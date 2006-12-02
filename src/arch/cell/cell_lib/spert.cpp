@@ -300,6 +300,19 @@ inline void processMsgState_sent(int msgIndex) {
 	    }
           #endif
 
+          // STATS2
+          #if SPE_STATS2 != 0
+            #if SPE_STATS2 > 0
+            if (msgIndex == SPE_STATS2) {
+            #endif
+              register unsigned int clock2;
+              getTimer(clock2);
+              printf("SPE_%d :: [0x%08x] SPE_MESSAGE_STATE_SEND for %d\n", (int)getSPEID(), clock2, msgIndex);
+            #if SPE_STATS2 > 0
+            }
+            #endif
+          #endif
+
           // TRACE
           #if ENABLE_TRACE != 0
             STATETRACE_CLEAR(msgIndex);
@@ -389,6 +402,19 @@ inline void processMsgState_preFetching(int msgIndex) {
   // STATS
   #if SPE_STATS != 0
     startTimer();
+  #endif
+
+  // STATS2
+  #if SPE_STATS2 != 0
+    #if SPE_STATS2 > 0
+    if (msgIndex == SPE_STATS2) {
+    #endif
+      register unsigned int clock2;
+      getTimer(clock2);
+      printf("SPE_%d :: [0x%08x] SPE_MESSAGE_STATE_PRE_FETCHING for %d\n", (int)getSPEID(), clock2, msgIndex);
+    #if SPE_STATS2 > 0
+    }
+    #endif
   #endif
 
   // TRACE
@@ -821,6 +847,19 @@ inline void processMsgState_preFetchingList(int msgIndex) {
     startTimer();
   #endif
 
+  // STATS2
+  #if SPE_STATS2 != 0
+    #if SPE_STATS2 > 0
+    if (msgIndex == SPE_STATS2) {
+    #endif
+      register unsigned int clock2;
+      getTimer(clock2);
+      printf("SPE_%d :: [0x%08x] SPE_MESSAGE_STATE_PRE_FETCHING_LIST for %d\n", (int)getSPEID(), clock2, msgIndex);
+    #if SPE_STATS2 > 0
+    }
+    #endif
+  #endif
+
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
@@ -1033,6 +1072,19 @@ inline void processMsgState_fetchingList(int msgIndex) {
     startTimer();
   #endif
 
+  // STATS2
+  #if SPE_STATS2 != 0
+    #if SPE_STATS2 > 0
+    if (msgIndex == SPE_STATS2) {
+    #endif
+      register unsigned int clock2;
+      getTimer(clock2);
+      printf("SPE_%d :: [0x%08x] SPE_MESSAGE_STATE_FETCHING_LIST for %d\n", (int)getSPEID(), clock2, msgIndex);
+    #if SPE_STATS2 > 0
+    }
+    #endif
+  #endif
+
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
@@ -1098,6 +1150,19 @@ inline void processMsgState_listReadyList(int msgIndex) {
   // STATS
   #if SPE_STATS != 0
     startTimer();
+  #endif
+
+  // STATS2
+  #if SPE_STATS2 != 0
+    #if SPE_STATS2 > 0
+    if (msgIndex == SPE_STATS2) {
+    #endif
+      register unsigned int clock2;
+      getTimer(clock2);
+      printf("SPE_%d :: [0x%08x] SPE_MESSAGE_STATE_LIST_READY_LIST for %d\n", (int)getSPEID(), clock2, msgIndex);
+    #if SPE_STATS2 > 0
+    }
+    #endif
   #endif
 
   // TRACE
@@ -1619,6 +1684,19 @@ inline void processMsgState_fetching(int msgIndex) {
     startTimer();
   #endif
 
+  // STATS2
+  #if SPE_STATS2 != 0
+    #if SPE_STATS2 > 0
+    if (msgIndex == SPE_STATS2) {
+    #endif
+      register unsigned int clock2;
+      getTimer(clock2);
+      printf("SPE_%d :: [0x%08x] SPE_MESSAGE_STATE_FETCHING for %d\n", (int)getSPEID(), clock2, msgIndex);
+    #if SPE_STATS2 > 0
+    }
+    #endif
+  #endif
+
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
@@ -1737,6 +1815,19 @@ inline void processMsgState_ready(int msgIndex) {
   // STATS
   #if SPE_STATS != 0
     startTimer();
+  #endif
+
+  // STATS2
+  #if SPE_STATS2 != 0
+    #if SPE_STATS2 > 0
+    if (msgIndex == SPE_STATS2) {
+    #endif
+      register unsigned int clock2;
+      getTimer(clock2);
+      printf("SPE_%d :: [0x%08x] SPE_MESSAGE_STATE_READY for %d\n", (int)getSPEID(), clock2, msgIndex);
+    #if SPE_STATS2 > 0
+    }
+    #endif
   #endif
 
   // TRACE
@@ -1916,6 +2007,19 @@ inline void processMsgState_executed(int msgIndex) {
   // STATS
   #if SPE_STATS != 0
     startTimer();
+  #endif
+
+  // STATS2
+  #if SPE_STATS2 != 0
+    #if SPE_STATS2 > 0
+    if (msgIndex == SPE_STATS2) {
+    #endif
+      register unsigned int clock2;
+      getTimer(clock2);
+      printf("SPE_%d :: [0x%08x] SPE_MESSAGE_STATE_EXECUTED for %d\n", (int)getSPEID(), clock2, msgIndex);
+    #if SPE_STATS2 > 0
+    }
+    #endif
   #endif
 
   // TRACE
@@ -2183,6 +2287,19 @@ inline void processMsgState_executedList(int msgIndex) {
     startTimer();
   #endif
 
+  // STATS2
+  #if SPE_STATS2 != 0
+    #if SPE_STATS2 > 0
+    if (msgIndex == SPE_STATS2) {
+    #endif
+      register unsigned int clock2;
+      getTimer(clock2);
+      printf("SPE_%d :: [0x%08x] SPE_MESSAGE_STATE_EXECUTED_LIST for %d\n", (int)getSPEID(), clock2, msgIndex);
+    #if SPE_STATS2 > 0
+    }
+    #endif
+  #endif
+
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
@@ -2301,6 +2418,19 @@ inline void processMsgState_committing(int msgIndex) {
   // STATS
   #if SPE_STATS != 0
     startTimer();
+  #endif
+
+  // STATS2
+  #if SPE_STATS2 != 0
+    #if SPE_STATS2 > 0
+    if (msgIndex == SPE_STATS2) {
+    #endif
+      register unsigned int clock2;
+      getTimer(clock2);
+      printf("SPE_%d :: [0x%08x] SPE_MESSAGE_STATE_COMMITTING for %d\n", (int)getSPEID(), clock2, msgIndex);
+    #if SPE_STATS2 > 0
+    }
+    #endif
   #endif
 
   // TRACE
@@ -2541,6 +2671,19 @@ inline void processMsgState_error(int msgIndex) {
     startTimer();
   #endif
 
+  // STATS2
+  #if SPE_STATS2 != 0
+    #if SPE_STATS2 > 0
+    if (msgIndex == SPE_STATS2) {
+    #endif
+      register unsigned int clock2;
+      getTimer(clock2);
+      printf("SPE_%d :: [0x%08x] SPE_MESSAGE_STATE_ERROR for %d\n", (int)getSPEID(), clock2, msgIndex);
+    #if SPE_STATS2 > 0
+    }
+    #endif
+  #endif
+
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
@@ -2714,7 +2857,7 @@ inline void speSchedulerInner() {
   int wrInUseCountCounter = 0;
 #endif
 
-#define LIMIT_READY  2
+#define LIMIT_READY  4
 
 // Switch scheduler method
 inline void speSchedulerInner() {
@@ -2727,6 +2870,12 @@ inline void speSchedulerInner() {
     register int stateSampleFlag = 0;
     int wrStateCount_[SPE_MESSAGE_NUM_STATES] = { 0 };
     wrInUseCountCounter++;
+  #endif
+
+  // STATS2
+  #if SPE_STATS2 != 0
+    static unsigned int clearStateCount = 0;
+    printf("SPE_%d :: speSchedulerInner() [clearStateCount:%u] - called...\n", (int)getSPEID(), clearStateCount);
   #endif
 
   // For each message queue entry
@@ -2755,6 +2904,12 @@ inline void speSchedulerInner() {
       switch (msgState[i]) {
 
         case SPE_MESSAGE_STATE_CLEAR:
+
+          // STATS2
+          #if SPE_STATS2 != 0
+            clearStateCount++;
+          #endif
+
           processMsgState_sent(i);
           tryAgain = 1;  // Continue on to either PRE_FETCHING or PRE_FETCHING_LIST
           break;
@@ -2805,7 +2960,11 @@ inline void speSchedulerInner() {
           break;
 
         case SPE_MESSAGE_STATE_READY:
-          #if LIMIT_READY == 0
+          #if LIMIT_READY <= 0
+
+            // DEBUG
+            //printf("SPE_%d : READY-site 1\n", (int)getSPEID());
+
             processMsgState_ready(i);
             tryAgain = 1;  // Execution finished... move on to EXECUTED or EXECUTED_LIST to queue DMA-Put
           #else
@@ -2862,28 +3021,32 @@ inline void speSchedulerInner() {
       } // end switch(msgState[i])
 
     } while ((msgState[i] != msgState_last) && (tryAgain != 0));
+  } // end for (i < SPE_MESSAGE_QUEUE_LENGTH)
 
-    #if LIMIT_READY > 0
-    {
-      static int runIndex = 0;
-      register int iOffset;
-      register int leftToRun = LIMIT_READY;
-      for (iOffset = 0; leftToRun > 0 && iOffset < SPE_MESSAGE_QUEUE_LENGTH; iOffset++) {
-        register int ri = (runIndex + iOffset) % SPE_MESSAGE_QUEUE_LENGTH;
-        if (msgState[ri] == SPE_MESSAGE_STATE_READY) {
-          processMsgState_ready(ri);
-          if ((msgQueue[ri]->flags & WORK_REQUEST_FLAGS_LIST) == 0x00) {
-            processMsgState_executed(ri);
-	  } else {
-            processMsgState_executedList(ri);
-	  }
-          leftToRun--;
-	}
+  #if LIMIT_READY > 0
+  {
+    static int runIndex = 0;
+    register int iOffset;
+    register int leftToRun = LIMIT_READY;
+    for (iOffset = 0; leftToRun > 0 && iOffset < SPE_MESSAGE_QUEUE_LENGTH; iOffset++) {
+      register int ri = (runIndex + iOffset) % SPE_MESSAGE_QUEUE_LENGTH;
+      if (msgState[ri] == SPE_MESSAGE_STATE_READY) {
+
+        // DEBUG
+        //printf("SPE_%d : READY-site 2\n", (int)getSPEID());
+          
+        processMsgState_ready(ri);
+        if ((msgQueue[ri]->flags & WORK_REQUEST_FLAGS_LIST) == 0x00) {
+          processMsgState_executed(ri);
+        } else {
+          processMsgState_executedList(ri);
+        }
+        leftToRun--;
       }
     }
-    #endif
-
-  } // end for (i < SPE_MESSAGE_QUEUE_LENGTH)
+    runIndex = (runIndex + iOffset - 1) % SPE_MESSAGE_QUEUE_LENGTH;
+  }
+  #endif
 
   // STATS
   #if SPE_STATS != 0
@@ -3076,6 +3239,12 @@ void speScheduler_wrapper(SPEData *speData, unsigned long long id) {
     startTimer();
   #endif
 
+  // STATS2
+  #if SPE_STATS2 != 0
+    startTimer();
+  #endif
+
+
   // The scheduler loop
   while (__builtin_expect(keepLooping != FALSE, 1)) {
 
@@ -3134,7 +3303,7 @@ void speScheduler_wrapper(SPEData *speData, unsigned long long id) {
       tagStatus = mfc_read_tag_status();
 
       // Message Queue Throttle Counter - Set to 0 to disable or to possitive throttle value
-      #define SPE_MESSAGE_QUEUE_THROTTLE_VALUE   61
+      #define SPE_MESSAGE_QUEUE_THROTTLE_VALUE   0
 
       #if SPE_MESSAGE_QUEUE_THROTTLE_VALUE > 0
 
@@ -3148,6 +3317,11 @@ void speScheduler_wrapper(SPEData *speData, unsigned long long id) {
       #endif
 
       if (tagStatus && mfc_stat_cmd_queue() > 0) {
+
+        // STATS2
+        #if SPE_STATS2 != 0
+          printf("SPE_%d :: MsgQ arrived, swapping buffers...\n", (int)getSPEID());
+        #endif
 
         // Swap the buffers
         volatile char* tmp0 = msgQueueRaw;
@@ -3199,7 +3373,7 @@ void speScheduler_wrapper(SPEData *speData, unsigned long long id) {
       }
     #endif
 
-    #define SPE_NOTIFY_QUEUE_THROTTLE_VALUE  64
+    #define SPE_NOTIFY_QUEUE_THROTTLE_VALUE  0
 
     #if SPE_NOTIFY_QUEUE_THROTTLE_VALUE > 0
 
@@ -3215,8 +3389,15 @@ void speScheduler_wrapper(SPEData *speData, unsigned long long id) {
     mfc_write_tag_mask(0x40000000); // only enable tag group 30 (notifcation queue request)
     mfc_write_tag_update_immediate();
     tagStatus = mfc_read_tag_status();
-    if (tagStatus && numDMAQueueEntries > 0)
+    if (tagStatus && numDMAQueueEntries > 0) {
+
+      // STATS2
+      #if SPE_STATS2 != 0
+        printf("SPE_%d :: Posting Notification Queue...\n", (int)getSPEID());
+      #endif
+
       spu_mfcdma32(notifyQueueRaw, (PPU_POINTER_TYPE)(speData->notifyQueue), SPE_NOTIFY_QUEUE_BYTE_COUNT, 30, MFC_PUT_CMD);
+    }
 
     #if SPE_NOTIFY_QUEUE_THROTTLE_VALUE > 0
 
@@ -3400,1397 +3581,6 @@ int main(unsigned long long id, unsigned long long param) {
   return 0;
 }
 
-
-#if 0
-
-void speScheduler(SPEData *speData, unsigned long long id) {
-
-  int keepLooping = TRUE;
-  int runIndex = 0;
-  int getIndex = 0;
-  int putIndex = 0;
-  int commitIndex = 0;
-  int tagStatus;
-  unsigned int numDMAQueueEntries = 0;
-  int i, j, iOffset;
-
-  // DEBUG
-  #if SPE_DEBUG_DISPLAY_STILL_ALIVE >= 1
-    int stillAliveCounter = SPE_DEBUG_DISPLAY_STILL_ALIVE;
-  #endif
-
-  #if SPE_DEBUG_DISPLAY >= 1
-    sim_printf("[0x%llx] --==>> Starting SPE Scheduler ...\n", id);
-  #endif
-
-  // Initialize the tag status registers to all tags enabled
-  spu_writech(MFC_WrTagMask, (unsigned int)-1);
-
-  // Clear out the DMAListEntry array
-  memset((void*)dmaListEntry, 0, sizeof(DMAListEntry) * 2 * SPE_MESSAGE_QUEUE_LENGTH);
-
-  // Create the local message queue
-  #if SPE_DEBUG_DISPLAY_NO_PROGRESS >= 1
-    int msgLastStateCount = 0;
-    int msgLastState[SPE_MESSAGE_QUEUE_LENGTH];
-  #endif
-
-
-  for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
-    STATETRACE_CLEAR(i);
-  }
-
-
-  for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
-    msgQueue[i] = (SPEMessage*)(((char*)msgQueueRaw) + (SIZEOF_16(SPEMessage) * i));
-    msgState[i] = SPE_MESSAGE_STATE_CLEAR;
-    #if SPE_DEBUG_DISPLAY_NO_PROGRESS >= 1
-      msgLastState[i] = SPE_MESSAGE_STATE_CLEAR;
-    #endif
-    readWritePtr[i] = NULL;
-    readOnlyPtr[i] = NULL;
-    writeOnlyPtr[i] = NULL;
-    msgCounter[i] = 0;
-    dmaListSize[i] = -1;
-    dmaList[i] = NULL;
-    localMemPtr[i] = NULL;
-    errorCode[i] = SPE_MESSAGE_OK;
-  }
-
-  // Once the message queue has been created, check in with the main processor by sending a pointer to it
-  spu_write_out_mbox((unsigned int)msgQueueRaw);
-  #if SPE_REPORT_END != 0
-    spu_write_out_mbox((unsigned int)(&_end));
-  #endif
-
-
-  // DEBUG
-  //__asm__ ("dsync");
-
-  // Do the intial read of the message queue from main memory
-  spu_mfcdma32(msgQueueRaw, (PPU_POINTER_TYPE)(speData->messageQueue), SPE_MESSAGE_QUEUE_BYTE_COUNT, 31, MFC_GET_CMD);
-
-  // DEBUG
-  #if SPE_DEBUG_DISPLAY >= 1
-    sim_printf("[0x%llx] :: starting scheduler loop...\n", id);
-  #endif
-
-  // The scheduler loop
-  while (__builtin_expect(keepLooping != FALSE, 1)) {
-
-    // Check the in mailbox for commands from the PPE
-    register int inMBoxCount = spu_stat_in_mbox();
-    while (__builtin_expect(inMBoxCount > 0, 0)) {
-      int command = spu_read_in_mbox();
-      if (command == SPE_MESSAGE_COMMAND_EXIT) {
-        keepLooping = FALSE;
-      }
-
-      inMBoxCount--;
-    }
-    if (__builtin_expect(keepLooping == FALSE, 0)) continue;
-
-
-    // DEBUG
-    register int displayMessageQueueRead = 0;
-    for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
-      if (msgQueue[i]->traceFlag != 0) {
-        displayMessageQueueRead = 1;
-        break;
-      }
-    }
-    if (displayMessageQueueRead) {
-      printf("SPE_%d :: Reading Message Queue...\n", (int)getSPEID());
-    }
-
-
-    // Let the user know that the SPE Runtime is still running...
-    #if SPE_DEBUG_DISPLAY_STILL_ALIVE >= 1
-      if (__builtin_expect(stillAliveCounter == 0, 0)) {
-        printf("[0x%llx] :: SPE_%d :: still going...\n", id, (int)getSPEID());
-        stillAliveCounter = SPE_DEBUG_DISPLAY_STILL_ALIVE;
-      }
-      stillAliveCounter--;
-    #endif
-
-
-    // Wait for the latest message queue read (blocking)
-    mfc_write_tag_mask(0x80000000);   // enable only tag group 31 (message queue request)
-    #if 0
-      mfc_write_tag_update_any();
-    #else
-      mfc_write_tag_update_all();
-    #endif
-    tagStatus = mfc_read_tag_status();
-    //mfc_write_tag_mask(0x7FFFFFFF);   // enable all tag groups except 31
-
-
-    // DEBUG
-    //__asm__ ("dsync");
-
-
-    // DEBUG
-    #if SPE_DEBUG_DISPLAY != 0
-      debug_displayActiveMessageQueue(id, msgState, "(0)");
-    #endif
-
-
-    // DEBUG
-    //__asm__ ("dsync");
-
-
-    //////////////////////////////////////////////////////////////////////////////////
-    // SPE_MESSAGE_STATE_SENT
-
-    // Check for new messages
-    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
-
-      // Check for a new message in this slot
-      // Conditions... 1) msgQueue[i]->counter0 == msgQueue[i]->counter1  // Entire entry has been written by PPE
-      //               2) msgQueue[i]->counter1 != msgCounter[i]          // Entry has not already been processed
-      //               3) msgQueue[i]->state == SPE_MESSAGE_STATE_SENT    // PPE wrote an entry and is waiting for the result
-      //               4) msgState[i] == SPE_MESSAGE_STATE_CLEAR          // SPE isn't currently processing this slot
-      if (__builtin_expect((msgQueue[i]->counter0 == msgQueue[i]->counter1) &&
-                           (msgQueue[i]->counter1 != msgCounter[i]) &&
-                           (msgQueue[i]->state == SPE_MESSAGE_STATE_SENT) &&
-                           (msgState[i] == SPE_MESSAGE_STATE_CLEAR),
-                           0
-                          )
-         ) {
-
-        STATETRACE_CLEAR(i);
-
-        // Start by checking the command
-        int command = msgQueue[i]->command;
-        if (__builtin_expect(command == SPE_MESSAGE_COMMAND_EXIT, 0)) {
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf(" --==>> SPE received EXIT command...\n");
-          #endif
-          keepLooping = FALSE;
-          break;
-        }
-
-        // Update the state of the message (locally)
-        if ((msgQueue[i]->flags & WORK_REQUEST_FLAGS_LIST) == 0x00)
-          msgState[i] = SPE_MESSAGE_STATE_PRE_FETCHING;
-        else
-          msgState[i] = SPE_MESSAGE_STATE_PRE_FETCHING_LIST;
-      
-        // DEBUG
-        #if SPE_DEBUG_DISPLAY >= 1
-          sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_SENT, msgState[i]);
-	#endif
-
-        msgCounter[i] = msgQueue[i]->counter1;
-
-        // DEBUG
-        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
-          printf("SPE_%d :: [TRACE] :: Tracing entry at index %d...\n", (int)getSPEID(), i);
-          debug_displayActiveMessageQueue(id, msgState, "(*)");
-	}
-      }
-    }
-
-    STATETRACE_UPDATE_ALL
-
-    // DEBUG
-    #if SPE_DEBUG_DISPLAY != 0
-      debug_displayActiveMessageQueue(id, msgState, "(1)");
-    #endif
-
-
-    //////////////////////////////////////////////////////////////////////////////////
-    // SPE_MESSAGE_STATE_PRE_FETCHING_LIST
-
-    // Check for messages that need data fetched (list)
-    numDMAQueueEntries = mfc_stat_cmd_queue();
-    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
-      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_PRE_FETCHING_LIST, 0)) {
-
-
-        // DEBUG
-        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
-          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_PRE_FETCHING_LIST for index %d...\n", (int)getSPEID(), i);
-          debug_displayActiveMessageQueue(id, msgState, "(*)");
-	}
-
-
-        // Ckeck the size of the dmaList.  If it is less than SPE_DMA_LIST_LENGTH then it will fit
-        //   in the preallocated area reserved for lists.  Otherwise, malloc memory to receive the
-        //   dma list from main memory.
-        if (dmaListSize[i] < 0) {
-
-          dmaListSize[i] = msgQueue[i]->readOnlyLen + msgQueue[i]->readWriteLen + msgQueue[i]->writeOnlyLen;
-          register int memNeeded = ROUNDUP_16(dmaListSize[i] * sizeof(DMAListEntry));
-
-          if (dmaListSize[i] > SPE_DMA_LIST_LENGTH) {
-            #ifdef __cplusplus
-            try {
-            #endif
-              //dmaList[i] = (DMAListEntry*)(new char[memNeeded]);
-              dmaList[i] = (DMAListEntry*)(_malloc_align(memNeeded, 4));
-            #ifdef __cplusplus
-	    } catch (...) {
-              dmaList[i] = NULL;
-	    }
-            #endif
-
-	    // DEBUG
-            #if SPE_DEBUG_DISPLAY >= 1
-              sim_printf("[0x%llx] :: dmaList[%d] = %p\n", id, i, dmaList[i]);
-            #endif
-
-            //if (dmaList[i] != NULL) { delete [] dmaList[i]; }
-	    if (__builtin_expect((dmaList[i] == NULL) || 
-                                 (((unsigned int)dmaList[i]) < ((unsigned int)(&_end))) ||
-                                 (((unsigned int)dmaList[i] + memNeeded) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE)),
-                                 0
-                                )
-               ) {
-              #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
-                sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for dmaList[%d] (1)... will try again later...\n", id, i);
-                sim_printf("[0x%llx] :: SPE :: dmaList[%d] = %p\n", id, i, dmaList[i]);
-	      #endif
-
-              dmaList[i] = NULL;
-              dmaListSize[i] = -1;  // Try allocating again next time
-
-              // DEBUG
-              //print_block_table();
-
-              continue;  // Skip for now, try again later
-            }
-          } else {
-            dmaList[i] = (DMAListEntry*)(&(dmaListEntry[i * SPE_DMA_LIST_LENGTH]));
-          }
-
-          // Zero-out the dmaList
-          memset(dmaList[i], 0, memNeeded);
-	}
-
-        // Intiate the DMA transfer for the DMA list into dmaList
-        if (numDMAQueueEntries > 0 && dmaListSize[i] > 0) {
-
-          spu_mfcdma32(dmaList[i],
-                       (unsigned int)(msgQueue[i]->readWritePtr),
-                       ROUNDUP_16(dmaListSize[i] * sizeof(DMAListEntry)),
-                       i,
-                       MFC_GET_CMD
-		      );
-
-          // Decrement the counter of available DMA queue entries left
-          numDMAQueueEntries--;
-
-          // Update the state of the message queue entry now that the data should be in-flight
-          msgState[i] = SPE_MESSAGE_STATE_FETCHING_LIST;
-
-          // DEBUG
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_PRE_FETCHING_LIST, msgState[i]);
-          #endif
-	}
-
-      }
-    }
-
-    STATETRACE_UPDATE_ALL
-
-    // DEBUG
-    #if SPE_DEBUG_DISPLAY != 0
-      debug_displayActiveMessageQueue(id, msgState, "(2)");
-    #endif
-
-
-    //////////////////////////////////////////////////////////////////////////////////
-    // SPE_MESSAGE_STATE_FETCHING_LIST
-
-    // Read the tag status to see if the data has arrived for any of the fetching message entries
-    mfc_write_tag_mask(0x7FFFFFFF);
-    mfc_write_tag_update_immediate();
-    tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
-    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
-      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_FETCHING_LIST && ((tagStatus & (0x01 << i)) != 0), 0)) {
-
-
-        // DEBUG
-        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
-          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_FETCHING_LIST for index %d...\n", (int)getSPEID(), i);
-          debug_displayActiveMessageQueue(id, msgState, "(*)");
-	}
-
-
-        // Update the state to show that this message queue entry is ready to be executed
-        msgState[i] = SPE_MESSAGE_STATE_LIST_READY_LIST;
-
-        // DEBUG
-        #if SPE_DEBUG_DISPLAY >= 1
-          sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_FETCHING_LIST, msgState[i]);
-        #endif
-
-        // Roundup all of the sizes to the next highest multiple of 16
-        for (j = 0; j < dmaListSize[i]; j++)
-          dmaList[i][j].size = ROUNDUP_16(dmaList[i][j].size);
-      }
-    }
-
-    STATETRACE_UPDATE_ALL
-
-    // DEBUG
-    #if SPE_DEBUG_DISPLAY != 0
-      debug_displayActiveMessageQueue(id, msgState, "(3)");
-    #endif
-
-
-    //////////////////////////////////////////////////////////////////////////////////
-    // SPE_MESSAGE_STATE_LIST_READY_LIST
-
-    // Check for messages that need data fetched (standard)
-    numDMAQueueEntries = mfc_stat_cmd_queue();
-    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
-      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_LIST_READY_LIST, 0)) {
-
-
-        // DEBUG
-        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
-          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_LIST_READY_LIST for index %d...\n", (int)getSPEID(), i);
-          debug_displayActiveMessageQueue(id, msgState, "(*)");
-	}
-
-
-        // Allocate the memory needed in the LS for this work request
-        if (localMemPtr[i] == NULL) {
-
-          // NOTE :Format: The allocated memory will contain a list of pointers (to the buffers) along
-          //   with the memory for the buffers themselves following the list (in order).
-
-          // Determine the number of bytes needed
-          register unsigned int memNeeded = 0;
-          for (j = 0; j < dmaListSize[i]; j++)
-            memNeeded += dmaList[i][j].size + sizeof(DMAListEntry);
-          if ((dmaListSize[i] & 0x01) != 0x00)  // Force even number of dmaListEntry structures
-            memNeeded += sizeof(DMAListEntry);
-
-          // Check the size of the memory needed.  If it is too large for the SPE's LS, then stop this
-          //   message with an error code because the memory allocation will never work.
-          // TODO : Should also add a define that guesses at what the expected maximum stack size is (that
-          //   could also be changed at compile-time by the end user)
-          if (__builtin_expect(memNeeded > ((unsigned int)0x40000 - ((unsigned int)(&_end))), 0)) {
-
-            // Clear up the dmaList
-            if (dmaListSize[i] > SPE_DMA_LIST_LENGTH) {
-              if (dmaList[i] != NULL) {
-                //delete [] dmaList[i];
-	        _free_align(dmaList[i]);
-	      }
-              dmaList[i] = NULL;
-              dmaListSize[i] = -1;
-	    }
-
-            // Move the message into an error state
-            errorCode[i] = SPE_MESSAGE_ERROR_NOT_ENOUGH_MEMORY;
-            msgState[i] = SPE_MESSAGE_STATE_ERROR;
-
-            // Move onto the next message
-            continue;
-	  }
-
-          // Try to allocate that memory
-          #ifdef __cplusplus
-          try {
-          #endif
-            //localMemPtr[i] = (void*)(new char[memNeeded]);
-            localMemPtr[i] = (void*)(_malloc_align(memNeeded, 4));
-          #ifdef __cplusplus
-	  } catch (...) {
-            localMemPtr[i] = NULL;
-	  }
-          #endif
-
-          // DEBUG
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf("[0x%llx] :: localMemPtr[%d] = %p\n", id, i, localMemPtr[i]);
-          #endif
-
-	  //if (localMemPtr[i] == NULL || ((unsigned int)localMemPtr[i]) + memNeeded >= (unsigned int)0x40000) {
-	  if (__builtin_expect((localMemPtr[i] == NULL) || 
-                               (((unsigned int)localMemPtr[i]) < ((unsigned int)(&_end))) ||
-                               (((unsigned int)localMemPtr[i] + memNeeded) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE)),
-                               0
-                              )
-             ) {
-            #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
-	      sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for localMemPtr[%d] (1)... will try again later...\n", id, i);
-              sim_printf("[0x%llx] :: SPE :: localMemPtr[%d] = %p\n", id, i, localMemPtr[i]);
-	    #endif
-
-	    localMemPtr[i] = NULL;
-
-            // DEBUG
-            //print_block_table();
-
-            continue;  // Try again next time
-	  }
-
-
-          // Setup pointers to the buffers
-          register unsigned int offset = ROUNDUP_16(dmaListSize[i] * sizeof(DMAListEntry));
-          for (j = 0; j < dmaListSize[i]; j++) {
-            ((DMAListEntry*)(localMemPtr[i]))[j].size = ((dmaList[i][j].size) & (0x0000FFFF));  // Force notify and reserved fields to zero
-            ((DMAListEntry*)(localMemPtr[i]))[j].ea = (unsigned int)(((char*)(localMemPtr[i])) + offset);
-            offset += dmaList[i][j].size;
-	  }
-
-          // Zero the memory if needed
-          #if SPE_ZERO_WRITE_ONLY_MEMORY != 0
-            if (msgQueue[i]->writeOnlyLen > 0) {
-	      register unsigned int writeSize = 0;
-              for (j = dmaListSize[i] - msgQueue[i]->writeOnlyLen; j < dmaListSize[i]; j++)
-                writeSize += dmaList[i][j].size;
-              memset(((char*)(localMemPtr[i])) + memNeeded - writeSize, 0, writeSize);
-	    }
-          #endif
-
-	  // Setup the list pointers for the buffer types (make sure they are NULL)
-	  readOnlyPtr[i] = NULL;
-          readWritePtr[i] = NULL;
-          writeOnlyPtr[i] = NULL;
-	}
-
-        // Start the DMA transaction that will grab the data to be read from main memory
-        if (numDMAQueueEntries > 0 &&
-            (msgQueue[i]->readOnlyLen + msgQueue[i]->readWriteLen) > 0 &&
-            localMemPtr[i] != NULL
-           ) {
-
-          // DEBUG
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf("[0x%llx] :: Pre-GETL :: msgIndex = %d, ls_addr = %p, eah = %d, list_addr = %p, list_size = %d, tag = %d...\n",
-                       id, i, ((char*)localMemPtr[i]) + ROUNDUP_16(dmaListSize[i] * sizeof(DMAListEntry)),
-                       (unsigned int)msgQueue[i]->readOnlyPtr,
-                       (unsigned int)(dmaList[i]),
-                       (msgQueue[i]->readOnlyLen + msgQueue[i]->readWriteLen) * sizeof(DMAListEntry), i
-                      );
-
-            for (j = 0; j < dmaListSize[i]; j++) {
-              sim_printf("[0x%llx] :: dmaList[%d][%d].size = %d (0x%x), dmaList[%d][%d].ea = 0x%08x (0x%08x)\n",
-                         id,
-                         i, j, dmaList[i][j].size, ((DMAListEntry*)(localMemPtr[i]))[j].size,
-                         i, j, dmaList[i][j].ea, ((DMAListEntry*)(localMemPtr[i]))[j].ea
-	                );
-            }
-	  #endif
-
-	  spu_mfcdma64(((char*)localMemPtr[i]) + ROUNDUP_16(dmaListSize[i] * sizeof(DMAListEntry)),
-                       (unsigned int)msgQueue[i]->readOnlyPtr,  // eah
-                       (unsigned int)(dmaList[i]),
-                       (msgQueue[i]->readOnlyLen + msgQueue[i]->readWriteLen) * sizeof(DMAListEntry),
-                       i,
-                       MFC_GETL_CMD
-	              );
-
-          // Decrement the counter of available DMA queue entries left
-          numDMAQueueEntries--;
-
-          // Update the state of the message queue entry now that the data should be in-flight
-          msgState[i] = SPE_MESSAGE_STATE_FETCHING;
-
-          // DEBUG
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_LIST_READY_LIST, msgState[i]);
-          #endif
-	}
-
-      }
-    }
-
-    STATETRACE_UPDATE_ALL
-
-    // DEBUG
-    #if SPE_DEBUG_DISPLAY != 0
-      debug_displayActiveMessageQueue(id, msgState, "(4)");
-    #endif
-
-
-    //////////////////////////////////////////////////////////////////////////////////
-    // SPE_MESSAGE_STATE_PRE_FETCHING
-
-    // Check for messages that need data fetched (standard)
-    numDMAQueueEntries = mfc_stat_cmd_queue();
-    int newGetIndex = (getIndex + 1) % SPE_MESSAGE_QUEUE_LENGTH;
-    int numGetsLeft = SPE_MAX_GET_PER_LOOP;
-    for (iOffset = 0; __builtin_expect(iOffset < SPE_MESSAGE_QUEUE_LENGTH, 1); iOffset++) {
-
-      register int i = (getIndex + iOffset) % SPE_MESSAGE_QUEUE_LENGTH;
-
-      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_PRE_FETCHING, 0)) {
-
-
-        // DEBUG
-        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
-          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_PRE_FETCHING for index %d...\n", (int)getSPEID(), i);
-          debug_displayActiveMessageQueue(id, msgState, "(*)");
-	}
-
-
-        // Allocate the memory for the message queue entry (if need be)
-        // NOTE: First check to see if it is non-null.  What might have happened was that there was enough memory
-        //   last time but the DMA queue was full and a retry was needed.  So this time, the memory is there and
-        //   only the DMA needs to be retried.
-        if (localMemPtr[i] == NULL) {
-
-          // Allocate the memory and place a pointer to the allocated buffer into localMemPtr.  This buffer will
-          //   be divided up into three regions: readOnly, readWrite, write (IN THAT ORDER!; the regions may be
-          //   empty if no pointer for the region was supplied by the original sendWorkRequest() call on the PPU).
-          register int memNeeded = ROUNDUP_16(msgQueue[i]->readWriteLen) +
-                                   ROUNDUP_16(msgQueue[i]->readOnlyLen) +
-                                   ROUNDUP_16(msgQueue[i]->writeOnlyLen);
-          register int offset = 0;
-
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf("[0x%llx] :: Allocating Memory for index %d :: memNeeded = %d, msgQueue[%d].totalMem = %d\n",
-                       id, i, memNeeded, i, msgQueue[i]->totalMem
-                      );
-	  #endif
-
-          // Check the size of the memory needed.  If it is too large for the SPE's LS, then stop this
-          //   message with an error code because the memory allocation will never work.
-          // TODO : Should also add a define that guesses at what the expected maximum stack size is (that
-          //   could also be changed at compile-time by the end user)
-          if (__builtin_expect(memNeeded > ((int)0x40000 - ((int)(&_end))), 0)) {
-
-            // Move the message into an error state
-            errorCode[i] = SPE_MESSAGE_ERROR_NOT_ENOUGH_MEMORY;
-            msgState[i] = SPE_MESSAGE_STATE_ERROR;
-
-            // Move onto the next message
-            continue;
-	  }
-
-          #ifdef __cplusplus
-          try {
-          #endif
-            //localMemPtr[i] = (void*)(new char[memNeeded]);
-            localMemPtr[i] = (void*)(_malloc_align(memNeeded, 4));
-          #ifdef __cplusplus
-	  } catch (...) {
-            localMemPtr[i] = NULL;
-	  }
-          #endif
-
-          // Check the pointer (if it is bad, then skip this message for now and try again later)
-          // TODO: There are probably better checks for this (use _end, etc.)
-          //if (localMemPtr[i] == NULL || ((unsigned int)localMemPtr[i] + memNeeded) >= (unsigned int)0x40000) {
-          if (__builtin_expect((localMemPtr[i] == NULL) || 
-                               (((unsigned int)localMemPtr[i]) < ((unsigned int)(&_end))) ||
-                               (((unsigned int)localMemPtr[i] + memNeeded) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE)),
-                               0
-                              )
-             ) {
-            #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
-	      sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for localMemPtr[%d] (2)... will try again later...\n", id, i);
-              sim_printf("[0x%llx] :: SPE :: localMemPtr[%d] = %p\n", id, i, localMemPtr[i]);
-	    #endif
-
-            localMemPtr[i] = NULL;
-
-            // DEBUG
-            //print_block_table();
-
-            continue;
-	  }
-
-          // DEBUG
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf("[0x%llx] :: localMemPtr[%d] = %p\n", id, i, localMemPtr[i]);
-	  #endif
-
-          // Assign the buffer specific pointers
-          // NOTE: Order matters here.  Need to allocate the read buffers next to each other and the write
-          //   buffers next to each other
-          if (msgQueue[i]->readOnlyPtr != (PPU_POINTER_TYPE)NULL) {
-            readOnlyPtr[i] = localMemPtr[i];
-            offset += ROUNDUP_16(msgQueue[i]->readOnlyLen);
-          } else {
-            readOnlyPtr[i] = NULL;
-	  }
-
-          if (msgQueue[i]->readWritePtr != (PPU_POINTER_TYPE)NULL) {
-            readWritePtr[i] = (void*)((char*)localMemPtr[i] + offset);
-            offset += ROUNDUP_16(msgQueue[i]->readWriteLen);
-          } else {
-            readWritePtr[i] = NULL;
-	  }
-
-          if (msgQueue[i]->writeOnlyPtr != (PPU_POINTER_TYPE)NULL) {
-            writeOnlyPtr[i] = (void*)((char*)localMemPtr[i] + offset);
-            #if SPE_ZERO_WRITE_ONLY_MEMORY != 0
-              memset(writeOnlyPtr[i], 0, ROUNDUP_16(msgQueue[i]->writeOnlyLen));
-            #endif
-          } else {
-            writeOnlyPtr[i] = NULL;
-	  }
-	}
-
-        // Check to see if this message does not needs to fetch any data
-        if (((msgQueue[i]->readWritePtr == (PPU_POINTER_TYPE)NULL)
-             || ((msgQueue[i]->flags & WORK_REQUEST_FLAGS_RW_IS_WO) == WORK_REQUEST_FLAGS_RW_IS_WO)
-	    )
-            && (msgQueue[i]->readOnlyPtr == (PPU_POINTER_TYPE)NULL)
-           ) {
-
-          // Update the state (to ready to execute)
-          msgState[i] = SPE_MESSAGE_STATE_READY;
-
-          // DEBUG
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_PRE_FETCHING, msgState[i]);
-          #endif
-
-          // Done with this one
-          continue;
-	}
-
-        // Create the DMA list
-        // NOTE: Check to see if the dma list has already been created yet or not (if dmaListSize[i] < 0, not created)
-        if (dmaListSize[i] < 0) {
-
-          // Count the number of DMA entries needed for the read DMA list
-          register int entryCount = 0;
-          if ((msgQueue[i]->flags & WORK_REQUEST_FLAGS_RW_IS_WO) == 0x00)
-            entryCount += (ROUNDUP_16(msgQueue[i]->readWriteLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
-                          (((msgQueue[i]->readWriteLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
-          entryCount += (ROUNDUP_16(msgQueue[i]->readOnlyLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
-                        (((msgQueue[i]->readOnlyLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
-
-          // Allocate a larger DMA list if needed
-          if (entryCount > SPE_DMA_LIST_LENGTH) {
-            #ifdef __cplusplus
-            try {
-            #endif
-              //dmaList[i] = new DMAListEntry[entryCount];
-              dmaList[i] = (DMAListEntry*)(_malloc_align(entryCount * sizeof(DMAListEntry), 4));
-            #ifdef __cplusplus
-	    } catch (...) {
-              dmaList[i] = NULL;
-	    }
-            #endif
-
-	    // DEBUG
-            #if SPE_DEBUG_DISPLAY >= 1
-              sim_printf("[0x%llx] :: dmaList[%d] = %p\n", id, i, dmaList[i]);
-            #endif
-
-	    //if (dmaList[i] == NULL || ((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry))) >= (unsigned int)0x40000) {
-            if (__builtin_expect((dmaList[i] == NULL) || 
-                                 (((unsigned int)dmaList[i]) < ((unsigned int)(&_end))) ||
-                                 (((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry))) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE)),
-                                 0
-				)
-               ) {
-              #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
-	        sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for dmaList[%d] (2)... will try again later...\n", id, i);
-                sim_printf("[0x%llx] :: SPE :: dmaList[%d] = %p\n", id, i, dmaList[i]);
-	      #endif
-
-              dmaList[i] = NULL;
-
-              // DEBUG
-              //print_block_table();
-
-              continue;  // Skip for now, try again later
-	    }
-            memset(dmaList[i], 0, sizeof(DMAListEntry) * entryCount);
-	  } else {
-            dmaList[i] = (DMAListEntry*)(&(dmaListEntry[i * SPE_DMA_LIST_LENGTH]));
-	  }
-          dmaListSize[i] = entryCount;
-
-          // Fill in the list
-          register int listIndex = 0;
-
-          if (readOnlyPtr[i] != NULL) {
-            register int bufferLeft = msgQueue[i]->readOnlyLen;
-            register unsigned int srcOffset = (unsigned int)(msgQueue[i]->readOnlyPtr);
-
-            while (bufferLeft > 0) {
-              dmaList[i][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
-              dmaList[i][listIndex].size = ROUNDUP_16(dmaList[i][listIndex].size);
-              dmaList[i][listIndex].ea = srcOffset;
-
-              bufferLeft -= SPE_DMA_LIST_ENTRY_MAX_LENGTH;
-              listIndex++;
-              srcOffset += SPE_DMA_LIST_ENTRY_MAX_LENGTH;
-	    }
-	  }
-
-          if (((msgQueue[i]->flags & WORK_REQUEST_FLAGS_RW_IS_WO) == 0x00) && (readWritePtr[i] != NULL)) {
-            register int bufferLeft = msgQueue[i]->readWriteLen;
-            register unsigned int srcOffset = (unsigned int)(msgQueue[i]->readWritePtr);
-
-            while (bufferLeft > 0) {
-              dmaList[i][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
-              dmaList[i][listIndex].size = ROUNDUP_16(dmaList[i][listIndex].size);
-              dmaList[i][listIndex].ea = srcOffset;
-
-              bufferLeft -= SPE_DMA_LIST_ENTRY_MAX_LENGTH;
-              listIndex++;
-              srcOffset += SPE_DMA_LIST_ENTRY_MAX_LENGTH;
-	    }
-	  }
-	}
-
-        // Initiate the DMA command
-        if (numDMAQueueEntries > 0 && dmaListSize[i] > 0) {
-
-          // DEBUG
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf("[0x%llx] :: Pre-GETL :: msgIndex = %d, ls_addr = %p, eah = %d, list_addr = %p, list_size = %d, tag = %d...\n",
-                   id, i, localMemPtr[i], 0, (unsigned int)(dmaList[i]), dmaListSize[i] * sizeof(DMAListEntry), i
-                  );
-
-            for (j = 0; j < dmaListSize[i]; j++) {
-              sim_printf("[0x%llx] :: dmaList[%d][%d].size = %d (0x%x), dmaList[%d][%d].ea = 0x%08x (0x%08x)\n",
-                         id,
-                         i, j, dmaList[i][j].size, ((DMAListEntry*)(localMemPtr[i]))[j].size,
-                         i, j, dmaList[i][j].ea, ((DMAListEntry*)(localMemPtr[i]))[j].ea
-		        );
-	    }
-	  #endif
-
-          spu_mfcdma64(localMemPtr[i],
-                       0,
-                       (unsigned int)(dmaList[i]),
-                       dmaListSize[i] * sizeof(DMAListEntry),
-                       i,
-                       MFC_GETL_CMD
-		      );
-
-          // Update the getIndex so it will point to the index directly after the last index that was able
-          //   to get the GET through.
-          newGetIndex = (i + 1) % SPE_MESSAGE_QUEUE_LENGTH;
-
-          // Decrement the counter of available DMA queue entries left
-          numDMAQueueEntries--;
-
-          // Update the state of the message queue entry now that the data should be in-flight
-          msgState[i] = SPE_MESSAGE_STATE_FETCHING;
-
-          // DEBUG
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_PRE_FETCHING, msgState[i]);
-          #endif
-
-	  // Check to see if this maxs out the number of GETs allowed each scheduler loop iteration
-	  numGetsLeft--;
-          if (numGetsLeft <= 0)
-            break;
-	}
-
-      }
-    }
-    getIndex = newGetIndex;
-
-    STATETRACE_UPDATE_ALL
-
-    // DEBUG
-    #if SPE_DEBUG_DISPLAY != 0
-      debug_displayActiveMessageQueue(id, msgState, "(5)");
-    #endif
-
-
-    //////////////////////////////////////////////////////////////////////////////////
-    // SPE_MESSAGE_STATE_FETCHING
-
-    // Read the tag status to see if the data has arrived for any of the fetching message entries
-    mfc_write_tag_mask(0x7FFFFFFF);
-    mfc_write_tag_update_immediate();
-    tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
-    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
-      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_FETCHING && ((tagStatus & (0x01 << i)) != 0), 0)) {
-
-
-        // DEBUG
-        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
-          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_FETCHING for index %d...\n", (int)getSPEID(), i);
-          debug_displayActiveMessageQueue(id, msgState, "(*)");
-	}
-
-
-        // Update the state to show that this message queue entry is ready to be executed
-        msgState[i] = SPE_MESSAGE_STATE_READY;
-
-        // DEBUG
-        #if SPE_DEBUG_DISPLAY >= 1
-          sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_FETCHING, msgState[i]);
-        #endif
-
-        // Clean up the dmaList (only if this is NOT a list type work request; if it is a
-        //   list type work request (flag has LIST bit set) then do not delete the dma list)
-        if ((msgQueue[i]->flags & WORK_REQUEST_FLAGS_LIST) == 0x00) {
-          if (dmaListSize[i] > SPE_DMA_LIST_LENGTH) {
-            //delete [] dmaList[i];
-            _free_align(dmaList[i]);
-            dmaList[i] = NULL;
-	  }
-          dmaListSize[i] = -1;  // NOTE: Clear this so data that the dmaList looks like it has not been set now
-	}
-
-      }
-    }
-
-    STATETRACE_UPDATE_ALL
-
-    // DEBUG
-    #if SPE_DEBUG_DISPLAY != 0
-      debug_displayActiveMessageQueue(id, msgState, "(6)");
-    #endif
-
-
-    //////////////////////////////////////////////////////////////////////////////////
-    // SPE_MESSAGE_STATE_READY
-
-    // Execute SPE_MAX_EXECUTE_PER_LOOP ready messages
-    register unsigned int numExecLeft = SPE_MAX_EXECUTE_PER_LOOP;
-    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
-
-      if (__builtin_expect(msgState[runIndex] == SPE_MESSAGE_STATE_READY, 0)) {
-
-
-        // DEBUG
-        if (__builtin_expect(msgQueue[runIndex]->traceFlag, 0)) {
-          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_READY for index %d...\n", (int)getSPEID(), runIndex);
-          debug_displayActiveMessageQueue(id, msgState, "(*)");
-	}
-
-
-        register volatile SPEMessage* msg = msgQueue[runIndex];
-
-        #if SPE_DEBUG_DISPLAY >= 1
-	  if (msgQueue[runIndex]->traceFlag)
-            printf("SPE_%d :: >>>>> Entering User Code (index %d)...\n", (int)getSPEID(), runIndex);
-	#endif
-
-
-        // DEBUG
-        isTracingFlag = ((msg->traceFlag) ? (-1) : (0));
-
-
-        // Execute the function specified
-        if ((msg->flags & WORK_REQUEST_FLAGS_LIST) == 0x00) {
-
-          #if SPE_DEBUG_DISPLAY >= 1
-	    if (msgQueue[runIndex]->traceFlag)
-	      printf("SPE_%d :: Executing message queue entry as standard entry... fi = %d...\n", (int)getSPEID(), msg->funcIndex);
-	  #endif
-
-          funcLookup(msg->funcIndex,
-                     readWritePtr[runIndex], msg->readWriteLen,
-                     readOnlyPtr[runIndex], msg->readOnlyLen,
-                     writeOnlyPtr[runIndex], msg->writeOnlyLen,
-                     NULL
-                    );
-	} else {
-
-          #if SPE_DEBUG_DISPLAY >= 1
-	    if (msgQueue[runIndex]->traceFlag)
-	      printf("SPE_%d :: Executing message queue entry as list entry... fi = %d...\n", (int)getSPEID(), msg->funcIndex);
-	  #endif
-
-          funcLookup(msg->funcIndex,
-                     NULL, msg->readWriteLen,
-                     NULL, msg->readOnlyLen,
-                     NULL, msg->writeOnlyLen,
-                     (DMAListEntry*)(localMemPtr[runIndex])
-                    );
-	}
-
-        #if SPE_DEBUG_DISPLAY >= 1
-	  if (msgQueue[runIndex]->traceFlag)
-            printf("SPE_%d :: <<<<< Leaving User Code...\n", (int)getSPEID());
-	#endif
-
-        #if SPE_STATS != 0
-          statData.numWorkRequestsExecuted++;
-        #endif
-
-        // Update the state of the message queue entry
-        if ((msg->flags & WORK_REQUEST_FLAGS_LIST) == 0x00)
-          msgState[runIndex] = SPE_MESSAGE_STATE_EXECUTED;
-        else
-          msgState[runIndex] = SPE_MESSAGE_STATE_EXECUTED_LIST;
-
-        // DEBUG
-        #if SPE_DEBUG_DISPLAY >= 1
-          sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_READY, msgState[i]);
-        #endif
-
-        // Move runIndex to the next message and break from the loop (execute only one)
-        runIndex++;
-        if (runIndex >= SPE_MESSAGE_QUEUE_LENGTH)
-          runIndex = 0;
-
-        // Decrement the count of work request that can still be execute this scheduler loop iteration
-        //   and break from this execute loop if the maximum number has already been reached.
-        numExecLeft--;
-        if (numExecLeft <= 0)
-          break;
-      }
-
-      // Try the next message
-      runIndex++;
-      if (runIndex >= SPE_MESSAGE_QUEUE_LENGTH)
-        runIndex = 0;
-    }
-
-    STATETRACE_UPDATE_ALL
-
-    // DEBUG
-    #if SPE_DEBUG_DISPLAY != 0
-      debug_displayActiveMessageQueue(id, msgState, "(7)");
-    #endif
-
-
-    //////////////////////////////////////////////////////////////////////////////////
-    // SPE_MESSAGE_STATE_EXECUTED_LIST
-
-    // Check for messages that have been executed but still need data committed to main memory
-    numDMAQueueEntries = mfc_stat_cmd_queue();
-    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
-      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_EXECUTED_LIST, 0)) {
-
-
-        // DEBUG
-        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
-          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_EXECUTED_LIST for index %d...\n", (int)getSPEID(), i);
-          debug_displayActiveMessageQueue(id, msgState, "(*)");
-	}
-
-
-        // Initiate the DMA transfer of the readWrite and writeOnly buffer back to main memory
-        if ((msgQueue[i]->readWriteLen + msgQueue[i]->writeOnlyLen) > 0 && localMemPtr[i] != NULL) {
-
-          if (numDMAQueueEntries > 0) {
-
-            // Get the offsets in the dmaList and the localMemPtr for the readWrite section
-            register unsigned int readWriteOffset = ROUNDUP_16(dmaListSize[i] * sizeof(DMAListEntry));
-            for (j = 0; j < msgQueue[i]->readOnlyLen; j++)
-              readWriteOffset += dmaList[i][j].size;
-
-            // DEBUG
-            #if SPE_DEBUG_DISPLAY >= 1
-              sim_printf("[0x%llx] :: Pre-PUTL :: msgIndex = %d, ls_addr = %p, eah = %d, list_addr = %p, list_size = %d, tag = %d...\n",
-                         id, i, ((char*)localMemPtr[i]) + (readWriteOffset),
-                         (unsigned int)msgQueue[i]->readOnlyPtr,
-                         (unsigned int)(&(dmaList[i][msgQueue[i]->readOnlyLen])),
-                         (msgQueue[i]->readWriteLen + msgQueue[i]->writeOnlyLen) * sizeof(DMAListEntry), i
-                        );
-	    #endif
-
-            spu_mfcdma64(((char*)localMemPtr[i]) + (readWriteOffset),
-                         (unsigned int)msgQueue[i]->readOnlyPtr,  // eah
-                         (unsigned int)(&(dmaList[i][msgQueue[i]->readOnlyLen])),
-                         (msgQueue[i]->readWriteLen + msgQueue[i]->writeOnlyLen) * sizeof(DMAListEntry),
-                         i,
-                         MFC_PUTL_CMD
-	                );
-
-            // Decrement the counter of available DMA queue entries left
-            numDMAQueueEntries--;
-
-            // Update the state of the message queue entry now that the data should be in-flight
-            msgState[i] = SPE_MESSAGE_STATE_COMMITTING;
-
-            // DEBUG
-            #if SPE_DEBUG_DISPLAY >= 1
-              sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_EXECUTED_LIST, msgState[i]);
-            #endif
-          }
-
-	} else {
-
-          // Update the state of the message queue entry now that the data should be in-flight
-          msgState[i] = SPE_MESSAGE_STATE_COMMITTING;
-
-          // DEBUG
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_EXECUTED_LIST, msgState[i]);
-          #endif
-	}
-
-      }
-    }
-
-    STATETRACE_UPDATE_ALL
-
-    // DEBUG
-    #if SPE_DEBUG_DISPLAY != 0
-      debug_displayActiveMessageQueue(id, msgState, "(8)");
-    #endif
-
-
-    //////////////////////////////////////////////////////////////////////////////////
-    // SPE_MESSAGE_STATE_EXECUTED
-
-    // Check for messages that have been executed but still need data committed to main memory
-    numDMAQueueEntries = mfc_stat_cmd_queue();
-    int newPutIndex = (putIndex + 1) % SPE_MESSAGE_QUEUE_LENGTH;
-    int numPutsLeft = SPE_MAX_PUT_PER_LOOP;
-    for (iOffset = 0; __builtin_expect(iOffset < SPE_MESSAGE_QUEUE_LENGTH, 1); iOffset++) {
-
-      register int i = (putIndex + iOffset) % SPE_MESSAGE_QUEUE_LENGTH;
-
-      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_EXECUTED, 0)) {
-
-
-        // DEBUG
-        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
-          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_EXECUTED for index %d...\n", (int)getSPEID(), i);
-          debug_displayActiveMessageQueue(id, msgState, "(*)");
-	}
-
-
-        // Check to see if this message does not need to fetch any data
-        if (((msgQueue[i]->readWritePtr == (PPU_POINTER_TYPE)NULL)
-             || ((msgQueue[i]->flags & WORK_REQUEST_FLAGS_RW_IS_RO) == WORK_REQUEST_FLAGS_RW_IS_RO)
-            )
-            && (msgQueue[i]->writeOnlyPtr == (PPU_POINTER_TYPE)NULL)
-           ) {
-
-          msgState[i] = SPE_MESSAGE_STATE_COMMITTING;  // The index still needs to be passed back to the PPU
-
-          // DEBUG
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_EXECUTED, msgState[i]);
-          #endif
-
-          continue;
-	}
-
-        // Create the DMA list
-        // NOTE: Check to see if the dma list has already been created yet or not (if dmaListSize[i] < 0, not created)
-        if (dmaListSize[i] < 0) {
-
-          // Count the number of DMA entries needed for the read DMA list
-          register int entryCount = 0;
-          if ((msgQueue[i]->flags & WORK_REQUEST_FLAGS_RW_IS_RO) == 0x00)
-            entryCount += (ROUNDUP_16(msgQueue[i]->readWriteLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
-                          (((msgQueue[i]->readWriteLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
-          entryCount += (ROUNDUP_16(msgQueue[i]->writeOnlyLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
-                        (((msgQueue[i]->writeOnlyLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
-
-          // Allocate a larger DMA list if needed
-          if (entryCount > SPE_DMA_LIST_LENGTH) {
-            #ifdef __cplusplus
-            try {
-            #endif
-              //dmaList[i] = new DMAListEntry[entryCount];
-              dmaList[i] = (DMAListEntry*)(_malloc_align(entryCount * sizeof(DMAListEntry), 4));
-            #ifdef __cplusplus
-	    } catch (...) {
-              dmaList[i] = NULL;
-	    }
-            #endif
-
-	    // DEBUG
-            #if SPE_DEBUG_DISPLAY >= 1
-              sim_printf("[0x%llx] :: dmaList[%d] = %p\n", id, i, dmaList[i]);
-            #endif
-
-	    //if (dmaList[i] == NULL || ((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry)))>= (unsigned int)0x40000) {
-	    if (__builtin_expect((dmaList[i] == NULL) || 
-                                 (((unsigned int)dmaList[i]) < ((unsigned int)(&_end))) ||
-                                 (((unsigned int)dmaList[i] + (entryCount * sizeof(DMAListEntry))) >= ((unsigned int)0x40000 - SPE_RESERVED_STACK_SIZE)),
-                                 0
-				)
-               ) {
-              #if SPE_NOTIFY_ON_MALLOC_FAILURE != 0
-	        sim_printf("[0x%llu] :: SPE :: Failed to allocate memory for dmaList[%d] (3)... will try again later...\n", id, i);
-                sim_printf("[0x%llx] :: SPE :: dmaList[%d] = %p\n", id, i, dmaList[i]);
-	      #endif
-
-              dmaList[i] = NULL;
-
-              // DEBUG
-              //print_block_table();
-
-              continue;  // Skip for now, try again later
-            }
-            memset(dmaList[i], 0, sizeof(DMAListEntry) * entryCount);
-	  } else {
-            dmaList[i] = (DMAListEntry*)(&(dmaListEntry[i * SPE_DMA_LIST_LENGTH]));
-	  }
-          dmaListSize[i] = entryCount;
-
-
-          // Fill in the list
-          readOnlyPtr[i] = NULL;   // Use this pointer to point to the first buffer to be written to memory (don't nead readOnly data anymore)
-          register int listIndex = 0;
-
-          if (((msgQueue[i]->flags & WORK_REQUEST_FLAGS_RW_IS_RO) == 0x00) && (readWritePtr[i] != NULL)) {
-            register int bufferLeft = msgQueue[i]->readWriteLen;
-            register unsigned int srcOffset = (unsigned int)(msgQueue[i]->readWritePtr);
-
-            while (bufferLeft > 0) {
-              dmaList[i][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ?
-                                             (SPE_DMA_LIST_ENTRY_MAX_LENGTH) :
-                                             (bufferLeft)
-                                           );
-              dmaList[i][listIndex].size = ROUNDUP_16(dmaList[i][listIndex].size);
-              dmaList[i][listIndex].ea = srcOffset;
-
-              bufferLeft -= SPE_DMA_LIST_ENTRY_MAX_LENGTH;
-              listIndex++;
-              srcOffset += SPE_DMA_LIST_ENTRY_MAX_LENGTH;
-	    }
-
-            // Store the start of the write portion of the localMem buffer in readOnlyPtr
-            readOnlyPtr[i] = readWritePtr[i];
-	  }
-
-          if (writeOnlyPtr[i] != NULL) {
-            register int bufferLeft = msgQueue[i]->writeOnlyLen;
-            register unsigned int srcOffset = (unsigned int)(msgQueue[i]->writeOnlyPtr);
-
-            while (bufferLeft > 0) {
-              dmaList[i][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
-              dmaList[i][listIndex].size = ROUNDUP_16(dmaList[i][listIndex].size);
-              dmaList[i][listIndex].ea = srcOffset;
-
-              bufferLeft -= SPE_DMA_LIST_ENTRY_MAX_LENGTH;
-              listIndex++;
-              srcOffset += SPE_DMA_LIST_ENTRY_MAX_LENGTH;
-	    }
-
-            // Store the start of the write portion of the localMem buffer in readOnlyPtr (if
-            //   it is not set already... i.e. - this buffer isn't first)
-            if (readOnlyPtr[i] == NULL) readOnlyPtr[i] = writeOnlyPtr[i];
-	  }
-
-	}
-
-
-        // Initiate the DMA command
-        if (numDMAQueueEntries > 0 && dmaListSize[i] > 0) {
-
-          // DEBUG
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf("[0x%llx] :: Pre-PUTL :: msgIndex = %d, ls_addr = %p, eah = %d, list_addr = %p, list_size = %d, tag = %d...\n",
-                       id, i, readOnlyPtr[i], 0, (unsigned int)(dmaList[i]), dmaListSize[i] * sizeof(DMAListEntry), i
-                      );
-	  #endif
-
-          spu_mfcdma64(readOnlyPtr[i],  // This pointer is being used to point to the start of the write portion of localMem
-                       0,
-                       (unsigned int)(dmaList[i]),
-                       dmaListSize[i] * sizeof(DMAListEntry),
-                       i,
-                       MFC_PUTL_CMD
-		      );
-
-          // Update the putList heuristic
-          newPutIndex = (i + 1) % SPE_MESSAGE_QUEUE_LENGTH;
-
-          // Decrement the counter of available DMA queue entries left
-          numDMAQueueEntries--;
-
-          // Update the state of the message queue entry now that the data should be in-flight
-          msgState[i] = SPE_MESSAGE_STATE_COMMITTING;
-
-          // DEBUG
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_EXECUTED, msgState[i]);
-          #endif
-
-	  // Check to see if this maxs out the number of PUTs allowed per scheduler loop iteration
-	  numPutsLeft--;
-          if (numPutsLeft <= 0)
-            break;
-	}
-
-      }
-    }
-    putIndex = newPutIndex;
-
-    STATETRACE_UPDATE_ALL
-
-    // DEBUG
-    #if SPE_DEBUG_DISPLAY != 0
-      debug_displayActiveMessageQueue(id, msgState, "(9)");
-    #endif
-
-
-    // Initiate the next message queue read from main memory
-    spu_mfcdma32(msgQueueRaw, (PPU_POINTER_TYPE)(speData->messageQueue), SPE_MESSAGE_QUEUE_BYTE_COUNT, 31, MFC_GET_CMD);
-
-
-    //////////////////////////////////////////////////////////////////////////////////
-    // SPE_MESSAGE_STATE_COMMITTING
-
-    // Check for messages that are committed
-    mfc_write_tag_mask(0x7FFFFFFF);
-    mfc_write_tag_update_immediate();
-    tagStatus = mfc_read_tag_status(); //spu_readch(MFC_RdTagStat);
-    int commitIndexNext = (commitIndex + 1) % SPE_MESSAGE_QUEUE_LENGTH;
-    for (iOffset = 0; __builtin_expect(iOffset < SPE_MESSAGE_QUEUE_LENGTH, 1); iOffset++) {
-
-      register int i = (commitIndex + iOffset) % SPE_MESSAGE_QUEUE_LENGTH;
-
-      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_COMMITTING && ((tagStatus & (0x01 << i)) != 0), 0)) {
-
-
-        // DEBUG
-        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
-          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_COMMITTING for index %d...\n", (int)getSPEID(), i);
-          debug_displayActiveMessageQueue(id, msgState, "(*)");
-	}
-
-
-        // Check to see if there is an available entry in the outbound mailbox
-        if (spu_stat_out_mbox() > 0) {
-
-          STATETRACE_OUTPUT(i);
-
-          // Free the local data and message buffers
-          if (localMemPtr[i] != NULL) {
-            //delete [] ((char*)localMemPtr[i]);
-            _free_align(localMemPtr[i]);
-            localMemPtr[i] = NULL;
-            readWritePtr[i] = NULL;
-            readOnlyPtr[i] = NULL;
-            writeOnlyPtr[i] = NULL;
-	  }
-
-          // Clear the entry
-          msgState[i] = SPE_MESSAGE_STATE_CLEAR;
-
-          // DEBUG
-          #if SPE_DEBUG_DISPLAY >= 1
-            sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, SPE_MESSAGE_STATE_COMMITTING, msgState[i]);
-          #endif
-
-          // Clear the dmaList size so it looks like the dma list has not been set
-          if (dmaListSize[i] > SPE_DMA_LIST_LENGTH) {
-            //delete [] dmaList[i];
-            _free_align(dmaList[i]);
-            dmaList[i] = NULL;
-	  }
-          dmaListSize[i] = -1;
-
-          // Send the index of the entry in the message queue to the PPE
-          //spu_write_out_mbox((unsigned int)i);
-          spu_write_out_mbox(MESSAGE_RETURN_CODE(i, SPE_MESSAGE_OK));
-
-          // Update the commitIndex heuristic
-          commitIndexNext = (i + 1) % SPE_MESSAGE_QUEUE_LENGTH;
-	}
-        
-      }
-    }
-    commitIndex = commitIndexNext;
-
-    STATETRACE_UPDATE_ALL
-
-    // DEBUG
-    #if SPE_DEBUG_DISPLAY != 0
-      debug_displayActiveMessageQueue(id, msgState, "(A)");
-    #endif
-
-
-    //////////////////////////////////////////////////////////////////////////////////
-    // SPE_MESSAGE_STATE_ERROR
-
-    // Check for any messages that have entered into the ERROR state
-    for (i = 0; __builtin_expect(i < SPE_MESSAGE_QUEUE_LENGTH, 1); i++) {
-      if (__builtin_expect(msgState[i] == SPE_MESSAGE_STATE_ERROR, 0)) {
-
-
-        // DEBUG
-        if (__builtin_expect(msgQueue[i]->traceFlag, 0)) {
-          printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_ERROR for index %d...\n", (int)getSPEID(), i);
-          debug_displayActiveMessageQueue(id, msgState, "(*)");
-	}
-
-
-        STATETRACE_OUTPUT(i);
-
-
-        // NOTE: All clean-up should be taken care of by the code placing the message into the error
-        //   state (that way the code here does not have to handle all cases).
-
-        // Check to see if there is an available entry in the outbound mailbox
-        if (spu_stat_out_mbox() > 0) {
-
-          // DEBUG
-          #if SPE_DEBUG_DISPLAY >= 1
-	    sim_printf("[0x%llx] :: msg %d's state going from %d -> %d\n", id, i, msgState[i], SPE_MESSAGE_STATE_CLEAR);
-          #endif
-
-          // Clear the entry
-          msgState[i] = SPE_MESSAGE_STATE_CLEAR;
-
-          // Send the index of the entry in the message queue to the PPE along with the ERROR code
-          spu_write_out_mbox(MESSAGE_RETURN_CODE(i, errorCode[i]));
-
-          // Clear the error
-          errorCode[i] = SPE_MESSAGE_OK;
-	}
-      }
-    }
-
-    STATETRACE_UPDATE_ALL
-
-    // DEBUG
-    #if SPE_DEBUG_DISPLAY >= 1
-      debug_displayActiveMessageQueue(id, msgState, "(B)");
-    #endif
-
-    // DEBUG
-    #if SPE_DEBUG_DISPLAY >= 1
-      debug_displayStateHistogram(id, msgState, "");
-    #endif
-
-    // Check to see if there has been no progress in the message's states
-    #if SPE_DEBUG_DISPLAY_NO_PROGRESS >= 1
-      int msgLastStateFlag = 0;
-      for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
-        if (msgState[i] != msgLastState[i]) {
-          msgLastState[i] = msgState[i];
-          msgLastStateFlag = 1;  // Something changed
-	}
-      }
-
-      if (msgLastStateFlag != 0) {  // if something changed
-        msgLastStateCount = 0;
-      } else {                      // otherwise, nothing has changed
-        msgLastStateCount++;
-        if (msgLastStateCount >= SPE_DEBUG_DISPLAY_NO_PROGRESS) {
-          for (int i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
-            sim_printf("[0x%llx] :: msgState[%d] = %d\n", id, i, msgState[i]);
-	  }
-          msgLastStateCount = 0; // reset the count
-	}
-      }
-    #endif
-
-    #if SPE_STATS != 0
-      statData.schedulerLoopCount++;
-    #endif
-
-
-    // DEBUG
-    //__asm__("dsync");
-
-
-    // DEBUG - Moved to here (commented out at original location)
-    // Initiate the next message queue read from main memory
-    //spu_mfcdma32(msgQueueRaw, (PPU_POINTER_TYPE)(speData->messageQueue), SPE_MESSAGE_QUEUE_BYTE_COUNT, 31, MFC_GET_CMD);
-
-
-  } // end while (keepLooping)
-
-}
-
-#endif
 
 
 
