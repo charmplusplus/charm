@@ -54,7 +54,7 @@ extern "C" {
  *    of physical SPEs will reduce the ammount of time it takes to initiate all the SPEs (which
  *    can be slow on the simulator).
  */
-#define NUM_SPE_THREADS  8   // Normally, this is limited by (and should be set to) the number of physical SPEs present
+#define NUM_SPE_THREADS  1   // Normally, this is limited by (and should be set to) the number of physical SPEs present
 
 /** Create each SPEThread one-by-one (i.e. - create one thread and wait for it to check in
  *    before creating the next one).  If this is not set, all SPEThreads are created and then
@@ -82,6 +82,14 @@ extern "C" {
 #define WORK_REQUEST_STATE_FINISHED  (2)
 #define WORK_REQUEST_STATE_MAX       (2)
 
+// WRGROUP_STATE_xxx Defines
+#define WRGROUP_STATE_MIN      (0)
+#define WRGROUP_STATE_FREE     (1)  // Available to use
+#define WRGROUP_STATE_FILLING  (2)  // Work Requests are being added to it
+#define WRGROUP_STATE_FULL     (3)  // All Work Requests have been added, waiting for all Work Requests to complete
+#define WRGROUP_STATE_FINISHED (4)  // All Work Requests have completed
+#define WRGROUP_STATE_MAX      (4)
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 // Externals
@@ -95,6 +103,27 @@ extern spe_program_handle_t spert_main;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 // Data Structures
+
+/** WRGroup is used to specify a collection of Work Requests. */
+typedef struct __wr_group {
+
+  int numWRs;               ///< A counter indicating the number of Work Requests that are associated with this group
+  int finishedCount;        ///< A counter indicating the number of Work Requests associated with this group that have completed
+  int state;                ///< An internal state that indicates the state of this group
+
+  void* userData;                ///< A user defined pointer that will be passed to the callback function
+  void (*callbackFunc)(void*);  ///< A pointer to a group specific callback function
+
+  struct __wr_group *next;  ///< Pointer to the next WRGroup in the linked list of WRGroups
+
+} WRGroup;
+
+/** WRGroupHandle structure that is used by Offload API calls. */
+typedef WRGroup* WRGroupHandle;
+
+/** A "NULL" WRGroupHandle. */
+#define INVALID_WRGroupHandle (NULL)
+
 
 /** WorkRequest is used to keep track of and access outstanding work requests. */
 typedef struct __work_request {
@@ -114,8 +143,12 @@ typedef struct __work_request {
   void* writeOnlyPtr; ///< Pointer to a single buffer that is DMAed out-of the SPE's local store after the work request has been executed.  An equal sized buffer will be provied to the funcLookup() function, which may be filled in by the user's code.  Upon completion of the work request, the data will be DMAed into the buffer pointed to by this pointer.  Not used for scatter/gather work requests.  (<b>Must be 16 byte aligned.</b>  128 byte alignment is preferred.)
   int writeOnlyLen;   ///< Length (in bytes) of the buffer pointed to by writeOnlyPtr.  For scatter/gather work requests, this number is the number of DMAListEntry structures in the user's dma list that are write-only.
   unsigned int flags; ///< One or more WORK_REQUEST_FLAGS_xxx bitwise ORed together.
-  void *userData;     ///< A user defined pointer that will be passed to the callback function provided to InitOffloadAPI().
+  void *userData;     ///< A user defined pointer that will be passed to the callback function
   volatile void (*callbackFunc)(void*);  // A pointer to a work request specific callback function
+
+  DMAListEntry dmaList[SPE_DMA_LIST_LENGTH];
+
+  WRGroupHandle wrGroupHandle;   ///< WRGroupHandle that this Work Request belongs to.
 
   struct __work_request *next; ///< Pointer to the next WRHandle in the linked list of WRHandles
 
@@ -127,7 +160,7 @@ typedef struct __work_request {
 /** WRHandle structure that is used by Offload API calls.  This is what the caller (user of Offload API) keeps track of. */
 typedef WorkRequest* WRHandle;
 
-/** A "NULL" WRHandle (similar to a null pointer). */
+/** A "NULL" WRHandle. */
 #define INVALID_WRHandle (NULL)
 
 
@@ -157,8 +190,15 @@ extern "C" {
  *
  *  \return Non-zero on success.
  */
-extern int InitOffloadAPI(void(*cbFunc)(void*) DEFAULT_TO_NULL  ///< Pointer to a function that should be called when a work request completes
+extern int InitOffloadAPI(void(*cbFunc)(void*) DEFAULT_TO_NULL,   ///< Pointer to a function that should be called when a work request completes
+                          void(*gcbFunc)(void*) DEFAULT_TO_NULL,  ///< Pointer to a function that should be called when a group of work requests completes
+                          void(*errorFunc)(int,void*,WRHandle) DEFAULT_TO_NULL ///< Pointer to a function that should be called if an error is returned by a Work Request on one of the SPEs
                          );
+#ifndef __cplusplus
+#define InitOffloadAPI()     InitOffloadAPI(NULL, NULL)
+#define InitOffloadAPI(cbf)  InitOffloadAPI(cbf, NULL)
+#endif
+
 
 /** Close function.  This function should be called after all other function calls to the
  *  Offload API have been made.  It should only be called once.
@@ -182,13 +222,15 @@ extern WRHandle sendWorkRequest(int funcIndex,      ///< Index of the function t
                                 void* userData DEFAULT_TO_NULL, ///< A pointer to user defined data that will be passed to the callback function (if there is one) once this request is finished
 				unsigned int flags DEFAULT_TO_NONE, ///< Flags for the work request (see WORK_REQUEST_FLAGS_xxx defines)
                                 void (*callbackFunc)(void*) DEFAULT_TO_NULL, ///< A callback function to use specifically for this work request
+                                WRGroupHandle wrGroupHandle DEFAULT_TO_NULL, ///< A handle to a Work Request Group that this Work Request will be added to
                                 unsigned int speAffinityMask DEFAULT_TO_ALLSET  ///< The logical SPE that this work request should be executed on
                                );
 #ifndef __cplusplus
-#define sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol) sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, NULL, WORK_REQUEST_FLAGS_NONE, NULL, -1)
-#define sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud) sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, WORK_REQUEST_FLAGS_NONE, NULL, -1)
-#define sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, f) sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, f, NULL, -1)
-#define sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, f, cb) sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, f, cb, -1)
+#define sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol) sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, NULL, WORK_REQUEST_FLAGS_NONE, NULL, NULL, -1)
+#define sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud) sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, WORK_REQUEST_FLAGS_NONE, NULL, NULL, -1)
+#define sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, f) sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, f, NULL, NULL, -1)
+#define sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, f, cb) sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, f, cb, NULL, -1)
+#define sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, f, cb, gh) sendWorkRequest(fi, rwp, rwl, rop, rol, wop, wol, ud, f, cb, gh, -1)
 #endif
 
 /** Creates and sends a work request to one of the SPEs.  This method of sending a work request is considered
@@ -208,14 +250,16 @@ extern WRHandle sendWorkRequest_list(int funcIndex,         ///< Index of the fu
                                      void* userData DEFAULT_TO_NULL, ///< A pointer to user defined data that will be passed to the callback function (if there is one) once this request is finished
                                      unsigned int flags DEFAULT_TO_NONE, ///< Flags for the work requests (see WORK_REQUEST_FLAGS_xxx defines)
                                      void (*callbackFunc)(void*) DEFAULT_TO_NULL, ///< A callback function to use specifically for this work request
+                                     WRGroupHandle wrGroupHandle DEFAULT_TO_NULL, ///< A handle to a Work Request Group that this Work Request will be added to
                                      unsigned int speAffinityMask DEFAULT_TO_ALLSET ///< The logical SPE that this work request should be executed on
                                     );
 // Create some defines that will allow sendWorkRequest_list() to be called more easily
 #ifndef __cplusplus
-#define sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo) sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, NULL, WORK_REQUEST_FLAGS_NONE, NULL, -1)
-#define sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud) sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, WORK_REQUEST_FLAGS_NONE, NULL, -1)
-#define sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, f) sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, f, NULL, -1)
-#define sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, f, cb) sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, f, cb, -1)
+#define sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo) sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, NULL, WORK_REQUEST_FLAGS_NONE, NULL, NULL, -1)
+#define sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud) sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, WORK_REQUEST_FLAGS_NONE, NULL, NULL, -1)
+#define sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, f) sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, f, NULL, NULL, -1)
+#define sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, f, cb) sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, f, cb, NULL, -1)
+#define sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, f, cb, gh) sendWorkRequest_list(fi, eah, dmal, nro, nrw, nwo, ud, f, cb, gh, -1)
 #endif
 
 
@@ -237,6 +281,29 @@ extern int isFinished(WRHandle wrHandle    ///< A work request handle returned b
  */
 void waitForWRHandle(WRHandle wrHandle     ///< A work request handle returned by sendWorkRequest
                     );
+
+
+/** Used to create a Work Request Group to which Work Requests may be added. */
+extern WRGroupHandle createWRGroup(void* userData DEFAULT_TO_NULL,              ///< User data pointer
+                                   void (*callbackFunc)(void*) DEFAULT_TO_NULL  ///< Callback function pointer
+                                  );
+#ifndef __cplusplus
+#define createWRGroup()    createWRGroup(NULL, NULL);
+#define createWRGroup(ud)  createWRGroup(ud, NULL);
+#endif
+
+
+/** Used to inidicate that all the Work Requests that will be added to the specified Work Request Group have been added. */
+extern void completeWRGroup(WRGroupHandle wrGroupHandle);
+
+
+/** Used to check whether or not a Work Request Group has finished. */
+extern int isWRGroupFinished(WRGroupHandle wrGroupHandle);
+
+
+/** Used to wait for a Work Reqeuest Group to finish. */
+extern void waitForWRGroupHandle(WRGroupHandle wrGroupHandle);
+
 
 /** Used to allow the Offload API to make progress.  Checks for finished work requests, etc.
   */
