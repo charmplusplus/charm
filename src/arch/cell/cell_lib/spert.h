@@ -90,6 +90,7 @@
 // NOTE : Only a single SPE_STATS should be enabled at a time (e.g. - SPE_STATS enabled, SPE_STATS1 disabled) !!!
 #define SPE_STATS    0  // Set to have stat data collected during execution for the SPE side of the Offload API (SPE Runtime)
 #define SPE_STATS1   0
+#define SPE_STATS2   0  // 0: unset; >0: message queue index to track; <0: track all message queue entries
 
 // The lower and upper bounds of tags that are available to the user's code (incase the user's code needs to
 //   do DMA transactions directly and needs to use tags in doing so).
