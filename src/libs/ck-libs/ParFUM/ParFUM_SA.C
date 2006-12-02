@@ -32,7 +32,16 @@ void ParFUM_SA_Init(int meshId) {
   meshSA = ParfumSAId;
   meshSA[idx].insert(size, idx);
   FEM_Mesh *m = FEM_Mesh_lookup(meshId,"ParFUM_SA_Init");
-  FEMMeshMsg *msg = new FEMMeshMsg(m,tc); 
+
+	//initializing the lock code
+	FEM_DataAttribute *lockAttr = (FEM_DataAttribute *) m->node.lookup(FEM_ADAPT_LOCK,"ParFUM_SA_Init");
+	AllocTable2d<int> &lockTable = lockAttr->getInt();
+	for(int i=0;i<lockAttr->getMax();i++){
+		lockTable[i][0] = -1; // locking chunkID
+		lockTable[i][1] = -1; // locking region
+	}
+  
+	FEMMeshMsg *msg = new FEMMeshMsg(m,tc); 
   meshSA[idx].setFemMesh(msg);
   return;
 }
@@ -43,11 +52,13 @@ ParFUMShadowArray::ParFUMShadowArray(int s, int i) {
   numChunks = s;
   idx = i;
   fmMesh = NULL;
+	regionCount = 0;
 }
 
 ParFUMShadowArray::ParFUMShadowArray(CkMigrateMessage *m) {
   tc = NULL;
   fmMesh = NULL;
+	regionCount = 0;
 }
 
 ParFUMShadowArray::~ParFUMShadowArray() {
@@ -86,14 +97,148 @@ void ParFUMShadowArray::sort(int *chkList, int chkListSize) {
   for(int i=0; i<chkListSize; i++) {
     for(int j=i+1; j<chkListSize; j++) {
       if(chkList[j] < chkList[i]) {
-	int tmp = chkList[i];
-	chkList[i] = chkList[j];
-	chkList[j] = tmp;
+  int tmp = chkList[i];
+  chkList[i] = chkList[j];
+  chkList[j] = tmp;
       }
     }
   }
   return;
 }
+
+
+/** This method locks all the nodes belonging to the 
+ * specified elements. Elements might be on remote chunk.
+ * Corresponding idxls between other chunks must also be locked */
+bool ParFUMShadowArray::lockRegion(int numElements,adaptAdj *elements,RegionID *regionID){
+  
+	//create a regionID for this region
+	regionID->chunkID = idx;
+	regionID->localID = regionCount;
+	regionCount++;
+
+	LockRegion * region = new LockRegion;
+	region->myID = *regionID;
+
+  //collect all the local nodes in this list of elements into one list
+  collectLocalNodes(numElements,elements,region->localNodes);
+  
+	//Try to lock all the local nodes. If any fails unlock all and
+  //return
+	
+	FEM_Node &fmNode = fmMesh->node;
+	IDXL_Side &shared = fmNode.shared;
+	AllocTable2d<int> &lockTable = ((FEM_DataAttribute *)fmNode.lookup(FEM_ADAPT_LOCK,"lockRegion"))->getInt();
+	bool success = true;
+
+	for(int i=0;i<region->localNodes.length();i++){
+		int node = region->localNodes[i];
+		if(shared.getRec(node)==NULL){
+			//Purely Local node
+		}else{
+			//Shared node
+		}
+
+		if(lockTable[node][0]!= -1){
+			//the node is locked
+			success = false;
+			break;
+		}else{
+			//the node is unlocked
+			lockTable[node][0] = idx;
+			lockTable[node][1] = region->myID.localID;
+		}
+	}
+
+	//add this region to the regionTable if the locals have all been locked
+	if(!success){
+		//we could not lock one of the local nodes
+		freeRegion(region);
+		return false;
+	}else{
+		//all local nodes were sucessfully locked
+		regionTable.put(*regionID) = region;
+	}
+  
+  //Of the local nodes some are shared. Find all the chunks that 
+  //share these nodes and lock all the idxls for that
+  
+  
+
+  //elements that are remote need to be sent to a remote 
+  //processor and their nodes need to be locked on the remote
+  
+  
+}
+
+/** Free up all the local nodes, idxl and elements 
+ * on remote chunk locked by this node */
+void ParFUMShadowArray::freeRegion(LockRegion *region){
+	//free the localNodes
+	FEM_Node &fmNode = fmMesh->node;
+	IDXL_Side &shared = fmNode.shared;
+	AllocTable2d<int> &lockTable = ((FEM_DataAttribute *)fmNode.lookup(FEM_ADAPT_LOCK,"lockRegion"))->getInt();
+	
+	for(int i=0;i<region->localNodes.length();i++){
+		//is the node locked and has it been locked by this region
+		if(lockTable[region->localNodes[i]][0] == region->myID.chunkID && lockTable[region->localNodes[i]][1] == region->myID.localID ){
+			//the node had been locked by this region earlier
+			//unlocking it now
+			lockTable[region->localNodes[i]][0] = -1;
+			lockTable[region->localNodes[i]][1] = -1;
+		}
+	}
+
+	//TODO: free the idxl and elements on remote chunks
+	
+}
+
+void ParFUMShadowArray::unlockRegion(RegionID regionID){
+	CkAssert(regionID.chunkID == idx);
+	LockRegion *region = regionTable.get(regionID);
+	freeRegion(region);
+}
+
+
+
+/**  Find all the local nodes in the connectivity of the list of elements 
+  * and store it in the vector localNodes */
+void ParFUMShadowArray::collectLocalNodes(int numElements,adaptAdj *elements,CkVec<int> &localNodes){
+  for(int i=0;i<numElements;i++){
+    //check if the element is local
+    CkAssert(elements[i].partID >= 0 && elements[i].localID >= 0);
+    if(elements[i].partID == idx){
+      int elemType = elements[i].elemType;
+      const FEM_Elem &elem = fmMesh->getElem(elemType);
+      const int *conn = elem.connFor(elements[i].localID);
+      const int numNodes = elem.getNodesPer();
+      for(int j=0;j<numNodes;j++){
+        int node = conn[j];
+        CkAssert(node >= 0);
+        localNodes.push_back(node);
+      }
+    }
+  }
+  //now we need to uniquify the list of localNodes
+  if(localNodes.length() != 0){
+    localNodes.quickSort(8);
+    int count=0;
+    for(int i=1;i<localNodes.length();i++){
+      if(localNodes[count] == localNodes[i]){
+      }else{
+        count++;
+        if(i != count){
+          localNodes[count] = localNodes[i];
+        }
+      }
+    }
+    localNodes.resize(count+1);
+  }
+}
+
+
+
+
 
 
 /** Helper function that translates the sharedChk and idxlType 

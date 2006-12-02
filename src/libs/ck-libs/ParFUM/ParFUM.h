@@ -150,9 +150,9 @@ extern "C" {
 #define FEM_MESH_SIZING (FEM_ATTRIB_FIRST+15) ///< Target edge length attr.
 
 #define FEM_ADAPT_ADJ (FEM_ATTRIB_FIRST+16) ///< Element to element adjacency used for adaptivity (does not have ghosts)
+#define FEM_ADAPT_LOCK (FEM_ATTRIB_FIRST+17) /// Lock for the bulk adaptivity.. Used for nodes
 
-
-#define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+17) ///< This is the last valid attribute code
+#define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+18) ///< This is the last valid attribute code
 
   // Specialized routines: 
   void FEM_Mesh_set_conn(int fem_mesh,int entity,

@@ -1502,8 +1502,12 @@ void FEM_Entity::create(int attr,const char *caller) {
   }
   else if(attr == FEM_BOUNDARY){
 	allocateBoundary();
-  }else if(attr = FEM_ADAPT_ADJ){
+  }else if(attr == FEM_ADAPT_ADJ){
 		add(new FEM_DataAttribute(this,attr));
+	}else if(attr == FEM_ADAPT_LOCK){
+		FEM_DataAttribute *adaptLock = new FEM_DataAttribute(this,attr);
+		adaptLock->setDatatype(FEM_INT);
+		adaptLock->setWidth(2);
 	}
   else {
 	//It's an unrecognized tag: abort

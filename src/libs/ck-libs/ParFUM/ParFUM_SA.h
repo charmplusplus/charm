@@ -9,6 +9,7 @@
 #include "charm++.h"
 #include "ParFUM.h"
 #include "idxl.h"
+#include "ParFUM_internals.h"
 #include "ParFUM_SA.decl.h"
 
 ///This is a message which packs all the chunk indices together
@@ -44,6 +45,29 @@ class lockChunksMsg : public CMessage_lockChunksMsg {
   }
 };
 
+class RegionID{
+public:
+	int chunkID;
+	int localID;
+ 	operator CkHashCode() const {
+		return (CkHashCode )(localID + 1<< chunkID); 
+	};
+	inline bool operator ==(const RegionID &rhs) const {
+		return (rhs.chunkID == chunkID) && (rhs.localID == localID);
+	}
+};
+
+/** Class that represent a region that is being locked 
+ */
+class LockRegion {
+public:
+	RegionID myID;
+	CkVec<int> localNodes;
+	CkVec<int> sharedIdxls;
+	CkVec<adaptAdj> remoteElements;
+};
+
+
 ///The shadow array attached to a fem chunk to perform all communication
 /** This is a shadow array that should be used by all operations
     which want to perform any operations on meshes and for that
@@ -62,6 +86,9 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
   ///cross-pointer to the fem mesh on this chunk
   FEM_Mesh *fmMesh;
   ///Deprecated: used to lock this chunk
+
+	CkHashtableT<CkHashtableAdaptorT<RegionID>,LockRegion *> regionTable;
+	int regionCount;
 
  public:
   ///constructor
@@ -88,7 +115,22 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
 
   ///Sort this list of numbers in increasing order
   void sort(int *chkList, int chkListSize);
-  ///Translates the sharedChk and the idxlType to the idxl side
+  
+	//Lock all the nodes belonging to these elements
+	//Some of the elements might be remote
+	//You also have to lock idxls with all those chunks with which
+	//any of the nodes are shared
+	bool lockRegion(int numElements,adaptAdj *elements,RegionID *regionID);
+
+	void unlockRegion(RegionID regionID);
+	
+	void collectLocalNodes(int numElements,adaptAdj *elements,CkVec<int> &localNodes);
+	void freeRegion(LockRegion *region);
+
+
+	
+	
+	///Translates the sharedChk and the idxlType to the idxl side
   FEM_Comm *FindIdxlSide(int idxlType);
 
   ///Lock the particular idxl list on the following chunks
