@@ -1,6 +1,7 @@
 OPTS=-O3 
 CHARMC=../../../bin/charmc -language ampi $(OPTS)
-MPICC=mpicc $(OPTS)
+#MPICC=mpicc $(OPTS)
+MPICC=$(CHARMC)
 
 #all : pingpong-2way.c
 #	$(CHARMC) pingpong-2wayc -o pgm
