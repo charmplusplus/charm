@@ -391,9 +391,9 @@ void FEM_Register_array_layout(int fem_mesh,int entity,int attr,void *data,int f
 	FEM_Attribute *a = e->lookup(attr,caller);
 	if(a->getWidth() == 0){
 		/** While registering an attribute for the first time
-		 * Its width and type should get set correctly
+		 * Its width should get set correctly
 		 * **/
-		a->setDatatype(layout.type);
+	//	a->setDatatype(layout.type);
 		a->setWidth(layout.width);
 	}
 	
@@ -1503,11 +1503,14 @@ void FEM_Entity::create(int attr,const char *caller) {
   else if(attr == FEM_BOUNDARY){
 	allocateBoundary();
   }else if(attr == FEM_ADAPT_ADJ){
-		add(new FEM_DataAttribute(this,attr));
+		FEM_DataAttribute *adaptAdj = new FEM_DataAttribute(this,attr);
+		adaptAdj->setDatatype(FEM_BYTE);
+		add(adaptAdj);
 	}else if(attr == FEM_ADAPT_LOCK){
 		FEM_DataAttribute *adaptLock = new FEM_DataAttribute(this,attr);
 		adaptLock->setDatatype(FEM_INT);
 		adaptLock->setWidth(2);
+		add(adaptLock);
 	}
   else {
 	//It's an unrecognized tag: abort

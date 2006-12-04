@@ -14,6 +14,13 @@ module ParFUM_SA {
   array [1D] ParFUMShadowArray {
     entry ParFUMShadowArray(int s, int i);
     entry void setFemMesh(FEMMeshMsg *m);
+
+		entry void lockRegionForRemote(RegionID regionID,int sharedIdxls[numSharedIdxls],int numSharedIdxls,adaptAdj elements[numElements],int numElements);
+		entry void lockReply(int remoteChunk,RegionID regionID,bool success);
+		entry void unlockForRemote(RegionID regionID);
+		entry void unlockReply(int remoteChunk,RegionID regionID);
+
+
     entry [sync,threaded] void IdxlLockChunksRemote(lockChunksMsg *lm);
     entry [sync,threaded] void IdxlLockChunksSecondaryRemote(lockChunksMsg *lm);
     entry [sync,threaded] void IdxlUnlockChunksRemote(lockChunksMsg *lm);

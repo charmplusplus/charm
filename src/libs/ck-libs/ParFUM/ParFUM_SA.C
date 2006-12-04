@@ -9,7 +9,7 @@
 #include "ParFUM_SA.h"
 
 CProxy_ParFUMShadowArray meshSA;
-
+#define DEBUG(x) x
 
 
 void ParFUM_SA_Init(int meshId) {
@@ -18,7 +18,7 @@ void ParFUM_SA_Init(int meshId) {
   int size;
   FEM_Mesh_allocate_valid_attr(meshId, FEM_ELEM+0);
   FEM_Mesh_allocate_valid_attr(meshId, FEM_NODE);
-  //_registerParFUM_SA();
+  _registerParFUM_SA();
   TCharm *tc=TCharm::get();
   MPI_Comm comm = MPI_COMM_WORLD;
   MPI_Comm_rank(comm,&idx);
@@ -107,11 +107,28 @@ void ParFUMShadowArray::sort(int *chkList, int chkListSize) {
 }
 
 
+void uniquify(CkVec<int> &vec){
+  if(vec.length() != 0){
+    vec.quickSort(8);
+    int count=0;
+    for(int i=1;i<vec.length();i++){
+      if(vec[count] == vec[i]){
+      }else{
+        count++;
+        if(i != count){
+          vec[count] = vec[i];
+        }
+      }
+    }
+    vec.resize(count+1);
+  }
+}
+
+
 /** This method locks all the nodes belonging to the 
  * specified elements. Elements might be on remote chunk.
  * Corresponding idxls between other chunks must also be locked */
 bool ParFUMShadowArray::lockRegion(int numElements,adaptAdj *elements,RegionID *regionID){
-  
 	//create a regionID for this region
 	regionID->chunkID = idx;
 	regionID->localID = regionCount;
@@ -119,85 +136,108 @@ bool ParFUMShadowArray::lockRegion(int numElements,adaptAdj *elements,RegionID *
 
 	LockRegion * region = new LockRegion;
 	region->myID = *regionID;
+	DEBUG(CkPrintf("[%d] LockRegion %d created \n",idx,regionID->localID));
 
   //collect all the local nodes in this list of elements into one list
   collectLocalNodes(numElements,elements,region->localNodes);
   
 	//Try to lock all the local nodes. If any fails unlock all and
   //return
-	
+	//add this region to the regionTable if the locals have all been locked
 	FEM_Node &fmNode = fmMesh->node;
 	IDXL_Side &shared = fmNode.shared;
-	AllocTable2d<int> &lockTable = ((FEM_DataAttribute *)fmNode.lookup(FEM_ADAPT_LOCK,"lockRegion"))->getInt();
-	bool success = true;
-
-	for(int i=0;i<region->localNodes.length();i++){
-		int node = region->localNodes[i];
-		if(shared.getRec(node)==NULL){
-			//Purely Local node
-		}else{
-			//Shared node
-		}
-
-		if(lockTable[node][0]!= -1){
-			//the node is locked
-			success = false;
-			break;
-		}else{
-			//the node is unlocked
-			lockTable[node][0] = idx;
-			lockTable[node][1] = region->myID.localID;
-		}
-	}
-
-	//add this region to the regionTable if the locals have all been locked
+	bool success = lockLocalNodes(region);
+	DEBUG(CkPrintf("[%d] LockRegion %d lockLocalNodes success %d  \n",idx,regionID->localID,success));
 	if(!success){
 		//we could not lock one of the local nodes
-		freeRegion(region);
+		unlockLocalNodes(region);
+		delete region;
 		return false;
 	}else{
 		//all local nodes were sucessfully locked
 		regionTable.put(*regionID) = region;
 	}
-  
-  //Of the local nodes some are shared. Find all the chunks that 
-  //share these nodes and lock all the idxls for that
-  
-  
-
-  //elements that are remote need to be sent to a remote 
-  //processor and their nodes need to be locked on the remote
-  
-  
-}
-
-/** Free up all the local nodes, idxl and elements 
- * on remote chunk locked by this node */
-void ParFUMShadowArray::freeRegion(LockRegion *region){
-	//free the localNodes
-	FEM_Node &fmNode = fmMesh->node;
-	IDXL_Side &shared = fmNode.shared;
-	AllocTable2d<int> &lockTable = ((FEM_DataAttribute *)fmNode.lookup(FEM_ADAPT_LOCK,"lockRegion"))->getInt();
-	
+		
+	//find the list of chunks that share nodes (have a shared idxl)
+	//with the local nodes of this region
+	region->sharedIdxls.push_back(idx);
 	for(int i=0;i<region->localNodes.length();i++){
-		//is the node locked and has it been locked by this region
-		if(lockTable[region->localNodes[i]][0] == region->myID.chunkID && lockTable[region->localNodes[i]][1] == region->myID.localID ){
-			//the node had been locked by this region earlier
-			//unlocking it now
-			lockTable[region->localNodes[i]][0] = -1;
-			lockTable[region->localNodes[i]][1] = -1;
+		int node = region->localNodes[i];
+		const IDXL_Rec *rec=shared.getRec(node);
+		if(rec!=NULL){
+			//Put in the list of shared Nodes
+			for(int j=0;j<rec->getShared();j++){
+				region->sharedIdxls.push_back(rec->getChk(j));
+			}
+		}
+  }
+	uniquify(region->sharedIdxls);	
+	DEBUG(CkPrintf("[%d] LockRegion %d number of SharedIdxls %d \n",idx,regionID->localID,region->sharedIdxls.length()));
+	if(region->sharedIdxls.length() == 1){
+		//no remote chunks are invovled in this region's locking
+		DEBUG(CkPrintf("[%d] LockRegion %d successfully locked with no remote messages \n",idx,regionID->localID));
+		return true;
+	}
+
+	//lock the local shared idxls
+	success = lockSharedIdxls(region);
+	if(!success){
+		//we could not lock one of the idxls owned by us
+		//The idxls that were locked would have already been unlocked
+		//so we need to unlock only the local nodes
+		unlockLocalNodes(region);
+		regionTable.remove(*regionID);
+		delete region;
+		return false;
+	}
+
+  //separate the list of remote elements by chunk
+	for(int i=0;i<numElements;i++){
+		if(elements[i].partID != idx){
+			//remote element
+			CkVec<adaptAdj> *list = region->remoteElements.get(elements[i].partID);
+			if(list == NULL){
+				//first element of this type
+				list = new CkVec<adaptAdj>;
+				region->remoteElements.put(elements[i].partID) = list;
+			}
+			list->push_back(elements[i]);
 		}
 	}
 
-	//TODO: free the idxl and elements on remote chunks
-	
+	//send the message to lock all the idxls for all the chunks
+	//and corresponding remote elements
+	for(int i=0;i<region->sharedIdxls.length();i++){
+		int chunk = region->sharedIdxls[i];
+		if(chunk == idx){
+			// do not send out a request to lock a region
+			// to this chunk, since it has already locked it
+			// by this time
+			continue;
+		}
+		CkVec<adaptAdj> *list = region->remoteElements.get(chunk);
+		adaptAdj *elementsForChunk=NULL;
+		int numElementsForChunk=0;
+		if(list != NULL){
+			elementsForChunk = list->getVec();
+			numElementsForChunk = list->size();
+		}
+		thisProxy[chunk].lockRegionForRemote(region->myID,region->sharedIdxls.getVec(),region->sharedIdxls.size(),elementsForChunk,numElementsForChunk);		
+	}
+	region->numReplies = 1; //this chunk itself has locked all its local nodes and idxl
+	region->success = true;
+	region->tid = CthSelf();
+	CthSuspend();
+
+	if(region->success){
+		return true;
+	}else{
+		regionTable.remove(*regionID);
+		delete region;
+		return false;
+	}
 }
 
-void ParFUMShadowArray::unlockRegion(RegionID regionID){
-	CkAssert(regionID.chunkID == idx);
-	LockRegion *region = regionTable.get(regionID);
-	freeRegion(region);
-}
 
 
 
@@ -220,25 +260,231 @@ void ParFUMShadowArray::collectLocalNodes(int numElements,adaptAdj *elements,CkV
     }
   }
   //now we need to uniquify the list of localNodes
-  if(localNodes.length() != 0){
-    localNodes.quickSort(8);
-    int count=0;
-    for(int i=1;i<localNodes.length();i++){
-      if(localNodes[count] == localNodes[i]){
-      }else{
-        count++;
-        if(i != count){
-          localNodes[count] = localNodes[i];
-        }
-      }
-    }
-    localNodes.resize(count+1);
-  }
+	uniquify(localNodes);
+	
 }
 
 
+bool ParFUMShadowArray::lockLocalNodes(LockRegion *region){
+	FEM_Node &fmNode = fmMesh->node;
+	AllocTable2d<int> &lockTable = ((FEM_DataAttribute *)fmNode.lookup(FEM_ADAPT_LOCK,"lockRegion"))->getInt();
+
+	bool success=true;
+	for(int i=0;i<region->localNodes.length();i++){
+		int node = region->localNodes[i];
+
+		if(lockTable[node][0]!= -1){
+			//the node is locked
+			success = false;
+			break;
+		}else{
+			//the node is unlocked
+			lockTable[node][0] = idx;
+			lockTable[node][1] = region->myID.localID;
+		}
+	}
+	return success;
+}
 
 
+/** Lock the sharedidxls specified in the region.
+ *	If idx < chunkID of shared idxl, lock the idxl
+ *	with chunkID on this chunk
+ *
+ *	If we cant lock all the idxls we need to, clean
+ *	up the locked ones and return false
+ * */
+
+bool ParFUMShadowArray::lockSharedIdxls(LockRegion *region){
+	bool success=true;
+	int lockedIdx=-1;
+	
+	for(int i=0;i<region->sharedIdxls.length();i++){
+		int chunkID = region->sharedIdxls[i];
+		if(idx < chunkID){
+			IDXL_List *list =  fmMesh->node.shared.getIdxlListN(chunkID);
+			if(list != NULL){
+				if(list->isLocked()){
+					//list is locked 
+					success = false;
+					lockedIdx= i;
+					break;
+				}else{
+					list->lockIdxl();
+				}
+			}
+		}
+	}
+
+	if(!success){
+		for(int i=0;i<lockedIdx;i++){
+			int chunkID = region->sharedIdxls[i];
+			if(idx < chunkID){
+				IDXL_List *list =  fmMesh->node.shared.getIdxlListN(chunkID);
+				if(list != NULL){
+					if(list->isLocked()){
+						list->unlockIdxl();
+					}
+				}
+			}
+		}
+	}
+	return success;
+}
+
+/** Process a request from another chunk to lock these idxls and the nodes
+ * belonging to these elements
+ */
+void ParFUMShadowArray::lockRegionForRemote(RegionID regionID,int *sharedIdxls,int numSharedIdxls,adaptAdj *elements,int numElements){
+	LockRegion *region = new LockRegion;
+	region->myID = regionID;
+	
+	//make a list of all the nodes that are specified in the elements
+	collectLocalNodes(numElements,elements,region->localNodes);
+	//try locking all the local nodes,
+	bool success = lockLocalNodes(region);
+	if(success){
+		//if we locked the local nodes, then we try locking the idxls
+		success = lockSharedIdxls(region);
+	}
+	
+	//if we could not lock either the shared idxls or the local nodes successfully we
+	//need to unlock the local nodes before replying
+	if(!success){
+		unlockLocalNodes(region);
+		delete region;
+	}else{
+		//if the locking was successful, store the region
+		regionTable.put(regionID) = region;
+	}
+	
+	//send a reply back to the requesting chunk with the result 
+	//of the lock attempt
+	thisProxy[regionID.chunkID].lockReply(idx,regionID,success);
+
+}
+
+/** Collect the replies from all the remote chunks that were 
+ * requested to lock regions of the mesh. 
+ * If all chunks reply that they have locked successfully, 
+ * then we just wake up the thread waiting for this region to lock.
+ * If some chunks fail, we need to unlock the region before replying
+ * */
+void ParFUMShadowArray::lockReply(int remoteChunk,RegionID regionID,bool success){
+	LockRegion *region = regionTable.get(regionID);
+	CkAssert(region != NULL);
+	region->numReplies++;
+	region->success = region->success && success;
+	if(region->numReplies == region->sharedIdxls.size()){
+		if(region->success){
+			CthAwaken(region->tid);
+		}else{
+			unlockRegion(region);
+		}	
+	}
+}
+
+void ParFUMShadowArray::unlockRegion(RegionID regionID){
+	CkAssert(regionID.chunkID == idx);
+	LockRegion *region = regionTable.get(regionID);
+	unlockRegion(region);
+	if(region->sharedIdxls.length() == 1){
+		//there are no remote chunks involved in this region
+	}else{
+		//wait for unlock to finish on other chunks
+		CthSuspend();
+	}
+	regionTable.remove(regionID);
+	delete region;
+	DEBUG(CkPrintf("[%d] LockRegion %d unlocked \n",idx,regionID.localID));
+	return;
+}
+
+/** Free up all the local nodes, idxl and elements 
+ * on remote chunk locked by this node */
+void ParFUMShadowArray::unlockRegion(LockRegion *region){
+	//unlock the local nodes
+	unlockLocalNodes(region);
+	//unlock the sharedIdxls on this chunk
+	unlockSharedIdxls(region);
+
+	//free the idxl and elements on remote chunks
+	for(int i=0;i<region->sharedIdxls.size();i++){
+		int chunk = region->sharedIdxls[i];
+		if(chunk != idx){
+			thisProxy[chunk].unlockForRemote(region->myID);
+		}
+	}
+	region->numReplies = 1; //this chunk has unlocked all the stuff on it
+
+}
+
+void ParFUMShadowArray::unlockLocalNodes(LockRegion *region){
+	//unlock the localNodes
+	FEM_Node &fmNode = fmMesh->node;
+	IDXL_Side &shared = fmNode.shared;
+	AllocTable2d<int> &lockTable = ((FEM_DataAttribute *)fmNode.lookup(FEM_ADAPT_LOCK,"lockRegion"))->getInt();
+	
+	for(int i=0;i<region->localNodes.length();i++){
+		//is the node locked and has it been locked by this region
+		if(lockTable[region->localNodes[i]][0] == region->myID.chunkID && lockTable[region->localNodes[i]][1] == region->myID.localID ){
+			//the node had been locked by this region earlier
+			//unlocking it now
+			lockTable[region->localNodes[i]][0] = -1;
+			lockTable[region->localNodes[i]][1] = -1;
+		}
+	}
+
+}
+
+/***
+ *Unlock all the shared idxl on this chunk
+ * */
+
+void ParFUMShadowArray::unlockSharedIdxls(LockRegion *region){
+	for(int i=0;i<region->sharedIdxls.length();i++){
+		int chunkID = region->sharedIdxls[i];
+		if(idx < chunkID){
+			IDXL_List *list =  fmMesh->node.shared.getIdxlListN(chunkID);
+			if(list != NULL){
+				if(list->isLocked()){
+					list->unlockIdxl();
+				}else{
+					CmiAbort("Idxl was not locked. Attempting to unlock it?");
+				}
+			}
+		}
+	}
+	
+}
+/** 
+ * Unlock the local nodes and sharedIdxls locked for the remote region
+ * specified by regionID.
+ * We need to send an ack back
+ */
+void ParFUMShadowArray::unlockForRemote(RegionID regionID){
+	LockRegion *region = regionTable.get(regionID);
+	if(region != NULL){
+		unlockLocalNodes(region);
+		unlockSharedIdxls(region);
+		regionTable.remove(regionID);
+		delete region;
+	}
+	thisProxy[regionID.chunkID].unlockReply(idx,regionID);
+}
+
+/***
+ * Collect the replies to unlock requests from all the chunks that are involved
+ * in this region. Once all the chunks have replied wake up the calling thread
+ */
+void ParFUMShadowArray::unlockReply(int remoteChunk,RegionID regionID){
+	LockRegion *region = regionTable.get(regionID);
+	CkAssert(region != NULL);
+	region->numReplies++;
+	if(region->numReplies == region->sharedIdxls.length()){
+		CthAwaken(region->tid);
+	}
+}
 
 
 /** Helper function that translates the sharedChk and idxlType 

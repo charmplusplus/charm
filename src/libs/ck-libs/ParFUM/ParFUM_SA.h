@@ -10,40 +10,7 @@
 #include "ParFUM.h"
 #include "idxl.h"
 #include "ParFUM_internals.h"
-#include "ParFUM_SA.decl.h"
 
-///This is a message which packs all the chunk indices together
-class lockChunksMsg : public CMessage_lockChunksMsg {
- public:
-  ///list of chunks
-  int *chkList;
-  ///number of chunks in the list
-  int chkListSize;
-  ///type of idxl list
-  int idxlType;
-
- public:
-  lockChunksMsg(int *c, int s, int type) {
-    chkListSize = s;
-    idxlType = type;
-  }
-
-  ~lockChunksMsg() {
-    ///if(chkList!=NULL) delete chkList;
-  }
-
-  int *getChks() {
-    return chkList;
-  }
-
-  int getSize() {
-    return chkListSize;
-  }
-
-  int getType() {
-    return idxlType;
-  }
-};
 
 class RegionID{
 public:
@@ -56,6 +23,7 @@ public:
 		return (rhs.chunkID == chunkID) && (rhs.localID == localID);
 	}
 };
+PUPbytes(RegionID);
 
 /** Class that represent a region that is being locked 
  */
@@ -64,9 +32,20 @@ public:
 	RegionID myID;
 	CkVec<int> localNodes;
 	CkVec<int> sharedIdxls;
-	CkVec<adaptAdj> remoteElements;
+	CkHashtableT<CkHashtableAdaptorT<int>, CkVec<adaptAdj> *> remoteElements;
+	CthThread tid;
+	int numReplies;
+	bool success;
+	~LockRegion(){
+		CkHashtableIterator *iter = remoteElements.iterator();
+		while(iter->hasNext()){
+			CkVec<adaptAdj> *list = (CkVec<adaptAdj> *)iter->next();
+			delete list;
+		}
+	}
 };
 
+#include "ParFUM_SA.decl.h"
 
 ///The shadow array attached to a fem chunk to perform all communication
 /** This is a shadow array that should be used by all operations
@@ -125,6 +104,20 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
 	void unlockRegion(RegionID regionID);
 	
 	void collectLocalNodes(int numElements,adaptAdj *elements,CkVec<int> &localNodes);
+	bool lockLocalNodes(LockRegion *region);
+	bool lockSharedIdxls(LockRegion *region);
+	void lockRegionForRemote(RegionID regionID,int *sharedIdxls,int numSharedIdxls,adaptAdj *elements,int numElements);
+	void lockReply(int remoteChunk,RegionID regionID,bool success);
+	void unlockRegion(LockRegion *region);
+	void unlockLocalNodes(LockRegion *region);
+	void unlockSharedIdxls(LockRegion *region);
+	void unlockForRemote(RegionID regionID);
+	void unlockReply(int remoteChunk,RegionID regionID);
+
+
+
+	
+
 	void freeRegion(LockRegion *region);
 
 
@@ -164,6 +157,39 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
   int IdxlLookUpPrimary(int localId, int sharedChk, int idxlType);
   ///Return the localIdx at this 'sharedIdx' on this idxl list
   int IdxlLookUpSecondary(int sharedChk, int sharedIdx, int idxlType);
+};
+
+///This is a message which packs all the chunk indices together
+class lockChunksMsg : public CMessage_lockChunksMsg {
+ public:
+  ///list of chunks
+  int *chkList;
+  ///number of chunks in the list
+  int chkListSize;
+  ///type of idxl list
+  int idxlType;
+
+ public:
+  lockChunksMsg(int *c, int s, int type) {
+    chkListSize = s;
+    idxlType = type;
+  }
+
+  ~lockChunksMsg() {
+    ///if(chkList!=NULL) delete chkList;
+  }
+
+  int *getChks() {
+    return chkList;
+  }
+
+  int getSize() {
+    return chkListSize;
+  }
+
+  int getType() {
+    return idxlType;
+  }
 };
 
 #endif
