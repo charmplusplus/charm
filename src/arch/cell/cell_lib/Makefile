@@ -30,6 +30,15 @@ install: libcellppu.a libcellspu.a
 	cp libcellppu.a libcellspu.a $(CHARMDIR)/lib
 
 
+spert.s: spert.cpp spert.h
+	cp spert.cpp spert.c
+	$(SPU_CC) --param max-inline-insns-single=1000000 --param inline-unit-growth=1000 --param large-function-growth=1000 -c -S -g spert.c
+
+
+spert.s.timing: spert.s
+	/opt/IBM/cell-sdk-1.1/bin/spu_timing spert.s
+
+
 # Clean-up
 clean :
-	$(RM) *.o spert_ppu_test spert *.a
+	$(RM) *.o spert_ppu_test spert *.a spert.s spert.s.timing
