@@ -284,9 +284,17 @@ inline void processMsgState_sent(int msgIndex) {
 
   if (__builtin_expect(tmp_counter1 != msgCounter[msgIndex], 0)) {
 
-    register int tmp_counter0 = tmp_msgQueueEntry->counter0;
-    register int tmp_msgState = tmp_msgQueueEntry->state;
-    register int tmp_localState = msgState[msgIndex];
+    #if OPT_SPEMESSAGE_STRUCT == 0
+      register int tmp_counter0 = tmp_msgQueueEntry->counter0;
+      register int tmp_msgState = tmp_msgQueueEntry->state;
+      register int tmp_localState = msgState[msgIndex];
+    #else
+      register vector signed int msg_tmp0 = *((vector signed int*)(tmp_msgQueueEntry));
+      register int tmp_counter0 = spu_extract(msg_tmp0, 0);
+      register int tmp_msgState = spu_extract(msg_tmp0, 1);
+      register int tmp_flags = (unsigned int)(spu_extract(msg_tmp0, 3));
+      register int tmp_localState = msgState[msgIndex];
+    #endif
 
     if (__builtin_expect(tmp_counter0 == tmp_counter1, 1)) {
       if (__builtin_expect(tmp_msgState == SPE_MESSAGE_STATE_SENT, 1)) {
@@ -318,11 +326,21 @@ inline void processMsgState_sent(int msgIndex) {
             STATETRACE_CLEAR(msgIndex);
           #endif
 
-          // Update the state of the message queue entry (locally)
-          if ((tmp_msgQueueEntry->flags & WORK_REQUEST_FLAGS_LIST) == 0x00)
-            msgState[msgIndex] = SPE_MESSAGE_STATE_PRE_FETCHING;
-          else
-            msgState[msgIndex] = SPE_MESSAGE_STATE_PRE_FETCHING_LIST;
+          #if OPT_SPEMESSAGE_STRUCT == 0
+            // Update the state of the message queue entry (locally)
+            if ((tmp_msgQueueEntry->flags & WORK_REQUEST_FLAGS_LIST) == 0x00)
+              msgState[msgIndex] = SPE_MESSAGE_STATE_PRE_FETCHING;
+            else
+              msgState[msgIndex] = SPE_MESSAGE_STATE_PRE_FETCHING_LIST;
+          #else
+            register int tmp_msgState;
+            // Update the state of the message queue entry (locally)
+            if ((tmp_flags & WORK_REQUEST_FLAGS_LIST) == 0x00)
+              tmp_msgState = SPE_MESSAGE_STATE_PRE_FETCHING;
+            else
+              tmp_msgState = SPE_MESSAGE_STATE_PRE_FETCHING_LIST;
+            msgState[msgIndex] = tmp_msgState;
+          #endif
 
           // DEBUG (moved from _committing)
           //localMemPtr[msgIndex] = NULL;
@@ -417,9 +435,12 @@ inline void processMsgState_preFetching(int msgIndex) {
     #endif
   #endif
 
+  // Get a pointer to the message queue entry
+  register SPEMessage* tmp_msgQueueEntry = (SPEMessage*)(msgQueue[msgIndex]);
+
   // TRACE
   #if ENABLE_TRACE != 0
-    if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
+    if (__builtin_expect(tmp_msgQueueEntry->traceFlag, 0)) {
       printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_PRE_FETCHING for index %d...\n", (int)getSPEID(), msgIndex);
       debug_displayActiveMessageQueue(0x00, msgState, "(*)");
     }
@@ -433,15 +454,15 @@ inline void processMsgState_preFetching(int msgIndex) {
 
     // TRACE
     #if ENABLE_TRACE != 0
-      if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
+      if (__builtin_expect(tmp_msgQueueEntry->traceFlag, 0)) {
         printf("SPE_%d :: [TRACE] :: Allocating LS Memory for index %d...\n", (int)getSPEID(), msgIndex);
         printf("SPE_%d :: [TRACE] ::   msgQueue[%d] = { readOnlyPtr = 0x%08lx, readOnlyLen = %d,\n"
                "                                      readWritePtr = 0x%08lx, readWritelen = %d,\n"
                "                                      writeOnlyPtr = 0x%08lx, writeOnlyLen = %d, ...}...\n",
                (int)getSPEID(), msgIndex,
-               msgQueue[msgIndex]->readOnlyPtr, msgQueue[msgIndex]->readOnlyLen,
-               msgQueue[msgIndex]->readWritePtr, msgQueue[msgIndex]->readWriteLen,
-               msgQueue[msgIndex]->writeOnlyPtr, msgQueue[msgIndex]->writeOnlyLen
+               tmp_msgQueueEntry->readOnlyPtr, tmp_msgQueueEntry->readOnlyLen,
+               tmp_msgQueueEntry->readWritePtr, tmp_msgQueueEntry->readWriteLen,
+               tmp_msgQueueEntry->writeOnlyPtr, tmp_msgQueueEntry->writeOnlyLen
               );
         debug_displayActiveMessageQueue(0x0, msgState, "(*)");
       }
@@ -450,15 +471,15 @@ inline void processMsgState_preFetching(int msgIndex) {
     // Allocate the memory and place a pointer to the allocated buffer into localMemPtr.  This buffer will
     //   be divided up into three regions: readOnly, readWrite, writeOnly (IN THAT ORDER!; the regions may be
     //   empty if no pointer for the region was supplied by the original sendWorkRequest() call on the PPU).
-    register int memNeeded = ROUNDUP_16(msgQueue[msgIndex]->readWriteLen) +
-                             ROUNDUP_16(msgQueue[msgIndex]->readOnlyLen) +
-                             ROUNDUP_16(msgQueue[msgIndex]->writeOnlyLen);
+    register int memNeeded = ROUNDUP_16(tmp_msgQueueEntry->readWriteLen) +
+                             ROUNDUP_16(tmp_msgQueueEntry->readOnlyLen) +
+                             ROUNDUP_16(tmp_msgQueueEntry->writeOnlyLen);
     register int offset = 0;
 
     // DEBUG
     #if SPE_DEBUG_DISPLAY >= 1
       printf("SPE_%d :: Allocating Memory for index %d :: memNeeded = %d, msgQueue[%d].totalMem = %d\n",
-             (int)getSPEID(), msgIndex, memNeeded, msgIndex, msgQueue[msgIndex]->totalMem
+             (int)getSPEID(), msgIndex, memNeeded, msgIndex, tmp_msgQueueEntry->totalMem
             );
     #endif
 
@@ -548,26 +569,26 @@ inline void processMsgState_preFetching(int msgIndex) {
     //   buffers next to each other (i.e. - read-only, then read-write, then write-only).
 
     // read-only buffer
-    if (msgQueue[msgIndex]->readOnlyPtr != (PPU_POINTER_TYPE)NULL) {
+    if (tmp_msgQueueEntry->readOnlyPtr != (PPU_POINTER_TYPE)NULL) {
       readOnlyPtr[msgIndex] = localMemPtr[msgIndex];
-      offset += ROUNDUP_16(msgQueue[msgIndex]->readOnlyLen);
+      offset += ROUNDUP_16(tmp_msgQueueEntry->readOnlyLen);
     } else {
       readOnlyPtr[msgIndex] = NULL;
     }
 
     // read-write buffer
-    if (msgQueue[msgIndex]->readWritePtr != (PPU_POINTER_TYPE)NULL) {
+    if (tmp_msgQueueEntry->readWritePtr != (PPU_POINTER_TYPE)NULL) {
       readWritePtr[msgIndex] = (void*)((char*)localMemPtr[msgIndex] + offset);
-      offset += ROUNDUP_16(msgQueue[msgIndex]->readWriteLen);
+      offset += ROUNDUP_16(tmp_msgQueueEntry->readWriteLen);
     } else {
       readWritePtr[msgIndex] = NULL;
     }
 
     // write-only buffer
-    if (msgQueue[msgIndex]->writeOnlyPtr != (PPU_POINTER_TYPE)NULL) {
+    if (tmp_msgQueueEntry->writeOnlyPtr != (PPU_POINTER_TYPE)NULL) {
       writeOnlyPtr[msgIndex] = (void*)((char*)localMemPtr[msgIndex] + offset);
       #if SPE_ZERO_WRITE_ONLY_MEMORY != 0
-        memset(writeOnlyPtr[msgIndex], 0, ROUNDUP_16(msgQueue[msgIndex]->writeOnlyLen));
+        memset(writeOnlyPtr[msgIndex], 0, ROUNDUP_16(tmp_msgQueueEntry->writeOnlyLen));
       #endif
     } else {
       writeOnlyPtr[msgIndex] = NULL;
@@ -575,7 +596,7 @@ inline void processMsgState_preFetching(int msgIndex) {
 
     // TRACE
     #if ENABLE_TRACE != 0
-      if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
+      if (__builtin_expect(tmp_msgQueueEntry->traceFlag, 0)) {
         printf("SPE_%d :: [TRACE] ::   localMemPtr[%d] = %p...\n", (int)getSPEID(), msgIndex, localMemPtr[msgIndex]);
         printf("SPE_%d :: [TRACE] ::   readOnlyPtr[%d] = %p, readWritePtr[%d] = %p, writeOnlyPtr[%d] = %p...\n",
                (int)getSPEID(),
@@ -594,10 +615,10 @@ inline void processMsgState_preFetching(int msgIndex) {
   //   is actually write-only).
   // NOTE : This should be done after the memory for the work request has been allocated so the
   //   output buffers are created.
-  if (__builtin_expect(((msgQueue[msgIndex]->readWritePtr == (PPU_POINTER_TYPE)NULL) ||
-                        ((msgQueue[msgIndex]->flags & WORK_REQUEST_FLAGS_RW_IS_WO) == WORK_REQUEST_FLAGS_RW_IS_WO)
+  if (__builtin_expect(((tmp_msgQueueEntry->readWritePtr == (PPU_POINTER_TYPE)NULL) ||
+                        ((tmp_msgQueueEntry->flags & WORK_REQUEST_FLAGS_RW_IS_WO) == WORK_REQUEST_FLAGS_RW_IS_WO)
                        ) &&
-                       (msgQueue[msgIndex]->readOnlyPtr == (PPU_POINTER_TYPE)NULL),
+                       (tmp_msgQueueEntry->readOnlyPtr == (PPU_POINTER_TYPE)NULL),
                        0
 		      )
      ) {
@@ -629,11 +650,11 @@ inline void processMsgState_preFetching(int msgIndex) {
 
     // Count the number of DMA entries needed for the read DMA list
     register int entryCount = 0;
-    if (__builtin_expect((msgQueue[msgIndex]->flags & WORK_REQUEST_FLAGS_RW_IS_WO) == 0x00, 0))
-      entryCount += (ROUNDUP_16(msgQueue[msgIndex]->readWriteLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
-                    (((msgQueue[msgIndex]->readWriteLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
-    entryCount += (ROUNDUP_16(msgQueue[msgIndex]->readOnlyLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
-                  (((msgQueue[msgIndex]->readOnlyLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
+    if (__builtin_expect((tmp_msgQueueEntry->flags & WORK_REQUEST_FLAGS_RW_IS_WO) == 0x00, 0))
+      entryCount += (ROUNDUP_16(tmp_msgQueueEntry->readWriteLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
+                    (((tmp_msgQueueEntry->readWriteLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
+    entryCount += (ROUNDUP_16(tmp_msgQueueEntry->readOnlyLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
+                  (((tmp_msgQueueEntry->readOnlyLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
 
     // Check to see if the DMA list is too large for the static DMA list
     if (__builtin_expect(entryCount > SPE_DMA_LIST_LENGTH, 0)) {
@@ -688,7 +709,7 @@ inline void processMsgState_preFetching(int msgIndex) {
     } else {
 
       // Point the DMA list pointer at the message queue entry's dma list
-      dmaList[msgIndex] = (DMAListEntry*)(msgQueue[msgIndex]->dmaList);
+      dmaList[msgIndex] = (DMAListEntry*)(tmp_msgQueueEntry->dmaList);
 
       //dmaList[msgIndex] = (DMAListEntry*)(&(dmaListEntry[msgIndex * SPE_DMA_LIST_LENGTH]));
     }
@@ -699,8 +720,8 @@ inline void processMsgState_preFetching(int msgIndex) {
 
     // Create the portion of the DMA list needed by the read-only buffer
     if (readOnlyPtr[msgIndex] != NULL) {
-      register int bufferLeft = msgQueue[msgIndex]->readOnlyLen;
-      register unsigned int srcOffset = (unsigned int)(msgQueue[msgIndex]->readOnlyPtr);
+      register int bufferLeft = tmp_msgQueueEntry->readOnlyLen;
+      register unsigned int srcOffset = (unsigned int)(tmp_msgQueueEntry->readOnlyPtr);
 
       while (bufferLeft > 0) {
         dmaList[msgIndex][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
@@ -715,13 +736,13 @@ inline void processMsgState_preFetching(int msgIndex) {
 
     // Create the portion of the DMA list needed by the read-write buffer
     if ((
-         __builtin_expect((msgQueue[msgIndex]->flags & WORK_REQUEST_FLAGS_RW_IS_WO) == 0x00, 0)
+         __builtin_expect((tmp_msgQueueEntry->flags & WORK_REQUEST_FLAGS_RW_IS_WO) == 0x00, 0)
         ) &&
         (readWritePtr[msgIndex] != NULL)
        ) {
 
-      register int bufferLeft = msgQueue[msgIndex]->readWriteLen;
-      register unsigned int srcOffset = (unsigned int)(msgQueue[msgIndex]->readWritePtr);
+      register int bufferLeft = tmp_msgQueueEntry->readWriteLen;
+      register unsigned int srcOffset = (unsigned int)(tmp_msgQueueEntry->readWritePtr);
 
       while (bufferLeft > 0) {
         dmaList[msgIndex][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
@@ -736,7 +757,7 @@ inline void processMsgState_preFetching(int msgIndex) {
 
     // TRACE
     #if ENABLE_TRACE != 0
-      if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
+      if (__builtin_expect(tmp_msgQueueEntry->traceFlag, 0)) {
         printf("SPE_%d :: [TRACE] :: Created DMA List for index %d...\n", (int)getSPEID(), msgIndex);
         printf("SPE_%d :: [TRACE] ::   dmaList[%d] = %p, dmaListSize[%d] = %d...\n",
                (int)getSPEID(), msgIndex, dmaList[msgIndex], msgIndex, dmaListSize[msgIndex]
@@ -2022,19 +2043,22 @@ inline void processMsgState_executed(int msgIndex) {
     #endif
   #endif
 
+  // Get a pointer to the message queue entry
+  register SPEMessage* tmp_msgQueueEntry = (SPEMessage*)(msgQueue[msgIndex]);  
+
   // TRACE
   #if ENABLE_TRACE != 0
-    if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
+    if (__builtin_expect(tmp_msgQueueEntry->traceFlag, 0)) {
       printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_EXECUTED for index %d...\n", (int)getSPEID(), msgIndex);
       debug_displayActiveMessageQueue(0x0, msgState, "(*)");
     }
   #endif
 
   // Check to see if this message does not need to fetch any data
-  if (__builtin_expect(((msgQueue[msgIndex]->readWritePtr == (PPU_POINTER_TYPE)NULL) ||
-                        ((msgQueue[msgIndex]->flags & WORK_REQUEST_FLAGS_RW_IS_RO) == WORK_REQUEST_FLAGS_RW_IS_RO)
+  if (__builtin_expect(((tmp_msgQueueEntry->readWritePtr == (PPU_POINTER_TYPE)NULL) ||
+                        ((tmp_msgQueueEntry->flags & WORK_REQUEST_FLAGS_RW_IS_RO) == WORK_REQUEST_FLAGS_RW_IS_RO)
                        ) &&
-                       (msgQueue[msgIndex]->writeOnlyPtr == (PPU_POINTER_TYPE)NULL),
+                       (tmp_msgQueueEntry->writeOnlyPtr == (PPU_POINTER_TYPE)NULL),
                        0
 		      )
      ) {
@@ -2061,11 +2085,11 @@ inline void processMsgState_executed(int msgIndex) {
 
     // Count the number of DMA entries needed for the read DMA list
     register int entryCount = 0;
-    if ((msgQueue[msgIndex]->flags & WORK_REQUEST_FLAGS_RW_IS_RO) == 0x00)
-      entryCount += (ROUNDUP_16(msgQueue[msgIndex]->readWriteLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
-                    (((msgQueue[msgIndex]->readWriteLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
-    entryCount += (ROUNDUP_16(msgQueue[msgIndex]->writeOnlyLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
-                  (((msgQueue[msgIndex]->writeOnlyLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
+    if ((tmp_msgQueueEntry->flags & WORK_REQUEST_FLAGS_RW_IS_RO) == 0x00)
+      entryCount += (ROUNDUP_16(tmp_msgQueueEntry->readWriteLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
+                    (((tmp_msgQueueEntry->readWriteLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
+    entryCount += (ROUNDUP_16(tmp_msgQueueEntry->writeOnlyLen) / SPE_DMA_LIST_ENTRY_MAX_LENGTH) +
+                  (((tmp_msgQueueEntry->writeOnlyLen & (SPE_DMA_LIST_ENTRY_MAX_LENGTH - 1)) == 0x0) ? (0) : (1));
 
     // Allocate a larger DMA list if needed
     if (__builtin_expect(entryCount > SPE_DMA_LIST_LENGTH, 0)) {
@@ -2120,7 +2144,7 @@ inline void processMsgState_executed(int msgIndex) {
     } else {  // Otherwise, the static DMA list is large enough (just use it)
 
       // Point the DMA list pointer at the message queue entry's dma list
-      dmaList[msgIndex] = (DMAListEntry*)(msgQueue[msgIndex]->dmaList);
+      dmaList[msgIndex] = (DMAListEntry*)(tmp_msgQueueEntry->dmaList);
 
       // Place the pointer of the static DMA list
       //dmaList[msgIndex] = (DMAListEntry*)(&(dmaListEntry[msgIndex * SPE_DMA_LIST_LENGTH]));
@@ -2135,12 +2159,12 @@ inline void processMsgState_executed(int msgIndex) {
     register int listIndex = 0;
 
     // Read-write buffer
-    if (__builtin_expect((msgQueue[msgIndex]->flags & WORK_REQUEST_FLAGS_RW_IS_RO) == 0x00, 0) &&
+    if (__builtin_expect((tmp_msgQueueEntry->flags & WORK_REQUEST_FLAGS_RW_IS_RO) == 0x00, 0) &&
         (readWritePtr[msgIndex] != NULL)
        ) {
 
-      register int bufferLeft = msgQueue[msgIndex]->readWriteLen;
-      register unsigned int srcOffset = (unsigned int)(msgQueue[msgIndex]->readWritePtr);
+      register int bufferLeft = tmp_msgQueueEntry->readWriteLen;
+      register unsigned int srcOffset = (unsigned int)(tmp_msgQueueEntry->readWritePtr);
 
       while (bufferLeft > 0) {
         dmaList[msgIndex][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ?
@@ -2162,8 +2186,8 @@ inline void processMsgState_executed(int msgIndex) {
     // Write-only buffer
     if (writeOnlyPtr[msgIndex] != NULL) {
 
-      register int bufferLeft = msgQueue[msgIndex]->writeOnlyLen;
-      register unsigned int srcOffset = (unsigned int)(msgQueue[msgIndex]->writeOnlyPtr);
+      register int bufferLeft = tmp_msgQueueEntry->writeOnlyLen;
+      register unsigned int srcOffset = (unsigned int)(tmp_msgQueueEntry->writeOnlyPtr);
 
       while (bufferLeft > 0) {
         dmaList[msgIndex][listIndex].size = ((bufferLeft > SPE_DMA_LIST_ENTRY_MAX_LENGTH) ? (SPE_DMA_LIST_ENTRY_MAX_LENGTH) : (bufferLeft));
@@ -2183,7 +2207,7 @@ inline void processMsgState_executed(int msgIndex) {
 
     // TRACE
     #if ENABLE_TRACE != 0
-      if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
+      if (__builtin_expect(tmp_msgQueueEntry->traceFlag, 0)) {
         printf("SPE_%d :: [TRACE] :: Created DMA List for index %d...\n", (int)getSPEID(), msgIndex);
         printf("SPE_%d :: [TRACE] ::   dmaList[%d] = %p, dmaListSize[%d] = %d...\n",
                (int)getSPEID(), msgIndex, dmaList[msgIndex], msgIndex, dmaListSize[msgIndex]

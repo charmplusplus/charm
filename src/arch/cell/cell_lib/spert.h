@@ -84,6 +84,8 @@
 #define SPE_USE_OWN_MEMSET  0  // Set to 1 to force a local version of memset to be used (to try to remove C/C++ runtime dependence)
 #define SPE_NOTIFY_ON_MALLOC_FAILURE   0  // Set to 1 to force the SPE to notify the user when a pointer returned by malloc/new returns an un-usable pointer (message will retry malloc/new later)
 
+#define OFFLOAD_API_FULL_CHECK  1
+
 // STATS Data Collection
 #define PPE_STATS    0  // Set to have stat data collected during execution for the PPE side of the Offload API
 
@@ -121,16 +123,23 @@ typedef struct __dma_list_entry {
 /* @} */
 
 
+#define OPT_SPEMESSAGE_STRUCT 1
+
 // SPE Message: The structure that defines a message being passed to an SPE
 typedef struct __SPE_MESSAGE {
+
+#if OPT_SPEMESSAGE_STRUCT == 0
+
   volatile int counter0;
   volatile int funcIndex;          // Indicates what "function" the SPE should perform
   volatile PPU_POINTER_TYPE readWritePtr;
   volatile int readWriteLen;
+
   volatile PPU_POINTER_TYPE readOnlyPtr;
   volatile int readOnlyLen;
   volatile PPU_POINTER_TYPE writeOnlyPtr;
   volatile int writeOnlyLen;
+
   volatile unsigned int flags;
   volatile unsigned int totalMem;  // The total amount of memory that will be needed on the SPE for the request
   volatile int state;              // Current state of the message (see SPE_MESSAGE_STATE_xxx)
@@ -143,8 +152,38 @@ typedef struct __SPE_MESSAGE {
 
   volatile PPU_POINTER_TYPE wrPtr; // A pointer to userData specified in the sendWorkRequest call that will be passed to the callback function
   volatile int traceFlag;   // DEBUG
-
   volatile int counter1;            // A counter used to uniquely identify this message from the message previously held in this slot
+
+#else
+
+  volatile int counter0;
+  volatile int state;              // Current state of the message (see SPE_MESSAGE_STATE_xxx)
+  volatile unsigned int flags;
+  volatile int funcIndex;          // Indicates what "function" the SPE should perform
+
+  volatile PPU_POINTER_TYPE readWritePtr;
+  volatile int readWriteLen;
+  volatile PPU_POINTER_TYPE readOnlyPtr;
+  volatile int readOnlyLen;
+
+  volatile PPU_POINTER_TYPE writeOnlyPtr;
+  volatile int writeOnlyLen;
+  volatile PPU_POINTER_TYPE wrPtr; // A pointer to userData specified in the sendWorkRequest call that will be passed to the callback function
+  volatile int traceFlag;   // DEBUG
+
+
+  // NOTE : !!! VERY IMPORTANT !!! : The dmaList address must be 16 byte aligned in the SPE's LS.  The SPEMessage
+  //   data structures get 16 byte aligned so the fields in this data structure must be order in such a way
+  //   that dmaList starts a multiple of 16 bytes away from the start of the overall structure.
+  volatile DMAListEntry dmaList[SPE_DMA_LIST_LENGTH];
+
+  volatile int command;            // A control command that the PPU can use to send commands to the SPE runtime (see SPE_MESSAGE_COMMAND_xxx)
+  volatile unsigned int totalMem;  // The total amount of memory that will be needed on the SPE for the request
+  volatile int counter1;            // A counter used to uniquely identify this message from the message previously held in this slot
+
+#endif 
+
+
 } SPEMessage;
 
 
