@@ -113,6 +113,13 @@ test_link() {
           $CMK_LDXX -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 > out 2>&1
           test_result $? "$1" "$2" "$3"
         fi
+        if test $pass -eq 1
+	then 
+ 	  if cat out | grep -i "warn" > /dev/null 2>&1
+	  then 
+	    strictpass="0" && strictfail="1"
+          fi
+        fi
 	cat out >> $charmout
 	/bin/rm -f out
 }
@@ -562,7 +569,7 @@ TRACE_LINK_FLAG="-rdynamic"
 test_link "whether glibc backtrace works" "yes" "no" "-DCMK_USE_BACKTRACE=1 $TRACE_LINK_FLAG"
 AC_DEFINE_UNQUOTED(CMK_USE_BACKTRACE, $pass, [whether glibc backtrace works])
 
-if test $pass -eq 1
+if test $strictpass -eq 1
 then 
 	add_flag 'CMK_LD="$CMK_LD '$TRACE_LINK_FLAG'"' "backtrace"
 	add_flag 'CMK_LDXX="$CMK_LDXX '$TRACE_LINK_FLAG'"' "backtrace"
