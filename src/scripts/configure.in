@@ -113,6 +113,8 @@ test_link() {
           $CMK_LDXX -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 > out 2>&1
           test_result $? "$1" "$2" "$3"
         fi
+ 	strictpass=$pass
+	strictfail=$fail
         if test $pass -eq 1
 	then 
  	  if cat out | grep -i "warn" > /dev/null 2>&1
