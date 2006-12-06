@@ -1326,7 +1326,7 @@ Debug "About to check TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
 
 # Check for valid choice of TRACEMODE
 
-[ -r $CHARMLIB/libtrace-projections.a ] || Abort "trace libraries not installed.  Is Charm++ built properly?"
+# [ -r $CHARMLIB/libtrace-projections.a ] || Abort "trace libraries not installed.  Is Charm++ built properly?"
 
 if [ x"$TRACEMODE" != x ]
 then
@@ -1400,8 +1400,15 @@ for module in $MODULES; do
     echo "extern void _register$module(void);" >> $modInitSrc
 done
 for trace in $TRACEMODE; do
-    if test $trace = "summary" || test $trace = "all"
+    if test $trace = "summary" 
     then
+      echo "  extern void _registerTraceSummary();" >> $modInitSrc
+    elif test $trace = "projections"
+    then
+      echo "  extern void _registerTraceProjections();" >> $modInitSrc
+    elif test $trace = "all"
+    then
+      echo "  extern void _registerTraceProjections();" >> $modInitSrc
       echo "  extern void _registerTraceSummary();" >> $modInitSrc
     fi
 done
@@ -1415,8 +1422,15 @@ for module in $MODULES; do
     echo "  _register$module();" >> $modInitSrc
 done
 for trace in $TRACEMODE; do
-    if test $trace = "summary" || test $trace = "all"
+    if test $trace = "summary"
     then
+      echo "  _registerTraceSummary();" >> $modInitSrc
+    elif test $trace = "projections"
+    then
+      echo "  _registerTraceProjections();" >> $modInitSrc
+    elif test $trace = "all"
+    then
+      echo "  _registerTraceProjections();" >> $modInitSrc
       echo "  _registerTraceSummary();" >> $modInitSrc
     fi
 done

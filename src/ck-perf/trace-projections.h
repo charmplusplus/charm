@@ -16,8 +16,12 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
+
 #include "trace.h"
+#include "envelope.h"
+#include "register.h"
 #include "ckhashtable.h"
+#include "trace-common.h"
 
 #if CMK_HAS_COUNTER_PAPI
 #include <papi.h>
@@ -114,13 +118,16 @@ class TraceProjections;
 /// log pool in trace projection
 class LogPool {
   friend class TraceProjections;
+  friend class TraceProjectionsBOC;
   private:
+    bool writeData;
     unsigned int poolSize;
     unsigned int numEntries;
     LogEntry *pool;
     FILE *fp;
     FILE *deltafp;
     FILE *stsfp;
+    FILE *rcfp;
     char *fname;
     char *dfname;
     char *pgmname;
@@ -136,8 +143,10 @@ class LogPool {
     // writing out logs.
     double prevTime;
     double timeErr;
+    double globalEndTime; // used at the end on Pe 0 only
 
     int headerWritten;
+    bool fileCreated;
     void writeHeader();
   public:
     LogPool(char *pgm);
@@ -146,13 +155,16 @@ class LogPool {
 #if CMK_PROJECTIONS_USE_ZLIB
     void setCompressed(int c) { compressed = c; }
 #endif
-    void creatFiles(char *fix="");
+    void createFile(char *fix="");
+    void createSts(char *fix="");
+    void createRC();
     void openLog(const char *mode);
     void closeLog(void);
     void writeLog(void);
     void write(int writedelta);
     void writeSts(void);
     void writeSts(TraceProjections *traceProj);
+    void writeRC(void);
 
     void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., double cpuT=0.0);
       // complementary function to set papi info to current log entry
@@ -224,6 +236,8 @@ class StrKey {
   events descriptions will be written into .sts file.
 */
 class TraceProjections : public Trace {
+  friend class TraceProjectionsBOC;
+ private:
     LogPool* _logPool;        /**<  logpool for all events */
     int curevent;
     int execEvent;
@@ -243,7 +257,11 @@ class TraceProjections : public Trace {
     int papiEventSet;
     LONG_LONG_PAPI *papiValues;
 #endif
+
   public:
+    int converseExit; // used for exits that bypass CkExit.
+    double endTime;
+
     TraceProjections(char **argv);
     void userEvent(int e);
     void userBracketEvent(int e, double bt, double et);
@@ -279,9 +297,12 @@ class TraceProjections : public Trace {
     int getFuncNumber(){return funcHashtable.numObjects();};
     void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0);
     void beginFunc(char *name,char *file,int line);
-		void beginFunc(int idx,char *file,int line);
+    void beginFunc(int idx,char *file,int line);
     void endFunc(char *name);
-		void endFunc(int num);
+    void endFunc(int num);
+
+    /* This is for moving projections to being a charm++ module */
+    void closeTrace(void);
 
     /* for overiding basic thread listener support in Trace class */
     virtual void traceAddThreadListeners(CthThread tid, envelope *e);

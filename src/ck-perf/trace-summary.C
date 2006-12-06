@@ -19,6 +19,7 @@
 #define VER   4.0
 
 #define INVALIDEP     -2
+#define TRACEON_EP     -3
 
 #define DefaultBinCount      10000
 
@@ -385,6 +386,8 @@ void SumLogPool::updateSummaryDetail(int epIdx, double startTime, double endTime
                 addToCPUtime(startingBinIdx, epIdx, binSz);
             addToCPUtime(endingBinIdx, epIdx, endTime - endingBinIdx*binSz);
         } else {
+	  CkPrintf("[%d] EP:%d Start:%lf End:%lf\n",CkMyPe(),epIdx,
+		   startTime, endTime);
             CmiAbort("Error: end time of EP is less than start time\n");
         }
 
@@ -460,6 +463,7 @@ TraceSummary::TraceSummary(char **argv):binStart(0.0),bin(0.0),msgNum(0)
       sumDetail = CmiGetArgFlagDesc(argv, "+sumDetail", "more detailed summary info");
 
   _logPool = new SumLogPool(CkpvAccess(traceRoot));
+  // assume invalid entry point on start
   execEp=INVALIDEP;
 }
 
@@ -529,6 +533,12 @@ void TraceSummary::endExecute(void)
   double t = TraceTimer();
   double ts = start;
   double nts = binStart;
+
+  if (execEp == TRACEON_EP) {
+    // if trace just got turned on, then one expects to see this
+    // END_PROCESSING event without seeing a preceeding BEGIN_PROCESSING
+    return;
+  }
 
   if (execEp == INVALIDEP) {
     CmiPrintf("Warning: TraceSummary END_PROCESSING without BEGIN_PROCESSING!\n");

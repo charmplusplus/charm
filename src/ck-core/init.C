@@ -532,10 +532,13 @@ static void _initHandler(void *msg)
 extern "C"
 void _CkExit(void) 
 {
+  // Shuts down Converse handlers for the upper layers on this processor
+  //
   CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
   CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
   CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
   DEBUGF(("[%d] CkExit - _exitStarted:%d %d\n", CkMyPe(), _exitStarted, _exitHandlerIdx));
+
   if(CkMyPe()==0) {
     if(_exitStarted)
       CsdScheduler(-1);

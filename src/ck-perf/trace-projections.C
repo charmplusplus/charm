@@ -12,10 +12,10 @@
 /*@{*/
 
 #include <string.h>
+
 #include "charm++.h"
-#include "envelope.h"
-#include "trace-common.h"
 #include "trace-projections.h"
+#include "trace-projectionsBOC.h"
 
 #define DEBUGF(x)           // CmiPrintf x
 
@@ -29,9 +29,12 @@ int nonDeltaLog;
 
 int checknested=0;		// check illegal nested begin/end execute 
 
-CkpvStaticDeclare(Trace*, _trace);
+CkGroupID traceProjectionsGID;
+
+CkpvStaticDeclare(TraceProjections*, _trace);
 CtvStaticDeclare(int,curThreadEvent);
 
+CkpvDeclare(bool, useOutlierAnalysis);
 CkpvDeclare(int, CtrLogBufSize);
 
 typedef CkVec<char *>  usrEventVec;
@@ -69,6 +72,18 @@ int numPAPIEvents = 2;
 int papiEvents[] = { PAPI_L3_DCM, PAPI_FP_OPS };
 char *papiEventNames[] = {"PAPI_L3_DCM", "PAPI_FP_OPS"};
 #endif
+
+/**
+  For each TraceFoo module, _createTraceFoo() must be defined.
+  This function is called in _createTraces() generated in moduleInit.C
+*/
+void _createTraceProjections(char **argv)
+{
+  DEBUGF(("%d createTraceProjections\n", CkMyPe()));
+  CkpvInitialize(TraceProjections*, _trace);
+  CkpvAccess(_trace) = new  TraceProjections(argv);
+  CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
+}
  
 /* ****** CW TEMPORARY LOCATION ***** Support for thread listeners */
 
@@ -224,17 +239,25 @@ void _createTraceprojections(char **argv)
 
 LogPool::LogPool(char *pgm) {
   pool = new LogEntry[CkpvAccess(CtrLogBufSize)];
+  // defaults to writing data (no outlier changes)
+  writeData = true;
   numEntries = 0;
   // **CW** for simple delta encoding
   prevTime = 0.0;
   timeErr = 0.0;
+  globalEndTime = 0.0;
+  headerWritten = 0;
+  fileCreated = false;
   poolSize = CkpvAccess(CtrLogBufSize);
   pgmname = new char[strlen(pgm)+1];
   strcpy(pgmname, pgm);
 }
 
-void LogPool::creatFiles(char *fix)
+void LogPool::createFile(char *fix)
 {
+  if (fileCreated) {
+    return;
+  }
   char pestr[10];
   sprintf(pestr, "%d", CkMyPe());
 #if CMK_PROJECTIONS_USE_ZLIB
@@ -288,42 +311,63 @@ void LogPool::creatFiles(char *fix)
     }
   }
 #endif
+  fileCreated = true;
   openLog("w+");
   CLOSE_LOG 
+}
 
-  if (CkMyPe() == 0) 
-  {
-    char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(fix)+strlen(".sts")+2];
-    sprintf(fname, "%s%s.sts", CkpvAccess(traceRoot), fix);
-    do
+void LogPool::createSts(char *fix)
+{
+  CkAssert(CkMyPe() == 0);
+  // create the sts file
+  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(fix)+strlen(".sts")+2];
+  sprintf(fname, "%s%s.sts", CkpvAccess(traceRoot), fix);
+  do
     {
       stsfp = fopen(fname, "w");
     } while (!stsfp && (errno == EINTR || errno == EMFILE));
-    if(stsfp==0)
-      CmiAbort("Cannot open projections sts file for writing.\n");
-    delete[] fname;
+  if(stsfp==0)
+    CmiAbort("Cannot open projections sts file for writing.\n");
+  delete[] fname;
+}  
+
+void LogPool::createRC()
+{
+  // create the projections rc file.
+  fname = 
+    new char[strlen(CkpvAccess(traceRoot))+strlen(".projrc")];
+  sprintf(fname, "%s.projrc", CkpvAccess(traceRoot));
+  do {
+    rcfp = fopen(fname, "w");
+  } while (!rcfp && (errno == EINTR || errno == EMFILE));
+  if (rcfp==0) {
+    CmiAbort("Cannot open projections configuration file for writing.\n");
   }
-  headerWritten = 0;
+  delete[] fname;
 }
 
 LogPool::~LogPool() 
 {
-  writeLog();
+  if (writeData) {
+    writeLog();
+#if !CMK_TRACE_LOGFILE_NUM_CONTROL
+    closeLog();
+#endif
+  }
 
 #if CMK_BLUEGENE_CHARM
   extern int correctTimeLog;
   if (correctTimeLog) {
-    closeLog();
-    creatFiles("-bg");
+    createFile("-bg");
+    if (CkMyPe() == 0) {
+      createSts("-bg");
+    }
     writeHeader();
     if (CkMyPe() == 0) writeSts(NULL);
     postProcessLog();
   }
 #endif
 
-#if !CMK_TRACE_LOGFILE_NUM_CONTROL
-  closeLog();
-#endif
   delete[] pool;
   delete [] fname;
 }
@@ -365,6 +409,7 @@ void LogPool::writeHeader()
 
 void LogPool::writeLog(void)
 {
+  createFile();
   OPEN_LOG
   writeHeader();
   if (nonDeltaLog) write(0);
@@ -453,6 +498,19 @@ void LogPool::writeSts(TraceProjections *traceProj){
   }
   fprintf(stsfp, "END\n");
   fclose(stsfp);
+}
+
+void LogPool::writeRC(void)
+{
+  CkAssert(CkMyPe() == 0);
+  fprintf(rcfp,"RC_GLOBAL_END_TIME %lld\n",
+	  (CMK_TYPEDEF_UINT8)(1.0e6*globalEndTime));
+  if (CkpvAccess(useOutlierAnalysis)) {
+    fprintf(rcfp,"RC_OUTLIER_FILTERED true\n");
+  } else {
+    fprintf(rcfp,"RC_OUTLIER_FILTERED false\n");
+  }	  
+  fclose(rcfp);
 }
 
 
@@ -701,14 +759,20 @@ void LogEntry::pup(PUP::er &p)
 }
 
 TraceProjections::TraceProjections(char **argv): 
-curevent(0), inEntry(0), computationStarted(0)
+  curevent(0), inEntry(0), computationStarted(0), 
+  converseExit(0), endTime(0.0)
 {
+  //  CkPrintf("Trace projections dummy constructor called on %d\n",CkMyPe());
+
   if (CkpvAccess(traceOnPe) == 0) return;
 
   CtvInitialize(int,curThreadEvent);
   CkpvInitialize(int, CtrLogBufSize);
+  CkpvInitialize(bool, useOutlierAnalysis);
   CkpvAccess(CtrLogBufSize) = DefaultLogBufSize;
   CtvAccess(curThreadEvent)=0;
+  CkpvAccess(useOutlierAnalysis) =
+    CmiGetArgFlagDesc(argv, "+outlier", "Perform Outlier Analysis");
   if (CmiGetArgIntDesc(argv,"+logsize",&CkpvAccess(CtrLogBufSize), 
 		       "Log entries to buffer per I/O")) {
     if (CkMyPe() == 0) {
@@ -723,6 +787,11 @@ curevent(0), inEntry(0), computationStarted(0)
 		      "Write log files in binary format");
 #if CMK_PROJECTIONS_USE_ZLIB
   int compressed = CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
+#else
+  // consume the flag so there's no confusing
+  CmiGetArgFlagDesc(argv,"+gz-trace",
+		    "Write log files pre-compressed with gzip");
+  CkPrintf("Warning: gz-trace is not supported on this machine!\n");
 #endif
 
   // **CW** default to non delta log encoding. The user may choose to do
@@ -742,8 +811,10 @@ curevent(0), inEntry(0), computationStarted(0)
 #if CMK_PROJECTIONS_USE_ZLIB
   _logPool->setCompressed(compressed);
 #endif
-  _logPool->creatFiles();
-
+  if (CkMyPe() == 0) {
+    _logPool->createSts();
+    _logPool->createRC();
+  }
   funcCount=1;
 
 #if CMK_HAS_COUNTER_PAPI
@@ -809,17 +880,37 @@ void TraceProjections::traceWriteSts(void)
     _logPool->writeSts(this);
 }
 
+// This is called when Converse closes during ConverseCommonExit()
+// 
+// Some programs bypass 
+// CkExit (like NAMD, which eventually calls ConverseExit), modules
+// like traces will have to pretend to shutdown as if CkExit was called
+// but at the same time avoid making subsequent CkExit calls (which is
+// usually required for allowing other modules to shutdown).
+//
+// Note that we can only get here if CkExit was not called, since the
+// trace module will un-register itself from TraceArray if it did.
 void TraceProjections::traceClose(void)
 {
-  if(CkMyPe()==0){
-    _logPool->writeSts(this);
+  // CmiPrintf("CkExit was not called on shutdown on [%d]\n", CkMyPe());
+  // sets the flag that tells the code not to make the CkExit call later
+  converseExit = 1;
+  if (CkMyPe() == 0) {
+    CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
+    bocProxy.shutdownAnalysis();
   }
-  CkpvAccess(_trace)->endComputation();
-  delete _logPool;		// will write
-  // remove myself from traceArray so that no tracing will be called.
-  CkpvAccess(_traces)->removeTrace(this);
-//    delete CkpvAccess(_trace);
-//  free(CkpvAccess(traceRoot));
+}
+
+// This is meant to be called internally rather than by converse.
+void TraceProjections::closeTrace() {
+  //  CkPrintf("Close Trace called on [%d]\n", CkMyPe());
+  if (CkMyPe() == 0) {
+    // CkPrintf("Pe 0 will now write sts and projrc files\n");
+    _logPool->writeSts(this);
+    _logPool->writeRC();
+    // CkPrintf("Pe 0 has now written sts and projrc files\n");
+  }
+  delete _logPool;	 // will write logs to file
 }
 
 void TraceProjections::traceBegin(void)
@@ -1062,7 +1153,12 @@ void TraceProjections::endComputation(void)
   // NOTE: We should not do a complete close of PAPI until after the
   // sts writer is done.
 #endif
-  _logPool->add(END_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
+  endTime = TraceTimer();
+  _logPool->add(END_COMPUTATION, 0, 0, endTime, -1, -1);
+  /*
+  CkPrintf("End Computation [%d] records time as %lf\n", CkMyPe(), 
+  	   endTime*1e06);
+  */
 }
 
 int TraceProjections::idxRegistered(int idx)
@@ -1220,5 +1316,329 @@ void toProjectionsGZFile::bytes(void *p,int n,size_t itemSize,dataType t)
     };
 }
 #endif
+
+void TraceProjectionsBOC::shutdownAnalysis() {
+  if (CkMyPe() == 0) {
+    analysisStartTime = CmiWallTimer();
+  }
+  //  CkPrintf("Shutdown analysis called on [%d]\n",CkMyPe());
+  CkpvAccess(_trace)->endComputation();
+  // no more tracing for projections on this processor after this point. 
+  // Note that clear must be called after remove, or bad things will happen.
+  CkpvAccess(_traces)->removeTrace(CkpvAccess(_trace));
+  CkpvAccess(_traces)->clearTrace();
+
+  // From this point, we start a chain of reductions and broadcasts to
+  // perform final online analysis activities, ending with endTimeReduction
+  if (CkpvAccess(useOutlierAnalysis)) {
+    thisProxy[CkMyPe()].startOutlierAnalysis();
+  } else {
+    thisProxy[CkMyPe()].startEndTimeAnalysis();
+  }
+}
+
+void TraceProjectionsBOC::startOutlierAnalysis() {
+  // assumes the presence of the complete logs on this processor.
+  LogPool *pool = CkpvAccess(_trace)->_logPool;
+
+  // this array stores entry method and idle times (hence +1) and 
+  // is twice as long to store their squares for statistical analysis
+  // when the reduction is performed.
+  int numEvents = _entryTable.size()+1;
+  execTimes = new double[numEvents*2];
+  for (int i=0; i<numEvents*2; i++) {
+    execTimes[i] = 0.0;
+  }
+
+  bool markedBegin = false;
+  bool markedIdle = false;
+  double beginBlockTime = 0.0;
+  double beginIdleBlockTime = 0.0;
+
+  for (int i=0; i<pool->numEntries; i++) {
+    if (pool->pool[i].type == BEGIN_PROCESSING) {
+      // check pairing
+      if (!markedBegin) {
+	markedBegin = true;
+      }
+      beginBlockTime = pool->pool[i].time;
+    } else if (pool->pool[i].type == END_PROCESSING) {
+      // check pairing
+      // if End without a begin, just ignore
+      // this event.
+      if (markedBegin) {
+	markedBegin = false;
+	if (pool->pool[i].event < 0)
+	{
+	  // ignore dummy events
+	  break;
+	}
+	execTimes[pool->pool[i].eIdx] +=
+	  pool->pool[i].time - beginBlockTime;
+      }
+    } else if (pool->pool[i].type == BEGIN_IDLE) {
+      // check pairing
+      if (!markedIdle) {
+	markedIdle = true;
+      }
+      beginIdleBlockTime = pool->pool[i].time;
+    } else if (pool->pool[i].type == END_IDLE) {
+      // check pairing
+      if (markedIdle) {
+	markedIdle = false;
+	execTimes[numEvents] +=
+	  pool->pool[i].time - beginIdleBlockTime;
+      }
+    }
+  }
+  // convert all values to milliseconds first (else values would be too small
+  // or too big)
+  for (int i=0; i<numEvents; i++) {
+    execTimes[i] *= 1.0e3;
+  }
+
+  // compute squares
+  for (int i=0; i<numEvents; i++) {
+    execTimes[i+numEvents] = execTimes[i]*execTimes[i];
+  }
+
+  CkCallback cb(CkIndex_TraceProjectionsBOC::outlierAverageReduction(NULL), 
+		0, thisProxy);
+  contribute(numEvents*2*sizeof(double), execTimes, 
+	     CkReduction::sum_double, cb);  
+}
+
+void TraceProjectionsBOC::outlierAverageReduction(CkReductionMsg *msg) {
+  CkAssert(CkMyPe() == 0);
+  // kinda wierd place to initialize a variable, but ...
+  encounteredWeights = 0;
+  weightArray = new double[CkNumPes()];
+  mapArray = new int[CkNumPes()];
+
+  // calculate statistics
+  int numEvents = _entryTable.size()+1;
+  OutlierStatsMessage *outmsg = new (numEvents*2) OutlierStatsMessage;
+
+  double *execTimes = (double *)msg->getData();
+  /*
+  for (int i=0; i<numEvents; i++) {
+    CkPrintf("EP: %d has Data: %lf and sum of squares %lf\n",
+	     i,execTimes[i],execTimes[i+numEvents]);
+  }
+  */
+  for (int i=0; i<numEvents; i++) {
+    // calculate mean
+    outmsg->stats[i] = execTimes[i]/CkNumPes();
+    // calculate stddev (using biased variance)
+    outmsg->stats[i+numEvents] = 
+      sqrt((execTimes[i+numEvents]-2*(outmsg->stats[i])*execTimes[i]+
+	    (outmsg->stats[i])*(outmsg->stats[i])*CkNumPes())/
+	   CkNumPes());
+    // CkPrintf("EP:%d Mean:%lf Stddev:%lf\n",i,outmsg->stats[i],
+    // 	     outmsg->stats[i+numEvents]);
+  }
+  delete msg;
+
+  // output averages to a file in microseconds. File handle to be kept
+  // open so we can write more stats to it.
+  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".outlier")+1];
+  sprintf(fname, "%s.outlier", CkpvAccess(traceRoot));
+  do {
+    outlierfp = fopen(fname, "w");
+  } while (!outlierfp && (errno == EINTR || errno == EMFILE));
+  for (int i=0; i<numEvents; i++) {
+    fprintf(outlierfp,"%lld ",(CMK_TYPEDEF_UINT8)(outmsg->stats[i]*1.0e3));
+  }
+  fprintf(outlierfp,"\n");
+
+  // broadcast statistical values to all processors for weight calculations
+  thisProxy.calculateWeights(outmsg);
+}
+
+void TraceProjectionsBOC::calculateWeights(OutlierStatsMessage *msg) {
+  // calculate outlier "weights"
+  int numEvents = _entryTable.size()+1;
+
+  // this is silly, but do it for now. First pass for computing total
+  // time. It is also a misnomer, since this total will not include
+  // any overhead time.
+  OutlierWeightMessage *outmsg = new OutlierWeightMessage;
+  weight = 0.0;
+  outmsg->sourcePe = CkMyPe();
+  outmsg->weight = 0.0;
+  double total = 0.0;
+  for (int i=0; i<numEvents; i++) {
+    total += execTimes[i];
+  }
+  for (int i=0; i<numEvents; i++) {
+    if ((total > 0.0) &&
+	(msg->stats[i+numEvents] > 0.0)) {
+      outmsg->weight += 
+	(fabs(execTimes[i]-msg->stats[i])/msg->stats[i+numEvents]) *
+	(msg->stats[i]/total);
+    }
+    // CkPrintf("[%d] EP:%d Weight:%lf\n",CkMyPe(),i,outmsg->weight);
+  }
+  weight = outmsg->weight;
+  delete msg;
+  
+  thisProxy[0].determineOutliers(outmsg);
+}
+
+void TraceProjectionsBOC::determineOutliers(OutlierWeightMessage *msg) {
+  CkAssert(CkMyPe() == 0);
+  encounteredWeights++;
+
+  // For now, implement a full array for sorting later. For better scaling
+  // it should really be a sorted list of maximum k entries.
+  weightArray[msg->sourcePe] = msg->weight;
+
+  if (encounteredWeights == CkNumPes()) {
+    OutlierThresholdMessage *outmsg = new OutlierThresholdMessage;
+    outmsg->threshold = 0.0;
+
+    // initialize the map array
+    for (int i=0; i<CkNumPes(); i++) {
+      mapArray[i] = i;
+    }
+    
+    // bubble sort the array
+    for (int p=CkNumPes()-1; p>0; p--) {
+      for (int i=0; i<p; i++) {
+	if (weightArray[i+1] < weightArray[i]) {
+	  int tempI;
+	  double temp = weightArray[i+1];
+	  weightArray[i+1] = weightArray[i];
+	  weightArray[i] = temp;
+	  tempI = mapArray[i+1];
+	  mapArray[i+1] = mapArray[i];
+	  mapArray[i] = tempI;
+	}
+      }
+    }    
+
+    // default threshold is applied.
+    //
+    // **CW** This needs to be changed to accept a runtime parameter
+    // so the default can be overridden. Default value considers the
+    // top 10% "different" processors as outliers.
+    int thresholdIndex;
+    thresholdIndex = (int)round(CkNumPes()*0.9);
+    if (thresholdIndex == CkNumPes()) {
+      thresholdIndex--;
+    }
+
+    // output the sorted processor list to stats file
+    for (int i=thresholdIndex; i<CkNumPes(); i++) {
+      fprintf(outlierfp,"%d ",mapArray[i]);
+    }
+    fprintf(outlierfp,"\n");
+    fflush(outlierfp);
+    fclose(outlierfp);
+
+    // CkPrintf("Outlier Index determined to be %d with value %lf\n",
+    //	     thresholdIndex, weightArray[thresholdIndex]);
+    outmsg->threshold = weightArray[thresholdIndex];
+    
+    delete msg;
+    thisProxy.setOutliers(outmsg);
+  } else {
+    delete msg;
+  }
+}
+
+void TraceProjectionsBOC::setOutliers(OutlierThresholdMessage *msg)
+{
+  LogPool *pool = CkpvAccess(_trace)->_logPool;
+  // CkPrintf("[%d] My weight is %lf, threshold is %lf\n",CkMyPe(),weight,
+  //   msg->threshold);
+  if (weight < msg->threshold) {
+    // CkPrintf("[%d] Removing myself from output list\n");
+    pool->writeData = false;
+  }
+
+  delete msg;
+  thisProxy[CkMyPe()].startEndTimeAnalysis();
+}
+
+void TraceProjectionsBOC::startEndTimeAnalysis()
+{
+  endTime = CkpvAccess(_trace)->endTime;
+  // CkPrintf("[%d] End time is %lf us\n", CkMyPe(), endTime*1e06);
+
+  CkCallback cb(CkIndex_TraceProjectionsBOC::endTimeReduction(NULL), 
+		0, thisProxy);
+  contribute(sizeof(double), &endTime, CkReduction::max_double, cb);  
+}
+
+void TraceProjectionsBOC::endTimeReduction(CkReductionMsg *msg)
+{
+  CkAssert(CkMyPe() == 0);
+  if (CkpvAccess(_trace) != NULL) {
+    CkpvAccess(_trace)->_logPool->globalEndTime = *(double *)msg->getData();
+    // CkPrintf("End time determined to be %lf us\n",
+    //	     (CkpvAccess(_trace)->_logPool->globalEndTime)*1e06);
+  }
+  delete msg;  
+  CkPrintf("Total Analysis Time = %lf\n", CmiWallTimer()-analysisStartTime);
+  thisProxy.closeTrace();
+}
+
+void TraceProjectionsBOC::finalReduction(CkReductionMsg *msg)
+{
+  CkAssert(CkMyPe() == 0);
+  // CkPrintf("Final Reduction called\n");
+  delete msg;
+  CkExit();
+}
+
+void TraceProjectionsBOC::closeTrace()
+{
+  if (CkpvAccess(_trace) == NULL) {
+    return;
+  }
+  CkpvAccess(_trace)->closeTrace();
+  // the following section is only excuted if CkExit is called, since
+  // closing-progress is required for other modules.
+  if (!CkpvAccess(_trace)->converseExit) {
+    // this is a dummy reduction to make sure that all the output
+    // is completed before other modules are allowed to do stuff
+    // and finally _CkExit is called.
+    CkCallback cb(CkIndex_TraceProjectionsBOC::finalReduction(NULL), 
+		  0, thisProxy);
+    contribute(sizeof(double), &dummy, CkReduction::max_double, cb);
+  }
+}
+
+// This is the C++ code that is registered to be activated at module
+// shutdown. This is called exactly once on processor 0.
+// 
+extern "C" void CombineProjections()
+{
+  // CkPrintf("[%d] CombineProjections called!\n", CkMyPe());
+  CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
+  bocProxy.shutdownAnalysis();
+}
+
+// This method is called by module initialization to register the exit
+// function. This exit function must ultimately call CkExit() again to
+// so that other module exit functions may proceed after this module is
+// done.
+//
+// This is called once on each processor but the idiom of use appears
+// to be to only have processor 0 register the function.
+void initTraceProjectionsBOC()
+{
+  // CkPrintf("[%d] Trace Projections initialization called!\n", CkMyPe());
+#ifdef __BLUEGENE__
+  if (BgNodeRank() == 0) {
+#else
+    if (CkMyRank() == 0) {
+#endif
+      registerExitFn(CombineProjections);
+    }
+  }
+
+#include "TraceProjections.def.h"
 
 /*@}*/

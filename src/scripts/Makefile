@@ -209,7 +209,8 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  TopoCentLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
           NeighborCommLB.decl.h HbmLB.decl.h \
           HybridBaseLB.decl.h HybridLB.decl.h WSLB.decl.h EveryLB.decl.h \
-          charisma.decl.h TraceSummary.decl.h BlueGene.decl.h \
+          charisma.decl.h TraceProjections.decl.h TraceSummary.decl.h \
+	BlueGene.decl.h \
 	  comlib.decl.h ComlibManager.h DummyStrategy.h	\
 	  DirectMulticastStrategy.h RingMulticastStrategy.h	\
 	  MultiRingMulticast.h \
@@ -617,6 +618,11 @@ BaseLB.def.h: BaseLB.decl.h
 
 BaseLB.decl.h: BaseLB.ci charmxi
 	$(CHARMXI) BaseLB.ci
+
+TraceProjections.def.h: TraceProjections.decl.h
+
+TraceProjections.decl.h: trace-projections.ci charmxi
+	$(CHARMXI) trace-projections.ci
 
 TraceSummary.def.h: TraceSummary.decl.h
 

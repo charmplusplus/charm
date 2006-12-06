@@ -50,6 +50,7 @@
 #define CMK_TIMER_USE_GETRUSAGE                            0
 #define CMK_TIMER_USE_SPECIAL                              1
 #define CMK_TIMER_USE_TIMES                                0
+#define CMK_TIMER_USE_XT3_DCLOCK                           0
 
 #define CMK_TYPEDEF_INT2 short
 #define CMK_TYPEDEF_INT4 int
