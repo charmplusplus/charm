@@ -1,0 +1,35 @@
+
+module TraceProjections {
+
+  message OutlierStatsMessage {
+    double stats[];
+  };
+
+  message OutlierWeightMessage;
+
+  message OutlierThresholdMessage;
+
+  mainchare TraceProjectionsInit {
+    entry TraceProjectionsInit(CkArgMsg *m);
+  };
+
+  initnode void initTraceProjectionsBOC();
+  
+  readonly CkGroupID traceProjectionsGID;
+
+  group [migratable] TraceProjectionsBOC {
+    entry TraceProjectionsBOC(void);
+    entry void startOutlierAnalysis();
+    entry void outlierAverageReduction(CkReductionMsg *);
+    entry void calculateWeights(OutlierStatsMessage *);
+    entry void determineOutliers(OutlierWeightMessage *);
+    entry void setOutliers(OutlierThresholdMessage *);
+    entry void startEndTimeAnalysis();
+    entry void endTimeReduction(CkReductionMsg *);
+    entry void finalReduction(CkReductionMsg *);
+    entry [notrace] void shutdownAnalysis(void);
+    entry void closeTrace(void);
+  };
+
+};
+
