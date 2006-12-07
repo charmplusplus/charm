@@ -127,7 +127,7 @@ initialize(const DType& dt, void *lhs, int op)
           assign(dt.vec_len,(unsigned char*)lhs, (unsigned char)CHAR_MIN); 
           break;
         case MBLK_INT : assign(dt.vec_len,(int*)lhs, INT_MIN); break;
-        case MBLK_REAL : assign(dt.vec_len,(float*)lhs, FLT_MIN); break;
+        case MBLK_REAL : assign(dt.vec_len,(float*)lhs, (float)FLT_MIN); break;
         case MBLK_DOUBLE : assign(dt.vec_len,(double*)lhs, DBL_MIN); break;
       }
       break;

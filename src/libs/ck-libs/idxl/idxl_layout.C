@@ -124,7 +124,7 @@ void reduction_initialize(const IDXL_Layout& dt, void *lhs, int op,const char *c
       switch(dt.type) {
         case IDXL_BYTE : assignFn(dt.width,(byte*)lhs, (byte)CHAR_MIN); break;
         case IDXL_INT : assignFn(dt.width,(int*)lhs, INT_MIN); break;
-        case IDXL_REAL : assignFn(dt.width,(float*)lhs, FLT_MIN); break;
+        case IDXL_REAL : assignFn(dt.width,(float*)lhs, (float)FLT_MIN); break;
         case IDXL_DOUBLE : assignFn(dt.width,(double*)lhs, DBL_MIN); break;
       }
       break;
