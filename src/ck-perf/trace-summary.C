@@ -133,7 +133,8 @@ SumLogPool::SumLogPool(char *pgm) : numBins(0), phaseTab(MAX_PHASES)
     do {
       fp = fopen(fname, "w+");
     } while (!fp && errno == EINTR);
-    if(!fp) {
+    if (!fp) {
+    CkPrintf("[%d] Attempting to open [%s]\n",CkMyPe(),fname);
       CmiAbort("Cannot open Summary Trace File for writing...\n");
     }
 

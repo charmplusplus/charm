@@ -168,7 +168,10 @@ void LogPool::openLog(const char *mode)
       do {
 	fp = fopen(fname, mode);
       } while (!fp && (errno == EINTR || errno == EMFILE));
-      if(!fp) CmiAbort("Cannot open Projections Non Delta Trace File for writing...\n");
+      if (!fp) {
+	CkPrintf("[%d] Attempting to open file [%s]\n",CkMyPe(),fname);
+	CmiAbort("Cannot open Projections Non Delta Trace File for writing...\n");
+      }
     }
     if (deltaLog) {
       do {
@@ -183,7 +186,10 @@ void LogPool::openLog(const char *mode)
     do {
       fp = fopen(fname, mode);
     } while (!fp && (errno == EINTR || errno == EMFILE));
-    if(!fp) CmiAbort("Cannot open Projections Non Delta Trace File for writing...\n");
+    if (!fp) {
+      CkPrintf("[%d] Attempting to open file [%s]\n",CkMyPe(),fname);
+      CmiAbort("Cannot open Projections Non Delta Trace File for writing...\n");
+    }
   }
   if (deltaLog) {
     do {
@@ -892,7 +898,7 @@ void TraceProjections::traceWriteSts(void)
 // trace module will un-register itself from TraceArray if it did.
 void TraceProjections::traceClose(void)
 {
-  // CmiPrintf("CkExit was not called on shutdown on [%d]\n", CkMyPe());
+  // CkPrintf("CkExit was not called on shutdown on [%d]\n", CkMyPe());
   // sets the flag that tells the code not to make the CkExit call later
   converseExit = 1;
   if (CkMyPe() == 0) {

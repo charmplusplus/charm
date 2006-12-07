@@ -11,6 +11,19 @@
 /*@{*/
 
 #include <stdlib.h>
+#if defined(_WIN32) && !defined(__CYGWIN__)
+#include <direct.h>
+#define CHDIR _chdir
+#define GETCWD _getcwd
+#define PATHSEP '\\'
+#define PATHSEPSTR "\\"
+#else
+#include <unistd.h>
+#define CHDIR chdir
+#define GETCWD getcwd
+#define PATHSEP '/'
+#define PATHSEPSTR "/"
+#endif
 
 // cannot include charm++.h because trace-common.o is part of libconv-core.a
 #include "charm.h"
@@ -69,13 +82,27 @@ static void traceCommonInit(char **argv)
   CkpvInitialize(int, traceOnPe);
   CkpvAccess(traceOnPe) = 1;
   char *root;
-  if (CmiGetArgStringDesc(argv, "+traceroot", &root, "Directory to write trace files to")) {
+  char *temproot;
+  char *temproot2;
+  if (CmiGetArgStringDesc(argv, "+traceroot", &temproot, "Directory to write trace files to")) {
     int i;
-    for (i=strlen(argv[0])-1; i>=0; i--) if (argv[0][i] == '/') break;
+    // Trying to decide if the traceroot path is absolute or not. If it is not
+    // then create an absolute pathname for it.
+    if (temproot[0] != PATHSEP) {
+      temproot2 = GETCWD(NULL,0);
+      root = (char *)malloc(strlen(temproot2)+1+strlen(temproot)+1);
+      strcpy(root, temproot2);
+      strcat(root, PATHSEPSTR);
+      strcat(root, temproot);
+    } else {
+      root = (char *)malloc(strlen(temproot)+1);
+      strcpy(root,temproot);
+    }
+    for (i=strlen(argv[0])-1; i>=0; i--) if (argv[0][i] == PATHSEP) break;
     i++;
     CkpvAccess(traceRoot) = (char *)malloc(strlen(argv[0]+i) + strlen(root) + 2);    _MEMCHECK(CkpvAccess(traceRoot));
     strcpy(CkpvAccess(traceRoot), root);
-    strcat(CkpvAccess(traceRoot), "/");
+    strcat(CkpvAccess(traceRoot), PATHSEPSTR);
     strcat(CkpvAccess(traceRoot), argv[0]+i);
     if (CkMyPe() == 0) 
       CmiPrintf("Trace: traceroot: %s\n", CkpvAccess(traceRoot));
