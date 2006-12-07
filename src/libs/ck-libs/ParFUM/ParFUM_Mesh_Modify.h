@@ -146,10 +146,16 @@ class FEMMeshMsg : public CMessage_FEMMeshMsg {
  public:
   FEM_Mesh *m;
   TCharm *t;
+	int meshid;
 
   FEMMeshMsg(FEM_Mesh *mh, TCharm *t1) {
     m = mh;
     t = t1;
+  }
+  FEMMeshMsg(FEM_Mesh *mh, TCharm *t1,int _meshid) {
+    m = mh;
+    t = t1;
+		meshid = _meshid;
   }
 
   ~FEMMeshMsg() {}

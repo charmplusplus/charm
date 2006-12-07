@@ -7,6 +7,7 @@
 #include "charm++.h"
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
+#include "ParFUM_SA.h"
 
 /// This shadow array is attached to a partition to perform bulk adaptivity
 /** This is a shadow array for performing all bulk adaptivity operations, 
@@ -15,6 +16,7 @@ class BulkAdapt {
  private:
   /// The index of the partition this array element is attached to
   int partitionID;
+	int meshID;
   /// Pointer to the local mesh partition associated with this array
   FEM_Mesh *meshPtr;
   /// Proxy to ParFUM shadow array attached to each mesh partition
@@ -24,7 +26,7 @@ class BulkAdapt {
 
  public:
   /// Construct array to be attached to the partitions of mesh mId
-  BulkAdapt(FEM_Mesh *mPtr, int partID, CProxy_ParFUMShadowArray sa_proxy);
+  BulkAdapt(int meshid, FEM_Mesh *mPtr, int partID, CProxy_ParFUMShadowArray sa_proxy);
   /// Destructor
   ~BulkAdapt();
 

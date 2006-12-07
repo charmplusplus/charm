@@ -7,6 +7,7 @@
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
 #include "ParFUM_SA.h"
+#include "bulk_adapt_ops.h"
 
 CProxy_ParFUMShadowArray meshSA;
 #define DEBUG(x) x
@@ -41,7 +42,7 @@ void ParFUM_SA_Init(int meshId) {
 		lockTable[i][1] = -1; // locking region
 	}
   
-	FEMMeshMsg *msg = new FEMMeshMsg(m,tc); 
+	FEMMeshMsg *msg = new FEMMeshMsg(m,tc,meshId); 
   meshSA[idx].setFemMesh(msg);
   return;
 }
@@ -86,6 +87,9 @@ void ParFUMShadowArray::setFemMesh(FEMMeshMsg *msg) {
   tc = msg->t;
   tproxy = tc->getProxy();
   fmMesh->setParfumSA(this);
+
+	bulkAdapt = new BulkAdapt(msg->meshid,fmMesh,idx,thisProxy);
+
   return;
 }
 

@@ -5,9 +5,10 @@
 #include "bulk_adapt_ops.h"
 
 /// Construct array to be attached to the partitions of mesh mId
-BulkAdapt::BulkAdapt(FEM_Mesh *mPtr, int partID, 
+BulkAdapt::BulkAdapt(int meshid,FEM_Mesh *mPtr, int partID, 
 		     CProxy_ParFUMShadowArray sa_proxy)
 {
+	meshID = meshid;
   meshPtr = mPtr;
   partitionID = partID;
   shadowProxy = sa_proxy;
@@ -44,7 +45,7 @@ int BulkAdapt::edge_bisect(int elemID, int elemType, int edgeID)
   region[0].localID = elemID;
   region[0].partID = partitionID;
   region[0].elemType = elemType;
-  &(region[1]) = GetAdaptAdj(elemID, elemType, edgeID);
+  region[1] = *GetAdaptAdj(meshID,elemID, elemType, edgeID);
   RegionID regionID;
   bool success;
   if (success = (localShadow->lockRegion(2, region, &regionID))) {

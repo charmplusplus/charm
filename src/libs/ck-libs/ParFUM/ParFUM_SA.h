@@ -52,6 +52,8 @@ public:
     which want to perform any operations on meshes and for that
     purpose want to communicate among chunks on different processors
  */
+
+class BulkAdapt;
 class ParFUMShadowArray : public CBase_ParFUMShadowArray {
  private:
   ///Total number of chunks
@@ -68,6 +70,9 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
 
 	CkHashtableT<CkHashtableAdaptorT<RegionID>,LockRegion *> regionTable;
 	int regionCount;
+
+ public:
+	BulkAdapt *bulkAdapt;
 
  public:
   ///constructor
