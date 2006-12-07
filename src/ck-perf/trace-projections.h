@@ -18,10 +18,7 @@
 #include <unistd.h>
 
 #include "trace.h"
-#include "envelope.h"
-#include "register.h"
 #include "ckhashtable.h"
-#include "trace-common.h"
 
 #if CMK_HAS_COUNTER_PAPI
 #include <papi.h>

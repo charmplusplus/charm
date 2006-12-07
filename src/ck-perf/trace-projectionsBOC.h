@@ -1,3 +1,6 @@
+#include "envelope.h"
+#include "register.h"
+#include "trace-common.h"
 
 #include "TraceProjections.decl.h"
 
