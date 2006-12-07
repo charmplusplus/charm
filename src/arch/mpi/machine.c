@@ -46,8 +46,8 @@
 
 
 /*
-    To reduce the buffer used in broadcast and distribute the load from 
-  broadcasting node, define CMK_BROADCAST_SPANNING_TREE enforce the use of 
+    To reduce the buffer used in broadcast and distribute the load from
+  broadcasting node, define CMK_BROADCAST_SPANNING_TREE enforce the use of
   spanning tree broadcast algorithm.
     This will use the fourth short in message as an indicator of spanning tree
   root.
@@ -102,6 +102,13 @@ static int checksum_flag = 0;
  to avoid MPI's in order delivery, changing MPI Tag all the time
 */
 #define TAG     1375
+
+#if MPI_POST_RECV_COUNT > 0
+#define POST_RECV_TAG 1376
+#endif
+
+
+
 /*
 static int mpi_tag = TAG;
 #define NEW_MPI_TAG	mpi_tag++; if (mpi_tag == MPI_TAG_UB) mpi_tag=TAG;
@@ -112,7 +119,7 @@ int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_mynodesize;/* Number of processors in my address space */
 int               _Cmi_numnodes;  /* Total number of address spaces */
 int               _Cmi_numpes;    /* Total number of processors */
-static int        Cmi_nodestart; /* First processor in this address space */ 
+static int        Cmi_nodestart; /* First processor in this address space */
 CpvDeclare(void*, CmiLocalQueue);
 
 /*Network progress utility variables. Period controls the rate at
@@ -121,6 +128,12 @@ CpvDeclare(unsigned , networkProgressCount);
 int networkProgressPeriod;
 
 int 		  idleblock = 0;
+
+#if MPI_POST_RECV_COUNT > 0
+CpvDeclare(MPI_Request*, CmiPostedRecvRequests); /* An array of request handles for posted recvs */
+CpvDeclare(void*,CmiPostedRecvBuffers);
+#endif
+
 
 #define BLK_LEN  512
 
@@ -199,7 +212,7 @@ int CmiTimerIsSynchronized()
     printf("MPI_WTIME_IS_GLOBAL not valid!\n");
   if (flag) {
     _is_global = *(int*)v;
-    if (_is_global && CmiMyPe() == 0) 
+    if (_is_global && CmiMyPe() == 0)
       printf("Charm++> MPI timer is synchronized!\n");
   }
   return _is_global;
@@ -210,10 +223,10 @@ void CmiTimerInit()
   _is_global = CmiTimerIsSynchronized();
 
   if (CmiMyRank() == 0) {
-    if (_is_global) { 
+    if (_is_global) {
       double minTimer;
       starttimer = MPI_Wtime();
-      MPI_Allreduce(&starttimer, &minTimer, 1, MPI_DOUBLE, MPI_MIN, 
+      MPI_Allreduce(&starttimer, &minTimer, 1, MPI_DOUBLE, MPI_MIN,
                                   MPI_COMM_WORLD );
       starttimer = minTimer;
     }
@@ -313,7 +326,7 @@ static CmiNodeLock  sendMsgBufLock = NULL;        /* for sendMsgBuf */
 #endif
 
 /************************************************************
- * 
+ *
  * Processor state structure
  *
  ************************************************************/
@@ -345,7 +358,7 @@ static void CmiStartThreads(char **argv)
   CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
   _Cmi_mype = Cmi_nodestart;
   _Cmi_myrank = 0;
-}      
+}
 #endif	/* non smp */
 
 /*Add a message to this processor's receive queue, pe is a rank */
@@ -374,7 +387,7 @@ CmiPrintf("[node %d] Immediate Message done.}} \n", CmiMyNode());
 #if CMK_SMP
   CmiUnlock(procState[pe].recvLock);
 #endif
-  CmiIdleLock_addMessage(&cs->idle); 
+  CmiIdleLock_addMessage(&cs->idle);
   MACHSTATE1(3,"} Pushing message into rank %d's queue done",pe);
 }
 
@@ -429,10 +442,10 @@ static int CmiAllAsyncMsgsSent(void)
    SMSG_LIST *msg_tmp = sent_msgs;
    MPI_Status sts;
    int done;
-     
+
    while(msg_tmp!=0) {
     done = 0;
-    if (MPI_SUCCESS != MPI_Test(&(msg_tmp->req), &done, &sts)) 
+    if (MPI_SUCCESS != MPI_Test(&(msg_tmp->req), &done, &sts))
       CmiAbort("CmiAllAsyncMsgsSent: MPI_Test failed!\n");
     if(!done)
       return 0;
@@ -443,7 +456,7 @@ static int CmiAllAsyncMsgsSent(void)
 }
 
 int CmiAsyncMsgSent(CmiCommHandle c) {
-     
+
   SMSG_LIST *msg_tmp = sent_msgs;
   int done;
   MPI_Status sts;
@@ -452,7 +465,7 @@ int CmiAsyncMsgSent(CmiCommHandle c) {
     msg_tmp = msg_tmp->next;
   if(msg_tmp) {
     done = 0;
-    if (MPI_SUCCESS != MPI_Test(&(msg_tmp->req), &done, &sts)) 
+    if (MPI_SUCCESS != MPI_Test(&(msg_tmp->req), &done, &sts))
       CmiAbort("CmiAsyncMsgSent: MPI_Test failed!\n");
     return ((done)?1:0);
   } else {
@@ -477,11 +490,11 @@ void CmiReleaseSentMessages(void)
   int done;
   MPI_Status sts;
 
-  
+
 #if CMK_VERSION_BLUEGENE
   MPID_Progress_test();
 #endif
- 
+
   MACHSTATE1(2,"CmiReleaseSentMessages begin on %d {", CmiMyPe());
   while(msg_tmp!=0) {
     done =0;
@@ -529,7 +542,7 @@ int PumpMsgs(void)
     recd = 1;
     MPI_Get_count(&sts, MPI_BYTE, &nbytes);
     msg = (char *) CmiAlloc(nbytes);
-    if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, MPI_COMM_WORLD,&sts)) 
+    if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, MPI_COMM_WORLD,&sts))
       CmiAbort("PumpMsgs: MPI_Recv failed!\n");
 
     MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
@@ -572,7 +585,7 @@ static void PumpMsgsBlocking(void)
   char *msg;
   int recd=0;
 
-  if (!PCQueueEmpty(CmiGetState()->recv)) return; 
+  if (!PCQueueEmpty(CmiGetState()->recv)) return;
   if (!CdsFifo_Empty(CpvAccess(CmiLocalQueue))) return;
   if (!CqsEmpty(CpvAccess(CsdSchedQueue))) return;
   if (sent_msgs)  return;
@@ -586,7 +599,7 @@ static void PumpMsgsBlocking(void)
     _MEMCHECK(buf);
   }
 
-  if (MPI_SUCCESS != MPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts)) 
+  if (MPI_SUCCESS != MPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts))
       CmiAbort("PumpMsgs: PMP_Recv failed!\n");
    MPI_Get_count(&sts, MPI_BYTE, &nbytes);
    msg = (char *) CmiAlloc(nbytes);
@@ -651,7 +664,7 @@ static void CommunicationServer(int sleepTime)
 */
   PumpMsgs();
   CmiReleaseSentMessages();
-  SendMsgBuf(); 
+  SendMsgBuf();
 /*
   if (count % 10000000==0) MACHSTATE(3, "} Exiting CommunicationServer.");
 */
@@ -662,7 +675,7 @@ static void CommunicationServer(int sleepTime)
 #endif
     while(!MsgQueueEmpty() || !CmiAllAsyncMsgsSent()) {
       CmiReleaseSentMessages();
-      SendMsgBuf(); 
+      SendMsgBuf();
       PumpMsgs();
     }
     MACHSTATE(2, "CommunicationServer barrier begin {");
@@ -676,7 +689,7 @@ static void CommunicationServer(int sleepTime)
 #endif
     MACHSTATE(2, "} CommunicationServer EXIT");
     MPI_Finalize();
-    exit(0);   
+    exit(0);
   }
 }
 
@@ -720,9 +733,9 @@ void *CmiGetNonLocal(void)
 
   CmiReleaseSentMessages();
   PumpMsgs();
-  
+
   CmiLock(procState[cs->rank].recvLock);
-  msg =  PCQueuePop(cs->recv); 
+  msg =  PCQueuePop(cs->recv);
   CmiUnlock(procState[cs->rank].recvLock);
 
 /*
@@ -740,7 +753,7 @@ void *CmiGetNonLocal(void)
       PumpMsgs();
     }
   }
-  
+
   if(!msg) {
     CmiReleaseSentMessages();
     if (PumpMsgs())
@@ -758,7 +771,7 @@ void CmiNotifyIdle(void)
   CmiReleaseSentMessages();
   if (!PumpMsgs() && idleblock) PumpMsgsBlocking();
 }
- 
+
 
 /********************************************************
     The call to probe immediate messages has been renamed to
@@ -863,7 +876,7 @@ static int SendMsgBuf()
       MACHSTATE2(3,"MPI_send to node %d rank: %d{", node, CMI_DEST_RANK(msg));
       CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
       CMI_SET_CHECKSUM(msg, size);
-      if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
+      if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
         CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
       MACHSTATE(3,"}MPI_send end");
       MsgQueueLen++;
@@ -878,19 +891,19 @@ static int SendMsgBuf()
       CmiUnlock(sendMsgBufLock);
     }
 #if 0
-  } 
+  }
 #endif
   MACHSTATE(2,"}SendMsgBuf end ");
   return sent;
 }
 
-void EnqueueMsg(void *m, int size, int node)    
+void EnqueueMsg(void *m, int size, int node)
 {
   SMSG_LIST *msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
   MACHSTATE1(3,"EnqueueMsg to node %d {{ ", node);
   msg_tmp->msg = m;
-  msg_tmp->size = size;	
-  msg_tmp->destpe = node;	
+  msg_tmp->size = size;
+  msg_tmp->destpe = node;
   CmiLock(sendMsgBufLock);
   PCQueuePush(sendMsgBuf,(char *)msg_tmp);
   CmiUnlock(sendMsgBufLock);
@@ -904,7 +917,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
   CmiState cs = CmiGetState();
   SMSG_LIST *msg_tmp;
   CmiUInt2  rank, node;
-     
+
   if(destPE == cs->pe) {
     char *dupmsg = (char *) CmiAlloc(size);
     memcpy(dupmsg, msg, size);
@@ -935,7 +948,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
   }
   CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
   CMI_SET_CHECKSUM(msg, size);
-  if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req))) 
+  if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
     CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
   MsgQueueLen++;
   if(sent_msgs==0)
@@ -1006,14 +1019,14 @@ void SendHypercube(int size, char *msg)
   double logp = CmiNumPes();
   logp = log(logp)/log(2.0);
   logp = ceil(logp);
-  
+
   /*  CmiPrintf("In hypercube\n"); */
 
   /* assert(startpe>=0 && startpe<_Cmi_numpes); */
 
   for (i = curcycle; i < logp; i++) {
     int p = cs->pe ^ (1 << i);
-    
+
     /*   CmiPrintf("p = %d, logp = %5.1f\n", p, logp);*/
 
     if(p < CmiNumPes()) {
@@ -1029,17 +1042,17 @@ void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
 #if CMK_BROADCAST_SPANNING_TREE
   CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
   SendSpanningChildren(size, msg);
-  
+
 #elif CMK_BROADCAST_HYPERCUBE
   CMI_SET_CYCLE(msg, 0);
   SendHypercube(size, msg);
-    
+
 #else
   int i;
 
-  for ( i=cs->pe+1; i<_Cmi_numpes; i++ ) 
+  for ( i=cs->pe+1; i<_Cmi_numpes; i++ )
     CmiSyncSendFn(i, size,msg) ;
-  for ( i=0; i<cs->pe; i++ ) 
+  for ( i=0; i<cs->pe; i++ )
     CmiSyncSendFn(i, size,msg) ;
 #endif
 
@@ -1048,14 +1061,14 @@ void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
 
 
 /*  FIXME: luckily async is never used  G. Zheng */
-CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)  
+CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
 {
   CmiState cs = CmiGetState();
   int i ;
 
-  for ( i=cs->pe+1; i<_Cmi_numpes; i++ ) 
+  for ( i=cs->pe+1; i<_Cmi_numpes; i++ )
     CmiAsyncSendFn(i,size,msg) ;
-  for ( i=0; i<cs->pe; i++ ) 
+  for ( i=0; i<cs->pe; i++ )
     CmiAsyncSendFn(i,size,msg) ;
 
   /*CmiPrintf("In  AsyncBroadcast broadcast\n");*/
@@ -1068,10 +1081,10 @@ void CmiFreeBroadcastFn(int size, char *msg)
    CmiSyncBroadcastFn(size,msg);
    CmiFree(msg);
 }
- 
+
 void CmiSyncBroadcastAllFn(int size, char *msg)        /* All including me */
 {
- 
+
 #if CMK_BROADCAST_SPANNING_TREE
   CmiState cs = CmiGetState();
   CmiSyncSendFn(cs->pe, size,msg) ;
@@ -1086,23 +1099,23 @@ void CmiSyncBroadcastAllFn(int size, char *msg)        /* All including me */
 
 #else
     int i ;
-     
-  for ( i=0; i<_Cmi_numpes; i++ ) 
+
+  for ( i=0; i<_Cmi_numpes; i++ )
     CmiSyncSendFn(i,size,msg) ;
 #endif
 
   /*CmiPrintf("In  SyncBroadcastAll broadcast\n");*/
 }
 
-CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)  
+CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
 {
   int i ;
 
-  for ( i=1; i<_Cmi_numpes; i++ ) 
+  for ( i=1; i<_Cmi_numpes; i++ )
     CmiAsyncSendFn(i,size,msg) ;
 
   CmiAbort("In  AsyncBroadcastAll broadcast\n");
-    
+
   return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
 
@@ -1123,8 +1136,8 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 
 #else
   int i ;
-     
-  for ( i=0; i<_Cmi_numpes; i++ ) 
+
+  for ( i=0; i<_Cmi_numpes; i++ )
     CmiSyncSendFn(i,size,msg) ;
 #endif
   CmiFree(msg) ;
@@ -1154,7 +1167,7 @@ CmiCommHandle CmiAsyncNodeSendFn(int dstNode, int size, char *msg)
   int i;
   SMSG_LIST *msg_tmp;
   char *dupmsg;
-     
+
   CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
   switch (dstNode) {
   case NODE_BROADCAST_ALL:
@@ -1227,7 +1240,7 @@ void CmiFreeNodeBroadcastAllFn(int s, char *m)
 #endif
 
 /************************** MAIN ***********************************/
-#define MPI_REQUEST_MAX 16      //1024*10 
+#define MPI_REQUEST_MAX 16      //1024*10
 
 void ConverseExit(void)
 {
@@ -1236,7 +1249,7 @@ void ConverseExit(void)
     PumpMsgs();
     CmiReleaseSentMessages();
   }
-  if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD)) 
+  if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
     CmiAbort("ConverseExit: MPI_Barrier failed!\n");
   ConverseCommonExit();
   MPI_Finalize();
@@ -1282,9 +1295,9 @@ static void CmiNotifyBeginIdle(CmiIdleState *s)
   s->sleepMs=0;
   s->nIdles=0;
 }
-    
+
 static void CmiNotifyStillIdle(CmiIdleState *s)
-{ 
+{
 #if ! CMK_SMP
   CmiReleaseSentMessages();
   PumpMsgs();
@@ -1306,7 +1319,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
     MACHSTATE1(2,"idle lock(%d) {",CmiMyPe())
     CmiIdleLock_sleep(&s->cs->idle,s->sleepMs);
     MACHSTATE1(2,"} idle lock(%d)",CmiMyPe())
-  }       
+  }
   MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())
   }
 #endif
@@ -1328,9 +1341,9 @@ static void ConverseRunPE(int everReturn)
 
   if (CmiMyRank())
     CmiMyArgv=CmiCopyArgs(Cmi_argvcopy);
-  else   
+  else
     CmiMyArgv=Cmi_argv;
-    
+
   CthInit(CmiMyArgv);
 
   ConverseCommonInit(CmiMyArgv);
@@ -1339,7 +1352,7 @@ static void ConverseRunPE(int everReturn)
   /* Network progress function is used to poll the network when for
      messages. This flushes receive buffers on some  implementations*/
   CpvInitialize(int , networkProgressCount);
-  CpvAccess(networkProgressCount) = 0; 
+  CpvAccess(networkProgressCount) = 0;
 
 #if CMK_SMP
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)s);
@@ -1391,7 +1404,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   _main(argc,argv);
 #endif
 #endif
-  
+
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &_Cmi_numnodes);
   MPI_Comm_rank(MPI_COMM_WORLD, &_Cmi_mynode);
@@ -1399,7 +1412,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   _Cmi_mynodesize = 1;
   CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize);
 #if ! CMK_SMP
-  if (_Cmi_mynodesize > 1 && _Cmi_mynode == 0) 
+  if (_Cmi_mynodesize > 1 && _Cmi_mynode == 0)
     CmiAbort("+ppn cannot be used in non SMP version!\n");
 #endif
   idleblock = CmiGetArgFlag(argv, "+idleblocking");
@@ -1445,6 +1458,33 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
       sleep(10);
   }
 
+
+#if MPI_POST_RECV_COUNT > 0
+#warning "Using MPI posted receives which have not yet been tested"
+    /* Post some extra recvs to help out with incoming messages */
+    /* On some MPIs the messages are unexpected and thus slow */
+
+    /* An array of request handles for posted recvs */
+    CmiPostedRecvRequests = (MPI_Request*)malloc(sizeof(MPI_Request)*MPI_POST_RECV_COUNT);
+
+    /* An array of buffers for posted recvs */
+    CmiPostedRecvBuffers = (void*)malloc(MPI_POST_RECV_COUNT*MPI_POST_RECV_SIZE);
+
+    /* Post Recvs */
+    for(int i=0; i<MPI_POST_RECVS_COUNT; i++){
+        MPI_IRecv(  CmiPostedRecvBuffers[i],
+                    MPI_POST_RECV_SIZE,
+                    MPI_BYTE,
+                    MPI_ANY_SOURCE,
+                    POSTED_TAG,
+                    MPI_COMM_WORLD,
+                    &CmiPostedRecvRequests[i]  );
+    }
+
+#endif
+
+
+
   /* CmiTimerInit(); */
 
 #if 0
@@ -1481,7 +1521,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CpvInitialize(struct BGLTorusManager*, tmanager);
   CpvAccess(tmanager) = NULL;
 #endif
-  
+
   CmiStartThreads(argv);
   ConverseRunPE(initret);
 }
@@ -1520,7 +1560,7 @@ static void ** AllocBlock(unsigned int len)
   return blk;
 }
 
-static void 
+static void
 SpillBlock(void **srcblk, void **destblk, unsigned int first, unsigned int len)
 {
   memcpy(destblk, &srcblk[first], (len-first)*sizeof(void *));
