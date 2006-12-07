@@ -115,9 +115,6 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
 	void unlockReply(int remoteChunk,RegionID regionID);
 
 
-
-	
-
 	void freeRegion(LockRegion *region);
 
 
@@ -126,23 +123,6 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
 	///Translates the sharedChk and the idxlType to the idxl side
   FEM_Comm *FindIdxlSide(int idxlType);
 
-  ///Lock the particular idxl list on the following chunks
-  void IdxlLockChunks(int* chkList, int chkListSize, int idxlType);
-  ///Calls the above function, it is just a remote interface
-  void IdxlLockChunksRemote(lockChunksMsg *lm);
-  ///Lock the particular idxl lists only on this chunk
-  void IdxlLockChunksSecondary(int *chkList, int chkListSize, int idxlType);
-  ///Calls the above function, it is just a remote interface
-  void IdxlLockChunksSecondaryRemote(lockChunksMsg *lm);
-
-  ///Unlock the particular idxl list on the following chunks
-  void IdxlUnlockChunks(int* chkList, int chkListSize, int idxlType);
-  ///Calls the above function, it is just a remote interface
-  void IdxlUnlockChunksRemote(lockChunksMsg *lm);
-  ///Lock the particular idxl lists only on this chunk
-  void IdxlUnlockChunksSecondary(int *chkList, int chkListSize, int idxlType);
-  ///Calls the above function, it is just a remote interface
-  void IdxlUnlockChunksSecondaryRemote(lockChunksMsg *lm);
 
   ///Add this 'localId' to this idxl list and return the shared entry index
   int IdxlAddPrimary(int localId, int sharedChk, int idxlType);

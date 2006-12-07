@@ -19,11 +19,6 @@ module ParFUM_SA {
 		entry void lockReply(int remoteChunk,RegionID regionID,bool success);
 		entry void unlockForRemote(RegionID regionID);
 		entry void unlockReply(int remoteChunk,RegionID regionID);
+	}
 
-
-    entry [sync,threaded] void IdxlLockChunksRemote(lockChunksMsg *lm);
-    entry [sync,threaded] void IdxlLockChunksSecondaryRemote(lockChunksMsg *lm);
-    entry [sync,threaded] void IdxlUnlockChunksRemote(lockChunksMsg *lm);
-    entry [sync,threaded] void IdxlUnlockChunksSecondaryRemote(lockChunksMsg *lm);
-  };
 };
