@@ -102,9 +102,14 @@ static int checksum_flag = 0;
  to avoid MPI's in order delivery, changing MPI Tag all the time
 */
 #define TAG     1375
+#define BARRIER_ZERO_TAG     1376
 
 #if MPI_POST_RECV_COUNT > 0
-#define POST_RECV_TAG 1376
+#define POST_RECV_TAG 1377
+CpvDeclare(unsigned long long, Cmi_posted_recv_total);
+CpvDeclare(unsigned long long, Cmi_unposted_recv_total);
+CpvDeclare(MPI_Request*, CmiPostedRecvRequests); /* An array of request handles for posted recvs */
+CpvDeclare(char*,CmiPostedRecvBuffers);
 #endif
 
 
@@ -128,12 +133,6 @@ CpvDeclare(unsigned , networkProgressCount);
 int networkProgressPeriod;
 
 int 		  idleblock = 0;
-
-#if MPI_POST_RECV_COUNT > 0
-CpvDeclare(MPI_Request*, CmiPostedRecvRequests); /* An array of request handles for posted recvs */
-CpvDeclare(void*,CmiPostedRecvBuffers);
-#endif
-
 
 #define BLK_LEN  512
 
@@ -299,12 +298,14 @@ void CmiBarrierZero()
     MPI_Status sts;
     if (CmiMyNode() == 0)  {
       for (i=0; i<CmiNumNodes()-1; i++) {
-        if (MPI_SUCCESS != MPI_Recv(msg,1,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts))
-          printf("MPI_Recv failed!\n");
+         CmiPrintf("CmiBarrierZero loop\n");
+          if (MPI_SUCCESS != MPI_Recv(msg,1,MPI_BYTE,MPI_ANY_SOURCE,BARRIER_ZERO_TAG, MPI_COMM_WORLD,&sts))
+            printf("MPI_Recv failed!\n");
+       
       }
     }
     else {
-      if (MPI_SUCCESS != MPI_Send((void *)msg,1,MPI_BYTE,0,TAG,MPI_COMM_WORLD))
+      if (MPI_SUCCESS != MPI_Send((void *)msg,1,MPI_BYTE,0,BARRIER_ZERO_TAG,MPI_COMM_WORLD))
          printf("MPI_Send failed!\n");
     }
   }
@@ -533,17 +534,58 @@ int PumpMsgs(void)
 #endif
 
   MACHSTATE(2,"PumpMsgs begin {");
+
   while(1) {
-    flg = 0;
+    /* First check posted recvs then do  probe unmatched outstanding messages */
+#if MPI_POST_RECV_COUNT > 0
+#warning "Using MPI posted receives which have not yet been tested"
+    int completed_index=-1;
+    if(MPI_SUCCESS != MPI_Testany(MPI_POST_RECV_COUNT, CpvAccess(CmiPostedRecvRequests), &completed_index, &flg, &sts))
+        CmiAbort("PumpMsgs: MPI_Testany failed!\n");
+    if(flg){
+        if (MPI_SUCCESS != MPI_Get_count(&sts, MPI_BYTE, &nbytes))
+            CmiAbort("PumpMsgs: MPI_Get_count failed!\n");
+        memcpy(msg,&(CpvAccess(CmiPostedRecvBuffers)[completed_index*MPI_POST_RECV_SIZE]),nbytes);
+        /* and repost the recv */
+        if (MPI_SUCCESS != MPI_Irecv(  &(CpvAccess(CmiPostedRecvBuffers)[completed_index*MPI_POST_RECV_SIZE])	,
+            MPI_POST_RECV_SIZE,
+            MPI_BYTE,
+            MPI_ANY_SOURCE,
+            POST_RECV_TAG,
+            MPI_COMM_WORLD,
+            &(CpvAccess(CmiPostedRecvRequests)[completed_index])  ))
+                CmiAbort("PumpMsgs: MPI_Irecv failed!\n");
+        CpvAccess(Cmi_posted_recv_total)++;
+    } 
+    else {
+        res = MPI_Iprobe(MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, &flg, &sts);
+        if(res != MPI_SUCCESS)
+        CmiAbort("MPI_Iprobe failed\n");
+        if(!flg) break;
+        recd = 1;
+        MPI_Get_count(&sts, MPI_BYTE, &nbytes);
+        msg = (char *) CmiAlloc(nbytes);
+    
+        if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, MPI_COMM_WORLD,&sts))
+            CmiAbort("PumpMsgs: MPI_Recv failed!\n");
+        CpvAccess(Cmi_unposted_recv_total)++;
+    }
+#else
+    /* Original version just probes for any message */
     res = MPI_Iprobe(MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, &flg, &sts);
     if(res != MPI_SUCCESS)
       CmiAbort("MPI_Iprobe failed\n");
+
     if(!flg) break;
     recd = 1;
     MPI_Get_count(&sts, MPI_BYTE, &nbytes);
     msg = (char *) CmiAlloc(nbytes);
+
     if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, MPI_COMM_WORLD,&sts))
       CmiAbort("PumpMsgs: MPI_Recv failed!\n");
+#endif
+
+
 
     MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
     CMI_CHECK_CHECKSUM(msg, nbytes);
@@ -598,6 +640,12 @@ static void PumpMsgsBlocking(void)
     buf = (char *) CmiAlloc(maxbytes);
     _MEMCHECK(buf);
   }
+
+
+#if MPI_POST_RECV_COUNT > 0
+#warning "Using MPI posted receives and PumpMsgsBlocking() will break"
+CmiAbort("Unsupported use of PumpMsgsBlocking. This call should be extended to check posted recvs, cancel them all, and then wait on any incoming message, and then re-post the recvs");
+#endif 
 
   if (MPI_SUCCESS != MPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts))
       CmiAbort("PumpMsgs: PMP_Recv failed!\n");
@@ -876,8 +924,23 @@ static int SendMsgBuf()
       MACHSTATE2(3,"MPI_send to node %d rank: %d{", node, CMI_DEST_RANK(msg));
       CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
       CMI_SET_CHECKSUM(msg, size);
-      if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
-        CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
+
+#if MPI_POST_RECV_COUNT > 0
+        CmiPrintf("size=%d",size);
+        if(size <= MPI_POST_RECV_SIZE){
+            if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,POST_RECV_TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
+                CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
+            CmiPrintf("Got Here");
+            }
+        else {
+            if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
+                CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
+        }
+#else
+        if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
+            CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
+#endif
+
       MACHSTATE(3,"}MPI_send end");
       MsgQueueLen++;
       if(sent_msgs==0)
@@ -948,8 +1011,22 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
   }
   CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
   CMI_SET_CHECKSUM(msg, size);
+
+#if MPI_POST_RECV_COUNT > 0
+        CmiPrintf("size=%d\n",size);
+        if(size <= MPI_POST_RECV_SIZE){
+              if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,POST_RECV_TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
+                CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
+            }
+        else {
+             if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
+                CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
+        }
+#else
   if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
     CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
+#endif
+
   MsgQueueLen++;
   if(sent_msgs==0)
     sent_msgs = msg_tmp;
@@ -1256,7 +1333,10 @@ void ConverseExit(void)
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
   if (CmiMyPe() == 0){
     CmiPrintf("End of program\n");
-  }
+#if MPI_POST_RECV_COUNT > 0
+    CmiPrintf("%llu posted receives,  %llu unposted receives\n", CpvAccess(Cmi_posted_recv_total), CpvAccess(Cmi_unposted_recv_total));
+#endif
+}
 #endif
   exit(0);
 #else
@@ -1465,20 +1545,20 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     /* On some MPIs the messages are unexpected and thus slow */
 
     /* An array of request handles for posted recvs */
-    CmiPostedRecvRequests = (MPI_Request*)malloc(sizeof(MPI_Request)*MPI_POST_RECV_COUNT);
+    CpvAccess(CmiPostedRecvRequests) = (MPI_Request*)malloc(sizeof(MPI_Request)*MPI_POST_RECV_COUNT);
 
     /* An array of buffers for posted recvs */
-    CmiPostedRecvBuffers = (void*)malloc(MPI_POST_RECV_COUNT*MPI_POST_RECV_SIZE);
+   CpvAccess(CmiPostedRecvBuffers) = (char*)malloc(MPI_POST_RECV_COUNT*MPI_POST_RECV_SIZE);
 
     /* Post Recvs */
-    for(int i=0; i<MPI_POST_RECVS_COUNT; i++){
-        MPI_IRecv(  CmiPostedRecvBuffers[i],
+    for(i=0; i<MPI_POST_RECV_COUNT; i++){
+        MPI_Irecv(  &(CpvAccess(CmiPostedRecvBuffers)[i*MPI_POST_RECV_SIZE])	,
                     MPI_POST_RECV_SIZE,
                     MPI_BYTE,
                     MPI_ANY_SOURCE,
-                    POSTED_TAG,
+                    POST_RECV_TAG,
                     MPI_COMM_WORLD,
-                    &CmiPostedRecvRequests[i]  );
+                    &(CpvAccess(CmiPostedRecvRequests)[i])  );
     }
 
 #endif
