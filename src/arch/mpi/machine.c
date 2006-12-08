@@ -301,7 +301,7 @@ void CmiBarrierZero()
          CmiPrintf("CmiBarrierZero loop\n");
           if (MPI_SUCCESS != MPI_Recv(msg,1,MPI_BYTE,MPI_ANY_SOURCE,BARRIER_ZERO_TAG, MPI_COMM_WORLD,&sts))
             printf("MPI_Recv failed!\n");
-       
+
       }
     }
     else {
@@ -545,6 +545,10 @@ int PumpMsgs(void)
     if(flg){
         if (MPI_SUCCESS != MPI_Get_count(&sts, MPI_BYTE, &nbytes))
             CmiAbort("PumpMsgs: MPI_Get_count failed!\n");
+#if MPI_POST_RECV_DEBUG > 0
+        CmiPrintf("Received a posted message of %d bytes\n",nbytes);
+#endif
+        msg = (char *) CmiAlloc(nbytes);
         memcpy(msg,&(CpvAccess(CmiPostedRecvBuffers)[completed_index*MPI_POST_RECV_SIZE]),nbytes);
         /* and repost the recv */
         if (MPI_SUCCESS != MPI_Irecv(  &(CpvAccess(CmiPostedRecvBuffers)[completed_index*MPI_POST_RECV_SIZE])	,
@@ -556,7 +560,7 @@ int PumpMsgs(void)
             &(CpvAccess(CmiPostedRecvRequests)[completed_index])  ))
                 CmiAbort("PumpMsgs: MPI_Irecv failed!\n");
         CpvAccess(Cmi_posted_recv_total)++;
-    } 
+    }
     else {
         res = MPI_Iprobe(MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, &flg, &sts);
         if(res != MPI_SUCCESS)
@@ -565,7 +569,7 @@ int PumpMsgs(void)
         recd = 1;
         MPI_Get_count(&sts, MPI_BYTE, &nbytes);
         msg = (char *) CmiAlloc(nbytes);
-    
+
         if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, MPI_COMM_WORLD,&sts))
             CmiAbort("PumpMsgs: MPI_Recv failed!\n");
         CpvAccess(Cmi_unposted_recv_total)++;
@@ -645,7 +649,7 @@ static void PumpMsgsBlocking(void)
 #if MPI_POST_RECV_COUNT > 0
 #warning "Using MPI posted receives and PumpMsgsBlocking() will break"
 CmiAbort("Unsupported use of PumpMsgsBlocking. This call should be extended to check posted recvs, cancel them all, and then wait on any incoming message, and then re-post the recvs");
-#endif 
+#endif
 
   if (MPI_SUCCESS != MPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts))
       CmiAbort("PumpMsgs: PMP_Recv failed!\n");
@@ -926,11 +930,9 @@ static int SendMsgBuf()
       CMI_SET_CHECKSUM(msg, size);
 
 #if MPI_POST_RECV_COUNT > 0
-        CmiPrintf("size=%d",size);
         if(size <= MPI_POST_RECV_SIZE){
             if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,POST_RECV_TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
                 CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
-            CmiPrintf("Got Here");
             }
         else {
             if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
@@ -1013,7 +1015,6 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
   CMI_SET_CHECKSUM(msg, size);
 
 #if MPI_POST_RECV_COUNT > 0
-        CmiPrintf("size=%d\n",size);
         if(size <= MPI_POST_RECV_SIZE){
               if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,POST_RECV_TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
                 CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
