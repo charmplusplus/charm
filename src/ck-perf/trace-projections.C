@@ -238,7 +238,7 @@ void _createTraceprojections(char **argv)
   // CthRegister does not call the constructor
 //  CkpvAccess(usrEvents) = CkVec<UsrEvent *>();
 #endif
-  CkpvInitialize(Trace*, _trace);
+  CkpvInitialize(TraceProjections*, _trace);
   CkpvAccess(_trace) = new  TraceProjections(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
 }
@@ -1529,7 +1529,7 @@ void TraceProjectionsBOC::determineOutliers(OutlierWeightMessage *msg) {
     // so the default can be overridden. Default value considers the
     // top 10% "different" processors as outliers.
     int thresholdIndex;
-    thresholdIndex = (int)round(CkNumPes()*0.9);
+    thresholdIndex = (int)(CkNumPes()*0.9);
     if (thresholdIndex == CkNumPes()) {
       thresholdIndex--;
     }
