@@ -102,7 +102,7 @@ static int checksum_flag = 0;
  to avoid MPI's in order delivery, changing MPI Tag all the time
 */
 #define TAG     1375
-#define BARRIER_ZERO_TAG     1376
+#define BARRIER_ZERO_TAG     1375
 
 #if MPI_POST_RECV_COUNT > 0
 #define POST_RECV_TAG 1377
