@@ -104,7 +104,22 @@ static int checksum_flag = 0;
 #define TAG     1375
 #define BARRIER_ZERO_TAG     1375
 
+
+/** 
+    If MPI_POST_RECV is defined, we provide default values for size 
+    and number of posted recieves. If MPI_POST_RECV_COUNT is set
+    then a default value for MPI_POST_RECV_SIZE is used if not specified
+    by the user.
+*/
+#ifdef MPI_POST_RECV
+#define MPI_POST_RECV_COUNT 10
+#undef MPI_POST_RECV
+#endif
 #if MPI_POST_RECV_COUNT > 0
+#ifndef MPI_POST_RECV_SIZE
+#define MPI_POST_RECV_SIZE 200
+#endif
+// #undef  MPI_POST_RECV_DEBUG 
 #define POST_RECV_TAG 1377
 CpvDeclare(unsigned long long, Cmi_posted_recv_total);
 CpvDeclare(unsigned long long, Cmi_unposted_recv_total);
@@ -545,9 +560,11 @@ int PumpMsgs(void)
     if(flg){
         if (MPI_SUCCESS != MPI_Get_count(&sts, MPI_BYTE, &nbytes))
             CmiAbort("PumpMsgs: MPI_Get_count failed!\n");
+
 #if MPI_POST_RECV_DEBUG > 0
         CmiPrintf("Received a posted message of %d bytes\n",nbytes);
 #endif
+	recd = 1;
         msg = (char *) CmiAlloc(nbytes);
         memcpy(msg,&(CpvAccess(CmiPostedRecvBuffers)[completed_index*MPI_POST_RECV_SIZE]),nbytes);
         /* and repost the recv */
@@ -575,7 +592,7 @@ int PumpMsgs(void)
         CpvAccess(Cmi_unposted_recv_total)++;
     }
 #else
-    /* Original version just probes for any message */
+    /* Original version */
     res = MPI_Iprobe(MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, &flg, &sts);
     if(res != MPI_SUCCESS)
       CmiAbort("MPI_Iprobe failed\n");
