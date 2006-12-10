@@ -88,6 +88,39 @@ typedef Elf32_Sym     ELFXX_TYPE_Sym;
 
 extern ELFXX_TYPE_Dyn _DYNAMIC[];      //The Dynamic section table pointer
 
+
+/**
+	Method to read blacklist of variables that should not be 
+	identified as global variables
+	**/
+
+CkVec<char *>  _blacklist;
+static int loaded = 0;
+
+static void readBlacklist()
+{
+	if (loaded) return;
+  const char *fname = "blacklist";
+	printf("Loading blacklist from file \"%s\" ... \n", fname);
+  FILE *bl = fopen(fname, "r");
+  if (bl == NULL){
+		printf("WARNING: Running swapglobals without blacklist, globals from libraries might be getting un-necessarily swapped\n");
+		loaded = 1;
+		return;
+	}
+  while (!feof(bl)){
+  	char name[1024];
+    int size;
+    fscanf(bl, "%s\n", &name, &size);
+     _blacklist.push_back(strdup(name));
+  }
+  fclose(bl);
+  loaded = 1;
+}
+
+
+
+
 /****************** Global Variable Understanding *********************/
 /**
  Keeps a list of global variables.
@@ -139,10 +172,18 @@ int CtgGlobalList::isUserSymbol(const char *name) {
        || (strncmp("Bnv_", name, 4) == 0) || (strncmp("Bpv_", name, 4) == 0)
        || (strncmp("ckout", name, 5) == 0) || (strncmp("stdout", name, 6) == 0)
        || (strncmp("environ", name, 7) == 0)
-       || (strncmp("stderr", name, 6) == 0) || (strncmp("stdin", name, 5) == 0)
-			 || (strncmp("MPIR_",name,5) == 0) || (strncmp("MPID_",name,5) == 0))
+       || (strncmp("stderr", name, 6) == 0) || (strncmp("stdin", name, 5) == 0))
         return 0;
     
+		/**
+			if the name is on the blacklist, it is not a user symbol
+		*/
+		for(int i=0;i<_blacklist.size();i++){
+			if(strncmp(name,_blacklist[i],strlen(name)) == 0){
+				return 0;
+			}
+		}
+		
     return 1;
 }
 
@@ -305,6 +346,7 @@ void CtgInit(void) {
 	/*
 	  First call on this node: parse out our globals:
 	*/
+		readBlacklist();
 		CtgGlobalList *l=new CtgGlobalList;
 		CtgGlobalStruct *g=new CtgGlobalStruct;
 		if (CmiMyNode()==0) {
