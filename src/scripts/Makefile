@@ -555,7 +555,7 @@ $(L)/libthreads-uJcontext-memoryalias.o: threads.c $(CVHEADERS)
 	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_JCONTEXT=1 -IQuickThreads -I. threads.c || touch $@
 
 ## Global swapping (-swapglobal)
-swapglobal-target: $(L)/libglobal-swap.o $(L)/libglobal-elfcopy.o $(L)/loadsym.o
+swapglobal-target: $(L)/libglobal-swap.o $(L)/libglobal-copy.o $(L)/loadsym.o
 
 $(L)/libglobal-swap.o: global-elfgot.C $(CVHEADERS)
 	-$(CHARMC) -c global-elfgot.C -o $@ || touch $@
