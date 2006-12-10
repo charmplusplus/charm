@@ -59,6 +59,7 @@
 
        integer, parameter :: MPI_DATATYPE_NULL = -1
        integer, parameter :: MPI_DOUBLE_PRECISION = 0
+       integer, parameter :: MPI_REAL8 = 0
        integer, parameter :: MPI_INTEGER = 1
        integer, parameter :: MPI_REAL = 2
        integer, parameter :: MPI_COMPLEX = 3
