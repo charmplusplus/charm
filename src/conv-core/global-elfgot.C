@@ -58,7 +58,7 @@ A more readable summary is at:
 #endif
 
 
-#define DEBUG_GOT_MANAGER 0
+#define DEBUG_GOT_MANAGER 1
 
 #if CMK_AMD64
 typedef Elf64_Addr    ELFXX_TYPE_Addr;
@@ -139,7 +139,8 @@ int CtgGlobalList::isUserSymbol(const char *name) {
        || (strncmp("Bnv_", name, 4) == 0) || (strncmp("Bpv_", name, 4) == 0)
        || (strncmp("ckout", name, 5) == 0) || (strncmp("stdout", name, 6) == 0)
        || (strncmp("environ", name, 7) == 0)
-       || (strncmp("stderr", name, 6) == 0) || (strncmp("stdin", name, 5) == 0))
+       || (strncmp("stderr", name, 6) == 0) || (strncmp("stdin", name, 5) == 0)
+			 || (strncmp("MPIR_",name,5) == 0) || (strncmp("MPID_",name,5) == 0))
         return 0;
     
     return 1;
