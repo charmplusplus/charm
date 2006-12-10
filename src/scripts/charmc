@@ -419,6 +419,14 @@ do
 		OPTS_LD="$OPTS_LD $OPTS_PIC"
 		;;
 
+	"-copyglobal"|"-copyglobals")
+		SWAPGLOBALS="2"
+		OPTS_CC="$OPTS_CC $OPTS_PIC"
+		OPTS_CXX="$OPTS_CXX $OPTS_PIC"
+		OPTS_F90="$OPTS_F90 $OPTS_PIC"
+		OPTS_LD="$OPTS_LD $OPTS_PIC"
+		;;
+
 	"-verbose")
 		echo "Verbose mode set"
 		VERBOSE=true
@@ -1259,6 +1267,18 @@ then
 		exit 1
 	else
 		OBJECTFILES="$swapo $OBJECTFILES"
+	fi
+fi
+if [ "$SWAPGLOBALS" = "2" ]
+then
+	swapo="$CHARMLIB/libglobal-copy.o"
+	if [ ! -r "$swapo" -o ! -s "$swapo" ]
+	then
+		echo "Global-copying library $swapo missing--"
+		echo "  Is -copyglobals supported on this machine?"
+		exit 1
+	else
+		OBJECTFILES="$swapo $OBJECTFILES $CHARMLIB/loadsym.o"
 	fi
 fi
 

@@ -209,8 +209,8 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  TopoCentLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
           NeighborCommLB.decl.h HbmLB.decl.h \
           HybridBaseLB.decl.h HybridLB.decl.h WSLB.decl.h EveryLB.decl.h \
-          charisma.decl.h TraceProjections.decl.h TraceSummary.decl.h \
-	BlueGene.decl.h \
+          charisma.decl.h TraceSummary.decl.h TraceProjections.decl.h \
+          BlueGene.decl.h \
 	  comlib.decl.h ComlibManager.h DummyStrategy.h	\
 	  DirectMulticastStrategy.h RingMulticastStrategy.h	\
 	  MultiRingMulticast.h \
@@ -555,11 +555,16 @@ $(L)/libthreads-uJcontext-memoryalias.o: threads.c $(CVHEADERS)
 	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_JCONTEXT=1 -IQuickThreads -I. threads.c || touch $@
 
 ## Global swapping (-swapglobal)
-swapglobal-target: $(L)/libglobal-swap.o
+swapglobal-target: $(L)/libglobal-swap.o $(L)/libglobal-elfcopy.o $(L)/loadsym.o
 
 $(L)/libglobal-swap.o: global-elfgot.C $(CVHEADERS)
 	-$(CHARMC) -c global-elfgot.C -o $@ || touch $@
 
+$(L)/libglobal-copy.o: global-elfcopy.C  $(CVHEADERS)
+	-$(CHARMC) -c global-elfcopy.C -o $@ || touch $@
+
+$(L)/loadsym.o: loadsym.c  $(CVHEADERS)
+	-$(CHARMC) -c loadsym.c -o $@ || touch $@
 
 ###############################################################################
 #
@@ -628,6 +633,11 @@ TraceSummary.def.h: TraceSummary.decl.h
 
 TraceSummary.decl.h: trace-summary.ci charmxi
 	$(CHARMXI) trace-summary.ci
+
+TraceProjections.def.h: TraceProjections.decl.h
+
+TraceProjections.decl.h: trace-projections.ci charmxi
+	$(CHARMXI) trace-projections.ci
 
 CkReduction.def.h: CkReduction.decl.h
 
