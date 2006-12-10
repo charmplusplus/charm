@@ -10,6 +10,9 @@
 #include "bulk_adapt_ops.h"
 
 CProxy_ParFUMShadowArray meshSA;
+#ifdef DEBUG
+#undef DEBUG
+#endif
 #define DEBUG(x) x
 
 

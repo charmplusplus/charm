@@ -125,6 +125,7 @@ class adjReply {
     requestingElemID = rhs.requestingElemID;
     requestingNodeSetID = rhs.requestingNodeSetID;
     replyingElem = rhs.replyingElem;
+		return *this;
   }
   virtual void pup(PUP::er &p){
     p | requestingElemID;
