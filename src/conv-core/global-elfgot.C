@@ -58,7 +58,7 @@ A more readable summary is at:
 #endif
 
 
-#define DEBUG_GOT_MANAGER 1
+#define DEBUG_GOT_MANAGER 0
 
 #if CMK_AMD64
 typedef Elf64_Addr    ELFXX_TYPE_Addr;
