@@ -1394,8 +1394,7 @@ MSG_ORDER_DEBUG(
   // check posted recvs
   int tags[3], sts[3];
   tags[0] = msg->tag; tags[1] = msg->srcRank; tags[2] = msg->comm;
-#if 0
-  if(){
+  if(CpvAccess(CmiHasPIC)==0){
     IReq *ireq = (IReq *)CmmGet(posted_ireqs, 3, tags, sts);
     if (ireq) {	// receive posted
       ireq->receive(this, msg);
@@ -1405,10 +1404,9 @@ MSG_ORDER_DEBUG(
     } else {
       CmmPut(msgs, 3, tags, msg);
     }
-  }else
-#endif
-
+  }else{
     CmmPut(msgs, 3, tags, msg);
+  }
 }
 
 AmpiMsg *ampi::getMessage(int t, int s, int comm, int *sts)

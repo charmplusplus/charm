@@ -53,12 +53,13 @@ A more readable summary is at:
 #if CMK_HAS_ELF_H
 #include <elf.h>
 
+#define DEBUG_GOT_MANAGER 0
+
 #if !CMK_SHARED_VARS_UNAVAILABLE
 #  error "Global-elfgot won't work properly under smp version: -swapglobals disabled"
 #endif
 
-
-#define DEBUG_GOT_MANAGER 0
+CpvDeclare(int, CmiHasPIC);
 
 #if CMK_AMD64
 typedef Elf64_Addr    ELFXX_TYPE_Addr;
@@ -339,6 +340,8 @@ static CtgGlobalStruct *_ctgListGlobals=NULL;
 
 /** Initialize the globals support (called on each processor). */
 void CtgInit(void) {
+	CpvInitialize(int, CmiHasPIC);
+	CpvAccess(CmiHasPIC) = 1;
 	CpvInitialize(CtgGlobal,_curCtg);
 	
 	if (!_ctgList) 

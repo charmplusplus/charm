@@ -7,7 +7,12 @@
 */
 #include "converse.h"
 
-void CtgInit(void) {}
+CpvDeclare(int, CmiHasPIC);
+
+void CtgInit(void) {
+	CpvInitialize(int, CmiHasPIC);
+        CpvAccess(CmiHasPIC) = 0;
+}
 void CtgInstall(CtgGlobals g) {}
 CtgGlobals CtgCreate(void) {return 0;}
 CtgGlobals CtgPup(pup_er p,CtgGlobals g) { return 0;}
