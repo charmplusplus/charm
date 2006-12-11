@@ -59,7 +59,7 @@ A more readable summary is at:
 #  error "Global-elfgot won't work properly under smp version: -swapglobals disabled"
 #endif
 
-CpvDeclare(int, CmiHasPIC);
+CpvDeclare(int, CmiPICMethod);
 
 #if CMK_AMD64 || CMK_XT3
 typedef Elf64_Addr    ELFXX_TYPE_Addr;
@@ -393,8 +393,8 @@ extern "C" int init_symtab(char *exename);
 
 /** Initialize the globals support (called on each processor). */
 void CtgInit(void) {
-        CpvInitialize(int, CmiHasPIC);
-        CpvAccess(CmiHasPIC) = 1;
+        CpvInitialize(int, CmiPICMethod);
+        CpvAccess(CmiPICMethod) = 2;
 	CpvInitialize(CtgGlobal,_curCtg);
 	
 	if (!_ctgList) 

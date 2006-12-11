@@ -7,11 +7,11 @@
 */
 #include "converse.h"
 
-CpvDeclare(int, CmiHasPIC);
+CpvDeclare(int, CmiPICMethod);
 
 void CtgInit(void) {
-	CpvInitialize(int, CmiHasPIC);
-        CpvAccess(CmiHasPIC) = 0;
+	CpvInitialize(int, CmiPICMethod);
+        CpvAccess(CmiPICMethod) = 0;
 }
 void CtgInstall(CtgGlobals g) {}
 CtgGlobals CtgCreate(void) {return 0;}
