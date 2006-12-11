@@ -1394,17 +1394,13 @@ MSG_ORDER_DEBUG(
   // check posted recvs
   int tags[3], sts[3];
   tags[0] = msg->tag; tags[1] = msg->srcRank; tags[2] = msg->comm;
-  if(CpvAccess(CmiHasPIC)==0){
-    IReq *ireq = (IReq *)CmmGet(posted_ireqs, 3, tags, sts);
-    if (ireq) {	// receive posted
-      ireq->receive(this, msg);
-      ireq->tag = sts[0];
-      ireq->src = sts[1];
-      ireq->comm = sts[2];
-    } else {
-      CmmPut(msgs, 3, tags, msg);
-    }
-  }else{
+  IReq *ireq = (IReq *)CmmGet(posted_ireqs, 3, tags, sts);
+  if (ireq) {	// receive posted
+    ireq->receive(this, msg);
+    ireq->tag = sts[0];
+    ireq->src = sts[1];
+    ireq->comm = sts[2];
+  } else {
     CmmPut(msgs, 3, tags, msg);
   }
 }
