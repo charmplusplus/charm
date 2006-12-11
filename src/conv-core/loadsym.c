@@ -303,6 +303,8 @@ load_symtab(char *filename)
 	return symtab;
 }
 
+#define MYMAX(a,b)  (a>b?a:b)
+
 static int
 lookup2(struct symlist *sl, unsigned char type,
 	char *name, unsigned long *val, unsigned int *size)
@@ -312,13 +314,15 @@ lookup2(struct symlist *sl, unsigned char type,
 	int i;
 
 	len = strlen(name);
-	for (i = 0, p = sl->sym; i < sl->num; i++, p++)
-		if (!strncmp(sl->str+p->st_name, name, len)
+	for (i = 0, p = sl->sym; i < sl->num; i++, p++) {
+                int mlen = MYMAX(len, strlen(sl->str+p->st_name));       
+		if (!strncmp(sl->str+p->st_name, name, mlen)
 		    && ELFXX_ST_TYPE(p->st_info) == type) {
 			*val = p->st_value;
                         *size = p->st_size;
 			return 0;
 		}
+        }
 	return -1;
 }
 
