@@ -53,7 +53,7 @@ A more readable summary is at:
 #if CMK_HAS_ELF_H
 #include <elf.h>
 
-#define DEBUG_GOT_MANAGER 1
+#define DEBUG_GOT_MANAGER 0
 
 #if !CMK_SHARED_VARS_UNAVAILABLE
 #  error "Global-elfgot won't work properly under smp version: -swapglobals disabled"
@@ -100,19 +100,18 @@ static int loaded = 0;
 
 static void readBlacklist()
 {
-	if (loaded) return;
+  if (loaded) return;
   const char *fname = "blacklist";
-	printf("Loading blacklist from file \"%s\" ... \n", fname);
   FILE *bl = fopen(fname, "r");
   if (bl == NULL){
 		printf("WARNING: Running swapglobals without blacklist, globals from libraries might be getting un-necessarily swapped\n");
 		loaded = 1;
 		return;
-	}
+  }
+  printf("Loading blacklist from file \"%s\" ... \n", fname);
   while (!feof(bl)){
-  	char name[1024];
-    int size;
-    fscanf(bl, "%s\n", &name, &size);
+    char name[512];
+    fscanf(bl, "%s\n", &name);
      _blacklist.push_back(strdup(name));
   }
   fclose(bl);
@@ -406,6 +405,9 @@ void CtgFree(CtgGlobals g) {
 CtgGlobals CtgCurrentGlobals(void){
 	return CpvAccess(_curCtg);
 }
+
+void CtgInstall_var(CtgGlobals g, void *ptr) {}
+void CtgUninstall_var(CtgGlobals g, void *ptr) {}
 
 #else
 

@@ -1062,6 +1062,8 @@ CtgGlobals CtgPup(pup_er, CtgGlobals g);
 void CtgFree(CtgGlobals g);
 /** Return the current global list */
 CtgGlobals CtgCurrentGlobals(void);
+void CtgInstall_var(CtgGlobals g, void *ptr);
+void CtgUninstall_var(CtgGlobals g, void *ptr);
 
 /* The thread listener structure. The user must register one such listener
 	if he wants to find out when a thread is suspended or when it starts running
@@ -1362,6 +1364,7 @@ extern int networkProgressPeriod;
 #if !CMK_MACHINE_PROGRESS_DEFINED
 #define CmiNetworkProgress() 
 #define CmiNetworkProgressAfter(p) 
+#define CmiMachineProgressImpl()
 
 void CmiProbeImmediateMsg();
 

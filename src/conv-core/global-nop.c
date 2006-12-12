@@ -18,3 +18,5 @@ CtgGlobals CtgCreate(void) {return 0;}
 CtgGlobals CtgPup(pup_er p,CtgGlobals g) { return 0;}
 void CtgFree(CtgGlobals g) {}
 CtgGlobals CtgCurrentGlobals(void) { return 0; }
+void CtgInstall_var(CtgGlobals g, void *ptr) {}
+void CtgUninstall_var(CtgGlobals g, void *ptr) {}

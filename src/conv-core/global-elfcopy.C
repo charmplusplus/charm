@@ -122,11 +122,6 @@ public:
   
   /// copy data to globals
   inline void install(void *datav) const {
-/*
-    char *data=(char *)datav;
-    for (int i=0;i<nRec;i++)
-      *(rec[i].got)=(ELFXX_TYPE_Addr)(data+rec[i].off);
-*/
     char *data=(char *)datav;
     for (int i=0;i<nRec;i++) {
       int size;
@@ -137,6 +132,21 @@ public:
       memcpy((void *)rec[i].got, data+rec[i].off, rec[i].size);
     }
   }
+  
+  inline void install_var(void *datav, void *ptr) const {
+    char *data=(char *)datav;
+    int done = 0;
+    for (int i=0;i<nRec;i++) {
+      long offset = (char*)ptr-(char *)rec[i].got;
+      if (offset >= 0 && offset < rec[i].size) {
+        memcpy((void *)rec[i].got, data+rec[i].off, rec[i].size);
+        done = 1;
+        break;
+      }
+    }
+  }
+
+  void read_var(void *datav, void *ptr) const;
   
 private:
   /* Return 1 if this is the name of a user global variable;
@@ -170,10 +180,21 @@ void CtgGlobalList::read(void *datav) const {
     }
 }
 
+void CtgGlobalList::read_var(void *datav, void *ptr) const {
+    char *data=(char *)datav;
+    int done = 0;
+    for (int i=0;i<nRec;i++) {
+      long offset = (char*)ptr-(char *)rec[i].got;
+      if (offset >= 0 && offset < rec[i].size) {
+        memcpy(data+rec[i].off, (void *)rec[i].got, rec[i].size);
+        done = 1;
+        break;
+      }
+    }
+}
 
 CkVec<char *>  _namelist;
 static int loaded = 0;
-static unsigned int symbtab_size = 0;
 
 extern "C" int lookup_obj_sym(char *name, unsigned long *val, int *size);
 
@@ -191,7 +212,6 @@ printf("Loading globals from file \"%s\" ... \n", fname);
       char name[1024];
       int size;
       fscanf(gf, "%s\n", &name, &size);
-printf("GLOBAL: %s\n", name);
       _namelist.push_back(strdup(name));
     }
     fclose(gf);
@@ -408,7 +428,7 @@ void CtgInit(void) {
 		CtgGlobalList *l=new CtgGlobalList;
 		CtgGlobalStruct *g=new CtgGlobalStruct;
 		if (CmiMyNode()==0) {
-			CmiPrintf("CHARM> -swapglobals2 enabled\n");
+			CmiPrintf("CHARM> -copyglobals enabled\n");
 		}
 		
 		g->allocate(l->getSize());
@@ -447,7 +467,6 @@ void CtgInstall(CtgGlobals g) {
 	CtgGlobals oldG=*cur;
 	if (g==NULL) g=_ctgListGlobals;
 	if (g == oldG) return;
-printf("CtgGlobals: %p => %p\n", oldG, g);
         if (oldG) {
           _ctgList->read(oldG->data_seg);             /* store globals to own copy */
         }
@@ -466,6 +485,44 @@ void CtgFree(CtgGlobals g) {
 CtgGlobals CtgCurrentGlobals(void){
 	return CpvAccess(_curCtg);
 }
+
+#if 0
+void CtgInstall_var(CtgGlobals g, void *ptr) {
+        CtgGlobals *cur=&CpvAccess(_curCtg);
+	CtgGlobals oldG = *cur;
+        if (oldG)
+        _ctgList->read_var(oldG->data_seg, ptr);
+//       *cur=g;
+        _ctgList->install_var(g->data_seg, ptr);             /* store globals to own copy */
+}
+
+void CtgUninstall_var(CtgGlobals g, void *ptr) {
+        CtgGlobals *cur=&CpvAccess(_curCtg);
+	CtgGlobals oldG = *cur;
+        if (oldG)
+        _ctgList->read_var(g->data_seg, ptr);             /* store globals to own copy */
+       *cur=_ctgListGlobals;
+        _ctgList->install_var(_ctgListGlobals->data_seg, ptr);             /* store globals to own copy */
+}
+
+#else
+
+void CtgInstall_var(CtgGlobals g, void *ptr) {
+        CtgGlobals *cur=&CpvAccess(_curCtg);
+	CtgGlobals oldG = *cur;
+        if (oldG)
+        _ctgList->read_var(oldG->data_seg, ptr);
+        _ctgList->install_var(g->data_seg, ptr);             /* store globals to own copy */
+}
+
+void CtgUninstall_var(CtgGlobals g, void *ptr) {
+        CtgGlobals *cur=&CpvAccess(_curCtg);
+	CtgGlobals oldG = *cur;
+        if (oldG)
+        _ctgList->read_var(g->data_seg, ptr);             /* store globals to own copy */
+        _ctgList->install_var(oldG->data_seg, ptr);             /* store globals to own copy */
+}
+#endif
 
 #else
 
