@@ -2133,7 +2133,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkCallback reduceCB(CkIndex_ampi::reduceResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy(),true);
   msg->setCallback(reduceCB);
-	MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Reduce called on comm %d root %d \n",ptr->thisIndex,comm,rootIdx));
+  MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Reduce called on comm %d root %d \n",ptr->thisIndex,comm,rootIdx));
   ptr->contribute(msg);
   if (ptr->thisIndex == rootIdx){
     /*HACK: Use recv() to block until reduction data comes back*/
@@ -3439,8 +3439,9 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     MPI_Status status;
     for(i=0;i<size;i++) {
       int dst = (rank+i) % size;
-      AMPI_Recv(((char*)recvbuf)+(itemsize*dst), recvcount, recvtype,
-		dst, MPI_ATA_TAG, comm, &status);
+//      AMPI_Recv(((char*)recvbuf)+(itemsize*dst), recvcount, recvtype,
+//		dst, MPI_ATA_TAG, comm, &status);
+      if(-1==ptr->recv(MPI_ATA_TAG,dst,((char*)recvbuf)+(itemsize*dst),recvcount,recvtype, comm, (int*) &status)) CkAbort("AMPI> Error in MPI_Alltoall");
     }
   } else {    // large messages
     /* Long message. Use pairwise exchange. If comm_size is a
@@ -3612,8 +3613,9 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
   itemsize = dttype->getSize() ;
 
   for(i=0;i<size;i++) {
-    AMPI_Recv(((char*)recvbuf)+(itemsize*rdispls[i]), recvcounts[i], recvtype,
-             i, MPI_GATHER_TAG, comm, &status);
+//    AMPI_Recv(((char*)recvbuf)+(itemsize*rdispls[i]), recvcounts[i], recvtype,
+//             i, MPI_GATHER_TAG, comm, &status);
+      if(-1==ptr->recv(MPI_GATHER_TAG,i,((char*)recvbuf)+(itemsize*rdispls[i]),recvcounts[i],recvtype, comm, (int*) &status)) CkAbort("AMPI> Error in MPI_Alltoallv");
   }
 #if AMPI_COUNTER
   getAmpiParent()->counters.alltoall++;
