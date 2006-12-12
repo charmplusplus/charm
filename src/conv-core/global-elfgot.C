@@ -53,7 +53,7 @@ A more readable summary is at:
 #if CMK_HAS_ELF_H
 #include <elf.h>
 
-#define DEBUG_GOT_MANAGER 0
+#define DEBUG_GOT_MANAGER 1
 
 #if !CMK_SHARED_VARS_UNAVAILABLE
 #  error "Global-elfgot won't work properly under smp version: -swapglobals disabled"
@@ -180,7 +180,7 @@ int CtgGlobalList::isUserSymbol(const char *name) {
 			if the name is on the blacklist, it is not a user symbol
 		*/
 		for(int i=0;i<_blacklist.size();i++){
-			if(strncmp(name,_blacklist[i],strlen(name)) == 0){
+			if(strlen(name) == strlen(_blacklist[i]) && strncmp(name,_blacklist[i],strlen(name)) == 0){
 				return 0;
 			}
 		}
