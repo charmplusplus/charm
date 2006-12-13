@@ -830,8 +830,9 @@ static double readMHz(void)
   double x;
   char str[1000];
   char buf[100];
+  FILE *fp;
   CmiLock(smp_mutex);
-  FILE *fp = fopen("/proc/cpuinfo", "r");
+  fp = fopen("/proc/cpuinfo", "r");
   if (fp != NULL)
   while(fgets(str, 1000, fp)!=0) {
     if(sscanf(str, "cpu MHz%[^:]",buf)==1)
@@ -1365,6 +1366,7 @@ void CsdSchedulePoll(void)
   while (1)
   {
 	CsdPeriodic();
+        /*CmiMachineProgressImpl(); ??? */
 	if (NULL!=(msg = CsdNextMessage(&state)))
 	{
 	     SCHEDULE_MESSAGE 
