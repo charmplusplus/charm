@@ -634,11 +634,6 @@ TraceSummary.def.h: TraceSummary.decl.h
 TraceSummary.decl.h: trace-summary.ci charmxi
 	$(CHARMXI) trace-summary.ci
 
-TraceProjections.def.h: TraceProjections.decl.h
-
-TraceProjections.decl.h: trace-projections.ci charmxi
-	$(CHARMXI) trace-projections.ci
-
 CkReduction.def.h: CkReduction.decl.h
 
 CkReduction.decl.h: ckreduction.ci charmxi
