@@ -193,7 +193,7 @@ void GridCommLB::Initialize_PE_Data (CentralLB::LDStats *stats)
   for (i = 0; i < Num_PEs; i++) {
     (&PE_Data[i])->relative_speed = (double) (stats->procs[i].pe_speed / min_speed);
     if (CK_LDB_GridCommLB_Background_Load) {
-      (&PE_Data[i])->scaled_load += stats->procs[i].bg_cputime;
+      (&PE_Data[i])->scaled_load += stats->procs[i].bg_walltime;
     }
   }
 }
@@ -449,29 +449,6 @@ int GridCommLB::Find_Maximum_Object (int cluster)
   }
 
   return (max_index);
-
-/*
-  int i;
-  int max_index;
-  int max_wan_msgs;
-
-
-  max_index = -1;
-  max_wan_msgs = -1;
-
-  for (i = 0; i < Num_Objects; i++) {
-    if ((&Object_Data[i])->cluster == cluster) {
-      if ((&Object_Data[i])->to_pe == -1) {
-	if ((&Object_Data[i])->num_wan_msgs > max_wan_msgs) {
-	  max_index = i;
-	  max_wan_msgs = (&Object_Data[i])->num_wan_msgs;
-	}
-      }
-    }
-  }
-
-  return (max_index);
-*/
 }
 
 
@@ -571,11 +548,11 @@ int GridCommLB::Find_Minimum_PE (int cluster)
 	  min_index = i;
 	  min_objs = (&PE_Data[i])->num_objs;
 	} else if (((&PE_Data[i])->num_objs == min_objs) &&
-		   ((&PE_Data[i])->num_wan_msgs < (&PE_Data[min_index])->num_wan_msgs)) {
+		   ((&PE_Data[i])->num_wan_objs < (&PE_Data[min_index])->num_wan_objs)) {
 	  min_index = i;
 	  min_objs = (&PE_Data[i])->num_objs;
 	} else if (((&PE_Data[i])->num_objs == min_objs) &&
-		   ((&PE_Data[i])->num_wan_msgs == (&PE_Data[min_index])->num_wan_msgs) &&
+		   ((&PE_Data[i])->num_wan_objs == (&PE_Data[min_index])->num_wan_objs) &&
 		   ((&PE_Data[i])->scaled_load < (&PE_Data[min_index])->scaled_load)) {
 	  min_index = i;
 	  min_objs = (&PE_Data[i])->num_objs;
