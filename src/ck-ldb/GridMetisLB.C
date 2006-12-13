@@ -139,7 +139,7 @@ void GridMetisLB::Initialize_PE_Data (CentralLB::LDStats *stats)
   for (i = 0; i < Num_PEs; i++) {
     (&PE_Data[i])->relative_speed = (double) (stats->procs[i].pe_speed / min_speed);
     if (CK_LDB_GridMetisLB_Background_Load) {
-      (&PE_Data[i])->scaled_load += stats->procs[i].bg_cputime;
+      (&PE_Data[i])->scaled_load += stats->procs[i].bg_walltime;
     }
   }
 }
