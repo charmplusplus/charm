@@ -492,7 +492,11 @@ static unsigned long libc;  /* libc start address */
 int
 lookup_obj_sym(char *name, unsigned long *val, int *size)
 {
-	return lookup_sym(symtab, STT_OBJECT, name, val, size);
+	if(-1==lookup_sym(symtab, STT_OBJECT, name, val, size) 
+	 &&-1==lookup_sym(symtab, STT_NOTYPE, name, val, size))
+		return -1;
+	else 
+		return 0;
 }
 
 int
