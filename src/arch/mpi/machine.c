@@ -128,7 +128,7 @@ CpvDeclare(char*,CmiPostedRecvBuffers);
 #define TAG     1375
 
 #if MPI_POST_RECV_COUNT > 0
-#define POST_RECV_TAG TAG
+#define POST_RECV_TAG TAG+1
 #define BARRIER_ZERO_TAG TAG
 #else
 #define BARRIER_ZERO_TAG     1375
@@ -565,9 +565,9 @@ int PumpMsgs(void)
         if (MPI_SUCCESS != MPI_Get_count(&sts, MPI_BYTE, &nbytes))
             CmiAbort("PumpMsgs: MPI_Get_count failed!\n");
 
-#if MPI_POST_RECV_DEBUG > 0
-        CmiPrintf("Received a posted message of %d bytes\n",nbytes);
-#endif
+
+	//        CmiPrintf("Received a posted message of %d bytes\n",nbytes);
+
 	recd = 1;
         msg = (char *) CmiAlloc(nbytes);
         memcpy(msg,&(CpvAccess(CmiPostedRecvBuffers)[completed_index*MPI_POST_RECV_SIZE]),nbytes);
