@@ -39,7 +39,8 @@ public:
 	~LockRegion(){
 		CkHashtableIterator *iter = remoteElements.iterator();
 		while(iter->hasNext()){
-			CkVec<adaptAdj> *list = (CkVec<adaptAdj> *)iter->next();
+			CkVec<adaptAdj> *list = *((CkVec<adaptAdj> **)iter->next());
+			printf("[%d] LockRegion destructor deleting list %p\n",myID.chunkID,list);
 			delete list;
 		}
 	}

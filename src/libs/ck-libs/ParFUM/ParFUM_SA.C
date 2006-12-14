@@ -206,7 +206,9 @@ bool ParFUMShadowArray::lockRegion(int numElements,adaptAdj *elements,RegionID *
 			if(list == NULL){
 				//first element of this type
 				list = new CkVec<adaptAdj>;
+				printf("[%d] Adding remoteElements %p for partition %d\n",idx,list,elements[i].partID);
 				region->remoteElements.put(elements[i].partID) = list;
+				CkAssert(region->remoteElements.get(elements[i].partID) ==list);
 			}
 			list->push_back(elements[i]);
 		}
@@ -253,7 +255,10 @@ bool ParFUMShadowArray::lockRegion(int numElements,adaptAdj *elements,RegionID *
 void ParFUMShadowArray::collectLocalNodes(int numElements,adaptAdj *elements,CkVec<int> &localNodes){
   for(int i=0;i<numElements;i++){
     //check if the element is local
-    CkAssert(elements[i].partID >= 0 && elements[i].localID >= 0);
+    if(elements[i].partID < 0 || elements[i].localID < 0){
+			CkAssert(elements[i].partID < 0 && elements[i].localID < 0);
+			continue;
+		}
     if(elements[i].partID == idx){
       int elemType = elements[i].elemType;
       const FEM_Elem &elem = fmMesh->getElem(elemType);
