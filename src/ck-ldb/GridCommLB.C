@@ -471,6 +471,37 @@ int GridCommLB::Find_Minimum_PE (int cluster)
 {
   if (CK_LDB_GridCommLB_Mode == 0) {
     int min_index;
+    int min_objs;
+    int i;
+
+
+    min_index = -1;
+    min_objs = MAXINT;
+
+    for (i = 0; i < Num_PEs; i++) {
+      if (((&PE_Data[i])->available) && ((&PE_Data[i])->cluster == cluster)) {
+	if ((&PE_Data[i])->num_objs < min_objs) {
+	  min_index = i;
+	  min_objs = (&PE_Data[i])->num_objs;
+	} else if (((&PE_Data[i])->num_objs == min_objs) &&
+		   ((&PE_Data[i])->num_wan_objs < (&PE_Data[min_index])->num_wan_objs)) {
+	  min_index = i;
+	} else if (((&PE_Data[i])->num_objs == min_objs) &&
+		   ((&PE_Data[i])->num_wan_objs == (&PE_Data[min_index])->num_wan_objs) &&
+		   ((&PE_Data[i])->num_wan_msgs < (&PE_Data[min_index])->num_wan_msgs)) {
+	  min_index = i;
+	} else if (((&PE_Data[i])->num_objs == min_objs) &&
+		   ((&PE_Data[i])->num_wan_objs == (&PE_Data[min_index])->num_wan_objs) &&
+		   ((&PE_Data[i])->num_wan_msgs == (&PE_Data[min_index])->num_wan_msgs) &&
+		   ((&PE_Data[i])->scaled_load < (&PE_Data[min_index])->scaled_load)) {
+	  min_index = i;
+	}
+      }
+    }
+
+    return (min_index);
+  } else if (CK_LDB_GridCommLB_Mode == 1) {
+    int min_index;
     int min_load_index;
     double min_scaled_load;
     int min_wan_msgs_index;
@@ -528,34 +559,6 @@ int GridCommLB::Find_Minimum_PE (int cluster)
 	      min_index = i;
 	    }
 	  }
-	}
-      }
-    }
-
-    return (min_index);
-  } else if (CK_LDB_GridCommLB_Mode == 1) {
-    int min_index;
-    int min_objs;
-    int i;
-
-
-    min_index = -1;
-    min_objs = MAXINT;
-
-    for (i = 0; i < Num_PEs; i++) {
-      if (((&PE_Data[i])->available) && ((&PE_Data[i])->cluster == cluster)) {
-	if ((&PE_Data[i])->num_objs < min_objs) {
-	  min_index = i;
-	  min_objs = (&PE_Data[i])->num_objs;
-	} else if (((&PE_Data[i])->num_objs == min_objs) &&
-		   ((&PE_Data[i])->num_wan_objs < (&PE_Data[min_index])->num_wan_objs)) {
-	  min_index = i;
-	  min_objs = (&PE_Data[i])->num_objs;
-	} else if (((&PE_Data[i])->num_objs == min_objs) &&
-		   ((&PE_Data[i])->num_wan_objs == (&PE_Data[min_index])->num_wan_objs) &&
-		   ((&PE_Data[i])->scaled_load < (&PE_Data[min_index])->scaled_load)) {
-	  min_index = i;
-	  min_objs = (&PE_Data[i])->num_objs;
 	}
       }
     }
