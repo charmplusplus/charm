@@ -58,6 +58,10 @@ int* BgLoadOffsets(int totalProcs, int numPes){
   for (int i=0; i<numPes; i++){
     sprintf(d,"bgTrace%d",i);
     FILE *f = fopen(d,"r");
+    if (f == NULL) {
+      CmiPrintf("BgLoadOffsets: can not open file %s!\n", d);
+      CmiAbort("BgLoadOffsets failed!\n");
+    }  
     PUP::fromDisk pd(f);
     pd((char *)&machInfo, sizeof(machInfo));
     PUP::xlater p(machInfo, pd);
