@@ -1723,7 +1723,7 @@ void req_poll()
 	 }
 
   if (arg_charmdebug) {
-    char buf[100];
+    char buf[2048];
     if (FD_ISSET(0, &rfds)) {
       int indata = read(0, buf, 5);
       buf[indata] = 0;
@@ -1735,7 +1735,7 @@ void req_poll()
 	//printf("Command to be forwarded\n");
 	while (read(0, &c, 1)!=-1) {
 	  buf[num++]=c;
-	  if (c=='\n' || num >= 99) {
+	  if (c=='\n' || num >= 2045) {
 	    write(gdb_info_std[0], buf, num);
 	    if (c=='\n') break;
 	  }

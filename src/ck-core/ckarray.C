@@ -298,6 +298,14 @@ char *ArrayElement::ckDebugChareName(void) {
 	return strdup(buf);
 }
 
+int ArrayElement::ckDebugChareID(char *str, int limit) {
+  if (limit<21) return -1;
+  str[0] = 2;
+  *((int*)&str[1]) = ((CkGroupID)thisArrayID).idx;
+  *((CkArrayIndexMax*)&str[5]) = thisIndexMax;
+  return 21;
+}
+
 /// A more verbose form of abort
 void ArrayElement::CkAbort(const char *str) const
 {

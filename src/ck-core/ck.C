@@ -59,10 +59,19 @@ void Chare::pup(PUP::er &p)
   p(thishandle.onPE);
   thishandle.objPtr=(void *)this;
 }
+
+int Chare::ckGetChareType() const {
+  return -3;
+}
 char *Chare::ckDebugChareName(void) {
   char buf[100];
   sprintf(buf,"Chare on pe %d at %p",CkMyPe(),this);
   return strdup(buf);
+}
+int Chare::ckDebugChareID(char *str, int limit) {
+  // pure chares for now do not have a valid ID
+  str[0] = 0;
+  return 1;
 }
 void Chare::ckDebugPup(PUP::er &p) {
   pup(p);
@@ -98,6 +107,21 @@ void IrrGroup::pup(PUP::er &p)
 {
   Chare::pup(p);
   p|thisgroup;
+}
+
+int IrrGroup::ckGetChareType() const {
+  return CkpvAccess(_groupTable)->find(thisgroup).getcIdx();
+}
+
+int IrrGroup::ckDebugChareID(char *str, int limit) {
+  if (limit<5) return -1;
+  str[0] = 1;
+  *((int*)&str[1]) = thisgroup.idx;
+  return 5;
+}
+
+char *IrrGroup::ckDebugChareName() {
+  return strdup(_chareTable[ckGetChareType()]->name);
 }
 
 void IrrGroup::ckJustMigrated(void)

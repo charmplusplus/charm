@@ -10,7 +10,7 @@
 #include "converse.h"
 #include "ckhashtable.h"
 #include "pup.h"
-#include "pup_toNetwork4.h"
+#include "pup_toNetwork.h"
 #include "debug-charm.h"
 #include "conv-ccs.h"
 #include "sockRoutines.h"
@@ -226,13 +226,37 @@ static void CpdList_ccs_list_items_set(char *msg)
   CpdListAccessor *acc=CpdListHeader_ccs_list_items(msg,req);
   if(acc == NULL) CmiPrintf("ccs-builtins> Null Accessor--bad list name (set)\n");
   else {
-    PUP_toNetwork4_unpack p(req.extra);
+    PUP_toNetwork_unpack p(req.extra);
     pupCpd(p,acc,req);
     if (p.size()!=req.extraLen)
     	CmiPrintf("Size mismatch during ccs_list_items.set: client sent %d bytes, but %d bytes used!\n",
 		req.extraLen,p.size());
   }
   CmiFree(msg);
+}
+
+/** gather information about the machine we're currently running on */
+void CpdMachineArchitecture(char *msg) {
+  char reply[6]; // where we store our reply
+  // decide if we are 32 bit (1) or 64 bit (2)
+  reply[0] = 0;
+  if (sizeof(char*) == 4) reply[0] = 1;
+  else if (sizeof(char*) == 8) reply[0] = 2;
+  // decide if we are little endian (1) or big endian (2)
+  reply[1] = 0;
+  int value = 1;
+  char firstByte = *((char*)&value);
+  if (firstByte == 1) reply[1] = 1;
+  else reply[1] = 2;
+  // get the size of an "int"
+  reply[2] = sizeof(int);
+  // get the size of an "long"
+  reply[3] = sizeof(long);
+  // get the size of an "long long"
+  reply[4] = sizeof(long long);
+  // get the size of an "bool"
+  reply[5] = sizeof(bool);
+  CcsSendReply(6, (void*)reply);
 }
 
 
@@ -258,7 +282,9 @@ class PUP_fmt : public PUP::wrap_er {
 	typedef enum { 
 		typeCode_byte=0, // unknown data type: nItems bytes
 		typeCode_int=2, // 32-bit integer array: nItems ints
+		typeCode_long=3, // 64-bit integer array: nItems ints
 		typeCode_float=5, // 32-bit floating-point array: nItems floats
+		typeCode_double=6, // 64-bit floating-point array: nItems floats
 		typeCode_comment=10, // comment/label: nItems byte characters
 		typeCode_sync=11 // synchronization code
 	} typeCode_t;
@@ -309,14 +335,24 @@ void PUP_fmt::bytes(void *ptr,int n,size_t itemSize,PUP::dataType t) {
 		fieldHeader(typeCode_byte,n);
 		p.bytes(ptr,n,itemSize,t);
 		break;
-	case PUP::Tshort: case PUP::Tint: case PUP::Tlong: case PUP::Tlonglong:
-	case PUP::Tushort: case PUP::Tuint: case PUP::Tulong: case PUP::Tulonglong:
+	case PUP::Tshort: case PUP::Tint:
+	case PUP::Tushort: case PUP::Tuint:
 	case PUP::Tbool:
 		fieldHeader(typeCode_int,n);
 		p.bytes(ptr,n,itemSize,t);
 		break;
-	case PUP::Tfloat: case PUP::Tdouble: case PUP::Tlongdouble:
+        // treat "long" as 8-bytes, in conformity with pup_toNetwork.C
+        case PUP::Tlong: case PUP::Tlonglong:
+        case PUP::Tulong: case PUP::Tulonglong:
+		fieldHeader(typeCode_long,n);
+		p.bytes(ptr,n,itemSize,t);
+		break;
+	case PUP::Tfloat:
 		fieldHeader(typeCode_float,n);
+		p.bytes(ptr,n,itemSize,t);
+		break;
+        case PUP::Tdouble: case PUP::Tlongdouble:
+		fieldHeader(typeCode_double,n);
 		p.bytes(ptr,n,itemSize,t);
 		break;
 	default: CmiAbort("Unrecognized type code in PUP_fmt::bytes");
@@ -330,14 +366,14 @@ static void CpdList_ccs_list_items_fmt(char *msg)
   if (acc!=NULL) {
     int bufLen;
     { 
-      PUP_toNetwork4_sizer ps;
+      PUP_toNetwork_sizer ps;
       PUP_fmt p(ps); 
       pupCpd(p,acc,req);
       bufLen=ps.size(); 
     }
     char *buf=new char[bufLen];
     { 
-      PUP_toNetwork4_pack pp(buf); 
+      PUP_toNetwork_pack pp(buf); 
       PUP_fmt p(pp);
       pupCpd(p,acc,req);
       if (pp.size()!=bufLen)
@@ -454,6 +490,7 @@ static void CpdListInit(void) {
   CcsRegisterHandler("ccs_list_items.txt",(CmiHandler)CpdList_ccs_list_items_txt);
   CcsRegisterHandler("ccs_list_items.fmt",(CmiHandler)CpdList_ccs_list_items_fmt);
   CcsRegisterHandler("ccs_list_items.set",(CmiHandler)CpdList_ccs_list_items_set);
+  CcsRegisterHandler("ccs_machine_architecture",(CmiHandler)CpdMachineArchitecture);
 }
 
 #if CMK_WEB_MODE

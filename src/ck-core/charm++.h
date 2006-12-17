@@ -389,8 +389,13 @@ class Chare {
     inline CkObjectMsgQ &CkGetObjQueue() { return objQ; }
 #endif
     CHARM_INPLACE_NEW
+    /// Return the type of this chare, as present in _chareTable
+    virtual int ckGetChareType() const;
     /// Return a strdup'd array containing this object's string name.
     virtual char *ckDebugChareName(void);
+    /// Place into str a copy of the id of this object up to limit bytes, return
+    /// the number of bytes used for the id
+    virtual int ckDebugChareID(char *str, int limit);
     virtual void ckDebugPup(PUP::er &p);
     /// Called when a [threaded] charm entry method is created:
     virtual void CkAddThreadListeners(CthThread tid, void *msg);
@@ -411,6 +416,9 @@ class IrrGroup : public Chare {
     virtual void ckJustMigrated(void);
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
     inline CkGroupID CkGetGroupID(void) const {return thisgroup;}
+    virtual int ckGetChareType() const;
+    virtual char *ckDebugChareName();
+    virtual int ckDebugChareID(char *, int);
 
     // Silly run-time type information
     virtual int isNodeGroup() { return 0; };

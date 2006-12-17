@@ -476,6 +476,7 @@ public:
   virtual void ckJustMigrated(void);
   virtual void ckDestroy(void);
   virtual char *ckDebugChareName(void);
+  virtual int ckDebugChareID(char*, int);
 
   /// Synonym for ckMigrate
   inline void migrateMe(int toPe) {ckMigrate(toPe);}

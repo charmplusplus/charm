@@ -385,6 +385,8 @@ void CmiOutOfMemoryInit(void) {
 int  cpd_memory_length(void *lenParam) { return 0; }
 void cpd_memory_pup(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
 void cpd_memory_leak(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
+int  cpd_memory_getLength(void *lenParam) { return 0; }
+void cpd_memory_get(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
 /* routine used by CthMemory{Protect,Unprotect} to specify that some region of
    memory has been protected */
 void setProtection(char *mem, char *ptr, int len, int flag) { }

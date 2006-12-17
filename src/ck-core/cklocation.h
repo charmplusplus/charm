@@ -271,7 +271,7 @@ public:
   virtual void pup(PUP::er &p);
   virtual void CkAddThreadListeners(CthThread tid, void *msg);
 
-  inline int ckGetChareType(void) const {return thisChareType;}
+  virtual int ckGetChareType(void) const;// {return thisChareType;}
   const CkArrayIndex &ckGetArrayIndex(void) const {return myRec->getIndex();}
 
 #if CMK_LBDB_ON  //For load balancing:

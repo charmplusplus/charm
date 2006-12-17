@@ -26,6 +26,7 @@ void PUP_toNetwork_sizer::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 	case PUP::Tulonglong:
 	case PUP::Tlonglong: 
 	case PUP::Tdouble: 
+        case PUP::Tlongdouble:
 		nBytes+=n*8;
 		break;
 	default: //Everything else goes as a network int
@@ -64,6 +65,9 @@ void PUP_toNetwork_pack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 		  w((writeAs)( ((typeName *)p)[i] ));\
 	        break
 	casesPUP_toNetwork_types
+#if CMK_LONG_DOUBLE_DEFINED
+        casePUP_toNetwork_type(Tlongdouble,long double,double); 
+#endif
 #undef casePUP_toNetwork_type
 	
        	default: 
@@ -87,6 +91,9 @@ void PUP_toNetwork_unpack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 		  ((typeName *)p)[i]=(typeName)read_##readAs();\
 	        break
 	casesPUP_toNetwork_types
+#if CMK_LONG_DOUBLE_DEFINED
+        casePUP_toNetwork_type(Tlongdouble,long double,double); 
+#endif
 #undef casePUP_toNetwork_type
 	
        	default: 

@@ -40,6 +40,16 @@ public:
    CkArrayElementRangeIterator(T *dest_,int l,int h) 
    	:dest(dest_),mgr(0),cur(0),lo(l),hi(h) {}
    
+  /** Called to iterate only on a specific array manager.
+      Returs the number of objects it iterate on.
+  */
+  int iterate(int start, CkArray *m) {
+    cur = start;
+    mgr = m;
+    mgr->getLocMgr()->iterate(*this);
+    cur -= start;
+  }
+
    /** Call add for every in-range array element on this processor */
    void iterate(void)
    { /* Walk the groupTable for arrays (FIXME: get rid of _groupIDTable) */
@@ -68,8 +78,114 @@ public:
    int getCount(void) {return cur;}
 };
 
+/**
+  Count charm++ objects going by until they reach this 
+  range (lo to hi), then start passing them to dest.
+*/
+template <class T>
+class CkObjectRangeIterator {
+private:
+   T *dest;
+   int cur,lo,hi;
+public:
+   CkObjectRangeIterator(T *dest_,int l,int h) 
+   	:dest(dest_),cur(0),lo(l),hi(h) {}
+   
+   /** Call add for every in-range array element on this processor */
+   void iterate(void)
+   { /* Walk the groupTable for arrays (FIXME: get rid of _groupIDTable) */
+     int numGroups=CkpvAccess(_groupIDTable)->size();
+     for(int i=0;i<numGroups;i++) {
+        IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
+	if (obj->isArrMgr()) 
+	{ /* This is an array manager: examine its array elements */
+	  CkArray *mgr=(CkArray *)obj;
+          CkArrayElementRangeIterator<T> ait(dest,lo,hi);
+	  ait.iterate(cur, mgr);
+          cur+=ait.getCount();
+	} else {
+          dest->add(cur,obj);
+          cur++;
+        }
+     }
+   }
+   
+   // Return the number of total array elements seen so far.
+   int getCount(void) {return cur;}
+};
+
 class ignoreAdd {
-public: void add(int cur,ArrayElement *elt) {}
+public: void add(int cur,Chare *elt) {}
+};
+
+/** Examine all the objects on the server returning the name */
+class CpdList_objectNames : public CpdListAccessor {
+  PUP::er *pp; // Only used while inside pup routine.
+  int curGroup;
+public:
+  virtual const char * getPath(void) const {return "charm/objectNames";}
+  virtual int getLength(void) const {
+    CkObjectRangeIterator<ignoreAdd> it(0,0,0);
+    it.iterate();
+    return it.getCount();
+  }
+  virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
+    pp=&p;
+    CkObjectRangeIterator<CpdList_objectNames> it(this,req.lo,req.hi);
+    it.iterate(); // calls "add" for in-range elements
+  }
+  void add(int cur, Chare *obj) {
+    PUP::er &p=*pp;
+    beginItem(p,cur);
+    p.comment("id");
+    char *n = (char*)malloc(30);
+    int s=obj->ckDebugChareID(n, 30);
+    CkAssert(s > 0);
+    p(n,s);
+    free(n);
+    p.comment("name");
+    n=obj->ckDebugChareName();
+    p(n,strlen(n));
+    free(n);
+  }
+};
+
+/** Examine a single object identified by the id passed in the request and
+    return its type and memory data */
+class CpdList_object : public CpdListAccessor {
+  PUP::er *pp; //Only used while inside pup routine.
+  CpdListItemsRequest *reqq; // Only used while inside pup routine.
+public:
+  virtual const char * getPath(void) const {return "charm/object";}
+  virtual int getLength(void) const {
+    CkObjectRangeIterator<ignoreAdd> it(0,0,0);
+    it.iterate();
+    return it.getCount();
+  }
+  virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
+    pp=&p;
+    reqq=&req;
+    CkObjectRangeIterator<CpdList_object> it(this,req.lo,req.hi);
+    it.iterate(); // calls "add" for in-range elements;
+  }
+  void add(int cur, Chare *obj) {
+    PUP::er &p=*pp;
+    CpdListItemsRequest &req=*reqq;
+    char *n = (char *)malloc(30);
+    int s=obj->ckDebugChareID(n, 30);
+    CkAssert(s > 0);
+    if (req.extraLen == s && memcmp(req.extra, n, s) == 0) {
+      // the object match, found!
+      beginItem(p,cur);
+      int type = obj->ckGetChareType();
+      p.comment("type");
+      const char *t = _chareTable[type]->name;
+      p((char*)t,strlen(t));
+      p.comment("value");
+      int size = _chareTable[type]->size;
+      p((char*)obj,size);
+    }
+  }
 };
 
 /** Coarse: examine array element names */
@@ -87,8 +203,9 @@ public:
     CkArrayElementRangeIterator<CpdList_arrayElementNames> it(this,req.lo,req.hi);
     it.iterate(); // calls "add" for in-range elements
   }
-  void add(int cur,ArrayElement *elt) 
+  void add(int cur,Chare *e) 
   { // Just grab the name and nothing else:
+    ArrayElement *elt = (ArrayElement*)e;
          PUP::er &p=*pp;
 	 beginItem(p,cur);
          p.comment("name");
@@ -113,11 +230,24 @@ public:
     CkArrayElementRangeIterator<CpdList_arrayElements> it(this,req.lo,req.hi);
     it.iterate(); // calls "add" for in-range elements
   }
-  void add(int cur,ArrayElement *elt) 
+  void add(int cur, Chare *e) 
   { // Pup the element data
-         PUP::er &p=*pp;
-	 beginItem(p,cur);
-	 elt->ckDebugPup(p);
+    ArrayElement *elt = (ArrayElement*)e;
+    PUP::er &p=*pp;
+    beginItem(p,cur);
+    //elt->ckDebugPup(p);
+    // Now ignore any pupper, just copy all the memory as raw data
+    p.comment("name");
+    char *n=elt->ckDebugChareName();
+    p(n,strlen(n));
+    free(n);
+    int type = elt->ckGetChareType();
+    p.comment("type");
+    const char *t = _chareTable[type]->name;
+    p((char*)t,strlen(t));
+    p.comment("value");
+    int size = _chareTable[type]->size;
+    p((char*)elt,size);
   }
 };
 
@@ -405,7 +535,6 @@ void CpdStartGdb(void)
 #endif
 }
 
-
 void CpdCharmInit()
 {
   CpdBreakPointInit();
@@ -418,19 +547,9 @@ void CpdCharmInit()
   CpdListRegister(new CpdList_localQ());
   CpdListRegister(new CpdList_arrayElementNames());
   CpdListRegister(new CpdList_arrayElements());
+  CpdListRegister(new CpdList_objectNames());
+  CpdListRegister(new CpdList_object());
 }
 
 
 #endif /*CMK_CCS_AVAILABLE*/
-
-
-
-
-
-
-
-
-
-
-
-

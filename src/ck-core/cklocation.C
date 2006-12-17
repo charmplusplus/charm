@@ -637,6 +637,8 @@ CkMigratable::CkMigratable(CkMigrateMessage *m) {
 	commonInit();
 }
 
+int CkMigratable::ckGetChareType(void) const {return thisChareType;}
+
 void CkMigratable::pup(PUP::er &p) {
 	DEBM((AA"In CkMigratable::pup %s\n"AB,idx2str(thisIndexMax)));
 	Chare::pup(p);

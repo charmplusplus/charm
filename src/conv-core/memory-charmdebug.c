@@ -155,6 +155,23 @@ void cpd_memory_leak(void *iterParam, pup_er p, CpdListItemsRequest *req) {
   cpd_memory_pup(iterParam, p, req);
 }
 
+int cpd_memory_getLength(void *lenParam) { return 1; }
+void cpd_memory_get(void *iterParam, pup_er p, CpdListItemsRequest *req) {
+  void *userData = (void*)req->lo;
+  Slot *sl = ((Slot*)req->lo)-1;
+  CpdListBeginItem(p, 0);
+  pup_comment(p, "size");
+  //printf("value: %x %x %x %d\n",sl->magic, sl->magic&~FLAGS_MASK, SLOTMAGIC, ((sl->magic&~FLAGS_MASK) != SLOTMAGIC));
+  if ((sl->magic&~FLAGS_MASK) != SLOTMAGIC) {
+    int zero = 0;
+    pup_int(p, &zero);
+  } else {
+    pup_int(p, &sl->userSize);
+    pup_comment(p, "value");
+    pup_bytes(p, userData, sl->userSize);
+  }
+}
+
 /********* Heap Checking ***********/
 
 // FIXME: this function assumes that all memory is allocated in slot_unknown!

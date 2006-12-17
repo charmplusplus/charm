@@ -187,6 +187,8 @@ extern "C" {
   int cpd_memory_length(void*);
   void cpd_memory_pup(void*,void*,CpdListItemsRequest*);
   void cpd_memory_leak(void*,void*,CpdListItemsRequest*);
+  int cpd_memory_getLength(void*);
+  void cpd_memory_get(void*,void*,CpdListItemsRequest*);
 }
 
 void _registerDone(void)
@@ -199,6 +201,7 @@ void _registerDone(void)
   CpdListRegister(new CpdSimpleListAccessor("charm/readonlyMsg",_readonlyMsgs.size(),pupReadonlyMsg));
   CpdListRegister(new CpdListAccessor_c("converse/memory",cpd_memory_length,0,cpd_memory_pup,0));
   CpdListRegister(new CpdListAccessor_c("converse/memory/leak",cpd_memory_length,0,cpd_memory_leak,0));
+  CpdListRegister(new CpdListAccessor_c("converse/memory/data",cpd_memory_getLength,0,cpd_memory_get,0));
 #if CMK_CCS_AVAILABLE
   CpdCharmInit();
 #endif
