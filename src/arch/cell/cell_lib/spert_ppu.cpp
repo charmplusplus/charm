@@ -119,6 +119,39 @@ int idCounter = 0;
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// "Projections" Data Structures and Function Prototypes
+
+#if SPE_TIMING != 0
+
+  #define PROJ_BUF_SIZE   (32 * 1024)
+
+  typedef struct __projections_buffer_entry {
+
+    unsigned long long int startTime;
+    unsigned int runTime;
+    unsigned int speIndex;
+    unsigned int funcIndex;
+
+  } ProjBufEntry;
+
+  // Buffer to hold timing data until the entries are flushed to the file
+  ProjBufEntry projBuf[PROJ_BUF_SIZE];
+  int projBufCount = 0;
+  int totalProjSampleCount = 0;
+
+  FILE* projFile;
+
+  void openProjFile(char* name);
+  void closeProjFile();
+  void addProjEntry(SPENotify* notifyEntry, int speIndex, int funcIndex);
+  void flushProjBuf();
+
+#endif
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function Prototypes
 
 SPEThread* createSPEThread(SPEData *speData);
@@ -338,6 +371,17 @@ int InitOffloadAPI(void (*cbFunc)(void*), void (*gcbFunc)(void*), void (*errorFu
     msgQEntryFreeTail = &(__msgQEntries[(NUM_SPE_THREADS * SPE_MESSAGE_QUEUE_LENGTH) - 1]);
   #endif
 
+  // Open the projections/timing file
+  #if SPE_TIMING != 0
+    openProjFile(NULL);
+  #endif
+
+  // Send each of the SPE threads a command to restart their clocks (in an attempt to remove clock
+  //   skew from the timing information).
+  for (int i = 0; i < NUM_SPE_THREADS; i++)
+    sendSPECommand(speThreads[i], SPE_MESSAGE_COMMAND_RESET_CLOCK);
+
+
   return 1;
 }
 
@@ -421,6 +465,11 @@ void CloseOffloadAPI() {
     entry = entry->next;
     delete tmp;
   }
+
+  // Close the projections/timing file
+  #if SPE_TIMING != 0
+    closeProjFile();
+  #endif
 
   #if DEBUG_DISPLAY >= 1
     printf(" ---------- CLOSING OFFLOAD API ----------\n");
@@ -1844,11 +1893,18 @@ void OffloadAPIProgress() {
     // DEBUG - Pipeline Loads
     register SPEData* speData_0 = speThreads[0]->speData;
     register char* msgQueueRaw_0 = (char*)(speData_0->messageQueue);
-    register int* notifyQueue_0 = (int*)(speData_0->notifyQueue);
+    //register int* notifyQueue_0 = (int*)(speData_0->notifyQueue);
+    register SPENotify* notifyQueue_0 = (SPENotify*)(speData_0->notifyQueue);
     register SPEMessage* msg_0 = (SPEMessage*)(msgQueueRaw_0);
     register int state_0 = msg_0->state;
     register int counter0_0 = msg_0->counter0;
-    register int rtnCode_0 = notifyQueue_0[0];
+    //register int rtnCode_0 = notifyQueue_0[0];
+    #if SPE_TIMING != 0
+      register unsigned long long int notify_startTime_0 = notifyQueue_0[0].startTime;
+      register unsigned int notify_runTime_0 = notifyQueue_0[0].runTime;
+    #endif
+    register int notify_errorCode_0 = notifyQueue_0[0].errorCode;
+    register int notify_counter_0 = notifyQueue_0[0].counter;
   #endif
 
   // Check each message queue entry
@@ -1862,11 +1918,18 @@ void OffloadAPIProgress() {
         // Load this iteration's data
         register SPEData* speData = speData_0;
         register char* msgQueueRaw = msgQueueRaw_0;
-        register int* notifyQueue = notifyQueue_0;
+        //register int* notifyQueue = notifyQueue_0;
+        register SPENotify* notifyQueue = notifyQueue_0;
         register SPEMessage* msg = msg_0;
         register int state = state_0;
         register int counter0 = counter0_0;
-        register int rtnCode = rtnCode_0;
+        //register int rtnCode = rtnCode_0;
+        #if SPE_TIMING != 0
+	  register unsigned long long int notify_startTime = notify_startTime_0;
+          register unsigned int notify_runTime = notify_runTime_0;
+        #endif
+        register int notify_errorCode = notify_errorCode_0;
+        register int notify_counter = notify_counter_0;
 
         register int i_0 = i + 1;
         register int j_0 = j;
@@ -1881,22 +1944,36 @@ void OffloadAPIProgress() {
         // Next Iteration
         speData_0 = speThreads[i_0]->speData;
         msgQueueRaw_0 = (char*)(speData_0->messageQueue);
-        notifyQueue_0 = (int*)(speData_0->notifyQueue);
+        //notifyQueue_0 = (int*)(speData_0->notifyQueue);
+        notifyQueue_0 = (SPENotify*)(speData_0->notifyQueue);
         msg_0 = (SPEMessage*)(msgQueueRaw_0 + (j_0 * SIZEOF_16(SPEMessage)));
         state_0 = msg_0->state;
         counter0_0 = msg_0->counter0;
-        rtnCode_0 = notifyQueue_0[j_0];
+        //rtnCode_0 = notifyQueue_0[j_0];
+        #if SPE_TIMING != 0
+          notify_startTime_0 = notifyQueue_0[j_0].startTime;
+          notify_runTime_0 = notifyQueue_0[j_0].runTime;
+        #endif
+        notify_errorCode_0 = notifyQueue_0[j_0].errorCode;
+        notify_counter_0 = notifyQueue_0[j_0].counter;
 
       #else
 
         register SPEData* speData = speThreads[i]->speData;
         register char* msgQueueRaw = (char*)(speData->messageQueue);
-        register int* notifyQueue = (int*)(speData->notifyQueue);
+        //register int* notifyQueue = (int*)(speData->notifyQueue);
+        register SPENotify* notifyQueue = (SPENotify*)(speData->notifyQueue);
 
         register SPEMessage* msg = (SPEMessage*)(msgQueueRaw + (j * SIZEOF_16(SPEMessage)));
         register int state = msg->state;
         register int counter0 = msg->counter0;
-        register int rtnCode = notifyQueue[j];
+        //register int rtnCode = notifyQueue[j];
+        #if SPE_TIMING != 0
+          register int notify_startTime = notifyQueue[j].startTime;
+          register int notify_runTime = notifyQueue[j].runTime;
+        #endif
+        register int notify_errorCode = notifyQueue[j].errorCode;
+        register int notify_counter = notifyQueue[j].counter;
 
       #endif
 
@@ -1907,7 +1984,19 @@ void OffloadAPIProgress() {
       #endif
 
       // Check to see if this message queue entry is pending a completion notification
-      if ((state == SPE_MESSAGE_STATE_SENT) && ((rtnCode & 0xFFFF) == counter0)) {
+      //if ((state == SPE_MESSAGE_STATE_SENT) && ((rtnCode & 0xFFFF) == counter0)) {
+      if ((state == SPE_MESSAGE_STATE_SENT) && (notify_counter == counter0)) {
+
+        #if SPE_TIMING != 0
+
+          //// DEBUG
+          //printf(" --- Offload API :: [DEBUG] :: WR finished with startTime = %llu, runTime = %u\n",
+          //       notify_startTime, notify_runTime
+	  //      );
+
+          addProjEntry(&(notifyQueue[j]), i, msg->funcIndex);
+
+        #endif
 
         // STATS
         #if PPE_STATS != 0
@@ -1918,7 +2007,7 @@ void OffloadAPIProgress() {
         register WorkRequest* wrPtr = (WorkRequest*)(msg->wrPtr);
 
         // Get the error code
-        register int errorCode = (rtnCode >> 16) & 0xFFFF;
+        //register int errorCode = (rtnCode >> 16) & 0xFFFF;
 
         //// If there was an error returned by the SPE, display it now
         //if (__builtin_expect(errorCode != SPE_MESSAGE_OK, 0)) {
@@ -1930,19 +2019,25 @@ void OffloadAPIProgress() {
         // TRACE
         #if ENABLE_TRACE != 0
           if (__builtin_expect(wrPtr->traceFlag, 0)) {
-            printf("OffloadAPI :: [TRACE] :: rtnCode = 0x%08x, errorCode(%d,%d) = %d...\n",
-                   rtnCode, i, j, errorCode
+            //printf("OffloadAPI :: [TRACE] :: rtnCode = 0x%08x, errorCode(%d,%d) = %d...\n",
+            //       rtnCode, i, j, errorCode
+            //      );
+            printf("OffloadAPI :: [TRACE] :: counter(%d,%d) = %d, errorCode(%d,%d) = %d...\n",
+                   i, j, notify_counter, i, j, notify_errorCode
                   );
           }
         #endif
 
         // If there was an error returned by the SPE, call the error handler function now
-        if (__builtin_expect(errorCode != SPE_MESSAGE_OK, 0)) {
+        //if (__builtin_expect(notify_errorCode != SPE_MESSAGE_OK, 0)) {
+        if (__builtin_expect(notify_errorCode != SPE_MESSAGE_OK, 0)) {
           if (errorHandlerFunc != NULL) {
-            errorHandlerFunc(errorCode, wrPtr->userData, wrPtr);
+            //errorHandlerFunc(errorCode, wrPtr->userData, wrPtr);
+            errorHandlerFunc(notify_errorCode, wrPtr->userData, wrPtr);
 	  } else {
             fprintf(stderr, " --- Offload API :: ERROR :: SPE_%d returned error code %d for message at index %d...\n",
-                    i, errorCode, j
+                    //i, errorCode, j
+                    i, notify_errorCode, j
                    );
 	  }
 	}
@@ -2015,6 +2110,7 @@ void OffloadAPIProgress() {
           //printf("       wrGroupHandle = { numWRs = %d, fC = %d, state = %d }\n",
           //       wrGroup->numWRs, wrGroup->finishedCount, wrGroup->state
           //      );
+          //printf("       wrQueuedHead = %p\n", wrQueuedHead);
 
           // Check to see if this is the last work request in the group to complete
           if (wrGroup->state == WRGROUP_STATE_FULL && wrGroup->finishedCount >= wrGroup->numWRs) {
@@ -2076,6 +2172,9 @@ void OffloadAPIProgress() {
           // Check to see if a work request was found
           if (__builtin_expect(wrEntry != NULL, 1)) {
 
+            //// DEBUG
+            //printf("       ISSUING IMMEDIATE...\n");
+
             // STATS
             #if PPE_STATS != 0
               wrImmedIssueCount++;
@@ -2104,6 +2203,9 @@ void OffloadAPIProgress() {
             wrEntry->next = NULL;
 
 	  } else { // Otherwise, just clear the entry
+
+            //// DEBUG
+            //printf("       NOT - ISSUING IMMEDIATE...\n");
 
             // Now that the work request has been moved to either the wrFree list or marked as
             //   finished, set the state of the message queue entry to clear so it can accempt
@@ -2671,3 +2773,92 @@ WRGroup* createWRGroupHandles(int numHandles) {
 
   return groups;
 }
+
+
+#if SPE_TIMING != 0
+
+void openProjFile(char* name) {
+
+  char buf[256];
+  buf[0] = '\0';
+
+  // Verify the parameter
+  if (name == NULL || strlen(name) <= 0)
+    name = "default";
+
+  // Create the file name
+  sprintf(buf, "%s.cellRaw", name);
+
+  // Open the file for writing
+  projFile = fopen(buf, "w+");
+  if (__builtin_expect(projFile == NULL, 0)) {
+    fprintf(stderr, " --- Offload API :: [WARNING] :: Unable to open timing file (\"%s\")...\n", buf);
+    return;
+  }
+}
+
+void closeProjFile() {
+
+  if (projFile != NULL) {
+
+    // Flush the remaining buffer entries to the file
+    flushProjBuf();
+
+    // Output the number of total entries
+    register size_t bytesWritten = fwrite((void*)(&totalProjSampleCount), 1, sizeof(int), projFile);
+    if (sizeof(int) != bytesWritten) {
+      fprintf(stderr,
+              " --- Offload API :: [WARNING] :: Incorrect number of bytes written when writing entry count (%d of %d bytes)...\n",
+              bytesWritten, sizeof(int)
+             );
+    }
+
+    // Close the file
+    fclose(projFile);
+  }
+}
+
+void addProjEntry(SPENotify* notifyEntry, int speIndex, int funcIndex) {
+
+  // Make sure the file is open
+  if (projFile == NULL) return;
+
+  // Make sure there is room in the buffer for this entry (if not, flush)
+  if (projBufCount >= PROJ_BUF_SIZE)
+    flushProjBuf();
+
+  // Add the entry to the buffer
+  projBuf[projBufCount].startTime = notifyEntry->startTime;
+  projBuf[projBufCount].runTime = notifyEntry->runTime;
+  projBuf[projBufCount].speIndex = speIndex;
+  projBuf[projBufCount].funcIndex = funcIndex;
+
+  // Increment the projBufCount so it points to the next projBuf entry
+  projBufCount++;
+
+  // Increment the counter for the number of total samples
+  totalProjSampleCount++;
+}
+
+void flushProjBuf() {
+
+  // Make sure the file is open
+  if (projFile == NULL) return;
+
+  // Calculate the number of bytes in projBuf that contain valid data
+  register int byteCount = sizeof(ProjBufEntry) * projBufCount;
+
+  // Write projBuf (or a portion of it) to the projFile
+  register size_t bytesWritten = fwrite((void*)projBuf, 1, byteCount, projFile);
+  if (bytesWritten != byteCount) {
+    fprintf(stderr,
+            " --- Offload API :: [WARNING] :: Flush only wrote %d of %d bytes to timing file...\n",
+            bytesWritten, byteCount
+           );
+  }
+
+  // Reset the projBufCount counter
+  projBufCount = 0;
+}
+
+#endif

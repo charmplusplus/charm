@@ -12,7 +12,12 @@
 #define WORK_REQUEST_FLAGS_NONE      (0x00)  // No flags
 #define WORK_REQUEST_FLAGS_RW_IS_RO  (0x01)  // (Standard Only) Treat the buffer that readWritePtr points to as a readOnly buffer
 #define WORK_REQUEST_FLAGS_RW_IS_WO  (0x02)  // (Standard Only) Tread the buffer that readWritePtr points to as a writeOnly buffer
-#define WORK_REQUEST_FLAGS_LIST      (0x04)  // (List Only) The work request uses a dma list instead of a single set of buffers
+#define WORK_REQUEST_FLAGS_LIST      (0x04)  // (List Only) The work request uses a dma list instead of a single set of buffers#
+
+// Right shift amounts to bring flag checks into lsb of register value
+#define WORK_REQUEST_FLAGS_RW_IS_RO_SHIFT (0)
+#define WORK_REQUEST_FLAGS_RW_IS_WO_SHIFT (1)
+#define WORK_REQUEST_FLAGS_LIST_SHIFT     (2)
 
 // NOTE : This should be "unsigned long" for 32-bit and "unsigned long long" for 64-bit
 #define PPU_POINTER_TYPE   unsigned long
@@ -20,13 +25,13 @@
 // Defines that describe the message queue between the PPU and SPE
 #define SPE_MESSAGE_QUEUE_LENGTH      8   // DO NOT SET ABOVE 31 (because of the way tags are used with the DMA engines)
 #define SPE_MESSAGE_QUEUE_BYTE_COUNT  (SIZEOF_128(SPEMessage) * SPE_MESSAGE_QUEUE_LENGTH)
-#define SPE_NOTIFY_QUEUE_BYTE_COUNT   (ROUNDUP_128(sizeof(int) * SPE_MESSAGE_QUEUE_LENGTH))
+#define SPE_NOTIFY_QUEUE_BYTE_COUNT   (ROUNDUP_128(sizeof(SPENotify) * SPE_MESSAGE_QUEUE_LENGTH))
 
 // Set to non-zero if the write-only buffer should be zero-ed out on the SPE before being filled in
 #define SPE_ZERO_WRITE_ONLY_MEMORY    0
 
 // The number of dma list entries in a pre-allocated dma list.
-#define SPE_DMA_LIST_LENGTH                16       // Per message in message queue (NOTE: Must be even: 2, 4, 10, etc.)
+#define SPE_DMA_LIST_LENGTH                16       // Per message in message queue (NOTE: Must be an even # >= 4: 4, 10, 22, etc.)
 #define SPE_DMA_LIST_ENTRY_MAX_LENGTH      0x4000   // Maximum length of a buffer pointed to by a single dma list entry (should be a power of 2)
 
 // The reserved area for stack
@@ -47,13 +52,13 @@
 #define SPE_MESSAGE_STATE_CLEAR               0
 #define SPE_MESSAGE_STATE_SENT                1
 #define SPE_MESSAGE_STATE_PRE_FETCHING        2
-#define SPE_MESSAGE_STATE_FETCHING            3
-#define SPE_MESSAGE_STATE_PRE_FETCHING_LIST   4
+#define SPE_MESSAGE_STATE_PRE_FETCHING_LIST   3  // NOTE: code in processMsgState_send requires 'PRE_FETCHING_LIST = PRE_FETCHING + 1'
+#define SPE_MESSAGE_STATE_FETCHING            4
 #define SPE_MESSAGE_STATE_LIST_READY_LIST     5
 #define SPE_MESSAGE_STATE_FETCHING_LIST       6
 #define SPE_MESSAGE_STATE_READY               7
 #define SPE_MESSAGE_STATE_EXECUTED            8
-#define SPE_MESSAGE_STATE_EXECUTED_LIST       9
+#define SPE_MESSAGE_STATE_EXECUTED_LIST       9  // NOTE: code in processMsgState_ready requires 'EXECUTED_LIST = EXECUTED + 1'
 #define SPE_MESSAGE_STATE_COMMITTING          10
 #define SPE_MESSAGE_STATE_FINISHED            11
 #define SPE_MESSAGE_STATE_ERROR               12
@@ -66,10 +71,11 @@
 #define SPE_FUNC_INDEX_USER       (0)
 
 // SPE Commands
-#define SPE_MESSAGE_COMMAND_MIN   0
-#define SPE_MESSAGE_COMMAND_NONE  0
-#define SPE_MESSAGE_COMMAND_EXIT  1
-#define SPE_MESSAGE_COMMAND_MAX   1
+#define SPE_MESSAGE_COMMAND_MIN          0
+#define SPE_MESSAGE_COMMAND_NONE         0
+#define SPE_MESSAGE_COMMAND_EXIT         1
+#define SPE_MESSAGE_COMMAND_RESET_CLOCK  2
+#define SPE_MESSAGE_COMMAND_MAX          2
 
 // SPE Error Codes
 #define SPE_MESSAGE_OK                       (0x0000)
@@ -89,7 +95,9 @@
 // STATS Data Collection
 #define PPE_STATS    0  // Set to have stat data collected during execution for the PPE side of the Offload API
 
-// NOTE : Only a single SPE_STATS should be enabled at a time (e.g. - SPE_STATS enabled, SPE_STATS1 disabled) !!!
+// NOTE : Only a single SPE_TIMING/STATS should be enabled at a time
+//   !!! (e.g. - if SPE_STATS enabled, then SPE_STATS1, SPE_STATS2, and SPE_TIMING should be disabled) !!!
+#define SPE_TIMING   1  // Set to have timing data on the WRs sent back to the PPE
 #define SPE_STATS    0  // Set to have stat data collected during execution for the SPE side of the Offload API (SPE Runtime)
 #define SPE_STATS1   0
 #define SPE_STATS2   0  // 0: unset; >0: message queue index to track; <0: track all message queue entries
@@ -123,68 +131,46 @@ typedef struct __dma_list_entry {
 /* @} */
 
 
-#define OPT_SPEMESSAGE_STRUCT 1
-
 // SPE Message: The structure that defines a message being passed to an SPE
 typedef struct __SPE_MESSAGE {
 
-#if OPT_SPEMESSAGE_STRUCT == 0
-
-  volatile int counter0;
-  volatile int funcIndex;          // Indicates what "function" the SPE should perform
-  volatile PPU_POINTER_TYPE readWritePtr;
-  volatile int readWriteLen;
-
-  volatile PPU_POINTER_TYPE readOnlyPtr;
-  volatile int readOnlyLen;
-  volatile PPU_POINTER_TYPE writeOnlyPtr;
-  volatile int writeOnlyLen;
-
-  volatile unsigned int flags;
-  volatile unsigned int totalMem;  // The total amount of memory that will be needed on the SPE for the request
-  volatile int state;              // Current state of the message (see SPE_MESSAGE_STATE_xxx)
-  volatile int command;            // A control command that the PPU can use to send commands to the SPE runtime (see SPE_MESSAGE_COMMAND_xxx)
-
-  // NOTE : !!! VERY IMPORTANT !!! : The dmaList address must be 16 byte aligned in the SPE's LS.  The SPEMessage
-  //   data structures get 16 byte aligned so the fields in this data structure must be order in such a way
-  //   that dmaList starts a multiple of 16 bytes away from the start of the overall structure.
-  volatile DMAListEntry dmaList[SPE_DMA_LIST_LENGTH];
-
-  volatile PPU_POINTER_TYPE wrPtr; // A pointer to userData specified in the sendWorkRequest call that will be passed to the callback function
-  volatile int traceFlag;   // DEBUG
-  volatile int counter1;            // A counter used to uniquely identify this message from the message previously held in this slot
-
-#else
-
   volatile int counter0;
   volatile int state;              // Current state of the message (see SPE_MESSAGE_STATE_xxx)
   volatile unsigned int flags;
   volatile int funcIndex;          // Indicates what "function" the SPE should perform
 
   volatile PPU_POINTER_TYPE readWritePtr;
-  volatile int readWriteLen;
   volatile PPU_POINTER_TYPE readOnlyPtr;
-  volatile int readOnlyLen;
-
   volatile PPU_POINTER_TYPE writeOnlyPtr;
-  volatile int writeOnlyLen;
-  volatile PPU_POINTER_TYPE wrPtr; // A pointer to userData specified in the sendWorkRequest call that will be passed to the callback function
-  volatile int traceFlag;   // DEBUG
+  volatile int readWriteLen;
 
+  volatile int readOnlyLen;
+  volatile int writeOnlyLen;
+  volatile unsigned int totalMem;  // The total amount of memory that will be needed on the SPE for the request
+  volatile int traceFlag;          // DEBUG
 
   // NOTE : !!! VERY IMPORTANT !!! : The dmaList address must be 16 byte aligned in the SPE's LS.  The SPEMessage
   //   data structures get 16 byte aligned so the fields in this data structure must be order in such a way
   //   that dmaList starts a multiple of 16 bytes away from the start of the overall structure.
   volatile DMAListEntry dmaList[SPE_DMA_LIST_LENGTH];
 
-  volatile int command;            // A control command that the PPU can use to send commands to the SPE runtime (see SPE_MESSAGE_COMMAND_xxx)
-  volatile unsigned int totalMem;  // The total amount of memory that will be needed on the SPE for the request
+  volatile int command;             // A control command that the PPU can use to send commands to the SPE runtime (see SPE_MESSAGE_COMMAND_xxx)
+  volatile PPU_POINTER_TYPE wrPtr;  // A pointer to userData specified in the sendWorkRequest call that will be passed to the callback function
   volatile int counter1;            // A counter used to uniquely identify this message from the message previously held in this slot
-
-#endif 
-
 
 } SPEMessage;
+
+
+// SPE Notify: The structure that defines a notification beind passed from the SPE to the PPE notifying the
+//   the PPE that a given work request has completed.
+typedef struct __SPE_NOTIFY {
+
+  volatile unsigned long long int startTime;   // The time the Work Request entered user code
+  volatile unsigned int runTime;               // The amount of time the Work Request spent in user code
+  volatile unsigned short errorCode;           // The error code for the Work Request
+  volatile unsigned short counter;             // The counter value (when completed, should match corresponding counter in Message Queue)
+
+} SPENotify;
 
 
 // Define a structure that will be passed to each SPE thread when it is created
