@@ -1,4 +1,5 @@
-CELL_SDK_DIR="/opt/IBM/cell-sdk-1.1"
+#CELL_SDK_DIR="/opt/IBM/cell-sdk-1.1"
+CELL_SDK_DIR="/opt/ibm/cell-sdk/prototype"
 
 CMK_CPP_CHARM='/usr/lib/cpp'
 CMK_CPP_C='ppu32-gcc -E'
@@ -17,13 +18,15 @@ CMK_SPE_CC="spu-gcc -W -Wall -Winline -Wno-main -Wl,-N -I$CELL_SDK_DIR/sysroot/u
 CMK_SPE_CXX="spu-g++ -W -Wall -Winline -Wno-main -Wl,-N -I$CELL_SDK_DIR/sysroot/usr/spu/include -L$CELL_SDK_DIR/sysroot/usr/spu/lib"
 CMK_SPE_LD="spu-gcc -Wl,-N -L$CELL_SDK_DIR/sysroot/usr/spu/lib"
 CMK_SPE_LDXX="spu-g++ -Wl,-N -L$CELL_SDK_DIR/sysroot/usr/spu/lib"
-CMK_SPERT_LIBS="-lcellspu $CELL_SDK_DIR/sysroot/usr/spu/lib/libc.a $CELL_SDK_DIR/sysroot/usr/spu/lib/libsim.a"
+#CMK_SPERT_LIBS="-lcellspu $CELL_SDK_DIR/sysroot/usr/spu/lib/libc.a $CELL_SDK_DIR/sysroot/usr/spu/lib/libsim.a"
+CMK_SPERT_LIBS="-lcellspu $CELL_SDK_DIR/sysroot/usr/spu/lib/libsim.a"
 CMK_SPE_AR='spu-ar'
 CMK_PPU_EMBEDSPU='ppu32-embedspu'
 
 CMK_RANLIB='ppu-ranlib'
 CMK_AR='ppu-ar -r'
-CMK_LIBS='-lckqt -lcellppu -lspe'
+#CMK_LIBS='-lckqt -lcellppu -lspe'
+CMK_LIBS='-lckqt -lcellppu -lspe2'
 CMK_LD_SHARED='-shared'
 
 CMK_NATIVE_CC='gcc'

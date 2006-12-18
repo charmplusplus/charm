@@ -12,7 +12,8 @@ done
 #make library
 export CHARMINC=../include
 . ./conv-config.sh
-if test ! -f $CELL_SDK_DIR/sysroot/usr/include/libspe.h
+%if test ! -f $CELL_SDK_DIR/sysroot/usr/include/libspe.h
+if test ! -f $CELL_SDK_DIR/sysroot/usr/include/libspe2.h
 then
   echo "Please define CELL_SDK_DIR in charm/src/arch/net-linux-cell/conv-mach.sh!"
   exit 1
