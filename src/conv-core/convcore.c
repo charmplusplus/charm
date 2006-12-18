@@ -2490,7 +2490,7 @@ void ConverseCommonExit(void)
 #if CMK_CELL
 void CmiInitCell()
 {
-  InitOffloadAPI(offloadCallback);
+  InitOffloadAPI(offloadCallback, NULL, NULL);
   CcdCallOnConditionKeep(CcdPERIODIC, 
         (CcdVoidFn) OffloadAPIProgress, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
