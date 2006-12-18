@@ -28,7 +28,7 @@ void initMem();
 
 #include <spu_intrinsics.h>
 #include <spu_mfcio.h>
-#include <cbe_mfc.h>
+//#include <cbe_mfc.h>
 
 #if SPE_USE_OWN_MEMSET == 0
   #include <string.h>
@@ -38,7 +38,7 @@ void initMem();
 #include "spert.h"
 
 
-#define USE_PRINT_BLOCK  1
+#define USE_PRINT_BLOCK  0
 void print_block_table();
 
 
@@ -185,7 +185,7 @@ unsigned int lastTimerRead_store = (unsigned int)0xFFFFFFFF;
                         register unsigned int tmp_lastTimerRead = lastTimerRead_store;  \
                         lastTimerRead_store = cntr;                                     \
                         if (__builtin_expect(cntr > tmp_lastTimerRead, 0)) {            \
-                          timerUpper_store += 1                                         \
+                          timerUpper_store += 1;                                        \
                         }                                                               \
                       }
 
@@ -625,9 +625,9 @@ inline void processMsgState_preFetching(int msgIndex) {
 
     // Do the comparisons (pointer to each buffer type == NULL)
     // NOTE: tmp_msgQueueData1 = { rWPtr, rOPtr, wOPtr, rWLen }, tmp_msgQueueData2 = { rOLen, wOLen, xx, xx }
-    register vector signed int tmp_ptrCompare = spu_cmpeq(tmp_msgQueueData1, (int)NULL);
-    register vector signed int tmp_allOnes = { -1, -1, -1, -1 };
-    register vector signed int tmp_ptrCompareNot = spu_sub(tmp_allOnes, tmp_ptrCompare);
+    register vector unsigned int tmp_ptrCompare = spu_cmpeq(tmp_msgQueueData1, (int)NULL);
+    register vector unsigned int tmp_allOnes = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
+    register vector unsigned int tmp_ptrCompareNot = spu_sub(tmp_allOnes, tmp_ptrCompare);
     // NOTE: tmp_ptrCompare    = { rWPtr == NULL (-1 if true,  0 otherwise), 'same for rOPtr', 'same for wOPtr', xx }
     // NOTE: tmp_ptrCompareNot = { rWPtr == NULL ( 0 if true, -1 otherwise), 'same for rOPtr', 'same for wOPtr', xx }
     register int tmp_readWriteCompareNot = spu_extract(tmp_ptrCompareNot, 0);
@@ -1991,9 +1991,9 @@ inline void processMsgState_executed(int msgIndex) {
 
   // Calculate the number of write buffers
   register int tmp_flags = spu_extract(tmp_msgQueueData0, 2);
-  register vector signed int tmp_ptrCompare = spu_cmpeq(tmp_msgQueueData1, (int)NULL);
-  register vector signed int tmp_allOnes = { -1, -1, -1, -1 };
-  register vector signed int tmp_ptrCompareNot = spu_sub(tmp_allOnes, tmp_ptrCompare);
+  register vector unsigned int tmp_ptrCompare = spu_cmpeq(tmp_msgQueueData1, (int)NULL);
+  register vector unsigned int tmp_allOnes = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
+  register vector unsigned int tmp_ptrCompareNot = spu_sub(tmp_allOnes, tmp_ptrCompare);
   // NOTE: tmp_ptrCompare    = { rWPtr == NULL (-1 if true,  0 otherwise), 'same for rOPtr', 'same for wOPtr', xx }
   // NOTE: tmp_ptrCompareNot = { rWPtr == NULL ( 0 if true, -1 otherwise), 'same for rOPtr', 'same for wOPtr', xx }
 
