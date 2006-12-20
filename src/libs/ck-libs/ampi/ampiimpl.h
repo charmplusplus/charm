@@ -1032,7 +1032,7 @@ class ampiParent : public CBase_ampiParent {
 
     // MPI MPI_Attr_get C binding returns a *pointer* to an integer,
     //  so there needs to be some storage somewhere to point to.
-    int kv_builtin_storage;
+    int* kv_builtin_storage;
     int kv_is_builtin(int keyval);
     CkPupPtrVec<KeyvalNode> kvlist;
 

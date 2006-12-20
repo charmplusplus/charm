@@ -800,7 +800,7 @@ int ampiParent::putAttr(MPI_Comm comm, int keyval, void* attribute_val){
 class Builtin_kvs{
  public:
   int tag_ub,host,io,wtime_is_global,keyval_mype,keyval_numpes,keyval_mynode,keyval_numnodes;
-  Buildin_kvs(){
+  Builtin_kvs(){
     tag_ub = MPI_TAG_UB_VALUE; 
     host = MPI_PROC_NULL;
     io = 0;
@@ -819,10 +819,10 @@ int ampiParent::kv_is_builtin(int keyval) {
 	case MPI_HOST: kv_builtin_storage=&(bikvs.host); return 1;
 	case MPI_IO: kv_builtin_storage=&(bikvs.io); return 1;
 	case MPI_WTIME_IS_GLOBAL: kv_builtin_storage=&(bikvs.wtime_is_global); return 1;
-	case AMPI_KEYVAL_MYPE: kv_builtin_storage=&(bikvs.mype); return 1;
-	case AMPI_KEYVAL_NUMPES: kv_builtin_storage=&(bikvs.numpes); return 1;
-	case AMPI_KEYVAL_MYNODE: kv_builtin_storage=&(bikvs.mynode); return 1;
-	case AMPI_KEYVAL_NUMNODES: kv_builtin_storage=&(bikvs.numnodes); return 1;
+	case AMPI_KEYVAL_MYPE: kv_builtin_storage=&(bikvs.keyval_mype); return 1;
+	case AMPI_KEYVAL_NUMPES: kv_builtin_storage=&(bikvs.keyval_numpes); return 1;
+	case AMPI_KEYVAL_MYNODE: kv_builtin_storage=&(bikvs.keyval_mynode); return 1;
+	case AMPI_KEYVAL_NUMNODES: kv_builtin_storage=&(bikvs.keyval_numnodes); return 1;
 	default: return 0;
 	};
 }
