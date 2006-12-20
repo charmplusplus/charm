@@ -1412,15 +1412,20 @@ MSG_ORDER_DEBUG(
   // check posted recvs
   int tags[3], sts[3];
   tags[0] = msg->tag; tags[1] = msg->srcRank; tags[2] = msg->comm;
-  IReq *ireq = (IReq *)CmmGet(posted_ireqs, 3, tags, sts);
-  if (ireq) {	// receive posted
-    ireq->receive(this, msg);
-    ireq->tag = sts[0];
-    ireq->src = sts[1];
-    ireq->comm = sts[2];
-  } else {
-    CmmPut(msgs, 3, tags, msg);
+  IReq *ireq = NULL;
+  if (CpvAccess(CmiPICMethod) != 2) {
+    IReq *ireq = (IReq *)CmmGet(posted_ireqs, 3, tags, sts);
+    if (ireq) {	// receive posted
+      ireq->receive(this, msg);
+      ireq->tag = sts[0];
+      ireq->src = sts[1];
+      ireq->comm = sts[2];
+    } else {
+      CmmPut(msgs, 3, tags, msg);
+    }
   }
+  else
+      CmmPut(msgs, 3, tags, msg);
 }
 
 AmpiMsg *ampi::getMessage(int t, int s, int comm, int *sts)
@@ -1439,9 +1444,11 @@ AmpiMsg *ampi::makeAmpiMsg(int destIdx,
   int sIdx=thisIndex;
   int seq = -1;
   if (destIdx>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_TAG_UB_VALUE) //Not cross-module: set seqno
-     seq = oorder.nextOutgoing(destIdx);
+  seq = oorder.nextOutgoing(destIdx);
   AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sIdx, sRank, len, destcomm);
+  TCharm::activateVariable(buf);
   ddt->serialize((char*)buf, (char*)msg->data, count, 1);
+  TCharm::deactivateVariable(buf);
   return msg;
 }
 
@@ -1512,11 +1519,14 @@ ampi::processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, int type)
   }else if(msg->length < len){ // only at rare case shall we reset count by using divide
     count = msg->length/(ddt->getSize(1));
   }
+  //
+  TCharm::activateVariable(buf);
   if (msg->length-len==sizeof(AmpiOpHeader)) {	// reduction msg
     ddt->serialize((char*)buf, (char*)msg->data+sizeof(AmpiOpHeader), count, (-1));
   } else {
     ddt->serialize((char*)buf, (char*)msg->data, count, (-1));
   }
+  TCharm::deactivateVariable(buf);
   return 0;
 }
 
@@ -2118,7 +2128,9 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
   AmpiOpHeader newhdr(op,type,count,szdata); 
   CkReductionMsg *msg=CkReductionMsg::buildNew(szdata+szhdr,NULL,AmpiReducer);
   memcpy(msg->getData(),&newhdr,szhdr);
+  TCharm::activateVariable(inbuf);
   ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
+  TCharm::deactivateVariable(inbuf);
   return msg;
 }
 
@@ -2130,8 +2142,12 @@ static int copyDatatype(MPI_Comm comm,MPI_Datatype type,int count,const void *in
   CkDDT_DataType *ddt=ptr->getDDT()->getType(type);
   int len=ddt->getSize(count);
   char *serialized=new char[len];
+  TCharm::activateVariable(inbuf);
+  TCharm::activateVariable(outbuf);
   ddt->serialize((char*)inbuf,(char*)serialized,count,1);
   ddt->serialize((char*)outbuf,(char*)serialized,count,-1); 
+  TCharm::deactivateVariable(outbuf);
+  TCharm::deactivateVariable(inbuf);
   delete [] serialized;		// < memory leak!  // gzheng 
   
   return MPI_SUCCESS;
@@ -2466,6 +2482,11 @@ int PersReq::wait(MPI_Status *sts){
 }
 
 int IReq::wait(MPI_Status *sts){
+  if (CpvAccess(CmiPICMethod) != 2) 
+  {
+          // optimization for Irecv
+          // generic() writes directly to the buffer, so the only thing we
+          // do here is to wait
   	ampi *aptr = getAmpiInstance(comm);
 	while (status == false) {
   		aptr->resumeOnRecv=true;
@@ -2478,10 +2499,11 @@ int IReq::wait(MPI_Status *sts){
           sts->MPI_COMM = comm;
           sts->MPI_LENGTH = length;
         }
-#if 0
+  }
+  else {
 	if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
 		CkAbort("AMPI> Error in non-blocking request wait");
-#endif
+  }
 #if CMK_BLUEGENE_CHARM
   	_TRACE_BG_TLINE_END(&event);
 #endif
@@ -2952,9 +2974,13 @@ int AMPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
     // posted irecv
   // message already arraved?
   ampi *aptr = getAmpiInstance(comm);
-  AmpiMsg *msg = aptr->getMessage(tag, src, comm, &newreq->tag);
+  AmpiMsg *msg = NULL;
+  if (CpvAccess(CmiPICMethod) != 2)       // not copyglobals 
+  {
+    msg = aptr->getMessage(tag, src, comm, &newreq->tag);
+  }
   if (msg) {
-    newreq->receive(aptr, msg);
+      newreq->receive(aptr, msg);
   }
   else {
       // post receive
@@ -3599,15 +3625,33 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 CDECL
-int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
-                  MPI_Datatype sendtype, void *recvbuf, int *recvcounts,
-                  int *rdispls, MPI_Datatype recvtype, MPI_Comm comm)
+int AMPI_Alltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
+                  MPI_Datatype sendtype, void *recvbuf, int *recvcounts_,
+                  int *rdispls_, MPI_Datatype recvtype, MPI_Comm comm)
 {
-  AMPIAPI("AMPI_Alltoallv");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Alltoallv not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return 0;
   ampi *ptr = getAmpiInstance(comm);
   int size = ptr->getSize(comm);
+  int *sendcounts = sendcounts_;
+  int *sdispls = sdispls_;
+  int *recvcounts = recvcounts_;
+  int *rdispls = rdispls_;
+  if (CpvAccess(CmiPICMethod) == 2)       // copyglobals make separate copy
+  {
+      // FIXME: we don't need to make copy if it is not global variable
+    sendcounts = new int[size];
+    sdispls = new int[size];
+    recvcounts = new int[size];
+    rdispls = new int[size];
+    for (int i=0; i<size; i++) {
+      sendcounts[i] = sendcounts_[i];
+      sdispls[i] = sdispls_[i];
+      recvcounts[i] = recvcounts_[i];
+      rdispls[i] = rdispls_[i];
+    }
+  }
+  AMPIAPI("AMPI_Alltoallv");
   CkDDT_DataType* dttype = ptr->getDDT()->getType(sendtype) ;
   int itemsize = dttype->getSize() ;
   int i;
@@ -3622,10 +3666,12 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
       ptr->getAlltoall().endIteration();
   } else
 #endif
-      for(i=0;i<size;i++) 
-          ptr->send(MPI_GATHER_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
+  {
+      for(i=0;i<size;i++)  {
+        ptr->send(MPI_GATHER_TAG,ptr->getRank(comm),((char*)sendbuf)+(itemsize*sdispls[i]),sendcounts[i],
                     sendtype, i, comm);
-  
+      }
+  }
   MPI_Status status;
   dttype = ptr->getDDT()->getType(recvtype) ;
   itemsize = dttype->getSize() ;
@@ -3638,6 +3684,13 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls,
 #if AMPI_COUNTER
   getAmpiParent()->counters.alltoall++;
 #endif
+  if (CpvAccess(CmiPICMethod) == 2)       // copyglobals
+  {
+    delete [] sendcounts;
+    delete [] sdispls;
+    delete [] recvcounts;
+    delete [] rdispls;
+  }
   return 0;
 }
 
