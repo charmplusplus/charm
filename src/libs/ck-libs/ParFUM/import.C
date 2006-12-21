@@ -32,6 +32,9 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
   double *nodeCoords;
   numNodes = FEM_Mesh_get_length(meshid,FEM_NODE);
   nodeCoords = (double *)malloc(dim*numNodes*sizeof(double));
+
+  FEM_Mesh_become_get(meshid);
+
   FEM_Mesh_data(meshid,FEM_NODE,FEM_COORD, nodeCoords, 0, numNodes,FEM_DOUBLE, dim);
   /*
   printf("Node Coords for rank %d \n",rank);
