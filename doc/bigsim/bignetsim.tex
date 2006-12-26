@@ -30,7 +30,7 @@ performance of this application.
 \end{itemize}
 
 So, the two important uses are studying {\it interconnection networks} and
-{\it perfomrance prediction for applications}.
+{\it performance prediction for applications}.
 
 
 \subsection{BigNetSim Design and Internals}
@@ -66,7 +66,7 @@ a large number of networks.
 \item {\it network card:} Network cards packetize and unpacketize messages.
 A NIC is implemented as two posers. The sending and receiving entities in a
 NIC are implemented as separate posers. A NIC is attached to each node.
-\item {\it channel:} These are modelled as posers and connect a NIC to a switch
+\item {\it channel:} These are modeled as posers and connect a NIC to a switch
 or a switch to another switch.
 \item {\it compute node:} Each compute node connects to a network interface card.
 A compute node simulates execution of entry methods on it. It is also attached
@@ -84,7 +84,7 @@ by a uniform or Poisson distribution.
 
 
 \subsection{Topology, Routing and Virtual Channel Selection}
-Topology, Routing strategies and input and output virtual channel seclection
+Topology, Routing strategies and input and output virtual channel selection
 strategies need to be decided for any inter-connection network. Once we
 have all of these in place we can simulate an inter-connection network.
 
@@ -115,11 +115,11 @@ switch {\it nodeid}, at {\it portid}. The number of ports this node has is {\it 
 
 \function{int getStartVc()}
 \index{getStartVc}
-\desc{Retuns the index of the first virtual channel (mostly 0).}
+\desc{Returns the index of the first virtual channel (mostly 0).}
 
 \function{int getStartSwitch(int nodeid)}
 \index{getStartSwitch}
-\desc{Retuns the index of the node/switch that is connected to the first port}
+\desc{Returns the index of the node/switch that is connected to the first port}
 
 \function{int getStartNode()}
 \index{getStartNode}
@@ -128,7 +128,7 @@ irrespective of the type of the poser.}
 
 \function{int getEndNode()}
 \index{getEndNode}
-\desc{Retuns the index of the last node.}
+\desc{Returns the index of the last node.}
 
 
 \subsubsection{Routing}
@@ -169,7 +169,7 @@ can choose among them. Each should implement the following function.
 
 \function{int selectInputVc(map<int,int> \&availBuffer, map<int,int> \&request, map<int,vector<Header> > \&inBuffer, int globalVc, int curSwitch)}
 \index{selectInputVc}
-\desc{Retuns the input virtual channel to be used depending on the strategy and
+\desc{Returns the input virtual channel to be used depending on the strategy and
 the input parameters.}
 
 
@@ -180,7 +180,7 @@ can choose among them. Each should implement the following function.
 
 \function{int selectOutputVc(map<int,int> \&bufsize, Packet *p, int unused)}
 \index{selectOutputVc}
-\desc{Retuns the output virtual channel to be used depending on the strategy and
+\desc{Returns the output virtual channel to be used depending on the strategy and
 the input parameters.}
 
 
