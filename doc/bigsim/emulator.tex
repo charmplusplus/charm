@@ -45,7 +45,7 @@ example programs and instructions for executing them.
 
 The basic philosophy of the BigSim Emulator is to hide intricate details of the
 simulated machine from the application developer. Thus, the application
-developer needs to provide intialization details and handler functions only and
+developer needs to provide initialization details and handler functions only and
 gets the result as though running on a real machine.  Communication, Thread
 creation, Time Stamping, etc are done by the emulator.
 
@@ -141,7 +141,7 @@ For each simulated node, the execution starts at
 where application handlers can be registered and computation 
 is triggered by creating a task at required nodes.
 
-Similar to pthread's thread specifc data, each bluegene node has its
+Similar to pthread's thread specific data, each bluegene node has its
 own node specific data associated with it. To do this, the user needs to define its 
 own node-specific variables encapsulated in a struct definition and register
  the pointer to the data with the emulator by following function:
@@ -178,7 +178,7 @@ communication.
 \desc{
 This sends a trunk of data to Node[x, y, z] and also specifies the
 handler function to be used for this message i.e. the handlerID;
-threadID specifes the desired thread to handle the message, ANYTHREAD means
+threadID specifies the desired thread to handle the message, ANYTHREAD means
 no preference.
 
 To specify the thread category:
@@ -201,15 +201,15 @@ Node specific data type declarations;
 
 void  BgEmulatorInit(int argc, char **argv)  function
   Configure bluegene machine parameters including size, number of threads, etc.
-  You also neet to register handlers here.
+  You also need to register handlers here.
 
 void *BgNodeStart(int argc, char **argv) function
-  The usual practice in this function is to send an intial message to trigger 
+  The usual practice in this function is to send an initial message to trigger 
   the execution.
   You can also register node specific data in this function.
 
 Handler Function 1, void handlerName(char *info)
-Hanlder Function 2, void handlerName(char *info)
+Handler Function 2, void handlerName(char *info)
 ..
 Handler Function N, void handlerName(char *info)
 
