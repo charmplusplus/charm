@@ -48,6 +48,7 @@ public:
     mgr = m;
     mgr->getLocMgr()->iterate(*this);
     cur -= start;
+    return cur;
   }
 
    /** Call add for every in-range array element on this processor */
