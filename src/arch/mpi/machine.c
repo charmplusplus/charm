@@ -15,6 +15,9 @@
 #include <errno.h>
 #include "converse.h"
 #include <mpi.h>
+#if CMK_TIMER_USE_XT3_DCLOCK
+#include <catamount/dclock.h>
+#endif
 
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
@@ -214,7 +217,7 @@ extern unsigned char computeCheckSum(unsigned char *data, int len);
 
 /**************************  TIMER FUNCTIONS **************************/
 
-#if CMK_TIMER_USE_SPECIAL
+#if CMK_TIMER_USE_SPECIAL || CMK_TIMER_USE_XT3_DCLOCK
 
 /* MPI calls are not threadsafe, even the timer on some machines */
 static CmiNodeLock  timerLock = 0;
@@ -244,7 +247,11 @@ void CmiTimerInit()
   if (CmiMyRank() == 0) {
     if (_is_global) {
       double minTimer;
+#if CMK_TIMER_USE_XT3_DCLOCK
+      starttimer = dclock();
+#else
       starttimer = MPI_Wtime();
+#endif
       MPI_Allreduce(&starttimer, &minTimer, 1, MPI_DOUBLE, MPI_MIN,
                                   MPI_COMM_WORLD );
       starttimer = minTimer;
@@ -254,7 +261,11 @@ void CmiTimerInit()
       CmiBarrier();
       CmiBarrier();
       CmiBarrier();
+#if CMK_TIMER_USE_XT3_DCLOCK
+      starttimer = dclock();
+#else
       starttimer = MPI_Wtime();
+#endif
     }
   }
   CmiNodeAllBarrier();          /* for smp */
@@ -267,7 +278,11 @@ double CmiTimer(void)
 #if CMK_SMP
   if (timerLock) CmiLock(timerLock);
 #endif
+#if CMK_TIMER_USE_XT3_DCLOCK
+  t = dclock() - starttimer;
+#else
   t = MPI_Wtime() - starttimer;
+#endif
 #if CMK_SMP
   if (timerLock) CmiUnlock(timerLock);
 #endif
@@ -280,7 +295,11 @@ double CmiWallTimer(void)
 #if CMK_SMP
   if (timerLock) CmiLock(timerLock);
 #endif
+#if CMK_TIMER_USE_XT3_DCLOCK
+  t = dclock() - starttimer;
+#else
   t = MPI_Wtime() - starttimer;
+#endif
 #if CMK_SMP
   if (timerLock) CmiUnlock(timerLock);
 #endif
@@ -293,7 +312,11 @@ double CmiCpuTimer(void)
 #if CMK_SMP
   if (timerLock) CmiLock(timerLock);
 #endif
+#if CMK_TIMER_USE_XT3_DCLOCK
+  t = dclock() - starttimer;
+#else
   t = MPI_Wtime() - starttimer;
+#endif
 #if CMK_SMP
   if (timerLock) CmiUnlock(timerLock);
 #endif

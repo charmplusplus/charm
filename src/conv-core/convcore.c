@@ -79,10 +79,6 @@ extern void CldModuleInit(char **);
 #include <sys/time.h>
 #endif
 
-#if CMK_TIMER_USE_XT3_DCLOCK
-#include <catamount/dclock.h>
-#endif
-
 #if CMK_TIMER_USE_TIMES
 #include <sys/times.h>
 #include <limits.h>
@@ -675,41 +671,6 @@ static void CmiHandlerInit()
  * select either, and define the timer in machine.c instead.
  *
  *****************************************************************************/
-
-#if CMK_TIMER_USE_XT3_DCLOCK
-
-CpvStaticDeclare(double,inittime_wallclock);
-CpvStaticDeclare(double,inittime_virtual);
-
-int CmiTimerIsSynchronized()
-{
-  return 0;
-}
-
-void CmiTimerInit()
-{
-  CpvInitialize(double, inittime_wallclock);
-  CpvInitialize(double, inittime_virtual);
-  CpvAccess(inittime_wallclock) = dclock();
-  CpvAccess(inittime_virtual) = 0.0; // never used. always 0.0
-}
-
-double CmiWallTimer()
-{
-  return dclock()-CpvAccess(inittime_wallclock);
-}
-
-double CmiCpuTimer()
-{
-  return 0.0; // never used. always 0.0
-}
-
-double CmiTimer()
-{
-  return CmiCpuTimer();
-}
-
-#endif
 
 #if CMK_TIMER_USE_TIMES
 
