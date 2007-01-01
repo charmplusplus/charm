@@ -331,6 +331,21 @@ CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs){
 
 CkReduction::reducerType AmpiReducer;
 
+class Builtin_kvs{
+ public:
+  int tag_ub,host,io,wtime_is_global,keyval_mype,keyval_numpes,keyval_mynode,keyval_numnodes;
+  Builtin_kvs(){
+    tag_ub = MPI_TAG_UB_VALUE; 
+    host = MPI_PROC_NULL;
+    io = 0;
+    wtime_is_global = 0;
+    keyval_mype = CkMyPe();
+    keyval_numpes = CkNumPes();
+    keyval_mynode = CkMyNode();
+    keyval_numnodes = CkNumNodes();
+  }
+};
+
 // ------------ startup support -----------
 int _ampi_fallback_setup_count;
 CDECL void AMPI_Setup(void);
@@ -364,6 +379,7 @@ static int nodeinit_has_been_called=0;
 CtvDeclare(ampiParent*, ampiPtr);
 CtvDeclare(int, ampiInitDone);
 CtvDeclare(int, ampiFinalized);
+CkpvDeclare(Builtin_kvs, bikvs);
 CkpvDeclare(int,argvExtracted);
 static int enableStreaming = 0;
 
@@ -406,6 +422,8 @@ static void ampiProcInit(void){
 
   CtvInitialize(MPI_Op_Array, mpi_ops);
   CtvInitialize(int, mpi_opc);
+
+  CkpvInitialize(Builtin_kvs, bikvs); // built-in key-values
 
   CkpvInitialize(int, argvExtracted);
   CkpvAccess(argvExtracted) = 0;
@@ -801,32 +819,16 @@ int ampiParent::putAttr(MPI_Comm comm, int keyval, void* attribute_val){
 	return 0;
 }
 
-class Builtin_kvs{
- public:
-  int tag_ub,host,io,wtime_is_global,keyval_mype,keyval_numpes,keyval_mynode,keyval_numnodes;
-  Builtin_kvs(){
-    tag_ub = MPI_TAG_UB_VALUE; 
-    host = MPI_PROC_NULL;
-    io = 0;
-    wtime_is_global = 0;
-    keyval_mype = CkMyPe();
-    keyval_numpes = CkNumPes();
-    keyval_mynode = CkMyNode();
-    keyval_numnodes = CkNumNodes();
-  }
-};
-
-static Builtin_kvs bikvs;
 int ampiParent::kv_is_builtin(int keyval) {
 	switch(keyval) {
-	case MPI_TAG_UB: kv_builtin_storage=&(bikvs.tag_ub); return 1;
-	case MPI_HOST: kv_builtin_storage=&(bikvs.host); return 1;
-	case MPI_IO: kv_builtin_storage=&(bikvs.io); return 1;
-	case MPI_WTIME_IS_GLOBAL: kv_builtin_storage=&(bikvs.wtime_is_global); return 1;
-	case AMPI_KEYVAL_MYPE: kv_builtin_storage=&(bikvs.keyval_mype); return 1;
-	case AMPI_KEYVAL_NUMPES: kv_builtin_storage=&(bikvs.keyval_numpes); return 1;
-	case AMPI_KEYVAL_MYNODE: kv_builtin_storage=&(bikvs.keyval_mynode); return 1;
-	case AMPI_KEYVAL_NUMNODES: kv_builtin_storage=&(bikvs.keyval_numnodes); return 1;
+	case MPI_TAG_UB: kv_builtin_storage=&(CkpvAccess(bikvs).tag_ub); return 1;
+	case MPI_HOST: kv_builtin_storage=&(CkpvAccess(bikvs).host); return 1;
+	case MPI_IO: kv_builtin_storage=&(CkpvAccess(bikvs).io); return 1;
+	case MPI_WTIME_IS_GLOBAL: kv_builtin_storage=&(CkpvAccess(bikvs).wtime_is_global); return 1;
+	case AMPI_KEYVAL_MYPE: kv_builtin_storage=&(CkpvAccess(bikvs).keyval_mype); return 1;
+	case AMPI_KEYVAL_NUMPES: kv_builtin_storage=&(CkpvAccess(bikvs).keyval_numpes); return 1;
+	case AMPI_KEYVAL_MYNODE: kv_builtin_storage=&(CkpvAccess(bikvs).keyval_mynode); return 1;
+	case AMPI_KEYVAL_NUMNODES: kv_builtin_storage=&(CkpvAccess(bikvs).keyval_numnodes); return 1;
 	default: return 0;
 	};
 }
@@ -835,7 +837,7 @@ int ampiParent::getAttr(MPI_Comm comm, int keyval, void *attribute_val, int *fla
 	*flag = false;
 	if (kv_is_builtin(keyval)) { /* Allow access to special builtin flags */
 	  *flag=true;
-	  *(void **)attribute_val = &kv_builtin_storage;
+	  *(void **)attribute_val = kv_builtin_storage;
 	  return 0;
 	}
 	if(keyval<0 || keyval >= kvlist.size() || (kvlist[keyval]==NULL))
