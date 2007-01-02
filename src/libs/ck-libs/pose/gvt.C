@@ -81,7 +81,7 @@ void PVT::startPhase(prioBcMsg *m)
   if (m->bc) {
     prioBcMsg *startMsg = new (8*sizeof(int)) prioBcMsg;
     startMsg->bc = 0;
-    *((int *)CkPriorityPtr(startMsg)) = 1-INT_MAX;
+    *((int *)CkPriorityPtr(startMsg)) = 1-POSE_TimeMax;
     CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
     p.startPhaseExp(startMsg);
   }
@@ -180,6 +180,7 @@ void PVT::setGVT(GVTMsg *m)
 #ifdef POSE_COMM_ON  
   //PrioStreaming *pstrat = (PrioStreaming *)(POSE_commlib_insthndl.getStrategy());
   //pstrat->setBasePriority((estGVT+10) - POSE_TimeMax);
+  //pstrat->setBasePriority(estGVT+10);
 #endif
   simdone = m->done;
   CkFreeMsg(m);

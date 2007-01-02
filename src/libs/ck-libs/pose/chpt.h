@@ -33,8 +33,8 @@ template<class StateType>
 void chpt<StateType>::registerTimestamp(int idx, eventMsg *m, int offset)
 {
   m->Timestamp(ovt+offset);
-  m->setPriority(ovt+offset-INT_MAX);
-  parent->registerSent(ovt+offset);
+  m->setPriority(ovt+offset-POSE_TimeMax);
+    parent->registerSent(ovt+offset);
   ((opt *)myStrat)->AddSpawnedEvent(idx, m->evID, m->timestamp);
 }
 
