@@ -35,7 +35,7 @@ void rep::registerTimestamp(int idx, eventMsg *m, POSE_TimeType offset)
   CmiAssert(ovt+offset >= localPVT->getGVT());
 #endif
   m->Timestamp(ovt+offset);
-  m->setPriority(ovt+offset-INT_MAX);
+  m->setPriority(ovt+offset-POSE_TimeMax);
   //m->evID.setObj(myHandle);
 #ifndef SEQUENTIAL_POSE
   parent->registerSent(ovt+offset);
