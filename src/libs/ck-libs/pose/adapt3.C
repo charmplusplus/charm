@@ -50,11 +50,12 @@ void adapt3::Step()
   //  CkPrintf("offset=%d timeLeash=%d avgRBoffset=%d specEventCount=%d eventCount=%d\n", offset, timeLeash, avgRBoffset, specEventCount, eventCount);
   while ((ev->timestamp > POSE_UnsetTS) && (ev->timestamp <= offset)) { 
 #ifdef MEM_COARSE
-    // note: first part of check below ensures we don't deadlock:
-    //       can't advance gvt if we don't execute events with timestamp > gvt
-    if (((eq->frontPtr->timestamp > lastGVT) ||
-         (eq->frontPtr->timestamp < ev->prev->timestamp)) &&
-        (eq->mem_usage > pose_config.max_usage)) break;
+    // Check to see if we should hold off on forward execution to save on 
+    // memory.
+    // NOTE: to avoid deadlock, make sure we have executed something
+    // beyond current GVT before worrying about memory usage
+    if ((lastGVT < ev->prev->timestamp) &&
+	(eq->mem_usage > pose_config.max_usage)) break;
 #endif
     iter++;
     currentEvent = ev;

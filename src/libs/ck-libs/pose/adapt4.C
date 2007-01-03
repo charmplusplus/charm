@@ -53,6 +53,10 @@ void adapt4::Step()
   while ((ev->timestamp > POSE_UnsetTS) && (ev->timestamp <= offset) &&
 	 (itersAllowed > 0)) { 
 #ifdef MEM_COARSE
+    // Check to see if we should hold off on forward execution to save on 
+    // memory.
+    // NOTE: to avoid deadlock, make sure we have executed something
+    // beyond current GVT before worrying about memory usage
     if (((ev->timestamp > lastGVT) || (userObj->OVT() > lastGVT))
 	&& (eq->mem_usage > objUsage)) // don't deadlock
       break;
