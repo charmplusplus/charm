@@ -127,10 +127,25 @@ int idCounter = 0;
 
   typedef struct __projections_buffer_entry {
 
-    unsigned long long int startTime;
-    unsigned int runTime;
+    //unsigned long long int startTime;
+    //unsigned int runTime;
     unsigned int speIndex;
     unsigned int funcIndex;
+
+    unsigned long long int recvTimeStart;
+    unsigned int recvTimeEnd;
+    unsigned int preFetchingTimeStart;
+    unsigned int preFetchingTimeEnd;
+    unsigned int fetchingTimeStart;
+    unsigned int fetchingTimeEnd;
+    unsigned int readyTimeStart;
+    unsigned int readyTimeEnd;
+    unsigned int userTimeStart;
+    unsigned int userTimeEnd;
+    unsigned int executedTimeStart;
+    unsigned int executedTimeEnd;
+    unsigned int commitTimeStart;    
+    unsigned int commitTimeEnd;
 
   } ProjBufEntry;
 
@@ -1899,10 +1914,10 @@ void OffloadAPIProgress() {
     register int state_0 = msg_0->state;
     register int counter0_0 = msg_0->counter0;
     //register int rtnCode_0 = notifyQueue_0[0];
-    #if SPE_TIMING != 0
-      register unsigned long long int notify_startTime_0 = notifyQueue_0[0].startTime;
-      register unsigned int notify_runTime_0 = notifyQueue_0[0].runTime;
-    #endif
+    //#if SPE_TIMING != 0
+    //  register unsigned long long int notify_startTime_0 = notifyQueue_0[0].startTime;
+    //  register unsigned int notify_runTime_0 = notifyQueue_0[0].runTime;
+    //#endif
     register int notify_errorCode_0 = notifyQueue_0[0].errorCode;
     register int notify_counter_0 = notifyQueue_0[0].counter;
   #endif
@@ -1924,10 +1939,10 @@ void OffloadAPIProgress() {
         register int state = state_0;
         register int counter0 = counter0_0;
         //register int rtnCode = rtnCode_0;
-        #if SPE_TIMING != 0
-	  register unsigned long long int notify_startTime = notify_startTime_0;
-          register unsigned int notify_runTime = notify_runTime_0;
-        #endif
+        //#if SPE_TIMING != 0
+	//  register unsigned long long int notify_startTime = notify_startTime_0;
+        //  register unsigned int notify_runTime = notify_runTime_0;
+        //#endif
         register int notify_errorCode = notify_errorCode_0;
         register int notify_counter = notify_counter_0;
 
@@ -1950,10 +1965,10 @@ void OffloadAPIProgress() {
         state_0 = msg_0->state;
         counter0_0 = msg_0->counter0;
         //rtnCode_0 = notifyQueue_0[j_0];
-        #if SPE_TIMING != 0
-          notify_startTime_0 = notifyQueue_0[j_0].startTime;
-          notify_runTime_0 = notifyQueue_0[j_0].runTime;
-        #endif
+        //#if SPE_TIMING != 0
+        //  notify_startTime_0 = notifyQueue_0[j_0].startTime;
+        //  notify_runTime_0 = notifyQueue_0[j_0].runTime;
+        //#endif
         notify_errorCode_0 = notifyQueue_0[j_0].errorCode;
         notify_counter_0 = notifyQueue_0[j_0].counter;
 
@@ -1968,10 +1983,10 @@ void OffloadAPIProgress() {
         register int state = msg->state;
         register int counter0 = msg->counter0;
         //register int rtnCode = notifyQueue[j];
-        #if SPE_TIMING != 0
-          register int notify_startTime = notifyQueue[j].startTime;
-          register int notify_runTime = notifyQueue[j].runTime;
-        #endif
+        //#if SPE_TIMING != 0
+        //  register int notify_startTime = notifyQueue[j].startTime;
+        //  register int notify_runTime = notifyQueue[j].runTime;
+        //#endif
         register int notify_errorCode = notifyQueue[j].errorCode;
         register int notify_counter = notifyQueue[j].counter;
 
@@ -2828,10 +2843,25 @@ void addProjEntry(SPENotify* notifyEntry, int speIndex, int funcIndex) {
     flushProjBuf();
 
   // Add the entry to the buffer
-  projBuf[projBufCount].startTime = notifyEntry->startTime;
-  projBuf[projBufCount].runTime = notifyEntry->runTime;
+  //projBuf[projBufCount].startTime = notifyEntry->startTime;
+  //projBuf[projBufCount].runTime = notifyEntry->runTime;
   projBuf[projBufCount].speIndex = speIndex;
   projBuf[projBufCount].funcIndex = funcIndex;
+
+  projBuf[projBufCount].recvTimeStart = notifyEntry->recvTimeStart;
+  projBuf[projBufCount].recvTimeEnd = notifyEntry->recvTimeEnd;
+  projBuf[projBufCount].preFetchingTimeStart = notifyEntry->preFetchingTimeStart;
+  projBuf[projBufCount].preFetchingTimeEnd = notifyEntry->preFetchingTimeEnd;
+  projBuf[projBufCount].fetchingTimeStart = notifyEntry->fetchingTimeStart;
+  projBuf[projBufCount].fetchingTimeEnd = notifyEntry->fetchingTimeEnd;
+  projBuf[projBufCount].readyTimeStart = notifyEntry->readyTimeStart;
+  projBuf[projBufCount].readyTimeEnd = notifyEntry->readyTimeEnd;
+  projBuf[projBufCount].userTimeStart = notifyEntry->userTimeStart;
+  projBuf[projBufCount].userTimeEnd = notifyEntry->userTimeEnd;
+  projBuf[projBufCount].executedTimeStart = notifyEntry->executedTimeStart;
+  projBuf[projBufCount].executedTimeEnd = notifyEntry->executedTimeEnd;
+  projBuf[projBufCount].commitTimeStart = notifyEntry->commitTimeStart;
+  projBuf[projBufCount].commitTimeEnd = notifyEntry->commitTimeEnd;
 
   // Increment the projBufCount so it points to the next projBuf entry
   projBufCount++;

@@ -213,7 +213,7 @@ unsigned int lastTimerRead_store = (unsigned int)0xFFFFFFFF;
                          register unsigned int tmp_lastTimerRead = lastTimerRead_store;  \
                          lastTimerRead_store = cntr;                                     \
                          if (__builtin_expect(cntr > tmp_lastTimerRead, 0)) {            \
-                           timerUpper_store += 1;			\
+                           timerUpper_store += 1;			                 \
                          }                                                               \
                        }
 
@@ -346,6 +346,13 @@ inline void processMsgState_sent(int msgIndex) {
     register int msgFoundFlag = 0;
   #endif
 
+  // TIMING
+  #if SPE_TIMING != 0
+    register unsigned long long int tmp_recvTimeStart;
+    getTimer64(tmp_recvTimeStart);
+  #endif
+
+
   // Check for a new message in this slot
   // Conditions... 1) msgQueue[i]->counter1 != msgCounter[i]          // Entry has not already been processed (most likely not true, i.e. - test first to reduce cost of overall condition check)
   //               2) msgQueue[i]->counter0 == msgQueue[i]->counter1  // Entire entry has been written by PPE
@@ -368,7 +375,6 @@ inline void processMsgState_sent(int msgIndex) {
     register int tmp_counter0 = spu_extract(msg_tmp0, 0);
     register int tmp_msgState = spu_extract(msg_tmp0, 1);
     register int tmp_flags = (unsigned int)(spu_extract(msg_tmp0, 2));
-    //register int tmp_localState = localMsgQData[msgIndex].msgState;
     register int tmp_localState = (int)(spu_extract(tmp_localData0, 0));
 
     if (__builtin_expect(tmp_counter0 == tmp_counter1, 1)) {
@@ -408,6 +414,20 @@ inline void processMsgState_sent(int msgIndex) {
           tmp_localData0 = spu_insert(tmp_msgState, tmp_localData0, 0);
           tmp_localData0 = spu_insert(tmp_counter1, tmp_localData0, 1);
           *tmp_localData0Addr = tmp_localData0;
+
+          // TIMING
+          #if SPE_TIMING != 0
+            register unsigned long long int tmp_endTime;
+            getTimer64(tmp_endTime);
+            register unsigned int tmp_recvTimeEnd = (unsigned int)(tmp_endTime - tmp_recvTimeStart);
+            register int tmp_offset = msgIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+            register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
+            register vector unsigned int tmp_notifyQueueEntry0 = { 0, 0, 0, 0 };
+            tmp_notifyQueueEntry0 = spu_insert((unsigned int)(tmp_recvTimeStart), tmp_notifyQueueEntry0, 1);
+            tmp_notifyQueueEntry0 = spu_insert((unsigned int)((tmp_recvTimeStart >> 32) & 0xFFFFFFFF), tmp_notifyQueueEntry0, 0);
+            tmp_notifyQueueEntry0 = spu_insert(tmp_recvTimeEnd, tmp_notifyQueueEntry0, 2);
+            (*tmp_notifyQueueEntryPtr) = tmp_notifyQueueEntry0;
+          #endif
 
           // TRACE
           #if ENABLE_TRACE != 0
@@ -494,6 +514,12 @@ inline void processMsgState_preFetching(int msgIndex) {
       printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_PRE_FETCHING for index %d...\n", (int)getSPEID(), msgIndex);
       debug_displayActiveMessageQueue(0x00, msgState, "(*)");
     }
+  #endif
+
+  // TIMING
+  #if SPE_TIMING != 0
+    register unsigned long long int tmp_startTime;
+    getTimer64(tmp_startTime);
   #endif
 
   // Get a pointer to the message queue entry and local data
@@ -788,6 +814,33 @@ inline void processMsgState_preFetching(int msgIndex) {
     // Update the state of the message queue entry now that the data should be in-flight
     tmp_localData0 = spu_insert(SPE_MESSAGE_STATE_FETCHING, tmp_localData0, 0);
     (*tmp_localData0Addr) = tmp_localData0;
+
+    // TIMING
+    // NOTE : Only keeping the last entry (this code will be executed the last time
+    //   this state function is called for any given work request).
+    #if SPE_TIMING != 0
+      // Get the ending time
+      register unsigned long long int tmp_endTime;
+      getTimer64(tmp_endTime);
+
+      // Get a pointer to the notify queue entry
+      register int tmp_offset = msgIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+      register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
+
+      // Grab the initial recv time
+      register vector unsigned long long int tmp_notifyQueueEntry0 = *((vector unsigned long long int*)tmp_notifyQueueEntryPtr);
+      register unsigned long long int tmp_recvTimeStart = spu_extract(tmp_notifyQueueEntry0, 0);
+
+      // Calculate the start and end offsets from recvStartTime
+      register unsigned int tmp_preFetchingStart = (unsigned int)(tmp_startTime - tmp_recvTimeStart);
+      register unsigned int tmp_preFetchingEnd = (unsigned int)(tmp_endTime - tmp_recvTimeStart);
+
+      // Write the start and end times to the LS
+      register vector unsigned int tmp_notifyQueueEntry1 = { 0, 0, 0, 0 };
+      tmp_notifyQueueEntry1 = spu_insert(tmp_preFetchingStart, tmp_notifyQueueEntry1, 0);
+      tmp_notifyQueueEntry1 = spu_insert(tmp_preFetchingEnd, tmp_notifyQueueEntry1, 1);
+      (*(tmp_notifyQueueEntryPtr + 1)) = tmp_notifyQueueEntry1;
+    #endif
 
     // DEBUG
     #if SPE_DEBUG_DISPLAY >= 1
@@ -1698,6 +1751,12 @@ inline void processMsgState_fetching(int msgIndex) {
     }
   #endif
 
+  // TIMING
+  #if SPE_TIMING != 0
+    register unsigned long long int tmp_startTime;
+    getTimer64(tmp_startTime);
+  #endif
+
   // Read the tag status to see if the data has arrived for the fetching message entry
   mfc_write_tag_mask(0x1 << msgIndex);
   mfc_write_tag_update_immediate();
@@ -1708,6 +1767,31 @@ inline void processMsgState_fetching(int msgIndex) {
 
     // Update the state to show that this message queue entry is ready to be executed
     localMsgQData[msgIndex].msgState = SPE_MESSAGE_STATE_READY;
+
+    // TIMING
+    #if SPE_TIMING != 0
+      // Get the time
+      register unsigned long long int tmp_endTime;
+      getTimer64(tmp_endTime);
+
+      // Get a pointer to the notify queue entry
+      register int tmp_offset = msgIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+      register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
+
+      // Grab the initial recv time
+      register vector unsigned long long int tmp_notifyQueueEntry0 = *((vector unsigned long long int*)tmp_notifyQueueEntryPtr);
+      register unsigned long long int tmp_recvTimeStart = spu_extract(tmp_notifyQueueEntry0, 0);
+
+      // Calculate the start and end offsets from recvStartTime
+      register unsigned int tmp_fetchingStart = (unsigned int)(tmp_startTime - tmp_recvTimeStart);
+      register unsigned int tmp_fetchingEnd = (unsigned int)(tmp_endTime - tmp_recvTimeStart);
+
+      // Write the start and end times to the LS
+      register vector unsigned int tmp_notifyQueueEntry1 = (*(tmp_notifyQueueEntryPtr + 1));
+      tmp_notifyQueueEntry1 = spu_insert(tmp_fetchingStart, tmp_notifyQueueEntry1, 2);
+      tmp_notifyQueueEntry1 = spu_insert(tmp_fetchingEnd, tmp_notifyQueueEntry1, 3);
+      (*(tmp_notifyQueueEntryPtr + 1)) = tmp_notifyQueueEntry1;
+    #endif
 
     // STATS
     #if SPE_STATS != 0
@@ -1809,6 +1893,12 @@ inline void processMsgState_ready(int msgIndex) {
     }
   #endif
 
+  // TIMING
+  #if SPE_TIMING != 0
+    register unsigned long long int tmp_readyStartTime;
+    getTimer64(tmp_readyStartTime);
+  #endif
+
   register SPEMessage* tmp_msgQueueEntry = (SPEMessage*)(msgQueue[msgIndex]);
   register vector signed int tmp_msgQueueData0 = *(((vector signed int*)tmp_msgQueueEntry) + 0);
   register vector signed int tmp_msgQueueData1 = *(((vector signed int*)tmp_msgQueueEntry) + 1);
@@ -1867,8 +1957,8 @@ inline void processMsgState_ready(int msgIndex) {
 
   // TIMING
   #if SPE_TIMING != 0
-    register unsigned long long int tmp_startTime;
-    getTimer64(tmp_startTime);
+    register unsigned long long int tmp_userStartTime;
+    getTimer64(tmp_userStartTime);
   #endif
 
   // Call into user code via funcLookup()
@@ -1881,15 +1971,8 @@ inline void processMsgState_ready(int msgIndex) {
 
   // TIMING
   #if SPE_TIMING != 0
-    register unsigned long long int tmp_endTime;
-    getTimer64(tmp_endTime);
-    register unsigned int tmp_runTime = (unsigned int)(tmp_endTime - tmp_startTime);
-    register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + msgIndex;
-    register vector unsigned int tmp_notifyQueueEntry = { 0, 0, 0, 0 };
-    tmp_notifyQueueEntry = spu_insert((unsigned int)(tmp_startTime), tmp_notifyQueueEntry, 1);
-    tmp_notifyQueueEntry = spu_insert((unsigned int)((tmp_startTime >> 32) & 0xFFFFFFFF), tmp_notifyQueueEntry, 0);
-    tmp_notifyQueueEntry = spu_insert(tmp_runTime, tmp_notifyQueueEntry, 2);
-    (*tmp_notifyQueueEntryPtr) = tmp_notifyQueueEntry;
+    register unsigned long long int tmp_userEndTime;
+    getTimer64(tmp_userEndTime);
   #endif
 
   // TRACE
@@ -1914,6 +1997,35 @@ inline void processMsgState_ready(int msgIndex) {
   register int tmp_nextState = SPE_MESSAGE_STATE_EXECUTED + tmp_isListWRFlag;
   tmp_localData0 = spu_insert(tmp_nextState, tmp_localData0, 0);
   *(((vector signed int*)tmp_localDataEntry) + 0) = tmp_localData0;
+
+  // TIMING
+  #if SPE_TIMING != 0
+    // Get the ending time
+    register unsigned long long int tmp_readyEndTime;
+    getTimer64(tmp_readyEndTime);
+
+    // Get a pointer to the notify queue entry
+    register int tmp_offset = msgIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+    register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
+
+    // Grab the initial recv time
+    register vector unsigned long long int tmp_notifyQueueEntry0 = *((vector unsigned long long int*)tmp_notifyQueueEntryPtr);
+    register unsigned long long int tmp_recvTimeStart = spu_extract(tmp_notifyQueueEntry0, 0);
+
+    // Calculate the start and end offsets from recvStartTime
+    register unsigned int tmp_readyStart = (unsigned int)(tmp_readyStartTime - tmp_recvTimeStart);
+    register unsigned int tmp_readyEnd = (unsigned int)(tmp_readyEndTime - tmp_recvTimeStart);
+    register unsigned int tmp_userStart = (unsigned int)(tmp_userStartTime - tmp_recvTimeStart);
+    register unsigned int tmp_userEnd = (unsigned int)(tmp_userEndTime - tmp_recvTimeStart);
+
+    // Write the start and end times to the LS
+    register vector unsigned int tmp_notifyQueueEntry2 = { 0, 0, 0, 0 };
+    tmp_notifyQueueEntry2 = spu_insert(tmp_readyStart, tmp_notifyQueueEntry2, 0);
+    tmp_notifyQueueEntry2 = spu_insert(tmp_readyEnd, tmp_notifyQueueEntry2, 1);
+    tmp_notifyQueueEntry2 = spu_insert(tmp_userStart, tmp_notifyQueueEntry2, 2);
+    tmp_notifyQueueEntry2 = spu_insert(tmp_userEnd, tmp_notifyQueueEntry2, 3);
+    (*(tmp_notifyQueueEntryPtr + 2)) = tmp_notifyQueueEntry2;
+  #endif
 
   // SPE Stats Code
   #if SPE_STATS != 0
@@ -1977,6 +2089,12 @@ inline void processMsgState_executed(int msgIndex) {
       printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_EXECUTED for index %d...\n", (int)getSPEID(), msgIndex);
       debug_displayActiveMessageQueue(0x0, msgState, "(*)");
     }
+  #endif
+
+  // TIMING
+  #if SPE_TIMING != 0
+    register unsigned long long int tmp_startTime;
+    getTimer64(tmp_startTime);
   #endif
 
   // Get a pointer to the message queue entry
@@ -2066,6 +2184,31 @@ inline void processMsgState_executed(int msgIndex) {
     // Update the state of the message queue entry now that the data should be in-flight
     tmp_localData0 = spu_insert(SPE_MESSAGE_STATE_COMMITTING, tmp_localData0, 0);
     *(((vector signed int*)tmp_localDataEntry) + 0) = tmp_localData0;
+
+    // TIMING
+    #if SPE_TIMING != 0
+      // Get the ending time
+      register unsigned long long int tmp_endTime;
+      getTimer64(tmp_endTime);
+
+      // Get a pointer to the notify queue entry
+      register int tmp_offset = msgIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+      register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
+
+      // Grab the initial recv time
+      register vector unsigned long long int tmp_notifyQueueEntry0 = *((vector unsigned long long int*)tmp_notifyQueueEntryPtr);
+      register unsigned long long int tmp_recvTimeStart = spu_extract(tmp_notifyQueueEntry0, 0);
+
+      // Calculate the start and end offsets from recvStartTime
+      register unsigned int tmp_executedStart = (unsigned int)(tmp_startTime - tmp_recvTimeStart);
+      register unsigned int tmp_executedEnd = (unsigned int)(tmp_endTime - tmp_recvTimeStart);
+
+      // Write the start and end times to the LS
+      register vector unsigned int tmp_notifyQueueEntry3 = { 0, 0, 0, 0 };
+      tmp_notifyQueueEntry3 = spu_insert(tmp_executedStart, tmp_notifyQueueEntry3, 0);
+      tmp_notifyQueueEntry3 = spu_insert(tmp_executedEnd, tmp_notifyQueueEntry3, 1);
+      (*(tmp_notifyQueueEntryPtr + 3)) = tmp_notifyQueueEntry3;
+    #endif
 
   } // end if (numDMAQueueEntries > 0)
 
@@ -2261,6 +2404,12 @@ inline void processMsgState_committing(int msgIndex) {
     }
   #endif
 
+  // TIMING
+  #if SPE_TIMING != 0
+    register unsigned long long int tmp_startTime;
+    getTimer64(tmp_startTime);
+  #endif
+
   // Read the tag status to see if the data was sent for the committing message entry
   mfc_write_tag_mask(0x1 << msgIndex);
   mfc_write_tag_update_immediate();
@@ -2350,18 +2499,46 @@ inline void processMsgState_committing(int msgIndex) {
       register vector signed int* tmp_msgQueueEntry = (vector signed int*)(msgQueue[msgIndex]);
       register vector signed int tmp_msgQueueData0 = *tmp_msgQueueEntry;
       register int tmp_counter0 = spu_extract(tmp_msgQueueData0, 0);
-      // NOTE : This code will fill in the SPENotify counter and errorCode fields at the same time.
-      register vector unsigned int* notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + msgIndex;
+
+      // NOTE : This code will fill in the SPENotify counter, errorCode, and commit timing fields
+      //   at the same time.
+
+      // Get a pointer to the notify queue entry
+      register int tmp_offset = msgIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+      register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
+
       register unsigned int returnCode = (SPE_MESSAGE_OK << 16) | (tmp_counter0 & 0xFFFF);
-      register vector unsigned int notifyQueueEntry = (*notifyQueueEntryPtr);
-      notifyQueueEntry = spu_insert(returnCode, notifyQueueEntry, 3);
-      (*notifyQueueEntryPtr) = notifyQueueEntry;
+      //register vector unsigned int tmp_notifyQueueEntry4 = (*(tmp_notifyQueueEntryPtr + 4));
+      register vector unsigned int tmp_notifyQueueEntry4 = { 0, 0, 0, 0 };
+      tmp_notifyQueueEntry4 = spu_insert(returnCode, tmp_notifyQueueEntry4, 2);
+
+      // TIMING
+      #if SPE_TIMING != 0
+        // Get the ending time
+        register unsigned long long int tmp_endTime;
+        getTimer64(tmp_endTime);
+
+        // Grab the initial recv time
+        register vector unsigned long long int tmp_notifyQueueEntry0 = *((vector unsigned long long int*)tmp_notifyQueueEntryPtr);
+        register unsigned long long int tmp_recvTimeStart = spu_extract(tmp_notifyQueueEntry0, 0);
+
+        // Calculate the start and end offsets from recvStartTime
+        register unsigned int tmp_commitStart = (unsigned int)(tmp_startTime - tmp_recvTimeStart);
+        register unsigned int tmp_commitEnd = (unsigned int)(tmp_endTime - tmp_recvTimeStart);
+
+        // Add the start and end times to the notifyQueueEntry
+        tmp_notifyQueueEntry4 = spu_insert(tmp_commitStart, tmp_notifyQueueEntry4, 0);
+        tmp_notifyQueueEntry4 = spu_insert(tmp_commitEnd, tmp_notifyQueueEntry4, 1);
+      #endif
+
+      // Write the notification queue entry to the LS
+      (*(tmp_notifyQueueEntryPtr + 4)) = tmp_notifyQueueEntry4;
 
       // TRACE
       #if ENABLE_TRACE != 0
         if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
           unsigned int notifyQueueEntry_3 = spu_extract(notifyQueueEntry, 3);
-          printf("SPE_%d :: [DEBUG] :: Notified PPE -> msgIndex = %d, notifyQueueEntry_3 = 0x%08u\n",
+          printf("SPE_%d :: [TRACE] :: Notified PPE -> msgIndex = %d, notifyQueueEntry_3 = 0x%08u\n",
                  (int)getSPEID(), msgIndex, notifyQueueEntry_3
                 );
 	}
@@ -3180,9 +3357,14 @@ void speScheduler_wrapper(SPEData *speData, unsigned long long id) {
 
       // SPE_MESSAGE_COMMAND_RESET_CLOCK
       if (command == SPE_MESSAGE_COMMAND_RESET_CLOCK) {
+
+        // TIMING
         #if SPE_TIMING != 0
-          register unsigned long long int tmp_ignore;
-          stopTimer64(tmp_ignore);
+          // NOTE : TODO : The code to stop the timer has been commented out because
+          //   compiling a call to stopTimer64() followed by startTimer() with "-O3" seems to
+          //   mess up the timer somehow... look into this.  Just using startTimer() seems to work.
+          //register unsigned long long int tmp_ignore;
+          //stopTimer64(tmp_ignore);
           startTimer();
         #endif
       }

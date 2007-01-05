@@ -97,7 +97,7 @@
 
 // NOTE : Only a single SPE_TIMING/STATS should be enabled at a time
 //   !!! (e.g. - if SPE_STATS enabled, then SPE_STATS1, SPE_STATS2, and SPE_TIMING should be disabled) !!!
-#define SPE_TIMING   1  // Set to have timing data on the WRs sent back to the PPE
+#define SPE_TIMING   0  // Set to have timing data on the WRs sent back to the PPE
 #define SPE_STATS    0  // Set to have stat data collected during execution for the SPE side of the Offload API (SPE Runtime)
 #define SPE_STATS1   0
 #define SPE_STATS2   0  // 0: unset; >0: message queue index to track; <0: track all message queue entries
@@ -163,12 +163,40 @@ typedef struct __SPE_MESSAGE {
 
 // SPE Notify: The structure that defines a notification beind passed from the SPE to the PPE notifying the
 //   the PPE that a given work request has completed.
+// NOTE : Size of this structure should be a multiple of 16 bytes
 typedef struct __SPE_NOTIFY {
 
-  volatile unsigned long long int startTime;   // The time the Work Request entered user code
-  volatile unsigned int runTime;               // The amount of time the Work Request spent in user code
+  //volatile unsigned long long int startTime;   // The time the Work Request entered user code
+  //volatile unsigned int runTime;               // The amount of time the Work Request spent in user code
+  //volatile unsigned short errorCode;           // The error code for the Work Request
+  //volatile unsigned short counter;             // The counter value (when completed, should match corresponding counter in Message Queue)
+
+  volatile unsigned long long int recvTimeStart; // The time the SPE Runtime first "noticed" the Work Request entry
+  volatile unsigned int recvTimeEnd;
+  volatile unsigned int __padding0__[1];
+
+  volatile unsigned int preFetchingTimeStart;
+  volatile unsigned int preFetchingTimeEnd;
+  volatile unsigned int fetchingTimeStart;
+  volatile unsigned int fetchingTimeEnd;
+
+  volatile unsigned int readyTimeStart;
+  volatile unsigned int readyTimeEnd;
+  volatile unsigned int userTimeStart;
+  volatile unsigned int userTimeEnd;
+
+  volatile unsigned int executedTimeStart;
+  volatile unsigned int executedTimeEnd;
+  volatile unsigned int __padding1__[2];
+
+  // NOTE : Important to keep the commit timing fields, errorCode, and counter fields together in the same
+  //   cache line (they are all written at the same time and this will ensure that the other cache lines in
+  //   the same structure are in the LS ... i.e. loads cannot go out of order).
+  volatile unsigned int commitTimeStart;
+  volatile unsigned int commitTimeEnd;
   volatile unsigned short errorCode;           // The error code for the Work Request
   volatile unsigned short counter;             // The counter value (when completed, should match corresponding counter in Message Queue)
+  volatile unsigned int __padding2__[1];
 
 } SPENotify;
 
