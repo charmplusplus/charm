@@ -54,7 +54,7 @@ extern "C" {
  *    of physical SPEs will reduce the ammount of time it takes to initiate all the SPEs (which
  *    can be slow on the simulator).
  */
-#define NUM_SPE_THREADS  1   // Normally, this is limited by (and should be set to) the number of physical SPEs present
+#define NUM_SPE_THREADS  8   // Normally, this is limited by (and should be set to) the number of physical SPEs present
 
 /** Create each SPEThread one-by-one (i.e. - create one thread and wait for it to check in
  *    before creating the next one).  If this is not set, all SPEThreads are created and then
@@ -111,7 +111,7 @@ typedef struct __wr_group {
   int finishedCount;        ///< A counter indicating the number of Work Requests associated with this group that have completed
   int state;                ///< An internal state that indicates the state of this group
 
-  void* userData;                ///< A user defined pointer that will be passed to the callback function
+  void* userData;               ///< A user defined pointer that will be passed to the callback function
   void (*callbackFunc)(void*);  ///< A pointer to a group specific callback function
 
   struct __wr_group *next;  ///< Pointer to the next WRGroup in the linked list of WRGroups
@@ -148,9 +148,9 @@ typedef struct __work_request {
 
   DMAListEntry dmaList[SPE_DMA_LIST_LENGTH];
 
-  WRGroupHandle wrGroupHandle;   ///< WRGroupHandle that this Work Request belongs to.
+  WRGroupHandle wrGroupHandle;  ///< WRGroupHandle that this Work Request belongs to.
 
-  struct __work_request *next; ///< Pointer to the next WRHandle in the linked list of WRHandles
+  struct __work_request *next;  ///< Pointer to the next WRHandle in the linked list of WRHandles
 
   int id;        // DEBUG
   int traceFlag; // DEBUG
@@ -195,8 +195,9 @@ extern int InitOffloadAPI(void(*cbFunc)(void*) DEFAULT_TO_NULL,   ///< Pointer t
                           void(*errorFunc)(int,void*,WRHandle) DEFAULT_TO_NULL ///< Pointer to a function that should be called if an error is returned by a Work Request on one of the SPEs
                          );
 #ifndef __cplusplus
-#define InitOffloadAPI()     InitOffloadAPI(NULL, NULL)
-#define InitOffloadAPI(cbf)  InitOffloadAPI(cbf, NULL)
+//#define InitOffloadAPI() InitOffloadAPI(NULL, NULL, NULL)
+//#define InitOffloadAPI(cbf) InitOffloadAPI(cbf, NULL, NULL)
+//#define InitOffloadAPI(cbf, gcbf) InitOffloadAPI(cbf, gcbf, NULL)
 #endif
 
 
