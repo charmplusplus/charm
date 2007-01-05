@@ -79,7 +79,7 @@ void PVT::startPhase(prioBcMsg *m)
 #endif
   startPhaseActive = 1;
   if (m->bc) {
-    prioBcMsg *startMsg = new (8*sizeof(int)) prioBcMsg;
+    prioBcMsg *startMsg = new (8*sizeof(POSE_TimeType)) prioBcMsg;
     startMsg->bc = 0;
     *((POSE_TimeType *)CkPriorityPtr(startMsg)) = 1-POSE_TimeMax;
     CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
