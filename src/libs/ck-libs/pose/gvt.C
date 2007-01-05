@@ -81,7 +81,7 @@ void PVT::startPhase(prioBcMsg *m)
   if (m->bc) {
     prioBcMsg *startMsg = new (8*sizeof(int)) prioBcMsg;
     startMsg->bc = 0;
-    *((int *)CkPriorityPtr(startMsg)) = 1-POSE_TimeMax;
+    *((POSE_TimeType *)CkPriorityPtr(startMsg)) = 1-POSE_TimeMax;
     CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
     p.startPhaseExp(startMsg);
   }

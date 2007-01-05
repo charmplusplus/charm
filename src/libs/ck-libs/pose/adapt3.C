@@ -5,8 +5,8 @@
 void adapt3::Step()
 {
   Event *ev;
-  POSE_TimeType lastGVT = localPVT->getGVT();
-  int iter=0, offset;
+  POSE_TimeType lastGVT = localPVT->getGVT(), offset;
+  int iter=0;
   double critStart;
 
   rbFlag = 0;
