@@ -1,4 +1,4 @@
-CHARMC=../../../../bin/charmc $(OPTS) -g
+CHARMC=../../../../bin/charmc $(OPTS) -O2
 
 
 rewritelog: rewritelog.o
@@ -13,4 +13,4 @@ clean:
 	rm -rf *.decl.h *.def.h core *.log
 
 test: rewritelog
-	./rewritelog
+	./rewritelog < sample-input
