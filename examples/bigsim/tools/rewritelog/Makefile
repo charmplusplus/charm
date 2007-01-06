@@ -10,7 +10,7 @@ rewritelog.o: rewritelog.C
 
 clean:
 	rm -f *.o *~ moduleinit.C charmrun conv-host rewritelog
-	rm -rf *.decl.h *.def.h core *.log
+	rm -rf *.decl.h *.def.h core *.log newtraces
 
 test: rewritelog
 	./rewritelog < sample-input
