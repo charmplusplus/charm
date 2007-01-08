@@ -1,0 +1,13 @@
+# format for each line is : numAtoms1 numAtoms2  new_timing 
+# timings are 100+100*numAtoms1*numAtoms2
+# This is to easily test our interpolation 
+2 2 500
+4 2 900
+3 3 1000
+10 1 1100
+5 5 2600
+2 18 3700
+# and some not perfect points to make things messy:
+1 1 190
+2 3 725
+0 0 0
