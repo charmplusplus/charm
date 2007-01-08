@@ -36,7 +36,7 @@ spert.s: spert.cpp spert.h
 
 
 spert.s.timing: spert.s
-	/opt/IBM/cell-sdk-1.1/bin/spu_timing spert.s
+	/opt/ibm/cell-sdk/prototype/bin/spu_timing spert.s
 
 
 # Clean-up
