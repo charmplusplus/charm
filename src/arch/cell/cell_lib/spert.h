@@ -25,6 +25,7 @@
 // Defines that describe the message queue between the PPU and SPE
 #define SPE_MESSAGE_QUEUE_LENGTH      8   // DO NOT SET ABOVE 31 (because of the way tags are used with the DMA engines)
 #define SPE_MESSAGE_QUEUE_BYTE_COUNT  (SIZEOF_128(SPEMessage) * SPE_MESSAGE_QUEUE_LENGTH)
+#define DOUBLE_BUFFER_MESSAGE_QUEUE   1   // Set to non-zero to make the SPE Runtime double buffer the message queue
 #define SPE_NOTIFY_QUEUE_BYTE_COUNT   (ROUNDUP_128(sizeof(SPENotify) * SPE_MESSAGE_QUEUE_LENGTH))
 
 // Set to non-zero if the write-only buffer should be zero-ed out on the SPE before being filled in
@@ -87,9 +88,12 @@
 #define SPE_DEBUG_DISPLAY_STILL_ALIVE  0 // If > 0 then display a "still alive" message every SPE_DEBUG_DISPLAY_STILL_ALIVE iterations
 #define SPE_DEBUG_DISPLAY_NO_PROGRESS  0 // If non-zero, warn when no messages changes state for this many iterations
 #define SPE_REPORT_END      0  // Have each SPE report the address of it's _end variable (end of data segment; will be printed by PPE during spe thread creation)
+#define SPE_NOTIFY_ON_MALLOC_FAILURE   0  // Set to 1 to force the SPE to notify the user when a pointer returned by malloc/new returns an un-usable pointer (message will retry malloc/new later)
+
+// Memory Settings
 #define SPE_USE_OWN_MEMSET  0  // Set to 1 to force a local version of memset to be used (to try to remove C/C++ runtime dependence)
 #define SPE_USE_OWN_MALLOC  1  // Set to 1 to force a local version of malloc and free to be used
-#define SPE_NOTIFY_ON_MALLOC_FAILURE   0  // Set to 1 to force the SPE to notify the user when a pointer returned by malloc/new returns an un-usable pointer (message will retry malloc/new later)
+#define SPE_MEMORY_BLOCK_SIZE  1024  // !!! IMPORTANT !!! : NOTE : SPE_MEMORY_BLOCK_SIZE should be a power of 2.
 
 #define OFFLOAD_API_FULL_CHECK  1
 

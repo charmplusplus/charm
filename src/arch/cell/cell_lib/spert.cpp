@@ -90,7 +90,7 @@ StatData statData = { 0, 0 };
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Global Data
 
-#define DOUBLE_BUFFER_MESSAGE_QUEUE  1
+
 #if DOUBLE_BUFFER_MESSAGE_QUEUE == 0
   volatile char msgQueueRaw[SPE_MESSAGE_QUEUE_BYTE_COUNT] __attribute__((aligned(128)));
   volatile SPEMessage* msgQueue[SPE_MESSAGE_QUEUE_LENGTH];
@@ -3879,113 +3879,6 @@ void print_block_table () {
 
 #if SPE_USE_OWN_MALLOC >= 1
 
-
-
-#if 0
-
-
-#define SPE_MEMORY_NUM_BLOCKS  7
-
-typedef struct _blockEntry {
-  void* addr;
-  int inUse;
-} BlockEntry;
-
-unsigned int blockSize = 0;
-
-BlockEntry memBlocks[SPE_MEMORY_NUM_BLOCKS];
-
-void local_initMem() {
-  register int i;
-  register unsigned int startAddr = ROUNDUP_128((unsigned int)(&(_end))) + 128;
-  //register unsigned int endAddr = (ROUNDUP_128(0x40000 - SPE_RESERVED_STACK_SIZE) - 128);
-  register unsigned int endAddr = 0x40000 - SPE_RESERVED_STACK_SIZE;
-  endAddr = ROUNDUP_128(endAddr);
-  endAddr -= 128;
-
-  if (__builtin_expect(endAddr <= startAddr, 0)) {
-    printf("SPE_%d :: [ERROR] :: Initing memory, endAddr <= startAddr... bad things headed your way...\n", (int)getSPEID());
-    return;
-  }
-
-  register unsigned int stepSize = ROUNDUP_128((endAddr - startAddr) / SPE_MEMORY_NUM_BLOCKS) - 128;
-  blockSize = stepSize;
-
-  for (i = 0; i < SPE_MEMORY_NUM_BLOCKS; i++) {
-    memBlocks[i].addr = (void*)(startAddr + (i * stepSize));
-    memBlocks[i].inUse = 0;
-  }
-
-  #if SPE_DEBUG_DISPLAY >= 1
-    printf("SPE_%d :: [INFO] :: initMem() - startAddr = 0x%08x, endAddr = 0x%08x, stepSize = 0x%08x...\n",
-           (int)getSPEID(), startAddr, endAddr, stepSize
-          );
-  #endif
-}
-
-void* local_malloc(int size, int alignment) {
-
-  // NOTE : Blocks are already aligned to 128 byte boundries in initMem() (that should be the most the user would
-  //   ask for.
-
-  if (__builtin_expect(alignment >= 8, 0)) {
-    printf("SPE_%d :: [ERROR] :: local_malloc() called with alignment >= 8 (not implemented yet)...\n", (int)getSPEID());
-  }
-
-  if (__builtin_expect(size > (int)blockSize, 0)) {
-    printf("SPE_%d :: [ERROR] :: local_malloc() called with large size (not implemented yet)...\n", (int)getSPEID());
-    printf("SPE_%d :: [ERROR] ::   blockSize = %u, size = %d\n", (int)getSPEID(), blockSize, size);
-  }
-
-  register int i;
-  register void* rtnValue = NULL;
-  for (i = 0; i < SPE_MEMORY_NUM_BLOCKS; i++) {
-    if (memBlocks[i].inUse == 0) {
-      memBlocks[i].inUse = 1;
-      rtnValue = memBlocks[i].addr;
-      break;
-    }
-  }
-
-  return rtnValue;
-}
-
-void local_free(void* addr) {
-
-  register int i;
-  //register int foundFlag = 0;
-
-  if (__builtin_expect(addr == NULL, 0)) return;
-
-  for (i = 0; i < SPE_MEMORY_NUM_BLOCKS; i++) {
-    if (memBlocks[i].addr == addr) {
-
-      //if (__builtin_expect(memBlocks[i].inUse != 1, 0)) {
-      //  printf("SPE_%d :: [ERROR] :: free'ing memory that is not in use in local_free()...\n", (int)getSPEID());
-      //}
-
-      memBlocks[i].inUse = 0;      
-      //foundFlag = 1;
-      break;
-    }
-  }
-
-  //if (__builtin_expect(foundFlag == 0, 0)) {
-  //  printf("SPE_%d :: [ERROR] :: Unable to free block in local_free()... unknown block...\n", (int)getSPEID());
-  //}
-}
-
-#else
-
-
-#define SPE_MEMORY_BLOCK_SIZE  1024  // !!! IMPORTANT !!! : NOTE : SPE_MEMORY_BLOCK_SIZE should be a power of 2.
-
-//typedef struct __memory_block_record {
-//  void* blockAddr;
-//  unsigned short inUseFlag;
-//  unsigned short blockCount;
-//} MemBlockRec;
-
 // TODO : This data structure is too large (but fast)... optimize this for size more
 typedef struct __memory_block_record {
   unsigned int blockAddr;
@@ -3998,43 +3891,6 @@ typedef struct __memory_block_record {
 MemBlockRec* memBlockTable = NULL;
 int memBlockTableSize = 0;
 
-void local_initMem_old() {
-
-  register int i;
-
-  // Caclulate the starting and ending addresses of the heap (128 bytes of "buffer" on either side)
-  register unsigned int startAddr = ROUNDUP_16((unsigned int)(&(_end))) + 128; // '+ 128' for buffer between heap and code/data
-  register unsigned int endAddr = SPE_TOTAL_MEMORY_SIZE - SPE_RESERVED_STACK_SIZE - 128;
-  register int memAvail = ((int)endAddr - (int)startAddr) - 128;  // '- 128' for alignment of heap memory blocks
-
-  // Make sure there is enough heap memory (for now, just warn the user if there is not)
-  if (__builtin_expect(memAvail <= SPE_MEMORY_BLOCK_SIZE, 0)) {
-    printf("SPE_%d :: [ERROR] :: Initing memory, not enough memory for a single block... bad things are headed your way...\n",
-           (int)getSPEID()
-          );
-    return;
-  }
-
-  // Calculate the number of blocks that will fit in the heap
-  register int memPerBlock = SPE_MEMORY_BLOCK_SIZE + sizeof(MemBlockRec);
-  register int numBlocks = memAvail / memPerBlock;
-  memBlockTableSize = numBlocks;
-
-  // Setup the memory block table
-  memBlockTable = (MemBlockRec*)startAddr;
-  register unsigned int blockAddr = startAddr + (numBlocks * sizeof(MemBlockRec));
-  blockAddr = ROUNDUP_128(blockAddr);
-  for (i = 0; i < numBlocks; i++) {
-
-    // Init the record
-    memBlockTable[i].blockAddr = blockAddr;
-    memBlockTable[i].inUseFlag = 0;
-    memBlockTable[i].blockCount = 0;
-
-    // Advance the blockAddr "pointer"
-    blockAddr += SPE_MEMORY_BLOCK_SIZE;
-  }
-}
 
 void local_initMem() {
 
@@ -4073,51 +3929,6 @@ void local_initMem() {
     // Advance the blockAddr "pointer"
     blockAddr += SPE_MEMORY_BLOCK_SIZE;
   }
-}
-
-void* local_malloc_old(int size, int alignment) {
-
-  register int i;
-  register void* rtnAddr = NULL;
-
-  // Verify the parameters
-  if (__builtin_expect(size <= 0, 0)) return NULL;
-  if (__builtin_expect(alignment <= 0, 0)) return NULL;
-
-  // Calculate the loop step from the alignment
-  register int tmp_alignSize = 0x01 << alignment;
-  register int tmp_blockSize = SPE_MEMORY_BLOCK_SIZE;
-  register int tmp_div = tmp_alignSize / tmp_blockSize;
-  if (__builtin_expect(tmp_div <= 0, 1)) tmp_div = 1;  // Common case should be alignSize <= blockSize
-
-  // Search for the blocks in the block table
-  register int numBlocks = memBlockTableSize;
-  register int consecCount = 0;
-  register int blocksNeeded = ROUNDUP(size, SPE_MEMORY_BLOCK_SIZE) / SPE_MEMORY_BLOCK_SIZE;
-  for (i = 0; i < numBlocks; i++) {
-
-    // Add one to the consecCount and then "and" with inverted inUseFlag (all 1s or all 0s)
-    // NOTE : The number of bits in consecCount that are used should not go above 16 (sizeof(unsigned int))
-    consecCount = (consecCount + 1) & (0xFFFF - memBlockTable[i].inUseFlag);
-
-    // Check to see if enough blocks have been found
-    if (__builtin_expect(consecCount >= blocksNeeded, 0)) {
-
-      consecCount--;
-
-      // Set the return address
-      rtnAddr = (void*)(memBlockTable[i - consecCount].blockAddr);
-      memBlockTable[i - consecCount].blockCount = consecCount + 1;
-
-      // Back track and set all the blocks as "in use"
-      for (; consecCount >= 0; consecCount--)
-        memBlockTable[i - consecCount].inUseFlag = (unsigned short)0xFFFF;
-
-      break;
-    }
-  }
-
-  return rtnAddr;
 }
 
 void* local_malloc(int size, int alignment) {
@@ -4184,25 +3995,6 @@ void* local_malloc(int size, int alignment) {
   return rtnAddr;
 }
 
-void local_free_old(void* addr) {
-
-  if (__builtin_expect(addr == NULL, 0)) return;
-
-  register int i;
-
-  // Calculate the index into the memory block table
-  register unsigned int firstBlockAddr = (unsigned int)(memBlockTable[0].blockAddr);
-  register int tableIndex = ((unsigned int)addr - firstBlockAddr) / SPE_MEMORY_BLOCK_SIZE;
-
-  // Clear the blockCount
-  register int blockCount = memBlockTable[tableIndex].blockCount;
-  memBlockTable[tableIndex].blockCount = 0;
-
-  // Clear the "in use" flags
-  for (i = 0; i < blockCount; i++)
-    memBlockTable[tableIndex + i].inUseFlag = 0x0000;
-}
-
 void local_free(void* addr) {
 
   if (__builtin_expect(addr == NULL, 0)) return;
@@ -4221,7 +4013,4 @@ void local_free(void* addr) {
   *tmp_recPtr = tmp_rec;
 }
 
-
-#endif
-
-#endif
+#endif  // SPE_USE_OWN_MALLOC >= 1
