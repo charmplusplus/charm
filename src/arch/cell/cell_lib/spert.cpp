@@ -10,21 +10,6 @@ extern "C" {
 }
 #endif
 
-#define SPE_USE_OWN_MALLOC  0
-
-#if SPE_USE_OWN_MALLOC <= 0
-  #ifdef __cplusplus
-  extern "C" {
-  #endif
-    #include <malloc_align.h>
-  #ifdef __cplusplus
-  }
-  #endif
-#else
-void initMem();
-  void* _malloc_align(int size, int alignment);
-  void _free_align(void* addr);
-#endif
 
 #include <spu_intrinsics.h>
 #include <spu_mfcio.h>
@@ -36,6 +21,31 @@ void initMem();
 
 #include "spert_common.h"
 #include "spert.h"
+
+
+#if SPE_USE_OWN_MALLOC <= 0
+
+  #ifdef __cplusplus
+  extern "C" {
+  #endif
+    #include <malloc_align.h>
+  #ifdef __cplusplus
+  }
+  #endif
+
+  #define MALLOC(size) _malloc_align(size, 7)
+  #define FREE(addr)   _free_align(addr)
+
+#else
+
+  void local_initMem();
+  void* local_malloc(int size, int alignment);
+  void local_free(void* addr);
+
+  #define MALLOC(size) local_malloc(size, 7)
+  #define FREE(addr)   local_free(addr)
+
+#endif
 
 
 #define USE_PRINT_BLOCK  0
@@ -596,7 +606,8 @@ inline void processMsgState_preFetching(int msgIndex) {
     }
 
     // Allocate the memory
-    tmp_localMemPtr = (void*)(_malloc_align(memNeeded, 4));
+    //tmp_localMemPtr = (void*)(_malloc_align(memNeeded, 4));
+    tmp_localMemPtr = (void*)(MALLOC(memNeeded));
 
     // STATS
     #if SPE_STATS != 0
@@ -955,7 +966,8 @@ inline void processMsgState_preFetchingList(int msgIndex) {
         try {
       #endif
           //localMsgQData[msgIndex].dmaList = (DMAListEntry*)(new char[memNeeded]);
-          localMsgQData[msgIndex].dmaList = (DMAListEntry*)(_malloc_align(memNeeded, 4));
+          //localMsgQData[msgIndex].dmaList = (DMAListEntry*)(_malloc_align(memNeeded, 4));
+          localMsgQData[msgIndex].dmaList = (DMAListEntry*)(MALLOC(memNeeded));
       #ifdef __cplusplus
 	} catch (...) {
           localMsgQData[msgIndex].dmaList = NULL;
@@ -1282,7 +1294,8 @@ inline void processMsgState_listReadyList(int msgIndex) {
       if (__builtin_expect(localMsgQData[msgIndex].dmaListSize > SPE_DMA_LIST_LENGTH, 0)) {
         if (__builtin_expect(localMsgQData[msgIndex].dmaList != NULL, 1)) {
           //delete [] localMsgQData[msgIndex].dmaList;
-          _free_align(localMsgQData[msgIndex].dmaList);
+          //_free_align(localMsgQData[msgIndex].dmaList);
+          FREE(localMsgQData[msgIndex].dmaList);
 	}
         localMsgQData[msgIndex].dmaList = NULL;
         localMsgQData[msgIndex].dmaListSize = -1;
@@ -1316,7 +1329,8 @@ inline void processMsgState_listReadyList(int msgIndex) {
     #endif
         //localMsgQData[msgIndex].localMemPtr = (void*)(new char[memNeeded]);
         //localMsgQData[msgIndex].localMemPtr = (void*)(_malloc_align(memNeeded, 4));
-        tmp_localMemPtr = (void*)(_malloc_align(memNeeded, 4));
+        //tmp_localMemPtr = (void*)(_malloc_align(memNeeded, 4));
+        tmp_localMemPtr = (void*)(MALLOC(memNeeded));
     #ifdef __cplusplus
       } catch (...) {
         //localMsgQData[msgIndex].localMemPtr = NULL;
@@ -2437,12 +2451,14 @@ inline void processMsgState_committing(int msgIndex) {
 
     // Free the memory being used by the Work Request
     if (__builtin_expect(tmp_localMemPtr != NULL, 1)) {
-      _free_align(tmp_localMemPtr);
+      //_free_align(tmp_localMemPtr);
+      FREE(tmp_localMemPtr);
     }
 
     // If the DMA list was allocated, free it
     if (__builtin_expect(tmp_dmaListSize > SPE_DMA_LIST_LENGTH, 0)) {
-      _free_align(tmp_dmaList);
+      //_free_align(tmp_dmaList);
+      FREE(tmp_dmaList);
     }
 
     // Clear the memory and dma related local data fields
@@ -2901,7 +2917,7 @@ unsigned int stateLookupTable[] = {
   (unsigned int)processMsgState_error,           0x00000000, 0, 0  // 12 = ERROR
 };
 
-#define SPE_USE_STATE_LOOKUP_TABLE  1
+#define SPE_USE_STATE_LOOKUP_TABLE  0
 
 #if SPE_USE_STATE_LOOKUP_TABLE != 0
 
@@ -3073,7 +3089,11 @@ inline void speSchedulerInner() {
 
         case SPE_MESSAGE_STATE_FETCHING:
           processMsgState_fetching(i);
-          tryAgain = 0;  // Input data has arrived... ready to executed
+          #if LIMIT_READY <= 0
+	    tryAgain = 1;  // Input data has arrived... ready to executed
+          #else
+            tryAgain = 0;  // READY state handled outside this loop... don't try again as it will not do anything
+          #endif
           // STATS
           #if SPE_STATS != 0
             stateSampleFlag++;  // DEBUG
@@ -3591,7 +3611,7 @@ int main(unsigned long long id, unsigned long long param) {
     memLeft -= 128;  // Buffer zone between stack and heap
     memLeft &= 0xFFFFFF00;  // Force it to be a multiple of 256 bytes
     #if SPE_DEBUG_DISPLAY >= 1
-      printf("SPE_%d :: memLeft = %d\n", (int)getSPEID(), memLeft);
+      printf("SPE_%d :: [DEBUG] :: memLeft = %d\n", (int)getSPEID(), memLeft);
     #endif
     if (memLeft < SPE_MINIMUM_HEAP_SIZE) return -1;
     #if SPE_DEBUG_DISPLAY >= 1
@@ -3612,7 +3632,7 @@ int main(unsigned long long id, unsigned long long param) {
 
   #else
 
-    initMem();
+    local_initMem();
 
   #endif
 
@@ -3859,18 +3879,25 @@ void print_block_table () {
 
 #if SPE_USE_OWN_MALLOC >= 1
 
-#define SPE_MEMORY_NUM_BLOCKS  4
+
+
+#if 0
+
+
+#define SPE_MEMORY_NUM_BLOCKS  7
 
 typedef struct _blockEntry {
   void* addr;
   int inUse;
 } BlockEntry;
 
+unsigned int blockSize = 0;
+
 BlockEntry memBlocks[SPE_MEMORY_NUM_BLOCKS];
 
-void initMem() {
+void local_initMem() {
   register int i;
-  register unsigned int startAddr = ROUNDUP_128((unsigned int)(&(_end)));
+  register unsigned int startAddr = ROUNDUP_128((unsigned int)(&(_end))) + 128;
   //register unsigned int endAddr = (ROUNDUP_128(0x40000 - SPE_RESERVED_STACK_SIZE) - 128);
   register unsigned int endAddr = 0x40000 - SPE_RESERVED_STACK_SIZE;
   endAddr = ROUNDUP_128(endAddr);
@@ -3882,27 +3909,32 @@ void initMem() {
   }
 
   register unsigned int stepSize = ROUNDUP_128((endAddr - startAddr) / SPE_MEMORY_NUM_BLOCKS) - 128;
+  blockSize = stepSize;
 
   for (i = 0; i < SPE_MEMORY_NUM_BLOCKS; i++) {
     memBlocks[i].addr = (void*)(startAddr + (i * stepSize));
     memBlocks[i].inUse = 0;
   }
 
-  //#if SPE_DEBUG_DISPLAY >= 1
+  #if SPE_DEBUG_DISPLAY >= 1
     printf("SPE_%d :: [INFO] :: initMem() - startAddr = 0x%08x, endAddr = 0x%08x, stepSize = 0x%08x...\n",
            (int)getSPEID(), startAddr, endAddr, stepSize
           );
-  //#endif
-
+  #endif
 }
 
-void* _malloc_align(int size, int alignment) {
+void* local_malloc(int size, int alignment) {
 
   // NOTE : Blocks are already aligned to 128 byte boundries in initMem() (that should be the most the user would
   //   ask for.
 
   if (__builtin_expect(alignment >= 8, 0)) {
-    printf("SPE_%d :: [ERROR] :: _malloc_align() called with alignment >= 8 (not implemented yet)...\n", (int)getSPEID());
+    printf("SPE_%d :: [ERROR] :: local_malloc() called with alignment >= 8 (not implemented yet)...\n", (int)getSPEID());
+  }
+
+  if (__builtin_expect(size > (int)blockSize, 0)) {
+    printf("SPE_%d :: [ERROR] :: local_malloc() called with large size (not implemented yet)...\n", (int)getSPEID());
+    printf("SPE_%d :: [ERROR] ::   blockSize = %u, size = %d\n", (int)getSPEID(), blockSize, size);
   }
 
   register int i;
@@ -3918,28 +3950,278 @@ void* _malloc_align(int size, int alignment) {
   return rtnValue;
 }
 
-void _free_align(void* addr) {
+void local_free(void* addr) {
 
   register int i;
-  register int foundFlag = 0;
+  //register int foundFlag = 0;
 
   if (__builtin_expect(addr == NULL, 0)) return;
 
   for (i = 0; i < SPE_MEMORY_NUM_BLOCKS; i++) {
     if (memBlocks[i].addr == addr) {
 
-      if (__builtin_expect(memBlocks[i].inUse != 1, 0)) {
-        printf("SPE_%d :: [ERROR] :: free'ing memory that is not in use in _free_align()...\n", (int)getSPEID());
-      }
+      //if (__builtin_expect(memBlocks[i].inUse != 1, 0)) {
+      //  printf("SPE_%d :: [ERROR] :: free'ing memory that is not in use in local_free()...\n", (int)getSPEID());
+      //}
 
       memBlocks[i].inUse = 0;      
-      foundFlag = 1;
+      //foundFlag = 1;
+      break;
     }
   }
 
-  if (foundFlag == 0) {
-    printf("SPE_%d :: [ERROR] :: Unable to free block in _free_align()... unknown block...\n", (int)getSPEID());
+  //if (__builtin_expect(foundFlag == 0, 0)) {
+  //  printf("SPE_%d :: [ERROR] :: Unable to free block in local_free()... unknown block...\n", (int)getSPEID());
+  //}
+}
+
+#else
+
+
+#define SPE_MEMORY_BLOCK_SIZE  1024  // !!! IMPORTANT !!! : NOTE : SPE_MEMORY_BLOCK_SIZE should be a power of 2.
+
+//typedef struct __memory_block_record {
+//  void* blockAddr;
+//  unsigned short inUseFlag;
+//  unsigned short blockCount;
+//} MemBlockRec;
+
+// TODO : This data structure is too large (but fast)... optimize this for size more
+typedef struct __memory_block_record {
+  unsigned int blockAddr;
+  unsigned int inUseFlag;   // NOTE : 0xFFFFFFFF = Free, 0x00000000 = In Use
+  unsigned int blockCount;
+  unsigned int __padding__;
+} MemBlockRec;
+
+
+MemBlockRec* memBlockTable = NULL;
+int memBlockTableSize = 0;
+
+void local_initMem_old() {
+
+  register int i;
+
+  // Caclulate the starting and ending addresses of the heap (128 bytes of "buffer" on either side)
+  register unsigned int startAddr = ROUNDUP_16((unsigned int)(&(_end))) + 128; // '+ 128' for buffer between heap and code/data
+  register unsigned int endAddr = SPE_TOTAL_MEMORY_SIZE - SPE_RESERVED_STACK_SIZE - 128;
+  register int memAvail = ((int)endAddr - (int)startAddr) - 128;  // '- 128' for alignment of heap memory blocks
+
+  // Make sure there is enough heap memory (for now, just warn the user if there is not)
+  if (__builtin_expect(memAvail <= SPE_MEMORY_BLOCK_SIZE, 0)) {
+    printf("SPE_%d :: [ERROR] :: Initing memory, not enough memory for a single block... bad things are headed your way...\n",
+           (int)getSPEID()
+          );
+    return;
+  }
+
+  // Calculate the number of blocks that will fit in the heap
+  register int memPerBlock = SPE_MEMORY_BLOCK_SIZE + sizeof(MemBlockRec);
+  register int numBlocks = memAvail / memPerBlock;
+  memBlockTableSize = numBlocks;
+
+  // Setup the memory block table
+  memBlockTable = (MemBlockRec*)startAddr;
+  register unsigned int blockAddr = startAddr + (numBlocks * sizeof(MemBlockRec));
+  blockAddr = ROUNDUP_128(blockAddr);
+  for (i = 0; i < numBlocks; i++) {
+
+    // Init the record
+    memBlockTable[i].blockAddr = blockAddr;
+    memBlockTable[i].inUseFlag = 0;
+    memBlockTable[i].blockCount = 0;
+
+    // Advance the blockAddr "pointer"
+    blockAddr += SPE_MEMORY_BLOCK_SIZE;
   }
 }
+
+void local_initMem() {
+
+  register int i;
+
+  // Caclulate the starting and ending addresses of the heap (128 bytes of "buffer" on either side)
+  register unsigned int startAddr = ROUNDUP_16((unsigned int)(&(_end))) + 128; // '+ 128' for buffer between heap and code/data
+  register unsigned int endAddr = SPE_TOTAL_MEMORY_SIZE - SPE_RESERVED_STACK_SIZE - 128;
+  register int memAvail = ((int)endAddr - (int)startAddr) - 128;  // '- 128' for alignment of heap memory blocks
+
+  // Make sure there is enough heap memory (for now, just warn the user if there is not)
+  if (__builtin_expect(memAvail <= SPE_MEMORY_BLOCK_SIZE, 0)) {
+    printf("SPE_%d :: [ERROR] :: Initing memory, not enough memory for a single block... bad things are headed your way...\n",
+           (int)getSPEID()
+          );
+    return;
+  }
+
+  // Calculate the number of blocks that will fit in the heap
+  register int memPerBlock = SPE_MEMORY_BLOCK_SIZE + sizeof(MemBlockRec);
+  register int numBlocks = memAvail / memPerBlock;
+  memBlockTableSize = numBlocks;
+
+  // Setup the memory block table
+  memBlockTable = (MemBlockRec*)startAddr;
+  register unsigned int blockAddr = startAddr + (numBlocks * sizeof(MemBlockRec));
+  blockAddr = ROUNDUP_16(blockAddr);
+  for (i = 0; i < numBlocks; i++) {
+
+    // Init the record
+    memBlockTable[i].blockAddr = blockAddr;
+    memBlockTable[i].inUseFlag = 0xFFFFFFFF;
+    memBlockTable[i].blockCount = 0;
+    memBlockTable[i].__padding__ = 0;
+
+    // Advance the blockAddr "pointer"
+    blockAddr += SPE_MEMORY_BLOCK_SIZE;
+  }
+}
+
+void* local_malloc_old(int size, int alignment) {
+
+  register int i;
+  register void* rtnAddr = NULL;
+
+  // Verify the parameters
+  if (__builtin_expect(size <= 0, 0)) return NULL;
+  if (__builtin_expect(alignment <= 0, 0)) return NULL;
+
+  // Calculate the loop step from the alignment
+  register int tmp_alignSize = 0x01 << alignment;
+  register int tmp_blockSize = SPE_MEMORY_BLOCK_SIZE;
+  register int tmp_div = tmp_alignSize / tmp_blockSize;
+  if (__builtin_expect(tmp_div <= 0, 1)) tmp_div = 1;  // Common case should be alignSize <= blockSize
+
+  // Search for the blocks in the block table
+  register int numBlocks = memBlockTableSize;
+  register int consecCount = 0;
+  register int blocksNeeded = ROUNDUP(size, SPE_MEMORY_BLOCK_SIZE) / SPE_MEMORY_BLOCK_SIZE;
+  for (i = 0; i < numBlocks; i++) {
+
+    // Add one to the consecCount and then "and" with inverted inUseFlag (all 1s or all 0s)
+    // NOTE : The number of bits in consecCount that are used should not go above 16 (sizeof(unsigned int))
+    consecCount = (consecCount + 1) & (0xFFFF - memBlockTable[i].inUseFlag);
+
+    // Check to see if enough blocks have been found
+    if (__builtin_expect(consecCount >= blocksNeeded, 0)) {
+
+      consecCount--;
+
+      // Set the return address
+      rtnAddr = (void*)(memBlockTable[i - consecCount].blockAddr);
+      memBlockTable[i - consecCount].blockCount = consecCount + 1;
+
+      // Back track and set all the blocks as "in use"
+      for (; consecCount >= 0; consecCount--)
+        memBlockTable[i - consecCount].inUseFlag = (unsigned short)0xFFFF;
+
+      break;
+    }
+  }
+
+  return rtnAddr;
+}
+
+void* local_malloc(int size, int alignment) {
+
+  register int i;
+  register void* rtnAddr = NULL;
+
+  // Verify the parameters
+  if (__builtin_expect(size <= 0, 0)) return NULL;
+  if (__builtin_expect(alignment <= 0, 0)) return NULL;
+
+  // Calculate the loop step from the alignment
+  register int tmp_alignSize = 0x01 << alignment;
+  register int tmp_blockSize = SPE_MEMORY_BLOCK_SIZE;
+  register int tmp_div = tmp_alignSize / tmp_blockSize;
+  if (__builtin_expect(tmp_div <= 0, 1)) tmp_div = 1;  // Common case should be alignSize <= blockSize
+
+  // Search for the blocks in the block table
+  register int numBlocks = memBlockTableSize;
+  register int consecCount = 0;
+  register int blocksNeeded = ROUNDUP(size, SPE_MEMORY_BLOCK_SIZE) / SPE_MEMORY_BLOCK_SIZE;
+
+  // Pre-load the first memory block record
+  register vector unsigned int* tmp_memBlockTablePtr = (vector unsigned int*)memBlockTable;
+  register vector unsigned int tmp_memBlockRec_next = *tmp_memBlockTablePtr;
+
+  for (i = 0; i < numBlocks; i++) {
+
+    // Start loading the next memory block record
+    register vector unsigned int tmp_memBlockRec = tmp_memBlockRec_next;
+
+    // Get the inUseFlag
+    register unsigned int tmp_inUseFlag = spu_extract(tmp_memBlockRec, 1);
+
+    // Add one to the consecCount and then "and" with inUseFlag (all 1s or all 0s)
+    consecCount = (consecCount + 1) & tmp_inUseFlag;
+
+    // Calculate a skip amount (first block in a series of will have blockCount set
+    //   so if an in use block is found, skip ahead the block count)
+    register unsigned int tmp_blockCount = spu_extract(tmp_memBlockRec, 2);
+    register unsigned int tmp_inUseFlag_inv = ((unsigned int)0xFFFFFFFF) - tmp_inUseFlag;
+    register unsigned int skipCount = (tmp_blockCount - 1) & tmp_inUseFlag_inv;
+
+    // Check to see if enough blocks have been found
+    if (__builtin_expect(consecCount >= blocksNeeded, 0)) {
+
+      // Set the first block's record (inUseFlag and blockCount)      
+      register vector unsigned int* tmp_firstRecPtr = tmp_memBlockTablePtr - (consecCount - 1);
+      register vector unsigned int tmp_firstRec = *tmp_firstRecPtr;
+      rtnAddr = (void*)(spu_extract(tmp_firstRec, 0));
+      tmp_firstRec = spu_insert(0x00000000, tmp_firstRec, 1);
+      tmp_firstRec = spu_insert(consecCount, tmp_firstRec, 2);
+      *tmp_firstRecPtr = tmp_firstRec;
+
+      break;
+    }
+
+    // Start loading the next memory block record
+    i += skipCount;  // Add to i before incrementing since i will be incremented from the loop itself
+    tmp_memBlockTablePtr += (skipCount + 1);
+    tmp_memBlockRec_next = *(tmp_memBlockTablePtr);
+  }
+
+  return rtnAddr;
+}
+
+void local_free_old(void* addr) {
+
+  if (__builtin_expect(addr == NULL, 0)) return;
+
+  register int i;
+
+  // Calculate the index into the memory block table
+  register unsigned int firstBlockAddr = (unsigned int)(memBlockTable[0].blockAddr);
+  register int tableIndex = ((unsigned int)addr - firstBlockAddr) / SPE_MEMORY_BLOCK_SIZE;
+
+  // Clear the blockCount
+  register int blockCount = memBlockTable[tableIndex].blockCount;
+  memBlockTable[tableIndex].blockCount = 0;
+
+  // Clear the "in use" flags
+  for (i = 0; i < blockCount; i++)
+    memBlockTable[tableIndex + i].inUseFlag = 0x0000;
+}
+
+void local_free(void* addr) {
+
+  if (__builtin_expect(addr == NULL, 0)) return;
+
+  // Calculate the index into the memory block table
+  register vector unsigned int* tmp_memBlockTablePtr = (vector unsigned int*)memBlockTable;
+  register vector unsigned int tmp_firstRec = *tmp_memBlockTablePtr;
+  register unsigned int tmp_firstBlockAddr = spu_extract(tmp_firstRec, 0);
+  register int tableIndex = ((unsigned int)addr - tmp_firstBlockAddr) / SPE_MEMORY_BLOCK_SIZE;
+
+  // Load, clear, and store the record for the first block's record
+  register vector unsigned int* tmp_recPtr = tmp_memBlockTablePtr + tableIndex;
+  register vector unsigned int tmp_rec = *tmp_recPtr;
+  tmp_rec = spu_insert(0xFFFFFFFF, tmp_rec, 1);
+  tmp_rec = spu_insert(0x00000000, tmp_rec, 2);
+  *tmp_recPtr = tmp_rec;
+}
+
+
+#endif
 
 #endif

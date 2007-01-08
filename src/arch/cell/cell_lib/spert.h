@@ -88,6 +88,7 @@
 #define SPE_DEBUG_DISPLAY_NO_PROGRESS  0 // If non-zero, warn when no messages changes state for this many iterations
 #define SPE_REPORT_END      0  // Have each SPE report the address of it's _end variable (end of data segment; will be printed by PPE during spe thread creation)
 #define SPE_USE_OWN_MEMSET  0  // Set to 1 to force a local version of memset to be used (to try to remove C/C++ runtime dependence)
+#define SPE_USE_OWN_MALLOC  1  // Set to 1 to force a local version of malloc and free to be used
 #define SPE_NOTIFY_ON_MALLOC_FAILURE   0  // Set to 1 to force the SPE to notify the user when a pointer returned by malloc/new returns an un-usable pointer (message will retry malloc/new later)
 
 #define OFFLOAD_API_FULL_CHECK  1
