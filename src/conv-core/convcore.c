@@ -767,6 +767,8 @@ double CmiCpuTimer()
   return currenttime - CpvAccess(inittime_virtual);
 }
 
+static double lastT = -1.0;
+
 double CmiWallTimer()
 {
   struct timeval tv;
@@ -774,6 +776,12 @@ double CmiWallTimer()
 
   gettimeofday(&tv,0);
   currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
+#ifndef CMK_OPTIMIZE
+  if (lastT > 0.0 && currenttime < lastT) {
+    currenttime = lastT;
+  }
+  lastT = currenttime;
+#endif
   return currenttime - inittime_wallclock;
 }
 
