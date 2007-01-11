@@ -406,6 +406,9 @@ static void processMessage(char *msg, int len)
       }
       /* get a full packet */
       if (node->asm_fill == node->asm_total) {
+        int total_size = node->asm_total;
+        node->asm_msg = 0;
+
       /* do it after integration - the following function may re-entrant */
 #if CMK_BROADCAST_SPANNING_TREE
         if (rank == DGRAM_BROADCAST
@@ -413,19 +416,20 @@ static void processMessage(char *msg, int len)
           || rank == DGRAM_NODEBROADCAST
 #endif
            )
-          SendSpanningChildren(NULL, 0, node->asm_total, newmsg, broot, rank);
+          SendSpanningChildren(NULL, 0, total_size, newmsg, broot, rank);
 #elif CMK_BROADCAST_HYPERCUBE
         if (rank == DGRAM_BROADCAST
 #if CMK_NODE_QUEUE_AVAILABLE
           || rank == DGRAM_NODEBROADCAST
 #endif
            )
-          SendHypercube(NULL, 0, node->asm_total, newmsg, broot, rank);
+          SendHypercube(NULL, 0, total_size, newmsg, broot, rank);
 #endif
+
         switch (rank) {
         case DGRAM_BROADCAST: {
           for (i=1; i<_Cmi_mynodesize; i++)
-            CmiPushPE(i, CopyMsg(newmsg, node->asm_total));
+            CmiPushPE(i, CopyMsg(newmsg, total_size));
           CmiPushPE(0, newmsg);
           break;
         }
@@ -438,8 +442,7 @@ static void processMessage(char *msg, int len)
 #endif
         default:
           CmiPushPE(rank, newmsg);
-        }
-        node->asm_msg = 0;
+        }    /* end of switch */
       }
     } 
     else {
