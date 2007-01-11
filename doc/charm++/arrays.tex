@@ -207,6 +207,15 @@ of 4D, 5D, and 6D are respectively \{w,x,y,z\}, \{v,w,x,y,z\}, and
 A user-defined index array can access its index as ``thisIndex''.
 
 
+Likewise, you can create a dense multidimensional array by passing the extents at creation time to \kw{ckNew}.
+
+\begin{alltt}
+CProxy_A1 a1 = CProxy_A1::ckNew(parameters ,num_elements);
+CProxy_A2 a2 = CProxy_A2::ckNew(parameters, num_rows, num_colums);
+CProxy_A3 a3 = CProxy_A3::ckNew(parameters, num_rows, num_columns, num_depth);
+...
+\end{alltt}
+
 \subsubsection{Advanced Array Creation}
 \label{advanced array create}
 There are several ways to control the array creation process.
