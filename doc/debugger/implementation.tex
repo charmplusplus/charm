@@ -1,0 +1,129 @@
+%% Section: Implementation details
+
+The following classes in the PUP framework were used in
+implementing debugging support in charm.
+
+
+\begin{itemize}
+
+\item
+
+\texttt{class PUP::er} - This class is the abstract superclass of
+all the other classes in the framework. The \texttt{pup} method of
+a particular class takes a reference to a \texttt{PUP::er} as
+parameter. This class has methods for dealing with all the basic
+C++ data types. All these methods are expressed in terms of a
+generic pure virtual method. Subclasses only need to provide the
+generic method.
+
+\item
+
+\texttt{class PUP::toText} - This is a subclass of the
+\texttt{PUP::toTextUtil} class which is a subclass of the
+\texttt{PUP::er} class. It copies the data of an object to a C
+string, including the terminating NULL.
+
+\item
+
+\texttt{class PUP::sizerText} - This is a subclass of the
+\texttt{PUP::toTextUtil} class which is a subclass of the
+\texttt{PUP::er} class. It returns the number of characters
+including the terminating NULL and is used by the
+\texttt{PUP::toText} object to allocate space for building the C
+string.
+
+\end{itemize}
+
+
+The code below shows a simple class declaration
+that includes a \texttt{pup} method.
+
+
+\begin{verbatim}
+  class foo {
+   private:
+    bool isBar;
+    int x;
+    char y;
+    unsigned long z;
+    float q[3];
+   public:
+    void pup(PUP::er &p) {
+      p(isBar);
+      p(x);p(y);p(z);
+      p(q,3);
+    }
+  };
+\end{verbatim}
+
+
+\subsection{Converse Client-Server Interface}
+
+The Converse Client-Server (CCS) module enables Converse
+\cite{InterOpIPPS96} programs to act as parallel servers,
+responding to requests from non-Converse programs. The CCS module
+is split into two parts - client and server. The server side is
+used by a Converse program while the client side is used by
+arbitrary non-Converse programs. A CCS client accesses a running
+Converse program by talking to a \texttt{server-host} which
+receives the CCS requests and relays them to the appropriate
+processor. The \texttt{server-host} is \texttt{charmrun}
+\cite{charmman} for net-versions and is the first processor for
+all other versions.
+
+In the case of the net-version of \charmpp{}, a Converse program
+is started as a server by running the \charmpp{} program using the
+additional runtime option ``\textit{++server}''. This opens the CCS
+server on any TCP port number. The TCP port number can be
+specified using the command-line option ``\textit{server-port}''. A
+CCS client connects to a CCS server, asks a server PE to execute a
+pre-registered handler and receives the response data. The
+function \texttt{CcsConnect} takes a pointer to a
+\texttt{CcsServer} as an argument and connects to the given CCS
+server. The functions \texttt{CcsNumNodes}, \texttt{CcsNumPes},
+\texttt{CcsNodeSize} implemented as part of the client interface
+in \charmpp{} returns information about the parallel machine. The
+function \texttt{CcsSendRequest} takes a handler ID and the
+destination processor number as arguments and asks the server to
+execute the particular handler on the specified processor.
+\texttt{CcsRecvResponse} receives a response to the previous
+request in-place. A timeout is also specified which gives the
+number of seconds to wait till the function returns a 0, otherwise
+the number of bytes received is returned.
+
+Once a request arrives on a CCS server socket, the CCS server
+runtime looks up the appropriate registered handler and calls it.
+If no handler is found the runtime prints a diagnostic and ignores
+the message. If the CCS module is disabled in the core, all CCS
+routines become macros returning 0. The function
+\texttt{CcsRegisterHandler} is used to register handlers in the
+CCS server. A handler ID string and a function pointer are passed
+as parameters. A table of strings corresponding to appropriate
+function pointers is created. Various built-in functions are
+provided which can be called from within a CCS handler. The
+debugger behaves as a CCS client invoking appropriate handlers
+which makes use of some of these functions. Some of the built-in
+functions are as follows.
+
+\begin{itemize}
+
+\item
+
+\texttt{CcsSendReply} - This function sends the data provided as
+an argument back to the client as a reply. This function can only
+be called from a CCS handler invoked remotely.
+
+\item
+
+\texttt{CcsDelayReply} - This call is made to allow a CCS reply to
+be delayed until after the handler has completed.
+
+
+\end{itemize}
+
+The CCS runtime system provides several built-in CCS handlers,
+which are available to any Converse program. All \charmpp{}
+programs are essentially Converse programs. \texttt{ccs\_getinfo}
+takes an empty message and responds with information about the
+parallel job. Similarly the handler \texttt{ccs\_killport} allows
+a client to be notified when a parallel run exits.

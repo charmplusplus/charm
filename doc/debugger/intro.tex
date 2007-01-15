@@ -1,0 +1,47 @@
+%% Section: Introduction
+
+The primary goal of the parallel debugger is to provide an integrated
+debugging environment which allows the programmer to examine the
+changing state of the parallel program during the course of its
+execution.
+
+The \charmpp{} debugging system has a number of useful features for
+\charmpp{} programmers.  The system includes a Java GUI client program
+which runs on the programmer's desktop, and a \charmpp{} parallel
+program which acts as a server.  The client and server need not be on
+the same machine, and communicate over the network using a secure
+protocol described in
+ http://charm.cs.uiuc.edu/manuals/html/converse/5\_CONVERSE\_Client\_Server\_In.html 
+
+The system provides the following features: 
+
+\begin{itemize}
+
+\item Provides a means to easily access and view the major programmer
+visible entities, including array elements and messages in queues,
+across the parallel machine during program execution. Objects and messages
+are extracted as raw data, and interpreted by the debugger, as explained
+in \ref{section:data}.
+%% Objects and
+%%messages are extracted using the \charmpp{} PUP framework described in
+%%Section%%~\ref{section:pup}.
+
+\item Provides an interface to set and remove breakpoints on remote
+entry points, which capture the major
+programmer-visible control flows in a \charmpp{} program. 
+
+\item Provides the ability to freeze and unfreeze the execution of 
+selected processors of the parallel program, which allows a 
+consistent snapshot by 
+preventing things from changing as they are examined.
+
+\item Provides a way to attach a sequential debugger to a specific
+subset of processes of the parallel program during execution,
+which keeps a manageable number of sequential debugger windows open.
+Currently these windows are opened independently of the GUI interface,
+while in the future they will be transformed into an integrated view.
+
+\end{itemize}
+
+The debugging client provides these features via 
+extensive support built into the \charmpp{} runtime.

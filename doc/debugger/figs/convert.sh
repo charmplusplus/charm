@@ -1,7 +1,8 @@
 #!/bin/sh
 
-for basename in arrayelement menu snapshot1 snapshot2 snapshot3 snapshot4
+for name in *.png
 do
+	basename=${name%.png}
 	echo "Converting figure $basename"
 	convert $basename.png $basename.eps
 #	convert $basename.png $basename.pdf
