@@ -1,13 +1,16 @@
 CHARMC=../../../../bin/charmc $(OPTS) -O2
 
-INCS=-I/SW/include
+INCS=-I/SW/include -I.
 LIBS=-lgsl -lgslcblas -lm -L/sw/lib
  
-interpolatelog: interpolatelog.o 
-	$(CHARMC) -seq -o interpolatelog interpolatelog.o -lconv-bigsim-logs -lconv-util -lblue-standalone -language c++  $(LIBS)
+interpolatelog: interpolatelog.o EventInterpolator.o
+	$(CHARMC) -seq -o interpolatelog interpolatelog.o EventInterpolator.o -lconv-bigsim-logs -lconv-util -lblue-standalone -language c++  $(LIBS)
  
 interpolatelog.o: interpolatelog.C 
-	$(CHARMC) -seq -c interpolatelog.C $(INCS) $(LIBS)
+	$(CHARMC) -seq -c interpolatelog.C $(INCS)
+
+EventInterpolator.o: EventInterpolator.C
+	$(CHARMC) -c EventInterpolator.C $(INCS)
 
 
 rewritelog: rewritelog.o

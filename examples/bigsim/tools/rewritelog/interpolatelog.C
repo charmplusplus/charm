@@ -8,9 +8,10 @@
 
     This uses the gsl library for least-square fitting. It is a freely available GPL'ed library
 
+    Currently we hard code in two parameters some places. This should be fixed
+
+
 */
-
-
 
 #include "blue.h"
 #include "blue_impl.h"
@@ -22,25 +23,27 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include <gsl/gsl_multifit.h>
+#include <EventInterpolator.h>
 
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <map>
-
 
 extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
 
-
 #define OUTPUTDIR "newtraces/"
+#define INPUTPARAMS "params-time-table"
+
 
 
 int main()
 {
+
+#if 0
   int totalProcs, numX, numY, numZ, numCth, numWth, numPes;
   BgTimeLineRec *tlinerecs;
-
 
   bool done = false;
   double newtime=1.0;
@@ -120,7 +123,6 @@ int main()
         }
 
     }
-
   }
 
 
@@ -135,59 +137,15 @@ int main()
     BgWriteTimelines(0, &tlinerecs[0], totalProcs, numWth, OUTPUTDIR);
 
   delete [] allNodeOffsets;
-  printf("End of program\n");
-}
-
-
-
-
-void fitCurve(){
-
-
-        int n = 5;  // number of sample input evaluations
-        int cs = 2; // number of coefficients
-
-        gsl_multifit_linear_workspace * work = gsl_multifit_linear_alloc(n,cs);
-
-        //  Find C     where y=Xc
-
-        gsl_matrix *X;  // Each row is a set of parameters  [1, a, a^2, b, c, a*b*c] for each input parameter set
-        gsl_vector *y;  // vector of cycle accurate times for each input parameter set
-        gsl_vector *c;  // coefficients which are produced by least square fit
-        gsl_matrix *cov;
-        double chisqr;
-
-        X = gsl_matrix_alloc (n,cs);
-        y = gsl_vector_alloc (n);
-        c = gsl_vector_alloc(cs);
-        cov = gsl_matrix_alloc(cs,cs);
-
-        double val;
-
-        for(int i=0;i<n;i++){
-            for(int j=0;j<cs;j++){
-                gsl_matrix_set(X,i,j,val);
-            }
-        }
-
-        for(int i=0;i<n;i++){
-            gsl_vector_set(y,i,val);
-        }
-
-        // Do we need to initialize c?
-        for(int j=0;j<cs;j++){
-            gsl_vector_set(c,j,0.0);
-        }
-
-        gsl_multifit_linear(X,y,c,cov,&chisqr,work);
-
-        // Estimate time for a given set of parameters p
-        gsl_vector *desired_params;
-        double desired_time, desired_time_err;
-        gsl_multifit_linear_est(desired_params,c,cov,&desired_time,&desired_time_err);
-
-        // We now have a predicted time for the desired parameters
-
-        gsl_multifit_linear_free(work);
+  
+#endif
+  
+  
+  double parray[2] = {2.0,4.0};
+  EventInterpolator interpolator(INPUTPARAMS);  
+  std::cout << "Interpolated value chisqr=" << interpolator.get_chisqr() << " value = " << interpolator.predictTime(parray) << std::endl;
+  
+  
+  std::cout << "End of program" << std::endl;
 }
 
