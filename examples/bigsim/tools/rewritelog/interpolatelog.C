@@ -6,7 +6,7 @@
    email : idooley2@uiuc.edu
    date  : Jan 06, 2007
 
-    This uses the gsl library for least-square fitting. It is a freely available GPL'ed library
+    This uses the gsl library for least-square fitting. Gnu Scientific Library is available under GPL
 
     Currently we hard code in two parameters some places. This should be fixed
 
