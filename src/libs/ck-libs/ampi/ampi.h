@@ -765,7 +765,7 @@ traceEndFuncProj(name);
 #define _TRACE_BEGIN_FUNCTION_NAME(name) traceBeginFuncProj(name, __FILE__, __LINE__);
 #define _TRACE_END_FUNCTION_NAME(name) traceEndFuncProj(name);
 
-void startTraceBigSim(char* msg);
+void beginTraceBigSim(char* msg);
 void endTraceBigSim(char* msg, char* param);
 
 #include "ampiProjections.h"

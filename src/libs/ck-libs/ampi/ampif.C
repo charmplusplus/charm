@@ -1025,10 +1025,10 @@ void mpi_info_memory(){
   CkPrintf("Memory %ld\n", CmiMemoryUsage());
 }
 
-#define starttracebigsim FTN_NAME (STARTTRACEBIGSIM , starttracebigsim)
+#define begintracebigsim FTN_NAME (BEGINTRACEBIGSIM , begintracebigsim)
 #define endtracebigsim FTN_NAME (ENDTRACEBIGSIM , endtracebigsim)
-void starttracebigsim(char* msg){
-  startTraceBigSim(msg);
+void begintracebigsim(char* msg){
+  beginTraceBigSim(msg);
 }
 void endtracebigsim(char* msg, char* param){
   endTraceBigSim(msg, param);
