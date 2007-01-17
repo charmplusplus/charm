@@ -697,11 +697,21 @@ void ampiParent::init(){
   char fname[256];
   sprintf(fname,"msg%d.log",msgLogRank);
   if(msgLogWrite && msgLogRank == thisIndex){
+#if CMK_PROJECTIONS_USE_ZLIB
+    fMsgLog = gzopen(fname,"wb");
+    toPUPer = new PUP::tozDisk(fMsgLog);
+#else
     fMsgLog = fopen(fname,"wb");
     toPUPer = new PUP::toDisk(fMsgLog);
+#endif
   }else if(msgLogRead){
+#if CMK_PROJECTIONS_USE_ZLIB
+    fMsgLog = gzopen(fname,"rb");
+    fromPUPer = new PUP::fromzDisk(fMsgLog);
+#else
     fMsgLog = fopen(fname,"rb");
     fromPUPer = new PUP::fromDisk(fMsgLog);
+#endif
   }
 #endif
 }
@@ -710,10 +720,18 @@ void ampiParent::finalize(){
 #ifdef AMPIMSGLOG
   if(msgLogWrite && msgLogRank == thisIndex){
     delete toPUPer;
-    fclose(fMsgLog);//fclose(fMsgLog);
+#if CMK_PROJECTIONS_USE_ZLIB
+    gzclose(fMsgLog);
+#else
+    fclose(fMsgLog);
+#endif
   }else if(msgLogRead){
     delete fromPUPer;
-    fclose(fMsgLog);//fclose(fMsgLog);
+#if CMK_PROJECTIONS_USE_ZLIB
+    gzclose(fMsgLog);
+#else
+    fclose(fMsgLog);
+#endif
   }
 #endif
 }

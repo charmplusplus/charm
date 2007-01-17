@@ -26,11 +26,53 @@
 #endif
 
 #ifdef AMPIMSGLOG
-#include <zlib.h>
+
 static int msgLogRank;
 static int msgLogWrite;
 static int msgLogRead;
+
+#if CMK_PROJECTIONS_USE_ZLIB
+#include <zlib.h>
+namespace PUP{
+class zdisk : public er {
+ protected:
+  gzFile F;//Disk file to read from/write to
+  zdisk(unsigned int type,gzFile f):er(type),F(f) {}
+  zdisk(const zdisk &p);			//You don't want to copy
+  void operator=(const zdisk &p);	// You don't want to copy
+
+  //For seeking (pack/unpack in different orders)
+  virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
+  virtual int impl_tell(seekBlock &s); /*Give the current offset*/
+  virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+};
+
+//For packing to a disk file
+class tozDisk : public zdisk {
+ protected:
+  //Generic bottleneck: pack n items of size itemSize from p.
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+ public:
+  //Write data to the given file pointer
+  // (must be opened for binary write)
+  // You must close the file yourself when done.
+  tozDisk(gzFile f):zdisk(IS_PACKING,f) {}
+};
+
+//For unpacking from a disk file
+class fromzDisk : public zdisk {
+ protected:
+  //Generic bottleneck: unpack n items of size itemSize from p.
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+ public:
+  //Write data to the given file pointer 
+  // (must be opened for binary read)
+  // You must close the file yourself when done.
+  fromzDisk(gzFile f):zdisk(IS_UNPACKING,f) {}
+};
+}; // namespace PUP
 #endif
+#endif // AMPIMSGLOG
 
 #define AMPI_COUNTER 0
 
@@ -1253,11 +1295,16 @@ public:
  public:
 #ifdef AMPIMSGLOG
     /* message logging */
-    //    gzFile fMsgLog;
-    FILE* fMsgLog;
     int pupBytes;
-    PUP::toDisk *toPUPer;
-    PUP::fromDisk *fromPUPer;
+#if CMK_PROJECTIONS_USE_ZLIB
+    gzFile fMsgLog;
+    PUP::tozDisk *toPUPer;
+    PUP::fromzDisk *fromPUPer;
+#else
+    FILE* fMsgLog;
+    PUP::tozDisk *toPUPer;
+    PUP::fromzDisk *fromPUPer;
+#endif
 #endif
     void init();
     void finalize();
