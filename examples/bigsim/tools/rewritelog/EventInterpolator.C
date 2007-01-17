@@ -1,38 +1,39 @@
 
 #include <EventInterpolator.h>
 
+using namespace std;
 
-int EventInterpolator::numCoefficients(std::string funcname){
-  if(funcname == std::string("calc_pair_energy") )
-	return 9;
-  if(funcname == std::string("calc_self_energy") )
-	return 9;
-  else if(funcname == std::string("angle"))
-	return 2;
-  else if(funcname == std::string("diherals"))
-	return 2;
+int EventInterpolator::numCoefficients(string funcname){
+  if(funcname == string("calc_pair_energy") )
+	return 7;
+  else if(funcname == string("calc_self_energy") )
+    return 6;
+  else if(funcname == string("angle"))
+	return 3;
+  else if(funcname == string("diherals"))
+    return 3;
+  else if(funcname == string("testcase"))
+    return 2;
+  else {
+    throw new runtime_error("numCoefficients() does not know about some function name");
+  }
 }
 
 
-
-
-
 EventInterpolator::EventInterpolator(char *table_filename){
-  
-  work = NULL;
-  
-  std::ifstream paramtable(table_filename);
+  cout << "Loading timings file: " << table_filename << endl;
+  ifstream paramtable(table_filename);
 
   // First pass, scan through file to count how many samples there are for each function
   while(paramtable.good()){
-	std::string line_s;
+	string line_s;
 	getline(paramtable,line_s);
-	std::istringstream line(line_s);
-	
+	istringstream line(line_s);
+
 	if(paramtable.good()){
-	  std::string t1, t2, t3, t4, t5;
-	  std::string funcname;
-	  
+	  string t1, t2, t3, t4, t5;
+	  string funcname;
+
 	  line >> t1 >> t2 >> t3 >> t4 >> t5;
 	  line >> funcname;
 
@@ -42,107 +43,140 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
 
   // Create a gsl interpolator workspace for each event/function
-  for(std::map<std::string,unsigned long>::iterator i=sample_count.begin(); i!=sample_count.end();++i){
-	std::string name = (*i).first;
-	unsigned long occur = (*i).second;
-	std::cout << "function " << name << " has " << occur << " occurrences" << std::endl;
-	
-	work[(*i).first] = gsl_multifit_linear_alloc(occur,numCoefficients(name));
+  for(map<string,unsigned long>::iterator i=sample_count.begin(); i!=sample_count.end();++i){
+	string name = (*i).first;
+	unsigned long samples = (*i).second;
+	cout << "     > " << name << " has " << samples << " sampled timings" << endl;
+
+    if(samples < numCoefficients(name) ){
+        cerr << "FATAL ERROR: Not enough input timing samples for " << name << " which has " << numCoefficients(name) << " coefficients" << endl;
+        throw new runtime_error("samples < numCoefficients");
+    }
+    else {
+        work[name] = gsl_multifit_linear_alloc(samples,numCoefficients(name));
+        X[name] = gsl_matrix_alloc (samples,numCoefficients(name));
+        y[name] = gsl_vector_alloc (samples);
+        c[name] = gsl_vector_alloc(numCoefficients(name));
+        cov[name] = gsl_matrix_alloc(numCoefficients(name),numCoefficients(name));
+
+        for(int i=0;i<numCoefficients(name);++i){
+            gsl_vector_set(c[name],i,1.0);
+        }
+
+    }
   }
 
-  paramtable.close();
+  paramtable.seekg(0,ios_base::beg); // rewind
 
-  // Second Pass, scan through the file to load 
+  // Second Pass, scan through the file to load
   while(paramtable.good()){
-	std::string line_s;
+	string line_s;
 	getline(paramtable,line_s);
-	std::istringstream line(line_s);
-	
+	istringstream line(line_s);
+
 	if(paramtable.good()){
-	  std::string t1, t2, t3, t4, t5;
-	  std::string funcname;
-	  
-	  line >> t1 >> t2 >> t3 >> t4 >> t5;
-	  line >> funcname;
-	  
-	  
-	  
-	  
+        string t1, t2, t3, t4, t5;
+        string funcname;
+
+        line >> t1 >> t2 >> t3 >> t4 >> t5;
+        line >> funcname;
+
+        if(t4 == string("TRACEBIGSIM")){
+
+            if(funcname == string("calc_pair_energy")){
+                double d1,d2,d3,d4,d5,d6,d7,d8,d9, t1;
+                unsigned i1,i2,i3,i4,i5,i6;
+                string s1;
+                line >> s1 >> d1 >> d2 >> i1 >> i2 >> i3 >> i4 >> i5 >> i6 >> d3 >> d4 >> d5 >> d6 >> d7 >> d8 >> d9 >> t1;
+
+                gsl_matrix * x = X[funcname];
+                unsigned i = Xcount[funcname] ++;
+                gsl_matrix_set(x,i,0, 1.0);
+                gsl_matrix_set(x,i,1, min(d1,d2) );
+                gsl_matrix_set(x,i,2, 1.0/( (i1-i4)*(i1-i4)+(i2-i5)*(i2-i5)+(i3-i6)*(i3-i6) ) );
+                // Ignore d3, d8,d9
+                gsl_matrix_set(x,i,3, d4 );
+                gsl_matrix_set(x,i,4, d5 );
+                gsl_matrix_set(x,i,5, d6 );
+                gsl_matrix_set(x,i,6, d7 );
+                gsl_vector_set(y[funcname],i,t1);
+            }
+            else if(funcname == string("angle")){
+                double d1, d2, t1, t2;
+                line >> d1 >> d2 >> t1 >> t2;
+                gsl_matrix * x = X[funcname];
+                unsigned i = Xcount[funcname] ++;
+                gsl_matrix_set(x,i,0, 1.0);
+                gsl_matrix_set(x,i,1, d1 );
+                gsl_matrix_set(x,i,2, d2 );
+                gsl_vector_set(y[funcname],i,t2-t1);
+            }
+            else if(funcname == string("testcase")){
+                double d1, d2, t1;
+                line >> d1 >> d2 >> t1;
+                gsl_matrix * x = X[funcname];
+                unsigned i = Xcount[funcname] ++;
+                gsl_matrix_set(x,i,0, 1.0);
+                gsl_matrix_set(x,i,1, d1*d2 );
+                gsl_vector_set(y[funcname],i,t1);
+            }
+        }
 	}
   }
 
 
-  //  Find C     where y=Xc
+    cout << "Performing Least Squared Fits to sampled time data" << endl;
 
-  gsl_matrix *X;  // Each row is a set of parameters  [1, a, a^2, b, b^2, a*b] for each input parameter set
-  gsl_vector *y;  // vector of cycle accurate times for each input parameter set
+    //  Now do Least Square Fit: Find C where y=Xc
+    map<string, gsl_multifit_linear_workspace *>::iterator i;
+    for(i=work.begin();i!=work.end();++i){
+        string name = (*i).first;
+        assert(! gsl_multifit_linear(X[name],y[name],c[name],cov[name],&chisqr[name],work[name]));
+        gsl_matrix_free(X[name]);
+        gsl_vector_free(y[name]);
+        cout << "     > " << name << " has chisqr=" << chisqr[name] << endl;
+    }
 
-
-  X = gsl_matrix_alloc (n,cs);
-  y = gsl_vector_alloc (n);
-  c = gsl_vector_alloc(cs);
-  cov = gsl_matrix_alloc(cs,cs);
-
-  // Load parameters and times from input file
-  for(int i=0;i<n;i++){
-      double temp1, temp2;
-      paramtable >> temp1;
-      paramtable >> temp2;
-      
-      gsl_matrix_set(X,i,0,1.0);
-      gsl_matrix_set(X,i,1,temp1);
-      gsl_matrix_set(X,i,2,temp1*temp1);
-      gsl_matrix_set(X,i,3,temp2);
-      gsl_matrix_set(X,i,4,temp2*temp2);
-      gsl_matrix_set(X,i,5,temp1*temp2);
-      
-      double temp;
-      paramtable >> temp;
-      gsl_vector_set(y,i,temp);
-  }
-
-  // Do we need to initialize c
-  for(int j=0;j<cs;j++){
-      gsl_vector_set(c,j,1.0);
-  }
-
-  gsl_multifit_linear(X,y,c,cov,&chisqr,work);
-
-  gsl_matrix_free(X);
-  gsl_vector_free(y);
 
 }
 
 
-double EventInterpolator::predictTime(double *params) {
+double EventInterpolator::predictTime(string name, double *params) {
 
-  // Estimate time for a given set of parameters p
-  gsl_vector *desired_params;
-  
-  desired_params = gsl_vector_alloc(cs);
+    // Estimate time for a given set of parameters p
+    gsl_vector *desired_params;
 
-  gsl_vector_set(desired_params,0,1.0);
-  gsl_vector_set(desired_params,1,params[0]);
-  gsl_vector_set(desired_params,2,params[0]*params[0]);
-  gsl_vector_set(desired_params,3,params[1]);
-  gsl_vector_set(desired_params,4,params[1]*params[1]);
-  gsl_vector_set(desired_params,5,params[0]*params[1]);
-  
-  
-  double desired_time, desired_time_err;
-  gsl_multifit_linear_est(desired_params,c,cov,&desired_time,&desired_time_err);
+    desired_params = gsl_vector_alloc(numCoefficients(name));
 
-  // We now have a predicted time for the desired parameters
+    if(name == string("testcase")){
+        gsl_vector_set(desired_params,0,1.0);
+        gsl_vector_set(desired_params,1,params[0]*params[1]);
+    } else {
+        cerr << "FATAL ERROR: predictTime does not understand " << name << " yet" << endl;
+        throw new runtime_error("predictTime not yet done");
+    }
+
+    double desired_time, desired_time_err;
+    assert(! gsl_multifit_linear_est(desired_params,c[name],cov[name],&desired_time,&desired_time_err));
+
+    // We now have a predicted time for the desired parameters
 
     gsl_vector_free(desired_params);
-  return desired_time;
-  
+    return desired_time;
+
 }
 
+
+
+/** Free the gsl arrays and workspaces */
 EventInterpolator::~EventInterpolator(){
-  gsl_multifit_linear_free(work);
-  gsl_matrix_free(cov);
-  gsl_vector_free(c);
+    map<string, gsl_multifit_linear_workspace *>::iterator i;
+    for(i=work.begin();i!=work.end();++i){
+        string name = (*i).first;
+        gsl_multifit_linear_free(work[name]);
+        gsl_matrix_free(cov[name]);
+        gsl_vector_free(c[name]);
+    }
 }
 
 

@@ -41,12 +41,12 @@ int main()
 
 
   // Load in Mambo Times
-  EventInterpolator interpolator("MamboTimes"); 
+  EventInterpolator interpolator("MamboTimes");
 
 
   double parray[2] = {2.0,4.0};
-  std::cout << "Interpolated value chisqr=" << interpolator.get_chisqr() << " value = " << interpolator.predictTime(parray) << std::endl;
-  
+  std::cout << "Interpolated value chisqr=" << interpolator.get_chisqr(string("testcase")) << " value = " << interpolator.predictTime(string("testcase"),parray) << std::endl;
+
 
   // Load in Parameter File
 
@@ -148,10 +148,10 @@ int main()
     BgWriteTimelines(0, &tlinerecs[0], totalProcs, numWth, OUTPUTDIR);
 
   delete [] allNodeOffsets;
-  
+
 #endif
- 
-  
+
+
   std::cout << "End of program" << std::endl;
 }
 
