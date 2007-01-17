@@ -1,5 +1,12 @@
 
 #include <gsl/gsl_multifit.h>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <sstream>
+#include <map>
+
+using namespace std;
 
 /**
  @class A class for wrapping the least-square fitting portions of gsl.
@@ -12,18 +19,27 @@
 */
 class EventInterpolator{
 private: 
-  gsl_vector *c;  // coefficients which are produced by least square fit
-  gsl_matrix *cov;
-  gsl_multifit_linear_workspace * work;
-  int n;  // number of sample input evaluations
-  int np; // number of input parameters
-  int cs; // number of coefficients
-  double chisqr;
+  
+  // For each interpolatable function we record things in these maps:
+
+  map<string, unsigned long> sample_count;
+  map<string, gsl_multifit_linear_workspace *> work;
+  map<string, gsl_vector *> c; // coefficients which are produced by least square fit
+  map<string, gsl_matrix *> cov;
+  map<string, double> chisqr;
+
+  map<string, gsl_matrix *> X;  // Each row of matrix is a set of parameters  [1, a, a^2, b, b^2, a*b] for each input parameter set
+  map<string, gsl_vector *>y;  // vector of cycle accurate times for each input parameter set
+
 
 public:
 
   double predictTime(double *params);
   double get_chisqr(){if(work!=NULL) return chisqr; else return -1.0;}
+  
+  int EventInterpolator::numCoefficients(string funcname);
+  int EventInterpolator::numParameters(string funcname);
+
 
   EventInterpolator(char *table_filename);
   ~EventInterpolator();

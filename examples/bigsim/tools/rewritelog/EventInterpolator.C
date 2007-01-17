@@ -1,19 +1,76 @@
 
 #include <EventInterpolator.h>
-#include <iostream>
-#include <fstream>
+
+
+int EventInterpolator::numCoefficients(std::string funcname){
+  if(funcname == std::string("calc_pair_energy") )
+	return 9;
+  if(funcname == std::string("calc_self_energy") )
+	return 9;
+  else if(funcname == std::string("angle"))
+	return 2;
+  else if(funcname == std::string("diherals"))
+	return 2;
+}
+
+
+
 
 
 EventInterpolator::EventInterpolator(char *table_filename){
   
   work = NULL;
-  cs=6;
   
   std::ifstream paramtable(table_filename);
 
-  paramtable >> np >> n;
+  // First pass, scan through file to count how many samples there are for each function
+  while(paramtable.good()){
+	std::string line_s;
+	getline(paramtable,line_s);
+	std::istringstream line(line_s);
+	
+	if(paramtable.good()){
+	  std::string t1, t2, t3, t4, t5;
+	  std::string funcname;
+	  
+	  line >> t1 >> t2 >> t3 >> t4 >> t5;
+	  line >> funcname;
 
-  work = gsl_multifit_linear_alloc(n,cs);
+	  sample_count[funcname]++;
+	}
+  }
+
+
+  // Create a gsl interpolator workspace for each event/function
+  for(std::map<std::string,unsigned long>::iterator i=sample_count.begin(); i!=sample_count.end();++i){
+	std::string name = (*i).first;
+	unsigned long occur = (*i).second;
+	std::cout << "function " << name << " has " << occur << " occurrences" << std::endl;
+	
+	work[(*i).first] = gsl_multifit_linear_alloc(occur,numCoefficients(name));
+  }
+
+  paramtable.close();
+
+  // Second Pass, scan through the file to load 
+  while(paramtable.good()){
+	std::string line_s;
+	getline(paramtable,line_s);
+	std::istringstream line(line_s);
+	
+	if(paramtable.good()){
+	  std::string t1, t2, t3, t4, t5;
+	  std::string funcname;
+	  
+	  line >> t1 >> t2 >> t3 >> t4 >> t5;
+	  line >> funcname;
+	  
+	  
+	  
+	  
+	}
+  }
+
 
   //  Find C     where y=Xc
 

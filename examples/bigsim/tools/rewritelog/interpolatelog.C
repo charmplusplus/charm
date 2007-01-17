@@ -34,14 +34,23 @@ extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
 
 #define OUTPUTDIR "newtraces/"
-#define INPUTPARAMS "params-time-table"
-
-
-
 
 
 int main()
 {
+
+
+  // Load in Mambo Times
+  EventInterpolator interpolator("MamboTimes"); 
+
+
+  double parray[2] = {2.0,4.0};
+  std::cout << "Interpolated value chisqr=" << interpolator.get_chisqr() << " value = " << interpolator.predictTime(parray) << std::endl;
+  
+
+  // Load in Parameter File
+
+
 
 #if 0
   int totalProcs, numX, numY, numZ, numCth, numWth, numPes;
@@ -141,12 +150,7 @@ int main()
   delete [] allNodeOffsets;
   
 #endif
-  
-  
-  double parray[2] = {2.0,4.0};
-  EventInterpolator interpolator(INPUTPARAMS);  
-  std::cout << "Interpolated value chisqr=" << interpolator.get_chisqr() << " value = " << interpolator.predictTime(parray) << std::endl;
-  
+ 
   
   std::cout << "End of program" << std::endl;
 }
