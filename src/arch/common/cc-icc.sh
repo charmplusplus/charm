@@ -9,6 +9,8 @@ CMK_NATIVE_CC="$CMK_CC"
 CMK_NATIVE_CXX="$CMK_CXX"
 CMK_NATIVE_LD="$CMK_LD"
 CMK_NATIVE_LDXX="$CMK_LDXX"
+CPPFLAGS="$CPPFLAGS -fpic -cxxlib-icc "
+LDFLAGS="$LDFLAGS -i_dynamic -cxxlib-icc "
 
 # for absoft?
 #CMK_F90LIBS='-L/usr/local/intel/compiler70/ia32/lib -L/opt/intel/compiler70/ia32/lib -lintrins -lIEPCF90 -lPEPCF90 -lF90 -lintrins -limf '
