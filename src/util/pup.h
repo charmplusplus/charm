@@ -398,6 +398,19 @@ inline void fromMemBuf(T &t,void *buf,int len) {
 		"This means your pup routine doesn't match during packing and unpacking");
 }
 
+/*
+#ifdef AMPIMSGLOG
+#include <zlib.h>
+#define diskFile gzFile
+#define fwrite(p,s,n,f) gzwrite((f),(p),(s)*(n))
+#define fread(p,s,n,f) gzread((f),(p),(s)*(n))
+#define ftell(f) gztell((f))
+#define fseek(f,o,w) gzseek((f),(o),(w))
+#else
+#define diskFile FILE *
+#endif
+*/
+
 /********** PUP::er -- Binary disk file pack/unpack *********/
 class disk : public er {
  protected:
@@ -436,6 +449,45 @@ class fromDisk : public disk {
   fromDisk(FILE *f):disk(IS_UNPACKING,f) {}
 };
 
+#ifdef AMPIMSGLOG
+#include <zlib.h>
+class zdisk : public er {
+ protected:
+  gzFile F;//Disk file to read from/write to
+  zdisk(unsigned int type,gzFile f):er(type),F(f) {}
+  zdisk(const zdisk &p);			//You don't want to copy
+  void operator=(const zdisk &p);	// You don't want to copy
+
+  //For seeking (pack/unpack in different orders)
+  virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
+  virtual int impl_tell(seekBlock &s); /*Give the current offset*/
+  virtual void impl_seek(seekBlock &s,int off); /*Seek to the given offset*/
+};
+
+//For packing to a disk file
+class tozDisk : public zdisk {
+ protected:
+  //Generic bottleneck: pack n items of size itemSize from p.
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+ public:
+  //Write data to the given file pointer
+  // (must be opened for binary write)
+  // You must close the file yourself when done.
+  tozDisk(gzFile f):zdisk(IS_PACKING,f) {}
+};
+
+//For unpacking from a disk file
+class fromzDisk : public zdisk {
+ protected:
+  //Generic bottleneck: unpack n items of size itemSize from p.
+  virtual void bytes(void *p,int n,size_t itemSize,dataType t);
+ public:
+  //Write data to the given file pointer 
+  // (must be opened for binary read)
+  // You must close the file yourself when done.
+  fromzDisk(gzFile f):zdisk(IS_UNPACKING,f) {}
+};
+#endif // AMPIMSGLOG
 
 
 /************** PUP::er -- Text *****************/

@@ -137,10 +137,17 @@ void PUP::fromMem::bytes(void *p,int n,size_t itemSize,dataType t)
 
 /*Disk PUP::er's*/
 void PUP::toDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
-	{/*CkPrintf("writing\n");*/fwrite(p,itemSize,n,F);}
+{/* CkPrintf("writing %d bytes\n",itemSize*n); */ fwrite(p,itemSize,n,F);}
 void PUP::fromDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
-	{fread(p,itemSize,n,F);}
+{/* CkPrintf("reading %d bytes\n",itemSize*n); */ fread(p,itemSize,n,F);}
 
+#ifdef AMPIMSGLOG
+/*zDisk PUP::er's*/
+void PUP::tozDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
+{ CkPrintf("writing %d bytes\n",itemSize*n);  gzwrite(F,p,itemSize*n);}
+void PUP::fromzDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
+{ CkPrintf("reading %d bytes\n",itemSize*n);  gzread(F,p,itemSize*n);}
+#endif
 
 /****************** Seek support *******************
 For seeking:
@@ -232,6 +239,16 @@ int PUP::disk::impl_tell(seekBlock &s) /*Give the current offset*/
   {return (int)(ftell(F)-s.data.loff);}
 void PUP::disk::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
   {fseek(F,s.data.loff+off,0);}
+
+#ifdef AMPIMSGLOG
+/*zDisk buffer seeking is also simple*/
+void PUP::zdisk::impl_startSeek(seekBlock &s) /*Begin a seeking block*/
+  {s.data.loff=gztell(F);}
+int PUP::zdisk::impl_tell(seekBlock &s) /*Give the current offset*/
+  {return (int)(gztell(F)-s.data.loff);}
+void PUP::zdisk::impl_seek(seekBlock &s,int off) /*Seek to the given offset*/
+  {gzseek(F,s.data.loff+off,0);}
+#endif
 
 /*PUP::wrap_er just forwards seek calls to its wrapped PUP::er.*/
 void PUP::wrap_er::impl_startSeek(seekBlock &s) /*Begin a seeking block*/
