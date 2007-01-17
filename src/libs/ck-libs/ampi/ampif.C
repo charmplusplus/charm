@@ -1024,5 +1024,15 @@ void mpi_info_maxmemory(){
 void mpi_info_memory(){
   CkPrintf("Memory %ld\n", CmiMemoryUsage());
 }
+
+#define starttracebigsim FTN_NAME (STARTTRACEBIGSIM , starttracebigsim)
+#define endtracebigsim FTN_NAME (ENDTRACEBIGSIM , endtracebigsim)
+void starttracebigsim(char* msg){
+  startTraceBigSim(msg);
+}
+void endtracebigsim(char* msg, char* param){
+  endTraceBigSim(msg, param);
+}
+
 } // extern "C"
 

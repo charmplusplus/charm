@@ -25,6 +25,13 @@
 #  define AMPI_COMLIB 0
 #endif
 
+#ifdef AMPIMSGLOG
+#include <zlib.h>
+static int msgLogRank;
+static int msgLogWrite;
+static int msgLogRead;
+#endif
+
 #define AMPI_COUNTER 0
 
 #define AMPI_ALLTOALL_SHORT_MSG   32
@@ -498,11 +505,10 @@ Represents an MPI request that has been initiated
 using Isend, Irecv, Ialltoall, Send_init, etc.
 */
 class AmpiRequest {
-protected:
+public:
 	void *buf;
 	int count;
 	int type;
-public:
 	int tag;            // the order must match MPI_Status
 	int src;
 	int comm;
@@ -533,7 +539,7 @@ public:
 	///  returning a valid MPI error code.
 	virtual int wait(MPI_Status *sts) =0;
 
-	virtual void receive(ampi *aptr, AmpiMsg *msg) = 0; 
+	virtual void receive(ampi *ptr, AmpiMsg *msg) = 0; 
 
 	/// Frees up the request: invalidate it
 	virtual void free(void){ isvalid=false; }
@@ -568,7 +574,7 @@ public:
 	CmiBool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
-	void receive(ampi *aptr, AmpiMsg *msg) {}
+	void receive(ampi *ptr, AmpiMsg *msg) {}
 	inline int getType(void){ return 1; }
 	virtual void pup(PUP::er &p){
 		AmpiRequest::pup(p);
@@ -591,7 +597,7 @@ public:
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
 	inline int getType(void){ return 2; }
-	void receive(ampi *aptr, AmpiMsg *msg); 
+	void receive(ampi *ptr, AmpiMsg *msg); 
 	virtual void pup(PUP::er &p){
 		AmpiRequest::pup(p);
 		p|status;  p|length;
@@ -634,7 +640,7 @@ public:
 	CmiBool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
 	int wait(MPI_Status *sts);
-	void receive(ampi *aptr, AmpiMsg *msg) {}
+	void receive(ampi *ptr, AmpiMsg *msg) {}
 	inline int getCount(void){ return elmcount; }
 	inline int getType(void){ return 3; }
 // 	inline void free(void){ isvalid=false; delete [] myreqs; }
@@ -1243,6 +1249,18 @@ public:
     int getInfoNkeys(MPI_Info info);
     int getInfoNthkey(MPI_Info info, int n, char *key);
     void freeInfo(MPI_Info info);
+
+ public:
+#ifdef AMPIMSGLOG
+    /* message logging */
+    //    gzFile fMsgLog;
+    FILE* fMsgLog;
+    int pupBytes;
+    PUP::toDisk *toPUPer;
+    PUP::fromDisk *fromPUPer;
+#endif
+    void init();
+    void finalize();
 };
 
 /*
