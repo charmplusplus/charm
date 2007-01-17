@@ -66,15 +66,20 @@ EventInterpolator::EventInterpolator(char *table_filename){
     }
   }
 
-  paramtable.seekg(0,ios_base::beg); // rewind
+//  paramtable.seekg(0,ios_base::beg); // rewind
+  paramtable.close(); // I do this because seeking was failing earlier. why???
+
+  ifstream paramtable2(table_filename);
+
+    cout << "here 2" << endl;
 
   // Second Pass, scan through the file to load
-  while(paramtable.good()){
+  while(paramtable2.good()){
 	string line_s;
-	getline(paramtable,line_s);
+	getline(paramtable2,line_s);
 	istringstream line(line_s);
 
-	if(paramtable.good()){
+	if(paramtable2.good()){
         string t1, t2, t3, t4, t5;
         string funcname;
 
@@ -82,15 +87,14 @@ EventInterpolator::EventInterpolator(char *table_filename){
         line >> funcname;
 
         if(t4 == string("TRACEBIGSIM")){
-
+            unsigned i = Xcount[funcname] ++;
+            gsl_matrix * x = X[funcname];
             if(funcname == string("calc_pair_energy")){
                 double d1,d2,d3,d4,d5,d6,d7,d8,d9, t1;
                 unsigned i1,i2,i3,i4,i5,i6;
                 string s1;
-                line >> s1 >> d1 >> d2 >> i1 >> i2 >> i3 >> i4 >> i5 >> i6 >> d3 >> d4 >> d5 >> d6 >> d7 >> d8 >> d9 >> t1;
-
-                gsl_matrix * x = X[funcname];
-                unsigned i = Xcount[funcname] ++;
+                line >> s1 >> d1 >> d2 >> i1 >> i2 >> i3 >> i4 >> i5 >>
+                        i6 >> d3 >> d4 >> d5 >> d6 >> d7 >> d8 >> d9 >> t1;
                 gsl_matrix_set(x,i,0, 1.0);
                 gsl_matrix_set(x,i,1, min(d1,d2) );
                 gsl_matrix_set(x,i,2, 1.0/( (i1-i4)*(i1-i4)+(i2-i5)*(i2-i5)+(i3-i6)*(i3-i6) ) );
@@ -104,8 +108,6 @@ EventInterpolator::EventInterpolator(char *table_filename){
             else if(funcname == string("angle")){
                 double d1, d2, t1, t2;
                 line >> d1 >> d2 >> t1 >> t2;
-                gsl_matrix * x = X[funcname];
-                unsigned i = Xcount[funcname] ++;
                 gsl_matrix_set(x,i,0, 1.0);
                 gsl_matrix_set(x,i,1, d1 );
                 gsl_matrix_set(x,i,2, d2 );
@@ -114,8 +116,6 @@ EventInterpolator::EventInterpolator(char *table_filename){
             else if(funcname == string("testcase")){
                 double d1, d2, t1;
                 line >> d1 >> d2 >> t1;
-                gsl_matrix * x = X[funcname];
-                unsigned i = Xcount[funcname] ++;
                 gsl_matrix_set(x,i,0, 1.0);
                 gsl_matrix_set(x,i,1, d1*d2 );
                 gsl_vector_set(y[funcname],i,t1);
@@ -124,6 +124,12 @@ EventInterpolator::EventInterpolator(char *table_filename){
 	}
   }
 
+
+    // Perform a sanity check now
+
+    for(map<string, gsl_multifit_linear_workspace *>::iterator i=work.begin();i!=work.end();++i){
+        assert(sample_count[(*i).first]==Xcount[(*i).first]);
+    }
 
     cout << "Performing Least Squared Fits to sampled time data" << endl;
 
