@@ -4,37 +4,42 @@
 using namespace std;
 
 int EventInterpolator::numCoefficients(string funcname){
-  if(funcname == string("calc_pair_energy") )
-	return 7;
-  else if(funcname == string("calc_self_energy") )
-    return 6;
-  else if(funcname == string("angle"))
-	return 3;
-  else if(funcname == string("diherals"))
-    return 3;
-  else if(funcname == string("testcase"))
-    return 2;
-  else {
-    throw new runtime_error("numCoefficients() does not know about some function name");
-  }
+    if( funcname == string("calc_self_energy_merge_fullelect") ||
+        funcname == string("calc_pair_energy_merge_fullelect") ||
+        funcname == string("calc_self_merge_fullelect") ||
+        funcname == string("calc_pair_merge_fullelect") ||
+        funcname == string("calc_self_energy") ||
+        funcname == string("calc_pair_energy") ) {
+            return 3;
+        }
+    else if(funcname == string("angle") || funcname == string("dihedrals")){
+            return 3;
+        }
+    else if(funcname == string("*integrate*") ){
+            return 2;
+        }
+    else {
+        cerr << "Unknown function: " << funcname << endl;
+        throw new runtime_error("numCoefficients() does not know about some function name");
+    }
 }
 
 
 EventInterpolator::EventInterpolator(char *table_filename){
   cout << "Loading timings file: " << table_filename << endl;
-  ifstream paramtable(table_filename);
+  ifstream accurateTimeTable(table_filename);
 
   // First pass, scan through file to count how many samples there are for each function
-  while(paramtable.good()){
+  while(accurateTimeTable.good()){
 	string line_s;
-	getline(paramtable,line_s);
+	getline(accurateTimeTable,line_s);
 	istringstream line(line_s);
 
-	if(paramtable.good()){
-	  string t1, t2, t3, t4, t5;
+	if(accurateTimeTable.good()){
+	  string t1, t2;
 	  string funcname;
 
-	  line >> t1 >> t2 >> t3 >> t4 >> t5;
+	  line >> t1 >> t2;
 	  line >> funcname;
 
 	  sample_count[funcname]++;
@@ -66,58 +71,62 @@ EventInterpolator::EventInterpolator(char *table_filename){
     }
   }
 
-//  paramtable.seekg(0,ios_base::beg); // rewind
-  paramtable.close(); // I do this because seeking was failing earlier. why???
+//  accurateTimeTable.seekg(0,ios_base::beg); // rewind
+  accurateTimeTable.close(); // I do this because seeking was failing earlier. why???
 
-  ifstream paramtable2(table_filename);
-
-    cout << "here 2" << endl;
+  ifstream accurateTimeTable2(table_filename);
 
   // Second Pass, scan through the file to load
-  while(paramtable2.good()){
+  while(accurateTimeTable2.good()){
 	string line_s;
-	getline(paramtable2,line_s);
+	getline(accurateTimeTable2,line_s);
 	istringstream line(line_s);
 
-	if(paramtable2.good()){
-        string t1, t2, t3, t4, t5;
+	if(accurateTimeTable2.good()){
+        string t1, t2;
         string funcname;
 
-        line >> t1 >> t2 >> t3 >> t4 >> t5;
+        line >> t1 >> t2;
         line >> funcname;
 
-        if(t4 == string("TRACEBIGSIM")){
+        if(t1 == string("TRACEBIGSIM")){
             unsigned i = Xcount[funcname] ++;
             gsl_matrix * x = X[funcname];
-            if(funcname == string("calc_pair_energy")){
+            if( funcname == string("calc_self_energy_merge_fullelect") ||
+                funcname == string("calc_pair_energy_merge_fullelect") ||
+                funcname == string("calc_self_merge_fullelect") ||
+                funcname == string("calc_pair_merge_fullelect") ||
+                funcname == string("calc_self_energy") ||
+                funcname == string("calc_pair_energy") ){
                 double d1,d2,d3,d4,d5,d6,d7,d8,d9, t1;
                 unsigned i1,i2,i3,i4,i5,i6;
-                string s1;
-                line >> s1 >> d1 >> d2 >> i1 >> i2 >> i3 >> i4 >> i5 >>
-                        i6 >> d3 >> d4 >> d5 >> d6 >> d7 >> d8 >> d9 >> t1;
+
+                line >> d1 >> d2 >> i1 >> i2 >> i3 >> i4 >> i5 >> i6 >>
+                        d3 >> d4 >> d5 >> d6 >> d7 >> d8 >> t1;
+
                 gsl_matrix_set(x,i,0, 1.0);
                 gsl_matrix_set(x,i,1, min(d1,d2) );
-                gsl_matrix_set(x,i,2, 1.0/( (i1-i4)*(i1-i4)+(i2-i5)*(i2-i5)+(i3-i6)*(i3-i6) ) );
-                // Ignore d3, d8,d9
-                gsl_matrix_set(x,i,3, d4 );
-                gsl_matrix_set(x,i,4, d5 );
-                gsl_matrix_set(x,i,5, d6 );
-                gsl_matrix_set(x,i,6, d7 );
+                gsl_matrix_set(x,i,2, d3 );
+
                 gsl_vector_set(y[funcname],i,t1);
             }
-            else if(funcname == string("angle")){
-                double d1, d2, t1, t2;
-                line >> d1 >> d2 >> t1 >> t2;
+            else if(funcname == string("angle") || funcname == string("testcase")){
+                double d1, d2, t1;
+                line >> d1 >> d2 >> t1;
+
                 gsl_matrix_set(x,i,0, 1.0);
                 gsl_matrix_set(x,i,1, d1 );
                 gsl_matrix_set(x,i,2, d2 );
-                gsl_vector_set(y[funcname],i,t2-t1);
+
+                gsl_vector_set(y[funcname],i,t1);
             }
-            else if(funcname == string("testcase")){
-                double d1, d2, t1;
-                line >> d1 >> d2 >> t1;
+            else if(funcname == string("*integrate*")){
+                double d1, d2, d3, d4, d5, d6, d7, t1;
+                line >> d1 >> d2 >> d3 >> d4 >> d5 >> d6 >> d7 >> t1;
+
                 gsl_matrix_set(x,i,0, 1.0);
-                gsl_matrix_set(x,i,1, d1*d2 );
+                gsl_matrix_set(x,i,1, d2 );
+
                 gsl_vector_set(y[funcname],i,t1);
             }
         }
@@ -144,10 +153,102 @@ EventInterpolator::EventInterpolator(char *table_filename){
     }
 
 
+
+    // Load in Parameter File which maps event id to function name and parameters
+    cout << "Loading parameter files" << table_filename << endl;
+
+    for(int i=0;i<102400;++i){
+        char name[512];
+        sprintf(name,"param.%d",i);
+        ifstream parameterEventTable(name);
+
+        if(parameterEventTable.good()){
+            cout << "     >  Loading " << name << endl;
+
+            while(parameterEventTable.good()){
+                string line_s;
+                getline(parameterEventTable,line_s);
+                istringstream line(line_s);
+
+                if(parameterEventTable.good()){
+                    string t1, t2;
+                    string funcname;
+                    unsigned eventid;
+
+                    line >> eventid;
+                    line >> t1 >> t2;
+                    line >> funcname;
+
+                    if(t1 == string("TRACEBIGSIM")){
+                        unsigned i = Xcount[funcname] ++;
+
+                        if( funcname == string("calc_self_energy_merge_fullelect") ||
+                            funcname == string("calc_pair_energy_merge_fullelect") ||
+                            funcname == string("calc_self_merge_fullelect") ||
+                            funcname == string("calc_pair_merge_fullelect") ||
+                            funcname == string("calc_self_energy") ||
+                            funcname == string("calc_pair_energy") ){
+                            double d1,d2,d3,d4,d5,d6,d7,d8,d9, t1;
+                            unsigned i1,i2,i3,i4,i5,i6;
+
+                            line >> d1 >> d2 >> i1 >> i2 >> i3 >> i4 >> i5 >> i6 >>
+                                    d3 >> d4 >> d5 >> d6 >> d7 >> d8 >> t1;
+
+                            vector<double> params;
+                            params.push_back( 1.0);
+                            params.push_back( min(d1,d2) );
+                            params.push_back( d3 );
+                            eventparams[pair<unsigned,unsigned>(i,eventid)] = pair<string,vector<double> >(funcname,params);
+                        }
+                        else if(funcname == string("angle") || funcname == string("testcase")){
+                            double d1, d2, t1;
+                            line >> d1 >> d2 >> t1;
+
+                            vector<double> params;
+                            params.push_back( 1.0);
+                            params.push_back( d1 );
+                            params.push_back( d2 );
+                            eventparams[pair<unsigned,unsigned>(i,eventid)] = pair<string,vector<double> >(funcname,params);
+
+                        }
+                        else if(funcname == string("*integrate*")){
+                            double d1, d2, d3, d4, d5, d6, d7, t1;
+                            line >> d1 >> d2 >> d3 >> d4 >> d5 >> d6 >> d7 >> t1;
+
+                            vector<double> params;
+                            params.push_back( 1.0);
+                            params.push_back( d2 );
+                            eventparams[pair<unsigned,unsigned>(i,eventid)] = pair<string,vector<double> >(funcname,params);
+
+                        }
+                    }
+                }
+            }
+
+        }
+        else{ // file was no good
+            break;
+        }
+
+        parameterEventTable.close();
+    }
+
+
 }
 
 
-double EventInterpolator::predictTime(string name, double *params) {
+
+double EventInterpolator::predictTime(const string &name, vector<double> &params) {
+    double val;
+    double *p = new double[params.size()];
+    for(int i=0;i<params.size();++i)
+        p[i] = params[i];
+    val = predictTime(name, p);
+    delete[] p;
+    return val;
+}
+
+double EventInterpolator::predictTime(const string &name, double *params) {
 
     // Estimate time for a given set of parameters p
     gsl_vector *desired_params;

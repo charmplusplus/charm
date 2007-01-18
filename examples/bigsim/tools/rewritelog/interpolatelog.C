@@ -29,26 +29,24 @@
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <utility> // for std::pair
+#include <vector>
 
 extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
 
 #define OUTPUTDIR "newtraces/"
-
+#define CYCLE_TIMES_FILE "pme"
 
 int main()
 {
 
+    // Load in Mambo Times
+    EventInterpolator interpolator(CYCLE_TIMES_FILE);
 
-  // Load in Mambo Times
-  EventInterpolator interpolator("MamboTimes");
+    //   double parray[2] = {2.0,4.0};
+    //   std::cout << "Interpolated value chisqr=" << interpolator.get_chisqr(string("testcase")) << " value = " << interpolator.predictTime(string("testcase"),parray) << std::endl;
 
-
-  double parray[2] = {2.0,4.0};
-  std::cout << "Interpolated value chisqr=" << interpolator.get_chisqr(string("testcase")) << " value = " << interpolator.predictTime(string("testcase"),parray) << std::endl;
-
-
-  // Load in Parameter File
 
 
 

@@ -5,8 +5,13 @@
 #include <string>
 #include <sstream>
 #include <cassert>
-#include <map>
 #include <stdexcept>
+
+#include <map>
+#include <string>
+#include <utility> // for std::pair
+#include <vector>
+
 
 using namespace std;
 
@@ -35,9 +40,15 @@ private:
     map<string, gsl_vector *>y;  // vector of cycle accurate times for each input parameter set
 
 
+    map<pair<unsigned,unsigned>,pair<string,vector<double> > > eventparams;
+
+
 public:
 
-    double predictTime(string funcname, double *params);
+    double predictTime(const string &name, vector<double> &params);
+    double predictTime(const string &name, double *params);
+
+
     double get_chisqr(string funcname){if(work[funcname]!=NULL) return chisqr[funcname]; else return -1.0;}
 
     int EventInterpolator::numCoefficients(string funcname);
