@@ -32,7 +32,7 @@
 #include <utility> // for std::pair
 #include <vector>
 
-// extern BgTimeLineRec* currTline;
+extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
 
 #define OUTPUTDIR "newtraces/"
@@ -62,6 +62,11 @@ int main()
 
     // load each individual trace file for each bg proc
     assert(totalProcs == 4);
+
+    unsigned rewritten_count=0;
+    unsigned total_count=0;
+    bool negative_durations_occured = false;
+
     for (int i=0; i<totalProcs; i++)
     {
         int procNum = i;
@@ -79,42 +84,53 @@ int main()
         for(int j=0;j<timeLine.length();j++){
             BgTimeLog* timeLog = timeLine[j];
             std::string name(timeLog->name);
-
+            total_count++;
             // If name of this event is one that needs to have its duration modified
             if( interpolator.haveNewTiming(i,timeLog->seqno) ) {
 
                 double newduration = interpolator.predictTime(i,timeLog->seqno);
 
-                double oldstart = timeLog->startTime;
-                double oldend   = timeLog->endTime;
-                double newstart = oldstart;
-                double newend   = oldstart+newduration;
+                if(newduration > 0.0){
 
-                timeLog->startTime = newstart;
-                timeLog->endTime   = newend;
+                    rewritten_count++;
 
-                printf("Rewriting duration of event %d name=%s from [%.10lf , %.10lf] to [%.10lf , %.10lf]\n", j, timeLog->name, oldstart,oldend,newstart,newend);
+                    double oldstart = timeLog->startTime;
+                    double oldend   = timeLog->endTime;
+                    double newstart = oldstart;
+                    double newend   = oldstart+newduration;
 
-                for(int m=0;m<timeLog->msgs.length();m++){
-                    double oldsendtime = timeLog->msgs[m]->sendTime;
-                    double newsendtime;
+                    timeLog->startTime = newstart;
+                    timeLog->endTime   = newend;
 
-                    if(oldstart == oldend){
-                        newsendtime = oldstart;
-                    } else {
-                        // Linearly map the old range onto the new range
-                        newsendtime = newstart + (oldsendtime-oldstart)/(oldend-oldstart) * (newend-newstart);
+//                     printf("Rewriting duration of event %d name=%s from [%.10lf , %.10lf] to [%.10lf , %.10lf]\n", j, timeLog->name, oldstart,oldend,newstart,newend);
+
+                    for(int m=0;m<timeLog->msgs.length();m++){
+                        double oldsendtime = timeLog->msgs[m]->sendTime;
+                        double newsendtime;
+
+                        if(oldstart == oldend){
+                            newsendtime = oldstart;
+                        } else {
+                            // Linearly map the old range onto the new range
+                            newsendtime = newstart + (oldsendtime-oldstart)/(oldend-oldstart) * (newend-newstart);
+                        }
+
+                        timeLog->msgs[m]->sendTime = newsendtime;
+                        printf("changing message %d send time from %.10lf to %.10lf\n", m, oldsendtime, newsendtime);
                     }
-
-                    timeLog->msgs[m]->sendTime = newsendtime;
-                    printf("changing message %d send time from %.10lf to %.10lf\n", m, oldsendtime, newsendtime);
                 }
-
+                else {
+                    negative_durations_occured=true;
+                }
             }
 
         }
     }
-
+    if(negative_durations_occured){
+        cerr << "======================  WARNING ======================" << endl;
+        cerr << "||  One or more new durations were less than zero. \n||  This probably means your model or input times are \n||  not good enough." << endl;
+        cerr << "======================================================" << endl;
+    }
 
     // Create output directory
     mkdir(OUTPUTDIR, 0777);
@@ -128,6 +144,8 @@ int main()
 
     delete [] allNodeOffsets;
 
-  std::cout << "End of program" << std::endl;
+    std::cout << " We successfully replaced the durations of " << rewritten_count << " events out of " <<  total_count << std::endl;
+    std::cout << "End of program" << std::endl;
+
 }
 

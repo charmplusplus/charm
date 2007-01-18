@@ -1,6 +1,10 @@
 
 #include <EventInterpolator.h>
 
+
+#define sec_per_cycle 0.00000000025
+
+
 using namespace std;
 
 int EventInterpolator::numCoefficients(string funcname){
@@ -106,36 +110,36 @@ EventInterpolator::EventInterpolator(char *table_filename){
                 funcname == string("calc_pair") ||
                 funcname == string("calc_self_energy") ||
                 funcname == string("calc_pair_energy") ){
-                double d1,d2,d3,d4,d5,d6,d7,d8,d9, t1;
+                double d1,d2,d3,d4,d5,d6,d7,d8,d9, t;
                 unsigned i1,i2,i3,i4,i5,i6;
 
                 line >> d1 >> d2 >> i1 >> i2 >> i3 >> i4 >> i5 >> i6 >>
-                        d3 >> d4 >> d5 >> d6 >> d7 >> d8 >> t1;
+                        d3 >> d4 >> d5 >> d6 >> d7 >> d8 >> t;
 
                 gsl_matrix_set(x,i,0, 1.0);
                 gsl_matrix_set(x,i,1, min(d1,d2) );
                 gsl_matrix_set(x,i,2, d3 );
 
-                gsl_vector_set(y[funcname],i,t1);
+                gsl_vector_set(y[funcname],i,t*sec_per_cycle);
             }
             else if(funcname == string("angle") || funcname == string("testcase")){
-                double d1, d2, t1;
-                line >> d1 >> d2 >> t1;
+                double d1, d2, t;
+                line >> d1 >> d2 >> t;
 
                 gsl_matrix_set(x,i,0, 1.0);
                 gsl_matrix_set(x,i,1, d1 );
                 gsl_matrix_set(x,i,2, d2 );
 
-                gsl_vector_set(y[funcname],i,t1);
+                gsl_vector_set(y[funcname],i,t*sec_per_cycle);
             }
             else if(funcname == string("*integrate*")){
-                double d1, d2, d3, d4, d5, d6, d7, t1;
-                line >> d1 >> d2 >> d3 >> d4 >> d5 >> d6 >> d7 >> t1;
+                double d1, d2, d3, d4, d5, d6, d7, t;
+                line >> d1 >> d2 >> d3 >> d4 >> d5 >> d6 >> d7 >> t;
 
                 gsl_matrix_set(x,i,0, 1.0);
                 gsl_matrix_set(x,i,1, d2 );
 
-                gsl_vector_set(y[funcname],i,t1);
+                gsl_vector_set(y[funcname],i,t*sec_per_cycle);
             }
 
         }
@@ -191,7 +195,7 @@ EventInterpolator::EventInterpolator(char *table_filename){
                     line >> funcname;
 
                     if(t1 == string("TRACEBIGSIM")){
-                        unsigned i = Xcount[funcname] ++;
+                        Xcount[funcname] ++;
 
                         if( funcname == string("calc_self_energy_merge_fullelect") ||
                             funcname == string("calc_pair_energy_merge_fullelect") ||
@@ -223,7 +227,6 @@ EventInterpolator::EventInterpolator(char *table_filename){
                             params.push_back( d1 );
                             params.push_back( d2 );
                             eventparams[pair<unsigned,unsigned>(i,eventid)] = pair<string,vector<double> >(funcname,params);
-
                         }
                         else if(funcname == string("*integrate*")){
                             double d1, d2, d3, d4, d5, d6, d7, t1;
@@ -233,7 +236,6 @@ EventInterpolator::EventInterpolator(char *table_filename){
                             params.push_back( 1.0);
                             params.push_back( d2 );
                             eventparams[pair<unsigned,unsigned>(i,eventid)] = pair<string,vector<double> >(funcname,params);
-
                         }
                     }
                 }
@@ -284,12 +286,16 @@ double EventInterpolator::predictTime(const string &name, const vector<double> &
     }
 
     double desired_time, desired_time_err;
-    cout << "name=" << name << endl;
     assert(c[name]);
     assert(cov[name]);
     assert(! gsl_multifit_linear_est(desired_params,c[name],cov[name],&desired_time,&desired_time_err));
 
     gsl_vector_free(desired_params);
+
+    if(desired_time< 0.0){
+        cout << "desired_time less than zero for " << name << endl;
+    }
+
     return desired_time;
 
 }
