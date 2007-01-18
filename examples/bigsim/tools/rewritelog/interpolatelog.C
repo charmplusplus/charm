@@ -32,7 +32,7 @@
 #include <utility> // for std::pair
 #include <vector>
 
-extern BgTimeLineRec* currTline;
+// extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
 
 #define OUTPUTDIR "newtraces/"
@@ -40,115 +40,93 @@ extern int currTlineIdx;
 
 int main()
 {
-
     // Load in Mambo Times
     EventInterpolator interpolator(CYCLE_TIMES_FILE);
 
-    //   double parray[2] = {2.0,4.0};
-    //   std::cout << "Interpolated value chisqr=" << interpolator.get_chisqr(string("testcase")) << " value = " << interpolator.predictTime(string("testcase"),parray) << std::endl;
+    int totalProcs, numX, numY, numZ, numCth, numWth, numPes;
+    BgTimeLineRec *tlinerecs;
 
 
+    // load bg trace summary file
+    printf("Loading bgTrace ... \n");
+    int status = BgLoadTraceSummary("bgTrace", totalProcs, numX, numY, numZ, numCth, numWth, numPes);
+    if (status == -1) exit(1);
+    printf("========= BgLog Version: %d ========= \n", bglog_version);
+    printf("Found %d (%dx%dx%d:%dw-%dc) emulated procs on %d real procs.\n", totalProcs, numX, numY, numZ, numWth, numCth, numPes);
 
+    int* allNodeOffsets = BgLoadOffsets(totalProcs,numPes);
 
-#if 0
-  int totalProcs, numX, numY, numZ, numCth, numWth, numPes;
-  BgTimeLineRec *tlinerecs;
+    tlinerecs = new BgTimeLineRec[totalProcs];
 
-  bool done = false;
-  double newtime=1.0;
-  std::string eventname;
-  std::map<std::string,double> newtimes;
-  std::cout << "Enter event name followed by its new time duration.\nEnter \"none -1.0\" after finishing. Don't use any spaces in names." << std::endl;
-  while(!done) {
-    std::cin >> eventname >> newtime;
-    if(newtime < 0.0)
-        done = 1;
-    else
-        newtimes[eventname]=newtime;
-  }
+    printf("========= Loading All Logs ========= \n");
 
-  std::cout << "You entered " << newtimes.size() << " distinct events with their associated durations" << std::endl;
+    // load each individual trace file for each bg proc
+    assert(totalProcs == 4);
+    for (int i=0; i<totalProcs; i++)
+    {
+        int procNum = i;
+        currTline = &tlinerecs[i];
+        currTlineIdx = procNum;
+        int fileNum = BgReadProc(procNum,numWth,numPes,totalProcs,allNodeOffsets,tlinerecs[i]);
+        CmiAssert(fileNum != -1);
+        printf("Load log of BG proc %d from bgTrace%d... \n", i, fileNum);
 
+        BgTimeLine &timeLine = tlinerecs[i].timeline; // Really a CkQ< BgTimeLog *>
 
-  // load bg trace summary file
-  printf("Loading bgTrace ... \n");
-  int status = BgLoadTraceSummary("bgTrace", totalProcs, numX, numY, numZ, numCth, numWth, numPes);
-  if (status == -1) exit(1);
-  printf("========= BgLog Version: %d ========= \n", bglog_version);
-  printf("Found %d (%dx%dx%d:%dw-%dc) emulated procs on %d real procs.\n", totalProcs, numX, numY, numZ, numWth, numCth, numPes);
+        printf("%d entries in timeLine\n", timeLine.length());
 
-  int* allNodeOffsets = BgLoadOffsets(totalProcs,numPes);
+        // Scan through each event for this emulated processor
+        for(int j=0;j<timeLine.length();j++){
+            BgTimeLog* timeLog = timeLine[j];
+            std::string name(timeLog->name);
 
-  tlinerecs = new BgTimeLineRec[totalProcs];
+            // If name of this event is one that needs to have its duration modified
+            if( interpolator.haveNewTiming(i,timeLog->seqno) ) {
 
-  printf("========= Loading All Logs ========= \n");
+                double newduration = interpolator.predictTime(i,timeLog->seqno);
 
-  // load each individual trace file for each bg proc
-  for (int i=0; i<totalProcs; i++)
-  {
-    int procNum = i;
-    currTline = &tlinerecs[i];
-    currTlineIdx = procNum;
-    int fileNum = BgReadProc(procNum,numWth,numPes,totalProcs,allNodeOffsets,tlinerecs[i]);
-    CmiAssert(fileNum != -1);
-    printf("Load log of BG proc %d from bgTrace%d... \n", i, fileNum);
+                double oldstart = timeLog->startTime;
+                double oldend   = timeLog->endTime;
+                double newstart = oldstart;
+                double newend   = oldstart+newduration;
 
-    BgTimeLine &timeLine = tlinerecs[i].timeline; // Really a CkQ< BgTimeLog *>
+                timeLog->startTime = newstart;
+                timeLog->endTime   = newend;
 
-    printf("%d entries in timeLine\n", timeLine.length());
+                printf("Rewriting duration of event %d name=%s from [%.10lf , %.10lf] to [%.10lf , %.10lf]\n", j, timeLog->name, oldstart,oldend,newstart,newend);
 
-    // Scan through each event for this emulated processor
-    for(int j=0;j<timeLine.length();j++){
-        BgTimeLog* timeLog = timeLine[j];
-        std::string name(timeLog->name);
+                for(int m=0;m<timeLog->msgs.length();m++){
+                    double oldsendtime = timeLog->msgs[m]->sendTime;
+                    double newsendtime;
 
-        // If name of this event is one that needs to have its duration modified
-        if( newtimes.find(name) != newtimes.end() ) {
-            double oldstart = timeLog->startTime;
-            double oldend   = timeLog->endTime;
-            double newstart = oldstart;
-            double newend   = oldstart+newtimes[name];
+                    if(oldstart == oldend){
+                        newsendtime = oldstart;
+                    } else {
+                        // Linearly map the old range onto the new range
+                        newsendtime = newstart + (oldsendtime-oldstart)/(oldend-oldstart) * (newend-newstart);
+                    }
 
-            timeLog->startTime = newstart;
-            timeLog->endTime   = newend;
-
-            printf("Rewriting duration of event %d name=%s from [%.10lf , %.10lf] to [%.10lf , %.10lf]\n", j, timeLog->name, oldstart,oldend,newstart,newend);
-
-            for(int m=0;m<timeLog->msgs.length();m++){
-                double oldsendtime = timeLog->msgs[m]->sendTime;
-                double newsendtime;
-
-                if(oldstart == oldend){
-                    newsendtime = oldstart;
-                } else {
-                    // Linearly map the old range onto the new range
-                    newsendtime = newstart + (oldsendtime-oldstart)/(oldend-oldstart) * (newend-newstart);
+                    timeLog->msgs[m]->sendTime = newsendtime;
+                    printf("changing message %d send time from %.10lf to %.10lf\n", m, oldsendtime, newsendtime);
                 }
 
-                timeLog->msgs[m]->sendTime = newsendtime;
-                printf("changing message %d send time from %.10lf to %.10lf\n", m, oldsendtime, newsendtime);
             }
 
         }
-
     }
-  }
 
 
-// Create output directory
+    // Create output directory
     mkdir(OUTPUTDIR, 0777);
 
-// We should write out the timelines to the same number of files as we started with.
-// The mapping from VP to file was probably round robin. Here we cheat and make just one file
-// TODO : fix this to write out in same initial pattern
+    // We should write out the timelines to the same number of files as we started with.
+    // The mapping from VP to file was probably round robin. Here we cheat and make just one file
+    // TODO : fix this to write out in same initial pattern
     BgWriteTraceSummary(totalProcs, 1, numX, numY, numZ, numCth, numWth, OUTPUTDIR);
-//  for(int i=0; i<numPes; i++)
+    //  for(int i=0; i<numPes; i++)
     BgWriteTimelines(0, &tlinerecs[0], totalProcs, numWth, OUTPUTDIR);
 
-  delete [] allNodeOffsets;
-
-#endif
-
+    delete [] allNodeOffsets;
 
   std::cout << "End of program" << std::endl;
 }

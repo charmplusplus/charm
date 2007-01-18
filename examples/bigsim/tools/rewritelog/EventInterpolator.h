@@ -41,13 +41,14 @@ private:
 
     map<pair<unsigned,unsigned>,pair<string,vector<double> > > eventparams;
 
+    bool canInterpolateName(const string& name);
+
 
 public:
-
+    double haveNewTiming(const unsigned pe, const unsigned eventid);
     double predictTime(const unsigned pe, const unsigned eventid);
     double predictTime(const pair<string,vector<double> > &p);
     double predictTime(const string &name, const vector<double> &params);
-    double predictTime(const string &name, const double *params);
 
 
     double get_chisqr(string funcname){if(work[funcname]!=NULL) return chisqr[funcname]; else return -1.0;}

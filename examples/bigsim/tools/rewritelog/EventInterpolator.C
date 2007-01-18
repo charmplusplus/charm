@@ -41,15 +41,12 @@ EventInterpolator::EventInterpolator(char *table_filename){
         string temp("");
         while(temp != string("TRACEBIGSIM") && line.good() && accurateTimeTable.good() ){
             line >> temp;
-//             cout << "G:  " << temp << endl;
         }
         line >> temp; // gobble up one more worthless bit of input line
-//         cout << "G2:  " << temp << endl;
 
         if(line.good() && accurateTimeTable.good()){
             string funcname;
             line >> funcname;
-//             cout << "F=" << funcname << endl;
             sample_count[funcname]++;
             }
         }
@@ -83,8 +80,6 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
     ifstream accurateTimeTable2(table_filename);
 
-//     cout << "HERE" << endl;
-
     // Second Pass, scan through the file to load
     while(accurateTimeTable2.good()){
         string line_s;
@@ -94,16 +89,12 @@ EventInterpolator::EventInterpolator(char *table_filename){
         string temp("");
         while(temp != string("TRACEBIGSIM") && line.good() && accurateTimeTable2.good() ){
             line >> temp;
-//             cout << "G:  " << temp << endl;
         }
         line >> temp; // gobble up one more worthless bit of input line
-//         cout << "G2:  " << temp << endl;
 
         if(line.good() && accurateTimeTable2.good()){
             string funcname;
             line >> funcname;
-
-//             cout << "funcname=" << funcname << endl;
 
             unsigned i = Xcount[funcname] ++;
             gsl_matrix * x = X[funcname];
@@ -175,7 +166,7 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
 
     // Load in Parameter File which maps event id to function name and parameters
-    cout << "Loading parameter files" << table_filename << endl;
+    cout << "Loading parameter files: " << table_filename << "*" << endl;
 
     for(int i=0;i<102400;++i){
         char name[512];
@@ -206,8 +197,11 @@ EventInterpolator::EventInterpolator(char *table_filename){
                             funcname == string("calc_pair_energy_merge_fullelect") ||
                             funcname == string("calc_self_merge_fullelect") ||
                             funcname == string("calc_pair_merge_fullelect") ||
+                            funcname == string("calc_self") ||
+                            funcname == string("calc_pair") ||
                             funcname == string("calc_self_energy") ||
                             funcname == string("calc_pair_energy") ){
+
                             double d1,d2,d3,d4,d5,d6,d7,d8,d9, t1;
                             unsigned i1,i2,i3,i4,i5,i6;
 
@@ -254,7 +248,10 @@ EventInterpolator::EventInterpolator(char *table_filename){
     }
 }
 
-
+/** If we have a parameterfile entry for the requested pe,eventid pair */
+double EventInterpolator::haveNewTiming(const unsigned pe, const unsigned eventid) {
+    return eventparams.find( pair<unsigned,unsigned>(pe,eventid) ) != eventparams.end();
+}
 
 double EventInterpolator::predictTime(const unsigned pe, const unsigned eventid) {
     return predictTime(eventparams[pair<unsigned,unsigned>(pe,eventid)]);
@@ -265,35 +262,32 @@ double EventInterpolator::predictTime(const pair<string,vector<double> > &p) {
     return predictTime(p.first,p.second);
 }
 
-double EventInterpolator::predictTime(const string &name, const vector<double> &params) {
-    double val;
-    double *p = new double[params.size()];
-    for(int i=0;i<params.size();++i)
-        p[i] = params[i];
-    val = predictTime(name, p);
-    delete[] p;
-    return val;
+bool EventInterpolator::canInterpolateName(const string& name){
+    return (work.find(name) != work.end());
 }
 
-double EventInterpolator::predictTime(const string &name, const double *params) {
+double EventInterpolator::predictTime(const string &name, const vector<double> &params) {
+    // check name
+    if(!canInterpolateName(name)){
+        cerr << "FATAL ERROR: function name not found in cycle accurate timing file: " << name << endl;
+       throw new runtime_error("function name not found");
+    }
 
     // Estimate time for a given set of parameters p
     gsl_vector *desired_params;
 
     desired_params = gsl_vector_alloc(numCoefficients(name));
+    assert(numCoefficients(name)==params.size());
 
-    if(name == string("testcase")){
-        gsl_vector_set(desired_params,0,1.0);
-        gsl_vector_set(desired_params,1,params[0]*params[1]);
-    } else {
-        cerr << "FATAL ERROR: predictTime does not understand " << name << " yet" << endl;
-        throw new runtime_error("predictTime not yet done");
+    for(int i=0;i<params.size();++i){
+        gsl_vector_set(desired_params,i,params[i]);
     }
 
     double desired_time, desired_time_err;
+    cout << "name=" << name << endl;
+    assert(c[name]);
+    assert(cov[name]);
     assert(! gsl_multifit_linear_est(desired_params,c[name],cov[name],&desired_time,&desired_time_err));
-
-    // We now have a predicted time for the desired parameters
 
     gsl_vector_free(desired_params);
     return desired_time;
