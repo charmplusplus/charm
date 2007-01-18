@@ -37,6 +37,8 @@ extern int currTlineIdx;
 
 #define OUTPUTDIR "newtraces/"
 #define CYCLE_TIMES_FILE "nopme"
+#define sec_per_cycle 0.00000000025
+#define cycle_per_sec 4000000000.0
 
 int main()
 {
@@ -88,7 +90,7 @@ int main()
             // If name of this event is one that needs to have its duration modified
             if( interpolator.haveNewTiming(i,timeLog->seqno) ) {
 
-                double newduration = interpolator.predictTime(i,timeLog->seqno);
+                double newduration = interpolator.predictTime(i,timeLog->seqno) * sec_per_cycle;
 
                 if(newduration > 0.0){
 
@@ -132,6 +134,9 @@ int main()
         cerr << "======================================================" << endl;
     }
 
+    interpolator.printMinInterpolatedTimes();
+    interpolator.printCoefficients();
+
     // Create output directory
     mkdir(OUTPUTDIR, 0777);
 
@@ -144,7 +149,8 @@ int main()
 
     delete [] allNodeOffsets;
 
-    std::cout << " We successfully replaced the durations of " << rewritten_count << " events out of " <<  total_count << std::endl;
+    std::cout << "We successfully replaced the durations of " << rewritten_count << " events out of " <<  total_count << std::endl;
+    std::cout << interpolator.exact_matches << " were exact matches to entries in the cycle accurate file " << endl;
     std::cout << "End of program" << std::endl;
 
 }

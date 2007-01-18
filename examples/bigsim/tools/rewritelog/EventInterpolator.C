@@ -2,12 +2,27 @@
 #include <EventInterpolator.h>
 
 
-#define sec_per_cycle 0.00000000025
-
-
 using namespace std;
 
-int EventInterpolator::numCoefficients(string funcname){
+int EventInterpolator::numCoefficients(const string &funcname){
+// We create a dummy input stringstream and pass it to readParameters.
+// Then we count how many parameters that function creates
+
+string temp("0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0");
+istringstream temp2(temp);
+
+return readParameters(funcname,temp2).size();
+
+}
+
+vector<double> EventInterpolator::readParameters(const string &funcname, istringstream &param_stream){
+    double temp;
+    return readParameters(funcname,param_stream,temp);
+}
+
+vector<double> EventInterpolator::readParameters(const string &funcname, istringstream &line, double &time){
+    vector<double> params;
+
     if( funcname == string("calc_self_energy_merge_fullelect") ||
         funcname == string("calc_pair_energy_merge_fullelect") ||
         funcname == string("calc_self_merge_fullelect") ||
@@ -15,23 +30,62 @@ int EventInterpolator::numCoefficients(string funcname){
         funcname == string("calc_self") ||
         funcname == string("calc_pair") ||
         funcname == string("calc_self_energy") ||
-        funcname == string("calc_pair_energy") ) {
-            return 3;
-        }
-    else if(funcname == string("angle") || funcname == string("dihedrals")){
-            return 3;
-        }
-    else if(funcname == string("*integrate*") ){
-            return 2;
-        }
-    else {
-        cerr << "Unknown function: \"" << funcname << "\"" << endl;
-        throw new runtime_error("numCoefficients() does not know about some function name");
+        funcname == string("calc_pair_energy") ){
+
+        double d1,d2,d3,d4,d5,d6,d7,d8,d9, t1;
+        int i1,i2,i3,i4,i5,i6;
+
+        line >> d1 >> d2 >> i1 >> i2 >> i3 >> i4 >> i5 >> i6 >>
+                d3 >> d4 >> d5 >> d6 >> d7 >> d8 >> t1;
+
+        double distance = (i1-i4)*(i1-i4) + (i2-i5)*(i2-i5) + (i3-i6)*(i3-i6);
+
+//         params.push_back( 1.0);
+        params.push_back( min(d1,d2) );
+        params.push_back( d1*d2 );
+//         params.push_back( 1.0 / distance );
+        params.push_back( d1 );
+        params.push_back( d2 );
+        params.push_back( d3 );
+        params.push_back( d4 );
+
+        time = t1;
     }
+    else if(funcname == string("angle") || funcname == string("dihedrals")){
+        double d1, d2, t1;
+        line >> d1 >> d2 >> t1;
+
+//         params.push_back( 1.0);
+        params.push_back( d1 );
+        params.push_back( d2 );
+        params.push_back( d1*d2 );
+        time = t1;
+
+    }
+    else if(funcname == string("*integrate*")){
+        double d1, d2, d3, d4, d5, d6, d7, t1;
+        line >> d1 >> d2 >> d3 >> d4 >> d5 >> d6 >> d7 >> t1;
+
+//         params.push_back( 1.0);
+        params.push_back( d2 );
+        time = t1;
+
+    }
+    else {
+        cerr << "FATAL ERROR: Don't know how to read parameters for function " << funcname << endl;
+        throw new runtime_error("unknown function");
+    }
+
+    return params;
 }
 
 
+
+
+
 EventInterpolator::EventInterpolator(char *table_filename){
+    exact_matches = 0;
+
     cout << "Loading timings file: " << table_filename << endl;
     ifstream accurateTimeTable(table_filename);
 
@@ -79,9 +133,7 @@ EventInterpolator::EventInterpolator(char *table_filename){
         }
     }
 
-    //  accurateTimeTable.seekg(0,ios_base::beg); // rewind
-    accurateTimeTable.close(); // I do this because seeking was failing earlier. why???
-
+    accurateTimeTable.close();
     ifstream accurateTimeTable2(table_filename);
 
     // Second Pass, scan through the file to load
@@ -102,45 +154,17 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
             unsigned i = Xcount[funcname] ++;
             gsl_matrix * x = X[funcname];
-            if( funcname == string("calc_self_energy_merge_fullelect") ||
-                funcname == string("calc_pair_energy_merge_fullelect") ||
-                funcname == string("calc_self_merge_fullelect") ||
-                funcname == string("calc_pair_merge_fullelect") ||
-                funcname == string("calc_self") ||
-                funcname == string("calc_pair") ||
-                funcname == string("calc_self_energy") ||
-                funcname == string("calc_pair_energy") ){
-                double d1,d2,d3,d4,d5,d6,d7,d8,d9, t;
-                unsigned i1,i2,i3,i4,i5,i6;
 
-                line >> d1 >> d2 >> i1 >> i2 >> i3 >> i4 >> i5 >> i6 >>
-                        d3 >> d4 >> d5 >> d6 >> d7 >> d8 >> t;
+            double time;
+            vector<double>params = readParameters(funcname,line,time);
 
-                gsl_matrix_set(x,i,0, 1.0);
-                gsl_matrix_set(x,i,1, min(d1,d2) );
-                gsl_matrix_set(x,i,2, d3 );
+            accurateTimings[pair<string,vector<double> >(funcname,params)]=time;
 
-                gsl_vector_set(y[funcname],i,t*sec_per_cycle);
+
+            for(int param_index=0;param_index<params.size();++param_index){
+                gsl_matrix_set(x,i,param_index, params[param_index]);
             }
-            else if(funcname == string("angle") || funcname == string("testcase")){
-                double d1, d2, t;
-                line >> d1 >> d2 >> t;
-
-                gsl_matrix_set(x,i,0, 1.0);
-                gsl_matrix_set(x,i,1, d1 );
-                gsl_matrix_set(x,i,2, d2 );
-
-                gsl_vector_set(y[funcname],i,t*sec_per_cycle);
-            }
-            else if(funcname == string("*integrate*")){
-                double d1, d2, d3, d4, d5, d6, d7, t;
-                line >> d1 >> d2 >> d3 >> d4 >> d5 >> d6 >> d7 >> t;
-
-                gsl_matrix_set(x,i,0, 1.0);
-                gsl_matrix_set(x,i,1, d2 );
-
-                gsl_vector_set(y[funcname],i,t*sec_per_cycle);
-            }
+            gsl_vector_set(y[funcname],i,time);
 
         }
     }
@@ -170,7 +194,7 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
 
     // Load in Parameter File which maps event id to function name and parameters
-    cout << "Loading parameter files: " << table_filename << "*" << endl;
+    cout << "Loading parameter files" << endl;
 
     for(int i=0;i<102400;++i){
         char name[512];
@@ -196,47 +220,8 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
                     if(t1 == string("TRACEBIGSIM")){
                         Xcount[funcname] ++;
-
-                        if( funcname == string("calc_self_energy_merge_fullelect") ||
-                            funcname == string("calc_pair_energy_merge_fullelect") ||
-                            funcname == string("calc_self_merge_fullelect") ||
-                            funcname == string("calc_pair_merge_fullelect") ||
-                            funcname == string("calc_self") ||
-                            funcname == string("calc_pair") ||
-                            funcname == string("calc_self_energy") ||
-                            funcname == string("calc_pair_energy") ){
-
-                            double d1,d2,d3,d4,d5,d6,d7,d8,d9, t1;
-                            unsigned i1,i2,i3,i4,i5,i6;
-
-                            line >> d1 >> d2 >> i1 >> i2 >> i3 >> i4 >> i5 >> i6 >>
-                                    d3 >> d4 >> d5 >> d6 >> d7 >> d8 >> t1;
-
-                            vector<double> params;
-                            params.push_back( 1.0);
-                            params.push_back( min(d1,d2) );
-                            params.push_back( d3 );
-                            eventparams[pair<unsigned,unsigned>(i,eventid)] = pair<string,vector<double> >(funcname,params);
-                        }
-                        else if(funcname == string("angle") || funcname == string("testcase")){
-                            double d1, d2, t1;
-                            line >> d1 >> d2 >> t1;
-
-                            vector<double> params;
-                            params.push_back( 1.0);
-                            params.push_back( d1 );
-                            params.push_back( d2 );
-                            eventparams[pair<unsigned,unsigned>(i,eventid)] = pair<string,vector<double> >(funcname,params);
-                        }
-                        else if(funcname == string("*integrate*")){
-                            double d1, d2, d3, d4, d5, d6, d7, t1;
-                            line >> d1 >> d2 >> d3 >> d4 >> d5 >> d6 >> d7 >> t1;
-
-                            vector<double> params;
-                            params.push_back( 1.0);
-                            params.push_back( d2 );
-                            eventparams[pair<unsigned,unsigned>(i,eventid)] = pair<string,vector<double> >(funcname,params);
-                        }
+                        vector<double>params = readParameters(funcname,line);
+                        eventparams[pair<unsigned,unsigned>(i,eventid)] = pair<string,vector<double> >(funcname,params);
                     }
                 }
             }
@@ -248,6 +233,14 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
         parameterEventTable.close();
     }
+}
+
+bool EventInterpolator::haveExactTime(const string& name, const vector<double> &p){
+    return (accurateTimings.find(pair<string,vector<double> >(name,p)) != accurateTimings.end());
+}
+
+double EventInterpolator::lookupExactTime(const string& name, const vector<double> &p){
+    return accurateTimings[pair<string,vector<double> >(name,p)];
 }
 
 /** If we have a parameterfile entry for the requested pe,eventid pair */
@@ -269,6 +262,13 @@ bool EventInterpolator::canInterpolateName(const string& name){
 }
 
 double EventInterpolator::predictTime(const string &name, const vector<double> &params) {
+
+    // If we know the exact time from some entry in the cycle accurate file, just return that
+    if(haveExactTime(name, params) ) {
+        exact_matches++;
+        return lookupExactTime(name, params);
+    }
+
     // check name
     if(!canInterpolateName(name)){
         cerr << "FATAL ERROR: function name not found in cycle accurate timing file: " << name << endl;
@@ -292,13 +292,44 @@ double EventInterpolator::predictTime(const string &name, const vector<double> &
 
     gsl_vector_free(desired_params);
 
-    if(desired_time< 0.0){
-        cout << "desired_time less than zero for " << name << endl;
-    }
+
+    if(min_interpolated_time.find(name) == min_interpolated_time.end())
+        min_interpolated_time[name] = desired_time;
+    else
+        min_interpolated_time[name] = min( min_interpolated_time[name], desired_time);
+
+    if(max_interpolated_time.find(name) == max_interpolated_time.end())
+        max_interpolated_time[name] = desired_time;
+    else
+        max_interpolated_time[name] = max( max_interpolated_time[name], desired_time);
+
 
     return desired_time;
+}
+
+
+void EventInterpolator::printMinInterpolatedTimes(){
+    for(map<string,double>::iterator i=min_interpolated_time.begin();i!=min_interpolated_time.end();++i){
+        cout << "   > min interpolated time for function " << (*i).first << " is " << (*i).second << " cycles " << endl;
+    }
+    for(map<string,double>::iterator i=max_interpolated_time.begin();i!=max_interpolated_time.end();++i){
+        cout << "   > max interpolated time for function " << (*i).first << " is " << (*i).second << " cycles " << endl;
+    }
+}
+
+
+
+void EventInterpolator::printCoefficients(){
+
+    for(map<string,gsl_vector*>::iterator i=c.begin();i!=c.end();++i){
+        cout << "    > Coefficients for function " << (*i).first << " :" << endl;
+        for(int j=0; j < ((*i).second)->size; ++j){
+            cout << "    >    " << j << " is " << gsl_vector_get ((*i).second, j) << endl;
+        }
+    }
 
 }
+
 
 
 

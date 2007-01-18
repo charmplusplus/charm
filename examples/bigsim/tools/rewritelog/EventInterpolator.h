@@ -40,21 +40,37 @@ private:
     map<string, gsl_vector *>y;  // vector of cycle accurate times for each input parameter set
 
     map<pair<unsigned,unsigned>,pair<string,vector<double> > > eventparams;
+    map< pair<string,vector<double> >, double > accurateTimings;
+
 
     bool canInterpolateName(const string& name);
 
+    map<string,double> min_interpolated_time;
+    map<string,double> max_interpolated_time;
+
 
 public:
+
+    unsigned exact_matches;
+
     double haveNewTiming(const unsigned pe, const unsigned eventid);
     double predictTime(const unsigned pe, const unsigned eventid);
     double predictTime(const pair<string,vector<double> > &p);
     double predictTime(const string &name, const vector<double> &params);
 
+    bool haveExactTime(const string& name, const vector<double> &p);
+    double lookupExactTime(const string& name, const vector<double> &p);
+
 
     double get_chisqr(string funcname){if(work[funcname]!=NULL) return chisqr[funcname]; else return -1.0;}
 
-    int EventInterpolator::numCoefficients(string funcname);
-    int EventInterpolator::numParameters(string funcname);
+    int numCoefficients(const string &funcname);
+    vector<double> readParameters(const string &funcname, istringstream &param_stream, double &time);
+    vector<double> readParameters(const string &funcname, istringstream &param_stream);
+
+    void printMinInterpolatedTimes();
+
+    void printCoefficients();
 
 
     EventInterpolator(char *table_filename);
