@@ -40,8 +40,8 @@ vector<double> EventInterpolator::readParameters(const string &funcname, istring
 
         double distance = (i1-i4)*(i1-i4) + (i2-i5)*(i2-i5) + (i3-i6)*(i3-i6);
 
-//         params.push_back( 1.0);
-        params.push_back( min(d1,d2) );
+        params.push_back( 1.0);
+//         params.push_back( min(d1,d2) );
         params.push_back( d1*d2 );
 //         params.push_back( 1.0 / distance );
         params.push_back( d1 );
@@ -55,10 +55,9 @@ vector<double> EventInterpolator::readParameters(const string &funcname, istring
         double d1, d2, t1;
         line >> d1 >> d2 >> t1;
 
-//         params.push_back( 1.0);
+        params.push_back( 1.0);
         params.push_back( d1 );
         params.push_back( d2 );
-        params.push_back( d1*d2 );
         time = t1;
 
     }
@@ -66,7 +65,7 @@ vector<double> EventInterpolator::readParameters(const string &funcname, istring
         double d1, d2, d3, d4, d5, d6, d7, t1;
         line >> d1 >> d2 >> d3 >> d4 >> d5 >> d6 >> d7 >> t1;
 
-//         params.push_back( 1.0);
+        params.push_back( 1.0);
         params.push_back( d2 );
         time = t1;
 
@@ -84,12 +83,15 @@ vector<double> EventInterpolator::readParameters(const string &funcname, istring
 
 
 EventInterpolator::EventInterpolator(char *table_filename){
-    exact_matches = 0;
+    exact_matches=0;
+    exact_positive_matches=0;
+    approx_matches=0;
+    approx_positive_matches=0;
 
     cout << "Loading timings file: " << table_filename << endl;
     ifstream accurateTimeTable(table_filename);
 
-    // First pass, scan through file containing cycle accurate times to count
+    // First pass, scan through cycle accurate time file to count
     // how many samples there are for each function
     while(accurateTimeTable.good()){
         string line_s;
@@ -135,8 +137,8 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
     accurateTimeTable.close();
     ifstream accurateTimeTable2(table_filename);
-
-    // Second Pass, scan through the file to load
+    ofstream statfile("stats-out");
+    // Second pass, scan through cycle accurate time file
     while(accurateTimeTable2.good()){
         string line_s;
         getline(accurateTimeTable2,line_s);
@@ -160,6 +162,8 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
             accurateTimings[pair<string,vector<double> >(funcname,params)]=time;
 
+            statfile << funcname << "\t" << time << endl;
+
 
             for(int param_index=0;param_index<params.size();++param_index){
                 gsl_matrix_set(x,i,param_index, params[param_index]);
@@ -168,7 +172,7 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
         }
     }
-
+    statfile.close();
 
     // Perform a sanity check now
 
@@ -202,7 +206,7 @@ EventInterpolator::EventInterpolator(char *table_filename){
         ifstream parameterEventTable(name);
 
         if(parameterEventTable.good()){
-            cout << "     >  Loading " << name << endl;
+//             cout << "     >  Loading " << name << endl;
 
             while(parameterEventTable.good()){
                 string line_s;
@@ -235,12 +239,34 @@ EventInterpolator::EventInterpolator(char *table_filename){
     }
 }
 
+
+
+bool EventInterpolator::haveExactTime(const unsigned pe, const unsigned eventid){
+    return haveExactTime(eventparams[pair<unsigned,unsigned>(pe,eventid)]);
+}
+
+bool EventInterpolator::haveExactTime(const pair<string,vector<double> > &p) {
+    return haveExactTime(p.first,p.second);
+}
+
 bool EventInterpolator::haveExactTime(const string& name, const vector<double> &p){
     return (accurateTimings.find(pair<string,vector<double> >(name,p)) != accurateTimings.end());
 }
 
+double EventInterpolator::lookupExactTime(const unsigned pe, const unsigned eventid){
+    return lookupExactTime(eventparams[pair<unsigned,unsigned>(pe,eventid)]);
+}
+
+double EventInterpolator::lookupExactTime(const pair<string,vector<double> > &p) {
+    return lookupExactTime(p.first,p.second);
+}
+
 double EventInterpolator::lookupExactTime(const string& name, const vector<double> &p){
-    return accurateTimings[pair<string,vector<double> >(name,p)];
+    double val = accurateTimings[pair<string,vector<double> >(name,p)];
+    exact_matches++;
+    if(val>0.0)
+        exact_positive_matches++;
+    return val;
 }
 
 /** If we have a parameterfile entry for the requested pe,eventid pair */
@@ -252,7 +278,6 @@ double EventInterpolator::predictTime(const unsigned pe, const unsigned eventid)
     return predictTime(eventparams[pair<unsigned,unsigned>(pe,eventid)]);
 }
 
-
 double EventInterpolator::predictTime(const pair<string,vector<double> > &p) {
     return predictTime(p.first,p.second);
 }
@@ -262,12 +287,6 @@ bool EventInterpolator::canInterpolateName(const string& name){
 }
 
 double EventInterpolator::predictTime(const string &name, const vector<double> &params) {
-
-    // If we know the exact time from some entry in the cycle accurate file, just return that
-    if(haveExactTime(name, params) ) {
-        exact_matches++;
-        return lookupExactTime(name, params);
-    }
 
     // check name
     if(!canInterpolateName(name)){
@@ -304,6 +323,10 @@ double EventInterpolator::predictTime(const string &name, const vector<double> &
         max_interpolated_time[name] = max( max_interpolated_time[name], desired_time);
 
 
+    approx_matches++;
+    if(desired_time>0.0)
+        approx_positive_matches++;
+
     return desired_time;
 }
 
@@ -317,7 +340,10 @@ void EventInterpolator::printMinInterpolatedTimes(){
     }
 }
 
-
+void EventInterpolator::printMatches(){
+    cout << " Exact  Matches = " << exact_matches << " (" << exact_positive_matches << " positive)" << endl;
+    cout << " Approx Matches = " << approx_matches << " (" << approx_positive_matches << " positive)" << endl;
+}
 
 void EventInterpolator::printCoefficients(){
 

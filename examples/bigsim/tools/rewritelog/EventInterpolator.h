@@ -48,18 +48,30 @@ private:
     map<string,double> min_interpolated_time;
     map<string,double> max_interpolated_time;
 
+    unsigned exact_matches;
+    unsigned exact_positive_matches;
+    unsigned approx_matches;
+    unsigned approx_positive_matches;
 
 public:
 
-    unsigned exact_matches;
+
 
     double haveNewTiming(const unsigned pe, const unsigned eventid);
+
     double predictTime(const unsigned pe, const unsigned eventid);
     double predictTime(const pair<string,vector<double> > &p);
     double predictTime(const string &name, const vector<double> &params);
 
+    bool haveExactTime(const unsigned pe, const unsigned eventid);
+    bool haveExactTime(const pair<string,vector<double> > &p);
     bool haveExactTime(const string& name, const vector<double> &p);
+
+    double lookupExactTime(const unsigned pe, const unsigned eventid);
+    double lookupExactTime(const pair<string,vector<double> > &p);
     double lookupExactTime(const string& name, const vector<double> &p);
+
+
 
 
     double get_chisqr(string funcname){if(work[funcname]!=NULL) return chisqr[funcname]; else return -1.0;}
@@ -71,6 +83,8 @@ public:
     void printMinInterpolatedTimes();
 
     void printCoefficients();
+
+    void printMatches();
 
 
     EventInterpolator(char *table_filename);

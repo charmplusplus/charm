@@ -63,7 +63,6 @@ int main()
     printf("========= Loading All Logs ========= \n");
 
     // load each individual trace file for each bg proc
-    assert(totalProcs == 4);
 
     unsigned rewritten_count=0;
     unsigned total_count=0;
@@ -90,7 +89,11 @@ int main()
             // If name of this event is one that needs to have its duration modified
             if( interpolator.haveNewTiming(i,timeLog->seqno) ) {
 
-                double newduration = interpolator.predictTime(i,timeLog->seqno) * sec_per_cycle;
+                double newduration;
+                if( interpolator.haveExactTime(i,timeLog->seqno) )
+                    newduration = interpolator.lookupExactTime(i,timeLog->seqno);
+                else
+                    newduration = interpolator.predictTime(i,timeLog->seqno) * sec_per_cycle;
 
                 if(newduration > 0.0){
 
@@ -118,7 +121,7 @@ int main()
                         }
 
                         timeLog->msgs[m]->sendTime = newsendtime;
-                        printf("changing message %d send time from %.10lf to %.10lf\n", m, oldsendtime, newsendtime);
+//                         printf("changing message %d send time from %.10lf to %.10lf\n", m, oldsendtime, newsendtime);
                     }
                 }
                 else {
@@ -150,7 +153,8 @@ int main()
     delete [] allNodeOffsets;
 
     std::cout << "We successfully replaced the durations of " << rewritten_count << " events out of " <<  total_count << std::endl;
-    std::cout << interpolator.exact_matches << " were exact matches to entries in the cycle accurate file " << endl;
+
+    interpolator.printMatches();
     std::cout << "End of program" << std::endl;
 
 }
