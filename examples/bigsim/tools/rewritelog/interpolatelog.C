@@ -36,7 +36,7 @@ extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
 
 #define OUTPUTDIR "newtraces/"
-#define CYCLE_TIMES_FILE "pme"
+#define CYCLE_TIMES_FILE "nopme"
 
 int main()
 {

@@ -8,6 +8,8 @@ int EventInterpolator::numCoefficients(string funcname){
         funcname == string("calc_pair_energy_merge_fullelect") ||
         funcname == string("calc_self_merge_fullelect") ||
         funcname == string("calc_pair_merge_fullelect") ||
+        funcname == string("calc_self") ||
+        funcname == string("calc_pair") ||
         funcname == string("calc_self_energy") ||
         funcname == string("calc_pair_energy") ) {
             return 3;
@@ -19,83 +21,98 @@ int EventInterpolator::numCoefficients(string funcname){
             return 2;
         }
     else {
-        cerr << "Unknown function: " << funcname << endl;
+        cerr << "Unknown function: \"" << funcname << "\"" << endl;
         throw new runtime_error("numCoefficients() does not know about some function name");
     }
 }
 
 
 EventInterpolator::EventInterpolator(char *table_filename){
-  cout << "Loading timings file: " << table_filename << endl;
-  ifstream accurateTimeTable(table_filename);
+    cout << "Loading timings file: " << table_filename << endl;
+    ifstream accurateTimeTable(table_filename);
 
-  // First pass, scan through file to count how many samples there are for each function
-  while(accurateTimeTable.good()){
-	string line_s;
-	getline(accurateTimeTable,line_s);
-	istringstream line(line_s);
+    // First pass, scan through file containing cycle accurate times to count
+    // how many samples there are for each function
+    while(accurateTimeTable.good()){
+        string line_s;
+        getline(accurateTimeTable,line_s);
+        istringstream line(line_s);
 
-	if(accurateTimeTable.good()){
-	  string t1, t2;
-	  string funcname;
+        string temp("");
+        while(temp != string("TRACEBIGSIM") && line.good() && accurateTimeTable.good() ){
+            line >> temp;
+//             cout << "G:  " << temp << endl;
+        }
+        line >> temp; // gobble up one more worthless bit of input line
+//         cout << "G2:  " << temp << endl;
 
-	  line >> t1 >> t2;
-	  line >> funcname;
-
-	  sample_count[funcname]++;
-	}
-  }
-
-
-  // Create a gsl interpolator workspace for each event/function
-  for(map<string,unsigned long>::iterator i=sample_count.begin(); i!=sample_count.end();++i){
-	string name = (*i).first;
-	unsigned long samples = (*i).second;
-	cout << "     > " << name << " has " << samples << " sampled timings" << endl;
-
-    if(samples < numCoefficients(name) ){
-        cerr << "FATAL ERROR: Not enough input timing samples for " << name << " which has " << numCoefficients(name) << " coefficients" << endl;
-        throw new runtime_error("samples < numCoefficients");
-    }
-    else {
-        work[name] = gsl_multifit_linear_alloc(samples,numCoefficients(name));
-        X[name] = gsl_matrix_alloc (samples,numCoefficients(name));
-        y[name] = gsl_vector_alloc (samples);
-        c[name] = gsl_vector_alloc(numCoefficients(name));
-        cov[name] = gsl_matrix_alloc(numCoefficients(name),numCoefficients(name));
-
-        for(int i=0;i<numCoefficients(name);++i){
-            gsl_vector_set(c[name],i,1.0);
+        if(line.good() && accurateTimeTable.good()){
+            string funcname;
+            line >> funcname;
+//             cout << "F=" << funcname << endl;
+            sample_count[funcname]++;
+            }
         }
 
+    // Create a gsl interpolator workspace for each event/function
+    for(map<string,unsigned long>::iterator i=sample_count.begin(); i!=sample_count.end();++i){
+        string name = (*i).first;
+        unsigned long samples = (*i).second;
+        cout << "     > " << name << " has " << samples << " sampled timings" << endl;
+
+        if(samples < numCoefficients(name) ){
+            cerr << "FATAL ERROR: Not enough input timing samples for " << name << " which has " << numCoefficients(name) << " coefficients" << endl;
+            throw new runtime_error("samples < numCoefficients");
+        }
+        else {
+            work[name] = gsl_multifit_linear_alloc(samples,numCoefficients(name));
+            X[name] = gsl_matrix_alloc (samples,numCoefficients(name));
+            y[name] = gsl_vector_alloc (samples);
+            c[name] = gsl_vector_alloc(numCoefficients(name));
+            cov[name] = gsl_matrix_alloc(numCoefficients(name),numCoefficients(name));
+
+            for(int i=0;i<numCoefficients(name);++i){
+                gsl_vector_set(c[name],i,1.0);
+            }
+
+        }
     }
-  }
 
-//  accurateTimeTable.seekg(0,ios_base::beg); // rewind
-  accurateTimeTable.close(); // I do this because seeking was failing earlier. why???
+    //  accurateTimeTable.seekg(0,ios_base::beg); // rewind
+    accurateTimeTable.close(); // I do this because seeking was failing earlier. why???
 
-  ifstream accurateTimeTable2(table_filename);
+    ifstream accurateTimeTable2(table_filename);
 
-  // Second Pass, scan through the file to load
-  while(accurateTimeTable2.good()){
-	string line_s;
-	getline(accurateTimeTable2,line_s);
-	istringstream line(line_s);
+//     cout << "HERE" << endl;
 
-	if(accurateTimeTable2.good()){
-        string t1, t2;
-        string funcname;
+    // Second Pass, scan through the file to load
+    while(accurateTimeTable2.good()){
+        string line_s;
+        getline(accurateTimeTable2,line_s);
+        istringstream line(line_s);
 
-        line >> t1 >> t2;
-        line >> funcname;
+        string temp("");
+        while(temp != string("TRACEBIGSIM") && line.good() && accurateTimeTable2.good() ){
+            line >> temp;
+//             cout << "G:  " << temp << endl;
+        }
+        line >> temp; // gobble up one more worthless bit of input line
+//         cout << "G2:  " << temp << endl;
 
-        if(t1 == string("TRACEBIGSIM")){
+        if(line.good() && accurateTimeTable2.good()){
+            string funcname;
+            line >> funcname;
+
+//             cout << "funcname=" << funcname << endl;
+
             unsigned i = Xcount[funcname] ++;
             gsl_matrix * x = X[funcname];
             if( funcname == string("calc_self_energy_merge_fullelect") ||
                 funcname == string("calc_pair_energy_merge_fullelect") ||
                 funcname == string("calc_self_merge_fullelect") ||
                 funcname == string("calc_pair_merge_fullelect") ||
+                funcname == string("calc_self") ||
+                funcname == string("calc_pair") ||
                 funcname == string("calc_self_energy") ||
                 funcname == string("calc_pair_energy") ){
                 double d1,d2,d3,d4,d5,d6,d7,d8,d9, t1;
@@ -129,18 +146,21 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
                 gsl_vector_set(y[funcname],i,t1);
             }
+
         }
-	}
-  }
+    }
 
 
     // Perform a sanity check now
 
     for(map<string, gsl_multifit_linear_workspace *>::iterator i=work.begin();i!=work.end();++i){
-        assert(sample_count[(*i).first]==Xcount[(*i).first]);
+        if(sample_count[(*i).first]!=Xcount[(*i).first]){
+          cerr << "FATAL ERROR: sanity check failed: " << sample_count[(*i).first] << "!=" << Xcount[(*i).first] << "  :(" << endl;
+       throw new runtime_error("sanity check failed");
+        }
     }
 
-    cout << "Performing Least Squared Fits to sampled time data" << endl;
+    cout << "Performing Least Squared Fit to sampled time data" << endl;
 
     //  Now do Least Square Fit: Find C where y=Xc
     map<string, gsl_multifit_linear_workspace *>::iterator i;
@@ -232,13 +252,20 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
         parameterEventTable.close();
     }
-
-
 }
 
 
 
-double EventInterpolator::predictTime(const string &name, vector<double> &params) {
+double EventInterpolator::predictTime(const unsigned pe, const unsigned eventid) {
+    return predictTime(eventparams[pair<unsigned,unsigned>(pe,eventid)]);
+}
+
+
+double EventInterpolator::predictTime(const pair<string,vector<double> > &p) {
+    return predictTime(p.first,p.second);
+}
+
+double EventInterpolator::predictTime(const string &name, const vector<double> &params) {
     double val;
     double *p = new double[params.size()];
     for(int i=0;i<params.size();++i)
@@ -248,7 +275,7 @@ double EventInterpolator::predictTime(const string &name, vector<double> &params
     return val;
 }
 
-double EventInterpolator::predictTime(const string &name, double *params) {
+double EventInterpolator::predictTime(const string &name, const double *params) {
 
     // Estimate time for a given set of parameters p
     gsl_vector *desired_params;
