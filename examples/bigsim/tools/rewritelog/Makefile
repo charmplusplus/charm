@@ -12,6 +12,8 @@ interpolatelog.o: interpolatelog.C
 EventInterpolator.o: EventInterpolator.C
 	$(CHARMC) -c EventInterpolator.C $(INCS)
 
+# FunctionSpecifier.o: FunctionSpecifier.C
+# 	$(CHARMC) -c FunctionSpecifier.C $(INCS)
 
 rewritelog: rewritelog.o
 	$(CHARMC) -seq -o rewritelog rewritelog.o -lconv-bigsim-logs -lconv-util -lblue-standalone -language c++

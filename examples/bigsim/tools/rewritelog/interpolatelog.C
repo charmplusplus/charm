@@ -49,6 +49,8 @@ int main()
     BgTimeLineRec *tlinerecs;
 
 
+	interpolator.printCoefficients();
+
     // load bg trace summary file
     printf("Loading bgTrace ... \n");
     int status = BgLoadTraceSummary("bgTrace", totalProcs, numX, numY, numZ, numCth, numWth, numPes);
@@ -68,6 +70,8 @@ int main()
     unsigned total_count=0;
     bool negative_durations_occured = false;
 
+    printf("Loading bgTrace files ...\n");
+
     for (int i=0; i<totalProcs; i++)
     {
         int procNum = i;
@@ -75,11 +79,16 @@ int main()
         currTlineIdx = procNum;
         int fileNum = BgReadProc(procNum,numWth,numPes,totalProcs,allNodeOffsets,tlinerecs[i]);
         CmiAssert(fileNum != -1);
-        printf("Load log of BG proc %d from bgTrace%d... \n", i, fileNum);
+
+#ifdef DEBUG
+    printf("Load log of BG proc %d from bgTrace%d... \n", i, fileNum);
+#endif
 
         BgTimeLine &timeLine = tlinerecs[i].timeline; // Really a CkQ< BgTimeLog *>
 
+#ifdef DEBUG
         printf("%d entries in timeLine\n", timeLine.length());
+#endif
 
         // Scan through each event for this emulated processor
         for(int j=0;j<timeLine.length();j++){
@@ -95,7 +104,7 @@ int main()
                 else
                     newduration = interpolator.predictTime(i,timeLog->seqno) * sec_per_cycle;
 
-                if(newduration > 0.0){
+                if(newduration >= 0.0){
 
                     rewritten_count++;
 
@@ -138,7 +147,8 @@ int main()
     }
 
     interpolator.printMinInterpolatedTimes();
-    interpolator.printCoefficients();
+
+    printf("Writing new bgTrace files ...\n");
 
     // Create output directory
     mkdir(OUTPUTDIR, 0777);
@@ -152,7 +162,9 @@ int main()
 
     delete [] allNodeOffsets;
 
-    std::cout << "We successfully replaced the durations of " << rewritten_count << " events out of " <<  total_count << std::endl;
+    std::cout << "Of the " << total_count << " events found in the bgTrace files, " << rewritten_count << " were found in the param files" << endl;
+
+    std::cout << "Those " << rewritten_count << " events were given new durations" << std::endl;
 
     interpolator.printMatches();
     std::cout << "End of program" << std::endl;
