@@ -27,7 +27,7 @@ int main()
     currTlineIdx = procNum;
     int fileNum = BgReadProc(procNum,numWth,numPes,totalProcs,allNodeOffsets,tline);
     CmiAssert(fileNum != -1);
-    printf("Load log of BG proc %d from bgTrace%d... \n", i, fileNum);
+    printf("Loading bglog of proc %d from bgTrace%d succeed. \n", i, fileNum);
                                                                                 
     // dump bg timeline log to disk in asci format
     BgWriteThreadTimeLine("detail", 0, 0, 0, procNum, tline.timeline);
