@@ -124,6 +124,11 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
     cout << "Loading timings file: " << table_filename << endl;
     ifstream accurateTimeTable(table_filename);
+    if(! accurateTimeTable.good() ){
+        cerr << "FATAL ERROR: Couldn't open file(perhaps it doesn't exist): " << table_filename << endl;
+        throw new runtime_error("missing file");
+    }
+
 
     // First pass, scan through cycle accurate time file to count
     // how many samples there are for each function
@@ -175,7 +180,11 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
     accurateTimeTable.close();
     ifstream accurateTimeTable2(table_filename);
+
+#ifdef WRITESTATS
     ofstream statfile("stats-out");
+#endif
+
     // Second pass, scan through cycle accurate time file
     while(accurateTimeTable2.good()){
         string line_s;
@@ -193,7 +202,7 @@ EventInterpolator::EventInterpolator(char *table_filename){
             line >> funcname;
 
             double time;
-            fullParams params = parseParameters(funcname,line,time,true);
+            fullParams params = parseParameters(funcname,line,time,false);
 
             funcIdentifier func(funcname,params.first);
 
@@ -201,7 +210,10 @@ EventInterpolator::EventInterpolator(char *table_filename){
             gsl_matrix * x = X[func];
             accurateTimings[pair<funcIdentifier,vector<double> >(func,params.second)]=time;
 
+#ifdef WRITESTATS
             statfile << funcname << "\t" << time << endl;
+#endif
+
             for(int param_index=0;param_index<params.second.size();++param_index){
                 gsl_matrix_set(x,i,param_index, params.second[param_index]);
             }
@@ -209,7 +221,10 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
         }
     }
+
+#ifdef WRITESTATS
     statfile.close();
+#endif
 
     // Perform a sanity check now
 
@@ -368,6 +383,9 @@ double EventInterpolator::predictTime(const funcIdentifier &func, const vector<d
     approx_matches++;
     if(desired_time>=0.0)
         approx_positive_matches++;
+
+//    gsl_vector_free(desired_params);
+
 
     return desired_time;
 }

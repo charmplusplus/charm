@@ -32,13 +32,15 @@
 #include <utility> // for std::pair
 #include <vector>
 
-extern BgTimeLineRec* currTline;
-extern int currTlineIdx;
-
 #define OUTPUTDIR "newtraces/"
 #define CYCLE_TIMES_FILE "nopme"
 #define sec_per_cycle 0.00000000025
 #define cycle_per_sec 4000000000.0
+
+#undef DEBUG
+
+extern BgTimeLineRec* currTline;
+extern int currTlineIdx;
 
 int main()
 {
@@ -46,8 +48,7 @@ int main()
     EventInterpolator interpolator(CYCLE_TIMES_FILE);
 
     int totalProcs, numX, numY, numZ, numCth, numWth, numPes;
-    BgTimeLineRec *tlinerecs;
-
+ 
 
 	interpolator.printCoefficients();
 
@@ -60,8 +61,6 @@ int main()
 
     int* allNodeOffsets = BgLoadOffsets(totalProcs,numPes);
 
-    tlinerecs = new BgTimeLineRec[totalProcs];
-
     printf("========= Loading All Logs ========= \n");
 
     // load each individual trace file for each bg proc
@@ -72,19 +71,23 @@ int main()
 
     printf("Loading bgTrace files ...\n");
 
-    for (int i=0; i<totalProcs; i++)
+    // Create output directory
+    mkdir(OUTPUTDIR, 0777);
+
+    for (int procNum=0; procNum<totalProcs; procNum++)
     {
-        int procNum = i;
-        currTline = &tlinerecs[i];
-        currTlineIdx = procNum;
-        int fileNum = BgReadProc(procNum,numWth,numPes,totalProcs,allNodeOffsets,tlinerecs[i]);
+	    BgTimeLineRec tlinerec;
+	  	  
+		currTline = &tlinerec;
+		currTlineIdx = procNum;
+        int fileNum = BgReadProc(procNum,numWth,numPes,totalProcs,allNodeOffsets,tlinerec);
         CmiAssert(fileNum != -1);
 
 #ifdef DEBUG
-		printf("Load log of BG proc %d from bgTrace%d... \n", i, fileNum);
+    printf("Load log of BG proc %d from bgTrace%d... \n", procNum, fileNum);
 #endif
 
-        BgTimeLine &timeLine = tlinerecs[i].timeline; // Really a CkQ< BgTimeLog *>
+        BgTimeLine &timeLine = tlinerec.timeline; // Really a CkQ< BgTimeLog *>
 
 #ifdef DEBUG
         printf("%d entries in timeLine\n", timeLine.length());
@@ -96,13 +99,13 @@ int main()
             std::string name(timeLog->name);
             total_count++;
             // If name of this event is one that needs to have its duration modified
-            if( interpolator.haveNewTiming(i,timeLog->seqno) ) {
+            if( interpolator.haveNewTiming(procNum,timeLog->seqno) ) {
 
                 double newduration;
-                if( interpolator.haveExactTime(i,timeLog->seqno) )
-                    newduration = interpolator.lookupExactTime(i,timeLog->seqno);
+                if( interpolator.haveExactTime(procNum,timeLog->seqno) )
+                    newduration = interpolator.lookupExactTime(procNum,timeLog->seqno);
                 else
-                    newduration = interpolator.predictTime(i,timeLog->seqno) * sec_per_cycle;
+                    newduration = interpolator.predictTime(procNum,timeLog->seqno) * sec_per_cycle;
 
                 if(newduration >= 0.0){
 
@@ -140,17 +143,10 @@ int main()
 
         }
 
-		
-	// Create output directory
-    mkdir(OUTPUTDIR, 0777);
-
-	
-    BgWriteTimelines(i, &tlinerecs[i], 1, numWth, OUTPUTDIR);
-
+		// Write out the file
+		BgWriteTimelines(procNum,&tlinerec,1,numWth,OUTPUTDIR);
 
     }
-
-
     if(negative_durations_occured){
         cerr << "======================  WARNING ======================" << endl;
         cerr << "||  One or more new durations were less than zero. \n||  This probably means your model or input times are \n||  not good enough." << endl;
@@ -161,14 +157,10 @@ int main()
 
     printf("Writing new bgTrace files ...\n");
 
-    // Create output directory
-    mkdir(OUTPUTDIR, 0777);
 
-    // We should write out the timelines to the same number of files as we started with.
-    // The mapping from VP to file was probably round robin. Here we cheat and make just one file
-    // TODO : fix this to write out in same initial pattern
+    // Write out the timelines to the same number of files as we started with.
     BgWriteTraceSummary(totalProcs, 1, numX, numY, numZ, numCth, numWth, OUTPUTDIR);
-
+    
     delete [] allNodeOffsets;
 
     std::cout << "Of the " << total_count << " events found in the bgTrace files, " << rewritten_count << " were found in the param files" << endl;
@@ -176,6 +168,8 @@ int main()
     std::cout << "Those " << rewritten_count << " events were given new durations" << std::endl;
 
     interpolator.printMatches();
+
+
     std::cout << "End of program" << std::endl;
 
 }

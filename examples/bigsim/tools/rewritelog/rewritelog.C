@@ -48,24 +48,15 @@
 #include <iostream>
 #include <map>
 
-
-extern BgTimeLineRec* currTline;
-extern int currTlineIdx;
-
-
 #define OUTPUTDIR "newtraces/"
 
 
 int main()
 {
     int totalProcs, numX, numY, numZ, numCth, numWth, numPes;
-    BgTimeLineRec *tlinerecs;
-
-
 
     // Create output directory
     mkdir(OUTPUTDIR, 0777);
-
 
     bool done = false;
     double newtime=1.0;
@@ -82,7 +73,6 @@ int main()
 
     std::cout << "You entered " << newtimes.size() << " distinct events with their associated durations" << std::endl;
 
-
     // load bg trace summary file
     printf("Loading bgTrace ... \n");
     int status = BgLoadTraceSummary("bgTrace", totalProcs, numX, numY, numZ, numCth, numWth, numPes);
@@ -92,19 +82,19 @@ int main()
 
     int* allNodeOffsets = BgLoadOffsets(totalProcs,numPes);
 
-    tlinerecs = new BgTimeLineRec[totalProcs];
-
     printf("========= Loading All Logs ========= \n");
 
     // load each individual trace file for each bg proc
-    for (int i=0; i<totalProcs; i++)
+    for (int procNum=0; procNum<totalProcs; procNum++)
     {
-        int procNum = i;
-        int fileNum = BgReadProc(procNum,numWth,numPes,totalProcs,allNodeOffsets,tlinerecs[i]);
-        CmiAssert(fileNum != -1);
-        printf("Load log of BG proc %d from bgTrace%d... \n", i, fileNum);
+        BgTimeLineRec tlinerec;
 
-        BgTimeLine &timeLine = tlinerecs[i].timeline; // Really a CkQ< BgTimeLog *>
+        int procNum = i;
+        int fileNum = BgReadProc(procNum,numWth,numPes,totalProcs,allNodeOffsets,tlinerec);
+        CmiAssert(fileNum != -1);
+        printf("Load log of BG proc %d from bgTrace%d... \n", procNum, fileNum);
+
+        BgTimeLine &timeLine = tlinerec.timeline; // Really a CkQ< BgTimeLog *>
 
         printf("%d entries in timeLine\n", timeLine.length());
 
@@ -144,18 +134,14 @@ int main()
 
         }
 
-        BgWriteTimelines(i, &tlinerecs[i], 1, numWth, OUTPUTDIR);
+        BgWriteTimelines(procNum, tlinerec, 1, numWth, OUTPUTDIR);
 
     }
 
-
-// We should write out the timelines to the same number of files as we started with.
-// The mapping from VP to file was probably round robin. Here we cheat and make just one file
-// TODO : fix this to write out in same initial pattern
     BgWriteTraceSummary(totalProcs, 1, numX, numY, numZ, numCth, numWth, OUTPUTDIR);
 
-  delete [] allNodeOffsets;
-  printf("End of program\n");
+    delete [] allNodeOffsets;
+    printf("End of program\n");
 }
 
 
