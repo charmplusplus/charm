@@ -1,16 +1,15 @@
 /*
 
-   interpolatelog.C
+    @file interpolatelog.C
 
-   Author: Isaac Dooley
-   email : idooley2@uiuc.edu
-   date  : Jan 06, 2007
-
+	@author: Isaac Dooley
+	email : idooley2@uiuc.edu
+	date  : Jan 2007
+	
     This uses the gsl library for least-square fitting. Gnu Scientific Library is available under GPL
-
-    Currently we hard code in two parameters some places. This should be fixed
-
-
+	
+    Currently we hard code in two parameters some places.
+	
 */
 
 #include "blue.h"
@@ -37,10 +36,16 @@
 #define sec_per_cycle 0.00000000025
 #define cycle_per_sec 4000000000.0
 
+// Set these for more output:
 #undef DEBUG
+#undef PRINT_NEW_TIMES
 
+
+// Needed to communicated with the bigsim file reading and writing routines:
 extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
+
+
 
 int main()
 {
@@ -119,8 +124,9 @@ int main()
                     timeLog->startTime = newstart;
                     timeLog->endTime   = newend;
 
-//                     printf("Rewriting duration of event %d name=%s from [%.10lf , %.10lf] to [%.10lf , %.10lf]\n", j, timeLog->name, oldstart,oldend,newstart,newend);
-
+#ifdef PRINT_NEW_TIMES
+                     printf("Rewriting duration of event %d name=%s from [%.10lf , %.10lf] to [%.10lf , %.10lf]\n", j, timeLog->name, oldstart,oldend,newstart,newend);
+#endif
                     for(int m=0;m<timeLog->msgs.length();m++){
                         double oldsendtime = timeLog->msgs[m]->sendTime;
                         double newsendtime;
@@ -133,7 +139,9 @@ int main()
                         }
 
                         timeLog->msgs[m]->sendTime = newsendtime;
-//                         printf("changing message %d send time from %.10lf to %.10lf\n", m, oldsendtime, newsendtime);
+#ifdef PRINT_NEW_TIMES
+/                         printf("changing message %d send time from %.10lf to %.10lf\n", m, oldsendtime, newsendtime);
+#endif
                     }
                 }
                 else {
@@ -168,7 +176,6 @@ int main()
     std::cout << "Those " << rewritten_count << " events were given new durations" << std::endl;
 
     interpolator.printMatches();
-
 
     std::cout << "End of program" << std::endl;
 
