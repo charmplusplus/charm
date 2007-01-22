@@ -36,6 +36,9 @@
 #define sec_per_cycle 0.00000000025
 #define cycle_per_sec 4000000000.0
 
+// Scale the duration of all unknown events by this factor
+#define time_factor 0.2
+
 // Set these for more output:
 #undef DEBUG
 #undef PRINT_NEW_TIMES
@@ -103,62 +106,73 @@ int main()
             BgTimeLog* timeLog = timeLine[j];
             std::string name(timeLog->name);
             total_count++;
-            // If name of this event is one that needs to have its duration modified
-            if( interpolator.haveNewTiming(procNum,timeLog->seqno) ) {
 
-                double newduration;
+			double oldstart = timeLog->startTime; 
+			double oldend   = timeLog->endTime; 
+			double oldduration = oldend-oldstart;
+			double newduration;
+
+            // If this event occurs in the paramerter file and cycle-accurate simulations, use that data to predict its runtime
+            if( interpolator.haveNewTiming(procNum,timeLog->seqno) ) {
                 if( interpolator.haveExactTime(procNum,timeLog->seqno) )
                     newduration = interpolator.lookupExactTime(procNum,timeLog->seqno);
                 else
                     newduration = interpolator.predictTime(procNum,timeLog->seqno) * sec_per_cycle;
 
-                if(newduration >= 0.0){
+			} 
+			// If event is not in parameter file then we just scale its duration by a simple constant
+			else {
+			  newduration = oldduration*time_factor ;
+			}
 
-                    rewritten_count++;
 
-                    double oldstart = timeLog->startTime;
-                    double oldend   = timeLog->endTime;
-                    double newstart = oldstart;
-                    double newend   = oldstart+newduration;
-
-                    timeLog->startTime = newstart;
-                    timeLog->endTime   = newend;
-
+			if(newduration >= 0.0) {
+			    double newstart = oldstart;  
+				double newend   = oldstart+newduration;  
+				
+				timeLog->startTime = newstart;  
+				timeLog->endTime   = newend;  
+				
+				rewritten_count++;
+				
 #ifdef PRINT_NEW_TIMES
-                     printf("Rewriting duration of event %d name=%s from [%.10lf , %.10lf] to [%.10lf , %.10lf]\n", j, timeLog->name, oldstart,oldend,newstart,newend);
+				printf("Rewriting duration of event %d name=%s from [%.10lf , %.10lf] to [%.10lf , %.10lf]\n", j, timeLog->name, oldstart,oldend,newstart,newend);
 #endif
-                    for(int m=0;m<timeLog->msgs.length();m++){
-                        double oldsendtime = timeLog->msgs[m]->sendTime;
-                        double newsendtime;
-
-                        if(oldstart == oldend){
-                            newsendtime = oldstart;
-                        } else {
-                            // Linearly map the old range onto the new range
-                            newsendtime = newstart + (oldsendtime-oldstart)/(oldend-oldstart) * (newend-newstart);
-                        }
-
-                        timeLog->msgs[m]->sendTime = newsendtime;
+				
+				// Rewrite times of messages sent from this event
+				for(int m=0;m<timeLog->msgs.length();m++){
+				  double oldsendtime = timeLog->msgs[m]->sendTime;
+				  double newsendtime;
+				  
+				  if(oldstart == oldend){
+					newsendtime = oldstart;
+				  } else {
+					// Linearly map the old range onto the new range
+					newsendtime = newstart + (oldsendtime-oldstart)/(oldend-oldstart) * (newend-newstart);
+				  }
+				  
+				  timeLog->msgs[m]->sendTime = newsendtime;
+				  
 #ifdef PRINT_NEW_TIMES
-/                         printf("changing message %d send time from %.10lf to %.10lf\n", m, oldsendtime, newsendtime);
+				  //				  printf("changing message %d send time from %.10lf to %.10lf\n", m, oldsendtime, newsendtime);
 #endif
-                    }
-                }
-                else {
-                    negative_durations_occured=true;
-                }
-            }
-
-        }
-
+				}
+			}
+			else {
+			  negative_durations_occured=true;
+			}
+		}
+		
+		
+		
 		// Write out the file
 		BgWriteTimelines(procNum,&tlinerec,1,numWth,OUTPUTDIR);
-
-    }
+		
+	}
     if(negative_durations_occured){
-        cerr << "======================  WARNING ======================" << endl;
-        cerr << "||  One or more new durations were less than zero. \n||  This probably means your model or input times are \n||  not good enough." << endl;
-        cerr << "======================================================" << endl;
+	  cerr << "======================  WARNING ======================" << endl;
+	  cerr << "||  One or more new durations were less than zero. \n||  This probably means your model or input times are \n||  not good enough." << endl;
+	  cerr << "======================================================" << endl;
     }
 
     interpolator.printMinInterpolatedTimes();
