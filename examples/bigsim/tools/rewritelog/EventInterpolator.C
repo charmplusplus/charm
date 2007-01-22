@@ -1,6 +1,7 @@
 
 #include <EventInterpolator.h>
-#include <FunctionSpecifier.h>
+
+#define DEBUG
 
 using namespace std;
 
@@ -83,6 +84,7 @@ pair<int,vector<double> > EventInterpolator::parseParameters(const string &funcn
 
         params.push_back( 1.0);
         params.push_back( d2 );
+        params.push_back( d2*d2 );
 
         time = t1;
 
@@ -96,6 +98,7 @@ pair<int,vector<double> > EventInterpolator::parseParameters(const string &funcn
 
         params.push_back( 1.0);
         params.push_back( d2 );
+        params.push_back( d2*d2 );
         time = t1;
 
     }
@@ -148,23 +151,23 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
     // Create a gsl interpolator workspace for each event/function
     for(map<funcIdentifier,unsigned long>::iterator i=sample_count.begin(); i!=sample_count.end();++i){
-        funcIdentifier name = (*i).first;
+        funcIdentifier func = (*i).first;
         unsigned long samples = (*i).second;
-        cout << "     > " << name.first << "," << name.second << " has " << samples << " sampled timings" << endl;
+        cout << "     > " << func.first << "," << func.second << " has " << samples << " sampled timings" << endl;
 
-        if(samples < numCoefficients(name.first) ){
-            cerr << "FATAL ERROR: Not enough input timing samples for " << name.first << "," << name.second << " which has " << numCoefficients(name.first) << " coefficients" << endl;
+        if(samples < numCoefficients(func.first) ){
+            cerr << "FATAL ERROR: Not enough input timing samples for " << func.first << "," << func.second << " which has " << numCoefficients(func.first) << " coefficients" << endl;
             throw new runtime_error("samples < numCoefficients");
         }
         else {
-            work[name] = gsl_multifit_linear_alloc(samples,numCoefficients(name.first));
-            X[name] = gsl_matrix_alloc (samples,numCoefficients(name.first));
-            y[name] = gsl_vector_alloc (samples);
-            c[name] = gsl_vector_alloc(numCoefficients(name.first));
-            cov[name] = gsl_matrix_alloc(numCoefficients(name.first),numCoefficients(name.first));
+            work[func] = gsl_multifit_linear_alloc(samples,numCoefficients(func.first));
+            X[func] = gsl_matrix_alloc (samples,numCoefficients(func.first));
+            y[func] = gsl_vector_alloc (samples);
+            c[func] = gsl_vector_alloc(numCoefficients(func.first));
+            cov[func] = gsl_matrix_alloc(numCoefficients(func.first),numCoefficients(func.first));
 
-            for(int i=0;i<numCoefficients(name.first);++i){
-                gsl_vector_set(c[name],i,1.0);
+            for(int i=0;i<numCoefficients(func.first);++i){
+                gsl_vector_set(c[func],i,1.0);
             }
 
         }
@@ -240,7 +243,9 @@ EventInterpolator::EventInterpolator(char *table_filename){
         ifstream parameterEventTable(name);
 
         if(parameterEventTable.good()){
-//             cout << "     >  Loading " << name << endl;
+#ifdef DEBUG
+            cout << "     >  Loading " << name << endl;
+#endif
 
             while(parameterEventTable.good()){
                 string line_s;
@@ -383,8 +388,9 @@ void EventInterpolator::printMinInterpolatedTimes(){
 }
 
 void EventInterpolator::printMatches(){
-    cout << " Exact  Matches = " << exact_matches << " (" << exact_positive_matches << " positive)" << endl;
-    cout << " Approx Matches = " << approx_matches << " (" << approx_positive_matches << " positive)" << endl;
+    cout << "    > Exact lookup = " << exact_matches << " (" << exact_positive_matches << " positive)" << endl;
+    cout << "    > Approximated = " << approx_matches << " (" << approx_positive_matches << " positive)" << endl;
+    cout << "    > Total        = " << approx_matches+exact_matches <<  " (" << exact_positive_matches+approx_positive_matches << " positive)" << endl;
 }
 
 void EventInterpolator::printCoefficients(){

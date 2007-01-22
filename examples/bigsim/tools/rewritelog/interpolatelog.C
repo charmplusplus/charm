@@ -81,7 +81,7 @@ int main()
         CmiAssert(fileNum != -1);
 
 #ifdef DEBUG
-    printf("Load log of BG proc %d from bgTrace%d... \n", i, fileNum);
+		printf("Load log of BG proc %d from bgTrace%d... \n", i, fileNum);
 #endif
 
         BgTimeLine &timeLine = tlinerecs[i].timeline; // Really a CkQ< BgTimeLog *>
@@ -139,7 +139,18 @@ int main()
             }
 
         }
+
+		
+	// Create output directory
+    mkdir(OUTPUTDIR, 0777);
+
+	
+    BgWriteTimelines(i, &tlinerecs[i], 1, numWth, OUTPUTDIR);
+
+
     }
+
+
     if(negative_durations_occured){
         cerr << "======================  WARNING ======================" << endl;
         cerr << "||  One or more new durations were less than zero. \n||  This probably means your model or input times are \n||  not good enough." << endl;
@@ -157,8 +168,6 @@ int main()
     // The mapping from VP to file was probably round robin. Here we cheat and make just one file
     // TODO : fix this to write out in same initial pattern
     BgWriteTraceSummary(totalProcs, 1, numX, numY, numZ, numCth, numWth, OUTPUTDIR);
-    //  for(int i=0; i<numPes; i++)
-    BgWriteTimelines(0, &tlinerecs[0], totalProcs, numWth, OUTPUTDIR);
 
     delete [] allNodeOffsets;
 
