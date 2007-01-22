@@ -100,8 +100,6 @@ int main()
     for (int i=0; i<totalProcs; i++)
     {
         int procNum = i;
-        currTline = &tlinerecs[i];
-        currTlineIdx = procNum;
         int fileNum = BgReadProc(procNum,numWth,numPes,totalProcs,allNodeOffsets,tlinerecs[i]);
         CmiAssert(fileNum != -1);
         printf("Load log of BG proc %d from bgTrace%d... \n", i, fileNum);
