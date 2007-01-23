@@ -41,7 +41,7 @@
 
 // Set these for more output:
 #undef DEBUG
-#undef PRINT_NEW_TIMES
+#define PRINT_NEW_TIMES
 
 
 // Needed to communicated with the bigsim file reading and writing routines:
@@ -136,7 +136,7 @@ int main()
 				rewritten_count++;
 				
 #ifdef PRINT_NEW_TIMES
-				printf("Rewriting duration of event %d name=%s from [%.10lf , %.10lf] to [%.10lf , %.10lf]\n", j, timeLog->name, oldstart,oldend,newstart,newend);
+				printf("Rewriting duration of event %d name=%s from [%.10lf , %.10lf] (%.10lf) to [%.10lf , %.10lf] (%.10lf)\n", j, timeLog->name, oldstart,oldend,oldend-oldstart,newstart,newend,newend-newstart,(oldend-oldstart)/(newend-newstart));
 #endif
 				
 				// Rewrite times of messages sent from this event
@@ -154,7 +154,7 @@ int main()
 				  timeLog->msgs[m]->sendTime = newsendtime;
 				  
 #ifdef PRINT_NEW_TIMES
-				  //				  printf("changing message %d send time from %.10lf to %.10lf\n", m, oldsendtime, newsendtime);
+				  printf("changing message %d send time from %.10lf to %.10lf\n", m, oldsendtime, newsendtime);
 #endif
 				}
 			}
@@ -181,7 +181,7 @@ int main()
 
 
     // Write out the timelines to the same number of files as we started with.
-    BgWriteTraceSummary(totalProcs, 1, numX, numY, numZ, numCth, numWth, OUTPUTDIR);
+    BgWriteTraceSummary(totalProcs, totalProcs, numX, numY, numZ, numCth, numWth, OUTPUTDIR);
     
     delete [] allNodeOffsets;
 
