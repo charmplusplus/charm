@@ -177,7 +177,7 @@ extern double (*timerFunc) (void);
 #define tTHREADTABLE    tMYNODE->threadTable
 #define tSTARTED        tMYNODE->started
 
-extern int bgSize;
+extern int _bgSize;
 
 /*****************************************************************************
    used internally, define BG Node to real Processor mapping
@@ -189,8 +189,8 @@ public:
   inline static int numLocalNodes()
   {
     int n, m;
-    n = bgSize / CmiNumPes();
-    m = bgSize % CmiNumPes();
+    n = _bgSize / CmiNumPes();
+    m = _bgSize % CmiNumPes();
     if (CmiMyPe() < m) n++;
     return n;
   }
@@ -224,8 +224,8 @@ public:
 
     /* map global serial node number to PE ++++ */
   inline static int Global2PE(int num) { 
-    int n = bgSize/CmiNumPes();
-    int bn = bgSize%CmiNumPes();
+    int n = _bgSize/CmiNumPes();
+    int bn = _bgSize%CmiNumPes();
     int start = 0; 
     int end = 0;
     for (int i=0; i< CmiNumPes(); i++) {
@@ -240,8 +240,8 @@ public:
 
     /* map global serial node ID to local node array index  ++++ */
   inline static int Global2Local(int num) { 
-    int n = bgSize/CmiNumPes();
-    int bn = bgSize%CmiNumPes();
+    int n = _bgSize/CmiNumPes();
+    int bn = _bgSize%CmiNumPes();
     int start = 0; 
     int end = 0;
     for (int i=0; i< CmiNumPes(); i++) {
@@ -256,8 +256,8 @@ public:
 
     /* map local node index to global serial node id ++++ */
   inline static int Local2Global(int num) { 
-    int n = bgSize/CmiNumPes();
-    int bn = bgSize%CmiNumPes();
+    int n = _bgSize/CmiNumPes();
+    int bn = _bgSize%CmiNumPes();
     int start = 0; 
     int end = 0;
     for (int i=0; i< CmiMyPe(); i++) {
@@ -275,8 +275,8 @@ public:
   inline static int numLocalNodes()
   {
     int n, m;
-    n = bgSize / CmiNumPes();
-    m = bgSize % CmiNumPes();
+    n = _bgSize / CmiNumPes();
+    m = _bgSize % CmiNumPes();
     if (CmiMyPe() < m) n++;
     return n;
   }
