@@ -123,4 +123,24 @@ public:
 };
 
 
+class IBMNetwork: public BigSimNetwork
+{
+private:
+  double alpha;
+  double bandwidth;
+public:
+  IBMNetwork() { 
+    myname = "ibmNetwork";
+    alpha = 2.5*1e-6;
+    bandwidth = 12*1e9; 
+  }
+  inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
+    return alpha + bytes/bandwidth;
+  }
+  void print() {
+    CmiPrintf("alpha: %e	bandwidth :%e.\n", alpha, bandwidth);
+  }
+};
+
+
 
