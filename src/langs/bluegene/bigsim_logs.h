@@ -100,7 +100,7 @@ extern void BgDelaySend(BgMsgEntry *msgEntry);
 class BgTimeLineRec;
 /**
   one time log for an handler function;
-  it record a list of message sent events in an execution of handler
+  it records a list of message sent events in an execution of handler
 */
 class BgTimeLog {
 public:
