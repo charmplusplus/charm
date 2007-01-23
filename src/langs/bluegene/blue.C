@@ -40,7 +40,7 @@ CpvDeclare(SimState, simState);
 static int arg_argc;
 static char **arg_argv;
 
-int bgSize = 0;			// short cut of blue gene node size
+int _bgSize = 0;			// short cut of blue gene node size
 int delayCheckFlag = 1;          // when enabled, only check correction 
 					// messages after some interval
 int programExit = 0;
@@ -739,7 +739,7 @@ static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int 
   // timing
 #if 0
   if (node == BG_BROADCASTALL) {
-    for (int i=0; i<bgSize; i++) {
+    for (int i=0; i<_bgSize; i++) {
       for (int j=0; j<cva(numWth); j++) {
         BG_ADDMSG(sendmsg, node);
       }
@@ -904,7 +904,7 @@ int BgTraceProjectionOn(int pe)
 /* return the total number of Blue gene nodes */
 int BgNumNodes()
 {
-  return bgSize;
+  return _bgSize;
 }
 
 /* can only called in emulatorinit */
@@ -1300,7 +1300,7 @@ CmiStartFn bgMain(int argc, char **argv)
   /* check if all bluegene node size and thread information are set */
   sanityCheck();
 
-  bgSize = cva(bgMach).getNodeSize(); 
+  _bgSize = cva(bgMach).getNodeSize(); 
 
   timerFunc = BgGetTime;
 

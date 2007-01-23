@@ -132,7 +132,8 @@ public:
   IBMNetwork() { 
     myname = "ibmNetwork";
     alpha = 2.5*1e-6;
-    bandwidth = 12*1e9; 
+    //bandwidth = 12*1e9; 
+    bandwidth = 1.7*1e9; 
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
     return alpha + bytes/bandwidth;
