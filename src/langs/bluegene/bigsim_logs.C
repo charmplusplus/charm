@@ -339,6 +339,17 @@ int BgTimeLog::bDepExists(BgTimeLog* log){
 void BgTimeLog::pup(PUP::er &p){
     int l=0,idx;
     int i;
+
+    if(p.isPacking()) {           // sanity check
+      if (!strcasecmp(name, "BgSchedulerEnd")) {       // exit event
+        if (endTime == 0.0) {
+          endTime = startTime;
+          if (msgs.length() > 0 && msgs[msgs.length()-1]->sendTime > endTime)
+            endTime = msgs[msgs.length()-1]->sendTime;
+        }
+      }
+    }
+
     p|ep; 
     p|seqno; p|msgId;
     p|recvTime; p|effRecvTime;p|startTime; p|execTime; p|endTime; 
