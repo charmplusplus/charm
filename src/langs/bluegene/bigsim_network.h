@@ -14,6 +14,21 @@ public:
   virtual void print() = 0;
 };
 
+class DummyNetwork: public BigSimNetwork
+{
+public:
+  DummyNetwork() { 
+    myname = "dummy";
+    alpha = 0.0;
+  }
+  inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
+    return 0;
+  }
+  void print() {
+    CmiPrintf("Dummy network.\n");
+  }
+};
+
 const double BANDWIDTH = 256E6;
 
 class LemieuxNetwork: public BigSimNetwork
@@ -123,20 +138,22 @@ public:
 };
 
 
-class IBMNetwork: public BigSimNetwork
+class IBMPowerNetwork: public BigSimNetwork
 {
 private:
-  double alpha;
+  double permsg;
   double bandwidth;
 public:
-  IBMNetwork() { 
-    myname = "ibmNetwork";
-    alpha = 2.5*1e-6;
+  IBMPowerNetwork() { 
+    myname = "ibmpower";
+    alpha = 1*1e-6;
+//    permsg = 2.5*1e-6;
+    permsg = 2.5*(1e-6)*20;
     //bandwidth = 12*1e9; 
     bandwidth = 1.7*1e9; 
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
-    return alpha + bytes/bandwidth;
+    return permsg + bytes/bandwidth;
   }
   void print() {
     CmiPrintf("alpha: %e	bandwidth :%e.\n", alpha, bandwidth);

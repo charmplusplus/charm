@@ -117,7 +117,9 @@ int BGMach::traceProejctions(int pe)
 
 void BGMach::setNetworkModel(char *model)
 {
-  if (!strcmp(model, "lemieux"))
+  if (!strcmp(model, "dummy"))
+        network = new DummyNetwork;
+  else if (!strcmp(model, "lemieux"))
         network = new LemieuxNetwork;
   else if (!strcmp(model, "bluegenel"))
         network = new BlueGeneLNetwork;
@@ -125,6 +127,8 @@ void BGMach::setNetworkModel(char *model)
         network = new BlueGeneNetwork;
   else if (!strcmp(model, "redstorm"))
         network = new RedStormNetwork;
+  else if (!strcmp(model, "ibmpower"))
+        network = new IBMPowerNetwork;
   else
         CmiAbort("BG> unknown network setup");
 }
