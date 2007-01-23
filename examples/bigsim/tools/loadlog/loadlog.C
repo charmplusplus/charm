@@ -1,4 +1,5 @@
 
+#include <math.h>
 #include "blue.h"
 #include "blue_impl.h"
 
@@ -29,7 +30,22 @@ int main()
     CmiAssert(fileNum != -1);
     printf("Loading bglog of proc %d from bgTrace%d succeed. \n", i, fileNum);
                                                                                 
-    // dump bg timeline log to disk in asci format
+    // some senity checking
+    for (int idx = 0; idx < tline.length(); idx ++)
+    {
+      BgTimeLog *bglog = tline[idx];
+#if 1
+      if (fabs(bglog->execTime - ( bglog->endTime - bglog->startTime)) > 1e-6)
+        printf("Invalid log: startT: %f endT: %f execT: %f\n", bglog->startTime, bglog->endTime, bglog->execTime);
+#endif
+      for(int midx=0; midx < bglog->msgs.length(); midx++){
+        BgMsgEntry *msg = bglog->msgs[midx];
+        if (msg->sendTime < bglog->startTime || msg->sendTime > bglog->endTime)
+          printf("Invalid MsgEntry [%d]: sendTime: %f in log startT: %f endT: %f execT: %f\n", idx, msg->sendTime, bglog->startTime, bglog->endTime, bglog->execTime);
+      }
+    }
+
+    // dump bg timeline log to disk in ASCII format
     BgWriteThreadTimeLine("detail", 0, 0, 0, procNum, tline.timeline);
   }
 
