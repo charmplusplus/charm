@@ -21,6 +21,8 @@
 #undef DEBUGF
 #define DEBUGF(x)  // CmiPrintf x
 
+static int _bgPrintOff = 0;
+
 void _createTracebluegene(char** argv)
 {
   DEBUGF(("%d createTraceBluegene\n", CkMyPe()));
@@ -49,6 +51,9 @@ void TraceBluegene::writePrint(char* str, double t){
 
 TraceBluegene::TraceBluegene(char** argv): pfp(NULL)
 {
+  _bgPrintOff = 
+    CmiGetArgFlagDesc(argv,"+bgprintoff",
+		      "Turn off bgPrint on screen");
 }
 
 void TraceBluegene::traceClose() {
@@ -202,7 +207,7 @@ void TraceBluegene::bgPrint(char* str){
   double curT = BgGetTime();
   if (genTimeLog)
     bgAddProjEvent(strdup(str), -1, curT, writeData, this, BG_EVENT_PRINT);
-  CmiPrintf(str, curT);
+  if (!_bgPrintOff) CmiPrintf(str, curT);
   // bypass
   resetVTime();
 }
