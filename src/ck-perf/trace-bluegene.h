@@ -39,6 +39,7 @@ class TraceBluegene : public Trace {
     void userBracketEvent(char* name, double bt, double et, void** parentLogPtr);
     void userBracketEvent(char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList);
     void bgPrint(char* str);
+    void bgMark(char* str);
     void creatFiles();
     void writePrint(char *, double t);
     void traceClose();
@@ -58,6 +59,7 @@ extern int traceBluegeneLinked;
 // for Sdag only
 // fixme - think of better api for tracing sdag code
 #define BgPrint(x)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgPrint(x))
+#define BgMark(x)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgMark(x))
 #define _TRACE_BG_BEGIN_EXECUTE_NOMSG(x,pLogPtr)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgDummyBeginExec(x,pLogPtr))
 #define _TRACE_BG_BEGIN_EXECUTE(msg, str)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgBeginExec(msg, str))
 #define _TRACE_BG_AMPI_BEGIN_EXECUTE(msg, str, log)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgAmpiBeginExec(msg, str, log))
@@ -131,7 +133,9 @@ extern "C" void BgSetStartEvent();
 # define TRACE_BG_NEWSTART(t, str, events, count)
 #define TRACE_BG_AMPI_WAITALL(reqs)
 #endif   /* CMK_TRACE_IN_CHARM */
+
 extern "C" void BgPrintf(char *str);
+extern "C" void BgMark(char *str);
 
 #endif
 
