@@ -271,7 +271,7 @@ void BgTimeLog::write(FILE *fp)
   int i;
 //  fprintf(fp,"%p ep:%d name:%s (srcnode:%d msgID:%d) startTime:%f endTime:%f recvime:%f effRecvTime:%e seqno:%d startevent:%d\n", this, ep, name, msgId.node(), msgId.msgID(), startTime, endTime, recvTime, effRecvTime, seqno, isStartEvent());
   fprintf(fp,"%p name:%s (srcnode:%d msgID:%d) ep:%d %s\n", this, name, msgId.node(), msgId.msgID(), ep, isStartEvent()?"STARTEVENT":"");
-  fprintf(fp," recvtime:%f startTime:%f endTime:%f \n", recvTime, startTime, endTime);
+  fprintf(fp," recvtime:%f startTime:%f endTime:%f execTime:%f\n", recvTime, startTime, endTime, execTime);
   if (bglog_version >= 2) {
     if (!objId.isNull())
       fprintf(fp," ObjID: %d %d %d\n", objId.id[0], objId.id[1], objId.id[2]);
