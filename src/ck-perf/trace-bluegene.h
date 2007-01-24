@@ -120,6 +120,7 @@ extern int traceBluegeneLinked;
 extern "C" void BgSetStartEvent();
 #else
 # define BgPrint(x)  
+# define BgMark_(x)  
 # define _TRACE_BG_TLINE_END(x)
 #define _TRACE_BG_BEGIN_EXECUTE_NOMSG(x,pLogPtr)
 #define _TRACE_BG_USER_EVENT_BRACKET(x,bt,et,pLogPtr)
