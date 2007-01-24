@@ -84,6 +84,10 @@ void bgEvents::print()
 	CmiPrintf("EVT: time:%f string:%s\n", rTime, data);
 	break;
        }
+  case BG_EVENT_MARK: {
+	CmiPrintf("EVT: time:%f marker:%s\n", rTime, data);
+	break;
+       }
   default: CmiAbort("bgEvents::pup(): unknown BG event type!");
   }
 }
@@ -97,6 +101,10 @@ void bgEvents::write(FILE *fp)
 	fprintf(fp, "EVT: time:%f string:%s\n", rTime, data);
 	break;
        }
+  case BG_EVENT_MARK: {
+	fprintf(fp, "EVT: time:%f marker:%s\n", rTime, data);
+	break;
+       }
   default: CmiAbort("bgEvents::pup(): unknown BG event type!");
   }
 }
@@ -107,6 +115,7 @@ void bgEvents::pup(PUP::er &p)
   switch (eType) {
   case BG_EVENT_PROJ:
 	   p|index;  break;
+  case BG_EVENT_MARK:
   case BG_EVENT_PRINT: {
 	     int slen = 0;
 	     if (p.isPacking()) slen = strlen((char *)data)+1;

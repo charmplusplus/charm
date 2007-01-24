@@ -232,6 +232,7 @@ void BgStartCorrection();
 /* BG event types */
 #define BG_EVENT_PROJ		1
 #define BG_EVENT_PRINT		2
+#define BG_EVENT_MARK           3
 
 void *BgCreateEvent(int eidx);
 void BgEntrySplit();
