@@ -222,7 +222,7 @@ void TraceBluegene::bgMark(char* str){
 
 extern "C" void BgMark(char *str)
 {
-  BgMark(str);
+  BgMark_(str);
 }
 
 extern "C" void BgSetStartEvent()
