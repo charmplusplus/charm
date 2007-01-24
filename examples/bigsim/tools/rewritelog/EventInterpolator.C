@@ -343,6 +343,14 @@ bool EventInterpolator::canInterpolateFunc(const funcIdentifier& func){
     return (work.find(func) != work.end());
 }
 
+
+double EventInterpolator::getNewTiming(const unsigned pe, const unsigned eventid){
+  if(haveExactTime(pe,eventid) )
+	return lookupExactTime(pe,eventid);
+  else
+	return predictTime(pe,eventid);
+}			  
+
 double EventInterpolator::predictTime(const funcIdentifier &func, const vector<double> &params) {
 
     // check name

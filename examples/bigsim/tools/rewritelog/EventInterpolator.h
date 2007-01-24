@@ -76,6 +76,8 @@ public:
     double lookupExactTime(const pair<funcIdentifier,vector<double> > &p);
     double lookupExactTime(const funcIdentifier& name, const vector<double> &p);
 
+	/** Get the new timing exactly if possible otherwise predict it */
+	double getNewTiming(const unsigned pe, const unsigned eventid);
 
     double get_chisqr(funcIdentifier funcname){if(work[funcname]!=NULL) return chisqr[funcname]; else return -1.0;}
 
