@@ -257,7 +257,7 @@ void BgTimeLog::closeLog()
 void BgTimeLog::print(int node, int th)
 {
   int i;
-  CmiPrintf("<<== [%d th:%d] ep:%d name:%s startTime:%f endTime:%f srcnode:%d msgID:%d\n", node, th, ep, name,startTime, endTime, msgId.node(), msgId.msgID());
+  CmiPrintf("<<== [%d th:%d] ep:%d name:%s startTime:%f endTime:%f execTIme:%f srcnode:%d msgID:%d\n", node, th, ep, name,startTime, endTime, execTime, msgId.node(), msgId.msgID());
   for (i=0; i<msgs.length(); i++)
     msgs[i]->print();
   for (i=0; i<evts.length(); i++)
@@ -346,6 +346,7 @@ void BgTimeLog::pup(PUP::er &p){
           endTime = startTime;
           if (msgs.length() > 0 && msgs[msgs.length()-1]->sendTime > endTime)
             endTime = msgs[msgs.length()-1]->sendTime;
+          execTime = endTime - startTime;
         }
       }
     }
