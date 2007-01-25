@@ -712,13 +712,8 @@ void LogEntry::pup(PUP::er &p)
       if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
       p|mIdx; p|eIdx; p|itime;
       p|event; p|pe; p|msglen; p|irecvtime; p|numpes;
-      if (pes == NULL) {
-        int n=-1;
-        p(n);
-      }
-      else {
-	for (i=0; i<numpes; i++) p|pes[i];
-      }
+      if (p.isUnpacking()) pes = numpes?new int[numpes]:NULL;
+      for (i=0; i<numpes; i++) p|pes[i];
       if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
       break;
     case MESSAGE_RECV:
