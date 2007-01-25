@@ -3,6 +3,8 @@
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 
+#define CMI_MPI_TRACE_USEREVENTS                           0
+
 #define CMK_HANDLE_SIGUSR                                  1
 
 #define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, root, hdl,xhdl,info, stratid; unsigned char cksum, magic;  CmiUInt2 padding;

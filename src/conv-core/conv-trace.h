@@ -31,6 +31,9 @@ int  traceRegisterUserEvent(const char*, int e
 #endif
 );
 
+/* Support for machine layers to register their user events to projections */
+void registerMachineUserEventsFunction(void (*eventRegistrationFunc)());
+
 int traceRegisterFunction(const char*, int idx
 #ifdef __cplusplus
 =-999

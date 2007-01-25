@@ -741,6 +741,7 @@ void TraceSummaryBOC::write(void)
 
 extern "C" void CombineSummary()
 {
+#ifndef CMK_OPTIMIZE
   CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());
   if (sumonly) {
     CmiPrintf("[%d] Sum Only start!\n", CkMyPe());
@@ -749,6 +750,9 @@ extern "C" void CombineSummary()
     sumProxy[0].startSumOnly();
   }
   else CkExit();
+#else
+  CkExit();
+#endif
 }
 
 void initTraceSummaryBOC()

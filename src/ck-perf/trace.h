@@ -57,7 +57,9 @@ class Trace {
     virtual void traceBegin() {}
     virtual void traceEnd() {}
     // registers user event trace module returns int identifier 
-    virtual int traceRegisterUserEvent(const char* eventName, int e) { return 0; }
+    virtual int traceRegisterUserEvent(const char* eventName, int e) { 
+      return 0; 
+    }
     // a user event has just occured
     virtual void userEvent(int eventID) {}
     // a pair of begin/end user event has just occured
@@ -189,7 +191,9 @@ public:
     inline int traceRegisterUserEvent(const char*x, int evt) {
 	  int eno = 0;
 	  for (int i=0; i<length(); i++) {
-	    if (traces[i]->traceOnPE() == 0) continue;
+	    if (traces[i]->traceOnPE() == 0) {
+	      continue;
+	    }
 	    int e = traces[i]->traceRegisterUserEvent(x, evt);
 	    if (e) eno = e;
           }

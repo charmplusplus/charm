@@ -38,14 +38,14 @@
 
 CpvCExtern(int, _traceCoreOn);   // projector
 
-#define DEBUGF(x)          // CmiPrintf x
-
 #ifdef CMK_OPTIMIZE
 static int warned = 0;
 #define OPTIMIZE_WARNING if (!warned) { warned=1;  CmiPrintf("\n\n!!!! Warning: tracing not available with CMK_OPTIMIZE!\n");  return;  }
 #else
 #define OPTIMIZE_WARNING /*empty*/
 #endif
+
+#define DEBUGF(x)          // CmiPrintf x
 
 CkpvDeclare(TraceArray*, _traces);		// lists of all trace modules
 
@@ -59,6 +59,10 @@ CkpvDeclare(double, traceInitCpuTime);
 CpvDeclare(int, traceOn);
 CkpvDeclare(int, traceOnPe);
 CkpvDeclare(char*, traceRoot);
+
+typedef void (*mTFP)();                   // function pointer for
+CpvDeclare(mTFP, machineTraceFuncPtr);    // machine user event
+                                          // registration
 
 int _threadMsg, _threadChare, _threadEP;
 int _packMsg, _packChare, _packEP;
@@ -81,6 +85,7 @@ static void traceCommonInit(char **argv)
   CpvAccess(_traceCoreOn)=0; //projector
   CkpvInitialize(int, traceOnPe);
   CkpvAccess(traceOnPe) = 1;
+  CpvInitialize(mTFP, machineTraceFuncPtr);
   char *root;
   char *temproot;
   char *temproot2;
@@ -323,6 +328,20 @@ void traceUserBracketEvent(int e, double beginT, double endT)
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
     CkpvAccess(_traces)->userBracketEvent(e, beginT, endT);
 #endif
+}
+
+extern "C"
+void registerMachineUserEventsFunction(void (*eventRegistrationFunc)()) {
+  CpvAccess(machineTraceFuncPtr) = eventRegistrationFunc;
+}
+
+extern "C"
+void (*registerMachineUserEvents())() {
+  if (CpvAccess(machineTraceFuncPtr) != NULL) {
+    return CpvAccess(machineTraceFuncPtr);
+  } else {
+    return NULL;
+  }
 }
 
 extern "C"

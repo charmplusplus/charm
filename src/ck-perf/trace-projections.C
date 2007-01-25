@@ -1132,6 +1132,16 @@ void TraceProjections::dequeue(envelope *) {}
 void TraceProjections::beginComputation(void)
 {
   computationStarted = 1;
+
+  // Executes the callback function provided by the machine
+  // layer. This is the proper method to register user events in a
+  // machine layer because projections is a charm++ module.
+  if (CkpvAccess(traceOnPe) != 0) {
+    void (*ptr)() = registerMachineUserEvents();
+    if (ptr != NULL) {
+      ptr();
+    }
+  }
 //  CkpvAccess(traceInitTime) = TRACE_TIMER();
 //  CkpvAccess(traceInitCpuTime) = TRACE_CPUTIMER();
   _logPool->add(BEGIN_COMPUTATION, 0, 0, TraceTimer(), -1, -1);
@@ -1616,9 +1626,13 @@ void TraceProjectionsBOC::closeTrace()
 // 
 extern "C" void CombineProjections()
 {
+#ifndef CMK_OPTIMIZE
   // CkPrintf("[%d] CombineProjections called!\n", CkMyPe());
   CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
   bocProxy.shutdownAnalysis();
+#else
+  CkExit();
+#endif
 }
 
 // This method is called by module initialization to register the exit

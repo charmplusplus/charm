@@ -45,7 +45,6 @@ CkpvExtern(char*, traceRoot);
 CkpvExtern(double, traceInitTime);
 CkpvExtern(double, traceInitCpuTime);
 
-
 #if CMK_BLUEGENE_CHARM
 #define  TRACE_TIMER   BgGetTime
 #define  TRACE_CPUTIMER   BgGetTime
@@ -70,6 +69,8 @@ extern int _dummyMsg, _dummyChare, _dummyEP;
 
 /** Write out the common parts of the .sts file. */
 extern void traceWriteSTS(FILE *stsfp,int nUserEvents);
+
+extern "C" void (*registerMachineUserEvents())();
 
 #endif
 
