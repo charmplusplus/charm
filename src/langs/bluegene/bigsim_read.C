@@ -15,7 +15,7 @@ int BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNode
   int numNodes = totalProcs/numWth;
   int fileNum = nodeNum%numPes;
   int arrayID=0, fileOffset;
-  char* fName = new char[10];
+  char fName[20];
   //BgTimeLineRec* tlinerec = new BgTimeLineRec;
   
   for(int i=0;i<fileNum;i++)
