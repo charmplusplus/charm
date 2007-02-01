@@ -1136,6 +1136,8 @@ void CmiMachineProgressImpl()
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
+CmiCommHandle CmiAsyncSendFn_(int destPE, int size, char *msg);
+
 static void CmiSendSelf(char *msg)
 {
 #if CMK_IMMEDIATE_MSG
@@ -1162,7 +1164,7 @@ void CmiSyncSendFn(int destPE, int size, char *msg)
     CmiSendSelf(dupmsg);
   }
   else
-    CmiAsyncSendFn(destPE, size, dupmsg);
+    CmiAsyncSendFn_(destPE, size, dupmsg);
 }
 
 #if CMK_SMP
@@ -1332,7 +1334,7 @@ void EnqueueMsg(void *m, int size, int node)
 
 #endif
 
-CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
+CmiCommHandle CmiAsyncSendFn_(int destPE, int size, char *msg)
 {
   CmiState cs = CmiGetState();
   SMSG_LIST *msg_tmp;
@@ -1476,6 +1478,12 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
 #endif
 }
 
+CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
+{
+  CMI_SET_BROADCAST_ROOT(msg, 0);
+  CmiAsyncSendFn_(destPE, size, msg);
+}
+
 void CmiFreeSendFn(int destPE, int size, char *msg)
 {
   CmiState cs = CmiGetState();
@@ -1484,7 +1492,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg)
   if (cs->pe==destPE) {
     CmiSendSelf(msg);
   } else {
-    CmiAsyncSendFn(destPE, size, msg);
+    CmiAsyncSendFn_(destPE, size, msg);
   }
 }
 
@@ -1499,7 +1507,7 @@ void CmiSyncSendFn1(int destPE, int size, char *msg)
   if (cs->pe==destPE)
     CmiSendSelf(dupmsg);
   else
-    CmiAsyncSendFn(destPE, size, dupmsg);
+    CmiAsyncSendFn_(destPE, size, dupmsg);
 }
 
 /* send msg to its spanning children in broadcast. G. Zheng */
@@ -1958,7 +1966,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   MPI_Comm_rank(MPI_COMM_WORLD, &_Cmi_mynode);
   /* processor per node */
   _Cmi_mynodesize = 1;
-  CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize);
+  if (!CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize))
+    CmiGetArgInt(argv,"++ppn", &_Cmi_mynodesize);
 #if ! CMK_SMP
   if (_Cmi_mynodesize > 1 && _Cmi_mynode == 0)
     CmiAbort("+ppn cannot be used in non SMP version!\n");
