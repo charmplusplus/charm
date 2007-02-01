@@ -11,7 +11,7 @@ class opt3 : public opt {
   /// Time window size; fixed to SPEC_WINDOW in pose.h
   POSE_TimeType timeLeash;
 public:
-  opt3() { timeLeash = pose_config.spec_window; STRAT_T = OPT3_T; }
+  opt3() : timeLeash (pose_config.spec_window){ STRAT_T = OPT3_T; }
   virtual void Step();
 };
 

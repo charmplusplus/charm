@@ -23,7 +23,7 @@ void CancelList::RemoveItem(CancelNode *item)
   }
   count--;
   if (isEarliest) { // item had earliest timestamp; recalculate earliest
-    earliest = -1;
+    earliest = POSE_UnsetTS;
     tmp = cancellations;
     while (tmp) {
       if ((tmp->timestamp < earliest) || (earliest < 0))

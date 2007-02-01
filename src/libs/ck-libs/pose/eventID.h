@@ -21,7 +21,8 @@ class eventID
   /// Large number for identifier unique on creation PE
   unsigned int id; 
   /// Basic Constructor
-  eventID() { id = 0; pe = CkMyPe(); control = 0; }          
+  eventID() : pe(CkMyPe()), control (0), id(0) { }          
+
   /// Init to default unused values
   void init() { id = 0; pe = -1; control = INT_MIN; }
   /// Get next value for eventID

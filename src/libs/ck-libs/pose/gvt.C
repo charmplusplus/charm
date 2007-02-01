@@ -201,7 +201,7 @@ void PVT::setGVT(GVTMsg *m)
 /// Register poser with PVT
 int PVT::objRegister(int arrIdx, POSE_TimeType safeTime, int sync, sim *myPtr)
 {
-  int i = objs.Insert(arrIdx, -1, sync, myPtr); // add to object list
+  int i = objs.Insert(arrIdx, POSE_UnsetTS, sync, myPtr); // add to object list
   return(i*1000 + CkMyPe());                          // return unique PVT idx
 }
 

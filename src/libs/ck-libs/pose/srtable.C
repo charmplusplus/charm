@@ -7,16 +7,13 @@
 #include "gvt.h"
 
 /// Basic constructor
-SRtable::SRtable() 
+SRtable::SRtable() : offset(0), b(0), size_b(0), numOverflow(0), overflow(NULL), end_overflow(NULL), ofSends(0), ofRecvs(0)
 { 
   register int i;
-  offset = b = size_b = numOverflow = 0;
   for (i=0; i<MAX_B; i++) {
     buckets[i] = end_bucket[i] = NULL;
     numEntries[i] = sends[i] = recvs[i] = 0;
   }
-  overflow = end_overflow = NULL;
-  ofSends = ofRecvs = 0;
 }
 
 /// Initialize table to a minimum size
@@ -284,7 +281,7 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt, POSE_TimeType *maxSR)
   POSE_TimeType destBkt;  // which bucket?
   SRentry *tmp;
 
-  if (pvt == -1) destBkt = b;
+  if (pvt == POSE_UnsetTS) destBkt = b;
   else destBkt = (pvt-offset)/size_b;
 
   SortTable();

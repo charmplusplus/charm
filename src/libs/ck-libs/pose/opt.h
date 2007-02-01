@@ -37,13 +37,14 @@ public:
   POSE_TimeType avgRBoffset, avgTimeLeash, avgJump;
   unsigned short int rbFlag;
   /// Basic Constructor
-  opt() { 
-    STRAT_T = OPT_T; 
-    cpRate = pose_config.store_rate;
-    specEventCount = eventCount = stepCount = avgEventsPerStep = rbCount = jumpCount = rbFlag = 0;
-    avgRBoffset = POSE_TimeMax/2;
-    idle = avgTimeLeash = avgJump = 0;
-  }
+  opt() :   specEventCount(0),
+    eventCount(0), stepCount(0), avgEventsPerStep(0), rbCount(0), jumpCount(0),
+    rbFlag(0), idle(0), avgTimeLeash(0),avgJump(0)
+    { 
+      STRAT_T=OPT_T;
+      cpRate=pose_config.store_rate;
+      avgRBoffset = POSE_TimeMax/2;
+    }
   /// Initialize the synchronization strategy type of the poser
   void initSync() { parent->sync = OPTIMISTIC; }
   /// Perform a single forward execution step

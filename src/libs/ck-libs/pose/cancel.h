@@ -12,9 +12,9 @@ class CancelNode {
   /// Next cancellation in list
   CancelNode *next;
   /// Basic Constructor
-  CancelNode() { }
+  CancelNode() : timestamp(POSE_UnsetTS), next(NULL) { }
   /// Initializing Constructor
-  CancelNode(POSE_TimeType ts, eventID e) { timestamp = ts; evID = e; next = NULL; }
+  CancelNode(POSE_TimeType ts, eventID e) :timestamp (ts), evID (e), next(NULL){ }
   /// Dump all datafields
   void dump() {
 #if USE_LONG_TIMESTAMPS
@@ -40,9 +40,9 @@ class CancelList {
   CancelNode *current; 
  public:
   /// Initializing Constructor
-  CancelList() { 
-    count = 0; earliest = POSE_UnsetTS; cancellations = current = NULL; 
-  }
+  CancelList() :
+    count (0), earliest(POSE_UnsetTS), cancellations(NULL), current(NULL) 
+  {}
   /// Insert an event at beginning of cancellations list
   /** Inserts an event at beginning of list; increments count and sets earliest
       if applicable; sets current if list was previously empty */

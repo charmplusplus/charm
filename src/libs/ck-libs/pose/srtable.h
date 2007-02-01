@@ -23,29 +23,29 @@ class SRentry {
   SRentry *next;
   /// Basic constructor
   /** Initializes all data members */
-  SRentry() { 
-    timestamp = POSE_UnsetTS; sends = recvs = 0; next = NULL; 
+  SRentry() :timestamp(POSE_UnsetTS), sends(0), recvs(0), next(NULL) 
+{ 
   }
   /// Initializing constructor 1
   /** Initializes timestamp & next w/parameters, sends & recvs to 0 */
-  SRentry(POSE_TimeType ts, SRentry *p) { 
-    timestamp = ts; sends = recvs = 0; next = p; 
-  }
+  SRentry(POSE_TimeType ts, SRentry *p) :timestamp(ts), sends(0), recvs(0), next(p) 
+    { 
+    }
   /// Initializing constructor 2
   /** Initializes timestamp, send/recv count and next
       w/parameters */
-  SRentry(POSE_TimeType ts, int sr, SRentry *p) {
-    timestamp = ts;  next = p; 
-    if (sr == SEND) { sends = 1; recvs = 0; }
-    else { sends = 0; recvs = 1; }
-  }
+  SRentry(POSE_TimeType ts, int sr, SRentry *p) :timestamp(ts), sends(0), recvs(0), next(p) 
+    {
+      if (sr == SEND) { sends = 1; recvs = 0; }
+      else { sends = 0; recvs = 1; }
+    }
   /// Initializing constructor
   /** Initializes timestamp and send/recv count w/parameters */
-  SRentry(POSE_TimeType ts, int sr) {
-    timestamp = ts;  next = NULL; 
-    if (sr == SEND) { sends = 1; recvs = 0; }
-    else { sends = 0; recvs = 1; }
-  }
+  SRentry(POSE_TimeType ts, int sr) :timestamp(ts), sends(0), recvs(0), next(NULL) 
+    {
+      if (sr == SEND) { sends = 1; recvs = 0; }
+      else { sends = 0; recvs = 1; }
+    }
   /// Assignment operator
   SRentry& operator=(const SRentry& e) {
     timestamp = e.timestamp;

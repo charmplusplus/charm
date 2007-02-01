@@ -2,14 +2,12 @@
 #include "pose.h"
 
 /// Basic Constructor
-Event::Event() 
+Event::Event() :   spawnedList(NULL),msg (NULL), commitBfr(NULL),cpData(NULL),
+		   next(NULL),prev(NULL), commitBfrLen(0), commitErr(0),
+		   done (0),   fnIdx(-1),  timestamp(POSE_UnsetTS),
+		   srt(0.0), svt (0)
 { 
-  spawnedList = NULL; msg = NULL; commitBfr = NULL; cpData = NULL;
-  next = prev = NULL;
-  commitBfrLen = commitErr = done = 0;
-  fnIdx = timestamp = -1;
-  srt = 0.0;
-  svt = 0;
+
 }
 
 /// Destructor

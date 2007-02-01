@@ -15,7 +15,7 @@ class Pool
   int numBlocks, blockSize;
   void *memPool[MAX_POOL_SIZE];
   Pool *next, *prev;
-  Pool() { numBlocks = 0; blockSize=0; }
+  Pool() : numBlocks(0),blockSize(0),next(NULL), prev(NULL){ }
 };
 
 // Set of memory pools for various size blocks; 1 MemoryPool per PE
@@ -25,7 +25,7 @@ private:
   Pool *lastLook;  // last pool looked at
 public:
   /// Basic initialization
-  MemoryPool() { memPools = lastLook = NULL; }
+  MemoryPool() :memPools(NULL),lastLook(NULL){ }
   MemoryPool(CkMigrateMessage *) { };
   /// returns number of blocks of size sz in pool
   int CheckPool(int sz); 

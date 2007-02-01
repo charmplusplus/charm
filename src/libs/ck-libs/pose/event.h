@@ -20,11 +20,12 @@ class SpawnedEvent {
   /// Next spawned event in list
   SpawnedEvent *next;
   /// Basic Constructor
-  SpawnedEvent() { objIdx = timestamp = -1; next = NULL; }
+  SpawnedEvent() : objIdx(-1), timestamp(POSE_UnsetTS),next(NULL){ }
   /// Initializing constructor
-  SpawnedEvent(int idx, eventID e, POSE_TimeType ts, SpawnedEvent *n) {
-    objIdx = idx;  evID = e;  timestamp = ts;  next = n;
-  }
+  SpawnedEvent(int idx, eventID e, POSE_TimeType ts, SpawnedEvent *n) 
+    :objIdx (idx), evID(e),  timestamp(ts), next(n)
+    {
+    }
   /// Pack/unpack/sizing operator
   void pup(PUP::er &p) { p(objIdx); p(timestamp); evID.pup(p); } 
 };

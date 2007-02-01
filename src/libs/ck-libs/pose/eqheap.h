@@ -15,11 +15,11 @@ class HeapNode
   /// Left and right subheaps
   HeapNode *left, *right;  
   /// Basic Constructor
-  HeapNode() { subheapsize = 0; e = NULL; left = right = NULL; }
+  HeapNode() : subheapsize ( 0), e(NULL),left(NULL),right( NULL){ }
   /// Initializing Constructor
-  HeapNode(Event *ev, int sz, HeapNode *l, HeapNode *r) { 
-    subheapsize = sz; e = ev; left = l; right = r; 
-  }
+  HeapNode(Event *ev, int sz, HeapNode *l, HeapNode *r) :
+    subheapsize(sz), e(ev), left(l), right(r) 
+  {}
   /// Destructor
   ~HeapNode(){if (left) delete left; if (right) delete right; if (e) delete e;}
   /// Insert event in heap
@@ -63,7 +63,7 @@ class EqHeap {
   /// Top node of heap  
   HeapNode *top;
   /// Basic Constructor
-  EqHeap() { heapSize = 0; top = NULL; }
+  EqHeap() : heapSize(0),top(NULL){ }
   /// Destructor
   ~EqHeap() { if (top) delete top; } 
   /// Insert event e in heap with low timestamps at top of heap

@@ -124,7 +124,7 @@ class pose : public Chare {
   int callBackSet;
  public:
   /// Basic Constructor
-  pose(void) { callBackSet = 0; }
+  pose(void) : callBackSet(0) {  }
   pose(CkMigrateMessage *) { }
   /// Register the callback with POSE
   void registerCallBack(callBack *);

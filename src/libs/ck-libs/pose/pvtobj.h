@@ -25,11 +25,11 @@ class pvtObjectNode {
   /// A pointer to the actual poser
   sim *localObjPtr;
   /// Basic Constructor
-  pvtObjectNode() { present = 0; }
+  pvtObjectNode() : ovt(POSE_UnsetTS), ovt2(POSE_UnsetTS), index(-1), present (0), sync(0), qdo(0.0) {  }
   /// Sets all data fields
   void set(POSE_TimeType ts, int idx, short int on, short int s, sim *p) {
     ovt = ts; index = idx; present = on; sync = s; localObjPtr = p; qdo = 0.0;
-    ovt2 = -1;
+    ovt2 = POSE_UnsetTS;
   }
   /// Sets ovt to -1 to indicate idle
   void setIdle() { ovt = ovt2 = POSE_UnsetTS; }
@@ -100,7 +100,7 @@ class pvtObjects {
   int Insert(int index, POSE_TimeType ovt, int sync, sim *myPtr); 
   /// Delete a poser from the list
   void Delete(int idx) {
-    objs[idx].set(-1, -1, 0, 0, NULL);
+    objs[idx].set(POSE_UnsetTS, POSE_UnsetTS, 0, 0, NULL);
     numObjs--;
     if (idx < firstEmpty) firstEmpty = idx; // recalculate firstEmpty
   }                       

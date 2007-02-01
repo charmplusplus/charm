@@ -16,7 +16,7 @@
 //#define TRACE_DETAIL 1
 
 /// Set this to use 64 bit timestamps
-//#define USE_LONG_TIMESTAMPS 1
+#define USE_LONG_TIMESTAMPS 1
 
 /// Uncomment to force determinism in event ordering
 //#define DETERMINISTIC_EVENTS 1
@@ -42,7 +42,7 @@
 
 /// Synchronization strategy constants
 #define MAX_ITERATIONS 100  // maximum forward executions per Step call
-#define STORE_RATE 50       // default checkpoint rate: 1 for every n events
+#define STORE_RATE 5       // default checkpoint rate: 1 for every n events
 #define SPEC_WINDOW 10      // speculative event window size
 #define MIN_LEASH 10        // min speculative window for adaptive strategy
 #define MAX_LEASH 100        // max  "     "     "     "        "     "
@@ -63,13 +63,26 @@
 
 #if USE_LONG_TIMESTAMPS 
 typedef CmiInt8 POSE_TimeType;
+//we'd like to set UnsetTS to a very large negative value with some
+//wiggle room for underflow.  But there are many maddeningly hard to
+//find things which quietly break if its not -1.
+
+#ifdef LLONG_MAX
+const POSE_TimeType POSE_TimeMax=LLONG_MAX;
+//const POSE_TimeType POSE_UnsetTS=LLONG_MIN+10LL;
 const POSE_TimeType POSE_UnsetTS=-1LL;
+#else
 const POSE_TimeType POSE_TimeMax=9223372036854775807LL;
+//const POSE_TimeType POSE_UnsetTS=(-POSE_TimeMax-1LL)+10LL;
+const POSE_TimeType POSE_UnsetTS=-1LL;
+#endif
 #else
 typedef int POSE_TimeType;
-const POSE_TimeType POSE_UnsetTS=-1;
 const POSE_TimeType POSE_TimeMax=INT_MAX;
+const POSE_TimeType POSE_UnsetTS=-1;
 #endif
+
+
 
 // POSE Command line struct
 //glorified struct
@@ -101,62 +114,61 @@ class POSE_Config
   int max_leash;
   int leash_flex;
   bool deterministic;
-  POSE_Config()
-    {
+  /* one very long initializer line */
+  POSE_Config() :
 #ifdef POSE_STATS_ON                   //w
-      stats=true;
+    stats(true),
 #else
-      stats=false;
+    stats(false), 
 #endif
-      // timestamp start end tracing not supported yet
-      start_proj=-1;
-      end_proj=-1;
+    start_proj(-1),
+    end_proj(-1),
 #ifdef TRACE_DETAIL                    //w
-      trace=true;
+    trace(true),
 #else      
-      trace=false;
+    trace(false),
 #endif
-
 #ifdef POSE_DOP_ON
-      dop=true;
+    dop(true),
 #else
-      dop=false;
+    dop(false),
 #endif
-      max_usage=MAX_USAGE;               //w
+    max_usage(MAX_USAGE),
 /** MSG POOLING AND COMMLIB OPTIONS NOT SUPPORTED YET **/
 #ifdef MSG_RECYCLING
-      msg_pool=true;
+    msg_pool(true),
 #else
-      msg_pool=false;
+    msg_pool(false),
 #endif
-      msg_pool_size=40;
-      max_pool_msg_size=1000;
+    msg_pool_size(40),
+    max_pool_msg_size(1000),
 #ifdef POSE_COMM_ON
-      commlib_strat=nostrat;
+    commlib_strat(nostrat),
 #else
-      commlib_strat=stream;
+    commlib_strat(stream),
 #endif
-      commlib_timeout=COMM_TIMEOUT;
-      commlib_maxmsg=COMM_MAXMSG;
+    commlib_timeout(COMM_TIMEOUT),
+    commlib_maxmsg(COMM_MAXMSG),
 #ifdef LB_ON
-      lb_on=true;                  //w
+    lb_on(true),                  //w
 #else
-      lb_on=false;                 //w
+    lb_on(false),                 //w
 #endif
-      lb_skip=LB_SKIP;             //w
-      lb_threshold=LB_THRESHOLD;   //w
-      lb_diff=LB_DIFF;             //w
-      store_rate=STORE_RATE;       //w
-      max_iter=MAX_ITERATIONS;     //apparently defunct 
-      spec_window=SPEC_WINDOW;     //w
-      min_leash=MIN_LEASH;         //w
-      max_leash=MAX_LEASH;         //w
-      leash_flex=LEASH_FLEX;       //w
+    lb_skip(LB_SKIP),             //w
+    lb_threshold(LB_THRESHOLD),   //w
+    lb_diff(LB_DIFF),             //w
+    store_rate(STORE_RATE),       //w
+    max_iter(MAX_ITERATIONS),     //apparently defunct 
+    spec_window(SPEC_WINDOW),     //w
+    min_leash(MIN_LEASH),         //w
+    max_leash(MAX_LEASH),         //w
+    leash_flex(LEASH_FLEX),       //w
 #ifdef DETERMINISTIC_EVENTS        //w
-      deterministic=true;
+    deterministic(true)
 #else
-      deterministic=false;
+    deterministic(false)
 #endif
+    {// all handled in initializer
     }
 };
 PUPbytes(POSE_Config);

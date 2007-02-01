@@ -23,7 +23,7 @@ pvtObjects::pvtObjects()
     CkPrintf("ERROR: pvtObjects::pvtObjects: OUT OF MEMORY!\n");
     CkExit();
   }
-  for (i=0; i<size; i++) objs[i].set(-1, -1, 0, 0, NULL);
+  for (i=0; i<size; i++) objs[i].set(POSE_UnsetTS, POSE_UnsetTS, 0, 0, NULL);
 }
 
 /// Insert poser in list
@@ -52,7 +52,7 @@ int pvtObjects::Insert(int index, POSE_TimeType ovt, int sync, sim *myPtr)
       CkExit();
     }
     for (i=firstEmpty; i<size; i++)  // initialize new slots to empty
-      objs[i].set(-1, -1, 0, 0, NULL);
+      objs[i].set(POSE_UnsetTS, POSE_UnsetTS, 0, 0, NULL);
     idx = firstEmpty;  // insert new object at firstEmpty
     objs[idx].set(ovt, index, 1, sync, myPtr);
     numObjs++;

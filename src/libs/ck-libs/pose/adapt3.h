@@ -19,10 +19,9 @@
 class adapt3 : public opt3 {
   double specTol;
  public:
-  adapt3() { 
+  adapt3() : specTol(0.05) { 
     STRAT_T = ADAPT3_T; 
     timeLeash = POSE_TimeMax/2;
-    specTol = 0.05;
   }
   virtual void Step();
 };
