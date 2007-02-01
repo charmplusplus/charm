@@ -66,7 +66,7 @@ class LogEntry {
     char *fName;
     int flen;
   public:
-    LogEntry() {fName=NULL;flen=0;}
+    LogEntry() {fName=NULL;flen=0;pes=NULL;numpes=0;}
     LogEntry(double tm, unsigned char t, unsigned short m=0, unsigned short e=0, int ev=0, int p=0, int ml=0, CmiObjId *d=NULL, double rt=0., double cputm=0.) {
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
@@ -77,6 +77,8 @@ class LogEntry {
       papiIDs = NULL;
       papiValues = NULL;
 #endif
+      fName = NULL; flen=0;
+      pes=NULL;numpes=0;
     }
     LogEntry(double _time,unsigned char _type,unsigned short _funcID,int _lineNum,char *_fileName){
 			time = _time;
@@ -92,6 +94,7 @@ class LogEntry {
 				memcpy(fName+1,_fileName,strlen(_fileName)+1);
 				flen = strlen(fName)+1;
 			}	
+                        pes=NULL;numpes=0;
 		}
     // **CW** new constructor for multicast data
     LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
@@ -106,7 +109,7 @@ class LogEntry {
 #endif
     void pup(PUP::er &p);
     ~LogEntry(){
-      delete [] fName;
+      if (fName) delete [] fName;
     }
 };
 
