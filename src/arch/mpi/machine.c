@@ -1057,8 +1057,10 @@ void *CmiGetNonLocal(void)
   /* although it seems that lock is not needed, I found it crashes very often
      on mpi-smp without lock */
 
+#if ! CMK_SMP
   CmiReleaseSentMessages();
   PumpMsgs();
+#endif
 
   CmiLock(procState[cs->rank].recvLock);
   msg =  PCQueuePop(cs->recv);
