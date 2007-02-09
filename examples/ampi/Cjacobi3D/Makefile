@@ -1,3 +1,4 @@
+OPTS=-g
 CHARMBASE=../../../
 CHARMC=../../../bin/charmc $(OPTS)
 TOKENS=6
@@ -7,8 +8,12 @@ ampi: jacobi jacobi.iso jacobi-get
 mpi: jacobi.C
 	mpiCC -o jacobi jacobi.C  $(OPTS)
 
+jacobi-cpp: jacobi-cpp.C
+	$(CHARMC) -c jacobi-cpp.C 
+	$(CHARMC) -o jacobi-cpp jacobi-cpp.o -language ampi -module EveryLB -lm
+
 jacobi: jacobi.C
-	$(CHARMC) -c jacobi.C
+	$(CHARMC) -c jacobi.C -DNO_PUP
 	$(CHARMC) -o jacobi jacobi.o -language ampi -module EveryLB -lm
 
 jacobi.iso: jacobi.C
