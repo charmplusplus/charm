@@ -36,5 +36,5 @@ bgtest: jacobi
 	-./charmrun +p2 jacobi.iso 2 2 2 10 +vp8 +balancer RotateLB +x2 +y2 +z1 $(TESTOPTS)
 
 clean:
-	rm -f *.o jacobi *~ moduleinit.C charmrun conv-host
+	rm -f *.o jacobi *~ moduleinit.C charmrun conv-host jacobi-cpp jacobi.iso jacobi-get
 	rm -rf 40 80 120
