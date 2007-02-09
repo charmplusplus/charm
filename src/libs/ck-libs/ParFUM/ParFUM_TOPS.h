@@ -1,16 +1,37 @@
-/**  
+/**
 *	A ParFUM TOPS compatibility layer
-*	
-*      Author: Isaac Dooley 
+*
+*      Author: Isaac Dooley
 
 
-Implement these first
-
-Then consider how to get TOPS node to one element data structure in here so their adjacency functions just work.
-
-What kind of adaptivity do they want?
 
 LB & PUPing
+
+
+Sample usage:
+
+    // Reads nodes (id, x, y, z)
+    for (i = 0; i < nn; i++)
+    {
+        double x, y, z;
+        TopNode node;
+        NodeAtt*  node_data;
+        if (fscanf(fp,"%d, %lf, %lf, %lf",&id, &x, &y, &z) != 4) {
+            fprintf(stderr,"Invalid format for nodes.\n");
+            exit(1);
+            }
+        // Adds node to the model
+        node = topModel_InsertNode (model, x, y, z);
+        topNode_SetId (model, node, id);
+        node_data = (NodeAtt*) malloc(sizeof(NodeAtt));
+        assert(node_data);
+        initNodeAtt(node_data);
+        node_data->material.E = material.E;
+        node_data->material.v = material.v;
+        node_data->material.p = material.p;
+        node_data->bc = 0;
+        topNode_SetAttrib (model, node, node_data);
+
 
 */
 

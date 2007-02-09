@@ -1,7 +1,7 @@
-/**  
+/**
 *	A ParFUM TOPS compatibility layer
-*	
-*      Author: Isaac Dooley 
+*
+*      Author: Isaac Dooley
 */
 
 
@@ -47,6 +47,7 @@ TopElement topModel_GetElemAtId(TopModel*,TopID);
 /** Get nodal attribute */
 NodeAtt* topNode_GetAttrib(TopModel*, TopNode);
 
+
 /** C-like Iterator for nodes */
 TopNodeItr*  topModel_CreateNodeItr(TopModel* model){
     TopNodeItr *itr = new TopNodeItr;
@@ -63,14 +64,7 @@ void topNodeItr_Begin(TopNodeItr* itr){
 }
 
 bool topNodeItr_IsValid(TopNodeItr*itr){
-    // should return true if there is a node at the current index 
-    // or if there are nodes past this index
-    // or if there are any ghost nodes
-
-    if (itr->parfum_nodal_index > itr->model->mesh->node.size())
-        return false;
-
-    return true;
+     return itr->model->mesh->node.is_valid(itr->parfum_nodal_index);
 }
 
 void topNodeItr_next(TopNodeItr* itr){
@@ -81,27 +75,40 @@ void topNodeItr_next(TopNodeItr* itr){
     // advance index until we hit a valid index
     itr->parfum_nodal_index++;
 
-    if(itr >= 0) {// local nodes
+    if(itr->parfum_nodal_index > 0) {// local nodes
 
-        while ((! itr->model->mesh->node.is_valid(itr->parfum_nodal_index)) && 
+        while ((! itr->model->mesh->node.is_valid(itr->parfum_nodal_index)) &&
                   (itr->parfum_nodal_index<itr->model->mesh->node.size()))
         {
             itr->parfum_nodal_index++;
         }
 
-        // TODO next go through the ghosts if we didn't get to a valid local node
-
+        if(itr->model->mesh->node.is_valid(itr->parfum_nodal_index)) {
+            return;
+        } else {
+            // cycle to most negative index possible for ghosts
+            itr->parfum_nodal_index = FEM_To_ghost_index(itr->model->mesh->node.ghost->size());
+        }
     }
-    else { // just go through ghost nodes
 
+    // just go through ghost nodes
 
+    while ( (! itr->model->mesh->node.ghost->
+                is_valid(FEM_To_ghost_index(itr->parfum_nodal_index)))
+                &&
+                itr->parfum_nodal_index<0)
+    {
+        itr->parfum_nodal_index++;
     }
 
+    if(itr->parfum_nodal_index==0){
+        itr->parfum_nodal_index = itr->model->mesh->node.size()+1000; // way past the end
+    }
 
 }
 
 TopNode topNodeItr_GetCurr(TopNodeItr*itr){
-    // TODO somehow need to get back to a TopNode
+    // TODO lookup data associated with this iterator
     TopNode a;
 return a;
 }
