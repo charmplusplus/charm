@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "mpi.h"
+#ifdef AMPI
 #include "charm++.h"
+#endif
 
 #if CMK_BLUEGENE_CHARM
 extern void BgPrintf(char *);
@@ -10,52 +12,52 @@ extern void BgPrintf(char *);
 #define BGPRINTF(x)
 #endif
 
-int DIM, NX, NY, NZ;
+int DIM, DIMX, DIMY, DIMZ, NX, NY, NZ;
 
 class chunk {
  public:
-  int dim;
+  int dimx, dimy, dimz;
   int xidx, yidx, zidx;
   int xm, xp, ym, yp, zm, zp;
-  double ***t; //[DIM+2][DIM+2][DIM+2];
-  double *sbxm; //[DIM*DIM];
-  double *sbxp; //[DIM*DIM];
-  double *sbym; //[DIM*DIM];
-  double *sbyp; //[DIM*DIM];
-  double *sbzm; //[DIM*DIM];
-  double *sbzp; //[DIM*DIM];
-  double *rbxm; //[DIM*DIM];
-  double *rbxp; //[DIM*DIM];
-  double *rbym; //[DIM*DIM];
-  double *rbyp; //[DIM*DIM];
-  double *rbzm; //[DIM*DIM];
-  double *rbzp; //[DIM*DIM];
+  double ***t; 
+  double *sbxm;
+  double *sbxp;
+  double *sbym;
+  double *sbyp;
+  double *sbzm;
+  double *sbzp;
+  double *rbxm;
+  double *rbxp;
+  double *rbym;
+  double *rbyp;
+  double *rbzm;
+  double *rbzp;
 
  private:
   void create(){
-    t = new double** [dim+2];
-    for(int i=0;i<dim+2;i++){
-      t[i] = new double* [dim+2];
-      for(int j=0;j<dim+2;j++){
-	t[i][j] = new double [dim+2];
+    t = new double** [dimx+2];
+    for(int i=0;i<dimx+2;i++){
+      t[i] = new double* [dimy+2];
+      for(int j=0;j<dimy+2;j++){
+	t[i][j] = new double [dimz+2];
       }
     }
-    sbxm = new double [dim*dim];
-    sbxp = new double [dim*dim];
-    sbym = new double [dim*dim];
-    sbyp = new double [dim*dim];
-    sbzm = new double [dim*dim];
-    sbzp = new double [dim*dim];
-    rbxm = new double [dim*dim];
-    rbxp = new double [dim*dim];
-    rbym = new double [dim*dim];
-    rbyp = new double [dim*dim];
-    rbzm = new double [dim*dim];
-    rbzp = new double [dim*dim];
+    sbxm = new double [dimy*dimz];
+    sbxp = new double [dimy*dimz];
+    sbym = new double [dimx*dimz];
+    sbyp = new double [dimx*dimz];
+    sbzm = new double [dimx*dimy];
+    sbzp = new double [dimx*dimy];
+    rbxm = new double [dimy*dimz];
+    rbxp = new double [dimy*dimz];
+    rbym = new double [dimx*dimz];
+    rbyp = new double [dimx*dimz];
+    rbzm = new double [dimx*dimy];
+    rbzp = new double [dimx*dimy];
   }
   void destroy(){
-    for(int i=0;i<dim+2;i++){
-      for(int j=0;j<dim+2;j++){
+    for(int i=0;i<dimx+2;i++){
+      for(int j=0;j<dimy+2;j++){
 	delete [] t[i][j];
       }
       delete [] t[i];
@@ -85,64 +87,88 @@ class chunk {
   }
   
  public:
-  chunk(int d){
-    dim = d;
+  chunk(int x, int y, int z, int rank){
+    int i,j,k;
+    dimx = x; dimy = y; dimz = z;
     create();
+    indexing(rank);
+    for(i=1; i<=DIMX; i++)
+      for(j=1; j<=DIMY; j++)
+	for(k=1; k<=DIMZ; k++)
+	  t[i][j][k] = DIMY*DIMZ*(i-1) + DIMZ*(j-1) + (k-1);
   }
   ~chunk(){
     destroy();
   }
+#ifdef AMPI
   void pup(PUP::er& p){
-    p|dim;
+    p|dimx;p|dimy;p|dimz;
     p|xidx;p|yidx;p|zidx;
     p|xp;p|xm;p|yp;p|ym;p|zp;p|zm;
     if(p.isUnpacking())
       create();
-    for(int i=0;i<dim+2;i++){
-      for(int j=0;j<dim+2;j++){
-	p(t[i][j],dim+2);
+    for(int i=0;i<dimx+2;i++){
+      for(int j=0;j<dimy+2;j++){
+	p(t[i][j],dimz+2);
       }
     }
-    p(sbxm,dim*dim);
-    p(sbxp,dim*dim);
-    p(sbym,dim*dim);
-    p(sbyp,dim*dim);
-    p(sbzm,dim*dim);
-    p(sbzp,dim*dim);
-    p(rbxm,dim*dim);
-    p(rbxp,dim*dim);
-    p(rbym,dim*dim);
-    p(rbyp,dim*dim);
-    p(rbzm,dim*dim);
-    p(rbzp,dim*dim);
+    p(sbxm,dimy*dimz);
+    p(sbxp,dimy*dimz);
+    p(sbym,dimx*dimz);
+    p(sbyp,dimx*dimz);
+    p(sbzm,dimx*dimy);
+    p(sbzp,dimx*dimy);
+    p(rbxm,dimy*dimz);
+    p(rbxp,dimy*dimz);
+    p(rbym,dimx*dimz);
+    p(rbyp,dimx*dimz);
+    p(rbzm,dimx*dimy);
+    p(rbzp,dimx*dimy);
     if(p.isDeleting())
       destroy();
   }
+#endif
   void copyin(){
     int i, j;
     int l = 0;
-    for(i=1;i<=dim;i++)
-      for(j=1;j<=dim;j++,l++){
+    for(i=1;i<=dimy;i++)
+      for(j=1;j<=dimz;j++,l++){
 	t[0][i][j] = sbxm[l];
-	t[dim+1][i][j] = sbxp[l];
+	t[dimx+1][i][j] = sbxp[l];
+      }
+    l = 0;
+    for(i=1;i<=dimx;i++)
+      for(j=1;j<=dimz;j++,l++){
 	t[i][0][j] = sbym[l];
-	t[i][dim+1][j] = sbyp[l];
+	t[i][dimy+1][j] = sbyp[l];
+      }
+    l = 0;
+    for(i=1;i<=dimx;i++)
+      for(j=1;j<=dimy;j++,l++){
 	t[i][j][0] = sbzm[l];
-	t[i][j][dim+1] = sbzp[l];
+	t[i][j][dimz+1] = sbzp[l];
       }
   }
 
   void copyout(){
     int i, j;
     int l = 0;
-    for(i=1;i<=dim;i++)
-      for(j=1;j<=dim;j++,l++){
+    for(i=1;i<=dimy;i++)
+      for(j=1;j<=dimz;j++,l++){
 	sbxm[l] = t[1][i][j];
-	sbxp[l] = t[dim][i][j];
+	sbxp[l] = t[dimx][i][j];
+      }
+    l = 0;
+    for(i=1;i<=dimx;i++)
+      for(j=1;j<=dimz;j++,l++){
 	sbym[l] = t[i][1][j];
-	sbyp[l] = t[i][dim][j];
+	sbyp[l] = t[i][dimy][j];
+      }
+    l = 0;
+    for(i=1;i<=dimx;i++)
+      for(j=1;j<=dimy;j++,l++){
 	sbzm[l] = t[i][j][1];
-	sbzp[l] = t[i][j][dim];
+	sbzp[l] = t[i][j][dimz];
       }
   }
 
@@ -154,6 +180,21 @@ class chunk {
     ym = index1d(xidx,(yidx+NY-1)%NY,zidx);
     zp = index1d(xidx,yidx,(zidx+1)%NZ);
     zm = index1d(xidx,yidx,(zidx+NZ-1)%NZ);
+  }
+
+  double calc(){
+    double error = 0.0, maxerr = 0.0, tval;
+    int i,j,k;
+    for(k=1; k<=DIMX; k++) 
+      for(j=1; j<=DIMY; j++)
+	for(i=1; i<=DIMZ; i++){
+	  tval = (t[k][j][i] + t[k][j][i+1] + t[k][j][i-1] + t[k][j+1][i]+ 
+		  t[k][j-1][i] + t[k+1][j][i] + t[k-1][j][i])/7.0;
+	  error = abs(tval-t[k][j][i]);
+	  t[k][j][i] = tval;
+	  if (error > maxerr) maxerr = error;
+	}
+    return maxerr;
   }
 };
 
@@ -191,21 +232,17 @@ int main(int ac, char** av)
   else
     niter = 10;
 
+  DIMX = DIM/NX;
+  DIMY = DIM/NY;
+  DIMZ = DIM/NZ;
+
   MPI_Bcast(&niter, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  cp = new chunk(DIM);
-
-  cp->indexing(thisIndex);
-
-  for(i=1; i<=DIM; i++)
-    for(j=1; j<=DIM; j++)
-      for(k=1; k<=DIM; k++)
-        cp->t[k][j][i] = DIM*DIM*(i-1) + DIM*(j-2) + (k-1);
+  cp = new chunk(DIMX,DIMY,DIMZ,thisIndex);
 
   MPI_Barrier(MPI_COMM_WORLD);
   starttime = MPI_Wtime();
 
-  maxerr = 0.0;
   for(iter=1; iter<=niter; iter++) {
     BGPRINTF("interation starts at %f\n");
     maxerr = 0.0;
@@ -232,22 +269,9 @@ int main(int ac, char** av)
     MPI_Waitall(6, rreq, rsts);
 
     cp->copyin();
- 
-    if(iter > 25 &&  iter < 85 && thisIndex == 35)
-      m = 9;
-    else
-      m = 1;
-    for(; m>0; m--)
-      for(i=1; i<=DIM; i++)
-        for(j=1; j<=DIM; j++)
-          for(k=1; k<=DIM; k++) {
-            tval = (cp->t[k][j][i] + cp->t[k][j][i+1] +
-                 cp->t[k][j][i-1] + cp->t[k][j+1][i]+ 
-                 cp->t[k][j-1][i] + cp->t[k+1][j][i] + cp->t[k-1][j][i])/7.0;
-            error = abs(tval-cp->t[k][j][i]);
-            cp->t[k][j][i] = tval;
-            if (error > maxerr) maxerr = error;
-          }
+
+    maxerr = cp->calc(); 
+
     MPI_Allreduce(&maxerr, &tmpmaxerr, 1, MPI_DOUBLE, MPI_MAX, 
                    MPI_COMM_WORLD);
     maxerr = tmpmaxerr;
@@ -261,10 +285,11 @@ int main(int ac, char** av)
       printf("iter %d time: %lf maxerr: %lf\n", iter, itertime, maxerr);
     starttime = MPI_Wtime();
 
+#ifdef AMPI
     if(iter%20 == 10) {
-      //      MPI_Migrate();
+      MPI_Migrate();
     }
-
+#endif
   }
   MPI_Finalize();
   return 0;
