@@ -341,7 +341,7 @@ void LogPool::createRC()
 {
   // create the projections rc file.
   fname = 
-    new char[strlen(CkpvAccess(traceRoot))+strlen(".projrc")];
+    new char[strlen(CkpvAccess(traceRoot))+strlen(".projrc")+1];
   sprintf(fname, "%s.projrc", CkpvAccess(traceRoot));
   do {
     rcfp = fopen(fname, "w");
