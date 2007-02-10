@@ -252,19 +252,19 @@ int main(int ac, char** av)
     MPI_Request rreq[6];
     MPI_Status rsts[6];
 
-    MPI_Irecv(cp->rbxp, DIM*DIM, MPI_DOUBLE, cp->xp, 0, MPI_COMM_WORLD, &rreq[0]);
-    MPI_Irecv(cp->rbxm, DIM*DIM, MPI_DOUBLE, cp->xm, 1, MPI_COMM_WORLD, &rreq[1]);
-    MPI_Irecv(cp->rbyp, DIM*DIM, MPI_DOUBLE, cp->yp, 2, MPI_COMM_WORLD, &rreq[2]);
-    MPI_Irecv(cp->rbym, DIM*DIM, MPI_DOUBLE, cp->ym, 3, MPI_COMM_WORLD, &rreq[3]);
-    MPI_Irecv(cp->rbzm, DIM*DIM, MPI_DOUBLE, cp->zm, 5, MPI_COMM_WORLD, &rreq[4]);
-    MPI_Irecv(cp->rbzp, DIM*DIM, MPI_DOUBLE, cp->zp, 4, MPI_COMM_WORLD, &rreq[5]);
+    MPI_Irecv(cp->rbxp, DIMY*DIMZ, MPI_DOUBLE, cp->xp, 0, MPI_COMM_WORLD, &rreq[0]);
+    MPI_Irecv(cp->rbxm, DIMY*DIMZ, MPI_DOUBLE, cp->xm, 1, MPI_COMM_WORLD, &rreq[1]);
+    MPI_Irecv(cp->rbyp, DIMX*DIMZ, MPI_DOUBLE, cp->yp, 2, MPI_COMM_WORLD, &rreq[2]);
+    MPI_Irecv(cp->rbym, DIMX*DIMZ, MPI_DOUBLE, cp->ym, 3, MPI_COMM_WORLD, &rreq[3]);
+    MPI_Irecv(cp->rbzp, DIMX*DIMY, MPI_DOUBLE, cp->zp, 4, MPI_COMM_WORLD, &rreq[4]);
+    MPI_Irecv(cp->rbzm, DIMX*DIMY, MPI_DOUBLE, cp->zm, 5, MPI_COMM_WORLD, &rreq[5]);
 
-    MPI_Send(cp->sbxm, DIM*DIM, MPI_DOUBLE, cp->xm, 0, MPI_COMM_WORLD);
-    MPI_Send(cp->sbxp, DIM*DIM, MPI_DOUBLE, cp->xp, 1, MPI_COMM_WORLD);
-    MPI_Send(cp->sbym, DIM*DIM, MPI_DOUBLE, cp->ym, 2, MPI_COMM_WORLD);
-    MPI_Send(cp->sbyp, DIM*DIM, MPI_DOUBLE, cp->yp, 3, MPI_COMM_WORLD);
-    MPI_Send(cp->sbzm, DIM*DIM, MPI_DOUBLE, cp->zm, 4, MPI_COMM_WORLD);
-    MPI_Send(cp->sbzp, DIM*DIM, MPI_DOUBLE, cp->zp, 5, MPI_COMM_WORLD);
+    MPI_Send(cp->sbxm, DIMY*DIMZ, MPI_DOUBLE, cp->xm, 0, MPI_COMM_WORLD);
+    MPI_Send(cp->sbxp, DIMY*DIMZ, MPI_DOUBLE, cp->xp, 1, MPI_COMM_WORLD);
+    MPI_Send(cp->sbym, DIMX*DIMZ, MPI_DOUBLE, cp->ym, 2, MPI_COMM_WORLD);
+    MPI_Send(cp->sbyp, DIMX*DIMZ, MPI_DOUBLE, cp->yp, 3, MPI_COMM_WORLD);
+    MPI_Send(cp->sbzm, DIMX*DIMY, MPI_DOUBLE, cp->zm, 4, MPI_COMM_WORLD);
+    MPI_Send(cp->sbzp, DIMX*DIMY, MPI_DOUBLE, cp->zp, 5, MPI_COMM_WORLD);
 
     MPI_Waitall(6, rreq, rsts);
 
@@ -277,10 +277,6 @@ int main(int ac, char** av)
     maxerr = tmpmaxerr;
     endtime = MPI_Wtime();
     itertime = endtime - starttime;
-    double  it;
-    MPI_Allreduce(&itertime, &it, 1, MPI_DOUBLE, MPI_SUM,
-                   MPI_COMM_WORLD);
-    itertime = it/nblocks;
     if (thisIndex == 0)
       printf("iter %d time: %lf maxerr: %lf\n", iter, itertime, maxerr);
     starttime = MPI_Wtime();
