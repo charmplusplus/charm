@@ -272,14 +272,7 @@ int main(int ac, char** av)
 
     maxerr = cp->calc(); 
 
-    MPI_Allreduce(&maxerr, &tmpmaxerr, 1, MPI_DOUBLE, MPI_MAX, 
-                   MPI_COMM_WORLD);
-    maxerr = tmpmaxerr;
-    endtime = MPI_Wtime();
-    itertime = endtime - starttime;
-    if (thisIndex == 0)
-      printf("iter %d time: %lf maxerr: %lf\n", iter, itertime, maxerr);
-    starttime = MPI_Wtime();
+//    MPI_Allreduce(&maxerr, &tmpmaxerr, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
 #ifdef AMPI
     if(iter%20 == 10) {
@@ -287,6 +280,13 @@ int main(int ac, char** av)
     }
 #endif
   }
+  endtime = MPI_Wtime();
+  if (thisIndex == 0){
+    itertime = (endtime - starttime) / niter;
+    printf("iteration time: %lf s\n", itertime);
+  }
+
+  delete cp;
   MPI_Finalize();
   return 0;
 }
