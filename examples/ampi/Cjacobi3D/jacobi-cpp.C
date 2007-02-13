@@ -280,6 +280,7 @@ int main(int ac, char** av)
     }
 #endif
   }
+  MPI_Barrier(MPI_COMM_WORLD);
   endtime = MPI_Wtime();
   if (thisIndex == 0){
     itertime = (endtime - starttime) / niter;
