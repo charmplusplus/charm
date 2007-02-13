@@ -50,7 +50,7 @@ public:
 	// index into here with an int that is possibly stored in ParFUM int attribute
 
 	TopModel(){
-		mesh=FEM_Mesh_default_read();  // fix this to get the right FEM_Mesh instead of an int
+	  //		mesh=FEM_Mesh_default_read();  // fix this to get the right FEM_Mesh instead of an int
 	}
 
 };

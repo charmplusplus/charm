@@ -27,7 +27,6 @@ $(DEST): $(OBJS) headers $(HEADDEP)
 # Copy header files to include directory
 headers: $(HEADDEP)
 	cp $(HEADERS) $(CDIR)/include/
-	cp $(GENHEADERS) $(CDIR)/include/
 	touch headers
 
 ParFUM_TOPS.o: ParFUM_TOPS.C $(HEADDEP) ParFUM_TOPS.h
