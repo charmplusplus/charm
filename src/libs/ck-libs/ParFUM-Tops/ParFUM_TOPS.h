@@ -40,20 +40,7 @@ Sample usage:
 #include <ParFUM_internals.h>
 
 
-
-/** some abstract data containers which will need to make sense at some point. */
-class TopModel{
-public:
-    FEM_Mesh *mesh;
-
-	// add a hash table for the attribute pointers here
-	// index into here with an int that is possibly stored in ParFUM int attribute
-
-	TopModel(){
-	  //		mesh=FEM_Mesh_default_read();  // fix this to get the right FEM_Mesh instead of an int
-	}
-
-};
+typedef FEM_Mesh TopModel;
 
 typedef unsigned TopNode;
 typedef unsigned TopElement;

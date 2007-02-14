@@ -2,18 +2,23 @@
 *	A ParFUM TOPS compatibility layer
 *
 *      Author: Isaac Dooley
+
+mesh_modify.C:  FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Print_Mesh_Summary");
+mesh_modify.C:  return FEM_add_node(FEM_Mesh_lookup(mesh,"FEM_add_node"), adjacent_nodes, num_adjacent_nodes, chunks, numChunks, forceShared);
+mesh_modify.C:  return FEM_remove_node(FEM_Mesh_lookup(mesh,"FEM_remove_node"), node);
+mesh_modify.C:  return FEM_add_element(FEM_Mesh_lookup(mesh,"FEM_add_element"), conn, conn_size, elem_type, chunkNo);
+mesh_modify.C:  return FEM_remove_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), element, elem_type, permanent);
+mesh_modify.C:  return FEM_purge_element(FEM_Mesh_lookup(mesh,"FEM_remove_element"), element, elem_type);
+
 */
 
 
-#include <ParFUM_TOPS.h>
-
+#include "ParFUM_TOPS.h"
+#include "ParFUM.decl.h"
 
 TopModel* topModel_Create(){
-    return new TopModel;
-    // We really need to support multiple meshes for this to work
-
-	// Setup tables for attributes for the new model
-
+	int which_mesh=FEM_Mesh_default_read();  // fix this to create a new mesh
+	return FEM_Mesh_lookup(which_mesh,"TopModel::TopModel()");
 }
 
 TopNode topModel_InsertNode(TopModel*, double x, double y, double z){
@@ -75,7 +80,7 @@ void topNodeItr_Begin(TopNodeItr* itr){
 }
 
 bool topNodeItr_IsValid(TopNodeItr*itr){
-     return itr->model->mesh->node.is_valid(itr->parfum_nodal_index);
+     return itr->model->node.is_valid(itr->parfum_nodal_index);
 }
 
 void topNodeItr_next(TopNodeItr* itr){
@@ -88,23 +93,23 @@ void topNodeItr_next(TopNodeItr* itr){
 
     if(itr->parfum_nodal_index > 0) {// local nodes
 
-        while ((! itr->model->mesh->node.is_valid(itr->parfum_nodal_index)) &&
-                  (itr->parfum_nodal_index<itr->model->mesh->node.size()))
+        while ((! itr->model->node.is_valid(itr->parfum_nodal_index)) &&
+                  (itr->parfum_nodal_index<itr->model->node.size()))
         {
             itr->parfum_nodal_index++;
         }
 
-        if(itr->model->mesh->node.is_valid(itr->parfum_nodal_index)) {
+        if(itr->model->node.is_valid(itr->parfum_nodal_index)) {
             return;
         } else {
             // cycle to most negative index possible for ghosts
-            itr->parfum_nodal_index = FEM_To_ghost_index(itr->model->mesh->node.ghost->size());
+            itr->parfum_nodal_index = FEM_To_ghost_index(itr->model->node.ghost->size());
         }
     }
 
     // just go through ghost nodes
-
-    while ( (! itr->model->mesh->node.ghost->
+    
+    while ( (! itr->model->node.ghost->
                 is_valid(FEM_To_ghost_index(itr->parfum_nodal_index)))
                 &&
                 itr->parfum_nodal_index<0)
@@ -113,13 +118,13 @@ void topNodeItr_next(TopNodeItr* itr){
     }
 
     if(itr->parfum_nodal_index==0){
-        itr->parfum_nodal_index = itr->model->mesh->node.size()+1000; // way past the end
+        itr->parfum_nodal_index = itr->model->node.size()+1000; // way past the end
     }
 
 }
 
 TopNode topNodeItr_GetCurr(TopNodeItr*itr){
-    // TODO lookup data associated with this iterator
+    // TODO lookup data associated with this node
     TopNode a;
 return a;
 }
@@ -133,3 +138,4 @@ void topElemItr_next(TopElemItr*);
 TopElement topElemItr_GetCurr(TopElemItr*);
 
 
+#include "ParFUM_TOPS.def.h"
