@@ -1,5 +1,5 @@
 CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
+CHARMC=$(CDIR)/bin/charmc $(OPTS) -g
 
 #Headers to be copied to include directory so application users can see them
 HEADERS= ParFUM_TOPS.h  $(INTERNALHEADERS)
@@ -9,7 +9,7 @@ GENHEADERS= ParFUM_TOPS.def.h ParFUM_TOPS.decl.h
 
 HEADDEP= $(GENHEADERS) $(HEADERS) $(INTERNALHEADERS)
 
-OBJS=ParFUM_TOPS.o
+OBJS=ParFUM_TOPS.o ParFUM_TOPS_Iterators.o
 
 LIB=libmoduleParFUM_TOPS
 
@@ -38,6 +38,9 @@ headers: $(HEADDEP)
 
 ParFUM_TOPS.o: ParFUM_TOPS.C $(HEADDEP) ParFUM_TOPS.h
 	$(CHARMC) -c ParFUM_TOPS.C $(INCS)
+
+ParFUM_TOPS_Iterators.o: ParFUM_TOPS_Iterators.C $(HEADDEP) ParFUM_TOPS.h
+	$(CHARMC) -c ParFUM_TOPS_Iterators.C $(INCS)
 
 
 # clean up

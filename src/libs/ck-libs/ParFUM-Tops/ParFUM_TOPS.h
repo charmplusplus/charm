@@ -50,11 +50,15 @@ class ElemAtt{};
 /** Iterators */
 class TopNodeItr{
 public:
-    int parfum_nodal_index;
+    int parfum_index;
     TopModel *model;
 };
 
-class TopElemItr{};
+class TopElemItr{
+public:
+    int parfum_index;
+    TopModel *model;
+};
 
 /** an opaque id for top entities */
 typedef int TopID;
@@ -100,7 +104,7 @@ TopNodeItr*  topModel_CreateNodeItr(TopModel*);
 void topNodeItr_Destroy(TopNodeItr*);
 void topNodeItr_Begin(TopNodeItr*);
 bool topNodeItr_IsValid(TopNodeItr*);
-void topNodeItr_next(TopNodeItr*);
+void topNodeItr_Next(TopNodeItr*);
 TopNode topNodeItr_GetCurr(TopNodeItr*);
 
 /** C-like Iterator for elements */
@@ -108,7 +112,7 @@ TopElemItr*  topModel_CreateElemItr(TopModel*);
 void topElemItr_Destroy(TopElemItr*);
 void topElemItr_Begin(TopElemItr*);
 bool topElemItr_IsValid(TopElemItr*);
-void topElemItr_next(TopElemItr*);
+void topElemItr_Next(TopElemItr*);
 TopElement topElemItr_GetCurr(TopElemItr*);
 
 

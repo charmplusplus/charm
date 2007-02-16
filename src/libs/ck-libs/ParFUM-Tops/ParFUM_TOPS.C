@@ -17,14 +17,25 @@ mesh_modify.C:  return FEM_purge_element(FEM_Mesh_lookup(mesh,"FEM_remove_elemen
 #include "ParFUM.decl.h"
 
 TopModel* topModel_Create(){
-	int which_mesh=FEM_Mesh_default_read();  // fix this to create a new mesh
-	return FEM_Mesh_lookup(which_mesh,"TopModel::TopModel()");
+  // This only uses a single mesh, so better not create multiple ones of these
+  int which_mesh=FEM_Mesh_default_read();
+  FEM_Mesh_allocate_valid_attr(which_mesh, FEM_NODE);
+  FEM_Mesh_allocate_valid_attr(which_mesh, FEM_ELEM+0);
+  
+  // Allocate an ID attribute for the elements and nodes
+  
+  //	FEM_GLOBALNO
+  
+  return FEM_Mesh_lookup(which_mesh,"TopModel::TopModel()");
 }
 
-TopNode topModel_InsertNode(TopModel*, double x, double y, double z){
-	// TODO : insert a node here
-	TopNode a;
-	return a;
+TopNode topModel_InsertNode(TopModel* m, double x, double y, double z){
+  // TODO : insert a node here
+  int which = FEM_add_node_local_nolock(m);
+  m->node.set_coord(which,x,y,z);
+
+  TopNode a;
+  return a;
 }
 
 
@@ -60,82 +71,7 @@ TopNode topModel_GetNodeAtId(TopModel*,TopID);
 /** Get elem via id */
 TopElement topModel_GetElemAtId(TopModel*,TopID);
 
-/** Get nodal attribute */
-NodeAtt* topNode_GetAttrib(TopModel*, TopNode);
 
-
-/** C-like Iterator for nodes */
-TopNodeItr*  topModel_CreateNodeItr(TopModel* model){
-    TopNodeItr *itr = new TopNodeItr;
-    itr->model = model;
-    return itr;
-}
-
-void topNodeItr_Destroy(TopNodeItr* itr){
-    delete itr;
-}
-
-void topNodeItr_Begin(TopNodeItr* itr){
-    itr->parfum_nodal_index = 0;
-}
-
-bool topNodeItr_IsValid(TopNodeItr*itr){
-     return itr->model->node.is_valid(itr->parfum_nodal_index);
-}
-
-void topNodeItr_next(TopNodeItr* itr){
-
-    if(!topNodeItr_IsValid(itr))
-        return;
-
-    // advance index until we hit a valid index
-    itr->parfum_nodal_index++;
-
-    if(itr->parfum_nodal_index > 0) {// local nodes
-
-        while ((! itr->model->node.is_valid(itr->parfum_nodal_index)) &&
-                  (itr->parfum_nodal_index<itr->model->node.size()))
-        {
-            itr->parfum_nodal_index++;
-        }
-
-        if(itr->model->node.is_valid(itr->parfum_nodal_index)) {
-            return;
-        } else {
-            // cycle to most negative index possible for ghosts
-            itr->parfum_nodal_index = FEM_To_ghost_index(itr->model->node.ghost->size());
-        }
-    }
-
-    // just go through ghost nodes
-    
-    while ( (! itr->model->node.ghost->
-                is_valid(FEM_To_ghost_index(itr->parfum_nodal_index)))
-                &&
-                itr->parfum_nodal_index<0)
-    {
-        itr->parfum_nodal_index++;
-    }
-
-    if(itr->parfum_nodal_index==0){
-        itr->parfum_nodal_index = itr->model->node.size()+1000; // way past the end
-    }
-
-}
-
-TopNode topNodeItr_GetCurr(TopNodeItr*itr){
-    // TODO lookup data associated with this node
-    TopNode a;
-return a;
-}
-
-/** C-like Iterator for elements */
-TopElemItr*  topModel_CreateElemItr(TopModel*);
-void topElemItr_Destroy(TopElemItr*);
-void topElemItr_Begin(TopElemItr*);
-bool topElemItr_IsValid(TopElemItr*);
-void topElemItr_next(TopElemItr*);
-TopElement topElemItr_GetCurr(TopElemItr*);
 
 
 #include "ParFUM_TOPS.def.h"
