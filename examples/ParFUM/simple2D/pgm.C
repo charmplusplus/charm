@@ -127,6 +127,11 @@ init(void)
   delete[] ele;
   delete[] pts;
 
+  // Add a single ghost layer
+  //FEM_Add_ghost_layer(1, 1);  
+  //const static int tri2node[]={0,1,2};
+  //FEM_Add_ghost_elem(1, 3, tri2node);
+
   CkPrintf("Finished with init (Reading took %.f s)\n",CmiWallTimer()-startTime);
 
 }
