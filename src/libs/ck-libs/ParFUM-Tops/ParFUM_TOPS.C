@@ -45,7 +45,7 @@ TopModel* topModel_Create(){
 }
 
 TopNode topModel_InsertNode(TopModel* m, double x, double y, double z){
-  int newNode = FEM_add_node_local_nolock(m);
+  int newNode = FEM_add_node_local(m,false,false,false);
   m->node.set_coord(newNode,x,y,z);
   return newNode;
 }
