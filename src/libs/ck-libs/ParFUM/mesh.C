@@ -1328,13 +1328,15 @@ void FEM_Entity::set_invalid(int idx, bool isNode){
 }
 
 int FEM_Entity::is_valid(int idx){
-  if(true) { //maintains a list of invalid elements. FASTER
     CkAssert(idx < size() && idx >=0);
     return valid->getChar()(idx,0);
-  } else {
-    CkAssert(idx < size() && idx >=0 && first_invalid<=last_invalid);
+}
+
+int FEM_Entity::is_valid_any_idx(int idx){
+  if(idx >= size() || idx < 0)
+	return false;
+  else 
     return valid->getChar()(idx,0);
-  }
 }
 
 int FEM_Entity::count_valid(){
