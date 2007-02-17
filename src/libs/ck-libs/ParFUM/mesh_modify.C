@@ -100,31 +100,38 @@ CDECL int FEM_purge_element(int mesh, int element, int elem_type) {
     then, it creates a lock for this node, if this node is new (i.e. unused)
     otherwise, the existing lock is reset
 */
-int FEM_add_node_local(FEM_Mesh *m, int addGhost){
+int FEM_add_node_local(FEM_Mesh *m, bool addGhost, bool doLocking, bool doAdjacencies){
   int newNode;
   if(addGhost){
     // find a place for new node in tables, reusing old invalid nodes if possible
     newNode = m->node.getGhost()->get_next_invalid(m,true,true); 
-    m->n2e_removeAll(FEM_To_ghost_index(newNode));    // initialize element adjacencies
-    m->n2n_removeAll(FEM_To_ghost_index(newNode));    // initialize node adjacencies
+	if(doAdjacencies){
+	  m->n2e_removeAll(FEM_To_ghost_index(newNode));    // initialize element adjacencies
+	  m->n2n_removeAll(FEM_To_ghost_index(newNode));    // initialize node adjacencies
+	}
   }
   else{
     newNode = m->node.get_next_invalid(m,true,false);
-    m->n2e_removeAll(newNode);    // initialize element adjacencies
-    m->n2n_removeAll(newNode);    // initialize node adjacencies
+    if(doAdjacencies){
+	  m->n2e_removeAll(newNode);    // initialize element adjacencies
+	  m->n2n_removeAll(newNode);    // initialize node adjacencies
+	}
     //add a lock
-    if(newNode >= m->getfmMM()->fmLockN.size()) {
-      m->getfmMM()->fmLockN.push_back(FEM_lockN(newNode,m->getfmMM()));
-    }
-    else {
-      m->getfmMM()->fmLockN[newNode].reset(newNode,m->getfmMM());
-    }
+    if(doLocking){
+	  if(newNode >= m->getfmMM()->fmLockN.size()) {
+		m->getfmMM()->fmLockN.push_back(FEM_lockN(newNode,m->getfmMM()));
+	  }
+	  else {
+		m->getfmMM()->fmLockN[newNode].reset(newNode,m->getfmMM());
+	  }
+	}
   }
 #ifdef DEBUG_2
   CkPrintf("[%d]Adding Node %d\n",m->getfmMM()->getfmUtil()->getIdx(),(addGhost==0)?newNode:FEM_To_ghost_index(newNode));
 #endif
   return newNode;  // return a new index
 }
+
 
 /** 'adjacentNodes' specifies the set of nodes between which this new node
     is to be added.
@@ -463,7 +470,7 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
 
 /** A helper function that adds the local element, and updates adjacencies
  */
-int FEM_add_element_local(FEM_Mesh *m, int *conn, int connSize, int elemType, int addGhost){
+int FEM_add_element_local(FEM_Mesh *m, int *conn, int connSize, int elemType, bool addGhost, bool create_adjacencies){
   // lengthen element attributes
   int newEl;
   if(addGhost){
@@ -487,31 +494,35 @@ int FEM_add_element_local(FEM_Mesh *m, int *conn, int connSize, int elemType, in
     // update element's conn, i.e. e2n table
     m->elem[elemType].connIs(newEl,conn); 
   }
-  // add to corresponding inverse, the n2e and n2n table
-  for(int i=0;i<connSize;i++){
-    m->n2e_add(conn[i],newEl);
-    for(int j=i+1;j<connSize;j++){
-      if(! m->n2n_exists(conn[i],conn[j]))
-        m->n2n_add(conn[i],conn[j]);
-      if(! m->n2n_exists(conn[j],conn[i]))
-        m->n2n_add(conn[j],conn[i]);
-    }
-  }
-  // update e2e table -- too complicated, so it gets is own function
-  m->e2e_removeAll(newEl);
-  update_new_element_e2e(m,newEl,elemType);
-  int *adjes = new int[connSize];
-  m->e2e_getAll(newEl, adjes, 0);
-  CkAssert(!((adjes[0]==adjes[1] && adjes[0]!=-1) || (adjes[1]==adjes[2] && adjes[1]!=-1) || (adjes[2]==adjes[0] && adjes[2]!=-1)));
+
+  if(create_adjacencies){
+	// add to n2e and n2n table
+	for(int i=0;i<connSize;i++){
+	  m->n2e_add(conn[i],newEl);
+	  for(int j=i+1;j<connSize;j++){
+		if(! m->n2n_exists(conn[i],conn[j]))
+		  m->n2n_add(conn[i],conn[j]);
+		if(! m->n2n_exists(conn[j],conn[i]))
+		  m->n2n_add(conn[j],conn[i]);
+	  }
+	}
+	// update e2e table -- too complicated, so it gets is own function
+	m->e2e_removeAll(newEl);
+	update_new_element_e2e(m,newEl,elemType);
+	int *adjes = new int[connSize];
+	m->e2e_getAll(newEl, adjes, 0);
+	CkAssert(!((adjes[0]==adjes[1] && adjes[0]!=-1) || (adjes[1]==adjes[2] && adjes[1]!=-1) || (adjes[2]==adjes[0] && adjes[2]!=-1)));
 #ifdef DEBUG_2
-  CkPrintf("[%d]Adding element %d(%d,%d,%d)\n",m->getfmMM()->getfmUtil()->getIdx(),newEl,conn[0],conn[1],conn[2]);
+	CkPrintf("[%d]Adding element %d(%d,%d,%d)\n",m->getfmMM()->getfmUtil()->getIdx(),newEl,conn[0],conn[1],conn[2]);
 #endif
 #ifdef FEM_ELEMSORDERED
-  if(!FEM_Is_ghost_index(newEl)) {
-    m->getfmMM()->fmAdaptAlgs->ensureQuality(conn[0],conn[1],conn[2]);
-  }
+	if(!FEM_Is_ghost_index(newEl)) {
+	  m->getfmMM()->fmAdaptAlgs->ensureQuality(conn[0],conn[1],conn[2]);
+	}
 #endif
-  delete[] adjes;
+	delete[] adjes;
+  }
+
   return newEl;
 }
 

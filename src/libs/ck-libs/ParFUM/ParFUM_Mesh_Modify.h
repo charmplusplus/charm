@@ -40,11 +40,11 @@ int FEM_purge_element(FEM_Mesh *m, int element, int elem_type=0);
 
 // Internal functions used as helper for the above functions
 ///Update adjacencies for this new node, and attach a lock to it
-int FEM_add_node_local(FEM_Mesh *m, int addGhost=0);
+int FEM_add_node_local(FEM_Mesh *m, bool addGhost=false, bool doLocking=true, bool doAdjacencies=true);
 ///Get rid of idxl entries for this node and clear adjacencies, invalidate node
 void FEM_remove_node_local(FEM_Mesh *m, int node);
 ///Update adjacencies for this element and all surrounding nodes/elements
-int FEM_add_element_local(FEM_Mesh *m, int *conn, int connSize, int elemType, int addGhost);
+int FEM_add_element_local(FEM_Mesh *m, int *conn, int connSize, int elemType, bool addGhost, bool create_adjacencies=1);
 ///Clear up the adjacencies
 void FEM_remove_element_local(FEM_Mesh *m, int element, int etype);
 
