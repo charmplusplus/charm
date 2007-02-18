@@ -2,15 +2,11 @@ CHARMC=../../../bin/charmc $(OPTS)  -g
 
 all: pgm
 
-pgm: pgm.o cst_nl.o
-	$(CHARMC) -o pgm pgm.o cst_nl.o -module netfem -language ParFUM_TOPS  
+pgm: pgm.o
+	$(CHARMC) -o pgm pgm.o -module netfem -language ParFUM_TOPS  
 
 pgm.o: pgm.C
 	$(CHARMC) -c pgm.C
-
-cst_nl.o: cst_nl.C
-	$(CHARMC) -c cst_nl.C
-
 
 test: pgm
 	./charmrun ./pgm +vp4 +p2
