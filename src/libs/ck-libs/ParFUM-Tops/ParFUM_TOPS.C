@@ -1,18 +1,14 @@
 /**
-*	A ParFUM TOPS compatibility layer
-*
-*      Author: Isaac Dooley
 
+   @file
+   @brief Implementation of ParFUM-TOPS layer, except for Iterators
+   
+   @author Isaac Dooley
 
-
-Assumptions: 
-
-TopNode is just the index into the nodes
-TopElem is just the signed index into the elements negatives are ghosts
-
+   @todo add code to generate ghost layers
+   @todo Support multiple models
 
 */
-
 
 #include "ParFUM_TOPS.h"
 #include "ParFUM.decl.h"
@@ -51,7 +47,7 @@ TopModel* topModel_Create_Init(int elem_attr_sz, int node_attr_sz){
 }
 
 TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz){
-  // This only uses a single mesh, so better not create multiple ones of these
+  // This only uses a single mesh, so don't create multiple TopModels of these
   elem_attr_size = elem_attr_sz;
   node_attr_size = node_attr_sz;
   int which_mesh=FEM_Mesh_default_read();
@@ -72,15 +68,6 @@ void topNode_SetId(TopModel* m, TopNode n, TopID id){
   m->node.setGlobalno(n,id);
 }
 
-/** Set attribute of a node */
-void topNode_SetAttrib(TopModel* m, TopNode n, NodeAtt* d){
-  FEM_DataAttribute * at = (FEM_DataAttribute*) m->node.lookup(FEM_DATA+0,"topNode_SetAttrib");
-  AllocTable2d<unsigned char> &dataTable  = at->getChar();
-  unsigned char *data = dataTable.getData();
-  memcpy(data + n*node_attr_size, d, node_attr_size);
-}
-
-
  /** Insert an element */
 TopElement topModel_InsertElem(TopModel*m, TopElemType type, TopNode* nodes){
   assert(type == FEM_TRIANGULAR);
@@ -97,7 +84,28 @@ void topElement_SetId(TopModel* m, TopElement e, TopID id){
   m->elem[0].setGlobalno(e,id);
 }
 
-/** Set attribute of an element */
+
+
+/** 
+	@brief Set attribute of a node 
+	
+	The attribute passed in must be a contiguous data structure with size equal to the value node_attr_sz passed into topModel_Create_Driver() and topModel_Create_Init() 
+
+	The supplied attribute will be copied into the ParFUM attribute array "FEM_DATA+0". Then ParFUM will own this data. The function topNode_GetAttrib() will return a pointer to the copy owned by ParFUM. If a single material parameter attribute is used for multiple nodes, each node will get a separate copy of the array. Any subsequent modifications to the data will only be reflected at a single node. 
+
+	The user is responsible for deallocating parameter d passed into this function.
+
+*/
+void topNode_SetAttrib(TopModel* m, TopNode n, NodeAtt* d){
+  FEM_DataAttribute * at = (FEM_DataAttribute*) m->node.lookup(FEM_DATA+0,"topNode_SetAttrib");
+  AllocTable2d<unsigned char> &dataTable  = at->getChar();
+  unsigned char *data = dataTable.getData();
+  memcpy(data + n*node_attr_size, d, node_attr_size);
+}
+
+/** @brief Set attribute of an element 
+See topNode_SetAttrib() for description
+*/
 void topElement_SetAttrib(TopModel* m, TopElement e, ElemAtt* d){
   FEM_DataAttribute * at = (FEM_DataAttribute*) m->elem[0].lookup(FEM_DATA+0,"topElem_SetAttrib");
   AllocTable2d<unsigned char> &dataTable  = at->getChar();
@@ -106,7 +114,9 @@ void topElement_SetAttrib(TopModel* m, TopElement e, ElemAtt* d){
 }
 
 
-/** Get elem attribute */
+/** @brief Get elem attribute 
+See topNode_SetAttrib() for description
+*/
 ElemAtt* topElem_GetAttrib(TopModel* m, TopElement e){
   FEM_DataAttribute * at = (FEM_DataAttribute*) m->elem[0].lookup(FEM_DATA+0,"topElem_GetAttrib");
   AllocTable2d<unsigned char> &dataTable  = at->getChar();
@@ -114,7 +124,9 @@ ElemAtt* topElem_GetAttrib(TopModel* m, TopElement e){
   return (ElemAtt*)(data + e*elem_attr_size);
 }
 
-// /** Get nodal attribute */
+/** @brief Get nodal attribute 
+See topNode_SetAttrib() for description
+*/
 NodeAtt* topNode_GetAttrib(TopModel* m, TopNode n){
   FEM_DataAttribute * at = (FEM_DataAttribute*) m->node.lookup(FEM_DATA+0,"topNode_GetAttrib");
   AllocTable2d<unsigned char> &dataTable  = at->getChar();
@@ -124,13 +136,19 @@ NodeAtt* topNode_GetAttrib(TopModel* m, TopNode n){
 
 
 
-/** Get node via id */
+/** 
+	Get node via id 
+	@todo Implement this function
+*/
 TopNode topModel_GetNodeAtId(TopModel*,TopID){
   // lookup node via global ID
   assert(0);
 }
 
-/** Get elem via id */
+/** 
+	Get elem via id
+	@todo Implement this function
+ */
 TopElement topModel_GetElemAtId(TopModel*,TopID){
   assert(0);
 }
