@@ -76,7 +76,7 @@ public:
   TopModel *model;
 };
 
-/** Element Iterator. See notes for class TopNodeItr */
+/** @brief Element Iterator. See notes for class TopNodeItr */
 class TopElemItr{
 public:
   int parfum_index;
