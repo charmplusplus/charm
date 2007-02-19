@@ -44,8 +44,9 @@ typedef FEM_Mesh TopModel;
 
 typedef unsigned TopNode;
 typedef unsigned TopElement;
-class NodeAtt{};
-class ElemAtt{};
+
+class NodeAtt;
+class ElemAtt;
 
 /** Iterators */
 class TopNodeItr{
@@ -67,10 +68,14 @@ typedef int TopID;
 typedef int TopElemType;
 
 
-/** TOPS functions we need to support */
+/** 
+Create and access a Tops model. Only call from Init 
+Currently only one model can be created. To extend, each model must just reference a different FEM_Mesh object
+*/
+TopModel* topModel_Create_Init(int elem_attr_sz, int node_attr_sz);
 
-/** Create a new model(essentially a mesh) */
-TopModel* topModel_Create();
+/** Create and access a Tops model. Only call from Driver */
+TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz);
 
 /** Insert a node */
 TopNode topModel_InsertNode(TopModel*, double x, double y, double z);
