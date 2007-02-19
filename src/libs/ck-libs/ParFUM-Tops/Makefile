@@ -45,4 +45,4 @@ ParFUM_TOPS_Iterators.o: ParFUM_TOPS_Iterators.C $(HEADDEP) ParFUM_TOPS.h
 
 # clean up
 clean:
-	rm -rf *.a *.def.h *.decl.h *.o *~ SunWS_cache $(DEST)
+	rm -rf *.a *.def.h *.decl.h *.o *~ SunWS_cache $(DEST) headers
