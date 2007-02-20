@@ -44,9 +44,9 @@ Sample usage:
 		print_node_attribute(myId, na);
 	  }
 	  printf("vp %d: node_count = %d\n", myId, node_count);
-
-
 \endcode
+
+@note ::NodeAtt and ::ElemAtt are just replaced with void* for this implementation.
 
 */
 
@@ -63,9 +63,6 @@ typedef unsigned TopNode;
 /** See notes for ::TopNode */
 typedef unsigned TopElement;
 
-typedef void NodeAtt;
-/** See notes for ::NodeAtt */
-typedef void ElemAtt;
 
 /** Node Iterator */
 class TopNodeItr{
@@ -106,7 +103,7 @@ TopNode topModel_InsertNode(TopModel*, double x, double y, double z);
 void topNode_SetId(TopModel*, TopNode, TopID id);
 
 /** Set attribute of a node */
-void topNode_SetAttrib(TopModel*, TopNode, NodeAtt*);
+void topNode_SetAttrib(TopModel*, TopNode, void*);
 
 /** Insert an element */
 TopElement topModel_InsertElem(TopModel*, TopElemType, TopNode*);
@@ -115,7 +112,7 @@ TopElement topModel_InsertElem(TopModel*, TopElemType, TopNode*);
 void topElement_SetId(TopModel*, TopElement, TopID id);
 
 /** Set attribute of an element */
-void topElement_SetAttrib(TopModel*, TopElement, ElemAtt*);
+void topElement_SetAttrib(TopModel*, TopElement, void*);
 
 /** Get node via id */
 TopNode topModel_GetNodeAtId(TopModel*,TopID);
@@ -124,7 +121,10 @@ TopNode topModel_GetNodeAtId(TopModel*,TopID);
 TopElement topModel_GetElemAtId(TopModel*,TopID);
 
 /** Get nodal attribute */
-NodeAtt* topNode_GetAttrib(TopModel*, TopNode);
+void* topNode_GetAttrib(TopModel*, TopNode);
+
+/** Get element attribute */
+void* topElem_GetAttrib(TopModel*, TopElement);
 
 /** Create Iterator for nodes */
 TopNodeItr*  topModel_CreateNodeItr(TopModel*);

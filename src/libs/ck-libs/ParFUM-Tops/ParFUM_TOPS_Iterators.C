@@ -66,9 +66,7 @@ void topNodeItr_Next(TopNodeItr* itr){
 }
 
 TopNode topNodeItr_GetCurr(TopNodeItr*itr){
-    // TODO lookup data associated with this node
-    TopNode a;
-	return a;
+	return itr->parfum_index;
 }
 
 
@@ -132,4 +130,8 @@ void topElemItr_Next(TopElemItr* itr){
         itr->parfum_index = itr->model->elem[0].size()+1000; // way past the end
     }
 
+}
+
+TopNode topElemItr_GetCurr(TopElemItr*itr){
+	return itr->parfum_index;
 }

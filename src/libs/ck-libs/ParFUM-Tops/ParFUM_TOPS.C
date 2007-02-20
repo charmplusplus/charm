@@ -96,7 +96,7 @@ void topElement_SetId(TopModel* m, TopElement e, TopID id){
 	The user is responsible for deallocating parameter d passed into this function.
 
 */
-void topNode_SetAttrib(TopModel* m, TopNode n, NodeAtt* d){
+void topNode_SetAttrib(TopModel* m, TopNode n, void* d){
   FEM_DataAttribute * at = (FEM_DataAttribute*) m->node.lookup(FEM_DATA+0,"topNode_SetAttrib");
   AllocTable2d<unsigned char> &dataTable  = at->getChar();
   unsigned char *data = dataTable.getData();
@@ -106,7 +106,7 @@ void topNode_SetAttrib(TopModel* m, TopNode n, NodeAtt* d){
 /** @brief Set attribute of an element 
 See topNode_SetAttrib() for description
 */
-void topElement_SetAttrib(TopModel* m, TopElement e, ElemAtt* d){
+void topElement_SetAttrib(TopModel* m, TopElement e, void* d){
   FEM_DataAttribute * at = (FEM_DataAttribute*) m->elem[0].lookup(FEM_DATA+0,"topElem_SetAttrib");
   AllocTable2d<unsigned char> &dataTable  = at->getChar();
   unsigned char *data = dataTable.getData();
@@ -117,21 +117,21 @@ void topElement_SetAttrib(TopModel* m, TopElement e, ElemAtt* d){
 /** @brief Get elem attribute 
 See topNode_SetAttrib() for description
 */
-ElemAtt* topElem_GetAttrib(TopModel* m, TopElement e){
+void* topElem_GetAttrib(TopModel* m, TopElement e){
   FEM_DataAttribute * at = (FEM_DataAttribute*) m->elem[0].lookup(FEM_DATA+0,"topElem_GetAttrib");
   AllocTable2d<unsigned char> &dataTable  = at->getChar();
   unsigned char *data = dataTable.getData();
-  return (ElemAtt*)(data + e*elem_attr_size);
+  return (data + e*elem_attr_size);
 }
 
 /** @brief Get nodal attribute 
 See topNode_SetAttrib() for description
 */
-NodeAtt* topNode_GetAttrib(TopModel* m, TopNode n){
+void* topNode_GetAttrib(TopModel* m, TopNode n){
   FEM_DataAttribute * at = (FEM_DataAttribute*) m->node.lookup(FEM_DATA+0,"topNode_GetAttrib");
   AllocTable2d<unsigned char> &dataTable  = at->getChar();
   unsigned char *data = dataTable.getData();
-  return (NodeAtt*)(data + n*node_attr_size);
+  return (data + n*node_attr_size);
 }
 
 
