@@ -51,6 +51,7 @@ class BulkAdapt {
       reason. */
   int edge_bisect(int elemID, int elemType, int edgeID);
 
+	//TODO: add elemType to the prototype of all the following mesh-modification functions
   /// Perform an edge flip (2D)
   /** Locks mesh and any affected IDXL lists, performs operation,
       updates adapt adjacencies, and unlocks mesh & IDXL
@@ -86,5 +87,29 @@ class BulkAdapt {
   /* COMMUNICATION HELPERS FOR BULK ADAPTIVITY OPERATIONS */
   
   /* LOCAL HELPERS FOR BULK ADAPTIVITY OPERATIONS */
+	
+	/** Add a new element to the mesh. 
+	 * Update its connectivity
+	 * Return index of new element
+	 * */
+	int add_element(int elemType,int nodesPerElem,int *conn);
+
+	/** Update the conn of an element*/
+	void update_element_conn(int elemType,int elemID,int nodesPerElem,int *conn);
+
+
+
+	/**
+	 * Add a new node to the mesh
+	 * update its co-ordinates 
+	 * Return index of new node
+	 * */
+	int add_node(int dim,double *coords);
+	
+	/** Update the co-ordimates of the given node
+	*/
+	void update_node_coord(int nodeID,int dim,double *coords);
+
+	void make_node_shared(int nodeID,int numSharedChunks,int *sharedChunks);
 };
 #endif

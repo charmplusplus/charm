@@ -111,3 +111,27 @@ int BulkAdapt::edge_collapse(int elemID, int edgeID)
 
 /* LOCAL HELPERS FOR BULK ADAPTIVITY OPERATIONS */
 
+/** Add a new element to the mesh. 
+	 * Update its connectivity
+	 * Return index of new element
+	 * */
+	int BulkAdapt::add_element(int elemType,int nodesPerElem,int *conn){};
+
+	/** Update the conn of an element*/
+	void BulkAdapt::update_element_conn(int elemType,int elemID,int nodesPerElem,int *conn){};
+
+
+
+	/**
+	 * Add a new node to the mesh
+	 * update its co-ordinates 
+	 * Return index of new node
+	 * */
+	int BulkAdapt::add_node(int dim,double *coords){};
+	
+	/** Update the co-ordimates of the given node
+	*/
+	void BulkAdapt::update_node_coord(int nodeID,int dim,double *coords){};
+
+	void BulkAdapt::make_node_shared(int nodeID,int numSharedChunks,int *sharedChunks){};
+
