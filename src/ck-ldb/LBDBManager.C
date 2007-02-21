@@ -35,9 +35,7 @@ void LBDB::batsyncer::resumeFromSync(void *bs)
 {
   LBDB::batsyncer *s=(LBDB::batsyncer *)bs;
 //  CmiPrintf("[%d] LBDB::batsyncer::resumeFromSync with %gs\n", CkMyPe(), s->period);
-  int p = (int)(1000*s->period);    // in ms
-  if (p < 0)  p = 1 << 30;
-  CcdCallFnAfterOnPE((CcdVoidFn)gotoSync, (void *)s, p, CkMyPe());
+  CcdCallFnAfterOnPE((CcdVoidFn)gotoSync, (void *)s, 1000*s->period, CkMyPe());
 }
 
 // initPeriod in seconds
