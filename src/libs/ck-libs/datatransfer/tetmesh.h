@@ -91,7 +91,6 @@ public:
 	  fclose(file);
 	}
 
-
 private:
 	std::vector<conn_t> tet; //< Connectivity
 	std::vector<CkVector3d> pts; //< nPts 3d node locations.
