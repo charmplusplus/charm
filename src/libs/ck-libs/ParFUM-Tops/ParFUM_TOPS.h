@@ -50,6 +50,8 @@ Sample usage:
 
 */
 
+#ifndef __PARFUM_TOPS___H
+#define __PARFUM_TOPS___H
 
 #include <ParFUM.h>
 #include <ParFUM_internals.h>
@@ -62,6 +64,28 @@ typedef FEM_Mesh TopModel;
 typedef unsigned TopNode;
 /** See notes for ::TopNode */
 typedef unsigned TopElement;
+
+
+enum {
+  TOP_ELEMENT_T3 =0,
+  TOP_ELEMENT_T6,
+  TOP_ELEMENT_Q4,
+  TOP_ELEMENT_Q8,
+  TOP_ELEMENT_TET4,
+  TOP_ELEMENT_TET10,
+  TOP_ELEMENT_HEX8,
+  TOP_ELEMENT_HEX8_RESERVOIR,
+  TOP_ELEMENT_HEX20,
+  TOP_ELEMENT_WEDGE15,
+  TOP_ELEMENT_COH2E2,
+  TOP_ELEMENT_COH2E3,
+  TOP_ELEMENT_COH3T3,
+  TOP_ELEMENT_COH3T6,
+  TOP_ELEMENT_COH3Q4,
+  TOP_ELEMENT_COH3Q8,
+  TOP_ELEMENT_WEDGE6,
+  TOP_ELEMENT_MAX
+};
 
 
 /** Node Iterator */
@@ -96,6 +120,9 @@ TopModel* topModel_Create_Init(int elem_attr_sz, int node_attr_sz);
 /** Create and access a Tops model. Only call from Driver */
 TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz);
 
+/** Cleanup a model. Currently does nothing */
+void topModel_Destroy(TopModel* m);
+
 /** Insert a node */
 TopNode topModel_InsertNode(TopModel*, double x, double y, double z);
 
@@ -124,7 +151,19 @@ TopElement topModel_GetElemAtId(TopModel*,TopID);
 void* topNode_GetAttrib(TopModel*, TopNode);
 
 /** Get element attribute */
-void* topElem_GetAttrib(TopModel*, TopElement);
+void* topElement_GetAttrib(TopModel*, TopElement);
+
+
+TopNode topElement_GetNode(TopModel*,TopElement,int idx);
+
+int topNode_GetId(TopModel* m, TopNode n);
+
+
+int topModel_GetNNodes(TopModel *model);
+
+int topElement_GetNNodes(TopModel* model, TopElement elem);
+
+void topNode_GetPosition(TopModel*model, TopNode node,double*x,double*y,double*z);
 
 /** Create Iterator for nodes */
 TopNodeItr*  topModel_CreateNodeItr(TopModel*);
@@ -164,4 +203,4 @@ void topElemItr_Next(TopElemItr*);
 TopElement topElemItr_GetCurr(TopElemItr*);
 
 
-
+#endif

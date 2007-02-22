@@ -55,6 +55,10 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz){
   return mesh;
 }
 
+void topModel_Destroy(TopModel* m){
+}
+
+
 TopNode topModel_InsertNode(TopModel* m, double x, double y, double z){
   int newNode = FEM_add_node_local(m,false,false,false);
   m->node.set_coord(newNode,x,y,z);
@@ -68,14 +72,15 @@ void topNode_SetId(TopModel* m, TopNode n, TopID id){
   m->node.setGlobalno(n,id);
 }
 
- /** Insert an element */
+/** Insert an element */
 TopElement topModel_InsertElem(TopModel*m, TopElemType type, TopNode* nodes){
-  assert(type == FEM_TRIANGULAR);
-  int conn[3];
+  assert(type ==  TOP_ELEMENT_TET4);
+  int conn[4];
   conn[0] = nodes[0];
   conn[1] = nodes[1];
   conn[2] = nodes[2];
-  int newEl = FEM_add_element_local(m, conn, 3, 0, 0, 0);
+  conn[3] = nodes[3];
+  int newEl = FEM_add_element_local(m, conn, 4, 0, 0, 0);
   return newEl;
 }
 
@@ -117,7 +122,7 @@ void topElement_SetAttrib(TopModel* m, TopElement e, void* d){
 /** @brief Get elem attribute 
 See topNode_SetAttrib() for description
 */
-void* topElem_GetAttrib(TopModel* m, TopElement e){
+void* topElement_GetAttrib(TopModel* m, TopElement e){
   FEM_DataAttribute * at = (FEM_DataAttribute*) m->elem[0].lookup(FEM_DATA+0,"topElem_GetAttrib");
   AllocTable2d<unsigned char> &dataTable  = at->getChar();
   unsigned char *data = dataTable.getData();
@@ -155,6 +160,26 @@ TopElement topModel_GetElemAtId(TopModel*,TopID){
 
 
 
+TopNode topElement_GetNode(TopModel* m,TopElement e,int idx){
+  assert(0);
+}
+
+
+int topNode_GetId(TopModel* m, TopNode n){
+  assert(0);
+}
+
+int topModel_GetNNodes(TopModel *model){
+  assert(0);
+}
+
+int topElement_GetNNodes(TopModel* model, TopElement elem){
+  assert(0);
+}
+
+void topNode_GetPosition(TopModel*model, TopNode node,double*x,double*y,double*z){
+  assert(0);
+}
 
 
 #include "ParFUM_TOPS.def.h"
