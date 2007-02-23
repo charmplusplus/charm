@@ -74,7 +74,7 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
 	if (coordEqual(&nodeCoords[j*dim], &recvNodeCoords[k*dim], dim)) {
 	  localSharedNodes.push_back(j); 
 	  remoteSharedNodes.push_back(k);
-	  printf("[%d] found local node %d to match with remote node %d \n",rank,j,k);
+	  //printf("[%d] found local node %d to match with remote node %d \n",rank,j,k);
 	  break;
 	}
       }
