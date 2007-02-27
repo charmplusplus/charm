@@ -26,22 +26,25 @@
 #define SPE_MESSAGE_QUEUE_LENGTH      8   // DO NOT SET ABOVE 31 (because of the way tags are used with the DMA engines)
 #define SPE_MESSAGE_QUEUE_BYTE_COUNT  (SIZEOF_128(SPEMessage) * SPE_MESSAGE_QUEUE_LENGTH)
 #define DOUBLE_BUFFER_MESSAGE_QUEUE   1   // Set to non-zero to make the SPE Runtime double buffer the message queue
+#define SPE_NOTIFY_VIA_MAILBOX        0
 #define SPE_NOTIFY_QUEUE_BYTE_COUNT   (ROUNDUP_128(sizeof(SPENotify) * SPE_MESSAGE_QUEUE_LENGTH))
-
-// Set to non-zero if the write-only buffer should be zero-ed out on the SPE before being filled in
-#define SPE_ZERO_WRITE_ONLY_MEMORY    0
 
 // The number of dma list entries in a pre-allocated dma list.
 #define SPE_DMA_LIST_LENGTH                16       // Per message in message queue (NOTE: Must be an even # >= 4: 4, 10, 22, etc.)
 #define SPE_DMA_LIST_ENTRY_MAX_LENGTH      0x4000   // Maximum length of a buffer pointed to by a single dma list entry (should be a power of 2)
 
-// The reserved area for stack
-#define SPE_TOTAL_MEMORY_SIZE    (256 * 1024)  // Defined by the architecture
-#define SPE_RESERVED_STACK_SIZE  (1024 * 40)   // Reserve this much memory for the stack
-#define SPE_MINIMUM_HEAP_SIZE    (1024 * 16)   // Require at least this amount of heap (or the SPE Runtime will exit)
+// Scheduler controls
+#define SPE_USE_STATE_LOOKUP_TABLE  1
+#define LIMIT_READY  5
 
-// PPE Completion Notification Method
-#define SPE_NOTIFY_VIA_MAILBOX     0
+// Memory Settings
+#define SPE_TOTAL_MEMORY_SIZE   (256 * 1024)  // Defined by the architecture
+#define SPE_USE_OWN_MEMSET               (0)  // Set to 1 to force a local version of memset to be used (to try to remove C/C++ runtime dependence)
+#define SPE_USE_OWN_MALLOC               (1)  // Set to 1 to force a local version of malloc and free to be used
+#define SPE_MEMORY_BLOCK_SIZE     (1024 * 4)  // !!! IMPORTANT !!! : NOTE : SPE_MEMORY_BLOCK_SIZE should be a power of 2.
+#define SPE_RESERVED_STACK_SIZE  (1024 * 40)  // Reserve this much memory for the stack
+#define SPE_MINIMUM_HEAP_SIZE    (1024 * 16)  // Require at least this amount of heap (or the SPE Runtime will exit)
+#define SPE_ZERO_WRITE_ONLY_MEMORY       (0)  // Set to non-zero if the write-only buffer should be zero-ed out on the SPE before being filled in
 
 // The maximum number of work requests that can be serviced in a single SPE scheduler loop iteration
 #define SPE_MAX_GET_PER_LOOP       10
@@ -82,18 +85,15 @@
 #define SPE_MESSAGE_OK                       (0x0000)
 #define SPE_MESSAGE_ERROR_NOT_ENOUGH_MEMORY  (0x0001)
 
-// DEBUG Display Level
+// Tracing
 #define ENABLE_TRACE        0  // Set to non-zero to enable trance statements for work requests that have tracing enabled
+
+// DEBUG Display Level
 #define SPE_DEBUG_DISPLAY   0  // Set to 0 to save on LS memory usage (all printf's should be wrapped in this!)
 #define SPE_DEBUG_DISPLAY_STILL_ALIVE  0 // If > 0 then display a "still alive" message every SPE_DEBUG_DISPLAY_STILL_ALIVE iterations
 #define SPE_DEBUG_DISPLAY_NO_PROGRESS  0 // If non-zero, warn when no messages changes state for this many iterations
 #define SPE_REPORT_END      0  // Have each SPE report the address of it's _end variable (end of data segment; will be printed by PPE during spe thread creation)
 #define SPE_NOTIFY_ON_MALLOC_FAILURE   0  // Set to 1 to force the SPE to notify the user when a pointer returned by malloc/new returns an un-usable pointer (message will retry malloc/new later)
-
-// Memory Settings
-#define SPE_USE_OWN_MEMSET  0  // Set to 1 to force a local version of memset to be used (to try to remove C/C++ runtime dependence)
-#define SPE_USE_OWN_MALLOC  1  // Set to 1 to force a local version of malloc and free to be used
-#define SPE_MEMORY_BLOCK_SIZE  1024  // !!! IMPORTANT !!! : NOTE : SPE_MEMORY_BLOCK_SIZE should be a power of 2.
 
 #define OFFLOAD_API_FULL_CHECK  1
 
@@ -110,7 +110,7 @@
 // The lower and upper bounds of tags that are available to the user's code (incase the user's code needs to
 //   do DMA transactions directly and needs to use tags in doing so).
 #define SPE_USER_TAG_MIN   SPE_MESSAGE_QUEUE_LENGTH  // NOTE: 0 through SPE_MESSAGE_QUEUE_LENGTH are used for work request DMA transactions
-#define SPE_USER_TAG_MAX   30  // NOTE: 31 is reserved for message queue dma transactions (restricted by hardware)
+#define SPE_USER_TAG_MAX   29  // NOTE: 31 and 30 are reserved for message and notify queues
 #define SPE_NUM_USER_TAGS  (SPE_USER_TAG_MAX - SPE_USER_TAG_MIN + 1)
 
 

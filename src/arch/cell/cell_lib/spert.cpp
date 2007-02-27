@@ -807,6 +807,7 @@ inline void processMsgState_preFetching(int msgIndex) {
     // Queue the DMA command
     register int tmp_dmaList = spu_extract(tmp_localData2, 0);
     register int tmp_dmaListSize = spu_extract(tmp_localData2, 1);
+
     spu_mfcdma64(tmp_localMemPtr,
                  0,  // TODO : Update the message queue so the upper 32-bits are also sent
                  (unsigned int)tmp_dmaList,
@@ -1686,6 +1687,7 @@ inline void processMsgState_listReadyList(int msgIndex) {
       //             msgIndex,
       //             MFC_GETL_CMD
       //            );
+
       spu_mfcdma64((void*)lsPtr,
                    (unsigned int)tmp_msgQueueEntry->readOnlyPtr,  // eah
                    (unsigned int)(localMsgQData[msgIndex].dmaList),
@@ -2326,6 +2328,7 @@ inline void processMsgState_executedList(int msgIndex) {
       //             msgIndex,
       //             MFC_PUTL_CMD
       //          );
+
       spu_mfcdma64(((char*)tmp_localMemPtr) + (readWriteOffset),
                    (unsigned int)tmp_msgQueueEntry->readOnlyPtr,  // eah
                    (unsigned int)(&(tmp_dmaList[tmp_readOnlyLen])),
@@ -2894,8 +2897,6 @@ inline void speSchedulerInner() {
   int wrInUseCountCounter = 0;
 #endif
 
-#define LIMIT_READY  4
-
 void processMsgState_doNothing(int msgIndex) {
   printf("SPE_%d :: [ERROR] :: !!! processMsgState_doNothing() called !!!\n", (int)getSPEID());
 }
@@ -2917,7 +2918,6 @@ unsigned int stateLookupTable[] = {
   (unsigned int)processMsgState_error,           0x00000000, 0, 0  // 12 = ERROR
 };
 
-#define SPE_USE_STATE_LOOKUP_TABLE  0
 
 #if SPE_USE_STATE_LOOKUP_TABLE != 0
 
@@ -3897,7 +3897,7 @@ void local_initMem() {
   register int i;
 
   // Caclulate the starting and ending addresses of the heap (128 bytes of "buffer" on either side)
-  register unsigned int startAddr = ROUNDUP_16((unsigned int)(&(_end))) + 128; // '+ 128' for buffer between heap and code/data
+  register unsigned int startAddr = ROUNDUP_128((unsigned int)(&(_end))) + 128; // '+ 128' for buffer between heap and code/data
   register unsigned int endAddr = SPE_TOTAL_MEMORY_SIZE - SPE_RESERVED_STACK_SIZE - 128;
   register int memAvail = ((int)endAddr - (int)startAddr) - 128;  // '- 128' for alignment of heap memory blocks
 
@@ -3917,7 +3917,7 @@ void local_initMem() {
   // Setup the memory block table
   memBlockTable = (MemBlockRec*)startAddr;
   register unsigned int blockAddr = startAddr + (numBlocks * sizeof(MemBlockRec));
-  blockAddr = ROUNDUP_16(blockAddr);
+  blockAddr = ROUNDUP_128(blockAddr);
   for (i = 0; i < numBlocks; i++) {
 
     // Init the record
