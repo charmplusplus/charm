@@ -2562,4 +2562,18 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
 
 #endif
 
+
+#if CMK_CELL
+
+#include "spert_ppu.h"
+
+void machine_OffloadAPIProgress() {
+  CmiCommLock();
+  OffloadAPIProgress();
+  CmiCommUnlock();
+}
+#endif
+
+
+
 /*@}*/
