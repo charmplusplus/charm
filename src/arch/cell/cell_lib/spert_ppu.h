@@ -43,6 +43,8 @@ extern "C" {
 
 #include "spert.h"
 
+#include <stdio.h>
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 // Defines
@@ -192,12 +194,14 @@ extern "C" {
  */
 extern int InitOffloadAPI(void(*cbFunc)(void*) DEFAULT_TO_NULL,   ///< Pointer to a function that should be called when a work request completes
                           void(*gcbFunc)(void*) DEFAULT_TO_NULL,  ///< Pointer to a function that should be called when a group of work requests completes
-                          void(*errorFunc)(int,void*,WRHandle) DEFAULT_TO_NULL ///< Pointer to a function that should be called if an error is returned by a Work Request on one of the SPEs
+                          void(*errorFunc)(int,void*,WRHandle) DEFAULT_TO_NULL, ///< Pointer to a function that should be called if an error is returned by a Work Request on one of the SPEs
+                          char* timingFileName DEFAULT_TO_NULL    ///< Pointer to a string containing a file name which will be used when timing data is being produced
                          );
 #ifndef __cplusplus
-//#define InitOffloadAPI() InitOffloadAPI(NULL, NULL, NULL)
-//#define InitOffloadAPI(cbf) InitOffloadAPI(cbf, NULL, NULL)
-//#define InitOffloadAPI(cbf, gcbf) InitOffloadAPI(cbf, gcbf, NULL)
+//#define InitOffloadAPI() InitOffloadAPI(NULL, NULL, NULL, NULL)
+//#define InitOffloadAPI(cbf) InitOffloadAPI(cbf, NULL, NULL, NULL)
+//#define InitOffloadAPI(cbf, gcbf) InitOffloadAPI(cbf, gcbf, NULL, NULL)
+//#define InitOffloadAPI(cbf, gcbf, ef) InitOffloadAPI(cbf, gcbf, ef, NULL)
 #endif
 
 
@@ -310,6 +314,10 @@ extern void waitForWRGroupHandle(WRGroupHandle wrGroupHandle);
   */
 extern void OffloadAPIProgress();
 
+
+/** Use to display the configuration of the Offload API in the specified file.
+  */
+extern void OffloadAPIDisplayConfig(FILE* fout);
 
 // DEBUG
 extern int getWorkRequestID(WRHandle wrHandle);

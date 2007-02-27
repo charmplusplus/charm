@@ -300,7 +300,11 @@ inline int sendSPECommand(SPEThread *speThread, int command) {
 
 
 extern "C"
-int InitOffloadAPI(void (*cbFunc)(void*), void (*gcbFunc)(void*), void (*errorFunc)(int, void*, WRHandle)) {
+int InitOffloadAPI(void (*cbFunc)(void*),
+                   void (*gcbFunc)(void*),
+                   void (*errorFunc)(int, void*, WRHandle),
+                   char* timingFileName
+                  ) {
 
   // Let the user know that the Offload API is being initialized
   #if DEBUG_DISPLAY >= 1
@@ -388,7 +392,7 @@ int InitOffloadAPI(void (*cbFunc)(void*), void (*gcbFunc)(void*), void (*errorFu
 
   // Open the projections/timing file
   #if SPE_TIMING != 0
-    openProjFile(NULL);
+    openProjFile(timingFileName);
   #endif
 
   // Send each of the SPE threads a command to restart their clocks (in an attempt to remove clock
@@ -2787,6 +2791,59 @@ WRGroup* createWRGroupHandles(int numHandles) {
   }
 
   return groups;
+}
+
+
+void OffloadAPIDisplayConfig(FILE* fout) {
+
+  // Make sure fout points somewhere
+  if (fout == NULL) fout = stdout;
+
+  // Dump the Offload API's configuration parameters to the file specified
+  fprintf(fout, "OffloadAPI :: [CONFIG] :: PPE:\n");
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::   Threads:\n");
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     NUM_SPE_THREADS: %d\n", NUM_SPE_THREADS);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     CREATE_EACH_THREAD_ONE_BY_ONE: %d\n", CREATE_EACH_THREAD_ONE_BY_ONE);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::   Debugging:\n");
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     DEBUG_DISPLAY: %d\n", DEBUG_DISPLAY);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::   Stats:\n");
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     PPE_STATS: %d\n", PPE_STATS);
+  fprintf(fout, "OffloadAPI :: [CONFIG] :: SPE:\n");
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::   Queues:\n");
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_MESSAGE_QUEUE_LENGTH: %d\n", SPE_MESSAGE_QUEUE_LENGTH);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_MESSAGE_QUEUE_BYTE_COUNT: %d\n", SPE_MESSAGE_QUEUE_BYTE_COUNT);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     DOUBLE_BUFFER_MESSAGE_QUEUE: %d\n", DOUBLE_BUFFER_MESSAGE_QUEUE);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_NOTIFY_VIA_MAILBOX: %d\n", SPE_NOTIFY_VIA_MAILBOX);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_NOTIFY_QUEUE_BYTE_COUNT: %d\n", SPE_NOTIFY_QUEUE_BYTE_COUNT);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::   Static DMA Lists:\n");
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_DMA_LIST_LENGTH: %d\n", SPE_DMA_LIST_LENGTH);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_DMA_LIST_ENTRY_MAX_LENGTH: %d\n", SPE_DMA_LIST_ENTRY_MAX_LENGTH);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::   Memory:\n");
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_TOTAL_MEMORY_SIZE: %d\n", SPE_TOTAL_MEMORY_SIZE);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_USE_OWN_MEMSET: %d\n", SPE_USE_OWN_MEMSET);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_USE_OWN_MALLOC: %d\n", SPE_USE_OWN_MALLOC);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_MEMORY_BLOCK_SIZE: %d\n", SPE_MEMORY_BLOCK_SIZE);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_RESERVED_STACK_SIZE: %d\n", SPE_RESERVED_STACK_SIZE);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_MINIMUM_HEAP_SIZE: %d\n", SPE_MINIMUM_HEAP_SIZE);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_ZERO_WRITE_ONLY_MEMORY: %d\n", SPE_ZERO_WRITE_ONLY_MEMORY);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::   Scheduler Controls:\n");
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_USE_STATE_LOOKUP_TABLE: %d\n", SPE_USE_STATE_LOOKUP_TABLE);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     LIMIT_READY: %d\n", LIMIT_READY);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::   Tracing:\n");
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     ENABLE_TRACE: %d\n", ENABLE_TRACE);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::   Debugging:\n");
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_DEBUG_DISPLAY: %d\n", SPE_DEBUG_DISPLAY);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_DEBUG_DISPLAY_STILL_ALIVE: %d\n", SPE_DEBUG_DISPLAY_STILL_ALIVE);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_DEBUG_DISPLAY_NO_PROGRESS: %d\n", SPE_DEBUG_DISPLAY_NO_PROGRESS);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_REPORT_END: %d\n", SPE_REPORT_END);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_NOTIFY_ON_MALLOC_FAILURE: %d\n", SPE_NOTIFY_ON_MALLOC_FAILURE);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::   Stats:\n");
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_TIMING: %d\n", SPE_TIMING);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_STATS: %d\n", SPE_STATS);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_STATS1: %d\n", SPE_STATS1);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_STATS2: %d\n", SPE_STATS2);
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::   User Tags:\n");
+  fprintf(fout, "OffloadAPI :: [CONFIG] ::     SPE_NUM_USER_TAGS: %d\n", SPE_NUM_USER_TAGS);
 }
 
 
