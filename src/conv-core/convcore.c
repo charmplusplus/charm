@@ -1295,8 +1295,16 @@ int CsdScheduler(int maxmsgs)
 */
 extern void CkClearAllArrayElements();
 
+
+extern void machine_OffloadAPIProgress();
+
 void CsdScheduleForever(void)
 {
+  #if CMK_CELL
+    #define CMK_CELL_PROGRESS_FREQ  96  // (MSG-Q Entries x1.5)
+    int progressCount = CMK_CELL_PROGRESS_FREQ;
+  #endif
+
   int isIdle=0;
   SCHEDULE_TOP
   while (1) {
@@ -1304,8 +1312,25 @@ void CsdScheduleForever(void)
     if (msg) { /*A message is available-- process it*/
       if (isIdle) {isIdle=0;CsdEndIdle();}
       SCHEDULE_MESSAGE
+
+      #if CMK_CELL
+        if (progressCount <= 0) {
+          //OffloadAPIProgress();
+          machine_OffloadAPIProgress();
+          progressCount = CMK_CELL_PROGRESS_FREQ;
+	}
+        progressCount--;
+      #endif
+
     } else { /*No message available-- go (or remain) idle*/
       SCHEDULE_IDLE
+
+      #if CMK_CELL
+        //OffloadAPIProgress();
+        machine_OffloadAPIProgress();
+        progressCount = CMK_CELL_PROGRESS_FREQ;
+      #endif
+
     }
     CsdPeriodic();
   }
@@ -2457,11 +2482,17 @@ void ConverseCommonExit(void)
 
 
 #if CMK_CELL
+
 void CmiInitCell()
 {
-  InitOffloadAPI(offloadCallback, NULL, NULL);
-  CcdCallOnConditionKeep(CcdPERIODIC, 
-        (CcdVoidFn) OffloadAPIProgress, NULL);
+  // Create a unique string for each PPE to use for the timing
+  //   data file's name
+  char fileNameBuf[128];
+  sprintf(fileNameBuf, "speTiming.%d", CmiMyPe());
+
+  InitOffloadAPI(offloadCallback, NULL, NULL, fileNameBuf);
+  //CcdCallOnConditionKeep(CcdPERIODIC, 
+  //      (CcdVoidFn) OffloadAPIProgress, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) OffloadAPIProgress, NULL);
 }
