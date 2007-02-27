@@ -25,8 +25,8 @@ CMK_PPU_EMBEDSPU='ppu32-embedspu'
 
 CMK_RANLIB='ppu-ranlib'
 CMK_AR='ppu-ar -r'
-#CMK_LIBS='-lckqt -lcellppu -lspe'
-CMK_LIBS='-lckqt -lcellppu -lspe2'
+CMK_LIBS='-lckqt -lcellppu -lspe'
+#CMK_LIBS='-lckqt -lcellppu -lspe2'
 CMK_LD_SHARED='-shared'
 
 CMK_NATIVE_CC='gcc'
