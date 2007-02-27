@@ -10,6 +10,15 @@
    
    TRIANGLES: Given nodes 0, 1, 2, the edges 0, 1, and 2 of a triangle are:
    (0, 1), (1, 2) and (2, 0), in that order.
+
+              0
+             / \
+            /   \
+          2/     \0
+          /       \
+         /         \
+        2-----------1
+              1
    
    QUADS: Given nodes 0, 1, 2, 3, the edges 0, 1, 2 and 3 of a quad are:
    (0, 1), (1, 2), (2, 3) and (3, 0), in that order.
@@ -18,6 +27,17 @@
    
    TETS: Given nodes 0, 1, 2, 3, the faces 0, 1, 2 and 3 of a tetrahedra are:
    (0, 1, 2), (1, 0, 3), (1, 3, 2), and (0, 2, 3), in that order
+
+              0
+             /|\
+            / | \
+          1/  0  \2       Back Face: 1
+          / 0 | 2 \       Bottom Face: 3
+         /....|....\       
+        2-_   |   _-3     Back Edge: 4
+           -_ | _-  
+          3  -1-  5
+
    
    HEXES: Given nodes 0, 1, 2, 3, 4, 5, 6, 7, the faces 0, 1, 2, 3, 4, 5
    of a hex are: (0, 1, 2, 3), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0),
