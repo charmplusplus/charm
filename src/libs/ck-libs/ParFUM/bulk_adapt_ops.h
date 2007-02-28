@@ -49,7 +49,9 @@ class BulkAdapt {
       lists. Returns zero if the lock fails, positive if the operation
       suceeds, and negative if the operations fails for some other
       reason. */
-  int edge_bisect(int elemID, int elemType, int edgeID);
+  int edge_bisect(int elemID, int elemType, int edgeID, int dim);
+  int edge_bisect_2D(int elemID, int elemType, int edgeID);
+  int edge_bisect_3D(int elemID, int elemType, int edgeID);
 
 	//TODO: add elemType to the prototype of all the following mesh-modification functions
   /// Perform an edge flip (2D)
@@ -84,6 +86,12 @@ class BulkAdapt {
       reason. */
   int edge_collapse(int elemID, int edgeID);
 
+  /// Perform a single side of an edge_bisect operation
+  void one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int edgeID,
+			 int *node1idx, int *node2idx,
+			 adaptAdj **startElemAdaptAdj, adaptAdj **splitElemAdaptAdj, bool startSide);
+
+
   /* COMMUNICATION HELPERS FOR BULK ADAPTIVITY OPERATIONS */
   
   /* LOCAL HELPERS FOR BULK ADAPTIVITY OPERATIONS */
@@ -112,4 +120,11 @@ class BulkAdapt {
 
 	void make_node_shared(int nodeID,int numSharedChunks,int *sharedChunks);
 };
+
+void midpoint(double *n1, double *n2, int dim, double *result);
+
+int getRelNode(int nodeIdx, int *conn, int nodesPerElem);
+
+int getEdgeID(int node1, int node2, int nodePerElem, int dim);
+
 #endif
