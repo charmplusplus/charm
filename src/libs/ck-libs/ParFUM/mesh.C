@@ -1352,7 +1352,7 @@ int FEM_Entity::count_valid(){
 /// If someone has a better name for this function, please change it.
 int FEM_Entity::get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost){
   int retval=0;
-  if(true) { //maintains a list of invalid elements. FASTER
+//  if(true) { //maintains a list of invalid elements. FASTER
     if(invalidListLen>0) {
       retval = invalidList[invalidListLen-1];
     }
@@ -1360,8 +1360,8 @@ int FEM_Entity::get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost){
       retval = size();
       setLength(retval+1,true);  
     }
-  }
-  else {
+//  }
+/*  else {
     int size1 = size();
     if(size1==0) { //special case because for size=0, first_invalid=last_invalid=0
       retval= 0;
@@ -1414,7 +1414,7 @@ int FEM_Entity::get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost){
 	setLength(retval+1);
       }
     }
-  }
+  }*/
   set_valid(retval,isNode);
   return retval;
 }

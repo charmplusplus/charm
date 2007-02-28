@@ -223,10 +223,18 @@ int BulkAdapt::edge_collapse(int elemID, int edgeID)
 	 * Update its connectivity
 	 * Return index of new element
 	 * */
-	int BulkAdapt::add_element(int elemType,int nodesPerElem,int *conn){ return 0;}
+	int BulkAdapt::add_element(int elemType,int nodesPerElem,int *conn){ 
+		FEM_Elem &elem = meshPtr->elem[elemType];
+		int newElem = elem.get_next_invalid();
+		elem.connIs(newElem,conn);
+		return newElem;
+	}
 
 	/** Update the conn of an element*/
-	void BulkAdapt::update_element_conn(int elemType,int elemID,int nodesPerElem,int *conn){};
+	void BulkAdapt::update_element_conn(int elemType,int elemID,int nodesPerElem,int *conn){
+		FEM_Elem &elem = meshPtr->elem[elemType];
+		elem.connIs(elemID,conn);
+	};
 
 
 
@@ -235,11 +243,20 @@ int BulkAdapt::edge_collapse(int elemID, int edgeID)
 	 * update its co-ordinates 
 	 * Return index of new node
 	 * */
-	int BulkAdapt::add_node(int dim,double *coords){ return 0;}
+	int BulkAdapt::add_node(int dim,double *coords){ 
+		int newNode = meshPtr->node.get_next_invalid();
+		FEM_DataAttribute *coord = meshPtr->node.getCoord();
+		(coord->getDouble()).setRow(newNode,coords);
+		return newNode;
+	}
 	
 	/** Update the co-ordimates of the given node
 	*/
-	void BulkAdapt::update_node_coord(int nodeID,int dim,double *coords){};
+	void BulkAdapt::update_node_coord(int nodeID,int dim,double *coords){
+		FEM_DataAttribute *coord = meshPtr->node.getCoord();
+		(coord->getDouble()).setRow(nodeID,coords);
+	};
 
-	void BulkAdapt::make_node_shared(int nodeID,int numSharedChunks,int *sharedChunks){};
+	void BulkAdapt::make_node_shared(int nodeID,int numSharedChunks,int *sharedChunks){
+	};
 

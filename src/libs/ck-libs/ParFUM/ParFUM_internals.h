@@ -871,7 +871,7 @@ class FEM_Entity {
   int is_valid(int idx);         // will fail assertions for out of range indices
   int is_valid_any_idx(int idx); // will not fail assertions for out of range indices
   int count_valid();
-  int get_next_invalid(FEM_Mesh *m, bool isNode, bool isGhost);
+  int get_next_invalid(FEM_Mesh *m=NULL, bool isNode=false, bool isGhost=false);// the arguments are not really needed but Nilesh added them when he wrote a messy version and did not remove them when he fixed the implementation. Since changing the uses was too painful the default arguments were added.
   virtual bool hasConn(int idx)=0;
   /**
    * Set the coordinates for a single item
