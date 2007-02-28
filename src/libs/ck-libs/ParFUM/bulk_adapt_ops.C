@@ -258,5 +258,10 @@ int BulkAdapt::edge_collapse(int elemID, int edgeID)
 	};
 
 	void BulkAdapt::make_node_shared(int nodeID,int numSharedChunks,int *sharedChunks){
+		for(int i=0;i<numSharedChunks;i++){
+			IDXL_List &sharedList = meshPtr->node.shared.addList(sharedChunks[i]);
+			sharedList.push_back(nodeID);
+		}
+		meshPtr->node.shared.flushMap();
 	};
 
