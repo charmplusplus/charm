@@ -133,6 +133,7 @@ int BulkAdapt::edge_bisect_2D(int elemID, int elemType, int edgeID)
 
   // unlock the two partitions
   localShadow->unlockRegion(lockRegionID);
+  return 1;
 }
 
 int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
@@ -181,6 +182,7 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
 
   // Unlock the partition set.
 */
+  return 0;
 }
 
 
