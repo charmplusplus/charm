@@ -31,6 +31,8 @@ parallel program. In the orchestration code, Charisma employs a macro dataflow
 approach; the statments produce and consume values, from which the control flows
 can be organized, and messages and method invocations generated. 
 
+\subsubsection{Header Section}
+
 The very first line should give the name of the Charisma program with the {\tt
 program} keyword.
 
@@ -58,15 +60,35 @@ parallel code, such as basic data structure declaration.
 
 After the {\tt include} section is the {\tt define} section, where environmental
 variables can be defined for Charisma. For example, to tell Charisma to generate
-code for the load balancing module, the programmer should define ``ldb'' to be
-1, as follows.
+additional code to enable the load balancing module, the programmer should
+define ``ldb'' to be 1, as follows.
 
 \begin{alltt}
     define ldb 1;
 \end{alltt}
 
+\subsubsection{Declaration Section}
+
+Next comes the declaration section, where classes, objects and parameters are
+declared. A Charisma program is composed of multiple sets of parallel objects
+which are organized by the orchestration code. Different sets of objects can be
+instantiated from different class types. Therefore, we have to specify the class
+types and object instantiation. Also we need to specify the parameters (See
+Section~\ref{sec:orchsec}) to use in the orchestration statements. 
+
+A Charisma program or module has one ``MainChare'' class, and it does not
+require explicit instantiation since it is a singleton. The statement to declare
+MainChare looks like this.
+
+\begin{alltt}
+    class JacobiMain : MainChare;
+\end{alltt}
 
 
+
+
+\subsubsection{Orchestration Section}
+\label{sec:orchsec}
 
 
 \subsection{Sequential Code}
@@ -84,9 +106,9 @@ program jacobi
 
 class  JacobiMain : MainChare;
 class  JacobiWorker : ChareArray1D;
-param  lb : double[900];
-param  rb : double[900];
-obj  workers :  JacobiWorker[30];
+obj  workers :  JacobiWorker[16];
+param  lb : double[512];
+param  rb : double[512];
 
 begin
     for iter := 1 to 10
@@ -109,8 +131,8 @@ declaration from the orchestration code, and incorporate the sequential portion
 in the final header file. 
 
 \begin{SaveVerbatim}{foodecl}
-#define N 900
-#define M 30
+#define N 512
+#define M 16
 
 int currentArray;	
 double localData[2][M][N]; 
