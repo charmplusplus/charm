@@ -35,15 +35,44 @@ The very first line should give the name of the Charisma program with the {\tt
 program} keyword.
 
 \begin{alltt}
-    program jacobi    
+    program jacobi 
 \end{alltt}
 
 The {\tt program} keyword can be replaced with {\tt module}, which means that
 the output program is going to be a library module instead of a stand-alone
-program. 
+program. Please refer to Section~\ref{sec:module} for more details.
+
+Next, the programmer can include external code files in the generated code with
+keyword {\tt include} with the filename without extension. For example, the
+following statement tells the Charisma compiler to look for header file
+``particles.h'' to be included in the generated header file ``jacobi.h'' and to
+look for C/C++ code file ``particles.[C|cc|cpp|cxx|c]'' to be included in the
+generated C++ code file "jacobi.C".
+
+\begin{alltt}
+    include particles;
+\end{alltt}
+
+It is useful when there are source code that must be preceed the generated
+parallel code, such as basic data structure declaration. 
+
+After the {\tt include} section is the {\tt define} section, where environmental
+variables can be defined for Charisma. For example, to tell Charisma to generate
+code for the load balancing module, the programmer should define ``ldb'' to be
+1, as follows.
+
+\begin{alltt}
+    define ldb 1;
+\end{alltt}
+
+
+
 
 
 \subsection{Sequential Code}
+
+\section{Charisma Library Module}
+\label{sec:module}
 
 \appendix
 
