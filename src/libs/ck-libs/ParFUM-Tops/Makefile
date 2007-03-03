@@ -1,5 +1,5 @@
 CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc $(OPTS) -g
+CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 #Headers to be copied to include directory so application users can see them
 HEADERS= ParFUM_TOPS.h  $(INTERNALHEADERS)

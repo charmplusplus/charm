@@ -61,9 +61,9 @@ Sample usage:
 typedef FEM_Mesh TopModel;
 
 /** Tops uses some bit patterns for these, but we just use TopNode as a signed value to represent the corresponding ParFUM node. A non-negative value is a local node, while a negative value is a ghost. */
-typedef unsigned TopNode;
+typedef long TopNode;
 /** See notes for ::TopNode */
-typedef unsigned TopElement;
+typedef long TopElement;
 
 
 enum {
@@ -123,6 +123,9 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz);
 /** Cleanup a model. Currently does nothing */
 void topModel_Destroy(TopModel* m);
 
+/** Synchronize element and node data for ghost layers. Should be called every timestep */
+void topModel_Sync(TopModel*m);
+
 /** Insert a node */
 TopNode topModel_InsertNode(TopModel*, double x, double y, double z);
 
@@ -144,9 +147,6 @@ void topElement_SetAttrib(TopModel*, TopElement, void*);
 /** Get node via id */
 TopNode topModel_GetNodeAtId(TopModel*,TopID);
 
-/** Get elem via id */
-TopElement topModel_GetElemAtId(TopModel*,TopID);
-
 /** Get nodal attribute */
 void* topNode_GetAttrib(TopModel*, TopNode);
 
@@ -157,7 +157,6 @@ void* topElement_GetAttrib(TopModel*, TopElement);
 TopNode topElement_GetNode(TopModel*,TopElement,int idx);
 
 int topNode_GetId(TopModel* m, TopNode n);
-
 
 int topModel_GetNNodes(TopModel *model);
 
@@ -201,6 +200,9 @@ void topElemItr_Next(TopElemItr*);
 
 /** Get TopElement associated with the iterator */
 TopElement topElemItr_GetCurr(TopElemItr*);
+
+/** Perform sanity check on iterators. This checks to make sure that the count of the itereated elements and nodes matches that returned by ParFUM's countValid() */
+void topModel_TestIterators(TopModel*m);
 
 
 #endif

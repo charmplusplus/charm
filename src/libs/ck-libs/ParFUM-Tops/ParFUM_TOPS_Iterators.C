@@ -1,5 +1,8 @@
 #include "ParFUM_TOPS.h"
 
+
+
+
 /**************************************************************************
  *     Iterator for nodes 
  */
@@ -15,53 +18,50 @@ void topNodeItr_Destroy(TopNodeItr* itr){
 }
 
 void topNodeItr_Begin(TopNodeItr* itr){
-    itr->parfum_index = 0;
+  if(itr->model->node.ghost != NULL){
+	itr->parfum_index =  FEM_To_ghost_index(itr->model->node.ghost->size());
+  }
+  else{
+	itr->parfum_index =  0;
+  }  
+
+  // Make sure we start with a valid one:
+  while((!itr->model->node.is_valid_any_idx(itr->parfum_index)) &&
+		(itr->parfum_index < itr->model->node.size()))
+	itr->parfum_index++;
+  
+  if(itr->parfum_index==itr->model->node.size()){
+	itr->parfum_index = itr->model->node.size()+1000; // way past the end
+  }  
+
+#ifdef PTOPS_ITERATOR_PRINT
+  CkPrintf("Initializing Node Iterator to %d\n", itr->parfum_index);
+#endif
 }
 
 bool topNodeItr_IsValid(TopNodeItr*itr){
-     return itr->model->node.is_valid_any_idx(itr->parfum_index);
+  	return itr->model->node.is_valid_any_idx(itr->parfum_index);
 }
 
 void topNodeItr_Next(TopNodeItr* itr){
+  CkAssert(topNodeItr_IsValid(itr));
+  
+  // advance index until we hit a valid index
+  itr->parfum_index++;
 
-    if(!topNodeItr_IsValid(itr))
-        return;
+  while((!itr->model->node.is_valid_any_idx(itr->parfum_index)) &&
+		(itr->parfum_index < itr->model->node.size()))
+	itr->parfum_index++;
+  
+  if(itr->parfum_index==itr->model->node.size()){
+	itr->parfum_index = itr->model->node.size()+1000; // way past the end
+  }  
 
-    // advance index until we hit a valid index
-    itr->parfum_index++;
-
-    if(itr->parfum_index > 0) {// local nodes
-
-        while ((! itr->model->node.is_valid_any_idx(itr->parfum_index)) &&
-                  (itr->parfum_index<itr->model->node.size()))
-        {
-            itr->parfum_index++;
-        }
-
-        if(itr->model->node.is_valid_any_idx(itr->parfum_index)) {
-            return;
-        } else {
-            // cycle to most negative index possible for ghosts
-		  printf("Node iterator switched to ghosts\n");
-            itr->parfum_index = FEM_To_ghost_index(itr->model->node.ghost->size());
-        }
-    }
-
-    // just go through ghost nodes
-    
-    while ( (! itr->model->node.ghost->
-                is_valid_any_idx(FEM_To_ghost_index(itr->parfum_index)))
-                &&
-                itr->parfum_index<0)
-    {
-        itr->parfum_index++;
-    }
-
-    if(itr->parfum_index==0){
-        itr->parfum_index = itr->model->node.size()+1000; // way past the end
-    }
-
+#ifdef PTOPS_ITERATOR_PRINT
+  CkPrintf("Advancing Node Iterator to %d\n", itr->parfum_index);
+#endif
 }
+
 
 TopNode topNodeItr_GetCurr(TopNodeItr*itr){
 	return itr->parfum_index;
@@ -83,52 +83,52 @@ void topElemItr_Destroy(TopElemItr* itr){
 }
 
 void topElemItr_Begin(TopElemItr* itr){
-    itr->parfum_index = 0;
+  if(itr->model->elem[0].ghost != NULL){
+	itr->parfum_index =  FEM_To_ghost_index(itr->model->elem[0].ghost->size());
+  }
+  else{
+	itr->parfum_index =  0;
+  }  
+
+  // Make sure we start with a valid one:
+  while((!itr->model->elem[0].is_valid_any_idx(itr->parfum_index)) &&
+		(itr->parfum_index < itr->model->elem[0].size()))
+	itr->parfum_index++;
+  
+  if(itr->parfum_index==itr->model->elem[0].size()){
+	itr->parfum_index = itr->model->elem[0].size()+1000; // way past the end
+  }  
+
+#ifdef PTOPS_ITERATOR_PRINT
+  CkPrintf("Initializing Elem[0] Iterator to %d\n", itr->parfum_index);
+#endif
+
 }
 
 bool topElemItr_IsValid(TopElemItr*itr){
-     return itr->model->elem[0].is_valid_any_idx(itr->parfum_index);
+  return itr->model->elem[0].is_valid_any_idx(itr->parfum_index);
 }
 
 void topElemItr_Next(TopElemItr* itr){
+  CkAssert(topElemItr_IsValid(itr));
+  
+  // advance index until we hit a valid index
+  itr->parfum_index++;
 
-    if(!topElemItr_IsValid(itr))
-        return;
+  while((!itr->model->elem[0].is_valid_any_idx(itr->parfum_index)) &&
+		(itr->parfum_index < itr->model->elem[0].size()))
+	itr->parfum_index++;
 
-    // advance index until we hit a valid index
-    itr->parfum_index++;
+  
+  if(itr->parfum_index==itr->model->elem[0].size()){
+	itr->parfum_index = itr->model->elem[0].size()+1000; // way past the end
+  }  
 
-    if(itr->parfum_index > 0) {// non-ghosts
-
-        while ((! itr->model->elem[0].is_valid_any_idx(itr->parfum_index)) &&
-                  (itr->parfum_index<itr->model->elem[0].size()))
-        {
-            itr->parfum_index++;
-        }
-
-        if(itr->model->elem[0].is_valid_any_idx(itr->parfum_index)) {
-            return;
-        } else {
-            // cycle to most negative index possible for ghosts
-		  printf("Elem iterator switched to ghosts\n");
-            itr->parfum_index = FEM_To_ghost_index(itr->model->elem[0].ghost->size());
-        }
-    }
-
-    // just go through ghosts    
-    while ( (! itr->model->elem[0].ghost->
-                is_valid_any_idx(FEM_To_ghost_index(itr->parfum_index)))
-                &&
-                itr->parfum_index<0)
-    {
-        itr->parfum_index++;
-    }
-
-    if(itr->parfum_index==0){
-        itr->parfum_index = itr->model->elem[0].size()+1000; // way past the end
-    }
-
+#ifdef PTOPS_ITERATOR_PRINT
+  CkPrintf("Advancing Elem Iterator to %d\n", itr->parfum_index);
+#endif
 }
+
 
 TopNode topElemItr_GetCurr(TopElemItr*itr){
 	return itr->parfum_index;
