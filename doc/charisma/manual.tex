@@ -2,6 +2,7 @@
 \usepackage{../pplmanual}
 \input{../pplmanual}
 \def\smallfbox#1{\small \fbox{#1}}
+\def\code#1{{\small {\tt {#1}}}}
 
 \title{Charisma Manual}
 \version{1.0}
@@ -48,8 +49,8 @@ Next, the programmer can include external code files in the generated code with
 keyword {\tt include} with the filename without extension. For example, the
 following statement tells the Charisma compiler to look for header file
 ``particles.h'' to be included in the generated header file ``jacobi.h'' and to
-look for C/C++ code file ``particles.[C|cc|cpp|cxx|c]'' to be included in the
-generated C++ code file "jacobi.C".
+look for C/C++ code file ``particles.[C/cc/cpp/cxx/c]'' to be included in the
+generated C++ code file ``jacobi.C''.
 
 \begin{alltt}
     include particles;
@@ -78,20 +79,180 @@ Section~\ref{sec:orchsec}) to use in the orchestration statements.
 
 A Charisma program or module has one ``MainChare'' class, and it does not
 require explicit instantiation since it is a singleton. The statement to declare
-MainChare looks like this.
+MainChare looks like this:
 
 \begin{alltt}
     class JacobiMain : MainChare;
 \end{alltt}
 
+For object arrays, we first need to declare the class types inherited from 1D
+object array, 2D object array, etc, and then instantiate from the class types. 
 
+\begin{alltt}
+    class JacobiWorker : ChareArray1D;
+    obj workers : JacobiWorker[16];
+\end{alltt}
 
+Note that key word ``class'' is for class type derivation, and ``obj'' is for
+parallel object or object array instantiation. The above code segment declares a
+new class type JacobiWorker which is a 1D object array, (and the programmer is
+supposed to supply sequential code for it in files ``JacobiWorker.h'' and
+``JacobiWorker.C'' (See Section~\ref{sec:sequential} for more details on
+sequential code). Object array ``workers'' is instantiated from ``JacobiWorker''
+and has 16 elements.
+
+The last part is orchestration parameter declaration. These parameters are used
+only in the orchestration code to connect input and output of orchestration
+statements, and their data type and size is declared here. More explanation of
+these parameters can be found in Section~\ref{sec:orchsec}. 
+
+\begin{alltt}
+    param lb : double[512];
+    param rb : double[512];
+\end{alltt}
+
+With this, ``lb'' and ``rb'' are declared as parameters of double array with
+size of 512. 
 
 \subsubsection{Orchestration Section}
 \label{sec:orchsec}
 
+In the main body of orchestration code, the programmer describes the behavior
+and interaction of the elements of the object arrays using orchestration
+statements.
+
+$\bullet$ {\bf Foreach Statement}
+
+The most common kind of parallelism is the invocation of a method
+across all elements in an object array. Charisma provides a {\em foreach}
+statement for specifying such parallelism. The keywords \code{foreach} and
+\code{end-foreach} forms an enclosure within which the parallel invocation is
+performed. The following code segment invokes the entry method \code{compute} on
+all the elements of array \code{myWorkers}. 
+
+\begin{SaveVerbatim}{foodecl}
+    foreach i in workers
+        workers[i].compute();
+    end-foreach
+\end{SaveVerbatim}
+\vspace{0.1in}
+\smallfbox{\BUseVerbatim{foodecl}}
+\vspace{0.1in}
+
+$\bullet$ {\bf Publish Statement and Produced/Consumed Parameters}
+
+In the orchestration code, an object method invocation can have input and output
+(consumed and produced) parameters. Here is an orchestration statement that
+exemplifies the input and output of this object methods
+\code{workers.produceBorders} and \code{workers.compute}. 
+
+\begin{SaveVerbatim}{foodecl}
+    <lb[i], rb[i]> := workers[i].produceBorders();
+    workers[i].compute(lb[i+1], rb[i-1]);
+    
+    <+error> := workers[i].reduceData();
+\end{SaveVerbatim}
+\vspace{0.1in}
+\smallfbox{\BUseVerbatim{foodecl}}
+\vspace{0.1in}
+
+Here, the entry method \code{workers[i].produceBorders} produces (called {\em
+published} in Charisma) values of \code{lb[i], rb[i]}, enclosed in a pair of
+angular brackets before the publishing sign ``\code{:=}''. In the second
+statement, function \code{workers[i].compute} consumes values of \code{lb[i+1],
+rb[i-1]}, just like normal function parameters. If a reduction operation is
+needed, the reduced parameter is marked with a ``\code{+}'' before it, like the
+\code{error} in the third statement. 
+
+A entry method can have arbitrary number of published (produced and reduced)
+values and consumed values. In addition to basic data types, each of these
+values can also be an object of arbitrary type. The values published by
+\code{A[i]} must have the index \code{i}, whereas values consumed can have the
+index \code{e(i)}, which is an index expression in the form of \code{i}$\pm c$
+where $c$ is a constant. Although we have used different symbols (\code{p} and
+\code{q}) for the input and the output variables, they are allowed to overlap. 
+
+The parameters are produced and consumed in the program order. Namely, a
+parameter produced in an early statement will be consumed by the next consuming
+statement, but will no longer be visible to any consuming statement after that.
+Special rules involving loops are discussed later with loop statement.
+
+$\bullet$ {\bf Overlap Statement}
+
+Complicated parallel programs usually have concurrent flows of control. To
+explicitly express this, Charisma provides a \code{overlap} keyword, whereby the
+programmer can fire multiple overlapping control flows. These flows may contain
+different number of steps or statements, and their execution should be
+independent of one another so that their progress can interleave with arbitrary
+order and always return correct results. 
+
+This example shows an \code{overlap} statement in a \code{for} loop. The two
+blocks in curly brackets are executed in parallel. Their execution join back to
+one at the end mark of \code{end-overlap}, and the iteration is repeated in a
+for loop. 
+
+
+
+$\bullet$ {\bf Loop Statement}
+
+Loops are supported with \code{for} statement and \code{while} statement. Here
+are two examples.
+\begin{SaveVerbatim}{foodecl}
+  for iter := 0 to 10
+     workers.doWork();
+  end-for
+\end{SaveVerbatim}
+\vspace{0.1in}
+\smallfbox{\BUseVerbatim{foodecl}}
+\vspace{0.1in}
+  
+\begin{SaveVerbatim}{foodecl}
+  while maxError > epsilon
+     workers.doWork();
+  end-while
+\end{SaveVerbatim}
+\vspace{0.1in}
+\smallfbox{\BUseVerbatim{foodecl}}
+\vspace{0.1in}
+
+The loop condition in \code{for} statement is independent from the main program;
+It simply tells the program to repeat the block for so many times. The loop
+condition in \code{while} statement is actually updated in the MainChare. In the
+above example, maxError and epsilon are both member variables of class
+MainChare, and can (should) be updated as the program executes. 
+
+Rules of connecting produced and consumed parameters concerning loops are
+natural. The first consuming statement will look for values produced by the last
+producing statement before the loop, for the first iteration. The last
+producing statement within the loop body, for the following iterations. At the
+last iteration, the last produced values will be disseminated to the code
+segment following the loop body. Within the loop body, program order holds. 
+
+\begin{SaveVerbatim}{foodecl}
+  for iter := 0 to 10
+    foreach i in workers
+      <lb[i], rb[i]> := workers[i].compute(lb[i+1], rb[i-1]);
+    end-foreach
+  end-for
+\end{SaveVerbatim}
+\vspace{0.1in}
+\smallfbox{\BUseVerbatim{foodecl}}
+\vspace{0.1in}
+
+One special case is when one statement's produced parameter and consumed
+parameter overlaps. It must be noted that there is no dependency within the same
+\code{foreach} statement. In the above code segment, the values consumed
+\code{lb[i], rb[i]} by \code{worker[i]} will not come from  
+its neighbors in this iteration. The rule is that the consumed values always
+originate from previous \code{foreach} statements or \code{foreach} statements
+from a previous loop iteration, and the published values are visible only to
+following \code{foreach} statements or \code{foreach} statements in following
+loop iterations. 
+
 
 \subsection{Sequential Code}
+\label{sec:sequential}
+
 
 \section{Charisma Library Module}
 \label{sec:module}
@@ -106,7 +267,7 @@ program jacobi
 
 class  JacobiMain : MainChare;
 class  JacobiWorker : ChareArray1D;
-obj  workers :  JacobiWorker[16];
+obj  workers : JacobiWorker[16];
 param  lb : double[512];
 param  rb : double[512];
 
