@@ -344,7 +344,9 @@ void midpoint(double *n1, double *n2, int dim, double *result) {
 }
 
 int getRelNode(int nodeIdx, int *conn, int nodesPerElem) {
+  return 0;
 }
 
 int getEdgeID(int node1, int node2, int nodePerElem, int dim) {
+  return 0;
 }
