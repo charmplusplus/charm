@@ -267,17 +267,15 @@ along with its own headers, declarations and whatever else it needs.
 
 Somewhere in the {\tt main} function, {\tt POSE\_init()} should be
 called.  This initializes all of \pose{}'s internal data structures.
-Then, a termination method should be specified.  \pose{} programs can
+The parameters to {\tt POSE\_init()} specify a termination method.  \pose{} programs can
 be terminated in two ways: with inactivity detection or with an end
 time.  Inactivity detection terminates after a few iterations of the
-GVT determine that no events are being executed and virtual time is
+GVT if no events are being executed and virtual time is
 not advancing.  When an end time is specified, and the GVT passes it,
-the simulation exits.  Both approaches can be used separately or in
-combination:
+the simulation exits. If no parameters are provided to {\tt POSE\_init()}, then the 
+simulation will use inactivity detection. If a time is provided as the parameter, this time
+will be used as the end time.
 
-~\\
-\noindent{\tt POSE\_useID();\\
-\noindent POSE\_useET($t$);}\\
 
 Now \pose{} is ready for posers.  All posers can be created at this
 point, each with a unique handle.  The programmer is responsible for
