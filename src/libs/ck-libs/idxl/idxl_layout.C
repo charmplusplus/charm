@@ -19,6 +19,7 @@ int IDXL_Layout::type_size(int dataType,const char *callingRoutine)
       case IDXL_INT : return sizeof(int);
       case IDXL_REAL : return sizeof(float);
       case IDXL_DOUBLE : return sizeof(double);
+      case IDXL_LONG_DOUBLE : return sizeof(long double); 
       case IDXL_INDEX_0 : return sizeof(int);
       case IDXL_INDEX_1 : return sizeof(int);
       default: IDXL_Abort(callingRoutine,"Expected an IDXL data type, but got %d",dataType);
@@ -33,6 +34,7 @@ const char *IDXL_Layout::type_name(int dataType,const char *callingRoutine)
       case IDXL_INT : return "IDXL_INT";
       case IDXL_REAL : return "IDXL_REAL";
       case IDXL_DOUBLE : return "IDXL_DOUBLE";
+      case IDXL_LONG_DOUBLE : return "IDXL_LONG_DOUBLE";
       case IDXL_INDEX_0 : return "IDXL_INDEX_0";
       case IDXL_INDEX_1 : return "IDXL_INDEX_1";
       default: break;
@@ -82,7 +84,8 @@ void gatherName(T *dest,const byte *src,const IDXL_Layout *srcLayout) { \
 template void gatherName(byte *dest,const byte *src,const IDXL_Layout *srcLayout); \
 template void gatherName(int *dest,const byte *src,const IDXL_Layout *srcLayout); \
 template void gatherName(float *dest,const byte *src,const IDXL_Layout *srcLayout); \
-template void gatherName(double *dest,const byte *src,const IDXL_Layout *srcLayout);
+template void gatherName(double *dest,const byte *src,const IDXL_Layout *srcLayout); \
+template void gatherName(long double *dest,const byte *src,const IDXL_Layout *srcLayout);
 
 oneToFn(sumOne,sumFn)
 oneToFn(prodOne,prodFn)
@@ -93,6 +96,8 @@ typedef void (*byteCombineFn)(byte *dest,const byte *src,const IDXL_Layout *srcL
 typedef void (*intCombineFn)(int *dest,const byte *src,const IDXL_Layout *srcLayout);
 typedef void (*floatCombineFn)(float *dest,const byte *src,const IDXL_Layout *srcLayout);
 typedef void (*doubleCombineFn)(double *dest,const byte *src,const IDXL_Layout *srcLayout);
+typedef void (*longDoubleCombineFn)(long double *dest,const byte *src,const IDXL_Layout *srcLayout);
+
 
 template<class T>
 inline void assignFn(int len,T *dest,T val) {
@@ -109,7 +114,8 @@ void reduction_initialize(const IDXL_Layout& dt, void *lhs, int op,const char *c
         case IDXL_INT : assignFn(dt.width,(int*)lhs, 0); break;
         case IDXL_REAL : assignFn(dt.width,(float*)lhs, (float)0.0); break;
         case IDXL_DOUBLE : assignFn(dt.width,(double*)lhs, 0.0); break;
-        default: IDXL_Abort(callingRoutine,"Invalid IDXL data type %d",dt.type);
+	    case IDXL_LONG_DOUBLE : assignFn(dt.width,(long double*)lhs, 0.0L); break;
+	    default: IDXL_Abort(callingRoutine,"Invalid IDXL data type %d",dt.type);
       }
       break;
     case IDXL_PROD:
@@ -118,6 +124,7 @@ void reduction_initialize(const IDXL_Layout& dt, void *lhs, int op,const char *c
         case IDXL_INT : assignFn(dt.width,(int*)lhs, 1); break;
         case IDXL_REAL : assignFn(dt.width,(float*)lhs, (float)1.0); break;
         case IDXL_DOUBLE : assignFn(dt.width,(double*)lhs, 1.0); break;
+        case IDXL_LONG_DOUBLE : assignFn(dt.width,(long double*)lhs, 1.0L); break;
       }
       break;
     case IDXL_MAX:
@@ -126,6 +133,7 @@ void reduction_initialize(const IDXL_Layout& dt, void *lhs, int op,const char *c
         case IDXL_INT : assignFn(dt.width,(int*)lhs, INT_MIN); break;
         case IDXL_REAL : assignFn(dt.width,(float*)lhs, (float)FLT_MIN); break;
         case IDXL_DOUBLE : assignFn(dt.width,(double*)lhs, DBL_MIN); break;
+        case IDXL_LONG_DOUBLE : assignFn(dt.width,(long double*)lhs, LDBL_MIN); break;
       }
       break;
     case IDXL_MIN:
@@ -134,6 +142,7 @@ void reduction_initialize(const IDXL_Layout& dt, void *lhs, int op,const char *c
         case IDXL_INT : assignFn(dt.width,(int*)lhs, INT_MAX); break;
         case IDXL_REAL : assignFn(dt.width,(float*)lhs, FLT_MAX); break;
         case IDXL_DOUBLE : assignFn(dt.width,(double*)lhs, DBL_MAX); break;
+        case IDXL_LONG_DOUBLE : assignFn(dt.width,(long double*)lhs, LDBL_MAX); break;
       }
       break;
     default: IDXL_Abort(callingRoutine,"Expected an IDXL reduction type, but got %d",op);
@@ -148,7 +157,8 @@ void reduction_initialize(const IDXL_Layout& dt, void *lhs, int op,const char *c
         case IDXL_INT : return (reduction_combine_fn)(intCombineFn)fn;\
         case IDXL_REAL : return (reduction_combine_fn)(floatCombineFn)fn;\
         case IDXL_DOUBLE : return (reduction_combine_fn)(doubleCombineFn)fn;\
-      }
+        case IDXL_LONG_DOUBLE : return (reduction_combine_fn)(longDoubleCombineFn)fn;\
+	  }
 
 reduction_combine_fn reduction_combine(const IDXL_Layout& dt, int op,const char *callingRoutine)
 {
@@ -171,6 +181,7 @@ reduction_combine_fn reduction_combine(const IDXL_Layout& dt, int op,const char 
         case IDXL_INT : fn args(int); break; \
         case IDXL_REAL : fn args(float); break; \
         case IDXL_DOUBLE : fn args(double); break; \
+        case IDXL_LONG_DOUBLE : fn args(long double); break; \
       }
 
 // Even more bizarre macro: pass typecast arguments for typical scatter/gather 

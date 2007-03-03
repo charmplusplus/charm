@@ -80,7 +80,7 @@ int IDXL_Get_source(IDXL_t l,int localNo);
 #define IDXL_DOUBLE (IDXL_FIRST_DATATYPE+3)
 #define IDXL_INDEX_0 (IDXL_FIRST_DATATYPE+4) /*zero-based integer (c-style indexing) */
 #define IDXL_INDEX_1 (IDXL_FIRST_DATATYPE+5) /*one-based integer (Fortran-style indexing) */
-
+#define IDXL_LONG_DOUBLE (IDXL_FIRST_DATATYPE+6)
 
 /** An IDXL_Layout_t describes the in-memory layout of a user data array */
 typedef int IDXL_Layout_t;
