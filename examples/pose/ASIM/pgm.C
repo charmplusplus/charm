@@ -6,12 +6,12 @@
 #include "Worker_sim.h"
 
 main::main(CkArgMsg *m)
-{ 
+{
   CkGetChareID(&mainhandle);
   //  CProxy_main M(mainhandle);
 
-  int numObjs=-1, numMsgs=-1, msgSize=-1, distribution=-1, connectivity=-1, 
-    locality=-1, grainSize=-1, elapsePattern=-1, offsetPattern=-1, 
+  int numObjs=-1, numMsgs=-1, msgSize=-1, distribution=-1, connectivity=-1,
+    locality=-1, grainSize=-1, elapsePattern=-1, offsetPattern=-1,
     sendPattern=-1, pattern=-1, i;
   double granularity=-1.0;
   char grainString[20];
@@ -51,7 +51,7 @@ main::main(CkArgMsg *m)
     connectivity = HEAVY;
   else if (strcmp(m->argv[5], "FULL") == 0)
     connectivity = FULL;
-  else { 
+  else {
     CkPrintf("Invalid connectivity type: %s\n", m->argv[5]);
     CkExit();
   }
@@ -83,9 +83,17 @@ main::main(CkArgMsg *m)
 	   elapsePattern, offsetPattern, sendPattern);
 
 #if USE_LONG_TIMESTAMPS
-  POSE_init(atoll(m->argv[7]));
+  long long endtime = atoll(m->argv[7]);
+  if(endtime == -1)
+    POSE_init();
+  else
+    POSE_init(endtime);
 #else
-  POSE_init(atoi(m->argv[7]));
+  int endtime = atoll(m->argv[7]);
+  if(endtime == -1)
+    POSE_init();
+  else
+    POSE_init(endtime);
 #endif
 
   // create all the workers
@@ -109,13 +117,13 @@ main::main(CkArgMsg *m)
     wd->sendPattern = sendPattern;
 
     wd->granularity = granularity;
-    
+
     // compute elapseTimes, numSends, offsets, neighbors, numNbrs
-    if (connectivity == SPARSE) wd->numNbrs = 4; 
+    if (connectivity == SPARSE) wd->numNbrs = 4;
     else if (connectivity == HEAVY) wd->numNbrs = 25;
     else if (connectivity == FULL) wd->numNbrs = 100;
-    
-    if (elapsePattern == 1) 
+
+    if (elapsePattern == 1)
       for (j=0; j<5; j++) wd->elapseTimes[j] = (lrand48() % 2);
     else if (elapsePattern == 2)
       for (j=0; j<5; j++) wd->elapseTimes[j] = (lrand48() % 48) + 3;
@@ -125,8 +133,8 @@ main::main(CkArgMsg *m)
       for (j=0; j<5; j++) wd->elapseTimes[j] = (lrand48() % 400) + 101;
     else if (elapsePattern == 5)
       for (j=0; j<5; j++) wd->elapseTimes[j] = (lrand48() % 500) + 501;
-    
-    if (offsetPattern == 1) 
+
+    if (offsetPattern == 1)
       for (j=0; j<5; j++) wd->offsets[j] = (lrand48() % 2);
     else if (offsetPattern == 2)
       for (j=0; j<5; j++) wd->offsets[j] = (lrand48() % 48) + 3;
@@ -137,7 +145,7 @@ main::main(CkArgMsg *m)
     else if (offsetPattern == 5)
       for (j=0; j<5; j++) wd->offsets[j] = (lrand48() % 500) + 501;
 
-    if (sendPattern == 1) 
+    if (sendPattern == 1)
       for (j=0; j<5; j++) wd->numSends[j] = (lrand48()%numMsgs)/4;
     else if (sendPattern == 2)
       for (j=0; j<5; j++) wd->numSends[j] = (lrand48()%numMsgs)/3;
@@ -146,7 +154,7 @@ main::main(CkArgMsg *m)
     else if (sendPattern == 4)
       for (j=0; j<5; j++) wd->numSends[j] = (lrand48()%numMsgs);
 
-    for (j=0; j<wd->numNbrs; j++) 
+    for (j=0; j<wd->numNbrs; j++)
       wd->neighbors[j] = getAnbr(numObjs, locality, dest);
 
     wd->Timestamp(0);
