@@ -1188,7 +1188,6 @@ void FEM_Entity::setLength(int newlen, bool f)
             length = newlen;
             // Each of our attributes need to be expanded for our new length:
             for (int a=0; a<attributes.size(); a++) {
-                CkAssert(attributes[a]->getWidth() < 1000);
                 attributes[a]->reallocate();
             }
         }
@@ -1333,8 +1332,10 @@ int FEM_Entity::is_valid(int idx){
 }
 
 int FEM_Entity::is_valid_any_idx(int idx){
-  if(idx >= size() || idx < 0)
+  if(idx == -1 || idx >= size())
 	return false;
+  else if(idx < 0)
+	return ghost->is_valid_any_idx(FEM_To_ghost_index(idx));
   else 
     return valid->getChar()(idx,0);
 }
