@@ -29,7 +29,7 @@ part contains information about the program, included external files, defines,
 and declaration of parallel constructs used in the code. The orchestration
 section is made up of statements that forms a global control flow of the
 parallel program. In the orchestration code, Charisma employs a macro dataflow
-approach; the statments produce and consume values, from which the control flows
+approach; the statements produce and consume values, from which the control flows
 can be organized, and messages and method invocations generated. 
 
 \subsubsection{Header Section}
@@ -56,7 +56,7 @@ generated C++ code file ``jacobi.C''.
     include particles;
 \end{alltt}
 
-It is useful when there are source code that must be preceed the generated
+It is useful when there are source code that must precede the generated
 parallel code, such as basic data structure declaration. 
 
 After the {\tt include} section is the {\tt define} section, where environmental
@@ -131,9 +131,9 @@ performed. The following code segment invokes the entry method \code{compute} on
 all the elements of array \code{myWorkers}. 
 
 \begin{SaveVerbatim}{foodecl}
-    foreach i in workers
-        workers[i].compute();
-    end-foreach
+  foreach i in workers
+    workers[i].compute();
+  end-foreach
 \end{SaveVerbatim}
 \vspace{0.1in}
 \smallfbox{\BUseVerbatim{foodecl}}
@@ -147,10 +147,12 @@ exemplifies the input and output of this object methods
 \code{workers.produceBorders} and \code{workers.compute}. 
 
 \begin{SaveVerbatim}{foodecl}
+  foreach i in workers
     <lb[i], rb[i]> := workers[i].produceBorders();
     workers[i].compute(lb[i+1], rb[i-1]);
     
     <+error> := workers[i].reduceData();
+  end-foreach
 \end{SaveVerbatim}
 \vspace{0.1in}
 \smallfbox{\BUseVerbatim{foodecl}}
@@ -186,12 +188,30 @@ different number of steps or statements, and their execution should be
 independent of one another so that their progress can interleave with arbitrary
 order and always return correct results. 
 
-This example shows an \code{overlap} statement in a \code{for} loop. The two
-blocks in curly brackets are executed in parallel. Their execution join back to
-one at the end mark of \code{end-overlap}, and the iteration is repeated in a
-for loop. 
+\begin{SaveVerbatim}{foodecl}
+  overlap
+  {
+    foreach i in workers1
+      <lb[i], rb[i]> := workers1[i].produceBorders();
+    end-foreach
+    foreach i in workers1
+      workers1[i].compute(lb[i+1], rb[i-1]);
+    end-foreach
+  }
+  {
+    foreach i in workers2
+      <lb[i], rb[i]> := workers2[i].compute(lb[i+1], rb[i-1]);
+    end-foreach
+  }
+  end-overlap
+\end{SaveVerbatim}
+\vspace{0.1in}
+\smallfbox{\BUseVerbatim{foodecl}}
+\vspace{0.1in}
 
-
+This example shows an \code{overlap} statement where two blocks in curly
+brackets are executed in parallel. Their execution join back to one at the end
+mark of \code{end-overlap}. 
 
 $\bullet$ {\bf Loop Statement}
 
@@ -249,15 +269,98 @@ from a previous loop iteration, and the published values are visible only to
 following \code{foreach} statements or \code{foreach} statements in following
 loop iterations. 
 
+$\bullet$ {\bf Scatter and Gather Operation}
+
+A collection of values produced by one object may be split and consumed by
+multiple object array elements for a scatter operation. Conversely, a collection
+of values from different objects can be gathered to be consumed by one object.
+
+\begin{SaveVerbatim}{foodecl}
+  foreach i in A
+    <points[i,*]> := A[i].f(...);
+  end-foreach
+  foreach k,j in B
+    <...> := B[k,j].g(points[k,j]);
+  end-foreach
+\end{SaveVerbatim}
+\vspace{0.1in}
+\smallfbox{\BUseVerbatim{foodecl}}
+\vspace{0.1in}
+
+A wildcard dimension ``*'' in \code{A[i].f()}'s output \code{points} specifies
+that it will publish multiple data items. At the consuming side, each
+\code{B[k,j]} consumes only one point in the data, and therefore a scatter
+communication will be generated from \code{A} to \code{B}. For instance,
+\code{A[1]} will publish data \code{points[1,0..N-1]} to be consumed by multiple
+array objects \code{B[1,0..N-1]}.  
+
+\begin{SaveVerbatim}{foodecl}
+  foreach i,j in A
+    <points[i,j]> := A[i,j].f(...);
+  end-foreach
+  foreach k in B
+    <...> := B[k].g(points[*,k]);
+  end-foreach
+\end{SaveVerbatim}
+\vspace{0.1in}
+\smallfbox{\BUseVerbatim{foodecl}}
+\vspace{0.1in}
+
+Similar to the scatter example, if a wildcard dimension ``*'' is in the
+consumed parameter and the corresponding published parameter does not have a
+wildcard dimension, there is a gather operation generated from the publishing
+statement to the consuming statement. In the following code segment, each 
+\code{A[i,j]} publishes a data point, then data points from \code{A[0..N-1,j]} are
+combined together to for the data to be consumed by \code{B[j]}.  
+
+Many communication patterns can be expressed with combination of orchestration
+statements. For more details, please refer to PPL technical report 06-18,
+``Charisma: Orchestrating Migratable Parallel Objects''.
 
 \subsection{Sequential Code}
 \label{sec:sequential}
 
+The programmer supplies the sequential code for each class as necessary. The
+files should be named in the form of class name with appropriate file extension.
+The header file is not really an ANSI C header file. Instead, it is the
+sequential portion of the class's declaration. Charisma will generate the class 
+declaration from the orchestration code, and incorporate the sequential portion
+in the final header file. Please refer to the example in the Appendix.
 
-\section{Charisma Library Module}
+The C/C++ source code is nothing different than ordinary sequential source code,
+except for the producing/consuming part. For consumed parameters, a function
+treat them just like normal parameters passed in. For produced parameters, the
+sequential code uses the keyword \code{produce} to connect the orchestration
+parameter and the local variables whose value will be sent out. The format is as
+follows.
+
+\begin{alltt}
+    produce(produced\_parameter, local\_variable[, size\_of\_array]);
+\end{alltt}
+
+When the parameter represents a data array, we need the additional
+\code{size\_of\_array} to specify the size of the data array. 
+
+Special cases of the produced/consumed parameters involve scatter/gather
+operations. In scatter operation, since an additional dimension is implied in
+the produced parameter, we the \code{local\_variable} should have additional
+dimension equal to the dimension over which the scatter is performed. Similarly,
+the input parameter in gather operation will have an additional dimension the
+same size of the dimension of the gather operation.
+
+\section{Support for Library Module}
 \label{sec:module}
 
+Charisma is capable of producing library code for reuse with a Charisma program
+or a Charm++ program. When the first keyword in the orchestration is
+\code{module} instead of \code{program}, Charisma library code will be
+generated. This means the code will not compile into a stand-alone program.
+
+Charisma's support for library module is currently under development. More
+details will be reported in this manual when available.
+
 \appendix
+\label{sec:appendix}
 
 \section{Example: Jacobi 1D}
 Following is the content of the orchestration file jacobi.or. 
@@ -286,10 +389,8 @@ end
 
 The class {\tt JacobiMain} does not need any sequential code, so the only
 sequential code are in JacobiWorker.h and JacobiWorker.C. Note that
-JacobiWorker.h is not really an ANSI C header file. Instead, it is the
-sequential portion of the class's declaration. Charisma will generate the class
-declaration from the orchestration code, and incorporate the sequential portion
-in the final header file. 
+JacobiWorker.h contains only the sequential portion of JacobiWorker's
+declaration. 
 
 \begin{SaveVerbatim}{foodecl}
 #define N 512
@@ -341,6 +442,5 @@ flow of control, and then it looks for sequential code files for the classes
 declared, namely {\tt JacobiMain} and {\tt JacobiWorker}, and integrates them
 into the final output: {\tt jacobi.h}, {\tt jacobi.C} and {\tt jacobi.ci}, which
 is a Charm++ program and can be built the way a Charm++ program is built.
-
 
 \end{document}
