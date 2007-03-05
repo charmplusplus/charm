@@ -60,17 +60,26 @@ Sample usage:
 /** A tops model is roughly equivalent to a ParFUM FEM_Mesh object */
 typedef struct{
     FEM_Mesh *mesh;
+    void *mAtt;
 
     unsigned node_attr_size;
     unsigned elem_attr_size;
     unsigned model_attr_size;
 
+    /** number of local elements */
+    unsigned num_local_elem;
+    /** number of local nodes */
+    unsigned num_local_node;
+
 #ifdef CUDA
     unsigned char *mAttDevice; /** Device pointers to the goods */
     unsigned char *ElemDataDevice;
     unsigned char *NodeDataDevice;
+    int * ElemConnDevice;
     TopModel* modelD;
 #endif
+
+
 
 } TopModel;
 
@@ -102,6 +111,9 @@ enum {
   TOP_ELEMENT_MAX
 };
 
+/** used as iterators on CUDA system. See usage!*/
+typedef bool TopNodeItr_D;
+typedef bool TopElemItr_D;
 
 /** Node Iterator */
 class TopNodeItr{
@@ -118,6 +130,7 @@ public:
   int parfum_index;
     TopModel *model;
 };
+
 
 /** an opaque id for top entities */
 typedef int TopID;
