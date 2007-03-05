@@ -61,10 +61,15 @@ Sample usage:
 typedef struct{
     FEM_Mesh *mesh;
 
+    unsigned node_attr_size;
+    unsigned elem_attr_size;
+    unsigned model_attr_size;
+
 #ifdef CUDA
     unsigned char *mAttDevice; /** Device pointers to the goods */
     unsigned char *ElemDataDevice;
     unsigned char *NodeDataDevice;
+    TopModel* modelD;
 #endif
 
 } TopModel;
