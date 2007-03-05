@@ -1,7 +1,7 @@
 /**
    @file
    @brief A ParFUM "Tops" compatibility layer API Definition
-   
+
    @author Isaac Dooley
 
    ParFUM-TOPS provides a Tops-like API for ParFUM.
@@ -58,7 +58,17 @@ Sample usage:
 
 
 /** A tops model is roughly equivalent to a ParFUM FEM_Mesh object */
-typedef FEM_Mesh TopModel;
+typedef struct{
+    FEM_Mesh *mesh;
+
+#ifdef CUDA
+    unsigned char *mAttDevice; /** Device pointers to the goods */
+    unsigned char *ElemDataDevice;
+    unsigned char *NodeDataDevice;
+#endif
+
+} TopModel;
+
 
 /** Tops uses some bit patterns for these, but we just use TopNode as a signed value to represent the corresponding ParFUM node. A non-negative value is a local node, while a negative value is a ghost. */
 typedef long TopNode;
@@ -91,7 +101,7 @@ enum {
 /** Node Iterator */
 class TopNodeItr{
 public:
-  /** The signed index used to refer to a ParFUM Element. Non-negatives are ghosts*/ 
+  /** The signed index used to refer to a ParFUM Element. Non-negatives are ghosts*/
   int parfum_index;
   /** The associated model */
   TopModel *model;
@@ -111,14 +121,14 @@ typedef int TopID;
 typedef int TopElemType;
 
 
-/** 
-Create and access a Tops model. Only call from Init 
+/**
+Create and access a Tops model. Only call from Init
 Currently only one model can be created. To extend, each model must just reference a different FEM_Mesh object
 */
 TopModel* topModel_Create_Init(int elem_attr_sz, int node_attr_sz);
 
 /** Create and access a Tops model. Only call from Driver */
-TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz);
+TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_attr_sz, void* mAtt);
 
 /** Cleanup a model. Currently does nothing */
 void topModel_Destroy(TopModel* m);
@@ -203,6 +213,13 @@ TopElement topElemItr_GetCurr(TopElemItr*);
 
 /** Perform sanity check on iterators. This checks to make sure that the count of the itereated elements and nodes matches that returned by ParFUM's countValid() */
 void topModel_TestIterators(TopModel*m);
+
+
+#if CUDA
+void* topElement_D_GetAttrib(TopModel* m, TopElement e);
+void* topNode_D_GetAttrib(TopModel* m, TopNode n);
+TopNode topElement_D_GetNode(TopModel* m,TopElement e,int idx);
+#endif
 
 
 #endif
