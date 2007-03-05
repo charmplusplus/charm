@@ -341,12 +341,36 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int 
 
 
 void midpoint(double *n1, double *n2, int dim, double *result) {
+	for(int i=0;i<dim;i++){
+		result[i] = (n1[i]+n2[i])/2.0;
+	}
 }
 
 int getRelNode(int nodeIdx, int *conn, int nodesPerElem) {
-  return 0;
+	for(int i=0;i<nodesPerElem;i++){
+		if(conn[i] == nodeIdx){
+			return i;
+		}
+	}
+	CkAbort("Could not find node in given connectivity");
 }
 
-int getEdgeID(int node1, int node2, int nodePerElem, int dim) {
+int getEdgeID(int node1, int node2, int nodesPerElem, int dim) {
+	switch(dim){
+		case 2:
+		switch(nodesPerElem){
+			case 3:
+				{
+					static int edgeFromNode[3][3]={-1,0,2,0,-1,1,2,1,-1};
+					return edgeFromNode[node1][node2];
+				}
+				break;
+			default:
+				CkAbort("This shape is not yet implemented");
+		};
+		break;
+		default:
+		 CkAbort("This dimension not yet implemented");
+	};
   return 0;
 }
