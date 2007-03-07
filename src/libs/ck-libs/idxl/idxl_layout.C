@@ -105,44 +105,45 @@ inline void assignFn(int len,T *dest,T val) {
 }
 
 
+
 void reduction_initialize(const IDXL_Layout& dt, void *lhs, int op,const char *callingRoutine)
 {
   switch(op) {
     case IDXL_SUM:
       switch(dt.type) {
-        case IDXL_BYTE : assignFn(dt.width,(byte*)lhs, (byte)0); break;
-        case IDXL_INT : assignFn(dt.width,(int*)lhs, 0); break;
-        case IDXL_REAL : assignFn(dt.width,(float*)lhs, (float)0.0); break;
-        case IDXL_DOUBLE : assignFn(dt.width,(double*)lhs, 0.0); break;
-	    case IDXL_LONG_DOUBLE : assignFn(dt.width,(long double*)lhs, 0.0L); break;
-	    default: IDXL_Abort(callingRoutine,"Invalid IDXL data type %d",dt.type);
+        case IDXL_BYTE : assignFn<unsigned char>(dt.width,(byte*)lhs, (byte)0); break;
+        case IDXL_INT : assignFn<int>(dt.width,(int*)lhs, 0); break;
+        case IDXL_REAL : assignFn<float>(dt.width,(float*)lhs, (float)0.0); break;
+        case IDXL_DOUBLE : assignFn<double>(dt.width,(double*)lhs, 0.0); break;
+        case IDXL_LONG_DOUBLE : assignFn<long double>(dt.width,(long double*)lhs, 0.0L); break;
+        default: IDXL_Abort(callingRoutine,"Invalid IDXL data type %d",dt.type);
       }
       break;
     case IDXL_PROD:
       switch(dt.type) {
-        case IDXL_BYTE : assignFn(dt.width,(byte*)lhs, (byte)1); break;
-        case IDXL_INT : assignFn(dt.width,(int*)lhs, 1); break;
-        case IDXL_REAL : assignFn(dt.width,(float*)lhs, (float)1.0); break;
-        case IDXL_DOUBLE : assignFn(dt.width,(double*)lhs, 1.0); break;
-        case IDXL_LONG_DOUBLE : assignFn(dt.width,(long double*)lhs, 1.0L); break;
+        case IDXL_BYTE : assignFn<unsigned char>(dt.width,(byte*)lhs, (byte)1); break;
+        case IDXL_INT : assignFn<int>(dt.width,(int*)lhs, 1); break;
+        case IDXL_REAL : assignFn<float>(dt.width,(float*)lhs, (float)1.0); break;
+        case IDXL_DOUBLE : assignFn<double>(dt.width,(double*)lhs, 1.0); break;
+        case IDXL_LONG_DOUBLE : assignFn<long double>(dt.width,(long double*)lhs, 1.0L); break;
       }
       break;
     case IDXL_MAX:
       switch(dt.type) {
-        case IDXL_BYTE : assignFn(dt.width,(byte*)lhs, (byte)CHAR_MIN); break;
-        case IDXL_INT : assignFn(dt.width,(int*)lhs, INT_MIN); break;
-        case IDXL_REAL : assignFn(dt.width,(float*)lhs, (float)FLT_MIN); break;
-        case IDXL_DOUBLE : assignFn(dt.width,(double*)lhs, DBL_MIN); break;
-        case IDXL_LONG_DOUBLE : assignFn(dt.width,(long double*)lhs, LDBL_MIN); break;
+        case IDXL_BYTE : assignFn<unsigned char>(dt.width,(byte*)lhs, (byte)CHAR_MIN); break;
+        case IDXL_INT : assignFn<int>(dt.width,(int*)lhs, INT_MIN); break;
+        case IDXL_REAL : assignFn<float>(dt.width,(float*)lhs, (float)FLT_MIN); break;
+        case IDXL_DOUBLE : assignFn<double>(dt.width,(double*)lhs, DBL_MIN); break;
+        case IDXL_LONG_DOUBLE : assignFn<long double>(dt.width,(long double*)lhs, LDBL_MIN); break;
       }
       break;
     case IDXL_MIN:
       switch(dt.type) {
-        case IDXL_BYTE : assignFn(dt.width,(byte*)lhs, (byte)CHAR_MAX); break;
-        case IDXL_INT : assignFn(dt.width,(int*)lhs, INT_MAX); break;
-        case IDXL_REAL : assignFn(dt.width,(float*)lhs, FLT_MAX); break;
-        case IDXL_DOUBLE : assignFn(dt.width,(double*)lhs, DBL_MAX); break;
-        case IDXL_LONG_DOUBLE : assignFn(dt.width,(long double*)lhs, LDBL_MAX); break;
+        case IDXL_BYTE : assignFn<unsigned char>(dt.width,(byte*)lhs, (byte)CHAR_MAX); break;
+        case IDXL_INT : assignFn<int>(dt.width,(int*)lhs, INT_MAX); break;
+        case IDXL_REAL : assignFn<float>(dt.width,(float*)lhs, FLT_MAX); break;
+        case IDXL_DOUBLE : assignFn<double>(dt.width,(double*)lhs, DBL_MAX); break;
+        case IDXL_LONG_DOUBLE : assignFn<long double>(dt.width,(long double*)lhs, LDBL_MAX); break;
       }
       break;
     default: IDXL_Abort(callingRoutine,"Expected an IDXL reduction type, but got %d",op);
