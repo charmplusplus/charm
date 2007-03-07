@@ -1207,7 +1207,7 @@ void FEM_Entity::setLength(int newlen, bool f)
             for (int a=0;a<attributes.size();a++){
                 int code = attributes[a]->getAttr();
                 if (!(code <= FEM_ATTRIB_TAG_MAX || 
-                            code == FEM_CONN || 
+                            code == FEM_CONN || code == FEM_COORD ||
 		      code == FEM_BOUNDARY)) { //user can store bpundary & connectivity also
                     attributes[a]->reallocate();
                 }
