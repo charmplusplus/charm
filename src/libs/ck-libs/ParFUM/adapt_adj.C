@@ -199,7 +199,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   }
 
   replyTable->sync();
-  dumpAdaptAdjacencies(adaptAdjacencies,numElems,numAdjElems,myRank);
+//  dumpAdaptAdjacencies(adaptAdjacencies,numElems,numAdjElems,myRank);
 
   mesh->becomeSetting();  
   //Register the adaptAdjacency with ParFUM

@@ -53,7 +53,7 @@ int BulkAdapt::edge_bisect(int elemID, int elemType, int edgeID, int dim)
 
 int BulkAdapt::edge_bisect_2D(int elemID, int elemType, int edgeID)
 {
-  CkPrintf("BulkAdapt::edge_bisect_2D not yet implemented.\n");
+  CkPrintf("BulkAdapt::edge_bisect_2D starts \n");
   // lock partitions for the two involved elements
   adaptAdj elemsToLock[2];
   adaptAdj startElem(partitionID, elemID, elemType);
