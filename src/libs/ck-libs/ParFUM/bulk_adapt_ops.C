@@ -74,10 +74,10 @@ int BulkAdapt::edge_bisect_2D(int elemID, int elemType, int edgeID)
 
   adaptAdj *startElemAdaptAdj;
   adaptAdj *splitElemAdaptAdj;
-  int node1idx, node2idx;
+  int node1idx, node2idx, newNodeID;
   adaptAdj splitElem;
 
-  one_side_split_2D(startElem, splitElem, edgeID, &node1idx, &node2idx, &startElemAdaptAdj, &splitElemAdaptAdj, true);
+  one_side_split_2D(startElem, splitElem, edgeID, &node1idx, &node2idx, &newNodeID, &startElemAdaptAdj, &splitElemAdaptAdj, true);
 
   if ((nbrElem.partID > -1) && (nbrElem.partID == partitionID)) { // if e2 exists and is local...
     // PRE: neighbor-side operations
@@ -93,7 +93,8 @@ int BulkAdapt::edge_bisect_2D(int elemID, int elemType, int edgeID)
     
     // nugget :)
     one_side_split_2D(nbrElem, nbrSplitElem, nbrEdgeID, &nbrNode1, &nbrNode2, 
-		      &nbrElemAdaptAdj, &nbrSplitElemAdaptAdj, false);
+		      &newNodeID, &nbrElemAdaptAdj, &nbrSplitElemAdaptAdj, 
+		      false);
 
     nbrSplitElemAdaptAdj[nbrEdgeID] = splitElem;
     // POST: start-side operations
@@ -235,7 +236,7 @@ int BulkAdapt::edge_collapse(int elemID, int edgeID)
 }
 
 void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int edgeID,
-				  int *node1idx, int *node2idx,
+				  int *node1idx, int *node2idx, int *newNodeID,
 				  adaptAdj **startElemAdaptAdj, adaptAdj **splitElemAdaptAdj,
 				  bool startSide)
 {
@@ -253,7 +254,15 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int 
   double bisectCoords[2];
   midpoint(node1coords, node2coords, 2, &bisectCoords[0]);
   // add node at bisectCoords to get bisectNode
-  int bisectNode = add_node(2, &bisectCoords[0]);
+  int bisectNode;
+  if (startSide) { // For local ops, startSide creates the node, nbr uses it
+    bisectNode = add_node(2, &bisectCoords[0]);
+    *newNodeID = bisectNode;
+  }
+  else { // local nbr just uses node created on startSide
+    // We'll need a special case if the neighbor is remote!
+    bisectNode = *newNodeID;
+  }
   // duplicate conn in conn2.  
   int splitConn[3];
   memcpy(&splitConn[0], startConn, 3*sizeof(int));
