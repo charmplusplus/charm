@@ -7,43 +7,7 @@
    ParFUM-TOPS provides a Tops-like API for ParFUM.
 
 \note \code
-Sample usage:
-
-  // Reads nodes (id, x, y, z)
-  for (i = 0; i < nn; i++)
-  {
-      double x, y, z;
-      TopNode node;
-      NodeAtt*  node_data;
-      if (fscanf(fp,"%d, %lf, %lf, %lf",&id, &x, &y, &z) != 4) {
-          fprintf(stderr,"Invalid format for nodes.\n");
-          exit(1);
-          }
-      // Adds node to the model
-      node = topModel_InsertNode (model, x, y, z);
-      topNode_SetId (model, node, id);
-      node_data = (NodeAtt*) malloc(sizeof(NodeAtt));
-      assert(node_data);
-      initNodeAtt(node_data);
-      node_data->material.E = material.E;
-      node_data->material.v = material.v;
-      node_data->material.p = material.p;
-      node_data->bc = 0;
-      topNode_SetAttrib (model, node, node_data);
-  }
-
-
-
-
-	 TopNodeItr* itr = topModel_CreateNodeItr(m);
-	  int node_count=0;
-	  for(topNodeItr_Begin(itr);topNodeItr_IsValid(itr);topNodeItr_Next(itr)){
-		node_count++;
-		TopNode node = topNodeItr_GetCurr(itr);
-		NodeAtt* na = topNode_GetAttrib(m,node);
-		print_node_attribute(myId, na);
-	  }
-	  printf("vp %d: node_count = %d\n", myId, node_count);
+put example here!
 \endcode
 
 @note ::NodeAtt and ::ElemAtt are just replaced with void* for this implementation.
@@ -55,6 +19,16 @@ Sample usage:
 
 #include <ParFUM.h>
 #include <ParFUM_internals.h>
+
+
+#ifdef FP_TYPE_FLOAT
+#warning "Using floats for various things"
+typedef float FP_TYPE;
+#else
+#warning "Using doubles for various things"
+typedef double FP_TYPE;
+#endif
+
 
 
 /** A tops model is roughly equivalent to a ParFUM FEM_Mesh object */
@@ -155,7 +129,7 @@ void topModel_Destroy(TopModel* m);
 void topModel_Sync(TopModel*m);
 
 /** Insert a node */
-TopNode topModel_InsertNode(TopModel*, double x, double y, double z);
+TopNode topModel_InsertNode(TopModel*, FP_TYPE x, FP_TYPE y, FP_TYPE z);
 
 /** Set id of a node */
 void topNode_SetId(TopModel*, TopNode, TopID id);
@@ -190,7 +164,8 @@ int topModel_GetNNodes(TopModel *model);
 
 int topElement_GetNNodes(TopModel* model, TopElement elem);
 
-void topNode_GetPosition(TopModel*model, TopNode node,double*x,double*y,double*z);
+void topNode_GetPosition(TopModel*model, TopNode node,FP_TYPE*x,FP_TYPE*y,FP_TYPE*z);
+
 
 /** Create Iterator for nodes */
 TopNodeItr*  topModel_CreateNodeItr(TopModel*);
@@ -239,5 +214,7 @@ void* topNode_D_GetAttrib(TopModel* m, TopNode n);
 TopNode topElement_D_GetNode(TopModel* m,TopElement e,int idx);
 #endif
 
+void top_retreive_elem_data(TopModel* m);
+void top_retreive_node_data(TopModel* m);
 
 #endif

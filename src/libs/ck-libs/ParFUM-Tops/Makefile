@@ -1,15 +1,16 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
+CUDAC=$(CHARMC)
 
 #Headers to be copied to include directory so application users can see them
-HEADERS= ParFUM_TOPS.h  $(INTERNALHEADERS)
+HEADERS= ParFUM_TOPS.h ParFUM_TOPS_CUDA.h $(INTERNALHEADERS)
 
 #Headers generated from .ci files
 GENHEADERS= ParFUM_TOPS.def.h ParFUM_TOPS.decl.h 
 
 HEADDEP= $(GENHEADERS) $(HEADERS) $(INTERNALHEADERS)
 
-OBJS=ParFUM_TOPS.o ParFUM_TOPS_Iterators.o
+OBJS=ParFUM_TOPS.o ParFUM_TOPS_Iterators.o ParFUM_TOPS_CUDA.o
 
 LIB=libmoduleParFUM_TOPS
 
@@ -39,8 +40,11 @@ headers: $(HEADDEP)
 ParFUM_TOPS.o: ParFUM_TOPS.C $(HEADDEP) ParFUM_TOPS.h
 	$(CHARMC) -c ParFUM_TOPS.C $(INCS)
 
-ParFUM_TOPS_Iterators.o: ParFUM_TOPS_Iterators.C $(HEADDEP) ParFUM_TOPS.h
+ParFUM_TOPS_Iterators.o: ParFUM_TOPS_Iterators.C $(HEADDEP)
 	$(CHARMC) -c ParFUM_TOPS_Iterators.C $(INCS)
+
+ParFUM_TOPS_CUDA.o: ParFUM_TOPS_CUDA.C $(HEADDEP)
+	$(CUDAC) -c ParFUM_TOPS_CUDA.C $(INCS)
 
 
 # clean up

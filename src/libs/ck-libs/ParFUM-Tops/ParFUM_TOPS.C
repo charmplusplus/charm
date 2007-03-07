@@ -32,6 +32,13 @@ TopModel* topModel_Create_Init(int elem_attr_sz, int node_attr_sz){
 
   char* temp_array = new char[16]; // just some junk array to use below
 
+  // Allocate node coords
+#ifdef FP_TYPE_FLOAT
+  FEM_Mesh_data(which_mesh,FEM_NODE,FEM_COORD,temp_array, 0, 0, FEM_FLOAT, 3);
+#else
+  FEM_Mesh_data(which_mesh,FEM_NODE,FEM_COORD,temp_array, 0, 0, FEM_DOUBLE, 3);
+#endif
+
   // Allocate element connectivity
   FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_CONN,temp_array, 0, 0, FEM_INDEX_0, 4);
   // Allocate element attributes
@@ -39,8 +46,8 @@ TopModel* topModel_Create_Init(int elem_attr_sz, int node_attr_sz){
   // Allocate element Id array
   FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+1,temp_array, 0, 0, FEM_INT, 1);
 
-  // Allocate node coords
-  FEM_Mesh_data(which_mesh,FEM_NODE,FEM_COORD,temp_array, 0, 0, FEM_DOUBLE, 3);
+
+
   // Allocate node attributes
   FEM_Mesh_data(which_mesh,FEM_NODE+0,FEM_DATA+0,temp_array, 0, 0, FEM_BYTE, model->node_attr_size);
   // Allocate node Id array
@@ -126,6 +133,32 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
     return model;
 }
 
+/** Copy node attribute array from CUDA device back to the ParFUM attribute */
+void top_retreive_node_data(TopModel* m){
+#if CUDA
+    FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->node.lookup(FEM_DATA+0,"top_retreive_node_data");
+    AllocTable2d<unsigned char> &dataTable  = at->getChar();
+    unsigned char *NodeData = dataTable.getData();
+    int size = at->size();
+
+    cudaMemcpy(NodeData,m->NodeDataDevice,size,cudaMemcpyDeviceToHost);
+#endif
+}
+
+
+/** Copy element attribute array from CUDA device back to the ParFUM attribute */
+void top_retreive_elem_data(TopModel* m){
+#if CUDA
+    FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->elem[0].lookup(FEM_DATA+0,"top_retreive_elem_data");
+    AllocTable2d<unsigned char> &dataTable  = at->getChar();
+    unsigned char *ElemData = dataTable.getData();
+    int size = at->size();
+
+    cudaMemcpy(ElemData,m->ElemDataDevice,size,cudaMemcpyDeviceToHost);
+#endif
+}
+
+
 
 /** Cleanup a model */
 void topModel_Destroy(TopModel* m){
@@ -138,7 +171,7 @@ void topModel_Destroy(TopModel* m){
 }
 
 
-TopNode topModel_InsertNode(TopModel* m, double x, double y, double z){
+TopNode topModel_InsertNode(TopModel* m, FP_TYPE x, FP_TYPE y, FP_TYPE z){
   int newNode = FEM_add_node_local(m->mesh,false,false,false);
   m->mesh->node.set_coord(newNode,x,y,z);
   return newNode;
@@ -293,18 +326,26 @@ int topElement_GetNNodes(TopModel* model, TopElement elem){
 }
 
 /** @todo make sure we are in a getting mesh */
-void topNode_GetPosition(TopModel*model, TopNode node,double*x,double*y,double*z){
+void topNode_GetPosition(TopModel*model, TopNode node,FP_TYPE*x,FP_TYPE*y,FP_TYPE*z){
   CkAssert(node>=0);
-  double coord[3]={7.01,7.01,7.01};
 
   // lookup node via global ID
   FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->node.lookup(FEM_COORD,"topModel_GetNodeAtId");
+
+#ifdef FP_TYPE_FLOAT
+  CkAssert(at->getFloat().width()==3);
+  CkAssert(node<at->getFloat().size());
+  *x = at->getFloat()(node,0);
+  *y = at->getFloat()(node,1);
+  *z = at->getFloat()(node,2);
+#else
   CkAssert(at->getDouble().width()==3);
-  //  CkPrintf("node=%d, size=%d\n",node,at->getDouble().size() );
   CkAssert(node<at->getDouble().size());
   *x = at->getDouble()(node,0);
   *y = at->getDouble()(node,1);
   *z = at->getDouble()(node,2);
+#endif
+
 }
 
 void topModel_Sync(TopModel*m){
