@@ -10,14 +10,28 @@
 
    @note FEM_DATA+0 holds the elemAttr or nodeAtt data
    @note FEM_DATA+1 holds the id
+   @note FEM_DATA+2 holds nodal coordinates
    @note FEM_CONN holds the element connectivity
-   @note FEM_COORD holds the nodal coordinates
 
 */
 
 #include "ParFUM_TOPS.h"
 #include "ParFUM.decl.h"
 #include "ParFUM_internals.h"
+
+void setTableReferences(TopModel* model){
+  model->ElemConn_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_CONN,""))->getInt();
+  model->node_id_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+1,""))->getInt();
+  model->elem_id_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+1,""))->getInt();
+  model->ElemData_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+0,""))->getChar();
+  model->NodeData_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+0,""))->getChar();
+#ifdef FP_TYPE_FLOAT
+  model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+2,""))->getFloat();
+#else
+  model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+2,""))->getDouble();
+#endif
+}
+
 
 TopModel* topModel_Create_Init(int elem_attr_sz, int node_attr_sz){
   CkAssert(elem_attr_sz > 0);
@@ -30,41 +44,42 @@ TopModel* topModel_Create_Init(int elem_attr_sz, int node_attr_sz){
   int which_mesh=FEM_Mesh_default_write();
   model->mesh = FEM_Mesh_lookup(which_mesh,"TopModel::TopModel()");
 
-  char* temp_array = new char[16]; // just some junk array to use below
+
+/** @note   Here we allocate the arrays with a single
+            initial node and element, which are set as
+            invalid. If no initial elements were provided.
+            the AllocTable2d's would not ever get allocated,
+            and insertNode or insertElement would fail.
+ */
+  char temp_array[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
   // Allocate node coords
 #ifdef FP_TYPE_FLOAT
-  FEM_Mesh_data(which_mesh,FEM_NODE,FEM_COORD,temp_array, 0, 0, FEM_FLOAT, 3);
+  FEM_Mesh_data(which_mesh,FEM_NODE,FEM_DATA+2,temp_array, 0, 1, FEM_FLOAT, 3);
 #else
-  FEM_Mesh_data(which_mesh,FEM_NODE,FEM_COORD,temp_array, 0, 0, FEM_DOUBLE, 3);
+  FEM_Mesh_data(which_mesh,FEM_NODE,FEM_DATA+2,temp_array, 0, 1, FEM_DOUBLE, 3);
 #endif
 
   // Allocate element connectivity
-  FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_CONN,temp_array, 0, 0, FEM_INDEX_0, 4);
+  FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_CONN,temp_array, 0, 1, FEM_INDEX_0, 4);
   // Allocate element attributes
-  FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+0,temp_array, 0, 0, FEM_BYTE, model->elem_attr_size);
+  FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+0,temp_array, 0, 1, FEM_BYTE, model->elem_attr_size);
   // Allocate element Id array
-  FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+1,temp_array, 0, 0, FEM_INT, 1);
-
+  FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+1,temp_array, 0, 1, FEM_INT, 1);
 
 
   // Allocate node attributes
-  FEM_Mesh_data(which_mesh,FEM_NODE+0,FEM_DATA+0,temp_array, 0, 0, FEM_BYTE, model->node_attr_size);
+  FEM_Mesh_data(which_mesh,FEM_NODE+0,FEM_DATA+0,temp_array, 0, 1, FEM_BYTE, model->node_attr_size);
   // Allocate node Id array
-  FEM_Mesh_data(which_mesh,FEM_NODE+0,FEM_DATA+1,temp_array, 0, 0, FEM_INT, 1);
-
-  delete[] temp_array;
-
-  // Don't Allocate the Global Number attribute for the elements and nodes
-  // It will be automatically created upon calls to void FEM_Entity::setGlobalno(int r,int g) {
+  FEM_Mesh_data(which_mesh,FEM_NODE+0,FEM_DATA+1,temp_array, 0, 1, FEM_INT, 1);
 
   FEM_Mesh_allocate_valid_attr(which_mesh, FEM_NODE);
   FEM_Mesh_allocate_valid_attr(which_mesh, FEM_ELEM+0);
 
-  // Setup ghost layers, assume Tet4
-  // const int tet4vertices[4] = {0,1,2,3};
-  //  FEM_Add_ghost_layer(1,1);
-  // FEM_Add_ghost_elem(0,4,tet4vertices);
+  FEM_set_entity_invalid(which_mesh, FEM_NODE, 0);
+  FEM_set_entity_invalid(which_mesh, FEM_ELEM+0, 0);
+
+  setTableReferences(model);
 
   return model;
 }
@@ -75,6 +90,8 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
     CkAssert(node_attr_sz > 0);
     int which_mesh=FEM_Mesh_default_read();
     TopModel *model = new TopModel;
+    memset(model, 0, sizeof(TopModel));
+
     model->elem_attr_size = elem_attr_sz;
     model->node_attr_size = node_attr_sz;
     model->model_attr_size = model_attr_sz;
@@ -82,6 +99,11 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
     model->mesh = FEM_Mesh_lookup(which_mesh,"TopModel::TopModel()");
 
     model->mAtt = mAtt;
+
+    model->num_local_elem = model->mesh->elem[0].size();
+    model->num_local_node = model->mesh->node.size();
+
+    setTableReferences(model);
 
 #if CUDA
     /** Copy element Attribute array to device global memory */
@@ -92,7 +114,6 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
         int size = at->size();
         cudaMalloc(size, (void**)&(model->ElemDataDevice));
         cudaMemcpy(ElemDataDevice,ElemData,size,cudaMemcpyHostToDevice);
-        model->num_local_elem = size / elem_attr_sz;
     }
 
     /** Copy node Attribute array to device global memory */
@@ -103,7 +124,6 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
         int size = at->size();
         cudaMalloc(size, (void**)&(model->NodeDataDevice));
         cudaMemcpy(NodeDataDevice,NodeData,size,cudaMemcpyHostToDevice);
-        model->num_local_node = size / node_attr_sz;
     }
 
     /** Copy elem connectivity array to device global memory */
@@ -127,7 +147,6 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
         cudaMalloc(sizeof(TopModel), (void**)&(model->modelD);
         cudaMemcpy(model->modelD,model,sizeof(TopModel),cudaMemcpyHostToDevice);
     }
-
 #endif
 
     return model;
@@ -136,12 +155,7 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
 /** Copy node attribute array from CUDA device back to the ParFUM attribute */
 void top_retreive_node_data(TopModel* m){
 #if CUDA
-    FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->node.lookup(FEM_DATA+0,"top_retreive_node_data");
-    AllocTable2d<unsigned char> &dataTable  = at->getChar();
-    unsigned char *NodeData = dataTable.getData();
-    int size = at->size();
-
-    cudaMemcpy(NodeData,m->NodeDataDevice,size,cudaMemcpyDeviceToHost);
+    cudaMemcpy(m->NodeData,m->NodeDataDevice,size,cudaMemcpyDeviceToHost);
 #endif
 }
 
@@ -149,12 +163,7 @@ void top_retreive_node_data(TopModel* m){
 /** Copy element attribute array from CUDA device back to the ParFUM attribute */
 void top_retreive_elem_data(TopModel* m){
 #if CUDA
-    FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->elem[0].lookup(FEM_DATA+0,"top_retreive_elem_data");
-    AllocTable2d<unsigned char> &dataTable  = at->getChar();
-    unsigned char *ElemData = dataTable.getData();
-    int size = at->size();
-
-    cudaMemcpy(ElemData,m->ElemDataDevice,size,cudaMemcpyDeviceToHost);
+    cudaMemcpy(m->ElemData,m->ElemDataDevice,size,cudaMemcpyDeviceToHost);
 #endif
 }
 
@@ -173,7 +182,9 @@ void topModel_Destroy(TopModel* m){
 
 TopNode topModel_InsertNode(TopModel* m, FP_TYPE x, FP_TYPE y, FP_TYPE z){
   int newNode = FEM_add_node_local(m->mesh,false,false,false);
-  m->mesh->node.set_coord(newNode,x,y,z);
+  (*m->coord_T)(newNode,0)=x;
+  (*m->coord_T)(newNode,1)=y;
+  (*m->coord_T)(newNode,2)=z;
   return newNode;
 }
 
@@ -183,8 +194,7 @@ TopNode topModel_InsertNode(TopModel* m, FP_TYPE x, FP_TYPE y, FP_TYPE z){
 */
 void topNode_SetId(TopModel* m, TopNode n, TopID id){
   CkAssert(n>=0);
-  FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->node.lookup(FEM_DATA+1,"topNode_SetId");
-  at->getInt()(n,0)=id;
+  (*m->node_id_T)(n,0)=id;
 }
 
 /** Insert an element */
@@ -204,8 +214,7 @@ TopElement topModel_InsertElem(TopModel*m, TopElemType type, TopNode* nodes){
 */
 void topElement_SetId(TopModel* m, TopElement e, TopID id){
   CkAssert(e>=0);
-  FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->elem[0].lookup(FEM_DATA+1,"topElement_SetId");
-  at->getInt()(e,0)=id;
+  (*m->elem_id_T)(e,0)=id;
 }
 
 
@@ -222,9 +231,7 @@ void topElement_SetId(TopModel* m, TopElement e, TopID id){
 */
 void topNode_SetAttrib(TopModel* m, TopNode n, void* d){
   CkAssert(n>=0);
-  FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->node.lookup(FEM_DATA+0,"topNode_SetAttrib");
-  AllocTable2d<unsigned char> &dataTable  = at->getChar();
-  unsigned char *data = dataTable.getData();
+  unsigned char *data = m->NodeData_T->getData();
   memcpy(data + n*m->node_attr_size, d, m->node_attr_size);
 }
 
@@ -233,9 +240,7 @@ See topNode_SetAttrib() for description
 */
 void topElement_SetAttrib(TopModel* m, TopElement e, void* d){
   CkAssert(e>=0);
-  FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->elem[0].lookup(FEM_DATA+0,"topElem_SetAttrib");
-  AllocTable2d<unsigned char> &dataTable  = at->getChar();
-  unsigned char *data = dataTable.getData();
+  unsigned char *data = m->ElemData_T->getData();
   memcpy(data + e*m->elem_attr_size, d, m->elem_attr_size);
 }
 
@@ -246,10 +251,7 @@ See topNode_SetAttrib() for description
 void* topElement_GetAttrib(TopModel* m, TopElement e){
   if(! m->mesh->elem[0].is_valid_any_idx(e))
 	return NULL;
-
-  FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->elem[0].lookup(FEM_DATA+0,"topElem_GetAttrib");
-  AllocTable2d<unsigned char> &dataTable  = at->getChar();
-  unsigned char *data = dataTable.getData();
+  unsigned char *data = m->ElemData_T->getData();
   return (data + e*m->elem_attr_size);
 }
 
@@ -259,10 +261,7 @@ See topNode_SetAttrib() for description
 void* topNode_GetAttrib(TopModel* m, TopNode n){
   if(! m->mesh->node.is_valid_any_idx(n))
 	return NULL;
-
-  FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->node.lookup(FEM_DATA+0,"topNode_GetAttrib");
-  AllocTable2d<unsigned char> &dataTable  = at->getChar();
-  unsigned char *data = dataTable.getData();
+  unsigned char *data = m->NodeData_T->getData();
   return (data + n*m->node_attr_size);
 }
 
@@ -276,9 +275,8 @@ void* topNode_GetAttrib(TopModel* m, TopNode n){
 */
 TopNode topModel_GetNodeAtId(TopModel* m, TopID id){
   // lookup node via global ID
-  FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->node.lookup(FEM_DATA+1,"topModel_GetNodeAtId");
-  for(int i=0;i<at->getInt().size();++i){
-	if(at->getInt()(i,0)==id){
+  for(int i=0;i<m->node_id_T->size();++i){
+	if((*m->node_id_T)(i,0)==id){
 	  return i;
 	}
   }
@@ -310,8 +308,7 @@ TopNode topElement_GetNode(TopModel* m,TopElement e,int idx){
 
 int topNode_GetId(TopModel* m, TopNode n){
   CkAssert(n>=0);
-  FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->node.lookup(FEM_DATA+1,"topNode_SetId");
-  return at->getInt()(n,0);
+  return (*m->node_id_T)(n,0);
 }
 
 
@@ -328,24 +325,9 @@ int topElement_GetNNodes(TopModel* model, TopElement elem){
 /** @todo make sure we are in a getting mesh */
 void topNode_GetPosition(TopModel*model, TopNode node,FP_TYPE*x,FP_TYPE*y,FP_TYPE*z){
   CkAssert(node>=0);
-
-  // lookup node via global ID
-  FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->node.lookup(FEM_COORD,"topModel_GetNodeAtId");
-
-#ifdef FP_TYPE_FLOAT
-  CkAssert(at->getFloat().width()==3);
-  CkAssert(node<at->getFloat().size());
-  *x = at->getFloat()(node,0);
-  *y = at->getFloat()(node,1);
-  *z = at->getFloat()(node,2);
-#else
-  CkAssert(at->getDouble().width()==3);
-  CkAssert(node<at->getDouble().size());
-  *x = at->getDouble()(node,0);
-  *y = at->getDouble()(node,1);
-  *z = at->getDouble()(node,2);
-#endif
-
+  *x = (*model->coord_T)(node,0);
+  *y = (*model->coord_T)(node,1);
+  *z = (*model->coord_T)(node,2);
 }
 
 void topModel_Sync(TopModel*m){

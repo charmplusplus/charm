@@ -35,6 +35,13 @@ typedef double FP_TYPE;
 typedef struct{
     FEM_Mesh *mesh;
     void *mAtt;
+    AllocTable2d<unsigned char> *ElemData_T;
+    AllocTable2d<unsigned char> *NodeData_T;
+    AllocTable2d<int> *ElemConn_T;
+    AllocTable2d<FP_TYPE> *coord_T;
+    AllocTable2d<int> *node_id_T;
+    AllocTable2d<int> *elem_id_T;
+
 
     unsigned node_attr_size;
     unsigned elem_attr_size;
@@ -46,14 +53,12 @@ typedef struct{
     unsigned num_local_node;
 
 #ifdef CUDA
-    unsigned char *mAttDevice; /** Device pointers to the goods */
-    unsigned char *ElemDataDevice;
-    unsigned char *NodeDataDevice;
-    int * ElemConnDevice;
+    void *mAttDevice; /** Device pointers to the goods */
+    void *ElemDataDevice;
+    void *NodeDataDevice;
+    int *ElemConnDevice;
     TopModel* modelD;
 #endif
-
-
 
 } TopModel;
 
@@ -125,9 +130,6 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
 /** Cleanup a model. Currently does nothing */
 void topModel_Destroy(TopModel* m);
 
-/** Synchronize element and node data for ghost layers. Should be called every timestep */
-void topModel_Sync(TopModel*m);
-
 /** Insert a node */
 TopNode topModel_InsertNode(TopModel*, FP_TYPE x, FP_TYPE y, FP_TYPE z);
 
@@ -154,7 +156,6 @@ void* topNode_GetAttrib(TopModel*, TopNode);
 
 /** Get element attribute */
 void* topElement_GetAttrib(TopModel*, TopElement);
-
 
 TopNode topElement_GetNode(TopModel*,TopElement,int idx);
 
