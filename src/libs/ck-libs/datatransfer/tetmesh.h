@@ -71,19 +71,21 @@ public:
 	void write_real_tecplot(char *fname) {
 	  FILE *file = fopen(fname, "w");
 	  // Header
+	  nonGhostPt = pts.size();
+	  nonGhostTet = tet.size();
 	  fprintf (file, "TITLE=\"%s\"\n", fname);
 	  fprintf (file, "ZONE N=%d E=%d ET=TETRAHEDRON F=FEPOINT\n",
 		   nonGhostPt, nonGhostTet);
 	  // Mesh vertices
-	  int i,n;
+	  int n;
 	  n=nonGhostPt;
-	  for (i=0; i<n; ++i) {
+	  for (int i=0; i<n; ++i) {
 	    fprintf(file,"%lf %lf %lf %lf\n",pts[i][0],pts[i][1],pts[i][2],pts[i][3]);
 	  }
 	  // Mesh triangles
 	  n=nonGhostTet;
-	  for ( i=0; i<n; ++i) {
-	    for ( int j=0; j<4; ++j) {
+	  for (int i=0; i<n; ++i) {
+	    for (int j=0; j<4; ++j) {
 	      fprintf(file,"%d ", tet[i].nodes[j]+1);  
 	    }
 	    fprintf(file,"\n");
