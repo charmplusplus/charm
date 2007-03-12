@@ -146,11 +146,16 @@ class BGLTorusManager {
   }
   
   int isNeighborByCoord(int x1, int y1, int z1, int x2, int y2, int z2, int dist) {
+#if 0
     if(absx(x1 - x2) <= dist && 
        absy(y1 - y2) <= dist && 
        absz(z1 - z2) <= dist)
       return 1;
-    
+#endif
+
+    if( (absx(x1 - x2) + absy(y1 - y2) + absz(z1 - z2)) <= dist )
+      return 1;
+
     return 0;
   }
 
