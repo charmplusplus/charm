@@ -23,10 +23,14 @@ put example here!
 
 #ifdef FP_TYPE_FLOAT
 #warning "Using floats for various things"
-typedef float FP_TYPE;
+typedef double FP_TYPE_HIGH;
+typedef float FP_TYPE_LOW;
+typedef float FP_TYPE_SYNC;
 #else
 #warning "Using doubles for various things"
-typedef double FP_TYPE;
+typedef double FP_TYPE_HIGH;
+typedef double FP_TYPE_LOW;
+typedef double FP_TYPE_SYNC;
 #endif
 
 
@@ -38,7 +42,7 @@ typedef struct{
     AllocTable2d<unsigned char> *ElemData_T;
     AllocTable2d<unsigned char> *NodeData_T;
     AllocTable2d<int> *ElemConn_T;
-    AllocTable2d<FP_TYPE> *coord_T;
+    AllocTable2d<FP_TYPE_LOW> *coord_T;
     AllocTable2d<int> *node_id_T;
     AllocTable2d<int> *elem_id_T;
 
@@ -131,7 +135,9 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
 void topModel_Destroy(TopModel* m);
 
 /** Insert a node */
-TopNode topModel_InsertNode(TopModel*, FP_TYPE x, FP_TYPE y, FP_TYPE z);
+TopNode topModel_InsertNode(TopModel*, float x, float y, float z);
+TopNode topModel_InsertNode(TopModel*, double x, double y, double z);
+
 
 /** Set id of a node */
 void topNode_SetId(TopModel*, TopNode, TopID id);
@@ -165,8 +171,8 @@ int topModel_GetNNodes(TopModel *model);
 
 int topElement_GetNNodes(TopModel* model, TopElement elem);
 
-void topNode_GetPosition(TopModel*model, TopNode node,FP_TYPE*x,FP_TYPE*y,FP_TYPE*z);
-
+void topNode_GetPosition(TopModel*model, TopNode node,float*x,float*y,float*z);
+void topNode_GetPosition(TopModel*model, TopNode node,double*x,double*y,double*z);
 
 /** Create Iterator for nodes */
 TopNodeItr*  topModel_CreateNodeItr(TopModel*);

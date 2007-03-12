@@ -180,7 +180,15 @@ void topModel_Destroy(TopModel* m){
 }
 
 
-TopNode topModel_InsertNode(TopModel* m, FP_TYPE x, FP_TYPE y, FP_TYPE z){
+TopNode topModel_InsertNode(TopModel* m, double x, double y, double z){
+  int newNode = FEM_add_node_local(m->mesh,false,false,false);
+  (*m->coord_T)(newNode,0)=x;
+  (*m->coord_T)(newNode,1)=y;
+  (*m->coord_T)(newNode,2)=z;
+  return newNode;
+}
+
+TopNode topModel_InsertNode(TopModel* m, float x, float y, float z){
   int newNode = FEM_add_node_local(m->mesh,false,false,false);
   (*m->coord_T)(newNode,0)=x;
   (*m->coord_T)(newNode,1)=y;
@@ -323,7 +331,15 @@ int topElement_GetNNodes(TopModel* model, TopElement elem){
 }
 
 /** @todo make sure we are in a getting mesh */
-void topNode_GetPosition(TopModel*model, TopNode node,FP_TYPE*x,FP_TYPE*y,FP_TYPE*z){
+void topNode_GetPosition(TopModel*model, TopNode node,double*x,double*y,double*z){
+  CkAssert(node>=0);
+  *x = (*model->coord_T)(node,0);
+  *y = (*model->coord_T)(node,1);
+  *z = (*model->coord_T)(node,2);
+}
+
+/** @todo make sure we are in a getting mesh */
+void topNode_GetPosition(TopModel*model, TopNode node,float*x,float*y,float*z){
   CkAssert(node>=0);
   *x = (*model->coord_T)(node,0);
   *y = (*model->coord_T)(node,1);
