@@ -893,6 +893,7 @@ void TraceProjections::traceWriteSts(void)
 // trace module will un-register itself from TraceArray if it did.
 void TraceProjections::traceClose(void)
 {
+#ifdef PROJ_ANALYSIS
   // CkPrintf("CkExit was not called on shutdown on [%d]\n", CkMyPe());
   // sets the flag that tells the code not to make the CkExit call later
   converseExit = 1;
@@ -900,6 +901,20 @@ void TraceProjections::traceClose(void)
     CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
     bocProxy.shutdownAnalysis();
   }
+#else
+  // we've already deleted the logpool, so multiple calls to traceClose
+  // are tolerated.
+  if (_logPool == NULL) {
+    return;
+  }
+  if(CkMyPe()==0){
+    _logPool->writeSts(this);
+  }
+  CkpvAccess(_trace)->endComputation();
+  delete _logPool;              // will write
+  // remove myself from traceArray so that no tracing will be called.
+  CkpvAccess(_traces)->removeTrace(this);
+#endif
 }
 
 // This is meant to be called internally rather than by converse.
@@ -1328,6 +1343,7 @@ void toProjectionsGZFile::bytes(void *p,int n,size_t itemSize,dataType t)
 }
 #endif
 
+#ifdef PROJ_ANALYSIS
 void TraceProjectionsBOC::shutdownAnalysis() {
   if (CkMyPe() == 0) {
     analysisStartTime = CmiWallTimer();
@@ -1655,5 +1671,6 @@ void initTraceProjectionsBOC()
   }
 
 #include "TraceProjections.def.h"
+#endif
 
 /*@}*/

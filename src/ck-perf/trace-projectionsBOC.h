@@ -2,6 +2,11 @@
 #include "register.h"
 #include "trace-common.h"
 
+#ifndef PROJ_ANALYSIS
+void _registerTraceProjections() {
+  // faked call that does nothing.
+}
+#else
 #include "TraceProjections.decl.h"
 
 extern CkGroupID traceProjectionsGID;
@@ -57,5 +62,4 @@ public:
   void shutdownAnalysis(void);
   void closeTrace(void);
 };
-
-
+#endif
