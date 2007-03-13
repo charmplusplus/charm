@@ -255,8 +255,9 @@ class AllocTable2d : public BasicTable2d<T> {
  public:
   ///default constructor
   AllocTable2d(int cols_=0,int rows_=0,T fill_=0) 
-    :BasicTable2d<T>(NULL,cols_,rows_), max(0), fill(fill_),allocTable(NULL)
+    :BasicTable2d<T>(NULL,cols_,rows_), max(0), fill(fill_)		
     {
+			allocTable = NULL;
       if (this->rows>0) allocate(this->rows);
     }
   ///default destructor

@@ -264,11 +264,14 @@ void ParFUMShadowArray::collectLocalNodes(int numElements,adaptAdj *elements,CkV
       const FEM_Elem &elem = fmMesh->getElem(elemType);
       const int *conn = elem.connFor(elements[i].localID);
       const int numNodes = elem.getNodesPer();
+			DEBUG(printf("Nodes for local element %d: ",elements[i].localID));
       for(int j=0;j<numNodes;j++){
         int node = conn[j];
         CkAssert(node >= 0);
         localNodes.push_back(node);
+				DEBUG(printf("%d ",node));
       }
+			DEBUG(printf("\n"));
     }
   }
   //now we need to uniquify the list of localNodes
@@ -287,12 +290,15 @@ bool ParFUMShadowArray::lockLocalNodes(LockRegion *region){
 
 		if(lockTable[node][0]!= -1){
 			//the node is locked
+			printf("[%d] Node  %d was locked \n",thisIndex,node);
 			success = false;
 			break;
 		}else{
 			//the node is unlocked
 			lockTable[node][0] = idx;
 			lockTable[node][1] = region->myID.localID;
+			
+			printf("[%d] Locking Node  %d \n",thisIndex,node);
 		}
 	}
 	return success;
@@ -444,6 +450,8 @@ void ParFUMShadowArray::unlockLocalNodes(LockRegion *region){
 			//unlocking it now
 			lockTable[region->localNodes[i]][0] = -1;
 			lockTable[region->localNodes[i]][1] = -1;
+			
+			printf("[%d] Un Locking Node  %d \n",thisIndex,region->localNodes[i]);
 		}
 	}
 

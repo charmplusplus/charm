@@ -53,20 +53,21 @@ int BulkAdapt::edge_bisect(int elemID, int elemType, int edgeID, int dim)
 
 int BulkAdapt::edge_bisect_2D(int elemID, int elemType, int edgeID)
 {
-  CkPrintf("BulkAdapt::edge_bisect_2D starts \n");
+  BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_2D starts elemID %d \n",partitionID,elemID));
   // lock partitions for the two involved elements
   adaptAdj elemsToLock[2];
   adaptAdj startElem(partitionID, elemID, elemType);
   adaptAdj nbrElem = *GetAdaptAdj(meshID, elemID, elemType, edgeID);
+	BULK_DEBUG(printf("[%d] neighbor of elem %d is elem (%d,%d) \n",partitionID,elemID,nbrElem.partID,nbrElem.localID);)
   elemsToLock[0] = startElem;
   elemsToLock[1] = nbrElem;
   RegionID lockRegionID;
   bool success;
   if (success = (localShadow->lockRegion(2, elemsToLock, &lockRegionID))) {
-    BULK_DEBUG(CkPrintf("Lock obtained.\n"););
+    BULK_DEBUG(CkPrintf("[%d] Lock obtained.\n",partitionID););
   }
   else {
-    BULK_DEBUG(CkPrintf("Lock not obtained.\n"););
+    BULK_DEBUG(CkPrintf("[%d] Lock not obtained.\n",partitionID););
     return success;
   }
 
@@ -247,6 +248,8 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int 
   int relNode1 = edgeID, relNode2 = (edgeID+1)%3;
   *node1idx = startConn[relNode1];
   *node2idx = startConn[relNode2];
+
+	BULK_DEBUG(printf("[%d] one_side_split_2D called for elem %d edge %d nodes %d %d \n",partitionID,startElem.localID,edgeID,*node1idx,*node2idx);)
   // get node1coords and node2Coords. find midpoint: bisectCoords
   FEM_DataAttribute *coord = meshPtr->node.getCoord(); // entire local coords
   double *node1coords = (coord->getDouble()).getRow(*node1idx); // ptrs to ACTUAL coords!
@@ -268,10 +271,12 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int 
   memcpy(&splitConn[0], startConn, 3*sizeof(int));
   // in startConn, replace node2idx with bisectNode
   startConn[relNode2] = bisectNode; // ACTUAL data was changed!
+	BULK_DEBUG(printf("[%d] conn[%d] of elem %d changed to node %d\n",partitionID,relNode2,startElem.localID,bisectNode);)
   // in splitConn, replace node1idx with bisectNode
   splitConn[relNode1] = bisectNode;
   // add element split with splitConn
   int splitElemID = add_element(startElem.elemType, 3, &splitConn[0]);
+	BULK_DEBUG(printf("[%d] new element %d with conn %d %d %d added \n",partitionID,splitElemID,splitConn[0],splitConn[1],splitConn[2]);)
   // copy startElem.localID's adapt adj for all edges.
   *startElemAdaptAdj = GetAdaptAdj(meshID, startElem.localID, startElem.elemType, 0);
   *splitElemAdaptAdj = GetAdaptAdj(meshID, splitElemID, startElem.elemType, 0);
@@ -303,47 +308,51 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int 
 	 * Update its connectivity
 	 * Return index of new element
 	 * */
-	int BulkAdapt::add_element(int elemType,int nodesPerElem,int *conn){ 
-		FEM_Elem &elem = meshPtr->elem[elemType];
-		int newElem = elem.get_next_invalid();
-		elem.connIs(newElem,conn);
-		return newElem;
+int BulkAdapt::add_element(int elemType,int nodesPerElem,int *conn){ 
+	FEM_Elem &elem = meshPtr->elem[elemType];
+	int newElem = elem.get_next_invalid();
+	elem.connIs(newElem,conn);
+	return newElem;
+}
+
+/** Update the conn of an element*/
+void BulkAdapt::update_element_conn(int elemType,int elemID,int nodesPerElem,int *conn){
+	FEM_Elem &elem = meshPtr->elem[elemType];
+	elem.connIs(elemID,conn);
+};
+
+
+
+/**
+ * Add a new node to the mesh
+ * update its co-ordinates 
+ * Return index of new node
+ * */
+int BulkAdapt::add_node(int dim,double *coords){ 
+	int newNode = meshPtr->node.get_next_invalid();
+	FEM_DataAttribute *coord = meshPtr->node.getCoord();
+	(coord->getDouble()).setRow(newNode,coords);
+	AllocTable2d<int> &lockTable = ((FEM_DataAttribute *)(meshPtr->node.lookup(FEM_ADAPT_LOCK,"lockRegion")))->getInt();
+
+	lockTable[newNode][0] = -1;
+	lockTable[newNode][1] = -1;
+	return newNode;
+}
+
+/** Update the co-ordimates of the given node
+*/
+void BulkAdapt::update_node_coord(int nodeID,int dim,double *coords){
+	FEM_DataAttribute *coord = meshPtr->node.getCoord();
+	(coord->getDouble()).setRow(nodeID,coords);
+};
+
+void BulkAdapt::make_node_shared(int nodeID,int numSharedChunks,int *sharedChunks){
+	for(int i=0;i<numSharedChunks;i++){
+		IDXL_List &sharedList = meshPtr->node.shared.addList(sharedChunks[i]);
+		sharedList.push_back(nodeID);
 	}
-
-	/** Update the conn of an element*/
-	void BulkAdapt::update_element_conn(int elemType,int elemID,int nodesPerElem,int *conn){
-		FEM_Elem &elem = meshPtr->elem[elemType];
-		elem.connIs(elemID,conn);
-	};
-
-
-
-	/**
-	 * Add a new node to the mesh
-	 * update its co-ordinates 
-	 * Return index of new node
-	 * */
-	int BulkAdapt::add_node(int dim,double *coords){ 
-		int newNode = meshPtr->node.get_next_invalid();
-		FEM_DataAttribute *coord = meshPtr->node.getCoord();
-		(coord->getDouble()).setRow(newNode,coords);
-		return newNode;
-	}
-	
-	/** Update the co-ordimates of the given node
-	*/
-	void BulkAdapt::update_node_coord(int nodeID,int dim,double *coords){
-		FEM_DataAttribute *coord = meshPtr->node.getCoord();
-		(coord->getDouble()).setRow(nodeID,coords);
-	};
-
-	void BulkAdapt::make_node_shared(int nodeID,int numSharedChunks,int *sharedChunks){
-		for(int i=0;i<numSharedChunks;i++){
-			IDXL_List &sharedList = meshPtr->node.shared.addList(sharedChunks[i]);
-			sharedList.push_back(nodeID);
-		}
-		meshPtr->node.shared.flushMap();
-	};
+	meshPtr->node.shared.flushMap();
+};
 
 
 

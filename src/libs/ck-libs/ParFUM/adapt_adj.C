@@ -113,12 +113,11 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   guessElementShape(dim,nodesPerElem,&numAdjElems,&nodeSetSize,nodeSetMap);
   CkAssert(nodeSetSize <= MAX_NODESET_SIZE);
   
-
-  // Create the adaptAdj array associated with the new FEM attribute
-  // FEM_ADAPT_ADJ This array will be populated by this function, then
-  // set on the FEM mesh
-  adaptAdj *adaptAdjacencies;
-  adaptAdjacencies = new adaptAdj[numElems*numAdjElems];
+  // Add the FEM_ADAPT_ADJ attribute to the elements
+	// Set the correct width of the table and then get the pointer to the actual data
+	FEM_DataAttribute *adaptAdjAttr = (FEM_DataAttribute *) elem->lookup(FEM_ADAPT_ADJ,"CreateAdaptAdjacencies");	
+	adaptAdjAttr->setWidth(sizeof(adaptAdj)*numAdjElems);
+  adaptAdj *adaptAdjacencies = (adaptAdj *)(adaptAdjAttr->getChar()).getData();
 
   // Init adaptAdj array to at least have -1 as partID signifying no neighbor
   for (int i=0; i<numElems*numAdjElems; i++) {
@@ -201,11 +200,12 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   replyTable->sync();
 //  dumpAdaptAdjacencies(adaptAdjacencies,numElems,numAdjElems,myRank);
 
-  mesh->becomeSetting();  
+/*  mesh->becomeSetting();  
   //Register the adaptAdjacency with ParFUM
   FEM_Register_array(meshid,FEM_ELEM+elemType,FEM_ADAPT_ADJ,(void *)adaptAdjacencies,FEM_BYTE,sizeof(adaptAdj)*numAdjElems);
   //do not delete adaptAdjacencies. It will be used during the rest of adaptivity
   mesh->becomeGetting();  
+	*/
 }
 
 void fillLocalAdaptAdjacencies(int numNodes,FEM_Node *node,adjNode *adaptAdjTable,adaptAdj *adaptAdjacencies,int nodeSetSize,int numAdjElems,int myRank,int elemType){
