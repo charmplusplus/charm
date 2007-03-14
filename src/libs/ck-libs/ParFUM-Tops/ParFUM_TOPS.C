@@ -106,14 +106,22 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
     setTableReferences(model);
 
 #if CUDA
+    /** copy number/sizes of nodes and elements to device structure */
+    model->device_model.elem_attr_size = elem_attr_sz;
+    model->device_model.node_attr_size = node_attr_sz;
+    model->device_model.model_attr_size = model_attr_sz;
+    model->device_model.num_local_node = model->num_local_node;
+    model->device_model.num_local_elem = model->num_local_elem;
+
     /** Copy element Attribute array to device global memory */
     {
         FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->elem[0].lookup(FEM_DATA+0,"topModel_Create_Driver");
         AllocTable2d<unsigned char> &dataTable  = at->getChar();
         unsigned char *ElemData = dataTable.getData();
         int size = at->size();
-        cudaMalloc(size, (void**)&(model->ElemDataDevice));
-        cudaMemcpy(ElemDataDevice,ElemData,size,cudaMemcpyHostToDevice);
+        cudaMalloc(size, (void**)&(model->devive_model.ElemDataDevice));
+        cudaMemcpy(model->device_model.ElemDataDevice,ElemData,size,
+                cudaMemcpyHostToDevice);
     }
 
     /** Copy node Attribute array to device global memory */
@@ -122,8 +130,9 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
         AllocTable2d<unsigned char> &dataTable  = at->getChar();
         unsigned char *NodeData = dataTable.getData();
         int size = at->size();
-        cudaMalloc(size, (void**)&(model->NodeDataDevice));
-        cudaMemcpy(NodeDataDevice,NodeData,size,cudaMemcpyHostToDevice);
+        cudaMalloc(size, (void**)&(model->device_model.NodeDataDevice));
+        cudaMemcpy(model->device_model.NodeDataDevice,NodeData,size,
+                cudaMemcpyHostToDevice);
     }
 
     /** Copy elem connectivity array to device global memory */
@@ -132,21 +141,19 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
         AllocTable2d<int> &dataTable  = at->getInt();
         int *data = dataTable.getData();
         int size = at->size()*sizeof(int);
-        cudaMalloc(size, (void**)&(model->ElemConnDevice));
-        cudaMemcpy(ElemConnDevice,data,size,cudaMemcpyHostToDevice);
+        cudaMalloc(size, (void**)&(model->device_model.ElemConnDevice));
+        cudaMemcpy(model->device_model.ElemConnDevice,data,size,
+                cudaMemcpyHostToDevice);
     }
 
     /** Copy model Attribute to device global memory */
     {
-        cudaMalloc(model->model_attr_size, (void**)&(model->mAttDevice));
-        cudaMemcpy(mAttDevice,mAtt,model->model_attr_size,cudaMemcpyHostToDevice);
+        cudaMalloc(model->model_attr_size, 
+                (void**)&(model->device_model.mAttDevice));
+        cudaMemcpy(model->device_model.mAttDevice,mAtt,model->model_attr_size,
+                cudaMemcpyHostToDevice);
     }
 
-    /** Copy model to device global memory */
-    {
-        cudaMalloc(sizeof(TopModel), (void**)&(model->modelD);
-        cudaMemcpy(model->modelD,model,sizeof(TopModel),cudaMemcpyHostToDevice);
-    }
 #endif
 
     return model;

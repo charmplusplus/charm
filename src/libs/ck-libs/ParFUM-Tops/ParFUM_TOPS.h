@@ -20,35 +20,8 @@ put example here!
 #include <ParFUM.h>
 #include <ParFUM_internals.h>
 
-
-#ifdef FP_TYPE_FLOAT
-#warning "Using floats for various things"
-typedef double FP_TYPE_HIGH;
-typedef float FP_TYPE_LOW;
-typedef float FP_TYPE_SYNC;
-#else
-#warning "Using doubles for various things"
-typedef double FP_TYPE_HIGH;
-typedef double FP_TYPE_LOW;
-typedef double FP_TYPE_SYNC;
-#endif
-
-
-/** A TopModelDevice contains structures for use by CUDA kernels */
-typedef struct {
-    unsigned node_attr_size;
-    unsigned elem_attr_size;
-    unsigned model_attr_size;
-
-    unsigned num_local_elem;
-    unsigned num_local_node;
-    
-    /** Device pointers to the goods */
-    void *mAttDevice;
-    void *ElemDataDevice;
-    void *NodeDataDevice;
-    int *ElemConnDevice;
-} TopModelDevice;
+#include "ParFUM_TOPS_Types.h"
+#include "ParFUM_TOPS_CUDA.h"
 
 
 /** A tops model is roughly equivalent to a ParFUM FEM_Mesh object */
@@ -79,36 +52,6 @@ typedef struct{
 } TopModel;
 
 
-/** Tops uses some bit patterns for these, but we just use TopNode as a signed value to represent the corresponding ParFUM node. A non-negative value is a local node, while a negative value is a ghost. */
-typedef long TopNode;
-/** See notes for ::TopNode */
-typedef long TopElement;
-
-
-enum {
-  TOP_ELEMENT_T3 =0,
-  TOP_ELEMENT_T6,
-  TOP_ELEMENT_Q4,
-  TOP_ELEMENT_Q8,
-  TOP_ELEMENT_TET4,
-  TOP_ELEMENT_TET10,
-  TOP_ELEMENT_HEX8,
-  TOP_ELEMENT_HEX8_RESERVOIR,
-  TOP_ELEMENT_HEX20,
-  TOP_ELEMENT_WEDGE15,
-  TOP_ELEMENT_COH2E2,
-  TOP_ELEMENT_COH2E3,
-  TOP_ELEMENT_COH3T3,
-  TOP_ELEMENT_COH3T6,
-  TOP_ELEMENT_COH3Q4,
-  TOP_ELEMENT_COH3Q8,
-  TOP_ELEMENT_WEDGE6,
-  TOP_ELEMENT_MAX
-};
-
-/** used as iterators on CUDA system. See usage!*/
-typedef bool TopNodeItr_D;
-typedef bool TopElemItr_D;
 
 /** Node Iterator */
 class TopNodeItr{
@@ -125,13 +68,6 @@ public:
   int parfum_index;
     TopModel *model;
 };
-
-
-/** an opaque id for top entities */
-typedef int TopID;
-
-/** an enumeration of supported element types */
-typedef int TopElemType;
 
 
 /**
@@ -226,12 +162,6 @@ TopElement topElemItr_GetCurr(TopElemItr*);
 /** Perform sanity check on iterators. This checks to make sure that the count of the itereated elements and nodes matches that returned by ParFUM's countValid() */
 void topModel_TestIterators(TopModel*m);
 
-
-#if CUDA
-void* topElement_D_GetAttrib(TopModelDevice* m, TopElement e);
-void* topNode_D_GetAttrib(TopModelDevice* m, TopNode n);
-TopNode topElement_D_GetNode(TopModelDevice* m, TopElement e,int idx);
-#endif
 
 void top_retreive_elem_data(TopModel* m);
 void top_retreive_node_data(TopModel* m);

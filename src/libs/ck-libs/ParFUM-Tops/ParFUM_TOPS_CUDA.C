@@ -7,8 +7,7 @@
 
 */
 
-#include "ParFUM_TOPS.h"
-#include "ParFUM_internals.h"
+#include "ParFUM_TOPS_CUDA.h"
 
 
 #ifdef CUDA
