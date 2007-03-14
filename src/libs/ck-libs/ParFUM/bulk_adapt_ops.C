@@ -98,8 +98,10 @@ int BulkAdapt::edge_bisect_2D(int elemID, int elemType, int edgeID)
 		      false);
 
     nbrSplitElemAdaptAdj[nbrEdgeID] = splitElem;
+    BULK_DEBUG(printf("[%d] For nbrSplitElem %d set adjacency to %d across splitEdge\n",partitionID,nbrSplitElem.localID,splitElem.localID);)
     // POST: start-side operations
     splitElemAdaptAdj[edgeID] = nbrSplitElem;
+    BULK_DEBUG(printf("[%d] For splitElem %d set adjacency to %d across splitEdge\n",partitionID,splitElem.localID,nbrSplitElem.localID);)
   }
 
   /*
@@ -303,8 +305,8 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int 
     (*startElemAdaptAdj)[(edgeID+2)%3] = splitElem;
     // update splitElemAdaptAdj for edge (edgeID+2)%3 to local startElem
     (*splitElemAdaptAdj)[(edgeID+1)%3] = startElem;
-		BULK_DEBUG(printf("[%d] For startElem %d edge %d is npw set to %d\n",partitionID,startElem.localID,(edgeID+2)%3,splitElem.localID));
-		BULK_DEBUG(printf("[%d] For splitElem %d edge %d is npw set to %d\n",partitionID,splitElem.localID,(edgeID+1)%3,startElem.localID));
+		BULK_DEBUG(printf("[%d] For startElem %d edge %d is now set to %d\n",partitionID,startElem.localID,(edgeID+2)%3,splitElem.localID));
+		BULK_DEBUG(printf("[%d] For splitElem %d edge %d is now set to %d\n",partitionID,splitElem.localID,(edgeID+1)%3,startElem.localID));
   }
   if (startElemNbr.partID == startElem.partID) {
     ReplaceAdaptAdj(meshID, startElemNbr.localID, startElemNbr.elemType, startElem, splitElem);
