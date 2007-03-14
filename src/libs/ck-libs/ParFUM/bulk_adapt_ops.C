@@ -249,7 +249,7 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int 
   *node1idx = startConn[relNode1];
   *node2idx = startConn[relNode2];
 
-	BULK_DEBUG(printf("[%d] one_side_split_2D called for elem %d edge %d nodes %d %d \n",partitionID,startElem.localID,edgeID,*node1idx,*node2idx);)
+  BULK_DEBUG(printf("[%d] one_side_split_2D called for elem %d edge %d nodes %d %d \n",partitionID,startElem.localID,edgeID,*node1idx,*node2idx);)
   // get node1coords and node2Coords. find midpoint: bisectCoords
   FEM_DataAttribute *coord = meshPtr->node.getCoord(); // entire local coords
   double *node1coords = (coord->getDouble()).getRow(*node1idx); // ptrs to ACTUAL coords!
@@ -282,17 +282,26 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int 
   *splitElemAdaptAdj = GetAdaptAdj(meshID, splitElemID, startElem.elemType, 0);
   splitElem = adaptAdj(partitionID, splitElemID, startElem.elemType);
   memcpy(*splitElemAdaptAdj, *startElemAdaptAdj, 3*sizeof(adaptAdj));
+  adaptAdj startElemNbr;  // startElem's original nbr on the edge that will now border with splitElem
   if (startSide) {
     // update startElemAdaptAdj for edge (edgeID+1)%3 to local splitElem
+    startElemNbr = (*startElemAdaptAdj)[(edgeID+1)%3];
     (*startElemAdaptAdj)[(edgeID+1)%3] = splitElem;
     // update splitElemAdaptAdj for edge (edgeID+2)%3 to local startElem
     (*splitElemAdaptAdj)[(edgeID+2)%3] = startElem;
   }
   else {
     // update startElemAdaptAdj for edge (edgeID+1)%3 to local splitElem
+    startElemNbr = (*startElemAdaptAdj)[(edgeID+2)%3];
     (*startElemAdaptAdj)[(edgeID+2)%3] = splitElem;
     // update splitElemAdaptAdj for edge (edgeID+2)%3 to local startElem
     (*splitElemAdaptAdj)[(edgeID+1)%3] = startElem;
+  }
+  if (startElemNbr.partID == startElem.partID) {
+    ReplaceAdaptAdj(meshID, startElemNbr.localID, startElemNbr.elemType, startElem, splitElem);
+  }
+  else {
+    // need to call ReplaceAdaptAdj on startElemNbr.partID
   }
   // interpolate nodal data, copy startElem data to splitElem
   CkPrintf("WARNING: Data transfer not yet implemented.\n");
