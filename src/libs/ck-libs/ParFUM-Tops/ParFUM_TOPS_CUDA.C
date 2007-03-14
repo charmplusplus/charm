@@ -12,12 +12,12 @@
 
 
 #ifdef CUDA
-__device__ void* topElement_D_GetAttrib(TopModel* m, TopElement e){
+__device__ void* topElement_D_GetAttrib(TopModelDevice* m, TopElement e){
   return (m->ElemDataDevice + e*m->elem_attr_size);
 }
 
 
-__device__ void* topNode_D_GetAttrib(TopModel* m, TopNode n){
+__device__ void* topNode_D_GetAttrib(TopModelDevice* m, TopNode n){
   return (m->NodeDataDevice + n*m->node_attr_size);
 }
 #endif

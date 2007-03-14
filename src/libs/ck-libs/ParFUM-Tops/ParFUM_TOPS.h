@@ -34,6 +34,22 @@ typedef double FP_TYPE_SYNC;
 #endif
 
 
+/** A TopModelDevice contains structures for use by CUDA kernels */
+typedef struct {
+    unsigned node_attr_size;
+    unsigned elem_attr_size;
+    unsigned model_attr_size;
+
+    unsigned num_local_elem;
+    unsigned num_local_node;
+    
+    /** Device pointers to the goods */
+    void *mAttDevice;
+    void *ElemDataDevice;
+    void *NodeDataDevice;
+    int *ElemConnDevice;
+} TopModelDevice;
+
 
 /** A tops model is roughly equivalent to a ParFUM FEM_Mesh object */
 typedef struct{
@@ -57,11 +73,7 @@ typedef struct{
     unsigned num_local_node;
 
 #ifdef CUDA
-    void *mAttDevice; /** Device pointers to the goods */
-    void *ElemDataDevice;
-    void *NodeDataDevice;
-    int *ElemConnDevice;
-    TopModel* modelD;
+    TopModelDevice device_model;
 #endif
 
 } TopModel;
@@ -216,9 +228,9 @@ void topModel_TestIterators(TopModel*m);
 
 
 #if CUDA
-void* topElement_D_GetAttrib(TopModel* m, TopElement e);
-void* topNode_D_GetAttrib(TopModel* m, TopNode n);
-TopNode topElement_D_GetNode(TopModel* m,TopElement e,int idx);
+void* topElement_D_GetAttrib(TopModelDevice* m, TopElement e);
+void* topNode_D_GetAttrib(TopModelDevice* m, TopNode n);
+TopNode topElement_D_GetNode(TopModelDevice* m, TopElement e,int idx);
 #endif
 
 void top_retreive_elem_data(TopModel* m);
