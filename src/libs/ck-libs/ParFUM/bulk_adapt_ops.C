@@ -246,8 +246,15 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int 
   int *startConn = elem.connFor(startElem.localID); // startConn points at startElem.localID's ACTUAL data!
   // let edgeID have element-relative node indices relNode1, relNode2.
   int relNode1 = edgeID, relNode2 = (edgeID+1)%3;
-  *node1idx = startConn[relNode1];
-  *node2idx = startConn[relNode2];
+  if (startSide) {
+    *node1idx = startConn[relNode1];
+    *node2idx = startConn[relNode2];
+  }
+  else {
+    *node1idx = startConn[relNode2];
+    *node2idx = startConn[relNode1];
+  }
+
 
   BULK_DEBUG(printf("[%d] one_side_split_2D called for elem %d edge %d nodes %d %d \n",partitionID,startElem.localID,edgeID,*node1idx,*node2idx);)
   // get node1coords and node2Coords. find midpoint: bisectCoords
