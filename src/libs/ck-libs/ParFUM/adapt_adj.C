@@ -122,6 +122,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   // Init adaptAdj array to at least have -1 as partID signifying no neighbor
   for (int i=0; i<numElems*numAdjElems; i++) {
     adaptAdjacencies[i].partID = -1;
+		adaptAdjacencies[i].localID = -1;
   }
 
   // Create an array of size equal to the number of local nodes, each
@@ -509,11 +510,26 @@ int GetEdgeFace(int meshid,int elemID, int elemType, int *vertexList)
 // Update functions
 /** Look up elemID in elemType array and set the adjacency on
     edgeFaceID to nbr. */
-void SetAdaptAdj(int meshid,int elemID, int elemType, int edgeFaceID, adaptAdj nbr)
+void SetAdaptAdj(int meshID,int elemID, int elemType, int edgeFaceID, adaptAdj nbr)
 {
 	int numAdjacencies;
-  adaptAdj *adaptAdjTable = lookupAdaptAdjacencies(meshid, elemType,&numAdjacencies);
+  adaptAdj *adaptAdjTable = lookupAdaptAdjacencies(meshID, elemType,&numAdjacencies);
   adaptAdjTable[elemID*numAdjacencies + edgeFaceID] = nbr;
+}
+
+/** Lookup elemID in elemType array and search for the edgeID which has originalNbr as
+ * a neighbor, then replace originalNbr with newNbr
+ */
+void ReplaceAdaptAdj(int meshID,int elemID,int elemType,adaptAdj originalNbr, adaptAdj newNbr){
+	int numAdjacencies;
+  adaptAdj *adaptAdjTable = lookupAdaptAdjacencies(meshID, elemType,&numAdjacencies);
+	for(int i=0;i<numAdjacencies;i++){
+		if(adaptAdjTable[elemID*numAdjacencies+i] == originalNbr){
+			adaptAdjTable[elemID*numAdjacencies+i] = newNbr;
+			return;
+		}
+	}
+	CkAbort("ReplaceAdaptAdj did not find the specified originalNbr");
 }
 
 //given the dimensions and nodes per element guess whether the element 

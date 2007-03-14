@@ -296,6 +296,8 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int 
     (*startElemAdaptAdj)[(edgeID+1)%3] = splitElem;
     // update splitElemAdaptAdj for edge (edgeID+2)%3 to local startElem
     (*splitElemAdaptAdj)[(edgeID+2)%3] = startElem;
+		BULK_DEBUG(printf("[%d] For startElem %d edge %d is npw set to %d\n",partitionID,startElem.localID,(edgeID+1)%3,splitElem.localID));
+		BULK_DEBUG(printf("[%d] For splitElem %d edge %d is npw set to %d\n",partitionID,splitElem.localID,(edgeID+2)%3,startElem.localID));
   }
   else {
     // update startElemAdaptAdj for edge (edgeID+1)%3 to local splitElem
@@ -303,9 +305,12 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int 
     (*startElemAdaptAdj)[(edgeID+2)%3] = splitElem;
     // update splitElemAdaptAdj for edge (edgeID+2)%3 to local startElem
     (*splitElemAdaptAdj)[(edgeID+1)%3] = startElem;
+		BULK_DEBUG(printf("[%d] For startElem %d edge %d is npw set to %d\n",partitionID,startElem.localID,(edgeID+2)%3,splitElem.localID));
+		BULK_DEBUG(printf("[%d] For splitElem %d edge %d is npw set to %d\n",partitionID,splitElem.localID,(edgeID+1)%3,startElem.localID));
   }
   if (startElemNbr.partID == startElem.partID) {
     ReplaceAdaptAdj(meshID, startElemNbr.localID, startElemNbr.elemType, startElem, splitElem);
+		BULK_DEBUG(printf("[%d] For startElemNbr %d replaced startElem %d with splitElem %d\n",partitionID,startElemNbr.localID,startElem.localID,splitElem.localID);)
   }
   else {
     // need to call ReplaceAdaptAdj on startElemNbr.partID

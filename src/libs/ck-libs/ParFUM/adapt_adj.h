@@ -67,6 +67,9 @@ class adaptAdj{
     elemType = rhs.elemType;
     return *this;
   }
+	inline bool operator==(const adaptAdj &rhs) const{
+		return (partID == rhs.partID && localID == rhs.localID);
+	}
   virtual void pup(PUP::er &p){
     p | partID;
     p | localID;
@@ -186,6 +189,9 @@ int GetEdgeFace(int meshid, int elemID, int elemType, int *vertexList);
     edgeFaceID to nbr. */
 void SetAdaptAdj(int meshid, int elemID, int elemType, int edgeFaceID, 
 		 adaptAdj nbr);
+
+void ReplaceAdaptAdj(int meshID,int elemID,int elemType,adaptAdj originalNbr, adaptAdj newNbr);
+
 
 
 /**given the dimensions and nodes per element guess whether the element 
