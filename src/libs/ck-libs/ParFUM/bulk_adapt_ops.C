@@ -246,14 +246,12 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int 
   int *startConn = elem.connFor(startElem.localID); // startConn points at startElem.localID's ACTUAL data!
   // let edgeID have element-relative node indices relNode1, relNode2.
   int relNode1 = edgeID, relNode2 = (edgeID+1)%3;
-  if (startSide) {
-    *node1idx = startConn[relNode1];
-    *node2idx = startConn[relNode2];
+  if (!startSide) {
+    relNode1 = (edgeID+1)%3;
+    relNode2 = edgeID;
   }
-  else {
-    *node1idx = startConn[relNode2];
-    *node2idx = startConn[relNode1];
-  }
+  *node1idx = startConn[relNode1];
+  *node2idx = startConn[relNode2];
 
 
   BULK_DEBUG(printf("[%d] one_side_split_2D called for elem %d edge %d nodes %d %d \n",partitionID,startElem.localID,edgeID,*node1idx,*node2idx);)
@@ -296,8 +294,8 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem, int 
     (*startElemAdaptAdj)[(edgeID+1)%3] = splitElem;
     // update splitElemAdaptAdj for edge (edgeID+2)%3 to local startElem
     (*splitElemAdaptAdj)[(edgeID+2)%3] = startElem;
-		BULK_DEBUG(printf("[%d] For startElem %d edge %d is npw set to %d\n",partitionID,startElem.localID,(edgeID+1)%3,splitElem.localID));
-		BULK_DEBUG(printf("[%d] For splitElem %d edge %d is npw set to %d\n",partitionID,splitElem.localID,(edgeID+2)%3,startElem.localID));
+    BULK_DEBUG(printf("[%d] For startElem %d edge %d is now set to %d\n",partitionID,startElem.localID,(edgeID+1)%3,splitElem.localID));
+		BULK_DEBUG(printf("[%d] For splitElem %d edge %d is now set to %d\n",partitionID,splitElem.localID,(edgeID+2)%3,startElem.localID));
   }
   else {
     // update startElemAdaptAdj for edge (edgeID+1)%3 to local splitElem
