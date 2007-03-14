@@ -137,6 +137,7 @@ int BulkAdapt::edge_bisect_2D(int elemID, int elemType, int edgeID)
 
   // unlock the two partitions
   localShadow->unlockRegion(lockRegionID);
+  dumpAdaptAdjacencies(GetAdaptAdj(meshID, 0, elemType, 0),meshPtr->nElems(),3,partitionID);	
   return 1;
 }
 
