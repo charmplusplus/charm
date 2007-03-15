@@ -118,8 +118,8 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
         FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->elem[0].lookup(FEM_DATA+0,"topModel_Create_Driver");
         AllocTable2d<unsigned char> &dataTable  = at->getChar();
         unsigned char *ElemData = dataTable.getData();
-        int size = at->size();
-        cudaMalloc(size, (void**)&(model->devive_model.ElemDataDevice));
+        int size = dataTable.size();
+        cudaMalloc(size, (void**)&(model->device_model.ElemDataDevice));
         cudaMemcpy(model->device_model.ElemDataDevice,ElemData,size,
                 cudaMemcpyHostToDevice);
     }
@@ -129,7 +129,7 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
         FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->node.lookup(FEM_DATA+0,"topModel_Create_Driver");
         AllocTable2d<unsigned char> &dataTable  = at->getChar();
         unsigned char *NodeData = dataTable.getData();
-        int size = at->size();
+        int size = dataTable.size();
         cudaMalloc(size, (void**)&(model->device_model.NodeDataDevice));
         cudaMemcpy(model->device_model.NodeDataDevice,NodeData,size,
                 cudaMemcpyHostToDevice);
@@ -140,7 +140,7 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
         FEM_DataAttribute * at = (FEM_DataAttribute*) m->mesh->node.lookup(FEM_CONN,"topModel_Create_Driver");
         AllocTable2d<int> &dataTable  = at->getInt();
         int *data = dataTable.getData();
-        int size = at->size()*sizeof(int);
+        int size = dataTable.size()*sizeof(int);
         cudaMalloc(size, (void**)&(model->device_model.ElemConnDevice));
         cudaMemcpy(model->device_model.ElemConnDevice,data,size,
                 cudaMemcpyHostToDevice);
