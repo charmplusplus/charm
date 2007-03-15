@@ -3,7 +3,7 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 CUDAC=$(CHARMC)
 
 #Headers to be copied to include directory so application users can see them
-HEADERS= ParFUM_TOPS.h ParFUM_TOPS_CUDA.h $(INTERNALHEADERS)
+HEADERS= ParFUM_TOPS.h ParFUM_TOPS_CUDA.h ParFUM_TOPS_Types.h $(INTERNALHEADERS)
 
 #Headers generated from .ci files
 GENHEADERS= ParFUM_TOPS.def.h ParFUM_TOPS.decl.h 
@@ -33,9 +33,9 @@ $(DEST): $(OBJS) headers $(HEADDEP)
 	cp $(LIB).dep $(LIBDIR)/$(LIB).dep
 
 # Copy header files to include directory
+.PHONY: headers
 headers: $(HEADDEP)
 	cp $(HEADERS) $(CDIR)/include/
-	touch headers
 
 ParFUM_TOPS.o: ParFUM_TOPS.C $(HEADDEP) ParFUM_TOPS.h
 	$(CHARMC) -c ParFUM_TOPS.C $(INCS)
