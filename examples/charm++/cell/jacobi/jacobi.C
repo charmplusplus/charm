@@ -8,6 +8,7 @@
 
 
 extern /* readonly */ CProxy_Main mainProxy;
+extern /* readonly */ CProxy_Jacobi jacobiProxy;
 
 
 Jacobi::Jacobi() {
@@ -24,8 +25,8 @@ Jacobi::Jacobi() {
 
   // Allocate memory for the buffers
   // NOTE: Each buffer will have enough room for all the data (local data + ghost data from bordering chares)
-  matrix = (volatile float*)malloc_aligned(sizeof(float) * DATA_BUFFER_SIZE, 16);
-  matrixTmp = (volatile float*)malloc_aligned(sizeof(float) * DATA_BUFFER_SIZE, 16);
+  matrix = (volatile float*)malloc_aligned(sizeof(float) * DATA_BUFFER_SIZE, 128);
+  matrixTmp = (volatile float*)malloc_aligned(sizeof(float) * DATA_BUFFER_SIZE, 128);
 
   // Initialize the data
   memset((float*)matrix, 0, sizeof(float) * DATA_BUFFER_SIZE);
@@ -39,14 +40,48 @@ Jacobi::Jacobi() {
 
   // Init the iteration counter to zero
   iterCount = 0;
+
+  // Initialize the saved message pointers
+  #if USE_MESSAGES != 0
+    eastMsgSave[0] = new EastWestGhost();
+    eastMsgSave[1] = NULL;
+    westMsgSave[0] = new EastWestGhost();
+    westMsgSave[1] = NULL;
+    northMsgSave[0] = new NorthSouthGhost();
+    northMsgSave[1] = NULL;
+    southMsgSave[0] = new NorthSouthGhost();
+    southMsgSave[1] = NULL;
+
+    futureEastMsg = NULL;
+    futureWestMsg = NULL;
+    futureNorthMsg = NULL;
+    futureSouthMsg = NULL;
+  #endif
+
+  // Check in with the main chare
+  mainProxy.createdCheckIn();
 }
 
 Jacobi::Jacobi(CkMigrateMessage *msg) {
 }
 
 Jacobi::~Jacobi() {
+
+  // Clean up the matrix data
   if (matrix != NULL) { free_aligned((void*)matrix); matrix = NULL; }
   if (matrixTmp != NULL) { free_aligned((void*)matrixTmp); matrixTmp = NULL; }
+
+  // Clean up any saved messages
+  #if USE_MESSAGES != 0
+    if (eastMsgSave[0] != NULL) { delete eastMsgSave[0]; }
+    if (eastMsgSave[1] != NULL) { delete eastMsgSave[1]; }
+    if (westMsgSave[0] != NULL) { delete westMsgSave[0]; }
+    if (westMsgSave[1] != NULL) { delete westMsgSave[1]; }
+    if (northMsgSave[0] != NULL) { delete northMsgSave[0]; }
+    if (northMsgSave[1] != NULL) { delete northMsgSave[1]; }
+    if (southMsgSave[0] != NULL) { delete southMsgSave[0]; }
+    if (southMsgSave[1] != NULL) { delete southMsgSave[1]; }
+  #endif
 }
 
 void Jacobi::startIteration() {
@@ -55,31 +90,79 @@ void Jacobi::startIteration() {
   int chareX = GET_CHARE_X(thisIndex);
   int chareY = GET_CHARE_Y(thisIndex);
 
+  //// DEBUG
+  //if (northMsgSave[0] == NULL  && chareY > 0) CkPrintf("[%d @ %d] northMsgSave[0] = NULL...\n", thisIndex, iterCount);
+  //if (southMsgSave[0] == NULL && chareY < (NUM_CHARES - 1)) CkPrintf("[%d @ %d] southMsgSave[0] = NULL...\n", thisIndex, iterCount);
+  //if (eastMsgSave[0] == NULL && chareX < (NUM_CHARES - 1)) CkPrintf("[%d @ %d] eastMsgSave[0] = NULL...\n", thisIndex, iterCount);
+  //if (westMsgSave[0] == NULL && chareX > 0) CkPrintf("[%d @ %d] westMsgSave[0] = NULL...\n", thisIndex, iterCount);
+
   // Send to the north
   if (chareY > 0) {
-    thisProxy[GET_CHARE_I(chareX, chareY-1)].southData(NUM_COLS, (float*)matrix + DATA_NORTH_DATA_OFFSET, iterCount);
+    #if USE_MESSAGES != 0
+      memcpy(northMsgSave[0]->data, (float*)matrix + DATA_NORTH_DATA_OFFSET, sizeof(float) * NUM_COLS);
+      northMsgSave[0]->iterCount = iterCount;
+      thisProxy[GET_CHARE_I(chareX, chareY-1)].southData_msg(northMsgSave[0]);
+      northMsgSave[0] = NULL;
+    #else
+      thisProxy[GET_CHARE_I(chareX, chareY-1)].southData(NUM_COLS, (float*)matrix + DATA_NORTH_DATA_OFFSET, iterCount);
+    #endif
   }
 
   // Send to the south
   if (chareY < (NUM_CHARES - 1)) {
-    thisProxy[GET_CHARE_I(chareX, chareY+1)].northData(NUM_COLS, (float*)matrix + DATA_SOUTH_DATA_OFFSET, iterCount);
+    #if USE_MESSAGES != 0
+      memcpy(southMsgSave[0]->data, (float*)matrix + DATA_SOUTH_DATA_OFFSET, sizeof(float) * NUM_COLS);
+      southMsgSave[0]->iterCount = iterCount;
+      thisProxy[GET_CHARE_I(chareX, chareY+1)].northData_msg(southMsgSave[0]);
+      southMsgSave[0] = NULL;
+    #else
+      thisProxy[GET_CHARE_I(chareX, chareY+1)].northData(NUM_COLS, (float*)matrix + DATA_SOUTH_DATA_OFFSET, iterCount);
+    #endif
   }
 
   // Send to the west
   if (chareX > 0) {
-    float buf[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++)
-      buf[i] = matrix[DATA_BUFFER_COLS * i + DATA_WEST_DATA_OFFSET];
-    thisProxy[GET_CHARE_I(chareX - 1, chareY)].eastData(NUM_ROWS, buf, iterCount);
+    #if USE_MESSAGES != 0
+      float* dataPtr = westMsgSave[0]->data;
+      for (int i = 0; i < NUM_ROWS; i++)
+        dataPtr[i] = matrix[DATA_BUFFER_COLS * i + DATA_WEST_DATA_OFFSET];
+      westMsgSave[0]->iterCount = iterCount;
+      thisProxy[GET_CHARE_I(chareX - 1, chareY)].eastData_msg(westMsgSave[0]);
+      westMsgSave[0] = NULL;
+    #else
+      float buf[NUM_ROWS];
+      for (int i = 0; i < NUM_ROWS; i++)
+        buf[i] = matrix[DATA_BUFFER_COLS * i + DATA_WEST_DATA_OFFSET];
+      thisProxy[GET_CHARE_I(chareX - 1, chareY)].eastData(NUM_ROWS, buf, iterCount);
+    #endif
   }
 
   // Send to the east
   if (chareX < (NUM_CHARES - 1)) {
-    float buf[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++)
-      buf[i] = matrix[DATA_BUFFER_COLS * i + DATA_EAST_DATA_OFFSET];
-    thisProxy[GET_CHARE_I(chareX + 1, chareY)].westData(NUM_ROWS, buf, iterCount);
+    #if USE_MESSAGES != 0
+      float* dataPtr = eastMsgSave[0]->data;
+      for (int i = 0; i < NUM_ROWS; i++)
+        dataPtr[i] = matrix[DATA_BUFFER_COLS * i + DATA_EAST_DATA_OFFSET];
+      eastMsgSave[0]->iterCount = iterCount;
+      thisProxy[GET_CHARE_I(chareX + 1, chareY)].westData_msg(eastMsgSave[0]);
+      eastMsgSave[0] = NULL;
+    #else
+      float buf[NUM_ROWS];
+      for (int i = 0; i < NUM_ROWS; i++)
+        buf[i] = matrix[DATA_BUFFER_COLS * i + DATA_EAST_DATA_OFFSET];
+      thisProxy[GET_CHARE_I(chareX + 1, chareY)].westData(NUM_ROWS, buf, iterCount);
+    #endif
   }
+
+  // Process any future messages that have already been received
+  // NOTE: Important... this code assumes that startIteration() is called directly from
+  //   doCalculation_post()... i.e. iterCount is incremented and then these future
+  //   messages are processed before control is passed back to the Charm++ scheduler that
+  //   way no messages can be received inbetween (and thus a future message overwritten).
+  if (futureNorthMsg != NULL) { northData_msg(futureNorthMsg); futureNorthMsg = NULL; }
+  if (futureSouthMsg != NULL) { southData_msg(futureSouthMsg); futureSouthMsg = NULL; }
+  if (futureEastMsg != NULL) { eastData_msg(futureEastMsg); futureEastMsg = NULL; }
+  if (futureWestMsg != NULL) { westData_msg(futureWestMsg); futureWestMsg = NULL; }
 }
 
 void Jacobi::northData(int size, float* ghostData, int iterRef) {
@@ -92,6 +175,19 @@ void Jacobi::northData(int size, float* ghostData, int iterRef) {
   }
 }
 
+void Jacobi::northData_msg(NorthSouthGhost *msg) {
+  // Check to see if this message has arrived in order...
+  if (msg->iterCount == iterCount) {  // If so, process it
+    memcpy((float*)matrix + DATA_NORTH_BUFFER_OFFSET, msg->data, NUM_COLS * sizeof(float));
+    northMsgSave[1] = msg;  // Save the message for later use
+    attemptCalculation();
+  } else if (msg->iterCount == iterCount + 1) {  // For next iteration so save the message
+    futureNorthMsg = msg;    
+  } else {                            // If not, resend to self and try again later
+    thisProxy[thisIndex].northData_msg(msg);
+  }
+}
+
 void Jacobi::southData(int size, float* ghostData, int iterRef) {
   // Check to see if this message has arrived in order...
   if (iterCount == iterRef) {  // If so, process it
@@ -99,6 +195,19 @@ void Jacobi::southData(int size, float* ghostData, int iterRef) {
     attemptCalculation();
   } else {                     // If not, resend to self and try again later
     thisProxy[thisIndex].southData(size, ghostData, iterRef);
+  }
+}
+
+void Jacobi::southData_msg(NorthSouthGhost *msg) {
+  // Check to see if this message has arrived in order...
+  if (msg->iterCount == iterCount) {  // If so, process it
+    memcpy((float*)matrix + DATA_SOUTH_BUFFER_OFFSET, msg->data, NUM_COLS * sizeof(float));
+    southMsgSave[1] = msg;  // Save the message for later use
+    attemptCalculation();
+  } else if (msg->iterCount == iterCount + 1) {  // For next iteration so save the message
+    futureSouthMsg = msg;    
+  } else {                            // If not, resend to self and try again later
+    thisProxy[thisIndex].southData_msg(msg);
   }
 }
 
@@ -113,6 +222,21 @@ void Jacobi::eastData(int size, float* ghostData, int iterRef) {
   }
 }
 
+void Jacobi::eastData_msg(EastWestGhost* msg) {
+  // Check to see if this message has arrived in order...
+  if (msg->iterCount == iterCount) {  // If so, process it
+    float* data = msg->data;
+    for (int i = 0; i < NUM_ROWS; i++)
+      matrix[DATA_BUFFER_COLS * i + DATA_EAST_BUFFER_OFFSET] = data[i];
+    eastMsgSave[1] = msg;  // Save the message for later use
+    attemptCalculation();
+  } else if (msg->iterCount == iterCount + 1) {  // For next iteration so save the message
+    futureEastMsg = msg;    
+  } else {                            // If not, resend to self and try again later
+    thisProxy[thisIndex].eastData_msg(msg);
+  }
+}
+
 void Jacobi::westData(int size, float* ghostData, int iterRef) {
   // Check to see if this message has arrived in order...
   if (iterCount == iterRef) {  // If so, process it
@@ -124,6 +248,21 @@ void Jacobi::westData(int size, float* ghostData, int iterRef) {
   }
 }
 
+void Jacobi::westData_msg(EastWestGhost* msg) {
+  // Check to see if this message has arrived in order...
+  if (msg->iterCount == iterCount) {  // If so, process it
+    float* data = msg->data;
+    for (int i = 0; i < NUM_ROWS; i++)
+      matrix[DATA_BUFFER_COLS * i + DATA_WEST_BUFFER_OFFSET] = data[i];
+    westMsgSave[1] = msg;  // Save the message for later use
+    attemptCalculation();
+  } else if (msg->iterCount == iterCount + 1) {  // For next iteration so save the message
+    futureWestMsg = msg;    
+  } else {                            // If not, resend to self and try again later
+    thisProxy[thisIndex].westData_msg(msg);
+  }
+}
+
 void Jacobi::attemptCalculation() {
 
   ghostCount++;
@@ -132,15 +271,24 @@ void Jacobi::attemptCalculation() {
     // NOTE: No two iterations can overlap because of the reduction
     ghostCount = 0;
 
-    // Send a message so the threaded doCalculation() entry method will be called
-    thisProxy[thisIndex].doCalculation();  // NOTE: Message needed because doCalculation is [threaded].
-                                           //   DO NOT call doCalculation directly!
+    #if USE_CALLBACK == 0
+      // Send a message so the threaded doCalculation() entry method will be called
+      thisProxy[thisIndex].doCalculation();  // NOTE: Message needed because doCalculation is [threaded].
+                                             //   DO NOT call doCalculation directly!
+    #else
+      // NOTE : Since the Offload API callback mechanism is being used, no message is needed
+      //   here (i.e. - just call doCalculation() directly).
+      doCalculation();
+    #endif
   }
 }
 
 
 #if USE_CALLBACK != 0
-  void doCalculation_callback(void* obj) { ((Jacobi*)obj)->doCalculation_post(); }
+  void doCalculation_callback(void* obj) {
+    //((Jacobi*)obj)->doCalculation_post();
+    jacobiProxy[(int)obj].doCalculation_post();
+  }
 #endif
 
 
@@ -149,7 +297,7 @@ void Jacobi::doCalculation() {
   // Send the work request to the Offload API
   #if USE_CALLBACK == 0
 
-    WRHandle wrHandle = sendWorkRequest(FUNC_DoCalculation,
+    WRHandle wrHandle = sendWorkRequest(FUNC_DoCalculation + (iterCount % 2),
                                         NULL, 0,                                              // readWrite data
                                         (float*)matrix, sizeof(float) * DATA_BUFFER_SIZE,     // readOnly data
                                         (float*)matrixTmp, sizeof(float) * DATA_BUFFER_SIZE,  // writeOnly data
@@ -167,11 +315,11 @@ void Jacobi::doCalculation() {
 
   #else
 
-    WRHandle wrHandle = sendWorkRequest(FUNC_DoCalculation,
+    WRHandle wrHandle = sendWorkRequest(FUNC_DoCalculation + (iterCount % 2),
                                         NULL, 0,                                      // readWrite data
-                                        matrix, sizeof(float) * DATA_BUFFER_SIZE,     // readOnly data
-                                        matrixTmp, sizeof(float) * DATA_BUFFER_SIZE,  // writeOnly data
-                                        this,
+                                        (float*)matrix, sizeof(float) * DATA_BUFFER_SIZE,     // readOnly data
+                                        (float*)matrixTmp, sizeof(float) * DATA_BUFFER_SIZE,  // writeOnly data
+                                        (void*)thisIndex,
                                         WORK_REQUEST_FLAGS_NONE,
                                         doCalculation_callback
                                        );
@@ -183,9 +331,12 @@ void Jacobi::doCalculation() {
 
 void Jacobi::doCalculation_post() {
 
-  // Get the maxError calculated by the work request and contribute it the reduction for this overall iteration
-  contribute(sizeof(float), (float*)matrixTmp, CkReduction::max_float);
-
+  #if USE_REDUCTION != 0
+    // Get the maxError calculated by the work request and contribute it the reduction for this overall iteration
+    contribute(sizeof(float), (float*)matrixTmp, CkReduction::max_float);
+  #else
+    mainProxy.reportMaxError(*((float*)matrixTmp), iterCount); 
+  #endif
 
   // Display the matrix
   #if DISPLAY_MATRIX != 0
@@ -212,7 +363,6 @@ void Jacobi::doCalculation_post() {
     printf("}\n");
   #endif
 
-
   // Swap the matrix and matrixTmp pointers
   volatile float *tmp = matrix;
   matrix = matrixTmp;
@@ -220,6 +370,15 @@ void Jacobi::doCalculation_post() {
 
   // Start the next iteration for this chare
   iterCount++;
+
+  // Swap the message pointers
+  #if USE_MESSAGES != 0
+    SWAP(eastMsgSave[0], eastMsgSave[1], EastWestGhost*);
+    SWAP(westMsgSave[0], westMsgSave[1], EastWestGhost*);
+    SWAP(northMsgSave[0], northMsgSave[1], NorthSouthGhost*);
+    SWAP(southMsgSave[0], southMsgSave[1], NorthSouthGhost*);
+  #endif
+
   startIteration();
 }
 

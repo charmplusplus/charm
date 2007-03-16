@@ -2,10 +2,12 @@
 #define __MAIN_H__
 
 #include "main.decl.h"
+#include "jacobi.decl.h"
 #include "jacobi_shared.h"
 
 
 /* readonly */ CProxy_Main mainProxy;
+/* readonly */ CProxy_Jacobi jacobiProxy;
 
 
 class Main : public CBase_Main {
@@ -18,6 +20,14 @@ class Main : public CBase_Main {
     double startTime;
     double endTime;
 
+    float partialMaxError[REPORT_MAX_ERROR_BUFFER_DEPTH];
+    int checkInCount[REPORT_MAX_ERROR_BUFFER_DEPTH];
+
+    int createdCheckIn_count;
+
+    // STATS
+    int reportMaxError_resendCount;
+
   ////////////////////////////////////////////////////////////////////////////////////////////////
   // Constructor(s) / Destructor
   public:
@@ -26,7 +36,9 @@ class Main : public CBase_Main {
   ////////////////////////////////////////////////////////////////////////////////////////////////
   // Member Functions
   public:
+    void createdCheckIn();
     void maxErrorReductionClient(CkReductionMsg *msg);
+    void reportMaxError(float val, int iter);
 };
 
 

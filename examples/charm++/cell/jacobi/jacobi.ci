@@ -1,5 +1,8 @@
 module jacobi {
 
+  message EastWestGhost;
+  message NorthSouthGhost;
+
   array [1D] Jacobi {
 
     entry Jacobi(void);
@@ -11,7 +14,14 @@ module jacobi {
     entry void eastData(int size, float ghostData[size], int iterRef);
     entry void westData(int size, float ghostData[size], int iterRef);
 
-    entry [threaded] void doCalculation();
+    entry void northData_msg(NorthSouthGhost*);
+    entry void southData_msg(NorthSouthGhost*);
+    entry void eastData_msg(EastWestGhost*);
+    entry void westData_msg(EastWestGhost*);
+
+    entry void doCalculation();
+
+    entry void doCalculation_post();
   };
 
 };

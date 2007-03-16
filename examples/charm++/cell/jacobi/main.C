@@ -16,28 +16,77 @@ Main::Main(CkArgMsg *msg) {
   unsigned int memNeeded = ((NUM_ROWS + 2) * (NUM_COLS + 2)) * sizeof(float) * 2;
   CkPrintf("   Per Work Request Memory : %d (0x%08x) bytes\n", memNeeded, memNeeded);
 
+  // DEBUG
+  CkPrintf("Config:\n");
+  CkPrintf("  USE_CALLBACK = %d\n", USE_CALLBACK);
+  CkPrintf("  USE_REDUCTION = %d\n", USE_REDUCTION);
+  CkPrintf("  USE_MESSAGES = %d\n", USE_MESSAGES);
+  CkPrintf("  CHARE_MAPPING_TO_PES__STRIPE = %d\n", CHARE_MAPPING_TO_PES__STRIPE);
+  CkPrintf("  WORK_MULTIPLIER = %d\n", WORK_MULTIPLIER);
+  CkPrintf("  FORCE_NO_SPE_OPT = %d\n", FORCE_NO_SPE_OPT);
+  OffloadAPIDisplayConfig(stdout);
+
   // Init the member variables
   iterationCount = 0;
+
+  // Initialize the partialMaxError and checkInCount arrays
+  for (int i = 0; i < REPORT_MAX_ERROR_BUFFER_DEPTH; i++) {
+    partialMaxError[i] = 0.0f;
+    checkInCount[i] = 0;
+  }
 
   // Set the mainProxy readonly
   mainProxy = thisProxy;
 
   // Create the Jacobi array
-  jArray = CProxy_Jacobi::ckNew(NUM_CHARES * NUM_CHARES);
+  #if CHARE_MAPPING_TO_PES__STRIPE != 0
 
-  // Register a reduction callback with the array
-  CkCallback *cb = new CkCallback(CkIndex_Main::maxErrorReductionClient(NULL), mainProxy);
-  jArray.ckSetReductionClient(cb);
+    CkPrintf("Using Chare striping...\n");
 
-  // Start timing
-  startTime = CkWallTimer();
+    register float numPEs_f = (float)(CkNumPes());
+    jArray = CProxy_Jacobi::ckNew();
+    for (int i = 0; i < (NUM_CHARES * NUM_CHARES); i++) {
+      register int pe = (int)(((float)i / (float)(NUM_CHARES * NUM_CHARES)) * numPEs_f);
+      jArray(i).insert(pe);
+    }
+    jArray.doneInserting();
 
-  // Tell the jArray to start the first iteration
-  iterationCount++;
-  jArray.startIteration();
-  #if DISPLAY_MATRIX != 0
-    CkPrintf("Starting Iteration %d...\n", iterationCount);
+  #else
+
+    CkPrintf("Using default Chare placement...\n");
+
+    jArray = CProxy_Jacobi::ckNew(NUM_CHARES * NUM_CHARES);
+
   #endif
+  jacobiProxy = jArray;
+
+  #if USE_REDUCTION != 0
+    // Register a reduction callback with the array
+    CkCallback *cb = new CkCallback(CkIndex_Main::maxErrorReductionClient(NULL), mainProxy);
+    jArray.ckSetReductionClient(cb);
+  #endif
+
+  // Clear the createdCheckIn count
+  createdCheckIn_count = 0;
+
+  // STATS
+  reportMaxError_resendCount = 0;
+}
+
+void Main::createdCheckIn() {
+
+  createdCheckIn_count++;
+  if (createdCheckIn_count >= (NUM_CHARES * NUM_CHARES)) {
+
+    // Start timing
+    startTime = CkWallTimer();
+
+    // Tell the jArray to start the first iteration
+    jArray.startIteration();
+    #if DISPLAY_MATRIX != 0
+      CkPrintf("Starting Iteration %d...\n", iterationCount);
+    #endif
+  }
 }
 
 void Main::maxErrorReductionClient(CkReductionMsg *msg) {
@@ -63,6 +112,73 @@ void Main::maxErrorReductionClient(CkReductionMsg *msg) {
   } else {
     iterationCount++;
   }
+
+}
+
+
+void Main::reportMaxError(float val, int iter) {
+
+  // Calculate the iteration count offset of this value and the current iteration
+  //   the main chare is working on
+  register int iterDelta = iter - iterationCount;
+  if (iterDelta < 0) {
+    CkPrintf("iterDelta = %d, iter = %d, iterationCount = %d\n",
+             iterDelta, iter, iterationCount
+	    );
+    CkAbort("ERROR: iterDelta < 0 in Main::reportMaxError... later...\n");
+  }
+
+  // Check to see if this partial max error does not go into the buffer of max error
+  //   values... if so, resend to self... if it does, combine with the appropriate value
+  if (iterDelta >= REPORT_MAX_ERROR_BUFFER_DEPTH) {
+
+    // STATS
+    reportMaxError_resendCount++;
+
+    thisProxy.reportMaxError(val, iter);
+    return;
+  }
+
+  // Combine the value with the appropriate partial max error
+  partialMaxError[iterDelta] = (partialMaxError[iterDelta] < val)
+                                 ? (val)
+                                 : (partialMaxError[iterDelta]);
+  checkInCount[iterDelta]++;
+
+  // Check to see if one or more iterations have completed
+  while (checkInCount[0] >= (NUM_CHARES * NUM_CHARES)) {
+
+    //CkPrintf("Iteration %d Finished... maxError = %f...\n",
+    //         iterationCount, partialMaxError[0]);
+
+    if (partialMaxError[0] <= MAX_ERROR) {
+
+      // Stop timing
+      endTime = CkWallTimer();
+
+      CkPrintf("final maxError = %.12f\n", partialMaxError[0]);
+      CkPrintf("final iterationCount = %d\n", iterationCount);
+      CkPrintf("Time: %lfs\n", endTime - startTime);
+
+      // STATS
+      CkPrintf("reportMaxError_resendCount = %d\n", reportMaxError_resendCount);
+
+      CkExit();
+
+    } else {
+
+      iterationCount++;
+
+      // Advance the elements in the paritial max error buffer
+      for (int i = 1; i < REPORT_MAX_ERROR_BUFFER_DEPTH; i++) {
+        partialMaxError[i-1] = partialMaxError[i];
+        checkInCount[i-1] = checkInCount[i];
+      }
+      partialMaxError[REPORT_MAX_ERROR_BUFFER_DEPTH - 1] = 0.0f;
+      checkInCount[REPORT_MAX_ERROR_BUFFER_DEPTH - 1] = 0;
+    }
+
+  } // end while
 
 }
 

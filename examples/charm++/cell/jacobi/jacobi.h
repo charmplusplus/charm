@@ -5,6 +5,25 @@
 #include "jacobi_shared.h"
 
 
+#define SWAP(a, b, t) { register t __tmp__ = a; a = b; b = __tmp__; }
+
+
+class EastWestGhost : public CMessage_EastWestGhost {
+  public:
+    EastWestGhost() : CMessage_EastWestGhost() {};
+    float data[NUM_ROWS];
+    int iterCount;
+};
+
+
+class NorthSouthGhost : public CMessage_NorthSouthGhost {
+  public:
+    NorthSouthGhost() : CMessage_NorthSouthGhost() {};
+    float data[NUM_COLS];
+    int iterCount;
+};
+
+
 class Jacobi : public CBase_Jacobi {
 
   ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -15,6 +34,16 @@ class Jacobi : public CBase_Jacobi {
     int ghostCount;
     int ghostCountNeeded;
     int iterCount;
+
+    EastWestGhost* eastMsgSave[2];
+    EastWestGhost* westMsgSave[2];
+    NorthSouthGhost* northMsgSave[2];
+    NorthSouthGhost* southMsgSave[2];
+
+    EastWestGhost* futureEastMsg;
+    EastWestGhost* futureWestMsg;
+    NorthSouthGhost* futureNorthMsg;
+    NorthSouthGhost* futureSouthMsg;
 
 
   ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,6 +63,11 @@ class Jacobi : public CBase_Jacobi {
     void southData(int size, float* ghostData, int iterRef);
     void eastData(int size, float* ghostData, int iterRef);
     void westData(int size, float* ghostData, int iterRef);
+
+    void northData_msg(NorthSouthGhost*);
+    void southData_msg(NorthSouthGhost*);
+    void eastData_msg(EastWestGhost*);
+    void westData_msg(EastWestGhost*);
 
     void attemptCalculation();
     void doCalculation();
