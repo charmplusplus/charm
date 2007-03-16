@@ -1,7 +1,7 @@
 \documentclass[10pt]{article}
 \usepackage{../pplmanual}
 \input{../pplmanual}
-\def\smallfbox#1{\small \fbox{#1}}
+\def\smallfbox#1{{\small \fbox{#1}}}
 \def\code#1{{\small {\tt {#1}}}}
 
 \title{Charisma Manual}
@@ -87,10 +87,15 @@ MainChare looks like this:
 
 For object arrays, we first need to declare the class types inherited from 1D
 object array, 2D object array, etc, and then instantiate from the class types. 
+The dimensionality information of the object array is given in a pair of 
+brackets with each dimension size separated by a comma.
 
 \begin{alltt}
     class JacobiWorker : ChareArray1D;
     obj workers : JacobiWorker[16];
+
+    class Cell : ChareArray3D;
+    obj cells : Cell[128,128,128];
 \end{alltt}
 
 Note that key word ``class'' is for class type derivation, and ``obj'' is for
@@ -111,8 +116,8 @@ these parameters can be found in Section~\ref{sec:orchsec}.
     param rb : double[512];
 \end{alltt}
 
-With this, ``lb'' and ``rb'' are declared as parameters of double array with
-size of 512. 
+With this, ``lb'' and ``rb'' are declared as parameters of that can be 
+``connected'' with local variables of double array with size of 512. 
 
 \subsubsection{Orchestration Section}
 \label{sec:orchsec}
@@ -227,7 +232,7 @@ are two examples.
 \vspace{0.1in}
   
 \begin{SaveVerbatim}{foodecl}
-  while maxError > epsilon
+  while (maxError > epsilon)
      workers.doWork();
   end-while
 \end{SaveVerbatim}
@@ -320,13 +325,28 @@ statements. For more details, please refer to PPL technical report 06-18,
 \subsection{Sequential Code}
 \label{sec:sequential}
 
+\subsubsection{Sequential Files}
 The programmer supplies the sequential code for each class as necessary. The
 files should be named in the form of class name with appropriate file extension.
 The header file is not really an ANSI C header file. Instead, it is the
 sequential portion of the class's declaration. Charisma will generate the class 
 declaration from the orchestration code, and incorporate the sequential portion
-in the final header file. Please refer to the example in the Appendix.
+in the final header file. For example, if a molecular dynamics simulation has
+the following classes (as declared in the orchestration code):
 
+\begin{alltt}
+    class MDMain : MainChare;
+    class Cell : ChareArray3D;
+    class CellPair : ChareArray6D;
+\end{alltt}
+
+The user is supposed to prepare the following sequential files for the classes:
+MDMain.h, MDMain.C, Cell.h, Cell.C, CellPair.h and CellPair.C, unless a class
+does not need sequential declaration and/or definition code.
+
+Please refer to the example in the Appendix.
+
+\subsubsection{Producing and Consuming Functions}
 The C/C++ source code is nothing different than ordinary sequential source code,
 except for the producing/consuming part. For consumed parameters, a function
 treat them just like normal parameters passed in. For produced parameters, the
@@ -341,12 +361,66 @@ follows.
 When the parameter represents a data array, we need the additional
 \code{size\_of\_array} to specify the size of the data array. 
 
+The dimensionality of an orchestration parameter is divided into two parts: 
+its dimension in the orchestration code, which is implied by the dimensionality
+of the object arrays the parameter is associated, and the local dimensionality,
+which is declared in the declaration section. The orchestration dimension is not
+explicitly declared anywhere, but it is derived from the object arrays. For 
+instance, in the 1D Jacobi worker example, ``lb'' and ``rb'' has the same 
+orchestration dimensionality of workers, namely 1D of size [16]. The local
+dimensionality is used when the parameter is associated with local variables 
+in sequential code. Since ``lb'' and ``rb'' are declared to have the local
+type and dimension of ``double [512]'', the producing statement should connect
+it with a local variable of ``double [512]''.
+
+\begin{alltt}
+    produce(lb,localRB,512);
+\end{alltt}
+
 Special cases of the produced/consumed parameters involve scatter/gather
 operations. In scatter operation, since an additional dimension is implied in
 the produced parameter, we the \code{local\_variable} should have additional
 dimension equal to the dimension over which the scatter is performed. Similarly,
 the input parameter in gather operation will have an additional dimension the
 same size of the dimension of the gather operation.
+
+For reduction, one additional parameter of type char[] is added to specify the
+reduction operation. Built-in reduction operations are ``+'' (sum), ``*'' (product),
+``$<$'' (minimum), ``$>$'' (maximum) for basic data types. For instance the 
+following statements takes the sum of all local value of \code{result} and 
+for output in \code{sum}.
+
+\begin{alltt}
+    reduce(sum, result, ``+'');
+\end{alltt}
+
+If the data type is a user-defined class, then you might use the function or
+operator defined to do the reduction. For example, assume we have a class
+called ``Force'', and we have an ``add'' function (or a ``+'' operator) defined.
+
+\begin{alltt}
+    Force& Force::add(const Force& f_);
+\end{alltt}
+
+In the reduction to sum all the local forces, we can use
+
+\begin{alltt}
+    reduce(sumForces, localForce, ``add'');
+\end{alltt}
+
+\subsubsection{Miscellaneous Issues}
+In sequential code, the user can access the object's index by a keyword 
+``thisIndex''. The index of 1-D to 6-D object arrays are:
+
+\begin{alltt}
+1D: thisIndex
+2D: thisIndex.x, thisIndex.y
+3D: thisIndex.x, thisIndex.y, thisIndex.z
+4D: thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z
+5D: thisIndex.v, thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z
+6D: thisIndex.x1, thisIndex.y1, thisIndex.z1, thisIndex.x2, thisIndex.y2, thisIndex.z2
+\end{alltt}
+
 
 \section{Support for Library Module}
 \label{sec:module}
