@@ -342,9 +342,12 @@ the following classes (as declared in the orchestration code):
 
 The user is supposed to prepare the following sequential files for the classes:
 MDMain.h, MDMain.C, Cell.h, Cell.C, CellPair.h and CellPair.C, unless a class
-does not need sequential declaration and/or definition code.
+does not need sequential declaration and/or definition code. Please refer to the
+example in the Appendix. 
 
-Please refer to the example in the Appendix.
+For each class, a member function ``void initialize(void)'' can be defined and
+the generated constructor will automatically call it. This saves the trouble of 
+explicitly call initialization code for each array object. 
 
 \subsubsection{Producing and Consuming Functions}
 The C/C++ source code is nothing different than ordinary sequential source code,
@@ -420,7 +423,6 @@ In sequential code, the user can access the object's index by a keyword
 5D: thisIndex.v, thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z
 6D: thisIndex.x1, thisIndex.y1, thisIndex.z1, thisIndex.x2, thisIndex.y2, thisIndex.z2
 \end{alltt}
-
 
 \section{Support for Library Module}
 \label{sec:module}
