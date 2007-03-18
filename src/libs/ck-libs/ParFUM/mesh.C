@@ -1347,6 +1347,14 @@ int FEM_Entity::count_valid(){
   return count;
 }
 
+int FEM_Entity::set_all_invalid(){
+    // Set all to invalid
+    for(int i=0;i<size();i++) {
+      valid->getChar()(i,0)=0;
+    }
+}
+
+
 /// Get an entry(entity index) that corresponds to an invalid entity
 /// The invalid slot in the tables can then be reused when "creating" a new element or node
 /// We either return an empty slot, or resize the array and return a value at the end
