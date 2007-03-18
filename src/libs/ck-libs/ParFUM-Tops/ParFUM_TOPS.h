@@ -20,6 +20,7 @@ put example here!
 #include <ParFUM.h>
 #include <ParFUM_internals.h>
 
+
 #include "ParFUM_TOPS_Types.h"
 #include "ParFUM_TOPS_CUDA.h"
 
@@ -85,6 +86,8 @@ void topModel_Destroy(TopModel* m);
 /** Insert a node */
 TopNode topModel_InsertNode(TopModel*, float x, float y, float z);
 TopNode topModel_InsertNode(TopModel*, double x, double y, double z);
+
+void topModel_SuggestInitialSize(TopModel* m, unsigned numNodes, unsigned numElements);
 
 
 /** Set id of a node */

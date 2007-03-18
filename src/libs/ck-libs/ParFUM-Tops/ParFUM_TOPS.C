@@ -187,6 +187,15 @@ void topModel_Destroy(TopModel* m){
 }
 
 
+void topModel_SuggestInitialSize(TopModel* m, unsigned numNodes, unsigned numElements){
+  m->mesh->node.setLength(numNodes);
+  m->mesh->node.set_all_invalid();
+
+  m->mesh->elem[0].setLength(numElements);
+  m->mesh->elem[0].set_all_invalid();
+}
+
+
 TopNode topModel_InsertNode(TopModel* m, double x, double y, double z){
   int newNode = FEM_add_node_local(m->mesh,false,false,false);
   (*m->coord_T)(newNode,0)=x;
@@ -291,10 +300,12 @@ void* topNode_GetAttrib(TopModel* m, TopNode n){
 TopNode topModel_GetNodeAtId(TopModel* m, TopID id){
   // lookup node via global ID
   for(int i=0;i<m->node_id_T->size();++i){
-	if((*m->node_id_T)(i,0)==id){
+	if( m->mesh->node.is_valid(i) && (*m->node_id_T)(i,0)==id){
 	  return i;
 	}
   }
+  CkPrintf("ERROR: could not find node with id %d\n", id);
+  CkExit();
   return -1;
 }
 
