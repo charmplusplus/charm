@@ -192,7 +192,30 @@ extern CmiNodeLock CmiMemLock_lock;
 
 #endif
 
+  /*#include "BGLMLMemcpy.h"*/
+#include "string.h"
+
+#if CMK_VERSION_BLUEGENE
+#if defined (__cplusplus)
+  inline void CmiMemcpy (void *dest, void *src, int size) {
+    int count = 0;
+    if (((unsigned)dest & 0x7)==0 && ((unsigned)src &0x7)==0) {
+      double *adest=(double*)dest, *asrc= (double*)src;      
+#pragma disjoint (*asrc, *adest)
+#pragma unroll(4)
+      for (count = 0; count < size/8; count++)
+	adest[count] = asrc[count];
+    }
+    
+    if (count*8 < size) 
+      memcpy ((char *)dest + count*8, (char *)src + count*8, size - count*8);
+  }
+#else
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
+#endif
+#else
+#define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
+#endif
 
 #if CMK_SHARED_VARS_EXEMPLAR /* Used only by HP Exemplar version */
 
@@ -1369,6 +1392,10 @@ extern int networkProgressPeriod;
 void CmiProbeImmediateMsg();
 
 #else
+
+//#ifdef __cplusplus
+//extern "C" 
+//#endif
 void CmiMachineProgressImpl();
 
 #define CmiProbeImmediateMsg CmiMachineProgressImpl
