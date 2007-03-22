@@ -745,11 +745,18 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 
 #include "machine-tcp.c"
 
+#elif CMK_USE_IBVERBS
+
+#include "machine-ibverbs.c"
+
 #else
 
 #include "machine-eth.c"
 
 #endif
+
+
+
 
 #if ! CMK_USE_GM
 void CmiBarrier()
