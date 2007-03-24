@@ -1393,9 +1393,9 @@ void CmiProbeImmediateMsg();
 
 #else
 
-//#ifdef __cplusplus
-//extern "C" 
-//#endif
+/*#ifdef __cplusplus
+extern "C" 
+#endif*/
 void CmiMachineProgressImpl();
 
 #define CmiProbeImmediateMsg CmiMachineProgressImpl
