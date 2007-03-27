@@ -28,6 +28,7 @@ int main (int argc, char** argv) {
   PythonExecute wrapper((char*)code.c_str());
   wrapper.setHighLevel(true);
   wrapper.setKeepPrint(true);
+  wrapper.setPersistent(true);
 
   // if there is a third argument means kill the server
   CmiUInt4 remoteValue;
@@ -36,21 +37,21 @@ int main (int argc, char** argv) {
     CcsSendRequest (&server, "kill", 0, 1, code.c_str());
   }
   else {
-    CcsSendRequest (&server, "pyCode", 0, wrapper.size(), wrapper.toString());
+    CcsSendRequest (&server, "pyCode", 0, wrapper.size(), wrapper.pack());
     CcsRecvResponse (&server, 10, &remoteValue, sizeof(remoteValue));
     printf("buffer: %d\n",remoteValue);
     PythonPrint request(remoteValue);
     sleep(2);
     //request.print();
-    CcsSendRequest (&server, "pyCode", 0, sizeof(request), &request);
+    //   CcsSendRequest (&server, "pyCode", 0, sizeof(request), &request);
     //request.print();
-    CcsRecvResponse (&server, 100, buffer, 100);
+    //   CcsRecvResponse (&server, 100, buffer, 100);
     //request.print();
     printf("responce: %s\n",buffer);
-    sleep(2);
+    //sleep(2);
     //request.print();
-    CcsSendRequest (&server, "pyCode", 0, sizeof(request), &request);
-    CcsRecvResponse (&server, 100, buffer, 100);
+    //   CcsSendRequest (&server, "pyCode", 0, sizeof(request), &request);
+    //   CcsRecvResponse (&server, 100, buffer, 100);
     printf("responce: %x\n",*buffer);
   }
 }

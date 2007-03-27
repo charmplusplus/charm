@@ -11,7 +11,7 @@ Main::Main (CkArgMsg *msg) {
      for the python code been inserted */
   elem = 10;
 
-  mypython = CProxy_MyArray::ckNew(elem);
+  mypython = CProxy_MyArray::ckNew(elem, 2);
 
   count=0;
   total=0;
@@ -20,7 +20,8 @@ Main::Main (CkArgMsg *msg) {
   pythonHandle2=0;
 
   // register handler for callback
-  CcsRegisterHandler("pyCode", CkCallback(CkIndex_Main::execute(0),thishandle));
+  //CcsRegisterHandler("pyCode", CkCallback(CkIndex_Main::pyRequest(0),thishandle));
+  mainProxy.registerPython("pyCode");
   CcsRegisterHandler("kill", CkCallback(CkIndex_Main::exit(),thishandle));
 
 }
@@ -36,6 +37,7 @@ void Main::ccs_kill (CkCcsRequestMsg *msg) {
 void Main::runhigh(int i) {
   if (pythonHandle1) pythonHandle2=i;
   else pythonHandle1=i;
+  pythonSleep(i);
   mypython.run();
 }
 
@@ -46,21 +48,21 @@ void Main::arrayResult (int value) {
     int *pythonHandle;
     if (pythonHandle1) pythonHandle=&pythonHandle1;
     else pythonHandle=&pythonHandle2;
-    pythonPrepareReturn(*pythonHandle);
+    pythonAwake(*pythonHandle);
     pythonReturn(*pythonHandle,Py_BuildValue("i",total));
     *pythonHandle = 0;
     total=0;
   }
 }
 
-MyArray::MyArray () {mynumber = thisIndex+1000;}
+MyArray::MyArray (int a) {mynumber = thisIndex+1000;}
 
 MyArray::MyArray (CkMigrateMessage *msg) {}
 
 void MyArray::run() {
   CkPrintf("[%d] in run %d\n",thisIndex,mynumber);
-  //sleep(1);
-  mainProxy.arrayResult(mynumber);
+  sleep(0);
+  mainProxy.arrayResult(mynumber++);
 }
 
 #include "server.def.h"

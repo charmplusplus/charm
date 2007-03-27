@@ -24,7 +24,7 @@ class Main : public CBase_Main {
 
 class MyArray : public CBase_MyArray {
  public:
-  MyArray();
+  MyArray(int);
   MyArray(CkMigrateMessage *msg);
   void run();
  private:
