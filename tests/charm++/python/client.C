@@ -43,15 +43,15 @@ int main (int argc, char** argv) {
     PythonPrint request(remoteValue);
     sleep(2);
     //request.print();
-    //   CcsSendRequest (&server, "pyCode", 0, sizeof(request), &request);
+    CcsSendRequest (&server, "pyCode", 0, request.size(), request.pack());
     //request.print();
-    //   CcsRecvResponse (&server, 100, buffer, 100);
+    CcsRecvResponse (&server, 100, buffer, 100);
     //request.print();
     printf("responce: %s\n",buffer);
     //sleep(2);
     //request.print();
-    //   CcsSendRequest (&server, "pyCode", 0, sizeof(request), &request);
-    //   CcsRecvResponse (&server, 100, buffer, 100);
-    printf("responce: %x\n",*buffer);
+    //    CcsSendRequest (&server, "pyCode", 0, sizeof(request), &request);
+    //    CcsRecvResponse (&server, 100, buffer, 100);
+    //printf("responce: %x\n",*buffer);
   }
 }

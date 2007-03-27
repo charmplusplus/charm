@@ -12,7 +12,7 @@ mainmodule server {
 	}
 
 	array [1D] MyArray {
-		entry MyArray(int);
+		entry MyArray();
 		entry void run(void);
 	}
 

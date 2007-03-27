@@ -11,7 +11,7 @@ Main::Main (CkArgMsg *msg) {
      for the python code been inserted */
   elem = 10;
 
-  mypython = CProxy_MyArray::ckNew(elem, 2);
+  mypython = CProxy_MyArray::ckNew(elem);
 
   count=0;
   total=0;
@@ -55,7 +55,7 @@ void Main::arrayResult (int value) {
   }
 }
 
-MyArray::MyArray (int a) {mynumber = thisIndex+1000;}
+MyArray::MyArray () {mynumber = thisIndex+1000;}
 
 MyArray::MyArray (CkMigrateMessage *msg) {}
 
