@@ -174,7 +174,8 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h\
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	ckstatistics.h ckvector3d.h conv-lists.h RTH.h ckcomplex.h \
-	sockRoutines.h sockRoutines.c ckpool.h bgltorus.h
+	sockRoutines.h sockRoutines.c ckpool.h bgltorus.h \
+	TopoManager.h CrayTorus.h
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h \
@@ -350,7 +351,7 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	pup_xlater.o pup_c.o pup_paged.o pup_cmialloc.o			\
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
 	conv-lists.o RTH.o persist-comm.o $(CONVERSE_COM_CORE_OBJS) \
-	ckbitvector.o
+	ckbitvector.o TopoManager.o CrayTorus.o
 
 LIBCONV_UTILF=pup_f.o
 
@@ -448,6 +449,12 @@ pup_cmialloc.o: pup_cmialloc.C $(CVHEADERS) $(UTILHEADERS)
 
 ckhashtable.o: ckhashtable.C ckhashtable.h $(CVHEADERS)
 	$(CHARMC) -o ckhashtable.o ckhashtable.C
+
+TopoManager.o: TopoManager.C TopoManager.h bgltorus.h CrayTorus.h $(CVHEADERS) $(UTILHEADERS)
+	$(CHARMC) -o TopoManager.o TopoManager.C
+
+CrayTorus.o: CrayTorus.C CrayTorus.h $(CVHEADERS) $(UTILHEADERS)
+	$(CHARMC) -o CrayTorus.o CrayTorus.C
 
 ckbitvector.o: ckbitvector.C ckbitvector.h $(CVHEADERS)
 	$(CHARMC) -o ckbitvector.o ckbitvector.C
