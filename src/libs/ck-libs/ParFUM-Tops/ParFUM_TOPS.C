@@ -100,8 +100,8 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
 
     model->mAtt = mAtt;
 
-    model->num_local_elem = model->mesh->elem[0].size();
-    model->num_local_node = model->mesh->node.size();
+    model->num_local_elem = model->mesh->elem[0].count_valid();
+    model->num_local_node = model->mesh->node.count_valid();
 
     setTableReferences(model);
 
@@ -298,6 +298,11 @@ void* topNode_GetAttrib(TopModel* m, TopNode n){
 	@todo Does not work with ghosts yet.
 */
 TopNode topModel_GetNodeAtId(TopModel* m, TopID id){
+  // If the nodes are inserted with ids 1..n then we can just return node id-1
+  if( m->mesh->node.is_valid(id-1) && (*m->node_id_T)(id-1,0)==id){ 
+    return id-1; 
+  } 
+
   // lookup node via global ID
   for(int i=0;i<m->node_id_T->size();++i){
 	if( m->mesh->node.is_valid(i) && (*m->node_id_T)(i,0)==id){
@@ -340,7 +345,7 @@ int topNode_GetId(TopModel* m, TopNode n){
 
 /** @todo handle ghost nodes as appropriate */
 int topModel_GetNNodes(TopModel *model){
-  return model->mesh->node.count_valid();
+  return model->num_local_node;
 }
 
 /** @todo Fix to return the width of the conn array */
@@ -362,15 +367,6 @@ void topNode_GetPosition(TopModel*model, TopNode node,float*x,float*y,float*z){
   *x = (*model->coord_T)(node,0);
   *y = (*model->coord_T)(node,1);
   *z = (*model->coord_T)(node,2);
-}
-
-void topModel_Sync(TopModel*m){
-  MPI_Barrier(MPI_COMM_WORLD);
-
-
-  //  CkPrintf("%d: %d local, %d ghost elements\n", FEM_My_partition(), m->mesh->elem[0].size(),m->mesh->elem[0].ghost->size() );
-  //  CkPrintf("%d: %d local, %d ghost valid elements\n", FEM_My_partition(), m->mesh->elem[0].count_valid(),m->mesh->elem[0].ghost->count_valid() );
-
 }
 
 void topModel_TestIterators(TopModel*m){
