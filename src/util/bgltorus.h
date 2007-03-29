@@ -222,6 +222,7 @@ class BGLTorusManager {
     if(absx(dx)>=absy(dy) && absx(dx)>=absz(dz)) return (dx>0)?0:1;
     if(absy(dy)> absx(dx) && absy(dy)>=absz(dz)) return (dy>0)?2:3;
     if(absz(dz)> absx(dx) && absz(dz)> absy(dy)) return (dz>0)?4:5;
+    return -1;
   }
 
   /* sort pes by ascending order of hops to me */
