@@ -5,10 +5,10 @@
 /*@{*/
 
 
-/*** 
+/***
    ParFUM_internals.h
 
-   This file should contain ALL required header code that is 
+   This file should contain ALL required header code that is
    internal to ParFUM, but should not be visible to users. This
    includes all the old fem_mesh.h type files.
 
@@ -66,7 +66,7 @@ CtvExtern(FEM_Adapt_Algs *, _adaptAlgs);
   Charm++ Finite Element Framework:
   C++ implementation file: Mesh representation and manipulation
 
-  This file lists the classes used to represent and manipulate 
+  This file lists the classes used to represent and manipulate
   Finite Element Meshes inside the FEM framework.
 
   Orion Sky Lawlor, olawlor@acm.org, 1/3/2003
@@ -77,7 +77,7 @@ typedef IDXL_Side FEM_Comm;
 typedef IDXL_List FEM_Comm_List;
 typedef IDXL_Rec FEM_Comm_Rec;
 
-/// We want the FEM_Comm/IDXL_Side's to be accessible to *both* 
+/// We want the FEM_Comm/IDXL_Side's to be accessible to *both*
 ///  FEM routines (via these data structures) and IDXL routines
 ///  (via an idxl->addStatic registration).  Hence this class, which
 ///  manages IDXL's view of FEM's data structures.
@@ -90,7 +90,7 @@ class FEM_Comm_Holder {
   FEM_Comm_Holder(FEM_Comm *sendComm, FEM_Comm *recvComm);
   void pup(PUP::er &p);
   ~FEM_Comm_Holder(void);
-	
+
   /// Return our IDXL_Comm_t, registering with chunk if needed
   inline IDXL_Comm_t getIndex(IDXL_Chunk *c) {
     if (idx==-1) registerIdx(c);
@@ -113,10 +113,10 @@ class FEM_Sym_Desc : public PUP::able {
 
   /// Apply this symmetry to this location vector
   virtual CkVector3d applyLoc(const CkVector3d &loc) const =0;
-	
+
   /// Apply this symmetry to this relative (vel or acc) vector
   virtual CkVector3d applyVec(const CkVector3d &vec) const =0;
-	
+
   /// Allows Desc's to be pup'd via | operator:
   friend inline void operator|(PUP::er &p,FEM_Sym_Desc &a) {a.pup(p);}
   friend inline void operator|(PUP::er &p,FEM_Sym_Desc* &a) {
@@ -130,13 +130,13 @@ class FEM_Sym_Linear : public FEM_Sym_Desc {
  public:
   FEM_Sym_Linear(const CkVector3d &shift_) :shift(shift_) {}
   FEM_Sym_Linear(CkMigrateMessage *m) {}
-	
+
   /// Apply this symmetry to this location vector
   CkVector3d applyLoc(const CkVector3d &loc) const {return loc+shift;}
-	
+
   /// Apply this symmetry to this relative (vel or acc) vector
   virtual CkVector3d applyVec(const CkVector3d &vec) const {return vec;}
-	
+
   virtual void pup(PUP::er &p);
   PUPable_decl(FEM_Sym_Linear);
 };
@@ -147,24 +147,24 @@ class FEM_Sym_Linear : public FEM_Sym_Desc {
  */
 class FEM_Sym_List {
   //This lists the different kinds of symmetry
-  CkPupAblePtrVec<FEM_Sym_Desc> sym; 
-	
+  CkPupAblePtrVec<FEM_Sym_Desc> sym;
+
   FEM_Sym_List(const FEM_Sym_List &src); //NOT DEFINED: copy constructor
  public:
   FEM_Sym_List();
   void operator=(const FEM_Sym_List &src); //Assignment operator
   ~FEM_Sym_List();
-	
+
   /// Add a new kind of symmetry to this list, returning
   ///  the way objects with that symmetry should be marked.
   FEM_Symmetries_t add(FEM_Sym_Desc *desc);
-	
+
   /// Apply all the listed symmetries to this location
   void applyLoc(CkVector3d *loc,FEM_Symmetries_t sym) const;
-	
+
   /// Apply all the listed symmetries to this relative vector
   void applyVec(CkVector3d *vec,FEM_Symmetries_t sym) const;
-	
+
   void pup(PUP::er &p);
 };
 
@@ -176,21 +176,21 @@ class BasicTable2d : public CkNoncopyable {
   int cols; //Size of each entry in table
   T *table; //Data in table [rows * cols]
  public:
-  BasicTable2d(T *src,int cols_,int rows_) 
+  BasicTable2d(T *src,int cols_,int rows_)
     :rows(rows_), cols(cols_), table(src) {}
-	
+
   /// "size" of the table is the number of rows:
   inline int size(void) const {return rows;}
   /// Width of the table is the number of columns:
   inline int width(void) const {return cols;}
-	
+
   T *getData(void) {return table;}
   const T *getData(void) const {return table;}
-	
+
   // Element-by-element operations:
   T operator() (int r,int c) const {return table[c+r*cols];}
   T &operator() (int r,int c) {return table[c+r*cols];}
-	
+
   // Row-by-row operations
   ///Get a pointer to a row of the table:
   inline T *getRow(int r) {return &table[r*cols];}
@@ -213,22 +213,22 @@ class BasicTable2d : public CkNoncopyable {
 
   // These affect the entire table:
   void set(const T *src,T idxBase=0) {
-    for (int r=0;r<rows;r++) 
+    for (int r=0;r<rows;r++)
       for (int c=0;c<cols;c++)
 	table[c+r*cols]=src[c+r*cols]-idxBase;
   }
   void setTranspose(const T *srcT,int idxBase=0) {
-    for (int r=0;r<rows;r++) 
+    for (int r=0;r<rows;r++)
       for (int c=0;c<cols;c++)
 	table[c+r*cols]=srcT[r+c*rows]-idxBase;
   }
   void get(T *dest,T idxBase=0) const {
-    for (int r=0;r<rows;r++) 
+    for (int r=0;r<rows;r++)
       for (int c=0;c<cols;c++)
 	dest[c+r*cols]=table[c+r*cols]+idxBase;
   }
   void getTranspose(T *destT,int idxBase=0) const {
-    for (int r=0;r<rows;r++) 
+    for (int r=0;r<rows;r++)
       for (int c=0;c<cols;c++)
 	destT[r+c*rows]=table[c+r*cols]+idxBase;
   }
@@ -249,13 +249,13 @@ class AllocTable2d : public BasicTable2d<T> {
   ///Maximum number of rows that can be used without reallocation
   int max;
   ///Value to fill uninitialized regions with
-  T fill; 
+  T fill;
   /// the table that I allocated
   T *allocTable;
  public:
   ///default constructor
-  AllocTable2d(int cols_=0,int rows_=0,T fill_=0) 
-    :BasicTable2d<T>(NULL,cols_,rows_), max(0), fill(fill_)		
+  AllocTable2d(int cols_=0,int rows_=0,T fill_=0)
+    :BasicTable2d<T>(NULL,cols_,rows_), max(0), fill(fill_)
     {
 			allocTable = NULL;
       if (this->rows>0) allocate(this->rows);
@@ -263,11 +263,11 @@ class AllocTable2d : public BasicTable2d<T> {
   ///default destructor
   ~AllocTable2d() {if(allocTable != NULL){delete[] allocTable;}}
   /// Make room for this many rows
-  void allocate(int rows_) { 
+  void allocate(int rows_) {
     allocate(this->width(),rows_);
   }
   /// Make room for this many cols & rows
-  void allocate(int cols_,int rows_,int max_=0) { 
+  void allocate(int cols_,int rows_,int max_=0) {
     if (cols_==this->cols && rows_<max) {
       //We have room--just update the size:
       this->rows=rows_;
@@ -276,7 +276,7 @@ class AllocTable2d : public BasicTable2d<T> {
     if (max_==0) { //They gave no suggested size-- pick one:
       if (rows_==this->rows+1) //Growing slowly: grab a little extra
 	max_=10+rows_+(rows_>>2); //  125% plus 10
-      else // for a big change, just go with the minimum needed: 
+      else // for a big change, just go with the minimum needed:
 	max_=rows_;
     }
 
@@ -287,7 +287,7 @@ class AllocTable2d : public BasicTable2d<T> {
     this->table=new T[max*this->cols];
     //Preserve old table entries (FIXME: assumes old cols is unchanged)
     int copyRows=0;
-    if (allocTable!=NULL) { 
+    if (allocTable!=NULL) {
       copyRows=oldRows;
       if (copyRows>max) copyRows=max;
       memcpy(this->table,allocTable,sizeof(T)*this->cols*copyRows);
@@ -298,7 +298,7 @@ class AllocTable2d : public BasicTable2d<T> {
     }
     allocTable = this->table;
   }
-	
+
   /// Pup routine and operator|:
   void pup(PUP::er &p) {
     p|this->rows; p|this->cols;
@@ -317,7 +317,7 @@ class AllocTable2d : public BasicTable2d<T> {
 
   /// Add a row to the table (by analogy with std::vector):
   T *push_back(void) {
-    if (this->rows>=max) 
+    if (this->rows>=max)
       { //Not already enough room for the new row:
 	int newMax=max+(max/4)+16; //Grow 25% longer
 	allocate(this->cols,this->rows,newMax);
@@ -333,7 +333,7 @@ class AllocTable2d : public BasicTable2d<T> {
     if(allocTable != NULL){
       delete [] allocTable;
       allocTable = NULL;
-    }	
+    }
     this->table = user;
     this->rows = len;
     this->max = max;
@@ -369,16 +369,16 @@ class FEM_Attribute {
   int datatype;
   ///True if subclass allocate has been called.
   bool allocated;
-  
-  ///Abort with a nice error message saying: 
+
+  ///Abort with a nice error message saying:
   /** Our <field> was previously set to <cur>; it cannot now be <next>*/
   void bad(const char *field,bool forRead,int cur,int next,const char *caller) const;
-  
+
  protected:
   /**
    * Allocate storage for at least length width-item records of type datatype.
    * This routine is called after all three parameters are set,
-   * as a convenience for subclasses. 
+   * as a convenience for subclasses.
    */
   virtual void allocate(int length,int width,int datatype) =0;
  public:
@@ -386,68 +386,68 @@ class FEM_Attribute {
   virtual void pup(PUP::er &p);
   virtual void pupSingle(PUP::er &p, int pupindx);
   virtual ~FEM_Attribute();
-	
+
   /// Install this attribute as our ghost:
   inline void setGhost(FEM_Attribute *ghost_) { ghost=ghost_;}
-	
+
   /// Return true if we're a ghost
   inline bool isGhost(void) const { return ghost!=NULL; }
-	
+
   /// Return our attribute code
   inline int getAttr(void) const {return attr;}
 
   inline FEM_Entity *getEntity(void) {return e;}
-	
+
   /// Return the number of rows in our table of data (0 if unknown).
   /// This value is obtained directly from our owning Entity.
   int getLength(void) const;
   int getRealLength(void) const;
 
   int getMax();
-	
+
   /// Return the number of columns in our table of data (0 if unknown)
   inline int getWidth(void) const { return width<0?0:width; }
   inline int getRealWidth(void) const { return width; }
-	
+
   /// Return our FEM_* datatype (-1 if unknown)
   inline int getDatatype(void) const { return datatype; }
-	
+
   /**
    * Set our length (number of rows, or records) to this value.
    * Default implementation calls setLength on our owning entity
    * and tries to call allocate().
    */
   void setLength(int l,const char *caller="");
-	
+
   /**
    * Set our width (number of values per row) to this value.
    * The default implementation sets width and tries to call allocate().
    */
   void setWidth(int w,const char *caller="");
-	
+
   /**
    * Set our datatype (e.g., FEM_INT, FEM_DOUBLE) to this value.
    * The default implementation sets width and tries to call allocate().
    */
   void setDatatype(int dt,const char *caller="");
-	
+
   /**
    * Copy our width and datatype from this attribute.
    * The default implementation calls setWidth and setDatatype.
    * which should be enough for virtually any attribute.
    */
   virtual void copyShape(const FEM_Attribute &src);
-	
+
   /// Check if all three of length, width, and datatype are set,
   ///  but we're not yet allocated.  If so, call allocate; else ignore.
   void tryAllocate(void);
-	
+
   /// Our parent's length has changed: reallocate our storage
   inline void reallocate(void) { allocated=false; tryAllocate(); }
-	
+
   /// Return true if we've already had storage allocated.
   inline bool isAllocated(void) const {return allocated;}
-	
+
   /**
    * Set our data to these (typically user-supplied, unchecked) values.
    * Subclasses normally override this method as:
@@ -456,9 +456,9 @@ class FEM_Attribute {
    *       copy data from src.
    *    }
    */
-  virtual void set(const void *src, int firstItem,int length, 
+  virtual void set(const void *src, int firstItem,int length,
 		   const IDXL_Layout &layout, const char *caller);
-	
+
   /**
    * Extract this quantity of user data.  Length and layout are
    * parameter checked by the default implementation.
@@ -470,16 +470,16 @@ class FEM_Attribute {
    */
   virtual void get(void *dest, int firstItem,int length,
 		   const IDXL_Layout &layout, const char *caller) const;
-	
+
   /// Copy everything associated with src[srcEntity] into our dstEntity.
   virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity) =0;
 
-  /** Register this user data for this attributre 
+  /** Register this user data for this attributre
       Length, layout etc are checked by the default implementaion
   */
   virtual void register_data(void *dest, int length,int max,
 			     const IDXL_Layout &layout, const char *caller);
-	
+
 };
 PUPmarshall(FEM_Attribute);
 
@@ -505,33 +505,33 @@ class FEM_DataAttribute : public FEM_Attribute {
   virtual void pup(PUP::er &p);
   virtual void pupSingle(PUP::er &p, int pupindx);
   ~FEM_DataAttribute();
-  
+
   AllocTable2d<unsigned char> &getChar(void) {return *char_data;}
   const AllocTable2d<unsigned char> &getChar(void) const {return *char_data;}
-  
+
   AllocTable2d<int> &getInt(void) {return *int_data;}
   const AllocTable2d<int> &getInt(void) const {return *int_data;}
-    
+
   AllocTable2d<double> &getDouble(void) {return *double_data;}
   const AllocTable2d<double> &getDouble(void) const {return *double_data;}
 
   AllocTable2d<float> &getFloat(void) {return *float_data;}
   const AllocTable2d<float> &getFloat(void) const {return *float_data;}
 
-  
-  virtual void set(const void *src, int firstItem,int length, 
+
+  virtual void set(const void *src, int firstItem,int length,
 		   const IDXL_Layout &layout, const char *caller);
-  
-  virtual void get(void *dest, int firstItem,int length, 
+
+  virtual void get(void *dest, int firstItem,int length,
 		   const IDXL_Layout &layout, const char *caller) const;
-  
+
   virtual void register_data(void *dest, int length,int max,
 			     const IDXL_Layout &layout, const char *caller);
-  
-	
+
+
   /// Copy src[srcEntity] into our dstEntity.
   virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
-  
+
   /// extrapolate the values of a node from 2 others
   /** Extrapolate the value of D from A and B (using the fraction 'frac')
    */
@@ -554,7 +554,7 @@ class FEM_IndexAttribute : public FEM_Attribute {
   class Checker {
   public:
     virtual ~Checker();
-    
+
     /**
      * Check this (newly set) row of our table for validity.
      * You're expected to abort or throw or exit if something is wrong.
@@ -574,19 +574,19 @@ class FEM_IndexAttribute : public FEM_Attribute {
   virtual void pup(PUP::er &p);
   virtual void pupSingle(PUP::er &p, int pupindx);
   ~FEM_IndexAttribute();
-  
+
   AllocTable2d<int> &get(void) {return idx;}
   const AllocTable2d<int> &get(void) const {return idx;}
-	
-  virtual void set(const void *src, int firstItem,int length, 
+
+  virtual void set(const void *src, int firstItem,int length,
 		   const IDXL_Layout &layout, const char *caller);
-	
+
   virtual void get(void *dest, int firstItem,int length,
 		   const IDXL_Layout &layout, const char *caller) const;
 
   virtual void register_data(void *dest, int length, int max,
 			     const IDXL_Layout &layout, const char *caller);
-	
+
   /// Copy src[srcEntity] into our dstEntity.
   virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
 };
@@ -594,7 +594,7 @@ PUPmarshall(FEM_IndexAttribute);
 
 ///The FEM_Attribute is a variable set of integer indices
 /**
-  This table maps an entity to a list of integer indices 
+  This table maps an entity to a list of integer indices
   of unknown length.
   The node to element adjacency array is an example, where a node
   is mapped to a list of element indices of unknown length.
@@ -655,7 +655,7 @@ class FEM_VarIndexAttribute : public FEM_Attribute{
  protected:
   virtual void allocate(int _length,int _width,int _datatype){
     if(_length > oldlength){
-      setWidth(1,"allocate"); //there is 1 vector per entity 
+      setWidth(1,"allocate"); //there is 1 vector per entity
       oldlength = _length*2;
       idx.reserve(oldlength);
       for(int i=idx.size();i<oldlength;i++){
@@ -671,25 +671,25 @@ class FEM_VarIndexAttribute : public FEM_Attribute{
   virtual void pupSingle(PUP::er &p, int pupindx);
   CkVec<CkVec<ID> > &get(){return idx;};
   const CkVec<CkVec<ID> > &get() const {return idx;};
-	
+
   virtual void set(const void *src,int firstItem,int length,
 		   const IDXL_Layout &layout,const char *caller);
 
   virtual void get(void *dest, int firstItem,int length,
 		   const IDXL_Layout &layout, const char *caller) const;
-	
+
   virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
 
   int findInRow(int row,const ID &data);
-	
+
   void print();
 };
 
 ///FEM_Entity describes an entire entity (nodes/elements/sparse) which contains attributes
 /**
- * Describes an entire class of "entities"--nodes, elements, or sparse 
+ * Describes an entire class of "entities"--nodes, elements, or sparse
  *  data records. Basically consists of a length and a set of
- *  FEM_Attributes. 
+ *  FEM_Attributes.
  */
 class FEM_Entity {
   ///symmetries
@@ -702,51 +702,51 @@ class FEM_Entity {
   FEM_Mesh_alloc_fn resize;
   /// arguments to the resize function
   void *args;
-	
+
   /**
-   * This is our main list of attributes-- everything about each of 
+   * This is our main list of attributes-- everything about each of
    * our entities is in this list of attributes.  This list is searched
-   * by our "lookup" method and maintained by our subclasses "create" 
+   * by our "lookup" method and maintained by our subclasses "create"
    * method and calls to our "add" method.
-   * 
+   *
    * It's a little funky having the superclass keep pointers to subclass
    * objects (like element connectivity), but very nice to be able to
    * easily loop over everything associated with an entity.
    */
   CkVec<FEM_Attribute *> attributes;
-	
+
   /**
    * Coordinates of each entity, from FEM_COORD.
    * Datatype is always FEM_DOUBLE, width is always 2 or 3.
    *  If NULL, coordinates are unknown.
    */
-  FEM_DataAttribute *coord; 
+  FEM_DataAttribute *coord;
   void allocateCoord(void);
-	
+
   /**
    * Symmetries of each entity, from FEM_SYMMETRIES.  This bitvector per
    * entity indicates which symmetry conditions the entity belongs to.
-   * Datatype is always FEM_BYTE (same as FEM_Symmetries_t), width 
+   * Datatype is always FEM_BYTE (same as FEM_Symmetries_t), width
    * is always 1.  If NULL, all the symmetries are 0.
    */
-  FEM_DataAttribute *sym; 
+  FEM_DataAttribute *sym;
   void allocateSym(void);
-	
+
   /**
    * Global numbers of each entity, from FEM_GLOBALNO.
    * If NULL, the global numbers are unknown.
    */
   FEM_IndexAttribute *globalno;
   void allocateGlobalno(void);
-	
+
   /**
     used to allocate the integer array for storing the boundary
-    values associated with an entity. 
+    values associated with an entity.
   */
   void allocateBoundary();
 
   /// Mesh sizing attribute for elements
-  /** Specifies a double edge length target for the mesh at each 
+  /** Specifies a double edge length target for the mesh at each
       element; used in adaptivity algorithms */
   FEM_DataAttribute *meshSizing;
   void allocateMeshSizing(void);
@@ -765,11 +765,11 @@ class FEM_Entity {
    * allocate only when we need to
    */
   int* invalidList;
-  ///length of invalid list 
+  ///length of invalid list
   int invalidListLen;
   ///length of allocated invalid list
   int invalidListAllLen;
-  
+
  protected:
   /**
    * lookup of this attribute code has failed: check if it needs
@@ -785,62 +785,62 @@ class FEM_Entity {
    * known beforehand should just call add() from their constructor.
    */
   virtual void create(int attr,const char *caller);
-	
+
   /// Add this attribute to this kind of Entity.
   /// This superclass is responsible for eventually deleting the attribute.
-  /// This class also attaches the ghost attribute, so be sure to 
+  /// This class also attaches the ghost attribute, so be sure to
   ///   call add before manipulating the attribute.
   void add(FEM_Attribute *attribute);
  public:
 
   FEM_Entity *ghost; // Our ghost entity type, or NULL if we're the ghost
-		
+
   FEM_Comm ghostSend; //Non-ghosts we send out (only set for real entities)
   FEM_Comm ghostRecv; //Ghosts we recv into (only set for ghost entities)
-  
+
 	FEM_Comm_Holder ghostIDXL; //IDXL interface
 
   FEM_Entity(FEM_Entity *ghost_); //Default constructor
   void pup(PUP::er &p);
   virtual ~FEM_Entity();
-	
+
   /// Return true if we're a ghost
   bool isGhost(void) const {return ghost==NULL;}
-	
+
   /// Switch from this, a real entity, to the ghosts:
   FEM_Entity *getGhost(void) {return ghost;}
   const FEM_Entity *getGhost(void) const {return ghost;}
-	
+
 	//should only be called on non-ghost elements that have ghosts.
 	//empty its corresponding ghost entity and clear the idxls
 	void clearGhost();
-	
+
   /// Return the number of entities of this type
   inline int size(void) const {return length==-1?0:length;}
   inline int realsize(void) const {return length;}
 
-  // return the maximum size 
+  // return the maximum size
   inline int getMax() { if(max > 0) return max; else return length;}
-	
+
   /// Return the human-readable name of this entity type, like "node"
   virtual const char *getName(void) const =0;
-	
+
   /// Copy all our attributes' widths and data types from this entity.
   void copyShape(const FEM_Entity &src);
-	
-  /** 
+
+  /**
    *  The user is setting this many entities.  This reallocates
    * all existing attributes to make room for the new entities.
    */
   void setLength(int newlen, bool f=false);
 
-  /** Support for registration API 
-   *  Set the current length and maximum length for this entity. 
+  /** Support for registration API
+   *  Set the current length and maximum length for this entity.
    *  If the current length exceeds the maximum length a resize
    *  method is called .
    */
   void setMaxLength(int newLen,int newMaxLen,void *args,FEM_Mesh_alloc_fn fn);
-	
+
   /// Copy everything associated with src[srcEntity] into our dstEntity.
   /// dstEntity must have already been allocated, e.g., with setLength.
   void copyEntity(int dstEntity,const FEM_Entity &src,int srcEntity);
@@ -848,25 +848,25 @@ class FEM_Entity {
   /// Add room for one more entity, with initial values from src[srcEntity],
   /// and return the new entity's index.
   int push_back(const FEM_Entity &src,int srcEntity);
-	
+
   /**
-   * Find this attribute (from an FEM_ATTR code) of this entity, or 
+   * Find this attribute (from an FEM_ATTR code) of this entity, or
    * create the entity (using the create method below) or abort if it's
    * not found.
    */
   FEM_Attribute *lookup(int attr,const char *caller);
 
-	
+
   /**
    * Get a list of the attribute numbers for this entity.
    */
   int getAttrs(int *attrs) const {
     int len=attributes.size();
-    for (int i=0;i<len;i++) 
+    for (int i=0;i<len;i++)
       attrs[i]=attributes[i]->getAttr();
     return len;
   }
-	
+
   /**
    * Allocate or Modify the FEM_IS_VALID attribute data
    */
@@ -875,9 +875,11 @@ class FEM_Entity {
   void set_invalid(int idx, bool isNode);
   int is_valid(int idx);         // will fail assertions for out of range indices
   int is_valid_any_idx(int idx); // will not fail assertions for out of range indices
+  int is_valid_nonghost_idx(int idx); // same as is_valid_any_idx except returns false for ghosts
+
   int count_valid();
   int get_next_invalid(FEM_Mesh *m=NULL, bool isNode=false, bool isGhost=false);// the arguments are not really needed but Nilesh added them when he wrote a messy version and did not remove them when he fixed the implementation. Since changing the uses was too painful the default arguments were added.
-  int set_all_invalid();
+  void set_all_invalid();
 
 
   virtual bool hasConn(int idx)=0;
@@ -892,22 +894,22 @@ class FEM_Entity {
   CkVec<FEM_Attribute *>* getAttrVec(){
     return &attributes;
   }
-	
+
   // Stupidest possible coordinate access
   inline FEM_DataAttribute *getCoord(void) {return coord;}
   inline const FEM_DataAttribute *getCoord(void) const {return coord;}
-	
+
   //Symmetry array access:
   const FEM_Symmetries_t *getSymmetries(void) const {
     if (sym==NULL) return NULL;
     else return (const FEM_Symmetries_t *)sym->getChar()[0];
   }
-  FEM_Symmetries_t getSymmetries(int r) const { 
+  FEM_Symmetries_t getSymmetries(int r) const {
     if (sym==NULL) return FEM_Symmetries_t(0);
     else return sym->getChar()(r,0);
   }
   void setSymmetries(int r,FEM_Symmetries_t s);
-	
+
   //Global numbering array access
   bool hasGlobalno(void) const {return globalno!=0;}
   int getGlobalno(int r) const {
@@ -921,24 +923,24 @@ class FEM_Entity {
 
   // Mesh sizing array access
   bool hasMeshSizing(void) const {return meshSizing!=0;}
-  double getMeshSizing(int r); 
+  double getMeshSizing(int r);
   void setMeshSizing(int r,double s);
   void setMeshSizing(double *sf);
-	
+
   //Ghost comm. list access
   FEM_Comm &setGhostSend(void) { return ghostSend; }
   const FEM_Comm &getGhostSend(void) const { return ghostSend; }
-  FEM_Comm &setGhostRecv(void) { 
+  FEM_Comm &setGhostRecv(void) {
     if (ghost==NULL) return ghostRecv;
-    else return ghost->ghostRecv; 
+    else return ghost->ghostRecv;
   }
   const FEM_Comm &getGhostRecv(void) const { return ghost->ghostRecv; }
-	
+
   void addVarIndexAttribute(int code){
     FEM_VarIndexAttribute *varAttribute = new FEM_VarIndexAttribute(this,code);
     add(varAttribute);
   }
-	
+
   void print(const char *type,const IDXL_Print_Map &map);
 };
 PUPmarshall(FEM_Entity);
@@ -951,7 +953,7 @@ inline int FEM_Attribute::getMax(){ return e->getMax();}
 
 ///FEM_Node is a type of FEM_Entity, which refers to nodes
 /**
- * Describes a set of FEM Nodes--the FEM_NODE entity type. 
+ * Describes a set of FEM Nodes--the FEM_NODE entity type.
  * Unlike elements, nodes have no connectivity; but they do have
  * special shared-nodes communications and a "primary" flag.
  */
@@ -963,27 +965,27 @@ class FEM_Node : public FEM_Entity {
    * Datatype is always FEM_BYTE (we need an FEM_BIT!), width is always 1,
    * since there's only one such flag per node.
    */
-  FEM_DataAttribute *primary; 
+  FEM_DataAttribute *primary;
   void allocatePrimary(void);
-	
+
   void allocateElemAdjacency();
   void allocateNodeAdjacency();
 
-  FEM_VarIndexAttribute *elemAdjacency; ///< stores the node to element adjacency vector 
-  FEM_VarIndexAttribute *nodeAdjacency; ///< stores the node to node adjacency vector 
+  FEM_VarIndexAttribute *elemAdjacency; ///< stores the node to element adjacency vector
+  FEM_VarIndexAttribute *nodeAdjacency; ///< stores the node to node adjacency vector
   typedef FEM_VarIndexAttribute::ID var_id;
  protected:
   virtual void create(int attr,const char *caller);
  public:
   FEM_Comm shared; ///<Shared nodes
   FEM_Comm_Holder sharedIDXL; ///<IDXL interface to shared nodes
-	
+
   FEM_Node(FEM_Node *ghost_);
   void pup(PUP::er &p);
   ~FEM_Node();
-	
+
   virtual const char *getName(void) const;
-	
+
   inline bool getPrimary(int nodeNo) const {
     if (primary==NULL) return true; //Everything must be primary
     else return primary->getChar()(nodeNo,0);
@@ -1017,30 +1019,30 @@ class FEM_Elem:public FEM_Entity {
   int tuplesPerElem;
 
   // The following are attributes that will commonly be used:
-  FEM_IndexAttribute *conn;                ///< FEM_CONN attribute: element-to-node mapping 
+  FEM_IndexAttribute *conn;                ///< FEM_CONN attribute: element-to-node mapping
   FEM_IndexAttribute *elemAdjacency;       ///< FEM_ELEM_ELEM_ADJACENCY attribute
   FEM_IndexAttribute *elemAdjacencyTypes;  ///< FEM_ELEM_ELEM_ADJ_TYPES attribute
-  
+
  public:
-  
+
   FEM_Elem(const FEM_Mesh &mesh_, FEM_Elem *ghost_);
   void pup(PUP::er &p);
   ~FEM_Elem();
-  
+
   virtual const char *getName(void) const;
-  
+
   // Directly access our connectivity table:
   inline conn_t &setConn(void) {return conn->get();}
   inline const conn_t &getConn(void) const {return conn->get();}
-  
+
   void print(const char *type,const IDXL_Print_Map &map);
-  
+
   void create(int attr,const char *caller);
-  
+
   void allocateElemAdjacency();
-  
+
   FEM_IndexAttribute *getElemAdjacency(){return elemAdjacency;}
-  
+
   // Backward compatability routines:
   int getConn(int elem,int nodeNo) const {return conn->get()(elem,nodeNo);}
   int getNodesPer(void) const {return conn->get().width();}
@@ -1064,9 +1066,9 @@ PUPmarshall(FEM_Elem);
 class FEM_Sparse : public FEM_Elem {
   typedef FEM_Elem super;
   typedef AllocTable2d<int> elem_t;
-	
+
   /**
-   * elem, from FEM_SPARSE_ELEM, is an optional (that is, possibly NULL) 
+   * elem, from FEM_SPARSE_ELEM, is an optional (that is, possibly NULL)
    * array which changes the partitioning of sparse entities: if non-NULL,
    * sparse entity t lives on the same chunk as FEM_ELEM+elem[2*t]
    * local number elem[2*t+1].
@@ -1082,19 +1084,19 @@ class FEM_Sparse : public FEM_Elem {
   FEM_Sparse(const FEM_Mesh &mesh_, FEM_Sparse *ghost_);
   void pup(PUP::er &p);
   virtual ~FEM_Sparse();
-	
+
   virtual const char *getName(void) const;
-	
+
   /// Return true if we have an element partitioning table
   bool hasElements(void) const {return elem!=NULL;}
-	
+
   /// Directly access our element partitioning table (e.g., for re-numbering)
   inline elem_t &setElem(void) {return elem->get();}
   inline const elem_t &getElem(void) const {return elem->get();}
 };
 PUPmarshall(FEM_Sparse);
 
-/** Describes a user function to pup a piece of mesh data 
+/** Describes a user function to pup a piece of mesh data
  */
 class FEM_Userdata_pupfn {
   FEM_Userdata_fn fn;
@@ -1114,10 +1116,10 @@ class FEM_Userdata_item {
  public:
   int tag; //User-assigned identifier
   FEM_Userdata_item(int tag_=-1) {tag=tag_;}
-	
+
   /// Return true if we have stored data.
   bool hasStored(void) const {return data.size()!=0;}
-	
+
   /// Store this userdata inside us:
   void store(FEM_Userdata_pupfn &f) {
     data.resize(PUP::size(f));
@@ -1127,7 +1129,7 @@ class FEM_Userdata_item {
   void restore(FEM_Userdata_pupfn &f) {
     PUP::fromMemBuf(f,&data[0],data.size());
   }
-	
+
   /// Save our stored data to this PUP::er
   void pup(PUP::er &p) {
     p|tag;
@@ -1135,7 +1137,7 @@ class FEM_Userdata_item {
   }
 };
 
-/// Describes all the unassociated data in a mesh. 
+/// Describes all the unassociated data in a mesh.
 class FEM_Userdata_list {
   CkVec<FEM_Userdata_item> list;
  public:
@@ -1158,7 +1160,7 @@ void FEM_Index_Check(const char *caller,const char *entityType,int type,int maxT
 void FEM_Is_NULL(const char *caller,const char *entityType,int type);
 
 /**
- * This class describes several different types of a certain kind 
+ * This class describes several different types of a certain kind
  * of entity.  For example, there might be a FEM_Entity_Types<FEM_Elem>
  * that lists the different kinds of element.
  *
@@ -1176,9 +1178,9 @@ class FEM_Entity_Types {
   const char *name; //FEM_SPARSE or FEM_ELEM, or some such.
 
  public:
-  FEM_Entity_Types(const FEM_Mesh &mesh_,const char *name_) 
+  FEM_Entity_Types(const FEM_Mesh &mesh_,const char *name_)
     :mesh(mesh_), name(name_) {}
-  void pup(PUP::er &p) { 
+  void pup(PUP::er &p) {
     // Can't just use p|types, because T has a funky constructor:
     int n=types.size();
     p|n;
@@ -1193,10 +1195,10 @@ class FEM_Entity_Types {
     for (int i=0;i<types.size();i++)
       if (types[i]) delete types[i];
   }
-	
+
   /// Return the number of different entity types
   inline int size(void) const {return types.size();}
-	
+
   /// Return a read-only copy of this type, or else abort if type isn't set.
   const T &get(int type,const char *caller="") const {
     FEM_Index_Check(caller,name,type,types.size());
@@ -1204,13 +1206,13 @@ class FEM_Entity_Types {
     if (ret==NULL) FEM_Is_NULL(caller,name,type);
     return *ret;
   }
-	
+
   /// Return true if we have a type t, and false otherwise
-  bool has(int type) const { 
+  bool has(int type) const {
     if (type>=types.size()) return false;
-    return types[type]!=NULL; 
+    return types[type]!=NULL;
   }
-	
+
   /// Return a writable copy of this type, calling new T(mesh) if it's not there
   T &set(int type,const char *caller="") {
     if (type<0) FEM_Index_Check(caller,name,type,types.size());
@@ -1221,7 +1223,7 @@ class FEM_Entity_Types {
     }
     return *types[type];
   }
-	
+
   /// Read-only and write-only operator[]'s:
   inline T &operator[] (int type) { return set(type); }
   inline const T &operator[] (int type) const { return get(type); }
@@ -1246,9 +1248,9 @@ class FEM_Mesh : public CkNoncopyable {
   /// The symmetries in the mesh
   FEM_Sym_List symList;
   bool m_isSetting;
-  
+
   void checkElemType(int elType,const char *caller) const;
-  void checkSparseType(int uniqueID,const char *caller) const; 
+  void checkSparseType(int uniqueID,const char *caller) const;
 
  public:
   femMeshModify *fmMM;
@@ -1257,32 +1259,32 @@ class FEM_Mesh : public CkNoncopyable {
   FEM_ElemAdj_Layer* lastElemAdjLayer;
   void setFemMeshModify(femMeshModify *m);
   void setParfumSA(ParFUMShadowArray *m);
-  
+
   FEM_Mesh();
   void pup(PUP::er &p); //For migration
   ~FEM_Mesh();
 
   /// The nodes in this mesh:
-  FEM_Node node; 
-  
+  FEM_Node node;
+
   /// The different element types in this mesh:
   FEM_Entity_Types<FEM_Elem> elem;
-  
+
   /// The different sparse types in this mesh:
   FEM_Entity_Types<FEM_Sparse> sparse;
-  
+
   /// The unassociated user data for this mesh:
   FEM_Userdata_list udata;
-  
+
   /// The symmetries that apply to this mesh:
   void setSymList(const FEM_Sym_List &src) {symList=src;}
   const FEM_Sym_List &getSymList(void) const {return symList;}
-  
+
   /// Set up the "shape" of our fields-- the number of element types,
   /// the datatypes for user data, etc--based on this mesh.
   void copyShape(const FEM_Mesh &src);
 
-  // Get the fem mesh modification object associated with this mesh or partition  
+  // Get the fem mesh modification object associated with this mesh or partition
   femMeshModify *getfmMM();
 
   //Return this type of element, given an element type
@@ -1297,16 +1299,16 @@ class FEM_Mesh : public CkNoncopyable {
   FEM_Elem &setElem(int elType) {return elem[chkET(elType)];}
   const FEM_Elem &getElem(int elType) const {return elem[chkET(elType)];}
   int chkET(int elType) const; //Check this element type-- abort if it's bad
-  
+
   /// Look up this FEM_Entity type in this mesh, or abort if it's not valid.
   FEM_Entity *lookup(int entity,const char *caller);
   const FEM_Entity *lookup(int entity,const char *caller) const;
-  
+
   /// Set/get direction control:
   inline bool isSetting(void) const {return m_isSetting;}
   void becomeSetting(void) {m_isSetting=true;}
   void becomeGetting(void) {m_isSetting=false;}
-  
+
   int nElems() const //Return total number of elements (of all types)
     {return nElems(elem.size());}
   /// Return the total number of elements before type t
@@ -1317,33 +1319,33 @@ class FEM_Mesh : public CkNoncopyable {
   void setAscendingGlobalno(void);
   ///	The global numbers for elements runs across different types
   void setAbsoluteGlobalno();
-  
+
   void copyOldGlobalno(const FEM_Mesh &m);
   void print(int idxBase);//Write a human-readable description to CkPrintf
   /// Extract a list of our entities:
   int getEntities(int *entites);
-  
+
   /**
 	 * clearing the idxl and data for shared nodes and ghost nodes and shared elements
-	 * 
+	 *
 	 * */
 
 	void clearSharedNodes();
 	void clearGhostNodes();
 	void clearGhostElems();
-  
+
   /********** New methods ***********/
   /*
-    This method creates the mapping from a node to all the elements that are 
+    This method creates the mapping from a node to all the elements that are
     incident on it . It assumes the presence of one layer of ghost nodes that
     share a node.
   */
   void createNodeElemAdj();
   void createNodeNodeAdj();
   void createElemElemAdj();
-  
+
   FEM_ElemAdj_Layer *getElemAdjLayer(void);
-  
+
   // Terry's adjacency accessors & modifiers
 
   //  ------- Element-to-element: preserve initial ordering relative to nodes
@@ -1355,7 +1357,7 @@ class FEM_Mesh : public CkNoncopyable {
   /// Given id of element e and id of another element nbr, return i such that
   /// nbr is the i-th element adjacent to e
   int e2e_getIndex(int e, int nbr, int etype=0);
-  /// Set the element adjacencies of element e to neighbors; assumes neighbors 
+  /// Set the element adjacencies of element e to neighbors; assumes neighbors
   /// has the correct size
   void e2e_setAll(int e, int *neighbors, int etype=0);
   /// Set the idx-th element adjacent to e to be newElem
@@ -1375,7 +1377,7 @@ class FEM_Mesh : public CkNoncopyable {
   /// Given id of element e and id of a node n, return i such that
   /// n is the i-th node adjacent to e
   short e2n_getIndex(int e, int n, int etype=0);
-  /// Set the node adjacencies of element e to adjnodes; assumes adjnodes 
+  /// Set the node adjacencies of element e to adjnodes; assumes adjnodes
   /// has the correct size
   void e2n_setAll(int e, int *adjnodes, int etype=0);
   /// Set the idx-th node adjacent to e to be newNode
@@ -1388,7 +1390,7 @@ class FEM_Mesh : public CkNoncopyable {
 
   //  ------- Node-to-node
   int n2n_getLength(int n);
-  /// Place all of node n's adjacent nodes in adjnodes and the resulting 
+  /// Place all of node n's adjacent nodes in adjnodes and the resulting
   /// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
   void n2n_getAll(int n, int *&adjnodes, int &sz);
   /// Adds newNode to node n's node adjacency list
@@ -1404,8 +1406,8 @@ class FEM_Mesh : public CkNoncopyable {
 
   //  ------- Node-to-element
   int n2e_getLength(int n);
-  /// Place all of node n's adjacent elements in adjelements and the resulting 
-  /// length of adjelements in sz; assumes adjelements is not allocated, 
+  /// Place all of node n's adjacent elements in adjelements and the resulting
+  /// length of adjelements in sz; assumes adjelements is not allocated,
   /// but sz is
   void n2e_getAll(int n, int *&adjelements, int &sz);
   /// Adds newElem to node n's element adjacency list
@@ -1418,20 +1420,20 @@ class FEM_Mesh : public CkNoncopyable {
   void n2e_removeAll(int n);
 
   /// Get an element on edge (n1, n2) where n1, n2 are chunk-local
-  /// node numberings and result is chunk-local element; return -1 in case 
+  /// node numberings and result is chunk-local element; return -1 in case
   /// of failure
   int getElementOnEdge(int n1, int n2);
 
   /// Get two elements adjacent to both n1 and n2
   void get2ElementsOnEdge(int n1, int n2, int *result_e1, int *result_e2) ;
-}; 
+};
 PUPmarshall(FEM_Mesh);
 
 FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller);
 FEM_Entity *FEM_Entity_lookup(int fem_mesh,int entity,const char *caller);
 FEM_Attribute *FEM_Attribute_lookup(int fem_mesh,int entity,int attr,const char *caller);
 
-void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr, 	
+void FEM_Mesh_data_layout(int fem_mesh,int entity,int attr,
 			  void *data, int firstItem,int length, const IDXL_Layout &layout);
 
 //registration internal api
@@ -1455,7 +1457,7 @@ void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks);
   Orion Sky Lawlor, olawlor@acm.org, 9/28/00
 */
 
-/* A stupid, stupid number: the maximum value of user-defined "elType" fields. 
+/* A stupid, stupid number: the maximum value of user-defined "elType" fields.
    This should be dynamic, so any use of this should be considered a bug.
 */
 #define FEM_MAX_ELTYPE 20
@@ -1479,7 +1481,7 @@ class l2g_t {
 template <class T>
 class NumberedVec {
   CkPupPtrVec<T, CkPupAlwaysAllocatePtr<T> > vec;
-	
+
  public:
   //Extend the vector to have up to this element
   void makeLonger(int toHaveElement)
@@ -1495,16 +1497,16 @@ class NumberedVec {
     vec[doomedEl].destroy();
     vec[doomedEl]=new T;
   }
-	
+
   int size(void) const {return vec.size();}
-	
+
   //Same old bracket operators, but return the actual object, not a pointer:
   T &operator[](int i) {
     if (i>=vec.size()) makeLonger(i);
     return *( vec[i] );
   }
   const T &operator[](int i) const {return *( vec[i] );}
-	
+
   void pup(PUP::er &p) {
     vec.pup(p);
   }
@@ -1544,7 +1546,7 @@ class marshallNewHeapCopy {
   marshallNewHeapCopy(void) { //Used on recv side:
     cur=new T;
   }
-	
+
   void pup(PUP::er &p) {
     cur->pup(p);
   }
@@ -1561,13 +1563,13 @@ class FEM_T_List {
  protected:
   int FIRST_DT; // User index of first T
   int size(void) const {return list.size();}
-	
+
   /// If this isn't a valid, allocated index, abort.
   inline void check(int l,const char *caller) const {
-    if (l<FIRST_DT || l>=FIRST_DT+list.size() || list[l-FIRST_DT]==NULL) 
+    if (l<FIRST_DT || l>=FIRST_DT+list.size() || list[l-FIRST_DT]==NULL)
       badIndex(l,caller);
   }
-	
+
   void badIndex(int l,const char *caller) const {
     if (l<FIRST_DT || l>FIRST_DT+list.size()) bad(l,0,caller);
     else bad(l,1,caller);
@@ -1576,13 +1578,13 @@ class FEM_T_List {
   FEM_T_List(int FIRST_DT_) :FIRST_DT(FIRST_DT_) {}
   virtual ~FEM_T_List() {}
   void pup(PUP::er &p) { p|list; }
-	
+
   /// This routine is called when we're passed an invalid T index.
   virtual void bad(int l,int bad_code,const char *caller) const =0;
-	
+
   /// Insert a new T (allocated with "new"), returning the user index:
   int put(T *t) {
-    for (int i=0;i<list.size();i++) 
+    for (int i=0;i<list.size();i++)
       if (list[i]==NULL) {
 	list[i]=t;
 	return FIRST_DT+i;
@@ -1591,19 +1593,19 @@ class FEM_T_List {
     list.push_back(t);
     return FIRST_DT+ret;
   }
-	
+
   /// Get this T given its user index.
   inline T *lookup(int l,const char *caller) const {
     check(l,caller);
     return list[l-FIRST_DT];
   }
-	
+
   /// Free this T
   void destroy(int l,const char *caller) {
     check(l,caller);
     list[l-FIRST_DT].destroy();
   }
-	
+
   /// Clear all stored T's:
   void empty(void) {
     for (int i=0;i<list.size();i++) list[i].destroy();
@@ -1613,7 +1615,7 @@ class FEM_Mesh_list : public FEM_T_List<FEM_Mesh> {
   typedef FEM_T_List<FEM_Mesh> super;
  public:
   FEM_Mesh_list() :super(FEM_MESH_FIRST) { }
-	
+
   virtual void bad(int l,int bad_code,const char *caller) const;
 };
 
@@ -1624,20 +1626,20 @@ class FEM_Mesh_list : public FEM_T_List<FEM_Mesh> {
 /**
    FEM global data object.  Keeps track of the global
    list of meshes, and the default read and write meshes.
-  
-   This class was once an array element, back when the 
+
+   This class was once an array element, back when the
    FEM framework was built directly on Charm++.
-  
+
    There's only one of this object per thread, and it's
    kept in a thread-private variable.
 */
-class FEM_chunk 
+class FEM_chunk
 {
  public:
   FEM_Mesh_list meshes; ///< Global list of meshes.
   int default_read; ///< Index of default read mesh.
   int default_write; ///< Index of default write mesh.
-  
+
   /// Default communicator to use
   FEM_Comm_t defaultComm;
 
@@ -1652,7 +1654,7 @@ class FEM_chunk
 
  private:
   CkVec<int> listTmp;//List of local entities, for ghost list exchange
- 
+
   void initFields(void);
 
  public:
@@ -1660,17 +1662,17 @@ class FEM_chunk
   FEM_chunk(CkMigrateMessage *msg);
   void pup(PUP::er &p);
   ~FEM_chunk();
-  
+
   /// Return this thread's single static FEM_chunk instance:
   static FEM_chunk *get(const char *caller);
-  
+
   inline FEM_Mesh *lookup(int fem_mesh,const char *caller) {
     return meshes.lookup(fem_mesh,caller);
   }
 
-  inline FEM_Mesh *getMesh(const char *caller) 
+  inline FEM_Mesh *getMesh(const char *caller)
     {return meshes.lookup(default_read,caller);}
-  inline FEM_Mesh *setMesh(const char *caller) 
+  inline FEM_Mesh *setMesh(const char *caller)
     {return meshes.lookup(default_write,caller);}
 
   void print(int fem_mesh,int idxBase);
@@ -1682,10 +1684,10 @@ class FEM_chunk
   void recvList(int elemType,int fmChk,int nIdx,const int *idx);
   const CkVec<int> &getList(void) {return listTmp;}
   void emptyList(void) {listTmp.length()=0;}
-  
+
   void reduce_field(int idxl_datatype, const void *nodes, void *outbuf, int op);
   void reduce(int idxl_datatype, const void *inbuf, void *outbuf, int op);
-  void readField(int idxl_datatype, void *nodes, const char *fname);  
+  void readField(int idxl_datatype, void *nodes, const char *fname);
 };
 
 /// Describes a single layer of ghost elements.
@@ -1736,15 +1738,15 @@ class FEM_Ghost_Stencil {
   int n;
   /// If true, add ghost nodes as well as elements
   bool addNodes;
-	
+
   /// Last adjacency entry (plus one), indexed by element.
   ///  That is, element i's data is at [ends[i-1],ends[i])
   intArrayPtr ends;
-	
+
   /** Adjacency entries for each element.
       Stored as a series of pairs: elType, elNum.
       The first pair for element i starts at
-      2*(ends[i-1]) 
+      2*(ends[i-1])
       the last pair for element i starts at
       2*(ends[i]-1)
       This array then has, in total, 2*ends[n-1] elements.
@@ -1752,20 +1754,20 @@ class FEM_Ghost_Stencil {
   intArrayPtr adj;
  public:
   /**
-     Create a stencil with this number of elements, 
+     Create a stencil with this number of elements,
      and these adjecent elements.
   */
   FEM_Ghost_Stencil(int elType_, int n_,bool addNodes_,
 		    const int *ends_,
 		    const int *adj_,
 		    int idxBase);
-	
+
   /// Make sure this stencil makes sense for this mesh.
   void check(const FEM_Mesh &mesh) const;
-	
+
   /// Return the type of element we describe
   inline int getType(void) const {return elType;}
-	
+
   /**
      Return a pair consisting of the i'th element's
      j'th neighbor: the return value's first int is an element type,
@@ -1778,16 +1780,16 @@ class FEM_Ghost_Stencil {
     if (j>=ends[i]-start) return 0;
     return &adj[2*(start+j)];
   }
-	
+
   inline bool wantNodes(void) const {return addNodes;}
 };
 
 /// Describes a way to grow a set of ghosts.
 class FEM_Ghost_Region {
- public:	
+ public:
   FEM_Ghost_Layer *layer;
   FEM_Ghost_Stencil *stencil;
-	
+
   FEM_Ghost_Region() {layer=0; stencil=0;}
   FEM_Ghost_Region(FEM_Ghost_Layer *l) {layer=l; stencil=0;}
   FEM_Ghost_Region(FEM_Ghost_Stencil *s) {layer=0; stencil=s;}
@@ -1801,21 +1803,21 @@ class FEM_Initial_Symmetries; /*Defined in symmetries.C*/
 class FEM_Partition : public CkNoncopyable {
   /// Maps element number to (0-based) chunk number, allocated with new[]
   int *elem2chunk;
-	
+
   /// Describes the different regions of ghost elements:
   CkVec<FEM_Ghost_Region> regions;
   FEM_Ghost_Layer *lastLayer;
-	
+
   /// Describes the problem domain's spatial symmetries.
   FEM_Initial_Symmetries *sym;
  public:
   FEM_Partition();
   ~FEM_Partition();
-	
+
   // Manipulate partitioning information
   void setPartition(const int *elem2chunk, int nElem, int idxBase);
   const int *getPartition(FEM_Mesh *src,int nChunks) const;
-	
+
   // Manipulate ghost layers
   FEM_Ghost_Layer *addLayer(void) {
     lastLayer=new FEM_Ghost_Layer();
@@ -1826,7 +1828,7 @@ class FEM_Partition : public CkNoncopyable {
     if (lastLayer==0) CkAbort("Must call FEM_Add_ghost_layer before FEM_Add_ghost_elem\n");
     return lastLayer;
   }
-	
+
   // Manipulate ghost stencils
   void addGhostStencil(FEM_Ghost_Stencil *s) {
     regions.push_back(s);
@@ -1835,11 +1837,11 @@ class FEM_Partition : public CkNoncopyable {
   void markGhostStencilLayer(void) {
     regions.push_back(FEM_Ghost_Region());
   }
-	
+
   // Read back ghost regions
   int getRegions(void) const {return regions.size();}
   const FEM_Ghost_Region &getRegion(int regNo) const {return regions[regNo];}
-	
+
   // Manipulate spatial symmetries:
   void setSymmetries(int nNodes_,int *new_can,const int *sym_src);
   void addLinearPeriodic(int nFaces_,int nPer,
@@ -1893,7 +1895,7 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
  public:
   int initialized;
   int nodesPerTuple; //Number of shared nodes for a pair of elements
-  
+
   class elemAdjInfo {
   public:
     //  int recentElType; // should not be here, but if it is it should be pup'ed
@@ -1904,11 +1906,11 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
     void pup(PUP::er &p) {//CkAbort("FEM> Shouldn't call elemGhostInfo::pup!\n");
     }
   };
-  
+
   elemAdjInfo elem[FEM_MAX_ELTYPE];
-  
+
   FEM_ElemAdj_Layer() {initialized=0;}
-  
+
   virtual void pup(PUP::er &p){
     p | nodesPerTuple;
     p | initialized;
@@ -1939,7 +1941,7 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
 
 
 /*
-  File containing the data structures, function declaration 
+  File containing the data structures, function declaration
   and msa array declarations used during parallel partitioning
   of the mesh.
   Author Sayantan Chakravorty
@@ -2023,8 +2025,8 @@ public:
     if(lvec->length() != 0){
       int count=0;
       for(int i=1;i<lvec->length();i++){
-	if((*lvec)[count] == (*lvec)[i]){	
-	}else{					
+	if((*lvec)[count] == (*lvec)[i]){
+	}else{
 	  count++;
 	  if(i != count){
 	    (*lvec)[count] = (*lvec)[i];
@@ -2032,7 +2034,7 @@ public:
 	}
       }
       lvec->resize(count+1);
-    }	
+    }
   }
 };
 
@@ -2129,9 +2131,9 @@ class NodeElem {
   a chunk.
 */
 class MeshElem{
- public: 
+ public:
   FEM_Mesh *m;
-  CkVec<int> gedgechunk; // Chunk number of 
+  CkVec<int> gedgechunk; // Chunk number of
   MeshElem(){
     m = new FEM_Mesh;
   }
@@ -2148,11 +2150,11 @@ class MeshElem{
   inline MeshElem& operator=(const MeshElem &rhs){
     if(m != NULL){
       delete m;
-    }	
+    }
     m = new FEM_Mesh;
     m->copyShape(*(rhs.m));
     (*this) += rhs;
-                
+
     return *this;
   }
   inline MeshElem& operator+=(const MeshElem &rhs){
@@ -2160,14 +2162,14 @@ class MeshElem{
     m->copyShape(*(rhs.m));
     for(int i=0;i<rhs.m->node.size();i++){
       m->node.push_back((rhs.m)->node,i);
-    }	
+    }
     if((rhs.m)->elem.size()>0){
       for(int t=0;t<(rhs.m)->elem.size();t++){
 	if((rhs.m)->elem.has(t)){
 	  for(int e=0;e<(rhs.m)->elem.get(t).size();e++){
 	    m->elem[t].push_back((rhs.m)->elem.get(t),e);
-	  }	
-	}	
+	  }
+	}
       }
     }
 
@@ -2219,7 +2221,7 @@ public:
 	int numnodes; //number of nodes in this tuple
 	//TODO: replace *nodes with the above tupledata class
 	tupledata nodes;	//the nodes in the tuple
-	int chunk;		//the chunk number to which this element belongs 
+	int chunk;		//the chunk number to which this element belongs
 	int elementNo;		//local number of that element
 	Hashnode(){
 		numnodes=0;
@@ -2288,7 +2290,7 @@ public:
     }
     return true;
   }
-	
+
   inline bool operator<=(const Hashnode &rhs){
     if(numnodes < rhs.numnodes){
       return true;
@@ -2296,7 +2298,7 @@ public:
     if(numnodes > rhs.numnodes){
       return false;
     }
-		
+
     for(int i=0;i<numnodes;i++){
       if(nodes[i] < rhs.nodes[i]){
 	return true;
@@ -2319,7 +2321,7 @@ public:
     }
     return true;
   }
-	
+
   inline bool equals(tupledata &tuple){
     for(int i=0;i<numnodes;i++){
       if(tuple.nodes[i] != nodes[i]){
@@ -2376,7 +2378,7 @@ struct conndata{
 };
 
 /**
-  Structure to store connectivity data after the 
+  Structure to store connectivity data after the
   global element partition has been returned by parmetis
 */
 struct partconndata{
@@ -2452,7 +2454,7 @@ class MsaHashtable{
     }
     int index = (int )(sum %(long )numSlots);
     Hashnode entry(nodesPerTuple,chunk,elementNo,tuple);
-	
+
     Hashtuple &list=table.accumulate(index);
     list.vec->push_back(entry);
     char str[100];
@@ -2476,7 +2478,7 @@ class MsaHashtable{
   const Hashtuple &get(int i){
     return table.get(i);
   }
-	
+
 };
 
 
@@ -2520,19 +2522,19 @@ extern "C" int ck_fem_map_compare_int(const void *a, const void *b);
 class elemList {
  public:
   int chunk;
-  int tupleNo;//tuple number on this element for the tuple that this list sorrounds 
+  int tupleNo;//tuple number on this element for the tuple that this list sorrounds
   int localNo;//Local number of this element on this chunk (negative for a ghost)
   int type; //Kind of element
   FEM_Symmetries_t sym; //Symmetries this element was reached via
   elemList *next;
 
   elemList(int chunk_,int localNo_,int type_,FEM_Symmetries_t sym_)
-    :chunk(chunk_),localNo(localNo_),type(type_), sym(sym_) 
+    :chunk(chunk_),localNo(localNo_),type(type_), sym(sym_)
     { next=NULL; }
   elemList(int chunk_,int localNo_,int type_,FEM_Symmetries_t sym_,int tupleNo_)
     :chunk(chunk_),localNo(localNo_),type(type_), sym(sym_) , tupleNo(tupleNo_)
     { next=NULL; }
-	
+
   ~elemList() {if (next) delete next;}
   void setNext(elemList *n) {next=n;}
 };
@@ -2551,7 +2553,7 @@ class tupleTable : public CkHashtable {
     int os=sizeof(elemList *);
     return CkHashtableLayout(ks,ks,oo,os,oo+os);
   }
-  
+
   //Make a canonical version of this tuple, so different
   // orderings of the same nodes don't end up in different lists.
   //I canonicalize by sorting:
@@ -2595,8 +2597,8 @@ class tupleTable : public CkHashtable {
     int can[MAX_TUPLE];
     canonicalize(tuple,can);
     return (elemList **)get(can);
-  }	
-	
+  }
+
   //Register this (new'd) element with this tuple
   void addTuple(const int *tuple,elemList *nu)
     {
@@ -2604,7 +2606,7 @@ class tupleTable : public CkHashtable {
       canonicalize(tuple,can);
       //First try for an existing list:
       elemList **dest=(elemList **)get(can);
-      if (dest!=NULL) 
+      if (dest!=NULL)
 	{ //A list already exists here-- link it into the new list
 	  nu->setNext(*dest);
 	} else {//No pre-existing list-- initialize a new one.
@@ -2619,7 +2621,7 @@ class tupleTable : public CkHashtable {
   elemList *lookupNext(void) {
     void *ret=it->next();
     if (ret==NULL) {
-      delete it; 
+      delete it;
       return NULL;
     }
     return *(elemList **)ret;
@@ -2673,7 +2675,7 @@ class chunkList : public CkNoncopyable {
     else if (next==NULL) return NULL;
     else return next->onChunk(c,s);
   }
-  int isEmpty(void) const //Return 1 if this is an empty list 
+  int isEmpty(void) const //Return 1 if this is an empty list
     {return (chunk==-1);}
   int isShared(void) const //Return 1 if this is a shared entity
     {return next!=NULL;}
@@ -2697,7 +2699,7 @@ class chunkList : public CkNoncopyable {
 
 /* File: util.h
  * Authors: Nilesh Choudhury
- * 
+ *
  */
 /// A utility class with helper functions for adaptivity
 class FEM_MUtil {
@@ -2812,9 +2814,9 @@ class FEM_MUtil {
   void idxllock(FEM_Mesh *m, int chk, int type);
   ///Unlock the idxl list with 'chk' (might be remote if chk is smaller)
   void idxlunlock(FEM_Mesh *m, int chk, int type);
-  ///Lock the idxl list with chk on this chunk 
+  ///Lock the idxl list with chk on this chunk
   void idxllockLocal(FEM_Mesh *m, int toChk, int type);
-  ///Unlock the idxl list with chk on this chunk 
+  ///Unlock the idxl list with chk on this chunk
   void idxlunlockLocal(FEM_Mesh *m, int toChk, int type);
 
   ///Print the node-to-node adjacency for this node
@@ -2866,7 +2868,7 @@ class FEM_MUtil {
 
   This file provides various utility routines for easily
   manipulating 2-D vectors-- included are arithmetic,
-  dot product, magnitude and normalization terms. 
+  dot product, magnitude and normalization terms.
   All routines are provided right in the header file (for inlining).
 
   Converted from vector3d.h.
@@ -2893,16 +2895,16 @@ class vector2d {
   vector2d(const Real Nx,const Real Ny) {x=Nx;y=Ny;}
   //Copy constructor
   vector2d(const vector2d &copy) {x=copy.x;y=copy.y;}
-	
+
   //Cast-to-Real * operators (treat vector as array)
   operator Real *() {return &x;}
   operator const Real *() const {return &x;}
-	
+
   /*Arithmetic operations: these are carefully restricted to just those
     that make unambiguous sense (to me... now...  ;-)
     Counterexamples: vector*vector makes no sense (use .dot()) because
-    Real/vector is meaningless (and we'd want a*b/b==a for b!=0), 
-    ditto for vector&vector (dot?), vector|vector (projection?), 
+    Real/vector is meaningless (and we'd want a*b/b==a for b!=0),
+    ditto for vector&vector (dot?), vector|vector (projection?),
     vector^vector (cross?),Real+vector, vector+=real, etc.
   */
   vector2d &operator=(const vector2d &b) {x=b.x;y=b.y;return *this;}
@@ -2910,7 +2912,7 @@ class vector2d {
   int operator!=(const vector2d &b) const {return (x!=b.x)||(y!=b.y);}
   vector2d operator+(const vector2d &b) const {return vector2d(x+b.x,y+b.y);}
   vector2d operator-(const vector2d &b) const {return vector2d(x-b.x,y-b.y);}
-  vector2d operator*(const Real scale) const 
+  vector2d operator*(const Real scale) const
     {return vector2d(x*scale,y*scale);}
   friend vector2d operator*(const Real scale,const vector2d &v)
     {return vector2d(v.x*scale,v.y*scale);}
@@ -2927,18 +2929,18 @@ class vector2d {
   Real magSqr(void) const {return x*x+y*y;}
   //Return the magnitude (length) of this vector
   Real mag(void) const {return sqrt(magSqr());}
-	
+
   //Return the square of the distance to the vector b
-  Real distSqr(const vector2d &b) const 
+  Real distSqr(const vector2d &b) const
     {return (x-b.x)*(x-b.x)+(y-b.y)*(y-b.y);}
   //Return the distance to the vector b
   Real dist(const vector2d &b) const {return sqrt(distSqr(b));}
-	
+
   //Return the dot product of this vector and b
   Real dot(const vector2d &b) const {return x*b.x+y*b.y;}
   //Return the cosine of the angle between this vector and b
   Real cosAng(const vector2d &b) const {return dot(b)/(mag()*b.mag());}
-	
+
   //Return the "direction" (unit vector) of this vector
   vector2d dir(void) const {return (*this)/mag();}
 
@@ -2947,7 +2949,7 @@ class vector2d {
 
   //Return this vector scaled by that
   vector2d &scale(const vector2d &b) {x*=b.x;y*=b.y;return *this;}
-	
+
   //Return the largest coordinate in this vector
   Real max(void) {return (x>y)?x:y;}
   //Make each of this vector's coordinates at least as big
@@ -2961,13 +2963,13 @@ class vector2d {
 /*
  * The former cktimer.h
  *
- */ 
+ */
 
 #ifndef CMK_THRESHOLD_TIMER
 #define CMK_THRESHOLD_TIMER
 
 /** Time a sequence of operations, printing out the
-    names and times of any operations that exceed a threshold. 
+    names and times of any operations that exceed a threshold.
 
     Use it with only the constructor and destructor like:
     void foo(void) {
@@ -2986,7 +2988,7 @@ class vector2d {
     t.start("third");
     ...
     }
-  
+
     This class *only* prints out the time if it exceeds
     a threshold-- by default, one millisecond.
 */
@@ -2994,7 +2996,7 @@ class CkThresholdTimer {
   double threshold; // Print any times that exceed this (s).
   double lastStart; // Last activity started at this time (s).
   const char *lastWhat; // Last activity has this name.
-	
+
   void start_(const char *what) {
     lastStart=CmiWallTimer();
     lastWhat=what;
@@ -3006,7 +3008,7 @@ class CkThresholdTimer {
     }
   }
  public:
-  CkThresholdTimer(const char *what,double thresh=0.001) 
+  CkThresholdTimer(const char *what,double thresh=0.001)
     :threshold(thresh) { start_(what); }
   void start(const char *what) { done_(); start_(what); }
   ~CkThresholdTimer() {done_();}
