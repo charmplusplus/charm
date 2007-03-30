@@ -33,12 +33,15 @@ void setTableReferences(TopModel* model){
 }
 
 
-TopModel* topModel_Create_Init(int elem_attr_sz, int node_attr_sz){
+TopModel* topModel_Create_Init(int elem_attr_sz, int node_attr_sz, int model_attr_sz){
   CkAssert(elem_attr_sz > 0);
   CkAssert(node_attr_sz > 0);
   TopModel *model = new TopModel;
+  memset(model, 0, sizeof(TopModel));
+
   model->elem_attr_size = elem_attr_sz;
   model->node_attr_size = node_attr_sz;
+  model->model_attr_size = model_attr_sz;
 
   // This only uses a single mesh, so better not create multiple ones of these
   int which_mesh=FEM_Mesh_default_write();
@@ -148,7 +151,7 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
 
     /** Copy model Attribute to device global memory */
     {
-        cudaMalloc(model->model_attr_size, 
+        cudaMalloc(model->model_attr_size,
                 (void**)&(model->device_model.mAttDevice));
         cudaMemcpy(model->device_model.mAttDevice,mAtt,model->model_attr_size,
                 cudaMemcpyHostToDevice);
@@ -188,11 +191,13 @@ void topModel_Destroy(TopModel* m){
 
 
 void topModel_SuggestInitialSize(TopModel* m, unsigned numNodes, unsigned numElements){
+#if 0
   m->mesh->node.setLength(numNodes);
   m->mesh->node.set_all_invalid();
 
   m->mesh->elem[0].setLength(numElements);
   m->mesh->elem[0].set_all_invalid();
+#endif
 }
 
 
@@ -298,20 +303,18 @@ void* topNode_GetAttrib(TopModel* m, TopNode n){
 	@todo Does not work with ghosts yet.
 */
 TopNode topModel_GetNodeAtId(TopModel* m, TopID id){
-  // If the nodes are inserted with ids 1..n then we can just return node id-1
-  if( m->mesh->node.is_valid(id-1) && (*m->node_id_T)(id-1,0)==id){ 
-    return id-1; 
-  } 
+    // If the nodes are inserted with ids 1..n then we can just return node id-1
+    if( m->mesh->node.is_valid_nonghost_idx(id-1) && (*m->node_id_T)(id-1,0)==id){
+        return id-1;
+    }
 
-  // lookup node via global ID
-  for(int i=0;i<m->node_id_T->size();++i){
-	if( m->mesh->node.is_valid(i) && (*m->node_id_T)(i,0)==id){
-	  return i;
-	}
-  }
-  CkPrintf("ERROR: could not find node with id %d\n", id);
-  CkExit();
-  return -1;
+    // lookup node via global ID
+    for(int i=0;i<m->node_id_T->size();++i){
+        if( m->mesh->node.is_valid(i) && (*m->node_id_T)(i,0)==id){
+        return i;
+        }
+    }
+    return -1;
 }
 
 /**
