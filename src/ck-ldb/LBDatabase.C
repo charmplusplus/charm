@@ -197,6 +197,7 @@ void _loadbalancerInit()
   /******************* SIMULATION *******************/
   // get the step number at which to dump the LB database
   CmiGetArgIntDesc(argv, "+LBVersion", &_lb_args.lbversion(), "LB database file version number");
+  CmiGetArgIntDesc(argv, "+LBCentPE", &_lb_args.central_pe(), "CentralLB processor");
   int _lb_dump_activated = 0;
   if (CmiGetArgIntDesc(argv, "+LBDump", &LBSimulation::dumpStep, "Dump the LB state from this step"))
     _lb_dump_activated = 1;

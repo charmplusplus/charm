@@ -102,7 +102,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   future_migrates_completed = 0;
   migrates_expected = -1;
   future_migrates_expected = -1;
-  cur_ld_balancer = 0;
+  cur_ld_balancer = _lb_args.central_pe();      // 0 default
   lbdone = 0;
   count_msgs=0;
   statsMsg = NULL;

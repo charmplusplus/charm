@@ -27,6 +27,8 @@ class CkLBArgs
 {
 private:
   double _autoLbPeriod;		// in seconds
+  double _lb_alpha;		// per message send overhead
+  double _lb_beeta;		// per byte send overhead
   int _lb_debug;		// 1 or greater
   int _lb_printsumamry;		// print summary
   int _lb_loop;                 // use multiple load balancers in loop
@@ -37,8 +39,7 @@ private:
   int _lb_useCpuTime;           // use cpu instead of wallclock time
   int _lb_statson;		// stats collection
   int _lb_traceComm;		// stats collection for comm
-  double _lb_alpha;		// per message send overhead
-  double _lb_beeta;		// per byte send overhead
+  int _lb_central_pe;           // processor number for centralized startegy
   int _lb_percentMovesAllowed; //Specifies restriction on num of chares to be moved(as a percentage of total number of chares). Used by RefineKLB
 public:
   CkLBArgs() {
@@ -52,6 +53,7 @@ public:
     _lb_statson = _lb_traceComm = 1;
     _lb_percentMovesAllowed=100;
     _lb_loop = 0;
+    _lb_central_pe = 0;
   }
   inline double & lbperiod() { return _autoLbPeriod; }
   inline int & debug() { return _lb_debug; }
@@ -65,6 +67,7 @@ public:
   inline int & useCpuTime() { return _lb_useCpuTime; }
   inline int & statsOn() { return _lb_statson; }
   inline int & traceComm() { return _lb_traceComm; }
+  inline int & central_pe() { return _lb_central_pe; }
   inline double & alpha() { return _lb_alpha; }
   inline double & beeta() { return _lb_beeta; }
   inline int & percentMovesAllowed() { return _lb_percentMovesAllowed;}
