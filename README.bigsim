@@ -57,7 +57,9 @@ a "cd" into the corresponding directory (e.g. 'cd BlueGene').
 Inside that directory, one should simply "make". This
 will produce file "../tmp/bigsimulator". That file, together
 with file "BlueGene/netconfig.vc", will be used during a
-simulation.
+simulation. It may be useful to set the variable SEQUENTIAL
+to 1 in Makefile.common to build a sequential(non-parallel)
+version of bigsimulator.
 
 
 
