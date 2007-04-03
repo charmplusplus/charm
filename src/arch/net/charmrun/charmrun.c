@@ -875,6 +875,12 @@ typedef struct nodetab_host {
   char    *passwd;  /*User login password*/
   char    *setup;  /*Commands to execute on login*/
 #endif
+
+#if CMK_USE_IBVERBS
+	ChInfiAddr *qpData;
+#endif
+
+
 } nodetab_host;
 
 nodetab_host **nodetab_table;
@@ -1147,13 +1153,21 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 	int node=ChMessageInt(in->nodeNo);
 	ChNodeinfo i=in->info;
 	unsigned int nt;
-	unsigned int pe,dataport;
+	unsigned int pe;
+	unsigned int dataport;
 	if (node<0 || node>=nodetab_rank0_size)
 		{fprintf(stderr,"Unexpected node %d registered!\n",node);exit(1);}
-	nt=nodetab_rank0_table[node];/*Nodetable index for this node*/
+	nt=nodetab_rank0_table[node];/*Nodetable index for this node*/	
+	printf("Charmrun> node %d info is being added \n",nt);
 	i.nPE=ChMessageInt_new(nodetab_cpus(nt));
 	i.IP=nodetab_ip(nt);
-        dataport = ChMessageInt(i.dataport);
+#if CMK_USE_IBVERBS
+	nodeinfo_arr[node] = i;
+	for (pe=0;pe<nodetab_cpus(nt);pe++){
+		nodetab_table[nt+pe]->ctrlfd=ctrlfd;
+	}
+#else
+  dataport = ChMessageInt(i.dataport);
 	if (0==dataport)
 		{fprintf(stderr,"Node %d could not initialize network!\n",node);exit(1);}
 	nodeinfo_arr[node]=i;
@@ -1167,6 +1181,7 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 	  skt_print_ip(ips,nodetab_ip(nt));
 	  printf("Charmrun> client %d connected (IP=%s data_port=%d)\n", nt, ips, dataport);
 	}
+#endif
 }
 
 /****************************************************************************
@@ -1409,11 +1424,26 @@ routines that actually respond to the request.
  */
 int req_handle_initnode(ChMessage *msg,SOCKET fd)
 {
+#if CMK_USE_IBVERBS
+	int i;
+	ChSingleNodeinfo *nodeInfo = (ChSingleNodeinfo *)msg->data;
+//	printf("Charmrun> msg->len %d sizeof(ChSingleNodeinfo) %d sizeof(ChInfiAddr) %d \n",msg->len,sizeof(ChSingleNodeinfo),sizeof(ChInfiAddr));
+	if(msg->len != sizeof(ChSingleNodeinfo) + (nodetab_rank0_size-1)*sizeof(ChInfiAddr)){
+    fprintf(stderr,"Charmrun: Bad initnode data length. Aborting\n");
+		exit(1);
+	}
+	nodeInfo->info.qpList = malloc(sizeof(ChInfiAddr)*(nodetab_rank0_size-1));
+	memcpy((char *)nodeInfo->info.qpList,&msg->data[sizeof(ChSingleNodeinfo)],sizeof(ChInfiAddr)*(nodetab_rank0_size-1));
+	for(i=0;i<nodetab_rank0_size-1;i++){
+		printf("i %d  0x%0x 0x%0x 0x%0x\n",i,ChMessageInt(nodeInfo->info.qpList[i].lid),ChMessageInt(nodeInfo->info.qpList[i].qpn),ChMessageInt(nodeInfo->info.qpList[i].psn));
+	}
+#else
   if (msg->len!=sizeof(ChSingleNodeinfo)) {
     fprintf(stderr,"Charmrun: Bad initnode data length. Aborting\n");
     fprintf(stderr,"Charmrun: possibly because: %s.\n", msg->data);
     exit(1);
   }
+#endif	
   nodeinfo_add((ChSingleNodeinfo *)msg->data,fd);
   return REQ_OK;
 }
@@ -1431,6 +1461,7 @@ int req_handle_initnodetab(ChMessage *msg,SOCKET fd)
 	skt_sendN(fd,(const char *)&nNodes,sizeof(nNodes));
 	skt_sendN(fd,(const char *)nodeinfo_arr,
 		  sizeof(ChNodeinfo)*nodetab_rank0_size);
+			
 	return REQ_OK;
 }
 
@@ -1809,6 +1840,50 @@ void req_one_client_connect(int client)
 	}
 }
 
+#if CMK_USE_IBVERBS
+/* Each node has sent the qpn data for all the qpns it has created
+   This data needs to be sent to all the other nodes
+	 This needs to be done for all nodes
+**/
+void exchange_qpdata_clients(){
+	int proc,i;
+	for( i=0;i<nodetab_rank0_size;i++){
+		int nt=nodetab_rank0_table[i];/*Nodetable index for this node*/	
+		nodetab_table[nt]->qpData = malloc(sizeof(ChInfiAddr)*nodetab_rank0_size);
+	}
+	for(proc =0;proc< nodetab_rank0_size;proc++){
+		int count=0;
+		for(i=0;i<nodetab_rank0_size;i++){
+			if(i == proc){
+			}else{
+				int nt=nodetab_rank0_table[i];/*Nodetable index for this node*/	
+				nodetab_table[nt]->qpData[proc] =  nodeinfo_arr[proc].qpList[count];
+				printf("Charmrun> nt %d proc %d lid 0x%x qpn 0x%x psn 0x%x\n",nt,proc,ChMessageInt(nodetab_table[nt]->qpData[proc].lid),ChMessageInt(nodetab_table[nt]->qpData[proc].qpn),ChMessageInt(nodetab_table[nt]->qpData[proc].psn));
+				count++;
+			}
+		}
+		free(nodeinfo_arr[proc].qpList);
+	}
+};
+
+void	send_clients_nodeinfo_qpdata(){
+	int node;
+	int msgSize = sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*nodetab_rank0_size+sizeof(ChInfiAddr)*nodetab_rank0_size;
+	for(node=0;node<nodetab_rank0_size;node++){
+		int nt=nodetab_rank0_table[node];/*Nodetable index for this node*/
+		printf("Charmrun> Node %d proc %d sending initnodetab \n",node,nt);
+		ChMessageHeader hdr;
+		ChMessageInt_t nNodes=ChMessageInt_new(nodetab_rank0_size);
+		ChMessageHeader_new("initnodetab",msgSize,&hdr);
+		skt_sendN(nodetab_table[nt]->ctrlfd,(const char *)&hdr,sizeof(hdr));
+		skt_sendN(nodetab_table[nt]->ctrlfd,(const char *)&nNodes,sizeof(nNodes));
+		skt_sendN(nodetab_table[nt]->ctrlfd,(const char *)nodeinfo_arr,sizeof(ChNodeinfo)*nodetab_rank0_size);
+		skt_sendN(nodetab_table[nt]->ctrlfd,(const char *)&nodetab_table[nt]->qpData[0],sizeof(ChInfiAddr)*nodetab_rank0_size);				
+	}
+}
+#endif
+
+
 /*Wait for all the clients to connect to our server port*/
 void req_client_connect(void)
 {
@@ -1825,8 +1900,13 @@ void req_client_connect(void)
 	}
         if (portOk == 0) exit(1);
 	if (arg_verbose) printf("Charmrun> All clients connected.\n");
+#if CMK_USE_IBVERBS
+		exchange_qpdata_clients();
+		send_clients_nodeinfo_qpdata();
+#else
 	for (client=0;client<req_nClients;client++)
 	  req_handle_initnodetab(NULL,req_clients[client]);
+#endif
 	if (arg_verbose) printf("Charmrun> IP tables sent.\n");
 }
 
@@ -1862,6 +1942,12 @@ void req_client_start_and_connect(void)
 	}
         if (portOk == 0) exit(1);
 	if (arg_verbose) printf("Charmrun> All clients connected.\n");
+	
+#if CMK_USE_IBVERBS
+		exchange_qpdata_clients();	
+		send_clients_nodeinfo_qpdata();
+#endif
+	
 	for (client=0;client<req_nClients;client++)
 	  req_handle_initnodetab(NULL,req_clients[client]);
 	if (arg_verbose) printf("Charmrun> IP tables sent.\n");
@@ -1955,6 +2041,9 @@ int main(int argc, char **argv, char **envp)
 #if CMK_BPROC
     start_nodes_scyld();
 #else
+#if CMK_USE_IBVERBS
+		printf("Charmrun> IBVERBS version of charmrun\n");
+#endif
     if (!arg_local) {
       if (!arg_batch_spawn)
         start_nodes_rsh();

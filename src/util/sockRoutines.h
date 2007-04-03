@@ -259,8 +259,19 @@ void ChMessageHeader_new(const char *type,int len,ChMessageHeader *dst);
 void ChMessage_new(const char *type,int len,ChMessage *dst);
 int ChMessage_send(SOCKET fd,const ChMessage *src); /*You must free after send*/
 
+
+#if CMK_USE_IBVERBS
+typedef struct {
+	ChMessageInt_t lid,qpn,psn;
+} ChInfiAddr ;
+#endif
+
+
 typedef struct {
 	ChMessageInt_t nPE; /* Number of compute processors on this node */
+#if CMK_USE_IBVERBS
+	ChInfiAddr *qpList; /** An array of queue pair identifiers of length CmiNumNodes()-1*/
+#endif
 	ChMessageInt_t dataport; /* node's data port (UDP or GM) */
 	ChMessageInt_t mach_id; /* node's hardware address (GM-only) */
 #if CMK_USE_MX

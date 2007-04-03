@@ -598,11 +598,11 @@ void CmiEnableNonblockingIO(int fd) { }
 
 
 /******************************************************************************
- *
- * Configuration Data
- *
- * This data is all read in from the NETSTART variable (provided by the
- * charmrun) and from the command-line arguments.  Once read in, it is never
+*
+* Configuration Data
+*
+* This data is all read in from the NETSTART variable (provided by the
+* charmrun) and from the command-line arguments.  Once read in, it is never
  * modified.
  *
  *****************************************************************************/
@@ -651,6 +651,12 @@ static void parse_netstart(void)
   	Cmi_charmrun_pid=0;
         dataport = -1;
   }
+#if CMK_USE_IBVERBS	
+	char *cmi_num_nodes = getenv("CmiNumNodes");
+	if(cmi_num_nodes != NULL){
+		sscanf(cmi_num_nodes,"%d",&_Cmi_numnodes);
+	}
+#endif	
 }
 
 static void extract_common_args(char **argv)
@@ -834,6 +840,8 @@ extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
 
 static void CmiStartThreads(char **argv)
 {
+	MACHSTATE2(3,"_Cmi_numpes %d _Cmi_numnodes %d",_Cmi_numpes,_Cmi_numnodes);
+	MACHSTATE1(3,"_Cmi_mynodesize %d",_Cmi_mynodesize);
   if ((_Cmi_numpes != _Cmi_numnodes) || (_Cmi_mynodesize != 1))
     KillEveryone
       ("Multiple cpus unavailable, don't use cpus directive in nodesfile.\n");
@@ -1450,11 +1458,16 @@ int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
  *
  *****************************************************************************/
 
+#if CMK_USE_IBVERBS
+void copyInfiAddr(ChInfiAddr *qpList);
+#endif
+
 /*Note: node_addresses_obtain is called before starting
   threads, so no locks are needed (or valid!)*/
 static void node_addresses_obtain(char **argv)
 {
   ChMessage nodetabmsg; /* info about all nodes*/
+	MACHSTATE(3,"node_addresses_obtain");
   if (Cmi_charmrun_fd==-1) 
   {/*Standalone-- fake a single-node nodetab message*/
   	int npes=1;
@@ -1487,6 +1500,29 @@ static void node_addresses_obtain(char **argv)
 	ChSingleNodeinfo me;
 
   	me.nodeNo=ChMessageInt_new(_Cmi_mynode);
+
+#if CMK_USE_IBVERBS
+	{
+		int qpListSize = (_Cmi_numnodes-1)*sizeof(ChInfiAddr);
+		me.info.qpList = malloc(qpListSize);
+		copyInfiAddr(me.info.qpList);
+		MACHSTATE1(3,"me.info.qpList created and copied size %d bytes",qpListSize);
+		ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),(const char *)me.info.qpList,qpListSize);
+		free(me.info.qpList);
+  	
+		MACHSTATE(3,"initnode sent");
+		
+		/*We get the other node addresses from a message sent
+  	  back via the charmrun control port.*/
+  	if (!skt_select1(Cmi_charmrun_fd,600*1000)) {
+			MACHSTATE(3,"Aborting due to timeout");
+			CmiAbort("Timeout waiting for nodetab!\n");
+		}
+        MACHSTATE(2,"recv initnode {");
+  	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
+        MACHSTATE(2,"} recv initnode");
+	}
+#else
 	/*The nPE and IP fields are set by charmrun--
 	  these values don't matter.
 	*/
@@ -1510,9 +1546,13 @@ static void node_addresses_obtain(char **argv)
         MACHSTATE(2,"recv initnode {");
   	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
         MACHSTATE(2,"} recv initnode");
+#endif	//CMK_USE_IBVERBS
   }
+//#if CMK_USE_IBVERBS	
+//#else
   node_addresses_store(&nodetabmsg);
   ChMessage_free(&nodetabmsg);
+//#endif	
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE

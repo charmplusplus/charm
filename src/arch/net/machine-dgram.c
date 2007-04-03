@@ -20,6 +20,10 @@
 #include "machine-ammasso.h"
 #endif
 
+#if CMK_USE_IBVERBS
+#include <infiniband/verbs.h>
+#endif
+
 #define DGRAM_HEADER_SIZE 8
 
 #define CmiMsgHeaderSetLength(msg, len) (((int*)(msg))[2] = (len))
@@ -199,6 +203,9 @@ typedef struct OutgoingMsgStruct
   char *data;
   int   refcount;
   int   freemode;
+#if CMK_USE_IBVERBS
+	struct ibv_mr *key;
+#endif
 }
 *OutgoingMsg;
 
@@ -223,6 +230,13 @@ typedef struct ImplicitDgramStruct
 *ImplicitDgram;
 
 struct PendingMsgStruct;
+
+#if CMK_USE_IBVERBS
+struct infiOtherNodeData;
+struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]);
+void	cleanUpInfiContext();
+#endif
+
 
 #if CMK_USE_AMMASSO
 
@@ -276,6 +290,10 @@ typedef struct OtherNodeStruct
   struct PendingMsgStruct *sendhead, *sendtail;  /* gm send queue */
   int 			   disable;
   int 			   gm_pending;
+#endif
+
+#if CMK_USE_IBVERBS
+	struct infiOtherNodeData *infiData;
 #endif
 
 #if CMK_USE_AMMASSO
@@ -480,15 +498,25 @@ static void node_addresses_store(ChMessage *msg)
   int i,j,n;
   MACHSTATE(1,"node_addresses_store {");	
   _Cmi_numnodes=ChMessageInt(n32[0]);
-  
+
+#if CMK_USE_IBVERBS
+	ChInfiAddr *remoteInfiAddr = (ChInfiAddr *) (&msg->data[sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes]);
+  if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes +sizeof(ChInfiAddr)*_Cmi_numnodes )
+         !=(unsigned int)msg->len)
+    {printf("Node table has inconsistent length!");machine_exit(1);}
+
+#else
+
   if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes)
          !=(unsigned int)msg->len)
     {printf("Node table has inconsistent length!");machine_exit(1);}
+#endif//CMK_USE_IBVERBS
   nodes = (OtherNode)malloc(_Cmi_numnodes * sizeof(struct OtherNodeStruct));
   nodestart=0;
   for (i=0; i<_Cmi_numnodes; i++) {
     nodes[i].nodestart = nodestart;
     nodes[i].nodesize  = ChMessageInt(d[i].nPE);
+		MACHSTATE2(3,"node %d nodesize %d",i,nodes[i].nodesize);
     nodes[i].mach_id = ChMessageInt(d[i].mach_id);
 #if CMK_USE_MX
     nodes[i].nic_id = ChMessageLong(d[i].nic_id);
@@ -502,8 +530,21 @@ static void node_addresses_store(ChMessage *msg)
       _Cmi_mynodesize=nodes[i].nodesize;
       Cmi_self_IP=nodes[i].IP;
     }
+#if CMK_USE_IBVERBS
+		{
+			if(i != _Cmi_mynode){
+				int addr[3];
+				addr[0] =ChMessageInt(remoteInfiAddr[i].lid);
+				addr[1] =ChMessageInt(remoteInfiAddr[i].qpn);
+				addr[2] =ChMessageInt(remoteInfiAddr[i].psn);
+				nodes[i].infiData = initInfiOtherNodeData(i,addr);
+			}
+		}
+#else
     nodes[i].dataport = ChMessageInt(d[i].dataport);
     nodes[i].addr = skt_build_addr(nodes[i].IP,nodes[i].dataport);
+#endif
+
 #if CMK_USE_TCP
     nodes[i].sock = INVALID_SOCKET;
 #endif
@@ -533,6 +574,9 @@ static void node_addresses_store(ChMessage *msg)
     OtherNode node = nodes + i-_Cmi_numpes;
     nodes_by_pe[i] = node;
   }
+#endif
+#if CMK_USE_IBVERBS
+	cleanUpInfiContext();
 #endif
   MACHSTATE(1,"} node_addresses_store");
 }
