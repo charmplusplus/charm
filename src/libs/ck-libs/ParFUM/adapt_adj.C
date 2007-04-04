@@ -450,8 +450,7 @@ void getAndDumpAdaptAdjacencies(int meshid, int numElems, int elemType, int myRa
 }
 
 // Access functions
-inline adaptAdj *lookupAdaptAdjacencies(int meshid,int elemType,int *numAdjacencies){
-  FEM_Mesh *mesh = FEM_chunk::get("lookupAdaptAdjacencies")->lookup(meshid,"lookupAdaptAdjacencies");
+inline adaptAdj *lookupAdaptAdjacencies(FEM_Mesh *mesh,int elemType,int *numAdjacencies){
   FEM_Elem *elem = (FEM_Elem *)mesh->lookup(FEM_ELEM+elemType,"lookupAdaptAdjacencies");
 
   FEM_DataAttribute *adaptAttr = (FEM_DataAttribute *)elem->lookup(FEM_ADAPT_ADJ,"lookupAdaptAdjacencies");
@@ -461,11 +460,23 @@ inline adaptAdj *lookupAdaptAdjacencies(int meshid,int elemType,int *numAdjacenc
   return (adaptAdj  *)table.getData();
 }
 
+inline adaptAdj *lookupAdaptAdjacencies(int meshid,int elemType,int *numAdjacencies){
+  FEM_Mesh *mesh = FEM_chunk::get("lookupAdaptAdjacencies")->lookup(meshid,"lookupAdaptAdjacencies");
+  return lookupAdaptAdjacencies(mesh, elemType, numAdjacencies);
+}
+
 /** Look up elemID in elemType array, access edgeFaceID-th adaptAdj. */
 adaptAdj *GetAdaptAdj(int meshid,int elemID, int elemType, int edgeFaceID)
 {
-	int numAdjacencies;
+  int numAdjacencies;
   adaptAdj *adaptAdjacencies = lookupAdaptAdjacencies(meshid, elemType,&numAdjacencies);
+  return(&(adaptAdjacencies[elemID*numAdjacencies+edgeFaceID]));
+}
+
+adaptAdj *GetAdaptAdj(FEM_Mesh *meshPtr,int elemID, int elemType, int edgeFaceID)
+{
+  int numAdjacencies;
+  adaptAdj *adaptAdjacencies = lookupAdaptAdjacencies(meshPtr, elemType,&numAdjacencies);
   return(&(adaptAdjacencies[elemID*numAdjacencies+edgeFaceID]));
 }
 
@@ -520,17 +531,23 @@ void SetAdaptAdj(int meshID,int elemID, int elemType, int edgeFaceID, adaptAdj n
 /** Lookup elemID in elemType array and search for the edgeID which has originalNbr as
  * a neighbor, then replace originalNbr with newNbr
  */
-void ReplaceAdaptAdj(int meshID,int elemID,int elemType,adaptAdj originalNbr, adaptAdj newNbr){
-	int numAdjacencies;
-  adaptAdj *adaptAdjTable = lookupAdaptAdjacencies(meshID, elemType,&numAdjacencies);
-	for(int i=0;i<numAdjacencies;i++){
-		if(adaptAdjTable[elemID*numAdjacencies+i] == originalNbr){
-			adaptAdjTable[elemID*numAdjacencies+i] = newNbr;
-			return;
-		}
-	}
-	CkAbort("ReplaceAdaptAdj did not find the specified originalNbr");
+void ReplaceAdaptAdj(FEM_Mesh *meshPtr,int elemID,int elemType,adaptAdj originalNbr, adaptAdj newNbr){
+  int numAdjacencies;
+  adaptAdj *adaptAdjTable = lookupAdaptAdjacencies(meshPtr, elemType,&numAdjacencies);
+  for(int i=0;i<numAdjacencies;i++){
+    if(adaptAdjTable[elemID*numAdjacencies+i] == originalNbr){
+      adaptAdjTable[elemID*numAdjacencies+i] = newNbr;
+      return;
+    }
+  }
+  CkAbort("ReplaceAdaptAdj did not find the specified originalNbr");
 }
+
+void ReplaceAdaptAdj(int meshID,int elemID,int elemType,adaptAdj originalNbr, adaptAdj newNbr){
+  FEM_Mesh *meshPtr = FEM_chunk::get("ReplaceAdaptAdj")->lookup(meshID,"ReplaceAdaptAdj");
+  ReplaceAdaptAdj(meshPtr, elemID, elemType, originalNbr, newNbr);
+}
+
 
 //given the dimensions and nodes per element guess whether the element 
 // is a triangle, quad, tet or hex. At the moment these are the 4 shapes

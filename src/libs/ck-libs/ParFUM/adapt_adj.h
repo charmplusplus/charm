@@ -171,6 +171,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType);
 
 /** Look up elemID in elemType array, access edgeFaceID-th adaptAdj. */
 adaptAdj *GetAdaptAdj(int meshid, int elemID, int elemType, int edgeFaceID);
+adaptAdj *GetAdaptAdj(FEM_Mesh *meshPtr, int elemID, int elemType, int edgeFaceID);
 /** Look up elemID in elemType array, calculate edgeFaceID from
     vertexList (with GetEdgeFace below), and access edgeFaceID-th
     adaptAdj with GetAdaptAdj above. */
@@ -191,6 +192,7 @@ void SetAdaptAdj(int meshid, int elemID, int elemType, int edgeFaceID,
 		 adaptAdj nbr);
 
 void ReplaceAdaptAdj(int meshID,int elemID,int elemType,adaptAdj originalNbr, adaptAdj newNbr);
+void ReplaceAdaptAdj(FEM_Mesh *meshPtr,int elemID,int elemType,adaptAdj originalNbr, adaptAdj newNbr);
 
 
 

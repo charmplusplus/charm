@@ -592,4 +592,19 @@ int ParFUMShadowArray::IdxlLookUpSecondary(int sharedChk, int sharedIdx, int idx
   return (FindIdxlSide(idxlType))->getNode(sharedChk,sharedIdx);
 }
 
+
+// BULK ADAPT ENTRY METHODS START HERE:
+adaptAdjMsg *ParFUMShadowArray::remote_bulk_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, int new_idxl, int n1_idxl, int n2_idxl, int partitionID)
+{
+  
+  adaptAdjMsg *am = new adaptAdjMsg;
+  am->elem = bulkAdapt->remote_edge_bisect_2D(nbrElem, splitElem, new_idxl, n1_idxl, n2_idxl, partitionID);
+  return am;
+}
+
+void ParFUMShadowArray::remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, adaptAdj newElem)
+{
+  bulkAdapt->remote_adaptAdj_replace(elem, oldElem, newElem);
+}
+
 #include "ParFUM_SA.def.h"

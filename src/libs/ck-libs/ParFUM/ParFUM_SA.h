@@ -143,6 +143,11 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
   int IdxlLookUpPrimary(int localId, int sharedChk, int idxlType);
   ///Return the localIdx at this 'sharedIdx' on this idxl list
   int IdxlLookUpSecondary(int sharedChk, int sharedIdx, int idxlType);
+
+  /// These are entry methods for bulk adaptivity
+  adaptAdjMsg *remote_bulk_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, int new_idxl, int n1_idxl, int n2_idxl, int partitionID);
+
+  void remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, adaptAdj newElem);
 };
 
 ///This is a message which packs all the chunk indices together
@@ -178,5 +183,10 @@ class lockChunksMsg : public CMessage_lockChunksMsg {
   }
 };
 
+class adaptAdjMsg : public CMessage_adaptAdjMsg {
+ public:
+  adaptAdj elem;
+};
+  
 #endif
 

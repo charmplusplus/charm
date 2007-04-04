@@ -16,7 +16,7 @@ class BulkAdapt {
  private:
   /// The index of the partition this array element is attached to
   int partitionID;
-	int meshID;
+  int meshID;
   /// Pointer to the local mesh partition associated with this array
   FEM_Mesh *meshPtr;
   /// Proxy to ParFUM shadow array attached to each mesh partition
@@ -93,7 +93,12 @@ class BulkAdapt {
 
 
   /* COMMUNICATION HELPERS FOR BULK ADAPTIVITY OPERATIONS */
-  
+  adaptAdj remote_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, 
+				 int new_idxl, int n1_idxl, int n2_idxl, 
+				 int remotePartID);
+
+  void remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, 
+			       adaptAdj newElem);
   /* LOCAL HELPERS FOR BULK ADAPTIVITY OPERATIONS */
 	
 	/** Add a new element to the mesh. 
@@ -119,6 +124,9 @@ class BulkAdapt {
 	void update_node_coord(int nodeID,int dim,double *coords);
 
 	void make_node_shared(int nodeID,int numSharedChunks,int *sharedChunks);
+
+	int get_idxl_for_node(int nodeID, int partID);
+	int get_node_from_idxl(int node_idxl, int partID);
 };
 
 void midpoint(double *n1, double *n2, int dim, double *result);
