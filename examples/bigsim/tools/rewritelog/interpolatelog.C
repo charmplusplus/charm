@@ -6,9 +6,7 @@
 	email : idooley2@uiuc.edu
 	date  : Jan 2007
 
-    This uses the gsl library for least-square fitting. Gnu Scientific Library is available under GPL
-
-    Currently we hard code in two parameters some places.
+    This uses the gsl library for least-square fitting. GNU Scientific Library is available under GPL
 
 */
 
@@ -31,15 +29,19 @@
 #include <utility> // for std::pair
 #include <vector>
 
-#define OUTPUTDIR "newtraces/"
+#define KEEP_RATIO 1.0
+
+#define OUTPUTDIR "newtraces-keep1.0/"
 #define CYCLE_TIMES_FILE "nopme"
 #define sec_per_cycle 0.00000000025
 
 // Scale the duration of all unknown events by this factor
-#define time_factor 0.2
+//#define time_factor 0.2
+//#define time_factor (1.0/4.418)
+#define time_factor (1.0/6.05)
 
 // Set these for more output:
-#define DEBUG
+//#define DEBUG
 #undef PRINT_NEW_TIMES
 #define WRITE_OUTPUT_FILES
 
@@ -48,7 +50,7 @@ extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
 
 
-/** linearly map a point from an interval with sepcified bounds to a new interval linearly 
+/** linearly map a point from an interval with sepcified bounds to a new interval linearly
     @return a value between new_lower and new_upper
 */
 double map_linearly_to_interval(double val, double old_lower, double old_upper, double new_lower, double new_upper){
@@ -61,8 +63,13 @@ double map_linearly_to_interval(double val, double old_lower, double old_upper, 
   else
 	new_val = new_lower + ((val-old_lower)*(new_upper-new_lower))/(old_upper-old_lower);
 
+  assert(new_upper >= new_lower);
   assert(new_val <= new_upper);
   assert(new_val >= new_lower);
+
+  assert(old_upper >= old_lower);
+  assert(val <= old_upper);
+  assert(val >= old_lower);
 
   return new_val;
 }
@@ -70,11 +77,22 @@ double map_linearly_to_interval(double val, double old_lower, double old_upper, 
 int main()
 {
     // Load in Mambo Times
-    EventInterpolator interpolator(CYCLE_TIMES_FILE);
+    EventInterpolator interpolator(CYCLE_TIMES_FILE, KEEP_RATIO);
 
     int totalProcs, numX, numY, numZ, numCth, numWth, numPes;
 	double ratio_sum=0.0;
 	unsigned long ratio_count= 0;
+
+	double ratio_bracketed_sum=0.0;
+	unsigned long ratio_bracketed_count = 0;
+
+	double old_times_sum=0.0;
+	double old_bracketed_times_sum=0.0;
+	double new_bracketed_times_sum=0.0;
+
+	ofstream of_ratio_all("ratio_all");
+	ofstream of_ratio_bracketed("ratio_bracketed");
+
 	interpolator.printCoefficients();
 
     // load bg trace summary file
@@ -101,7 +119,7 @@ int main()
 
 
     for (int fileNum=0; fileNum<numPes; fileNum++){
-        BgTimeLineRec *tlinerecs = new BgTimeLineRec[totalProcs/numPes];
+        BgTimeLineRec *tlinerecs = new BgTimeLineRec[totalProcs/numPes+1];
         int rec_count = 0;
 
         for(int procNum=fileNum;procNum<totalProcs;procNum+=numPes){
@@ -134,11 +152,8 @@ int main()
                 double old_end   = timeLog->endTime;
                 double old_duration = old_end-old_start;
 
-				double old_bracket_start = -1.0;
-				double old_bracket_end;
-
-				double new_bracket_duration;
-				double new_other_duration;
+				double old_bracket_start=0.0;
+				double old_bracket_end=0.0;
 
 				int have_bracket_start=0;
 				int have_bracket_end=0;
@@ -147,49 +162,74 @@ int main()
 				double middle_piece=old_duration;
 				double end_piece=0.0;
 
-				//			assert(old_end > 0.0);
+				assert(old_duration >= 0.0);
+				assert(old_end > 0.0);
+
 				if(old_end > old_start){
+				  old_times_sum += old_duration;
+
+				  //FIXME: check only the right kind of events.
 
 				  // Look for BG_EVENT_PRINT 'events' inside this event.
 				  for(int i=0;i<timeLog->evts.length();i++){
 					char *data = (char*)timeLog->evts[i]->data;
-					printf("Event ->%s<-\n",data);
 					if(strncmp(data,"startTraceBigSim",16)==0){
 					  old_bracket_start = old_start+timeLog->evts[i]->rTime;
 					  have_bracket_start = 1;
-					  printf("\t\tfound startTraceBigSim!!!\n");
 					}
 					else if(strncmp(data,"endTraceBigSim",14)==0){
 					  old_bracket_end = old_start+timeLog->evts[i]->rTime;
-					  have_bracket_end = 1;  
-					  printf("\t\tfound endTraceBigSim!!!\n");
+					  have_bracket_end = 1;
 					}
 				  }
 
-				  // If we have bracketed timings, the middle part will be the old 
-				  // bracketed time region, and the begin and end pieces will be non-zero				
+				  // If we have bracketed timings, the middle part will be the old
+				  // bracketed time region, and the begin and end pieces will be non-zero
 				  if(have_bracket_end && have_bracket_start){
 					begin_piece = old_bracket_start - old_start;
 					middle_piece = old_bracket_end - old_bracket_start;
-					end_piece = (old_end - old_start) - begin_piece - middle_piece;
+					end_piece = old_duration - begin_piece - middle_piece;
+					old_bracketed_times_sum += middle_piece;
+					assert(begin_piece >= 0.0);
+					assert(middle_piece >= 0.0);
+					assert(end_piece >= 0.0);
+				  }
+				  else{
+					old_bracket_start = old_start;
+					old_bracket_end = old_end;
+					assert(old_bracket_end - old_bracket_start >= 0.0);
 				  }
 
 
 				  // If this event occurs in the paramerter file and cycle-accurate simulations, use that data to predict its runtime
-				
+
 				  if( interpolator.haveNewTiming(procNum,timeLog->seqno) ) {
+					double old_middle_piece = middle_piece;
 					middle_piece = interpolator.getNewTiming(procNum,timeLog->seqno) * sec_per_cycle;
 					found_event_count ++;
+
+					double ratio =  old_middle_piece / middle_piece;
+					if(ratio > 1e-10 && ratio < 1e10){
+					  ratio_bracketed_sum += ratio;
+					  ratio_bracketed_count ++;
+					  of_ratio_bracketed << ratio << endl;
+					}
+
+
 				  }
 				  // If event is not in parameter file then we just scale its duration by a simple constant
 				  else {
 					middle_piece = middle_piece*time_factor ;
 				  }
 
-				
+
 				  if(middle_piece < 0.0) {
 					middle_piece=0.0;
 					negative_durations_occured=true;
+				  }
+
+				  if(have_bracket_end && have_bracket_start){
+					new_bracketed_times_sum += middle_piece;
 				  }
 
 				  // Scale the begin and end pieces by time_factor;
@@ -201,8 +241,8 @@ int main()
 				  assert(end_piece >= 0.0);
 
 				  double new_start    = old_start;
-				  double new_end      = new_start + begin_piece + middle_piece + end_piece;
-				  double new_duration =             begin_piece + middle_piece + end_piece;
+				  double new_duration = begin_piece + middle_piece + end_piece;
+				  double new_end      = new_start + new_duration;
 
 				  timeLog->startTime = new_start;
 				  timeLog->endTime   = new_end;
@@ -215,47 +255,48 @@ int main()
 #ifdef PRINT_NEW_TIMES
 				  printf("Rewriting duration of event %d name=%s from [%.10lf , %.10lf] (%.10lf) to [%.10lf , %.10lf] (%.10lf) ratio=%.10lf\n", j, timeLog->name, old_start,old_end,old_end-old_start,new_start,new_end,new_end-new_start,(old_end-old_start)/(new_end-new_start));
 #endif
-				
+
 				  double ratio = (old_duration)/(new_duration);
-				  if(ratio >= 0.5 && ratio <= 50.0){
+				  if(ratio >= 1e-10 && ratio <= 1e10){
 					ratio_sum += ratio;
 					ratio_count ++;
+					of_ratio_all << ratio << endl;
 				  }
 
 				  // Rewrite times of messages sent from this event
 				  for(int m=0;m<timeLog->msgs.length();m++){
 					double old_send = timeLog->msgs[m]->sendTime;
 					double new_send;
-				  
+
 					assert(old_send <= old_end);
 					assert(old_send >= old_start);
-				  
+
 					// We have three places where the message is coming from
 					// We linearly map the value into the beginning, middle, or end piece
 					if(old_send < old_bracket_start){
 					  new_send = map_linearly_to_interval(old_send, old_start,old_bracket_start,new_start,new_bracket_start);
-					} 
+					}
 					else if(old_send < old_bracket_end){
 					  new_send = map_linearly_to_interval(old_send, old_bracket_start,old_bracket_end,new_bracket_start,new_bracket_end);
 					}
 					else {
 					  new_send = map_linearly_to_interval(old_send, old_bracket_end,old_end,new_bracket_end,new_end);
-					}				  
-				  
+					}
+
 					timeLog->msgs[m]->sendTime = new_send;
-				  
+
 #ifdef PRINT_NEW_TIMES
 					printf("pe=%d changing message %d send time from %.10lf to %.10lf\n", procNum, m, old_send, new_send);
 #endif
-				  
+
 					assert(new_send <= new_end);
-					assert(new_send >= new_start);				  
-				  
+					assert(new_send >= new_start);
+
 				  }
 				}
-				
+
             }
-			
+
 
         }
 
@@ -279,7 +320,14 @@ int main()
 
     printf("Writing new bgTrace files ...\n");
 
-	printf("average duration ratio: %.15lf\n", ratio_sum / (double)ratio_count);
+	printf("average duration speedup(including unbracketed pieces): %.8lf\n", ratio_sum / (double)ratio_count);
+
+	printf("average bracketed speedup: %.8lf\n", ratio_bracketed_sum / (double)ratio_bracketed_count);
+
+	cout << "Sum of times of bracketed portions of input logs: " << old_bracketed_times_sum << endl;
+	cout << "Sum of times of bracketed portions of output logs: " << new_bracketed_times_sum << endl;
+
+
 
 #ifdef WRITE_OUTPUT_FILES
     // Write out the timelines to the same number of files as we started with.
@@ -288,11 +336,14 @@ int main()
 
     delete [] allNodeOffsets;
 
-    std::cout << "Of the " << total_count << " events found in the bgTrace files, " << found_event_count << " were found in the param files" << endl;
+    cout << "Of the " << total_count << " events found in the bgTrace files, " << found_event_count << " were found in the param files" << endl;
 
     interpolator.printMatches();
 
-    std::cout << "End of program" << std::endl;
+	cout << "The sum of all positive duration events from the original bgTrace files is: " << old_times_sum << endl;
+
+
+    cout << "End of program" << endl;
 
 }
 

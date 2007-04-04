@@ -1,9 +1,46 @@
-
 #include <EventInterpolator.h>
 
-#define DEBUG
+//#define DEBUG
+#define PRETEND_NO_ENERGY
 
 using namespace std;
+
+
+/** Create a vector such that "count" items out of "length" in the vector are set to true */
+vector<bool> random_select(int count, int length){
+  vector<bool> v(length);
+  int c=0;
+  // Initialize all to false
+  for(int i=0;i<length;++i)
+	v[i] = false;
+  while(c < count){
+	// find a random entry int the vector
+	int r = rand() % length;
+	// mark it as true, incrementing c if this is the first time we mark it
+	if(v[r] == false){
+	  c++;
+	  v[r] = true;
+	}
+  }
+  return v;
+}
+
+template <typename T, typename T2>
+multimap<T,T2> random_select_multimap(multimap<T,T2> input_map , int count){
+    assert(input_map.size() >= count);
+    vector<bool> which_to_keep = random_select(count, input_map.size());
+    multimap<T,T2> output_map;
+    int len = which_to_keep.size();
+    typename multimap<T, T2>::iterator itr=input_map.begin();
+    for(int i=0; i<len; ++i, ++itr){
+        if(which_to_keep[i] == true){
+          // Do something like this to keep them around:
+            output_map.insert(make_pair((*itr).first, (*itr).second));
+        }
+    }
+//     assert(output_map.size()==count);
+    return output_map;
+}
 
 int EventInterpolator::numCoefficients(const string &funcname){
 // We create a dummy input stringstream and pass it to parseParameters.
@@ -37,6 +74,7 @@ pair<int,vector<double> > EventInterpolator::parseParameters(const string &funcn
 }
 
 
+/** First parameter is a category or subclass for a particular timed region. For example, we wish to consider computation for adjacent patches differently than patches that are neighbors of adjacent patches. This allows a single timed region to be broken out and treated as a number of different cases. */
 pair<int,vector<double> > EventInterpolator::parseParameters(const string &funcname, istringstream &line, double &time, const bool log){
     vector<double> params;
     int category=0;
@@ -90,8 +128,8 @@ pair<int,vector<double> > EventInterpolator::parseParameters(const string &funcn
 
     }
     else if(funcname == string("*integrate*")){
-        double d1, d2, d3, d4, d5, d6, d7, t1;
-        line >> d1 >> d2 >> d3 >> d4 >> d5 >> d6 >> d7 >> t1;
+        double d1, d2, d3, d4, d5, d6, d7, d8, t1;
+        line >> d1 >> d2 >> d3 >> d4 >> d5 >> d6 >> d7 >> d8 >> t1;
 
         if(log)
             log1 << funcname << "\t" << t1 << "\t" << d1 << "\t" << d2 << "\t" << d3 << "\t" << d4 << "\t" << d5 << "\t" << d6 << "\t" << d7 << endl;
@@ -107,18 +145,20 @@ pair<int,vector<double> > EventInterpolator::parseParameters(const string &funcn
         throw new runtime_error("unknown function");
     }
 
-    return pair<int,vector<double> >(category,params);
+    return make_pair(category,params);
 }
 
 
 
 
 
-EventInterpolator::EventInterpolator(char *table_filename){
-    exact_matches=0;
-    exact_positive_matches=0;
-    approx_matches=0;
-    approx_positive_matches=0;
+EventInterpolator::EventInterpolator(char *table_filename, double sample_rate){
+  std::map<string,double> cycle_accurate_time_sum;
+
+  exact_matches=0;
+  exact_positive_matches=0;
+  approx_matches=0;
+  approx_positive_matches=0;
 
 	log1.open("log1");
 
@@ -151,14 +191,65 @@ EventInterpolator::EventInterpolator(char *table_filename){
 			fullParams params = parseParameters(funcname,line,time,false);
             funcIdentifier func(funcname,params.first);
             sample_count[func]++;
+			cycle_accurate_time_sum[funcname] += time;
+
+            accurateTimings.insert(make_pair(make_pair(func,params.second),time));
+
         }
     }
+
+
+	std::map<string,double>::iterator cycle_i;
+	cout << "The following table displays the total cycle count for each event in the \n" 
+            "cycle-accurate timings file. This may be useful for back of the envelope \n"
+            "calculations for expected performance " << endl << endl;
+	cout << "\t|=========================|===================|" << endl;
+	cout << "\t|                  event  | total cycle count |" << endl;
+	cout << "\t|-------------------------|-------------------|" << endl;
+	for(cycle_i= cycle_accurate_time_sum.begin();cycle_i!=cycle_accurate_time_sum.end();++cycle_i){
+	  cout << "\t|";
+  	  for(int i=0;i<24-(*cycle_i).first.length();++i) 
+		cout << " ";
+	  cout << (*cycle_i).first << " | ";
+	  cout.width(17);
+	  cout << (*cycle_i).second;
+	  cout << " |" << endl;
+	}	
+	cout << "\t|=========================|===================|" << endl << endl;
+
+
+
+    unsigned long sample_keep = (unsigned long) ceil(sample_rate * accurateTimings.size());
+    if (sample_rate < 1.0){
+        cout << "Randomly dropping " << (1.0-sample_rate)*100 << "% of the cycle accurate timings" << endl;
+        accurateTimings = random_select_multimap(accurateTimings, sample_keep);
+    }
+
+	analyzeExactVariances();
+
+	cout << "The following table displays the number of timing samples from \n the cycle-accurate file for each event." << endl << endl;
+	cout << "\t|=========================|==========================|" << endl;
+	cout << "\t|                  event  | number of timing samples |" << endl;
+	cout << "\t|-------------------------|--------------------------|" << endl;
+
 
     // Create a gsl interpolator workspace for each event/function
     for(map<funcIdentifier,unsigned long>::iterator i=sample_count.begin(); i!=sample_count.end();++i){
         funcIdentifier func = (*i).first;
         unsigned long samples = (*i).second;
-        cout << "     > " << func.first << "," << func.second << " has " << samples << " sampled timings" << endl;
+		
+        cout << "\t|";
+		
+		for(int i=0;i<20-func.first.length();++i)
+		  cout << " ";
+		cout << func.first << ",";
+		cout.width(3);
+		cout << func.second;
+		
+		cout << " | ";
+		cout.width(24);
+		cout << samples << " |" << endl;
+
 
         if(samples < numCoefficients(func.first) ){
             cerr << "FATAL ERROR: Not enough input timing samples for " << func.first << "," << func.second << " which has " << numCoefficients(func.first) << " coefficients" << endl;
@@ -177,77 +268,90 @@ EventInterpolator::EventInterpolator(char *table_filename){
 
         }
     }
+	cout << "\t|=========================|==========================|" << endl << endl;
 
     accurateTimeTable.close();
-    ifstream accurateTimeTable2(table_filename);
+
 
 #ifdef WRITESTATS
     ofstream statfile("stats-out");
 #endif
 
-    // Second pass, scan through cycle accurate time file
-    while(accurateTimeTable2.good()){
-        string line_s;
-        getline(accurateTimeTable2,line_s);
-        istringstream line(line_s);
+    // Fill in values for matrix X and vector Y which will be fed into the least square fit algorithm
+	// The data is currently in  accurateTimings[pair<funcIdentifier,vector<double> >(func,params.second)]=time;
 
-        string temp("");
-        while(temp != string("TRACEBIGSIM") && line.good() && accurateTimeTable2.good() ){
-            line >> temp;
-        }
-        line >> temp; // gobble up one more worthless bit of input line
+	//iterate through accurateTimings
+	cout << "accurateTimings.size() = " << accurateTimings.size() << endl;
+	map< pair<funcIdentifier,vector<double> >, double >::iterator itr;
+    for(itr=accurateTimings.begin();itr!=accurateTimings.end();++itr){
+	  const double &time = (*itr).second;
+	  const vector<double> &paramsSecond =(*itr).first.second;
+	  const funcIdentifier func = (*itr).first.first;
 
-        if(line.good() && accurateTimeTable2.good()){
-            string funcname;
-            line >> funcname;
+	  // lookup the next unused entry in X
+	  unsigned next = Xcount[func] ++;
+	  gsl_matrix * x = X[func];
 
-            double time;
-            fullParams params = parseParameters(funcname,line,time,false);
+	  // copy data into array X and Y
+	  for(int param_index=0;param_index<paramsSecond.size();++param_index){
+		gsl_matrix_set(x,next,param_index, paramsSecond[param_index]);
+	  }
+	  gsl_vector_set(y[func],next,time);
 
-            funcIdentifier func(funcname,params.first);
+	}
 
-            unsigned i = Xcount[func] ++;
-            gsl_matrix * x = X[func];
-            accurateTimings[pair<funcIdentifier,vector<double> >(func,params.second)]=time;
-
-#ifdef WRITESTATS
-            statfile << funcname << "\t" << time << endl;
-#endif
-
-            for(int param_index=0;param_index<params.second.size();++param_index){
-                gsl_matrix_set(x,i,param_index, params.second[param_index]);
-            }
-            gsl_vector_set(y[func],i,time);
-
-        }
-    }
 
 #ifdef WRITESTATS
     statfile.close();
 #endif
 
     // Perform a sanity check now
-
+	int count1=0, count2=0;
     for(map<funcIdentifier, gsl_multifit_linear_workspace *>::iterator i=work.begin();i!=work.end();++i){
-        if(sample_count[(*i).first]!=Xcount[(*i).first]){
-          cerr << "FATAL ERROR: sanity check failed: " << sample_count[(*i).first] << "!=" << Xcount[(*i).first] << "  :(" << endl;
-       throw new runtime_error("sanity check failed");
-        }
-    }
+#if DEBUG
+	  cout << "sample count vs Xcount (" << (*i).first.first << "): " << sample_count[(*i).first] << "?=" << Xcount[(*i).first] << " " << endl;
+#endif
+	  count1 += sample_count[(*i).first];
+	  count2 += Xcount[(*i).first] ;
+	}
+	cout << "Samples from cycle accurate file : " << count1 << ".  Keeping only " << count2 << " of them " << endl;
 
     cout << "Performing Least Squared Fit to sampled time data" << endl;
 
     //  Now do Least Square Fit: Find C where y=Xc
+	cout << "The following table displays the chi^2 measure for how well the model fits the input times." << endl << endl;
+	cout << "\t|=========================|=========|=========|" << endl;
+	cout << "\t|                  event  |   chi^2 |     chi |" << endl;
+	cout << "\t|-------------------------|---------|---------|" << endl;
+
+	cout.setf(ios_base::scientific, ios_base::floatfield);
+	cout.precision(1);
+
     map<funcIdentifier, gsl_multifit_linear_workspace *>::iterator i;
     for(i=work.begin();i!=work.end();++i){
         funcIdentifier func = (*i).first;
         assert(! gsl_multifit_linear(X[func],y[func],c[func],cov[func],&chisqr[func],work[func]));
         gsl_matrix_free(X[func]);
         gsl_vector_free(y[func]);
-        cout << "     > " << func.first << "," << func.second << " has chisqr=" << chisqr[func] << endl;
+
+		cout << "\t|";
+		
+		for(int i=0;i<20-func.first.length();++i)
+		  cout << " ";
+		cout << func.first << ",";
+		cout.width(3);
+		cout << func.second;
+		
+		cout << " | ";
+		cout.width(7);
+		cout << chisqr[func];
+
+		cout << " | ";
+		cout.width(7);
+		cout << sqrt(chisqr[func]) << " |" << endl;
+
     }
-
-
+	cout << "\t|=========================|=========|=========|" << endl << endl;
 
     // Load in Parameter File which maps event id to function name and parameters
     cout << "Loading parameter files" << endl;
@@ -277,10 +381,19 @@ EventInterpolator::EventInterpolator(char *table_filename){
                     line >> funcname;
 
                     if(t1 == string("TRACEBIGSIM")){
+#ifdef PRETEND_NO_ENERGY
+					    if(funcname == string("calc_pair_energy")){\
+						  funcname = "calc_pair";
+						}
+						else if(funcname == string("calc_self_energy")){
+						  funcname = "calc_self";
+						}
+#endif
+
                         fullParams params = parseParameters(funcname,line,false);
                         funcIdentifier func(funcname,params.first);
                         Xcount[func] ++;
-                        eventparams[pair<unsigned,unsigned>(i,eventid)] = pair<funcIdentifier,vector<double> >(func,params.second);
+                        eventparams[make_pair(i,eventid)] = make_pair(func,params.second);
                     }
                 }
             }
@@ -295,9 +408,8 @@ EventInterpolator::EventInterpolator(char *table_filename){
 }
 
 
-
 bool EventInterpolator::haveExactTime(const unsigned pe, const unsigned eventid){
-    return haveExactTime(eventparams[pair<unsigned,unsigned>(pe,eventid)]);
+    return haveExactTime(eventparams[make_pair(pe,eventid)]);
 }
 
 bool EventInterpolator::haveExactTime(const pair<funcIdentifier,vector<double> > &p) {
@@ -305,11 +417,11 @@ bool EventInterpolator::haveExactTime(const pair<funcIdentifier,vector<double> >
 }
 
 bool EventInterpolator::haveExactTime(const funcIdentifier& func, const vector<double> &p){
-    return (accurateTimings.find(pair<funcIdentifier,vector<double> >(func,p)) != accurateTimings.end());
+  return (accurateTimings.find(make_pair(func,p)) != accurateTimings.end());
 }
 
 double EventInterpolator::lookupExactTime(const unsigned pe, const unsigned eventid){
-    return lookupExactTime(eventparams[pair<unsigned,unsigned>(pe,eventid)]);
+    return lookupExactTime(eventparams[make_pair(pe,eventid)]);
 }
 
 double EventInterpolator::lookupExactTime(const pair<funcIdentifier,vector<double> > &p) {
@@ -317,22 +429,156 @@ double EventInterpolator::lookupExactTime(const pair<funcIdentifier,vector<doubl
 }
 
 double EventInterpolator::lookupExactTime(const funcIdentifier& func, const vector<double> &p){
-    double val = accurateTimings[pair<funcIdentifier,vector<double> >(func,p)];
+    const  pair<funcIdentifier,vector<double> > key(func,p);
+    const int count = accurateTimings.count(key);
+
+	pair<timings_type::iterator, timings_type::iterator> itrs = accurateTimings.equal_range(key);
+	double time_sum=0;
+	for(timings_type::iterator itr=itrs.first; itr!=itrs.second; ++itr){
+	  time_sum += (*itr).second;
+	}
+	double time_average = time_sum / count;
+
     exact_matches++;
-    if(val>=0.0)
-        exact_positive_matches++;
-	else
-	  cout << "exact negative match = " << val << endl;
-    return val;
+	assert(time_average >= 0.0 );
+    return time_average;
 }
+
+
+/** Print out some statistics about the timings for any parameter that has multiple associated cycle-accurate timings */
+void EventInterpolator::analyzeExactVariances(){
+
+    map< pair<funcIdentifier,vector<double> >, double > variances;
+    map< pair<funcIdentifier,vector<double> >, double > means;
+	map< funcIdentifier, double > max_std_dev;
+	map< funcIdentifier, double > associated_mean;
+
+	// Iterate through items in accurateTimings and store variances
+	timings_type::iterator itr;
+	for(itr=accurateTimings.begin();itr!=accurateTimings.end();++itr){
+	  variances[(*itr).first] = lookupExactVariance( (*itr).first );
+	  means[(*itr).first] = lookupExactMean( (*itr).first );
+	}
+
+	// Display the variances
+	map< pair<funcIdentifier,vector<double> >, double >::iterator vItr;
+	for(vItr = variances.begin(); vItr!=variances.end(); ++vItr){
+	  double var = (*vItr).second;
+	  double stddev = sqrt(var);
+	  double mean = means[(*vItr).first];
+
+	  if(var > 0.0){
+		if(stddev > max_std_dev[(*vItr).first.first]){
+		  max_std_dev[(*vItr).first.first] = stddev;
+		  associated_mean[(*vItr).first.first] = mean;
+		}
+	  }
+	}
+	
+	// Display the max std dev for any given event
+	cout << "The following events have differing exact times for one or more parameter set.\n"
+	        "Each line corresponds to whichever parameter list produced the greatest variance\n"
+	        "(and equivalently std dev). The mean is the mean timing value associated with the\n"
+            " same parameter list of greatest variance" << endl << endl;
+
+
+	cout << "\t|=========================|=================|=================|==============|" << endl;
+	cout << "\t|                  event  |     max std dev |            mean | sd % of mean |" << endl;
+	cout << "\t|-------------------------|-----------------|-----------------|--------------|" << endl;
+
+	cout.setf(ios_base::fixed, ios_base::floatfield);
+	cout.precision(1);
+
+	int func_name_field_width=20;
+	map< funcIdentifier, double >::iterator sItr;
+	for(sItr=max_std_dev.begin(); sItr!=max_std_dev.end(); ++sItr) {
+	  double stddev = (*sItr).second;
+	  double mean = associated_mean[(*sItr).first];
+	  cout << "\t|";
+	  for(int i=0;i<func_name_field_width-(*sItr).first.first.length();++i) 
+		cout << " ";
+	  cout << (*sItr).first.first ;
+	  cout << ",";
+	  cout.width(3);
+	  cout << (*sItr).first.second;
+	  cout << " | ";
+	  cout.width(15);
+	  cout <<  stddev;
+	  cout << " | ";
+	  cout.width(15);
+	  cout << mean << " | ";
+	  cout.width(9);
+	  cout << (stddev * 100.0 / mean) << "    | " << endl;
+	}
+	cout.setf(ios_base::fmtflags(0), ios_base::floatfield);
+	cout << "\t|=========================|=================|=================|==============|" << endl << endl;
+
+}
+
+/** Lookup the average timing for a given event and parameter list */
+double EventInterpolator::lookupExactVariance(const unsigned pe, const unsigned eventid){
+    return lookupExactVariance(eventparams[make_pair(pe,eventid)]);
+}
+
+/** Lookup the variance in the timings for a given event and parameter list */
+double EventInterpolator::lookupExactVariance(const pair<funcIdentifier,vector<double> > &p) {
+    return lookupExactVariance(p.first,p.second);
+}
+
+/** Lookup the variance in the timings for a given event and parameter list */
+double EventInterpolator::lookupExactVariance(const funcIdentifier& func, const vector<double> &p){
+    const  pair<funcIdentifier,vector<double> > key(func,p);
+    const int count = accurateTimings.count(key);
+
+	// Compute mean
+	pair<timings_type::iterator, timings_type::iterator> itrs = accurateTimings.equal_range(key);
+	double time_sum=0;
+	for(timings_type::iterator itr=itrs.first; itr!=itrs.second; ++itr){
+	  time_sum += (*itr).second;
+	}
+	const double time_average = time_sum / count;
+
+	// Compute Variance
+	double V_sum=0;
+	for(timings_type::iterator itr=itrs.first; itr!=itrs.second; ++itr){
+	  const double d = (*itr).second-time_average;
+	  V_sum += d*d;
+	}
+	const double Var = V_sum / count;
+
+    return Var;
+}
+
+/** Lookup the average timing for a given event and parameter list */
+double EventInterpolator::lookupExactMean(const unsigned pe, const unsigned eventid){
+    return lookupExactMean(eventparams[make_pair(pe,eventid)]);
+}
+/** Lookup the average timing for a given event and parameter list */
+double EventInterpolator::lookupExactMean(const pair<funcIdentifier,vector<double> > &p) {
+    return lookupExactMean(p.first,p.second);
+}
+/** Lookup the average timing for a given event and parameter list */
+double EventInterpolator::lookupExactMean(const funcIdentifier& func, const vector<double> &p){
+    const  pair<funcIdentifier,vector<double> > key(func,p);
+    const int count = accurateTimings.count(key);
+
+	// Compute mean
+	pair<timings_type::iterator, timings_type::iterator> itrs = accurateTimings.equal_range(key);
+	double time_sum=0;
+	for(timings_type::iterator itr=itrs.first; itr!=itrs.second; ++itr){
+	  time_sum += (*itr).second;
+	}
+	return time_sum / count;
+}
+
 
 /** If we have a parameterfile entry for the requested pe,eventid pair */
 double EventInterpolator::haveNewTiming(const unsigned pe, const unsigned eventid) {
-    return eventparams.find( pair<unsigned,unsigned>(pe,eventid) ) != eventparams.end();
+    return eventparams.find( make_pair(pe,eventid) ) != eventparams.end();
 }
 
 double EventInterpolator::predictTime(const unsigned pe, const unsigned eventid) {
-    return predictTime(eventparams[pair<unsigned,unsigned>(pe,eventid)]);
+    return predictTime(eventparams[make_pair(pe,eventid)]);
 }
 
 double EventInterpolator::predictTime(const pair<funcIdentifier,vector<double> > &p) {
@@ -349,7 +595,7 @@ double EventInterpolator::getNewTiming(const unsigned pe, const unsigned eventid
 	return lookupExactTime(pe,eventid);
   else
 	return predictTime(pe,eventid);
-}			  
+}
 
 double EventInterpolator::predictTime(const funcIdentifier &func, const vector<double> &params) {
 

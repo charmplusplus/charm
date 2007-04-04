@@ -1,11 +1,13 @@
 
 #include <gsl/gsl_multifit.h>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <string>
 #include <sstream>
 #include <cassert>
 #include <stdexcept>
+#include <stdlib.h> // for rand()
 
 #include <map>
 #include <string>
@@ -29,10 +31,11 @@ using namespace std;
 
 typedef pair<string,int> funcIdentifier;
 typedef pair<int,vector<double> > fullParams;
+typedef multimap< pair<funcIdentifier,vector<double> >, double > timings_type;
 
 class EventInterpolator{
 private:
-  ofstream log1;
+    ofstream log1;
 
     // For each interpolatable function we record things in these maps:
 
@@ -47,7 +50,7 @@ private:
     map<funcIdentifier, gsl_vector *>y;  // vector of cycle accurate times for each input parameter set
 
     map<pair<unsigned,unsigned>,pair<funcIdentifier,vector<double> > > eventparams;
-    map< pair<funcIdentifier,vector<double> >, double > accurateTimings;
+    timings_type accurateTimings;
 
 
     bool canInterpolateFunc(const funcIdentifier& name);
@@ -66,15 +69,35 @@ public:
 
     double predictTime(const unsigned pe, const unsigned eventid);
     double predictTime(const pair<funcIdentifier,vector<double> > &p);
-    double predictTime(const funcIdentifier &name, const vector<double> &params);
+    double predictTime(const funcIdentifier &f, const vector<double> &p);
 
     bool haveExactTime(const unsigned pe, const unsigned eventid);
     bool haveExactTime(const pair<funcIdentifier,vector<double> > &p);
-    bool haveExactTime(const funcIdentifier& name, const vector<double> &p);
+    bool haveExactTime(const funcIdentifier& f, const vector<double> &p);
 
+
+	/** Compute average time for the provided event signature(name&parameters) */
     double lookupExactTime(const unsigned pe, const unsigned eventid);
+	/** Compute average time for the provided event signature(name&parameters) */
     double lookupExactTime(const pair<funcIdentifier,vector<double> > &p);
+	/** Compute average time for the provided event signature(name&parameters) */
     double lookupExactTime(const funcIdentifier& name, const vector<double> &p);
+
+	/** Compute variance of the timings for the provided event signature(name&parameters) */
+    double lookupExactVariance(const unsigned pe, const unsigned eventid);
+	/** Compute variance of the timings for the provided event signature(name&parameters) */
+    double lookupExactVariance(const pair<funcIdentifier,vector<double> > &p);
+	/** Compute variance of the timings for the the provided event signature(name&parameters)*/
+	double lookupExactVariance(const funcIdentifier& func, const vector<double> &p);
+
+	/** Compute average timing for the provided event signature(name&parameters) */
+    double lookupExactMean(const unsigned pe, const unsigned eventid);
+	/** Compute average timing for the provided event signature(name&parameters) */
+    double lookupExactMean(const pair<funcIdentifier,vector<double> > &p);
+	/** Compute average timing for the the provided event signature(name&parameters)*/
+	double lookupExactMean(const funcIdentifier& func, const vector<double> &p);
+
+	void analyzeExactVariances();
 
 	/** Get the new timing exactly if possible otherwise predict it */
 	double getNewTiming(const unsigned pe, const unsigned eventid);
@@ -91,8 +114,14 @@ public:
 
     void printMatches();
 
+	/**
+		Setup an EventInterpolator object from the data in the specified file
+		@params sample_rate specifies what fraction of the cycle accurate times
+		to keep. The rest will be dropped prior to constructing the best fit
+		interpolating model
+	*/
+    EventInterpolator(char *table_filename, double sample_rate=1.0);
 
-    EventInterpolator(char *table_filename);
     ~EventInterpolator();
 
 };
