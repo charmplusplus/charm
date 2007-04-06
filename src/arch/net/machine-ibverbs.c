@@ -33,6 +33,7 @@ enum ibv_mtu mtu = IBV_MTU_2048;
 static int page_size;
 static int mtu_size;
 static int packetSize;
+static int tokensPerProcessor;
 
 
 typedef struct {
@@ -73,7 +74,8 @@ struct infiContext {
 	int ibPort;
 //	struct ibv_comp_channel *channel;
 	struct ibv_pd		*pd;
-	struct ibv_cq		*cq;
+	struct ibv_cq		*sendCq;
+	struct ibv_cq   *recvCq;
 	struct ibv_qp		**qp; //Array of qps (numNodes long) to temporarily store the queue pairs
 												//It is used between CmiMachineInit and the call to node_addresses_store
 												//when the qps are stored in the corresponding OtherNodes
@@ -118,12 +120,23 @@ struct infiOtherNodeData{
 	struct ibv_qp *qp ;
 	int state;// does it expect a packet with a header (first packet) or one without
 	struct infiBufferPool *recvBufferPool;
+	int tokensLeft;
+	int nodeNo;
+	
+	int broot;//needed to store the root of a multi-packet broadcast sent along a spanning tree or hypercube
 };
 
 
+typedef struct infiPacketStruct {	
+	OutgoingMsg ogm;
+	struct OtherNodeStruct *destNode;
+	struct infiPacketStruct *next;
+}* infiPacket;
 
+//TODO: use this to store a pool of infiPackets and extract nodes from it
+static infiPacket infiPacketFreeList;
 
-struct infiContext *context;
+static struct infiContext *context;
 /******************CmiMachineInit and its helper functions*/
 
 void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,struct infiAddr *localAddr);
@@ -167,8 +180,8 @@ static void CmiMachineInit(char **argv){
 
 	mtu_size=2048;
 	packetSize = mtu_size-48;//infiniband rc header size -estimate
+	tokensPerProcessor=100;
 	createLocalQps(dev,ibPort,_Cmi_mynode,_Cmi_numnodes,context->localAddr);
-
 	
 	
 	MACHSTATE(3,"} CmiMachineInit");
@@ -180,8 +193,6 @@ static void CmiMachineInit(char **argv){
 void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,struct infiAddr *localAddr){
 	int myLid;
 	int i;
-	int rx_depth=500;
-	int send_wr=500;
 	
 	
 	//find my lid
@@ -190,9 +201,12 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 	MACHSTATE1(3,"myLid %d",myLid);
 
 	//create a completion queue to be used with all the queue pairs
-	context->cq = ibv_create_cq(context->context,rx_depth+1,NULL,NULL,0);
+	context->sendCq = ibv_create_cq(context->context,(tokensPerProcessor*(numNodes-1))+1,NULL,NULL,0);
+	assert(context->sendCq != NULL);
+	
 
-	assert(context->cq != NULL);
+	context->recvCq = ibv_create_cq(context->context,(tokensPerProcessor*(numNodes-1))+1,NULL,NULL,0);
+	assert(context->recvCq != NULL);
 	
 	MACHSTATE(3,"cq created");
 	
@@ -203,14 +217,14 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 	{
 		struct ibv_qp_init_attr initAttr = {
 			.qp_type = IBV_QPT_RC,
-			.send_cq = context->cq,
-			.recv_cq = context->cq,
+			.send_cq = context->sendCq,
+			.recv_cq = context->recvCq,
 			.sq_sig_all = 0,
 			.srq = NULL,
 			.qp_context = NULL,
 			.cap     = {
-				.max_send_wr  = send_wr,
-				.max_recv_wr  = rx_depth,
+				.max_send_wr  = tokensPerProcessor,
+				.max_recv_wr  = tokensPerProcessor,
 				.max_send_sge = 1,
 				.max_recv_sge = 1
 			},
@@ -280,7 +294,7 @@ static uint16_t getLocalLid(struct ibv_context *dev_context, int port){
 /**************** END OF CmiMachineInit and its helper functions*/
 
 struct infiBufferPool * allocateInfiBufferPool(int numRecvsPerNode,int sizePerBuffer);
-void postInitialRecvs(struct infiBufferPool *recvBufferPool,struct ibv_qp *qp ,int numRecvsPerNode,int sizePerBuffer);
+void postInitialRecvs(int node, struct infiBufferPool *recvBufferPool,struct ibv_qp *qp ,int numRecvsPerNode,int sizePerBuffer);
 
 /* Initial the infiniband specific data for a remote node
 	1. connect the qp and store it in and return it
@@ -290,6 +304,8 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	int err;
 	ret->state = INFI_HEADER_DATA;
 	ret->qp = context->qp[node];
+	ret->tokensLeft = tokensPerProcessor;
+	ret->nodeNo = node;
 	
 	struct ibv_qp_attr attr = {
 		.qp_state		= IBV_QPS_RTR,
@@ -346,7 +362,7 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 
 	//TODO: create the pool and post the receives
 	ret->recvBufferPool = allocateInfiBufferPool(100,packetSize);
-	postInitialRecvs(ret->recvBufferPool,ret->qp ,100,packetSize);
+	postInitialRecvs(node,ret->recvBufferPool,ret->qp ,100,packetSize);
 	MACHSTATE(3,"} initInfiOtherNodeData");
 	return ret;
 }
@@ -386,25 +402,22 @@ struct infiBufferPool * allocateInfiBufferPool(int numRecvsPerNode,int sizePerBu
 /**
 	 Post the buffers as recv work requests
 */
-void postInitialRecvs(struct infiBufferPool *recvBufferPool,struct ibv_qp *qp ,int numRecvsPerNode,int sizePerBuffer){
-	int i,j;
+void postInitialRecvs(int node,struct infiBufferPool *recvBufferPool,struct ibv_qp *qp ,int numRecvsPerNode,int sizePerBuffer){
+	int j;
 	struct ibv_recv_wr *workRequests = malloc(sizeof(struct ibv_recv_wr)*numRecvsPerNode);
 	struct ibv_sge *sgElements = malloc(sizeof(struct ibv_sge)*numRecvsPerNode);
 	struct ibv_recv_wr *bad_wr;
 	
-	for(i=0;i<_Cmi_numnodes ;i++){
-		if(i == _Cmi_mynode){
-		}else{
 			int startBufferIdx;
-			MACHSTATE3(3,"posting %d receives for node %d of size %d",numRecvsPerNode,i,sizePerBuffer);
-			if(i < _Cmi_mynode){
-				startBufferIdx = i*numRecvsPerNode;
+			MACHSTATE3(3,"posting %d receives for node %d of size %d",numRecvsPerNode,node,sizePerBuffer);
+			if(node < _Cmi_mynode){
+				startBufferIdx = node*numRecvsPerNode;
 			}else{
-				startBufferIdx = (i-1)*numRecvsPerNode;
+				startBufferIdx = (node-1)*numRecvsPerNode;
 			}
 			for(j=0;j<numRecvsPerNode;j++){
 				
-				recvBufferPool->buffers[startBufferIdx+j].fromNode = i;
+				recvBufferPool->buffers[startBufferIdx+j].fromNode = node;
 				
 				sgElements[j].addr = (uint64_t) recvBufferPool->buffers[startBufferIdx+j].buf;
 				sgElements[j].length = sizePerBuffer;
@@ -421,8 +434,6 @@ void postInitialRecvs(struct infiBufferPool *recvBufferPool,struct ibv_qp *qp ,i
 			if(ibv_post_recv(qp,workRequests,&bad_wr)){
 				assert(0);
 			}
-		}
-	}
 
 	free(workRequests);
 	free(sgElements);
@@ -431,28 +442,37 @@ void postInitialRecvs(struct infiBufferPool *recvBufferPool,struct ibv_qp *qp ,i
 
 
 
+static void CommunicationServer_nolock(int withDelayMs);
 
 static void CmiMachineExit()
 {
 }
 
 static void CmiNotifyStillIdle(CmiIdleState *s) {
+	CommunicationServer_nolock(0);
 }
 
 /**
 	Packetize this data and send it
 **/
 
+static void pollRecvCq(void);
+static void pollSendCq(void);
+
 static void EnqueuePacket(OutgoingMsg ogm, OtherNode node, int rank,char *data,int size,int broot,int copy){
-	ogm->refcount++;
-	
-	struct ibv_sge sendElement;
-	sendElement.addr = (uintptr_t)data;
-	sendElement.length = size;
-	sendElement.lkey = ogm->key->lkey;
+	int full=0;
+	infiPacket packet = malloc(sizeof(struct infiPacketStruct));
+	packet->ogm = ogm;
+	packet->destNode = node;
+
+	struct ibv_sge sendElement = {
+		.addr = (uintptr_t)data,
+		.length = size,
+		.lkey = ogm->key->lkey
+	};
 
 	struct ibv_send_wr wr = {
-		.wr_id 	    = (uint64_t)ogm,
+		.wr_id 	    = (uint64_t)packet,
 		.sg_list    = &sendElement,
 		.num_sge    = 1,
 		.opcode     = IBV_WR_SEND,
@@ -461,43 +481,63 @@ static void EnqueuePacket(OutgoingMsg ogm, OtherNode node, int rank,char *data,i
 	};
 	struct ibv_send_wr *bad_wr;
 	
+	ogm->refcount++;
+
+/*	if(node->infiData->tokensLeft == 0){
+		printf("[%d] Number of tokens to node %d is 0 \n",_Cmi_mynode,node->infiData->nodeNo);
+		full = 1;
+	}*/
+	while(node->infiData->tokensLeft == 0){
+		pollSendCq();
+	}
+/*	
+	if(full){
+		printf("[%d] Number of tokens to node %d is no longer 0 but %d \n",_Cmi_mynode,node->infiData->nodeNo,node->infiData->tokensLeft);
+	}*/
+	
+	
 	if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
 		assert(0);
 	}
+	node->infiData->tokensLeft--;
+
+	MACHSTATE4(3,"Packet send ogm %p size %d refcount %d tokensLeft %d",ogm,size,ogm->refcount,packet->destNode->infiData->tokensLeft);
 
 };
 
 
-static void CommunicationServer_nolock(int withDelayMs);
 
 void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int broot, int copy){
 	int size; char *data;
+	int count=0;
 	
   size = ogm->size;
   data = ogm->data;
 
-	MACHSTATE2(3,"Sending ogm %p of size %d",ogm,size);
+	MACHSTATE3(3,"Sending ogm %p of size %d to %d",ogm,size,node->infiData->nodeNo);
 	//First packet has dgram header, other packets dont
 	
   DgramHeaderMake(data, rank, ogm->src, Cmi_charmrun_pid, 1, broot);
 	
 	CmiMsgHeaderSetLength(ogm->data,ogm->size);
-	ogm->refcount=0;
-	ogm->key = ibv_reg_mr(context->pd,ogm->data,ogm->size,IBV_ACCESS_LOCAL_WRITE);
+	if(ogm->key == NULL){
+		ogm->key = ibv_reg_mr(context->pd,ogm->data,ogm->size,IBV_ACCESS_LOCAL_WRITE);
+	}
 	CmiAssert(ogm->key->lkey != 0);
 	
+	
 	while(size > packetSize){
+/*		if(count%10 == 1){
+			CommunicationServer_nolock(0);
+		}*/
 		EnqueuePacket(ogm,node,rank,data,packetSize,broot,copy);
 		size -= packetSize;
 		data += packetSize;
+		count++;
 	}
 	if(size > 0){
 		EnqueuePacket(ogm,node,rank,data,size,broot,copy);
 	}
-
-
-
-	CommunicationServer_nolock(0);
 }
 
 
@@ -506,12 +546,26 @@ static void processSendWC(struct ibv_wc *sendWC);
 
 
 static void CommunicationServer_nolock(int withDelayMs) {
-	int i;
-	struct ibv_wc wc[100];
-	int ne;
+	MACHSTATE(2,"CommServer_nolock{");
 	
-	ne = ibv_poll_cq(context->cq,100,&wc[0]);
+
+	pollRecvCq();
+	
+	pollSendCq();
+	
+	MACHSTATE(2,"} CommServer_nolock ne");
+
+}
+
+static void pollRecvCq(){
+	int i;
+	int ne;
+	struct ibv_wc wc[100];
+	
+	ne = ibv_poll_cq(context->recvCq,100,&wc[0]);
 	assert(ne >=0);
+	
+	
 	for(i=0;i<ne;i++){
 		if(wc[i].status != IBV_WC_SUCCESS){
 			assert(0);
@@ -521,8 +575,8 @@ static void CommunicationServer_nolock(int withDelayMs) {
 				//message received
 				processRecvWC(&wc[i]);
 				break;
-			case IBV_WC_SEND:
-				processSendWC(&wc[i]);
+			default:
+				CmiAbort("Wrong type of work completion object in recvq");
 				break;
 		}
 			
@@ -530,6 +584,31 @@ static void CommunicationServer_nolock(int withDelayMs) {
 
 }
 
+static void pollSendCq(){
+	int i;
+	int ne;
+	struct ibv_wc wc[100];
+
+	ne = ibv_poll_cq(context->sendCq,100,&wc[0]);
+	assert(ne >=0);
+	
+	
+	for(i=0;i<ne;i++){
+		if(wc[i].status != IBV_WC_SUCCESS){
+			assert(0);
+		}
+		switch(wc[i].opcode){
+			case IBV_WC_SEND:
+				//message received
+				processSendWC(&wc[i]);
+				break;
+			default:
+				CmiAbort("Wrong type of work completion object in recvq");
+				break;
+		}
+			
+	}
+}
 
 static void CommunicationServer(int sleepTime, int where){
 	CommunicationServer_nolock(sleepTime);
@@ -570,6 +649,7 @@ static void processMessage(int nodeNo,int len,struct infiBuffer *buffer){
       node->asm_total = size;
       node->asm_fill = len;
       node->asm_msg = newmsg;
+			node->infiData->broot = broot;
 			if(len == size){
 				//this is the only packet for this message 
 				node->infiData->state = INFI_HEADER_DATA;
@@ -581,6 +661,10 @@ static void processMessage(int nodeNo,int len,struct infiBuffer *buffer){
 		}
 		case INFI_DATA:
 		{
+			if(node->asm_fill + len < node->asm_total && len != packetSize){
+				CmiPrintf("from node %d asm_total: %d, asm_fill: %d, len:%d.\n",node->infiData->nodeNo, node->asm_total, node->asm_fill, len);
+				CmiAbort("packet in the middle does not have expected length");
+			}
 			if(node->asm_fill+len > node->asm_total){
 				CmiPrintf("asm_total: %d, asm_fill: %d, len:%d.\n", node->asm_total, node->asm_fill, len);
 				CmiAbort("\n\n\t\tLength mismatch!!\n\n");
@@ -601,7 +685,26 @@ static void processMessage(int nodeNo,int len,struct infiBuffer *buffer){
 	if(node->infiData->state == INFI_HEADER_DATA){
 		int total_size = node->asm_total;
 		node->asm_msg = NULL;
-		MACHSTATE2(3,"Message from node %d of length %d completely received",nodeNo,total_size);
+		MACHSTATE3(3,"Message from node %d of length %d completely received msg %p",nodeNo,total_size,newmsg);
+
+#if CMK_BROADCAST_SPANNING_TREE
+        if (node->asm_rank == DGRAM_BROADCAST
+#if CMK_NODE_QUEUE_AVAILABLE
+          || node->asm_rank == DGRAM_NODEBROADCAST
+#endif
+           )
+          SendSpanningChildren(NULL, 0, total_size, newmsg, node->infiData->broot, node->asm_rank);
+#elif CMK_BROADCAST_HYPERCUBE
+        if (node->asm_rank == DGRAM_BROADCAST
+#if CMK_NODE_QUEUE_AVAILABLE
+          || node->asm_rank == DGRAM_NODEBROADCAST
+#endif
+           )
+          SendHypercube(NULL, 0, total_size, newmsg, node->infiData->broot, node->asm_rank);
+#endif
+
+
+		
 		switch (node->asm_rank) {
     	case DGRAM_BROADCAST: {
 				int i;
@@ -619,7 +722,10 @@ static void processMessage(int nodeNo,int len,struct infiBuffer *buffer){
         }
 #endif
         default:
+				{
+					
           CmiPushPE(node->asm_rank, newmsg);
+				}
   	}    /* end of switch */
 	}
 
@@ -657,11 +763,19 @@ static void processRecvWC(struct ibv_wc *recvWC){
 
 
 static void processSendWC(struct ibv_wc *sendWC){
-	OutgoingMsg ogm = (OutgoingMsg )sendWC->wr_id;
+	infiPacket packet = (infiPacket )sendWC->wr_id;
+	OutgoingMsg ogm = (OutgoingMsg )packet->ogm;
+	
+	packet->destNode->infiData->tokensLeft++;
+	
 	ogm->refcount--;
+	
+	MACHSTATE3(3,"Packet send complete ogm %p refcount %d tokensLeft %d",ogm,ogm->refcount,packet->destNode->infiData->tokensLeft);
+
 	if(ogm->refcount == 0){
 		ibv_dereg_mr(ogm->key);
 		GarbageCollectMsg(ogm);
 	}
+	free(packet);
 };
 

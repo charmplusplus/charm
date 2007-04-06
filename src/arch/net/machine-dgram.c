@@ -732,7 +732,7 @@ static void CommunicationsClock(void)
   MACHSTATE(1,"CommunicationsClock");
   Cmi_clock = GetClock();
   if (Cmi_clock > Cmi_ack_last + 0.5*Cmi_ack_delay) {
-    MACHSTATE(4,"CommunicationsClock timing out acks");    
+    MACHSTATE(2,"CommunicationsClock timing out acks");    
     Cmi_ack_last=Cmi_clock;
     writeableAcks=1;
     writeableDgrams=1;

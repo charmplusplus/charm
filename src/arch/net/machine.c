@@ -1737,6 +1737,9 @@ static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char
   ogm->dst = pe;
   ogm->freemode = freemode;
   ogm->refcount = 0;
+#if CMK_USE_IBVERBS
+	ogm->key = NULL;
+#endif
   return (CmiCommHandle)ogm;	
 }
 
@@ -2093,6 +2096,8 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
   if (tmp) {
      do {--k;} while (!(tmp>>k));
   }
+
+	MACHSTATE2(3,"Broadcast SendHypercube ogm %p size %d",ogm,size);
 
   dest_pes = CmiTmpAlloc(sizeof(int)*(k+1));
   k--;
