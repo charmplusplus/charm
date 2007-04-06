@@ -842,6 +842,8 @@ class AmpiMsg : public CMessage_AmpiMsg {
 };
 
 
+#if 0
+// Moved to cklists.h
 /**
   An array that is broken up into "pages"
   which are separately allocated.  Useful for saving memory
@@ -927,6 +929,7 @@ public:
 		}
 	}
 };
+#endif
 
 
 /**
