@@ -98,6 +98,8 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
   ///Initialize the mesh pointer for this chunk
   void setFemMesh(FEMMeshMsg *m);
 
+	void setRunningTCharm(){CtvAccess(_curTCharm)= tc;};
+
   ///Sort this list of numbers in increasing order
   void sort(int *chkList, int chkListSize);
   

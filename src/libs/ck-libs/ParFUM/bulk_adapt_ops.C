@@ -379,6 +379,9 @@ void BulkAdapt::remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, adaptAd
 	 * Return index of new element
 	 * */
 int BulkAdapt::add_element(int elemType,int nodesPerElem,int *conn){ 
+	//since the element array might be resized we need to set the correct thread
+	//context before we call get_next_invalid
+	localShadow->setRunningTCharm();
 	FEM_Elem &elem = meshPtr->elem[elemType];
 	int newElem = elem.get_next_invalid();
 	elem.connIs(newElem,conn);
@@ -399,6 +402,9 @@ void BulkAdapt::update_element_conn(int elemType,int elemID,int nodesPerElem,int
  * Return index of new node
  * */
 int BulkAdapt::add_node(int dim,double *coords){ 
+	//since the node array might be resized we need to set the correct thread
+	//context before we call get_next_invalid
+	localShadow->setRunningTCharm();
 	int newNode = meshPtr->node.get_next_invalid();
 	FEM_DataAttribute *coord = meshPtr->node.getCoord();
 	(coord->getDouble()).setRow(newNode,coords);
