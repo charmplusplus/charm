@@ -92,10 +92,10 @@ brackets with each dimension size separated by a comma.
 
 \begin{alltt}
     class JacobiWorker : ChareArray1D;
-    obj workers : JacobiWorker[16];
+    obj workers : JacobiWorker[N];
 
     class Cell : ChareArray3D;
-    obj cells : Cell[128,128,128];
+    obj cells : Cell[M,M,M];
 \end{alltt}
 
 Note that key word ``class'' is for class type derivation, and ``obj'' is for
@@ -112,8 +112,8 @@ statements, and their data type and size is declared here. More explanation of
 these parameters can be found in Section~\ref{sec:orchsec}. 
 
 \begin{alltt}
-    param lb : double[512];
-    param rb : double[512];
+    param lb : double[N];
+    param rb : double[N];
 \end{alltt}
 
 With this, ``lb'' and ``rb'' are declared as parameters of that can be 
@@ -223,7 +223,7 @@ $\bullet$ {\bf Loop Statement}
 Loops are supported with \code{for} statement and \code{while} statement. Here
 are two examples.
 \begin{SaveVerbatim}{foodecl}
-  for iter := 0 to 10
+  for iter := 0 to MAX_ITER
      workers.doWork();
   end-for
 \end{SaveVerbatim}
@@ -254,7 +254,7 @@ last iteration, the last produced values will be disseminated to the code
 segment following the loop body. Within the loop body, program order holds. 
 
 \begin{SaveVerbatim}{foodecl}
-  for iter := 0 to 10
+  for iter := 0 to MAX_ITER
     foreach i in workers
       <lb[i], rb[i]> := workers[i].compute(lb[i+1], rb[i-1]);
     end-foreach
@@ -465,6 +465,56 @@ Cluster, use the customized job launcher \code{rjq} or \code{rj}.)
 Please refer to Charm++'s manual and tutorial for more details of building 
 and running a Charm++ program. 
 
+\section{Handling Sparse Object Arrays}
+\label{sec:sparse}
+
+In Charisma, when we declare an object array, by default a dense array is
+created with all the elements populated. For instance, when we have the
+following declaration in the orchestration code, an array of NxNxN is created. 
+\begin{alltt}
+    class Cell : ChareArray3D;
+    obj cells : Cell[N,N,N];
+\end{alltt}
+
+There are certain occasions when the programmer may need sparse object arrays,
+in which not all elements are created. An example is neighborhood force
+calculation in molecular dynamics application. We have a 3D array of Cell
+objects to hold the atom coordinates, and a 6D array of CellPair objects to
+perform pairwise force calculation between neighboring cells. In this case, not
+all elements in the 6D array of CellPair are necessary in the program. Only
+those which represent two immediately neighboring cells are needed for the
+force calculation. In this case, Charisma provides flexibility of declaring a
+sparse object array, with a \code{sparse} keyword following the object array
+declaration, as follows.
+
+\begin{alltt}
+    class CellPair : ChareArray6D;	
+    obj cellpairs : CellPair[N,N,N,N,N,N],sparse; 
+\end{alltt}
+
+Then the programmer is expected to supply a sequential function with the name
+\code{getIndex\_ARRAYNAME} to generate a list of selected indices of the
+elements to create. As an example, the following function essentially tells the
+system to generate all the NxNxNxNxNxN elements for the 6D array. 
+
+\begin{SaveVerbatim}{foodecl}
+void getIndex_cellpairs(CkVec<CkArrayIndex6D>& vec){
+  int i,j,k,l,m,n;
+  for(i=0;i<N;i++)
+    for(j=0;j<N;j++)
+      for(k=0;k<N;k++)
+        for(l=0;l<N;l++)
+          for(m=0;m<N;m++)
+            for(n=0;n<N;n++)
+              vec.push_back(CkArrayIndex6D(i,j,k,l,m,n));
+}
+\end{SaveVerbatim}
+\vspace{0.1in}
+\smallfbox{\BUseVerbatim{foodecl}}
+\vspace{0.1in}
+
+%neighbors and neighborsize for dense array
+
 \section{Support for Library Module}
 \label{sec:module}
 
@@ -487,12 +537,12 @@ program jacobi
 
 class  JacobiMain : MainChare;
 class  JacobiWorker : ChareArray1D;
-obj  workers : JacobiWorker[16];
-param  lb : double[512];
-param  rb : double[512];
+obj  workers : JacobiWorker[M];
+param  lb : double[N];
+param  rb : double[N];
 
 begin
-    for iter := 1 to 10
+    for iter := 1 to MAX_ITER
 	foreach i in workers
 	    <lb[i], rb[i]> := workers[i].produceBorders();
 	    workers[i].compute(lb[i+1], rb[i-1]);
