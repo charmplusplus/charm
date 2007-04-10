@@ -1028,7 +1028,7 @@ static void pingCharmrun(void *ignored)
 
   double clock=GetClock();
   if (clock > Cmi_check_last + Cmi_check_delay) {
-    MACHSTATE1(2,"CommunicationsClock pinging charmrun Cmi_charmrun_fd_sendflag=%d", Cmi_charmrun_fd_sendflag);
+    MACHSTATE1(3,"CommunicationsClock pinging charmrun Cmi_charmrun_fd_sendflag=%d", Cmi_charmrun_fd_sendflag);
     Cmi_check_last = clock; 
 #if CMK_USE_GM || CMK_USE_MX
     if (!Cmi_netpoll)  /* GM netpoll, charmrun service is done in interrupt */
@@ -1737,9 +1737,6 @@ static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char
   ogm->dst = pe;
   ogm->freemode = freemode;
   ogm->refcount = 0;
-#if CMK_USE_IBVERBS
-	ogm->key = NULL;
-#endif
   return (CmiCommHandle)ogm;	
 }
 
@@ -2227,7 +2224,7 @@ static void ConverseRunPE(int everReturn)
     setitimer(ITIMER_REAL, &i, NULL);
     }
 
-#if ! CMK_USE_GM && ! CMK_USE_MX && ! CMK_USE_TCP
+#if ! CMK_USE_GM && ! CMK_USE_MX && ! CMK_USE_TCP && ! CMK_USE_IBVERBS
     /*Occasionally check for retransmissions, outgoing acks, etc.*/
     /*no need for GM case */
     CcdCallFnAfter((CcdVoidFn)CommunicationsClockCaller,NULL,Cmi_comm_clock_delay);

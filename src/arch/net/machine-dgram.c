@@ -203,9 +203,6 @@ typedef struct OutgoingMsgStruct
   char *data;
   int   refcount;
   int   freemode;
-#if CMK_USE_IBVERBS
-	struct ibv_mr *key;
-#endif
 }
 *OutgoingMsg;
 
