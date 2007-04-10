@@ -422,7 +422,7 @@ void collideMgr::unregisterContributor(int chunkNo)
 void collideMgr::contribute(int chunkNo,
 	int n,const bbox3d *boxes,const int *prio)
 {
-  printf("[%d] Receiving contribution from %d\n",CkMyPe(), chunkNo);
+  //printf("[%d] Receiving contribution from %d\n",CkMyPe(), chunkNo);
   CM_STATUS("collideMgr::contribute "<<n<<" boxes from "<<chunkNo);
   aggregator.aggregate(CkMyPe(),chunkNo,n,boxes,prio);
   aggregator.send(); //Deliver all outgoing messages
@@ -432,7 +432,7 @@ void collideMgr::contribute(int chunkNo,
       aggregator.compact();//Blow away all the old voxels (saves memory)
     tryAdvance();
   }
-  printf("[%d] DONE receiving contribution from %d\n",CkMyPe(), chunkNo);
+  //printf("[%d] DONE receiving contribution from %d\n",CkMyPe(), chunkNo);
 }
 
 inline CkArrayIndex3D buildIndex(const CollideLoc3d &l) 

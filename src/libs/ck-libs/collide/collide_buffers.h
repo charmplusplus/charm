@@ -104,8 +104,8 @@ template <class T> class growableBufferT : public bufferT<T> {
   void grow(int min) {
     if (min>max) {
       if (min > 1000000) {
-	//printf("Buffer size %d is getting out of hand, switching to conservative mechanism!\n", min);
-	atLeast(min+(min/2));
+	//printf("COLLIDE: Buffer size %d is getting out of hand, switching to conservative mechanism!\n", min);
+	atLeast(min+(min/4));
       }
       else {
 	resize(min+max+8);

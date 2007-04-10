@@ -164,13 +164,21 @@ void threadCollideMgr::collisions(ArrayElement *src,int step,CollisionList &coll
 
 	// Split out this voxel's contribution
 	int i=0, n=colls.size();
+	static int count=0;
+	
 	TRACE("Voxel contributes "<<n<<" collisions")
+
+	//printf("COLLIDE: Total collisions contributed so far: %d\n", count+=n);
 	for (i=0;i<n;i++) {
 		const Collision &c=colls[i];
 		toPE[c.A.pe].push_back(c);
+		//if (toPE[c.A.pe].capacity() > 10000000)
+		  //printf("COLLIDE: WARNING! toPE[%d] has over ten million collisions recorded!\n", c.A.pe);
 		if (c.B.pe!=c.A.pe) { //Report collision to both processors
 			Collision cB(c.B,c.A); //Swap so B is listed first
 			toPE[c.B.pe].push_back(cB);
+			//if (toPE[c.B.pe].capacity() > 10000000)
+			  //printf("COLLIDE: WARNING! toPE[%d] has over ten million collisions recorded!\n", c.B.pe);
 		}
 	}
 	
