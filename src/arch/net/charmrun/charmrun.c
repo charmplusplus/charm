@@ -2495,7 +2495,7 @@ int rsh_fork(int nodeno,const char *startScript)
   }
   free(rshargv);
   if (arg_verbose)
-    fprintf(stderr,"Charmrun> rsh (%s:%d) started\n",
+    fprintf(stderr,"Charmrun> remote shell (%s:%d) started\n",
     	nodetab_name(nodeno),nodeno);
   return pid;
 }
@@ -2522,7 +2522,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
 
   fprintf(f, /*Echo: prints out status message*/
   	"Echo() {\n"
-  	"  echo 'Charmrun rsh(%s.%d)>' $*\n"
+  	"  echo 'Charmrun remote shell(%s.%d)>' $*\n"
   	"}\n",host,nodeno);
   fprintf(f, /*Exit: exits with return code*/
 	"Exit() {\n"
@@ -2888,7 +2888,7 @@ void finish_one_node(int rank0no)
   const char *host=nodetab_name(nodetab_rank0_table[rank0no]);
   int status=0;
   if (!rsh_pids) return; /*nothing to do*/
-  if (arg_verbose) printf("Charmrun> waiting for rsh (%s:%d), pid %d\n",
+  if (arg_verbose) printf("Charmrun> waiting for remote shell (%s:%d), pid %d\n",
 		host,rank0no,rsh_pids[rank0no]);
     /* on gcc4, charmrun hangs here waiting for rsh processors to finish
        this should not cause any problem since gdb will kill residue processes
