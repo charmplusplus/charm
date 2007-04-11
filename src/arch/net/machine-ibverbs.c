@@ -38,7 +38,14 @@ static int sendPacketPoolSize; /*total number of send buffers created*/
 
 static double _startTime=0;
 static int regCount;
+
+static int pktCount;
+static int msgCount;
+
+
 static double regTime;
+
+#define CMK_IBVERBS_STATS 0
 
 #define WC_LIST_SIZE 100
 #define WC_BUFFER_SIZE 100
@@ -224,13 +231,13 @@ static void CmiMachineInit(char **argv){
 	MACHSTATE2(3,"pd %p pd->handle %d",context->pd,context->pd->handle);
 	
 
-	mtu_size=2048;
+	mtu_size=1048;
 	packetSize = mtu_size-48;//infiniband rc header size -estimate
-	tokensPerProcessor=100;
+	tokensPerProcessor=350;
 	createLocalQps(dev,ibPort,_Cmi_mynode,_Cmi_numnodes,context->localAddr);
 		
 	//create the pool of arrays
-	sendPacketPoolSize = (_Cmi_numnodes-1)*(tokensPerProcessor)/2;
+	sendPacketPoolSize = (_Cmi_numnodes-1)*(tokensPerProcessor);
 	context->infiPacketFreeList=NULL;
 	pktPtrs = malloc(sizeof(infiPacket)*sendPacketPoolSize);
 	//Silly way of allocating the memory buffers (slow as well) but simplifies the code
@@ -243,10 +250,13 @@ static void CmiMachineInit(char **argv){
 	free(pktPtrs);
 	
 /*	context->infiBufferedRecvList = NULL;*/
-	
+#if CMK_IBVERBS_STATS	
 	regCount =0;
 	regTime  = 0;
-	
+
+	pktCount=0;
+	msgCount=0;
+#endif	
 	MACHSTATE(3,"} CmiMachineInit");
 }
 
@@ -507,12 +517,15 @@ void postInitialRecvs(int node,struct infiBufferPool *recvBufferPool,struct ibv_
 
 
 
-static void CommunicationServer_nolock(int toBuffer); //if buffer ==1 recvd messages are buffered but not processed
+static inline void CommunicationServer_nolock(int toBuffer); //if buffer ==1 recvd messages are buffered but not processed
 
 static void CmiMachineExit()
 {
 //	printf("[%d] totalTime %.6lf total RegTime %.6lf total RegCount %d avg regTime %.6lf \n",_Cmi_mynode,CmiWallTimer()-_startTime,regTime,regCount,regTime/(double )regCount);
 //	printf("[%d] calling CmiMachineExit \n",_Cmi_mynode);
+#if CMK_IBVERBS_STATS	
+	printf("[%d] msgCount %d pktCount %d packetSize %d # 0 tokens %d time loss due to 0 tokens %.6lf \n",_Cmi_mynode,msgCount,pktCount,packetSize,regCount,regTime);
+#endif
 }
 
 static void CmiNotifyStillIdle(CmiIdleState *s) {
@@ -529,10 +542,15 @@ static inline void pollSendCq(void);
 static void EnqueuePacket(OutgoingMsg ogm, OtherNode node, int rank,char *data,int size,int broot,int copy){
 	int full=0;
 	infiPacket packet;
+	double _regStartTime;
 	MallocInfiPacket(packet);
 	packet->destNode = node;
 	//copy the data
 	memcpy(packet->buf,data,size);
+	
+#if CMK_IBVERBS_STATS	
+	pktCount++;
+#endif
 
 	struct ibv_sge sendElement = {
 		.addr = (uintptr_t)packet->buf,
@@ -550,19 +568,25 @@ static void EnqueuePacket(OutgoingMsg ogm, OtherNode node, int rank,char *data,i
 	};
 	struct ibv_send_wr *bad_wr;
 	
-/*	if(node->infiData->tokensLeft == 0){
-		CmiPrintf("[%d] Number of tokens to node %d is 0 \n",_Cmi_mynode,node->infiData->nodeNo);
+#if CMK_IBVERBS_STATS	
+	if(node->infiData->tokensLeft == 0){
+/*		CmiPrintf("[%d] Number of tokens to node %d is 0 \n",_Cmi_mynode,node->infiData->nodeNo); */
 		full = 1;
-	}*/
+		regCount++;
+		_regStartTime = CmiWallTimer();
+	}
+#endif	
 	while(node->infiData->tokensLeft == 0){
 		CommunicationServer_nolock(1); //buffer any messages received now. do not process them as processing a broadcast request can result in messages being sent to a processor in turn. It would result in a broadcast message getting sent in between packets of another message
 //		pollSendCq();
 	}
 	
-/*	if(full){
-		CmiPrintf("[%d] Number of tokens to node %d is no longer 0 but %d \n",_Cmi_mynode,node->infiData->nodeNo,node->infiData->tokensLeft);
-	}*/
-	
+#if CMK_IBVERBS_STATS	
+	if(full){
+/*		CmiPrintf("[%d] Number of tokens to node %d is no longer 0 but %d \n",_Cmi_mynode,node->infiData->nodeNo,node->infiData->tokensLeft);*/
+		regTime += (CmiWallTimer()-_regStartTime);
+	}
+#endif	
 	
 	if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
 		assert(0);
@@ -580,6 +604,10 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 	
   size = ogm->size;
   data = ogm->data;
+
+#if CMK_IBVERBS_STATS	
+	msgCount++;
+#endif
 
 	MACHSTATE3(3,"Sending ogm %p of size %d to %d",ogm,size,node->infiData->nodeNo);
 	//First packet has dgram header, other packets dont
@@ -604,14 +632,8 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer);
 static inline void processSendWC(struct ibv_wc *sendWC);
 static int _count=0;
 
-static void CommunicationServer_nolock(int toBuffer) {
-	if(_startTime == 0){
-		//TODO: remove after debugging is done
-		_startTime = CmiWallTimer();
-	}
+static inline  void CommunicationServer_nolock(int toBuffer) {
 	_count++;
-//	regCount++;
-//	double _startCommTime=CmiWallTimer();
 	MACHSTATE(2,"CommServer_nolock{");
 	
 
@@ -622,7 +644,6 @@ static void CommunicationServer_nolock(int toBuffer) {
 	
 	MACHSTATE(2,"} CommServer_nolock ne");
 	
-//	regTime += CmiWallTimer()-_startCommTime;
 }
 /*
 static inline infiBufferedWC createInfiBufferedWC(){
@@ -701,16 +722,9 @@ static inline void pollRecvCq(const int toBuffer){
 	int ne;
 	struct ibv_wc wc[WC_LIST_SIZE];
 	
-/*	if(toBuffer == 0 && context->infiBufferedRecvList != NULL && context->infiBufferedRecvList->count != 0){
-		processBufferedRecvList();
-	}*/
-	
-//	regCount++;
-//	double _startCommTime=CmiWallTimer();
-	
-	
+
 	ne = ibv_poll_cq(context->recvCq,WC_LIST_SIZE,&wc[0]);
-	assert(ne >=0);
+//	assert(ne >=0);
 	
 	
 	for(i=0;i<ne;i++){
@@ -719,12 +733,7 @@ static inline void pollRecvCq(const int toBuffer){
 		}
 		switch(wc[i].opcode){
 			case IBV_WC_RECV:
-				//message received
-		/*		if(toBuffer){
-					insertBufferedRecv(&wc[i]);
-				}else{*/
 					processRecvWC(&wc[i],toBuffer);
-		/*		}*/
 				break;
 			default:
 				CmiAbort("Wrong type of work completion object in recvq");
@@ -732,7 +741,6 @@ static inline void pollRecvCq(const int toBuffer){
 		}
 			
 	}
-//	regTime += CmiWallTimer()-_startCommTime;
 
 }
 
@@ -742,7 +750,7 @@ static inline void pollSendCq(){
 	struct ibv_wc wc[WC_LIST_SIZE];
 
 	ne = ibv_poll_cq(context->sendCq,WC_LIST_SIZE,&wc[0]);
-	assert(ne >=0);
+//	assert(ne >=0);
 	
 	
 	for(i=0;i<ne;i++){
@@ -768,7 +776,7 @@ static void CommunicationServer(int sleepTime, int where){
 	CommunicationServer_nolock(0);
 }
 
-static void processMessage(int nodeNo,int len,struct infiBuffer *buffer,const int toBuffer){
+static inline void processMessage(int nodeNo,int len,struct infiBuffer *buffer,const int toBuffer){
 	char *msg = buffer->buf;
 	
 	char *newmsg;
@@ -886,7 +894,7 @@ static void processMessage(int nodeNo,int len,struct infiBuffer *buffer,const in
 };
 
 
-static void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
+static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 	struct infiBuffer *buffer = (struct infiBuffer *) recvWC->wr_id;	
 	int len = recvWC->byte_len;
 	int nodeNo = buffer->fromNode;
@@ -916,7 +924,7 @@ static void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 };
 
 
-static void processSendWC(struct ibv_wc *sendWC){
+static inline  void processSendWC(struct ibv_wc *sendWC){
 	infiPacket packet = (infiPacket )sendWC->wr_id;
 	
 	packet->destNode->infiData->tokensLeft++;
