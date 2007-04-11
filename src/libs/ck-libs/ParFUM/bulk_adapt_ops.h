@@ -91,6 +91,11 @@ class BulkAdapt {
 			 int *node1idx, int *node2idx, int *newNodeID,
 			 bool startSide);
 
+  /// Perform a single side of an edge_bisect operation
+  void one_side_split_3D(adaptAdj &startElem, adaptAdj &splitElem, 
+			 adaptAdj &firstElem, adaptAdj &fromElem,
+			 int edgeID, int *node1idx, int *node2idx, 
+			 int *newNodeID, bool startSide);
 
   /* COMMUNICATION HELPERS FOR BULK ADAPTIVITY OPERATIONS */
   adaptAdj remote_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, 
@@ -99,34 +104,36 @@ class BulkAdapt {
 
   void remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, 
 			       adaptAdj newElem);
+
+
   /* LOCAL HELPERS FOR BULK ADAPTIVITY OPERATIONS */
 	
-	/** Add a new element to the mesh. 
-	 * Update its connectivity
-	 * Return index of new element
-	 * */
-	int add_element(int elemType,int nodesPerElem,int *conn);
+  /** Add a new element to the mesh. 
+   * Update its connectivity
+   * Return index of new element
+   * */
+  int add_element(int elemType,int nodesPerElem,int *conn);
+  
+  /** Update the conn of an element*/
+  void update_element_conn(int elemType,int elemID,int nodesPerElem,int *conn);
+  
+  /** Add a new node to the mesh
+   * update its co-ordinates 
+   * Return index of new node
+   * */
+  int add_node(int dim,double *coords);
+  
+  /** Update the co-ordimates of the given node */
+  void update_node_coord(int nodeID,int dim,double *coords);
+  
+  void make_node_shared(int nodeID,int numSharedChunks,int *sharedChunks);
+  
+  int get_idxl_for_node(int nodeID, int partID);
+  int get_node_from_idxl(int node_idxl, int partID);
 
-	/** Update the conn of an element*/
-	void update_element_conn(int elemType,int elemID,int nodesPerElem,int *conn);
+  /** Find all elements adjacent to an edge, for locking purposes */
+  void get_elemsToLock(adaptAdj startElem, adaptAdj *elemsToLock, int *count);
 
-
-
-	/**
-	 * Add a new node to the mesh
-	 * update its co-ordinates 
-	 * Return index of new node
-	 * */
-	int add_node(int dim,double *coords);
-	
-	/** Update the co-ordimates of the given node
-	*/
-	void update_node_coord(int nodeID,int dim,double *coords);
-
-	void make_node_shared(int nodeID,int numSharedChunks,int *sharedChunks);
-
-	int get_idxl_for_node(int nodeID, int partID);
-	int get_node_from_idxl(int node_idxl, int partID);
 };
 
 void midpoint(double *n1, double *n2, int dim, double *result);
@@ -134,5 +141,8 @@ void midpoint(double *n1, double *n2, int dim, double *result);
 int getRelNode(int nodeIdx, int *conn, int nodesPerElem);
 
 int getEdgeID(int node1, int node2, int nodePerElem, int dim);
+
+/** Fill out the nodes and relative numberings for a tet */
+void fillNodes(int *relNode, int *nodeIDs, int *conn);
 
 #endif

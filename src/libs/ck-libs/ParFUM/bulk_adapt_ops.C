@@ -182,17 +182,44 @@ adaptAdj BulkAdapt::remote_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, 
   return nbrSplitElem;
 }
 
+/// Perform a 3D edge bisection on a tetrahedron
 int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
-{
-  CkPrintf("BulkAdapt::edge_bisect_3D not yet implemented.\n");
-  /*
-  // ASSERT: An edge can only be on one surface.
-  // get elemID's conn.
-  // let edgeID have node indices n1, n2.
-  // Union the set of partitions that share n1 and n2.
-  // Lock the partition set.
+{ // ASSERT: An edge can only be on one surface.
+  BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D starts at elemID %d \n",partitionID,elemID));
+  int numElemsToLock = 0;
+  adaptAdj *elemsToLock;
+  adaptAdj startElem(partitionID, elemID, elemType);
+  get_elemsToLock(startElem, elemsToLock, &numElemsToLock);
+  RegionID lockRegionID;
+  bool success;
+  if (success = (localShadow->lockRegion(numElemsToLock, elemsToLock, &lockRegionID))) {
+    BULK_DEBUG(CkPrintf("[%d] Lock obtained.\n",partitionID););
+  }
+  else {
+    BULK_DEBUG(CkPrintf("[%d] Lock not obtained.\n",partitionID););
+    return success;
+  }
 
   // ******** LOCAL OPS *********
+  int nodeIDs[4], newNodeID;
+  adaptAdj splitElem;
+  // split the local element, i.e. the first "side"
+  one_side_split_3D(startElem, splitElem, startElem, startElem, edgeID, &(nodeIDs[0]), &(nodeIDs[1]), &newNodeID, true);
+
+  int relNode[4];
+  FEM_Elem &elem = meshPtr->elem[elemType]; // elem is local elements
+  int *startConn = elem.connFor(startElem.localID);
+  relNode[0] = getRelNode(nodeIDs[0], startConn, 4);
+  relNode[1] = getRelNode(nodeIDs[1], startConn, 4);
+  fillNodes(&(relNode[0]), &(nodeIDs[0]), startConn);
+  int face[2]; // faces on which the two potentially splittable neighbors lie
+  face[0] = 3 - (relNode[0] + relNode[1] + relNode[2]);
+  face[1] = 3 - (relNode[0] + relNode[1] + relNode[3]);
+  adaptAdj neighbors[2]; // startElem's neighbors
+  neighbors[0] = *GetAdaptAdj(meshID, elemID, elemType, face[0]);
+  neighbors[1] = *GetAdaptAdj(meshID, elemID, elemType, face[1]);
+
+  /*
   // let the other nodes of elemID be n3 and n4
   // let elemNext be the adaptAdj on face of (n1, n2, n3)
   // let nPrev = n3
@@ -225,10 +252,11 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
   //   is reached or boundary is reached.
 
   // if elemNext is remote...
-
-  // Unlock the partition set.
 */
-  return 0;
+
+  // unlock the partitions
+  localShadow->unlockRegion(lockRegionID);
+  return 1;
 }
 
 
@@ -364,6 +392,17 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem,
 }
 
 
+void BulkAdapt::one_side_split_3D(adaptAdj &startElem, adaptAdj &splitElem, 
+				  adaptAdj &firstElem, adaptAdj &fromElem,
+				  int edgeID, int *node1idx, int *node2idx, 
+				  int *newNodeID, bool startSide)
+{
+  CkPrintf("ERROR: one_side_split_3D not yet implemented!\n");
+}
+
+
+
+
 /* COMMUNICATION HELPERS FOR BULK ADAPTIVITY OPERATIONS 
    ARE LOCATED IN ParFUM_SA. */
 
@@ -375,23 +414,23 @@ void BulkAdapt::remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, adaptAd
 /* LOCAL HELPERS FOR BULK ADAPTIVITY OPERATIONS */
 
 /** Add a new element to the mesh. 
-	 * Update its connectivity
-	 * Return index of new element
-	 * */
+ * Update its connectivity
+ * Return index of new element
+ * */
 int BulkAdapt::add_element(int elemType,int nodesPerElem,int *conn){ 
-	//since the element array might be resized we need to set the correct thread
-	//context before we call get_next_invalid
-	localShadow->setRunningTCharm();
-	FEM_Elem &elem = meshPtr->elem[elemType];
-	int newElem = elem.get_next_invalid();
-	elem.connIs(newElem,conn);
-	return newElem;
+  //since the element array might be resized we need to set the correct thread
+  //context before we call get_next_invalid
+  localShadow->setRunningTCharm();
+  FEM_Elem &elem = meshPtr->elem[elemType];
+  int newElem = elem.get_next_invalid();
+  elem.connIs(newElem,conn);
+  return newElem;
 }
 
 /** Update the conn of an element*/
 void BulkAdapt::update_element_conn(int elemType,int elemID,int nodesPerElem,int *conn){
-	FEM_Elem &elem = meshPtr->elem[elemType];
-	elem.connIs(elemID,conn);
+  FEM_Elem &elem = meshPtr->elem[elemType];
+  elem.connIs(elemID,conn);
 };
 
 
@@ -402,32 +441,32 @@ void BulkAdapt::update_element_conn(int elemType,int elemID,int nodesPerElem,int
  * Return index of new node
  * */
 int BulkAdapt::add_node(int dim,double *coords){ 
-	//since the node array might be resized we need to set the correct thread
-	//context before we call get_next_invalid
-	localShadow->setRunningTCharm();
-	int newNode = meshPtr->node.get_next_invalid();
-	FEM_DataAttribute *coord = meshPtr->node.getCoord();
-	(coord->getDouble()).setRow(newNode,coords);
-	AllocTable2d<int> &lockTable = ((FEM_DataAttribute *)(meshPtr->node.lookup(FEM_ADAPT_LOCK,"lockRegion")))->getInt();
-
-	lockTable[newNode][0] = -1;
-	lockTable[newNode][1] = -1;
-	return newNode;
+  //since the node array might be resized we need to set the correct thread
+  //context before we call get_next_invalid
+  localShadow->setRunningTCharm();
+  int newNode = meshPtr->node.get_next_invalid();
+  FEM_DataAttribute *coord = meshPtr->node.getCoord();
+  (coord->getDouble()).setRow(newNode,coords);
+  AllocTable2d<int> &lockTable = ((FEM_DataAttribute *)(meshPtr->node.lookup(FEM_ADAPT_LOCK,"lockRegion")))->getInt();
+  
+  lockTable[newNode][0] = -1;
+  lockTable[newNode][1] = -1;
+  return newNode;
 }
 
 /** Update the co-ordimates of the given node
 */
 void BulkAdapt::update_node_coord(int nodeID,int dim,double *coords){
-	FEM_DataAttribute *coord = meshPtr->node.getCoord();
-	(coord->getDouble()).setRow(nodeID,coords);
+  FEM_DataAttribute *coord = meshPtr->node.getCoord();
+  (coord->getDouble()).setRow(nodeID,coords);
 };
 
 void BulkAdapt::make_node_shared(int nodeID,int numSharedChunks,int *sharedChunks){
-	for(int i=0;i<numSharedChunks;i++){
-		IDXL_List &sharedList = meshPtr->node.shared.addList(sharedChunks[i]);
-		sharedList.push_back(nodeID);
-	}
-	meshPtr->node.shared.flushMap();
+  for(int i=0;i<numSharedChunks;i++){
+    IDXL_List &sharedList = meshPtr->node.shared.addList(sharedChunks[i]);
+    sharedList.push_back(nodeID);
+  }
+  meshPtr->node.shared.flushMap();
 };
 
 int BulkAdapt::get_idxl_for_node(int nodeID, int partID) 
@@ -451,37 +490,56 @@ int BulkAdapt::get_node_from_idxl(int node_idxl, int partID)
 }
 
 
+void BulkAdapt::get_elemsToLock(adaptAdj startElem, adaptAdj *elemsToLock, int *count)
+{
+  CkPrintf("ERROR: get_elemsToLock not yet implemented!\n");
+}
+
+
+
 void midpoint(double *n1, double *n2, int dim, double *result) {
-	for(int i=0;i<dim;i++){
-		result[i] = (n1[i]+n2[i])/2.0;
-	}
+  for(int i=0;i<dim;i++){
+    result[i] = (n1[i]+n2[i])/2.0;
+  }
 }
 
 int getRelNode(int nodeIdx, int *conn, int nodesPerElem) {
-	for(int i=0;i<nodesPerElem;i++){
-		if(conn[i] == nodeIdx){
-			return i;
-		}
-	}
-	CkAbort("Could not find node in given connectivity");
+  for(int i=0;i<nodesPerElem;i++){
+    if(conn[i] == nodeIdx){
+      return i;
+    }
+  }
+  CkAbort("Could not find node in given connectivity");
 }
 
 int getEdgeID(int node1, int node2, int nodesPerElem, int dim) {
-	switch(dim){
-		case 2:
-		switch(nodesPerElem){
-			case 3:
-				{
-					static int edgeFromNode[3][3]={-1,0,2,0,-1,1,2,1,-1};
-					return edgeFromNode[node1][node2];
-				}
-				break;
-			default:
-				CkAbort("This shape is not yet implemented");
-		};
-		break;
-		default:
-		 CkAbort("This dimension not yet implemented");
-	};
+  switch(dim){
+  case 2:
+    switch(nodesPerElem){
+    case 3:
+      {
+	static int edgeFromNode[3][3]={-1,0,2,0,-1,1,2,1,-1};
+	return edgeFromNode[node1][node2];
+      }
+      break;
+    default:
+      CkAbort("This shape is not yet implemented");
+    };
+    break;
+  default:
+    CkAbort("This dimension not yet implemented");
+  };
   return 0;
+}
+
+void fillNodes(int *relNode, int *nodeIDs, int *conn)
+{ // ASSERT: this is only for tets.  Assumes positions 0 and 1 are filled.
+  if ((relNode[0] != 0) && (relNode[1] != 0))
+    relNode[2] = 0;
+  else if ((relNode[0] != 1) && (relNode[1] != 1))
+    relNode[2] = 1;
+  else relNode[2] = 2;
+  relNode[3] = 6 - relNode[0] - relNode[1] - relNode[2];
+  nodeIDs[2] = conn[relNode[2]];
+  nodeIDs[3] = conn[relNode[3]];
 }

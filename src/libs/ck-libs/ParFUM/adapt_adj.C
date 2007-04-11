@@ -10,7 +10,7 @@ using namespace std;
 
 int nodeSetMap2d_tri[3][2] = {{0,1},{1,2},{2,0}};
 int nodeSetMap2d_quad[4][2] = {{0,1},{1,2},{2,3},{3,0}};
-int nodeSetMap3d_tet[4][3] = {{0,1,2},{1,0,3},{1,3,2},{0,2,3}};
+int nodeSetMap3d_tet[4][3] = {{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
 int nodeSetMap3d_hex[6][4] = {{0,1,2,3},{1,5,6,2},{2,6,7,3},{3,7,4,0},{0,4,5,1},{5,4,6,7}};
 
 int nodeSetMap2d_cohquad[2][2] = {{0,1},{2,3}}; // Cohesive for 2D triangles
@@ -493,10 +493,10 @@ adaptAdj *GetAdaptAdj(int meshid,int elemID, int elemType, int *vertexList)
     associated with the edge or face represented by edgeFaceID. */
 void GetVertices(int meshid,int elemID, int elemType, int edgeFaceID, int *vertexList)
 {
-	int numAdjacencies;
+  int numAdjacencies;
   int nodeSetSize, nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE];
-	findNodeSet(meshid,elemType,&numAdjacencies,&nodeSetSize,nodeSetMap);
-
+  findNodeSet(meshid,elemType,&numAdjacencies,&nodeSetSize,nodeSetMap);
+  
   for (int i=0; i<nodeSetSize; i++) {
     vertexList[i] = nodeSetMap[edgeFaceID][i];
   }
@@ -506,10 +506,10 @@ void GetVertices(int meshid,int elemID, int elemType, int edgeFaceID, int *verte
     specified by the set of vertices in vertexList. */
 int GetEdgeFace(int meshid,int elemID, int elemType, int *vertexList)
 {
-	int numAdjacencies;
+  int numAdjacencies;
   int nodeSetSize, nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE];
-	findNodeSet(meshid,elemType,&numAdjacencies,&nodeSetSize,nodeSetMap);
-
+  findNodeSet(meshid,elemType,&numAdjacencies,&nodeSetSize,nodeSetMap);
+  
   std::set<int> vertexSet(vertexList, vertexList+nodeSetSize);
   for (int i=0; i<numAdjacencies; i++) {
     std::set<int> aNodeSet(nodeSetMap[i], nodeSetMap[i]+nodeSetSize);
