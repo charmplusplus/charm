@@ -1,0 +1,20 @@
+mainmodule jacobi2d {
+  readonly CProxy_Main mainProxy;
+  readonly int num_rows;
+  readonly int num_cols;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void report(int, int, float);
+  };
+
+  array [2D] Jacobi {
+    // Normal Charm++ entry methods
+    entry Jacobi(void);
+    entry void begin_iteration(void);
+    entry void recieve_neighbor(int,int,float);
+
+    // A method for requesting data to be displayed graphically to the user
+    entry void requestNextFrame(liveVizRequestMsg *m);
+  };
+};
