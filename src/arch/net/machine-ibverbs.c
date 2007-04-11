@@ -226,7 +226,7 @@ static void CmiMachineInit(char **argv){
 
 	mtu_size=2048;
 	packetSize = mtu_size-48;//infiniband rc header size -estimate
-	tokensPerProcessor=20;
+	tokensPerProcessor=100;
 	createLocalQps(dev,ibPort,_Cmi_mynode,_Cmi_numnodes,context->localAddr);
 		
 	//create the pool of arrays
