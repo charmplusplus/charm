@@ -22,9 +22,11 @@ runserver.sh, or just do a "./runserver.sh"
 While the program is running, connect a visualization client to that
 server. To do this you can run "charm/java/bin/liveViz localhost 1234"
 Note that port 1234 is the port specified in runserver.sh. You should
-at this point see a small window appear, with a black background, and
-a 64x64 pixel blue rectangle in the upper left corner. The parallel
+at this point see a window appear, with a black background, and
+a red/white grid in the upper left corner. Resize as needed. The parallel
 server job should also print out a series of lines whenever each worker
 is requested to provide a portion of the frame. Resizing the client
 window will cause the image to be requested again, but with a different
-size.
+size. The client can only connect while the server is running. So you may 
+have to be quick to get to see anything. You may want to make the client 
+perform more iterations so that you have more time to see things.
