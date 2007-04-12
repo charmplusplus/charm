@@ -1158,7 +1158,6 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 	if (node<0 || node>=nodetab_rank0_size)
 		{fprintf(stderr,"Unexpected node %d registered!\n",node);exit(1);}
 	nt=nodetab_rank0_table[node];/*Nodetable index for this node*/	
-	printf("Charmrun> node %d info is being added \n",nt);
 	i.nPE=ChMessageInt_new(nodetab_cpus(nt));
 	i.IP=nodetab_ip(nt);
 #if CMK_USE_IBVERBS
