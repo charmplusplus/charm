@@ -33,6 +33,10 @@ enum ibv_mtu mtu = IBV_MTU_2048;
 static int page_size;
 static int mtu_size;
 static int packetSize;
+static int dataSize;
+
+
+static int maxTokens;
 static int tokensPerProcessor; /*number of outstanding sends and receives between any two nodes*/
 static int sendPacketPoolSize; /*total number of send buffers created*/
 
@@ -45,10 +49,14 @@ static int msgCount;
 
 static double regTime;
 
-#define CMK_IBVERBS_STATS 0
+#define CMK_IBVERBS_STATS 1
+#define CMK_IBVERBS_INCTOKENS 1
 
 #define WC_LIST_SIZE 100
 #define WC_BUFFER_SIZE 100
+
+#define INCTOKENS_FRACTION 0.04
+#define INCTOKENS_INCREASE .50
 
 typedef struct {
 char none;  
@@ -76,12 +84,23 @@ void CmiNotifyIdle(void) {
 Data Structures 
 ***********************/
 
+/******
+	This is a header attached to the beginning of every infiniband packet
+*******/
+#define INFIPACKETCODE_DATA 1
+#define INFIPACKETCODE_INCTOKENS 2
+
+struct infiPacketHeader{
+	char code;
+	int nodeNo;
+};
+
+
 /** Represents a buffer that is used to receive messages
 */
 struct infiBuffer{
 	char *buf;
 	int size;
-	int fromNode;
 	struct ibv_mr *key;
 };
 
@@ -93,7 +112,13 @@ struct infiBuffer{
 struct infiBufferPool{
 	int numBuffers;
 	struct infiBuffer *buffers;
+	struct infiBufferPool *next;
 };
+
+/*****
+	It is the structure for the send buffers that are used
+	to send messages to other nodes
+********/
 
 
 typedef struct infiPacketStruct {	
@@ -124,6 +149,8 @@ struct infiContext {
 	struct ibv_pd		*pd;
 	struct ibv_cq		*sendCq;
 	struct ibv_cq   *recvCq;
+	struct ibv_srq  *srq;
+	
 	struct ibv_qp		**qp; //Array of qps (numNodes long) to temporarily store the queue pairs
 												//It is used between CmiMachineInit and the call to node_addresses_store
 												//when the qps are stored in the corresponding OtherNodes
@@ -131,6 +158,12 @@ struct infiContext {
 	struct infiAddr *localAddr; //store the lid,qpn,msn address of ur qpair until they are sent
 
 	infiPacket infiPacketFreeList; 
+	
+	struct infiBufferPool *recvBufferPool;
+
+	struct infiPacketHeader header;
+
+	int srqSize;
 	
 /*	infiBufferedWC infiBufferedRecvList;*/
 };
@@ -141,6 +174,7 @@ static inline infiPacket newPacket(int size){
 	infiPacket pkt = malloc(sizeof(struct infiPacketStruct));
 	pkt->size = size;
 	pkt->buf = malloc(sizeof(char)*size);
+	memcpy(pkt->buf,(char *)&(context->header),sizeof(struct infiPacketHeader));
 	pkt->next = NULL;
 	pkt->destNode = NULL;
 	pkt->key = ibv_reg_mr(context->pd,pkt->buf,pkt->size,IBV_ACCESS_LOCAL_WRITE);
@@ -161,6 +195,7 @@ static inline infiPacket newPacket(int size){
 }
 
 
+
 /** Represents a qp used to send messages to another node
  There is one for each remote node
 */
@@ -177,10 +212,11 @@ enum { INFI_HEADER_DATA=21,INFI_DATA};
 struct infiOtherNodeData{
 	struct ibv_qp *qp ;
 	int state;// does it expect a packet with a header (first packet) or one without
-	struct infiBufferPool *recvBufferPool;
+	int totalTokens;
 	int tokensLeft;
 	int nodeNo;
 	
+	int postedRecvs;
 	int broot;//needed to store the root of a multi-packet broadcast sent along a spanning tree or hypercube
 };
 
@@ -230,14 +266,17 @@ static void CmiMachineInit(char **argv){
 	assert(context->pd != NULL);
 	MACHSTATE2(3,"pd %p pd->handle %d",context->pd,context->pd->handle);
 	
+	context->header.nodeNo = _Cmi_mynode;
 
-	mtu_size=1048;
-	packetSize = mtu_size-48;//infiniband rc header size -estimate
-	tokensPerProcessor=350;
+	mtu_size=4096;
+	packetSize = mtu_size;
+	dataSize = packetSize-sizeof(struct infiPacketHeader);//infiniband rc header size -estimate
+	maxTokens =1000;
+	tokensPerProcessor=100;
 	createLocalQps(dev,ibPort,_Cmi_mynode,_Cmi_numnodes,context->localAddr);
 		
 	//create the pool of arrays
-	sendPacketPoolSize = (_Cmi_numnodes-1)*(tokensPerProcessor);
+	sendPacketPoolSize = (_Cmi_numnodes-1)*(tokensPerProcessor)/4;
 	context->infiPacketFreeList=NULL;
 	pktPtrs = malloc(sizeof(infiPacket)*sendPacketPoolSize);
 	//Silly way of allocating the memory buffers (slow as well) but simplifies the code
@@ -288,18 +327,26 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 	context->qp = (struct ibv_qp **)malloc(sizeof(struct ibv_qp *)*numNodes);
 
 	{
+		context->srqSize = (maxTokens)*(_Cmi_numnodes-1)+1;
+		struct ibv_srq_init_attr srqAttr = {
+			.attr = {
+			.max_wr  = context->srqSize,
+			.max_sge = 1
+			}
+		};
+		context->srq = ibv_create_srq(context->pd,&srqAttr);
+		assert(context->srq != NULL);
+	
 		struct ibv_qp_init_attr initAttr = {
 			.qp_type = IBV_QPT_RC,
 			.send_cq = context->sendCq,
 			.recv_cq = context->recvCq,
+			.srq		 = context->srq,
 			.sq_sig_all = 0,
-			.srq = NULL,
 			.qp_context = NULL,
 			.cap     = {
-				.max_send_wr  = tokensPerProcessor,
-				.max_recv_wr  = tokensPerProcessor,
+				.max_send_wr  = maxTokens,
 				.max_send_sge = 1,
-				.max_recv_sge = 1
 			},
 		};
 		struct ibv_qp_attr attr;
@@ -366,8 +413,8 @@ static uint16_t getLocalLid(struct ibv_context *dev_context, int port){
 
 /**************** END OF CmiMachineInit and its helper functions*/
 
-struct infiBufferPool * allocateInfiBufferPool(int numRecvsPerNode,int sizePerBuffer);
-void postInitialRecvs(int node, struct infiBufferPool *recvBufferPool,struct ibv_qp *qp ,int numRecvsPerNode,int sizePerBuffer);
+struct infiBufferPool * allocateInfiBufferPool(int numRecvs,int sizePerBuffer);
+void postInitialRecvs(struct infiBufferPool *recvBufferPool,int numRecvs,int sizePerBuffer);
 
 /* Initial the infiniband specific data for a remote node
 	1. connect the qp and store it in and return it
@@ -377,8 +424,10 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	int err;
 	ret->state = INFI_HEADER_DATA;
 	ret->qp = context->qp[node];
+	ret->totalTokens = tokensPerProcessor;
 	ret->tokensLeft = tokensPerProcessor;
 	ret->nodeNo = node;
+	ret->postedRecvs = tokensPerProcessor;
 
 	
 	struct ibv_qp_attr attr = {
@@ -434,15 +483,18 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	}
 	MACHSTATE(3,"qp state changed to RTS");
 
-	//TODO: create the pool and post the receives
-	ret->recvBufferPool = allocateInfiBufferPool(tokensPerProcessor,packetSize);
-	postInitialRecvs(node,ret->recvBufferPool,ret->qp ,tokensPerProcessor,packetSize);
 	MACHSTATE(3,"} initInfiOtherNodeData");
 	return ret;
 }
 
 
-void 	cleanUpInfiContext(){
+void 	infiPostInitialRecvs(){
+	//create the pool and post the receives
+	int numPosts = tokensPerProcessor*(_Cmi_numnodes-1);
+	context->recvBufferPool = allocateInfiBufferPool(numPosts,packetSize);
+	postInitialRecvs(context->recvBufferPool,numPosts,packetSize);
+
+
 	free(context->qp);
 	context->qp = NULL;
 	free(context->localAddr);
@@ -450,7 +502,7 @@ void 	cleanUpInfiContext(){
 
 }
 
-struct infiBufferPool * allocateInfiBufferPool(int numRecvsPerNode,int sizePerBuffer){
+struct infiBufferPool * allocateInfiBufferPool(int numRecvs,int sizePerBuffer){
 	int numBuffers;
 	int i;
 	struct infiBufferPool *ret;
@@ -459,7 +511,8 @@ struct infiBufferPool * allocateInfiBufferPool(int numRecvsPerNode,int sizePerBu
 
 	page_size = sysconf(_SC_PAGESIZE);
 	ret = malloc(sizeof(struct infiBufferPool));
-	numBuffers=ret->numBuffers = numRecvsPerNode*(_Cmi_numnodes -1 );
+	ret->next = NULL;
+	numBuffers=ret->numBuffers = numRecvs;
 	
 	ret->buffers = malloc(sizeof(struct infiBuffer)*numBuffers);
 	
@@ -477,38 +530,34 @@ struct infiBufferPool * allocateInfiBufferPool(int numRecvsPerNode,int sizePerBu
 /**
 	 Post the buffers as recv work requests
 */
-void postInitialRecvs(int node,struct infiBufferPool *recvBufferPool,struct ibv_qp *qp ,int numRecvsPerNode,int sizePerBuffer){
-	int j;
-	struct ibv_recv_wr *workRequests = malloc(sizeof(struct ibv_recv_wr)*numRecvsPerNode);
-	struct ibv_sge *sgElements = malloc(sizeof(struct ibv_sge)*numRecvsPerNode);
+void postInitialRecvs(struct infiBufferPool *recvBufferPool,int numRecvs,int sizePerBuffer){
+	int j,err;
+	struct ibv_recv_wr *workRequests = malloc(sizeof(struct ibv_recv_wr)*numRecvs);
+	struct ibv_sge *sgElements = malloc(sizeof(struct ibv_sge)*numRecvs);
 	struct ibv_recv_wr *bad_wr;
 	
-			int startBufferIdx;
-			MACHSTATE3(3,"posting %d receives for node %d of size %d",numRecvsPerNode,node,sizePerBuffer);
-			if(node < _Cmi_mynode){
-				startBufferIdx = node*numRecvsPerNode;
-			}else{
-				startBufferIdx = (node-1)*numRecvsPerNode;
-			}
-			for(j=0;j<numRecvsPerNode;j++){
-				
-				recvBufferPool->buffers[startBufferIdx+j].fromNode = node;
-				
-				sgElements[j].addr = (uint64_t) recvBufferPool->buffers[startBufferIdx+j].buf;
-				sgElements[j].length = sizePerBuffer;
-				sgElements[j].lkey = recvBufferPool->buffers[startBufferIdx+j].key->lkey;
-				
-				workRequests[j].wr_id = (uint64_t)&(recvBufferPool->buffers[startBufferIdx+j]);
-				workRequests[j].sg_list = &sgElements[j];
-				workRequests[j].num_sge = 1;
-				if(j != numRecvsPerNode-1){
-					workRequests[j].next = &workRequests[j+1];
-				}
-				
-			}
-			if(ibv_post_recv(qp,workRequests,&bad_wr)){
-				assert(0);
-			}
+	int startBufferIdx=0;
+	MACHSTATE2(3,"posting %d receives of size %d",numRecvsPerNode,sizePerBuffer);
+	for(j=0;j<numRecvs;j++){
+		
+		
+		sgElements[j].addr = (uint64_t) recvBufferPool->buffers[startBufferIdx+j].buf;
+		sgElements[j].length = sizePerBuffer;
+		sgElements[j].lkey = recvBufferPool->buffers[startBufferIdx+j].key->lkey;
+		
+		workRequests[j].wr_id = (uint64_t)&(recvBufferPool->buffers[startBufferIdx+j]);
+		workRequests[j].sg_list = &sgElements[j];
+		workRequests[j].num_sge = 1;
+		if(j != numRecvs-1){
+			workRequests[j].next = &workRequests[j+1];
+		}
+		
+	}
+	workRequests[numRecvs-1].next = NULL;
+	MACHSTATE(3,"About to call ibv_post_srq_recv");
+	if(ibv_post_srq_recv(context->srq,workRequests,&bad_wr)){
+		assert(0);
+	}
 
 	free(workRequests);
 	free(sgElements);
@@ -521,10 +570,8 @@ static inline void CommunicationServer_nolock(int toBuffer); //if buffer ==1 rec
 
 static void CmiMachineExit()
 {
-//	printf("[%d] totalTime %.6lf total RegTime %.6lf total RegCount %d avg regTime %.6lf \n",_Cmi_mynode,CmiWallTimer()-_startTime,regTime,regCount,regTime/(double )regCount);
-//	printf("[%d] calling CmiMachineExit \n",_Cmi_mynode);
 #if CMK_IBVERBS_STATS	
-	printf("[%d] msgCount %d pktCount %d packetSize %d # 0 tokens %d time loss due to 0 tokens %.6lf \n",_Cmi_mynode,msgCount,pktCount,packetSize,regCount,regTime);
+	printf("[%d] msgCount %d pktCount %d packetSize %d dataSize %d # 0 tokens %d time loss due to 0 tokens %.6lf \n",_Cmi_mynode,msgCount,pktCount,packetSize,dataSize,regCount,regTime);
 #endif
 }
 
@@ -532,21 +579,27 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
 	CommunicationServer_nolock(0);
 }
 
+static inline void increaseTokens(OtherNode node);
+
 /**
 	Packetize this data and send it
 **/
 
-static inline void pollRecvCq(int toBuffer);
-static inline void pollSendCq(void);
 
 static void EnqueuePacket(OutgoingMsg ogm, OtherNode node, int rank,char *data,int size,int broot,int copy){
 	int full=0;
+	int incTokens=0;
 	infiPacket packet;
 	double _regStartTime;
 	MallocInfiPacket(packet);
 	packet->destNode = node;
+	
+	//the nodeNo is added at time of buffer allocation
+	struct infiPacketHeader *header = (struct infiPacketHeader *)packet->buf;
+	header->code = INFIPACKETCODE_DATA;
+	
 	//copy the data
-	memcpy(packet->buf,data,size);
+	memcpy((packet->buf+sizeof(struct infiPacketHeader)),data,size);
 	
 #if CMK_IBVERBS_STATS	
 	pktCount++;
@@ -554,7 +607,7 @@ static void EnqueuePacket(OutgoingMsg ogm, OtherNode node, int rank,char *data,i
 
 	struct ibv_sge sendElement = {
 		.addr = (uintptr_t)packet->buf,
-		.length = size,
+		.length = size+sizeof(struct infiPacketHeader),
 		.lkey = packet->key->lkey
 	};
 
@@ -577,8 +630,7 @@ static void EnqueuePacket(OutgoingMsg ogm, OtherNode node, int rank,char *data,i
 	}
 #endif	
 	while(node->infiData->tokensLeft == 0){
-		CommunicationServer_nolock(1); //buffer any messages received now. do not process them as processing a broadcast request can result in messages being sent to a processor in turn. It would result in a broadcast message getting sent in between packets of another message
-//		pollSendCq();
+		CommunicationServer_nolock(1); 
 	}
 	
 #if CMK_IBVERBS_STATS	
@@ -587,12 +639,24 @@ static void EnqueuePacket(OutgoingMsg ogm, OtherNode node, int rank,char *data,i
 		regTime += (CmiWallTimer()-_regStartTime);
 	}
 #endif	
+
+#if CMK_IBVERBS_INCTOKENS	
+	if(node->infiData->tokensLeft < INCTOKENS_FRACTION*node->infiData->totalTokens && node->infiData->totalTokens < maxTokens){
+		header->code |= INFIPACKETCODE_INCTOKENS;
+		incTokens=1;
+	}
+#endif
 	
 	if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
 		assert(0);
 	}
 	node->infiData->tokensLeft--;
-
+	
+#if CMK_IBVERBS_INCTOKENS	
+	if(incTokens){
+		increaseTokens(node);
+	}
+#endif
 	MACHSTATE4(3,"Packet send ogm %p size %d packet %p tokensLeft %d",ogm,size,packet,packet->destNode->infiData->tokensLeft);
 
 };
@@ -616,10 +680,10 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 	
 	CmiMsgHeaderSetLength(ogm->data,ogm->size);
 	
-	while(size > packetSize){
-		EnqueuePacket(ogm,node,rank,data,packetSize,broot,copy);
-		size -= packetSize;
-		data += packetSize;
+	while(size > dataSize){
+		EnqueuePacket(ogm,node,rank,data,dataSize,broot,copy);
+		size -= dataSize;
+		data += dataSize;
 	}
 	if(size > 0){
 		EnqueuePacket(ogm,node,rank,data,size,broot,copy);
@@ -627,6 +691,9 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 	MACHSTATE3(3,"DONE Sending ogm %p of size %d to %d",ogm,size,node->infiData->nodeNo);
 }
 
+
+static inline void pollRecvCq(const int toBuffer);
+static inline void pollSendCq();
 
 static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer);
 static inline void processSendWC(struct ibv_wc *sendWC);
@@ -776,9 +843,7 @@ static void CommunicationServer(int sleepTime, int where){
 	CommunicationServer_nolock(0);
 }
 
-static inline void processMessage(int nodeNo,int len,struct infiBuffer *buffer,const int toBuffer){
-	char *msg = buffer->buf;
-	
+static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffer){
 	char *newmsg;
 	
 	MACHSTATE2(3,"Processing packet from node %d len %d",nodeNo,len);
@@ -823,7 +888,7 @@ static inline void processMessage(int nodeNo,int len,struct infiBuffer *buffer,c
 		}
 		case INFI_DATA:
 		{
-			if(node->asm_fill + len < node->asm_total && len != packetSize){
+			if(node->asm_fill + len < node->asm_total && len != dataSize){
 				CmiPrintf("from node %d asm_total: %d, asm_fill: %d, len:%d.\n",node->infiData->nodeNo, node->asm_total, node->asm_fill, len);
 				CmiAbort("packet in the middle does not have expected length");
 			}
@@ -893,14 +958,23 @@ static inline void processMessage(int nodeNo,int len,struct infiBuffer *buffer,c
 
 };
 
+static void increasePostedRecvs(int nodeNo);
 
 static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 	struct infiBuffer *buffer = (struct infiBuffer *) recvWC->wr_id;	
-	int len = recvWC->byte_len;
-	int nodeNo = buffer->fromNode;
+	struct infiPacketHeader *header = (struct infiPacketHeader *)buffer->buf;
+	int nodeNo = header->nodeNo;
 	
-	processMessage(nodeNo,len,buffer,toBuffer);
+	int len = recvWC->byte_len-sizeof(struct infiPacketHeader);
 	
+	if(header->code & INFIPACKETCODE_DATA){
+			processMessage(nodeNo,len,(buffer->buf+sizeof(struct infiPacketHeader)),toBuffer);
+	}
+#if CMK_IBVERBS_INCTOKENS	
+	if(header->code & INFIPACKETCODE_INCTOKENS){
+		increasePostedRecvs(nodeNo);
+	}
+#endif	
 	{
 		struct ibv_sge list = {
 			.addr 	= (uintptr_t) buffer->buf,
@@ -916,7 +990,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		};
 		struct ibv_recv_wr *bad_wr;
 	
-		if(ibv_post_recv(nodes[nodeNo].infiData->qp,&wr,&bad_wr)){
+		if(ibv_post_srq_recv(context->srq,&wr,&bad_wr)){
 			assert(0);
 		}
 	}
@@ -934,3 +1008,55 @@ static inline  void processSendWC(struct ibv_wc *sendWC){
 	FreeInfiPacket(packet);
 };
 
+
+
+
+static inline void increaseTokens(OtherNode node){
+	int err;
+	int increase = node->infiData->totalTokens*INCTOKENS_INCREASE;
+	node->infiData->totalTokens += increase;
+	node->infiData->tokensLeft += increase;
+	//increase the size of the sendCq
+	int currentCqSize = context->sendCq->cqe;
+	if(ibv_resize_cq(context->sendCq,currentCqSize+increase)){
+		assert(0);
+	}
+/*	struct ibv_qp_attr attr = {
+		.cap = {
+			.max_send_wr = node->infiData->totalTokens,
+			.max_send_sge = 1,
+		},
+	};
+
+	if(err= ibv_modify_qp(node->infiData->qp,&attr,IBV_QP_CAP)){
+		assert(0);
+	}*/
+};
+
+
+
+static void increasePostedRecvs(int nodeNo){
+	OtherNode node = &nodes[nodeNo];
+	int increase = node->infiData->postedRecvs*INCTOKENS_INCREASE;
+	node->infiData->postedRecvs+= increase;
+	//increase the size of the recvCq
+	int currentCqSize = context->recvCq->cqe;
+	if(ibv_resize_cq(context->recvCq,currentCqSize+increase)){
+		assert(0);
+	}
+/*	//increase the size of the srq
+	context->srqSize += increase;
+	struct ibv_srq_attr srq_attr = {
+		.max_wr = context->srqSize
+	};
+	if( ibv_modify_srq(context->srq,&srq_attr,IBV_SRQ_MAX_WR )){
+		assert(0);
+	}*/
+
+	//create another bufferPool and attach it to the top of the current one
+	struct infiBufferPool *newPool = allocateInfiBufferPool(increase,packetSize);
+	newPool->next = context->recvBufferPool;
+	context->recvBufferPool = newPool;
+	postInitialRecvs(newPool,increase,packetSize);
+
+};

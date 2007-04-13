@@ -231,7 +231,7 @@ struct PendingMsgStruct;
 #if CMK_USE_IBVERBS
 struct infiOtherNodeData;
 struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]);
-void	cleanUpInfiContext();
+void	infiPostInitialRecvs();
 #endif
 
 
@@ -573,7 +573,7 @@ static void node_addresses_store(ChMessage *msg)
   }
 #endif
 #if CMK_USE_IBVERBS
-	cleanUpInfiContext();
+	infiPostInitialRecvs();
 #endif
   MACHSTATE(1,"} node_addresses_store");
 }
