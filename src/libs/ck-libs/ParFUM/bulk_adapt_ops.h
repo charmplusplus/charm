@@ -92,7 +92,7 @@ class BulkAdapt {
 			 bool startSide);
 
   /// Perform a single side of an edge_bisect operation
-  void one_side_split_3D(adaptAdj &startElem, adaptAdj &splitElem, 
+  bool one_side_split_3D(adaptAdj &startElem, adaptAdj &splitElem, 
 			 adaptAdj &firstElem, adaptAdj &fromElem,
 			 int edgeID, int *node1idx, int *node2idx, 
 			 int *newNodeID, bool startSide);

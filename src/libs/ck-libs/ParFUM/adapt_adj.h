@@ -170,31 +170,29 @@ void CreateAdaptAdjacencies(int meshid, int elemType);
 // Access functions
 
 /** Look up elemID in elemType array, access edgeFaceID-th adaptAdj. */
-adaptAdj *GetAdaptAdj(int meshid, int elemID, int elemType, int edgeFaceID);
-adaptAdj *GetAdaptAdj(FEM_Mesh *meshPtr, int elemID, int elemType, int edgeFaceID);
+adaptAdj *GetAdaptAdj(int meshid, adaptAdj elem, int edgeFaceID);
+adaptAdj *GetAdaptAdj(FEM_Mesh *meshPtr, adaptAdj elem, int edgeFaceID);
 /** Look up elemID in elemType array, calculate edgeFaceID from
     vertexList (with GetEdgeFace below), and access edgeFaceID-th
     adaptAdj with GetAdaptAdj above. */
-adaptAdj *GetAdaptAdj(int meshid, int elemID, int elemType, int *vertexList);
+adaptAdj *GetAdaptAdj(int meshid, adaptAdj elem, int *vertexList);
 
 /** Look up elemID in elemType array and determine the set of vertices
     associated with the edge or face represented by edgeFaceID. */
-void GetVertices(int meshid, int elemID, int elemType, int edgeFaceID, 
-		 int *vertexList);
+void GetVertices(int meshid, adaptAdj elem, int edgeFaceID, int *vertexList);
 /** Look up elemID in elemType array and determine the edge or face ID
     specified by the set of vertices in vertexList. */
-int GetEdgeFace(int meshid, int elemID, int elemType, int *vertexList);
+int GetEdgeFace(int meshid, adaptAdj elem, int *vertexList);
 
 // Update functions
 /** Look up elemID in elemType array and set the adjacency on
     edgeFaceID to nbr. */
-void SetAdaptAdj(int meshid, int elemID, int elemType, int edgeFaceID, 
-		 adaptAdj nbr);
+void SetAdaptAdj(int meshid, adaptAdj elem, int edgeFaceID, adaptAdj nbr);
 
-void ReplaceAdaptAdj(int meshID,int elemID,int elemType,adaptAdj originalNbr, adaptAdj newNbr);
-void ReplaceAdaptAdj(FEM_Mesh *meshPtr,int elemID,int elemType,adaptAdj originalNbr, adaptAdj newNbr);
-
-
+void ReplaceAdaptAdj(int meshID, adaptAdj elem, adaptAdj originalNbr, 
+		     adaptAdj newNbr);
+void ReplaceAdaptAdj(FEM_Mesh *meshPtr, adaptAdj elem, adaptAdj originalNbr,
+		     adaptAdj newNbr);
 
 /**given the dimensions and nodes per element guess whether the element 
  is a triangle, quad, tet or hex. At the moment these are the 4 shapes
