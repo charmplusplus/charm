@@ -1,0 +1,37 @@
+mainmodule streaming {
+			 
+  readonly CProxy_Main mainProxy;	
+  readonly CProxy_StreamingArray streamingArrayProxy;
+  readonly int nElements;
+
+  readonly ComlibInstanceHandle stratStreaming;				
+
+  message streamingMessage {
+    char msg[];
+  };
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void finishTimeoutTest(void);
+    entry void finishMaxCountTest(void);
+    entry void finishMaxMsgSizeTest(void);
+    entry void finishArrayStreaming(void);
+    entry void finishMigrate(void);		
+  };
+
+  array[1D] StreamingArray {
+    entry StreamingArray(void);			
+    entry void testStreamingTimeout(void);
+    entry void receiveAfterTimeout(streamingMessage *m);
+    entry void testStreamingMaxCount(void);
+    entry void receiveWithoutTimeout(streamingMessage *m);
+    entry void receiveGroupAfterTimeout(streamingMessage *m);
+    entry void testStreamingMaxMsgSize(void);
+    entry void receiveLargeMessage(streamingMessage *m);
+    entry void testStreamingMaxBufSize(void);
+    entry void receiveAfterMaxBufSizeReached(streamingMessage *m);
+    entry void receiveAndIgnore(streamingMessage *m);
+    entry void migrate(void);
+  };
+
+};
