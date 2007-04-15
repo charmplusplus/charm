@@ -19,22 +19,28 @@ void StreamingHandlerFn(void *msg) {
     return;
 }
 
-StreamingStrategy::StreamingStrategy(int periodMs, int bufferMax_)
-    : PERIOD(periodMs), bufferMax(bufferMax_), CharmStrategy()
+StreamingStrategy::StreamingStrategy(int periodMs, int bufferMax_, 
+				     int msgSizeMax_, int bufSizeMax_)
+    : PERIOD(periodMs), bufferMax(bufferMax_), msgSizeMax(msgSizeMax_), 
+      bufSizeMax(bufSizeMax_), CharmStrategy()
 {
-    streamingMsgBuf=NULL;
-    streamingMsgCount=NULL;
+    streamingMsgBuf = NULL;
+    streamingMsgCount = NULL;
+    bufSize = NULL;
     shortMsgPackingFlag = CmiFalse;
     idleFlush = CmiTrue;
     streaming_handler_id = 0;
     setType(ARRAY_STRATEGY);
 }
 
-StreamingStrategy::StreamingStrategy(double periodMs, int bufferMax_)
-    : PERIOD(periodMs), bufferMax(bufferMax_), CharmStrategy()
+StreamingStrategy::StreamingStrategy(double periodMs, int bufferMax_, 
+				     int msgSizeMax_, int bufSizeMax_)
+    : PERIOD(periodMs), bufferMax(bufferMax_), msgSizeMax(msgSizeMax_), 
+      bufSizeMax(bufSizeMax_), CharmStrategy()
 {
     streamingMsgBuf = NULL;
     streamingMsgCount = NULL;
+    bufSize = NULL;
     shortMsgPackingFlag = CmiFalse;
     idleFlush = CmiTrue;
     streaming_handler_id = 0;
@@ -48,19 +54,22 @@ void StreamingStrategy::insertMessage(CharmMessageHolder *cmsg) {
     envelope *env = UsrToEnv(msg);
     int size = env->getTotalsize();
 
-    if(size > MAX_STREAMING_MESSAGE_SIZE) {//AVOID COPYING
-        ComlibPrintf("StreamingStrategy::insertMessage: direct send\n");
+    if(size > msgSizeMax) {//AVOID COPYING
+        ComlibPrintf("StreamingStrategy::inserSessage: direct send\n");
         CmiSyncSendAndFree(pe, size, (char *)env);
         delete cmsg;
         return;
     }
 
-    ComlibPrintf("StreamingStrategy::insertMessage: buffering t=%g, n=%d, s=%d\n",  
-                 PERIOD, bufferMax, size);
+    ComlibPrintf("[%d] StreamingStrategy::insertMessage: buffering t=%g, n=%d, d=%d, s=%d\n",  
+                 CkMyPe(), PERIOD, bufferMax, pe, size);
     
     streamingMsgBuf[pe].enq(cmsg);
     streamingMsgCount[pe]++;
-    if (streamingMsgCount[pe] > bufferMax) flushPE(pe);
+    bufSize[pe]+=cmsg->getSize();
+    if (streamingMsgCount[pe] > bufferMax || bufSize[pe] > bufSizeMax) {
+      flushPE(pe);
+    }
 }
 
 void StreamingStrategy::doneInserting() {
@@ -88,6 +97,7 @@ void StreamingStrategy::flushPE(int pe) {
                    CkMyPe(), streamingMsgCount[pe], pe); 
       CmiSyncSendAndFree(pe, size, (char *)msg);
       streamingMsgCount[pe] = 0;
+      bufSize[pe] = 0;
   }
   else {
       
@@ -103,6 +113,7 @@ void StreamingStrategy::flushPE(int pe) {
                      CkMyPe(), pe);            
         delete cmsg;
         streamingMsgCount[pe] = 0;
+	bufSize[pe] = 0;
         return;
     }
     /*
@@ -183,6 +194,7 @@ void StreamingStrategy::flushPE(int pe) {
     }    
     
     streamingMsgCount[pe] = 0;
+    bufSize[pe] = 0;
     CmiSetHandler(newmsg, streaming_handler_id);
     CmiSyncSendAndFree(pe, sp.size(), newmsg); 
   }
@@ -254,15 +266,20 @@ void StreamingStrategy::pup(PUP::er &p){
   CharmStrategy::pup(p);
   p | PERIOD;
   p | bufferMax;
+  p | msgSizeMax;
   p | shortMsgPackingFlag;
+  p | bufSizeMax;
   p | idleFlush;
   p | streaming_handler_id;
 
   if(p.isUnpacking()) {
       streamingMsgBuf = new CkQ<CharmMessageHolder *>[CkNumPes()];
       streamingMsgCount = new int[CkNumPes()];
-      for(int count = 0; count < CkNumPes(); count ++)
-          streamingMsgCount[count] = 0;
+      bufSize = new int[CkNumPes()];
+      for(int count = 0; count < CkNumPes(); count ++) {
+	streamingMsgCount[count] = 0;
+	bufSize[count] = 0;
+      }
   }
 }
 

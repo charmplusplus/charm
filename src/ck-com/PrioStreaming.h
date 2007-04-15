@@ -27,7 +27,11 @@ class PrioStreaming : public StreamingStrategy {
      - Current message is a high priority message
     */
 
-    PrioStreaming(int periodMs=10, int bufferMax=1000, int prio=0);
+    PrioStreaming(int periodMs=DEFAULT_TIMEOUT, 
+		  int bufferMax=MAX_NUM_STREAMING_MESSAGES, 
+		  int prio=0,
+		  int msgSizeMax=MAX_STREAMING_MESSAGE_SIZE,
+		  int bufSizeMAX=MAX_STREAMING_MESSAGE_SIZE*MAX_NUM_STREAMING_MESSAGES);
     PrioStreaming(CkMigrateMessage *m) : StreamingStrategy(m) {}
     
     virtual void insertMessage(CharmMessageHolder *msg);

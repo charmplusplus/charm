@@ -3,12 +3,17 @@
 #include "ComlibManager.h"
 
 #define MAX_STREAMING_MESSAGE_SIZE 2048*2
+#define MAX_NUM_STREAMING_MESSAGES 1000
+#define DEFAULT_TIMEOUT 10
 
 class StreamingStrategy : public CharmStrategy {
  protected:
     CkQ<CharmMessageHolder *> *streamingMsgBuf;
     int *streamingMsgCount;
+    int *bufSize;
     int bufferMax;
+    int msgSizeMax;
+    int bufSizeMax;
     double PERIOD;
     CmiBool shortMsgPackingFlag, idleFlush;
 
@@ -23,11 +28,19 @@ class StreamingStrategy : public CharmStrategy {
      These are the criteria for flushing all pending messages:
        - it's been at least period (in ms) since the last flush, or
        - the processor just went idle.
-     Thses criteria flush a single PE's pending messages:
-       - more than bufferMax messages to buffered for one PE.
+     These criteria flush a single PE's pending messages:
+       - more than bufferMax messages to buffered for one PE, or
+       - max buffer size reached
+     Messages above the size threshold are sent directly without using the strategy  .
     */
-    StreamingStrategy(int periodMs=1, int bufferMax=1000);
-    StreamingStrategy(double periodMs=1.0, int bufferMax=1000);
+    StreamingStrategy(int periodMs=DEFAULT_TIMEOUT, 
+		      int bufferMax=MAX_NUM_STREAMING_MESSAGES,
+		      int msgSizeMax=MAX_STREAMING_MESSAGE_SIZE, 
+		      int bufSizeMax=MAX_STREAMING_MESSAGE_SIZE*MAX_NUM_STREAMING_MESSAGES);
+    StreamingStrategy(double periodMs=DEFAULT_TIMEOUT, 
+		      int bufferMax=MAX_NUM_STREAMING_MESSAGES, 
+		      int msgSizeMax=MAX_STREAMING_MESSAGE_SIZE, 
+		      int bufSizeMax=MAX_STREAMING_MESSAGE_SIZE*MAX_NUM_STREAMING_MESSAGES);
 
     StreamingStrategy(CkMigrateMessage *m) : CharmStrategy(m) {}
     

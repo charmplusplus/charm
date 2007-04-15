@@ -1,8 +1,9 @@
 #include "PrioStreaming.h"
 #include "MsgPacker.h"
 
-PrioStreaming::PrioStreaming(int periodMs,int bufferMax_, int prio)
-    : StreamingStrategy(periodMs, bufferMax_), basePriority(prio)
+PrioStreaming::PrioStreaming(int periodMs,int bufferMax_, int prio, 
+			     int msgSizeMax_, int bufSizeMax_)
+    : StreamingStrategy(periodMs, bufferMax_, msgSizeMax_, bufSizeMax_), basePriority(prio)
 {
 }
 
@@ -23,11 +24,12 @@ void PrioStreaming::insertMessage(CharmMessageHolder *cmsg) {
 
     streamingMsgBuf[pe].enq(cmsg);
     streamingMsgCount[pe]++;   
+    bufSize[pe]+=cmsg->getSize();
 
     if(msg_prio <= basePriority)
         flushPE(pe);
 
-    if (streamingMsgCount[pe] > bufferMax) 
+    if (streamingMsgCount[pe] > bufferMax || bufSize[pe] > bufSizeMax) 
         flushPE(pe);
 }
 
