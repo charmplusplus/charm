@@ -823,6 +823,8 @@ $(L)/libmodulecomlib.a: $(COMLIB_OBJS)
 bigsim:  basics
 	$(MAKE) bigsim-target
 
+bigemulator: bigsim
+
 bigsim-target: charm++ $(L)/libconv-bigsim.a $(L)/libconv-bigsim-logs.a $(L)/libconv-bluegene-stub.a $(L)/libblue-standalone.a METIS
 
 # old (Charm++) Blue Gene emulator
