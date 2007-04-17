@@ -415,6 +415,7 @@ bool BulkAdapt::one_side_split_3D(adaptAdj &startElem, adaptAdj &splitElem,
 				  int *newNodeID, bool startSide)
 {
   CkPrintf("ERROR: one_side_split_3D not yet implemented!\n");
+  return 1;
 }
 
 
