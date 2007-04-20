@@ -311,7 +311,7 @@ void NeighborMsg :: pup(PUP::er &p)
   nborIdx.pup(p);
   if(p.isUnpacking())
     data = (void *) new char[dataSize];
-  p(data,dataSize);
+  p((char *)data,dataSize);
 }
 
 /*
