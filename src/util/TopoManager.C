@@ -66,7 +66,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
 #elif CMK_XT3
 
 #else
-  x = pe; y = 1; z = 1;
+  x = pe; y = 0; z = 0;
 #endif
 }
 
