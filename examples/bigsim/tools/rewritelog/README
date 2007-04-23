@@ -44,11 +44,15 @@ Modifying Application:
   the time, parameters, and possibly some performance counters
   for the code executed between the calls. 
 
+  A sample output file: traceBigSim/sample_namd_timings.txt
+
   Run the application, in serial or parallel to produce a good
   set of samples of the timings. These timings will be used 
   to predict the performance for the events appearing in a
   bgTrace log files. Put all of these timings in the file
-  reference by CYCLE_TIMES_FILE in interpolatelog.C
+  reference by CYCLE_TIMES_FILE in interpolatelog.C. You can 
+  grep out only the lines containing TRACEBIGSIM, and can 
+  concatenate them all together into one big file.
 
  
 Running The interpolation tool:
