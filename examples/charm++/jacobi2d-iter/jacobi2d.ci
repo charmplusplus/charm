@@ -10,7 +10,10 @@ mainmodule jacobi2d {
     // Normal Charm++ entry methods
     entry Jacobi(void);
     entry void begin_iteration(void);
-    entry void recieve_neighbor(int, int, int width, double s[width]);
+    entry void sendLeft(int width, double s[width]);
+    entry void sendRight(int width, double s[width]);
+    entry void sendTop(int width, double s[width]);
+    entry void sendBottom(int width, double s[width]);
 
     // A method for requesting data to be displayed graphically to the user
     entry void requestNextFrame(liveVizRequestMsg *m);

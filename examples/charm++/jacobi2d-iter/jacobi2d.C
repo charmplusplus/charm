@@ -64,7 +64,7 @@ public:
                 CkPrintf("Completed %d iterations\n", iterations);
                 CkExit();
             } else {
-                CkPrintf("starting new iteration.\n");
+                CkPrintf("starting new iteration %d.\n", iterations);
                 recieve_count=0;
                 iterations++;
                 // Call begin_iteration on all worker chares in array
@@ -78,16 +78,13 @@ class Jacobi: public CBase_Jacobi {
 public:
     int messages_due;
 
-    double temperature[block_height][block_width];
-    double left_ghosts[block_height];
-    double right_ghosts[block_height];
-    double top_ghosts[block_width];
-    double bottom_ghosts[block_width];
+    double temperature[block_height+2][block_width+2];
 
     // Constructor, initialize values
     Jacobi() {
-        for(int i=0;i<block_height;++i){
-            for(int j=0;j<block_width;++j){
+        messages_due = 4;
+        for(int i=0;i<block_height+2;++i){
+            for(int j=0;j<block_width+2;++j){
                 temperature[i][j] = 0.0;
             }
         }
@@ -97,10 +94,10 @@ public:
     // Enforce some boundary conditions
     void BC(){
         // Heat left and top edges of each chare's block
-		for(int i=0;i<block_height;++i)
-            temperature[i][0] = 255.0;
-        for(int j=0;j<block_width;++j)
-            temperature[0][j] = 255.0;
+	for(int i=1;i<block_height+1;++i)
+            temperature[i][1] = 255.0;
+        for(int j=1;j<block_width+1;++j)
+            temperature[1][j] = 255.0;
     }
 
     // a necessary function which we ignore now
@@ -112,75 +109,62 @@ public:
     // Perform one iteration of work
     // The first step is to send the local state to the neighbors
     void begin_iteration(void) {
-        messages_due = 4;
 
         // Copy left column and right column into temporary arrays
         double left_edge[block_height];
         double right_edge[block_height];
-		double top_edge[block_width];
-		double bottom_edge[block_height];
 
         for(int i=0;i<block_height;++i){
-            left_edge[i] = temperature[i][0];
-            right_edge[i] = temperature[i][block_width-1];
-        }
-
-        for(int j=0;j<block_width;++j){
-            top_edge[j] = temperature[0][j];
-            bottom_edge[j] = temperature[block_height-1][j];
+            left_edge[i] = temperature[i+1][1];
+            right_edge[i] = temperature[i+1][block_width];
         }
 
         // Send my left edge
-        thisProxy(wrap_x(thisIndex.x-1), thisIndex.y).recieve_neighbor(thisIndex.x, thisIndex.y, block_height, left_edge);
+        thisProxy(wrap_x(thisIndex.x-1), thisIndex.y).sendLeft(block_height, left_edge);
 		// Send my right edge
-        thisProxy(wrap_x(thisIndex.x+1), thisIndex.y).recieve_neighbor(thisIndex.x, thisIndex.y, block_height, right_edge);
+        thisProxy(wrap_x(thisIndex.x+1), thisIndex.y).sendRight(block_height, right_edge);
 		// Send my top edge
-        thisProxy(thisIndex.x, wrap_y(thisIndex.y-1)).recieve_neighbor(thisIndex.x, thisIndex.y, block_width, top_edge);
+        thisProxy(thisIndex.x, wrap_y(thisIndex.y-1)).sendTop(block_width, &temperature[1][1]);
 		// Send my bottom edge
-        thisProxy(thisIndex.x, wrap_y(thisIndex.y+1)).recieve_neighbor(thisIndex.x, thisIndex.y, block_width, bottom_edge);
+        thisProxy(thisIndex.x, wrap_y(thisIndex.y+1)).sendBottom(block_width, &temperature[block_height][1]);
 
         check_done_iteration();
     }
 
-    void recieve_neighbor(int neighbor_x, int neighbor_y, int width, double ghost_values[]) {
-        // we have just received a message from worker neighbor_x,neighbor_y with its adjacent
-        // row or column of data values. This worker's index is thisIndex.x, thisIndex.y
-        // We store these in temporary arrays, until all data arrives, then we perform computation
-        // This could be optimized by performing the available computation as soon as the 
-        // required data arrives, but  this example is intentionally simple
-        if(neighbor_x == wrap_x(thisIndex.x-1) && neighbor_y == thisIndex.y){
-            // the ghost data from my LEFT neighbor
-            CkAssert(width == block_height);
-            for(int i=0;i<width;++i){
-                left_ghosts[i] = ghost_values[i];
-            }
-        } else if(neighbor_x == wrap_x(thisIndex.x+1) && neighbor_y == thisIndex.y){
-            // the ghost data from my RIGHT neighbor
-            CkAssert(width == block_height);
-            for(int i=0;i<width;++i){
-                right_ghosts[i] = ghost_values[i];
-            }
-        } else  if(neighbor_x == thisIndex.x && neighbor_y == wrap_y(thisIndex.y-1)){
-            // the ghost data from my TOP neighbor
-            CkAssert(width == block_width);
-            for(int i=0;i<width;++i){
-                top_ghosts[i] = ghost_values[i];
-            }
-        } else if(neighbor_x == thisIndex.x && neighbor_y == wrap_y(thisIndex.y+1)){
-            // the ghost data from my BOTTOM neighbor
-            CkAssert(width == block_width);
-            for(int i=0;i<width;++i){
-                bottom_ghosts[i] = ghost_values[i];
-            }
-        } else {
-            CkPrintf("Message from non-neighbor chare. I am %d,%d. Message was from %d,%d\n",thisIndex.x,thisIndex.y,neighbor_x,neighbor_y);
-            CkExit();
+    void sendLeft(int width, double ghost_values[]) {
+        for(int i=0;i<width;++i){
+            temperature[i+1][block_width] = ghost_values[i];
         }
-
         messages_due--;
         check_done_iteration();
     }
 
+      // message from right, store in left ghost
+    void sendRight(int width, double ghost_values[]) {
+        for(int i=0;i<width;++i){
+            temperature[i+1][1] = ghost_values[i];
+        }
+        messages_due--;
+        check_done_iteration();
+    }
+
+      // message from top, store in bottom ghost
+    void sendTop(int width, double ghost_values[]) {
+        for(int i=0;i<width;++i){
+            temperature[block_height][i+1] = ghost_values[i];
+        }
+        messages_due--;
+        check_done_iteration();
+    }
+
+      // message from bottom, store in top ghost
+    void sendBottom(int width, double ghost_values[]) {
+        for(int i=0;i<width;++i){
+            temperature[1][i+1] = ghost_values[i];
+        }
+        messages_due--;
+        check_done_iteration();
+    }
 
     // Check to see if we have received all neighbor values yet
     // If all neighbor values have been received, we update our values and proceed
@@ -190,48 +174,25 @@ public:
             // the values in temperature[][] array until using them first. Other schemes could be used
             // to accomplish this same problem. We just put the new values in a temporary array
             // and write them to temperature[][] after all of the new values are computed.
-            double new_temperature[block_height][block_width];
+            double new_temperature[block_height+2][block_width+2];
     
-            for(int i=0;i<block_height;++i){
-                for(int j=0;j<block_width;++j){
-                    // first we find the values around the i,j entry in this chare's local block                
-                    double up, down, left, right;
-
-                    if(i==0)
-                        up = top_ghosts[j];
-                    else
-                        up = temperature[i-1][j];
-
-                    if(i==block_height-1)
-                        down = bottom_ghosts[j];
-                    else
-                        down = temperature[i+1][j];
-
-                    if(j==0)
-                        left = left_ghosts[i];
-                    else
-                        left = temperature[i][j-1];
-
-                    if(j==block_width-1)
-                        right = right_ghosts[i];
-                    else
-                        right = temperature[i][j+1];
-
-
+            for(int i=1;i<block_height+1;++i){
+                for(int j=1;j<block_width+1;++j){
                     // update my value based on the surrounding values
-					new_temperature[i][j] = (up+down+left+right+temperature[i][j]) / 5.0;
+                    new_temperature[i][j] = (temperature[i-1][j]+temperature[i+1][j]+temperature[i][j-1]+temperature[i][j+1]+temperature[i][j]) / 5.0;
 
                 }
             }
 
-            for(int i=0;i<block_height;++i)
-                for(int j=0;j<block_width;++j)
+            for(int i=0;i<block_height+2;++i)
+                for(int j=0;j<block_width+2;++j)
                     temperature[i][j] = new_temperature[i][j];
 
             // Enforce the boundary conditions again
             BC();
 
             mainProxy.report(thisIndex.x, thisIndex.y);
+            messages_due = 4;
         }
     }
 
