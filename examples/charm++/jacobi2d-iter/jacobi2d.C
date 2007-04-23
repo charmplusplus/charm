@@ -6,8 +6,8 @@
 /*readonly*/ CProxy_Main mainProxy;
 
 // specify the number of worker chares in each dimension
-#define num_chare_rows 5
-#define num_chare_cols 3
+#define num_chare_rows 20
+#define num_chare_cols 12
 
 // Each worker chare will process a 4x4 block of elements
 #define block_width 131
@@ -133,7 +133,7 @@ public:
 
     void sendLeft(int width, double ghost_values[]) {
         for(int i=0;i<width;++i){
-            temperature[i+1][block_width] = ghost_values[i];
+            temperature[i+1][block_width+1] = ghost_values[i];
         }
         messages_due--;
         check_done_iteration();
@@ -142,7 +142,7 @@ public:
       // message from right, store in left ghost
     void sendRight(int width, double ghost_values[]) {
         for(int i=0;i<width;++i){
-            temperature[i+1][1] = ghost_values[i];
+            temperature[i+1][0] = ghost_values[i];
         }
         messages_due--;
         check_done_iteration();
@@ -151,7 +151,7 @@ public:
       // message from top, store in bottom ghost
     void sendTop(int width, double ghost_values[]) {
         for(int i=0;i<width;++i){
-            temperature[block_height][i+1] = ghost_values[i];
+            temperature[block_height+1][i+1] = ghost_values[i];
         }
         messages_due--;
         check_done_iteration();
@@ -160,7 +160,7 @@ public:
       // message from bottom, store in top ghost
     void sendBottom(int width, double ghost_values[]) {
         for(int i=0;i<width;++i){
-            temperature[1][i+1] = ghost_values[i];
+            temperature[0][i+1] = ghost_values[i];
         }
         messages_due--;
         check_done_iteration();
@@ -219,8 +219,8 @@ public:
         for(int i=0;i<h;++i){
             for(int j=0;j<w;++j){
                         intensity[3*(i*w+j)+0] = 255; // RED component
-                        intensity[3*(i*w+j)+1] = 255-temperature[i][j]; // BLUE component
-                        intensity[3*(i*w+j)+2] = 255-temperature[i][j]; // GREEN component
+                        intensity[3*(i*w+j)+1] = 255-temperature[i+1][j+1]; // BLUE component
+                        intensity[3*(i*w+j)+2] = 255-temperature[i+1][j+1]; // GREEN component
             }
         }
 
