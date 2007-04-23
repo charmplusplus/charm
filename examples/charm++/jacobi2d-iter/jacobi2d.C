@@ -4,14 +4,14 @@
 // See README for documentation
 
 /*readonly*/ CProxy_Main mainProxy;
+/*readonly*/ int block_height;
+/*readonly*/ int block_width;
+/*readonly*/ int array_height;
+/*readonly*/ int array_width;
 
 // specify the number of worker chares in each dimension
-#define num_chare_rows 20
-#define num_chare_cols 12
-
-// Each worker chare will process a 4x4 block of elements
-#define block_width 131
-#define block_height 61
+/*readonly*/ int num_chare_rows;
+/*readonly*/ int num_chare_cols;
 
 // We want to wrap entries around, and because mod operator % sometimes misbehaves on negative values, 
 // I just wrote these simple wrappers that will make the mod work as expected. -1 maps to the highest value.
@@ -31,12 +31,24 @@ public:
     int iterations;
 
     Main(CkArgMsg* m) {
+        if (m->argc < 3) {
+          CkPrintf("%s [array_size] [block_size]\n", m->argv[0]);
+          CkAbort("Abort");
+        }
+
         // set iteration counter to zero
         iterations=0;
 
         // store the main proxy
         mainProxy = thisProxy;
 
+        array_height = array_width = atoi(m->argv[1]);
+        block_height = block_width = atoi(m->argv[2]);
+        if (array_width < block_width || array_width % block_width != 0)
+          CkAbort("array_size % block_size != 0!");
+
+        num_chare_rows = array_height / block_height;
+        num_chare_cols = array_width / block_width;
         // print info
         CkPrintf("Running Jacobi on %d processors with (%d,%d) elements\n", CkNumPes(), num_chare_rows, num_chare_cols);
 
@@ -78,13 +90,18 @@ class Jacobi: public CBase_Jacobi {
 public:
     int messages_due;
 
-    double temperature[block_height+2][block_width+2];
+    double **temperature;
 
     // Constructor, initialize values
     Jacobi() {
+        int i,j;
+          // allocate two dimensional array
+        temperature = new double*[block_height+2];
+        for (i=0; i<block_height+2; i++)
+          temperature[i] = new double[block_width+2];
         messages_due = 4;
-        for(int i=0;i<block_height+2;++i){
-            for(int j=0;j<block_width+2;++j){
+        for(i=0;i<block_height+2;++i){
+            for(j=0;j<block_width+2;++j){
                 temperature[i][j] = 0.0;
             }
         }
@@ -105,14 +122,19 @@ public:
     // this function might become useful
     Jacobi(CkMigrateMessage* m) {}
 
+    ~Jacobi() { 
+      for (int i=0; i<block_height; i++)
+        delete [] temperature[i];
+      delete [] temperature; 
+    }
 
     // Perform one iteration of work
     // The first step is to send the local state to the neighbors
     void begin_iteration(void) {
 
         // Copy left column and right column into temporary arrays
-        double left_edge[block_height];
-        double right_edge[block_height];
+        double *left_edge = new double[block_height];
+        double *right_edge = new double[block_height];
 
         for(int i=0;i<block_height;++i){
             left_edge[i] = temperature[i+1][1];
@@ -120,56 +142,57 @@ public:
         }
 
         // Send my left edge
-        thisProxy(wrap_x(thisIndex.x-1), thisIndex.y).sendLeft(block_height, left_edge);
+        thisProxy(wrap_x(thisIndex.x-1), thisIndex.y).ghostsFromRight(block_height, left_edge);
 		// Send my right edge
-        thisProxy(wrap_x(thisIndex.x+1), thisIndex.y).sendRight(block_height, right_edge);
+        thisProxy(wrap_x(thisIndex.x+1), thisIndex.y).ghostsFromLeft(block_height, right_edge);
 		// Send my top edge
-        thisProxy(thisIndex.x, wrap_y(thisIndex.y-1)).sendTop(block_width, &temperature[1][1]);
+        thisProxy(thisIndex.x, wrap_y(thisIndex.y-1)).ghostsFromBottom(block_width, &temperature[1][1]);
 		// Send my bottom edge
-        thisProxy(thisIndex.x, wrap_y(thisIndex.y+1)).sendBottom(block_width, &temperature[block_height][1]);
+        thisProxy(thisIndex.x, wrap_y(thisIndex.y+1)).ghostsFromTop(block_width, &temperature[block_height][1]);
 
-        check_done_iteration();
+        delete [] right_edge;
+        delete [] left_edge;
     }
 
-    void sendLeft(int width, double ghost_values[]) {
+    void ghostsFromRight(int width, double ghost_values[]) {
         for(int i=0;i<width;++i){
             temperature[i+1][block_width+1] = ghost_values[i];
         }
-        messages_due--;
-        check_done_iteration();
+        check_and_compute();
     }
 
-      // message from right, store in left ghost
-    void sendRight(int width, double ghost_values[]) {
+    void ghostsFromLeft(int width, double ghost_values[]) {
         for(int i=0;i<width;++i){
             temperature[i+1][0] = ghost_values[i];
         }
-        messages_due--;
-        check_done_iteration();
+        check_and_compute();
     }
 
-      // message from top, store in bottom ghost
-    void sendTop(int width, double ghost_values[]) {
+    void ghostsFromBottom(int width, double ghost_values[]) {
         for(int i=0;i<width;++i){
             temperature[block_height+1][i+1] = ghost_values[i];
         }
-        messages_due--;
-        check_done_iteration();
+        check_and_compute();
     }
 
-      // message from bottom, store in top ghost
-    void sendBottom(int width, double ghost_values[]) {
+    void ghostsFromTop(int width, double ghost_values[]) {
         for(int i=0;i<width;++i){
             temperature[0][i+1] = ghost_values[i];
         }
-        messages_due--;
-        check_done_iteration();
+        check_and_compute();
+    }
+
+    void check_and_compute() {
+       if (--messages_due == 0) {
+          messages_due = 4;
+          compute();
+          mainProxy.report(thisIndex.x, thisIndex.y);
+        }
     }
 
     // Check to see if we have received all neighbor values yet
     // If all neighbor values have been received, we update our values and proceed
-    void check_done_iteration() {
-        if (messages_due == 0) {
+    void compute() {
             // We must create a new array for these values because we don't want to update any of the
             // the values in temperature[][] array until using them first. Other schemes could be used
             // to accomplish this same problem. We just put the new values in a temporary array
@@ -191,9 +214,6 @@ public:
             // Enforce the boundary conditions again
             BC();
 
-            mainProxy.report(thisIndex.x, thisIndex.y);
-            messages_due = 4;
-        }
     }
 
 
