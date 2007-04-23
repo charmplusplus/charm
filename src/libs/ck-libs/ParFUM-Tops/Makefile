@@ -1,6 +1,10 @@
 CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
-CUDAC=$(CHARMC)
+CHARMC=$(CDIR)/bin/charmc -cc $(CUDAC) -c++ $(CUDAC) $(OPTS)
+CUDADIR = /usr/local/cuda
+CUDASDK = $(HOME)/NVIDIA_CUDA_SDK
+CUDAC = $(CUDADIR)/bin/nvcc 
+CUDAINC = -I$(CUDASDK)/common/inc -I$(CUDADIR)/include
+CCFLAGS = -DCUDA -DFP_TYPE_FLOAT -g
 
 #Headers to be copied to include directory so application users can see them
 HEADERS= ParFUM_TOPS.h ParFUM_TOPS_CUDA.h ParFUM_TOPS_Types.h $(INTERNALHEADERS)
@@ -17,7 +21,7 @@ LIB=libmoduleParFUM_TOPS
 LIBDIR=$(CDIR)/lib
 DEST=$(LIBDIR)/$(LIB).a
 
-INCS=-I.
+INCS=-I. $(CUDAINC)
 
 all: $(DEST)
 
@@ -37,14 +41,16 @@ $(DEST): $(OBJS) headers $(HEADDEP)
 headers: $(HEADDEP)
 	cp $(HEADERS) $(CDIR)/include/
 
-ParFUM_TOPS.o: ParFUM_TOPS.C $(HEADDEP) ParFUM_TOPS.h
-	$(CHARMC) -c ParFUM_TOPS.C $(INCS)
+#ParFUM_TOPS.o: ParFUM_TOPS.C $(HEADDEP) ParFUM_TOPS.h
+#	$(CHARMC) -c ParFUM_TOPS.C $(INCS)
+ParFUM_TOPS.o: ParFUM_TOPS.cc $(HEADDEP) ParFUM_TOPS.h
+	$(CHARMC) -c ParFUM_TOPS.cc $(INCS) $(CCFLAGS)
 
-ParFUM_TOPS_Iterators.o: ParFUM_TOPS_Iterators.C $(HEADDEP)
-	$(CHARMC) -c ParFUM_TOPS_Iterators.C $(INCS)
+ParFUM_TOPS_Iterators.o: ParFUM_TOPS_Iterators.cc $(HEADDEP)
+	$(CHARMC) -c ParFUM_TOPS_Iterators.cc $(CCFLAGS) $(INCS)
 
-ParFUM_TOPS_CUDA.o: ParFUM_TOPS_CUDA.C $(HEADDEP)
-	$(CUDAC) -c ParFUM_TOPS_CUDA.C $(INCS)
+ParFUM_TOPS_CUDA.o: ParFUM_TOPS_CUDA.cu $(HEADDEP)
+	$(CHARMC) -c ParFUM_TOPS_CUDA.cu $(CCFLAGS) $(INCS)
 
 
 # clean up

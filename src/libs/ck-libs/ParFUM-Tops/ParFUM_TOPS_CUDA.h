@@ -12,7 +12,8 @@
 #define __PARFUM_TOPS_CUDA___H
 #ifdef CUDA
 
-#include "ParFUM_Tops_Types.h"
+#include "ParFUM_TOPS_Types.h"
+#include <cutil.h>
 
 /** A TopModelDevice contains structures for use by CUDA kernels */
 typedef struct {
@@ -31,9 +32,11 @@ typedef struct {
 } TopModelDevice;
 
 
-void* topElement_D_GetAttrib(TopModelDevice* m, TopElement e);
-void* topNode_D_GetAttrib(TopModelDevice* m, TopNode n);
-TopNode topElement_D_GetNode(TopModelDevice* m,TopElement e,int idx);
+#define topElement_D_GetAttrib(m, e) (((char*)(m)->ElemDataDevice) + (e)*(m)->elem_attr_size)
+
+#define topNode_D_GetAttrib(m, e) (((char*)(m)->NodeDataDevice) + (e)*(m)->node_attr_size)
+
+#define topElement_D_GetNode(m, e, idx) (((m)->ElemConnDevice)[e*4 + idx])
 
 #endif
 #endif

@@ -114,7 +114,11 @@ void* topNode_GetAttrib(TopModel*, TopNode);
 /** Get element attribute */
 void* topElement_GetAttrib(TopModel*, TopElement);
 
+/** Get node via id */
 TopNode topElement_GetNode(TopModel*,TopElement,int idx);
+
+/** Get element via id */
+TopElement topModel_GetElemAtId(TopModel*,TopID);
 
 int topNode_GetId(TopModel* m, TopNode n);
 
@@ -166,7 +170,7 @@ TopElement topElemItr_GetCurr(TopElemItr*);
 void topModel_TestIterators(TopModel*m);
 
 
-void top_retreive_elem_data(TopModel* m);
-void top_retreive_node_data(TopModel* m);
+void top_retrieve_elem_data(TopModel* m);
+void top_retrieve_node_data(TopModel* m);
 
 #endif
