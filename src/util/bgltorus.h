@@ -2,9 +2,9 @@
 #ifndef _BGL_TOROUS_H__
 #define _BGL_TOROUS_H__
 
-#if CMK_VERSION_BLUEGENE
-
 #include "converse.h"
+
+#if CMK_VERSION_BLUEGENE
 
 #if 0
 #include <bgml.h>
