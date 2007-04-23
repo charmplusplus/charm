@@ -200,7 +200,7 @@ EventInterpolator::EventInterpolator(char *table_filename, double sample_rate){
 
 
 	std::map<string,double>::iterator cycle_i;
-	cout << "The following table displays the total cycle count for each event in the \n" 
+	cout << "\nThe following table displays the total cycle count for each event in the \n" 
             "cycle-accurate timings file. This may be useful for back of the envelope \n"
             "calculations for expected performance " << endl << endl;
 	cout << "\t|=========================|===================|" << endl;
@@ -227,7 +227,7 @@ EventInterpolator::EventInterpolator(char *table_filename, double sample_rate){
 
 	analyzeExactVariances();
 
-	cout << "The following table displays the number of timing samples from \n the cycle-accurate file for each event." << endl << endl;
+	cout << "\nThe following table displays the number of timing samples from \n the cycle-accurate file for each event." << endl << endl;
 	cout << "\t|=========================|==========================|" << endl;
 	cout << "\t|                  event  | number of timing samples |" << endl;
 	cout << "\t|-------------------------|--------------------------|" << endl;
@@ -319,7 +319,7 @@ EventInterpolator::EventInterpolator(char *table_filename, double sample_rate){
     cout << "Performing Least Squared Fit to sampled time data" << endl;
 
     //  Now do Least Square Fit: Find C where y=Xc
-	cout << "The following table displays the chi^2 measure for how well the model fits the input times." << endl << endl;
+	cout << "\nThe following table displays the chi^2 measure for how well the model fits the input times." << endl << endl;
 	cout << "\t|=========================|=========|=========|" << endl;
 	cout << "\t|                  event  |   chi^2 |     chi |" << endl;
 	cout << "\t|-------------------------|---------|---------|" << endl;
@@ -476,7 +476,7 @@ void EventInterpolator::analyzeExactVariances(){
 	}
 	
 	// Display the max std dev for any given event
-	cout << "The following events have differing exact times for one or more parameter set.\n"
+	cout << "\nThe following events have differing exact times for one or more parameter set.\n"
 	        "Each line corresponds to whichever parameter list produced the greatest variance\n"
 	        "(and equivalently std dev). The mean is the mean timing value associated with the\n"
             " same parameter list of greatest variance" << endl << endl;

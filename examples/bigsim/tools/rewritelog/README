@@ -30,11 +30,15 @@ Modifying Application:
 
   Insert startTraceBigSim() call before a compute kernel. Add an 
   endTraceBigSim() call after the kernel. Currently the first call
-  takes between 0 and 20 parameters describing the computation. 
+  takes no parameters, and the second takes a name for the event
+  that is being bracketed, followed by between 0 and 20 parameters 
+  describing the computation. 
 
-  startTraceBigSim(param1, param2, param3);
+  You will find the definitions of these functions in traceBigSim/
+
+  startTraceBigSim();
   // Some serial computational kernel goes here
-  endTraceBigSim("EventName");
+  endTraceBigSim("EventName",param1,param2,param3);
 
   Thes calls will time and produce output(to STDOUT) that lists 
   the time, parameters, and possibly some performance counters

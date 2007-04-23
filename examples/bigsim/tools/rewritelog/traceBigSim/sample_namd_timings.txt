@@ -1,5 +1,7 @@
 # This file contains sample entries produced when instrumenting NAMD, a common molecular dynamics simulator.
 # The routines found in traceBigSim.C and traceBigSim.h were what format and produce these strings
+# NAMD also has other output, but this file contains only the lines containing "TRACEBIGSIM"
+
 
 TRACEBIGSIM: event:{ angles }  time:{ 0.020026 }  PAPI:{ 33136473 18194 1772428 } params:{ 1.000000 5790.000000 }
 TRACEBIGSIM: event:{ dihedrals }  time:{ 0.018967 }  PAPI:{ 56522271 14983 7248537 } params:{ 1.000000 12795.000000 }
