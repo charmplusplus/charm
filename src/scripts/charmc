@@ -1074,7 +1074,7 @@ do
 		Do $CMK_GCXX -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
-	*.C|*.cc|*.cxx|*.cpp|*.c++)
+	*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu)
 		Do $CMK_CXX -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $FILE $DESTO
 		NU_OBJ=$BASEO
 		;;
