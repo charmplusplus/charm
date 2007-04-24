@@ -42,10 +42,10 @@ void* CkAllocBuffer(void *msg, int bufsize)
                       env->getPriobits());
   
   register int size = packbuf->getTotalsize();
-  memcpy(packbuf, env, sizeof(envelope));
+  CmiMemcpy(packbuf, env, sizeof(envelope));
   packbuf->setTotalsize(size);
   packbuf->setPacked(!env->isPacked());
-  memcpy(packbuf->getPrioPtr(), env->getPrioPtr(), packbuf->getPrioBytes());
+  CmiMemcpy(packbuf->getPrioPtr(), env->getPrioPtr(), packbuf->getPrioBytes());
   return EnvToUsr(packbuf);;
 }
 
@@ -70,7 +70,7 @@ void* CkCopyMsg(void **pMsg)
   }
   register int size = UsrToEnv(srcMsg)->getTotalsize();
   register envelope *newenv = (envelope *) CmiAlloc(size);
-  memcpy(newenv, UsrToEnv(srcMsg), size);
+  CmiMemcpy(newenv, UsrToEnv(srcMsg), size);
   if(UsrToEnv(srcMsg)->isPacked() && _msgTable[msgidx]->unpack) {
     srcMsg = _msgTable[msgidx]->unpack(srcMsg);
     UsrToEnv(srcMsg)->setPacked(0);
@@ -104,7 +104,7 @@ CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opt
 	//Copy the user's priority data into the message
 	envelope *env=UsrToEnv(m);
 	setMemoryTypeMessage(env);
-	memcpy(env->getPrioPtr(),opts->getPriorityPtr(),env->getPrioBytes());
+	CmiMemcpy(env->getPrioPtr(),opts->getPriorityPtr(),env->getPrioBytes());
 	//Set the message's queueing type
 	env->setQueueing((unsigned char)opts->getQueueing());
 	return m;
