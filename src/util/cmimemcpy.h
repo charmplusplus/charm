@@ -8,13 +8,13 @@
 *  8 byte aligned copies larger than 128 bytes                *
 *                  - Sameer (04/07)                           *
 *  It has two functions :                                     *
-*  inlined opt_memcopy and __dcopy128 (dcopy.h)               *
+*  inlined cmi_memcpy and __dcopy128 (dcopy.h)               *
 ***************************************************************/
 
 #include <assert.h>
 #include <stdio.h>
 
-static inline void *_bcopy( void *dest, const void *src, size_t bytes )
+static inline void *bg_bcopy( void *dest, const void *src, size_t bytes )
 {
   const unsigned char *r1 = (const unsigned char *)src;
   unsigned char *r2 = (unsigned char *)dest;
@@ -40,7 +40,7 @@ static inline void *_bcopy( void *dest, const void *src, size_t bytes )
   return( dest );
 }
 
-static inline void *_wcopy ( void *dest, const void *src , size_t bytes )
+static inline void *bg_wcopy ( void *dest, const void *src , size_t bytes )
 {
   const unsigned *r1 = (const unsigned *)src;
   unsigned *r2 = (unsigned *)dest;
@@ -57,24 +57,24 @@ static inline void *_wcopy ( void *dest, const void *src , size_t bytes )
   }
   
   if ( remainder )
-    _bcopy ( r2, r1, remainder );
+    bg_bcopy ( r2, r1, remainder );
   
   return( dest );
 }
 
-void *_dcopy128 ( void * dest, const void *src, size_t n );
+void *bg_dcopy128 ( void * dest, const void *src, size_t n );
 
-static inline void *opt_memcopy ( void * dest, const void *src, size_t n ) {
+static inline void *CmiMemcpy ( void * dest, const void *src, size_t n ) {
   unsigned long daddr = (unsigned long) dest;
   unsigned long saddr = (unsigned long) src;
   
   if ( (n >= 128) &&  (  ((daddr & 0x07) == 0) && ((saddr & 0x07) == 0)  ))
-    return _dcopy128 (dest, src, n);
+    return bg_dcopy128 (dest, src, n);
   else if ( ((daddr & 0x03) == 0) && ((saddr & 0x03) == 0) ) {
-    return _wcopy (dest, src, n);
+    return bg_wcopy (dest, src, n);
   }
   else {
-    return _bcopy (dest, src, n);
+    return bg_bcopy (dest, src, n);
   }
   
   return 0;

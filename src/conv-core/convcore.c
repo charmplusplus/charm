@@ -861,6 +861,10 @@ double CmiCpuTimer()
 
 #endif
 
+#if CMK_VERSION_BLUEGENE
+#include "dcopy.h"
+#endif
+
 #if CMK_TIMER_USE_BLUEGENEL
 
 #include <rts.h>

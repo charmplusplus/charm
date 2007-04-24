@@ -11,7 +11,7 @@
 *  inlined opt_memcopy (cmimemcpy.h) and __dcopy128           *
 **************************************************************/
 
-inline void *_dcopy128 ( void * dest, const void *src, size_t n )
+inline void *bg_dcopy128 ( void * dest, const void *src, size_t n )
 {
   const double *f1 = ((const double *) src) - 1;
   double       *f2 = ((double *) dest) - 1;
@@ -107,7 +107,7 @@ inline void *_dcopy128 ( void * dest, const void *src, size_t n )
   }
   
   if (remainder)
-    return _wcopy (f2+1, f1+1, remainder);
+    return bg_wcopy (f2+1, f1+1, remainder);
 
   return f2+1;
 }
