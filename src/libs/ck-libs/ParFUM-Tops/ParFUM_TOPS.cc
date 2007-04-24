@@ -33,6 +33,7 @@ void setTableReferences(TopModel* model){
   model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+2,""))->getFloat();
 #else
   model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+2,""))->getDouble();
+  model->n2eConn_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+2,""))->getInt();
 #endif
 }
 
@@ -69,10 +70,13 @@ TopModel* topModel_Create_Init(int elem_attr_sz, int node_attr_sz, int model_att
 
   // Allocate element connectivity
   FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_CONN,temp_array, 0, 1, FEM_INDEX_0, 4);
+
   // Allocate element attributes
   FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+0,temp_array, 0, 1, FEM_BYTE, model->elem_attr_size);
   // Allocate element Id array
   FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+1,temp_array, 0, 1, FEM_INT, 1);
+  // Allocate n2e connectivity
+  FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+2,temp_array, 0, 1, FEM_INT, 4);
 
 
   // Allocate node attributes
@@ -120,6 +124,52 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
     model->device_model.num_local_node = model->num_local_node;
     model->device_model.num_local_elem = model->num_local_elem;
 
+
+    /** Create n2e connectivity array and copy to device global memory */
+    {
+        FEM_Mesh_create_node_elem_adjacency(which_mesh);
+        FEM_Mesh* mesh = FEM_Mesh_lookup(which_mesh, "topModel_Create_Driver");
+        FEM_DataAttribute * at = (FEM_DataAttribute*) 
+            model->mesh->elem[0].lookup(FEM_DATA+2,"topModel_Create_Driver");
+        int* n2eTable  = at->getInt().getData();
+
+        FEM_IndexAttribute * iat = (FEM_IndexAttribute*) 
+            model->mesh->elem[0].lookup(FEM_CONN,"topModel_Create_Driver");
+        int* connTable  = iat->get().getData();
+
+        int* adjElements;
+        int size;
+        for (int i=0; i<model->num_local_node; ++i) {
+            mesh->n2e_getAll(i, adjElements, size);
+            for (int j=0; j<size; ++j) {
+                for (int k=0; k<5; ++k) {
+                    if (connTable[4*adjElements[j]+k] == i) {
+                        n2eTable[4*adjElements[j]+k] = j;
+                        break;
+                    }
+                    assert(k != 4);
+                }
+            }
+            delete[] adjElements;
+        }
+
+        //for (int i=0; i<model->num_local_elem*4; ++i) {
+        //    printf("%d ", connTable[i]);
+        //    if ((i+1)%4 == 0) printf("\n");
+        //}
+        //printf("\n\n");
+        //for (int i=0; i<model->num_local_elem*4; ++i) {
+        //    printf("%d ", n2eTable[i]);
+        //    if ((i+1)%4 == 0) printf("\n");
+        //}
+
+        size = model->num_local_elem * 4 *sizeof(int);
+        cudaMalloc((void**)&(model->device_model.n2eConnDevice), size);
+        cudaMemcpy(model->device_model.n2eConnDevice,n2eTable,size,
+                cudaMemcpyHostToDevice);
+
+    }
+
     /** Copy element Attribute array to device global memory */
     {
         FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->elem[0].lookup(FEM_DATA+0,"topModel_Create_Driver");
@@ -152,6 +202,8 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
         cudaMemcpy(model->device_model.ElemConnDevice,data,size,
                 cudaMemcpyHostToDevice);
     }
+
+
 
     /** Copy model Attribute to device global memory */
     {

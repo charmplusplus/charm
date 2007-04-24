@@ -29,6 +29,7 @@ typedef struct {
     void *ElemDataDevice;
     void *NodeDataDevice;
     int *ElemConnDevice;
+    int *n2eConnDevice;
 } TopModelDevice;
 
 
