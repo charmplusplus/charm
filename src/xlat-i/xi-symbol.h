@@ -722,6 +722,7 @@ class Message : public TEntity {
 #define SPYTHON       0x1000
 #define SINLINE       0x2000 //<- inline message
 #define SIGET   0x4000 
+#define SLOCAL        0x8000 //<- local message
 
 /* An entry construct */
 class Entry : public Member {
@@ -797,10 +798,12 @@ class Entry : public Member {
     int isImmediate(void) { return (attribs & SIMMEDIATE); }
     int isSkipscheduler(void) { return (attribs & SSKIPSCHED); }
     int isInline(void) { return attribs & SINLINE; }
+    int isLocal(void) { return attribs & SLOCAL; }
     int isCreate(void) { return (attribs & SCREATEHERE)||(attribs & SCREATEHOME); }
     int isCreateHome(void) { return (attribs & SCREATEHOME); }
     int isCreateHere(void) { return (attribs & SCREATEHERE); }
     int isPython(void) { return (attribs & SPYTHON); }
+    int isNoTrace(void) { return (attribs & SNOTRACE); }
     int isSdag(void) { return (sdagCon!=0); }
     void print(XStr& str);
     void genIndexDecls(XStr& str);

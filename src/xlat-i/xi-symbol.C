@@ -2328,6 +2328,10 @@ void Entry::genChareDefs(XStr& str)
       cerr << (char *)container->baseName() << ": Chare does not allow immediate message.\n";
       exit(1);
   }
+  if (isLocal()) {
+    cerr << (char*)container->baseName() << ": Chare does not allow LOCAL entry methods.\n";
+    exit(1);
+  }
 
   if(isConstructor()) {
     genChareStaticConstructorDefs(str);
@@ -2393,7 +2397,7 @@ void Entry::genArrayDecl(XStr& str)
   if(isConstructor()) {
     genArrayStaticConstructorDecl(str);
   } else {
-    if (isSync() && !container->isForElement()) return; //No sync broadcast
+    if ((isSync() || isLocal()) && !container->isForElement()) return; //No sync broadcast
     if(isIget())
       str << "    "<<"CkFutureID"<<" "<<name<<"("<<paramType(1,1)<<") ;\n"; //no const
     else		
@@ -2417,17 +2421,31 @@ void Entry::genArrayDefs(XStr& str)
     if (isCreateHere()) ifNot="CkArray_IfNotThere_createhere";
     if (isCreateHome()) ifNot="CkArray_IfNotThere_createhome";
     
-    if (isSync() && !container->isForElement()) return; //No sync broadcast
+    if ((isSync() || isLocal()) && !container->isForElement()) return; //No sync broadcast
     
     XStr retStr; retStr<<retType;
     if(isIget())
-      str << makeDecl("CkFutureID ",1)<<"::"<<name<<"("<<paramType(0,1)<<") \n"; /\
-/no const
+      str << makeDecl("CkFutureID ",1)<<"::"<<name<<"("<<paramType(0,1)<<") \n"; //no const
     else
       str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<") \n"; //no const
-    str << "{\n  ckCheck();\n"<<marshallMsg();
-    str << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
-    str << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
+    str << "{\n  ckCheck();\n";
+    if (!isLocal()) {
+      str << marshallMsg();
+      str << "  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;\n";
+      str << "  impl_amsg->array_setIfNotThere("<<ifNot<<");\n";
+    } else {
+      XStr unmarshallStr; param->unmarshall(unmarshallStr);
+      str << "  LDObjHandle objHandle;\n  int objstopped=0;\n";
+      str << "  "<<container->baseName()<<" *obj = ckLocal();\n";
+      str << "#ifndef CMK_OPTIMIZE\n";
+      str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a non-local element\");\n";
+      str << "#endif\n";
+      if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,"<<epIdx()<<",CkMyPe(),0,((CkArrayIndexMax&)ckGetIndex()).getProjectionID());\n";
+      str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
+      str << "  obj->"<<name<<"("<<unmarshallStr<<");\n";
+      str << "#if CMK_LBDB_ON\n  obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
+      if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
+    }
     if(isIget()) {
 	    str << "  CkFutureID f=CkCreateAttachedFutureSend(impl_amsg,"<<epIdx()<<",ckGetArrayID(),ckGetIndex(),&CProxyElement_ArrayBase::ckSendWrapper);"<<"\n";
     }
@@ -2435,7 +2453,7 @@ void Entry::genArrayDefs(XStr& str)
     if(isSync()) {
       str << syncReturn() << "ckSendSync(impl_amsg, "<<epIdx()<<"));\n";
     } 
-    else 
+    else if (!isLocal())
     {
       XStr opts;
       opts << ",0";
@@ -2541,12 +2559,30 @@ void Entry::genGroupDecl(XStr& str)
       exit(1);
   }
 #endif
+  if (isLocal() && container->isNodeGroup()) {
+    cerr << (char*)container->baseName() << ": Nodegroup does not allow LOCAL entry methods.\n";
+    exit(1);
+  }
 
+  if(isConstructor()) {
+    genGroupStaticConstructorDecl(str);
+  } else {
+    if ((isSync() || isLocal()) && !container->isForElement()) return; //No sync broadcast
+    str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<");\n";
+    // entry method on multiple PEs declaration
+    if(!container->isForElement() && !isSync() && !isLocal() && !container->isNodeGroup()) {
+      str << "    "<<retType<<" "<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(1)<<");\n";
+    }
+  }
+}
+
+void Entry::genGroupDefs(XStr& str)
+{
   //Selects between NodeGroup and Group
   char *node = (char *)(container->isNodeGroup()?"Node":"");
 
   if(isConstructor()) {
-    genGroupStaticConstructorDecl(str);
+    genGroupStaticConstructorDefs(str);
   } else {
     int forElement=container->isForElement();
     XStr params; params<<epIdx()<<", impl_msg";
@@ -2558,12 +2594,34 @@ void Entry::genGroupDecl(XStr& str)
     if (isInline())  opts << "+CK_MSG_INLINE";
     if (isSkipscheduler())  opts << "+CK_MSG_EXPEDITED";
 
-    if (isSync() && !container->isForElement()) return; //No sync broadcast
+    if ((isSync() || isLocal()) && !container->isForElement()) return; //No sync broadcast
     
-    str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<")\n";
-    str << "    {\n    ckCheck();\n"<<marshallMsg();
+    XStr retStr; retStr<<retType;
+    str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<")\n";
+    str << "{\n  ckCheck();\n";
+    if (!isLocal()) str <<marshallMsg();
 
-    if(isSync()) {
+    if (isLocal()) {
+      XStr unmarshallStr; param->unmarshall(unmarshallStr);
+      str << "  "<<container->baseName()<<" *obj = ckLocalBranch();\n";
+      str << "  CkAssert(obj);\n";
+      if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,"<<epIdx()<<",CkMyPe(),0,NULL);\n";
+      str << "  #if CMK_LBDB_ON\n"
+"  // if there is a running obj being measured, stop it temporarily\n"
+"  LDObjHandle objHandle;\n"
+"  int objstopped = 0;\n"
+"  LBDatabase *the_lbdb = (LBDatabase *)CkLocalBranch(_lbdb);\n"
+"  if (the_lbdb->RunningObject(&objHandle)) {\n"
+"    objstopped = 1;\n"
+"    the_lbdb->ObjectStop(objHandle);\n"
+"  }\n"
+"#endif\n";
+      str << "  obj->"<<name<<"("<<unmarshallStr<<");\n";
+      str << "#if CMK_LBDB_ON\n"
+"  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
+"#endif\n";
+      if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
+    } else if(isSync()) {
       str << syncReturn() <<
         "CkRemote"<<node<<"BranchCall("<<paramg<<", ckGetGroupPe()));\n"; 
     } 
@@ -2571,36 +2629,28 @@ void Entry::genGroupDecl(XStr& str)
     { //Non-sync entry method
       if (forElement)
       {// Send
-        str << "      if (ckIsDelegated()) {\n";
-        str << "         Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
-	str << "         ckDelegatedTo()->"<<node<<"GroupSend(ckDelegatedPtr(),"<<parampg<<");\n";
-        str << "      } else CkSendMsg"<<node<<"Branch"<<"("<<parampg<<opts<<");\n";
+        str << "  if (ckIsDelegated()) {\n";
+        str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
+	str << "     ckDelegatedTo()->"<<node<<"GroupSend(ckDelegatedPtr(),"<<parampg<<");\n";
+        str << "  } else CkSendMsg"<<node<<"Branch"<<"("<<parampg<<opts<<");\n";
       }
       else
       {// Broadcast
-        str << "      if (ckIsDelegated()) {\n";
-        str << "         Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
-        str << "         ckDelegatedTo()->"<<node<<"GroupBroadcast(ckDelegatedPtr(),"<<paramg<<");\n";
-        str << "      } else CkBroadcastMsg"<<node<<"Branch("<<paramg<<opts<<");\n";
+        str << "  if (ckIsDelegated()) {\n";
+        str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
+        str << "     ckDelegatedTo()->"<<node<<"GroupBroadcast(ckDelegatedPtr(),"<<paramg<<");\n";
+        str << "  } else CkBroadcastMsg"<<node<<"Branch("<<paramg<<opts<<");\n";
       }
     }
-    str << "    }\n";
+    str << "}\n";
 
     // entry method on multiple PEs declaration
-    if(!forElement && !isSync() && !container->isNodeGroup()) {
-      str << "    "<<retType<<" "<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(1)<<")\n";
+    if(!forElement && !isSync() && !isLocal() && !container->isNodeGroup()) {
+      str << "    "<<makeDecl(retStr,1)<<"::"<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(0)<<")\n";
       str << "    {\n"<<marshallMsg();
       str << "      CkSendMsg"<<node<<"BranchMulti("<<params<<", npes, pes, ckGetGroupID()"<<opts<<");\n";
       str << "    }\n";
     }
-  }
-}
-
-void Entry::genGroupDefs(XStr& str)
-{
-  if(isConstructor()) {
-    genGroupStaticConstructorDefs(str);
-  } else {
   }
 }
 
@@ -3039,29 +3089,45 @@ void Entry::genDefs(XStr& str)
   //Generate the call-method body
   str << makeDecl("void")<<"::_call_"<<epStr()<<"(void* impl_msg,"<<containerType<<" * impl_obj)\n";
   str << "{\n";
-  if(isThreaded()) str << callThread(epStr());
-  str << preMarshall;
-  if (param->isMarshalled()) str << "  char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
-  genCall(str,preCall);
-  param->endUnmarshall(str);
-  str << postCall;
-  if(isThreaded() && param->isMarshalled()) str << "  delete (CkMarshallMsg *)impl_msg;\n";
+  if (!isLocal()) {
+    if(isThreaded()) str << callThread(epStr());
+    str << preMarshall;
+    if (param->isMarshalled()) str << "  char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
+    genCall(str,preCall);
+    param->endUnmarshall(str);
+    str << postCall;
+    if(isThreaded() && param->isMarshalled()) str << "  delete (CkMarshallMsg *)impl_msg;\n";
+  } else {
+    str << "  CkAbort(\"This method should never be called as it refers to a LOCAL entry method!\");\n";
+  }
   str << "}\n";
   
   if (hasCallMarshall) {
     str << makeDecl("int")<<"::_callmarshall_"<<epStr()<<"(char* impl_buf,"<<containerType<<" * impl_obj) {\n";
+    if (!isLocal()) {
       genCall(str,preCall);
-    /*FIXME: implP.size() is wrong if the parameter list contains arrays--
-       need to add in the size of the arrays.
-     */
-    str << "  return implP.size();\n";
+      /*FIXME: implP.size() is wrong if the parameter list contains arrays--
+        need to add in the size of the arrays.
+      */
+      str << "  return implP.size();\n";
+    } else {
+      str << "  CkAbort(\"This method should never be called as it refers to a LOCAL entry method!\");\n";
+      str << "  return 0;\n";
+    }
     str << "}\n";
   }
   if (param->isMarshalled()) {
      str << makeDecl("void")<<"::_marshallmessagepup_"<<epStr()<<"(PUP::er &implDestP,void *impl_msg) {\n";
-     str << "  char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
-     param->beginUnmarshall(str);
-     param->pupAllValues(str);
+     if (!isLocal()) {
+       str << "  char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
+       param->beginUnmarshall(str);
+       param->pupAllValues(str);
+     } else {
+       str << "  /*Fake pupping since we don't really have a message */\n";
+       str << "  int n=0;\n";
+       str << "  if (implDestP.hasComments()) implDestP.comment(\"LOCAL message\");\n";
+       str << "  implDestP|n;\n";
+     }
      str << "}\n";
   }
 }

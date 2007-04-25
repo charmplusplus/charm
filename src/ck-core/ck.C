@@ -15,7 +15,11 @@ clients, including the rest of Charm++, are actually C++.
 #include "ck.h"
 #include "trace.h"
 #include "queueing.h"
- 
+
+#if CMK_LBDB_ON
+#include "LBDatabase.h"
+#endif // CMK_LBDB_ON
+
 #define CK_MSG_SKIP_OR_IMM    (CK_MSG_EXPEDITED | CK_MSG_IMMEDIATE)
 
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
@@ -736,7 +740,20 @@ IrrGroup *_lookupGroup(CkCoreState *ck,envelope *env,const CkGroupID &groupID)
 
 static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,IrrGroup *obj)
 {
+#if CMK_LBDB_ON
+  // if there is a running obj being measured, stop it temporarily
+  LDObjHandle objHandle;
+  int objstopped = 0;
+  LBDatabase *the_lbdb = (LBDatabase *)CkLocalBranch(_lbdb);
+  if (the_lbdb->RunningObject(&objHandle)) {
+    objstopped = 1;
+    the_lbdb->ObjectStop(objHandle);
+  }
+#endif
   _invokeEntry(epIdx,env,obj);
+#if CMK_LBDB_ON
+  if (objstopped) the_lbdb->ObjectStart(objHandle);
+#endif
   _STATS_RECORD_PROCESS_BRANCH_1();  
 }
 
@@ -1216,7 +1233,11 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
     IrrGroup *obj=(IrrGroup *)_localBranch(gID);
     if (obj!=NULL)
     { //Just directly call the group:
+#ifndef CMK_OPTIMIZE
+      envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+#else
       envelope *env=UsrToEnv(msg);
+#endif
       _deliverForBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
       return;
     }
@@ -1570,6 +1591,11 @@ int CkMessageToEpIdx(void *msg) {
 		return env->getsetArrayBcastEp();
 	else
 		return ep;
+}
+
+extern "C"
+int getCharmEnvelopeSize() {
+  return sizeof(envelope);
 }
 
 

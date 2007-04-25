@@ -1,7 +1,7 @@
-/* A Bison parser, made by GNU Bison 1.875.  */
+/* A Bison parser, made by GNU Bison 2.1.  */
 
 /* Skeleton parser for Yacc-like parsing with Bison,
-   Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -15,8 +15,8 @@
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
-   Foundation, Inc., 59 Temple Place - Suite 330,
-   Boston, MA 02111-1307, USA.  */
+   Foundation, Inc., 51 Franklin Street, Fifth Floor,
+   Boston, MA 02110-1301, USA.  */
 
 /* As a special exception, when this file is copied by Bison into a
    Bison output file, you may use that output file without restriction.
@@ -77,21 +77,23 @@
      CONNECT = 303,
      PUBLISHES = 304,
      PYTHON = 305,
-     IDENT = 306,
-     NUMBER = 307,
-     LITERAL = 308,
-     CPROGRAM = 309,
-     HASHIF = 310,
-     HASHIFDEF = 311,
-     INT = 312,
-     LONG = 313,
-     SHORT = 314,
-     CHAR = 315,
-     FLOAT = 316,
-     DOUBLE = 317,
-     UNSIGNED = 318
+     LOCAL = 306,
+     IDENT = 307,
+     NUMBER = 308,
+     LITERAL = 309,
+     CPROGRAM = 310,
+     HASHIF = 311,
+     HASHIFDEF = 312,
+     INT = 313,
+     LONG = 314,
+     SHORT = 315,
+     CHAR = 316,
+     FLOAT = 317,
+     DOUBLE = 318,
+     UNSIGNED = 319
    };
 #endif
+/* Tokens.  */
 #define MODULE 258
 #define MAINMODULE 259
 #define EXTERN 260
@@ -140,19 +142,20 @@
 #define CONNECT 303
 #define PUBLISHES 304
 #define PYTHON 305
-#define IDENT 306
-#define NUMBER 307
-#define LITERAL 308
-#define CPROGRAM 309
-#define HASHIF 310
-#define HASHIFDEF 311
-#define INT 312
-#define LONG 313
-#define SHORT 314
-#define CHAR 315
-#define FLOAT 316
-#define DOUBLE 317
-#define UNSIGNED 318
+#define LOCAL 306
+#define IDENT 307
+#define NUMBER 308
+#define LITERAL 309
+#define CPROGRAM 310
+#define HASHIF 311
+#define HASHIFDEF 312
+#define INT 313
+#define LONG 314
+#define SHORT 315
+#define CHAR 316
+#define FLOAT 317
+#define DOUBLE 318
+#define UNSIGNED 319
 
 
 
@@ -194,8 +197,8 @@ typedef union YYSTYPE {
   Chare::attrib_t cattr;
   SdagConstruct *sc;
 } YYSTYPE;
-/* Line 1249 of yacc.c.  */
-#line 198 "y.tab.h"
+/* Line 1447 of yacc.c.  */
+#line 202 "y.tab.h"
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 # define YYSTYPE_IS_TRIVIAL 1

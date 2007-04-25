@@ -83,7 +83,7 @@ extern char *python_doc;
 %token ELSE
 %token CONNECT
 %token PUBLISHES 
-%token PYTHON
+%token PYTHON LOCAL
 %token <strval> IDENT NUMBER LITERAL CPROGRAM HASHIF HASHIFDEF
 %token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED
 
@@ -679,6 +679,8 @@ EAttrib		: THREADED
                 { $$ = SSKIPSCHED; }
 		| INLINE
                 { $$ = SINLINE; }
+		| LOCAL
+                { $$ = SLOCAL; }
 		| PYTHON PythonOptions
                 { $$ = SPYTHON; }
 		;
