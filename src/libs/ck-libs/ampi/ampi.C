@@ -4470,6 +4470,7 @@ int AMPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
   groupStruct vec = getAmpiParent()->group2vec(group);
   if(vec.size()==0) CkAbort("AMPI> Abort: Does it really make sense to create an empty communicator?");
   getAmpiInstance(comm)->commCreate(vec, newcomm);
+  AMPI_Barrier(comm);
   return 0;
 }
 
