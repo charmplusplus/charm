@@ -705,6 +705,10 @@ Which is not the case on my FC4 laptop ?!
 extended it to work for tcharm and registered user data migration
 tested platforms: opteron, Cygwin.
 
+For Fedora, 
+echo 0 > /proc/sys/kernel/randomize_va_space
+will disable the randomization of the stack pointer
+
 Gengbin Zheng March, 2006
 */
 
@@ -807,6 +811,7 @@ void CthInit(char **argv)
   /* leave some space for current stack frame < 256 bytes */
   /* sp must be same on all processors for migration to work ! */
   sp = (qt_t*)(((size_t)&t) & ~((size_t)0xFF));
+/*printf("System stack base: %p\n", sp);*/
   p->stackbase = QT_SP(sp, 0x100);
 
   /* printf("sp: %p\n", sp); */
