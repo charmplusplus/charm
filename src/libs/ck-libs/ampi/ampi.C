@@ -4073,6 +4073,7 @@ int AMPI_Comm_split(int src,int color,int key,int *dest)
 #endif
 
   getAmpiInstance(src)->split(color,key,dest, 0);
+  AMPI_Barrier(src);  // to prevent race condition in the new comm
 
 #ifdef AMPIMSGLOG
   if(msgLogWrite && pptr->thisIndex == msgLogRank){
