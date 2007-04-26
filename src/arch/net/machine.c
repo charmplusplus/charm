@@ -862,6 +862,10 @@ static void CmiStartThreads(char **argv)
       if (dataskt!=-1) CmiEnableAsyncIO(dataskt);
       if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
     }
+#if CMK_USE_GM || CMK_USE_MX
+      /* charmrun is serviced in interrupt for gm */
+    if (Cmi_charmrun_fd!=-1) CmiEnableAsyncIO(Cmi_charmrun_fd);
+#endif
   }
 #endif
 }
