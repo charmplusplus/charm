@@ -29,6 +29,7 @@ void setTableReferences(TopModel* model){
   model->elem_id_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+1,""))->getInt();
   model->ElemData_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+0,""))->getChar();
   model->NodeData_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+0,""))->getChar();
+  model->n2eConn_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+2,""))->getInt();
 
 #ifdef FP_TYPE_FLOAT
   model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+2,""))->getFloat();
@@ -36,9 +37,6 @@ void setTableReferences(TopModel* model){
   model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+2,""))->getDouble();
 #endif
 
-#ifdef CUDA
-  model->n2eConn_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+2,""))->getInt();
-#endif
 
 }
 
@@ -121,14 +119,6 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
 
     setTableReferences(model);
 
-#if CUDA
-    /** copy number/sizes of nodes and elements to device structure */
-    model->device_model.elem_attr_size = elem_attr_sz;
-    model->device_model.node_attr_size = node_attr_sz;
-    model->device_model.model_attr_size = model_attr_sz;
-    model->device_model.num_local_node = model->num_local_node;
-    model->device_model.num_local_elem = model->num_local_elem;
-
 
     /** Create n2e connectivity array and copy to device global memory */
     {
@@ -168,12 +158,27 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
         //    if ((i+1)%4 == 0) printf("\n");
         //}
 
+#if CUDA
         size = model->num_local_elem * 4 *sizeof(int);
         cudaMalloc((void**)&(model->device_model.n2eConnDevice), size);
         cudaMemcpy(model->device_model.n2eConnDevice,n2eTable,size,
                 cudaMemcpyHostToDevice);
+#endif
 
     }
+
+
+
+
+#if CUDA
+    /** copy number/sizes of nodes and elements to device structure */
+    model->device_model.elem_attr_size = elem_attr_sz;
+    model->device_model.node_attr_size = node_attr_sz;
+    model->device_model.model_attr_size = model_attr_sz;
+    model->device_model.num_local_node = model->num_local_node;
+    model->device_model.num_local_elem = model->num_local_elem;
+
+
 
     /** Copy element Attribute array to device global memory */
     {
@@ -468,10 +473,10 @@ void topModel_TestIterators(TopModel*m){
 
   TopElemItr* e_itr = topModel_CreateElemItr(m);
   for(topElemItr_Begin(e_itr);topElemItr_IsValid(e_itr);topElemItr_Next(e_itr)){
-	iterated_elem_count++;
-	TopElement elem = topElemItr_GetCurr(e_itr);
-	void* ea = topElement_GetAttrib(m,elem);
-	CkAssert(ea != NULL);
+      iterated_elem_count++;
+      TopElement elem = topElemItr_GetCurr(e_itr);
+      void* ea = topElement_GetAttrib(m,elem);
+      CkAssert(ea != NULL);
   }
 
   CkAssert(iterated_node_count == expected_node_count);

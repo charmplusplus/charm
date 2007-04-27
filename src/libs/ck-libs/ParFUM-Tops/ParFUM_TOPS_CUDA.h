@@ -10,9 +10,12 @@
 
 #ifndef __PARFUM_TOPS_CUDA___H
 #define __PARFUM_TOPS_CUDA___H
-#ifdef CUDA
 
 #include "ParFUM_TOPS_Types.h"
+
+
+#ifdef CUDA
+
 #include <cutil.h>
 
 /** A TopModelDevice contains structures for use by CUDA kernels */

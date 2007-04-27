@@ -35,6 +35,7 @@ typedef struct{
     AllocTable2d<FP_TYPE_LOW> *coord_T;
     AllocTable2d<int> *node_id_T;
     AllocTable2d<int> *elem_id_T;
+    AllocTable2d<int> *n2eConn_T;
 
 
     unsigned node_attr_size;
@@ -48,7 +49,6 @@ typedef struct{
 
 #ifdef CUDA
     TopModelDevice device_model;
-  AllocTable2d<int> *n2eConn_T;
 #endif
 
 } TopModel;
@@ -173,7 +173,6 @@ void topModel_TestIterators(TopModel*m);
 
 void top_retrieve_elem_data(TopModel* m);
 void top_retrieve_node_data(TopModel* m);
-
 void top_put_node_data(TopModel* m);
 
 #endif
