@@ -39,7 +39,7 @@ entry [\uw{attribute1}, ..., \uw{attributeN}] void \uw{EntryMethod}(\uw{paramete
 
 \charmpp{} currently offers the following attributes that one may assign to 
 an entry method:
-\kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{nokeep}, \kw{notrace}, \kw{immediate}, \kw{expedited}.
+\kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{nokeep}, \kw{notrace}, \kw{immediate}, \kw{expedited}, \kw{inline}, \kw{local}, \kw{python}.
 
 \begin{description}
 \index{threaded}\item[threaded] \index{entry method}entry methods are simply entry
@@ -91,6 +91,23 @@ Array. However, skipscheduler message still needs to be scheduled in low level
 Converse message queue and be processed in the order of arrival. It may still
 suffer from long running entry methods.
 
+\index{inline}\item[inline] entry methods are entry functions in which the
+message is delivered immediately to the recipient if it happens to reside on the
+same processor. Therefore, these entry methods need to be reentrant, as they
+could be called multiple times recursively. If the recipient reside on another
+processor, a regular message is sent, and \kw{inline} has no effect.
+
+\index{local}\item[local] entry methods are equivalent to function calls: the
+entry method is always called immediately. This feature is available only for
+Groups and Chare Arrays. The user has to guarantee that the recipient chare
+element reside on the same processor, a failure will result in the application
+to abort. In contrast will all other entry methods where input parameters are
+marshalled into a message, \kw{local} entry methods pass them direcly to the
+callee. This implies that the callee can modify the caller data if this is
+passed by pointer or reference. Furthermore, the input parameters do not require
+to be PUPable. Being these entry methods always called immediately, they are
+allowed to have a non-void return type. Nevertheless, the returned type must be
+a pointer.
 
 \index{python}\item[python] entry methods are methods which are enabled to be
 called from python scripts running as explained in section~\ref{python}. In
