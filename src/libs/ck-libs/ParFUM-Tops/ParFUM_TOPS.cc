@@ -29,12 +29,17 @@ void setTableReferences(TopModel* model){
   model->elem_id_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+1,""))->getInt();
   model->ElemData_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+0,""))->getChar();
   model->NodeData_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+0,""))->getChar();
+
 #ifdef FP_TYPE_FLOAT
   model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+2,""))->getFloat();
 #else
   model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+2,""))->getDouble();
+#endif
+
+#ifdef CUDA
   model->n2eConn_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+2,""))->getInt();
 #endif
+
 }
 
 
@@ -226,6 +231,16 @@ void top_retrieve_node_data(TopModel* m){
             m->device_model.NodeDataDevice,
             m->num_local_node * m->node_attr_size,
             cudaMemcpyDeviceToHost);
+#endif
+}
+
+/** Copy node attribute array to CUDA device from the ParFUM attribute */
+void top_put_node_data(TopModel* m){
+#if CUDA
+  cudaMemcpy(m->device_model.NodeDataDevice,
+	     m->NodeData_T->getData(),
+	     m->num_local_node * m->node_attr_size,
+	     cudaMemcpyHostToDevice);
 #endif
 }
 
