@@ -52,6 +52,7 @@ class TopoManager {
     int coordinatesToRank(int x, int y, int z);
     int getHopsBetweenRanks(int pe1, int pe2);
     void sortRanksByHops(int pe, int *pes, int *idx, int n); 
+    int pickClosestRank(int mype, int *pes, int n);
 
   private:
     void quicksort(int pe, int *pes, int *arr, int left, int right);

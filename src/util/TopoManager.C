@@ -99,6 +99,16 @@ void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
   quicksort(pe, pes, idx, 0, n-1);
 }
 
+int TopoManager::pickClosestRank(int mype, int *pes, int n){
+#ifdef CMK_VERSION_BLUEGENE
+    return(bgltm->pickClosestRank(mype,pes,n));
+#elif CMK_XT3
+#else 
+    return(pes[0]);
+#endif
+  }
+
+
 void TopoManager::quicksort(int pe, int *pes, int *arr, int left, int right) {
   if(left<right) {
     int split = partition(pe, pes, arr, left, right);
