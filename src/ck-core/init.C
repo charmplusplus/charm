@@ -48,7 +48,7 @@ which is probably overly complex.
 
 void CkRestartMain(const char* dirname);
 
-#define  DEBUGF(x)    // CmiPrintf x;
+#define  DEBUGF(x)     //CmiPrintf x;
 
 UChar _defaultQueueing = CK_QUEUEING_FIFO;
 
@@ -521,6 +521,7 @@ static void _initHandler(void *msg)
     default:
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
+	DEBUGF(("[%d,%.6lf] _numExpectInitMsgs %d CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs) %d\n",CmiMyPe(),CmiWallTimer(),_numExpectInitMsgs,CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs)));
   if(_numExpectInitMsgs&&(CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs)>=_numExpectInitMsgs)) {
     _initDone();
   }
@@ -628,6 +629,8 @@ extern "C" void CpdFreeze(void);
 void _initCharm(int unused_argc, char **argv)
 { 
 	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
+
+	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
 
 	CkpvInitialize(PtrQ*,_buffQ);
 	CkpvInitialize(PtrVec*,_bocInitVec);
@@ -870,6 +873,9 @@ void _initCharm(int unused_argc, char **argv)
 		_STATS_RECORD_CREATE_CHARE_N(nMains);
 		_STATS_RECORD_PROCESS_CHARE_N(nMains);
 
+
+
+
 		for(i=0;i<_readonlyMsgs.size();i++) /* Send out readonly messages */
 		{
 			register void *roMsg = (void *) *((char **)(_readonlyMsgs[i]->pMsg));
@@ -903,11 +909,13 @@ void _initCharm(int unused_argc, char **argv)
 		env->setCount(++_numInitMsgs);
 		env->setSrcPe(CkMyPe());
 		CmiSetHandler(env, _initHandlerIdx);
+		DEBUGF(("[%d,%.6lf] RODataMsg being sent of size %d \n",CmiMyPe(),CmiWallTimer(),env->getTotalsize()));
 		CmiSyncBroadcastAndFree(env->getTotalsize(), (char *)env);
 		CpvAccess(_qd)->create(CkNumPes()-1);
 		_initDone();
 	}
 
+	DEBUGF(("[%d,%d%.6lf] inCommThread %d\n",CmiMyPe(),CmiMyRank(),CmiWallTimer(),inCommThread));
 	// when I am a communication thread, I don't participate initDone.
         if (inCommThread) {
                 CkNumberHandlerEx(_bocHandlerIdx,(CmiHandlerEx)_processHandler,
