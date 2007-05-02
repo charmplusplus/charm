@@ -51,6 +51,11 @@ static int msgCount;
 
 static double regTime;
 
+/*TODO: remove this **/
+/*char *rdmaOutBuf,*rdmaInBuf;
+struct ibv_mr *outKey,*inKey;*/
+
+
 #define CMK_IBVERBS_STATS 1
 #define CMK_IBVERBS_INCTOKENS 1
 
@@ -339,6 +344,14 @@ static void CmiMachineInit(char **argv){
 	pktCount=0;
 	msgCount=0;
 #endif	
+/*
+	rdmaOutBuf = (char *)CmiAlloc(4000000);
+	rdmaInBuf = (char *)CmiAlloc(4000000);
+	outKey = ibv_reg_mr(context->pd,rdmaOutBuf,4000000,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE);
+	inKey = ibv_reg_mr(context->pd,rdmaInBuf,4000000,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE| IBV_ACCESS_REMOTE_WRITE);
+*/
+	
+
 	MACHSTATE(3,"} CmiMachineInit");
 }
 
@@ -542,7 +555,6 @@ void 	infiPostInitialRecvs(){
 	context->qp = NULL;
 	free(context->localAddr);
 	context->localAddr= NULL;
-
 }
 
 struct infiBufferPool * allocateInfiBufferPool(int numRecvs,int sizePerBuffer){
@@ -615,7 +627,7 @@ static inline void CommunicationServer_nolock(int toBuffer); //if buffer ==1 rec
 static void CmiMachineExit()
 {
 #if CMK_IBVERBS_STATS	
-	printf("[%d] msgCount %d pktCount %d packetSize %d dataSize %d # 0 tokens %d time loss due to 0 tokens %.6lf \n",_Cmi_mynode,msgCount,pktCount,packetSize,dataSize,regCount,regTime);
+	printf("[%d] msgCount %d pktCount %d packetSize %d total Time %.6lf s # Rdma Reg-Dereg %d Reg-Dereg time %.6lf s \n",_Cmi_mynode,msgCount,pktCount,packetSize,CmiTimer(),regCount,regTime);
 #endif
 }
 
@@ -632,9 +644,7 @@ static inline void increaseTokens(OtherNode node);
 
 
 static void inline EnqueuePacket(OtherNode node,infiPacket packet,int totalSize){
-	int full=0;
 	int incTokens=0;
-	double _regStartTime;
 
 	struct ibv_sge sendElement = {
 		.addr = (uintptr_t)packet->buf,
@@ -658,23 +668,11 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int totalSize)
 	
 #if CMK_IBVERBS_STATS	
 	pktCount++;
-	if(node->infiData->tokensLeft == 0){
-/*		CmiPrintf("[%d] Number of tokens to node %d is 0 \n",_Cmi_mynode,node->infiData->nodeNo); */
-		full = 1;
-		regCount++;
-		_regStartTime = CmiWallTimer();
-	}
 #endif	
 	while(node->infiData->tokensLeft == 0){
 		CommunicationServer_nolock(1); 
 	}
 	
-#if CMK_IBVERBS_STATS	
-	if(full){
-/*		CmiPrintf("[%d] Number of tokens to node %d is no longer 0 but %d \n",_Cmi_mynode,node->infiData->nodeNo,node->infiData->tokensLeft);*/
-		regTime += (CmiWallTimer()-_regStartTime);
-	}
-#endif	
 
 #if CMK_IBVERBS_INCTOKENS	
 	if(node->infiData->tokensLeft < INCTOKENS_FRACTION*node->infiData->totalTokens && node->infiData->totalTokens < maxTokens){
@@ -748,14 +746,27 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 
 static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node){
 	infiPacket packet;
-	
+
 	ogm->refcount++;
 	
 	MallocInfiPacket(packet);
  
  {
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)packet->buf;
-		struct ibv_mr *key = ibv_reg_mr(context->pd,ogm->data,ogm->size,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ  );
+		
+#if CMK_IBVERBS_STATS
+		double _startRegTime = CmiWallTimer();
+#endif
+		struct ibv_mr *key = ibv_reg_mr(context->pd,ogm->data,ogm->size,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE);
+#if CMK_IBVERBS_STATS
+		regCount++;
+		regTime += CmiWallTimer()-_startRegTime;
+#endif
+		
+		/*TODO:remove this
+		memcpy(rdmaOutBuf,ogm->data,ogm->size);
+		struct ibv_mr *key = outKey;*/
+		
 		rdmaPacket->key = *key;
 		rdmaPacket->keyPtr = key;
 		rdmaPacket->header.code = INFIRDMA_START;
@@ -763,6 +774,9 @@ static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node){
 		rdmaPacket->ogm = ogm;
 		rdmaPacket->remoteBuf = ogm->data;
 		rdmaPacket->remoteSize = ogm->size;
+		
+		/*TODO: remove
+		rdmaPacket->remoteBuf = rdmaOutBuf;*/
 		
 		MACHSTATE3(3,"rdmaRequest being sent to node %d buf %p size %d",node->infiData->nodeNo,ogm->data,ogm->size);
 		EnqueuePacket(node,packet,sizeof(struct infiRdmaPacket));
@@ -1214,6 +1228,9 @@ static inline  void processSendWC(struct ibv_wc *sendWC){
 /********************************************************************/
 //TODO: get token for rdma later
 static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket){
+#if CMK_IBVERBS_STATS
+	double _startRegTime;
+#endif	
 	int nodeNo = _rdmaPacket->header.nodeNo;
 	OtherNode node = &nodes[nodeNo];
 
@@ -1229,8 +1246,19 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket){
 	
 	buffer->buf  = (char *)CmiAlloc(rdmaPacket->remoteSize);
 //	CmiAssert(buffer->buf != NULL);
-	
+
+#if CMK_IBVERBS_STATS
+		_startRegTime = CmiWallTimer();
+#endif
 	buffer->key = ibv_reg_mr(context->pd,buffer->buf,buffer->size,IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |IBV_ACCESS_REMOTE_READ );
+#if CMK_IBVERBS_STATS
+		regCount++;
+		regTime += CmiWallTimer()-_startRegTime;
+#endif
+
+	/*TODO: remove this
+	buffer->key = inKey;*/
+	
 	MACHSTATE3(3,"received rdma request from node %d for remoteBuffer %p remoteSize %d",nodeNo,rdmaPacket->remoteBuf,rdmaPacket->remoteSize);
 	MACHSTATE2(3,"Local buffer->buf %p buffer->key %p",buffer->buf,buffer->key);
 //	CmiAssert(buffer->key != NULL);
@@ -1238,6 +1266,8 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket){
 	{
 		struct ibv_sge list = {
 			.addr = (uintptr_t )buffer->buf,
+			/*TODO: change this
+			.addr = (uintptr_t )rdmaInBuf,*/
 			.length = buffer->size,
 			.lkey 	= buffer->key->lkey
 		};
@@ -1266,8 +1296,16 @@ static inline void EnqueueRdmaAck(struct infiRdmaPacket *rdmaPacket);
 
 static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 		//rdma get done
+#if CMK_IBVERBS_STATS
+	double _startRegTime;
+#endif	
+
 	struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *) rdmaWC->wr_id;
 	struct infiBuffer *buffer = rdmaPacket->localBuffer;
+
+	/*TODO: remove this
+	memcpy(buffer->buf,rdmaInBuf,rdmaWC->byte_len);*/
+	
 /*	CmiAssert(buffer->type == BUFFER_RDMA);
 	CmiAssert(rdmaWC->byte_len == buffer->size);*/
 	
@@ -1282,7 +1320,17 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 		handoverMessage(buffer->buf,size,rank,broot,toBuffer);
 	}
 	MACHSTATE2(3,"Rdma done for buffer->buf %p buffer->key %p",buffer->buf,buffer->key);
-	ibv_dereg_mr(buffer->key);
+
+#if CMK_IBVERBS_STATS
+		_startRegTime = CmiWallTimer();
+#endif
+	
+		ibv_dereg_mr(buffer->key);
+#if CMK_IBVERBS_STATS
+		regCount++;
+		regTime += CmiWallTimer()-_startRegTime;
+#endif
+	
 	free(buffer);
 
 	//send ack to sender 
@@ -1307,7 +1355,17 @@ static inline void EnqueueRdmaAck(struct infiRdmaPacket *rdmaPacket){
 
 
 static inline void processRdmaAck(struct infiRdmaPacket *rdmaPacket){
+#if CMK_IBVERBS_STATS
+	double _startRegTime=CmiWallTimer();
+#endif	
+	
 	ibv_dereg_mr(rdmaPacket->keyPtr);
+
+#if CMK_IBVERBS_STATS
+		regCount++;
+		regTime += CmiWallTimer()-_startRegTime;
+#endif
+
 	MACHSTATE2(3,"rdma ack received for remoteBuf %p size %d",rdmaPacket->remoteBuf,rdmaPacket->remoteSize);
 	rdmaPacket->ogm->refcount--;
 	GarbageCollectMsg(rdmaPacket->ogm);
