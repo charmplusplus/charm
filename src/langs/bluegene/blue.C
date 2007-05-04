@@ -1723,3 +1723,38 @@ static void writeToDisk()
 }
 
 
+// application COnverse thread hook
+
+CpvExtern(int      , CthResumeBigSimThreadIdx);
+
+void CthEnqueueBigSimThread(CthThreadToken* token, int s,
+                                   int pb,unsigned int *prio)
+{
+/*
+  CmiSetHandler(token, CpvAccess(CthResumeNormalThreadIdx));
+  CsdEnqueueGeneral(token, s, pb, prio);
+*/
+#if CMK_BLUEGENE_THREAD
+  int x, y, z;
+  BgGetMyXYZ(&x, &y, &z);
+  int t = BgGetThreadID();
+#else
+  #error "ERROR HERE"
+#endif
+    // local message into queue
+  BgSendPacket(x,y,z, t, CpvAccess(CthResumeBigSimThreadIdx), LARGE_WORK, sizeof(CthThreadToken), (char *)token);
+} 
+
+CthThread CthSuspendBigSimThread()
+{ 
+  return  cta(threadinfo)->me;
+}
+
+
+void BgSetStrategyBigSimDefault(CthThread t)
+{ 
+  CthSetStrategy(t,
+                 CthEnqueueBigSimThread,
+                 CthSuspendBigSimThread);
+}
+

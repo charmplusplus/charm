@@ -25,8 +25,11 @@ extern "C" {
 /**
   conform to Converse message header
 */
+/*
+MOVED to converse.h
 typedef struct CMK_MSG_HEADER_BLUEGENE   CmiBlueGeneMsgHeader;
 #define CmiBlueGeneMsgHeaderSizeBytes (sizeof(CmiBlueGeneMsgHeader))
+*/
 
 /**
   macros to access Blue Gene message header fields
@@ -198,6 +201,8 @@ void BgThreadBroadcastPacketExcept(int node, CmiInt2 threadID, int handlerID,
 */
 void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, 
 				int numbytes, char *data);
+
+void BgSetStrategyBigSimDefault(CthThread t);
 
 /************************ utility functions ************************/
 

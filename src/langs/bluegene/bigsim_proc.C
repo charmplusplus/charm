@@ -9,6 +9,8 @@ extern BgStartHandler  workStartFunc;
 
 void correctMsgTime(char *msg);
 
+CpvDeclare(int      , CthResumeBigSimThreadIdx);
+
 /**
   threadInfo methods
 */
@@ -204,9 +206,14 @@ void workThreadInfo::scheduler(int count)
   CsdStopFlag --;
 }
 
+extern "C" void CthResumeNormalThread(CthThreadToken* token);
+
 void workThreadInfo::run()
 {
   tSTARTTIME = CmiWallTimer();
+
+    //  register for charm++ applications threads
+  CpvAccess(CthResumeBigSimThreadIdx) = BgRegisterHandler((BgHandler)CthResumeNormalThread);
 
 //  InitHandlerTable();
   // before going into scheduler loop, call workStartFunc

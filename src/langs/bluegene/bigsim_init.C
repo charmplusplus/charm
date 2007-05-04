@@ -38,6 +38,8 @@ extern "C" void BgAttach(CthThread t)
 {
 //  CthShadow(t, cta(threadinfo)->getThread());
   CtvAccessOther(t, threadinfo)= cta(threadinfo);
+    // special thread scheduling
+  BgSetStrategyBigSimDefault(t);
 }
 
 // quiescence detection callback
