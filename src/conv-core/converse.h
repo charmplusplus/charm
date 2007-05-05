@@ -457,6 +457,8 @@ typedef struct CMK_MSG_HEADER_EXT   CmiMsgHeaderExt;
 #define CMK_BLUEGENE_FIELDS  CmiInt4 nd,n; double rt; CmiInt2 tID, hID; char t, flag; CmiInt2 ref; CmiInt4 msgID, srcPe;
 
 #ifndef CmiReservedHeaderSize
+typedef struct CMK_MSG_HEADER_BLUEGENE   CmiBlueGeneMsgHeader;
+#define CmiBlueGeneMsgHeaderSizeBytes (sizeof(CmiBlueGeneMsgHeader))
 #if CMK_BLUEGENE_CHARM
 #  define CmiReservedHeaderSize   CmiBlueGeneMsgHeaderSizeBytes
 #else
@@ -1004,7 +1006,7 @@ typedef struct {
   /*Start with a message header so threads can be enqueued 
     as messages (e.g., by CthEnqueueNormalThread in convcore.c)
   */
-  char cmicore[CmiMsgHeaderSizeBytes];
+  char cmicore[CmiReservedHeaderSize];
   CthThread thread;
 } CthThreadToken;
 
