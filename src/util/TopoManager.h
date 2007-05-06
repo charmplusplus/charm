@@ -11,6 +11,8 @@
 #ifndef _TOPO_MANAGER_H_
 #define _TOPO_MANAGER_H_
 
+#include "charm.h"
+
 #ifdef CMK_VERSION_BLUEGENE
 #include "bgltorus.h"
 #endif
@@ -45,6 +47,27 @@ class TopoManager {
     inline int getDimNX() { return dimNX; }
     inline int getDimNY() { return dimNY; }
     inline int getDimNZ() { return dimNZ; }
+
+    inline int absX(int x) {
+      int px = abs(x);
+      int sx = dimX - px;
+      CmiAssert(sx>=0);
+      return ((px>sx) ? sx : px);
+    }
+    
+    inline int absY(int y) {
+      int py = abs(y);
+      int sy = dimY - py;
+      CmiAssert(sy>=0);
+      return ((py>sy) ? sy : py);
+    }
+
+    inline int absZ(int z) {
+      int pz = abs(z);
+      int sz = dimZ - pz;
+      CmiAssert(sz>=0);
+      return ((pz>sz) ? sz : pz);
+    }
 
     int hasMultipleProcsPerNode();
  
