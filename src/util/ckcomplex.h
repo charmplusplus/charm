@@ -5,13 +5,16 @@
 
 #if USE_FFTW_DECLS
 #include "fftw.h"
-typedef fftw_real  RealType
+typedef fftw_real  RealType;
 #else
-typedef double     RealType
+typedef double     RealType;
 #endif
 
 struct ckcomplex {
-    
+    RealType  re;
+    RealType  im;   
+
+ 
     inline ckcomplex(RealType _re=0., RealType _im=0.): re(_re), im(_im){}
     //    inline ckcomplex(RealType r) {re=r; im=0;}
     //    inline ckcomplex(RealType r,RealType i) {re=r; im=i;}
