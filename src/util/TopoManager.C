@@ -8,7 +8,6 @@
  *  BigSim and non-topo machines.
  */
 
-#include "ck.h"
 #include "TopoManager.h"
 
 TopoManager::TopoManager() {
@@ -81,13 +80,10 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
 }
 
 int TopoManager::getHopsBetweenRanks(int pe1, int pe2) {
-#ifdef CMK_VERSION_BLUEGENE
-  return bgltm->getHopsBetweenRanks(pe1, pe2);
-#elif CMK_XT3
-
-#else
-  return abs(pe1-pe2);
-#endif
+  int x1, y1, z1, x2, y2, z2;
+  rankToCoordinates(pe1, x1, y1, z1);
+  rankToCoordinates(pe2, x2, y2, z2);
+  return (absX(x2-x1)+absY(y2-y1)+absZ(z2-z1));
 }
 
 void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
