@@ -9,7 +9,24 @@
 #ifndef _CRAY_TORUS_H_
 #define _CRAY_TORUS_H_
 
-#ifdef CMK_XT3
+#include "converse.h"
+#include <stdlib.h>
+
+#if CMK_XT3
+
+#include <stdio.h>
+//#include <catamount/cnos_mpi_os.h>
+#define XDIM 11
+#define YDIM 12
+#define ZDIM 16
+#define MAXNID 2783
+
+struct loc {
+  int x;
+  int y;
+  int z;
+};
+
 class CrayTorusManager {
   private:
     int dimX;	// dimension of the allocation in X (processors)
@@ -18,6 +35,10 @@ class CrayTorusManager {
     int dimNX;	// dimension of the allocation in X (nodes)
     int dimNY;	// dimension of the allocation in Y (nodes)
     int dimNZ;	// dimension of the allocation in Z (nodes)
+
+    //cnos_nidpid_map_t* nidpid;
+    int coords2nid[XDIM][YDIM][ZDIM];
+    struct loc nid2coords[MAXNID];
 
   public:
     CrayTorusManager();
@@ -31,11 +52,8 @@ class CrayTorusManager {
     inline int getDimNY() { return dimNY; }
     inline int getDimNZ() { return dimNZ; }
 
-    inline void rankToCoordinates(int pe, int &x, int &y, int &z);
-    inline int coordinatesToRank(int x, int y, int z);
-    inline int getHopsBetweenRanks(int pe1, int pe2);
-    inline void sortRanksByHops(int pe, int *pes, int *idx, int n); 
-
+    void rankToCoordinates(int pe, int &x, int &y, int &z);
+    int coordinatesToRank(int x, int y, int z);
 };
 
 #endif // CMK_XT3
