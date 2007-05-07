@@ -10,7 +10,7 @@ extern "C" void CthResumeNormalThread(CthThreadToken* token);
 
 void correctMsgTime(char *msg);
 
-CpvDeclare(int      , CthResumeBigSimThreadIdx);
+CpvExtern(int      , CthResumeBigSimThreadIdx);
 
 /**
   threadInfo methods

@@ -37,6 +37,8 @@ CpvDeclare(int, numNodes);        /* number of bg nodes on this PE */
 /* emulator node level variables */
 CpvDeclare(SimState, simState);
 
+CpvDeclare(int      , CthResumeBigSimThreadIdx);
+
 static int arg_argc;
 static char **arg_argv;
 
