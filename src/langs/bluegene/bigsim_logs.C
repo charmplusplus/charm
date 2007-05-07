@@ -301,9 +301,9 @@ void BgTimeLog::write(FILE *fp)
   fprintf(fp, "\n");
 }
 
-void BgTimeLog::addMsgBackwardDep(BgTimeLineRec &tlinerec, void* msg){
-  
-  CmiAssert(recvTime < 0.);
+void BgTimeLog::addMsgBackwardDep(BgTimeLineRec &tlinerec, void* msg)
+{
+  // CmiAssert(recvTime < 0.);
   int idx;
   BgTimeLog *msglog = tlinerec.getTimeLogOnThread(BgMsgID(CmiBgMsgSrcPe(msg), CmiBgMsgID(msg)), &idx);
   //CmiAssert(msglog != NULL);
