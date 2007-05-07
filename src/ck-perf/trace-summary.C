@@ -509,19 +509,18 @@ void TraceSummary::beginExecute(envelope *e)
 void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen, CmiObjId *idx)
 {
   if (execEp != INVALIDEP) {
-    CmiPrintf("Warning: TraceSummary two consecutive BEGIN_PROCESSING!\n");
+    TRACE_WARN("Warning: TraceSummary two consecutive BEGIN_PROCESSING!\n");
     return;
   }
-
+  
   execEp=ep;
   double t = TraceTimer();
-//CmiPrintf("start: %f \n", start);
-
+  //CmiPrintf("start: %f \n", start);
+  
   start = t;
   double ts = binStart;
   // fill gaps
-  while ((ts = ts + CkpvAccess(binSize)) < t)
-  {
+  while ((ts = ts + CkpvAccess(binSize)) < t) {
      _logPool->add(bin, CkMyPe());
      bin=0.0;
      binStart = ts;
@@ -542,7 +541,7 @@ void TraceSummary::endExecute(void)
   }
 
   if (execEp == INVALIDEP) {
-    CmiPrintf("Warning: TraceSummary END_PROCESSING without BEGIN_PROCESSING!\n");
+    TRACE_WARN("Warning: TraceSummary END_PROCESSING without BEGIN_PROCESSING!\n");
     return;
   }
 

@@ -42,6 +42,7 @@
 
 CkpvExtern(int, CtrLogBufSize);
 CkpvExtern(char*, traceRoot);
+CkpvExtern(bool, verbose);
 CkpvExtern(double, traceInitTime);
 CkpvExtern(double, traceInitCpuTime);
 
@@ -60,6 +61,8 @@ inline double TraceTimer(double t) { return t - CkpvAccess(traceInitTime); }
 inline double TraceCpuTimer() { return TRACE_CPUTIMER() - CkpvAccess(traceInitCpuTime); }
 inline double TraceCpuTimer(double t) { return t - CkpvAccess(traceInitCpuTime); }
 #endif
+
+#define TRACE_WARN(msg) if (CkpvAccess(verbose)) CmiPrintf(msg)
 
 /** Tracing-specific registered Charm entities: */
 extern int _threadMsg, _threadChare, _threadEP;

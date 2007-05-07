@@ -59,6 +59,7 @@ CkpvDeclare(double, traceInitCpuTime);
 CpvDeclare(int, traceOn);
 CkpvDeclare(int, traceOnPe);
 CkpvDeclare(char*, traceRoot);
+CkpvDeclare(bool, verbose);
 
 typedef void (*mTFP)();                   // function pointer for
 CpvDeclare(mTFP, machineTraceFuncPtr);    // machine user event
@@ -80,6 +81,7 @@ static void traceCommonInit(char **argv)
   CkpvAccess(traceInitCpuTime) = TRACE_CPUTIMER();
   CpvInitialize(int, traceOn);
   CpvInitialize(int, _traceCoreOn); //projector
+  CkpvInitialize(bool, verbose);
   CkpvInitialize(char*, traceRoot);
   CpvAccess(traceOn) = 0;
   CpvAccess(_traceCoreOn)=0; //projector
@@ -89,6 +91,11 @@ static void traceCommonInit(char **argv)
   char *root;
   char *temproot;
   char *temproot2;
+  if (CmiGetArgFlag(argv, "+traceWarn")) {
+    CkpvAccess(verbose) = true;
+  } else {
+    CkpvAccess(verbose) = false;
+  }
   if (CmiGetArgStringDesc(argv, "+traceroot", &temproot, "Directory to write trace files to")) {
     int i;
     // Trying to decide if the traceroot path is absolute or not. If it is not
