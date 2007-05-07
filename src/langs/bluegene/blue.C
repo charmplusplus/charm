@@ -1362,6 +1362,8 @@ CmiStartFn bgMain(int argc, char **argv)
   CpvInitialize(CthThread, mainThread);
   cva(mainThread) = CthSelf();
 
+  CpvInitialize(int, CthResumeBigSimThreadIdx);
+
   cva(simState).simStartTime = CmiWallTimer();
 
   return 0;

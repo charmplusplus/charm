@@ -6,6 +6,7 @@
 #define  DEBUGF(x)      //CmiPrintf x;
 
 extern BgStartHandler  workStartFunc;
+extern "C" void CthResumeNormalThread(CthThreadToken* token);
 
 void correctMsgTime(char *msg);
 
@@ -16,6 +17,8 @@ CpvDeclare(int      , CthResumeBigSimThreadIdx);
 */
 void commThreadInfo::run()
 {
+  CpvAccess(CthResumeBigSimThreadIdx) = BgRegisterHandler((BgHandler)CthResumeNormalThread);
+
   tSTARTTIME = CmiWallTimer();
 
   if (!tSTARTED) {
@@ -205,8 +208,6 @@ void workThreadInfo::scheduler(int count)
 
   CsdStopFlag --;
 }
-
-extern "C" void CthResumeNormalThread(CthThreadToken* token);
 
 void workThreadInfo::run()
 {
