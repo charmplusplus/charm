@@ -265,6 +265,38 @@ struct infiOtherNodeData{
 };
 
 
+/********************************
+Memory management structures and types
+*****************/
+
+typedef struct {
+	struct ibv_mr *key;
+	int poolIdx;
+	void *nextBuf;
+} infiCmiChunkMetaData;
+
+
+typedef struct {
+	infiCmiChunkMetaData *metaData;
+	CmiChunkHeader chunkHeader;
+} infiCmiChunkHeader;
+
+
+#define METADATAFIELD(m) (((infiCmiChunkHeader *)m)[-1].metaData)
+
+typedef struct {
+	int size;//without infiCmiChunkHeader
+	void *startBuf;
+} infiCmiChunkPool;
+
+#define INFINUMPOOLS 15
+infiCmiChunkPool infiCmiChunkPools[INFINUMPOOLS];
+
+static void initInfiCmiChunkPools();
+
+
+
+
 
 
 /******************CmiMachineInit and its helper functions*/
@@ -335,7 +367,8 @@ static void CmiMachineInit(char **argv){
 	
 	//TURN ON RDMA
 	rdma=1;
-	rdmaThreshold=32768;
+//	rdmaThreshold=32768;
+	rdmaThreshold=22000;
 /*	context->infiBufferedRecvList = NULL;*/
 #if CMK_IBVERBS_STATS	
 	regCount =0;
@@ -344,6 +377,8 @@ static void CmiMachineInit(char **argv){
 	pktCount=0;
 	msgCount=0;
 #endif	
+
+	initInfiCmiChunkPools();
 /*
 	rdmaOutBuf = (char *)CmiAlloc(4000000);
 	rdmaInBuf = (char *)CmiAlloc(4000000);
@@ -757,7 +792,9 @@ static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node){
 #if CMK_IBVERBS_STATS
 		double _startRegTime = CmiWallTimer();
 #endif
-		struct ibv_mr *key = ibv_reg_mr(context->pd,ogm->data,ogm->size,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE);
+/*		struct ibv_mr *key = ibv_reg_mr(context->pd,ogm->data,ogm->size,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE);*/
+		struct ibv_mr *key = METADATAFIELD(ogm->data)->key;
+		MACHSTATE3(3,"ogm->data %p metadata %p key %p",ogm->data,METADATAFIELD(ogm->data),key);
 #if CMK_IBVERBS_STATS
 		regCount++;
 		regTime += CmiWallTimer()-_startRegTime;
@@ -1250,7 +1287,8 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket){
 #if CMK_IBVERBS_STATS
 		_startRegTime = CmiWallTimer();
 #endif
-	buffer->key = ibv_reg_mr(context->pd,buffer->buf,buffer->size,IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |IBV_ACCESS_REMOTE_READ );
+/*	buffer->key = ibv_reg_mr(context->pd,buffer->buf,buffer->size,IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |IBV_ACCESS_REMOTE_READ );*/
+		buffer->key = METADATAFIELD(buffer->buf)->key;
 #if CMK_IBVERBS_STATS
 		regCount++;
 		regTime += CmiWallTimer()-_startRegTime;
@@ -1259,8 +1297,8 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket){
 	/*TODO: remove this
 	buffer->key = inKey;*/
 	
-	MACHSTATE3(3,"received rdma request from node %d for remoteBuffer %p remoteSize %d",nodeNo,rdmaPacket->remoteBuf,rdmaPacket->remoteSize);
-	MACHSTATE2(3,"Local buffer->buf %p buffer->key %p",buffer->buf,buffer->key);
+	MACHSTATE3(3,"received rdma request from node %d for remoteBuffer %p keyPtr %p",nodeNo,rdmaPacket->remoteBuf,rdmaPacket->keyPtr);
+	MACHSTATE3(3,"Local buffer->buf %p buffer->key %p rdmaPacket %p",buffer->buf,buffer->key,rdmaPacket);
 //	CmiAssert(buffer->key != NULL);
 	
 	{
@@ -1325,7 +1363,7 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 		_startRegTime = CmiWallTimer();
 #endif
 	
-		ibv_dereg_mr(buffer->key);
+//		ibv_dereg_mr(buffer->key);
 #if CMK_IBVERBS_STATS
 		regCount++;
 		regTime += CmiWallTimer()-_startRegTime;
@@ -1359,7 +1397,7 @@ static inline void processRdmaAck(struct infiRdmaPacket *rdmaPacket){
 	double _startRegTime=CmiWallTimer();
 #endif	
 	
-	ibv_dereg_mr(rdmaPacket->keyPtr);
+//	ibv_dereg_mr(rdmaPacket->keyPtr);
 
 #if CMK_IBVERBS_STATS
 		regCount++;
@@ -1413,3 +1451,137 @@ static void increasePostedRecvs(int nodeNo){
 	postInitialRecvs(newPool,increase,packetSize);
 
 };
+
+
+
+
+/*********************************************
+	Memory management routines for RDMA
+
+************************************************/
+
+
+static void initInfiCmiChunkPools(){
+	int i;
+	int size = rdmaThreshold*2;
+	
+	for(i=0;i<INFINUMPOOLS;i++){
+		infiCmiChunkPools[i].size = size; // pool i has buffers of size rdmaThreshold*2^(i+1)
+		infiCmiChunkPools[i].startBuf = NULL;
+		size *= 2;
+	}
+}
+
+static inline void *getInfiCmiChunk(int dataSize){
+	//find out to which pool this dataSize belongs to
+	// poolIdx = rint(log2(dataSize/rdmaThreshold))
+	int ratio = dataSize/rdmaThreshold;
+	int poolIdx=-1;
+	void *res;
+	
+	CmiAssert(ratio >= 1);
+	while(ratio > 0){
+		ratio  = ratio >> 1;
+		poolIdx++;
+	}
+	MACHSTATE2(3,"getInfiCmiChunk for size %d in poolIdx %d",dataSize,poolIdx);
+	if((poolIdx < INFINUMPOOLS && infiCmiChunkPools[poolIdx].startBuf == NULL) || poolIdx >= INFINUMPOOLS){
+		infiCmiChunkMetaData *metaData;		
+		int allocSize;
+		if(poolIdx < INFINUMPOOLS ){
+			allocSize = infiCmiChunkPools[poolIdx].size;
+		}else{
+			allocSize = dataSize;
+		}
+		res = malloc(allocSize+sizeof(infiCmiChunkHeader));
+		res += sizeof(infiCmiChunkHeader);
+		
+		
+		metaData = METADATAFIELD(res) = malloc(sizeof(infiCmiChunkMetaData));
+		metaData->key = ibv_reg_mr(context->pd,res,allocSize,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+		
+		MACHSTATE3(3,"AllocSize %d buf %p key %p",allocSize,res,metaData->key);
+		
+		CmiAssert(metaData->key != NULL);
+		metaData->poolIdx = poolIdx;
+		metaData->nextBuf = NULL;
+		return res;
+	}
+	if(poolIdx < INFINUMPOOLS){
+		infiCmiChunkMetaData *metaData;				
+	
+		res = infiCmiChunkPools[poolIdx].startBuf;
+		res += sizeof(infiCmiChunkHeader);
+
+		MACHSTATE2(3,"Reusing old pool %d buf %p",poolIdx,res);
+		metaData = METADATAFIELD(res);
+
+		infiCmiChunkPools[poolIdx].startBuf = metaData->nextBuf;
+		MACHSTATE2(3,"Pool %d now has startBuf at %p",poolIdx,infiCmiChunkPools[poolIdx].startBuf);
+		
+		metaData->nextBuf = NULL;
+		CmiAssert(metaData->poolIdx == poolIdx);
+		return res;
+	}
+
+	CmiAssert(0);
+
+	
+};
+
+
+
+
+void * infi_CmiAlloc(int size){
+	void *res;
+	if(size-sizeof(CmiChunkHeader) > rdmaThreshold){
+		MACHSTATE1(3,"infi_CmiAlloc for dataSize %d",size-sizeof(CmiChunkHeader));
+		res = getInfiCmiChunk(size-sizeof(CmiChunkHeader));	
+		res -= sizeof(CmiChunkHeader);
+	}else{
+		res = malloc(size);
+	}
+	return res;
+}
+
+void infi_CmiFree(void *ptr){
+	int size;
+	void *freePtr = ptr;
+	
+	ptr += sizeof(CmiChunkHeader);
+	size = SIZEFIELD (ptr);
+	if(size > rdmaThreshold){
+		infiCmiChunkMetaData *metaData;
+		int poolIdx;
+		//there is a infiniband specific header
+		freePtr = ptr - sizeof(infiCmiChunkHeader);
+		metaData = METADATAFIELD(ptr);
+		poolIdx = metaData->poolIdx;
+		MACHSTATE2(3,"CmiFree buf %p goes back to pool %d",ptr,poolIdx);
+		CmiAssert(poolIdx >= 0);
+		if(poolIdx < INFINUMPOOLS){
+			metaData->nextBuf = infiCmiChunkPools[poolIdx].startBuf;
+			infiCmiChunkPools[poolIdx].startBuf = freePtr;
+			
+			MACHSTATE2(3,"Pool %d now has startBuf at %p",poolIdx,infiCmiChunkPools[poolIdx].startBuf);
+		}else{			
+			ibv_dereg_mr(metaData->key);
+			free(metaData);
+			free(freePtr);
+		}	
+	}else{
+		free(freePtr);
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
