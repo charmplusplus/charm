@@ -120,50 +120,24 @@ SumLogPool::SumLogPool(char *pgm) : numBins(0), phaseTab(MAX_PHASES)
    pool = new BinEntry[poolSize];
    _MEMCHECK(pool);
 
-   fp = NULL;
-   sdfp = NULL;
-   //CmiPrintf("TRACE: %s:%d\n", fname, errno);
-   if (!sumonly) {
-    char pestr[10];
-    sprintf(pestr, "%d", CkMyPe());
-    int len = strlen(pgm) + strlen(".sumd.") + strlen(pestr) + 1;
-    char *fname = new char[len+1];
-
-    sprintf(fname, "%s.%s.sum", pgm, pestr);
-    do {
-      fp = fopen(fname, "w+");
-    } while (!fp && errno == EINTR);
-    if (!fp) {
-    CkPrintf("[%d] Attempting to open [%s]\n",CkMyPe(),fname);
-      CmiAbort("Cannot open Summary Trace File for writing...\n");
-    }
-
-    if (sumDetail) {
-        sprintf(fname, "%s.%s.sumd", pgm, pestr);
-        do {
-            sdfp = fopen(fname, "w+");
-        } while (!sdfp && errno == EINTR);
-        if(!sdfp) {
-            CmiAbort("Cannot open Detailed Summary Trace File for writing...\n");
-        }
-    }
-
-    delete[] fname;
+   this->pgm = new char[strlen(pgm)+1];
+   strcpy(this->pgm,pgm);
+   
+   // create the sts file
+   if (CkMyPe() == 0) {
+     char *fname = 
+       new char[strlen(CkpvAccess(traceRoot))+strlen(".sum.sts")+1];
+     sprintf(fname, "%s.sum.sts", CkpvAccess(traceRoot));
+     stsfp = fopen(fname, "w+");
+     //CmiPrintf("File: %s \n", fname);
+     if (stsfp == 0) {
+       CmiAbort("Cannot open summary sts file for writing.\n");
+      }
+     delete[] fname;
    }
-
+   
    // event
    markcount = 0;
-
-   if (CkMyPe() == 0)
-   {
-    char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sum.sts")+1];
-    sprintf(fname, "%s.sum.sts", CkpvAccess(traceRoot));
-    stsfp = fopen(fname, "w+");
-    //CmiPrintf("File: %s \n", fname);
-    if(stsfp == 0)
-      CmiAbort("Cannot open summary sts file for writing.\n");
-    delete[] fname;
-   }
 }
 
 void SumLogPool::initMem()
@@ -202,6 +176,38 @@ void SumLogPool::write(void)
   int i;
   unsigned int j;
   int _numEntries=_entryTable.size();
+
+  fp = NULL;
+  sdfp = NULL;
+
+  // create file(s)
+  // CmiPrintf("TRACE: %s:%d\n", fname, errno);
+  if (!sumonly) {
+    char pestr[10];
+    sprintf(pestr, "%d", CkMyPe());
+    int len = strlen(pgm) + strlen(".sumd.") + strlen(pestr) + 1;
+    char *fname = new char[len+1];
+    
+    sprintf(fname, "%s.%s.sum", pgm, pestr);
+    do {
+      fp = fopen(fname, "w+");
+    } while (!fp && errno == EINTR);
+    if (!fp) {
+      CkPrintf("[%d] Attempting to open [%s]\n",CkMyPe(),fname);
+      CmiAbort("Cannot open Summary Trace File for writing...\n");
+    }
+    
+    if (sumDetail) {
+      sprintf(fname, "%s.%s.sumd", pgm, pestr);
+      do {
+	sdfp = fopen(fname, "w+");
+      } while (!sdfp && errno == EINTR);
+      if(!sdfp) {
+	CmiAbort("Cannot open Detailed Summary Trace File for writing...\n");
+      }
+    }
+    delete[] fname;
+  }
 
   fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e", CkpvAccess(version), CkMyPe(), CkNumPes(), numBins, _numEntries, CkpvAccess(binSize));
   if (CkpvAccess(version)>=3.0)

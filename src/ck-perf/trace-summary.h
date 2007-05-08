@@ -170,6 +170,7 @@ class SumLogPool {
     UInt numBins;
     BinEntry *pool;	/**< bins */
     FILE *fp, *stsfp, *sdfp ;
+    char *pgm;
 
     SumEntryInfo  *epInfo;
     UInt epInfoSize;
