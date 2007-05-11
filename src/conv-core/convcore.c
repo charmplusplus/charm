@@ -169,6 +169,12 @@ void CMI_VMI_CmiFree (void *ptr);
 void* elan_CmiAlloc(int size);
 #endif
 
+#if CMK_USE_IBVERBS
+void *infi_CmiAlloc(int size);
+void infi_CmiFree(void *ptr);
+#endif
+
+
 #if CMK_GRID_QUEUE_AVAILABLE
 CpvDeclare(void *, CkGridObject);
 CpvDeclare(void *, CsdGridQueue);
@@ -1864,6 +1870,8 @@ void *CmiAlloc(int size)
   res = (char *) elan_CmiAlloc(size+sizeof(CmiChunkHeader));
 #elif CONVERSE_VERSION_VMI
   res = (char *) CMI_VMI_CmiAlloc(size+sizeof(CmiChunkHeader));
+#elif CMK_USE_IBVERBS
+	res = (char *) infi_CmiAlloc(size+sizeof(CmiChunkHeader));
 #elif CONVERSE_POOL
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
 #else
@@ -1945,6 +1953,8 @@ void CmiFree(void *blk)
     elan_CmiFree(BLKSTART(parentBlk));
 #elif CONVERSE_VERSION_VMI
     CMI_VMI_CmiFree(BLKSTART(parentBlk));
+#elif CMK_USE_IBVERBS
+		infi_CmiFree(BLKSTART(parentBlk));
 #elif CONVERSE_POOL
     CmiPoolFree(BLKSTART(parentBlk));
 #else
