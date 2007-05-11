@@ -417,6 +417,7 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 
 	context->qp = (struct ibv_qp **)malloc(sizeof(struct ibv_qp *)*numNodes);
 
+	if(numNodes > 1)
 	{
 		context->srqSize = (maxTokens+2)*(_Cmi_numnodes-1);
 		struct ibv_srq_init_attr srqAttr = {
@@ -582,8 +583,10 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 void 	infiPostInitialRecvs(){
 	//create the pool and post the receives
 	int numPosts = tokensPerProcessor*(_Cmi_numnodes-1);
-	context->recvBufferPool = allocateInfiBufferPool(numPosts,packetSize);
-	postInitialRecvs(context->recvBufferPool,numPosts,packetSize);
+	if(numPosts > 0){
+		context->recvBufferPool = allocateInfiBufferPool(numPosts,packetSize);
+		postInitialRecvs(context->recvBufferPool,numPosts,packetSize);
+	}
 
 
 	free(context->qp);
