@@ -30,6 +30,7 @@
 static int msgLogRank;
 static int msgLogWrite;
 static int msgLogRead;
+static char msgLogFilename[256];
 
 #if CMK_PROJECTIONS_USE_ZLIB
 #include <zlib.h>

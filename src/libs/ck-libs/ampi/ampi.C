@@ -442,6 +442,7 @@ static void ampiProcInit(void){
   msgLogWrite = CmiGetArgFlag(argv, "+msgLogWrite");
   msgLogRead = CmiGetArgFlag(argv, "+msgLogRead");
   CmiGetArgInt(argv, "+msgLogRank", &msgLogRank);
+  CmiGetArgString(argv, "+msgLogFilename", &msgLogFilename);
 #endif
 }
 
@@ -694,22 +695,20 @@ void ampiParent::prepareCtv(void) {
 
 void ampiParent::init(){
 #ifdef AMPIMSGLOG
-  char fname[256];
-  sprintf(fname,"msg%d.log",msgLogRank);
   if(msgLogWrite && msgLogRank == thisIndex){
 #if CMK_PROJECTIONS_USE_ZLIB
-    fMsgLog = gzopen(fname,"wb");
+    fMsgLog = gzopen(msgLogFilename,"wb");
     toPUPer = new PUP::tozDisk(fMsgLog);
 #else
-    fMsgLog = fopen(fname,"wb");
+    fMsgLog = fopen(msgLogFilename,"wb");
     toPUPer = new PUP::toDisk(fMsgLog);
 #endif
   }else if(msgLogRead){
 #if CMK_PROJECTIONS_USE_ZLIB
-    fMsgLog = gzopen(fname,"rb");
+    fMsgLog = gzopen(msgLogFilename,"rb");
     fromPUPer = new PUP::fromzDisk(fMsgLog);
 #else
-    fMsgLog = fopen(fname,"rb");
+    fMsgLog = fopen(msgLogFilename,"rb");
     fromPUPer = new PUP::fromDisk(fMsgLog);
 #endif
   }
