@@ -10,7 +10,7 @@
 
 #define COLLIDE_TRACE 0
 #if COLLIDE_TRACE
-#  define TRACE(x) ckout<<"["<<CkMyPe()<<"] "<<x<<endl;
+  define TRACE(x) ckout<<"["<<CkMyPe()<<"] "<<x<<endl;
 #else
 #  define TRACE(x) /* empty */
 #endif
@@ -157,31 +157,27 @@ public:
 
 /// collideClient interface (called by voxels)
 /// Splits up collisions by destination PE
-void threadCollideMgr::collisions(ArrayElement *src,int step,CollisionList &colls) {
-	// Do a fake reduction, so we'll know when all voxels have reported:
-	src->contribute(0,0,CkReduction::sum_int,
-		CkCallback(CkIndex_threadCollideMgr::sendRemote(0),thisProxy));
-
-	// Split out this voxel's contribution
-	int i=0, n=colls.size();
-	static int count=0;
-	
-	TRACE("Voxel contributes "<<n<<" collisions")
-
-	//printf("COLLIDE: Total collisions contributed so far: %d\n", count+=n);
-	for (i=0;i<n;i++) {
-		const Collision &c=colls[i];
-		toPE[c.A.pe].push_back(c);
-		//if (toPE[c.A.pe].capacity() > 10000000)
-		  //printf("COLLIDE: WARNING! toPE[%d] has over ten million collisions recorded!\n", c.A.pe);
-		if (c.B.pe!=c.A.pe) { //Report collision to both processors
-			Collision cB(c.B,c.A); //Swap so B is listed first
-			toPE[c.B.pe].push_back(cB);
-			//if (toPE[c.B.pe].capacity() > 10000000)
-			  //printf("COLLIDE: WARNING! toPE[%d] has over ten million collisions recorded!\n", c.B.pe);
-		}
-	}
-	
+void threadCollideMgr::collisions(ArrayElement *src,int step,
+				  CollisionList &colls) {
+  // Do a fake reduction, so we'll know when all voxels have reported:
+  src->contribute(0,0,CkReduction::sum_int,
+		  CkCallback(CkIndex_threadCollideMgr::sendRemote(0),thisProxy));
+  
+  // Split out this voxel's contribution
+  int i=0, n=colls.size();
+  static int count=0;
+  
+  TRACE("Voxel contributes "<<n<<" collisions")
+    
+    //printf("COLLIDE: Total collisions contributed so far: %d\n", count+=n);
+    for (i=0;i<n;i++) {
+      const Collision &c=colls[i];
+      toPE[c.A.pe].push_back(c);
+      if (c.B.pe!=c.A.pe) { //Report collision to both processors
+	Collision cB(c.B,c.A); //Swap so B is listed first
+	toPE[c.B.pe].push_back(cB);
+      }
+    }
 }
 
 /// Destroy this collision list, and create a message
