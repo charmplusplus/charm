@@ -2178,7 +2178,7 @@ Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz, SdagConstr
   if (param && param->isMarshalled() && !isThreaded()) attribs|=SNOKEEP;
 
   if(!isThreaded() && stacksize) die("Non-Threaded methods cannot have stacksize",line);
-  if(retType && !isSync() && !isIget() && !retType->isVoid()) 
+  if(retType && !isSync() && !isIget() && !isLocal() && !retType->isVoid()) 
     die("A remote method normally returns void.  To return non-void, you need to declare the method as [sync], which means it has blocking semantics.",line);
   if (isPython()) pythonDoc = python_doc;
 }
@@ -2441,10 +2441,12 @@ void Entry::genArrayDefs(XStr& str)
       str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a non-local element\");\n";
       str << "#endif\n";
       if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,"<<epIdx()<<",CkMyPe(),0,((CkArrayIndexMax&)ckGetIndex()).getProjectionID());\n";
-      str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
-      str << "  obj->"<<name<<"("<<unmarshallStr<<");\n";
+      str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n  ";
+      if (!retType->isVoid()) str << retType<< " retValue = ";
+      str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
       str << "#if CMK_LBDB_ON\n  obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
+      if (!retType->isVoid()) str << "  return retValue;\n";
     }
     if(isIget()) {
 	    str << "  CkFutureID f=CkCreateAttachedFutureSend(impl_amsg,"<<epIdx()<<",ckGetArrayID(),ckGetIndex(),&CProxyElement_ArrayBase::ckSendWrapper);"<<"\n";
@@ -2615,12 +2617,14 @@ void Entry::genGroupDefs(XStr& str)
 "    objstopped = 1;\n"
 "    the_lbdb->ObjectStop(objHandle);\n"
 "  }\n"
-"#endif\n";
-      str << "  obj->"<<name<<"("<<unmarshallStr<<");\n";
+"#endif\n  ";
+      if (!retType->isVoid()) str << retType << " retValue = ";
+      str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
       str << "#if CMK_LBDB_ON\n"
 "  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
 "#endif\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
+      if (!retType->isVoid()) str << "  return retValue;\n";
     } else if(isSync()) {
       str << syncReturn() <<
         "CkRemote"<<node<<"BranchCall("<<paramg<<", ckGetGroupPe()));\n"; 
