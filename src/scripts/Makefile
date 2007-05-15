@@ -175,7 +175,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	ckstatistics.h ckvector3d.h conv-lists.h RTH.h ckcomplex.h \
 	sockRoutines.h sockRoutines.c ckpool.h bgltorus.h \
-	TopoManager.h CrayTorus.h
+	TopoManager.h CrayTorus.h cmimemcpy.h
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h \
