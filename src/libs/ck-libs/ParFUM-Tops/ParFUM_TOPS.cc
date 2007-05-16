@@ -300,14 +300,33 @@ void topNode_SetId(TopModel* m, TopNode n, TopID id){
 
 /** Insert an element */
 TopElement topModel_InsertElem(TopModel*m, TopElemType type, TopNode* nodes){
-  CkAssert(type ==  TOP_ELEMENT_TET4);
-  int conn[4];
-  conn[0] = nodes[0];
-  conn[1] = nodes[1];
-  conn[2] = nodes[2];
-  conn[3] = nodes[3];
-  int newEl = FEM_add_element_local(m->mesh, conn, 4, 0, 0, 0);
-  return newEl;
+  CkAssert(type ==  TOP_ELEMENT_TET4 || type == TOP_ELEMENT_TET10); 
+         
+ int newEl; 
+ 
+  if(type==TOP_ELEMENT_TET4){ 
+          int conn[4]; 
+          conn[0] = nodes[0]; 
+          conn[1] = nodes[1]; 
+          conn[2] = nodes[2]; 
+          conn[3] = nodes[3]; 
+          newEl = FEM_add_element_local(m->mesh, conn, 4, 0, 0, 0); 
+  } else if (type==TOP_ELEMENT_TET4){  
+          int conn[10];  
+          conn[0] = nodes[0];  
+          conn[1] = nodes[1];  
+          conn[2] = nodes[2];  
+          conn[3] = nodes[3]; 
+          conn[4] = nodes[4];   
+          conn[5] = nodes[5];   
+          conn[6] = nodes[6];   
+          conn[7] = nodes[7];  
+          conn[8] = nodes[8];   
+          conn[9] = nodes[9]; 
+          newEl = FEM_add_element_local(m->mesh, conn, 10, 0, 0, 0);  
+  } 
+ 
+         return newEl; 
 }
 
 /** Set id of an element
