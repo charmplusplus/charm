@@ -56,9 +56,9 @@ extern int currTlineIdx;
 double map_linearly_to_interval(double val, double old_lower, double old_upper, double new_lower, double new_upper){
   double new_val;
 
-  if(val = old_lower)
+  if(val == old_lower)
 	new_val = new_lower;
-  else if(val = old_upper)
+  else if(val == old_upper)
 	new_val = old_lower;
   else
 	new_val = new_lower + ((val-old_lower)*(new_upper-new_lower))/(old_upper-old_lower);
