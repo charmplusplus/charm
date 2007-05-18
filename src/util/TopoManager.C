@@ -95,15 +95,35 @@ void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
   quicksort(pe, pes, idx, 0, n-1);
 }
 
-int TopoManager::pickClosestRank(int mype, int *pes, int n){
+int TopoManager::pickClosestRank(int mype, int *pes, int n) {
 #ifdef CMK_VERSION_BLUEGENE
-    return(bgltm->pickClosestRank(mype,pes,n));
+  return(bgltm->pickClosestRank(mype, pes, n));
 #elif CMK_XT3
 #else 
-    return(pes[0]);
+  return(pes[0]);
 #endif
-  }
+}
 
+int TopoManager::areNeighbors(int pe1, int pe2, int pe3, int distance) {
+#ifdef CMK_VERSION_BLUEGENE
+  return(bgltm->isNeighborOfBoth(pe1, pe2, pe3, distance));
+#elif CMK_XT3
+#else 
+  if(abs(pe1-pe2) + abs(pe2-pe3) <= distance)
+    return 1;
+  else
+    return 0;
+#endif
+}
+
+/*int TopoManager::getConeNumberForRank(int pe) {
+#ifdef CMK_VERSION_BLUEGENE
+  return(bgltm->getConeNumberForRank(pe));
+#elif CMK_XT3
+#else 
+    return 0;
+#endif
+}*/
 
 void TopoManager::quicksort(int pe, int *pes, int *arr, int left, int right) {
   if(left<right) {
