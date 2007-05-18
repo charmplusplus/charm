@@ -74,7 +74,7 @@ string parseStreamUntilSquiggle(istream &in){
   in >> temp;
   while(temp != string("}") && in.good()){
 
-	out << temp << " "; 
+	out << temp << " ";
 
 	in >> temp;
   }
@@ -151,14 +151,14 @@ pair<int,vector<double> > EventInterpolator::parseParameters(const string &funcn
 
 EventInterpolator::EventInterpolator(char *table_filename, double sample_rate){
   std::map<string,double> cycle_accurate_time_sum;
-  
+
   exact_matches=0;
   exact_positive_matches=0;
   approx_matches=0;
   approx_positive_matches=0;
-  
+
   log1.open("log1");
-  
+
   cout << "Loading timings file: " << table_filename << endl;
   ifstream accurateTimeTable(table_filename);
   if(! accurateTimeTable.good() ){
@@ -205,7 +205,7 @@ EventInterpolator::EventInterpolator(char *table_filename, double sample_rate){
 		}
 		line >> field;
 	  }
-	  
+
 	  if(funcname != string("") && time != -1){
 		istringstream paramstream(paramstring);
 		fullParams params = parseParameters(funcname,paramstream);
@@ -224,7 +224,7 @@ EventInterpolator::EventInterpolator(char *table_filename, double sample_rate){
 
 
   std::map<string,double>::iterator cycle_i;
-  cout << "\nThe following table displays the total cycle count for each event in the \n" 
+  cout << "\nThe following table displays the total cycle count for each event in the \n"
 	"cycle-accurate timings file. This may be useful for back of the envelope \n"
 	"calculations for expected performance " << endl << endl;
   cout << "\t|===============================|===================|" << endl;
@@ -233,13 +233,13 @@ EventInterpolator::EventInterpolator(char *table_filename, double sample_rate){
   for(cycle_i= cycle_accurate_time_sum.begin();cycle_i!=cycle_accurate_time_sum.end();++cycle_i){
 	cout << "\t|";
 	assert((*cycle_i).first.length() <= 30); // the event names should be at most 30 characters
-	for(int i=0;i<30-(*cycle_i).first.length();++i) 
+	for(int i=0;i<30-(*cycle_i).first.length();++i)
 	  cout << " ";
 	cout << (*cycle_i).first << " | ";
 	cout.width(17);
 	cout << (*cycle_i).second;
 	cout << " |" << endl;
-  }	
+  }
   cout << "\t|===============================|===================|" << endl << endl;
 
 
@@ -262,15 +262,15 @@ EventInterpolator::EventInterpolator(char *table_filename, double sample_rate){
   for(map<funcIdentifier,unsigned long>::iterator i=sample_count.begin(); i!=sample_count.end();++i){
 	funcIdentifier func = (*i).first;
 	unsigned long samples = (*i).second;
-		
+
 	cout << "\t|";
-		
+
 	for(int i=0;i<30-func.first.length();++i)
 	  cout << " ";
 	cout << func.first << ",";
 	cout.width(3);
 	cout << func.second;
-		
+
 	cout << " | ";
 	cout.width(24);
 	cout << samples << " |" << endl;
@@ -360,13 +360,13 @@ EventInterpolator::EventInterpolator(char *table_filename, double sample_rate){
 	gsl_vector_free(y[func]);
 
 	cout << "\t|";
-		
+
 	for(int i=0;i<30-func.first.length();++i)
 	  cout << " ";
 	cout << func.first << ",";
 	cout.width(3);
 	cout << func.second;
-		
+
 	cout << " | ";
 	cout.width(7);
 	cout << chisqr[func];
@@ -379,9 +379,9 @@ EventInterpolator::EventInterpolator(char *table_filename, double sample_rate){
   cout << "\t|===================================|=========|=========|" << endl << endl;
 
   // Load in Parameter File which maps event id to function name and parameters
-  cout << "Loading parameter files" << endl;
+  cout << "Loading parameter files (May take a while)" << endl;
 
-  for(int i=0;i<102400;++i){
+  for(int i=0;true;++i){
 	char name[512];
 	sprintf(name,"param.%d",i);
 	ifstream parameterEventTable(name);
@@ -499,7 +499,7 @@ void EventInterpolator::analyzeExactVariances(){
 		}
 	  }
 	}
-	
+
 	// Display the max std dev for any given event
 	cout << "\nThe following events have differing exact times for one or more parameter set.\n"
 	        "Each line corresponds to whichever parameter list produced the greatest variance\n"
@@ -520,7 +520,7 @@ void EventInterpolator::analyzeExactVariances(){
 	  double stddev = (*sItr).second;
 	  double mean = associated_mean[(*sItr).first];
 	  cout << "\t|";
-	  for(int i=0;i<func_name_field_width-(*sItr).first.first.length();++i) 
+	  for(int i=0;i<func_name_field_width-(*sItr).first.first.length();++i)
 		cout << " ";
 	  cout << (*sItr).first.first ;
 	  cout << ",";
