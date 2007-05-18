@@ -32,7 +32,7 @@
 #define KEEP_RATIO 1.0
 
 #define OUTPUTDIR "newtraces-keep1.0/"
-#define CYCLE_TIMES_FILE "nopme"
+#define CYCLE_TIMES_FILE "expectedTimings"
 #define sec_per_cycle 0.00000000025
 
 // Scale the duration of all unknown events by this factor
@@ -76,7 +76,8 @@ double map_linearly_to_interval(double val, double old_lower, double old_upper, 
 
 int main()
 {
-    // Load in Mambo Times
+    // Create model from sample Predicted Parameterized Times
+    // (from cycle accurate simulator or real machine)
     EventInterpolator interpolator(CYCLE_TIMES_FILE, KEEP_RATIO);
 
     int totalProcs, numX, numY, numZ, numCth, numWth, numPes;

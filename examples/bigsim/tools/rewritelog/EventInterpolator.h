@@ -105,8 +105,7 @@ public:
     double get_chisqr(funcIdentifier funcname){if(work[funcname]!=NULL) return chisqr[funcname]; else return -1.0;}
 
     int numCoefficients(const string &funcname);
-    fullParams parseParameters(const string &funcname, istringstream &param_stream, double &time, const bool log);
-    fullParams parseParameters(const string &funcname, istringstream &param_stream, const bool log);
+    fullParams parseParameters(const string &funcname, istringstream &param_stream);
 
     void printMinInterpolatedTimes();
 
