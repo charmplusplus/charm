@@ -76,6 +76,8 @@ class TopoManager {
     int getHopsBetweenRanks(int pe1, int pe2);
     void sortRanksByHops(int pe, int *pes, int *idx, int n); 
     int pickClosestRank(int mype, int *pes, int n);
+    int areNeighbors(int pe1, int pe2, int pe3, int distance);
+    //int getConeNumberForRank(int pe);
 
   private:
     void quicksort(int pe, int *pes, int *arr, int left, int right);
