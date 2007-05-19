@@ -38,6 +38,15 @@ class TopoManager {
 
   public:
     TopoManager();
+
+    TopoManager(int X, int Y, int Z, int NX, int NY, int NZ ) : dimX(X), dimY(Y), dimZ(Z),  dimNX(NX), dimNY(NY), dimNZ(NZ)
+      {
+	// we rashly assume only one dimension is expanded 
+	  procsPerNode = dimX/dimNX;
+	  procsPerNode = (dimY/dimNY >procsPerNode) ? dimY/dimNY: procsPerNode;
+	  procsPerNode = (dimZ/dimNZ >procsPerNode) ? dimZ/dimNZ: procsPerNode;
+      }
+
     ~TopoManager();
 
     inline int getDimX() { return dimX; }
@@ -68,9 +77,9 @@ class TopoManager {
       CmiAssert(sz>=0);
       return ((pz>sz) ? sz : pz);
     }
-
+    int coords2rank(int x, int y, int z);
     int hasMultipleProcsPerNode();
- 
+    void getCoordinatesByRank(int pe, int &x, int &y, int &z);
     void rankToCoordinates(int pe, int &x, int &y, int &z);
     int coordinatesToRank(int x, int y, int z);
     int getHopsBetweenRanks(int pe1, int pe2);
