@@ -37,17 +37,49 @@ class TopoManager {
 #endif
 
   public:
-    TopoManager();
+
+    TopoManager() {
+#ifdef CMK_VERSION_BLUEGENE
+      bgltm = BGLTorusManager::getObject();
+  
+      dimX = bgltm->getXSize();
+      dimY = bgltm->getYSize();
+      dimZ = bgltm->getZSize();
+    
+      dimNX = bgltm->getXNodeSize();
+      dimNY = bgltm->getYNodeSize();
+      dimNZ = bgltm->getZNodeSize();
+
+      if(bgltm->isVnodeMode())
+        procsPerNode = 2;
+      else
+        procsPerNode = 1;
+
+#elif CMK_XT3
+
+#else
+      dimX = CkNumPes();
+      dimY = 1;
+      dimZ = 1;
+
+      dimNX = dimX;
+      dimNY = 1;
+      dimNZ = 1;
+
+      procsPerNode = 1;
+#endif
+    }
 
     TopoManager(int X, int Y, int Z, int NX, int NY, int NZ ) : dimX(X), dimY(Y), dimZ(Z),  dimNX(NX), dimNY(NY), dimNZ(NZ)
-      {
-	// we rashly assume only one dimension is expanded 
-	  procsPerNode = dimX/dimNX;
-	  procsPerNode = (dimY/dimNY >procsPerNode) ? dimY/dimNY: procsPerNode;
-	  procsPerNode = (dimZ/dimNZ >procsPerNode) ? dimZ/dimNZ: procsPerNode;
-      }
+    {
+      // we rashly assume only one dimension is expanded 
+      procsPerNode = dimX/dimNX;
+      procsPerNode = (dimY/dimNY >procsPerNode) ? dimY/dimNY: procsPerNode;
+      procsPerNode = (dimZ/dimNZ >procsPerNode) ? dimZ/dimNZ: procsPerNode;
+    }
 
-    ~TopoManager();
+    ~TopoManager() {
+     }
 
     inline int getDimX() { return dimX; }
     inline int getDimY() { return dimY; }
@@ -77,9 +109,8 @@ class TopoManager {
       CmiAssert(sz>=0);
       return ((pz>sz) ? sz : pz);
     }
-    int coords2rank(int x, int y, int z);
+    
     int hasMultipleProcsPerNode();
-    void getCoordinatesByRank(int pe, int &x, int &y, int &z);
     void rankToCoordinates(int pe, int &x, int &y, int &z);
     int coordinatesToRank(int x, int y, int z);
     int getHopsBetweenRanks(int pe1, int pe2);
