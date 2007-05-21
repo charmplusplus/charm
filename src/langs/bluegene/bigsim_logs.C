@@ -307,8 +307,10 @@ void BgTimeLog::addMsgBackwardDep(BgTimeLineRec &tlinerec, void* msg)
   int idx;
   BgTimeLog *msglog = tlinerec.getTimeLogOnThread(BgMsgID(CmiBgMsgSrcPe(msg), CmiBgMsgID(msg)), &idx);
   //CmiAssert(msglog != NULL);
-  if (msglog != NULL)
-  addBackwardDep(msglog);
+  if (msglog != NULL) {
+    CmiAssert(msglog != this);
+    addBackwardDep(msglog);
+  }
 }
 
 // log  => this
