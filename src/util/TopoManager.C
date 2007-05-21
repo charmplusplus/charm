@@ -10,44 +10,6 @@
 
 #include "TopoManager.h"
 
-TopoManager::TopoManager() {
-#ifdef CMK_VERSION_BLUEGENE
-  bgltm = BGLTorusManager::getObject();
-  
-  dimX = bgltm->getXSize();
-  dimY = bgltm->getYSize();
-  dimZ = bgltm->getZSize();
-
-  dimNX = bgltm->getXNodeSize();
-  dimNY = bgltm->getYNodeSize();
-  dimNZ = bgltm->getZNodeSize();
-
-  if(bgltm->isVnodeMode())
-    procsPerNode = 2;
-  else
-    procsPerNode = 1;
-
-#elif CMK_XT3
-
-#else
-  dimX = CkNumPes();
-  dimY = 1;
-  dimZ = 1;
-
-  dimNX = dimX;
-  dimNY = 1;
-  dimNZ = 1;
-
-  procsPerNode = 1;
-#endif
-}
-
-
-
-TopoManager::~TopoManager() {
-
-}
-
 int TopoManager::hasMultipleProcsPerNode() {
 #ifdef CMK_VERSION_BLUEGENE
   if(procsPerNode==1)
@@ -67,24 +29,19 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
 #elif CMK_XT3
 
 #else
-  if(dimY>0)
-    {
-      getCoordinatesByRank(pe, x, y, z);
-    }
-  else
-    {
-      x = pe; y = 0; z = 0;
+  if(dimY>0){
+    // Assumed TXYZ
+    x = pe % dimX;
+    y = (pe % (dimX * dimY)) / dimX;
+    z = pe / (dimX * dimY);
+  }
+  else {
+      x = pe; 
+      y = 0; 
+      z = 0;
     }
 #endif
 }
-
-void TopoManager::getCoordinatesByRank(int pe, int &x, int &y, int &z) {
-    //Assumed TXYZ
-    x = pe % dimX;
-    y = (pe % (dimX * dimY)) / dimX;
-    z = pe / (dimX * dimY);    
-  }
-
 
 int TopoManager::coordinatesToRank(int x, int y, int z) {
 #ifdef CMK_VERSION_BLUEGENE
@@ -92,16 +49,12 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
 #elif CMK_XT3
 
 #else
-  if(dimY>0)
-    return(coords2rank(x,y,z));
+  if(dimY > 0)
+    return x + y*dimX + z*dimX*dimY;
   else
     return x;
 #endif
 }
-int TopoManager::coords2rank(int x, int y, int z) {
-    return x + y * dimX + z * dimX * dimY;
-  }
-
 
 int TopoManager::getHopsBetweenRanks(int pe1, int pe2) {
   int x1, y1, z1, x2, y2, z2;
@@ -118,6 +71,7 @@ void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
     idx[i] = i;
   quicksort(pe, pes, idx, 0, n-1);
 }
+
 /*
 int TopoManager::pickClosestRank(int mype, int *pes, int n) {
 #ifdef CMK_VERSION_BLUEGENE
@@ -130,18 +84,18 @@ int TopoManager::pickClosestRank(int mype, int *pes, int n) {
 */
 
 int TopoManager::pickClosestRank(int mype, int *pes, int n){
-    int minHops=getHopsBetweenRanks(mype,pes[0]);
-    int minIdx=0;
-    int nowHops; 
-    for(int i=1;i<n;i++){
-      nowHops = getHopsBetweenRanks(mype,pes[i]);
-      if(nowHops<minHops){
-        minHops=nowHops; minIdx=i;
-      }
+  int minHops = getHopsBetweenRanks(mype, pes[0]);
+  int minIdx=0;
+  int nowHops; 
+  for(int i=1; i<n; i++) {
+    nowHops = getHopsBetweenRanks(mype, pes[i]);
+    if(nowHops < minHops) {
+      minHops = nowHops;
+      minIdx=i;
     }
-    return minIdx;
   }
-
+  return minIdx;
+}
 
 int TopoManager::areNeighbors(int pe1, int pe2, int pe3, int distance) {
 #ifdef CMK_VERSION_BLUEGENE
