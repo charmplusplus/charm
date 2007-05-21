@@ -50,7 +50,9 @@ private:
     map<funcIdentifier, gsl_vector *>y;  // vector of cycle accurate times for each input parameter set
 
     map<pair<unsigned,unsigned>,pair<funcIdentifier,vector<double> > > eventparams;
+    map<string, int> number_of_coefficients; // records the number of coefficients
     timings_type accurateTimings;
+
 
 
     bool canInterpolateFunc(const funcIdentifier& name);
@@ -105,6 +107,7 @@ public:
     double get_chisqr(funcIdentifier funcname){if(work[funcname]!=NULL) return chisqr[funcname]; else return -1.0;}
 
     int numCoefficients(const string &funcname);
+    void recordNumCoefficients(const string &f, int num_params);
     fullParams parseParameters(const string &funcname, istringstream &param_stream);
 
     void printMinInterpolatedTimes();

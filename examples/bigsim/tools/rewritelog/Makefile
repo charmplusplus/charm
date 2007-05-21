@@ -18,9 +18,12 @@ rewritelog: rewritelog.o
 rewritelog.o: rewritelog.C
 	$(CHARMC) -seq -c rewritelog.C
 
+docs: 
+	doxygen Doxyfile
+
 clean:
 	rm -f *.o *~ moduleinit.C charmrun conv-host rewritelog
-	rm -rf *.decl.h *.def.h core *.log newtraces interpolatelog
+	rm -rf *.decl.h *.def.h core *.log newtraces interpolatelog html latex xml
 
 test: rewritelog
 	./rewritelog < sample-input

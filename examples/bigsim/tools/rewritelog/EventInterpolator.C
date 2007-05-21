@@ -42,15 +42,6 @@ multimap<T,T2> random_select_multimap(multimap<T,T2> input_map , int count){
     return output_map;
 }
 
-int EventInterpolator::numCoefficients(const string &funcname){
-// We create a dummy input stringstream and pass it to parseParameters.
-// Then we count how many parameters that function creates
-    string temp("0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0");
-    istringstream temp2(temp);
-    return parseParameters(funcname,temp2).second.size();
-}
-
-
 int distance(int i1, int i2, int i3, int i4, int i5, int i6){
     int x1 =(abs(13+i1-i4)%13)*4;
     int x2 =(abs(13+i4-i1)%13)*4;
@@ -83,8 +74,35 @@ string parseStreamUntilSquiggle(istream &in){
 }
 
 
+/** Record the number of parameters for the given type of event. Subsequent invocation for the same function identifier will fail if num_params doesn't match the recorded value from the first invocation  */
+void EventInterpolator::recordNumCoefficients(const string &f, int c){
+    // find existing entry and verify it matches
+    if(number_of_coefficients.find(f) != number_of_coefficients.end()){
+        if(number_of_coefficients[f] != c){
+            cerr << "Number of coefficients for function " << f << " is not consistent" << endl;
+            exit(-5);
+        }
+    } else {
+        // create if no entry was found
+        number_of_coefficients[f] = c;
+    }
+}
 
-/** First parameter is a category or subclass for a particular timed region. For example, we wish to consider computation for adjacent patches differently than patches that are neighbors of adjacent patches. This allows a single timed region to be broken out and treated as a number of different cases. */
+
+int EventInterpolator::numCoefficients(const string &funcname){
+     if(number_of_coefficients.find(funcname) == number_of_coefficients.end()){
+            cerr << "Number of coefficients looked up before it was set." << endl;
+            exit(-5);
+    }
+    int num = number_of_coefficients[funcname];
+    return num;
+}
+
+/** First parameter is a category or subclass for a particular timed region. For example, we wish to consider computation for adjacent patches differently than patches that are neighbors of adjacent patches. This allows a single timed region to be broken out and treated as a number of different cases.
+
+@note The use should modify this function to incorporate better models of the interpolation function basis
+
+*/
 pair<int,vector<double> > EventInterpolator::parseParameters(const string &funcname, istringstream &line){
     vector<double> params;
     int category=0;
@@ -113,29 +131,23 @@ pair<int,vector<double> > EventInterpolator::parseParameters(const string &funcn
         params.push_back( min(d1,d2)*d1*d2 );
         params.push_back( d1*d2 );
 
-        category = distance(d9,d10,d11,d12,d13,d14);
+        category = distance((int)d9,(int)d10,(int)d11,(int)d12,(int)d13,(int)d14);
 
     }
-    else if(funcname == string("angles") || funcname == string("dihedrals")){
-        double d1, d2;
-        line >> d1 >> d2;
+    else { /** @note default model is quadratic in each variable */
+        double d;
+        int count=0;
         params.push_back( 1.0);
-        params.push_back( d2 );
-        params.push_back( d2*d2 );
+        while(line.good()){
+            line >> d;
+            if(line.good()){
+                params.push_back(d);
+                params.push_back(d*d);
+                count++;
+            }
+        }
     }
-    else if(funcname == string("integrate")){
-        double d1, d2, d3, d4, d5, d6, d7, d8;
-        line >> d1 >> d2 >> d3 >> d4 >> d5 >> d6 >> d7 >> d8;
-
-        params.push_back( 1.0);
-        params.push_back( d2 );
-        params.push_back( d2*d2 );
-    }
-    else {
-        cerr << "FATAL ERROR: Don't know how to read parameters for function " << funcname << endl;
-        throw new runtime_error("unknown function");
-    }
-
+    recordNumCoefficients(funcname,params.size());
     return make_pair(category,params);
 }
 
