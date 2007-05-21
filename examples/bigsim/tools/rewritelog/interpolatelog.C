@@ -181,7 +181,7 @@ int main()
 					else if(strncmp(data,"endTraceBigSim",14)==0){
 					  old_bracket_end = old_start+timeLog->evts[i]->rTime;
 					  have_bracket_end = 1;
-					}
+                    }
 				  }
 
 				  // If we have bracketed timings, the middle part will be the old

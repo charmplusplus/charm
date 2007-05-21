@@ -100,31 +100,25 @@ pair<int,vector<double> > EventInterpolator::parseParameters(const string &funcn
         funcname == string("calc_self_energy") ||
         funcname == string("calc_pair_energy") ){
 
-        double d1,d2,d3,d4,d5,d6,d7,d8,d9;
-        int i1,i2,i3,i4,i5,i6;
+        double d1,d2,d3,d4,d5,d6,d7,d8,d9,d10,d11,d12,d13,d14;
 
-        line >> d1 >> d2 >> i1 >> i2 >> i3 >> i4 >> i5 >> i6 >>
-                d3 >> d4 >> d5 >> d6 >> d7 >> d8;
+        line >> d1 >> d2 >> d3 >> d4 >> d5 >> d6 >> d7 >> d8 >> d9 >> d10 >> d11 >> d12 >> d13 >> d14;
 
         params.push_back( 1.0);
 
-//         params.push_back( 1.0 / distance );
         params.push_back( d3 );
         params.push_back( d4 );
         params.push_back( d5 );
-		//        params.push_back( d2 );
-		//        params.push_back( d3 );
-		//        params.push_back( d4 );
+
         params.push_back( min(d1,d2)*d1*d2 );
         params.push_back( d1*d2 );
 
-        category = distance(i1,i2,i3,i4,i5,i6 );
+        category = distance(d9,d10,d11,d12,d13,d14);
 
     }
     else if(funcname == string("angles") || funcname == string("dihedrals")){
         double d1, d2;
         line >> d1 >> d2;
-
         params.push_back( 1.0);
         params.push_back( d2 );
         params.push_back( d2*d2 );
@@ -228,7 +222,7 @@ EventInterpolator::EventInterpolator(char *table_filename, double sample_rate){
 	"cycle-accurate timings file. This may be useful for back of the envelope \n"
 	"calculations for expected performance " << endl << endl;
   cout << "\t|===============================|===================|" << endl;
-  cout << "\t|                        event  | total cycle count |" << endl;
+  cout << "\t|                        event  | total time (sec)  |" << endl;
   cout << "\t|-------------------------------|-------------------|" << endl;
   for(cycle_i= cycle_accurate_time_sum.begin();cycle_i!=cycle_accurate_time_sum.end();++cycle_i){
 	cout << "\t|";
@@ -237,7 +231,7 @@ EventInterpolator::EventInterpolator(char *table_filename, double sample_rate){
 	  cout << " ";
 	cout << (*cycle_i).first << " | ";
 	cout.width(17);
-	cout << (*cycle_i).second;
+    cout << (*cycle_i).second;
 	cout << " |" << endl;
   }
   cout << "\t|===============================|===================|" << endl << endl;
@@ -306,7 +300,6 @@ EventInterpolator::EventInterpolator(char *table_filename, double sample_rate){
   // The data is currently in  accurateTimings[pair<funcIdentifier,vector<double> >(func,params.second)]=time;
 
   //iterate through accurateTimings
-  cout << "accurateTimings.size() = " << accurateTimings.size() << endl;
   map< pair<funcIdentifier,vector<double> >, double >::iterator itr;
   for(itr=accurateTimings.begin();itr!=accurateTimings.end();++itr){
 	const double &time = (*itr).second;
@@ -508,11 +501,12 @@ void EventInterpolator::analyzeExactVariances(){
 
 
 	cout << "\t|===================================|=================|=================|==============|" << endl;
-	cout << "\t|                            event  |     max std dev |            mean | sd % of mean |" << endl;
+	cout << "\t|                            event  |     max std dev |      mean (sec) | sd % of mean |" << endl;
 	cout << "\t|-----------------------------------|-----------------|-----------------|--------------|" << endl;
 
-	cout.setf(ios_base::fixed, ios_base::floatfield);
-	cout.precision(1);
+//	cout.setf(ios_base::fixed, ios_base::floatfield);
+    cout.setf(ios_base::scientific, ios_base::floatfield);
+	cout.precision(3);
 
 	int func_name_field_width=30;
 	map< funcIdentifier, double >::iterator sItr;
@@ -528,11 +522,17 @@ void EventInterpolator::analyzeExactVariances(){
 	  cout << (*sItr).first.second;
 	  cout << " | ";
 	  cout.width(15);
+      cout.setf(ios_base::scientific, ios_base::floatfield);
+      cout.precision(3);
 	  cout <<  stddev;
 	  cout << " | ";
-	  cout.width(15);
+      cout.width(15);
+      cout.setf(ios_base::scientific, ios_base::floatfield);
+      cout.precision(3);
 	  cout << mean << " | ";
 	  cout.width(9);
+      cout.setf(ios_base::fixed, ios_base::floatfield);
+      cout.precision(1);
 	  cout << (stddev * 100.0 / mean) << "    | " << endl;
 	}
 	cout.setf(ios_base::fmtflags(0), ios_base::floatfield);
