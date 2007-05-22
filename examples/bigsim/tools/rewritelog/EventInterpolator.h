@@ -32,6 +32,7 @@ using namespace std;
 typedef pair<string,int> funcIdentifier;
 typedef pair<int,vector<double> > fullParams;
 typedef multimap< pair<funcIdentifier,vector<double> >, double > timings_type;
+typedef vector<long> counterValues;
 
 class EventInterpolator{
 private:
@@ -53,6 +54,7 @@ private:
     map<string, int> number_of_coefficients; // records the number of coefficients
     timings_type accurateTimings;
 
+    std::map<string,double> cycle_accurate_time_sum;
 
 
     bool canInterpolateFunc(const funcIdentifier& name);
@@ -64,6 +66,8 @@ private:
     unsigned exact_positive_matches;
     unsigned approx_matches;
     unsigned approx_positive_matches;
+
+    map<counterValues,double> papiTimings; // holds a timing for each set of counter values. This will be used to model the execution time for each sequential execution block just by using the performance counters
 
 public:
 
@@ -109,6 +113,7 @@ public:
     int numCoefficients(const string &funcname);
     void recordNumCoefficients(const string &f, int num_params);
     fullParams parseParameters(const string &funcname, istringstream &param_stream);
+    counterValues parseCounters(istringstream &line);
 
     void printMinInterpolatedTimes();
 
@@ -123,6 +128,11 @@ public:
 		interpolating model
 	*/
     EventInterpolator(char *table_filename, double sample_rate=1.0);
+    void LoadTimingsFile(char *table_filename);
+    void AnalyzeTimings(double sample_rate);
+    void AnalyzeTimings_PAPI();
+    void LoadParameterFiles();
+
 
     ~EventInterpolator();
 
