@@ -41,8 +41,25 @@ class CrayTorusManager {
     struct loc nid2coords[MAXNID];
 
   public:
-    CrayTorusManager();
-    ~CrayTorusManager();
+    CrayTorusManager() {
+      FILE *fp = fopen("CrayNeighbourTable", "r");
+      int temp, nid, num, lx, ly, lz;
+      char header[50];
+      for(int i=0; i<10;i++)
+        temp = fscanf(fp, "%s", header);
+      for(int i=0; i<2112;i++)
+      {
+        temp = fscanf(fp, "%d%d%d%d%d%d%d%d%d%d", &nid, &num, &num, &num, &num, &num, &num, &lx, &ly, &lz);
+        //printf("%d %d %d %d %d %d %d %d %d %d\n", nid, num, num, num, num, num, num, lx, ly, lz);
+        nid2coords[nid].x = lx;
+        nid2coords[nid].y = ly;
+        nid2coords[nid].z = lz;
+        coords2nid[lx][ly][lz] = nid;
+      }
+      fclose(fp); 
+    }
+
+    ~CrayTorusManager() { }
 
     inline int getDimX() { return dimX; }
     inline int getDimY() { return dimY; }
@@ -52,8 +69,15 @@ class CrayTorusManager {
     inline int getDimNY() { return dimNY; }
     inline int getDimNZ() { return dimNZ; }
 
-    void rankToCoordinates(int pe, int &x, int &y, int &z);
-    int coordinatesToRank(int x, int y, int z);
+    inline void rankToCoordinates(int pe, int &x, int &y, int &z) {
+      x = nid2coords[pe].x; 
+      y = nid2coords[pe].y; 
+      z = nid2coords[pe].z; 
+    }
+
+    inline int coordinatesToRank(int x, int y, int z) {
+      return coords2nid[x][y][z];
+    }
 };
 
 #endif // CMK_XT3
