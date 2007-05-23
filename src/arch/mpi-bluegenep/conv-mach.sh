@@ -1,4 +1,4 @@
-BGP_TYPICAL_FLOOR=/auto/BGP/releases/ppcfloor
+BGP_TYPICAL_FLOOR=/bgsys/drivers/ppcfloor
 
 # if no floor set, use typical floor path
 if test -z "$BGP_FLOOR"
@@ -9,8 +9,7 @@ fi
 # if no install path (for experimental) set, use floor
 if test -z "$BGP_INSTALL"
 then
-  BGP_INSTALL=$BGPHOME/bgp/work/
-  echo "Using $BGP_INSTALL"
+  BGP_INSTALL=$BGP_TYPICAL_FLOOR
 fi
 
 BGP_BIN=$BGP_FLOOR/gnu-linux/bin
