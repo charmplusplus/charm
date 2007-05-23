@@ -867,15 +867,15 @@ double CmiCpuTimer()
 
 #endif
 
-#if CMK_VERSION_BLUEGENE
+#if CMK_VERSION_BLUEGENE || CMK_BLUEGENEP
 #include "dcopy.h"
 #endif
 
 #if CMK_TIMER_USE_BLUEGENEL
 
-#include <rts.h>
+#include "rts.h"
 
-#if 0
+#if 0 
 #define SPRN_TBRL 0x10C  // Time Base Read Lower Register (user & sup R/O)
 #define SPRN_TBRU 0x10D  // Time Base Read Upper Register (user & sup R/O)
 #define SPRN_PIR  0x11E  // CPU id
@@ -944,6 +944,80 @@ double CmiTimer()
 }
 
 #endif
+
+#if CMK_TIMER_USE_BLUEGENEP  //This module just compiles with GCC charm.
+
+#include "common/bgp_personality.h"
+#include <spi/bgp_SPI.h>
+
+#define SPRN_TBRL 0x10C  // Time Base Read Lower Register (user & sup R/O)
+#define SPRN_TBRU 0x10D  // Time Base Read Upper Register (user & sup R/O)
+#define SPRN_PIR  0x11E  // CPU id
+
+static inline unsigned long long BGPTimebase(void)
+{
+  unsigned volatile u1, u2, lo;
+  union
+  {
+    struct { unsigned hi, lo; } w;
+    unsigned long long d;
+  } result;
+                                                                         
+  do {
+    asm volatile ("mfspr %0,%1" : "=r" (u1) : "i" (SPRN_TBRU));
+    asm volatile ("mfspr %0,%1" : "=r" (lo) : "i" (SPRN_TBRL));
+    asm volatile ("mfspr %0,%1" : "=r" (u2) : "i" (SPRN_TBRU));
+  } while (u1!=u2);
+                                                                         
+  result.w.lo = lo;
+  result.w.hi = u2;
+  return result.d;
+}
+
+static unsigned long long inittime_wallclock = 0;
+CpvStaticDeclare(double, clocktick);
+
+int CmiTimerIsSynchronized()
+{
+  return 0;
+}
+
+void CmiTimerInit()
+{
+  _BGP_Personality_t dst;
+  CpvInitialize(double, clocktick);
+  int size = sizeof(_BGP_Personality_t);
+  rts_get_personality(&dst, size);
+
+  CpvAccess(clocktick) = 1.0 / (dst.Kernel_Config.FreqMHz * 1e6);
+
+  /* try to synchronize calling barrier */
+  CmiBarrier();
+  CmiBarrier();
+  CmiBarrier();
+
+  inittime_wallclock = BGPTimebase (); 
+}
+
+double CmiWallTimer()
+{
+  unsigned long long currenttime;
+  currenttime = BGPTimebase();
+  return CpvAccess(clocktick)*(currenttime-inittime_wallclock);
+}
+
+double CmiCpuTimer()
+{
+  return CmiWallTimer();
+}
+
+double CmiTimer()
+{
+  return CmiWallTimer();
+}
+
+#endif
+
 
 #if CMK_TIMER_USE_WIN32API
 
