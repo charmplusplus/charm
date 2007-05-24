@@ -51,6 +51,18 @@ class BGPTorusManager {
     inline int getDimNY() { return dimNY; }
     inline int getDimNZ() { return dimNZ; }
 
+    inline int getProcsPerNode() { return procsPerNode; }
+
+    inline void rankToCoordinates(int pe, int &x, int &y, int &z) {
+      x = pe % dimX;
+      y = (pe % (dimX*dimY)) / dimX;
+      z = pe / (dimX*dimY);
+    }
+
+    inline int coordinatesToRank(int x, int y, int z) {
+      return x + y*dimX + z*dimX*dimY;
+    }
+
 };
 
 #endif // CMK_BLUEGENEP
