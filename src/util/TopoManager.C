@@ -16,6 +16,11 @@ int TopoManager::hasMultipleProcsPerNode() {
     return 0;
   else
     return 1;
+#elif CMK_BLUEGENP
+  if(procsPerNode==1)
+    return 0;
+  else
+    return 1;
 #elif CMK_XT3
   return 0;
 #else
@@ -26,6 +31,8 @@ int TopoManager::hasMultipleProcsPerNode() {
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
 #ifdef CMK_VERSION_BLUEGENE
   bgltm->getCoordinatesByRank(pe, x, y, z);
+#elif CMK_BLUEGENEP
+  bgptm->rankToCoordinates(pe, x, y, z);
 #elif CMK_XT3
 
 #else
@@ -46,6 +53,8 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
 int TopoManager::coordinatesToRank(int x, int y, int z) {
 #ifdef CMK_VERSION_BLUEGENE
   return bgltm->coords2rank(x, y, z);
+#elif CMK_BLUEGENEP
+  return bgptm->coordinatesToRank(x, y, z);
 #elif CMK_XT3
 
 #else
@@ -98,25 +107,19 @@ int TopoManager::pickClosestRank(int mype, int *pes, int n){
 }
 
 int TopoManager::areNeighbors(int pe1, int pe2, int pe3, int distance) {
-#ifdef CMK_VERSION_BLUEGENE
-  return(bgltm->isNeighborOfBoth(pe1, pe2, pe3, distance));
-#elif CMK_XT3
-#else 
-  if(abs(pe1-pe2) + abs(pe2-pe3) <= distance)
+  int pe1_x, pe1_y, pe1_z;
+  int pe2_x, pe2_y, pe2_z;
+  int pe3_x, pe3_y, pe3_z;
+
+  rankToCoordinates(pe1, pe1_x, pe1_y, pe1_z);
+  rankToCoordinates(pe2, pe2_x, pe2_y, pe2_z);
+  rankToCoordinates(pe3, pe3_x, pe3_y, pe3_z);
+
+  if ( (absX(pe1_x - (pe2_x+pe3_x)/2) + absY(pe1_y - (pe2_y+pe3_y)/2) + absZ(pe1_z - (pe2_z+pe3_z)/2)) <= distance )
     return 1;
   else
     return 0;
-#endif
 }
-
-/*int TopoManager::getConeNumberForRank(int pe) {
-#ifdef CMK_VERSION_BLUEGENE
-  return(bgltm->getConeNumberForRank(pe));
-#elif CMK_XT3
-#else 
-    return 0;
-#endif
-}*/
 
 void TopoManager::quicksort(int pe, int *pes, int *arr, int left, int right) {
   if(left<right) {
