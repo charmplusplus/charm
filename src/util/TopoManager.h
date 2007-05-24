@@ -15,8 +15,9 @@
 
 #ifdef CMK_VERSION_BLUEGENE
 #include "bgltorus.h"
-#endif
-#ifdef CMK_XT3
+#elif CMK_BLUEGENEP
+#include "BGPTorus.h"
+#elif CMK_XT3
 #include "CrayTorus.h"
 #endif
 
@@ -31,9 +32,11 @@ class TopoManager {
     int procsPerNode;
 
 #ifdef CMK_VERSION_BLUEGENE
-  BGLTorusManager *bgltm;
+    BGLTorusManager *bgltm;
+#elif CMK_BLUEGENEP
+    BGPTorusManager *bgptm;
 #elif CMK_XT3
-  CrayTorusManager *crtm;
+    CrayTorusManager *crtm;
 #endif
 
   public:
@@ -54,7 +57,19 @@ class TopoManager {
         procsPerNode = 2;
       else
         procsPerNode = 1;
+#elif CMK_BLUEGENEP
+      bgptm = new BGPTorusManager();
+  
+      dimX = bgptm->getDimX();
+      dimY = bgptm->getDimY();
+      dimZ = bgptm->getDimZ();
+    
+      dimNX = bgptm->getDimNX();
+      dimNY = bgptm->getDimNY();
+      dimNZ = bgptm->getDimNZ();
 
+      procsPerNode = bgptm->getProcsPerNode();
+      
 #elif CMK_XT3
 
 #else
@@ -117,7 +132,6 @@ class TopoManager {
     void sortRanksByHops(int pe, int *pes, int *idx, int n); 
     int pickClosestRank(int mype, int *pes, int n);
     int areNeighbors(int pe1, int pe2, int pe3, int distance);
-    //int getConeNumberForRank(int pe);
 
   private:
     void quicksort(int pe, int *pes, int *arr, int left, int right);
