@@ -876,9 +876,9 @@ double CmiCpuTimer()
 #include "rts.h"
 
 #if 0 
-#define SPRN_TBRL 0x10C  // Time Base Read Lower Register (user & sup R/O)
-#define SPRN_TBRU 0x10D  // Time Base Read Upper Register (user & sup R/O)
-#define SPRN_PIR  0x11E  // CPU id
+#define SPRN_TBRL 0x10C  /* Time Base Read Lower Register (user & sup R/O) */
+#define SPRN_TBRU 0x10D  /* Time Base Read Upper Register (user & sup R/O) */
+#define SPRN_PIR  0x11E  /* CPU id */
 
 static inline unsigned long long BGLTimebase(void)
 {
@@ -945,14 +945,14 @@ double CmiTimer()
 
 #endif
 
-#if CMK_TIMER_USE_BLUEGENEP  //This module just compiles with GCC charm.
+#if CMK_TIMER_USE_BLUEGENEP  /* This module just compiles with GCC charm. */
 
 #include "common/bgp_personality.h"
 #include <spi/bgp_SPI.h>
 
-#define SPRN_TBRL 0x10C  // Time Base Read Lower Register (user & sup R/O)
-#define SPRN_TBRU 0x10D  // Time Base Read Upper Register (user & sup R/O)
-#define SPRN_PIR  0x11E  // CPU id
+#define SPRN_TBRL 0x10C  /* Time Base Read Lower Register (user & sup R/O) */
+#define SPRN_TBRU 0x10D  /* Time Base Read Upper Register (user & sup R/O) */
+#define SPRN_PIR  0x11E  /* CPU id */
 
 static inline unsigned long long BGPTimebase(void)
 {
@@ -1385,7 +1385,7 @@ extern void machine_OffloadAPIProgress();
 void CsdScheduleForever(void)
 {
   #if CMK_CELL
-    #define CMK_CELL_PROGRESS_FREQ  96  // (MSG-Q Entries x1.5)
+    #define CMK_CELL_PROGRESS_FREQ  96  /* (MSG-Q Entries x1.5) */
     int progressCount = CMK_CELL_PROGRESS_FREQ;
   #endif
 
