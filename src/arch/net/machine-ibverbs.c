@@ -36,6 +36,7 @@ static int packetSize;
 static int dataSize;
 static int rdma;
 static int rdmaThreshold;
+static int firstBinSize;
 
 
 static int maxTokens;
@@ -106,13 +107,13 @@ struct infiPacketHeader{
 
 struct infiBuffer;
 struct infiRdmaPacket{
-	struct infiPacketHeader header;
+	int fromNodeNo;
 	struct ibv_mr key;
 	struct ibv_mr *keyPtr;
 	int remoteSize;
 	char *remoteBuf;
-	OutgoingMsg ogm;
 	struct infiBuffer *localBuffer;
+	OutgoingMsg ogm;
 };
 
 
@@ -147,9 +148,11 @@ struct infiBufferPool{
 typedef struct infiPacketStruct {	
 	char *buf;
 	int size;
-	struct ibv_mr *key;
+	struct infiPacketHeader header;
+	struct ibv_mr *keyHeader;
 	struct OtherNodeStruct *destNode;
 	struct infiPacketStruct *next;
+	OutgoingMsg ogm;
 }* infiPacket;
 
 /*
@@ -214,26 +217,27 @@ struct infiContext {
 
 static struct infiContext *context;
 
-static inline infiPacket newPacket(int size){
+static inline infiPacket newPacket(){
 	infiPacket pkt = malloc(sizeof(struct infiPacketStruct));
-	pkt->size = size;
-	pkt->buf = malloc(sizeof(char)*size);
-	memcpy(pkt->buf,(char *)&(context->header),sizeof(struct infiPacketHeader));
+	pkt->size = -1;
+	pkt->header = context->header;
 	pkt->next = NULL;
 	pkt->destNode = NULL;
-	pkt->key = ibv_reg_mr(context->pd,pkt->buf,pkt->size,IBV_ACCESS_LOCAL_WRITE);
-	
+	pkt->keyHeader = ibv_reg_mr(context->pd,&pkt->header,sizeof(struct infiPacketHeader),IBV_ACCESS_LOCAL_WRITE);
+	pkt->ogm=NULL;
 	return pkt;
 };
 
 #define FreeInfiPacket(pkt){ \
+	pkt->size = -1;\
+	pkt->ogm=NULL;\
 	pkt->next = context->infiPacketFreeList; \
 	context->infiPacketFreeList = pkt; \
 }
 
 #define MallocInfiPacket(pkt) { \
 	infiPacket p = context->infiPacketFreeList; \
-	if(p == NULL){ p = newPacket(packetSize);} \
+	if(p == NULL){ p = newPacket();} \
 	         else{context->infiPacketFreeList = p->next; } \
 	pkt = p;\
 }
@@ -289,7 +293,7 @@ typedef struct {
 	void *startBuf;
 } infiCmiChunkPool;
 
-#define INFINUMPOOLS 15
+#define INFINUMPOOLS 20
 infiCmiChunkPool infiCmiChunkPools[INFINUMPOOLS];
 
 static void initInfiCmiChunkPools();
@@ -310,6 +314,7 @@ static void CmiMachineInit(char **argv){
 	int ibPort;
 	int i;
 	infiPacket *pktPtrs;
+	struct infiRdmaPacket **rdmaPktPtrs;
 
 	MACHSTATE(3,"CmiMachineInit {");
 	MACHSTATE2(3,"_Cmi_numnodes %d CmiNumNodes() %d",_Cmi_numnodes,CmiNumNodes());
@@ -345,7 +350,7 @@ static void CmiMachineInit(char **argv){
 
 	mtu_size=4200;
 	packetSize = mtu_size;
-	dataSize = packetSize-sizeof(struct infiPacketHeader);//infiniband rc header size -estimate
+	dataSize = packetSize-sizeof(struct infiPacketHeader);
 	maxTokens =1000;
 	tokensPerProcessor=100;
 	createLocalQps(dev,ibPort,_Cmi_mynode,_Cmi_numnodes,context->localAddr);
@@ -369,6 +374,26 @@ static void CmiMachineInit(char **argv){
 	rdma=1;
 //	rdmaThreshold=32768;
 	rdmaThreshold=22000;
+	firstBinSize = 100;
+	CmiAssert(rdmaThreshold > firstBinSize);
+	
+	initInfiCmiChunkPools();
+	
+	if(rdma){
+		int numPkts = _Cmi_numnodes*32;
+		int k;
+		
+		rdmaPktPtrs = (struct infiRdmaPacket **)malloc(numPkts*sizeof(struct infiRdmaPacket));
+		for(k=0;k<numPkts;k++){
+			rdmaPktPtrs[k] = CmiAlloc(sizeof(struct infiRdmaPacket));
+		}
+		
+		for(k=0;k<numPkts;k++){
+			CmiFree(rdmaPktPtrs[k]);
+		}
+		free(rdmaPktPtrs);
+	}
+	
 /*	context->infiBufferedRecvList = NULL;*/
 #if CMK_IBVERBS_STATS	
 	regCount =0;
@@ -378,7 +403,6 @@ static void CmiMachineInit(char **argv){
 	msgCount=0;
 #endif	
 
-	initInfiCmiChunkPools();
 /*
 	rdmaOutBuf = (char *)CmiAlloc(4000000);
 	rdmaInBuf = (char *)CmiAlloc(4000000);
@@ -438,7 +462,7 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 			.qp_context = NULL,
 			.cap     = {
 				.max_send_wr  = maxTokens,
-				.max_send_sge = 1,
+				.max_send_sge = 2,
 			},
 		};
 		struct ibv_qp_attr attr;
@@ -681,26 +705,30 @@ static inline void increaseTokens(OtherNode node);
 
 
 
-static void inline EnqueuePacket(OtherNode node,infiPacket packet,int totalSize){
+static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struct ibv_mr *dataKey){
 	int incTokens=0;
 
-	struct ibv_sge sendElement = {
-		.addr = (uintptr_t)packet->buf,
-		.length = totalSize,
-		.lkey = packet->key->lkey
-	};
+	struct ibv_sge elemList[2];
+	
+	elemList[1].addr = (uintptr_t)packet->buf;
+	elemList[1].length = size;
+	elemList[1].lkey = dataKey->lkey;
+	
+	
+	elemList[0].addr = (uintptr_t)&(packet->header);
+	elemList[0].length = sizeof(struct infiPacketHeader);
+	elemList[0].lkey = packet->keyHeader->lkey;
 
 	struct ibv_send_wr wr = {
 		.wr_id 	    = (uint64_t)packet,
-		.sg_list    = &sendElement,
-		.num_sge    = 1,
+		.sg_list    = &elemList[0],
+		.num_sge    = 2,
 		.opcode     = IBV_WR_SEND,
 		.send_flags = IBV_SEND_SIGNALED,
 		.next       = NULL 
 	};
 	struct ibv_send_wr *bad_wr;
-	struct infiPacketHeader *header = (struct infiPacketHeader *)packet->buf;
-	header->nodeNo = _Cmi_mynode;
+	packet->header.nodeNo = _Cmi_mynode;
 	
 	packet->destNode = node;
 	
@@ -714,7 +742,7 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int totalSize)
 
 #if CMK_IBVERBS_INCTOKENS	
 	if(node->infiData->tokensLeft < INCTOKENS_FRACTION*node->infiData->totalTokens && node->infiData->totalTokens < maxTokens){
-		header->code |= INFIPACKETCODE_INCTOKENS;
+		packet->header.code |= INFIPACKETCODE_INCTOKENS;
 		incTokens=1;
 	}
 #endif
@@ -729,21 +757,35 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int totalSize)
 		increaseTokens(node);
 	}
 #endif
-	MACHSTATE3(3,"Packet send size %d packet %p tokensLeft %d",totalSize,packet,packet->destNode->infiData->tokensLeft);
+	MACHSTATE3(3,"Packet send size %d packet %p tokensLeft %d",size,packet,packet->destNode->infiData->tokensLeft);
 
 };
 
 static void inline EnqueueDataPacket(OutgoingMsg ogm, OtherNode node, int rank,char *data,int size,int broot,int copy){
 	infiPacket packet;
+#if CMK_IBVERBS_STATS
+	double _startRegTime =CmiWallTimer();
+#endif	
+/*#if CMK_IBVERBS_STATS
+		_startRegTime = CmiWallTimer();
+#endif*/
 	MallocInfiPacket(packet);
+	packet->size = size;
+	packet->buf=data;
 	
-	//the nodeNo is added at time of buffer allocation
-	struct infiPacketHeader *header = (struct infiPacketHeader *)packet->buf;
-	header->code = INFIPACKETCODE_DATA;
+	//the nodeNo is added at time of packet allocation
+	packet->header.code = INFIPACKETCODE_DATA;
 	
-	//copy the data
-	memcpy((packet->buf+sizeof(struct infiPacketHeader)),data,size);
-	EnqueuePacket(node,packet,size+sizeof(struct infiPacketHeader));
+	ogm->refcount++;
+	packet->ogm = ogm;
+	
+	struct ibv_mr *key = METADATAFIELD(ogm->data)->key;
+	
+	EnqueuePacket(node,packet,size,key);
+#if CMK_IBVERBS_STATS
+			regCount++;
+			regTime += CmiWallTimer()-_startRegTime;
+#endif
 };
 
 static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node);
@@ -778,7 +820,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 			EnqueueDataPacket(ogm,node,rank,data,size,broot,copy);
 		}
 	}
-	MACHSTATE3(3,"DONE Sending ogm %p of size %d to %d",ogm,size,node->infiData->nodeNo);
+	MACHSTATE3(3,"DONE Sending ogm %p of size %d to %d",ogm,ogm->size,node->infiData->nodeNo);
 }
 
 
@@ -790,36 +832,30 @@ static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node){
 	MallocInfiPacket(packet);
  
  {
-		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)packet->buf;
+		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)CmiAlloc(sizeof(struct infiRdmaPacket));
+		packet->size = sizeof(struct infiRdmaPacket);
+		packet->buf = (char *)rdmaPacket;
 		
-#if CMK_IBVERBS_STATS
-		double _startRegTime = CmiWallTimer();
-#endif
 /*		struct ibv_mr *key = ibv_reg_mr(context->pd,ogm->data,ogm->size,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE);*/
 		struct ibv_mr *key = METADATAFIELD(ogm->data)->key;
 		MACHSTATE3(3,"ogm->data %p metadata %p key %p",ogm->data,METADATAFIELD(ogm->data),key);
-#if CMK_IBVERBS_STATS
-		regCount++;
-		regTime += CmiWallTimer()-_startRegTime;
-#endif
 		
-		/*TODO:remove this
-		memcpy(rdmaOutBuf,ogm->data,ogm->size);
-		struct ibv_mr *key = outKey;*/
-		
+		packet->header.code = INFIRDMA_START;
+		packet->header.nodeNo = _Cmi_mynode;
+		packet->ogm = NULL;
+
+
+		rdmaPacket->ogm = ogm;
 		rdmaPacket->key = *key;
 		rdmaPacket->keyPtr = key;
-		rdmaPacket->header.code = INFIRDMA_START;
-		rdmaPacket->header.nodeNo = _Cmi_mynode;
-		rdmaPacket->ogm = ogm;
 		rdmaPacket->remoteBuf = ogm->data;
 		rdmaPacket->remoteSize = ogm->size;
 		
-		/*TODO: remove
-		rdmaPacket->remoteBuf = rdmaOutBuf;*/
+		
+		struct ibv_mr *packetKey = METADATAFIELD((void *)rdmaPacket)->key;
 		
 		MACHSTATE3(3,"rdmaRequest being sent to node %d buf %p size %d",node->infiData->nodeNo,ogm->data,ogm->size);
-		EnqueuePacket(node,packet,sizeof(struct infiRdmaPacket));
+		EnqueuePacket(node,packet,sizeof(struct infiRdmaPacket),packetKey);
 	}
 }
 
@@ -1087,7 +1123,7 @@ static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffe
 			int rank, srcpe, seqno, magic, i;
 			unsigned int broot;
 			DgramHeaderBreak(msg, rank, srcpe, magic, seqno, broot);
-			
+			MACHSTATE1(3,"START of a new message from node %d",nodeNo);
 //			CmiAssert(nodes_by_pe[srcpe] == node);
 			
 //			CmiAssert(newmsg == NULL);
@@ -1123,6 +1159,8 @@ static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffe
 				CmiPrintf("asm_total: %d, asm_fill: %d, len:%d.\n", node->asm_total, node->asm_fill, len);
 				CmiAbort("\n\n\t\tLength mismatch!!\n\n");
 			}
+			//tODO: remove this
+			MACHSTATE2(3,"first int val in packet %d second %d \n",*(int *)msg,((int *)msg)[1]);
 			memcpy(newmsg + node->asm_fill,msg,len);
 			node->asm_fill += len;
 			if(node->asm_fill == node->asm_total){
@@ -1200,7 +1238,7 @@ void static inline handoverMessage(char *newmsg,int total_size,int rank,int broo
 
 
 static inline void increasePostedRecvs(int nodeNo);
-static inline void processRdmaRequest(struct infiRdmaPacket *rdmaPacket);
+static inline void processRdmaRequest(struct infiRdmaPacket *rdmaPacket,int fromNodeNo);
 static inline void processRdmaAck(struct infiRdmaPacket *rdmaPacket);
 
 
@@ -1220,11 +1258,11 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 	}
 #endif	
 	if(rdma && header->code & INFIRDMA_START){
-		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)buffer->buf;
-		processRdmaRequest(rdmaPacket);
+		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)(buffer->buf+sizeof(struct infiPacketHeader));
+		processRdmaRequest(rdmaPacket,nodeNo);
 	}
 	if(rdma && header->code & INFIRDMA_ACK){
-		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)buffer->buf;
+		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)(buffer->buf+sizeof(struct infiPacketHeader)) ;
 		processRdmaAck(rdmaPacket);
 	}
 	{
@@ -1259,6 +1297,16 @@ static inline  void processSendWC(struct ibv_wc *sendWC){
 	packet->destNode->infiData->tokensLeft++;
 
 	MACHSTATE2(3,"Packet send complete packet %p tokensLeft %d",packet,packet->destNode->infiData->tokensLeft);
+	if(packet->ogm != NULL){
+		packet->ogm->refcount--;
+		if(packet->ogm->refcount == 0){
+			GarbageCollectMsg(packet->ogm);	
+		}
+	}else{
+		if(packet->header.code == INFIRDMA_START || packet->header.code == INFIRDMA_ACK ){
+			CmiFree(packet->buf);
+		}		
+	}
 
 	FreeInfiPacket(packet);
 };
@@ -1267,18 +1315,17 @@ static inline  void processSendWC(struct ibv_wc *sendWC){
 
 /********************************************************************/
 //TODO: get token for rdma later
-static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket){
-#if CMK_IBVERBS_STATS
-	double _startRegTime;
-#endif	
-	int nodeNo = _rdmaPacket->header.nodeNo;
+static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fromNodeNo){
+	int nodeNo = fromNodeNo;
 	OtherNode node = &nodes[nodeNo];
 
 	struct infiBuffer *buffer = malloc(sizeof(struct infiBuffer));
 //	CmiAssert(buffer != NULL);
 	struct infiRdmaPacket *rdmaPacket = malloc(sizeof(struct infiRdmaPacket));
 	
+
 	*rdmaPacket = *_rdmaPacket;
+	rdmaPacket->fromNodeNo = fromNodeNo;
 	rdmaPacket->localBuffer = buffer;
 	
 	buffer->type = BUFFER_RDMA;
@@ -1287,15 +1334,8 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket){
 	buffer->buf  = (char *)CmiAlloc(rdmaPacket->remoteSize);
 //	CmiAssert(buffer->buf != NULL);
 
-#if CMK_IBVERBS_STATS
-		_startRegTime = CmiWallTimer();
-#endif
 /*	buffer->key = ibv_reg_mr(context->pd,buffer->buf,buffer->size,IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |IBV_ACCESS_REMOTE_READ );*/
 		buffer->key = METADATAFIELD(buffer->buf)->key;
-#if CMK_IBVERBS_STATS
-		regCount++;
-		regTime += CmiWallTimer()-_startRegTime;
-#endif
 
 	/*TODO: remove this
 	buffer->key = inKey;*/
@@ -1362,15 +1402,6 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 	}
 	MACHSTATE2(3,"Rdma done for buffer->buf %p buffer->key %p",buffer->buf,buffer->key);
 
-#if CMK_IBVERBS_STATS
-		_startRegTime = CmiWallTimer();
-#endif
-	
-//		ibv_dereg_mr(buffer->key);
-#if CMK_IBVERBS_STATS
-		regCount++;
-		regTime += CmiWallTimer()-_startRegTime;
-#endif
 	
 	free(buffer);
 
@@ -1381,32 +1412,25 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 
 static inline void EnqueueRdmaAck(struct infiRdmaPacket *rdmaPacket){
 	infiPacket packet;
-	OtherNode node=&nodes[rdmaPacket->header.nodeNo];
+	OtherNode node=&nodes[rdmaPacket->fromNodeNo];
 	MallocInfiPacket(packet);
-	
 	{
-		struct infiRdmaPacket *ackPacket = (struct infiRdmaPacket *) packet->buf;
+		struct infiRdmaPacket *ackPacket = (struct infiRdmaPacket *)CmiAlloc(sizeof(struct infiRdmaPacket));
 		*ackPacket = *rdmaPacket;
-		ackPacket->header.code = INFIRDMA_ACK;
+		packet->size = sizeof(struct infiRdmaPacket);
+		packet->buf = (char *)ackPacket;
+		packet->header.code = INFIRDMA_ACK;
+		packet->ogm=NULL;
+		
+		struct ibv_mr *packetKey = METADATAFIELD((void *)ackPacket)->key;
 	
 
-		EnqueuePacket(node,packet,sizeof(struct infiRdmaPacket));
+		EnqueuePacket(node,packet,sizeof(struct infiRdmaPacket),packetKey);
 	}
 };
 
 
 static inline void processRdmaAck(struct infiRdmaPacket *rdmaPacket){
-#if CMK_IBVERBS_STATS
-	double _startRegTime=CmiWallTimer();
-#endif	
-	
-//	ibv_dereg_mr(rdmaPacket->keyPtr);
-
-#if CMK_IBVERBS_STATS
-		regCount++;
-		regTime += CmiWallTimer()-_startRegTime;
-#endif
-
 	MACHSTATE2(3,"rdma ack received for remoteBuf %p size %d",rdmaPacket->remoteBuf,rdmaPacket->remoteSize);
 	rdmaPacket->ogm->refcount--;
 	GarbageCollectMsg(rdmaPacket->ogm);
@@ -1463,13 +1487,18 @@ static void increasePostedRecvs(int nodeNo){
 
 ************************************************/
 
+/**
+	There are INFINUMPOOLS of memory.
+	The first pool is of size firstBinSize.
+	The ith pool is of size firstBinSize*2^i
+*/
 
 static void initInfiCmiChunkPools(){
 	int i;
-	int size = rdmaThreshold*2;
+	int size = firstBinSize;
 	
 	for(i=0;i<INFINUMPOOLS;i++){
-		infiCmiChunkPools[i].size = size; // pool i has buffers of size rdmaThreshold*2^(i+1)
+		infiCmiChunkPools[i].size = size;
 		infiCmiChunkPools[i].startBuf = NULL;
 		size *= 2;
 	}
@@ -1477,12 +1506,11 @@ static void initInfiCmiChunkPools(){
 
 static inline void *getInfiCmiChunk(int dataSize){
 	//find out to which pool this dataSize belongs to
-	// poolIdx = rint(log2(dataSize/rdmaThreshold))
-	int ratio = dataSize/rdmaThreshold;
-	int poolIdx=-1;
+	// poolIdx = floor(log2(dataSize/firstBinSize))+1
+	int ratio = dataSize/firstBinSize;
+	int poolIdx=0;
 	void *res;
 	
-	CmiAssert(ratio >= 1);
 	while(ratio > 0){
 		ratio  = ratio >> 1;
 		poolIdx++;
@@ -1505,7 +1533,7 @@ static inline void *getInfiCmiChunk(int dataSize){
 		
 		MACHSTATE3(3,"AllocSize %d buf %p key %p",allocSize,res,metaData->key);
 		
-		CmiAssert(metaData->key != NULL);
+//		CmiAssert(metaData->key != NULL);
 		metaData->poolIdx = poolIdx;
 		metaData->nextBuf = NULL;
 		return res;
@@ -1523,7 +1551,7 @@ static inline void *getInfiCmiChunk(int dataSize){
 		MACHSTATE2(3,"Pool %d now has startBuf at %p",poolIdx,infiCmiChunkPools[poolIdx].startBuf);
 		
 		metaData->nextBuf = NULL;
-		CmiAssert(metaData->poolIdx == poolIdx);
+//		CmiAssert(metaData->poolIdx == poolIdx);
 		return res;
 	}
 
@@ -1537,13 +1565,13 @@ static inline void *getInfiCmiChunk(int dataSize){
 
 void * infi_CmiAlloc(int size){
 	void *res;
-	if(size-sizeof(CmiChunkHeader) > rdmaThreshold){
+/*(	if(size-sizeof(CmiChunkHeader) > firstBinSize){*/
 		MACHSTATE1(3,"infi_CmiAlloc for dataSize %d",size-sizeof(CmiChunkHeader));
 		res = getInfiCmiChunk(size-sizeof(CmiChunkHeader));	
 		res -= sizeof(CmiChunkHeader);
-	}else{
+/*	}else{
 		res = malloc(size);
-	}
+	}*/
 	return res;
 }
 
@@ -1553,7 +1581,7 @@ void infi_CmiFree(void *ptr){
 	
 	ptr += sizeof(CmiChunkHeader);
 	size = SIZEFIELD (ptr);
-	if(size > rdmaThreshold){
+/*	if(size > firstBinSize){*/
 		infiCmiChunkMetaData *metaData;
 		int poolIdx;
 		//there is a infiniband specific header
@@ -1572,9 +1600,9 @@ void infi_CmiFree(void *ptr){
 			free(metaData);
 			free(freePtr);
 		}	
-	}else{
+/*	}else{
 		free(freePtr);
-	}
+	}*/
 }
 
 
