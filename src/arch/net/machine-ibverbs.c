@@ -57,7 +57,7 @@ static double regTime;
 struct ibv_mr *outKey,*inKey;*/
 
 
-#define CMK_IBVERBS_STATS 1
+#define CMK_IBVERBS_STATS 0
 #define CMK_IBVERBS_INCTOKENS 1
 
 #define WC_LIST_SIZE 100
@@ -153,6 +153,8 @@ typedef struct infiPacketStruct {
 	struct OtherNodeStruct *destNode;
 	struct infiPacketStruct *next;
 	OutgoingMsg ogm;
+	struct ibv_sge elemList[2];
+	struct ibv_send_wr wr;
 }* infiPacket;
 
 /*
@@ -225,6 +227,18 @@ static inline infiPacket newPacket(){
 	pkt->destNode = NULL;
 	pkt->keyHeader = ibv_reg_mr(context->pd,&pkt->header,sizeof(struct infiPacketHeader),IBV_ACCESS_LOCAL_WRITE);
 	pkt->ogm=NULL;
+	
+	pkt->elemList[0].addr = (uintptr_t)&(pkt->header);
+	pkt->elemList[0].length = sizeof(struct infiPacketHeader);
+	pkt->elemList[0].lkey = pkt->keyHeader->lkey;
+	
+	pkt->wr.wr_id = (uint64_t)pkt;
+	pkt->wr.sg_list = &(pkt->elemList[0]);
+	pkt->wr.num_sge = 2;
+	pkt->wr.opcode = IBV_WR_SEND;
+	pkt->wr.send_flags = IBV_SEND_SIGNALED;
+	pkt->wr.next = NULL;
+	
 	return pkt;
 };
 
@@ -707,17 +721,22 @@ static inline void increaseTokens(OtherNode node);
 
 static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struct ibv_mr *dataKey){
 	int incTokens=0;
+#if CMK_IBVERBS_STATS
+	double _startRegTime =CmiWallTimer();
+#endif	
 
-	struct ibv_sge elemList[2];
+#if CMK_IBVERBS_STATS
+		_startRegTime = CmiWallTimer();
+#endif
+	packet->elemList[1].addr = (uintptr_t)packet->buf;
+	packet->elemList[1].length = size;
+	packet->elemList[1].lkey = dataKey->lkey;
 	
-	elemList[1].addr = (uintptr_t)packet->buf;
-	elemList[1].length = size;
-	elemList[1].lkey = dataKey->lkey;
 	
-	
-	elemList[0].addr = (uintptr_t)&(packet->header);
+/*	elemList[0].addr = (uintptr_t)&(packet->header);
 	elemList[0].length = sizeof(struct infiPacketHeader);
 	elemList[0].lkey = packet->keyHeader->lkey;
+
 
 	struct ibv_send_wr wr = {
 		.wr_id 	    = (uint64_t)packet,
@@ -727,9 +746,12 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 		.send_flags = IBV_SEND_SIGNALED,
 		.next       = NULL 
 	};
-	struct ibv_send_wr *bad_wr;
-	packet->header.nodeNo = _Cmi_mynode;
+	packet->header.nodeNo = _Cmi_mynode;*/
 	
+#if CMK_IBVERBS_STATS
+			regCount++;
+			regTime += CmiWallTimer()-_startRegTime;
+#endif
 	packet->destNode = node;
 	
 #if CMK_IBVERBS_STATS	
@@ -747,7 +769,8 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 	}
 #endif
 	
-	if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
+	struct ibv_send_wr *bad_wr;
+	if(ibv_post_send(node->infiData->qp,&(packet->wr),&bad_wr)){
 		assert(0);
 	}
 	node->infiData->tokensLeft--;
@@ -763,12 +786,6 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 
 static void inline EnqueueDataPacket(OutgoingMsg ogm, OtherNode node, int rank,char *data,int size,int broot,int copy){
 	infiPacket packet;
-#if CMK_IBVERBS_STATS
-	double _startRegTime =CmiWallTimer();
-#endif	
-/*#if CMK_IBVERBS_STATS
-		_startRegTime = CmiWallTimer();
-#endif*/
 	MallocInfiPacket(packet);
 	packet->size = size;
 	packet->buf=data;
@@ -782,10 +799,6 @@ static void inline EnqueueDataPacket(OutgoingMsg ogm, OtherNode node, int rank,c
 	struct ibv_mr *key = METADATAFIELD(ogm->data)->key;
 	
 	EnqueuePacket(node,packet,size,key);
-#if CMK_IBVERBS_STATS
-			regCount++;
-			regTime += CmiWallTimer()-_startRegTime;
-#endif
 };
 
 static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node);
