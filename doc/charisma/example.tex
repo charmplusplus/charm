@@ -11,9 +11,9 @@ param  lb : double[N];
 param  rb : double[N];
 
 begin
-    for iter := 1 to MAX_ITER
+    for iter = 1 to MAX_ITER
 	foreach i in workers
-	    <lb[i], rb[i]> := workers[i].produceBorders();
+	    (lb[i], rb[i]) <- workers[i].produceBorders();
 	    workers[i].compute(lb[i+1], rb[i-1]);
 	end-foreach
     end-for

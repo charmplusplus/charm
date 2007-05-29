@@ -34,9 +34,9 @@ elements in an object array. The following example shows how to invoke load
 balancing session every 4th iteration in a for-loop. 
 
 \begin{SaveVerbatim}{foodecl}
-  for iter := 1 to 100
+  for iter = 1 to 100
     // work work
-    if(iter % 4 = 0) then
+    if(iter % 4 == 0) then
       foreach i in workers
         workers[i].AtSync();
       end-foreach

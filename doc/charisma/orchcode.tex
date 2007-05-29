@@ -125,10 +125,10 @@ exemplifies the input and output of this object methods
 
 \begin{SaveVerbatim}{foodecl}
   foreach i in workers
-    <lb[i], rb[i]> := workers[i].produceBorders();
+    (lb[i], rb[i]) <- workers[i].produceBorders();
     workers[i].compute(lb[i+1], rb[i-1]);
     
-    <+error> := workers[i].reduceData();
+    (+error) <- workers[i].reduceData();
   end-foreach
 \end{SaveVerbatim}
 \vspace{0.1in}
@@ -137,7 +137,7 @@ exemplifies the input and output of this object methods
 
 Here, the entry method \code{workers[i].produceBorders} produces (called {\em
 published} in Charisma) values of \code{lb[i], rb[i]}, enclosed in a pair of
-angular brackets before the publishing sign ``\code{:=}''. In the second
+parentheses before the publishing sign ``\code{<-}''. In the second
 statement, function \code{workers[i].compute} consumes values of \code{lb[i+1],
 rb[i-1]}, just like normal function parameters. If a reduction operation is
 needed, the reduced parameter is marked with a ``\code{+}'' before it, like the
@@ -169,7 +169,7 @@ order and always return correct results.
   overlap
   {
     foreach i in workers1
-      <lb[i], rb[i]> := workers1[i].produceBorders();
+      (lb[i], rb[i]) <- workers1[i].produceBorders();
     end-foreach
     foreach i in workers1
       workers1[i].compute(lb[i+1], rb[i-1]);
@@ -177,7 +177,7 @@ order and always return correct results.
   }
   {
     foreach i in workers2
-      <lb[i], rb[i]> := workers2[i].compute(lb[i+1], rb[i-1]);
+      (lb[i], rb[i]) <- workers2[i].compute(lb[i+1], rb[i-1]);
     end-foreach
   }
   end-overlap
@@ -195,7 +195,7 @@ $\bullet$ {\bf Loop Statement}
 Loops are supported with \code{for} statement and \code{while} statement. Here
 are two examples.
 \begin{SaveVerbatim}{foodecl}
-  for iter := 0 to MAX_ITER
+  for iter = 0 to MAX_ITER
      workers.doWork();
   end-for
 \end{SaveVerbatim}
@@ -205,7 +205,7 @@ are two examples.
   
 \begin{SaveVerbatim}{foodecl}
   while (err > epsilon)
-     <+err> := workers.doWork();
+     (+err) <- workers.doWork();
      MainChare.updateError(err);
   end-while
 \end{SaveVerbatim}
@@ -234,9 +234,9 @@ last iteration, the last produced values will be disseminated to the code
 segment following the loop body. Within the loop body, program order holds. 
 
 \begin{SaveVerbatim}{foodecl}
-  for iter := 1 to MAX_ITER
+  for iter = 1 to MAX_ITER
     foreach i in workers
-      <lb[i], rb[i]> := workers[i].compute(lb[i+1], rb[i-1]);
+      (lb[i], rb[i]) <- workers[i].compute(lb[i+1], rb[i-1]);
     end-foreach
   end-for
 \end{SaveVerbatim}
@@ -275,7 +275,7 @@ segment, the variable \code{iter} should either be a local variable in
 MainChare, or a for-loop iteration counter, as the example describes.
 
 \begin{SaveVerbatim}{foodecl}
-  for iter := 1 to MAX_ITER
+  for iter = 1 to MAX_ITER
     if(iter % 4 = 0) then
       // do something every 4th iteration
     end-if
@@ -293,10 +293,10 @@ of values from different objects can be gathered to be consumed by one object.
 
 \begin{SaveVerbatim}{foodecl}
   foreach i in A
-    <points[i,*]> := A[i].f(...);
+    (points[i,*]) <- A[i].f(...);
   end-foreach
   foreach k,j in B
-    <...> := B[k,j].g(points[k,j]);
+    (...) <- B[k,j].g(points[k,j]);
   end-foreach
 \end{SaveVerbatim}
 \vspace{0.1in}
@@ -312,10 +312,10 @@ array objects \code{B[1,0..N-1]}.
 
 \begin{SaveVerbatim}{foodecl}
   foreach i,j in A
-    <points[i,j]> := A[i,j].f(...);
+    (points[i,j]) <- A[i,j].f(...);
   end-foreach
   foreach k in B
-    <...> := B[k].g(points[*,k]);
+    (...) <- B[k].g(points[*,k]);
   end-foreach
 \end{SaveVerbatim}
 \vspace{0.1in}
