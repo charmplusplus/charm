@@ -1619,10 +1619,30 @@ void infi_CmiFree(void *ptr){
 }
 
 
+/*********************************************************************************************
+This section is for CmiDirect. This is a variant of the  persistent communication in which 
+the user can transfer data between processors without using Charm++ messages. This lets the user
+send and receive data from the middle of his arrays without any copying on either send or receive
+side
+*********************************************************************************************/
+
+/**
+ To be called on the receiver to create a handle and return its number
+**/
+int CmiDirect_createHandle(int senderProc,void *recvBuf, void (*callbackFnPtr)(void *), void *callbackData){
+	return -1;
+}
+
+/****
+ To be called on the sender to attach the sender's buffer to this handle
+******/
+void CmiDirect_assocLocalBuffer(int recverProc,int handle,void *senderBuf){};
 
 
-
-
+/****
+To be called on the sender to do the actual data transfer
+******/
+void CmiDirect_put(int recverProc,int handle){};
 
 
 
