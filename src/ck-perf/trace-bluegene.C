@@ -79,6 +79,13 @@ void TraceBluegene::tlineEnd(void** parentLogPtr){
     *parentLogPtr = NULL;
 }
 
+void TraceBluegene::bgAddTag(char* str){
+  if (!genTimeLog) return;
+  BgTimeLog * log = BgLastLog(tTIMELINEREC);
+  CmiAssert(log != NULL);
+  log->setName(str);
+}
+
 void TraceBluegene::bgDummyBeginExec(char* name,void** parentLogPtr)
 {
   startVTimer();
@@ -101,15 +108,27 @@ void TraceBluegene::bgBeginExec(char* msg, char *name)
   resetVTime();
 }
 
-// create a new log, which depends on log
-void TraceBluegene::bgAmpiBeginExec(char *msg, char *name, void *log)
+// mark a new log, which depends on log
+void TraceBluegene::bgSetInfo(char *msg, char *name, void **logs, int count)
+{
+  if (!genTimeLog) return;
+  BgTimeLog * curlog = BgLastLog(tTIMELINEREC);
+  if (name != NULL) curlog->setName(name);
+  for (int i=0; i<count; i++)
+      curlog->addBackwardDep((BgTimeLog*)logs[i]);
+  if (msg) curlog->addMsgBackwardDep(tTIMELINEREC, msg);
+}
+
+// mark a new log, which depends on log
+void TraceBluegene::bgAmpiBeginExec(char *msg, char *name, void **logs, int count)
 {
   startVTimer();
   if (!genTimeLog) return;
-  BgTimeLog* newLog = new BgTimeLog(_threadEP,name,BgGetCurTime());
-  tTIMELINEREC.logEntryStart(newLog);
-  newLog->addBackwardDep((BgTimeLog*)log);
-  newLog->addMsgBackwardDep(tTIMELINEREC, msg);
+  BgTimeLog * curlog = BgLastLog(tTIMELINEREC);
+  curlog->setName(name);
+  for (int i=0; i<count; i++)
+      curlog->addBackwardDep((BgTimeLog*)logs[i]);
+  if (msg) curlog->addMsgBackwardDep(tTIMELINEREC, msg);
 }
 
 void TraceBluegene::bgEndExec(int commit)

@@ -29,9 +29,11 @@ class TraceBluegene : public Trace {
     void getForwardDep(void* log, void** fDepPtr);
     void getForwardDepForAll(void** logs1, void** logs2, int logsize,void* fDepPtr);
     void tlineEnd(void** parentLogPtr);
+    void bgAddTag(char *str);
     void bgDummyBeginExec(char* name,void** parentLogPtr);
     void bgBeginExec(char* msg, char *str);
-    void bgAmpiBeginExec(char *msg, char *str, void *log);
+    void bgAmpiBeginExec(char *msg, char *str, void **logs, int count);
+    void bgSetInfo(char *msg, char *str, void **logs, int count);
     void bgEndExec(int);
     virtual void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx);
     void addBackwardDep(void *log);
@@ -62,60 +64,51 @@ extern int traceBluegeneLinked;
 #define BgMark_(x)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgMark(x))
 #define _TRACE_BG_BEGIN_EXECUTE_NOMSG(x,pLogPtr)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgDummyBeginExec(x,pLogPtr))
 #define _TRACE_BG_BEGIN_EXECUTE(msg, str)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgBeginExec(msg, str))
-#define _TRACE_BG_AMPI_BEGIN_EXECUTE(msg, str, log)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgAmpiBeginExec(msg, str, log))
+#define _TRACE_BG_SET_INFO(msg, str, logs, count)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgSetInfo(msg, str, logs, count))
+#define _TRACE_BG_AMPI_BEGIN_EXECUTE(msg, str, logs, count)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgAmpiBeginExec(msg, str, logs, count))
 #define _TRACE_BG_END_EXECUTE(commit)   _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgEndExec(commit))
 #define _TRACE_BG_TLINE_END(pLogPtr) _TRACE_BG_ONLY(CkpvAccess(_tracebg)->tlineEnd(pLogPtr))
 #define _TRACE_BG_FORWARD_DEPS(logs1,logs2,size,fDep)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->getForwardDepForAll(logs1,logs2, size,fDep))
 #define _TRACE_BG_ADD_BACKWARD_DEP(log)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->addBackwardDep(log))
 #define _TRACE_BG_USER_EVENT_BRACKET(x,bt,et,pLogPtr) _TRACE_BG_ONLY(CkpvAccess(_tracebg)->userBracketEvent(x,bt,et,pLogPtr))
 #define _TRACE_BGLIST_USER_EVENT_BRACKET(x,bt,et,pLogPtr,bgLogList) _TRACE_BG_ONLY(CkpvAccess(_tracebg)->userBracketEvent(x,bt,et,pLogPtr,bgLogList))
+#define TRACE_BG_ADD_TAG(str)	_TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgAddTag(str))
 
 # define TRACE_BG_AMPI_SUSPEND()     \
         if(CpvAccess(traceOn)) traceSuspend();  \
-        _TRACE_BG_END_EXECUTE(1);
-# define TRACE_BG_AMPI_RESUME(t, msg, str, log)        \
-	/* using the actual received message's time */	\
-        _TRACE_BG_AMPI_BEGIN_EXECUTE((char *)UsrToEnv(msg), str, log); \
-        if(CpvAccess(traceOn)) CthTraceResume(t);
+	_TRACE_BG_END_EXECUTE(1);
+
 # define TRACE_BG_AMPI_START(t, str)  { \
         void* _bgParentLog = NULL;      \
-        /*_TRACE_BG_TLINE_END(&_bgParentLog);*/	\
+        /*_TRACE_BG_TLINE_END(&_bgParentLog);*/ \
         _TRACE_BG_BEGIN_EXECUTE_NOMSG(str, &_bgParentLog);      \
-        if(CpvAccess(traceOn) && t) CthTraceResume(t);	\
+        if(CpvAccess(traceOn) && t) CthTraceResume(t);  \
         }
-# define TRACE_BG_AMPI_NEWSTART(t, str, event, count)	\
-	TRACE_BG_AMPI_SUSPEND();	\
-	TRACE_BG_AMPI_START(t, str);	\
-    	{	\
-	for(int i=0;i<count;i++) {	\
-                _TRACE_BG_ADD_BACKWARD_DEP(event);	\
+
+# define TRACE_BG_AMPI_BREAK(t, str, event, count)  	\
+	{	\
+	void *curLog;    /* store current log in timeline */	\
+  	_TRACE_BG_TLINE_END(&curLog);	\
+	TRACE_BG_AMPI_SUSPEND();        \
+        TRACE_BG_AMPI_START(t, str);    \
+        for(int i=0;i<count;i++) {      \
+                _TRACE_BG_ADD_BACKWARD_DEP(event);      \
         }	\
+        _TRACE_BG_ADD_BACKWARD_DEP(curLog);      \
 	}
+	
+
 #define TRACE_BG_AMPI_WAITALL(reqs) 	\
         {	\
 	/* TRACE_BG_AMPI_SUSPEND(); */	\
 	CthThread th = getAmpiInstance(MPI_COMM_WORLD)->getThread();	\
-  	TRACE_BG_AMPI_START(th, "AMPI_WAITALL")	\
+ 	TRACE_BG_AMPI_BREAK(th, "AMPI_WAITALL", NULL, 0);	\
     	_TRACE_BG_ADD_BACKWARD_DEP(curLog);	\
   	for(int i=0;i<count;i++) {	\
 	  if (request[i] == MPI_REQUEST_NULL) continue;	\
     	  void *log = (*reqs)[request[i]]->event;	\
     	  _TRACE_BG_ADD_BACKWARD_DEP(log);	\
         }	\
-	}
-#define TRACE_BG_AMPI_BARRIER_START(barrierLog)	\
-	{	\
-  	_TRACE_BG_TLINE_END(&barrierLog);	\
-  	TRACE_BG_AMPI_SUSPEND();	\
-  	_TRACE_BG_BEGIN_EXECUTE_NOMSG("AMPI_Barrier", &barrierLog);	\
-	}
-#define TRACE_BG_AMPI_BARRIER_END(barrierLog)	\
-	{	\
-	void *curLog;    /* store current log in timeline */	\
-  	_TRACE_BG_TLINE_END(&curLog);	\
-  	TRACE_BG_AMPI_SUSPEND();	\
-  	_TRACE_BG_BEGIN_EXECUTE_NOMSG("AMPI_Barrier_END", &curLog);	\
-  	_TRACE_BG_ADD_BACKWARD_DEP(barrierLog);	\
 	}
 extern "C" void BgSetStartEvent();
 #else
@@ -127,6 +120,7 @@ extern "C" void BgSetStartEvent();
 #define _TRACE_BGLIST_USER_EVENT_BRACKET(x,bt,et,pLogPtr,bgLogList)
 #define _TRACE_BG_END_EXECUTE(commit)
 #define _TRACE_BG_FORWARD_DEPS(logs1,logs2,size,fDep)
+#define _TRACE_BG_SET_INFO(msg, str, logs, count) 
 
 # define TRACE_BG_AMPI_SUSPEND()
 # define TRACE_BG_AMPI_RESUME(t, msg, str, log)
