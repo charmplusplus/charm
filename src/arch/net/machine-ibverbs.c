@@ -1626,17 +1626,33 @@ send and receive data from the middle of his arrays without any copying on eithe
 side
 *********************************************************************************************/
 
+
+typedef struct {
+	int id;
+	void *buf;
+	struct ibv_mr *key;
+}	infiDirectHandle;
+
+
+
+
+
+
+
+
+
 /**
  To be called on the receiver to create a handle and return its number
 **/
-int CmiDirect_createHandle(int senderProc,void *recvBuf, void (*callbackFnPtr)(void *), void *callbackData){
+int CmiDirect_createHandle(int senderProc,void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData){
+	
 	return -1;
 }
 
 /****
  To be called on the sender to attach the sender's buffer to this handle
 ******/
-void CmiDirect_assocLocalBuffer(int recverProc,int handle,void *senderBuf){};
+void CmiDirect_assocLocalBuffer(int recverProc,int handle,void *senderBuf,int sendBufSize){};
 
 
 /****
