@@ -937,18 +937,19 @@ extern void CkStartQD(const CkCallback& cb);
 void CmiMachineProgressImpl();
 
 #define CkNetworkProgress() {CpvAccess(networkProgressCount) ++; \
-if (LBDatabaseObj()->getLBDB()->StatsOn() == 0) \
-      if(CpvAccess(networkProgressCount) >=  networkProgressPeriod) { \
+if(CpvAccess(networkProgressCount) >=  networkProgressPeriod)  \
+    if (LBDatabaseObj()->getLBDB()->StatsOn() == 0) { \
         CmiMachineProgressImpl(); \
         CpvAccess(networkProgressCount) = 0; \
-      } \
+    } \
 } \
 
 #define CkNetworkProgressAfter(p) {CpvAccess(networkProgressCount) ++; \
-      if(CpvAccess(networkProgressCount) >=  p) { \
+if(CpvAccess(networkProgressCount) >=  p)  \
+    if (LBDatabaseObj()->getLBDB()->StatsOn() == 0) { \
         CmiMachineProgressImpl(); \
         CpvAccess(networkProgressCount) = 0; \
-      } \
+    } \
 } \
 
 #endif
