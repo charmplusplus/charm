@@ -901,8 +901,8 @@ static inline unsigned long long BGLTimebase(void)
 }
 #endif
 
-static long long inittime_wallclock = 0;
-CpvDeclare(double, clocktick);
+static unsigned long long inittime_wallclock = 0;
+CpvStaticDeclare(double, clocktick);
 
 int CmiTimerIsSynchronized()
 {
@@ -926,11 +926,10 @@ void CmiTimerInit()
   inittime_wallclock = 0.0;    /* use bgl absolute time */
 }
 
-#if 0
 double CmiWallTimer()
 {
   unsigned long long currenttime;
-  currenttime = BGLTimebase (); //rts_get_timebase();
+  currenttime = rts_get_timebase();
   return CpvAccess(clocktick)*(currenttime-inittime_wallclock);
 }
 
@@ -943,7 +942,6 @@ double CmiTimer()
 {
   return CmiWallTimer();
 }
-#endif
 
 #endif
 
@@ -1207,30 +1205,19 @@ void (*handler)();
  *
  *****************************************************************************/
 
-#include "conv-conds.h"
-
-/* Call all the functions that are waiting for this condition to be raised
- */
-inline void CcdRaiseCondition(int condnum)
-{
-  double curWallTime=CmiWallTimer();
-  call_cblist_remove(&(CpvAccess(conds).condcb[condnum]),curWallTime);
-  call_cblist_keep(&(CpvAccess(conds).condcb_keep[condnum]),curWallTime);
-}
-
-static inline void CsdBeginIdle(void)
+void CsdBeginIdle(void)
 {
   CcdCallBacks();
   _LOG_E_PROC_IDLE(); 	/* projector */
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 }
 
-static inline void CsdStillIdle(void)
+void CsdStillIdle(void)
 {
   CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
 }
 
-static inline void CsdEndIdle(void)
+void CsdEndIdle(void)
 {
   _LOG_E_PROC_BUSY(); 	/* projector */
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
@@ -1313,11 +1300,8 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 #endif
 }
 
-void *CsdNextMessage(CsdSchedulerState_t *s) __attribute__((always_inline));
-
 void *CsdNextMessage(CsdSchedulerState_t *s) {
-	void *msg=NULL;
-#if 0
+	void *msg;
 	if((*(s->localCounter))-- >0)
 	  {
               /* This avoids a race condition with migration detected by megatest*/
@@ -1332,10 +1316,9 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	  }
 	
 	*(s->localCounter)=CsdLocalMax;
-#endif
 	if ( NULL!=(msg=CmiGetNonLocal()) || 
 	     NULL!=(msg=CdsFifo_Dequeue(s->localQ)) ) {
-	    CpvAccess(cQdState)->mProcessed++;
+            CpvAccess(cQdState)->mProcessed++;
             return msg;
         }
 #if CMK_GRID_QUEUE_AVAILABLE
@@ -1360,16 +1343,15 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
           return msg;
         }
 #endif
-#if 0
         if(!CsdLocalMax) {
-#endif
 	  CqsDequeue(s->schedQ,(void **)&msg);
-	  if (msg!=NULL) return msg;	    
-//        }
-	  return NULL;
-} 
-	
-	int CsdScheduler(int maxmsgs)
+            if (msg!=NULL) return msg;	    
+        }
+
+	return NULL;
+}
+
+int CsdScheduler(int maxmsgs)
 {
 	if (maxmsgs<0) CsdScheduleForever();	
 	else if (maxmsgs==0)
