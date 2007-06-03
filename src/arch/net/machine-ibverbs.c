@@ -99,20 +99,27 @@ Data Structures
 #define INFIPACKETCODE_INCTOKENS 2
 #define INFIRDMA_START 4
 #define INFIRDMA_ACK 8
+#define INFIDIRECT_REQUEST 16
 
 struct infiPacketHeader{
 	char code;
 	int nodeNo;
 };
 
-struct infiBuffer;
+/*
+	Types of rdma packets
+*/
+#define INFI_MESG 1 
+#define INFI_DIRECT 2
+
 struct infiRdmaPacket{
 	int fromNodeNo;
+	int type;
 	struct ibv_mr key;
 	struct ibv_mr *keyPtr;
 	int remoteSize;
 	char *remoteBuf;
-	struct infiBuffer *localBuffer;
+	void *localBuffer;
 	OutgoingMsg ogm;
 };
 
@@ -846,6 +853,8 @@ static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node){
  
  {
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)CmiAlloc(sizeof(struct infiRdmaPacket));
+
+		
 		packet->size = sizeof(struct infiRdmaPacket);
 		packet->buf = (char *)rdmaPacket;
 		
@@ -857,7 +866,7 @@ static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node){
 		packet->header.nodeNo = _Cmi_mynode;
 		packet->ogm = NULL;
 
-
+		rdmaPacket->type = INFI_MESG;
 		rdmaPacket->ogm = ogm;
 		rdmaPacket->key = *key;
 		rdmaPacket->keyPtr = key;
@@ -1254,6 +1263,8 @@ static inline void increasePostedRecvs(int nodeNo);
 static inline void processRdmaRequest(struct infiRdmaPacket *rdmaPacket,int fromNodeNo);
 static inline void processRdmaAck(struct infiRdmaPacket *rdmaPacket);
 
+struct infiDirectRequestPacket;
+static inline void processDirectRequest(struct infiDirectRequestPacket *directRequestPacket);
 
 static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 	struct infiBuffer *buffer = (struct infiBuffer *) recvWC->wr_id;	
@@ -1277,6 +1288,10 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 	if(rdma && header->code & INFIRDMA_ACK){
 		struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *)(buffer->buf+sizeof(struct infiPacketHeader)) ;
 		processRdmaAck(rdmaPacket);
+	}
+	if(header->code & INFIDIRECT_REQUEST){
+		struct infiDirectRequestPacket *directRequestPacket = (struct infiDirectRequestPacket *)(buffer->buf+sizeof(struct infiPacketHeader));
+		processDirectRequest(directRequestPacket);
 	}
 	{
 		struct ibv_sge list = {
@@ -1318,7 +1333,7 @@ static inline  void processSendWC(struct ibv_wc *sendWC){
 	}else{
 		if(packet->header.code == INFIRDMA_START || packet->header.code == INFIRDMA_ACK ){
 			CmiFree(packet->buf);
-		}		
+		}
 	}
 
 	FreeInfiPacket(packet);
@@ -1339,7 +1354,7 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 
 	*rdmaPacket = *_rdmaPacket;
 	rdmaPacket->fromNodeNo = fromNodeNo;
-	rdmaPacket->localBuffer = buffer;
+	rdmaPacket->localBuffer = (void *)buffer;
 	
 	buffer->type = BUFFER_RDMA;
 	buffer->size = rdmaPacket->remoteSize;
@@ -1360,8 +1375,6 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 	{
 		struct ibv_sge list = {
 			.addr = (uintptr_t )buffer->buf,
-			/*TODO: change this
-			.addr = (uintptr_t )rdmaInBuf,*/
 			.length = buffer->size,
 			.lkey 	= buffer->key->lkey
 		};
@@ -1387,6 +1400,7 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 };
 
 static inline void EnqueueRdmaAck(struct infiRdmaPacket *rdmaPacket);
+static inline void processDirectWC(struct infiRdmaPacket *rdmaPacket);
 
 static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 		//rdma get done
@@ -1395,7 +1409,12 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 #endif	
 
 	struct infiRdmaPacket *rdmaPacket = (struct infiRdmaPacket *) rdmaWC->wr_id;
-	struct infiBuffer *buffer = rdmaPacket->localBuffer;
+	if(rdmaPacket->type == INFI_DIRECT){
+		processDirectWC(rdmaPacket);
+		return;
+	}
+	CmiAssert(rdmaPacket->type == INFI_MESG);
+	struct infiBuffer *buffer = (struct infiBuffer *)rdmaPacket->localBuffer;
 
 	/*TODO: remove this
 	memcpy(buffer->buf,rdmaInBuf,rdmaWC->byte_len);*/
@@ -1626,42 +1645,234 @@ send and receive data from the middle of his arrays without any copying on eithe
 side
 *********************************************************************************************/
 
+#define MAXHANDLES 100
+
+struct infiDirectRequestPacket{
+	int senderProc;
+	int handle;
+	struct ibv_mr senderKey;
+	void *senderBuf;
+	int senderBufSize;
+};
 
 typedef struct {
 	int id;
 	void *buf;
+	int size;
 	struct ibv_mr *key;
+	void (*callbackFnPtr)(void *);
+	void *callbackData;
+	struct infiDirectRequestPacket *packet;
+	struct infiRdmaPacket *rdmaPacket;
 }	infiDirectHandle;
 
+typedef struct infiDirectHandleTableStruct{
+	infiDirectHandle handles[MAXHANDLES];
+	struct infiDirectHandleTableStruct *next;
+} infiDirectHandleTable;
 
 
 
 
+static infiDirectHandleTable **sendHandleTable=NULL;
+static infiDirectHandleTable **recvHandleTable=NULL;
 
+static int *recvHandleCount=NULL;
 
+static inline infiDirectHandleTable **createHandleTable(){
+	infiDirectHandleTable **table = malloc(_Cmi_numnodes*sizeof(infiDirectHandleTable *));
+	int i;
+	for(i=0;i<_Cmi_numnodes;i++){
+		table[i] = NULL;
+	}
+	return table;
+}
 
+static inline void calcHandleTableIdx(int handle,int *tableIdx,int *idx){
+	*tableIdx = handle/MAXHANDLES;
+	*idx = handle%MAXHANDLES;
+};
 
 /**
  To be called on the receiver to create a handle and return its number
 **/
 int CmiDirect_createHandle(int senderProc,void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData){
+	int newHandle;
+	int tableIdx,idx;
+	int i;
+	infiDirectHandleTable *table;
 	
-	return -1;
+	if(recvHandleTable == NULL){
+		recvHandleTable = createHandleTable();
+		recvHandleCount = malloc(sizeof(int)*_Cmi_numnodes);
+		for(i=0;i<_Cmi_numnodes;i++){
+			recvHandleCount[i] = -1;
+		}
+	}
+	if(recvHandleTable[senderProc] == NULL){
+		recvHandleTable[senderProc] = malloc(sizeof(infiDirectHandleTable));
+		recvHandleTable[senderProc]->next = NULL;		
+	}
+	
+	newHandle = ++recvHandleCount[senderProc];
+	CmiAssert(newHandle >= 0);
+	
+	calcHandleTableIdx(newHandle,&tableIdx,&idx);
+	
+	table = recvHandleTable[senderProc];
+	for(i=0;i<tableIdx;i++){
+		if(table->next ==NULL){
+			table->next = malloc(sizeof(infiDirectHandleTable));
+			table->next->next = NULL;
+		}
+		table = table->next;
+	}
+	table->handles[idx].id = newHandle;
+	table->handles[idx].buf = recvBuf;
+	table->handles[idx].size = recvBufSize;
+	table->handles[idx].callbackFnPtr = callbackFnPtr;
+	table->handles[idx].callbackData = callbackData;
+	table->handles[idx].key = ibv_reg_mr(context->pd, recvBuf, recvBufSize,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+	table->handles[idx].rdmaPacket = CmiAlloc(sizeof(struct infiRdmaPacket));
+	table->handles[idx].rdmaPacket->type = INFI_DIRECT;
+	table->handles[idx].rdmaPacket->localBuffer = &(table->handles[idx]);
+	
+	return newHandle;
 }
 
 /****
  To be called on the sender to attach the sender's buffer to this handle
 ******/
-void CmiDirect_assocLocalBuffer(int recverProc,int handle,void *senderBuf,int sendBufSize){};
+void CmiDirect_assocLocalBuffer(int recverProc,int handle,void *sendBuf,int sendBufSize){
+	int tableIdx,idx;
+	int i;
+	infiDirectHandleTable *table;
+
+	if(sendHandleTable == NULL){
+		sendHandleTable = createHandleTable();
+	}
+	if(sendHandleTable[recverProc] == NULL){
+		sendHandleTable[recverProc] = malloc(sizeof(infiDirectHandleTable));
+		sendHandleTable[recverProc]->next = NULL;
+	}
+	
+	CmiAssert(handle >= 0);
+	calcHandleTableIdx(handle,&tableIdx,&idx);
+	
+	table = sendHandleTable[recverProc];
+	for(i=0;i<tableIdx;i++){
+		if(table->next ==NULL){
+			table->next = malloc(sizeof(infiDirectHandleTable));
+			table->next->next = NULL;
+		}
+		table = table->next;
+	}
+	table->handles[idx].id = handle;
+	table->handles[idx].buf = sendBuf;
+	table->handles[idx].size = sendBufSize;
+	table->handles[idx].callbackFnPtr = table->handles[idx].callbackData = NULL;
+	table->handles[idx].key =  ibv_reg_mr(context->pd, sendBuf, sendBufSize,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+	
+	table->handles[idx].packet = (struct infiDirectRequestPacket *)CmiAlloc(sizeof(struct infiDirectRequestPacket));
+	table->handles[idx].packet->senderProc = _Cmi_mynode;
+	table->handles[idx].packet->handle = handle;
+	table->handles[idx].packet->senderKey = *(table->handles[idx].key);
+	table->handles[idx].packet->senderBuf = sendBuf;
+	table->handles[idx].packet->senderBufSize = sendBufSize;
+};
+
+
+
 
 
 /****
 To be called on the sender to do the actual data transfer
 ******/
-void CmiDirect_put(int recverProc,int handle){};
+void CmiDirect_put(int recverProc,int handle){
+	if(recverProc == _Cmi_mynode){
+		//TODO: Do a copy
+		CmiAbort("OOPS!! forgot to do a memcpy");
+	}else{
+		infiPacket packet;
+		int tableIdx,idx;
+		int i;
+		OtherNode node;
+		infiDirectHandleTable *table;
+
+		calcHandleTableIdx(handle,&tableIdx,&idx);
+
+		table = sendHandleTable[recverProc];
+		CmiAssert(table != NULL);
+		for(i=0;i<tableIdx;i++){
+			table = table->next;
+		}
+
+		
+		MallocInfiPacket (packet);
+		{
+			packet->size = sizeof(struct infiDirectRequestPacket);
+			packet->buf = (char *)&(table->handles[idx].packet);
+			packet->header.code = INFIDIRECT_REQUEST;
+			packet->header.nodeNo = _Cmi_mynode;
+			packet->ogm = NULL;
+
+			node = nodes_by_pe[recverProc];
+			struct ibv_mr *packetKey = METADATAFIELD((void *)table->handles[idx].packet)->key;
+			EnqueuePacket(node,packet,sizeof(struct infiDirectRequestPacket),packetKey);
+		}
+	}
+
+};
 
 
+void processDirectRequest(struct infiDirectRequestPacket *directRequestPacket){
+	int senderProc = directRequestPacket->senderProc;
+	int handle = directRequestPacket->handle;
+	int tableIdx,idx,i;
+	infiDirectHandleTable *table;
+	OtherNode node = nodes_by_pe[senderProc];
+	
+	calcHandleTableIdx(handle,&tableIdx,&idx);
 
+	table = recvHandleTable[senderProc];
+	CmiAssert(table != NULL);
+	for(i=0;i<tableIdx;i++){
+		table = table->next;
+	}
+	
+	CmiAssert(table->handles[idx].size == directRequestPacket->senderBufSize);
+	
+	{
+		struct ibv_sge list = {
+			.addr = (uintptr_t )table->handles[idx].buf,
+			.length = table->handles[idx].size,
+			.lkey 	= table->handles[idx].key->lkey
+		};
 
+		struct ibv_send_wr *bad_wr;
+		struct ibv_send_wr wr = {
+			.wr_id = (uint64_t)table->handles[idx].rdmaPacket,
+			.sg_list = &list,
+			.num_sge = 1,
+			.opcode = IBV_WR_RDMA_READ,
+			.send_flags = IBV_SEND_SIGNALED,
+			.wr.rdma = {
+				.remote_addr = (uint64_t )directRequestPacket->senderBuf,
+				.rkey = directRequestPacket->senderKey.rkey
+			}
+		};
+		/** post and rdma_read that is a rdma get*/
+		if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
+			assert(0);
+		}
+	}
+			
+	
+};
+
+void processDirectWC(struct infiRdmaPacket *rdmaPacket){
+	infiDirectHandle *handle = (infiDirectHandle *)rdmaPacket->localBuffer;
+	(*(handle->callbackFnPtr))(handle->callbackData);
+};
 
 
