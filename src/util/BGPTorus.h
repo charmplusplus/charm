@@ -22,6 +22,7 @@ class BGPTorusManager {
     int dimNX;  // dimension of the allocation in X (nodes)
     int dimNY;  // dimension of the allocation in Y (nodes)
     int dimNZ;  // dimension of the allocation in Z (nodes)
+    int torus[4];
     int procsPerNode;
 
   public:
@@ -39,6 +40,11 @@ class BGPTorusManager {
         dimX = dimX * bgp_hwt.tSize;
       }
       procsPerNode = bgp_hwt.tSize;
+
+      torus[0] = bgp_hwt.xTorus;
+      torus[1] = bgp_hwt.yTorus;
+      torus[2] = bgp_hwt.zTorus;
+      torus[3] = bgp_hwt.tTorus;
     }
 
     ~BGPTorusManager() { }
@@ -52,6 +58,8 @@ class BGPTorusManager {
     inline int getDimNZ() { return dimNZ; }
 
     inline int getProcsPerNode() { return procsPerNode; }
+
+    inline int* isTorus() { return torus; }
 
     inline void rankToCoordinates(int pe, int &x, int &y, int &z) {
       x = pe % dimX;
