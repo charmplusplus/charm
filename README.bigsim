@@ -99,7 +99,7 @@ B-2) Running a BigSim emulation:
 
 Here, one must point his/her path to the Charm++ instance
 produced for emulation; in our example of step (A), this
-would be under subdir "net-linux-bigsim-gm". Next, one must
+would be under subdir "net-linux-bigemulator-gm". Next, one must
 compile again the MPI code, preparing it for the emulation:
 
    mpicc -o prog_emul prog.c -swapglobals
