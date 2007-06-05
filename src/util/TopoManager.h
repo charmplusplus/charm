@@ -29,6 +29,7 @@ class TopoManager {
     int dimNX;	// dimension of the allocation in X (nodes)
     int dimNY;	// dimension of the allocation in Y (nodes)
     int dimNZ;	// dimension of the allocation in Z (nodes)
+    int torusX, torusY, torusZ, torusT; 
     int procsPerNode;
 
 #ifdef CMK_VERSION_BLUEGENE
@@ -69,7 +70,13 @@ class TopoManager {
       dimNZ = bgptm->getDimNZ();
 
       procsPerNode = bgptm->getProcsPerNode();
-      
+      int *torus = (int *)malloc(sizeof(int)*4);
+      torus = bgptm->isTorus();
+      torusX = torus[0];
+      torusY = torus[1];
+      torusZ = torus[2];
+      torusT = torus[3];
+
 #elif CMK_XT3
 
 #else
@@ -94,6 +101,9 @@ class TopoManager {
     }
 
     ~TopoManager() {
+#ifdef CMK_BLUEGENEP
+       delete bgptm;
+#endif
      }
 
     inline int getDimX() { return dimX; }
@@ -108,21 +118,30 @@ class TopoManager {
       int px = abs(x);
       int sx = dimX - px;
       CmiAssert(sx>=0);
-      return ((px>sx) ? sx : px);
+      if(torusX)
+        return ((px>sx) ? sx : px);
+      else
+        return px;
     }
     
     inline int absY(int y) {
       int py = abs(y);
       int sy = dimY - py;
       CmiAssert(sy>=0);
-      return ((py>sy) ? sy : py);
+      if(torusY)
+        return ((py>sy) ? sy : py);
+      else
+        return py;
     }
 
     inline int absZ(int z) {
       int pz = abs(z);
       int sz = dimZ - pz;
       CmiAssert(sz>=0);
-      return ((pz>sz) ? sz : pz);
+      if(torusZ)
+        return ((pz>sz) ? sz : pz);
+      else
+        return pz;
     }
     
     int hasMultipleProcsPerNode();
