@@ -64,7 +64,12 @@ static inline void *bg_wcopy ( void *dest, const void *src , size_t bytes )
 
 void *bg_dcopy128 ( void * dest, const void *src, size_t n );
 
-static inline void *CmiMemcpy ( void * dest, const void *src, size_t n ) {
+#if !defined(__xlC__) && !defined(__xlc__) 
+#if !defined(__cplusplus) //for gcc to compile c programs
+static
+#endif
+#endif
+inline void *CmiMemcpy ( void * dest, const void *src, size_t n ) {
   unsigned long daddr = (unsigned long) dest;
   unsigned long saddr = (unsigned long) src;
   
