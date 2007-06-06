@@ -14,7 +14,12 @@
 #include <assert.h>
 #include <stdio.h>
 
-static inline void *bg_bcopy( void *dest, const void *src, size_t bytes )
+#if !defined(__xlC__) && !defined(__xlc__) 
+#if !defined(__cplusplus) //for gcc to compile c programs
+static
+#endif
+#endif
+inline void *bg_bcopy( void *dest, const void *src, size_t bytes )
 {
   const unsigned char *r1 = (const unsigned char *)src;
   unsigned char *r2 = (unsigned char *)dest;
@@ -40,7 +45,12 @@ static inline void *bg_bcopy( void *dest, const void *src, size_t bytes )
   return( dest );
 }
 
-static inline void *bg_wcopy ( void *dest, const void *src , size_t bytes )
+#if !defined(__xlC__) && !defined(__xlc__) 
+#if !defined(__cplusplus) //for gcc to compile c programs
+static
+#endif
+#endif
+inline void *bg_wcopy ( void *dest, const void *src , size_t bytes )
 {
   const unsigned *r1 = (const unsigned *)src;
   unsigned *r2 = (unsigned *)dest;
