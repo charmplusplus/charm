@@ -63,8 +63,8 @@ syntax() {
   echo '  smp             support for SMP, multithreaded charm on each node'
   echo '  mpt             use SGI Message Passing Toolkit (only for mpi version)'
   echo '  gm              use Myrinet for communication'
-	echo '  ibverbs         use the Infiniband OpenIB layer for communication (only for net-linux-amd64 currently)'
-  echo '  tcp             use TCP sockets for communication (ony for net version)'
+  echo '  tcp             use TCP sockets for communication (only for net version)'
+  echo '  ibverbs         use the Infiniband OpenIB layer for communication (only for net-linux-amd64 currently)'
   echo "  vmi             use NCSA's VMI for communication (only for mpi version)"
   echo '  scyld           compile for Scyld Beowulf cluster based on bproc'
   echo '  clustermatic    compile for Clustermatic (support version 3 and 4) '
@@ -377,10 +377,10 @@ then
 # source files.
 	echo "Copying compilers for win64 into cygwin /bin directory"
 	cp $src/win64/unix2nt* /bin
-	cp $src/win64/system_ln $VERSION/tmp
-	cp $src/win64/unistd.h $VERSION/tmp
-	cp $src/win64/unistd.h $VERSION/include
-	cp $src/win64/createlink.exe /bin
+	cp $src/win32/system_ln $VERSION/tmp
+	cp $src/win32/unistd.h $VERSION/tmp
+	cp $src/win32/unistd.h $VERSION/include
+	cp $src/win32/createlink.exe /bin
   chmod +x $VERSION/tmp/system_ln
 else
 	cat > $VERSION/tmp/system_ln <<EOF
