@@ -213,8 +213,8 @@ BUILDING THE SOURCE
 ===================
 
 If you have downloaded a binary version of Charm++, you can skip
-this step-- Charm++ should already be compiled.  For win32 systems,
-see README.win32; for Cygwin version, see README.cygwin; for net- version, 
+this step-- Charm++ should already be compiled.  For win32/win64 systems,
+see README.win; for Cygwin version, see README.cygwin; for net- version, 
 see README.net.
 
 Once you have decided on a version, unpack Charm++, cd into charm,
