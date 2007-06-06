@@ -63,6 +63,7 @@ syntax() {
   echo '  smp             support for SMP, multithreaded charm on each node'
   echo '  mpt             use SGI Message Passing Toolkit (only for mpi version)'
   echo '  gm              use Myrinet for communication'
+	echo '  ibverbs         use the Infiniband OpenIB layer for communication'
   echo '  tcp             use TCP sockets for communication (ony for net version)'
   echo "  vmi             use NCSA's VMI for communication (only for mpi version)"
   echo '  scyld           compile for Scyld Beowulf cluster based on bproc'
