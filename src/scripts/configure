@@ -1759,6 +1759,21 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test for system ###
+cat > $t <<EOT
+#include <stdlib.h>
+int main() {
+  system("/bin/ls");
+  return 0;
+}
+EOT
+test_link "whether it has system" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_SYSTEM $pass
+_ACEOF
+
+
 #### test for poll ###
 cat > $t <<EOT
 #include <poll.h>
@@ -2123,7 +2138,6 @@ _ACEOF
 
 fi
 fi
-
 
 #### test the if command sync exists ####
 # Extract the first word of "sync", so it can be a program name with args.

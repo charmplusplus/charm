@@ -81,6 +81,9 @@
 /* sync program */
 #undef CMK_HAS_SYNC
 
+/* whether it has system */
+#undef CMK_HAS_SYSTEM
+
 /* whether typeinfo/typeid works */
 #undef CMK_HAS_TYPEINFO
 
