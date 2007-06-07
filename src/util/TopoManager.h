@@ -58,6 +58,12 @@ class TopoManager {
         procsPerNode = 2;
       else
         procsPerNode = 1;
+      int *torus = (int *)malloc(sizeof(int)*3);
+      torus = bgltm->isTorus();
+      torusX = torus[0];
+      torusY = torus[1];
+      torusZ = torus[2];
+
 #elif CMK_BLUEGENEP
       bgptm = new BGPTorusManager();
   
