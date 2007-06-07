@@ -443,6 +443,17 @@ EOT
 test_link "whether it has mkstemp" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_USE_MKSTEMP, $pass, [whether it has mkstemp])
 
+#### test for system ###
+cat > $t <<EOT
+#include <stdlib.h>
+int main() {
+  system("/bin/ls");
+  return 0;
+}
+EOT
+test_link "whether it has system" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_SYSTEM, $pass, [whether it has system])
+
 #### test for poll ###
 cat > $t <<EOT
 #include <poll.h>
@@ -734,7 +745,6 @@ bproc_ver=`echo $bproc_ver | cut -d'.' -f1`
 AC_DEFINE_UNQUOTED(CMK_BPROC_VERSION, $bproc_ver, [bproc version])
 fi
 fi
-
 
 #### test the if command sync exists ####
 AC_CHECK_PROG(SYNC, sync, sync )
