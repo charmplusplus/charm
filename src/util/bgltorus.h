@@ -27,6 +27,7 @@ class BGLTorusManager {
   int xsize, ysize, zsize;   //size in processors
   int nxsize, nysize, nzsize;  //size in nodes
   int isVN;
+  int torus[3];
 
  public:
   
@@ -94,7 +95,11 @@ class BGLTorusManager {
       isVN = 1;
       xsize *= 2;      //Assuming TXYZ
     }    
-    
+   
+    torus[0] = my_bg.isTorusX();
+    torus[1] = my_bg.isTorusY();
+    torus[2] = my_bg.isTorusZ();
+ 
     //CmiPrintf("BGL Torus Constructor %d,%d,%d  nodes %d,%d,%d\n", xsize, ysize, zsize, nxsize, nysize, nzsize);
   }
   
@@ -107,6 +112,7 @@ class BGLTorusManager {
   inline int getZNodeSize() { return nzsize;}
 
   inline int isVnodeMode() { return isVN;}
+  inline int* isTorus() { return torus; }
 
   static inline BGLTorusManager *getObject();
 
