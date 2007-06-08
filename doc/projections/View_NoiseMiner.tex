@@ -1,14 +1,14 @@
 
 \subsubsection{NoiseMiner View}
 
-The NoiseMiner view (see figure \ref{time profile}) displays statistics about abnormally long entry methods. The abnormal events are filtered and clustered across multiple dimensions to produce a concise summary. The view displays both the duration of the events as well as the periodicity at which they occur. Its dialog box is exactly the same as that of the Graph tool (see section \ref{sec::graph view}).
+The NoiseMiner view (see figure \ref{time profile}) displays statistics about abnormally long entry methods. Its purpose is to detect symptoms consistent with \textit{Operating System Interference} or \textit{Compuatational Noise}. The abnormal events are filtered and clustered across multiple dimensions to produce a concise summary. The view displays both the duration of the events as well as the periodicity at which they occur. Its dialog box is exactly the same as that of the Graph tool (see section \ref{sec::graph view}).
 
-The tool uses stream mining techniques to produce its results by making only one pass through the input data while using a limited amount of memory. This allows NoiseMiner to be very fast. 
+The tool uses stream mining techniques to produce its results by making only one pass through the input data while using a limited amount of memory. This allows NoiseMiner to be very fast and scalable. 
 
 \begin{figure}[htb]
 \center
 \includegraphics[width=4.0in]{fig/noiseminer}
-\caption{NoiseMiner View}
+\caption{NoiseMiner View displaying one \textit{Internal Noise} component of duration 5.68(ms) that occurred 1006 times during the run. This shows that there is likely some OS interference or Computational Noise problem occurring during the run. In this case, a faulty MPI implementation took an extra 5 ms to complete various calls which should have taken less than 0.1 ms.}
 \label{noiseminer}
 \end{figure}
 
