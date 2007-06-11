@@ -270,7 +270,7 @@ You can use \kw{CkArrayOptions} to specify a ``map object''
 for an array.  The map object is used by the array manager
 to determine the ``home'' processor of each element.  The
 home processor is the processor responsible for maintaining
-the location of the the element.
+the location of the element.
 
 There is a default map object, which maps 1D array indices
 in a round-robin fashion to processors, and maps other array
@@ -507,7 +507,7 @@ aF.doneInserting();
 
 \end{alltt}
 
-The \kw{doneInserting} call starts the the reduction manager (see ``Array
+The \kw{doneInserting} call starts the reduction manager (see ``Array
 Reductions'') and load balancer (see ~\ref{lbFramework})-- since
 these objects need to know about all the array's elements, they
 must be started after the initial elements are inserted.

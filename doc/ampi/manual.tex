@@ -413,7 +413,7 @@ execution, a chunk needs to notify the system about the data that it is going
 to use (apart from local variables.) Even with the data registration, \ampi{}
 cannot determine what size the data is, or whether the registered data contains
 pointers to other places in memory. For this purpose, a packing subroutine also
-needs to be provided to the \ampi{} runtime system alongwith registered data.
+needs to be provided to the \ampi{} runtime system along with registered data.
 (See next section for writing packing subroutines.) The call provided by
 \ampi{} for doing this is \texttt{MPI\_Register}. This function takes two
 arguments: A data item to be transported alongwith the chunk, and the pack
@@ -739,7 +739,7 @@ communicate with each other, which is essential for building efficient coupled
 codes.  For this purpose, we have extended the \ampi{} functionality to allow
 multiple ``\texttt{COMM\_WORLD}s''; one for each application. These \emph{world
 communicators} form a ``communicator universe'': an array of communicators
-aptly called \emph{MPI\_COMM\_UNIVERSE}. This array of communicators in
+aptly called \emph{MPI\_COMM\_UNIVERSE}. This array of communicators is 
 indexed [1 . . . \texttt{MPI\_MAX\_COMM}]. In the current implementation,
 \texttt{MPI\_MAX\_COMM} is 8, that is, maximum of 8 applications can co-exist
 within the same executable.
@@ -800,7 +800,7 @@ generating compressed log file.)
 \end{alltt}
 
 The feature is used in two phases: writing (logging) the environment and
-repeating the run. The first logging phase is inovked by a parallel run of the
+repeating the run. The first logging phase is invoked by a parallel run of the
 AMPI program with some additional command line options. 
 
 \begin{alltt}
