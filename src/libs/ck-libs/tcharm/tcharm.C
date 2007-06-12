@@ -110,12 +110,20 @@ void TCHARM_Api_trace(const char *routineName,const char *libraryName)
 	CmiPrintf("\n");
 }
 
+#if CMK_TCHARM_FNPTR_HACK
+CDECL void AMPI_threadstart(void *data);
+#endif
+
 static void startTCharmThread(TCharmInitMsg *msg)
 {
 	DBGX("thread started");
 	TCharm::activateThread();
 	typedef void (*threadFn_t)(void *);
+#if CMK_TCHARM_FNPTR_HACK
+	((threadFn_t)AMPI_threadstart)(msg->data);
+#else
 	((threadFn_t)msg->threadFn)(msg->data);
+#endif
 	TCharm::deactivateThread();
 	CtvAccess(_curTCharm)->done();
 }

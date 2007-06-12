@@ -471,7 +471,11 @@ public:
 	void start(void) {
 		char **argv=CmiCopyArgs(CkGetArgv());
 		int argc=CkGetArgc();
+#if CMK_AMPI_FNPTR_HACK
+		AMPI_Fallback_Main(argc,argv);
+#else
 		(fn)(argc,argv);
+#endif
 	}
 	void pup(PUP::er &p) {
 		p|fn;
