@@ -4,7 +4,7 @@
 
 	@author: Isaac Dooley
 	email : idooley2@uiuc.edu
-	date  : Jan 2007
+	date  : June 2007
 
     This uses the gsl library for least-square fitting. GNU Scientific Library is available under GPL
 
@@ -36,13 +36,11 @@
 #define sec_per_cycle 0.00000000025
 
 // Scale the duration of all unknown events by this factor
-//#define time_factor 0.2
-//#define time_factor (1.0/4.418)
-#define time_factor (1.0/6.05)
+#define time_factor (1.0/2.0)
 
 // Set these for more output:
 //#define DEBUG
-#undef PRINT_NEW_TIMES
+//#undef PRINT_NEW_TIMES
 #define WRITE_OUTPUT_FILES
 
 // Needed to communicated with the bigsim file reading and writing routines:

@@ -540,9 +540,9 @@ EventInterpolator::EventInterpolator(char *table_filename, double sample_rate) :
   approx_positive_matches(0)
 {
     LoadTimingsFile(table_filename);
-  //  AnalyzeTimings(sample_rate);
-    AnalyzeTimings_PAPI();
-   // LoadParameterFiles();
+    AnalyzeTimings(sample_rate);
+   // AnalyzeTimings_PAPI();
+    LoadParameterFiles();
 }
 
 
