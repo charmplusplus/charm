@@ -36,7 +36,9 @@
 #define sec_per_cycle 0.00000000025
 
 // Scale the duration of all unknown events by this factor
-#define time_factor (1.0/2.0)
+// 0.5 means the new event durations will be twice as fast as the durations in the bgTrace files
+#define time_dilation_factor 0.5
+
 
 // Set these for more output:
 //#define DEBUG
@@ -218,7 +220,7 @@ int main()
 				  }
 				  // If event is not in parameter file then we just scale its duration by a simple constant
 				  else {
-					middle_piece = middle_piece*time_factor ;
+					middle_piece = middle_piece*time_dilation_factor ;
 				  }
 
 
@@ -231,9 +233,9 @@ int main()
 					new_bracketed_times_sum += middle_piece;
 				  }
 
-				  // Scale the begin and end pieces by time_factor;
-				  begin_piece = begin_piece*time_factor;
-				  end_piece = end_piece*time_factor;
+				  // Scale the begin and end pieces by time_dilation_factor;
+				  begin_piece = begin_piece*time_dilation_factor;
+				  end_piece = end_piece*time_dilation_factor;
 
 				  assert(begin_piece >= 0.0);
 				  assert(middle_piece >= 0.0);

@@ -101,12 +101,12 @@ public:
 	/** Compute average timing for the provided event signature(name&parameters) */
     double lookupExactMean(const pair<funcIdentifier,vector<double> > &p);
 	/** Compute average timing for the the provided event signature(name&parameters)*/
-	double lookupExactMean(const funcIdentifier& func, const vector<double> &p);
+    double lookupExactMean(const funcIdentifier& func, const vector<double> &p);
 
-	void analyzeExactVariances();
+    void analyzeExactVariances();
 
-	/** Get the new timing exactly if possible otherwise predict it */
-	double getNewTiming(const unsigned pe, const unsigned eventid);
+    /** Get the new timing exactly if possible otherwise predict it */
+    double getNewTiming(const unsigned pe, const unsigned eventid);
 
     double get_chisqr(funcIdentifier funcname){if(work[funcname]!=NULL) return chisqr[funcname]; else return -1.0;}
 
