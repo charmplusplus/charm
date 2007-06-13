@@ -17,25 +17,24 @@
 
 CkpvExtern(FILE *, bgfp);
 
-extern void initBigSimTrace();
-extern void finalizeBigSimTrace();
-
 CkpvExtern(unsigned long, bgTraceCounter);
+CkpvExtern(bool, insideTraceBracket);
 
 
+// Some prototypes
 void initBigSimTrace();
 void finalizeBigSimTrace();
 void BgSetStartEvent();
 
 
 //======================PAPI======================= 
-#define BIG_SIM_PAPI
+//#define BIG_SIM_PAPI
 
 #ifdef BIG_SIM_PAPI
 
 #include <papi.h>
 
-#define NUM_PAPI_EVENTS 3
+#define NUM_PAPI_EVENTS 7
 #define BIGSIM_PAPI
 
 int errorcode; 
@@ -50,9 +49,17 @@ char errorstring[PAPI_MAX_STR_LEN+1];
 /** @TODO, wrap this with Ckpv */
 double startTime;
 
-/** A function that starts the bigsim tracing processes with up to 20 parameters. The user should use one of the 20 aliases below which takes the right number of parameters. */
+extern bool insideTraceBracket;
+
+
+
+
+
+
 void startTraceBigSim(){
 
+  CkAssert(CkpvAccess(insideTraceBracket) == false);
+  CkpvAccess(insideTraceBracket) = true;
 
 #if SPLIT_APART_CYCLE_ACCURATE
   SimParameters *simParams = Node::Object()->simParameters;
@@ -68,9 +75,19 @@ void startTraceBigSim(){
   startTime = CmiWallTimer();
 
 #ifdef BIGSIM_PAPI
-    events[0] = PAPI_TOT_CYC;
-    events[1] = PAPI_TLB_TL;
-    events[2] = PAPI_FP_INS;
+
+   for(int i=0;i<NUM_PAPI_EVENTS;i++)
+	values[i] = 0;
+
+
+    events[0] = PAPI_FP_OPS;
+    events[1] = PAPI_TOT_INS;	
+    events[2] = PAPI_L1_ICM;
+    events[3] = PAPI_L2_TCM;
+    events[4] = PAPI_L3_TCM;
+    events[5] = PAPI_TLB_TL;
+    events[6] = PAPI_LD_INS;
+
 
 /* Other available events:
 					PAPI_BR_INS,
@@ -87,11 +104,7 @@ void startTraceBigSim(){
                                         PAPI_TLB_TL  
 */
 
-    errorcode = PAPI_start_counters(events, NUM_PAPI_EVENTS);
-    if (errorcode != PAPI_OK) {
-        PAPI_perror(errorcode, errorstring, PAPI_MAX_STR_LEN);
-        fprintf(stderr, "PAPI error after start_counters (%d): %s\n", errorcode, errorstring);
-    }
+    CkAssert(PAPI_start_counters(events, NUM_PAPI_EVENTS) == PAPI_OK);
 
 #endif
   
@@ -100,6 +113,11 @@ void startTraceBigSim(){
 
 
 void endTraceBigSim_20param(char * eventname, int num_params, double p1 , double p2 , double p3 , double p4 , double p5 , double p6 , double p7 , double p8 , double p9 , double p10 , double p11 , double p12 , double p13 , double p14 , double p15 , double p16 , double p17 , double p18 , double p19 , double p20 ) {
+
+//    CkPrintf("endTraceBigSim()\n");
+    CkAssert(CkpvAccess(insideTraceBracket) == true);
+    CkpvAccess(insideTraceBracket) = false;
+
     char perfCountString[1024]; 
     perfCountString[0] = 0; 
  
@@ -134,24 +152,20 @@ if(num_params==20) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f
 
  
 #ifdef BIGSIM_PAPI
-    errorcode = PAPI_read_counters(values, NUM_PAPI_EVENTS); 
-    if (errorcode != PAPI_OK) { 
-        PAPI_perror(errorcode, errorstring, PAPI_MAX_STR_LEN); 
-        fprintf(stderr, "PAPI error after read counters (%d): %s\n", errorcode, errorstring); 
-    } else { 
-        sprintf(perfCountString, 
-                " PAPI:{ %lld %lld %lld }", 
-                values[0], 
-                values[1],
-		values[2] 
-                ); 
-    } 
+        CkAssert(PAPI_stop_counters(values, NUM_PAPI_EVENTS) == PAPI_OK); 
 
-    errorcode = PAPI_stop_counters(values, NUM_PAPI_EVENTS);
-    if (errorcode != PAPI_OK) { 
-        PAPI_perror(errorcode, errorstring, PAPI_MAX_STR_LEN); 
-        fprintf(stderr, "PAPI error after stop counters (%d): %s\n", errorcode, errorstring); 
-    } 
+        sprintf(perfCountString, " PAPI:{ " ); 
+
+	for(int i=0;i<NUM_PAPI_EVENTS;i++){
+		sprintf(perfCountString+strlen(perfCountString), " %lld ", values[i] );
+	}
+
+
+	 printf("value=%lld\n", values[0]);
+
+	 sprintf(perfCountString+strlen(perfCountString), " }");
+	
+
 #endif
 	double endTime = CmiWallTimer();
  
@@ -183,7 +197,7 @@ if(num_params==20) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f
   sprintf(sequenceString, "seqno: { %d } ",seqno);
 
 #endif
-  fprintf(CkpvAccess(bgfp),"%s\n",params);
+//  fprintf(CkpvAccess(bgfp),"%s\n",params);
 
   
 #ifdef CMK_BLUEGENE_CHARM
@@ -226,3 +240,5 @@ void endTraceBigSim( char * eventName , double p1 , double p2 , double p3 , doub
 void endTraceBigSim( char * eventName , double p1 , double p2 , double p3 , double p4 , double p5 , double p6 , double p7 , double p8 , double p9 , double p10 , double p11 , double p12 , double p13 , double p14 , double p15 , double p16 , double p17 , double p18 , double p19 ){endTraceBigSim_20param( eventName, 19 , p1 , p2 , p3 , p4 , p5 , p6 , p7 , p8 , p9 , p10 , p11 , p12 , p13 , p14 , p15 , p16 , p17 , p18 , p19 , 0.0 );}
 void endTraceBigSim( char * eventName , double p1 , double p2 , double p3 , double p4 , double p5 , double p6 , double p7 , double p8 , double p9 , double p10 , double p11 , double p12 , double p13 , double p14 , double p15 , double p16 , double p17 , double p18 , double p19 , double p20 ){endTraceBigSim_20param( eventName, 20 , p1 , p2 , p3 , p4 , p5 , p6 , p7 , p8 , p9 , p10 , p11 , p12 , p13 , p14 , p15 , p16 , p17 , p18 , p19 , p20 );}
 
+#define endTraceBigSim CkPrintf("endTraceBigSim() at %s:%u \n", __FILE__ , __LINE__ );endTraceBigSim
+#define startTraceBigSim CkPrintf("startTraceBigSim() at %s:%u \n", __FILE__ , __LINE__ );startTraceBigSim
