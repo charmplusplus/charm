@@ -1,7 +1,7 @@
 NOTE: the instructions below represent a rapidly changing experimental
       setup. Contact idooley2@uiuc.edu for the latest status. I am 
       currently adding support for PAPI performance counters, so the 
-      format of the CYCLE_ACCURATE_TIMES file is under a state of flux. 
+      format of the CYCLE_ACCURATE_TIMES file has recently changed
 
 
 Building / Compiling :
