@@ -124,7 +124,7 @@ pair<int,vector<double> > EventInterpolator::parseParameters(const string &funcn
 
     if( funcname == string("calc_self_energy_merge_fullelect") ||
         funcname == string("calc_pair_energy_merge_fullelect") ||
-		funcname == string("calc_self_energy_fullelect") ||
+	funcname == string("calc_self_energy_fullelect") ||
         funcname == string("calc_pair_energy_fullelect") ||
         funcname == string("calc_self_merge_fullelect") ||
         funcname == string("calc_pair_merge_fullelect") ||
@@ -403,7 +403,11 @@ void EventInterpolator::AnalyzeTimings(double sample_rate){
 
 }
 
-
+/** 
+	The model is currently a linear combination of the PAPI counters.
+	The first coefficient is associated with a constant value 1.0, and all 
+	other coefficients are associated with the performance counters in order.
+*/
 void EventInterpolator::AnalyzeTimings_PAPI(){
 
     cout << "Analyzing the PAPI performance counters. Using all samples" << endl;
@@ -413,12 +417,16 @@ void EventInterpolator::AnalyzeTimings_PAPI(){
     gsl_matrix * cov;
     double chisqr;
 
-    gsl_matrix * X;  // Each row of matrix is a set of parameters  [1, a, a^2, b, b^2, a*b] for each input parameter set
+    gsl_matrix * X;  // Each row of matrix is a set of parameters  [1, a, b, c, ... ] for each input parameter set
     gsl_vector *y;  // vector of cycle accurate times for each input parameter setAnalyzeTimings(
 
     if(papiTimings.begin() != papiTimings.end()){
         int numCounters = (*papiTimings.begin()).first.size();
         int numCoefficients = numCounters + 1; // currently we use a linear function of the counter values
+#define MANUAL_COUNTER_SELECTION
+#ifdef MANUAL_COUNTER_SELECTION	
+	numCoefficients = 2;
+#endif
         int samples = papiTimings.size();
 
         // Create a gsl interpolator workspace, and populate with values from papiTimings
@@ -434,12 +442,13 @@ void EventInterpolator::AnalyzeTimings_PAPI(){
         }
 
 
-        // For each sample
+        // Build matrix X and vector y from the samples
         int whichSample=0;
         for(map<counterValues,double>::iterator itr=papiTimings.begin(); itr!=papiTimings.end();++itr){
             const double &time = (*itr).second;
             const vector<long> &counterValues =(*itr).first;
 
+#ifndef MANUAL_COUNTER_SELECTION
             // put a constant coefficient in there
             gsl_matrix_set(X, whichSample, 0, 1.0);
 
@@ -448,6 +457,14 @@ void EventInterpolator::AnalyzeTimings_PAPI(){
             for(int counter_index=0;counter_index<counterValues.size();++counter_index){
                 gsl_matrix_set(X, whichSample, counter_index+1, (double)counterValues[counter_index]);
             }
+#else 
+
+ 	    gsl_matrix_set(X, whichSample, 0, 1.0);
+ 	    gsl_matrix_set(X, whichSample, 1, (double)counterValues[1]);
+
+#endif
+
+
 
             gsl_vector_set(y, whichSample, (double)time);
             whichSample++;
@@ -467,6 +484,7 @@ void EventInterpolator::AnalyzeTimings_PAPI(){
             cout.precision(2);
             cout << gsl_vector_get(c, i) <<  " ";
         }
+	cout << endl;
 
     }
     else {
