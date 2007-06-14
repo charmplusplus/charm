@@ -7,6 +7,7 @@
 #include <stdlib.h> // for abort
 #include <vector> //for std::vector 
 #include "transfer.h" 
+#include "geom_util.h" 
 #include "charm++.h" 
 #include "MgcIntr3DTetrTetr.h"
 using namespace Mgc;
@@ -29,6 +30,31 @@ double getSharedVolumeTets(const ConcreteElement &A,const ConcreteElement &B)
 		abort();
 	}
 	return sumVol;
+}
+
+
+double getSharedArea(const ConcreteElement &A,const ConcreteElement &B) {
+  double area=0.0;
+  vector<Vec3D> xpoly2;
+  double tri[3][3];
+  double pri[6][3];
+
+  for (int i=0; i<6; i++) {
+    CkVector3d pt = A.getNodeLocation(i);
+    pri[i][0] = pt[0];
+    pri[i][1] = pt[1];
+    pri[i][2] = pt[2];
+  }
+
+  for (int i=0; i<3; i++) {
+    CkVector3d pt = B.getNodeLocation(i);
+    tri[i][0] = pt[0];
+    tri[i][1] = pt[1];
+    tri[i][2] = pt[2];
+  }
+
+  area = tri_prism_X(tri,pri,xpoly2);
+  return area;
 }
 
 // Compute the volume shared by cell s of srcMesh

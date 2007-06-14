@@ -42,6 +42,35 @@ class TriangleSurfaceMesh {
   inline int *getTriangleConn(void) {return getTriangle(0);}
   inline const int *getTriangleConn(void) const {return getTriangle(0);}
   
+  inline const double getArea(int t) const {
+    CkVector3d n1_coord = pts[tris[t].nodes[0]];
+    CkVector3d n2_coord = pts[tris[t].nodes[1]];
+    CkVector3d n3_coord = pts[tris[t].nodes[2]];
+    double area=0.0;
+    double aLen, bLen, cLen, sLen, d, ds_sum;
+    
+    ds_sum = 0.0;
+    for (int i=0; i<3; i++) {
+      d = n1_coord[i] - n2_coord[i];
+      ds_sum += d*d;
+    }
+    aLen = sqrt(ds_sum);
+    ds_sum = 0.0;
+    for (int i=0; i<3; i++) {
+      d = n2_coord[i] - n3_coord[i];
+      ds_sum += d*d;
+    }
+    bLen = sqrt(ds_sum);
+    ds_sum = 0.0;
+    for (int i=0; i<3; i++) {
+      d = n3_coord[i] - n1_coord[i];
+      ds_sum += d*d;
+    }
+    cLen = sqrt(ds_sum);
+    sLen = (aLen+bLen+cLen)/2;
+    return (sqrt(sLen*(sLen-aLen)*(sLen-bLen)*(sLen-cLen)));
+  }
+
   //! Return the number of points (vertices, nodes) in the mesh
   inline int getPoints(void) const {return pts.size();}
   //! Return the p'th vertex (0..getPoints()-1)
@@ -77,8 +106,8 @@ class TriangleSurfaceMesh {
     // Mesh triangles
     n=tris.size();
     for (i=0; i<n; ++i) {
-      fprintf(file,"%d %d %d\n", prism[i].nodes[0]+1, prism[i].nodes[1]+1, 
-	      prism[i].nodes[2]+1);  
+      fprintf(file,"%d %d %d\n", tris[i].nodes[0]+1, tris[i].nodes[1]+1, 
+	      tris[i].nodes[2]+1);  
     }
     fclose(file);
   }

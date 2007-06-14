@@ -67,6 +67,14 @@ public:
 	int addTet(const conn_t &c) {tet.push_back(c); return tet.size()-1;}
 	int addPoint(const CkVector3d &pt) {pts.push_back(pt); return pts.size()-1;}
 
+	void translateMesh(const CkVector3d &pt) {
+	  for (int i=0; i<pts.size(); i++) {
+	    pts[i][0] += pt[0];
+	    pts[i][1] += pt[1];
+	    pts[i][2] += pt[2];
+	  }
+	}
+
 	int nonGhostTet, nonGhostPt;
 	void write_real_tecplot(char *fname) {
 	  FILE *file = fopen(fname, "w");
