@@ -35,7 +35,7 @@ class TopoManager {
 #ifdef CMK_VERSION_BLUEGENE
     BGLTorusManager *bgltm;
 #elif CMK_BLUEGENEP
-    BGPTorusManager *bgptm;
+    BGPTorusManager bgptm;
 #elif CMK_XT3
     CrayTorusManager *crtm;
 #endif
@@ -65,19 +65,17 @@ class TopoManager {
       torusZ = torus[2];
 
 #elif CMK_BLUEGENEP
-      bgptm = new BGPTorusManager();
-  
-      dimX = bgptm->getDimX();
-      dimY = bgptm->getDimY();
-      dimZ = bgptm->getDimZ();
+      dimX = bgptm.getDimX();
+      dimY = bgptm.getDimY();
+      dimZ = bgptm.getDimZ();
     
-      dimNX = bgptm->getDimNX();
-      dimNY = bgptm->getDimNY();
-      dimNZ = bgptm->getDimNZ();
+      dimNX = bgptm.getDimNX();
+      dimNY = bgptm.getDimNY();
+      dimNZ = bgptm.getDimNZ();
 
-      procsPerNode = bgptm->getProcsPerNode();
+      procsPerNode = bgptm.getProcsPerNode();
       int *torus = (int *)malloc(sizeof(int)*4);
-      torus = bgptm->isTorus();
+      torus = bgptm.isTorus();
       torusX = torus[0];
       torusY = torus[1];
       torusZ = torus[2];
@@ -107,9 +105,6 @@ class TopoManager {
     }
 
     ~TopoManager() {
-#ifdef CMK_BLUEGENEP
-       delete bgptm;
-#endif
      }
 
     inline int getDimX() { return dimX; }
