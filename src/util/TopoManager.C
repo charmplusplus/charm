@@ -32,7 +32,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
 #ifdef CMK_VERSION_BLUEGENE
   bgltm->getCoordinatesByRank(pe, x, y, z);
 #elif CMK_BLUEGENEP
-  bgptm->rankToCoordinates(pe, x, y, z);
+  bgptm.rankToCoordinates(pe, x, y, z);
 #elif CMK_XT3
 
 #else
@@ -54,7 +54,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
 #ifdef CMK_VERSION_BLUEGENE
   return bgltm->coords2rank(x, y, z);
 #elif CMK_BLUEGENEP
-  return bgptm->coordinatesToRank(x, y, z);
+  return bgptm.coordinatesToRank(x, y, z);
 #elif CMK_XT3
 
 #else
