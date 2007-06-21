@@ -361,7 +361,7 @@ converse: basics
 
 converse-target:  $(CVLIBS) fmain-ok charmrun-target swapglobal-target conv-cpm
 
-charmrun-target: $(L)/libck.a sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o
+charmrun-target: sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o
 	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS)' ) ; fi
 	if [ -f charmrun ] ; then ( cp -f charmrun ../bin ) ; fi
 
