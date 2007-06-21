@@ -36,7 +36,7 @@ ParFUM:	idxl ampi parmetis collide
 ifem: fem
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
-armci: tcharm ampi
+armci: ampi
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 collide: tcharm
@@ -51,7 +51,7 @@ barrier:
 irecv:
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
-netfem:
+netfem: tcharm
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 liveViz:
