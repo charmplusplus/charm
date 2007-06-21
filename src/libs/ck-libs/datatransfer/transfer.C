@@ -53,7 +53,9 @@ double getSharedArea(const ConcreteElement &A,const ConcreteElement &B) {
     tri[i][2] = pt[2];
   }
 
-  area = tri_prism_X(tri,pri,xpoly2);
+  // need to uncomment the line below when geom_util is functional
+  //area = tri_prism_X(tri,pri,xpoly2);
+  CkPrintf("datatransfer> transfer.C:getSharedArea: not yet functional\n");
   return area;
 }
 
