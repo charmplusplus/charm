@@ -179,6 +179,7 @@ struct infiBufferedBcastStruct{
 	int size;
 	int broot;
 	int asm_rank;
+	int valid;
 };
 
 typedef struct infiBufferedBcastPoolStruct{
@@ -218,6 +219,7 @@ struct infiContext {
 	struct infiPacketHeader header;
 
 	int srqSize;
+	int sendCqSize,recvCqSize;
 
 	infiBufferedBcastPool bufferedBcastList;
 	
@@ -449,11 +451,13 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 	MACHSTATE1(3,"myLid %d",myLid);
 
 	//create a completion queue to be used with all the queue pairs
-	context->sendCq = ibv_create_cq(context->context,(tokensPerProcessor*(numNodes-1))+5,NULL,NULL,0);
+	context->sendCqSize = (tokensPerProcessor*(numNodes-1))+5;
+	context->sendCq = ibv_create_cq(context->context,context->sendCqSize,NULL,NULL,0);
 	assert(context->sendCq != NULL);
 	
-
-	context->recvCq = ibv_create_cq(context->context,(tokensPerProcessor*(numNodes-1))+5,NULL,NULL,0);
+	
+	context->recvCqSize = (tokensPerProcessor*(numNodes-1))+5;
+	context->recvCq = ibv_create_cq(context->context,context->recvCqSize,NULL,NULL,0);
 	assert(context->recvCq != NULL);
 	
 	MACHSTATE(3,"cq created");
@@ -1042,9 +1046,13 @@ static void CommunicationServer(int sleepTime, int where){
 
 
 static inline infiBufferedBcastPool createBcastPool(){
+	int i;
 	infiBufferedBcastPool ret = malloc(sizeof(struct infiBufferedBcastPoolStruct));
 	ret->count = 0;
 	ret->next = ret->prev = NULL;	
+	for(i=0;i<BCASTLIST_SIZE;i++){
+		ret->bcastList[i].valid = 0;
+	}
 	return ret;
 };
 /****
@@ -1071,6 +1079,11 @@ static void insertBufferedBcast(char *msg,int size,int broot,int asm_rank){
 	context->bufferedBcastList->bcastList[context->bufferedBcastList->count].size = size;
 	context->bufferedBcastList->bcastList[context->bufferedBcastList->count].broot = broot;
 	context->bufferedBcastList->bcastList[context->bufferedBcastList->count].asm_rank = asm_rank;
+	context->bufferedBcastList->bcastList[context->bufferedBcastList->count].valid = 1;
+	
+	MACHSTATE3(3,"Broadcast msg %p of size %d being buffered at count %d ",msg,size,context->bufferedBcastList->count);
+	
+	context->bufferedBcastList->count++;
 }
 
 /*********
@@ -1080,6 +1093,9 @@ static void insertBufferedBcast(char *msg,int size,int broot,int asm_rank){
 static inline void processBufferedBcast(){
 	infiBufferedBcastPool start;
 	start = context->bufferedBcastList;
+	if(start == NULL){
+		return;
+	}
 
 	while(start->next != NULL){
 		start = start->next;
@@ -1089,6 +1105,11 @@ static inline void processBufferedBcast(){
 		int i=0;
 		infiBufferedBcastPool tmp;
 		for(i=0;i<start->count;i++){
+			if(start->bcastList[i].valid == 0){
+				continue;
+			}
+			start->bcastList[i].valid=0;
+			MACHSTATE3(3,"Buffered broadcast msg %p of size %d being processed at %d",start->bcastList[i].msg,start->bcastList[i].size,i);
 #if CMK_BROADCAST_SPANNING_TREE
         if (start->bcastList[i].asm_rank == DGRAM_BROADCAST
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -1201,6 +1222,7 @@ static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffe
 		node->asm_msg = NULL;
 		handoverMessage(newmsg,total_size,node->asm_rank,node->infiData->broot,toBuffer);
 		MACHSTATE3(3,"Message from node %d of length %d completely received msg %p",nodeNo,total_size,newmsg);
+		processBufferedBcast();
 	}
 	
 };
@@ -1481,10 +1503,12 @@ static inline void increaseTokens(OtherNode node){
 	node->infiData->totalTokens += increase;
 	node->infiData->tokensLeft += increase;
 	//increase the size of the sendCq
-	int currentCqSize = context->sendCq->cqe;
+	int currentCqSize = context->sendCqSize;
 	if(ibv_resize_cq(context->sendCq,currentCqSize+increase)){
+		fprintf(stderr,"[%d] failed to increase cq by %d from %d totalTokens %d \n",_Cmi_mynode,increase,currentCqSize, node->infiData->totalTokens);
 		assert(0);
 	}
+	context->sendCqSize+= increase;
 };
 
 
@@ -1498,10 +1522,11 @@ static void increasePostedRecvs(int nodeNo){
 	node->infiData->postedRecvs+= increase;
 	MACHSTATE3(3,"Increase tokens by %d to %d for node %d ",increase,node->infiData->postedRecvs,nodeNo);
 	//increase the size of the recvCq
-	int currentCqSize = context->recvCq->cqe;
+	int currentCqSize = context->recvCqSize;
 	if(ibv_resize_cq(context->recvCq,currentCqSize+increase)){
 		assert(0);
 	}
+	context->recvCqSize += increase;
 
 	//create another bufferPool and attach it to the top of the current one
 	struct infiBufferPool *newPool = allocateInfiBufferPool(increase,packetSize);
