@@ -200,6 +200,7 @@ class CkVec : private CkSTLHelper<T> {
     ~CkVec() { freeBlock(); }
     CkVec(const this_type &src) {copyFrom(src);}
     CkVec(int size) { makeBlock(size,size); } 
+    CkVec(int size, int used) { makeBlock(size,used); } 
     CkVec(const CkSkipInitialization &skip) {/* don't initialize */}
     this_type &operator=(const this_type &src) {
       freeBlock();
