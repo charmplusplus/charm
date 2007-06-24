@@ -126,10 +126,10 @@ void GridHybridLB::Initialize_PE_Data (CentralLB::LDStats *stats)
     (&PE_Data[i])->available      = stats->procs[i].available;
     (&PE_Data[i])->cluster        = Get_Cluster (i);
     (&PE_Data[i])->num_objs       = 0;
-    (&PE_Data[i])->num_lan_objs   = 0;   // new
-    (&PE_Data[i])->num_lan_msgs   = 0;   // new
-    (&PE_Data[i])->num_wan_objs   = 0;   // new
-    (&PE_Data[i])->num_wan_msgs   = 0;   // new
+    (&PE_Data[i])->num_lan_objs   = 0;
+    (&PE_Data[i])->num_lan_msgs   = 0;
+    (&PE_Data[i])->num_wan_objs   = 0;
+    (&PE_Data[i])->num_wan_msgs   = 0;
     (&PE_Data[i])->relative_speed = 0.0;
     (&PE_Data[i])->scaled_load    = 0.0;
 
@@ -207,8 +207,8 @@ void GridHybridLB::Initialize_Object_Data (CentralLB::LDStats *stats)
   for (i = 0; i < Num_Objects; i++) {
     (&Object_Data[i])->migratable   = (&stats->objData[i])->migratable;
     (&Object_Data[i])->from_pe      = stats->from_proc[i];
-    (&Object_Data[i])->num_lan_msgs = 0;   // new
-    (&Object_Data[i])->num_wan_msgs = 0;   // new
+    (&Object_Data[i])->num_lan_msgs = 0;
+    (&Object_Data[i])->num_wan_msgs = 0;
     (&Object_Data[i])->load         = (&stats->objData[i])->wallTime;
 
     if ((&Object_Data[i])->migratable) {
@@ -216,7 +216,7 @@ void GridHybridLB::Initialize_Object_Data (CentralLB::LDStats *stats)
       (&Object_Data[i])->cluster = -1;
     } else {
       (&Object_Data[i])->to_pe = (&Object_Data[i])->from_pe;
-      (&Object_Data[i])->cluster = GetCluster ((&Object_Data[i])->from_pe);
+      (&Object_Data[i])->cluster = Get_Cluster ((&Object_Data[i])->from_pe);
       if (_lb_args.debug() > 1) {
 	CkPrintf ("[%d] GridHybridLB identifies object %d as non-migratable.\n", CkMyPe(), i);
       }

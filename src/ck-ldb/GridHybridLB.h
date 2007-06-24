@@ -56,6 +56,10 @@ class PE_Data_T
     CmiBool available;
     int cluster;
     int num_objs;
+    int num_lan_objs;
+    int num_lan_msgs;
+    int num_wan_objs;
+    int num_wan_msgs;
     double relative_speed;
     double scaled_load;
 };
@@ -67,6 +71,8 @@ class Object_Data_T
     int cluster;
     int from_pe;
     int to_pe;
+    int num_lan_msgs;
+    int num_wan_msgs;
     double load;
     int secondary_index;
 };
@@ -97,10 +103,16 @@ class GridHybridLB : public CentralLB
     void Initialize_Object_Data (CentralLB::LDStats *stats);
     void Initialize_Cluster_Data ();
     void Partition_Objects_Into_Clusters (CentralLB::LDStats *stats);
-    void Partition_ClusterObjects_Into_PEs (CentralLB::LDStats *stats, int cluster);
+    void Examine_InterObject_Messages (CentralLB::LDStats *stats);
+    void Map_NonMigratable_Objects_To_PEs ();
+    void Map_Migratable_Objects_To_PEs (int cluster);
+    int Find_Maximum_Object (int cluster);
+    int Find_Minimum_PE (int cluster);
+    void Assign_Object_To_PE (int target_object, int target_pe);
 
     int CK_LDB_GridHybridLB_Mode;
     int CK_LDB_GridHybridLB_Background_Load;
+    double CK_LDB_GridHybridLB_Load_Tolerance;
 
     int Num_PEs;
     int Num_Objects;
