@@ -15,6 +15,7 @@ LOADBALANCERS=\
    $(L)/libmoduleGridCommLB.a \
    $(L)/libmoduleGridCommRefineLB.a \
    $(L)/libmoduleGridMetisLB.a \
+   $(L)/libmoduleGridHybridLB.a \
    $(L)/libmoduleComm1LB.a \
    $(L)/libmoduleOrbLB.a \
    $(L)/libmoduleRecBisectBfLB.a \
@@ -139,6 +140,15 @@ GridMetisLB.decl.h: GridMetisLB.ci charmxi
 $(L)/libmoduleGridMetisLB.a: GridMetisLB.o 
 	$(CHARMC) -o $(L)/libmoduleGridMetisLB.a GridMetisLB.o 
 	cp libmoduleGridMetisLB.dep $(L)/
+
+
+GridHybridLB.def.h: GridHybridLB.decl.h
+
+GridHybridLB.decl.h: GridHybridLB.ci charmxi
+	$(CHARMXI) GridHybridLB.ci
+
+$(L)/libmoduleGridHybridLB.a: GridHybridLB.o manager.o
+	$(CHARMC) -o $(L)/libmoduleGridHybridLB.a GridHybridLB.o manager.o
 
 
 Comm1LB.def.h: Comm1LB.decl.h
@@ -288,6 +298,7 @@ LB_OBJ=EveryLB.o \
     GridCommLB.o \
     GridCommRefineLB.o \
     GridMetisLB.o \
+    GridHybridLB.o \
     Comm1LB.o \
     OrbLB.o \
     RecBisectBfLB.o \

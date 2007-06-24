@@ -12,6 +12,7 @@ module EveryLB {
    extern module GridCommLB;
    extern module GridCommRefineLB;
    extern module GridMetisLB;
+   extern module GridHybridLB;
    extern module Comm1LB;
    extern module OrbLB;
    extern module RecBisectBfLB;
