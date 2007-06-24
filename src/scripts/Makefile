@@ -192,7 +192,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  RefineLB.h RefineKLB.h RefineCommLB.h OrbLB.h \
 	  GreedyLB.h GreedyCommLB.h GreedyAgentLB.h Comm1LB.h MetisLB.h \
 	  TopoLB.h RefineTopoLB.h  TopoCentLB.h  PhasebyArrayLB.h RotateLB.h \
-	  GridCommLB.h GridCommRefineLB.h GridMetisLB.h DummyLB.h BlockLB.h \
+	  GridCommLB.h GridCommRefineLB.h GridMetisLB.h GridHybridLB.h DummyLB.h BlockLB.h \
 	  NborBaseLB.h HybridBaseLB.h HybridLB.h HybridLBMsg.h HbmLB.h \
 	  NeighborLB.h NeighborCommLB.h NeighborLBMsg.h WSLB.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
@@ -205,7 +205,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           DummyLB.decl.h RotateLB.decl.h RefineLB.decl.h RefineKLB.decl.h BlockLB.decl.h \
           RefineCommLB.decl.h OrbLB.decl.h GreedyLB.decl.h GreedyCommLB.decl.h \
           Comm1LB.decl.h GreedyAgentLB.decl.h \
-          GridCommLB.decl.h GridCommRefineLB.decl.h GridMetisLB.decl.h \
+          GridCommLB.decl.h GridCommRefineLB.decl.h GridMetisLB.decl.h GridHybridLB.decl.h \
 	  PhasebyArrayLB.decl.h TopoLB.decl.h RefineTopoLB.decl.h 	\
 	  TopoCentLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
           NeighborCommLB.decl.h HbmLB.decl.h \

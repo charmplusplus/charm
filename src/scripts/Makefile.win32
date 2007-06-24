@@ -56,7 +56,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h trace.h conv-ccs.h \
       MetisLB.decl.h RefineLB.decl.h \
       HeapCentLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
       WSLB.decl.h GridCommLB.decl.h GridCommRefineLB.decl.h \
-      GridMetisLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
+      GridMetisLB.decl.h GridHybridLB.decl.h GreedyRefLB.decl.h RandRefLB.decl.h \
       tempo.decl.h waitqd.decl.h \
 	  CommLB.decl.h Comm1LB.decl.h  \
 	  ampi.decl.h ampimain.decl.h BlueGene.decl.h blue.h
@@ -75,7 +75,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  RefineLB.h HeapCentLB.h CommLB.h Comm1LB.h \
 	  MetisLB.h NborBaseLB.h \
 	  NeighborLB.h WSLB.h GridCommLB.h GridCommRefineLB.h \
-	  GridMetisLB.h GreedyRefLB.h RandRefLB.h \
+	  GridMetisLB.h GridHybridLB.h GreedyRefLB.h RandRefLB.h \
 	  ampi.h BlueGene.h \
 	  $(CVHEADERS)
 
@@ -303,7 +303,7 @@ LIBCK_CORE=init.obj register.obj qd.obj ck.obj main.obj msgalloc.obj ckfutures.o
 	   RecBisectBfLB.obj graph.obj bitvecset.obj \
 	   MetisLB.obj RefineLB.obj Set.obj CommLB.obj Comm1LB.obj\
            HeapCentLB.obj heap.obj NborBaseLB.obj NeighborLB.obj WSLB.obj \
-	   GridCommLB.obj GridCommRefineLB.obj GridMetisLB.obj \
+	   GridCommLB.obj GridCommRefineLB.obj GridMetisLB.obj GridHybridLB.obj \
 	   GreedyRefLB.obj RandRefLB.obj CommLBHeap.obj
 
 
@@ -399,6 +399,9 @@ GridCommRefineLB.decl.h GridCommRefineLB.def.h : GridCommRefineLB.ci $(CHARMXI)
 
 GridMetisLB.decl.h GridMetisLB.def.h : GridMetisLB.ci $(CHARMXI)
 	$(CHARMXI) -ansi GridMetisLB.ci
+
+GridHybridLB.decl.h GridHybridLB.def.h : GridHybridLB.ci $(CHARMXI)
+	$(CHARMXI) -ansi GridHybridLB.ci
 
 GreedyRefLB.decl.h GreedyRefLB.def.h : GreedyRefLB.ci $(CHARMXI)
 	$(CHARMXI) -ansi GreedyRefLB.ci
@@ -519,6 +522,9 @@ GridCommRefineLB.obj: GridCommRefineLB.C $(CKHEADERS)
 
 GridMetisLB.obj: GridMetisLB.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP GridMetisLB.C
+
+GridHybridLB.obj: GridHybridLB.C $(CKHEADERS)
+	$(CPP) $(CPP_PROJ) /TP GridHybridLB.C
 
 GreedyRefLB.obj: GreedyRefLB.C $(CKHEADERS)
 	$(CPP) $(CPP_PROJ) /TP GreedyRefLB.C
