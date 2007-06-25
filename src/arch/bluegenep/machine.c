@@ -44,7 +44,7 @@ PCQueue broadcast_q;                 //queue to send broadcast messages
 #if CMK_SMP
 #define CMK_BROADCAST_SPANNING_TREE    0
 #else
-#define CMK_BROADCAST_SPANNING_TREE    0
+#define CMK_BROADCAST_SPANNING_TREE    1
 #define CMK_BROADCAST_HYPERCUBE        0
 #endif /* CMK_SMP */
 
@@ -232,7 +232,9 @@ static void CommunicationServerThread(int sleepTime);
 void SendSpanningChildren(int size, char *msg);
 void SendHypercube(int size, char *msg);
 
+DCMF_Protocol_t  cmi_dcmf_short_registration;
 DCMF_Protocol_t  cmi_dcmf_eager_registration;
+DCMF_Protocol_t  cmi_dcmf_rzv_registration;
 
 typedef struct msg_list {
   DCMF_Request_t             send;
@@ -375,7 +377,7 @@ void     short_pkt_recv (void             * clientdata,
   //printf ("%d: Receiving short message %d bytes\n", CmiMyPe(), sndlen);
   
   char * new_buffer = (char *)CmiAlloc(alloc_size);
-  memcpy (new_buffer, buffer, sndlen);
+  CmiMemcpy (new_buffer, buffer, sndlen);
   recv_done (new_buffer);
 }
 
@@ -519,6 +521,7 @@ int mysleep (int sec) {
    return count;
 }
 
+#define RESEARCH_CONTRIB  0
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret){
   int n, i, count;
@@ -530,13 +533,35 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
   mysleep (10);
 
-  DCMF_Send_Configuration_t eager_config;
+  DCMF_Send_Configuration_t short_config, eager_config, rzv_config;
+  
+#if RESEARCH_CONTRIB
+  short_config.protocol      = DCMF_SHORT_CONTRIB_PROTOCOL;
+#else
+  short_config.protocol      = DCMF_DEFAULT_SEND_PROTOCOL;
+#endif
+  short_config.cb_recv_short = short_pkt_recv;
+  short_config.cb_recv       = first_pkt_recv_done;
 
-  eager_config.protocol = DCMF_DEFAULT_SEND_PROTOCOL;
+#if RESEARCH_CONTRIB  
+  eager_config.protocol      = DCMF_EAGER_CONTRIB_PROTOCOL;
+#else
+  eager_config.protocol      = DCMF_DEFAULT_SEND_PROTOCOL;
+#endif
   eager_config.cb_recv_short = short_pkt_recv;
   eager_config.cb_recv       = first_pkt_recv_done;
   
+#if RESEARCH_CONTRIB  
+  rzv_config.protocol        = DCMF_RZV_CONTRIB_PROTOCOL;
+#else
+  rzv_config.protocol        = DCMF_DEFAULT_SEND_PROTOCOL;
+#endif
+  rzv_config.cb_recv_short   = short_pkt_recv;
+  rzv_config.cb_recv         = first_pkt_recv_done;
+  
+  DCMF_Send_register (&cmi_dcmf_short_registration, &short_config);
   DCMF_Send_register (&cmi_dcmf_eager_registration, &eager_config);
+  DCMF_Send_register (&cmi_dcmf_rzv_registration,   &rzv_config);
  
   //fprintf(stderr, "Initializing Eager Protocol\n");
  
@@ -875,7 +900,16 @@ void machineSend(SMSG_LIST *msg_tmp) {
   msg_tmp->cb.function     =   send_done;
   msg_tmp->cb.clientdata   =   msg_tmp;
 
-  DCMF_Send (&cmi_dcmf_eager_registration, &msg_tmp->send, msg_tmp->cb, 
+  DCMF_Protocol_t *protocol = NULL;
+
+  if (msg_tmp->size < 224)
+    protocol = &cmi_dcmf_short_registration;
+  else if (msg_tmp->size < 2048)
+    protocol = &cmi_dcmf_eager_registration;
+  else
+    protocol = &cmi_dcmf_rzv_registration;
+
+  DCMF_Send (protocol, &msg_tmp->send, msg_tmp->cb, 
 	     DCMF_MATCH_CONSISTENCY, msg_tmp->destpe, 
 	     msg_tmp->size, msg_tmp->msg, &msg_tmp->info, 1);    
 }
@@ -932,7 +966,7 @@ void  CmiGeneralFreeSend(int destPE, int size, char* msg){
 void CmiSyncSendFn(int destPE, int size, char *msg){
   char *copymsg;
   copymsg = (char *)CmiAlloc(size);
-  memcpy(copymsg,msg,size);
+  CmiMemcpy(copymsg,msg,size);
   CmiFreeSendFn(destPE,size,copymsg);
 }
 
@@ -950,7 +984,7 @@ void CmiSyncSendFn1(int destPE, int size, char *msg)
 {
   char *copymsg;
   copymsg = (char *)CmiAlloc(size);
-  memcpy(copymsg, msg, size);
+  CmiMemcpy(copymsg, msg, size);
 
   //  asm volatile("sync" ::: "memory");
 
@@ -1010,7 +1044,7 @@ void SendHypercube(int size, char *msg)
 void CmiSyncBroadcastFn(int size, char *msg){
   char *copymsg;
   copymsg = (char *)CmiAlloc(size);
-  memcpy(copymsg,msg,size);
+  CmiMemcpy(copymsg,msg,size);
   CmiFreeBroadcastFn(size,copymsg);
 }
 
@@ -1042,7 +1076,7 @@ void CmiFreeBroadcastFn(int size, char *msg){
 void CmiSyncBroadcastAllFn(int size, char *msg){
   char *copymsg;
   copymsg = (char *)CmiAlloc(size);
-  memcpy(copymsg,msg,size);
+  CmiMemcpy(copymsg,msg,size);
   CmiFreeBroadcastAllFn(size,copymsg);
 }
 
@@ -1146,24 +1180,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
 /*  CmiYield();  */
 #endif
 
-#if 1
-  {
-  int nSpins=20; /*Number of times to spin before sleeping*/
-  MACHSTATE1(2,"still idle (%d) begin {",CmiMyPe())
-  s->nIdles++;
-  if (s->nIdles>nSpins) { /*Start giving some time back to the OS*/
-    s->sleepMs+=2;
-    if (s->sleepMs>10) s->sleepMs=10;
-  }
-  /*Comm. thread will listen on sockets-- just sleep*/
-  if (s->sleepMs>0) {
-    MACHSTATE1(2,"idle lock(%d) {",CmiMyPe())
-    CmiIdleLock_sleep(&s->cs->idle,s->sleepMs);
-    MACHSTATE1(2,"} idle lock(%d)",CmiMyPe())
-  }       
-  MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())
-  }
-#endif
+  //Call comm thread!!
 }
 
 /*==========================================================*/
@@ -1216,7 +1233,7 @@ void          CmiReleaseCommHandle(CmiCommHandle handle){
 void CmiSyncListSendFn(int npes, int *pes, int size, char *msg){
   char *copymsg;
   copymsg = (char *)CmiAlloc(size);
-  memcpy(copymsg,msg,size);
+  CmiMemcpy(copymsg,msg,size);
   CmiFreeListSendFn(npes, pes, size, msg);
 }
 
