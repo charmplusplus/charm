@@ -79,6 +79,10 @@ extern FILE *debugLog;
 #endif
 
 
+#define COMM_SERVER_FROM_SMP             0
+#define COMM_SERVER_FROM_INTERRUPT       1
+#define COMM_SERVER_FROM_WORKER          2
+
 #endif
 
 /*@}*/
