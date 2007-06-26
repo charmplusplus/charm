@@ -829,7 +829,7 @@ static void CommunicationInterrupt(int ignored)
     /*Make sure any malloc's we do in here are NOT migratable:*/
     CmiIsomallocBlockList *oldList=CmiIsomallocBlockListActivate(NULL);
 /*    _Cmi_myrank=1; */
-    CommunicationServer(0, 1);     /* from interrupt */
+    CommunicationServer(0, COMM_SERVER_FROM_INTERRUPT);  /* from interrupt */
 /*    _Cmi_myrank=0; */
     CmiIsomallocBlockListActivate(oldList);
   }
@@ -1471,7 +1471,7 @@ void copyInfiAddr(ChInfiAddr *qpList);
 static void node_addresses_obtain(char **argv)
 {
   ChMessage nodetabmsg; /* info about all nodes*/
-	MACHSTATE(3,"node_addresses_obtain");
+  MACHSTATE(3,"node_addresses_obtain");
   if (Cmi_charmrun_fd==-1) 
   {/*Standalone-- fake a single-node nodetab message*/
   	int npes=1;
@@ -1488,6 +1488,10 @@ static void node_addresses_obtain(char **argv)
 			npes,argv[0],CMK_MACHINE_NAME);
 		exit(1);
 	}
+#else
+        /* standalone smp version reads ppn */
+        if (CmiGetArgInt(argv, "+ppn", &_Cmi_mynodesize))
+          npes = _Cmi_mynodesize;
 #endif
 	/*This is a stupid hack: we expect the *number* of nodes
 	followed by ChNodeinfo structs; so we use a ChSingleNodeinfo
@@ -1786,7 +1790,7 @@ CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
   DeliverOutgoingNodeMessage(ogm);
   CmiCommUnlock();
   /* Check if any packets have arrived recently (preserves kernel network buffers). */
-  CommunicationServer(0, 2);
+  CommunicationServer(0, COMM_SERVER_FROM_WORKER);
   MACHSTATE(1,"} CmiGeneralNodeSend");
   return (CmiCommHandle)ogm;
 }
@@ -1865,7 +1869,7 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   DeliverOutgoingMessage(ogm);
   CmiCommUnlock();
   /* Check if any packets have arrived recently (preserves kernel network buffers). */
-  CommunicationServer(0, 2);
+  CommunicationServer(0, COMM_SERVER_FROM_WORKER);
   MACHSTATE(1,"}  CmiGeneralSend");
   return (CmiCommHandle)ogm;
 }
@@ -2120,7 +2124,7 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 #if CMK_IMMEDIATE_MSG
 void CmiProbeImmediateMsg()
 {
-  CommunicationServer(0, 0);
+  CommunicationServer(0, COMM_SERVER_FROM_SMP);
 }
 #endif
 */
@@ -2129,7 +2133,7 @@ void CmiProbeImmediateMsg()
    messages. This flushes receive buffers on some implementations*/ 
 void CmiMachineProgressImpl()
 {
-    CommunicationServer(0, 0);
+  CommunicationServer(0, COMM_SERVER_FROM_SMP);
 }
 
 /******************************************************************************
@@ -2272,7 +2276,7 @@ static void ConverseRunPE(int everReturn)
   if (CmiMyRank() == CmiMyNodeSize()) {
     Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
     if (Cmi_charmrun_fd!=-1)
-          while (1) CommunicationServer(5, 0);
+          while (1) CommunicationServer(5, COMM_SERVER_FROM_SMP);
   }
   else
   if (!everReturn) {
@@ -2302,7 +2306,7 @@ void ConverseExit(void)
   	ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away */
 #if CMK_SHARED_VARS_UNAVAILABLE
  	Cmi_check_delay = 1.0;		/* speed up checking of charmrun */
- 	while (1) CommunicationServer(500, 2);
+ 	while (1) CommunicationServer(500, COMM_SERVER_FROM_WORKER);
 #endif
   }
   MACHSTATE(2,"} ConverseExit");
