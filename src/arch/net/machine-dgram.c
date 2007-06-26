@@ -513,7 +513,7 @@ static void node_addresses_store(ChMessage *msg)
   for (i=0; i<_Cmi_numnodes; i++) {
     nodes[i].nodestart = nodestart;
     nodes[i].nodesize  = ChMessageInt(d[i].nPE);
-		MACHSTATE2(3,"node %d nodesize %d",i,nodes[i].nodesize);
+    MACHSTATE2(3,"node %d nodesize %d",i,nodes[i].nodesize);
     nodes[i].mach_id = ChMessageInt(d[i].mach_id);
 #if CMK_USE_MX
     nodes[i].nic_id = ChMessageLong(d[i].nic_id);
@@ -753,7 +753,7 @@ static void CommunicationsClockCaller(void *ignored)
 
 static void CommunicationPeriodic(void) 
 { /*Poll on the communications server*/
-  CommunicationServer(0, 0);
+  CommunicationServer(0, COMM_SERVER_FROM_SMP);
 }
 
 static void CommunicationPeriodicCaller(void *ignored)
