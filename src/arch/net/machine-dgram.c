@@ -700,7 +700,8 @@ static int dataskt_ready_write;
 
 void GarbageCollectMsg(OutgoingMsg ogm)
 {
-  if (ogm->refcount == 0) {
+  MACHSTATE2(3,"GarbageCollectMsg called on ogm %p refcount %d",ogm,ogm->refcount);
+	if (ogm->refcount == 0) {
     if (ogm->freemode == 'A') {
       ogm->freemode = 'X';
     } else {
