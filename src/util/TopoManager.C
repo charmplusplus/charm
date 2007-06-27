@@ -50,6 +50,28 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
 #endif
 }
 
+void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
+#ifdef CMK_VERSION_BLUEGENE
+
+#elif CMK_BLUEGENEP
+  bgptm.rankToCoordinates(pe, x, y, z, t);
+#elif CMK_XT3
+
+#else
+  if(dimY>0){
+    // Assumed TXYZ
+    x = pe % dimX;
+    y = (pe % (dimX * dimY)) / dimX;
+    z = pe / (dimX * dimY);
+  }
+  else {
+      x = pe; 
+      y = 0; 
+      z = 0;
+    }
+#endif
+}
+
 int TopoManager::coordinatesToRank(int x, int y, int z) {
 #ifdef CMK_VERSION_BLUEGENE
   return bgltm->coords2rank(x, y, z);
@@ -65,10 +87,25 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
 #endif
 }
 
+int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
+#ifdef CMK_VERSION_BLUEGENE
+  return bgltm->coords2rank(x, y, z);
+#elif CMK_BLUEGENEP
+  return bgptm.coordinatesToRank(x, y, z, t);
+#elif CMK_XT3
+
+#else
+  if(dimY > 0)
+    return x + y*dimX + z*dimX*dimY;
+  else
+    return x;
+#endif
+}
+
 int TopoManager::getHopsBetweenRanks(int pe1, int pe2) {
-  int x1, y1, z1, x2, y2, z2;
-  rankToCoordinates(pe1, x1, y1, z1);
-  rankToCoordinates(pe2, x2, y2, z2);
+  int x1, y1, z1, x2, y2, z2, t1, t2;
+  rankToCoordinates(pe1, x1, y1, z1, t1);
+  rankToCoordinates(pe2, x2, y2, z2, t2);
   return (absX(x2-x1)+absY(y2-y1)+absZ(z2-z1));
 }
 
@@ -107,13 +144,13 @@ int TopoManager::pickClosestRank(int mype, int *pes, int n){
 }
 
 int TopoManager::areNeighbors(int pe1, int pe2, int pe3, int distance) {
-  int pe1_x, pe1_y, pe1_z;
-  int pe2_x, pe2_y, pe2_z;
-  int pe3_x, pe3_y, pe3_z;
+  int pe1_x, pe1_y, pe1_z, pe1_t;
+  int pe2_x, pe2_y, pe2_z, pe2_t;
+  int pe3_x, pe3_y, pe3_z, pe3_t;
 
-  rankToCoordinates(pe1, pe1_x, pe1_y, pe1_z);
-  rankToCoordinates(pe2, pe2_x, pe2_y, pe2_z);
-  rankToCoordinates(pe3, pe3_x, pe3_y, pe3_z);
+  rankToCoordinates(pe1, pe1_x, pe1_y, pe1_z, pe1_t);
+  rankToCoordinates(pe2, pe2_x, pe2_y, pe2_z, pe2_t);
+  rankToCoordinates(pe3, pe3_x, pe3_y, pe3_z, pe3_t);
 
   if ( (absX(pe1_x - (pe2_x+pe3_x)/2) + absY(pe1_y - (pe2_y+pe3_y)/2) + absZ(pe1_z - (pe2_z+pe3_z)/2)) <= distance )
     return 1;

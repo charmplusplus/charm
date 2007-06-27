@@ -23,12 +23,13 @@
 
 class TopoManager {
   private:
-    int dimX;	// dimension of the allocation in X (processors)
-    int dimY;	// dimension of the allocation in Y (processors)
-    int dimZ;	// dimension of the allocation in Z (processors)
-    int dimNX;	// dimension of the allocation in X (nodes)
-    int dimNY;	// dimension of the allocation in Y (nodes)
-    int dimNZ;	// dimension of the allocation in Z (nodes)
+    int dimX;	// dimension of the allocation in X (no. of processors)
+    int dimY;	// dimension of the allocation in Y (no. of processors)
+    int dimZ;	// dimension of the allocation in Z (no. of processors)
+    int dimNX;	// dimension of the allocation in X (no. of nodes)
+    int dimNY;	// dimension of the allocation in Y (no. of nodes)
+    int dimNZ;	// dimension of the allocation in Z (no. of nodes)
+    int dimNT;  // dimension of the allocation in T (no. of processors per node)
     int torusX, torusY, torusZ, torusT; 
     int procsPerNode;
 
@@ -72,6 +73,7 @@ class TopoManager {
       dimNX = bgptm.getDimNX();
       dimNY = bgptm.getDimNY();
       dimNZ = bgptm.getDimNZ();
+      dimNT = bgptm.getDimNT();
 
       procsPerNode = bgptm.getProcsPerNode();
       int *torus = (int *)malloc(sizeof(int)*4);
@@ -114,6 +116,7 @@ class TopoManager {
     inline int getDimNX() { return dimNX; }
     inline int getDimNY() { return dimNY; }
     inline int getDimNZ() { return dimNZ; }
+    inline int getDimNT() { return dimNT; }
 
     inline int absX(int x) {
       int px = abs(x);
@@ -147,7 +150,9 @@ class TopoManager {
     
     int hasMultipleProcsPerNode();
     void rankToCoordinates(int pe, int &x, int &y, int &z);
+    void rankToCoordinates(int pe, int &x, int &y, int &z, int &t);
     int coordinatesToRank(int x, int y, int z);
+    int coordinatesToRank(int x, int y, int z, int t);
     int getHopsBetweenRanks(int pe1, int pe2);
     void sortRanksByHops(int pe, int *pes, int *idx, int n); 
     int pickClosestRank(int mype, int *pes, int n);
