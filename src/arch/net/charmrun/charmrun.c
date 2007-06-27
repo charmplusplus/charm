@@ -1433,9 +1433,9 @@ int req_handle_initnode(ChMessage *msg,SOCKET fd)
 	}
 	nodeInfo->info.qpList = malloc(sizeof(ChInfiAddr)*(nodetab_rank0_size-1));
 	memcpy((char *)nodeInfo->info.qpList,&msg->data[sizeof(ChSingleNodeinfo)],sizeof(ChInfiAddr)*(nodetab_rank0_size-1));
-	for(i=0;i<nodetab_rank0_size-1;i++){
+/*	for(i=0;i<nodetab_rank0_size-1;i++){
 		printf("i %d  0x%0x 0x%0x 0x%0x\n",i,ChMessageInt(nodeInfo->info.qpList[i].lid),ChMessageInt(nodeInfo->info.qpList[i].qpn),ChMessageInt(nodeInfo->info.qpList[i].psn));
-	}
+	}*/
 #else
   if (msg->len!=sizeof(ChSingleNodeinfo)) {
     fprintf(stderr,"Charmrun: Bad initnode data length. Aborting\n");
@@ -1857,7 +1857,7 @@ void exchange_qpdata_clients(){
 			}else{
 				int nt=nodetab_rank0_table[i];/*Nodetable index for this node*/	
 				nodetab_table[nt]->qpData[proc] =  nodeinfo_arr[proc].qpList[count];
-				printf("Charmrun> nt %d proc %d lid 0x%x qpn 0x%x psn 0x%x\n",nt,proc,ChMessageInt(nodetab_table[nt]->qpData[proc].lid),ChMessageInt(nodetab_table[nt]->qpData[proc].qpn),ChMessageInt(nodetab_table[nt]->qpData[proc].psn));
+	//			printf("Charmrun> nt %d proc %d lid 0x%x qpn 0x%x psn 0x%x\n",nt,proc,ChMessageInt(nodetab_table[nt]->qpData[proc].lid),ChMessageInt(nodetab_table[nt]->qpData[proc].qpn),ChMessageInt(nodetab_table[nt]->qpData[proc].psn));
 				count++;
 			}
 		}
@@ -1870,7 +1870,7 @@ void	send_clients_nodeinfo_qpdata(){
 	int msgSize = sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*nodetab_rank0_size+sizeof(ChInfiAddr)*nodetab_rank0_size;
 	for(node=0;node<nodetab_rank0_size;node++){
 		int nt=nodetab_rank0_table[node];/*Nodetable index for this node*/
-		printf("Charmrun> Node %d proc %d sending initnodetab \n",node,nt);
+//		printf("Charmrun> Node %d proc %d sending initnodetab \n",node,nt);
 		ChMessageHeader hdr;
 		ChMessageInt_t nNodes=ChMessageInt_new(nodetab_rank0_size);
 		ChMessageHeader_new("initnodetab",msgSize,&hdr);
