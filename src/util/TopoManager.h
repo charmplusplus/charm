@@ -14,7 +14,7 @@
 #include "charm.h"
 
 #ifdef CMK_VERSION_BLUEGENE
-#include "bgltorus.h"
+#include "BGLTorus.h"
 #elif CMK_BLUEGENEP
 #include "BGPTorus.h"
 #elif CMK_XT3
@@ -34,33 +34,29 @@ class TopoManager {
     int procsPerNode;
 
 #ifdef CMK_VERSION_BLUEGENE
-    BGLTorusManager *bgltm;
+    BGLTorusManager bgltm;
 #elif CMK_BLUEGENEP
     BGPTorusManager bgptm;
 #elif CMK_XT3
-    CrayTorusManager *crtm;
+    CrayTorusManager crtm;
 #endif
 
   public:
 
     TopoManager() {
 #ifdef CMK_VERSION_BLUEGENE
-      bgltm = BGLTorusManager::getObject();
-  
-      dimX = bgltm->getXSize();
-      dimY = bgltm->getYSize();
-      dimZ = bgltm->getZSize();
+      dimX = bgltm.getDimX();
+      dimY = bgltm.getDimY();
+      dimZ = bgltm.getDimZ();
     
-      dimNX = bgltm->getXNodeSize();
-      dimNY = bgltm->getYNodeSize();
-      dimNZ = bgltm->getZNodeSize();
+      dimNX = bgltm.getDimNX();
+      dimNY = bgltm.getDimNY();
+      dimNZ = bgltm.getDimNZ();
 
-      if(bgltm->isVnodeMode())
-        procsPerNode = 2;
-      else
-        procsPerNode = 1;
+      
+      procsPerNode = bgltm.getProcsPerNode();
       int *torus = (int *)malloc(sizeof(int)*3);
-      torus = bgltm->isTorus();
+      torus = bgltm.isTorus();
       torusX = torus[0];
       torusY = torus[1];
       torusZ = torus[2];
