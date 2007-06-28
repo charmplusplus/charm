@@ -52,7 +52,9 @@ class BGPTorusManager {
       mapping = getenv("BG_MAPPING");
     }
 
-    ~BGPTorusManager() { }
+    ~BGPTorusManager() {
+       free(mapping);
+     }
 
     inline int getDimX() { return dimX; }
     inline int getDimY() { return dimY; }
