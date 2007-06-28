@@ -60,6 +60,7 @@ class TopoManager {
       torusX = torus[0];
       torusY = torus[1];
       torusZ = torus[2];
+      free(torus);
 
 #elif CMK_BLUEGENEP
       dimX = bgptm.getDimX();
@@ -78,6 +79,7 @@ class TopoManager {
       torusY = torus[1];
       torusZ = torus[2];
       torusT = torus[3];
+      free(torus);
 
 #elif CMK_XT3
 

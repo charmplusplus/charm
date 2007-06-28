@@ -62,7 +62,9 @@ class BGLTorusManager {
       mapping = getenv("BGLMPI_MAPPING");
     }
 
-    ~BGLTorusManager() { }
+    ~BGLTorusManager() { 
+       free(mapping);
+     }
 
     inline int getDimX() { return dimX; }
     inline int getDimY() { return dimY; }
@@ -109,5 +111,5 @@ class BGLTorusManager {
     }
 };
 
-#endif // CMK_BLUEGENEP
-#endif //_BGP_TORUS_H_
+#endif // CMK_VERSION_BLUEGENE
+#endif //_BGL_TORUS_H_
