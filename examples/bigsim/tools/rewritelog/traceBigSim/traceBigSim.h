@@ -28,18 +28,18 @@ void BgSetStartEvent();
 
 
 //======================PAPI======================= 
-//#define BIG_SIM_PAPI
+#define BIG_SIM_PAPI
 
 #ifdef BIG_SIM_PAPI
 
 #include <papi.h>
 
-#define NUM_PAPI_EVENTS 7
+#define NUM_PAPI_EVENTS 9
 #define BIGSIM_PAPI
 
 int errorcode; 
-int events[NUM_PAPI_EVENTS];
-long long values[NUM_PAPI_EVENTS]; 
+int events[NUM_PAPI_EVENTS+20];
+long long values[NUM_PAPI_EVENTS+20]; 
 char errorstring[PAPI_MAX_STR_LEN+1]; 
 
 #endif
@@ -87,22 +87,15 @@ void startTraceBigSim(){
     events[4] = PAPI_L3_TCM;
     events[5] = PAPI_TLB_TL;
     events[6] = PAPI_LD_INS;
+    events[7] = PAPI_SR_INS; // store instructions
+    events[8] = PAPI_RES_STL; // resource stalls
 
+// THESE FAIL ON TUNGSTEN:
+    events[10] = PAPI_LST_INS; // load stall instructions (derived)
+    events[9] = PAPI_BR_INS; // branch instructions 
+    events[11] = PAPI_BR_MSP; // Branch mispredict  
+    events[12] = PAPI_BR_PRC; // branch predict correct 
 
-/* Other available events:
-					PAPI_BR_INS,
-                                        PAPI_BR_MSP,
-                                        PAPI_FP_INS,
-                                        PAPI_TOT_INS,
-                                        PAPI_TOT_IIS,
-                                        PAPI_L1_DCM,
-                                        PAPI_L1_LDM,
-                                        PAPI_L2_TCM,
-                                        PAPI_L3_LDM,
-                                        PAPI_RES_STL,
-                                        PAPI_LD_INS,
-                                        PAPI_TLB_TL  
-*/
 
     CkAssert(PAPI_start_counters(events, NUM_PAPI_EVENTS) == PAPI_OK);
 
