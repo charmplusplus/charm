@@ -7,7 +7,7 @@
 #include <stdlib.h> // for abort
 #include <vector> //for std::vector 
 #include "transfer.h" 
-#include "geom_util.h" 
+//#include "geom_util.h" 
 #include "charm++.h" 
 #include "MgcIntr3DTetrTetr.h"
 using namespace Mgc;
