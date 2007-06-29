@@ -35,7 +35,7 @@ double getSharedVolumeTets(const ConcreteElement &A,const ConcreteElement &B)
 
 double getSharedArea(const ConcreteElement &A,const ConcreteElement &B) {
   double area=0.0;
-  vector<Vec3D> xpoly2;
+  /*  vector<Vec3D> xpoly2;
   double tri[3][3];
   double pri[6][3];
 
@@ -52,7 +52,7 @@ double getSharedArea(const ConcreteElement &A,const ConcreteElement &B) {
     tri[i][1] = pt[1];
     tri[i][2] = pt[2];
   }
-
+  */
   // need to uncomment the line below when geom_util is functional
   //area = tri_prism_X(tri,pri,xpoly2);
   CkPrintf("datatransfer> transfer.C:getSharedArea: not yet functional\n");
