@@ -369,7 +369,7 @@ static void *call_startfn(void *vindex)
 static void CmiStartThreads(char **argv)
 {
   pthread_t pid;
-  int i, ok;
+  int i, ok, tocreate;
   pthread_attr_t attr;
 
   CmiMemLock_lock=CmiCreateLock();
@@ -385,7 +385,12 @@ static void CmiStartThreads(char **argv)
 /*  CmiStateInit(-1,_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize)); */
   CmiStateInit(_Cmi_mynode+CmiNumPes(),_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize));
 
-  for (i=1; i<=_Cmi_mynodesize; i++) {
+#if CMK_MULTICORE
+  tocreate = _Cmi_mynodesize-1;
+#else
+  tocreate = _Cmi_mynodesize;
+#endif
+  for (i=1; i<=tocreate; i++) {
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     ok = pthread_create(&pid, &attr, call_startfn, (void *)i);
@@ -416,7 +421,11 @@ void  CmiNodeBarrier(void) {
 /* unfortunately this could also be called in a seemingly non smp version
    net-win32, which actually is implemented as smp with comm. thread */
 void CmiNodeAllBarrier(void) {
+#if CMK_MULTICORE
+  CmiNodeBarrierCount(CmiMyNodeSize());
+#else
   CmiNodeBarrierCount(CmiMyNodeSize()+1);
+#endif
 }
 
 #endif
