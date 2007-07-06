@@ -793,7 +793,7 @@ void arg_init(int argc, char **argv)
 
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
-  if (argv[1][1]==':') { /*E.g.: "C:\foo\bar.exe*/
+  if (argv[1][1]==':' || argv[1][0]=='\\' && argv[1][1]=='\\') { /*E.g.: "C:\foo\bar.exe*/
 #else
   if (argv[1][0]=='/') { /*E.g.: "\foo\bar"*/
 #endif
