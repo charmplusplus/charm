@@ -1,0 +1,25 @@
+
+args=""
+
+while [ $# -gt 0 ]
+do
+        case $1 in
+	+p)     shift;
+		shift
+		;;
+	+p*)	shift
+		;;
+        +*)
+                args=$args" "$1
+                shift
+                ;;
+        *)
+		break;
+		;;
+	esac
+done
+
+echo Running command: $* $args
+echo
+
+exec $* $args
