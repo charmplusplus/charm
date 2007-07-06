@@ -246,7 +246,7 @@ headerlinks: dirs+sources Makefile $(ALLHEADERS)
 dirs+sources:
 	rm -f .gdir
 	(cd .. ; basename "`pwd`" | sed -e 's@-.*@@') 	> .gdir
-	test -f ../../src/arch/`cat .gdir`/gdir_link && cat ../../src/arch/`cat .gdir`/gdir_link > .gdir.new && mv .gdir.new .gdir
+	test -f ../../src/arch/`cat .gdir`/gdir_link && cat ../../src/arch/`cat .gdir`/gdir_link > .gdir.new && mv .gdir.new .gdir || true
 	pwd
 	find . -type l -exec rm {} \;
 	rm -rf QuickThreads
