@@ -947,6 +947,8 @@ double CmiTimer()
 
 #if CMK_TIMER_USE_BLUEGENEP  /* This module just compiles with GCC charm. */
 
+void CmiTimerInit() {}
+
 #if 0
 #include "common/bgp_personality.h"
 #include <spi/bgp_SPI.h>
