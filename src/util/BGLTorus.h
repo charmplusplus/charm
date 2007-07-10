@@ -46,7 +46,6 @@ class BGLTorusManager {
         dimNT = 2;
       else
 	dimNT = 1;
-      CkPrintf("AB TORUS %d %d %d %d\n", dimNT, dimNX, dimNY, dimNZ);
 
       dimX = dimNX;
       dimY = dimNY;
