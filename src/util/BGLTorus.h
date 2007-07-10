@@ -86,17 +86,17 @@ class BGLTorusManager {
     }
 
     inline void rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
-      if(mapping!=NULL && strcmp(mapping, "XYZT")) {
+      /*if(mapping!=NULL && strcmp(mapping, "XYZT")) {
         x = pe % dimNX;
         y = (pe % (dimNX*dimNY)) / dimNX;
         z = (pe % (dimNX*dimNY*dimNZ)) / (dimNX*dimNY);
         t = pe / (dimNX*dimNY*dimNZ);
-      } else {
+      } else {*/
         t = pe % dimNT;
         x = (pe % (dimNT*dimNX)) / dimNT;
         y = (pe % (dimNT*dimNX*dimNY)) / (dimNT*dimNX);
         z = pe / (dimNT*dimNX*dimNY);
-      }
+      //}
     }
 
     inline int coordinatesToRank(int x, int y, int z) {
@@ -104,10 +104,10 @@ class BGLTorusManager {
     }
 
     inline int coordinatesToRank(int x, int y, int z, int t) {
-      if(mapping!=NULL && strcmp(mapping, "XYZT"))
+      /*if(mapping!=NULL && strcmp(mapping, "XYZT"))
         return x + y*dimNX + z*dimNX*dimNY + t*dimNX*dimNY*dimNZ;
-      else
-        return t + x*dimNT + y*dimNT*dimNX + z*dimNT*dimNX*dimNY;
+      else*/
+        return t*(dimNT-1) + x*dimNT + y*dimNT*dimNX + z*dimNT*dimNX*dimNY;
     }
 };
 
