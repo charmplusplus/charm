@@ -34,7 +34,7 @@ class BGLTorusManager {
     char *mapping;
 
   public:
-    BGPTorusManager() {
+    BGLTorusManager() {
       int size = sizeof(BGLPersonality);
       int i = rts_get_personality(&bgl_p, size);
 
@@ -42,11 +42,11 @@ class BGLTorusManager {
       dimNY = bgl_p.ySize;
       dimNZ = bgl_p.zSize;
    
-      CkPrintf("%d %d %d\n", dimNX, dimNY, dimNZ);
       if(bgl_p.opFlags & BGLPERSONALITY_OPFLAGS_VIRTUALNM)
         dimNT = 2;
       else
 	dimNT = 1;
+      CkPrintf("AB TORUS %d %d %d %d\n", dimNT, dimNX, dimNY, dimNZ);
 
       dimX = dimNX;
       dimY = dimNY;
