@@ -52,7 +52,7 @@ class TopoManager {
       dimNX = bgltm.getDimNX();
       dimNY = bgltm.getDimNY();
       dimNZ = bgltm.getDimNZ();
-
+      dimNT = bgltm.getDimNT();
       
       procsPerNode = bgltm.getProcsPerNode();
       int *torus = (int *)malloc(sizeof(int)*3);
