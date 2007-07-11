@@ -4,9 +4,12 @@
 
    Created 11 Sept 2006 - Terry L. Wilmarth
    
-   Format of adjacency information:  (partition ID, local ID on partition, type)
+   Format of adjacency information: (partitionID, localID on partition, type)
    
-   2D Adjacencies: 
+   2D Adjacencies: Adjacencies are across edges
+   3D Adjacencies: Adjacencies can be across edges and faces
+
+   Numberings:
    
    TRIANGLES: Given nodes 0, 1, 2, the edges 0, 1, and 2 of a triangle are:
    (0, 1), (1, 2) and (2, 0), in that order.
@@ -67,9 +70,9 @@ class adaptAdj{
     elemType = rhs.elemType;
     return *this;
   }
-	inline bool operator==(const adaptAdj &rhs) const{
-		return (partID == rhs.partID && localID == rhs.localID);
-	}
+  inline bool operator==(const adaptAdj &rhs) const{
+    return (partID==rhs.partID && localID==rhs.localID && elemType==rhs.elemType);
+  }
   virtual void pup(PUP::er &p){
     p | partID;
     p | localID;
@@ -169,6 +172,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType);
 
 // Access functions
 
+// 2D gets
 /** Look up elemID in elemType array, access edgeFaceID-th adaptAdj. */
 adaptAdj *GetAdaptAdj(int meshid, adaptAdj elem, int edgeFaceID);
 adaptAdj *GetAdaptAdj(FEM_Mesh *meshPtr, adaptAdj elem, int edgeFaceID);
@@ -176,6 +180,12 @@ adaptAdj *GetAdaptAdj(FEM_Mesh *meshPtr, adaptAdj elem, int edgeFaceID);
     vertexList (with GetEdgeFace below), and access edgeFaceID-th
     adaptAdj with GetAdaptAdj above. */
 adaptAdj *GetAdaptAdj(int meshid, adaptAdj elem, int *vertexList);
+
+// 3D gets
+adaptAdj *GetAdaptAdjOnEdge(int meshid, adaptAdj elem, int edgeID, int *size);
+adaptAdj *GetAdaptAdjOnEdge(FEM_Mesh *meshPtr, adaptAdj elem, int edgeID, int *size);
+adaptAdj *GetAdaptAdjOnFace(int meshid, adaptAdj elem, int faceID);
+adaptAdj *GetAdaptAdjOnFace(FEM_Mesh *meshPtr, adaptAdj elem, int faceID);
 
 /** Look up elemID in elemType array and determine the set of vertices
     associated with the edge or face represented by edgeFaceID. */
@@ -185,13 +195,26 @@ void GetVertices(int meshid, adaptAdj elem, int edgeFaceID, int *vertexList);
 int GetEdgeFace(int meshid, adaptAdj elem, int *vertexList);
 
 // Update functions
-/** Look up elemID in elemType array and set the adjacency on
+/** 2D or 3D (faces): Look up elemID in elemType array and set the adjacency on
     edgeFaceID to nbr. */
 void SetAdaptAdj(int meshid, adaptAdj elem, int edgeFaceID, adaptAdj nbr);
 
+/** 3D: Look up elemID in elemType array and add nbr to the adjacency on
+    edgeID. */
+void AddToAdaptAdj(int meshid, adaptAdj elem, int edgeID, adaptAdj nbr);
+/** 3D: Look up elemID in elemType array and remove nbr from the adjacency on
+    edgeID. */
+void RemoveFromAdaptAdj(int meshid, adaptAdj elem, int edgeID, adaptAdj nbr);
+
+/** Substitute an old neighbor with a new neighbor, assumes 2D or 3D-face neighbor */
 void ReplaceAdaptAdj(int meshID, adaptAdj elem, adaptAdj originalNbr, 
 		     adaptAdj newNbr);
 void ReplaceAdaptAdj(FEM_Mesh *meshPtr, adaptAdj elem, adaptAdj originalNbr,
+		     adaptAdj newNbr);
+/** 3D edge neighbors: Substitution operation needs to know edgeID to reduce search space. */
+void ReplaceAdaptAdjOnEdge(int meshID, adaptAdj elem, adaptAdj originalNbr, 
+		     adaptAdj newNbr);
+void ReplaceAdaptAdjOnEdge(FEM_Mesh *meshPtr, adaptAdj elem, adaptAdj originalNbr,
 		     adaptAdj newNbr);
 
 /**given the dimensions and nodes per element guess whether the element 
@@ -203,6 +226,13 @@ void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,
 void dumpAdaptAdjacencies(adaptAdj *adaptAdjacencies,int numElems,
 			  int numAdjElems,int myRank);
 void getAndDumpAdaptAdjacencies(int meshid, int numElems, int elemType, int myRank);
-void fillLocalAdaptAdjacencies(int numNodes,FEM_Node *node,adjNode *adaptAdjTable,adaptAdj *adaptAdjacencies,int nodeSetSize,int numAdjElems,int myRank,int elemType);
-void makeAdjacencyRequests(int numNodes,FEM_Node *node,adjNode *adaptAdjTable,MSA1DREQLIST *requestTable, int nodeSetSize,int myRank,int elemType);
-void replyAdjacencyRequests(MSA1DREQLIST *requestTable,MSA1DREPLYLIST *replyTable,FEM_Node *node,adjNode *adaptAdjTable,adaptAdj *adaptAdjacencies,int nodeSetSize,int numAdjElems,int myRank,int elemType);
+void fillLocalAdaptAdjacencies(int numNodes, FEM_Node *node, adjNode *adaptAdjTable,
+			       adaptAdj *adaptAdjacencies, int nodeSetSize,
+			       int numAdjElems, int myRank, int elemType);
+void makeAdjacencyRequests(int numNodes, FEM_Node *node, adjNode *adaptAdjTable,
+			   MSA1DREQLIST *requestTable, int nodeSetSize, int myRank,
+			   int elemType);
+void replyAdjacencyRequests(MSA1DREQLIST *requestTable, MSA1DREPLYLIST *replyTable,
+			    FEM_Node *node, adjNode *adaptAdjTable, 
+			    adaptAdj *adaptAdjacencies, int nodeSetSize,
+			    int numAdjElems, int myRank, int elemType);

@@ -103,7 +103,6 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   const int dim = (node->getCoord())->getWidth();
   assert(dim == 2|| dim == 3);
 
-  
   // A nodeSet is a set of nodes that defines a pairing of two
   // adjacent elements; For example, in 2D triangle meshes, the
   // nodeSet is the nodes of an edge between two elements.  The
@@ -114,15 +113,15 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   CkAssert(nodeSetSize <= MAX_NODESET_SIZE);
   
   // Add the FEM_ADAPT_ADJ attribute to the elements
-	// Set the correct width of the table and then get the pointer to the actual data
-	FEM_DataAttribute *adaptAdjAttr = (FEM_DataAttribute *) elem->lookup(FEM_ADAPT_ADJ,"CreateAdaptAdjacencies");	
-	adaptAdjAttr->setWidth(sizeof(adaptAdj)*numAdjElems);
+  // Set the correct width of the table and then get the pointer to the actual data
+  FEM_DataAttribute *adaptAdjAttr = (FEM_DataAttribute *) elem->lookup(FEM_ADAPT_ADJ,"CreateAdaptAdjacencies");	
+  adaptAdjAttr->setWidth(sizeof(adaptAdj)*numAdjElems);
   adaptAdj *adaptAdjacencies = (adaptAdj *)(adaptAdjAttr->getChar()).getData();
 
   // Init adaptAdj array to at least have -1 as partID signifying no neighbor
   for (int i=0; i<numElems*numAdjElems; i++) {
     adaptAdjacencies[i].partID = -1;
-		adaptAdjacencies[i].localID = -1;
+    adaptAdjacencies[i].localID = -1;
   }
 
   // Create an array of size equal to the number of local nodes, each
@@ -184,7 +183,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
   replyTable->sync();
 
 	
-	replyAdjacencyRequests(requestTable,replyTable,node,adaptAdjTable,adaptAdjacencies,nodeSetSize,numAdjElems,myRank,elemType);
+  replyAdjacencyRequests(requestTable,replyTable,node,adaptAdjTable,adaptAdjacencies,nodeSetSize,numAdjElems,myRank,elemType);
 
   requestTable->sync();
   replyTable->sync();
@@ -216,7 +215,7 @@ void fillLocalAdaptAdjacencies(int numNodes,FEM_Node *node,adjNode *adaptAdjTabl
     // Each adjacency between two elements is represented by two adjElems
     // We try to match those up
     if(node->is_valid(i) && adaptAdjTable[i].adjElemList != NULL){  
-//      CkAssert(adaptAdjTable[i].adjElemList != NULL);
+      // CkAssert(adaptAdjTable[i].adjElemList != NULL);
       adjElem *preTarget = adaptAdjTable[i].adjElemList;
       adjElem *target = adaptAdjTable[i].adjElemList->next;
       while (target != NULL) { //loop over adjElemList of a node
@@ -227,9 +226,9 @@ void fillLocalAdaptAdjacencies(int numNodes,FEM_Node *node,adjNode *adaptAdjTabl
         //the nodeset of that entry and that of target match but they 
         //do not belong to the same element. 
         adjElem *rover = searchAdjElemInList(preTarget,
-               target->nodeSet.getVec(),
-               nodeSetSize,target->elemID,
-               &found); 
+					     target->nodeSet.getVec(),
+					     nodeSetSize,target->elemID,
+					     &found); 
         
         if (found) { // We found a local element adjacent to target->elemID
           // Set adjacency of target->elemID corresponding to nodeSet to 
@@ -237,7 +236,7 @@ void fillLocalAdaptAdjacencies(int numNodes,FEM_Node *node,adjNode *adaptAdjTabl
           // Store adjacency info in adaptAdjacency of each one and
           // use nodeSetID to index into adaptAdjacency
           adaptAdjacencies[numAdjElems*target->elemID+target->nodeSetID] = 
-      adaptAdj(myRank,rover->next->elemID,elemType);
+	    adaptAdj(myRank,rover->next->elemID,elemType);
           adaptAdjacencies[numAdjElems*rover->next->elemID+rover->next->nodeSetID] = adaptAdj(myRank,target->elemID,elemType);
           // Remove both elem-nodeSet pairs from the list
           adjElem *tmp = rover->next;
@@ -270,13 +269,13 @@ void makeAdjacencyRequests(int numNodes,FEM_Node *node,adjNode *adaptAdjTable,MS
           // create and empty set, commonSharedChunks
           std::set<int> commonSharedChunks;
           for (int j=0; j<nodeSetSize; j++) {
-      // look up sharedWithPartitions for node: 
-      //    adaptAdjTable[i]->adjElemList->nodeset[j]
-      // intersect with commonSharedChunks
+	    // look up sharedWithPartitions for node: 
+	    //    adaptAdjTable[i]->adjElemList->nodeset[j]
+	    // intersect with commonSharedChunks
             int sharedNode = adjStart->nodeSet[j];
             adjNode *sharedNodeAdj = &adaptAdjTable[sharedNode];
             std::set<int> sharedChunks(sharedNodeAdj->sharedWithPartition,
-               sharedNodeAdj->sharedWithPartition+sharedNodeAdj->numSharedPartitions);
+				       sharedNodeAdj->sharedWithPartition+sharedNodeAdj->numSharedPartitions);
             if(j == 0){
               commonSharedChunks = sharedChunks;
             }else{
@@ -491,6 +490,27 @@ adaptAdj *GetAdaptAdj(int meshid, adaptAdj elem, int *vertexList)
   return GetAdaptAdj(meshid, elem, edgeFaceID);
 }
 
+adaptAdj *GetAdaptAdjOnEdge(int meshid, adaptAdj elem, int edgeID, int *size)
+{
+  return NULL;
+}
+
+adaptAdj *GetAdaptAdjOnEdge(FEM_Mesh *meshPtr, adaptAdj elem, int edgeID, int *size)
+{
+  return NULL;
+}
+
+adaptAdj *GetAdaptAdjOnFace(int meshid, adaptAdj elem, int faceID)
+{
+  return NULL;
+}
+
+adaptAdj *GetAdaptAdjOnFace(FEM_Mesh *meshPtr, adaptAdj elem, int faceID)
+{
+  return NULL;
+}
+
+
 /** Look up elemID in elemType array and determine the set of vertices
     associated with the edge or face represented by edgeFaceID. */
 void GetVertices(int meshid, adaptAdj elem, int edgeFaceID, int *vertexList)
@@ -531,6 +551,14 @@ void SetAdaptAdj(int meshID, adaptAdj elem, int edgeFaceID, adaptAdj nbr)
   adaptAdjTable[elem.localID*numAdjacencies + edgeFaceID] = nbr;
 }
 
+void AddToAdaptAdj(int meshid, adaptAdj elem, int edgeID, adaptAdj nbr)
+{
+}
+
+void RemoveFromAdaptAdj(int meshid, adaptAdj elem, int edgeID, adaptAdj nbr)
+{
+}
+
 /** Lookup elemID in elemType array and search for the edgeID which has originalNbr as
  * a neighbor, then replace originalNbr with newNbr
  */
@@ -554,6 +582,15 @@ void ReplaceAdaptAdj(int meshID, adaptAdj elem, adaptAdj originalNbr,
   ReplaceAdaptAdj(meshPtr, elem, originalNbr, newNbr);
 }
 
+void ReplaceAdaptAdjOnEdge(int meshID, adaptAdj elem, adaptAdj originalNbr, 
+		     adaptAdj newNbr)
+{
+}
+
+void ReplaceAdaptAdjOnEdge(FEM_Mesh *meshPtr, adaptAdj elem, adaptAdj originalNbr,
+		     adaptAdj newNbr)
+{
+}
 
 //given the dimensions and nodes per element guess whether the element 
 // is a triangle, quad, tet or hex. At the moment these are the 4 shapes
