@@ -94,9 +94,13 @@ class BGPTorusManager {
 
     inline int coordinatesToRank(int x, int y, int z, int t) {
       if(mapping!=NULL && strcmp(mapping, "XYZT"))
-        return x + y*dimNX + z*dimNX*dimNY + t*dimNX*dimNY*dimNZ;
-      else
-        return t + x*dimNT + y*dimNT*dimNX + z*dimNT*dimNX*dimNY;
+        return x + (y + z*dimNY + t*dimNY*dimNZ)*dimNX;
+      else {
+        if(procsPerNode==1)
+          return x + y*dimNX + z*dimNX*dimNY;
+        else
+          return t + (x + y*dimNX + z*dimNX*dimNY)*dimNT;
+      }
     }
 };
 
