@@ -40,6 +40,7 @@ static int rdmaThreshold;
 static int firstBinSize;
 
 
+static int maxRecvBuffers;
 static int maxTokens;
 static int tokensPerProcessor; /*number of outstanding sends and receives between any two nodes*/
 static int sendPacketPoolSize; /*total number of send buffers created*/
@@ -56,7 +57,7 @@ static double regTime;
 static double processBufferedTime;
 static int processBufferedCount;
 
-#define CMK_IBVERBS_STATS 0
+#define CMK_IBVERBS_STATS 1
 #define CMK_IBVERBS_INCTOKENS 1
 #define CMK_IBVERBS_DEBUG 0
 
@@ -386,12 +387,17 @@ static void CmiMachineInit(char **argv){
 	mtu_size=4200;
 	packetSize = mtu_size;
 	dataSize = packetSize-sizeof(struct infiPacketHeader);
-	maxTokens = 10000/_Cmi_numnodes;
+	maxRecvBuffers = 2000;
+	maxTokens = 100000/_Cmi_numnodes; // the maximum number of tokens that one can have between two processors
 	tokensPerProcessor=10;
 	createLocalQps(dev,ibPort,_Cmi_mynode,_Cmi_numnodes,context->localAddr);
 		
 	/*create the pool of arrays*/
-	sendPacketPoolSize = (_Cmi_numnodes-1)*(tokensPerProcessor)/4;
+	if((_Cmi_numnodes-1)*(tokensPerProcessor) <= maxRecvBuffers ){
+		sendPacketPoolSize = (_Cmi_numnodes-1)*(tokensPerProcessor)/4;
+	}else{
+		sendPacketPoolSize = maxRecvBuffers/4;	
+	}
 	context->infiPacketFreeList=NULL;
 	pktPtrs = malloc(sizeof(infiPacket)*sendPacketPoolSize);
 	//Silly way of allocating the memory buffers (slow as well) but simplifies the code
@@ -418,8 +424,13 @@ static void CmiMachineInit(char **argv){
 	initInfiCmiChunkPools();
 	
 	if(rdma){
-		int numPkts = _Cmi_numnodes*4;
+		int numPkts;
 		int k;
+		if( _Cmi_numnodes*4 < maxRecvBuffers/4){
+			numPkts = _Cmi_numnodes*4;
+		}else{
+			numPkts = maxRecvBuffers/4;
+		}
 		
 		rdmaPktPtrs = (struct infiRdmaPacket **)malloc(numPkts*sizeof(struct infiRdmaPacket));
 		for(k=0;k<numPkts;k++){
@@ -486,7 +497,7 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 
 	if(numNodes > 1)
 	{
-		context->srqSize = (maxTokens+2)*(_Cmi_numnodes-1);
+		context->srqSize = (maxRecvBuffers+2);
 		struct ibv_srq_init_attr srqAttr = {
 			.attr = {
 			.max_wr  = context->srqSize,
@@ -651,7 +662,12 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 
 void 	infiPostInitialRecvs(){
 	//create the pool and post the receives
-	int numPosts = tokensPerProcessor*(_Cmi_numnodes-1);
+	int numPosts;
+	if(tokensPerProcessor*(_Cmi_numnodes-1) <= maxRecvBuffers){
+		numPosts = tokensPerProcessor*(_Cmi_numnodes-1);
+	}else{
+		numPosts = maxRecvBuffers;
+	}
 	if(numPosts > 0){
 		context->recvBufferPool = allocateInfiBufferPool(numPosts,packetSize);
 		postInitialRecvs(context->recvBufferPool,numPosts,packetSize);
@@ -687,7 +703,7 @@ struct infiBufferPool * allocateInfiBufferPool(int numRecvs,int sizePerBuffer){
 		buffer->key = ibv_reg_mr(context->pd,buffer->buf,buffer->size,IBV_ACCESS_LOCAL_WRITE);
 		if(buffer->key == NULL){
 			MACHSTATE2(3,"i %d buffer->buf %p",i,buffer->buf);
-		//	CmiAssert(buffer->key != NULL);
+			CmiAssert(buffer->key != NULL);
 		}
 	}
 	return ret;
@@ -1568,14 +1584,7 @@ static void insertBufferedBcast(char *msg,int size,int broot,int asm_rank){
 static inline void processBufferedBcast(){
 	infiBufferedBcastPool start;
 
-#if CMK_IBVERBS_STATS
-	double _startTime = CmiWallTimer();
-	processBufferedCount++;
-#endif
 	if(context->bufferedBcastList == NULL){
-#if CMK_IBVERBS_STATS
-	processBufferedTime += (CmiWallTimer()-_startTime);
-#endif	
 		return;
 	}
 	start = context->bufferedBcastList;
@@ -1684,10 +1693,17 @@ static inline void processBufferedRdmaRequests(){
 
 
 static inline void processAllBufferedMsgs(){
+#if CMK_IBVERBS_STATS
+	double _startTime = CmiWallTimer();
+	processBufferedCount++;
+#endif
 	processBufferedBcast();
 
 	processBufferedRdmaAcks();
 	processBufferedRdmaRequests();
+#if CMK_IBVERBS_STATS
+	processBufferedTime += (CmiWallTimer()-_startTime);
+#endif	
 };
 
 
@@ -1730,24 +1746,29 @@ static inline void increaseTokens(OtherNode node){
 
 static void increasePostedRecvs(int nodeNo){
 	OtherNode node = &nodes[nodeNo];
-	int increase = node->infiData->postedRecvs*INCTOKENS_INCREASE;	
-	if(increase+node->infiData->postedRecvs > maxTokens){
-		increase = maxTokens - node->infiData->postedRecvs;
+	int tokenIncrease = node->infiData->postedRecvs*INCTOKENS_INCREASE;	
+	int recvIncrease = tokenIncrease;
+	if(tokenIncrease+node->infiData->postedRecvs > maxTokens){
+		tokenIncrease = maxTokens - node->infiData->postedRecvs;
 	}
-	node->infiData->postedRecvs+= increase;
-	MACHSTATE3(3,"Increase tokens by %d to %d for node %d ",increase,node->infiData->postedRecvs,nodeNo);
+	if(tokenIncrease+context->srqSize > maxRecvBuffers){
+		recvIncrease = maxRecvBuffers-context->srqSize;
+	}
+	node->infiData->postedRecvs+= recvIncrease;
+	context->srqSize += recvIncrease;
+	MACHSTATE3(3,"Increase tokens by %d to %d for node %d ",tokenIncrease,node->infiData->postedRecvs,nodeNo);
 	//increase the size of the recvCq
 	int currentCqSize = context->recvCqSize;
-	if(ibv_resize_cq(context->recvCq,currentCqSize+increase)){
+	if(ibv_resize_cq(context->recvCq,currentCqSize+tokenIncrease)){
 		assert(0);
 	}
-	context->recvCqSize += increase;
+	context->recvCqSize += tokenIncrease;
 
 	//create another bufferPool and attach it to the top of the current one
-	struct infiBufferPool *newPool = allocateInfiBufferPool(increase,packetSize);
+	struct infiBufferPool *newPool = allocateInfiBufferPool(recvIncrease,packetSize);
 	newPool->next = context->recvBufferPool;
 	context->recvBufferPool = newPool;
-	postInitialRecvs(newPool,increase,packetSize);
+	postInitialRecvs(newPool,recvIncrease,packetSize);
 
 };
 
