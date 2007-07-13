@@ -447,7 +447,7 @@ PipeBroadcastStrategy(CkGroupID gid, int topology=USE_HYPERCUBE, int pipeSize=DE
 The subclasses of MulticastStrategy can multicast a message to the entire array
 or a section of array elements (MulticastStrategy itself is abstract). The
 multicast strategies are non-bracketed, and the message is processed when the
-application deposits is. These strategies do not combine messages, but they may
+application deposits it. These strategies do not combine messages, but they may
 sequence the destinations of the multicast to minimize contention on a network.
 
 In order to use these strategies, the message sent must inherit from class
