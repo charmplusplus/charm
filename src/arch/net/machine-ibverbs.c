@@ -57,7 +57,7 @@ static double regTime;
 static double processBufferedTime;
 static int processBufferedCount;
 
-#define CMK_IBVERBS_STATS 1
+#define CMK_IBVERBS_STATS 0
 #define CMK_IBVERBS_INCTOKENS 1
 #define CMK_IBVERBS_DEBUG 0
 
@@ -1763,12 +1763,13 @@ static void increasePostedRecvs(int nodeNo){
 		assert(0);
 	}
 	context->recvCqSize += tokenIncrease;
-
-	//create another bufferPool and attach it to the top of the current one
-	struct infiBufferPool *newPool = allocateInfiBufferPool(recvIncrease,packetSize);
-	newPool->next = context->recvBufferPool;
-	context->recvBufferPool = newPool;
-	postInitialRecvs(newPool,recvIncrease,packetSize);
+	if(recvIncrease > 0){
+		//create another bufferPool and attach it to the top of the current one
+		struct infiBufferPool *newPool = allocateInfiBufferPool(recvIncrease,packetSize);
+		newPool->next = context->recvBufferPool;
+		context->recvBufferPool = newPool;
+		postInitialRecvs(newPool,recvIncrease,packetSize);
+	}
 
 };
 
