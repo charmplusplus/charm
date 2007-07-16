@@ -1955,7 +1955,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #ifndef CMK_OPTIMIZE
 #if ! CMK_TRACE_IN_CHARM
   CpvInitialize(double, projTraceStart);
-  // only PE 0 needs to care about registration (to generate sts file).
+  /* only PE 0 needs to care about registration (to generate sts file). */
   if (CmiMyPe() == 0) {
     registerMachineUserEventsFunction(&registerMPITraceEvents);
   }
