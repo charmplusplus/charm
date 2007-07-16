@@ -13,6 +13,9 @@ int nodeSetMap2d_quad[4][2] = {{0,1},{1,2},{2,3},{3,0}};
 int nodeSetMap3d_tet[4][3] = {{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
 int nodeSetMap3d_hex[6][4] = {{0,1,2,3},{1,5,6,2},{2,6,7,3},{3,7,4,0},{0,4,5,1},{5,4,6,7}};
 
+int edgeMap3d_tet[6][2] = {{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
+int edgeMap3d_hex[12][2] = {{0,1},{0,3},{0,4},{1,2},{1,5},{2,3},{2,6},{3,7},{4,5},{4,7},{5,6},{6,7}};
+
 int nodeSetMap2d_cohquad[2][2] = {{0,1},{2,3}}; // Cohesive for 2D triangles
 int nodeSetMap3d_cohprism[2][3] = {{0,1,2},{3,4,5}}; // Cohesive for 3D tets
 
@@ -290,8 +293,8 @@ void makeAdjacencyRequests(int numNodes,FEM_Node *node,adjNode *adaptAdjTable,MS
           // be shared
           int numCommonSharedChunks = commonSharedChunks.size();
           if(numCommonSharedChunks > 0){
-      //adjStart is possibly shared with these chunks. It is
-      //shared across the adjStart->nodeSet set of nodes.
+            //adjStart is possibly shared with these chunks. It is
+            //shared across the adjStart->nodeSet set of nodes.
             adjRequest *adjRequestList = new adjRequest[numCommonSharedChunks];
             //Translate the nodes in the nodeSet into the index in the
             //idxl list for each chunk in the commonSharedChunks
@@ -299,7 +302,8 @@ void makeAdjacencyRequests(int numNodes,FEM_Node *node,adjNode *adaptAdjTable,MS
               int sharedNode = adjStart->nodeSet[j];
               const IDXL_Rec *recSharedNode = node->shared.getRec(sharedNode);
               int countChunk=0;
-              for(std::set<int>::iterator chunkIterator = commonSharedChunks.begin();chunkIterator != commonSharedChunks.end();chunkIterator++){
+              for(std::set<int>::iterator chunkIterator = commonSharedChunks.begin();
+                      chunkIterator != commonSharedChunks.end();chunkIterator++){
                 int chunk = *chunkIterator;
                 // if(chunk > myRank){
                 if(j == 0){
@@ -326,12 +330,17 @@ void makeAdjacencyRequests(int numNodes,FEM_Node *node,adjNode *adaptAdjTable,MS
                 countChunk++;
               }
             }
-            //Now the nodeNumbers for the nodeSets that might be along
-            //chunk boundaries have been translated into idxl indices
-            //between the two chunks We now need to write the requests
-            //into the msa array requestTable WARNING: This depends on
-            //sets getting enumerated in the same way always Might not
-            //be true
+
+            // Now the nodeNumbers for the nodeSets that might be along
+            // chunk boundaries have been translated into idxl indices
+            // between the two chunks We now need to write the requests
+            // into the msa array requestTable 
+            //
+            // WARNING: This depends on sets getting enumerated in the 
+            // same way always. Might not be true
+            // 
+            // Note: this isn't a problem--set iterators return their 
+            // elements in sorted order -Aaron
             int countChunk=0;
             for(std::set<int>::iterator chunkIterator = commonSharedChunks.begin();chunkIterator != commonSharedChunks.end();chunkIterator++){
               int chunk = *chunkIterator;
@@ -596,54 +605,65 @@ void ReplaceAdaptAdjOnEdge(FEM_Mesh *meshPtr, adaptAdj elem, adaptAdj originalNb
 // is a triangle, quad, tet or hex. At the moment these are the 4 shapes
 // that are handled
   
-#define copyNodeSetMap(numAdjElems,nodeSetSize,nodeSetMap,srcMap) {\
+#define copyNodeSetMap(numAdjElems,nodeSetSize,nodeSetMap,srcMap) \
+do { \
   for (int i=0;i<numAdjElems;i++){ \
     for(int j=0;j<nodeSetSize;j++){ \
       nodeSetMap[i][j] = srcMap[i][j]; \
     } \
   } \
-}
+} while (0) 
+
 
 void guessElementShape(int dim,int nodesPerElem,int *numAdjElems,int *nodeSetSize,int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]){
-  switch(dim){
-  case 2:
-    {
-      //2 dimension
-      switch(nodesPerElem){
-      case 3:
-  //Triangles
-  *numAdjElems = 3;
-  *nodeSetSize = 2;
-  copyNodeSetMap(3,2,nodeSetMap,nodeSetMap2d_tri)
-    break;
-      case 4:
-  //quads
-  *numAdjElems = 4;
-  *nodeSetSize = 2;
-  copyNodeSetMap(4,2,nodeSetMap,nodeSetMap2d_quad)
-    break;
-      }
+    switch(dim){
+        case 2:
+            {
+                //2 dimension
+                switch (nodesPerElem) {
+                    case 3:
+                        //Triangles
+                        *numAdjElems = 3;
+                        *nodeSetSize = 2;
+                        copyNodeSetMap(3,2,nodeSetMap,nodeSetMap2d_tri);
+                        break;
+                    case 4:
+                        //quads
+                        *numAdjElems = 4;
+                        *nodeSetSize = 2;
+                        copyNodeSetMap(4,2,nodeSetMap,nodeSetMap2d_quad);
+                        break;
+                    default:
+                        CkPrintf("Unknown element type\n");
+                        CkAssert(false);
+                }
+            }
+            break;
+        case 3:
+            {
+                //3 dimension
+                switch(nodesPerElem){
+                    case 4:
+                        //Tetrahedra
+                        *numAdjElems = 4;
+                        *nodeSetSize = 3;
+                        copyNodeSetMap(4,3,nodeSetMap,nodeSetMap3d_tet);
+                        break;
+                    case 6:
+                        //Hexahedra
+                        *numAdjElems = 6;
+                        *nodeSetSize = 4;
+                        copyNodeSetMap(6,4,nodeSetMap,nodeSetMap3d_hex);
+                        break;
+                    default:
+                        CkPrintf("Unknown element type\n");
+                        CkAssert(false);
+                }
+            }
+            break;
+        default:
+            CkPrintf("Unknown element type\n");
+            CkAssert(false);
     }
-    break;
-  case 3:
-    {
-      //3 dimension
-      switch(nodesPerElem){
-      case 4:
-  //Tetrahedra
-  *numAdjElems = 4;
-  *nodeSetSize = 3;
-  copyNodeSetMap(4,3,nodeSetMap,nodeSetMap3d_tet)
-    break;
-      case 6:
-  //Hexahedra
-  *numAdjElems = 6;
-  *nodeSetSize = 4;
-  copyNodeSetMap(6,4,nodeSetMap,nodeSetMap3d_hex)
-    break;
-      }
-    }
-    break;
-  }
 }
 

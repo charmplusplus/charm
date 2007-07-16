@@ -28,8 +28,11 @@
    
    3D Adjacencies: 
    
-   TETS: Given nodes 0, 1, 2, 3, the faces 0, 1, 2 and 3 of a tetrahedra are:
+   TETS: Given nodes 0, 1, 2, 3, 
+   The faces (0-3) of a tetrahedra are:
    (0, 1, 2), (0, 3, 1), (0, 2, 3), and (1,3,2), in that order
+   The edges (0-5) are:
+   (0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3), in that order
 
               0
              /|\
@@ -42,10 +45,15 @@
           3  -1-  4
 
    
-   HEXES: Given nodes 0, 1, 2, 3, 4, 5, 6, 7, the faces 0, 1, 2, 3, 4, 5
-   of a hex are: (0, 1, 2, 3), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0),
+   HEXES: Given nodes 0, 1, 2, 3, 4, 5, 6, 7, 
+   The faces 0, 1, 2, 3, 4, 5 of a hex are: 
+   (0, 1, 2, 3), (1, 5, 6, 2), 
+   (2, 6, 7, 3), (3, 7, 4, 0), 
    (0, 4, 5, 1), (5, 4, 6, 7) in that order
-   
+   The edges (0-11) are: 
+   (0, 1), (0, 3), (0, 4), (1, 2), 
+   (1, 5), (2, 3), (2, 6), (3, 7), 
+   (4, 5), (4, 7), (5, 6), (6, 7), in that order
 */
 
 // NOTE: review for mixed and cohesive element handling
