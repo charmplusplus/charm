@@ -61,7 +61,7 @@ All of them have two common methods to enable communication across different pla
 
 \item[int size();]
 Returns the size of the class, as number of bytes that will be
-transmitted through the network (this include the code and other dynamic
+transmitted through the network (this includes the code and other dynamic
 variables in the case of \texttt{PythonExecute}).
 
 \item[char *pack();]
@@ -71,7 +71,7 @@ original class will be unmodified and can be reused in subsequent calls.
 
 \end{description}
 
-A tipical invocation to send a request from the client to the server have the
+A tipical invocation to send a request from the client to the server has the
 following format:
 
 \begin{alltt}
@@ -187,7 +187,7 @@ using the \texttt{CkPrintf} function call.
 
 \item[printclient]
 It accepts a string as parameter. It will forward the string back to the client when it
-issue a PythonPrint request. It will buffer the strings if the \texttt{KeepPrint}
+issues a PythonPrint request. It will buffer the strings if the \texttt{KeepPrint}
 option is true, otherwise it will discard them.
 
 \item[mype]
@@ -210,7 +210,7 @@ tuple containing as many numbers as the dimension of the array.
 It accepts one object parameter, and it will perform a read request to the
 \charmpp{} object connected to the Python script, and return an object
 containing the data read (see \ref{pythonServerRW} for a description of this
-functionality). An example of call can be:
+functionality). An example of a call can be:
 \function{value = ck.read((number, param, var2, var3))}
 where the double parenthesis are needed to create a single tuple object
 containing four values passed as a single paramter, instead of four different
@@ -219,7 +219,7 @@ parameters.
 \item[write]
 It accepts two object parameters, and it will perform a write request to the
 \charmpp{} object connected to the Python script. For a description of this
-method, see \ref{pythonServerRW}. Again, only two object need to be passed, so
+method, see \ref{pythonServerRW}. Again, only two objects need to be passed, so
 extra parenthesis may be needed to create tuples from individual values.
 
 \end{description}
@@ -228,10 +228,10 @@ extra parenthesis may be needed to create tuples from individual values.
 \label{pythonIterator}
 
 Sometimes some operations need to be iterated over all the elements in the
-system. This ``iterative'' functinality provides a shortcup for the client user
-to do this. With an example, suppose we have a system which contains particles,
-with their position, velocity and mass. If we implement a \texttt{read} and
-\texttt{write} routines which allow to access single particle attributes, we may
+system. This ``iterative'' functionality provides a shortcut for the client user
+to do this. As an example, suppose we have a system which contains particles,
+with their position, velocity and mass. If we implement \texttt{read} and
+\texttt{write} routines which allow us to access single particle attributes, we may
 upload a script which doubles the mass of the particles with velocity greater
 than 1:
 
@@ -312,7 +312,7 @@ This zero reply can happen in different situations:
 \item If the request is non blocking and no data is available on the server;
 \item If a kill request is sent, the previous blocking request is squashed;
 \item If the Python code ends without any output and it is not persistent;
-\item If another print requests arrive, the previous one is squashed and the second one is kept.
+\item If another print request arrives, the previous one is squashed and the second one is kept.
 \end{itemize}
 
 As for a print kill request, no data is expected to come back, so it is safe to
@@ -331,13 +331,13 @@ bool isKill();
 \subsubsection{PythonFinished}
 \label{pythonFinished}
 
-In order to know when a Python code has finished to execute, especially when
+In order to know when a Python code has finished executing, especially when
 using persistent interpreters, and a serialization of the scripts is needed, a
 PythonFinished request is available. The constructor is the following:
 
 \function{PythonFinished(CmiUInt4 interpreter, bool Wait=true);}
 
-The interpreter correspond to the handle for which the request was sent, while
+The interpreter corresponds to the handle for which the request was sent, while
 the wait option refers to a blocking call (true), or immediate return (false).
 
 The wait option can be dynamically modified with the two methods:
@@ -366,8 +366,8 @@ group [python] myGroup \{\ldots\}
 \end{alltt}
 
 In order to register a newly created object to receive Python scripts, the
-method \texttt{registerPython} of the proxy should be called. With an example,
-the following code creates a 10 elements array myArray, and then registers it to
+method \texttt{registerPython} of the proxy should be called. As an example,
+the following code creates a 10 element array myArray, and then registers it to
 receive scripts directed to ``pycode''. The argument of \texttt{registerPython}
 is the string that CCS will use to address the Python scripting capability of
 the object.
@@ -391,7 +391,7 @@ PyObject* read(PyObject* where);
 void write(PyObject* where, PyObject* what);
 \end{alltt}
 
-The read function receives as parameter an object specifying from where the data
+The read function receives as a parameter an object specifying from where the data
 will be read, and returns an object with the information required. The write
 function will receive two parameters: where the data will be written and what
 data, and will perform the update. All these \texttt{PyObject}s are generic, and
@@ -406,8 +406,8 @@ manual ``Extending and Embedding the Python Interpreter''
 
 In order to use the iterative mode as explained in
 subsection~\ref{pythonIterator}, it is necessary to implement two functions
-which will be called by the system. This two functions have the following
-signature:
+which will be called by the system. These two functions have the following
+signatures:
 
 \begin{alltt}
 int buildIterator(PyObject*, void*);
@@ -415,7 +415,7 @@ int nextIteratorUpdate(PyObject*, PyObject*, void*);
 \end{alltt}
 
 The first one is called once before the first execution of the Python code, and
-receives to parameters. The first is a pointer to an empty PyObject to be filled with
+receives two parameters. The first is a pointer to an empty PyObject to be filled with
 the data needed by the Python code. In order to manage this object, some utility
 functions are provided. They are explained in subsection~\ref{pythonUtilityFuncs}.
 
@@ -494,7 +494,7 @@ entry [python] void highMethod(int handle);
 \end{alltt}
 
 The parameter is a handle that is passed by the system and has to be used in
-subsequest calls to return the control to the Python code. Thus, if the method
+subsequent calls to return the control to the Python code. Thus, if the method
 does not return immediately but it sends out messages to other \charmpp{}
 objects, the handle must be saved somewhere. \textbf{Note:} if another Python
 script is sent to the server, this second one could also call the same function.
@@ -529,7 +529,7 @@ void pythonAwake(int handle);   // to acquire the lock
 void pythonSleep(int handle);   // to release the lock
 \end{alltt}
 
-Important to remember is that before any Python value is access, the Python
+Important to remember is that before any Python value is accessed, the Python
 interpreter must be awake. This include the functions \texttt{Py\_BuildValue} and
 \texttt{PyArg\_ParseTuple}. \textbf{Note:} it is an error to call these functions
 more than once before the other one is called.
