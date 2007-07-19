@@ -48,7 +48,6 @@ class BGPTorusManager {
       torus[2] = bgp_hwt.zTorus;
       torus[3] = bgp_hwt.tTorus;
       
-      mapping = (char *)malloc(sizeof(char)*4);
       mapping = getenv("BG_MAPPING");
     }
 

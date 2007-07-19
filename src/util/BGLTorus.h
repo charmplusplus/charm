@@ -58,7 +58,6 @@ class BGLTorusManager {
       torus[1] = bgl_p.isTorusY();
       torus[2] = bgl_p.isTorusZ();
       
-      mapping = (char *)malloc(sizeof(char)*4);
       mapping = getenv("BGLMPI_MAPPING");
     }
 
