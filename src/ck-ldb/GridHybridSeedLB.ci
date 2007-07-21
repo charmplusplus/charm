@@ -1,0 +1,11 @@
+module GridHybridSeedLB
+{
+  extern module CentralLB;
+
+  initnode void lbinit (void);
+
+  group [migratable] GridHybridSeedLB : CentralLB
+  {
+    entry void GridHybridSeedLB (const CkLBOptions &);  
+  };
+};

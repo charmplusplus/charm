@@ -1,5 +1,5 @@
 #!/bin/sh
-LOADBALANCERS="DummyLB ComboCentLB RandCentLB RefineLB RefineKLB  RefineCommLB GreedyLB GreedyCommLB GreedyAgentLB GridCommLB GridCommRefineLB GridMetisLB GridHybridLB Comm1LB OrbLB RecBisectBfLB MetisLB PhasebyArrayLB RotateLB NeighborLB NeighborCommLB WSLB TopoLB RefineTopoLB TopoCentLB HybridLB HbmLB BlockLB"
+LOADBALANCERS="DummyLB ComboCentLB RandCentLB RefineLB RefineKLB  RefineCommLB GreedyLB GreedyCommLB GreedyAgentLB GridCommLB GridCommRefineLB GridMetisLB GridHybridLB GridHybridSeedLB Comm1LB OrbLB RecBisectBfLB MetisLB PhasebyArrayLB RotateLB NeighborLB NeighborCommLB WSLB TopoLB RefineTopoLB TopoCentLB HybridLB HbmLB BlockLB"
 
 out="Make.lb"
 
@@ -24,6 +24,7 @@ do
         [ $bal = 'GridCommLB' ] && manager="manager.o"
         [ $bal = 'GridCommRefineLB' ] && manager="manager.o"
         [ $bal = 'GridHybridLB' ] && manager="manager.o"
+        [ $bal = 'GridHybridSeedLB' ] && manager="manager.o"
 	cat >> $out << EOB 
 $bal.def.h: $bal.decl.h
 
