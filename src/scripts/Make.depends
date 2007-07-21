@@ -1276,7 +1276,8 @@ EveryLB.o: EveryLB.C charm++.h charm.h converse.h conv-config.h \
   ComboCentLB.decl.h RandCentLB.decl.h RefineLB.decl.h RefineKLB.decl.h \
   RefineCommLB.decl.h GreedyLB.decl.h GreedyCommLB.decl.h \
   GreedyAgentLB.decl.h GridCommLB.decl.h GridCommRefineLB.decl.h \
-  GridMetisLB.decl.h GridHybridLB.decl.h Comm1LB.decl.h OrbLB.decl.h \
+  GridMetisLB.decl.h GridHybridLB.decl.h GridHybridSeedLB.decl.h \
+  Comm1LB.decl.h OrbLB.decl.h \
   RecBisectBfLB.decl.h MetisLB.decl.h PhasebyArrayLB.decl.h \
   RotateLB.decl.h NeighborLB.decl.h NborBaseLB.decl.h NeighborLBMsg.h \
   NeighborCommLB.decl.h WSLB.decl.h TopoLB.decl.h RefineTopoLB.decl.h \
@@ -1556,6 +1557,27 @@ GridHybridLB.o: GridHybridLB.C GridHybridLB.decl.h charm++.h charm.h converse.h 
   trace-bluegene.h CentralLB.decl.h CentralLBMsg.h GridHybridLB.h \
   CentralLB.h BaseLB.h manager.h GridHybridLB.def.h
 	$(CHARMC) -c -I. GridHybridLB.C
+
+GridHybridSeedLB.o: GridHybridSeedLB.C GridHybridSeedLB.decl.h \
+  charm++.h charm.h converse.h conv-config.h conv-autoconfig.h \
+  conv-common.h conv-mach.h conv-mach-opt.h pup_c.h conv-cpm.h \
+  conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
+  persistent.h conv-onesided.h debug-conv.h pup.h middle.h \
+  middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
+  charm.h ckhashtable.h debug-charm.h CkMarshall.decl.h cksection.h \
+  ckcallback.h conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h \
+  ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
+  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
+  LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
+  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
+  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
+  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+  CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
+  trace-bluegene.h CentralLB.decl.h CentralLBMsg.h GridHybridSeedLB.h \
+  CentralLB.h BaseLB.h manager.h GridHybridSeedLB.def.h
+	$(CHARMC) -c -I. GridHybridSeedLB.C
 
 Comm1LB.o: Comm1LB.C charm++.h charm.h converse.h conv-config.h \
   conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
