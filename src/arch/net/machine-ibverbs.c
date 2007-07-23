@@ -390,14 +390,17 @@ static void CmiMachineInit(char **argv){
 	maxRecvBuffers = 2000;
 	maxTokens = 100000/_Cmi_numnodes; // the maximum number of tokens that one can have between two processors
 	tokensPerProcessor=10;
-	createLocalQps(dev,ibPort,_Cmi_mynode,_Cmi_numnodes,context->localAddr);
+	if(_Cmi_numnodes > 1){
+		createLocalQps(dev,ibPort,_Cmi_mynode,_Cmi_numnodes,context->localAddr);
+	}
 		
-	/*create the pool of arrays*/
+	/*create the pool of send packets*/
 	if((_Cmi_numnodes-1)*(tokensPerProcessor) <= maxRecvBuffers ){
 		sendPacketPoolSize = (_Cmi_numnodes-1)*(tokensPerProcessor)/4;
 	}else{
 		sendPacketPoolSize = maxRecvBuffers/4;	
 	}
+	
 	context->infiPacketFreeList=NULL;
 	pktPtrs = malloc(sizeof(infiPacket)*sendPacketPoolSize);
 	//Silly way of allocating the memory buffers (slow as well) but simplifies the code
@@ -962,6 +965,9 @@ static unsigned int _count=0;
 
 static inline  void CommunicationServer_nolock(int toBuffer) {
 	int processed;
+	if(_Cmi_numnodes <= 1){
+		return;
+	}
 /*	
 	if(_count > 2){
 		MACHSTATE1(3,"CommunicationServer_nolock called %d",_count);
