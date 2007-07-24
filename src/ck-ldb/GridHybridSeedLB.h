@@ -106,7 +106,6 @@ class GridHybridSeedLB : public CentralLB
     void Partition_Objects_Into_Clusters (CentralLB::LDStats *stats);
     void Examine_InterObject_Messages (CentralLB::LDStats *stats);
     void Map_NonMigratable_Objects_To_PEs ();
-    int Compute_Cluster_PE_Count (int cluster);
     int Compute_Cluster_Border_Object_Count (int cluster);
     int Compute_Cluster_LocalOnly_Object_Count (int cluster);
     int Compute_PE_NonMigratable_Object_Count (int pe);
@@ -130,6 +129,7 @@ class GridHybridSeedLB : public CentralLB
     PE_Data_T *PE_Data;
     Object_Data_T *Object_Data;
     Cluster_Data_T *Cluster_Data;
+    int *Migratable_Objects;
     int **Communication_Matrix;
 };
 

@@ -279,9 +279,21 @@ void GridHybridSeedLB::Initialize_Communication_Matrix (CentralLB::LDStats *stat
   int recv_index;
   int num_objects;
   LDObjKey *recv_objects;
+  int index;
   int i;
   int j;
 
+
+  Migratable_Objects = new int[Num_Migratable_Objects];
+
+  index = 0;
+  for (i = 0; i < Num_Objects; i++) {
+    if ((&Object_Data[i])->migratable) {
+      (&Object_Data[i])->secondary_index = index;
+      Migratable_Objects[index] = i;
+      index += 1;
+    }
+  }
 
   // Create Communication_Matrix[] to hold all object-to-object message counts.
   Communication_Matrix = new int *[Num_Migratable_Objects];
@@ -356,7 +368,6 @@ void GridHybridSeedLB::Initialize_Communication_Matrix (CentralLB::LDStats *stat
 */
 void GridHybridSeedLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stats)
 {
-  int *migratable_objects;
   int index;
   int num_partitions;
   int *partition_to_cluster_map;
@@ -385,17 +396,6 @@ void GridHybridSeedLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stat
     }
 
     return;
-  }
-
-  migratable_objects = new int[Num_Migratable_Objects];
-
-  index = 0;
-  for (i = 0; i < Num_Objects; i++) {
-    if ((&Object_Data[i])->migratable) {
-      (&Object_Data[i])->secondary_index = index;
-      migratable_objects[index] = i;
-      index += 1;
-    }
   }
 
   // Compute the number of partitions for Metis, based on the scaled CPU power for each cluster.
@@ -483,7 +483,7 @@ void GridHybridSeedLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stat
     partition = newmap[i];
     cluster = partition_to_cluster_map[partition];
 
-    index = migratable_objects[i];
+    index = Migratable_Objects[i];
 
     (&Object_Data[index])->cluster = cluster;
   }
@@ -497,7 +497,6 @@ void GridHybridSeedLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stat
     delete [] vertex_weights;
   }
   delete [] partition_to_cluster_map;
-  delete [] migratable_objects;
 }
 
 
@@ -587,28 +586,6 @@ void GridHybridSeedLB::Map_NonMigratable_Objects_To_PEs ()
       Assign_Object_To_PE (i, (&Object_Data[i])->from_pe);
     }
   }
-}
-
-
-
-/**************************************************************************
-**
-*/
-int GridHybridSeedLB::Compute_Cluster_PE_Count (int cluster)
-{
-  int i;
-  int count;
-
-
-  count = 0;
-
-  for (i = 0; i < Num_PEs; i++) {
-    if ((&PE_Data[i])->cluster == cluster) {
-      count += 1;
-    }
-  }
-
-  return (count);
 }
 
 
@@ -1200,6 +1177,9 @@ void GridHybridSeedLB::work (CentralLB::LDStats *stats, int count)
   // Initialize the Cluster_Data[] data structure.
   Initialize_Cluster_Data ();
 
+  // Initialize the Communication_Matrix[] data structure.
+  Initialize_Communication_Matrix (stats);
+
   // Partition objects into clusters.
   Partition_Objects_Into_Clusters (stats);
 
@@ -1211,7 +1191,7 @@ void GridHybridSeedLB::work (CentralLB::LDStats *stats, int count)
 
   // Map migratable objects to PEs in each cluster.
   for (i = 0; i < Num_Clusters; i++) {
-    num_cluster_pes = Compute_Cluster_PE_Count (i);
+    num_cluster_pes = (&Cluster_Data[i])->num_pes;
 
     num_cluster_border_objects = Compute_Cluster_Border_Object_Count (i);
     num_cluster_localonly_objects = Compute_Cluster_LocalOnly_Object_Count (i);
@@ -1291,6 +1271,7 @@ void GridHybridSeedLB::work (CentralLB::LDStats *stats, int count)
   }
 
   // Free memory.
+  delete [] Migratable_Objects;
   for (i = 0; i < Num_Migratable_Objects; i++) {
     delete [] Communication_Matrix[i];
   }
