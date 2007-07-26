@@ -50,7 +50,8 @@
 	   integer, parameter :: FEM_ELEM_ELEM_ADJ_TYPES=(FEM_ATTRIB_FIRST+13)
 !	   integer, parameter :: FEM_IS_VALID_ATTR=(FEM_ATTRIB_FIRST+14)		 
        integer, parameter :: FEM_MESH_SIZING=(FEM_ATTRIB_FIRST+15)
-       integer, parameter :: FEM_ADAPT_ADJ=(FEM_ATTRIB_FIRST+16)
+       integer, parameter :: FEM_ADAPT_FACE_ADJ=(FEM_ATTRIB_FIRST+16)
+       integer, parameter :: FEM_ADAPT_EDGE_ADJ=(FEM_ATTRIB_FIRST+17)
 
        integer, parameter :: FEM_INDEX_0=IDXL_INDEX_0
        integer, parameter :: FEM_INDEX_1=IDXL_INDEX_1
