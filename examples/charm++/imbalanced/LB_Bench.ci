@@ -1,0 +1,21 @@
+mainmodule LB_Bench {
+  readonly CProxy_Main mainProxy;
+  readonly int num_chare_rows;
+  readonly int num_chare_cols;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void report_done();
+  };
+
+  array [2D] LB_Bench {
+    // Normal Charm++ entry methods
+    entry LB_Bench(void);
+    entry void do_iteration(void);
+    entry void fromLeft();
+    entry void fromRight();
+    entry void fromUp();
+    entry void fromDown();
+
+  };
+};
