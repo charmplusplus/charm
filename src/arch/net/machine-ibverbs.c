@@ -441,10 +441,10 @@ static void CmiMachineInit(char **argv){
 	mtu_size=1200;
 	packetSize = mtu_size;
 	dataSize = packetSize-sizeof(struct infiPacketHeader);
-	maxRecvBuffers = 5;
+	maxRecvBuffers = 4000;
 //	maxTokens = 100000/_Cmi_numnodes; // the maximum number of tokens that one can have between two processors
 //	tokensPerProcessor=maxRecvBuffers;
-	maxTokens = 3000;
+	maxTokens = 5000;
 	context->tokensLeft=maxTokens;
 	//tokensPerProcessor=4;
 	if(_Cmi_numnodes > 1){
@@ -513,12 +513,6 @@ static void CmiMachineInit(char **argv){
 	processBufferedTime=0;
 #endif	
 
-/*
-	rdmaOutBuf = (char *)CmiAlloc(4000000);
-	rdmaInBuf = (char *)CmiAlloc(4000000);
-	outKey = ibv_reg_mr(context->pd,rdmaOutBuf,4000000,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE);
-	inKey = ibv_reg_mr(context->pd,rdmaInBuf,4000000,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE| IBV_ACCESS_REMOTE_WRITE);
-*/
 	
 
 	MACHSTATE(3,"} CmiMachineInit");
@@ -1095,6 +1089,7 @@ static inline void processAsyncEvents(){
 	}
 	
 	if (ibv_get_async_event(context->context, &event)){
+		return;
 		CmiAbort("get async event failed");
 	}
 	printf("[%d] async event %d \n",_Cmi_mynode, event.event_type);
@@ -1110,7 +1105,7 @@ static inline  void CommunicationServer_nolock(int toBuffer) {
 	}
 	MACHSTATE(2,"CommServer_nolock{");
 	
-	processAsyncEvents();
+//	processAsyncEvents();
 	
 //	checkAllQps();
 
@@ -1243,6 +1238,8 @@ static inline int pollSendCq(const int toBuffer){
 	
 	for(i=0;i<ne;i++){
 		if(wc[i].status != IBV_WC_SUCCESS){
+			infiPacket _packet = (infiPacket )wc[i].wr_id;
+			printf("[%d] wc[%d] status %d wc[i].opcode %d destnode %d \n",_Cmi_mynode,i,wc[i].status,wc[i].opcode,_packet->destNode->infiData->nodeNo);
 			assert(0);
 		}
 		switch(wc[i].opcode){
