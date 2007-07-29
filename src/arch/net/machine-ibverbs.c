@@ -44,7 +44,7 @@ static int blockThreshold;
 
 static int maxRecvBuffers;
 static int maxTokens;
-static int tokensPerProcessor; /*number of outstanding sends and receives between any two nodes*/
+//static int tokensPerProcessor; /*number of outstanding sends and receives between any two nodes*/
 static int sendPacketPoolSize; /*total number of send buffers created*/
 
 static double _startTime=0;
@@ -217,6 +217,10 @@ typedef struct infiBufferedBcastPoolStruct{
 */
 struct infiContext {
 	struct ibv_context	*context;
+	
+	fd_set  asyncFds;
+	struct timeval tmo;
+	
 	int ibPort;
 //	struct ibv_comp_channel *channel;
 	struct ibv_pd		*pd;
@@ -238,6 +242,7 @@ struct infiContext {
 
 	int srqSize;
 	int sendCqSize,recvCqSize;
+	int tokensLeft;
 
 	infiBufferedBcastPool bufferedBcastList;
 	
@@ -421,6 +426,11 @@ static void CmiMachineInit(char **argv){
 	context->context = ibv_open_device(dev);
 	assert(context->context != NULL);
 
+	FD_ZERO(&context->asyncFds);
+	FD_SET(context->context->async_fd,&context->asyncFds);
+	context->tmo.tv_sec=0;
+	context->tmo.tv_usec=0;
+
 	//protection domain
 	context->pd = ibv_alloc_pd(context->context);
 	assert(context->pd != NULL);
@@ -431,21 +441,18 @@ static void CmiMachineInit(char **argv){
 	mtu_size=1200;
 	packetSize = mtu_size;
 	dataSize = packetSize-sizeof(struct infiPacketHeader);
-	maxRecvBuffers = 2000;
+	maxRecvBuffers = 5;
 //	maxTokens = 100000/_Cmi_numnodes; // the maximum number of tokens that one can have between two processors
-	tokensPerProcessor=maxRecvBuffers;
-	maxTokens = tokensPerProcessor+10;
+//	tokensPerProcessor=maxRecvBuffers;
+	maxTokens = 3000;
+	context->tokensLeft=maxTokens;
 	//tokensPerProcessor=4;
 	if(_Cmi_numnodes > 1){
 		createLocalQps(dev,ibPort,_Cmi_mynode,_Cmi_numnodes,context->localAddr);
 	}
 		
 	/*create the pool of send packets*/
-	if((_Cmi_numnodes-1)*(tokensPerProcessor) <= maxRecvBuffers ){
-		sendPacketPoolSize = (_Cmi_numnodes-1)*(tokensPerProcessor)/4;
-	}else{
-		sendPacketPoolSize = maxRecvBuffers/4;	
-	}
+	sendPacketPoolSize = maxTokens/2;	
 	
 	context->infiPacketFreeList=NULL;
 	pktPtrs = malloc(sizeof(infiPacket)*sendPacketPoolSize);
@@ -531,11 +538,12 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 	MACHSTATE2(3,"myLid %d numNodes %d",myLid,numNodes);
 
 	//create a completion queue to be used with all the queue pairs
-	if(tokensPerProcessor*(numNodes - 1) > 100000){
+/*	if(tokensPerProcessor*(numNodes - 1) > 100000){
 		context->sendCqSize = 100000;
 	}else{
 		context->sendCqSize = (tokensPerProcessor*(numNodes-1));
-	}
+	}*/
+	context->sendCqSize = maxTokens+2;
 	context->sendCq = ibv_create_cq(context->context,context->sendCqSize,NULL,NULL,0);
 	assert(context->sendCq != NULL);
 	
@@ -651,10 +659,10 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	int err;
 	ret->state = INFI_HEADER_DATA;
 	ret->qp = context->qp[node];
-	ret->totalTokens = tokensPerProcessor;
-	ret->tokensLeft = tokensPerProcessor;
+//	ret->totalTokens = tokensPerProcessor;
+//	ret->tokensLeft = tokensPerProcessor;
 	ret->nodeNo = node;
-	ret->postedRecvs = tokensPerProcessor;
+//	ret->postedRecvs = tokensPerProcessor;
 #if	CMK_IBVERBS_DEBUG	
 	ret->psn = 0;
 #endif
@@ -847,7 +855,8 @@ static inline void getFreeTokens(struct infiOtherNodeData *infiData){
 #if !CMK_IBVERBS_TOKENS_FLOW
 	return;
 #else
-	if(infiData->tokensLeft == 0){
+	//if(infiData->tokensLeft == 0){
+	if(context->tokensLeft == 0){
 		MACHSTATE(3,"GET FREE TOKENS {{{");
 	}else{
 		return;
@@ -855,7 +864,7 @@ static inline void getFreeTokens(struct infiOtherNodeData *infiData){
 	while(infiData->tokensLeft == 0){
 		CommunicationServer_nolock(1); 
 	}
-	MACHSTATE1(3,"}}} GET FREE TOKENS %d",infiData->tokensLeft);
+	MACHSTATE1(3,"}}} GET FREE TOKENS %d",context->tokensLeft);
 #endif
 }
 
@@ -901,10 +910,10 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 	getFreeTokens(node->infiData);
 
 #if CMK_IBVERBS_INCTOKENS	
-	if((node->infiData->tokensLeft < INCTOKENS_FRACTION*node->infiData->totalTokens || node->infiData->tokensLeft < 2) && node->infiData->totalTokens < maxTokens){
+/*	if((node->infiData->tokensLeft < INCTOKENS_FRACTION*node->infiData->totalTokens || node->infiData->tokensLeft < 2) && node->infiData->totalTokens < maxTokens){
 		packet->header.code |= INFIPACKETCODE_INCTOKENS;
 		incTokens=1;
-	}
+	}*/
 #endif
 /*
 	if(!checkQp(node->infiData->qp)){
@@ -918,7 +927,8 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 		assert(0);
 	}
 #if	CMK_IBVERBS_TOKENS_FLOW
-	node->infiData->tokensLeft--;
+	//node->infiData->tokensLeft--;
+	context->tokensLeft--;
 #endif
 /*
 	if(!checkQp(node->infiData->qp)){
@@ -934,9 +944,9 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 
 
 #if	CMK_IBVERBS_DEBUG
-	MACHSTATE4(3,"Packet send size %d node %d tokensLeft %d psn %d",size,packet->destNode->infiData->nodeNo,packet->destNode->infiData->tokensLeft,packet->header.psn);
+	MACHSTATE4(3,"Packet send size %d node %d tokensLeft %d psn %d",size,packet->destNode->infiData->nodeNo,context->tokensLeft,packet->header.psn);
 #else
-	MACHSTATE4(3,"Packet send size %d node %d tokensLeft %d packet->buf %p",size,packet->destNode->infiData->nodeNo,packet->destNode->infiData->tokensLeft,packet->buf);
+	MACHSTATE4(3,"Packet send size %d node %d tokensLeft %d packet->buf %p",size,packet->destNode->infiData->nodeNo,context->tokensLeft,packet->buf);
 #endif
 
 };
@@ -1062,6 +1072,36 @@ static inline void EnqueueRdmaPacket(OutgoingMsg ogm, OtherNode node){
 static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer);
 static inline void processSendWC(struct ibv_wc *sendWC);
 static unsigned int _count=0;
+extern int errno;
+static int _countAsync=0;
+static inline void processAsyncEvents(){
+	struct ibv_async_event event;
+	int ready;
+	_countAsync++;
+	if(_countAsync < 1){
+		return;
+	}
+	_countAsync=0;
+	FD_SET(context->context->async_fd,&context->asyncFds);
+	assert(FD_ISSET(context->context->async_fd,&context->asyncFds));
+	ready = select(1, &context->asyncFds,NULL,NULL,&context->tmo);
+	
+	if(ready==0){
+		return;
+	}
+	if(ready == -1){
+//		printf("[%d] strerror %s \n",_Cmi_mynode,strerror(errno));
+		return;
+	}
+	
+	if (ibv_get_async_event(context->context, &event)){
+		CmiAbort("get async event failed");
+	}
+	printf("[%d] async event %d \n",_Cmi_mynode, event.event_type);
+	ibv_ack_async_event(&event);
+
+	
+}
 
 static inline  void CommunicationServer_nolock(int toBuffer) {
 	int processed;
@@ -1069,6 +1109,8 @@ static inline  void CommunicationServer_nolock(int toBuffer) {
 		return;
 	}
 	MACHSTATE(2,"CommServer_nolock{");
+	
+	processAsyncEvents();
 	
 //	checkAllQps();
 
@@ -1459,10 +1501,11 @@ static inline  void processSendWC(struct ibv_wc *sendWC){
 
 	infiPacket packet = (infiPacket )sendWC->wr_id;
 #if CMK_IBVERBS_TOKENS_FLOW
-	packet->destNode->infiData->tokensLeft++;
+//	packet->destNode->infiData->tokensLeft++;
+	context->tokensLeft++;
 #endif
 
-	MACHSTATE2(3,"Packet send complete node %d  tokensLeft %d",packet->destNode->infiData->nodeNo,packet->destNode->infiData->tokensLeft);
+	MACHSTATE2(3,"Packet send complete node %d  tokensLeft %d",packet->destNode->infiData->nodeNo,context->tokensLeft);
 	if(packet->ogm != NULL){
 		packet->ogm->refcount--;
 		if(packet->ogm->refcount == 0){
@@ -1488,7 +1531,8 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 
 	getFreeTokens(node->infiData);
 #if CMK_IBVERBS_TOKENS_FLOW
-	node->infiData->tokensLeft--;
+//	node->infiData->tokensLeft--;
+	context->tokensLeft--;
 #endif
 	
 	struct infiBuffer *buffer = malloc(sizeof(struct infiBuffer));
@@ -1588,7 +1632,8 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 	//we are sending this ack as a response to a successful
 	// rdma_Read.. the token for that rdma_Read needs to be freed
 #if CMK_IBVERBS_TOKENS_FLOW	
-	node->infiData->tokensLeft++;
+	//node->infiData->tokensLeft++;
+	context->tokensLeft++;
 #endif
 
 	//send ack to sender if toBuffer is off otherwise buffer it
