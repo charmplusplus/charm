@@ -202,7 +202,7 @@ void CmiNodeBarrierCount(int nThreads) {
 
 static void CmiStartThreads(char **argv)
 {
-  int     i;
+  int     i,tocreate;
   DWORD   threadID;
   HANDLE  thr;
 
@@ -222,7 +222,12 @@ static void CmiStartThreads(char **argv)
 /*  CmiStateInit(-1,_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize)); */
   CmiStateInit(_Cmi_mynode+CmiNumPes(),_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize));
   
-  for (i=1; i<=_Cmi_mynodesize; i++) {
+#if CMK_MULTICORE
+  tocreate = _Cmi_mynodesize-1;
+#else
+  tocreate = _Cmi_mynodesize;
+#endif
+  for (i=1; i<=tocreate; i++) {
     if((thr = CreateThread(NULL, 0, call_startfn, (LPVOID)i, 0, &threadID)) 
        == NULL) PerrorExit("CreateThread");
     CloseHandle(thr);
