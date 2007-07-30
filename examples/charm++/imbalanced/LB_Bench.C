@@ -1,4 +1,5 @@
 #include "LB_Bench.decl.h"
+#include "charm++.h"
 
 // See README for documentation
 
@@ -13,7 +14,7 @@
 
 CkArrayID a;
 
-#define total_iterations 100
+#define total_iterations 200
 
 class Main : public CBase_Main
 {
@@ -45,7 +46,7 @@ public:
 
 	//Start the computation
 	done_count = 0;
-	array.do_iteration();
+	array.startup();
   }
 
   // Each worker reports back to here when it completes an iteration
@@ -61,18 +62,17 @@ public:
 
 class LB_Bench: public CBase_LB_Bench {
 public:
-  int messages_due;
-  double **temperature;
   int iterations;
   int received_right, received_left, received_up, received_down;
 
   // Constructor
-  LB_Bench() {
-	iterations=0;
-	received_right=0;
-	received_left=0;
-	received_up=0;
-	received_down=0;
+  LB_Bench() : iterations(0), received_right(0), received_down(0), received_up(0), received_left(0) {
+	/*	iterations=0;
+	  received_right=0;
+	  received_left=0;
+	  received_up=0;
+	  received_down=0;
+	*/
   }
 
   // For migration
@@ -83,47 +83,64 @@ public:
 
   // Perform one iteration of work
   // The first step is to send the local state to the neighbors
-  void do_iteration(void) {
-	  
+  void startup(void) {
+	next_iter();
+  }
+
+  void next_iter(){
 	thisProxy(wrap_x(thisIndex.x-1), thisIndex.y).fromRight();
 	thisProxy(wrap_x(thisIndex.x+1), thisIndex.y).fromLeft();
 	thisProxy(thisIndex.x, wrap_y(thisIndex.y-1)).fromDown();
 	thisProxy(thisIndex.x, wrap_y(thisIndex.y+1)).fromUp();
 
+	if(iterations % 10 ==5 &&  usesAtSync==CmiTrue )
+	  AtSync();
+
+
   }
 
   void fromRight() {
 	received_right ++;
+	//	CkPrintf("%d,%d R=%d L=%d D=%d U=%d\n", thisIndex.x, thisIndex.y, received_right, received_left, received_down, received_up);
+	//	CkAssert(received_right <= 2);
 	check_and_compute();
   }
 
   void fromLeft() {
 	received_left ++;
+	//	CkPrintf("%d,%d R=%d L=%d D=%d U=%d\n", thisIndex.x, thisIndex.y, received_right, received_left, received_down, received_up);
+	//	CkAssert(received_left <= 2);
 	check_and_compute();
   }
 
   void fromDown() {
 	received_down ++;
+	//	CkPrintf("%d,%d R=%d L=%d D=%d U=%d\n", thisIndex.x, thisIndex.y, received_right, received_left, received_down, received_up);
+	//CkAssert(received_down <= 2);
 	check_and_compute();
   }
 
   void fromUp() {
 	received_up ++;
+	//	CkPrintf("%d,%d R=%d L=%d D=%d U=%d\n", thisIndex.x, thisIndex.y, received_right, received_left, received_down, received_up);
+	//	CkAssert(received_up <= 2);
 	check_and_compute();
   }
 
   void check_and_compute() {
 	if(received_right>0 && received_left>0 && received_up>0 && received_down>0) {
+	  //CkPrintf("%d,%d ====================== \n", thisIndex.x, thisIndex.y);
 
 	  received_right --;
 	  received_left --;
 	  received_down --;
 	  received_up --;
+	  
+	  //	  CkPrintf("%d,%d R=%d L=%d D=%d U=%d\n", thisIndex.x, thisIndex.y, received_right, received_left, received_down, received_up);
 
 	  if(iterations < total_iterations){
 		iterations++;
-		compute();
-		do_iteration();
+		thisProxy(thisIndex.x,thisIndex.y).compute();
 	  } else {
 		mainProxy.report_done();
 	  }
@@ -133,11 +150,11 @@ public:
 
 
   void compute() {
-	double work_factor = 0.3;
+	double work_factor = 1.0;
 
 	//	CkPrintf("my x index is %d of %d, iteration=%d\n", thisIndex.x, num_chare_cols, iterations);
-	if(thisIndex.y == num_chare_cols / 2){
-	  const double start_activate=0.1*(double)total_iterations;
+	if(thisIndex.x >= num_chare_cols*0.40 && thisIndex.x <= num_chare_cols*0.60){
+	  const double start_activate=0.4*(double)total_iterations;
 	  const double end_activate=0.7*(double)total_iterations;
 	  double fraction_activated;
 
@@ -148,9 +165,8 @@ public:
 	  else
 		fraction_activated = ((double)iterations-start_activate) / (end_activate-start_activate); 
 
-	  if( ((double)thisIndex.x / ((double)num_chare_cols-1.0)) <= fraction_activated)
-		work_factor += 0.7;
-
+	  if( ((double)thisIndex.y / ((double)num_chare_rows-1.0)) <= fraction_activated)
+		work_factor += num_chare_rows*2.0;
 	  //	  CkPrintf("x index %d has work_factor %f at iteration %d\n", thisIndex.x, work_factor, iterations);
 	}
 
@@ -165,8 +181,28 @@ public:
 		c[2*i] = a[2*i];
 	  }
 	}
+
+	next_iter();
   }
  
+
+
+  void ResumeFromSync(void) { //Called by Load-balancing framework
+	// CkPrintf("Element %d,%d resumeFromSync on PE %d\n",thisIndex.x, thisIndex.y, CkMyPe());
+  }
+
+
+  virtual void pup(PUP::er &p)
+  {
+	p | iterations;
+    p | received_right;
+	p | received_left;
+	p | received_up;
+	p | received_down;
+  }
+
+
+
 
 };
 

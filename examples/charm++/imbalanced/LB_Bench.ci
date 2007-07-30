@@ -11,11 +11,12 @@ mainmodule LB_Bench {
   array [2D] LB_Bench {
     // Normal Charm++ entry methods
     entry LB_Bench(void);
-    entry void do_iteration(void);
+    entry void compute();
     entry void fromLeft();
     entry void fromRight();
     entry void fromUp();
     entry void fromDown();
-
+	entry void startup();
+    entry void next_iter();
   };
 };
