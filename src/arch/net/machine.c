@@ -1764,8 +1764,8 @@ static OutgoingMsg PrepareOutgoing(CmiState cs,int pe,int size,int freemode,char
 
 CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
 {
-  MACHSTATE(1,"CmiGeneralNodeSend {");
   CmiState cs = CmiGetState(); OutgoingMsg ogm;
+  MACHSTATE(1,"CmiGeneralNodeSend {");
 
   if (freemode == 'S') {
     char *copy = (char *)CmiAlloc(size);
