@@ -230,6 +230,28 @@ void GridHybridSeedLB::Initialize_Object_Data (CentralLB::LDStats *stats)
 /**************************************************************************
 **
 */
+int GridHybridSeedLB::Compute_Migratable_Object_Count ()
+{
+  int count;
+  int i;
+
+
+  count = 0;
+
+  for (i = 0; i < Num_Objects; i++) {
+    if ((&Object_Data[i])->migratable) {
+      count += 1;
+    }
+  }
+
+  return (count);
+}
+
+
+
+/**************************************************************************
+**
+*/
 void GridHybridSeedLB::Initialize_Cluster_Data ()
 {
   int cluster;
@@ -591,70 +613,6 @@ void GridHybridSeedLB::Map_NonMigratable_Objects_To_PEs ()
 
 
 /**************************************************************************
-**
-*/
-int GridHybridSeedLB::Compute_Cluster_Border_Object_Count (int cluster)
-{
-  int i;
-  int count;
-
-
-  count = 0;
-
-  for (i = 0; i < Num_Objects; i++) {
-    if (((&Object_Data[i])->cluster == cluster) && ((&Object_Data[i])->num_wan_msgs > 0)) {
-      count += 1;
-    }
-  }
-
-  return (count);
-}
-
-
-
-/**************************************************************************
-**
-*/
-int GridHybridSeedLB::Compute_Cluster_LocalOnly_Object_Count (int cluster)
-{
-  int i;
-  int count;
-
-
-  count = 0;
-
-  for (i = 0; i < Num_Objects; i++) {
-    if (((&Object_Data[i])->cluster == cluster) && ((&Object_Data[i])->num_wan_msgs == 0)) {
-      count += 1;
-    }
-  }
-
-  return (count);
-}
-
-
-
-/**************************************************************************
-**
-*/
-int GridHybridSeedLB::Compute_PE_NonMigratable_Object_Count (int pe)
-{
-  int i;
-  int count;
-
-
-  count = 0;
-
-  for (i = 0; i < Num_Objects; i++) {
-    if (((&Object_Data[i])->to_pe == pe) && (!((&Object_Data[i])->migratable))) {
-      count += 1;
-    }
-  }
-}
-
-
-
-/**************************************************************************
 ** This method locates the maximum WAN object in terms of number of
 ** messages that traverse a wide-area connection.  The search is
 ** constrained to objects within the specified cluster that have not yet
@@ -793,79 +751,11 @@ int GridHybridSeedLB::Find_Maximum_Border_Object (int cluster)
 
 
 /**************************************************************************
-** This method locates the maximum WAN object in terms of number of
-** messages that traverse a wide-area connection.  The search is
-** constrained to objects within the specified cluster that have not yet
-** been mapped (balanced) to a PE.
-**
 ** The method returns -1 if no matching object is found.
 */
-int GridHybridSeedLB::Find_Maximum_LocalOnly_Object (int cluster)
+int GridHybridSeedLB::Find_Maximum_Object_From_Seeds (int pe)
 {
-  int max_index;
-  int max_load_index;
-  double max_load;
-  int max_lan_msgs_index;
-  int max_lan_msgs;
-  double load_tolerance;
-  int i;
-
-
-  max_index = -1;
-
-  max_load_index = -1;
-  max_load = -1.0;
-
-  max_lan_msgs_index = -1;
-  max_lan_msgs = -1;
-
-  for (i = 0; i < Num_Objects; i++) {
-    if (((&Object_Data[i])->cluster == cluster) && ((&Object_Data[i])->to_pe == -1) && ((&Object_Data[i])->num_wan_msgs == 0)) {
-      if ((&Object_Data[i])->load > max_load) {
-	max_load_index = i;
-	max_load = (&Object_Data[i])->load;
-      }
-      if ((&Object_Data[i])->num_lan_msgs > max_lan_msgs) {
-	max_lan_msgs_index = i;
-	max_lan_msgs = (&Object_Data[i])->num_lan_msgs;
-      }
-    }
-  }
-
-  if (max_load_index < 0) {
-    return (max_load_index);
-  }
-
-  if ((&Object_Data[max_load_index])->num_lan_msgs >= (&Object_Data[max_lan_msgs_index])->num_lan_msgs) {
-    return (max_load_index);
-  }
-
-  load_tolerance = (&Object_Data[max_load_index])->load * CK_LDB_GridHybridSeedLB_Load_Tolerance;
-
-  max_index = max_load_index;
-
-  for (i = 0; i < Num_Objects; i++) {
-    if (((&Object_Data[i])->cluster == cluster) && ((&Object_Data[i])->to_pe == -1) && ((&Object_Data[i])->num_wan_msgs == 0)) {
-      if (i != max_load_index) {
-	if (fabs ((&Object_Data[max_load_index])->load - (&Object_Data[i])->load) <= load_tolerance) {
-	  if ((&Object_Data[i])->num_lan_msgs > (&Object_Data[max_index])->num_lan_msgs) {
-	    max_index = i;
-	  }
-	}
-      }
-    }
-  }
-
-  return (max_index);
-}
-
-
-
-/**************************************************************************
-** The method returns -1 if no matching object is found.
-*/
-int GridHybridSeedLB::Find_Maximum_Border_Object_From_Seeds (int pe)
-{
+  int cluster;
   int max_index;
   int max_comm_events;
   int comm_events;
@@ -877,10 +767,12 @@ int GridHybridSeedLB::Find_Maximum_Border_Object_From_Seeds (int pe)
 
   max_comm_events = 0;
 
+  cluster = (&PE_Data[pe])->cluster;
+
   for (i = 0; i < Num_Objects; i++) {
     if ((&Object_Data[i])->to_pe == pe) {
       for (j = 0; j < Num_Objects; j++) {
-	if ((i != j) && ((&Object_Data[j])->to_pe == -1) && ((&Object_Data[j])->num_wan_msgs > 0)) {
+	if (((&Object_Data[j])->to_pe == -1) && ((&Object_Data[j])->cluster == cluster) && (i != j)) {
 	  comm_events = Compute_Communication_Events (i, j);
 	  if (comm_events > max_comm_events) {
 	    max_index = j;
@@ -899,8 +791,9 @@ int GridHybridSeedLB::Find_Maximum_Border_Object_From_Seeds (int pe)
 /**************************************************************************
 ** The method returns -1 if no matching object is found.
 */
-int GridHybridSeedLB::Find_Maximum_LocalOnly_Object_From_Seeds (int pe)
+int GridHybridSeedLB::Find_Maximum_Border_Object_From_Seeds (int pe)
 {
+  int cluster;
   int max_index;
   int max_comm_events;
   int comm_events;
@@ -912,10 +805,12 @@ int GridHybridSeedLB::Find_Maximum_LocalOnly_Object_From_Seeds (int pe)
 
   max_comm_events = 0;
 
+  cluster = (&PE_Data[pe])->cluster;
+
   for (i = 0; i < Num_Objects; i++) {
     if ((&Object_Data[i])->to_pe == pe) {
       for (j = 0; j < Num_Objects; j++) {
-	if ((i != j) && ((&Object_Data[j])->to_pe == -1) && ((&Object_Data[j])->num_wan_msgs == 0)) {
+	if (((&Object_Data[j])->to_pe == -1) && ((&Object_Data[j])->cluster == cluster) && ((&Object_Data[j])->num_wan_msgs > 0) && (i != j)) {
 	  comm_events = Compute_Communication_Events (i, j);
 	  if (comm_events > max_comm_events) {
 	    max_index = j;
@@ -1102,19 +997,9 @@ void GridHybridSeedLB::Assign_Object_To_PE (int target_object, int target_pe)
 */
 void GridHybridSeedLB::work (CentralLB::LDStats *stats, int count)
 {
-  int num_cluster_pes;
-  int num_cluster_objects;
-  int num_cluster_objects_per_pe;
-  int num_cluster_objects_remainder;
-  int num_cluster_border_objects;
-  int num_cluster_border_objects_per_pe;
-  int num_cluster_localonly_objects;
-  int num_pe_nonmigratable_objects;
-  int pe;
-  int object;
+  int target_pe;
+  int target_object;
   int i;
-  int j;
-  int k;
 
 
   if (_lb_args.debug() > 0) {
@@ -1167,12 +1052,7 @@ void GridHybridSeedLB::work (CentralLB::LDStats *stats, int count)
   Initialize_Object_Data (stats);
 
   // Compute number of migratable objects.
-  Num_Migratable_Objects = 0;
-  for (i = 0; i < Num_Objects; i++) {
-    if ((&Object_Data[i])->migratable) {
-      Num_Migratable_Objects += 1;
-    }
-  }
+  Num_Migratable_Objects = Compute_Migratable_Object_Count ();
 
   // Initialize the Cluster_Data[] data structure.
   Initialize_Cluster_Data ();
@@ -1191,69 +1071,39 @@ void GridHybridSeedLB::work (CentralLB::LDStats *stats, int count)
 
   // Map migratable objects to PEs in each cluster.
   for (i = 0; i < Num_Clusters; i++) {
-    num_cluster_pes = (&Cluster_Data[i])->num_pes;
 
-    num_cluster_border_objects = Compute_Cluster_Border_Object_Count (i);
-    num_cluster_localonly_objects = Compute_Cluster_LocalOnly_Object_Count (i);
+    while (1) {
+      target_pe = Find_Minimum_PE (i);
 
-    num_cluster_objects = num_cluster_border_objects + num_cluster_localonly_objects;
-
-    num_cluster_objects_per_pe = num_cluster_objects / num_cluster_pes;
-    num_cluster_objects_remainder = num_cluster_objects % num_cluster_pes;
-    num_cluster_border_objects_per_pe = num_cluster_border_objects / num_cluster_pes;
-    //num_cluster_border_objects_remainder = num_cluster_border_objects % num_cluster_pes;
-    //num_cluster_localonly_objects_per_pe = num_cluster_localonly_objects / num_cluster_pes;
-    //num_cluster_localonly_objects_remainder = num_cluster_localonly_objects % num_cluster_pes;
-
-    for (j = 0; j < num_cluster_pes; j++) {
-      pe = Find_Minimum_PE (i);
-
-      num_pe_nonmigratable_objects = Compute_PE_NonMigratable_Object_Count (pe);
-
-      count = num_cluster_objects_per_pe - num_pe_nonmigratable_objects;
-
-      for (k = 0; k < count; k++) {
-	if (k == 0) {
-	  object = Find_Maximum_Border_Object (i);
-	  if (object == -1) {
-	    object = Find_Maximum_Object (i);
-	  }
-	  Assign_Object_To_PE (object, pe);
-	} else if (k < num_cluster_border_objects_per_pe) {
-	  object = Find_Maximum_Border_Object_From_Seeds (pe);
-	  if (object == -1) {
-	    object = Find_Maximum_Border_Object (i);
-	  }
-	  if (object == -1) {
-	    object = Find_Maximum_LocalOnly_Object_From_Seeds (pe);
-	  }
-	  if (object == -1) {
-	    object = Find_Maximum_Object (i);
-	  }
-	  Assign_Object_To_PE (object, pe);
-	} else {
-	  object = Find_Maximum_LocalOnly_Object_From_Seeds (pe);
-	  if (object == -1) {
-	    object = Find_Maximum_LocalOnly_Object (i);
-	  }
-	  if (object == -1) {
-	    object = Find_Maximum_Object (i);
-	  }
-	  Assign_Object_To_PE (object, pe);
+      if ((&PE_Data[target_pe])->num_objs == 0) {
+	target_object = Find_Maximum_Border_Object (i);
+      } else {
+	target_object = Find_Maximum_Border_Object_From_Seeds (target_pe);
+	if (target_object == -1) {
+	  target_object = Find_Maximum_Border_Object (i);
 	}
       }
-      if (num_cluster_objects_remainder > 0) {
-	object = Find_Maximum_LocalOnly_Object_From_Seeds (pe);
-	if (object == -1) {
-	  object = Find_Maximum_LocalOnly_Object (i);
-	}
-	if (object == -1) {
-	  object = Find_Maximum_Object (i);
-	}
-	Assign_Object_To_PE (object, pe);
 
-	num_cluster_objects_remainder -= 1;
+      if ((target_object == -1) || (target_pe == -1)) {
+	break;
       }
+
+      Assign_Object_To_PE (target_object, target_pe);
+    }
+
+    while (1) {
+      target_pe = Find_Minimum_PE (i);
+
+      target_object = Find_Maximum_Object_From_Seeds (target_pe);
+      if (target_object == -1) {
+	target_object = Find_Maximum_Object (i);
+      }
+
+      if ((target_object == -1) || (target_pe == -1)) {
+	break;
+      }
+
+      Assign_Object_To_PE (target_object, target_pe);
     }
   }
 
