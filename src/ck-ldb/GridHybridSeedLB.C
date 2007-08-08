@@ -41,6 +41,12 @@ GridHybridSeedLB::GridHybridSeedLB (const CkLBOptions &opt) : CentralLB (opt)
     CK_LDB_GridHybridSeedLB_Background_Load = CK_LDB_GRIDHYBRIDSEEDLB_BACKGROUND_LOAD;
   }
 
+  if (value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_LOAD_TOLERANCE")) {
+    CK_LDB_GridHybridSeedLB_Load_Tolerance = atof (value);
+  } else {
+    CK_LDB_GridHybridSeedLB_Load_Tolerance = CK_LDB_GRIDHYBRIDSEEDLB_LOAD_TOLERANCE;
+  }
+  
   manager_init ();
 }
 
@@ -66,6 +72,12 @@ GridHybridSeedLB::GridHybridSeedLB (CkMigrateMessage *msg) : CentralLB (msg)
     CK_LDB_GridHybridSeedLB_Background_Load = atoi (value);
   } else {
     CK_LDB_GridHybridSeedLB_Background_Load = CK_LDB_GRIDHYBRIDSEEDLB_BACKGROUND_LOAD;
+  }
+
+  if (value = getenv ("CK_LDB_GRIDHYBRIDSEEDLB_LOAD_TOLERANCE")) {
+    CK_LDB_GridHybridSeedLB_Load_Tolerance = atof (value);
+  } else {
+    CK_LDB_GridHybridSeedLB_Load_Tolerance = CK_LDB_GRIDHYBRIDSEEDLB_LOAD_TOLERANCE;
   }
 
   manager_init ();
@@ -116,13 +128,12 @@ int GridHybridSeedLB::Get_Cluster (int pe)
 void GridHybridSeedLB::Initialize_PE_Data (CentralLB::LDStats *stats)
 {
   int min_speed;
-  int i;
 
 
   PE_Data = new PE_Data_T[Num_PEs];
 
   min_speed = MAXINT;
-  for (i = 0; i < Num_PEs; i++) {
+  for (int i = 0; i < Num_PEs; i++) {
     (&PE_Data[i])->available      = stats->procs[i].available;
     (&PE_Data[i])->cluster        = Get_Cluster (i);
     (&PE_Data[i])->num_objs       = 0;
@@ -140,7 +151,7 @@ void GridHybridSeedLB::Initialize_PE_Data (CentralLB::LDStats *stats)
 
   // Compute the relative PE speeds.
   // Also add background CPU time to each PE's scaled load.
-  for (i = 0; i < Num_PEs; i++) {
+  for (int i = 0; i < Num_PEs; i++) {
     (&PE_Data[i])->relative_speed = (double) (stats->procs[i].pe_speed / min_speed);
     if (CK_LDB_GridHybridSeedLB_Background_Load) {
       (&PE_Data[i])->scaled_load += stats->procs[i].bg_walltime;
@@ -156,15 +167,15 @@ void GridHybridSeedLB::Initialize_PE_Data (CentralLB::LDStats *stats)
 int GridHybridSeedLB::Available_PE_Count ()
 {
   int available_pe_count;
-  int i;
 
 
   available_pe_count = 0;
-  for (i = 0; i < Num_PEs; i++) {
+  for (int i = 0; i < Num_PEs; i++) {
     if ((&PE_Data[i])->available) {
       available_pe_count += 1;
     }
   }
+
   return (available_pe_count);
 }
 
@@ -176,11 +187,10 @@ int GridHybridSeedLB::Available_PE_Count ()
 int GridHybridSeedLB::Compute_Number_Of_Clusters ()
 {
   int max_cluster;
-  int i;
 
 
   max_cluster = 0;
-  for (i = 0; i < Num_PEs; i++) {
+  for (int i = 0; i < Num_PEs; i++) {
     if ((&PE_Data[i])->cluster < 0) {
       return (-1);
     }
@@ -189,6 +199,7 @@ int GridHybridSeedLB::Compute_Number_Of_Clusters ()
       max_cluster = (&PE_Data[i])->cluster;
     }
   }
+
   return (max_cluster + 1);
 }
 
@@ -199,12 +210,9 @@ int GridHybridSeedLB::Compute_Number_Of_Clusters ()
 */
 void GridHybridSeedLB::Initialize_Object_Data (CentralLB::LDStats *stats)
 {
-  int i;
-
-
   Object_Data = new Object_Data_T[Num_Objects];
 
-  for (i = 0; i < Num_Objects; i++) {
+  for (int i = 0; i < Num_Objects; i++) {
     (&Object_Data[i])->migratable      = (&stats->objData[i])->migratable;
     (&Object_Data[i])->from_pe         = stats->from_proc[i];
     (&Object_Data[i])->num_lan_msgs    = 0;
@@ -233,12 +241,11 @@ void GridHybridSeedLB::Initialize_Object_Data (CentralLB::LDStats *stats)
 int GridHybridSeedLB::Compute_Migratable_Object_Count ()
 {
   int count;
-  int i;
 
 
   count = 0;
 
-  for (i = 0; i < Num_Objects; i++) {
+  for (int i = 0; i < Num_Objects; i++) {
     if ((&Object_Data[i])->migratable) {
       count += 1;
     }
@@ -256,19 +263,18 @@ void GridHybridSeedLB::Initialize_Cluster_Data ()
 {
   int cluster;
   double min_total_cpu_power;
-  int i;
 
 
   Cluster_Data = new Cluster_Data_T[Num_Clusters];
 
-  for (i = 0; i < Num_Clusters; i++) {
+  for (int i = 0; i < Num_Clusters; i++) {
     (&Cluster_Data[i])->num_pes = 0;
     (&Cluster_Data[i])->total_cpu_power = 0.0;
     (&Cluster_Data[i])->scaled_cpu_power = 0.0;
   }
 
   // Compute the relative speed of each cluster.
-  for (i = 0; i < Num_PEs; i++) {
+  for (int i = 0; i < Num_PEs; i++) {
     cluster = (&PE_Data[i])->cluster;
 
     (&Cluster_Data[cluster])->num_pes += 1;
@@ -276,13 +282,13 @@ void GridHybridSeedLB::Initialize_Cluster_Data ()
   }
 
   min_total_cpu_power = MAXDOUBLE;
-  for (i = 0; i < Num_Clusters; i++) {
+  for (int i = 0; i < Num_Clusters; i++) {
     if ((&Cluster_Data[i])->total_cpu_power < min_total_cpu_power) {
       min_total_cpu_power = (&Cluster_Data[i])->total_cpu_power;
     }
   }
 
-  for (i = 0; i < Num_Clusters; i++) {
+  for (int i = 0; i < Num_Clusters; i++) {
     (&Cluster_Data[i])->scaled_cpu_power = (double) ((&Cluster_Data[i])->total_cpu_power / min_total_cpu_power);
   }
 }
@@ -302,14 +308,12 @@ void GridHybridSeedLB::Initialize_Communication_Matrix (CentralLB::LDStats *stat
   int num_objects;
   LDObjKey *recv_objects;
   int index;
-  int i;
-  int j;
 
 
   Migratable_Objects = new int[Num_Migratable_Objects];
 
   index = 0;
-  for (i = 0; i < Num_Objects; i++) {
+  for (int i = 0; i < Num_Objects; i++) {
     if ((&Object_Data[i])->migratable) {
       (&Object_Data[i])->secondary_index = index;
       Migratable_Objects[index] = i;
@@ -319,14 +323,14 @@ void GridHybridSeedLB::Initialize_Communication_Matrix (CentralLB::LDStats *stat
 
   // Create Communication_Matrix[] to hold all object-to-object message counts.
   Communication_Matrix = new int *[Num_Migratable_Objects];
-  for (i = 0; i < Num_Migratable_Objects; i++) {
+  for (int i = 0; i < Num_Migratable_Objects; i++) {
     Communication_Matrix[i] = new int[Num_Migratable_Objects];
-    for (j = 0; j < Num_Migratable_Objects; j++) {
+    for (int j = 0; j < Num_Migratable_Objects; j++) {
       Communication_Matrix[i][j] = 0;
     }
   }
 
-  for (i = 0; i < stats->n_comm; i++) {
+  for (int i = 0; i < stats->n_comm; i++) {
     com_data = &(stats->commData[i]);
     if ((!com_data->from_proc()) && (com_data->recv_type() == LD_OBJ_MSG)) {
       send_object = stats->getHash (com_data->sender);
@@ -358,7 +362,7 @@ void GridHybridSeedLB::Initialize_Communication_Matrix (CentralLB::LDStats *stat
 
       recv_objects = com_data->receiver.get_destObjs (num_objects);   // (num_objects is passed by reference)
 
-      for (j = 0; j < num_objects; j++) {
+      for (int j = 0; j < num_objects; j++) {
 	recv_object = stats->getHash (recv_objects[j]);
 
 	if ((recv_object < 0) || (recv_object > Num_Objects)) {
@@ -378,7 +382,7 @@ void GridHybridSeedLB::Initialize_Communication_Matrix (CentralLB::LDStats *stat
     }
   }
 
-  for (i = 0; i < Num_Migratable_Objects; i++) {
+  for (int i = 0; i < Num_Migratable_Objects; i++) {
     Communication_Matrix[i][i] = 0;
   }
 }
@@ -408,12 +412,10 @@ void GridHybridSeedLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stat
   int options[5];
   int edgecut;
   int *newmap;
-  int i;
-  int j;
 
 
   if (Num_Clusters == 1) {
-    for (i = 0; i < Num_Objects; i++) {
+    for (int i = 0; i < Num_Objects; i++) {
       (&Object_Data[i])->cluster = 0;
     }
 
@@ -423,7 +425,7 @@ void GridHybridSeedLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stat
   // Compute the number of partitions for Metis, based on the scaled CPU power for each cluster.
   // Also create a partition-to-cluster mapping so the output of Metis can be mapped back to clusters.
   num_partitions = 0;
-  for (i = 0; i < Num_Clusters; i++) {
+  for (int i = 0; i < Num_Clusters; i++) {
     num_partitions += (int) ceil ((&Cluster_Data[i])->scaled_cpu_power);
   }
 
@@ -434,7 +436,7 @@ void GridHybridSeedLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stat
   while (partition < num_partitions) {
     partition_count = (int) ceil ((&Cluster_Data[cluster])->scaled_cpu_power);
 
-    for (i = partition; i < (partition + partition_count); i++) {
+    for (int i = partition; i < (partition + partition_count); i++) {
       partition_to_cluster_map[i] = cluster;
     }
 
@@ -445,7 +447,7 @@ void GridHybridSeedLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stat
   if ((CK_LDB_GridHybridSeedLB_Mode == 1) || (CK_LDB_GridHybridSeedLB_Mode == 3)) {
     vertex_weights = new int[Num_Migratable_Objects];
     vertex = 0;
-    for (i = 0; i < Num_Objects; i++) {
+    for (int i = 0; i < Num_Objects; i++) {
       if ((&Object_Data[i])->migratable) {
 	vertex_weights[vertex] = (int) ceil ((&Object_Data[i])->load * 10000);
 	vertex += 1;
@@ -456,8 +458,8 @@ void GridHybridSeedLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stat
   // Construct a graph in CSR format for input to Metis.
   xadj = new int[Num_Migratable_Objects + 1];
   num_edges = 0;
-  for (i = 0; i < Num_Migratable_Objects; i++) {
-    for (j = 0; j < Num_Migratable_Objects; j++) {
+  for (int i = 0; i < Num_Migratable_Objects; i++) {
+    for (int j = 0; j < Num_Migratable_Objects; j++) {
       if (Communication_Matrix[i][j] > 0) {
 	num_edges += 1;
       }
@@ -467,8 +469,8 @@ void GridHybridSeedLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stat
   edge_weights = new int[num_edges];
   count = 0;
   xadj[0] = 0;
-  for (i = 0; i < Num_Migratable_Objects; i++) {
-    for (j = 0; j < Num_Migratable_Objects; j++) {
+  for (int i = 0; i < Num_Migratable_Objects; i++) {
+    for (int j = 0; j < Num_Migratable_Objects; j++) {
       if (Communication_Matrix[i][j] > 0) {
 	adjncy[count] = j;
 	edge_weights[count] = Communication_Matrix[i][j];
@@ -501,7 +503,7 @@ void GridHybridSeedLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stat
   }
 
   // Place the partitioned objects into their correct clusters.
-  for (i = 0; i < Num_Migratable_Objects; i++) {
+  for (int i = 0; i < Num_Migratable_Objects; i++) {
     partition = newmap[i];
     cluster = partition_to_cluster_map[partition];
 
@@ -528,8 +530,6 @@ void GridHybridSeedLB::Partition_Objects_Into_Clusters (CentralLB::LDStats *stat
 */
 void GridHybridSeedLB::Examine_InterObject_Messages (CentralLB::LDStats *stats)
 {
-  int i;
-  int j;
   LDCommData *com_data;
   int send_object;
   int send_pe;
@@ -541,7 +541,7 @@ void GridHybridSeedLB::Examine_InterObject_Messages (CentralLB::LDStats *stats)
   int num_objects;
 
 
-  for (i = 0; i < stats->n_comm; i++) {
+  for (int i = 0; i < stats->n_comm; i++) {
     com_data = &(stats->commData[i]);
     if ((!com_data->from_proc()) && (com_data->recv_type() == LD_OBJ_MSG)) {
       send_object = stats->getHash (com_data->sender);
@@ -570,7 +570,7 @@ void GridHybridSeedLB::Examine_InterObject_Messages (CentralLB::LDStats *stats)
 
       recv_objects = com_data->receiver.get_destObjs (num_objects);   // (num_objects is passed by reference)
 
-      for (j = 0; j < num_objects; j++) {
+      for (int j = 0; j < num_objects; j++) {
 	recv_object = stats->getHash (recv_objects[j]);
 
         if ((recv_object < 0) || (recv_object > Num_Objects)) {
@@ -596,10 +596,7 @@ void GridHybridSeedLB::Examine_InterObject_Messages (CentralLB::LDStats *stats)
 */
 void GridHybridSeedLB::Map_NonMigratable_Objects_To_PEs ()
 {
-  int i;
-
-
-  for (i = 0; i < Num_Objects; i++) {
+  for (int i = 0; i < Num_Objects; i++) {
     if (!((&Object_Data[i])->migratable)) {
       if (_lb_args.debug() > 1) {
 	CkPrintf ("[%d] GridHybridSeedLB identifies object %d as non-migratable.\n", CkMyPe(), i);
@@ -623,56 +620,16 @@ void GridHybridSeedLB::Map_NonMigratable_Objects_To_PEs ()
 int GridHybridSeedLB::Find_Maximum_Object (int cluster)
 {
   int max_index;
-  int max_load_index;
   double max_load;
-  int max_wan_msgs_index;
-  int max_wan_msgs;
-  double load_tolerance;
-  int i;
 
 
   max_index = -1;
-
-  max_load_index = -1;
   max_load = -1.0;
 
-  max_wan_msgs_index = -1;
-  max_wan_msgs = -1;
-
-  for (i = 0; i < Num_Objects; i++) {
-    if (((&Object_Data[i])->cluster == cluster) && ((&Object_Data[i])->to_pe == -1)) {
-      if ((&Object_Data[i])->load > max_load) {
-	max_load_index = i;
-	max_load = (&Object_Data[i])->load;
-      }
-      if ((&Object_Data[i])->num_wan_msgs > max_wan_msgs) {
-	max_wan_msgs_index = i;
-	max_wan_msgs = (&Object_Data[i])->num_wan_msgs;
-      }
-    }
-  }
-
-  if (max_load_index < 0) {
-    return (max_load_index);
-  }
-
-  if ((&Object_Data[max_load_index])->num_wan_msgs >= (&Object_Data[max_wan_msgs_index])->num_wan_msgs) {
-    return (max_load_index);
-  }
-
-  load_tolerance = (&Object_Data[max_load_index])->load * CK_LDB_GridHybridSeedLB_Load_Tolerance;
-
-  max_index = max_load_index;
-
-  for (i = 0; i < Num_Objects; i++) {
-    if (((&Object_Data[i])->cluster == cluster) && ((&Object_Data[i])->to_pe == -1)) {
-      if (i != max_load_index) {
-	if (fabs ((&Object_Data[max_load_index])->load - (&Object_Data[i])->load) <= load_tolerance) {
-	  if ((&Object_Data[i])->num_wan_msgs > (&Object_Data[max_index])->num_wan_msgs) {
-	    max_index = i;
-	  }
-	}
-      }
+  for (int i = 0; i < Num_Objects; i++) {
+    if ((((&Object_Data[i])->cluster == cluster) && ((&Object_Data[i])->to_pe == -1)) && ((&Object_Data[i])->load > max_load)) {
+      max_index = i;
+      max_load = (&Object_Data[i])->load;
     }
   }
 
@@ -697,7 +654,6 @@ int GridHybridSeedLB::Find_Maximum_Border_Object (int cluster)
   int max_wan_msgs_index;
   int max_wan_msgs;
   double load_tolerance;
-  int i;
 
 
   max_index = -1;
@@ -708,7 +664,7 @@ int GridHybridSeedLB::Find_Maximum_Border_Object (int cluster)
   max_wan_msgs_index = -1;
   max_wan_msgs = -1;
 
-  for (i = 0; i < Num_Objects; i++) {
+  for (int i = 0; i < Num_Objects; i++) {
     if (((&Object_Data[i])->cluster == cluster) && ((&Object_Data[i])->to_pe == -1) && ((&Object_Data[i])->num_wan_msgs > 0)) {
       if ((&Object_Data[i])->load > max_load) {
 	max_load_index = i;
@@ -729,19 +685,17 @@ int GridHybridSeedLB::Find_Maximum_Border_Object (int cluster)
     return (max_load_index);
   }
 
+  if (CK_LDB_GridHybridSeedLB_Load_Tolerance <= 0.0) {
+    return (max_load_index);
+  }
+
   load_tolerance = (&Object_Data[max_load_index])->load * CK_LDB_GridHybridSeedLB_Load_Tolerance;
 
   max_index = max_load_index;
 
-  for (i = 0; i < Num_Objects; i++) {
-    if (((&Object_Data[i])->cluster == cluster) && ((&Object_Data[i])->to_pe == -1) && ((&Object_Data[i])->num_wan_msgs > 0)) {
-      if (i != max_load_index) {
-	if (fabs ((&Object_Data[max_load_index])->load - (&Object_Data[i])->load) <= load_tolerance) {
-	  if ((&Object_Data[i])->num_wan_msgs > (&Object_Data[max_index])->num_wan_msgs) {
-	    max_index = i;
-	  }
-	}
-      }
+  for (int i = 0; i < Num_Objects; i++) {
+    if (((&Object_Data[i])->cluster == cluster) && ((&Object_Data[i])->to_pe == -1) && ((&Object_Data[i])->num_wan_msgs > 0) && ((&Object_Data[i])->num_wan_msgs > (&Object_Data[max_index])->num_wan_msgs) && (fabs ((&Object_Data[max_load_index])->load - (&Object_Data[i])->load) <= load_tolerance)) {
+      max_index = i;
     }
   }
 
@@ -758,27 +712,50 @@ int GridHybridSeedLB::Find_Maximum_Object_From_Seeds (int pe)
   int cluster;
   int max_index;
   int max_comm_events;
+  int max_load_index;
+  double max_load;
+  double load_tolerance;
   int comm_events;
-  int i;
-  int j;
 
 
   max_index = -1;
 
   max_comm_events = 0;
 
+  max_load_index = -1;
+  max_load = -1.0;
+
   cluster = (&PE_Data[pe])->cluster;
 
-  for (i = 0; i < Num_Objects; i++) {
+  for (int i = 0; i < Num_Objects; i++) {
+    if (((&Object_Data[i])->cluster == cluster) && ((&Object_Data[i])->to_pe == -1) && ((&Object_Data[i])->load > max_load)) {
+      max_load_index = i;
+      max_load = (&Object_Data[i])->load;
+    }
+  }
+
+  if (max_load_index < 0) {
+    return (max_load_index);
+  }
+
+  if (CK_LDB_GridHybridSeedLB_Load_Tolerance <= 0.0) {
+    return (max_load_index);
+  }
+
+  load_tolerance = (&Object_Data[max_load_index])->load * CK_LDB_GridHybridSeedLB_Load_Tolerance;
+
+  max_index = max_load_index;
+
+  for (int i = 0; i < Num_Objects; i++) {
     if ((&Object_Data[i])->to_pe == pe) {
-      for (j = 0; j < Num_Objects; j++) {
-	if (((&Object_Data[j])->to_pe == -1) && ((&Object_Data[j])->cluster == cluster) && (i != j)) {
+      for (int j = 0; j < Num_Objects; j++) {
+	if (((&Object_Data[j])->cluster == cluster) && ((&Object_Data[j])->to_pe == -1) && (fabs ((&Object_Data[max_load_index])->load - (&Object_Data[j])->load) <= load_tolerance)) {
 	  comm_events = Compute_Communication_Events (i, j);
 	  if (comm_events > max_comm_events) {
 	    max_index = j;
 	    max_comm_events = comm_events;
 	  }
-	}	
+	}
       }
     }
   }
@@ -796,21 +773,44 @@ int GridHybridSeedLB::Find_Maximum_Border_Object_From_Seeds (int pe)
   int cluster;
   int max_index;
   int max_comm_events;
+  int max_load_index;
+  double max_load;
+  double load_tolerance;
   int comm_events;
-  int i;
-  int j;
 
 
   max_index = -1;
 
   max_comm_events = 0;
 
+  max_load_index = -1;
+  max_load = -1.0;
+
   cluster = (&PE_Data[pe])->cluster;
 
-  for (i = 0; i < Num_Objects; i++) {
+  for (int i = 0; i < Num_Objects; i++) {
+    if (((&Object_Data[i])->cluster == cluster) && ((&Object_Data[i])->to_pe == -1) && ((&Object_Data[i])->num_wan_msgs > 0) && ((&Object_Data[i])->load > max_load)) {
+      max_load_index = i;
+      max_load = (&Object_Data[i])->load;
+    }
+  }
+
+  if (max_load_index < 0) {
+    return (max_load_index);
+  }
+
+  if (CK_LDB_GridHybridSeedLB_Load_Tolerance <= 0.0) {
+    return (max_load_index);
+  }
+
+  load_tolerance = (&Object_Data[max_load_index])->load * CK_LDB_GridHybridSeedLB_Load_Tolerance;
+
+  max_index = max_load_index;
+
+  for (int i = 0; i < Num_Objects; i++) {
     if ((&Object_Data[i])->to_pe == pe) {
-      for (j = 0; j < Num_Objects; j++) {
-	if (((&Object_Data[j])->to_pe == -1) && ((&Object_Data[j])->cluster == cluster) && ((&Object_Data[j])->num_wan_msgs > 0) && (i != j)) {
+      for (int j = 0; j < Num_Objects; j++) {
+	if (((&Object_Data[j])->cluster == cluster) && ((&Object_Data[j])->to_pe == -1) && ((&Object_Data[j])->num_wan_msgs > 0) && (fabs ((&Object_Data[max_load_index])->load - (&Object_Data[j])->load) <= load_tolerance)) {
 	  comm_events = Compute_Communication_Events (i, j);
 	  if (comm_events > max_comm_events) {
 	    max_index = j;
@@ -862,13 +862,12 @@ int GridHybridSeedLB::Find_Minimum_PE (int cluster)
   if ((CK_LDB_GridHybridSeedLB_Mode == 0) || (CK_LDB_GridHybridSeedLB_Mode == 1)) {
     int min_index;
     int min_objs;
-    int i;
 
 
     min_index = -1;
     min_objs = MAXINT;
 
-    for (i = 0; i < Num_PEs; i++) {
+    for (int i = 0; i < Num_PEs; i++) {
       if (((&PE_Data[i])->available) && ((&PE_Data[i])->cluster == cluster)) {
 	if ((&PE_Data[i])->num_objs < min_objs) {
 	  min_index = i;
@@ -897,7 +896,6 @@ int GridHybridSeedLB::Find_Minimum_PE (int cluster)
     int min_wan_msgs_index;
     int min_wan_msgs;
     double load_tolerance;
-    int i;
 
 
     min_index = -1;
@@ -908,7 +906,7 @@ int GridHybridSeedLB::Find_Minimum_PE (int cluster)
     min_wan_msgs_index = -1;
     min_wan_msgs = MAXINT;
 
-    for (i = 0; i < Num_PEs; i++) {
+    for (int i = 0; i < Num_PEs; i++) {
       if (((&PE_Data[i])->available) && ((&PE_Data[i])->cluster == cluster)) {
 	if ((&PE_Data[i])->scaled_load < min_scaled_load) {
 	  min_load_index = i;
@@ -941,7 +939,7 @@ int GridHybridSeedLB::Find_Minimum_PE (int cluster)
 
     min_index = min_load_index;
 
-    for (i = 0; i < Num_PEs; i++) {
+    for (int i = 0; i < Num_PEs; i++) {
       if (((&PE_Data[i])->available) && ((&PE_Data[i])->cluster == cluster)) {
 	if (i != min_load_index) {
 	  if (fabs ((&PE_Data[i])->scaled_load - (&PE_Data[min_load_index])->scaled_load) <= load_tolerance) {
@@ -999,11 +997,10 @@ void GridHybridSeedLB::work (CentralLB::LDStats *stats, int count)
 {
   int target_pe;
   int target_object;
-  int i;
 
 
   if (_lb_args.debug() > 0) {
-    CkPrintf ("[%d] GridHybridSeedLB is working (mode=%d, background load=%d).\n", CkMyPe(), CK_LDB_GridHybridSeedLB_Mode, CK_LDB_GridHybridSeedLB_Background_Load);
+    CkPrintf ("[%d] GridHybridSeedLB is working (mode=%d, background load=%d, load tolerance=%f).\n", CkMyPe(), CK_LDB_GridHybridSeedLB_Mode, CK_LDB_GridHybridSeedLB_Background_Load, CK_LDB_GridHybridSeedLB_Load_Tolerance);
   }
 
   // Since this load balancer looks at communications data, it must call stats->makeCommHash().
@@ -1070,7 +1067,7 @@ void GridHybridSeedLB::work (CentralLB::LDStats *stats, int count)
   Map_NonMigratable_Objects_To_PEs ();
 
   // Map migratable objects to PEs in each cluster.
-  for (i = 0; i < Num_Clusters; i++) {
+  for (int i = 0; i < Num_Clusters; i++) {
 
     while (1) {
       target_pe = Find_Minimum_PE (i);
@@ -1108,7 +1105,7 @@ void GridHybridSeedLB::work (CentralLB::LDStats *stats, int count)
   }
 
   // Make the assignment of objects to PEs in the load balancer framework.
-  for (i = 0; i < Num_Objects; i++) {
+  for (int i = 0; i < Num_Objects; i++) {
     stats->to_proc[i] = (&Object_Data[i])->to_pe;
 
     if (_lb_args.debug() > 2) {
@@ -1122,7 +1119,7 @@ void GridHybridSeedLB::work (CentralLB::LDStats *stats, int count)
 
   // Free memory.
   delete [] Migratable_Objects;
-  for (i = 0; i < Num_Migratable_Objects; i++) {
+  for (int i = 0; i < Num_Migratable_Objects; i++) {
     delete [] Communication_Matrix[i];
   }
   delete [] Communication_Matrix;

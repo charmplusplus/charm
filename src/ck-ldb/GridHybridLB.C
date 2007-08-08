@@ -41,6 +41,12 @@ GridHybridLB::GridHybridLB (const CkLBOptions &opt) : CentralLB (opt)
     CK_LDB_GridHybridLB_Background_Load = CK_LDB_GRIDHYBRIDLB_BACKGROUND_LOAD;
   }
 
+  if (value = getenv ("CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE")) {
+    CK_LDB_GridHybridLB_Load_Tolerance = atof (value);
+  } else {
+    CK_LDB_GridHybridLB_Load_Tolerance = CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE;
+  }
+
   manager_init ();
 }
 
@@ -66,6 +72,12 @@ GridHybridLB::GridHybridLB (CkMigrateMessage *msg) : CentralLB (msg)
     CK_LDB_GridHybridLB_Background_Load = atoi (value);
   } else {
     CK_LDB_GridHybridLB_Background_Load = CK_LDB_GRIDHYBRIDLB_BACKGROUND_LOAD;
+  }
+
+  if (value = getenv ("CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE")) {
+    CK_LDB_GridHybridLB_Load_Tolerance = atof (value);
+  } else {
+    CK_LDB_GridHybridLB_Load_Tolerance = CK_LDB_GRIDHYBRIDLB_LOAD_TOLERANCE;
   }
 
   manager_init ();
@@ -850,7 +862,7 @@ void GridHybridLB::work (CentralLB::LDStats *stats, int count)
 
 
   if (_lb_args.debug() > 0) {
-    CkPrintf ("[%d] GridHybridLB is working (mode=%d, background load=%d).\n", CkMyPe(), CK_LDB_GridHybridLB_Mode, CK_LDB_GridHybridLB_Background_Load);
+    CkPrintf ("[%d] GridHybridLB is working (mode=%d, background load=%d, load tolerance=%f).\n", CkMyPe(), CK_LDB_GridHybridLB_Mode, CK_LDB_GridHybridLB_Background_Load, CK_LDB_GridHybridLB_Load_Tolerance);
   }
 
   // Since this load balancer looks at communications data, it must call stats->makeCommHash().
