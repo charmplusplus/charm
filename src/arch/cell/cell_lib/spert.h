@@ -42,7 +42,7 @@
 #define SPE_USE_OWN_MEMSET               (0)  // Set to 1 to force a local version of memset to be used (to try to remove C/C++ runtime dependence)
 #define SPE_USE_OWN_MALLOC               (1)  // Set to 1 to force a local version of malloc and free to be used
 #define SPE_MEMORY_BLOCK_SIZE     (1024 * 4)  // !!! IMPORTANT !!! : NOTE : SPE_MEMORY_BLOCK_SIZE should be a power of 2.
-#define SPE_RESERVED_STACK_SIZE  (1024 * 40)  // Reserve this much memory for the stack
+#define SPE_RESERVED_STACK_SIZE  (1024 * 48)  // Reserve this much memory for the stack
 #define SPE_MINIMUM_HEAP_SIZE    (1024 * 16)  // Require at least this amount of heap (or the SPE Runtime will exit)
 #define SPE_ZERO_WRITE_ONLY_MEMORY       (0)  // Set to non-zero if the write-only buffer should be zero-ed out on the SPE before being filled in
 
@@ -162,6 +162,7 @@ typedef struct __SPE_MESSAGE {
   volatile int command;             // A control command that the PPU can use to send commands to the SPE runtime (see SPE_MESSAGE_COMMAND_xxx)
   volatile PPU_POINTER_TYPE wrPtr;  // A pointer to userData specified in the sendWorkRequest call that will be passed to the callback function
   volatile int counter1;            // A counter used to uniquely identify this message from the message previously held in this slot
+  volatile int checksum;            // A checksum of the contents of the data structure (NOTE: Code assumes that checksum is the last field and is an int)
 
 } SPEMessage;
 
@@ -192,7 +193,9 @@ typedef struct __SPE_NOTIFY {
 
   volatile unsigned int executedTimeStart;
   volatile unsigned int executedTimeEnd;
-  volatile unsigned int __padding1__[2];
+  //volatile unsigned int __padding1__[2];
+  volatile unsigned int userTime0Start;
+  volatile unsigned int userTime0End;
 
   // NOTE : Important to keep the commit timing fields, errorCode, and counter fields together in the same
   //   cache line (they are all written at the same time and this will ensure that the other cache lines in
@@ -202,6 +205,17 @@ typedef struct __SPE_NOTIFY {
   volatile unsigned short errorCode;           // The error code for the Work Request
   volatile unsigned short counter;             // The counter value (when completed, should match corresponding counter in Message Queue)
   volatile unsigned int __padding2__[1];
+
+  volatile unsigned int userTime1Start;
+  volatile unsigned int userTime1End;
+  volatile unsigned int userTime2Start;
+  volatile unsigned int userTime2End;
+
+  volatile unsigned long long int userAccumTime0;
+  volatile unsigned long long int userAccumTime1;
+
+  volatile unsigned long long int userAccumTime2;
+  volatile unsigned long long int userAccumTime3;
 
 } SPENotify;
 
@@ -229,6 +243,17 @@ extern "C" {
 extern unsigned short getSPEID();
 extern int isTracing();
 extern void debug_dumpSPERTState();
+
+extern void startUserTime0();
+extern void endUserTime0();
+extern void startUserTime1();
+extern void endUserTime1();
+extern void startUserTime2();
+extern void endUserTime2();
+
+extern void clearUserAccumTime(int index);
+extern void startUserAccumTime(int index);
+extern void endUserAccumTime(int index);
 
 #ifdef __cplusplus
 }

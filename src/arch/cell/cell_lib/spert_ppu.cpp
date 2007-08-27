@@ -23,11 +23,11 @@ extern "C" {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Defines
 
-#define WRHANDLES_NUM_INITIAL  (1024 * 128)
-#define WRHANDLES_GROW_SIZE    (1024 * 32)
+#define WRHANDLES_NUM_INITIAL  (1024 * 8)
+#define WRHANDLES_GROW_SIZE    (1024 * 1)
 
-#define WRGROUPHANDLES_NUM_INITIAL  (1024 * 16)
-#define WRGROUPHANDLES_GROW_SIZE    (1024 * 2)
+#define WRGROUPHANDLES_NUM_INITIAL  (1024 * 2)
+#define WRGROUPHANDLES_GROW_SIZE    (1024 * 1)
 
 #define MESSAGE_RETURN_CODE_INDEX(rc)  ((unsigned int)(rc) & 0x0000FFFF)
 #define MESSAGE_RETURN_CODE_ERROR(rc)  (((unsigned int)(rc) >> 16) & 0x0000FFFF)
@@ -147,6 +147,18 @@ int idCounter = 0;
     unsigned int commitTimeStart;    
     unsigned int commitTimeEnd;
 
+    unsigned int userTime0Start;
+    unsigned int userTime0End;
+    unsigned int userTime1Start;
+    unsigned int userTime1End;
+    unsigned int userTime2Start;
+    unsigned int userTime2End;
+
+    unsigned long long int userAccumTime0;
+    unsigned long long int userAccumTime1;
+    unsigned long long int userAccumTime2;
+    unsigned long long int userAccumTime3;
+
   } ProjBufEntry;
 
   // Buffer to hold timing data until the entries are flushed to the file
@@ -238,13 +250,21 @@ inline int sendSPEMessage(SPEThread *speThread, int qIndex, WorkRequest *wrPtr, 
       // DEBUG
       //printf(" --- Offload API :: wrPtr = %p, msgDMAList = %p, wrDMAList = %p...\n", wrPtr, msgDMAList, wrDMAList);
 
-      for (int i = 0; i < dmaListSize; i++) {
+      register int i;
+      for (i = 0; i < dmaListSize; i++) {
         msgDMAList[i].ea = wrDMAList[i].ea;
         msgDMAList[i].size = ROUNDUP_16(wrDMAList[i].size);
 
         // DEBUG
         //printf(" --- Offload API :: msgDMAList[%d] = { ea = 0x%08x, size = %u }\n", i, msgDMAList[i].ea, msgDMAList[i].size);
       }
+
+      // For the sake of the checksum, clear out the rest of the dma list entries to 0
+      for (; i < SPE_DMA_LIST_LENGTH; i++) {
+        msgDMAList[i].ea = 0;
+        msgDMAList[i].size = 0;
+      }
+
     }
   }
 
@@ -286,6 +306,18 @@ inline int sendSPEMessage(SPEThread *speThread, int qIndex, WorkRequest *wrPtr, 
   __asm__ ("sync");
   msg->counter0 = tmp0;
   msg->counter1 = tmp1;
+  __asm__ ("sync");
+
+
+  // Fill in the check sum
+  register int checkSumVal = 0;
+  register int* intPtr = (int*)msg;
+  register int i;
+  for (i = 0; i < (sizeof(SPEMessage) - sizeof(int)) / sizeof(int); i++) {
+    checkSumVal += intPtr[i];
+  }
+  msg->checksum = checkSumVal;
+
 
   return qIndex;
 }
@@ -915,6 +947,36 @@ WRHandle sendWorkRequest_list(int funcIndex,
       if (__builtin_expect(wrEntry->next != NULL, 0)) {
         fprintf(stderr, " --- Offload API :: ERROR : Sent work request where wrEntry->next != NULL\n");
       }
+
+
+      // TRACE
+      #if ENABLE_TRACE != 0
+        if (wrEntry->traceFlag) {
+
+          printf("OffloadAPI :: [TRACE] :: (sendWorkRequest_list) processingSPEIndex = %d, sentIndex = %d\n",
+                 processingSPEIndex, sentIndex
+		);
+
+          printf("OffloadAPI :: [TRACE] :: (sendWorkRequest_list) dmaList:\n");
+          register int jj;
+          for (jj = 0; jj < numReadOnly; jj++) {
+            printf("OffloadAPI :: [TRACE] ::                          entry %d = { ea = 0x%08x, size = %u } (RO)\n",
+                   jj, dmaList[jj].ea, dmaList[jj].size
+                  );
+	  }
+          for (; jj < numReadOnly + numReadWrite; jj++) {
+            printf("OffloadAPI :: [TRACE] ::                          entry %d = { ea = 0x%08x, size = %u } (RW)\n",
+                   jj, dmaList[jj].ea, dmaList[jj].size
+                  );
+	  }
+          for (; jj < numReadOnly + numReadWrite + numWriteOnly; jj++) {
+            printf("OffloadAPI :: [TRACE] ::                          entry %d = { ea = 0x%08x, size = %u } (WO)\n",
+                   jj, dmaList[jj].ea, dmaList[jj].size
+                  );
+	  }
+	}
+      #endif
+
 
       // Send the SPE Message (NOTE: The DMA List source is the user's data structure since this Work
       //   Request is being issued to the SPE immediately.
@@ -2084,7 +2146,7 @@ void OffloadAPIProgress() {
         #if ENABLE_TRACE != 0
           if (__builtin_expect(wrPtr->traceFlag, 0)) {
             printf("OffloadAPI :: [TRACE] :: spe = %d, qi = %d, ec = %d...\n",
-                   i, j, errorCode
+                   i, j, notify_errorCode
                   );
             displayMessageQueue(speThreads[i]);
           }
@@ -2202,6 +2264,41 @@ void OffloadAPIProgress() {
             // Set the speIndex and entryIndex of the work request
             wrEntry->speIndex = i;
             wrEntry->entryIndex = j;
+
+
+            // TRACE
+            #if ENABLE_TRACE != 0
+  	      if (wrEntry->traceFlag) {
+
+                register int numReadOnly = wrEntry->readOnlyLen;
+                register int numReadWrite = wrEntry->readWriteLen;
+                register int numWriteOnly = wrEntry->writeOnlyLen;
+                register DMAListEntry* dmaList = wrEntry->dmaList;
+                register int jj;
+
+                printf("OffloadAPI :: [TRACE] :: (OffloadAPIProgress) processingSPEIndex = %d, sentIndex = %d\n",
+                       i, j
+	  	      );
+
+                printf("OffloadAPI :: [TRACE] :: (OffloadAPIProgress) dmaList:\n");
+                for (jj = 0; jj < numReadOnly; jj++) {
+                  printf("OffloadAPI :: [TRACE] ::                          entry %d = { ea = 0x%08x, size = %u } (RO)\n",
+                         jj, dmaList[jj].ea, dmaList[jj].size
+                        );
+	        }
+                for (; jj < numReadOnly + numReadWrite; jj++) {
+                  printf("OffloadAPI :: [TRACE] ::                          entry %d = { ea = 0x%08x, size = %u } (RW)\n",
+                         jj, dmaList[jj].ea, dmaList[jj].size
+                        );
+	        }
+                for (; jj < numReadOnly + numReadWrite + numWriteOnly; jj++) {
+                  printf("OffloadAPI :: [TRACE] ::                          entry %d = { ea = 0x%08x, size = %u } (WO)\n",
+                         jj, dmaList[jj].ea, dmaList[jj].size
+                        );
+	        }
+	      }
+            #endif
+
 
             // Send the work request
             sendSPEMessage(speThreads[i], j, wrEntry, SPE_MESSAGE_COMMAND_NONE, wrEntry->dmaList);
@@ -2721,6 +2818,11 @@ int sendSPEMessage(SPEThread *speThread, WorkRequest *wrPtr, int command) {
 
 WorkRequest* createWRHandles(int numHandles) {
 
+
+  // DEBUG
+  //printf("OffloadAPI :: [DEBUG] :: createWRHandles(%d) - Called...\n", numHandles);
+
+
   // Verify the parameter
   if (numHandles <= 0) return NULL;
 
@@ -2758,6 +2860,11 @@ WorkRequest* createWRHandles(int numHandles) {
 
 
 WRGroup* createWRGroupHandles(int numHandles) {
+
+
+  // DEBUG
+  //printf("OffloadAPI :: [DEBUG] :: createWRGroupHandles(%d) - Called...\n", numHandles);
+
 
   // Verify the parameter
   if (numHandles <= 0) return NULL;
@@ -2919,6 +3026,18 @@ void addProjEntry(SPENotify* notifyEntry, int speIndex, int funcIndex) {
   projBuf[projBufCount].executedTimeEnd = notifyEntry->executedTimeEnd;
   projBuf[projBufCount].commitTimeStart = notifyEntry->commitTimeStart;
   projBuf[projBufCount].commitTimeEnd = notifyEntry->commitTimeEnd;
+
+  projBuf[projBufCount].userTime0Start = notifyEntry->userTime0Start;
+  projBuf[projBufCount].userTime0End = notifyEntry->userTime0End;
+  projBuf[projBufCount].userTime1Start = notifyEntry->userTime1Start;
+  projBuf[projBufCount].userTime1End = notifyEntry->userTime1End;
+  projBuf[projBufCount].userTime2Start = notifyEntry->userTime2Start;
+  projBuf[projBufCount].userTime2End = notifyEntry->userTime2End;
+
+  projBuf[projBufCount].userAccumTime0 = notifyEntry->userAccumTime0;
+  projBuf[projBufCount].userAccumTime1 = notifyEntry->userAccumTime1;
+  projBuf[projBufCount].userAccumTime2 = notifyEntry->userAccumTime2;
+  projBuf[projBufCount].userAccumTime3 = notifyEntry->userAccumTime3;
 
   // Increment the projBufCount so it points to the next projBuf entry
   projBufCount++;

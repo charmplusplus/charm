@@ -262,7 +262,8 @@ char stateTraceBuf[1024];
                                   stateTrace_counter[index] = 0;                                                   \
                                 }
 
-#define STATETRACE_UPDATE_ALL {                                                                     \
+/*
+#define STATETRACE_UPDATE_ALL {					\
                                 int iii = 0;                                                        \
                                 for (iii = 0; iii < SPE_MESSAGE_QUEUE_LENGTH; iii++) {              \
                                   if (stateTrace[iii][stateTrace_counter[iii]] != msgState[iii]) {  \
@@ -272,12 +273,34 @@ char stateTraceBuf[1024];
                                   }                                                                 \
                                 }                                                                   \
                               }
+*/
 
-#define STATETRACE_UPDATE(index) {                                                                         \
+#define STATETRACE_UPDATE_ALL {                                                                     \
+                                int iii = 0;                                                        \
+                                for (iii = 0; iii < SPE_MESSAGE_QUEUE_LENGTH; iii++) {              \
+                                  if (stateTrace[iii][stateTrace_counter[iii]] != localMsgQData[iii].msgState) {  \
+                                    stateTrace[iii][stateTrace_counter[iii]] = localMsgQData[iii].msgState;       \
+                                    stateTrace_counter[iii]++;                                      \
+                                    stateTrace[iii][stateTrace_counter[iii]] = localMsgQData[iii].msgState;       \
+                                  }                                                                 \
+                                }                                                                   \
+                              }
+
+/*
+#define STATETRACE_UPDATE(index) {					\
                                    if (stateTrace[index][stateTrace_counter[index]] != msgState[index]) {  \
                                      stateTrace[index][stateTrace_counter[index]] = msgState[index];       \
                                      stateTrace_counter[index]++;                                          \
                                      stateTrace[index][stateTrace_counter[index]] = msgState[index];       \
+                                   }                                                                       \
+                                 }
+*/
+
+#define STATETRACE_UPDATE(index) {                                                                         \
+                                   if (stateTrace[index][stateTrace_counter[index]] != localMsgQData[index].msgState) {  \
+                                     stateTrace[index][stateTrace_counter[index]] = localMsgQData[index].msgState;       \
+                                     stateTrace_counter[index]++;                                          \
+                                     stateTrace[index][stateTrace_counter[index]] = localMsgQData[index].msgState;       \
                                    }                                                                       \
                                  }
 
@@ -391,75 +414,97 @@ inline void processMsgState_sent(int msgIndex) {
       if (__builtin_expect(tmp_msgState == SPE_MESSAGE_STATE_SENT, 1)) {
         if (__builtin_expect(tmp_localState == SPE_MESSAGE_STATE_CLEAR, 1)) {
 
-          // STATS1
-          #if SPE_STATS1 != 0
-	    if (timingIndex == -1) {
-              startTimer();
-              timingIndex = msgIndex;
-	    }
-          #endif
 
-          // STATS2
-          #if SPE_STATS2 != 0
-            #if SPE_STATS2 > 0
-            if (msgIndex == SPE_STATS2) {
+          // Lastly, check the checksum value
+          register int checkSumVal = 0;
+          register int* intPtr = (int*)tmp_msgQueueEntry;
+          register int jj;
+          for (jj = 0; jj < (sizeof(SPEMessage) - sizeof(int)) / sizeof(int); jj++) {
+            checkSumVal += intPtr[jj];
+	  }
+          if (checkSumVal == tmp_msgQueueEntry->checksum) {
+
+            // STATS1
+            #if SPE_STATS1 != 0
+	      if (timingIndex == -1) {
+                startTimer();
+                timingIndex = msgIndex;
+  	      }
             #endif
-              register unsigned int clock2;
-              getTimer(clock2);
-              printf("SPE_%d :: [0x%08x] SPE_MESSAGE_STATE_SEND for %d\n", (int)getSPEID(), clock2, msgIndex);
-            #if SPE_STATS2 > 0
-            }
+
+            // STATS2
+            #if SPE_STATS2 != 0
+              #if SPE_STATS2 > 0
+              if (msgIndex == SPE_STATS2) {
+              #endif
+                register unsigned int clock2;
+                getTimer(clock2);
+                printf("SPE_%d :: [0x%08x] SPE_MESSAGE_STATE_SEND for %d\n", (int)getSPEID(), clock2, msgIndex);
+              #if SPE_STATS2 > 0
+              }
+              #endif
             #endif
-          #endif
 
-          // TRACE
-          #if ENABLE_TRACE != 0
-            STATETRACE_CLEAR(msgIndex);
-          #endif
+            // TRACE
+            #if ENABLE_TRACE != 0
+              STATETRACE_CLEAR(msgIndex);
+            #endif
 
-          // Write the new message state and counter value to the LS
-          // Note: tmp_msgStateToAdd = 0 if standard WR or = 1 if scatter/gather(list) WR
-          register int tmp_msgStateToAdd = (tmp_flags & WORK_REQUEST_FLAGS_LIST) >> WORK_REQUEST_FLAGS_LIST_SHIFT;
-          register int tmp_msgState = SPE_MESSAGE_STATE_PRE_FETCHING + tmp_msgStateToAdd;
-          tmp_localData0 = spu_insert(tmp_msgState, tmp_localData0, 0);
-          tmp_localData0 = spu_insert(tmp_counter1, tmp_localData0, 1);
-          *tmp_localData0Addr = tmp_localData0;
+            // Write the new message state and counter value to the LS
+            // Note: tmp_msgStateToAdd = 0 if standard WR or = 1 if scatter/gather(list) WR
+            register int tmp_msgStateToAdd = (tmp_flags & WORK_REQUEST_FLAGS_LIST) >> WORK_REQUEST_FLAGS_LIST_SHIFT;
+            register int tmp_msgState = SPE_MESSAGE_STATE_PRE_FETCHING + tmp_msgStateToAdd;
+            tmp_localData0 = spu_insert(tmp_msgState, tmp_localData0, 0);
+            tmp_localData0 = spu_insert(tmp_counter1, tmp_localData0, 1);
+            *tmp_localData0Addr = tmp_localData0;
 
-          // TIMING
-          #if SPE_TIMING != 0
-            register unsigned long long int tmp_endTime;
-            getTimer64(tmp_endTime);
-            register unsigned int tmp_recvTimeEnd = (unsigned int)(tmp_endTime - tmp_recvTimeStart);
-            register int tmp_offset = msgIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
-            register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
-            register vector unsigned int tmp_notifyQueueEntry0 = { 0, 0, 0, 0 };
-            tmp_notifyQueueEntry0 = spu_insert((unsigned int)(tmp_recvTimeStart), tmp_notifyQueueEntry0, 1);
-            tmp_notifyQueueEntry0 = spu_insert((unsigned int)((tmp_recvTimeStart >> 32) & 0xFFFFFFFF), tmp_notifyQueueEntry0, 0);
-            tmp_notifyQueueEntry0 = spu_insert(tmp_recvTimeEnd, tmp_notifyQueueEntry0, 2);
-            (*tmp_notifyQueueEntryPtr) = tmp_notifyQueueEntry0;
-          #endif
+            // TIMING
+            #if SPE_TIMING != 0
+              register unsigned long long int tmp_endTime;
+              getTimer64(tmp_endTime);
+              register unsigned int tmp_recvTimeEnd = (unsigned int)(tmp_endTime - tmp_recvTimeStart);
+              register int tmp_offset = msgIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+              register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
+              register vector unsigned int tmp_notifyQueueEntry0 = { 0, 0, 0, 0 };
+              tmp_notifyQueueEntry0 = spu_insert((unsigned int)(tmp_recvTimeStart), tmp_notifyQueueEntry0, 1);
+              tmp_notifyQueueEntry0 = spu_insert((unsigned int)((tmp_recvTimeStart >> 32) & 0xFFFFFFFF), tmp_notifyQueueEntry0, 0);
+              tmp_notifyQueueEntry0 = spu_insert(tmp_recvTimeEnd, tmp_notifyQueueEntry0, 2);
+              (*tmp_notifyQueueEntryPtr) = tmp_notifyQueueEntry0;
+            #endif
 
-          // TRACE
-          #if ENABLE_TRACE != 0
-            if (__builtin_expect(tmp_msgQueueEntry->traceFlag, 0)) {
-              printf("SPE_%d :: [TRACE] :: Tracing entry at index %d...\n", (int)getSPEID(), msgIndex);
-              debug_displayActiveMessageQueue(0x0, msgState, "(*)");
-            }
-          #endif
+            // TRACE
+            #if ENABLE_TRACE != 0
+              if (__builtin_expect(tmp_msgQueueEntry->traceFlag, 0)) {
+                unsigned long long int curTime;
+                getTimer64(curTime);
+                printf("SPE_%d :: [TRACE] @ %llu :: Tracing entry at index %d...\n",
+                       (int)getSPEID(), curTime, msgIndex
+                      );
+                debug_displayActiveMessageQueue(0x0, NULL/*msgState*/, "(*)");
+              }
+            #endif
 
-	  // STATS
-          #if SPE_STATS != 0
-            msgFoundFlag = 1;
-          #endif
+	    // STATS
+            #if SPE_STATS != 0
+              msgFoundFlag = 1;
+            #endif
 
-          // STATS1
-          #if SPE_STATS1 != 0
-            if (timingIndex == msgIndex) {
-              register unsigned int clocks;
-              getTimer(clocks);
-              wrClocksDetail[SPE_MESSAGE_STATE_SENT] = clocks;
-            }
-          #endif
+            // STATS1
+            #if SPE_STATS1 != 0
+              if (timingIndex == msgIndex) {
+                register unsigned int clocks;
+                getTimer(clocks);
+                wrClocksDetail[SPE_MESSAGE_STATE_SENT] = clocks;
+              }
+            #endif
+
+          } // end checksum check
+
+
+          // DEBUG
+          //else { printf("SPE_%d :: [DEBUG] :: CHECKSUM FAILURE !!!\n", (int)getSPEID()); }
+
+
         }
       }
     }
@@ -518,11 +563,18 @@ inline void processMsgState_preFetching(int msgIndex) {
     #endif
   #endif
 
+  // Get a pointer to the message queue entry and local data
+  register SPEMessage* tmp_msgQueueEntry = (SPEMessage*)(msgQueue[msgIndex]);
+
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(tmp_msgQueueEntry->traceFlag, 0)) {
-      printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_PRE_FETCHING for index %d...\n", (int)getSPEID(), msgIndex);
-      debug_displayActiveMessageQueue(0x00, msgState, "(*)");
+      unsigned long long int curTime;
+      getTimer64(curTime);
+      printf("SPE_%d :: [TRACE] @ %llu :: Processing SPE_MESSAGE_STATE_PRE_FETCHING for index %d...\n",
+             (int)getSPEID(), curTime, msgIndex
+            );
+      debug_displayActiveMessageQueue(0x00, NULL/*msgState*/, "(*)");
     }
   #endif
 
@@ -532,8 +584,6 @@ inline void processMsgState_preFetching(int msgIndex) {
     getTimer64(tmp_startTime);
   #endif
 
-  // Get a pointer to the message queue entry and local data
-  register SPEMessage* tmp_msgQueueEntry = (SPEMessage*)(msgQueue[msgIndex]);
   register vector signed int tmp_msgQueueData0 = *(((vector signed int*)tmp_msgQueueEntry) + 0);
   register vector signed int tmp_msgQueueData1 = *(((vector signed int*)tmp_msgQueueEntry) + 1);
   register vector signed int tmp_msgQueueData2 = *(((vector signed int*)tmp_msgQueueEntry) + 2);
@@ -565,7 +615,7 @@ inline void processMsgState_preFetching(int msgIndex) {
                tmp_msgQueueEntry->readWritePtr, tmp_msgQueueEntry->readWriteLen,
                tmp_msgQueueEntry->writeOnlyPtr, tmp_msgQueueEntry->writeOnlyLen
               );
-        debug_displayActiveMessageQueue(0x0, msgState, "(*)");
+        debug_displayActiveMessageQueue(0x0, NULL/*msgState*/, "(*)");
       }
     #endif
 
@@ -919,10 +969,12 @@ inline void processMsgState_preFetchingList(int msgIndex) {
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
-      printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_PRE_FETCHING_LIST for index %d...\n",
-             (int)getSPEID(), msgIndex
+      unsigned long long int curTime;
+      getTimer64(curTime);
+      printf("SPE_%d :: [TRACE] @ %llu :: Processing SPE_MESSAGE_STATE_PRE_FETCHING_LIST for index %d...\n",
+             (int)getSPEID(), curTime, msgIndex
             );
-      debug_displayActiveMessageQueue(0x0, msgState, "(*)");
+      debug_displayActiveMessageQueue(0x0, NULL/*msgState*/, "(*)");
     }
   #endif
 
@@ -1146,8 +1198,12 @@ inline void processMsgState_fetchingList(int msgIndex) {
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
-      printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_FETCHING_LIST for index %d...\n", (int)getSPEID(), msgIndex);
-      debug_displayActiveMessageQueue(0x0, msgState, "(*)");
+      unsigned long long int curTime;
+      getTimer64(curTime);
+      printf("SPE_%d :: [TRACE] @ %llu :: Processing SPE_MESSAGE_STATE_FETCHING_LIST for index %d...\n",
+             (int)getSPEID(), curTime, msgIndex
+            );
+      debug_displayActiveMessageQueue(0x0, NULL/*msgState*/, "(*)");
     }
   #endif
 
@@ -1226,8 +1282,12 @@ inline void processMsgState_listReadyList(int msgIndex) {
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
-      printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_LIST_READY_LIST for index %d...\n", (int)getSPEID(), msgIndex);
-      debug_displayActiveMessageQueue(0x0, msgState, "(*)");
+      unsigned long long int curTime;
+      getTimer64(curTime);
+      printf("SPE_%d :: [TRACE] @ %llu :: Processing SPE_MESSAGE_STATE_LIST_READY_LIST for index %d...\n",
+             (int)getSPEID(), curTime, msgIndex
+            );
+      debug_displayActiveMessageQueue(0x0, NULL/*msgState*/, "(*)");
     }
   #endif
 
@@ -1413,7 +1473,7 @@ inline void processMsgState_listReadyList(int msgIndex) {
     // TRACE
     #if ENABLE_TRACE != 0
       if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
-        printf("SPE_%d :: Allocated memory for WR at index %d... tmp_localMemPtr = %p\n",
+        printf("SPE_%d :: [TRACE] :: Allocated memory for WR at index %d... tmp_localMemPtr = %p\n",
                (int)getSPEID(), msgIndex, tmp_localMemPtr
               );
       }
@@ -1688,6 +1748,58 @@ inline void processMsgState_listReadyList(int msgIndex) {
       //             MFC_GETL_CMD
       //            );
 
+
+      // DEBUG
+      {
+        register int delay = 0;
+        register int jj = 0;
+        register DMAListEntry* tmp_dmaListPtr = localMsgQData[msgIndex].dmaList;
+        for (jj = 0; jj < tmp_readCount; jj++) {
+          register unsigned int ea = tmp_dmaListPtr->ea;
+          register unsigned int size = tmp_dmaListPtr->size;
+          tmp_dmaListPtr++;
+          if (__builtin_expect((ea & 0x7F) != 0x00, 0)) {
+            printf("SPE :: [WARNING] :: non-128-byte-aligned ea in DMA List in entry %d... :(\n", jj);
+            delay = 100;
+	  }
+          if (__builtin_expect((size & 0x0F) != 0x00, 0)) {
+            printf("SPE :: [WARNING] :: non-128-byte size in DMA List in entry %d... :(\n", jj);
+            delay = 100;
+	  }
+          if (__builtin_expect(size > SPE_DMA_LIST_ENTRY_MAX_LENGTH, 0)) {
+            printf("SPE :: [WARNING] :: Size in DMA List in entry %d too large (output)... :(\n", jj);
+            delay = 100;
+	  }
+	}
+
+        while (delay > 0) {
+          printf("SPE :: [DELAY] :: ...\n");
+          delay--;
+	}
+      }
+      
+
+      // TRACE
+      #if ENABLE_TRACE != 0
+        if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
+
+          printf("SPE_%d :: [TRACE] :: Issuing GETL command for index %d (tmp_readCount = %d)\n",
+                 (int)getSPEID(), msgIndex, tmp_readCount
+                );
+
+          register DMAListEntry* tmp_dmaListPtr = localMsgQData[msgIndex].dmaList;
+          register int jj;
+          printf("SPE_%d :: [TRACE] :: GETL DMA List:\n", (int)getSPEID());
+          for (jj = 0; jj < tmp_readCount; jj++) {
+            printf("SPE_%d :: [TRACE] ::   entry %d = { ea = 0x%08x, size = %u }\n",
+                   (int)getSPEID(), jj, tmp_dmaListPtr->ea, tmp_dmaListPtr->size
+		  );
+            tmp_dmaListPtr++;
+	  }
+	}
+      #endif
+
+
       spu_mfcdma64((void*)lsPtr,
                    (unsigned int)tmp_msgQueueEntry->readOnlyPtr,  // eah
                    (unsigned int)(localMsgQData[msgIndex].dmaList),
@@ -1762,8 +1874,12 @@ inline void processMsgState_fetching(int msgIndex) {
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
-      printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_FETCHING for index %d...\n", (int)getSPEID(), msgIndex);
-      debug_displayActiveMessageQueue(0x0, msgState, "(*)");
+      unsigned long long int curTime;
+      getTimer64(curTime);
+      printf("SPE_%d :: [TRACE] @ %llu :: Processing SPE_MESSAGE_STATE_FETCHING for index %d...\n",
+             (int)getSPEID(), curTime, msgIndex
+            );
+      debug_displayActiveMessageQueue(0x0, NULL/*msgState*/, "(*)");
     }
   #endif
 
@@ -1777,6 +1893,20 @@ inline void processMsgState_fetching(int msgIndex) {
   mfc_write_tag_mask(0x1 << msgIndex);
   mfc_write_tag_update_immediate();
   register int tagStatus = mfc_read_tag_status();
+
+
+  // DEBUG
+  #if ENABLE_TRACE != 0
+    if (msgQueue[msgIndex]->traceFlag) {
+      printf("SPE_%d :: [DEBUG/TRACE] :: tagStatus = 0x%08x\n", (int)getSPEID(), tagStatus);
+
+      mfc_write_tag_mask(0xFFFFFFFF);
+      mfc_write_tag_update_immediate();
+      register int tmp_ts = mfc_read_tag_status();
+      printf("SPE_%d :: [DEBUG/TRACE] :: tmp_ts = 0x%08x\n", (int)getSPEID(), tmp_ts);
+    }
+  #endif
+
 
   // Check if the data has arrived
   if (tagStatus != 0) {
@@ -1880,6 +2010,11 @@ inline void processMsgState_fetching(int msgIndex) {
   long long int readyClocksCounter = 0;
 #endif
 
+
+vector unsigned long long int userAccumTimeStart[2] __attribute__((aligned(16)));
+vector unsigned long long int userAccumTime[2] __attribute__((aligned(16)));
+
+
 // SPE_MESSAGE_STATE_READY
 inline void processMsgState_ready(int msgIndex) {
 
@@ -1904,8 +2039,12 @@ inline void processMsgState_ready(int msgIndex) {
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
-      printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_READY for index %d...\n", (int)getSPEID(), msgIndex);
-      debug_displayActiveMessageQueue(0x0, msgState, "(*)");
+      unsigned long long int curTime;
+      getTimer64(curTime);
+      printf("SPE_%d :: [TRACE] @ %llu :: Processing SPE_MESSAGE_STATE_READY for index %d...\n",
+             (int)getSPEID(), curTime, msgIndex
+            );
+      debug_displayActiveMessageQueue(0x0, NULL/*msgState*/, "(*)");
     }
   #endif
 
@@ -1933,7 +2072,7 @@ inline void processMsgState_ready(int msgIndex) {
   // TRACE
   #if ENABLE_TRACE != 0
     //isTracingFlag = ((msg->traceFlag) ? (-1) : (0));
-    register tmp_traceFlag = spu_extract(tmp_msgQueueData2, 3);
+    register int tmp_traceFlag = spu_extract(tmp_msgQueueData2, 3);
     isTracingFlag = tmp_traceFlag;
   #endif
 
@@ -1961,13 +2100,26 @@ inline void processMsgState_ready(int msgIndex) {
   register int tmp_localWriteOnlyPtr = spu_extract(tmp_localData1, 2) & tmp_isStdWR;  // Only set for std WR
   register int tmp_localDMAList = spu_extract(tmp_localData0, 2) & tmp_isListWR;      // Only set (=localMemPtr) for list WR
 
-  // DEBUG - for dumping internal state of the SPE Runtime while executing user code (at user code's request)
+  // DEBUG - Used for functions that might be called by the user's code (so the SPE Runtime
+  //   can determine which work request is being executed and should be accessed).
   execIndex = msgIndex;
+
+  // Clear out the user timers
+  {
+    register int tmp_offset = msgIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+    register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
+    register vector unsigned int tmp_notifyQueueEntry3 = (*(tmp_notifyQueueEntryPtr + 3));
+    register vector unsigned int tmp_notifyQueueEntry5 = { 0, 0, 0, 0 };
+    tmp_notifyQueueEntry3 = spu_insert((unsigned int)0, tmp_notifyQueueEntry3, 2);
+    tmp_notifyQueueEntry3 = spu_insert((unsigned int)0, tmp_notifyQueueEntry3, 3);
+    (*(tmp_notifyQueueEntryPtr + 3)) = tmp_notifyQueueEntry3;
+    (*(tmp_notifyQueueEntryPtr + 5)) = tmp_notifyQueueEntry5;
+  }
 
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
-      printf("SPE_%d :: [TRACE] :: Entring user code for index %d...\n", (int)getSPEID(), msgIndex);
+      printf("SPE_%d :: [TRACE] :: Entering user code for index %d...\n", (int)getSPEID(), msgIndex);
     }
   #endif
 
@@ -1997,6 +2149,14 @@ inline void processMsgState_ready(int msgIndex) {
       printf("SPE_%d :: [TRACE] :: Exiting user code for index %d...\n", (int)getSPEID(), msgIndex);
     }
   #endif
+
+  // Copy the user accum timers into the notify queue
+  {
+    register int tmp_offset = msgIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+    register vector unsigned long long int* tmp_notifyQueueEntryPtr = ((vector unsigned long long int*)notifyQueueRaw) + tmp_offset;
+    (*(tmp_notifyQueueEntryPtr + 6)) = *(userAccumTime);
+    (*(tmp_notifyQueueEntryPtr + 7)) = *(userAccumTime + 1);
+  }
 
   // DEBUG
   execIndex = -1;
@@ -2099,11 +2259,18 @@ inline void processMsgState_executed(int msgIndex) {
     #endif
   #endif
 
+  // Get a pointer to the message queue entry
+  register SPEMessage* tmp_msgQueueEntry = (SPEMessage*)(msgQueue[msgIndex]);
+
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(tmp_msgQueueEntry->traceFlag, 0)) {
-      printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_EXECUTED for index %d...\n", (int)getSPEID(), msgIndex);
-      debug_displayActiveMessageQueue(0x0, msgState, "(*)");
+      unsigned long long int curTime;
+      getTimer64(curTime);
+      printf("SPE_%d :: [TRACE] @ %llu :: Processing SPE_MESSAGE_STATE_EXECUTED for index %d...\n",
+             (int)getSPEID(), curTime, msgIndex
+            );
+      debug_displayActiveMessageQueue(0x0, NULL/*msgState*/, "(*)");
     }
   #endif
 
@@ -2113,8 +2280,6 @@ inline void processMsgState_executed(int msgIndex) {
     getTimer64(tmp_startTime);
   #endif
 
-  // Get a pointer to the message queue entry
-  register SPEMessage* tmp_msgQueueEntry = (SPEMessage*)(msgQueue[msgIndex]);
   register vector signed int tmp_msgQueueData0 = *(((vector signed int*)tmp_msgQueueEntry) + 0);
   register vector signed int tmp_msgQueueData1 = *(((vector signed int*)tmp_msgQueueEntry) + 1);
   register vector signed int tmp_msgQueueData2 = *(((vector signed int*)tmp_msgQueueEntry) + 2);
@@ -2282,8 +2447,12 @@ inline void processMsgState_executedList(int msgIndex) {
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
-      printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_EXECUTED_LIST for index %d...\n", (int)getSPEID(), msgIndex);
-      debug_displayActiveMessageQueue(0x0, msgState, "(*)");
+      unsigned long long int curTime;
+      getTimer64(curTime);
+      printf("SPE_%d :: [TRACE] @ %llu :: Processing SPE_MESSAGE_STATE_EXECUTED_LIST for index %d...\n",
+             (int)getSPEID(), curTime, msgIndex
+            );
+      debug_displayActiveMessageQueue(0x0, NULL/*msgState*/, "(*)");
     }
   #endif
 
@@ -2328,6 +2497,37 @@ inline void processMsgState_executedList(int msgIndex) {
       //             msgIndex,
       //             MFC_PUTL_CMD
       //          );
+
+
+      // DEBUG
+      {
+        register int delay = 0;
+        register int jj = 0;
+        register DMAListEntry* tmp_dmaListPtr = &(tmp_dmaList[tmp_readOnlyLen]);
+        for (jj = 0; jj < tmp_writeCount; jj++) {
+          register unsigned int ea = tmp_dmaListPtr->ea;
+          register unsigned int size = tmp_dmaListPtr->size;
+          tmp_dmaListPtr++;
+          if (__builtin_expect((ea & 0x7F) != 0x00, 0)) {
+            printf("SPE :: [WARNING] :: non-128-byte-aligned ea in DMA List in entry %d (output)... :(\n", jj);
+            delay = 100;
+	  }
+          if (__builtin_expect((size & 0x0F) != 0x00, 0)) {
+            printf("SPE :: [WARNING] :: non-128-byte size in DMA List in entry %d (output)... :(\n", jj);
+            delay = 100;
+	  }
+          if (__builtin_expect(size > SPE_DMA_LIST_ENTRY_MAX_LENGTH, 0)) {
+            printf("SPE :: [WARNING] :: Size in DMA List in entry %d too large (output)... :(\n", jj);
+            delay = 100;
+	  }
+	}
+
+        while (delay > 0) {
+          printf("SPE :: [DELAY] :: ...\n");
+          delay--;
+	}
+      }
+
 
       spu_mfcdma64(((char*)tmp_localMemPtr) + (readWriteOffset),
                    (unsigned int)tmp_msgQueueEntry->readOnlyPtr,  // eah
@@ -2416,8 +2616,12 @@ inline void processMsgState_committing(int msgIndex) {
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
-      printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_COMMITTING for index %d...\n", (int)getSPEID(), msgIndex);
-      debug_displayActiveMessageQueue(0x0, msgState, "(*)");
+      unsigned long long int curTime;
+      getTimer64(curTime);
+      printf("SPE_%d :: [TRACE] @ %llu :: Processing SPE_MESSAGE_STATE_COMMITTING for index %d...\n",
+             (int)getSPEID(), curTime, msgIndex
+            );
+      debug_displayActiveMessageQueue(0x0, NULL/*msgState*/, "(*)");
     }
   #endif
 
@@ -2556,9 +2760,8 @@ inline void processMsgState_committing(int msgIndex) {
       // TRACE
       #if ENABLE_TRACE != 0
         if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
-          unsigned int notifyQueueEntry_3 = spu_extract(notifyQueueEntry, 3);
-          printf("SPE_%d :: [TRACE] :: Notified PPE -> msgIndex = %d, notifyQueueEntry_3 = 0x%08u\n",
-                 (int)getSPEID(), msgIndex, notifyQueueEntry_3
+          printf("SPE_%d :: [TRACE] :: Notified PPE -> msgIndex = %d, returnCode = 0x%08u\n",
+                 (int)getSPEID(), msgIndex, returnCode
                 );
 	}
       #endif
@@ -2724,10 +2927,12 @@ inline void processMsgState_error(int msgIndex) {
   // TRACE
   #if ENABLE_TRACE != 0
     if (__builtin_expect(msgQueue[msgIndex]->traceFlag, 0)) {
-      printf("SPE_%d :: [TRACE] :: Processing SPE_MESSAGE_STATE_ERROR for index %d (errorCode = %d)...\n",
-             (int)getSPEID(), msgIndex, localMsgQData[msgIndex].errorCode
+      unsigned long long int curTime;
+      getTimer64(curTime);
+      printf("SPE_%d :: [TRACE] @ %llu :: Processing SPE_MESSAGE_STATE_ERROR for index %d (errorCode = %d)...\n",
+             (int)getSPEID(), curTime, msgIndex, localMsgQData[msgIndex].errorCode
             );
-      debug_displayActiveMessageQueue(0x0, msgState, "(*)");
+      debug_displayActiveMessageQueue(0x0, NULL/*msgState*/, "(*)");
       STATETRACE_OUTPUT(msgIndex);
     }
   #endif
@@ -3362,6 +3567,10 @@ void speScheduler_wrapper(SPEData *speData, unsigned long long id) {
   #endif
 
 
+  // DEBUG
+  register int speID = (int)getSPEID();
+
+
   // The scheduler loop
   while (__builtin_expect(keepLooping != FALSE, 1)) {
 
@@ -3404,6 +3613,17 @@ void speScheduler_wrapper(SPEData *speData, unsigned long long id) {
       if (__builtin_expect(stillAliveCounter == 0, 0)) {
         printf("SPE_%d :: still going... WRs Completed = %d\n", (int)getSPEID(), wrCompletedCounter);
         stillAliveCounter = SPE_DEBUG_DISPLAY_STILL_ALIVE;
+
+        // DEBUG
+        //register int speid = (int)getSPEID();
+        //register int iii = 0;
+        //printf("SPE_%d ::   Local MSG Queue Data:\n", speid);
+        //for (iii = 0; iii < SPE_MESSAGE_QUEUE_LENGTH; iii++) {
+        //  printf("SPE_%d ::     %d: state = %d (PPE: %d)\n",
+        //         speid, iii, localMsgQData[iii].msgState, msgQueue[iii]->state
+        //        );
+	//}
+
       }
       stillAliveCounter--;
     #endif
@@ -3474,6 +3694,7 @@ void speScheduler_wrapper(SPEData *speData, unsigned long long id) {
       schedLoopClocks += clocks0;
       schedLoopClocksCounter++;
     #endif
+
 
     // Call the function containing the scheduling technique
     speSchedulerInner();
@@ -3717,12 +3938,14 @@ void debug_displayActiveMessageQueue(unsigned long long id, int* msgState, char*
   printf("SPE_%d :: Dumping active portion of message queue...\n", (int)getSPEID());
 
   int tmp;
+  int speID = (int)getSPEID();
 
   for (tmp = 0; tmp < SPE_MESSAGE_QUEUE_LENGTH; tmp++) {
-    //if (msgState[tmp] != SPE_MESSAGE_STATE_CLEAR || msgQueue[tmp]->state < SPE_MESSAGE_STATE_MIN || msgQueue[tmp]->state > SPE_MESSAGE_STATE_MAX) {
-    if (1) {
-      printf("[0x%llx] :: %s%s msgQueue[%d] @ %p (msgQueue: %p) = { fi = %d, rw = %lu, rwl = %d, ro = %lu, rol = %d, wo = %lu, wol = %d, f = 0x%08X, tm = %u, s = %d(%d), cnt = %d:%d, cmd = %d }\n",
-                 id,
+    register int msgS = localMsgQData[tmp].msgState;
+    if (msgS != SPE_MESSAGE_STATE_CLEAR || msgS < SPE_MESSAGE_STATE_MIN || msgS > SPE_MESSAGE_STATE_MAX) {
+    //if (1) {
+      printf("SPE_%d ::   :: %s%s msgQueue[%d] @ %p (msgQueue: %p) = { fi = %d, rw = %lu, rwl = %d, ro = %lu, rol = %d, wo = %lu, wol = %d, f = 0x%08X, tm = %u, s = %d(%d), cnt = %d:%d, cmd = %d }\n",
+	         speID,
                  ((msgQueue[tmp]->state < SPE_MESSAGE_STATE_MIN || msgQueue[tmp]->state > SPE_MESSAGE_STATE_MAX) ? ("---===!!! WARNING !!!===--- ") : ("")),
                  ((str == NULL) ? ("") : (str)),
                  tmp,
@@ -3738,7 +3961,7 @@ void debug_displayActiveMessageQueue(unsigned long long id, int* msgState, char*
                  (volatile int)(msgQueue[tmp]->flags),
                  (volatile int)(msgQueue[tmp]->totalMem),
                  (volatile int)(msgQueue[tmp]->state),
-                 msgState[tmp],
+                 msgS, //msgState[tmp]
                  (volatile int)(msgQueue[tmp]->counter0),
                  (volatile int)(msgQueue[tmp]->counter1),
                  (volatile int)(msgQueue[tmp]->command)
@@ -3835,6 +4058,216 @@ void debug_dumpSPERTState() {
   printf("SPE_%d : -------------------------------------\n", (int)getSPEID());
 
 }
+
+
+void startUserTime0() {
+
+  // Get the time
+  register unsigned long long int tmp_time;
+  getTimer64(tmp_time);
+
+  // Get a pointer to the notify queue entry
+  register int tmp_offset = execIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+  register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
+
+  // Grab the initial recv time
+  register vector unsigned long long int tmp_notifyQueueEntry0 = *((vector unsigned long long int*)tmp_notifyQueueEntryPtr);
+  register unsigned long long int tmp_recvTimeStart = spu_extract(tmp_notifyQueueEntry0, 0);
+  
+  // Calculate the start and end offsets from recvStartTime
+  register unsigned int tmp_timeDelta = (unsigned int)(tmp_time - tmp_recvTimeStart);
+
+  // Write the start and end times to the LS
+  register vector unsigned int tmp_notifyQueueEntry3 = (*(tmp_notifyQueueEntryPtr + 3));
+  tmp_notifyQueueEntry3 = spu_insert(tmp_timeDelta, tmp_notifyQueueEntry3, 2);
+  (*(tmp_notifyQueueEntryPtr + 3)) = tmp_notifyQueueEntry3;
+}
+
+void endUserTime0() {
+
+  // Get the time
+  register unsigned long long int tmp_time;
+  getTimer64(tmp_time);
+
+  // Get a pointer to the notify queue entry
+  register int tmp_offset = execIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+  register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
+
+  // Grab the initial recv time
+  register vector unsigned long long int tmp_notifyQueueEntry0 = *((vector unsigned long long int*)tmp_notifyQueueEntryPtr);
+  register unsigned long long int tmp_recvTimeStart = spu_extract(tmp_notifyQueueEntry0, 0);
+  
+  // Calculate the start and end offsets from recvStartTime
+  register unsigned int tmp_timeDelta = (unsigned int)(tmp_time - tmp_recvTimeStart);
+
+  // Write the start and end times to the LS
+  register vector unsigned int tmp_notifyQueueEntry3 = (*(tmp_notifyQueueEntryPtr + 3));
+  tmp_notifyQueueEntry3 = spu_insert(tmp_timeDelta, tmp_notifyQueueEntry3, 3);
+  (*(tmp_notifyQueueEntryPtr + 3)) = tmp_notifyQueueEntry3;
+}
+
+void startUserTime1() {
+
+  // Get the time
+  register unsigned long long int tmp_time;
+  getTimer64(tmp_time);
+
+  // Get a pointer to the notify queue entry
+  register int tmp_offset = execIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+  register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
+
+  // Grab the initial recv time
+  register vector unsigned long long int tmp_notifyQueueEntry0 = *((vector unsigned long long int*)tmp_notifyQueueEntryPtr);
+  register unsigned long long int tmp_recvTimeStart = spu_extract(tmp_notifyQueueEntry0, 0);
+  
+  // Calculate the start and end offsets from recvStartTime
+  register unsigned int tmp_timeDelta = (unsigned int)(tmp_time - tmp_recvTimeStart);
+
+  // Write the start and end times to the LS
+  register vector unsigned int tmp_notifyQueueEntry5 = (*(tmp_notifyQueueEntryPtr + 5));
+  tmp_notifyQueueEntry5 = spu_insert(tmp_timeDelta, tmp_notifyQueueEntry5, 0);
+  (*(tmp_notifyQueueEntryPtr + 5)) = tmp_notifyQueueEntry5;
+}
+
+void endUserTime1() {
+
+  // Get the time
+  register unsigned long long int tmp_time;
+  getTimer64(tmp_time);
+
+  // Get a pointer to the notify queue entry
+  register int tmp_offset = execIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+  register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
+
+  // Grab the initial recv time
+  register vector unsigned long long int tmp_notifyQueueEntry0 = *((vector unsigned long long int*)tmp_notifyQueueEntryPtr);
+  register unsigned long long int tmp_recvTimeStart = spu_extract(tmp_notifyQueueEntry0, 0);
+  
+  // Calculate the start and end offsets from recvStartTime
+  register unsigned int tmp_timeDelta = (unsigned int)(tmp_time - tmp_recvTimeStart);
+
+  // Write the start and end times to the LS
+  register vector unsigned int tmp_notifyQueueEntry5 = (*(tmp_notifyQueueEntryPtr + 5));
+  tmp_notifyQueueEntry5 = spu_insert(tmp_timeDelta, tmp_notifyQueueEntry5, 1);
+  (*(tmp_notifyQueueEntryPtr + 5)) = tmp_notifyQueueEntry5;
+}
+
+void startUserTime2() {
+
+  // Get the time
+  register unsigned long long int tmp_time;
+  getTimer64(tmp_time);
+
+  // Get a pointer to the notify queue entry
+  register int tmp_offset = execIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+  register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
+
+  // Grab the initial recv time
+  register vector unsigned long long int tmp_notifyQueueEntry0 = *((vector unsigned long long int*)tmp_notifyQueueEntryPtr);
+  register unsigned long long int tmp_recvTimeStart = spu_extract(tmp_notifyQueueEntry0, 0);
+  
+  // Calculate the start and end offsets from recvStartTime
+  register unsigned int tmp_timeDelta = (unsigned int)(tmp_time - tmp_recvTimeStart);
+
+  // Write the start and end times to the LS
+  register vector unsigned int tmp_notifyQueueEntry5 = (*(tmp_notifyQueueEntryPtr + 5));
+  tmp_notifyQueueEntry5 = spu_insert(tmp_timeDelta, tmp_notifyQueueEntry5, 2);
+  (*(tmp_notifyQueueEntryPtr + 5)) = tmp_notifyQueueEntry5;
+}
+
+void endUserTime2() {
+
+  // Get the time
+  register unsigned long long int tmp_time;
+  getTimer64(tmp_time);
+
+  // Get a pointer to the notify queue entry
+  register int tmp_offset = execIndex * (sizeof(SPENotify) / sizeof(vector unsigned int));
+  register vector unsigned int* tmp_notifyQueueEntryPtr = ((vector unsigned int*)notifyQueueRaw) + tmp_offset;
+
+  // Grab the initial recv time
+  register vector unsigned long long int tmp_notifyQueueEntry0 = *((vector unsigned long long int*)tmp_notifyQueueEntryPtr);
+  register unsigned long long int tmp_recvTimeStart = spu_extract(tmp_notifyQueueEntry0, 0);
+  
+  // Calculate the start and end offsets from recvStartTime
+  register unsigned int tmp_timeDelta = (unsigned int)(tmp_time - tmp_recvTimeStart);
+
+  // Write the start and end times to the LS
+  register vector unsigned int tmp_notifyQueueEntry5 = (*(tmp_notifyQueueEntryPtr + 5));
+  tmp_notifyQueueEntry5 = spu_insert(tmp_timeDelta, tmp_notifyQueueEntry5, 3);
+  (*(tmp_notifyQueueEntryPtr + 5)) = tmp_notifyQueueEntry5;
+}
+
+
+
+void clearUserAccumTime(int index) {
+
+  // Force the index to be 0 <= index <= 3
+  index &= 0x3;
+  
+  // Place this value into userAccumTime
+  register int tmp_ptr_offset = ((index & 0x2) >> 1);
+  register vector unsigned long long int* tmp_ptr = userAccumTime + tmp_ptr_offset;
+  register vector unsigned long long int tmp_startTime = *tmp_ptr;
+  tmp_startTime = spu_insert((unsigned long long int)0, tmp_startTime, (index & 0x1));
+  *tmp_ptr = tmp_startTime;
+
+  // Place this value into userAccumTimeStart
+  tmp_ptr = userAccumTimeStart + tmp_ptr_offset;
+  tmp_startTime = *tmp_ptr;
+  tmp_startTime = spu_insert((unsigned long long int)0, tmp_startTime, (index & 0x1));
+  *tmp_ptr = tmp_startTime;
+}
+
+void clearUserAccumTimeAll() {
+  register vector unsigned long long int tmp_zeros = { 0, 0 };
+  register vector unsigned long long int* tmp_ptr = userAccumTime;
+  *(tmp_ptr) = tmp_zeros;
+  *(tmp_ptr + 1) = tmp_zeros;
+}
+
+void startUserAccumTime(int index) {
+
+  // Force the index to be 0 <= index <= 3
+  index &= 0x3;
+
+  // Get the time
+  register unsigned long long int tmp_time;
+  getTimer64(tmp_time);
+
+  // Place this value into userAccumTimeStart
+  register int tmp_ptr_offset = ((index & 0x2) >> 1);
+  register vector unsigned long long int* tmp_ptr = userAccumTimeStart + tmp_ptr_offset;
+  register vector unsigned long long int tmp_startTime = *tmp_ptr;
+  tmp_startTime = spu_insert(tmp_time, tmp_startTime, (index & 0x1));
+  *tmp_ptr = tmp_startTime;
+}
+
+void endUserAccumTime(int index) {
+
+  // Force the index to be 0 <= index <= 3
+  index &= 0x3;
+
+  // Get the time
+  register unsigned long long int tmp_time;
+  getTimer64(tmp_time);
+
+  // Get the userAccumTimeStart value and subtract it
+  register int tmp_ptr_offset = ((index & 0x2) >> 1);
+  register vector unsigned long long int* tmp_ptr = userAccumTimeStart + tmp_ptr_offset;
+  register vector unsigned long long int tmp_startTime_vec = *tmp_ptr;
+  register unsigned long long int tmp_startTime = spu_extract(tmp_startTime_vec, (index & 0x1));
+  register unsigned long long int tmp_timeDelta = tmp_time - tmp_startTime;
+
+  // Add the tmp_timeDelta value to the accumulator value
+  tmp_ptr = userAccumTime + tmp_ptr_offset;
+  tmp_startTime_vec = *tmp_ptr;
+  tmp_startTime = spu_extract(tmp_startTime_vec, (index & 0x1));
+  tmp_startTime += tmp_timeDelta;
+  tmp_startTime_vec = spu_insert(tmp_startTime, tmp_startTime_vec, (index & 0x1));
+  *tmp_ptr = tmp_startTime_vec;
+}
+
 
 
 #if USE_PRINT_BLOCK == 0
