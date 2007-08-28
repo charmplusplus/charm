@@ -48,8 +48,8 @@ class Hello : public CBase_Hello {
 
       CkPrintf("[%d] BEFORE First\n", thisIndex);
 
-      char buf[16] __attribute__((aligned(16)));
-      sprintf(buf, "%d", thisIndex);
+      char buf[48] __attribute__((aligned(16)));
+      sprintf(buf, "%d (fromPE %d)", thisIndex, CkMyPe());
       sendWorkRequest(FUNC_SAYHI,
                       NULL, 0,            // readWrite data
                       buf, strlen(buf)+1, // readOnly data
@@ -61,6 +61,7 @@ class Hello : public CBase_Hello {
       CkPrintf("[%d] AFTER First\n", thisIndex);
 
 
+      /*
       ///// Second, Test the Scatter/Gather Method for Work Requests /////
 
       CkPrintf("[%d] BEFORE Second\n", thisIndex);
@@ -115,6 +116,7 @@ class Hello : public CBase_Hello {
       }
 
       CkPrintf("[%d] AFTER Second\n", thisIndex);
+      */
 
 
       // Send a message onto the next element in the array (or to
