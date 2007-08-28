@@ -158,6 +158,13 @@ class FEM_AdaptL : public FEM_Adapt {
   int edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1_n1, 
 				    int e1_n2, int e1_n3, int e2_n1, int e2_n2,
 				    int e2_n3, int n3, int n4);
+
+  /// Acquire an element in our ghost layer, turning it into a local element
+  int eatIntoElement(int e);
+  /// Test the adaptivity system to see if any nodes are locked
+  void residualLockTest();
+  /// Test the mesh for corruption in connectivity/adjacency
+  void structureTest();
 };
 
 #endif

@@ -835,3 +835,21 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
   return np;
 }
 // ======================  END vertex_split ===================
+
+
+int FEM_AdaptL::eatIntoElement(int e)
+{
+    return theMod->fmUtil->eatIntoElement(e);
+}
+
+
+void FEM_AdaptL::residualLockTest()
+{
+    theMod->fmUtil->residualLockTest(theMod->fmMesh);
+}
+
+
+void FEM_AdaptL::structureTest()
+{
+    theMod->fmUtil->StructureTest(theMod->fmMesh);
+}

@@ -359,6 +359,11 @@ void FEM_remove_node(FEM_Mesh *m, int node){
 /** A helper function for FEM_add_element_local below
     Will only work with the same element type as the one given, may crash otherwise
 */
+void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType);
+void FEM_update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
+    update_new_element_e2e(m, newEl, elemType);
+}
+
 void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
   // this function most definitely will not yet work with mixed element types.
   CkAssert(elemType==0); 
@@ -438,7 +443,7 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
         for (const elemList *b=a->next;b!=NULL;b=b->next){
 	  // if a and b are different elements
           if((a->localNo != b->localNo) || (a->type != b->type)){
-	    //	CkPrintf("%d:%d:%d adj to %d:%d:%d\n", a->type, a->localNo, a->tupleNo, b->type, b->localNo, b->tupleNo);
+	    //CkPrintf("%d:%d:%d adj to %d:%d:%d\n", a->type, a->localNo, a->tupleNo, b->type, b->localNo, b->tupleNo);
 	    // Put b in a's adjacency list
 	    if(FEM_Is_ghost_index(a->localNo)){
 	      const int j = FEM_To_ghost_index(a->localNo)*tuplesPerElem + a->tupleNo;

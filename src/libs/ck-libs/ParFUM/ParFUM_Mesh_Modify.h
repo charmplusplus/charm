@@ -47,6 +47,7 @@ void FEM_remove_node_local(FEM_Mesh *m, int node);
 int FEM_add_element_local(FEM_Mesh *m, int *conn, int connSize, int elemType, bool addGhost, bool create_adjacencies=1);
 ///Clear up the adjacencies
 void FEM_remove_element_local(FEM_Mesh *m, int element, int etype);
+void FEM_update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType);
 
 ///Deprecated: locks all chunks for the nodes and elements specified
 int FEM_Modify_Lock(FEM_Mesh *m, int* affectedNodes=0, int numAffectedNodes=0, int* affectedElts=0, int numAffectedElts=0, int elemtype=0);
