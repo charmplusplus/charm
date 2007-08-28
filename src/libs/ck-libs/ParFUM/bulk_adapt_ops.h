@@ -93,9 +93,11 @@ class BulkAdapt {
 
   /// Perform a single side of an edge_bisect operation
   bool one_side_split_3D(adaptAdj &startElem, adaptAdj &splitElem, 
-			 adaptAdj &firstElem, adaptAdj &fromElem,
+			 adaptAdj &firstElem, adaptAdj &firstSplitElem, 
+			 adaptAdj &fromElem, adaptAdj &fromSplitElem,
 			 int edgeID, int *node1idx, int *node2idx, 
-			 int *newNodeID, bool startSide);
+			 int *newNodeID, bool startSide, double *n1coord,
+			 adaptAdj &lastElem, adaptAdj &lastSplitElem);
 
   /* COMMUNICATION HELPERS FOR BULK ADAPTIVITY OPERATIONS */
   adaptAdj remote_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, 
@@ -139,8 +141,11 @@ class BulkAdapt {
 void midpoint(double *n1, double *n2, int dim, double *result);
 
 int getRelNode(int nodeIdx, int *conn, int nodesPerElem);
+void getRelNodes(int edgeID, int nodesPerElem, int *r1, int *r2);
 
 int getEdgeID(int node1, int node2, int nodePerElem, int dim);
+
+
 
 /** Fill out the nodes and relative numberings for a tet */
 void fillNodes(int *relNode, int *nodeIDs, int *conn);
