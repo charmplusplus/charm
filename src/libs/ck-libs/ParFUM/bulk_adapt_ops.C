@@ -241,13 +241,13 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
 				  &(n1coord[0]), lastElem, lastSplitElem);
     
     // now fix the adjacencies across the new edge to the two new elements
-    ReplaceAdaptAdj(meshID, splitElem, neighbors[0], nbrSplitElem);
-    ReplaceAdaptAdj(meshID, nbrSplitElem, startElem, splitElem);
+    replaceAdaptAdj(meshID, splitElem, neighbors[0], nbrSplitElem);
+    replaceAdaptAdj(meshID, nbrSplitElem, startElem, splitElem);
     BULK_DEBUG(printf("[%d] For nbrSplitElem %d set adjacency to %d across splitEdge\n",partitionID,nbrSplitElem.localID,splitElem.localID);)
     BULK_DEBUG(printf("[%d] For splitElem %d set adjacency to %d across splitEdge\n",partitionID,splitElem.localID,nbrSplitElem.localID);)
     if (completed) {
       // need to hook splitElem to neighbors[1]'s splitElem
-      ReplaceAdaptAdj(meshID, splitElem, neighbors[1], lastSplitElem);
+      replaceAdaptAdj(meshID, splitElem, neighbors[1], lastSplitElem);
     }
   }
   else if (neighbors[0].partID == -1) { // startElem's side on domain boundary
@@ -273,8 +273,8 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
 			       &(n1coord[0]), lastElem, lastSplitElem);
       
       // now fix the adjacencies across the new edge to the two new elements
-      ReplaceAdaptAdj(meshID, splitElem, neighbors[1], nbrSplitElem);
-      ReplaceAdaptAdj(meshID, nbrSplitElem, startElem, splitElem);
+      replaceAdaptAdj(meshID, splitElem, neighbors[1], nbrSplitElem);
+      replaceAdaptAdj(meshID, nbrSplitElem, startElem, splitElem);
       BULK_DEBUG(printf("[%d] For nbrSplitElem %d set adjacency to %d across splitEdge\n",partitionID,nbrSplitElem.localID,splitElem.localID);)
       BULK_DEBUG(printf("[%d] For splitElem %d set adjacency to %d across splitEdge\n",partitionID,splitElem.localID,nbrSplitElem.localID);)
     }
@@ -462,10 +462,10 @@ bool BulkAdapt::one_side_split_3D(adaptAdj &startElem, adaptAdj &splitElem,
   face[2] = 3 - (relNode[0] + relNode[3] + relNode[2]);
   face[3] = 3 - (relNode[1] + relNode[3] + relNode[2]);
   adaptAdj neighbors[4]; // startElem's neighbors
-  neighbors[0] = *GetAdaptAdj(meshID, startElem, face[0]);
-  neighbors[1] = *GetAdaptAdj(meshID, startElem, face[1]);
-  neighbors[2] = *GetAdaptAdj(meshID, startElem, face[2]);
-  neighbors[3] = *GetAdaptAdj(meshID, startElem, face[3]);
+  neighbors[0] = *getAdaptAdj(meshID, startElem.localID, startElem.elemType, face[0]);
+  neighbors[1] = *getAdaptAdj(meshID, startElem.localID, startElem.elemType, face[1]);
+  neighbors[2] = *getAdaptAdj(meshID, startElem.localID, startElem.elemType, face[2]);
+  neighbors[3] = *getAdaptAdj(meshID, startElem.localID, startElem.elemType, face[3]);
 
   // get node1coords and node2Coords. find midpoint: bisectCoords
   double *node1coords = (coord->getDouble()).getRow(*node1idx); // ptrs to ACTUAL coords!
@@ -497,18 +497,18 @@ bool BulkAdapt::one_side_split_3D(adaptAdj &startElem, adaptAdj &splitElem,
   BULK_DEBUG(printf("[%d] new element %d with conn %d %d %d %d added \n", partitionID, splitElemID, splitConn[0], splitConn[1], splitConn[2], splitConn[3]);)
   // copy startElem.localID's adapt adj for all faces.
   splitElem = adaptAdj(partitionID, splitElemID, startElem.elemType);
-  adaptAdj *startElemAdaptAdj = GetAdaptAdj(meshPtr, startElem, 0);
-  adaptAdj *splitElemAdaptAdj = GetAdaptAdj(meshPtr, splitElem, 0);
+  adaptAdj *startElemAdaptAdj = getAdaptAdj(meshPtr, startElem.localID, startElem.elemType, 0);
+  adaptAdj *splitElemAdaptAdj = getAdaptAdj(meshPtr, splitElem.localID, splitElem.elemType, 0);
   memcpy(splitElemAdaptAdj, startElemAdaptAdj, 4*sizeof(adaptAdj));
-  ReplaceAdaptAdj(meshPtr, splitElem, fromElem, fromSplitElem);
+  replaceAdaptAdj(meshPtr, splitElem, fromElem, fromSplitElem);
   // startElem's non-split are neighbors[2] and [3]
   // update startElem's new nbr from neighbors[3] to splitElem
-  ReplaceAdaptAdj(meshPtr, startElem, neighbors[3], splitElem);
+  replaceAdaptAdj(meshPtr, startElem, neighbors[3], splitElem);
   // update splitElem's neighbor from neighbors[2] to startElem
-  ReplaceAdaptAdj(meshPtr, splitElem, neighbors[2], startElem);
+  replaceAdaptAdj(meshPtr, splitElem, neighbors[2], startElem);
   // update startElem's nbr's back-adjacency from startElem to splitElem
   if (neighbors[3].partID == startElem.partID) {
-    ReplaceAdaptAdj(meshPtr, neighbors[3], startElem, splitElem);
+    replaceAdaptAdj(meshPtr, neighbors[3], startElem, splitElem);
   }
   else if (neighbors[3].partID != -1) { // startElem's nbr exists and is remote
     shadowProxy[neighbors[3].partID].remote_adaptAdj_replace(neighbors[3], startElem, splitElem); 
@@ -539,9 +539,9 @@ bool BulkAdapt::one_side_split_3D(adaptAdj &startElem, adaptAdj &splitElem,
 	completed = one_side_split_3D(neighbors[1], nbrSplitElem, firstElem, 
 				      firstSplitElem, startElem, splitElem, 
 				      nbrEdgeID, &nbrNode1, &nbrNode2, 
-				      &newNodeID, false, &(n1coord[0]), 
+				      newNodeID, false, &(n1coord[0]), 
 				      lastElem, lastSplitElem);
-	ReplaceAdaptAdj(meshPtr, splitElem, neighbors[1], nbrSplitElem);
+	replaceAdaptAdj(meshPtr, splitElem, neighbors[1], nbrSplitElem);
       }
       else { // call remotely
       }
@@ -568,9 +568,9 @@ bool BulkAdapt::one_side_split_3D(adaptAdj &startElem, adaptAdj &splitElem,
 	completed = one_side_split_3D(neighbors[0], nbrSplitElem, firstElem, 
 				      firstSplitElem, startElem, splitElem, 
 				      nbrEdgeID, &nbrNode1, &nbrNode2, 
-				      &newNodeID, false, &(n1coord[0]), 
+				      newNodeID, false, &(n1coord[0]), 
 				      lastElem, lastSplitElem);
-	ReplaceAdaptAdj(meshPtr, splitElem, neighbors[0], nbrSplitElem);
+	replaceAdaptAdj(meshPtr, splitElem, neighbors[0], nbrSplitElem);
       }
       else { // call remotely
       }
