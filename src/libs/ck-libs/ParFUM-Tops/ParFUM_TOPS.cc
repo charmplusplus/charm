@@ -23,33 +23,31 @@
     #include <cuda_runtime.h>
 #endif
 
-void setTableReferences(TopModel* model){
+void setBasicTableReferences(TopModel* model)
+{
   model->ElemConn_T = &((FEM_IndexAttribute*)model->mesh->elem[0].lookup(FEM_CONN,""))->get();
-  model->node_id_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+1,""))->getInt();
-  model->elem_id_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+1,""))->getInt();
-  model->ElemData_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+0,""))->getChar();
-  model->NodeData_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+0,""))->getChar();
-  model->n2eConn_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+2,""))->getInt();
+  model->node_id_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+0,""))->getInt();
+  model->elem_id_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+0,""))->getInt();
+  model->n2eConn_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+1,""))->getInt();
 
 #ifdef FP_TYPE_FLOAT
-  model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+2,""))->getFloat();
+  model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+1,""))->getFloat();
 #else
-  model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+2,""))->getDouble();
+  model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+1,""))->getDouble();
 #endif
+}
 
-
+void setTableReferences(TopModel* model)
+{
+    setBasicTableReferences(model);
+    model->ElemData_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+2,""))->getChar();
+    model->NodeData_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+2,""))->getChar();
 }
 
 
-TopModel* topModel_Create_Init(int elem_attr_sz, int node_attr_sz, int model_attr_sz){
-
-  CkAssert(elem_attr_sz > 0);
-  CkAssert(node_attr_sz > 0);
+TopModel* topModel_Create_Init(){
   TopModel *model = new TopModel;
   memset(model, 0, sizeof(TopModel));
-  model->elem_attr_size = elem_attr_sz;
-  model->node_attr_size = node_attr_sz;
-  model->model_attr_size = model_attr_sz;
 
   // This only uses a single mesh, so better not create multiple ones of these
   int which_mesh=FEM_Mesh_default_write();
@@ -66,26 +64,18 @@ TopModel* topModel_Create_Init(int elem_attr_sz, int node_attr_sz, int model_att
 
   // Allocate node coords
 #ifdef FP_TYPE_FLOAT
-  FEM_Mesh_data(which_mesh,FEM_NODE,FEM_DATA+2,temp_array, 0, 1, FEM_FLOAT, 3);
+  FEM_Mesh_data(which_mesh,FEM_NODE,FEM_DATA+1,temp_array, 0, 1, FEM_FLOAT, 3);
 #else
-  FEM_Mesh_data(which_mesh,FEM_NODE,FEM_DATA+2,temp_array, 0, 1, FEM_DOUBLE, 3);
+  FEM_Mesh_data(which_mesh,FEM_NODE,FEM_DATA+1,temp_array, 0, 1, FEM_DOUBLE, 3);
 #endif
-
   // Allocate element connectivity
   FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_CONN,temp_array, 0, 1, FEM_INDEX_0, 4);
-
-  // Allocate element attributes
-  FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+0,temp_array, 0, 1, FEM_BYTE, model->elem_attr_size);
   // Allocate element Id array
-  FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+1,temp_array, 0, 1, FEM_INT, 1);
+  FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+0,temp_array, 0, 1, FEM_INT, 1);
   // Allocate n2e connectivity
-  FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+2,temp_array, 0, 1, FEM_INT, 4);
-
-
-  // Allocate node attributes
-  FEM_Mesh_data(which_mesh,FEM_NODE+0,FEM_DATA+0,temp_array, 0, 1, FEM_BYTE, model->node_attr_size);
+  FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+1,temp_array, 0, 1, FEM_INT, 4);
   // Allocate node Id array
-  FEM_Mesh_data(which_mesh,FEM_NODE+0,FEM_DATA+1,temp_array, 0, 1, FEM_INT, 1);
+  FEM_Mesh_data(which_mesh,FEM_NODE+0,FEM_DATA+0,temp_array, 0, 1, FEM_INT, 1);
 
   FEM_Mesh_allocate_valid_attr(which_mesh, FEM_NODE);
   FEM_Mesh_allocate_valid_attr(which_mesh, FEM_ELEM+0);
@@ -93,12 +83,12 @@ TopModel* topModel_Create_Init(int elem_attr_sz, int node_attr_sz, int model_att
   FEM_set_entity_invalid(which_mesh, FEM_NODE, 0);
   FEM_set_entity_invalid(which_mesh, FEM_ELEM+0, 0);
 
-  setTableReferences(model);
-
+  setBasicTableReferences(model);
   return model;
 }
 
 TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_attr_sz, void *mAtt){
+
     // This only uses a single mesh, so don't create multiple TopModels of these
     CkAssert(elem_attr_sz > 0);
     CkAssert(node_attr_sz > 0);
@@ -110,22 +100,31 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
     model->node_attr_size = node_attr_sz;
     model->model_attr_size = model_attr_sz;
 
-    model->mesh = FEM_Mesh_lookup(which_mesh,"TopModel::TopModel()");
-
+    model->mesh = FEM_Mesh_lookup(which_mesh,"topModel_Create_Driver");
     model->mAtt = mAtt;
 
     model->num_local_elem = model->mesh->elem[0].size();
     model->num_local_node = model->mesh->node.size();
 
-    setTableReferences(model);
+    FEM_Mesh_become_set(which_mesh);
+    char* temp_array = (char*) malloc(model->num_local_elem * model->elem_attr_size);
+    FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+2,temp_array,0,model->num_local_elem,FEM_BYTE,model->elem_attr_size);
+    free(temp_array);
 
+    //int mesh_write = FEM_Mesh_default_write();
+    temp_array = (char*) malloc(model->num_local_node * model->node_attr_size);
+    FEM_Mesh_data(which_mesh,FEM_NODE+0,FEM_DATA+2,temp_array,0,model->num_local_node,FEM_BYTE,model->node_attr_size);
+    free(temp_array);
+    FEM_Mesh_become_get(which_mesh);
+
+    setTableReferences(model);
 
     /** Create n2e connectivity array and copy to device global memory */
     {
         FEM_Mesh_create_node_elem_adjacency(which_mesh);
         FEM_Mesh* mesh = FEM_Mesh_lookup(which_mesh, "topModel_Create_Driver");
         FEM_DataAttribute * at = (FEM_DataAttribute*) 
-            model->mesh->elem[0].lookup(FEM_DATA+2,"topModel_Create_Driver");
+            model->mesh->elem[0].lookup(FEM_DATA+1,"topModel_Create_Driver");
         int* n2eTable  = at->getInt().getData();
 
         FEM_IndexAttribute * iat = (FEM_IndexAttribute*) 
