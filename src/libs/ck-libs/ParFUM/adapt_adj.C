@@ -177,7 +177,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     CkVec<adaptAdj>** adaptEdgeAdjacencies = edgeMapSize == 0 ?
         NULL :
         reinterpret_cast<CkVec<adaptAdj>**>(
-                (adaptAdjEdgeAttr->getInt()).getData());
+                (adaptAdjEdgeAttr->getChar()).getData());
 
     // Initialize adaptAdj arrays
     for (int i=0; i<numElems; i++) {
@@ -185,8 +185,12 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
             adaptFaceAdjacencies[i*faceMapSize + j].partID = -1;
             adaptFaceAdjacencies[i*faceMapSize + j].localID = -1;
         }
-        if (adaptEdgeAdjacencies)
-            adaptEdgeAdjacencies[i] = new CkVec<adaptAdj>;
+        if (adaptEdgeAdjacencies) {
+            for (int j=0; j<edgeMapSize; ++j) {
+                adaptEdgeAdjacencies[i*edgeMapSize + j] = new CkVec<adaptAdj>;
+                assert(adaptEdgeAdjacencies[i*edgeMapSize + j] != NULL);
+            }
+        }
     }
 
     // Create an array of size equal to the number of local nodes, each
