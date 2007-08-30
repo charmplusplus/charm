@@ -26,11 +26,11 @@ extern "C" {
 // Function Bodies
 
 
-extern "C" inline void* malloc_aligned_helper(size_t size, char alignment, int zeroFlag) {
+extern "C" inline void* malloc_aligned_helper(size_t size, unsigned short alignment, int zeroFlag) {
 
   void* rtn = NULL;
   int tailPadding;
-  char offset = 0;
+  unsigned short offset = 0;
 
   // Verify the parameters
   if (size <= 0 || alignment <= 0)
@@ -59,6 +59,7 @@ extern "C" inline void* malloc_aligned_helper(size_t size, char alignment, int z
 
   // Calculate the offset into the returned memory chunk that has the required alignment
   offset = (char)(((size_t)rtn) % alignment);
+  offset = alignment - offset;
   if (offset == 0) offset = alignment;
 
   // Write the offset into the byte before the address to be returned
@@ -68,10 +69,10 @@ extern "C" inline void* malloc_aligned_helper(size_t size, char alignment, int z
   return (void*)((char*)rtn + offset);
 }
 
-extern "C" void* malloc_aligned(size_t size, char alignment) {
+extern "C" void* malloc_aligned(size_t size, unsigned short alignment) {
   return malloc_aligned_helper(size, alignment, 0);
 }
-extern "C" void* calloc_aligned(size_t size, char alignment) {
+extern "C" void* calloc_aligned(size_t size, unsigned short alignment) {
   return malloc_aligned_helper(size, alignment, 1);
 }
 
