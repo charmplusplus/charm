@@ -51,7 +51,7 @@ TopModel* topModel_Create_Init(){
 
   // This only uses a single mesh, so better not create multiple ones of these
   int which_mesh=FEM_Mesh_default_write();
-  model->mesh = FEM_Mesh_lookup(which_mesh,"TopModel::TopModel()");
+  model->mesh = FEM_Mesh_lookup(which_mesh,"topModel_Create_Init");
 
 
 /** @note   Here we allocate the arrays with a single
@@ -438,9 +438,10 @@ int topModel_GetNNodes(TopModel *model){
   return model->mesh->node.count_valid();
 }
 
-/** @todo Fix to return the width of the conn array */
+/** @todo How should we handle meshes with mixed elements? */
 int topElement_GetNNodes(TopModel* model, TopElement elem){
-  return 4;
+    const AllocTable2d<int>& conn = model->mesh->elem[0].getConn();
+    return conn.width();
 }
 
 /** @todo make sure we are in a getting mesh */
