@@ -1641,6 +1641,13 @@ the BG/L machine at IBM TJ Watson.
 End-of-Run analysis techniques are currently known to hang for
 applications that make multiple calls to traceBegin() and traceEnd()
 on the same processor through multiple \charmpp{} objects.
+\item
+Timeline displays mis-aligned time bars whenever the window is
+maximized. This is a Java 1.5 issue with our code. {\em The current
+work-around is to click on the ``Reset'' button on the Timeline
+control panel after maximizing.} This bug also shows up on the JDK1.3
+version if it were built with Java 1.5 but not if it were built using
+the 1.3.1 Java compiler.
 \end{itemize}
 
 \end{document}
