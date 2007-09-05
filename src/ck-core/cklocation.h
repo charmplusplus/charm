@@ -208,6 +208,7 @@ public:
 #if CMK_LBDB_ON
 public:
   inline LBDatabase *getLBDB(void) const {return the_lbdb;}
+  inline LDObjHandle getLdHandle() const{return ldHandle;}
   static void staticMigrate(LDObjHandle h, int dest);
   void recvMigrate(int dest);
   void setMigratable(int migratable);	/// set migratable
