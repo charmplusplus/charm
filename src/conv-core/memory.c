@@ -110,7 +110,11 @@ CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage() { return 0; }
 void CmiResetMaxMemory() {}
 CMK_TYPEDEF_UINT8 CmiMinMemoryUsage() { return 0; }
 void CmiResetMinMemory() {}
-#else 
+
+#define MEM_LOCK_AROUND(code)   code
+
+#else       /* of CMK_MEMORY_BUILD_OS */
+
 /*************************************************************
 *Not* using the system malloc-- first pick the implementation:
 */
@@ -376,7 +380,7 @@ void CmiOutOfMemoryInit(void) {
 #if CMK_MEMORY_PREALLOCATE_HACK
   memory_preallocate_hack();
 #endif
-  memory_lifeRaft=(char *)mm_malloc(65536/2);
+  MEM_LOCK_AROUND( memory_lifeRaft=(char *)mm_malloc(65536/2); )
   }
 }
 
