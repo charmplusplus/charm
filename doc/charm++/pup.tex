@@ -128,8 +128,9 @@ the case for simple structs and classes without pointers.
       This lets you use the \verb.p|*myPtr;. syntax 
       to pup the entire class as sizeof(myClass) raw bytes.
 
-\item Use \verb.p((void *)myPtr,sizeof(myClass));. in the pup 
-      routine.  This is a direct call to pup a set of bytes.
+\item Use \verb.p((char *)myPtr,sizeof(myClass));. in the pup 
+      routine.  This is a direct call to pup a set of bytes. 
+      Pointers to arrays of other primitive types may also be used.
 \end{itemize}
 
 Note that pupping as bytes is just like using `memcpy': 
