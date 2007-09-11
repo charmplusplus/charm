@@ -31,6 +31,11 @@ void CmiBacktraceRecord(void **retPtrs,int nSkip,int *nLevels) {
 		retPtrs[i]=stackPtrs[nSkip+i];
 }
 
+/* Meant to be used for large stack traces, avoids copy */
+void CmiBacktraceRecordHuge(void **retPtrs,int *nLevels) {
+  *nLevels=backtrace(retPtrs,*nLevels);
+}
+
 /* Look up the names of these function pointers */
 char **CmiBacktraceLookup(void **srcPtrs,int nLevels) {
 	return backtrace_symbols(srcPtrs,nLevels);
@@ -39,6 +44,10 @@ char **CmiBacktraceLookup(void **srcPtrs,int nLevels) {
 #else /*Backtrace not available-- use do-nothing version*/
 void CmiBacktraceRecord(void **retPtrs,int nSkip,int *nLevels) {
 	*nLevels=0;
+}
+
+void CmiBacktraceRecordHuge(void **retPtrs,int nSkip,int *nLevels) {
+    *nLevels=0;
 }
 
 /* Look up the names of these function pointers */
