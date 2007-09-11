@@ -108,9 +108,11 @@ Return the given items, formatted as ASCII text.
 
 static void CpdListBoundsCheck(CpdListAccessor *l,int &lo,int &hi)
 {
+  if (l->checkBoundary()) {
     int len=l->getLength();
     if (lo<0) lo=0;
-    if (hi>len) hi=len;  
+    if (hi>len) hi=len;
+  }
 }
 
 typedef CkHashtableTslow<const char *,CpdListAccessor *> CpdListTable_t;
@@ -286,7 +288,8 @@ class PUP_fmt : public PUP::wrap_er {
 		typeCode_float=5, // 32-bit floating-point array: nItems floats
 		typeCode_double=6, // 64-bit floating-point array: nItems floats
 		typeCode_comment=10, // comment/label: nItems byte characters
-		typeCode_sync=11 // synchronization code
+		typeCode_sync=11, // synchronization code
+		typeCode_pointer=12 // 32 or 64 bit pointer, depending on the machine architecture
 	} typeCode_t;
 	void fieldHeader(typeCode_t typeCode,int nItems) {
 		// Compute and write intro byte:
@@ -341,9 +344,9 @@ void PUP_fmt::bytes(void *ptr,int n,size_t itemSize,PUP::dataType t) {
 		fieldHeader(typeCode_int,n);
 		p.bytes(ptr,n,itemSize,t);
 		break;
-        // treat "long" as 8-bytes, in conformity with pup_toNetwork.C
-        case PUP::Tlong: case PUP::Tlonglong:
-        case PUP::Tulong: case PUP::Tulonglong:
+	// treat "long" and "pointer" as 8-bytes, in conformity with pup_toNetwork.C
+	case PUP::Tlong: case PUP::Tlonglong:
+	case PUP::Tulong: case PUP::Tulonglong:
 		fieldHeader(typeCode_long,n);
 		p.bytes(ptr,n,itemSize,t);
 		break;
@@ -351,10 +354,14 @@ void PUP_fmt::bytes(void *ptr,int n,size_t itemSize,PUP::dataType t) {
 		fieldHeader(typeCode_float,n);
 		p.bytes(ptr,n,itemSize,t);
 		break;
-        case PUP::Tdouble: case PUP::Tlongdouble:
+	case PUP::Tdouble: case PUP::Tlongdouble:
 		fieldHeader(typeCode_double,n);
 		p.bytes(ptr,n,itemSize,t);
 		break;
+    case PUP::Tpointer:
+        fieldHeader(typeCode_pointer,n);
+        p.bytes(ptr,n,itemSize,t);
+        break;
 	default: CmiAbort("Unrecognized type code in PUP_fmt::bytes");
 	};
 }
@@ -465,11 +472,11 @@ void CpdListRegister(CpdListAccessor *acc)
 
 extern "C" void CpdListRegister_c(const char *path,
             CpdListLengthFn_c len,void *lenParam,
-            CpdListItemsFn_c items,void *itemsParam)
+            CpdListItemsFn_c items,void *itemsParam,int checkBoundary)
 #if CMK_CCS_AVAILABLE
 {
   CpdListRegister(new CpdListAccessor_c(path,
-	     len,lenParam,items,itemsParam));
+	     len,lenParam,items,itemsParam,checkBoundary!=0?true:false));
 }
 #else
 { }
