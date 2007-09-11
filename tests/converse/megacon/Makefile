@@ -1,6 +1,6 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
-OBJS=blkinhand.o megacon.o ringsimple.o ring.o fibobj.o fibthr.o broadc.o priotest.o deadlock.o vars.o nodenum.o specmsg.o bigmsg.o vecsend.o posixth.o future.o multicast.o multisend.o handler.o
+OBJS=blkinhand.o megacon.o ringsimple.o ring.o fibobj.o fibthr.o broadc.o priotest.o deadlock.o vars.o nodenum.o specmsg.o bigmsg.o vecsend.o posixth.o future.o multicast.o multisend.o handler.o reduction.o
 
 pgm: $(OBJS) link
 
@@ -76,6 +76,9 @@ multisend.o: multisend.c
 
 handler.o: handler.c
 	$(CHARMC) handler.c
+
+reduction.o: reduction.c
+	$(CHARMC) reduction.c
 
 clean:
 	rm -f core *.cpm.h
