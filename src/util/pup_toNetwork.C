@@ -26,10 +26,13 @@ void PUP_toNetwork_sizer::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 	case PUP::Tulonglong:
 	case PUP::Tlonglong: 
 	case PUP::Tdouble: 
-        case PUP::Tlongdouble:
+	case PUP::Tlongdouble:
 		nBytes+=n*8;
 		break;
-	default: //Everything else goes as a network int
+    case PUP::Tpointer:  // pointers are 8 bytes on 64-bit machines and 4 bytes on 32-bit machines
+        nBytes+=n*sizeof(void*);
+        break;
+    default: //Everything else goes as a network int
 		nBytes+=n*4;
 		break;
 	}
@@ -42,12 +45,13 @@ void PUP_toNetwork_sizer::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 	casePUP_toNetwork_type(Tshort,short,int); \
 	case PUP::Tuint:  \
 	casePUP_toNetwork_type(Tint,int,int); \
-       	case PUP::Tulong: \
-       	casePUP_toNetwork_type(Tlong,long,CMK_NETWORK_INT8); \
-       	case PUP::Tulonglong:  \
-       	casePUP_toNetwork_type(Tlonglong,CMK_NETWORK_INT8,CMK_NETWORK_INT8); \
-       	casePUP_toNetwork_type(Tbool,CmiBool,int); \
-       	case PUP::Tsync: break; /* ignore syncs */
+	case PUP::Tulong: \
+	casePUP_toNetwork_type(Tlong,long,CMK_NETWORK_INT8); \
+	case PUP::Tulonglong:  \
+	casePUP_toNetwork_type(Tlonglong,CMK_NETWORK_INT8,CMK_NETWORK_INT8); \
+	casePUP_toNetwork_type(Tbool,CmiBool,int); \
+	case PUP::Tsync: break; /* ignore syncs */ \
+	casePUP_toNetwork_type(Tpointer,void*,CMK_POINTER_SIZED_INT);
 
 void PUP_toNetwork_pack::bytes(void *p,int n,size_t itemSize,PUP::dataType t)
 {

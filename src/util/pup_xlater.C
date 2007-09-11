@@ -38,7 +38,7 @@ CmiBool PUP::machineInfo::needsConversion(void) const
 	    intBytes[0]==m.intBytes[0] && intBytes[1]==m.intBytes[1] &&
 	    intBytes[2]==m.intBytes[2] && intBytes[3]==m.intBytes[3] && 
 	    floatBytes==m.floatBytes && doubleBytes==m.doubleBytes && 
-	    boolBytes==m.boolBytes
+	    boolBytes==m.boolBytes && pointerBytes==m.pointerBytes
 	   )
 		return CmiFalse;//No conversion needed
 	else 
@@ -100,7 +100,8 @@ const PUP::machineInfo &PUP::machineInfo::current(void)
 		m->doubleBytes=sizeof(double);
 		m->floatFormat=getFloatFormat();
 		m->boolBytes=sizeof(CmiBool);
-		m->padding[0]=m->padding[1]=0;
+		m->pointerBytes=sizeof(void*);
+		m->padding[0]=0;
 	}
 	return *m;
 }
@@ -265,6 +266,7 @@ PUP::xlater::xlater(const PUP::machineInfo &src,PUP::er &fromData)
 	
 	convertFn[Tbyte]=cvt_null;//Bytes are never converted at all
 	setConverterInt(src,cur,0,2,Tsync);
+	convertFn[Tpointer]=cvt_null; //<- a lie, but pointers should never be converted across machines
 	
 	//Finish out the size table (integer portion is done by setConverterInt)
 #ifdef CMK_PUP_LONG_LONG
@@ -281,6 +283,7 @@ PUP::xlater::xlater(const PUP::machineInfo &src,PUP::er &fromData)
 #endif
 	convertSize[Tbool]=src.boolBytes;
 	convertSize[Tbyte]=1;//Byte always takes one byte of storage
+	convertSize[Tpointer]=src.pointerBytes;
 }
 
 //Generic bottleneck: unpack n items of size itemSize from p.

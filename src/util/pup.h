@@ -87,6 +87,7 @@ typedef enum {
   Tbool,
   Tbyte,
   Tsync,
+  Tpointer,
   dataType_last //<- for setting table lengths, etc.
 } dataType;
 
@@ -190,7 +191,8 @@ class er {
   void operator()(CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
   void operator()(unsigned CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
 #endif
-
+  void operator()(void* &v,void* sig) {(*this)(&v,1,sig);}
+  
 //For arrays:
   //Integral types:
   void operator()(signed char *a,int nItems)
@@ -238,6 +240,11 @@ class er {
     {bytes((void *)a,nItems,sizeof(unsigned CMK_PUP_LONG_LONG),Tulonglong);}
 #endif
 
+  //For pointers: the last parameter is to make it more difficult to call
+  //(should not be used in normal code as pointers may loose meaning across processor)
+  void operator()(void **a,int nItems,void *pointerSignature)
+    {bytes((void *)a,nItems,sizeof(void *),Tpointer);}
+  
   //For raw memory (n gives number of bytes)
 /*
   // pup void * is error-prune, let's avoid it - Gengbin
@@ -276,6 +283,8 @@ class er {
   virtual void bytes(void *p,int n,size_t itemSize,dataType t) =0;
   virtual void object(able** a);
 
+  virtual int size(void) const { return 0; }
+  
   //For seeking (pack/unpack in different orders)
   virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
   virtual int impl_tell(seekBlock &s); /*Give the current offset*/
@@ -530,8 +539,9 @@ class machineInfo {
   myByte floatFormat;//0-- big endian IEEE.  1-- little endian IEEE.
 
   myByte boolBytes;
+  myByte pointerBytes;
 
-  myByte padding[2];//Padding to 16 bytes
+  myByte padding[1];//Padding to 16 bytes
 
   //Return true if our magic number is valid.
   CmiBool valid(void) const;

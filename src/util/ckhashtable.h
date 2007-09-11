@@ -51,6 +51,21 @@ void *CkHashtableGet(CkHashtable_c h,const void *fromKey);
 /*Remove this key, rehashing as needed */
 void CkHashtableRemove(CkHashtable_c h,const void *doomedKey);
 
+/*C Version of Hashtable iterator */
+typedef void *CkHashtableIterator_c;
+
+/*Return the iterator for the given hashtable. It is reset to the beginning */
+CkHashtableIterator_c CkHashtableGetIterator(CkHashtable_c h);
+
+/* Return the next element in the hash table given the iterator (NULL if not found) */
+void *CkHashtableIteratorNext(CkHashtableIterator_c it, void **retKey);
+
+/* Seek the iterator into the hashtable by 'n' slot (*not* objects) */
+void CkHashtableIteratorSeek(CkHashtableIterator_c it, int n);
+
+/* Seek the iterator into the hashtable by 'n' slot (*not* objects) */
+void CkHashtableIteratorSeekStart(CkHashtableIterator_c it);
+
 #endif /*__OSL_HASH_TABLE_C*/
 #ifdef __cplusplus
 };
@@ -81,7 +96,7 @@ inline CkHashCode CkHashFunction_int(const void *keyData,size_t /*len*/)
 	{return *(int *)keyData;}
 inline CkHashCode CkHashFunction_pointer(const void *keyData,size_t /*len*/)
 	{if (sizeof(char*)==sizeof(int)) return *(int *)keyData;
-	else if (sizeof(char*)==2*sizeof(int)) return ((int*)keyData)[0] & ((int*)keyData)[1];
+	else if (sizeof(char*)==2*sizeof(int)) return ((int*)keyData)[0] ^ ((int*)keyData)[1];
 	else *((char*)0) = 0;
         return 0;
 	}

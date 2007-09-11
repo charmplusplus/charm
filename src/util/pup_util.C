@@ -489,6 +489,7 @@ void PUP::toTextUtil::bytes(void *p,int n,size_t itemSize,dataType t) {
       case Tlonglong: sprintf(o,"longlong=%lld;\n",((CMK_PUP_LONG_LONG *)p)[i]);break;
       case Tulonglong: sprintf(o,"ulonglong=%llu;\n",((unsigned CMK_PUP_LONG_LONG *)p)[i]);break;
 #endif
+      case Tpointer: sprintf(o,"pointer=%p;\n",((void **)p)[i]); break;
       default: CmiAbort("Unrecognized pup type code!");
       }
       endLine();
@@ -545,6 +546,7 @@ void PUP::toTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tlonglong: fprintf(f," %lld",((CMK_PUP_LONG_LONG *)p)[i]);break;
     case Tulonglong: fprintf(f," %llu",((unsigned CMK_PUP_LONG_LONG *)p)[i]);break;
 #endif
+    case Tpointer: fprintf(f," %p",((void **)p)[i]); break;
     default: CmiAbort("Unrecognized pup type code!");
     };
   fprintf(f,"\n");
@@ -647,6 +649,11 @@ void PUP::fromTextFile::bytes(void *p,int n,size_t itemSize,dataType t)
       ((CmiBool *)p)[i]=val; 
     }
       break;
+    case Tpointer: {
+      void *ret=0;
+      if (1!=fscanf(f,"%p",&ret)) parseError("could not match pointer");
+      ((void **)p)[i]=ret;
+    } break;
     default: CmiAbort("Unrecognized pup type code!");
     };
 }

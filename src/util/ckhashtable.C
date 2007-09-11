@@ -409,3 +409,21 @@ CDECL void CkHashtableRemove(CkHashtable_c h,const void *doomedKey)
 	((CkHashtable *)h)->remove(doomedKey);
 }
 
+/*Return the iterator for the given hashtable. It is reset to the beginning */
+CDECL CkHashtableIterator_c CkHashtableGetIterator(CkHashtable_c h) {
+    CkHashtableIterator *it = ((CkHashtable *)h)->iterator();
+    it->seekStart();
+    return it;
+}
+/* Return the next element in the hash table given the iterator (NULL if not found) */
+CDECL void *CkHashtableIteratorNext(CkHashtableIterator_c it, void **keyRet) {
+    return ((CkHashtableIterator *)it)->next(keyRet);
+}
+/* Seek the iterator into the hashtable by 'n' slot (*not* objects) */
+CDECL void CkHashtableIteratorSeek(CkHashtableIterator_c it, int n) {
+    ((CkHashtableIterator *)it)->seek(n);
+}
+/* Seek the iterator into the hashtable by 'n' slot (*not* objects) */
+CDECL void CkHashtableIteratorSeekStart(CkHashtableIterator_c it) {
+    ((CkHashtableIterator *)it)->seekStart();
+}

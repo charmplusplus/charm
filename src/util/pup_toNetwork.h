@@ -15,7 +15,7 @@ typedef CMK_TYPEDEF_INT4 CMK_NETWORK_INT4;
 #ifdef CMK_PUP_LONG_LONG
 typedef CMK_PUP_LONG_LONG CMK_NETWORK_INT8;
 #else
-typedef long CMK_NETWORK_INT8; /* long is 8 bytes */
+typedef CMK_TYPEDEF_INT8 CMK_NETWORK_INT8; /* long is 8 bytes */
 #endif
 
 /// Integer type the same size as "float"
@@ -23,6 +23,11 @@ typedef CMK_NETWORK_INT4 CMK_FLOAT_SIZED_INT;
 /// Integer type the same size as "double"
 typedef CMK_NETWORK_INT8 CMK_DOUBLE_SIZED_INT;
 
+#if CMK_64BIT
+typedef CMK_NETWORK_INT8 CMK_POINTER_SIZED_INT;
+#else
+typedef CMK_NETWORK_INT4 CMK_POINTER_SIZED_INT;
+#endif
 
 class PUP_toNetwork_sizer : public PUP::er {
 	int nBytes;
@@ -58,6 +63,7 @@ class PUP_toNetwork_pack : public PUP::er {
  public:
 	PUP_toNetwork_pack(void *dest) :PUP::er(IS_PACKING) {
 		start=buf=(unsigned char *)dest;
+		CmiAssert(sizeof(void *) == sizeof(CMK_POINTER_SIZED_INT));
 	}
 	inline int size(void) const {return buf-start;}
 };
@@ -75,6 +81,8 @@ class PUP_toNetwork_unpack : public PUP::er {
 		CMK_NETWORK_INT8 lo=0xffFFffFFu&(CMK_NETWORK_INT8)read_int();
 		return (hi<<32)|(lo);
 	}
+	inline void read_integer(CMK_NETWORK_INT4 &i) { i=read_int(); }
+    inline void read_integer(CMK_NETWORK_INT8 &i) { i=read_CMK_NETWORK_INT8(); }
 	inline float read_float(void) {
 		CMK_NETWORK_INT4 i=read_int();
 		return *(float *)&i;
@@ -82,6 +90,11 @@ class PUP_toNetwork_unpack : public PUP::er {
 	inline double read_double(void) {
 		CMK_NETWORK_INT8 i=read_CMK_NETWORK_INT8();
 		return *(double *)&i;
+	}
+	inline void * read_CMK_POINTER_SIZED_INT(void) {
+	    CMK_POINTER_SIZED_INT i;
+	    read_integer(i);
+	    return *(void **)&i;
 	}
 
 	virtual void bytes(void *p,int n,size_t itemSize,PUP::dataType t);

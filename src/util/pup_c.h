@@ -66,6 +66,12 @@ extern "C" {
 */
 typedef void *pup_er;
 
+/*Allocate PUP::er of different kind */
+pup_er pup_new_sizer();
+pup_er pup_new_toMem(void *Nbuf);
+pup_er pup_new_fromMem(const void *Nbuf);
+void pup_destroy(pup_er p);
+
 /*Determine what kind of pup_er we have--
 return 1 for true, 0 for false.*/
 int pup_isPacking(const pup_er p);
@@ -77,6 +83,9 @@ int pup_isUserlevel(const pup_er p);
 /*Insert a synchronization into the data stream */
 void pup_syncComment(const pup_er p, unsigned int sync, char *message);
 void pup_comment(const pup_er p, char *message);
+
+/*Read the size of a pupper */
+int pup_size(const pup_er p);
 
 /*Pack/unpack data items, declared with macros for brevity.
 The macros expand like:
@@ -97,6 +106,7 @@ PUP_BASIC_DATATYPE(uint,unsigned int)
 PUP_BASIC_DATATYPE(ulong,unsigned long)
 PUP_BASIC_DATATYPE(float,float)
 PUP_BASIC_DATATYPE(double,double)
+PUP_BASIC_DATATYPE(pointer,void*)
 
 /*Pack/unpack untyped byte array:*/
 void pup_bytes(pup_er p,void *ptr,int nBytes);

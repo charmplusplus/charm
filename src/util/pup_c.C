@@ -20,6 +20,16 @@ a C++ "PUP::er &" type.  We actually want a
 */
 #define mp (*(PUP::er *)p)
 
+/*Allocate PUP::er of different kind */
+CDECL pup_er pup_new_sizer()
+  { return new PUP::sizer; }
+CDECL pup_er pup_new_toMem(void *Nbuf)
+  { return new PUP::toMem(Nbuf); }
+CDECL pup_er pup_new_fromMem(const void *Nbuf)
+  { return new PUP::fromMem(Nbuf); }
+CDECL void pup_destroy(pup_er p)
+  { delete ((PUP::er *)p); }
+
 /*Determine what kind of pup_er we have--
 return 1 for true, 0 for false.*/
 CDECL int pup_isPacking(const pup_er p)
@@ -43,6 +53,10 @@ FDECL int FTN_NAME(FPUP_ISDELETING,fpup_isdeleting)(const pup_er p)
   { return (mp.isDeleting())?1:0;}
 FDECL int FTN_NAME(FPUP_ISUSERLEVEL,fpup_isuserlevel)(const pup_er p)
   { return (mp.isUserlevel())?1:0;}
+
+/*Read the size of the pupper */
+CDECL int pup_size(const pup_er p)
+  { return mp.size(); }
 
 /*Insert a synchronization into the data stream */
 CDECL void pup_syncComment(const pup_er p, unsigned int sync, char *message)
@@ -79,6 +93,9 @@ PUP_BASIC_DATATYPE(ulong,unsigned long)
 PUP_BASIC_DATATYPE(float,float)
 PUP_BASIC_DATATYPE(double,double)
 
+// Pointers have a different signature, so they need special treatment
+CDECL void pup_pointer(pup_er p,void **v) {mp(*v,(void*)NULL);}
+CDECL void pup_pointers(pup_er p,void **arr,int nItems) {mp(arr,nItems,(void*)NULL);}
 
 #define PUP_BASIC_DATATYPEF(typeUP,typelo,type) \
  FDECL void FTN_NAME(FPUP_##typeUP,fpup_##typelo)(pup_er p,type *v) \
