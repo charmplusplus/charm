@@ -51,6 +51,8 @@
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
+#define CMK_64BIT    0
+
 
 #define CMK_WEB_MODE                                       1
 #define CMK_DEBUG_MODE                                     0
