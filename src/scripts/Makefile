@@ -308,12 +308,12 @@ CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-neighbor.o $(L)/libld
 TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a \
-          $(L)/libtrace-recordreplay.a  $(L)/libtracef_f.a
+          $(L)/libtrace-recordreplay.a  $(L)/libtracef_f.a $(L)/libtrace-memory.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
           $(L)/libmemory-gnuold.o $(L)/libmemory-verbose.o 	\
 	  $(L)/libmemory-paranoid.o \
 	  $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o \
-	  $(L)/libmemory-charmdebug.o
+	  $(L)/libmemory-charmdebug.o 
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o 	\
 	  $(L)/libthreads-context.o $(L)/libthreads-uJcontext.o \
 	  $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o \
@@ -331,7 +331,7 @@ CVLIBS=$(L)/libconv-core.a \
 LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o topology.o random.o \
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
-	traceCore.o traceCoreCommon.o \
+	traceCore.o traceCoreCommon.o tracec.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o conv-counter.o \
 	global-nop.o cmipool.o
@@ -738,7 +738,14 @@ LIBTRACE_BG=trace-bluegene.o
 $(L)/libtrace-bluegene.a:$(LIBTRACE_BG)
 	$(CHARMC) -o $@ $(LIBTRACE_BG)
 
-LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-recordreplay.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o
+tracec.o: tracec.h tracec.C
+	$(CHARMC) -o $@ tracec.C
+
+LIBTRACE_MEMORY=trace-memory.o
+$(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)
+	$(CHARMC) -o $@ $(LIBTRACE_MEMORY)
+
+LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-recordreplay.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
 
@@ -760,7 +767,7 @@ tracef_f.o: tracef_f.f90
 # used for make depends
 TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-counter.o	\
 	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
-              trace-recordreplay.o
+              trace-recordreplay.o trace-memory.o
 
 ###############################################################################
 #
