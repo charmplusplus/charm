@@ -662,6 +662,7 @@ static inline void *_allocNewChare(envelope *env)
 {
   void *tmp=malloc(_chareTable[_entryTable[env->getEpIdx()]->chareIdx]->size);
   _MEMCHECK(tmp);
+  setMemoryTypeChare(tmp);
   return tmp;
 }
  

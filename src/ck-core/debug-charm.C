@@ -252,9 +252,23 @@ public:
   }
 };
 
+#include <rpc/rpc.h>
+
+int hostInfoLength(void *) {return 1;}
+
+void hostInfo(void *itemIter, pup_er pp, CpdListItemsRequest *req) {
+  PUP::er &p = *(PUP::er *)pp;
+  struct sockaddr_in addr;
+  CpdListBeginItem(pp, 0);
+  get_myaddress(&addr);
+  char *address = (char*)&addr.sin_addr.s_addr;
+  PUPv(address, 4);
+  int pid = getpid();
+  PUPn(pid);
+}
+
 /************ Message CPD Lists ****************/
 CpvCExtern(void *,debugQueue);
-
 
 // Interpret data in a message in a user-friendly way.
 //  Ignores most of the envelope fields used by CkPupMessage,
@@ -545,6 +559,7 @@ void CpdCharmInit()
   CcsRegisterHandler("ccs_continue_break_point",(CmiHandler)CpdContinueFromBreakPoint);
   CcsRegisterHandler("ccs_debug_quit",(CmiHandler)CpdQuitDebug);
   CcsRegisterHandler("ccs_debug_startgdb",(CmiHandler)CpdStartGdb);
+  CpdListRegister(new CpdListAccessor_c("hostinfo",hostInfoLength,0,hostInfo,0));
   CpdListRegister(new CpdList_localQ());
   CpdListRegister(new CpdList_arrayElementNames());
   CpdListRegister(new CpdList_arrayElements());

@@ -33,12 +33,17 @@ protected:
     different CpdList items. 
   */
   void beginItem(PUP::er &p,int itemNo);
+  /// Decides if this CpdList requires boundary checking
+  bool checkBound;
 public:
+  CpdListAccessor() : checkBound(true) {}
   virtual ~CpdListAccessor(); 
   /// Return the CpdList path CCS clients should use to access this data.
   virtual const char *getPath(void) const =0;
   /// Return the length of this CpdList.
   virtual int getLength(void) const =0;
+  /// Does this CpdList requires boundary checking?
+  virtual bool checkBoundary(void) const { return checkBound; }
   /// Pup the items listed in this request.  Be sure to call beginItem between items!
   virtual void pup(PUP::er &p,CpdListItemsRequest &req) =0;
 };
@@ -59,9 +64,9 @@ class CpdListAccessor_c : public CpdListAccessor {
 public:
   CpdListAccessor_c(const char *path_,
             CpdListLengthFn_c lenFn_,void *lenParam_,
-            CpdListItemsFn_c itemsFn_,void *itemsParam_):
+            CpdListItemsFn_c itemsFn_,void *itemsParam_,bool checkBoundary_=true):
 	path(path_), lenFn(lenFn_), lenParam(lenParam_), 
-	itemsFn(itemsFn_), itemsParam(itemsParam_) {}
+	itemsFn(itemsFn_), itemsParam(itemsParam_) {checkBound = checkBoundary_;}
   CpdListAccessor_c(const CpdListAccessor_c &p);//You don't want to copy
   void operator=(const CpdListAccessor_c &p);	// You don't want to copy
   

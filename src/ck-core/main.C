@@ -17,6 +17,8 @@ extern "C" void g95_runtime_stop();
 #ifndef __BLUEGENE__
 int main(int argc, char **argv)
 {
+  int stack_top=0;
+  memory_stack_top = &stack_top;
 #ifdef CMK_G95
   g95_runtime_start(argc, argv);
 #endif

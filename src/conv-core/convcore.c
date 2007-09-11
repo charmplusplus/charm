@@ -1708,6 +1708,166 @@ void CmiSyncVectorSendAndFree(int destPE, int n, int *sizes, char **msgs) {
 
 /*****************************************************************************
  *
+ * Reduction management
+ *
+ * Only one reduction can be active at a single time in the program.
+ * Moreover, since every call is supposed to pass in the same arguments,
+ * having some static variables is not a problem for multithreading.
+ * 
+ * Except for "data" and "size", all the other parameters (which are all function
+ * pointers) MUST be the same in every processor. Having different processors
+ * pass in different function pointers results in an undefined behaviour.
+ * 
+ * The data passed in to CmiReduce and CmiNodeReduce is deleted by the system,
+ * and MUST be allocated with CmiAlloc. The data passed in to the "Struct"
+ * functions is deleted with the provided function, or it is left intact if no
+ * function is specified.
+ * 
+ * The destination handler for the the first form MUST be embedded into the
+ * message's header.
+ * 
+ * The pup function is used to pup the input data structure into a message to
+ * be sent to the parent processor. This pup routine is currently used only
+ * for sizing and packing, NOT unpacking. It MUST be non-null.
+ * 
+ * The merge function receives as first parameter the input "data", being it
+ * a message or a complex data structure (it is up to the user to interpret it
+ * correctly), and a list of incoming (packed) messages from the children.
+ * The merge function is responsible to delete "data" if this is no longer needed.
+ * The system will be in charge of deleting the messages passed in as the second
+ * argument, and the return value of the function (using the provided deleteFn in
+ * the second version, or CmiFree in the first). The merge function can return
+ * data if the merge can be performed in-place. It MUST be non-null.
+ * 
+ * At the destination, on processor zero, the final data returned by the last
+ * merge call will not be deleted by the system, and the CmiHandler function
+ * will be in charge of its deletion.
+ * 
+ * CmiReduce/CmiReduceStruct MUST be called once by every processor,
+ * CmiNodeReduce/CmiNodeReduceStruct MUST be called once by every node, and in
+ * particular by the rank zero in each node.
+ ****************************************************************************/
+
+CpvStaticDeclare(int, CmiReductionMessageHandler);
+CpvStaticDeclare(int, _reduce_num_children);
+CpvStaticDeclare(int, _reduce_parent);
+CpvStaticDeclare(int, _reduce_received);
+CpvStaticDeclare(void**, _reduce_msg_list);
+CpvStaticDeclare(void*, _reduce_data);
+CpvStaticDeclare(int, _reduce_data_size);
+static CmiHandler _reduce_destination;
+static void * (*_reduce_mergeFn)(void*,void**,int);
+static void (*_reduce_pupFn)(void*,void*);
+static void (*_reduce_deleteFn)(void*);
+
+CmiReductionsInit() {
+  CpvInitialize(int, CmiReductionMessageHandler);
+  CpvAccess(CmiReductionMessageHandler) = CmiRegisterHandler((CmiHandler)CmiHandleReductionMessage);
+  CpvInitialize(int, _reduce_num_children);
+  CpvInitialize(int, _reduce_parent);
+  CpvInitialize(int, _reduce_received);
+  CpvInitialize(void**, _reduce_msg_list);
+  CpvInitialize(void*, _reduce_data);
+  CpvInitialize(int, _reduce_data_size);
+  CpvAccess(_reduce_num_children) = 0;
+  CpvAccess(_reduce_received) = 0;
+  CpvAccess(_reduce_msg_list) = (void**)malloc(CmiNumSpanTreeChildren(CmiMyPe())*sizeof(void*));
+}
+
+void CmiSendReduce() {
+  void *mergedData = CpvAccess(_reduce_data);
+  if (CpvAccess(_reduce_num_children) > 0) {
+    int i, offset=0;
+    if (_reduce_pupFn != NULL) {
+      offset = CmiMsgHeaderSizeBytes;
+      for (i=0; i<CpvAccess(_reduce_num_children); ++i) CpvAccess(_reduce_msg_list)[i] += offset;
+    }
+    mergedData = _reduce_mergeFn(CpvAccess(_reduce_data), CpvAccess(_reduce_msg_list), CpvAccess(_reduce_num_children));
+    for (i=0; i<CpvAccess(_reduce_num_children); ++i) CmiFree(CpvAccess(_reduce_msg_list)[i] - offset);
+  }
+  CpvAccess(_reduce_num_children) = 0;
+  CpvAccess(_reduce_received) = 0;
+  void *msg = mergedData;
+  int msg_size = CpvAccess(_reduce_data_size);
+  if (CmiMyPe() != 0) {
+    if (_reduce_pupFn != NULL) {
+      pup_er p = pup_new_sizer();
+      _reduce_pupFn(p, mergedData);
+      msg_size = pup_size(p) + CmiMsgHeaderSizeBytes;
+      pup_destroy(p);
+      msg = CmiAlloc(msg_size);
+      p = pup_new_toMem((void*)(((char*)msg)+CmiMsgHeaderSizeBytes));
+      _reduce_pupFn(p, mergedData);
+      pup_destroy(p);
+      if (_reduce_deleteFn != NULL) _reduce_deleteFn(CpvAccess(_reduce_data));
+    }
+    CmiSetHandler(msg, CpvAccess(CmiReductionMessageHandler));
+    //CmiPrintf("CmiSendReduce(%d): sending %d bytes to %d\n",CmiMyPe(),msg_size,CpvAccess(_reduce_parent));
+    CmiSyncSendAndFree(CpvAccess(_reduce_parent), msg_size, msg);
+  } else {
+    _reduce_destination(msg);
+  }
+}
+
+void CmiReduce(void *data, int size, void * (*mergeFn)(void*,void**,int)) {
+  CpvAccess(_reduce_data) = data;
+  CpvAccess(_reduce_data_size) = size;
+  CpvAccess(_reduce_parent) = CmiSpanTreeParent(CmiMyPe());
+  _reduce_destination = (CmiHandler)CmiGetHandlerFunction(data);
+  _reduce_pupFn = NULL;
+  _reduce_mergeFn = mergeFn;
+  CpvAccess(_reduce_num_children) = CmiNumSpanTreeChildren(CmiMyPe());
+  if (CpvAccess(_reduce_received) == CpvAccess(_reduce_num_children)) CmiSendReduce();
+}
+
+void CmiReduceStruct(void *data, void (*pupFn)(void*,void*),
+                     void * (*mergeFn)(void*,void**,int), CmiHandler dest,
+                     void (*deleteFn)(void*)) {
+  CpvAccess(_reduce_data) = data;
+  CpvAccess(_reduce_parent) = CmiSpanTreeParent(CmiMyPe());
+  _reduce_destination = dest;
+  _reduce_pupFn = pupFn;
+  _reduce_mergeFn = mergeFn;
+  _reduce_deleteFn = deleteFn;
+  CpvAccess(_reduce_num_children) = CmiNumSpanTreeChildren(CmiMyPe());
+  if (CpvAccess(_reduce_received) == CpvAccess(_reduce_num_children)) CmiSendReduce();
+  //else CmiPrintf("CmiReduceStruct(%d): %d - %d\n",CmiMyPe(),CpvAccess(_reduce_received),CpvAccess(_reduce_num_children));
+}
+
+void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int)) {
+  CmiAssert(CmiRankOf(CmiMyPe()) == 0);
+  CpvAccess(_reduce_data) = data;
+  CpvAccess(_reduce_data_size) = size;
+  CpvAccess(_reduce_parent) = CmiNodeFirst(CmiNodeSpanTreeParent(CmiMyNode()));
+  _reduce_destination = (CmiHandler)CmiGetHandlerFunction(data);
+  _reduce_pupFn = NULL;
+  _reduce_mergeFn = mergeFn;
+  CpvAccess(_reduce_num_children) = CmiNumNodeSpanTreeChildren(CmiMyNode());
+  if (CpvAccess(_reduce_received) == CpvAccess(_reduce_num_children)) CmiSendReduce();
+}
+
+void CmiNodeReduceStruct(void *data, void (*pupFn)(void*,void*),
+                         void * (*mergeFn)(void*,void**,int), CmiHandler dest,
+                         void (*deleteFn)(void*)) {
+  CmiAssert(CmiRankOf(CmiMyPe()) == 0);
+  CpvAccess(_reduce_data) = data;
+  CpvAccess(_reduce_parent) = CmiNodeFirst(CmiNodeSpanTreeParent(CmiMyNode()));
+  _reduce_destination = dest;
+  _reduce_pupFn = pupFn;
+  _reduce_mergeFn = mergeFn;
+  _reduce_deleteFn = deleteFn;
+  CpvAccess(_reduce_num_children) = CmiNumNodeSpanTreeChildren(CmiMyNode());
+  if (CpvAccess(_reduce_received) == CpvAccess(_reduce_num_children)) CmiSendReduce();
+}
+
+void CmiHandleReductionMessage(void *msg) {
+  CpvAccess(_reduce_msg_list)[CpvAccess(_reduce_received)++] = msg;
+  if (CpvAccess(_reduce_received) == CpvAccess(_reduce_num_children)) CmiSendReduce();
+  //else CmiPrintf("CmiHandleReductionMessage(%d): %d - %d\n",CmiMyPe(),CpvAccess(_reduce_received),CpvAccess(_reduce_num_children));
+}
+
+/*****************************************************************************
+ *
  * Multicast groups
  *
  ****************************************************************************/
@@ -2515,6 +2675,7 @@ void ConverseCommonInit(char **argv)
 
   CcdModuleInit(argv);
   CmiHandlerInit();
+  CmiReductionsInit();
   CIdleTimeoutInit(argv);
   
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the net-*-smp versions*/

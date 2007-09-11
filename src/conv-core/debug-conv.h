@@ -11,6 +11,8 @@
 extern "C" {
 #endif
 
+extern void (*CpdDebugGetAllocationTree)(void);
+  
 void CpdInit(void); 
 void CpdFreeze(void);  
 void CpdUnFreeze(void);
@@ -67,7 +69,8 @@ typedef int  (*CpdListLengthFn_c)(void *lenParam);
 */
 void CpdListRegister_c(const char *path,
 	    CpdListLengthFn_c lenFn,void *lenParam,
-	    CpdListItemsFn_c itemsFn,void *itemsParam);
+	    CpdListItemsFn_c itemsFn,void *itemsParam,
+	    int checkBoundary);
 
 #ifdef __cplusplus
 };

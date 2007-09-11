@@ -547,6 +547,7 @@ void CmiTmpFree(void *);
 
 
 /* Various special features of certain -memory modes: */
+extern void * memory_stack_top; /* contains the top of the stack, for -memory charmdebug */
 void CmiMemoryCheck(void); /* heap check, for -memory paranoid */
 void CmiMemoryMark(void); /* ignore current allocations, for -memory leak */
 void CmiMemoryMarkBlock(void *blk); /* ignore this allocation, for -memory leak */
@@ -869,6 +870,16 @@ void          CmiFreeListSendFn(int, int *, int, char*);
 void          CmiSyncMulticastFn(CmiGroup, int, char*);
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup, int, char*);
 void          CmiFreeMulticastFn(CmiGroup, int, char*);
+
+void CmiReduce(void *data, int size, void * (*mergeFn)(void*,void**,int));
+void CmiReduceStruct(void *data, void (*pupFn)(void*,void*),
+                     void * (*mergeFn)(void*,void**,int), CmiHandler dest,
+                     void (*deleteFn)(void*));
+void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int));
+void CmiNodeReduceStruct(void *data, void (*pupFn)(void*,void*),
+                         void * (*mergeFn)(void*,void**,int), CmiHandler dest,
+                         void (*deleteFn)(void*));
+void CmiHandleReductionMessage(void *msg);
 
 /* If the second parameter (the number of chunks to send) is negative, then
  * every message will be started aligned with 8 bytes, and a message header will

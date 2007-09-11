@@ -14,6 +14,7 @@
 
 /* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
 #include "memory-gnu.c"
+#include "tracec.h"
 
 /* Utilities needed by the code */
 #include "ckhashtable.h"
@@ -48,12 +49,14 @@ struct _Slot {
 #define SLOTMAGIC            0x8402a5e0
 #define SLOTMAGIC_VALLOC     0x7402a5e0
 #define SLOTMAGIC_FREED      0xDEADBEEF
-  int  magic;
+  int magic;
 
+  int pad;
   /* Controls the number of stack frames to print out. Should be always odd, so
      the total size of this struct becomes multiple of 8 bytes everywhere */
-#define STACK_LEN 15
-  void *from[STACK_LEN];
+//#define STACK_LEN 15
+  int stackLen;
+  void **from;
 
   /* Pointer to extra stacktrace, when the user requested more trace */
   SlotStack *extraStack;
@@ -70,6 +73,7 @@ static char *SlotToUser(Slot *s) {
   return ((char *)s)+sizeof(Slot);
 }
 
+
 /*Convert a user address to a slot*/
 static Slot *UserToSlot(void *user) {
   char *cu=(char *)user;
@@ -84,7 +88,7 @@ static int isLeakSlot(Slot *s) {
 static void printSlot(Slot *s) {
   CmiPrintf("[%d] Leaked block of %d bytes at %p:\n",
 	    CmiMyPe(), s->userSize, SlotToUser(s));
-  CmiBacktracePrint(s->from,STACK_LEN);
+  CmiBacktracePrint(s->from,s->stackLen);
 }
 
 /********* Circural list of allocated memory *********/
@@ -113,23 +117,22 @@ void cpd_memory_single_pup(Slot* list, pup_er p) {
   while (cur != list) {
     int i;
     int flags;
-    // FIXME: this is bad since it consider only 32 bit machines!!!
-    unsigned int userData = (cur+1);
+    void *loc = (void*)(cur+1);
     CpdListBeginItem(p, 0);
     pup_comment(p, "loc");
-    pup_uint(p, &userData);
+    pup_pointer(p, &loc);
     pup_comment(p, "size");
     pup_int(p, &cur->userSize);
     pup_comment(p, "flags");
     flags = cur->magic & FLAGS_MASK;
     pup_int(p, &flags);
     pup_comment(p, "stack");
-    for (i=0; i<STACK_LEN; ++i) {
-      if (cur->from[i] <= 0) break;
+    //for (i=0; i<STACK_LEN; ++i) {
+    //  if (cur->from[i] <= 0) break;
       //      if (cur->from[i] > 0) pup_uint(p, (unsigned int*)&cur->from[i]);
       //      else break;
-    }
-    pup_uints(p, (unsigned int*)cur->from, i);
+    //}
+    pup_pointers(p, cur->from, cur->stackLen);
     cur = cur->next;
   }
 }
@@ -157,8 +160,8 @@ void cpd_memory_leak(void *iterParam, pup_er p, CpdListItemsRequest *req) {
 
 int cpd_memory_getLength(void *lenParam) { return 1; }
 void cpd_memory_get(void *iterParam, pup_er p, CpdListItemsRequest *req) {
-  void *userData = (void*)req->lo;
-  Slot *sl = ((Slot*)req->lo)-1;
+  void *userData = (void*)(((unsigned int)req->lo) + (((unsigned long)req->hi)<<32));
+  Slot *sl = ((Slot*)userData)-1;
   CpdListBeginItem(p, 0);
   pup_comment(p, "size");
   //printf("value: %x %x %x %d\n",sl->magic, sl->magic&~FLAGS_MASK, SLOTMAGIC, ((sl->magic&~FLAGS_MASK) != SLOTMAGIC));
@@ -174,17 +177,20 @@ void cpd_memory_get(void *iterParam, pup_er p, CpdListItemsRequest *req) {
 
 /********* Heap Checking ***********/
 
+int charmEnvelopeSize = 0;
+
 // FIXME: this function assumes that all memory is allocated in slot_unknown!
 void check_memory_leaks(CpdListItemsRequest *req) {
+  FILE* fd=fopen("check_memory_leaks", "w");
   // Step 1)
   // index all memory into a CkHashtable, with a scan of 4 bytes.
   CkHashtable_c table;
   Slot leaking, inProgress;
   Slot *sl, **fnd, *found;
   char *scanner;
-  int begin_stack, end_stack;
-  int begin_data, end_data;
-  int begin_bss, end_bss;
+  char *begin_stack, *end_stack;
+  char *begin_data, *end_data;
+  char *begin_bss, *end_bss;
   int growing_dimension = 0;
 
   // copy all the memory from "slot_first" to "leaking"
@@ -200,12 +206,43 @@ void check_memory_leaks(CpdListItemsRequest *req) {
     // index the i-th memory slot
     char *ptr;
     sl->magic |= LEAK_FLAG;
-    for (ptr = ((char*)sl)+sizeof(Slot); ptr < ((char*)sl)+sizeof(Slot)+sl->userSize; ptr+=sizeof(char*)) {
-      //printf("memory %p\n",ptr);
-      //growing_dimension++;
-      //if ((growing_dimension&0xFF) == 0) printf("inserted %d objects\n",growing_dimension);
+    if (req->lo > 0) {
+      //CmiPrintf("checking memory fast\n");
+      // means index only specific offsets of the memory region
+      ptr = ((char*)sl)+sizeof(Slot);
       char **object = (char**)CkHashtablePut(table, &ptr);
       *object = (char*)sl;
+      ptr += 4;
+      object = (char**)CkHashtablePut(table, &ptr);
+      *object = (char*)sl;
+      // beginning of converse header
+      ptr += sizeof(CmiChunkHeader) - 4;
+      if (ptr < ((char*)sl)+2*sizeof(Slot)+sl->userSize) {
+        object = (char**)CkHashtablePut(table, &ptr);
+        *object = (char*)sl;
+      }
+      // beginning of charm header
+      ptr += CmiReservedHeaderSize;
+      if (ptr < ((char*)sl)+2*sizeof(Slot)+sl->userSize) {
+        object = (char**)CkHashtablePut(table, &ptr);
+        *object = (char*)sl;
+      }
+      // beginning of ampi header
+      ptr += charmEnvelopeSize - CmiReservedHeaderSize;
+      if (ptr < ((char*)sl)+2*sizeof(Slot)+sl->userSize) {
+        object = (char**)CkHashtablePut(table, &ptr);
+        *object = (char*)sl;
+      }
+    } else {
+      //CmiPrintf("checking memory extensively\n");
+      // means index every fourth byte of the memory region
+      for (ptr = ((char*)sl)+sizeof(Slot); ptr < ((char*)sl)+sizeof(Slot)+sl->userSize; ptr+=sizeof(char*)) {
+        //printf("memory %p\n",ptr);
+        //growing_dimension++;
+        //if ((growing_dimension&0xFF) == 0) printf("inserted %d objects\n",growing_dimension);
+        char **object = (char**)CkHashtablePut(table, &ptr);
+        *object = (char*)sl;
+      }
     }
   }
 
@@ -217,27 +254,26 @@ void check_memory_leaks(CpdListItemsRequest *req) {
   // field, with the structure "begin .data", "end .data", "begin .bss", "end .bss".
   inProgress.prev = &inProgress;
   inProgress.next = &inProgress;
-  begin_stack = &table;
-  end_stack = begin_stack | 0xFFFFF - sizeof(char*) + 1;
-  if (req->extraLen != 4*sizeof(char*)) {
+  begin_stack = (char*)&table;
+  end_stack = memory_stack_top;
+  if (req->extraLen != 4*4/*sizeof(char*) FIXME: assumes 64 bit addresses of .data and .bss are small enough*/) {
     CmiPrintf("requested for a memory leak check with wrong information! %d bytes\n",req->extraLen);
   }
-  if (sizeof(char*) == 4) {
-    /* 32 bit addresses */
-    begin_data = ntohl(((char**)(req->extra))[0]);
-    end_data = ntohl(((char**)(req->extra))[1]) - sizeof(char*) + 1;
-    begin_bss = ntohl(((char**)(req->extra))[2]);
-    end_bss = ntohl(((char**)(req->extra))[3]) - sizeof(char*) + 1;
-  } else {
-    /* 64 bit addresses */
+  //if (sizeof(char*) == 4) {
+    /* 32 bit addresses; for 64 bit machines it assumes the following addresses were small enough */
+    begin_data = (char*)ntohl(((int*)(req->extra))[0]);
+    end_data = (char*)ntohl(((int*)(req->extra))[1]) - sizeof(char*) + 1;
+    begin_bss = (char*)ntohl(((int*)(req->extra))[2]);
+    end_bss = (char*)ntohl(((int*)(req->extra))[3]) - sizeof(char*) + 1;
+  /*} else {
     CmiAbort("not ready yet");
     begin_data = ntohl(((char**)(req->extra))[0]);
     end_data = ntohl(((char**)(req->extra))[1]) - sizeof(char*) + 1;
     begin_bss = ntohl(((char**)(req->extra))[2]);
     end_bss = ntohl(((char**)(req->extra))[3]) - sizeof(char*) + 1;
-  }
-  //printf("scanning stack from %p to %p\n",begin_stack,end_stack);
-  for (scanner = begin_stack; scanner < end_stack; scanner+=2) {
+  }*/
+  printf("scanning stack from %p (%d) to %p (%d)\n",begin_stack,begin_stack,end_stack,end_stack);
+  for (scanner = begin_stack; scanner < end_stack; scanner+=sizeof(char*)) {
     fnd = (Slot**)CkHashtableGet(table, scanner);
     //if (fnd != NULL) printf("scanning stack %p, %d\n",*fnd,isLeakSlot(*fnd));
     if (fnd != NULL && isLeakSlot(*fnd)) {
@@ -254,8 +290,10 @@ void check_memory_leaks(CpdListItemsRequest *req) {
       found->prev->next = found;
     }
   }
-  //printf("scanning data from %p to %p\n",begin_data,end_data);
-  for (scanner = begin_data; scanner < end_data; scanner+=2) {
+  printf("scanning data from %p (%d) to %p (%d)\n",begin_data,begin_data,end_data,end_data);
+  for (scanner = begin_data; scanner < end_data; scanner+=sizeof(char*)) {
+    //fprintf(fd, "scanner = %p\n",scanner);
+    fflush(fd);
     fnd = (Slot**)CkHashtableGet(table, scanner);
     //if (fnd != NULL) printf("scanning data %p, %d\n",*fnd,isLeakSlot(*fnd));
     if (fnd != NULL && isLeakSlot(*fnd)) {
@@ -272,8 +310,8 @@ void check_memory_leaks(CpdListItemsRequest *req) {
       found->prev->next = found;
     }
   }
-  //printf("scanning bss from %p to %p\n",begin_bss,end_bss);
-  for (scanner = begin_bss; scanner < end_bss; scanner+=2) {
+  printf("scanning bss from %p (%d) to %p (%d)\n",begin_bss,begin_bss,end_bss,end_bss);
+  for (scanner = begin_bss; scanner < end_bss; scanner+=sizeof(char*)) {
     //printf("bss: %p %p\n",scanner,*(char**)scanner);
     fnd = (Slot**)CkHashtableGet(table, scanner);
     //if (fnd != NULL) printf("scanning bss %p, %d\n",*fnd,isLeakSlot(*fnd));
@@ -297,7 +335,7 @@ void check_memory_leaks(CpdListItemsRequest *req) {
   // "inProcess" list
   while (inProgress.next != &inProgress) {
     sl = inProgress.next;
-    //printf("scanning memory %p\n",sl);
+    printf("scanning memory %p of size %d\n",sl,sl->userSize);
     /* move slot back to the main list (slot_first) */
     sl->next->prev = sl->prev;
     sl->prev->next = sl->next;
@@ -353,6 +391,157 @@ void check_memory_leaks(CpdListItemsRequest *req) {
   */
 
   CkDeleteHashtable(table);
+}
+
+/****************** memory allocation tree ******************/
+
+/* This allows the representation and creation of a tree where each node
+ * represents a line in the code part of a stack trace of a malloc. The node
+ * contains how much data has been allocated starting from that line of code,
+ * down the stack.
+ */
+
+typedef struct _AllocationPoint AllocationPoint;
+
+struct _AllocationPoint {
+  /* The stack pointer this allocation refers to */
+  void * key;
+  /* Pointer to the parent AllocationPoint of this AllocationPoint in the tree */
+  AllocationPoint * parent;
+  /* Pointer to the first child AllocationPoint in the tree */
+  AllocationPoint * firstChild;
+  /* Pointer to the sibling of this AllocationPoint (i.e the next child of the parent) */
+  AllocationPoint * sibling;
+  /* Pointer to the next AllocationPoint with the same key.
+   * There can be more than one AllocationPoint with the same key because the
+   * parent can be different. Used only in the hashtable. */
+  AllocationPoint * next;
+  /* Size of the memory allocate */
+  int size;
+  /* How many blocks have been allocated from this point */
+  int count;
+};
+
+// pup a single AllocationPoint. The data structure must be already allocated
+void pupAllocationPointSingle(pup_er p, AllocationPoint *node, int *numChildren) {
+  pup_pointer(p, node->key);
+  pup_int(p, node->size);
+  pup_int(p, node->count);
+  *numChildren = 0;
+  AllocationPoint *child;
+  for (child = node->firstChild; child != NULL; child = child->sibling) *numChildren ++;
+  pup_int(p, numChildren);
+ 
+}
+
+// TODO: the following pup does not work for unpacking!
+void pupAllocationPoint(pup_er p, void *data) {
+  AllocationPoint *node = (AllocationPoint*)data;
+  int numChildren;
+  pupAllocationPointSingle(p, node, &numChildren);
+  for (child = node->firstChild; child != NULL; child = child->sibling) {
+    pupAllocationPoint(p, child);
+  }
+}
+
+void deleteAllocationPoint(void *ptr) {
+  AllocationPoint *node = (AllocationPoint*)ptr;
+  AllocationPoint *child;
+  for (child = node->firstChild; child != NULL; child = child->sibling) deleteAllocationPoint(child);
+  mm_free(node);
+}
+
+AllocationPoint * CreateAllocationTree(int *nodesCount) {
+  Slot *scanner;
+  CkHashtable_c table;
+  int i, new;
+  AllocationPoint *parent, **start, *cur;
+  AllocationPoint *root = NULL;
+  int numNodes = 0;
+  
+  scanner=slot_first->next;
+  table = CkCreateHashtable_pointer(sizeof(char *), 10000);
+
+  for ( ; scanner!=slot_first; scanner=scanner->next) {
+    parent = NULL;
+    for (i=scanner->stackLen-1; i>=0; --i) {
+      new = 0;
+      start = CkHashtableGet(table, &scanner->from[i]);
+      if (start == NULL) {
+        cur = (AllocationPoint*) mm_malloc(sizeof(AllocationPoint));
+        numNodes ++;
+        new = 1;
+        cur->next = cur;
+        *(AllocationPoint**)CkHashtablePut(table, &scanner->from[i]) = cur;
+      } else {
+        for (cur = (*start)->next; cur != *start && cur->parent != parent; cur = cur->next);
+        if (cur->parent != parent) {
+          cur = (AllocationPoint*) mm_malloc(sizeof(AllocationPoint));
+          numNodes ++;
+          new = 1;
+          cur->next = (*start)->next;
+          (*start)->next = cur;
+        }
+      }
+      // here "cur" points to the correct AllocationPoint for this stack frame
+      if (new) {
+        cur->key = scanner->from[i];
+        cur->parent = parent;
+        cur->size = 0;
+        cur->count = 0;
+        cur->firstChild = NULL;
+        if (parent == NULL) {
+          cur->sibling = NULL;
+          CmiAssert(root == NULL);
+          root = cur;
+        } else {
+          cur->sibling = parent->firstChild;
+          parent->firstChild = cur;
+        }
+      }
+      cur->size += scanner->userSize;
+      
+      cur->count ++;
+      parent = cur;
+    }
+  }
+  
+  char filename[100];
+  sprintf(filename, "allocationTree_%d", CmiMyPe());
+  FILE *fd = fopen(filename, "w");
+  fprintf(fd, "digraph %s {\n", filename);
+  CkHashtableIterator_c it = CkHashtableGetIterator(table);
+  AllocationPoint **startscan, *scan;
+  while ((startscan=CkHashtableIteratorNext(it,NULL))!=NULL) {
+    fprintf(fd, "\t\"n%p\" [label=\"%p\\nsize=%d\\ncount=%d\"];\n",*startscan,(*startscan)->key,
+          (*startscan)->size,(*startscan)->count);
+    for (scan = (*startscan)->next; scan != *startscan; scan = scan->next) {
+      fprintf(fd, "\t\"n%p\" [label=\"%p\\nsize=%d\\ncount=%d\"];\n",scan,scan->key,scan->size,scan->count);
+    }
+  }
+  CkHashtableIteratorSeekStart(it);
+  while ((startscan=CkHashtableIteratorNext(it,NULL))!=NULL) {
+    fprintf(fd, "\t\"n%p\" -> \"n%p\";\n",(*startscan)->parent,(*startscan));
+    for (scan = (*startscan)->next; scan != *startscan; scan = scan->next) {
+      fprintf(fd, "\t\"n%p\" -> \"n%p\";\n",scan->parent,scan);
+    }
+  }
+  fprintf(fd, "}\n");
+  fclose(fd);
+  
+  CkDeleteHashtable(table);
+  if (nodesCount != NULL) *nodesCount = numNodes;
+  return root;
+}
+
+void MergeAllocationTreeSingle(AllocationPoint *node, AllocationPoint *remote) {
+  
+}
+
+void * MergeAllocationTree(void *data, void **remoteData, int numRemote) {
+  int i;
+  for (i=0; i<numRemote; ++i) MergeAllocationTreeSingle((AllocationPoint*)data, (AllocationPoint*)remoteData[i]);
+  return data;
 }
 
 /*
@@ -411,6 +600,9 @@ void CmiMemoryCheck(void) {}
 /********** Allocation/Free ***********/
 
 static int memoryTraceDisabled = 0;
+#define MAX_STACK_FRAMES   2048
+static int numStackFrames; // the number of frames presetn in stackFrames - 4 (this number is trimmed at 0
+static void *stackFrames[MAX_STACK_FRAMES];
 
 /* Write a valid slot to this field */
 static void *setSlot(Slot *s,int userSize) {
@@ -427,22 +619,12 @@ static void *setSlot(Slot *s,int userSize) {
   //if (memory_status_info>0) printf("user allocation\n");
   s->userSize=userSize;
   s->extraStack=(SlotStack *)0;
-  {
-    int i;
-    int n=STACK_LEN;
-    if (memoryTraceDisabled==0) {
-      memoryTraceDisabled = 1;
-      CmiBacktraceRecord(s->from,3,&n);
-      memoryTraceDisabled = 0;
-    } else {
-      s->from[0] = (void*)10;
-      s->from[1] = (void*)9;
-      s->from[2] = (void*)8;
-      s->from[3] = (void*)7;
-      s->from[4] = (void*)6;
-    }
-    for (i=n; i<STACK_LEN; ++i) s->from[i] = 0;
-  }
+
+  /* Set the stack frames */
+  s->stackLen=numStackFrames;
+  s->from=(void**)(user+userSize);
+  memcpy(s->from, &stackFrames[4], numStackFrames*sizeof(void*));
+  
   return (void *)user;
 }
 
@@ -455,6 +637,20 @@ static void freeSlot(Slot *s) {
 
   s->magic=SLOTMAGIC_FREED;
   s->userSize=-1;
+}
+
+void dumpStackFrames() {
+  numStackFrames=MAX_STACK_FRAMES;
+  if (memoryTraceDisabled==0) {
+    memoryTraceDisabled = 1;
+    CmiBacktraceRecordHuge(stackFrames,&numStackFrames);
+    memoryTraceDisabled = 0;
+    numStackFrames-=4;
+    if (numStackFrames < 0) numStackFrames = 0;
+  } else {
+    numStackFrames=0;
+    stackFrames[0] = (void*)0;
+  }
 }
 
 /********** meta_ routines ***********/
@@ -477,18 +673,28 @@ static void status(char *msg) {
   }
 }
 
+extern int getCharmEnvelopeSize();
+
 static void meta_init(char **argv) {
   status("Converse -memory mode: charmdebug\n");
+  char buf[100];
+  sprintf(buf,"slot size %d\n",sizeof(Slot));
+  status(buf);
+  charmEnvelopeSize = getCharmEnvelopeSize();
+  CpdDebugGetAllocationTree = CreateAllocationTree;
 }
 
 static void *meta_malloc(size_t size) {
-  Slot *s=(Slot *)mm_malloc(sizeof(Slot)+size);
+  dumpStackFrames();
+  Slot *s=(Slot *)mm_malloc(sizeof(Slot)+size+numStackFrames*sizeof(void*));
+  traceMalloc_c(s+1, size);
   if (s==NULL) return s;
   return setSlot(s,size);
 }
 
 static void meta_free(void *mem) {
   Slot *s;
+  traceFree_c(mem);
   if (mem==NULL) return; /*Legal, but misleading*/
 
   s=((Slot *)mem)-1;
@@ -538,8 +744,9 @@ static void *meta_memalign(size_t align, size_t size) {
   int overhead = align;
   while (overhead < sizeof(Slot)+sizeof(SlotStack)) overhead += align;
   /* Allocate the required size + the overhead needed to keep the user alignment */
-
-  char *alloc=(char *)mm_memalign(align,overhead+size);
+  dumpStackFrames();
+  
+  char *alloc=(char *)mm_memalign(align,overhead+size+numStackFrames*sizeof(void*));
   Slot *s=(Slot *)(alloc+overhead-sizeof(Slot));  
   void *user=setSlot(s,size);
   s->magic = SLOTMAGIC_VALLOC + (s->magic&0xF);

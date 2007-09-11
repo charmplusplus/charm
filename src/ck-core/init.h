@@ -1,7 +1,7 @@
 #ifndef _INIT_H
 #define _INIT_H
 
-#include <charm.h> // For CkNumPes
+#include "charm.h" // For CkNumPes
 #if CMK_STL_DONT_USE_DOT_H
 #include <new>   // for in-place new operator
 #else

@@ -64,7 +64,7 @@ typedef unsigned int   UInt;
 typedef unsigned short UShort;
 typedef unsigned char  UChar;
 
-#include <charm.h> // for CkGroupID
+#include "charm.h" // for CkGroupID
 
 /**
 The "envelope" sits at the start of every Charm++

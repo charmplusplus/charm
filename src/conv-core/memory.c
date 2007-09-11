@@ -29,6 +29,8 @@
 #endif
 #include "converse.h"
 
+void * memory_stack_top; /*The higher end of the stack (approximation)*/
+
 /*Choose the proper default configuration*/
 #if CMK_MEMORY_BUILD_DEFAULT
 

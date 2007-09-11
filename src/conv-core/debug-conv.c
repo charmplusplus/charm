@@ -23,7 +23,12 @@ CpvDeclare(void *, debugQueue);
 
 #include <string.h>
 
+void (*CpdDebugGetAllocationTree)(void);
 
+static void CpdDebugCallAllocationTree(char *msg)
+{
+  CpdDebugGetAllocationTree();
+}
 
 static void CpdDebugHandler(char *msg)
 {
@@ -129,6 +134,7 @@ void CpdInit(void)
   CpvAccess(debugQueue) = CdsFifo_Create();
 
   CcsRegisterHandler("ccs_debug", (CmiHandler)CpdDebugHandler);
+  CcsRegisterHandler("ccs_debug_allocationTree", (CmiHandler)CpdDebugCallAllocationTree);
   
 #if 0
   CpdInitializeObjectTable();
