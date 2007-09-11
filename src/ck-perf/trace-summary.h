@@ -26,7 +26,7 @@
 
 #define  MAX_MARKS       256
 
-#define  MAX_PHASES       10
+#define  MAX_PHASES       100
 
 /// Bin entry record CPU time in an interval
 class BinEntry {

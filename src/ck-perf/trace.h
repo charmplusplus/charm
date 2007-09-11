@@ -127,6 +127,10 @@ class Trace {
     virtual void endFunc(char *name){}    
     virtual void endFunc(int idx){}
 
+    /* Memory tracing */
+    virtual void malloc(void *where, int size){}
+    virtual void free(void *where){}
+
     /* for implementing thread listeners */
     virtual void traceAddThreadListeners(CthThread tid, envelope *e) {}
 
@@ -217,6 +221,10 @@ public:
     inline void endFunc(char *name){ ALLDO(endFunc(name)); }
     inline void endFunc(int idx){ ALLDO(endFunc(idx)); }
 
+    /* Memory tracing */
+    inline void malloc(void *where, int size){ ALLDO(malloc(where,size)); }
+    inline void free(void *where){ ALLDO(free(where)); }
+
     /* calls for thread listener registration for each trace module */
     inline void traceAddThreadListeners(CthThread tid, envelope *e) {
       ALLDO(traceAddThreadListeners(tid, e));
@@ -259,6 +267,11 @@ extern "C" {
 #define _TRACE_END_COMPUTATION() _TRACE_ALWAYS(CkpvAccess(_traces)->endComputation())
 #define _TRACE_ENQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->enqueue(env))
 #define _TRACE_DEQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->dequeue(env))
+
+/* Memory tracing */
+#define _TRACE_MALLOC(where, size) _TRACE_ONLY(CkpvAccess(_traces)->malloc(where,size))
+#define _TRACE_FREE(where) _TRACE_ONLY(CkpvAccess(_traces)->free(where))
+
 
 #include "trace-bluegene.h"
 

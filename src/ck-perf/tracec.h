@@ -1,0 +1,15 @@
+#ifndef __TRACEC_H__
+#define __TRACEC_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+  extern void traceMalloc_c(void *where, int size);
+  extern void traceFree_c(void *where);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

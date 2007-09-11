@@ -38,6 +38,10 @@
 #define	 BEGIN_FUNC         22
 #define	 END_FUNC           23
 
+/* Memory tracing */
+#define  MEMORY_MALLOC      24
+#define  MEMORY_FREE        25
+
 #define  USER_EVENT_PAIR    100
 
 CkpvExtern(int, CtrLogBufSize);
