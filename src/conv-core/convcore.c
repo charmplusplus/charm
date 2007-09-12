@@ -1802,7 +1802,7 @@ void CmiSendReduce() {
       if (_reduce_deleteFn != NULL) _reduce_deleteFn(CpvAccess(_reduce_data));
     }
     CmiSetHandler(msg, CpvAccess(CmiReductionMessageHandler));
-    //CmiPrintf("CmiSendReduce(%d): sending %d bytes to %d\n",CmiMyPe(),msg_size,CpvAccess(_reduce_parent));
+    /*CmiPrintf("CmiSendReduce(%d): sending %d bytes to %d\n",CmiMyPe(),msg_size,CpvAccess(_reduce_parent));*/
     CmiSyncSendAndFree(CpvAccess(_reduce_parent), msg_size, msg);
   } else {
     _reduce_destination(msg);
@@ -1831,7 +1831,7 @@ void CmiReduceStruct(void *data, void (*pupFn)(void*,void*),
   _reduce_deleteFn = deleteFn;
   CpvAccess(_reduce_num_children) = CmiNumSpanTreeChildren(CmiMyPe());
   if (CpvAccess(_reduce_received) == CpvAccess(_reduce_num_children)) CmiSendReduce();
-  //else CmiPrintf("CmiReduceStruct(%d): %d - %d\n",CmiMyPe(),CpvAccess(_reduce_received),CpvAccess(_reduce_num_children));
+  /*else CmiPrintf("CmiReduceStruct(%d): %d - %d\n",CmiMyPe(),CpvAccess(_reduce_received),CpvAccess(_reduce_num_children));*/
 }
 
 void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int)) {
@@ -1863,7 +1863,7 @@ void CmiNodeReduceStruct(void *data, void (*pupFn)(void*,void*),
 void CmiHandleReductionMessage(void *msg) {
   CpvAccess(_reduce_msg_list)[CpvAccess(_reduce_received)++] = msg;
   if (CpvAccess(_reduce_received) == CpvAccess(_reduce_num_children)) CmiSendReduce();
-  //else CmiPrintf("CmiHandleReductionMessage(%d): %d - %d\n",CmiMyPe(),CpvAccess(_reduce_received),CpvAccess(_reduce_num_children));
+  /*else CmiPrintf("CmiHandleReductionMessage(%d): %d - %d\n",CmiMyPe(),CpvAccess(_reduce_received),CpvAccess(_reduce_num_children));*/
 }
 
 /*****************************************************************************
