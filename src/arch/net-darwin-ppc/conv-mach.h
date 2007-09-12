@@ -60,6 +60,7 @@
 #define CMK_TYPEDEF_FLOAT4 float
 #define CMK_TYPEDEF_FLOAT8 double
 
+#define CMK_MACOSX             1
 
 #define CMK_DEBUG_MODE					   0 
 #define CMK_WEB_MODE                                       1
