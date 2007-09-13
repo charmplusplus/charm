@@ -567,6 +567,17 @@ EOT
 test_cxx "whether mmap() accepts MAP_ANON" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MMAP_ANON, $pass, [whether mmap() accepts MAP_ANON])
 
+#### check if get_myaddress exists ####
+cat > $t <<EOT
+#include <rpc/rpc.h>
+
+void *foo(void *a) {
+    return get_myaddress((struct sockaddr_in*)a);
+}
+EOT
+test_cc "whether get_myaddress() exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_GET_MYADDRESS, $pass, [whether get_myaddress() exists])
+
 #### check if glibc backtrace exists ####
 cat > $t <<EOT
 #include "cmibacktrace.c"

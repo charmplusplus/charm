@@ -1919,6 +1919,21 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### check if get_myaddress exists ####
+cat > $t <<EOT
+#include <rpc/rpc.h>
+
+void *foo(void *a) {
+    return get_myaddress((struct sockaddr_in*)a);
+}
+EOT
+test_cc "whether get_myaddress() exists" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_GET_MYADDRESS $pass
+_ACEOF
+
+
 #### check if glibc backtrace exists ####
 cat > $t <<EOT
 #include "cmibacktrace.c"

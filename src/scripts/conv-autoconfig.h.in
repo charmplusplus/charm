@@ -66,6 +66,9 @@
 /* whether mmap() accepts MAP_ANON */
 #undef CMK_HAS_MMAP_ANON
 
+/* whether get_myaddress() exists */
+#undef CMK_HAS_GET_MYADDRESS
+
 /* whether Python is installed */
 #undef CMK_HAS_PYTHON
 

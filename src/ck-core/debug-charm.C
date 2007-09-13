@@ -260,9 +260,10 @@ void hostInfo(void *itemIter, pup_er pp, CpdListItemsRequest *req) {
   PUP::er &p = *(PUP::er *)pp;
   struct sockaddr_in addr;
   CpdListBeginItem(pp, 0);
-#ifndef CMK_MACOSX
-  /*The following rpc function call does not work on MAC, so for now just avoid id... */
+#ifndef CMK_HAS_GET_MYADDRESS
   get_myaddress(&addr);
+#else
+  CmiAbort("hostInfo: get_myaddress does not work on this machine");
 #endif
   char *address = (char*)&addr.sin_addr.s_addr;
   PUPv(address, 4);
