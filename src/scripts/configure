@@ -1927,7 +1927,7 @@ void foo(void *a) {
     get_myaddress((struct sockaddr_in*)a);
 }
 EOT
-test_cc "whether get_myaddress() exists" "yes" "no" ""
+test_cxx "whether get_myaddress() exists" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_GET_MYADDRESS $pass
