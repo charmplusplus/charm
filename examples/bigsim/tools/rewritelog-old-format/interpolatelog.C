@@ -31,7 +31,7 @@
 
 #define KEEP_RATIO 1.0
 
-#define OUTPUTDIR "newtraces-keep1.0/"
+#define OUTPUTDIR "newtraces/"
 #define CYCLE_TIMES_FILE "nopme"
 #define sec_per_cycle 0.00000000025
 
@@ -41,7 +41,7 @@
 #define time_factor (1.0/6.05)
 
 // Set these for more output:
-//#define DEBUG
+#undef DEBUG
 #undef PRINT_NEW_TIMES
 #define WRITE_OUTPUT_FILES
 
