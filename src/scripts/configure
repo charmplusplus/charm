@@ -1923,8 +1923,8 @@ _ACEOF
 cat > $t <<EOT
 #include <rpc/rpc.h>
 
-void *foo(void *a) {
-    return get_myaddress((struct sockaddr_in*)a);
+void foo(void *a) {
+    get_myaddress((struct sockaddr_in*)a);
 }
 EOT
 test_cc "whether get_myaddress() exists" "yes" "no" ""

@@ -260,7 +260,7 @@ void hostInfo(void *itemIter, pup_er pp, CpdListItemsRequest *req) {
   PUP::er &p = *(PUP::er *)pp;
   struct sockaddr_in addr;
   CpdListBeginItem(pp, 0);
-#ifndef CMK_HAS_GET_MYADDRESS
+#if CMK_HAS_GET_MYADDRESS
   get_myaddress(&addr);
 #else
   CmiAbort("hostInfo: get_myaddress does not work on this machine");
