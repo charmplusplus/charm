@@ -23,11 +23,44 @@ CpvDeclare(void *, debugQueue);
 
 #include <string.h>
 
-void (*CpdDebugGetAllocationTree)(void);
+#include "pup_c.h"
+void * (*CpdDebugGetAllocationTree)(int *);
+extern void pupAllocationPoint(pup_er p, void *data);
+extern void deleteAllocationPoint(void *ptr);
+extern void * MergeAllocationTree(void *data, void **remoteData, int numRemote);
+CpvDeclare(int, CpdDebugCallAllocationTree_Index);
+
+static void CpdDebugReturnAllocationTree(void *tree) {
+  pup_er sizer = pup_new_sizer();
+  pupAllocationPoint(sizer, tree);
+  char *buf = (char *)malloc(pup_size(sizer));
+  pup_er packer = pup_new_toMem(buf);
+  pupAllocationPoint(packer, tree);
+  /*CmiPrintf("size=%d tree:",pup_size(sizer));
+  int i;
+  for (i=0;i<100;++i) CmiPrintf(" %02x",((unsigned char*)buf)[i]);
+  CmiPrintf("\n");*/
+  CcsSendReply(pup_size(sizer),buf);
+  pup_destroy(sizer);
+  pup_destroy(packer);
+  free(buf);
+}
 
 static void CpdDebugCallAllocationTree(char *msg)
 {
-  CpdDebugGetAllocationTree();
+  int numNodes;
+  int forPE;
+  sscanf(msg+CmiMsgHeaderSizeBytes, "%d", &forPE);
+  if (forPE == -1 && CmiMyPe()==0) {
+    CmiSetHandler(msg, CpvAccess(CpdDebugCallAllocationTree_Index));
+    CmiSyncBroadcast(CmiMsgHeaderSizeBytes+sizeof(int), msg);
+  }
+  void *tree = CpdDebugGetAllocationTree(&numNodes);
+  if (forPE == CmiMyPe()) CpdDebugReturnAllocationTree(tree);
+  else if (forPE == -1) CmiReduceStruct(tree, pupAllocationPoint, MergeAllocationTree,
+                                CpdDebugReturnAllocationTree, deleteAllocationPoint);
+  else CmiAbort("Received allocationTree request for another PE!");
+  CmiFree(msg);
 }
 
 static void CpdDebugHandler(char *msg)
@@ -135,6 +168,8 @@ void CpdInit(void)
 
   CcsRegisterHandler("ccs_debug", (CmiHandler)CpdDebugHandler);
   CcsRegisterHandler("ccs_debug_allocationTree", (CmiHandler)CpdDebugCallAllocationTree);
+  CpvInitialize(int, CpdDebugCallAllocationTree_Index);
+  CpvAccess(CpdDebugCallAllocationTree_Index) = CmiRegisterHandler((CmiHandler)CpdDebugCallAllocationTree);
   
 #if 0
   CpdInitializeObjectTable();

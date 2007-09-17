@@ -420,16 +420,19 @@ struct _AllocationPoint {
   int size;
   /* How many blocks have been allocated from this point */
   int count;
+  /* Flags pertaining to the allocation point, currently only LEAK_FLAG */
+  char flags;
 };
 
 // pup a single AllocationPoint. The data structure must be already allocated
 void pupAllocationPointSingle(pup_er p, AllocationPoint *node, int *numChildren) {
-  pup_pointer(p, node->key);
-  pup_int(p, node->size);
-  pup_int(p, node->count);
+  pup_pointer(p, &node->key);
+  pup_int(p, &node->size);
+  pup_int(p, &node->count);
+  pup_char(p, &node->flags);
   *numChildren = 0;
   AllocationPoint *child;
-  for (child = node->firstChild; child != NULL; child = child->sibling) *numChildren ++;
+  for (child = node->firstChild; child != NULL; child = child->sibling) (*numChildren) ++;
   pup_int(p, numChildren);
  
 }
@@ -439,6 +442,7 @@ void pupAllocationPoint(pup_er p, void *data) {
   AllocationPoint *node = (AllocationPoint*)data;
   int numChildren;
   pupAllocationPointSingle(p, node, &numChildren);
+  AllocationPoint *child;
   for (child = node->firstChild; child != NULL; child = child->sibling) {
     pupAllocationPoint(p, child);
   }
@@ -449,6 +453,18 @@ void deleteAllocationPoint(void *ptr) {
   AllocationPoint *child;
   for (child = node->firstChild; child != NULL; child = child->sibling) deleteAllocationPoint(child);
   mm_free(node);
+}
+
+void printAllocationTree(AllocationPoint *node, FILE *fd, int depth) {
+  int i;
+  if (node==NULL) return;
+  int numChildren = 0;
+  AllocationPoint *child;
+  for (child = node->firstChild; child != NULL; child = child->sibling) numChildren ++; 
+  for (i=0; i<depth; ++i) fprintf(fd, " ");
+  fprintf(fd, "node %p: bytes=%d, count=%d, child=%d\n",node->key,node->size,node->count,numChildren);
+  printAllocationTree(node->sibling, fd, depth);
+  printAllocationTree(node->firstChild, fd, depth+2);
 }
 
 AllocationPoint * CreateAllocationTree(int *nodesCount) {
@@ -489,6 +505,7 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
         cur->parent = parent;
         cur->size = 0;
         cur->count = 0;
+        cur->flags = 0;
         cur->firstChild = NULL;
         if (parent == NULL) {
           cur->sibling = NULL;
@@ -500,8 +517,8 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
         }
       }
       cur->size += scanner->userSize;
-      
       cur->count ++;
+      cur->flags |= isLeakSlot(scanner);
       parent = cur;
     }
   }
@@ -529,6 +546,11 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
   fprintf(fd, "}\n");
   fclose(fd);
   
+  sprintf(filename, "allocationTree_%d.tree", CmiMyPe());
+  fd = fopen(filename, "w");
+  printAllocationTree(root, fd, 0);
+  fclose(fd);
+ 
   CkDeleteHashtable(table);
   if (nodesCount != NULL) *nodesCount = numNodes;
   return root;
@@ -687,9 +709,10 @@ static void meta_init(char **argv) {
 static void *meta_malloc(size_t size) {
   dumpStackFrames();
   Slot *s=(Slot *)mm_malloc(sizeof(Slot)+size+numStackFrames*sizeof(void*));
-  traceMalloc_c(s+1, size);
-  if (s==NULL) return s;
-  return setSlot(s,size);
+  char *user = (char*)s;
+  if (s!=NULL) user = setSlot(s,size);
+  traceMalloc_c(user, size, s->from, s->stackLen);
+  return user;
 }
 
 static void meta_free(void *mem) {
@@ -753,6 +776,7 @@ static void *meta_memalign(size_t align, size_t size) {
   s->extraStack = (SlotStack *)alloc; /* use the extra space as stack */
   s->extraStack->protectedMemory = NULL;
   s->extraStack->protectedMemoryLength = 0;
+  traceMalloc_c(user, size, s->from, s->stackLen);
   return user;  
 }
 

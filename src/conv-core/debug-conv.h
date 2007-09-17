@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-extern void (*CpdDebugGetAllocationTree)(void);
+extern void * (*CpdDebugGetAllocationTree)(int*);
   
 void CpdInit(void); 
 void CpdFreeze(void);  
