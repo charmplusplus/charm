@@ -128,7 +128,7 @@ class Trace {
     virtual void endFunc(int idx){}
 
     /* Memory tracing */
-    virtual void malloc(void *where, int size){}
+    virtual void malloc(void *where, int size, void **stack, int stackSize){}
     virtual void free(void *where){}
 
     /* for implementing thread listeners */
@@ -222,7 +222,7 @@ public:
     inline void endFunc(int idx){ ALLDO(endFunc(idx)); }
 
     /* Memory tracing */
-    inline void malloc(void *where, int size){ ALLDO(malloc(where,size)); }
+    inline void malloc(void *where, int size, void **stack, int stackSize){ ALLDO(malloc(where,size,stack,stackSize)); }
     inline void free(void *where){ ALLDO(free(where)); }
 
     /* calls for thread listener registration for each trace module */
@@ -269,7 +269,7 @@ extern "C" {
 #define _TRACE_DEQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->dequeue(env))
 
 /* Memory tracing */
-#define _TRACE_MALLOC(where, size) _TRACE_ONLY(CkpvAccess(_traces)->malloc(where,size))
+#define _TRACE_MALLOC(where, size, stack, stackSize) _TRACE_ONLY(CkpvAccess(_traces)->malloc(where,size,stack,stackSize))
 #define _TRACE_FREE(where) _TRACE_ONLY(CkpvAccess(_traces)->free(where))
 
 

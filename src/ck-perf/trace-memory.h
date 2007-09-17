@@ -9,10 +9,12 @@
 /** A representant of a memory operation */
 
 class MemEntry {
+  friend class TraceMemory;
  private:
   int type;
   void *where;
   int size;
+  int stackSize;
   
  public:  
   MemEntry();
@@ -21,6 +23,11 @@ class MemEntry {
     type = t;
     where = w;
     size = s;
+    stackSize = 0;
+  }
+  void setStack(int ss, void **s) {
+    stackSize = ss;
+    memcpy(this+1, s, ss*sizeof(void*));
   }
 };
 
@@ -33,14 +40,17 @@ class TraceMemory : public Trace {
   int firstTime;
   int logBufSize;
   int usedBuffer;
-  MemEntry *logBuffer;
-  void checkFlush();
+  bool recordStack;
+  char *logBuffer;
+  bool traceDisabled;
+
+  void checkFlush(int add);
   void flush();
  public:
   TraceMemory(char **argv);
   
   void traceClose();
-  void malloc(void *where, int size);
+  void malloc(void *where, int size, void **stack, int stackSize);
   void free(void *where);
 };
 

@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-  extern void traceMalloc_c(void *where, int size);
+  extern void traceMalloc_c(void *where, int size, void **stack, int stackSize);
   extern void traceFree_c(void *where);
 
 #ifdef __cplusplus

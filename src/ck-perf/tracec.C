@@ -5,8 +5,8 @@
 
 extern "C" {
 
-  void traceMalloc_c(void *where, int size) {
-    _TRACE_MALLOC(where, size);
+  void traceMalloc_c(void *where, int size, void **stack, int stackSize) {
+    _TRACE_MALLOC(where, size, stack, stackSize);
   }
 
   void traceFree_c(void *where) {
