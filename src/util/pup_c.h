@@ -70,6 +70,9 @@ typedef void *pup_er;
 pup_er pup_new_sizer();
 pup_er pup_new_toMem(void *Nbuf);
 pup_er pup_new_fromMem(const void *Nbuf);
+pup_er pup_new_network_sizer();
+pup_er pup_new_network_pack(void *Nbuf);
+pup_er pup_new_network_unpack(const void *Nbuf);
 void pup_destroy(pup_er p);
 
 /*Determine what kind of pup_er we have--

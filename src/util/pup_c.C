@@ -11,6 +11,7 @@ there's nothing actually happening here.
 */
 #include "pup.h"
 #include "pup_c.h"
+#include "pup_toNetwork.h"
 #include "charm-api.h"
 
 
@@ -27,6 +28,12 @@ CDECL pup_er pup_new_toMem(void *Nbuf)
   { return new PUP::toMem(Nbuf); }
 CDECL pup_er pup_new_fromMem(const void *Nbuf)
   { return new PUP::fromMem(Nbuf); }
+CDECL pup_er pup_new_network_sizer()
+  { return new PUP_toNetwork_sizer; }
+CDECL pup_er pup_new_network_pack(void *Nbuf)
+  { return new PUP_toNetwork_pack(Nbuf); }
+CDECL pup_er pup_new_network_unpack(const void *Nbuf)
+  { return new PUP_toNetwork_unpack(Nbuf); }
 CDECL void pup_destroy(pup_er p)
   { delete ((PUP::er *)p); }
 
