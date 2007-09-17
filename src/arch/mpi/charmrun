@@ -63,7 +63,7 @@ then
 		ppn='#PBS -l nodes='$pes':ppn=1'
 		extra='-machinefile $PBS_NODEFILE'
 		;;
-	tg-login*)
+	tg-login*|honest*.ncsa.uiuc.edu)
 		# always ppn=2
 		nodes=`expr \( $pes + 1 \) / 2`
 		ppn='#PBS -l nodes='$nodes':ppn=2'
