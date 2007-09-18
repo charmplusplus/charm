@@ -12,7 +12,10 @@ extern "C" {
 #endif
 
 extern void * (*CpdDebugGetAllocationTree)(int*);
-  
+extern void (*CpdDebug_pupAllocationPoint)(pup_er p, void *data);
+extern void (*CpdDebug_deleteAllocationPoint)(void *ptr);
+extern void * (*CpdDebug_MergeAllocationTree)(void *data, void **remoteData, int numRemote);
+
 void CpdInit(void); 
 void CpdFreeze(void);  
 void CpdUnFreeze(void);

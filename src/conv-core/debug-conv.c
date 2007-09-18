@@ -25,17 +25,17 @@ CpvDeclare(void *, debugQueue);
 
 #include "pup_c.h"
 void * (*CpdDebugGetAllocationTree)(int *);
-extern void pupAllocationPoint(pup_er p, void *data);
-extern void deleteAllocationPoint(void *ptr);
-extern void * MergeAllocationTree(void *data, void **remoteData, int numRemote);
+void (*CpdDebug_pupAllocationPoint)(pup_er p, void *data);
+void (*CpdDebug_deleteAllocationPoint)(void *ptr);
+void * (*CpdDebug_MergeAllocationTree)(void *data, void **remoteData, int numRemote);
 CpvDeclare(int, CpdDebugCallAllocationTree_Index);
 
 static void CpdDebugReturnAllocationTree(void *tree) {
   pup_er sizer = pup_new_sizer();
-  pupAllocationPoint(sizer, tree);
+  CpdDebug_pupAllocationPoint(sizer, tree);
   char *buf = (char *)malloc(pup_size(sizer));
   pup_er packer = pup_new_toMem(buf);
-  pupAllocationPoint(packer, tree);
+  CpdDebug_pupAllocationPoint(packer, tree);
   /*CmiPrintf("size=%d tree:",pup_size(sizer));
   int i;
   for (i=0;i<100;++i) CmiPrintf(" %02x",((unsigned char*)buf)[i]);
@@ -57,8 +57,8 @@ static void CpdDebugCallAllocationTree(char *msg)
   }
   void *tree = CpdDebugGetAllocationTree(&numNodes);
   if (forPE == CmiMyPe()) CpdDebugReturnAllocationTree(tree);
-  else if (forPE == -1) CmiReduceStruct(tree, pupAllocationPoint, MergeAllocationTree,
-                                CpdDebugReturnAllocationTree, deleteAllocationPoint);
+  else if (forPE == -1) CmiReduceStruct(tree, CpdDebug_pupAllocationPoint, CpdDebug_MergeAllocationTree,
+                                CpdDebugReturnAllocationTree, CpdDebug_deleteAllocationPoint);
   else CmiAbort("Received allocationTree request for another PE!");
   CmiFree(msg);
 }

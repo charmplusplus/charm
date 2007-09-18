@@ -704,6 +704,9 @@ static void meta_init(char **argv) {
   status(buf);
   charmEnvelopeSize = getCharmEnvelopeSize();
   CpdDebugGetAllocationTree = CreateAllocationTree;
+  CpdDebug_pupAllocationPoint = pupAllocationPoint;
+  CpdDebug_deleteAllocationPoint = deleteAllocationPoint;
+  CpdDebug_MergeAllocationTree = MergeAllocationTree;
 }
 
 static void *meta_malloc(size_t size) {
