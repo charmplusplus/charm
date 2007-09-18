@@ -871,11 +871,11 @@ void          CmiSyncMulticastFn(CmiGroup, int, char*);
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup, int, char*);
 void          CmiFreeMulticastFn(CmiGroup, int, char*);
 
-void CmiReduce(void *data, int size, void * (*mergeFn)(void*,void**,int));
+void CmiReduce(void *msg, int size, void * (*mergeFn)(void*,void**,int));
 void CmiReduceStruct(void *data, void (*pupFn)(void*,void*),
                      void * (*mergeFn)(void*,void**,int), CmiHandler dest,
                      void (*deleteFn)(void*));
-void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int));
+void CmiNodeReduce(void *msg, int size, void * (*mergeFn)(void*,void**,int));
 void CmiNodeReduceStruct(void *data, void (*pupFn)(void*,void*),
                          void * (*mergeFn)(void*,void**,int), CmiHandler dest,
                          void (*deleteFn)(void*));
