@@ -460,6 +460,81 @@ handle which could be used to check the status of this send using
 can be reused immediately, thus saving a call to \kw{CmiAsyncMsgSent}. \uw{msg}
 should not be overwritten or freed before the communication is complete.}
 
+\section{Reducing Messaging}
+\label{reduce}
+
+Reductions currently are implemented only over the entire set of processors. 
+Therefore, one call to one of the forms below must be invoked exacly once from
+each processor. For the ``node'' forms, each node must invoke it once, and in
+particular on its rank zero. The handler function of every reduction is always
+called on processor zero.
+
+\function{void CmiReduce(void *msg, int size, void * (*mergeFn)(void*,void**,int));}
+\index{CmiReduce}
+\desc{Contribute a message \uw{msg} of size \uw{size} previously allocated with
+CmiAlloc. The message will be deallocated by the system by calling CmiFree.
+The destination handler will be taken by the converse header of the message itself.
+The last parameter is a function pointer to a merge function (described below).}
+
+\function{void CmiReduceStruct((void *data, void (*pupFn)(void*,void*),
+                     void * (*mergeFn)(void*,void**,int), CmiHandler dest,
+                     void (*deleteFn)(void*));}
+\index{CmiReduceStruct}
+\desc{Contribute a data structure \uw{data} which is allocated on the heap, possibly
+in a distributed form (like a linked-list or a tree). On processor zero, the
+function specified by \uw{dest} will be invoked with the data structure resulting
+from the reduction (the pointer returned by the last merge function). This handler
+does not need to be registered as a converse handler. The other parameters are
+function pointers whose purpose is described below.}
+
+\function{void CmiNodeReduce(void *msg, int size, void * (*mergeFn)(void*,void**,int));}
+\index{CmiNodeReduce}
+\desc{Similar to CmiReduce, only that the contribution is at the node level instead
+of the processor level.}
+
+\function{void CmiNodeReduceStruct((void *data, void (*pupFn)(void*,void*),
+                     void * (*mergeFn)(void*,void**,int), CmiHandler dest,
+                     void (*deleteFn)(void*));}
+\index{CmiNodeReduceStruct}
+\desc{Similar to CmiNodeReduce, only that the contribution is at the node level instead
+of the processor level.}
+
+Other than the fuction pointer \uw{dest} used to invoke the final handler on
+processor zero, there are several other function pointers passed in by the user:
+
+\function{void * (*mergeFn)(void *local, void **remore, int count)}
+\desc{This function is used in all the CmiReduce forms to merge the local
+message/data structure deposited on a processor with all the messages incoming
+from the children processors of the reduction spanning tree. The input parameters
+are in the order: the local data (the exact same pointer passed in as first
+parameter of CmiReduce and similar); a pointer to an array of incoming messages;
+the number of elements in the second parameter. The function returns a pointer
+to a freshly allocated message (or data structure for the \kw{Struct} forms)
+corresponding to the merge of all the messages. All the messages in the
+\uw{remote} array are deleted by the system; the data pointed by the first parameter
+should be deleted by this function. If the data can be merged ``in-place'' by
+modifying or augmenting \uw{local}, the function can return the same pointer to
+\uw{local} which can be considered freshly allocated. Each element in \uw{remote}
+is the complete incoming message (including the converse header) for message
+reductions, and the data as it has been packed by the pup function (without any
+additional header) for struct reductions.}
+
+\function{void (*pupFn)(pup\_er p, void *data)}
+\desc{This function will use the PUP framework to pup the \uw{data} passed in
+into a message for sending across the network. The data can be either the same
+data passed in as first parameter of CmiReduceStruct of CmiNodeReduceStruct, or
+the return of the merge function. It will be called for sizing and packing.
+\note{It will not be called for unpacking.}}
+
+\function{void (*deleteFn)(void *ptr)}
+\desc{This function is used to delete either the data stucture passed in as first
+parameter of CmiReduceStruct and CmiNodeReduceStruct, or the return of the merge
+function. It can be as simple as ``free'' or as complicated as needed to delete
+complex structures. If this function is NULL, the data structure will not be
+deleted, and the program can continue to use it. Note: even if this function is
+NULL, the input data structure can still be modified by the merge function.}
+
+
 \section{Scheduling Messages}
 \label{schedqueue}
 
