@@ -130,4 +130,4 @@ seqtrans: Worker.C Worker.h Worker.ci
 	$(CHARMBIN)/etrans.pl -s Worker
 
 test:
-	./pgm 1000 100 SMALL 50 -gf 200
+	./phold  10 10 RANDOM RANDOM RANDOM -gm  50 100
