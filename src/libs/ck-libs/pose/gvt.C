@@ -280,7 +280,7 @@ void PVT::reportReduce(UpdateMsg *m)
   // see if message provides new min optGVT or conGVT
   if ((optGVT < 0) || ((m->optPVT > POSE_UnsetTS) && (m->optPVT < optGVT)))
     optGVT = m->optPVT;
-  if (m->maxSR > maxSR)
+  if (m->maxSR > 0)
     maxSR = m->maxSR;
   addSR(&SRs, m->SRs, optGVT, m->numEntries);
   done++;
@@ -551,6 +551,7 @@ void GVT::computeGVT(UpdateMsg *m)
 
       // transmit data to start next GVT estimation on next GVT branch
       UpdateMsg *umsg = new UpdateMsg;
+      umsg->maxSR=0;
       umsg->optPVT = estGVT;
       umsg->inactive = inactive;
       umsg->inactiveTime = inactiveTime;

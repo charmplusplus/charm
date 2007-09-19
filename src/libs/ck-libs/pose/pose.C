@@ -154,6 +154,15 @@ void POSE_exit()
   POSE_Coordinator.exit();
 }
 
+/// Exit simulation program after terminus reduction
+void POSE_prepExit(void *param, void *msg)
+{
+  CkReductionMsg *m=(CkReductionMsg *)msg;
+  delete m;
+  CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
+  POSE_Coordinator.prepExit();
+}
+
 /// Set busy wait time
 void POSE_set_busy_wait(double n) { busyWait = n; }
 
@@ -181,21 +190,25 @@ void pose::registerCallBack(callBack *cbm)
 /// Stop the simulation
 void pose::stop(void) 
 { 
-#ifndef CMK_OPTIMIZE
-    CProxy_localStat stats(theLocalStats);
-#endif
 #ifdef SEQUENTIAL_POSE
 #if USE_LONG_TIMESTAMPS
   CkPrintf("Sequential Endtime Approximation: %lld\n", POSE_GlobalClock);
 #else
   CkPrintf("Sequential Endtime Approximation: %d\n", POSE_GlobalClock);
 #endif
-  // Call sequential termination here...
+  // Call sequential termination here, when done it calls prepExit
   POSE_Objects.Terminate();
 #endif
+  // prepExit();
+}
+
+//! dump stats if enabled and exit
+void pose::prepExit(void) 
+{
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
     {
+      CProxy_localStat stats(theLocalStats);
       CkPrintf("%d PE Simulation finished at %f. Gathering stats...\n", 
 	       CkNumPes(), CmiWallTimer() - sim_timer);
       stats.SendStats();

@@ -316,6 +316,8 @@ UpdateMsg *SRtable::PackTable(POSE_TimeType pvt, POSE_TimeType *maxSR)
       tmp = tmp->next;
     }
   }
+  // arguably redundant
+  um->maxSR=*maxSR;
   if (destBkt >= b) {
     tmp = overflow;
     while (tmp && (tmp->timestamp < pvt)) {

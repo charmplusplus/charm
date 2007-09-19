@@ -11,6 +11,7 @@ module pose {
     entry pose();
     entry void registerCallBack(callBack *);
     entry void stop();
+    entry void prepExit();
     entry void exit();
   };
 };

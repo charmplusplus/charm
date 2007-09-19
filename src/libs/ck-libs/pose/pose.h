@@ -67,6 +67,8 @@ void POSE_registerCallBack(CkCallback cb);
 /** Stops timer so statistics collection, callback, final output, etc. 
     are not counted in simulation time. */
 void POSE_stop(); 
+// Prepare to exit
+void POSE_prepExit(void *param, void *msg); 
 /// Exit simulation program
 void POSE_exit(); 
 
@@ -133,6 +135,10 @@ class pose : public Chare {
   void stop();
   /// Exit the simulation
   /** Executes callback before terminating program. */
+
+  //! handle stats output before exiting if necessary 
+  void prepExit();
+
   void exit();
 };
 

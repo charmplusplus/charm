@@ -13,6 +13,7 @@
 #include "sim.decl.h"
 #include <stdarg.h>
 
+void POSE_prepExit(void *param, void *msg); 
 extern CProxy_sim POSE_Objects; 
 extern CProxy_sim POSE_Objects_RO; 
 extern CkChareID POSE_Coordinator_ID; 
@@ -284,8 +285,9 @@ class sim : public CBase_sim {
   void ReportLBdata();
   /// Migrate this poser to processor indicated in m
   void Migrate(destMsg *m) { migrateMe(m->destPE); }
-  /// Terminate this poser 
-  void Terminate() { objID->terminus(); }
+  /// Terminate this poser, when everyone is terminated we exit 
+
+  void Terminate() { objID->terminus(); int i=1;contribute(sizeof(int),&i,CkReduction::sum_int,CkCallback(POSE_prepExit,NULL)); }
   /// Return this poser's unique index on PVT branch
   int PVTindex() { return myPVTidx; }
   /// Test active flag
