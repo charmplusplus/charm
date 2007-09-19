@@ -144,5 +144,6 @@ class worker {
   void workLarge(LargeWorkMsg *m);
   void workLarge_anti(LargeWorkMsg *m);
   void workLarge_commit(LargeWorkMsg *m);
+  void terminus(){}
 };
 

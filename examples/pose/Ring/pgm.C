@@ -71,7 +71,7 @@ main::main(CkArgMsg *m)
   CkArrayOptions opts(totalObjs);
   opts.setMap(myMap);
   (*(CProxy_worker *) &POSE_Objects) = CProxy_worker::ckNew(wd, opts);
-
+  POSE_Objects.doneInserting();
   /*
   // create all the workers
   WorkerData *wd;

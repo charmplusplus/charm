@@ -36,6 +36,7 @@ main::main(CkArgMsg *m) {
     sd->Timestamp(0);
     (*(CProxy_schedulerObject *) &POSE_Objects)[i].insert(sd);
   }
+    POSE_Objects.doneInserting();
 }
 
 

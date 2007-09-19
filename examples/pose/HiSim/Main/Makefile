@@ -26,7 +26,7 @@ include ../Makefile.common
 # *************************
 PGM_MODULE=Pgm
 PGM=pgm
-OTHER=-lconv-bluegene-logs
+OTHER=-lconv-bigsim-logs
 LIBS=-Lstdc++ -lm
 #LIBS=/expand8/home/guna/charm/src/langs/bluegene/blue_seq.o
 

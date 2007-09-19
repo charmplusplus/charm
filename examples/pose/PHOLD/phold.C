@@ -82,6 +82,7 @@ main::main(CkArgMsg *m)
     wd->Timestamp(0);
     (*(CProxy_worker *) &POSE_Objects)[i].insert(wd, dest);
   }
+  POSE_Objects.doneInserting();
 }
 
 void main::buildMap(int numLPs, int dist)

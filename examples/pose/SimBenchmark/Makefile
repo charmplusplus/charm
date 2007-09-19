@@ -116,5 +116,5 @@ Worker.def.h Worker.decl.h : Worker_sim.ci
 Worker_sim.C Worker_sim.h Worker_sim.ci: Worker.C Worker.h Worker.ci 
 	$(CHARMBIN)/etrans.pl Worker
 
-test:
+test: $(PGM)
 	./pgm 1000 100 SMALL 50 -gf 200

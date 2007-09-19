@@ -164,6 +164,7 @@ main::main(CkArgMsg *m)
     else
       (*(CProxy_worker *) &POSE_Objects)[i].insert(wd, dest);
   }
+  POSE_Objects.doneInserting();
 }
 
 void main::buildMap(int numObjs, int dist)

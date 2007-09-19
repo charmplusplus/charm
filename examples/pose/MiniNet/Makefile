@@ -134,4 +134,4 @@ seqtrans: Node.C Node.h Node.ci
 	$(CHARMBIN)/etrans.pl -s Node
 
 test:
-	./pgm
+	./mininet

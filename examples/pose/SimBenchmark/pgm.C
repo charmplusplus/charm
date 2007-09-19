@@ -14,7 +14,7 @@ main::main(CkArgMsg *m)
   double granularity=-1.0;
   char grainString[20];
   char *text;
-
+  POSE_init();
   if(m->argc<7) {
     CkPrintf("Usage: simb <#objsPerProc> <#msgsPerObj> <msgSize(MIXED,SMALL,MEDIUM,LARGE)> <locality(%)> [ -g[f|m|c|z] | -t<granularity> ] <density(msgsPerVTU)>\n");
     CkExit();
@@ -55,7 +55,7 @@ main::main(CkArgMsg *m)
 
   CkPrintf(">>> ...Objects communicate locally %d%% of the time...\n>>> ...Each event has %s granularity of %f on average...\n>>> ...Events are concentrated at approximately %d per Virtual Time Unit(VTU).\n", locality, text, granularity, density);
 
-  POSE_init();
+
 
   // create all the workers
   WorkerData *wd;
@@ -77,6 +77,7 @@ main::main(CkArgMsg *m)
     //wd->dump();
     (*(CProxy_worker *) &POSE_Objects)[i].insert(wd, dest);
   }
+  POSE_Objects.doneInserting();
 }
 
 void main::buildMap(int numObjs, int dist)

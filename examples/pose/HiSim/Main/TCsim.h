@@ -1,6 +1,6 @@
-#include "blue.h"
+#include "bigsim.h"
 #include "blue_impl.h"
-#include "blue_logs.h"
+#include "bigsim_logs.h"
 #include "trace-projections.h"
 
 #define  yourUniqueTaskIDtype TaskID*

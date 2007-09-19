@@ -25,4 +25,5 @@ main::main(CkArgMsg *m)
     nm->Timestamp(0);
     (*(CProxy_Node *) &POSE_Objects)[i].insert(nm);
   }
+  POSE_Objects.doneInserting();
 }
