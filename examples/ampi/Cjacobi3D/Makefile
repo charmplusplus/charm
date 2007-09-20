@@ -2,6 +2,8 @@ CHARMBASE=../../../
 CHARMC=../../../bin/charmc $(OPTS)
 TOKENS=6
 
+all: ampi
+
 ampi: jacobi jacobi.iso jacobi-get
 
 mpi: jacobi.C

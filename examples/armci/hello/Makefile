@@ -1,5 +1,7 @@
 CHARMBIN = ../../bin
 
+all: hello
+
 hello: hello.c
 	$(CHARMBIN)/charmc -o hello hello.c -language armci
 

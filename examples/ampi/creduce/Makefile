@@ -1,5 +1,7 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
+all: ampi
+
 ampi: test.C
 	$(CHARMC) -c test.C
 	$(CHARMC) -o pgm test.o -language ampi

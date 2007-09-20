@@ -2,6 +2,8 @@ CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = hello.o hellof.o
 
+all:pgm
+
 pgm: $(OBJS) 
 	$(CHARMC) -o pgm $(OBJS) -language f90charm
 

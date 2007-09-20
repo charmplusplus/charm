@@ -1,5 +1,7 @@
 CHARMC=../../../../bin/charmc $(OPTS)
 
+all: loadlog
+
 loadlog: loadlog.o
 	$(CHARMC) -seq -o loadlog loadlog.o -lconv-bigsim-logs -lconv-util -lblue-standalone -language c++
 

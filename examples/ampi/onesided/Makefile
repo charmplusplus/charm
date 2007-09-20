@@ -4,7 +4,7 @@ CHARMC=../../../bin/charmc -language ampi $(OPTS)
 MPICC=mpicc $(OPTS)
 TOKENS=6
 
-all : GetPutTest IGetTest
+all: GetPutTest IGetTest
 
 GetPutTest: GetPutTest.C
 	$(CHARMC) GetPutTest.C -language ampi  -o GetPutTest

@@ -7,8 +7,8 @@ GENERAL_DEPENDS = Makefile
 # NOTE : Mainfile.cell will set some variables including : CELL_SDK_DIR, SPU_CXX, PPU_EMBEDSPU, etc.
 include $(CHARM_BASE_DIR)/tmp/Makefile.cell
 
-
 default : all
+
 all : jacobi
 
 

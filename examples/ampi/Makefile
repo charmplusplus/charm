@@ -2,9 +2,8 @@ DIRS=creduce Cjacobi3D
 
 all:
 	for d in $(DIRS); do \
-		(cd $$d; $(MAKE)  OPTS='$(OPTS)' || exit 1) || exit 1; \
+		(cd $$d; $(MAKE) all OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
-
 
 test:
 	for d in $(DIRS); do \

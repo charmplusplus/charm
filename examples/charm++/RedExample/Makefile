@@ -1,8 +1,6 @@
 CHARMC=../../../bin/charmc $(OPTS) $(MOPTS) 
 
-
 OBJS = RedExample.o
-
 
 all: RedExample
 
