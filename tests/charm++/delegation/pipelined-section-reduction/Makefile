@@ -1,6 +1,8 @@
 OPTS=-g
 CHARMC=../../../../bin/charmc $(OPTS)
 
+all: hello
+
 hello:   hello.o
 	$(CHARMC) hello.o -o hello -module CkMulticast -language charm++ #-memory paranoid
 

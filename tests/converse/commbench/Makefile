@@ -2,6 +2,8 @@ CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS=commbench.o overhead.o timer.o proc.o smputil.o pingpong.o ctxt.o
 
+all: pgm
+
 pgm: $(OBJS) link
 
 link:

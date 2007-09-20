@@ -2,6 +2,8 @@ CHARMC=../../../bin/charmc $(OPTS)
 
 LINKLINE=$(CHARMC) -o pgm pgm.o -language converse++
 
+all: pgm
+
 pgm: pgm.o
 	$(LINKLINE)
 

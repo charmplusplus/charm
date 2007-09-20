@@ -2,6 +2,11 @@ DIRS=comlib commlib_stream pipeBroadcast
 
 .PHONY: test $(DIRS)
 
+all:
+	for d in $(DIRS); do \
+                (cd $$d; $(MAKE) all OPTS='$(OPTS)' || exit 1) || exit 1; \
+        done
+
 test: comlib commlib_stream pipeBroadcast
 
 comlib: 

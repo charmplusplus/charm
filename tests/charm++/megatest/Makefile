@@ -71,6 +71,8 @@ CIFILES =  \
 .SUFFIXES:
 .SUFFIXES: .o .C .def.h .decl.h .ci .h
 
+all: pgm
+
 pgm: $(OBJS)
 	$(CHARMC) -o pgm  $(OBJS) -language charm++
 

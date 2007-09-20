@@ -2,6 +2,8 @@ CHARMC=../../bin/charmc $(OPTS)
 
 LINKLINE=$(CHARMC) -o check check.o -language converse++
 
+all: check
+
 check: check.o
 	$(LINKLINE)
 

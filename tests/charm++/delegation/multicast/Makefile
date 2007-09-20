@@ -1,5 +1,7 @@
 CHARMC=../../../../bin/charmc $(OPTS)
 
+all: hello
+
 hello:   hello.o
 	$(CHARMC) hello.o -o hello -module CkMulticast -language charm++ 
 
@@ -9,10 +11,10 @@ hello.o : hello.C hello.def.h hello.decl.h
 hello.decl.h hello.def.h : hello.ci
 	$(CHARMC) hello.ci
 
-test: hello
+test: all
 	./charmrun +p3 ./hello 10
 
-bgtest: hello
+bgtest: all
 	./charmrun +p3 ./hello 10 +x1 +y1 +z3
 
 clean:
