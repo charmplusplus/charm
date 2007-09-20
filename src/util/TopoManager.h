@@ -89,7 +89,9 @@ class TopoManager {
       dimNX = dimX;
       dimNY = 1;
       dimNZ = 1;
-
+      torusX=true;
+      torusY=true;
+      torusZ=true;
       procsPerNode = 1;
 #endif
     }
@@ -100,6 +102,9 @@ class TopoManager {
       procsPerNode = dimX/dimNX;
       procsPerNode = (dimY/dimNY >procsPerNode) ? dimY/dimNY: procsPerNode;
       procsPerNode = (dimZ/dimNZ >procsPerNode) ? dimZ/dimNZ: procsPerNode;
+      torusX=true;
+      torusY=true;
+      torusZ=true;
     }
 
     ~TopoManager() {
