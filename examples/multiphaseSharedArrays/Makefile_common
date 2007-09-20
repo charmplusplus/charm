@@ -15,7 +15,7 @@ CHARMC=$(CDIR)/bin/charmc -language charm++ $(OPTS)
 .decl.h.def.h:
 	@true
 
-all : opt
+all: opt
 
 test: $(PGM)
 	./charmrun +p4 $(PGM) $(TEST_ARGS)

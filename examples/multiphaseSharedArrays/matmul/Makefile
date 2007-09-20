@@ -9,6 +9,8 @@ include ../Makefile_common
 # 	$(CHARMC) test.ci
 # 	$(CHARMC) -o test -module msa test.C -lm
 
+all: opt
+
 tt: opt
 	time ./charmrun ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 1 1
 	time ./charmrun ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 4 1

@@ -1,5 +1,7 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
+all: pgm
+
 pgm:  rings.o
 	$(CHARMC) rings.o  -o pgm -language charm++
 

@@ -1,5 +1,7 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
+all: pgm
+
 pgm:   counter.o pgm.o
 	$(CHARMC) counter.o pgm.o -o pgm -language charm++ 
 

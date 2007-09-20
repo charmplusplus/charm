@@ -1,5 +1,7 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
+all: pingpong
+
 pingpong: pingpong.o
 	$(CHARMC) -language converse++ -o pingpong pingpong.o
 

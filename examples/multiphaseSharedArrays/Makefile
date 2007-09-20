@@ -2,7 +2,7 @@ DIRS=simpletest simpleTestVarsize
 
 all:
 	for d in $(DIRS); do \
-		(cd $$d; make OPTS='$(OPTS)' || exit 1) || exit 1; \
+		(cd $$d; make all OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
 test:

@@ -1,5 +1,7 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
+all: pgm
+
 pgm:  onesided.o
 	$(CHARMC) onesided.o  -o onesidedtest -language charm++
 

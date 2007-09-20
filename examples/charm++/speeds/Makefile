@@ -1,5 +1,7 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
+all: pgm
+
 pgm:  speed.o
 	$(CHARMC) speed.o  -o pgm -language charm++
 

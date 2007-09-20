@@ -1,9 +1,10 @@
 # modify the path of CHARMC
 CHARMC=../../../bin/charmc $(OPTS)
 
+all: pgm
+
 pgm: pgm.o
 	$(CHARMC) pgm.o  -o pgm -language charm++
-
 
 test: pgm
 	./charmrun +p4 pgm 1000000 100
