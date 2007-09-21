@@ -427,7 +427,7 @@ class toDisk : public disk {
   //Generic bottleneck: pack n items of size itemSize from p.
   virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
-  //Write data to the given file pointer
+  // Write data to the given file pointer
   // (must be opened for binary write)
   // You must close the file yourself when done.
   toDisk(FILE *f):disk(IS_PACKING,f) {}
@@ -439,7 +439,7 @@ class fromDisk : public disk {
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,int n,size_t itemSize,dataType t);
  public:
-  //Write data to the given file pointer 
+  // Read data from the given file pointer 
   // (must be opened for binary read)
   // You must close the file yourself when done.
   fromDisk(FILE *f):disk(IS_UNPACKING,f) {}
