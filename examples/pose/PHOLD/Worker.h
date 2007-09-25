@@ -56,6 +56,7 @@ class worker {
   }
 
   // Event methods
+  void terminus(){CkPrintf("called terminus\n");}
   void work(WorkMsg *m);
   void work_anti(WorkMsg *m);
   void work_commit(WorkMsg *m);

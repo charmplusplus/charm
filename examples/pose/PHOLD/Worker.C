@@ -38,7 +38,7 @@ worker& worker::operator=(const worker& obj)
 
 void worker::work(WorkMsg *m)
 {
-  //CkPrintf("%d receiving work at %d\n", parent->thisIndex, ovt);
+  //  CkPrintf("%d receiving work at %d\n", parent->thisIndex, ovt);
   WorkMsg *wm;
   int nbr=-1, away, sign, offset;
 

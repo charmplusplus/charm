@@ -63,6 +63,8 @@ main::main(CkArgMsg *m)
   CkPrintf(">>> ...grainsize: %s %3.8e  locality: %d  time scale: %d.\n", 
 	   text, granularity, locality, tScale);
 
+  CkPrintf("Procs %d nodes %d\n",CkNumPes(), CkNumNodes());
+
   POSE_init();
 
   // create all the workers
@@ -91,7 +93,7 @@ void main::buildMap(int numLPs, int dist)
   if (dist == RANDOM)
     for (i=0; i<numLPs; i++) map[i] = lrand48() % CkNumPes();
   else if (dist == UNIFORM)
-    for (i=0; i<numLPs; i++) map[i] = i / (numLPs/CkNumPes());
+    for (i=0; i<numLPs; i++) map[i] = (i / (numLPs/CkNumPes()))%CkNumPes();
   else if (dist == IMBALANCED) {
     int min = (numLPs/CkNumPes())/2;
     if (min < 1) min = 1;
