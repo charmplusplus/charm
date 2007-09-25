@@ -6,10 +6,19 @@
 
 CkGroupID ThePVT;
 CkGroupID TheGVT;
-
+CpvExtern(int, stateRecovery);
+CpvExtern(eventID, theEventID);
 /// Basic Constructor
 PVT::PVT() 
 {
+  //  CkPrintf("[%d] constructing PVT\n",CkMyPe());
+#ifndef SEQUENTIAL_POSE
+  CpvInitialize(int, stateRecovery);
+  CpvAccess(stateRecovery) = 0;
+#endif
+  CpvInitialize(eventID, theEventID);
+  CpvAccess(theEventID)=eventID();
+  //  CpvAccess(theEventID).dump();
   LBTurnInstrumentOff();
 #ifdef POSE_COMM_ON
   //comm_debug = 1;

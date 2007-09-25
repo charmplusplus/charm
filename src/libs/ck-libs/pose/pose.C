@@ -3,6 +3,7 @@
 #include "pose.def.h"
 
 CpvDeclare(int, stateRecovery);
+CpvDeclare(eventID, theEventID);
 
 void POSEreadCmdLine();
 #ifdef POSE_COMM_ON
@@ -17,6 +18,13 @@ POSE_TimeType POSE_GlobalTS;
 POSE_Config pose_config;
 ComlibInstanceHandle POSE_commlib_insthndl;
 
+
+const eventID& GetEventID() {
+  //CpvStaticDeclare(eventID, theEventID);  // initializes to [0.pe]
+  //  for each pe called on
+  CpvAccess(theEventID).incEventID();
+  return(CpvAccess(theEventID));
+ }
 
 // Main initialization for all of POSE
 void POSE_init() // use inactivity detection by default
@@ -84,8 +92,6 @@ void POSE_init(int IDflag, int ET) // can specify both
   ThePVT = CProxy_PVT::ckNew(); 
   TheGVT = CProxy_GVT::ckNew();
   // Start off using normal forward execution
-  CpvInitialize(int, stateRecovery);
-  CpvAccess(stateRecovery) = 0;
   if(pose_config.lb_on)
     {
       // Initialize the load balancer
