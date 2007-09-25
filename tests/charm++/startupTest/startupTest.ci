@@ -12,6 +12,7 @@ mainmodule startupTest {
   readonly CkVec<int> IntArrFour;
   readonly CkVec<int> IntArrFive;
   readonly CkVec<CProxy_groupTest> groupProxy;
+  readonly CkVec<CProxy_groupTestX> groupProxyX;
   readonly CkHashtableT<intdual, int> mapSix;
 
 
@@ -33,6 +34,10 @@ mainmodule startupTest {
 
   group groupTest {
     entry groupTest(int);
+  }	
+
+  group groupTestX {
+    entry groupTestX(int);
   }	
 
   array [1D] ReadArrZero {
@@ -66,12 +71,12 @@ mainmodule startupTest {
   };        	
 
   array [2D] ReadArrSix {
-    entry ReadArrSix(int, double);
+    entry ReadArrSix(int, int, double);
     entry void dowork(void);	
   };        	
 
   array [2D] ReadArrSeven {
-    entry ReadArrSeven(int, double, bool);
+    entry ReadArrSeven(int, int, double, bool);
     entry void dowork(void);	
   };        	
 

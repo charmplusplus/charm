@@ -7,6 +7,7 @@ extern double dTwo;
 extern CkVec<int> IntArrFour;
 extern CkVec<int> IntArrFive;
 extern CkVec<CProxy_groupTest> groupProxy;
+extern CkVec<CProxy_groupTestX> groupProxyX;
 
 bool CheckAllReadOnly();
 void WasteTime(double);
@@ -63,6 +64,26 @@ class groupTest : public Group
 	  //test the order value in it
 	  //	  CkPrintf("[%d] test group id %d looking at %d\n",CkMyPe(),order,i);
 	  CkAssert(groupProxy[i].ckLocalBranch()->order==i);
+
+	}
+    }
+};
+
+class groupTestX : public Group
+{
+ public:
+  int order;
+  groupTestX(int order): order(order) 
+    {
+      // test that all lower order ids were created first
+      for(int i=order-1;i>0;i--)
+	{
+	  //make a proxy
+	  //get a branch
+	  //test the order value in it
+	  //	  CkPrintf("[%d] test group id %d looking at %d\n",CkMyPe(),order,i);
+	  CkAssert(groupProxy[i].ckLocalBranch()->order==i);
+	  CkAssert(groupProxyX[i].ckLocalBranch()->order==i);
 
 	}
     }
@@ -245,9 +266,10 @@ class ReadArrSix : public CBase_ReadArrSix
  public:
   int *data;
   int size;
+  int size2;
   double units;
   
-  ReadArrSix(int arrSize, double WasteUnits) :size(arrSize), units(WasteUnits) 
+  ReadArrSix(int arrSize, int arrSize2, double WasteUnits) :size(arrSize), size2(arrSize2), units(WasteUnits) 
     {
       int a=1;
       data=new int[arrSize];
@@ -271,10 +293,11 @@ class ReadArrSeven : public CBase_ReadArrSeven
  public:
   int *data;
   int size;
+  int size2;
   double units;
   bool validate;
   
-  ReadArrSeven(int arrSize, double WasteUnits, bool validate) :size(arrSize), units(WasteUnits), validate(validate) 
+  ReadArrSeven(int arrSize, int arrSize2, double WasteUnits, bool validate) :size(arrSize), size2(arrSize2), units(WasteUnits), validate(validate) 
     {
       int a=1;
       // we shadow six, use its data member

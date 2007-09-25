@@ -18,6 +18,7 @@ CkVec <int> IntArrFour;
 CkVec <int> IntArrFive;
 CkHashtableT<intdual, int> mapSix;
 CkVec<CProxy_groupTest> groupProxy;
+CkVec<CProxy_groupTestX> groupProxyX;
 CProxy_main mainProxy;		
 CProxy_ReadArrZero zeroProxy;		
 CProxy_ReadArrOne oneProxy;		
@@ -34,15 +35,18 @@ main::main(CkArgMsg *msg)
   int reported;
   int validateBoundOrder=0;
   if(msg->argc<4)
-    CkAbort("Usage: startupTest arrSize WasteUnits validateBoundOrder\n Where arrsize is int >0 wasteunit is double >0 validateBoundOrder is 1 or 0\n");
+    CkAbort("Usage: startupTest arrSize1 arrSize2 WasteUnits validateBoundOrder\n Where arrsize is int >0 wasteunit is double >0 validateBoundOrder is 1 or 0\n");
   //get arrsize and wastetime from cmd line
   arrSize=atoi(msg->argv[1]);
-  sscanf(msg->argv[2],"%lg",&WasteUnits);
-  validateBoundOrder=atoi(msg->argv[3]);
+  int arrSize2=atoi(msg->argv[2]);
+  sscanf(msg->argv[3],"%lg",&WasteUnits);
+  validateBoundOrder=atoi(msg->argv[4]);
   mainProxy=thishandle;
+  if(arrSize<1 || arrSize2 < 1 || WasteUnits<=0 || (validateBoundOrder!=1 && validateBoundOrder!=0))
+    CkAbort("Usage: startupTest arrSize1 arrSize2 WasteUnits validateBoundOrder\n Where arrsize is int >0 wasteunit is double >0 validateBoundOrder is 1 or 0\n");
   doneCount=0;
   //init readonly values
-  CkPrintf("Nodes %d Cpus %d Using %d from %s %g from %s\n",CkNumNodes(), CkNumPes(),arrSize,msg->argv[1],WasteUnits, msg->argv[2]);
+  CkPrintf("Nodes %d Cpus %d Using %d %d from %s %s %g from %s\n",CkNumNodes(), CkNumPes(),arrSize,arrSize2,msg->argv[1],msg->argv[2],WasteUnits, msg->argv[3]);
   intOne=1;
   dOne=1.0;
   dTwo=2.0;
@@ -57,6 +61,10 @@ main::main(CkArgMsg *msg)
   for(int i=0;i<arrSize;i++)
     {
       groupProxy.push_back(CProxy_groupTest::ckNew(i));
+    }
+  for(int i=0;i<arrSize;i++)
+    {
+      groupProxyX.push_back(CProxy_groupTestX::ckNew(i));
     }
   //create zero by default map
   zeroProxy  = CProxy_ReadArrZero::ckNew();  
@@ -109,17 +117,17 @@ main::main(CkArgMsg *msg)
   // if you make six this way it may lose the race with seven 
   CProxy_SixMap sixMap = CProxy_SixMap::ckNew(WasteUnits);
   arrOpts.setMap(sixMap);
-  sixProxy  = CProxy_ReadArrSix::ckNew(arrSize, WasteUnits, arrOpts);  
+  sixProxy  = CProxy_ReadArrSix::ckNew(arrSize, arrSize2, WasteUnits, arrOpts);  
   for(int i=0;i<arrSize;i++)
-    for(int j=0;j<arrSize;j++)
-      sixProxy(i,j).insert(arrSize, WasteUnits);
+    for(int j=0;j<arrSize2;j++)
+      sixProxy(i,j).insert(arrSize,arrSize2, WasteUnits);
   sixProxy.doneInserting();
 #else
   // bulk build six
-  CkArrayOptions arrOptsSix(arrSize,arrSize);
+  CkArrayOptions arrOptsSix(arrSize,arrSize2);
   CProxy_SixMap sixMap = CProxy_SixMap::ckNew(WasteUnits);
   arrOptsSix.setMap(sixMap);
-  sixProxy  = CProxy_ReadArrSix::ckNew(arrSize, WasteUnits, arrOptsSix);  
+  sixProxy  = CProxy_ReadArrSix::ckNew(arrSize,arrSize2, WasteUnits, arrOptsSix);  
   sixProxy.doneInserting();
 
 #endif
@@ -130,17 +138,17 @@ main::main(CkArgMsg *msg)
 
   CkArrayOptions arrOptsBind6;
   arrOptsBind6.bindTo(sixProxy);
-  sevenProxy  = CProxy_ReadArrSeven::ckNew(arrSize, WasteUnits, validateBoundOrder,arrOptsBind6);  
+  sevenProxy  = CProxy_ReadArrSeven::ckNew(arrSize, arrSize2,WasteUnits, validateBoundOrder,arrOptsBind6);  
   for(int i=0;i<arrSize;i++)
-    for(int j=0;j<arrSize;j++)
-      sevenProxy(i,j).insert(arrSize, WasteUnits,validateBoundOrder);
+    for(int j=0;j<arrSize2;j++)
+      sevenProxy(i,j).insert(arrSize, arrSize2,WasteUnits,validateBoundOrder);
   sevenProxy.doneInserting();
 
 #else
 
-  CkArrayOptions arrOptsBind6(arrSize,arrSize);
+  CkArrayOptions arrOptsBind6(arrSize,arrSize2);
   arrOptsBind6.bindTo(sixProxy);
-  sevenProxy  = CProxy_ReadArrSeven::ckNew(arrSize, WasteUnits, validateBoundOrder,arrOptsBind6);  
+  sevenProxy  = CProxy_ReadArrSeven::ckNew(arrSize, arrSize2,WasteUnits, validateBoundOrder,arrOptsBind6);  
   sevenProxy.doneInserting();
 #endif  
 
