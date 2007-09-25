@@ -20,6 +20,9 @@ PVT::PVT()
   CpvAccess(theEventID)=eventID();
   //  CpvAccess(theEventID).dump();
   LBTurnInstrumentOff();
+  optGVT = POSE_UnsetTS; conGVT = POSE_UnsetTS;
+  rdone=0;
+  SRs=NULL;
 #ifdef POSE_COMM_ON
   //comm_debug = 1;
 #endif
@@ -282,9 +285,6 @@ void PVT::reportReduce(UpdateMsg *m)
   CProxy_PVT p(ThePVT);
   CProxy_GVT g(TheGVT);
   POSE_TimeType lastGVT = 0, maxSR=0;
-  static POSE_TimeType optGVT = POSE_UnsetTS, conGVT = POSE_UnsetTS;
-  static int done=0;
-  static SRentry *SRs = NULL;
 
   // see if message provides new min optGVT or conGVT
   if ((optGVT < 0) || ((m->optPVT > POSE_UnsetTS) && (m->optPVT < optGVT)))
@@ -292,10 +292,10 @@ void PVT::reportReduce(UpdateMsg *m)
   if (m->maxSR > 0)
     maxSR = m->maxSR;
   addSR(&SRs, m->SRs, optGVT, m->numEntries);
-  done++;
+  rdone++;
   CkFreeMsg(m);
 
-  if (done == reportsExpected) { // all PVT reports are in
+  if (rdone == reportsExpected) { // all PVT reports are in
     UpdateMsg *um;
     int entryCount = 0;
     // pack data into um
@@ -341,7 +341,7 @@ void PVT::reportReduce(UpdateMsg *m)
       delete cur;
       cur = tmp;
     }
-    done = 0;
+    rdone = 0;
   }
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
@@ -352,6 +352,11 @@ void PVT::reportReduce(UpdateMsg *m)
 /// Basic Constructor
 GVT::GVT() 
 {
+  optGVT = POSE_UnsetTS, conGVT = POSE_UnsetTS;
+  done=0;
+  SRs = NULL;
+  startOffset = 0;
+
 #ifndef CMK_OPTIMIZE
   localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
@@ -414,10 +419,6 @@ void GVT::computeGVT(UpdateMsg *m)
   GVTMsg *gmsg = new GVTMsg;
   POSE_TimeType lastGVT = 0, earliestMsg = POSE_UnsetTS, 
     earlyAny = POSE_UnsetTS;
-  static POSE_TimeType optGVT = POSE_UnsetTS, conGVT = POSE_UnsetTS;
-  static int done=0;
-  static SRentry *SRs = NULL;
-  static int startOffset = 0;
 
   if (CkMyPe() != 0) startOffset = 1;
   if (m->runGVTflag == 1) done++;
@@ -544,10 +545,10 @@ void GVT::computeGVT(UpdateMsg *m)
 	  if(pose_config.stats)
 	    localStats->SwitchTimer(LB_TIMER);
 #endif
-	  static int lb_skip = pose_config.lb_skip;
+	 
 	  if (CkNumPes() > 1) {
 	    nextLBstart++;
-	    if (lb_skip == nextLBstart) {
+	    if (pose_config.lb_skip == nextLBstart) {
 	      TheLBG.calculateLocalLoad();
 	      nextLBstart = 0;
 	    }

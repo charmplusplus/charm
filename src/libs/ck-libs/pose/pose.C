@@ -23,6 +23,7 @@ const eventID& GetEventID() {
   //CpvStaticDeclare(eventID, theEventID);  // initializes to [0.pe]
   //  for each pe called on
   CpvAccess(theEventID).incEventID();
+  CkAssert(CpvAccess(theEventID).getPE()>=0);
   return(CpvAccess(theEventID));
  }
 
@@ -69,19 +70,6 @@ void POSE_init(int IDflag, int ET) // can specify both
   // Create a MemoryPool with global handle for memory recycling 
   MemPoolID = CProxy_MemoryPool::ckNew();
 #endif
-  // Create array to hold all POSE objects
-#ifdef POSE_COMM_ON  
-  POSE_Objects_RO = CProxy_sim::ckNew(); 
-  POSE_Objects = POSE_Objects_RO;
-#else
-  POSE_Objects = CProxy_sim::ckNew(); 
-#endif
-  //#ifndef SEQUENTIAL_POSE
-  //#ifdef POSE_COMM_ON
-  // Make POSE_Objects use the comm lib
-  //  ComlibDelegateProxy(&POSE_Objects);
-  //#endif
-  //#endif
   // Initialize statistics collection if desired
 #ifndef CMK_OPTIMIZE
   theLocalStats = CProxy_localStat::ckNew();
@@ -101,6 +89,20 @@ void POSE_init(int IDflag, int ET) // can specify both
     }
 #endif
   CProxy_pose::ckNew(&POSE_Coordinator_ID, 0);
+  // Create array to hold all POSE objects
+#ifdef POSE_COMM_ON  
+  POSE_Objects_RO = CProxy_sim::ckNew(); 
+  POSE_Objects = POSE_Objects_RO;
+#else
+  POSE_Objects = CProxy_sim::ckNew(); 
+#endif
+  //#ifndef SEQUENTIAL_POSE
+  //#ifdef POSE_COMM_ON
+  // Make POSE_Objects use the comm lib
+  //  ComlibDelegateProxy(&POSE_Objects);
+  //#endif
+  //#endif
+
 #ifdef SEQUENTIAL_POSE
   if (CkNumPes() > 1) CkAbort("ERROR: Cannot run a sequential simulation on more than one processor!\n");
   CkPrintf("NOTE: POSE running in sequential simulation mode!\n");

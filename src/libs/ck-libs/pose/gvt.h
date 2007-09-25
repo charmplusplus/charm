@@ -95,6 +95,12 @@ class PVT : public Group {
   int specEventCount, eventCount;
   /// startPhase active flag
   int startPhaseActive;
+  /* things which used to be member function statics */
+  POSE_TimeType optGVT, conGVT;
+  int rdone;
+  SRentry *SRs;
+
+
  public:
   /// Basic Constructor
   PVT(void);
@@ -156,6 +162,12 @@ private:
   int lastRecvs;
   /// Number of PVT reports expected (1 or 2)
   int reportsExpected;
+  /* things which used to be member function static */
+  POSE_TimeType optGVT,  conGVT;
+  int done;
+  SRentry *SRs;
+  int startOffset;
+
 public:
   /// Basic Constructor
   GVT(void);

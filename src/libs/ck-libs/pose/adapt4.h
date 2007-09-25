@@ -19,7 +19,11 @@
 class adapt4 : public opt3 {
   double specTol;
  public:
+  int itersAllowed, iter, objUsage;
   adapt4() { 
+    itersAllowed=-1;
+    iter=0;
+    objUsage = pose_config.max_usage * pose_config.store_rate;
     STRAT_T = ADAPT4_T; 
     //timeLeash = POSE_TimeMax/2;
     timeLeash = 1;
