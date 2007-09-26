@@ -1,5 +1,5 @@
-#CMK_DEFS="-I/opt/rs/1.8/mpich2-64/T/include "
-#CMK_LD_DEFS="-L/opt/rs/1.8/mpich2-64/T/lib "
+#CMK_DEFS="-I/opt/xt-mpt/1.5.47/mpich2-64/T/include "
+#CMK_LD_DEFS="-L/opt/xt-mpt/1.5.47/mpich2-64/T/lib "
 
 CMK_CPP_CHARM="/lib/cpp -P"
 CMK_CPP_C="cc -E $CMK_DEFS "
@@ -30,8 +30,8 @@ CMK_RANLIB="ranlib"
 CMK_QT="generic64"
 
 # for F90 compiler
-CMK_CF77="ftn "
-CMK_CF90="ftn "
+CMK_CF77="f77 "
+CMK_CF90="f77 "
 CMK_F90LIBS=""
 CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-p"
