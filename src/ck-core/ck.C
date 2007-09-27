@@ -1543,6 +1543,17 @@ class CkMessageReplay : public CkMessageWatcher {
 			  {
 				REPLAYDEBUG("requeueing delayed message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
 				  
+				//  in SMP, which this processor pick up a
+                                //  msg which was processed in a different
+                                //  rank, it will forward the message to
+                                //  next one and keep trying the same thing.
+                                if (env->getEvent() < nextEvent) {
+                                  int nextpe = CkMyPe()+1;
+                                  if (nextpe == CkNodeFirst(CkMyNode())+CkMyNodeSize())
+                                        nextpe = CkNodeFirst(CkMyNode());
+                                  CmiSyncSendAndFree(nextpe,env->getTotalsize(),(char *)env);
+                                }
+                                else
 				delayed.enq(env);
 			  }
 		}
