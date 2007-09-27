@@ -1538,16 +1538,24 @@ class CkMessageReplay : public CkMessageWatcher {
 				CmiSyncSendAndFree(CkMyPe(),env->getTotalsize(),(char *)env);
 				return;
 			}
-			else /* Not ready yet-- put it back in the queue */
+			else /* Not ready yet-- put it back in the
+				queue */
+			  {
+				REPLAYDEBUG("requeueing delayed message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
+				  
 				delayed.enq(env);
+			  }
 		}
 	}
 	
 public:
-	CkMessageReplay(FILE *f_) :f(f_) { getNext(); }
+	CkMessageReplay(FILE *f_) :f(f_) { getNext(); 
+	REPLAYDEBUG("Constructing ckMessageReplay: "<< nextPE <<" "<< nextSize <<" "<<nextEvent);
+		    }
 	~CkMessageReplay() {fclose(f);}
 	
 	virtual CmiBool processMessage(envelope *env,CkCoreState *ck) {
+	  REPLAYDEBUG("ProcessMessage message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent() <<" " <<env->getMsgtype() <<" " <<env->getMsgIdx());
                 if (env->getEvent() == 0) return CmiTrue;
 		if (isNext(env)) { /* This is the message we were expecting */
 			REPLAYDEBUG("Executing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
@@ -1566,9 +1574,11 @@ public:
 };
 
 static FILE *openReplayFile(const char *permissions) {
+
 	char fName[200];
 	sprintf(fName,"ckreplay_%06d.log",CkMyPe());
 	FILE *f=fopen(fName,permissions);
+	REPLAYDEBUG("openReplayfile "<<fName);
 	if (f==NULL) {
 		CkPrintf("[%d] Could not open replay file '%s' with permissions '%w'\n",
 			CkMyPe(),fName,permissions);
@@ -1578,6 +1588,7 @@ static FILE *openReplayFile(const char *permissions) {
 }
 
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
+	REPLAYDEBUG("CkMessageWaterInit ");
 	if (CmiGetArgFlagDesc(argv,"+record","Record message processing order"))
 		ck->watcher=new CkMessageRecorder(openReplayFile("w"));
 	if (CmiGetArgFlagDesc(argv,"+replay","Re-play recorded message stream"))
