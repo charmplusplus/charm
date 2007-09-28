@@ -1495,7 +1495,7 @@ public:
 	
 	virtual CmiBool processMessage(envelope *env,CkCoreState *ck) {
                 if (env->getEvent())
-		     fprintf(f,"%d %d %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent());
+		     fprintf(f,"%d %d %d %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg);
 		return CmiTrue;
 	}
 };
