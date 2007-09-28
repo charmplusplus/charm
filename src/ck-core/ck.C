@@ -1505,12 +1505,12 @@ public:
 
 class CkMessageReplay : public CkMessageWatcher {
 	FILE *f;
-	int nextPE, nextSize, nextEvent; //Properties of next message we need:
+	int nextPE, nextSize, nextEvent, nexttype; //Properties of next message we need:
 	/// Read the next message we need from the file:
 	void getNext(void) {
-		if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) {
+		if (4!=fscanf(f,"%d%d%d%d", &nextPE,&nextSize,&nextEvent,&nexttype)) {
 			// CkAbort("CkMessageReplay> Syntax error reading replay file");
-			nextPE=nextSize=nextEvent=-1; //No destructor->record file just ends in the middle!
+			nextPE=nextSize=nextEvent=nexttype=-1; //No destructor->record file just ends in the middle!
 		}
 	}
 	/// If this is the next message we need, advance and return CmiTrue.
@@ -1542,18 +1542,6 @@ class CkMessageReplay : public CkMessageWatcher {
 				queue */
 			  {
 				REPLAYDEBUG("requeueing delayed message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
-				  
-				//  in SMP, which this processor pick up a
-                                //  msg which was processed in a different
-                                //  rank, it will forward the message to
-                                //  next one and keep trying the same thing.
-                                if (env->getEvent() < nextEvent) {
-                                  int nextpe = CkMyPe()+1;
-                                  if (nextpe == CkNodeFirst(CkMyNode())+CkMyNodeSize())
-                                        nextpe = CkNodeFirst(CkMyNode());
-                                  CmiSyncSendAndFree(nextpe,env->getTotalsize(),(char *)env);
-                                }
-                                else
 				delayed.enq(env);
 			  }
 		}
@@ -1574,6 +1562,17 @@ public:
 			flush(); /* try to process queued-up stuff */
 			return CmiTrue;
 		}
+#if CMK_SMP
+                else if (env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg) {
+                         // try next rank, we can't just buffer the msg and left
+                         // we need to keep unprocessed msg on the fly
+                        int nextpe = CkMyPe()+1;
+                        if (nextpe == CkNodeFirst(CkMyNode())+CkMyNodeSize())
+                        nextpe = CkNodeFirst(CkMyNode());
+                        CmiSyncSendAndFree(nextpe,env->getTotalsize(),(char *)env);
+                        return CmiFalse;
+                }
+#endif
 		else /*!isNext(env) */ {
 			REPLAYDEBUG("Queueing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent()
 				<<" because we wanted "<<nextPE<<" "<<nextSize<<" "<<nextEvent)
