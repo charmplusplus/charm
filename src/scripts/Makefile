@@ -27,6 +27,10 @@ INC=../include
 
 all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM doc
 
+all-test:
+	cd ../tests ; $(MAKE) all OPTS='$(OPTS)'
+	cd ../examples ; $(MAKE) all OPTS='$(OPTS)'
+
 charm++: basics
 	$(MAKE) charm-target
 	@echo "$(OPTS)" > OPTS
@@ -102,8 +106,6 @@ jadeall: jade
 
 LIBS: CONVLIBS CHARMLIBS
 	cd libs; $(MAKE) otherlibs
-
-test-all: test
 
 bgtest: bigsim AMPI
 	cd ../tests ; $(MAKE) bgtest OPTS='$(OPTS)'
