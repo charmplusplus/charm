@@ -60,6 +60,9 @@ public:
     commTime(0.0),maxGRT(0.0),
     maxDo(-1.0),minDo(-1.0)
   {
+#ifdef VERBOSE_DEBUG
+    CkPrintf("[%d] constructing localStat\n",CkMyPe());
+#endif
   }
   localStat(CkMigrateMessage *) { };
   /// Start the specified timer

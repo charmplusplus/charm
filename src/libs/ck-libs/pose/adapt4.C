@@ -6,7 +6,7 @@ void adapt4::Step()
 {
   Event *ev;
   POSE_TimeType lastGVT = localPVT->getGVT();
-   POSE_TimeType offset=POSE_UnsetTS, theMaxLeash=POSE_TimeMax/2;
+  POSE_TimeType offset=POSE_UnsetTS, theMaxLeash=POSE_TimeMax/2;
   double critStart;
 
   rbFlag = 0;

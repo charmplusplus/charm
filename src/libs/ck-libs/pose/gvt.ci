@@ -15,7 +15,7 @@ module gvt {
   group PVT {
     entry PVT(void);
     entry void startPhase(prioBcMsg *);
-    entry [expedited] void startPhaseExp(prioBcMsg *);
+    entry void startPhaseExp(prioBcMsg *);	// not SMP safe to make this expedited
     entry [expedited] void setGVT(GVTMsg *);
     entry [expedited] void reportReduce(UpdateMsg *);
   };

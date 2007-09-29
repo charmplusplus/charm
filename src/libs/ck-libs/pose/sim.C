@@ -17,6 +17,10 @@ extern CkGroupID dmid;
 /// Basic Constructor
 sim::sim() 
 {
+#ifdef VERBOSE_DEBUG
+  CkPrintf("[%d] constructing sim %d\n",CkMyPe(), thisIndex);
+#endif
+
 #ifndef SEQUENTIAL_POSE
   localPVT = (PVT *)CkLocalBranch(ThePVT);
   if(pose_config.lb_on)

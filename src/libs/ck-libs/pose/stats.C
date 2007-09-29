@@ -45,7 +45,9 @@ globalStat::globalStat(void):    doAvg (0.0), doMax (0.0), rbAvg (0.0), rbMax (0
   cpBytes (0), reporting (0), totalDos (0), totalUndos (0), totalCommits (0), totalLoops (0), 
     totalGvts (0), maxChkPts (0), maxGVT (0)
 {
-
+#ifdef VERBOSE_DEBUG
+  CkPrintf("[%d] constructing globalStat\n",CkMyPe());
+#endif
 
 }
 

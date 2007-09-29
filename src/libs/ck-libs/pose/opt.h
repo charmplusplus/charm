@@ -82,7 +82,7 @@ public:
     //CkPrintf("theTime=%d ovt=%d wt=%d ec=%d gvt=%d\n", theTime, ovt, 
     //worktime, ec, gvt);
     CkAssert((theTime == POSE_UnsetTS) || (theTime >= gvt) ||
-	     (theTime == gvt-1));
+	     (theTime == (gvt-1)));
     return theTime;
   }
   /// Add spawned event to current event's spawned event list

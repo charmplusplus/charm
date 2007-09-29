@@ -25,7 +25,12 @@ private:
   Pool *lastLook;  // last pool looked at
 public:
   /// Basic initialization
-  MemoryPool() :memPools(NULL),lastLook(NULL){ }
+  MemoryPool() :memPools(NULL),lastLook(NULL){
+#ifdef VERBOSE_DEBUG
+  CkPrintf("[%d] constructing MemoryPool\n",CkMyPe());
+#endif
+
+ }
   MemoryPool(CkMigrateMessage *) { };
   /// returns number of blocks of size sz in pool
   int CheckPool(int sz); 

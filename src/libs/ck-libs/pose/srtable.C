@@ -20,9 +20,9 @@ SRtable::SRtable() : offset(0), b(0), size_b(0), numOverflow(0), overflow(NULL),
 void SRtable::Initialize()
 {
   offset = 0; b = MAX_B; size_b = -1;
-#ifdef SR_SANITIZE
-  sanitize();
-#endif
+  //#ifdef SR_SANITIZE
+  //  sanitize();  this will always fail 
+  //#endif
 }
 
 /// Restructure the table according to new GVT estimate and first send/recv

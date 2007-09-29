@@ -11,11 +11,11 @@ CpvExtern(eventID, theEventID);
 /// Basic Constructor
 PVT::PVT() 
 {
-  //  CkPrintf("[%d] constructing PVT\n",CkMyPe());
-#ifndef SEQUENTIAL_POSE
+#ifdef VERBOSE_DEBUG
+  CkPrintf("[%d] constructing PVT\n",CkMyPe());
+#endif
   CpvInitialize(int, stateRecovery);
   CpvAccess(stateRecovery) = 0;
-#endif
   CpvInitialize(eventID, theEventID);
   CpvAccess(theEventID)=eventID();
   //  CpvAccess(theEventID).dump();
@@ -108,7 +108,7 @@ void PVT::startPhase(prioBcMsg *m)
 	if ((optPVT < 0) || ((objs.objs[i].getOVT() < optPVT) && 
 			     (objs.objs[i].getOVT() > POSE_UnsetTS))) {
 	  optPVT = objs.objs[i].getOVT();
-	  CkAssert(simdone || ((objs.objs[i].getOVT() >= estGVT) ||
+	  CkAssert(simdone>0 || ((objs.objs[i].getOVT() >= estGVT) ||
 			       (objs.objs[i].getOVT() == POSE_UnsetTS)));
 	}
       }
@@ -117,8 +117,8 @@ void PVT::startPhase(prioBcMsg *m)
 			     (objs.objs[i].getOVT() > POSE_UnsetTS)))
 	  conPVT = objs.objs[i].getOVT();
       }
-      CkAssert(simdone || (optPVT >= estGVT)||(optPVT == POSE_UnsetTS)||(estGVT == POSE_UnsetTS));
-      CkAssert(simdone || (conPVT >= estGVT)||(conPVT == POSE_UnsetTS)||(estGVT == POSE_UnsetTS));
+      CkAssert(simdone>0 || (optPVT >= estGVT)||(optPVT == POSE_UnsetTS)||(estGVT == POSE_UnsetTS));
+      CkAssert(simdone>0 || (conPVT >= estGVT)||(conPVT == POSE_UnsetTS)||(estGVT == POSE_UnsetTS));
     }
 
   // (1) Find out the local PVT from optPVT and conPVT
@@ -237,9 +237,10 @@ void PVT::objUpdate(POSE_TimeType timestamp, int sr)
   }
 #endif
   //if ((timestamp < estGVT) && (estGVT > POSE_UnsetTS))
-  //CkPrintf("timestamp=%d estGVT=%d simdone=%d sr=%d\n", timestamp, estGVT, simdone, sr);
-  CmiAssert(simdone || (timestamp >= estGVT) || (estGVT == POSE_UnsetTS));
-  CmiAssert((sr == SEND) || (sr == RECV));
+  //CkPrintf("timestamp=%d estGVT=%d simdone=%d sr=%d\n", timestamp,
+  //estGVT, simdone, sr);
+  CkAssert(simdone>0 || (timestamp >= estGVT) || (estGVT == POSE_UnsetTS));
+  CkAssert((sr == SEND) || (sr == RECV));
   if ((estGVT > POSE_UnsetTS) && 
       ((timestamp < iterMin) || (iterMin == POSE_UnsetTS))) 
     iterMin = timestamp;
@@ -265,8 +266,8 @@ void PVT::objUpdateOVT(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType ovt)
   int index = (pvtIdx-CkMyPe())/1000;
   // minimize the non-idle OVT
   //  if ((safeTime < estGVT) && (safeTime > POSE_UnsetTS)) 
-  //CkPrintf("safeTime=%d estGVT=%d\n", safeTime, estGVT);
-  CmiAssert(simdone || (safeTime >= estGVT) || (safeTime == POSE_UnsetTS));
+
+  CkAssert(simdone>0 || (safeTime >= estGVT) || (safeTime == POSE_UnsetTS));
   if ((safeTime == POSE_UnsetTS) && (objs.objs[index].getOVT2() < ovt))
     objs.objs[index].setOVT2(ovt);
   if ((safeTime > POSE_UnsetTS) && 
@@ -321,7 +322,7 @@ void PVT::reportReduce(UpdateMsg *m)
     um->runGVTflag = 0;
 
     if (reportEnd) { //send to computeGVT
-      if (simdone) // transmit final info to GVT on PE 0
+      if (simdone>0) // transmit final info to GVT on PE 0
 	g[0].computeGVT(um);              
       else {
 	g[gvtTurn].computeGVT(um);           // transmit info to GVT
@@ -352,6 +353,10 @@ void PVT::reportReduce(UpdateMsg *m)
 /// Basic Constructor
 GVT::GVT() 
 {
+#ifdef VERBOSE_DEBUG
+  CkPrintf("[%d] constructing GVT\n",CkMyPe());
+#endif
+
   optGVT = POSE_UnsetTS, conGVT = POSE_UnsetTS;
   done=0;
   SRs = NULL;

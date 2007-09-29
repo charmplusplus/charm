@@ -167,7 +167,6 @@ private:
   int done;
   SRentry *SRs;
   int startOffset;
-
 public:
   /// Basic Constructor
   GVT(void);

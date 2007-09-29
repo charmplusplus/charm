@@ -110,6 +110,11 @@ void POSE_init(int IDflag, int ET) // can specify both
   CkStartQD(fnIdx, &POSE_Coordinator_ID);
   POSE_GlobalClock = 0;
   POSE_GlobalTS = 0;
+#else
+  /*  CkPrintf("WARNING: Charm Quiescence termination enabled!\n");
+  int fnIdx = CkIndex_pose::stop();
+  CkStartQD(fnIdx, &POSE_Coordinator_ID);
+  */
 #endif  
   CkPrintf("POSE initialization complete.\n");
   if (POSE_inactDetect) CkPrintf("Using Inactivity Detection for termination.\n");
