@@ -19,11 +19,14 @@ class PUP_toNetwork4_sizer : public PUP::er {
 
 class PUP_toNetwork4_pack : public PUP::er {
 	unsigned char *buf,*start;
+    // NOTE: Need to use a union to force gcc compiler to consider pointer aliasing
 	inline void w(float f) {
 		//Write floating-point number to stream.
 		// Assumes "int4" and "float" type have the
 		// same size and endianness (true on every current machine).
-		w(*(CMK_TYPEDEF_INT4 *)&f); //Take out as integer and write out
+	    union { float f; CMK_TYPEDEF_INT4 i; } uaw;
+	    uaw.f=f;
+	    w(uaw.i); //Take out as integer and write out
 	}
 	inline void w(int i) {
 		//Write big-endian integer to output stream
@@ -45,12 +48,14 @@ class PUP_toNetwork4_pack : public PUP::er {
 
 class PUP_toNetwork4_unpack : public PUP::er {
 	const unsigned char *buf,*start;
+    // NOTE: Need to use a union to force gcc compiler to consider pointer aliasing
 	inline float read_float(void) {
 		//Read floating-point number from stream.
 		// Assumes "int4" and "float" type have the
 		// same size and endianness (true on every current machine).
-		CMK_TYPEDEF_INT4 i=read_int();
-		return *(float *)&i;
+	    union { float f; CMK_TYPEDEF_INT4 i; } uaw;
+		uaw.i=read_int();
+		return uaw.f;
 	}
 	inline int read_int(void) {
 		//Read big-endian integer to output stream

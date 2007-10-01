@@ -50,13 +50,20 @@ class PUP_toNetwork_pack : public PUP::er {
 		w(CMK_NETWORK_INT4(i>>32));
 		w(CMK_NETWORK_INT4(i));
 	}
+	// NOTE: Need to use a union to force gcc compiler to consider pointer aliasing
 	//Write floating-point number to stream.
 	inline void w(float f) {
-		w(*(CMK_FLOAT_SIZED_INT *)&f);
+	  union { float f; CMK_FLOAT_SIZED_INT i; } uaw;
+	  uaw.f=f;
+	  w(uaw.i);
+	  //w(*(CMK_FLOAT_SIZED_INT *)&f);
 	}
 	//Write floating-point number to stream.
 	inline void w(double f)  {
-		w(*(CMK_DOUBLE_SIZED_INT *)&f);
+	  union { double f; CMK_DOUBLE_SIZED_INT i; } uaw;
+	  uaw.f=f;
+	  w(uaw.i);
+	  //w(*(CMK_DOUBLE_SIZED_INT *)&f);
 	}
 
 	virtual void bytes(void *p,int n,size_t itemSize,PUP::dataType t);
@@ -83,13 +90,20 @@ class PUP_toNetwork_unpack : public PUP::er {
 	}
 	inline void read_integer(CMK_NETWORK_INT4 &i) { i=read_int(); }
     inline void read_integer(CMK_NETWORK_INT8 &i) { i=read_CMK_NETWORK_INT8(); }
+    // NOTE: Need to use a union to force gcc compiler to consider pointer aliasing
 	inline float read_float(void) {
-		CMK_NETWORK_INT4 i=read_int();
-		return *(float *)&i;
+	  union { float f; CMK_FLOAT_SIZED_INT i; } uaw;
+	  read_integer(uaw.i);
+	  return uaw.f;
+	  //CMK_NETWORK_INT4 i=read_int();
+	  //return *(float *)&i;
 	}
 	inline double read_double(void) {
-		CMK_NETWORK_INT8 i=read_CMK_NETWORK_INT8();
-		return *(double *)&i;
+	  union { double f; CMK_DOUBLE_SIZED_INT i; } uaw;
+	  read_integer(uaw.i);
+	  return uaw.f;
+	  //CMK_NETWORK_INT8 i=read_CMK_NETWORK_INT8();
+	  //return *(double *)&i;
 	}
 	inline void * read_CMK_POINTER_SIZED_INT(void) {
 	    CMK_POINTER_SIZED_INT i;
