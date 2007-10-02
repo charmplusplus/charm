@@ -150,7 +150,7 @@ double tri_prism_X(double tri[][3], double prism[][3], vector<Vec3D>  & xpoly)
     
   P.from_tri(tri);
 
-  int n_edges = 9;
+  const int n_edges = 9;
   Ray3D ray[n_edges];
   ray[0].set(prism[0], prism[1]);
   ray[1].set(prism[0], prism[2]);
