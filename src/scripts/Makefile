@@ -27,7 +27,7 @@ INC=../include
 
 all: charm++ bigsim LIBS AMPI f90charm TSM SM PVM doc
 
-all-test:
+all-test: bigsim AMPI
 	cd ../tests ; $(MAKE) all OPTS='$(OPTS)'
 	cd ../examples ; $(MAKE) all OPTS='$(OPTS)'
 
