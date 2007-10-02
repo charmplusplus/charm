@@ -1779,7 +1779,12 @@ void ConverseExit(void)
     CmiAbort("ConverseExit: MPI_Barrier failed!\n");
 
   ConverseCommonExit();
+#if CMK_VMI
+    /* vmi mpi always return exit status 255 */
+  exit(0);
+#else
   MPI_Finalize();
+#endif
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
   if (CmiMyPe() == 0){
     CmiPrintf("End of program\n");
