@@ -4,9 +4,7 @@ OBJS=commbench.o overhead.o timer.o proc.o smputil.o pingpong.o ctxt.o
 
 all: pgm
 
-pgm: $(OBJS) link
-
-link:
+pgm: $(OBJS) 
 	$(CHARMC) -o pgm $(OBJS) -language converse++
 
 test: pgm
