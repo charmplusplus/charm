@@ -7,7 +7,7 @@ ampi: hello
 hello: hello.c
 	$(CHARMC) -o hello hello.c -language ampi $(OPTS)
 
-test: clean ampi
+test: hello
 	./charmrun +p3 ./hello +vp8
 	./charmrun +p3 ./hello +vp8 +restart log
 	./charmrun +p2 ./hello +vp8 +restart log
