@@ -1,8 +1,10 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
-all: ampi
+all: pgm
 
-ampi: test.C
+ampi: clean pgm
+
+pgm: test.C
 	$(CHARMC) -c test.C
 	$(CHARMC) -o pgm test.o -language ampi
 
@@ -12,7 +14,7 @@ mpi: test.C
 clean:
 	rm -f *.o *.mod pgm *~ conv-host charmrun
 
-test: ampi
+test: pgm
 	./charmrun ./pgm +p1 +vp1
 	./charmrun ./pgm +p1 +vp2
 	./charmrun ./pgm +p1 +vp4
