@@ -1,8 +1,10 @@
 CHARMC=../../../bin/charmc
 
-all: ampi
+all: hello
 
-ampi: hello.c
+ampi: hello
+
+hello: hello.c
 	$(CHARMC) -o hello hello.c -language ampi $(OPTS)
 
 test: clean ampi
