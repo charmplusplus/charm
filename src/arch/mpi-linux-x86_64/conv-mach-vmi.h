@@ -7,4 +7,6 @@
 #undef CMK_THREADS_USE_CONTEXT
 #define CMK_THREADS_USE_CONTEXT                            1
 
+#define CMK_DISABLE_SYNC				   1
+
 #define CMK_VMI						   1
