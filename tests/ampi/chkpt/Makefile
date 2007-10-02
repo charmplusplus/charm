@@ -8,6 +8,7 @@ hello: hello.c
 	$(CHARMC) -o hello hello.c -language ampi $(OPTS)
 
 test: hello
+	rm -rf log
 	./charmrun +p3 ./hello +vp8
 	./charmrun +p3 ./hello +vp8 +restart log
 	./charmrun +p2 ./hello +vp8 +restart log
