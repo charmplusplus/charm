@@ -801,7 +801,7 @@ void CmiMachineInit(char **argv)
     return; 
   }
 
-  rc = mx_open_endpoint(MX_ANY_NIC, MX_ANY_ENDPOINT, MX_FILTER, NULL, 0, &endpoint);
+  rc = mx_open_endpoint(MX_ANY_NIC, MX_ANY_ENDPOINT, MX_FILTER, 0, 0, &endpoint);
   if (rc != MX_SUCCESS) {
     MACHSTATE1(3," open endpoint address returns %d", rc);
     printf("Cannot open endpoint address\n");
@@ -896,7 +896,7 @@ static const char *getErrorMsg(mx_return_t rc)
 static void processStatusCode(mx_status_t status){
   const char *str = mx_strstatus(status.code);
   CmiPrintf("processStatusCode: %s\n", str);
-  MACHSTATE(4, str);
+  MACHSTATE1(4, "%s", str);
 }
 
 /*@}*/
