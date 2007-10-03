@@ -12,7 +12,7 @@ CMK_LDXX="$CMK_CXX "
 CMK_LD_SHARED="-shared"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_XIOPTS=""
-CMK_QT="aix"
+CMK_QT="generic-light"
 
 # fortran compiler Absoft or gnu f95
 CMK_CF77="g77 "

@@ -7,6 +7,8 @@ CMK_PIC='-qpic=small'
 CMK_LD="$CMK_CC  "
 CMK_LDXX="$CMK_CXX  "
 
+CMK_QT="aix"
+
 CMK_AR='ar cq'
 CMK_NM='nm '
 
