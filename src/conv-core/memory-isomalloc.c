@@ -24,6 +24,17 @@ CpvStaticDeclare(CmiIsomallocBlockList *,isomalloc_blocklist);
 	CpvAccess(isomalloc_blocklist)=pushed_blocklist;\
 	rank_holding_CmiMemLock=-1;\
 
+
+void isomalloc_push()
+{
+  ISOMALLOC_PUSH
+}
+
+void isomalloc_pop()
+{
+  ISOMALLOC_POP
+}
+
 static void meta_init(char **argv)
 {
    CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
