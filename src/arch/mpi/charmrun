@@ -36,7 +36,16 @@ printf "\nRunning on $pes processors: $args\n"
 if [ -n "$PBS_NODEFILE" ]
 then
 # we are in a job shell
-  mpirun -np $pes -machinefile $PBS_NODEFILE $args
+  mpirun_cmd=`which mpirun`
+  if echo $mpirun_cmd | grep 'mvapich2'  > /dev/null 2>/dev/null
+  then
+    mvapich2-start-mpd
+    mpirun -np $pes $args
+    mpdallexit
+  else   # normal case
+    echo mpirun -np $pes -machinefile $PBS_NODEFILE $args
+    mpirun -np $pes -machinefile $PBS_NODEFILE $args
+  fi
 elif [ -n "$LSB_HOSTS" ]
 then
 # Tungsten
