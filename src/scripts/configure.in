@@ -271,6 +271,21 @@ EOT
 test_cxx "whether ucontext has FPU pointer" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_CONTEXT_FPU_POINTER, $pass, [whether ucontext has pointer])
 
+if test $pass -eq 1
+then
+cat > $t <<EOT
+#include <ucontext.h>
+
+int main()
+{
+  ucontext_t context;
+  context.uc_mcontext.uc_regs = 0;
+}
+EOT
+test_cxx "whether ucontext uses uc_regs" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_CONTEXT_FPU_POINTER_UCREGS, $pass, [whether ucontext uses uc_regs union])
+fi
+
 ###################### C++ Compiler Features #####################
 
 #### check C inline ####
