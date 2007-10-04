@@ -1971,6 +1971,9 @@ void req_start_server(void)
   else if (arg_charmrunip != NULL)
       /* user specify the IP at +useip */
     strcpy(server_addr, arg_charmrunip);
+  else if ( (arg_charmrunip = getenv ("CHARMRUN_IP")) != NULL)
+      /* user specify the env  */
+    strcpy(server_addr, arg_charmrunip);
   else 
     skt_print_ip(server_addr,ip);
 
