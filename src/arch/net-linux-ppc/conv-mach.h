@@ -15,15 +15,13 @@
 #define CMK_ASYNC_USE_FIOSSAIOSTAT_AND_FIOSSAIOOWN         0
 #define CMK_ASYNC_USE_F_SETFL_AND_F_SETOWN                 1
 
-#define CMK_DLL_CC  "g++ -shared -O3 -o "
-
 #define CMK_GETPAGESIZE_AVAILABLE                          0
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          1
 #define CMK_MALLOC_USE_OS_BUILTIN                          0
 
-#define CMK_MEMORY_PAGESIZE                                8192
-#define CMK_MEMORY_PROTECTABLE                             1
+#define CMK_MEMORY_PAGESIZE                                4096
+#define CMK_MEMORY_PROTECTABLE                             0
 
 #define CMK_NODE_QUEUE_AVAILABLE                           0
 
@@ -45,8 +43,8 @@
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 #define CMK_THREADS_COPY_STACK                             0
 
-#define CMK_TIMER_USE_RDTSC                                1
-#define CMK_TIMER_USE_GETRUSAGE                            0
+#define CMK_TIMER_USE_RDTSC                                0
+#define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 
@@ -67,6 +65,8 @@
 #define CMK_WEB_MODE                                       1
 
 #define CMK_LBDB_ON					   1
+
+#define CMK_STACKSIZE_DEFAULT                              65536
 
 #define __ONESIDED_IMPL 1
 
