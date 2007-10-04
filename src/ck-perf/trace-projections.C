@@ -545,11 +545,12 @@ void LogPool::flushLogBuffer()
   }
 }
 
-void LogPool::add(UChar type,UShort mIdx,UShort eIdx,double time,int event,
-		  int pe, int ml, CmiObjId *id, double recvT, double cpuT)
+void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
+		  double time, int event, int pe, int ml, CmiObjId *id, 
+		  double recvT, double cpuT, int numPe)
 {
   new (&pool[numEntries++])
-    LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT);
+    LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT, numPe);
   if(poolSize==numEntries) {
     flushLogBuffer();
 #if CMK_BLUEGENE_CHARM
@@ -595,10 +596,10 @@ void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileNam
 */
 void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time,
 				   int event, int pe, int ml, CmiObjId *id,
-				   double recvT, int num, int *pelist)
+				   double recvT, int numPe, int *pelist)
 {
   new (&pool[numEntries++])
-    LogEntry(time, mIdx, eIdx, event, pe, ml, id, recvT, num, pelist);
+    LogEntry(time, mIdx, eIdx, event, pe, ml, id, recvT, numPe, pelist);
   if(poolSize==numEntries) {
     flushLogBuffer();
   }
@@ -612,15 +613,15 @@ void LogPool::postProcessLog()
 }
 
 LogEntry::LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
-	     int ml, CmiObjId *d, double rt, int num, int *pelist) 
+	     int ml, CmiObjId *d, double rt, int numPe, int *pelist) 
 {
     type = CREATION_MULTICAST; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
     if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
     recvTime = rt; 
-    numpes = num;
+    numpes = numPe;
     if (pelist != NULL) {
-	pes = new int[num];
-	for (int i=0; i<num; i++) {
+	pes = new int[numPe];
+	for (int i=0; i<numPe; i++) {
 	  pes[i] = pelist[i];
 	}
     } else {
@@ -706,6 +707,12 @@ void LogEntry::pup(PUP::er &p)
       if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
       p|mIdx; p|eIdx; p|itime;
       p|event; p|pe; p|msglen; p|irecvtime;
+      if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
+      break;
+    case CREATION_BCAST:
+      if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
+      p|mIdx; p|eIdx; p|itime;
+      p|event; p|pe; p|msglen; p|irecvtime; p|numpes;
       if (p.isUnpacking()) recvTime = irecvtime/1.0e6;
       break;
     case CREATION_MULTICAST:
@@ -957,18 +964,22 @@ void TraceProjections::userBracketEvent(int e, double bt, double et)
 void TraceProjections::creation(envelope *e, int ep, int num)
 {
   double curTime = TraceTimer();
-  if(e==0) {
-    CtvAccess(curThreadEvent)=curevent;
-    _logPool->add(CREATION,ForChareMsg,ep,curTime,
-                    curevent++,CkMyPe(), 0, 0, 0.0);
+  if (e == 0) {
+    CtvAccess(curThreadEvent) = curevent;
+    _logPool->add(CREATION, ForChareMsg, ep, curTime,
+		  curevent++, CkMyPe(), 0, NULL, 0, 0.0);
   } else {
     int type=e->getMsgtype();
     e->setEvent(curevent);
-    for(int i=0; i<num; i++) {
-      _logPool->add(CREATION,type,ep, curTime,
-                    curevent+i,CkMyPe(),e->getTotalsize(), 0, 0.0);
+    if (num > 1) {
+      _logPool->add(CREATION_BCAST, type, ep, curTime,
+		    curevent++, CkMyPe(), e->getTotalsize(), 
+		    NULL, 0, 0.0, num);
+    } else {
+      _logPool->add(CREATION, type, ep, curTime,
+		    curevent++, CkMyPe(), e->getTotalsize(), 
+		    NULL, 0, 0.0);
     }
-    curevent += num;
   }
 }
 
@@ -1001,7 +1012,9 @@ void TraceProjections::creationDone(int num)
   int idx = _logPool->numEntries-1;
   while (idx >=0 && num >0 ) {
     LogEntry &log = _logPool->pool[idx];
-    if (log.type == CREATION) {
+    if ((log.type == CREATION) ||
+	(log.type == CREATION_BCAST) ||
+	(log.type == CREATION_MULTICAST)) {
       log.recvTime = curTime - log.time;
       num --;
     }
@@ -1020,7 +1033,7 @@ void TraceProjections::beginExecute(CmiObjId *tid)
   execEvent = CtvAccess(curThreadEvent);
   execEp = (-1);
   _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
-                             execEvent,CkMyPe(), 0, tid);
+		execEvent,CkMyPe(), 0, tid);
 #if CMK_HAS_COUNTER_PAPI
   _logPool->addPapi(numPAPIEvents, papiEvents, papiValues);
 #endif
@@ -1039,17 +1052,19 @@ void TraceProjections::beginExecute(envelope *e)
     execEvent = CtvAccess(curThreadEvent);
     execEp = (-1);
     _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
-		  execEvent,CkMyPe(), 0, 0, 0.0, TraceCpuTimer());
+		  execEvent,CkMyPe(), 0, NULL, 0.0, TraceCpuTimer());
 #if CMK_HAS_COUNTER_PAPI
     _logPool->addPapi(numPAPIEvents, papiEvents, papiValues);
 #endif
     inEntry = 1;
   } else {
-    beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),e->getSrcPe(),e->getTotalsize());
+    beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),
+		 e->getSrcPe(),e->getTotalsize());
   }
 }
 
-void TraceProjections::beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx)
+void TraceProjections::beginExecute(int event, int msgType, int ep, int srcPe,
+				    int mlen, CmiObjId *idx)
 {
 #if CMK_HAS_COUNTER_PAPI
   if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
@@ -1078,11 +1093,11 @@ void TraceProjections::endExecute(void)
   if (checknested && !inEntry) CmiAbort("Nested EndExecute!\n");
   double cputime = TraceCpuTimer();
   if(execEp == (-1)) {
-    _logPool->add(END_PROCESSING,0,_threadEP,TraceTimer(),
-                             execEvent,CkMyPe(),0,0,0.0,cputime);
+    _logPool->add(END_PROCESSING, 0, _threadEP, TraceTimer(),
+		  execEvent, CkMyPe(), 0, NULL, 0.0, cputime);
   } else {
-    _logPool->add(END_PROCESSING,0,execEp,TraceTimer(),
-                             execEvent,execPe,0,0,0.0,cputime);
+    _logPool->add(END_PROCESSING, 0, execEp, TraceTimer(),
+		  execEvent, execPe, 0, NULL, 0.0, cputime);
   }
 #if CMK_HAS_COUNTER_PAPI
   _logPool->addPapi(numPAPIEvents, papiEvents, papiValues);
@@ -1105,8 +1120,8 @@ void TraceProjections::messageRecv(char *env, int pe)
   else
     ep = _threadEP;
 #endif
-  _logPool->add(MESSAGE_RECV,msgType,ep,TraceTimer(),
-                             curevent++,e->getSrcPe(), e->getTotalsize());
+  _logPool->add(MESSAGE_RECV, msgType, ep, TraceTimer(),
+		curevent++, e->getSrcPe(), e->getTotalsize());
 #endif
 }
 

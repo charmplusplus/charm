@@ -640,7 +640,7 @@ CkGroupID CkCreateGroup(int cIdx, int eIdx, void *msg)
   env->setSrcPe(CkMyPe());
   _TRACE_CREATION_N(env, CkNumPes());
   CkGroupID gid = _groupCreate(env);
-  _TRACE_CREATION_DONE(CkNumPes());
+  _TRACE_CREATION_DONE(1);
   return gid;
 }
 
@@ -654,7 +654,7 @@ CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg)
   env->setSrcPe(CkMyPe());
   _TRACE_CREATION_N(env, CkNumNodes());
   CkGroupID gid = _nodeGroupCreate(env);
-  _TRACE_CREATION_DONE(CkNumNodes());
+  _TRACE_CREATION_DONE(1);
   return gid;
 }
 
@@ -1186,7 +1186,7 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
     _noCldEnqueue(pe, env);
   else
     _skipCldEnqueue(pe, env, _infoIdx);
-  _TRACE_CREATION_DONE(numPes);
+  _TRACE_CREATION_DONE(1);
 }
 
 static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
@@ -1216,7 +1216,7 @@ void CkSendMsgBranchImmediate(int eIdx, void *msg, int destPE, CkGroupID gID)
   _noCldEnqueue(destPE, env);
   _STATS_RECORD_SEND_BRANCH_1();
   CkpvAccess(_coreState)->create();
-  _TRACE_CREATION_DONE(numPes);
+  _TRACE_CREATION_DONE(1);
 #else
   // no support for immediate message, send inline
   CkSendMsgBranchInline(eIdx, msg, destPE, gID);
@@ -1310,7 +1310,7 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
     _noCldNodeEnqueue(node, env);
   else
     CldNodeEnqueue(node, env, _infoIdx);
-  _TRACE_CREATION_DONE(numPes);
+  _TRACE_CREATION_DONE(1);
 }
 
 extern "C"
@@ -1331,7 +1331,7 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
   _noCldNodeEnqueue(node, env);
   _STATS_RECORD_SEND_BRANCH_1();
   CkpvAccess(_coreState)->create();
-  _TRACE_CREATION_DONE(numPes);
+  _TRACE_CREATION_DONE(1);
 #else
   // no support for immediate message, send inline
   CkSendMsgNodeBranchInline(eIdx, msg, node, gID);

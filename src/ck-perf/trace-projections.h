@@ -67,8 +67,11 @@ class LogEntry {
     int flen;
   public:
     LogEntry() {fName=NULL;flen=0;pes=NULL;numpes=0;}
-    LogEntry(double tm, unsigned char t, unsigned short m=0, unsigned short e=0, int ev=0, int p=0, int ml=0, CmiObjId *d=NULL, double rt=0., double cputm=0.) {
-      type = t; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
+    LogEntry(double tm, unsigned char t, unsigned short m=0, 
+	     unsigned short e=0, int ev=0, int p=0, int ml=0, 
+	     CmiObjId *d=NULL, double rt=0., double cputm=0., int numPe=0) {
+      type = t; mIdx = m; eIdx = e; event = ev; pe = p; 
+      time = tm; msglen = ml;
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
       recvTime = rt; cputime = cputm;
       // initialize for papi as well as non papi versions.
@@ -78,27 +81,29 @@ class LogEntry {
       papiValues = NULL;
 #endif
       fName = NULL; flen=0;
+      pes=NULL;
+      numpes=numPe;
+    }
+    LogEntry(double _time,unsigned char _type,unsigned short _funcID,
+	     int _lineNum,char *_fileName){
+      time = _time;
+      type = _type;
+      mIdx = _funcID;
+      event = _lineNum;
+      if(_fileName == NULL){
+	fName = NULL;
+	flen = 0;
+      }else{
+	fName = new char[strlen(_fileName)+2];
+	fName[0] = ' ';
+	memcpy(fName+1,_fileName,strlen(_fileName)+1);
+	flen = strlen(fName)+1;
+      }	
       pes=NULL;numpes=0;
     }
-    LogEntry(double _time,unsigned char _type,unsigned short _funcID,int _lineNum,char *_fileName){
-			time = _time;
-			type = _type;
-			mIdx = _funcID;
-			event = _lineNum;
-			if(_fileName == NULL){
-				fName = NULL;
-				flen = 0;
-			}else{
-				fName = new char[strlen(_fileName)+2];
-				fName[0] = ' ';
-				memcpy(fName+1,_fileName,strlen(_fileName)+1);
-				flen = strlen(fName)+1;
-			}	
-                        pes=NULL;numpes=0;
-		}
     // **CW** new constructor for multicast data
     LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
-	     int ml, CmiObjId *d, double rt, int num, int *pelist);
+	     int ml, CmiObjId *d, double rt, int numPe, int *pelist);
     // complementary function for adding papi data
     void addPapi( int numPapiEvts, int *papi_ids, LONG_LONG_PAPI *papiVals);
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
@@ -166,14 +171,16 @@ class LogPool {
     void writeSts(TraceProjections *traceProj);
     void writeRC(void);
 
-    void add(unsigned char type,unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., double cpuT=0.0);
-      // complementary function to set papi info to current log entry
-      // must be called after an add()
+    void add(unsigned char type, unsigned short mIdx, unsigned short eIdx,
+	     double time, int event, int pe, int ml=0, CmiObjId* id=0, 
+	     double recvT=0., double cpuT=0.0, int numPe=0);
+    // complementary function to set papi info to current log entry
+    // must be called after an add()
     void addPapi(int numPap, int *pap_ids, LONG_LONG_PAPI *papVals) {
       pool[numEntries-1].addPapi(numPap, pap_ids, papVals);
     }
     void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
-    void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int num=0, int *pelist=NULL);
+    void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int numPe=0, int *pelist=NULL);
     void flushLogBuffer();
     void postProcessLog();
 };

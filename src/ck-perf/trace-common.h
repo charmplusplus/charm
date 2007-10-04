@@ -32,6 +32,7 @@
 #define  END_PACK           17
 #define  BEGIN_UNPACK       18
 #define  END_UNPACK         19
+#define  CREATION_BCAST     20
 
 #define  CREATION_MULTICAST 21
 
