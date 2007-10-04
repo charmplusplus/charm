@@ -12,6 +12,9 @@
 /* whether ucontext has pointer */
 #undef CMK_CONTEXT_FPU_POINTER
 
+/* whether ucontext uses uc_regs union */
+#undef CMK_CONTEXT_FPU_POINTER_UCREGS
+
 /* C++ *_casts<> does not work */
 #undef CMK_CPP_CAST_ILLEGAL
 
@@ -57,6 +60,9 @@
 /* wether has elf.h */
 #undef CMK_HAS_ELF_H
 
+/* whether get_myaddress() exists */
+#undef CMK_HAS_GET_MYADDRESS
+
 /* whether has malloc.h */
 #undef CMK_HAS_MALLOC_H
 
@@ -65,9 +71,6 @@
 
 /* whether mmap() accepts MAP_ANON */
 #undef CMK_HAS_MMAP_ANON
-
-/* whether get_myaddress() exists */
-#undef CMK_HAS_GET_MYADDRESS
 
 /* whether Python is installed */
 #undef CMK_HAS_PYTHON
