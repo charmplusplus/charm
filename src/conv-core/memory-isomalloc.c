@@ -14,6 +14,7 @@ be wrapped in CmiMemLock.  (Doesn't hurt, tho')
 
 /*The current allocation arena */
 CpvStaticDeclare(CmiIsomallocBlockList *,isomalloc_blocklist);
+CpvStaticDeclare(CmiIsomallocBlockList *,pushed_blocklist);
 
 #define ISOMALLOC_PUSH \
 	CmiIsomallocBlockList *pushed_blocklist=CpvAccess(isomalloc_blocklist);\
@@ -24,21 +25,24 @@ CpvStaticDeclare(CmiIsomallocBlockList *,isomalloc_blocklist);
 	CpvAccess(isomalloc_blocklist)=pushed_blocklist;\
 	rank_holding_CmiMemLock=-1;\
 
-
 void isomalloc_push()
 {
-  ISOMALLOC_PUSH
+	CpvAccess(pushed_blocklist)=CpvAccess(isomalloc_blocklist);
+	CpvAccess(isomalloc_blocklist)=NULL;
+	rank_holding_CmiMemLock=CmiMyRank();
 }
 
 void isomalloc_pop()
 {
-  ISOMALLOC_POP
+	CpvAccess(isomalloc_blocklist)=CpvAccess(pushed_blocklist);
+	rank_holding_CmiMemLock=-1;\
 }
 
 static void meta_init(char **argv)
 {
    CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
    CpvInitialize(CmiIsomallocBlockList *,isomalloc_blocklist);
+   CpvInitialize(CmiIsomallocBlockList *,pushed_blocklist);
 }
 
 static void *meta_malloc(size_t size)
