@@ -1519,6 +1519,7 @@ CthThread CthPup(pup_er p, CthThread t)
   /* so far, uJcontext and context-memoryalias works for IA32, not ia64 */
   pup_bytes(p,&t->context,sizeof(t->context));
 #if !CMK_THREADS_USE_JCONTEXT && CMK_CONTEXT_FPU_POINTER
+#if ! CMK_CONTEXT_FPU_POINTER_UCREGS
     /* context is not portable for ia32 due to pointer in uc_mcontext.fpregs,
        pup it separately */
   if (!pup_isUnpacking(p)) flag = t->context.uc_mcontext.fpregs != NULL;
@@ -1529,6 +1530,16 @@ CthThread CthPup(pup_er p, CthThread t)
     }
     pup_bytes(p,t->context.uc_mcontext.fpregs,sizeof(struct _libc_fpstate));
   }
+#else             /* net-linux-ppc 32 bit */
+  if (!pup_isUnpacking(p)) flag = t->context.uc_mcontext.uc_regs != NULL;
+  pup_int(p,&flag);
+  if (flag) {
+    if (pup_isUnpacking(p)) {
+      t->context.uc_mcontext.uc_regs = malloc(sizeof(mcontext_t));
+    }
+    pup_bytes(p,t->context.uc_mcontext.uc_regs,sizeof(mcontext_t));
+  }
+#endif
 #endif
   if (pup_isUnpacking(p)) {
       t->context.uc_link = 0;
