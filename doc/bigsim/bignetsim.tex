@@ -1,8 +1,8 @@
 \section{BigSim Network Simulator}
 \label{bignetsim}
 
-The BigSim Network Simulator is also known as DetailedSim and lives 
-in the pgms module in cvs at pose/DetailedSim. 
+The BigSim Network Simulator is also known as Bigsimulator and lives 
+in the SVN repository https://charm.cs.uiuc.edu/svn/repos/BigNetSim. 
 The Network simulator is actually more of an Inter-connection network 
 simulator and hence more important in the context of large parallel
 machines with interconnects. 
@@ -205,9 +205,51 @@ directories in the software.
 
 
 \subsection{Using the software}
-Refer to the README file that comes in the directory containing the software.
-It presents different schemes to use the software.
 
+BigNetSim has 2 major modes.  
+
+\begin{itemize}
+\item{ Trace based traffic simulation }
+\item{Artificial traffic generation based simulation.
+The mode of the simulator is governed by the $USE\_TRANSCEIVER$ parameter
+in the netconfig file.  When set to 0, trace based simulation is used,
+when set to 1, traffic generation is used.}
+\end{itemize}
+
+Trace based simulation.  This is used to study target application
+performance, or detailed network performance when loaded by a specific
+application.
+
+There are two command line parameters for traced based simulation.
+\begin{alltt}./bigsimulator arg1 arg2\end{alltt}
+\begin{alltt}
+	arg1 = 0 => Latency only mode
+	       1 => Detailed contention model
+	arg2 = N => starts execution at the time marked by skip point N	(0 is start) 
+\end{alltt}
+
+Artificial traffic generation based simulation is use to study the performance of interconnects under standard network load schemes.
+
+
+\begin{alltt}./bigsimulator arg1 arg2 arg3 arg4 arg5 arg6\end{alltt}
+example
+\begin{alltt}./bigsimulator 1 2 3 100 2031 0.1\end{alltt}
+
+\begin{alltt}
+	arg1 = 0 => Latency only mode
+	       1 => Detailed contention model
+	arg2 = 1 => deterministic traffic
+	       2 => poisson traffic
+	arg3 = 1 => KSHIFT 
+	       2 => RING 
+	       3 => BITTRANSPOSE 
+	       4 => BITREVERSAL 
+	       5 => BITCOMPLEMENT 
+	       6 => UNIFORM\_DISTRIBUTION 
+	arg4 = number of packets
+	arg5 = message size
+	arg6 = load factor
+\end{alltt}
 
 \subsection{Build your own Interconnection network}
 To build a new interconnection network, one has to create a new directory
