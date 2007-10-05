@@ -47,12 +47,49 @@ class BGLTorusManager {
       else
 	dimNT = 1;
 
+      // If we are using lesser no. of processors than the total partition
+      // we allocated, then we need to do some arithmetic:
+
+      int numPes = CmiNumPes();
+      int numNodes = numPes;
+      if(dimNT==2) numNodes = numPes / 2;
+
+      int max_t = 0;
+      if(dimNX * dimNY * dimNZ != numNodes) {
+        dimNX = dimNY = dimNZ = 0;
+        int min_x, min_y, min_z;
+        min_x = min_y = min_z = numPes;
+        unsigned int tmp_t, tmp_x, tmp_y, tmp_z;      
+         for(int c = 0; c < numPes; c++) {
+	   rts_coordinatesForRank(c, &tmp_x, &tmp_y, &tmp_z, &tmp_t);
+
+	   if(tmp_x > dimNX) dimNX = tmp_x;
+           if(tmp_x < min_x) min_x = tmp_x;
+	   if(tmp_y > dimNY) dimNY = tmp_y;
+           if(tmp_y < min_y) min_y = tmp_y;
+	   if(tmp_z > dimNZ) dimNZ = tmp_z;
+           if(tmp_z < min_z) min_z = tmp_z;
+
+	   if(tmp_t > max_t) max_t = tmp_t;
+         }
+	 
+	 dimNX = dimNX - min_x + 1;
+	 dimNY = dimNY - min_y + 1;
+	 dimNZ = dimNZ - min_z + 1;
+      }
+
       dimX = dimNX;
       dimY = dimNY;
       dimZ = dimNZ;
- 
-      dimX = dimX * dimNT;	// assuming TXYZ
-      procsPerNode = dimNT;
+
+      if(dimX * dimY * dimZ != numNodes) {
+        dimX = dimX * (max_t + 1);	// assuming TXYZ
+        procsPerNode = max_t;
+      }
+      else if(dimNT == 2) {
+	dimX = dimX * dimNT;		// assuming TXYZ
+	procsPerNode = dimNT;
+      }
 
       torus[0] = bgl_p.isTorusX();
       torus[1] = bgl_p.isTorusY();
