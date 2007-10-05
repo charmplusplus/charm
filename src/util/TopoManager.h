@@ -119,7 +119,9 @@ class TopoManager {
     inline int getDimNZ() { return dimNZ; }
     inline int getDimNT() { return dimNT; }
 
-    inline int absX(int x) {
+    inline int getProcsPerNode() { return procsPerNode; }
+    
+inline int absX(int x) {
       int px = abs(x);
       int sx = dimX - px;
       CmiAssert(sx>=0);
