@@ -1961,6 +1961,12 @@ void req_start_server(void)
   if (arg_local)
       /* local execution, use localhost always */
     strcpy(server_addr, "127.0.0.1");
+  else if (arg_charmrunip != NULL)
+      /* user specify the IP at +useip */
+    strcpy(server_addr, arg_charmrunip);
+  else if ( (arg_charmrunip = getenv ("CHARMRUN_IP")) != NULL)
+      /* user specify the env  */
+    strcpy(server_addr, arg_charmrunip);
   else if (skt_ip_match(ip,_skt_invalid_ip)) {
       printf("Charmrun> Warning-- cannot find IP address for your hostname.  Using loopback.\n");
       strcpy(server_addr, "127.0.0.1");
@@ -1968,12 +1974,6 @@ void req_start_server(void)
   else if (arg_usehostname || skt_ip_match(ip,skt_lookup_ip("127.0.0.1")))
       /*Use symbolic host name as charmrun address*/
     gethostname(server_addr,sizeof(server_addr));
-  else if (arg_charmrunip != NULL)
-      /* user specify the IP at +useip */
-    strcpy(server_addr, arg_charmrunip);
-  else if ( (arg_charmrunip = getenv ("CHARMRUN_IP")) != NULL)
-      /* user specify the env  */
-    strcpy(server_addr, arg_charmrunip);
   else 
     skt_print_ip(server_addr,ip);
 
