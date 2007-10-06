@@ -3,7 +3,9 @@
  *****************************************************************************/
 
 #include <stdio.h>
+#if CMK_HAS_STDINT_H
 #include <stdint.h>
+#endif
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
