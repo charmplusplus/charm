@@ -2,16 +2,12 @@
  * A few useful built-in CPD and CCS handlers.
  *****************************************************************************/
 
-#include <stdio.h>
-#if CMK_HAS_STDINT_H
-#include <stdint.h>
-#endif
-#include <stdlib.h>
+#include "converse.h"
+
 #include <errno.h>
 #include <string.h>
 #include <sys/stat.h>		// for chmod
 
-#include "converse.h"
 #include "ckhashtable.h"
 #include "conv-ccs.h"
 #include "debug-charm.h"
