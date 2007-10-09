@@ -62,6 +62,9 @@ void ParFUM_findMatchingCoords(int dim, int extent_a, double* a,
 			       std::vector<int>& matches_a,
 			       std::vector<int>& matches_b
 			       );
+
+void sortNodes(double *nodes, double *sorted_nodes, int *sorted_ids, int numNodes, int dim);
+
 #endif
 
 
