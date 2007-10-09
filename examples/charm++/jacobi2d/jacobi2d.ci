@@ -15,6 +15,6 @@ mainmodule jacobi2d {
   array [2D] Jacobi {
     entry Jacobi(void);
     entry void begin_iteration(void);
-    entry void recieve_neighbor(float);
+    entry void receive_neighbor(float);
   };        	
 };

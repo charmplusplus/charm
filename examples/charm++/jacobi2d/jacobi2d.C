@@ -39,7 +39,7 @@ float right = 0;
 class Main : public CBase_Main
 {
 public:
-    int recieve_count;
+    int receive_count;
     CProxy_Jacobi array;
     int num_chares;
 
@@ -64,7 +64,7 @@ public:
 	num_chares = num_rows*num_cols;
 
 	//Start the computation
-	recieve_count = num_chares;
+	receive_count = num_chares;
 	array.begin_iteration();
     }
 
@@ -73,21 +73,21 @@ public:
     void report_error(int row, int col, float error) {
 	CkPrintf("[main] (%d, %d) error=%g\n", row, col, error);
 
-	if ((recieve_count == num_chares)
+	if ((receive_count == num_chares)
 	    ||
 	    (fabs(error) > max_error)
 	    ) {
 	    max_error = fabs(error);
 	}
 
-	recieve_count--;
-	if (0 == recieve_count) {
+	receive_count--;
+	if (0 == receive_count) {
 	    if (max_error < epsilon) {
 		CkPrintf("All done\n");
 		CkExit();
 	    } else {
 		CkPrintf("[main] error = %g, starting new iteration.\n", max_error);
-		recieve_count=num_chares;
+		receive_count=num_chares;
 		array.begin_iteration();
 	    }
 	}
@@ -102,12 +102,34 @@ public:
 
     Jacobi() {
 	temperature = 0;
+	messages_due = 4;
     }
 
     Jacobi(CkMigrateMessage* m) {}
 
+    //added for array migration
+    void pup(PUP::er &p){
+	p | temperature;
+	p | update;
+	p | messages_due;
+    }
+
     void begin_iteration(void) {
-	messages_due = 4;
+	/* messages_due should not be assigned here because it is not guaranteed
+	 * that all elements' function "begin_iteration" are called before the
+	 * function "receive_neighbor". Otherwise, the "messages_due" is messed up.
+	 * For example, assuming the 2D array is of size 2*2. Then the array element(0,1)
+	 * would send its data to element(1,1) and element(0,0) according to the sequence
+	 * of calling "receive_neighbor" in this function. If element(1,1)'s "receive_neighbor"
+	 * is called before its "begin_iteration" call and the "message_due" is reset
+	 * in the "begin_iteration" function, then the "messages_due" of element(1,1) would be 
+	 * messed up. Because one of 4 messages that element(1,1) needs to receive is already
+	 * posted, the "messages_due" should not be reset, otherwise element(1,1) would think
+	 * there's still one msg to receive and woudl not progress to the next iteration.
+	 * The solution is to initialize the value in Jacobi's constructor and reset it
+	 * before doing the next iteration (in the check_done_iteration function) --Chao Mei
+	 */
+//	messages_due = 4;
 	update = 0;
 
 	//enforce the boundary conditions.  Nodes on an edge shouldn't
@@ -116,35 +138,35 @@ public:
 	    update += top;
 	    messages_due--;
 	} else {
-	    thisProxy(thisIndex.x-1, thisIndex.y).recieve_neighbor(temperature);
+	    thisProxy(thisIndex.x-1, thisIndex.y).receive_neighbor(temperature);
 	}
 
 	if (thisIndex.x == num_rows-1) {
 	    update += bottom;
 	    messages_due--;
 	} else {
-	    thisProxy(thisIndex.x+1, thisIndex.y).recieve_neighbor(temperature);
+	    thisProxy(thisIndex.x+1, thisIndex.y).receive_neighbor(temperature);
 	}
 
 	if (thisIndex.y == 0) {
 	    update += left;
 	    messages_due--;
 	} else {
-	    thisProxy(thisIndex.x, thisIndex.y-1).recieve_neighbor(temperature);
+	    thisProxy(thisIndex.x, thisIndex.y-1).receive_neighbor(temperature);
 	}
 
 	if (thisIndex.y == num_cols-1) {
 	    update += right;
 	    messages_due--;
 	} else {
-	    thisProxy(thisIndex.x, thisIndex.y+1).recieve_neighbor(temperature);
+	    thisProxy(thisIndex.x, thisIndex.y+1).receive_neighbor(temperature);
 	}
 
 	//check to see if we still need messages.
 	check_done_iteration();
     }
 
-    void recieve_neighbor(float new_temperature) {
+    void receive_neighbor(float new_temperature) {
 	update += new_temperature;
 	messages_due--;
 	check_done_iteration();
@@ -155,6 +177,7 @@ public:
 	    update /= 4;
 	    float error = update-temperature;
 	    temperature = update;
+	    messages_due = 4;
 	    mainProxy.report_error(thisIndex.x, thisIndex.y, error);
 	}
     }
