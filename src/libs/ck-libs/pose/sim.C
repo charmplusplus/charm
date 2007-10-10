@@ -50,12 +50,11 @@ sim::~sim()
 void sim::Step()
 {
   if (active < 0) return; // object is migrating; deactivate it 
+
 #ifndef CMK_OPTIMIZE
   double critStart;
   if(pose_config.trace)
     critStart=CmiWallTimer();  // trace timing
-#endif
-#ifndef CMK_OPTIMIZE
   int tstat;
   if(pose_config.stats)
     {
@@ -64,6 +63,7 @@ void sim::Step()
       else localStats->SwitchTimer(SIM_TIMER);
     }
 #endif
+
   prioMsg *pm;
   switch (myStrat->STRAT_T) { // step based on strategy type
   case SEQ_T:
@@ -88,8 +88,6 @@ void sim::Step()
       if (!tstat)  localStats->TimerStop();
       else localStats->SwitchTimer(tstat);
     }
-#endif
-#ifndef CMK_OPTIMIZE
   if(pose_config.trace)
     traceUserBracketEvent(60, critStart, CmiWallTimer());
 #endif
@@ -110,7 +108,9 @@ void sim::Step(prioMsg *m)
       else localStats->SwitchTimer(SIM_TIMER);
     }
 #endif
+
   myStrat->Step(); // Call Step on strategy
+
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
     {
@@ -129,8 +129,6 @@ void sim::Commit()
   double critStart;
   if(pose_config.trace)
     critStart= CmiWallTimer();  // trace timing
-#endif
-#ifndef CMK_OPTIMIZE
   int tstat;
   if(pose_config.stats)
     {
@@ -138,12 +136,10 @@ void sim::Commit()
       if (!tstat)  localStats->TimerStart(SIM_TIMER);
       else localStats->SwitchTimer(SIM_TIMER);
     }
-#endif
-  //  localPVT = (PVT *)CkLocalBranch(ThePVT);
-#ifndef CMK_OPTIMIZE
   if(pose_config.stats)
     localStats->SwitchTimer(FC_TIMER);
 #endif
+
   if (localPVT->done()) { // simulation inactive
     eq->CommitEvents(this, POSE_endtime); // commit all events in
 					  // queue
@@ -153,25 +149,24 @@ void sim::Commit()
     lastGVT = localPVT->getGVT();
     eq->CommitEvents(this, lastGVT); // commit events up to GVT
   }
+
 #ifndef CMK_OPTIMIZE
   if(pose_config.trace)
     {
       traceUserBracketEvent(50, critStart, CmiWallTimer());
       critStart = CmiWallTimer();
     }
-#endif
-#ifndef CMK_OPTIMIZE
   if(pose_config.stats)
     localStats->SwitchTimer(SIM_TIMER);
 #endif
+
   if (!localPVT->done() && (eq->currentPtr->timestamp > -1)) 
     Step(); // not done; try stepping again
+
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
     if (!tstat)  localStats->TimerStop();
     else localStats->SwitchTimer(tstat);
-#endif
-#ifndef CMK_OPTIMIZE
   if(pose_config.trace)
     traceUserBracketEvent(60, critStart, CmiWallTimer());
 #endif
@@ -211,21 +206,20 @@ void sim::Cancel(cancelMsg *m)
   cancels.Insert(m->timestamp, m->evID); // add to cancellations list
   localPVT->objUpdate(m->timestamp, RECV); // tell PVT branch about recv
   CkFreeMsg(m);
+
 #ifndef CMK_OPTIMIZE
   double critStart;
   if(pose_config.trace)
     critStart= CmiWallTimer();  // trace timing
-#endif
-#ifndef CMK_OPTIMIZE
   if(pose_config.stats)
     localStats->SwitchTimer(SIM_TIMER);      
 #endif
+
   myStrat->Step(); // call Step to handle cancellation
+
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
     localStats->TimerStop();
-#endif
-#ifndef CMK_OPTIMIZE
   if(pose_config.trace)
     traceUserBracketEvent(60, critStart, CmiWallTimer());
 #endif
