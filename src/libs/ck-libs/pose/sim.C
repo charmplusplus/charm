@@ -139,7 +139,7 @@ void sim::Commit()
       else localStats->SwitchTimer(SIM_TIMER);
     }
 #endif
-  localPVT = (PVT *)CkLocalBranch(ThePVT);
+  //  localPVT = (PVT *)CkLocalBranch(ThePVT);
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
     localStats->SwitchTimer(FC_TIMER);
@@ -207,7 +207,7 @@ void sim::Cancel(cancelMsg *m)
 #endif
   //  char str[20];
   //  CkPrintf("[%d] RECV(cancel) %s at %d...\n", CkMyPe(), m->evID.sdump(str), m->timestamp);      
-  localPVT = (PVT *)CkLocalBranch(ThePVT);
+  //  localPVT = (PVT *)CkLocalBranch(ThePVT);
   cancels.Insert(m->timestamp, m->evID); // add to cancellations list
   localPVT->objUpdate(m->timestamp, RECV); // tell PVT branch about recv
   CkFreeMsg(m);
