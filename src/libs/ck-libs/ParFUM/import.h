@@ -20,7 +20,7 @@ extern int getFloatFormat(void);
  */
 inline int coordCompare(const double *key1, const double *key2, int dim) {
   static const int endian = getFloatFormat();
-  int maxUlps=200;
+  int maxUlps=100;
   for(int ii=0; ii<dim; ii++) {
     int a, b;
     msbInt(a,key1[ii]);

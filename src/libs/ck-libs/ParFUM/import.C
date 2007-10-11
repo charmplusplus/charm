@@ -1,4 +1,7 @@
 #include "import.h"
+
+bool coord_leq(double *a, double* b, int dim);
+
 void ParFUM_desharing(int meshid){
 	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_desharing"))->lookup(meshid,"ParFUM_desharing");
 	mesh->clearSharedNodes();
@@ -53,9 +56,9 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
   }
   // Handle node coordinate-matching requests from other ranks
 
-  //int *sorted_local_idxs = (int *)malloc(numNodes*sizeof(int));
-  //double *sorted_nodeCoords = (double *)malloc(dim*numNodes*sizeof(double));
-  //sortNodes(nodeCoords, sorted_nodeCoords, sorted_local_idxs, numNodes, dim);
+  int *sorted_local_idxs = (int *)malloc(numNodes*sizeof(int));
+  double *sorted_nodeCoords = (double *)malloc(dim*numNodes*sizeof(double));
+  sortNodes(nodeCoords, sorted_nodeCoords, sorted_local_idxs, numNodes, dim);
 
   for (int i=0; i<rank; i++) {
     std::vector<int> remoteSharedNodes, localSharedNodes;
@@ -74,10 +77,11 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
     // Match coords between local nodes and received coords
     int recvNodeCount = length/dim;
 
-    //int *sorted_remote_idxs = (int *)malloc(recvNodeCount*sizeof(int));
-    //double *sorted_recvNodeCoords = (double *)malloc(length*sizeof(double));
-    //sortNodes(recvNodeCoords, sorted_recvNodeCoords, sorted_remote_idxs, recvNodeCount, dim);
+    int *sorted_remote_idxs = (int *)malloc(recvNodeCount*sizeof(int));
+    double *sorted_recvNodeCoords = (double *)malloc(length*sizeof(double));
+    sortNodes(recvNodeCoords, sorted_recvNodeCoords, sorted_remote_idxs, recvNodeCount, dim);
 
+    /* OLD SLOW WAY
     for (int j=0; j<numNodes; j++) {
       for (int k=0; k<recvNodeCount; k++) {
 	if (coordEqual(&nodeCoords[j*dim], &recvNodeCoords[k*dim], dim)) {
@@ -88,23 +92,29 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
 	}
       }
     }
+    */
 
-    /*
     int j = 0; 
     int k = 0;
-    while (k < recvNodeCount) {
-      int cmp = coordCompare(&sorted_nodeCoords[j*dim], &sorted_recvNodeCoords[k*dim], dim);
-      if (cmp == 0) {
+    while ((j<numNodes) && (k < recvNodeCount)) {
+      if ((coordCompare(&sorted_nodeCoords[j*dim], &sorted_recvNodeCoords[k*dim], dim)) == 0) {
 	localSharedNodes.push_back(sorted_local_idxs[j]); 
 	remoteSharedNodes.push_back(sorted_remote_idxs[k]);
 	j++; k++;
       }
-      else if (cmp == 1) { // local is less than remote
+      else if (coord_leq(&sorted_nodeCoords[j*dim], &sorted_recvNodeCoords[k*dim], dim)) {
+	// local is less than remote
 	j++;
       }
-      else if (cmp == -1) { // remote is less than local; remote is not present
+      else if (!coord_leq(&sorted_nodeCoords[j*dim], &sorted_recvNodeCoords[k*dim], dim)) { 
+	// remote is less than local; remote is not present
 	k++;
       }
+    }
+    
+    /*
+    if (localSharedNodes.size() > 0) {
+      printf("%d has %d nodes shared with %d.\n", rank, localSharedNodes.size(), source);
     }
     */
 
@@ -172,15 +182,15 @@ void ParFUM_createComm(int meshid, int dim)
   MPI_Barrier(MPI_COMM_WORLD);
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (rank==0) CkPrintf("Recreating shared nodes...\n");
+  //if (rank==0) CkPrintf("Recreating shared nodes...\n");
   ParFUM_recreateSharedNodes(meshid, dim);
   MPI_Barrier(MPI_COMM_WORLD);
-  if (rank==0) CkPrintf("Generating global node numbers...\n");
+  //if (rank==0) CkPrintf("Generating global node numbers...\n");
   ParFUM_generateGlobalNodeNumbers(meshid);
   FEM_Mesh *mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->lookup(meshid,"ParFUM_recreateSharedNodes");
   MPI_Barrier(MPI_COMM_WORLD);
   
-  if (rank==0) CkPrintf("Gathering ghost data...\n");
+  //if (rank==0) CkPrintf("Gathering ghost data...\n");
   struct ghostdata *gdata;
   if(rank == 0){
     gdata = gatherGhosts();
@@ -188,7 +198,7 @@ void ParFUM_createComm(int meshid, int dim)
     gdata = new ghostdata;
   }
   MPI_Bcast_pup(*gdata,0,MPI_COMM_WORLD);
-  if (rank==0) CkPrintf("Making ghosts...\n");
+  //if (rank==0) CkPrintf("Making ghosts...\n");
   makeGhosts(mesh,MPI_COMM_WORLD,0,gdata->numLayers,gdata->layers);
   MPI_Barrier(MPI_COMM_WORLD);
 }
@@ -211,13 +221,24 @@ void ParFUM_import_elems(int meshid, int numElems, int nodesPer, int *conn, int 
 void qsort(double *nodes, int *ids, int dim, int first, int last);
 void sortNodes(double *nodes, double *sorted_nodes, int *sorted_ids, int numNodes, int dim)
 {
+  
   for(int i=0; i<numNodes; i++) {
     sorted_ids[i] = i;
     for(int j=0; j<dim; j++) {
       sorted_nodes[i*dim+j] = nodes[i*dim+j];
     }
   }
+  /*
+  for (int i=0; i<10; i++) {
+    printf("[%d] %6.4f,%6.4f,%6.4f is at %d\n", i, sorted_nodes[i*dim], sorted_nodes[i*dim+1], sorted_nodes[i*dim+2], sorted_ids[i]);
+  }
+  */
   qsort(sorted_nodes, sorted_ids, dim, 0, numNodes-1);
+  /*
+  for (int i=0; i<20; i++) {
+    printf("[%d] %6.4f,%6.4f,%6.4f is at %d\n", i, sorted_nodes[i*dim], sorted_nodes[i*dim+1], sorted_nodes[i*dim+2], sorted_ids[i]);
+  }
+  */
 }
 
 void merge(double *nodes, int *ids, int dim, int first, int mid, int last);
@@ -225,7 +246,7 @@ void qsort(double *nodes, int *ids, int dim, int first, int last)
 {
   if (first==last) return;
   else if (first==last-1) {
-    if (coordCompare(&(nodes[first*dim]), &(nodes[last*dim]), dim) == -1) {
+    if (!coord_leq(&(nodes[first*dim]), &(nodes[last*dim]), dim)) {
       int tmpId=ids[first];
       ids[first] = ids[last];
       ids[last] = tmpId;
@@ -251,14 +272,14 @@ void merge(double *nodes, int *ids, int dim, int first, int mid, int last)
   int *tmpIds = (int *)malloc((last-first+1)*sizeof(int));
   int pos = 0;
   while ((rover1<mid) && (rover2<=last)) {
-    if (coordCompare(&(nodes[rover1*dim]), &(nodes[rover2*dim]), dim) == -1) {
+    if (!coord_leq(&(nodes[rover1*dim]), &(nodes[rover2*dim]), dim)) {
       tmpIds[pos] = ids[rover2];
       for (int i=0; i<dim; i++) {
 	tmpCoords[pos*dim+i] = nodes[rover2*dim+i];
       }
       rover2++;
     }
-    else if (coordCompare(&(nodes[rover1*dim]), &(nodes[rover2*dim]), dim) == 1) {
+    else if (coord_leq(&(nodes[rover1*dim]), &(nodes[rover2*dim]), dim)) {
       tmpIds[pos] = ids[rover1];
       for (int i=0; i<dim; i++) {
 	tmpCoords[pos*dim+i] = nodes[rover1*dim+i];
@@ -298,4 +319,16 @@ void merge(double *nodes, int *ids, int dim, int first, int mid, int last)
       nodes[i*dim+j] = tmpCoords[(i-first)*dim+j];
     }
   }
+}
+
+// this is a strictly ordering floating point less-than-or-equal-to operator, faster than the coord_compare
+bool coord_leq(double *a, double* b, int dim) {
+  int d=0;
+  while (d<dim) {
+    if (a[d] < b[d]) return true;
+    else if (a[d] > b[d]) return false;
+    else d++;
+  }
+  // a and b are identical
+  return true;
 }
