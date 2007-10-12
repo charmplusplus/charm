@@ -11,20 +11,25 @@
 
 #include "converse.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 #if CMK_XT3
 
-#include <stdio.h>
-//#include <catamount/cnos_mpi_os.h>
 #define XDIM 11
 #define YDIM 12
 #define ZDIM 16
-#define MAXNID 2783
+#define TDIM 2
+#define MAXNID 2784
+
+extern "C" int *pid2nid;
+extern "C" int nid2pid[MAXNID][2];
+extern "C" int pidtonid(int numpes);
 
 struct loc {
   int x;
   int y;
   int z;
+  int t;
 };
 
 class CrayTorusManager {
@@ -35,26 +40,48 @@ class CrayTorusManager {
     int dimNX;	// dimension of the allocation in X (nodes)
     int dimNY;	// dimension of the allocation in Y (nodes)
     int dimNZ;	// dimension of the allocation in Z (nodes)
+    int dimNT;  // number of processors per node (2 for XT3)
 
-    //cnos_nidpid_map_t* nidpid;
-    int coords2nid[XDIM][YDIM][ZDIM];
-    struct loc nid2coords[MAXNID];
+    int procsPerNode;
+    
+    int coords2pid[XDIM][YDIM][ZDIM][TDIM];
+    struct loc *pid2coords;
 
   public:
     CrayTorusManager() {
-      FILE *fp = fopen("CrayNeighbourTable", "r");
-      int temp, nid, num, lx, ly, lz;
+      // load data from CrayNeighborTable
+      FILE *fp = fopen("/usr/users/4/abhatele/work/charm-works/src/util/CrayNeighbourTable", "r");
+      int temp, nid, pid0, pid1, num, lx, ly, lz;
       char header[50];
+      pid2coords = (struct loc*)malloc(sizeof(struct loc) * CmiNumPes());
+      pidtonid(CmiNumPes());
+      
+      // skip header
       for(int i=0; i<10;i++)
         temp = fscanf(fp, "%s", header);
+        
+      // read the lines one at a time and fill the two arrays  
       for(int i=0; i<2112;i++)
       {
         temp = fscanf(fp, "%d%d%d%d%d%d%d%d%d%d", &nid, &num, &num, &num, &num, &num, &num, &lx, &ly, &lz);
-        //printf("%d %d %d %d %d %d %d %d %d %d\n", nid, num, num, num, num, num, num, lx, ly, lz);
-        nid2coords[nid].x = lx;
-        nid2coords[nid].y = ly;
-        nid2coords[nid].z = lz;
-        coords2nid[lx][ly][lz] = nid;
+        pid0 = nid2pid[nid][0];
+        if(pid0 != -1) {
+          pid2coords[pid0].x = lx;
+          pid2coords[pid0].y = ly;
+          pid2coords[pid0].z = lz;
+          pid2coords[pid0].t = 0;
+          coords2pid[lx][ly][lz][0] = pid0;
+          //printf("%d %d %d %d %d\n", pid0, lx, ly, lz, 0);
+        }
+        pid1 = nid2pid[nid][1];
+        if(pid1 != -1) {
+          pid2coords[pid1].x = lx;
+          pid2coords[pid1].y = ly;
+          pid2coords[pid1].z = lz;
+          pid2coords[pid1].t = 1;
+          coords2pid[lx][ly][lz][1] = pid1;
+          //printf("%d %d %d %d %d\n", pid1, lx, ly, lz, 1);
+        }
       }
       fclose(fp); 
     }
@@ -68,15 +95,19 @@ class CrayTorusManager {
     inline int getDimNX() { return dimNX; }
     inline int getDimNY() { return dimNY; }
     inline int getDimNZ() { return dimNZ; }
+    inline int getDimNT() { return dimNT; }
 
-    inline void rankToCoordinates(int pe, int &x, int &y, int &z) {
-      x = nid2coords[pe].x; 
-      y = nid2coords[pe].y; 
-      z = nid2coords[pe].z; 
+    inline int getProcsPerNode() { return procsPerNode; }
+    
+    inline void rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
+      x = pid2coords[pe].x; 
+      y = pid2coords[pe].y; 
+      z = pid2coords[pe].z; 
+      t = pid2coords[pe].t; 
     }
-
-    inline int coordinatesToRank(int x, int y, int z) {
-      return coords2nid[x][y][z];
+    
+    inline int coordinatesToRank(int x, int y, int z, int t) {
+      return coords2pid[x][y][z][t];
     }
 };
 
