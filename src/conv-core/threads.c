@@ -705,7 +705,7 @@ Which is not the case on my FC4 laptop ?!
 extended it to work for tcharm and registered user data migration
 tested platforms: opteron, Cygwin.
 
-For Fedora, 
+For Fedora and Ubuntu, run the following command as root
 echo 0 > /proc/sys/kernel/randomize_va_space
 will disable the randomization of the stack pointer
 
@@ -1311,6 +1311,16 @@ Note: on some machine like Sun and IBM SP, one needs to link with memory gnuold
  to have this context thread working.
 
 Written by Gengbin Zheng around April 2001
+
+For thread checkpoint/restart, isomalloc requires that iso region from all
+machines are same.
+
+For Fedora and Ubuntu, run the following command as root
+echo 0 > /proc/sys/kernel/randomize_va_space
+will disable the randomization of the stack pointer
+
+Gengbin Zheng October, 2007
+
 */
 #elif (CMK_THREADS_USE_CONTEXT || CMK_THREADS_USE_JCONTEXT)
 
