@@ -60,22 +60,22 @@ class BGLTorusManager {
         int min_x, min_y, min_z;
         min_x = min_y = min_z = numPes;
         unsigned int tmp_t, tmp_x, tmp_y, tmp_z;      
-         for(int c = 0; c < numPes; c++) {
-	   rts_coordinatesForRank(c, &tmp_x, &tmp_y, &tmp_z, &tmp_t);
+        for(int c = 0; c < numPes; c++) {
+	  rts_coordinatesForRank(c, &tmp_x, &tmp_y, &tmp_z, &tmp_t);
 
-	   if(tmp_x > dimNX) dimNX = tmp_x;
-           if(tmp_x < min_x) min_x = tmp_x;
-	   if(tmp_y > dimNY) dimNY = tmp_y;
-           if(tmp_y < min_y) min_y = tmp_y;
-	   if(tmp_z > dimNZ) dimNZ = tmp_z;
-           if(tmp_z < min_z) min_z = tmp_z;
+	  if(tmp_x > dimNX) dimNX = tmp_x;
+          if(tmp_x < min_x) min_x = tmp_x;
+	  if(tmp_y > dimNY) dimNY = tmp_y;
+          if(tmp_y < min_y) min_y = tmp_y;
+	  if(tmp_z > dimNZ) dimNZ = tmp_z;
+          if(tmp_z < min_z) min_z = tmp_z;
 
-	   if(tmp_t > max_t) max_t = tmp_t;
-         }
+	  if(tmp_t > max_t) max_t = tmp_t;
+        }
 	 
-	 dimNX = dimNX - min_x + 1;
-	 dimNY = dimNY - min_y + 1;
-	 dimNZ = dimNZ - min_z + 1;
+	dimNX = dimNX - min_x + 1;
+	dimNY = dimNY - min_y + 1;
+	dimNZ = dimNZ - min_z + 1;
       }
 
       dimX = dimNX;
