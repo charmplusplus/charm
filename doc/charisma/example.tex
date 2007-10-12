@@ -69,9 +69,12 @@ void JacobiWorker::produceBorders(outport lb, outport rb){
 
 The user compile these input files with the following command:
 
-\begin{alltt}
-> orchc jacobi.or
-\end{alltt}
+\begin{SaveVerbatim}{foodecl}
+  > orchc jacobi.or
+\end{SaveVerbatim}
+\vspace{0.1in}
+\smallfbox{\BUseVerbatim{foodecl}}
+\vspace{0.1in}
 
 The compiler generates the parallel code for sending out messages, organizing
 flow of control, and then it looks for sequential code files for the classes

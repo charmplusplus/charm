@@ -1,0 +1,56 @@
+Charisma is capable of producing library code for reuse with another Charisma
+program. We explain this feature in the following section.
+
+\section{Writing Module Library}
+
+The programmer uses the keyword \code{module} instead of \code{program} in the
+header section of the orchestration code to tell the compiler that it is a
+library module. Following keyword \code{module} is the module name, then
+followed by a set of configuration variables in a pair parentheses. The 
+configuration variables are used in creating instances of the library, for
+such info as problem size. 
+
+Following the first line, the library's input and output parameters are posted
+with keywords \code{inparam} and \code{outparam}. 
+
+\begin{SaveVerbatim}{foodecl}
+  module FFT3D(CHUNK, M, N);
+  inparam indata;
+  outparam outdata1,outdata2;
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
+
+The body of the library is not very different from that of a normal program. It
+takes input parameters and produces out parameters, as posted in the header
+section. 
+
+\section{Using Module Library}
+
+To use a Charisma module library, the programmer first needs to create an
+instance of the library. There are two steps: including the module and creating
+an instance. 
+
+\begin{SaveVerbatim}{foodecl}
+  use FFT3D;Å 
+  library f1 : FFT3D(CHUNK=10,M=10,N=100);Å 
+  library f2 : FFT3D(CHUNK=8,M=8,N=64);Å
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
+
+The keyword \code{use} and the module name includes the module in the program,
+and the keyword \code{library} creates an instance with the instance name,
+followed by the module name with value assignment of configuration variables. 
+These statements must appear in the declaration section before the library
+instance can be used in the main program's orchestration code. 
+
+Invoking the library is like calling a publish statement; the input and output
+parameters are the same, and the object name and function name are replaced with
+the library instance name and the keyword \code{call} connected with a colon. 
+
+\begin{SaveVerbatim}{foodecl}
+  (f1_outdata[*]) <- f1:call(f1_indata[*]);Å
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
+
+Multiple instances can be created out of the same module. Their execution can
+interleave without interfering with one another. 

@@ -7,11 +7,12 @@ declaration from the orchestration code, and incorporate the sequential portion
 in the final header file. For example, if a molecular dynamics simulation has
 the following classes (as declared in the orchestration code):
 
-\begin{alltt}
+\begin{SaveVerbatim}{foodecl}
     class MDMain : MainChare;
     class Cell : ChareArray3D;
     class CellPair : ChareArray6D;
-\end{alltt}
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 
 The user is supposed to prepare the following sequential files for the classes:
 MDMain.h, MDMain.C, Cell.h, Cell.C, CellPair.h and CellPair.C, unless a class
@@ -33,9 +34,10 @@ in the body of the function, the keyword \code{produce} is used to connect the
 orchestration parameter and the local variables whose value will be sent out, in 
 a format of a function call, as follows.
 
-\begin{alltt}
-    produce(produced\_parameter, local\_variable[, size\_of\_array]);
-\end{alltt}
+\begin{SaveVerbatim}{foodecl}
+    produce(produced_parameter, local_variable[, size_of_array]);
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 
 When the parameter represents a data array, we need the additional
 \code{size\_of\_array} to specify the size of the data array. 
@@ -52,13 +54,14 @@ in sequential code. Since ``lb'' and ``rb'' are declared to have the local
 type and dimension of ``double [512]'', the producing statement should connect
 it with a local variable of ``double [512]''.
 
-\begin{alltt}
-    void JacobiWorker::produceBorders(outport lb, outport rb)\{
+\begin{SaveVerbatim}{foodecl}
+    void JacobiWorker::produceBorders(outport lb, outport rb){
       . . .
       produce(lb,localLB,512);
       produce(rb,localRB,512);
-    \}
-\end{alltt}
+    }
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 
 Special cases of the produced/consumed parameters involve scatter/gather
 operations. In scatter operation, since an additional dimension is implied in
@@ -73,34 +76,38 @@ reduction operation. Built-in reduction operations are ``+'' (sum), ``*'' (produ
 following statements takes the sum of all local value of \code{result} and 
 for output in \code{sum}.
 
-\begin{alltt}
+\begin{SaveVerbatim}{foodecl}
     reduce(sum, result, ``+'');
-\end{alltt}
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 
 If the data type is a user-defined class, then you might use the function or
 operator defined to do the reduction. For example, assume we have a class
 called ``Force'', and we have an ``add'' function (or a ``+'' operator) defined.
 
-\begin{alltt}
-    Force& Force::add(const Force& f_);
-\end{alltt}
+\begin{SaveVerbatim}{foodecl}
+    Force& Force::add(const Force& f);
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 
 In the reduction to sum all the local forces, we can use
 
-\begin{alltt}
-    reduce(sumForces, localForce, ``add'');
-\end{alltt}
+\begin{SaveVerbatim}{foodecl}
+    reduce(sumForces, localForce, "add");
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 
 \subsubsection{Miscellaneous Issues}
 In sequential code, the user can access the object's index by a keyword 
 ``thisIndex''. The index of 1-D to 6-D object arrays are:
 
-\begin{alltt}
-1D: thisIndex
-2D: thisIndex.x, thisIndex.y
-3D: thisIndex.x, thisIndex.y, thisIndex.z
-4D: thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z
-5D: thisIndex.v, thisIndex.w, thisIndex.x, thisIndex.y, thisIndex.z
-6D: thisIndex.x1, thisIndex.y1, thisIndex.z1, thisIndex.x2, thisIndex.y2, thisIndex.z2
-\end{alltt}
+\begin{SaveVerbatim}{foodecl}
+  1D: thisIndex
+  2D: thisIndex.{x,y}
+  3D: thisIndex.{x,y,z}
+  4D: thisIndex.{w,x,y,z}
+  5D: thisIndex.{v,w,x,y,z}
+  6D: thisIndex.{x1,y1,z1,x2,y2,z2}
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 

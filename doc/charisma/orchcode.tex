@@ -12,9 +12,10 @@ can be organized, and messages and method invocations generated.
 The very first line should give the name of the Charisma program with the {\tt
 program} keyword.
 
-\begin{alltt}
+\begin{SaveVerbatim}{foodecl}
     program jacobi 
-\end{alltt}
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 
 The {\tt program} keyword can be replaced with {\tt module}, which means that
 the output program is going to be a library module instead of a stand-alone
@@ -24,12 +25,13 @@ Next, the programmer can include external code files in the generated code with
 keyword {\tt include} with the filename without extension. For example, the
 following statement tells the Charisma compiler to look for header file
 ``particles.h'' to be included in the generated header file ``jacobi.h'' and to
-look for C/C++ code file ``particles.[C/cc/cpp/cxx/c]'' to be included in the
+look for C/C++ code file ``particles.[C|cc|cpp|cxx|c]'' to be included in the
 generated C++ code file ``jacobi.C''.
 
-\begin{alltt}
+\begin{SaveVerbatim}{foodecl}
     include particles;
-\end{alltt}
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 
 It is useful when there are source code that must precede the generated
 parallel code, such as basic data structure declaration. 
@@ -53,22 +55,24 @@ A Charisma program or module has one ``MainChare'' class, and it does not
 require explicit instantiation since it is a singleton. The statement to declare
 MainChare looks like this:
 
-\begin{alltt}
+\begin{SaveVerbatim}{foodecl}
     class JacobiMain : MainChare;
-\end{alltt}
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 
 For object arrays, we first need to declare the class types inherited from 1D
 object array, 2D object array, etc, and then instantiate from the class types. 
 The dimensionality information of the object array is given in a pair of 
 brackets with each dimension size separated by a comma.
 
-\begin{alltt}
+\begin{SaveVerbatim}{foodecl}
     class JacobiWorker : ChareArray1D;
     obj workers : JacobiWorker[N];
 
     class Cell : ChareArray3D;
     obj cells : Cell[M,M,M];
-\end{alltt}
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 
 Note that key word ``class'' is for class type derivation, and ``obj'' is for
 parallel object or object array instantiation. The above code segment declares a
@@ -83,10 +87,11 @@ only in the orchestration code to connect input and output of orchestration
 statements, and their data type and size is declared here. More explanation of
 these parameters can be found in Section~\ref{sec:orchsec}. 
 
-\begin{alltt}
+\begin{SaveVerbatim}{foodecl}
     param lb : double[N];
     param rb : double[N];
-\end{alltt}
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 
 With this, ``lb'' and ``rb'' are declared as parameters of that can be 
 ``connected'' with local variables of double array with size of 512. 
@@ -112,9 +117,7 @@ all the elements of array \code{myWorkers}.
     workers[i].compute();
   end-foreach
 \end{SaveVerbatim}
-\vspace{0.1in}
 \smallfbox{\BUseVerbatim{foodecl}}
-\vspace{0.1in}
 
 $\bullet$ {\bf Publish Statement and Produced/Consumed Parameters}
 
@@ -131,9 +134,7 @@ exemplifies the input and output of this object methods
     (+error) <- workers[i].reduceData();
   end-foreach
 \end{SaveVerbatim}
-\vspace{0.1in}
 \smallfbox{\BUseVerbatim{foodecl}}
-\vspace{0.1in}
 
 Here, the entry method \code{workers[i].produceBorders} produces (called {\em
 published} in Charisma) values of \code{lb[i], rb[i]}, enclosed in a pair of
@@ -182,9 +183,7 @@ order and always return correct results.
   }
   end-overlap
 \end{SaveVerbatim}
-\vspace{0.1in}
 \smallfbox{\BUseVerbatim{foodecl}}
-\vspace{0.1in}
 
 This example shows an \code{overlap} statement where two blocks in curly
 brackets are executed in parallel. Their execution join back to one at the end
@@ -199,9 +198,7 @@ are two examples.
      workers.doWork();
   end-for
 \end{SaveVerbatim}
-\vspace{0.1in}
 \smallfbox{\BUseVerbatim{foodecl}}
-\vspace{0.1in}
   
 \begin{SaveVerbatim}{foodecl}
   while (err > epsilon)
@@ -209,9 +206,7 @@ are two examples.
      MainChare.updateError(err);
   end-while
 \end{SaveVerbatim}
-\vspace{0.1in}
 \smallfbox{\BUseVerbatim{foodecl}}
-\vspace{0.1in}
 
 The loop condition in \code{for} statement is independent from the main program;
 It simply tells the program to repeat the block for so many times. The loop
@@ -240,9 +235,7 @@ segment following the loop body. Within the loop body, program order holds.
     end-foreach
   end-for
 \end{SaveVerbatim}
-\vspace{0.1in}
 \smallfbox{\BUseVerbatim{foodecl}}
-\vspace{0.1in}
 
 One special case is when one statement's produced parameter and consumed
 parameter overlaps. It must be noted that there is no dependency within the same
@@ -253,37 +246,6 @@ originate from previous \code{foreach} statements or \code{foreach} statements
 from a previous loop iteration, and the published values are visible only to
 following \code{foreach} statements or \code{foreach} statements in following
 loop iterations. 
-
-$\bullet$ {\bf \code{If} Statement}
-
-The syntax for \code{if} statement is as follows.
-\begin{SaveVerbatim}{foodecl}
-  if (test-condition) then
-    // true-branch;
-  else
-    // false-branch;
-  end-if
-\end{SaveVerbatim}
-\vspace{0.1in}
-\smallfbox{\BUseVerbatim{foodecl}}
-\vspace{0.1in}
-
-Similar to the loop-condition in \code{while} statement, the test-condition in
-\code{if} statement uses member variables of class MainChare, with the exception
-of for-loop iteration counter. For example, in the following code
-segment, the variable \code{iter} should either be a local variable in
-MainChare, or a for-loop iteration counter, as the example describes.
-
-\begin{SaveVerbatim}{foodecl}
-  for iter = 1 to MAX_ITER
-    if(iter % 4 = 0) then
-      // do something every 4th iteration
-    end-if
-  end-for
-\end{SaveVerbatim}
-\vspace{0.1in}
-\smallfbox{\BUseVerbatim{foodecl}}
-\vspace{0.1in}
 
 $\bullet$ {\bf Scatter and Gather Operation}
 
@@ -299,9 +261,7 @@ of values from different objects can be gathered to be consumed by one object.
     (...) <- B[k,j].g(points[k,j]);
   end-foreach
 \end{SaveVerbatim}
-\vspace{0.1in}
 \smallfbox{\BUseVerbatim{foodecl}}
-\vspace{0.1in}
 
 A wildcard dimension ``*'' in \code{A[i].f()}'s output \code{points} specifies
 that it will publish multiple data items. At the consuming side, each
@@ -318,9 +278,8 @@ array objects \code{B[1,0..N-1]}.
     (...) <- B[k].g(points[*,k]);
   end-foreach
 \end{SaveVerbatim}
-\vspace{0.1in}
 \smallfbox{\BUseVerbatim{foodecl}}
-\vspace{0.1in}
+
 
 Similar to the scatter example, if a wildcard dimension ``*'' is in the
 consumed parameter and the corresponding published parameter does not have a

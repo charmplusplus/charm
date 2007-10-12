@@ -30,16 +30,62 @@ file, and sequential user code in C/C++ form.
 \label{sec:sequential}
 \input{seqcode}
 
+\section{Building and Running a Charisma Program}
+There are two steps to build a Charisma program: generating Charm++ program 
+from orchestration code, and building the Charm++ program. 
+
+1) Charisma compiler, currently named \code{orchc}, is used to compile the
+orchestration code (.or file) and integrate sequential code to generate a
+Charm++ program. The resultant Charm++ program usually consists of the 
+following code files: Charm++ Interface file ([modulename].ci), header file 
+([modulename].h) and C++ source code file ([modulename].C). The command 
+for this step is as follows.
+
+\begin{SaveVerbatim}{foodecl}
+    > orchc [modulename].or
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
+
+2) Charm++ compiler, charmc, is used to parse the Charm++ Interface (.ci) file,
+compile C/C++ code, and link and build the executable. The typical commands are:
+\begin{SaveVerbatim}{foodecl}
+    > charmc [modulename].ci
+    > charmc [modulename].C -c
+    > charmc [modulename].o -o pgm -language charm++
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
+
+Running the Charisma program is the same as running a Charm++ program, using
+Charm++'s job launcher \code{charmrun}. (On some platforms like CSE's Turing 
+Cluster, use the customized job launcher \code{rjq} or \code{rj}.) 
+
+\begin{SaveVerbatim}{foodecl}
+    > charmrun pgm +p4
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
+
+Please refer to Charm++'s manual and tutorial for more details of building 
+and running a Charm++ program. 
+
+\section{Support for Library Module}
+\label{sec:module}
+\input{libmodule}
+
+\section{Using Load Balancing Module}
+\label{sec:ldb}
+\input{ldb}
+
 \section{Handling Sparse Object Arrays}
 \label{sec:sparse}
 
 In Charisma, when we declare an object array, by default a dense array is
 created with all the elements populated. For instance, when we have the
 following declaration in the orchestration code, an array of NxNxN is created. 
-\begin{alltt}
+\begin{SaveVerbatim}{foodecl}
     class Cell : ChareArray3D;
     obj cells : Cell[N,N,N];
-\end{alltt}
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 
 There are certain occasions when the programmer may need sparse object arrays,
 in which not all elements are created. An example is neighborhood force
@@ -52,10 +98,11 @@ force calculation. In this case, Charisma provides flexibility of declaring a
 sparse object array, with a \code{sparse} keyword following the object array
 declaration, as follows.
 
-\begin{alltt}
+\begin{SaveVerbatim}{foodecl}
     class CellPair : ChareArray6D;	
     obj cellpairs : CellPair[N,N,N,N,N,N],sparse; 
-\end{alltt}
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 
 Then the programmer is expected to supply a sequential function with the name
 \code{getIndex\_ARRAYNAME} to generate a list of selected indices of the
@@ -63,71 +110,22 @@ elements to create. As an example, the following function essentially tells the
 system to generate all the NxNxNxNxNxN elements for the 6D array. 
 
 \begin{SaveVerbatim}{foodecl}
-void getIndex_cellpairs(CkVec<CkArrayIndex6D>& vec){
-  int i,j,k,l,m,n;
-  for(i=0;i<N;i++)
-    for(j=0;j<N;j++)
-      for(k=0;k<N;k++)
-        for(l=0;l<N;l++)
-          for(m=0;m<N;m++)
-            for(n=0;n<N;n++)
-              vec.push_back(CkArrayIndex6D(i,j,k,l,m,n));
-}
+  void getIndex_cellpairs(CkVec<CkArrayIndex6D>& vec){
+    int i,j,k,l,m,n;
+    for(i=0;i<N;i++)
+      for(j=0;j<N;j++)
+        for(k=0;k<N;k++)
+          for(l=0;l<N;l++)
+            for(m=0;m<N;m++)
+              for(n=0;n<N;n++)
+                vec.push_back(CkArrayIndex6D(i,j,k,l,m,n));
+  }
 \end{SaveVerbatim}
-\vspace{0.1in}
+
 \smallfbox{\BUseVerbatim{foodecl}}
-\vspace{0.1in}
+
 
 %neighbors and neighborsize for dense array
-
-\section{Building and Running a Charisma Program}
-There are two steps to build a Charisma program: generating Charm++ program 
-from orchestration code, and building the Charm++ program. 
-
-1) Charisma compiler, currently named \code{orchc}, is used to compile the
-orchestration code (.or file) and integrate sequential code to generate a
-Charm++ program. The resultant Charm++ program usually consists of the 
-following code files: Charm++ Interface file ([modulename].ci), header file 
-([modulename].h) and C++ source code file ([modulename].C). The command 
-for this step is as follows.
-
-\begin{alltt}
-    > orchc [modulename].or
-\end{alltt}
-
-2) Charm++ compiler, charmc, is used to parse the Charm++ Interface (.ci) file,
-compile C/C++ code, and link and build the executable. The typical commands are:
-\begin{alltt}
-    > charmc [modulename].ci
-    > charmc [modulename].C -c
-    > charmc [modulename].o -o pgm -language charm++
-\end{alltt}
-
-Running the Charisma program is the same as running a Charm++ program, using
-Charm++'s job launcher \code{charmrun}. (On some platforms like CSE's Turing 
-Cluster, use the customized job launcher \code{rjq} or \code{rj}.) 
-
-\begin{alltt}
-    > charmrun pgm +p4
-\end{alltt}
-
-Please refer to Charm++'s manual and tutorial for more details of building 
-and running a Charm++ program. 
-
-\section{Using Load Balancing Module}
-\label{sec:ldb}
-\input{ldb}
-
-\section{Support for Library Module}
-\label{sec:module}
-
-Charisma is capable of producing library code for reuse with a Charisma program
-or a Charm++ program. When the first keyword in the orchestration is
-\code{module} instead of \code{program}, Charisma library code will be
-generated. This means the code will not compile into a stand-alone program.
-
-Charisma's support for library module is currently under development. More
-details will be reported in this manual when available.
 
 \appendix
 \label{sec:appendix}

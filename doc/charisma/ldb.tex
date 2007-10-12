@@ -24,9 +24,7 @@ file:
     PUParray(p,(double *)localData,1000);
   }
 \end{SaveVerbatim}
-\vspace{0.1in}
 \smallfbox{\BUseVerbatim{foodecl}}
-\vspace{0.1in}
 
 Thirdly, the user will make the call to invoke load balancing session in the
 orchestration code. The call is \code{AtSync();} and it is invoked on all
@@ -43,9 +41,7 @@ balancing session every 4th iteration in a for-loop.
     end-if
   end-for
 \end{SaveVerbatim}
-\vspace{0.1in}
 \smallfbox{\BUseVerbatim{foodecl}}
-\vspace{0.1in}
 
 If a while-loop is used instead of for-loop, then the test-condition in the
 \code{if} statement is a local variable in the program's MainChare. In the
@@ -59,13 +55,14 @@ actual load balancing. The way to link in a load balancer module is adding
 \code{-module EveryLB} as a link-time option. 
 
 At run-time, the load balancer is specified in command line after the
-\code{+balancer} option. If the balancer name is incorrect, the job laucher will
-automatically print out all avaiable load balancers. For instance, the following
+\code{+balancer} option. If the balancer name is incorrect, the job launcher will
+automatically print out all available load balancers. For instance, the following
 command uses \code{RotateLB}. 
 
-\begin{alltt}
-    ./charmrun ./pgm +p16 +balancer RotateLB
-\end{alltt}
+\begin{SaveVerbatim}{foodecl}
+    > ./charmrun ./pgm +p16 +balancer RotateLB
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
 
 
 
