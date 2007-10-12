@@ -80,6 +80,16 @@ class TopoManager {
       torusT = torus[3];
 
 #elif CMK_XT3
+      dimX = crtm.getDimX();
+      dimY = crtm.getDimY();
+      dimZ = crtm.getDimZ();
+    
+      dimNX = crtm.getDimNX();
+      dimNY = crtm.getDimNY();
+      dimNZ = crtm.getDimNZ();
+      dimNT = crtm.getDimNT();
+
+      procsPerNode = crtm.getProcsPerNode();
 
 #else
       dimX = CkNumPes();

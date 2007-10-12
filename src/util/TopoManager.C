@@ -22,7 +22,7 @@ int TopoManager::hasMultipleProcsPerNode() {
   else
     return 1;
 #elif CMK_XT3
-  return 0;
+  return 1;
 #else
   return 0;
 #endif
@@ -56,7 +56,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
 #elif CMK_BLUEGENEP
   bgptm.rankToCoordinates(pe, x, y, z, t);
 #elif CMK_XT3
-
+  crtm.rankToCoordinates(pe, x, y, z, t);
 #else
   if(dimY>0){
     // Assumed TXYZ
@@ -93,7 +93,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
 #elif CMK_BLUEGENEP
   return bgptm.coordinatesToRank(x, y, z, t);
 #elif CMK_XT3
-
+  return crtm.coordinatesToRank(x, y, z, t);
 #else
   if(dimY > 0)
     return x + y*dimX + z*dimX*dimY;
