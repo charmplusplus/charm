@@ -354,7 +354,7 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	pup_xlater.o pup_c.o pup_paged.o pup_cmialloc.o			\
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
 	conv-lists.o RTH.o persist-comm.o $(CONVERSE_COM_CORE_OBJS) \
-	ckbitvector.o TopoManager.o
+	ckbitvector.o TopoManager.o CrayNid.o
 
 LIBCONV_UTILF=pup_f.o
 
@@ -453,8 +453,11 @@ pup_cmialloc.o: pup_cmialloc.C $(CVHEADERS) $(UTILHEADERS)
 ckhashtable.o: ckhashtable.C ckhashtable.h $(CVHEADERS)
 	$(CHARMC) -o ckhashtable.o ckhashtable.C
 
-TopoManager.o: TopoManager.C TopoManager.h BGLTorus.h CrayTorus.h BGPTorus.h $(CVHEADERS) $(UTILHEADERS)
+TopoManager.o: TopoManager.C TopoManager.h BGLTorus.h CrayTorus.h BGPTorus.h CrayNid.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o TopoManager.o TopoManager.C
+
+CrayNid.o: CrayNid.c $(CVHEADERS) $(UTILHEADERS)
+	$(CHARMC) -c -o CrayNid.o CrayNid.c
 
 ckbitvector.o: ckbitvector.C ckbitvector.h $(CVHEADERS)
 	$(CHARMC) -o ckbitvector.o ckbitvector.C
