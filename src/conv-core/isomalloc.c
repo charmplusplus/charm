@@ -24,6 +24,22 @@ generalized by Orion Lawlor November 2001.
 #include <stdlib.h>
 #include <errno.h> /* just so I can find dynamically-linked symbols */
 
+static int read_randomflag(void)
+{
+  FILE *fp;
+  int random_flag;
+  CmiLock(smp_mutex);
+  fp = fopen("/proc/sys/kernel/randomize_va_space", "r");
+  if (fp != NULL) {
+    fscanf(fp, "%d", &random_flag);
+  }
+  else {
+    random_flag = -1;
+  }
+  CmiUnlock(smp_mutex);
+  return random_flag;
+}
+
 struct CmiIsomallocBlock {
       int slot; /*First mapped slot*/
       int length; /*Length of (user portion of) mapping, in bytes*/
@@ -880,6 +896,11 @@ void CmiIsomallocInit(char **argv)
   init_comm(argv);
   if (!init_map(argv)) {
     disable_isomalloc("mmap() does not work");
+  }
+  else if (read_randomflag() == 1) {
+    if (CmiMyPe() == 0)
+      printf("Charm> run 'echo 0 > /proc/sys/kernel/randomize_va_space' as root to disable the randomization of stack pointer\n");
+    disable_isomalloc("mmap() does not work due to stack pointer randomization");
   }
   else {
     init_ranges(argv);
