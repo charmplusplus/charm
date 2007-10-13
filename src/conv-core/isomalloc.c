@@ -897,12 +897,11 @@ void CmiIsomallocInit(char **argv)
   if (!init_map(argv)) {
     disable_isomalloc("mmap() does not work");
   }
-  else if (read_randomflag() == 1) {
-    if (CmiMyPe() == 0)
-      printf("Charm> run 'echo 0 > /proc/sys/kernel/randomize_va_space' as root to disable the randomization of stack pointer\n");
-    disable_isomalloc("mmap() does not work due to stack pointer randomization");
-  }
   else {
+    if (read_randomflag() == 1) {    /* randomization stack pointer */
+      if (CmiMyPe() == 0)
+        printf("Charm warning> Randomization of stack pointer is turned on in Kernel, run 'echo 0 > /proc/sys/kernel/randomize_va_space' as root to disable it. Thread migration may not work! \n");
+    }
     init_ranges(argv);
   }
 #endif
