@@ -328,6 +328,8 @@ int usched, initret;
   CmiBarred  = (int       *)CmiAlloc(CmiNumPes()*sizeof(int));
   CmiQueues  = (void**)CmiAlloc(CmiNumPes()*sizeof(void*));
   
+  smp_mutex = CmiCreateLock();
+
   /* Create threads for all PE except PE 0 */
   for(i=0; i<CmiNumPes(); i++) {
     t = (i==0) ? CthSelf() : CthCreate(CmiCallMain, 0, Cmi_stacksize);
