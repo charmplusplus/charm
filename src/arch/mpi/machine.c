@@ -1037,13 +1037,13 @@ char *CmiGetNonLocalNodeQ(void)
   CmiState cs = CmiGetState();
   char *result = 0;
   CmiIdleLock_checkMessage(&cs->idle);
-  if(!PCQueueEmpty(CsvAccess(NodeState).NodeRecv)) {
+/*  if(!PCQueueEmpty(CsvAccess(NodeState).NodeRecv)) {  */
     MACHSTATE1(3,"CmiGetNonLocalNodeQ begin %d {", CmiMyPe());
     CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
     result = (char *) PCQueuePop(CsvAccess(NodeState).NodeRecv);
     CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
     MACHSTATE1(3,"} CmiGetNonLocalNodeQ end %d ", CmiMyPe());
-  }
+/*  }  */
   return result;
 }
 #endif
