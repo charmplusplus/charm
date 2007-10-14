@@ -1449,6 +1449,16 @@ extern int _immRunning;
 #  define CmiImmIsRunning()       (0)
 #endif
 
+/******** Memory Fence ********/
+
+#if  CMK_AMD64
+#define smp_rmb()    asm volatile("lfence":::"memory")
+#define smp_wmb()    asm volatile("sfence" ::: "memory")
+#else
+#define smp_rmb()
+#define smp_wmb()
+#endif
+
 /******** Performance Counters ********/
 void CmiInitCounters();
 void CmiStartCounters(int events[], int numEvents);
