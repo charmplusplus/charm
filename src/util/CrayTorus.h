@@ -2,7 +2,7 @@
  *  Author: Abhinav S Bhatele
  *  Date created: March 19th, 2007  
  *  
- *  This file makes use of a static routing we obtain from a file available
+ *  This file makes use of a static table we obtain from a file available
  *  on Bigben.
  */
 
@@ -50,8 +50,9 @@ class CrayTorusManager {
   public:
     CrayTorusManager() {
       // load data from CrayNeighborTable
-      FILE *fp = fopen("/usr/users/4/abhatele/work/charm-works/src/util/CrayNeighbourTable", "r");
+      FILE *fp = fopen("/usr/users/4/abhatele/work/charm/src/util/CrayNeighbourTable", "r");
       int temp, nid, pid0, pid1, num, lx, ly, lz;
+      int minX=XDIM, minY=YDIM, minZ=ZDIM, maxX=0, maxY=0, maxZ=0;
       char header[50];
       pid2coords = (struct loc*)malloc(sizeof(struct loc) * CmiNumPes());
       pidtonid(CmiNumPes());
@@ -60,7 +61,8 @@ class CrayTorusManager {
       for(int i=0; i<10;i++)
         temp = fscanf(fp, "%s", header);
         
-      // read the lines one at a time and fill the two arrays  
+      // read the lines one at a time and fill the two arrays
+      // for pid2coords and coords2pid
       for(int i=0; i<2112;i++)
       {
         temp = fscanf(fp, "%d%d%d%d%d%d%d%d%d%d", &nid, &num, &num, &num, &num, &num, &num, &lx, &ly, &lz);
@@ -71,6 +73,11 @@ class CrayTorusManager {
           pid2coords[pid0].z = lz;
           pid2coords[pid0].t = 0;
           coords2pid[lx][ly][lz][0] = pid0;
+          
+          if(lx<minX) minX = lx; if(lx>maxX) maxX = lx;
+          if(ly<minY) minY = ly; if(ly>maxY) maxY = ly;
+          if(lz<minZ) minZ = lz; if(lz>maxZ) maxZ = lz;
+
           //printf("%d %d %d %d %d\n", pid0, lx, ly, lz, 0);
         }
         pid1 = nid2pid[nid][1];
@@ -80,10 +87,24 @@ class CrayTorusManager {
           pid2coords[pid1].z = lz;
           pid2coords[pid1].t = 1;
           coords2pid[lx][ly][lz][1] = pid1;
+
+          if(lx<minX) minX = lx; if(lx>maxX) maxX = lx;
+          if(ly<minY) minY = ly; if(ly>maxY) maxY = ly;
+          if(lz<minZ) minZ = lz; if(lz>maxZ) maxZ = lz;
+          
           //printf("%d %d %d %d %d\n", pid1, lx, ly, lz, 1);
         }
       }
       fclose(fp); 
+
+      // assuming a contiguous allocation find the dimensions of 
+      // the torus
+      dimNX = maxX - minX;
+      dimNY = maxY - minY;
+      dimNZ = maxZ - minZ;
+      dimNT = procsPerNode = 2;
+      dimX = dimNX * dimNT;
+      dimY = dimNY; dimZ = dimNZ;
     }
 
     ~CrayTorusManager() { }
