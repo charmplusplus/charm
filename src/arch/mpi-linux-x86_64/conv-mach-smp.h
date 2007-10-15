@@ -28,3 +28,5 @@
 #undef CMK_SYNCHRONIZE_ON_TCP_CLOSE
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       1
 
+#define  CMK_USE_MFENCE                                    1
+
