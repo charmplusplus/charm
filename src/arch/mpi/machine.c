@@ -1680,10 +1680,18 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 static void CmiSendNodeSelf(char *msg)
 {
 #if CMK_IMMEDIATE_MSG
+#if 0
     if (CmiIsImmediate(msg) && !_immRunning) {
       /*CmiHandleImmediateMessage(msg); */
       CmiPushImmediateMsg(msg);
       CmiHandleImmediate();
+      return;
+    }
+#endif
+    if (CmiIsImmediate(msg))
+    {
+      CmiPushImmediateMsg(msg);
+      if (!_immRunning) CmiHandleImmediate();
       return;
     }
 #endif
