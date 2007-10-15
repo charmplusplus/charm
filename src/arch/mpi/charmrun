@@ -206,6 +206,7 @@ End() {
 		fi
         done
 else
+  [ -n "$MPI_MACHINEFILE" ] && args="$args -machinefile $MPI_MACHINEFILE"
   mpirun -np $pes $args
 fi
 
