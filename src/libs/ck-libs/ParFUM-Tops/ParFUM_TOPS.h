@@ -30,7 +30,9 @@ typedef struct{
     FEM_Mesh *mesh;
     void *mAtt;
     AllocTable2d<unsigned char> *ElemData_T;
+    AllocTable2d<unsigned char> *GhostElemData_T;
     AllocTable2d<unsigned char> *NodeData_T;
+    AllocTable2d<unsigned char> *GhostNodeData_T;
     AllocTable2d<int> *ElemConn_T;
     AllocTable2d<FP_TYPE_LOW> *coord_T;
     AllocTable2d<int> *node_id_T;
@@ -76,7 +78,7 @@ public:
 Create and access a Tops model. Only call from Init
 Currently only one model can be created. To extend, each model must just reference a different FEM_Mesh object
 */
-TopModel* topModel_Create_Init();
+TopModel* topModel_Create_Init(int nelnode);
 
 /** Create and access a Tops model. Only call from Driver */
 TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_attr_sz, void* mAtt);
