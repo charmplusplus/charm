@@ -1014,7 +1014,12 @@ static void CommunicationServer(int sleepTime)
     }
 #endif
     MACHSTATE(2, "} CommunicationServer EXIT");
+#if CMK_MPI_VMI
+    /* vmi mpi always return exit status 255 when calling MPI_Finalize() which broke Make */
+  exit(0);
+#else
     MPI_Finalize();
+#endif
     exit(0);
   }
 }
@@ -1779,7 +1784,7 @@ void ConverseExit(void)
     CmiAbort("ConverseExit: MPI_Barrier failed!\n");
 
   ConverseCommonExit();
-#if CMK_VMI
+#if CMK_MPI_VMI
     /* vmi mpi always return exit status 255 */
   exit(0);
 #else
