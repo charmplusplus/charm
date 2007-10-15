@@ -21,7 +21,7 @@
 #define CMK_MALLOC_USE_OS_BUILTIN                          0
 
 #define CMK_MEMORY_PAGESIZE                                8192
-#define CMK_MEMORY_PROTECTABLE                             0
+#define CMK_MEMORY_PROTECTABLE                             1
 
 #define CMK_NODE_QUEUE_AVAILABLE                           0
 
