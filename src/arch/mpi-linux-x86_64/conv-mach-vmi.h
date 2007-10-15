@@ -9,4 +9,4 @@
 
 #define CMK_DISABLE_SYNC				   1
 
-#define CMK_VMI						   1
+#define CMK_MPI_VMI					   1
