@@ -18,12 +18,20 @@
 #ifndef __PCQUEUE__
 #define __PCQUEUE__
 
+
 /*****************************************************************************
  * #define CMK_PCQUEUE_LOCK
  * PCQueue doesn't need any lock, the lock here is only 
  * for debugging and testing purpose! it only make sense in smp version
  ****************************************************************************/
 /*#define CMK_PCQUEUE_LOCK  1 */
+
+#if CMK_PCQUEUE_LOCK || !defined(CMK_USE_MFENCE) || !CMK_USE_MFENCE
+#undef smp_rmb
+#undef smp_wmb
+#define smp_rmb()
+#define smp_wmb()
+#endif
 
 #define PCQueueSize 0x100
 
@@ -136,6 +144,9 @@ char *PCQueuePop(PCQueue Q)
     CmiLock(Q->lock);
 #endif
     circ = Q->head;
+
+    smp_rmb();
+
     pull = circ->pull;
     data = circ->data[pull];
 #if XT3_ONLY_PCQUEUE_WORKAROUND
@@ -147,7 +158,9 @@ char *PCQueuePop(PCQueue Q)
       circ->data[pull] = 0;
       if (pull == PCQueueSize - 1) { /* just pulled the data from the last slot
                                      of this buffer */
+        smp_rmb();
         Q->head = circ-> next; /* next buffer must exist, because "Push"  */
+        CmiAssert(Q->head != NULL);
 	
 	/* FreeCircQueueStruct(circ); */
         free(circ);
@@ -191,12 +204,17 @@ void PCQueuePush(PCQueue Q, char *data)
 #endif
     /* MallocCircQueueStruct(circ); */
 
+    smp_wmb();
+
     Q->tail->next = circ;
     Q->tail = circ;
+
+    smp_wmb();
   }
   circ1->data[push] = data;
   circ1->push = (push + 1);
   Q->len ++;
+  smp_wmb();
 
 #ifdef CMK_PCQUEUE_LOCK
   CmiUnlock(Q->lock);
