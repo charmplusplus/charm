@@ -40,40 +40,40 @@ test_bench: all
 	./charmrun bench +p4 10
 
 test: all
-	./charmrun hello +p1 1
-	./charmrun hello +p1 2
-	./charmrun hello +p2 2
-	./charmrun hello +p4 10 2
-	./charmrun hello +p4 10 3
-	./charmrun hello +p4 10 4
-	./charmrun hello +p4 10 5
-	./charmrun hello +p2 1
-	./charmrun bench +p2 100 1 +balancer RefineLB
-	./charmrun bench +p2 100 2 +balancer RefineLB
-	./charmrun bench +p2 100 4 +balancer RefineLB
-	./charmrun bench +p4 100 2 +balancer RefineLB
-	./charmrun bench +p4 100 4 +balancer RefineLB
-	./charmrun bench +p2 100 1 +strategy USE_GRID +balancer RefineLB 
-	./charmrun bench +p2 100 2 +strategy USE_GRID +balancer RefineLB
-	./charmrun bench +p2 100 4 +strategy USE_GRID +balancer RefineLB
-	./charmrun bench +p2 100 1 +strategy USE_DIRECT +balancer RefineLB
-	./charmrun bench +p2 100 2 +strategy USE_DIRECT +balancer RefineLB
-	./charmrun bench +p2 100 4 +strategy USE_DIRECT +balancer RefineLB
-	./charmrun benchmulti +p2 100 1 +balancer RefineLB
-	./charmrun benchmulti +p2 100 2 +balancer RefineLB
-	./charmrun benchmulti +p2 100 4 +balancer RefineLB
-	./charmrun benchmulti +p4 100 2 +balancer RefineLB
-	./charmrun benchmulti +p4 100 4 +balancer RefineLB
-	./charmrun benchmulti +p2 100 1 +strategy USE_GRID +balancer RefineLB 
-	./charmrun benchmulti +p2 100 2 +strategy USE_GRID +balancer RefineLB
-	./charmrun benchmulti +p2 100 4 +strategy USE_GRID +balancer RefineLB
-	./charmrun benchmulti +p2 100 1 +strategy USE_DIRECT +balancer RefineLB
-	./charmrun benchmulti +p2 100 2 +strategy USE_DIRECT +balancer RefineLB
-	./charmrun benchmulti +p2 100 4 +strategy USE_DIRECT +balancer RefineLB
-	./charmrun benchsectionmulti +p2 100 1 +balancer RefineLB
-	./charmrun benchsectionmulti +p2 100 2 +balancer RefineLB
-	./charmrun benchsectionmulti +p2 100 4 +balancer RefineLB
-	./charmrun benchsectionmulti +p4 100 4 +balancer RefineLB
+	./charmrun hello +p1 1 $(TESTOPTS)
+	./charmrun hello +p1 2 $(TESTOPTS)
+	./charmrun hello +p2 2 $(TESTOPTS)
+	./charmrun hello +p4 10 2 $(TESTOPTS)
+	./charmrun hello +p4 10 3 $(TESTOPTS)
+	./charmrun hello +p4 10 4 $(TESTOPTS)
+	./charmrun hello +p4 10 5 $(TESTOPTS)
+	./charmrun hello +p2 1 $(TESTOPTS)
+	./charmrun bench +p2 100 1 +balancer RefineLB $(TESTOPTS)
+	./charmrun bench +p2 100 2 +balancer RefineLB $(TESTOPTS)
+	./charmrun bench +p2 100 4 +balancer RefineLB $(TESTOPTS)
+	./charmrun bench +p4 100 2 +balancer RefineLB $(TESTOPTS)
+	./charmrun bench +p4 100 4 +balancer RefineLB $(TESTOPTS)
+	./charmrun bench +p2 100 1 +strategy USE_GRID +balancer RefineLB  $(TESTOPTS)
+	./charmrun bench +p2 100 2 +strategy USE_GRID +balancer RefineLB $(TESTOPTS)
+	./charmrun bench +p2 100 4 +strategy USE_GRID +balancer RefineLB $(TESTOPTS)
+	./charmrun bench +p2 100 1 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
+	./charmrun bench +p2 100 2 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
+	./charmrun bench +p2 100 4 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
+	./charmrun benchmulti +p2 100 1 +balancer RefineLB $(TESTOPTS)
+	./charmrun benchmulti +p2 100 2 +balancer RefineLB $(TESTOPTS)
+	./charmrun benchmulti +p2 100 4 +balancer RefineLB $(TESTOPTS)
+	./charmrun benchmulti +p4 100 2 +balancer RefineLB $(TESTOPTS)
+	./charmrun benchmulti +p4 100 4 +balancer RefineLB $(TESTOPTS)
+	./charmrun benchmulti +p2 100 1 +strategy USE_GRID +balancer RefineLB  $(TESTOPTS)
+	./charmrun benchmulti +p2 100 2 +strategy USE_GRID +balancer RefineLB $(TESTOPTS)
+	./charmrun benchmulti +p2 100 4 +strategy USE_GRID +balancer RefineLB $(TESTOPTS)
+	./charmrun benchmulti +p2 100 1 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
+	./charmrun benchmulti +p2 100 2 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
+	./charmrun benchmulti +p2 100 4 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
+	./charmrun benchsectionmulti +p2 100 1 +balancer RefineLB $(TESTOPTS)
+	./charmrun benchsectionmulti +p2 100 2 +balancer RefineLB $(TESTOPTS)
+	./charmrun benchsectionmulti +p2 100 4 +balancer RefineLB $(TESTOPTS)
+	./charmrun benchsectionmulti +p4 100 4 +balancer RefineLB $(TESTOPTS)
 
 bgtest: all
 	./charmrun hello +p1 1  +x1 +y1 +z1
