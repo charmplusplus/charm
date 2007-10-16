@@ -12,7 +12,7 @@ clean:
 	rm -f *.o *.mod pgm *~ conv-host charmrun
 
 test: pgm
-	./charmrun ./pgm +p2 +vp4
+	./charmrun ./pgm +p2 +vp4 $(TESTOPTS)
 
 bgtest: pgm
 	./charmrun ./pgm +p2 +vp4 +x2 +y1 +z1

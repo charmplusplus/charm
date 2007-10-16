@@ -9,9 +9,9 @@ hello: hello.c
 
 test: hello
 	rm -rf log
-	./charmrun +p3 ./hello +vp8
-	./charmrun +p3 ./hello +vp8 +restart log
-	./charmrun +p2 ./hello +vp8 +restart log
+	./charmrun +p3 ./hello +vp8 $(TESTOPTS)
+	./charmrun +p3 ./hello +vp8 +restart log $(TESTOPTS)
+	./charmrun +p2 ./hello +vp8 +restart log $(TESTOPTS)
 
 bgtest: clean ampi
 	./charmrun +p3 ./hello +vp8 +x3 +y1 +z1
