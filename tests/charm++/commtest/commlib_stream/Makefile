@@ -20,8 +20,8 @@ manytomany : manytomany.ci manytomany.C
 	$(CHARMC) -o manytomany manytomany.C -module comlib
 
 test: all
-	./charmrun hello +p4 10
-	./charmrun linear +p2 2
+	./charmrun hello +p4 10 $(TESTOPTS)
+	./charmrun linear +p2 2 $(TESTOPTS)
 
 bgtest: all
 	./charmrun hello +p4 10 +x2 +y2 +z1
