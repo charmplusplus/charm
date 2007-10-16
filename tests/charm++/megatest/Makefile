@@ -90,10 +90,10 @@ clean:
 	rm -r -f conv-host pgm *.o *.decl.h *.def.h *.log *.sts *~ *.bak charmrun SunWS_cache
 
 test: pgm
-	./charmrun ./pgm +p1
-	./charmrun ./pgm +p2
-	./charmrun ./pgm +p3
-	./charmrun ./pgm +p4
+	./charmrun ./pgm +p1 $(TESTOPTS)
+	./charmrun ./pgm +p2 $(TESTOPTS)
+	./charmrun ./pgm +p3 $(TESTOPTS)
+	./charmrun ./pgm +p4 $(TESTOPTS)
 
 depends:  $(CIFILES)
 	echo "Creating " $(DEPENDFILE) " ...";	\
