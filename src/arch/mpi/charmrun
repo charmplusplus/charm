@@ -206,9 +206,9 @@ End() {
 		fi
         done
 else
-  [ -n "$MPI_MACHINEFILE" ] && args="$args -machinefile $MPI_MACHINEFILE"
+  [ -n "$MPI_MACHINEFILE" ] && args=" -machinefile $MPI_MACHINEFILE $args"
+  echo "charmrun> mpirun -np $pes $args"
   mpirun -np $pes $args
 fi
-
 
 
