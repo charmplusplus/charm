@@ -18,9 +18,9 @@ pingpong.o: pingpong.C
 
 test: all
 	@echo "Intra-processor Pingpong.."
-	./charmrun ./pgm +p1
+	./charmrun ./pgm +p1 $(TESTOPTS)
 	@echo "Inter-processor Pingpong.."
-	./charmrun ./pgm +p2
+	./charmrun ./pgm +p2 $(TESTOPTS)
 
 bgtest: all
 	@echo "Intra-processor Pingpong.."
