@@ -8,7 +8,7 @@ pgm: $(OBJS)
 	$(CHARMC) -o pgm $(OBJS) -language converse++
 
 test: pgm
-	./charmrun ./pgm +p4
+	./charmrun ./pgm +p4 $(TESTOPTS)
 
 commbench.o: commbench.c
 	$(CHARMC) commbench.c
