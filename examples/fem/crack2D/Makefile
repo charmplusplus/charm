@@ -42,10 +42,10 @@ serial: $(SERIAL_OBJS)
 
 
 test: pgm
-	./charmrun ./pgm +p2 +vp4
+	./charmrun ./pgm +p2 +vp4 $(TESTOPTS)
 
 bgtest: pgm
-	./charmrun ./pgm +p2 +vp4 +x2 +y2 +z1
+	./charmrun ./pgm +p2 +vp4 +x2 +y2 +z1 $(TESTOPTS)
 
 clean:
 	rm -rf *.o pgm *.sts *.log *.bak *~ SunWS_cache ii_files ti_files

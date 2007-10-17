@@ -9,7 +9,7 @@ rings.o : rings.C rings.h rings.ci
 	$(CHARMC) -c rings.ci rings.C
 
 test: pgm
-	./charmrun +p4 pgm
+	./charmrun +p4 pgm $(TESTOPTS)
 
 bgtest: pgm
 	./charmrun +p4 pgm +x2 +y2 +z2

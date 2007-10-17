@@ -17,7 +17,7 @@ RedExample.o: RedExample.C RedExample.decl.h RedExample.h
 	$(CHARMC) -c RedExample.C
 
 test: all
-	./charmrun ./RedExample 20 4.5 10.3 +p4
+	./charmrun ./RedExample 20 4.5 10.3 +p4 $(TESTOPTS)
 
 bgtest: all
 	./charmrun ./RedExample 20 4.5 10.3 +p4 +x2 +y2 +z2
