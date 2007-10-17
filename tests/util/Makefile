@@ -11,7 +11,7 @@ check.o: check.C
 	$(CHARMC) -c check.C
 
 test: check
-	./charmrun +p1 check
+	./charmrun +p1 check $(TESTOPTS)
 
 clean:
 	rm -f conv-host *.o *.bak *.log check.sts *~ charmrun
