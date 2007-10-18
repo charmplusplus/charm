@@ -32,12 +32,14 @@ CpvDeclare(int, CpdDebugCallAllocationTree_Index);
 
 static void CpdDebugReturnAllocationTree(void *tree) {
   pup_er sizer = pup_new_sizer();
+  char *buf;
+  pup_er packer;
+  int i;
   CpdDebug_pupAllocationPoint(sizer, tree);
-  char *buf = (char *)malloc(pup_size(sizer));
-  pup_er packer = pup_new_toMem(buf);
+  buf = (char *)malloc(pup_size(sizer));
+  packer = pup_new_toMem(buf);
   CpdDebug_pupAllocationPoint(packer, tree);
   /*CmiPrintf("size=%d tree:",pup_size(sizer));
-  int i;
   for (i=0;i<100;++i) CmiPrintf(" %02x",((unsigned char*)buf)[i]);
   CmiPrintf("\n");*/
   CcsSendReply(pup_size(sizer),buf);
@@ -50,12 +52,13 @@ static void CpdDebugCallAllocationTree(char *msg)
 {
   int numNodes;
   int forPE;
+  void *tree;
   sscanf(msg+CmiMsgHeaderSizeBytes, "%d", &forPE);
   if (forPE == -1 && CmiMyPe()==0) {
     CmiSetHandler(msg, CpvAccess(CpdDebugCallAllocationTree_Index));
     CmiSyncBroadcast(CmiMsgHeaderSizeBytes+sizeof(int), msg);
   }
-  void *tree = CpdDebugGetAllocationTree(&numNodes);
+  tree = CpdDebugGetAllocationTree(&numNodes);
   if (forPE == CmiMyPe()) CpdDebugReturnAllocationTree(tree);
   else if (forPE == -1) CmiReduceStruct(tree, CpdDebug_pupAllocationPoint, CpdDebug_MergeAllocationTree,
                                 CpdDebugReturnAllocationTree, CpdDebug_deleteAllocationPoint);

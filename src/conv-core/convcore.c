@@ -1776,19 +1776,21 @@ CmiReductionsInit() {
 
 void CmiSendReduce() {
   void *mergedData = CpvAccess(_reduce_data);
+  void *msg;
+  int msg_size;
   if (CpvAccess(_reduce_num_children) > 0) {
     int i, offset=0;
     if (_reduce_pupFn != NULL) {
       offset = CmiMsgHeaderSizeBytes;
-      for (i=0; i<CpvAccess(_reduce_num_children); ++i) CpvAccess(_reduce_msg_list)[i] += offset;
+      for (i=0; i<CpvAccess(_reduce_num_children); ++i) (char*)(CpvAccess(_reduce_msg_list)[i]) += offset;
     }
     mergedData = _reduce_mergeFn(CpvAccess(_reduce_data), CpvAccess(_reduce_msg_list), CpvAccess(_reduce_num_children));
-    for (i=0; i<CpvAccess(_reduce_num_children); ++i) CmiFree(CpvAccess(_reduce_msg_list)[i] - offset);
+    for (i=0; i<CpvAccess(_reduce_num_children); ++i) CmiFree((char *)(CpvAccess(_reduce_msg_list)[i]) - offset);
   }
   CpvAccess(_reduce_num_children) = 0;
   CpvAccess(_reduce_received) = 0;
-  void *msg = mergedData;
-  int msg_size = CpvAccess(_reduce_data_size);
+  msg = mergedData;
+  msg_size = CpvAccess(_reduce_data_size);
   if (CmiMyPe() != 0) {
     if (_reduce_pupFn != NULL) {
       pup_er p = pup_new_sizer();
