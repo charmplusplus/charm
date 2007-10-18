@@ -18,7 +18,7 @@
 #include "register.h"
 //#include "queueing.h"
 
-#if CMK_CCS_AVAILABLE
+#if CMK_CCS_AVAILABLE && !defined(_WIN32)
 
 #include "ck.h"
 
@@ -251,7 +251,9 @@ public:
   }
 };
 
+#ifndef __CYGWIN__
 #include <rpc/rpc.h>
+#endif
 
 int hostInfoLength(void *) {return 1;}
 
