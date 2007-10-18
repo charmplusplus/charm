@@ -1752,7 +1752,7 @@ CpvStaticDeclare(int, CmiReductionMessageHandler);
 CpvStaticDeclare(int, _reduce_num_children);
 CpvStaticDeclare(int, _reduce_parent);
 CpvStaticDeclare(int, _reduce_received);
-CpvStaticDeclare(void**, _reduce_msg_list);
+CpvStaticDeclare(char**, _reduce_msg_list);
 CpvStaticDeclare(void*, _reduce_data);
 CpvStaticDeclare(int, _reduce_data_size);
 static CmiHandler _reduce_destination;
@@ -1766,12 +1766,12 @@ CmiReductionsInit() {
   CpvInitialize(int, _reduce_num_children);
   CpvInitialize(int, _reduce_parent);
   CpvInitialize(int, _reduce_received);
-  CpvInitialize(void**, _reduce_msg_list);
+  CpvInitialize(char**, _reduce_msg_list);
   CpvInitialize(void*, _reduce_data);
   CpvInitialize(int, _reduce_data_size);
   CpvAccess(_reduce_num_children) = 0;
   CpvAccess(_reduce_received) = 0;
-  CpvAccess(_reduce_msg_list) = (void**)malloc(CmiNumSpanTreeChildren(CmiMyPe())*sizeof(void*));
+  CpvAccess(_reduce_msg_list) = (char**)malloc(CmiNumSpanTreeChildren(CmiMyPe())*sizeof(void*));
 }
 
 void CmiSendReduce() {
@@ -1782,10 +1782,10 @@ void CmiSendReduce() {
     int i, offset=0;
     if (_reduce_pupFn != NULL) {
       offset = CmiMsgHeaderSizeBytes;
-      for (i=0; i<CpvAccess(_reduce_num_children); ++i) (char*)(CpvAccess(_reduce_msg_list)[i]) += offset;
+      for (i=0; i<CpvAccess(_reduce_num_children); ++i) CpvAccess(_reduce_msg_list)[i] += offset;
     }
-    mergedData = _reduce_mergeFn(CpvAccess(_reduce_data), CpvAccess(_reduce_msg_list), CpvAccess(_reduce_num_children));
-    for (i=0; i<CpvAccess(_reduce_num_children); ++i) CmiFree((char *)(CpvAccess(_reduce_msg_list)[i]) - offset);
+    mergedData = _reduce_mergeFn(CpvAccess(_reduce_data), (void **)CpvAccess(_reduce_msg_list), CpvAccess(_reduce_num_children));
+    for (i=0; i<CpvAccess(_reduce_num_children); ++i) CmiFree(CpvAccess(_reduce_msg_list)[i] - offset);
   }
   CpvAccess(_reduce_num_children) = 0;
   CpvAccess(_reduce_received) = 0;
