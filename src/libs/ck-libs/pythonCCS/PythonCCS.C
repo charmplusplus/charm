@@ -270,6 +270,7 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
       // the interpreter already exists and it is neither in use, nor dead
       //CkPrintf("interpreter present and not in use\n");
       pyReference = pyMsg->interpreter;
+      PyThreadState_Swap(iter->second.pythread);
       //PyEval_AcquireLock();
     } else {
       // ops, either the iterator does not exist or is already in use, return an
@@ -296,6 +297,9 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
     // create the new interpreter
     //PyEval_AcquireLock();
     PyThreadState *pts = Py_NewInterpreter();
+
+    CkAssert(pts != NULL);
+    ((*CsvAccess(pyWorkers))[pyReference]).pythread = pts;
 
     Py_InitModule("ck", CkPy_MethodsDefault);
     if (pyMsg->isHighLevel()) Py_InitModule("charm", getMethods());
@@ -422,14 +426,14 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
     char *userCode = pyMsg->code.code;
     struct _node* programNode = PyParser_SimpleParseString(userCode, Py_file_input);
     if (programNode==NULL) {
-      CkPrintf("Program error\n");
+      CkPrintf("Program Parse Error\n");
       // distroy map element in pyWorkers and terminate interpreter
       cleanup(pyMsg, mine, pyReference);
       return;
     }
     PyCodeObject *program = PyNode_Compile(programNode, "");
     if (program==NULL) {
-      CkPrintf("Program error\n");
+      CkPrintf("Program Compile Error\n");
       PyNode_Free(programNode);
       // distroy map element in pyWorkers and terminate interpreter
       cleanup(pyMsg, mine, pyReference);
@@ -439,7 +443,7 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
     PyObject *dict = PyModule_GetDict(mod);
     PyObject *code = PyEval_EvalCode(program, dict, dict);
     if (code==NULL) {
-      CkPrintf("Program error\n");
+      CkPrintf("Program Eval Error\n");
       PyNode_Free(programNode);
       Py_DECREF(program);
       // distroy map element in pyWorkers and terminate interpreter
@@ -476,6 +480,7 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
       result = PyObject_CallObject(item, arg);
       if (!result) {
 	CkPrintf("Python Call error\n");
+        PyErr_Print();
 	break;
       }
       more = nextIteratorUpdate(part, result, userIterator);
@@ -768,6 +773,7 @@ PyObject *PythonObject::pythonGetArg(int handle) {
 void PythonObject::pythonReturn(int handle) {
   CmiLock(CsvAccess(pyLock));
   CthThread handleThread = ((*CsvAccess(pyWorkers))[handle]).thread;
+  *((*CsvAccess(pyWorkers))[handle]).result = 0;
   CmiUnlock(CsvAccess(pyLock));
   CthAwaken(handleThread);
 }
