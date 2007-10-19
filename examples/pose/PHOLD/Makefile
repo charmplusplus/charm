@@ -52,6 +52,10 @@ $(PGM):	$(SIM_OBJECTS)
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM) \
 	-module pose -language charm++
 
+$(PGM).prof:	$(SIM_OBJECTS) 
+	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM) \
+	-module pose -language charm++ -pg
+
 $(PGM).seq: seqobjs
 	$(CHARMC) $(SIM_OBJECTS) $(OTHER) $(LIBS) -o $(PGM).seq \
 	-DSEQUENTIAL_POSE=1 -module seqpose -language charm++

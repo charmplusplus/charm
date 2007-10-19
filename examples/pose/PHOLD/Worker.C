@@ -60,7 +60,8 @@ void worker::work(WorkMsg *m)
     wm->fromPE = myHandle;
     offset = 1 + POSE_rand() % (tscale/100);
     while ((nbr < 0) || (nbr >= numObjs)) {
-      away = (POSE_rand() % locality) + 1;
+      away = (POSE_rand() % (numObjs - ((int)((((float)locality)/100.0) * (float)numObjs)))) + 1;
+      away = away/2;
       sign = POSE_rand() % 2;
       if (sign) nbr = myHandle+away;
       else nbr = myHandle-away;

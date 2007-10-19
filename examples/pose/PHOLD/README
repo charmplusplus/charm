@@ -1,0 +1,36 @@
+Usage: phold <#LPs> <#initMsgs> <initMsgDist (RANDOM)> <timestampIncFn
+(RANDOM)> <moveFn (RANDOM)> [ -g[f|m|c|z] | -t<granularity> ]
+<spacialLocality ()> <timescale (>=100)>  
+
+This program creates a number of posers, i.e. PDES objects or LPs as specified by <#LPs>.
+
+Each object, known as a Worker, is created on the available processors
+according to a UNIFORM distribution.  As each Worker is created, it
+initiates <#initMsgs> "work" events on random Worker objects, at times scaled
+by <timescale> with distribution <initMsgDist>. <initMsgDist> is
+currently ignored and set to RANDOM.  Here <timescale> represents a range
+of acceptable times at which to generate messages, and should be at
+least 100.  Note that only 10^2 and higher digits are meaningful in
+this context (but the actual value is used later).
+
+<timestampIncFn> and <moveFn> are currently ignored and set to RANDOM.
+
+To specify grainsize, use -g or -t.  -g takes a single character arg,
+f, m, c, or z, representing fine, medium, coarse or mixed,
+respectively.  These represent busy-wait values of 0.000010, 0.001000,
+and 0.010000, or a mix of these, respectively.  Alternatively, -t can
+be used to specify a specific busy-wait value.
+
+When a Worker receives a work event, it busy-waits for the indicated
+grainsize.  Then if its current time is below <timescale> (here
+specifying a specific endtime), it
+generates another work message for a neighbor worker, where neighbor
+is defined by a percentage <spacialLocality>.  For example, 100%
+locality will send to the two Workers immediately above and below the current
+object (in numbering).  50% locality will consist of the neighborhood
+around the current Worker that contains 50% of all Workers.  These
+messages are specified with offsets similar to the initial messages
+--- randomly in the future within the timescale.
+
+The simulation terminates when all messages have been processed.
+
