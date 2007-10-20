@@ -572,5 +572,10 @@ void CpdCharmInit()
   CpdListRegister(new CpdList_object());
 }
 
+#else
+
+void CpdCharmInit()
+{
+}
 
 #endif /*CMK_CCS_AVAILABLE*/
