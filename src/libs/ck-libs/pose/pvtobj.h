@@ -14,9 +14,9 @@ class pvtObjectNode {
   /// Index of poser in POSE_Objects array
   int index;  
   /// Flag to indicate if object data is stored at this index
-  /** present==1 indicates that this node contains a valid object, present==0 
+  /** present==true indicates that this node contains a valid object, present==false
       indicates the node can be recycled */
-  short int present;
+  bool present;
   /// The synchronization strategy of the poser (OPTIMISTIC or CONSERVATIVE)
   short int sync; 
   /// Time spent executing events on this object within a DOP_QUANTA
@@ -25,16 +25,16 @@ class pvtObjectNode {
   /// A pointer to the actual poser
   sim *localObjPtr;
   /// Basic Constructor
-  pvtObjectNode() : ovt(POSE_UnsetTS), ovt2(POSE_UnsetTS), index(-1), present (0), sync(0), qdo(0.0) {  }
+  pvtObjectNode() : ovt(POSE_UnsetTS), ovt2(POSE_UnsetTS), index(-1), present(false), sync(0), qdo(0.0) {  }
   /// Sets all data fields
-  void set(POSE_TimeType ts, int idx, short int on, short int s, sim *p) {
+  void set(POSE_TimeType ts, int idx, bool on, short int s, sim *p) {
     ovt = ts; index = idx; present = on; sync = s; localObjPtr = p; qdo = 0.0;
     ovt2 = POSE_UnsetTS;
   }
   /// Sets ovt to -1 to indicate idle
   void setIdle() { ovt = ovt2 = POSE_UnsetTS; }
   /// Test present flag
-  int isPresent() { return present; }
+  bool isPresent() { return present; }
   /// Test if synchronization strategy is optimistic
   int isOptimistic() { return (sync == OPTIMISTIC); }
   /// Test if synchronization strategy is conservative
@@ -56,11 +56,11 @@ class pvtObjectNode {
   /// Dump data fields
   void dump() {
     if (localObjPtr == NULL)
-      CkPrintf("ovt=%d index=%d present=%d sync=%s ptr=NULL",
-	       ovt, index, present, (sync==0)?"OPT":"CON");
+      CkPrintf("ovt=%d index=%d present=%s sync=%s ptr=NULL",
+	       ovt, index, present?"true":"false", (sync==0)?"OPT":"CON");
     else 
-      CkPrintf("ovt=%d index=%d present=%d sync=%s ptr!=NULL",
-	       ovt, index, present, (sync==0)?"OPT":"CON");
+      CkPrintf("ovt=%d index=%d present=%s sync=%s ptr!=NULL",
+	       ovt, index, present?"true":"false", (sync==0)?"OPT":"CON");
   }
   /// Check validity of data fields
   void sanitize();
@@ -100,7 +100,7 @@ class pvtObjects {
   int Insert(int index, POSE_TimeType ovt, int sync, sim *myPtr); 
   /// Delete a poser from the list
   void Delete(int idx) {
-    objs[idx].set(POSE_UnsetTS, POSE_UnsetTS, 0, 0, NULL);
+    objs[idx].set(POSE_UnsetTS, POSE_UnsetTS, false, 0, NULL);
     numObjs--;
     if (idx < firstEmpty) firstEmpty = idx; // recalculate firstEmpty
   }                       

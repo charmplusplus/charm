@@ -270,9 +270,8 @@ void PVT::objUpdateOVT(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType ovt)
   CkAssert(simdone>0 || (safeTime >= estGVT) || (safeTime == POSE_UnsetTS));
   if ((safeTime == POSE_UnsetTS) && (objs.objs[index].getOVT2() < ovt))
     objs.objs[index].setOVT2(ovt);
-  if ((safeTime > POSE_UnsetTS) && 
-      ((objs.objs[index].getOVT() > safeTime) || 
-       (objs.objs[index].getOVT() == POSE_UnsetTS)))
+  else if ((safeTime > POSE_UnsetTS) && 
+	   ((objs.objs[index].getOVT() > safeTime) || (objs.objs[index].getOVT() == POSE_UnsetTS)))
     objs.objs[index].setOVT(safeTime);
 }
 

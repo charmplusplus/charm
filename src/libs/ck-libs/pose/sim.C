@@ -130,37 +130,34 @@ void sim::Commit()
   if(pose_config.trace)
     critStart= CmiWallTimer();  // trace timing
   int tstat;
-  if(pose_config.stats)
-    {
-      tstat = localStats->TimerRunning();
-      if (!tstat)  localStats->TimerStart(SIM_TIMER);
-      else localStats->SwitchTimer(SIM_TIMER);
-    }
+  if(pose_config.stats) {
+    tstat = localStats->TimerRunning();
+    if (!tstat)  localStats->TimerStart(SIM_TIMER);
+    else localStats->SwitchTimer(SIM_TIMER);
+  }
   if(pose_config.stats)
     localStats->SwitchTimer(FC_TIMER);
 #endif
-
-  if (localPVT->done()) { // simulation inactive
-    eq->CommitEvents(this, POSE_endtime); // commit all events in
-					  // queue
+  int isDone=localPVT->done(); 
+  int curGVT=localPVT->getGVT();
+  if (isDone) { // simulation inactive
+    eq->CommitEvents(this, POSE_endtime); // commit all events in queue
     Terminate();// call terminus on all posers
   }
-  else if (localPVT->getGVT() > lastGVT + 10) {
-    lastGVT = localPVT->getGVT();
+  else if (curGVT > lastGVT + 100) {  // What's the constant doing to us?
+    lastGVT = curGVT;
     eq->CommitEvents(this, lastGVT); // commit events up to GVT
   }
 
 #ifndef CMK_OPTIMIZE
-  if(pose_config.trace)
-    {
-      traceUserBracketEvent(50, critStart, CmiWallTimer());
-      critStart = CmiWallTimer();
-    }
+  if(pose_config.trace) {
+    traceUserBracketEvent(50, critStart, CmiWallTimer());
+    critStart = CmiWallTimer();
+  }
   if(pose_config.stats)
     localStats->SwitchTimer(SIM_TIMER);
 #endif
-
-  if (!localPVT->done() && (eq->currentPtr->timestamp > -1)) 
+  if (!isDone && (eq->currentPtr->timestamp > -1)) 
     Step(); // not done; try stepping again
 
 #ifndef CMK_OPTIMIZE
@@ -202,7 +199,7 @@ void sim::Cancel(cancelMsg *m)
 #endif
   //  char str[20];
   //  CkPrintf("[%d] RECV(cancel) %s at %d...\n", CkMyPe(), m->evID.sdump(str), m->timestamp);      
-  //  localPVT = (PVT *)CkLocalBranch(ThePVT);
+  //localPVT = (PVT *)CkLocalBranch(ThePVT);
   cancels.Insert(m->timestamp, m->evID); // add to cancellations list
   localPVT->objUpdate(m->timestamp, RECV); // tell PVT branch about recv
   CkFreeMsg(m);

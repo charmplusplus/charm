@@ -4,7 +4,6 @@
 /// Check validity of data fields
 void pvtObjectNode::sanitize() 
 {
-  CmiAssert((present == 0) || (present == 1));
   if (present) {
     CmiAssert(ovt >= -1);
     CmiAssert(index >= 0);
@@ -23,7 +22,7 @@ pvtObjects::pvtObjects()
     CkPrintf("ERROR: pvtObjects::pvtObjects: OUT OF MEMORY!\n");
     CkExit();
   }
-  for (i=0; i<size; i++) objs[i].set(POSE_UnsetTS, POSE_UnsetTS, 0, 0, NULL);
+  for (i=0; i<size; i++) objs[i].set(POSE_UnsetTS, POSE_UnsetTS, false, 0, NULL);
 }
 
 /// Insert poser in list
@@ -35,7 +34,7 @@ int pvtObjects::Insert(int index, POSE_TimeType ovt, int sync, sim *myPtr)
     idx = firstEmpty;
     if (firstEmpty == numSpaces) // all spaces occupied up to end of list
       numSpaces++;  // use a previously unused space
-    objs[idx].set(ovt, index, 1, sync, myPtr);
+    objs[idx].set(ovt, index, true, sync, myPtr);
     numObjs++;
     for (i=firstEmpty+1; i<size; i++)  // reset firstEmpty
       if (!objs[i].isPresent()) {
@@ -52,9 +51,9 @@ int pvtObjects::Insert(int index, POSE_TimeType ovt, int sync, sim *myPtr)
       CkExit();
     }
     for (i=firstEmpty; i<size; i++)  // initialize new slots to empty
-      objs[i].set(POSE_UnsetTS, POSE_UnsetTS, 0, 0, NULL);
+      objs[i].set(POSE_UnsetTS, POSE_UnsetTS, false, 0, NULL);
     idx = firstEmpty;  // insert new object at firstEmpty
-    objs[idx].set(ovt, index, 1, sync, myPtr);
+    objs[idx].set(ovt, index, true, sync, myPtr);
     numObjs++;
     numSpaces++;
     firstEmpty++;
