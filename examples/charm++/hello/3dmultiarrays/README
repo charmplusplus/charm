@@ -1,0 +1,9 @@
+Hello World in Charm with two 3D Arrays.
+
+Similar to the 3darrays except that this demonstrates 2 3D chare
+arrays running simultaneously. This example was primarily created to
+test that array ids are properly assigned to multiple arrays in the
+same charm++ application.
+
+
+
