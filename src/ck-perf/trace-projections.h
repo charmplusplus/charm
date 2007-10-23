@@ -30,7 +30,7 @@
 
 #include "pup.h"
 
-#define PROJECTION_VERSION  "6.6"
+#define PROJECTION_VERSION  "7.0"
 
 // Macro to make projections check for errors before an fprintf succeeds.
 #define CheckAndFPrintF(f,string,data) \

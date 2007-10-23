@@ -299,7 +299,14 @@ public:
 		p|nInts;
 		for (int i=0;i<nInts;i++) p|index.data[i];
 	}
-	CmiObjId *getProjectionID() { return (CmiObjId *)&index; }
+	CmiObjId *getProjectionID(int arrayID) { 
+	  CmiObjId *ret = new CmiObjId;
+	  for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) {
+	    ret->id[i] = index.data[i];
+	  }
+	  ret->id[CK_ARRAYINDEX_MAXLEN] = arrayID;
+	  return ret; 
+	}
         CmiBool operator==(const CkArrayIndexMax& idx) const {
           if (nInts != idx.nInts) return CmiFalse;
           for (int i=0; i<nInts; i++)

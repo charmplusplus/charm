@@ -616,7 +616,7 @@ LogEntry::LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
 	     int ml, CmiObjId *d, double rt, int numPe, int *pelist) 
 {
     type = CREATION_MULTICAST; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
-    if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
+    if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=-1; };
     recvTime = rt; 
     numpes = numPe;
     if (pelist != NULL) {
@@ -671,7 +671,8 @@ void LogEntry::pup(PUP::er &p)
         icputime = (CMK_TYPEDEF_UINT8)(1.0e6*cputime);
       }
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; 
-      p|msglen; p|irecvtime; p|id.id[0]; p|id.id[1]; p|id.id[2];
+      p|msglen; p|irecvtime; 
+      p|id.id[0]; p|id.id[1]; p|id.id[2]; p|id.id[3];
       p|icputime;
 #if CMK_HAS_COUNTER_PAPI
       p|numPapiEvents;

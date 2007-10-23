@@ -16,7 +16,7 @@
 
 #define DEBUGF(x)  // CmiPrintf x
 
-#define VER   4.0
+#define VER   7.0
 
 #define INVALIDEP     -2
 #define TRACEON_EP     -3
