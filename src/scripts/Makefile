@@ -336,7 +336,7 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	traceCore.o traceCoreCommon.o tracec.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o conv-counter.o \
-	global-nop.o cmipool.o
+	global-nop.o cmipool.o cpuaffinity.o
 
 #############################################
 #
@@ -742,9 +742,6 @@ $(L)/libtrace-counter.a: $(LIBTRACE_COUNT)
 LIBTRACE_BG=trace-bluegene.o
 $(L)/libtrace-bluegene.a:$(LIBTRACE_BG)
 	$(CHARMC) -o $@ $(LIBTRACE_BG)
-
-tracec.o: tracec.h tracec.C
-	$(CHARMC) -o $@ tracec.C
 
 LIBTRACE_MEMORY=trace-memory.o
 $(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)

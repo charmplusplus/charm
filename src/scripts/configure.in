@@ -126,6 +126,36 @@ test_link() {
 	/bin/rm -f out
 }
 
+# Testlinkc: tries to compile and link a C file $t (described by $1).
+#  If successful, prints $2 and sets $pass/clears $fail
+#  If failure, prints $3 and sets $pass/clears $fail
+#  additional arguments to c++ compiler are passed as $4
+test_linkc() {
+        AC_MSG_CHECKING("$1")
+	cat $tc >> $charmout
+	echo $CMK_CC -I../include -I. $CMK_INCDIR $OPTS_CC -c $tc -o test.o $4 >> $charmout
+	$CMK_CC -I../include -I. $CMK_INCDIR $OPTS_CC -c $tc -o test.o $4 > out 2>&1
+        if test $? = 1
+        then
+          test_result 1 "$1" "$2" "$3"
+        else
+          echo $CMK_LD -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 >> $charmout
+          $CMK_LD -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 > out 2>&1
+          test_result $? "$1" "$2" "$3"
+        fi
+ 	strictpass=$pass
+	strictfail=$fail
+        if test $pass -eq 1
+	then 
+ 	  if cat out | grep -i "warn" > /dev/null 2>&1
+	  then 
+	    strictpass="0" && strictfail="1"
+          fi
+        fi
+	cat out >> $charmout
+	/bin/rm -f out
+}
+
 # test_linkso $1 $2 $3 $4, where
 # $1: debug msg
 # $2: yes msg
@@ -497,6 +527,31 @@ cat > $t <<EOT
 EOT
 test_cxx "whether to use signal-safe system() " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_SIGSAFE_SYSTEM, $pass, [whether to use signal-safe system()])
+
+### test sched_setaffinity ####
+cat > $tc <<EOT
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+
+#define _GNU_SOURCE
+#include <sched.h>
+long sched_setaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
+long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
+
+int main()
+{
+  unsigned long mask = 0xffffffff;
+  unsigned int len = sizeof(mask);
+
+  if (sched_setaffinity(0, len, &mask) < 0) {
+    return -1;
+  }
+  return 0;
+}
+EOT
+test_linkc "whether sched_setaffinity call exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_SETAFFINITY, $pass, [whether the sched_setaffinity() exists])
 
 #### check if dlopen works ####
 skip_dl=0

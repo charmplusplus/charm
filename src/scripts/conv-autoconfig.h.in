@@ -75,6 +75,9 @@
 /* whether Python is installed */
 #undef CMK_HAS_PYTHON
 
+/* whether the sched_setaffinity() exists */
+#undef CMK_HAS_SETAFFINITY
+
 /* whether the setpriority() exists */
 #undef CMK_HAS_SETPRIORITY
 
