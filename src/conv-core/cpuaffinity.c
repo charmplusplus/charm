@@ -1,6 +1,8 @@
 #include "converse.h"
 #include "sockRoutines.h"
 
+#if CMK_HAS_SETAFFINITY
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -18,12 +20,7 @@ long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr
 #include <winbase.h>
 #endif
 
-/* needed for call to sysconf() */
-#if defined(__sun) || defined(ARCH_IRIX6) || defined(ARCH_IRIX6_64) || defined(ARCH_LINUX) || defined(ARCH_LINUXALHPA) || defined(ARCH_LINUXAMD64) || defined(ARCH_LINUXIA64) || defined(ARCH_LINUXPPC) || defined(ARCH_LINUXPPC64) || defined(_CRAY) || defined(__osf__) || defined(ARCH_AIX4) || defined(ARCH_AIX5) || defined(ARCH_AIX5_64)
-#include<unistd.h>
-#endif
-
-#if defined(__APPLE__) && defined(VMDTHREADS)
+#if defined(__APPLE__) 
 #include <Carbon/Carbon.h> /* Carbon APIs for Multiprocessing */
 #endif
 
@@ -173,7 +170,7 @@ static void cpuAffinityRecvHandler(void *msg)
 {
   int myrank;
   rankMsg *m = (rankMsg *)msg;
-  m->ranks = (char*)m + sizeof(rankMsg); 
+  m->ranks = (int *)((char*)m + sizeof(rankMsg));
   myrank = m->ranks[CmiMyPe()];
   CmiPrintf("[%d %d] rank: %d\n", CmiMyNode(), CmiMyPe(), myrank);
 
@@ -184,14 +181,19 @@ static void cpuAffinityRecvHandler(void *msg)
   CmiFree(m);
 }
 
-void CmiInitCPUAffinity()
+void CmiInitCPUAffinity(char **argv)
 {
   hostnameMsg  *msg;
+  int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
+						"set cpu affinity");
+
   cpuAffinityHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityHandler);
   cpuAffinityRecvHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler);
   if (CmiMyPe() >= CmiNumPes()) return;    /* comm thread return */
+  if (!affinity_flag) return;
+
 #if 0
   if (gethostname(hostname, 999)!=0) {
       strcpy(hostname, "");
@@ -214,8 +216,19 @@ void CmiInitCPUAffinity()
     hostTable = CmmNew();
     rankmsg = (rankMsg *)CmiAlloc(sizeof(rankMsg)+CmiNumPes()*sizeof(int));
     CmiSetHandler((char *)rankmsg, cpuAffinityRecvHandlerIdx);
-    rankmsg->ranks = (char*)rankmsg + sizeof(rankMsg); /* (int *)(void **)&rankmsg->ranks + 1; */
+    rankmsg->ranks = (int *)((char*)rankmsg + sizeof(rankMsg)); /* (int *)(void **)&rankmsg->ranks + 1; */
     for (i=0; i<CmiNumPes(); i++) rankmsg->ranks[i] = 0;
   }
 }
 
+#else
+
+void CmiInitCPUAffinity(char **argv)
+{
+  int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
+						"set cpu affinity");
+  if (affinity_flag)
+    CmiPrintf("sched_setaffinity() is not supported, +affinity_flag disabled.\n");
+}
+
+#endif
