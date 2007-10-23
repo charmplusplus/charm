@@ -320,8 +320,8 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     replyTable->sync();
 
     if (adaptEdgeAdjacencies != NULL) {
-        delete requestTable;
-        delete replyTable;
+        //delete requestTable;
+        //delete replyTable;
 
         // do the same thing for the edges
         if (myRank == 0) {
@@ -390,8 +390,8 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     }
 
     // cleanup
-    delete requestTable;
-    delete replyTable;
+    //delete requestTable;
+    //delete replyTable;
 
     //for (int i=0; i<numNodes; ++i) {
     //    delete[] faceTable[i].sharedWithPartition;
@@ -415,8 +415,8 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     //        //}
     //    }
     //}
-    delete[] faceTable;
-    delete[] edgeTable;
+    //delete[] faceTable;
+    //delete[] edgeTable;
 }
 
 
@@ -493,11 +493,11 @@ void fillLocalAdaptAdjacencies(
                         // Remove both elem-nodeSet pairs from the list
                         adjElem *tmp = rover->next;
                         rover->next = rover->next->next;
-                        delete tmp;
+                        //delete tmp;
                         tmp = target;
                         preTarget->next = target->next;
                         target = target->next;
-                        delete tmp;
+                        //delete tmp;
                     } else { 
                         // No match for target was found in adjElemList
                         // This means that either target is on the domain 
@@ -625,7 +625,7 @@ void makeAdjacencyRequests(
                                     chunk,adjRequestList[countChunk]);
                             countChunk++;
                         }
-                        delete [] adjRequestList;
+                        //delete [] adjRequestList;
                     }
                     adjStart = adjStart->next;
                 }
@@ -710,7 +710,7 @@ void replyAdjacencyRequests(
             
             adjElem *tmp = rover->next;
             rover->next = tmp->next;
-            delete tmp;
+            //delete tmp;
 
             //Set requesting data in reply to that in receivedRequest
             //Put in data from rover->next into the replyElem portion of data
