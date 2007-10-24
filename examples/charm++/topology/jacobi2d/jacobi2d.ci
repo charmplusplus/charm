@@ -20,8 +20,5 @@ mainmodule jacobi2d {
     entry void ghostsFromRight(int width, double s[width]);
     entry void ghostsFromTop(int width, double s[width]);
     entry void ghostsFromBottom(int width, double s[width]);
-
-    // A method for requesting data to be displayed graphically to the user
-    // entry void requestNextFrame(liveVizRequestMsg *m);
   };
 };

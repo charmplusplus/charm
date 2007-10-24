@@ -77,11 +77,6 @@ class Main : public CBase_Main
         // save the total number of worker chares we have in this simulation
         num_chares = num_chare_rows*num_chare_cols;
 
-        // setup liveviz
-        // CkCallback c(CkIndex_Jacobi::requestNextFrame(0),array);
-        // liveVizConfig cfg(liveVizConfig::pix_color,true);
-        // liveVizInit(cfg,a,c);
-
         //Start the computation
         recieve_count = 0;
         array.begin_iteration();
@@ -269,42 +264,6 @@ class Jacobi: public CBase_Jacobi {
         BC();
 
     }
-
-
-    // provide my portion of the image to the graphical liveViz client
-    // Currently we just provide some pretty color depending upon the thread id
-    // In a real program we would provide a colored rectangle or pixel that
-    // depends upon the local thread data.
-
-    /*void requestNextFrame(liveVizRequestMsg *m){
-		// These specify the desired total image size requested by the client viewer
-        int wdes = m->req.wid;
-        int hdes = m->req.ht;
-
-        // Deposit a rectangular region to liveViz
-
-        // where to deposit
-        int sx=thisIndex.x*block_width;
-        int sy=thisIndex.y*block_height;
-        int w=block_width,h=block_height; // Size of my rectangular part of the image
-
-        // set the output pixel values for my rectangle
-        // Each component is a char which can have 256 possible values.
-        unsigned char *intensity= new unsigned char[3*w*h];
-        for(int i=0;i<h;++i){
-            for(int j=0;j<w;++j){
-                        intensity[3*(i*w+j)+0] = 255; // RED component
-                        intensity[3*(i*w+j)+1] = 255-temperature[i+1][j+1]; // BLUE component
-                        intensity[3*(i*w+j)+2] = 255-temperature[i+1][j+1]; // GREEN component
-            }
-        }
-
-        liveVizDeposit(m, sx,sy, w,h, intensity, this);
-        delete[] intensity;
-
-    }*/
-
-
 
 };
 
