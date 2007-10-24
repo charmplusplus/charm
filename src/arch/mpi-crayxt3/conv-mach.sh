@@ -30,8 +30,8 @@ CMK_RANLIB="ranlib"
 CMK_QT="generic64"
 
 # for F90 compiler
-CMK_CF77="f77 "
-CMK_CF90="f77 "
+CMK_CF77="ftn "
+CMK_CF90="ftn "
 CMK_F90LIBS=""
 CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-p"
