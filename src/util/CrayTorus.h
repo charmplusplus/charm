@@ -99,9 +99,9 @@ class CrayTorusManager {
 
       // assuming a contiguous allocation find the dimensions of 
       // the torus
-      dimNX = maxX - minX;
-      dimNY = maxY - minY;
-      dimNZ = maxZ - minZ;
+      dimNX = maxX - minX + 1;
+      dimNY = maxY - minY + 1;
+      dimNZ = maxZ - minZ + 1;
       dimNT = procsPerNode = 2;
       dimX = dimNX * dimNT;
       dimY = dimNY; dimZ = dimNZ;
