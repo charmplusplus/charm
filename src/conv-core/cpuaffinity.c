@@ -1,23 +1,31 @@
 #include "converse.h"
 #include "sockRoutines.h"
 
-#if CMK_HAS_SETAFFINITY
+/*
+ This scheme relies on using IP address to identify nodes and assigning 
+cpu affinity.  
+
+ when CMK_NO_SOCKETS, which is typically on cray xt3 and bluegene/L.
+ There is no hostname for the compute nodes.
+*/
+#if (CMK_HAS_SETAFFINITY || defined (_WIN32)) && !CMK_NO_SOCKETS
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 
-#define _GNU_SOURCE
-#include <sched.h>
-long sched_setaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
-long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
 
 #include <stdlib.h>
 #include <stdio.h>
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <windows.h>
 #include <winbase.h>
+#else
+#define _GNU_SOURCE
+#include <sched.h>
+long sched_setaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
+long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
 #endif
 
 #if defined(__APPLE__) 
@@ -47,7 +55,7 @@ int num_cores(void) {
   a = MPProcessorsScheduled(); /* Number of active/running CPUs */
 #endif
 
-#ifdef _MSC_VER
+#ifdef _WIN32
   struct _SYSTEM_INFO sysinfo;
   GetSystemInfo(&sysinfo);
   a = sysinfo.dwNumberOfProcessors; /* total number of CPUs */
@@ -86,13 +94,54 @@ int set_cpu_affinity(int cpuid) {
     mask = 1 << cpuid;   /* set the affinity mask exclusively to one CPU */
   }
 
+#ifdef _WIN32
+  HANDLE hProcess = GetCurrentProcess();
+  if (SetProcessAffinityMask(hProcess, mask) == 0) {
+    return -1;
+  }
+#else
   /* PID 0 refers to the current process */
   if (sched_setaffinity(0, len, &mask) < 0) {
     perror("sched_setaffinity");
     return -1;
   }
+#endif
 
   return 0;
+}
+
+int set_thread_affinity(int cpuid) {
+#if CMK_SMP
+  unsigned long mask = 0xffffffff;
+  unsigned int len = sizeof(mask);
+
+  /* set the affinity mask if possible */
+  if ((cpuid / 8) > len) {
+    printf("Mask size too small to handle requested CPU ID\n");
+    return -1;
+  } else {
+    mask = 1 << cpuid;   /* set the affinity mask exclusively to one CPU */
+  }
+
+#ifdef _WIN32
+  HANDLE hThread = GetCurrentThread();
+  if (SetThreadAffinityMask(hThread, mask) == 0) {
+    return -1;
+  }
+#elif  CMK_HAS_PTHREAD_SETAFFINITY
+  /* PID 0 refers to the current process */
+  if (pthread_setaffinity(0, len, &mask) < 0) {
+    perror("pthread_setaffinity");
+    return -1;
+  }
+#else
+  return set_cpu_affinity(cpuid);
+#endif
+
+  return 0;
+#else
+  return -1;
+#endif
 }
 
 /* This implementation assumes the default x86 CPU mask size used by Linux */
