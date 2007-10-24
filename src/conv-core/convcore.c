@@ -2723,9 +2723,7 @@ void ConverseCommonInit(char **argv)
   CthSetSuspendable(CthSelf(), 0);
 */
 
-#if CMK_HAS_SETAFFINITY
   CmiInitCPUAffinity(argv);
-#endif
 }
 
 void ConverseCommonExit(void)
