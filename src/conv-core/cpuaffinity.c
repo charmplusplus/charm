@@ -183,6 +183,7 @@ static void cpuAffinityRecvHandler(void *msg)
 
 void CmiInitCPUAffinity(char **argv)
 {
+  skt_ip_t myip;
   hostnameMsg  *msg;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
@@ -200,7 +201,7 @@ void CmiInitCPUAffinity(char **argv)
   }
 #endif
     /* get my ip address */
-  skt_ip_t myip = skt_my_ip();
+  myip = skt_my_ip();
 
     /* prepare a msg to send */
   msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg));
