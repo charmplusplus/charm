@@ -28,7 +28,12 @@ then
   test `basename $F90DIR` = "$F90DIR" && F90DIR=`which gfortran 2> /dev/null`
 fi
 F90DIR="`dirname $F90DIR`"
+if test "$F90DIR" = '/usr/bin'
+then
+F90LIBDIR=/usr/lib
+else
 F90LIBDIR=`cd $F90DIR/../lib/gcc/ia64-unknown-linux-gnu/4.1.0; pwd`
+fi
 CMK_F90LIBS="-L$F90LIBDIR -lgfortran -lgcc_eh"
 
 CMK_MOD_NAME_ALLCAPS=
