@@ -1,3 +1,10 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
 /** \file CrayNid.c
  *  Author: Abhinav S Bhatele
  *  Date created: October 10th, 2007  
@@ -16,6 +23,19 @@
 
 int *pid2nid;
 int nid2pid[MAXNID][2];  // assuming 2 ppn for cray xt3
+
+/** \function getXT3NodeID
+ *  returns nodeID corresponding to the CkMyPe() passed to it
+ */
+void getXT3NodeID(int mype, int numpes) {
+  cnos_nidpid_map_t *nidpid; 
+  int ierr;
+  
+  nidpid = (cnos_nidpid_map_t *)malloc(sizeof(cnos_nidpid_map_t) * numpes);
+
+  ierr = cnos_get_nidpid_map(&nidpid);
+  return nidpid[mype].nid;
+}
 
 /** \function pidtonid
  *  finds nids for pids 1 to CmiNumPes and stores them in an array
