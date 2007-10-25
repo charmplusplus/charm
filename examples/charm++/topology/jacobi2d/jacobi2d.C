@@ -12,6 +12,19 @@
  *  This does a topological placement for a 2d jacobi.
  *  This jacobi is different from the one in ../../jacobi2d-iter in
  *  the sense that it does not use barriers
+ *
+ *
+ *    ***********  ^
+ *    *		*  |
+ *    *		*  |
+ *    *		*  h
+ *    *		*  |
+ *    *		*  |
+ *    ***********  ~
+ *    <--- w --->
+ *
+ *    h: block_height, array_height --> wrap_y
+ *    w: block_width, array_width   --> wrap_x
  */
 
 #include "jacobi2d.decl.h"
@@ -32,8 +45,6 @@
 // sometimes misbehaves on negative values. -1 maps to the highest value.
 #define wrap_x(a)  (((a)+num_chare_cols)%num_chare_cols)
 #define wrap_y(a)  (((a)+num_chare_rows)%num_chare_rows)
-
-CkArrayID a;
 
 #define MAX_ITER	200
 #define LEFT		1
