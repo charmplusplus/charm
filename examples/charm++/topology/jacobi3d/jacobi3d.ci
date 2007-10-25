@@ -26,4 +26,9 @@ mainmodule jacobi3d {
     entry void ghostsFromFront(int height, int width, double s[height*width]);
     entry void ghostsFromBack(int height, int width, double s[height*width]);
   };
+
+  group JacobiMap : CkArrayMap {
+    entry JacobiMap(int x, int y, int z);
+  };
+
 };

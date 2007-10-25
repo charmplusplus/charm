@@ -31,6 +31,7 @@
  */
 
 #include "jacobi3d.decl.h"
+#include "TopoManager.h"
 
 // See README for documentation
 
@@ -47,6 +48,7 @@
 /*readonly*/ int num_chare_y;
 /*readonly*/ int num_chare_z;
 
+#define USE_TOPOMAP	1
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
 #define wrap_x(a)  (((a)+num_chare_x)%num_chare_x)
@@ -61,8 +63,11 @@
 #define FRONT		5
 #define BACK		6
 
-class Main : public CBase_Main
-{
+/** \class Main
+ *
+ */
+
+class Main : public CBase_Main {
   public:
     int recieve_count;
     CProxy_Jacobi array;
@@ -70,47 +75,70 @@ class Main : public CBase_Main
     int iterations;
 
     Main(CkArgMsg* m) {
-        if (m->argc < 3) {
-          CkPrintf("%s [array_size] [block_size]\n", m->argv[0]);
-          CkAbort("Abort");
-        }
+      if ( (m->argc != 3) && (m->argc != 7) ) {
+        CkPrintf("%s [array_size] [block_size]\n", m->argv[0]);
+        CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z]\n", m->argv[0]);
+        CkAbort("Abort");
+      }
 
-        // set iteration counter to zero
-        iterations=0;
+      // set iteration counter to zero
+      iterations=0;
 
-        // store the main proxy
-        mainProxy = thisProxy;
+      // store the main proxy
+      mainProxy = thisProxy;
+	
+      if(m->argc == 3) {
+	arrayDimX = arrayDimY = arrayDimZ = atoi(m->argv[1]);
+        blockDimX = blockDimY = blockDimZ = atoi(m->argv[2]); 
+      }
+      else {
+        arrayDimX = atoi(m->argv[1]);
+	arrayDimY = atoi(m->argv[2]);
+	arrayDimZ = atoi(m->argv[3]);
+        blockDimX = atoi(m->argv[4]); 
+	blockDimY = atoi(m->argv[5]); 
+	blockDimZ = atoi(m->argv[6]);
+      }
 
-        arrayDimX = arrayDimY = arrayDimZ = atoi(m->argv[1]);
-        blockDimX = blockDimY = blockDimZ = atoi(m->argv[2]);
-        if (arrayDimZ < blockDimZ || arrayDimZ % blockDimZ != 0)
-          CkAbort("array_size % block_size != 0!");
+      if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
+        CkAbort("array_size_X % block_size_X != 0!");
+      if (arrayDimY < blockDimY || arrayDimY % blockDimY != 0)
+        CkAbort("array_size_Y % block_size_Y != 0!");
+      if (arrayDimZ < blockDimZ || arrayDimZ % blockDimZ != 0)
+        CkAbort("array_size_Z % block_size_Z != 0!");
 
-        num_chare_x = arrayDimX / blockDimX;
-        num_chare_y = arrayDimY / blockDimY;
-        num_chare_z = arrayDimZ / blockDimZ;
-        // print info
-        CkPrintf("Running Jacobi on %d processors with (%d, %d, %d) elements\n", CkNumPes(), num_chare_x, num_chare_y, num_chare_z);
+      num_chare_x = arrayDimX / blockDimX;
+      num_chare_y = arrayDimY / blockDimY;
+      num_chare_z = arrayDimZ / blockDimZ;
 
-        // Create new array of worker chares
-        array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y, num_chare_z);
+      // print info
+      CkPrintf("Running Jacobi on %d processors with (%d, %d, %d) chares\n", CkNumPes(), num_chare_x, num_chare_y, num_chare_z);
+      CkPrintf("Array Dimensions: %d %d %d\n", arrayDimX, arrayDimY, arrayDimZ);
+      CkPrintf("Block Dimensions: %d %d %d\n", blockDimX, blockDimY, blockDimZ);
 
-        // save the total number of worker chares we have in this simulation
-        num_chares = num_chare_x * num_chare_y * num_chare_z;
+      // Create new array of worker chares
+      array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y, num_chare_z);
 
-        //Start the computation
-        recieve_count = 0;
-        array.begin_iteration();
+      // save the total number of worker chares we have in this simulation
+      num_chares = num_chare_x * num_chare_y * num_chare_z;
+
+      //Start the computation
+      recieve_count = 0;
+      array.begin_iteration();
     }
 
     // Each worker reports back to here when it completes an iteration
     void report(int x, int y, int z) {
-        recieve_count++;
-        if (num_chares == recieve_count) {
-          CkExit();
-        }
+      recieve_count++;
+      if (num_chares == recieve_count) {
+        CkExit();
+      }
     }
 };
+
+/** \class Jacobi
+ *
+ */
 
 class Jacobi: public CBase_Jacobi {
   public:
@@ -359,4 +387,19 @@ class Jacobi: public CBase_Jacobi {
 
 };
 
+/** \class
+ *
+ */
+
+class JacobiMap : public CkArrayMap {
+  public:
+    JacobiMap(int x, int y, int z) {
+
+
+    }
+
+    int procNum(int, const CkArrayIndex &idx) {
+      
+    }
+};
 #include "jacobi3d.def.h"
