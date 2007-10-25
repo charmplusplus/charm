@@ -27,14 +27,16 @@ int nid2pid[MAXNID][2];  // assuming 2 ppn for cray xt3
 /** \function getXT3NodeID
  *  returns nodeID corresponding to the CkMyPe() passed to it
  */
-void getXT3NodeID(int mype, int numpes) {
+int getXT3NodeID(int mype, int numpes) {
   cnos_nidpid_map_t *nidpid; 
   int ierr;
   
   nidpid = (cnos_nidpid_map_t *)malloc(sizeof(cnos_nidpid_map_t) * numpes);
 
   ierr = cnos_get_nidpid_map(&nidpid);
-  return nidpid[mype].nid;
+  int nid = nidpid[mype].nid;
+  free(nidpid);
+  return nid;
 }
 
 /** \function pidtonid
@@ -61,6 +63,7 @@ void pidtonid(int numpes) {
     else
       nid2pid[nid][1] = i;
   }
+  free(nidpid);
 }
 
 #endif // CMK_XT3
