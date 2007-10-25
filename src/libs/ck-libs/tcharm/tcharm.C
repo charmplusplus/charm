@@ -234,11 +234,14 @@ void TCharm::pup(PUP::er &p) {
   p(nUd);
   for(int i=0;i<nUd;i++) ud[i].pup(p);
   checkPupMismatch(p,5137,"after TCHARM_Register user data");
-  p|sud;
+  if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+    deactivateThread();
+  p|sud;           //  sud vector block can not be in isomalloc
   checkPupMismatch(p,5138,"after TCHARM_Global user data");
   
   // Tear down TCHARM context after calling user pup routines
-  deactivateThread();
+  if (!CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+    deactivateThread();
   CtvAccess(_curTCharm)=NULL;
   
   if (!p.isUnpacking())
@@ -280,13 +283,22 @@ void TCharm::UserData::pup(PUP::er &p)
      p((char*)&data,sizeof(data));
      //FIXME: function pointers may not be valid across processors
      p((char*)&cfn, sizeof(TCHARM_Pup_fn));
-     if (cfn) cfn(pext,data);
+     if (!CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC) && cfn)
+       cfn(pext,data);
      } break;
   case 'g': { /* Global mode: zero out userdata on arrival */
-     if (p.isUnpacking()) data=0;
-     //FIXME: function pointers may not be valid across processors
-     p((char*)&gfn, sizeof(TCHARM_Pup_global_fn));
-     if (gfn) gfn(pext);
+     if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+     {
+        // keep the pointer value if using isomalloc, no need to use pup
+       p((char*)&data,sizeof(data));
+       p((char*)&gfn, sizeof(TCHARM_Pup_global_fn));
+     } 
+     else {    //  zero out userdata on arrival 
+       if (p.isUnpacking()) data=0;
+       //FIXME: function pointers may not be valid across processors
+       p((char*)&gfn, sizeof(TCHARM_Pup_global_fn));
+       if (gfn) gfn(pext);
+     }
      } break;
   default:
      break;
