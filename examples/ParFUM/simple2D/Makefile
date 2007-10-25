@@ -1,22 +1,29 @@
-CHARMC=../../../bin/charmc $(OPTS) 
+OPTS += -I..  
+CHARMC = charmc 
 
-all: pgm
+SRCS = simple2D.C \
+       cst_nl.C \
+       main.C \
+       ../ampi_split.C
 
-pgm: pgm.o cst_nl.o
-	$(CHARMC) -o pgm pgm.o cst_nl.o -language ParFUM -module netfem 
+OBJS = $(SRCS:.C=.o)
 
-pgm.o: pgm.C
-	$(CHARMC) -c pgm.C
+all: simple2D
 
-cst_nl.o: cst_nl.C
-	$(CHARMC) -c cst_nl.C
+simple2D: $(OBJS)
+	$(CHARMC) -o simple2D $(OBJS) \
+	    -language ampi -module ParFUM -module netfem -module MetisLB
+
+%.o: %.C
+	$(CHARMC) $(OPTS) -c $< -o $@
 
 
-test: pgm
-	./charmrun ./pgm +vp4 +p2
+test: simple2D
+	./charmrun ./simple2D +vp4 +p2
 
-bgtest: pgm
-	./charmrun ./pgm +vp4 +p2 +x2 +y2 +z1
+bgtest: simple2D
+	./charmrun ./simple2D +vp4 +p2 +x2 +y2 +z1
 
+.PHONY: clean
 clean:
-	rm -f pgm fpgm *.o conv-host charmrun
+	rm -f simple2D fsimple2D *.o conv-host charmrun ../ampi_split.o
