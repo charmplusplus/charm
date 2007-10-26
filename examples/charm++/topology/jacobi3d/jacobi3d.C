@@ -48,20 +48,23 @@
 /*readonly*/ int num_chare_y;
 /*readonly*/ int num_chare_z;
 
-#define USE_TOPOMAP	1
+#define USE_TOPOMAP	0
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
 #define wrap_x(a)  (((a)+num_chare_x)%num_chare_x)
 #define wrap_y(a)  (((a)+num_chare_y)%num_chare_y)
 #define wrap_z(a)  (((a)+num_chare_z)%num_chare_z)
 
-#define MAX_ITER	200
+#define MAX_ITER	1000
 #define LEFT		1
 #define RIGHT		2
 #define TOP		3
 #define BOTTOM		4
 #define FRONT		5
 #define BACK		6
+
+double startTime;
+double endTime;
 
 /** \class Main
  *
@@ -117,13 +120,22 @@ class Main : public CBase_Main {
       CkPrintf("Block Dimensions: %d %d %d\n", blockDimX, blockDimY, blockDimZ);
 
       // Create new array of worker chares
+#if USE_TOPOMAP
+      CkPrintf("Topology Mapping is being done ... \n");
+      CProxy_JacobiMap map = CProxy_JacobiMap::ckNew(num_chare_x, num_chare_y, num_chare_z);
+      CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
+      opts.setMap(map);
+      array = CProxy_Jacobi::ckNew(opts);
+#else
       array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y, num_chare_z);
+#endif
 
       // save the total number of worker chares we have in this simulation
       num_chares = num_chare_x * num_chare_y * num_chare_z;
 
       //Start the computation
       recieve_count = 0;
+      startTime = CmiWallTimer();
       array.begin_iteration();
     }
 
@@ -131,6 +143,8 @@ class Main : public CBase_Main {
     void report(int x, int y, int z) {
       recieve_count++;
       if (num_chares == recieve_count) {
+	endTime = CmiWallTimer();
+	CkPrintf("Time elapsed: %f\n", endTime - startTime);
         CkExit();
       }
     }
@@ -346,11 +360,10 @@ class Jacobi: public CBase_Jacobi {
 	  iterations++;
           if (iterations == MAX_ITER) {
             if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0) CkPrintf("Completed %d iterations\n", iterations);
-            //CkPrintf("INDEX %d %d MSGS %d\n", thisIndex.x, thisIndex.y, msgs);
             mainProxy.report(thisIndex.x, thisIndex.y, thisIndex.z);
             // CkExit();
           } else {
-            if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0) CkPrintf("Starting new iteration %d.\n", iterations);
+            // if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0) CkPrintf("%d ... \n", iterations);
             // Call begin_iteration on all worker chares in array
             begin_iteration();
           } 
@@ -393,13 +406,28 @@ class Jacobi: public CBase_Jacobi {
 
 class JacobiMap : public CkArrayMap {
   public:
-    JacobiMap(int x, int y, int z) {
+    int ***mapping;
 
+    JacobiMap(int x, int y, int z) {
+      int i, j, k;
+      mapping = new int**[x];
+      for (i=0; i<x; i++) {
+        mapping[i] = new int*[y];
+	for(j=0; j<y; j++)
+	  mapping[i][j] = new int[z];
+      }
+      TopoManager tmgr;
+      for (i=0; i<x; i++)
+	for(j=0; j<y; j++)
+	  for(k=0; k<z; k++)
+	    mapping[i][j][k] = tmgr.coordinatesToRank(i, j, k);
 
     }
 
     int procNum(int, const CkArrayIndex &idx) {
-      
+      int *index = (int *)idx.data();
+      return mapping[index[0]][index[1]][index[2]]; 
     }
 };
+
 #include "jacobi3d.def.h"
