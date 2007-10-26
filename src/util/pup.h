@@ -136,7 +136,8 @@ class er {
   /// These state bits describe various user-settable properties.
   enum {IS_USERLEVEL=0x0004, // If set, this is *not* a migration pup-- it's something else.
 	IS_DELETING =0x0008, // If set, C & f90 objects should delete themselves after pup
-	IS_COMMENTS =0x0010  // If set, this PUP::er wants comments and sync codes.
+	IS_COMMENTS =0x0010,  // If set, this PUP::er wants comments and sync codes.
+	IS_RESTARTING=0x0020  // If set, it is during restarting
   };
   /// These state bits describe the PUP::er's direction.
   enum {IS_SIZING   =0x0100,
@@ -166,6 +167,10 @@ class er {
   //This indicates that the pup routine should not call system objects' pups.
   void becomeUserlevel(void) {PUP_er_state|=IS_USERLEVEL;}
   CmiBool isUserlevel(void) const {return (PUP_er_state&IS_USERLEVEL)!=0?CmiTrue:CmiFalse;}
+  
+  //This indicates that the pup routine should not call system objects' pups.
+  void becomeRestarting(void) {PUP_er_state|=IS_RESTARTING;}
+  CmiBool isRestarting(void) const {return (PUP_er_state&IS_RESTARTING)!=0?CmiTrue:CmiFalse;}
   
   CmiBool hasComments(void) const {return (PUP_er_state&IS_COMMENTS)!=0?CmiTrue:CmiFalse;}
 
