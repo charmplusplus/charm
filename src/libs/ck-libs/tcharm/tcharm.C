@@ -256,6 +256,7 @@ void TCharm::pup(PUP::er &p) {
   s.endBlock(); //End of seeking block
   checkPupMismatch(p,5140,"after TCHARM");
 }
+
 // Pup our thread and related data
 void TCharm::pupThread(PUP::er &pc) {
     pup_er p=(pup_er)&pc;
@@ -283,22 +284,20 @@ void TCharm::UserData::pup(PUP::er &p)
      p((char*)&data,sizeof(data));
      //FIXME: function pointers may not be valid across processors
      p((char*)&cfn, sizeof(TCHARM_Pup_fn));
-     if (!CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC) && cfn)
-       cfn(pext,data);
+     if (cfn) cfn(pext,data);
      } break;
   case 'g': { /* Global mode: zero out userdata on arrival */
      if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
      {
         // keep the pointer value if using isomalloc, no need to use pup
        p((char*)&data,sizeof(data));
-       p((char*)&gfn, sizeof(TCHARM_Pup_global_fn));
-     } 
-     else {    //  zero out userdata on arrival 
-       if (p.isUnpacking()) data=0;
-       //FIXME: function pointers may not be valid across processors
-       p((char*)&gfn, sizeof(TCHARM_Pup_global_fn));
-       if (gfn) gfn(pext);
      }
+     else if (p.isUnpacking())      //  zero out userdata on arrival
+       data=0;
+
+       //FIXME: function pointers may not be valid across processors
+     p((char*)&gfn, sizeof(TCHARM_Pup_global_fn));
+     if (gfn) gfn(pext);
      } break;
   default:
      break;
