@@ -18,7 +18,7 @@ generalized by Orion Lawlor November 2001.
 #include "converse.h"
 #include "memory-isomalloc.h"
 
-#define CMK_THREADS_DEBUG 0 
+#define CMK_THREADS_DEBUG 0
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -841,7 +841,7 @@ void CmiIsomallocPup(pup_er p,void **blockPtrPtr)
 	
 	if (pup_isUnpacking(p)) 
 	{ /*Must allocate a new block in its old location*/
-		if (pup_isUserlevel(p))
+		if (pup_isUserlevel(p) || pup_isRestarting(p))
 			/*Checkpoint: must grab old slots (even remote!)*/
 			all_slotOP(&grabOP,s,n);
 		blk=map_slots(s,n);
