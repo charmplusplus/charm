@@ -8,7 +8,7 @@ cpu affinity.
  when CMK_NO_SOCKETS, which is typically on cray xt3 and bluegene/L.
  There is no hostname for the compute nodes.
 */
-#if (CMK_HAS_SETAFFINITY || defined (_WIN32)) && !CMK_NO_SOCKETS
+#if (CMK_HAS_SETAFFINITY || defined (_WIN32)) 
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -75,7 +75,6 @@ int num_cores(void) {
   a = mpctl(MPC_GETNUMSPUS, 0, 0); /* total number of CPUs */
 #endif /* HPUX */
 
-printf("[%d] %d\n", sysconf(_SC_NPROCESSORS_ONLN), a);
   return a;
 }
 
@@ -241,6 +240,7 @@ void CmiInitCPUAffinity(char **argv)
        CmiRegisterHandler((CmiHandler)cpuAffinityHandler);
   cpuAffinityRecvHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler);
+
   if (CmiMyPe() >= CmiNumPes()) return;    /* comm thread return */
   if (!affinity_flag) return;
 
@@ -250,7 +250,13 @@ void CmiInitCPUAffinity(char **argv)
   }
 #endif
     /* get my ip address */
+#if CMK_XT3
+  myip = getXT3NodeID(CmiMyPe(), CmiNumPes());
+#elif CMK_HAS_GETHOSTNAME
   myip = skt_my_ip();
+#else
+  CmiAbort("Can not get unique name for the compute nodes. \n");
+#endif
 
     /* prepare a msg to send */
   msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg));
