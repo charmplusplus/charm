@@ -60,6 +60,9 @@
 /* wether has elf.h */
 #undef CMK_HAS_ELF_H
 
+/* whether gethostname() exists */
+#undef CMK_HAS_GETHOSTNAME
+
 /* whether get_myaddress() exists */
 #undef CMK_HAS_GET_MYADDRESS
 

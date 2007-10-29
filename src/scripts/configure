@@ -2329,6 +2329,26 @@ _ACEOF
 
 fi
 
+### test gethostname ####
+cat > $tc <<EOT
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+
+int main()
+{
+  char hostname[1000];
+  gethostname(hostname, 999);
+  return 0;
+}
+EOT
+test_linkc "whether gethostname call exists" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_GETHOSTNAME $pass
+_ACEOF
+
+
 #### check if getProcAddress works ####
 cat > $t <<EOT
 #include "ckdll_win32.C"

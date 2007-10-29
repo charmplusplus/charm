@@ -589,6 +589,22 @@ then
 	AC_DEFINE_UNQUOTED(CMK_DLL_USE_DLOPEN, 1, [dlopen])
 fi
 
+### test gethostname ####
+cat > $tc <<EOT
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+
+int main()
+{
+  char hostname[[1000]];
+  gethostname(hostname, 999);
+  return 0;
+}
+EOT
+test_linkc "whether gethostname call exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_GETHOSTNAME, $pass, [whether gethostname() exists])
+
 #### check if getProcAddress works ####
 cat > $t <<EOT
 #include "ckdll_win32.C"
