@@ -1,3 +1,10 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
 //Contains the structures for bg logs and timelines
 #ifndef BLUE_LOGS_H
 #define BLUE_LOGS_H
@@ -58,7 +65,13 @@ public:
     CmiPrintf("msgID:%d sent:%f recvtime:%f dstPe:%d group:%d\n", msgID, sendTime, recvTime, dstPe, group);
   }
   void write(FILE *fp) {
-    fprintf(fp, "msgID:%d sent:%f recvtime:%f dstPe:%d size:%d group:%d\n", msgID, sendTime, recvTime, dstPe, msgsize, group);
+    if(dstPe >= 0)
+      fprintf(fp, "msgID:%d sent:%f recvtime:%f dstPe:%d size:%d group:%d\n", msgID, sendTime, recvTime, dstPe, msgsize, group);
+    if(dstPe == -1)
+      fprintf(fp, "msgID:%d sent:%f recvtime:%f dstPe:BG_BROADCASTALL size:%d group:%d\n", msgID, sendTime, recvTime, msgsize, group);
+    if(dstPe <= -100)
+      fprintf(fp, "msgID:%d sent:%f recvtime:%f dstPe:BG_BROADCASTALL except %d size:%d group:%d\n", msgID, sendTime, recvTime, -100-dstPe, msgsize, group);
+    
   }
 #if DELAY_SEND
 //  void send();
