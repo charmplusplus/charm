@@ -601,6 +601,15 @@ int ChMessage_send(SOCKET fd,const ChMessage *src)
   return skt_sendV(fd,2,bufs,lens);
 } /*You must free after send*/
 
+#else
+
+skt_ip_t _skt_invalid_ip={{0}};
+
+skt_ip_t skt_my_ip(void)
+{
+  return _skt_invalid_ip;
+}
+
 #endif /*!CMK_NO_SOCKETS*/
 
 

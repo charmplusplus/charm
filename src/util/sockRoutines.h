@@ -112,6 +112,9 @@
 #define INVALID_SOCKET (SOCKET)(~0)
 typedef struct {int tag;} skt_ip_t;
 
+extern skt_ip_t _skt_invalid_ip;
+skt_ip_t skt_my_ip(void);
+
 #else /*Use actual sockets*/
 
 /*Preliminaries*/
