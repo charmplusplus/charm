@@ -1,3 +1,10 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
 #include "converse.h"
 #include "sockRoutines.h"
 
@@ -129,7 +136,7 @@ int set_thread_affinity(int cpuid) {
   }
 #elif  CMK_HAS_PTHREAD_SETAFFINITY
   /* PID 0 refers to the current process */
-  if (pthread_setaffinity(0, len, &mask) < 0) {
+  if (pthread_setaffinity_np(pthread_self(), len, &mask) < 0) {
     perror("pthread_setaffinity");
     return -1;
   }
@@ -191,8 +198,10 @@ static void cpuAffinityHandler(void *m)
   int tag, tag1, pe;
   CmiAssert(rankmsg != NULL);
 
+/*   for debug
   skt_print_ip(str, msg->ip);
   printf("hostname: %d %s\n", msg->pe, str);
+*/
   tag = *(int*)&msg->ip;
   pe = msg->pe;
   if ((rec = (hostnameMsg *)CmmProbe(hostTable, 1, &tag, &tag1)) != NULL) {
@@ -220,12 +229,17 @@ static void cpuAffinityRecvHandler(void *msg)
   rankMsg *m = (rankMsg *)msg;
   m->ranks = (int *)((char*)m + sizeof(rankMsg));
   myrank = m->ranks[CmiMyPe()];
-  CmiPrintf("[%d %d] rank: %d\n", CmiMyNode(), CmiMyPe(), myrank);
+  /*CmiPrintf("[%d %d] rank: %d\n", CmiMyNode(), CmiMyPe(), myrank); */
 
   /* set cpu affinity */
+#if CMK_SMP
+  if (set_thread_affinity(myrank) != -1)
+    CmiPrintf("Processor %d is bound to core #%d\n", CmiMyPe(), myrank);
+#else
   if (set_cpu_affinity(myrank) != -1)
-    CmiPrintf("Processor %d is bound to core %d\n", CmiMyPe(), myrank);
-  print_cpu_affinity();
+    CmiPrintf("Processor %d is bound to core #%d\n", CmiMyPe(), myrank);
+  /* print_cpu_affinity(); */
+#endif
   CmiFree(m);
 }
 
@@ -249,6 +263,7 @@ void CmiInitCPUAffinity(char **argv)
       strcpy(hostname, "");
   }
 #endif
+
     /* get my ip address */
 #if CMK_XT3
   myip = getXT3NodeID(CmiMyPe(), CmiNumPes());
@@ -272,12 +287,12 @@ void CmiInitCPUAffinity(char **argv)
     hostTable = CmmNew();
     rankmsg = (rankMsg *)CmiAlloc(sizeof(rankMsg)+CmiNumPes()*sizeof(int));
     CmiSetHandler((char *)rankmsg, cpuAffinityRecvHandlerIdx);
-    rankmsg->ranks = (int *)((char*)rankmsg + sizeof(rankMsg)); /* (int *)(void **)&rankmsg->ranks + 1; */
+    rankmsg->ranks = (int *)((char*)rankmsg + sizeof(rankMsg));
     for (i=0; i<CmiNumPes(); i++) rankmsg->ranks[i] = 0;
   }
 }
 
-#else
+#else           /* not supporting affinity */
 
 void CmiInitCPUAffinity(char **argv)
 {
