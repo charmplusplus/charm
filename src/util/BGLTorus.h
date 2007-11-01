@@ -1,3 +1,10 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
 /** \file BGLTorus.h
  *  Author: Abhinav S Bhatele
  *  Date created: June 28th, 2007  
@@ -143,6 +150,15 @@ class BGLTorusManager {
         return x + y*dimNX + z*dimNX*dimNY + t*dimNX*dimNY*dimNZ;
       else*/
         return t*(dimNT-1) + x*dimNT + y*dimNT*dimNX + z*dimNT*dimNX*dimNY;
+    }
+
+    inline int getNodeID(int pe) {
+      int t, x, y, z;
+      t = pe % dimNT;
+      x = (pe % (dimNT*dimNX)) / dimNT;
+      y = (pe % (dimNT*dimNX*dimNY)) / (dimNT*dimNX);
+      z = pe / (dimNT*dimNX*dimNY);
+      return x + y*dimNX + z*dimNX*dimNY;
     }
 };
 
