@@ -48,7 +48,7 @@
 /*readonly*/ int num_chare_y;
 /*readonly*/ int num_chare_z;
 
-#define USE_TOPOMAP	0
+#define USE_TOPOMAP	1
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
 #define wrap_x(a)  (((a)+num_chare_x)%num_chare_x)
@@ -416,12 +416,34 @@ class JacobiMap : public CkArrayMap {
 	for(j=0; j<y; j++)
 	  mapping[i][j] = new int[z];
       }
+
       TopoManager tmgr;
+#if 0	// naive mapping
       for (i=0; i<x; i++)
 	for(j=0; j<y; j++)
 	  for(k=0; k<z; k++)
 	    mapping[i][j][k] = tmgr.coordinatesToRank(i, j, k);
+#else
+      // we are assuming that the no. of chares in each dimension is a 
+      // multiple of the torus dimension
+      int dimX = tmgr.getDimX();
+      int dimY = tmgr.getDimY();
+      int dimZ = tmgr.getDimZ();
+      
+      int numCharesPerPeX = x / dimX;
+      int numCharesPerPeY = y / dimY;
+      int numCharesPerPeZ = z / dimZ;
 
+      for(int i=0; i<dimX; i++)
+	for(int j=0; j<dimY; j++)
+	  for(int k=0; k<dimZ; k++)
+	    for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
+	      for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
+		for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
+		  mapping[ci][cj][ck] = tmgr.coordinatesToRank(i, j, k);
+		}
+
+#endif
     }
 
     int procNum(int, const CkArrayIndex &idx) {
