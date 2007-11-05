@@ -2609,12 +2609,15 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
     if (arg_verbose) fprintf(f,"Echo 'using debugger' $F_DBG\n");
   }
 
-  if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
+   if (!arg_ssh_display && (arg_debug || arg_debug_no_pause ||
+      arg_in_xterm)) {
+     /*    if (arg_debug || arg_debug_no_pause || arg_in_xterm) {*/
     fprintf(f,"$F_XRDB -query > /dev/null\n");
     fprintf(f,"if test $? != 0\nthen\n");
     fprintf(f,"  Echo 'Cannot contact X Server '$DISPLAY'.  You probably'\n");
     fprintf(f,"  Echo 'need to run xhost to authorize connections.'\n");
     fprintf(f,"  Echo '(See manual for xhost for security issues)'\n");
+    fprintf(f,"  Echo 'Or try ++batch 1 ++ssh-display to rely on SSH X11 forwarding'\n");
     fprintf(f,"  Exit 1\n");
     fprintf(f,"fi\n");
   }
