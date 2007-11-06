@@ -48,7 +48,7 @@
 /*readonly*/ int num_chare_y;
 /*readonly*/ int num_chare_z;
 
-#define USE_TOPOMAP	1
+#define USE_TOPOMAP	0
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
 #define wrap_x(a)  (((a)+num_chare_x)%num_chare_x)
@@ -406,9 +406,11 @@ class Jacobi: public CBase_Jacobi {
 
 class JacobiMap : public CkArrayMap {
   public:
+    int X, Y, Z;
     int ***mapping;
 
     JacobiMap(int x, int y, int z) {
+      X = x; Y = y; Z = z;
       int i, j, k;
       mapping = new int**[x];
       for (i=0; i<x; i++) {
@@ -444,6 +446,15 @@ class JacobiMap : public CkArrayMap {
 		}
 
 #endif
+    }
+
+    ~JacobiMap() { 
+      for (int i=0; i<X; i++) {
+	for(int j=0; j<Y; j++)
+	  delete [] mapping[i][j];
+        delete [] mapping[i];
+      }
+      delete [] mapping;
     }
 
     int procNum(int, const CkArrayIndex &idx) {
