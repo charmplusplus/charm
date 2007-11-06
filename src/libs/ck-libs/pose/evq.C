@@ -225,7 +225,7 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
   Event *link = commitPtr;
   commitPtr = commitPtr->prev;
   while (commitPtr != frontPtr) {
-    //    if (commitPtr->cpData) delete commitPtr->cpData;
+    if (commitPtr->cpData) delete commitPtr->cpData;
     commitPtr = commitPtr->prev;
     delete commitPtr->next;
     mem_usage--;
@@ -260,7 +260,7 @@ void eventQueue::CommitAll(sim *obj)
   Event *link = commitPtr;
   commitPtr = commitPtr->prev;
   while (commitPtr != frontPtr) {
-    //    if (commitPtr->cpData) delete commitPtr->cpData;
+    if (commitPtr->cpData) delete commitPtr->cpData;
     commitPtr = commitPtr->prev;
     mem_usage--;
     delete commitPtr->next;
