@@ -50,11 +50,23 @@ void setTableReferences(TopModel* model)
         model->GhostNodeData_T = &((FEM_DataAttribute*)ghost->lookup(FEM_DATA+2,""))->getChar();
 }
 
+void fillIDHash(TopModel* model)
+{
+    for(int i=0; i<model->node_id_T->size(); ++i){
+        model->nodeIDHash->put((*model->node_id_T)(i,0)) = i;
+    }
+    for(int i=0; i<model->elem_id_T->size(); ++i){
+        model->elemIDHash->put((*model->elem_id_T)(i,0)) = i;
+    }
+}
 
 TopModel* topModel_Create_Init(int nelnode){
-  TopModel *model = new TopModel;
+  TopModel* model = new TopModel;
   memset(model, 0, sizeof(TopModel));
-
+  
+  model->nodeIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
+  model->elemIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
+  
   // This only uses a single mesh, so better not create multiple ones of these
   int which_mesh=FEM_Mesh_default_write();
   model->mesh = FEM_Mesh_lookup(which_mesh,"topModel_Create_Init");
@@ -125,8 +137,10 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
     FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+1,temp_array, 0, 1, FEM_INT, connSize);
     free(temp_array);
 
-
     setTableReferences(model);
+    model->nodeIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
+    model->elemIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
+    fillIDHash(model);
 
 
 #if CUDA
@@ -311,6 +325,7 @@ TopNode topModel_InsertNode(TopModel* m, float x, float y, float z){
 void topNode_SetId(TopModel* m, TopNode n, TopID id){
   CkAssert(n>=0);
   (*m->node_id_T)(n,0)=id;
+  m->nodeIDHash->put(id) = n+1;
 }
 
 /** Insert an element */
@@ -350,6 +365,7 @@ TopElement topModel_InsertElem(TopModel*m, TopElemType type, TopNode* nodes){
 void topElement_SetId(TopModel* m, TopElement e, TopID id){
   CkAssert(e>=0);
   (*m->elem_id_T)(e,0)=id;
+  m->elemIDHash->put(id) = e+1;
 }
 
 
@@ -430,50 +446,35 @@ void* topNode_GetAttrib(TopModel* m, TopNode n)
 
 /**
 	Get node via id
-	@todo Re-implement this function with some hash to make it fast.
-	@note In the explicit FEA example, this is just used during initialization, so speed is not too important.
-	@todo Does not work with ghosts yet.
 */
-TopNode topModel_GetNodeAtId(TopModel* m, TopID id){
-  // lookup node via global ID
-  for(int i=0;i<m->node_id_T->size();++i){
-	if((*m->node_id_T)(i,0)==id){
-	  return i;
-	}
-  }
-
-  AllocTable2d<int>* ghostNode_id_T = &((FEM_DataAttribute*)m->mesh->
-          node.getGhost()->lookup(FEM_DATA+0,""))->getInt();
-  for(int i=0; i<ghostNode_id_T->size(); ++i) {
-	if((*ghostNode_id_T)(i,0)==id){
-	  return FEM_To_ghost_index(i);
-	}
-  }
-
-  return -1;
+TopNode topModel_GetNodeAtId(TopModel* m, TopID id)
+{
+    return m->nodeIDHash->get(id)-1;
 }
 
 
 /**
 	Get elem via id
  */
-TopElement topModel_GetElemAtId(TopModel*m,TopID id){
-    // lookup node via global ID
-    for(int i=0;i<m->elem_id_T->size();++i){
-        if( m->mesh->elem[0].is_valid(i) && (*m->elem_id_T)(i,0)==id){
-		  return i;
-        }
-    }
-
-  AllocTable2d<int>* ghostElem_id_T = &((FEM_DataAttribute*)m->mesh->
-          elem[0].getGhost()->lookup(FEM_DATA+0,""))->getInt();
-  for(int i=0; i<ghostElem_id_T->size(); ++i) {
-	if((*ghostElem_id_T)(i,0)==id){
-	  return FEM_To_ghost_index(i);
-	}
-  }
-
-  return -1;
+TopElement topModel_GetElemAtId(TopModel*m,TopID id)
+{
+    return m->elemIDHash->get(id)-1;
+//    // lookup node via global ID
+//    for(int i=0;i<m->elem_id_T->size();++i){
+//        if( m->mesh->elem[0].is_valid(i) && (*m->elem_id_T)(i,0)==id){
+//		  return i;
+//        }
+//    }
+//
+//  AllocTable2d<int>* ghostElem_id_T = &((FEM_DataAttribute*)m->mesh->
+//          elem[0].getGhost()->lookup(FEM_DATA+0,""))->getInt();
+//  for(int i=0; i<ghostElem_id_T->size(); ++i) {
+//	if((*ghostElem_id_T)(i,0)==id){
+//	  return FEM_To_ghost_index(i);
+//	}
+//  }
+//
+//  return -1;
 }
 
 

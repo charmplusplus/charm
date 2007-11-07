@@ -39,6 +39,9 @@ typedef struct{
     AllocTable2d<int> *elem_id_T;
     AllocTable2d<int> *n2eConn_T;
 
+    // table mapping global ids to local indices
+    CkHashtableT<CkHashtableAdaptorT<int>, int>* nodeIDHash;
+    CkHashtableT<CkHashtableAdaptorT<int>, int>* elemIDHash;
 
     unsigned node_attr_size;
     unsigned elem_attr_size;
@@ -54,6 +57,7 @@ typedef struct{
 #endif
 
 } TopModel;
+
 
 
 
