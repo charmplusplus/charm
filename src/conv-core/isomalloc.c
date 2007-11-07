@@ -55,7 +55,7 @@ static CmiIsomallocBlock *pointer2block(void *heapBlock) {
 }
 
 /*Integral type to be used for pointer arithmetic:*/
-typedef CmiUInt8 memRange_t;
+typedef size_t memRange_t;
 
 /*Size in bytes of a single slot*/
 static size_t slotsize;
@@ -506,8 +506,8 @@ static void check_range(char *start,char *end,memRegion_t *max)
 {
   memRange_t len;
   char *initialStart=start, *initialEnd=end;
-  memRange_t tb = gig*1024ul;   /* One terabyte */
-  memRange_t vm_limit = tb*256ul;   /* terabyte */
+  CmiUInt8 tb = (CmiUInt8)gig*1024ul;   /* One terabyte */
+  CmiUInt8 vm_limit = tb*256ul;   /* terabyte */
 
   if (start>=end) return; /*Ran out of hole*/
   len=(memRange_t)end-(memRange_t)start;
@@ -702,12 +702,11 @@ static void init_ranges(char **argv)
       }
       else /* freeRegion.len>0, so can isomalloc */
       {
-#if !CMK_THREADS_DEBUG
-	if (CmiMyPe() == 0)
-#endif
+#if CMK_THREADS_DEBUG
         CmiPrintf("[%d] Isomalloc memory region: %p - %p (%d megs)\n",CmiMyPe(),
 	      freeRegion.start,freeRegion.start+freeRegion.len,
 	      freeRegion.len/meg);
+#endif
         
         /*Isomalloc covers entire unused region*/
         isomallocStart=freeRegion.start;
