@@ -53,10 +53,10 @@ void setTableReferences(TopModel* model)
 void fillIDHash(TopModel* model)
 {
     for(int i=0; i<model->node_id_T->size(); ++i){
-        model->nodeIDHash->put((*model->node_id_T)(i,0)) = i;
+        model->nodeIDHash->put((*model->node_id_T)(i,0)) = i+1;
     }
     for(int i=0; i<model->elem_id_T->size(); ++i){
-        model->elemIDHash->put((*model->elem_id_T)(i,0)) = i;
+        model->elemIDHash->put((*model->elem_id_T)(i,0)) = i+1;
     }
 }
 
@@ -449,7 +449,17 @@ void* topNode_GetAttrib(TopModel* m, TopNode n)
 */
 TopNode topModel_GetNodeAtId(TopModel* m, TopID id)
 {
-    return m->nodeIDHash->get(id)-1;
+    int hashnode = m->nodeIDHash->get(id)-1;
+    if (hashnode != -1) return hashnode;
+
+    AllocTable2d<int>* ghostNode_id_T = &((FEM_DataAttribute*)m->mesh->
+            node.getGhost()->lookup(FEM_DATA+0,""))->getInt();
+    for(int i=0; i<ghostNode_id_T->size(); ++i) {
+        if((*ghostNode_id_T)(i,0)==id){
+            return FEM_To_ghost_index(i);
+        }
+    }
+    return -1;
 }
 
 
@@ -458,23 +468,17 @@ TopNode topModel_GetNodeAtId(TopModel* m, TopID id)
  */
 TopElement topModel_GetElemAtId(TopModel*m,TopID id)
 {
-    return m->elemIDHash->get(id)-1;
-//    // lookup node via global ID
-//    for(int i=0;i<m->elem_id_T->size();++i){
-//        if( m->mesh->elem[0].is_valid(i) && (*m->elem_id_T)(i,0)==id){
-//		  return i;
-//        }
-//    }
-//
-//  AllocTable2d<int>* ghostElem_id_T = &((FEM_DataAttribute*)m->mesh->
-//          elem[0].getGhost()->lookup(FEM_DATA+0,""))->getInt();
-//  for(int i=0; i<ghostElem_id_T->size(); ++i) {
-//	if((*ghostElem_id_T)(i,0)==id){
-//	  return FEM_To_ghost_index(i);
-//	}
-//  }
-//
-//  return -1;
+    int hashelem = m->elemIDHash->get(id)-1;
+    if (hashelem != -1) return hashelem;
+
+    AllocTable2d<int>* ghostElem_id_T = &((FEM_DataAttribute*)m->mesh->
+            elem[0].getGhost()->lookup(FEM_DATA+0,""))->getInt();
+    for(int i=0; i<ghostElem_id_T->size(); ++i) {
+        if((*ghostElem_id_T)(i,0)==id){
+            return FEM_To_ghost_index(i);
+        }
+    }
+    return -1;
 }
 
 
