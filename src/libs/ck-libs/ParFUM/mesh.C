@@ -2126,6 +2126,27 @@ FEM_Mesh *FEM_readMesh(const char *prefix,int chunkNo,int nChunks)
 	PUP::fromTextFile p(fp);
 	ret->pup(p);
   	fclose(fp);
+
+
+
+#ifdef PRINT_SHARED_NODE_INFO
+        /** For Abhinav, print out the neighbors for this vp */
+        
+        CkPrintf("%d: Finding Neighbors for VP\n", chunkNo);
+        
+        FEM_Comm &shared = ret->node.shared; ///<Shared nodes     The type is really an IDXL_Side
+        
+        int numNeighborVPs = shared.size();
+        
+        CkPrintf("%d: communicates with %d neighbors\n", chunkNo, numNeighborVPs);
+        
+        for(int i=0;i<numNeighborVPs;i++){
+          IDXL_List list = shared.getLocalList(i);
+            CkPrintf("%d: communicates %d shared nodes with chunk %d\n", chunkNo , list.size() , list.getDest()); 
+        }
+#endif
+
+
 	return ret;
 }
 
