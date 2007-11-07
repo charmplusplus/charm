@@ -55,7 +55,7 @@ static CmiIsomallocBlock *pointer2block(void *heapBlock) {
 }
 
 /*Integral type to be used for pointer arithmetic:*/
-typedef unsigned long memRange_t;
+typedef CmiUInt8 memRange_t;
 
 /*Size in bytes of a single slot*/
 static size_t slotsize;
@@ -457,6 +457,8 @@ static char *pmax(char *a,char *b) {return pointer_lt(a,b)?b:a;}
 
 const static memRange_t meg=1024u*1024u; /*One megabyte*/
 const static memRange_t gig=1024u*1024u*1024u; /*One gigabyte*/
+const static memRange_t tb=1024ul*1024u*1024u*1024u;   /* One terabyte */
+const static memRange_t vm_limit=256ul*1024ul*1024u*1024u*1024u;   /* terabyte */
 
 /*Check if this memory location is usable.  
   If not, return 1.
@@ -510,11 +512,23 @@ static void check_range(char *start,char *end,memRegion_t *max)
   if (start>=end) return; /*Ran out of hole*/
   len=(memRange_t)end-(memRange_t)start;
   
+#if 0
+    /* too conservative */
   if (len/gig>64u) { /* This is an absurd amount of space-- cut it down, for safety */
      start+=16u*gig;
      end=start+32u*gig;
      len=(memRange_t)end-(memRange_t)start;  
   }
+#else
+  /* Note: 256TB == 248 bytes.  So a 48-bit virtual-address CPU 
+   *    can only actually address 256TB of space. */
+  if (len/tb>10u) { /* This is an absurd amount of space-- cut it down, for safety */
+    const memRange_t other_libs=16ul*gig; /* space for other libraries to use */
+    start+=other_libs;
+    end=pmin(start+vm_limit-2*other_libs, end-other_libs);
+    len=(memRange_t)end-(memRange_t)start;
+  }
+#endif
   if (len<=max->len) return; /*It's too short already!*/
 #if CMK_THREADS_DEBUG
   CmiPrintf("[%d] Checking at %p - %p\n",CmiMyPe(),start,end);
@@ -688,11 +702,12 @@ static void init_ranges(char **argv)
       }
       else /* freeRegion.len>0, so can isomalloc */
       {
-#if CMK_THREADS_DEBUG
+#if !CMK_THREADS_DEBUG
+	if (CmiMyPe() == 0)
+#endif
         CmiPrintf("[%d] Isomalloc memory region: %p - %p (%d megs)\n",CmiMyPe(),
 	      freeRegion.start,freeRegion.start+freeRegion.len,
 	      freeRegion.len/meg);
-#endif
         
         /*Isomalloc covers entire unused region*/
         isomallocStart=freeRegion.start;
