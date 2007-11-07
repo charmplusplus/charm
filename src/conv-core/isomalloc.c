@@ -457,8 +457,6 @@ static char *pmax(char *a,char *b) {return pointer_lt(a,b)?b:a;}
 
 const static memRange_t meg=1024u*1024u; /*One megabyte*/
 const static memRange_t gig=1024u*1024u*1024u; /*One gigabyte*/
-const static memRange_t tb=1024ul*1024u*1024u*1024u;   /* One terabyte */
-const static memRange_t vm_limit=256ul*1024ul*1024u*1024u*1024u;   /* terabyte */
 
 /*Check if this memory location is usable.  
   If not, return 1.
@@ -508,6 +506,8 @@ static void check_range(char *start,char *end,memRegion_t *max)
 {
   memRange_t len;
   char *initialStart=start, *initialEnd=end;
+  memRange_t tb = gig*1024ul;   /* One terabyte */
+  memRange_t vm_limit = tb*256ul;   /* terabyte */
 
   if (start>=end) return; /*Ran out of hole*/
   len=(memRange_t)end-(memRange_t)start;
