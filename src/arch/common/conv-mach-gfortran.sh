@@ -13,6 +13,7 @@ then
 CMK_F90FLAGS="$CMK_F90FLAGS -fno-common"
 fi
 
+CMK_CF77="g77 "
 CMK_CF90=`which gfortran 2>/dev/null`
 CMK_FPP="/lib/cpp -P -CC"
 CMK_CF90="$CMK_CF90 $CMK_F90FLAGS -fPIC -fno-second-underscore -fdollar-ok" 
