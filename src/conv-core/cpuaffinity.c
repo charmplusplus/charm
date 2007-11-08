@@ -232,14 +232,14 @@ static void cpuAffinityRecvHandler(void *msg)
   /*CmiPrintf("[%d %d] rank: %d\n", CmiMyNode(), CmiMyPe(), myrank); */
 
   /* set cpu affinity */
-/*#if CMK_SMP
-  if (set_thread_affinity(myrank) != -1)
-    CmiPrintf("Processor %d is bound to core #%d\n", CmiMyPe(), myrank);
+#if CMK_SMP
+  if (set_thread_affinity(myrank) != -1) { }
+    // CmiPrintf("Processor %d is bound to core #%d\n", CmiMyPe(), myrank);
 #else
-  if (set_cpu_affinity(myrank) != -1)
-    CmiPrintf("Processor %d is bound to core #%d\n", CmiMyPe(), myrank);
+  if (set_cpu_affinity(myrank) != -1) { }
+    // CmiPrintf("Processor %d is bound to core #%d\n", CmiMyPe(), myrank);
   // print_cpu_affinity();
-#endif*/
+#endif
   CmiFree(m);
 }
 
