@@ -17,7 +17,7 @@ class QdMsg {
       struct { /* none */ } p3;
       struct { int dirty; } p4;
     } u;
-	CkCallback cb;
+    CkCallback cb;
   public:
     int getPhase(void) { return phase; }
     void setPhase(int p) { phase = p; }
@@ -71,6 +71,7 @@ class QdState {
 	_MEMCHECK(children);
 	CmiSpanTreeChildren(CmiMyPe(), children);
       }
+      /* CmiPrintf("[%d] n:%d parent:%d - %d %d %d %d %d %d.\n", CmiMyPe(), nChildren, parent, nChildren?children[0]:-1, nChildren?children[1]:-1, nChildren?children[2]:-1, nChildren?children[3]:-1, nChildren?children[4]:-1, nChildren?children[5]:-1); */
     }
     void propagate(QdMsg *msg) {
       envelope *env = UsrToEnv((void *)msg);

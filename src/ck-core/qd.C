@@ -5,9 +5,10 @@
  * $Revision$
  *****************************************************************************/
 
+#define  DEBUGP(x)    // CmiPrintf x;
+
 #include "ck.h"
 
-#define  DEBUGP(x)   // CmiPrintf x;
 
 // a fake QD which just wait for several seconds to triger QD callback
 #define CMK_DUMMY_QD             0	/* seconds to wait for */
@@ -29,7 +30,7 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
   msg->setPhase(0);
   state->propagate(msg);
   msg->setPhase(1);
-  DEBUGP(("[%d] State: getCreated:%d getProcessed:%d\n", CmiMyPe(), state->getCreated(), state->getProcessed()));
+  DEBUGP(("[%d] _bcastQD1: State: getCreated:%d getProcessed:%d\n", CmiMyPe(), state->getCreated(), state->getProcessed()));
 #if ! CMK_SHARED_VARS_UNIPROCESSOR && !CMK_MULTICORE
   QdState *comm_state;
   static int comm_create=0, comm_process=0;
@@ -51,12 +52,14 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
   state->markProcessed();
   state->reset();
   state->setStage(1);
+  DEBUGP(("[%d] _bcastQD1 stage changed to: %d\n", CmiMyPe(), state->getStage()));
 }
 
 // final phase to check if the counters become dirty or not
 // stage 2 means the node is waiting for children to report their dirty state
 static inline void _bcastQD2(QdState* state, QdMsg *msg)
 {
+  DEBUGP(("[%d] _bcastQD2: \n", CmiMyPe()));
   msg->setPhase(1);
   state->propagate(msg);
   msg->setPhase(2);
@@ -65,10 +68,12 @@ static inline void _bcastQD2(QdState* state, QdMsg *msg)
   CmiSyncSendAndFree(CmiMyPe(), env->getTotalsize(), (char *)env);
   state->reset();
   state->setStage(2);
+  DEBUGP(("[%d] _bcastQD2: stage changed to: %d\n", CmiMyPe(), state->getStage()));
 }
 
 static inline void _handlePhase0(QdState *state, QdMsg *msg)
 {
+  DEBUGP(("[%d] _handlePhase0: stage: %d, msg phase: %d\n", CmiMyPe(), state->getStage(), msg->getPhase()));
   CkAssert(CmiMyPe()==0 || state->getStage()==0);
   if(CmiMyPe()==0) {
     QdCallback *qdcb = new QdCallback(msg->getCb());
@@ -84,6 +89,7 @@ static inline void _handlePhase0(QdState *state, QdMsg *msg)
 // collecting counters from children
 static inline void _handlePhase1(QdState *state, QdMsg *msg)
 {
+  DEBUGP(("[%d] _handlePhase1: stage: %d, msg phase: %d\n", CmiMyPe(), state->getStage(), msg->getPhase()));
   switch(state->getStage()) {
     case 0 :
       CkAssert(CmiMyPe()!=0);
@@ -124,7 +130,8 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
 static inline void _handlePhase2(QdState *state, QdMsg *msg)
 {
 //  This assertion seems too strong for smp and uth version.
-//  CkAssert(state->getStage()==2);
+  DEBUGP(("[%d] _handlePhase2: stage: %d, msg phase: %d \n", CmiMyPe(), state->getStage(), msg->getPhase()));
+  CkAssert(state->getStage()==2);
   state->subtreeSetDirty(msg->getDirty());
   state->reported();
   if(state->allReported()) {
@@ -133,6 +140,7 @@ static inline void _handlePhase2(QdState *state, QdMsg *msg)
         _bcastQD1(state, msg);   // dirty, restart again
       } else {             
           // quiescence detected, send callbacks
+        DEBUGP(("[%d] quiescence detected,\n", CmiMyPe()));
         QdCallback* cb;
         while(NULL!=(cb=state->deq())) {
           cb->send();
@@ -144,6 +152,7 @@ static inline void _handlePhase2(QdState *state, QdMsg *msg)
       }
     } else {
         // tell parent if the counters on the node is dirty or not
+      DEBUGP(("[%d] _handlePhase2 dirty:%d\n", CmiMyPe(), state->isDirty()));
       msg->setDirty(state->isDirty());
       envelope *env = UsrToEnv((void*)msg);
       CmiSyncSendAndFree(state->getParent(), env->getTotalsize(), (char *)env);
@@ -156,7 +165,7 @@ static inline void _handlePhase2(QdState *state, QdMsg *msg)
 
 static void _callWhenIdle(QdMsg *msg)
 {
-  DEBUGP(("[%d] callWhenIdle msg:%p\n", CmiMyPe(), msg));
+  DEBUGP(("[%d] callWhenIdle msg:%p \n", CmiMyPe(), msg));
   QdState *state = CpvAccess(_qd);
   switch(msg->getPhase()) {
     case 0 : _handlePhase0(state, msg); break;
@@ -178,7 +187,7 @@ static void _invokeQD(QdMsg *msg)
 void _qdHandler(envelope *env)
 {
   register QdMsg *msg = (QdMsg*) EnvToUsr(env);
-  DEBUGP(("[%d] _qdHandler msg:%p\n", CmiMyPe(), msg));
+  DEBUGP(("[%d] _qdHandler msg:%p \n", CmiMyPe(), msg));
 #if CMK_DUMMY_QD
   CcdCallFnAfter((CcdVoidFn)_invokeQD,(void *)msg, CMK_DUMMY_QD*1000); // in ms
 #else
