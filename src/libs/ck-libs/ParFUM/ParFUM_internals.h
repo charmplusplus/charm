@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <vector>
+#include <set>
 
 #include "charm-api.h" /* for Fortran name mangling FTN_NAME */
 #include "ckvector3d.h"
@@ -889,6 +890,9 @@ class FEM_Entity {
   void set_coord(int idx, double x, double y);
   void set_coord(int idx, double x, double y, double z);
 
+  void get_coord(int idx, double &x, double &y);
+  void get_coord(int idx, double &x, double &y, double &z);
+
   /** Expose the attribute vector for refining. breaks modularity but more efficient
   */
   CkVec<FEM_Attribute *>* getAttrVec(){
@@ -1346,7 +1350,7 @@ class FEM_Mesh : public CkNoncopyable {
 
   FEM_ElemAdj_Layer *getElemAdjLayer(void);
 
-  // Terry's adjacency accessors & modifiers
+  // Adjacency accessors & modifiers
 
   //  ------- Element-to-element: preserve initial ordering relative to nodes
   /// Place all of element e's adjacent elements in neighbors; assumes
@@ -1426,6 +1430,32 @@ class FEM_Mesh : public CkNoncopyable {
 
   /// Get two elements adjacent to both n1 and n2
   void get2ElementsOnEdge(int n1, int n2, int *result_e1, int *result_e2) ;
+
+  /// Count the number of elements adjacent to both n1 and n2
+  int countElementsOnEdge(int n1, int n2);
+  
+  
+  
+  // The experimental new code for feature detection below has not yet been widely tested, but it does work for some example
+  
+  /// list of edges on the boundary(adjacent to at least one local node)
+  std::set<std::pair<int,int> > edgesOnBoundary;
+  
+  /// list of the nodes found in edgesOnBoundary
+  std::set<int> verticesOnBoundary;
+  
+  /** list of corners on the mesh. These are nodes in edgesOnBoundary that have small angles between their adjacent boundary edges
+  @note the criterion angle is specified in the preprocessor define CORNER_ANGLE_CUTOFF in mesh_feature_detect.C
+  */
+  std::set<int> cornersOnBoundary;
+    
+  /** Detect features of the mesh, storing results in verticesOnBoundary, edgesOnBoundary, cornersOnBoundary
+      @note currently only 2-d triangular meshes(with triangles in FEM_ELEM+0) are supported
+      @note We require at least a single node-adjacent ghost layer for this to work correctly
+      @note We do not yet pup the structures that store the results, so don't use these with migration yet
+  */
+  void detectFeatures();
+
 };
 PUPmarshall(FEM_Mesh);
 

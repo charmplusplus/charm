@@ -1233,3 +1233,38 @@ void FEM_Mesh::get2ElementsOnEdge(int n1, int n2, int *result_e1, int *result_e2
   delete[] n2AdjElems;
 }
 
+
+/** Count the number of elements on edge (n1, n2) */
+int FEM_Mesh::countElementsOnEdge(int n1, int n2) {
+  if (n1==n2) {
+    CkPrintf("ERROR: You called countElementsOnEdge() with two identical nodes %d, and %d \n", n1, n2);
+    CkExit();
+  }
+  
+  int *n1AdjElems=0, *n2AdjElems=0;
+  int n1NumElems, n2NumElems;
+
+  CkAssert(node.is_valid_any_idx(n1));
+  CkAssert(node.is_valid_any_idx(n2));
+
+  n2e_getAll(n1, n1AdjElems, n1NumElems);
+  n2e_getAll(n2, n2AdjElems, n2NumElems);
+  CkAssert(n1AdjElems!=0);
+  CkAssert(n2AdjElems!=0);
+  int count=0;
+
+
+  for (int i=0; i<n1NumElems; i++) {
+    for (int j=0; j<n2NumElems; j++) {
+      if (n1AdjElems[i] == n2AdjElems[j]) {
+        count++;
+      }
+    }
+  }
+  delete[] n1AdjElems;
+  delete[] n2AdjElems;
+
+  return count;
+}
+
+

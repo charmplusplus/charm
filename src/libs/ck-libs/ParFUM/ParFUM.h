@@ -275,6 +275,10 @@ extern "C" {
   int FEM_is_valid(int mesh, int entityType, int entityIdx);
   int FEM_count_valid(int mesh, int entityType);
 
+  /* Create and modify the Detected Topological and Geometric Mesh Features */
+  void FEM_Mesh_detect_features(int fem_mesh);
+
+
   /* Easy set method for coordinates, that may be helpful when creating a mesh */
   void FEM_set_entity_coord2(int mesh, int entityType, int entityIdx, double x, double y);
   void FEM_set_entity_coord3(int mesh, int entityType, int entityIdx, double x, double y, double z);
