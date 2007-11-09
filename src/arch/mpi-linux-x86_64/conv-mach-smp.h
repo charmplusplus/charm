@@ -12,9 +12,6 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          1
 #define CMK_MALLOC_USE_OS_BUILTIN                          0
 
-#undef CMK_THREADS_USE_CONTEXT
-#define CMK_THREADS_USE_CONTEXT                            1
-
 #undef CMK_NODE_QUEUE_AVAILABLE
 #define CMK_NODE_QUEUE_AVAILABLE                           1
 
@@ -28,6 +25,6 @@
 #undef CMK_SYNCHRONIZE_ON_TCP_CLOSE
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       1
 
-#define  CMK_USE_MFENCE                                    1
-#define  CMK_PCQUEUE_LOCK                                  0
+/*#define  CMK_USE_MFENCE                                    1 */
+#define  CMK_PCQUEUE_LOCK                                  1
 

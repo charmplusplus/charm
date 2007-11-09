@@ -40,7 +40,7 @@
 #define CMK_TIMER_USE_TIMES                                0
 #define CMK_TIMER_USE_RDTSC				   0
 
-#define CMK_THREADS_USE_CONTEXT                            0
+#define CMK_THREADS_USE_CONTEXT                            1
 #define CMK_THREADS_USE_PTHREADS                           0
 
 #define CMK_TYPEDEF_INT2 short
