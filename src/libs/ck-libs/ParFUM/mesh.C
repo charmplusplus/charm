@@ -1609,6 +1609,73 @@ inline void FEM_Entity::set_coord(int idx, double x, double y, double z){
 }
 
 
+/** Get coordinates for a given 2-D node, if idx<0 the corresponding ghost node is used 
+@note there are a couple places coordinates have been historically stored. We can find either of them here.
+*/
+void FEM_Entity::get_coord(int idx, double &x, double &y){
+  if(coord){
+      if(idx<0){ // ghost
+        x = ghost->coord->getDouble()(FEM_From_ghost_index(idx),0);
+        y = ghost->coord->getDouble()(FEM_From_ghost_index(idx),1);
+      } else { // non-ghost
+        x = coord->getDouble()(idx,0);
+        y = coord->getDouble()(idx,1);
+      }
+      
+    }
+  else {
+  
+    if(idx<0){ // ghost
+      FEM_DataAttribute* attr = (FEM_DataAttribute*)ghost->lookup(FEM_DATA,"get_coord");
+      x = attr->getDouble()(FEM_From_ghost_index(idx),0);
+      y = attr->getDouble()(FEM_From_ghost_index(idx),1);
+    } else  { // non-ghost
+      FEM_DataAttribute* attr = (FEM_DataAttribute*)lookup(FEM_DATA,"get_coord");
+      x = attr->getDouble()(idx,0);
+      y = attr->getDouble()(idx,1);
+    }
+    
+  }
+  
+}
+
+/** Get coordinates for a given 3-D node, if idx<0 the corresponding ghost node is used 
+@note there are a couple places coordinates have been historically stored. We can find either of them here.
+ */
+void FEM_Entity::get_coord(int idx, double &x, double &y, double &z){
+  if(coord){
+    if(idx<0){ // ghost
+      x = ghost->coord->getDouble()(FEM_From_ghost_index(idx),0);
+      y = ghost->coord->getDouble()(FEM_From_ghost_index(idx),1);
+      z = ghost->coord->getDouble()(FEM_From_ghost_index(idx),2);
+    } else { // non-ghost
+      x = coord->getDouble()(idx,0);
+      y = coord->getDouble()(idx,1);
+      z = coord->getDouble()(idx,2);
+    }
+    
+  }
+  else {
+     
+    if(idx<0){ // ghost
+      FEM_DataAttribute* attr = (FEM_DataAttribute*)ghost->lookup(FEM_DATA,"get_coord");
+      x = attr->getDouble()(FEM_From_ghost_index(idx),0);
+      y = attr->getDouble()(FEM_From_ghost_index(idx),1);
+      z = attr->getDouble()(FEM_From_ghost_index(idx),2);
+    } else { // non-ghost
+      FEM_DataAttribute* attr = (FEM_DataAttribute*)lookup(FEM_DATA,"get_coord");
+      x = attr->getDouble()(idx,0);
+      y = attr->getDouble()(idx,1);
+      z = attr->getDouble()(idx,2);
+    }
+    
+  }
+}
+
+
+
+
+
 void FEM_Entity::allocateGlobalno(void) {
 	if (globalno) CkAbort("FEM_Entity::allocateGlobalno called, but already allocated");
 	globalno=new FEM_IndexAttribute(this,FEM_GLOBALNO,NULL);
