@@ -771,7 +771,7 @@ extern void CsdSchedulePoll(void);
 #define CST_SP(n) (CmiNodeSpanTreeParent(n))
 #define CST_ND(p) (CmiNodeOf(p))
 #define CST_NS(p) (CmiNodeSize(CST_ND(p)))
-#define CmiSpanTreeParent(p) ((p)?(CST_R(p)?(CST_NF(CST_ND(p))+CST_R(p)/CST_W):CST_NF(CST_SP(CST_ND(p)))):(-1))
+#define CmiSpanTreeParent(p) ((p)?(CST_R(p)?(CST_NF(CST_ND(p))+(CST_R(p)-1)/CST_W):CST_NF(CST_SP(CST_ND(p)))):(-1))
 #define CST_C(p) (((CST_R(p)+1)*CST_W<CST_NS(p))?CST_W:(((CST_R(p)*CST_W+1)>=CST_NS(p))?0:((CST_NS(p)-1)-CST_R(p)*CST_W)))
 #define CST_SC(p) (CmiNumNodeSpanTreeChildren(CST_ND(p)))
 #define CmiNumSpanTreeChildren(p) (CST_R(p)?CST_C(p):(CST_SC(p)+CST_C(p)))
