@@ -1994,7 +1994,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
   idleblock = CmiGetArgFlag(argv, "+idleblocking");
   if (idleblock && _Cmi_mynode == 0) {
-    CmiPrintf("Charm++: Running in idle blocking mode.\n");
+    printf("Charm++: Running in idle blocking mode.\n");
   }
 
 #if CMK_NO_OUTSTANDING_SENDS
@@ -2003,7 +2003,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   if (CmiGetArgFlag(argv,"+no_outstanding_sends")) {
     no_outstanding_sends = 1;
     if (_Cmi_mynode == 0)
-      CmiPrintf("Charm++: Will%s consume outstanding sends in scheduler loop\n",
+      printf("Charm++: Will%s consume outstanding sends in scheduler loop\n",
      	no_outstanding_sends?"":" not");
   }
   _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
