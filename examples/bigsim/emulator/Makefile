@@ -31,7 +31,7 @@ test: all
 	./charmrun +p4 ./jacobi3D 3 3 3 2 10 0.1 $(TESTOPTS)
 	./charmrun +p4 ./prime 3 3 3 3 4 1000 $(TESTOPTS)
 	./charmrun +p4 ./ring 2 2 2 1 1 $(TESTOPTS)
-	./charmrun +p4 littleMD/bgMD 6 6 6 5 6 +bgstacksize 10240 $(TESTOPTS)
+	./charmrun +p4 littleMD/bgMD 6 6 6 5 6 +bgstacksize 102400 $(TESTOPTS)
 
 clean:
 	rm -f core *.cpm.h
