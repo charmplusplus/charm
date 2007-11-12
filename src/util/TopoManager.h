@@ -99,22 +99,22 @@ class TopoManager {
       dimNX = dimX;
       dimNY = 1;
       dimNZ = 1;
-      torusX=true;
-      torusY=true;
-      torusZ=true;
+
       procsPerNode = 1;
+      torusX = true;
+      torusY = true;
+      torusZ = true;
 #endif
     }
 
-    TopoManager(int X, int Y, int Z, int NX, int NY, int NZ ) : dimX(X), dimY(Y), dimZ(Z),  dimNX(NX), dimNY(NY), dimNZ(NZ)
-    {
+    TopoManager(int X, int Y, int Z, int NX, int NY, int NZ) : dimX(X), dimY(Y), dimZ(Z), dimNX(NX), dimNY(NY), dimNZ(NZ) {
       // we rashly assume only one dimension is expanded 
       procsPerNode = dimX/dimNX;
-      procsPerNode = (dimY/dimNY >procsPerNode) ? dimY/dimNY: procsPerNode;
-      procsPerNode = (dimZ/dimNZ >procsPerNode) ? dimZ/dimNZ: procsPerNode;
-      torusX=true;
-      torusY=true;
-      torusZ=true;
+      procsPerNode = (dimY/dimNY > procsPerNode) ? dimY/dimNY : procsPerNode;
+      procsPerNode = (dimZ/dimNZ > procsPerNode) ? dimZ/dimNZ : procsPerNode;
+      torusX = true;
+      torusY = true;
+      torusZ = true;
     }
 
     ~TopoManager() {
@@ -131,7 +131,7 @@ class TopoManager {
 
     inline int getProcsPerNode() { return procsPerNode; }
     
-inline int absX(int x) {
+    inline int absX(int x) {
       int px = abs(x);
       int sx = dimX - px;
       CmiAssert(sx>=0);

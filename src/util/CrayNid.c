@@ -21,8 +21,9 @@
 #include <catamount/cnos_mpi_os.h>
 #define MAXNID 2784
 
-int *pid2nid;
-int nid2pid[MAXNID][2];  // assuming 2 ppn for cray xt3
+int *pid2nid;                   // rank to node ID
+int nid2pid[MAXNID][2];         // node ID to rank
+                                // assuming 2 ppn for cray xt3
 
 /** \function getXT3NodeID
  *  returns nodeID corresponding to the CkMyPe() passed to it
@@ -58,6 +59,9 @@ void pidtonid(int numpes) {
   for(i=0; i<numpes; i++) {
     nid = nidpid[i].nid;
     pid2nid[i] = nid;
+    
+    // if the first position on the node is not filled
+    // put it there (0) else at (1)
     if(nid2pid[nid][0]==-1)
       nid2pid[nid][0] = i;
     else
