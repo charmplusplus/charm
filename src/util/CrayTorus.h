@@ -3,7 +3,7 @@
  *  Date created: March 19th, 2007  
  *  
  *  This file makes use of a static table we obtain from a file available
- *  on Bigben.
+ *  on Bigben. Bigben does a XYZT mapping by default
  */
 
 #ifndef _CRAY_TORUS_H_
@@ -42,19 +42,22 @@ class CrayTorusManager {
     int dimNZ;	// dimension of the allocation in Z (nodes)
     int dimNT;  // number of processors per node (2 for XT3)
 
-    int procsPerNode;
+    int procsPerNode;   // number of cores per node
     
-    int coords2pid[XDIM][YDIM][ZDIM][TDIM];
-    struct loc *pid2coords;
+    int coords2pid[XDIM][YDIM][ZDIM][TDIM];     // coordinates to rank
+    struct loc *pid2coords;                     // rank to coordinates
+    struct loc origin;
 
   public:
     CrayTorusManager() {
       // load data from CrayNeighborTable
       FILE *fp = fopen("/usr/users/4/abhatele/work/charm/src/util/CrayNeighbourTable", "r");
       int temp, nid, pid0, pid1, num, lx, ly, lz;
-      int minX=XDIM, minY=YDIM, minZ=ZDIM, maxX=0, maxY=0, maxZ=0;
+      int minX=XDIM, minY=YDIM, minZ=ZDIM, minT=0, maxX=0, maxY=0, maxZ=0;
       char header[50];
       pid2coords = (struct loc*)malloc(sizeof(struct loc) * CmiNumPes());
+
+      // fill the nid2pid and pid2nid data structures
       pidtonid(CmiNumPes());
       
       // skip header
@@ -66,12 +69,15 @@ class CrayTorusManager {
       for(int i=0; i<2112;i++)
       {
         temp = fscanf(fp, "%d%d%d%d%d%d%d%d%d%d", &nid, &num, &num, &num, &num, &num, &num, &lx, &ly, &lz);
+
+        // look for the first position (0) on the node for a pid
         pid0 = nid2pid[nid][0];
-        if(pid0 != -1) {
-          pid2coords[pid0].x = lx;
+        
+        if(pid0 != -1) {                // if the pid exists
+          pid2coords[pid0].x = lx;      
           pid2coords[pid0].y = ly;
           pid2coords[pid0].z = lz;
-          pid2coords[pid0].t = 0;
+          pid2coords[pid0].t = 0;       // give it position 0 on the node
           coords2pid[lx][ly][lz][0] = pid0;
           
           if(lx<minX) minX = lx; if(lx>maxX) maxX = lx;
@@ -80,12 +86,14 @@ class CrayTorusManager {
 
           //printf("%d %d %d %d %d\n", pid0, lx, ly, lz, 0);
         }
+
+        // look for the second position (1) on the node for a pid
         pid1 = nid2pid[nid][1];
-        if(pid1 != -1) {
+        if(pid1 != -1) {                // if the pid exists
           pid2coords[pid1].x = lx;
           pid2coords[pid1].y = ly;
           pid2coords[pid1].z = lz;
-          pid2coords[pid1].t = 1;
+          pid2coords[pid1].t = 1;       // give it position 1 on the node
           coords2pid[lx][ly][lz][1] = pid1;
 
           if(lx<minX) minX = lx; if(lx>maxX) maxX = lx;
@@ -97,6 +105,12 @@ class CrayTorusManager {
       }
       fclose(fp); 
 
+      // set the origin as the element on the lower end of the torus
+      origin.x =  minX;
+      origin.y =  minY;
+      origin.z =  minZ;
+      origin.t =  minT;
+      
       // assuming a contiguous allocation find the dimensions of 
       // the torus
       dimNX = maxX - minX + 1;
@@ -121,14 +135,14 @@ class CrayTorusManager {
     inline int getProcsPerNode() { return procsPerNode; }
     
     inline void rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
-      x = pid2coords[pe].x; 
-      y = pid2coords[pe].y; 
-      z = pid2coords[pe].z; 
-      t = pid2coords[pe].t; 
+      x = pid2coords[pe].x - origin.x; 
+      y = pid2coords[pe].y - origin.y; 
+      z = pid2coords[pe].z - origin.z; 
+      t = pid2coords[pe].t - origin.t; 
     }
     
     inline int coordinatesToRank(int x, int y, int z, int t) {
-      return coords2pid[x][y][z][t];
+      return coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t];
     }
 };
 
