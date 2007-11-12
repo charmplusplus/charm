@@ -49,7 +49,7 @@ void reductionArray::start(void) {
 	contribute(sizeof(i),&i,CkReduction::sum_int);
 	i[1]=2; //Sum=2*numElements
 	contribute(sizeof(i),&i,CkReduction::sum_int);
-	if (1) //Migrate to the next processor
+	if (0) //Migrate to the next processor
 		ckMigrate((CkMyPe()+1)%CkNumPes());
 }
 void reductionGroup::start(void) {
