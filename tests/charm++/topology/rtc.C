@@ -28,7 +28,7 @@ class Main : public Chare
 #ifdef CMK_VERSION_BLUEGENE
 	  unsigned int tmp_t, tmp_x, tmp_y, tmp_z;
 	  rts_coordinatesForRank(i, &tmp_x, &tmp_y, &tmp_z, &tmp_t);
-	  CkPrintf("Processor %d ---> x %d y %d z %d t %d\n", i, x, y, z, t);
+	  CkPrintf("Processor %d ---> x %d y %d z %d t %d\n", i, tmp_x, tmp_y, tmp_z, tmp_t);
 #endif
         }
       }
