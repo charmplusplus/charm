@@ -69,6 +69,7 @@ inline void addElementNodeSetData(
     if (edgeTable) {
         for (int j=0; j<numEdges; j++) { 
             adjElem *e = new adjElem(2);
+            e->nodeSetID = j;
             for (int k=0; k<2; k++) { 
                 e->nodeSet[k] = conn[elem * nodesPerElem + edgeMap[j][k]];
             }
