@@ -74,7 +74,7 @@ class BGPTorusManager {
     }
 
     inline void rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
-      if(mapping!=NULL && strcmp(mapping, "XYZT")) {
+      if(mapping==NULL || (mapping!=NULL && mapping[0]=='X')) {
         x = pe % dimNX;
         y = (pe % (dimNX*dimNY)) / dimNX;
         z = (pe % (dimNX*dimNY*dimNZ)) / (dimNX*dimNY);
@@ -88,18 +88,14 @@ class BGPTorusManager {
     }
 
     inline int coordinatesToRank(int x, int y, int z) {
-      return x + y*dimX + z*dimX*dimY;
+      return x + (y + z*dimY) * dimX;
     }
 
     inline int coordinatesToRank(int x, int y, int z, int t) {
-      if(mapping!=NULL && strcmp(mapping, "XYZT"))
-        return x + (y + z*dimNY + t*dimNY*dimNZ)*dimNX;
-      else {
-        if(procsPerNode==1)
-          return x + y*dimNX + z*dimNX*dimNY;
-        else
-          return t + (x + y*dimNX + z*dimNX*dimNY)*dimNT;
-      }
+      if(mapping==NULL || (mapping!=NULL && mapping[0]=='X'))
+        return x + (y + (z + t*dimNZ) * dimNY) * dimNX;
+      else
+        return t + (x + (y + z*dimNY) * dimNX) * dimNT;
     }
 };
 
