@@ -48,7 +48,7 @@
 /*readonly*/ int num_chare_y;
 /*readonly*/ int num_chare_z;
 
-#define USE_TOPOMAP	0
+#define USE_TOPOMAP	1
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
 #define wrap_x(a)  (((a)+num_chare_x)%num_chare_x)
@@ -428,14 +428,17 @@ class JacobiMap : public CkArrayMap {
 #else
       // we are assuming that the no. of chares in each dimension is a 
       // multiple of the torus dimension
-      int dimX = tmgr.getDimX();
-      int dimY = tmgr.getDimY();
-      int dimZ = tmgr.getDimZ();
-      
+      int dimX = tmgr.getDimNX();
+      int dimY = tmgr.getDimNY();
+      int dimZ = tmgr.getDimNZ();
+      int dimT = tmgr.getDimNT();
+
       int numCharesPerPeX = x / dimX;
       int numCharesPerPeY = y / dimY;
       int numCharesPerPeZ = z / dimZ;
 
+      if(dimT < 2) {	// one core per node
+      if(CkMyPe()==0) CkPrintf("%d %d %d %d _ %d %d %d \n", dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
       for(int i=0; i<dimX; i++)
 	for(int j=0; j<dimY; j++)
 	  for(int k=0; k<dimZ; k++)
@@ -444,7 +447,22 @@ class JacobiMap : public CkArrayMap {
 		for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
 		  mapping[ci][cj][ck] = tmgr.coordinatesToRank(i, j, k);
 		}
-
+      } else {		// multiple cores per node
+      // in this case, we split the chares in the Z dimension among the
+      // cores on the same node
+      numCharesPerPeZ /= dimT;
+      if(CkMyPe()==0) CkPrintf("%d %d %d %d _ %d %d %d \n", dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
+      for(int i=0; i<dimX; i++)
+	for(int j=0; j<dimY; j++)
+	  for(int k=0; k<dimZ; k++)
+	    for(int l=0; l<dimT; l++)
+	      for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
+	        for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
+		  for(int ck=(2*k+l)*numCharesPerPeZ; ck<(2*k+l+1)*numCharesPerPeZ; ck++) {
+		    mapping[ci][cj][ck] = tmgr.coordinatesToRank(i, j, k, l);
+		    // if(CkMyPe()==0) CkPrintf("%d %d %d %d", ci, cj, ck, tmgr.coordinatesToRank(i, j, k, l));
+		  }
+      } // endif
 #endif
     }
 
