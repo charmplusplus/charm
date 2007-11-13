@@ -149,7 +149,7 @@ class BGLTorusManager {
       /*if(mapping!=NULL && strcmp(mapping, "XYZT"))
         return x + y*dimNX + z*dimNX*dimNY + t*dimNX*dimNY*dimNZ;
       else*/
-        return t*(dimNT-1) + x*dimNT + y*dimNT*dimNX + z*dimNT*dimNX*dimNY;
+        return t + x*dimNT + y*dimNT*dimNX + z*dimNT*dimNX*dimNY;
     }
 
     inline int getNodeID(int pe) {
