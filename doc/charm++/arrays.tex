@@ -842,9 +842,9 @@ for different array sections in an application:
 \begin{alltt}
   CProxySection_Hello sectProxy = CProxySection_Hello::ckNew(...);
   CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew();
-  CkMulticastMgr *mcastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+  CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
 
-  sectProxy.ckSectionDelegate(mCastGrpId);  // initialize section proxy
+  sectProxy.ckSectionDelegate(mCastGrp);  // initialize section proxy
 
   sectProxy.someEntry(...)           //multicast via delegation library as before
 \end{alltt}
