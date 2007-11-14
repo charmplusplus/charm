@@ -8,7 +8,7 @@
 #include "converse.h"
 #include "sockRoutines.h"
 
-#define DEBUGP(x)     // CmiPrintf x;
+#define DEBUGP(x)     /* CmiPrintf x; */
 
 /*
  This scheme relies on using IP address to identify nodes and assigning 
@@ -47,16 +47,16 @@ long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr
 
 
 int num_cores(void) {
-  int a=1;
+  int a = 1;
 
-  // Allow the user to override the number of CPUs for use
-  // in scalability testing, debugging, etc.
+  /* Allow the user to override the number of CPUs for use
+     in scalability testing, debugging, etc. */
   char *forcecount = getenv("VMDFORCECPUCOUNT");
   if (forcecount != NULL) {
     if (sscanf(forcecount, "%d", &a) == 1) {
-      return a; // if we got a valid count, return it
+      return a; /* if we got a valid count, return it */
     } else {
-      a=1;      // otherwise use the real available hardware CPU count
+      a = 1;      /* otherwise use the real available hardware CPU count */
     }
   }
 
@@ -244,7 +244,7 @@ static void cpuAffinityRecvHandler(void *msg)
   m->ranks = (int *)((char*)m + sizeof(rankMsg));
   myrank = m->ranks[CmiMyPe()];
 
-  /*CmiPrintf("[%d %d] rank: %d\n", CmiMyNode(), CmiMyPe(), myrank); */
+  /* CmiPrintf("[%d %d] rank: %d\n", CmiMyNode(), CmiMyPe(), myrank); */
 
   if (-1 != set_myaffinitity(myrank)) {
     DEBUGP(("Processor %d is bound to core #%d\n", CmiMyPe(), myrank));
