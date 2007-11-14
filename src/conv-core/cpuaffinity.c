@@ -8,6 +8,8 @@
 #include "converse.h"
 #include "sockRoutines.h"
 
+#define DEBUGP(x)     // CmiPrintf x;
+
 /*
  This scheme relies on using IP address to identify nodes and assigning 
 cpu affinity.  
@@ -223,29 +225,44 @@ static void cpuAffinityHandler(void *m)
   }
 }
 
+static int set_myaffinitity(int myrank)
+{
+  /* set cpu affinity */
+#if CMK_SMP
+  return set_thread_affinity(myrank);
+#else
+  return set_cpu_affinity(myrank);
+  /* print_cpu_affinity(); */
+#endif
+}
+
+/* called on each processor */
 static void cpuAffinityRecvHandler(void *msg)
 {
   int myrank;
   rankMsg *m = (rankMsg *)msg;
   m->ranks = (int *)((char*)m + sizeof(rankMsg));
   myrank = m->ranks[CmiMyPe()];
+
   /*CmiPrintf("[%d %d] rank: %d\n", CmiMyNode(), CmiMyPe(), myrank); */
 
-  /* set cpu affinity */
-#if CMK_SMP
-  if (set_thread_affinity(myrank) != -1) { }
-    // CmiPrintf("Processor %d is bound to core #%d\n", CmiMyPe(), myrank);
-#else
-  if (set_cpu_affinity(myrank) != -1) { }
-    // CmiPrintf("Processor %d is bound to core #%d\n", CmiMyPe(), myrank);
-  // print_cpu_affinity();
-#endif
+  if (-1 != set_myaffinitity(myrank)) {
+    DEBUGP(("Processor %d is bound to core #%d\n", CmiMyPe(), myrank));
+  }
+
   CmiFree(m);
+
+  CmiNodeBarrier();
 }
+
+#if CMK_XT3
+extern int getXT3NodeID(int mype, int numpes);
+#endif
 
 void CmiInitCPUAffinity(char **argv)
 {
   skt_ip_t myip;
+  int ret;
   hostnameMsg  *msg;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
@@ -255,8 +272,15 @@ void CmiInitCPUAffinity(char **argv)
   cpuAffinityRecvHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler);
 
-  if (CmiMyPe() >= CmiNumPes()) return;    /* comm thread return */
   if (!affinity_flag) return;
+
+  if (CmiMyPe() >= CmiNumPes()) {
+#if 0
+      /* comm thread either can float around, or pin down to the last rank */
+    set_myaffinitity(num_cores()-1);
+#endif
+    return;    /* comm thread return */
+  }
 
 #if 0
   if (gethostname(hostname, 999)!=0) {
@@ -266,7 +290,8 @@ void CmiInitCPUAffinity(char **argv)
 
     /* get my ip address */
 #if CMK_XT3
-  myip = getXT3NodeID(CmiMyPe(), CmiNumPes());
+  ret = getXT3NodeID(CmiMyPe(), CmiNumPes());
+  memcpy(&myip, &ret, sizeof(int));
 #elif CMK_HAS_GETHOSTNAME
   myip = skt_my_ip();
 #else
