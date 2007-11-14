@@ -471,17 +471,18 @@ class JacobiMap : public CkArrayMap {
 		  mapping[ci][cj][ck] = tmgr.coordinatesToRank(i, j, k);
 		}
       } else {		// multiple cores per node
-      // in this case, we split the chares in the Z dimension among the
-      // cores on the same node
-      numCharesPerPeZ /= dimT;
-      if(CkMyPe()==0) CkPrintf("%d %d %d %d _ %d %d %d \n", dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
+      // In this case, we split the chares in the X dimension among the
+      // cores on the same node. The strange thing I figured out is that
+      // doing this in the Z dimension is not as good.
+      numCharesPerPeX /= dimT;
+      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
       for(int i=0; i<dimX; i++)
 	for(int j=0; j<dimY; j++)
 	  for(int k=0; k<dimZ; k++)
 	    for(int l=0; l<dimT; l++)
-	      for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
+	      for(int ci=(2*i+l)*numCharesPerPeX; ci<(2*i+l+1)*numCharesPerPeX; ci++)
 	        for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
-		  for(int ck=(2*k+l)*numCharesPerPeZ; ck<(2*k+l+1)*numCharesPerPeZ; ck++) {
+		  for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
 		    mapping[ci][cj][ck] = tmgr.coordinatesToRank(i, j, k, l);
 		    // if(CkMyPe()==0) CkPrintf("%d %d %d %d", ci, cj, ck, tmgr.coordinatesToRank(i, j, k, l));
 		  }
