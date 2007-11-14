@@ -1951,6 +1951,19 @@ FEM_Mesh *FEM_readMesh(const char *prefix,int chunkNo,int nChunks)
 	PUP::fromTextFile p(fp);
 	ret->pup(p);
   	fclose(fp);
+
+#ifdef PRINT_SHARED_NODE_INFO
+        FEM_Comm &shared = ret->node.shared;
+        int numNeighborVPs = shared.size();
+        CkPrintf("COMM DATA %d %d ", chunkNo, numNeighborVPs);
+        
+        for(int i=0;i<numNeighborVPs;i++) {
+	  IDXL_List list = shared.getLocalList(i);
+          CkPrintf("%d %d ", list.getDest(), list.size()); 
+        }
+	CkPrintf("\n");
+#endif
+
 	return ret;
 }
 
