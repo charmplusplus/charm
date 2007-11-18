@@ -62,6 +62,7 @@
 #define BOTTOM		4
 #define FRONT		5
 #define BACK		6
+#define DIVIDEBY7       0.14285714285714285714
 
 double startTime;
 double endTime;
@@ -402,16 +403,18 @@ class Jacobi: public CBase_Jacobi {
         // the new values in a temporary array and write them to temperature[][] 
         // after all of the new values are computed.
         double new_temperature[blockDimX+2][blockDimY+2][blockDimZ+2];
-    
+
+#pragma unroll    
         for(int i=1; i<blockDimX+1; ++i) {
           for(int j=1; j<blockDimY+1; ++j) {
             for(int k=1; k<blockDimZ+1; ++k) {
               // update my value based on the surrounding values
-              new_temperature[i][j][k] = (temperature[i-1][j][k] + temperature[i+1][j][k] + temperature[i][j-1][k] + temperature[i][j+1][k] + temperature[i][j][k-1] + temperature[i][j][k+1] + temperature[i][j][k]) / 7.0;
+              new_temperature[i][j][k] = (temperature[i-1][j][k] + temperature[i+1][j][k] + temperature[i][j-1][k] + temperature[i][j+1][k] + temperature[i][j][k-1] + temperature[i][j][k+1] + temperature[i][j][k]) * DIVIDEBY7;
             }
 	  }
         }
 
+#pragma unroll
         for(int i=0;i<blockDimX+2;++i)
           for(int j=0;j<blockDimY+2;++j)
             for(int k=1; k<blockDimZ+1; ++k)
