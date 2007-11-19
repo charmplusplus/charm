@@ -353,7 +353,7 @@ static void *call_startfn(void *vindex)
 
 static void *call_startfn(void *vindex)
 {
-  int index = (int)vindex;
+  size_t index = (size_t)vindex;
   CmiState state = Cmi_state_vector + index;
   pthread_setspecific(Cmi_state_key, state);
 
@@ -374,7 +374,8 @@ static void *call_startfn(void *vindex)
 static void CmiStartThreads(char **argv)
 {
   pthread_t pid;
-  int i, ok, tocreate;
+  size_t i;
+  int ok, tocreate;
   pthread_attr_t attr;
 
   CmiMemLock_lock=CmiCreateLock();
