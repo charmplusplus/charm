@@ -47,12 +47,13 @@
 #define MAX_QLEN 200
 #endif
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
-CpvDeclare(double, projTraceStart);
-#endif
-#endif
+#if CMI_MPI_TRACE_USEREVENTS && !defined(CMK_OPTIMIZE) && ! CMK_TRACE_IN_CHARM
+CpvStaticDeclare(double, projTraceStart);
+# define  START_EVENT()  CpvAccess(projTraceStart) = CmiWallTimer();
+# define  END_EVENT(x)   traceUserBracketEvent(x, CpvAccess(projTraceStart), CmiWallTimer());
+#else
+# define  START_EVENT()
+# define  END_EVENT(x)
 #endif
 
 /*
@@ -337,35 +338,12 @@ void CmiBarrier()
 {
   if (CmiMyRank() == 0) {
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-  CpvAccess(projTraceStart) = dclock() - starttimer;
-#else
-  CpvAccess(projTraceStart) = MPI_Wtime() - starttimer;
-#endif
-#endif
-#endif
-#endif
+    START_EVENT();
 
     if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
         CmiAbort("Timernit: MPI_Barrier failed!\n");
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    traceUserBracketEvent(10, CpvAccess(projTraceStart), 
-			  (dclock() - starttimer));
-#else
-    traceUserBracketEvent(10, CpvAccess(projTraceStart),
-			  (MPI_Wtime() - starttimer));
-#endif
-#endif
-#endif
-#endif
-
+    END_EVENT(10);
   }
 }
 
@@ -378,69 +356,21 @@ void CmiBarrierZero()
     MPI_Status sts;
     if (CmiMyNode() == 0)  {
       for (i=0; i<CmiNumNodes()-1; i++) {
-         CmiPrintf("CmiBarrierZero loop\n");
+         START_EVENT();
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-	 CpvAccess(projTraceStart) = dclock() - starttimer;
-#else
-	 CpvAccess(projTraceStart) = MPI_Wtime() - starttimer;
-#endif
-#endif
-#endif
-#endif
+         if (MPI_SUCCESS != MPI_Recv(msg,1,MPI_BYTE,MPI_ANY_SOURCE,BARRIER_ZERO_TAG, MPI_COMM_WORLD,&sts))
+            CmiPrintf("MPI_Recv failed!\n");
 
-          if (MPI_SUCCESS != MPI_Recv(msg,1,MPI_BYTE,MPI_ANY_SOURCE,BARRIER_ZERO_TAG, MPI_COMM_WORLD,&sts))
-            printf("MPI_Recv failed!\n");
-
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    traceUserBracketEvent(30, CpvAccess(projTraceStart), 
-			  (dclock() - starttimer));
-#else
-    traceUserBracketEvent(30, CpvAccess(projTraceStart),
-			  (MPI_Wtime() - starttimer));
-#endif
-#endif
-#endif
-#endif
-
+         END_EVENT(30);
       }
     }
     else {
-
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-      CpvAccess(projTraceStart) = dclock() - starttimer;
-#else
-      CpvAccess(projTraceStart) = MPI_Wtime() - starttimer;
-#endif
-#endif
-#endif
-#endif
+      START_EVENT();
 
       if (MPI_SUCCESS != MPI_Send((void *)msg,1,MPI_BYTE,0,BARRIER_ZERO_TAG,MPI_COMM_WORLD))
          printf("MPI_Send failed!\n");
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    traceUserBracketEvent(20, CpvAccess(projTraceStart), 
-			  (dclock() - starttimer));
-#else
-    traceUserBracketEvent(20, CpvAccess(projTraceStart),
-			  (MPI_Wtime() - starttimer));
-#endif
-#endif
-#endif
-#endif
+      END_EVENT(20);
     }
   }
   CmiNodeAllBarrier();
@@ -572,7 +502,7 @@ int CmiNodeOf(int pe)      { return (pe/_Cmi_mynodesize); }
 int CmiRankOf(int pe)      { return pe%_Cmi_mynodesize; }
 #endif
 
-static int CmiAllAsyncMsgsSent(void)
+static size_t CmiAllAsyncMsgsSent(void)
 {
    SMSG_LIST *msg_tmp = sent_msgs;
    MPI_Status sts;
@@ -687,17 +617,7 @@ int PumpMsgs(void)
         memcpy(msg,&(CpvAccess(CmiPostedRecvBuffers)[completed_index*MPI_POST_RECV_SIZE]),nbytes);
         /* and repost the recv */
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-	CpvAccess(projTraceStart) = dclock() - starttimer;
-#else
-	CpvAccess(projTraceStart) = MPI_Wtime() - starttimer;
-#endif
-#endif
-#endif
-#endif
+        START_EVENT();
 
         if (MPI_SUCCESS != MPI_Irecv(  &(CpvAccess(CmiPostedRecvBuffers)[completed_index*MPI_POST_RECV_SIZE])	,
             MPI_POST_RECV_SIZE,
@@ -708,19 +628,7 @@ int PumpMsgs(void)
             &(CpvAccess(CmiPostedRecvRequests)[completed_index])  ))
                 CmiAbort("PumpMsgs: MPI_Irecv failed!\n");
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    traceUserBracketEvent(50, CpvAccess(projTraceStart), 
-			  (dclock() - starttimer));
-#else
-    traceUserBracketEvent(50, CpvAccess(projTraceStart),
-			  (MPI_Wtime() - starttimer));
-#endif
-#endif
-#endif
-#endif
+        END_EVENT(50);
 
         CpvAccess(Cmi_posted_recv_total)++;
     }
@@ -733,34 +641,12 @@ int PumpMsgs(void)
         MPI_Get_count(&sts, MPI_BYTE, &nbytes);
         msg = (char *) CmiAlloc(nbytes);
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-	CpvAccess(projTraceStart) = dclock() - starttimer;
-#else
-	CpvAccess(projTraceStart) = MPI_Wtime() - starttimer;
-#endif
-#endif
-#endif
-#endif
+        START_EVENT();
 
         if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, MPI_COMM_WORLD,&sts))
             CmiAbort("PumpMsgs: MPI_Recv failed!\n");
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    traceUserBracketEvent(30, CpvAccess(projTraceStart), 
-			  (dclock() - starttimer));
-#else
-    traceUserBracketEvent(30, CpvAccess(projTraceStart),
-			  (MPI_Wtime() - starttimer));
-#endif
-#endif
-#endif
-#endif
+        END_EVENT(30);
 
         CpvAccess(Cmi_unposted_recv_total)++;
     }
@@ -775,39 +661,13 @@ int PumpMsgs(void)
     MPI_Get_count(&sts, MPI_BYTE, &nbytes);
     msg = (char *) CmiAlloc(nbytes);
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    CpvAccess(projTraceStart) = dclock() - starttimer;
-#else
-    CpvAccess(projTraceStart) = MPI_Wtime() - starttimer;
-#endif
-#endif
-#endif
-#endif
+    START_EVENT();
 
     if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, MPI_COMM_WORLD,&sts))
       CmiAbort("PumpMsgs: MPI_Recv failed!\n");
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    traceUserBracketEvent(30, CpvAccess(projTraceStart), 
-			  (dclock() - starttimer));
-#else
-    traceUserBracketEvent(30, CpvAccess(projTraceStart),
-			  (MPI_Wtime() - starttimer));
+    END_EVENT(30);
 #endif
-#endif
-#endif
-#endif
-
-
-#endif
-
-
 
     MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
     CMI_CHECK_CHECKSUM(msg, nbytes);
@@ -869,34 +729,12 @@ static void PumpMsgsBlocking(void)
 CmiAbort("Unsupported use of PumpMsgsBlocking. This call should be extended to check posted recvs, cancel them all, and then wait on any incoming message, and then re-post the recvs");
 #endif
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
- CpvAccess(projTraceStart) = dclock() - starttimer;
-#else
- CpvAccess(projTraceStart) = MPI_Wtime() - starttimer;
-#endif
-#endif
-#endif
-#endif
+  START_EVENT();
 
   if (MPI_SUCCESS != MPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts))
       CmiAbort("PumpMsgs: PMP_Recv failed!\n");
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    traceUserBracketEvent(30, CpvAccess(projTraceStart), 
-			  (dclock() - starttimer));
-#else
-    traceUserBracketEvent(30, CpvAccess(projTraceStart),
-			  (MPI_Wtime() - starttimer));
-#endif
-#endif
-#endif
-#endif
+  END_EVENT(30);
 
    MPI_Get_count(&sts, MPI_BYTE, &nbytes);
    msg = (char *) CmiAlloc(nbytes);
@@ -977,35 +815,12 @@ static void CommunicationServer(int sleepTime)
     }
     MACHSTATE(2, "CommunicationServer barrier begin {");
 
-
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    CpvAccess(projTraceStart) = dclock() - starttimer;
-#else
-    CpvAccess(projTraceStart) = MPI_Wtime() - starttimer;
-#endif
-#endif
-#endif
-#endif
+    START_EVENT();
 
     if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
       CmiAbort("ConverseExit: MPI_Barrier failed!\n");
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    traceUserBracketEvent(10, CpvAccess(projTraceStart), 
-			  (dclock() - starttimer));
-#else
-    traceUserBracketEvent(10, CpvAccess(projTraceStart),
-			  (MPI_Wtime() - starttimer));
-#endif
-#endif
-#endif
-#endif
+    END_EVENT(10);
 
     MACHSTATE(2, "} CommunicationServer barrier end");
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
@@ -1215,96 +1030,23 @@ static int SendMsgBuf()
 #if MPI_POST_RECV_COUNT > 0
         if(size <= MPI_POST_RECV_SIZE){
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    CpvAccess(projTraceStart) = dclock() - starttimer;
-#else
-    CpvAccess(projTraceStart) = MPI_Wtime() - starttimer;
-#endif
-#endif
-#endif
-#endif
-            if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,POST_RECV_TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
+          START_EVENT();
+          if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,POST_RECV_TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
                 CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    traceUserBracketEvent(40, CpvAccess(projTraceStart), 
-			  (dclock() - starttimer));
-#else
-    traceUserBracketEvent(40, CpvAccess(projTraceStart),
-			  (MPI_Wtime() - starttimer));
-#endif
-#endif
-#endif
-#endif
-            }
+          STOP_EVENT(40);
+        }
         else {
-
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    CpvAccess(projTraceStart) = dclock() - starttimer;
-#else
-    CpvAccess(projTraceStart) = MPI_Wtime() - starttimer;
-#endif
-#endif
-#endif
-#endif
-
+            START_EVENT();
             if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
                 CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
-
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    traceUserBracketEvent(40, CpvAccess(projTraceStart), 
-			  (dclock() - starttimer));
-#else
-    traceUserBracketEvent(40, CpvAccess(projTraceStart),
-			  (MPI_Wtime() - starttimer));
-#endif
-#endif
-#endif
-#endif
-
+            STOP_EVENT(40);
         }
 #else
-
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-	CpvAccess(projTraceStart) = dclock() - starttimer;
-#else
-	CpvAccess(projTraceStart) = MPI_Wtime() - starttimer;
-#endif
-#endif
-#endif
-#endif
-
+        START_EVENT();
         if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
             CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
-#endif
-
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    traceUserBracketEvent(40, CpvAccess(projTraceStart), 
-			  (dclock() - starttimer));
-#else
-    traceUserBracketEvent(40, CpvAccess(projTraceStart),
-			  (MPI_Wtime() - starttimer));
-#endif
-#endif
-#endif
+        END_EVENT(40);
 #endif
 
       MACHSTATE(3,"}MPI_send end");
@@ -1381,98 +1123,22 @@ CmiCommHandle CmiAsyncSendFn_(int destPE, int size, char *msg)
 #if MPI_POST_RECV_COUNT > 0
         if(size <= MPI_POST_RECV_SIZE){
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    CpvAccess(projTraceStart) = dclock() - starttimer;
-#else
-    CpvAccess(projTraceStart) = MPI_Wtime() - starttimer;
-#endif
-#endif
-#endif
-#endif
-
-              if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,POST_RECV_TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
+          START_EVENT();
+          if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,POST_RECV_TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
                 CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
-
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    traceUserBracketEvent(40, CpvAccess(projTraceStart), 
-			  (dclock() - starttimer));
-#else
-    traceUserBracketEvent(40, CpvAccess(projTraceStart),
-			  (MPI_Wtime() - starttimer));
-#endif
-#endif
-#endif
-#endif
-            }
+          END_EVENT(40);
+        }
         else {
-
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-	  CpvAccess(projTraceStart) = dclock() - starttimer;
-#else
-	  CpvAccess(projTraceStart) = MPI_Wtime() - starttimer;
-#endif
-#endif
-#endif
-#endif
-
-             if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
+          START_EVENT();
+          if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
                 CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
-
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    traceUserBracketEvent(40, CpvAccess(projTraceStart), 
-			  (dclock() - starttimer));
-#else
-    traceUserBracketEvent(40, CpvAccess(projTraceStart),
-			  (MPI_Wtime() - starttimer));
-#endif
-#endif
-#endif
-#endif
-
+          END_EVENT(40);
         }
 #else
-
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-	CpvAccess(projTraceStart) = dclock() - starttimer;
-#else
-	CpvAccess(projTraceStart) = MPI_Wtime() - starttimer;
-#endif
-#endif
-#endif
-#endif
-
+  START_EVENT();
   if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
     CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
-
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE 
-#if ! CMK_TRACE_IN_CHARM
-#if CMK_TIMER_USE_XT3_DCLOCK
-    traceUserBracketEvent(40, CpvAccess(projTraceStart), 
-			  (dclock() - starttimer));
-#else
-    traceUserBracketEvent(40, CpvAccess(projTraceStart),
-			  (MPI_Wtime() - starttimer));
-#endif
-#endif
-#endif
-#endif
-
+  END_EVENT(40);
 #endif
 
   MsgQueueLen++;
@@ -1482,7 +1148,7 @@ CmiCommHandle CmiAsyncSendFn_(int destPE, int size, char *msg)
     end_sent->next = msg_tmp;
   end_sent = msg_tmp;
   return (CmiCommHandle) &(msg_tmp->req);
-#endif
+#endif              /* non-smp */
 }
 
 CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg)
@@ -1603,7 +1269,7 @@ CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg)
     CmiAsyncSendFn(i,size,msg) ;
 
   /*CmiPrintf("In  AsyncBroadcast broadcast\n");*/
-CmiAbort("CmiAsyncBroadcastFn should never be called");
+  CmiAbort("CmiAsyncBroadcastFn should never be called");
   return (CmiCommHandle) (CmiAllAsyncMsgsSent());
 }
 
@@ -1898,7 +1564,9 @@ static void ConverseRunPE(int everReturn)
   CmiIdleState *s=CmiNotifyGetState();
   CmiState cs;
   char** CmiMyArgv;
+
   CmiNodeAllBarrier();
+
   cs = CmiGetState();
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
@@ -2031,10 +1699,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   if (CmiGetArgFlag(argv,"++debug"))
   {   /*Pause so user has a chance to start and attach debugger*/
     printf("CHARMDEBUG> Processor %d has PID %d\n",_Cmi_mynode,getpid());
+    fflush(stdout);
     if (!CmiGetArgFlag(argv,"++debug-no-pause"))
       sleep(10);
   }
-
 
 #if MPI_POST_RECV_COUNT > 0
 
