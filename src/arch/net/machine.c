@@ -534,6 +534,8 @@ void CmiAbort(const char *message)
   already_aborting=1;
   MACHSTATE1(5,"CmiAbort(%s)",message);
   
+  /* CmiDestoryLocks();  */
+
   CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
   	"Reason: %s\n",CmiMyPe(),message);
   CmiPrintStackTrace(0);
@@ -2297,13 +2299,17 @@ void ConverseExit(void)
     if(Cmi_print_stats)
       printNetStatistics();
     log_done();
-    CmiMachineExit();
-    CmiStdoutFlush();
-    ConverseCommonExit();
-    if (Cmi_charmrun_fd==-1) exit(0); /*Standalone version-- just leave*/
   }
-  if (Cmi_charmrun_fd!=-1) {
-  	ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away */
+  CmiMachineExit();
+  ConverseCommonExit();               /* should be called by every rank */
+  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
+  if (CmiMyRank()==0) CmiStdoutFlush();
+  if (Cmi_charmrun_fd==-1) {
+    if (CmiMyRank() == 0) exit(0); /*Standalone version-- just leave*/
+    else while (1) CmiYield();
+  }
+  else {
+  	ctrl_sendone_locking("ending",NULL,0,NULL,0); /* this causes charmrun to go away, every PE needs to report */
 #if CMK_SHARED_VARS_UNAVAILABLE
  	Cmi_check_delay = 1.0;		/* speed up checking of charmrun */
  	while (1) CommunicationServer(500, COMM_SERVER_FROM_WORKER);
