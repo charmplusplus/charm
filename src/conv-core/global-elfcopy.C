@@ -1,42 +1,9 @@
-/*  Library to manage the program's global offset table.
+/*  Library to manage the program's global and static varaibles manually
+ *  by copying them during context switch.
  *
- *  The global offset table (GOT) is a static, linker-generated 
- *  table used to look up the locations of dynamic stuff
- *  like subroutines or global data.
  *
- *  It's only generated and used if you're on an ELF binary
- *  format machine, and compile with "-fpic", for "position 
- *  independent code"; otherwise the code includes direct 
- *  references to subroutines and data.
+ *  Developed by Gengbin Zheng (gzheng@uiuc.edu) 12/06
  *
- *  During execution of a single routine, the GOT is pointed to
- *  by %ebx.  Changing %ebx only affects global access within
- *  the current subroutine, so we have to change the single, 
- *  static copy of the GOT to switch between sets of global variables.
- *  This is slow, but because the GOT just contains pointers,
- *  it's not as slow as copying the data in and out of the GOT.
- *
- 
-The ELF GOT layout is described in excruciating detail
-by the Sun documentation, at 
-   Solaris 2.5 Software Developer AnswerBook >> 
-      Linker and Libraries Guide >> 
-        6 Object Files >> 
-	  File Format
-
-A more readable summary is at:  
-  http://www.iecc.com/linker/linker08.html
-
- *
- *  Developed by Sameer Kumar (sameer@ks.uiuc.edu) 8/25/03
- *  Made functional by Orion Lawlor (olawlor@acm.org) 2003/9/16
- *  Made working on AMD64 by Gengbin Zheng 12/20/2005
- *
- *  FIXME2: Sanity check. I am assuming that if a symbol is in the
- *  relocation table it is in the global offset table. A sanity check
- *  would be to get the address from the symbol table and look for it
- *  in the GOT. Pointers to remote function calls may be an exception
- *  to this.
  */
 
 #include "converse.h"
@@ -56,7 +23,7 @@ A more readable summary is at:
 #define DEBUG_GOT_MANAGER 0
 
 #if !CMK_SHARED_VARS_UNAVAILABLE
-#  error "Global-elfgot won't work properly under smp version: -swapglobals disabled"
+#  error "Global-elfcopy won't work properly under smp version: -copyglobals disabled"
 #endif
 
 CpvDeclare(int, CmiPICMethod);
@@ -205,8 +172,9 @@ static void readGlobals()
     const char *fname = "globals";
 printf("Loading globals from file \"%s\" ... \n", fname);
     FILE *gf = fopen(fname, "r");
-    if (gf == NULL)
-      CmiAbort("Failed to load globals!");
+    if (gf == NULL) {
+      CmiAbort("Failed to load globals, file may not exist!");
+    }
     while (!feof(gf)) 
     {
       char name[1024];
@@ -257,98 +225,6 @@ CtgGlobalList::CtgGlobalList() {
 	datalen+=gSize;
     }
 
-#if 0
-
-/*Find tables and sizes of tables from the dynamic segment table*/
-    count = 0;
-    while(_DYNAMIC[count].d_tag != 0){
-
-        if(_DYNAMIC[count].d_tag == CMK_DT_REL)
-            relt = (ELFXX_TYPE_Rel *) _DYNAMIC[count].d_un.d_ptr;
-
-        else if(_DYNAMIC[count].d_tag == CMK_DT_RELSZ)
-            relt_size = _DYNAMIC[count].d_un.d_val/ sizeof(ELFXX_TYPE_Rel);
-
-        else if(_DYNAMIC[count].d_tag == DT_SYMTAB)
-            symt = (ELFXX_TYPE_Sym *) _DYNAMIC[count].d_un.d_ptr;
-
-        else if(_DYNAMIC[count].d_tag == DT_STRSZ)
-            symt_size = _DYNAMIC[count].d_un.d_val / sizeof(ELFXX_TYPE_Sym);
-
-        else if(_DYNAMIC[count].d_tag == DT_STRTAB)
-            str_tab = (char *)_DYNAMIC[count].d_un.d_ptr;
-
-        count ++;
-    }
-
-    symt_size = symbtab_size/sizeof(ELFXX_TYPE_Sym);
-    printf("size of symbol table: %d\n", symt_size);
-    for (count = 0; count < _namelist.size(); count ++) 
-    {
-      for (int i=0; i<symt_size; i++) {
-        sym_name = str_tab + symt[i].st_name;
-printf("sym table: %s\n", sym_name);
-        if (strcmp(sym_name, _namelist[count]) == 0) {
-           // found one
-           int gSize = ALIGN8(symt[i].st_size);
-           void *ptr = (void *)symt[i].st_value;
-		    
-//#if DEBUG_GOT_MANAGER
-            printf("   -> %s is a user global, of size %d, at %p\n",
-	      sym_name, symt[i].st_size, ptr);
-//#endif
-		    
-	   rec.push_back(CtgRec(ptr,datalen));
-	   datalen+=gSize;
-        }
-      }
-    }
-
-/*Figure out which relocation data entries refer to global data:
-*/
-    for(count = 0; count < relt_size; count ++){
-        type = ELFXX_R_TYPE(relt[count].r_info);
-        symindx = ELFXX_R_SYM(relt[count].r_info);
-        
-        if(is_elf_global(type)) { /* It's global data */
-            sym_name = str_tab + symt[symindx].st_name;
-#if DEBUG_GOT_MANAGER
-            printf("relt[%d]= %s: %d bytes, %p sym, R_==%d\n", count, sym_name, 
-              symt[symindx].st_size, (void *)symt[symindx].st_value, type);
-#endif
-	
-            if(!(strcmp(sym_name, "_DYNAMIC") == 0
-	      || strcmp(sym_name, "__gmon_start__") == 0
-	      || strcmp(sym_name, "_GLOBAL_OFFSET_TABLE_") == 0
-	    )) 
-	    { /* It's not system data */
-              if(ELFXX_ST_TYPE(symt[symindx].st_info) == STT_OBJECT || ELFXX_ST_TYPE(symt[symindx].st_info) == STT_NOTYPE
-/*
-#ifdef __INTEL_COMPILER
-                  || ELFXX_ST_TYPE(symt[symindx].st_info) == STT_FUNC
-#endif
-*/
-                 ) /* ? */
-	        if (isUserSymbol(sym_name))
-		{ /* It's got the right name-- it's a user global */
-                    int gSize = ALIGN8(symt[symindx].st_size);
-		    ELFXX_TYPE_Addr *gGot=(ELFXX_TYPE_Addr *)relt[count].r_offset;
-		    
-#if DEBUG_GOT_MANAGER
-            printf("   -> %s is a user global, of size %d, at %p\n",
-	      sym_name, symt[symindx].st_size, (void *)*gGot);
-#endif
-		    if ((void *)*gGot != (void *)symt[symindx].st_value)
-		    	CmiAbort("CtgGlobalList: symbol table and GOT address mismatch!\n");
-		    
-		    rec.push_back(CtgRec(gGot,datalen));
-		    datalen+=gSize;
-                }
-            }
-        }
-    }
-#endif
-    
     nRec=rec.size();
     
 #if DEBUG_GOT_MANAGER   
@@ -437,6 +313,7 @@ void CtgInit(void) {
 		_ctgList=l;
 		_ctgListGlobals=g;
 	}
+        /* CmiNodeAllBarrier();  no smp anyway */
 	
 	CpvAccess(_curCtg)=_ctgListGlobals;
 }
@@ -502,7 +379,7 @@ void CtgUninstall_var(CtgGlobals g, void *ptr) {
         _ctgList->install_var(oldG->data_seg, ptr);             /* store globals to own copy */
 }
 
-#else
+#else     /* no ELF */
 
 #include "global-nop.c"
 
