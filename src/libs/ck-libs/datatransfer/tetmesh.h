@@ -46,7 +46,26 @@ public:
 	inline int *getTetConn(void) {return getTet(0);}
 	inline const int *getTetConn(void) const {return getTet(0);}
 	double getTetVolume(int t) const;
-	
+	inline void flipTet(int t) { 
+	  int tmp = tet[t].nodes[0];
+	  tet[t].nodes[0] = tet[t].nodes[1];
+	  tet[t].nodes[1] = tmp;
+	}
+	inline double getTetOrientation(int t) {
+	  double yz01 = pts[tet[t].nodes[0]][1]*pts[tet[t].nodes[1]][2] - pts[tet[t].nodes[0]][2]*pts[tet[t].nodes[1]][1];
+	  double yz02 = pts[tet[t].nodes[0]][1]*pts[tet[t].nodes[2]][2] - pts[tet[t].nodes[0]][2]*pts[tet[t].nodes[2]][1];
+	  double yz03 = pts[tet[t].nodes[0]][1]*pts[tet[t].nodes[3]][2] - pts[tet[t].nodes[0]][2]*pts[tet[t].nodes[3]][1];
+	  double yz12 = pts[tet[t].nodes[1]][1]*pts[tet[t].nodes[2]][2] - pts[tet[t].nodes[1]][2]*pts[tet[t].nodes[2]][1];
+	  double yz13 = pts[tet[t].nodes[1]][1]*pts[tet[t].nodes[3]][2] - pts[tet[t].nodes[1]][2]*pts[tet[t].nodes[3]][1];
+	  double yz23 = pts[tet[t].nodes[2]][1]*pts[tet[t].nodes[3]][2] - pts[tet[t].nodes[2]][2]*pts[tet[t].nodes[3]][1];
+	  double x0 = pts[tet[t].nodes[0]][0], x1 = pts[tet[t].nodes[1]][0], x2 = pts[tet[t].nodes[2]][0], 
+	    x3 = pts[tet[t].nodes[3]][0];
+	  
+	  return x1*yz23 - x2*yz13 + x3*yz12 - x0*yz23 + x2*yz03 - x3*yz02 + x0*yz13
+	    - x1*yz03 + x3*yz01 - x0*yz12 + x1*yz02 - x2*yz01;	
+	}
+
+
 	/// Return the number of points (vertices, nodes) in the mesh
 	inline int getPoints(void) const {return pts.size();}
 	/// Return the p'th vertex (0..getPoints()-1)
