@@ -446,9 +446,9 @@ CtgGlobals CtgCreate(void) {
 	CtgGlobalStruct *g=new CtgGlobalStruct;
 	g->allocate(_ctgList->getSize());
 	_ctgList->read(g->data_seg);
-printf("CtgCreate: %p\n", g);
 	return g;
 }
+
 /** PUP this (not currently installed) globals set */
 CtgGlobals CtgPup(pup_er pv, CtgGlobals g) {
 	PUP::er *p=(PUP::er *)pv;
@@ -486,27 +486,6 @@ CtgGlobals CtgCurrentGlobals(void){
 	return CpvAccess(_curCtg);
 }
 
-#if 0
-void CtgInstall_var(CtgGlobals g, void *ptr) {
-        CtgGlobals *cur=&CpvAccess(_curCtg);
-	CtgGlobals oldG = *cur;
-        if (oldG)
-        _ctgList->read_var(oldG->data_seg, ptr);
-//       *cur=g;
-        _ctgList->install_var(g->data_seg, ptr);             /* store globals to own copy */
-}
-
-void CtgUninstall_var(CtgGlobals g, void *ptr) {
-        CtgGlobals *cur=&CpvAccess(_curCtg);
-	CtgGlobals oldG = *cur;
-        if (oldG)
-        _ctgList->read_var(g->data_seg, ptr);             /* store globals to own copy */
-       *cur=_ctgListGlobals;
-        _ctgList->install_var(_ctgListGlobals->data_seg, ptr);             /* store globals to own copy */
-}
-
-#else
-
 void CtgInstall_var(CtgGlobals g, void *ptr) {
         CtgGlobals *cur=&CpvAccess(_curCtg);
 	CtgGlobals oldG = *cur;
@@ -522,7 +501,6 @@ void CtgUninstall_var(CtgGlobals g, void *ptr) {
         _ctgList->read_var(g->data_seg, ptr);             /* store globals to own copy */
         _ctgList->install_var(oldG->data_seg, ptr);             /* store globals to own copy */
 }
-#endif
 
 #else
 
