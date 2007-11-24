@@ -30,7 +30,7 @@ testnocorr:jacobi
 	./charmrun +p8 ./jacobi 2000 4 1000 +x10 +y5 +z2 +cth1 +wth1 +bglog +stacksize 4000 +logsize 20000
 
 test: jacobi
-	./charmrun +p4 ./jacobi 64 10 32 +bgstacksize 102400 $(TESTOPTS)
+	./charmrun +p4 ./jacobi 64 10 32 $(TESTOPTS)
 
 big: jacobi
 	./charmrun +p10 ./jacobi 8000 4 4000 +x10 +y50 +z2 +cth1 +wth1 +bgcorrect +stacksize 4000 +logsize 20000
@@ -44,7 +44,7 @@ bglog: jacobi
 #	./charmrun +p4 ./jacobi 16 10 4 +x2 +y2 +z2 +cth1 +wth1 +bglog
 
 bgtest: jacobi
-	./charmrun +p4 ./jacobi 64 10 32 +bgconfig ./bg_config
+	./charmrun +p4 ./jacobi 64 10 32 +bgconfig ./bg_config +bgstacksize 102400
 
 clean:
 	rm -f *.sts *.log C *.o *.def.h *.decl.h *~ jacobi bgTraceFile
