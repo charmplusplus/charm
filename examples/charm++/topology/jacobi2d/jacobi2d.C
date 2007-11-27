@@ -42,7 +42,7 @@
 /*readonly*/ int num_chare_x;
 /*readonly*/ int num_chare_y;
 
-#define USE_TOPOMAP	1
+#define USE_TOPOMAP	0
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
 #define wrap_x(a)  (((a)+num_chare_x)%num_chare_x)
@@ -115,6 +115,25 @@ class Main : public CBase_Main
 #else
       array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y);
 #endif
+
+      TopoManager tmgr;
+      CkArray *jarr = array.ckLocalBranch();
+      int jmap[num_chare_x][num_chare_y];
+
+      int hops=0, p;
+      for(int i=0; i<num_chare_x; i++)
+        for(int j=0; j<num_chare_y; j++)
+            jmap[i][j] = jarr->procNum(CkArrayIndex2D(i, j));
+
+      for(int i=0; i<num_chare_x; i++)
+        for(int j=0; j<num_chare_y; j++) {
+          int p = jmap[i][j];
+          hops += tmgr.getHopsBetweenRanks(p, jmap[wrap_x(i+1)][j]);
+          hops += tmgr.getHopsBetweenRanks(p, jmap[wrap_x(i-1)][j]);
+          hops += tmgr.getHopsBetweenRanks(p, jmap[i][wrap_y(j+1)]);
+          hops += tmgr.getHopsBetweenRanks(p, jmap[i][wrap_y(j-1)]);
+        }
+      CkPrintf("Total Hops: %d\n", hops);
 
       // save the total number of worker chares we have in this simulation
       num_chares = num_chare_x * num_chare_y;
