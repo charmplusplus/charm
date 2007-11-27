@@ -1,11 +1,11 @@
 mainmodule jacobi2d {
   readonly CProxy_Main mainProxy;
-  readonly int array_height;
-  readonly int array_width;
-  readonly int block_height;
-  readonly int block_width;
-  readonly int num_chare_rows;
-  readonly int num_chare_cols;
+  readonly int arrayDimX;
+  readonly int arrayDimY;
+  readonly int blockDimX;
+  readonly int blockDimY;
+  readonly int num_chare_x;
+  readonly int num_chare_y;
 
   mainchare Main {
     entry Main(CkArgMsg *m);
@@ -21,4 +21,9 @@ mainmodule jacobi2d {
     entry void ghostsFromTop(int width, double s[width]);
     entry void ghostsFromBottom(int width, double s[width]);
   };
+
+  group JacobiMap : CkArrayMap {
+    entry JacobiMap(int x, int y);
+  };
+
 };
