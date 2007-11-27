@@ -301,7 +301,7 @@ class Jacobi: public CBase_Jacobi {
     void ghostsFromRight(int height, int width, double ghost_values[]) {
         for(int j=0; j<height; ++j) 
 	  for(int k=0; k<width; ++k) {
-            temperature[blockDimX][j+1][k+1] = ghost_values[k*height+j];
+            temperature[blockDimX+1][j+1][k+1] = ghost_values[k*height+j];
         }
         check_and_compute(RIGHT);
     }
@@ -309,7 +309,7 @@ class Jacobi: public CBase_Jacobi {
     void ghostsFromLeft(int height, int width, double ghost_values[]) {
         for(int j=0; j<height; ++j) 
 	  for(int k=0; k<width; ++k) {
-            temperature[1][j+1][k+1] = ghost_values[k*height+j];
+            temperature[0][j+1][k+1] = ghost_values[k*height+j];
         }
         check_and_compute(LEFT);
     }
@@ -317,7 +317,7 @@ class Jacobi: public CBase_Jacobi {
     void ghostsFromBottom(int height, int width, double ghost_values[]) {
 	for(int i=0; i<height; ++i) 
 	  for(int k=0; k<width; ++k) {
-            temperature[i+1][blockDimY][k+1] = ghost_values[k*height+i];
+            temperature[i+1][blockDimY+1][k+1] = ghost_values[k*height+i];
         }
         check_and_compute(BOTTOM);
     }
@@ -325,7 +325,7 @@ class Jacobi: public CBase_Jacobi {
     void ghostsFromTop(int height, int width, double ghost_values[]) {
 	for(int i=0; i<height; ++i) 
 	  for(int k=0; k<width; ++k) {
-            temperature[i+1][1][k+1] = ghost_values[k*height+i];
+            temperature[i+1][0][k+1] = ghost_values[k*height+i];
         }
         check_and_compute(TOP);
     }
@@ -333,7 +333,7 @@ class Jacobi: public CBase_Jacobi {
     void ghostsFromFront(int height, int width, double ghost_values[]) {
 	for(int i=0; i<height; ++i) 
           for(int j=0; j<width; ++j) {
-            temperature[i+1][j+1][blockDimZ] = ghost_values[j*height+i];
+            temperature[i+1][j+1][blockDimZ+1] = ghost_values[j*height+i];
         }
         check_and_compute(FRONT);
     }
@@ -341,7 +341,7 @@ class Jacobi: public CBase_Jacobi {
     void ghostsFromBack(int height, int width, double ghost_values[]) {
 	for(int i=0; i<height; ++i) 
           for(int j=0; j<width; ++j) {
-            temperature[i+1][j+1][1] = ghost_values[j*height+i];
+            temperature[i+1][j+1][0] = ghost_values[j*height+i];
         }
         check_and_compute(BACK);
     }
@@ -426,7 +426,7 @@ class Jacobi: public CBase_Jacobi {
 
 };
 
-/** \class
+/** \class JacobiMap
  *
  */
 
