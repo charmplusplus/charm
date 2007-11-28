@@ -16,6 +16,7 @@
 #include "charm++.h"
 #include "eventID.h"
 #include "mempool.h"
+#include "memory_temporal.h"
 #include "srtable.h"
 #include "stats.h"
 #include "cancel.h"
