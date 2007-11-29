@@ -407,11 +407,12 @@ BG2S_t * first_pkt_recv_done (const BGQuad      * info,
   return (BG2S_t *) ALIGN_16(*buffer + sndlen);
 }
 
+void sendBroadcastMessages() __attribute__((noinline));
 
-inline void sendBroadcastMessages() {
+void sendBroadcastMessages() {
   while(!PCQueueEmpty(broadcast_q)) {
     char *msg = (char *) PCQueuePop(broadcast_q);
-
+    
 #if CMK_BROADCAST_SPANNING_TREE
     SendSpanningChildren(((CmiMsgHeaderBasic *) msg)->size, msg);
 #elif CMK_BROADCAST_HYPERCUBE
@@ -798,8 +799,9 @@ void CmiAbort(const char * message){
     AdvanceCommunications();
   }
   
-  CmiBarrier(); 
-  exit(-1);
+  //CmiBarrier(); 
+
+  assert (0);
 }
 
 void *CmiGetNonLocal(){
@@ -807,38 +809,27 @@ void *CmiGetNonLocal(){
   CmiState cs = CmiGetState();
 
   void *msg = NULL;
-  CmiIdleLock_checkMessage(&cs->idle);
+  //CmiIdleLock_checkMessage(&cs->idle);
   /* although it seems that lock is not needed, I found it crashes very often
      on mpi-smp without lock */
-
+  
   AdvanceCommunications();
   
-  //int length = PCQueueLength(cs->recv);
-  //if(length != 0)
-  //printf("%d: {%d} PCQueue length = %d\n", CmiMyPe(), bgx_in_interrupt, length);
+  //CmiLock(procState[cs->rank].recvLock);
   
-  CmiLock(procState[cs->rank].recvLock);
+  if (PCQueueLength(cs->recv) > 0)
+    msg =  PCQueuePop(cs->recv); 
 
-  //if(length > 0)
-  msg =  PCQueuePop(cs->recv); 
-  CmiUnlock(procState[cs->rank].recvLock);
-
+  //CmiUnlock(procState[cs->rank].recvLock);
+  
 #if !CMK_SMP
+#if BLOCKING_COMM
   if (no_outstanding_sends) {
     SendMsgsUntil(0, 0);
   }
-  
-  if(!msg) {
-    AdvanceCommunications();
-    
-    //int length = PCQueueLength(cs->recv);
-    //if(length != 0)
-    //    printf("%d: {%d} PCQueue length = %d\n", CmiMyPe(), bgx_in_interrupt, length);
-
-    //if(length > 0)
-    return PCQueuePop(cs->recv);
-  }
+#endif
 #endif /* !CMK_SMP */
+  
   return msg;
 }
 
@@ -883,7 +874,9 @@ inline void machineSend(SMSG_LIST *msg_tmp) {
 		       msg_tmp->msg, msg_tmp->size, msg_tmp->destpe);    
 }
 
-static inline void sendQueuedMessages() {
+void sendQueuedMessages() __attribute__((noinline));
+
+void sendQueuedMessages() {
   while(numPosted <= request_max && !PCQueueEmpty(message_q)) {
     SMSG_LIST *msg_tmp = (SMSG_LIST *)PCQueuePop(message_q);    
     machineSend(msg_tmp);
@@ -918,7 +911,11 @@ inline void  CmiGeneralFreeSend(int destPE, int size, char* msg){
   msg_tmp->phsSize = phsSize;
 #endif
 
-  sendQueuedMessages();
+  //sendQueuedMessages();
+  while(numPosted <= request_max && !PCQueueEmpty(message_q)) {
+    SMSG_LIST *msg_tmp = (SMSG_LIST *)PCQueuePop(message_q);    
+    machineSend(msg_tmp);
+  }  
   
   if(numPosted > request_max) {
     PCQueuePush(message_q, (char *)msg_tmp);
@@ -1131,14 +1128,16 @@ void CmiFreeBroadcastAllFn(int size, char *msg){
   CmiFree(msg);
 #endif
   
-  //SendMsgsUntil(0,0);
 }
 
 static unsigned long long lastProgress = 0;
 
 static inline void AdvanceCommunications(int max_out){
-  sendBroadcastMessages();
+  
+  if (PCQueueLength (broadcast_q) > 0)
+    sendBroadcastMessages();
 
+#if BLOCKING_COMM
   while(msgQueueLen > maxMessages && msgQBytes > maxBytes){
     while(BGML_Messager_advance()>0) ;
     sendQueuedMessages();
@@ -1149,11 +1148,13 @@ static inline void AdvanceCommunications(int max_out){
     while(BGML_Messager_advance()>0) ;
     target = outstanding_recvs - max_out;
   }
+#endif
   
   while(BGML_Messager_advance()>0);
 
-  sendBroadcastMessages();
-
+  if (PCQueueLength (broadcast_q) > 0)
+    sendBroadcastMessages();
+  
 #if CMK_IMMEDIATE_MSG
   if(received_immediate) {
     CmiHandleImmediate();
@@ -1161,8 +1162,8 @@ static inline void AdvanceCommunications(int max_out){
   received_immediate = 0;
 #endif
   
-  sendQueuedMessages();
-  //while(BGML_Messager_advance()>0);
+  if (numPosted <= request_max) 
+    sendQueuedMessages();
 }
 
 static inline void SendMsgsUntil(int targetm, int targetb){
@@ -1544,12 +1545,13 @@ void CmiProbeImmediateMsg();
 
 void CmiMachineProgressImpl()
 {
-
+#if 0
   unsigned long long new_time = rts_get_timebase();  
   if(new_time < lastProgress + progress_cycles) {
     return;
   }
   lastProgress = new_time;
+#endif
 
 #if !CMK_SMP
   AdvanceCommunications();
