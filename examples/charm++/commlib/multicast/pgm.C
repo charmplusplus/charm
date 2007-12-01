@@ -119,7 +119,7 @@ Source::Source(int n, int *indices) {
 }
 
 void Source::start(int i) {
-  MyMulticastMessage *msg = new (10000) MyMulticastMessage();
+  MyMulticastMessage *msg = new (1000) MyMulticastMessage();
   //CkPrintf("Source %d: starting multicast %d\n",thisIndex,i);
   // Perform a multicast, using one of the strategies through the associated proxies
   switch (i) {
