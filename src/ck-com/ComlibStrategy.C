@@ -531,7 +531,7 @@ int ComlibGetLastKnown(CkArrayID aid, CkArrayIndexMax idx) {
     //CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
     //return (cgproxy.ckLocalBranch())->getLastKnown(aid, idx);
 
-    if(!CpvInitialized(locationTable)) {
+    if(!CkpvInitialized(locationTable)) {
         CkAbort("Uninitialized table\n");
     }
     CkAssert(CkpvAccess(locationTable) != NULL);
