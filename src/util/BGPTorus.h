@@ -22,7 +22,7 @@ class BGPTorusManager {
     int dimNX;	// dimension of the allocation in X (no. of nodes)
     int dimNY;	// dimension of the allocation in Y (no. of nodes)
     int dimNZ;	// dimension of the allocation in Z (no. of nodes)
-    int dimNT;  // dimension of the allocation in T (no. of processors per node)
+    int dimNT;  //dimension of the allocation in T (no. of processors per node)
    
     int torus[4];
     int procsPerNode;
@@ -34,8 +34,36 @@ class BGPTorusManager {
       dimNX = bgp_hwt.xSize;
       dimNY = bgp_hwt.ySize;
       dimNZ = bgp_hwt.zSize;
-      dimNT = bgp_hwt.tSize;
+      dimNT = bgp_hwt.tSize;  //dimNT is a runtime option and not boot
+			      //time and hence does not need to be
+			      //corrected
  
+      int numPes = CmiNumPes();
+      int numNodes = numPes / dimNT;
+
+      int max_t = 0;
+      if(dimNX * dimNY * dimNZ != numNodes) {
+        dimNX = dimNY = dimNZ = 0;
+        int min_x, min_y, min_z;
+        min_x = min_y = min_z = numPes;
+        unsigned int tmp_t, tmp_x, tmp_y, tmp_z;      
+        for(int c = 0; c < numPes; c++) {
+	  DCMF_Messager_rank2torus(c, &tmp_x, &tmp_y, &tmp_z, &tmp_t);
+	  
+	  if(tmp_x > dimNX) dimNX = tmp_x;
+          if(tmp_x < min_x) min_x = tmp_x;
+	  if(tmp_y > dimNY) dimNY = tmp_y;
+          if(tmp_y < min_y) min_y = tmp_y;
+	  if(tmp_z > dimNZ) dimNZ = tmp_z;
+          if(tmp_z < min_z) min_z = tmp_z;
+	  if(tmp_t > max_t) max_t = tmp_t;
+        }
+	 
+	dimNX = dimNX - min_x + 1;
+	dimNY = dimNY - min_y + 1;
+	dimNZ = dimNZ - min_z + 1;
+      }
+
       dimX = dimNX;
       dimY = dimNY;
       dimZ = dimNZ;
