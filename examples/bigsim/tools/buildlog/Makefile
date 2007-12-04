@@ -14,4 +14,4 @@ clean:
 	rm -rf *.decl.h *.def.h core *.log
 
 test: buildlog
-	./buildlog
+	./charmrun +p1 ./buildlog
