@@ -12,7 +12,8 @@
 #endif
 
 
-extern FILE *bgfp;
+CkpvExtern(FILE *, bgfp);
+
 extern unsigned long bgTraceCounter;
 extern bool insideTraceBracket;
 
@@ -23,14 +24,14 @@ void finalizeBigSimTrace();
 void BgSetStartEvent();
 void startTraceBigSim();
 
-  
+
 
 /** 
 	startTraceBigSim() begins tracing an event with a specified set of parameters. These are convenience
 	aliases so that a user can easily add/remove parameters while testing their application.
 	Up to 20 parameters can be specified. These just call through to startTraceBigSim_20param().
 */
-void endTraceBigSim( char * eventName );
+//void endTraceBigSim( char * eventName );
 void endTraceBigSim( char * eventName , double p1 );
 void endTraceBigSim( char * eventName , double p1 , double p2 );
 void endTraceBigSim( char * eventName , double p1 , double p2 , double p3 );
