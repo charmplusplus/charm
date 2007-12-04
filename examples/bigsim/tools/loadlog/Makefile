@@ -13,4 +13,4 @@ clean:
 	rm -rf *.decl.h *.def.h core *.log
 
 test: loadlog
-	./loadlog
+	./charmrun +p1 ./loadlog $(TESTOPTS)
