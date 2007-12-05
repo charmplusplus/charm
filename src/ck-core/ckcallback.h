@@ -19,6 +19,7 @@ typedef void (*Ck1CallbackFn)(void *message);
 
 class CProxyElement_ArrayBase; /*forward declaration*/
 class CProxyElement_Group; /*forward declaration*/
+class CProxy_NodeGroup;
 
 class CkCallback {
 public:
@@ -31,11 +32,14 @@ public:
 	call1Fn, //Call a C function pointer on any processor (d.c1fn)
 	sendChare, //Send to a chare (d.chare)
 	sendGroup, //Send to a group (d.group)
+	sendNodeGroup, //Send to a nodegroup (d.group)
 	sendArray, //Send to an array (d.array)
 	isendChare, //Inlined send to a chare (d.chare)
 	isendGroup, //Inlined send to a group (d.group)
+	isendNodeGroup, //Inlined send to a nodegroup (d.group)
 	isendArray, //Inlined send to an array (d.array)
 	bcastGroup, //Broadcast to a group (d.group)
+	bcastNodeGroup, //Broadcast to a nodegroup (d.group)
 	bcastArray, //Broadcast to an array (d.array)
 	replyCCS // Reply to a CCS message (d.ccsReply)
 	} callbackType;
@@ -97,12 +101,18 @@ public:
 		:type(doInline?isendChare:sendChare) 
 		{d.chare.ep=ep; d.chare.id=id;}
 
-	CkCallback(int ep,const CkGroupID &id)
-		:type(bcastGroup) 
+	CkCallback(int ep,const CProxy_NodeGroup &ngp);
+
+	CkCallback(int ep,const CkGroupID &id, int isNodeGroup=0)
+		:type(isNodeGroup?bcastNodeGroup:bcastGroup) 
 		{d.group.ep=ep; d.group.id=id;}
-	CkCallback(int ep,int onPE,const CkGroupID &id,CmiBool doInline=CmiFalse)
-		:type(doInline?isendGroup:sendGroup) 
+
+	CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,CmiBool doInline=CmiFalse);
+
+	CkCallback(int ep,int onPE,const CkGroupID &id,CmiBool doInline=CmiFalse, int isNodeGroup=0)
+		:type(doInline?(isNodeGroup?isendNodeGroup:isendGroup):(isNodeGroup?sendNodeGroup:sendGroup)) 
 		{d.group.ep=ep; d.group.id=id; d.group.onPE=onPE;}
+
 	CkCallback(int ep,const CProxyElement_Group &grpElt,CmiBool doInline=CmiFalse);
 	
 	CkCallback(int ep,const CkArrayID &id)

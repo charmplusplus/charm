@@ -1778,7 +1778,7 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   p|futureMsgs;
   p|futureRemoteMsgs;
   p|futureLateMigrantMsgs;
-	p|parent;
+  p|parent;
   if(p.isUnpacking()) {
     gcount=CkNumNodes();
     thisProxy = thisgroup;
@@ -1791,6 +1791,15 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   }
   p | blocked;
   p | maxModificationRedNo;
+
+  int isnull = (storedCallback == NULL);
+  p | isnull;
+  if (!isnull) {
+    if (p.isUnpacking()) {
+      storedCallback = new CkCallback;
+    }
+    p|*storedCallback;
+  }
 }
 
 /*

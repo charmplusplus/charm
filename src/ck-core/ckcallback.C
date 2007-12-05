@@ -71,6 +71,18 @@ void *CkCallback::impl_thread_delay(void) const
 /*These can't be defined in the .h file like the other constructors
  * because we need CkCallback before CProxyElement* are defined.
  */
+CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp)
+		:type(bcastNodeGroup) 
+{
+	d.group.ep=ep; d.group.id=ngp.ckGetGroupID();
+}
+
+CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,CmiBool doInline)
+	:type(doInline?isendNodeGroup:sendNodeGroup) 
+{
+	d.group.ep=ep; d.group.id=ngp.ckGetGroupID(); d.group.onPE=onPE;
+}
+
 CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,CmiBool doInline) 
 	:type(doInline?isendGroup:sendGroup) 
 {
@@ -139,9 +151,17 @@ void CkCallback::send(void *msg) const
 		if (!msg) msg=CkAllocSysMsg();
 		CkSendMsgBranch(d.group.ep,msg,d.group.onPE,d.group.id);
 		break;
+	case sendNodeGroup: //Send message to a group element
+		if (!msg) msg=CkAllocSysMsg();
+		CkSendMsgNodeBranch(d.group.ep,msg,d.group.onPE,d.group.id);
+		break;
 	case isendGroup: //inline send-to-group element
 		if (!msg) msg=CkAllocSysMsg();
 		CkSendMsgBranchInline(d.group.ep,msg,d.group.onPE,d.group.id);
+		break;
+	case isendNodeGroup: //inline send-to-group element
+		if (!msg) msg=CkAllocSysMsg();
+		CkSendMsgNodeBranchInline(d.group.ep,msg,d.group.onPE,d.group.id);
 		break;
 	case sendArray: //Send message to an array element
 		if (!msg) msg=CkAllocSysMsg();
@@ -154,6 +174,10 @@ void CkCallback::send(void *msg) const
 	case bcastGroup:
 		if (!msg) msg=CkAllocSysMsg();
 		CkBroadcastMsgBranch(d.group.ep,msg,d.group.id);
+		break;
+	case bcastNodeGroup:
+		if (!msg) msg=CkAllocSysMsg();
+		CkBroadcastMsgNodeBranch(d.group.ep,msg,d.group.id);
 		break;
 	case bcastArray:
 		if (!msg) msg=CkAllocSysMsg();
