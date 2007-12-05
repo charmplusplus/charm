@@ -96,15 +96,15 @@ EOF
 			last;
 		} elsif($line eq "2"){
 			$converse_network_type = "net";
-			$network_option_string += "ibverbs ";
+			$network_option_string = $network_option_string . "ibverbs ";
 			last;
 		} elsif($line eq "3"){
 			$converse_network_type = "net";
-			$network_option_string += "gm ";
+			$network_option_string = $network_option_string . "gm ";
 			last;
 		} elsif($line eq "4"){
 			$converse_network_type = "net";
-			$network_option_string += "mx ";
+			$network_option_string = $network_option_string . "mx ";
 			last;
 		} elsif($line eq "5"){
 			$converse_network_type = "ammasso";
@@ -140,6 +140,9 @@ EOF
 $target = "LIBS";
 $arch = "";
 
+print "arch_os: $arch_os\n";
+print "converse_network_type: $converse_network_type\n";
+
 if($converse_network_type eq "ammasso" || 
    $converse_network_type eq "bluegenel" ||
    $converse_network_type eq "mpi-bluegenel"||
@@ -150,15 +153,17 @@ if($converse_network_type eq "ammasso" ||
 else 
    {
 	  $arch = "${converse_network_type}-${arch_os}";
+          print "arch: $arch\n";
 	  if($amd64) {
-	  	$arch += "-amd64";
+                $arch = $arch . "-amd64";
 	  } elsif($ia64){
-	  	$arch += "-ia64";
+	  	$arch = $arch . "-ia64";
 	  } elsif($ppc){
-	  	$arch += "-ppc";
+	  	$arch = $arch . "-ppc";
 	  }
 	  
    }
+print "arch: $arch\n";
 
 
 
