@@ -47,7 +47,11 @@ if($cpu =~ m/i[0-9]86/){
 } elsif($cpu =~ m/powerpc/){
 	print "Detected architecture ppc\n";
 	$ppc = 1;
+} elsif($cpu =~ m/Power Mac/){
+  print "Detected architecture ppc\n";
+  $ppc = 1;
 }
+
 
 
 
