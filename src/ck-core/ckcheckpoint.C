@@ -29,6 +29,8 @@ typedef struct _GroupInfo{
 PUPbytes(GroupInfo)
 PUPmarshall(GroupInfo)
 
+int _inrestart = 0;
+
 // help class to find how many array elements
 class ElementCounter : public CkLocIterator {
 private:
@@ -424,6 +426,8 @@ void CkRestartMain(const char* dirname){
 	char filename[1024];
 	CkCallback cb;
 	
+        _inrestart = 1;
+
 	// restore readonlys
 	sprintf(filename,"%s/RO.dat",dirname);
 	FILE* fRO = fopen(filename,"rb");
@@ -488,6 +492,8 @@ void CkRestartMain(const char* dirname){
 	      fclose(datFile);
             }
 	  }
+
+        _inrestart = 0;
 
    	_initDone();
 

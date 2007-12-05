@@ -78,9 +78,12 @@ waits for the migrant contributions to straggle in.
 #define INT_MAX 2147483647
 #endif
 
+extern int _inrestart;
 
 Group::Group()
 {
+	if (_inrestart) CmiAbort("A Group object did not call the migratable constructor of its base class!");
+
 	creatingContributors();
 	contributorStamped(&reductionInfo);
 	contributorCreated(&reductionInfo);
@@ -664,10 +667,12 @@ void CkReductionMgr::pup(PUP::er &p)
   p|adjVec;
   p|nodeProxy;
   p|storedCallback;
+  p|lcount;
+  p|gcount;
   if(p.isUnpacking()){
     thisProxy = thisgroup;
-    lcount=0;
-    gcount=0;
+//    lcount=0;
+//    gcount=0;
     maxStartRequest=0;
   }
 #if DEBUGRED
@@ -1181,7 +1186,7 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
 #else
-	init_BinaryTree();
+  init_BinaryTree();
 #endif
   storedCallback=NULL;
   redNo=0;
@@ -1284,12 +1289,12 @@ void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMs
 void CkNodeReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 {
   CmiLock(lockEverything);
-	if(blocked){
-		delete m;
+  if(blocked){
+	delete m;
   	CmiUnlock(lockEverything);
-		return ;
-	}
-	int srcNode = CmiNodeOf((UsrToEnv(m))->getSrcPe());
+	return ;
+  }
+  int srcNode = CmiNodeOf((UsrToEnv(m))->getSrcPe());
   if (isPresent(m->num) && !inProgress)
   {
     DEBR((AA"Starting Node reduction #%d at parent's request\n"AB,m->num));
@@ -1427,9 +1432,9 @@ void CkNodeReductionMgr::doAddContribution(CkReductionMsg *m){
 //Handle a message from one element for the reduction
 void CkNodeReductionMgr::addContribution(CkReductionMsg *m)
 {
-   interrupt = 1;
-   CmiLock(lockEverything);
-   doAddContribution(m);
+  interrupt = 1;
+  CmiLock(lockEverything);
+  doAddContribution(m);
   CmiUnlock(lockEverything);
   interrupt = 0;
 }
@@ -1502,7 +1507,7 @@ void CkNodeReductionMgr::finishReduction(void)
 		*/
 			result->gcount += additionalGCount;//if u have replaced some node add its gcount to ur count
 	    thisProxy[treeParent()].RecvMsg(result);
-		}
+	}
 
   }
   else
@@ -1779,13 +1784,13 @@ void CkNodeReductionMgr::pup(PUP::er &p)
     thisProxy = thisgroup;
     lockEverything = CmiCreateLock();
 #ifdef BINOMIAL_TREE
-		init_BinomialTree();
+    init_BinomialTree();
 #else
-		init_BinaryTree();
+    init_BinaryTree();
 #endif		
   }
-	p | blocked;
-	p | maxModificationRedNo;
+  p | blocked;
+  p | maxModificationRedNo;
 }
 
 /*
