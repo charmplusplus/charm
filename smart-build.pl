@@ -33,7 +33,7 @@ if ($os eq "Linux") {
   $arch_os = "linux";
 } elsif ($os =~ m/AIX/ ) {
   print "Detected an AIX kernel\n";
-  $arch_os = "linux";
+  $arch = "mpi-sp";
 }
 
 
@@ -41,27 +41,25 @@ if ($os eq "Linux") {
 # Determine architecture
 # x86, ppc, ia64, amd64
 if($cpu =~ m/i[0-9]86/){
-	print "Detected architecture x86\n";
-	$x86 = 1;
+  print "Detected architecture x86\n";
+  $x86 = 1;
 } elsif($cpu =~ m/x86\_64/){
-	print "Detected architecture x86_64\n";
-	$amd64 = 1;
+  print "Detected architecture x86_64\n";
+  $amd64 = 1;
 } elsif($cpu =~ m/ia64/){
-	print "Detected architecture ia64\n";
-	$ia64 = 1;
-	$nobs = "--no-build-shared";
+  print "Detected architecture ia64\n";
+  $ia64 = 1;
+  $nobs = "--no-build-shared";
 } elsif($cpu =~ m/powerpc/){
-	print "Detected architecture ppc\n";
-	$ppc = 1;
+  print "Detected architecture ppc\n";
+  $ppc = 1;
 } elsif($cpu =~ m/Power Mac/){
   print "Detected architecture ppc\n";
   $ppc = 1;
-}elsif($cpu =~ m/alpha/){
-    print "Detected architecture alpha\n";
-      $alpha = 1;
-  }
-
-
+} elsif($cpu =~ m/alpha/){
+  print "Detected architecture alpha\n";
+  $alpha = 1;
+}
 
 
 # Determine converse architecture
@@ -86,7 +84,7 @@ if($special_network eq "true"){
 	#select type of interconnect here
 	print << "EOF";
 	
-Choose an interconnect from below: [1-10]
+Choose an interconnect from below: [1-12]
 	1) Infiniband (using OSU MPI)
 	2) Infiniband (native layer alpha version)
 	3) Myrinet GM
@@ -95,8 +93,10 @@ Choose an interconnect from below: [1-10]
 	6) Cray XT3, XT4 (not yet tested on CNL)
 	7) Bluegene/L Native
 	8) Bluegene/L MPI
-	9) Other Vendor MPI
-	10) VMI
+    9) Bluegene/P Native
+    10) Bluegene/P MPI
+	11) MPI
+	12) VMI
 
 Note: Some other less common options can be found by calling "./build --help"
 
@@ -136,9 +136,17 @@ EOF
 			$nobs = "--no-build-shared";
 			last;
 		} elsif($line eq "9"){
-			$converse_network_type = "mpi";
+		    $arch = "bluegenep";
+			$compiler = "xlc";
 			last;
 		} elsif($line eq "10"){
+		    $arch = "mpi-bluegenep";
+			$compiler = "xlc";
+			last;
+		} elsif($line eq "11"){
+			$converse_network_type = "mpi";
+			last;
+		} elsif($line eq "12"){
 			$converse_network_type = "vmi";
 			last;
 		} else {
