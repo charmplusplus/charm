@@ -147,7 +147,8 @@ EOF
 			$compiler = "xlc";
 			last;
 		} elsif($line eq "11"){
-			$converse_network_type = "vmi";
+			$converse_network_type = "mpi";
+			$compiler = "vmi";
 			last;
 		} else {
 			print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
@@ -180,7 +181,7 @@ if($arch eq "net-darwin"){
 } 
 
 
-if($compiler ne ""){
+if($compiler eq "xlc"){
 	print "We determined that you should use the compiler $compiler\n Do you want to use a different compiler?[y/N]";
 } else {
 	print "Do you want to specify a compiler? [y/N]";
@@ -229,55 +230,79 @@ EOF
 	while($line = <>){
 		chomp $line;
 		if($line eq "1"){
-			$compiler = "cc";
+			$compiler = $compiler . "cc";
 			last;
 		} elsif($line eq "2"){
-			$compiler = "cc64";
+			$compiler =  $compiler . "cc64";
 			last;
 		} elsif($line eq "3"){
-			$compiler = "cxx";
+			$compiler =  $compiler . "cxx";
 			last;
 		} elsif($line eq "4"){
-			$compiler = "kcc";
+			$compiler =  $compiler . "kcc";
 			last;
 		} elsif($line eq "5"){
-			$compiler = "pgcc";
+			$compiler =  $compiler . "pgcc";
 			last;
 		} elsif($line eq "6"){
-			$compiler = "acc";
+			$compiler =  $compiler . "acc";
 			last;
 		} elsif($line eq "7"){
-			$compiler = "icc";
+			$compiler =  $compiler . "icc";
 			last;
 		} elsif($line eq "8"){
-			$compiler = "ecc";
+			$compiler =  $compiler . "ecc";
 			last;
 		} elsif($line eq "9"){
-			$compiler = "gcc3";
+			$compiler =  $compiler . "gcc3";
 			last;
 		} elsif($line eq "10"){
-			$compiler = "gcc4";
+			$compiler =  $compiler . "gcc4";
 			last;
 		} elsif($line eq "11"){
-			$compiler = "mpcc";
+			$compiler =  $compiler . "mpcc";
 			last;
 		} elsif($line eq "12"){
-			$compiler = "pathscale";
+			$compiler =  $compiler . "pathscale";
 			last;
 		} elsif($line eq "13"){
-			$compiler = "xlc";
+			$compiler =  $compiler . "xlc";
 			last;
 		} elsif($line eq "14"){
-			$compiler = "xlc64";
+			$compiler =  $compiler . "xlc64";
 			last;
 		} elsif($line eq "15"){
-			$compiler = "mpicxx";
+			$compiler =  $compiler . "mpicxx";
 			last;
 		} else {
 			print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
 		}
 	}
 }
+
+
+# Dynamically generate a list of compilers that could be used
+
+
+print "Potential compilers:\n---------\n";
+
+@ccs = `find src/arch | grep "cc-"`;
+foreach $cc (@ccs) {
+  $cc =~ m/cc-([a-zA-Z0-9]*)\..*/;
+  print "$1\n";
+}
+
+print "\n---------\n";
+
+
+
+
+
+
+
+
+
+
 
 
 # Determine whether to support SMP / Multicore
