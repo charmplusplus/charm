@@ -185,7 +185,15 @@ CkReductionMgr::CkReductionMgr()//Constructor
 
 CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
 {
+  redNo=0;
+  completedRedNo = -1;
+  inProgress=CmiFalse;
+  creating=CmiFalse;
+  startRequested=CmiFalse;
   gcount=lcount=0;
+  nContrib=nRemote=0;
+  maxStartRequest=0;
+  DEBR((AA"In reductionMgr migratable constructor at %d \n"AB,this));
 }
 
 void CkReductionMgr::flushStates()
