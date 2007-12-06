@@ -949,9 +949,7 @@ inline void  machineMulticast(int npes, int *pelist, int size, char* msg){
   CMI_SET_CHECKSUM(msg, size);
   
   SMSG_LIST *msg_tmp = (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
-  memset (msg_tmp, 0, sizeof(SMSG_LIST));
-  
-  //  CmiState cs = CmiGetState();
+  //memset (msg_tmp, 0, sizeof(SMSG_LIST));
   
   msg_tmp->destpe    = -1;      //multicast operation
   msg_tmp->size      = size * npes;
@@ -1275,6 +1273,8 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg){
   CmiFreeListSendFn(npes, pes, size, msg);
 }
 
+#define OPTIMIZED_MULTICAST  0
+
 static int iteration_count = 0;
 
 void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
@@ -1285,7 +1285,7 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
   
   //printf("%d: In Free List Send Fn\n", CmiMyPe());
   
-  //CmiBecomeImmediate(msg);
+  CmiBecomeImmediate(msg);
 
   iteration_count ++;
 #if 0
@@ -1294,10 +1294,10 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
     char tbuf[64];
     
     sprintf(pbuf, "PE %d sending %d messages of size %d\n", CmiMyPe(), npes, size);
-    //for(int pcount = 0; pcount < npes; pcount++) {
-    //sprintf(tbuf," %d,", pes[pcount]);
-    //strcat(pbuf, tbuf);
-    //}
+    for(int pcount = 0; pcount < npes; pcount++) {
+      sprintf(tbuf," %d,", pes[pcount]);
+      strcat(pbuf, tbuf);
+    }
     printf("\n%s\n", pbuf);
   }
 #endif
@@ -1310,7 +1310,7 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
     }
   }
   
-#if 0
+#if OPTIMIZED_MULTICAST
   if (iteration_count > 500 && (npes > 1) && (CmiNumPes() >= 512)) {    
     int *newpelist = (int *) malloc (sizeof(int) * npes);
     int new_npes = 0;
@@ -1352,110 +1352,6 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
   
   AdvanceCommunications();
 }
-
-#if 0
-
-void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
-  CMI_SET_BROADCAST_ROOT(msg,0);  
-  CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
-  ((CmiMsgHeaderBasic *)msg)->size = size;  
-  CMI_SET_CHECKSUM(msg, size);
-  
-  //printf("%d: In Free List Send Fn\n", CmiMyPe());
-  
-  CmiBecomeImmediate(msg);
-  iteration_count ++;
-  /*
-  if(iteration_count == 9500) {
-    
-    char pbuf[10000];
-    char tbuf[64];
-
-    sprintf(pbuf, "PE %d sending %d messages of size %d to :", CmiMyPe(), npes, size);
-    for(int pcount = 0; pcount < npes; pcount++) {
-      sprintf(tbuf," %d,", pes[pcount]);
-      strcat(pbuf, tbuf);
-    }
-
-    printf("\n%s\n", pbuf);
-  }
-  */
-
-  int new_npes = 0;
-
-  int i, count = 0, my_loc = -1;
-  for(i=0; i<npes; i++) {
-    if(pes[i] == CmiMyPe() || pes[i] == vnpeer) {
-      CmiSyncSend(pes[i], size, msg);
-      my_loc = i;
-    }
-  }
-  
-#if 0
-  int *pelist  = (int *) CmiAlloc (sizeof(int) * npes);
-  if(iteration_count > 700) {
-
-    CmiAssert (vnpeer < 0);
-    
-    if(my_loc >= 0) {
-      for(i=0; i<my_loc; i++) {
-	int loc = (19*my_loc + 7 * (i+1))% (npes-1);
-	pelist[loc] = pes[i];
-      }
-      
-      for(i ++; i < npes; i ++) {
-	int loc = (19*my_loc + 7 * i) % (npes-1);
-	pelist[loc] = pes[i];
-      }
-
-      new_npes = npes - 1;
-    }
-    else {
-      for(i=0; i<npes; i++) {
-	int loc = (19 + 7 * (i+1)) % npes;
-	pelist[i] = pes[i];
-      }
-      new_npes = npes;
-    }
-    
-    if(new_npes <= request_max) {
-      machineMulticast (new_npes, pelist, size, msg);
-      //SendMsgsUntil(0,0);
-      AdvanceCommunications();
-      return;
-    }
-  }
-  CmiFree (pelist);
-#endif  
-
-
-  for(i=0;i<npes;i++) {
-    if(pes[i] == CmiMyPe() || pes[i] == vnpeer);
-    else if(i < npes - 1){
-      CmiReference(msg);
-      CmiGeneralFreeSend(pes[i], size, msg);
-      
-      //CmiSyncSend(pes[i], size, msg);
-    }
-    
-#if CMK_PERSISTENT_COMM
-    if(phs) 
-      phscount ++;
-#endif
-  }
-  
-  if (npes  && (pes[npes-1] != CmiMyPe() && pes[npes-1] != vnpeer))
-    CmiSyncSendAndFree(pes[npes-1], size, msg);
-  else 
-    CmiFree(msg);
-  
-  phscount = 0;
-  
-  //  SendMsgsUntil(0,0);
-  SendMsgsUntil(maxMessages, maxBytes);
-  AdvanceCommunications();
-}
-#endif
 
 
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int size, char *msg){
