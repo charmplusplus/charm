@@ -1737,7 +1737,9 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
         else
           echo $CMK_LDXX -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 >> $charmout
           $CMK_LDXX -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 > out 2>&1
-          test_result $? "$1" "$2" "$3"
+          ret=$?
+	  test ! -d testlink && ret=1
+          test_result $ret "$1" "$2" "$3"
         fi
  	strictpass=$pass
 	strictfail=$fail
@@ -2286,6 +2288,31 @@ test_linkc "whether sched_setaffinity call exists" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_SETAFFINITY $pass
+_ACEOF
+
+
+### test pthread_setaffinity_np ####
+cat > $tc <<EOT
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <pthread.h>
+
+int main()
+{
+  unsigned long mask = 0xffffffff;
+  unsigned int len = sizeof(mask);
+
+  if (pthread_setaffinity_np(pthread_self(), len, &mask) < 0) {
+    return -1;
+  }
+  return 0;
+}
+EOT
+test_linkc "whether pthread_setaffinity_np call exists" "yes" "no" "-lpthread"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_PTHREAD_SETAFFINITY $pass
 _ACEOF
 
 

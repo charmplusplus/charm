@@ -75,6 +75,9 @@
 /* whether mmap() accepts MAP_ANON */
 #undef CMK_HAS_MMAP_ANON
 
+/* whether the pthread_setaffinity_np() exists */
+#undef CMK_HAS_PTHREAD_SETAFFINITY
+
 /* whether Python is installed */
 #undef CMK_HAS_PYTHON
 
