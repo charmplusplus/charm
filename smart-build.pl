@@ -9,14 +9,13 @@ $os = `uname -s`;
 $cpu = `uname -m`;
 
 $nobs = "";
+$arch = "";
+$network_option_string = "";
+$compiler = "";
 
-#$cpu = "x86_64\n";
 
 chomp($os);
 chomp ($cpu);
-
-$network_option_string = "";
-$compiler = "";
 
 # Determine kernel
 # linux, darwin, ...
@@ -117,10 +116,10 @@ EOF
 			$network_option_string = $network_option_string . "mx ";
 			last;
 		} elsif($line eq "5"){
-			$converse_network_type = "ammasso";
+			$arch = "ammasso";
 			last;
 		} elsif($line eq "6"){
-			$converse_network_type = "mpi-crayxt3";
+			$arch = "mpi-crayxt3";
 			last;
 		} elsif($line eq "7"){
 			$arch = "bluegenel";
@@ -128,7 +127,7 @@ EOF
 			$nobs = "--no-build-shared";
 			last;
 		} elsif($line eq "8"){
-			$converse_network_type = "mpi-bluegenel";
+		    $arch = "mpi-bluegenel";
 			$compiler = "xlc";
 			$nobs = "--no-build-shared";
 			last;
@@ -148,37 +147,21 @@ EOF
 
 
 $target = "LIBS";
-$arch = "";
 
-print "arch_os: $arch_os\n";
-print "converse_network_type: $converse_network_type\n";
 
-if($converse_network_type eq "ammasso" || 
-   $converse_network_type eq "bluegenel" ||
-   $converse_network_type eq "mpi-bluegenel"||
-   $converse_network_type eq "mpi-crayxt3" ) 
-   {    
-      $arch = $converse_network_type;
-   }
-else 
-   {
+if($arch eq ""){
 	  $arch = "${converse_network_type}-${arch_os}";
-          print "arch: $arch\n";
 	  if($amd64) {
-                $arch = $arch . "-amd64";
+		$arch = $arch . "-amd64";
 	  } elsif($ia64){
 	  	$arch = $arch . "-ia64";
 	  } elsif($ppc){
 	  	$arch = $arch . "-ppc";
-	      } elsif($alpha){
+	  } elsif($alpha){
 		$arch = $arch . "-axp";
-	      }
-	  
-   }
-print "arch: $arch\n";
-
-
-
+	  }
+}
+  
 #Cleanup the architectures to match the horrible real world inconsistent src/archs
 
 if($arch eq "net-darwin"){
