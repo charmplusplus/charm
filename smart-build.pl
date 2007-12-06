@@ -29,7 +29,10 @@ if($os eq "Linux"){
 } elsif($os =~ m/BSD/ ){
 	print "Detected a BSD kernel\n";
 	$arch_os = "linux";
-}
+      } elsif($os =~ m/OSF1/ ){
+	print "Detected an OSF1 kernel\n";
+	$arch_os = "linux";
+      }
 
 
 # Determine architecture
@@ -50,7 +53,10 @@ if($cpu =~ m/i[0-9]86/){
 } elsif($cpu =~ m/Power Mac/){
   print "Detected architecture ppc\n";
   $ppc = 1;
-}
+}elsif($cpu =~ m/alpha/){
+    print "Detected architecture alpha\n";
+      $alpha = 1;
+  }
 
 
 
@@ -164,7 +170,9 @@ else
 	  	$arch = $arch . "-ia64";
 	  } elsif($ppc){
 	  	$arch = $arch . "-ppc";
-	  }
+	      } elsif($alpha){
+		$arch = $arch . "-axp";
+	      }
 	  
    }
 print "arch: $arch\n";
