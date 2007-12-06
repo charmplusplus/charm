@@ -381,6 +381,10 @@ if($j ne ""){
 
 $build_line = "./build $target $arch ${network_option_string} $compiler $smp $j ${compiler_flags}\n";
 
+open(BUILDLINE, ">smart-build.log");
+print BUILDLINE "Using the following build command:\n$build_line\n";
+close(BUILDLINE);
+
 if(-e "src/arch/$arch"){
 	print "Building with: ${build_line}\n";	
 	system($build_line);
