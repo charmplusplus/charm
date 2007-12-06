@@ -90,19 +90,18 @@ $converse_network_type = "net";
 if($special_network eq "true"){
 	print << "EOF";
 	
-Choose an interconnect from below: [1-12]
-	 1) Infiniband (using OSU MPI)
-	 2) Infiniband (native layer alpha version)
+Choose an interconnect from below: [1-11]
+	 1) MPI
+	 2) Infiniband (native ibverbs alpha version)
 	 3) Myrinet GM
 	 4) Myrinet MX
 	 5) Amasso
 	 6) Cray XT3, XT4 (not yet tested on CNL)
-	 7) Bluegene/L Native
+	 7) Bluegene/L Native (only at T. J. Watson)
 	 8) Bluegene/L MPI
-	 9) Bluegene/P Native
+	 9) Bluegene/P Native (only at T. J. Watson)
 	10) Bluegene/P MPI
-	11) MPI
-	12) VMI
+	11) VMI
 
 EOF
 	
@@ -148,9 +147,6 @@ EOF
 			$compiler = "xlc";
 			last;
 		} elsif($line eq "11"){
-			$converse_network_type = "mpi";
-			last;
-		} elsif($line eq "12"){
 			$converse_network_type = "vmi";
 			last;
 		} else {
@@ -210,7 +206,8 @@ if($special_compiler eq "true"){
 	#select type of interconnect here
 	print << "EOF";
 	
-Choose a compiler from below: [1-14]
+Choose a compiler from below: [1-15]
+
 	1) cc
 	2) cc64
 	3) cxx
@@ -225,6 +222,7 @@ Choose a compiler from below: [1-14]
 	12) pathscale
 	13) xlc
 	14) xlc64
+    15) mpicxx
 
 EOF
 
@@ -271,6 +269,9 @@ EOF
 			last;
 		} elsif($line eq "14"){
 			$compiler = "xlc64";
+			last;
+		} elsif($line eq "15"){
+			$compiler = "mpicxx";
 			last;
 		} else {
 			print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
