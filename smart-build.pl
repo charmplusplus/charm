@@ -93,8 +93,8 @@ Choose an interconnect from below: [1-12]
 	6) Cray XT3, XT4 (not yet tested on CNL)
 	7) Bluegene/L Native
 	8) Bluegene/L MPI
-    9) Bluegene/P Native
-    10) Bluegene/P MPI
+	9) Bluegene/P Native
+	10) Bluegene/P MPI
 	11) MPI
 	12) VMI
 
