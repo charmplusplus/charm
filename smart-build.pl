@@ -19,19 +19,23 @@ chomp ($cpu);
 
 # Determine kernel
 # linux, darwin, ...
-if($os eq "Linux"){
-	print "Detected a linux kernel\n";
-	$arch_os = "linux";
-} elsif($os eq "Darwin"){
-	print "Detected a darwin kernel\n";
-	$arch_os = "darwin";
-} elsif($os =~ m/BSD/ ){
-	print "Detected a BSD kernel\n";
-	$arch_os = "linux";
-      } elsif($os =~ m/OSF1/ ){
-	print "Detected an OSF1 kernel\n";
-	$arch_os = "linux";
-      }
+if ($os eq "Linux") {
+  print "Detected a linux kernel\n";
+  $arch_os = "linux";
+} elsif ($os eq "Darwin") {
+  print "Detected a darwin kernel\n";
+  $arch_os = "darwin";
+} elsif ($os =~ m/BSD/ ) {
+  print "Detected a BSD kernel\n";
+  $arch_os = "linux";
+} elsif ($os =~ m/OSF1/ ) {
+  print "Detected an OSF1 kernel\n";
+  $arch_os = "linux";
+} elsif ($os =~ m/AIX/ ) {
+  print "Detected an AIX kernel\n";
+  $arch_os = "linux";
+}
+
 
 
 # Determine architecture
@@ -174,7 +178,7 @@ if($arch eq "net-darwin"){
 
 
 if($compiler ne ""){
-	print "We determined that you should use the compiler $compiler\n Do you want to use a different compiler?[Y/N]";
+	print "We determined that you should use the compiler $compiler\n Do you want to use a different compiler?[y/N]";
 } else {
 	print "Do you want to specify a compiler? [y/N]";
 }
