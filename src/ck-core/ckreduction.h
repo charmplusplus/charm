@@ -88,7 +88,7 @@ public:
 public:
 	CProxy_CkArrayReductionMgr nodeProxy; //holds the local branch of the nodegroup tree
 	CkReductionMgr(void);
-	CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m) {}
+	CkReductionMgr(CkMigrateMessage *m);
 
 	typedef CkReductionClientFn clientFn;
 
@@ -335,7 +335,7 @@ class Group : public CkReductionMgr
 	contributorInfo reductionInfo;//My reduction information
  public:
 	Group();
-	Group(CkMigrateMessage *msg):CkReductionMgr(msg) {}
+	Group(CkMigrateMessage *msg);
 	virtual int isNodeGroup() { return 0; }
 	virtual void pup(PUP::er &p);
 	virtual void flushStates() {

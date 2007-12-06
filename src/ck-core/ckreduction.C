@@ -95,6 +95,14 @@ Group::Group()
 	nodeProxy = nodetemp;
 }
 
+Group::Group(CkMigrateMessage *msg):CkReductionMgr(msg)
+{
+	creatingContributors();
+	contributorStamped(&reductionInfo);
+	contributorCreated(&reductionInfo);
+	doneCreatingContributors();
+}
+
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(Group,
 				    ((CkReductionMgr *)this),
 				    reductionInfo,false);
@@ -173,6 +181,11 @@ CkReductionMgr::CkReductionMgr()//Constructor
   nContrib=nRemote=0;
   maxStartRequest=0;
   DEBR((AA"In reductionMgr constructor at %d \n"AB,this));
+}
+
+CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
+{
+  gcount=lcount=0;
 }
 
 void CkReductionMgr::flushStates()
@@ -667,12 +680,18 @@ void CkReductionMgr::pup(PUP::er &p)
   p|adjVec;
   p|nodeProxy;
   p|storedCallback;
-  p|lcount;
-  p|gcount;
+
+  // subtle --- Gengbin
+  // Group : CkReductionMgr
+  // CkArray: CkReductionMgr
+  // lcount/gcount in Group is set in Group constructor
+  // lcount/gcount in CkArray is not, it is set when array elements are created
+  // we can not pup because inserting array elems will add the counters again
+//  p|lcount;
+//  p|gcount;
+
   if(p.isUnpacking()){
     thisProxy = thisgroup;
-//    lcount=0;
-//    gcount=0;
     maxStartRequest=0;
   }
 #if DEBUGRED
