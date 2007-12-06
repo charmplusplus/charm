@@ -1,24 +1,34 @@
 #!/usr/bin/perl
 
+
+# This is an interactive script that knows
+# common ways to build Charm++ and AMPI.
+#
+# Authors: dooley, becker
+
+
+
+# Turn off I/O buffering
 $| = 1;
 
 print "Begin interactive charm configuration\n\n";
 
-
+# Use uname to get the cpu type and OS information
 $os = `uname -s`;
 $cpu = `uname -m`;
 
+#Variables to hold the portions of the configuration:
 $nobs = "";
 $arch = "";
 $network_option_string = "";
 $compiler = "";
 
-
+#remove newlines from these strings:
 chomp($os);
 chomp ($cpu);
 
-# Determine kernel
-# linux, darwin, ...
+
+# Determine OS kernel
 if ($os eq "Linux") {
   print "Detected a linux kernel\n";
   $arch_os = "linux";
@@ -38,8 +48,7 @@ if ($os eq "Linux") {
 
 
 
-# Determine architecture
-# x86, ppc, ia64, amd64
+# Determine architecture (x86, ppc, ...)
 if($cpu =~ m/i[0-9]86/){
   print "Detected architecture x86\n";
   $x86 = 1;
@@ -62,9 +71,7 @@ if($cpu =~ m/i[0-9]86/){
 }
 
 
-# Determine converse architecture
-# net, mpi, ...
-
+# Determine converse architecture (net, mpi, ...)
 print "Do you have a special network interconnect? [y/N]";
 $special_network = "false";
 while($line = <>){
@@ -77,28 +84,25 @@ while($line = <>){
 	}
 }
 
-	
+# default to net
 $converse_network_type = "net";
 	
 if($special_network eq "true"){
-	#select type of interconnect here
 	print << "EOF";
 	
 Choose an interconnect from below: [1-12]
-	1) Infiniband (using OSU MPI)
-	2) Infiniband (native layer alpha version)
-	3) Myrinet GM
-	4) Myrinet MX
-	5) Amasso
-	6) Cray XT3, XT4 (not yet tested on CNL)
-	7) Bluegene/L Native
-	8) Bluegene/L MPI
-	9) Bluegene/P Native
+	 1) Infiniband (using OSU MPI)
+	 2) Infiniband (native layer alpha version)
+	 3) Myrinet GM
+	 4) Myrinet MX
+	 5) Amasso
+	 6) Cray XT3, XT4 (not yet tested on CNL)
+	 7) Bluegene/L Native
+	 8) Bluegene/L MPI
+	 9) Bluegene/P Native
 	10) Bluegene/P MPI
 	11) MPI
 	12) VMI
-
-Note: Some other less common options can be found by calling "./build --help"
 
 EOF
 	
@@ -152,13 +156,8 @@ EOF
 		} else {
 			print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
 		}
-		
 	}	
-	
 }
-
-
-$target = "LIBS";
 
 
 if($arch eq ""){
@@ -279,8 +278,8 @@ EOF
 	}
 }
 
-# SMP / Multicore
 
+# Determine whether to support SMP / Multicore
 print "Do you want SMP or multicore support? [y/N]";
 $smp = "";
 while($line = <>){
@@ -294,11 +293,6 @@ while($line = <>){
 		print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
 	}
 }
-
-
-
-
-
 
 
 # Choose compiler flags
@@ -340,6 +334,10 @@ while($line = <>){
 
 
 
+# Determine the target to build.
+# We want this simple so we just give 2 options
+$target = "";
+
 print << "EOF";
 
 What do you want to build?
@@ -352,7 +350,6 @@ while($line = <>){
 	chomp $line;
 	if($line eq "1" || $line eq ""){
 		$target = "charm++";
-		$j = "-j4";
 		last;
 	} elsif($line eq "2"){
 		$target = "LIBS";
@@ -363,14 +360,15 @@ while($line = <>){
 	
 }
 
-
-
-if($j ne ""){
+# Determine whether to use a -j4 flag for faster building
+# Currently LIBS cannot be safely built with -j4
+if($target eq "charm++"){
 	print "Do you want to do a parallel build (-j4)?[Y/n]";
 	while($line = <>){
 		chomp $line;
 		if(lc($line) eq "y" || lc($line) eq "yes" || $line eq ""){
-			last;
+			$j = "-j4";
+		  last;
 		} elsif(lc($line) eq "n" || lc($line) eq "no" ){
 			$j = "";
 			last;
@@ -381,15 +379,22 @@ if($j ne ""){
 }
 
 
-
+# Compose the build line
 $build_line = "./build $target $arch ${network_option_string} $compiler $smp $j ${compiler_flags}\n";
 
-open(BUILDLINE, ">smart-build.log");
-print BUILDLINE "Using the following build command:\n$build_line\n";
+
+# Save the build line in the log
+open(BUILDLINE, ">>smart-build.log");
+print BUILDLINE `date`;
+print BUILDLINE "Using the following build command:\n";
+print BUILDLINE "$build_line\n";
 close(BUILDLINE);
 
+
+# Execute the build line if the appriate architecture directory exists
 if(-e "src/arch/$arch"){
 	print "Building with: ${build_line}\n";	
+	# Execute the build line
 	system($build_line);
 } else {
 	print "We could not figure out how to build charm with those options on this platform, please manually build\n";
