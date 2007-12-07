@@ -20,8 +20,8 @@ $cpu = `uname -m`;
 #Variables to hold the portions of the configuration:
 $nobs = "";
 $arch = "";
-$network_option_string = "";
-$compiler = "";
+$compilers = "";
+$options = "";
 
 #remove newlines from these strings:
 chomp($os);
@@ -70,7 +70,6 @@ if($cpu =~ m/i[0-9]86/){
   $alpha = 1;
 }
 
-
 # Determine converse architecture (net, mpi, ...)
 print "Do you have a special network interconnect? [y/N]";
 $special_network = "false";
@@ -95,7 +94,7 @@ Choose an interconnect from below: [1-11]
 	 2) Infiniband (native ibverbs alpha version)
 	 3) Myrinet GM
 	 4) Myrinet MX
-	 5) Amasso
+     5) LAPI
 	 6) Cray XT3, XT4 (not yet tested on CNL)
 	 7) Bluegene/L Native (only at T. J. Watson)
 	 8) Bluegene/L MPI
@@ -112,43 +111,42 @@ EOF
 			last;
 		} elsif($line eq "2"){
 			$converse_network_type = "net";
-			$network_option_string = $network_option_string . "ibverbs ";
+			$options = "$options ibverbs ";
 			last;
 		} elsif($line eq "3"){
 			$converse_network_type = "net";
-			$network_option_string = $network_option_string . "gm ";
+			$options = $options . "gm ";
 			last;
 		} elsif($line eq "4"){
 			$converse_network_type = "net";
-			$network_option_string = $network_option_string . "mx ";
+			$options = $options . "mx ";
 			last;
 		} elsif($line eq "5"){
-			$arch = "ammasso";
+			$arch = "lapi";
 			last;
 		} elsif($line eq "6"){
 			$arch = "mpi-crayxt3";
 			last;
 		} elsif($line eq "7"){
 			$arch = "bluegenel";
-			$compiler = "xlc";
+			$compilers = "xlc ";
 			$nobs = "--no-build-shared";
 			last;
 		} elsif($line eq "8"){
 		    $arch = "mpi-bluegenel";
-			$compiler = "xlc";
+			$compilers = "xlc ";
 			$nobs = "--no-build-shared";
 			last;
 		} elsif($line eq "9"){
 		    $arch = "bluegenep";
-			$compiler = "xlc";
+			$compilers = "xlc ";
 			last;
 		} elsif($line eq "10"){
 		    $arch = "mpi-bluegenep";
-			$compiler = "xlc";
+			$compilers = "xlc ";
 			last;
-		} elsif($line eq "11"){
-			$converse_network_type = "mpi";
-			$compiler = "vmi";
+		  } elsif($line eq "11"){
+			$converse_network_type = "vmi";
 			last;
 		} else {
 			print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
@@ -181,11 +179,29 @@ if($arch eq "net-darwin"){
 } 
 
 
-if($compiler eq "xlc"){
-	print "We determined that you should use the compiler $compiler\n Do you want to use a different compiler?[y/N]";
-} else {
-	print "Do you want to specify a compiler? [y/N]";
+
+
+
+# Determine whether to support SMP / Multicore
+print "Do you want SMP or multicore support? [y/N]";
+$smp = "";
+while($line = <>){
+	chomp $line;
+	if(lc($line) eq "y" || lc($line) eq "yes" ){
+		$options = "$options smp ";
+		last;
+	} elsif(lc($line) eq "n" || lc($line) eq "no" || $line eq ""){
+		last;
+	} else {
+		print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
+	}
 }
+
+
+#================ Choose Compiler =================================
+
+
+print "Do you want to specify a compiler? [y/N]";
 $special_compiler = "false";
 while($line = <>){
 	chomp $line;
@@ -201,117 +217,49 @@ while($line = <>){
 
 
 
+# Produce list of compilers
+
+$cs = `./build charm++ $arch help | grep "Supported compilers"`;
+# prune away beginning of the line
+$cs =~ m/Supported compilers: (.*)/;
+$cs = $1;
+# split the line into an array
+@c_list = split(" ", $cs);
+
 
 # Choose compiler
 if($special_compiler eq "true"){
-	#select type of interconnect here
-	print << "EOF";
-	
-Choose a compiler from below: [1-15]
+    $numc = @c_list;
+	print "Choose a compiler: [1-$numc] \n";
 
-	1) cc
-	2) cc64
-	3) cxx
-	4) kcc
-	5) pgcc
-	6) acc
-	7) icc
-	8) ecc
-	9) gcc3
-	10) gcc4
-	11) mpcc
-	12) pathscale
-	13) xlc
-	14) xlc64
-    15) mpicxx
-
-EOF
+	$i = 1;
+	foreach $c (@c_list){
+	  print "\t$i)\t$c\n";
+	  $i++;
+	}
 
 	while($line = <>){
-		chomp $line;
-		if($line eq "1"){
-			$compiler = $compiler . "cc";
-			last;
-		} elsif($line eq "2"){
-			$compiler =  $compiler . "cc64";
-			last;
-		} elsif($line eq "3"){
-			$compiler =  $compiler . "cxx";
-			last;
-		} elsif($line eq "4"){
-			$compiler =  $compiler . "kcc";
-			last;
-		} elsif($line eq "5"){
-			$compiler =  $compiler . "pgcc";
-			last;
-		} elsif($line eq "6"){
-			$compiler =  $compiler . "acc";
-			last;
-		} elsif($line eq "7"){
-			$compiler =  $compiler . "icc";
-			last;
-		} elsif($line eq "8"){
-			$compiler =  $compiler . "ecc";
-			last;
-		} elsif($line eq "9"){
-			$compiler =  $compiler . "gcc3";
-			last;
-		} elsif($line eq "10"){
-			$compiler =  $compiler . "gcc4";
-			last;
-		} elsif($line eq "11"){
-			$compiler =  $compiler . "mpcc";
-			last;
-		} elsif($line eq "12"){
-			$compiler =  $compiler . "pathscale";
-			last;
-		} elsif($line eq "13"){
-			$compiler =  $compiler . "xlc";
-			last;
-		} elsif($line eq "14"){
-			$compiler =  $compiler . "xlc64";
-			last;
-		} elsif($line eq "15"){
-			$compiler =  $compiler . "mpicxx";
-			last;
-		} else {
-			print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
-		}
+	  chomp $line;
+	  if($line =~ m/([0-9]*)/ && $1 > 0 && $1 <= $numc){
+		$compilers = $compilers . " " . $c_list[$1-1] . " ";
+		last;
+	  } else {
+		print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
+	  }
 	}
 }
 
 
-# Dynamically generate a list of compilers that could be used
 
 
-print "Potential compilers:\n---------\n";
+#================ Choose Options =================================
 
-@ccs = `find src/arch | grep "cc-"`;
-foreach $cc (@ccs) {
-  $cc =~ m/cc-([a-zA-Z0-9]*)\..*/;
-  print "$1\n";
-}
-
-print "\n---------\n";
-
-
-
-
-
-
-
-
-
-
-
-
-# Determine whether to support SMP / Multicore
-print "Do you want SMP or multicore support? [y/N]";
-$smp = "";
+print "Do you want to specify any Charm++ build options such as fortran compilers? [y/N]";
+$special_options = "false";
 while($line = <>){
 	chomp $line;
 	if(lc($line) eq "y" || lc($line) eq "yes" ){
-		$smp = "smp";
+		$special_options = "true";
 		last;
 	} elsif(lc($line) eq "n" || lc($line) eq "no" || $line eq ""){
 		last;
@@ -319,6 +267,72 @@ while($line = <>){
 		print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
 	}
 }
+
+
+if($special_options eq "true"){
+
+  # Produce list of options
+
+  $opts = `./build charm++ $arch help | grep "Supported options"`;
+  # prune away beginning of line
+  $opts =~ m/Supported options: (.*)/;
+  $opts = $1;
+
+  @option_list = split(" ", $opts);
+  
+  print "Please enter one or more numbers separated by spaces\n";
+  print "Choices:\n";
+
+  # Prune out entries that would already have been chosen above, such as smp
+  @option_list_pruned = ();
+  foreach $o (@option_list){
+	if($o ne "smp" && $o ne "ibverbs"){
+	  @option_list_pruned = (@option_list_pruned , $o);
+	}
+  }
+
+  # sort the list
+  @option_list_pruned = sort @option_list_pruned;
+
+  # print out list for user to select from
+  $i = 1;
+  foreach $o (@option_list_pruned){
+	print "\t$i)\t$o\n";
+	$i++;
+  }
+  print "\t$i)\tNone Of The Above\n";
+
+  $num_options = @option_list_pruned;
+
+  while($line = <>){
+	chomp $line;
+    $line =~ m/([0-9 ]*)/;
+    @entries = split(" ",$1);
+    @entries = sort(@entries);
+
+	$additional_options = "";
+	foreach $e (@entries) {
+	  if($e>=1 && $e<= $num_options){
+		$estring = $option_list_pruned[$e-1];
+		$additional_options = "$additional_options $estring";
+	  } elsif ($e == $num_options+1){
+		# user chose "None of the above"
+		# clear the options we may have seen before
+		$additional_options = " ";
+	  }
+	}
+
+	# if the user input something reasonable, we can break out of this loop
+	if($additional_options ne ""){
+	  $options = "$options ${additional_options} ";
+	  last;
+	}
+
+  }
+
+}
+
+
 
 
 # Choose compiler flags
@@ -406,7 +420,7 @@ if($target eq "charm++"){
 
 
 # Compose the build line
-$build_line = "./build $target $arch ${network_option_string} $compiler $smp $j ${compiler_flags}\n";
+$build_line = "./build $target $arch $compilers $options $smp $j ${compiler_flags}\n";
 
 
 # Save the build line in the log
@@ -417,14 +431,32 @@ print BUILDLINE "$build_line\n";
 close(BUILDLINE);
 
 
-# Execute the build line if the appriate architecture directory exists
-if(-e "src/arch/$arch"){
-	print "Building with: ${build_line}\n";	
-	# Execute the build line
-	system($build_line);
-} else {
-	print "We could not figure out how to build charm with those options on this platform, please manually build\n";
-	print "Try something similar to: ${build_line}\n";
+print "We have determined a suitable build line is:\n";
+print "\t$build_line\n\n";
+
+
+# Execute the build line if the appropriate architecture directory exists
+print "Do you want to start the build now? [Y/n]";
+while($line = <>){
+  chomp $line;
+  if(lc($line) eq "y" || lc($line) eq "yes" || $line eq ""){
+	
+	if(-e "src/arch/$arch"){
+	  print "Building with: ${build_line}\n";	
+	  # Execute the build line
+	  system($build_line);
+	} else {
+	  print "We could not figure out how to build charm with those options on this platform, please manually build\n";
+	  print "Try something similar to: ${build_line}\n";
+	}
+	
+	last;
+  } elsif(lc($line) eq "n" || lc($line) eq "no" ){
+	last;
+  } else {
+	print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
+  }
 }
+
 
 
