@@ -1,6 +1,6 @@
 LIBS = /usr/lib/python/config/libpython2.3.a -lpthread -lutil -ldl -lm
 
-CHARMC=charmc -module liveViz -module PythonCCS $(OPTS)
+CHARMC=../../../bin/charmc -module liveViz -module PythonCCS $(OPTS)
 
 OBJS = lvServer.o
 
