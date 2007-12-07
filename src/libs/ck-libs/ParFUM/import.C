@@ -47,7 +47,9 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
       printf("%.5lf %.5lf \n", nodeCoords[dim*n+m]);
   }
   */
-  
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (rank==0) CkPrintf("Extracted node data...\n");
+
   // Begin exchange of node coordinates to determine shared nodes
   // FIX ME: compute bounding box, only exchange when bounding boxes collide
   for (int i=rank+1; i<comm_size; i++) { //send nodeCoords to rank i
@@ -56,9 +58,15 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
   }
   // Handle node coordinate-matching requests from other ranks
 
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (rank==0) CkPrintf("Exchanged node coords...\n");
+
   int *sorted_local_idxs = (int *)malloc(numNodes*sizeof(int));
   double *sorted_nodeCoords = (double *)malloc(dim*numNodes*sizeof(double));
   sortNodes(nodeCoords, sorted_nodeCoords, sorted_local_idxs, numNodes, dim);
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (rank==0) CkPrintf("Sorted node coords...\n");
 
   for (int i=0; i<rank; i++) {
     std::vector<int> remoteSharedNodes, localSharedNodes;
@@ -131,6 +139,10 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
 	     sharedlist_msg_tag, comm);
     free(recvNodeCoords);
   }
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (rank==0) CkPrintf("Received node coords, send shared...\n");
+
   for (int i=rank+1; i<comm_size; i++) {  // recv shared node lists
     int *sharedNodes;
     MPI_Status status;
@@ -147,6 +159,10 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
     sharedNodeLists[source] = sharedNodes;
     // don't delete sharedNodes! we kept a pointer to it!
   }
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (rank==0) CkPrintf("Received shared...\n");
+
   // IMPLEMENT ME: use sharedNodeLists and sharedNodeCounts to move shared node data 
   // to IDXL
   FEM_Mesh *mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->lookup(meshid,"ParFUM_recreateSharedNodes");
@@ -162,6 +178,10 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
       }
     }
   }
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (rank==0) CkPrintf("Recreation of shared nodes complete...\n");
+
   //printf("After recreating shared nodes %d \n",rank);
   //shared.print();
 	
@@ -173,6 +193,8 @@ void ParFUM_recreateSharedNodes(int meshid, int dim) {
       free(sharedNodeLists[i]);
   }
   free(sharedNodeLists);
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (rank==0) CkPrintf("All cleaned up.\n");
 }
 
 void ParFUM_createComm(int meshid, int dim)
@@ -182,15 +204,15 @@ void ParFUM_createComm(int meshid, int dim)
   MPI_Barrier(MPI_COMM_WORLD);
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  //if (rank==0) CkPrintf("Recreating shared nodes...\n");
+  if (rank==0) CkPrintf("Recreating shared nodes...\n");
   ParFUM_recreateSharedNodes(meshid, dim);
   MPI_Barrier(MPI_COMM_WORLD);
-  //if (rank==0) CkPrintf("Generating global node numbers...\n");
+  if (rank==0) CkPrintf("Generating global node numbers...\n");
   ParFUM_generateGlobalNodeNumbers(meshid);
   FEM_Mesh *mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->lookup(meshid,"ParFUM_recreateSharedNodes");
   MPI_Barrier(MPI_COMM_WORLD);
   
-  //if (rank==0) CkPrintf("Gathering ghost data...\n");
+  if (rank==0) CkPrintf("Gathering ghost data...\n");
   struct ghostdata *gdata;
   if(rank == 0){
     gdata = gatherGhosts();
@@ -198,7 +220,7 @@ void ParFUM_createComm(int meshid, int dim)
     gdata = new ghostdata;
   }
   MPI_Bcast_pup(*gdata,0,MPI_COMM_WORLD);
-  //if (rank==0) CkPrintf("Making ghosts...\n");
+  if (rank==0) CkPrintf("Making ghosts...\n");
   makeGhosts(mesh,MPI_COMM_WORLD,0,gdata->numLayers,gdata->layers);
   MPI_Barrier(MPI_COMM_WORLD);
 }
@@ -244,7 +266,7 @@ void sortNodes(double *nodes, double *sorted_nodes, int *sorted_ids, int numNode
 void merge(double *nodes, int *ids, int dim, int first, int mid, int last);
 void qsort(double *nodes, int *ids, int dim, int first, int last)
 {
-  if (first==last) return;
+  if (first>=last) return;
   else if (first==last-1) {
     if (!coord_leq(&(nodes[first*dim]), &(nodes[last*dim]), dim)) {
       int tmpId=ids[first];
@@ -319,6 +341,8 @@ void merge(double *nodes, int *ids, int dim, int first, int mid, int last)
       nodes[i*dim+j] = tmpCoords[(i-first)*dim+j];
     }
   }
+  free(tmpCoords);
+  free(tmpIds);
 }
 
 // this is a strictly ordering floating point less-than-or-equal-to operator, faster than the coord_compare
