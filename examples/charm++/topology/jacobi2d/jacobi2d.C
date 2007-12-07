@@ -42,7 +42,7 @@
 /*readonly*/ int num_chare_x;
 /*readonly*/ int num_chare_y;
 
-#define USE_TOPOMAP	0
+#define USE_TOPOMAP	1
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
 #define wrap_x(a)  (((a)+num_chare_x)%num_chare_x)

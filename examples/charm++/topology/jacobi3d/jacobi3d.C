@@ -48,7 +48,8 @@
 /*readonly*/ int num_chare_y;
 /*readonly*/ int num_chare_z;
 
-#define USE_TOPOMAP	1
+#define USE_TOPOMAP	1	
+#define USE_RANDOMMAP	0	
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
 #define wrap_x(a)  (((a)+num_chare_x)%num_chare_x)
@@ -121,8 +122,8 @@ class Main : public CBase_Main {
       CkPrintf("Block Dimensions: %d %d %d\n", blockDimX, blockDimY, blockDimZ);
 
       // Create new array of worker chares
-#if USE_TOPOMAP
-      CkPrintf("Topology Mapping is being done ... \n");
+#if USE_TOPOMAP || USE_RANDOMMAP
+      CkPrintf("Topology Mapping is being done ... %d\n", USE_RANDOMMAP);
       CProxy_JacobiMap map = CProxy_JacobiMap::ckNew(num_chare_x, num_chare_y, num_chare_z);
       CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
       opts.setMap(map);
@@ -446,12 +447,12 @@ class JacobiMap : public CkArrayMap {
       }
 
       TopoManager tmgr;
-#if 0	// naive mapping
-      for (i=0; i<x; i++)
+      // naive mapping
+      /*for (i=0; i<x; i++)
 	for(j=0; j<y; j++)
 	  for(k=0; k<z; k++)
-	    mapping[i][j][k] = tmgr.coordinatesToRank(i, j, k);
-#else
+	    mapping[i][j][k] = tmgr.coordinatesToRank(i, j, k);*/
+
       // we are assuming that the no. of chares in each dimension is a 
       // multiple of the torus dimension
       int dimX = tmgr.getDimNX();
@@ -462,7 +463,9 @@ class JacobiMap : public CkArrayMap {
       int numCharesPerPeX = x / dimX;
       int numCharesPerPeY = y / dimY;
       int numCharesPerPeZ = z / dimZ;
+      int numCharesPerPe = x*y*z/CkNumPes();
 
+#if USE_TOPOMAP
       if(dimT < 2) {	// one core per node
       if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
       for(int i=0; i<dimX; i++)
@@ -489,8 +492,21 @@ class JacobiMap : public CkArrayMap {
 		    mapping[ci][cj][ck] = tmgr.coordinatesToRank(i, j, k, l);
 		    // if(CkMyPe()==0) CkPrintf("%d %d %d %d", ci, cj, ck, tmgr.coordinatesToRank(i, j, k, l));
 		  }
-      } // endif
+      } // end of if
+#elif USE_RANDOMMAP
+      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
+      int pe = 0;
+      for(int i=0; i<x; i++)
+	for(int j=0; j<y; j++)
+	  for(int k=0; k<z; k++) {
+	    if(pe == CkNumPes()) {
+	      pe = 0;
+	    }
+	    mapping[i][j][k] = pe;
+	    pe++;
+	  }
 #endif
+
     }
 
     ~JacobiMap() { 
