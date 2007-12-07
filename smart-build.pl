@@ -94,7 +94,7 @@ Choose an interconnect from below: [1-11]
 	 2) Infiniband (native ibverbs alpha version)
 	 3) Myrinet GM
 	 4) Myrinet MX
-     5) LAPI
+	 5) LAPI
 	 6) Cray XT3, XT4 (not yet tested on CNL)
 	 7) Bluegene/L Native (only at T. J. Watson)
 	 8) Bluegene/L MPI
@@ -241,7 +241,7 @@ if($special_compiler eq "true"){
 	while($line = <>){
 	  chomp $line;
 	  if($line =~ m/([0-9]*)/ && $1 > 0 && $1 <= $numc){
-		$compilers = $compilers . " " . $c_list[$1-1] . " ";
+		$compilers = $c_list[$1-1];
 		last;
 	  } else {
 		print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
