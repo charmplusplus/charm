@@ -21,6 +21,7 @@ sparseReducer, sparseContiguousReducer
 Charm++:
 <a href="group__CkArray.html">Arrays</a>,
 <a href="group__CkLdb.html">Load balancer</a>,
+<a href="group__Comlib.html">Comlib</a>,
 <a href="group__CkPerf.html">Tracing</a>,
 <a href="group__CkReduction.html">Reductions</a>,
 <a href="group__CkArrayImpl.html">Array Implementation</a>
@@ -56,6 +57,7 @@ quiescence.
   </ul>
 <li>mpi
 <li>elan
+<li>lapi
 <li>vmi
 <li>shmem
 <li>sp3
