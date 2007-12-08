@@ -13,32 +13,32 @@ sparseReducer, sparseContiguousReducer
 
 <P>Languages: ARMCI, AMPI, TCharm, taskGraph, search
 
-<p>Frameworks: <a href="group__ParFUM.html">ParFUM</a>, IFEM, IDXL, Collide, MBlock, AMR
+<p>Frameworks: <a href="group__ParFUM.shtml">ParFUM</a>, IFEM, IDXL, Collide, MBlock, AMR
 
 <p>Visualization: liveViz, liveViz3d, netFEM
  
 </td></tr><tr><td>
 Charm++:
-<a href="group__CkArray.html">Arrays</a>,
-<a href="group__CkLdb.html">Load balancer</a>,
-<a href="group__Comlib.html">Comlib</a>,
-<a href="group__CkPerf.html">Tracing</a>,
-<a href="group__CkReduction.html">Reductions</a>,
-<a href="group__CkArrayImpl.html">Array Implementation</a>
+<a href="group__CkArray.shtml">Arrays</a>,
+<a href="group__CkLdb.shtml">Load balancer</a>,
+<a href="group__Comlib.shtml">Comlib</a>,
+<a href="group__CkPerf.shtml">Tracing</a>,
+<a href="group__CkReduction.shtml">Reductions</a>,
+<a href="group__CkArrayImpl.shtml">Array Implementation</a>
 
 </td></tr><tr><td>
 Charm Kernel:
-<a href="group__Ck.html">Groups and Chares</a>,  
-<a href="group__CkRegister.html">Registration</a>, 
-<a href="group__CkQD.html">Quiescence detection</a>, 
-<a href="group__CkFutures.html">Thread support</a>,
-<a href="group__CkInit.html">Startup</a>,
-<a href="group__CkEnvelope.html">Message Envelope</a>,
+<a href="group__Ck.shtml">Groups and Chares</a>,  
+<a href="group__CkRegister.shtml">Registration</a>, 
+<a href="group__CkQD.shtml">Quiescence detection</a>, 
+<a href="group__CkFutures.shtml">Thread support</a>,
+<a href="group__CkInit.shtml">Startup</a>,
+<a href="group__CkEnvelope.shtml">Message Envelope</a>,
 Translator, SDAG.
 
 </td></tr><tr><td>
 Converse:
-<a href="group__Converse.html">core</a>,
+<a href="group__Converse.shtml">core</a>,
 scheduler, threads, memory allocation,
 conditions, random numbers, converse client/server (CCS).
 
@@ -46,9 +46,9 @@ Converse tracing, parameter marshalling (CPM),
 quiescence.
 
 </td></tr><tr><td>
-<a href="group__Machine.html">Converse Machine Layer</a>:
+<a href="group__Machine.shtml">Converse Machine Layer</a>:
 <ul>
-<li><a href="group__NET.html">net</a>
+<li><a href="group__NET.shtml">net</a>
   <ul>
   <li>smp
   <li>gm
