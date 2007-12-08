@@ -23,6 +23,16 @@ public:
   }
   
   Main(CkMigrateMessage *m) : CBase_Main(m) { 
+    if (m!=NULL) {
+      CkArgMsg *args = (CkArgMsg *)m;
+      CkPrintf("Received %d arguments: { ",args->argc);
+      for (int i=0; i<args->argc; ++i) {
+        CkPrintf("|%s| ",args->argv[i]);
+      }
+      CkPrintf("}\n");
+    } else {
+      CkPrintf("Arguments null\n");
+    }
     mainProxy = thisProxy;
     a=987;b[0]=654;b[1]=321;
     CkPrintf("Main's MigCtor. a=%d(%p), b[0]=%d(%p), b[1]=%d.\n",a,&a,b[0],b,b[1]);
