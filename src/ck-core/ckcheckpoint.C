@@ -160,7 +160,7 @@ void CkPupROData(PUP::er &p)
 }
 
 // handle main chare
-void CkPupMainChareData(PUP::er &p)
+void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 {
 	int nMains=_mainTable.size();
 	DEBCHK("[%d] CkPupMainChareData %s: nMains = %d\n", CkMyPe(),p.typeString(),nMains);
@@ -175,8 +175,8 @@ void CkPupMainChareData(PUP::er &p)
 				obj = (Chare*)malloc(size);
 				_MEMCHECK(obj);
 				_mainTable[i]->setObj(obj);
-				void *m = CkAllocSysMsg();
-				_entryTable[entryMigCtor]->call(m, obj);
+				//void *m = CkAllocSysMsg();
+				_entryTable[entryMigCtor]->call(args, obj);
 			}
 			else 
 			 	obj = (Chare *)_mainTable[i]->getObj();
@@ -356,7 +356,7 @@ void CkPupProcessorData(PUP::er &p)
 
     // save mainchares into MainChares.dat
     if(CkMyPe()==0) {
-	CkPupMainChareData(p);
+      CkPupMainChareData(p, NULL);
     }
 	
     // save groups into Groups.dat
@@ -394,7 +394,7 @@ static void checkpointOne(const char* dirname, CkCallback& cb){
 		FILE* fMain = fopen(filename,"wb");
 		if(!fMain) CkAbort("Failed to open checkpoint file for mainchare data!");
 		PUP::toDisk pMain(fMain);
-		CkPupMainChareData(pMain);
+		CkPupMainChareData(pMain, NULL);
 		fclose(fMain);
 	}
 }
@@ -421,7 +421,7 @@ void CkStartCheckpoint(char* dirname,const CkCallback& cb)
   *          broadcast message.
   **/
 
-void CkRestartMain(const char* dirname){
+void CkRestartMain(const char* dirname, CkArgMsg *args){
 	int i;
 	char filename[1024];
 	CkCallback cb;
@@ -445,7 +445,7 @@ void CkRestartMain(const char* dirname){
 	FILE* fMain = fopen(filename,"rb");
 	if(fMain && CkMyPe()==0){ // only main chares have been checkpointed, we restart on PE0
 		PUP::fromDisk pMain(fMain);
-		CkPupMainChareData(pMain);
+		CkPupMainChareData(pMain, args);
 		fclose(fMain);
 		DEBCHK("[%d]CkRestartMain: mainchares restored\n",CkMyPe());
 		//bdcastRO(); // moved to CkPupMainChareData()

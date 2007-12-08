@@ -368,7 +368,7 @@ static inline void _handleProcData(PUP::er &p)
     CkPupROData(p);
 
     // save mainchares into MainChares.dat
-    if(CkMyPe()==0) CkPupMainChareData(p);
+    if(CkMyPe()==0) CkPupMainChareData(p, (CkArgMsg*)NULL);
 	
     // save groups into Groups.dat
     CkPupGroupData(p);
@@ -883,7 +883,7 @@ static void askProcDataHandler(char *msg)
 #endif
 }
 
-void CkMemRestart(const char *dummy)
+void CkMemRestart(const char *dummy, const CkArgMsg *args)
 {
 #if CMK_MEM_CHECKPOINT
    _diePE = CkMyPe();

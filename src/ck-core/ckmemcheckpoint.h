@@ -104,7 +104,7 @@ private:
 };
 
 // called in initCharm
-void CkMemRestart(const char *);
+void CkMemRestart(const char *, const CkArgMsg *);
 
 // called by user applications
 // to start a checkpointing

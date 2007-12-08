@@ -127,7 +127,7 @@ static InitCallTable _initCallTable;
 #endif
 
 // fault tolerance
-typedef void (*CkFtFn)(const char *);
+typedef void (*CkFtFn)(const char *, CkArgMsg *);
 static CkFtFn  faultFunc = NULL;
 static char* _restartDir;
 
@@ -851,7 +851,13 @@ void _initCharm(int unused_argc, char **argv)
 	
 	if (faultFunc) {
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
-		if (!inCommThread) faultFunc(_restartDir);
+		if (!inCommThread) {
+                  CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
+                  msg->argc = CmiGetArgc(argv);
+                  msg->argv = argv;
+                  faultFunc(_restartDir, msg);
+                  CkFreeMsg(msg);
+                }
 	}else if(CkMyPe()==0){
 		_allStats = new Stats*[CkNumPes()];
 		register int i, nMains=_mainTable.size();

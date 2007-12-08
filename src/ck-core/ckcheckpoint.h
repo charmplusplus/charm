@@ -58,7 +58,7 @@ public:
 
 // utility functions to pup system global tables
 void CkPupROData(PUP::er &p);
-void CkPupMainChareData(PUP::er &p);
+void CkPupMainChareData(PUP::er &p, CkArgMsg *args);
 void CkPupGroupData(PUP::er &p);
 void CkPupNodeGroupData(PUP::er &p);
 void CkPupArrayElementsData(PUP::er &p, int notifyListeners=1);
@@ -66,7 +66,7 @@ void CkPupProcessorData(PUP::er &p);
 void CkRemoveArrayElements();
 
 void CkStartCheckpoint(char* dirname,const CkCallback& cb);
-void CkRestartMain(const char* dirname);
+void CkRestartMain(const char* dirname, CkArgMsg *args);
 
 
 #endif //_CKCHECKPOINT_H
