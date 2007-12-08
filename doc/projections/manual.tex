@@ -767,21 +767,20 @@ a specific processor is doing at each moment of the program.
 \center
 %\epsfig{figure=fig/timeline.eps,height=3.8in}
 \includegraphics[width=3.8in]{fig/timeline}
-\caption{Timeline module}
+\caption{Timeline Tool}
 \label{timeline}
 \end{figure}
 
 %{\bf Dialog Box}
 
-When the Timeline window first appears, a dialog box appears along
-with it. The box asks for the following information (Please refer to
+When opening a Timeline view, a dialog box appears. 
+The box asks for the following information (Please refer to
 \ref{sec::misc} for information on special features you can
 use involving the various fields):
 
 \begin{itemize}
 \item
-Processor(s): Choose which processor(s) you want to see a timeline
-for.
+Processor(s): Choose which processor(s) you want to see in the timeline.
 \item
 Start Time  : Choose what time you want your timeline to start at.
 A time-based field.
@@ -793,41 +792,18 @@ field.
 Standard \projections{} dialog options and buttons are also available
 (see \ref{sec::misc} for details).
 
-{\bf Special Note} : {\it The current timeline main display fails to
-size itself properly when first loaded. This gives the impression that
-no timeline data was loaded as only the control panel shows up,
-confusing most users. All you have to make the main display show up is
-to resize the window after loading. This can be done manually or by
-using the window's maximize feature, available on most Java
-platforms. We recommend the latter.}
+\textbf{Warning: You might have to click ``update'' before being able
+to click ok on the dialog box. This is a known bug.}
 
-%Instead of entering a BeginTime, you can have the dialog box choose a
-%BeginTime for you based on the occurrence of a specific entry.  To do
-%this, you go to the bottom portion of the dialog box and select an
-%entry to find an occurrence of.  Then, you choose the processor you
-%want to find an occurrence on, and which occurrence you want to find
-%(N). Click on 'Search for Begin Time'.  The dialog box will display a
-%message telling you if your occurrence was found and when it was
-%found. If valid, the time is automatically entered as the begin time.
 
-%When you are satisifed with your time and processor ranges, click on
-%'OK'.  \projections{} will then get the Timeline data for you.  The
-%time for this step depends on the number of items in your time range
-%and the number of processors you have chosen.
-
-%{\bf Tool Features}
 
 The following menu options are available:
 
 \begin{itemize}
-\item {\bf File} contains 2 options: {\it Print Timeline} uses Java's
-built-in print manager and allows you to render the timeline's display
-onto a physical printer or file. Currently, the code used to render
-the timeline display for printing differs significantly from that used
-to render the display to screen, so please expect differences. 
+\item {\bf File} contains 1 enabled option: 
 {\it Close} simply closes the Timeline Window.
-\item {\bf Tools} contains 1 option: {\it Modify Ranges} reloads the 
-dialog box and allows you to select new processor or time duration
+\item {\bf Tools} contains 1 option: {\it Modify Ranges} opens the initial 
+dialog box thereby allowing you to select new set of processors or time duration
 parameters.
 \item {\bf Colors} contains 4 options: {\it Change Colors} functions in
 a manner similar to the button of the same name described under control 
@@ -839,6 +815,15 @@ scheme for storing saved color sets. {\it Restore Colors} allows you to
 load any previously saved color sets described above. {\it Default Colors}
 resets the current color set to the default set that \projections{} assigns
 without user intervention.
+
+\item {\bf Screenshot} contains 1 option: 
+{\it Save as JPG or PNG} save the visible portion of the visualization
+to an image file. You must choose a filename ending with a \texttt{.png}
+or \texttt{.jpg} extension when choosing the location to save the image. The
+appropriate filetype is chosen based on the chosen filename
+extension. If the view is zoomed in, only the portion currently shown
+on screen is saved.
+
 \end{itemize}
 
 The Timeline Window consists of two parts:
@@ -847,53 +832,54 @@ The Timeline Window consists of two parts:
 {\bf Display Panel} (located: top area)
 
 This is where the timelines are displayed and is the largest portion
-of the window.  The time axes are displayed at the top and the bottom
-of the panel, and the units are microseconds.  The left side of the
-panel shows the processor labels.  Underneath each processor label is
-a percentage telling you what amount of the total time in your
-timeline was actually spent working on this program.
+of the window.  The time axis is displayed at the top 
+of the panel.  The left side of the
+panel shows the processor labels, each containing a processor number and
+two strange numbers. These two numbers represent the percentage of the
+loaded timeline during which work occurs. The first of the two numbers
+is the ``non-idle'' time, i.e. the portion of the time in the timeline
+not spent in idle regions. This contains both time for entry methods
+as well as other uninstrumented time spent likely in the Charm++
+runtime. The second number is the percentage of the time used by the
+entry methods for the selected range.
 
-The timeline itself consists of colored bars for each work item.
-Placing the cursor over one of these bars will bring up a pop-up
-window telling you the name of that item, the begin time, the end
-time, and the total time.  It will also tell you what amount of time
-was spent packing, how many messages were created during this work
-item, and which processor created this item. 
 
-User events are also displayed as thin lines or bars above ordinary
+The timeline itself consists of colored bars for each event.
+Placing the cursor over any of these bars will display information 
+about the event including:  the name, the begin time, the end
+time, the total time, the time spent packing, the number of messages it
+created, and which processor created the event. 
+
+Left clicking on an event bar will cause a window to popup. This
+window contains detailed information about the messages sent by the
+clicked upon event.
+
+Right clicking on an event bar will cause a line to be drawn to the
+beginning of the event bar from the point where the message causing
+the event originated. This option may not be applicable for threaded
+events. If the message originated on a processor not currently
+included in the visualization, the other processor will be loaded, and
+then the message line will be drawn. A warning message will appear if
+the message origination point is outside the time duration, and hence
+no line will be drawn.
+
+User events are displayed as thin bars above the ordinary
 event bars in the display area.
 
-Display Panel features include:
-   \begin{itemize}
-   \item[-] 
-   Detailed Information Pop-up - If you left-click on an item, a
-   window will appear telling you similar information to the pop-up
-   window.  This window will also list all of the messages created
-   during this work item, and it will tell you what time they were
-   sent at and to which entry.
-   \item[-]
-   Message Source Lines - If you right-click on an item, a white line
-   will be drawn from the beginning of that item to the source of the
-   message send that created the item. This line can only be drawn if
-   the source lies within the loaded time range. Additionally, if the
-   processor on which the source lies is not loaded, \projections{}
-   will automatically load it into the timeline.
-   \end{itemize}
+Message pack times and send points can be displayed below the event
+bars. The message sends are small white tick marks, while the message
+pack times are small pink bars usually occurring immediatly after the
+message send point. If zoomed in to a point where each microsecond
+takes more than one pixel, the message send point and the following
+packing time may appear disconnected. This is an inherent problem with
+the granularity used for the logfiles.
+
 
 \item[2)]
 {\bf Control Panel} (located: bottom area)
 
-Checkboxes:
-   \begin{itemize}
-   \item[-]
-   Display Pack Times - Lets you toggle display of Time spent packing
-   \item[-] 
-   Display Message Creations - Lets you toggle display of message
-   creations. These are represented by little vertical lines at the
-   time a message was created.
-   \item[-]
-   Display Idle Time - Lets you toggle display of idle time.
-   \item[-] 
+The controls in this panel are obvious, but we mention one here anyway.
+
    View User Event - Checking this box will bring up a new
    window showing the string description, begin time, end time and
    duration of all user events on each processor. You can access
@@ -908,37 +894,23 @@ Checkboxes:
    \label{userevent}
    \end{figure}
 
-   \end{itemize}
-
-Buttons:
-   \begin{itemize}
-   \item[-]
-   Select Ranges - Brings up the initial dialog box.
-   \item[-]
-   Change Colors - Lets you change colors for the work items.
-   \item[-]
-   Scale - Enter a scale $>=$ 1.0 in the box, or click on the $<<$ and
-   $>>$ buttons to adjust the scale by 0.25 increments.  Click on
-   Reset to set the scale back to 1.0
-   \end{itemize}
 \end{enumerate}
 
-An additional feature of timeline is a quick interface to zoom into an
-area of interest. To determine the exact time of any event on the
-timeline, move your mouse along either the top or bottom axis and a
-white vertical highlight line will show where your cursor is along the
-timeline. The ``Highlight Time'' box on the bottom of the Timeline
-window will show the exact time based on the location of your cursor.
+Various features appear when the user moves the mouse cursor over the
+top axis. A vertical line will appear to highlight a specific
+time. The exact time will be displayed at the bottom of the
+window. Additionally a user can select a range by clicking while a
+time is highlighted and dragging to the left or right of that
+point. As a selection is being made, a vertical white line will mark
+the beginning and end of the range. Between these lines, the
+background color for the display will change to gray to better
+distinguish the selection from the surrounding areas. After a
+selection is made, its duration is displayed at the bottom. A user can
+zoom into the selection by clicking the ``Zoom Selected'' button. To
+release a selection, single-click anywhere along the axis. Clicking
+``Load Selected'' when a selection is active will cause the timeline
+range to be reloaded. To zoom out, the ``<<'' or ``Reset'' button can be used.
 
-To select an area, click on the axis to define the start of the area
-and drag the mouse to the end of the area to be defined.  Two yellow
-vertical lines will bracket the area of interest.  The exact times of
-the selected area will be shown in the ``Selection Start Time'' text
-area and the ``Selection End Time'' text area.  The difference between
-these times is shown in ms in the ``Selected Length'' text area.  Thus,
-this feature can be used to measure the time between two events of
-interest across processors, and is an easy way to measure the time of
-an entry point.
 
 To then zoom into the selected area via this interface, click on
 either the ``Zoom Selected'' or the ``Load Selected'' buttons.  The
@@ -951,15 +923,11 @@ becomes impossible to zoom back out without having to re-specify the
 time range via the ``Select Ranges'' button.
 
 Performance-wise, this is the most memory-intensive part of the
-visualization tool. Users should expect long load and/or display
-times. This is dependent on the number of event objects to be
-displayed (multiplied by the number of processors to be
-displayed). The selected time range is a loose approximation of this
-but the user should be aware of how event-intensive the application is
+visualization tool. The load and zoom times are proportional to the
+number of events displayed. The user should be aware of how event-intensive the application is
 over the desired time-period before proceeding to use this view. If
-\projections{} becomes stalled as a result of an attempt to load too
-much data, kill the visualization tool and restart the analysis with a
-smaller time/processor range. We expect to add features to alleviate
+\projections{} takes too long to load a timeline, cancel the load and
+choose a smaller time range or fewer processors. We expect to add features to alleviate
 this problem in future releases.
 
 \subsubsection{Usage Profile}
