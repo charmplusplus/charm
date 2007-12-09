@@ -24,6 +24,7 @@ doc:
 
 web: doc
 	chgrp -R kale ps pdf html
+	chmod g+w ps pdf html
 	rm -rf $(WEBDIR)/ps.new $(WEBDIR)/pdf.new $(WEBDIR)/html.new
 	cp -r ps $(WEBDIR)/ps.new
 	cp -r pdf $(WEBDIR)/pdf.new
