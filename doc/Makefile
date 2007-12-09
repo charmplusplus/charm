@@ -26,6 +26,8 @@ web: doc
 	cp -r ps $(WEBDIR)/ps.new
 	cp -r pdf $(WEBDIR)/pdf.new
 	cp -r html $(WEBDIR)/html.new
+	chmod 664 manual.css
+	cp manual.css $(WEBDIR)/
 	mv $(WEBDIR)/ps $(WEBDIR)/ps.old
 	mv $(WEBDIR)/pdf $(WEBDIR)/pdf.old
 	mv $(WEBDIR)/html $(WEBDIR)/html.old
