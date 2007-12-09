@@ -53,9 +53,11 @@ html: $(FILE)
 
 $(FILE): $(TEX) $(FILE).aux
 	-@ln -s ../pplmanual.* .
+	-@ln -s ../dot.latex2html-init .latex2html-init
 	-@rm -fr $(FILE)/*.html $(FILE)/*.aux
 	-@mkdir $(FILE)
 	-@ln -s ../../manual.css $(FILE)
+	-/bin/cp title.html $(FILE)
 	$(LATEX2HTML) $(FILE).tex
 	../latex2html_fixpaths.sh
 
