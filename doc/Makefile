@@ -23,6 +23,8 @@ doc:
 	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) doc) || exit 1; done
 
 web: doc
+	chgrp -R kale ps pdf html
+	rm -rf $(WEBDIR)/ps.new $(WEBDIR)/pdf.new $(WEBDIR)/html.new
 	cp -r ps $(WEBDIR)/ps.new
 	cp -r pdf $(WEBDIR)/pdf.new
 	cp -r html $(WEBDIR)/html.new
