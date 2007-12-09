@@ -2,7 +2,7 @@ IDIR=../../doc
 LNCMD=test ! -f pplmanual.sty && ln -f -s ../pplmanual.sty .
 RMCMD=rm -f ./pplmanual.sty
 WEBDIR=/www/ppl_manuals
-DIRS=install converse convext charm++ libraries f90charm pose \
+DIRS=install converse convext charm++ libraries f90charm pose charisma \
 	fem ifem netfem ampi bigsim mblock projections tcharm debugger
 
 all: pdf ps html
