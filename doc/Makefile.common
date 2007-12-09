@@ -27,16 +27,18 @@ DEPTEX=$(TEX) $(FILE).aux index.tex
 
 # Default target: build postscript, pdf, and html:
 
-all: ps pdf html
+all: pdf ps html
 
 # PostScript Target:
 ps: $(FILE).ps
 
-$(FILE).dvi: $(TEX) $(FILE).aux 
-	latex $(FILE).tex
+# latex does not create dvi anymore on new linux distributions
+#$(FILE).dvi: $(TEX) $(FILE).aux 
+#	latex $(FILE).tex
 
-$(FILE).ps: $(FILE).dvi
-	dvips -t letter -f $(FILE).dvi > $(FILE).ps
+$(FILE).ps: $(FILE).pdf
+	pdftops -level1 -paper letter $(FILE).pdf $(FILE).ps
+	#dvips -t letter -f $(FILE).dvi > $(FILE).ps
 
 
 # PDF Target:
