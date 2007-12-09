@@ -286,7 +286,7 @@ if($special_options eq "true"){
   # Prune out entries that would already have been chosen above, such as smp
   @option_list_pruned = ();
   foreach $o (@option_list){
-	if($o ne "smp" && $o ne "ibverbs"){
+	if($o ne "smp" && $o ne "ibverbs" && $o ne "gm" && $o ne "mx"){
 	  @option_list_pruned = (@option_list_pruned , $o);
 	}
   }
@@ -342,7 +342,8 @@ Choose a set of compiler flags [1-4]
 	1) none
 	2) debug
 	3) optimized [default]
-	4) custom
+	4) optimized + projections
+	5) custom
 	
 EOF
 
@@ -358,7 +359,10 @@ while($line = <>){
 	} elsif($line eq "3" || $line eq ""){
 		$compiler_flags = "-O2 -DCMK_OPTIMIZE";
 		last;
-	} elsif($line eq "4"){
+	} elsif($line eq "4"){ 
+                $compiler_flags = "-O2"; 
+                last; 
+        }  elsif($line eq "5"){
 
 		print "Enter compiler options: ";
 		$input_line = <>;
