@@ -18,7 +18,7 @@ for f in `echo manual/*.html`
 do
 	echo "Converting $f"
 	cwd=`pwd`
-	cwd=`echo $cwd | sed -e 's@/home/net@/expand8/home@'`
+	cwd=`echo $cwd | sed -e 's@/home/net@/expand/home@'`
 	sed -e 's!'`pwd`'/!!g' $f > tmp || die "error running sed on $f"
 	mv $f $f.bak || die "error backing up $f"
 	sed -e 's!'$cwd'/!!g' tmp > $f || die "error running sed on $f"
