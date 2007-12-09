@@ -18,8 +18,8 @@ BIG.XHUGE		{ font-size : xx-large }
 /* heading styles */
 H1		{ color: navy }
 H2		{ color: white; background: navy; padding: 8pt; text-align: center; letter-spacing: 5; word-spacing: 3 }
-H3		{ color: white; background: navy; padding: 5pt; padding-top: 10pt; letter-spacing: 2 }
-H4		{  }
+H3		{ color: white; background: navy; padding: 5pt; padding-top: 10pt; letter-spacing: 2; word-spacing: 1 }
+H4		{ background: lightyellow; padding: 3pt  }
 H5		{  }
 
 /* mathematics styles */
