@@ -82,19 +82,23 @@ doc: all
 	if [ ! -d $(DOCDIR)/pdf ] ; then mkdir $(DOCDIR)/pdf ; fi
 	if [ ! -d $(DOCDIR)/html ] ; then mkdir $(DOCDIR)/html ; fi
 	/bin/cp $(FILE).ps $(DOCDIR)/ps/$(DEST).ps
+	chmod 664 $(DOCDIR)/ps/$(DEST).ps
 	/bin/cp $(FILE).pdf $(DOCDIR)/pdf/$(DEST).pdf
+	chmod 664 $(DOCDIR)/pdf/$(DEST).pdf
 	/bin/rm -rf $(DOCDIR)/html/$(DEST)
 	/bin/cp -R $(FILE) $(DOCDIR)/html/$(DEST)
+	find $(DOCDIR)/html/$(DEST) $(DOCDIR)/p*/$(DEST).p* -type f -exec chmod 664 {} \;
+	find $(DOCDIR)/html/$(DEST) -type d -exec chmod 775 {} \;
 
 # Build web copy of documentation (PPL-only):
 web: all
 	/bin/cp $(FILE).ps $(WEBDIR)/ps/$(DEST).ps
-	chmod 664 $(WEBDIR)/ps/$(DEST).ps
+	-chmod 664 $(WEBDIR)/ps/$(DEST).ps
 	/bin/cp $(FILE).pdf $(WEBDIR)/pdf/$(DEST).pdf
-	chmod 664 $(WEBDIR)/pdf/$(DEST).pdf
+	-chmod 664 $(WEBDIR)/pdf/$(DEST).pdf
 	/bin/rm -rf $(WEBDIR)/html/$(DEST)
 	/bin/cp -R $(FILE) $(WEBDIR)/html/$(DEST)
 	find $(WEBDIR)/html/$(DEST) $(WEBDIR)/p*/$(DEST).p* -type f -exec chmod 664 {} \;
 	find $(WEBDIR)/html/$(DEST) -type d -exec chmod 775 {} \;
-	chgrp -R kale $(WEBDIR)/html/$(DEST) $(WEBDIR)/p*/$(DEST).p*
+	-chgrp -R kale $(WEBDIR)/html/$(DEST) $(WEBDIR)/p*/$(DEST).p*
 

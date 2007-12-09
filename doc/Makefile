@@ -1,10 +1,11 @@
 IDIR=../../doc
 LNCMD=test ! -f pplmanual.sty && ln -f -s ../pplmanual.sty .
 RMCMD=rm -f ./pplmanual.sty
+WEBDIR=/www/ppl_manuals
 DIRS=install converse convext charm++ libraries f90charm pose \
 	fem ifem netfem ampi bigsim mblock projections tcharm debugger
 
-all: ps pdf html
+all: pdf ps html
 
 ps:
 	[ -d $(IDIR)/ps ] || mkdir $(IDIR)/ps
@@ -21,8 +22,16 @@ html:
 doc:
 	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) doc) || exit 1; done
 
-web:
-	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) web) || exit 1; done
+web: doc
+	cp -r ps $(WEBDIR)/ps.new
+	cp -r pdf $(WEBDIR)/pdf.new
+	cp -r html $(WEBDIR)/html.new
+	mv $(WEBDIR)/ps $(WEBDIR)/ps.old
+	mv $(WEBDIR)/pdf $(WEBDIR)/pdf.old
+	mv $(WEBDIR)/html $(WEBDIR)/html.old
+	mv $(WEBDIR)/ps.new $(WEBDIR)/ps
+	mv $(WEBDIR)/pdf.new $(WEBDIR)/pdf
+	mv $(WEBDIR)/html.new $(WEBDIR)/html
 
 clean:
 	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) clean) || exit 1; done
