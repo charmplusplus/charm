@@ -1,4 +1,5 @@
 \subsection{Reductions}
+
 \label{reductions}
 
 A \index{array reduction}reduction applies a single operation (e.g. add,
@@ -53,6 +54,7 @@ explained below (Section~\ref{reductionClients}).
 
 
 \subsubsection{Reduction Clients}
+
 \label{reductionClients}
 
 After the data is reduced, it is passed to a you via a callback object,
@@ -130,6 +132,7 @@ void myClient(void *param,int dataSize,void *data)
 
 
 \subsubsection{Built-in Reduction Types}
+
 \label{builtin_reduction}
 
 \charmpp{} includes several built-in reduction types, used to combine 
@@ -223,6 +226,7 @@ your own reduction type.  See the next section
 
 
 \subsubsection{Defining a New Reduction Type}
+
 \label{new_type_reduction}
 
 It is possible to define a new type of reduction, performing a 

@@ -1,4 +1,5 @@
 \section{Checkpoint/Restart}
+
 \index{Checkpoint/Restart}
 \label{sec:checkpoint}
 
@@ -18,6 +19,7 @@ Two schemes of fault tolerance protocols are implemented.
 \subsection{Disk-based Checkpoint/Restart}
 
 \subsubsection{Checkpointing}
+
 \label{sec:diskcheckpoint}
 	The API to checkpoint the application is:
 
@@ -95,6 +97,7 @@ restored individually. A copy from processor 0 will be propagate to all
 the processors.
 
 \subsubsection{Choosing What to Save}
+
 In your programs, you may use chare groups for different types of purposes. 
 For example, groups holding read-only data can avoid excessive data copying,
 while groups maintaining processor-specific information is used as a local
@@ -113,6 +116,7 @@ for intermediate objects, and do save/restore only for the important
 objects. 
 
 \subsection{Double Memory/Disk Checkpoint/Restart}
+
 \label{sec:MemCheckpointing}
 
 The previous disk-based fault-tolerance scheme is a very basic scheme in 

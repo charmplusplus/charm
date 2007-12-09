@@ -1,4 +1,5 @@
 \subsection{Python scripting language}
+
 \label{python}
 
 The Python scripting language in \charmpp{} allows the user to dynamically
@@ -39,6 +40,7 @@ on the server implementation.
 
 
 \subsubsection{The client side}
+
 \label{pythonClient}
 
 In order to facilitate the interface between the client and the server, some
@@ -79,6 +81,7 @@ CcsSendRequest (&server, "pyCode", 0, request.size(), request.pack());
 \end{alltt}
 
 \subsubsection{PythonExecute}
+
 \label{pythonExecute}
 
 To execute a Python script on a running server, the client has to create an
@@ -168,6 +171,7 @@ still running on that interpreter.
 
 
 \subsubsection{Auto-imported modules}
+
 \label{pythonModules}
 
 When a Python script is run inside a \charmpp{} application, two Python modules
@@ -225,6 +229,7 @@ extra parenthesis may be needed to create tuples from individual values.
 \end{description}
 
 \subsubsection{Iterate mode}
+
 \label{pythonIterator}
 
 Sometimes some operations need to be iterated over all the elements in the
@@ -290,6 +295,7 @@ the work opposite to pack and fix all the pointers. This method will not return
 anything and is supposed to fix the pointers ``inline''.
 
 \subsubsection{PythonPrint}
+
 \label{pythonPrint}
 
 In order to receive the output printed by the Python script, the client needs to
@@ -329,6 +335,7 @@ bool isKill();
 \end{alltt}
 
 \subsubsection{PythonFinished}
+
 \label{pythonFinished}
 
 In order to know when a Python code has finished executing, especially when
@@ -352,6 +359,7 @@ if the Python script has already finished, or zero if the script is still
 running.
 
 \subsubsection{The server side}
+
 \label{pythonServer}
 
 In order for a \charmpp{} object (chare, array, node, or nodegroup) to receive
@@ -379,6 +387,7 @@ localVar.registerPython(``pycode'');
 
 
 \subsubsection{Server \kw{read} and \kw{write} functions}
+
 \label{pythonServerRW}
 
 As explained previously in subsection~\ref{pythonModules}, some functions are
@@ -402,6 +411,7 @@ manual ``Extending and Embedding the Python Interpreter''
 \texttt{PyArg\_ParseTuple} and \texttt{Py\_BuildValue}.
 
 \subsubsection{Server iterator functions}
+
 \label{pythonServerIterator}
 
 In order to use the iterative mode as explained in
@@ -441,6 +451,7 @@ Both functions return an integer which will be interpreted by the system as foll
 \end{description}
 
 \subsubsection{Server utility functions}
+
 \label{pythonUtilityFuncs}
 
 They are inherited when declaring an object as Python-compliant, and therefore
@@ -477,6 +488,7 @@ void pythonGetComplex(PyObject*, char*, double*, double*);
 To handle more complicated structures like Dictionaries, Lists or Tuples, please refer to ``Python/C API Reference Manual'' (http://docs.python.org/).
 
 \subsubsection{High level scripting}
+
 \label{pythonHighLevel}
 
 When other than defining the \charmpp{} object as \kw{python}, an entry method

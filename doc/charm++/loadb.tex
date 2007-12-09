@@ -1,5 +1,6 @@
 
 \subsection{Load Balancing}
+
 \label{loadbalancing}
 
 %(This introduction added on 11/12/2003)
@@ -40,6 +41,7 @@ one also spawns off work in the form of chares that can run on any
 processor. The seed balancer will handle such work as it arises.
 
 \subsubsection{Measurement-based Object Migration Strategies}
+
 \label{lbFramework}
 \label{migrationlb}
 
@@ -81,6 +83,7 @@ Here are the two terms often used in \charmpp{} load balancing framework:
 \end{itemize}
 
 \subsubsection{Available Load Balancing Strategies}
+
 \label{lbStrategy}
 
 Load balancing can be performed in either a centralized or distributed
@@ -130,6 +133,7 @@ are described in section \ref{lbOption}.
 %step, and use RefineLB for the later load balancing steps.
 
 \subsubsection{Load Balancing Chare Arrays}
+
 \label{lbarray}
 
 Load balancing framework is well integrated with Chare array implementation - 
@@ -262,6 +266,7 @@ switches back to the automatic Load balancing mode.
 \end{enumerate}
 
 \subsubsection{Migrating objects}
+
 \label{lbmigobj}
 
 Load balancers migrate objects automatically.
@@ -309,6 +314,7 @@ LBSetPeriod(5.0);
 \end{itemize}
 
 \subsubsection{Compiler and run-time options to use load balancing module}
+
 \label{lbOption}
 
 Load balancing strategies are implemented as libraries in \charmpp{}. This
@@ -427,6 +433,7 @@ The instrument of CPU usage is left on.
 \end{enumerate}
 
 \subsubsection{Load Balancing Simulation}
+
 The simulation feature of load balancing framework allows the users to collect information
 about the compute wall/cpu time and communication of the chares during a particular run of
 the program and use this information to later test different load balancing strategies to
@@ -555,6 +562,7 @@ callable from user program to modify the predictor. These methods are:
 
 
 \subsubsection{Seed load balancers - load balancing Chares at creation time}
+
 \label{seedlb}
 
 Seed load balancing involves the movement of object creation messages, or
@@ -644,6 +652,7 @@ name used above. Now one can use {\bf -balance foo} as compile time option
 to {\bf charmc} to link with the {\em foo} seed load balancer.
 
 \subsubsection{Simple Load Balancer Usage Example - Automatic with Sync LB}
+
 \label{lbexample}
 A simple example of how to use a load balancer in sync mode in one's application is presented below.
 

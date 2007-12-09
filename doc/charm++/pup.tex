@@ -1,4 +1,5 @@
 \subsection{PUP}
+
 \label{sec:pup}
 
 The \index{PUP} PUP framework is a generic way to describe the data in an object and to use that description for any task requiring serialization.
@@ -57,6 +58,7 @@ no pup routine, you must pup the values in the superclass yourself.
 
 
 \paragraph{PUP operator}
+
 \label{sec:pupstl}
 
 The recommended way to pup any object \verb.a. is to use \verb.p|a;..
@@ -115,6 +117,7 @@ operator\verb.|. might look like:
 
 
 \paragraph{PUP as bytes}
+
 \label{sec:pupbytes}
 
 For classes and structs with many fields, it can be tedious and 
@@ -151,6 +154,7 @@ eventually may, so pupping as bytes is currently discouraged.
 
 
 \paragraph{PUP overhead}
+
 \label{sec:pupoverhead}
 
 The \kw{PUP::er} overhead is very small---one virtual function call
@@ -163,6 +167,7 @@ transfer, with one virtual function call per array.
 
 
 \paragraph{PUP structured dagger}
+
 \label{sec:pupsdag}
 
 Please note that if your object contains Structured Dagger code (see section ``Structured Dagger'') you must call the generated routine \kw{\_\_sdag\_pup} to correctly pup the Structured Dagger state:
@@ -184,6 +189,7 @@ class bar : public barParent \{
 
 
 \paragraph{PUP modes}
+
 \label{sec:pupmodes}
 
 \charmpp{} uses your pup routine to both pack and unpack, 
@@ -219,6 +225,7 @@ memory should be deallocated in the destructor as usual.
 
 
 \subsubsection{Life Cycle}
+
 \label{sec:lifecycle}
 
 \begin{figure}[h]
@@ -255,6 +262,7 @@ as usual.
 
 
 \subsubsection{Dynamic Allocation}
+
 \label{sec:pupdynalloc}
 
 If your class has fields that are dynamically allocated, when unpacking
@@ -262,6 +270,7 @@ these need to be allocated (in the usual way) before you pup them.
 Deallocation should be left to the class destructor as usual.
 
 \paragraph{No allocation}
+
 The simplest case is when there is no dynamic allocation.
 \begin{alltt}
 class keepsFoo : public mySuperclass \{
@@ -278,6 +287,7 @@ public:
 \end{alltt}
 
 \paragraph{Allocation outside pup}
+
 The next simplest case is when we contain a class 
 that is always allocated during our constructor,
 and deallocated during our destructor.  Then no allocation
@@ -299,6 +309,7 @@ public:
 \end{alltt}
 
 \paragraph{Allocation during pup}
+
 If we need values obtained during the pup routine
 before we can allocate the class, we must 
 allocate the class inside the pup routine.
@@ -322,6 +333,7 @@ public:
 \end{alltt}
 
 \paragraph{Allocatable array}
+
 For example, if we keep an array of doubles,
 we need to know how many doubles there are 
 before we can allocate the array.  Hence we must
@@ -352,6 +364,7 @@ public:
 \end{alltt}
 
 \paragraph{NULL object pointer}
+
 If our allocated object may be NULL, our allocation
 becomes much more complicated.  We must first check
 and pup a flag to indicate whether the object exists, 
@@ -382,6 +395,7 @@ This sort of code is normally much longer and more
 error-prone if split into the various packing/unpacking cases.
 
 \paragraph{Array of classes}
+
 An array of actual classes can be treated exactly the same way
 as an array of basic types.  PUParray will pup each 
 element of the array properly, calling the appropriate \verb.operator|..
@@ -410,6 +424,7 @@ public:
 
 
 \paragraph{Array of pointers to classes}
+
 An array of pointers to classes must handle each element
 separately, since the PUParray routine does not work with 
 pointers.  An ``allocate'' routine to set up the array
@@ -452,6 +467,7 @@ in the next section can be helpful in this case.
 
 
 \subsubsection{Subclass allocation via PUP::able}
+
 \label{sec:pup::able}
 If the class \uw{foo} above might have been a subclass, instead of
 simply using \uw{new foo} above we would have had to allocate 
@@ -643,6 +659,7 @@ In the example above, we could do:
 
 
 \subsubsection{C and Fortran bindings}
+
 C and Fortran programmers can use a limited subset of the
 \kw{PUP::er} capability.  The routines all take a 
 handle named \kw{pup\_er}.  The routines 
@@ -676,6 +693,7 @@ interface is recommended.
 
 
 \subsubsection{Common PUP::ers}
+
 The most common \kw{PUP::er}s used are \kw{PUP::sizer},
 \kw{PUP::toMem}, and \kw{PUP::fromMem}.  These are sizing,
 packing, and unpacking \kw{PUP::er}s, respectively.
@@ -699,6 +717,7 @@ that describes the format used by the source machine.
 
 
 \subsubsection{PUP::seekBlock}
+
 It may rarely occur that you require items to be unpacked
 in a different order than they are packed.  That is, you
 want a seek capability.  \kw{PUP::er}s support a limited 
@@ -743,6 +762,7 @@ maximum number of seek sections.
 
 
 \subsubsection{Writing a PUP::er}
+
 System-level programmers may occasionally find it useful to define
 their own \kw{PUP::er} objects.  The system \kw{PUP::er} class is 
 an abstract base class that funnels all incoming pup requests

@@ -116,6 +116,7 @@ a message to a deleted array element.
 
 
 \subsubsection{Broadcasts}
+
 To \index{Array broadcast} broadcast a message to all the current elements of an array, 
 simply omit the index, as:
 
@@ -129,6 +130,7 @@ migrations, insertions, and deletions.
 
 
 \subsubsection{Reductions on Chare Arrays}
+
 A \index{array reduction}reduction applies a single operation (e.g. add,
 max, min, ...) to data items scattered across many processors and
 collects the result in one place.  \charmpp{} supports reductions on the
@@ -145,6 +147,7 @@ Reductions are described in more detail in Section~\ref{reductions}.
 
 
 \subsubsection{Destroying Arrays}
+
 To destroy an array element-- detach it from the array,
 call its destructor, and release its memory--invoke its 
 \kw{Array destroy} method, as:
@@ -161,6 +164,7 @@ its index.
 
 
 \subsection{Advanced Arrays}
+
 \label{advanced arrays}
 
 The basic array features described above (creation, messaging,
@@ -222,6 +226,7 @@ For 4D, 5D, 6D and user-defined arrays, this functionality cannot be used.
 You need to insert the array elements individually (Section~\ref{dynamic_insertion}).
 
 \subsubsection{Advanced Array Creation}
+
 \label{advanced array create}
 There are several ways to control the array creation process.
 You can adjust the map and bindings before creation, change
@@ -236,6 +241,7 @@ how it was created.
 
 
 \subsubsection{Advanced Array Creation: CkArrayOptions}
+
 \index{CkArrayOptions}
 \label{CkArrayOptions}
 
@@ -268,6 +274,7 @@ out of date.
 
 
 \subsubsection{Advanced Array Creation: Map Object}
+
 \index{array map}
 \label{array map}
 
@@ -335,6 +342,7 @@ For example, if you've declared a map object named ``blockMap'':
 
 
 \subsubsection{Advanced Array Creation: Initial Elements}
+
 \index{array initial}
 \label{array initial}
 
@@ -382,6 +390,7 @@ Thus calling \kw{ckNew(10)} on a 3-processor machine would result in
 
 
 \subsubsection{Advanced Array Creation: Bound Arrays}
+
 \experimental{}
 \index{bound arrays} \index{bindTo}
 \label{bound arrays}
@@ -466,6 +475,7 @@ private:
 
 
 \subsubsection{Advanced Array Creation: Dynamic Insertion}
+
 \label{dynamic_insertion}
 
 In addition to creating initial array elements using ckNew,
@@ -632,6 +642,7 @@ AF::AF()
 
 
 \subsubsection{Migratable Array Elements}
+
 \label{arraymigratable}
 Array objects can \index{migrate}migrate from one PE to another.
 For example, the load balancer (see section~\ref{lbFramework})
@@ -720,10 +731,12 @@ Deallocation is done in the element destructor as usual.
 
 
 \subsubsection{Load Balancing Chare Arrays}
+
 see section~\ref{lbFramework}
 
 
 \subsubsection{Local Access}
+
 \experimental{}
 \index{ckLocal for arrays}
 \label{ckLocal for arrays}
@@ -746,6 +759,7 @@ of each entry method.
 
 
 \subsubsection{Array Section}
+
 \experimental{}
 \label{array section}
 
