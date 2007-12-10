@@ -19,12 +19,12 @@ BIG.XHUGE		{ font-size : xx-large }
 H1		{ color: navy }
 H2		{ color: white; background: navy; padding: 8pt; text-align: center; letter-spacing: 5; word-spacing: 3 }
 H3		{ color: white; background: navy; padding: 5pt; padding-top: 10pt; letter-spacing: 2; word-spacing: 1 }
-H4		{ background: lightyellow; padding: 3pt  }
+H4		{ color: black; background: lightyellow; padding: 3pt  }
 H5		{  }
 H1 a:hover	{ color: navy  }
 H2 a:hover	{ color: white  }
 H3 a:hover	{ color: white  }
-H4 a:hover	{  }
+H4 a:hover	{ color: black  }
 
 /* mathematics styles */
 DIV.displaymath		{ }	/* math displays */
