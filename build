@@ -202,7 +202,7 @@ WITH_ROMIO=
 BUILD_EMULATOR=0
 
 [ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | more && exit 1
-[ $# -lt 2 ] && syntax && exit 1
+[ $# -lt 2 ] && ./smart-build.pl && exit 1
 PROGRAM=$1
 shift
 VERSION=$1; BASEVERSION=$1; ARCH=`echo $1 | sed -e 's@-.*@@'`
