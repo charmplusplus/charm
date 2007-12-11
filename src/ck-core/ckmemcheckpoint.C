@@ -883,7 +883,7 @@ static void askProcDataHandler(char *msg)
 #endif
 }
 
-void CkMemRestart(const char *dummy, const CkArgMsg *args)
+void CkMemRestart(const char *dummy, CkArgMsg *args)
 {
 #if CMK_MEM_CHECKPOINT
    _diePE = CkMyPe();
