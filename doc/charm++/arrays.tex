@@ -266,12 +266,15 @@ the following code segments all do exactly the same thing:
   a1=CProxy_A1::ckNew(\uw{parameters},opts);
 \end{alltt}
 
-Note that the ``numElements'' in an array element is simply
-the numElements passed in when the array was created.
-The true number of array elements may grow or shrink during 
-the course of the computation, so numElements can become 
-out of date. 
-
+Note that the ``numElements'' in an array element is simply the
+numElements passed in when the array was created.  The true number of
+array elements may grow or shrink during the course of the
+computation, so numElements can become out of date.  This ``bulk''
+constructor approach should be preferred where possible, especially
+for large arrays.  Bulk construction is handled via a broadcast which
+will be significantly more efficient in the number of messages
+required than inserting each element individually which will require
+one message send per element.
 
 \subsubsection{Advanced Array Creation: Map Object}
 
@@ -833,7 +836,16 @@ all section members on that processor locally. To support this optimization,
 a separate library called CkMulticast is provided. This library also supports
 section based reduction.
 
+Note: Use of the bulk array constructor (dimensions given in the CkNew
+or CkArrayOptions rather than individual insertion) will allow
+construction to race ahead of several other startup procedures, this
+creates some limitation on the construction delegation and use of
+array section proxies.  For safety, array sections should be
+created in a post constructor entry method.
+
+
 \label {array_section_multicast}
+
 
 To use the library, you need to compile and install CkMulticast library and 
 link your applications against the library using -module:
