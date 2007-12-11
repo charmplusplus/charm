@@ -267,8 +267,7 @@ $explanations{"ifort"} = "Use Intel's ifort fortran compiler";
 $explanations{"pgf90"} = "Use Portland Group's pgf90 fortran compiler";
 $explanations{"ifc"} = "Use Intel's ifc compiler";
 $explanations{"ammasso"} = "Use native RDMA support on Ammasso interconnect";
-
-
+$explanations{"syncft"} = "Use initial fault tolerance support";
 
 
 
