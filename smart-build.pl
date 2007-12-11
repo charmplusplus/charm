@@ -29,19 +29,20 @@ sub promptUserYN {
 
 # The beginning of the good stuff:
 print "\n============================================================\n";
-print "\nBegin interactive charm configuration\n";
+print "\nBegin interactive charm configuration ...\n";
 print "If you are a poweruser expecting a list of options, please use ./build --help\n";
+print "\n============================================================\n\n\n";
 
 
 
 # check for MPI. 
 
 $mpi_found = "false";
-$m = system("which mpicc mpiCC > /dev/null") / 256;
+$m = system("which mpicc mpiCC > /dev/null 2>/dev/null") / 256;
 if($m == 0){
   $mpi_found = "true";
 }
-$m = system("which mpicc mpicxx > /dev/null") / 256;
+$m = system("which mpicc mpicxx > /dev/null 2>/dev/null") / 256;
 if($m == 0){
   $mpi_found = "true";
 }
@@ -73,6 +74,11 @@ if ($os eq "Linux") {
   $arch_os = "linux";
 } elsif ($os =~ m/AIX/ ) {
   $arch = "mpi-sp";
+} elsif ($os =~ m/CYGWIN/ ) {
+  print "Detected an Cygwin kernel\n";
+  print "This by default uses gnu compiler!\n";
+  print "To build with Microsoft Visual C++ compiler, use net-win32. Please refer to README.win32 for the details on setting up VC++ under cygwin.\n\n";
+  $arch_os = "cygwin";
 }
 
 
@@ -96,6 +102,13 @@ if($cpu =~ m/i[0-9]86/){
 
 
 # Determine converse architecture (net, mpi, ...)
+print "Do you want to specify a multi-core version that runs only on a single multi-core node? [y/N]";
+$multicore = promptUserYN();
+
+if($multicore eq "true"){
+    $converse_network_type = "multicore";
+}
+else {
 
 $skip_choosing = "false";
 
@@ -213,13 +226,15 @@ if($arch eq "net-darwin"){
 
 
 
-
 # Determine whether to support SMP / Multicore
-print "\nDo you want SMP or multicore support? [y/N]";
+print "\nDo you want SMP support? [y/N]";
 $p = promptUserYN();
 if($p eq "yes" ){
   $options = "$options smp ";
 }
+
+
+}  # end of if multicore
 
 
 #================ Choose Compiler =================================
@@ -258,7 +273,6 @@ if($p eq "yes" ){
 	}
   }
 }
-
 
 
 
