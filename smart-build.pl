@@ -7,11 +7,13 @@
 # Authors: dooley, becker
 
 
-
 # Turn off I/O buffering
 $| = 1;
 
-print "Begin interactive charm configuration\n\n";
+print "\nBegin interactive charm configuration\n";
+print "If you are a poweruser expecting a list of options, please use ./build --help\n\n\n";
+
+
 
 # Use uname to get the cpu type and OS information
 $os = `uname -s`;
@@ -254,6 +256,22 @@ if($special_compiler eq "true"){
 
 #================ Choose Options =================================
 
+%explanations = ();
+
+$explanations{"ooc"} = "Out-of-core execution support in Charm++";
+$explanations{"tcp"} = "Charm++ over TCP instead of UDP for net versions. TCP is slower";
+$explanations{"ifort"} = "Use Intel's ifort fortran compiler";
+$explanations{"gfortran"} = "Use gfortran compiler for fortran";
+$explanations{"g95"} = "Use g95 compiler";
+$explanations{"ifort"} = "Use Intel's ifort fortran compiler";
+$explanations{"pgf90"} = "Use Portland Group's pgf90 fortran compiler";
+$explanations{"ifc"} = "Use Intel's ifc compiler";
+$explanations{"ammasso"} = "Use native RDMA support on Ammasso interconnect";
+
+
+
+
+
 print "Do you want to specify any Charm++ build options such as fortran compilers? [y/N]";
 $special_options = "false";
 while($line = <>){
@@ -297,7 +315,13 @@ if($special_options eq "true"){
   # print out list for user to select from
   $i = 1;
   foreach $o (@option_list_pruned){
-	print "\t$i)\t$o\n";
+	$exp = $explanations{$o};
+	print "\t$i)\t$o";
+	for($j=0;$j<20-length($o);$j++){
+	  print " ";
+	}
+    print ": $exp";
+	print "\n";
 	$i++;
   }
   print "\t$i)\tNone Of The Above\n";
