@@ -10,8 +10,27 @@
 # Turn off I/O buffering
 $| = 1;
 
+
+
+# A subroutine that reads from input and returns a yes/no/default
+sub promptUserYN {
+  while($line = <>){
+	chomp $line;
+	if(lc($line) eq "y" || lc($line) eq "yes" ){
+	  return "yes";
+	} elsif(lc($line) eq "n" || lc($line) eq "no" ){
+	  return "no";
+	} elsif( $line eq "" ){
+	  return "default";
+	}
+  }
+}
+  
+
+# The beginning of the good stuff:
+print "\n============================================================\n";
 print "\nBegin interactive charm configuration\n";
-print "If you are a poweruser expecting a list of options, please use ./build --help\n\n\n";
+print "If you are a poweruser expecting a list of options, please use ./build --help\n\n";
 
 
 
@@ -32,19 +51,14 @@ chomp ($cpu);
 
 # Determine OS kernel
 if ($os eq "Linux") {
-  print "Detected a linux kernel\n";
   $arch_os = "linux";
 } elsif ($os eq "Darwin") {
-  print "Detected a darwin kernel\n";
   $arch_os = "darwin";
 } elsif ($os =~ m/BSD/ ) {
-  print "Detected a BSD kernel\n";
   $arch_os = "linux";
 } elsif ($os =~ m/OSF1/ ) {
-  print "Detected an OSF1 kernel\n";
   $arch_os = "linux";
 } elsif ($os =~ m/AIX/ ) {
-  print "Detected an AIX kernel\n";
   $arch = "mpi-sp";
 }
 
@@ -52,43 +66,30 @@ if ($os eq "Linux") {
 
 # Determine architecture (x86, ppc, ...)
 if($cpu =~ m/i[0-9]86/){
-  print "Detected architecture x86\n";
   $x86 = 1;
 } elsif($cpu =~ m/x86\_64/){
-  print "Detected architecture x86_64\n";
   $amd64 = 1;
 } elsif($cpu =~ m/ia64/){
-  print "Detected architecture ia64\n";
   $ia64 = 1;
   $nobs = "--no-build-shared";
 } elsif($cpu =~ m/powerpc/){
-  print "Detected architecture ppc\n";
   $ppc = 1;
 } elsif($cpu =~ m/Power Mac/){
-  print "Detected architecture ppc\n";
   $ppc = 1;
 } elsif($cpu =~ m/alpha/){
-  print "Detected architecture alpha\n";
   $alpha = 1;
 }
 
+
+
 # Determine converse architecture (net, mpi, ...)
-print "Do you have a special network interconnect? [y/N]";
-$special_network = "false";
-while($line = <>){
-	chomp $line;
-	if(lc($line) eq "y" || lc($line) eq "yes" ){
-		$special_network = "true";
-		last;
-	} elsif(lc($line) eq "n" || lc($line) eq "no" || $line eq "" ){
-		last;
-	}
-}
 
 # default to net
 $converse_network_type = "net";
-	
-if($special_network eq "true"){
+
+print "Do you have a special network interconnect? [y/N]";
+$p = promptUserYN();
+if($p eq "yes"){
 	print << "EOF";
 	
 Choose an interconnect from below: [1-11]
@@ -151,7 +152,7 @@ EOF
 			$converse_network_type = "vmi";
 			last;
 		} else {
-			print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
+			print "Invalid option, please try again :P\n"
 		}
 	}	
 }
@@ -170,7 +171,8 @@ if($arch eq ""){
 	  }
 }
   
-#Cleanup the architectures to match the horrible real world inconsistent src/archs
+# Fixup the architecture to match the horrible real 
+# world inconsistent directories in src/archs
 
 if($arch eq "net-darwin"){
 	$arch = "net-darwin-x86";
@@ -183,20 +185,11 @@ if($arch eq "net-darwin"){
 
 
 
-
 # Determine whether to support SMP / Multicore
 print "Do you want SMP or multicore support? [y/N]";
-$smp = "";
-while($line = <>){
-	chomp $line;
-	if(lc($line) eq "y" || lc($line) eq "yes" ){
-		$options = "$options smp ";
-		last;
-	} elsif(lc($line) eq "n" || lc($line) eq "no" || $line eq ""){
-		last;
-	} else {
-		print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
-	}
+$p = promptUserYN();
+if($p eq "yes" ){
+  $options = "$options smp ";
 }
 
 
@@ -204,51 +197,37 @@ while($line = <>){
 
 
 print "Do you want to specify a compiler? [y/N]";
-$special_compiler = "false";
-while($line = <>){
+$p = promptUserYN();
+if($p eq "yes" ){
+
+  # Lookup list of compilers
+  $cs = `./build charm++ $arch help | grep "Supported compilers"`;
+  # prune away beginning of the line
+  $cs =~ m/Supported compilers: (.*)/;
+  $cs = $1;
+  # split the line into an array
+  @c_list = split(" ", $cs);
+
+  # print list of compilers
+  $numc = @c_list;
+  print "Choose a compiler: [1-$numc] \n";
+
+  $i = 1;
+  foreach $c (@c_list){
+	print "\t$i)\t$c\n";
+	$i++;
+  }
+  
+  # Choose compiler
+  while($line = <>){
 	chomp $line;
-	if(lc($line) eq "y" || lc($line) eq "yes" ){
-		$special_compiler = "true";
-		last;
-	} elsif(lc($line) eq "n" || lc($line) eq "no" || $line eq ""){
-		last;
+	if($line =~ m/([0-9]*)/ && $1 > 0 && $1 <= $numc){
+	  $compilers = $c_list[$1-1];
+	  last;
 	} else {
-		print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
+	  print "Invalid option, please try again :P\n"
 	}
-}
-
-
-
-# Produce list of compilers
-
-$cs = `./build charm++ $arch help | grep "Supported compilers"`;
-# prune away beginning of the line
-$cs =~ m/Supported compilers: (.*)/;
-$cs = $1;
-# split the line into an array
-@c_list = split(" ", $cs);
-
-
-# Choose compiler
-if($special_compiler eq "true"){
-    $numc = @c_list;
-	print "Choose a compiler: [1-$numc] \n";
-
-	$i = 1;
-	foreach $c (@c_list){
-	  print "\t$i)\t$c\n";
-	  $i++;
-	}
-
-	while($line = <>){
-	  chomp $line;
-	  if($line =~ m/([0-9]*)/ && $1 > 0 && $1 <= $numc){
-		$compilers = $c_list[$1-1];
-		last;
-	  } else {
-		print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
-	  }
-	}
+  }
 }
 
 
@@ -272,21 +251,9 @@ $explanations{"syncft"} = "Use initial fault tolerance support";
 
 
 print "Do you want to specify any Charm++ build options such as fortran compilers? [y/N]";
-$special_options = "false";
-while($line = <>){
-	chomp $line;
-	if(lc($line) eq "y" || lc($line) eq "yes" ){
-		$special_options = "true";
-		last;
-	} elsif(lc($line) eq "n" || lc($line) eq "no" || $line eq ""){
-		last;
-	} else {
-		print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
-	}
-}
+$special_options = promptUserYN();
 
-
-if($special_options eq "true"){
+if($special_options eq "yes"){
 
   # Produce list of options
 
@@ -362,7 +329,7 @@ if($special_options eq "true"){
 # Choose compiler flags
 print << "EOF";
 	
-Choose a set of compiler flags [1-4]
+Choose a set of compiler flags [1-5]
 	1) none
 	2) debug
 	3) optimized [default]
@@ -395,7 +362,7 @@ while($line = <>){
 		
 		last;
 	} else {
-		print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
+		print "Invalid option, please try again :P\n"
 	}
 }
 
@@ -423,26 +390,19 @@ while($line = <>){
 		$target = "LIBS";
 		last;
 	} else {
-		print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
+		print "Invalid option, please try again :P\n"
 	}
 	
 }
 
 # Determine whether to use a -j4 flag for faster building
 # Currently LIBS cannot be safely built with -j4
+$j = "";
 if($target eq "charm++"){
 	print "Do you want to do a parallel build (-j4)?[Y/n]";
-	while($line = <>){
-		chomp $line;
-		if(lc($line) eq "y" || lc($line) eq "yes" || $line eq ""){
-			$j = "-j4";
-		  last;
-		} elsif(lc($line) eq "n" || lc($line) eq "no" ){
-			$j = "";
-			last;
-		} else {
-			print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
-		}
+	$p = promptUserYN();
+	if($p eq "yes" || $p eq "default"){
+	  $j = "-j4";
 	}
 }
 
@@ -465,24 +425,15 @@ print "\t$build_line\n\n";
 
 # Execute the build line if the appropriate architecture directory exists
 print "Do you want to start the build now? [Y/n]";
-while($line = <>){
-  chomp $line;
-  if(lc($line) eq "y" || lc($line) eq "yes" || $line eq ""){
-	
-	if(-e "src/arch/$arch"){
-	  print "Building with: ${build_line}\n";	
-	  # Execute the build line
-	  system($build_line);
-	} else {
-	  print "We could not figure out how to build charm with those options on this platform, please manually build\n";
-	  print "Try something similar to: ${build_line}\n";
-	}
-	
-	last;
-  } elsif(lc($line) eq "n" || lc($line) eq "no" ){
-	last;
+$p = promptUserYN();
+if($p eq "yes" || $p eq "default"){
+  if(-e "src/arch/$arch"){
+	print "Building with: ${build_line}\n";	
+	# Execute the build line
+	system($build_line);
   } else {
-	print "Invalid option, DOES NOT COMPUTE, please try again :P\n"
+	print "We could not figure out how to build charm with those options on this platform, please manually build\n";
+	print "Try something similar to: ${build_line}\n";
   }
 }
 
