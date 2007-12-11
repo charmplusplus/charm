@@ -256,8 +256,8 @@ if($special_compiler eq "true"){
 
 #================ Choose Options =================================
 
+#Create a hash table containing descriptions of various options
 %explanations = ();
-
 $explanations{"ooc"} = "Out-of-core execution support in Charm++";
 $explanations{"tcp"} = "Charm++ over TCP instead of UDP for net versions. TCP is slower";
 $explanations{"ifort"} = "Use Intel's ifort fortran compiler";
@@ -316,6 +316,7 @@ if($special_options eq "true"){
   foreach $o (@option_list_pruned){
 	$exp = $explanations{$o};
 	print "\t$i)\t$o";
+	# pad whitespace before options
 	for($j=0;$j<20-length($o);$j++){
 	  print " ";
 	}
