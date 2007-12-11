@@ -30,8 +30,21 @@ sub promptUserYN {
 # The beginning of the good stuff:
 print "\n============================================================\n";
 print "\nBegin interactive charm configuration\n";
-print "If you are a poweruser expecting a list of options, please use ./build --help\n\n";
+print "If you are a poweruser expecting a list of options, please use ./build --help\n";
 
+
+
+# check for MPI. 
+
+$mpi_found = "false";
+$m = system("which mpicc mpiCC > /dev/null") / 256;
+if($m == 0){
+  $mpi_found = "true";
+}
+$m = system("which mpicc mpicxx > /dev/null") / 256;
+if($m == 0){
+  $mpi_found = "true";
+}
 
 
 # Use uname to get the cpu type and OS information
@@ -84,12 +97,26 @@ if($cpu =~ m/i[0-9]86/){
 
 # Determine converse architecture (net, mpi, ...)
 
+$skip_choosing = "false";
+
 # default to net
 $converse_network_type = "net";
 
-print "Do you have a special network interconnect? [y/N]";
-$p = promptUserYN();
-if($p eq "yes"){
+# Give option of just using the mpi version if mpicc and mpiCC are found
+if($mpi_found eq "true"){
+  print "\nI found that you have an mpicc available in your path.\nDo you want to build Charm++ on this MPI? [Y/n]: ";
+  $p = promptUserYN();
+  if($p eq "yes" || $p eq "default"){
+	$converse_network_type = "mpi";
+	$skip_choosing = "true";
+  }	
+}
+
+if($skip_choosing eq "false") { 
+  
+  print "\nDo you have a special network interconnect? [y/N]: ";
+  $p = promptUserYN();
+  if($p eq "yes"){
 	print << "EOF";
 	
 Choose an interconnect from below: [1-11]
@@ -108,56 +135,58 @@ Choose an interconnect from below: [1-11]
 EOF
 	
 	while($line = <>){
-		chomp $line;
-		if($line eq "1"){
-			$converse_network_type = "mpi";
-			last;
-		} elsif($line eq "2"){
-			$converse_network_type = "net";
-			$options = "$options ibverbs ";
-			last;
-		} elsif($line eq "3"){
-			$converse_network_type = "net";
-			$options = $options . "gm ";
-			last;
-		} elsif($line eq "4"){
-			$converse_network_type = "net";
-			$options = $options . "mx ";
-			last;
-		} elsif($line eq "5"){
-			$arch = "lapi";
-			last;
-		} elsif($line eq "6"){
-			$arch = "mpi-crayxt3";
-			last;
-		} elsif($line eq "7"){
-			$arch = "bluegenel";
-			$compilers = "xlc ";
-			$nobs = "--no-build-shared";
-			last;
-		} elsif($line eq "8"){
-		    $arch = "mpi-bluegenel";
-			$compilers = "xlc ";
-			$nobs = "--no-build-shared";
-			last;
-		} elsif($line eq "9"){
-		    $arch = "bluegenep";
-			$compilers = "xlc ";
-			last;
-		} elsif($line eq "10"){
-		    $arch = "mpi-bluegenep";
-			$compilers = "xlc ";
-			last;
-		  } elsif($line eq "11"){
-			$converse_network_type = "vmi";
-			last;
-		} else {
-			print "Invalid option, please try again :P\n"
-		}
+	  chomp $line;
+	  if($line eq "1"){
+		$converse_network_type = "mpi";
+		last;
+	  } elsif($line eq "2"){
+		$converse_network_type = "net";
+		$options = "$options ibverbs ";
+		last;
+	  } elsif($line eq "3"){
+		$converse_network_type = "net";
+		$options = $options . "gm ";
+		last;
+	  } elsif($line eq "4"){
+		$converse_network_type = "net";
+		$options = $options . "mx ";
+		last;
+	  } elsif($line eq "5"){
+		$arch = "lapi";
+		last;
+	  } elsif($line eq "6"){
+		$arch = "mpi-crayxt3";
+		last;
+	  } elsif($line eq "7"){
+		$arch = "bluegenel";
+		$compilers = "xlc ";
+		$nobs = "--no-build-shared";
+		last;
+	  } elsif($line eq "8"){
+		$arch = "mpi-bluegenel";
+		$compilers = "xlc ";
+		$nobs = "--no-build-shared";
+		last;
+	  } elsif($line eq "9"){
+		$arch = "bluegenep";
+		$compilers = "xlc ";
+		last;
+	  } elsif($line eq "10"){
+		$arch = "mpi-bluegenep";
+		$compilers = "xlc ";
+		last;
+	  } elsif($line eq "11"){
+		$converse_network_type = "vmi";
+		last;
+	  } else {
+		print "Invalid option, please try again :P\n"
+	  }
 	}	
+  }
 }
 
 
+# construct an $arch string if we did not explicitly set one above
 if($arch eq ""){
 	  $arch = "${converse_network_type}-${arch_os}";
 	  if($amd64) {
@@ -171,8 +200,8 @@ if($arch eq ""){
 	  }
 }
   
-# Fixup the architecture to match the horrible real 
-# world inconsistent directories in src/archs
+# Fixup $arch to match the horrible
+# inconsistent directories in src/archs
 
 if($arch eq "net-darwin"){
 	$arch = "net-darwin-x86";
@@ -186,7 +215,7 @@ if($arch eq "net-darwin"){
 
 
 # Determine whether to support SMP / Multicore
-print "Do you want SMP or multicore support? [y/N]";
+print "\nDo you want SMP or multicore support? [y/N]";
 $p = promptUserYN();
 if($p eq "yes" ){
   $options = "$options smp ";
@@ -196,7 +225,7 @@ if($p eq "yes" ){
 #================ Choose Compiler =================================
 
 
-print "Do you want to specify a compiler? [y/N]";
+print "\nDo you want to specify a compiler? [y/N]";
 $p = promptUserYN();
 if($p eq "yes" ){
 
@@ -250,7 +279,7 @@ $explanations{"syncft"} = "Use initial fault tolerance support";
 
 
 
-print "Do you want to specify any Charm++ build options such as fortran compilers? [y/N]";
+print "\nDo you want to specify any Charm++ build options such as fortran compilers? [y/N]";
 $special_options = promptUserYN();
 
 if($special_options eq "yes"){
@@ -399,7 +428,7 @@ while($line = <>){
 # Currently LIBS cannot be safely built with -j4
 $j = "";
 if($target eq "charm++"){
-	print "Do you want to do a parallel build (-j4)?[Y/n]";
+	print "\nDo you want to do a parallel build (-j4)?[Y/n]";
 	$p = promptUserYN();
 	if($p eq "yes" || $p eq "default"){
 	  $j = "-j4";
