@@ -1,2 +1,341 @@
 \section{\charmpp{} Programming}
 
+\subsubsection{What's the basic programming model for Charm++?}
+
+Parallel objects using "Asynchronous Remote Method Invocation":
+
+\begin{description}
+\item[Asynchronous] in that you {\em do not block} until the method returns--the
+caller continues immediately.
+
+\item[Remote] in that the two objects may be separated by a network.
+
+\item[Method Invocation] in that it's just C++ classes calling each other's
+methods.
+\end{description}
+
+\subsubsection{What is an ``entry method''?}
+
+Entry methods are all the methods of a chare where messages can be sent by other chares.
+They are declared in the .ci files, and they must be defined as public methods
+of the C++ object representing the chare.
+
+\subsubsection{When I invoke a remote method, do I block until that method returns?}
+
+No! This is one of the biggest differences between Charm++ and most
+other ``remote procedure call'' systems like CORBA, Java RMI, or RPC.
+``Invoke an asynchronous method'' and ``send a message'' have exactly the same
+semantics and implementation.
+Since the invoking method does now wait for the remote method to terminate, it
+normally cannot receive any return value. (see later for a way to return values)
+
+\subsubsection{Why does Charm++ use asynchronous methods?}
+
+Asynchronous method invocation is more efficient because it can be
+implemented as a single message send. Unlike with synchronous methods,
+thread blocking and unblocking and a return message are not needed.
+
+Another big advantage of asynchronous methods is that it's easy to make
+things run in parallel. If I execute:
+\begin{alltt}
+a->foo();
+b->bar();
+\end{alltt}
+Now foo and bar can run at the same time; there's no reason bar has
+to wait for foo.
+
+\subsubsection{Can I make a method synchronous? Can I then return a value?}
+
+Yes. If you want synchronous methods, so the caller will block, use the \textrm{[sync]}
+keyword before the method in the .ci file. This requires the sender to be a threaded
+entry method, as it will be suspended until the callee finishes.
+Sync entry methods are allowed to return values to the caller.
+
+\subsubsection{If I don't want to use threads, how can an asynchronous method return a value?}
+
+%<br>It can't--at least, not directly. The usual way to get data back to
+%your caller is via another invocation in the opposite direction:
+%<br><tt>void a::start(void) {</tt>
+%<br><tt>&nbsp;&nbsp;&nbsp; b->giveMeSomeData();</tt>
+%<br><tt>}</tt>
+%<br><tt>void b::giveMeSomeData(void) {</tt>
+%<br><tt>&nbsp;&nbsp;&nbsp; a->hereIsTheData(data);</tt>
+%<br><tt>}</tt>
+%<br><tt>void a::hereIsTheData(myclass_t data) {</tt>
+%<br><tt>&nbsp;&nbsp;&nbsp; ...use data somehow...</tt>
+%<br><tt>}</tt>
+%<p>This is contorted, but it exactly matches what the machine has to do.
+%The difficulty of accessing remote data encourages programmers to use local
+%data, bundle outgoing requests, and develop higher-level abstractions,
+%which leads to good performance and good code.
+%<br>&nbsp;
+
+\subsubsection{Isn't there a better way to send data back to whoever called me?}
+
+%<br>The above example is very non-modular, because <tt>b</tt> has to know
+%that <tt>a</tt> called it, and what method to call a back on.&nbsp; For
+%this kind of request/response code, you can abstract away the "where to
+%return the data"&nbsp;with a <tt>CkCallback</tt> object:
+%<br><tt>void a::start(void) {</tt>
+%<br><tt>&nbsp;&nbsp;&nbsp; b->giveMeSomeData(CkCallback(CkIndex_a::hereIsTheData,thisProxy));</tt>
+%<br><tt>}</tt>
+%<br><tt>void b::giveMeSomeData(CkCallback returnDataHere) {</tt>
+%<br><tt>&nbsp;&nbsp;&nbsp; returnDataHere.send(data);</tt>
+%<br><tt>}</tt>
+%<br><tt>void a::hereIsTheData(myclass_t data) {</tt>
+%<br><tt>&nbsp;&nbsp;&nbsp; ...use data somehow...</tt>
+%<br><tt>}</tt>
+%<br>Now<tt> b</tt> can be called from several different places in <tt>a</tt>,
+%or from several different modules.
+%<br><b></b>&nbsp;
+
+\subsubsection{Why should I prefer the callback way to return data rather than using \textrm{[sync]} entry methods?}
+
+
+
+\subsubsection{Does Charm++ support C and Fortran?}
+
+%Not directly, although most of the <a href="/research/">frameworks</a>
+%built on Charm++ support these languages directly. There has been some
+%effort at providing bindings to allow Charm++ programs to be written in
+%Fortran90; but these are immature.
+%<br>&nbsp;
+
+\subsubsection{What is a proxy?}
+
+%<br>A proxy is a local C++ class that represents a remote C++ class. When
+%you invoke a method on a proxy, it sends the request across the network
+%to the real object it represents.&nbsp; In Charm++, all communication is
+%done using proxies.
+%<p>A proxy class for each of your classes is generated based on the methods
+%you list in the .ci file.
+%<br><b></b>&nbsp;
+
+\subsubsection{What are the different ways one can can create proxies?}
+
+%<br>Proxies can be:
+%<ul>
+%<li>
+%Created using ckNew. This is the only method that actually creates a new
+%parallel object. "CProxy_A::ckNew(...)" returns a proxy, as described in
+%the <a href="/manuals/html/charm++/">manual</a>.</li>
+
+%<li>
+%Copied from an existing proxy. This happens when you assign two proxies
+%or send a proxy in a message.</li>
+
+%<li>
+%Created from a "handle".&nbsp; This happens when you say "CProxy_A p=thishandle;"</li>
+
+%<li>
+%Created uninitialized. This is the default when you say "CProxy_A p;".&nbsp;
+%You'll get a runtime error "proxy has not been initialized" if you try
+%to use an uninitialized proxy.</li>
+%</ul>
+
+\subsubsection{What is wrong if I do \textrm{A *ap = new CProxy\_A(handle)}?}
+
+%<br>This will not compile, because a <tt>CProxy_A</tt> is not an <tt>A</tt>.
+%What you want is <tt>CProxy_A *ap = new CProxy_A(handle)</tt>.
+%<br>&nbsp;
+%<li>
+%<b>When sending messages by invoking a method, can we be just in the middle
+%of executing another method? I tried to invoke one entry method in one
+%object while that target object was in the middle of execution of another
+%method, and could not finish until he'd receive the message. Is there something
+%wrong with this kind of thinking and can we execute only one method at
+%a time? How can I then make two-way communication between methods of two
+%objects?</b></li>
+
+%<br>Only one method can execute on a processor at any time. Message sends
+%do not interrupt an ongoing execution. Note the lack of <b>blocking receives</b>
+%in Charm++.
+%<p>The way you implement two-way communication in Charm++ between two objects
+%is as follows:
+%<p>Object A calls method M on object B. The argument to the method M is
+%a message Msg, which contains a field that contains object A's handle (or
+%ChareID). Object B's method gets invoked. It constructs a proxy to A using
+%A's handle from the message, and invokes a method on A using that proxy.
+%<br>&nbsp;
+%<li>
+%<b>Why is the </b><tt>def.h</tt><b> usually included at the end? Is it
+%necessary or can I just include it at the beginning?</b></li>
+
+%<br>You can include the <tt>def.h</tt> file once you've actually declared
+%everything it will reference-- all your chares and readonly variables.
+%If your chares and readonlies are in your own header files, it is legal
+%to include the <tt>def.h</tt> right away.
+%<p>However, if the class declaration for a chare isn't visible when you
+%include the <tt>def.h</tt> file, you'll get a confusing compiler error.
+%This is why we recommend including the <tt>def.h</tt> file at the end.
+%<br>&nbsp;
+
+\subsubsection{How can I use a global variable across different processors?}
+
+%<br>Make the global variable "readonly" by declaring it in the .ci file.
+%<br>&nbsp;
+%<li>
+%<b>Can I have a class static read-only variable?</b></li>
+
+%<br>One can have class-static variables as read-onlies. Inside a chare,
+%group or array declaration in the <tt>.ci</tt> file, one can have a readonly
+%variable declaration. Thus:
+%<pre>chare someChare {
+%&nbsp; ...
+%&nbsp; readonly CkGroupID someGroup;
+%&nbsp; ...
+%};</pre>
+%is fine. In the <tt>.h </tt>declaration for <tt>class someChare</tt> ,
+%you will have have to put <tt>someGroup </tt>as a public static variable,
+%and you are done.
+%<p>You then refer to the variable in your program as <tt>someChare::someGroup</tt>.
+%<br>&nbsp;
+
+\subsubsection{How do I measure the time taken by a program or operation?}
+
+%<br>You can use CkWallTimer() to determine the time on some particular
+%processor.&nbsp; To time some parallel computation, you need to call CkWallTimer
+%on some processor, do the parallel computation, then call CkWallTimer again
+%on the same processor and subtract.
+%<br>&nbsp;
+
+\subsubsection{What do \textrm{CmiAssert} and
+\textrm{CkAssert} do?}
+
+%<br>These are just like the standard C++ <tt>assert</tt> calls in <tt>&lt;assert.h></tt>--
+%they call abort if the condition passed to them is false.
+%<p>We use our own version rather than the standard version because we have
+%to call <tt>CkAbort</tt>, and because we can turn our asserts off when
+%<tt>CMK_OPTIMIZE</tt>
+%is defined.
+%<br>&nbsp;
+
+\subsubsection{How do I know which processor a chare array element is running on?}
+
+%<br>At any given instant, you can call <tt>CkMyPe()</tt> to find out where
+%you are. There is no reliable way to tell where another array element is;
+%even if you could find out at some instant, the element might immediately
+%migrate somewhere else!
+%<br>&nbsp;
+
+\subsubsection{What is a threaded entry method? How does one make an entry method threaded?}
+
+%<br>A threaded entry method is an entry method for a chare that executes
+%in a separate user-level thread. It is useful when the entry method wants
+%to suspend itself (for example, to wait for more data).&nbsp; Note that
+%threaded entry methods have nothing to do with kernel-level threads or
+%pthreads; they run in user-level threads that are scheduled by Charm++
+%itself.
+%<p>In order to make an entry method threaded, one should add the keyword
+%<tt>threaded</tt>
+%withing square brackets after the <tt>entry</tt> keyword in the interface
+%file:
+%<br><tt>module M {</tt>
+%<br><tt>&nbsp; chare X {</tt>
+%<br><tt>&nbsp;&nbsp;&nbsp; entry [threaded] E1(void);</tt>
+%<br><tt>&nbsp; };</tt>
+%<br><tt>};</tt>
+%<br>&nbsp;
+%<li>
+%<b>I have a situation in which I pass messages from one chare array to
+%another, but I don't know how many messages each element of the destination
+%chare array will receive. How can an element find out that it has all its
+%messages?</b></li>
+
+%<br>There isn't yet a nice library to solve this problem; but you can still:
+%<ul>
+%<li>
+%Send a return receipt message, wait until all the receipts for the messages
+%you sent have arrived, then go to a barrier.</li>
+
+%<li>
+%Do all the sends, then wait for quiescence.</li>
+%</ul>
+
+%<li>
+%<b>What is "quiescence"?</b></li>
+
+%<br>When nothing is happening anywhere on the parallel machine.
+%<br>&nbsp;
+%<li>
+%<b>How does Charm++ detect quiescence?</b></li>
+
+%<br>It uses a low-level background task that counts sent and received messages.&nbsp;
+%When, across the machine, all the messages that have been sent have been
+%received, and nothing is being processed, you've reached quiescence.
+%<br>&nbsp;
+%<li>
+%<b>Should I use quiescence detection?</b></li>
+
+%<br>Probably not.
+%<p>In some ways, quiescence is a very strong property--it guarentees <u>nothing</u>
+%is happening <u>anywhere</u>--so if some other library is doing something,
+%you won't reach quiescence. In other ways, quiescence is a very weak property,
+%since it doesn't guarentee anything about the state of your application
+%like a reduction does, only that nothing is happening. Because quiescence
+%detection is on the one hand so strong it breaks modularity, and on the
+%other hand is too weak to guarentee anything useful, it's often better
+%to use something else.
+%<p>Often global properties can be replaced by much easier-to-compute local
+%properties--for example, my object could wait until all <u>its</u> neighbors
+%have sent it messages (a local property my object can easily detect by
+%counting message arrivals), rather than waiting until <u>all</u> neighbor
+%messages across the whole machine have been sent (a global property that's
+%difficult to determine). Sometimes a simple reduction is needed instead
+%of quiescence, which has the benefits of being activated explicitly (each
+%array element has to call contribute) and allows some data to be collected
+%at the same time. A reduction is also a few times faster than quiescence
+%detection.&nbsp; Finally, there are a few situations, such as some tree-search
+%problems, where quiescence detection is actually the most sensible, efficient
+%solution.
+%<br>&nbsp;
+%<li>
+%<b>Can a chare be deleted by using </b><tt>delete this</tt><b>?</b></li>
+
+%<br>You can delete a chare using <tt>delete this;</tt> as long as you do
+%not refer to any of its instance variables, or don't send it a message
+%after that. <tt>delete this</tt>, by now, is a valid programming construct
+%after much debate. The ANSI C++ specification specifically mentions it.
+%To delete array elements, use <tt>ckDestroy()</tt> instead of <tt>delete
+%this;</tt>.
+%<br>&nbsp;
+%<li>
+%<b>When I compile the </b><tt>.ci</tt><b> file I get the message:
+%</b><tt>failed
+%assertion `isConstructor()'</tt><b>. What does this mean?</b></li>
+
+%<br>This problem has already been fixed in the latest version of Charm++.
+%Make sure your copy of Charm++ is the latest. (An old version of Charm++
+%would give this error when you declared a non-constructor entry method
+%in
+%<tt>.ci</tt> file without any parameter.)
+%<br>&nbsp;
+%<li>
+%<b>Is there any way to put inheritance in a
+%</b><tt>.ci</tt><b> file?</b></li>
+
+%<br>Yes!
+%<p>The syntax is exactly like C++, but there's no "public" keyword:
+%<pre>array [1D] subArray : parentArray {
+%&nbsp; ...the usual...
+%};</pre>
+%Virtual methods work right away, and entry methods which are declared virtual
+%in the .h file are still virtual, even across processors. Multiple inheritance
+%works, too. See
+%<tt>charm/pgms/charm++/ megatest/inherit.[ihC]</tt> for
+%an exhaustive example.
+%<br>&nbsp;
+%<li>
+%<b>Are accumulators supported in Charm++?</b></li>
+
+%<br>No, they are no longer supported. You can get almost exactly the same
+%behavior by using a reduction or defining your own group.
+%<br>&nbsp;
+%<li>
+%<b>Can I find out if there are any pending messages for a chare?</b></li>
+
+%<br>No. On a parallel machine, messages destined for a particular chare
+%might be queued on the sender, on the network, or queued on the local machine.&nbsp;
+%Since the first two are never going to be accessible to you, we didn't
+%make the last accessible either.
+%<br>&nbsp;</ol>
