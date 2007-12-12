@@ -62,7 +62,7 @@ static int processBufferedCount;
 #define CMK_IBVERBS_STATS 0
 #define CMK_IBVERBS_TOKENS_FLOW 1
 #define CMK_IBVERBS_INCTOKENS 0 //never turn this on 
-#define CMK_IBVERBS_DEBUG 0
+#define CMK_IBVERBS_DEBUG 1
 
 #define WC_LIST_SIZE 100
 /*#define WC_BUFFER_SIZE 100*/
@@ -398,6 +398,7 @@ static void CmiMachineInit(char **argv){
 	struct ibv_device *dev;
 	int ibPort;
 	int i;
+	int calcMaxSize;
 	infiPacket *pktPtrs;
 	struct infiRdmaPacket **rdmaPktPtrs;
 
@@ -441,10 +442,17 @@ static void CmiMachineInit(char **argv){
 	mtu_size=1200;
 	packetSize = mtu_size;
 	dataSize = packetSize-sizeof(struct infiPacketHeader);
-	maxRecvBuffers = 4000;
-//	maxTokens = 100000/_Cmi_numnodes; // the maximum number of tokens that one can have between two processors
-//	tokensPerProcessor=maxRecvBuffers;
-	maxTokens = 5000;
+	
+	calcMaxSize=5000;
+	if(_Cmi_numnodes*20 > calcMaxSize){
+		calcMaxSize = _Cmi_numnodes*20;
+		if(calcMaxSize > 100000){
+			calcMaxSize = 100000;
+		}
+	}
+//	maxRecvBuffers=80;
+	maxTokens = maxRecvBuffers=calcMaxSize;
+//	maxTokens = 80;
 	context->tokensLeft=maxTokens;
 	//tokensPerProcessor=4;
 	if(_Cmi_numnodes > 1){
@@ -531,12 +539,6 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 	
 	MACHSTATE2(3,"myLid %d numNodes %d",myLid,numNodes);
 
-	//create a completion queue to be used with all the queue pairs
-/*	if(tokensPerProcessor*(numNodes - 1) > 100000){
-		context->sendCqSize = 100000;
-	}else{
-		context->sendCqSize = (tokensPerProcessor*(numNodes-1));
-	}*/
 	context->sendCqSize = maxTokens+2;
 	context->sendCq = ibv_create_cq(context->context,context->sendCqSize,NULL,NULL,0);
 	assert(context->sendCq != NULL);
@@ -855,7 +857,7 @@ static inline void getFreeTokens(struct infiOtherNodeData *infiData){
 	}else{
 		return;
 	}
-	while(infiData->tokensLeft == 0){
+	while(context->tokensLeft == 0){
 		CommunicationServer_nolock(1); 
 	}
 	MACHSTATE1(3,"}}} GET FREE TOKENS %d",context->tokensLeft);
@@ -904,10 +906,10 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 	getFreeTokens(node->infiData);
 
 #if CMK_IBVERBS_INCTOKENS	
-/*	if((node->infiData->tokensLeft < INCTOKENS_FRACTION*node->infiData->totalTokens || node->infiData->tokensLeft < 2) && node->infiData->totalTokens < maxTokens){
+	if((node->infiData->tokensLeft < INCTOKENS_FRACTION*node->infiData->totalTokens || node->infiData->tokensLeft < 2) && node->infiData->totalTokens < maxTokens){
 		packet->header.code |= INFIPACKETCODE_INCTOKENS;
 		incTokens=1;
-	}*/
+	}
 #endif
 /*
 	if(!checkQp(node->infiData->qp)){
@@ -921,11 +923,10 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 		assert(0);
 	}
 #if	CMK_IBVERBS_TOKENS_FLOW
-	//node->infiData->tokensLeft--;
 	context->tokensLeft--;
 #endif
-/*
-	if(!checkQp(node->infiData->qp)){
+
+/*	if(!checkQp(node->infiData->qp)){
 		pollSendCq(1);
 		assert(0);
 	}*/
@@ -1205,6 +1206,9 @@ static inline int pollRecvCq(const int toBuffer){
 	ne = ibv_poll_cq(context->recvCq,WC_LIST_SIZE,&wc[0]);
 //	assert(ne >=0);
 	
+	if(ne != 0){
+		MACHSTATE1(3,"pollRecvCq ne %d",ne);
+	}
 	
 	for(i=0;i<ne;i++){
 		if(wc[i].status != IBV_WC_SUCCESS){
@@ -1520,7 +1524,6 @@ static inline  void processSendWC(struct ibv_wc *sendWC){
 
 
 /********************************************************************/
-//TODO: get token for rdma later
 static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fromNodeNo,int isBuffered){
 	int nodeNo = fromNodeNo;
 	OtherNode node = &nodes[nodeNo];
