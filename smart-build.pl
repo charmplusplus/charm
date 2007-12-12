@@ -75,8 +75,8 @@ if ($os eq "Linux") {
 } elsif ($os =~ m/AIX/ ) {
   $arch = "mpi-sp";
 } elsif ($os =~ m/CYGWIN/ ) {
-  print "Detected an Cygwin kernel\n";
-  print "This by default uses gnu compiler!\n";
+  print "Detected a Cygwin system\n";
+  print "This uses the gnu compiler by default,\n";
   print "To build with Microsoft Visual C++ compiler, use net-win32. Please refer to README.win32 for the details on setting up VC++ under cygwin.\n\n";
   $arch_os = "cygwin";
 }
@@ -239,39 +239,40 @@ if($p eq "yes" ){
 
 #================ Choose Compiler =================================
 
+# Lookup list of compilers
+$cs = `./build charm++ $arch help | grep "Supported compilers"`;
+# prune away beginning of the line
+$cs =~ m/Supported compilers: (.*)/;
+$cs = $1;
+# split the line into an array
+@c_list = split(" ", $cs);
 
-print "\nDo you want to specify a compiler? [y/N]";
-$p = promptUserYN();
-if($p eq "yes" ){
+# print list of compilers
+$numc = @c_list;
 
-  # Lookup list of compilers
-  $cs = `./build charm++ $arch help | grep "Supported compilers"`;
-  # prune away beginning of the line
-  $cs =~ m/Supported compilers: (.*)/;
-  $cs = $1;
-  # split the line into an array
-  @c_list = split(" ", $cs);
+if ($numc > 0) {
+    print "\nDo you want to specify a compiler? [y/N]";
+    $p = promptUserYN();
+    if($p eq "yes" ){
+        print "Choose a compiler: [1-$numc] \n";
 
-  # print list of compilers
-  $numc = @c_list;
-  print "Choose a compiler: [1-$numc] \n";
+        $i = 1;
+        foreach $c (@c_list){
+            print "\t$i)\t$c\n";
+            $i++;
+        }
 
-  $i = 1;
-  foreach $c (@c_list){
-	print "\t$i)\t$c\n";
-	$i++;
-  }
-  
-  # Choose compiler
-  while($line = <>){
-	chomp $line;
-	if($line =~ m/([0-9]*)/ && $1 > 0 && $1 <= $numc){
-	  $compilers = $c_list[$1-1];
-	  last;
-	} else {
-	  print "Invalid option, please try again :P\n"
-	}
-  }
+        # Choose compiler
+        while($line = <>){
+            chomp $line;
+            if($line =~ m/([0-9]*)/ && $1 > 0 && $1 <= $numc){
+                $compilers = $c_list[$1-1];
+                last;
+            } else {
+                print "Invalid option, please try again :P\n"
+            }
+        }
+    }
 }
 
 
