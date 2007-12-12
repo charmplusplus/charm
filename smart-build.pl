@@ -240,7 +240,7 @@ if($p eq "yes" ){
 #================ Choose Compiler =================================
 
 # Lookup list of compilers
-$cs = `./build charm++ $arch help | grep "Supported compilers"`;
+$cs = `./build charm++ $arch help 2>&1 | grep "Supported compilers"`;
 # prune away beginning of the line
 $cs =~ m/Supported compilers: (.*)/;
 $cs = $1;
@@ -294,22 +294,17 @@ $explanations{"syncft"} = "Use initial fault tolerance support";
 
 
 
-print "\nDo you want to specify any Charm++ build options such as fortran compilers? [y/N]";
-$special_options = promptUserYN();
 
-if($special_options eq "yes"){
 
   # Produce list of options
 
-  $opts = `./build charm++ $arch help | grep "Supported options"`;
+  $opts = `./build charm++ $arch help 2>&1 | grep "Supported options"`;
   # prune away beginning of line
   $opts =~ m/Supported options: (.*)/;
   $opts = $1;
 
   @option_list = split(" ", $opts);
   
-  print "Please enter one or more numbers separated by spaces\n";
-  print "Choices:\n";
 
   # Prune out entries that would already have been chosen above, such as smp
   @option_list_pruned = ();
@@ -321,52 +316,59 @@ if($special_options eq "yes"){
 
   # sort the list
   @option_list_pruned = sort @option_list_pruned;
+  if (@option_list_pruned > 0) {
 
-  # print out list for user to select from
-  $i = 1;
-  foreach $o (@option_list_pruned){
-	$exp = $explanations{$o};
-	print "\t$i)\t$o";
-	# pad whitespace before options
-	for($j=0;$j<20-length($o);$j++){
-	  print " ";
-	}
-    print ": $exp";
-	print "\n";
-	$i++;
+      print "\nDo you want to specify any Charm++ build options, such as fortran compilers? [y/N]";
+      $special_options = promptUserYN();
+
+      if($special_options eq "yes"){
+
+          # print out list for user to select from
+          print "Please enter one or more numbers separated by spaces\n";
+          print "Choices:\n";
+          $i = 1;
+          foreach $o (@option_list_pruned){
+              $exp = $explanations{$o};
+              print "\t$i)\t$o";
+              # pad whitespace before options
+              for($j=0;$j<20-length($o);$j++){
+                  print " ";
+              }
+              print ": $exp";
+              print "\n";
+              $i++;
+          }
+          print "\t$i)\tNone Of The Above\n";
+
+          $num_options = @option_list_pruned;
+
+          while($line = <>){
+              chomp $line;
+              $line =~ m/([0-9 ]*)/;
+              @entries = split(" ",$1);
+              @entries = sort(@entries);
+
+              $additional_options = "";
+              foreach $e (@entries) {
+                  if($e>=1 && $e<= $num_options){
+                      $estring = $option_list_pruned[$e-1];
+                      $additional_options = "$additional_options $estring";
+                  } elsif ($e == $num_options+1){
+                      # user chose "None of the above"
+                      # clear the options we may have seen before
+                      $additional_options = " ";
+                  }
+              }
+
+              # if the user input something reasonable, we can break out of this loop
+              if($additional_options ne ""){
+                  $options = "$options ${additional_options} ";
+                  last;
+              }
+
+          }
+      }
   }
-  print "\t$i)\tNone Of The Above\n";
-
-  $num_options = @option_list_pruned;
-
-  while($line = <>){
-	chomp $line;
-    $line =~ m/([0-9 ]*)/;
-    @entries = split(" ",$1);
-    @entries = sort(@entries);
-
-	$additional_options = "";
-	foreach $e (@entries) {
-	  if($e>=1 && $e<= $num_options){
-		$estring = $option_list_pruned[$e-1];
-		$additional_options = "$additional_options $estring";
-	  } elsif ($e == $num_options+1){
-		# user chose "None of the above"
-		# clear the options we may have seen before
-		$additional_options = " ";
-	  }
-	}
-
-	# if the user input something reasonable, we can break out of this loop
-	if($additional_options ne ""){
-	  $options = "$options ${additional_options} ";
-	  last;
-	}
-
-  }
-
-}
-
 
 
 
