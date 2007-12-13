@@ -34,20 +34,6 @@ print "If you are a poweruser expecting a list of options, please use ./build --
 print "\n============================================================\n\n\n";
 
 
-
-# check for MPI. 
-
-$mpi_found = "false";
-$m = system("which mpicc mpiCC > /dev/null 2>/dev/null") / 256;
-if($m == 0){
-  $mpi_found = "true";
-}
-$m = system("which mpicc mpicxx > /dev/null 2>/dev/null") / 256;
-if($m == 0){
-  $mpi_found = "true";
-}
-
-
 # Use uname to get the cpu type and OS information
 $os = `uname -s`;
 $cpu = `uname -m`;
@@ -115,6 +101,22 @@ $skip_choosing = "false";
 # default to net
 $converse_network_type = "net";
 
+
+
+# check for MPI
+
+$mpi_found = "false";
+$m = system("which mpicc mpiCC > /dev/null 2>/dev/null") / 256;
+if($m == 0){
+    $mpi_found = "true";
+    $mpioption = "";
+}
+$m = system("which mpicc mpicxx > /dev/null 2>/dev/null") / 256;
+if($m == 0){
+    $mpi_found = "true";
+    $mpioption = "mpicxx";
+}
+
 # Give option of just using the mpi version if mpicc and mpiCC are found
 if($mpi_found eq "true"){
   print "\nI found that you have an mpicc available in your path.\nDo you want to build Charm++ on this MPI? [Y/n]: ";
@@ -122,6 +124,7 @@ if($mpi_found eq "true"){
   if($p eq "yes" || $p eq "default"){
 	$converse_network_type = "mpi";
 	$skip_choosing = "true";
+	$options = "$options $mpioption";
   }	
 }
 
@@ -213,8 +216,7 @@ if($arch eq ""){
 	  }
 }
   
-# Fixup $arch to match the horrible
-# inconsistent directories in src/archs
+# Fixup $arch to match the inconsistent directories in src/archs
 
 if($arch eq "net-darwin"){
 	$arch = "net-darwin-x86";
