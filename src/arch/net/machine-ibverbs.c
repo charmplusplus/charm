@@ -419,18 +419,26 @@ static void CmiMachineInit(char **argv){
 
 	context = (struct infiContext *)malloc(sizeof(struct infiContext));
 	
+	MACHSTATE1(3,"context allocated %p",context);
+	
 	//localAddr will store the local addresses of all the qps
 	context->localAddr = (struct infiAddr *)malloc(sizeof(struct infiAddr)*_Cmi_numnodes);
+	
+	MACHSTATE1(3,"context->localAddr allocated %p",context->localAddr);
 	
 	context->ibPort = ibPort;
 	//the context for this infiniband device 
 	context->context = ibv_open_device(dev);
 	assert(context->context != NULL);
+	
+	MACHSTATE1(3,"device opened %p",context->context);
 
-	FD_ZERO(&context->asyncFds);
+/*	FD_ZERO(&context->asyncFds);
 	FD_SET(context->context->async_fd,&context->asyncFds);
 	context->tmo.tv_sec=0;
 	context->tmo.tv_usec=0;
+	
+	MACHSTATE(3,"asyncFds zeroed and set");*/
 
 	//protection domain
 	context->pd = ibv_alloc_pd(context->context);
@@ -444,14 +452,15 @@ static void CmiMachineInit(char **argv){
 	dataSize = packetSize-sizeof(struct infiPacketHeader);
 	
 	calcMaxSize=5000;
-	if(_Cmi_numnodes*20 > calcMaxSize){
-		calcMaxSize = _Cmi_numnodes*20;
+	if(_Cmi_numnodes*50 > calcMaxSize){
+		calcMaxSize = _Cmi_numnodes*50;
 		if(calcMaxSize > 100000){
 			calcMaxSize = 100000;
 		}
 	}
 //	maxRecvBuffers=80;
-	maxTokens = maxRecvBuffers=calcMaxSize;
+	maxRecvBuffers=calcMaxSize;
+	maxTokens = maxRecvBuffers;
 //	maxTokens = 80;
 	context->tokensLeft=maxTokens;
 	//tokensPerProcessor=4;
@@ -1796,7 +1805,7 @@ static inline void processBufferedBcast(){
 /*	context->bufferedBcastList->prev = NULL;
 	context->bufferedBcastList->count =0;	*/
 	context->insideProcessBufferedBcasts=0;
-	MACHSTATE2(2,"processBufferedBcast done count %d list %p",context->bufferedBcastList->count,context->bufferedBcastList);
+	MACHSTATE(2,"processBufferedBcast done ");
 };
 
 
