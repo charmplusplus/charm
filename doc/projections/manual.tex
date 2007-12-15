@@ -17,7 +17,7 @@
 
 
 \title{\projections{} Manual}
-\version{6.6}
+\version{7.0}
 \credits{
 By Mike DeNardo, Sid Cammeresi, Theckla Louchios, Orion Lawlor, Gengbin Zheng,
 Chee Wai Lee, Isaac Dooley, and Sindhura Bandhakavi
@@ -474,11 +474,44 @@ To rebuild \projections{} (optional) from the source:
 \subsection{Visualization and Analysis using \projections{}}
 
 \subsubsection{Starting Up}
-
+\label{sec:startingUp}
 From any location, type: \\
 {\tt > PROJECTIONS\_LOCATION/bin/projections [NAME.sts]} \\
 where {\tt PROJECTIONS\_LOCATION} is the path to the main projections
 directory.
+
+Available options to the visualization component of \projections{} include:
+
+\begin{itemize}
+\item
+{\tt -h or --help}: displays help information about available options.
+\item
+{\tt -V or --version}: displays current \projections{} version number.
+\item
+{\tt -u or --use-version $<ver>$}: overrides the data interpretation
+behavior of \projections{} to explicitly use $ver$ instead of the
+current version. This is useful in scenarios where the latest version
+of \projections{} is not backward-compatible with older log formats.
+\item
+{\tt -no-idle}: tells \projections{} to ignore idle time information
+contained in the logs.
+\item
+{\tt -bgsize $<x> <y> <z>$}: tells \projections{} to compute
+additional derived information by assuming a logical 3-D Torus
+topology with the specified dimensionality and a processor-to-torus
+placement policy that matches \charmpp's placement policy on the BG/L
+class of machines. The presence of this option enables additional
+communication visualization options (see later). Note that this option
+is really meant to be used for logs generated from virtual-node mode
+BG/L executions. The additional information derived from any other
+logs would probably be misleading.
+\item
+{\tt -print\_usage}: tells \projections{} to also write to standard
+output the detailed graph numbers when viewing Usage Profiles (see
+later). This is useful for generating visuals that are better
+expressed by tools such as gnuPlot than through screen captures of
+\projections{} plots.
+\end{itemize}
 
 Supplying the optional {\tt NAME.sts} file in the command line will
 cause \projections{} to load data from the file at startup. This shortcut
@@ -1038,8 +1071,8 @@ communication characteristics:
 \item[-] Number of Messages Sent externally (physically) by entry methods;
 \item[-] Number of Bytes Sent externally (physically) by entry methods;
 \item[-] and Number of hops messages travelled before being received
-by an entry methods (available only on trace logs generated on the
-Bluegene machine).
+by an entry methods. This is available when the runtime option {\tt -bgsize}
+(See section \ref{sec:startingUp}) is supplied.
 \end{itemize}
 
 \begin{figure}[htb]
@@ -1537,15 +1570,17 @@ timestep occurred.
 It consists of a pull-down text box and 2 buttons. ``Add to History
 List'' adds the current time range to the pull-down list to the left
 of the button. The dialog box maintains up to 5 entries, replacing
-older entries with newer ones. ``Save History to Disk'' stores current
-history information to the file ``ranges.hst'' in the same directory
-where your logs are stored. Note that you will need write access to
-that directory to successfully store history information. A more
-flexible scheme is currently being developed and will be released in a
-later version of \projections{}. Clicking on the pull-down list allows
-the user to select one out of up to 5 possible time ranges. You can do
-so by moving the mouse up or down the list. Clicking on any one item
-changes the start and end times on the dialog box.
+older entries with newer ones. ``Remove Selected History'' removes the
+currently selected entry in the history list. ``Save History to Disk''
+stores current history information to the file ``ranges.hst'' in the
+same directory where your logs are stored. Note that you will need
+write access to that directory to successfully store history
+information. A more flexible scheme is currently being developed and
+will be released in a later version of \projections{}. Clicking on the
+pull-down list allows the user to select one out of up to 5 possible
+time ranges. You can do so by moving the mouse up or down the
+list. Clicking on any one item changes the start and end times on the
+dialog box.
 \end{itemize}
 
 \subsubsection{Data Fields}
@@ -1606,16 +1641,10 @@ framework that we have not resolved at this time.
 \charmpp{} scheduler idle time is known to be incorrectly recorded on
 the BG/L machine at IBM TJ Watson.
 \item
-End-of-Run analysis techniques are currently known to hang for
-applications that make multiple calls to traceBegin() and traceEnd()
-on the same processor through multiple \charmpp{} objects.
-\item
-Timeline displays mis-aligned time bars whenever the window is
-maximized. This is a Java 1.5 issue with our code. {\em The current
-work-around is to click on the ``Reset'' button on the Timeline
-control panel after maximizing.} This bug also shows up on the JDK1.3
-version if it were built with Java 1.5 but not if it were built using
-the 1.3.1 Java compiler.
+End-of-Run analysis techniques (while tracing applications) are
+currently known to hang for applications that make multiple calls to
+traceBegin() and traceEnd() on the same processor through multiple
+\charmpp{} objects.
 \end{itemize}
 
 \end{document}
