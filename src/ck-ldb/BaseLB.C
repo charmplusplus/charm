@@ -39,7 +39,7 @@ void BaseLB::unregister() {
 }
 
 void BaseLB::pup(PUP::er &p) { 
-  IrrGroup::pup(p); 
+  CBase_BaseLB::pup(p); 
   p|seqno;
   if (p.isUnpacking())
   {
