@@ -51,47 +51,92 @@ keyword before the method in the .ci file. This requires the sender to be a thre
 entry method, as it will be suspended until the callee finishes.
 Sync entry methods are allowed to return values to the caller.
 
+\subsubsection{What is a threaded entry method? How does one make an entry method threaded?}
+
+A threaded entry method is an entry method for a chare that executes
+in a separate user-level thread. It is useful when the entry method wants
+to suspend itself (for example, to wait for more data). Note that
+threaded entry methods have nothing to do with kernel-level threads or
+pthreads; they run in user-level threads that are scheduled by Charm++
+itself.
+
+In order to make an entry method threaded, one should add the keyword
+{\em threaded} withing square brackets after the {\em entry} keyword in the
+interface file:
+\begin{alltt}
+module M \{
+  chare X \{
+    entry [threaded] E1(void);
+  \};
+\};
+\end{alltt}
+
 \subsubsection{If I don't want to use threads, how can an asynchronous method return a value?}
 
-%<br>It can't--at least, not directly. The usual way to get data back to
-%your caller is via another invocation in the opposite direction:
-%<br><tt>void a::start(void) {</tt>
-%<br><tt>&nbsp;&nbsp;&nbsp; b->giveMeSomeData();</tt>
-%<br><tt>}</tt>
-%<br><tt>void b::giveMeSomeData(void) {</tt>
-%<br><tt>&nbsp;&nbsp;&nbsp; a->hereIsTheData(data);</tt>
-%<br><tt>}</tt>
-%<br><tt>void a::hereIsTheData(myclass_t data) {</tt>
-%<br><tt>&nbsp;&nbsp;&nbsp; ...use data somehow...</tt>
-%<br><tt>}</tt>
-%<p>This is contorted, but it exactly matches what the machine has to do.
-%The difficulty of accessing remote data encourages programmers to use local
-%data, bundle outgoing requests, and develop higher-level abstractions,
-%which leads to good performance and good code.
-%<br>&nbsp;
+The usual way to get data back to
+your caller is via another invocation in the opposite direction:
+\begin{alltt}
+void A::start(void) \{
+  b->giveMeSomeData();
+\}
+void B::giveMeSomeData(void) \{
+  a->hereIsTheData(data);
+\}
+void A::hereIsTheData(myclass_t data) \{
+  ...use data somehow...
+\}
+\end{alltt}
+This is contorted, but it exactly matches what the machine has to do.
+The difficulty of accessing remote data encourages programmers to use local
+data, bundle outgoing requests, and develop higher-level abstractions,
+which leads to good performance and good code.
 
 \subsubsection{Isn't there a better way to send data back to whoever called me?}
 
-%<br>The above example is very non-modular, because <tt>b</tt> has to know
-%that <tt>a</tt> called it, and what method to call a back on.&nbsp; For
-%this kind of request/response code, you can abstract away the "where to
-%return the data"&nbsp;with a <tt>CkCallback</tt> object:
-%<br><tt>void a::start(void) {</tt>
-%<br><tt>&nbsp;&nbsp;&nbsp; b->giveMeSomeData(CkCallback(CkIndex_a::hereIsTheData,thisProxy));</tt>
-%<br><tt>}</tt>
-%<br><tt>void b::giveMeSomeData(CkCallback returnDataHere) {</tt>
-%<br><tt>&nbsp;&nbsp;&nbsp; returnDataHere.send(data);</tt>
-%<br><tt>}</tt>
-%<br><tt>void a::hereIsTheData(myclass_t data) {</tt>
-%<br><tt>&nbsp;&nbsp;&nbsp; ...use data somehow...</tt>
-%<br><tt>}</tt>
-%<br>Now<tt> b</tt> can be called from several different places in <tt>a</tt>,
-%or from several different modules.
-%<br><b></b>&nbsp;
+The above example is very non-modular, because {\em b} has to know
+that {\em a} called it, and what method to call a back on. For
+this kind of request/response code, you can abstract away the ``where to
+return the data'' with a {\em CkCallback} object:
+\begin{alltt}
+void A::start(void) \{
+  b->giveMeSomeData(CkCallback(CkIndex_A::hereIsTheData,thisProxy));
+\}
+void B::giveMeSomeData(CkCallback returnDataHere) \{
+  returnDataHere.send(data);
+\}
+void A::hereIsTheData(myclass_t data) \{
+  ...use data somehow...
+\}
+\end{alltt}
+Now {\em b} can be called from several different places in {\em a},
+or from several different modules.
 
 \subsubsection{Why should I prefer the callback way to return data rather than using \textrm{[sync]} entry methods?}
 
+There are a few reasons for that:
 
+\begin{itemize}
+
+\item
+The caller needs to be threaded, which implies some overhead in creating the
+thread. Moreover the threaded entry method will suspend waiting for the data,
+preventing any code after the remote method invocation to proceed in parallel.
+
+\item
+Threaded entry methods are still methods of an object. While they are suspended
+other entry methods for the same object (or even the same threaded entry method)
+can be called. This allows for potential problems if the suspending method does
+leave some objects in an inconsistent state.
+
+\item
+Finally, and probably most important, \textrm{[sync]} entry methods can only be
+used to return a value that can be computed by a single chare. When more
+flexibility is needed, such in cases where the resulting value needs to the
+contribution of multiple objects, the callback methodology is the only one
+available. The caller could for example send a broadcast to a chare array, which
+will use a reduction to collect back the results after they have been computed.
+
+\end{itemize}
 
 \subsubsection{Does Charm++ support C and Fortran?}
 
@@ -103,40 +148,43 @@ Sync entry methods are allowed to return values to the caller.
 
 \subsubsection{What is a proxy?}
 
-%<br>A proxy is a local C++ class that represents a remote C++ class. When
-%you invoke a method on a proxy, it sends the request across the network
-%to the real object it represents.&nbsp; In Charm++, all communication is
-%done using proxies.
-%<p>A proxy class for each of your classes is generated based on the methods
-%you list in the .ci file.
-%<br><b></b>&nbsp;
+A proxy is a local C++ class that represents a remote C++ class. When
+you invoke a method on a proxy, it sends the request across the network
+to the real object it represents. In Charm++, all communication is
+done using proxies.
+
+A proxy class for each of your classes is generated based on the methods
+you list in the .ci file.
 
 \subsubsection{What are the different ways one can can create proxies?}
 
-%<br>Proxies can be:
-%<ul>
-%<li>
-%Created using ckNew. This is the only method that actually creates a new
-%parallel object. "CProxy_A::ckNew(...)" returns a proxy, as described in
-%the <a href="/manuals/html/charm++/">manual</a>.</li>
+Proxies can be:
+\begin{itemize}
+\item
+Created using ckNew. This is the only method that actually creates a new
+parallel object. ``CProxy\_A::ckNew(...)'' returns a proxy, as described in
+the \htmladdnormallink{manual}{http://charm.cs.uiuc.edu/manuals/html/charm++/}.
 
-%<li>
-%Copied from an existing proxy. This happens when you assign two proxies
-%or send a proxy in a message.</li>
+\item
+Copied from an existing proxy. This happens when you assign two proxies
+or send a proxy in a message.
 
-%<li>
-%Created from a "handle".&nbsp; This happens when you say "CProxy_A p=thishandle;"</li>
+\item
+Created from a ``handle''. This happens when you say ``CProxy\_A p=thishandle;''
 
-%<li>
-%Created uninitialized. This is the default when you say "CProxy_A p;".&nbsp;
-%You'll get a runtime error "proxy has not been initialized" if you try
-%to use an uninitialized proxy.</li>
-%</ul>
+\item
+Created uninitialized. This is the default when you say ``CProxy\_A p;''.
+You'll get a runtime error ``proxy has not been initialized'' if you try
+to use an uninitialized proxy.
+\end{itemize}
 
 \subsubsection{What is wrong if I do \textrm{A *ap = new CProxy\_A(handle)}?}
 
-%<br>This will not compile, because a <tt>CProxy_A</tt> is not an <tt>A</tt>.
-%What you want is <tt>CProxy_A *ap = new CProxy_A(handle)</tt>.
+This will not compile, because a {\em CProxy\_A} is not an {\em A}.
+What you want is {\em CProxy\_A *ap = new CProxy\_A(handle)}.
+
+
+
 %<br>&nbsp;
 %<li>
 %<b>When sending messages by invoking a method, can we be just in the middle
@@ -157,138 +205,111 @@ Sync entry methods are allowed to return values to the caller.
 %ChareID). Object B's method gets invoked. It constructs a proxy to A using
 %A's handle from the message, and invokes a method on A using that proxy.
 %<br>&nbsp;
-%<li>
-%<b>Why is the </b><tt>def.h</tt><b> usually included at the end? Is it
-%necessary or can I just include it at the beginning?</b></li>
 
-%<br>You can include the <tt>def.h</tt> file once you've actually declared
-%everything it will reference-- all your chares and readonly variables.
-%If your chares and readonlies are in your own header files, it is legal
-%to include the <tt>def.h</tt> right away.
-%<p>However, if the class declaration for a chare isn't visible when you
-%include the <tt>def.h</tt> file, you'll get a confusing compiler error.
-%This is why we recommend including the <tt>def.h</tt> file at the end.
-%<br>&nbsp;
+\subsubsection{Why is the {\em def.h} usually included at the end? Is it
+necessary or can I just include it at the beginning?}
+
+You can include the {\em def.h} file once you've actually declared
+everything it will reference-- all your chares and readonly variables.
+If your chares and readonlies are in your own header files, it is legal
+to include the {\em def.h} right away.
+
+However, if the class declaration for a chare isn't visible when you
+include the {\em def.h} file, you'll get a confusing compiler error.
+This is why we recommend including the {\em def.h} file at the end.
 
 \subsubsection{How can I use a global variable across different processors?}
 
-%<br>Make the global variable "readonly" by declaring it in the .ci file.
-%<br>&nbsp;
-%<li>
-%<b>Can I have a class static read-only variable?</b></li>
+Make the global variable ``readonly'' by declaring it in the .ci file.
+Remember also that read-onlies can be safely set only in che mainchare
+constructor. Any change after the mainchare constructor has finished will be
+local to the processor that made the change. To change a global variable later
+in the program, every processor must modify it accordingly (e.g by using a chare
+group. Note that chare arrays are not guaranteed to cover all processors)
 
-%<br>One can have class-static variables as read-onlies. Inside a chare,
-%group or array declaration in the <tt>.ci</tt> file, one can have a readonly
-%variable declaration. Thus:
-%<pre>chare someChare {
-%&nbsp; ...
-%&nbsp; readonly CkGroupID someGroup;
-%&nbsp; ...
-%};</pre>
-%is fine. In the <tt>.h </tt>declaration for <tt>class someChare</tt> ,
-%you will have have to put <tt>someGroup </tt>as a public static variable,
-%and you are done.
-%<p>You then refer to the variable in your program as <tt>someChare::someGroup</tt>.
-%<br>&nbsp;
+\subsubsection{Can I have a class static read-only variable?}
+
+One can have class-static variables as read-onlies. Inside a chare,
+group or array declaration in the {\em .ci} file, one can have a readonly
+variable declaration. Thus:
+\begin{alltt}
+chare someChare \{
+  ...
+  readonly CkGroupID someGroup;
+  ...
+\};
+\end{alltt}
+is fine. In the {\em .h} declaration for {\em class someChare},
+you will have have to put {\em someGroup} as a public static variable,
+and you are done.
+
+You then refer to the variable in your program as {\em someChare::someGroup}.
 
 \subsubsection{How do I measure the time taken by a program or operation?}
 
-%<br>You can use CkWallTimer() to determine the time on some particular
-%processor.&nbsp; To time some parallel computation, you need to call CkWallTimer
-%on some processor, do the parallel computation, then call CkWallTimer again
-%on the same processor and subtract.
-%<br>&nbsp;
+You can use \textrm{CkWallTimer()} to determine the time on some particular
+processor. To time some parallel computation, you need to call CkWallTimer
+on some processor, do the parallel computation, then call CkWallTimer again
+on the same processor and subtract.
 
 \subsubsection{What do \textrm{CmiAssert} and
 \textrm{CkAssert} do?}
 
-%<br>These are just like the standard C++ <tt>assert</tt> calls in <tt>&lt;assert.h></tt>--
-%they call abort if the condition passed to them is false.
-%<p>We use our own version rather than the standard version because we have
-%to call <tt>CkAbort</tt>, and because we can turn our asserts off when
-%<tt>CMK_OPTIMIZE</tt>
-%is defined.
-%<br>&nbsp;
+These are just like the standard C++ {\em assert} calls in {\em <assert.h>}--
+they call abort if the condition passed to them is false.
 
-\subsubsection{How do I know which processor a chare array element is running on?}
+We use our own version rather than the standard version because we have
+to call {\em CkAbort}, and because we can turn our asserts off when
+{\em CMK\_OPTIMIZE} is defined.
 
-%<br>At any given instant, you can call <tt>CkMyPe()</tt> to find out where
-%you are. There is no reliable way to tell where another array element is;
-%even if you could find out at some instant, the element might immediately
-%migrate somewhere else!
-%<br>&nbsp;
+\subsubsection{Can I know how many messages are being sent to a chare?}
 
-\subsubsection{What is a threaded entry method? How does one make an entry method threaded?}
+No.
 
-%<br>A threaded entry method is an entry method for a chare that executes
-%in a separate user-level thread. It is useful when the entry method wants
-%to suspend itself (for example, to wait for more data).&nbsp; Note that
-%threaded entry methods have nothing to do with kernel-level threads or
-%pthreads; they run in user-level threads that are scheduled by Charm++
-%itself.
-%<p>In order to make an entry method threaded, one should add the keyword
-%<tt>threaded</tt>
-%withing square brackets after the <tt>entry</tt> keyword in the interface
-%file:
-%<br><tt>module M {</tt>
-%<br><tt>&nbsp; chare X {</tt>
-%<br><tt>&nbsp;&nbsp;&nbsp; entry [threaded] E1(void);</tt>
-%<br><tt>&nbsp; };</tt>
-%<br><tt>};</tt>
-%<br>&nbsp;
-%<li>
-%<b>I have a situation in which I pass messages from one chare array to
-%another, but I don't know how many messages each element of the destination
-%chare array will receive. How can an element find out that it has all its
-%messages?</b></li>
+There is no nice library to solve this problem, as some messages might be queued
+on the receiving processor, some on the sender, and some on the network. You can
+still:
+\begin{itemize}
+\item Send a return receipt message to the sender, and wait until all the
+receipts for the messages sent have arrived, then go to a barrier;
+\item Do all the sends, then wait for quiescence.
+\end{itemize}
 
-%<br>There isn't yet a nice library to solve this problem; but you can still:
-%<ul>
-%<li>
-%Send a return receipt message, wait until all the receipts for the messages
-%you sent have arrived, then go to a barrier.</li>
+\subsubsection{What is "quiescence"? How does it work?}
 
-%<li>
-%Do all the sends, then wait for quiescence.</li>
-%</ul>
+Quiescence is When nothing is happening anywhere on the parallel machine.
 
-%<li>
-%<b>What is "quiescence"?</b></li>
+A low-level background task counts sent and received messages.
+When, across the machine, all the messages that have been sent have been
+received, and nothing is being processed, quiescence is triggered.
 
-%<br>When nothing is happening anywhere on the parallel machine.
-%<br>&nbsp;
-%<li>
-%<b>How does Charm++ detect quiescence?</b></li>
+\subsubsection{Should I use quiescence detection?}
 
-%<br>It uses a low-level background task that counts sent and received messages.&nbsp;
-%When, across the machine, all the messages that have been sent have been
-%received, and nothing is being processed, you've reached quiescence.
-%<br>&nbsp;
-%<li>
-%<b>Should I use quiescence detection?</b></li>
+Probably not.
 
-%<br>Probably not.
-%<p>In some ways, quiescence is a very strong property--it guarentees <u>nothing</u>
-%is happening <u>anywhere</u>--so if some other library is doing something,
-%you won't reach quiescence. In other ways, quiescence is a very weak property,
-%since it doesn't guarentee anything about the state of your application
-%like a reduction does, only that nothing is happening. Because quiescence
-%detection is on the one hand so strong it breaks modularity, and on the
-%other hand is too weak to guarentee anything useful, it's often better
-%to use something else.
-%<p>Often global properties can be replaced by much easier-to-compute local
-%properties--for example, my object could wait until all <u>its</u> neighbors
-%have sent it messages (a local property my object can easily detect by
-%counting message arrivals), rather than waiting until <u>all</u> neighbor
-%messages across the whole machine have been sent (a global property that's
-%difficult to determine). Sometimes a simple reduction is needed instead
-%of quiescence, which has the benefits of being activated explicitly (each
-%array element has to call contribute) and allows some data to be collected
-%at the same time. A reduction is also a few times faster than quiescence
-%detection.&nbsp; Finally, there are a few situations, such as some tree-search
-%problems, where quiescence detection is actually the most sensible, efficient
-%solution.
-%<br>&nbsp;
+In some ways, quiescence is a very strong property (it guarentees {\em nothing}
+is happening {\em anywhere}) so if some other library is doing something,
+you won't reach quiescence. In other ways, quiescence is a very weak property,
+since it doesn't guarentee anything about the state of your application
+like a reduction does, only that nothing is happening. Because quiescence
+detection is on the one hand so strong it breaks modularity, and on the
+other hand is too weak to guarentee anything useful, it's often better
+to use something else.
+
+Often global properties can be replaced by much easier-to-compute local
+properties. For example, my object could wait until all {\em its} neighbors
+have sent it messages (a local property my object can easily detect by
+counting message arrivals), rather than waiting until {\em all} neighbor
+messages across the whole machine have been sent (a global property that's
+difficult to determine). Sometimes a simple reduction is needed instead
+of quiescence, which has the benefits of being activated explicitly (each
+element of a chare array or chare group has to call contribute) and allows
+some data to be collected
+at the same time. A reduction is also a few times faster than quiescence
+detection. Finally, there are a few situations, such as some tree-search
+problems, where quiescence detection is actually the most sensible, efficient
+solution.
+
 %<li>
 %<b>Can a chare be deleted by using </b><tt>delete this</tt><b>?</b></li>
 
@@ -298,17 +319,6 @@ Sync entry methods are allowed to return values to the caller.
 %after much debate. The ANSI C++ specification specifically mentions it.
 %To delete array elements, use <tt>ckDestroy()</tt> instead of <tt>delete
 %this;</tt>.
-%<br>&nbsp;
-%<li>
-%<b>When I compile the </b><tt>.ci</tt><b> file I get the message:
-%</b><tt>failed
-%assertion `isConstructor()'</tt><b>. What does this mean?</b></li>
-
-%<br>This problem has already been fixed in the latest version of Charm++.
-%Make sure your copy of Charm++ is the latest. (An old version of Charm++
-%would give this error when you declared a non-constructor entry method
-%in
-%<tt>.ci</tt> file without any parameter.)
 %<br>&nbsp;
 %<li>
 %<b>Is there any way to put inheritance in a
