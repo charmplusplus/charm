@@ -48,7 +48,7 @@ Several of the above flags and constants will be eliminated as the adaptive stra
 \label{sec:posecommand}
 
 Command line options are handled like \charmpp{} command line
-parameters.  For namespace purity nearly all \pose{} command line options
+parameters.  For namespace purity all \pose{} command line options
 have a \_pose suffix.  They can be inspected by appending a -h to an
 execution of a \pose{} program.  Command line options override any
 defaults set in the {\tt pose\_config.h} file
@@ -57,7 +57,7 @@ defaults set in the {\tt pose\_config.h} file
 \item {\tt {\bf +stats\_pose}}\\
 	$\circ$ Turn on timing and statistics gathering for internal \pose{}
 	operations.  Produces a small slowdown in program.\\
-\item {\tt {\bf +crit\_post}}\\
+\item {\tt {\bf +dop\_pose}}\\
 	$\circ$ Turn on timing and statistics gathering for degree of parallelism calculations.  Generates log files that can be loaded by ploticus scripts to produce graphs plotting active entities over time.  Slows down program dramatically.\\
 \item {\tt {\bf +lb\_on\_pose}}\\
 	$\circ$ Turn on \pose{} load balancing.\\
