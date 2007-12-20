@@ -187,7 +187,20 @@ MPI_Ialltoall   MPI_Iallgather  MPI_Iallreduce  MPI_Ireduce     MPI_IGet
 \end{alltt}
 
 
-\subsection{From MPI to AMPI}
+\subsection{Name for Main Program}
+
+To convert an existing program to use AMPI, the main function or program may need to be renamed. The changes should be made as follows:
+
+\subsubsection{Fortran}
+
+You must declare the main program as a subroutine called ``MPI\_MAIN''. Do not declare the main subroutine as a \textit{program} because it will never be called by the AMPI runtime.
+
+\subsubsection{C or C++}
+
+The main function can be left as is, if \texttt{mpi.h} is included before the main function. This header file has a preprocessor macro that renames main, and the renamed version is called by the AMPI runtime by each thread.
+
+
+\subsection{Global Variable Privatization}
 
 For dynamic load balancing to be effective, one needs to map multiple
 user-level threads onto a processor. Traditional MPI programs assume that the
@@ -234,8 +247,10 @@ global swapping and manual code modification.
 Thanks to the ELF Object Format, we have successfully automated the procedure 
 of switching the set of user global variables when switching thread contexts. 
 The only thing that the user needs to do is to set flag {\tt -swapglobals} 
-at compile and link time. Of course this feature is available on platforms where Position
-Independent Code(PIC) is supported. When this feature does not work for you,
+at compile and link time. Currently this feature only works on x86 and x86\_64
+ (i.e. amd64) platforms that fully support ELF. Thus it will not work on PPC or
+  Itanium, or on some microkernels such as Catamount.When this feature does
+   not work for you,
 you are advised to make the modification manually, which is detailed in the
 following section.
 
@@ -259,7 +274,7 @@ MODULE shareddata
   DOUBLE PRECISION :: xyz(100)
 END MODULE
 
-PROGRAM MAIN
+SUBROUTINE MPI_MAIN
   USE shareddata
   include 'mpif.h'
   INTEGER :: i, ierr
@@ -304,10 +319,7 @@ void subA()\{
 \}
 \end{alltt}
 
-\ampi{} executes the main program inside a user-level thread as a subroutine.
-For this purpose, the main program needs to be changed to be a subroutine with
-the name \verb+MPI_Main+. In C version we have quitely done this by a {\tt \#define}
-macro, but in Fortran code you will have to do it manually.
+\ampi{} executes the main subroutine inside a user-level thread as a subroutine. 
  
 Now we transform this program using the argument passing strategy. We first group the
 shared data into a user-defined type.
@@ -328,11 +340,9 @@ struct shareddata\{
 \};
 \end{alltt}
 
-Now we modify the main program to dynamically allocate this data and change the
+Now we modify the main subroutine to dynamically allocate this data and change the
 references to them. Subroutine \texttt{subA} is then modified to take this data
-as argument. One thing to note is that AMPI programs should rename the main function
-to MPI\_Main. This is to notify the AMPI framework of the entry point of the program.
-If a C++ compiler is used, you must have 'extern "C"' above your MPI\_Main declaration. 
+as argument. 
 
 \begin{alltt}
 !FORTRAN EXAMPLE
