@@ -101,6 +101,7 @@ class BGLTorusManager {
       torus[0] = bgl_p.isTorusX();
       torus[1] = bgl_p.isTorusY();
       torus[2] = bgl_p.isTorusZ();
+      torus[3] = 0;
       
       mapping = getenv("BGLMPI_MAPPING");
     }

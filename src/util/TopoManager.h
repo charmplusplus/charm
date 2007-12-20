@@ -60,6 +60,7 @@ class TopoManager {
       torusX = torus[0];
       torusY = torus[1];
       torusZ = torus[2];
+      torusT = torus[3];
 
 #elif CMK_BLUEGENEP
       dimX = bgptm.getDimX();
@@ -90,6 +91,12 @@ class TopoManager {
       dimNT = crtm.getDimNT();
 
       procsPerNode = crtm.getProcsPerNode();
+      int *torus;
+      torus = crtm.isTorus();
+      torusX = torus[0];
+      torusY = torus[1];
+      torusZ = torus[2];
+      torusT = torus[3];
 
 #else
       dimX = CkNumPes();

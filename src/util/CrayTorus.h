@@ -42,6 +42,7 @@ class CrayTorusManager {
     int dimNZ;	// dimension of the allocation in Z (nodes)
     int dimNT;  // number of processors per node (2 for XT3)
 
+    int torus[4];
     int procsPerNode;   // number of cores per node
     
     int coords2pid[XDIM][YDIM][ZDIM][TDIM];     // coordinates to rank
@@ -119,6 +120,12 @@ class CrayTorusManager {
       dimNT = procsPerNode = 2;
       dimX = dimNX * dimNT;
       dimY = dimNY; dimZ = dimNZ;
+
+      // we get a torus only if the size of the dimension is the biggest
+      torus[0] = (dimNX == XDIM) ? 1 : 0;
+      torus[1] = (dimNY == YDIM) ? 1 : 0;
+      torus[2] = (dimNZ == ZDIM) ? 1 : 0;
+      torus[3] = 0;
     }
 
     ~CrayTorusManager() { }
@@ -134,13 +141,22 @@ class CrayTorusManager {
 
     inline int getProcsPerNode() { return procsPerNode; }
     
+    inline int* isTorus() { return torus; }
+
     inline void rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
       x = pid2coords[pe].x - origin.x; 
       y = pid2coords[pe].y - origin.y; 
       z = pid2coords[pe].z - origin.z; 
       t = pid2coords[pe].t - origin.t; 
     }
-    
+
+    inline void realRankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
+      x = pid2coords[pe].x; 
+      y = pid2coords[pe].y; 
+      z = pid2coords[pe].z; 
+      t = pid2coords[pe].t; 
+    }
+
     inline int coordinatesToRank(int x, int y, int z, int t) {
       return coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t];
     }
