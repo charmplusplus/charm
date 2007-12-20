@@ -1,0 +1,24 @@
+mainmodule hello {
+  readonly CProxy_Main mainProxy;
+  readonly int numW;
+  readonly int numX;
+  readonly int numY;
+  readonly int numZ;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void done_1(void);
+    entry void done_2(void);
+  };
+
+  array [4D] Hello {
+    entry Hello(void);
+    entry void SayHi(int hiNo);
+    entry void SayBye();
+  };
+
+  group HelloMap : CkArrayMap {
+    entry HelloMap(int w, int x, int y, int z);
+  };
+
+};
