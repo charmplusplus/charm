@@ -39,7 +39,7 @@ the .ci file. They {\em cannot} migrate from one processor to another during
 normal execution, but only to disk for checkpointing purposes.
 
 Migratable groups must declare a migration constructor (taking
-\textrm{CkMigrateMessage *} as a parameter) and a pup routine. The migration
+{\tt CkMigrateMessage *} as a parameter) and a pup routine. The migration
 construtor {\em must} call the superclass migration constructor as in this
 example:
 \begin{alltt}

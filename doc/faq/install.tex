@@ -12,13 +12,13 @@ will likely contain bug fixes not found in the releases.
 
 \subsubsection{How do I compile Charm++?}
 
-Run the interactive build script \textrm{./build} with no extra arguments If this fails,
+Run the interactive build script {\tt ./build} with no extra arguments If this fails,
 email \htmladdnormallink{ppl@cs.uiuc.edu}{mailto:ppl@cs.uiuc.edu} with the
 problem. Include the build line used (this is saved automatically in
-\textrm{smart-build.log})
+{\tt smart-build.log})
 
 If you have a very unusual machine configuration, you will have to run
-\textrm{./build\ --help} to list all possible build options. You will then choose the closest
+{\tt ./build\ --help} to list all possible build options. You will then choose the closest
 architecture, and then you may have to modify the associated conf-mach.sh and
 conv-mach.h files in src/arch to point to your desired compilers and options. If
 you develop a significantly different platform, send the modified files to
@@ -27,7 +27,7 @@ in the distribution.
 
 \subsubsection{How do I compile AMPI?}
 
-Run the interactive build script \textrm{./build} and choose the option for building
+Run the interactive build script {\tt ./build} and choose the option for building
 ``Charm++, AMPI, ParFUM, FEM and other libraries''.
 
 \subsubsection{Can I remove part of charm tree after compilation to free disk space?}
@@ -248,11 +248,11 @@ machines as for normal MPI applications.
 
 \subsubsection{How do I use {\em ssh} instead of the deprecated {\em rsh}?}
 
-You need to set up your \textrm{.ssh/authorized\_keys} file
+You need to set up your {\tt .ssh/authorized\_keys} file
 correctly. Setup no-password logins using ssh by putting the correct host
-key (ssh-keygen) in the file \textrm{.ssh/authorized\_keys}.
+key (ssh-keygen) in the file {\tt .ssh/authorized\_keys}.
 
-Finally, in the \textrm{.nodelist} file,
+Finally, in the {\tt .nodelist} file,
 you specify the shell to use for remote execution of a program using
 the keyword {\em ++shell}.
 \begin{alltt}

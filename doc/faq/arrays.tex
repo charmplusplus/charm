@@ -2,7 +2,7 @@
 
 \subsubsection{How do I know which processor a chare array element is running on?}
 
-At any given instant, you can call \textrm{CkMyPe()} to find out where
+At any given instant, you can call {\tt CkMyPe()} to find out where
 you are. There is no reliable way to tell where another array element is;
 even if you could find out at some instant, the element might immediately
 migrate somewhere else!
@@ -45,7 +45,7 @@ with the {\em +balancer} option, or at runtime with the {\em -balancer} option.
 
 \subsubsection{What is the migration constructor and why do I need it?}
 
-The migration constructor (a constructor that takes \textrm{CkMigrateMessage *}
+The migration constructor (a constructor that takes {\tt CkMigrateMessage *}
 as parameter) is invoked when an array element migrates to a new
 processor. If there is anything you want to do when you migrate, you could put
 it here. However, even if you don't want to do anything, you must create it, as
@@ -60,7 +60,7 @@ that it can be created, and these must be declared in the {\em .ci} file.
 \subsubsection{What happens to the old copy of an array element after it migrates?}
 
 After sizing and packing a migrating array element, the array manager
-\textrm{delete}s
+{\tt delete}s
 the old copy. As long as all the array element destructors in the non-leaf
 nodes of your inheritance hierarchy are {\em virtual destructors}, with
 declaration syntax:
@@ -88,14 +88,14 @@ at the next {\em AtSync()}?}
 %<br>No.
 
 
-\subsubsection{When not using \textrm{AtSync} for LB, when does the LB start
+\subsubsection{When not using {\tt AtSync} for LB, when does the LB start
 up? Where is the code that periodically checks if load balancing can be
 done?}
 
-If not using \textrm{usesAtSync}, the load balancer can start up at
-anytime. There is a dummy \textrm{AtSync} for each array element which
+If not using {\tt usesAtSync}, the load balancer can start up at
+anytime. There is a dummy {\tt AtSync} for each array element which
 by default tells the load balancer that it is always ready. The LDBD manager
-has a syncer (\textrm{LBDB::batsyncer}) which periodically calls \textrm{AtSync}
+has a syncer ({\tt LBDB::batsyncer}) which periodically calls {\tt AtSync}
 roughly every 1ms to trigger the load balancing (this timeout can be changed
 with the {\em +LBPeriod} option). In this load balancing
 mode, users have to make sure all migratable objects are always ready to

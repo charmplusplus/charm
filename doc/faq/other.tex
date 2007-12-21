@@ -7,7 +7,7 @@ control dependencies in message-driven programs. It combines the efficiency
 of message-driven execution with the explicitness of control specification.
 Structured Dagger allows easy expression of dependencies among messages
 and computations and also among computations within the same object using
-\textrm{when-blocks}
+{\tt when-blocks}
 and various structured constructs. See the Charm++ manual for the details.
 
 \subsubsection{What are the performance problems with AMPI packing and unpacking?}
@@ -27,7 +27,7 @@ of a Charm++ message) while sending.
 %with collective operations can be done this way, so I have changed AMPI
 %to be a standalone Charm++ library, rather than being dependent on Tempo.
 
-\subsubsection{Is \textrm{TempoArray::ckTempoSendElem()} the only way for non-AMPI
+\subsubsection{Is {\tt TempoArray::ckTempoSendElem()} the only way for non-AMPI
 code to communicate with running AMPI code?}
 
 %<br>A static method <tt>sendraw</tt> is added to the AMPI class, that allows

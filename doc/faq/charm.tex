@@ -46,7 +46,7 @@ to wait for foo.
 
 \subsubsection{Can I make a method synchronous? Can I then return a value?}
 
-Yes. If you want synchronous methods, so the caller will block, use the \textrm{[sync]}
+Yes. If you want synchronous methods, so the caller will block, use the {\tt [sync]}
 keyword before the method in the .ci file. This requires the sender to be a threaded
 entry method, as it will be suspended until the callee finishes.
 Sync entry methods are allowed to return values to the caller.
@@ -111,7 +111,7 @@ void A::hereIsTheData(myclass_t data) \{
 Now {\em b} can be called from several different places in {\em a},
 or from several different modules.
 
-\subsubsection{Why should I prefer the callback way to return data rather than using \textrm{[sync]} entry methods?}
+\subsubsection{Why should I prefer the callback way to return data rather than using {\tt [sync]} entry methods?}
 
 There are a few reasons for that:
 
@@ -129,7 +129,7 @@ can be called. This allows for potential problems if the suspending method does
 leave some objects in an inconsistent state.
 
 \item
-Finally, and probably most important, \textrm{[sync]} entry methods can only be
+Finally, and probably most important, {\tt [sync]} entry methods can only be
 used to return a value that can be computed by a single chare. When more
 flexibility is needed, such in cases where the resulting value needs to the
 contribution of multiple objects, the callback methodology is the only one
@@ -137,6 +137,38 @@ available. The caller could for example send a broadcast to a chare array, which
 will use a reduction to collect back the results after they have been computed.
 
 \end{itemize}
+
+\subsubsection{How does the initializazion in Charm work?}
+
+Each processor executes the following operations strictly in order:
+\begin{enumerate}
+\item All methods registered as {\em initnode};
+\item All methods registered as {\em initproc};
+\item On processor zero, all {\em mainchares} constructor method is invoked (the ones taking a {\tt CkArgMsg*});
+\item The read-onlies are propagated from processor zero to all other processors;
+\item The nodegroups are created;
+\item The groups are created. During this phase, for all the chare arrays have been created with a block allocation, the corresponding array elements are instantiated;
+\item Initialization terminated and all messages are available for processing, including the messages responsible for the instantiation of array elements manually inserted.
+\end{enumerate}
+
+This implies that you can assume that the previous steps has completely finished
+before the next one starts, and any side effect from all the previous steps are
+committed (and can therefore be used).
+
+Inside a single step there is no order guarantee. This implies that, for example,
+two groups allocated from mainchare can be instantiated in any order. The only
+exception to this is processor zero, where chare objects are instantiated
+immediately when allocated in the mainchare, i.e if two groups are allocated,
+their order is fixed by the allocation order in the mainchare constructing them. 
+Again, this is only valid for processor zero, and in no other processor this
+assumption should be made.
+
+To notice that if array elements are allocated in block (by specifying the
+number of elements at the end of the {\tt ckNew} function), they are all
+instantiated before normal execution is resumed; if manual insertion is used,
+each element can be constructed at any time on its home processor, and not
+necessarily before other regular communication messages have been delivered to
+other chares (including other array elements part of the same array).
 
 \subsubsection{Does Charm++ support C and Fortran?}
 
@@ -178,7 +210,7 @@ You'll get a runtime error ``proxy has not been initialized'' if you try
 to use an uninitialized proxy.
 \end{itemize}
 
-\subsubsection{What is wrong if I do \textrm{A *ap = new CProxy\_A(handle)}?}
+\subsubsection{What is wrong if I do {\tt A *ap = new CProxy\_A(handle)}?}
 
 This will not compile, because a {\em CProxy\_A} is not an {\em A}.
 What you want is {\em CProxy\_A *ap = new CProxy\_A(handle)}.
@@ -247,13 +279,13 @@ You then refer to the variable in your program as {\em someChare::someGroup}.
 
 \subsubsection{How do I measure the time taken by a program or operation?}
 
-You can use \textrm{CkWallTimer()} to determine the time on some particular
+You can use {\tt CkWallTimer()} to determine the time on some particular
 processor. To time some parallel computation, you need to call CkWallTimer
 on some processor, do the parallel computation, then call CkWallTimer again
 on the same processor and subtract.
 
-\subsubsection{What do \textrm{CmiAssert} and
-\textrm{CkAssert} do?}
+\subsubsection{What do {\tt CmiAssert} and
+{\tt CkAssert} do?}
 
 These are just like the standard C++ {\em assert} calls in {\em <assert.h>}--
 they call abort if the condition passed to them is false.

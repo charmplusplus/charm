@@ -6,7 +6,7 @@ There are many ways to debug programs written in Charm++:
 
 \begin{description}
 
-\item[print] By using \textrm{CkPrintf}, values from critical point in the program can be
+\item[print] By using {\tt CkPrintf}, values from critical point in the program can be
 printed.
 
 \item[gdb] This can be used both on a single processor, and in parallel
@@ -23,7 +23,7 @@ attached to specific processors on demand.
 \subsubsection{How do I use charmdebug?}
 
 Currently charmdebug is tested to work only under net- versions. With other versions,
-testing is pending. The executable is present in \textrm{java/bin/charmdebug} of
+testing is pending. The executable is present in {\tt java/bin/charmdebug} of
 the Charm++ distribution. To start, simply substitute ``charmdebug'' to
 ``charmrun'':
 \begin{alltt}shell> <path>/charmdebug ./myprogram\end{alltt}
@@ -60,13 +60,13 @@ shell> ./charmrun ./myprogram +p2 ++debug
 %<br><tt>...</tt>
 %<br><tt>&nbsp; > dbx -p 34554234</tt>
 
-\subsubsection{When I try to use the {\em ++debug} option I get: \textrm{remote
+\subsubsection{When I try to use the {\em ++debug} option I get: {\tt remote
 host not responding... connection closed}}
 
 First, make sure the program at least starts to run properly without {\em ++debug}
 (i.e. charmrun is working and there are no problems with the program startup
 phase). You need to make sure that gdb or dbx, and xterm are installed
-on all the machines you are using (not the one that is running \textrm{charmrun}).
+on all the machines you are using (not the one that is running {\tt charmrun}).
 If you are working on remote machines from Linux, you need to run ``xhost +''
 locally to give the remote machines permission to display an xterm on
 your desktop. If you are working from a Windows machine, you need an X-win
@@ -128,7 +128,7 @@ least happen in causal order. Note that this does dramatically slow down
 output.
 
 \subsubsection{Is there a way to flush the print buffers in Charm++ (like
-\textrm{fflush()})?}
+{\tt fflush()})?}
 
 Charm++ automatically flushes the print buffers every newline and at
 program exit. There is no way to manually flush the buffers at another
@@ -163,7 +163,7 @@ from uninitialized data, corrupting the heap, etc. The solution is to never,
 ever send pointers in messages -- you need to send the data the pointer points
 to, not the pointer.
 
-\subsubsection{I get the error: ``\textrm{Group ID is zero-{}- invalid!}''. What does
+\subsubsection{I get the error: ``{\tt Group ID is zero-{}- invalid!}''. What does
 this mean?}
 
 The {\em group} it is refering to is the chare group. This
@@ -171,7 +171,7 @@ error is often due to using an uninitialized proxy or handle; but it's
 possible this indicates severe corruption. Run with {\em ++debug} and check
 it you just sent a message via an uninitialized proxy.
 
-\subsubsection{I get the error: \textrm{Null-Method Called. Program may have Unregistered
+\subsubsection{I get the error: {\tt Null-Method Called. Program may have Unregistered
 Module!!} What does this mean?}
 
 You are trying to use code from a module that has not been properly
@@ -193,16 +193,16 @@ Charmrun: error on request socket-{}-
 Socket closed before recv.
 \end{alltt}
 
-This means that the node program died without informing \textrm{charmrun}
+This means that the node program died without informing {\tt charmrun}
 about it, which typically means a segmentation fault while in the interrupt
 handler or other critical communications code. This indicates severe
 corruption in Charm++'s data structures, which is likely the result of
 a heap corruption bug in your program. Re-linking with {\em -memory paranoid}
 may clarify the true problem.
 
-\subsubsection{When I run my program, sometimes I get a \textrm{Hangup}, and
-sometimes \textrm{Bus Error}. What do these messages indicate?}
+\subsubsection{When I run my program, sometimes I get a {\tt Hangup}, and
+sometimes {\tt Bus Error}. What do these messages indicate?}
 
-\textrm{Bus Error} and \textrm{Hangup} both are indications that your
+{\tt Bus Error} and {\tt Hangup} both are indications that your
 program is terminating abnormally, i.e. with an uncaught signal (SEGV or
 SIGBUS). You should definitely run the program with gdb, or use {\em ++debug}.
