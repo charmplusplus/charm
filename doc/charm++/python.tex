@@ -406,8 +406,7 @@ function will receive two parameters: where the data will be written and what
 data, and will perform the update. All these \texttt{PyObject}s are generic, and
 need to be coherent with the protocol specified by the application. In order to
 parse the parameters, and create the value of the read, please refer to the
-manual ``Extending and Embedding the Python Interpreter''
-(http://docs.python.org/), and in particular to the functions
+manual \htmladdnormallink{``Extending and Embedding the Python Interpreter''}{http://docs.python.org/}, and in particular to the functions
 \texttt{PyArg\_ParseTuple} and \texttt{Py\_BuildValue}.
 
 \subsubsection{Server iterator functions}
@@ -485,7 +484,7 @@ void pythonGetFloat(PyObject*, char*, double*);
 void pythonGetComplex(PyObject*, char*, double*, double*);
 \end{alltt}
 
-To handle more complicated structures like Dictionaries, Lists or Tuples, please refer to ``Python/C API Reference Manual'' (http://docs.python.org/).
+To handle more complicated structures like Dictionaries, Lists or Tuples, please refer to \htmladdnormallink{``Python/C API Reference Manual''}{http://docs.python.org/}.
 
 \subsubsection{High level scripting}
 
