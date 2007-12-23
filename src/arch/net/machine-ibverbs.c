@@ -2215,6 +2215,8 @@ int CmiDirect_createHandle(int senderProc,void *recvBuf, int recvBufSize, void (
 	table->handles[idx].rdmaPacket->type = INFI_DIRECT;
 	table->handles[idx].rdmaPacket->localBuffer = &(table->handles[idx]);
 	
+	MACHSTATE4(3," Newhandle created %d senderProc %d recvBuf %p recvBufSize %d",newHandle,senderProc,recvBuf,recvBufSize);
+	
 	return newHandle;
 }
 
@@ -2257,6 +2259,7 @@ void CmiDirect_assocLocalBuffer(int recverProc,int handle,void *sendBuf,int send
 	table->handles[idx].packet->senderKey = *(table->handles[idx].key);
 	table->handles[idx].packet->senderBuf = sendBuf;
 	table->handles[idx].packet->senderBufSize = sendBufSize;
+	MACHSTATE4(3,"idx %d recverProc %d handle %d sendBuf %p",idx,recverProc,handle,sendBuf);
 };
 
 
@@ -2285,11 +2288,11 @@ void CmiDirect_put(int recverProc,int handle){
 			table = table->next;
 		}
 
-		
+		MACHSTATE2(3,"CmiDirect_put to recverProc %d handle %d",recverProc,handle);
 		MallocInfiPacket (packet);
 		{
 			packet->size = sizeof(struct infiDirectRequestPacket);
-			packet->buf = (char *)&(table->handles[idx].packet);
+			packet->buf = (char *)(table->handles[idx].packet);
 			packet->header.code = INFIDIRECT_REQUEST;
 			packet->header.nodeNo = _Cmi_mynode;
 			packet->ogm = NULL;
@@ -2309,7 +2312,9 @@ void processDirectRequest(struct infiDirectRequestPacket *directRequestPacket){
 	int tableIdx,idx,i;
 	infiDirectHandleTable *table;
 	OtherNode node = nodes_by_pe[senderProc];
-	
+
+	MACHSTATE2(3,"processDirectRequest from proc %d handle %d",senderProc,handle);
+
 	calcHandleTableIdx(handle,&tableIdx,&idx);
 
 	table = recvHandleTable[senderProc];
@@ -2349,6 +2354,7 @@ void processDirectRequest(struct infiDirectRequestPacket *directRequestPacket){
 };
 
 void processDirectWC(struct infiRdmaPacket *rdmaPacket){
+	MACHSTATE(3,"processDirectWC");
 	infiDirectHandle *handle = (infiDirectHandle *)rdmaPacket->localBuffer;
 	(*(handle->callbackFnPtr))(handle->callbackData);
 };
