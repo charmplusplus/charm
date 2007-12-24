@@ -2502,13 +2502,13 @@ void CmiInitImmediateMsg(void)
     CmiRegisterHandler((CmiHandler)CmiImmediateMsgHandler);
 }
 
-#if !CMK_IMMEDIATE_MSG
+/*#if !CMK_IMMEDIATE_MSG
 #if !CMK_MACHINE_PROGRESS_DEFINED
 void CmiProbeImmediateMsg()
 {
 }
 #endif
-#endif 
+#endif*/
 
 /******** Idle timeout module (+idletimeout=30) *********/
 
