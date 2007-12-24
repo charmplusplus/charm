@@ -1381,11 +1381,10 @@ CpvExtern(unsigned, networkProgressCount);
 extern int networkProgressPeriod;
 
 #if !CMK_MACHINE_PROGRESS_DEFINED
+
 #define CmiNetworkProgress() 
 #define CmiNetworkProgressAfter(p) 
 #define CmiMachineProgressImpl()
-
-void CmiProbeImmediateMsg();
 
 #else
 
@@ -1393,8 +1392,6 @@ void CmiProbeImmediateMsg();
 extern "C" 
 #endif*/
 void CmiMachineProgressImpl();
-
-#define CmiProbeImmediateMsg CmiMachineProgressImpl
 
 #define CmiNetworkProgress() {CpvAccess(networkProgressCount) ++; \
       if(CpvAccess(networkProgressCount) >=  networkProgressPeriod) { \
@@ -1411,6 +1408,8 @@ void CmiMachineProgressImpl();
 } \
 
 #endif
+
+#define CmiProbeImmediateMsg CmiMachineProgressImpl
 
 /*
    to immediate-fy a Converse message, set the most significant bit to 1
