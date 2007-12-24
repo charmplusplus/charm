@@ -942,6 +942,7 @@ void CmiProbeImmediateMsg()
 
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some  implementations*/
+#if CMK_MACHINE_PROGRESS_DEFINED
 void CmiMachineProgressImpl()
 {
 #if !CMK_SMP
@@ -955,6 +956,7 @@ void CmiMachineProgressImpl()
     /* CommunicationServerThread(0); */
 #endif
 }
+#endif
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
