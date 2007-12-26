@@ -3,8 +3,16 @@
 
 #define NITER 10000
 #define PAYLOAD 100
+#ifdef CMK_USE_IBVERBS 
+int iterations;
+int payload;
+extern "C" {
+  int CmiDirect_createHandle(int senderProc,void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData);
 
-
+  void CmiDirect_assocLocalBuffer(int recverProc,int handle,void *sendBuf,int sendBufSize);
+  void CmiDirect_put(int recverProc,int handle);
+}
+#endif
 class Fancy
 {
   char _str[12];
@@ -27,7 +35,8 @@ class CkArrayIndexFancy : public CkArrayIndex {
 class PingMsg : public CMessage_PingMsg
 {
   public:
-    char x[PAYLOAD];
+    char *x;
+
 };
 
 class IdMsg : public CMessage_IdMsg
@@ -51,6 +60,7 @@ class main : public Chare
   CProxy_PingF arrF;
   CProxy_PingC cid;
   CProxy_PingG gid;
+  CProxy_PingN ngid;
 public:
   main(CkMigrateMessage *m) {}
   main(CkArgMsg* m)
@@ -59,10 +69,20 @@ public:
     if(CkNumPes()>2) {
       CkAbort("Run this program on 1 or 2 processors only.\n");
     }
-    CkPrintf("Pingpong with payload: %d \n", PAYLOAD);
+
+    iterations=NITER;
+    payload=PAYLOAD;
+    if(m->argc>1)
+      payload=atoi(m->argv[1]);
+    if(m->argc>2)
+      iterations=atoi(m->argv[2]);
+    if(m->argc>3)
+      CkPrintf("Usage: pgm +pN [payload] [iterations]\n Where N [1-2], payload (default %d) is integer >0 iterations (default %d) is integer >0 ", PAYLOAD, NITER);
+    CkPrintf("Pingpong with payload: %d iterations: %d\n", payload,iterations);
     mainProxy = thishandle;
     phase = 0;
     gid = CProxy_PingG::ckNew();
+    ngid = CProxy_PingN::ckNew();
     cid=CProxy_PingC::ckNew(1%CkNumPes());
     cid=CProxy_PingC::ckNew(new IdMsg(cid.ckGetChareID()),0);
     arr1 = CProxy_Ping1::ckNew(2);
@@ -103,6 +123,21 @@ public:
       case 5:
         gid[0].start();
         break;
+#ifndef CMK_USE_IBVERBS
+      case 6:
+        ngid[0].start();
+        break;
+#else
+      case 6:
+	if(CkNumNodes()==2)
+	  {
+	    ngid[0].startRDMA();
+	    break;
+	  }
+	else
+	  CkPrintf("RDMA skipped, you only have 1 node\n");
+	// drop through to next case
+#endif
       default:
         CkExit();
     }
@@ -127,15 +162,15 @@ public:
   void start(void)
   {
     start_time = CkWallTimer();
-    (*pp).recv(new PingMsg);
+    (*pp).recv(new (payload) PingMsg);
   }
   void recv(PingMsg *msg)
   {
     if(me==0) {
       niter++;
-      if(niter==NITER) {
+      if(niter==iterations) {
         end_time = CkWallTimer();
-        int titer = (CkNumPes()==1)?(NITER/2) : NITER;
+        int titer = (CkNumPes()==1)?(iterations/2) : iterations;
         CkPrintf("Roundtrip time for Groups is %lf us\n",
                  1.0e6*(end_time-start_time)/titer);
         delete msg;
@@ -148,6 +183,123 @@ public:
     }
   }
 };
+
+
+class PingN : public NodeGroup
+{
+  CProxyElement_PingN *pp;
+  int niter;
+  int me, nbr;
+#ifdef CMK_USE_IBVERBS 
+  int rhandle;
+  int shandle;
+  char *rbuff;
+  char *sbuff;
+#endif
+  double start_time, end_time;
+public:
+  PingN()
+  {
+    me = CkMyNode();    
+    nbr = (me+1)%CkNumNodes();
+
+    // note: for RMDA in ping you can only have 1 nbr who is both your
+    // upstream and downstream which makes this an artificially simple
+    // calculation.
+
+    pp = new CProxyElement_PingN(thisgroup,nbr);
+    niter = 0;
+    CkPrintf("[%d] ith nodegroup chare on pe %d\n",me,CkMyPe());
+#ifdef CMK_USE_IBVERBS 
+    rhandle=-1;
+    shandle=-1;
+    rbuff=(char *) malloc(payload*sizeof(char));
+    sbuff=(char *) malloc(payload*sizeof(char));
+    // setup persistent comm sender and receiver side
+    rhandle=CmiDirect_createHandle(nbr,rbuff,payload*sizeof(char),PingN::Wrapper_To_CallBack,(void *) this);
+    (*pp).recvHandle(rhandle);
+#endif
+  }
+  PingN(CkMigrateMessage *m) {}
+  void recvHandle(int _shandle)
+  {
+#ifdef CMK_USE_IBVERBS 
+    CkPrintf("[%d] recvd handle %d\n",CkMyPe(),_shandle);
+    shandle=_shandle;
+    CmiDirect_assocLocalBuffer(nbr,shandle,sbuff,payload);
+#endif
+  }
+  void start(void)
+  {
+    start_time = CkWallTimer();
+    (*pp).recv(new (payload) PingMsg);
+  }
+  void startRDMA(void)
+  {
+    niter=0;
+    start_time = CkWallTimer();
+#ifdef CMK_USE_IBVERBS 
+    CkAssert(shandle>=0);
+    CmiDirect_put(nbr,shandle);
+#else
+    CkAbort("do not call startRDMA if you don't actually have RDMA");
+#endif
+  }
+
+  void recv(PingMsg *msg)
+  {
+    if(me==0) {
+      niter++;
+      if(niter==iterations) {
+        end_time = CkWallTimer();
+        int titer = (CkNumNodes()==1)?(iterations/2) : iterations;
+        CkPrintf("Roundtrip time for NodeGroups is %lf us\n",
+                 1.0e6*(end_time-start_time)/titer);
+        delete msg;
+        mainProxy.maindone();
+      } else {
+        (*pp).recv(msg);
+      }
+    } else {
+      (*pp).recv(msg);
+    }
+  }
+  static void Wrapper_To_CallBack(void* pt2Object){
+    // explicitly cast to a pointer to PingN
+    PingN* mySelf = (PingN*) pt2Object;
+
+    // call member
+    mySelf->recvRDMA();
+  }
+  // not an entry method, called via Wrapper_To_Callback
+  void recvRDMA()
+  {
+    if(me==0) {
+      niter++;
+      if(niter==iterations) {
+        end_time = CkWallTimer();
+        int titer = (CkNumNodes()==1)?(iterations/2) : iterations;
+        CkPrintf("Roundtrip time for NodeGroups RDMA is %lf us\n",
+                 1.0e6*(end_time-start_time)/titer);
+        mainProxy.maindone();
+      } else {
+#ifdef CMK_USE_IBVERBS 
+	CmiDirect_put(nbr,shandle);
+#else
+	CkAbort("do not call startRDMA if you don't actually have RDMA");
+#endif
+      }
+    } else {
+#ifdef CMK_USE_IBVERBS 
+      CmiDirect_put(nbr,shandle);
+#else
+      CkAbort("do not call startRDMA if you don't actually have RDMA");
+#endif
+    }
+  }
+
+};
+
 
 class Ping1 : public ArrayElement1D
 {
@@ -163,17 +315,17 @@ public:
   Ping1(CkMigrateMessage *m) {}
   void start(void)
   {
-    (*pp)[1].recv(new PingMsg);
+    (*pp)[1].recv(new (payload) PingMsg);
     start_time = CkWallTimer();
   }
   void recv(PingMsg *msg)
   {
     if(thisIndex==0) {
       niter++;
-      if(niter==NITER) {
+      if(niter==iterations) {
         end_time = CkWallTimer();
         CkPrintf("Roundtrip time for 1D Arrays is %lf us\n",
-                 1.0e6*(end_time-start_time)/NITER);
+                 1.0e6*(end_time-start_time)/iterations);
         //mainProxy.maindone();
         niter=0;
         start_time = CkWallTimer();
@@ -189,10 +341,10 @@ public:
   {
     if(thisIndex==0) {
       niter++;
-      if(niter==NITER) {
+      if(niter==iterations) {
         end_time = CkWallTimer();
         CkPrintf("Roundtrip time for 1D threaded Arrays is %lf us\n",
-                 1.0e6*(end_time-start_time)/NITER);
+                 1.0e6*(end_time-start_time)/iterations);
         mainProxy.maindone();
       } else {
         (*pp)[1].trecv(msg);
@@ -217,17 +369,17 @@ public:
   Ping2(CkMigrateMessage *m) {}
   void start(void)
   {
-    (*pp)(0,1).recv(new PingMsg);
+    (*pp)(0,1).recv(new (payload) PingMsg);
     start_time = CkWallTimer();
   }
   void recv(PingMsg *msg)
   {
     if(thisIndex.y==0) {
       niter++;
-      if(niter==NITER) {
+      if(niter==iterations) {
         end_time = CkWallTimer();
         CkPrintf("Roundtrip time for 2D Arrays is %lf us\n",
-                 1.0e6*(end_time-start_time)/NITER);
+                 1.0e6*(end_time-start_time)/iterations);
         mainProxy.maindone();
       } else {
         (*pp)(0,1).recv(msg);
@@ -252,17 +404,17 @@ public:
   Ping3(CkMigrateMessage *m) {}
   void start(void)
   {
-    (*pp)(0,0,1).recv(new PingMsg);
+    (*pp)(0,0,1).recv(new (payload) PingMsg);
     start_time = CkWallTimer();
   }
   void recv(PingMsg *msg)
   {
     if(thisIndex.z==0) {
       niter++;
-      if(niter==NITER) {
+      if(niter==iterations) {
         end_time = CkWallTimer();
         CkPrintf("Roundtrip time for 3D Arrays is %lf us\n",
-                 1.0e6*(end_time-start_time)/NITER);
+                 1.0e6*(end_time-start_time)/iterations);
         mainProxy.maindone();
       } else {
         (*pp)(0,0,1).recv(msg);
@@ -289,24 +441,25 @@ public:
   PingF(CkMigrateMessage *m) {}
   void start(void)
   {
-    (*pp)[CkArrayIndexFancy("second")].recv();
+    (*pp)[CkArrayIndexFancy("second")].recv(new (payload) PingMsg);
     start_time = CkWallTimer();
   }
-  void recv(void)
+  void recv(PingMsg *msg)
   {
     CkArrayIndexFancy partner((char *)(first?"second" : "first"));
     if(first) {
       niter++;
-      if(niter==NITER) {
+      if(niter==iterations) {
         end_time = CkWallTimer();
         CkPrintf("Roundtrip time for Fancy Arrays is %lf us\n",
-                 1.0e6*(end_time-start_time)/NITER);
+                 1.0e6*(end_time-start_time)/iterations);
+	delete msg;
         mainProxy.maindone();
       } else {
-        (*pp)[partner].recv();
+        (*pp)[partner].recv(msg);
       }
     } else {
-      (*pp)[partner].recv();
+      (*pp)[partner].recv(msg);
     }
   }
 };
@@ -333,7 +486,7 @@ class PingC : public Chare
   void start(void)
   {
     niter = 0;
-    pp->recvReuse(new PingMsg);
+    pp->recvReuse(new (payload) PingMsg);
     start_time = CkWallTimer();
   }
   void exchange(IdMsg *msg)
@@ -351,13 +504,13 @@ class PingC : public Chare
   {
     if(first) {
       niter++;
-      if(niter==NITER) {
+      if(niter==iterations) {
         end_time = CkWallTimer();
         CkPrintf("Roundtrip time for Chares (reuse msgs) is %lf us\n",
-                 1.0e6*(end_time-start_time)/NITER);
+                 1.0e6*(end_time-start_time)/iterations);
         niter = 0;
         delete msg;
-        pp->recv(new PingMsg);
+        pp->recv(new (payload) PingMsg);
         start_time = CkWallTimer();
       } else {
         pp->recvReuse(msg);
@@ -371,34 +524,35 @@ class PingC : public Chare
     delete msg;
     if(first) {
       niter++;
-      if(niter==NITER) {
+      if(niter==iterations) {
         end_time = CkWallTimer();
         CkPrintf("Roundtrip time for Chares (new/del msgs) is %lf us\n",
-                 1.0e6*(end_time-start_time)/NITER);
+                 1.0e6*(end_time-start_time)/iterations);
         niter = 0;
-        pp->trecv();
+        pp->trecv(new (payload) PingMsg);
         start_time = CkWallTimer();
       } else {
-        pp->recv(new PingMsg);
+        pp->recv(new (payload) PingMsg);
       }
     } else {
-      pp->recv(new PingMsg);
+      pp->recv(new (payload) PingMsg);
     }
   }
-  void trecv(void)
+  void trecv(PingMsg *msg)
   {
     if(first) {
       niter++;
-      if(niter==NITER) {
+      if(niter==iterations) {
         end_time = CkWallTimer();
-        CkPrintf("Roundtrip time for threaded Chares is %lf us\n",
-                 1.0e6*(end_time-start_time)/NITER);
+        CkPrintf("Roundtrip time for threaded Chares (reuse) is %lf us\n",
+                 1.0e6*(end_time-start_time)/iterations);
+	delete msg;
         mainProxy.maindone();
       } else {
-        pp->trecv();
+        pp->trecv(msg);
       }
     } else {
-      pp->trecv();
+      pp->trecv(msg);
     }
   }
 };

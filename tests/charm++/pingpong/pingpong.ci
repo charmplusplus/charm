@@ -1,10 +1,12 @@
 mainmodule pingpong {
   readonly CProxy_main mainProxy;
+  readonly int iterations;
+  readonly int payload;
   mainchare main {
     entry main();
     entry void maindone(void);
   };
-  message PingMsg;
+  message PingMsg{char x[];};
   message IdMsg;
   array [1D] Ping1 {
     entry Ping1();
@@ -29,16 +31,23 @@ mainmodule pingpong {
     entry void exchange(IdMsg *);
     entry void recvReuse(PingMsg *);
     entry void recv(PingMsg *);
-    entry [threaded] void trecv(void);
+    entry [threaded] void trecv(PingMsg *);
   };
   group PingG {
     entry PingG(void);
     entry void start(void);
     entry void recv(PingMsg *);
   }
+  nodegroup PingN {
+    entry PingN(void);
+    entry void start(void);
+    entry void startRDMA(void);
+    entry [exclusive] void recv(PingMsg *);
+    entry [exclusive] void recvHandle(int);
+  }
   array [Fancy] PingF {
     entry PingF();
     entry void start(void);
-    entry void recv(void);
+    entry void recv(PingMsg *msg);
   };        	
 };
