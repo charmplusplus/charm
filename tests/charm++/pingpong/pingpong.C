@@ -209,7 +209,6 @@ public:
 
     pp = new CProxyElement_PingN(thisgroup,nbr);
     niter = 0;
-    CkPrintf("[%d] ith nodegroup chare on pe %d\n",me,CkMyPe());
 #ifdef CMK_USE_IBVERBS 
     rhandle=-1;
     shandle=-1;
@@ -224,7 +223,6 @@ public:
   void recvHandle(int _shandle)
   {
 #ifdef CMK_USE_IBVERBS 
-    CkPrintf("[%d] recvd handle %d\n",CkMyPe(),_shandle);
     shandle=_shandle;
     CmiDirect_assocLocalBuffer(nbr,shandle,sbuff,payload);
 #endif
