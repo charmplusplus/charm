@@ -1,11 +1,10 @@
 #include <string.h> // for strlen, and strcmp
 #include <charm++.h>
 
-#define NITER 10000
+#define NITER 1000
 #define PAYLOAD 100
 #ifdef CMK_USE_IBVERBS 
-int iterations;
-int payload;
+
 extern "C" {
   int CmiDirect_createHandle(int senderProc,void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData);
 
@@ -47,6 +46,8 @@ class IdMsg : public CMessage_IdMsg
 };
 
 CProxy_main mainProxy;
+int iterations;
+int payload;
 
 #define P1 0
 #define P2 1%CkNumPes()
