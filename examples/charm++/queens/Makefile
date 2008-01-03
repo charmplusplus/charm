@@ -30,5 +30,5 @@ test: pgm
 	./charmrun ./pgm +p4 10 7 $(TESTOPTS)
 
 bgtest: pgm
-	./charmrun ./pgm +p4 10 7 +x2 +y2 +z2
+	./charmrun ./pgm +p4 10 7 +x2 +y2 +z2 +bgstacksize 102400 $(TESTOPTS)
 
