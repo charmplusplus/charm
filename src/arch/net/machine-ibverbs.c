@@ -2271,8 +2271,34 @@ To be called on the sender to do the actual data transfer
 ******/
 void CmiDirect_put(int recverProc,int handle){
 	if(recverProc == _Cmi_mynode){
-		//TODO: Do a copy
-		CmiAbort("OOPS!! forgot to do a memcpy");
+		/*when the sender and receiver are on the same
+		processor, just look up the sender and receiver
+		buffers and do a memcpy*/
+		infiDirectHandleTable *senderTable;
+		infiDirectHandleTable *recverTable;
+		
+		int tableIdx,idx,i;
+		
+		/*find entry for this handle in sender table*/
+		calcHandleTableIdx(handle,&tableIdx,&idx);
+		senderTable = recvHandleTable[_Cmi_mynode];
+		CmiAssert(senderTable != NULL);
+		for(i=0;i<tableIdx;i++){
+			senderTable = senderTable->next;
+		}
+
+		/**find entry for this handle in recver table*/
+		recverTable = recvHandleTable[recverProc];
+		CmiAssert(recverTable != NULL);
+		for(i=0;i< tableIdx;i++){
+			recverTable = recverTable->next;
+		}
+		
+		CmiAssert(senderTable->handles[idx].size == recverTable->handles[idx].size);
+		memcpy(recverTable->handles[idx].buf,senderTable->handles[idx].buf,senderTable->handles[idx].size);
+		(*(recverTable->handles[idx].callbackFnPtr))(recverTable->handles[idx].callbackData);
+		
+
 	}else{
 		infiPacket packet;
 		int tableIdx,idx;
