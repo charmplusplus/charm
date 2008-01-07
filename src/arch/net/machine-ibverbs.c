@@ -63,8 +63,8 @@ static int processBufferedCount;
 #define CMK_IBVERBS_TOKENS_FLOW 1
 #define CMK_IBVERBS_INCTOKENS 0 //never turn this on 
 #define CMK_IBVERBS_DEBUG 1
-
-#define WC_LIST_SIZE 100
+#define CMI_DIRECT_DEBUG 0
+#define WC_LIST_SIZE 512
 /*#define WC_BUFFER_SIZE 100*/
 
 #define INCTOKENS_FRACTION 0.04
@@ -1523,7 +1523,7 @@ static inline  void processSendWC(struct ibv_wc *sendWC){
 		}
 	}else{
 		if(packet->header.code == INFIRDMA_START || packet->header.code == INFIRDMA_ACK || packet->header.code ==  INFIDUMMYPACKET){
-			CmiFree(packet->buf);
+
 		}
 	}
 
@@ -2123,7 +2123,7 @@ send and receive data from the middle of his arrays without any copying on eithe
 side
 *********************************************************************************************/
 
-#define MAXHANDLES 100
+#define MAXHANDLES 512
 
 struct infiDirectRequestPacket{
 	int senderProc;
@@ -2208,6 +2208,9 @@ int CmiDirect_createHandle(int senderProc,void *recvBuf, int recvBufSize, void (
 	table->handles[idx].id = newHandle;
 	table->handles[idx].buf = recvBuf;
 	table->handles[idx].size = recvBufSize;
+#if CMI_DIRECT_DEBUG
+	CmiPrintf("[%d] RDMA create addr %p %d\n",CmiMyPe(),table->handles[idx].buf,recvBufSize);
+#endif
 	table->handles[idx].callbackFnPtr = callbackFnPtr;
 	table->handles[idx].callbackData = callbackData;
 	table->handles[idx].key = ibv_reg_mr(context->pd, recvBuf, recvBufSize,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
@@ -2247,9 +2250,14 @@ void CmiDirect_assocLocalBuffer(int recverProc,int handle,void *sendBuf,int send
 		}
 		table = table->next;
 	}
+
 	table->handles[idx].id = handle;
 	table->handles[idx].buf = sendBuf;
+
 	table->handles[idx].size = sendBufSize;
+#if CMI_DIRECT_DEBUG
+	CmiPrintf("[%d] RDMA assoc addr %p %d\n",CmiMyPe(),table->handles[idx].buf,sendBufSize);
+#endif
 	table->handles[idx].callbackFnPtr = table->handles[idx].callbackData = NULL;
 	table->handles[idx].key =  ibv_reg_mr(context->pd, sendBuf, sendBufSize,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 	
@@ -2281,7 +2289,7 @@ void CmiDirect_put(int recverProc,int handle){
 		
 		/*find entry for this handle in sender table*/
 		calcHandleTableIdx(handle,&tableIdx,&idx);
-		senderTable = recvHandleTable[_Cmi_mynode];
+		senderTable = sendHandleTable[_Cmi_mynode];
 		CmiAssert(senderTable != NULL);
 		for(i=0;i<tableIdx;i++){
 			senderTable = senderTable->next;
@@ -2296,6 +2304,9 @@ void CmiDirect_put(int recverProc,int handle){
 		
 		CmiAssert(senderTable->handles[idx].size == recverTable->handles[idx].size);
 		memcpy(recverTable->handles[idx].buf,senderTable->handles[idx].buf,senderTable->handles[idx].size);
+#if CMI_DIRECT_DEBUG
+		CmiPrintf("[%d] RDMA memcpy put addr %p receiver %p, size %d\n",CmiMyPe(),senderTable->handles[idx].buf,recverTable->handles[idx].buf,senderTable->handles[idx].size);
+#endif
 		(*(recverTable->handles[idx].callbackFnPtr))(recverTable->handles[idx].callbackData);
 		
 
@@ -2315,6 +2326,9 @@ void CmiDirect_put(int recverProc,int handle){
 		}
 
 		MACHSTATE2(3,"CmiDirect_put to recverProc %d handle %d",recverProc,handle);
+#if CMI_DIRECT_DEBUG
+		CmiPrintf("[%d] RDMA put addr %p\n",CmiMyPe(),table->handles[idx].buf);
+#endif
 		MallocInfiPacket (packet);
 		{
 			packet->size = sizeof(struct infiDirectRequestPacket);
