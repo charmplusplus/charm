@@ -56,7 +56,8 @@ To compile charm with VC++:
    the following (default) location: 
      /Program Files/Microsoft Visual Studio 8\VC
    In case it is not at this directory, edit the following (text) files to 
-   modify VCC_DIR to point to your visual studio c++ compiler directory:
+   modify VCC_DIR and SDK_DIR to point to your visual studio c++ and 
+          Microsoft SDK directories:
     src\arch\win32\unix2nt_ar
     src\arch\win32\unix2nt_cc  
 
