@@ -26,21 +26,25 @@ To compile charm with VC++:
 
 2. Start a Cygwin's Bash Shell window, type "cl" to make sure VC++ compiler 
    command line mode is correctly set. If it is not correctly set, you need to 
-   run the VCVARS32.BAT at Windows startup time. VCVARS32.BAT can be located in
-   your VC++ install directory, usually at: 
+   run the VCVARS32.BAT, or vcvarsall.bat (after VC++ 8.0) at Windows startup 
+   time. 
+   VCVARS32.BAT can be located in your VC++ install directory, usually at: 
    /Program Files/Microsoft Visual Studio/VC98/Bin
-   However VCVARS32.BAT(a DOS Batch) cannot be executed under Bash Shell 
-   , you have to: for Win8x, put it into AUTOEXEC.BAT; for WinNT, 
-   you have to merge call VCVARS32.BAT in cygwin.bat which is the target of the
-   Cygwin icon on desktop. Note that this dos batch is renamed to 
-   vcvarsall.bat for VC++ version 8.
-   For example, if cygwin is installed under c:\cygwin,
-   modify c:\cygwin\cygwin.bat to something like:
+   For Microsoft Visual C++ 8.0 and beyond, it is usually located at:
+   C:\Program Files\Microsoft Visual Studio 9.0\VC\vcvarsall.bat
+
+   However VCVARS32.BAT, or vcvarsall.bat (a DOS Batch) cannot be executed 
+   under Bash Shell, you have to: 
+   for Win8x: put it into AUTOEXEC.BAT; 
+   for WinNT/WindowsXP/Vista: you have to call VCVARS32.BAT in cygwin.bat 
+              which is the target of the Cygwin icon on your desktop. 
+              For example, if cygwin is installed under c:\cygwin,
+              modify c:\cygwin\cygwin.bat to something like:
 
    >>>>>>>>>>>>>>>>>>>
    @echo off
 
-   call "C:\Program Files\Microsoft Visual Studio 8\VC\vcvarsall" x86
+   call "C:\Program Files\Microsoft Visual Studio 9.0\VC\vcvarsall"
 
    C:
    chdir D:\cygwin\bin
@@ -52,7 +56,7 @@ To compile charm with VC++:
    the following (default) location: 
      /Program Files/Microsoft Visual Studio 8\VC
    In case it is not at this directory, edit the following (text) files to 
-   modify them to point to your visual studio c++ compiler directory:
+   modify VCC_DIR to point to your visual studio c++ compiler directory:
     src\arch\win32\unix2nt_ar
     src\arch\win32\unix2nt_cc  
 
