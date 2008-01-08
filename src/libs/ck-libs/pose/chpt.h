@@ -58,7 +58,11 @@ void chpt<StateType>::checkpoint(StateType *data)
     if ((sinceLast == ((opt *)myStrat)->cpRate) || 
 	//(CpvAccess(stateRecovery) == 1) || 
 	(myStrat->currentEvent->prev == parent->eq->front())) {
+#ifdef MEM_TEMPORAL
+      myStrat->currentEvent->cpData = (StateType *)localTimePool->tmp_alloc(myStrat->currentEvent->timestamp, sizeof(StateType));
+#else      
       myStrat->currentEvent->cpData = new StateType;
+#endif
       myStrat->currentEvent->cpData->copy = 1;
       *((StateType *)myStrat->currentEvent->cpData) = *data;
       sinceLast = 0;
@@ -88,12 +92,20 @@ void chpt<StateType>::restore(StateType *data)
     if (myStrat->currentEvent == myStrat->targetEvent) {
       if (myStrat->targetEvent->cpData) {
 	*data = *((StateType *)myStrat->targetEvent->cpData);
+#ifdef MEM_TEMPORAL
+      localTimePool->tmp_free(myStrat->currentEvent->timestamp, myStrat->currentEvent->cpData);
+#else	
 	delete myStrat->targetEvent->cpData;
+#endif
 	myStrat->targetEvent->cpData = NULL;
       }
     }
     if (myStrat->currentEvent->cpData) {
+#ifdef MEM_TEMPORAL
+      localTimePool->tmp_free(myStrat->currentEvent->timestamp, myStrat->currentEvent->cpData);
+#else	
       delete myStrat->currentEvent->cpData;
+#endif
       myStrat->currentEvent->cpData = NULL;
     }
   }

@@ -9,24 +9,78 @@
 
 CkGroupID TempMemID;  // global readonly to access pool anywhere
 
+void SuperBlock::sanity_check() {
+  // no obvious way to verify the sanity of a SuperBlock
+}
+
+POSE_TimeType TimeBucket::sanity_check(POSE_TimeType last_time) {
+  CkAssert(start > last_time);
+  if (!sBlocks) CkAssert(numSuperBlocks == 0);
+  if (sBlocks) {
+    int count=0;
+    SuperBlock *tmpblk = sBlocks;
+    while (tmpblk) {
+      if (!tmpblk->noLongerReferenced()) count++;
+      tmpblk = tmpblk->getNextBlock();
+    }
+    CkAssert(count == numSuperBlocks);
+    tmpblk = sBlocks;
+    while (tmpblk) {
+      tmpblk->sanity_check();
+      tmpblk = tmpblk->getNextBlock();
+    }
+  }
+  return (start+range-1);
+}
+
 void TimePool::clean_up() {
+  sanity_check();
   TimeBucket *tmpbkt = first_in_use;
   while (tmpbkt && (min_time >= (tmpbkt->getStart()+tmpbkt->getRange()))) {
     // move the blocks of this bucket to not_in_use
     SuperBlock *sb = tmpbkt->getFirstSuperBlock();
     while (sb) {
-      if (!sb->noLongerReferenced())
-	CkPrintf("ERROR: attempting to delete a SuperBlock that is still referenced.\n");
-      SuperBlock *next = sb->getNextBlock();
-      sb->setNextBlock(not_in_use);
-      not_in_use = sb;
-      sb = next;
+      if (sb->noLongerReferenced()) {
+	SuperBlock *next = sb->getNextBlock();
+	sb->setNextBlock(not_in_use);
+	not_in_use = sb;
+	sb = next;
+      }
+      else break;
     }
-    // move the first_in_use ptr forward
-    first_in_use = first_in_use->getNextBucket();
-    delete tmpbkt;
-    tmpbkt = first_in_use;
+    if (!sb) { // bucket is totally empty, delete it
+      // move the first_in_use ptr forward
+      if (tmpbkt == first_in_use) {
+	if (first_in_use == last_in_use) {
+	  first_in_use == last_in_use == NULL;
+	}
+	else {
+	  first_in_use = first_in_use->getPrevBucket();
+	  first_in_use->setNextBucket(NULL);
+	}
+	delete tmpbkt;
+	tmpbkt = first_in_use;
+      }
+      else if (tmpbkt == last_in_use) {
+	last_in_use = last_in_use->getNextBucket();
+	last_in_use->setPrevBucket(NULL);
+	delete tmpbkt;
+	tmpbkt = NULL;
+      }
+      else {
+	TimeBucket *tmp = tmpbkt->getPrevBucket();
+	tmp->setNextBucket(tmpbkt->getNextBucket());
+	tmpbkt->getNextBucket()->setPrevBucket(tmp);
+	delete tmpbkt;
+	tmpbkt = tmp;
+      }
+    }
+    else {
+      tmpbkt->setFirstSuperBlock(sb);
+      tmpbkt = tmpbkt->getPrevBucket();
+    }
   }
+  sanity_check();
 }
 
 TimePool::~TimePool() 
@@ -47,47 +101,68 @@ TimePool::~TimePool()
 
 // Return memory from a time range
 char *TimePool::tmp_alloc(POSE_TimeType timestamp, int sz_in_bytes)
-{
+{ // List looks like this:
+  //  last (newer, higher ts) .... first (older, lower ts)
+  sanity_check();
+  CkPrintf("[tmp_alloc:\n");
   TimeBucket *bkt = last_in_use;
   while (bkt && (timestamp < bkt->getStart())) {
     bkt = bkt->getNextBucket();
   }
-  if (!bkt) {
-    if (!last_in_use) {
-      last_in_use = new TimeBucket();
-      last_in_use->initBucket(timestamp, 1, &not_in_use);
-      first_in_use = last_in_use;
+  if (!bkt) { // either empty, or ts is older than anything we have
+    if (!first_in_use) {  // empty
+      first_in_use = new TimeBucket();
+      first_in_use->initBucket(timestamp, 1, &not_in_use);
+      last_in_use = first_in_use;
+      CkPrintf(".tmp_alloc]\n");
+      char *mem = last_in_use->tb_alloc(sz_in_bytes);
+      sanity_check();
+      return mem;
     }
-    else if (timestamp < first_in_use->getStart()) {
+    else if (timestamp < first_in_use->getStart()) { //not empty, ts is oldest
       first_in_use->setStart(timestamp);
-      return first_in_use->tb_alloc(sz_in_bytes);
+      CkPrintf(".tmp_alloc]\n");
+      char *mem = first_in_use->tb_alloc(sz_in_bytes);
+      sanity_check();
+      return mem;
     }
   }
-  else if (bkt == last_in_use) {
-    if (bkt->isVeryFull()) {
+  else if (bkt == last_in_use) {  // we have some options if the target is last
+    if (bkt->isVeryFull() && (timestamp >= (bkt->getStart() + bkt->getRange()))) { // let's make a new bucket, timestamp is far out enough
       int start = bkt->getStart()+bkt->getRange();
       int range = timestamp - start + 1;
       last_in_use = new TimeBucket();
       last_in_use->initBucket(start, range, &not_in_use);
       bkt->setPrevBucket(last_in_use);
       last_in_use->setNextBucket(bkt);
-      return last_in_use->tb_alloc(sz_in_bytes);
+      CkPrintf(".tmp_alloc]\n");
+      char *mem = last_in_use->tb_alloc(sz_in_bytes);
+      sanity_check();
+      return mem;
     }
-    else {
-      if (timestamp > (bkt->getStart() + bkt->getRange())) {
+    else { // let's put it here, expanding the range if necessary
+      if (timestamp >= (bkt->getStart() + bkt->getRange())) {
 	bkt->setRange(timestamp - bkt->getStart() + 1);
       }
-      return bkt->tb_alloc(sz_in_bytes);
+      CkPrintf(".tmp_alloc]\n");
+      char *mem = bkt->tb_alloc(sz_in_bytes);
+      sanity_check();
+      return mem;
     }
   }
-  else {
-    return bkt->tb_alloc(sz_in_bytes);
+  else { // this is in the range of this bucket, must put it here
+    CkPrintf(".tmp_alloc]\n");
+    char *mem = bkt->tb_alloc(sz_in_bytes);
+    sanity_check();
+    return mem;
   }
 }
 
 // "Free" up memory from a time range
 void TimePool::tmp_free(POSE_TimeType timestamp, void *mem) 
 {
+  sanity_check();
+  CkPrintf("[tmp_free:\n");
   TimeBucket *tmpbkt = first_in_use;
   while (tmpbkt && (timestamp >= (tmpbkt->getStart()+tmpbkt->getRange()))) {
     tmpbkt = tmpbkt->getPrevBucket();
@@ -95,5 +170,41 @@ void TimePool::tmp_free(POSE_TimeType timestamp, void *mem)
   if (tmpbkt) {
     tmpbkt->tb_free((char *)mem);
   }
-  else printf("ERROR: Memory in that time range not found for deallocation.\n");
+  else CkAbort("ERROR: Memory in that time range not found for deallocation.\n");
+  CkPrintf(".tmp_free]\n");
+  sanity_check();
+}
+
+void TimePool::sanity_check() {
+  // first check the quality of the list of in-use buckets
+  if (!last_in_use) CkAssert(!first_in_use);
+  if (!first_in_use) CkAssert(!last_in_use);
+  if (last_in_use) CkAssert(!(last_in_use->getPrevBucket()));
+  if (first_in_use) CkAssert(!(first_in_use->getNextBucket()));
+  TimeBucket *tmpbkt = last_in_use;
+  if (tmpbkt) {
+    while (tmpbkt->getNextBucket()) {
+      CkAssert(tmpbkt->getNextBucket()->getPrevBucket() == tmpbkt);
+      tmpbkt = tmpbkt->getNextBucket();
+    }
+    CkAssert(tmpbkt == first_in_use);
+  }
+  tmpbkt = first_in_use;
+  if (tmpbkt) {
+    while (tmpbkt->getPrevBucket()) {
+      CkAssert(tmpbkt->getPrevBucket()->getNextBucket() == tmpbkt);
+      tmpbkt = tmpbkt->getPrevBucket();
+    }
+    CkAssert(tmpbkt == last_in_use);
+  }
+  // ASSERT: Bucket structure of TimePool is fine at this point.
+  // Now, we examine the bucket contents
+  tmpbkt = first_in_use;
+  if (tmpbkt) {
+    POSE_TimeType lastTime = POSE_UnsetTS;
+    while (tmpbkt) {
+      lastTime = tmpbkt->sanity_check(lastTime);
+      tmpbkt = tmpbkt->getPrevBucket();
+    }
+  }
 }

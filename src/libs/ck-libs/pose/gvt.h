@@ -99,7 +99,9 @@ class PVT : public Group {
   POSE_TimeType optGVT, conGVT;
   int rdone;
   SRentry *SRs;
-
+#ifdef MEM_TEMPORAL
+  TimePool *localTimePool;
+#endif
 
  public:
   /// Basic Constructor

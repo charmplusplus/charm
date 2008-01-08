@@ -61,6 +61,7 @@ class SuperBlock {
   bool noLongerReferenced() { return(refCount == 0); }
   /// return pos, and advance pos by sz, aligned to 16 bytes, inc refCount
   char *sb_alloc(int sz) {
+    CkPrintf("[sb_alloc:\n");
     int remaining = BLOCK_SIZE - (pos - blk);
 #ifdef ALIGN16
     int actual_sz = (sz%16 == 0)? sz : (sz+16)/16 * 16;
@@ -72,21 +73,28 @@ class SuperBlock {
       ret = pos;
       pos += actual_sz;
       refCount++;
+      percent_full = (int)(((float)(pos-blk)/4096.0)*100.0);
     }
-    percent_full = (int)((float)(pos-blk)/4096.0)*100;
+    CkPrintf(".sb_alloc]\n");
     return ret;
   }
   // dec refCount
   bool sb_free(void *mem) { 
-    if ((mem >= blk) && (blk < pos)) {
+    CkPrintf("[sb_free:\n");
+    if ((mem >= blk) && (mem < pos)) {
       refCount--; 
+      CkPrintf(".sb_free]\n");
       return true;
     }
-    else return false;
+    else {
+      CkPrintf(".sb_free]\n");
+      return false;
+    }
   }
   SuperBlock *getNextBlock() { return nextBlock; }
   void setNextBlock(SuperBlock *loc) { nextBlock = loc; }
   int getPercentFull() { return percent_full; }
+  void sanity_check();
 };
 
 /// TimeBucket associates a time range with (a) large block(s) of memory
@@ -119,6 +127,7 @@ class TimeBucket {
     }
     numSuperBlocks = 1;
   }
+  int getNumSuperBlocks() { return numSuperBlocks; }
   int getStart() { return start; }
   int getRange() { return range; }
   void setStart(int s) { start = s; }
@@ -129,12 +138,14 @@ class TimeBucket {
     else return false;
   }
   SuperBlock *getFirstSuperBlock() { return sBlocks; }
+  void setFirstSuperBlock(SuperBlock *sb) { sBlocks = sb; }
   void setPrevBucket(TimeBucket *p) { prevBucket = p; }
   void setNextBucket(TimeBucket *n) { nextBucket = n; }
   TimeBucket *getPrevBucket() { return prevBucket; }
   TimeBucket *getNextBucket() { return nextBucket; }
   // Get some memory in this time range
   char *tb_alloc(int sz) {
+    CkPrintf("[tb_alloc:\n");
     char *newblk = sBlocks->sb_alloc(sz);
     if (!newblk) {
       SuperBlock *tmp;
@@ -152,19 +163,28 @@ class TimeBucket {
       numSuperBlocks++;
       newblk = sBlocks->sb_alloc(sz);
     }
+    CkPrintf(".tb_alloc]\n");
     return newblk;
   }
   // "Free" some memory from this time range
   void tb_free(char *mem) {
+    CkPrintf("[tb_free:\n");
     SuperBlock *tmp = sBlocks;
     bool done = false;
     while (tmp && !done) {
       done = tmp->sb_free(mem);
-      sBlocks = tmp->getNextBlock();
-      tmp = sBlocks;
+      if (done) {
+	if (tmp->noLongerReferenced())
+	  numSuperBlocks--;
+      }
+      else {
+	tmp = tmp->getNextBlock();
+      }
     }
-    if (!done) printf("ERROR: block to deallocate not found in time range.\n");
+    if (!done) CkAbort("ERROR: block to deallocate not found in time range.\n");
+    CkPrintf(".tb_free]\n");
   }
+  POSE_TimeType sanity_check(POSE_TimeType last_time);
 };
 
 class TimePool : public Group {
@@ -190,6 +210,7 @@ class TimePool : public Group {
   void tmp_free(POSE_TimeType timestamp, void *mem);
   // Update the minimum time before which SuperBlocks can be recycled
   void set_min_time(POSE_TimeType min_t) { min_time = min_t; clean_up(); }
+  void sanity_check(); 
 };
 
 #endif /* !MEMORY_TEMPORAL_H_ */

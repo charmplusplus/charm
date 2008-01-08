@@ -224,8 +224,17 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
   // now free up the memory
   Event *link = commitPtr;
   commitPtr = commitPtr->prev;
+#ifdef MEM_TEMPORAL
+  TimePool *localTimePool = (TimePool *)CkLocalBranch(TempMemID);
+#endif
   while (commitPtr != frontPtr) {
-    if (commitPtr->cpData) delete commitPtr->cpData;
+    if (commitPtr->cpData) {
+#ifdef MEM_TEMPORAL
+      localTimePool->tmp_free(commitPtr->timestamp, commitPtr->cpData);
+#else
+      delete commitPtr->cpData;
+#endif
+    }
     commitPtr = commitPtr->prev;
     delete commitPtr->next;
     mem_usage--;
@@ -259,8 +268,17 @@ void eventQueue::CommitAll(sim *obj)
   // now free up the memory
   Event *link = commitPtr;
   commitPtr = commitPtr->prev;
+#ifdef MEM_TEMPORAL
+  TimePool *localTimePool = (TimePool *)CkLocalBranch(TempMemID);
+#endif
   while (commitPtr != frontPtr) {
-    if (commitPtr->cpData) delete commitPtr->cpData;
+    if (commitPtr->cpData) {
+#ifdef MEM_TEMPORAL
+      localTimePool->tmp_free(commitPtr->timestamp, commitPtr->cpData);
+#else
+      delete commitPtr->cpData;
+#endif
+    }
     commitPtr = commitPtr->prev;
     mem_usage--;
     delete commitPtr->next;

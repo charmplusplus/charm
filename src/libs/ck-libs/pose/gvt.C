@@ -33,6 +33,10 @@ PVT::PVT()
       localStats->TimerStart(GVT_TIMER);
     }
 #endif
+#ifdef MEM_TEMPORAL
+  localTimePool = (TimePool *)CkLocalBranch(TempMemID);
+  CkPrintf("NOTE: Temporal memory manager is ON!\n");
+#endif
   optPVT = conPVT = estGVT = POSE_UnsetTS;
   startPhaseActive = gvtTurn = simdone = 0;
   SendsAndRecvs = new SRtable();
@@ -198,6 +202,9 @@ void PVT::setGVT(GVTMsg *m)
   CkFreeMsg(m);
   waitForFirst = 1;
   objs.Commit();
+#ifdef MEM_TEMPORAL
+  localTimePool->set_min_time(estGVT);
+#endif
   startPhaseActive = 0;
   prioBcMsg *startMsg = new (8*sizeof(int)) prioBcMsg;
   startMsg->bc = 1;

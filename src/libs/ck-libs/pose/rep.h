@@ -38,6 +38,9 @@ class rep
   unsigned short int prand48_seed[3];
   /// Flag indicating this object uses anti-methods rather than checkpoints
   int anti_methods;
+#ifdef MEM_TEMPORAL
+  TimePool *localTimePool;
+#endif
   /// Basic Constructor
   rep() { 
     ovt = 0; ort = 0.0; copy = 0; parent = NULL; myStrat = NULL; 
@@ -48,6 +51,9 @@ class rep
     ComlibDelegateProxy(&POSE_Objects);
   #endif
   #endif
+#ifdef MEM_TEMPORAL    
+    localTimePool = (TimePool *)CkLocalBranch(TempMemID);
+#endif
   }
   /// Initializing Constructor
   rep(POSE_TimeType init_ovt) { 

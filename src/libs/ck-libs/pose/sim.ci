@@ -3,6 +3,7 @@ module sim {
   extern module ldbal;
   extern module gvt;
   extern module mempool;
+  extern module memory_temporal;
   extern module stats;
   readonly CProxy_sim POSE_Objects;
   readonly CProxy_sim POSE_Objects_RO;

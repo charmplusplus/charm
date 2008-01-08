@@ -157,11 +157,11 @@ srtable.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h stats.h \
+  stats.decl.h cancel.h event.h ../../../../include/envelope.h eqheap.h \
+  pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h \
+  sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h \
+  adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o srtable.o srtable.C
 cancel.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -218,11 +218,11 @@ cancel.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h mempool.h mempool.decl.h \
-  srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  memory_temporal.h memory_temporal.decl.h srtable.h stats.h stats.decl.h \
+  cancel.h event.h ../../../../include/envelope.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o cancel.o cancel.C
 memory_temporal.o: memory_temporal.C ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -279,11 +279,11 @@ memory_temporal.o: memory_temporal.C ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h memory_temporal.def.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h memory_temporal.def.h
 	$(CHARMC) -o memory_temporal.o memory_temporal.C
 mempool.o: mempool.C ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -340,11 +340,11 @@ mempool.o: mempool.C ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h mempool.def.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h mempool.def.h
 	$(CHARMC) -o mempool.o mempool.C
 pvtobj.o: pvtobj.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -401,11 +401,11 @@ pvtobj.o: pvtobj.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o pvtobj.o pvtobj.C
 lbObject.o: lbObject.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -462,11 +462,11 @@ lbObject.o: lbObject.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o lbObject.o lbObject.C
 ldbal.o: ldbal.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -523,11 +523,11 @@ ldbal.o: ldbal.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h ldbal.def.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h ldbal.def.h
 	$(CHARMC) -o ldbal.o ldbal.C
 gvt.o: gvt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -584,11 +584,12 @@ gvt.o: gvt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h gvt.def.h ../../../../include/qd.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h gvt.def.h \
+  ../../../../include/qd.h
 	$(CHARMC) -o gvt.o gvt.C
 event.o: event.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -645,11 +646,11 @@ event.o: event.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o event.o event.C
 eqheap.o: eqheap.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -706,11 +707,11 @@ eqheap.o: eqheap.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o eqheap.o eqheap.C
 evq.o: evq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -767,11 +768,11 @@ evq.o: evq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o evq.o evq.C
 sim.o: sim.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -828,11 +829,11 @@ sim.o: sim.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h sim.def.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h sim.def.h
 	$(CHARMC) -o sim.o sim.C
 rep.o: rep.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -889,11 +890,11 @@ rep.o: rep.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o rep.o rep.C
 strat.o: strat.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -950,11 +951,11 @@ strat.o: strat.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o strat.o strat.C
 seq.o: seq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1011,11 +1012,11 @@ seq.o: seq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o seq.o seq.C
 cons.o: cons.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1072,11 +1073,11 @@ cons.o: cons.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o cons.o cons.C
 opt.o: opt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1133,11 +1134,11 @@ opt.o: opt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o opt.o opt.C
 opt2.o: opt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1194,11 +1195,11 @@ opt2.o: opt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o opt2.o opt2.C
 opt3.o: opt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1255,11 +1256,11 @@ opt3.o: opt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o opt3.o opt3.C
 spec.o: spec.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1316,11 +1317,11 @@ spec.o: spec.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o spec.o spec.C
 adapt.o: adapt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1377,11 +1378,11 @@ adapt.o: adapt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o adapt.o adapt.C
 adapt2.o: adapt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1438,11 +1439,11 @@ adapt2.o: adapt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o adapt2.o adapt2.C
 adapt3.o: adapt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1499,11 +1500,11 @@ adapt3.o: adapt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o adapt3.o adapt3.C
 adapt4.o: adapt4.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1560,11 +1561,11 @@ adapt4.o: adapt4.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o adapt4.o adapt4.C
 pose.o: pose.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1621,11 +1622,11 @@ pose.o: pose.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h pose.def.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h pose.def.h
 	$(CHARMC) -o pose.o pose.C
 eventID.seq.o: eventID.C eventID.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1785,11 +1786,11 @@ srtable.seq.o: srtable.C ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h stats.h \
+  stats.decl.h cancel.h event.h ../../../../include/envelope.h eqheap.h \
+  pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h \
+  sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h \
+  adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o srtable.seq.o -DSEQUENTIAL_POSE=1 srtable.C
 cancel.seq.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1846,11 +1847,11 @@ cancel.seq.o: cancel.C eventID.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h mempool.h mempool.decl.h \
-  srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  memory_temporal.h memory_temporal.decl.h srtable.h stats.h stats.decl.h \
+  cancel.h event.h ../../../../include/envelope.h eqheap.h pvtobj.h \
+  lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h \
+  strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h \
+  adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o cancel.seq.o -DSEQUENTIAL_POSE=1 cancel.C
 memory_temporal.seq.o: memory_temporal.C ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1907,11 +1908,11 @@ memory_temporal.seq.o: memory_temporal.C ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h memory_temporal.def.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h memory_temporal.def.h
 	$(CHARMC) -o memory_temporal.seq.o -DSEQUENTIAL_POSE=1 memory_temporal.C
 mempool.seq.o: mempool.C ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -1968,11 +1969,11 @@ mempool.seq.o: mempool.C ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h mempool.def.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h mempool.def.h
 	$(CHARMC) -o mempool.seq.o -DSEQUENTIAL_POSE=1 mempool.C
 pvtobj.seq.o: pvtobj.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2029,11 +2030,11 @@ pvtobj.seq.o: pvtobj.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o pvtobj.seq.o -DSEQUENTIAL_POSE=1 pvtobj.C
 lbObject.seq.o: lbObject.C pose.h pose.decl.h \
   ../../../../include/charm++.h ../../../../include/charm.h \
@@ -2091,11 +2092,11 @@ lbObject.seq.o: lbObject.C pose.h pose.decl.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o lbObject.seq.o -DSEQUENTIAL_POSE=1 lbObject.C
 ldbal.seq.o: ldbal.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2152,11 +2153,11 @@ ldbal.seq.o: ldbal.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h ldbal.def.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h ldbal.def.h
 	$(CHARMC) -o ldbal.seq.o -DSEQUENTIAL_POSE=1 ldbal.C
 gvt.seq.o: gvt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2213,11 +2214,12 @@ gvt.seq.o: gvt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h gvt.def.h ../../../../include/qd.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h gvt.def.h \
+  ../../../../include/qd.h
 	$(CHARMC) -o gvt.seq.o -DSEQUENTIAL_POSE=1 gvt.C
 event.seq.o: event.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2274,11 +2276,11 @@ event.seq.o: event.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o event.seq.o -DSEQUENTIAL_POSE=1 event.C
 eqheap.seq.o: eqheap.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2335,11 +2337,11 @@ eqheap.seq.o: eqheap.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o eqheap.seq.o -DSEQUENTIAL_POSE=1 eqheap.C
 evq.seq.o: evq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2396,11 +2398,11 @@ evq.seq.o: evq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o evq.seq.o -DSEQUENTIAL_POSE=1 evq.C
 sim.seq.o: sim.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2457,11 +2459,11 @@ sim.seq.o: sim.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h sim.def.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h sim.def.h
 	$(CHARMC) -o sim.seq.o -DSEQUENTIAL_POSE=1 sim.C
 rep.seq.o: rep.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2518,11 +2520,11 @@ rep.seq.o: rep.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o rep.seq.o -DSEQUENTIAL_POSE=1 rep.C
 strat.seq.o: strat.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2579,11 +2581,11 @@ strat.seq.o: strat.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o strat.seq.o -DSEQUENTIAL_POSE=1 strat.C
 seq.seq.o: seq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2640,11 +2642,11 @@ seq.seq.o: seq.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o seq.seq.o -DSEQUENTIAL_POSE=1 seq.C
 cons.seq.o: cons.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2701,11 +2703,11 @@ cons.seq.o: cons.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o cons.seq.o -DSEQUENTIAL_POSE=1 cons.C
 opt.seq.o: opt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2762,11 +2764,11 @@ opt.seq.o: opt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o opt.seq.o -DSEQUENTIAL_POSE=1 opt.C
 opt2.seq.o: opt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2823,11 +2825,11 @@ opt2.seq.o: opt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o opt2.seq.o -DSEQUENTIAL_POSE=1 opt2.C
 opt3.seq.o: opt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2884,11 +2886,11 @@ opt3.seq.o: opt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o opt3.seq.o -DSEQUENTIAL_POSE=1 opt3.C
 spec.seq.o: spec.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -2945,11 +2947,11 @@ spec.seq.o: spec.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o spec.seq.o -DSEQUENTIAL_POSE=1 spec.C
 adapt.seq.o: adapt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -3006,11 +3008,11 @@ adapt.seq.o: adapt.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o adapt.seq.o -DSEQUENTIAL_POSE=1 adapt.C
 adapt2.seq.o: adapt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -3067,11 +3069,11 @@ adapt2.seq.o: adapt2.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o adapt2.seq.o -DSEQUENTIAL_POSE=1 adapt2.C
 adapt3.seq.o: adapt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -3128,11 +3130,11 @@ adapt3.seq.o: adapt3.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o adapt3.seq.o -DSEQUENTIAL_POSE=1 adapt3.C
 adapt4.seq.o: adapt4.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -3189,11 +3191,11 @@ adapt4.seq.o: adapt4.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h
 	$(CHARMC) -o adapt4.seq.o -DSEQUENTIAL_POSE=1 adapt4.C
 pose.seq.o: pose.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/charm.h ../../../../include/converse.h \
@@ -3250,9 +3252,9 @@ pose.seq.o: pose.C pose.h pose.decl.h ../../../../include/charm++.h \
   ../../../../include/MeshStreamingStrategy.h \
   ../../../../include/PrioStreaming.h \
   ../../../../include/StreamingStrategy.h eventID.h mempool.h \
-  mempool.decl.h srtable.h stats.h stats.decl.h cancel.h event.h \
-  ../../../../include/envelope.h eqheap.h pvtobj.h lbObject.h ldbal.h \
-  ldbal.decl.h gvt.h gvt.decl.h evq.h rep.h sim.decl.h strat.h sim.h \
-  opt.h opt2.h opt3.h spec.h adapt.h adapt2.h adapt3.h adapt4.h cons.h \
-  seq.h chpt.h pose.def.h
+  mempool.decl.h memory_temporal.h memory_temporal.decl.h srtable.h \
+  stats.h stats.decl.h cancel.h event.h ../../../../include/envelope.h \
+  eqheap.h pvtobj.h lbObject.h ldbal.h ldbal.decl.h gvt.h gvt.decl.h \
+  evq.h rep.h sim.decl.h strat.h sim.h opt.h opt2.h opt3.h spec.h adapt.h \
+  adapt2.h adapt3.h adapt4.h cons.h seq.h chpt.h pose.def.h
 	$(CHARMC) -o pose.seq.o -DSEQUENTIAL_POSE=1 pose.C

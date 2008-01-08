@@ -69,6 +69,8 @@ void POSE_init(int IDflag, int ET) // can specify both
 #endif
   // Create a MemoryPool with global handle for memory recycling 
   MemPoolID = CProxy_MemoryPool::ckNew();
+  // Create a Temporal Memory Manager
+  TempMemID = CProxy_TimePool::ckNew();
 #endif
   // Initialize statistics collection if desired
 #ifndef CMK_OPTIMIZE
