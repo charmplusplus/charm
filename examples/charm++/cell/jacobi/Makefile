@@ -44,7 +44,8 @@ jacobi_shared.o : jacobi_shared.cpp jacobi_shared.h $(GENERAL_DEPENDS)
 #	spu-gcc $(OPTS) -I$(CHARM_BASE_DIR)/include -I$(CELL_SDK_DIR)/sysroot/usr/spu/include -o jacobi_shared jacobi_shared.c -lcellspu -lsim
 #	spu-gcc $(OPTS) -c -I$(CHARM_BASE_DIR)/include -I$(CELL_SDK_DIR)/sysroot/usr/spu/include -L$(CHARM_BASE_DIR)/lib -L$(CELL_SDK_DIR)/sysroot/usr/spu/lib -o jacobi_shared_tmp.o jacobi_shared.c
 #	spu-gcc -L$(CHARM_BASE_DIR)/lib -L$(CELL_SDK_DIR)/sysroot/usr/spu/lib -o jacobi_shared jacobi_shared_tmp.o -lcellspu -lsim
-	$(SPU_CC) -I$(CHARM_BASE_DIR)/include -I$(CELL_SDK_DIR)/sysroot/usr/spu/include -L$(CHARM_BASE_DIR)/lib -L$(CELL_SDK_DIR)/sysroot/usr/spu/lib -o jacobi_shared jacobi_shared.c -lcellspu -lsim -lc
+#	$(SPU_CC) -I$(CHARM_BASE_DIR)/include -I$(CELL_SDK_DIR)/sysroot/usr/spu/include -L$(CHARM_BASE_DIR)/lib -L$(CELL_SDK_DIR)/sysroot/usr/spu/lib -o jacobi_shared jacobi_shared.c -lcellspu -lsim -lc
+	$(SPU_CC) -I$(CHARM_BASE_DIR)/include -L$(CHARM_BASE_DIR)/lib -o jacobi_shared jacobi_shared.c -lcellspu
 	$(PPU_EMBEDSPU) spert_main jacobi_shared jacobi_shared.o
 
 

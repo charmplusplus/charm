@@ -7,7 +7,7 @@ include $(CHARM_BASE_DIR)/tmp/Makefile.cell
 all: jacobi
 
 jacobi: jacobi.o jacobi_shared.o
-	$(PPU_CXX) -L/opt/IBM/cell-sdk-1.1/sysroot/usr/lib -L$(CHARM_BASE_DIR)/lib -o jacobi jacobi_shared.o jacobi.o -lspe -lcellppu
+	$(PPU_CXX) -L$(CHARM_BASE_DIR)/lib -o jacobi jacobi_shared.o jacobi.o -lspe2 -lcellppu
 
 jacobi_shared.o: jacobi_shared.cpp jacobi_shared.h
 	cp jacobi_shared.cpp jacobi_shared.c

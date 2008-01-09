@@ -9,7 +9,7 @@ OBJS = hello.o
 all: hello
 
 hello: $(OBJS) hello_shared.o
-	$(PPU_CXX) -L/opt/IBM/cell-sdk-1.1/sysroot/usr/lib -L$(CHARM_BASE_DIR)/lib -o hello hello_shared.o $(OBJS) -lspe -lcellppu
+	$(PPU_CXX) -L$(CHARM_BASE_DIR)/lib -o hello hello_shared.o $(OBJS) -lspe2 -lcellppu
 
 hello_shared.o: hello_shared.cpp hello_shared.h
 	cp hello_shared.cpp hello_shared.c
