@@ -8,7 +8,7 @@
 #include "converse.h"
 #include "sockRoutines.h"
 
-#define DEBUGP(x)     /* CmiPrintf x; */
+#define DEBUGP(x)   /*  CmiPrintf x;  */
 
 /*
  This scheme relies on using IP address to identify nodes and assigning 
@@ -217,6 +217,7 @@ static void cpuAffinityHandler(void *m)
   rec->rank ++;
   count ++;
   if (count == CmiNumPes()) {
+    CmiPrintf("Cpuaffinity> %d unique compute nodes detected! \n", CmmEntries(hostTable));
     hostnameMsg *m;
     tag = CmmWildCard;
     while (m = CmmGet(hostTable, 1, &tag, &tag1)) CmiFree(m);
@@ -261,7 +262,7 @@ extern int getXT3NodeID(int mype, int numpes);
 
 void CmiInitCPUAffinity(char **argv)
 {
-  skt_ip_t myip;
+  static skt_ip_t myip;
   int ret;
   hostnameMsg  *msg;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
@@ -273,6 +274,8 @@ void CmiInitCPUAffinity(char **argv)
        CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler);
 
   if (!affinity_flag) return;
+  else if (CmiMyPe() == 0)
+     CmiPrintf("Charm++> set cpuaffinity enabled! \n");
 
   if (CmiMyPe() >= CmiNumPes()) {
 #if 0
@@ -293,7 +296,9 @@ void CmiInitCPUAffinity(char **argv)
   ret = getXT3NodeID(CmiMyPe(), CmiNumPes());
   memcpy(&myip, &ret, sizeof(int));
 #elif CMK_HAS_GETHOSTNAME
-  myip = skt_my_ip();
+  if (CmiMyRank() == 0)
+    myip = skt_my_ip();
+  CmiNodeBarrier();
 #else
   CmiAbort("Can not get unique name for the compute nodes. \n");
 #endif
