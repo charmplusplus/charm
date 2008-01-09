@@ -34,7 +34,9 @@ POSE_TimeType TimeBucket::sanity_check(POSE_TimeType last_time) {
 }
 
 void TimePool::clean_up() {
+#ifdef VERBOSE_DEBUG
   sanity_check();
+#endif
   TimeBucket *tmpbkt = first_in_use;
   while (tmpbkt && (min_time >= (tmpbkt->getStart()+tmpbkt->getRange()))) {
     // move the blocks of this bucket to not_in_use
@@ -52,7 +54,7 @@ void TimePool::clean_up() {
       // move the first_in_use ptr forward
       if (tmpbkt == first_in_use) {
 	if (first_in_use == last_in_use) {
-	  first_in_use == last_in_use == NULL;
+	  first_in_use = last_in_use = NULL;
 	}
 	else {
 	  first_in_use = first_in_use->getPrevBucket();
@@ -80,7 +82,9 @@ void TimePool::clean_up() {
       tmpbkt = tmpbkt->getPrevBucket();
     }
   }
+#ifdef VERBOSE_DEBUG
   sanity_check();
+#endif
 }
 
 TimePool::~TimePool() 
@@ -103,8 +107,10 @@ TimePool::~TimePool()
 char *TimePool::tmp_alloc(POSE_TimeType timestamp, int sz_in_bytes)
 { // List looks like this:
   //  last (newer, higher ts) .... first (older, lower ts)
+#ifdef VERBOSE_DEBUG
   sanity_check();
   CkPrintf("[tmp_alloc:\n");
+#endif
   TimeBucket *bkt = last_in_use;
   while (bkt && (timestamp < bkt->getStart())) {
     bkt = bkt->getNextBucket();
@@ -114,16 +120,20 @@ char *TimePool::tmp_alloc(POSE_TimeType timestamp, int sz_in_bytes)
       first_in_use = new TimeBucket();
       first_in_use->initBucket(timestamp, 1, &not_in_use);
       last_in_use = first_in_use;
-      CkPrintf(".tmp_alloc]\n");
       char *mem = last_in_use->tb_alloc(sz_in_bytes);
+#ifdef VERBOSE_DEBUG
+      CkPrintf(".tmp_alloc]\n");
       sanity_check();
+#endif
       return mem;
     }
     else if (timestamp < first_in_use->getStart()) { //not empty, ts is oldest
       first_in_use->setStart(timestamp);
-      CkPrintf(".tmp_alloc]\n");
       char *mem = first_in_use->tb_alloc(sz_in_bytes);
+#ifdef VERBOSE_DEBUG
+      CkPrintf(".tmp_alloc]\n");
       sanity_check();
+#endif
       return mem;
     }
   }
@@ -135,25 +145,31 @@ char *TimePool::tmp_alloc(POSE_TimeType timestamp, int sz_in_bytes)
       last_in_use->initBucket(start, range, &not_in_use);
       bkt->setPrevBucket(last_in_use);
       last_in_use->setNextBucket(bkt);
-      CkPrintf(".tmp_alloc]\n");
       char *mem = last_in_use->tb_alloc(sz_in_bytes);
+#ifdef VERBOSE_DEBUG
+      CkPrintf(".tmp_alloc]\n");
       sanity_check();
+#endif
       return mem;
     }
     else { // let's put it here, expanding the range if necessary
       if (timestamp >= (bkt->getStart() + bkt->getRange())) {
 	bkt->setRange(timestamp - bkt->getStart() + 1);
       }
-      CkPrintf(".tmp_alloc]\n");
       char *mem = bkt->tb_alloc(sz_in_bytes);
+#ifdef VERBOSE_DEBUG
+      CkPrintf(".tmp_alloc]\n");
       sanity_check();
+#endif
       return mem;
     }
   }
   else { // this is in the range of this bucket, must put it here
-    CkPrintf(".tmp_alloc]\n");
     char *mem = bkt->tb_alloc(sz_in_bytes);
+#ifdef VERBOSE_DEBUG
+    CkPrintf(".tmp_alloc]\n");
     sanity_check();
+#endif
     return mem;
   }
 }
@@ -161,8 +177,10 @@ char *TimePool::tmp_alloc(POSE_TimeType timestamp, int sz_in_bytes)
 // "Free" up memory from a time range
 void TimePool::tmp_free(POSE_TimeType timestamp, void *mem) 
 {
+#ifdef VERBOSE_DEBUG
   sanity_check();
   CkPrintf("[tmp_free:\n");
+#endif
   TimeBucket *tmpbkt = first_in_use;
   while (tmpbkt && (timestamp >= (tmpbkt->getStart()+tmpbkt->getRange()))) {
     tmpbkt = tmpbkt->getPrevBucket();
@@ -171,8 +189,10 @@ void TimePool::tmp_free(POSE_TimeType timestamp, void *mem)
     tmpbkt->tb_free((char *)mem);
   }
   else CkAbort("ERROR: Memory in that time range not found for deallocation.\n");
+#ifdef VERBOSE_DEBUG
   CkPrintf(".tmp_free]\n");
   sanity_check();
+#endif
 }
 
 void TimePool::sanity_check() {

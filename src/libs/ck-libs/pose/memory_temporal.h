@@ -30,7 +30,7 @@
 extern CkGroupID TempMemID;  // global readonly to access pool anywhere
 
 //#define ALIGN16 // for 16-byte alignment
-#define BLOCK_SIZE 4096  // size of SuperBlocks in bytes
+#define BLOCK_SIZE 8192  // size of SuperBlocks in bytes
 
 /// SuperBlock holds the actual memory block that is allocated in blk
 class SuperBlock {
@@ -61,7 +61,9 @@ class SuperBlock {
   bool noLongerReferenced() { return(refCount == 0); }
   /// return pos, and advance pos by sz, aligned to 16 bytes, inc refCount
   char *sb_alloc(int sz) {
+#ifdef VERBOSE_DEBUG
     CkPrintf("[sb_alloc:\n");
+#endif
     int remaining = BLOCK_SIZE - (pos - blk);
 #ifdef ALIGN16
     int actual_sz = (sz%16 == 0)? sz : (sz+16)/16 * 16;
@@ -75,19 +77,27 @@ class SuperBlock {
       refCount++;
       percent_full = (int)(((float)(pos-blk)/4096.0)*100.0);
     }
+#ifdef VERBOSE_DEBUG
     CkPrintf(".sb_alloc]\n");
+#endif
     return ret;
   }
   // dec refCount
   bool sb_free(void *mem) { 
+#ifdef VERBOSE_DEBUG
     CkPrintf("[sb_free:\n");
+#endif
     if ((mem >= blk) && (mem < pos)) {
       refCount--; 
+#ifdef VERBOSE_DEBUG
       CkPrintf(".sb_free]\n");
+#endif
       return true;
     }
     else {
+#ifdef VERBOSE_DEBUG
       CkPrintf(".sb_free]\n");
+#endif
       return false;
     }
   }
@@ -145,12 +155,14 @@ class TimeBucket {
   TimeBucket *getNextBucket() { return nextBucket; }
   // Get some memory in this time range
   char *tb_alloc(int sz) {
+#ifdef VERBOSE_DEBUG
     CkPrintf("[tb_alloc:\n");
+#endif
     char *newblk = sBlocks->sb_alloc(sz);
     if (!newblk) {
       SuperBlock *tmp;
       if (!(*pool)) {
-	tmp = new SuperBlock; // later, check the recycle bin
+	tmp = new SuperBlock;
 	tmp->initBlock();
       }
       else {
@@ -161,14 +173,22 @@ class TimeBucket {
       tmp->setNextBlock(sBlocks);
       sBlocks = tmp;
       numSuperBlocks++;
+#ifdef VERBOSE_DEBUG
+      if (numSuperBlocks > 3)
+	CkPrintf("WARNING: # SuperBlocks in TimeBucket exceeds 3 at %d.  SUGGESTION: Increase block size.\n", numSuperBlocks);
+#endif
       newblk = sBlocks->sb_alloc(sz);
     }
+#ifdef VERBOSE_DEBUG
     CkPrintf(".tb_alloc]\n");
+#endif
     return newblk;
   }
   // "Free" some memory from this time range
   void tb_free(char *mem) {
+#ifdef VERBOSE_DEBUG
     CkPrintf("[tb_free:\n");
+#endif
     SuperBlock *tmp = sBlocks;
     bool done = false;
     while (tmp && !done) {
@@ -182,7 +202,9 @@ class TimeBucket {
       }
     }
     if (!done) CkAbort("ERROR: block to deallocate not found in time range.\n");
+#ifdef VERBOSE_DEBUG
     CkPrintf(".tb_free]\n");
+#endif
   }
   POSE_TimeType sanity_check(POSE_TimeType last_time);
 };
