@@ -596,9 +596,15 @@ int ParFUMShadowArray::IdxlLookUpSecondary(int sharedChk, int sharedIdx, int idx
 // BULK ADAPT ENTRY METHODS START HERE:
 adaptAdjMsg *ParFUMShadowArray::remote_bulk_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, int new_idxl, int n1_idxl, int n2_idxl, int partitionID)
 {
-  
   adaptAdjMsg *am = new adaptAdjMsg;
   am->elem = bulkAdapt->remote_edge_bisect_2D(nbrElem, splitElem, new_idxl, n1_idxl, n2_idxl, partitionID);
+  return am;
+}
+
+adaptAdjMsg *ParFUMShadowArray::remote_bulk_edge_bisect_3D(adaptAdj nbrElem, adaptAdj splitElem, int new_idxl, int n1_idxl, int n2_idxl, int partitionID)
+{
+  adaptAdjMsg *am = new adaptAdjMsg;
+  am->elem = bulkAdapt->remote_edge_bisect_3D(nbrElem, splitElem, new_idxl, n1_idxl, n2_idxl, partitionID);
   return am;
 }
 
@@ -606,5 +612,16 @@ void ParFUMShadowArray::remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem,
 {
   bulkAdapt->remote_adaptAdj_replace(elem, oldElem, newElem);
 }
+
+void ParFUMShadowArray::remote_edgeAdj_replace(adaptAdj adj, adaptAdj elem, adaptAdj splitElem, double co1[3], double co2[3])
+{
+  bulkAdapt->remote_edgeAdj_replace(adj, elem, splitElem, co1, co2);
+}
+
+void ParFUMShadowArray::remote_edgeAdj_add(adaptAdj adj, adaptAdj splitElem, double co1[3], double co2[3])
+{
+  bulkAdapt->remote_edgeAdj_add(adj, splitElem, co1, co2);
+}
+
 
 #include "ParFUM_SA.def.h"

@@ -1,5 +1,5 @@
 /* File: ParFUM_SA.ci
- * Authors: Nilesh Choudhury
+ * Authors: Nilesh Choudhury, Terry Wilmarth
  * 
  */
 
@@ -22,7 +22,10 @@ module ParFUM_SA {
     entry void unlockReply(int remoteChunk,RegionID regionID);
 
     entry [sync] adaptAdjMsg *remote_bulk_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, int new_idxl, int n1_idxl, int n2_idxl, int partitionID);
+    entry [sync] adaptAdjMsg *remote_bulk_edge_bisect_3D(adaptAdj nbrElem, adaptAdj splitElem, int new_idxl, int n1_idxl, int n2_idxl, int partitionID);
     entry [sync] void remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, adaptAdj newElem);
+    entry [sync] void remote_edgeAdj_replace(adaptAdj adj, adaptAdj elem, adaptAdj splitElem, double co1[3], double co2[3]);
+    entry [sync] void remote_edgeAdj_add(adaptAdj elem, adaptAdj splitElem, double co1[3], double co2[3]);
   }
   
 };

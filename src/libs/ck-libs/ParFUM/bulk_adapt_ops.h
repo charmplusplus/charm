@@ -24,6 +24,9 @@ class BulkAdapt {
   /// Local element of shadow array
   ParFUMShadowArray *localShadow;
 
+  /// Data structure to gather elem-split pairs
+  int numSlots, numGathered;
+  adaptAdj *elemPairs;
  public:
   /// Construct array to be attached to the partitions of mesh mId
   BulkAdapt(int meshid, FEM_Mesh *mPtr, int partID, CProxy_ParFUMShadowArray sa_proxy);
@@ -106,7 +109,19 @@ class BulkAdapt {
 
   void remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, 
 			       adaptAdj newElem);
+  void remote_edgeAdj_replace(adaptAdj adj, adaptAdj elem, adaptAdj splitElem, 
+			      double co1[3], double co2[3]);
+  void remote_edgeAdj_add(adaptAdj adj, adaptAdj splitElem, double co1[3],
+			  double co2[3]);
 
+  adaptAdj remote_edge_bisect_3D(adaptAdj nbrElem, adaptAdj splitElem, 
+				 int new_idxl, int n1_idxl, int n2_idxl, 
+				 int remotePartID);
+
+  void remote_one_side_split_3D() {};
+  void local_one_side_split_3D() {};
+  void recv_splits() {};
+  void recv_updates() {};
 
   /* LOCAL HELPERS FOR BULK ADAPTIVITY OPERATIONS */
 	
@@ -134,8 +149,21 @@ class BulkAdapt {
   int get_node_from_idxl(int node_idxl, int partID);
 
   /** Find all elements adjacent to an edge, for locking purposes */
-  void get_elemsToLock(adaptAdj startElem, adaptAdj *elemsToLock, int *count);
+  void get_elemsToLock(adaptAdj startElem, adaptAdj **elemsToLock, int edgeID, int *count);
 
+  /** Perform all local mesh mods and updates for a local tet split */
+  adaptAdj *local_split_3D(adaptAdj elem, int n1, int n2, int n5);
+  /** Perform local face adjacency updates associated with a split */
+  void update_local_face_adj(adaptAdj elem, adaptAdj splitElem, int n1, int n2, int n5);
+  /** Perform local edge adjacency updates associated with a split */
+  void update_local_edge_adj(adaptAdj elem, adaptAdj splitElem, int n1, int n2, int n5);
+  int getEdgeIDfromCoords(adaptAdj elem, double *node1, double *node2, 
+			  int nodePerElem, int dim);
+  void updateStartElemAdj(adaptAdj elem, adaptAdj splitElem, adaptAdj nbr1, 
+			  adaptAdj nbr2, adaptAdj splitNbr1, adaptAdj splitNbr2,
+			  adaptAdj *splitList1, adaptAdj *splitList2,
+			  int sl1_len, int sl2_len, int n1, int n2, 
+			  int n3, int n4, int n5);
 };
 
 void midpoint(double *n1, double *n2, int dim, double *result);
