@@ -100,4 +100,114 @@
 
 \subsection{Mesh Adaptivity}
 
-{\it AARON}
+
+\subsubsection{Initialization}
+If a ParFUM application wants to use parallel mesh adaptivity,
+the first task is to call the initialization routine from the 
+{\it driver} function. This creates the node and element 
+adjacency information that is essential for the adaptivity 
+operations. It also initializes all the mesh adaptivity related
+internal objects in the framework.
+
+\function{void FEM\_ADAPT\_Init(int meshID)}
+\index{femAdaptInit}
+\desc{Initializes the mesh defined by {\it meshID} for the mesh
+adaptivity operations.}
+
+\subsubsection{Preparing the Mesh}
+For every element entity in the mesh, there is a desired size entry 
+for each element. This entry is called meshSizing. This meshSizing entry 
+contains a metric that determines element quality. The default metric is
+the average of the length of the three edges of an element. ParFUM provides 
+various mechanisms to set this field. Some of the adaptive operations
+use these metrics to maintain quality. In addition, there is another metric
+which is computed for each element and maintained during mesh adaptivity. This metric 
+is the ratio of the longest side to the shortest altitude, and this value 
+is not allowed to go beyond a certain limit in order to maintain element quality.
+
+\function{void FEM\_ADAPT\_SetElementSizeField(int meshID, int elem, double size);}
+\index{femAdaptSetElementSizeField1}
+\desc{For the mesh specified by {\it meshID}, for the element {\it elem},
+we set the desired size for each element to be {\it size}.}
+
+\function{void FEM\_ADAPT\_SetElementSizeField(int meshID, double *sizes);}
+\index{femAdaptSetElementSizeField2}
+\desc{For the mesh specified by {\it meshID}, for the element {\it elem},
+we set the desired size for each element from the corresonponding entry in
+the {\it sizes} array.}
+
+\function{void FEM\_ADAPT\_SetReferenceMesh(int meshID);}
+\index{femAdaptSetReferenceMesh}
+\desc{For each element int this mesh defined by {\it meshID} 
+set its size to the average edge length of the corresponding element.}
+
+\function{void FEM\_ADAPT\_GradateMesh(int meshID, double smoothness);}
+\index{femAdaptGradateMesh}
+\desc{Resize mesh elements to avoid jumps in element size.
+That is, avoid discontinuities in the desired sizes for elements of a mesh
+by smoothing them out. Algorithm based on h-shock correction, described in
+Mesh Gradation Control, Borouchaki et al.}
+
+
+\subsubsection{Modifying the Mesh}
+Once the elements in the mesh have been prepared by specifying their desired
+sizes, we are ready to use the actual adaptivity operations. Currently we
+provide delaunay flip operations, edge bisect operations and edge coarsen 
+operations, all of which are implemented in parallel. We provide several higher level 
+functions which use these basic operations to 
+generate a mesh with higher quality elements while achieving the
+desired sizing.
+
+\function{void FEM\_ADAPT\_Refine(int meshID, int qm, int method, double factor,double *sizes);}
+\index{femAdaptRefine}
+\desc{Perform refinements on the mesh specified by {\it meshId}.
+Tries to maintain/improve element quality by refining the mesh
+as specified by a quality measure {\it qm}.
+If {\it method} = 0, refine areas with size larger than {\it factor} down to {\it factor}
+If {\it method} = 1, refine elements down to sizes specified in the {\it sizes} array.
+In this array each entry corresponds to the corresponding element.
+Negative entries in sizes array indicate no refinement. }
+
+\function{void FEM\_ADAPT\_Coarsen(int meshID, int qm, int method, double factor,double *sizes);}
+\index{femAdaptCoarsen}
+\desc{Perform refinements on the mesh specified by {\it meshId}.
+Tries to maintain/improve element quality by coarsening the mesh
+as specified by a quality measure {\it qm}.
+If {\it method} = 0, coarsen areas with size smaller than {\it factor} down to {\it factor}
+If {\it method} = 1, coarsen elements up to sizes specified in the {\it sizes} array.
+In this array each entry corresponds to the corresponding element.
+Negative entries in sizes array indicate no coarsening. }
+
+\function{void FEM\_ADAPT\_AdaptMesh(int meshID, int qm, int method, double factor,double *sizes);}
+\index{femAdaptAdaptMesh}
+\desc{This function has the same set of arguments as required by the previous two operations,
+namely refine and coarsen. This function keeps using the above two functions until
+we have all elements in the mesh with as close to the desired quality. Apart from
+using the above two operations, it also performs a mesh repair operation which
+gets rid of some bad quality elements by delaunay flip or coarsening as the
+geometry in the area demands.}
+
+\function{int FEM\_ADAPT\_SimpleRefineMesh(int meshID, double targetA, double xmin, double ymin, double xmax, double ymax);}
+\index{femAdaptSimpleRefineMesh}
+\desc{A region is defined by ({\it xmax, xmin, ymax, ymin}) 
+and the target area to be achieved for all elements in this region
+in the mesh specified by {\it meshID} is given by {\it targetA}.
+This function only performs a series of refinements on the elements in this region.
+If the area is larger, then no coarsening is done.}
+
+\function{int FEM\_ADAPT\_SimpleCoarsenMesh(int meshID, double targetA, double xmin, double ymin, double xmax, double ymax);}
+\index{femAdaptSimpleCoarsenMesh}
+\desc{A region is defined by ({\it xmax, xmin, ymax, ymin}) 
+and the target area to be achieved for all elements in this region
+in the mesh specified by {\it meshID} is given by {\it targetA}.
+This function only performs a series of coarsenings on the elements in this region.
+If the area is smaller, then no refinement is done.}
+
+
+\subsection{Verifying correctness}
+We provide a checking function that can be used for debugging purposes to identify corrupted meshes or low quality elements.
+
+\function{void FEM\_ADAPT\_TestMesh(int meshID);}
+\index{femAdaptTestMesh}
+\desc{This provides a series of tests to determine the consistency of the
+mesh specified by {\it meshID}.}
