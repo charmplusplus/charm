@@ -7,17 +7,18 @@
 // DEBUG
 #include <sys/time.h>
 
-extern "C" {
-  #include <libspe.h>
-}
+//extern "C" {
+  #include <libspe2.h>
+//}
 
 #include "spert_common.h"
 #include "spert.h"
 
 extern "C" {
-#include "spert_ppu.h"
+  #include "spert_ppu.h"
 }
 
+#include "pthread.h"
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +63,15 @@ typedef struct __msgQEntry_list {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Global Data
 
-SPEThread* speThreads[NUM_SPE_THREADS];
+
+/// SDK 2.0 ///
+//SPEThread* speThreads[NUM_SPE_THREADS];
+
+/// SDK 2.1 ///
+SPEThread** speThreads = NULL;
+int numSPEThreads = -1;
+
+
 unsigned long long int wrCounter = 0;
 
 void (*callbackFunc)(void*) = NULL;
@@ -96,10 +105,17 @@ WRGroup *wrGroupFreeTail = NULL;
 
 // A Queue of free Work Request Entries
 #if USE_MESSAGE_QUEUE_FREE_LIST != 0
-MSGQEntryList __msgQEntries[NUM_SPE_THREADS * SPE_MESSAGE_QUEUE_LENGTH];
 MSGQEntryList *msgQEntryFreeHead = NULL;
 MSGQEntryList *msgQEntryFreeTail = NULL;
-int msgQListLen = NUM_SPE_THREADS * SPE_MESSAGE_QUEUE_LENGTH; // Initially all free
+
+/// SDK 2.0 ///
+//MSGQEntryList __msgQEntries[NUM_SPE_THREADS * SPE_MESSAGE_QUEUE_LENGTH];
+//int msgQListLen = NUM_SPE_THREADS * SPE_MESSAGE_QUEUE_LENGTH; // Initially all free
+
+/// SDK 2.1 ///
+MSGQEntryList* __msgQEntries;
+int msgQListLen = -1;
+
 #endif
 
 // This is used in an attempt to more evenly distribute the workload amongst all the SPE Threads
@@ -213,7 +229,10 @@ void displayList(char* listName, WorkRequest* list) {
 void displayMessageQueue(SPEThread* speThread) {
   int speIndex = -1;
   int i;
-  for (i = 0; i < NUM_SPE_THREADS; i++) if (speThreads[i] == speThread) speIndex = i;
+
+  //for (i = 0; i < NUM_SPE_THREADS; i++) if (speThreads[i] == speThread) speIndex = i;
+  for (i = 0; i < numSPEThreads; i++) if (speThreads[i] == speThread) speIndex = i;
+
   printf("OffloadAPI :: Message Queue for SPE_%d...\n", speIndex);
   for (i = 0; i < SPE_MESSAGE_QUEUE_LENGTH; i++) {
     SPEMessage *msg = (SPEMessage*)((char*)(speThread->speData->messageQueue) + (i * SIZEOF_16(SPEMessage)));
@@ -324,10 +343,18 @@ inline int sendSPEMessage(SPEThread *speThread, int qIndex, WorkRequest *wrPtr, 
 
 
 // Returns 0 on success, non-zero otherwise
-inline int sendSPECommand(SPEThread *speThread, int command) {
+inline int sendSPECommand(SPEThread *speThread, unsigned int command) {
+
   if (__builtin_expect(command < SPE_MESSAGE_COMMAND_MIN || command > SPE_MESSAGE_COMMAND_MAX, 0)) return -1;
-  while (spe_stat_in_mbox(speThread->speID) == 0);      // Loop while mailbox is full
-  return spe_write_in_mbox(speThread->speID, command);
+
+  /// SDK 2.0 ///
+  //
+  //while (spe_stat_in_mbox(speThread->speID) == 0);      // Loop while mailbox is full
+  //return spe_write_in_mbox(speThread->speID, command);
+  //
+
+  /// SDK 2.1 ///
+  return spe_in_mbox_write(speThread->speContext, &command, 1, SPE_MBOX_ALL_BLOCKING);
 }
 
 
@@ -352,13 +379,42 @@ int InitOffloadAPI(void (*cbFunc)(void*),
   // If the caller specified an error handler function, set errorHandlerFunc to point to it
   errorHandlerFunc = ((errorFunc != NULL) ? (errorFunc) : (NULL));
 
+
+  /// SDK 2.1 ///
+
+  // Set numSPEThreads
+  #if NUM_SPE_THREADS <= 0
+    // TODO : NOTE : For now, the assumption is made that all CPUs have the same number of SPEs and that
+    //   all will be used (the SDK does not seem to have a function that will identify which CPU this
+    //   process is running on so can't really check how many physical and/or usable SPEs are available
+    //   locally to "this" CPU).  For now, just check how many SPEs CPU 0 has and create that many threads.
+    numSPEThreads = spe_cpu_info_get(SPE_COUNT_PHYSICAL_SPES, 0);
+  #else
+    int numSPEs = spe_cpu_info_get(SPE_COUNT_PHYSICAL_SPES, 0);
+    numSPEThreads = NUM_SPE_THREADS;
+    if (numSPEThreads > numSPEs) {
+      fprintf(stderr, "OffloadAPI :: ERROR : %d SPE(s) were requested but there are only %d physical SPEs\n", numSPEThreads, numSPEs);
+      exit(EXIT_FAILURE);
+    }
+  #endif
+
+  // Create and initialize the speThreads array
+  speThreads = new SPEThread*[numSPEThreads];
+  for (int i = 0; i < numSPEThreads; i++) speThreads[i] = NULL;
+
+  // Create the msgQEntries array (will be initialized later)
+  msgQListLen = numSPEThreads * SPE_MESSAGE_QUEUE_LENGTH;
+  __msgQEntries = new MSGQEntryList[msgQListLen];
+
+
   // Start Creating the SPE threads
   #if DEBUG_DISPLAY >= 1
     printf(" --- Creating SPE Threads ---\n");
   #endif
 
   #if CREATE_EACH_THREAD_ONE_BY_ONE
-    for (int i = 0; i < NUM_SPE_THREADS; i++) {
+    //for (int i = 0; i < NUM_SPE_THREADS; i++) {
+    for (int i = 0; i < numSPEThreads; i++) {
 
       // Create the SPE Thread (with a default SPEData structure)
       // NOTE: The createSPEThread() call is blocking (it will block until the thread is created).  This
@@ -380,14 +436,16 @@ int InitOffloadAPI(void (*cbFunc)(void*),
     }
   #else
 
-    if (createSPEThreads(speThreads, NUM_SPE_THREADS) == NULL) {
+    //if (createSPEThreads(speThreads, NUM_SPE_THREADS) == NULL) {
+    if (createSPEThreads(speThreads, numSPEThreads) == NULL) {
       fprintf(stderr, "OffloadAPI :: ERROR :: createSPEThreads returned NULL... Exiting.\n");
       exit(EXIT_FAILURE);
     }
 
     // Display information about the threads that were just created
     #if DEBUG_DISPLAY >= 1
-      for (int i = 0; i < NUM_SPE_THREADS; i++) {
+      //for (int i = 0; i < NUM_SPE_THREADS; i++) {
+      for (int i = 0; i < numSPEThreads; i++) {
         printf("SPE_%d Created {\n", i);
         printf("  speThreads[%d]->speData->messageQueue = %p\n", i, (void*)(speThreads[i]->speData->messageQueue));
         printf("  speThreads[%d]->speData->messageQueueLength = %d\n", i, speThreads[i]->speData->messageQueueLength);
@@ -408,18 +466,22 @@ int InitOffloadAPI(void (*cbFunc)(void*),
   #if USE_MESSAGE_QUEUE_FREE_LIST != 0
     // Initialize the wrEntryFreeList
     for (int entryI = 0; entryI < SPE_MESSAGE_QUEUE_LENGTH; entryI++) {
-      for (int speI = 0; speI < NUM_SPE_THREADS; speI++) {
-        register int index = speI + (entryI * NUM_SPE_THREADS);
+      //for (int speI = 0; speI < NUM_SPE_THREADS; speI++) {
+      for (int speI = 0; speI < numSPEThreads; speI++) {
+	//register int index = speI + (entryI * NUM_SPE_THREADS);
+        register int index = speI + (entryI * numSPEThreads);
         __msgQEntries[index].msgQEntryPtr = (SPEMessage*)(((char*)speThreads[speI]->speData->messageQueue) + (entryI * SIZEOF_16(SPEMessage)));
         __msgQEntries[index].speIndex = speI;
         __msgQEntries[index].entryIndex = entryI;
-        __msgQEntries[index].next = ((entryI == (SPE_MESSAGE_QUEUE_LENGTH - 1) && speI == (NUM_SPE_THREADS - 1)) ?
+        //__msgQEntries[index].next = ((entryI == (SPE_MESSAGE_QUEUE_LENGTH - 1) && speI == (NUM_SPE_THREADS - 1)) ?
+        __msgQEntries[index].next = ((entryI == (SPE_MESSAGE_QUEUE_LENGTH - 1) && speI == (numSPEThreads - 1)) ?
                                       (NULL) :
                                       (&(__msgQEntries[index + 1])));
       }
     }
     msgQEntryFreeHead = &(__msgQEntries[0]);
-    msgQEntryFreeTail = &(__msgQEntries[(NUM_SPE_THREADS * SPE_MESSAGE_QUEUE_LENGTH) - 1]);
+    //msgQEntryFreeTail = &(__msgQEntries[(NUM_SPE_THREADS * SPE_MESSAGE_QUEUE_LENGTH) - 1]);
+    msgQEntryFreeTail = &(__msgQEntries[(numSPEThreads * SPE_MESSAGE_QUEUE_LENGTH) - 1]);
   #endif
 
   // Open the projections/timing file
@@ -429,7 +491,8 @@ int InitOffloadAPI(void (*cbFunc)(void*),
 
   // Send each of the SPE threads a command to restart their clocks (in an attempt to remove clock
   //   skew from the timing information).
-  for (int i = 0; i < NUM_SPE_THREADS; i++)
+  //for (int i = 0; i < NUM_SPE_THREADS; i++)
+  for (int i = 0; i < numSPEThreads; i++)
     sendSPECommand(speThreads[i], SPE_MESSAGE_COMMAND_RESET_CLOCK);
 
 
@@ -482,27 +545,48 @@ void CloseOffloadAPI() {
   #endif
 
   // Send each of the SPE threads a message to exit
-  for (int i = 0; i < NUM_SPE_THREADS; i++)
+  //for (int i = 0; i < NUM_SPE_THREADS; i++)
+  for (int i = 0; i < numSPEThreads; i++)
     sendSPECommand(speThreads[i], SPE_MESSAGE_COMMAND_EXIT);
 
-  // Wait for all the SPE threads to finish
-  for (int i = 0; i < NUM_SPE_THREADS; i++) {
 
-    #if DEBUG_DISPLAY >= 1
-      printf("OffloadAPI :: Waiting for SPE_%d to Exit...\n", i);
-    #endif
+  /// SDK 2.0 ///
+  //
+  //// Wait for all the SPE threads to finish
+  //for (int i = 0; i < NUM_SPE_THREADS; i++) {
+  //
+  //  #if DEBUG_DISPLAY >= 1
+  //    printf("OffloadAPI :: Waiting for SPE_%d to Exit...\n", i);
+  //  #endif
+  //
+  //  spe_wait(speThreads[i]->speID, &status, 0);
+  //
+  //  #if DEBUG_DISPLAY >= 1
+  //    printf("OffloadAPI :: SPE_%d Finished (status : %d)\n", i, status);
+  //  #endif
+  //}
+  //
 
-    spe_wait(speThreads[i]->speID, &status, 0);
 
-    #if DEBUG_DISPLAY >= 1
-      printf("OffloadAPI :: SPE_%d Finished (status : %d)\n", i, status);
-    #endif
+  /// SDK 2.1 ///
+
+  // Wait for all the pthreads to complete
+  //for (int i = 0; i < NUM_SPE_THREADS; i++) {
+  for (int i = 0; i < numSPEThreads; i++) {
+
+    int rtnCode = pthread_join(speThreads[i]->pThread, NULL);
+    if (rtnCode != 0) {
+      fprintf(stderr, "OffloadAPI :: ERROR : Unable to join pthread\n");
+      exit(EXIT_FAILURE);
+    }
   }
+
 
   // Clean-up any data structures that need cleaned up
 
   // Clean up the speThreads
-  for (int i = 0; i < NUM_SPE_THREADS; i++) {
+  //for (int i = 0; i < NUM_SPE_THREADS; i++) {
+  for (int i = 0; i < numSPEThreads; i++) {
     free_aligned((void*)(speThreads[i]->speData->messageQueue));
     free_aligned((void*)(speThreads[i]->speData));
     delete speThreads[i];
@@ -618,19 +702,19 @@ WRHandle sendWorkRequest(int funcIndex,
   #if USE_MESSAGE_QUEUE_FREE_LIST == 0
 
     processingSPEIndex = -1;
-    for (int i = 0; i < NUM_SPE_THREADS; i++) {
+    //for (int i = 0; i < NUM_SPE_THREADS; i++) {
+    for (int i = 0; i < numSPEThreads; i++) {
 
       // Check the affinity flag (if the bit for this SPE is not set, skip this SPE)
       if (((0x01 << i) & speAffinityMask) != 0x00) {
 
-        // NOTE: Since NUM_SPE_THREADS should be 8, the "% NUM_SPE_THREADS" should be transformed into masks/shifts
-        //   by strength reduction in the compiler when optimizations are turned on... for debuging purposes, leave them
-        //   as "% NUM_SPE_THREADS" in the code (if NUM_SPE_THREADS is reduced to save startup time in the simulator).
-        register int actualSPEThreadIndex = (i + speSendStartIndex) % NUM_SPE_THREADS;
+	//register int actualSPEThreadIndex = (i + speSendStartIndex) % NUM_SPE_THREADS;
+        register int actualSPEThreadIndex = (i + speSendStartIndex) % numSPEThreads;
         sentIndex = sendSPEMessage(speThreads[actualSPEThreadIndex], wrEntry, SPE_MESSAGE_COMMAND_NONE);
 
         if (sentIndex >= 0) {
-          speSendStartIndex = (actualSPEThreadIndex + 1) % NUM_SPE_THREADS;
+	  //speSendStartIndex = (actualSPEThreadIndex + 1) % NUM_SPE_THREADS;
+          speSendStartIndex = (actualSPEThreadIndex + 1) % numSPEThreads;
           processingSPEIndex = actualSPEThreadIndex;
 
           // Fill in the execution data into the work request (which SPE, which message queue entry)
@@ -866,16 +950,19 @@ WRHandle sendWorkRequest_list(int funcIndex,
   #if USE_MESSAGE_QUEUE_FREE_LIST == 0
 
     processingSPEIndex = -1;
-    for (int i = 0; i < NUM_SPE_THREADS; i++) {
+    //for (int i = 0; i < NUM_SPE_THREADS; i++) {
+    for (int i = 0; i < numSPEThreads; i++) {
 
       // Check the affinity flag (if the bit for this SPE is not set, skip this SPE)
       if (((0x01 << i) & speAffinityMask) != 0x00) {
 
-        register int actualSPEThreadIndex = (i + speSendStartIndex) % NUM_SPE_THREADS;
+	//register int actualSPEThreadIndex = (i + speSendStartIndex) % NUM_SPE_THREADS;
+        register int actualSPEThreadIndex = (i + speSendStartIndex) % numSPEThreads;
         sentIndex = sendSPEMessage(speThreads[actualSPEThreadIndex], wrEntry, SPE_MESSAGE_COMMAND_NONE);
 
         if (sentIndex >= 0) {
-          speSendStartIndex = (actualSPEThreadIndex + 1) % NUM_SPE_THREADS;
+	  //speSendStartIndex = (actualSPEThreadIndex + 1) % NUM_SPE_THREADS;
+          speSendStartIndex = (actualSPEThreadIndex + 1) % numSPEThreads;
           processingSPEIndex = actualSPEThreadIndex;
           break;
         }
@@ -1992,7 +2079,8 @@ void OffloadAPIProgress() {
   for (int j = 0; j < SPE_MESSAGE_QUEUE_LENGTH; j++) {
 
     // For each SPE
-    for (int i = 0; i < NUM_SPE_THREADS; i++) {
+    //for (int i = 0; i < NUM_SPE_THREADS; i++) {
+    for (int i = 0; i < numSPEThreads; i++) {
 
       #if PIPELINE_LOADS != 0
 
@@ -2014,7 +2102,8 @@ void OffloadAPIProgress() {
 
         register int i_0 = i + 1;
         register int j_0 = j;
-        if (__builtin_expect(i_0 >= NUM_SPE_THREADS, 0)) {
+        //if (__builtin_expect(i_0 >= NUM_SPE_THREADS, 0)) {
+        if (__builtin_expect(i_0 >= numSPEThreads, 0)) {
           j_0++;
           i_0 = 0;
         }
@@ -2331,7 +2420,8 @@ void OffloadAPIProgress() {
             // Re-add the message queue entry to the msgQEntryFreeList
             #if USE_MESSAGE_QUEUE_FREE_LIST != 0
               //MSGQEntryList* msgQEntry = &(__msgQEntries[speMessageQueueIndex + (i * NUM_SPE_THREADS)]);
-              MSGQEntryList* msgQEntry = &(__msgQEntries[i + (j * NUM_SPE_THREADS)]);
+              //MSGQEntryList* msgQEntry = &(__msgQEntries[i + (j * NUM_SPE_THREADS)]);
+              MSGQEntryList* msgQEntry = &(__msgQEntries[i + (j * numSPEThreads)]);
               if (__builtin_expect(msgQEntry->next != NULL, 0)) {
                 printf(" --- OffloadAPI :: ERROR :: msgQEntry->next != NULL !!!!!\n");
                 msgQEntry->next = NULL;
@@ -2357,7 +2447,8 @@ void OffloadAPIProgress() {
           // Re-add the message queue entry to the msgQEntryFreeList
           #if USE_MESSAGE_QUEUE_FREE_LIST != 0
             //MSGQEntryList* msgQEntry = &(__msgQEntries[speMessageQueueIndex + (i * NUM_SPE_THREADS)]);
-            MSGQEntryList* msgQEntry = &(__msgQEntries[i + (j * NUM_SPE_THREADS)]);
+            //MSGQEntryList* msgQEntry = &(__msgQEntries[i + (j * NUM_SPE_THREADS)]);
+            MSGQEntryList* msgQEntry = &(__msgQEntries[i + (j * numSPEThreads)]);
             if (__builtin_expect(msgQEntry->next != NULL, 0)) {
               printf(" --- OffloadAPI :: ERROR :: msgQEntry->next != NULL !!!!!\n");
               msgQEntry->next = NULL;
@@ -2418,6 +2509,59 @@ int getWorkRequestID(WRHandle wrHandle) {
 // Private Function Bodies
 
 
+void handleStopAndNotify(SPEThread* speThread, int stopCode) {
+
+  // TODO : Handle them... for now, since there aren't any, warn that one occured
+  fprintf(stderr, "OffloadAPI :: WARNING : Unhandled stop-and-notify (stopCode = %d)\n", stopCode);
+}
+
+
+void* pthread_func(void* arg) {
+
+  SPEThread* speThread = (SPEThread*)arg;
+  int rtnCode;
+
+  // Load the SPE Program into the SPE Context
+  rtnCode = spe_program_load(speThread->speContext, &spert_main);
+  if (rtnCode != 0) {
+    fprintf(stderr, "OffloadAPI :: ERROR : Unable to load program into SPE Context\n");
+    exit(EXIT_FAILURE);
+  }
+
+  // Start the SPE run loop
+  speThread->speEntry = SPE_DEFAULT_ENTRY;
+  do {
+
+    // Start/Continue execution of the SPE Context
+    rtnCode = spe_context_run(speThread->speContext,
+                              &(speThread->speEntry),
+                              0,
+                              speThread->speData,
+                              NULL,
+                              &(speThread->stopInfo)
+                             );
+
+    // React to a stop-and-notify from the SPE Context (if this is one)
+    if (rtnCode > 0) handleStopAndNotify(speThread, rtnCode);
+
+  } while (rtnCode > 0);
+
+  if (rtnCode < 0) {
+    fprintf(stderr, "OffloadAPI :: ERROR : SPE Threaded exited with rtnCode = %d\n", rtnCode);
+    exit(EXIT_FAILURE);
+  }
+
+  // Destroy the SPE Context
+  rtnCode = spe_context_destroy(speThread->speContext);
+  if (rtnCode != 0) {
+    fprintf(stderr, "OffloadAPI :: ERROR : Unable to destroy SPE Context\n");
+    exit(EXIT_FAILURE);
+  }
+
+  pthread_exit(NULL);
+  return NULL;
+}
+
 
 // Returns NULL on error... otherwise, returns a pointer to SPEData structure that was passed to the
 //   created thread.
@@ -2465,59 +2609,106 @@ SPEThread* createSPEThread(SPEData *speData) {
     speDataCreated = 1;
   }
 
-  // Create the thread
-  speid_t speID = spe_create_thread((spe_gid_t)NULL,       // spe_gid_t (actually a void*) - The SPE Group ID for the Thread
-                                    (spe_program_handle_t*)(&spert_main),    // spe_program_handle_t* - Pointer to SPE's function that should be executed (name in embedded object file, not function name from code)
-                                    speData,                 // void* - Argument List
-                                    (void*)NULL,             // void* - Evironment List
-                                    (unsigned long)-1,       // unsigned long - Affinity Mask
-                                    (int)0                   // int - Flags
-				   );
 
-  // Verify that the thread was actually created
-  if (speID == NULL) {
+  /// SDK 2.0 ///
+  //
+  //// Create the thread
+  //speid_t speID = spe_create_thread((spe_gid_t)NULL,       // spe_gid_t (actually a void*) - The SPE Group ID for the Thread
+  //                                  (spe_program_handle_t*)(&spert_main),    // spe_program_handle_t* - Pointer to SPE's function that should be executed (name in embedded object file, not function name from code)
+  //                                  speData,                 // void* - Argument List
+  //                                  (void*)NULL,             // void* - Evironment List
+  //                                  (unsigned long)-1,       // unsigned long - Affinity Mask
+  //                                  (int)0                   // int - Flags
+  //				   );
+  //
+  //// Verify that the thread was actually created
+  //if (speID == NULL) {
+  //
+  //  fprintf(stderr, "OffloadAPI :: ERROR : createSPEThread() : error code 2.0 --- spe_create_thread() returned %d...\n", speID);
+  //
+  //  // Clean up the speData structure if this function created it
+  //  if (speDataCreated != 0 && speData != NULL) {
+  //    if ((void*)(speData->messageQueue) != NULL) free_aligned((void*)(speData->messageQueue));
+  //    free_aligned(speData);
+  //  }
+  //
+  //  // Return failure
+  //  return NULL;
+  //}
+  //
+  //// Wait for the SPE thread to check in (with pointer to its message queue in its local store)
+  //while (spe_stat_out_mbox(speID) <= 0);
+  //unsigned int speMessageQueuePtr = spe_read_out_mbox(speID);
+  //if (speMessageQueuePtr == 0) {
+  //  fprintf(stderr, "OffloadAPI :: ERROR : SPE checked in with NULL value for Message Queue\n");
+  //  exit(EXIT_FAILURE);
+  //}
+  //
+  //// Wait for the thread to report it's _end
+  //#if SPE_REPORT_END != 0
+  //  while (spe_stat_out_mbox(speID) <= 0);
+  //  unsigned int endValue = spe_read_out_mbox(speID);
+  //  printf("SPE reported _end = 0x%08x\n", endValue);
+  //#endif
+  //
+  //#if DEBUG_DISPLAY >= 1
+  //  printf("---> SPE Checked in with 0x%08X\n", speMessageQueuePtr);
+  //#endif
+  //
+  //// Create the SPEThread structure to be returned
+  //SPEThread *rtn = new SPEThread;
+  //rtn->speData = speData;
+  //rtn->speID = speID;
+  //rtn->messageQueuePtr = speMessageQueuePtr;
+  //rtn->msgIndex = 0;
+  //rtn->counter = 0;
+  //
+  //return rtn;
+  //
 
-    fprintf(stderr, "OffloadAPI :: ERROR : createSPEThread() : error code 2.0 --- spe_create_thread() returned %d...\n", speID);
 
-    // Clean up the speData structure if this function created it
-    if (speDataCreated != 0 && speData != NULL) {
-      if ((void*)(speData->messageQueue) != NULL) free_aligned((void*)(speData->messageQueue));
-      free_aligned(speData);
-    }
+  /// SDK 2.1 ///
 
-    // Return failure
-    return NULL;
-  }
+  SPEThread* speThread = new SPEThread;
 
-
-  // Wait for the thread to check in (with pointer to its message queue in its local store)
-  while (spe_stat_out_mbox(speID) <= 0);
-  unsigned int speMessageQueuePtr = spe_read_out_mbox(speID);
-  if (speMessageQueuePtr == 0) {
-    fprintf(stderr, "OffloadAPI :: ERROR : SPE checked in with NULL value for Message Queue\n");
+  // Create the SPE Context
+  speThread->speContext = spe_context_create(0, NULL);
+  if (speThread->speContext == NULL) {
+    fprintf(stderr, "OffloadAPI :: ERROR : Unable to create SPE Context\n");
     exit(EXIT_FAILURE);
   }
 
-  // Wait for the thread to report it's _end
+  // Create the pthread for the SPE Thread
+  int rtnCode = pthread_create(&(speThread->pThread), NULL, pthread_func, speThread);
+  if (rtnCode != 0) {
+    fprintf(stderr, "OffloadAPI :: ERROR : Unable to create pthread (rtnCode = %d)\n", rtnCode);
+    exit(EXIT_FAILURE);
+  }
+
+  // Wait for the SPE thread to check in (with pointer to its message queue in its local store)
+  while (spe_out_mbox_status(speThread->speContext) == 0);
+  spe_out_mbox_read(speThread->speContext, &(speThread->messageQueuePtr), 1);
+  if (speThread->messageQueuePtr == NULL) {
+    fprintf(stderr, "OffloadAPI :: Error : SPE checked in with NULL value for Message Queue\n");
+    exit(EXIT_FAILURE);
+  }
+
+  // Wait for the SPE thread to report it's _end value
   #if SPE_REPORT_END != 0
-    while (spe_stat_out_mbox(speID) <= 0);
-    unsigned int endValue = spe_read_out_mbox(speID);
+    unsigned int endValue;
+    while (spe_out_mbox_status(speThread->speContext) == 0);
+    spe_out_mbox_read(speThread->speContext, &endValue, 1);
     printf("SPE reported _end = 0x%08x\n", endValue);
   #endif
 
-  #if DEBUG_DISPLAY >= 1
-    printf("---> SPE Checked in with 0x%08X\n", speMessageQueuePtr);
-  #endif
+  // Finish filling in the SPEThread structure
+  // NOTE: The speEntry and stopInfo fields should not be written to.  The pthread will fillin and use
+  //   these fields.  Writing to them here will create a race condition.  Badness!
+  speThread->speData = speData;
+  speThread->msgIndex = 0;
+  speThread->counter = 0;
 
-  // Create the SPEThread structure to be returned
-  SPEThread *rtn = new SPEThread;
-  rtn->speData = speData;
-  rtn->speID = speID;
-  rtn->messageQueuePtr = speMessageQueuePtr;
-  rtn->msgIndex = 0;
-  rtn->counter = 0;
-
-  return rtn;
+  return speThread;
 }
 
 
@@ -2572,55 +2763,109 @@ SPEThread** createSPEThreads(SPEThread **speThreads, int numThreads) {
     vIDCounter++;
   }
 
-  // Create all the threads at once
+  /// SDK 2.0 ///
+  //
+  //// Create all the threads at once
+  //for (int i = 0; i < numThreads; i++) {
+  //
+  //  speid_t speID = spe_create_thread((spe_gid_t)NULL,         // spe_gid_t (actually a void*) - The SPE Group ID for the Thread
+  //                                    (spe_program_handle_t*)(&spert_main),    // spe_program_handle_t* - Pointer to SPE's function that should be executed (name in embedded object file, not function name from code)
+  //                                    (void*)speThreads[i]->speData, // void* - Argument List
+  //                                    (void*)NULL,             // void* - Evironment List
+  //                                    (unsigned long)-1,       // unsigned long - Affinity Mask
+  //                                    (int)0                   // int - Flags
+  //                                   );
+  //
+  //  // Verify that the thread was actually created
+  //  if (speID == NULL) {
+  //    fprintf(stderr, "OffloadAPI :: ERROR : createSPEThreads() : error code 2.0 --- spe_create_thread() returned %d...\n", speID);
+  //    exit(EXIT_FAILURE);
+  //  }
+  //
+  //  // Store the speID
+  //  speThreads[i]->speID = speID;
+  //}
+  //
+  //// Wait for all the threads to check in (with pointer to its message queue in its local store)
+  //for (int i = 0; i < numThreads; i++) {
+  //
+  //  while (spe_stat_out_mbox(speThreads[i]->speID) <= 0);
+  //  unsigned int speMessageQueuePtr = spe_read_out_mbox(speThreads[i]->speID);
+  //  if (speMessageQueuePtr == 0) {
+  //   fprintf(stderr, "OffloadAPI :: ERROR : SPE checked in with NULL value for Message Queue\n");
+  //   exit(EXIT_FAILURE);
+  //  }
+  //  speThreads[i]->messageQueuePtr = speMessageQueuePtr;
+  //
+  //  #if DEBUG_DISPLAY >= 1
+  //    printf("---> SPE Checked in with 0x%08X\n", speMessageQueuePtr);
+  //  #endif
+  //
+  //  // Wait for the thread to report it's _end
+  //  #if SPE_REPORT_END != 0
+  //    while (spe_stat_out_mbox(speThreads[i]->speID) <= 0);
+  //    unsigned int endValue = spe_read_out_mbox(speThreads[i]->speID);
+  //    printf("SPE_%d reported &(_end) = 0x%08x\n", i, endValue);
+  //  #endif
+  //}
+  //
+  //// Finish filling in the speThreads array
+  //for (int i = 0; i < numThreads; i++) {
+  //  speThreads[i]->msgIndex = 0;
+  //  speThreads[i]->counter = 0;
+  //}
+  //
+
+
+  /// SDK 2.1 ///
+
+  // For each of the SPE Threads...
   for (int i = 0; i < numThreads; i++) {
 
-    speid_t speID = spe_create_thread((spe_gid_t)NULL,         // spe_gid_t (actually a void*) - The SPE Group ID for the Thread
-                                      (spe_program_handle_t*)(&spert_main),    // spe_program_handle_t* - Pointer to SPE's function that should be executed (name in embedded object file, not function name from code)
-                                      (void*)speThreads[i]->speData, // void* - Argument List
-                                      (void*)NULL,             // void* - Evironment List
-                                      (unsigned long)-1,       // unsigned long - Affinity Mask
-                                      (int)0                   // int - Flags
-                                     );
-
-    // Verify that the thread was actually created
-    if (speID == NULL) {
-      fprintf(stderr, "OffloadAPI :: ERROR : createSPEThreads() : error code 2.0 --- spe_create_thread() returned %d...\n", speID);
+    // Create the SPE Context
+    speThreads[i]->speContext = spe_context_create(0, NULL);
+    if (speThreads[i]->speContext == NULL) {
+      printf("OffloadAPI :: ERROR : Unable to create SPE Context\n");
       exit(EXIT_FAILURE);
     }
 
-    // Store the speID
-    speThreads[i]->speID = speID;
+    // Create the pthread for the SPE Thread
+    int rtnCode = pthread_create(&(speThreads[i]->pThread), NULL, pthread_func, speThreads[i]);
+    if (rtnCode != 0) {
+      fprintf(stderr, "OffloadAPI :: ERROR : Unable to create pthread (rtnCode = %d)\n", rtnCode);
+      exit(EXIT_FAILURE);
+    }
   }
 
-  // Wait for all the threads to check in (with pointer to its message queue in its local store)
+  // For each of the SPE Threads...
+  // NOTE : Done as a separate loop since SPEs need startup time (i.e. don't create and wait for the first
+  //   SPE thread before creating the second... create all then wait all... by the time the last is created
+  //   hopefully the first has checked in).
   for (int i = 0; i < numThreads; i++) {
 
-    while (spe_stat_out_mbox(speThreads[i]->speID) <= 0);
-    unsigned int speMessageQueuePtr = spe_read_out_mbox(speThreads[i]->speID);
-    if (speMessageQueuePtr == 0) {
-      fprintf(stderr, "OffloadAPI :: ERROR : SPE checked in with NULL value for Message Queue\n");
+    // Wait for the SPE Thread to check in
+    while (spe_out_mbox_status(speThreads[i]->speContext) == 0);
+    spe_out_mbox_read(speThreads[i]->speContext, &(speThreads[i]->messageQueuePtr), 1);
+    if (speThreads[i]->messageQueuePtr == NULL) {
+      fprintf(stderr, "OffloadAPI :: Error : SPE checked in with NULL value for Message Queue\n");
       exit(EXIT_FAILURE);
     }
-    speThreads[i]->messageQueuePtr = speMessageQueuePtr;
 
-    #if DEBUG_DISPLAY >= 1
-      printf("---> SPE Checked in with 0x%08X\n", speMessageQueuePtr);
-    #endif
-
-    // Wait for the thread to report it's _end
+    // Wait for the SPE thread to report it's _end value
     #if SPE_REPORT_END != 0
-      while (spe_stat_out_mbox(speThreads[i]->speID) <= 0);
-      unsigned int endValue = spe_read_out_mbox(speThreads[i]->speID);
-      printf("SPE_%d reported &(_end) = 0x%08x\n", i, endValue);
+      unsigned int endValue;
+      while (spe_out_mbox_status(speThreads[i]->speContext) == 0);
+      spe_out_mbox_read(speThreads[i]->speContext, &endValue, 1);
+      printf("SPE reported _end = 0x%08x\n", endValue);
     #endif
-  }
 
-  // Finish filling in the speThreads array
-  for (int i = 0; i < numThreads; i++) {
+    // Finish filling in the SPEThread structure
+    // NOTE: The speEntry and stopInfo fields should not be written to.  The pthread will fillin and use
+    //   these fields.  Writing to them here will create a race condition.  Badness!
     speThreads[i]->msgIndex = 0;
     speThreads[i]->counter = 0;
   }
+
 
   return speThreads;
 }
@@ -2910,6 +3155,9 @@ void OffloadAPIDisplayConfig(FILE* fout) {
   fprintf(fout, "OffloadAPI :: [CONFIG] :: PPE:\n");
   fprintf(fout, "OffloadAPI :: [CONFIG] ::   Threads:\n");
   fprintf(fout, "OffloadAPI :: [CONFIG] ::     NUM_SPE_THREADS: %d\n", NUM_SPE_THREADS);
+  #if NUM_SPE_THREADS <= 0
+    fprintf(fout, "OffloadAPI :: [CONFIG] ::     numSPEThreads: %d\n", numSPEThreads);
+  #endif
   fprintf(fout, "OffloadAPI :: [CONFIG] ::     CREATE_EACH_THREAD_ONE_BY_ONE: %d\n", CREATE_EACH_THREAD_ONE_BY_ONE);
   fprintf(fout, "OffloadAPI :: [CONFIG] ::   Debugging:\n");
   fprintf(fout, "OffloadAPI :: [CONFIG] ::     DEBUG_DISPLAY: %d\n", DEBUG_DISPLAY);

@@ -1,14 +1,14 @@
-#ifdef __cplusplus
-extern "C" {
-#endif
+//#ifdef __cplusplus
+//extern "C" {
+//#endif
   #include <stdlib.h>
   #include <unistd.h>
   #include <stdio.h>
-  #include <free_align.h>
-  #include <sim_printf.h>
-#ifdef __cplusplus
-}
-#endif
+  //#include <free_align.h>
+  //#include <sim_printf.h>
+//#ifdef __cplusplus
+//}
+//#endif
 
 
 #include <spu_intrinsics.h>

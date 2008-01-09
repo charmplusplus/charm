@@ -6,7 +6,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Defines
 
-#define SPU_DEC_FREQ  14318000  // Hz
+#define SPU_DEC_FREQ  79800000  // Hz
 
 #define RECV_FUNC              0
 #define PRE_FETCHING_FUNC      1

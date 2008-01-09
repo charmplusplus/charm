@@ -12,16 +12,14 @@ done
 #make library
 export CHARMINC=../include
 . ./conv-config.sh
-%if test ! -f $CELL_SDK_DIR/sysroot/usr/include/libspe.h
-if test ! -f $CELL_SDK_DIR/sysroot/usr/include/libspe2.h
-then
-  echo "Please define CELL_SDK_DIR in charm/src/arch/net-linux-cell/conv-mach.sh!"
-  exit 1
-fi
-
+#%if test ! -f $CELL_SDK_DIR/sysroot/usr/include/libspe.h
+#if test ! -f $CELL_SDK_DIR/sysroot/usr/include/libspe2.h
+#then
+#  echo "Please define CELL_SDK_DIR in charm/src/arch/net-linux-cell/conv-mach.sh!"
+#  exit 1
+#fi
 
 cat > Makefile.cell << EOF
-CELL_SDK_DIR=$CELL_SDK_DIR
 PPU_CC = $CMK_CC \$(OPTS)
 PPU_CXX = $CMK_CXX \$(OPTS)
 SPU_CC = $CMK_SPE_CC \$(OPTS)

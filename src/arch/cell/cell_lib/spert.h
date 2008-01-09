@@ -92,7 +92,7 @@
 #define SPE_DEBUG_DISPLAY   0  // Set to 0 to save on LS memory usage (all printf's should be wrapped in this!)
 #define SPE_DEBUG_DISPLAY_STILL_ALIVE  0 // If > 0 then display a "still alive" message every SPE_DEBUG_DISPLAY_STILL_ALIVE iterations
 #define SPE_DEBUG_DISPLAY_NO_PROGRESS  0 // If non-zero, warn when no messages changes state for this many iterations
-#define SPE_REPORT_END      0  // Have each SPE report the address of it's _end variable (end of data segment; will be printed by PPE during spe thread creation)
+#define SPE_REPORT_END      1  // Have each SPE report the address of it's _end variable (end of data segment; will be printed by PPE during spe thread creation)
 #define SPE_NOTIFY_ON_MALLOC_FAILURE   0  // Set to 1 to force the SPE to notify the user when a pointer returned by malloc/new returns an un-usable pointer (message will retry malloc/new later)
 
 #define OFFLOAD_API_FULL_CHECK  1
@@ -102,7 +102,7 @@
 
 // NOTE : Only a single SPE_TIMING/STATS should be enabled at a time
 //   !!! (e.g. - if SPE_STATS enabled, then SPE_STATS1, SPE_STATS2, and SPE_TIMING should be disabled) !!!
-#define SPE_TIMING   0  // Set to have timing data on the WRs sent back to the PPE
+#define SPE_TIMING   1  // Set to have timing data on the WRs sent back to the PPE
 #define SPE_STATS    0  // Set to have stat data collected during execution for the SPE side of the Offload API (SPE Runtime)
 #define SPE_STATS1   0
 #define SPE_STATS2   0  // 0: unset; >0: message queue index to track; <0: track all message queue entries

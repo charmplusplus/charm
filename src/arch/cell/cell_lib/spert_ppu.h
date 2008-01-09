@@ -33,13 +33,15 @@
 /*@{*/
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include <libspe.h>
-#ifdef __cplusplus
-}
-#endif
+//#ifdef __cplusplus
+//extern "C" {
+//#endif
+#include <libspe2.h>
+//#ifdef __cplusplus
+//}
+//#endif
+
+#include "pthread.h"
 
 #include "spert.h"
 
@@ -56,7 +58,7 @@ extern "C" {
  *    of physical SPEs will reduce the ammount of time it takes to initiate all the SPEs (which
  *    can be slow on the simulator).
  */
-#define NUM_SPE_THREADS  8   // Normally, this is limited by (and should be set to) the number of physical SPEs present
+#define NUM_SPE_THREADS  0
 
 /** Create each SPEThread one-by-one (i.e. - create one thread and wait for it to check in
  *    before creating the next one).  If this is not set, all SPEThreads are created and then
@@ -170,11 +172,21 @@ typedef WorkRequest* WRHandle;
  *  that is running on an SPE.
  */
 typedef struct __spe_thread {
+
   SPEData *speData;   ///< A pointer to the SPEData structure that was passed to the thread when it was initial created
-  speid_t speID;      ///< The ID for the thread
   unsigned int messageQueuePtr;  ///< Pointer (in the SPE's Local Store) to the SPE's message queue
   int msgIndex;       ///< Internal variable used to try and balance the usage of the various message queue entries (heuristic)
   int counter;        ///< A counter used to indicate new messages in the message queue
+
+  /// SDK 2.0 ///
+  //speid_t speID;      ///< The ID for the thread
+
+  /// SDK 2.1 ///
+  spe_context_ptr_t speContext;
+  unsigned int speEntry;
+  spe_stop_info_t stopInfo;
+  pthread_t pThread;
+
 } SPEThread;
 
 
