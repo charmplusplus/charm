@@ -252,8 +252,6 @@ static void cpuAffinityRecvHandler(void *msg)
   }
 
   CmiFree(m);
-
-  CmiNodeBarrier();
 }
 
 #if CMK_XT3
@@ -282,6 +280,7 @@ void CmiInitCPUAffinity(char **argv)
       /* comm thread either can float around, or pin down to the last rank */
     set_myaffinitity(num_cores()-1);
 #endif
+    CmiNodeAllBarrier();
     return;    /* comm thread return */
   }
 
@@ -292,16 +291,18 @@ void CmiInitCPUAffinity(char **argv)
 #endif
 
     /* get my ip address */
-#if CMK_XT3
-  ret = getXT3NodeID(CmiMyPe(), CmiNumPes());
-  memcpy(&myip, &ret, sizeof(int));
-#elif CMK_HAS_GETHOSTNAME
   if (CmiMyRank() == 0)
+  {
+#if CMK_XT3
+    ret = getXT3NodeID(CmiMyPe(), CmiNumPes());
+    memcpy(&myip, &ret, sizeof(int));
+#elif CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();
-  CmiNodeBarrier();
 #else
-  CmiAbort("Can not get unique name for the compute nodes. \n");
+    CmiAbort("Can not get unique name for the compute nodes. \n");
 #endif
+  }
+  CmiNodeAllBarrier();
 
     /* prepare a msg to send */
   msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg));
