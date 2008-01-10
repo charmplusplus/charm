@@ -58,7 +58,7 @@
 
 {\it SAYANTAN}
 
-\subsubsection{Ghost Layer Creation}
+\subsubsection{Ghost Layer Creation\label{SectionGhostLayerCreation}}
 
 {\it SAYANTAN}
 
@@ -96,9 +96,47 @@
 
 \subsection{Topological Mesh Data}
 
-{\it ISAAC}
+A ParFUM application can request that the ParFUM framework compute topological adjacencies. All ParFUM applications initially specify the mesh as a set of elements, each element defined by a fixed number of nodes. ParFUM can compute and maintain other sets of adjacencies such as which elements are adjacent to a given node, or which nodes are adjacent(they are both associated with a single element), or which elements share an edge/face with another element. Currently only a single element type is supported, and that element must be \texttt{FEM\_ELEM+0}. To generate the structures storing the other types of adjacencies, each process in the ParFUM application should call the following subroutines:
 
-\subsection{Mesh Adaptivity}
+\begin{list}{-}{}
+\item \texttt{FEM\_Add\_elem2face\_tuples(int mesh, 0, nodesPerFace, numFacesPerElement, faces);} specifies the topology of an element, specifically the configuration of its faces(if 3D) or edges(if 2D). Two elements are adjacent if they share a common face. The parameter faces is an integer array of length $nodesPerFace \cdot numFacesPerElement$. The description is the same as used for determining ghost layers in section \ref{SectionGhostLayerCreation}.
+\item \texttt{FEM\_Mesh\_allocate\_valid\_attr(int mesh, int entity\_type);}
+\item \texttt{FEM\_Mesh\_create\_node\_elem\_adjacency(int mesh);}
+\item \texttt{FEM\_Mesh\_create\_node\_node\_adjacency(int mesh);}
+\item \texttt{FEM\_Mesh\_create\_elem\_elem\_adjacency(int mesh);}
+\end{list}
+
+These subroutines can be called in \texttt{init} on a sequential mesh, or after partitioning in \texttt{driver}. The adjacencies will contain references to ghost elements if the subroutines were called in \texttt{driver} when ghosts are used. The indexes to ghosts are negative integers which can easily be converted to positive indices by using the function \texttt{FEM\_To\_ghost\_index(id)}. The C header \texttt{ParFUM\_internals.h} is required to be included by the ParFUM application to access the adjacencies. The functions to access the adjacencies are in sections \ref{adjacencies-e2e},\ref{adjacencies-n2e}, and \ref{adjacencies-n2n}.
+
+The internal data structures representing the adjacencies are maintained correctly when the adaptivity operations described in section \ref{Subsection-Mesh-Adaptivity} are used.
+
+\subsubsection{Accessing Element to Element Adjacencies\label{adjacencies-e2e}}
+
+\begin{list}{-}{}
+\item \texttt{void e2e\_getAll(int e, int *neighbors);} places all of element e's adjacent element ids in neighbors; assumes \texttt{neighbors} is already allocated to correct size
+\item \texttt{int e2e\_getNbr(int e, short idx);} returns the id of the idx-th adjacent element
+\end{list}
+
+
+\subsubsection{Accessing Node to Element Adjacencies\label{adjacencies-n2e}}
+
+\begin{list}{-}{}
+\item \texttt{n2e\_getLength(int n)} returns the number of elements adjacent to the given node \texttt{n}.
+\item \texttt{n2e\_getAll(int n, int *\&adjelements, int \&sz)} for node \texttt{n} place all the ids for adjacent elements into \texttt{adjelements}. You can ignore sz if you correctly determine the length beforehand.
+\end{list}
+
+
+\subsubsection{Accessing Node to Node Adjacencies\label{adjacencies-n2n}}
+
+\begin{list}{-}{}
+\item \texttt{n2n\_getLength(int n)} returns the number of nodes adjacent to the given node \texttt{n}.
+\item \texttt{n2n\_getAll(int n, int *\&adjnodes, int \&sz)} for node \texttt{n} place all the ids for adjacent nodes into \texttt{adjnodes}. You can ignore sz if you correctly determine the length beforehand.
+\end{list}
+
+
+
+
+\subsection{Mesh Adaptivity\label{Subsection-Mesh-Adaptivity}}
 
 
 \subsubsection{Initialization}
