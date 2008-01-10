@@ -278,10 +278,9 @@ void CmiInitCPUAffinity(char **argv)
      CmiPrintf("Charm++> cpu affinity enabled! \n");
 
   if (CmiMyPe() >= CmiNumPes()) {
-#if 0
-      /* comm thread either can float around, or pin down to the last rank */
+      /* comm thread either can float around, or pin down to the last rank.
+         however it seems to be reportedly slower if it is floating */
     set_myaffinitity(num_cores()-1);
-#endif
     CmiNodeAllBarrier();
     return;    /* comm thread return */
   }
