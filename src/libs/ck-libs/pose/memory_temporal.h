@@ -24,15 +24,15 @@
 #ifndef	MEMORY_TEMPORAL_H_
 #define	MEMORY_TEMPORAL_H_
 
-//#define	VERBOSE_DEBUG
-
 #include "pose_config.h"
 #include "memory_temporal.decl.h"
 
-extern CkGroupID TempMemID;  // global readonly to access pool anywhere
-
+//#define VERBOSE_DEBUG
 //#define ALIGN16 // for 16-byte alignment
 #define BLOCK_SIZE 8192  // size of SuperBlocks in bytes
+#define	RECYCLE_BIN_CAPACITY 100
+
+extern CkGroupID TempMemID;  // global readonly to access pool anywhere
 
 /// SuperBlock holds the actual memory block that is allocated in blk
 class SuperBlock {
@@ -118,14 +118,16 @@ class TimeBucket {
   TimeBucket *nextBucket; // pointer to next Bucket in TimePool
   TimeBucket *prevBucket; // pointer to previous Bucket in TimePool
   SuperBlock **pool;
+  int *poolSz;
 
  public:
   TimeBucket() : start(POSE_UnsetTS), range(POSE_UnsetTS), numSuperBlocks(0),
     sBlocks(NULL), nextBucket(NULL), prevBucket(NULL) {}
   ~TimeBucket() {} // these are garbage collected in the cleanup function
   // Initialize time range and create first SuperBlock
-  void initBucket(POSE_TimeType start_t, POSE_TimeType range_t, SuperBlock **p) {
+  void initBucket(POSE_TimeType start_t, POSE_TimeType range_t, SuperBlock **p, int *pSz) {
     pool = p;
+    poolSz = pSz;
     start = start_t;
     range = range_t;
     if (!(*pool)) {
@@ -136,6 +138,7 @@ class TimeBucket {
       sBlocks = (*pool);
       (*pool) = (*pool)->getNextBlock();
       sBlocks->resetBlock();
+      (*poolSz)--;
     }
     numSuperBlocks = 1;
   }
@@ -171,6 +174,7 @@ class TimeBucket {
 	tmp = (*pool);
 	(*pool) = (*pool)->getNextBlock();
 	tmp->resetBlock();
+	(*poolSz)--;
       }
       tmp->setNextBlock(sBlocks);
       sBlocks = tmp;
@@ -215,6 +219,7 @@ class TimePool : public Group {
   TimeBucket *last_in_use;  // head of doubly-linked list
   TimeBucket *first_in_use; // tail of doubly-linked list
   SuperBlock *not_in_use;   // separate singly-linked list
+  int not_in_use_sz;
   
   POSE_TimeType min_time;   // blocks older than this can be recycled
 
@@ -225,7 +230,7 @@ class TimePool : public Group {
   void clean_up(); // Move old defunct SuperBlocks to not_in_use list
  public:
   TimePool() : min_time(POSE_UnsetTS), last_in_use(NULL), first_in_use(NULL), 
-    not_in_use(NULL) {}
+    not_in_use(NULL), not_in_use_sz(0) {}
   TimePool(CkMigrateMessage *) {}
   ~TimePool();
   // Return memory from a time range
@@ -234,6 +239,14 @@ class TimePool : public Group {
   void tmp_free(POSE_TimeType timestamp, void *mem);
   // Update the minimum time before which SuperBlocks can be recycled
   void set_min_time(POSE_TimeType min_t) { min_time = min_t; clean_up(); }
+  void empty_recycle_bin() {
+    SuperBlock *b = not_in_use;
+    while (not_in_use) {
+      not_in_use = not_in_use->getNextBlock();
+      delete b;
+      b = not_in_use;
+    }
+  }
   void sanity_check(); 
 };
 

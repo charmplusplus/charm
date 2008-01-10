@@ -191,6 +191,7 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
     CommitAll(obj);
 #ifdef MEM_TEMPORAL
     localTimePool->set_min_time(ts);
+    localTimePool->empty_recycle_bin();
 #endif
     return;
   }

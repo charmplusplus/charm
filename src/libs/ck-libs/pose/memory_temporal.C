@@ -44,8 +44,17 @@ void TimePool::clean_up() {
     while (sb) {
       if (sb->noLongerReferenced()) {
 	SuperBlock *next = sb->getNextBlock();
-	sb->setNextBlock(not_in_use);
-	not_in_use = sb;
+	if (not_in_use_sz < RECYCLE_BIN_CAPACITY) {
+	  sb->setNextBlock(not_in_use);
+	  not_in_use = sb;
+	  not_in_use_sz++;
+	}
+	else {
+#ifdef VERBOSE_DEBUG
+	  CkPrintf("INFO: recycle bin at capacity; deleting blocks\n");
+#endif
+	  delete sb;
+	}
 	sb = next;
       }
       else break;
@@ -118,7 +127,7 @@ char *TimePool::tmp_alloc(POSE_TimeType timestamp, int sz_in_bytes)
   if (!bkt) { // either empty, or ts is older than anything we have
     if (!first_in_use) {  // empty
       first_in_use = new TimeBucket();
-      first_in_use->initBucket(timestamp, 1, &not_in_use);
+      first_in_use->initBucket(timestamp, 1, &not_in_use, &not_in_use_sz);
       last_in_use = first_in_use;
       char *mem = last_in_use->tb_alloc(sz_in_bytes);
 #ifdef VERBOSE_DEBUG
@@ -142,7 +151,7 @@ char *TimePool::tmp_alloc(POSE_TimeType timestamp, int sz_in_bytes)
       int start = bkt->getStart()+bkt->getRange();
       int range = timestamp - start + 1;
       last_in_use = new TimeBucket();
-      last_in_use->initBucket(start, range, &not_in_use);
+      last_in_use->initBucket(start, range, &not_in_use, &not_in_use_sz);
       bkt->setPrevBucket(last_in_use);
       last_in_use->setNextBucket(bkt);
       char *mem = last_in_use->tb_alloc(sz_in_bytes);
