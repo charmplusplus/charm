@@ -250,6 +250,8 @@ static void cpuAffinityRecvHandler(void *msg)
   if (-1 != set_myaffinitity(myrank)) {
     DEBUGP(("Processor %d is bound to core #%d\n", CmiMyPe(), myrank));
   }
+  else
+    CmiPrintf("Processor %d set affinity failed!\n", CmiMyPe());
 
   CmiFree(m);
 }
@@ -273,7 +275,7 @@ void CmiInitCPUAffinity(char **argv)
 
   if (!affinity_flag) return;
   else if (CmiMyPe() == 0)
-     CmiPrintf("Charm++> set cpuaffinity enabled! \n");
+     CmiPrintf("Charm++> cpu affinity enabled! \n");
 
   if (CmiMyPe() >= CmiNumPes()) {
 #if 0
