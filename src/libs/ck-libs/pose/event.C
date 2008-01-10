@@ -3,6 +3,7 @@
 
 /// Basic Constructor
 Event::Event() :   spawnedList(NULL),msg (NULL), commitBfr(NULL),cpData(NULL),
+		   serialCPdataSz(0), serialCPdata(NULL),
 		   next(NULL),prev(NULL), commitBfrLen(0), commitErr(0),
 		   done (0),   fnIdx(-1),  timestamp(POSE_UnsetTS),
 		   srt(0.0), svt (0)
@@ -25,7 +26,7 @@ Event::~Event()
     spawnedList = spawnedList->next;
     delete tmp;
   }
-  // NOTE: cpData is deleted in evq::Commit
+  // NOTE: cpData and serialCPdata are deleted in evq::Commit
 }
 
 /// Pack/unpack/sizing operator
@@ -98,8 +99,11 @@ void Event::pup(PUP::er &p)
     }
   }
   
-  if (p.isUnpacking())
+  if (p.isUnpacking()) {
     cpData = NULL; // to be set later
+    serialCPdata = NULL;
+    serialCPdataSz = 0;
+  }
 }
 
 /// Check validity of data fields

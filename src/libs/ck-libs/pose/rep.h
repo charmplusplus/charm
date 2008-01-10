@@ -30,8 +30,6 @@ class rep
   POSE_TimeType ovt;
   /// The object's real time (ORT)
   double ort;
-  /// Flag to signify if this is a checkpointed copy of the real object
-  int copy;                
   /// Checkpointed seed for POSE_rand
   unsigned int prand_seed;
   /// Checkpointed 48-bit seed to support uniform and linear rand
@@ -43,7 +41,7 @@ class rep
 #endif
   /// Basic Constructor
   rep() { 
-    ovt = 0; ort = 0.0; copy = 0; parent = NULL; myStrat = NULL; 
+    ovt = 0; ort = 0.0; parent = NULL; myStrat = NULL; 
     anti_methods = 0;
   #ifndef SEQUENTIAL_POSE
   #ifdef POSE_COMM_ON    
@@ -57,7 +55,7 @@ class rep
   }
   /// Initializing Constructor
   rep(POSE_TimeType init_ovt) { 
-    ovt = init_ovt; ort = 0.0; copy = 0; anti_methods = 0;
+    ovt = init_ovt; ort = 0.0; anti_methods = 0;
       }
   /// Destructor
   virtual ~rep() {
@@ -108,7 +106,7 @@ class rep
   /// Pack/unpack/sizing operator
   /** Derived classes must provide pup */
   virtual void pup(PUP::er &p) { 
-    p(ovt); p(ort); p(myHandle); p(copy); p(anti_methods); p(prand48_seed,3);
+    p(ovt); p(ort); p(myHandle); p(anti_methods); p(prand48_seed,3);
   }
 #ifdef SEQUENTIAL_POSE
   void checkpoint(rep *) { }

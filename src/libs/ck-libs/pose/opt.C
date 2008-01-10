@@ -91,7 +91,11 @@ void opt::Rollback()
     UndoEvent(recoveryPoint); // undo the recovery point
   }
   else {
+#ifdef MEM_TEMPORAL    
+    if (!recoveryPoint->serialCPdata) { // no checkpoint, must recover state
+#else
     if (!recoveryPoint->cpData) { // no checkpoint, must recover state
+#endif
       UndoEvent(recoveryPoint); // undo the recovery point
       RecoverState(recoveryPoint); // recover the state prior to target
     }
@@ -137,8 +141,14 @@ void opt::UndoEvent(Event *e)
     e->commitBfr = NULL;
     e->commitErr = 0;
     e->done = e->commitBfrLen = 0;
+#ifdef MEM_TEMPORAL
+    userObj->localTimePool->tmp_free(e->timestamp, e->serialCPdata);
+    e->serialCPdata = NULL; 
+    e->serialCPdataSz = 0;
+#else
     delete e->cpData;
     e->cpData = NULL;
+#endif
     eq->mem_usage--;
   }
 }
@@ -236,7 +246,11 @@ void opt::CancelEvents()
 	UndoEvent(recoveryPoint); // undo the recovery point
       }
       else {
+#ifdef MEM_TEMPORAL
+	if (!recoveryPoint->serialCPdata) { // no checkpoint, must recover state
+#else
 	if (!recoveryPoint->cpData) { // no checkpoint, must recover state
+#endif
 	  UndoEvent(recoveryPoint); // undo the recovery point
 	  RecoverState(recoveryPoint); // recover the state prior to target
 	}
@@ -407,10 +421,18 @@ void opt::CancelUnexecutedEvents()
 void opt::RecoverState(Event *recoveryPoint)
 {
   Event *ev;
+#ifdef MEM_TEMPORAL
+  CmiAssert(!recoveryPoint->serialCPdata); // ERROR: recoveryPoint has checkpoint
+#else
   CmiAssert(!recoveryPoint->cpData); // ERROR: recoveryPoint has checkpoint
+#endif
   CpvAccess(stateRecovery) = 1; // FE behavior changed to state recovery only
   ev = recoveryPoint->prev;
+#ifdef MEM_TEMPORAL
+  while ((ev != eq->front()) && (!ev->serialCPdata)) { // search for checkpoint
+#else
   while ((ev != eq->front()) && (!ev->cpData)) { // search for checkpoint
+#endif
     if (ev->commitBfrLen > 0)
       free(ev->commitBfr);
     ev->commitBfr = NULL;
@@ -419,15 +441,21 @@ void opt::RecoverState(Event *recoveryPoint)
   }
   CmiAssert(ev != eq->front()); // ERROR: no checkpoint
 
-  // restore state from ev->cpData
+  // restore state from ev->cpData or ev->serialCPdata
   currentEvent = targetEvent = ev;
   parent->ResolveFn(((ev->fnIdx) * -1), ev->msg);
   if (ev->commitBfrLen > 0)
     free(ev->commitBfr);
   ev->commitBfr = NULL;
   ev->commitBfrLen = 0;
+#ifdef MEM_TEMPORAL
+    userObj->localTimePool->tmp_free(ev->timestamp, ev->serialCPdata);
+    ev->serialCPdata = NULL; 
+    ev->serialCPdataSz = 0;
+#else
   delete ev->cpData;
   ev->cpData = NULL;
+#endif
   targetEvent = NULL;
 
   // execute forward to recoveryPoint

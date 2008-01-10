@@ -52,19 +52,30 @@ void chpt<StateType>::checkpoint(StateType *data)
     *(myStrat->currentEvent->cpData) = *(rep *)data;
   }
   else {
+#ifdef MEM_TEMPORAL
+    CmiAssert(!(parent->myStrat->currentEvent->serialCPdata));
+#else
     CmiAssert(!(parent->myStrat->currentEvent->cpData));
+#endif
     //  if ((myStrat->currentEvent->timestamp > 
     //myStrat->currentEvent->prev->timestamp) || (sinceLast == STORE_RATE)) {
     if ((sinceLast == ((opt *)myStrat)->cpRate) || 
 	//(CpvAccess(stateRecovery) == 1) || 
 	(myStrat->currentEvent->prev == parent->eq->front())) {
 #ifdef MEM_TEMPORAL
-      myStrat->currentEvent->cpData = (StateType *)localTimePool->tmp_alloc(myStrat->currentEvent->timestamp, sizeof(StateType));
+      PUP::sizer sp; 
+      ((StateType *)data)->cpPup(sp);
+      myStrat->currentEvent->serialCPdataSz = sp.size();
+      myStrat->currentEvent->serialCPdata = localTimePool->tmp_alloc(myStrat->currentEvent->timestamp, myStrat->currentEvent->serialCPdataSz);
+
+      PUP::toMem tp(myStrat->currentEvent->serialCPdata); 
+      ((StateType *)data)->cpPup(tp); 
+      if (tp.size()!=myStrat->currentEvent->serialCPdataSz)
+	CmiAbort("PUP packing size mismatch!");
 #else      
       myStrat->currentEvent->cpData = new StateType;
-#endif
-      myStrat->currentEvent->cpData->copy = 1;
       *((StateType *)myStrat->currentEvent->cpData) = *data;
+#endif
       sinceLast = 0;
 #ifndef CMK_OPTIMIZE
       //localStats->Checkpoint();
@@ -90,24 +101,37 @@ void chpt<StateType>::restore(StateType *data)
   }
   else {
     if (myStrat->currentEvent == myStrat->targetEvent) {
+#ifdef MEM_TEMPORAL
+      if (myStrat->targetEvent->serialCPdata) {
+	// data should be a pre-allocated PUP::able object
+        PUP::fromMem fp(myStrat->targetEvent->serialCPdata); 
+	((StateType *)data)->cpPup(fp); 
+	if (fp.size()!=myStrat->targetEvent->serialCPdataSz) 
+	  CmiAbort("PUP unpack size mismatch!");
+	localTimePool->tmp_free(myStrat->targetEvent->timestamp, myStrat->targetEvent->serialCPdata);
+	myStrat->targetEvent->serialCPdata = NULL;
+	myStrat->targetEvent->serialCPdataSz = 0;
+      }
+#else
       if (myStrat->targetEvent->cpData) {
 	*data = *((StateType *)myStrat->targetEvent->cpData);
-#ifdef MEM_TEMPORAL
-      localTimePool->tmp_free(myStrat->currentEvent->timestamp, myStrat->currentEvent->cpData);
-#else	
 	delete myStrat->targetEvent->cpData;
-#endif
 	myStrat->targetEvent->cpData = NULL;
       }
-    }
-    if (myStrat->currentEvent->cpData) {
-#ifdef MEM_TEMPORAL
-      localTimePool->tmp_free(myStrat->currentEvent->timestamp, myStrat->currentEvent->cpData);
-#else	
-      delete myStrat->currentEvent->cpData;
 #endif
+    }
+#ifdef MEM_TEMPORAL
+    if (myStrat->currentEvent->serialCPdata) {
+      localTimePool->tmp_free(myStrat->currentEvent->timestamp, myStrat->currentEvent->serialCPdata);
+      myStrat->currentEvent->serialCPdata = NULL;
+      myStrat->currentEvent->serialCPdataSz = 0;
+    }
+#else
+    if (myStrat->currentEvent->cpData) {
+      delete myStrat->currentEvent->cpData;
       myStrat->currentEvent->cpData = NULL;
     }
+#endif
   }
 }
 

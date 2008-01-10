@@ -24,6 +24,8 @@
 #ifndef	MEMORY_TEMPORAL_H_
 #define	MEMORY_TEMPORAL_H_
 
+//#define	VERBOSE_DEBUG
+
 #include "pose_config.h"
 #include "memory_temporal.decl.h"
 

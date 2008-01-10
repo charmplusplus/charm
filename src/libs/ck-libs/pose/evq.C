@@ -223,7 +223,11 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
       }
       //find next target
       target = target->next;
+#ifdef MEM_TEMPORAL      
+      while (!target->serialCPdata && (target->timestamp <ts) && (target != backPtr))
+#else
       while (!target->cpData && (target->timestamp <ts) && (target != backPtr))
+#endif
 	target = target->next;
     }
   }
@@ -231,10 +235,11 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
   Event *link = commitPtr;
   commitPtr = commitPtr->prev;
   while (commitPtr != frontPtr) {
-    if (commitPtr->cpData) {
 #ifdef MEM_TEMPORAL
-      localTimePool->tmp_free(commitPtr->timestamp, commitPtr->cpData);
+    if (commitPtr->serialCPdata) {
+      localTimePool->tmp_free(commitPtr->timestamp, commitPtr->serialCPdata);
 #else
+    if (commitPtr->cpData) {
       delete commitPtr->cpData;
 #endif
     }
@@ -275,10 +280,11 @@ void eventQueue::CommitAll(sim *obj)
   TimePool *localTimePool = (TimePool *)CkLocalBranch(TempMemID);
 #endif
   while (commitPtr != frontPtr) {
-    if (commitPtr->cpData) {
 #ifdef MEM_TEMPORAL
-      localTimePool->tmp_free(commitPtr->timestamp, commitPtr->cpData);
+    if (commitPtr->serialCPdata) {
+      localTimePool->tmp_free(commitPtr->timestamp, commitPtr->serialCPdata);
 #else
+    if (commitPtr->cpData) {
       delete commitPtr->cpData;
 #endif
     }
@@ -477,7 +483,11 @@ void eventQueue::sanitize()
 
   // first event in queue should always have a checkpoint
   if ((frontPtr->next != backPtr) && (frontPtr->next->done))
+#ifdef MEM_TEMPORAL
+    CmiAssert(frontPtr->next->serialCPdata);
+#else
     CmiAssert(frontPtr->next->cpData);
+#endif
 
   // Rollback check
   tmp = frontPtr->next;

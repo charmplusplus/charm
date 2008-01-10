@@ -57,6 +57,9 @@ class Event {
   SpawnedEvent *spawnedList;  
   /// Checkpointed state prior to execution of this event
   rep *cpData;    
+  /// Serialized checkpointed state prior to execution of this event
+  int serialCPdataSz;
+  char *serialCPdata;    
   /// Links to next and previous events in event queue
   Event *next, *prev;
   /// Basic Constructor
