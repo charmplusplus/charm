@@ -29,7 +29,7 @@
 #define MSG_RECYCLING 1
 
 /// Uncomment to use temporally-blocked memory management
-#define MEM_TEMPORAL
+//#define MEM_TEMPORAL
 
 /// Uncomment to make use of the Streaming Communication Library optimizations
 //#define POSE_COMM_ON 1
