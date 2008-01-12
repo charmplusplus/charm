@@ -8,6 +8,7 @@ mainmodule pingpong {
   };
   message PingMsg{char x[];};
   message IdMsg;
+
   array [1D] Ping1 {
     entry Ping1();
     entry void start(void);
@@ -43,7 +44,7 @@ mainmodule pingpong {
     entry void start(void);
     entry void startRDMA(void);
     entry [exclusive] void recv(PingMsg *);
-    entry [exclusive] void recvHandle(int);
+    entry [exclusive] void recvHandle(char ptr[size], int size);
   }
   array [Fancy] PingF {
     entry PingF();

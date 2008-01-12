@@ -5,11 +5,16 @@
 #define PAYLOAD 100
 #ifdef CMK_USE_IBVERBS 
 
-extern "C" {
-  int CmiDirect_createHandle(int senderProc,void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData);
 
-  void CmiDirect_assocLocalBuffer(int recverProc,int handle,void *sendBuf,int sendBufSize);
-  void CmiDirect_put(int recverProc,int handle);
+extern "C" {
+  struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData,double initialValue);
+  //  int CmiDirect_createHandle(int senderProc,void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData);
+
+  void CmiDirect_assocLocalBuffer(int recverNode,struct infiDirectUserHandle *userHandle,void *sendBuf,int sendBufSize);
+  //  void CmiDirect_assocLocalBuffer(int recverProc,int handle,void *sendBuf,int sendBufSize);
+  void CmiDirect_put(struct infiDirectUserHandle *userHandle);
+  void CmiDirect_ready(struct infiDirectUserHandle *userHandle);
+    //void CmiDirect_put(int recverProc,int handle);
 }
 #endif
 class Fancy
@@ -30,7 +35,17 @@ class CkArrayIndexFancy : public CkArrayIndex {
 };
 
 #include "pingpong.decl.h"
-
+#ifdef CMK_USE_IBVERBS 
+static struct infiDirectUserHandle{
+	int handle;
+	int senderNode;
+	int recverNode;
+	void *recverBuf;
+	int recverBufSize;
+	char recverKey[32];
+	double initialValue;
+};
+#endif
 class PingMsg : public CMessage_PingMsg
 {
   public:
@@ -192,8 +207,7 @@ class PingN : public NodeGroup
   int niter;
   int me, nbr;
 #ifdef CMK_USE_IBVERBS 
-  int rhandle;
-  int shandle;
+  struct infiDirectUserHandle shandle,rhandle;
   char *rbuff;
   char *sbuff;
 #endif
@@ -211,21 +225,22 @@ public:
     pp = new CProxyElement_PingN(thisgroup,nbr);
     niter = 0;
 #ifdef CMK_USE_IBVERBS 
-    rhandle=-1;
-    shandle=-1;
     rbuff=(char *) malloc(payload*sizeof(char));
     sbuff=(char *) malloc(payload*sizeof(char));
     // setup persistent comm sender and receiver side
-    rhandle=CmiDirect_createHandle(nbr,rbuff,payload*sizeof(char),PingN::Wrapper_To_CallBack,(void *) this);
-    (*pp).recvHandle(rhandle);
+    double OOB=9999999999.0;
+    rhandle=CmiDirect_createHandle(nbr,rbuff,payload*sizeof(char),PingN::Wrapper_To_CallBack,(void *) this,OOB);
+    (*pp).recvHandle((char*) &rhandle,sizeof(struct infiDirectUserHandle));
 #endif
   }
   PingN(CkMigrateMessage *m) {}
-  void recvHandle(int _shandle)
+  void recvHandle(char *ptr,int size)
   {
+
 #ifdef CMK_USE_IBVERBS 
-    shandle=_shandle;
-    CmiDirect_assocLocalBuffer(nbr,shandle,sbuff,payload);
+    struct infiDirectUserHandle *_shandle=(struct infiDirectUserHandle *) ptr;
+    shandle=*_shandle;
+    CmiDirect_assocLocalBuffer(nbr,&shandle,sbuff,payload);
 #endif
   }
   void start(void)
@@ -238,8 +253,7 @@ public:
     niter=0;
     start_time = CkWallTimer();
 #ifdef CMK_USE_IBVERBS 
-    CkAssert(shandle>=0);
-    CmiDirect_put(nbr,shandle);
+    CmiDirect_put(&shandle);
 #else
     CkAbort("do not call startRDMA if you don't actually have RDMA");
 #endif
@@ -273,6 +287,9 @@ public:
   // not an entry method, called via Wrapper_To_Callback
   void recvRDMA()
   {
+#ifdef CMK_USE_IBVERBS 
+    CmiDirect_ready(&rhandle);
+#endif
     if(me==0) {
       niter++;
       if(niter==iterations) {
@@ -283,14 +300,14 @@ public:
         mainProxy.maindone();
       } else {
 #ifdef CMK_USE_IBVERBS 
-	CmiDirect_put(nbr,shandle);
+	CmiDirect_put(&shandle);
 #else
 	CkAbort("do not call startRDMA if you don't actually have RDMA");
 #endif
       }
     } else {
 #ifdef CMK_USE_IBVERBS 
-      CmiDirect_put(nbr,shandle);
+      CmiDirect_put(&shandle);
 #else
       CkAbort("do not call startRDMA if you don't actually have RDMA");
 #endif
