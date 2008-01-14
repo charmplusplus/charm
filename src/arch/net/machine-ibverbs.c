@@ -1108,6 +1108,8 @@ static inline void processAsyncEvents(){
 	
 }
 
+void pollCmiDirectQ();
+
 static inline  void CommunicationServer_nolock(int toBuffer) {
 	int processed;
 	if(_Cmi_numnodes <= 1){
@@ -2490,7 +2492,19 @@ void CmiDirect_ready(struct infiDirectUserHandle *userHandle){
 	
 }
 
-int receivedDirectMessage(infiDirectHandle *handle);
+
+int receivedDirectMessage(infiDirectHandle *handle){
+	int index = handle->size - sizeof(double);
+	double *lastDouble = (double *)(((char *)handle->buf)+index);
+	if(*lastDouble == handle->userHandle.initialValue){
+		return 0;
+	}else{
+		(*(handle->callbackFnPtr))(handle->callbackData);	
+		return 1;
+	}
+	
+}
+
 
 void pollCmiDirectQ(){
 	directPollingQNode *ptr = headDirectPollingQ, *prevPtr=NULL;
@@ -2522,18 +2536,6 @@ void pollCmiDirectQ(){
 	}
 }
 
-
-int receivedDirectMessage(infiDirectHandle *handle){
-	int index = handle->size - sizeof(double);
-	double *lastDouble = (double *)(((char *)handle->buf)+index);
-	if(*lastDouble == handle->userHandle.initialValue){
-		return 0;
-	}else{
-		(*(handle->callbackFnPtr))(handle->callbackData);	
-		return 1;
-	}
-	
-}
 
 /*void processDirectRequest(struct infiDirectRequestPacket *directRequestPacket){
 	int senderProc = directRequestPacket->senderProc;
