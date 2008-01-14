@@ -48,8 +48,17 @@
 /*readonly*/ int num_chare_y;
 /*readonly*/ int num_chare_z;
 
-#define USE_TOPOMAP	1	
-#define USE_RANDOMMAP	0	
+/*readonly*/ int numCharesPerPe;
+/*readonly*/ int numCharesPerPeX;
+/*readonly*/ int numCharesPerPeY;
+/*readonly*/ int numCharesPerPeZ;
+
+#define SMPWAY		2
+#define USE_TOPOMAP	0	
+#define USE_RRMAP	1
+#define USE_BLOCKMAP	0
+#define USE_SMPMAP	0
+
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
 #define wrap_x(a)  (((a)+num_chare_x)%num_chare_x)
@@ -80,7 +89,7 @@ class Main : public CBase_Main {
     int iterations;
 
     Main(CkArgMsg* m) {
-      if ( (m->argc != 3) && (m->argc != 7) ) {
+      if ( (m->argc != 3) && (m->argc != 7) && (m->argc != 10) ) {
         CkPrintf("%s [array_size] [block_size]\n", m->argv[0]);
         CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z]\n", m->argv[0]);
         CkAbort("Abort");
@@ -96,13 +105,23 @@ class Main : public CBase_Main {
 	arrayDimX = arrayDimY = arrayDimZ = atoi(m->argv[1]);
         blockDimX = blockDimY = blockDimZ = atoi(m->argv[2]); 
       }
-      else {
+      else if (m->argc == 7) {
         arrayDimX = atoi(m->argv[1]);
 	arrayDimY = atoi(m->argv[2]);
 	arrayDimZ = atoi(m->argv[3]);
         blockDimX = atoi(m->argv[4]); 
 	blockDimY = atoi(m->argv[5]); 
 	blockDimZ = atoi(m->argv[6]);
+      } else {
+        arrayDimX = atoi(m->argv[1]);
+	arrayDimY = atoi(m->argv[2]);
+	arrayDimZ = atoi(m->argv[3]);
+        blockDimX = atoi(m->argv[4]); 
+	blockDimY = atoi(m->argv[5]); 
+	blockDimZ = atoi(m->argv[6]);
+	numCharesPerPeX = atoi(m->argv[7]);
+	numCharesPerPeY = atoi(m->argv[8]);
+	numCharesPerPeZ = atoi(m->argv[9]);
       }
 
       if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
@@ -122,8 +141,8 @@ class Main : public CBase_Main {
       CkPrintf("Block Dimensions: %d %d %d\n", blockDimX, blockDimY, blockDimZ);
 
       // Create new array of worker chares
-#if USE_TOPOMAP || USE_RANDOMMAP
-      CkPrintf("Topology Mapping is being done ... %d\n", USE_RANDOMMAP);
+#if USE_TOPOMAP || USE_RRMAP || USE_BLOCKMAP || USE_SMPMAP
+       CkPrintf("Topology Mapping is being done ... %d %d %d %d\n", USE_TOPOMAP, USE_RRMAP, USE_BLOCKMAP, USE_SMPMAP);
       CProxy_JacobiMap map = CProxy_JacobiMap::ckNew(num_chare_x, num_chare_y, num_chare_z);
       CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
       opts.setMap(map);
@@ -169,7 +188,7 @@ class Main : public CBase_Main {
       recieve_count++;
       if (num_chares == recieve_count) {
 	endTime = CmiWallTimer();
-	CkPrintf("Time elapsed: %f\n", endTime - startTime);
+	CkPrintf("TIME : %f\n", endTime - startTime);
         CkExit();
       }
     }
@@ -447,25 +466,21 @@ class JacobiMap : public CkArrayMap {
       }
 
       TopoManager tmgr;
-      // naive mapping
-      /*for (i=0; i<x; i++)
-	for(j=0; j<y; j++)
-	  for(k=0; k<z; k++)
-	    mapping[i][j][k] = tmgr.coordinatesToRank(i, j, k);*/
 
       // we are assuming that the no. of chares in each dimension is a 
       // multiple of the torus dimension
+      numCharesPerPe = x*y*z/CkNumPes();
+
+#if USE_TOPOMAP
       int dimX = tmgr.getDimNX();
       int dimY = tmgr.getDimNY();
       int dimZ = tmgr.getDimNZ();
       int dimT = tmgr.getDimNT();
 
-      int numCharesPerPeX = x / dimX;
-      int numCharesPerPeY = y / dimY;
-      int numCharesPerPeZ = z / dimZ;
-      int numCharesPerPe = x*y*z/CkNumPes();
+      numCharesPerPeX = x / dimX;
+      numCharesPerPeY = y / dimY;
+      numCharesPerPeZ = z / dimZ;
 
-#if USE_TOPOMAP
       if(dimT < 2) {	// one core per node
       if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
       for(int i=0; i<dimX; i++)
@@ -493,8 +508,8 @@ class JacobiMap : public CkArrayMap {
 		    // if(CkMyPe()==0) CkPrintf("%d %d %d %d", ci, cj, ck, tmgr.coordinatesToRank(i, j, k, l));
 		  }
       } // end of if
-#elif USE_RANDOMMAP
-      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
+#elif USE_RRMAP
+      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d\n", x, y, z, numCharesPerPe, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
       int pe = 0;
       for(int i=0; i<x; i++)
 	for(int j=0; j<y; j++)
@@ -505,6 +520,43 @@ class JacobiMap : public CkArrayMap {
 	    mapping[i][j][k] = pe;
 	    pe++;
 	  }
+#elif USE_BLOCKMAP
+      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d\n", x, y, z, numCharesPerPe, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
+      int pe = 0;
+      x /= numCharesPerPeX;
+      y /= numCharesPerPeY;
+      z /= numCharesPerPeZ;
+
+      for(int i=0; i<x; i++)
+	for(int j=0; j<y; j++)
+	  for(int k=0; k<z; k++) {
+	    for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
+	      for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
+		for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
+		  mapping[ci][cj][ck] = pe;
+		}
+	    pe++;
+	  }
+#elif USE_SMPMAP
+      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d\n", x, y, z, numCharesPerPe, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
+      int pe = 0;
+      x /= numCharesPerPeX*SMPWAY;
+      y /= numCharesPerPeY*SMPWAY;
+      z /= numCharesPerPeZ*SMPWAY;
+
+      for(int i=0; i<x; i++)
+	for(int j=0; j<y; j++)
+	  for(int k=0; k<z; k++)
+	    for(int bi=i*SMPWAY; bi<(i+1)*SMPWAY; bi++)
+	      for(int bj=j*SMPWAY; bj<(j+1)*SMPWAY; bj++)
+		for(int bk=k*SMPWAY; bk<(k+1)*SMPWAY; bk++) {
+		  for(int ci=bi*numCharesPerPeX; ci<(bi+1)*numCharesPerPeX; ci++)
+		    for(int cj=bj*numCharesPerPeY; cj<(bj+1)*numCharesPerPeY; cj++)
+		      for(int ck=bk*numCharesPerPeZ; ck<(bk+1)*numCharesPerPeZ; ck++) {
+			mapping[ci][cj][ck] = pe;
+		      }
+		      pe++;
+		}
 #endif
 
     }

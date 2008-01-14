@@ -9,6 +9,10 @@ mainmodule jacobi3d {
   readonly int num_chare_x;
   readonly int num_chare_y;
   readonly int num_chare_z;
+  readonly int numCharesPerPe;
+  readonly int numCharesPerPeX;
+  readonly int numCharesPerPeY;
+  readonly int numCharesPerPeZ;
 
   mainchare Main {
     entry Main(CkArgMsg *m);
