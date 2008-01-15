@@ -208,6 +208,7 @@ static int skt_parse_dotted(const char *str,skt_ip_t *ret)
   return 1;
 }
 
+/* this is NOT thread safe ! */
 skt_ip_t skt_lookup_ip(const char *name)
 {
   skt_ip_t ret=_skt_invalid_ip;
@@ -215,7 +216,7 @@ skt_ip_t skt_lookup_ip(const char *name)
   if (skt_parse_dotted(name,&ret))
     return ret;
   else {/*Try a DNS lookup*/
-    struct hostent *h = gethostbyname(name);
+    struct hostent *h = gethostbyname(name);   /* not thread safe */
     if (h==0) return _skt_invalid_ip;
     memcpy(&ret,h->h_addr_list[0],h->h_length);
     return ret;
