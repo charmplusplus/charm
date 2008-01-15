@@ -54,6 +54,10 @@ class worker {
     p(numObjs); p(numMsgs); p(tscale); p(locality); p(grainSize); 
     p(granularity);
   }
+  void cpPup(PUP::er &p) { 
+    p(numObjs); p(numMsgs); p(tscale); p(locality); p(grainSize); 
+    p(granularity);
+  }
 
   // Event methods
   void terminus(){ 
