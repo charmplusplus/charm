@@ -1177,7 +1177,7 @@ WRGroupHandle createWRGroup(void* userData, void (*callbackFunc)(void*)) {
   if (__builtin_expect(wrGroupFreeHead == NULL, 0)) {
     // Add some more WRGroupHandle structures
     wrGroupFreeHead = createWRGroupHandles(WRGROUPHANDLES_GROW_SIZE);
-    wrGroupFreeTail = &(wrGroupFreeTail[WRGROUPHANDLES_GROW_SIZE - 1]);
+    wrGroupFreeTail = &(wrGroupFreeHead[WRGROUPHANDLES_GROW_SIZE - 1]);
   }
 
   // Grab the first free WRGroupHandle structure and use it for this group
@@ -2274,6 +2274,12 @@ void OffloadAPIProgress() {
 
           // Increment the group's finished counter
           wrGroup->finishedCount++;
+
+          // Check to see if the individual work request's callback should be called in addition to the group's callback.
+          if ((wrPtr->flags & WORK_REQUEST_FLAGS_BOTH_CALLBACKS) == WORK_REQUEST_FLAGS_BOTH_CALLBACKS) {            
+            register void (*cbf)(void*) = ((wrPtr->callbackFunc != NULL) ? ((void (*)(void*))wrPtr->callbackFunc) : (callbackFunc));
+            if (cbf != NULL) cbf(wrPtr->userData);
+	  }
 
           //// DEBUG
           //printf(" --- Offload API : Work Request Group member finished...\n");

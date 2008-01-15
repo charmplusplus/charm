@@ -9,10 +9,11 @@
 // Defines
 
 // Work Request Flags
-#define WORK_REQUEST_FLAGS_NONE      (0x00)  // No flags
-#define WORK_REQUEST_FLAGS_RW_IS_RO  (0x01)  // (Standard Only) Treat the buffer that readWritePtr points to as a readOnly buffer
-#define WORK_REQUEST_FLAGS_RW_IS_WO  (0x02)  // (Standard Only) Tread the buffer that readWritePtr points to as a writeOnly buffer
-#define WORK_REQUEST_FLAGS_LIST      (0x04)  // (List Only) The work request uses a dma list instead of a single set of buffers#
+#define WORK_REQUEST_FLAGS_NONE            (0x00)  // No flags
+#define WORK_REQUEST_FLAGS_RW_IS_RO        (0x01)  // (Standard Only) Treat the buffer that readWritePtr points to as a readOnly buffer
+#define WORK_REQUEST_FLAGS_RW_IS_WO        (0x02)  // (Standard Only) Tread the buffer that readWritePtr points to as a writeOnly buffer
+#define WORK_REQUEST_FLAGS_LIST            (0x04)  // (List Only) The work request uses a dma list instead of a single set of buffers
+#define WORK_REQUEST_FLAGS_BOTH_CALLBACKS  (0x08)  // (Groups Only) If the work request is part of a group, setting this flag indicates that the individual work requests callback should also be called in addition to the group callback when the entire group is finished.  By default, only the group callback will be called.
 
 // Right shift amounts to bring flag checks into lsb of register value
 #define WORK_REQUEST_FLAGS_RW_IS_RO_SHIFT (0)
