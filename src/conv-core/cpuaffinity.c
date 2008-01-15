@@ -298,7 +298,7 @@ void CmiInitCPUAffinity(char **argv)
     ret = getXT3NodeID(CmiMyPe(), CmiNumPes());
     memcpy(&myip, &ret, sizeof(int));
 #elif CMK_HAS_GETHOSTNAME
-    myip = skt_my_ip();
+    myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
 #else
     CmiAbort("Can not get unique name for the compute nodes. \n");
 #endif
