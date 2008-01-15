@@ -62,7 +62,7 @@ CkpvDeclare(char*, traceRoot);
 CkpvDeclare(bool, verbose);
 
 typedef void (*mTFP)();                   // function pointer for
-CpvDeclare(mTFP, machineTraceFuncPtr);    // machine user event
+CpvStaticDeclare(mTFP, machineTraceFuncPtr);    // machine user event
                                           // registration
 
 int _threadMsg, _threadChare, _threadEP;
@@ -80,23 +80,25 @@ static void traceCommonInit(char **argv)
   CkpvInitialize(double, traceInitCpuTime);
   CkpvAccess(traceInitCpuTime) = TRACE_CPUTIMER();
   CpvInitialize(int, traceOn);
-  CpvInitialize(int, _traceCoreOn); //projector
-  CkpvInitialize(bool, verbose);
-  CkpvInitialize(char*, traceRoot);
   CpvAccess(traceOn) = 0;
+  CpvInitialize(int, _traceCoreOn); //projector
   CpvAccess(_traceCoreOn)=0; //projector
-  CkpvInitialize(int, traceOnPe);
-  CkpvAccess(traceOnPe) = 1;
   CpvInitialize(mTFP, machineTraceFuncPtr);
   CpvAccess(machineTraceFuncPtr) = NULL;
-  char *root;
-  char *temproot;
-  char *temproot2;
+  CkpvInitialize(int, traceOnPe);
+  CkpvAccess(traceOnPe) = 1;
+
+  CkpvInitialize(bool, verbose);
   if (CmiGetArgFlag(argv, "+traceWarn")) {
     CkpvAccess(verbose) = true;
   } else {
     CkpvAccess(verbose) = false;
   }
+
+  char *root;
+  char *temproot;
+  char *temproot2;
+  CkpvInitialize(char*, traceRoot);
   if (CmiGetArgStringDesc(argv, "+traceroot", &temproot, "Directory to write trace files to")) {
     int i;
     // Trying to decide if the traceroot path is absolute or not. If it is not
@@ -340,11 +342,13 @@ void traceUserBracketEvent(int e, double beginT, double endT)
 
 extern "C"
 void registerMachineUserEventsFunction(void (*eventRegistrationFunc)()) {
+  CmiAssert(CpvInitialized(machineTraceFuncPtr));
   CpvAccess(machineTraceFuncPtr) = eventRegistrationFunc;
 }
 
 extern "C"
 void (*registerMachineUserEvents())() {
+  CmiAssert(CpvInitialized(machineTraceFuncPtr));
   if (CpvAccess(machineTraceFuncPtr) != NULL) {
     return CpvAccess(machineTraceFuncPtr);
   } else {
