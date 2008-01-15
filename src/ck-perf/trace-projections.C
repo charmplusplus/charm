@@ -77,9 +77,16 @@ char *papiEventNames[] = {"PAPI_L3_DCM", "PAPI_FP_OPS"};
   For each TraceFoo module, _createTraceFoo() must be defined.
   This function is called in _createTraces() generated in moduleInit.C
 */
-void _createTraceProjections(char **argv)
+void _createTraceprojections(char **argv)
 {
   DEBUGF(("%d createTraceProjections\n", CkMyPe()));
+  CkpvInitialize(CkVec<char *>, usrEventlist);
+  CkpvInitialize(CkVec<UsrEvent *>*, usrEvents);
+  CkpvAccess(usrEvents) = new CkVec<UsrEvent *>();
+#if CMK_BLUEGENE_CHARM
+  // CthRegister does not call the constructor
+//  CkpvAccess(usrEvents) = CkVec<UsrEvent *>();
+#endif
   CkpvInitialize(TraceProjections*, _trace);
   CkpvAccess(_trace) = new  TraceProjections(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
@@ -222,25 +229,6 @@ void LogPool::closeLog(void)
 #endif
     fclose(deltafp);  
   }
-}
-
-/**
-  For each TraceFoo module, _createTraceFoo() must be defined.
-  This function is called in _createTraces() generated in moduleInit.C
-*/
-void _createTraceprojections(char **argv)
-{
-  DEBUGF(("%d createTraceProjections\n", CkMyPe()));
-  CkpvInitialize(CkVec<char *>, usrEventlist);
-  CkpvInitialize(CkVec<UsrEvent *>*, usrEvents);
-  CkpvAccess(usrEvents) = new CkVec<UsrEvent *>();
-#if CMK_BLUEGENE_CHARM
-  // CthRegister does not call the constructor
-//  CkpvAccess(usrEvents) = CkVec<UsrEvent *>();
-#endif
-  CkpvInitialize(TraceProjections*, _trace);
-  CkpvAccess(_trace) = new  TraceProjections(argv);
-  CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
 }
 
 LogPool::LogPool(char *pgm) {

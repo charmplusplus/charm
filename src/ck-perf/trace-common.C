@@ -88,6 +88,7 @@ static void traceCommonInit(char **argv)
   CkpvInitialize(int, traceOnPe);
   CkpvAccess(traceOnPe) = 1;
   CpvInitialize(mTFP, machineTraceFuncPtr);
+  CpvAccess(machineTraceFuncPtr) = NULL;
   char *root;
   char *temproot;
   char *temproot2;

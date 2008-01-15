@@ -72,7 +72,7 @@ class LogEntry {
 	     CmiObjId *d=NULL, double rt=0., double cputm=0., int numPe=0) {
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; 
       time = tm; msglen = ml;
-      if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=0; };
+      if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=0; };
       recvTime = rt; cputime = cputm;
       // initialize for papi as well as non papi versions.
       numPapiEvents = 0;
