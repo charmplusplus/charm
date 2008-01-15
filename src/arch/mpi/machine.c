@@ -132,7 +132,6 @@ CpvDeclare(MPI_Request*, CmiPostedRecvRequests); /* An array of request handles 
 CpvDeclare(char*,CmiPostedRecvBuffers);
 #endif
 
-
 /*
  to avoid MPI's in order delivery, changing MPI Tag all the time
 */
@@ -276,9 +275,9 @@ void CmiTimerInit()
       starttimer = MPI_Wtime();
 #endif
     }
+    /*  timerLock = CmiCreateLock();  */
   }
   CmiNodeAllBarrier();          /* for smp */
-/*  timerLock = CmiCreateLock(); */
 }
 
 double CmiTimer(void)
@@ -761,6 +760,7 @@ CmiAbort("Unsupported use of PumpMsgsBlocking. This call should be extended to c
 #if CMK_SMP
 
 static int inexit = 0;
+static CmiNodeLock  exitLock = 0;
 
 static int MsgQueueEmpty()
 {
@@ -829,12 +829,7 @@ static void CommunicationServer(int sleepTime)
     }
 #endif
     MACHSTATE(2, "} CommunicationServer EXIT");
-#if CMK_MPI_VMI
-    /* vmi mpi always return exit status 255 when calling MPI_Finalize() which broke Make */
-  exit(0);
-#else
     MPI_Finalize();
-#endif
     exit(0);
   }
 }
@@ -1460,12 +1455,7 @@ void ConverseExit(void)
     CmiAbort("ConverseExit: MPI_Barrier failed!\n");
 
   ConverseCommonExit();
-#if CMK_MPI_VMI
-    /* vmi mpi always return exit status 255 */
-  exit(0);
-#else
   MPI_Finalize();
-#endif
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
   if (CmiMyPe() == 0){
     CmiPrintf("End of program\n");
@@ -1475,14 +1465,14 @@ void ConverseExit(void)
 }
 #endif
   exit(0);
-#else
 
-  /* SMP version, communication thread will exit */
+#else
+    /* SMP version, communication thread will exit */
   ConverseCommonExit();
   /* atomic increment */
-  CmiCommLock();
+  CmiLock(exitLock);
   inexit++;
-  CmiCommUnlock();
+  CmiUnlock(exitLock);
   while (1) CmiYield();
 #endif
 }
@@ -1582,6 +1572,18 @@ static void ConverseRunPE(int everReturn)
 
   ConverseCommonInit(CmiMyArgv);
 
+#if CMI_MPI_TRACE_USEREVENTS
+#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_IN_CHARM
+  CpvInitialize(double, projTraceStart);
+  /* only PE 0 needs to care about registration (to generate sts file). */
+  if (CmiMyPe() == 0) {
+    registerMachineUserEventsFunction(&registerMPITraceEvents);
+  }
+#endif
+#endif
+#endif
+
   /* initialize the network progress counter*/
   /* Network progress function is used to poll the network when for
      messages. This flushes receive buffers on some  implementations*/
@@ -1636,18 +1638,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #if CMK_USE_HP_MAIN_FIX
 #if FOR_CPLUS
   _main(argc,argv);
-#endif
-#endif
-
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
-  CpvInitialize(double, projTraceStart);
-  /* only PE 0 needs to care about registration (to generate sts file). */
-  if (CmiMyPe() == 0) {
-    registerMachineUserEventsFunction(&registerMPITraceEvents);
-  }
-#endif
 #endif
 #endif
 
@@ -1759,6 +1749,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #if CMK_SMP
   sendMsgBuf = PCQueueCreate();
   sendMsgBufLock = CmiCreateLock();
+  exitLock = CmiCreateLock();            /* exit count lock */
 #endif
 
   /* Network progress function is used to poll the network when for
