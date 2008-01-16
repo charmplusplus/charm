@@ -4,11 +4,13 @@ args=""
 while [ $# -gt 0 ]
 do
         case $1 in
-	+p)     shift;
+	+p|+ppn)     args=$args" "$1" "$2
+                shift;
 		shift
 		;;
-	+p*)	shift
-		;;
+        ++ppn)  echo please use +ppn instead of ++ppn
+                exit 1
+                ;;
         +*)
                 args=$args" "$1
                 shift
