@@ -171,7 +171,8 @@ void _loadbalancerInit()
   char *balancer = NULL;
   CmiArgGroup("Charm++","Load Balancer");
   while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer")) {
-    lbRegistry.addRuntimeBalancer(balancer);
+    if (CkMyRank() == 0)                
+      lbRegistry.addRuntimeBalancer(balancer);   /* lbRegistry is a static */
   }
 
   // set up init value for LBPeriod time in seconds
