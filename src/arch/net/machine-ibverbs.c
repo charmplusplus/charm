@@ -2402,7 +2402,8 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle){
 #if CMI_DIRECT_DEBUG
 		CmiPrintf("[%d] RDMA memcpy put addr %p receiver %p, size %d\n",CmiMyPe(),senderTable->handles[idx].buf,recverTable->handles[idx].buf,senderTable->handles[idx].size);
 #endif
-		(*(recverTable->handles[idx].callbackFnPtr))(recverTable->handles[idx].callbackData);
+		// The polling Q should find you and handle the callback and pollingq entry
+		//		(*(recverTable->handles[idx].callbackFnPtr))(recverTable->handles[idx].callbackData);
 		
 
 	}else{
