@@ -829,7 +829,9 @@ static void CommunicationServer(int sleepTime)
     }
 #endif
     MACHSTATE(2, "} CommunicationServer EXIT");
+#if ! CMK_MPI_VMI
     MPI_Finalize();
+#endif
     exit(0);
   }
 }
@@ -1455,7 +1457,6 @@ void ConverseExit(void)
     CmiAbort("ConverseExit: MPI_Barrier failed!\n");
 
   ConverseCommonExit();
-  MPI_Finalize();
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
   if (CmiMyPe() == 0){
     CmiPrintf("End of program\n");
@@ -1463,6 +1464,9 @@ void ConverseExit(void)
     CmiPrintf("%llu posted receives,  %llu unposted receives\n", CpvAccess(Cmi_posted_recv_total), CpvAccess(Cmi_unposted_recv_total));
 #endif
 }
+#endif
+#if ! CMK_MPI_VMI
+  MPI_Finalize();
 #endif
   exit(0);
 
@@ -1758,6 +1762,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   CmiGetArgInt(argv, "+networkProgressPeriod", &networkProgressPeriod);
 
 #if CMK_VERSION_BLUEGENE
+    /* CpvInitialize should not be called before all worker threads start */
   CpvInitialize(struct BGLTorusManager*, tmanager);
   CpvAccess(tmanager) = NULL;
 #endif
