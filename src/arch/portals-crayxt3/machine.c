@@ -1297,11 +1297,6 @@ static void ConverseRunPE(int everReturn)
   }
 }
 
-#if CMK_VERSION_BLUEGENE
-struct BGLTorusManager;
-CpvDeclare(struct BGLTorusManager *, tmanager);
-#endif
-
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   ptl_process_id_t   my_id;
@@ -1426,11 +1421,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   networkProgressPeriod = NETWORK_PROGRESS_PERIOD_DEFAULT;
   CmiGetArgInt(argv, "+networkProgressPeriod", &networkProgressPeriod);
 
-#if CMK_VERSION_BLUEGENE
-  CpvInitialize(struct BGLTorusManager*, tmanager);
-  CpvAccess(tmanager) = NULL;
-#endif
-  
   CmiStartThreads(argv);
   ConverseRunPE(initret);
 }

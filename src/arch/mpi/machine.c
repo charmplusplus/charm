@@ -1627,11 +1627,6 @@ static void ConverseRunPE(int everReturn)
   }
 }
 
-#if CMK_VERSION_BLUEGENE
-struct BGLTorusManager;
-CpvDeclare(struct BGLTorusManager *, tmanager);
-#endif
-
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   int n,i;
@@ -1760,12 +1755,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
      messages. This flushes receive buffers on some  implementations*/
   networkProgressPeriod = NETWORK_PROGRESS_PERIOD_DEFAULT;
   CmiGetArgInt(argv, "+networkProgressPeriod", &networkProgressPeriod);
-
-#if CMK_VERSION_BLUEGENE
-    /* CpvInitialize should not be called before all worker threads start */
-  CpvInitialize(struct BGLTorusManager*, tmanager);
-  CpvAccess(tmanager) = NULL;
-#endif
 
   CmiStartThreads(argv);
   ConverseRunPE(initret);

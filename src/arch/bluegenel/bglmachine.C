@@ -1,3 +1,9 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
 
 #include <stdio.h>
 #include <errno.h>
@@ -425,8 +431,8 @@ void sendBroadcastMessages() {
 
 unsigned int *ranklist;
 
-#include "bgltorus.h"
-CpvDeclare(BGLTorusManager*, tmanager);
+// #include "BGLTorus.h"
+// CpvDeclare(BGLTorusManager*, tmanager);
 
 BGTsC_t        barrier;
 
@@ -592,8 +598,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   Cmi_argvcopy = CmiCopyArgs(argv);
   Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usched;
 
-  CpvInitialize(BGLTorusManager*, tmanager);
-  CpvAccess(tmanager) = new BGLTorusManager();
+  // CpvInitialize(BGLTorusManager*, tmanager);
+  // CpvAccess(tmanager) = new BGLTorusManager();
 
 
   /* find dim = log2(numpes), to pretend we are a hypercube */

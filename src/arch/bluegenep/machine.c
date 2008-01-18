@@ -360,9 +360,6 @@ int  networkProgressPeriod;
 #if 0
 unsigned int *ranklist;
 
-//#include "bgltorus.h"
-//CpvDeclare(BGLTorusManager*, tmanager);
-
 BGTsC_t        barrier;
 
 // -----------------------------------------
