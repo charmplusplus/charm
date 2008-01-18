@@ -117,7 +117,7 @@ public:
                                         nElements, elem_array, 
                                         nElements, elem_array);
         
-        strat->enableLearning();
+//        strat->enableLearning();
         cinst.setStrategy(strat);                
 
         for(count =0; count < nElements; count++)
