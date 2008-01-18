@@ -169,16 +169,18 @@ void CkArrayReductionMgr::startNodeGroupReduction(int number,CkGroupID groupID){
 	envelope::setSrcPe((char *)UsrToEnv(msg),CkMyNode());
 	((CkNodeReductionMgr *)this)->ReductionStarting(msg);
 }
-void CkArrayReductionMgr::startLocalGroupReductions(int number){	
+
+int CkArrayReductionMgr::startLocalGroupReductions(int number){	
 	ARPRINT("[%d] startLocalGroupReductions for red No %d my group %d attached group %d number of rednMgrs %d on %p \n",CkMyNode(),number,thisgroup.idx, attachedGroup.idx,size,this);
 	if(attachedGroup.isZero()){
-		return;
+		return 0;
 	}
 	int firstPE = CkNodeFirst(CkMyNode());
 	for(int i=0;i<size;i++){
 		CProxy_CkReductionMgr reductionMgrProxy(attachedGroup);
 		reductionMgrProxy[firstPE+i].ReductionStarting(new CkReductionNumberMsg(number));
 	}
+	return 1;
 };
 
 int CkArrayReductionMgr::getTotalGCount(){

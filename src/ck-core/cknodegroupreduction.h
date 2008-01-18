@@ -147,6 +147,7 @@ public:
 	void contribute(contributorInfo *ci,CkReductionMsg *msg);
 	void contributeWithCounter(contributorInfo *ci,CkReductionMsg *m,int count);
 //Communication (library-private)
+        void restartLocalGroupReductions(int number);
 	//Sent down the reduction tree (used by barren PEs)
 	void ReductionStarting(CkReductionNumberMsg *m);
 	//Sent up the reduction tree with reduced data
@@ -154,8 +155,8 @@ public:
 	void doRecvMsg(CkReductionMsg *m);
 	void LateMigrantMsg(CkReductionMsg *m);
 
-  virtual void flushStates();	// flush state varaibles
-	virtual void startLocalGroupReductions(int number){}; // can be used to start reductions on all the 
+	virtual void flushStates();	// flush state varaibles
+	virtual int startLocalGroupReductions(int number){ return 1;} // can be used to start reductions on all the 
 	//CkReductionMgrs on a particular node. It is overwritten by CkArrayReductionMgr to make the actual calls
 	// since it knows the CkReductionMgrs on a node.
 

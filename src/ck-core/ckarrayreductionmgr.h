@@ -24,7 +24,7 @@ class CkArrayReductionMgr : public NodeGroup{
 		virtual void pup(PUP::er &p);
 		void setAttachedGroup(CkGroupID groupID);
 		void startNodeGroupReduction(int number,CkGroupID groupID);
-		virtual void startLocalGroupReductions(int number);
+		virtual int startLocalGroupReductions(int number);
 		virtual int getTotalGCount();
 };
 #endif

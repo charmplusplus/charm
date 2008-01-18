@@ -525,7 +525,7 @@ void CkReductionMgr::finishReduction(void)
 {
   /*CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d (!inProgress) | creating) %d at %.6f\n",CkMyPe(),redNo, nContrib,(!inProgress) | creating,CmiWallTimer());*/
   DEBR((AA"in finishReduction (inProgress=%d) in grp %d\n"AB,inProgress,thisgroup.idx));
-  if ((!inProgress) | creating){
+  if ((!inProgress) || creating){
   	DEBR((AA"Either not in Progress or creating\n"AB));
   	return;
   }
@@ -1430,7 +1430,20 @@ void CkNodeReductionMgr::startReduction(int number,int srcNode)
 		}	
 #endif
 	}
-	startLocalGroupReductions(number);
+
+	DEBR((AA"Asking all local groups to start #%d\n"AB,redNo));
+	// in case, nodegroup does not has the attached red group,
+	// it has to restart groups again
+	if (startLocalGroupReductions(number) == 0)
+          thisProxy[CkMyNode()].restartLocalGroupReductions(number);
+}
+
+// restart local groups until succeed
+void CkNodeReductionMgr::restartLocalGroupReductions(int number) {
+  CmiLock(lockEverything);    
+  if (startLocalGroupReductions(number) == 0)
+    thisProxy[CkMyNode()].restartLocalGroupReductions(number);
+  CmiUnlock(lockEverything);    
 }
 
 void CkNodeReductionMgr::doAddContribution(CkReductionMsg *m){
@@ -1496,7 +1509,7 @@ void CkNodeReductionMgr::finishReduction(void)
 {
   DEBR((AA"in Nodegrp finishReduction %d treeKids %d \n"AB,inProgress,treeKids()));
   /***Check if reduction is finished in the next few ifs***/
-  if ((!inProgress) | creating){
+  if ((!inProgress) || creating){
   	DEBR((AA"Either not in Progress or creating\n"AB));
   	return;
   }
