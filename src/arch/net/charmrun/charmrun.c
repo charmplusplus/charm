@@ -2602,7 +2602,8 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
 
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
     rsh_Find(f,nodetab_xterm(nodeno),"F_XTERM");
-    rsh_Find(f,"xrdb","F_XRDB");
+    if(!arg_ssh_display)
+      rsh_Find(f,"xrdb","F_XRDB");
     if(arg_verbose) fprintf(f,"Echo 'using xterm' $F_XTERM\n");
   }
 
