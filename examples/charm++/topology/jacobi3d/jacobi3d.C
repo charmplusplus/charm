@@ -496,16 +496,15 @@ class JacobiMap : public CkArrayMap {
       // cores on the same node. The strange thing I figured out is that
       // doing this in the Z dimension is not as good.
       numCharesPerPeX /= dimT;
-      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
+      if(CkMyPe()==0) CkPrintf("%d %d %d : %d %d %d %d : %d %d %d \n", x, y, z, dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
       for(int i=0; i<dimX; i++)
 	for(int j=0; j<dimY; j++)
 	  for(int k=0; k<dimZ; k++)
 	    for(int l=0; l<dimT; l++)
-	      for(int ci=(2*i+l)*numCharesPerPeX; ci<(2*i+l+1)*numCharesPerPeX; ci++)
+	      for(int ci=(dimT*i+l)*numCharesPerPeX; ci<(dimT*i+l+1)*numCharesPerPeX; ci++)
 	        for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
 		  for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
 		    mapping[ci][cj][ck] = tmgr.coordinatesToRank(i, j, k, l);
-		    // if(CkMyPe()==0) CkPrintf("%d %d %d %d", ci, cj, ck, tmgr.coordinatesToRank(i, j, k, l));
 		  }
       } // end of if
 #elif USE_RRMAP
@@ -558,7 +557,7 @@ class JacobiMap : public CkArrayMap {
 		      pe++;
 		}
 #endif
-
+      if(CkMyPe() == 0) CkPrintf("Map generated ... \n");
     }
 
     ~JacobiMap() { 
