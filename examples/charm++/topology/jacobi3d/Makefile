@@ -7,6 +7,12 @@ all: jacobi3d
 jacobi3d: $(OBJS)
 	$(CHARMC) -O3 -language charm++ -o jacobi3d $(OBJS)
 
+projections: $(OBJS)
+	$(CHARMC) -O3 -language charm++ -tracemode projections -lz -L/bgl/local/lib -o jacobi3d.prj $(OBJS)
+
+summary: $(OBJS)
+	$(CHARMC) -O3 -language charm++ -tracemode summary -lz -L/bgl/local/lib -o jacobi3d.sum $(OBJS)
+
 jacobi3d.decl.h: jacobi3d.ci
 	$(CHARMC)  jacobi3d.ci
 

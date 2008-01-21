@@ -53,8 +53,15 @@
 /*readonly*/ int numCharesPerPeY;
 /*readonly*/ int numCharesPerPeZ;
 
+static unsigned long next = 1;
+
+int myrand(int numpes) {
+  next = next * 1103515245 + 12345;
+  return((unsigned)(next/65536) % numpes);
+}
+
 #define SMPWAY		2
-#define USE_TOPOMAP	0	
+#define USE_TOPOMAP	0
 #define USE_RRMAP	1
 #define USE_BLOCKMAP	0
 #define USE_SMPMAP	0
@@ -521,7 +528,11 @@ class JacobiMap : public CkArrayMap {
 	  }
 #elif USE_BLOCKMAP
       if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d\n", x, y, z, numCharesPerPe, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
-      int pe = 0;
+      int pe = 0, pes = CkNumPes();
+      int used[pes];
+      for(int i=0; i<pes; i++)
+	used[i] = 0;
+
       x /= numCharesPerPeX;
       y /= numCharesPerPeY;
       z /= numCharesPerPeZ;
@@ -529,12 +540,17 @@ class JacobiMap : public CkArrayMap {
       for(int i=0; i<x; i++)
 	for(int j=0; j<y; j++)
 	  for(int k=0; k<z; k++) {
+	    pe = myrand(pes); 
+            while(used[pe]!=0) {
+              pe = myrand(pes); 
+            }
+	    if(CkMyPe() == 0) CkPrintf("%d\n", pe);
+	    used[pe] = 1;
 	    for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
 	      for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
 		for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
 		  mapping[ci][cj][ck] = pe;
 		}
-	    pe++;
 	  }
 #elif USE_SMPMAP
       if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d\n", x, y, z, numCharesPerPe, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
