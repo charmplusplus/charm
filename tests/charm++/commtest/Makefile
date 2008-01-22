@@ -1,4 +1,5 @@
-DIRS=comlib commlib_stream pipeBroadcast
+#DIRS=comlib commlib_stream pipeBroadcast
+DIRS=commlib_stream pipeBroadcast
 
 .PHONY: test $(DIRS)
 
@@ -7,7 +8,8 @@ all:
                 (cd $$d; $(MAKE) all OPTS='$(OPTS)' || exit 1) || exit 1; \
         done
 
-test: comlib commlib_stream pipeBroadcast
+#test: comlib commlib_stream pipeBroadcast
+test: $(DIRS)
 
 comlib: 
 	$(MAKE) -C $@ test OPTS='$(OPTS)'
