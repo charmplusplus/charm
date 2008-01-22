@@ -142,9 +142,11 @@ void opt::UndoEvent(Event *e)
     e->commitErr = 0;
     e->done = e->commitBfrLen = 0;
 #ifdef MEM_TEMPORAL
-    userObj->localTimePool->tmp_free(e->timestamp, e->serialCPdata);
-    e->serialCPdata = NULL; 
-    e->serialCPdataSz = 0;
+    if (e->serialCPdata) {
+      userObj->localTimePool->tmp_free(e->timestamp, e->serialCPdata);
+      e->serialCPdata = NULL; 
+      e->serialCPdataSz = 0;
+    }
 #else
     delete e->cpData;
     e->cpData = NULL;
@@ -449,9 +451,11 @@ void opt::RecoverState(Event *recoveryPoint)
   ev->commitBfr = NULL;
   ev->commitBfrLen = 0;
 #ifdef MEM_TEMPORAL
+  if (ev->serialCPdata) {
     userObj->localTimePool->tmp_free(ev->timestamp, ev->serialCPdata);
     ev->serialCPdata = NULL; 
     ev->serialCPdataSz = 0;
+  }
 #else
   delete ev->cpData;
   ev->cpData = NULL;

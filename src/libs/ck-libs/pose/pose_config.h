@@ -1,4 +1,4 @@
-/// POSE confgiuration parameters
+/// POSE configuration parameters
 /** This code provides all the switches for control over adaptivity,
     communication, statistics gathering, load balancing, etc. */
 #ifndef POSE_CONFIG_H

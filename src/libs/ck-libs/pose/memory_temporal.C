@@ -190,18 +190,20 @@ void TimePool::tmp_free(POSE_TimeType timestamp, void *mem)
   sanity_check();
   CkPrintf("[tmp_free:\n");
 #endif
-  TimeBucket *tmpbkt = first_in_use;
-  while (tmpbkt && (timestamp >= (tmpbkt->getStart()+tmpbkt->getRange()))) {
-    tmpbkt = tmpbkt->getPrevBucket();
-  }
-  if (tmpbkt) {
-    tmpbkt->tb_free((char *)mem);
-  }
-  else CkAbort("ERROR: Memory in that time range not found for deallocation.\n");
+  if (mem) {
+    TimeBucket *tmpbkt = first_in_use;
+    while (tmpbkt && (timestamp >= (tmpbkt->getStart()+tmpbkt->getRange()))) {
+      tmpbkt = tmpbkt->getPrevBucket();
+    }
+    if (tmpbkt) {
+      tmpbkt->tb_free((char *)mem);
+    }
+    else CkAbort("ERROR: Memory in that time range not found for deallocation.\n");
 #ifdef VERBOSE_DEBUG
-  CkPrintf(".tmp_free]\n");
-  sanity_check();
+    CkPrintf(".tmp_free]\n");
+    sanity_check();
 #endif
+  }
 }
 
 void TimePool::sanity_check() {
