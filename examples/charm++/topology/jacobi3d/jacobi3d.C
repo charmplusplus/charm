@@ -60,11 +60,13 @@ int myrand(int numpes) {
   return((unsigned)(next/65536) % numpes);
 }
 
-#define SMPWAY		2
-#define USE_TOPOMAP	0
-#define USE_RRMAP	1
+#define SMPWAYX		1
+#define SMPWAYY		2
+#define SMPWAYZ		2
+#define USE_TOPOMAP	0	
+#define USE_RRMAP	0
 #define USE_BLOCKMAP	0
-#define USE_SMPMAP	0
+#define USE_SMPMAP	1
 
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
@@ -554,23 +556,24 @@ class JacobiMap : public CkArrayMap {
 	  }
 #elif USE_SMPMAP
       if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d\n", x, y, z, numCharesPerPe, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
-      int pe = 0;
-      x /= numCharesPerPeX*SMPWAY;
-      y /= numCharesPerPeY*SMPWAY;
-      z /= numCharesPerPeZ*SMPWAY;
+      int pe = -1;
+      x /= (numCharesPerPeX*SMPWAYX);
+      y /= (numCharesPerPeY*SMPWAYY);
+      z /= (numCharesPerPeZ*SMPWAYZ);
 
       for(int i=0; i<x; i++)
 	for(int j=0; j<y; j++)
 	  for(int k=0; k<z; k++)
-	    for(int bi=i*SMPWAY; bi<(i+1)*SMPWAY; bi++)
-	      for(int bj=j*SMPWAY; bj<(j+1)*SMPWAY; bj++)
-		for(int bk=k*SMPWAY; bk<(k+1)*SMPWAY; bk++) {
+	    for(int bi=i*SMPWAYX; bi<(i+1)*SMPWAYX; bi++)
+	      for(int bj=j*SMPWAYY; bj<(j+1)*SMPWAYY; bj++)
+		for(int bk=k*SMPWAYZ; bk<(k+1)*SMPWAYZ; bk++) {
+		  pe++;
 		  for(int ci=bi*numCharesPerPeX; ci<(bi+1)*numCharesPerPeX; ci++)
 		    for(int cj=bj*numCharesPerPeY; cj<(bj+1)*numCharesPerPeY; cj++)
 		      for(int ck=bk*numCharesPerPeZ; ck<(bk+1)*numCharesPerPeZ; ck++) {
+			//if(CkMyPe()==0) CkPrintf("%d %d %d %d %d %d [%d]\n", i, j, k, ci, cj, ck, pe);
 			mapping[ci][cj][ck] = pe;
 		      }
-		      pe++;
 		}
 #endif
       if(CkMyPe() == 0) CkPrintf("Map generated ... \n");
