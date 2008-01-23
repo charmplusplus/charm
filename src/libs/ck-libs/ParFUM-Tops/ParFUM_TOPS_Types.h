@@ -20,9 +20,12 @@ typedef double FP_TYPE_SYNC;
 
 /** Tops uses some bit patterns for these, but we just use TopNode as a signed value to represent the corresponding ParFUM node. A non-negative value is a local node, while a negative value is a ghost. */
 typedef long TopNode;
-/** See notes for ::TopNode */
+/** A type for a node */
 typedef long TopElement;
-
+/** A type for a facet */
+typedef long TopFacet;
+/** A type for a facet */
+typedef long TopVertex;
 
 enum {
   TOP_ELEMENT_T3 =0,

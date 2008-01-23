@@ -70,12 +70,32 @@ public:
   TopModel *model;
 };
 
-/** @brief Element Iterator. See notes for class TopNodeItr */
+/** Element Iterator */
 class TopElemItr{
 public:
   int parfum_index;
     TopModel *model;
 };
+
+/** Node->Element adjacency Iterator */
+class TopNodeElemItr{
+public:
+  int parfum_index;
+    TopModel *model;
+};
+
+/** Facet Iterator */
+class TopFacetItr{
+public:
+  int parfum_index;
+    TopModel *model;
+};
+
+
+
+
+
+
 
 
 /**
@@ -180,5 +200,43 @@ void topModel_TestIterators(TopModel*m);
 void top_retrieve_elem_data(TopModel* m);
 void top_retrieve_node_data(TopModel* m);
 void top_put_node_data(TopModel* m);
+
+
+
+//==============================================================
+//   New functions to be implemented for the new code to work
+
+
+
+int topModel_GetNElem (TopModel* m);
+void topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f);
+
+bool topElement_IsCohesive(TopModel* m, TopElement e);
+bool topElement_IsValid(TopModel* m, TopElement e);
+int topElement_GetId (TopModel* m, TopElement e);
+
+void topNode_GetVertex (TopModel* m, TopNode n);
+
+bool topVertex_IsBoundary (TopModel* m, TopVertex v);
+
+
+int topFacet_GetNNodes (TopModel* m, TopFacet f);
+TopNode topFacet_GetNode (TopModel* m, TopFacet f, int i);
+TopElement topFacet_GetElem (TopModel* m, TopFacet f, int i);
+
+TopFacetItr* topModel_CreateFacetItr (TopModel* m);
+void topFacetItr_Begin(TopFacetItr* itr);
+bool topFacetItr_IsValid(TopFacetItr* itr);
+void topFacetItr_Next(TopFacetItr* itr);
+TopFacet topFacetItr_GetCurr (TopFacetItr* itr);
+void topFacetItr_Destroy (TopFacetItr* itr);
+
+
+TopNodeElemItr* topModel_CreateNodeElemItr (TopModel* m, TopNode n);
+bool topNodeElemItr_IsValid (TopNodeElemItr* neitr);
+void topNodeElemItr_Next (TopNodeElemItr* neitr);
+TopElement topNodeElemItr_GetCurr (TopNodeElemItr* neitr);
+void topNodeElemItr_Destroy (TopNodeElemItr* neitr);
+
 
 #endif
