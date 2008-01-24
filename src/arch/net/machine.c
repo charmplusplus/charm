@@ -1685,7 +1685,19 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     node = nodes_by_pe[dst];
     rank = dst - node->nodestart;
     if (node->nodestart != Cmi_nodestart) {
+#if CMK_USE_PXSHM
+     {
+      int ret=CmiValidPxshm(ogm,node);
+      MACHSTATE4(3,"Msg ogm %p size %d dst %d usePxShm %d",ogm,ogm->size,ogm->dst,ret);
+      if(ret){
+         CmiSendMessagePxshm(ogm,node,rank,DGRAM_ROOTPE_MASK);
+       }else{
+         DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
+       }
+      } 
+#else
       DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
+#endif			
       GarbageCollectMsg(ogm);
     } else {
       if (ogm->freemode == 'A') {
@@ -1871,6 +1883,9 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   DeliverOutgoingMessage(ogm);
   CmiCommUnlock();
   /* Check if any packets have arrived recently (preserves kernel network buffers). */
+#if CMK_USE_PXSHM
+	CommunicationServerPxshm();
+#endif
   CommunicationServer(0, COMM_SERVER_FROM_WORKER);
   MACHSTATE(1,"}  CmiGeneralSend");
   return (CmiCommHandle)ogm;
@@ -2135,6 +2150,9 @@ void CmiProbeImmediateMsg()
    messages. This flushes receive buffers on some implementations*/ 
 void CmiMachineProgressImpl()
 {
+#if CMK_USE_PXSHM
+	CommunicationServerPxshm();
+#endif
   CommunicationServer(0, COMM_SERVER_FROM_SMP);
 }
 
@@ -2198,6 +2216,11 @@ static void ConverseRunPE(int everReturn)
       (CcdVoidFn) CmiNotifyBeginIdle, (void *) s);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) CmiNotifyStillIdle, (void *) s);
+#if CMK_USE_PXSHM
+		//TODO: add pxshm notify idle
+  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn) CmiNotifyBeginIdlePxshm, NULL);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn) CmiNotifyStillIdlePxshm, NULL);
+#endif
   }
 
 #if CMK_SHARED_VARS_UNAVAILABLE
@@ -2300,6 +2323,9 @@ void ConverseExit(void)
       printNetStatistics();
     log_done();
   }
+#if CMK_USE_PXSHM
+	CmiExitPxshm();
+#endif
   CmiMachineExit();
   ConverseCommonExit();               /* should be called by every rank */
   CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
@@ -2446,6 +2472,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #if CMK_USE_TCP
   open_tcp_sockets();
 #endif
+
+#if CMK_USE_PXSHM
+	CmiInitPxshm(argv);
+#endif
+
 
   skt_set_idle(CmiYield);
   Cmi_check_delay = 1.0+0.25*_Cmi_numnodes;
