@@ -41,15 +41,17 @@ static void CmiNotifyBeginIdle(CmiIdleState *s)
 {
   s->sleepMs=0;
   s->nIdles=0;
+
+  MACHSTATE(3,"begin idle")
 }
 
 static void CmiNotifyStillIdle(CmiIdleState *s)
 {
 #if CMK_SHARED_VARS_UNAVAILABLE
   /*No comm. thread-- listen on sockets for incoming messages*/
-  MACHSTATE(3,"idle commserver {")
+  MACHSTATE(1,"idle commserver {")
   CommunicationServer(Cmi_idlepoll?0:10, 0);
-  MACHSTATE(3,"} idle commserver")
+  MACHSTATE(1,"} idle commserver")
 #else
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
 	if(_Cmi_noprocforcommthread ){
@@ -144,7 +146,7 @@ void TransmitAckDatagram(OtherNode node)
   int retval;
   
   seqno = node->recv_next;
-  MACHSTATE2(2,"  TransmitAckDgram [seq %d to 'pe' %d]",seqno,node->nodestart)
+  MACHSTATE2(3,"  TransmitAckDgram [seq %d to 'pe' %d]",seqno,node->nodestart)
   DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, Cmi_charmrun_pid, seqno, 0);
   LOG(Cmi_clock, Cmi_nodestart, 'A', node->nodestart, seqno);
   for (i=0; i<Cmi_window_size; i++) {
@@ -182,7 +184,7 @@ void TransmitImplicitDgram(ImplicitDgram dg)
   OtherNode dest;
   int retval;
   
-  MACHSTATE3(2,"  TransmitImplicitDgram (%d bytes) [seq %d to 'pe' %d]",
+  MACHSTATE3(3,"  TransmitImplicitDgram (%d bytes) [seq %d to 'pe' %d]",
 	     dg->datalen,dg->seqno,dg->dest->nodestart)
   len = dg->datalen;
   data = dg->dataptr;
@@ -357,7 +359,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
   int size; char *data;
   OtherNode myNode = nodes+CmiMyNode();
 
-  MACHSTATE2(2,"DeliverViaNetwork %d-byte message to pe %d",
+  MACHSTATE2(3,"DeliverViaNetwork %d-byte message to pe %d",
 	     ogm->size,node->nodestart+rank);
   size = ogm->size - DGRAM_HEADER_SIZE;
   data = ogm->data + DGRAM_HEADER_SIZE;

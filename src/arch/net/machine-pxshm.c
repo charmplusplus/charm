@@ -99,20 +99,20 @@ void initAllSendQs();
  * ****************/
 void CmiInitPxshm(char **argv){
 	MACHSTATE(3,"CminitPxshm start");
-	MEMDEBUG(CmiMemoryCheck());
 	pxshmContext = (PxshmContext *)malloc(sizeof(PxshmContext));
 
 	if(Cmi_charmrun_pid <= 0){
 		CmiAbort("pxshm must be run with charmrun");
 	}
 	calculateNodeSizeAndRank(argv);
+	if(pxshmContext->nodesize == 1){
+		return;
+	}
 	
-	MEMDEBUG(CmiMemoryCheck());
 	MACHSTATE1(3,"CminitPxshm  %d calculateNodeSizeAndRank",pxshmContext->nodesize);
 
 	snprintf(&(pxshmContext->prefixStr[0]),PREFIXSTRLEN-1,"charm_pxshm_%d",Cmi_charmrun_pid);
 
-	MEMDEBUG(CmiMemoryCheck());
 
 	MACHSTATE2(3,"CminitPxshm %s %d pre setupSharedBuffers",pxshmContext->prefixStr,pxshmContext->nodesize);
 
@@ -120,16 +120,13 @@ void CmiInitPxshm(char **argv){
 
 	MACHSTATE2(3,"CminitPxshm %s %d setupSharedBuffers",pxshmContext->prefixStr,pxshmContext->nodesize);
 
-	MEMDEBUG(CmiMemoryCheck());
 
 	initAllSendQs();
 	
 	MACHSTATE2(3,"CminitPxshm %s %d initAllSendQs",pxshmContext->prefixStr,pxshmContext->nodesize);
-	MEMDEBUG(CmiMemoryCheck());
 
 	MACHSTATE2(3,"CminitPxshm %s %d done",pxshmContext->prefixStr,pxshmContext->nodesize);
 
-	MEMDEBUG(CmiMemoryCheck());
 };
 
 /**************
@@ -140,22 +137,25 @@ void tearDownSharedBuffers();
 
 void CmiExitPxshm(){
 	int i=0;
-
-	tearDownSharedBuffers();
 	
-	for(i=0;i<pxshmContext->nodesize;i++){
-		if(i != pxshmContext->noderank){
-			break;
+	if(pxshmContext->nodesize != 1){
+		tearDownSharedBuffers();
+	
+		for(i=0;i<pxshmContext->nodesize;i++){
+			if(i != pxshmContext->noderank){
+				break;
+			}
 		}
-	}
-	free(pxshmContext->recvBufNames[i]);
-	free(pxshmContext->sendBufNames[i]);
+		free(pxshmContext->recvBufNames[i]);
+		free(pxshmContext->sendBufNames[i]);
 	
-	free(pxshmContext->recvBufNames);
-	free(pxshmContext->sendBufNames);
+		free(pxshmContext->recvBufNames);
+		free(pxshmContext->sendBufNames);
 
-	free(pxshmContext->recvBufs);
-	free(pxshmContext->sendBufs);
+		free(pxshmContext->recvBufs);
+		free(pxshmContext->sendBufs);
+
+	}
 
 	free(pxshmContext);
 }
@@ -266,28 +266,20 @@ static void CmiNotifyBeginIdlePxshm(CmiIdleState *s)
 
 void calculateNodeSizeAndRank(char **argv){
 	pxshmContext->nodesize=1;
-	MEMDEBUG(CmiMemoryCheck());
 	MACHSTATE(3,"calculateNodeSizeAndRank start");
 	//CmiGetArgIntDesc(argv, "+nodesize", &(pxshmContext->nodesize),"Number of cores in this node (for non-smp case).Used by the shared memory communication layer");
 	CmiGetArgIntDesc(argv, "+nodesize", &(pxshmContext->nodesize),"Number of cores in this node");
-	MEMDEBUG(CmiMemoryCheck());
-	MEMDEBUG(CmiMemoryCheck());
-	MEMDEBUG(CmiMemoryCheck());
 	MACHSTATE1(3,"calculateNodeSizeAndRank argintdesc %d",pxshmContext->nodesize);
 
 	pxshmContext->noderank = _Cmi_mynode % (pxshmContext->nodesize);
 	
 	MACHSTATE1(3,"calculateNodeSizeAndRank noderank %d",pxshmContext->noderank);
-	MEMDEBUG(CmiMemoryCheck());
-	MACHSTATE(3,"calculateNodeSizeAndRank noderank memcheck passed ");
 	
 	pxshmContext->nodestart = _Cmi_mynode -pxshmContext->noderank;
 	
-	MEMDEBUG(CmiMemoryCheck());
 	MACHSTATE(3,"calculateNodeSizeAndRank nodestart ");
 
 	pxshmContext->nodeend = pxshmContext->nodestart + pxshmContext->nodesize -1;
-	MEMDEBUG(CmiMemoryCheck());
 	
 	MACHSTATE3(3,"calculateNodeSizeAndRank nodestart %d nodesize %d noderank %d",pxshmContext->nodestart,pxshmContext->nodesize,pxshmContext->noderank);
 }
@@ -319,9 +311,9 @@ void setupSharedBuffers(){
 
 	for(i=0;i<pxshmContext->nodesize;i++){
 		if(i != pxshmContext->noderank){
-			snprintf(pxshmContext->recvBufNames[i],NAMESTRLEN-1,"%s_%d_%d",pxshmContext->prefixStr,pxshmContext->noderank,i);
+			snprintf(pxshmContext->recvBufNames[i],NAMESTRLEN-1,"%s_%d_%d",pxshmContext->prefixStr,pxshmContext->noderank+pxshmContext->nodestart,i+pxshmContext->nodestart);
 			MACHSTATE2(3,"recvBufName %s with rank %d",pxshmContext->recvBufNames[i],i)
-			snprintf(pxshmContext->sendBufNames[i],NAMESTRLEN-1,"%s_%d_%d",pxshmContext->prefixStr,i,pxshmContext->noderank);
+			snprintf(pxshmContext->sendBufNames[i],NAMESTRLEN-1,"%s_%d_%d",pxshmContext->prefixStr,i+pxshmContext->nodestart,pxshmContext->noderank+pxshmContext->nodestart);
 			MACHSTATE2(3,"sendBufName %s with rank %d",pxshmContext->sendBufNames[i],i);
 		}
 	}

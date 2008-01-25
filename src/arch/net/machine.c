@@ -2218,8 +2218,8 @@ static void ConverseRunPE(int everReturn)
       (CcdVoidFn) CmiNotifyStillIdle, (void *) s);
 #if CMK_USE_PXSHM
 		//TODO: add pxshm notify idle
-  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn) CmiNotifyBeginIdlePxshm, NULL);
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn) CmiNotifyStillIdlePxshm, NULL);
+ 	 CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn) CmiNotifyBeginIdlePxshm, NULL);
+ 	 CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn) CmiNotifyStillIdlePxshm, NULL);
 #endif
   }
 
