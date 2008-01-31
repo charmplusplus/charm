@@ -55,6 +55,8 @@ class LogEntry {
     CmiObjId   id;
     int numpes;
     int *pes;
+	int userSuppliedData;
+
     // this is taken out so as to provide a placeholder value for non-PAPI
     // versions (whose value is *always* zero).
     int numPapiEvents;
@@ -101,11 +103,34 @@ class LogEntry {
       }	
       pes=NULL;numpes=0;
     }
+
+	// Constructor for User Supplied Data
+	LogEntry(double _time,unsigned char _type, int value,
+	     int _lineNum,char *_fileName){
+      time = _time;
+      type = _type;
+      userSuppliedData = value;
+      if(_fileName == NULL){
+		fName = NULL;
+		flen = 0;
+      }else{
+		fName = new char[strlen(_fileName)+2];
+		fName[0] = ' ';
+		memcpy(fName+1,_fileName,strlen(_fileName)+1);
+		flen = strlen(fName)+1;
+      }	
+      pes=NULL;numpes=0;
+    }
+
     // **CW** new constructor for multicast data
     LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
 	     int ml, CmiObjId *d, double rt, int numPe, int *pelist);
     // complementary function for adding papi data
     void addPapi( int numPapiEvts, int *papi_ids, LONG_LONG_PAPI *papiVals);
+   	void setUserSuppliedData(int data){
+	  userSuppliedData = data;
+	}
+
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
     void operator delete(void *ptr) {free(ptr); }
@@ -173,12 +198,17 @@ class LogPool {
 
     void add(unsigned char type, unsigned short mIdx, unsigned short eIdx,
 	     double time, int event, int pe, int ml=0, CmiObjId* id=0, 
-	     double recvT=0., double cpuT=0.0, int numPe=0);
+	     double recvT=0.0, double cpuT=0.0, int numPe=0);
+
     // complementary function to set papi info to current log entry
     // must be called after an add()
     void addPapi(int numPap, int *pap_ids, LONG_LONG_PAPI *papVals) {
       pool[numEntries-1].addPapi(numPap, pap_ids, papVals);
     }
+
+	/** add a record for a user supplied piece of data */
+	void addUserSupplied(int data);
+
     void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
     void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int numPe=0, int *pelist=NULL);
     void flushLogBuffer();
@@ -272,6 +302,7 @@ class TraceProjections : public Trace {
     TraceProjections(char **argv);
     void userEvent(int e);
     void userBracketEvent(int e, double bt, double et);
+    void userSuppliedData(int e);
     void creation(envelope *e, int epIdx, int num=1);
     void creationMulticast(envelope *e, int epIdx, int num=1, int *pelist=NULL);
     void creationDone(int num=1);

@@ -574,6 +574,19 @@ void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileNam
 #endif	
 }
 
+
+
+void LogPool::addUserSupplied(int data){
+	// add an event
+	add(USER_SUPPLIED, 0, 0, TraceTimer(), -1, -1, 0, 0, 0, 0, 0 );
+
+	// set the user supplied value for the previously created event 
+	pool[numEntries-1].setUserSuppliedData(data);
+  }
+  
+
+
+
 /* **CW** Not sure if this is the right thing to do. Feels more like
    a hack than a solution to Sameer's request to add the destination
    processor information to multicasts and broadcasts.
@@ -600,6 +613,7 @@ void LogPool::postProcessLog()
 #endif
 }
 
+/** Constructor for a multicast log entry */
 LogEntry::LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
 	     int ml, CmiObjId *d, double rt, int numPe, int *pelist) 
 {
@@ -631,6 +645,8 @@ void LogEntry::addPapi(int numPapiEvts, int *papi_ids, LONG_LONG_PAPI *papiVals)
   }
 #endif
 }
+
+
 
 void LogEntry::pup(PUP::er &p)
 {
@@ -668,6 +684,7 @@ void LogEntry::pup(PUP::er &p)
 	// not yet!!!
 	//	p|papiIDs[i]; 
 	p|papiValues[i];
+	
       }
 #else
       p|numPapiEvents;     // non papi version has value 0
@@ -692,6 +709,11 @@ void LogEntry::pup(PUP::er &p)
 #endif
       if (p.isUnpacking()) cputime = icputime/1.0e6;
       break;
+    case USER_SUPPLIED:
+	  p|userSuppliedData;
+	  p|itime;
+	break;
+
     case CREATION:
       if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
       p|mIdx; p|eIdx; p|itime;
@@ -948,6 +970,12 @@ void TraceProjections::userBracketEvent(int e, double bt, double et)
   // two events record Begin/End of event e.
   _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(bt), curevent, CkMyPe());
   _logPool->add(USER_EVENT_PAIR, e, 0, TraceTimer(et), curevent++, CkMyPe());
+}
+
+void TraceProjections::userSuppliedData(int d)
+{
+  if (!computationStarted) return;
+  _logPool->addUserSupplied(d);
 }
 
 void TraceProjections::creation(envelope *e, int ep, int num)

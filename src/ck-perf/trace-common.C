@@ -341,6 +341,17 @@ void traceUserBracketEvent(int e, double beginT, double endT)
 }
 
 extern "C"
+void traceUserSuppliedData(int d)
+{
+#ifndef CMK_OPTIMIZE
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->userSuppliedData(d);
+#endif
+}
+
+
+
+extern "C"
 void registerMachineUserEventsFunction(void (*eventRegistrationFunc)()) {
   CmiAssert(CpvInitialized(machineTraceFuncPtr));
   CpvAccess(machineTraceFuncPtr) = eventRegistrationFunc;

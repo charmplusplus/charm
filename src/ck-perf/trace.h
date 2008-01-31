@@ -64,6 +64,10 @@ class Trace {
     virtual void userEvent(int eventID) {}
     // a pair of begin/end user event has just occured
     virtual void userBracketEvent(int eventID, double bt, double et) {}
+
+	// a user supplied integer value(likely a timestep)
+	virtual void userSuppliedData(int e) {}
+
     // creation of message(s)
     virtual void creation(envelope *, int epIdx, int num=1) {}
     virtual void creationMulticast(envelope *, int epIdx, int num=1,
@@ -172,6 +176,8 @@ public:
     inline void userEvent(int e) { ALLDO(userEvent(e));}
     inline void userBracketEvent(int e,double bt, double et) {ALLDO(userBracketEvent(e,bt,et));}
     
+	inline void userSuppliedData(int d) { ALLDO(userSuppliedData(d));}
+
     /* Creation needs to access _entryTable, so moved into trace-common.C */
     void creation(envelope *env, int ep, int num=1);
     void creationMulticast(envelope *env, int ep, int num=1, int *pelist=NULL);

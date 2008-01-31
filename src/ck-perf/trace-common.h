@@ -43,6 +43,9 @@
 #define  MEMORY_MALLOC      24
 #define  MEMORY_FREE        25
 
+/* Trace user supplied data */
+#define USER_SUPPLIED       26
+
 #define  USER_EVENT_PAIR    100
 
 CkpvExtern(int, CtrLogBufSize);
