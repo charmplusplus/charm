@@ -602,6 +602,8 @@ PUPmarshall(FEM_IndexAttribute);
 */
 class FEM_VarIndexAttribute : public FEM_Attribute{
  public:
+	 
+/** A reference to an element(contains both type and index). Ghost indices are handled correctly here */
   class ID{
   public:
     ///type is negative for ghost elements
@@ -648,6 +650,17 @@ class FEM_VarIndexAttribute : public FEM_Attribute{
       }
       else return id;
     }
+    int getSignedType(){
+    	return type;
+    }
+    /** Return the element's type. This is necessary because the type member itself is negative for ghosts(for some stupid reason) */
+    int getUnsignedType(){
+    	if(type>0)
+    		return type;
+    	else 
+    		return -(type+1);
+    }
+        
   };
  private:
   typedef FEM_Attribute super;
@@ -976,7 +989,9 @@ class FEM_Node : public FEM_Entity {
   void allocateNodeAdjacency();
 
   FEM_VarIndexAttribute *elemAdjacency; ///< stores the node to element adjacency vector
+  
   FEM_VarIndexAttribute *nodeAdjacency; ///< stores the node to node adjacency vector
+
   typedef FEM_VarIndexAttribute::ID var_id;
  protected:
   virtual void create(int attr,const char *caller);
@@ -1243,6 +1258,7 @@ inline int zeroToMinusOne(int i) {
 
 class ParFUMShadowArray;
 
+
 ///A FEM_Mesh is a collection of entities.
 /**
  * This class describes all the nodes and elements in
@@ -1412,8 +1428,10 @@ class FEM_Mesh : public CkNoncopyable {
   int n2e_getLength(int n);
   /// Place all of node n's adjacent elements in adjelements and the resulting
   /// length of adjelements in sz; assumes adjelements is not allocated,
-  /// but sz is
+  /// but sz is. Ignore element types
   void n2e_getAll(int n, int *&adjelements, int &sz);
+  /// Get one of node n's adjacent elements
+  FEM_VarIndexAttribute::ID  n2e_getElem(int n, int whichAdjElem);
   /// Adds newElem to node n's element adjacency list
   void n2e_add(int n, int newElem);
   /// Removes oldElem from n's element adjacency list
@@ -1457,6 +1475,7 @@ class FEM_Mesh : public CkNoncopyable {
   void detectFeatures();
 
 };
+
 PUPmarshall(FEM_Mesh);
 
 FEM_Mesh *FEM_Mesh_lookup(int fem_mesh,const char *caller);

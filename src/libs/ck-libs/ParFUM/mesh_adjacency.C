@@ -82,7 +82,9 @@ void FEM_Node::allocateElemAdjacency(){
 	}
 	elemAdjacency = new FEM_VarIndexAttribute(this,FEM_NODE_ELEM_ADJACENCY);
 	add(elemAdjacency);
+
 }
+
 
 void FEM_Node::allocateNodeAdjacency(){
 	if(nodeAdjacency){
@@ -286,7 +288,7 @@ void FEM_Elem::allocateElemAdjacency(){
 
 
 void FEM_Mesh::createNodeElemAdj(){
-	node.lookup(FEM_NODE_ELEM_ADJACENCY,"FEM_Mesh::createElemNodeAdj");
+	node.lookup(FEM_NODE_ELEM_ADJACENCY,"FEM_Mesh::createNodeElemAdj");
 	for(int i=0;i<elem.size();i++){
 		node.setElemAdjacency(i,elem[i]);
 	}
@@ -997,6 +999,31 @@ int FEM_Mesh::n2e_getLength(int n) {
   CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
   return nsVec.length();
 }
+
+/** Return one of node n's adjacent elements 
+*/
+
+FEM_VarIndexAttribute::ID FEM_Mesh::n2e_getElem(int n, int whichIdx){
+
+  if(FEM_Is_ghost_index(n)){
+    FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_getElem");
+    CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
+    CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[FEM_To_ghost_index(n)];
+    assert(whichIdx < nsVec.length());
+    return  nsVec[whichIdx];
+    
+  }
+  else {
+    FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_getAll");
+    CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
+    CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+    assert(whichIdx < nsVec.length());
+    return  nsVec[whichIdx];
+  }
+  
+}
+
+
 
 /** Place all of node n's adjacent elements in adjelements and the resulting 
     length of adjelements in sz; assumes adjelements is not allocated, 
