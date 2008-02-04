@@ -114,11 +114,12 @@ class TopoManager {
 #endif
     }
 
-    TopoManager(int X, int Y, int Z, int NX, int NY, int NZ) : dimX(X), dimY(Y), dimZ(Z), dimNX(NX), dimNY(NY), dimNZ(NZ) {
+    TopoManager(int NX, int NY, int NZ, int NT) : dimNX(NX), dimNY(NY), dimNZ(NZ), dimNT(NT) {
       // we rashly assume only one dimension is expanded 
-      procsPerNode = dimX/dimNX;
-      procsPerNode = (dimY/dimNY > procsPerNode) ? dimY/dimNY : procsPerNode;
-      procsPerNode = (dimZ/dimNZ > procsPerNode) ? dimZ/dimNZ : procsPerNode;
+      procsPerNode = dimNT;
+      dimX = dimNX * dimNT;
+      dimY = dimNY;
+      dimZ = dimNZ;
       torusX = true;
       torusY = true;
       torusZ = true;

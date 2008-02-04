@@ -11,21 +11,10 @@
 #include "TopoManager.h"
 
 int TopoManager::hasMultipleProcsPerNode() {
-#ifdef CMK_VERSION_BLUEGENE
-  if(procsPerNode==1)
+  if(procsPerNode == 1)
     return 0;
   else
     return 1;
-#elif CMK_BLUEGENP
-  if(procsPerNode==1)
-    return 0;
-  else
-    return 1;
-#elif CMK_XT3
-  return 1;
-#else
-  return 0;
-#endif
 }
 
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
