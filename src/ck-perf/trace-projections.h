@@ -56,6 +56,7 @@ class LogEntry {
     int numpes;
     int *pes;
 	int userSuppliedData;
+	unsigned long memUsage;
 
     // this is taken out so as to provide a placeholder value for non-PAPI
     // versions (whose value is *always* zero).
@@ -130,6 +131,18 @@ class LogEntry {
    	void setUserSuppliedData(int data){
 	  userSuppliedData = data;
 	}
+
+	/// A constructor for a memory usage record
+	LogEntry(unsigned char _type, double _time, long _memUsage) {
+	    time = _time;
+		type = _type;
+		memUsage = _memUsage;
+		fName = NULL;
+		flen = 0;
+		pes=NULL;
+		numpes=0;
+	}
+
 
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
@@ -210,6 +223,9 @@ class LogPool {
 	void addUserSupplied(int data);
 
     void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
+  
+  	void addMemoryUsage(unsigned char type,double time,double memUsage);
+   
     void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int numPe=0, int *pelist=NULL);
     void flushLogBuffer();
     void postProcessLog();
@@ -303,6 +319,7 @@ class TraceProjections : public Trace {
     void userEvent(int e);
     void userBracketEvent(int e, double bt, double et);
     void userSuppliedData(int e);
+    void memoryUsage(double m);
     void creation(envelope *e, int epIdx, int num=1);
     void creationMulticast(envelope *e, int epIdx, int num=1, int *pelist=NULL);
     void creationDone(int num=1);

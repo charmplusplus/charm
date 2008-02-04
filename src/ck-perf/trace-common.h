@@ -46,6 +46,9 @@
 /* Trace user supplied data */
 #define USER_SUPPLIED       26
 
+/* Trace memory usage */
+#define MEMORY_USAGE_CURRENT       27
+
 #define  USER_EVENT_PAIR    100
 
 CkpvExtern(int, CtrLogBufSize);

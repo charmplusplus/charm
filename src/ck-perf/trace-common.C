@@ -349,6 +349,16 @@ void traceUserSuppliedData(int d)
 #endif
 }
 
+extern "C"
+void traceMemoryUsage()
+{
+#ifndef CMK_OPTIMIZE
+  long d = CmiMemoryUsage();
+
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->memoryUsage(d);
+#endif
+}
 
 
 extern "C"

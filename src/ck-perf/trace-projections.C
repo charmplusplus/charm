@@ -575,6 +575,20 @@ void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileNam
 }
 
 
+  
+void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
+#ifndef CMK_BLUEGENE_CHARM
+  new (&pool[numEntries++])
+	LogEntry(type,time,memUsage);
+  if(poolSize == numEntries){
+    flushLogBuffer();
+  }
+#endif	
+	
+}  
+
+
+
 
 void LogPool::addUserSupplied(int data){
 	// add an event
@@ -583,9 +597,6 @@ void LogPool::addUserSupplied(int data){
 	// set the user supplied value for the previously created event 
 	pool[numEntries-1].setUserSuppliedData(data);
   }
-  
-
-
 
 /* **CW** Not sure if this is the right thing to do. Feels more like
    a hack than a solution to Sameer's request to add the destination
@@ -713,7 +724,10 @@ void LogEntry::pup(PUP::er &p)
 	  p|userSuppliedData;
 	  p|itime;
 	break;
-
+    case MEMORY_USAGE_CURRENT:
+      p | memUsage;
+      p | itime;
+	break;
     case CREATION:
       if (p.isPacking()) irecvtime = (CMK_TYPEDEF_UINT8)(1.0e6*recvTime);
       p|mIdx; p|eIdx; p|itime;
@@ -977,6 +991,14 @@ void TraceProjections::userSuppliedData(int d)
   if (!computationStarted) return;
   _logPool->addUserSupplied(d);
 }
+
+void TraceProjections::memoryUsage(double m)
+{
+  if (!computationStarted) return;
+  _logPool->addMemoryUsage(MEMORY_USAGE_CURRENT, TraceTimer(), m );
+  
+}
+
 
 void TraceProjections::creation(envelope *e, int ep, int num)
 {
