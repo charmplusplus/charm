@@ -1,3 +1,4 @@
+
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
@@ -26,16 +27,13 @@ INCS=-I.
 
 all: $(DEST) $(COMPATLIB) $(PARFUMMAIN)
 
+ParFUM.def.h: ParFUM.decl.h
 ParFUM.decl.h: ParFUM.ci
 	$(CHARMC) ParFUM.ci
-ParFUM.def.h: ParFUM.ci
-	$(CHARMC) ParFUM.ci
-ParFUM_Adapt.def.h: mesh_modify.ci
-	$(CHARMC) mesh_modify.ci
+ParFUM_Adapt.def.h: ParFUM_Adapt.decl.h
 ParFUM_Adapt.decl.h: mesh_modify.ci
 	$(CHARMC) mesh_modify.ci
-ParFUM_SA.def.h: ParFUM_SA.ci
-	$(CHARMC) ParFUM_SA.ci
+ParFUM_SA.def.h: ParFUM_SA.decl.h
 ParFUM_SA.decl.h: ParFUM_SA.ci
 	$(CHARMC) ParFUM_SA.ci
 

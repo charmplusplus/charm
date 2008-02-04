@@ -1718,10 +1718,15 @@ void FEM_Entity::setMeshSizing(double *sf)
 }
 
 void FEM_Entity::allocateBoundary(){
-	FEM_DataAttribute *bound = new FEM_DataAttribute(this,FEM_BOUNDARY);
-	add(bound);
-	bound->setWidth(1);
-	bound->setDatatype(FEM_INT);
+	boundary = new FEM_DataAttribute(this,FEM_BOUNDARY);
+	add(boundary);
+	boundary->setWidth(1);
+	boundary->setDatatype(FEM_INT);
+}
+
+
+int FEM_Entity::isBoundary(int idx){
+	return boundary->getInt()(idx,0);
 }
 
 void FEM_Entity::setGlobalno(int r,int g) {

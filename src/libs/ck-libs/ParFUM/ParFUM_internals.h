@@ -757,6 +757,7 @@ class FEM_Entity {
     used to allocate the integer array for storing the boundary
     values associated with an entity.
   */
+  FEM_DataAttribute *boundary;
   void allocateBoundary();
 
   /// Mesh sizing attribute for elements
@@ -895,6 +896,7 @@ class FEM_Entity {
   int get_next_invalid(FEM_Mesh *m=NULL, bool isNode=false, bool isGhost=false);// the arguments are not really needed but Nilesh added them when he wrote a messy version and did not remove them when he fixed the implementation. Since changing the uses was too painful the default arguments were added.
   void set_all_invalid();
 
+  int isBoundary(int idx);
 
   virtual bool hasConn(int idx)=0;
   /**
@@ -1377,6 +1379,8 @@ class FEM_Mesh : public CkNoncopyable {
   /// Given id of element e and id of another element nbr, return i such that
   /// nbr is the i-th element adjacent to e
   int e2e_getIndex(int e, int nbr, int etype=0);
+  /// Same as previous but also returning the element type
+  FEM_VarIndexAttribute::ID e2e_getElem(int idx, int nbr, int etype=0);
   /// Set the element adjacencies of element e to neighbors; assumes neighbors
   /// has the correct size
   void e2e_setAll(int e, int *neighbors, int etype=0);
