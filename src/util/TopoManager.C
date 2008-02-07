@@ -25,17 +25,17 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
 #elif CMK_XT3
 
 #else
-  if(dimY>0){
+  if(dimY > 1){
     // Assumed TXYZ
     x = pe % dimX;
     y = (pe % (dimX * dimY)) / dimX;
     z = pe / (dimX * dimY);
   }
   else {
-      x = pe; 
-      y = 0; 
-      z = 0;
-    }
+    x = pe; 
+    y = 0; 
+    z = 0;
+  }
 #endif
 }
 
@@ -47,17 +47,17 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
 #elif CMK_XT3
   crtm.rankToCoordinates(pe, x, y, z, t);
 #else
-  if(dimY>0){
-    // Assumed TXYZ
-    x = pe % dimX;
-    y = (pe % (dimX * dimY)) / dimX;
-    z = pe / (dimX * dimY);
+  if(dimNY > 1) {
+    t = pe % dimNT;
+    x = (pe % (dimNT*dimNX)) / dimNT;
+    y = (pe % (dimNT*dimNX*dimNY)) / (dimNT*dimNX);
+    z = pe / (dimNT*dimNX*dimNY);
+  } else {
+    t = pe % dimNT;
+    x = (pe % (dimNT*dimNX)) / dimNT;
+    y = 0;
+    z = 0;
   }
-  else {
-      x = pe; 
-      y = 0; 
-      z = 0;
-    }
 #endif
 }
 
@@ -69,7 +69,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
 #elif CMK_XT3
 
 #else
-  if(dimY > 0)
+  if(dimY > 1)
     return x + y*dimX + z*dimX*dimY;
   else
     return x;
@@ -84,10 +84,10 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
 #elif CMK_XT3
   return crtm.coordinatesToRank(x, y, z, t);
 #else
-  if(dimY > 0)
-    return x + y*dimX + z*dimX*dimY;
+  if(dimNY > 1)
+    return t + (x + (y + z*dimNY) * dimNX) * dimNT;
   else
-    return x;
+    return t + x * dimNT;
 #endif
 }
 
