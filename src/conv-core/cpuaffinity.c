@@ -48,6 +48,9 @@ long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr
 
 int num_cores(void) {
   int a = 1;
+#ifdef _WIN32
+struct _SYSTEM_INFO sysinfo;
+#endif  
 
   /* Allow the user to override the number of CPUs for use
      in scalability testing, debugging, etc. */
@@ -65,7 +68,7 @@ int num_cores(void) {
 #endif
 
 #ifdef _WIN32
-  struct _SYSTEM_INFO sysinfo;
+  //struct _SYSTEM_INFO sysinfo;  
   GetSystemInfo(&sysinfo);
   a = sysinfo.dwNumberOfProcessors; /* total number of CPUs */
 #endif /* _MSC_VER */
@@ -94,6 +97,10 @@ int set_cpu_affinity(int cpuid) {
   unsigned long mask = 0xffffffff;
   unsigned int len = sizeof(mask);
 
+ #ifdef _WIN32
+   HANDLE hProcess;
+ #endif
+ 
   /* set the affinity mask if possible */
   if ((cpuid / 8) > len) {
     printf("Mask size too small to handle requested CPU ID\n");
@@ -103,7 +110,8 @@ int set_cpu_affinity(int cpuid) {
   }
 
 #ifdef _WIN32
-  HANDLE hProcess = GetCurrentProcess();
+  //HANDLE hProcess = GetCurrentProcess();
+  hProcess = GetCurrentProcess();
   if (SetProcessAffinityMask(hProcess, mask) == 0) {
     return -1;
   }
@@ -123,6 +131,10 @@ int set_thread_affinity(int cpuid) {
   unsigned long mask = 0xffffffff;
   unsigned int len = sizeof(mask);
 
+#ifdef _WIN32
+  HANDLE hThread;
+#endif	
+  
   /* set the affinity mask if possible */
   if ((cpuid / 8) > len) {
     printf("Mask size too small to handle requested CPU ID\n");
@@ -132,7 +144,8 @@ int set_thread_affinity(int cpuid) {
   }
 
 #ifdef _WIN32
-  HANDLE hThread = GetCurrentThread();
+  //HANDLE hThread = GetCurrentThread();
+  hThread = GetCurrentThread();
   if (SetThreadAffinityMask(hThread, mask) == 0) {
     return -1;
   }
@@ -156,6 +169,17 @@ int set_thread_affinity(int cpuid) {
 /* For a large SMP machine, this code should be changed to use a variable sized   */
 /* CPU affinity mask buffer instead, as the present code will fail beyond 32 CPUs */
 int print_cpu_affinity() {
+#ifdef _WIN32
+  unsigned long pMask, sMask;
+  HANDLE hProcess = GetCurrentProcess();
+  if(GetProcessAffinityMask(hProcess, &pMask, &sMask)){
+	perror("On Windows: GetProcessAffinityMask");
+    return -1;
+  }
+  
+  printf("CPU affinity mask is: %08lx\n", pMask);
+  
+#else
   unsigned long mask;
   unsigned int len = sizeof(mask);
 
@@ -166,7 +190,7 @@ int print_cpu_affinity() {
   }
 
   printf("CPU affinity mask is: %08lx\n", mask);
-
+#endif
   return 0;
 }
 
@@ -196,6 +220,7 @@ static void cpuAffinityHandler(void *m)
   static int count = 0;
   hostnameMsg *rec;
   hostnameMsg *msg = (hostnameMsg *)m;
+  hostnameMsg *tmpm;
   char str[128];
   int tag, tag1, pe;
   CmiAssert(rankmsg != NULL);
@@ -218,9 +243,9 @@ static void cpuAffinityHandler(void *m)
   count ++;
   if (count == CmiNumPes()) {
     CmiPrintf("Cpuaffinity> %d unique compute nodes detected! \n", CmmEntries(hostTable));
-    hostnameMsg *m;
+    //hostnameMsg *tmpm;
     tag = CmmWildCard;
-    while (m = CmmGet(hostTable, 1, &tag, &tag1)) CmiFree(m);
+    while (tmpm = CmmGet(hostTable, 1, &tag, &tag1)) CmiFree(tmpm);
     CmmFree(hostTable);
     CmiSyncBroadcastAllAndFree(sizeof(rankMsg)+CmiNumPes()*sizeof(int), (void *)rankmsg);
   }
