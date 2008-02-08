@@ -10,7 +10,7 @@
 
 # Configurable option: Location of MSDEV
 #VCC_DIR="C:/Program Files/Microsoft Visual Studio/Vc98"
-VCC_DIR="C:/Program Files/Microsoft Visual Studio 8/VC"
+VCC_DIR="C:/Program Files (x86)/Microsoft Visual Studio 9.0/VC"
 
 #only valid for the platform that has exported corresponding variables
 #LIB_CMD="$VCC_DIR/BIN/LIB.EXE"
