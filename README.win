@@ -9,7 +9,10 @@ Windows 9x/2K and NT, which emulates a UNIX environment under Windows.
 
 Note that since November 2005, Windows98 is not supported with VC++.
 Support for WindowsNT/XP is improved to take advantage of the creation of
-symbolic link under WindowsNT.
+symbolic link under WindowsNT. In addition, the Microsoft Visual Studio Express
+edition (which is free for download and registeration) doesn't include 64-bit 
+compiler and other 64-bit tools, therefore, to build charm++ for 64-bit windows, a standard Microsoft Visual Studio is required.
+ 
 Please read the FAQ at end of this file.
 
 
