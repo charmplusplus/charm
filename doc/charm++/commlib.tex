@@ -83,7 +83,7 @@ to send multicasts (see \ref{array section} for more on section proxies).
 
 \begin{alltt}
   CProxySection\_MyArray mysection = .....
-  ComlibAssociateProxy(cinst, mysection);  // mysection will always use commlib
+  ComlibAssociateProxy(\&cinst, mysection);  // mysection will always use commlib
 \end{alltt}
 
 After a proxy has been associated in some way to commlib, it can be used to send
