@@ -12,7 +12,7 @@ data-driven manner to coordinate a sequence of remotely triggered actions.
 The need to sequence remotely triggered actions
 arises in many situations. Let us consider an example:
 
-\begin{figure}[ht]
+%\begin{figure}[ht]
 \begin{center}
 \begin{alltt}
       class compute_object : public Chare \{
@@ -38,9 +38,9 @@ arises in many situations. Let us consider an example:
      \}
 \end{alltt}
 \end{center}
-\caption{Compute Object in a Molecular Dynamics Application}
-\label{figchareexample}
-\end{figure}
+%\caption{Compute Object in a Molecular Dynamics Application}
+%\label{figchareexample}
+%\end{figure}
 
 
 Consider an algorithm for computing cutoff-based pairwise interactions
@@ -81,7 +81,7 @@ message buffers, which complicates program development significantly.
 Threads are typically used to perform the abovementioned sequencing.
 Lets us code our previous example using threads.
 
-\begin{figure}[ht]
+%\begin{figure}[ht]
 \begin{center}
 \begin{alltt}
 void compute_thread(int first_index, int second_index)
@@ -105,9 +105,9 @@ void compute_thread(int first_index, int second_index)
   \}
 \end{alltt}
 \end{center}
-\caption{Compute Thread in a Molecular Dynamics Application}
-\label{figthreadexample}
-\end{figure}
+%\caption{Compute Thread in a Molecular Dynamics Application}
+%\label{figthreadexample}
+%\end{figure}
 
 Contrast the compute chare-object example in figure~\ref{figchareexample} with
 a thread-based implementation of the same scheme in
@@ -125,7 +125,7 @@ synchronization in the form of {\em join} has been added. Let us now code the
 same example in \sdag. It reduces the parallel programming complexity without
 adding any significant overhead.
 
-\begin{figure}[ht]
+%\begin{figure}[ht]
 \begin{center}
 \begin{alltt}
   array[1D] compute_object \{
@@ -145,9 +145,9 @@ adding any significant overhead.
   \}
 \end{alltt}
 \end{center}
-\caption{\sdag\ Implementation of the Compute Object}
-\label{figsdagexample}
-\end{figure}
+%\caption{\sdag\ Implementation of the Compute Object}
+%\label{figsdagexample}
+%\end{figure}
 
 \sdag\ is a coordination language built on top of \charmpp\ that supports the
 sequencing mentioned above, while overcoming limitations of thread-based
