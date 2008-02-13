@@ -65,8 +65,8 @@ int myrand(int numpes) {
 #define SMPWAYZ		2
 #define USE_TOPOMAP	0	
 #define USE_RRMAP	0
-#define USE_BLOCKMAP	0
-#define USE_SMPMAP	1
+#define USE_BLOCKMAP	1
+#define USE_SMPMAP	0
 
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
@@ -74,7 +74,7 @@ int myrand(int numpes) {
 #define wrap_y(a)  (((a)+num_chare_y)%num_chare_y)
 #define wrap_z(a)  (((a)+num_chare_z)%num_chare_z)
 
-#define MAX_ITER	1000
+#define MAX_ITER	100
 #define LEFT		1
 #define RIGHT		2
 #define TOP		3
@@ -474,13 +474,11 @@ class JacobiMap : public CkArrayMap {
 	  mapping[i][j] = new int[z];
       }
 
-      TopoManager tmgr;
-
       // we are assuming that the no. of chares in each dimension is a 
       // multiple of the torus dimension
       numCharesPerPe = x*y*z/CkNumPes();
 
-#if USE_TOPOMAP
+      TopoManager tmgr;
       int dimX = tmgr.getDimNX();
       int dimY = tmgr.getDimNY();
       int dimZ = tmgr.getDimNZ();
@@ -490,6 +488,7 @@ class JacobiMap : public CkArrayMap {
       numCharesPerPeY = y / dimY;
       numCharesPerPeZ = z / dimZ;
 
+#if USE_TOPOMAP
       if(dimT < 2) {	// one core per node
       if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
       for(int i=0; i<dimX; i++)
@@ -529,7 +528,7 @@ class JacobiMap : public CkArrayMap {
 	    pe++;
 	  }
 #elif USE_BLOCKMAP
-      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d\n", x, y, z, numCharesPerPe, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
+      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d\n", dimX, dimY, dimZ, numCharesPerPe, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
       int pe = 0, pes = CkNumPes();
       int used[pes];
       for(int i=0; i<pes; i++)
@@ -546,7 +545,7 @@ class JacobiMap : public CkArrayMap {
             while(used[pe]!=0) {
               pe = myrand(pes); 
             }
-	    //if(CkMyPe() == 0) CkPrintf("%d\n", pe);
+	    //if(CkMyPe() == 0) CkPrintf("PROC %d\n", pe);
 	    used[pe] = 1;
 	    for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
 	      for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
