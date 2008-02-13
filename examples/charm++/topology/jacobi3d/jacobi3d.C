@@ -174,7 +174,7 @@ class Main : public CBase_Main {
       for(int i=0; i<num_chare_x; i++)
 	for(int j=0; j<num_chare_y; j++)
 	  for(int k=0; k<num_chare_z; k++) {
-	    int p = jmap[i][j][k];
+	    p = jmap[i][j][k];
 	    hops += tmgr.getHopsBetweenRanks(p, jmap[wrap_x(i+1)][j][k]);
 	    hops += tmgr.getHopsBetweenRanks(p, jmap[wrap_x(i-1)][j][k]);
 	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][wrap_y(j+1)][k]);
@@ -546,7 +546,7 @@ class JacobiMap : public CkArrayMap {
             while(used[pe]!=0) {
               pe = myrand(pes); 
             }
-	    if(CkMyPe() == 0) CkPrintf("%d\n", pe);
+	    //if(CkMyPe() == 0) CkPrintf("%d\n", pe);
 	    used[pe] = 1;
 	    for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
 	      for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
