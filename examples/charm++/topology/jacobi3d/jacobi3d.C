@@ -63,9 +63,10 @@ int myrand(int numpes) {
 #define SMPWAYX		1
 #define SMPWAYY		2
 #define SMPWAYZ		2
-#define USE_TOPOMAP	0	
+#define USE_TOPOMAP	1	
 #define USE_RRMAP	0
-#define USE_BLOCKMAP	1
+#define USE_BLOCKMAP	0
+#define USE_BLOCK_RRMAP	0
 #define USE_SMPMAP	0
 
 // We want to wrap entries around, and because mod operator % 
@@ -530,28 +531,39 @@ class JacobiMap : public CkArrayMap {
 #elif USE_BLOCKMAP
       if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d\n", dimX, dimY, dimZ, numCharesPerPe, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
       int pe = 0, pes = CkNumPes();
+#if !USE_BLOCK_RRMAP
       int used[pes];
       for(int i=0; i<pes; i++)
 	used[i] = 0;
+#endif
 
       x /= numCharesPerPeX;
       y /= numCharesPerPeY;
       z /= numCharesPerPeZ;
 
+#if USE_BLOCK_RRMAP
+	    pe = 0;
+#endif
+
       for(int i=0; i<x; i++)
 	for(int j=0; j<y; j++)
 	  for(int k=0; k<z; k++) {
+#if !USE_BLOCK_RRMAP
 	    pe = myrand(pes); 
             while(used[pe]!=0) {
               pe = myrand(pes); 
             }
 	    //if(CkMyPe() == 0) CkPrintf("PROC %d\n", pe);
 	    used[pe] = 1;
+#endif
 	    for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
 	      for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
 		for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
 		  mapping[ci][cj][ck] = pe;
 		}
+#if USE_BLOCK_RRMAP
+	    pe++;
+#endif
 	  }
 #elif USE_SMPMAP
       if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d\n", x, y, z, numCharesPerPe, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
