@@ -64,7 +64,7 @@ static int processBufferedCount;
 #define CMK_IBVERBS_INCTOKENS 0 //never turn this on 
 #define CMK_IBVERBS_DEBUG 0
 #define CMI_DIRECT_DEBUG 0
-#define WC_LIST_SIZE 512
+#define WC_LIST_SIZE 128
 /*#define WC_BUFFER_SIZE 100*/
 
 #define INCTOKENS_FRACTION 0.04
