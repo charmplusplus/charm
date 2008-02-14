@@ -256,43 +256,6 @@ struct infiContext {
 
 static struct infiContext *context;
 
-static inline infiPacket newPacket(){
-	infiPacket pkt = malloc(sizeof(struct infiPacketStruct));
-	pkt->size = -1;
-	pkt->header = context->header;
-	pkt->next = NULL;
-	pkt->destNode = NULL;
-	pkt->keyHeader = ibv_reg_mr(context->pd,&pkt->header,sizeof(struct infiPacketHeader),IBV_ACCESS_LOCAL_WRITE);
-	pkt->ogm=NULL;
-	assert(pkt->keyHeader!=NULL);
-	
-	pkt->elemList[0].addr = (uintptr_t)&(pkt->header);
-	pkt->elemList[0].length = sizeof(struct infiPacketHeader);
-	pkt->elemList[0].lkey = pkt->keyHeader->lkey;
-	
-	pkt->wr.wr_id = (uint64_t)pkt;
-	pkt->wr.sg_list = &(pkt->elemList[0]);
-	pkt->wr.num_sge = 2;
-	pkt->wr.opcode = IBV_WR_SEND;
-	pkt->wr.send_flags = IBV_SEND_SIGNALED;
-	pkt->wr.next = NULL;
-	
-	return pkt;
-};
-
-#define FreeInfiPacket(pkt){ \
-	pkt->size = -1;\
-	pkt->ogm=NULL;\
-	pkt->next = context->infiPacketFreeList; \
-	context->infiPacketFreeList = pkt; \
-}
-
-#define MallocInfiPacket(pkt) { \
-	infiPacket p = context->infiPacketFreeList; \
-	if(p == NULL){ p = newPacket();} \
-	         else{context->infiPacketFreeList = p->next; } \
-	pkt = p;\
-}
 
 
 
@@ -360,6 +323,43 @@ infiCmiChunkPool infiCmiChunkPools[INFINUMPOOLS];
 static void initInfiCmiChunkPools();
 
 
+static inline infiPacket newPacket(){
+	infiPacket pkt = (infiPacket )CmiAlloc(sizeof(struct infiPacketStruct));
+	pkt->size = -1;
+	pkt->header = context->header;
+	pkt->next = NULL;
+	pkt->destNode = NULL;
+	pkt->keyHeader = METADATAFIELD(pkt)->key;
+	pkt->ogm=NULL;
+	assert(pkt->keyHeader!=NULL);
+	
+	pkt->elemList[0].addr = (uintptr_t)&(pkt->header);
+	pkt->elemList[0].length = sizeof(struct infiPacketHeader);
+	pkt->elemList[0].lkey = pkt->keyHeader->lkey;
+	
+	pkt->wr.wr_id = (uint64_t)pkt;
+	pkt->wr.sg_list = &(pkt->elemList[0]);
+	pkt->wr.num_sge = 2;
+	pkt->wr.opcode = IBV_WR_SEND;
+	pkt->wr.send_flags = IBV_SEND_SIGNALED;
+	pkt->wr.next = NULL;
+	
+	return pkt;
+};
+
+#define FreeInfiPacket(pkt){ \
+	pkt->size = -1;\
+	pkt->ogm=NULL;\
+	pkt->next = context->infiPacketFreeList; \
+	context->infiPacketFreeList = pkt; \
+}
+
+#define MallocInfiPacket(pkt) { \
+	infiPacket p = context->infiPacketFreeList; \
+	if(p == NULL){ p = newPacket();} \
+	         else{context->infiPacketFreeList = p->next; } \
+	pkt = p;\
+}
 
 
 
@@ -467,12 +467,28 @@ static void CmiMachineInit(char **argv){
 	if(_Cmi_numnodes > 1){
 		createLocalQps(dev,ibPort,_Cmi_mynode,_Cmi_numnodes,context->localAddr);
 	}
+	
+	
+	//TURN ON RDMA
+	rdma=1;
+//	rdmaThreshold=32768;
+	rdmaThreshold=22000;
+	firstBinSize = 120;
+	CmiAssert(rdmaThreshold > firstBinSize);
+	blockAllocRatio=16;
+	blockThreshold=8;
+	
+	initInfiCmiChunkPools();
 		
 	/*create the pool of send packets*/
 	sendPacketPoolSize = maxTokens/2;	
+	if(sendPacketPoolSize > 2000){
+		sendPacketPoolSize = 2000;
+	}
 	
 	context->infiPacketFreeList=NULL;
 	pktPtrs = malloc(sizeof(infiPacket)*sendPacketPoolSize);
+
 	//Silly way of allocating the memory buffers (slow as well) but simplifies the code
 	for(i=0;i<sendPacketPoolSize;i++){
 		MallocInfiPacket(pktPtrs[i]);	
@@ -487,19 +503,9 @@ static void CmiMachineInit(char **argv){
 	context->bufferedRdmaRequests = NULL;
 	context->insideProcessBufferedBcasts=0;
 	
-	//TURN ON RDMA
-	rdma=1;
-//	rdmaThreshold=32768;
-	rdmaThreshold=22000;
-	firstBinSize = 120;
-	CmiAssert(rdmaThreshold > firstBinSize);
-	blockAllocRatio=16;
-	blockThreshold=8;
-	
-	initInfiCmiChunkPools();
 	
 	if(rdma){
-		int numPkts;
+/*		int numPkts;
 		int k;
 		if( _Cmi_numnodes*4 < maxRecvBuffers/4){
 			numPkts = _Cmi_numnodes*4;
@@ -515,7 +521,7 @@ static void CmiMachineInit(char **argv){
 		for(k=0;k<numPkts;k++){
 			CmiFree(rdmaPktPtrs[k]);
 		}
-		free(rdmaPktPtrs);
+		free(rdmaPktPtrs);*/
 	}
 	
 /*	context->infiBufferedRecvList = NULL;*/
