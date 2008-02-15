@@ -225,7 +225,6 @@ void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int br
 				ogm->refcount+=2;/*this message should not get deleted when the queue is flushed*/
 			 	pushSendQ(pxshmContext->sendQs[dstRank],ogm);
 				MACHSTATE3(3,"Pxshm ogm %p pushed to sendQ length %d refcount %d",ogm,pxshmContext->sendQs[dstRank]->numEntries,ogm->refcount);
-				//TODO:send all the messages in the sendQ
 				int sent = flushSendQ(dstRank);
 				ogm->refcount--; /*if it has been sent, can be deleted by caller, if not will be deleted when queue is flushed*/
 				MACHSTATE1(3,"Pxshm flushSendQ sent %d messages",sent);
