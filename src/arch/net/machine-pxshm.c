@@ -279,6 +279,11 @@ void calculateNodeSizeAndRank(char **argv){
 	MACHSTATE(3,"calculateNodeSizeAndRank nodestart ");
 
 	pxshmContext->nodeend = pxshmContext->nodestart + pxshmContext->nodesize -1;
+
+	if(pxshmContext->nodeend >= _Cmi_numnodes){
+		pxshmContext->nodeend = _Cmi_numnodes-1;
+		pxshmContext->nodesize = (pxshmContext->nodeend - pxshmContext->nodestart) +1;
+	}
 	
 	MACHSTATE3(3,"calculateNodeSizeAndRank nodestart %d nodesize %d noderank %d",pxshmContext->nodestart,pxshmContext->nodesize,pxshmContext->noderank);
 }
