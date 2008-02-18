@@ -1625,7 +1625,13 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
 inline void DeliverViaNetworkOrPxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int broot,int copy){
 #if CMK_USE_PXSHM
      {
+#if PXSHM_STATS
+				double _startValidTime = CmiWallTimer();
+#endif
       int ret=CmiValidPxshm(ogm,node);
+#if PXSHM_STATS
+				pxshmContext->validCheckTime += CmiWallTimer() - _startValidTime;
+#endif			
       MACHSTATE4(3,"Msg ogm %p size %d dst %d usePxShm %d",ogm,ogm->size,ogm->dst,ret);
       if(ret){
          CmiSendMessagePxshm(ogm,node,rank,broot);

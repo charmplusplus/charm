@@ -32,6 +32,8 @@
 
 #define MEMDEBUG(x) //x
 
+#define PXSHM_STATS 0
+
 /************************
  * 	Implementation currently assumes that
  * 	1) all nodes have the same number of processors
@@ -81,7 +83,16 @@ typedef struct {
 	sharedBufData *sendBufs;
 
 	PxshmSendQ **sendQs;
-	
+
+
+#if PXSHM_STATS
+	int sendCount;
+	int validCheckCount;
+	double validCheckTime;
+	double sendTime;
+	double commServerTime;
+#endif
+
 } PxshmContext;
 
 
@@ -127,6 +138,15 @@ void CmiInitPxshm(char **argv){
 
 	MACHSTATE2(3,"CminitPxshm %s %d done",pxshmContext->prefixStr,pxshmContext->nodesize);
 
+
+#if PXSHM_STATS
+	pxshmContext->sendCount=0;
+	pxshmContext->sendTime=0.0;
+	pxshmContext->validCheckCount=0;
+	pxshmContext->validCheckTime=0.0;
+	pxshmContext->commServerTime = 0;
+#endif
+
 };
 
 /**************
@@ -156,7 +176,9 @@ void CmiExitPxshm(){
 		free(pxshmContext->sendBufs);
 
 	}
-
+#if PXSHM_STATS
+	CmiPrintf("[%d] sendCount %d sendTime %6lf validCheckCount %d validCheckTime %.6lf commServerTime %6lf \n",_Cmi_mynode,pxshmContext->sendCount,pxshmContext->sendTime,pxshmContext->validCheckCount,pxshmContext->validCheckTime,pxshmContext->commServerTime);
+#endif
 	free(pxshmContext);
 }
 
@@ -165,9 +187,13 @@ void CmiExitPxshm(){
  * ***********************/
 
 inline int CmiValidPxshm(OutgoingMsg ogm, OtherNode node){
-	if(pxshmContext->nodesize == 1){
+#if PXSHM_STATS
+	pxshmContext->validCheckCount++;
+#endif
+
+/*	if(pxshmContext->nodesize == 1){
 		return 0;
-	}
+	}*/
 	//replace by bitmap later
 	if(ogm->dst >= pxshmContext->nodestart && ogm->dst <= pxshmContext->nodeend && ogm->size < SHMBUFLEN ){
 		return 1;
@@ -180,8 +206,8 @@ inline int CmiValidPxshm(OutgoingMsg ogm, OtherNode node){
 inline int PxshmRank(int dst){
 	return dst - pxshmContext->nodestart;
 }
-void pushSendQ(PxshmSendQ *q,OutgoingMsg msg);
-int sendMessage(OutgoingMsg ogm,sharedBufData *dstBuf,PxshmSendQ *dstSendQ);
+inline void pushSendQ(PxshmSendQ *q,OutgoingMsg msg);
+inline int sendMessage(OutgoingMsg ogm,sharedBufData *dstBuf,PxshmSendQ *dstSendQ);
 inline int flushSendQ(int dstRank);
 
 /***************
@@ -193,6 +219,10 @@ inline int flushSendQ(int dstRank);
  * ****************************/
 
 void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int broot){
+#if PXSHM_STATS
+	double _startSendTime = CmiWallTimer();
+#endif
+
 	int dstRank = PxshmRank(ogm->dst);
 	MEMDEBUG(CmiMemoryCheck());
   
@@ -212,6 +242,10 @@ void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int br
 		pushSendQ(pxshmContext->sendQs[dstRank],ogm);
 		ogm->refcount++;
 		MEMDEBUG(CmiMemoryCheck());
+#if PXSHM_STATS
+		pxshmContext->sendCount ++;
+		pxshmContext->sendTime += (CmiWallTimer()-_startSendTime);
+#endif
 		return;
 	}else{
 		/***
@@ -232,23 +266,33 @@ void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int br
 		 /* unlock the recvbuffer*/
 		 sem_post(dstBuf->mutex);
 	}
+#if PXSHM_STATS
+		pxshmContext->sendCount ++;
+		pxshmContext->sendTime += (CmiWallTimer()-_startSendTime);
+#endif
 	MEMDEBUG(CmiMemoryCheck());
 
 };
 
-void emptyAllRecvBufs();
-void flushAllSendQs();
+inline void emptyAllRecvBufs();
+inline void flushAllSendQs();
 
 /**********
  * Extract all the messages from the recvBuffers you can
  * Flush all sendQs
  * ***/
 inline void CommunicationServerPxshm(){
+#if PXSHM_STATS
+	double _startCommServerTime =CmiWallTimer();
+#endif	
 	
 	MEMDEBUG(CmiMemoryCheck());
 	emptyAllRecvBufs();
 	flushAllSendQs();
 	
+#if PXSHM_STATS
+	pxshmContext->commServerTime += (CmiWallTimer()-_startCommServerTime);
+#endif
 	MEMDEBUG(CmiMemoryCheck());
 };
 
@@ -452,7 +496,7 @@ int sendMessage(OutgoingMsg ogm,sharedBufData *dstBuf,PxshmSendQ *dstSendQ){
 	return 0;
 }
 
-OutgoingMsg popSendQ(PxshmSendQ *q);
+inline OutgoingMsg popSendQ(PxshmSendQ *q);
 
 /****
  *Try to send all the messages in the sendq to this destination rank
@@ -481,7 +525,7 @@ inline int flushSendQ(int dstRank){
 
 inline void emptyRecvBuf(sharedBufData *recvBuf);
 
-void emptyAllRecvBufs(){
+inline void emptyAllRecvBufs(){
 	int i;
 
 	for(i=0;i<pxshmContext->nodesize;i++){
@@ -500,7 +544,7 @@ void emptyAllRecvBufs(){
 
 };
 
-void flushAllSendQs(){
+inline void flushAllSendQs(){
 	int i=0;
 
 	for(i=0;i<pxshmContext->nodesize;i++){
