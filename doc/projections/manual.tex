@@ -838,7 +838,7 @@ The following menu options are available:
 \item {\bf Tools} contains 1 option: {\it Modify Ranges} opens the initial 
 dialog box thereby allowing you to select new set of processors or time duration
 parameters.
-\item {\bf Colors} contains 4 options: {\it Change Colors} functions in
+\item {\bf Colors} contains options for loading, using, and modifying color schemes. {\it Change Colors} functions in
 a manner similar to the button of the same name described under control 
 panel information below. {\it Save Colors} allows you to save the current
 color set to a file named ``color.map'' into the same directory where your
@@ -848,6 +848,9 @@ scheme for storing saved color sets. {\it Restore Colors} allows you to
 load any previously saved color sets described above. {\it Default Colors}
 resets the current color set to the default set that \projections{} assigns
 without user intervention.
+
+Other color schemes are provided that can be used for some applications. The colors set as described above are the default coloring scheme. Other options for coloring the events are by event id (chare array index), user supplied parameter, or memory usage. In order to color by a user supplied parameter such as timestep, the C function  \texttt{traceUserSuppliedData(int value);} should be called within some entry methods. If such a method is called in an entry method, the entry method invocation can be colored by the parameter. The user supplied data can also be viewed in the tooltip that appears when the cursor hovers over an entry method invocation in the window. To color by memory usage, the C function \texttt{traceMemoryUsage();} should be called in all entry methods. The call records the current memory usage. Red indicates high memory usage, and green indicates low memory usage. The actual memory usage can also be viewed in the tooltips that appear when the cursor is over an event. The memory usage is only available in when using a Charm++ version that uses gnu memory.
+
 
 \item {\bf Screenshot} contains 1 option: 
 {\it Save as JPG or PNG} save the visible portion of the visualization
