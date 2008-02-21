@@ -2071,10 +2071,16 @@ static inline void *getInfiCmiChunk(int dataSize){
 
 void * infi_CmiAlloc(int size){
 	void *res;
+#if CMK_SMP	
+	CmiMemLock();
+#endif
 /*(	if(size-sizeof(CmiChunkHeader) > firstBinSize){*/
 		MACHSTATE1(1,"infi_CmiAlloc for dataSize %d",size-sizeof(CmiChunkHeader));
 		res = getInfiCmiChunk(size-sizeof(CmiChunkHeader));	
 		res -= sizeof(CmiChunkHeader);
+#if CMK_SMP	
+	CmiMemUnlock();
+#endif
 /*	}else{
 		res = malloc(size);
 	}*/
@@ -2085,6 +2091,9 @@ void infi_CmiFree(void *ptr){
 	int size;
 	void *freePtr = ptr;
 	
+#if CMK_SMP	
+	CmiMemLock();
+#endif
 	ptr += sizeof(CmiChunkHeader);
 	size = SIZEFIELD (ptr);
 /*	if(size > firstBinSize){*/
@@ -2126,6 +2135,9 @@ void infi_CmiFree(void *ptr){
 				free(metaData);
 			}
 		}	
+#if CMK_SMP	
+	CmiMemUnlock();
+#endif
 /*	}else{
 		free(freePtr);
 	}*/
