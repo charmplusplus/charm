@@ -853,7 +853,13 @@ static void CmiMachineExit()
 }
 
 static void CmiNotifyStillIdle(CmiIdleState *s) {
+#if CMK_SMP
+	CmiCommLock();
+#endif
 	CommunicationServer_nolock(0);
+#if CMK_SMP
+	CmiCommUnlock();
+#endif
 }
 
 static inline void increaseTokens(OtherNode node);
@@ -1293,11 +1299,79 @@ static inline int pollSendCq(const int toBuffer){
 	return ne;
 }
 
+
+/******************
+Check the communication server socket and
+
+*****************/
+int CheckSocketsReady(int withDelayMs)
+{   
+  int nreadable;
+  CMK_PIPE_DECL(withDelayMs);
+
+  CmiStdoutAdd(CMK_PIPE_SUB);
+  if (Cmi_charmrun_fd!=-1) CMK_PIPE_ADDREAD(Cmi_charmrun_fd);
+
+  nreadable=CMK_PIPE_CALL();
+  ctrlskt_ready_read = 0;
+  dataskt_ready_read = 0;
+  dataskt_ready_write = 0;
+  
+  if (nreadable == 0) {
+    MACHSTATE(1,"} CheckSocketsReady (nothing readable)")
+    return nreadable;
+  }
+  if (nreadable==-1) {
+    CMK_PIPE_CHECKERR();
+    MACHSTATE(2,"} CheckSocketsReady (INTERRUPTED!)")
+    return CheckSocketsReady(0);
+  }
+  CmiStdoutCheck(CMK_PIPE_SUB);
+  if (Cmi_charmrun_fd!=-1) 
+          ctrlskt_ready_read = CMK_PIPE_CHECKREAD(Cmi_charmrun_fd);
+  MACHSTATE(1,"} CheckSocketsReady")
+  return nreadable;
+}
+
+
+/*** Service the charmrun socket
+*************/
+
+static void ServiceCharmrun_nolock()
+{
+  int again = 1;
+  MACHSTATE(2,"ServiceCharmrun_nolock begin {")
+  while (again)
+  {
+  again = 0;
+  CheckSocketsReady(0);
+  if (ctrlskt_ready_read) { ctrl_getone(); again=1; }
+  if (CmiStdoutNeedsService()) { CmiStdoutService(); }
+  }
+  MACHSTATE(2,"} ServiceCharmrun_nolock end")
+}
+
+
+
 static void CommunicationServer(int sleepTime, int where){
 	if( where == COMM_SERVER_FROM_INTERRUPT){
 		return;
 	}
+#if CMK_SMP
+	if(where == COMM_SERVER_FROM_WORKER){
+		return;
+	}
+	if(where == COMM_SERVER_FROM_SMP){
+#endif
+		ServiceCharmrun_nolock();
+#if CMK_SMP
+	}
+	CmiCommLock();
+#endif
 	CommunicationServer_nolock(0);
+#if CMK_SMP
+	CmiCommUnlock();
+#endif
 }
 
 
