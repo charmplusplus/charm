@@ -448,7 +448,7 @@ static void CmiMachineInit(char **argv){
 	context->header.nodeNo = _Cmi_mynode;
 
 	mtu_size=1200;
-	packetSize = mtu_size;
+	packetSize = mtu_size*4;
 	dataSize = packetSize-sizeof(struct infiPacketHeader);
 	
 	calcMaxSize=5000;
