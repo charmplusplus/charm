@@ -7,9 +7,11 @@
  ChangeLog
  version 2 
      * add objId
+ version 3
+     * objId changed to 4 ints 
 */
 
-int bglog_version = 2;
+int bglog_version = 3;
 
 int genTimeLog = 0;			// was 1 for guna 's seq correction
 int correctTimeLog = 0;
@@ -366,8 +368,10 @@ void BgTimeLog::pup(PUP::er &p){
     p|seqno; p|msgId;
     p|recvTime; p|effRecvTime;p|startTime; p|execTime; p|endTime; 
     p|flag; p(name,20);
-    if (bglog_version >= 2)
+    if (bglog_version >= 3)
       p((int *)&objId, sizeof(CmiObjId)/sizeof(int));
+    else if (bglog_version == 2)
+      p((int *)&objId, 3);           // only 3 ints before
     
     /*    if(p.isUnpacking())
       CmiPrintf("Puping: %d %d %d %d %e %e %e %e %e %s\n",ep,seqno,srcnode,msgID,recvTime,effRecvTime,startTime,execTime,endTime,name);
