@@ -283,6 +283,7 @@ struct infiOtherNodeData{
 	int broot;//needed to store the root of a multi-packet broadcast sent along a spanning tree or hypercube
 #if	CMK_IBVERBS_DEBUG	
 	int psn;
+	int recvPsn;
 #endif	
 };
 
@@ -676,6 +677,7 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 //	ret->postedRecvs = tokensPerProcessor;
 #if	CMK_IBVERBS_DEBUG	
 	ret->psn = 0;
+	ret->recvPsn = 0;
 #endif
 	
 	struct ibv_qp_attr attr = {
@@ -1040,7 +1042,9 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 			EnqueueDataPacket(ogm,node,rank,data,size,broot,copy);
 		}
 	}
+//#if	!CMK_SMP
 	processAllBufferedMsgs();
+//#endif
 	ogm->refcount--;
 	MACHSTATE3(3,"DONE Sending ogm %p of size %d to %d",ogm,ogm->size,node->infiData->nodeNo);
 }
@@ -1141,7 +1145,7 @@ static inline  void CommunicationServer_nolock(int toBuffer) {
 	processed += pollSendCq(toBuffer);
 	
 	if(toBuffer == 0){
-		if(processed != 0)
+//		if(processed != 0)
 			processAllBufferedMsgs();
 	}
 	
@@ -1465,7 +1469,7 @@ void static inline handoverMessage(char *newmsg,int total_size,int rank,int broo
 #endif
          ){
 					 if(toBuffer){
-						 	insertBufferedBcast(newmsg,total_size,broot,rank);
+						 	insertBufferedBcast(CopyMsg(newmsg,total_size),total_size,broot,rank);
 					 	}else{
           		SendSpanningChildren(NULL, 0, total_size, newmsg,broot,rank);
 						}
@@ -1477,7 +1481,7 @@ void static inline handoverMessage(char *newmsg,int total_size,int rank,int broo
 #endif
          ){
 					 if(toBuffer){
-						 	insertBufferedBcast(newmsg,total_size,broot,rank);
+						 	insertBufferedBcast(CopyMsg(newmsg,total_size),total_size,broot,rank);
 					 }else{
           		SendHypercube(NULL, 0, total_size, newmsg,broot,rank);
 						}
@@ -1509,7 +1513,9 @@ void static inline handoverMessage(char *newmsg,int total_size,int rank,int broo
 				}
   	}    /* end of switch */
 		if(!toBuffer){
+//#if !CMK_SMP		
 		processAllBufferedMsgs();
+//#endif
 		}
 }
 
@@ -1525,9 +1531,18 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 	struct infiBuffer *buffer = (struct infiBuffer *) recvWC->wr_id;	
 	struct infiPacketHeader *header = (struct infiPacketHeader *)buffer->buf;
 	int nodeNo = header->nodeNo;
-		
+#if	CMK_IBVERBS_DEBUG
+	OtherNode node = &nodes[nodeNo];
+#endif
+	
 	int len = recvWC->byte_len-sizeof(struct infiPacketHeader);
 #if	CMK_IBVERBS_DEBUG
+	if(node->infiData->recvPsn == 0){
+		node->infiData->recvPsn = header->psn;
+	}else{
+		CmiAssert(header->psn == (node->infiData->recvPsn)+1);
+		node->infiData->recvPsn++;
+	}
 	MACHSTATE3(3,"packet from node %d len %d psn %d",nodeNo,len,header->psn);
 #else
 	MACHSTATE2(3,"packet from node %d len %d",nodeNo,len);	
@@ -2394,7 +2409,7 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
 
 	addHandleToPollingQ(&(table->handles[idx]));
 	
-	MACHSTATE4(3," Newhandle created %d senderProc %d recvBuf %p recvBufSize %d",newHandle,senderProc,recvBuf,recvBufSize);
+//	MACHSTATE4(3," Newhandle created %d senderProc %d recvBuf %p recvBufSize %d",newHandle,senderProc,recvBuf,recvBufSize);
 	
 	return userHandle;
 }
@@ -2513,7 +2528,7 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle){
 			table = table->next;
 		}
 
-		MACHSTATE2(3,"CmiDirect_put to recverProc %d handle %d",recverProc,handle);
+//		MACHSTATE2(3,"CmiDirect_put to recverProc %d handle %d",recverProc,handle);
 #if CMI_DIRECT_DEBUG
 		CmiPrintf("[%d] RDMA put addr %p\n",CmiMyPe(),table->handles[idx].buf);
 #endif
