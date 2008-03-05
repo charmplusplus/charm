@@ -1945,10 +1945,11 @@ void req_client_start_and_connect(void)
 #if CMK_USE_IBVERBS
 		exchange_qpdata_clients();	
 		send_clients_nodeinfo_qpdata();
-#endif
+#else
 	
 	for (client=0;client<req_nClients;client++)
 	  req_handle_initnodetab(NULL,req_clients[client]);
+#endif	  
 	if (arg_verbose) printf("Charmrun> IP tables sent.\n");
 }
 
