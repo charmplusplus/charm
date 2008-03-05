@@ -455,8 +455,8 @@ static void CmiMachineInit(char **argv){
 	calcMaxSize=5000;
 	if(_Cmi_numnodes*50 > calcMaxSize){
 		calcMaxSize = _Cmi_numnodes*50;
-		if(calcMaxSize > 100000){
-			calcMaxSize = 100000;
+		if(calcMaxSize > 10000){
+			calcMaxSize = 10000;
 		}
 	}
 //	maxRecvBuffers=80;
