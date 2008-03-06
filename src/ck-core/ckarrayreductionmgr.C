@@ -69,6 +69,7 @@ void CkArrayReductionMgr::contributeArrayReduction(CkReductionMsg *m){
 	}
 	CmiUnlock(lockCount);
 };
+
 CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
 	CkReductionMsg *ret=NULL;
 
@@ -121,8 +122,8 @@ CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
 			CkReduction::reducerFn f=CkReduction::reducerTable[r];
     	ret=(*f)(nMsgs,msgArr);
 		}
-    ret->reducer=r;
-  }
+                ret->reducer=r;
+        }
 
 	//Go back through the vector, deleting old messages
   	for (i=0;i<nMsgs;i++) {
