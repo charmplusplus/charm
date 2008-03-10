@@ -691,6 +691,8 @@ CkDDT_Indexed::CkDDT_Indexed(int nCount, int* arrBlock, int* arrDisp, int bindex
   arrayBlockLength = new int[count] ;
   arrayDisplacements = new int[count] ;
 
+  size = extent = 0;
+
   for(int i = 0 ; i < count ; i++) {
     arrayBlockLength[i] = arrBlock[i] ;
     arrayDisplacements[i] = arrDisp[i] ;
