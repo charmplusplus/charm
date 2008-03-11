@@ -530,7 +530,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #if RESEARCH_CONTRIB  
   rzv_config.protocol        = DCMF_RZV_CONTRIB_PROTOCOL;
 #else
+#ifdef  OPT_RZV
+#warning "Enabling Optimize Rzv"
+  rzv_config.protocol        = DCMF_RZV_SEND_PROTOCOL;
+#else
   rzv_config.protocol        = DCMF_DEFAULT_SEND_PROTOCOL;
+#endif
 #endif
   rzv_config.cb_recv_short   = short_pkt_recv;
   rzv_config.cb_recv         = first_pkt_recv_done;
