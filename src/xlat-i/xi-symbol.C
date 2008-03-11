@@ -3041,11 +3041,11 @@ void Entry::genCall(XStr& str, const XStr &preCall)
       str << "  int index3 = impl_obj->thisIndex.z;\n";
     }
     str << "  ::" << fortranify(name)
-	<< "((char **)(impl_obj->user_data), &index1 ";
+	<< "((char **)(impl_obj->user_data), &index1";
     if (dim==(const char*)"2D" || dim==(const char*)"3D")
-        str << "&index2 ";
+        str << ", &index2";
     if (dim==(const char*)"3D")
-        str << "&index3 ";
+        str << ", &index3";
     if (!param->isVoid()) { str << ", "; param->unmarshallAddress(str); }
     str<<");\n";
     str << "/* FORTRAN END */\n";
