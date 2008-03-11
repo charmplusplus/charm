@@ -24,6 +24,33 @@
       objPtr%obj%data = index1
       END SUBROUTINE
 
+!   user MUST write this puper subroutine
+      SUBROUTINE hello_pup(p, objPtr, aid)
+        USE HelloMod
+        IMPLICIT NONE
+        INCLUDE 'pupf.h'
+        INTEGER :: p
+        TYPE(HelloPtr),target :: objPtr
+        integer*8 aid
+
+        if (fpup_isUnpacking(p)) then
+          allocate(objPtr%obj)
+          objPtr%aid = aid;
+        endif
+        CALL fpup_int(p, objPtr%obj%data)
+      END SUBROUTINE
+
+! user MUST write this for load balancing
+      SUBROUTINE hello_resumefromsync(objPtr, aid, index1, index2)
+        USE HelloMod
+        TYPE(HelloPtr) objPtr
+        integer*8 aid
+        integer index1, index2
+
+        ! empty
+      END SUBROUTINE
+
+
 !    define fortran entry function
       SUBROUTINE SayHi(objPtr, myIndex1, myIndex2, data, data2, len, s)
       USE HelloMod
