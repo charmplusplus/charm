@@ -1,0 +1,13 @@
+mainmodule balanceDemo {
+  readonly int nElements;
+
+  array [1D] BalanceMe {
+    entry BalanceMe(void);
+    entry void nbrData(int size, float D[size], int k );
+    entry void nextStep(); 
+    entry void barrier(); 
+ };        	
+};
+
+
+
