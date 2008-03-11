@@ -3041,12 +3041,13 @@ void Entry::genCall(XStr& str, const XStr &preCall)
       str << "  int index3 = impl_obj->thisIndex.z;\n";
     }
     str << "  ::" << fortranify(name)
-	<< "((char **)(impl_obj->user_data), &index1, ";
+	<< "((char **)(impl_obj->user_data), &index1 ";
     if (dim==(const char*)"2D" || dim==(const char*)"3D")
-        str << "&index2, ";
+        str << "&index2 ";
     if (dim==(const char*)"3D")
-        str << "&index3, ";
-    param->unmarshallAddress(str); str<<");\n";
+        str << "&index3 ";
+    if (!param->isVoid()) { str << ", "; param->unmarshallAddress(str); }
+    str<<");\n";
     str << "/* FORTRAN END */\n";
   }
   else { //Normal case: call regular method
@@ -3127,8 +3128,8 @@ void Entry::genDefs(XStr& str)
       XStr dim; dim << ((Array*)container)->dim();
       // Declare the Fortran Entry Function
       // This is called from C++
-      str << "extern \"C\" void " << fortranify(name) << "(char **, " << container->indexList() << ", ";
-      param->printAddress(str);
+      str << "extern \"C\" void " << fortranify(name) << "(char **, " << container->indexList();
+      if (!param->isVoid()) { str << ", "; param->printAddress(str); }
       str << ");\n";
 
       // Define the Fortran interface function
@@ -3136,20 +3137,25 @@ void Entry::genDefs(XStr& str)
       str << "extern \"C\" void "
         //<< container->proxyName() << "_" 
           << fortranify("SendTo_", container->baseName(), "_", name)
-          << "(long* aindex, " << container->indexList() << ", ";
-      param->printAddress(str);
+          << "(long* aindex, " << container->indexList();
+      if (!param->isVoid()) { str << ", "; param->printAddress(str); }
       str << ")\n";
       str << "{\n";
       str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
       str << "\n";
       str << "  " << container->proxyName() << " h(*aid);\n";
+      str << "  if (*index1 == -1) \n";
+      str << "    h." << name << "(";
+      if (!param->isVoid()) param->printValue(str);
+      str << ");\n";
+      str << "  else\n";
       if (dim==(const char*)"1D")  
-        str << "  h[*index1]." << name << "(";
+        str << "    h[*index1]." << name << "(";
       else if (dim==(const char*)"2D")  
-        str << "  h[CkArrayIndex2D(*index1, *index2)]." << name << "(";
+        str << "    h[CkArrayIndex2D(*index1, *index2)]." << name << "(";
       else if (dim==(const char*)"3D")  
-        str << "  h[CkArrayIndex3D(*index1, *index2, *index3)]." << name << "(";
-      param->printValue(str);
+        str << "    h[CkArrayIndex3D(*index1, *index2, *index3)]." << name << "(";
+      if (!param->isVoid()) param->printValue(str);
       str << ");\n";
       str << "}\n";
       str << "/* FORTRAN SECTION END */\n";
