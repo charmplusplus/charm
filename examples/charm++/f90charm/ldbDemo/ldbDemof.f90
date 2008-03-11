@@ -1,18 +1,17 @@
       MODULE  LdbDemoMod
-      USE charm
-      TYPE LdbDemo
-        integer iterations
-        REAL*8  t0
-        integer next, iteration, n, count
-        REAL*4, pointer :: myData(:)
-      END TYPE
+        USE charm
+        TYPE LdbDemo
+          integer iterations
+          REAL*8  t0
+          integer next, iteration, n, count
+          REAL*4, pointer :: myData(:)
+        END TYPE
 
-!    define Object Pointer used to communicate with charm kernel
-      TYPE LdbDemoPtr
-        TYPE (LdbDemo), POINTER ::  obj
-        integer*8 aid
-      END TYPE
-
+          ! define Object Pointer used to communicate with charm kernel
+        TYPE LdbDemoPtr
+          TYPE (LdbDemo), POINTER ::  obj
+          integer*8 aid
+        END TYPE
       END MODULE
 
 !  user MUST write this subroutine to allocate the object data
@@ -20,17 +19,16 @@
         USE LdbDemoMod
         IMPLICIT NONE
         TYPE(LdbDemoPtr) objPtr
-        integer*8 aid
-        integer index
-        integer nElements
+        INTEGER*8 aid
+        INTEGER index, nElements
 
         allocate(objPtr%obj)
         objPtr%aid = aid
-        ! initialize Chare data here in constructor
+          ! initialize Chare data here in constructor
         objPtr%obj%iterations = 0
-        objPtr%obj%t0 = CmiWallTimer()
+        objPtr%obj%t0 =  CmiWallTimer()
 
-        objPtr%obj%n = 200+MOD( (index*31757) , 2000)
+        objPtr%obj%n = 200+MOD(index*31757, 2000)
         call CkPrintf("Constructor of element %d n: %d\n$$", index, objPtr%obj%n)
         allocate(objPtr%obj%myData(objPtr%obj%n))
         call get_nElements(nElements)
@@ -45,9 +43,9 @@
         USE LdbDemoMod
         IMPLICIT NONE
         INCLUDE 'pupf.h'
-        INTEGER :: p
+        INTEGER p
         TYPE(LdbDemoPtr),target :: objPtr 
-        integer*8 aid
+        INTEGER*8 aid
 
         if (fpup_isUnpacking(p)) then
             ! allocate chare and restore aid
@@ -61,6 +59,7 @@
         CALL fpup_int(p, objPtr%obj%n)
         CALL fpup_int(p, objPtr%obj%count)
         if (fpup_isUnpacking(p)) then
+            ! allocate array
           allocate(objPtr%obj%myData(objPtr%obj%n))
         ENDIF
         CALL fpup_reals(p, objPtr%obj%myData, objPtr%obj%n)
@@ -75,6 +74,7 @@
         integer*8 aid
         integer index
 
+          ! load balancing finish, start next step
         call nextStep(objPtr, index)
       END SUBROUTINE
 
@@ -84,7 +84,7 @@
         REAL*8 workTime, recvTimeStamp
         INTEGER k
        
-        recvTimeStamp = CmiWallTimer();
+        recvTimeStamp = CmiWallTimer()
         DO WHILE (CmiWallTimer() - recvTimeStamp < workTime ) 
           k = k+1;
         END DO
@@ -107,6 +107,7 @@
 
         objPtr%obj%iteration = objPtr%obj%iteration+1
         IF (MOD(objPtr%obj%iteration, 5) .eq. 0) THEN
+           ! AtSync to start load balancing
           call BalanceMe_atSync(objPtr%aid, myIndex)
         ELSE
           call SendTo_BalanceMe_barrier(objPtr%aid, 0)
@@ -130,7 +131,7 @@
 
         TYPE(LdbDemoPtr) objPtr
         INTEGER myIndex
-        REAL*8  t1
+        double precision  t1
         INTEGER nElements
 
         objPtr%obj%count = objPtr%obj%count + 1
@@ -139,10 +140,11 @@
           objPtr%obj%count = 0
           objPtr%obj%iterations = objPtr%obj%iterations + 1
           IF (objPtr%obj%iterations .eq. 18) THEN
-            t1 = CmiWallTimer();
-            call CkPrintf("ALL done in %f seconds.\n$$", t1 - objPtr%obj%t0)
+            t1 = CmiWallTimer()
+            call CkPrintf("ALL done in %F seconds.\n$$", t1-objPtr%obj%t0)
             call CkExit()
           ELSE
+             ! broadcast using "-1"
             call SendTo_BalanceMe_nextStep(objPtr%aid, -1);
           ENDIF
         ENDIF

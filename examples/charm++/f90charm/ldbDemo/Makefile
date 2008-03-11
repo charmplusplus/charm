@@ -16,7 +16,7 @@ ldbDemof.o: ldbDemof.f90
 balanceDemo.decl.h: ldbDemo.ci
 	$(CHARMC)   -language f90charm ldbDemo.ci 
 
-test:
+test: ldbDemo
 	./charmrun +p2 ./ldbDemo +balancer RotateLB +LBDebug 1
 
 clean:
