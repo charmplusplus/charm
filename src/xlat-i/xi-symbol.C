@@ -316,6 +316,7 @@ Module::generate()
   // defstr << "#ifndef _DEFS_"<<name<<"_H_"<<endx;
   // defstr << "#define _DEFS_"<<name<<"_H_"<<endx;
   if (clist) clist->genDefs(defstr);
+  
   defstr << 
   "#ifndef CK_TEMPLATES_ONLY\n"
   "void _register"<<name<<"(void)\n"
@@ -1260,6 +1261,8 @@ Chare::genDefs(XStr& str)
     // We have to generate the chare array itself
     str << "/* FORTRAN */\n";
     str << "extern \"C\" void " << fortranify(baseName(), "_allocate") << "(char **, void *, " << indexList() << ");\n";
+    str << "extern \"C\" void " << fortranify(baseName(), "_pup") << "(pup_er p, char **, void *);\n";
+    str << "extern \"C\" void " << fortranify(baseName(), "_resumefromsync") << "(char **, void *, " << indexList() << ");\n";
     str << "\n";
     XStr dim = ((Array*)this)->dim();
     str << "class " << baseName() << " : public ArrayElement" << dim << "\n";
@@ -1277,6 +1280,7 @@ Chare::genDefs(XStr& str)
       str << "    " << fortranify(baseName(), "_allocate") << "((char **)&user_data, &aid, &thisIndex.x, &thisIndex.y);\n";
     else if (dim==(const char*)"3D")
       str << "    " << fortranify(baseName(), "_allocate") << "((char **)&user_data, &aid, &thisIndex.x, &thisIndex.y, &thisIndex.z);\n";
+    str << "      usesAtSync = CmiTrue;\n";
     str << "  }\n";
     str << "\n";
     str << "  " << baseName() << "(CkMigrateMessage *m)\n";
@@ -1284,6 +1288,32 @@ Chare::genDefs(XStr& str)
     str << "    /* CkPrintf(\"" << baseName() << " %d migrating\\n\",thisIndex);*/ \n";
     str << "  }\n";
     str << "\n";
+
+    str << "  virtual void pup(PUP::er &p)\n";
+    str << "  {\n";
+    str << "    ArrayElement" << dim << "::pup(p);\n";
+    str << "    p(user_data, 64);\n";
+    str << "    CkArrayID *aid = &thisArrayID;\n";
+    str << "    ::" << fortranify(baseName(), "_pup") << "(&p, (char **)&user_data, &aid); \n";
+    str << "  }\n";
+    str << "\n";
+ 
+      // Define the Fortran interface function for ResumeFromSync
+    str << "  void ResumeFromSync()\n";
+    str << "  {\n";
+    str << "    CkArrayID *aid = &thisArrayID;\n";
+    str << "    ::" << fortranify(baseName(), "_resumefromSync");
+    if (dim == (const char*)"1D") {
+      str << "((char **)&user_data, &aid, &thisIndex);\n";
+    }
+    else if (dim == (const char*)"2D") {
+      str << "((char **)&user_data, &aid, &thisIndex.x, &thisIndex.y);\n";
+    }
+    else if (dim == (const char*)"3D") {
+      str << "((char **)&user_data, &aid, &thisIndex.x, &thisIndex.y, &thisIndex.z);\n";
+    }
+    str << "  }\n";
+
     str << "};\n";
     str << "\n";
     if (dim==(const char*)"1D") {
@@ -1317,7 +1347,42 @@ Chare::genDefs(XStr& str)
     }
     str << "    *aindex = (long)aid;\n";
     str << "}\n";
+
+      // Define the Fortran interface function for AtSync
+    if (dim == (const char*)"1D") {
+      str << "extern \"C\" void "
+          << fortranify(baseName(), "_atsync")
+          << "(long* aindex, int *index1)\n";
+      str << "{\n";
+      str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
+      str << "\n";
+      str << "  CProxy_" << baseName() << " h(*aid);\n";
+      str << "  h[*index1].ckLocal()->AtSync();\n";
+    }
+    else if (dim == (const char*)"2D") {
+      str << "extern \"C\" void "
+          << fortranify(baseName(), "_atsync")
+          << "(long* aindex, int *index1, int *index2)\n";
+      str << "{\n";
+      str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
+      str << "\n";
+      str << "  CProxy_" << baseName() << " h(*aid);\n";
+      str << "  h[CkArrayIndex2D(*index1, *index2)].ckLocal()->AtSync();\n";
+    }
+    else if (dim == (const char*)"3D") {
+      str << "extern \"C\" void "
+          << fortranify(baseName(), "_atsync")
+          << "(long* aindex, int *index1, int *index2, int *index3)\n";
+      str << "{\n";
+      str << "  CkArrayID *aid = (CkArrayID *)*aindex;\n";
+      str << "\n";
+      str << "  CProxy_" << baseName() << " h(*aid);\n";
+      str << "  h[CkArrayIndex3D(*index1, *index2, *index3)].ckLocal()->AtSync();\n";
+    }
+    str << "}\n";
+
   }
+
   if(!type->isTemplated()) {
     if(!templat) {
       str << "#ifndef CK_TEMPLATES_ONLY\n";
