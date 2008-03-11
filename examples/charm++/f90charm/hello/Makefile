@@ -6,7 +6,7 @@ OBJS = hello.o hellof.o
 all: pgm
 
 pgm: $(OBJS) 
-	$(CHARMC) -o pgm $(OBJS) -language f90charm
+	$(CHARMC) -o pgm $(OBJS) -language f90charm -balancer RotateLB
 
 hello.decl.h hello.def.h: hello.ci
 	$(CHARMC) hello.ci -language f90charm
@@ -16,6 +16,9 @@ hello.o: hello.C hello.decl.h  hello.def.h
 
 hellof.o: hellof.f90
 	$(CHARMC) -c hellof.f90
+
+test: pgm
+	./charmrun +p2 ./pgm +balancer RotateLB +LBDebug 1
 
 clean:
 	rm -f charmrun conv-host pgm *.o *.mod *.decl.h *.def.h
