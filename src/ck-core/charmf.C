@@ -140,3 +140,23 @@ FDECL CmiInt8 FTN_NAME(CMIMAXMEMORYUSAGE, cmimaxmemoryusage) ()
   return CmiMaxMemoryUsage();
 }
 
+FDECL CmiFloat8 FTN_NAME(CMIWALLTIMER, cmiwalltimer) ()
+{
+  return CmiWallTimer();
+}
+
+FDECL CmiFloat8 FTN_NAME(CKWALLTIMER, ckwalltimer) ()
+{
+  return CkWallTimer();
+}
+
+FDECL CmiFloat8 FTN_NAME(CMICPUTIMER, cmicputimer) ()
+{
+  return CmiCpuTimer();
+}
+
+FDECL CmiFloat8 FTN_NAME(CKCPUTIMER, ckcputimer) ()
+{
+  return CkCpuTimer();
+}
+
