@@ -79,8 +79,10 @@ a blocking call, like ``MPI\_Recv" or ``FEM\_Update\_field".
 By ``global variables'', we mean anything that is stored at a fixed, 
 preallocated location in memory.  In C, this means variables declared 
 at file scope or with the \kw{static} keyword.  In Fortran, this is
-variables that are part of a \kw{COMMON} block or declared inside 
-a \kw{MODULE}.
+% variables that are part of a \kw{COMMON} block or declared inside 
+% a \kw{MODULE}.
+either variables that are part of a \kw{COMMON} block, declared inside 
+a \kw{MODULE} or variables with the \kw{SAVE} attribute.
 
 Global variables are shared by all the threads on a processor, which
 makes using global variables extremely error prone.
