@@ -300,6 +300,19 @@ char *getenv_display()
   else strcpy(result, e);
   return result;
 }
+char *getenv_display_no_tamper()
+{
+  static char result[100],ipBuf[200];
+  char *e, *p;
+  
+  e = getenv("DISPLAY");
+  if (e==0) return NULL;
+  p = strrchr(e, ':');
+  if (p==0) return NULL;
+  strcpy(result, e);
+  return result;
+}
+
 #endif
 
 /*****************************************************************************
@@ -745,7 +758,8 @@ void arg_init(int argc, char **argv)
   if(!arg_shell) arg_shell = getenv_rsh();
 
   /* Find the current value of the DISPLAY variable */
-  arg_display = getenv_display();
+  if(!arg_display)
+    arg_display = getenv_display_no_tamper();
   if ((arg_debug || arg_debug_no_pause || arg_in_xterm) && (arg_display==0)) {
     fprintf(stderr,"ERROR> DISPLAY must be set to use debugging mode\n");
     exit(1);
