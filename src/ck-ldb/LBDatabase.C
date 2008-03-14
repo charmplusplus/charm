@@ -378,7 +378,7 @@ void LBDatabase::addLoadbalancer(BaseLB *lb, int seq) {
   }
   else
     nloadbalancers ++;
-  loadbalancers.resize(nloadbalancers);
+  loadbalancers.resize(seq+1);
   loadbalancers[seq] = lb;
 }
 
