@@ -361,7 +361,7 @@ void LBDatabase::set_avail_vector(char * bitmap, int new_ld){
 int LBDatabase::getLoadbalancerTicket()  { 
   int seq = nloadbalancers;
   nloadbalancers ++;
-  loadbalancers.growAtLeast(nloadbalancers); 
+  loadbalancers.resize(nloadbalancers); 
   loadbalancers[seq] = NULL;
   return seq; 
 }
@@ -378,7 +378,7 @@ void LBDatabase::addLoadbalancer(BaseLB *lb, int seq) {
   }
   else
     nloadbalancers ++;
-  loadbalancers.growAtLeast(seq); 
+  loadbalancers.resize(nloadbalancers);
   loadbalancers[seq] = lb;
 }
 
