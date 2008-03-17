@@ -282,6 +282,8 @@ void BgAttach(CthThread t);
 
 #else
 
+extern CmiNodeLock initLock;
+
 #ifdef __cplusplus
 template <class d>
 class Cnv {
@@ -290,12 +292,14 @@ public:
 public:
   Cnv(): data(NULL) {}
   inline void init() {
+    CmiLock(initLock);
     if (data == NULL) {
       data = new d*[CmiMyNodeSize()];
       CmiAssert(data);
       for (int i=0; i<CmiMyNodeSize(); i++)
         data[i] = new d[BgNodeSize()];
     }
+    CmiUnlock(initLock);
   }
   inline int inited() { return data != NULL; }
 };

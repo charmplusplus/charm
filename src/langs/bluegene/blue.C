@@ -42,6 +42,8 @@ CpvDeclare(int      , CthResumeBigSimThreadIdx);
 static int arg_argc;
 static char **arg_argv;
 
+CmiNodeLock initLock;     // used for BnvInitialize
+
 int _bgSize = 0;			// short cut of blue gene node size
 int delayCheckFlag = 1;          // when enabled, only check correction 
 					// messages after some interval
@@ -1335,6 +1337,8 @@ CmiStartFn bgMain(int argc, char **argv)
   /* number of bg nodes on this PE */
   CpvInitialize(int, numNodes);
   cva(numNodes) = nodeInfo::numLocalNodes();
+
+  initLock = CmiCreateLock();     // used for BnvInitialize
 
   bgstreaming.init(cva(numNodes));
 
