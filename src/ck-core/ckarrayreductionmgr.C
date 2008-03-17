@@ -9,14 +9,24 @@
 #define ARPRINT //ARPRINT
 #endif
 
-CkArrayReductionMgr::CkArrayReductionMgr(){
+void CkArrayReductionMgr::init()
+{
 	//ARPRINT("Array ReductionMgr Constructor called %d\n",thisgroup);
 	redNo=0;
 	size = CkMyNodeSize();
 	count = 0;
 	lockCount = CmiCreateLock();
 	ctorDoneFlag = 1;
+}
+
+CkArrayReductionMgr::CkArrayReductionMgr(){
+	init();
 	attachedGroup.setZero();
+};
+
+CkArrayReductionMgr::CkArrayReductionMgr(int dummy, CkGroupID gid){
+	init();
+	attachedGroup = gid;
 };
 
 void CkArrayReductionMgr::flushStates(){

@@ -535,7 +535,7 @@ void _createGroup(CkGroupID groupID, envelope *env)
   int gIdx = _entryTable[epIdx]->chareIdx;  
   CkNodeGroupID rednMgr;
   if(_chareTable[gIdx]->isIrr == 0){
-		CProxy_CkArrayReductionMgr rednMgrProxy = CProxy_CkArrayReductionMgr::ckNew();
+		CProxy_CkArrayReductionMgr rednMgrProxy = CProxy_CkArrayReductionMgr::ckNew(0, groupID);
 		rednMgr = rednMgrProxy;
 		rednMgrProxy.setAttachedGroup(groupID);
   }else{

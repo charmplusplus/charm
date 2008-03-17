@@ -13,10 +13,12 @@ class CkArrayReductionMgr : public NodeGroup{
 		CkMsgQ<CkReductionMsg> my_msgs;
 		CkMsgQ<CkReductionMsg> my_futureMsgs;
 		CmiNodeLock lockCount;
+		void init();
 		void collectAllMessages();
 	public:
 		volatile int ctorDoneFlag;
 		CkArrayReductionMgr();
+		CkArrayReductionMgr(int dummy, CkGroupID gid);
 		CkArrayReductionMgr(CkMigrateMessage *m):NodeGroup(m) {}
 		void contributeArrayReduction(CkReductionMsg *m);
 		CkReductionMsg *reduceMessages(void);
