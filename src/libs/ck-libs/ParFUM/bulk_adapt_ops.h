@@ -56,7 +56,7 @@ class BulkAdapt {
   int edge_bisect_2D(int elemID, int elemType, int edgeID);
   int edge_bisect_3D(int elemID, int elemType, int edgeID);
 
-	//TODO: add elemType to the prototype of all the following mesh-modification functions
+  //TODO: add elemType to the prototype of all the following mesh-modification functions
   /// Perform an edge flip (2D)
   /** Locks mesh and any affected IDXL lists, performs operation,
       updates adapt adjacencies, and unlocks mesh & IDXL
@@ -166,14 +166,14 @@ class BulkAdapt {
 			  int n3, int n4, int n5);
 };
 
+// GENERAL HELPER FUNCTIONS
+
+/** Find the midpoint between two nodes; store in result. */
 void midpoint(double *n1, double *n2, int dim, double *result);
 
 int getRelNode(int nodeIdx, int *conn, int nodesPerElem);
 void getRelNodes(int edgeID, int nodesPerElem, int *r1, int *r2);
-
 int getEdgeID(int node1, int node2, int nodePerElem, int dim);
-
-
 
 /** Fill out the nodes and relative numberings for a tet */
 void fillNodes(int *relNode, int *nodeIDs, int *conn);

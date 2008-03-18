@@ -740,21 +740,25 @@ inline void findNodeSet(
         int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE],
         int edgeMap[MAX_EDGES][2])
 {
-    FEM_Mesh *mesh = FEM_chunk::get("GetAdaptAdj")->
-        lookup(meshid,"GetAdaptAdj");
-    FEM_Elem *elem = (FEM_Elem *)mesh->
-        lookup(FEM_ELEM+elemType,"GetAdaptAdj");
-    FEM_Node *node = (FEM_Node *)mesh->
-        lookup(FEM_NODE,"GetAdaptAdj");
-    const int nodesPer = (elem->getConn()).width();
-    assert(node->getCoord()!= NULL);
-    assert(nodesPer > 0 && nodesPer < MAX_FACE_SIZE);
-    const int dim = (node->getCoord())->getWidth();
-    assert(dim == 2|| dim == 3);
-
-    guessElementShape(dim, nodesPer, 
-            faceSize, faceMapSize, edgeMapSize, 
-            nodeSetMap, edgeMap);
+  FEM_Mesh *mesh = FEM_chunk::get("GetAdaptAdj")->
+    lookup(meshid,"GetAdaptAdj");
+  FEM_Elem *elem = (FEM_Elem *)mesh->
+    lookup(FEM_ELEM+elemType,"GetAdaptAdj");
+  FEM_Node *node = (FEM_Node *)mesh->
+    lookup(FEM_NODE,"GetAdaptAdj");
+  const int nodesPer = (elem->getConn()).width();
+  assert(node->getCoord()!= NULL);
+  //assert(nodesPer > 0 && nodesPer < MAX_FACE_SIZE); 
+  // I fail to see a connection between nodesPer and MAX_FACE_SIZE, and
+  // for a tet nodesPer==4 while MAX_FACE_SIZE==4, so this test is
+  // always going to fail, so I have removed it
+  assert(nodesPer > 0);
+  const int dim = (node->getCoord())->getWidth();
+  assert(dim == 2|| dim == 3);
+  
+  guessElementShape(dim, nodesPer, 
+		    faceSize, faceMapSize, edgeMapSize, 
+		    nodeSetMap, edgeMap);
 }
 
 void getAndDumpAdaptAdjacencies(
@@ -768,33 +772,30 @@ void getAndDumpAdaptAdjacencies(
   int nodeSetMap[MAX_ADJELEMS][MAX_NODESET_SIZE]; // not used
   int edgeMap[MAX_EDGES][2]; // not used
   
-  findNodeSet(
-          meshid, elemType,
-          &faceSize, &faceMapSize, &edgeMapSize,
-          nodeSetMap, edgeMap);
+  findNodeSet(meshid, elemType, &faceSize, &faceMapSize, &edgeMapSize,
+	      nodeSetMap, edgeMap);
   
   for (int i=0; i<numElems; i++) {
-      printf("[%d] %d  :",myRank,i);
-      for (int j=0; j<faceMapSize; j++) {
-          adaptAdj *entry = getAdaptAdj(meshid, i, elemType, j);
-          printf("(%d,%d,%d)", entry->partID, entry->localID, entry->elemType);
-      }
-      printf("\n");
+    printf("[%d] %d  :",myRank,i);
+    for (int j=0; j<faceMapSize; j++) {
+      adaptAdj *entry = getAdaptAdj(meshid, i, elemType, j);
+      printf("(%d,%d,%d)", entry->partID, entry->localID, entry->elemType);
+    }
+    printf("\n");
   }
-
+  
   if (edgeMapSize == 0) return;
   for (int i=0; i<numElems; i++) {
-      printf("[%d] %d  :", myRank, i);
-      for (int j=0; j<edgeMapSize; j++) {
-          CkVec<adaptAdj>* entry = getEdgeAdaptAdj(meshid, i, elemType, j);
-          for (int k=0; k<entry->size(); ++k) {
-              printf("(%d,%d,%d)", (*entry)[k].partID, (*entry)[k].localID, 
-                      (*entry)[k].elemType);
-          }
+    printf("[%d] %d  :", myRank, i);
+    for (int j=0; j<edgeMapSize; j++) {
+      CkVec<adaptAdj>* entry = getEdgeAdaptAdj(meshid, i, elemType, j);
+      for (int k=0; k<entry->size(); ++k) {
+	printf("(%d,%d,%d)", (*entry)[k].partID, (*entry)[k].localID, 
+	       (*entry)[k].elemType);
       }
-      printf("\n");
+    }
+    printf("\n");
   }
-
 }
 
 // Access functions

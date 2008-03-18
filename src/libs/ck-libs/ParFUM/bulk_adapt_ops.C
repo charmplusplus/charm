@@ -205,11 +205,13 @@ adaptAdj BulkAdapt::remote_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, 
 int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
 { // ASSERT: An edge can only be on one surface.
   BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D starts at elemID %d \n",partitionID,elemID));
-
-  // Lock startElem and adjacent elements surrounding edgeID, i.e. the "star"
+  // Lock region defined by all elements surrounding edgeID, i.e. the "star"
   int numElemsToLock = 0;
   adaptAdj *elemsToLock;
   adaptAdj startElem(partitionID, elemID, elemType);
+  getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
+
+  BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D acquiring list of elements to build locked region.\n",partitionID));
   get_elemsToLock(startElem, &elemsToLock, edgeID, &numElemsToLock);
   RegionID lockRegionID;
   bool success;
@@ -826,6 +828,7 @@ void BulkAdapt::get_elemsToLock(adaptAdj startElem, adaptAdj **elemsToLock, int 
 {
   CkVec<adaptAdj>* nbrElems;
   // find the elements adjacent to startElem along the edge edgeID
+  BULK_DEBUG(CkPrintf("[%d] BulkAdapt::get_elemsToLock: calling getEdgeAdaptAdj on elem %d\n",partitionID,startElem.localID));
   nbrElems = getEdgeAdaptAdj(meshID, startElem.localID, startElem.elemType, 
 			     edgeID);
   // extract adjacencies from CkVec into array needed by the locking code 
@@ -857,6 +860,7 @@ int getRelNode(int nodeIdx, int *conn, int nodesPerElem) {
   }
   CkAbort("Could not find node in given connectivity");
 }
+
 
 void getRelNodes(int edgeID, int nodesPerElem, int *r1, int *r2)
 {
