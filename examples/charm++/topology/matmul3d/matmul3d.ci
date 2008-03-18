@@ -1,0 +1,18 @@
+mainmodule matmul3d {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Compute compute;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+  };
+
+  array [3D] Compute {
+    entry Compute(void);
+    entry void beginCopying();
+  };
+
+  group ComputeMap : CkArrayMap {
+    entry ComputeMap(int, int, int);
+  };
+
+};
