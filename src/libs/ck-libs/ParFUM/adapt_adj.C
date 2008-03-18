@@ -836,7 +836,7 @@ inline CkVec<adaptAdj>** lookupEdgeAdaptAdjacencies(
             FEM_ADAPT_EDGE_ADJ, "CreateAdaptAdjacencies");	
     *numAdjacencies = adaptAdjAttr->getWidth()/sizeof(CkVec<adaptAdj>**);
     CkVec<adaptAdj>** adaptAdjacencies = 
-        reinterpret_cast<CkVec<adaptAdj>**>((adaptAdjAttr->getInt()).getData());
+        reinterpret_cast<CkVec<adaptAdj>**>((adaptAdjAttr->getChar()).getData());
     return adaptAdjacencies;
 }
 
