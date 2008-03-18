@@ -26,7 +26,6 @@
 #include <malloc.h>
 #include <getopt.h>
 #include <time.h>
-#include <assert.h>
 
 #include <infiniband/verbs.h>
 
@@ -52,6 +51,7 @@ static int regCount;
 
 static int pktCount;
 static int msgCount;
+static int minTokensLeft;
 
 
 static double regTime;
@@ -64,7 +64,7 @@ static int processBufferedCount;
 #define CMK_IBVERBS_INCTOKENS 0 //never turn this on 
 #define CMK_IBVERBS_DEBUG 0
 #define CMI_DIRECT_DEBUG 0
-#define WC_LIST_SIZE 128
+#define WC_LIST_SIZE 32
 /*#define WC_BUFFER_SIZE 100*/
 
 #define INCTOKENS_FRACTION 0.04
@@ -332,7 +332,7 @@ static inline infiPacket newPacket(){
 	pkt->destNode = NULL;
 	pkt->keyHeader = METADATAFIELD(pkt)->key;
 	pkt->ogm=NULL;
-	assert(pkt->keyHeader!=NULL);
+	CmiAssert(pkt->keyHeader!=NULL);
 	
 	pkt->elemList[0].addr = (uintptr_t)&(pkt->header);
 	pkt->elemList[0].length = sizeof(struct infiPacketHeader);
@@ -387,7 +387,7 @@ static void checkAllQps(){
 		if(i != _Cmi_mynode){
 			if(!checkQp(nodes[i].infiData->qp)){
 				pollSendCq(0);
-				assert(0);
+				CmiAssert(0);
 			}
 		}
 	}
@@ -409,10 +409,10 @@ static void CmiMachineInit(char **argv){
 	//TODO: make the device and ibport configureable by commandline parameter
 	//Check example for how to do that
 	devList =  ibv_get_device_list(NULL);
-	assert(devList != NULL);
+	CmiAssert(devList != NULL);
 
 	dev = *devList;
-	assert(dev != NULL);
+	CmiAssert(dev != NULL);
 
 	ibPort=1;
 
@@ -430,7 +430,7 @@ static void CmiMachineInit(char **argv){
 	context->ibPort = ibPort;
 	//the context for this infiniband device 
 	context->context = ibv_open_device(dev);
-	assert(context->context != NULL);
+	CmiAssert(context->context != NULL);
 	
 	MACHSTATE1(3,"device opened %p",context->context);
 
@@ -443,7 +443,7 @@ static void CmiMachineInit(char **argv){
 
 	//protection domain
 	context->pd = ibv_alloc_pd(context->context);
-	assert(context->pd != NULL);
+	CmiAssert(context->pd != NULL);
 	MACHSTATE2(3,"pd %p pd->handle %d",context->pd,context->pd->handle);
 	
 	context->header.nodeNo = _Cmi_mynode;
@@ -452,13 +452,13 @@ static void CmiMachineInit(char **argv){
 	packetSize = mtu_size*4;
 	dataSize = packetSize-sizeof(struct infiPacketHeader);
 	
-	calcMaxSize=5000;
-	if(_Cmi_numnodes*50 > calcMaxSize){
+	calcMaxSize=8000;
+/*	if(_Cmi_numnodes*50 > calcMaxSize){
 		calcMaxSize = _Cmi_numnodes*50;
 		if(calcMaxSize > 10000){
 			calcMaxSize = 10000;
 		}
-	}
+	}*/
 //	maxRecvBuffers=80;
 	maxRecvBuffers=calcMaxSize;
 	maxTokens = maxRecvBuffers;
@@ -535,6 +535,8 @@ static void CmiMachineInit(char **argv){
 
 	processBufferedCount=0;
 	processBufferedTime=0;
+
+	minTokensLeft = maxTokens;
 #endif	
 
 	
@@ -557,7 +559,7 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 
 	context->sendCqSize = maxTokens+2;
 	context->sendCq = ibv_create_cq(context->context,context->sendCqSize,NULL,NULL,0);
-	assert(context->sendCq != NULL);
+	CmiAssert(context->sendCq != NULL);
 	
 	MACHSTATE1(3,"sendCq created %p",context->sendCq);
 	
@@ -566,7 +568,7 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 	context->recvCq = ibv_create_cq(context->context,context->recvCqSize,NULL,NULL,0);
 	
 	MACHSTATE2(3,"recvCq created %p %d",context->recvCq,context->recvCqSize);
-	assert(context->recvCq != NULL);
+	CmiAssert(context->recvCq != NULL);
 	
 	//array of queue pairs
 
@@ -582,7 +584,7 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 			}
 		};
 		context->srq = ibv_create_srq(context->pd,&srqAttr);
-		assert(context->srq != NULL);
+		CmiAssert(context->srq != NULL);
 	
 		struct ibv_qp_init_attr initAttr = {
 			.qp_type = IBV_QPT_RC,
@@ -615,7 +617,7 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 			
 				MACHSTATE2(3,"qp[%d] created %p",i,context->qp[i]);
 			
-				assert(context->qp[i] != NULL);
+				CmiAssert(context->qp[i] != NULL);
 			
 			
 				ibv_modify_qp(context->qp[i], &attr,
@@ -686,7 +688,7 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 		.dest_qp_num		= addr[1],
 		.rq_psn 		= addr[2],
 		.max_dest_rd_atomic	= 1,
-		.min_rnr_timer		= 12,
+		.min_rnr_timer		= 31,
 		.ah_attr		= {
 			.is_global	= 0,
 			.dlid		= addr[0],
@@ -714,8 +716,8 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]){
 	MACHSTATE(3,"qp state changed to RTR");
 	
 	attr.qp_state 	    = IBV_QPS_RTS;
-	attr.timeout 	    = 14;
-	attr.retry_cnt 	    = 7;
+	attr.timeout 	    = 26;
+	attr.retry_cnt 	    = 20;
 	attr.rnr_retry 	    = 7;
 	attr.sq_psn 	    = context->localAddr[node].psn;
 	attr.max_rd_atomic  = 1;
@@ -784,7 +786,7 @@ struct infiBufferPool * allocateInfiBufferPool(int numRecvs,int sizePerBuffer){
 	bigSize = numBuffers*sizePerBuffer;
 	bigBuf=malloc(bigSize);
 	bigKey = ibv_reg_mr(context->pd,bigBuf,bigSize,IBV_ACCESS_LOCAL_WRITE);
-	assert(bigKey != NULL);
+	CmiAssert(bigKey != NULL);
 	
 	for(i=0;i<numBuffers;i++){
 		struct infiBuffer *buffer =  &(ret->buffers[i]);
@@ -835,7 +837,7 @@ void postInitialRecvs(struct infiBufferPool *recvBufferPool,int numRecvs,int siz
 	workRequests[numRecvs-1].next = NULL;
 	MACHSTATE(3,"About to call ibv_post_srq_recv");
 	if(ibv_post_srq_recv(context->srq,workRequests,&bad_wr)){
-		assert(0);
+		CmiAssert(0);
 	}
 
 	free(workRequests);
@@ -850,14 +852,18 @@ static inline void CommunicationServer_nolock(int toBuffer); //if buffer ==1 rec
 static void CmiMachineExit()
 {
 #if CMK_IBVERBS_STATS	
-	printf("[%d] msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s \n",_Cmi_mynode,msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime);
+	printf("[%d] msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d \n",_Cmi_mynode,msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft);
 #endif
 }
+static void ServiceCharmrun_nolock();
 
 static void CmiNotifyStillIdle(CmiIdleState *s) {
 #if CMK_SMP
 	CmiCommLock();
+/*	if(where == COMM_SERVER_FROM_SMP)*/
 #endif
+/*		ServiceCharmrun_nolock();*/
+
 	CommunicationServer_nolock(0);
 #if CMK_SMP
 	CmiCommUnlock();
@@ -897,13 +903,6 @@ static inline void getFreeTokens(struct infiOtherNodeData *infiData){
 static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struct ibv_mr *dataKey){
 	int incTokens=0;
 	int retval;
-#if CMK_IBVERBS_STATS
-	double _startRegTime =CmiWallTimer();
-#endif	
-
-#if CMK_IBVERBS_STATS
-		_startRegTime = CmiWallTimer();
-#endif
 #if	CMK_IBVERBS_DEBUG
 	packet->header.psn = (++node->infiData->psn);
 #endif	
@@ -915,11 +914,6 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 	packet->elemList[1].lkey = dataKey->lkey;
 	
 	
-	
-#if CMK_IBVERBS_STATS
-			regCount++;
-			regTime += CmiWallTimer()-_startRegTime;
-#endif
 	packet->destNode = node;
 	
 #if CMK_IBVERBS_STATS	
@@ -937,21 +931,26 @@ static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struc
 /*
 	if(!checkQp(node->infiData->qp)){
 		pollSendCq(1);
-		assert(0);
+		CmiAssert(0);
 	}*/
 
 	struct ibv_send_wr *bad_wr=NULL;
 	if(retval = ibv_post_send(node->infiData->qp,&(packet->wr),&bad_wr)){
 		CmiPrintf("[%d] Sending to node %d failed with return value %d\n",_Cmi_mynode,node->infiData->nodeNo,retval);
-		assert(0);
+		CmiAssert(0);
 	}
 #if	CMK_IBVERBS_TOKENS_FLOW
 	context->tokensLeft--;
+#if 	CMK_IBVERBS_STATS
+	if(context->tokensLeft < minTokensLeft){
+		minTokensLeft = context->tokensLeft;
+	}
+#endif
 #endif
 
 /*	if(!checkQp(node->infiData->qp)){
 		pollSendCq(1);
-		assert(0);
+		CmiAssert(0);
 	}*/
 
 #if CMK_IBVERBS_INCTOKENS	
@@ -1103,7 +1102,7 @@ static inline void processAsyncEvents(){
 	}
 	_countAsync=0;
 	FD_SET(context->context->async_fd,&context->asyncFds);
-	assert(FD_ISSET(context->context->async_fd,&context->asyncFds));
+	CmiAssert(FD_ISSET(context->context->async_fd,&context->asyncFds));
 	ready = select(1, &context->asyncFds,NULL,NULL,&context->tmo);
 	
 	if(ready==0){
@@ -1233,7 +1232,7 @@ static inline int pollRecvCq(const int toBuffer){
 	
 	MACHSTATE1(2,"pollRecvCq %d (((",toBuffer);
 	ne = ibv_poll_cq(context->recvCq,WC_LIST_SIZE,&wc[0]);
-//	assert(ne >=0);
+//	CmiAssert(ne >=0);
 	
 	if(ne != 0){
 		MACHSTATE1(3,"pollRecvCq ne %d",ne);
@@ -1241,7 +1240,7 @@ static inline int pollRecvCq(const int toBuffer){
 	
 	for(i=0;i<ne;i++){
 		if(wc[i].status != IBV_WC_SUCCESS){
-			assert(0);
+			CmiAssert(0);
 		}
 		switch(wc[i].opcode){
 			case IBV_WC_RECV:
@@ -1266,14 +1265,17 @@ static inline int pollSendCq(const int toBuffer){
 	struct ibv_wc wc[WC_LIST_SIZE];
 
 	ne = ibv_poll_cq(context->sendCq,WC_LIST_SIZE,&wc[0]);
-//	assert(ne >=0);
+//	CmiAssert(ne >=0);
 	
 	
 	for(i=0;i<ne;i++){
 		if(wc[i].status != IBV_WC_SUCCESS){
 			infiPacket _packet = (infiPacket )wc[i].wr_id;
 			printf("[%d] wc[%d] status %d wc[i].opcode %d destnode %d \n",_Cmi_mynode,i,wc[i].status,wc[i].opcode,_packet->destNode->infiData->nodeNo);
-			assert(0);
+#if CMK_IBVERBS_STATS
+	printf("[%d] msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d minTokensLeft %d \n",_Cmi_mynode,msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft,minTokensLeft);
+#endif
+			CmiAssert(0);
 		}
 		switch(wc[i].opcode){
 			case IBV_WC_SEND:{
@@ -1603,7 +1605,7 @@ static inline void processRecvWC(struct ibv_wc *recvWC,const int toBuffer){
 		struct ibv_recv_wr *bad_wr;
 	
 		if(ibv_post_srq_recv(context->srq,&wr,&bad_wr)){
-			assert(0);
+			CmiAssert(0);
 		}
 	}
 
@@ -1647,6 +1649,11 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 #if CMK_IBVERBS_TOKENS_FLOW
 //	node->infiData->tokensLeft--;
 	context->tokensLeft--;
+#if 	CMK_IBVERBS_STATS
+	if(context->tokensLeft < minTokensLeft){
+		minTokensLeft = context->tokensLeft;
+	}
+#endif
 #endif
 	
 	struct infiBuffer *buffer = malloc(sizeof(struct infiBuffer));
@@ -1698,7 +1705,7 @@ static inline void processRdmaRequest(struct infiRdmaPacket *_rdmaPacket,int fro
 		};
 		/** post and rdma_read that is a rdma get*/
 		if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
-			assert(0);
+			CmiAssert(0);
 		}
 	}
 
@@ -2004,7 +2011,7 @@ static inline void increaseTokens(OtherNode node){
 	int currentCqSize = context->sendCqSize;
 	if(ibv_resize_cq(context->sendCq,currentCqSize+increase)){
 		fprintf(stderr,"[%d] failed to increase cq by %d from %d totalTokens %d \n",_Cmi_mynode,increase,currentCqSize, node->infiData->totalTokens);
-		assert(0);
+		CmiAssert(0);
 	}
 	context->sendCqSize+= increase;
 };
@@ -2027,7 +2034,7 @@ static void increasePostedRecvs(int nodeNo){
 	//increase the size of the recvCq
 	int currentCqSize = context->recvCqSize;
 	if(ibv_resize_cq(context->recvCq,currentCqSize+tokenIncrease)){
-		assert(0);
+		CmiAssert(0);
 	}
 	context->recvCqSize += tokenIncrease;
 	if(recvIncrease > 0){
@@ -2077,7 +2084,7 @@ static inline void *getInfiCmiChunk(int dataSize){
 		ratio  = ratio >> 1;
 		poolIdx++;
 	}
-	MACHSTATE2(3,"getInfiCmiChunk for size %d in poolIdx %d",dataSize,poolIdx);
+	MACHSTATE2(2,"getInfiCmiChunk for size %d in poolIdx %d",dataSize,poolIdx);
 	if((poolIdx < INFINUMPOOLS && infiCmiChunkPools[poolIdx].startBuf == NULL) || poolIdx >= INFINUMPOOLS){
 		infiCmiChunkMetaData *metaData;		
 		infiCmiChunkHeader *hdr;
@@ -2101,7 +2108,7 @@ static inline void *getInfiCmiChunk(int dataSize){
 		hdr = res;
 		
 		key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
-		assert(key != NULL);
+		CmiAssert(key != NULL);
 		
 		origres = (res += sizeof(infiCmiChunkHeader));
 
@@ -2127,7 +2134,7 @@ static inline void *getInfiCmiChunk(int dataSize){
 	  }	
 		
 		
-		MACHSTATE3(3,"AllocSize %d buf %p key %p",allocSize,res,metaData->key);
+		MACHSTATE3(2,"AllocSize %d buf %p key %p",allocSize,res,metaData->key);
 		
 		return origres;
 	}
@@ -2137,7 +2144,7 @@ static inline void *getInfiCmiChunk(int dataSize){
 		res = infiCmiChunkPools[poolIdx].startBuf;
 		res += sizeof(infiCmiChunkHeader);
 
-		MACHSTATE2(3,"Reusing old pool %d buf %p",poolIdx,res);
+		MACHSTATE2(2,"Reusing old pool %d buf %p",poolIdx,res);
 		metaData = METADATAFIELD(res);
 
 		infiCmiChunkPools[poolIdx].startBuf = metaData->nextBuf;
@@ -2199,9 +2206,9 @@ void infi_CmiFree(void *ptr){
 			infiCmiChunkPools[poolIdx].startBuf = freePtr;
 			infiCmiChunkPools[poolIdx].count++;
 			
-			MACHSTATE3(3,"Pool %d now has startBuf at %p count %d",poolIdx,infiCmiChunkPools[poolIdx].startBuf,infiCmiChunkPools[poolIdx].count);
+			MACHSTATE3(2,"Pool %d now has startBuf at %p count %d",poolIdx,infiCmiChunkPools[poolIdx].startBuf,infiCmiChunkPools[poolIdx].count);
 		}else{
-			MACHSTATE2(3,"Freeing up buf %p poolIdx %d",ptr,poolIdx);
+			MACHSTATE2(2,"Freeing up buf %p poolIdx %d",ptr,poolIdx);
 			metaData->owner->metaData->count--;
 			if(metaData->owner->metaData == metaData){
 				//I am the owner
@@ -2560,7 +2567,7 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle){
 			};
 			/** post and rdma_read that is a rdma get*/
 			if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
-				assert(0);
+				CmiAssert(0);
 			}
 		}
 
@@ -2685,7 +2692,7 @@ void pollCmiDirectQ(){
 		};
 //	 post and rdma_read that is a rdma get
 		if(ibv_post_send(node->infiData->qp,&wr,&bad_wr)){
-			assert(0);
+			CmiAssert(0);
 		}
 	}
 			
