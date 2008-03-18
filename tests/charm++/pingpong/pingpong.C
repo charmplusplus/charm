@@ -36,7 +36,7 @@ class CkArrayIndexFancy : public CkArrayIndex {
 
 #include "pingpong.decl.h"
 #ifdef CMK_USE_IBVERBS 
-static struct infiDirectUserHandle{
+struct infiDirectUserHandle{
 	int handle;
 	int senderNode;
 	int recverNode;
