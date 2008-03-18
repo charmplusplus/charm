@@ -1434,8 +1434,11 @@ void CkNodeReductionMgr::startReduction(int number,int srcNode)
 	DEBR((AA"Asking all local groups to start #%d\n"AB,redNo));
 	// in case, nodegroup does not has the attached red group,
 	// it has to restart groups again
+	startLocalGroupReductions(number);
+/*
 	if (startLocalGroupReductions(number) == 0)
           thisProxy[CkMyNode()].restartLocalGroupReductions(number);
+*/
 }
 
 // restart local groups until succeed

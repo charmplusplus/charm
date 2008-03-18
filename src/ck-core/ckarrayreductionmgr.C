@@ -17,6 +17,7 @@ void CkArrayReductionMgr::init()
 	count = 0;
 	lockCount = CmiCreateLock();
 	ctorDoneFlag = 1;
+	alreadyStarted = -1;
 }
 
 CkArrayReductionMgr::CkArrayReductionMgr(){
@@ -167,6 +168,10 @@ void CkArrayReductionMgr::pup(PUP::er &p){
 void CkArrayReductionMgr::setAttachedGroup(CkGroupID groupID){
 	attachedGroup = groupID;
 	ARPRINT("[%d] setAttachedGroup called with attachedGroup %d \n",CkMyNode(),attachedGroup);
+	if (alreadyStarted != -1) {
+		((CkNodeReductionMgr *)this)->restartLocalGroupReductions(alreadyStarted);
+		alreadyStarted = -1;
+	}
 }
 
 
@@ -184,6 +189,7 @@ void CkArrayReductionMgr::startNodeGroupReduction(int number,CkGroupID groupID){
 int CkArrayReductionMgr::startLocalGroupReductions(int number){	
 	ARPRINT("[%d] startLocalGroupReductions for red No %d my group %d attached group %d number of rednMgrs %d on %p \n",CkMyNode(),number,thisgroup.idx, attachedGroup.idx,size,this);
 	if(attachedGroup.isZero()){
+		alreadyStarted = number;
 		return 0;
 	}
 	int firstPE = CkNodeFirst(CkMyNode());

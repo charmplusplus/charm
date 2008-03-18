@@ -13,6 +13,7 @@ class CkArrayReductionMgr : public NodeGroup{
 		CkMsgQ<CkReductionMsg> my_msgs;
 		CkMsgQ<CkReductionMsg> my_futureMsgs;
 		CmiNodeLock lockCount;
+		int alreadyStarted;
 		void init();
 		void collectAllMessages();
 	public:
