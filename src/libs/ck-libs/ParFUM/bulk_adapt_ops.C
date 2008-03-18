@@ -840,6 +840,13 @@ void BulkAdapt::get_elemsToLock(adaptAdj startElem, adaptAdj **elemsToLock, int 
   // add the start element
   (*elemsToLock)[*count] = startElem;
   (*count)++;
+
+  printf("Elems to lock: ");
+  for (int i=0; i<*count; i++) {
+    printf("(%d, %d, %d) ", (*elemsToLock)[i].partID, (*elemsToLock)[i].localID,
+	   (*elemsToLock)[i].elemType);
+  }
+  printf("\n");
   
   //delete (*nbrElems);
 }

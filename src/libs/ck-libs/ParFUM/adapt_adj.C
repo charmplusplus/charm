@@ -793,6 +793,7 @@ void getAndDumpAdaptAdjacencies(
 	printf("(%d,%d,%d)", (*entry)[k].partID, (*entry)[k].localID, 
 	       (*entry)[k].elemType);
       }
+      if (j < (edgeMapSize-1)) printf(" | ");
     }
     printf("\n");
   }
