@@ -217,6 +217,7 @@ driver(void)
       FEM_Migrate();
     
     if (t%1024==0) { //Publish data to the net
+#if ! CMK_MULTICORE
 	    NetFEM n=NetFEM_Begin(FEM_My_partition(),t,2,NetFEM_POINTAT);
 	    
 	    NetFEM_Nodes(n,nnodes,(double *)g.coord,"Position (m)");
@@ -229,6 +230,7 @@ driver(void)
 		NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");
 	    
 	    NetFEM_End(n);
+#endif
     }
   }
 
