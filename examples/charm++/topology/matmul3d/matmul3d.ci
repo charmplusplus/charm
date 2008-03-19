@@ -1,14 +1,34 @@
 mainmodule matmul3d {
   readonly CProxy_Main mainProxy;
   readonly CProxy_Compute compute;
+  readonly int arrayDimX;
+  readonly int arrayDimY;
+  readonly int arrayDimZ;
+  readonly int blockDimX;
+  readonly int blockDimY;
+  readonly int blockDimZ;
+  readonly int torusDimX;
+  readonly int torusDimY;
+  readonly int torusDimZ;
+
+  readonly int num_chare_x;
+  readonly int num_chare_y;
+  readonly int num_chare_z;
+  readonly int num_chares;
+  readonly int subBlockDimX;
+  readonly int subBlockDimY;
+  readonly int subBlockDimZ;
 
   mainchare Main {
     entry Main(CkArgMsg *m);
+    entry void done();
   };
 
   array [3D] Compute {
     entry Compute(void);
     entry void beginCopying();
+    entry void receiveA(int indexZ, float data[size], int size);
+    entry void receiveB(int indexX, float data[size], int size);
   };
 
   group ComputeMap : CkArrayMap {

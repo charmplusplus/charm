@@ -28,6 +28,10 @@
 /*readonly*/ int num_chare_x;
 /*readonly*/ int num_chare_y;
 /*readonly*/ int num_chare_z;
+/*readonly*/ int num_chares;
+/*readonly*/ int subBlockDimX;
+/*readonly*/ int subBlockDimY;
+/*readonly*/ int subBlockDimZ;
 
 static unsigned long next = 1;
 
@@ -47,8 +51,11 @@ double endTime;
  *
  */
 class Main : public CBase_Main {
-  public:    
+  public:
+    int doneCount;
+
     Main(CkArgMsg* m);
+    void done();
 };
 
 /** \class Compute
@@ -56,12 +63,19 @@ class Main : public CBase_Main {
  */
 class Compute: public CBase_Compute {
   public:
+    float *A, *B, *C;
+    int countA, countB;
+    
     Compute();
     Compute(CkMigrateMessage* m);
-
     ~Compute();
 
     void beginCopying();
+    void sendA();
+    void sendB();
+    void receiveA(int indexZ, float *data, int size);
+    void receiveB(int indexX, float *data, int size);
+    void doWork();
 };
 
 /** \class ComputeMap

@@ -60,6 +60,11 @@ Main::Main(CkArgMsg* m) {
   num_chare_x = arrayDimX / blockDimX;
   num_chare_y = arrayDimY / blockDimY;
   num_chare_z = arrayDimZ / blockDimZ;
+  num_chares = num_chare_x * num_chare_y * num_chare_z;
+
+  subBlockDimX = blockDimX/num_chare_z;
+  subBlockDimY = blockDimY/num_chare_x;
+  subBlockDimZ = blockDimZ/num_chare_y;
 
   // print info
   CkPrintf("Running Matrix Multiplication on %d processors with (%d, %d, %d) chares\n", CkNumPes(), num_chare_x, num_chare_y, num_chare_z);
@@ -80,13 +85,33 @@ Main::Main(CkArgMsg* m) {
   // CkPrintf("Total Hops: %d\n", hops);
 
   // Start the computation
+  doneCount=0;
   startTime = CmiWallTimer();
   compute.beginCopying();
 }
 
+void Main::done() {
+  doneCount++;
+  if(doneCount == num_chares) {
+    endTime = CmiWallTimer();
+    CkPrintf("TIME %f secs\n", endTime - startTime);
+    CkExit();
+  }
+}
+
 // Constructor, initialize values
 Compute::Compute() {
+  // each compute will only hold blockDimX/num_chare_z no. of rows to begin with
+  A = new float[blockDimX*blockDimY];
+  B = new float[blockDimY*blockDimZ];
+  C = new float[blockDimX*blockDimZ];
+  memset(A, 1, sizeof(float)*(blockDimX*blockDimY));
+  memset(B, 2, sizeof(float)*(blockDimY*blockDimZ));
+  memset(C, 0, sizeof(float)*(blockDimX*blockDimZ));
 
+  // counters to keep track of how many messages have been received
+  countA = 0;
+  countB = 0;
 }
 
 Compute::Compute(CkMigrateMessage* m) {
@@ -94,11 +119,64 @@ Compute::Compute(CkMigrateMessage* m) {
 }
 
 Compute::~Compute() {
-
+  delete [] A;
+  delete [] B;
+  delete [] C;
 }
 
 void Compute::beginCopying() {
+  sendA();
+  sendB();
+}
 
+void Compute::sendA() {
+  int indexZ = thisIndex.z;
+  float *dataA = new float[subBlockDimX * blockDimY];
+  for(int i=0; i<subBlockDimX; i++)
+    for(int j=0; j<blockDimY; j++)
+      dataA[i*blockDimY + j] = A[indexZ*subBlockDimX*blockDimY + i*blockDimY + j];
+
+  for(int k=0; k<num_chare_z; k++)
+    if(k != indexZ)
+      compute(thisIndex.x, thisIndex.y, k).receiveA(indexZ, dataA, subBlockDimX * blockDimY);
+}
+
+void Compute::sendB() {
+  int indexX = thisIndex.x;
+  float *dataB = new float[subBlockDimY * blockDimZ];
+  for(int j=0; j<subBlockDimY; j++)
+    for(int k=0; k<blockDimZ; k++)
+      dataB[j*blockDimZ + k] = B[indexX*subBlockDimY*blockDimZ + j*blockDimZ + k];
+
+  for(int i=0; i<num_chare_x; i++)
+    if(i != indexX)
+      compute(i, thisIndex.y, thisIndex.z).receiveB(indexX, dataB, subBlockDimY * blockDimZ);
+}
+
+void Compute::receiveA(int indexZ, float *data, int size) {
+  for(int i=0; i<subBlockDimX; i++)
+    for(int j=0; j<blockDimY; j++)
+      A[indexZ*subBlockDimX*blockDimY + i*blockDimY + j] = data[i*blockDimY + j];
+  countA++;
+  if(countA == num_chare_z-1)
+    doWork();
+}
+
+void Compute::receiveB(int indexX, float *data, int size) {
+  for(int j=0; j<subBlockDimY; j++)
+    for(int k=0; k<blockDimZ; k++)
+      B[indexX*subBlockDimY*blockDimZ + j*blockDimZ + k] = data[j*blockDimZ + k];
+  if(countB == num_chare_x-1)
+    doWork();
+}
+
+void Compute::doWork() {
+  if(countA == num_chare_z-1 && countA == num_chare_z-1) {
+    for(int i=0; i<blockDimX; i++)
+      for(int j=0; j<blockDimY; j++)
+	for(int k=0; k<blockDimZ; k++)
+	  C[i*blockDimZ+k] = A[i*blockDimY+j] * B[j*blockDimZ+k];
+  }
 }
 
 ComputeMap::ComputeMap(int x, int y, int z) {
