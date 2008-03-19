@@ -2407,8 +2407,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   _main(argc,argv);
 #endif
 #endif
-  Cmi_argvcopy = CmiCopyArgs(argv);
-  Cmi_argv = argv; Cmi_startfn = fn; Cmi_usrsched = usc;
+  Cmi_startfn = fn; Cmi_usrsched = usc;
   Cmi_netpoll = 0;
 #if CMK_NETPOLL
   Cmi_netpoll = 1;
@@ -2504,6 +2503,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
      messages. This flushes receive buffers on some  implementations*/ 
   networkProgressPeriod = 0;  
   CmiGetArgInt(argv, "+networkProgressPeriod", &networkProgressPeriod);
+
+  Cmi_argvcopy = CmiCopyArgs(argv);
+  Cmi_argv = argv; 
 
   CmiStartThreads(argv);
 
