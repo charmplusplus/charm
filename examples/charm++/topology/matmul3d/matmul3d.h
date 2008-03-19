@@ -41,8 +41,7 @@ int myrand(int numpes) {
 }
 
 #define USE_TOPOMAP	0
-#define USE_RRMAP	0
-#define USE_RNDMAP	0
+#define USE_BLOCKMAP	0
 
 double startTime;
 double endTime;
@@ -84,9 +83,9 @@ class Compute: public CBase_Compute {
 class ComputeMap: public CBase_ComputeMap {
   public:
     int X, Y, Z;
-    int ***mapping;
+    int *mapping;
 
-    ComputeMap(int x, int y, int z);
+    ComputeMap(int x, int y, int z, int tx, int ty, int tz);
     ~ComputeMap();
     int procNum(int, const CkArrayIndex &idx);
 };

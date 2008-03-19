@@ -72,9 +72,15 @@ Main::Main(CkArgMsg* m) {
   CkPrintf("Block Dimensions: %d %d %d\n", blockDimX, blockDimY, blockDimZ);
 
   // Create new array of worker chares
-#if USE_TOPOMAP || USE_RRMAP || USE_RNDMAP
-  CkPrintf("Topology Mapping is being done ... %d %d %d\n", USE_TOPOMAP, USE_RRMAP, USE_RNDMAP);
-  CProxy_ComputeMap map = CProxy_ComputeMap::ckNew(num_chare_x, num_chare_y, num_chare_z);
+#if USE_TOPOMAP
+  CkPrintf("Topology Mapping is being done ...\n");
+  CProxy_ComputeMap map = CProxy_ComputeMap::ckNew(num_chare_x, num_chare_y, num_chare_z, 1, 1, 1);
+  CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
+  opts.setMap(map);
+  compute = CProxy_Compute::ckNew(opts);
+#elif USE_BLOCKMAP
+  CkPrintf("Block Mapping is being done ...\n");
+  CProxy_ComputeMap map = CProxy_ComputeMap::ckNew(num_chare_x, num_chare_y, num_chare_z, torusDimX, torusDimY, torusDimZ);
   CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
   opts.setMap(map);
   compute = CProxy_Compute::ckNew(opts);
@@ -177,24 +183,76 @@ void Compute::doWork() {
 	for(int k=0; k<blockDimZ; k++)
 	  C[i*blockDimZ+k] = A[i*blockDimY+j] * B[j*blockDimZ+k];
   }
+  mainProxy.done();
 }
 
-ComputeMap::ComputeMap(int x, int y, int z) {
+ComputeMap::ComputeMap(int x, int y, int z, int tx, int ty, int tz) {
+  X = x;
+  Y = y;
+  Z = z;
+  mapping = new int[X*Y*Z];
 
+  TopoManager tmgr;
+  int dimX, dimY, dimZ, dimT;
+
+#if USE_TOPOMAP
+  dimX = tmgr.getDimNX();
+  dimY = tmgr.getDimNY();
+  dimZ = tmgr.getDimNZ();
+  dimT = tmgr.getDimNT();
+#elif USE_BLOCKMAP
+  dimX = tx;
+  dimY = ty;
+  dimZ = tz;
+  dimT = 1;
+#endif
+
+  // we are assuming that the no. of chares in each dimension is a 
+  // multiple of the torus dimension
+  int numCharesPerPe = X*Y*Z/CkNumPes();
+
+  int numCharesPerPeX = X / dimX;
+  int numCharesPerPeY = Y / dimY;
+  int numCharesPerPeZ = Z / dimZ;
+
+  if(dimT < 2) {    // one core per node
+    if(CkMyPe()==0) CkPrintf("DATA: %d %d %d %d : %d %d %d\n", dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ);
+    for(int i=0; i<dimX; i++)
+      for(int j=0; j<dimY; j++)
+        for(int k=0; k<dimZ; k++)
+          for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
+            for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
+              for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
+#if USE_TOPOMAP
+                mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k);
+#elif USE_BLOCKMAP
+                mapping[ci*Y*Z + cj*Z + ck] = i + j*dimX + k*dimX*dimY;
+#endif
+              }
+  } else {          // multiple cores per node
+    // In this case, we split the chares in the X dimension among the
+    // cores on the same node.
+    numCharesPerPeX /= dimT;
+      if(CkMyPe()==0) CkPrintf("%d %d %d : %d %d %d %d : %d %d %d \n", x, y, z, dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ);
+      for(int i=0; i<dimX; i++)
+        for(int j=0; j<dimY; j++)
+          for(int k=0; k<dimZ; k++)
+            for(int l=0; l<dimT; l++)
+              for(int ci=(dimT*i+l)*numCharesPerPeX; ci<(dimT*i+l+1)*numCharesPerPeX; ci++)
+                for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
+                  for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
+                    mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k, l);
+                  }
+  }
 }
 
 ComputeMap::~ComputeMap() {
-  for (int i=0; i<X; i++) {
-    for(int j=0; j<Y; j++)
-      delete [] mapping[i][j];
-    delete [] mapping[i];
-  }
   delete [] mapping;
 }
 
 int ComputeMap::procNum(int, const CkArrayIndex &idx) {
   int *index = (int *)idx.data();
-  return mapping[index[0]][index[1]][index[2]];
+  return mapping[index[0]*Y*Z + index[1]*Z + index[2]];
 }
 
 

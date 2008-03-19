@@ -32,7 +32,7 @@ mainmodule matmul3d {
   };
 
   group ComputeMap : CkArrayMap {
-    entry ComputeMap(int, int, int);
+    entry ComputeMap(int, int, int, int, int, int);
   };
 
 };
