@@ -16,7 +16,7 @@ char *ALIGN_16(char *p){
   return((char *)((((unsigned long)p)+0xf)&0xfffffff0));
 }
 
-PCQueue broadcast_q;                 //queue to send broadcast messages
+CpvDeclare(PCQueue, broadcast_q);                 //queue to send broadcast messages
 
 #define PROGRESS_PERIOD 8
 
@@ -28,7 +28,7 @@ PCQueue broadcast_q;                 //queue to send broadcast messages
   root.
 */
 #if CMK_SMP
-#define CMK_BROADCAST_SPANNING_TREE    0
+#define CMK_BROADCAST_SPANNING_TREE    1
 #else
 #define CMK_BROADCAST_SPANNING_TREE    1
 #define CMK_BROADCAST_HYPERCUBE        0
@@ -277,20 +277,32 @@ static void recv_done(void *clientdata){
     return;
   }
 
+#if CMK_BROADCAST_SPANNING_TREE | CMK_BROADCAST_HYPERCUBE
+  if(CMI_BROADCAST_ROOT(msg) != 0) {
+    //printf ("%d: Receiving bcast message from %d with %d bytes\n", CmiMyPe(), CMI_BROADCAST_ROOT(msg), sndlen);
+
+    int pe = CMI_DEST_RANK(msg);
+
+    char *copymsg;
+    copymsg = (char *)CmiAlloc(sndlen);
+    CmiMemcpy(copymsg,msg,sndlen);
+    
+#if CMK_SMP
+    CmiLock(procState[pe].recvLock);
+    PCQueuePush(CpvAccessOther(broadcast_q, pe), copymsg);
+    CmiUnlock(procState[pe].recvLock);    
+#else
+    PCQueuePush(CpvAccess(broadcast_q), copymsg);
+#endif
+  }
+#endif
+
 #if CMK_NODE_QUEUE_AVAILABLE
   if (CMI_DEST_RANK(msg) == SMP_NODEMESSAGE)
     CmiPushNode(msg);
   else
 #endif
     CmiPushPE(CMI_DEST_RANK(msg), (void *)msg);
-
-#if CMK_BROADCAST_SPANNING_TREE | CMK_BROADCAST_HYPERCUBE
-  if(CMI_BROADCAST_ROOT(msg) != 0) {
-    //printf ("%d: Receiving bcast message %d bytes\n", CmiMyPe(), sndlen);
-    PCQueuePush(broadcast_q, msg);
-  }
-#endif
-
 
   outstanding_recvs --;
 }
@@ -340,18 +352,37 @@ DCMF_Request_t * first_pkt_recv_done (void              * clientdata,
 
 
 void sendBroadcastMessages() {
-#if !CMK_SMP
-  while(!PCQueueEmpty(broadcast_q)) {
-    char *msg = (char *) PCQueuePop(broadcast_q);
 
+#if CMK_SMP
+  CmiLock(procState[CmiMyRank()].recvLock);
+#endif
+  char *msg = (char *) PCQueuePop(CpvAccess(broadcast_q));
+
+#if CMK_SMP
+  CmiUnlock(procState[CmiMyRank()].recvLock);
+#endif  
+
+  while(msg) {
+    
 #if CMK_BROADCAST_SPANNING_TREE
     SendSpanningChildren(((CmiMsgHeaderBasic *) msg)->size, msg);
 #elif CMK_BROADCAST_HYPERCUBE
     SendHypercube(((CmiMsgHeaderBasic *) msg)->size, msg);
 #endif
+
+    CmiFree (msg);    
     
-  }
+#if CMK_SMP
+    CmiLock(procState[CmiMyRank()].recvLock);
 #endif
+    
+    msg = (char *) PCQueuePop(CpvAccess(broadcast_q));
+
+#if CMK_SMP
+    CmiUnlock(procState[CmiMyRank()].recvLock);
+#endif
+  }
+  //#endif
 }
 
 CpvDeclare(unsigned, networkProgressCount);
@@ -507,8 +538,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   //assert (config_out.thread_level == DCMF_THREAD_MULTIPLE);
 #endif
 
-  mysleep (1);
-
   DCMF_Send_Configuration_t short_config, eager_config, rzv_config;
   
 #if RESEARCH_CONTRIB
@@ -549,19 +578,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   _Cmi_numnodes = DCMF_Messager_size();
   _Cmi_mynode = DCMF_Messager_rank();
   
-  broadcast_q = PCQueueCreate();
+  //  CpvInitialize(PcQueue, broadcast_q);
 
   unsigned rank = DCMF_Messager_rank();
   unsigned size = DCMF_Messager_size();
-  
-#if 0
-  ranklist = (unsigned int *)malloc (size * sizeof(int));
-  for(count = 0; count < size; count ++)
-    ranklist[count] = count;
-  
-  /* global barrier initialize */
-  BGTsC_Barrier_init (&barrier, 0, size, ranklist);
-#endif
   
   CmiBarrier();    
   CmiBarrier();    
@@ -663,6 +683,9 @@ void ConverseRunPE(int everReturn)
      messages. This flushes receive buffers on some  implementations*/
   CpvInitialize(int , networkProgressCount);
   CpvAccess(networkProgressCount) = 0;
+
+  CpvInitialize(PCQueue, broadcast_q);
+  CpvAccess(broadcast_q) = PCQueueCreate();
 
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
   
@@ -831,7 +854,19 @@ static void CmiSendSelf(char *msg){
 }
 
 #if CMK_SMP
-static void CmiSendPeer (int rank, char *msg) {
+static void CmiSendPeer (int rank, int size, char *msg) {
+#if CMK_BROADCAST_SPANNING_TREE | CMK_BROADCAST_HYPERCUBE
+  if(CMI_BROADCAST_ROOT(msg) != 0) {
+    char *copymsg;
+    copymsg = (char *)CmiAlloc(size);
+    CmiMemcpy(copymsg,msg,size);
+    
+    CmiLock(procState[rank].recvLock);
+    PCQueuePush(CpvAccessOther(broadcast_q, rank), copymsg);
+    CmiUnlock(procState[rank].recvLock);    
+  }
+#endif
+  
   CQdCreate(CpvAccess(cQdState), 1);
   CmiPushPE (rank, msg);
 }
@@ -902,7 +937,7 @@ void CmiGeneralFreeSendN (int node, int rank, int size, char * msg) {
   CMI_SET_CHECKSUM(msg, size);
   
   if (node == CmiMyNode()) {
-    CmiSendPeer (rank, msg);
+    CmiSendPeer (rank, size, msg);
     return;
   }
 #endif
@@ -968,6 +1003,9 @@ void SendSpanningChildren(int size, char *msg)
     p += startpe;
     p = p%_Cmi_numpes;
     CmiAssert(p>=0 && p<_Cmi_numpes && p!=cs->pe);
+
+    //printf ("%d: Sending Spanning Tree Msg to %d\n",  CmiMyPe(), p);
+
     CmiSyncSendFn1(p, size, msg);
   }
 }
@@ -1009,6 +1047,8 @@ void CmiFreeBroadcastFn(int size, char *msg){
   
   CmiState cs = CmiGetState();
 #if CMK_BROADCAST_SPANNING_TREE
+  //printf ("%d: Starting Spanning Tree Broadcast of size %d bytes\n", CmiMyPe(), size);
+
   CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
   SendSpanningChildren(size, msg);
   CmiFree(msg);
@@ -1042,6 +1082,9 @@ void CmiFreeBroadcastAllFn(int size, char *msg){
 
   CmiState cs = CmiGetState();
 #if CMK_BROADCAST_SPANNING_TREE
+
+  //printf ("%d: Starting Spanning Tree Broadcast of size %d bytes\n", CmiMyPe(), size);
+
   CmiSyncSendFn(cs->pe,size,msg);
   CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
   SendSpanningChildren(size, msg);
@@ -1053,16 +1096,37 @@ void CmiFreeBroadcastAllFn(int size, char *msg){
   CmiFree(msg);
 #else
   int i ;
-
-  CmiSyncSendFn(CmiMyPe(), size, msg);
   
   for ( i=0; i<_Cmi_numpes; i++ ) {
-    if(i== CmiMyPe())
+    if (i== CmiMyPe() ||
+	(CmiNodeOf(i) == CmiMyNode()))
+      CmiSyncSendFn(i,size,msg);    
+  }
+  
+#if CMK_SMP
+  DCMF_CriticalSection_enter(0);
+#endif
+
+  CMI_SET_BROADCAST_ROOT(msg,0);  
+  CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
+  ((CmiMsgHeaderBasic *)msg)->size = size;  
+  CMI_SET_CHECKSUM(msg, size);
+
+  for ( i=0; i<_Cmi_numpes; i++ ) {
+    if (i== CmiMyPe() ||
+	(CmiNodeOf(i) == CmiMyNode()))
       continue;
 
-    CmiSyncSendFn(i,size,msg);
-  }
+    CmiReference (msg);  //Other threads shouldnt call advance and free the msg.
+    CmiGeneralFreeSend(i,size,msg);
+  }      
+
   CmiFree(msg);
+
+#if CMK_SMP
+  DCMF_CriticalSection_exit(0);
+#endif
+
 #endif
 }
 
@@ -1331,8 +1395,7 @@ void CmiMachineProgressImpl()
 /* Dummy implementation */
 extern void CmiBarrier()
 {
-  //BGTsC_Barrier(0);
-  //BGTr_Barrier(1);
+  //Use DCMF barrier later
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
