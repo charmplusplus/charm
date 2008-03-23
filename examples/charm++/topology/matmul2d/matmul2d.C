@@ -74,10 +74,10 @@ Compute::Compute() {
   }
   C = new float[blockDimX*blockDimY];
 
-  for(int i = 0; i < blockDimX*blockDimY; i++){
-    A[0][i] = MAGIC_A;
-    B[0][i] = MAGIC_B;
-  }
+  memset(A[0], MAGIC_A, sizeof(float)*(blockDimX*blockDimY));
+  memset(B[0], MAGIC_B, sizeof(float)*(blockDimX*blockDimY));
+  memset(C, 0, sizeof(float)*(blockDimX*blockDimY));
+
   step = 0;  
   row = thisIndex.y;
   col = thisIndex.x;
@@ -96,13 +96,11 @@ Compute::~Compute() {
   delete [] B[0];
   delete [] B[1];
   delete [] C;
-  delete [] C;
 }
 
 void Compute::compute(){
   for(int i = 0; i < blockDimX; i++){
     for(int j = 0; j < blockDimX; j++){
-      C[i*blockDimX+j] = 0;
       for(int k = 0; k < blockDimX; k++){
         C[i*blockDimX+j] += A[whichLocal][i*blockDimX+k] + B[whichLocal][k*blockDimX+j];
       }
@@ -124,10 +122,12 @@ void Compute::resumeFromBarrier(){
   // We must put our own 
   // 1. First put A
 
-  if(num_chare_x == 0 || num_chare_y ==0)
-    CkPrintf("(%d,%d): 0 divisor\n", thisIndex.y, thisIndex.x);
+  //if(num_chare_x == 0 || num_chare_y ==0)
+  //  CkPrintf("(%d,%d): 0 divisor\n", thisIndex.y, thisIndex.x);
+#ifdef MATMUL2D_DEBUG
+  CkPrintf("(%d,%d): A nbr: (%d,%d), iteration: %d\n", thisIndex.y, thisIndex.x, row, (col-1+num_chare_x)%num_chare_x, iteration);
+#endif
   /*
-  CkPrintf("(%d,%d): A nbr: (%d,%d)\n", thisIndex.y, thisIndex.x, row, (col-1+num_chare_x)%num_chare_x);
   CkPrintf("(%d,%d): B nbr: (%d,%d)\n", thisIndex.y, thisIndex.x, (row-1+num_chare_y)%num_chare_y, col);
   */
 
