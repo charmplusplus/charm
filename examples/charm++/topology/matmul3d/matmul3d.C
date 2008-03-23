@@ -62,9 +62,9 @@ Main::Main(CkArgMsg* m) {
   num_chare_z = arrayDimZ / blockDimZ;
   num_chares = num_chare_x * num_chare_y * num_chare_z;
 
-  subBlockDimX = blockDimX/num_chare_z;
-  subBlockDimY = blockDimY/num_chare_x;
-  subBlockDimZ = blockDimZ/num_chare_y;
+  subBlockDimXz = blockDimX/num_chare_z;
+  subBlockDimYx = blockDimY/num_chare_x;
+  subBlockDimXy = blockDimZ/num_chare_y;
 
   // print info
   CkPrintf("Running Matrix Multiplication on %d processors with (%d, %d, %d) chares\n", CkNumPes(), num_chare_x, num_chare_y, num_chare_z);
@@ -118,6 +118,7 @@ Compute::Compute() {
   // counters to keep track of how many messages have been received
   countA = 0;
   countB = 0;
+  countC = 0;
 }
 
 Compute::Compute(CkMigrateMessage* m) {
@@ -137,43 +138,66 @@ void Compute::beginCopying() {
 
 void Compute::sendA() {
   int indexZ = thisIndex.z;
-  float *dataA = new float[subBlockDimX * blockDimY];
-  for(int i=0; i<subBlockDimX; i++)
+  float *dataA = new float[subBlockDimXz * blockDimY];
+  for(int i=0; i<subBlockDimXz; i++)
     for(int j=0; j<blockDimY; j++)
-      dataA[i*blockDimY + j] = A[indexZ*subBlockDimX*blockDimY + i*blockDimY + j];
+      dataA[i*blockDimY + j] = A[indexZ*subBlockDimXz*blockDimY + i*blockDimY + j];
 
   for(int k=0; k<num_chare_z; k++)
     if(k != indexZ)
-      compute(thisIndex.x, thisIndex.y, k).receiveA(indexZ, dataA, subBlockDimX * blockDimY);
+      compute(thisIndex.x, thisIndex.y, k).receiveA(indexZ, dataA, subBlockDimXz * blockDimY);
 }
 
 void Compute::sendB() {
   int indexX = thisIndex.x;
-  float *dataB = new float[subBlockDimY * blockDimZ];
-  for(int j=0; j<subBlockDimY; j++)
+  float *dataB = new float[subBlockDimYx * blockDimZ];
+  for(int j=0; j<subBlockDimYx; j++)
     for(int k=0; k<blockDimZ; k++)
-      dataB[j*blockDimZ + k] = B[indexX*subBlockDimY*blockDimZ + j*blockDimZ + k];
+      dataB[j*blockDimZ + k] = B[indexX*subBlockDimYx*blockDimZ + j*blockDimZ + k];
 
   for(int i=0; i<num_chare_x; i++)
     if(i != indexX)
-      compute(i, thisIndex.y, thisIndex.z).receiveB(indexX, dataB, subBlockDimY * blockDimZ);
+      compute(i, thisIndex.y, thisIndex.z).receiveB(indexX, dataB, subBlockDimYx * blockDimZ);
+}
+
+void Compute::sendC() {
+  int indexY = thisIndex.y;
+  float *dataC = new float[subBlockDimXy * blockDimZ];
+  for(int j=0; j<num_chare_y; j++) {
+    if(j !=indexY) {
+      for(int i=0; i<subBlockDimXy; i++)
+	for(int k=0; k<blockDimZ; k++)
+	  dataC[i*blockDimZ + k] = C[j*subBlockDimXy*blockDimZ + i*blockDimZ + k];
+      compute(thisIndex.x, j, thisIndex.z).receiveC(dataC, subBlockDimXy * blockDimZ);
+    }
+  }
 }
 
 void Compute::receiveA(int indexZ, float *data, int size) {
-  for(int i=0; i<subBlockDimX; i++)
+  for(int i=0; i<subBlockDimXz; i++)
     for(int j=0; j<blockDimY; j++)
-      A[indexZ*subBlockDimX*blockDimY + i*blockDimY + j] = data[i*blockDimY + j];
+      A[indexZ*subBlockDimXz*blockDimY + i*blockDimY + j] = data[i*blockDimY + j];
   countA++;
   if(countA == num_chare_z-1)
     doWork();
 }
 
 void Compute::receiveB(int indexX, float *data, int size) {
-  for(int j=0; j<subBlockDimY; j++)
+  for(int j=0; j<subBlockDimYx; j++)
     for(int k=0; k<blockDimZ; k++)
-      B[indexX*subBlockDimY*blockDimZ + j*blockDimZ + k] = data[j*blockDimZ + k];
+      B[indexX*subBlockDimYx*blockDimZ + j*blockDimZ + k] = data[j*blockDimZ + k];
   if(countB == num_chare_x-1)
     doWork();
+}
+
+void Compute::receiveC(float *data, int size) {
+  int indexY = thisIndex.y;
+  for(int i=0; i<subBlockDimXy; i++)
+    for(int k=0; k<blockDimZ; k++)
+      C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k] = data[i*blockDimZ + k];
+  countC++;
+  if(countC == num_chare_y-1)
+    mainProxy.done();
 }
 
 void Compute::doWork() {
@@ -183,7 +207,7 @@ void Compute::doWork() {
 	for(int k=0; k<blockDimZ; k++)
 	  C[i*blockDimZ+k] = A[i*blockDimY+j] * B[j*blockDimZ+k];
   }
-  mainProxy.done();
+  sendC();
 }
 
 ComputeMap::ComputeMap(int x, int y, int z, int tx, int ty, int tz) {

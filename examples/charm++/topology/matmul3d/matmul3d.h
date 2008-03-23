@@ -29,9 +29,9 @@
 /*readonly*/ int num_chare_y;
 /*readonly*/ int num_chare_z;
 /*readonly*/ int num_chares;
-/*readonly*/ int subBlockDimX;
-/*readonly*/ int subBlockDimY;
-/*readonly*/ int subBlockDimZ;
+/*readonly*/ int subBlockDimXz;
+/*readonly*/ int subBlockDimYx;
+/*readonly*/ int subBlockDimXy;
 
 static unsigned long next = 1;
 
@@ -41,7 +41,7 @@ int myrand(int numpes) {
 }
 
 #define USE_TOPOMAP	0
-#define USE_BLOCKMAP	0
+#define USE_BLOCKMAP	1
 
 double startTime;
 double endTime;
@@ -63,7 +63,7 @@ class Main : public CBase_Main {
 class Compute: public CBase_Compute {
   public:
     float *A, *B, *C;
-    int countA, countB;
+    int countA, countB, countC;
     
     Compute();
     Compute(CkMigrateMessage* m);
@@ -72,8 +72,10 @@ class Compute: public CBase_Compute {
     void beginCopying();
     void sendA();
     void sendB();
+    void sendC();
     void receiveA(int indexZ, float *data, int size);
     void receiveB(int indexX, float *data, int size);
+    void receiveC(float *data, int size);
     void doWork();
 };
 
