@@ -201,7 +201,7 @@ void Compute::receiveC(float *data, int size) {
 }
 
 void Compute::doWork() {
-  if(countA == num_chare_z-1 && countA == num_chare_z-1) {
+  if(countA == num_chare_z-1 && countB == num_chare_x-1) {
     for(int i=0; i<blockDimX; i++)
       for(int j=0; j<blockDimY; j++)
 	for(int k=0; k<blockDimZ; k++)
