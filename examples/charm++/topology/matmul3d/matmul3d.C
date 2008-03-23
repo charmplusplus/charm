@@ -194,7 +194,7 @@ void Compute::receiveC(float *data, int size) {
   int indexY = thisIndex.y;
   for(int i=0; i<subBlockDimXy; i++)
     for(int k=0; k<blockDimZ; k++)
-      C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k] = data[i*blockDimZ + k];
+      C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k] += data[i*blockDimZ + k];
   countC++;
   if(countC == num_chare_y-1)
     mainProxy.done();
@@ -205,7 +205,7 @@ void Compute::doWork() {
     for(int i=0; i<blockDimX; i++)
       for(int j=0; j<blockDimY; j++)
 	for(int k=0; k<blockDimZ; k++)
-	  C[i*blockDimZ+k] = A[i*blockDimY+j] * B[j*blockDimZ+k];
+	  C[i*blockDimZ+k] += A[i*blockDimY+j] * B[j*blockDimZ+k];
   }
   sendC();
 }
