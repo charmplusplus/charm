@@ -536,6 +536,14 @@ void CmiAbort(const char *message)
   
   /* CmiDestoryLocks();  */
 
+  {
+/*    char str[22];
+    snprintf(str,18,"dead.%d",CmiMyPe());
+    FILE *fp = fopen(str,"w");
+    fprintf(fp,"Abort:%s\n",message);
+    fclose(fp);*/
+  }
+
   CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
   	"Reason: %s\n",CmiMyPe(),message);
   CmiPrintStackTrace(0);
@@ -1524,7 +1532,7 @@ static void node_addresses_obtain(char **argv)
 		
 		/*We get the other node addresses from a message sent
   	  back via the charmrun control port.*/
-  	if (!skt_select1(Cmi_charmrun_fd,600*1000)) {
+  	if (!skt_select1(Cmi_charmrun_fd,1200*1000)) {
 			MACHSTATE(3,"Aborting due to timeout");
 			CmiAbort("Timeout waiting for nodetab!\n");
 		}
