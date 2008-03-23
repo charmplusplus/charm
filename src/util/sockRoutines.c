@@ -415,7 +415,11 @@ int skt_recvN(SOCKET hSocket,void *buff,int nBytes)
   nLeft = nBytes;
   while (0 < nLeft)
   {
+#if CMK_USE_IBVERBS
+    if (0==skt_select1(hSocket,600*1000))
+#else
     if (0==skt_select1(hSocket,60*1000))
+#endif
 	return skt_abort(93610,"Timeout on socket recv!");
     skt_ignore_SIGPIPE=1;
     nRead = recv(hSocket,pBuff,nLeft,0);
