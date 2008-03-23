@@ -1,0 +1,64 @@
+// Read-only global variables
+
+/*readonly*/ CProxy_Main mainProxy;
+/*readonly*/ CProxy_Compute compute;
+
+/*readonly*/ int arrayDimX;
+/*readonly*/ int arrayDimY;
+
+/*readonly*/ int blockDimX;
+/*readonly*/ int blockDimY;
+
+/*readonly*/ int torusDimX;
+/*readonly*/ int torusDimY;
+
+/*readonly*/ int num_chare_x;
+/*readonly*/ int num_chare_y;
+
+static unsigned long next = 1;
+
+int myrand(int numpes) {
+  next = next * 1103515245 + 12345;
+  return((unsigned)(next/65536) % numpes);
+}
+
+#define USE_TOPOMAP	0
+#define USE_RRMAP	0
+#define USE_RNDMAP	0
+
+
+#define UNROLL_DEPTH 3
+#define MAGIC_A 1
+#define MAGIC_B 2
+
+class Main : public CBase_Main {
+  
+  double startTime;
+  double endTime;
+  
+  public:    
+  Main(CkArgMsg* m);
+  void done();
+};
+
+class Compute: public CBase_Compute {
+  int step;
+  float *A[2], *B[2], *C;
+
+  int row, col;
+  int remaining;
+  int whichLocal;
+  int iteration;
+
+
+  public:
+  Compute();
+  Compute(CkMigrateMessage* m);
+  ~Compute();
+
+  void compute();
+  void recvBlockA(float *block, int size, int whichBuf);
+  void recvBlockB(float *block, int size, int whichBuf);
+  void resumeFromBarrier();
+
+};
