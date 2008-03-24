@@ -18,7 +18,7 @@ matmul2d.decl.h: matmul2d.ci
 	$(CHARMC)  matmul2d.ci
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o matmul2d matmul2d.prj charmrun *~
+	rm -f *.decl.h *.def.h conv-host *.o matmul2d matmul2d.prj charmrun *~ mat.*
 
 matmul2d.o: matmul2d.C matmul2d.h matmul2d.decl.h
 	$(CHARMC) -c matmul2d.C 
