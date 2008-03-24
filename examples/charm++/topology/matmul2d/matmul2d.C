@@ -1,6 +1,14 @@
 #include "matmul2d.decl.h"
 #include "matmul2d.h"
 #include "TopoManager.h"
+/*
+#include <cstdio>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+*/
+#include "stdio.h"
+#include "stdlib.h"
 
 Main::Main(CkArgMsg* m) {
   if ( (m->argc != 3) && (m->argc != 5) && (m->argc != 7) ) {
@@ -46,7 +54,7 @@ Main::Main(CkArgMsg* m) {
   num_chare_y = arrayDimY / blockDimY;
 
   // print info
-  CkPrintf("Running Matrix Multiplication on %d processors with (%d, %d, %d) chares\n", CkNumPes(), num_chare_x, num_chare_y);
+  CkPrintf("Running Matrix Multiplication on %d processors with (%d, %d) chares\n", CkNumPes(), num_chare_x);
   CkPrintf("Array Dimensions: %d %d\n", arrayDimX, arrayDimY);
   CkPrintf("Block Dimensions: %d %d\n", blockDimX, blockDimY);
   CkPrintf("Chare-array Dimensions: %d %d\n", num_chare_x, num_chare_y);
@@ -56,7 +64,10 @@ Main::Main(CkArgMsg* m) {
 
   // Start the computation
   startTime = CmiWallTimer();
-  compute.compute();
+  if(num_chare_x == 1 && num_chare_y == 1)
+    compute(0,0).compute();
+  else
+    compute.start();
 }
 
 void Main::done(){
@@ -74,10 +85,12 @@ Compute::Compute() {
   }
   C = new float[blockDimX*blockDimY];
 
-  memset(A[0], MAGIC_A, sizeof(float)*(blockDimX*blockDimY));
-  memset(B[0], MAGIC_B, sizeof(float)*(blockDimX*blockDimY));
-  memset(C, 0, sizeof(float)*(blockDimX*blockDimY));
-
+  for(int i = 0; i < blockDimX*blockDimY; i++){
+    A[0][i] = MAGIC_A;
+    B[0][i] = MAGIC_B;
+    C[i] = 0;
+  }
+    
   step = 0;  
   row = thisIndex.y;
   col = thisIndex.x;
@@ -98,17 +111,64 @@ Compute::~Compute() {
   delete [] C;
 }
 
+void Compute::start(){
+  int newBuf = 1 - whichLocal;
+  //1. send A
+  Compute *c = thisProxy((col-row+num_chare_x)%num_chare_x, row).ckLocal();
+  if(c == 0){
+    thisProxy((col-row+num_chare_x)%num_chare_x, row).recvBlockA(A[whichLocal], blockDimX*blockDimY, newBuf);
+  }
+  else{
+    c->recvBlockA(A[whichLocal], blockDimX*blockDimY, newBuf);
+  }
+  
+  //2. send B
+  c = thisProxy(col, (row-col+num_chare_y)%num_chare_y).ckLocal();
+  if(c == 0){
+    thisProxy(col, (row-col+num_chare_y)%num_chare_y).recvBlockB(B[whichLocal], blockDimX*blockDimY, newBuf);
+  }
+  else{
+    c->recvBlockB(B[whichLocal], blockDimX*blockDimY, newBuf);
+  }
+
+  whichLocal = newBuf;
+}
+
 void Compute::compute(){
+  //int count = 0;
   for(int i = 0; i < blockDimX; i++){
     for(int j = 0; j < blockDimX; j++){
       for(int k = 0; k < blockDimX; k++){
-        C[i*blockDimX+j] += A[whichLocal][i*blockDimX+k] + B[whichLocal][k*blockDimX+j];
+        //CkPrintf("%d: C[%d,%d]: %f\n", count, i, j, C[i*blockDimX+j]);
+        C[i*blockDimX+j] += A[whichLocal][i*blockDimX+k]*B[whichLocal][k*blockDimX+j];
+        //count++;
       }
     }
   }
   remaining = 2;
   iteration++;
   if(iteration == num_chare_x){
+#ifdef MATMUL2D_WRITE_FILE
+    // create a file
+    //ostringstream oss;
+    char buf[128];
+    
+    sprintf(buf, "mat.%d.%d", row, col);
+    //oss << "mat." << row << "." << col;
+    //ofstream ofs(oss.str().c_str());
+    FILE *fp = fopen(buf, "w");
+
+    for(int i = 0; i < blockDimX; i++){
+      for(int j = 0; j < blockDimX; j++){
+        //ofs << C[i*blockDimX+j];
+        fprintf(fp, "%f ", C[i*blockDimX+j]);
+      }
+      //ofs << endl;
+      fprintf(fp, "\n");
+
+    }
+    fclose(fp);
+#endif
     contribute(0,0,CkReduction::concat, CkCallback(CkIndex_Main::done(), mainProxy));
   }
   else{
@@ -133,25 +193,25 @@ void Compute::resumeFromBarrier(){
 
   Compute *c = thisProxy((col-1+num_chare_x)%num_chare_x, row).ckLocal();
   if(c == 0){
-    thisProxy((col-1+num_chare_x)%num_chare_x, row).recvBlockA(A[whichLocal], blockDimX, newBuf);
+    thisProxy((col-1+num_chare_x)%num_chare_x, row).recvBlockA(A[whichLocal], blockDimX*blockDimY, newBuf);
   }
   else{
-    c->recvBlockA(A[whichLocal], blockDimX, newBuf);
+    c->recvBlockA(A[whichLocal], blockDimX*blockDimY, newBuf);
   }
   // 2. Then put B
   c =  thisProxy(col, (row-1+num_chare_y)%num_chare_y).ckLocal();
   if(c == 0){
-    thisProxy(col, (row-1+num_chare_y)%num_chare_y).recvBlockB(B[whichLocal], blockDimX, newBuf);
+    thisProxy(col, (row-1+num_chare_y)%num_chare_y).recvBlockB(B[whichLocal], blockDimX*blockDimY, newBuf);
   }
   else{
-    c->recvBlockB(B[whichLocal], blockDimX, newBuf);
+    c->recvBlockB(B[whichLocal], blockDimX*blockDimY, newBuf);
   }
   // toggle between local buffers
   whichLocal = newBuf;
 }
 
 void Compute::recvBlockA(float *block, int size, int whichBuf){
-  memcpy(A[whichBuf], block, size);
+  memcpy(A[whichBuf], block, sizeof(float)*size);
   remaining--;
   if(remaining == 0){
     compute();
@@ -159,11 +219,26 @@ void Compute::recvBlockA(float *block, int size, int whichBuf){
 }
 
 void Compute::recvBlockB(float *block, int size, int whichBuf){
-  memcpy(B[whichBuf], block, size);
+  memcpy(B[whichBuf], block, sizeof(float)*size);
   remaining--;
   if(remaining == 0){
     compute();
   }
 }
 
+ComputeMap::ComputeMap(int _adx, int _ady){
+  arrayDimX = _adx;
+  arrayDimY = _ady;
+
+  map = new int[_adx*_ady];
+  
+}
+
+int ComputeMap::procNum(int arrayHdl, const CkArrayIndex &idx){
+  int *index = (int *)(idx.data());
+  int row = index[1];
+  int col = index[0];
+
+  return map[row*arrayDimX + col];
+}
 #include "matmul2d.def.h"

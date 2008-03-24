@@ -18,9 +18,14 @@ mainmodule matmul2d {
 
   array [2D] Compute {
     entry Compute(void);
+    entry void start();
     entry void compute();
     entry void recvBlockA(float arr[size], int size, int whichBuf);
     entry void recvBlockB(float arr[size], int size, int whichBuf);
     entry void resumeFromBarrier();
+  };
+
+  group ComputeMap : CkArrayMap {
+    entry ComputeMap(int x, int y);
   };
 };

@@ -28,8 +28,8 @@ int myrand(int numpes) {
 
 
 #define UNROLL_DEPTH 3
-#define MAGIC_A 1
-#define MAGIC_B 2
+#define MAGIC_A 1.0
+#define MAGIC_B 4.0
 
 class Main : public CBase_Main {
   
@@ -56,9 +56,23 @@ class Compute: public CBase_Compute {
   Compute(CkMigrateMessage* m);
   ~Compute();
 
+  void start();
   void compute();
   void recvBlockA(float *block, int size, int whichBuf);
   void recvBlockB(float *block, int size, int whichBuf);
   void resumeFromBarrier();
+
+};
+
+class ComputeMap : public CBase_ComputeMap {
+  
+  int arrayDimX, arrayDimY;
+
+  int *map;
+
+  public:
+  ComputeMap(int, int);
+  ~ComputeMap(){delete []map;}
+  int procNum(int, const CkArrayIndex &idx);
 
 };
