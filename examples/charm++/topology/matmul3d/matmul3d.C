@@ -111,9 +111,18 @@ Compute::Compute() {
   A = new float[blockDimX*blockDimY];
   B = new float[blockDimY*blockDimZ];
   C = new float[blockDimX*blockDimZ];
-  memset(A, 1, sizeof(float)*(blockDimX*blockDimY));
-  memset(B, 2, sizeof(float)*(blockDimY*blockDimZ));
-  memset(C, 0, sizeof(float)*(blockDimX*blockDimZ));
+
+  for(int i=0; i<blockDimX; i++)
+    for(int j=0; j<blockDimY; j++)
+      A[i*blockDimY + j] = 1.0;
+
+  for(int j=0; j<blockDimY; j++)
+    for(int k=0; k<blockDimZ; k++)
+      B[j*blockDimZ + k] = 2.0;
+  
+  for(int i=0; i<blockDimX; i++)
+    for(int k=0; k<blockDimZ; k++)
+      C[i*blockDimZ + k] = 0.0;
 
   // counters to keep track of how many messages have been received
   countA = 0;
@@ -186,6 +195,7 @@ void Compute::receiveB(int indexX, float *data, int size) {
   for(int j=0; j<subBlockDimYx; j++)
     for(int k=0; k<blockDimZ; k++)
       B[indexX*subBlockDimYx*blockDimZ + j*blockDimZ + k] = data[j*blockDimZ + k];
+  countB++;
   if(countB == num_chare_x-1)
     doWork();
 }
@@ -196,8 +206,18 @@ void Compute::receiveC(float *data, int size) {
     for(int k=0; k<blockDimZ; k++)
       C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k] += data[i*blockDimZ + k];
   countC++;
-  if(countC == num_chare_y-1)
+  if(countC == num_chare_y-1) {
+    /*char name[30];
+    sprintf(name, "%s_%d_%d_%d", "C", thisIndex.x, thisIndex.y, thisIndex.z);
+    FILE *fp = fopen(name, "w");
+    for(int i=0; i<subBlockDimXy; i++) {
+      for(int k=0; k<blockDimZ; k++)
+	fprintf(fp, "%f ", C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k]);
+      fprintf(fp, "\n");
+    }
+    fclose(fp);*/
     mainProxy.done();
+  }
 }
 
 void Compute::doWork() {
@@ -206,8 +226,8 @@ void Compute::doWork() {
       for(int j=0; j<blockDimY; j++)
 	for(int k=0; k<blockDimZ; k++)
 	  C[i*blockDimZ+k] += A[i*blockDimY+j] * B[j*blockDimZ+k];
+    sendC();
   }
-  sendC();
 }
 
 ComputeMap::ComputeMap(int x, int y, int z, int tx, int ty, int tz) {
