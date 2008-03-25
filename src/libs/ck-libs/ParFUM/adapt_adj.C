@@ -63,6 +63,10 @@ inline void addElementNodeSetData(
         e->next = faceTable[minNode].adjElemList->next;
         faceTable[minNode].adjElemList->next = e;
         faceTable[minNode].adjElemCount++;
+        //printf("Adding element %d face nodeset [ ", elem);
+        //for (int i=0; i<faceSize; ++i)
+        //	printf("%d ", e->nodeSet[i]);
+        //printf("]\n");
     }
 
     // then add edge adjacencies
@@ -81,6 +85,11 @@ inline void addElementNodeSetData(
             e->next = edgeTable[minNode].adjElemList->next;
             edgeTable[minNode].adjElemList->next = e;
             edgeTable[minNode].adjElemCount++;
+        
+            //printf("Adding element %d edge nodeset [ ", elem);
+            //for (int i=0; i<2; ++i)
+            //	printf("%d ", e->nodeSet[i]);
+            //printf("]\n");
         }
     }
 }
@@ -99,23 +108,30 @@ inline adjElem *searchAdjElemInList(adjElem *adjStart, int *searchForNodeSet,
     *found = 0;
 
     while (rover->next != NULL) {
-        if (rover->next->elemID != searchForElemID) {
+    	if (rover->next->elemID != searchForElemID) {
+            //printf("looking for a match between %d and %d...", searchForElemID, rover->next->elemID);
             *found = 1; // found an element that is not myself, 
                         // possibly a match
 
             if (nodeSetSize != rover->next->nodeSet.size()) {
                 *found = 0; // not a match
+                //printf("nope\n");
                 continue; 
             }
             for (int j=0; j<nodeSetSize; j++) {
                 if (rover->next->nodeSet[j] != searchForNodeSet[j]) {
-                    *found = 0; // not a match
+                    //printf("nope\n");
+                	*found = 0; // not a match
                     break;
                 }
             }
         }
         if (*found) {
-            break; // We have found a nodeSet that matches adjStart
+            //printf(" [ ");
+            //for (int i=0; i<nodeSetSize; ++i)
+            //	printf("%d ", searchForNodeSet[i]);
+            //printf("]\n");
+        	break; // We have found a nodeSet that matches adjStart
         } else {
             rover = rover->next; // Keep looking for matching nodeSet
         }
@@ -436,13 +452,14 @@ void fillLocalAdaptAdjacencies(
     adjNode* adjTables[2] = { faceTable, edgeTable };
     adjNode* adaptAdjTable;
 
-    for (int table=0; table<2; ++table) {
+    for (int table=0; table<1; ++table) {
         adaptAdjTable = adjTables[table];
         for (int i=0; i<numNodes; i++) { 
             if (!adaptAdjTable) continue;
             // For each node, match up incident elements
             // Each adjacency between two elements is represented by two 
             // adjElems. We try to match those up
+            printf("searching node %d\n", i);
             if(node->is_valid(i) && adaptAdjTable[i].adjElemList != NULL){  
                 // CkAssert(adaptAdjTable[i].adjElemList != NULL);
                 adjElem *preTarget = adaptAdjTable[i].adjElemList;
@@ -477,6 +494,15 @@ void fillLocalAdaptAdjacencies(
                                 faceMapSize*rover->next->elemID + 
                                 rover->next->nodeSetID] = adaptAdj(
                                         myRank, target->elemID, elemType);
+
+                            // Remove both elem-nodeSet pairs from the list
+                            adjElem *tmp = rover->next;
+                            rover->next = rover->next->next;
+                            //delete tmp;
+                            tmp = target;
+                            preTarget->next = target->next;
+                            //delete tmp;
+                            
                         } else if (table == 1) { // working on edge nodesets
                             adaptEdgeAdjacencies[edgeMapSize*target->elemID + 
                                 target->nodeSetID]->push_back(adaptAdj(
@@ -491,14 +517,8 @@ void fillLocalAdaptAdjacencies(
                                             elemType));
                         }
                         
-                        // Remove both elem-nodeSet pairs from the list
-                        adjElem *tmp = rover->next;
-                        rover->next = rover->next->next;
-                        //delete tmp;
-                        tmp = target;
-                        preTarget->next = target->next;
                         target = target->next;
-                        //delete tmp;
+
                     } else { 
                         // No match for target was found in adjElemList
                         // This means that either target is on the domain 
@@ -512,6 +532,70 @@ void fillLocalAdaptAdjacencies(
             }
         }
     }
+    
+   
+    adaptAdjTable = edgeTable;
+	for (int i=0; i<numNodes; i++) {
+		if (!adaptAdjTable)
+			continue;
+		// For each node, match up incident elements
+		// Each adjacency between two elements is represented by two 
+		// adjElems. We try to match those up
+		printf("searching node %d\n", i);
+		if (node->is_valid(i) && adaptAdjTable[i].adjElemList != NULL) {
+			adjElem *preTarget = adaptAdjTable[i].adjElemList;
+			adjElem *target = adaptAdjTable[i].adjElemList->next;
+			printf("adjElemList for node %d [ ", i);
+			while (preTarget != NULL) {
+				printf("%d ", preTarget->elemID);
+				preTarget = preTarget->next;
+			}
+			printf("]\n");
+			
+			preTarget = adaptAdjTable[i].adjElemList;
+			target = preTarget->next;
+			while (target != NULL) { //loop over adjElemList of a node
+				//if (target->elemID >= preTarget->elemID) {
+				//	target = target->next;
+				//	continue;
+				//}
+				int found = 0;
+				// target represents an adjacency between two elements
+				// We search for the other adjElem corresponding to that 
+				// adjancency:
+				// Look for an entry in adjElemList after target such that 
+				// the nodeset of that entry and that of target match but 
+				// they do not belong to the same element. 
+				adjElem *rover = searchAdjElemInList(preTarget,
+						target->nodeSet.getVec(), target->nodeSet.size(),
+						target->elemID, &found);
+
+				while (found) {
+					// We found a local element adjacent to target->elemID
+					// Set adjacency of target->elemID corresponding to 
+					// nodeSet to rover->next->elemID, and vice versa
+					// Store adjacency info in adaptAdjacency of each one 
+					// and use nodeSetID to index into adaptAdjacency
+				    
+					//printf("adding adj for elem %d position %d (%d %d %d)\n", target->elemID, target->nodeSetID, myRank, rover->next->elemID, elemType);
+					
+					adaptEdgeAdjacencies[edgeMapSize*target->elemID +
+					target->nodeSetID]->push_back(adaptAdj(myRank,
+							rover->next->elemID, elemType));
+					//adaptEdgeAdjacencies[
+					//edgeMapSize*rover->next->elemID +
+					//rover->next->nodeSetID]->push_back(adaptAdj(myRank,
+					//		target->elemID, elemType));
+					
+					rover = searchAdjElemInList(rover->next,
+						target->nodeSet.getVec(), target->nodeSet.size(),
+						target->elemID, &found);
+				}
+				target = target->next;
+			}
+		}
+	}
+
 }
 
 
@@ -530,7 +614,7 @@ void makeAdjacencyRequests(
             if (adaptAdjTable[i].adjElemList->next!=NULL) {
                 adjElem *adjStart = adaptAdjTable[i].adjElemList->next;
                 while (adjStart !=NULL) {
-                    // create and empty set, commonSharedChunks
+                    // create an empty set, commonSharedChunks
                     std::set<int> commonSharedChunks;
                     for (int j=0; j<nodeSetSize; j++) {
                         // look up sharedWithPartitions for node: 
@@ -790,7 +874,7 @@ void getAndDumpAdaptAdjacencies(
     for (int j=0; j<edgeMapSize; j++) {
       CkVec<adaptAdj>* entry = getEdgeAdaptAdj(meshid, i, elemType, j);
       for (int k=0; k<entry->size(); ++k) {
-	printf("(%d,%d,%d)", (*entry)[k].partID, (*entry)[k].localID, 
+    	  printf("(%d,%d,%d)", (*entry)[k].partID, (*entry)[k].localID, 
 	       (*entry)[k].elemType);
       }
       if (j < (edgeMapSize-1)) printf(" | ");
@@ -1045,6 +1129,59 @@ void removeFromAdaptAdj(
     }
     CkAbort("removeFromAdaptAdj did not find the specified nbr");
 }
+
+
+void copyAdaptAdj(
+		const int meshid, 
+		const adaptAdj* const srcElem, 
+		const adaptAdj* const destElem)
+{
+    FEM_Mesh* meshPtr = FEM_chunk::get("ReplaceAdaptAdj")->lookup(
+            meshid,"ReplaceAdaptAdj");
+    copyAdaptAdj(meshPtr, srcElem, destElem);
+}
+
+
+void copyAdaptAdj(
+		const FEM_Mesh* const meshPtr, 
+		const adaptAdj* const srcElem, 
+		const adaptAdj* const destElem)
+{
+    int numAdjacencies;
+    adaptAdj* adaptAdjTable = lookupAdaptAdjacencies(meshPtr, srcElem->elemType,
+            &numAdjacencies);
+    memcpy(&adaptAdjTable[destElem->localID*numAdjacencies],
+    		&adaptAdjTable[srcElem->localID*numAdjacencies],
+    		numAdjacencies*sizeof(adaptAdj));
+}
+
+
+void copyEdgeAdaptAdj(
+		const int meshid, 
+		const adaptAdj* const srcElem, 
+		const adaptAdj* const destElem)
+{
+    FEM_Mesh* meshPtr = FEM_chunk::get("ReplaceAdaptAdj")->lookup(
+            meshid,"ReplaceAdaptAdj");
+    copyEdgeAdaptAdj(meshPtr, srcElem, destElem);
+}
+
+
+void copyEdgeAdaptAdj(
+		const FEM_Mesh* const meshPtr, 
+		const adaptAdj* const srcElem, 
+		const adaptAdj* const destElem)
+{
+    int numAdjacencies;
+    CkVec<adaptAdj>** adaptAdjTable = lookupEdgeAdaptAdjacencies(meshPtr, 
+    		srcElem->elemType, &numAdjacencies);
+    
+    CkVec<adaptAdj>* src = adaptAdjTable[srcElem->localID];
+    CkVec<adaptAdj>* dst = adaptAdjTable[destElem->localID];
+    *dst = *src; // let CkVec operator= do the work
+}
+
+
 
 /** Lookup elemID in elemType array and search for the face which has 
  *  originalNbr as a neighbor, then replace originalNbr with newNbr

@@ -130,8 +130,8 @@ class adjNode { // struct to store each node's adjacency info
             numSharedPartitions=0;
         }
         ~adjNode() { 
-            delete [] sharedWithPartition; 
-            delete [] sharedWithLocalIdx;
+            //delete [] sharedWithPartition; 
+            //delete [] sharedWithLocalIdx;
         }
 };
 
@@ -293,6 +293,27 @@ void removeFromAdaptAdj(
         const adaptAdj elem, 
         const int edgeID, 
         const adaptAdj nbr);
+
+/** Copy adjacency information
+ */
+void copyAdaptAdj(
+		const int meshid, 
+		const adaptAdj* const srcElem, 
+		const adaptAdj* const destElem);
+void copyAdaptAdj(
+		const FEM_Mesh* const meshPtr, 
+		const adaptAdj* const srcElem, 
+		const adaptAdj* const destElem);
+
+void copyEdgeAdaptAdj(
+		const int meshid, 
+		const adaptAdj* const srcElem, 
+		const adaptAdj* const destElem);
+void copyEdgeAdaptAdj(
+		const FEM_Mesh* const meshPtr, 
+		const adaptAdj* const srcElem, 
+		const adaptAdj* const destElem);
+
 
 /** Substitute an old neighbor with a new neighbor, assumes 2D or 3D-face 
     neighbor */
