@@ -1,0 +1,28 @@
+mainmodule stencil3d{
+  readonly CProxy_Main mainProxy;
+  readonly int dim;
+  readonly int blockDim;
+  readonly int num_iterations;
+
+  mainchare Main{
+    entry Main(CkArgMsg *m);
+    entry void done();
+  };
+
+  array [3D] StencilPoint {
+    entry StencilPoint(void);
+    // with CkDirect
+    entry void setupChannels(void);
+    entry void notify(int node, int whichBoundary, CkIndex3D whoSent);
+    entry void recvHandle(infiDirectUserHandle handle, int whichBoundary);
+    entry void allReadyCallback(CkReductionMsg *msg);
+    
+    entry void compute();   
+
+
+    // when not using CkDirect
+    entry void sendData();
+    entry void recvBuffer(float arr[size], int size, int which);
+    
+  };
+};
