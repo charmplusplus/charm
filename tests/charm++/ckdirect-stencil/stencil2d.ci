@@ -1,0 +1,20 @@
+mainmodule stencil2d{
+  readonly CProxy_Main mainProxy;
+  readonly int dim;
+  readonly int blockDim;
+  readonly int num_iterations;
+
+  mainchare Main{
+    entry Main(CkArgMsg *m);
+    entry void done();
+  };
+
+  array [3D] StencilPoint {
+    entry StencilPoint(void);
+    entry void notify(int node, int whichBoundary, CkIndex2D whoSent);
+    entry void recvHandle(infiDirectUserHandle handle, int whichBoundary);
+     entry void compute();   
+    entry void setupChannels(void);
+    entry void allReadyCallback(CkReductionMsg *msg);
+  };
+};
