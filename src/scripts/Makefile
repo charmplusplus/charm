@@ -361,7 +361,7 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 
 LIBCONV_UTILF=pup_f.o
 
-converse: basics converse-target
+converse: basics
 	$(MAKE) QuickThreads/libqt.a
 	$(MAKE) converse-target
 
