@@ -793,7 +793,10 @@ Debug "Read config script, setting defaults..."
 Debug "Setting vars..."
 
 # Now that we have read the config file, if python is requested, add the correct version
-POST_LIBRARIES=`AddList $POST_LIBRARIES -lpython${CMK_BUILD_PYTHON}`
+if [ -n "$CMK_BUILD_PYTHON" ]
+then
+	POST_LIBRARIES=`AddList $POST_LIBRARIES -lpython${CMK_BUILD_PYTHON}`
+fi
 
 if [ "$BUILD_SHARE" = "1" ]
 then
