@@ -3,20 +3,13 @@
 
 #define NITER 1000
 #define PAYLOAD 100
+
 #ifdef CMK_USE_IBVERBS 
-
-
 extern "C" {
-  struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData,double initialValue);
-  //  int CmiDirect_createHandle(int senderProc,void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData);
-
-  void CmiDirect_assocLocalBuffer(int recverNode,struct infiDirectUserHandle *userHandle,void *sendBuf,int sendBufSize);
-  //  void CmiDirect_assocLocalBuffer(int recverProc,int handle,void *sendBuf,int sendBufSize);
-  void CmiDirect_put(struct infiDirectUserHandle *userHandle);
-  void CmiDirect_ready(struct infiDirectUserHandle *userHandle);
-    //void CmiDirect_put(int recverProc,int handle);
+#include "cmidirect.h"
 }
 #endif
+
 class Fancy
 {
   char _str[12];
@@ -35,17 +28,6 @@ class CkArrayIndexFancy : public CkArrayIndex {
 };
 
 #include "pingpong.decl.h"
-#ifdef CMK_USE_IBVERBS 
-struct infiDirectUserHandle{
-	int handle;
-	int senderNode;
-	int recverNode;
-	void *recverBuf;
-	int recverBufSize;
-	char recverKey[32];
-	double initialValue;
-};
-#endif
 class PingMsg : public CMessage_PingMsg
 {
   public:
@@ -240,7 +222,7 @@ public:
 #ifdef CMK_USE_IBVERBS 
     struct infiDirectUserHandle *_shandle=(struct infiDirectUserHandle *) ptr;
     shandle=*_shandle;
-    CmiDirect_assocLocalBuffer(nbr,&shandle,sbuff,payload);
+    CmiDirect_assocLocalBuffer(&shandle,sbuff,payload);
 #endif
   }
   void start(void)

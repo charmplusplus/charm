@@ -1123,7 +1123,7 @@ static inline void processAsyncEvents(){
 	
 }
 
-void pollCmiDirectQ();
+static void pollCmiDirectQ();
 
 static inline  void CommunicationServer_nolock(int toBuffer) {
 	int processed;
@@ -2247,8 +2247,6 @@ send and receive data from the middle of his arrays without any copying on eithe
 side
 *********************************************************************************************/
 
-#define MAXHANDLES 512
-
 struct infiDirectRequestPacket{
 	int senderProc;
 	int handle;
@@ -2257,16 +2255,9 @@ struct infiDirectRequestPacket{
 	int senderBufSize;
 };
 
-static struct infiDirectUserHandle{
-	int handle;
-	int senderNode;
-	int recverNode;
-	void *recverBuf;
-	int recverBufSize;
-	char recverKey[32];
-	double initialValue;
-};
+#include "cmidirect.h"
 
+#define MAXHANDLES 512
 typedef struct {
 	int id;
 	void *buf;
@@ -2289,7 +2280,14 @@ typedef struct directPollingQNodeStruct {
 	struct directPollingQNodeStruct *next;
 } directPollingQNode;
 
+// data structures 
+
 directPollingQNode *headDirectPollingQ=NULL,*tailDirectPollingQ=NULL;
+
+static infiDirectHandleTable **sendHandleTable=NULL;
+static infiDirectHandleTable **recvHandleTable=NULL;
+
+static int *recvHandleCount=NULL;
 
 void addHandleToPollingQ(infiDirectHandle *handle){
 	directPollingQNode *newNode = malloc(sizeof(directPollingQNode));
@@ -2321,12 +2319,6 @@ infiDirectHandle *removeHandleFromPollingQ(){
 	free(retNode);
 	return retHandle;
 }*/
-
-
-static infiDirectHandleTable **sendHandleTable=NULL;
-static infiDirectHandleTable **recvHandleTable=NULL;
-
-static int *recvHandleCount=NULL;
 
 static inline infiDirectHandleTable **createHandleTable(){
 	infiDirectHandleTable **table = malloc(_Cmi_numnodes*sizeof(infiDirectHandleTable *));
@@ -2424,10 +2416,12 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
 /****
  To be called on the sender to attach the sender's buffer to this handle
 ******/
-void CmiDirect_assocLocalBuffer(int recverNode,struct infiDirectUserHandle *userHandle,void *sendBuf,int sendBufSize){
+void CmiDirect_assocLocalBuffer(struct infiDirectUserHandle *userHandle,void *sendBuf,int sendBufSize){
 	int tableIdx,idx;
 	int i;
 	int handle = userHandle->handle;
+	int recverNode  = userHandle->recverNode;
+
 	infiDirectHandleTable *table;
 
 	if(sendHandleTable == NULL){
@@ -2575,11 +2569,6 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle){
 		{
 			packet->size = sizeof(struct infiDirectRequestPacket);
 			packet->buf = (char *)(table->handles[idx].packet);
-			packet->header.code = INFIDIRECT_REQUEST;
-			packet->header.nodeNo = _Cmi_mynode;
-			packet->ogm = NULL;
-
-			node = nodes_by_pe[recverProc];
 			struct ibv_mr *packetKey = METADATAFIELD((void *)table->handles[idx].packet)->key;
 			EnqueuePacket(node,packet,sizeof(struct infiDirectRequestPacket),packetKey);
 		}*/
@@ -2587,7 +2576,7 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle){
 
 };
 
-/**** need not be called the first tiem *********/
+/**** need not be called the first time *********/
 void CmiDirect_ready(struct infiDirectUserHandle *userHandle){
 	int handle = userHandle->handle;
 	int tableIdx,idx,i;
@@ -2608,7 +2597,7 @@ void CmiDirect_ready(struct infiDirectUserHandle *userHandle){
 }
 
 
-int receivedDirectMessage(infiDirectHandle *handle){
+static int receivedDirectMessage(infiDirectHandle *handle){
 	int index = handle->size - sizeof(double);
 	double *lastDouble = (double *)(((char *)handle->buf)+index);
 	if(*lastDouble == handle->userHandle.initialValue){
@@ -2621,7 +2610,7 @@ int receivedDirectMessage(infiDirectHandle *handle){
 }
 
 
-void pollCmiDirectQ(){
+static void pollCmiDirectQ(){
 	directPollingQNode *ptr = headDirectPollingQ, *prevPtr=NULL;
 	while(ptr != NULL){
 		if(receivedDirectMessage(ptr->handle)){

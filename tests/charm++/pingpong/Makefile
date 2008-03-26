@@ -1,3 +1,4 @@
+SRC=../../../src
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = pingpong.o
@@ -14,7 +15,7 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o pgm charmrun
 
 pingpong.o: pingpong.C
-	$(CHARMC) -c pingpong.C
+	$(CHARMC) -I$(SRC)/conv-core pingpong.C
 
 test: all
 	@echo "Intra-processor Pingpong.."

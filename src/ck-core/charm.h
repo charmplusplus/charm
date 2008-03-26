@@ -55,6 +55,7 @@ extern "C" {
 #define CkError                 CmiError
 #define CkAbort                 CmiAbort
 #define CkAssert                CmiAssert
+
 extern void  CkExit(void);
 extern char **CkGetArgv(void);
 extern int  CkGetArgc(void);
