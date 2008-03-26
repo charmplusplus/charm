@@ -74,10 +74,13 @@ AMPIF: AMPIC
 
 f90charm: charm++ $(L)/libf90charm.a
 
-default_libs: multicast
+default_libs: multicast pythonCCS
 
 multicast:
 	cd libs/ck-libs/multicast && $(MAKE)
+
+pythonCCS:
+	cd libs/ck-libs/pythonCCS && $(MAKE)
 
 translators: charmxi conv-cpm
 
@@ -358,7 +361,7 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 
 LIBCONV_UTILF=pup_f.o
 
-converse: basics
+converse: basics converse-target
 	$(MAKE) QuickThreads/libqt.a
 	$(MAKE) converse-target
 

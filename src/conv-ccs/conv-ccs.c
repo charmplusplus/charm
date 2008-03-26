@@ -164,6 +164,8 @@ static void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
   if (fn==NULL) {
     CmiPrintf("CCS: Unknown CCS handler name '%s' requested. Ignoring...\n",
 	      hdr->handler);
+    CpvAccess(ccsReq)=hdr;
+    CcsSendReply(0,NULL); /*Send an empty reply to the possibly waiting client*/
     return;
  /*   CmiAbort("CCS: Unknown CCS handler name.\n");*/
   }

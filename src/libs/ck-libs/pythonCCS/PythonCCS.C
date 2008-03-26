@@ -1,9 +1,11 @@
 #include "PythonCCS.h"
 
-CsvDeclare(CmiNodeLock, pyLock);
-CsvDeclare(PythonTable *, pyWorkers);
-CsvDeclare(CmiUInt4, pyNumber);
+//CsvDeclare(CmiNodeLock, pyLock);
+//CsvDeclare(PythonTable *, pyWorkers);
+//CsvDeclare(CmiUInt4, pyNumber);
 CtvDeclare(PyObject *, pythonReturnValue);
+
+CProxy_PythonCCS pythonCcsProxy;
 
 // One-time per-processor setup routine
 // main interface for python to access common charm methods
@@ -14,33 +16,36 @@ static PyObject *CkPy_printstr(PyObject *self, PyObject *args) {
   Py_INCREF(Py_None);return Py_None; //Return-nothing idiom
 }
 
-static inline void Ck_printclient(CmiUInt4 ref, char* str) {
-    CmiLock(CsvAccess(pyLock));
+static inline void Ck_printclient(PythonObject *object, CmiUInt4 ref, char* str) {
+  //  CmiLock(CsvAccess(pyLock));
+  PythonStruct &worker = object->pyWorkers[ref];
   //PythonObject *pyWorker = ((*CsvAccess(pyWorkers))[pyReference]).object;
-  if (((*CsvAccess(pyWorkers))[ref]).clientReady > 0) {
+  //if (((*CsvAccess(pyWorkers))[ref]).clientReady > 0) {
+  if (worker.clientReady > 0) {
     // return the string to the client
     // since there is a client waiting, it means there must not be
     // pending strings to be returned ("printed" is empty)
     //CkPrintf("printing data to the client\n");
-    CcsDelayedReply client = ((*CsvAccess(pyWorkers))[ref]).client;
-    CcsSendDelayedReply(client, strlen(str), str);
-    ((*CsvAccess(pyWorkers))[ref]).printed.erase();
-    ((*CsvAccess(pyWorkers))[ref]).clientReady = 0;
+    CcsSendDelayedReply(worker.client, strlen(str), str);
+    worker.printed.erase();
+    worker.clientReady = 0;
   } else {
     // add the string to those in list to be returned if it is keepPrint
-    if (((*CsvAccess(pyWorkers))[ref]).isKeepPrint) {
-      ((*CsvAccess(pyWorkers))[ref]).printed += std::string(str);
+    if (worker.isKeepPrint) {
+      worker.printed += std::string(str);
     }
     // else just drop the line
   }
-  CmiUnlock(CsvAccess(pyLock));
+  //CmiUnlock(CsvAccess(pyLock));
 }
 
 static PyObject *CkPy_print(PyObject *self, PyObject *args) {
   char *stringToPrint;
   if (!PyArg_ParseTuple(args, "s:printclient", &stringToPrint)) return NULL;
-  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"__charmNumber__"));
-  Ck_printclient(pyReference, stringToPrint);
+  PyObject *dict = PyModule_GetDict(PyImport_AddModule("__main__"));
+  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(dict,"__charmNumber__"));
+  PythonObject *object = (PythonObject*)PyLong_AsVoidPtr(PyDict_GetItemString(dict,"__charmObject__"));
+  Ck_printclient(object, pyReference, stringToPrint);
   Py_INCREF(Py_None);return Py_None; //Return-nothing idiom
 }
 
@@ -56,15 +61,17 @@ static PyObject *CkPy_numpes(PyObject *self, PyObject *args) {
 
 static PyObject *CkPy_myindex(PyObject *self, PyObject *args) {
   if (!PyArg_ParseTuple(args, ":myindex")) return NULL;
-  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"__charmNumber__"));
-  CmiLock(CsvAccess(pyLock));
-  ArrayElement1D *pyArray1 = dynamic_cast<ArrayElement1D*>(((*CsvAccess(pyWorkers))[pyReference]).object);
-  ArrayElement2D *pyArray2 = dynamic_cast<ArrayElement2D*>(((*CsvAccess(pyWorkers))[pyReference]).object);
-  ArrayElement3D *pyArray3 = dynamic_cast<ArrayElement3D*>(((*CsvAccess(pyWorkers))[pyReference]).object);
-  ArrayElement4D *pyArray4 = dynamic_cast<ArrayElement4D*>(((*CsvAccess(pyWorkers))[pyReference]).object);
-  ArrayElement5D *pyArray5 = dynamic_cast<ArrayElement5D*>(((*CsvAccess(pyWorkers))[pyReference]).object);
-  ArrayElement6D *pyArray6 = dynamic_cast<ArrayElement6D*>(((*CsvAccess(pyWorkers))[pyReference]).object);
-  CmiUnlock(CsvAccess(pyLock));
+  PyObject *dict = PyModule_GetDict(PyImport_AddModule("__main__"));
+  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(dict,"__charmNumber__"));
+  PythonObject *object = (PythonObject*)PyLong_AsVoidPtr(PyDict_GetItemString(dict,"__charmObject__"));
+  //CmiLock(CsvAccess(pyLock));
+  ArrayElement1D *pyArray1 = dynamic_cast<ArrayElement1D*>(object);
+  ArrayElement2D *pyArray2 = dynamic_cast<ArrayElement2D*>(object);
+  ArrayElement3D *pyArray3 = dynamic_cast<ArrayElement3D*>(object);
+  ArrayElement4D *pyArray4 = dynamic_cast<ArrayElement4D*>(object);
+  ArrayElement5D *pyArray5 = dynamic_cast<ArrayElement5D*>(object);
+  ArrayElement6D *pyArray6 = dynamic_cast<ArrayElement6D*>(object);
+  //CmiUnlock(CsvAccess(pyLock));
   if (pyArray1) return Py_BuildValue("(i)", pyArray1->thisIndex);
   else if (pyArray2) return Py_BuildValue("(ii)", pyArray2->thisIndex.x, pyArray2->thisIndex.y);
   else if (pyArray3) return Py_BuildValue("(iii)", pyArray3->thisIndex.x, pyArray3->thisIndex.y, pyArray3->thisIndex.z);
@@ -78,11 +85,12 @@ static PyObject *CkPy_myindex(PyObject *self, PyObject *args) {
 // method to read a variable and convert it to a python object
 static PyObject *CkPy_read(PyObject *self, PyObject *args) {
   if (!PyArg_ParseTuple(args, "O:read")) return NULL;
-  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"__charmNumber__"));
-  CmiLock(CsvAccess(pyLock));
-  PythonObject *pyWorker = ((*CsvAccess(pyWorkers))[pyReference]).object;
-  CmiUnlock(CsvAccess(pyLock));
-  return pyWorker->read(args);
+  PyObject *dict = PyModule_GetDict(PyImport_AddModule("__main__"));
+  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(dict,"__charmNumber__"));
+  PythonObject *object = (PythonObject*)PyLong_AsVoidPtr(PyDict_GetItemString(dict,"__charmObject__"));
+  //CmiLock(CsvAccess(pyLock));
+  //CmiUnlock(CsvAccess(pyLock));
+  return object->read(args);
 }
 
 // method to convert a python object into a variable and write it
@@ -109,11 +117,10 @@ static PyObject *CkPy_write(PyObject *self, PyObject *args) {
     whatT = PyTuple_New(1);
     PyTuple_SET_ITEM(whatT, 0, what);
   }
-  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule("__main__")),"__charmNumber__"));
-  CmiLock(CsvAccess(pyLock));
-  PythonObject *pyWorker = ((*CsvAccess(pyWorkers))[pyReference]).object;
-  CmiUnlock(CsvAccess(pyLock));
-  pyWorker->write(whereT, whatT);
+  PyObject *dict = PyModule_GetDict(PyImport_AddModule("__main__"));
+  CmiUInt4 pyReference = PyInt_AsLong(PyDict_GetItemString(dict,"__charmNumber__"));
+  PythonObject *object = (PythonObject*)PyLong_AsVoidPtr(PyDict_GetItemString(dict,"__charmObject__"));
+  object->write(whereT, whatT);
   Py_DECREF(whereT);
   Py_DECREF(whatT);
   Py_INCREF(Py_None);return Py_None;
@@ -135,6 +142,19 @@ PyMethodDef CkPy_MethodsDefault[] = {
   {"write", CkPy_write, METH_VARARGS},
   {NULL,      NULL}        /* Sentinel */
 };
+
+void PythonObject::replyIntValue(CcsDelayedReply *reply, CmiUInt4 *value) {
+  CkPrintf("[%d] PythonObject::replyIntValue\n",CkMyPe());
+  PythonReplyInt forward;
+  forward.reply = *reply;
+  forward.value = *value;
+  CkCallback cb(CkIndex_PythonCCS::forwardInt(0), pythonCcsProxy);
+  ArrayElement *array = dynamic_cast<ArrayElement *>(this);
+  Group *group = dynamic_cast<Group *>(this);
+  if (array != NULL) array->contribute(sizeof(PythonReplyInt), &forward, CkReduction::bitvec_and, cb);
+  else if (group != NULL) group->contribute(sizeof(PythonReplyInt), &forward, CkReduction::bitvec_and, cb);
+  else CcsSendDelayedReply(*reply, sizeof(CmiUInt4), (void *)value);
+}
 
 void PythonObject::pyRequest (CkCcsRequestMsg *msg) {
   PythonAbstract *pyAbstract = (PythonAbstract *)msg->data;
@@ -160,17 +180,17 @@ void PythonObject::pyRequest (CkCcsRequestMsg *msg) {
 
 void PythonObject::print (PythonPrint *pyMsg, CcsDelayedReply *reply) {
   // ATTN: be sure that in all possible paths pyLock is released!
-  CmiLock(CsvAccess(pyLock));
+  //CmiLock(CsvAccess(pyLock));
   CmiUInt4 returnValue;
   pyMsg->unpack();
 
-  PythonTable::iterator iter = CsvAccess(pyWorkers)->find(pyMsg->interpreter);
-  if (iter == CsvAccess(pyWorkers)->end()) {
+  PythonTable::iterator iter = pyWorkers.find(pyMsg->interpreter);
+  if (iter == pyWorkers.end()) {
     // Malformed request!
     //CkPrintf("PythonCCS: print request on invalid interpreter\n");
-    CmiUnlock(CsvAccess(pyLock));
+    //CmiUnlock(CsvAccess(pyLock));
     returnValue = htonl(0);
-    CcsSendDelayedReply(*reply, sizeof(CmiUInt4), (void *)&returnValue);
+    replyIntValue(reply, &returnValue);
   } else {
     // it is a correct print request, parse it
 
@@ -178,9 +198,9 @@ void PythonObject::print (PythonPrint *pyMsg, CcsDelayedReply *reply) {
       // kill the pending client print request
       if (iter->second.clientReady == 1) {
 	returnValue = htonl(0);
-	CcsSendDelayedReply(iter->second.client, sizeof(CmiUInt4), (void *)&returnValue);
+	replyIntValue(&iter->second.client, &returnValue);
       }
-      CmiUnlock(CsvAccess(pyLock));
+      //CmiUnlock(CsvAccess(pyLock));
       // do no return anything to the calling socket
       CcsNoDelayedReply(*reply);
       return;
@@ -190,12 +210,21 @@ void PythonObject::print (PythonPrint *pyMsg, CcsDelayedReply *reply) {
     if (iter->second.printed.length() > 0) {
       // send back to the client the string
       const char *str = iter->second.printed.c_str();
+      int length = strlen(str);
       //CkPrintf("sending data to the client\n");
-      CcsSendDelayedReply(*reply, strlen(str), str);
+      PythonReplyString *forward = new (length) PythonReplyString();
+      forward->reply = *reply;
+      memcpy(forward->data, str, length);
+      CkCallback cb(CkIndex_PythonCCS::forwardString(0), pythonCcsProxy);
+      ArrayElement *array = dynamic_cast<ArrayElement *>(this);
+      Group *group = dynamic_cast<Group *>(this);
+      if (array != NULL) array->contribute(sizeof(CcsDelayedReply)+length, forward, PythonCCS::reduceString, cb);
+      else if (group != NULL) group->contribute(sizeof(CcsDelayedReply)+length, forward, PythonCCS::reduceString, cb);
+      else CcsSendDelayedReply(*reply, length, str);
       iter->second.printed.erase();
       if (iter->second.clientReady == -1) {
 	// after the client flush the printed buffer, delete the entry
-	CsvAccess(pyWorkers)->erase(pyMsg->interpreter);
+	pyWorkers.erase(pyMsg->interpreter);
       }
     } else {
       // nothing printed, store the client request if it will be waiting
@@ -203,33 +232,33 @@ void PythonObject::print (PythonPrint *pyMsg, CcsDelayedReply *reply) {
 	// check if someone else has requested prints, if yes, kill the other
 	if (iter->second.clientReady == 1) {
 	  returnValue = htonl(0);
-	  CcsSendDelayedReply(iter->second.client, sizeof(CmiUInt4), (void *)&returnValue);
+	  replyIntValue(&iter->second.client, &returnValue);
 	}
 	iter->second.client = *reply;
 	iter->second.clientReady = 1;
       } else {
 	// return null
 	returnValue = htonl(0);
-	CcsSendDelayedReply(*reply, sizeof(CmiUInt4), (void *)&returnValue);
+	replyIntValue(reply, &returnValue);
       }
     }
-    CmiUnlock(CsvAccess(pyLock));
+    //CmiUnlock(CsvAccess(pyLock));
   }
 }
 
 void PythonObject::finished (PythonFinished *pyMsg, CcsDelayedReply *reply) {
    // ATTN: be sure that in all possible paths pyLock is released!
-  CmiLock(CsvAccess(pyLock));
+  //CmiLock(CsvAccess(pyLock));
   CmiUInt4 pyReference = pyMsg->interpreter;
   CmiUInt4 returnValue;
   pyMsg->unpack();
 
-  PythonTable::iterator iter = CsvAccess(pyWorkers)->find(pyMsg->interpreter);
-  if (iter == CsvAccess(pyWorkers)->end() || !iter->second.inUse) {
+  PythonTable::iterator iter = pyWorkers.find(pyMsg->interpreter);
+  if (iter == pyWorkers.end() || !iter->second.inUse) {
     //ckout <<"answering Finished yes"<<endl;
     returnValue = htonl(pyReference);
-    CcsSendDelayedReply(*reply, sizeof(CmiUInt4), (void *)&returnValue);
-    CmiUnlock(CsvAccess(pyLock));
+    replyIntValue(reply, &returnValue);
+    //CmiUnlock(CsvAccess(pyLock));
     return;
   }
 
@@ -239,7 +268,7 @@ void PythonObject::finished (PythonFinished *pyMsg, CcsDelayedReply *reply) {
     if (iter->second.finishReady) {
       // kill the previous requester
       returnValue = htonl(0);
-      CcsSendDelayedReply(iter->second.finish, sizeof(CmiUInt4), (void *)&returnValue);
+      replyIntValue(&iter->second.finish, &returnValue);
     }
     //ckout <<"queueing Finished request"<<endl;
     iter->second.finish = *reply;
@@ -247,16 +276,16 @@ void PythonObject::finished (PythonFinished *pyMsg, CcsDelayedReply *reply) {
   } else {
     //ckout <<"answering Finished no"<<endl;
     returnValue = htonl(0);
-    CcsSendDelayedReply(*reply, sizeof(CmiUInt4), (void *)&returnValue);
+    replyIntValue(reply, &returnValue);
   }
-  CmiUnlock(CsvAccess(pyLock));
+  //CmiUnlock(CsvAccess(pyLock));
 }
 
 void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
   // ATTN: be sure that in all possible paths pyLock is released!
   PythonExecute *pyMsg = (PythonExecute *)msg->data;
-  PyEval_AcquireLock();
-  CmiLock(CsvAccess(pyLock));
+  //PyEval_AcquireLock();
+  //CmiLock(CsvAccess(pyLock));
   CmiUInt4 pyReference;
   CmiUInt4 returnValue;
 
@@ -266,12 +295,12 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
   if (pyMsg->interpreter > 0) {
     // the user specified an interpreter, check if it is free
     PythonTable::iterator iter;
-    if ((iter=CsvAccess(pyWorkers)->find(pyMsg->interpreter))!=CsvAccess(pyWorkers)->end() && !iter->second.inUse && iter->second.clientReady!=-1) {
+    if ((iter=pyWorkers.find(pyMsg->interpreter))!=pyWorkers.end() && !iter->second.inUse && iter->second.clientReady!=-1) {
       // the interpreter already exists and it is neither in use, nor dead
       //CkPrintf("interpreter present and not in use\n");
       pyReference = pyMsg->interpreter;
+      PyEval_AcquireLock();
       PyThreadState_Swap(iter->second.pythread);
-      //PyEval_AcquireLock();
     } else {
       // ops, either the iterator does not exist or is already in use, return an
       // error to the client, we don't want to create a new interpreter if the
@@ -279,9 +308,9 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
       //if (iter==CsvAccess(pyWorkers)->end()) CkPrintf("asked for an interpreter not present\n");
       //else CkPrintf("interpreter already in use\n");
       returnValue = htonl(0);
-      CcsSendDelayedReply(*reply, sizeof(CmiUInt4), (void *)&returnValue);
-      CmiUnlock(CsvAccess(pyLock));
-      PyEval_ReleaseLock();
+      replyIntValue(reply, &returnValue);
+      //CmiUnlock(CsvAccess(pyLock));
+      //PyEval_ReleaseLock();
       return;  // stop the execution
     }
   } else {
@@ -289,17 +318,17 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
     //CkPrintf("creating new interpreter\n");
 
     // update the reference number, used to access the current chare
-    pyReference = ++CsvAccess(pyNumber);
-    CsvAccess(pyNumber) &= ~(1<<31);
-    ((*CsvAccess(pyWorkers))[pyReference]).object = this;
-    ((*CsvAccess(pyWorkers))[pyReference]).clientReady = 0;
+    pyReference = ++pyNumber;
+    pyNumber &= ~(1<<31);
+    //pyWorkers[pyReference].object = this;
+    pyWorkers[pyReference].clientReady = 0;
 
     // create the new interpreter
-    //PyEval_AcquireLock();
+    PyEval_AcquireLock();
     PyThreadState *pts = Py_NewInterpreter();
 
     CkAssert(pts != NULL);
-    ((*CsvAccess(pyWorkers))[pyReference]).pythread = pts;
+    pyWorkers[pyReference].pythread = pts;
 
     Py_InitModule("ck", CkPy_MethodsDefault);
     if (pyMsg->isHighLevel()) Py_InitModule("charm", getMethods());
@@ -309,6 +338,7 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
     PyObject *dict = PyModule_GetDict(mod);
 
     PyDict_SetItemString(dict,"__charmNumber__",PyInt_FromLong(pyReference));
+    PyDict_SetItemString(dict,"__charmObject__",PyLong_FromVoidPtr(this));
     PyRun_String("import ck\nimport sys\n"
 		 "ck.__doc__ = \"Ck module: basic charm routines\\n"
 		 "printstr(str) -- print a string on the server\\n"
@@ -334,28 +364,28 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
 
   }
 
-  ((*CsvAccess(pyWorkers))[pyReference]).inUse = true;
+  pyWorkers[pyReference].inUse = true;
   if (pyMsg->isKeepPrint()) {
-    ((*CsvAccess(pyWorkers))[pyReference]).isKeepPrint = true;
+    pyWorkers[pyReference].isKeepPrint = true;
   } else {
-    ((*CsvAccess(pyWorkers))[pyReference]).isKeepPrint = false;
+    pyWorkers[pyReference].isKeepPrint = false;
   }
 
   if (pyMsg->isWait()) {
-    ((*CsvAccess(pyWorkers))[pyReference]).finish = *reply;
-    ((*CsvAccess(pyWorkers))[pyReference]).finishReady = 1;
+    pyWorkers[pyReference].finish = *reply;
+    pyWorkers[pyReference].finishReady = 1;
   } else {
-    ((*CsvAccess(pyWorkers))[pyReference]).finishReady = 0;
+    pyWorkers[pyReference].finishReady = 0;
     // send back this number to the client, which is an ack
     ckout<<"new interpreter created "<<pyReference<<endl;
     returnValue = htonl(pyReference);
-    CcsSendDelayedReply(*reply, sizeof(CmiUInt4), (void *)&returnValue);
+    replyIntValue(reply, &returnValue);
   }
 
   //if (((*CsvAccess(pyWorkers))[pyReference]).object != this) ckout<<"object not this"<<endl;
   //else ckout<<"object ok"<<endl;
 
-  CmiUnlock(CsvAccess(pyLock));
+  //CmiUnlock(CsvAccess(pyLock));
 
   // run the program
   if (pyMsg->isHighLevel()) {
@@ -389,9 +419,9 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
 
   // store the self thread for future suspention if high level execution
   if (pyMsg->isHighLevel()) {
-    CmiLock(CsvAccess(pyLock));
-    ((*CsvAccess(pyWorkers))[pyReference]).thread=CthSelf();
-    CmiUnlock(CsvAccess(pyLock));
+    //CmiLock(CsvAccess(pyLock));
+    pyWorkers[pyReference].thread=CthSelf();
+    //CmiUnlock(CsvAccess(pyLock));
   }
 
   // decide whether it is iterative or not
@@ -405,13 +435,13 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
       PyErr_Fetch(&ptype, &pvalue, &ptraceback);
       PyObject *strP = PyObject_Str(ptype);
       char *str = PyString_AsString(strP);
-      Ck_printclient(pyReference, str);
+      Ck_printclient(this, pyReference, str);
       //CkPrintf("%s\n",str);
       Py_DECREF(strP);
-      Ck_printclient(pyReference, ": ");
+      Ck_printclient(this, pyReference, ": ");
       strP = PyObject_Str(pvalue);
       str = PyString_AsString(strP);
-      Ck_printclient(pyReference, str);
+      Ck_printclient(this, pyReference, str);
       //CkPrintf("%s\n",str);
       Py_DECREF(strP);
       //PyObject_Print(ptype, stdout, 0);
@@ -422,6 +452,8 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
       //if (ptraceback) CkPrintf("   %d %d %d %d\n",PyType_Check(ptraceback),PyString_Check(ptraceback),PyList_Check(ptraceback),PyTuple_Check(ptraceback));
     }
   } else {
+    CkPrintf("userCode: |%s|",pyMsg->code);
+    CkPrintf("method: |%s|",pyMsg->methodName.methodName);
     // compile the program
     char *userCode = pyMsg->code.code;
     struct _node* programNode = PyParser_SimpleParseString(userCode, Py_file_input);
@@ -465,14 +497,16 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
     }
 
     // create the container for the data
-    PyRun_String("class Particle:\n\tpass\n\n", Py_file_input, dict, dict);
-    PyObject *part = PyRun_String("Particle()", Py_eval_input, dict, dict);
+    PyRun_String("class CharmContainer:\n\tpass\n\n", Py_file_input, dict, dict);
+    PyObject *part = PyRun_String("CharmContainer()", Py_eval_input, dict, dict);
     PyObject *arg = PyTuple_New(1);
-    PyTuple_SetItem(arg, 0, part);
+    PyObject *oldArg = part;
 
     // construct the iterator calling the user defined method in the interiting class
     PythonIterator *userIterator = pyMsg->info.info;
     int more = buildIterator(part, userIterator);
+    if (oldArg != part) Py_DECREF(oldArg);
+    PyTuple_SetItem(arg, 0, part);
 
     // iterate over all the provided iterators from the user class
     PyObject *result;
@@ -480,10 +514,15 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
       result = PyObject_CallObject(item, arg);
       if (!result) {
 	CkPrintf("Python Call error\n");
-        PyErr_Print();
+        //PyErr_Print();
 	break;
       }
+      oldArg = part;
       more = nextIteratorUpdate(part, result, userIterator);
+      if (oldArg != part) {
+        Py_DECREF(oldArg);
+        PyTuple_SetItem(arg, 0, part);
+      }
       Py_DECREF(result);
     }
 
@@ -505,170 +544,33 @@ void PythonObject::cleanup (PythonExecute *pyMsg, PyThreadState *pts, CmiUInt4 p
   CmiUInt4 returnValue;
 
   //ckout <<"cleanup called"<<endl;
-  CmiLock(CsvAccess(pyLock));
+  //CmiLock(CsvAccess(pyLock));
   // if there is someone waiting for finish, send ackowledge
-  if (((*CsvAccess(pyWorkers))[pyReference]).finishReady) {
+  if (pyWorkers[pyReference].finishReady) {
     //ckout <<"answering the client finish"<<endl;
     returnValue = htonl(pyReference);
-    CcsSendDelayedReply(((*CsvAccess(pyWorkers))[pyReference]).finish, sizeof(CmiUInt4), (void *)&returnValue);
-    ((*CsvAccess(pyWorkers))[pyReference]).finishReady = 0;
+    replyIntValue(&pyWorkers[pyReference].finish, &returnValue);
+    pyWorkers[pyReference].finishReady = 0;
   }
 
   //ckout << "options"<<pyMsg->isPersistent()<<endl;
-  ((*CsvAccess(pyWorkers))[pyReference]).inUse = false;
+  pyWorkers[pyReference].inUse = false;
   if (!pyMsg->isPersistent()) {
     Py_EndInterpreter(pts);
-    ((*CsvAccess(pyWorkers))[pyReference]).clientReady = -1;
+    pyWorkers[pyReference].clientReady = -1;
   }
   PyEval_ReleaseLock();
 
-  if (!pyMsg->isPersistent() && ((*CsvAccess(pyWorkers))[pyReference]).printed.length()==0) {
+  if (!pyMsg->isPersistent() && pyWorkers[pyReference].printed.length()==0) {
     // destroy the entry in the map
     //CkPrintf("destroyed interpreter\n");
-    CsvAccess(pyWorkers)->erase(pyReference);
+    pyWorkers.erase(pyReference);
   }
-  CmiUnlock(CsvAccess(pyLock));
+  //CmiUnlock(CsvAccess(pyLock));
 }
-
-/*
-void PythonObject::iterate (CkCcsRequestMsg *msg) {
-
-  // update the reference number, used to access the current chare
-  CmiLock(CsvAccess(pyLock));
-  CmiUInt4 pyReference = CsvAccess(pyNumber)++;
-  CsvAccess(pyNumber) &= ~(1<<31);
-  ((*CsvAccess(pyWorkers))[pyReference]).object = this;
-  CmiUnlock(CsvAccess(pyLock));
-
-  // send back this number to the client
-  CcsSendDelayedReply(msg->reply, 1, (void *)&pyReference);
-
-  // create the new interpreter
-  PyEval_AcquireLock();
-  PyThreadState *pts = Py_NewInterpreter();
-  Py_InitModule("ck", CkPy_MethodsDefault);
-
-  // insert into the dictionary a variable with the reference number
-  PyObject *mod = PyImport_AddModule("__main__");
-  PyObject *dict = PyModule_GetDict(mod);
-
-  PyDict_SetItemString(dict,"__charmNumber__",PyInt_FromLong(pyReference));
-
-  // compile the program
-  char *userCode = (char *)msg->data;
-  struct _node* programNode = PyParser_SimpleParseString(userCode, Py_file_input);
-  if (programNode==NULL) {
-    CkPrintf("Program error\n");
-    // distroy map element in pyWorkers and terminate interpreter
-    Py_EndInterpreter(pts);
-    PyEval_ReleaseLock();
-    CmiLock(CsvAccess(pyLock));
-    CsvAccess(pyWorkers)->erase(pyReference);
-    CmiUnlock(CsvAccess(pyLock));
-    delete msg;
-    return;
-  }
-  PyCodeObject *program = PyNode_Compile(programNode, "");
-  if (program==NULL) {
-    CkPrintf("Program error\n");
-    PyNode_Free(programNode);
-    // distroy map element in pyWorkers and terminate interpreter
-    Py_EndInterpreter(pts);
-    PyEval_ReleaseLock();
-    CmiLock(CsvAccess(pyLock));
-    CsvAccess(pyWorkers)->erase(pyReference);
-    CmiUnlock(CsvAccess(pyLock));
-    delete msg;
-    return;
-  }
-  PyObject *code = PyEval_EvalCode(program, dict, dict);
-  if (code==NULL) {
-    CkPrintf("Program error\n");
-    PyNode_Free(programNode);
-    Py_DECREF(program);
-    // distroy map element in pyWorkers and terminate interpreter
-    Py_EndInterpreter(pts);
-    PyEval_ReleaseLock();
-    CmiLock(CsvAccess(pyLock));
-    CsvAccess(pyWorkers)->erase(pyReference);
-    CmiUnlock(CsvAccess(pyLock));
-    delete msg;
-    return;
-  }
-
-  // load the user defined method
-  char *userMethod = userCode + strlen(userCode) + 1;
-  PyObject *item = PyDict_GetItemString(dict, userMethod);
-  if (item==NULL) {
-    CkPrintf("Method not found\n");
-    PyNode_Free(programNode);
-    Py_DECREF(program);
-    Py_DECREF(code);
-    // distroy map element in pyWorkers and terminate interpreter
-    Py_EndInterpreter(pts);
-    PyEval_ReleaseLock();
-    CmiLock(CsvAccess(pyLock));
-    CsvAccess(pyWorkers)->erase(pyReference);
-    CmiUnlock(CsvAccess(pyLock));
-    delete msg;
-    return;
-  }
-
-  // create the container for the data
-  PyRun_String("class Particle:\n\tpass\n\n", Py_file_input, dict, dict);
-  PyObject *part = PyRun_String("Particle()", Py_eval_input, dict, dict);
-  PyObject *arg = PyTuple_New(1);
-  PyTuple_SetItem(arg, 0, part);
-
-  // construct the iterator calling the user defined method in the interiting class
-  void *userIterator = (void *)(userMethod + strlen(userMethod) + 1);
-  int more = buildIterator(part, userIterator);
-
-  // iterate over all the provided iterators from the user class
-  PyObject *result;
-  while (more) {
-    result = PyObject_CallObject(item, arg);
-    if (!result) {
-      CkPrintf("Python Call error\n");
-      break;
-    }
-    more = nextIteratorUpdate(part, result, userIterator);
-    Py_DECREF(result);
-  }
-
-  Py_DECREF(part);
-  Py_DECREF(arg);
-  PyNode_Free(programNode);
-  Py_DECREF(program);
-  Py_DECREF(code);
-
-  // distroy map element in pyWorkers and terminate interpreter
-  Py_EndInterpreter(pts);
-  PyEval_ReleaseLock();
-  CmiLock(CsvAccess(pyLock));
-  CsvAccess(pyWorkers)->erase(pyReference);
-  CmiUnlock(CsvAccess(pyLock));
-  delete msg;
-}
-*/
 
 void PythonObject::getPrint(CkCcsRequestMsg *msg) {
 
-}
-
-static void initializePythonDefault(void) {
-  CsvInitialize(CmiUInt, pyNumber);
-  CsvAccess(pyNumber) = 0;
-  CsvInitialize(PythonTable *,pyWorkers);
-  CsvAccess(pyWorkers) = new PythonTable();
-  CsvInitialize(CmiNodeLock, pyLock);
-  CsvAccess(pyLock) = CmiCreateLock();
-  CtvInitialize(PyObject *,pythonReturnValue);
-
-  Py_Initialize();
-  PyEval_InitThreads();
-
-  PyEval_ReleaseLock();
 }
 
 // a bunch of routines to ease the user code
@@ -763,29 +665,44 @@ void PythonObject::pythonGetComplex(PyObject *arg, char *descr, double *real, do
   Py_DECREF(tmp);
 }
 
+void PythonObject::pythonSetPointer(PyObject *arg, char *descr, void *ptr) {
+  PyObject *tmp = PyLong_FromVoidPtr(ptr);
+  PyObject_SetAttrString(arg, descr, tmp);
+  Py_DECREF(tmp);
+}
+
+void PythonObject::pythonGetPointer(PyObject *arg, char *descr, void **ptr) {
+  PyObject *tmp = PyObject_GetAttrString(arg, descr);
+  *ptr = PyLong_AsVoidPtr(tmp);
+  Py_DECREF(tmp);
+}
+
 PyObject *PythonObject::pythonGetArg(int handle) {
-  CmiLock(CsvAccess(pyLock));
-  PyObject *result = ((*CsvAccess(pyWorkers))[handle]).arg;
-  CmiUnlock(CsvAccess(pyLock));
+  //CmiLock(CsvAccess(pyLock));
+  PyObject *result = pyWorkers[handle].arg;
+  //CmiUnlock(CsvAccess(pyLock));
   return result;
 }
 
 void PythonObject::pythonReturn(int handle) {
-  CmiLock(CsvAccess(pyLock));
-  CthThread handleThread = ((*CsvAccess(pyWorkers))[handle]).thread;
-  *((*CsvAccess(pyWorkers))[handle]).result = 0;
-  CmiUnlock(CsvAccess(pyLock));
-  CthAwaken(handleThread);
+  // The return value is now set to zero before calling the high-level function, so here
+  // we don't need to do anything.
+  //CmiLock(CsvAccess(pyLock));
+  //CthThread handleThread = ((*CsvAccess(pyWorkers))[handle]).thread;
+  //*((*CsvAccess(pyWorkers))[handle]).result = 0;
+  //CmiUnlock(CsvAccess(pyLock));
+  //CthAwaken(handleThread);
 }
 
 void PythonObject::pythonReturn(int handle, PyObject* data) {
-  CmiLock(CsvAccess(pyLock));
-  CthThread handleThread = ((*CsvAccess(pyWorkers))[handle]).thread;
-  *((*CsvAccess(pyWorkers))[handle]).result = data;
-  CmiUnlock(CsvAccess(pyLock));
-  CthAwaken(handleThread);
+  //CmiLock(CsvAccess(pyLock));
+  //CthThread handleThread = ((*CsvAccess(pyWorkers))[handle]).thread;
+  * pyWorkers[handle].result = data;
+  //CmiUnlock(CsvAccess(pyLock));
+  //CthAwaken(handleThread);
 }
 
+/*
 void PythonObject::pythonAwake(int handle) {
   CmiLock(CsvAccess(pyLock));
   PyThreadState *handleThread = ((*CsvAccess(pyWorkers))[handle]).pythread;
@@ -795,6 +712,63 @@ void PythonObject::pythonAwake(int handle) {
 }
 
 void PythonObject::pythonSleep(int handle) {
+  PyEval_ReleaseLock();
+}
+*/
+
+PythonCCS::PythonCCS(CkArgMsg *arg) {
+  pythonCcsProxy = thishandle;
+}
+
+CkReductionMsg *pythonCombinePrint(int nMsg, CkReductionMsg **msgs) {
+  // the final length is the sum of all the NULL-terminated strings, minus
+  // the initial CcsDelayedReply structs and the terminating NULL characters
+  // which are present only once in the final message
+  int length = - (nMsg-1) * sizeof(CcsDelayedReply);
+  for (int i=0; i<nMsg; ++i) {
+    length += msgs[i]->getSize();
+  }
+  
+  CkReductionMsg *result = CkReductionMsg::buildNew(length,NULL);
+  
+  PythonReplyString *data = (PythonReplyString*)(result->getData());
+  data->reply = ((PythonReplyString*)msgs[0]->getData())->reply;
+  char *cur=data->data;
+  for (int i=0; i<nMsg; ++i) {
+    int messageBytes=msgs[i]->getSize() - sizeof(CcsDelayedReply);
+    memcpy((void *)cur,(void *)((PythonReplyString*)msgs[i]->getData())->data,messageBytes);
+    cur+=messageBytes;
+  }
+  return result;
+}
+
+void PythonCCS::forwardString(CkReductionMsg *msg) {
+  PythonReplyString *forward = (PythonReplyString *)msg->getData();
+  CcsSendDelayedReply(forward->reply, msg->getSize()-sizeof(CcsDelayedReply), (void *)forward->data);
+}
+
+void PythonCCS::forwardInt(CkReductionMsg *msg) {
+  CkPrintf("PythonCCS::forwardInt\n");
+  PythonReplyInt *forward = (PythonReplyInt *)msg->getData();
+  CcsSendDelayedReply(forward->reply, sizeof(CmiUInt4), (void *)&forward->value);
+}
+
+CkReduction::reducerType PythonCCS::reduceString;
+
+static void initializePythonDefault(void) {
+  //CsvInitialize(CmiUInt, pyNumber);
+  //CsvAccess(pyNumber) = 0;
+  //CsvInitialize(PythonTable *,pyWorkers);
+  //CsvAccess(pyWorkers) = new PythonTable();
+  //CsvInitialize(CmiNodeLock, pyLock);
+  //CsvAccess(pyLock) = CmiCreateLock();
+  CtvInitialize(PyObject *,pythonReturnValue);
+
+  PythonCCS::reduceString = CkReduction::addReducer(pythonCombinePrint);
+  
+  Py_Initialize();
+  PyEval_InitThreads();
+
   PyEval_ReleaseLock();
 }
 

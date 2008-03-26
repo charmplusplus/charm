@@ -5,6 +5,8 @@
 #define DEBUGF(x) // CmiPrintf x
 
 CkpvStaticDeclare(TraceMemory*, _trace);
+extern "C" void memory_trace_all_existing_mallocs();
+extern "C" int get_memory_allocated_user_total();
 
 /**
   For each TraceFoo module, _createTraceFoo() must be defined.
@@ -16,17 +18,24 @@ void _createTracememory(char **argv)
   CkpvInitialize(TraceMemory*, _trace);
   CkpvAccess(_trace) = new TraceMemory(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
+  /* Since we started after the beginning of the program, we missed a bunch of
+   * allocations. We cannot record what was allocated and then deleted, but we
+   * can still record all the memory that is still allocated.
+   */
 }
 
 MemEntry::MemEntry() : type(0), where(0), size(0), stackSize(0) { }
 
 void MemEntry::write(FILE *fp) {
-  fprintf(fp, "%d %p", type, where);
+  if (type == BEGIN_TRACE) {
+    fprintf(fp, "%d %d\n", type, size);
+    return;
+  }
+  fprintf(fp, "%d %p %d", type, where, size);
   if (type == MEMORY_MALLOC) {
-    fprintf(fp, " %d", size);
     fprintf(fp, " %d", stackSize);
     void **stack = (void**)(this+1);
-    for (int i=0; i<stackSize; ++i) {
+    for (int i=stackSize-1; i>=0; --i) {
       fprintf(fp, " %p", stack[i]);
     }
   }
@@ -90,6 +99,13 @@ void TraceMemory::traceClose() {
   flush();
 }
 
+void TraceMemory::traceBegin() {
+  int increment = sizeof(MemEntry);
+  checkFlush(increment);
+  ((MemEntry*)&logBuffer[usedBuffer])->set(BEGIN_TRACE, 0, get_memory_allocated_user_total());
+  usedBuffer += increment;
+}
+
 void TraceMemory::malloc(void *where, int size, void **stack, int stackSize) {
   if (!traceDisabled) {
     int increment = sizeof(MemEntry) + (recordStack ? stackSize*sizeof(void*) : 0);
@@ -101,11 +117,11 @@ void TraceMemory::malloc(void *where, int size, void **stack, int stackSize) {
   }
 }
 
-void TraceMemory::free(void *where) {
+void TraceMemory::free(void *where, int size) {
   if (!traceDisabled) {
     int increment = sizeof(MemEntry);
     checkFlush(increment);
-    ((MemEntry*)&logBuffer[usedBuffer])->set(MEMORY_FREE, where);
+    ((MemEntry*)&logBuffer[usedBuffer])->set(MEMORY_FREE, where, size);
     usedBuffer += increment;
     //CmiPrintf("[%d] TraceMemory::free    %d  (%p)\n",CmiMyPe(),usedBuffer,where);
   }

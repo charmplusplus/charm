@@ -1,3 +1,10 @@
 module PythonCCS {
    initnode void initializePythonDefault(void);
+   readonly CProxy_PythonCCS pythonCcsProxy;
+
+   mainchare PythonCCS {
+     entry PythonCCS(CkArgMsg *arg);
+     entry void forwardString(CkReductionMsg *msg);
+     entry void forwardInt(CkReductionMsg *msg);
+   }
 }

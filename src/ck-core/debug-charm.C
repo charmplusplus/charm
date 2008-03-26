@@ -69,7 +69,7 @@ public:
    {
      if (cur>=lo && cur<hi) 
      { /* This element is in our range-- look it up */
-       dest->add(cur,mgr->lookup(loc.getIndex()));
+       dest->add(cur,mgr->lookup(loc.getIndex()),mgr->getGroupID().idx);
      }
      cur++;
    }
@@ -97,16 +97,16 @@ public:
      int numGroups=CkpvAccess(_groupIDTable)->size();
      for(int i=0;i<numGroups;i++) {
         IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
-	if (obj->isArrMgr()) 
-	{ /* This is an array manager: examine its array elements */
+	/*if (obj->isArrMgr()) 
+	{ / * This is an array manager: examine its array elements * /
 	  CkArray *mgr=(CkArray *)obj;
           CkArrayElementRangeIterator<T> ait(dest,lo,hi);
 	  ait.iterate(cur, mgr);
           cur+=ait.getCount();
-	} else {
-          dest->add(cur,obj);
+	} else {*/
+          dest->add(cur,obj,i);
           cur++;
-        }
+        //}
      }
    }
    
@@ -115,7 +115,7 @@ public:
 };
 
 class ignoreAdd {
-public: void add(int cur,Chare *elt) {}
+public: void add(int cur,Chare *elt,int group) {}
 };
 
 /** Examine all the objects on the server returning the name */
@@ -134,7 +134,7 @@ public:
     CkObjectRangeIterator<CpdList_objectNames> it(this,req.lo,req.hi);
     it.iterate(); // calls "add" for in-range elements
   }
-  void add(int cur, Chare *obj) {
+  void add(int cur, Chare *obj, int group) {
     PUP::er &p=*pp;
     beginItem(p,cur);
     p.comment("id");
@@ -143,6 +143,7 @@ public:
     CkAssert(s > 0);
     p(n,s);
     free(n);
+    PUPn(group);
     p.comment("name");
     n=obj->ckDebugChareName();
     p(n,strlen(n));
@@ -168,7 +169,7 @@ public:
     CkObjectRangeIterator<CpdList_object> it(this,req.lo,req.hi);
     it.iterate(); // calls "add" for in-range elements;
   }
-  void add(int cur, Chare *obj) {
+  void add(int cur, Chare *obj, int group) {
     PUP::er &p=*pp;
     CpdListItemsRequest &req=*reqq;
     char *n = (char *)malloc(30);
@@ -203,7 +204,7 @@ public:
     CkArrayElementRangeIterator<CpdList_arrayElementNames> it(this,req.lo,req.hi);
     it.iterate(); // calls "add" for in-range elements
   }
-  void add(int cur,Chare *e) 
+  void add(int cur,Chare *e,int group) 
   { // Just grab the name and nothing else:
     ArrayElement *elt = (ArrayElement*)e;
          PUP::er &p=*pp;
@@ -230,7 +231,7 @@ public:
     CkArrayElementRangeIterator<CpdList_arrayElements> it(this,req.lo,req.hi);
     it.iterate(); // calls "add" for in-range elements
   }
-  void add(int cur, Chare *e) 
+  void add(int cur, Chare *e, int group) 
   { // Pup the element data
     ArrayElement *elt = (ArrayElement*)e;
     PUP::er &p=*pp;
@@ -274,6 +275,7 @@ void hostInfo(void *itemIter, pup_er pp, CpdListItemsRequest *req) {
 
 /************ Message CPD Lists ****************/
 CpvCExtern(void *,debugQueue);
+CpvCExtern(int, skipBreakpoint);
 
 // Interpret data in a message in a user-friendly way.
 //  Ignores most of the envelope fields used by CkPupMessage,
@@ -310,6 +312,8 @@ void CpdPupMessage(PUP::er &p, void *msg)
   p.synchronize(PUP::sync_end_object);
 }
 
+CpvStaticDeclare(void *, lastBreakPointMsg);
+
 //Cpd Lists for local and scheduler queues
 class CpdList_localQ : public CpdListAccessor {
 
@@ -320,39 +324,53 @@ public:
     int x = CdsFifo_Length((CdsFifo)(CpvAccess(debugQueue)));
     //CmiPrintf("*******Returning fifo length %d*********\n", x);
     //return CdsFifo_Length((CdsFifo)(CpvAccess(CmiLocalQueue)));
+    if (CpvAccess(lastBreakPointMsg) != NULL) x++;
     return x;
   }
   virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
     int length = CdsFifo_Length((CdsFifo)(CpvAccess(debugQueue)));
     void ** messages = CdsFifo_Enumerate(CpvAccess(debugQueue));
     int curObj=0;
+
+    if (CpvAccess(lastBreakPointMsg) != NULL) {
+      beginItem(p, -1);
+      envelope *env=(envelope *)UsrToEnv(CpvAccess(lastBreakPointMsg));
+      p.comment("name");
+      char *type="Breakpoint";
+      p(type,strlen(type));
+      p.comment("charmMsg");
+      p.synchronize(PUP::sync_begin_object);
+      CkUnpackMessage(&env);
+      CpdPupMessage(p, EnvToUsr(env));
+      p.synchronize(PUP::sync_end_object);
+    }
     
     for(curObj=req.lo; curObj<req.hi; curObj++)
-    if ((curObj>=0) && (curObj<length))
-    {
+      if ((curObj>=0) && (curObj<length))
+      {
         beginItem(p,curObj);
         void *msg=messages[curObj]; /* converse message */
-	int isCharm=0;
+        int isCharm=0;
         const char *type="Converse";
         p.comment("name");
         char name[128];
-	if (CmiGetHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Local Charm";}
-	if (CmiGetXHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Network Charm";}
+        if (CmiGetHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Local Charm";}
+        if (CmiGetXHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Network Charm";}
         sprintf(name,"%s %d: %s (%d)","Message",curObj,type,CmiGetHandler(msg));
         p(name, strlen(name));
-	
-	if (isCharm) 
-	{ /* charm message */
+        
+        if (isCharm) 
+        { /* charm message */
           p.comment("charmMsg");
-	  p.synchronize(PUP::sync_begin_object);
-	  envelope *env=(envelope *)msg;
-	  CkUnpackMessage(&env);
-	  messages[curObj]=env;
+          p.synchronize(PUP::sync_begin_object);
+          envelope *env=(envelope *)msg;
+          CkUnpackMessage(&env);
+          messages[curObj]=env;
           CpdPupMessage(p, EnvToUsr(env));
           //CkPupMessage(p, &messages[curObj], 0);
-	  p.synchronize(PUP::sync_end_object);
-	}
-    }
+          p.synchronize(PUP::sync_end_object);
+        }
+      }
     delete[] messages;
 
   }
@@ -366,14 +384,14 @@ typedef CkHashtableTslow<int,EntryInfo *> CpdBpFuncTable_t;
 
 extern void CpdFreeze(void);
 extern void CpdUnFreeze(void);
-
+extern int  CpdIsFrozen(void);
 
 CpvStaticDeclare(int, _debugMsg);
 CpvStaticDeclare(int, _debugChare);
 
 CpvStaticDeclare(CpdBpFuncTable_t *, breakPointEntryTable);
 
-CpvStaticDeclare(void *, lastBreakPointMsg);
+//CpvStaticDeclare(void *, lastBreakPointMsg);
 CpvStaticDeclare(void *, lastBreakPointObject);
 CpvStaticDeclare(int, lastBreakPointIndex);
 
@@ -390,6 +408,7 @@ void CpdBreakPointInit()
   CpvAccess(lastBreakPointIndex) = 0;
   CpvAccess(_debugMsg) = CkRegisterMsg("debug_msg",0,0,0);
   CpvAccess(_debugChare) = CkRegisterChare("debug_Chare",0);
+  CkRegisterChareInCharm(CpvAccess(_debugChare));
   CpvAccess(breakPointEntryTable) = new CpdBpFuncTable_t(10,0.5,CkHashFunction_int,CkHashCompare_int );
 }
 
@@ -400,15 +419,45 @@ static void _call_freeze_on_break_point(void * msg, void * object)
       //Save breakpoint entry point index. This is retrieved from msg.
       //So that the appropriate EntryInfo can be later retrieved from the hash table 
       //of break point function entries, on continue.
+  
+  // If the counter "skipBreakpoint" is not zero we actually do not freeze and deliver the regular message
+  if (CpvAccess(skipBreakpoint) > 0) {
+    EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CkMessageToEpIdx(msg));
+    CkAssert(breakPointEntryInfo != NULL);
+    breakPointEntryInfo->call(msg, object);
+    CpvAccess(skipBreakpoint) --;
+  } else {
       CpvAccess(lastBreakPointMsg) = msg;
       CpvAccess(lastBreakPointObject) = object;
       CpvAccess(lastBreakPointIndex) = CkMessageToEpIdx(msg);
       EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CpvAccess(lastBreakPointIndex));
       CmiPrintf("Break point reached for Function = %s\n", breakPointEntryInfo->name);
       CpdFreeze();
+  }
 }
 
-
+//ccs handler when pressed the "next" command: deliver only a single message without unfreezing
+extern "C"
+void CpdDeliverSingleMessage () {
+  if (!CpdIsFrozen()) return; /* Do something only if we are in freeze mode */
+  if ( (CpvAccess(lastBreakPointMsg) != NULL) && (CpvAccess(lastBreakPointObject) != NULL) ) {
+    EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CpvAccess(lastBreakPointIndex));
+    if (breakPointEntryInfo != NULL) {
+      breakPointEntryInfo->call(CpvAccess(lastBreakPointMsg), CpvAccess(lastBreakPointObject));
+    }
+    CpvAccess(lastBreakPointMsg) = NULL;
+    CpvAccess(lastBreakPointObject) = NULL;
+  }
+  else {
+    // we were not stopped at a breakpoint, then deliver the first message in the debug queue
+    if (!CdsFifo_Empty(CpvAccess(debugQueue))) {
+      CpvAccess(skipBreakpoint) = 1;
+      char *queuedMsg = (char *)CdsFifo_Dequeue(CpvAccess(debugQueue));
+      CmiHandleMessage(queuedMsg);
+      CpvAccess(skipBreakpoint) = 0;
+    }
+  }
+}
 
 //ccs handler when continue from a break point
 extern "C"
@@ -436,10 +485,15 @@ void CpdSetBreakPoint (char *msg)
     tableSize = _entryTable.size();
     // Replace entry in entry table with _call_freeze_on_break_point
     // retrieve epIdx for entry method
-    for (tableIdx=0; tableIdx < tableSize; tableIdx++)
-    {
-       if (strstr(_entryTable[tableIdx]->name, functionName) != NULL)
-       {
+    //for (tableIdx=0; tableIdx < tableSize; tableIdx++)
+    //{
+       //if (strstr(_entryTable[tableIdx]->name, functionName) != NULL)
+       //{
+    tableIdx = atoi(functionName);
+    if (tableIdx < 0 || tableIdx >= tableSize) {
+      CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName); 
+      return;
+    }
             EntryInfo * breakPointEntryInfo = new EntryInfo(_entryTable[tableIdx]->name, _entryTable[tableIdx]->call, _entryTable[tableIdx]->msgIdx, _entryTable[tableIdx]->chareIdx );
            CmiPrintf("Breakpoint is set for function %s with an epIdx = %ld\n", _entryTable[tableIdx]->name, tableIdx);
            CpvAccess(breakPointEntryTable)->put(tableIdx) = breakPointEntryInfo;  
@@ -447,14 +501,14 @@ void CpdSetBreakPoint (char *msg)
            _entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
            _entryTable[tableIdx]->msgIdx = CpvAccess(_debugMsg); 
            _entryTable[tableIdx]->chareIdx = CpvAccess(_debugChare);
-           break;
-       }
-    }
-    if (tableIdx == tableSize)
-    {
-      CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName); 
-      return;
-    }
+           //break;
+       //}
+    //}
+    //if (tableIdx == tableSize)
+    //{
+    //  CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName); 
+    //  return;
+    //}
 
   }
 
@@ -470,20 +524,28 @@ void CpdRemoveBreakPoint (char *msg)
 {
   char functionName[128];
   sscanf(msg+CmiMsgHeaderSizeBytes, "%s", functionName);
-  void *objPointer;
-  void *keyPointer; 
-  CkHashtableIterator *it = CpvAccess(breakPointEntryTable)->iterator();
-  while(NULL!=(objPointer = it->next(&keyPointer)))
-  {
-    EntryInfo * breakPointEntryInfo = *(EntryInfo **)objPointer;
-    int idx = *(int *)keyPointer;
-    if (strstr(breakPointEntryInfo->name, functionName) != NULL){
+  if (strlen(functionName) > 0) {
+  int idx = atoi(functionName);
+  if (idx < 0 || idx >= _entryTable.size()) {
+    CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName); 
+    return;
+  }
+  //void *objPointer;
+  //void *keyPointer; 
+  //CkHashtableIterator *it = CpvAccess(breakPointEntryTable)->iterator();
+  //while(NULL!=(objPointer = it->next(&keyPointer)))
+  //{
+  //EntryInfo * breakPointEntryInfo = *(EntryInfo **)objPointer;
+  EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(idx);
+    //int idx = *(int *)keyPointer;
+    //if (strstr(breakPointEntryInfo->name, functionName) != NULL){
         _entryTable[idx]->name =  breakPointEntryInfo->name;
         _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
         _entryTable[idx]->msgIdx = breakPointEntryInfo->msgIdx;
         _entryTable[idx]->chareIdx = breakPointEntryInfo->chareIdx;
         CmiPrintf("Breakpoint is removed for function %s with epIdx %ld\n", _entryTable[idx]->name, idx);
-    }
+    //}
+  //}
   }
 }
 
@@ -504,7 +566,11 @@ void CpdRemoveAllBreakPoints ()
   }
 }
 
-
+extern "C" CmiBool isDebugMessage(void *msg) {
+  envelope *env = (envelope*)msg;
+  // Later should use "isDebug" value, but for now just bypass all intrinsic EPs
+  return _entryTable[env->getEpIdx()]->inCharm;
+}
 
 
 
@@ -562,6 +628,7 @@ void CpdCharmInit()
   CcsRegisterHandler("ccs_remove_break_point",(CmiHandler)CpdRemoveBreakPoint);
   CcsRegisterHandler("ccs_remove_all_break_points",(CmiHandler)CpdRemoveAllBreakPoints);
   CcsRegisterHandler("ccs_continue_break_point",(CmiHandler)CpdContinueFromBreakPoint);
+  CcsRegisterHandler("ccs_single_step",(CmiHandler)CpdDeliverSingleMessage);
   CcsRegisterHandler("ccs_debug_quit",(CmiHandler)CpdQuitDebug);
   CcsRegisterHandler("ccs_debug_startgdb",(CmiHandler)CpdStartGdb);
   CpdListRegister(new CpdListAccessor_c("hostinfo",hostInfoLength,0,hostInfo,0));

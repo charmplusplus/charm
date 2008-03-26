@@ -24,6 +24,9 @@
 typedef struct _Slot Slot;
 typedef struct _SlotStack SlotStack;
 
+int nextChareID;
+int memory_chare_id;
+
 /**
  * Struct Slot contains all of the information about a malloc buffer except
  * for the contents of its memory.
@@ -51,7 +54,7 @@ struct _Slot {
 #define SLOTMAGIC_FREED      0xDEADBEEF
   int magic;
 
-  int pad;
+  int chareID;
   /* Controls the number of stack frames to print out. Should be always odd, so
      the total size of this struct becomes multiple of 8 bytes everywhere */
 //#define STACK_LEN 15
@@ -97,6 +100,9 @@ static void printSlot(Slot *s) {
 Slot slot_first_storage = {&slot_first_storage, &slot_first_storage};
 Slot *slot_first = &slot_first_storage;
 
+int memory_allocated_user_total;
+int get_memory_allocated_user_total() {return memory_allocated_user_total;}
+
 /********* Cpd routines for pupping data to the debugger *********/
 
 int cpd_memory_length(void *lenParam) {
@@ -126,6 +132,8 @@ void cpd_memory_single_pup(Slot* list, pup_er p) {
     pup_comment(p, "flags");
     flags = cur->magic & FLAGS_MASK;
     pup_int(p, &flags);
+    pup_comment(p, "chare");
+    pup_int(p, &cur->chareID);
     pup_comment(p, "stack");
     //for (i=0; i<STACK_LEN; ++i) {
     //  if (cur->from[i] <= 0) break;
@@ -430,6 +438,12 @@ void pupAllocationPointSingle(pup_er p, AllocationPoint *node, int *numChildren)
   pup_int(p, &node->size);
   pup_int(p, &node->count);
   pup_char(p, &node->flags);
+  if (pup_isUnpacking(p)) {
+    node->parent = NULL;
+    node->firstChild = NULL;
+    node->sibling = NULL;
+    node->next = NULL;
+  }
   *numChildren = 0;
   AllocationPoint *child;
   for (child = node->firstChild; child != NULL; child = child->sibling) (*numChildren) ++;
@@ -556,13 +570,51 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
   return root;
 }
 
-void MergeAllocationTreeSingle(AllocationPoint *node, AllocationPoint *remote) {
-  
+void MergeAllocationTreeSingle(AllocationPoint *node, AllocationPoint *remote, int numChildren, pup_er p) {
+  AllocationPoint child;
+  int numChildChildren;
+  int i;
+  //pupAllocationPointSingle(p, &remote, &numChildren);
+  /* Update the node with the information coming from remote */
+  node->size += remote->size;
+  node->count += remote->count;
+  node->flags |= remote->flags;
+  /* Recursively merge the children */
+  for (i=0; i<numChildren; ++i) {
+    AllocationPoint *localChild;
+    pupAllocationPointSingle(p, &child, &numChildChildren);
+    /* Find the child in the local tree */
+    for (localChild = node->firstChild; localChild != NULL; localChild = localChild->sibling) {
+      if (localChild->key == child.key) {
+        break;
+      }
+    }
+    if (localChild == NULL) {
+      /* This child did not exist locally, allocate it */
+      localChild = (AllocationPoint*) mm_malloc(sizeof(AllocationPoint));
+      localChild->key = child.key;
+      localChild->flags = 0;
+      localChild->count = 0;
+      localChild->size = 0;
+      localChild->firstChild = NULL;
+      localChild->next = NULL;
+      localChild->parent = node;
+      localChild->sibling = node->firstChild;
+      node->firstChild = localChild;
+    }
+    MergeAllocationTreeSingle(localChild, &child, numChildChildren, p);
+  }
 }
 
 void * MergeAllocationTree(void *data, void **remoteData, int numRemote) {
   int i;
-  for (i=0; i<numRemote; ++i) MergeAllocationTreeSingle((AllocationPoint*)data, (AllocationPoint*)remoteData[i]);
+  for (i=0; i<numRemote; ++i) {
+    pup_er p = pup_new_fromMem(remoteData[i]);
+    AllocationPoint root;
+    int numChildren;
+    pupAllocationPointSingle(p, &root, &numChildren);
+    MergeAllocationTreeSingle((AllocationPoint*)data, &root, numChildren, p);
+  }
   return data;
 }
 
@@ -639,6 +691,7 @@ static void *setSlot(Slot *s,int userSize) {
   /* Set the last 4 bits of magic to classify the memory together with the magic */
   s->magic=SLOTMAGIC + (memory_status_info>0? USER_TYPE : SYSTEM_TYPE);
   //if (memory_status_info>0) printf("user allocation\n");
+  s->chareID = memory_chare_id;
   s->userSize=userSize;
   s->extraStack=(SlotStack *)0;
 
@@ -707,6 +760,8 @@ static void meta_init(char **argv) {
   CpdDebug_pupAllocationPoint = pupAllocationPoint;
   CpdDebug_deleteAllocationPoint = deleteAllocationPoint;
   CpdDebug_MergeAllocationTree = MergeAllocationTree;
+  memory_allocated_user_total = 0;
+  nextChareID = 1;
 }
 
 static void *meta_malloc(size_t size) {
@@ -714,13 +769,17 @@ static void *meta_malloc(size_t size) {
   Slot *s=(Slot *)mm_malloc(sizeof(Slot)+size+numStackFrames*sizeof(void*));
   char *user = (char*)s;
   if (s!=NULL) user = setSlot(s,size);
+  memory_allocated_user_total += size;
   traceMalloc_c(user, size, s->from, s->stackLen);
   return user;
 }
 
 static void meta_free(void *mem) {
   Slot *s;
-  traceFree_c(mem);
+  int memSize = 0;
+  if (mem!=NULL) memSize = (((Slot*)mem)-1)->userSize;
+  memory_allocated_user_total -= memSize;
+  traceFree_c(mem, memSize);
   if (mem==NULL) return; /*Legal, but misleading*/
 
   s=((Slot *)mem)-1;
@@ -779,6 +838,7 @@ static void *meta_memalign(size_t align, size_t size) {
   s->extraStack = (SlotStack *)alloc; /* use the extra space as stack */
   s->extraStack->protectedMemory = NULL;
   s->extraStack->protectedMemoryLength = 0;
+  memory_allocated_user_total += size;
   traceMalloc_c(user, size, s->from, s->stackLen);
   return user;  
 }
@@ -802,6 +862,8 @@ void setProtection(char* mem, char *ptr, int len, int flag) {
 void setMemoryTypeChare(void *ptr) {
   Slot *sl = UserToSlot(ptr);
   sl->magic = (sl->magic & ~FLAGS_MASK) | CHARE_TYPE;
+  sl->chareID = nextChareID;
+  nextChareID ++;
 }
 
 /* The input parameter is the pointer to the envelope, after the CmiChunkHeader */
@@ -811,4 +873,9 @@ void setMemoryTypeMessage(void *ptr) {
   if ((sl->magic&~FLAGS_MASK) == SLOTMAGIC || (sl->magic&~FLAGS_MASK) == SLOTMAGIC_VALLOC) {
     sl->magic = (sl->magic & ~FLAGS_MASK) | MESSAGE_TYPE;
   }
+}
+
+void setMemoryChareID(void *ptr) {
+  if (ptr == NULL || ptr == 0) memory_chare_id = 0;
+  else memory_chare_id = UserToSlot(ptr)->chareID;
 }

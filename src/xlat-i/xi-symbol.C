@@ -547,9 +547,11 @@ void Chare::sharedDisambiguation(XStr &str,const XStr &super)
     str<<"    }\n";
     if (isPython()) {
       str<<"    void registerPython(char *str) {\n";
-      str<<"      CcsRegisterHandler(str, CkCallback("<<Prefix::Index<<type<<"::pyRequest(0), ";
-      if (isArray()) str<<"ckGetArrayID()";
-      else str<<"ckGetChareID()";
+      str<<"      CcsRegisterHandler(str, CkCallback("<<Prefix::Index<<type<<"::pyRequest(0), ";//<<Prefix::Proxy<<type<<"(";
+      //if (isArray()) str<<"ckGetArrayID()";
+      //else if (isGroup()) str <<"ckGetGroupID()";
+      //else str<<"ckGetChareID()";
+      str << "*this";
       str<<"));\n";
       str<<"    }\n";
     }
@@ -606,6 +608,7 @@ Chare::genRegisterMethodDef(XStr& str)
   str <<  tspec() <<
   "void "<<indexName()<<"::__register(const char *s, size_t size) {\n"
   "  __idx = CkRegisterChare(s, size);\n";
+  if (internalMode) str << "  CkRegisterChareInCharm(__idx);\n";
   // register all bases
   genIndexNames(str, "  CkRegisterBase(__idx, ",NULL, "::__idx);\n", "");
   genSubRegisterMethodDef(str);
@@ -2770,17 +2773,19 @@ void Entry::genPythonDefs(XStr& str) {
   if (isPython()) {
 
     str << "PyObject *_Python_"<<container->baseName()<<"_"<<name<<"(PyObject *self, PyObject *arg) {\n";
-    str << "  int pyNumber = PyInt_AsLong(PyDict_GetItemString(PyModule_GetDict(PyImport_AddModule(\"__main__\")),\"__charmNumber__\"));\n";
-    str << "  CmiLock(CsvAccess(pyLock));\n";
-    str << "  "<<container->baseName()<<" *pyWorker = ("<<container->baseName()<<" *)((*CsvAccess(pyWorkers))[pyNumber]).object;\n";
-    str << "  ((*CsvAccess(pyWorkers))[pyNumber]).arg=arg;\n";
-    str << "  ((*CsvAccess(pyWorkers))[pyNumber]).result=&CtvAccess(pythonReturnValue);\n";
-    str << "  ((*CsvAccess(pyWorkers))[pyNumber]).pythread=PyThreadState_Get();\n";
-    str << "  CmiUnlock(CsvAccess(pyLock));\n";
+    str << "  PyObject *dict = PyModule_GetDict(PyImport_AddModule(\"__main__\"));\n";
+    str << "  int pyNumber = PyInt_AsLong(PyDict_GetItemString(dict,\"__charmNumber__\"));\n";
+    str << "  PythonObject *pythonObj = (PythonObject *)PyLong_AsVoidPtr(PyDict_GetItemString(dict,\"__charmObject__\"));\n";
+    str << "  "<<container->baseName()<<" *object = static_cast<"<<container->baseName()<<" *>(pythonObj);\n";
+    str << "  object->pyWorkers[pyNumber].arg=arg;\n";
+    str << "  object->pyWorkers[pyNumber].result=&CtvAccess(pythonReturnValue);\n";
+    str << "  object->pyWorkers[pyNumber].pythread=PyThreadState_Get();\n";
+    str << "  CtvAccess(pythonReturnValue) = 0;\n";
 
-    str << "  pyWorker->thisProxy."<<name<<"(pyNumber);\n";
+    str << "  //pyWorker->thisProxy."<<name<<"(pyNumber);\n";
+    str << "  object->"<<name<<"(pyNumber);\n";
 
-    str << "  CthSuspend();\n";
+    str << "  //CthSuspend();\n";
 
     str << "  if (CtvAccess(pythonReturnValue)) {\n";
     str << "    return CtvAccess(pythonReturnValue);\n";
@@ -3053,6 +3058,7 @@ void Entry::genCall(XStr& str, const XStr &preCall)
   else { //Normal case: call regular method
     if (isArgcArgv) str<<"  CkArgMsg *m=(CkArgMsg *)impl_msg;\n"; //Hack!
   
+    str << "#ifndef CMK_OPTIMIZE\n  setMemoryChareID(impl_obj);\n#endif\n";
     if(isConstructor()) {//Constructor: call "new (obj) foo(parameters)"
   	str << "  new (impl_obj) "<<container->baseName();
     } else {//Regular entry method: call "obj->bar(parameters)"
@@ -3068,6 +3074,7 @@ void Entry::genCall(XStr& str, const XStr &preCall)
     else {//Normal case: unmarshall parameters (or just pass message)
         str<<"("; param->unmarshall(str); str<<");\n";
     }
+    str << "#ifndef CMK_OPTIMIZE\n  setMemoryChareID(NULL);\n#endif\n";
   }
 }
 

@@ -16,6 +16,8 @@ CpvStaticDeclare(int, freezeModeFlag);
 CpvStaticDeclare(int, continueFlag);
 CpvStaticDeclare(int, stepFlag);
 CpvDeclare(void *, debugQueue);
+int _debugHandlerIdx;
+CpvDeclare(int, skipBreakpoint); /* This is a counter of how many breakpoints we should skip */
 
 /***************************************************
   The CCS interface to the debugger
@@ -29,6 +31,7 @@ void (*CpdDebug_pupAllocationPoint)(pup_er p, void *data);
 void (*CpdDebug_deleteAllocationPoint)(void *ptr);
 void * (*CpdDebug_MergeAllocationTree)(void *data, void **remoteData, int numRemote);
 CpvDeclare(int, CpdDebugCallAllocationTree_Index);
+CpvStaticDeclare(CcsDelayedReply, allocationTreeDelayedReply);
 
 static void CpdDebugReturnAllocationTree(void *tree) {
   pup_er sizer = pup_new_sizer();
@@ -42,7 +45,7 @@ static void CpdDebugReturnAllocationTree(void *tree) {
   /*CmiPrintf("size=%d tree:",pup_size(sizer));
   for (i=0;i<100;++i) CmiPrintf(" %02x",((unsigned char*)buf)[i]);
   CmiPrintf("\n");*/
-  CcsSendReply(pup_size(sizer),buf);
+  CcsSendDelayedReply(CpvAccess(allocationTreeDelayedReply), pup_size(sizer),buf);
   pup_destroy(sizer);
   pup_destroy(packer);
   free(buf);
@@ -54,9 +57,12 @@ static void CpdDebugCallAllocationTree(char *msg)
   int forPE;
   void *tree;
   sscanf(msg+CmiMsgHeaderSizeBytes, "%d", &forPE);
+  if (CmiMyPe() == forPE) CpvAccess(allocationTreeDelayedReply) = CcsDelayReply();
   if (forPE == -1 && CmiMyPe()==0) {
-    CmiSetHandler(msg, CpvAccess(CpdDebugCallAllocationTree_Index));
-    CmiSyncBroadcast(CmiMsgHeaderSizeBytes+sizeof(int), msg);
+    CpvAccess(allocationTreeDelayedReply) = CcsDelayReply();
+    CmiSetXHandler(msg, CpvAccess(CpdDebugCallAllocationTree_Index));
+    CmiSetHandler(msg, _debugHandlerIdx);
+    CmiSyncBroadcast(CmiMsgHeaderSizeBytes+strlen(msg+CmiMsgHeaderSizeBytes)+1, msg);
   }
   tree = CpdDebugGetAllocationTree(&numNodes);
   if (forPE == CmiMyPe()) CpdDebugReturnAllocationTree(tree);
@@ -117,11 +123,29 @@ void CpdUnFreeze(void)
   CpvAccess(freezeModeFlag) = 0;
 }
 
+int CpdIsFrozen(void) {
+  return CpvAccess(freezeModeFlag);
+}
+
+/* Deliver a single message in the queue while not unfreezing the program */
+void CpdNext(void) {
+  
+}
+
+/* This converse handler is used by the debugger itself, to send messages
+ * even when the scheduler is in freeze mode.
+ */
+void handleDebugMessage(void *msg) {
+  CmiSetHandler(msg, CmiGetXHandler(msg));
+  CmiHandleMessage(msg);
+}
+
 /* Special scheduler-type loop only executed while in
 freeze mode-- only executes CCS requests.
 */
 void CcsServerCheck(void);
 extern int _isCcsHandlerIdx(int idx);
+extern int _charmHandlerIdx;
 
 void CpdFreezeModeScheduler(void)
 {
@@ -140,13 +164,22 @@ void CpdFreezeModeScheduler(void)
 
       if (msg!=NULL) {
 	  int hIdx=CmiGetHandler(msg);
+	  /*
 	  if(_isCcsHandlerIdx(hIdx))
-	  /*A CCS request-- handle it immediately*/
+	  / *A CCS request-- handle it immediately* /
           {
 	    CmiHandleMessage(msg);
           }
+	  else if (hIdx == _debugHandlerIdx ||
+	          (hIdx == CmiGetReductionHandler() && CmiGetReductionDestination() == CpdDebugReturnAllocationTree)) {
+	    / * Debug messages should be handled immediately * /
+	    CmiHandleMessage(msg);
+	  } else */
+	  if (hIdx != _charmHandlerIdx || isDebugMessage(msg)) {
+	    CmiHandleMessage(msg);
+	  }
 	  else
-	  /*An ordinary message-- queue it up*/
+	  /*An ordinary charm++ message-- queue it up*/
 	    CdsFifo_Enqueue(debugQ, msg);
       } else CmiNotifyIdle();
     }
@@ -174,6 +207,7 @@ void CpdInit(void)
   CpvInitialize(int, CpdDebugCallAllocationTree_Index);
   CpvAccess(CpdDebugCallAllocationTree_Index) = CmiRegisterHandler((CmiHandler)CpdDebugCallAllocationTree);
   
+  _debugHandlerIdx = CmiRegisterHandler((CmiHandler)handleDebugMessage);
 #if 0
   CpdInitializeObjectTable();
   CpdInitializeHandlerArray();

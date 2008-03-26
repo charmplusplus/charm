@@ -79,9 +79,12 @@ extern "C" {
 /* Global variables used by charmdebug to maintain information */
 #ifndef CMK_OPTIMIZE
 extern int memory_status_info;
+extern int memory_chare_id;
 #define setMemoryStatus(p) memory_status_info = p;
+void setMemoryChareID(void *p);
 #else
 #define setMemoryStatus(p) /* empty */
+#define setMemoryChareID(p) /* empty */
 #endif
 
 /******************************************************************************
@@ -871,15 +874,31 @@ void          CmiSyncMulticastFn(CmiGroup, int, char*);
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup, int, char*);
 void          CmiFreeMulticastFn(CmiGroup, int, char*);
 
+typedef struct {
+  void *localMessage;
+  void *remoteMessages;
+  int numRemoteReceived;
+  int numChildren;
+  int parent;
+  struct {
+    CmiHandler destination;
+    void * (*mergeFn)(void*,void**,int);
+    void (*pupFn)(void*,void*);
+    void (*deleteFn)(void*);
+  } ops;
+} CmiReduction;
+
 void CmiReduce(void *msg, int size, void * (*mergeFn)(void*,void**,int));
 void CmiReduceStruct(void *data, void (*pupFn)(void*,void*),
                      void * (*mergeFn)(void*,void**,int), CmiHandler dest,
                      void (*deleteFn)(void*));
-void CmiNodeReduce(void *msg, int size, void * (*mergeFn)(void*,void**,int));
+void CmiNodeReduce(void *msg, int size, void * (*mergeFn)(void*,void**,int), int, int, int);
 void CmiNodeReduceStruct(void *data, void (*pupFn)(void*,void*),
                          void * (*mergeFn)(void*,void**,int), CmiHandler dest,
                          void (*deleteFn)(void*));
 void CmiHandleReductionMessage(void *msg);
+int CmiGetReductionHandler();
+CmiHandler CmiGetReductionDestination();
 
 /* If the second parameter (the number of chunks to send) is negative, then
  * every message will be started aligned with 8 bytes, and a message header will

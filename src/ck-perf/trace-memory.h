@@ -19,7 +19,7 @@ class MemEntry {
  public:  
   MemEntry();
   void write(FILE *fp);
-  void set(int t, void *w, int s=0) {
+  void set(int t, void *w, int s) {
     type = t;
     where = w;
     size = s;
@@ -49,9 +49,10 @@ class TraceMemory : public Trace {
  public:
   TraceMemory(char **argv);
   
+  void traceBegin();
   void traceClose();
   void malloc(void *where, int size, void **stack, int stackSize);
-  void free(void *where);
+  void free(void *where, int size);
 };
 
 #endif

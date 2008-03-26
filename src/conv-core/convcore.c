@@ -627,7 +627,6 @@ int CmiRegisterHandlerEx(CmiHandlerEx h,void *userPtr)
   return Count;
 }
 
-
 #if CMI_LOCAL_GLOBAL_AVAILABLE
 int CmiRegisterHandlerLocal(h)
 CmiHandler h;
@@ -1761,6 +1760,11 @@ static void * (*_reduce_mergeFn)(void*,void**,int);
 static void (*_reduce_pupFn)(void*,void*);
 static void (*_reduce_deleteFn)(void*);
 
+CpvStaticDeclare(CmiUInt2, _reduce_seqID);
+
+int CmiGetReductionHandler() { return CpvAccess(CmiReductionMessageHandler); }
+CmiHandler CmiGetReductionDestination() { return _reduce_destination; }
+
 CmiReductionsInit() {
   CpvInitialize(int, CmiReductionMessageHandler);
   CpvAccess(CmiReductionMessageHandler) = CmiRegisterHandler((CmiHandler)CmiHandleReductionMessage);
@@ -1773,6 +1777,14 @@ CmiReductionsInit() {
   CpvAccess(_reduce_num_children) = 0;
   CpvAccess(_reduce_received) = 0;
   CpvAccess(_reduce_msg_list) = (char**)malloc(CmiNumSpanTreeChildren(CmiMyPe())*sizeof(void*));
+
+  CpvInitialize(CmiUInt2, _reduce_seqID);
+  CpvAccess(_reduce_seqID) = 0x8000;
+}
+
+int CmiReduceNextID() {
+  if (CpvAccess(_reduce_seqID) == 0xffff) CpvAccess(_reduce_seqID) = 0x8000;
+  return ++CpvAccess(_reduce_seqID);
 }
 
 void CmiSendReduce() {
@@ -1837,7 +1849,7 @@ void CmiReduceStruct(void *data, void (*pupFn)(void*,void*),
   /*else CmiPrintf("CmiReduceStruct(%d): %d - %d\n",CmiMyPe(),CpvAccess(_reduce_received),CpvAccess(_reduce_num_children));*/
 }
 
-void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int)) {
+void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int), int redID, int numChildren, int parent) {
   CmiAssert(CmiRankOf(CmiMyPe()) == 0);
   CpvAccess(_reduce_data) = data;
   CpvAccess(_reduce_data_size) = size;
@@ -1848,6 +1860,17 @@ void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int)) {
   CpvAccess(_reduce_num_children) = CmiNumNodeSpanTreeChildren(CmiMyNode());
   if (CpvAccess(_reduce_received) == CpvAccess(_reduce_num_children)) CmiSendReduce();
 }
+//void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int), int redID) {
+//  CmiNodeReduce(data, size, mergeFn, redID, CmiNumNodeSpanTreeChildren(CmiMyNode()),
+//      CmiNodeFirst(CmiNodeSpanTreeParent(CmiMyNode())));
+//}
+//void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int), int numChildren, int parent) {
+//  CmiNodeReduce(data, size, mergeFn, CmiReduceNextID(), numChildren, parent);
+//}
+//void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int)) {
+//  CmiNodeReduce(data, size, mergeFn, CmiReduceNextID(), CmiNumNodeSpanTreeChildren(CmiMyNode()),
+//      CmiNodeFirst(CmiNodeSpanTreeParent(CmiMyNode())));
+//}
 
 void CmiNodeReduceStruct(void *data, void (*pupFn)(void*,void*),
                          void * (*mergeFn)(void*,void**,int), CmiHandler dest,

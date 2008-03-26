@@ -162,13 +162,19 @@ PUPbytes(CkCallback) //FIXME: write a real pup routine
  *   library can't or won't call "thread_delay".
  * The return value is lost, so your library needs to call
  *   thread_delay itself if you want a return value.
+ * Modification Filippo: Passing in an pointer argument, the return
+ *   value will be stored in that pointer 
  */
 class CkCallbackResumeThread : public CkCallback {
+ protected: void ** result;
  public:
 	CkCallbackResumeThread(void)
-		:CkCallback(resumeThread) {}
+		:CkCallback(resumeThread) { result = NULL; }
+	CkCallbackResumeThread(void * &ptr)
+	    :CkCallback(resumeThread) { result = &ptr; }
 	~CkCallbackResumeThread(void) {
-		thread_delay(); //<- block thread here if it hasn't already
+	    void * res = thread_delay(); //<- block thread here if it hasn't already
+	    if (result != NULL) *result = res;
 	}
 };
 

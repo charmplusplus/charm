@@ -9,6 +9,7 @@
 #  error "debug-charm.h is for C++; use debug-conv.h for C programs"
 #endif
 
+#include "converse.h"
 #include "pup.h"
 
 //These pup functions are useful in CpdLists, as they document the name

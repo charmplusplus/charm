@@ -91,6 +91,7 @@ void CmiOutOfMemory(int nBytes)
 /* Global variables keeping track of the status of the system (mostly used by charmdebug) */
 #ifndef CMK_OPTIMIZE
 int memory_status_info=0;
+int memory_chare_id=0;
 #endif
 
 #if CMK_MEMORY_BUILD_OS
@@ -399,4 +400,9 @@ void setProtection(char *mem, char *ptr, int len, int flag) { }
 /* Routines used to specify how the memory will the used */
 void setMemoryTypeChare(void *ptr) { }
 void setMemoryTypeMessage(void *ptr) { }
+
+int get_memory_allocated_user_total() { return 0; }
+#ifndef CMK_OPTIMIZE
+void setMemoryChareID(void *ptr) { }
+#endif
 #endif

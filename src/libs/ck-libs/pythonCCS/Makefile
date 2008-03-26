@@ -1,16 +1,26 @@
 CDIR=../../../..
 OPTS=-g -Wall
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
+CHARMXI=$(CHARMC) -intrinsic
 
-HEADERS=PythonCCS.h PythonCCS-client.h PythonCCS.decl.h
-HEADDEP=$(HEADERS) PythonCCS.def.h
+HEADERS=PythonCCS.h PythonCCS-client.h PythonCCS.decl.h pythonIncludes.h
+HEADDEP=$(HEADERS) PythonCCS.def.h charmdebug_python.def.h
 OBJS=PythonCCS.o PythonCCS-client.o
+OBJS_DEBUG=charmdebug-python.o
 DEST=$(CDIR)/lib/libmodulePythonCCS.a
+DEST_DEBUG=$(CDIR)/lib/libmodulecharmdebug_python.a
 
-all: $(DEST) headers
+all:
+	-(CHARMINC=../../../../include;. $$CHARMINC/conv-config.sh; \
+	if test "$$CMK_BUILD_PYTHON" != ""; then ($(MAKE) conditional OPTS='$(OPTS)' || exit 1); fi)
+
+conditional: $(DEST) $(DEST_DEBUG) headers
 
 $(DEST): $(OBJS)
 	$(CHARMC) $(OBJS) -o $@
+
+$(DEST_DEBUG): $(OBJS_DEBUG)
+	$(CHARMC) $(OBJS_DEBUG) -o $@
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
@@ -23,7 +33,21 @@ PythonCCS-client.o: PythonCCS-client.C $(HEADDEP)
 	$(CHARMC) -c $(FLAGS) PythonCCS-client.C
 
 PythonCCS.decl.h PythonCCS.def.h: PythonCCS.ci
-	$(CHARMC) PythonCCS.ci
+	$(CHARMXI) PythonCCS.ci
+
+charmdebug-python.o: charmdebug-python.C $(HEADDEP)
+	$(CHARMC) -c $(FLAGS) -I. charmdebug-python.C
+
+charmdebug_python.decl.h charmdebug_python.def.h: charmdebug-python.ci
+	$(CHARMXI) charmdebug-python.ci
+
+pythonIncludes.h:
+	(CHARMINC=../../../../include;. $$CHARMINC/conv-config.sh; \
+	echo "#include \"python$$CMK_BUILD_PYTHON/Python.h\"\n"\
+	"#include \"python$$CMK_BUILD_PYTHON/compile.h\"\n"\
+	"#include \"python$$CMK_BUILD_PYTHON/eval.h\"\n"\
+	"#include \"python$$CMK_BUILD_PYTHON/node.h\"" > pythonIncludes.h \
+	) 
 
 clean:
-	rm -rf *.a *~ *.def.h *.decl.h *.o SunWS_cache $(DEST) headers
+	rm -rf *.a *~ *.def.h *.decl.h *.o SunWS_cache $(DEST) $(DEST_DEBUG) pythonIncludes.h headers

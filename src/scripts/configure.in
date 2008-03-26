@@ -807,11 +807,12 @@ fi
 fi
 
 #### test if Python headers are installed ####
+PYTHON_VERSION=`python -V 2>&1 | awk {'print $2'} | awk -F. {'print $1"."$2'}`
 cat > $t <<EOT
-#include "python/Python.h"
-#include "python/compile.h"
-#include "python/eval.h"
-#include "python/node.h"
+#include "python${PYTHON_VERSION}/Python.h"
+#include "python${PYTHON_VERSION}/compile.h"
+#include "python${PYTHON_VERSION}/eval.h"
+#include "python${PYTHON_VERSION}/node.h"
 
 int main() {
     Py_Initialize();
@@ -820,9 +821,9 @@ int main() {
     PyCodeObject *program = PyNode_Compile(programNode, "");
 }
 EOT
-PYTHON_VERSION=`python -V 2>&1 | awk {'print $2'} | awk -F. {'print $1"."$2'}`
 test_link "whether Python is installed" "yes" "no" "-lpython$PYTHON_VERSION -lpthread -lutil -ldl"
 AC_DEFINE_UNQUOTED(CMK_HAS_PYTHON, $pass, [whether Python is installed])
+AC_DEFINE_UNQUOTED(CMK_PYTHON_VERSION, ${PYTHON_VERSION}, [Python version])
 if test $pass -eq 1
 then
 	add_flag "CMK_BUILD_PYTHON=$PYTHON_VERSION" "python"

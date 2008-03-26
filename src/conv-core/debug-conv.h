@@ -19,6 +19,7 @@ extern void * (*CpdDebug_MergeAllocationTree)(void *data, void **remoteData, int
 void CpdInit(void); 
 void CpdFreeze(void);  
 void CpdUnFreeze(void);
+int  CpdIsFrozen(void);
 void CpdFreezeModeScheduler(void);
 void CpdStartGdb(void);
 void Cpd_CmiHandleMessage(void *msg);

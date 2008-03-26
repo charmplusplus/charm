@@ -137,7 +137,7 @@ class Trace {
 
     /* Memory tracing */
     virtual void malloc(void *where, int size, void **stack, int stackSize){}
-    virtual void free(void *where){}
+    virtual void free(void *where, int size){}
 
     /* for implementing thread listeners */
     virtual void traceAddThreadListeners(CthThread tid, envelope *e) {}
@@ -236,7 +236,7 @@ public:
 
     /* Memory tracing */
     inline void malloc(void *where, int size, void **stack, int stackSize){ ALLDO(malloc(where,size,stack,stackSize)); }
-    inline void free(void *where){ ALLDO(free(where)); }
+    inline void free(void *where, int size){ ALLDO(free(where, size)); }
 
     /* calls for thread listener registration for each trace module */
     inline void traceAddThreadListeners(CthThread tid, envelope *e) {
@@ -283,7 +283,7 @@ extern "C" {
 
 /* Memory tracing */
 #define _TRACE_MALLOC(where, size, stack, stackSize) _TRACE_ONLY(CkpvAccess(_traces)->malloc(where,size,stack,stackSize))
-#define _TRACE_FREE(where) _TRACE_ONLY(CkpvAccess(_traces)->free(where))
+#define _TRACE_FREE(where, size) _TRACE_ONLY(CkpvAccess(_traces)->free(where, size))
 
 
 #include "trace-bluegene.h"

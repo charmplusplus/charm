@@ -762,9 +762,11 @@ void _initCharm(int unused_argc, char **argv)
 		_parseCommandLineOpts(argv);
 		_registerInit();
 		CkRegisterMsg("System", 0, 0, sizeof(int));
-		CkRegisterChare("null", 0);
+		CkRegisterChareInCharm(CkRegisterChare("null", 0));
 		CkIndex_Chare::__idx=CkRegisterChare("Chare", sizeof(Chare));
+		CkRegisterChareInCharm(CkIndex_Chare::__idx);
 		CkIndex_Group::__idx=CkRegisterChare("Group", sizeof(Group));
+        CkRegisterChareInCharm(CkIndex_Group::__idx);
 		CkRegisterEp("null", (CkCallFnPtr)_nullFn, 0, 0, 0+CK_EP_INTRINSIC);
 		
 		/**

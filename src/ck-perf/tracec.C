@@ -9,8 +9,8 @@ extern "C" {
     _TRACE_MALLOC(where, size, stack, stackSize);
   }
 
-  void traceFree_c(void *where) {
-    _TRACE_FREE(where);
+  void traceFree_c(void *where, int size) {
+    _TRACE_FREE(where, size);
   }
 
 }

@@ -1143,6 +1143,10 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
     if(!CmiNodeAlive(CkMyPe())){
 	return;
     }
+#ifndef CMK_OPTIMIZE
+    //Just in case we need to breakpoint or use the envelope in some way
+    _prepareMsg(entryIndex,msg,pCid);
+#endif
 		//Just directly call the chare (skip QD handling & scheduler)
     register envelope *env = UsrToEnv(msg);
     if (env->isPacked()) CkUnpackMessage(&env);
