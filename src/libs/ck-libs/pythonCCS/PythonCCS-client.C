@@ -81,6 +81,11 @@ void PythonExecute::setWait(bool _set) {
   else flags &= ~FLAG_WAIT;
 }
 
+void PythonExecute::setNoCheck(bool _set) {
+  if (_set) flags |= FLAG_NOCHECK;
+  else flags &= ~FLAG_NOCHECK;
+}
+
 int PythonExecute::size() {
   return sizeof(PythonExecute)+codeLength+1+methodNameLength+1+infoSize;
 }

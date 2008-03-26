@@ -65,6 +65,11 @@ int CkRegisterChare(const char *name, int dataSz)
   return _chareTable.add(new ChareInfo(name, dataSz));
 }
 
+extern "C"
+void CkRegisterChareInCharm(int chareIndex){
+  _chareTable[chareIndex]->inCharm = CmiTrue;
+}
+
 extern "C" 
 void CkRegisterGroupIrr(int chareIndex,int isIrr){
   _chareTable[chareIndex]->isIrr = isIrr;
@@ -158,6 +163,7 @@ static void pupChare(PUP::er &p,int i)
   PCOMS(name) PCOM(size) 
   PCOM(defCtor) PCOM(migCtor)
   PCOM(numbases)
+  PCOM(inCharm)
   p.comment("List of base classes:");
   p(c->bases,c->numbases);
 }

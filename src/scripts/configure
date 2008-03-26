@@ -2607,11 +2607,12 @@ fi
 fi
 
 #### test if Python headers are installed ####
+PYTHON_VERSION=`python -V 2>&1 | awk {'print $2'} | awk -F. {'print $1"."$2'}`
 cat > $t <<EOT
-#include "python/Python.h"
-#include "python/compile.h"
-#include "python/eval.h"
-#include "python/node.h"
+#include "python${PYTHON_VERSION}/Python.h"
+#include "python${PYTHON_VERSION}/compile.h"
+#include "python${PYTHON_VERSION}/eval.h"
+#include "python${PYTHON_VERSION}/node.h"
 
 int main() {
     Py_Initialize();
@@ -2620,11 +2621,15 @@ int main() {
     PyCodeObject *program = PyNode_Compile(programNode, "");
 }
 EOT
-PYTHON_VERSION=`python -V 2>&1 | awk {'print $2'} | awk -F. {'print $1"."$2'}`
 test_link "whether Python is installed" "yes" "no" "-lpython$PYTHON_VERSION -lpthread -lutil -ldl"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_PYTHON $pass
+_ACEOF
+
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_PYTHON_VERSION ${PYTHON_VERSION}
 _ACEOF
 
 if test $pass -eq 1

@@ -153,6 +153,9 @@ class ChareInfo {
     /// For groups -- 1 if the group is Irreducible 
     int isIrr;
     
+    /// true if this EP is charm internal functions
+    CmiBool inCharm;
+
     ChareInfo(const char *n, int s) : name(n), size(s) {
       defCtor=migCtor=-1;
       isIrr = numbases = 0;
@@ -162,6 +165,8 @@ class ChareInfo {
     void setMigCtor(int idx) { migCtor = idx; }
     int getMigCtor(void) { return migCtor; }
     void addBase(int idx) { bases[numbases++] = idx; }
+    void setInCharm() { inCharm = CmiTrue; }
+    CmiBool isInCharm() { return inCharm; }
 };
 
 /// Describes a mainchare's constructor.  These are all executed at startup.

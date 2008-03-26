@@ -101,6 +101,7 @@ class PythonExecute : private PythonAbstract {
   static const char FLAG_HIGHLEVEL = 0x20;
   static const char FLAG_ITERATE = 0x10;
   static const char FLAG_WAIT = 0x08;
+  static const char FLAG_NOCHECK = 0x04;
  public:
   static const CmiUInt4 localmagic = 37492037;
 
@@ -120,6 +121,7 @@ class PythonExecute : private PythonAbstract {
   void setKeepPrint(bool _set);
   void setWait(bool _set);
   void setInterpreter(CmiUInt4 i) { interpreter = i; };
+  void setNoCheck(bool _set);
 
   bool isPersistent() { return flags & FLAG_PERSISTENT; };
   bool isIterate() { return flags & FLAG_ITERATE; };
@@ -127,6 +129,7 @@ class PythonExecute : private PythonAbstract {
   bool isKeepPrint() { return flags & FLAG_KEEPPRINT; };
   bool isWait() { return flags & FLAG_WAIT; };
   CmiUInt4 getInterpreter() { return interpreter; };
+  bool isNoCheck() { return flags & FLAG_NOCHECK; };
 
   int size();
   char *pack();
