@@ -172,7 +172,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 	routerstrategy.h convcomlib.h dummyconversestrategy.h  treerouter.h \
 	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h \
 	prefixrouter.h pipebroadcastconverse.h pipelinestrategy.h cmipool.h \
-	comlib.h
+	comlib.h cmidirect.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -225,7 +225,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           PrioStreaming.h MPIStrategy.h MsgPacker.h StreamingStrategy.h \
 	  BroadcastStrategy.h ComlibSectionInfo.h AAPLearner.h \
 	  AAMLearner.h ComlibStats.h \
-	  RectMulticastStrategy.h \
+	  RectMulticastStrategy.h ckdirect.h \
 	  $(CVHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
