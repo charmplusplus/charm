@@ -1,4 +1,4 @@
-OPTS= -g
+OPTS=-g
 CHARMC=../../../bin/charmc $(OPTS)
 SRC=../../../src
 
@@ -16,7 +16,7 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o stencil3d charmrun
 
 stencil3d.o: stencil3d.C stencil3d.decl.h
-	$(CHARMC) -I$(SRC)/ck-core -I$(SRC)/conv-core -DUSE_CKDIRECT -c stencil3d.C
+	$(CHARMC) -I$(SRC)/ck-core -I$(SRC)/conv-core -c stencil3d.C
 
 test: all
 	./charmrun stencil3d +p4 20 5 100

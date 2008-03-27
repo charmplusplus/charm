@@ -7,6 +7,11 @@ mainmodule stencil3d{
   mainchare Main{
     entry Main(CkArgMsg *m);
     entry void done();
+    entry void doneSetup();
+  };
+
+  message StencilMsg{
+    float arr[];
   };
 
   array [3D] StencilPoint {
@@ -23,6 +28,7 @@ mainmodule stencil3d{
     // when not using CkDirect
     entry void sendData();
     entry void recvBuffer(float arr[size], int size, int which);
+    entry void recvBufferMsg(StencilMsg *msg);
     
   };
 };
