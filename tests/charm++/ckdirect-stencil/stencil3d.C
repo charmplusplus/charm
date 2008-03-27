@@ -32,7 +32,7 @@ class Main : public CBase_Main {
     CProxy_StencilPoint array = 
         CProxy_StencilPoint::ckNew(charesPerDim, charesPerDim, charesPerDim);
     //CkPrintf("main: %dx%dx%d elt array, num_iterations: %d\n", charesPerDim, charesPerDim, charesPerDim, num_iterations);
-    CkPrintf("main: %dx%dx%d elt array, num_iterations: %d\n", charesPerDim, charesPerDim, charesPerDim, num_iterations);
+    CkPrintf("main: dim: %d blockDim: %d num_iterations: %d\n", dim, blockDim, num_iterations);
     start = CmiWallTimer();
 #ifdef USE_CKDIRECT
     array.setupChannels();
@@ -204,9 +204,12 @@ class StencilPoint : public CBase_StencilPoint{
 //#else   // don't USE_CKDIRECT
   void recvBuffer(float *array, int size, int whichBuf){
     remainingBufs--;
+    memcpy(recvBuf[whichBuf], array, size*sizeof(float));
+    /*
     for(int i = 0; i < size; i++){
       recvBuf[whichBuf][i] = array[i];
     }
+    */
     
     if(remainingBufs == 0){
       remainingBufs = NBRS;
