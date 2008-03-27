@@ -796,7 +796,7 @@ static void one_slotOP(const slotOP *op,int pe,int s,int n)
 		op->local(CpvAccess(myss),s,n);
 	else 
 	{/*Remote request*/
-		slotmsg *m=prepare_slotmsg(s,e);
+		slotmsg *m=prepare_slotmsg(s,n);
 		CmiSetHandler(m, freeOP.remote);
 		CmiSyncSendAndFree(pe,sizeof(slotmsg),m);
 	}
