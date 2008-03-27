@@ -347,16 +347,6 @@ then
   test -z "$CHARMLIBSO" && echo "$CHARMBIN/../lib_so: not found" && exit 1
 fi
 
-################################
-# Preload configuration script
-################################
-Debug "About to preload machine config script"
-Debug "Preload config script, setting defaults..."
-
-[ ! -r $CHARMINC/conv-config.sh ] && Abort "Cannot find conv-config.sh in $CHARMINC"
-. $CHARMINC/conv-config.sh $CHARMINC
-
-
 ##############################################################################
 #
 # Parse the arguments
@@ -418,9 +408,7 @@ do
                 # Requested support from charmdebug: add some modules and libraries
                 CHARMDEBUG=1
                 MEMORY="charmdebug"
-                if [ -n "$CMK_BUILD_PYTHON" ]; then
-                    AddModules PythonCCS charmdebug_python
-                fi
+		shift
                 ;;
 
 	"-module"|"-modules")
@@ -716,10 +704,6 @@ trap 'End 1' 2
 # Process original command-line arguments
 processArgs "$@"
 
-# If we are debugging, add "-g -O0" to the C/C++ flags
-if [ -n "$CHARMDEBUG" ]; then
-    OPTS_CPP="$OPTS_CPP -O0 -g"
-fi
 
 ##############################################################################
 #
@@ -792,10 +776,13 @@ Debug "Read config script, setting defaults..."
 
 Debug "Setting vars..."
 
-# Now that we have read the config file, if python is requested, add the correct version
-if [ -n "$CMK_BUILD_PYTHON" ]
-then
-	POST_LIBRARIES=`AddList $POST_LIBRARIES -lpython${CMK_BUILD_PYTHON}`
+# If we are debugging, add "-g -O0" to the C/C++ flags
+if [ -n "$CHARMDEBUG" ]; then
+       if [ -n "$CMK_BUILD_PYTHON" ]; then
+         	AddModules PythonCCS charmdebug_python
+		POST_LIBRARIES=`AddList $POST_LIBRARIES -lpython${CMK_BUILD_PYTHON}`
+   	fi
+    	OPTS_CPP="$OPTS_CPP -O0 -g"
 fi
 
 if [ "$BUILD_SHARE" = "1" ]
