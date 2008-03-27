@@ -56,6 +56,9 @@
    (4, 5), (4, 7), (5, 6), (6, 7), in that order
 */
 
+#ifndef __ADAPT_ADJ_H__
+#define __ADAPT_ADJ_H__
+
 // NOTE: review for mixed and cohesive element handling
 #include <set>
 #include <algorithm>
@@ -294,8 +297,8 @@ void removeFromAdaptAdj(
         const int edgeID, 
         const adaptAdj nbr);
 
-/** Copy adjacency information
- */
+/** Copy adjacency information for one element to another.
+*/
 void copyAdaptAdj(
 		const int meshid, 
 		const adaptAdj* const srcElem, 
@@ -389,3 +392,5 @@ void replyAdjacencyRequests(
         const int myRank, 
         const int elemType,
         bool isEdgeRequest);
+
+#endif
