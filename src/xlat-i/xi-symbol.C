@@ -3026,6 +3026,8 @@ void Entry::genCall(XStr& str, const XStr &preCall)
   }
   else //Normal case: Unmarshall variables
 	param->beginUnmarshall(str);
+
+  str << "#ifndef CMK_OPTIMIZE\n  setMemoryChareID(impl_obj);\n#endif\n";
   str << preCall;
   if (!isConstructor() && fortranMode) {
     if (!container->isArray()) { // Currently, only arrays are supported
@@ -3058,7 +3060,6 @@ void Entry::genCall(XStr& str, const XStr &preCall)
   else { //Normal case: call regular method
     if (isArgcArgv) str<<"  CkArgMsg *m=(CkArgMsg *)impl_msg;\n"; //Hack!
   
-    str << "#ifndef CMK_OPTIMIZE\n  setMemoryChareID(impl_obj);\n#endif\n";
     if(isConstructor()) {//Constructor: call "new (obj) foo(parameters)"
   	str << "  new (impl_obj) "<<container->baseName();
     } else {//Regular entry method: call "obj->bar(parameters)"
@@ -3074,8 +3075,8 @@ void Entry::genCall(XStr& str, const XStr &preCall)
     else {//Normal case: unmarshall parameters (or just pass message)
         str<<"("; param->unmarshall(str); str<<");\n";
     }
-    str << "#ifndef CMK_OPTIMIZE\n  setMemoryChareID(NULL);\n#endif\n";
   }
+  str << "#ifndef CMK_OPTIMIZE\n  setMemoryChareID(NULL);\n#endif\n";
 }
 
 void Entry::genDefs(XStr& str)

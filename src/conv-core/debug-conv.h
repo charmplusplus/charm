@@ -24,6 +24,8 @@ void CpdFreezeModeScheduler(void);
 void CpdStartGdb(void);
 void Cpd_CmiHandleMessage(void *msg);
 
+extern int (*CpdIsDebugMessage)(void*);
+
 /* C bindings for CpdList functions: */
 
 /**

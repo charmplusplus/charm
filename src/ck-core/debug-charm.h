@@ -10,6 +10,7 @@
 #endif
 
 #include "converse.h"
+#include "debug-conv.h"
 #include "pup.h"
 
 //These pup functions are useful in CpdLists, as they document the name

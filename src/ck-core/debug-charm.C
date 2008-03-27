@@ -566,10 +566,10 @@ void CpdRemoveAllBreakPoints ()
   }
 }
 
-extern "C" CmiBool isDebugMessage(void *msg) {
+extern "C" int CpdIsCharmDebugMessage(void *msg) {
   envelope *env = (envelope*)msg;
   // Later should use "isDebug" value, but for now just bypass all intrinsic EPs
-  return _entryTable[env->getEpIdx()]->inCharm;
+  return CmiGetHandler(msg) != _charmHandlerIdx || _entryTable[env->getEpIdx()]->inCharm;
 }
 
 
@@ -637,6 +637,7 @@ void CpdCharmInit()
   CpdListRegister(new CpdList_arrayElements());
   CpdListRegister(new CpdList_objectNames());
   CpdListRegister(new CpdList_object());
+  CpdIsDebugMessage = CpdIsCharmDebugMessage;
 }
 
 #else

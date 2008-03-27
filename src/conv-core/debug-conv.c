@@ -145,7 +145,7 @@ freeze mode-- only executes CCS requests.
 */
 void CcsServerCheck(void);
 extern int _isCcsHandlerIdx(int idx);
-extern int _charmHandlerIdx;
+int (*CpdIsDebugMessage)(void *);
 
 void CpdFreezeModeScheduler(void)
 {
@@ -163,7 +163,7 @@ void CpdFreezeModeScheduler(void)
       msg = CsdNextMessage(&state);
 
       if (msg!=NULL) {
-	  int hIdx=CmiGetHandler(msg);
+        /*int hIdx=CmiGetHandler(msg);*/
 	  /*
 	  if(_isCcsHandlerIdx(hIdx))
 	  / *A CCS request-- handle it immediately* /
@@ -175,7 +175,7 @@ void CpdFreezeModeScheduler(void)
 	    / * Debug messages should be handled immediately * /
 	    CmiHandleMessage(msg);
 	  } else */
-	  if (hIdx != _charmHandlerIdx || isDebugMessage(msg)) {
+	  if (CpdIsDebugMessage(msg)) {
 	    CmiHandleMessage(msg);
 	  }
 	  else
