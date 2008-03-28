@@ -147,37 +147,58 @@ void Compute::beginCopying() {
 
 void Compute::sendA() {
   int indexZ = thisIndex.z;
+  /* this copying of data is unnecessary ---
   float *dataA = new float[subBlockDimXz * blockDimY];
   for(int i=0; i<subBlockDimXz; i++)
     for(int j=0; j<blockDimY; j++)
-      dataA[i*blockDimY + j] = A[indexZ*subBlockDimXz*blockDimY + i*blockDimY + j];
+      dataA[i*blockDimY + j] = A[indexZ*subBlockDimXz*blockDimY + i*blockDimY + j];*/
 
   for(int k=0; k<num_chare_z; k++)
-    if(k != indexZ)
-      compute(thisIndex.x, thisIndex.y, k).receiveA(indexZ, dataA, subBlockDimXz * blockDimY);
+    if(k != indexZ) {
+      // use a local pointer for chares on the same processor
+      Compute* c = compute(thisIndex.x, thisIndex.y, k).ckLocal();
+      if(c != NULL)
+	c->receiveA(indexZ, &A[indexZ*subBlockDimXz*blockDimY], subBlockDimXz * blockDimY);
+      else
+	compute(thisIndex.x, thisIndex.y, k).receiveA(indexZ, &A[indexZ*subBlockDimXz*blockDimY], subBlockDimXz * blockDimY);
+    }
 }
 
 void Compute::sendB() {
   int indexX = thisIndex.x;
+  /* this copying of data is unnecessary ---
   float *dataB = new float[subBlockDimYx * blockDimZ];
   for(int j=0; j<subBlockDimYx; j++)
     for(int k=0; k<blockDimZ; k++)
-      dataB[j*blockDimZ + k] = B[indexX*subBlockDimYx*blockDimZ + j*blockDimZ + k];
+      dataB[j*blockDimZ + k] = B[indexX*subBlockDimYx*blockDimZ + j*blockDimZ + k];*/
 
   for(int i=0; i<num_chare_x; i++)
-    if(i != indexX)
-      compute(i, thisIndex.y, thisIndex.z).receiveB(indexX, dataB, subBlockDimYx * blockDimZ);
+    if(i != indexX) {
+      // use a local pointer for chares on the same processor
+      Compute* c = compute(i, thisIndex.y, thisIndex.z).ckLocal();
+      if(c != NULL)
+	c->receiveB(indexX, &B[indexX*subBlockDimYx*blockDimZ], subBlockDimYx * blockDimZ);
+      else
+	compute(i, thisIndex.y, thisIndex.z).receiveB(indexX, &B[indexX*subBlockDimYx*blockDimZ], subBlockDimYx * blockDimZ);
+    }
 }
 
 void Compute::sendC() {
   int indexY = thisIndex.y;
-  float *dataC = new float[subBlockDimXy * blockDimZ];
   for(int j=0; j<num_chare_y; j++) {
     if(j !=indexY) {
+      /* this copying of data is unnecessary ---
+      float *dataC = new float[subBlockDimXy * blockDimZ];
       for(int i=0; i<subBlockDimXy; i++)
 	for(int k=0; k<blockDimZ; k++)
-	  dataC[i*blockDimZ + k] = C[j*subBlockDimXy*blockDimZ + i*blockDimZ + k];
-      compute(thisIndex.x, j, thisIndex.z).receiveC(dataC, subBlockDimXy * blockDimZ);
+	  dataC[i*blockDimZ + k] = C[j*subBlockDimXy*blockDimZ + i*blockDimZ + k];*/
+
+      // use a local pointer for chares on the same processor
+      Compute *c = compute(thisIndex.x, j, thisIndex.z).ckLocal();
+      if(c != NULL)
+	c->receiveC(&C[j*subBlockDimXy*blockDimZ], subBlockDimXy * blockDimZ);
+      else
+	compute(thisIndex.x, j, thisIndex.z).receiveC(&C[j*subBlockDimXy*blockDimZ], subBlockDimXy * blockDimZ);
     }
   }
 }
