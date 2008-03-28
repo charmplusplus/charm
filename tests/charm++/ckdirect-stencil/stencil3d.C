@@ -1205,13 +1205,13 @@ class StencilPoint : public CBase_StencilPoint{
         sendBuf[newLocal][zp][i] = 1.0;
     }
     // exclude the time for setup and the first iteration
+    iterations++;
     if(iterations == 1){
       contribute(0,0,CkReduction::concat, CkCallback(CkIndex_Main::doneSetup(), mainProxy));
     }
     
     // toggle between localChunks
     whichLocal = newLocal;
-    iterations++;
     if(iterations == num_iterations){
 #ifdef STENCIL2D_VERBOSE
       CkPrintf("(%d,%d): contributing to exit\n", row, col);
