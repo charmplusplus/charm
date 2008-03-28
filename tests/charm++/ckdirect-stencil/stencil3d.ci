@@ -6,7 +6,8 @@ mainmodule stencil3d{
 
   mainchare Main{
     entry Main(CkArgMsg *m);
-    entry void done(CkReductionMsg *msg);
+    entry void done();
+    //entry void done(CkReductionMsg *msg);
     entry void doneSetup();
   };
 

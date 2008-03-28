@@ -43,11 +43,11 @@ class Main : public CBase_Main {
     start = CmiWallTimer();
   }
   
-  void done(CkReductionMsg *msg){
+  void done(/*CkReductionMsg *msg*/){
     end = CmiWallTimer();
     CkPrintf("Total time: %f sec\n", end-startSetup);
     CkPrintf("Computation time: %f sec\n", end-start);
-    CkPrintf("Total computations: %d\n", *(int *)msg->getData());
+    //CkPrintf("Total computations: %d\n", *(int *)msg->getData());
     CkExit();
   }
 };
@@ -69,7 +69,7 @@ class StencilPoint : public CBase_StencilPoint{
   
     /* Number of elements whose new values have been computed
      */
-    int eltsComp;;
+    //int eltsComp;;
 //#ifdef USE_CKDIRECT
   /* 0: left, 1: right, 2: top, 3: bottom*/
   infiDirectUserHandle shandles[2][NBRS];
@@ -96,7 +96,7 @@ class StencilPoint : public CBase_StencilPoint{
     whichLocal= 0;
 
     iterations = 0;
-    eltsComp = 0;
+    //eltsComp = 0;
     
     col = thisIndex.y;
     row = thisIndex.x;
@@ -305,7 +305,7 @@ class StencilPoint : public CBase_StencilPoint{
                               localChunk[whichLocal][small(i,j,k+1)]+
                               localChunk[whichLocal][small(i,j,k-1)]
                             )/7;
-          eltsComp++;
+          //eltsComp++;
         }
       }
     }
@@ -399,7 +399,7 @@ class StencilPoint : public CBase_StencilPoint{
                             sendBuf[whichLocal][xn][face(blockDim-2,blockDim-2)]
                             )/7;
 
-    eltsComp += 8;
+    //eltsComp += 8;
 
     // 12 edges
     //zp,yp
@@ -413,7 +413,7 @@ class StencilPoint : public CBase_StencilPoint{
                 sendBuf[whichLocal][yp][face(i+1,1)]+
                 sendBuf[whichLocal][zp][face(1,i+1)]
           )/7;
-       eltsComp++;
+       //eltsComp++;
     }
 
     //xn,yp
@@ -427,7 +427,7 @@ class StencilPoint : public CBase_StencilPoint{
                 sendBuf[whichLocal][xn][face(1,i+1)]+
                 sendBuf[whichLocal][yp][face(blockDim-2,i+1)]
           )/7;
-       eltsComp++;
+       //eltsComp++;
     }
 
     //zn,yp
@@ -441,7 +441,7 @@ class StencilPoint : public CBase_StencilPoint{
                 sendBuf[whichLocal][zn][face(1,i+1)]+
                 sendBuf[whichLocal][yp][face(i+1,blockDim-2)]
           )/7;
-       eltsComp++;
+       //eltsComp++;
     }
 
     //yp,xp
@@ -455,7 +455,7 @@ class StencilPoint : public CBase_StencilPoint{
                 sendBuf[whichLocal][yp][face(1,i+1)]+
                 sendBuf[whichLocal][xp][face(1,i+1)]
           )/7;
-       eltsComp++;
+       //eltsComp++;
     }
 
     //yn,zp
@@ -469,7 +469,7 @@ class StencilPoint : public CBase_StencilPoint{
                 sendBuf[whichLocal][yn][face(i+1,1)]+
                 sendBuf[whichLocal][zp][face(blockDim-2,i+1)]
           )/7;
-       eltsComp++;
+       //eltsComp++;
     }
 
     //xn,yn
@@ -483,7 +483,7 @@ class StencilPoint : public CBase_StencilPoint{
                 sendBuf[whichLocal][xn][face(blockDim-2,i+1)]+
                 sendBuf[whichLocal][yn][face(blockDim-2,i+1)]
           )/7;
-       eltsComp++;
+       //eltsComp++;
     }
 
     //yn,zn
@@ -497,7 +497,7 @@ class StencilPoint : public CBase_StencilPoint{
                 sendBuf[whichLocal][yn][face(i+1,blockDim-2)]+
                 sendBuf[whichLocal][zn][face(blockDim-2,i+1)]
           )/7;
-       eltsComp++;
+       //eltsComp++;
     }
 
     //xp,yn
@@ -511,7 +511,7 @@ class StencilPoint : public CBase_StencilPoint{
                 sendBuf[whichLocal][xp][face(blockDim-2,i+1)]+
                 sendBuf[whichLocal][yn][face(1,i+1)]
           )/7;
-       eltsComp++;
+       //eltsComp++;
     }
 
     //xp,zp
@@ -525,7 +525,7 @@ class StencilPoint : public CBase_StencilPoint{
                 sendBuf[whichLocal][xp][face(i+1,1)]+
                 sendBuf[whichLocal][zp][face(i+1,1)]
           )/7;
-       eltsComp++;
+       //eltsComp++;
     }
 
     //xn,zp
@@ -539,7 +539,7 @@ class StencilPoint : public CBase_StencilPoint{
                 sendBuf[whichLocal][xn][face(i+1,1)]+
                 sendBuf[whichLocal][zp][face(i+1,blockDim-2)]
           )/7;
-       eltsComp++;
+       //eltsComp++;
     }
 
     //xp,zn
@@ -553,7 +553,7 @@ class StencilPoint : public CBase_StencilPoint{
                 sendBuf[whichLocal][xp][face(i+1,blockDim-2)]+
                 sendBuf[whichLocal][zn][face(i+1,1)]
           )/7;
-       eltsComp++;
+       //eltsComp++;
     }
 
     //xn,zn
@@ -567,7 +567,7 @@ class StencilPoint : public CBase_StencilPoint{
                 sendBuf[whichLocal][xn][face(i+1,blockDim-2)]+
                 sendBuf[whichLocal][zn][face(i+1,blockDim-2)]
           )/7;
-       eltsComp++;
+       //eltsComp++;
 
     }
 
@@ -583,7 +583,7 @@ class StencilPoint : public CBase_StencilPoint{
             localChunk[whichLocal][small(i,j,1)]+
             sendBuf[whichLocal][zp][face(i+1,j+1)]
         )/7;
-       eltsComp++;
+       //eltsComp++;
       }
     }
     for(int i = 1; i < blockDim-3; i++){
@@ -597,7 +597,7 @@ class StencilPoint : public CBase_StencilPoint{
             localChunk[whichLocal][small(i,j,blockDim-4)]+
             sendBuf[whichLocal][zn][face(i+1,j+1)]
         )/7;
-       eltsComp++;
+       //eltsComp++;
       }
     }
     
@@ -612,7 +612,7 @@ class StencilPoint : public CBase_StencilPoint{
             localChunk[whichLocal][small(i,1,j)]+
             sendBuf[whichLocal][xp][face(i+1,j+1)]
         )/7;
-       eltsComp++;
+       //eltsComp++;
       }
     }
     for(int i = 1; i < blockDim-3; i++){
@@ -626,7 +626,7 @@ class StencilPoint : public CBase_StencilPoint{
             localChunk[whichLocal][small(i,blockDim-4,j)]+
             sendBuf[whichLocal][xn][face(i+1,j+1)]
         )/7;
-       eltsComp++;
+       //eltsComp++;
       }
     }
     
@@ -641,7 +641,7 @@ class StencilPoint : public CBase_StencilPoint{
             localChunk[whichLocal][small(1,j,i)]+
             sendBuf[whichLocal][yp][face(j+1,i+1)]
         )/7;
-       eltsComp++;
+       //eltsComp++;
       }
     }
     for(int i = 1; i < blockDim-3; i++){
@@ -655,7 +655,7 @@ class StencilPoint : public CBase_StencilPoint{
             localChunk[whichLocal][small(blockDim-4,j,i)]+
             sendBuf[whichLocal][yn][face(j+1,i+1)]
         )/7;
-       eltsComp++;
+       //eltsComp++;
       }
     }
     /* Now we can compute the sendBufs. there are 6 faces.
@@ -679,7 +679,7 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(i-1,j-1,0)]+
                 recvBuf[ZP][face(i,j)]
         )/7;
-       eltsComp++;
+       //eltsComp++;
       }
     }
 
@@ -725,7 +725,7 @@ class StencilPoint : public CBase_StencilPoint{
           sendBuf[whichLocal][xn][face(blockDim-1,1)]
     )/7;
 
-    eltsComp += 4;
+    //eltsComp += 4;
     // Finally, the edges: 
     // Each element here uses 2 ghosts, 4 elts from its own sendBuf, 1 elt from a different sendBuf
     
@@ -739,7 +739,7 @@ class StencilPoint : public CBase_StencilPoint{
           sendBuf[whichLocal][zp][face(1,i)]+
           sendBuf[whichLocal][yp][face(i,1)]
       )/7; 
-      eltsComp++;
+      //eltsComp++;
     }
     for(int i = 1; i < blockDim-1; i++){
       sendBuf[newLocal][zp][face(i,0)] = (
@@ -751,7 +751,7 @@ class StencilPoint : public CBase_StencilPoint{
           sendBuf[whichLocal][zp][face(i,1)]+
           sendBuf[whichLocal][xp][face(i,1)]
       )/7;
-      eltsComp++;
+      //eltsComp++;
     }
     for(int i = 1; i < blockDim-1; i++){
       sendBuf[newLocal][zp][face(blockDim-1,i)] = (
@@ -763,7 +763,7 @@ class StencilPoint : public CBase_StencilPoint{
           sendBuf[whichLocal][zp][face(blockDim-2,i)]+
           sendBuf[whichLocal][yn][face(i,1)]
       )/7;
-      eltsComp++;
+      //eltsComp++;
     }
     for(int i = 1; i < blockDim-1; i++){
       sendBuf[newLocal][zp][face(i,blockDim-1)] = (
@@ -775,7 +775,7 @@ class StencilPoint : public CBase_StencilPoint{
           sendBuf[whichLocal][zp][face(i,blockDim-2)]+
           sendBuf[whichLocal][xn][face(i,1)]
       )/7;
-      eltsComp++;
+      //eltsComp++;
     }
     
     // 2. zn face
@@ -791,7 +791,7 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(i-1,j-1,blockDim-3)]+
                 recvBuf[ZN][face(i,j)]
         )/7;
-      eltsComp++;
+      //eltsComp++;
       }
     }
 
@@ -837,7 +837,7 @@ class StencilPoint : public CBase_StencilPoint{
           sendBuf[whichLocal][xn][face(blockDim-1,blockDim-2)]
     )/7;
 
-      eltsComp+=4;
+      //eltsComp+=4;
     // Finally, the edges: 
     // Each element here uses 2 ghosts, 4 elts from its own sendBuf, 1 elt from a different sendBuf
     
@@ -851,7 +851,7 @@ class StencilPoint : public CBase_StencilPoint{
           sendBuf[whichLocal][zn][face(1,i)]+
           sendBuf[whichLocal][yp][face(i,blockDim-2)]
       )/7;
-      eltsComp++;
+      //eltsComp++;
     }
     for(int i = 1; i < blockDim-1; i++){
       sendBuf[newLocal][zn][face(i,0)] = (
@@ -863,7 +863,7 @@ class StencilPoint : public CBase_StencilPoint{
           sendBuf[whichLocal][zn][face(i,1)]+
           sendBuf[whichLocal][xp][face(i,blockDim-2)]
       )/7;
-      eltsComp++;
+      //eltsComp++;
     }
     for(int i = 1; i < blockDim-1; i++){
       sendBuf[newLocal][zn][face(blockDim-1,i)] = (
@@ -875,7 +875,7 @@ class StencilPoint : public CBase_StencilPoint{
           sendBuf[whichLocal][zn][face(blockDim-2,i)]+
           sendBuf[whichLocal][yn][face(i,blockDim-2)]
       )/7;
-      eltsComp++;
+      //eltsComp++;
     }
     for(int i = 1; i < blockDim-1; i++){
       sendBuf[newLocal][zn][face(i,blockDim-1)] = (
@@ -887,7 +887,7 @@ class StencilPoint : public CBase_StencilPoint{
           sendBuf[whichLocal][zn][face(i,blockDim-2)]+
           sendBuf[whichLocal][xn][face(i,blockDim-2)]
       )/7;
-      eltsComp++;
+      //eltsComp++;
     }
     
     // 3. xp face
@@ -903,7 +903,7 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(i-1,0,j-1)]+
                 recvBuf[XP][face(i,j)]
         )/7;
-      eltsComp++;
+      //eltsComp++;
       }
     }
 
@@ -926,7 +926,7 @@ class StencilPoint : public CBase_StencilPoint{
           sendBuf[whichLocal][xp][face(1,i)]+
           sendBuf[whichLocal][yp][face(1,i)]
       )/7;
-      eltsComp++;
+      //eltsComp++;
     }
     for(int i = 1; i < blockDim-1; i++){
       sendBuf[newLocal][xp][face(i,0)] = sendBuf[newLocal][zp][face(i,0)];
@@ -941,7 +941,7 @@ class StencilPoint : public CBase_StencilPoint{
           sendBuf[whichLocal][xp][face(blockDim-2,i)]+
           sendBuf[whichLocal][yn][face(1,i)]
       )/7;
-      eltsComp++;
+      //eltsComp++;
     }
     for(int i = 1; i < blockDim-1; i++){
       sendBuf[newLocal][xp][face(i,blockDim-1)] = sendBuf[newLocal][zn][face(i,0)]; 
@@ -960,7 +960,7 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(i-1,blockDim-3,j-1)]+
                 recvBuf[XN][face(i,j)]
         )/7;
-      eltsComp++;
+      //eltsComp++;
       }
     }
 
@@ -983,7 +983,7 @@ class StencilPoint : public CBase_StencilPoint{
           sendBuf[whichLocal][xn][face(1,i)]+
           sendBuf[whichLocal][yp][face(blockDim-2,i)]
       )/7;
-      eltsComp++;
+      //eltsComp++;
     }
     for(int i = 1; i < blockDim-1; i++){
       sendBuf[newLocal][xn][face(i,0)] = sendBuf[newLocal][zp][face(i,blockDim-1)]; 
@@ -998,7 +998,7 @@ class StencilPoint : public CBase_StencilPoint{
           sendBuf[whichLocal][xn][face(blockDim-2,i)]+
           sendBuf[whichLocal][yn][face(blockDim-2,i)]
       )/7;
-      eltsComp++;
+      //eltsComp++;
     }
     for(int i = 1; i < blockDim-1; i++){
       sendBuf[newLocal][xn][face(i,blockDim-1)] = sendBuf[newLocal][zn][face(i,blockDim-1)];
@@ -1018,7 +1018,7 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(0,i-1,j-1)]+
                 recvBuf[YP][face(i,j)]
         )/7;
-      eltsComp++;
+      //eltsComp++;
       }
     }
 
@@ -1058,7 +1058,7 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(blockDim-1,i-1,j-1)]+
                 recvBuf[YN][face(i,j)]
         )/7;
-      eltsComp++;
+      //eltsComp++;
       }
     }
 
@@ -1104,7 +1104,8 @@ class StencilPoint : public CBase_StencilPoint{
 #ifdef STENCIL2D_VERBOSE
       CkPrintf("(%d,%d): contributing to exit\n", row, col);
 #endif
-      contribute(sizeof(int), &eltsComp, CkReduction::sum_int, CkCallback(CkIndex_Main::done(NULL), mainProxy));
+      //contribute(sizeof(int), &eltsComp, CkReduction::sum_int, CkCallback(CkIndex_Main::done(NULL), mainProxy));
+      contribute(0,0,CkReduction::concat,CkCallback(CkIndex_Main::done(/*NULL*/), mainProxy));
     }
     else{
 #ifdef USE_CKDIRECT
