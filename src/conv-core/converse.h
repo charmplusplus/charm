@@ -1010,7 +1010,7 @@ void *CmiIsomalloc(int sizeInBytes);
 void  CmiIsomallocPup(pup_er p,void **block);
 void  CmiIsomallocFree(void *block);
 
-int   CmiIsomallocLength(void *block);
+CmiInt8   CmiIsomallocLength(void *block);
 int   CmiIsomallocInRange(void *addr);
 
 /*List-of-blocks interface:*/
