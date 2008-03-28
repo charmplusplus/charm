@@ -1,7 +1,5 @@
 #include "ckdirect.h" 
 #include "stencil3d.decl.h"
-/* DIMxDIM elements per chare */
-#define DIM 10
 #define OOB 9999999999.0
 #define NBRS 6
 
@@ -45,10 +43,11 @@ class Main : public CBase_Main {
     start = CmiWallTimer();
   }
   
-  void done(){
+  void done(CkReductionMsg *msg){
     end = CmiWallTimer();
     CkPrintf("Total time: %f sec\n", end-startSetup);
     CkPrintf("Computation time: %f sec\n", end-start);
+    CkPrintf("Total computations: %d\n", *(int *)msg->getData());
     CkExit();
   }
 };
@@ -411,8 +410,8 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(0,i+1,0)]+
                 localChunk[whichLocal][small(1,i,0)]+
                 localChunk[whichLocal][small(0,i,1)]+
-                sendBuf[whichLocal][yp][face(i,1)]+
-                sendBuf[whichLocal][zp][face(1,i)]
+                sendBuf[whichLocal][yp][face(i+1,1)]+
+                sendBuf[whichLocal][zp][face(1,i+1)]
           )/7;
        eltsComp++;
     }
@@ -425,8 +424,8 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(0,blockDim-3,i+1)]+
                 localChunk[whichLocal][small(1,blockDim-3,i)]+
                 localChunk[whichLocal][small(0,blockDim-4,i)]+
-                sendBuf[whichLocal][xn][face(1,i)]+
-                sendBuf[whichLocal][yp][face(blockDim-2,i)]
+                sendBuf[whichLocal][xn][face(1,i+1)]+
+                sendBuf[whichLocal][yp][face(blockDim-2,i+1)]
           )/7;
        eltsComp++;
     }
@@ -439,8 +438,8 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(0,i+1,blockDim-3)]+
                 localChunk[whichLocal][small(0,i,blockDim-4)]+
                 localChunk[whichLocal][small(1,i,blockDim-3)]+
-                sendBuf[whichLocal][zn][face(1,i)]+
-                sendBuf[whichLocal][yp][face(i,blockDim-2)]
+                sendBuf[whichLocal][zn][face(1,i+1)]+
+                sendBuf[whichLocal][yp][face(i+1,blockDim-2)]
           )/7;
        eltsComp++;
     }
@@ -453,8 +452,8 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(0,0,i+1)]+
                 localChunk[whichLocal][small(0,1,i)]+
                 localChunk[whichLocal][small(1,0,i)]+
-                sendBuf[whichLocal][yp][face(1,i)]+
-                sendBuf[whichLocal][xp][face(1,i)]
+                sendBuf[whichLocal][yp][face(1,i+1)]+
+                sendBuf[whichLocal][xp][face(1,i+1)]
           )/7;
        eltsComp++;
     }
@@ -467,8 +466,8 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(blockDim-3,i+1,0)]+
                 localChunk[whichLocal][small(blockDim-4,i,0)]+
                 localChunk[whichLocal][small(blockDim-3,i,1)]+
-                sendBuf[whichLocal][yn][face(i,1)]+
-                sendBuf[whichLocal][zp][face(blockDim-2,i)]
+                sendBuf[whichLocal][yn][face(i+1,1)]+
+                sendBuf[whichLocal][zp][face(blockDim-2,i+1)]
           )/7;
        eltsComp++;
     }
@@ -481,8 +480,8 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(blockDim-3,blockDim-3,i+1)]+
                 localChunk[whichLocal][small(blockDim-4,blockDim-3,i)]+
                 localChunk[whichLocal][small(blockDim-3,blockDim-4,i)]+
-                sendBuf[whichLocal][xn][face(blockDim-2,i)]+
-                sendBuf[whichLocal][yn][face(blockDim-2,i)]
+                sendBuf[whichLocal][xn][face(blockDim-2,i+1)]+
+                sendBuf[whichLocal][yn][face(blockDim-2,i+1)]
           )/7;
        eltsComp++;
     }
@@ -495,8 +494,8 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(blockDim-3,i+1,blockDim-3)]+
                 localChunk[whichLocal][small(blockDim-4,i,blockDim-3)]+
                 localChunk[whichLocal][small(blockDim-3,i,blockDim-4)]+
-                sendBuf[whichLocal][yn][face(i,blockDim-2)]+
-                sendBuf[whichLocal][zn][face(blockDim-2,i)]
+                sendBuf[whichLocal][yn][face(i+1,blockDim-2)]+
+                sendBuf[whichLocal][zn][face(blockDim-2,i+1)]
           )/7;
        eltsComp++;
     }
@@ -509,8 +508,8 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(blockDim-3,0,i+1)]+
                 localChunk[whichLocal][small(blockDim-3,1,i)]+
                 localChunk[whichLocal][small(blockDim-4,0,i)]+
-                sendBuf[whichLocal][xp][face(blockDim-2,i)]+
-                sendBuf[whichLocal][yn][face(1,i)]
+                sendBuf[whichLocal][xp][face(blockDim-2,i+1)]+
+                sendBuf[whichLocal][yn][face(1,i+1)]
           )/7;
        eltsComp++;
     }
@@ -523,8 +522,8 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(i+1,0,0)]+
                 localChunk[whichLocal][small(i,1,0)]+
                 localChunk[whichLocal][small(i,0,1)]+
-                sendBuf[whichLocal][xp][face(i,1)]+
-                sendBuf[whichLocal][zp][face(i,1)]
+                sendBuf[whichLocal][xp][face(i+1,1)]+
+                sendBuf[whichLocal][zp][face(i+1,1)]
           )/7;
        eltsComp++;
     }
@@ -537,8 +536,8 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(i+1,blockDim-3,0)]+
                 localChunk[whichLocal][small(i,blockDim-4,0)]+
                 localChunk[whichLocal][small(i,blockDim-3,1)]+
-                sendBuf[whichLocal][xn][face(i,1)]+
-                sendBuf[whichLocal][zp][face(i,blockDim-2)]
+                sendBuf[whichLocal][xn][face(i+1,1)]+
+                sendBuf[whichLocal][zp][face(i+1,blockDim-2)]
           )/7;
        eltsComp++;
     }
@@ -551,8 +550,8 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(i+1,0,blockDim-3)]+
                 localChunk[whichLocal][small(i,1,blockDim-3)]+
                 localChunk[whichLocal][small(i,0,blockDim-4)]+
-                sendBuf[whichLocal][xp][face(i,blockDim-2)]+
-                sendBuf[whichLocal][zn][face(i,1)]
+                sendBuf[whichLocal][xp][face(i+1,blockDim-2)]+
+                sendBuf[whichLocal][zn][face(i+1,1)]
           )/7;
        eltsComp++;
     }
@@ -565,13 +564,100 @@ class StencilPoint : public CBase_StencilPoint{
                 localChunk[whichLocal][small(i+1,blockDim-3,blockDim-3)]+
                 localChunk[whichLocal][small(i,blockDim-4,blockDim-3)]+
                 localChunk[whichLocal][small(i,blockDim-3,blockDim-4)]+
-                sendBuf[whichLocal][xn][face(i,blockDim-2)]+
-                sendBuf[whichLocal][zn][face(i,blockDim-2)]
+                sendBuf[whichLocal][xn][face(i+1,blockDim-2)]+
+                sendBuf[whichLocal][zn][face(i+1,blockDim-2)]
           )/7;
        eltsComp++;
 
     }
+
+    // 6 more faces - use 6 (including self) from localChunk and 1 from one of the sendBufs
+    for(int i = 1; i < blockDim-3; i++){
+      for(int j = 1; j < blockDim-3; j++){
+        localChunk[newLocal][small(i,j,0)] = (
+            localChunk[whichLocal][small(i,j,0)]+
+            localChunk[whichLocal][small(i-1,j,0)]+
+            localChunk[whichLocal][small(i+1,j,0)]+
+            localChunk[whichLocal][small(i,j-1,0)]+
+            localChunk[whichLocal][small(i,j+1,0)]+
+            localChunk[whichLocal][small(i,j,1)]+
+            sendBuf[whichLocal][zp][face(i+1,j+1)]
+        )/7;
+       eltsComp++;
+      }
+    }
+    for(int i = 1; i < blockDim-3; i++){
+      for(int j = 1; j < blockDim-3; j++){
+        localChunk[newLocal][small(i,j,blockDim-3)] = (
+            localChunk[whichLocal][small(i,j,blockDim-3)]+
+            localChunk[whichLocal][small(i-1,j,blockDim-3)]+
+            localChunk[whichLocal][small(i+1,j,blockDim-3)]+
+            localChunk[whichLocal][small(i,j-1,blockDim-3)]+
+            localChunk[whichLocal][small(i,j+1,blockDim-3)]+
+            localChunk[whichLocal][small(i,j,blockDim-4)]+
+            sendBuf[whichLocal][zn][face(i+1,j+1)]
+        )/7;
+       eltsComp++;
+      }
+    }
     
+    for(int i = 1; i < blockDim-3; i++){
+      for(int j = 1; j < blockDim-3; j++){
+        localChunk[newLocal][small(i,0,j)] = (
+            localChunk[whichLocal][small(i,0,j)]+
+            localChunk[whichLocal][small(i-1,0,j)]+
+            localChunk[whichLocal][small(i+1,0,j)]+
+            localChunk[whichLocal][small(i,0,j-1)]+
+            localChunk[whichLocal][small(i,0,j+1)]+
+            localChunk[whichLocal][small(i,1,j)]+
+            sendBuf[whichLocal][xp][face(i+1,j+1)]
+        )/7;
+       eltsComp++;
+      }
+    }
+    for(int i = 1; i < blockDim-3; i++){
+      for(int j = 1; j < blockDim-3; j++){
+        localChunk[newLocal][small(i,blockDim-3,j)] = (
+            localChunk[whichLocal][small(i,blockDim-3,j)]+
+            localChunk[whichLocal][small(i-1,blockDim-3,j)]+
+            localChunk[whichLocal][small(i+1,blockDim-3,j)]+
+            localChunk[whichLocal][small(i,blockDim-3,j-1)]+
+            localChunk[whichLocal][small(i,blockDim-3,j+1)]+
+            localChunk[whichLocal][small(i,blockDim-4,j)]+
+            sendBuf[whichLocal][xn][face(i+1,j+1)]
+        )/7;
+       eltsComp++;
+      }
+    }
+    
+    for(int i = 1; i < blockDim-3; i++){
+      for(int j = 1; j < blockDim-3; j++){
+        localChunk[newLocal][small(0,j,i)] = (
+            localChunk[whichLocal][small(0,j,i)]+
+            localChunk[whichLocal][small(0,j-1,i)]+
+            localChunk[whichLocal][small(0,j+1,i)]+
+            localChunk[whichLocal][small(0,j,i-1)]+
+            localChunk[whichLocal][small(0,j,i+1)]+
+            localChunk[whichLocal][small(1,j,i)]+
+            sendBuf[whichLocal][yp][face(j+1,i+1)]
+        )/7;
+       eltsComp++;
+      }
+    }
+    for(int i = 1; i < blockDim-3; i++){
+      for(int j = 1; j < blockDim-3; j++){
+        localChunk[newLocal][small(blockDim-3,j,i)] = (
+            localChunk[whichLocal][small(blockDim-3,j,i)]+
+            localChunk[whichLocal][small(blockDim-3,j-1,i)]+
+            localChunk[whichLocal][small(blockDim-3,j+1,i)]+
+            localChunk[whichLocal][small(blockDim-3,j,i-1)]+
+            localChunk[whichLocal][small(blockDim-3,j,i+1)]+
+            localChunk[whichLocal][small(blockDim-4,j,i)]+
+            sendBuf[whichLocal][yn][face(j+1,i+1)]
+        )/7;
+       eltsComp++;
+      }
+    }
     /* Now we can compute the sendBufs. there are 6 faces.
      Each element of sendbuf uses the ghost layer (recvbufs) in some way.
      There are elements that :
@@ -1270,7 +1356,7 @@ class StencilPoint : public CBase_StencilPoint{
 #ifdef STENCIL2D_VERBOSE
       CkPrintf("(%d,%d): contributing to exit\n", row, col);
 #endif
-      contribute(0,0,CkReduction::concat, CkCallback(CkIndex_Main::done(), mainProxy));
+      contribute(sizeof(int), &eltsComp, CkReduction::sum_int, CkCallback(CkIndex_Main::done(NULL), mainProxy));
     }
     else{
 #ifdef USE_CKDIRECT
