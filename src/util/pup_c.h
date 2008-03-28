@@ -61,6 +61,8 @@ void pup_bar(pup_er p,bar *b)
 extern "C" {
 #endif
 
+#include "conv-config.h"
+
 /*This is actually a PUP::er *, cast to void *.
   From C++, you can pass "&p" as a pup_er.
 */
