@@ -61,7 +61,7 @@ typedef size_t memRange_t;
 static size_t slotsize;
 
 /*Total number of slots per processor*/
-static int numslots=0;
+static CmiInt8 numslots=0;
 
 /*Start and end of isomalloc-managed addresses.
 If isomallocStart==NULL, isomalloc is disabled.
@@ -77,7 +77,7 @@ static int slot2pe(CmiInt8 slot) {
 	return slot/numslots;
 }
 static CmiInt8 pe2slot(int pe) {
-	return pe*((CmiInt8)numslots);
+	return pe*numslots;
 }
 /*Return the number of slots in a block with n user data bytes*/
 static int length2slots(int nBytes) {
@@ -87,14 +87,14 @@ static int length2slots(int nBytes) {
 typedef struct _slotblock
 {
   CmiInt8 startslot;
-  int nslots;
+  CmiInt8 nslots;
 } slotblock;
 
 typedef struct _slotset
 {
   int maxbuf;
   slotblock *buf;
-  int emptyslots;
+  CmiInt8 emptyslots;
 } slotset;
 
 /*
@@ -102,7 +102,7 @@ typedef struct _slotset
  * empty slots. The slot numbers are [startslot,startslot+nslot-1]
  */
 static slotset *
-new_slotset(CmiInt8 startslot, int nslots)
+new_slotset(CmiInt8 startslot, CmiInt8 nslots)
 {
   int i;
   slotset *ss = (slotset*) malloc_reentrant(sizeof(slotset));
@@ -122,7 +122,7 @@ new_slotset(CmiInt8 startslot, int nslots)
  * returns new block of empty slots. if it cannot find any, returns (-1).
  */
 static CmiInt8
-get_slots(slotset *ss, int nslots)
+get_slots(slotset *ss, CmiInt8 nslots)
 {
   int i;
   if(ss->emptyslots < nslots)
@@ -135,9 +135,10 @@ get_slots(slotset *ss, int nslots)
 
 /* just adds a slotblock to an empty position in the given slotset. */
 static void
-add_slots(slotset *ss, CmiInt8 sslot, int nslots)
+add_slots(slotset *ss, CmiInt8 sslot, CmiInt8 nslots)
 {
-  int pos, emptypos = -1;
+  int pos; 
+  int emptypos = -1;
   if (nslots == 0)
     return;
   for (pos=0; pos < (ss->maxbuf); pos++) {
@@ -172,7 +173,7 @@ add_slots(slotset *ss, CmiInt8 sslot, int nslots)
  * slots to be grabbed.
  */
 static void
-grab_slots(slotset *ss, CmiInt8 sslot, int nslots)
+grab_slots(slotset *ss, CmiInt8 sslot, CmiInt8 nslots)
 {
   CmiInt8 pos, eslot, e;
   eslot = sslot + nslots;
@@ -183,7 +184,7 @@ grab_slots(slotset *ss, CmiInt8 sslot, int nslots)
     e = ss->buf[pos].startslot + ss->buf[pos].nslots;
     if(sslot >= ss->buf[pos].startslot && eslot <= e)
     {
-      int old_nslots;
+      CmiInt8 old_nslots;
       old_nslots = ss->buf[pos].nslots;
       ss->buf[pos].nslots = sslot - ss->buf[pos].startslot;
       ss->emptyslots -= (old_nslots - ss->buf[pos].nslots);
@@ -201,7 +202,7 @@ grab_slots(slotset *ss, CmiInt8 sslot, int nslots)
  * If the buffer fills up, it adds up extra buffer space.
  */
 static void
-free_slots(slotset *ss, CmiInt8 sslot, int nslots)
+free_slots(slotset *ss, CmiInt8 sslot, CmiInt8 nslots)
 {
   int pos;
   /* eslot is the ending slot of the block to be freed */
@@ -364,7 +365,7 @@ init_map(char **argv)
  * maps the virtual memory associated with slot using mmap
  */
 static CmiIsomallocBlock *
-map_slots(CmiInt8 slot, int nslots)
+map_slots(CmiInt8 slot, CmiInt8 nslots)
 {
   void *pa;
   void *addr=slot2addr(slot);
@@ -397,7 +398,7 @@ map_slots(CmiInt8 slot, int nslots)
  * unmaps the virtual memory associated with slot using munmap
  */
 static void
-unmap_slots(CmiInt8 slot, int nslots)
+unmap_slots(CmiInt8 slot, CmiInt8 nslots)
 {
   void *addr=slot2addr(slot);
   call_munmap(addr, slotsize*nslots);
@@ -407,7 +408,7 @@ unmap_slots(CmiInt8 slot, int nslots)
 #endif
 }
 
-static void map_failed(CmiInt8 s,int n)
+static void map_failed(CmiInt8 s,CmiInt8 n)
 {
   void *addr=slot2addr(s);
   CmiError("charm isomalloc.c> map failed to allocate %d bytes at %p.\n",
@@ -737,10 +738,10 @@ typedef struct _slotmsg
   char cmicore[CmiMsgHeaderSizeBytes];
   int pe; /*Source processor*/
   CmiInt8 slot; /*First requested slot*/
-  int nslots; /*Number of requested slots*/
+  CmiInt8 nslots; /*Number of requested slots*/
 } slotmsg;
 
-static slotmsg *prepare_slotmsg(CmiInt8 slot,int nslots)
+static slotmsg *prepare_slotmsg(CmiInt8 slot,CmiInt8 nslots)
 {
 	slotmsg *m=(slotmsg *)CmiAlloc(sizeof(slotmsg));
 	m->pe=CmiMyPe();
@@ -764,7 +765,7 @@ static int grab_remote_idx, free_remote_idx;
 
 struct slotOP {
 	/*Function pointer to perform local operation*/
-	void (*local)(slotset *ss,CmiInt8 s,int n);
+	void (*local)(slotset *ss,CmiInt8 s,CmiInt8 n);
 	/*Index to perform remote operation*/
 	int remote;
 };
@@ -783,7 +784,7 @@ static void init_comm(char **argv)
 
 /*Apply the given operation to the given slots which
   lie on the given processor.*/
-static void one_slotOP(const slotOP *op,int pe,CmiInt8 s,int n)
+static void one_slotOP(const slotOP *op,int pe,CmiInt8 s,CmiInt8 n)
 {
 /*Shrink range to only those covered by this processor*/
 	/*First and last slot for this processor*/
@@ -808,7 +809,7 @@ static void one_slotOP(const slotOP *op,int pe,CmiInt8 s,int n)
 After a restart from checkpoint, a slotset can cross an 
 arbitrary set of processors.
 */
-static void all_slotOP(const slotOP *op,CmiInt8 s,int n)
+static void all_slotOP(const slotOP *op,CmiInt8 s,CmiInt8 n)
 {
 	int spe=slot2pe(s), epe=slot2pe(s+n-1);
 	int pe;
@@ -842,7 +843,7 @@ void CmiIsomallocPup(pup_er p,void **blockPtrPtr)
 {
 	CmiIsomallocBlock *blk;
 	CmiInt8 s,length;
-        int n;
+        CmiInt8 n;
 	if (isomallocStart==NULL) CmiAbort("isomalloc is disabled-- cannot use IsomallocPup");
 
 	if (!pup_isUnpacking(p)) 
@@ -887,7 +888,7 @@ void CmiIsomallocFree(void *blockPtr)
 	{
 		CmiIsomallocBlock *blk=pointer2block(blockPtr);
 		CmiInt8 s=blk->slot; 
-                int n=length2slots(blk->length);
+                CmiInt8 n=length2slots(blk->length);
 		unmap_slots(s,n);
 		/*Mark used slots as free*/
 		all_slotOP(&freeOP,s,n);
