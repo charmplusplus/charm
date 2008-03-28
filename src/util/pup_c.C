@@ -101,6 +101,7 @@ PUP_BASIC_DATATYPE(uint,unsigned int)
 PUP_BASIC_DATATYPE(ulong,unsigned long)
 PUP_BASIC_DATATYPE(float,float)
 PUP_BASIC_DATATYPE(double,double)
+PUP_BASIC_DATATYPE(int8,CMK_TYPEDEF_INT8)
 
 // Pointers have a different signature, so they need special treatment
 CDECL void pup_pointer(pup_er p,void **v) {mp(*v,(void*)NULL);}

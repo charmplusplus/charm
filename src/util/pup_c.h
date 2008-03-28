@@ -111,6 +111,7 @@ PUP_BASIC_DATATYPE(ulong,unsigned long)
 PUP_BASIC_DATATYPE(float,float)
 PUP_BASIC_DATATYPE(double,double)
 PUP_BASIC_DATATYPE(pointer,void*)
+PUP_BASIC_DATATYPE(int8, CMK_TYPEDEF_INT8)
 
 /*Pack/unpack untyped byte array:*/
 void pup_bytes(pup_er p,void *ptr,int nBytes);
