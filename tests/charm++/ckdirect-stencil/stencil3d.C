@@ -908,48 +908,11 @@ class StencilPoint : public CBase_StencilPoint{
     }
 
     // Corners next
-    // Each element uses 3 ghosts, 3 from its own sendBuf (including itself)  and 1 from a different sendBuf
-    sendBuf[newLocal][xp][face(0,0)] = (
-          recvBuf[YP][face(0,0)]+
-          recvBuf[XP][face(0,0)]+
-          recvBuf[ZP][face(0,0)]+
-          sendBuf[whichLocal][xp][face(0,0)]+
-          sendBuf[whichLocal][xp][face(0,1)]+
-          sendBuf[whichLocal][xp][face(1,0)]+
-          sendBuf[whichLocal][zp][face(0,1)]
-    )/7;
+    sendBuf[newLocal][xp][face(0,0)] = sendBuf[newLocal][zp][face(0,0)];
+    sendBuf[newLocal][xp][face(0,blockDim-1)] = sendBuf[newLocal][zn][face(0,0)];
+    sendBuf[newLocal][xp][face(blockDim-1,0)] = sendBuf[newLocal][zp][face(blockDim-1,0)];
+    sendBuf[newLocal][xp][face(blockDim-1,blockDim-1)] = sendBuf[newLocal][zn][face(blockDim-1,0)];
 
-    sendBuf[newLocal][xp][face(0,blockDim-1)] = (
-          recvBuf[YP][face(0,blockDim-1)]+
-          recvBuf[XP][face(0,blockDim-1)]+
-          recvBuf[ZN][face(0,1)]+
-          sendBuf[whichLocal][xp][face(0,blockDim-1)]+
-          sendBuf[whichLocal][xp][face(1,blockDim-1)]+
-          sendBuf[whichLocal][xp][face(0,blockDim-2)]+
-          sendBuf[whichLocal][zn][face(0,1)]
-    )/7;
-
-    sendBuf[newLocal][xp][face(blockDim-1,0)] = (
-          recvBuf[ZP][face(blockDim-1,0)]+
-          recvBuf[XP][face(blockDim-1,0)]+
-          recvBuf[YN][face(0,0)]+
-          sendBuf[whichLocal][xp][face(blockDim-1,0)]+
-          sendBuf[whichLocal][xp][face(blockDim-2,0)]+
-          sendBuf[whichLocal][xp][face(blockDim-1,1)]+
-          sendBuf[whichLocal][zp][face(blockDim-1,1)]
-    )/7;
-
-    sendBuf[newLocal][xp][face(blockDim-1,blockDim-1)] = (
-          recvBuf[XP][face(blockDim-1,blockDim-1)]+
-          recvBuf[YN][face(0,blockDim-1)]+
-          recvBuf[ZN][face(blockDim-1,0)]+
-          sendBuf[whichLocal][xp][face(blockDim-1,blockDim-1)]+
-          sendBuf[whichLocal][xp][face(blockDim-2,blockDim-1)]+
-          sendBuf[whichLocal][xp][face(blockDim-1,blockDim-2)]+
-          sendBuf[whichLocal][zn][face(blockDim-1,1)]
-    )/7;
-
-      eltsComp+=4;
     // Finally, the edges: 
     // Each element here uses 2 ghosts, 4 elts from its own sendBuf, 1 elt from a different sendBuf
     
@@ -966,16 +929,7 @@ class StencilPoint : public CBase_StencilPoint{
       eltsComp++;
     }
     for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][xp][face(i,0)] = (
-          recvBuf[XP][face(i,0)]+
-          recvBuf[ZP][face(i,0)]+
-          sendBuf[whichLocal][xp][face(i,0)]+
-          sendBuf[whichLocal][xp][face(i-1,0)]+
-          sendBuf[whichLocal][xp][face(i+1,0)]+
-          sendBuf[whichLocal][xp][face(i,1)]+
-          sendBuf[whichLocal][zp][face(i,1)]
-      )/7;
-      eltsComp++;
+      sendBuf[newLocal][xp][face(i,0)] = sendBuf[newLocal][zp][face(i,0)];
     }
     for(int i = 1; i < blockDim-1; i++){
       sendBuf[newLocal][xp][face(blockDim-1,i)] = (
@@ -990,16 +944,7 @@ class StencilPoint : public CBase_StencilPoint{
       eltsComp++;
     }
     for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][xp][face(i,blockDim-1)] = (
-          recvBuf[XP][face(i,blockDim-1)]+
-          recvBuf[ZN][face(i,0)]+
-          sendBuf[whichLocal][xp][face(i,blockDim-1)]+
-          sendBuf[whichLocal][xp][face(i-1,blockDim-1)]+
-          sendBuf[whichLocal][xp][face(i+1,blockDim-1)]+
-          sendBuf[whichLocal][xp][face(i,blockDim-2)]+
-          sendBuf[whichLocal][zn][face(i,1)]
-      )/7;
-      eltsComp++;
+      sendBuf[newLocal][xp][face(i,blockDim-1)] = sendBuf[newLocal][zn][face(i,0)]; 
     }
    
     // 4. xn face
@@ -1020,48 +965,11 @@ class StencilPoint : public CBase_StencilPoint{
     }
 
     // Corners next
-    // Each element uses 3 ghosts, 3 from its own sendBuf (including itself)  and 1 from a different sendBuf
-    sendBuf[newLocal][xn][face(0,0)] = (
-          recvBuf[YP][face(blockDim-1,0)]+
-          recvBuf[XN][face(0,0)]+
-          recvBuf[ZP][face(0,blockDim-1)]+
-          sendBuf[whichLocal][xn][face(0,0)]+
-          sendBuf[whichLocal][xn][face(0,1)]+
-          sendBuf[whichLocal][xn][face(1,0)]+
-          sendBuf[whichLocal][zp][face(0,blockDim-2)]
-    )/7;
-
-    sendBuf[newLocal][xn][face(0,blockDim-1)] = (
-          recvBuf[YP][face(blockDim-1,blockDim-1)]+
-          recvBuf[XN][face(0,blockDim-1)]+
-          recvBuf[ZN][face(0,blockDim-1)]+
-          sendBuf[whichLocal][xn][face(0,blockDim-1)]+
-          sendBuf[whichLocal][xn][face(1,blockDim-1)]+
-          sendBuf[whichLocal][xn][face(0,blockDim-2)]+
-          sendBuf[whichLocal][zn][face(0,blockDim-2)]
-    )/7;
-
-    sendBuf[newLocal][xn][face(blockDim-1,0)] = (
-          recvBuf[ZP][face(blockDim-1,blockDim-1)]+
-          recvBuf[XN][face(blockDim-1,0)]+
-          recvBuf[YN][face(blockDim-1,0)]+
-          sendBuf[whichLocal][xn][face(blockDim-1,0)]+
-          sendBuf[whichLocal][xn][face(blockDim-2,0)]+
-          sendBuf[whichLocal][xn][face(blockDim-1,1)]+
-          sendBuf[whichLocal][zp][face(blockDim-1,blockDim-2)]
-    )/7;
-
-    sendBuf[newLocal][xn][face(blockDim-1,blockDim-1)] = (
-          recvBuf[XN][face(blockDim-1,blockDim-1)]+
-          recvBuf[YN][face(blockDim-1,blockDim-1)]+
-          recvBuf[ZN][face(blockDim-1,blockDim-1)]+
-          sendBuf[whichLocal][xn][face(blockDim-1,blockDim-1)]+
-          sendBuf[whichLocal][xn][face(blockDim-2,blockDim-1)]+
-          sendBuf[whichLocal][xn][face(blockDim-1,blockDim-2)]+
-          sendBuf[whichLocal][zn][face(blockDim-1,blockDim-2)]
-    )/7;
-
-      eltsComp+=4;
+    sendBuf[newLocal][xn][face(0,0)] = sendBuf[newLocal][zp][face(0,blockDim-1)];
+    sendBuf[newLocal][xn][face(0,blockDim-1)] = sendBuf[newLocal][zn][face(0,blockDim-1)];
+    sendBuf[newLocal][xn][face(blockDim-1,0)] = sendBuf[newLocal][zp][face(blockDim-1,blockDim-1)];
+    sendBuf[newLocal][xn][face(blockDim-1,blockDim-1)] = sendBuf[newLocal][zn][face(blockDim-1,blockDim-1)];
+    
     // Finally, the edges: 
     // Each element here uses 2 ghosts, 4 elts from its own sendBuf, 1 elt from a different sendBuf
     
@@ -1078,16 +986,7 @@ class StencilPoint : public CBase_StencilPoint{
       eltsComp++;
     }
     for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][xn][face(i,0)] = (
-          recvBuf[XN][face(i,0)]+
-          recvBuf[ZP][face(i,blockDim-1)]+
-          sendBuf[whichLocal][xn][face(i,0)]+
-          sendBuf[whichLocal][xn][face(i-1,0)]+
-          sendBuf[whichLocal][xn][face(i+1,0)]+
-          sendBuf[whichLocal][xn][face(i,1)]+
-          sendBuf[whichLocal][zp][face(i,blockDim-2)]
-      )/7;
-      eltsComp++;
+      sendBuf[newLocal][xn][face(i,0)] = sendBuf[newLocal][zp][face(i,blockDim-1)]; 
     }
     for(int i = 1; i < blockDim-1; i++){
       sendBuf[newLocal][xn][face(blockDim-1,i)] = (
@@ -1102,16 +1001,7 @@ class StencilPoint : public CBase_StencilPoint{
       eltsComp++;
     }
     for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][xn][face(i,blockDim-1)] = (
-          recvBuf[XN][face(i,blockDim-1)]+
-          recvBuf[ZN][face(i,blockDim-1)]+
-          sendBuf[whichLocal][xn][face(i,blockDim-1)]+
-          sendBuf[whichLocal][xn][face(i-1,blockDim-1)]+
-          sendBuf[whichLocal][xn][face(i+1,blockDim-1)]+
-          sendBuf[whichLocal][xn][face(i,blockDim-2)]+
-          sendBuf[whichLocal][zn][face(i,blockDim-2)]
-      )/7;
-      eltsComp++;
+      sendBuf[newLocal][xn][face(i,blockDim-1)] = sendBuf[newLocal][zn][face(i,blockDim-1)];
     }
     
  
@@ -1134,97 +1024,25 @@ class StencilPoint : public CBase_StencilPoint{
 
     // Corners next
     // Each element uses 3 ghosts, 3 from its own sendBuf (including itself)  and 1 from a different sendBuf
-    sendBuf[newLocal][yp][face(0,0)] = (
-          recvBuf[YP][face(0,0)]+
-          recvBuf[XP][face(0,0)]+
-          recvBuf[ZP][face(0,0)]+
-          sendBuf[whichLocal][yp][face(0,0)]+
-          sendBuf[whichLocal][yp][face(0,1)]+
-          sendBuf[whichLocal][yp][face(1,0)]+
-          sendBuf[whichLocal][xp][face(1,0)]
-    )/7;
-
-    sendBuf[newLocal][yp][face(0,blockDim-1)] = (
-          recvBuf[YP][face(0,blockDim-1)]+
-          recvBuf[XP][face(0,blockDim-1)]+
-          recvBuf[ZN][face(0,0)]+
-          sendBuf[whichLocal][yp][face(0,blockDim-1)]+
-          sendBuf[whichLocal][yp][face(1,blockDim-1)]+
-          sendBuf[whichLocal][yp][face(0,blockDim-2)]+
-          sendBuf[whichLocal][xp][face(1,blockDim-1)]
-    )/7;
-
-    sendBuf[newLocal][yp][face(blockDim-1,0)] = (
-          recvBuf[ZP][face(0,blockDim-1)]+
-          recvBuf[XN][face(0,0)]+
-          recvBuf[YP][face(blockDim-1,0)]+
-          sendBuf[whichLocal][yp][face(blockDim-1,0)]+
-          sendBuf[whichLocal][yp][face(blockDim-2,0)]+
-          sendBuf[whichLocal][yp][face(blockDim-1,1)]+
-          sendBuf[whichLocal][xn][face(1,0)]
-    )/7;
-
-    sendBuf[newLocal][yp][face(blockDim-1,blockDim-1)] = (
-          recvBuf[XN][face(0,blockDim-1)]+
-          recvBuf[YP][face(blockDim-1,blockDim-1)]+
-          recvBuf[ZN][face(0,blockDim-1)]+
-          sendBuf[whichLocal][yp][face(blockDim-1,blockDim-1)]+
-          sendBuf[whichLocal][yp][face(blockDim-2,blockDim-1)]+
-          sendBuf[whichLocal][yp][face(blockDim-1,blockDim-2)]+
-          sendBuf[whichLocal][xn][face(1,blockDim-1)]
-    )/7;
-
-      eltsComp+=4;
+    sendBuf[newLocal][yp][face(0,0)] = sendBuf[newLocal][zp][face(0,0)];
+    sendBuf[newLocal][yp][face(0,blockDim-1)] = sendBuf[newLocal][zn][face(0,0)];
+    sendBuf[newLocal][yp][face(blockDim-1,0)] = sendBuf[newLocal][xn][face(0,0)];
+    sendBuf[newLocal][yp][face(blockDim-1,blockDim-1)] = sendBuf[newLocal][zn][face(0,blockDim-1)]; 
+    
     // Finally, the edges: 
     // Each element here uses 2 ghosts, 4 elts from its own sendBuf, 1 elt from a different sendBuf
     
     for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yp][face(0,i)] = (
-          recvBuf[XP][face(0,i)]+
-          recvBuf[YP][face(0,i)]+
-          sendBuf[whichLocal][yp][face(0,i)]+
-          sendBuf[whichLocal][yp][face(0,i-1)]+
-          sendBuf[whichLocal][yp][face(0,i+1)]+
-          sendBuf[whichLocal][yp][face(1,i)]+
-          sendBuf[whichLocal][xp][face(1,i)]
-      )/7;
-      eltsComp++;
+      sendBuf[newLocal][yp][face(0,i)] = sendBuf[newLocal][xp][face(0,i)]; 
     }
     for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yp][face(i,0)] = (
-          recvBuf[YP][face(i,0)]+
-          recvBuf[ZP][face(0,i)]+
-          sendBuf[whichLocal][yp][face(i,0)]+
-          sendBuf[whichLocal][yp][face(i-1,0)]+
-          sendBuf[whichLocal][yp][face(i+1,0)]+
-          sendBuf[whichLocal][yp][face(i,1)]+
-          sendBuf[whichLocal][zp][face(1,i)]
-      )/7;
-      eltsComp++;
+      sendBuf[newLocal][yp][face(i,0)] = sendBuf[newLocal][zp][face(0,i)];
     }
     for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yp][face(blockDim-1,i)] = (
-          recvBuf[YP][face(blockDim-1,i)]+
-          recvBuf[XN][face(0,i)]+
-          sendBuf[whichLocal][yp][face(blockDim-1,i)]+
-          sendBuf[whichLocal][yp][face(blockDim-1,i-1)]+
-          sendBuf[whichLocal][yp][face(blockDim-1,i+1)]+
-          sendBuf[whichLocal][yp][face(blockDim-2,i)]+
-          sendBuf[whichLocal][xn][face(1,i)]
-      )/7;
-      eltsComp++;
+      sendBuf[newLocal][yp][face(blockDim-1,i)] = sendBuf[newLocal][xn][face(0,i)];
     }
     for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yp][face(i,blockDim-1)] = (
-          recvBuf[YP][face(i,blockDim-1)]+
-          recvBuf[ZN][face(0,i)]+
-          sendBuf[whichLocal][yp][face(i,blockDim-1)]+
-          sendBuf[whichLocal][yp][face(i-1,blockDim-1)]+
-          sendBuf[whichLocal][yp][face(i+1,blockDim-1)]+
-          sendBuf[whichLocal][yp][face(i,blockDim-2)]+
-          sendBuf[whichLocal][zn][face(1,i)]
-      )/7;
-      eltsComp++;
+      sendBuf[newLocal][yp][face(i,blockDim-1)] = sendBuf[newLocal][zn][face(0,i)];
     }
 
     // 6. yn face
@@ -1237,7 +1055,7 @@ class StencilPoint : public CBase_StencilPoint{
                 sendBuf[whichLocal][yn][face(i+1,j)]+
                 sendBuf[whichLocal][yn][face(i,j-1)]+
                 sendBuf[whichLocal][yn][face(i,j+1)]+
-                localChunk[whichLocal][small(blockDim-3,i-1,j-1)]+
+                localChunk[whichLocal][small(blockDim-1,i-1,j-1)]+
                 recvBuf[YN][face(i,j)]
         )/7;
       eltsComp++;
@@ -1246,98 +1064,28 @@ class StencilPoint : public CBase_StencilPoint{
 
     // Corners next
     // Each element uses 3 ghosts, 3 from its own sendBuf (including itself)  and 1 from a different sendBuf
-    sendBuf[newLocal][yn][face(0,0)] = (
-          recvBuf[YN][face(0,0)]+
-          recvBuf[XP][face(blockDim-1,0)]+
-          recvBuf[ZP][face(blockDim-1,0)]+
-          sendBuf[whichLocal][yn][face(0,0)]+
-          sendBuf[whichLocal][yn][face(0,1)]+
-          sendBuf[whichLocal][yn][face(1,0)]+
-          sendBuf[whichLocal][xp][face(blockDim-2,0)]
-    )/7;
-
-    sendBuf[newLocal][yn][face(0,blockDim-1)] = (
-          recvBuf[YN][face(0,blockDim-1)]+
-          recvBuf[XP][face(blockDim-1,blockDim-1)]+
-          recvBuf[ZN][face(blockDim-1,0)]+
-          sendBuf[whichLocal][yn][face(0,blockDim-1)]+
-          sendBuf[whichLocal][yn][face(1,blockDim-1)]+
-          sendBuf[whichLocal][yn][face(0,blockDim-2)]+
-          sendBuf[whichLocal][xp][face(blockDim-2,blockDim-1)]
-    )/7;
-
-    sendBuf[newLocal][yn][face(blockDim-1,0)] = (
-          recvBuf[ZP][face(blockDim-1,blockDim-1)]+
-          recvBuf[XN][face(blockDim-1,0)]+
-          recvBuf[YN][face(blockDim-1,0)]+
-          sendBuf[whichLocal][yn][face(blockDim-1,0)]+
-          sendBuf[whichLocal][yn][face(blockDim-2,0)]+
-          sendBuf[whichLocal][yn][face(blockDim-1,1)]+
-          sendBuf[whichLocal][xn][face(blockDim-2,0)]
-    )/7;
-
-    sendBuf[newLocal][yn][face(blockDim-1,blockDim-1)] = (
-          recvBuf[XN][face(blockDim-1,blockDim-1)]+
-          recvBuf[YN][face(blockDim-1,blockDim-1)]+
-          recvBuf[ZN][face(blockDim-1,blockDim-1)]+
-          sendBuf[whichLocal][yn][face(blockDim-1,blockDim-1)]+
-          sendBuf[whichLocal][yn][face(blockDim-2,blockDim-1)]+
-          sendBuf[whichLocal][yn][face(blockDim-1,blockDim-2)]+
-          sendBuf[whichLocal][xn][face(blockDim-2,blockDim-1)]
-    )/7;
-
-      eltsComp+=4;
+    sendBuf[newLocal][yp][face(0,0)] = sendBuf[newLocal][zp][face(blockDim-1,0)];
+    sendBuf[newLocal][yp][face(0,blockDim-1)] = sendBuf[newLocal][zn][face(blockDim-1,0)];
+    sendBuf[newLocal][yp][face(blockDim-1,0)] = sendBuf[newLocal][zp][face(blockDim-1,blockDim-1)];
+    sendBuf[newLocal][yp][face(blockDim-1,blockDim-1)] = sendBuf[newLocal][zn][face(blockDim-1,blockDim-1)]; 
+    
     // Finally, the edges: 
     // Each element here uses 2 ghosts, 4 elts from its own sendBuf, 1 elt from a different sendBuf
     
     for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yn][face(0,i)] = (
-          recvBuf[XP][face(blockDim-1,i)]+
-          recvBuf[YN][face(0,i)]+
-          sendBuf[whichLocal][yn][face(0,i)]+
-          sendBuf[whichLocal][yn][face(0,i-1)]+
-          sendBuf[whichLocal][yn][face(0,i+1)]+
-          sendBuf[whichLocal][yn][face(1,i)]+
-          sendBuf[whichLocal][xp][face(blockDim-2,i)]
-      )/7;
-      eltsComp++;
+      sendBuf[newLocal][yn][face(0,i)] = sendBuf[newLocal][xp][face(blockDim-1,i)]; 
     }
     for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yn][face(i,0)] = (
-          recvBuf[YN][face(i,0)]+
-          recvBuf[ZP][face(blockDim-1,i)]+
-          sendBuf[whichLocal][yn][face(i,0)]+
-          sendBuf[whichLocal][yn][face(i-1,0)]+
-          sendBuf[whichLocal][yn][face(i+1,0)]+
-          sendBuf[whichLocal][yn][face(i,1)]+
-          sendBuf[whichLocal][zp][face(blockDim-2,i)]
-      )/7;
-      eltsComp++;
+      sendBuf[newLocal][yn][face(i,0)] = sendBuf[newLocal][zp][face(blockDim-1,i)];
     }
     for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yn][face(blockDim-1,i)] = (
-          recvBuf[YN][face(blockDim-1,i)]+
-          recvBuf[XN][face(blockDim-1,i)]+
-          sendBuf[whichLocal][yn][face(blockDim-1,i)]+
-          sendBuf[whichLocal][yn][face(blockDim-1,i-1)]+
-          sendBuf[whichLocal][yn][face(blockDim-1,i+1)]+
-          sendBuf[whichLocal][yn][face(blockDim-2,i)]+
-          sendBuf[whichLocal][xn][face(blockDim-2,i)]
-      )/7;
-      eltsComp++;
+      sendBuf[newLocal][yn][face(blockDim-1,i)] = sendBuf[newLocal][xn][face(blockDim-1,i)];
     }
     for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yn][face(i,blockDim-1)] = (
-          recvBuf[YN][face(i,blockDim-1)]+
-          recvBuf[ZN][face(blockDim-1,i)]+
-          sendBuf[whichLocal][yn][face(i,blockDim-1)]+
-          sendBuf[whichLocal][yn][face(i-1,blockDim-1)]+
-          sendBuf[whichLocal][yn][face(i+1,blockDim-1)]+
-          sendBuf[whichLocal][yn][face(i,blockDim-2)]+
-          sendBuf[whichLocal][zn][face(blockDim-2,i)]
-      )/7;
-      eltsComp++;
+      sendBuf[newLocal][yn][face(i,blockDim-1)] = sendBuf[newLocal][zn][face(blockDim-1,i)];
     }
+
+
     
     // enforce boundary conditions
     if(plane == 0){
