@@ -853,8 +853,8 @@ void CmiIsomallocPup(pup_er p,void **blockPtrPtr)
 		length=blk->length;
 	}
 	
-	pup_long(p,&s);
-	pup_long(p,&length);
+	pup_int8(p,&s);
+	pup_int8(p,&length);
 	n=length2slots(length);
 	
 	if (pup_isUnpacking(p)) 
