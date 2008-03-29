@@ -28,9 +28,10 @@ class Main : public CBase_Main {
     delete msg;
     int charesPerDim = dim/blockDim;
     CProxy_StencilPoint array = 
-        CProxy_StencilPoint::ckNew(charesPerDim, charesPerDim, charesPerDim);
-    //CkPrintf("main: %dx%dx%d elt array, num_iterations: %d\n", charesPerDim, charesPerDim, charesPerDim, num_iterations);
-    CkPrintf("main: dim: %d blockDim: %d num_iterations: %d\n", dim, blockDim, num_iterations);
+        CProxy_StencilPoint::ckNew(charesPerDim*charesPerDim*charesPerDim);
+        //CProxy_StencilPoint::ckNew(charesPerDim, charesPerDim, charesPerDim);
+    //CkPrintf("main: %d elt array, num_iterations: %d\n", charesPerDim, charesPerDim, charesPerDim, num_iterations);
+    CkPrintf("main: dim: %d blockDim: %d num_iterations: %d total chares: %d\n", dim, blockDim, num_iterations,charesPerDim*charesPerDim*charesPerDim);
     startSetup = CmiWallTimer();
 #ifdef USE_CKDIRECT
     array.setupChannels();
@@ -98,13 +99,14 @@ class StencilPoint : public CBase_StencilPoint{
     iterations = 0;
     eltsComp = 0;
     
-    col = thisIndex.y;
-    row = thisIndex.x;
-    plane = thisIndex.z;
 
     charesPerDim = dim/blockDim;
     payload = blockDim*blockDim*sizeof(float);
     blockDimSq = blockDim*blockDim;
+    
+    plane = thisIndex/(charesPerDim*charesPerDim);
+    row = (thisIndex/charesPerDim)%charesPerDim;
+    col = thisIndex%charesPerDim;
     
     // allocate memory
     for(int i = 0; i < NBRS; i++){
@@ -160,6 +162,7 @@ class StencilPoint : public CBase_StencilPoint{
     delete [] localChunk[1];
   }
 
+#define lin(c,r,p) ((p)*charesPerDim*charesPerDim+(r)*charesPerDim+(c))
 //#ifdef USE_CKDIRECT
   void setupChannels(){
     int node = CkMyNode();
@@ -174,21 +177,21 @@ class StencilPoint : public CBase_StencilPoint{
     */
 #endif
 
-    thisProxy((col), (row+1)%charesPerDim, (plane)).notify(node,2,thisIndex);
-    thisProxy((col), (row-1+charesPerDim)%charesPerDim, (plane)).notify(node,3,thisIndex);
-    thisProxy((col+1)%charesPerDim, (row), (plane)).notify(node,0,thisIndex);
-    thisProxy((col-1+charesPerDim)%charesPerDim, (row), (plane)).notify(node,1,thisIndex);
-    thisProxy((col), (row), (plane+1)%charesPerDim).notify(node,4,thisIndex);
-    thisProxy((col), (row), (plane-1+charesPerDim)%charesPerDim).notify(node,5,thisIndex);
+    thisProxy(lin((col), (row+1)%charesPerDim, (plane))).notify(node,2,thisIndex);
+    thisProxy(lin((col), (row-1+charesPerDim)%charesPerDim, (plane))).notify(node,3,thisIndex);
+    thisProxy(lin((col+1)%charesPerDim, (row), (plane))).notify(node,0,thisIndex);
+    thisProxy(lin((col-1+charesPerDim)%charesPerDim, (row), (plane))).notify(node,1,thisIndex);
+    thisProxy(lin((col), (row), (plane+1)%charesPerDim)).notify(node,4,thisIndex);
+    thisProxy(lin((col), (row), (plane-1+charesPerDim)%charesPerDim)).notify(node,5,thisIndex);
   }
 
-  void notify(int node, int which, CkIndex3D whoSent){
+  void notify(int node, int which, CkIndex1D whoSent){
     // make handle
 #ifdef STENCIL2D_VERBOSE
-    CkPrintf("(%d,%d,%d): (%d,%d,%d) is %d to me\n", row, col, plane, whoSent.y, whoSent.x, whoSent.z, which);
+    CkPrintf("(%d,%d,%d): (%d) is %d to me\n", row, col, plane, whoSent, which);
 #endif
     rhandles[which] = CkDirect_createHandle(node, recvBuf[which], payload, StencilPoint::callbackWrapper, (void *)this, OOB);
-    thisProxy(whoSent.x, whoSent.y, whoSent.z).recvHandle(rhandles[which], which);
+    thisProxy(whoSent).recvHandle(rhandles[which], which);
   }
 
   void recvHandle(infiDirectUserHandle handle, int which){
@@ -219,7 +222,7 @@ class StencilPoint : public CBase_StencilPoint{
       //CkPrintf("(%d,%d,%d): recvd all buffers, start compute(%d)\n", x,y,z, iterations);
 #endif
       remainingBufs = NBRS;
-      thisProxy(thisIndex.x, thisIndex.y, thisIndex.z).compute();
+      thisProxy(thisIndex).compute();
     }
   }
   
@@ -240,7 +243,6 @@ class StencilPoint : public CBase_StencilPoint{
     if(remainingBufs == 0){
       remainingBufs = NBRS;
       compute();
-      //thisProxy(thisIndex.x, thisIndex.y, thisIndex.z).compute();
     }
   }
 
@@ -257,7 +259,6 @@ class StencilPoint : public CBase_StencilPoint{
         delete recvMsgs[i];
         recvMsgs[i] = 0;
       }
-      //thisProxy(thisIndex.x, thisIndex.y, thisIndex.z).compute();
     }
  
 #else
@@ -1140,14 +1141,14 @@ class StencilPoint : public CBase_StencilPoint{
     memcpy(msg->arr,buf,blockDimSq*sizeof(float));
     msg->which = which;
     msg->size = blockDimSq;
-    thisProxy(col,row,plane).recvBufferMsg(msg);
+    thisProxy(lin(col,row,plane)).recvBufferMsg(msg);
   }
 
   void sendData(){
     // 1. copy data into buffers from local chunk
     // top and bottom boundaries
 #ifdef STENCIL2D_VERBOSE
-    CkPrintf("(%d,%d,%d): sendData() called\n", x,y,z);
+    //CkPrintf("(%d,%d,%d): sendData() called\n", x,y,z);
 #endif
 #ifdef USE_CKDIRECT
     // 2. put buffers
@@ -1164,12 +1165,12 @@ class StencilPoint : public CBase_StencilPoint{
     sendMsg(col,row,(plane-1+charesPerDim)%charesPerDim,ZN,sendBuf[whichLocal][zp]);
 #else
     // 2. send messages
-    thisProxy((col+1)%charesPerDim,row,plane).recvBuffer(sendBuf[whichLocal][xn],blockDimSq,XP);
-    thisProxy((col-1+charesPerDim)%charesPerDim,row,plane).recvBuffer(sendBuf[whichLocal][xp],blockDimSq,XN);
-    thisProxy(col,(row+1)%charesPerDim,plane).recvBuffer(sendBuf[whichLocal][yn],blockDimSq,YP);
-    thisProxy(col,(row-1+charesPerDim)%charesPerDim,plane).recvBuffer(sendBuf[whichLocal][yp],blockDimSq,YN);
-    thisProxy(col,row,(plane+1)%charesPerDim).recvBuffer(sendBuf[whichLocal][zn],blockDimSq,ZP);
-    thisProxy(col,row,(plane-1+charesPerDim)%charesPerDim).recvBuffer(sendBuf[whichLocal][zp],blockDimSq,ZN);
+    thisProxy(lin((col+1)%charesPerDim,row,plane)).recvBuffer(sendBuf[whichLocal][xn],blockDimSq,XP);
+    thisProxy(lin((col-1+charesPerDim)%charesPerDim,row,plane)).recvBuffer(sendBuf[whichLocal][xp],blockDimSq,XN);
+    thisProxy(lin(col,(row+1)%charesPerDim,plane)).recvBuffer(sendBuf[whichLocal][yn],blockDimSq,YP);
+    thisProxy(lin(col,(row-1+charesPerDim)%charesPerDim,plane)).recvBuffer(sendBuf[whichLocal][yp],blockDimSq,YN);
+    thisProxy(lin(col,row,(plane+1)%charesPerDim)).recvBuffer(sendBuf[whichLocal][zn],blockDimSq,ZP);
+    thisProxy(lin(col,row,(plane-1+charesPerDim)%charesPerDim)).recvBuffer(sendBuf[whichLocal][zp],blockDimSq,ZN);
 #endif // end USE_MESSAGES
 #endif
   }

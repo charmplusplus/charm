@@ -15,11 +15,11 @@ mainmodule stencil3d{
     float arr[];
   };
 
-  array [3D] StencilPoint {
+  array [1D] StencilPoint {
     entry StencilPoint(void);
     // with CkDirect
     entry void setupChannels(void);
-    entry void notify(int node, int whichBoundary, CkIndex3D whoSent);
+    entry void notify(int node, int whichBoundary, CkIndex1D whoSent);
     entry void recvHandle(infiDirectUserHandle handle, int whichBoundary);
     entry void allReadyCallback(CkReductionMsg *msg);
     
