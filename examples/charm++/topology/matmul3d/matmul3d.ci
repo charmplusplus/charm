@@ -29,7 +29,7 @@ mainmodule matmul3d {
     entry void beginCopying();
     entry void receiveA(int indexZ, float data[size], int size);
     entry void receiveB(int indexX, float data[size], int size);
-    entry void receiveC(float data[size], int size);
+    entry void receiveC(float data[size], int size, int who);
   };
 
   group ComputeMap : CkArrayMap {

@@ -75,7 +75,7 @@ class Compute: public CBase_Compute {
     void sendC();
     void receiveA(int indexZ, float *data, int size);
     void receiveB(int indexX, float *data, int size);
-    void receiveC(float *data, int size);
+    void receiveC(float *data, int size, int who);
     void doWork();
 };
 

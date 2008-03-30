@@ -198,7 +198,7 @@ void Compute::sendB() {
 void Compute::sendC() {
   int indexY = thisIndex.y;
   for(int j=0; j<num_chare_y; j++) {
-    if(j !=indexY) {
+    if(j != indexY) {
       /* this copying of data is unnecessary ---
       float *dataC = new float[subBlockDimXy * blockDimZ];
       for(int i=0; i<subBlockDimXy; i++)
@@ -208,9 +208,9 @@ void Compute::sendC() {
       // use a local pointer for chares on the same processor
       Compute *c = compute(thisIndex.x, j, thisIndex.z).ckLocal();
       if(c != NULL)
-	c->receiveC(&C[j*subBlockDimXy*blockDimZ], subBlockDimXy * blockDimZ);
+	c->receiveC(&C[j*subBlockDimXy*blockDimZ], subBlockDimXy * blockDimZ, 1);
       else
-	compute(thisIndex.x, j, thisIndex.z).receiveC(&C[j*subBlockDimXy*blockDimZ], subBlockDimXy * blockDimZ);
+	compute(thisIndex.x, j, thisIndex.z).receiveC(&C[j*subBlockDimXy*blockDimZ], subBlockDimXy * blockDimZ, 1);
     }
   }
 }
@@ -233,14 +233,16 @@ void Compute::receiveB(int indexX, float *data, int size) {
     doWork();
 }
 
-void Compute::receiveC(float *data, int size) {
+void Compute::receiveC(float *data, int size, int who) {
   int indexY = thisIndex.y;
-  for(int i=0; i<subBlockDimXy; i++)
-    for(int k=0; k<blockDimZ; k++)
-      C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k] += data[i*blockDimZ + k];
+  if(who) {
+    for(int i=0; i<subBlockDimXy; i++)
+      for(int k=0; k<blockDimZ; k++)
+	C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k] += data[i*blockDimZ + k];
+  }
   countC++;
-  if(countC == num_chare_y-1) {
-    char name[30];
+  if(countC == num_chare_y) {
+    /*char name[30];
     sprintf(name, "%s_%d_%d_%d", "C", thisIndex.x, thisIndex.y, thisIndex.z);
     FILE *fp = fopen(name, "w");
     for(int i=0; i<subBlockDimXy; i++) {
@@ -248,7 +250,7 @@ void Compute::receiveC(float *data, int size) {
 	fprintf(fp, "%f ", C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k]);
       fprintf(fp, "\n");
     }
-    fclose(fp);
+    fclose(fp);*/
     mainProxy.done();
   }
 }
@@ -259,6 +261,8 @@ void Compute::doWork() {
       for(int j=0; j<blockDimY; j++)
 	for(int k=0; k<blockDimZ; k++)
 	  C[i*blockDimZ+k] += A[i*blockDimY+j] * B[j*blockDimZ+k];
+    
+    receiveC(&C[(thisIndex.y)*subBlockDimXy*blockDimZ], subBlockDimXy*blockDimZ, 0);
     sendC();
   }
 }
