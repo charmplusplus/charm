@@ -112,14 +112,26 @@ Compute::Compute() {
   B = new float[blockDimY*blockDimZ];
   C = new float[blockDimX*blockDimZ];
 
+  int indexX = thisIndex.x;
+  int indexY = thisIndex.y;
+  int indexZ = thisIndex.z;
+
   for(int i=0; i<blockDimX; i++)
-    for(int j=0; j<blockDimY; j++)
-      A[i*blockDimY + j] = 1.0;
+    for(int j=0; j<blockDimY; j++) {
+      if(i>=indexZ*subBlockDimXz && i<(indexZ+1)*subBlockDimXz)
+	A[i*blockDimY + j] = 1.0;
+      else
+	A[i*blockDimY + j] = 0.0;
+    }
 
   for(int j=0; j<blockDimY; j++)
-    for(int k=0; k<blockDimZ; k++)
-      B[j*blockDimZ + k] = 2.0;
-  
+    for(int k=0; k<blockDimZ; k++) {
+      if(j>=indexX*subBlockDimYx && j<(indexX+1)*subBlockDimYx)
+	B[j*blockDimZ + k] = 2.0;
+      else
+	B[j*blockDimZ + k] = 0.0;
+    }
+
   for(int i=0; i<blockDimX; i++)
     for(int k=0; k<blockDimZ; k++)
       C[i*blockDimZ + k] = 0.0;
@@ -228,7 +240,7 @@ void Compute::receiveC(float *data, int size) {
       C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k] += data[i*blockDimZ + k];
   countC++;
   if(countC == num_chare_y-1) {
-    /*char name[30];
+    char name[30];
     sprintf(name, "%s_%d_%d_%d", "C", thisIndex.x, thisIndex.y, thisIndex.z);
     FILE *fp = fopen(name, "w");
     for(int i=0; i<subBlockDimXy; i++) {
@@ -236,7 +248,7 @@ void Compute::receiveC(float *data, int size) {
 	fprintf(fp, "%f ", C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k]);
       fprintf(fp, "\n");
     }
-    fclose(fp);*/
+    fclose(fp);
     mainProxy.done();
   }
 }
