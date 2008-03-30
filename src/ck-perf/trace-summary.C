@@ -123,6 +123,7 @@ SumLogPool::SumLogPool(char *pgm) : numBins(0), phaseTab(MAX_PHASES)
    this->pgm = new char[strlen(pgm)+1];
    strcpy(this->pgm,pgm);
    
+#if 0
    // create the sts file
    if (CkMyPe() == 0) {
      char *fname = 
@@ -135,6 +136,7 @@ SumLogPool::SumLogPool(char *pgm) : numBins(0), phaseTab(MAX_PHASES)
       }
      delete[] fname;
    }
+#endif
    
    // event
    markcount = 0;
@@ -337,10 +339,22 @@ void SumLogPool::write(void)
 
 void SumLogPool::writeSts(void)
 {
+    // open sts file
+  char *fname = 
+       new char[strlen(CkpvAccess(traceRoot))+strlen(".sum.sts")+1];
+  sprintf(fname, "%s.sum.sts", CkpvAccess(traceRoot));
+  stsfp = fopen(fname, "w+");
+  //CmiPrintf("File: %s \n", fname);
+  if (stsfp == 0) {
+       CmiAbort("Cannot open summary sts file for writing.\n");
+  }
+  delete[] fname;
+
   traceWriteSTS(stsfp,_numEvents);
   for(int i=0;i<_numEvents;i++)
     fprintf(stsfp, "EVENT %d Event%d\n", i, i);
   fprintf(stsfp, "END\n");
+
   fclose(stsfp);
 }
 
