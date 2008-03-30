@@ -7,7 +7,7 @@
 
 /** \file matmul3d.C
  *  Author: Abhinav S Bhatele
- *  Date Created: March 13th, 2008
+ *  Date Created: March 28th, 2008
  *
  */
 
@@ -92,7 +92,7 @@ Main::Main(CkArgMsg* m) {
   // CkPrintf("Total Hops: %d\n", hops);
 
   // Start the computation
-  doneCount=0;
+  doneCount = 0;
   startTime = CmiWallTimer();
 #if USE_CKDIRECT
   compute.setupChannels();
@@ -105,7 +105,11 @@ void Main::done() {
   doneCount++;
   if(doneCount == num_chares) {
     endTime = CmiWallTimer();
+#if USE_CKDIRECT
     CkPrintf("TIME %f secs\n", endTime - setupTime);
+#else
+    CkPrintf("TIME %f secs\n", endTime - startTime);
+#endif
     CkExit();
   }
 }
@@ -224,7 +228,7 @@ void Compute::sendB() {
 void Compute::sendC() {
   int indexY = thisIndex.y;
   for(int j=0; j<num_chare_y; j++) {
-    if(j !=indexY) {
+    if(j != indexY) {
       /* this copying of data is unnecessary ---
       float *dataC = new float[subBlockDimXy * blockDimZ];
       for(int i=0; i<subBlockDimXy; i++)
@@ -237,9 +241,9 @@ void Compute::sendC() {
       // use a local pointer for chares on the same processor
       Compute *c = compute(thisIndex.x, j, thisIndex.z).ckLocal();
       if(c != NULL)
-	c->receiveC(&C[j*subBlockDimXy*blockDimZ], subBlockDimXy * blockDimZ);
+	c->receiveC(&C[j*subBlockDimXy*blockDimZ], subBlockDimXy * blockDimZ, 1);
       else
-	compute(thisIndex.x, j, thisIndex.z).receiveC(&C[j*subBlockDimXy*blockDimZ], subBlockDimXy * blockDimZ);
+	compute(thisIndex.x, j, thisIndex.z).receiveC(&C[j*subBlockDimXy*blockDimZ], subBlockDimXy * blockDimZ, 1);
 #endif
     }
   }
@@ -263,13 +267,15 @@ void Compute::receiveB(int indexX, float *data, int size) {
     doWork();
 }
 
-void Compute::receiveC(float *data, int size) {
+void Compute::receiveC(float *data, int size, int who) {
   int indexY = thisIndex.y;
-  for(int i=0; i<subBlockDimXy; i++)
-    for(int k=0; k<blockDimZ; k++)
-      C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k] += data[i*blockDimZ + k];
+  if(who) {
+    for(int i=0; i<subBlockDimXy; i++)
+      for(int k=0; k<blockDimZ; k++)
+	C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k] += data[i*blockDimZ + k];
+  }
   countC++;
-  if(countC == num_chare_y-1) {
+  if(countC == num_chare_y) {
     /*char name[30];
     sprintf(name, "%s_%d_%d_%d", "C", thisIndex.x, thisIndex.y, thisIndex.z);
     FILE *fp = fopen(name, "w");
@@ -289,6 +295,12 @@ void Compute::doWork() {
       for(int j=0; j<blockDimY; j++)
 	for(int k=0; k<blockDimZ; k++)
 	  C[i*blockDimZ+k] += A[i*blockDimY+j] * B[j*blockDimZ+k];
+
+#if USE_CKDIRECT
+    callBackRcvdC((void *)this);
+#else
+    receiveC(&C[(thisIndex.y)*subBlockDimXy*blockDimZ], subBlockDimXy*blockDimZ, 0);
+#endif
     sendC();
   }
 }
@@ -376,7 +388,7 @@ void Compute::callBackRcvdC(void *arg) {
   Compute *obj = (Compute *)arg;
   int indexY = obj->thisIndex.y;
   obj->countC++;
-  if(obj->countC == num_chare_y-1) {
+  if(obj->countC == num_chare_y) {
     // copy C from tmpC to the correct location
     for(int j=0; j<num_chare_y; j++) {
       if( j != indexY) {

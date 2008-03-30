@@ -7,7 +7,7 @@
 
 /** \file matmul3d.h
  *  Author: Abhinav S Bhatele
- *  Date Created: March 13th, 2008
+ *  Date Created: March 28th, 2008
  *
  */
 
@@ -51,7 +51,7 @@ int myrand(int numpes) {
 
 #define USE_CKDIRECT	1
 
-#define OOB		-1111111111
+#define OOB		-1111111111.0
 
 double startTime;
 double setupTime;
@@ -89,7 +89,7 @@ class Compute: public CBase_Compute {
     void sendC();
     void receiveA(int indexZ, float *data, int size);
     void receiveB(int indexX, float *data, int size);
-    void receiveC(float *data, int size);
+    void receiveC(float *data, int size, int who);
     void doWork();
 
     void setupChannels();
