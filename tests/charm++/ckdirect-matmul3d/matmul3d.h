@@ -95,6 +95,7 @@ class Compute: public CBase_Compute {
     void setupChannels();
     void notifyReceiver(int pe, CkIndex3D index, int arr);
     void recvHandle(infiDirectUserHandle shdl, int index, int arr);
+    void receiveC();
     static void callBackRcvdA(void *arg);
     static void callBackRcvdB(void *arg);
     static void callBackRcvdC(void *arg);

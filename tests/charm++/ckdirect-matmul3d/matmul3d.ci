@@ -31,10 +31,12 @@ mainmodule matmul3d {
     entry void receiveA(int indexZ, float data[size], int size);
     entry void receiveB(int indexX, float data[size], int size);
     entry void receiveC(float data[size], int size, int who);
+    entry void doWork();
 
     entry void setupChannels();
     entry void notifyReceiver(int pe, CkIndex3D index, int arr);
     entry void recvHandle(infiDirectUserHandle shdl, int index, int arr);
+    entry void receiveC();
   };
 
   group ComputeMap : CkArrayMap {

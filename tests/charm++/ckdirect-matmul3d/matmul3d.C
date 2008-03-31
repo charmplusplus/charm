@@ -110,6 +110,7 @@ void Main::done() {
 #else
     CkPrintf("TIME %f secs\n", endTime - startTime);
 #endif
+    fflush(NULL);
     CkExit();
   }
 }
@@ -289,6 +290,34 @@ void Compute::receiveC(float *data, int size, int who) {
   }
 }
 
+void Compute::receiveC() {
+  int indexY = thisIndex.y;
+  // copy C from tmpC to the correct location
+  for(int j=0; j<num_chare_y; j++) {
+    if( j != indexY) {
+      for(int i=0; i<subBlockDimXy; i++)
+	for(int k=0; k<blockDimZ; k++)
+	  C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k] += tmpC[j*subBlockDimXy*blockDimZ + i*blockDimZ + k];
+    }
+  }
+    /*char name[30];
+    sprintf(name, "%s_%d_%d_%d", "C", thisIndex.x, thisIndex.y, thisIndex.z);
+    FILE *fp = fopen(name, "w");
+    for(int i=0; i<subBlockDimXy; i++) {
+      for(int k=0; k<blockDimZ; k++)
+	fprintf(fp, "%f ", C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k]);
+      fprintf(fp, "\n");
+    }
+    fclose(fp);
+    CkPrintf("%d_%d_%d\n", thisIndex.x, thisIndex.y, thisIndex.z);
+    for(int i=0; i<subBlockDimXy; i++) {
+      for(int k=0; k<blockDimZ; k++)
+	CkPrintf("%f ", C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k]);
+      CkPrintf("\n");
+    }*/
+  mainProxy.done();
+}
+
 void Compute::doWork() {
   if(countA == num_chare_z-1 && countB == num_chare_x-1) {
     for(int i=0; i<blockDimX; i++)
@@ -297,7 +326,7 @@ void Compute::doWork() {
 	  C[i*blockDimZ+k] += A[i*blockDimY+j] * B[j*blockDimZ+k];
 
 #if USE_CKDIRECT
-    callBackRcvdC((void *)this);
+    receiveC();
 #else
     receiveC(&C[(thisIndex.y)*subBlockDimXy*blockDimZ], subBlockDimXy*blockDimZ, 0);
 #endif
@@ -373,32 +402,22 @@ void Compute::recvHandle(infiDirectUserHandle shdl, int index, int arr) {
 void Compute::callBackRcvdA(void *arg) {
   Compute *obj = (Compute *)arg;
   obj->countA++;
-  if(obj->countA == num_chare_z-1)
-    obj->doWork();
+  if(obj->countA == num_chare_z);
+    obj->thisProxy(obj->thisIndex.x, obj->thisIndex.y, obj->thisIndex.z).doWork();
 }
 
 void Compute::callBackRcvdB(void *arg) {
   Compute *obj = (Compute *)arg;
   obj->countB++;
-  if(obj->countB == num_chare_x-1)
-    obj->doWork();
+  if(obj->countB == num_chare_x);
+    obj->thisProxy(obj->thisIndex.x, obj->thisIndex.y, obj->thisIndex.z).doWork();
 }
 
 void Compute::callBackRcvdC(void *arg) {
   Compute *obj = (Compute *)arg;
-  int indexY = obj->thisIndex.y;
   obj->countC++;
-  if(obj->countC == num_chare_y) {
-    // copy C from tmpC to the correct location
-    for(int j=0; j<num_chare_y; j++) {
-      if( j != indexY) {
-	for(int i=0; i<subBlockDimXy; i++)
-	  for(int k=0; k<blockDimZ; k++)
-	    obj->C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k] += obj->tmpC[j*subBlockDimXy*blockDimZ + i*blockDimZ + k];
-      }
-    }
-    mainProxy.done();
-  }
+  if(obj->countC == num_chare_y);
+    obj->thisProxy(obj->thisIndex.x, obj->thisIndex.y, obj->thisIndex.z).receiveC();
 }
 
 ComputeMap::ComputeMap(int x, int y, int z, int tx, int ty, int tz) {
