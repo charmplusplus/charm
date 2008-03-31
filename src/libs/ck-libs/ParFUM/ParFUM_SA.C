@@ -601,13 +601,6 @@ adaptAdjMsg *ParFUMShadowArray::remote_bulk_edge_bisect_2D(adaptAdj nbrElem, ada
   return am;
 }
 
-adaptAdjMsg *ParFUMShadowArray::remote_bulk_edge_bisect_3D(adaptAdj nbrElem, adaptAdj splitElem, int new_idxl, int n1_idxl, int n2_idxl, int partitionID)
-{
-  adaptAdjMsg *am = new adaptAdjMsg;
-  am->elem = bulkAdapt->remote_edge_bisect_3D(nbrElem, splitElem, new_idxl, n1_idxl, n2_idxl, partitionID);
-  return am;
-}
-
 void ParFUMShadowArray::remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, adaptAdj newElem)
 {
   bulkAdapt->remote_adaptAdj_replace(elem, oldElem, newElem);
@@ -621,6 +614,24 @@ void ParFUMShadowArray::remote_edgeAdj_replace(adaptAdj adj, adaptAdj elem, adap
 void ParFUMShadowArray::remote_edgeAdj_add(adaptAdj adj, adaptAdj splitElem, double co1[3], double co2[3])
 {
   bulkAdapt->remote_edgeAdj_add(adj, splitElem, co1, co2);
+}
+
+void ParFUMShadowArray::recv_split_3D(int pos, int tableID, adaptAdj elem, 
+				      adaptAdj splitElem)
+{
+  bulkAdapt->recv_split_3D(pos, tableID, elem, splitElem);
+}
+
+void ParFUMShadowArray::handle_split_3D(int remotePartID, int pos, int tableID,
+					adaptAdj elem, int n1_idxl, int n2_idxl)
+{
+  bulkAdapt->handle_split_3D(remotePartID, pos, tableID, elem, n1_idxl, n2_idxl);
+}
+
+void ParFUMShadowArray::recv_splits(int tableID, int expectedSplits)
+{
+  while (!(bulkAdapt->all_splits_received(tableID, expectedSplits)))
+    CthYield();
 }
 
 

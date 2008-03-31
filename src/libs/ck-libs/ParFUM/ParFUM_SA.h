@@ -148,13 +148,16 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
 
   /// These are entry methods for bulk adaptivity
   adaptAdjMsg *remote_bulk_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, int new_idxl, int n1_idxl, int n2_idxl, int partitionID);
-  adaptAdjMsg *remote_bulk_edge_bisect_3D(adaptAdj nbrElem, adaptAdj splitElem, int new_idxl, int n1_idxl, int n2_idxl, int partitionID);
 
   void remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, adaptAdj newElem);
   void remote_edgeAdj_replace(adaptAdj adj, adaptAdj elem, adaptAdj splitElem, 
 			      double co1[3], double co2[3]);
   void remote_edgeAdj_add(adaptAdj adj, adaptAdj splitElem, double co1[3],
 			  double co2[3]);
+  void recv_split_3D(int pos, int tableID, adaptAdj elem, adaptAdj splitElem);
+  void handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj elem, 
+		       int n1_idxl, int n2_idxl);
+  void recv_splits(int tableID, int expectedSplits);
 };
 
 ///This is a message which packs all the chunk indices together

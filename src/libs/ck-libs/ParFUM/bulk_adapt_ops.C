@@ -16,6 +16,8 @@ BulkAdapt::BulkAdapt(int meshid,FEM_Mesh *mPtr, int partID,
   partitionID = partID;
   shadowProxy = sa_proxy;
   localShadow = meshPtr->parfumSA;
+  for (int i=0; i<100; i++) { freeTable[i] = 1; }
+  firstFree = 0;
 }
 
 /// Destructor
@@ -223,12 +225,6 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
     return success;
   }
 
-  // set up receiving data structure for elem-split pairs
-  numSlots = numElemsToLock;
-  numGathered = 0;
-  // Note: the "2*" below is because we are gatherings PAIRS of elems
-  elemPairs = (adaptAdj *)malloc(2*numSlots*sizeof(adaptAdj));
-
   // Find the nodes on the edge to be bisected
   int localNodes[3], localRelNodes[2]; 
   double nodeCoords[9];
@@ -269,172 +265,43 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
 
   // Perform the splits on all affected elements
   int numRemote=0;
+  int tableID = getTableID();
+  elemPairs[tableID] = (adaptAdj *)malloc(2*numElemsToLock*sizeof(adaptAdj));
   for (int i=0; i<numElemsToLock; i++) {
     if (elemsToLock[i].partID != partitionID) {
-      remote_one_side_split_3D();
+      elemPairs[tableID][2*i] = elemsToLock[i];
       numRemote++;
+      shadowProxy[elemsToLock[i].partID].
+	handle_split_3D(partitionID, i, tableID, elemsToLock[i], 
+			get_idxl_for_node(localNodes[0], elemsToLock[i].partID), 
+			get_idxl_for_node(localNodes[1], elemsToLock[i].partID));
     }
   }
   for (int i=0; i<numElemsToLock; i++) {
     if (elemsToLock[i].partID == partitionID) {
-      local_one_side_split_3D();
+      elemPairs[tableID][2*i] = elemsToLock[i];
+      elemPairs[tableID][2*i+1] = *(local_split_3D(elemsToLock[i], 
+						   localNodes[0], 
+						   localNodes[1], 
+						   localNodes[2]));
     }
   }
-  if (numRemote == 0) {
-    recv_splits();
+
+  if (numRemote > 0) {
+    localShadow->recv_splits(tableID, numRemote);
   }
 
-  /*
-  int nodeIDs[4], newNodeID;
-  adaptAdj splitElem, lastElem, lastSplitElem, dummyElem;
-  double n1coord[3];
-  // split the local element, i.e. the first "side"
-  (void) one_side_split_3D(startElem, splitElem, startElem, dummyElem, startElem, dummyElem, edgeID, &(nodeIDs[0]), &(nodeIDs[1]), &newNodeID, true, &(n1coord[0]), lastElem, dummyElem);
+  // Now we need to send out the elemPairs and make sure all
+  // adjacencies are updated
 
-  // find the two neighboring elements on edge that share face with startElem
-  int relNode[4];
-  FEM_Elem &elem = meshPtr->elem[elemType]; // elem is local elements
-  int *startConn = elem.connFor(startElem.localID);
-  relNode[0] = getRelNode(nodeIDs[0], startConn, 4);
-  relNode[1] = getRelNode(nodeIDs[1], startConn, 4);
-  fillNodes(&(relNode[0]), &(nodeIDs[0]), startConn);
-  int face[2]; // faces on which the two potentially splittable neighbors lie
-  face[0] = 3 - (relNode[0] + relNode[1] + relNode[2]);
-  face[1] = 3 - (relNode[0] + relNode[1] + relNode[3]);
-  adaptAdj neighbors[2]; // startElem's neighbors
-  neighbors[0] = *getAdaptAdj(meshID, startElem.localID, startElem.elemType, face[0]);
-  neighbors[1] = *getAdaptAdj(meshID, startElem.localID, startElem.elemType, face[1]);
-
-  bool completed=false;
-  // start splitting in each direction
-  if ((neighbors[0].partID > -1) && (neighbors[0].partID == partitionID)) {
-    // neighbors[0] exists and is local
-    FEM_Elem &elem = meshPtr->elem[elemType]; // elem is local elements
-    int *nbrConn = elem.connFor(neighbors[0].localID);
-    int relNode1 = getRelNode(nodeIDs[0], nbrConn, 4);
-    int relNode2 = getRelNode(nodeIDs[1], nbrConn, 4);
-    int nbrEdgeID = getEdgeID(relNode1, relNode2, 4, 3);
-
-    int nbrNode1, nbrNode2;
-    adaptAdj nbrSplitElem;
-    completed = one_side_split_3D(neighbors[0], nbrSplitElem, startElem, 
-				  splitElem, startElem, splitElem, nbrEdgeID, 
-				  &nbrNode1, &nbrNode2,  &newNodeID, false, 
-				  &(n1coord[0]), lastElem, lastSplitElem);
-    
-    // now fix the adjacencies across the new edge to the two new elements
-    replaceAdaptAdj(meshID, splitElem, neighbors[0], nbrSplitElem);
-    replaceAdaptAdj(meshID, nbrSplitElem, startElem, splitElem);
-    BULK_DEBUG(printf("[%d] For nbrSplitElem %d set adjacency to %d across splitEdge\n",partitionID,nbrSplitElem.localID,splitElem.localID);)
-    BULK_DEBUG(printf("[%d] For splitElem %d set adjacency to %d across splitEdge\n",partitionID,splitElem.localID,nbrSplitElem.localID);)
-    if (completed) {
-      // need to hook splitElem to neighbors[1]'s splitElem
-      replaceAdaptAdj(meshID, splitElem, neighbors[1], lastSplitElem);
-    }
-  }
-  else if (neighbors[0].partID == -1) { // startElem's side on domain boundary
-    // assert: splitElem's nbr on face[0] should already be domain boundary
-  }
-  else { // neighbors[0] exists and is remote
-    int chunks[1] = {neighbors[0].partID};
-    make_node_shared(newNodeID, 1, &chunks[0]);
-    int new_idxl, n1_idxl, n2_idxl;
-    new_idxl = get_idxl_for_node(newNodeID, neighbors[0].partID);
-    n1_idxl = get_idxl_for_node(nodeIDs[0], neighbors[0].partID);
-    n2_idxl = get_idxl_for_node(nodeIDs[1], neighbors[0].partID);
-
-    // make sync call on partition nbrElem.partID
-    // SEND: nbrElem, splitElem, new_idxl, n1_idxl, n2_idxl, partitionID
-    // RETURNS: nbrSplitElem
-    adaptAdjMsg *am = shadowProxy[neighbors[0].partID].remote_bulk_edge_bisect_3D(neighbors[0], splitElem, new_idxl, n1_idxl, n2_idxl, partitionID);
-    
-    adaptAdj nbrSplitElem = am->elem;
-    // now fix the adjacencies across the new edge to remote new element
-    // make sure splitElem's face and edge adj are init to startElem's
-    // replace nbrElem in edgeID adj with nbrSplitElem
-    // replace nbrElem in the face adj nbrSplitElem
-
-    // still need the updates of adjacencies between startElem and splitElem
-  }
-
-  if (!completed) { // was unable to traverse all the way around edge
-    if ((neighbors[1].partID > -1) && (neighbors[1].partID == partitionID)) {
-      // neighbors[1] exists and is local
-      FEM_Elem &elem = meshPtr->elem[elemType]; // elem is local elements
-      int *nbrConn = elem.connFor(neighbors[1].localID);
-      int relNode1 = getRelNode(nodeIDs[0], nbrConn, 4);
-      int relNode2 = getRelNode(nodeIDs[1], nbrConn, 4);
-      int nbrEdgeID = getEdgeID(relNode1, relNode2, 4, 3);
-      
-      int nbrNode1, nbrNode2;
-      adaptAdj nbrSplitElem;
-      (void) one_side_split_3D(neighbors[1], nbrSplitElem, startElem, 
-			       splitElem, startElem, splitElem, nbrEdgeID, 
-			       &nbrNode1, &nbrNode2, &newNodeID, false,
-			       &(n1coord[0]), lastElem, lastSplitElem);
-      
-      // now fix the adjacencies across the new edge to the two new elements
-      replaceAdaptAdj(meshID, splitElem, neighbors[1], nbrSplitElem);
-      replaceAdaptAdj(meshID, nbrSplitElem, startElem, splitElem);
-      BULK_DEBUG(printf("[%d] For nbrSplitElem %d set adjacency to %d across splitEdge\n",partitionID,nbrSplitElem.localID,splitElem.localID);)
-      BULK_DEBUG(printf("[%d] For splitElem %d set adjacency to %d across splitEdge\n",partitionID,splitElem.localID,nbrSplitElem.localID);)
-    }
-    else if (neighbors[1].partID == -1) { // startElem on domain boundary
-      // assert: splitElem's nbr on face[1] should already be domain boundary
-    }
-    else { // neighbors[1] exists and is remote
-    }
-  }
-  */
   // clean up elemPairs
-  numSlots = 0; 
-  numGathered = 0;
-  free(elemPairs);
+  freeTableID(tableID);
 
   // unlock the partitions
   localShadow->unlockRegion(lockRegionID);
   
   return 1;
 }
-
-adaptAdj BulkAdapt::remote_edge_bisect_3D(adaptAdj nbrElem, adaptAdj splitElem, int new_idxl, int n1_idxl, int n2_idxl, int remotePartID)
-{
-  // REWRITE ME FOR 3D
-  int node1idx, node2idx, newNodeID;
-  node1idx = get_node_from_idxl(n1_idxl, remotePartID);
-  node2idx = get_node_from_idxl(n2_idxl, remotePartID);
-  
-  FEM_Elem &elem = meshPtr->elem[nbrElem.elemType]; // elem is local elements
-  int *nbrConn = elem.connFor(nbrElem.localID);
-  int relNode1 = getRelNode(node1idx, nbrConn, 3);
-  int relNode2 = getRelNode(node2idx, nbrConn, 3);
-  int nbrEdgeID = getEdgeID(relNode1, relNode2, 3, 2);
-
-  FEM_DataAttribute *coord = meshPtr->node.getCoord(); // entire local coords
-  double *node1coords = (coord->getDouble()).getRow(node1idx); // ptrs to ACTUAL coords!
-  double *node2coords = (coord->getDouble()).getRow(node2idx); // ptrs to ACTUAL coords!
-  double bisectCoords[2];
-  midpoint(node1coords, node2coords, 2, &bisectCoords[0]);
-  newNodeID = add_node(2, &bisectCoords[0]);
-  int chunks[2] = {nbrElem.partID, remotePartID};
-  make_node_shared(newNodeID, 2, chunks);
-  int local_new_idxl = get_idxl_for_node(newNodeID, remotePartID);
-  if (new_idxl != local_new_idxl)
-    printf("ERROR: Partition %d added shared node at different idxl index %d than other copy at %d on partition %d!", 
-	   nbrElem.partID, local_new_idxl, new_idxl, remotePartID);
-
-  int nbrNode1, nbrNode2;
-  adaptAdj nbrSplitElem;
-  // split the local neighbor element, i.e. the second "side"
-  one_side_split_2D(nbrElem, nbrSplitElem, nbrEdgeID, &nbrNode1, &nbrNode2, &newNodeID, false);
-
-  adaptAdj *nbrSplitElemAdaptAdj = getAdaptAdj(meshPtr, nbrSplitElem.localID, nbrSplitElem.elemType, 0);
-  nbrSplitElemAdaptAdj[nbrEdgeID] = splitElem;
-  BULK_DEBUG(printf("[%d] For nbrSplitElem %d set adjacency to %d across splitEdge\n",partitionID,nbrSplitElem.localID,splitElem.localID);)
-  
-  return nbrSplitElem;
-}
-
 
 /// Perform an edge flip (2D)
 /** Locks mesh and any affected IDXL lists, performs operation,
@@ -566,166 +433,6 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem,
 }
 
 
-bool BulkAdapt::one_side_split_3D(adaptAdj &startElem, adaptAdj &splitElem, 
-				  adaptAdj &firstElem, 
-				  adaptAdj &firstSplitElem, adaptAdj &fromElem,
-				  adaptAdj &fromSplitElem, int edgeID, 
-				  int *node1idx, int *node2idx, int *newNodeID,
-				  bool startSide, double *n1coord, 
-				  adaptAdj &lastElem, adaptAdj &lastSplitElem)
-{
-  // get startElem.localID's conn.
-  FEM_Elem &elem = meshPtr->elem[startElem.elemType]; // elem is local elements
-  FEM_DataAttribute *coord = meshPtr->node.getCoord(); // entire local coords
-  int *startConn = elem.connFor(startElem.localID); // startConn points at startElem.localID's ACTUAL data!
-  // let edgeID have element-relative node indices relNode1, relNode2.
-  int relNode[4], nodeIDs[4];
-  getRelNodes(edgeID, 4, &(relNode[0]), &(relNode[1]));
-  *node1idx = nodeIDs[0] = startConn[relNode[0]];
-  *node2idx = nodeIDs[1] = startConn[relNode[1]];
-  // match up relNodes with the original startElem
-  if (startSide) { // this is the original startElem; save n1coords
-    double *n1co = (coord->getDouble()).getRow(*node1idx);
-    n1coord[0] = n1co[0];
-    n1coord[1] = n1co[1];
-    n1coord[2] = n1co[2];
-  }
-  else { // this is not the original startElem; line up nodes with n1coords
-    double *nco = (coord->getDouble()).getRow(*node1idx);
-    if (coordCompare(nco, n1coord, 3) != 0) { // swap relnodes
-      int tmp = relNode[0];
-      relNode[0] = relNode[1];
-      relNode[1] = tmp;
-      *node1idx = nodeIDs[0] = startConn[relNode[0]];
-      *node2idx = nodeIDs[1] = startConn[relNode[1]];
-    }
-  }
-  fillNodes(&(relNode[0]), &(nodeIDs[0]), startConn);
-  int face[4]; // face[0] and [1] are split; others are not
-  face[0] = 3 - (relNode[0] + relNode[1] + relNode[2]);
-  face[1] = 3 - (relNode[0] + relNode[1] + relNode[3]);
-  face[2] = 3 - (relNode[0] + relNode[3] + relNode[2]);
-  face[3] = 3 - (relNode[1] + relNode[3] + relNode[2]);
-  adaptAdj neighbors[4]; // startElem's neighbors
-  neighbors[0] = *getAdaptAdj(meshID, startElem.localID, startElem.elemType, face[0]);
-  neighbors[1] = *getAdaptAdj(meshID, startElem.localID, startElem.elemType, face[1]);
-  neighbors[2] = *getAdaptAdj(meshID, startElem.localID, startElem.elemType, face[2]);
-  neighbors[3] = *getAdaptAdj(meshID, startElem.localID, startElem.elemType, face[3]);
-
-  // get node1coords and node2Coords. find midpoint: bisectCoords
-  double *node1coords = (coord->getDouble()).getRow(*node1idx); // ptrs to ACTUAL coords!
-  double *node2coords = (coord->getDouble()).getRow(*node2idx); // ptrs to ACTUAL coords!
-  double bisectCoords[3];
-  midpoint(node1coords, node2coords, 3, &bisectCoords[0]);
-  // add node at bisectCoords to get bisectNode
-  int bisectNode;
-  if (startSide) { // For local ops, startSide creates the node, nbr uses it
-    bisectNode = add_node(3, &bisectCoords[0]);
-    *newNodeID = bisectNode;
-  }
-  else { // local nbr just uses node created on startSide
-    // if neighbor is remote, the newNodeID is set in remote_edge_bisect_3D before calling this function
-    bisectNode = *newNodeID;
-  }
-
-  // Now create a new element
-  // duplicate conn in conn2.  
-  int splitConn[4];
-  memcpy(&splitConn[0], startConn, 4*sizeof(int));
-  // in startConn, replace node2idx with bisectNode
-  startConn[relNode[1]] = bisectNode; // ACTUAL data was changed!
-  BULK_DEBUG(printf("[%d] conn[%d] of elem %d changed to node %d\n",partitionID,relNode[1],startElem.localID,bisectNode);)
-  // in splitConn, replace node1idx with bisectNode
-  splitConn[relNode[0]] = bisectNode;
-  // add element split with splitConn
-  int splitElemID = add_element(startElem.elemType, 4, &splitConn[0]);
-  BULK_DEBUG(printf("[%d] new element %d with conn %d %d %d %d added \n", partitionID, splitElemID, splitConn[0], splitConn[1], splitConn[2], splitConn[3]);)
-  // copy startElem.localID's adapt adj for all faces.
-  splitElem = adaptAdj(partitionID, splitElemID, startElem.elemType);
-  adaptAdj *startElemAdaptAdj = getAdaptAdj(meshPtr, startElem.localID, startElem.elemType, 0);
-  adaptAdj *splitElemAdaptAdj = getAdaptAdj(meshPtr, splitElem.localID, splitElem.elemType, 0);
-  memcpy(splitElemAdaptAdj, startElemAdaptAdj, 4*sizeof(adaptAdj));
-  replaceAdaptAdj(meshPtr, splitElem, fromElem, fromSplitElem);
-  // startElem's non-split are neighbors[2] and [3]
-  // update startElem's new nbr from neighbors[3] to splitElem
-  replaceAdaptAdj(meshPtr, startElem, neighbors[3], splitElem);
-  // update splitElem's neighbor from neighbors[2] to startElem
-  replaceAdaptAdj(meshPtr, splitElem, neighbors[2], startElem);
-  // update startElem's nbr's back-adjacency from startElem to splitElem
-  if (neighbors[3].partID == startElem.partID) {
-    replaceAdaptAdj(meshPtr, neighbors[3], startElem, splitElem);
-  }
-  else if (neighbors[3].partID != -1) { // startElem's nbr exists and is remote
-    shadowProxy[neighbors[3].partID].remote_adaptAdj_replace(neighbors[3], startElem, splitElem); 
-  }
-  // interpolate nodal data, copy startElem data to splitElem
-  CkPrintf("WARNING: Data transfer not yet implemented.\n");
-  
-  // continue splitting elements around edge
-  bool completed;
-  if (neighbors[0] == fromElem) {
-    if (neighbors[1] == firstElem) {
-      completed = true;
-      lastElem = startElem;
-      lastSplitElem = splitElem;
-    }
-    else if (neighbors[1].partID == -1) {
-      completed = false;
-    }
-    else { // need to call this fn recursively
-      if (neighbors[1].partID == partitionID) { // next neighbor is local
-	FEM_Elem &elem = meshPtr->elem[neighbors[1].elemType];
-	int *nbrConn = elem.connFor(neighbors[1].localID);
-	int relNode1 = getRelNode(nodeIDs[0], nbrConn, 4);
-	int relNode2 = getRelNode(nodeIDs[1], nbrConn, 4);
-	int nbrEdgeID = getEdgeID(relNode1, relNode2, 4, 3);
-	adaptAdj nbrSplitElem;
-	int nbrNode1, nbrNode2;
-	completed = one_side_split_3D(neighbors[1], nbrSplitElem, firstElem, 
-				      firstSplitElem, startElem, splitElem, 
-				      nbrEdgeID, &nbrNode1, &nbrNode2, 
-				      newNodeID, false, &(n1coord[0]), 
-				      lastElem, lastSplitElem);
-	replaceAdaptAdj(meshPtr, splitElem, neighbors[1], nbrSplitElem);
-      }
-      else { // call remotely
-      }
-    }
-  }
-  else if (neighbors[1] == fromElem) {
-    if (neighbors[0] == firstElem) {
-      completed = true;
-      lastElem = startElem;
-      lastSplitElem = splitElem;
-    }
-    else if (neighbors[0].partID == -1) {
-      completed = false;
-    }
-    else { // need to call this fn recursively
-      if (neighbors[0].partID == partitionID) { // next neighbor is local
-	FEM_Elem &elem = meshPtr->elem[neighbors[0].elemType];
-	int *nbrConn = elem.connFor(neighbors[0].localID);
-	int relNode1 = getRelNode(nodeIDs[0], nbrConn, 4);
-	int relNode2 = getRelNode(nodeIDs[1], nbrConn, 4);
-	int nbrEdgeID = getEdgeID(relNode1, relNode2, 4, 3);
-	adaptAdj nbrSplitElem;
-	int nbrNode1, nbrNode2;
-	completed = one_side_split_3D(neighbors[0], nbrSplitElem, firstElem, 
-				      firstSplitElem, startElem, splitElem, 
-				      nbrEdgeID, &nbrNode1, &nbrNode2, 
-				      newNodeID, false, &(n1coord[0]), 
-				      lastElem, lastSplitElem);
-	replaceAdaptAdj(meshPtr, splitElem, neighbors[0], nbrSplitElem);
-      }
-      else { // call remotely
-      }
-    }
-  }
-  return completed;
-}
-
-
-
 
 /* COMMUNICATION HELPERS FOR BULK ADAPTIVITY OPERATIONS 
    ARE LOCATED IN ParFUM_SA. */
@@ -745,6 +452,73 @@ void BulkAdapt::remote_edgeAdj_add(adaptAdj adj, adaptAdj splitElem, double co1[
 {
   int edgeID = getEdgeIDfromCoords(adj, co1, co2, 4, 3);
   addToAdaptAdj(meshID, adj, edgeID, splitElem);
+}
+
+void BulkAdapt::handle_split_3D(int remotePartID, int pos, int tableID, 
+				adaptAdj elem, int n1_idxl, int n2_idxl)
+{
+  int n1 = get_node_from_idxl(n1_idxl, remotePartID), 
+    n2 = get_node_from_idxl(n2_idxl, remotePartID), 
+    n5;
+  
+  FEM_DataAttribute *coord = meshPtr->node.getCoord(); // all local coords
+  double *n0co = (coord->getDouble()).getRow(n1);
+  double *n1co = (coord->getDouble()).getRow(n2);
+  double nodeCoords[9];
+  nodeCoords[0] = n0co[0];
+  nodeCoords[1] = n0co[1];
+  nodeCoords[2] = n0co[2];
+  nodeCoords[3] = n1co[0];
+  nodeCoords[4] = n1co[1];
+  nodeCoords[5] = n1co[2];
+  midpoint(&(nodeCoords[0]), &(nodeCoords[3]), 3, &(nodeCoords[6]));
+  n5 = add_node(3, &(nodeCoords[6]));  
+
+  // Find the relative nodes on the edge to be bisected
+  int relNodes[4]; 
+  FEM_Elem &elems = meshPtr->elem[elem.elemType]; // elems is all local elements
+  int *conn = elems.connFor(elem.localID); // conn points at elemID's ACTUAL data!
+  fillNodes(relNodes, n1, n2, conn);
+  // find which edgeID is bisected
+  int edgeID = getEdgeID(relNodes[0], relNodes[1], 4, 3);
+
+  // find elements on edge to be bisected
+  int numElemsToLock = 0;
+  adaptAdj *elemsToLock;
+  get_elemsToLock(elem, &elemsToLock, edgeID, &numElemsToLock);
+
+  // find chunks that share the edge to be bisected
+  int *chunks = (int *)malloc(numElemsToLock*sizeof(int));
+  int numParts=0;
+  for (int i=0; i<numElemsToLock; i++) {
+    chunks[i] = -1;
+    int j;
+    for (j=0; j<numParts; j++) {
+      if (chunks[j] == elemsToLock[i].partID) {
+	break;
+      }
+    }
+    chunks[j] = elemsToLock[i].partID;
+    if (j==numParts) numParts++;
+  }
+
+  make_node_shared(n5, numParts, &chunks[0]);
+
+  adaptAdj *splitElem = local_split_3D(elem, n1, n2, n5);
+  shadowProxy[remotePartID].recv_split_3D(pos, tableID, elem, *splitElem);
+}
+
+void BulkAdapt::recv_split_3D(int pos, int tableID, adaptAdj elem,
+			      adaptAdj splitElem) 
+{
+  assert(elemPairs[tableID][2*pos] == elem);
+  elemPairs[tableID][2*pos+1] = splitElem;
+  numGathered[tableID]++;
+}
+
+bool BulkAdapt::all_splits_received(int tableID, int expectedSplits)
+{
+  return (expectedSplits == numGathered[tableID]);
 }
 
 /* LOCAL HELPERS FOR BULK ADAPTIVITY OPERATIONS */
@@ -920,7 +694,27 @@ int getEdgeID(int node1, int node2, int nodesPerElem, int dim) {
   default:
     CkAbort("This dimension not yet implemented");
   };
-  return 0;
+  return -1;
+}
+
+
+int getFaceID(int node1, int node2, int node3, int nodesPerElem)
+{
+  switch(nodesPerElem){
+  case 4:
+    {
+      static int faceFromNode[4][4][4]=
+	{-1,-1,-1,-1,  -1,-1, 0, 1,  -1, 0,-1, 2,  -1, 1, 2,-1, 
+	 -1,-1, 0, 1,  -1,-1,-1,-1,   0,-1,-1, 3,   1,-1, 3,-1, 
+	 -1, 0,-1, 2,   0,-1,-1, 3,  -1,-1,-1,-1,   2, 3,-1,-1,
+	 -1, 1, 2,-1,   1,-1, 3,-1,   2, 3,-1,-1,  -1,-1,-1,-1};
+      return faceFromNode[node1][node2][node3];
+    }
+    break;
+  default:
+    CkAbort("This shape is not yet implemented");
+  };
+  return -1;
 }
 
 void fillNodes(int *relNode, int *nodeIDs, int *conn)
@@ -933,6 +727,29 @@ void fillNodes(int *relNode, int *nodeIDs, int *conn)
   relNode[3] = 6 - relNode[0] - relNode[1] - relNode[2];
   nodeIDs[2] = conn[relNode[2]];
   nodeIDs[3] = conn[relNode[3]];
+}
+
+void fillNodes(int *relNode, int n1, int n2, int *conn)
+{ // Given real node IDs n1 and n2 representing, respectively, the
+  // unchanged and the changed ends of the edge to bisect, and given
+  // the conn of a tet with edge (n1, n2), fill out a set of relative
+  // node numberings that put n1 and n2 in the first two relNode
+  // positions, respectively, and the remaining nodes in the remaining
+  // positions. i.e.:
+  // conn[relNode[0]] = n1, conn[relNode[1] = n2, and the rest map to 
+  // either of the remaining nodes.
+  for (int i=0; i<4; i++) {
+    if (conn[i] == n1)
+      relNode[0] = i;
+    else if (conn[i] == n2)
+      relNode[1] = i;
+  }
+  if ((relNode[0] != 0) && (relNode[1] != 0))
+    relNode[2] = 0;
+  else if ((relNode[0] != 1) && (relNode[1] != 1))
+    relNode[2] = 1;
+  else relNode[2] = 2;
+  relNode[3] = 6 - relNode[0] - relNode[1] - relNode[2];
 }
 
 /** Perform all local mesh mods and updates for a local tet split */
@@ -968,25 +785,24 @@ adaptAdj *BulkAdapt::local_split_3D(adaptAdj elem, int n1, int n2, int n5)
 void BulkAdapt::update_local_face_adj(adaptAdj elem, adaptAdj splitElem, 
 				      int n1, int n2, int n5)
 {
-  // get face adapt adjacencies for elem and splitElem
-  adaptAdj *elemAdj = getAdaptAdj(meshPtr, elem.localID, elem.elemType, 0);
-  adaptAdj *splitElemAdj = getAdaptAdj(meshPtr, splitElem.localID, splitElem.elemType, 0);
-  // init splitElem's face adjacencies to elem's
-  memcpy(splitElemAdj, elemAdj, 4*sizeof(adaptAdj));
+  // init splitElem's face and edge adjacencies to elem's
+  getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elem.elemType, partitionID);
+  copyAdaptAdj(meshPtr, &elem, &splitElem);
+  getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elem.elemType, partitionID);
   // get n3 and n4 from conn
   FEM_Elem &elems = meshPtr->elem[elem.elemType];
   int *conn = elems.connFor(elem.localID); 
   int n3=-1, n4=-1;
   for (int i=0; i<4; i++) {
-    if ((conn[i] != n1) && (conn[i] != n2) && (conn[i] != n3))
-      n4 = conn[i]; 
-    else if ((conn[i] != n1) && (conn[i] != n2))
-      n3 = conn[i];
+    if ((conn[i] != n1) && (conn[i] != n5) && (n3 == -1))
+      n3 = conn[i]; 
+    else if ((conn[i] != n1) && (conn[i] != n5))
+      n4 = conn[i];
   }
   // derive relative nodes
   int relNode[4];
   relNode[0] = getRelNode(n1, conn, 4);
-  relNode[1] = getRelNode(n2, conn, 4);
+  relNode[1] = getRelNode(n5, conn, 4);
   relNode[2] = getRelNode(n3, conn, 4);
   relNode[3] = getRelNode(n4, conn, 4);
   int face[4]; // face[0] and [1] are split; others are not
@@ -1017,6 +833,7 @@ void BulkAdapt::update_local_face_adj(adaptAdj elem, adaptAdj splitElem,
 void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem, 
 				      int n1, int n2, int n5)
 {
+  copyEdgeAdaptAdj(meshPtr, &elem, &splitElem);
   // first, extract the modifiable data structures in question
   CkVec<adaptAdj> *elemEdgeAdj[6];
   CkVec<adaptAdj> *splitElemEdgeAdj[6];

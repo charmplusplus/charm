@@ -25,8 +25,10 @@ class BulkAdapt {
   ParFUMShadowArray *localShadow;
 
   /// Data structure to gather elem-split pairs
-  int numSlots, numGathered;
-  adaptAdj *elemPairs;
+  adaptAdj *elemPairs[100];
+  int freeTable[100];
+  int numGathered[100];
+  int firstFree;
  public:
   /// Construct array to be attached to the partitions of mesh mId
   BulkAdapt(int meshid, FEM_Mesh *mPtr, int partID, CProxy_ParFUMShadowArray sa_proxy);
@@ -42,6 +44,20 @@ class BulkAdapt {
   int getPartition() { return partitionID; }
   /// Return a pointer to the local mesh partition
   FEM_Mesh *getMeshPtr() { return meshPtr; }
+
+  int getTableID() { 
+    int x = firstFree; 
+    freeTable[x]=0; 
+    numGathered[x] = 0;
+    firstFree++;
+    while (!freeTable[firstFree]) firstFree++;
+    return x; 
+  }
+  void freeTableID(int x) { 
+    freeTable[x]=1; 
+    free(elemPairs[x]);
+    if (x<firstFree) firstFree = x;
+  }
 
   /* BULK MESH OPERATIONS: These are all called locally, but may invoke
      remote operations. */
@@ -94,14 +110,6 @@ class BulkAdapt {
 			 int *node1idx, int *node2idx, int *newNodeID,
 			 bool startSide);
 
-  /// Perform a single side of an edge_bisect operation
-  bool one_side_split_3D(adaptAdj &startElem, adaptAdj &splitElem, 
-			 adaptAdj &firstElem, adaptAdj &firstSplitElem, 
-			 adaptAdj &fromElem, adaptAdj &fromSplitElem,
-			 int edgeID, int *node1idx, int *node2idx, 
-			 int *newNodeID, bool startSide, double *n1coord,
-			 adaptAdj &lastElem, adaptAdj &lastSplitElem);
-
   /* COMMUNICATION HELPERS FOR BULK ADAPTIVITY OPERATIONS */
   adaptAdj remote_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, 
 				 int new_idxl, int n1_idxl, int n2_idxl, 
@@ -118,10 +126,11 @@ class BulkAdapt {
 				 int new_idxl, int n1_idxl, int n2_idxl, 
 				 int remotePartID);
 
-  void remote_one_side_split_3D() {};
-  void local_one_side_split_3D() {};
-  void recv_splits() {};
-  void recv_updates() {};
+  void handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj elem,
+		       int n1_idxl, int n2_idxl);
+  void recv_split_3D(int pos, int tableID, adaptAdj elem, adaptAdj splitElem);
+  bool all_splits_received(int tableID, int expectedSplits);
+    
 
   /* LOCAL HELPERS FOR BULK ADAPTIVITY OPERATIONS */
 	
@@ -152,11 +161,11 @@ class BulkAdapt {
   void get_elemsToLock(adaptAdj startElem, adaptAdj **elemsToLock, int edgeID, int *count);
 
   /** Perform all local mesh mods and updates for a local tet split */
-  adaptAdj *local_split_3D(adaptAdj elem, int n1, int n2, int n5);
+  adaptAdj *local_split_3D(const adaptAdj elem, int n1, int n2, int n5);
   /** Perform local face adjacency updates associated with a split */
-  void update_local_face_adj(adaptAdj elem, adaptAdj splitElem, int n1, int n2, int n5);
+  void update_local_face_adj(const adaptAdj elem, const adaptAdj splitElem, int n1, int n2, int n5);
   /** Perform local edge adjacency updates associated with a split */
-  void update_local_edge_adj(adaptAdj elem, adaptAdj splitElem, int n1, int n2, int n5);
+  void update_local_edge_adj(const adaptAdj elem, const adaptAdj splitElem, int n1, int n2, int n5);
   int getEdgeIDfromCoords(adaptAdj elem, double *node1, double *node2, 
 			  int nodePerElem, int dim);
   void updateStartElemAdj(adaptAdj elem, adaptAdj splitElem, adaptAdj nbr1, 
@@ -174,8 +183,10 @@ void midpoint(double *n1, double *n2, int dim, double *result);
 int getRelNode(int nodeIdx, int *conn, int nodesPerElem);
 void getRelNodes(int edgeID, int nodesPerElem, int *r1, int *r2);
 int getEdgeID(int node1, int node2, int nodePerElem, int dim);
+int getFaceID(int node1, int node2, int node3, int nodesPerElem);
 
 /** Fill out the nodes and relative numberings for a tet */
 void fillNodes(int *relNode, int *nodeIDs, int *conn);
+void fillNodes(int *relNode, int n1, int n2, int *conn);
 
 #endif
