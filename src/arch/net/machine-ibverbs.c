@@ -1128,6 +1128,7 @@ static void pollCmiDirectQ();
 static inline  void CommunicationServer_nolock(int toBuffer) {
 	int processed;
 	if(_Cmi_numnodes <= 1){
+		pollCmiDirectQ();
 		return;
 	}
 	MACHSTATE(2,"CommServer_nolock{");
