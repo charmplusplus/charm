@@ -276,6 +276,30 @@ adaptAdj* getFaceAdaptAdj(
         const int elemType, 
         const int* const vertexList);
 
+// Adjacency manipulation functions
+void clearEdgeAdjacency(
+		const FEM_Mesh* const meshPtr,
+		const int localID,
+		const int elemType,
+		const int edgeID);
+void clearEdgeAdjacency(
+		const int meshID,
+		const int localID,
+		const int elemType,
+		const int edgeID);
+void addEdgeAdjacency(
+		const FEM_Mesh* const meshPtr,
+		const int localID,
+		const int elemType,
+		const int edgeID,
+		const adaptAdj adj);
+void addEdgeAdjacency(
+		const int meshID,
+		const int localID,
+		const int elemType,
+		const int edgeID,
+		const adaptAdj adj);
+
 /** Look up elemID in elemType array and determine the set of vertices
     associated with the edge or face represented by edgeFaceID. */
 void GetVertices(int meshid, adaptAdj elem, int edgeFaceID, int *vertexList);

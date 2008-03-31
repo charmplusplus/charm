@@ -1012,6 +1012,49 @@ adaptAdj* getFaceAdaptAdj(
 }
 
 
+/** Remove all neighbors on the specified edge */
+void clearEdgeAdjacency(
+		const FEM_Mesh* const meshPtr,
+		const int localID,
+		const int elemType,
+		const int edgeID)
+{
+	getEdgeAdaptAdj(meshPtr, localID, elemType, edgeID)->removeAll();
+}
+
+void clearEdgeAdjacency(
+		const int meshID,
+		const int localID,
+		const int elemType,
+		const int edgeID)
+{
+    FEM_Mesh *mesh = FEM_chunk::get("lookupAdaptAdjacencies")->
+        lookup(meshID,"lookupAdaptAdjacencies");
+	clearEdgeAdjacency(mesh, localID, elemType, edgeID);
+}
+
+/** Add a new adjacency on the specified edge */
+void addEdgeAdjacency(
+		const FEM_Mesh* const meshPtr,
+		const int localID,
+		const int elemType,
+		const int edgeID,
+		const adaptAdj adj)
+{
+	getEdgeAdaptAdj(meshPtr, localID, elemType, edgeID)->push_back(adj);
+}
+
+void addEdgeAdjacency(
+		const int meshID,
+		const int localID,
+		const int elemType,
+		const int edgeID,
+		const adaptAdj adj)
+{
+    FEM_Mesh *mesh = FEM_chunk::get("lookupAdaptAdjacencies")->
+        lookup(meshID,"lookupAdaptAdjacencies");
+    addEdgeAdjacency(mesh, localID, elemType, edgeID, adj);
+}
 
 /** Look up elemID in elemType array and determine the edge or face ID
     specified by the set of vertices in vertexList. */
