@@ -402,7 +402,8 @@ void setMemoryTypeChare(void *ptr) { }
 void setMemoryTypeMessage(void *ptr) { }
 
 int get_memory_allocated_user_total() { return 0; }
-#ifndef CMK_OPTIMIZE
-void setMemoryChareID(void *ptr) { }
+#ifdef setMemoryChareID
+#undef setMemoryChareID
 #endif
+void setMemoryChareID(void *ptr) { }
 #endif
