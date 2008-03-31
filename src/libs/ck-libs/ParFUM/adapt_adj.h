@@ -206,6 +206,24 @@ typedef MSA1D<AdjReplyList, DefaultListEntry<AdjReplyList,true>, MSA_DEFAULT_ENT
 /** Create Adaptivity Adjacencies for elemType; dimension inferred. */
 void CreateAdaptAdjacencies(int meshid, int elemType);
 
+// raw FEM attribute array accessors
+adaptAdj* lookupAdaptAdjacencies(
+        const FEM_Mesh* const mesh,
+        const int elemType,
+        int* numAdjacencies);
+adaptAdj* lookupAdaptAdjacencies(
+        const int meshid,
+        const int elemType,
+        int* numAdjacencies);
+CkVec<adaptAdj>** lookupEdgeAdaptAdjacencies(
+        const FEM_Mesh* const mesh,
+        const int elemType,
+        int* numAdjacencies);
+CkVec<adaptAdj>** lookupEdgeAdaptAdjacencies(
+        const int meshID,
+        const int elemType,
+        int* numAdjacencies);
+
 // Access functions
 
 // 2D accessors

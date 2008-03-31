@@ -529,28 +529,6 @@ int FEM_add_element_local(FEM_Mesh *m, int *conn, int connSize, int elemType, bo
 	delete[] adjes;
   }
   
-  // if bulk adapt adjacencies are available, allocate them correctly
-  // we can't use FEM_Entity::lookup here, because it will allocate attributes that aren't found
-  CkVec<FEM_Attribute *>* attrs = m->elem[elemType].getAttrVec();
-  for (int i=0; i<attrs->size(); ++i) {
-	  if ((*attrs)[i]->getAttr() == FEM_ADAPT_FACE_ADJ) {
-		  int nAdj = (*attrs)[i]->getWidth()/sizeof(adaptAdj);
-		  adaptAdj* adj = getAdaptAdj(m, newEl, elemType, 0);
-		  for (int a = 0; a<nAdj; ++a) {
-			  adj[a].partID = TCHARM_Element();
-			  adj[a].localID = -1;
-			  adj[a].elemType = elemType;
-		  }
-	  } else if ((*attrs)[i]->getAttr() == FEM_ADAPT_EDGE_ADJ) {
-		  int nAdj = (*attrs)[i]->getWidth()/sizeof(CkVec<adaptAdj>**);
-		  CkVec<adaptAdj>* adj = getEdgeAdaptAdj(m, newEl, elemType, 0);
-		  CkVec<adaptAdj>** adjArray = &adj;
-		  for (int a=0; a<nAdj; ++a) {
-			 adjArray[a] = new CkVec<adaptAdj>;
-		  }
-	  }
-  }
-  
   return newEl;
 }
 
@@ -990,21 +968,6 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
   else {
     m->elem[etype].set_invalid(element,false);
     }*/
-  
-  // if bulk adaptivity edge adjacency vectors exist, they must be deleted
-  // look the attribute up manually, because calling lookup() will allocate it if it doesn't exist
-  CkVec<FEM_Attribute *>* attrs = m->elem[etype].getAttrVec();
-  for (int i=0; i<attrs->size(); ++i) {
-	  if ((*attrs)[i]->getAttr() == FEM_ADAPT_EDGE_ADJ) {
-		  int nAdj = (*attrs)[i]->getWidth()/sizeof(CkVec<adaptAdj>**);
-		  CkVec<adaptAdj>* adj = getEdgeAdaptAdj(m, element, etype, 0);
-		  CkVec<adaptAdj>** adjArray = &adj;
-		  for (int a=0; a<nAdj; ++a) {
-			  delete adjArray[a];
-		  }
-	  }
-  }
-  
   
   //cleanup
   delete[] adjelts;

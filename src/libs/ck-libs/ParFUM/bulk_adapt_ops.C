@@ -534,6 +534,23 @@ int BulkAdapt::add_element(int elemType,int nodesPerElem,int *conn){
   FEM_Elem &elem = meshPtr->elem[elemType];
   int newElem = elem.get_next_invalid();
   elem.connIs(newElem,conn);
+
+
+  int nAdj;
+  adaptAdj* adaptAdjacencies = lookupAdaptAdjacencies(
+        meshPtr, elemType, &nAdj);
+  for (int a = 0; a<nAdj; ++a) {
+      adaptAdjacencies[newElem*nAdj + a].partID = TCHARM_Element();
+      adaptAdjacencies[newElem*nAdj + a].localID = -1;
+      adaptAdjacencies[newElem*nAdj + a].elemType = elemType;
+  }
+
+  CkVec<adaptAdj>** adaptEdgeAdjacencies = 
+      lookupEdgeAdaptAdjacencies(meshPtr,elemType,&nAdj);
+  for (int a=0; a<nAdj; ++a) {
+      adaptEdgeAdjacencies[newElem*nAdj + a] = new CkVec<adaptAdj>;
+  }
+  
   return newElem;
 }
 
