@@ -300,21 +300,21 @@ void Compute::receiveC() {
 	  C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k] += tmpC[j*subBlockDimXy*blockDimZ + i*blockDimZ + k];
     }
   }
-    /*char name[30];
-    sprintf(name, "%s_%d_%d_%d", "C", thisIndex.x, thisIndex.y, thisIndex.z);
-    FILE *fp = fopen(name, "w");
-    for(int i=0; i<subBlockDimXy; i++) {
-      for(int k=0; k<blockDimZ; k++)
-	fprintf(fp, "%f ", C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k]);
-      fprintf(fp, "\n");
-    }
-    fclose(fp);
-    CkPrintf("%d_%d_%d\n", thisIndex.x, thisIndex.y, thisIndex.z);
-    for(int i=0; i<subBlockDimXy; i++) {
-      for(int k=0; k<blockDimZ; k++)
-	CkPrintf("%f ", C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k]);
-      CkPrintf("\n");
-    }*/
+  /*char name[30];
+  sprintf(name, "%s_%d_%d_%d", "C", thisIndex.x, thisIndex.y, thisIndex.z);
+  FILE *fp = fopen(name, "w");
+  for(int i=0; i<subBlockDimXy; i++) {
+    for(int k=0; k<blockDimZ; k++)
+      fprintf(fp, "%f ", C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k]);
+    fprintf(fp, "\n");
+  }
+  fclose(fp);
+  CkPrintf("%d_%d_%d\n", thisIndex.x, thisIndex.y, thisIndex.z);
+  for(int i=0; i<subBlockDimXy; i++) {
+    for(int k=0; k<blockDimZ; k++)
+      CkPrintf("%f ", C[indexY*subBlockDimXy*blockDimZ + i*blockDimZ + k]);
+    CkPrintf("\n");
+  }*/
   mainProxy.done();
 }
 
@@ -326,7 +326,7 @@ void Compute::doWork() {
 	  C[i*blockDimZ+k] += A[i*blockDimY+j] * B[j*blockDimZ+k];
 
 #if USE_CKDIRECT
-    receiveC();
+    callBackRcvdC((void *)this);
 #else
     receiveC(&C[(thisIndex.y)*subBlockDimXy*blockDimZ], subBlockDimXy*blockDimZ, 0);
 #endif
@@ -402,21 +402,21 @@ void Compute::recvHandle(infiDirectUserHandle shdl, int index, int arr) {
 void Compute::callBackRcvdA(void *arg) {
   Compute *obj = (Compute *)arg;
   obj->countA++;
-  if(obj->countA == num_chare_z);
+  if(obj->countA == num_chare_z-1)
     obj->thisProxy(obj->thisIndex.x, obj->thisIndex.y, obj->thisIndex.z).doWork();
 }
 
 void Compute::callBackRcvdB(void *arg) {
   Compute *obj = (Compute *)arg;
   obj->countB++;
-  if(obj->countB == num_chare_x);
+  if(obj->countB == num_chare_x-1)
     obj->thisProxy(obj->thisIndex.x, obj->thisIndex.y, obj->thisIndex.z).doWork();
 }
 
 void Compute::callBackRcvdC(void *arg) {
   Compute *obj = (Compute *)arg;
   obj->countC++;
-  if(obj->countC == num_chare_y);
+  if(obj->countC == num_chare_y)
     obj->thisProxy(obj->thisIndex.x, obj->thisIndex.y, obj->thisIndex.z).receiveC();
 }
 
