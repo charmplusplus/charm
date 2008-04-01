@@ -92,6 +92,11 @@ class adaptAdj{
                     localID==rhs.localID && 
                     elemType==rhs.elemType);
         }
+        inline bool operator!=(const adaptAdj &rhs) const{
+            return (partID!=rhs.partID ||
+                    localID!=rhs.localID || 
+                    elemType!=rhs.elemType);
+        }
         virtual void pup(PUP::er &p){
             p | partID;
             p | localID;

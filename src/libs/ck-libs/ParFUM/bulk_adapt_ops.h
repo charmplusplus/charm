@@ -130,6 +130,10 @@ class BulkAdapt {
 		       int n1_idxl, int n2_idxl);
   void recv_split_3D(int pos, int tableID, adaptAdj elem, adaptAdj splitElem);
   bool all_splits_received(int tableID, int expectedSplits);
+  void update_asterisk_3D(int remotePartID, int i, adaptAdj elem, 
+			  int numElemPairs, adaptAdj *elemPairs, 
+			  int n1_idxl, int n2_idxl, int n5_idxl);
+
     
 
   /* LOCAL HELPERS FOR BULK ADAPTIVITY OPERATIONS */
@@ -162,6 +166,10 @@ class BulkAdapt {
 
   /** Perform all local mesh mods and updates for a local tet split */
   adaptAdj *local_split_3D(const adaptAdj elem, int n1, int n2, int n5);
+
+  void local_update_asterisk_3D(int i, adaptAdj elem, int numElemPairs, 
+				adaptAdj *elemPairs, int n1, 
+				int n2, int n5);
   /** Perform local face adjacency updates associated with a split */
   void update_local_face_adj(const adaptAdj elem, const adaptAdj splitElem, int n1, int n2, int n5);
   /** Perform local edge adjacency updates associated with a split */

@@ -634,5 +634,14 @@ void ParFUMShadowArray::recv_splits(int tableID, int expectedSplits)
     CthYield();
 }
 
+void ParFUMShadowArray::update_asterisk_3D(int remotePartID, int i, 
+					   adaptAdj elem, int numElemPairs, 
+					   adaptAdj *elemPairs, int n1_idxl, 
+					   int n2_idxl, int n5_idxl)
+{
+  bulkAdapt->update_asterisk_3D(remotePartID, i, elem, numElemPairs, elemPairs,
+				n1_idxl, n2_idxl, n5_idxl);
+}
+
 
 #include "ParFUM_SA.def.h"

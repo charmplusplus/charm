@@ -158,6 +158,10 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
   void handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj elem, 
 		       int n1_idxl, int n2_idxl);
   void recv_splits(int tableID, int expectedSplits);
+
+  void update_asterisk_3D(int remotePartID, int i, adaptAdj elem, 
+			  int numElemPairs, adaptAdj *elemPairs, int n1_idxl, 
+			  int n2_idxl, int n5_idxl);
 };
 
 ///This is a message which packs all the chunk indices together
