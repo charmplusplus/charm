@@ -5,8 +5,8 @@
 
 CProxy_Main mainProxy;
 
-int dim;
-int blockDim;
+int dimx, dimy, dimz;
+int charesx, charesy, charesz;
 int num_iterations;
 
 class Main : public CBase_Main {
@@ -17,21 +17,23 @@ class Main : public CBase_Main {
   Main(CkArgMsg *msg){
     mainProxy = thisProxy;
 
-    dim = 100;
-    num_iterations = 100;
-
-    if(msg->argc == 4){
-      dim = atoi(msg->argv[1]);
-      blockDim = atoi(msg->argv[2]);
-      num_iterations = atoi(msg->argv[3]);
+    if(msg->argc == 8){
+      dimx = atoi(msg->argv[1]);
+      dimy = atoi(msg->argv[2]);
+      dimz = atoi(msg->argv[3]);
+      charesx = atoi(msg->argv[4]);
+      charesy = atoi(msg->argv[5]);
+      charesz = atoi(msg->argv[6]);
+      num_iterations = atoi(msg->argv[7]);
     }
+    else{
+      CkAbort("arguments: dimx dimy dimz charesx charesy charesz iter\n");
+    }
+    
     delete msg;
-    int charesPerDim = dim/blockDim;
     CProxy_StencilPoint array = 
-        CProxy_StencilPoint::ckNew(charesPerDim*charesPerDim*charesPerDim);
-        //CProxy_StencilPoint::ckNew(charesPerDim, charesPerDim, charesPerDim);
-    //CkPrintf("main: %d elt array, num_iterations: %d\n", charesPerDim, charesPerDim, charesPerDim, num_iterations);
-    CkPrintf("main: dim: %d blockDim: %d num_iterations: %d total chares: %d\n", dim, blockDim, num_iterations,charesPerDim*charesPerDim*charesPerDim);
+        CProxy_StencilPoint::ckNew(charesx*charesy*charesz);
+    CkPrintf("main: dim: %d,%d,%d charedim: %d,%d,%d num_iterations: %d\n", dimx, dimy, dimz, charesx, charesy, charesz, num_iterations);
     startSetup = CmiWallTimer();
 #ifdef USE_CKDIRECT
     array.setupChannels();
@@ -61,12 +63,15 @@ class StencilMsg : public CMessage_StencilMsg {
 };
 
 class StencilPoint : public CBase_StencilPoint{
+  // this chare's place in the array of chares
   int row, col, plane;
   int whichLocal;
 
-  int blockDimSq;
+  // this chare has a domain with dimensions 
+  int rows, cols, planes;
+  int payload[3];
+  
   int iterations;
-  int charesPerDim;
   
     /* Number of elements whose new values have been computed
      */
@@ -75,19 +80,25 @@ class StencilPoint : public CBase_StencilPoint{
   /* 0: left, 1: right, 2: top, 3: bottom*/
   infiDirectUserHandle shandles[2][NBRS];
   infiDirectUserHandle rhandles[NBRS];
+
 //#endif
+#ifdef ARR_CHECK
+  CkVec<float> sendBuf[2][NBRS];
+  CkVec<float> recvBuf[NBRS];
+  CkVec<float> localChunk[2];
+#else
+  /* send buffers */
+  float *sendBuf[2][NBRS]; /* rectangle */
   /* receive buffers */
-  float *recvBuf[NBRS]; /* square of side (blockDim) */
+  float *recvBuf[NBRS]; /* rectangle */
+  float *localChunk[2]; /* cuboid */
+#endif
 #ifdef USE_MESSAGES
   StencilMsg *recvMsgs[NBRS];
 #endif
-  /* send buffers */
-  float *sendBuf[2][NBRS]; /* -do- */
-  float *localChunk[2]; /* cube of side (blockDim-2) */
 
   int remainingBufs;
   int remainingChannels;
-  int payload;
   
   public:
   StencilPoint(CkMigrateMessage *){}
@@ -99,52 +110,86 @@ class StencilPoint : public CBase_StencilPoint{
     iterations = 0;
     eltsComp = 0;
     
+    plane = thisIndex/(charesx*charesy);
+    row = (thisIndex/charesx)%charesy;
+    col = thisIndex%charesx;
+    
+    rows = dimy/charesy;
+    cols = dimx/charesx;
+    planes = dimz/charesz;
 
-    charesPerDim = dim/blockDim;
-    payload = blockDim*blockDim*sizeof(float);
-    blockDimSq = blockDim*blockDim;
+    payload[0] = rows*planes; // x
+    payload[1] = cols*planes; // y
+    payload[2] = rows*cols;   // z
     
-    plane = thisIndex/(charesPerDim*charesPerDim);
-    row = (thisIndex/charesPerDim)%charesPerDim;
-    col = thisIndex%charesPerDim;
-    
+    if(thisIndex == 0){
+      CkPrintf("rows: %d cols: %d planes: %d\n", rows, cols, planes);
+    }
     // allocate memory
-    for(int i = 0; i < NBRS; i++){
-      sendBuf[0][i] = new float [blockDimSq];
-      sendBuf[1][i] = new float [blockDimSq];
-#ifndef USE_MESSAGES
-      recvBuf[i] = new float [blockDimSq];
+#ifdef ARR_CHECK
 #else
+    sendBuf[0][0] = new float [payload[0]];
+    sendBuf[1][0] = new float [payload[0]];
+    sendBuf[0][1] = new float [payload[0]];
+    sendBuf[1][1] = new float [payload[0]];
+
+    sendBuf[0][2] = new float [payload[1]];
+    sendBuf[1][2] = new float [payload[1]];
+    sendBuf[0][3] = new float [payload[1]];
+    sendBuf[1][3] = new float [payload[1]];
+
+    sendBuf[0][4] = new float [payload[2]];
+    sendBuf[1][4] = new float [payload[2]];
+    sendBuf[0][5] = new float [payload[2]];
+    sendBuf[1][5] = new float [payload[2]];
+#endif
+
+#ifndef USE_MESSAGES
+    recvBuf[0] = new float[payload[0]];
+    recvBuf[1] = new float[payload[0]];
+    recvBuf[2] = new float[payload[1]];
+    recvBuf[3] = new float[payload[1]];
+    recvBuf[4] = new float[payload[2]];
+    recvBuf[5] = new float[payload[2]];
+#else
+    for(int i = 0; i < NBRS; i++)
       recvBuf[i] = 0;
 #endif
-    }
     
-    localChunk[0] = new float[(blockDim-2)*(blockDim-2)*(blockDim-2)];
-    localChunk[1] = new float[(blockDim-2)*(blockDim-2)*(blockDim-2)];
+    localChunk[0] = new float[(rows-2)*(cols-2)*(planes-2)];
+    localChunk[1] = new float[(rows-2)*(cols-2)*(planes-2)];
     // initialize
-    if(plane == 0){// face 0 is held at 0
-      for(int i = 0; i < blockDimSq; i++)
+    if(plane == 0){// face is held at 0
+      for(int i = 0; i < rows*cols; i++)
         // first index says which version of the double buffer is to be used
         // second index, the face in question
         sendBuf[0][5][i] = 1.0;
     }
     else{
-      for(int i = 0; i < blockDimSq; i++)
+      for(int i = 0; i < rows*cols; i++)
         // first index says which version of the double buffer is to be used
         // second index, the face in question
         sendBuf[0][5][i] = 0.0;
     }
 
-    // rest of the domain
-    // first the faces other than face 0
-    for(int i = 0; i < NBRS; i++){
-      for(int j = 0; j < blockDimSq; j++){
-        sendBuf[0][i][j] = 0.0;
-      }
-    }
+    for(int i = 0; i < rows*cols; i++)
+      sendBuf[0][4][i] = 0.0;
+      
+    for(int i = 0; i < rows*planes; i++)
+      sendBuf[0][1][i] = 0.0;
+      
+    for(int i = 0; i < rows*planes; i++)
+      sendBuf[0][0][i] = 0.0;
+      
+    for(int i = 0; i < cols*planes; i++)
+      sendBuf[0][3][i] = 0.0;
+      
+    for(int i = 0; i < cols*planes; i++)
+      sendBuf[0][2][i] = 0.0;
+      
     
     // now the rest of the cube
-    for(int j = 0; j < (blockDim-2)*(blockDim-2)*(blockDim-2); j++){
+    for(int j = 0; j < (rows-2)*(cols-2)*(planes-2); j++){
       localChunk[0][j] = 0.0; 
     }
   }
@@ -162,7 +207,7 @@ class StencilPoint : public CBase_StencilPoint{
     delete [] localChunk[1];
   }
 
-#define lin(c,r,p) ((p)*charesPerDim*charesPerDim+(r)*charesPerDim+(c))
+#define lin(c,r,p) ((p)*charesx*charesy+(r)*charesx+(c))
 //#ifdef USE_CKDIRECT
   void setupChannels(){
     int node = CkMyNode();
@@ -177,12 +222,12 @@ class StencilPoint : public CBase_StencilPoint{
     */
 #endif
 
-    thisProxy(lin((col), (row+1)%charesPerDim, (plane))).notify(node,2,thisIndex);
-    thisProxy(lin((col), (row-1+charesPerDim)%charesPerDim, (plane))).notify(node,3,thisIndex);
-    thisProxy(lin((col+1)%charesPerDim, (row), (plane))).notify(node,0,thisIndex);
-    thisProxy(lin((col-1+charesPerDim)%charesPerDim, (row), (plane))).notify(node,1,thisIndex);
-    thisProxy(lin((col), (row), (plane+1)%charesPerDim)).notify(node,4,thisIndex);
-    thisProxy(lin((col), (row), (plane-1+charesPerDim)%charesPerDim)).notify(node,5,thisIndex);
+    thisProxy[lin((col+1)%charesx, (row), (plane))].notify(node,0,thisIndex);
+    thisProxy[lin((col-1+charesx)%charesx, (row), (plane))].notify(node,1,thisIndex);
+    thisProxy[lin((col), (row+1)%charesy, (plane))].notify(node,2,thisIndex);
+    thisProxy[lin((col), (row-1+charesy)%charesy, (plane))].notify(node,3,thisIndex);
+    thisProxy[lin((col), (row), (plane+1)%charesz)].notify(node,4,thisIndex);
+    thisProxy[lin((col), (row), (plane-1+charesz)%charesz)].notify(node,5,thisIndex);
   }
 
   void notify(int node, int which, CkIndex1D whoSent){
@@ -190,8 +235,8 @@ class StencilPoint : public CBase_StencilPoint{
 #ifdef STENCIL2D_VERBOSE
     CkPrintf("(%d,%d,%d): (%d) is %d to me\n", row, col, plane, whoSent, which);
 #endif
-    rhandles[which] = CkDirect_createHandle(node, recvBuf[which], payload, StencilPoint::callbackWrapper, (void *)this, OOB);
-    thisProxy(whoSent).recvHandle(rhandles[which], which);
+    rhandles[which] = CkDirect_createHandle(node, recvBuf[which], payload[which/2]*sizeof(float), StencilPoint::callbackWrapper, (void *)this, OOB);
+    thisProxy[whoSent].recvHandle(rhandles[which], which);
   }
 
   void recvHandle(infiDirectUserHandle handle, int which){
@@ -200,8 +245,8 @@ class StencilPoint : public CBase_StencilPoint{
     shandles[0][which] = handle;
     shandles[1][which] = handle;
     
-    CkDirect_assocLocalBuffer(&shandles[0][which], sendBuf[0][which], payload);
-    CkDirect_assocLocalBuffer(&shandles[1][which], sendBuf[1][which], payload);
+    CkDirect_assocLocalBuffer(&shandles[0][which], sendBuf[0][which], payload[which/2]*sizeof(float));
+    CkDirect_assocLocalBuffer(&shandles[1][which], sendBuf[1][which], payload[which/2]*sizeof(float));
     remainingChannels--;
     if(remainingChannels == 0){
       // start 
@@ -222,7 +267,7 @@ class StencilPoint : public CBase_StencilPoint{
       //CkPrintf("(%d,%d,%d): recvd all buffers, start compute(%d)\n", x,y,z, iterations);
 #endif
       remainingBufs = NBRS;
-      thisProxy(thisIndex).compute();
+      thisProxy[thisIndex].compute();
     }
   }
   
@@ -268,11 +313,13 @@ class StencilPoint : public CBase_StencilPoint{
   }
 //#endif // end ifdef USE_CKDIRECT
   
-  
-// to access localChunks interior (i.e. interior of interior) 
-#define small(r,c,p) (p)*(blockDim-2)*(blockDim-2)+(r)*(blockDim-2)+(c)
+
+// to access localChunk interior (i.e. interior of interior) 
+#define small(r,c,p) (p)*(rows-2)*(cols-2)+(r)*(cols-2)+(c)
 // to access sendBufs 
-#define face(r,c) (r)*blockDim+(c)
+#define facex(r,c) (r)*planes+(c)
+#define facey(r,c) (r)*planes+(c)
+#define facez(r,c) (r)*cols+(c)
 // indices into sendBufs, after inversion
 #define xp 1
 #define xn 0
@@ -294,9 +341,9 @@ class StencilPoint : public CBase_StencilPoint{
     int newLocal= 1-whichLocal;
     
     // interior of interior: uses only localChunk
-    for(int i = 1; i < blockDim-3; i++){
-      for(int j = 1; j < blockDim-3; j++){
-        for(int k = 1; k < blockDim-3; k++){
+    for(int k = 1; k < planes-3; k++){
+      for(int i = 1; i < rows-3; i++){
+        for(int j = 1; j < cols-3; j++){
           localChunk[newLocal][small(i,j,k)] = (
                               localChunk[whichLocal][small(i,j,k)]+
                               localChunk[whichLocal][small(i+1,j,k)]+
@@ -318,263 +365,263 @@ class StencilPoint : public CBase_StencilPoint{
                             localChunk[whichLocal][small(1,0,0)]+
                             localChunk[whichLocal][small(0,1,0)]+
                             localChunk[whichLocal][small(0,0,1)]+
-                            sendBuf[whichLocal][zp][face(1,1)]+
-                            sendBuf[whichLocal][xp][face(1,1)]+
-                            sendBuf[whichLocal][yp][face(1,1)]
+                            sendBuf[whichLocal][zp][facez(1,1)]+
+                            sendBuf[whichLocal][xp][facex(1,1)]+
+                            sendBuf[whichLocal][yp][facey(1,1)]
                             )/7;
 
     //1.
-    localChunk[newLocal][small(0,blockDim-3,0)] = (
-                            localChunk[whichLocal][small(0,blockDim-3,0)]+
-                            localChunk[whichLocal][small(0,blockDim-4,0)]+
-                            localChunk[whichLocal][small(1,blockDim-3,0)]+
-                            localChunk[whichLocal][small(0,blockDim-3,1)]+
-                            sendBuf[whichLocal][zp][face(1,blockDim-2)]+
-                            sendBuf[whichLocal][yp][face(blockDim-2,1)]+
-                            sendBuf[whichLocal][xn][face(1,1)]
+    localChunk[newLocal][small(0,cols-3,0)] = (
+                            localChunk[whichLocal][small(0,cols-3,0)]+
+                            localChunk[whichLocal][small(0,cols-4,0)]+
+                            localChunk[whichLocal][small(1,cols-3,0)]+
+                            localChunk[whichLocal][small(0,cols-3,1)]+
+                            sendBuf[whichLocal][zp][facez(1,cols-2)]+
+                            sendBuf[whichLocal][yp][facey(cols-2,1)]+
+                            sendBuf[whichLocal][xn][facex(1,1)]
                             )/7;
 
     //2.
-    localChunk[newLocal][small(blockDim-3,0,0)] = (
-                            localChunk[whichLocal][small(blockDim-3,0,0)]+
-                            localChunk[whichLocal][small(blockDim-4,0,0)]+
-                            localChunk[whichLocal][small(blockDim-3,1,0)]+
-                            localChunk[whichLocal][small(blockDim-3,0,1)]+
-                            sendBuf[whichLocal][zp][face(blockDim-2,1)]+
-                            sendBuf[whichLocal][yn][face(1,1)]+
-                            sendBuf[whichLocal][xp][face(blockDim-2,1)]
+    localChunk[newLocal][small(rows-3,0,0)] = (
+                            localChunk[whichLocal][small(rows-3,0,0)]+
+                            localChunk[whichLocal][small(rows-4,0,0)]+
+                            localChunk[whichLocal][small(rows-3,1,0)]+
+                            localChunk[whichLocal][small(rows-3,0,1)]+
+                            sendBuf[whichLocal][zp][facez(rows-2,1)]+
+                            sendBuf[whichLocal][yn][facey(1,1)]+
+                            sendBuf[whichLocal][xp][facex(rows-2,1)]
                             )/7;
 
     //3.
-    localChunk[newLocal][small(blockDim-3,blockDim-3,0)] = (
-                            localChunk[whichLocal][small(blockDim-3,blockDim-3,0)]+
-                            localChunk[whichLocal][small(blockDim-3,blockDim-4,0)]+
-                            localChunk[whichLocal][small(blockDim-4,blockDim-3,0)]+
-                            localChunk[whichLocal][small(blockDim-3,blockDim-3,1)]+
-                            sendBuf[whichLocal][zp][face(blockDim-2,blockDim-2)]+
-                            sendBuf[whichLocal][yn][face(blockDim-2,1)]+
-                            sendBuf[whichLocal][xn][face(blockDim-2,1)]
+    localChunk[newLocal][small(rows-3,cols-3,0)] = (
+                            localChunk[whichLocal][small(rows-3,cols-3,0)]+
+                            localChunk[whichLocal][small(rows-3,cols-4,0)]+
+                            localChunk[whichLocal][small(rows-4,cols-3,0)]+
+                            localChunk[whichLocal][small(rows-3,cols-3,1)]+
+                            sendBuf[whichLocal][zp][facez(rows-2,cols-2)]+
+                            sendBuf[whichLocal][yn][facey(cols-2,1)]+
+                            sendBuf[whichLocal][xn][facex(rows-2,1)]
                             )/7;
     
     //4.
-    localChunk[newLocal][small(0,0,blockDim-3)] = (
-                            localChunk[whichLocal][small(0,0,blockDim-3)]+
-                            localChunk[whichLocal][small(0,0,blockDim-4)]+
-                            localChunk[whichLocal][small(0,1,blockDim-3)]+
-                            localChunk[whichLocal][small(1,0,blockDim-3)]+
-                            sendBuf[whichLocal][zn][face(1,1)]+
-                            sendBuf[whichLocal][yp][face(1,blockDim-2)]+
-                            sendBuf[whichLocal][xp][face(1,blockDim-2)]
+    localChunk[newLocal][small(0,0,planes-3)] = (
+                            localChunk[whichLocal][small(0,0,planes-3)]+
+                            localChunk[whichLocal][small(0,0,planes-4)]+
+                            localChunk[whichLocal][small(0,1,planes-3)]+
+                            localChunk[whichLocal][small(1,0,planes-3)]+
+                            sendBuf[whichLocal][zn][facez(1,1)]+
+                            sendBuf[whichLocal][yp][facey(1,planes-2)]+
+                            sendBuf[whichLocal][xp][facex(1,planes-2)]
                             )/7;
 
     //5.
-    localChunk[newLocal][small(0,blockDim-3,blockDim-3)] = (
-                            localChunk[whichLocal][small(0,blockDim-3,blockDim-3)]+
-                            localChunk[whichLocal][small(0,blockDim-4,blockDim-3)]+
-                            localChunk[whichLocal][small(1,blockDim-3,blockDim-3)]+
-                            localChunk[whichLocal][small(0,blockDim-3,blockDim-4)]+
-                            sendBuf[whichLocal][zn][face(1,blockDim-2)]+
-                            sendBuf[whichLocal][yp][face(blockDim-2,blockDim-2)]+
-                            sendBuf[whichLocal][xn][face(1,blockDim-2)]
+    localChunk[newLocal][small(0,cols-3,planes-3)] = (
+                            localChunk[whichLocal][small(0,cols-3,planes-3)]+
+                            localChunk[whichLocal][small(0,cols-4,planes-3)]+
+                            localChunk[whichLocal][small(1,cols-3,planes-3)]+
+                            localChunk[whichLocal][small(0,cols-3,planes-4)]+
+                            sendBuf[whichLocal][zn][facez(1,cols-2)]+
+                            sendBuf[whichLocal][yp][facey(cols-2,planes-2)]+
+                            sendBuf[whichLocal][xn][facex(1,planes-2)]
                             )/7;
     
     //6.
-    localChunk[newLocal][small(blockDim-3,0,blockDim-3)] = (
-                            localChunk[whichLocal][small(blockDim-3,0,blockDim-3)]+
-                            localChunk[whichLocal][small(blockDim-4,0,blockDim-3)]+
-                            localChunk[whichLocal][small(blockDim-3,1,blockDim-3)]+
-                            localChunk[whichLocal][small(blockDim-3,0,blockDim-4)]+
-                            sendBuf[whichLocal][zn][face(blockDim-2,1)]+
-                            sendBuf[whichLocal][yn][face(1,blockDim-2)]+
-                            sendBuf[whichLocal][xp][face(blockDim-2,blockDim-2)]
+    localChunk[newLocal][small(rows-3,0,planes-3)] = (
+                            localChunk[whichLocal][small(rows-3,0,planes-3)]+
+                            localChunk[whichLocal][small(rows-4,0,planes-3)]+
+                            localChunk[whichLocal][small(rows-3,1,planes-3)]+
+                            localChunk[whichLocal][small(rows-3,0,planes-4)]+
+                            sendBuf[whichLocal][zn][facez(rows-2,1)]+
+                            sendBuf[whichLocal][yn][facey(1,planes-2)]+
+                            sendBuf[whichLocal][xp][facex(rows-2,planes-2)]
                             )/7;
 
     //7.
-    localChunk[newLocal][small(blockDim-3,blockDim-3,blockDim-3)] = (
-                            localChunk[whichLocal][small(blockDim-3,blockDim-3,blockDim-3)]+
-                            localChunk[whichLocal][small(blockDim-4,blockDim-3,blockDim-3)]+
-                            localChunk[whichLocal][small(blockDim-3,blockDim-4,blockDim-3)]+
-                            localChunk[whichLocal][small(blockDim-3,blockDim-3,blockDim-4)]+
-                            sendBuf[whichLocal][zn][face(blockDim-2,blockDim-2)]+
-                            sendBuf[whichLocal][yn][face(blockDim-2,blockDim-2)]+
-                            sendBuf[whichLocal][xn][face(blockDim-2,blockDim-2)]
+    localChunk[newLocal][small(rows-3,cols-3,planes-3)] = (
+                            localChunk[whichLocal][small(rows-3,cols-3,planes-3)]+
+                            localChunk[whichLocal][small(rows-4,cols-3,planes-3)]+
+                            localChunk[whichLocal][small(rows-3,cols-4,planes-3)]+
+                            localChunk[whichLocal][small(rows-3,cols-3,planes-4)]+
+                            sendBuf[whichLocal][zn][facez(rows-2,cols-2)]+
+                            sendBuf[whichLocal][yn][facey(cols-2,planes-2)]+
+                            sendBuf[whichLocal][xn][facex(rows-2,planes-2)]
                             )/7;
 
    eltsComp += 8;
 
     // 12 edges
     //zp,yp
-    for(int i = 1; i < blockDim-3; i++){
+    for(int i = 1; i < cols-3; i++){
       localChunk[newLocal][small(0,i,0)] = (
                 localChunk[whichLocal][small(0,i,0)]+
                 localChunk[whichLocal][small(0,i-1,0)]+
                 localChunk[whichLocal][small(0,i+1,0)]+
                 localChunk[whichLocal][small(1,i,0)]+
                 localChunk[whichLocal][small(0,i,1)]+
-                sendBuf[whichLocal][yp][face(i+1,1)]+
-                sendBuf[whichLocal][zp][face(1,i+1)]
+                sendBuf[whichLocal][yp][facey(i+1,1)]+
+                sendBuf[whichLocal][zp][facez(1,i+1)]
           )/7;
        eltsComp++;
     }
 
     //xn,yp
-    for(int i = 1; i < blockDim-3; i++){
-      localChunk[newLocal][small(0,blockDim-3,i)] = (
-                localChunk[whichLocal][small(0,blockDim-3,i)]+
-                localChunk[whichLocal][small(0,blockDim-3,i-1)]+
-                localChunk[whichLocal][small(0,blockDim-3,i+1)]+
-                localChunk[whichLocal][small(1,blockDim-3,i)]+
-                localChunk[whichLocal][small(0,blockDim-4,i)]+
-                sendBuf[whichLocal][xn][face(1,i+1)]+
-                sendBuf[whichLocal][yp][face(blockDim-2,i+1)]
+    for(int i = 1; i < planes-3; i++){
+      localChunk[newLocal][small(0,cols-3,i)] = (
+                localChunk[whichLocal][small(0,cols-3,i)]+
+                localChunk[whichLocal][small(0,cols-3,i-1)]+
+                localChunk[whichLocal][small(0,cols-3,i+1)]+
+                localChunk[whichLocal][small(1,cols-3,i)]+
+                localChunk[whichLocal][small(0,cols-4,i)]+
+                sendBuf[whichLocal][xn][facex(1,i+1)]+
+                sendBuf[whichLocal][yp][facey(cols-2,i+1)]
           )/7;
        eltsComp++;
     }
 
     //zn,yp
-    for(int i = 1; i < blockDim-3; i++){
-      localChunk[newLocal][small(0,i,blockDim-3)] = (
-                localChunk[whichLocal][small(0,i,blockDim-3)]+
-                localChunk[whichLocal][small(0,i-1,blockDim-3)]+
-                localChunk[whichLocal][small(0,i+1,blockDim-3)]+
-                localChunk[whichLocal][small(0,i,blockDim-4)]+
-                localChunk[whichLocal][small(1,i,blockDim-3)]+
-                sendBuf[whichLocal][zn][face(1,i+1)]+
-                sendBuf[whichLocal][yp][face(i+1,blockDim-2)]
+    for(int i = 1; i < cols-3; i++){
+      localChunk[newLocal][small(0,i,planes-3)] = (
+                localChunk[whichLocal][small(0,i,planes-3)]+
+                localChunk[whichLocal][small(0,i-1,planes-3)]+
+                localChunk[whichLocal][small(0,i+1,planes-3)]+
+                localChunk[whichLocal][small(0,i,planes-4)]+
+                localChunk[whichLocal][small(1,i,planes-3)]+
+                sendBuf[whichLocal][zn][facez(1,i+1)]+
+                sendBuf[whichLocal][yp][facey(i+1,planes-2)]
           )/7;
        eltsComp++;
     }
 
     //yp,xp
-    for(int i = 1; i < blockDim-3; i++){
+    for(int i = 1; i < planes-3; i++){
       localChunk[newLocal][small(0,0,i)] = (
                 localChunk[whichLocal][small(0,0,i)]+
                 localChunk[whichLocal][small(0,0,i-1)]+
                 localChunk[whichLocal][small(0,0,i+1)]+
                 localChunk[whichLocal][small(0,1,i)]+
                 localChunk[whichLocal][small(1,0,i)]+
-                sendBuf[whichLocal][yp][face(1,i+1)]+
-                sendBuf[whichLocal][xp][face(1,i+1)]
+                sendBuf[whichLocal][yp][facey(1,i+1)]+
+                sendBuf[whichLocal][xp][facex(1,i+1)]
           )/7;
        eltsComp++;
     }
 
     //yn,zp
-    for(int i = 1; i < blockDim-3; i++){
-      localChunk[newLocal][small(blockDim-3,i,0)] = (
-                localChunk[whichLocal][small(blockDim-3,i,0)]+
-                localChunk[whichLocal][small(blockDim-3,i-1,0)]+
-                localChunk[whichLocal][small(blockDim-3,i+1,0)]+
-                localChunk[whichLocal][small(blockDim-4,i,0)]+
-                localChunk[whichLocal][small(blockDim-3,i,1)]+
-                sendBuf[whichLocal][yn][face(i+1,1)]+
-                sendBuf[whichLocal][zp][face(blockDim-2,i+1)]
+    for(int i = 1; i < cols-3; i++){
+      localChunk[newLocal][small(rows-3,i,0)] = (
+                localChunk[whichLocal][small(rows-3,i,0)]+
+                localChunk[whichLocal][small(rows-3,i-1,0)]+
+                localChunk[whichLocal][small(rows-3,i+1,0)]+
+                localChunk[whichLocal][small(rows-4,i,0)]+
+                localChunk[whichLocal][small(rows-3,i,1)]+
+                sendBuf[whichLocal][yn][facey(i+1,1)]+
+                sendBuf[whichLocal][zp][facez(rows-2,i+1)]
           )/7;
        eltsComp++;
     }
 
     //xn,yn
-    for(int i = 1; i < blockDim-3; i++){
-      localChunk[newLocal][small(blockDim-3,blockDim-3,i)] = (
-                localChunk[whichLocal][small(blockDim-3,blockDim-3,i)]+
-                localChunk[whichLocal][small(blockDim-3,blockDim-3,i-1)]+
-                localChunk[whichLocal][small(blockDim-3,blockDim-3,i+1)]+
-                localChunk[whichLocal][small(blockDim-4,blockDim-3,i)]+
-                localChunk[whichLocal][small(blockDim-3,blockDim-4,i)]+
-                sendBuf[whichLocal][xn][face(blockDim-2,i+1)]+
-                sendBuf[whichLocal][yn][face(blockDim-2,i+1)]
+    for(int i = 1; i < planes-3; i++){
+      localChunk[newLocal][small(rows-3,cols-3,i)] = (
+                localChunk[whichLocal][small(rows-3,cols-3,i)]+
+                localChunk[whichLocal][small(rows-3,cols-3,i-1)]+
+                localChunk[whichLocal][small(rows-3,cols-3,i+1)]+
+                localChunk[whichLocal][small(rows-4,cols-3,i)]+
+                localChunk[whichLocal][small(rows-3,cols-4,i)]+
+                sendBuf[whichLocal][xn][facex(rows-2,i+1)]+
+                sendBuf[whichLocal][yn][facey(cols-2,i+1)]
           )/7;
        eltsComp++;
     }
 
     //yn,zn
-    for(int i = 1; i < blockDim-3; i++){
-      localChunk[newLocal][small(blockDim-3,i,blockDim-3)] = (
-                localChunk[whichLocal][small(blockDim-3,i,blockDim-3)]+
-                localChunk[whichLocal][small(blockDim-3,i-1,blockDim-3)]+
-                localChunk[whichLocal][small(blockDim-3,i+1,blockDim-3)]+
-                localChunk[whichLocal][small(blockDim-4,i,blockDim-3)]+
-                localChunk[whichLocal][small(blockDim-3,i,blockDim-4)]+
-                sendBuf[whichLocal][yn][face(i+1,blockDim-2)]+
-                sendBuf[whichLocal][zn][face(blockDim-2,i+1)]
+    for(int i = 1; i < cols-3; i++){
+      localChunk[newLocal][small(rows-3,i,planes-3)] = (
+                localChunk[whichLocal][small(rows-3,i,planes-3)]+
+                localChunk[whichLocal][small(rows-3,i-1,planes-3)]+
+                localChunk[whichLocal][small(rows-3,i+1,planes-3)]+
+                localChunk[whichLocal][small(rows-4,i,planes-3)]+
+                localChunk[whichLocal][small(rows-3,i,planes-4)]+
+                sendBuf[whichLocal][yn][facey(i+1,planes-2)]+
+                sendBuf[whichLocal][zn][facez(rows-2,i+1)]
           )/7;
        eltsComp++;
     }
 
     //xp,yn
-    for(int i = 1; i < blockDim-3; i++){
-      localChunk[newLocal][small(blockDim-3,0,i)] = (
-                localChunk[whichLocal][small(blockDim-3,0,i)]+
-                localChunk[whichLocal][small(blockDim-3,0,i-1)]+
-                localChunk[whichLocal][small(blockDim-3,0,i+1)]+
-                localChunk[whichLocal][small(blockDim-3,1,i)]+
-                localChunk[whichLocal][small(blockDim-4,0,i)]+
-                sendBuf[whichLocal][xp][face(blockDim-2,i+1)]+
-                sendBuf[whichLocal][yn][face(1,i+1)]
+    for(int i = 1; i < planes-3; i++){
+      localChunk[newLocal][small(rows-3,0,i)] = (
+                localChunk[whichLocal][small(rows-3,0,i)]+
+                localChunk[whichLocal][small(rows-3,0,i-1)]+
+                localChunk[whichLocal][small(rows-3,0,i+1)]+
+                localChunk[whichLocal][small(rows-3,1,i)]+
+                localChunk[whichLocal][small(rows-4,0,i)]+
+                sendBuf[whichLocal][xp][facex(rows-2,i+1)]+
+                sendBuf[whichLocal][yn][facey(1,i+1)]
           )/7;
        eltsComp++;
     }
 
     //xp,zp
-    for(int i = 1; i < blockDim-3; i++){
+    for(int i = 1; i < rows-3; i++){
       localChunk[newLocal][small(i,0,0)] = (
                 localChunk[whichLocal][small(i,0,0)]+
                 localChunk[whichLocal][small(i-1,0,0)]+
                 localChunk[whichLocal][small(i+1,0,0)]+
                 localChunk[whichLocal][small(i,1,0)]+
                 localChunk[whichLocal][small(i,0,1)]+
-                sendBuf[whichLocal][xp][face(i+1,1)]+
-                sendBuf[whichLocal][zp][face(i+1,1)]
+                sendBuf[whichLocal][xp][facex(i+1,1)]+
+                sendBuf[whichLocal][zp][facez(i+1,1)]
           )/7;
        eltsComp++;
     }
 
     //xn,zp
-    for(int i = 1; i < blockDim-3; i++){
-      localChunk[newLocal][small(i,blockDim-3,0)] = (
-                localChunk[whichLocal][small(i,blockDim-3,0)]+
-                localChunk[whichLocal][small(i-1,blockDim-3,0)]+
-                localChunk[whichLocal][small(i+1,blockDim-3,0)]+
-                localChunk[whichLocal][small(i,blockDim-4,0)]+
-                localChunk[whichLocal][small(i,blockDim-3,1)]+
-                sendBuf[whichLocal][xn][face(i+1,1)]+
-                sendBuf[whichLocal][zp][face(i+1,blockDim-2)]
+    for(int i = 1; i < rows-3; i++){
+      localChunk[newLocal][small(i,cols-3,0)] = (
+                localChunk[whichLocal][small(i,cols-3,0)]+
+                localChunk[whichLocal][small(i-1,cols-3,0)]+
+                localChunk[whichLocal][small(i+1,cols-3,0)]+
+                localChunk[whichLocal][small(i,cols-4,0)]+
+                localChunk[whichLocal][small(i,cols-3,1)]+
+                sendBuf[whichLocal][xn][facex(i+1,1)]+
+                sendBuf[whichLocal][zp][facez(i+1,cols-2)]
           )/7;
        eltsComp++;
     }
 
     //xp,zn
-    for(int i = 1; i < blockDim-3; i++){
-      localChunk[newLocal][small(i,0,blockDim-3)] = (
-                localChunk[whichLocal][small(i,0,blockDim-3)]+
-                localChunk[whichLocal][small(i-1,0,blockDim-3)]+
-                localChunk[whichLocal][small(i+1,0,blockDim-3)]+
-                localChunk[whichLocal][small(i,1,blockDim-3)]+
-                localChunk[whichLocal][small(i,0,blockDim-4)]+
-                sendBuf[whichLocal][xp][face(i+1,blockDim-2)]+
-                sendBuf[whichLocal][zn][face(i+1,1)]
+    for(int i = 1; i < rows-3; i++){
+      localChunk[newLocal][small(i,0,planes-3)] = (
+                localChunk[whichLocal][small(i,0,planes-3)]+
+                localChunk[whichLocal][small(i-1,0,planes-3)]+
+                localChunk[whichLocal][small(i+1,0,planes-3)]+
+                localChunk[whichLocal][small(i,1,planes-3)]+
+                localChunk[whichLocal][small(i,0,planes-4)]+
+                sendBuf[whichLocal][xp][facex(i+1,planes-2)]+
+                sendBuf[whichLocal][zn][facez(i+1,1)]
           )/7;
        eltsComp++;
     }
 
     //xn,zn
-    for(int i = 1; i < blockDim-3; i++){
-      localChunk[newLocal][small(i,blockDim-3,blockDim-3)] = (
-                localChunk[whichLocal][small(i,blockDim-3,blockDim-3)]+
-                localChunk[whichLocal][small(i-1,blockDim-3,blockDim-3)]+
-                localChunk[whichLocal][small(i+1,blockDim-3,blockDim-3)]+
-                localChunk[whichLocal][small(i,blockDim-4,blockDim-3)]+
-                localChunk[whichLocal][small(i,blockDim-3,blockDim-4)]+
-                sendBuf[whichLocal][xn][face(i+1,blockDim-2)]+
-                sendBuf[whichLocal][zn][face(i+1,blockDim-2)]
+    for(int i = 1; i < rows-3; i++){
+      localChunk[newLocal][small(i,cols-3,planes-3)] = (
+                localChunk[whichLocal][small(i,cols-3,planes-3)]+
+                localChunk[whichLocal][small(i-1,cols-3,planes-3)]+
+                localChunk[whichLocal][small(i+1,cols-3,planes-3)]+
+                localChunk[whichLocal][small(i,cols-4,planes-3)]+
+                localChunk[whichLocal][small(i,cols-3,planes-4)]+
+                sendBuf[whichLocal][xn][facex(i+1,planes-2)]+
+                sendBuf[whichLocal][zn][facez(i+1,cols-2)]
           )/7;
        eltsComp++;
 
     }
 
     // 6 more faces - use 6 (including self) from localChunk and 1 from one of the sendBufs
-    for(int i = 1; i < blockDim-3; i++){
-      for(int j = 1; j < blockDim-3; j++){
+    for(int i = 1; i < rows-3; i++){
+      for(int j = 1; j < cols-3; j++){
         localChunk[newLocal][small(i,j,0)] = (
             localChunk[whichLocal][small(i,j,0)]+
             localChunk[whichLocal][small(i-1,j,0)]+
@@ -582,28 +629,28 @@ class StencilPoint : public CBase_StencilPoint{
             localChunk[whichLocal][small(i,j-1,0)]+
             localChunk[whichLocal][small(i,j+1,0)]+
             localChunk[whichLocal][small(i,j,1)]+
-            sendBuf[whichLocal][zp][face(i+1,j+1)]
+            sendBuf[whichLocal][zp][facez(i+1,j+1)]
         )/7;
        eltsComp++;
       }
     }
-    for(int i = 1; i < blockDim-3; i++){
-      for(int j = 1; j < blockDim-3; j++){
-        localChunk[newLocal][small(i,j,blockDim-3)] = (
-            localChunk[whichLocal][small(i,j,blockDim-3)]+
-            localChunk[whichLocal][small(i-1,j,blockDim-3)]+
-            localChunk[whichLocal][small(i+1,j,blockDim-3)]+
-            localChunk[whichLocal][small(i,j-1,blockDim-3)]+
-            localChunk[whichLocal][small(i,j+1,blockDim-3)]+
-            localChunk[whichLocal][small(i,j,blockDim-4)]+
-            sendBuf[whichLocal][zn][face(i+1,j+1)]
+    for(int i = 1; i < rows-3; i++){
+      for(int j = 1; j < cols-3; j++){
+        localChunk[newLocal][small(i,j,planes-3)] = (
+            localChunk[whichLocal][small(i,j,planes-3)]+
+            localChunk[whichLocal][small(i-1,j,planes-3)]+
+            localChunk[whichLocal][small(i+1,j,planes-3)]+
+            localChunk[whichLocal][small(i,j-1,planes-3)]+
+            localChunk[whichLocal][small(i,j+1,planes-3)]+
+            localChunk[whichLocal][small(i,j,planes-4)]+
+            sendBuf[whichLocal][zn][facez(i+1,j+1)]
         )/7;
        eltsComp++;
       }
     }
     
-    for(int i = 1; i < blockDim-3; i++){
-      for(int j = 1; j < blockDim-3; j++){
+    for(int j = 1; j < planes-3; j++){
+      for(int i = 1; i < rows-3; i++){
         localChunk[newLocal][small(i,0,j)] = (
             localChunk[whichLocal][small(i,0,j)]+
             localChunk[whichLocal][small(i-1,0,j)]+
@@ -611,50 +658,50 @@ class StencilPoint : public CBase_StencilPoint{
             localChunk[whichLocal][small(i,0,j-1)]+
             localChunk[whichLocal][small(i,0,j+1)]+
             localChunk[whichLocal][small(i,1,j)]+
-            sendBuf[whichLocal][xp][face(i+1,j+1)]
+            sendBuf[whichLocal][xp][facex(i+1,j+1)]
         )/7;
        eltsComp++;
       }
     }
-    for(int i = 1; i < blockDim-3; i++){
-      for(int j = 1; j < blockDim-3; j++){
-        localChunk[newLocal][small(i,blockDim-3,j)] = (
-            localChunk[whichLocal][small(i,blockDim-3,j)]+
-            localChunk[whichLocal][small(i-1,blockDim-3,j)]+
-            localChunk[whichLocal][small(i+1,blockDim-3,j)]+
-            localChunk[whichLocal][small(i,blockDim-3,j-1)]+
-            localChunk[whichLocal][small(i,blockDim-3,j+1)]+
-            localChunk[whichLocal][small(i,blockDim-4,j)]+
-            sendBuf[whichLocal][xn][face(i+1,j+1)]
+    for(int j = 1; j < planes-3; j++){
+      for(int i = 1; i < rows-3; i++){
+        localChunk[newLocal][small(i,cols-3,j)] = (
+            localChunk[whichLocal][small(i,cols-3,j)]+
+            localChunk[whichLocal][small(i-1,cols-3,j)]+
+            localChunk[whichLocal][small(i+1,cols-3,j)]+
+            localChunk[whichLocal][small(i,cols-3,j-1)]+
+            localChunk[whichLocal][small(i,cols-3,j+1)]+
+            localChunk[whichLocal][small(i,cols-4,j)]+
+            sendBuf[whichLocal][xn][facex(i+1,j+1)]
         )/7;
        eltsComp++;
       }
     }
     
-    for(int i = 1; i < blockDim-3; i++){
-      for(int j = 1; j < blockDim-3; j++){
-        localChunk[newLocal][small(0,j,i)] = (
-            localChunk[whichLocal][small(0,j,i)]+
-            localChunk[whichLocal][small(0,j-1,i)]+
-            localChunk[whichLocal][small(0,j+1,i)]+
-            localChunk[whichLocal][small(0,j,i-1)]+
-            localChunk[whichLocal][small(0,j,i+1)]+
-            localChunk[whichLocal][small(1,j,i)]+
-            sendBuf[whichLocal][yp][face(j+1,i+1)]
+    for(int j = 1; j < planes-3; j++){
+      for(int i = 1; i < cols-3; i++){
+        localChunk[newLocal][small(0,i,j)] = (
+            localChunk[whichLocal][small(0,i,j)]+
+            localChunk[whichLocal][small(0,i-1,j)]+
+            localChunk[whichLocal][small(0,i+1,j)]+
+            localChunk[whichLocal][small(0,i,j-1)]+
+            localChunk[whichLocal][small(0,i,j+1)]+
+            localChunk[whichLocal][small(1,i,j)]+
+            sendBuf[whichLocal][yp][facey(i+1,j+1)]
         )/7;
        eltsComp++;
       }
     }
-    for(int i = 1; i < blockDim-3; i++){
-      for(int j = 1; j < blockDim-3; j++){
-        localChunk[newLocal][small(blockDim-3,j,i)] = (
-            localChunk[whichLocal][small(blockDim-3,j,i)]+
-            localChunk[whichLocal][small(blockDim-3,j-1,i)]+
-            localChunk[whichLocal][small(blockDim-3,j+1,i)]+
-            localChunk[whichLocal][small(blockDim-3,j,i-1)]+
-            localChunk[whichLocal][small(blockDim-3,j,i+1)]+
-            localChunk[whichLocal][small(blockDim-4,j,i)]+
-            sendBuf[whichLocal][yn][face(j+1,i+1)]
+    for(int j = 1; j < planes-3; j++){
+      for(int i = 1; i < cols-3; i++){
+        localChunk[newLocal][small(rows-3,i,j)] = (
+            localChunk[whichLocal][small(rows-3,i,j)]+
+            localChunk[whichLocal][small(rows-3,i-1,j)]+
+            localChunk[whichLocal][small(rows-3,i+1,j)]+
+            localChunk[whichLocal][small(rows-3,i,j-1)]+
+            localChunk[whichLocal][small(rows-3,i,j+1)]+
+            localChunk[whichLocal][small(rows-4,i,j)]+
+            sendBuf[whichLocal][yn][facey(i+1,j+1)]
         )/7;
        eltsComp++;
       }
@@ -669,16 +716,24 @@ class StencilPoint : public CBase_StencilPoint{
 
     // 1. zp face
     // Interior points first
-    for(int i = 1; i < blockDim-1; i++){
-      for(int j = 1; j < blockDim-1; j++){
-        sendBuf[newLocal][zp][face(i,j)] = (
-                sendBuf[whichLocal][zp][face(i,j)]+
-                sendBuf[whichLocal][zp][face(i-1,j)]+
-                sendBuf[whichLocal][zp][face(i+1,j)]+
-                sendBuf[whichLocal][zp][face(i,j-1)]+
-                sendBuf[whichLocal][zp][face(i,j+1)]+
+    // enforce boundary conditions if plane = 0
+    if(plane == 0){
+      for(int i = 0; i < rows*cols; i++){
+        sendBuf[newLocal][zp][i] = 1.0;
+        eltsComp++;
+      }
+    }
+    else{
+    for(int i = 1; i < rows-1; i++){
+      for(int j = 1; j < cols-1; j++){
+        sendBuf[newLocal][zp][facez(i,j)] = (
+                sendBuf[whichLocal][zp][facez(i,j)]+
+                sendBuf[whichLocal][zp][facez(i-1,j)]+
+                sendBuf[whichLocal][zp][facez(i+1,j)]+
+                sendBuf[whichLocal][zp][facez(i,j-1)]+
+                sendBuf[whichLocal][zp][facez(i,j+1)]+
                 localChunk[whichLocal][small(i-1,j-1,0)]+
-                recvBuf[ZP][face(i,j)]
+                recvBuf[ZP][facez(i,j)]
         )/7;
        eltsComp++;
       }
@@ -686,111 +741,112 @@ class StencilPoint : public CBase_StencilPoint{
 
     // Corners next
     // Each element uses 3 ghosts, 3 from its own sendBuf (including itself)  and 1 from a different sendBuf
-    sendBuf[newLocal][zp][face(0,0)] = (
-          recvBuf[YP][face(0,0)]+
-          recvBuf[XP][face(0,0)]+
-          recvBuf[ZP][face(0,0)]+
-          sendBuf[whichLocal][zp][face(0,0)]+
-          sendBuf[whichLocal][zp][face(0,1)]+
-          sendBuf[whichLocal][zp][face(1,0)]+
-          sendBuf[whichLocal][xp][face(0,1)]
+    sendBuf[newLocal][zp][facez(0,0)] = (
+          recvBuf[YP][facey(0,0)]+
+          recvBuf[XP][facex(0,0)]+
+          recvBuf[ZP][facez(0,0)]+
+          sendBuf[whichLocal][zp][facez(0,0)]+
+          sendBuf[whichLocal][zp][facez(0,1)]+
+          sendBuf[whichLocal][zp][facez(1,0)]+
+          sendBuf[whichLocal][xp][facex(0,1)]
     )/7;
 
-    sendBuf[newLocal][zp][face(0,blockDim-1)] = (
-          recvBuf[YP][face(blockDim-1,0)]+
-          recvBuf[XN][face(0,0)]+
-          recvBuf[ZP][face(0,blockDim-1)]+
-          sendBuf[whichLocal][zp][face(0,blockDim-1)]+
-          sendBuf[whichLocal][zp][face(1,blockDim-1)]+
-          sendBuf[whichLocal][zp][face(0,blockDim-2)]+
-          sendBuf[whichLocal][xn][face(0,1)]
+    sendBuf[newLocal][zp][facez(0,cols-1)] = (
+          recvBuf[YP][facey(cols-1,0)]+
+          recvBuf[XN][facex(0,0)]+
+          recvBuf[ZP][facez(0,cols-1)]+
+          sendBuf[whichLocal][zp][facez(0,cols-1)]+
+          sendBuf[whichLocal][zp][facez(1,cols-1)]+
+          sendBuf[whichLocal][zp][facez(0,cols-2)]+
+          sendBuf[whichLocal][xn][facex(0,1)]
     )/7;
 
-    sendBuf[newLocal][zp][face(blockDim-1,0)] = (
-          recvBuf[ZP][face(blockDim-1,0)]+
-          recvBuf[XP][face(blockDim-1,0)]+
-          recvBuf[YN][face(0,0)]+
-          sendBuf[whichLocal][zp][face(blockDim-1,0)]+
-          sendBuf[whichLocal][zp][face(blockDim-2,0)]+
-          sendBuf[whichLocal][zp][face(blockDim-1,1)]+
-          sendBuf[whichLocal][xp][face(blockDim-1,1)]
+    sendBuf[newLocal][zp][facez(rows-1,0)] = (
+          recvBuf[ZP][facez(rows-1,0)]+
+          recvBuf[XP][facex(rows-1,0)]+
+          recvBuf[YN][facey(0,0)]+
+          sendBuf[whichLocal][zp][facez(rows-1,0)]+
+          sendBuf[whichLocal][zp][facez(rows-2,0)]+
+          sendBuf[whichLocal][zp][facez(rows-1,1)]+
+          sendBuf[whichLocal][xp][facex(rows-1,1)]
     )/7;
 
-    sendBuf[newLocal][zp][face(blockDim-1,blockDim-1)] = (
-          recvBuf[XN][face(blockDim-1,0)]+
-          recvBuf[YN][face(blockDim-1,0)]+
-          recvBuf[ZP][face(blockDim-1,blockDim-1)]+
-          sendBuf[whichLocal][zp][face(blockDim-1,blockDim-1)]+
-          sendBuf[whichLocal][zp][face(blockDim-2,blockDim-1)]+
-          sendBuf[whichLocal][zp][face(blockDim-1,blockDim-2)]+
-          sendBuf[whichLocal][xn][face(blockDim-1,1)]
+    sendBuf[newLocal][zp][facez(rows-1,cols-1)] = (
+          recvBuf[XN][facex(rows-1,0)]+
+          recvBuf[YN][facey(cols-1,0)]+
+          recvBuf[ZP][facez(rows-1,cols-1)]+
+          sendBuf[whichLocal][zp][facez(rows-1,cols-1)]+
+          sendBuf[whichLocal][zp][facez(rows-2,cols-1)]+
+          sendBuf[whichLocal][zp][facez(rows-1,cols-2)]+
+          sendBuf[whichLocal][xn][facex(rows-1,1)]
     )/7;
 
     eltsComp += 4;
     // Finally, the edges: 
     // Each element here uses 2 ghosts, 4 elts from its own sendBuf, 1 elt from a different sendBuf
     
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][zp][face(0,i)] = (
-          recvBuf[ZP][face(0,i)]+
-          recvBuf[YP][face(i,0)]+
-          sendBuf[whichLocal][zp][face(0,i)]+
-          sendBuf[whichLocal][zp][face(0,i-1)]+
-          sendBuf[whichLocal][zp][face(0,i+1)]+
-          sendBuf[whichLocal][zp][face(1,i)]+
-          sendBuf[whichLocal][yp][face(i,1)]
+    for(int i = 1; i < cols-1; i++){
+      sendBuf[newLocal][zp][facez(0,i)] = (
+          recvBuf[ZP][facez(0,i)]+
+          recvBuf[YP][facey(i,0)]+
+          sendBuf[whichLocal][zp][facez(0,i)]+
+          sendBuf[whichLocal][zp][facez(0,i-1)]+
+          sendBuf[whichLocal][zp][facez(0,i+1)]+
+          sendBuf[whichLocal][zp][facez(1,i)]+
+          sendBuf[whichLocal][yp][facey(i,1)]
       )/7; 
       eltsComp++;
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][zp][face(i,0)] = (
-          recvBuf[XP][face(i,0)]+
-          recvBuf[ZP][face(i,0)]+
-          sendBuf[whichLocal][zp][face(i,0)]+
-          sendBuf[whichLocal][zp][face(i-1,0)]+
-          sendBuf[whichLocal][zp][face(i+1,0)]+
-          sendBuf[whichLocal][zp][face(i,1)]+
-          sendBuf[whichLocal][xp][face(i,1)]
+    for(int i = 1; i < rows-1; i++){
+      sendBuf[newLocal][zp][facez(i,0)] = (
+          recvBuf[XP][facex(i,0)]+
+          recvBuf[ZP][facez(i,0)]+
+          sendBuf[whichLocal][zp][facez(i,0)]+
+          sendBuf[whichLocal][zp][facez(i-1,0)]+
+          sendBuf[whichLocal][zp][facez(i+1,0)]+
+          sendBuf[whichLocal][zp][facez(i,1)]+
+          sendBuf[whichLocal][xp][facex(i,1)]
       )/7;
       eltsComp++;
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][zp][face(blockDim-1,i)] = (
-          recvBuf[YN][face(i,0)]+
-          recvBuf[ZP][face(blockDim-1,i)]+
-          sendBuf[whichLocal][zp][face(blockDim-1,i)]+
-          sendBuf[whichLocal][zp][face(blockDim-1,i-1)]+
-          sendBuf[whichLocal][zp][face(blockDim-1,i+1)]+
-          sendBuf[whichLocal][zp][face(blockDim-2,i)]+
-          sendBuf[whichLocal][yn][face(i,1)]
+    for(int i = 1; i < cols-1; i++){
+      sendBuf[newLocal][zp][facez(rows-1,i)] = (
+          recvBuf[YN][facey(i,0)]+
+          recvBuf[ZP][facez(rows-1,i)]+
+          sendBuf[whichLocal][zp][facez(rows-1,i)]+
+          sendBuf[whichLocal][zp][facez(rows-1,i-1)]+
+          sendBuf[whichLocal][zp][facez(rows-1,i+1)]+
+          sendBuf[whichLocal][zp][facez(rows-2,i)]+
+          sendBuf[whichLocal][yn][facey(i,1)]
       )/7;
       eltsComp++;
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][zp][face(i,blockDim-1)] = (
-          recvBuf[XN][face(i,0)]+
-          recvBuf[ZP][face(i,blockDim-1)]+
-          sendBuf[whichLocal][zp][face(i,blockDim-1)]+
-          sendBuf[whichLocal][zp][face(i-1,blockDim-1)]+
-          sendBuf[whichLocal][zp][face(i+1,blockDim-1)]+
-          sendBuf[whichLocal][zp][face(i,blockDim-2)]+
-          sendBuf[whichLocal][xn][face(i,1)]
+    for(int i = 1; i < rows-1; i++){
+      sendBuf[newLocal][zp][facez(i,cols-1)] = (
+          recvBuf[XN][facex(i,0)]+
+          recvBuf[ZP][facez(i,cols-1)]+
+          sendBuf[whichLocal][zp][facez(i,cols-1)]+
+          sendBuf[whichLocal][zp][facez(i-1,cols-1)]+
+          sendBuf[whichLocal][zp][facez(i+1,cols-1)]+
+          sendBuf[whichLocal][zp][facez(i,cols-2)]+
+          sendBuf[whichLocal][xn][facex(i,1)]
       )/7;
       eltsComp++;
+    }
     }
     
     // 2. zn face
     // Interior points first
-    for(int i = 1; i < blockDim-1; i++){
-      for(int j = 1; j < blockDim-1; j++){
-        sendBuf[newLocal][zn][face(i,j)] = (
-                sendBuf[whichLocal][zn][face(i,j)]+
-                sendBuf[whichLocal][zn][face(i-1,j)]+
-                sendBuf[whichLocal][zn][face(i+1,j)]+
-                sendBuf[whichLocal][zn][face(i,j-1)]+
-                sendBuf[whichLocal][zn][face(i,j+1)]+
-                localChunk[whichLocal][small(i-1,j-1,blockDim-3)]+
-                recvBuf[ZN][face(i,j)]
+    for(int i = 1; i < rows-1; i++){
+      for(int j = 1; j < cols-1; j++){
+        sendBuf[newLocal][zn][facez(i,j)] = (
+                sendBuf[whichLocal][zn][facez(i,j)]+
+                sendBuf[whichLocal][zn][facez(i-1,j)]+
+                sendBuf[whichLocal][zn][facez(i+1,j)]+
+                sendBuf[whichLocal][zn][facez(i,j-1)]+
+                sendBuf[whichLocal][zn][facez(i,j+1)]+
+                localChunk[whichLocal][small(i-1,j-1,planes-3)]+
+                recvBuf[ZN][facez(i,j)]
         )/7;
       eltsComp++;
       }
@@ -798,226 +854,226 @@ class StencilPoint : public CBase_StencilPoint{
 
     // Corners next
     // Each element uses 3 ghosts, 3 from its own sendBuf (including itself)  and 1 from a different sendBuf
-    sendBuf[newLocal][zn][face(0,0)] = (
-          recvBuf[YP][face(0,blockDim-1)]+
-          recvBuf[XP][face(0,blockDim-1)]+
-          recvBuf[ZN][face(0,0)]+
-          sendBuf[whichLocal][zn][face(0,0)]+
-          sendBuf[whichLocal][zn][face(0,1)]+
-          sendBuf[whichLocal][zn][face(1,0)]+
-          sendBuf[whichLocal][xp][face(0,blockDim-2)]
+    sendBuf[newLocal][zn][facez(0,0)] = (
+          recvBuf[YP][facey(0,planes-1)]+
+          recvBuf[XP][facex(0,planes-1)]+
+          recvBuf[ZN][facez(0,0)]+
+          sendBuf[whichLocal][zn][facez(0,0)]+
+          sendBuf[whichLocal][zn][facez(0,1)]+
+          sendBuf[whichLocal][zn][facez(1,0)]+
+          sendBuf[whichLocal][xp][facex(0,planes-2)]
     )/7;
 
-    sendBuf[newLocal][zn][face(0,blockDim-1)] = (
-          recvBuf[YP][face(blockDim-1,blockDim-1)]+
-          recvBuf[XN][face(blockDim-1,0)]+
-          recvBuf[ZN][face(0,blockDim-1)]+
-          sendBuf[whichLocal][zn][face(0,blockDim-1)]+
-          sendBuf[whichLocal][zn][face(1,blockDim-1)]+
-          sendBuf[whichLocal][zn][face(0,blockDim-2)]+
-          sendBuf[whichLocal][xn][face(0,blockDim-2)]
+    sendBuf[newLocal][zn][facez(0,cols-1)] = (
+          recvBuf[YP][facey(cols-1,planes-1)]+
+          recvBuf[XN][facex(0,planes-1)]+
+          recvBuf[ZN][facez(0,cols-1)]+
+          sendBuf[whichLocal][zn][facez(0,cols-1)]+
+          sendBuf[whichLocal][zn][facez(1,cols-1)]+
+          sendBuf[whichLocal][zn][facez(0,cols-2)]+
+          sendBuf[whichLocal][xn][facex(0,cols-2)]
     )/7;
 
-    sendBuf[newLocal][zn][face(blockDim-1,0)] = (
-          recvBuf[ZN][face(blockDim-1,0)]+
-          recvBuf[XP][face(blockDim-1,blockDim-1)]+
-          recvBuf[YN][face(0,blockDim-1)]+
-          sendBuf[whichLocal][zn][face(blockDim-1,0)]+
-          sendBuf[whichLocal][zn][face(blockDim-2,0)]+
-          sendBuf[whichLocal][zn][face(blockDim-1,1)]+
-          sendBuf[whichLocal][xp][face(blockDim-1,blockDim-2)]
+    sendBuf[newLocal][zn][facez(rows-1,0)] = (
+          recvBuf[ZN][facez(rows-1,0)]+
+          recvBuf[XP][facex(rows-1,planes-1)]+
+          recvBuf[YN][facey(0,planes-1)]+
+          sendBuf[whichLocal][zn][facez(rows-1,0)]+
+          sendBuf[whichLocal][zn][facez(rows-2,0)]+
+          sendBuf[whichLocal][zn][facez(rows-1,1)]+
+          sendBuf[whichLocal][xp][facex(rows-1,planes-2)]
     )/7;
 
-    sendBuf[newLocal][zn][face(blockDim-1,blockDim-1)] = (
-          recvBuf[XN][face(blockDim-1,blockDim-1)]+
-          recvBuf[YN][face(blockDim-1,blockDim-1)]+
-          recvBuf[ZN][face(blockDim-1,blockDim-1)]+
-          sendBuf[whichLocal][zn][face(blockDim-1,blockDim-1)]+
-          sendBuf[whichLocal][zn][face(blockDim-2,blockDim-1)]+
-          sendBuf[whichLocal][zn][face(blockDim-1,blockDim-2)]+
-          sendBuf[whichLocal][xn][face(blockDim-1,blockDim-2)]
+    sendBuf[newLocal][zn][facez(rows-1,cols-1)] = (
+          recvBuf[XN][facex(rows-1,planes-1)]+
+          recvBuf[YN][facey(cols-1,planes-1)]+
+          recvBuf[ZN][facez(rows-1,cols-1)]+
+          sendBuf[whichLocal][zn][facez(rows-1,cols-1)]+
+          sendBuf[whichLocal][zn][facez(rows-2,cols-1)]+
+          sendBuf[whichLocal][zn][facez(rows-1,cols-2)]+
+          sendBuf[whichLocal][xn][facex(rows-1,planes-2)]
     )/7;
 
       eltsComp+=4;
     // Finally, the edges: 
     // Each element here uses 2 ghosts, 4 elts from its own sendBuf, 1 elt from a different sendBuf
     
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][zn][face(0,i)] = (
-          recvBuf[ZN][face(0,i)]+
-          recvBuf[YP][face(i,blockDim-1)]+
-          sendBuf[whichLocal][zn][face(0,i)]+
-          sendBuf[whichLocal][zn][face(0,i-1)]+
-          sendBuf[whichLocal][zn][face(0,i+1)]+
-          sendBuf[whichLocal][zn][face(1,i)]+
-          sendBuf[whichLocal][yp][face(i,blockDim-2)]
+    for(int i = 1; i < cols-1; i++){
+      sendBuf[newLocal][zn][facez(0,i)] = (
+          recvBuf[ZN][facez(0,i)]+
+          recvBuf[YP][facey(i,planes-1)]+
+          sendBuf[whichLocal][zn][facez(0,i)]+
+          sendBuf[whichLocal][zn][facez(0,i-1)]+
+          sendBuf[whichLocal][zn][facez(0,i+1)]+
+          sendBuf[whichLocal][zn][facez(1,i)]+
+          sendBuf[whichLocal][yp][facey(i,planes-2)]
       )/7;
       eltsComp++;
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][zn][face(i,0)] = (
-          recvBuf[XP][face(i,blockDim-1)]+
-          recvBuf[ZN][face(i,0)]+
-          sendBuf[whichLocal][zn][face(i,0)]+
-          sendBuf[whichLocal][zn][face(i-1,0)]+
-          sendBuf[whichLocal][zn][face(i+1,0)]+
-          sendBuf[whichLocal][zn][face(i,1)]+
-          sendBuf[whichLocal][xp][face(i,blockDim-2)]
+    for(int i = 1; i < rows-1; i++){
+      sendBuf[newLocal][zn][facez(i,0)] = (
+          recvBuf[XP][facex(i,planes-1)]+
+          recvBuf[ZN][facez(i,0)]+
+          sendBuf[whichLocal][zn][facez(i,0)]+
+          sendBuf[whichLocal][zn][facez(i-1,0)]+
+          sendBuf[whichLocal][zn][facez(i+1,0)]+
+          sendBuf[whichLocal][zn][facez(i,1)]+
+          sendBuf[whichLocal][xp][facex(i,planes-2)]
       )/7;
       eltsComp++;
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][zn][face(blockDim-1,i)] = (
-          recvBuf[YN][face(i,blockDim-1)]+
-          recvBuf[ZN][face(blockDim-1,i)]+
-          sendBuf[whichLocal][zn][face(blockDim-1,i)]+
-          sendBuf[whichLocal][zn][face(blockDim-1,i-1)]+
-          sendBuf[whichLocal][zn][face(blockDim-1,i+1)]+
-          sendBuf[whichLocal][zn][face(blockDim-2,i)]+
-          sendBuf[whichLocal][yn][face(i,blockDim-2)]
+    for(int i = 1; i < cols-1; i++){
+      sendBuf[newLocal][zn][facez(rows-1,i)] = (
+          recvBuf[YN][facey(i,planes-1)]+
+          recvBuf[ZN][facez(rows-1,i)]+
+          sendBuf[whichLocal][zn][facez(rows-1,i)]+
+          sendBuf[whichLocal][zn][facez(rows-1,i-1)]+
+          sendBuf[whichLocal][zn][facez(rows-1,i+1)]+
+          sendBuf[whichLocal][zn][facez(rows-2,i)]+
+          sendBuf[whichLocal][yn][facey(i,planes-2)]
       )/7;
       eltsComp++;
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][zn][face(i,blockDim-1)] = (
-          recvBuf[XN][face(i,blockDim-1)]+
-          recvBuf[ZN][face(i,blockDim-1)]+
-          sendBuf[whichLocal][zn][face(i,blockDim-1)]+
-          sendBuf[whichLocal][zn][face(i-1,blockDim-1)]+
-          sendBuf[whichLocal][zn][face(i+1,blockDim-1)]+
-          sendBuf[whichLocal][zn][face(i,blockDim-2)]+
-          sendBuf[whichLocal][xn][face(i,blockDim-2)]
+    for(int i = 1; i < rows-1; i++){
+      sendBuf[newLocal][zn][facez(i,cols-1)] = (
+          recvBuf[XN][facex(i,planes-1)]+
+          recvBuf[ZN][facez(i,cols-1)]+
+          sendBuf[whichLocal][zn][facez(i,cols-1)]+
+          sendBuf[whichLocal][zn][facez(i-1,cols-1)]+
+          sendBuf[whichLocal][zn][facez(i+1,cols-1)]+
+          sendBuf[whichLocal][zn][facez(i,cols-2)]+
+          sendBuf[whichLocal][xn][facex(i,planes-2)]
       )/7;
       eltsComp++;
     }
     
     // 3. xp face
     // Interior points first
-    for(int i = 1; i < blockDim-1; i++){
-      for(int j = 1; j < blockDim-1; j++){
-        sendBuf[newLocal][xp][face(i,j)] = (
-                sendBuf[whichLocal][xp][face(i,j)]+
-                sendBuf[whichLocal][xp][face(i-1,j)]+
-                sendBuf[whichLocal][xp][face(i+1,j)]+
-                sendBuf[whichLocal][xp][face(i,j-1)]+
-                sendBuf[whichLocal][xp][face(i,j+1)]+
+    for(int j = 1; j < planes-1; j++){
+      for(int i = 1; i < rows-1; i++){
+        sendBuf[newLocal][xp][facex(i,j)] = (
+                sendBuf[whichLocal][xp][facex(i,j)]+
+                sendBuf[whichLocal][xp][facex(i-1,j)]+
+                sendBuf[whichLocal][xp][facex(i+1,j)]+
+                sendBuf[whichLocal][xp][facex(i,j-1)]+
+                sendBuf[whichLocal][xp][facex(i,j+1)]+
                 localChunk[whichLocal][small(i-1,0,j-1)]+
-                recvBuf[XP][face(i,j)]
+                recvBuf[XP][facex(i,j)]
         )/7;
       eltsComp++;
       }
     }
 
     // Corners next
-    sendBuf[newLocal][xp][face(0,0)] = sendBuf[newLocal][zp][face(0,0)];
-    sendBuf[newLocal][xp][face(0,blockDim-1)] = sendBuf[newLocal][zn][face(0,0)];
-    sendBuf[newLocal][xp][face(blockDim-1,0)] = sendBuf[newLocal][zp][face(blockDim-1,0)];
-    sendBuf[newLocal][xp][face(blockDim-1,blockDim-1)] = sendBuf[newLocal][zn][face(blockDim-1,0)];
+    sendBuf[newLocal][xp][facex(0,0)] = sendBuf[newLocal][zp][facez(0,0)];
+    sendBuf[newLocal][xp][facex(0,planes-1)] = sendBuf[newLocal][zn][facez(0,0)];
+    sendBuf[newLocal][xp][facex(rows-1,0)] = sendBuf[newLocal][zp][facez(rows-1,0)];
+    sendBuf[newLocal][xp][facex(rows-1,planes-1)] = sendBuf[newLocal][zn][facez(rows-1,0)];
 
     // Finally, the edges: 
     // Each element here uses 2 ghosts, 4 elts from its own sendBuf, 1 elt from a different sendBuf
     
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][xp][face(0,i)] = (
-          recvBuf[XP][face(0,i)]+
-          recvBuf[YP][face(0,i)]+
-          sendBuf[whichLocal][xp][face(0,i)]+
-          sendBuf[whichLocal][xp][face(0,i-1)]+
-          sendBuf[whichLocal][xp][face(0,i+1)]+
-          sendBuf[whichLocal][xp][face(1,i)]+
-          sendBuf[whichLocal][yp][face(1,i)]
+    for(int i = 1; i < planes-1; i++){
+      sendBuf[newLocal][xp][facex(0,i)] = (
+          recvBuf[XP][facex(0,i)]+
+          recvBuf[YP][facey(0,i)]+
+          sendBuf[whichLocal][xp][facex(0,i)]+
+          sendBuf[whichLocal][xp][facex(0,i-1)]+
+          sendBuf[whichLocal][xp][facex(0,i+1)]+
+          sendBuf[whichLocal][xp][facex(1,i)]+
+          sendBuf[whichLocal][yp][facey(1,i)]
       )/7;
       eltsComp++;
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][xp][face(i,0)] = sendBuf[newLocal][zp][face(i,0)];
+    for(int i = 1; i < rows-1; i++){
+      sendBuf[newLocal][xp][facex(i,0)] = sendBuf[newLocal][zp][facez(i,0)];
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][xp][face(blockDim-1,i)] = (
-          recvBuf[YN][face(0,i)]+
-          recvBuf[XP][face(blockDim-1,i)]+
-          sendBuf[whichLocal][xp][face(blockDim-1,i)]+
-          sendBuf[whichLocal][xp][face(blockDim-1,i-1)]+
-          sendBuf[whichLocal][xp][face(blockDim-1,i+1)]+
-          sendBuf[whichLocal][xp][face(blockDim-2,i)]+
-          sendBuf[whichLocal][yn][face(1,i)]
+    for(int i = 1; i < planes-1; i++){
+      sendBuf[newLocal][xp][facex(rows-1,i)] = (
+          recvBuf[YN][facey(0,i)]+
+          recvBuf[XP][facex(rows-1,i)]+
+          sendBuf[whichLocal][xp][facex(rows-1,i)]+
+          sendBuf[whichLocal][xp][facex(rows-1,i-1)]+
+          sendBuf[whichLocal][xp][facex(rows-1,i+1)]+
+          sendBuf[whichLocal][xp][facex(rows-2,i)]+
+          sendBuf[whichLocal][yn][facey(1,i)]
       )/7;
       eltsComp++;
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][xp][face(i,blockDim-1)] = sendBuf[newLocal][zn][face(i,0)]; 
+    for(int i = 1; i < rows-1; i++){
+      sendBuf[newLocal][xp][facex(i,planes-1)] = sendBuf[newLocal][zn][facez(i,0)]; 
     }
    
     // 4. xn face
     // Interior points first
-    for(int i = 1; i < blockDim-1; i++){
-      for(int j = 1; j < blockDim-1; j++){
-        sendBuf[newLocal][xn][face(i,j)] = (
-                sendBuf[whichLocal][xn][face(i,j)]+
-                sendBuf[whichLocal][xn][face(i-1,j)]+
-                sendBuf[whichLocal][xn][face(i+1,j)]+
-                sendBuf[whichLocal][xn][face(i,j-1)]+
-                sendBuf[whichLocal][xn][face(i,j+1)]+
-                localChunk[whichLocal][small(i-1,blockDim-3,j-1)]+
-                recvBuf[XN][face(i,j)]
+    for(int j = 1; j < planes-1; j++){
+      for(int i = 1; i < rows-1; i++){
+        sendBuf[newLocal][xn][facex(i,j)] = (
+                sendBuf[whichLocal][xn][facex(i,j)]+
+                sendBuf[whichLocal][xn][facex(i-1,j)]+
+                sendBuf[whichLocal][xn][facex(i+1,j)]+
+                sendBuf[whichLocal][xn][facex(i,j-1)]+
+                sendBuf[whichLocal][xn][facex(i,j+1)]+
+                localChunk[whichLocal][small(i-1,cols-3,j-1)]+
+                recvBuf[XN][facex(i,j)]
         )/7;
       eltsComp++;
       }
     }
 
     // Corners next
-    sendBuf[newLocal][xn][face(0,0)] = sendBuf[newLocal][zp][face(0,blockDim-1)];
-    sendBuf[newLocal][xn][face(0,blockDim-1)] = sendBuf[newLocal][zn][face(0,blockDim-1)];
-    sendBuf[newLocal][xn][face(blockDim-1,0)] = sendBuf[newLocal][zp][face(blockDim-1,blockDim-1)];
-    sendBuf[newLocal][xn][face(blockDim-1,blockDim-1)] = sendBuf[newLocal][zn][face(blockDim-1,blockDim-1)];
+    sendBuf[newLocal][xn][facex(0,0)] = sendBuf[newLocal][zp][facez(0,cols-1)];
+    sendBuf[newLocal][xn][facex(0,planes-1)] = sendBuf[newLocal][zn][facez(0,cols-1)];
+    sendBuf[newLocal][xn][facex(rows-1,0)] = sendBuf[newLocal][zp][facez(rows-1,cols-1)];
+    sendBuf[newLocal][xn][facex(rows-1,planes-1)] = sendBuf[newLocal][zn][facez(rows-1,cols-1)];
     
     // Finally, the edges: 
     // Each element here uses 2 ghosts, 4 elts from its own sendBuf, 1 elt from a different sendBuf
     
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][xn][face(0,i)] = (
-          recvBuf[XN][face(0,i)]+
-          recvBuf[YP][face(blockDim-1,i)]+
-          sendBuf[whichLocal][xn][face(0,i)]+
-          sendBuf[whichLocal][xn][face(0,i-1)]+
-          sendBuf[whichLocal][xn][face(0,i+1)]+
-          sendBuf[whichLocal][xn][face(1,i)]+
-          sendBuf[whichLocal][yp][face(blockDim-2,i)]
+    for(int i = 1; i < planes-1; i++){
+      sendBuf[newLocal][xn][facex(0,i)] = (
+          recvBuf[XN][facex(0,i)]+
+          recvBuf[YP][facey(cols-1,i)]+
+          sendBuf[whichLocal][xn][facex(0,i)]+
+          sendBuf[whichLocal][xn][facex(0,i-1)]+
+          sendBuf[whichLocal][xn][facex(0,i+1)]+
+          sendBuf[whichLocal][xn][facex(1,i)]+
+          sendBuf[whichLocal][yp][facey(cols-2,i)]
       )/7;
       eltsComp++;
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][xn][face(i,0)] = sendBuf[newLocal][zp][face(i,blockDim-1)]; 
+    for(int i = 1; i < rows-1; i++){
+      sendBuf[newLocal][xn][facex(i,0)] = sendBuf[newLocal][zp][facez(i,cols-1)]; 
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][xn][face(blockDim-1,i)] = (
-          recvBuf[YN][face(blockDim-1,i)]+
-          recvBuf[XN][face(blockDim-1,i)]+
-          sendBuf[whichLocal][xn][face(blockDim-1,i)]+
-          sendBuf[whichLocal][xn][face(blockDim-1,i-1)]+
-          sendBuf[whichLocal][xn][face(blockDim-1,i+1)]+
-          sendBuf[whichLocal][xn][face(blockDim-2,i)]+
-          sendBuf[whichLocal][yn][face(blockDim-2,i)]
+    for(int i = 1; i < planes-1; i++){
+      sendBuf[newLocal][xn][facex(rows-1,i)] = (
+          recvBuf[YN][facey(cols-1,i)]+
+          recvBuf[XN][facex(rows-1,i)]+
+          sendBuf[whichLocal][xn][facex(rows-1,i)]+
+          sendBuf[whichLocal][xn][facex(rows-1,i-1)]+
+          sendBuf[whichLocal][xn][facex(rows-1,i+1)]+
+          sendBuf[whichLocal][xn][facex(rows-2,i)]+
+          sendBuf[whichLocal][yn][facey(cols-2,i)]
       )/7;
       eltsComp++;
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][xn][face(i,blockDim-1)] = sendBuf[newLocal][zn][face(i,blockDim-1)];
+    for(int i = 1; i < rows-1; i++){
+      sendBuf[newLocal][xn][facex(i,planes-1)] = sendBuf[newLocal][zn][facez(i,cols-1)];
     }
     
  
     // 5. yp face
     // Interior points first
-    for(int i = 1; i < blockDim-1; i++){
-      for(int j = 1; j < blockDim-1; j++){
-        sendBuf[newLocal][yp][face(i,j)] = (
-                sendBuf[whichLocal][yp][face(i,j)]+
-                sendBuf[whichLocal][yp][face(i-1,j)]+
-                sendBuf[whichLocal][yp][face(i+1,j)]+
-                sendBuf[whichLocal][yp][face(i,j-1)]+
-                sendBuf[whichLocal][yp][face(i,j+1)]+
+    for(int j = 1; j < planes-1; j++){
+      for(int i = 1; i < cols-1; i++){
+        sendBuf[newLocal][yp][facey(i,j)] = (
+                sendBuf[whichLocal][yp][facey(i,j)]+
+                sendBuf[whichLocal][yp][facey(i-1,j)]+
+                sendBuf[whichLocal][yp][facey(i+1,j)]+
+                sendBuf[whichLocal][yp][facey(i,j-1)]+
+                sendBuf[whichLocal][yp][facey(i,j+1)]+
                 localChunk[whichLocal][small(0,i-1,j-1)]+
-                recvBuf[YP][face(i,j)]
+                recvBuf[YP][facey(i,j)]
         )/7;
       eltsComp++;
       }
@@ -1025,39 +1081,39 @@ class StencilPoint : public CBase_StencilPoint{
 
     // Corners next
     // Each element uses 3 ghosts, 3 from its own sendBuf (including itself)  and 1 from a different sendBuf
-    sendBuf[newLocal][yp][face(0,0)] = sendBuf[newLocal][zp][face(0,0)];
-    sendBuf[newLocal][yp][face(0,blockDim-1)] = sendBuf[newLocal][zn][face(0,0)];
-    sendBuf[newLocal][yp][face(blockDim-1,0)] = sendBuf[newLocal][xn][face(0,0)];
-    sendBuf[newLocal][yp][face(blockDim-1,blockDim-1)] = sendBuf[newLocal][zn][face(0,blockDim-1)]; 
+    sendBuf[newLocal][yp][facey(0,0)] = sendBuf[newLocal][zp][facez(0,0)];
+    sendBuf[newLocal][yp][facey(0,planes-1)] = sendBuf[newLocal][zn][facez(0,0)];
+    sendBuf[newLocal][yp][facey(cols-1,0)] = sendBuf[newLocal][xn][facex(0,0)];
+    sendBuf[newLocal][yp][facey(cols-1,planes-1)] = sendBuf[newLocal][zn][facez(0,cols-1)]; 
     
     // Finally, the edges: 
     // Each element here uses 2 ghosts, 4 elts from its own sendBuf, 1 elt from a different sendBuf
     
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yp][face(0,i)] = sendBuf[newLocal][xp][face(0,i)]; 
+    for(int i = 1; i < planes-1; i++){
+      sendBuf[newLocal][yp][facey(0,i)] = sendBuf[newLocal][xp][facex(0,i)]; 
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yp][face(i,0)] = sendBuf[newLocal][zp][face(0,i)];
+    for(int i = 1; i < cols-1; i++){
+      sendBuf[newLocal][yp][facey(i,0)] = sendBuf[newLocal][zp][facez(0,i)];
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yp][face(blockDim-1,i)] = sendBuf[newLocal][xn][face(0,i)];
+    for(int i = 1; i < planes-1; i++){
+      sendBuf[newLocal][yp][facey(cols-1,i)] = sendBuf[newLocal][xn][facex(0,i)];
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yp][face(i,blockDim-1)] = sendBuf[newLocal][zn][face(0,i)];
+    for(int i = 1; i < cols-1; i++){
+      sendBuf[newLocal][yp][facey(i,planes-1)] = sendBuf[newLocal][zn][facez(0,i)];
     }
 
     // 6. yn face
     // Interior points first
-    for(int i = 1; i < blockDim-1; i++){
-      for(int j = 1; j < blockDim-1; j++){
-        sendBuf[newLocal][yn][face(i,j)] = (
-                sendBuf[whichLocal][yn][face(i,j)]+
-                sendBuf[whichLocal][yn][face(i-1,j)]+
-                sendBuf[whichLocal][yn][face(i+1,j)]+
-                sendBuf[whichLocal][yn][face(i,j-1)]+
-                sendBuf[whichLocal][yn][face(i,j+1)]+
-                localChunk[whichLocal][small(blockDim-1,i-1,j-1)]+
-                recvBuf[YN][face(i,j)]
+    for(int j = 1; j < planes-1; j++){
+      for(int i = 1; i < cols-1; i++){
+        sendBuf[newLocal][yn][facey(i,j)] = (
+                sendBuf[whichLocal][yn][facey(i,j)]+
+                sendBuf[whichLocal][yn][facey(i-1,j)]+
+                sendBuf[whichLocal][yn][facey(i+1,j)]+
+                sendBuf[whichLocal][yn][facey(i,j-1)]+
+                sendBuf[whichLocal][yn][facey(i,j+1)]+
+                localChunk[whichLocal][small(rows-1,i-1,j-1)]+
+                recvBuf[YN][facey(i,j)]
         )/7;
       eltsComp++;
       }
@@ -1065,34 +1121,30 @@ class StencilPoint : public CBase_StencilPoint{
 
     // Corners next
     // Each element uses 3 ghosts, 3 from its own sendBuf (including itself)  and 1 from a different sendBuf
-    sendBuf[newLocal][yp][face(0,0)] = sendBuf[newLocal][zp][face(blockDim-1,0)];
-    sendBuf[newLocal][yp][face(0,blockDim-1)] = sendBuf[newLocal][zn][face(blockDim-1,0)];
-    sendBuf[newLocal][yp][face(blockDim-1,0)] = sendBuf[newLocal][zp][face(blockDim-1,blockDim-1)];
-    sendBuf[newLocal][yp][face(blockDim-1,blockDim-1)] = sendBuf[newLocal][zn][face(blockDim-1,blockDim-1)]; 
+    sendBuf[newLocal][yn][facey(0,0)] = sendBuf[newLocal][zp][facez(rows-1,0)];
+    sendBuf[newLocal][yn][facey(0,planes-1)] = sendBuf[newLocal][zn][facez(rows-1,0)];
+    sendBuf[newLocal][yn][facey(cols-1,0)] = sendBuf[newLocal][zp][facez(rows-1,cols-1)];
+    sendBuf[newLocal][yn][facey(cols-1,planes-1)] = sendBuf[newLocal][zn][facez(rows-1,cols-1)]; 
     
     // Finally, the edges: 
     // Each element here uses 2 ghosts, 4 elts from its own sendBuf, 1 elt from a different sendBuf
     
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yn][face(0,i)] = sendBuf[newLocal][xp][face(blockDim-1,i)]; 
+    for(int i = 1; i < planes-1; i++){
+      sendBuf[newLocal][yn][facey(0,i)] = sendBuf[newLocal][xp][facex(rows-1,i)]; 
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yn][face(i,0)] = sendBuf[newLocal][zp][face(blockDim-1,i)];
+    for(int i = 1; i < cols-1; i++){
+      sendBuf[newLocal][yn][facey(i,0)] = sendBuf[newLocal][zp][facez(rows-1,i)];
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yn][face(blockDim-1,i)] = sendBuf[newLocal][xn][face(blockDim-1,i)];
+    for(int i = 1; i < planes-1; i++){
+      sendBuf[newLocal][yn][facey(cols-1,i)] = sendBuf[newLocal][xn][facex(rows-1,i)];
     }
-    for(int i = 1; i < blockDim-1; i++){
-      sendBuf[newLocal][yn][face(i,blockDim-1)] = sendBuf[newLocal][zn][face(blockDim-1,i)];
+    for(int i = 1; i < cols-1; i++){
+      sendBuf[newLocal][yn][facey(i,planes-1)] = sendBuf[newLocal][zn][facez(rows-1,i)];
     }
 
 
     
-    // enforce boundary conditions
-    if(plane == 0){
-      for(int i = 0; i < blockDimSq; i++)
-        sendBuf[newLocal][zp][i] = 1.0;
-    }
+    
     // exclude the time for setup and the first iteration
     iterations++;
     if(iterations == 1){
@@ -1137,11 +1189,11 @@ class StencilPoint : public CBase_StencilPoint{
   }
 
   inline void sendMsg(int col, int row, int plane, int which, float *buf){
-    StencilMsg *msg = new (blockDimSq) StencilMsg;
-    memcpy(msg->arr,buf,blockDimSq*sizeof(float));
+    StencilMsg *msg = new (payload[which/2]) StencilMsg;
+    memcpy(msg->arr,buf,payload[which/2]*sizeof(float));
     msg->which = which;
-    msg->size = blockDimSq;
-    thisProxy(lin(col,row,plane)).recvBufferMsg(msg);
+    msg->size = payload[which/2];
+    thisProxy[lin(col,row,plane)].recvBufferMsg(msg);
   }
 
   void sendData(){
@@ -1157,20 +1209,20 @@ class StencilPoint : public CBase_StencilPoint{
     }
 #else
 #ifdef USE_MESSAGES
-    sendMsg((col+1)%charesPerDim,row,plane,XP,sendBuf[whichLocal][xn]);
-    sendMsg((col-1+charesPerDim)%charesPerDim,row,plane,XN,sendBuf[whichLocal][xp]);
-    sendMsg(col,(row+1)%charesPerDim,plane,YP,sendBuf[whichLocal][yn]);
-    sendMsg(col,(row-1+charesPerDim)%charesPerDim,plane,YN,sendBuf[whichLocal][yp]);
-    sendMsg(col,row,(plane+1)%charesPerDim,ZP,sendBuf[whichLocal][zn]);
-    sendMsg(col,row,(plane-1+charesPerDim)%charesPerDim,ZN,sendBuf[whichLocal][zp]);
+    sendMsg((col+1)%charesx,row,plane,XP,sendBuf[whichLocal][xn]);
+    sendMsg((col-1+charesx)%charesx,row,plane,XN,sendBuf[whichLocal][xp]);
+    sendMsg(col,(row+1)%charesy,plane,YP,sendBuf[whichLocal][yn]);
+    sendMsg(col,(row-1+charesy)%charesy,plane,YN,sendBuf[whichLocal][yp]);
+    sendMsg(col,row,(plane+1)%charesz,ZP,sendBuf[whichLocal][zn]);
+    sendMsg(col,row,(plane-1+charesz)%charesz,ZN,sendBuf[whichLocal][zp]);
 #else
     // 2. send messages
-    thisProxy(lin((col+1)%charesPerDim,row,plane)).recvBuffer(sendBuf[whichLocal][xn],blockDimSq,XP);
-    thisProxy(lin((col-1+charesPerDim)%charesPerDim,row,plane)).recvBuffer(sendBuf[whichLocal][xp],blockDimSq,XN);
-    thisProxy(lin(col,(row+1)%charesPerDim,plane)).recvBuffer(sendBuf[whichLocal][yn],blockDimSq,YP);
-    thisProxy(lin(col,(row-1+charesPerDim)%charesPerDim,plane)).recvBuffer(sendBuf[whichLocal][yp],blockDimSq,YN);
-    thisProxy(lin(col,row,(plane+1)%charesPerDim)).recvBuffer(sendBuf[whichLocal][zn],blockDimSq,ZP);
-    thisProxy(lin(col,row,(plane-1+charesPerDim)%charesPerDim)).recvBuffer(sendBuf[whichLocal][zp],blockDimSq,ZN);
+    thisProxy[lin((col+1)%charesx,row,plane)].recvBuffer(sendBuf[whichLocal][xn],payload[0],XP);
+    thisProxy[lin((col-1+charesx)%charesx,row,plane)].recvBuffer(sendBuf[whichLocal][xp],payload[0],XN);
+    thisProxy[lin(col,(row+1)%charesy,plane)].recvBuffer(sendBuf[whichLocal][yn],payload[1],YP);
+    thisProxy[lin(col,(row-1+charesy)%charesy,plane)].recvBuffer(sendBuf[whichLocal][yp],payload[1],YN);
+    thisProxy[lin(col,row,(plane+1)%charesz)].recvBuffer(sendBuf[whichLocal][zn],payload[2],ZP);
+    thisProxy[lin(col,row,(plane-1+charesz)%charesz)].recvBuffer(sendBuf[whichLocal][zp],payload[2],ZN);
 #endif // end USE_MESSAGES
 #endif
   }

@@ -1,7 +1,11 @@
 mainmodule stencil3d{
   readonly CProxy_Main mainProxy;
-  readonly int dim;
-  readonly int blockDim;
+  readonly int dimx;
+  readonly int dimy;
+  readonly int dimz;
+  readonly int charesx;
+  readonly int charesy;
+  readonly int charesz;
   readonly int num_iterations;
 
   mainchare Main{
