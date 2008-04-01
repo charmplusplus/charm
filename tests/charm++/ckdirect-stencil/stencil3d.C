@@ -1,4 +1,9 @@
 #include "ckdirect.h" 
+
+#if defined ARR_CHECK && !defined CMK_PARANOID
+#define CMK_PARANOID
+#endif
+
 #include "stencil3d.decl.h"
 #define OOB 9999999999.0
 #define NBRS 6
@@ -83,8 +88,12 @@ class StencilPoint : public CBase_StencilPoint{
 
 //#endif
 #ifdef ARR_CHECK
-  CkVec<float> sendBuf[2][NBRS];
+#ifdef USE_MESSAGES
+  float *recvBuf[NBRS];
+#else
   CkVec<float> recvBuf[NBRS];
+#endif
+  CkVec<float> sendBuf[2][NBRS];
   CkVec<float> localChunk[2];
 #else
   /* send buffers */
@@ -127,6 +136,20 @@ class StencilPoint : public CBase_StencilPoint{
     }
     // allocate memory
 #ifdef ARR_CHECK
+    sendBuf[0][0].resize(payload[0]);
+    sendBuf[1][0].resize(payload[0]);
+    sendBuf[0][1].resize(payload[0]);
+    sendBuf[1][1].resize(payload[0]);
+
+    sendBuf[0][2].resize(payload[1]);
+    sendBuf[1][2].resize(payload[1]);
+    sendBuf[0][3].resize(payload[1]);
+    sendBuf[1][3].resize(payload[1]);
+    
+    sendBuf[0][4].resize(payload[2]);
+    sendBuf[1][4].resize(payload[2]);
+    sendBuf[0][5].resize(payload[2]);
+    sendBuf[1][5].resize(payload[2]);
 #else
     sendBuf[0][0] = new float [payload[0]];
     sendBuf[1][0] = new float [payload[0]];
@@ -145,19 +168,33 @@ class StencilPoint : public CBase_StencilPoint{
 #endif
 
 #ifndef USE_MESSAGES
+#ifdef ARR_CHECK
+    recvBuf[0].resize(payload[0]);
+    recvBuf[1].resize(payload[0]);
+    recvBuf[2].resize(payload[1]);
+    recvBuf[3].resize(payload[1]);
+    recvBuf[4].resize(payload[2]);
+    recvBuf[5].resize(payload[2]);
+#else
     recvBuf[0] = new float[payload[0]];
     recvBuf[1] = new float[payload[0]];
     recvBuf[2] = new float[payload[1]];
     recvBuf[3] = new float[payload[1]];
     recvBuf[4] = new float[payload[2]];
     recvBuf[5] = new float[payload[2]];
+#endif
 #else
     for(int i = 0; i < NBRS; i++)
       recvBuf[i] = 0;
 #endif
     
+#ifdef ARR_CHECK
+    localChunk[0].resize((rows-2)*(cols-2)*(planes-2));
+    localChunk[1].resize((rows-2)*(cols-2)*(planes-2));
+#else
     localChunk[0] = new float[(rows-2)*(cols-2)*(planes-2)];
     localChunk[1] = new float[(rows-2)*(cols-2)*(planes-2)];
+#endif
     // initialize
     if(plane == 0){// face is held at 0
       for(int i = 0; i < rows*cols; i++)
@@ -196,15 +233,29 @@ class StencilPoint : public CBase_StencilPoint{
   
   ~StencilPoint(){
     for(int i = 0; i < NBRS; i++){
+#ifdef ARR_CHECK
+      sendBuf[0][i].free();
+      sendBuf[1][i].free();
+#else
       delete [] sendBuf[0][i];
       delete [] sendBuf[1][i];
+#endif
 #ifndef USE_MESSAGES
+#ifdef ARR_CHECK
+      recvBuf[i].free();
+#else
       delete [] recvBuf[i];
+#endif
 #endif
     }
 
+#ifdef ARR_CHECK
+    localChunk[0].free();
+    localChunk[1].free();
+#else
     delete [] localChunk[0];
     delete [] localChunk[1];
+#endif
   }
 
 #define lin(c,r,p) ((p)*charesx*charesy+(r)*charesx+(c))
@@ -235,7 +286,11 @@ class StencilPoint : public CBase_StencilPoint{
 #ifdef STENCIL2D_VERBOSE
     CkPrintf("(%d,%d,%d): (%d) is %d to me\n", row, col, plane, whoSent, which);
 #endif
+#if defined ARR_CHECK && !defined USE_MESSAGES
+    rhandles[which] = CkDirect_createHandle(node, recvBuf[which].getVec(), payload[which/2]*sizeof(float), StencilPoint::callbackWrapper, (void *)this, OOB);
+#else
     rhandles[which] = CkDirect_createHandle(node, recvBuf[which], payload[which/2]*sizeof(float), StencilPoint::callbackWrapper, (void *)this, OOB);
+#endif
     thisProxy[whoSent].recvHandle(rhandles[which], which);
   }
 
@@ -245,8 +300,13 @@ class StencilPoint : public CBase_StencilPoint{
     shandles[0][which] = handle;
     shandles[1][which] = handle;
     
+#ifdef ARR_CHECK
+    CkDirect_assocLocalBuffer(&shandles[0][which], sendBuf[0][which].getVec(), payload[which/2]*sizeof(float));
+    CkDirect_assocLocalBuffer(&shandles[1][which], sendBuf[1][which].getVec(), payload[which/2]*sizeof(float));
+#else
     CkDirect_assocLocalBuffer(&shandles[0][which], sendBuf[0][which], payload[which/2]*sizeof(float));
     CkDirect_assocLocalBuffer(&shandles[1][which], sendBuf[1][which], payload[which/2]*sizeof(float));
+#endif
     remainingChannels--;
     if(remainingChannels == 0){
       // start 
@@ -278,7 +338,11 @@ class StencilPoint : public CBase_StencilPoint{
 //#else   // don't USE_CKDIRECT
   void recvBuffer(float *array, int size, int whichBuf){
     remainingBufs--;
+#if defined ARR_CHECK && !defined USE_MESSAGES
+    memcpy(recvBuf[whichBuf].getVec(), array, size*sizeof(float));
+#else
     memcpy(recvBuf[whichBuf], array, size*sizeof(float));
+#endif
     /*
     for(int i = 0; i < size; i++){
       recvBuf[whichBuf][i] = array[i];
@@ -1209,20 +1273,38 @@ class StencilPoint : public CBase_StencilPoint{
     }
 #else
 #ifdef USE_MESSAGES
+#ifdef ARR_CHECK
+    sendMsg((col+1)%charesx,row,plane,XP,sendBuf[whichLocal][xn].getVec());
+    sendMsg((col-1+charesx)%charesx,row,plane,XN,sendBuf[whichLocal][xp].getVec());
+    sendMsg(col,(row+1)%charesy,plane,YP,sendBuf[whichLocal][yn].getVec());
+    sendMsg(col,(row-1+charesy)%charesy,plane,YN,sendBuf[whichLocal][yp].getVec());
+    sendMsg(col,row,(plane+1)%charesz,ZP,sendBuf[whichLocal][zn].getVec());
+    sendMsg(col,row,(plane-1+charesz)%charesz,ZN,sendBuf[whichLocal][zp].getVec());
+#else
     sendMsg((col+1)%charesx,row,plane,XP,sendBuf[whichLocal][xn]);
     sendMsg((col-1+charesx)%charesx,row,plane,XN,sendBuf[whichLocal][xp]);
     sendMsg(col,(row+1)%charesy,plane,YP,sendBuf[whichLocal][yn]);
     sendMsg(col,(row-1+charesy)%charesy,plane,YN,sendBuf[whichLocal][yp]);
     sendMsg(col,row,(plane+1)%charesz,ZP,sendBuf[whichLocal][zn]);
     sendMsg(col,row,(plane-1+charesz)%charesz,ZN,sendBuf[whichLocal][zp]);
+#endif
 #else
+#ifdef ARR_CHECK
     // 2. send messages
+    thisProxy[lin((col+1)%charesx,row,plane)].recvBuffer(sendBuf[whichLocal][xn].getVec(),payload[0],XP);
+    thisProxy[lin((col-1+charesx)%charesx,row,plane)].recvBuffer(sendBuf[whichLocal][xp].getVec(),payload[0],XN);
+    thisProxy[lin(col,(row+1)%charesy,plane)].recvBuffer(sendBuf[whichLocal][yn].getVec(),payload[1],YP);
+    thisProxy[lin(col,(row-1+charesy)%charesy,plane)].recvBuffer(sendBuf[whichLocal][yp].getVec(),payload[1],YN);
+    thisProxy[lin(col,row,(plane+1)%charesz)].recvBuffer(sendBuf[whichLocal][zn].getVec(),payload[2],ZP);
+    thisProxy[lin(col,row,(plane-1+charesz)%charesz)].recvBuffer(sendBuf[whichLocal][zp].getVec(),payload[2],ZN);
+#else
     thisProxy[lin((col+1)%charesx,row,plane)].recvBuffer(sendBuf[whichLocal][xn],payload[0],XP);
     thisProxy[lin((col-1+charesx)%charesx,row,plane)].recvBuffer(sendBuf[whichLocal][xp],payload[0],XN);
     thisProxy[lin(col,(row+1)%charesy,plane)].recvBuffer(sendBuf[whichLocal][yn],payload[1],YP);
     thisProxy[lin(col,(row-1+charesy)%charesy,plane)].recvBuffer(sendBuf[whichLocal][yp],payload[1],YN);
     thisProxy[lin(col,row,(plane+1)%charesz)].recvBuffer(sendBuf[whichLocal][zn],payload[2],ZP);
     thisProxy[lin(col,row,(plane-1+charesz)%charesz)].recvBuffer(sendBuf[whichLocal][zp],payload[2],ZN);
+#endif
 #endif // end USE_MESSAGES
 #endif
   }
