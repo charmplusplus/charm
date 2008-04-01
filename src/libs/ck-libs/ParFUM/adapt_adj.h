@@ -378,12 +378,14 @@ void replaceAdaptAdjOnEdge(
         const int meshID, 
         const adaptAdj elem, 
         const adaptAdj originalNbr, 
-        const  adaptAdj newNbr);
+        const adaptAdj newNbr,
+        const int edgeID);
 void replaceAdaptAdjOnEdge(
         const FEM_Mesh* const meshPtr, 
         const adaptAdj elem, 
         const adaptAdj originalNbr, 
-        const adaptAdj newNbr);
+        const adaptAdj newNbr,
+        const int edgeID);
 
 /** Given the dimensions and nodes per element guess whether the element 
     is a triangle, quad, tet or hex. At the moment these are the 4 shapes
