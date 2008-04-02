@@ -51,13 +51,12 @@ int myrand(int numpes) {
 
 #define USE_CKDIRECT	0
 
-#define OOB		-1111111111.0
+#define OOB		-111111111111.0
 
 #define NUM_ITER	101
 
 #define MAX_LIMIT	9999999999.0
 
-int numIterations;
 double startTime;
 double setupTime;
 double firstTime;
@@ -68,7 +67,7 @@ double endTime;
  */
 class Main : public CBase_Main {
   public:
-    int doneCount;
+    int numIterations;
 
     Main(CkArgMsg* m);
     void done();
@@ -84,6 +83,7 @@ class Compute: public CBase_Compute {
     int countA, countB, countC;
     infiDirectUserHandle *sHandles;
     infiDirectUserHandle *rHandles;
+    int numIterations;
     
     Compute();
     Compute(CkMigrateMessage* m);

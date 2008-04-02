@@ -94,7 +94,6 @@ Main::Main(CkArgMsg* m) {
 
   // Start the computation
   numIterations = 0;
-  doneCount = 0;
   startTime = CmiWallTimer();
 #if USE_CKDIRECT
   compute.setupChannels();
@@ -104,8 +103,6 @@ Main::Main(CkArgMsg* m) {
 }
 
 void Main::done() {
-  // doneCount++;
-  // if(doneCount == num_chares) {
   numIterations++;
   if(numIterations == 1) {
     firstTime = CmiWallTimer();
@@ -130,13 +127,9 @@ void Main::done() {
 }
 
 void Main::setupDone() {
-  // doneCount++;
-  // if(doneCount == num_chares) {
-    setupTime = CmiWallTimer();
-    CkPrintf("SETUP TIME %f secs\n", setupTime - startTime);
-    doneCount = 0;
-    compute.beginCopying();
-  // }
+  setupTime = CmiWallTimer();
+  CkPrintf("SETUP TIME %f secs\n", setupTime - startTime);
+  compute.beginCopying();
 }
 
 // Constructor, initialize values
@@ -172,7 +165,7 @@ Compute::Compute() {
     for(int k=0; k<blockDimZ; k++) {
       C[i*blockDimZ + k] = 0.0;
 #if USE_CKDIRECT
-      C[i*blockDimZ + k] = 0.0;
+      tmpC[i*blockDimZ + k] = 0.0;
 #endif
     }
 
@@ -180,6 +173,7 @@ Compute::Compute() {
   countA = 0;
   countB = 0;
   countC = 0;
+  numIterations = 0;
 
 #if USE_CKDIRECT
   sHandles = new infiDirectUserHandle[num_chare_x + num_chare_y + num_chare_z];
@@ -215,7 +209,7 @@ void Compute::resetArrays() {
 	tmp = (float)drand48();
       
       A[i*blockDimY + j] = tmp;
-  }
+    }
 
   for(int j=0; j<blockDimY; j++)
     for(int k=0; k<blockDimZ; k++) {
@@ -224,16 +218,16 @@ void Compute::resetArrays() {
 	tmp = (float)drand48();
       
       B[j*blockDimZ + k] = tmp;
-  }
+    }
 
   for(int i=0; i<blockDimX; i++)
     for(int k=0; k<blockDimZ; k++) {
       C[i*blockDimZ + k] = 0.0;
 #if USE_CKDIRECT
-      C[i*blockDimZ + k] = 0.0;
+      tmpC[i*blockDimZ + k] = 0.0;
 #endif
     }
-
+  
   sendA();
   sendB();
 }
@@ -313,7 +307,7 @@ void Compute::receiveA(int indexZ, float *data, int size) {
     for(int j=0; j<blockDimY; j++)
       A[indexZ*subBlockDimXz*blockDimY + i*blockDimY + j] = data[i*blockDimY + j];
   countA++;
-  if(countA == num_chare_z-1)
+  if(countA == num_chare_z-1 && countB == num_chare_x-1)
     doWork();
 }
 
@@ -322,7 +316,7 @@ void Compute::receiveB(int indexX, float *data, int size) {
     for(int k=0; k<blockDimZ; k++)
       B[indexX*subBlockDimYx*blockDimZ + j*blockDimZ + k] = data[j*blockDimZ + k];
   countB++;
-  if(countB == num_chare_x-1)
+  if(countA == num_chare_z-1 && countB == num_chare_x-1)
     doWork();
 }
 
@@ -397,6 +391,12 @@ void Compute::receiveC() {
     if(k != indexZ)
       CkDirect_ready(&rHandles[num_chare_x + num_chare_y + k]);
 
+  // counters to keep track of how many messages have been received
+  countA = 0;
+  countB = 0;
+  countC = 0;
+
+  numIterations++;
   contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::done(), mainProxy));
   // mainProxy.done();
 }
@@ -476,7 +476,9 @@ void Compute::recvHandle(infiDirectUserHandle shdl, int index, int arr) {
   }
 
   if(countA == num_chare_z-1 && countB == num_chare_x-1 && countC == num_chare_y-1) {
-    countA = countB = countC = 0;
+    countA = 0;
+    countB = 0;
+    countC = 0;
     contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::setupDone(), mainProxy));
     // mainProxy.setupDone();
   }
@@ -486,14 +488,14 @@ void Compute::recvHandle(infiDirectUserHandle shdl, int index, int arr) {
 void Compute::callBackRcvdA(void *arg) {
   Compute *obj = (Compute *)arg;
   obj->countA++;
-  if(obj->countA == num_chare_z-1)
+  if(obj->countA == num_chare_z-1 && obj->countB == num_chare_x-1)
     obj->thisProxy(obj->thisIndex.x, obj->thisIndex.y, obj->thisIndex.z).doWork();
 }
 
 void Compute::callBackRcvdB(void *arg) {
   Compute *obj = (Compute *)arg;
   obj->countB++;
-  if(obj->countB == num_chare_x-1)
+  if(obj->countA == num_chare_z-1 && obj->countB == num_chare_x-1)
     obj->thisProxy(obj->thisIndex.x, obj->thisIndex.y, obj->thisIndex.z).doWork();
 }
 
