@@ -119,7 +119,7 @@ int BulkAdapt::edge_bisect_2D(int elemID, int elemType, int edgeID)
   }
   else if (nbrElem.partID == -1) { // startElem's edgeID is on domain boundary
     adaptAdj *splitElemAdaptAdj = getAdaptAdj(meshID, splitElem.localID, splitElem.elemType, 0);
-    splitElemAdaptAdj[edgeID] = adaptAdj(-1, -1, -1);
+    splitElemAdaptAdj[edgeID] = adaptAdj(-1, -1, 0);
     BULK_DEBUG(printf("[%d] For splitElem %d splitEdge is on the domain boundary.\n",partitionID,splitElem.localID);)
   }
   else { // nbrElem exists and is remote
@@ -860,7 +860,7 @@ void BulkAdapt::local_update_asterisk_3D(int i, adaptAdj elem, int numElemPairs,
   neighbors[3] = *getFaceAdaptAdj(meshID, elem.localID, elem.elemType, face[3]);
 
   adaptAdj splitElem = neighbors[3], nbr1 = neighbors[0], nbr2 = neighbors[1];
-  adaptAdj nbr1split(-1,-1,-1), nbr2split(-1,-1,-1);
+  adaptAdj nbr1split(-1,-1,0), nbr2split(-1,-1,0);
   int found=0;
   if (nbr1.localID != -1) found++;
   if (nbr2.localID != -1) found++;
