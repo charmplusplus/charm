@@ -2259,7 +2259,16 @@ struct infiDirectRequestPacket{
 #include "cmidirect.h"
 
 #define MAXHANDLES 512
-typedef struct {
+
+struct infiDirectHandleStruct;
+
+
+typedef struct directPollingQNodeStruct {
+	struct infiDirectHandleStruct *handle;
+	struct directPollingQNodeStruct *next;
+} directPollingQNode;
+
+typedef struct infiDirectHandleStruct{
 	int id;
 	void *buf;
 	int size;
@@ -2269,6 +2278,7 @@ typedef struct {
 //	struct infiDirectRequestPacket *packet;
 	struct infiDirectUserHandle userHandle;
 	struct infiRdmaPacket *rdmaPacket;
+	directPollingQNode pollingQNode;
 }	infiDirectHandle;
 
 typedef struct infiDirectHandleTableStruct{
@@ -2276,10 +2286,6 @@ typedef struct infiDirectHandleTableStruct{
 	struct infiDirectHandleTableStruct *next;
 } infiDirectHandleTable;
 
-typedef struct directPollingQNodeStruct {
-	infiDirectHandle *handle;
-	struct directPollingQNodeStruct *next;
-} directPollingQNode;
 
 // data structures 
 
@@ -2291,7 +2297,8 @@ static infiDirectHandleTable **recvHandleTable=NULL;
 static int *recvHandleCount=NULL;
 
 void addHandleToPollingQ(infiDirectHandle *handle){
-	directPollingQNode *newNode = malloc(sizeof(directPollingQNode));
+//	directPollingQNode *newNode = malloc(sizeof(directPollingQNode));
+	directPollingQNode *newNode = &(handle->pollingQNode);
 	newNode->handle = handle;
 	newNode->next = NULL;
 	if(headDirectPollingQ==NULL){
@@ -2633,7 +2640,7 @@ static void pollCmiDirectQ(){
 				prevPtr->next = ptr->next;
 			}
 			ptr = ptr->next;
-			free(delPtr);
+		//	free(delPtr);
 		}else{
 			prevPtr = ptr;
 			ptr = ptr->next;
