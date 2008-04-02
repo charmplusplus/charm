@@ -114,8 +114,7 @@ void Main::done() {
 #else
     CkPrintf("FIRST ITER TIME %f secs\n", firstTime - startTime);
 #endif
-  } else
-    CkPrintf("ITER %d\n", numIterations);
+  }
 
   if(numIterations == NUM_ITER) {
     endTime = CmiWallTimer();
@@ -126,7 +125,6 @@ void Main::done() {
 #endif
     CkExit();
   } else {
-    CkPrintf("ITER ~~~ %d\n", numIterations);
     compute.resetArrays();
   }
 }
@@ -236,12 +234,6 @@ void Compute::resetArrays() {
 #endif
     }
 
-  // counters to keep track of how many messages have been received
-  countA = 0;
-  countB = 0;
-  countC = 0;
-
-  CkPrintf("Starting here again\n");
   sendA();
   sendB();
 }
@@ -352,6 +344,12 @@ void Compute::receiveC(float *data, int size, int who) {
       fprintf(fp, "\n");
     }
     fclose(fp);*/
+
+    // counters to keep track of how many messages have been received
+    countA = 0;
+    countB = 0;
+    countC = 0;
+
     contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::done(), mainProxy));
     // mainProxy.done();
   }
@@ -415,7 +413,6 @@ void Compute::doWork() {
 #else
     receiveC(&C[(thisIndex.y)*subBlockDimXy*blockDimZ], subBlockDimXy*blockDimZ, 0);
 #endif
-    CkPrintf("sending C [%d][%d][%d]\n", thisIndex.x, thisIndex.y, thisIndex.z);
     sendC();
   }
 }
