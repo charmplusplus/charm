@@ -67,5 +67,6 @@
 #undef CMK_CCS_AVAILABLE
 #define CMK_CCS_AVAILABLE				   0
 
+#define CMK_DIRECT                                         1
 #endif
 
