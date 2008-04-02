@@ -217,6 +217,7 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
 
   BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D acquiring list of elements to build locked region.\n",partitionID));
   get_elemsToLock(startElem, &elemsToLock, edgeID, &numElemsToLock);
+
   RegionID lockRegionID;
   bool success;
   if (success = (localShadow->lockRegion(numElemsToLock, elemsToLock, &lockRegionID))) {
@@ -233,6 +234,7 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
   FEM_Elem &elems = meshPtr->elem[elemType]; // elems is all local elements
   FEM_DataAttribute *coord = meshPtr->node.getCoord(); // all local coords
   int *conn = elems.connFor(elemID); // conn points at elemID's ACTUAL data!
+
   // edgeID has element-relative node indices localRelNodes[0], localRelNodes[1]
   getRelNodes(edgeID, 4, &(localRelNodes[0]), &(localRelNodes[1]));
   localNodes[0] = conn[localRelNodes[0]];
@@ -251,6 +253,7 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
   localNodes[2] = add_node(3, &(nodeCoords[6]));
   int *chunks = (int *)malloc(numElemsToLock*sizeof(int));
   int numParts=0;
+
   for (int i=0; i<numElemsToLock; i++) {
     chunks[i] = -1;
     int j;
@@ -263,12 +266,14 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
     if (j==numParts) numParts++;
   }
 
-  make_node_shared(localNodes[2], numParts, &chunks[0]);
+  if (numParts > 1)
+    make_node_shared(localNodes[2], numParts, &chunks[0]);
 
   // Perform the splits on all affected elements
   int numRemote=0;
   int tableID = getTableID();
   elemPairs[tableID] = (adaptAdj *)malloc(2*numElemsToLock*sizeof(adaptAdj));
+
   for (int i=0; i<numElemsToLock; i++) {
     if (elemsToLock[i].partID != partitionID) {
       elemPairs[tableID][2*i] = elemsToLock[i];
@@ -279,6 +284,7 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
 			get_idxl_for_node(localNodes[1], elemsToLock[i].partID));
     }
   }
+
   for (int i=0; i<numElemsToLock; i++) {
     if (elemsToLock[i].partID == partitionID) {
       elemPairs[tableID][2*i] = elemsToLock[i];
@@ -524,7 +530,8 @@ void BulkAdapt::handle_split_3D(int remotePartID, int pos, int tableID,
     if (j==numParts) numParts++;
   }
 
-  make_node_shared(n5, numParts, &chunks[0]);
+  if (numParts > 1)
+    make_node_shared(n5, numParts, &chunks[0]);
 
   adaptAdj *splitElem = local_split_3D(elem, n1, n2, n5);
   shadowProxy[remotePartID].recv_split_3D(pos, tableID, elem, *splitElem);
@@ -652,11 +659,13 @@ void BulkAdapt::get_elemsToLock(adaptAdj startElem, adaptAdj **elemsToLock, int 
   CkVec<adaptAdj>* nbrElems;
   // find the elements adjacent to startElem along the edge edgeID
   BULK_DEBUG(CkPrintf("[%d] BulkAdapt::get_elemsToLock: calling getEdgeAdaptAdj on elem %d\n",partitionID,startElem.localID));
+
   nbrElems = getEdgeAdaptAdj(meshID, startElem.localID, startElem.elemType, 
 			     edgeID);
   // extract adjacencies from CkVec into array needed by the locking code 
   (*count) = nbrElems->size();
-  (*elemsToLock) = (adaptAdj *)malloc(*count * sizeof(adaptAdj));
+  (*elemsToLock) = (adaptAdj *)malloc((*count + 1) * sizeof(adaptAdj));
+
   for (int i=0; i<*count; i++) {
     (*elemsToLock)[i] = (*nbrElems)[i];
   }
