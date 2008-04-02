@@ -1,4 +1,4 @@
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = matmul3d.o
 
