@@ -66,7 +66,7 @@ Main::Main(CkArgMsg* m) {
 
   subBlockDimXz = blockDimX/num_chare_z;
   subBlockDimYx = blockDimY/num_chare_x;
-  subBlockDimXy = blockDimZ/num_chare_y;
+  subBlockDimXy = blockDimX/num_chare_y;
 
   // print info
   CkPrintf("Running Matrix Multiplication on %d processors with (%d, %d, %d) chares\n", CkNumPes(), num_chare_x, num_chare_y, num_chare_z);
@@ -116,9 +116,9 @@ void Main::done() {
   if(numIterations == NUM_ITER) {
     endTime = CmiWallTimer();
 #if USE_CKDIRECT
-    CkPrintf("AVG TIME %f secs\n", (endTime - firstTime)/100.0);
+    CkPrintf("AVG TIME %f secs\n", (endTime - firstTime)/(NUM_ITER-1));
 #else
-    CkPrintf("AVG TIME %f secs\n", (endTime - firstTime)/100.0);
+    CkPrintf("AVG TIME %f secs\n", (endTime - firstTime)/(NUM_ITER-1));
 #endif
     CkExit();
   } else {
