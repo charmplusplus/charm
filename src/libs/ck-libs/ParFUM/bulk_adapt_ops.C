@@ -212,7 +212,6 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
   adaptAdj *elemsToLock;
   adaptAdj startElem(partitionID, elemID, elemType);
 
-  FEM_Mesh_print(meshID);
   getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
 
   BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D acquiring list of elements to build locked region.\n",partitionID));
@@ -325,7 +324,6 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
   // unlock the partitions
   localShadow->unlockRegion(lockRegionID);
 
-  FEM_Mesh_print(meshID);
   getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
   
   return 1;
@@ -833,6 +831,7 @@ adaptAdj *BulkAdapt::local_split_3D(adaptAdj elem, int n1, int n2, int n5)
   // call updates here
   update_local_face_adj(elem, *splitElem, n1, n2, n5);
   update_local_edge_adj(elem, *splitElem, n1, n2, n5);
+  getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elem.elemType, partitionID);
   return splitElem;
 }
 
@@ -952,6 +951,8 @@ void BulkAdapt::local_update_asterisk_3D(int i, adaptAdj elem, int numElemPairs,
 void BulkAdapt::update_local_face_adj(adaptAdj elem, adaptAdj splitElem, 
 				      int n1, int n2, int n5)
 {
+  CkPrintf("Adapt Adj BEFORE updating face adj:\n");
+  getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elem.elemType, partitionID);
   // init splitElem's face and edge adjacencies to elem's
   copyAdaptAdj(meshPtr, &elem, &splitElem);
   // get n3 and n4 from conn
@@ -985,7 +986,7 @@ void BulkAdapt::update_local_face_adj(adaptAdj elem, adaptAdj splitElem,
   setAdaptAdj(meshID, elem, face[3], splitElem);
   //replaceAdaptAdj(meshPtr, elem, neighbors[3], splitElem);
   // update splitElem's neighbor from neighbors[2] to elem
-  setAdaptAdj(meshID, splitElem, face[0], elem);
+  setAdaptAdj(meshID, splitElem, face[2], elem);
   //replaceAdaptAdj(meshPtr, splitElem, neighbors[2], elem);
   // update elem's nbr's back-adjacency from elem to splitElem
   if (neighbors[3].partID == elem.partID) {
@@ -994,13 +995,19 @@ void BulkAdapt::update_local_face_adj(adaptAdj elem, adaptAdj splitElem,
   else if (neighbors[3].partID != -1) { // elem's nbr exists and is remote
     shadowProxy[neighbors[3].partID].remote_adaptAdj_replace(neighbors[3], elem, splitElem); 
   }
+  CkPrintf("Adapt Adj AFTER updating face adj:\n");
+  getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elem.elemType, partitionID);
 }
 
 /** Perform local edge adjacency updates associated with a split */
 void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem, 
 				      int n1, int n2, int n5)
 {
+  CkPrintf("Adapt Adj BEFORE copying 0's edgeAdj to 5's edgeAdj:\n");
+  getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elem.elemType, partitionID);
   copyEdgeAdaptAdj(meshPtr, &elem, &splitElem);
+  CkPrintf("Adapt Adj AFTER copying 0's edgeAdj to 5's edgeAdj:\n");
+  getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elem.elemType, partitionID);
   // first, extract the modifiable data structures in question
   CkVec<adaptAdj> *elemEdgeAdj[6];
   CkVec<adaptAdj> *splitElemEdgeAdj[6];
@@ -1120,7 +1127,6 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
   // edge, and the addition of elem and splitElem to each other's edgeAdj.
   for (int i=0; i<elemEdgeAdj[elem_n3_n4]->size(); i++) {
     adaptAdj adj = (*elemEdgeAdj[elem_n3_n4])[i];
-    splitElemEdgeAdj[n3_n4]->push_back(adj);
     if (adj.partID == splitElem.partID) { // do the local replace on adj
       int *adjConn = elems.connFor(adj.localID); 
       // derive relative nodes
@@ -1139,9 +1145,9 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
       shadowProxy[adj.partID].remote_edgeAdj_add(adj, splitElem, co1, co2);
     }
   }
-  splitElemEdgeAdj[n3_n4]->push_back(elem);
-  elemEdgeAdj[elem_n3_n4]->push_back(splitElem);
-  // Those last two cases are performed elsewhere
+  addToAdaptAdj(meshID, splitElem, n3_n4, elem);
+  addToAdaptAdj(meshID, elem, elem_n3_n4, splitElem);
+  // The last two cases are performed elsewhere
 }
 
 
