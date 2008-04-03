@@ -440,6 +440,8 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	fclose(fRO);
 	DEBCHK("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
 
+	CmiNodeBarrier();
+
 	// restore mainchares
 	sprintf(filename,"%s/MainChares.dat",dirname);
 	FILE* fMain = fopen(filename,"rb");
