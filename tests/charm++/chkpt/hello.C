@@ -33,6 +33,8 @@ public:
     } else {
       CkPrintf("Arguments null\n");
     }
+      // subtle: Chare proxy readonly needs to be updated manually because of
+      // the object pointer inside it.
     mainProxy = thisProxy;
     a=987;b[0]=654;b[1]=321;
     CkPrintf("Main's MigCtor. a=%d(%p), b[0]=%d(%p), b[1]=%d.\n",a,&a,b[0],b,b[1]);
