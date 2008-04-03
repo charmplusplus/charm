@@ -14,6 +14,13 @@ struct infiDirectUserHandle{
 	int recverBufSize;
 	char recverKey[32];
 	double initialValue;
+#ifdef CMK_BLUEGENEP
+    void *senderBuf;
+    void (*callbackFnPtr)(void *);
+    void *callbackData;
+    /*DCMF_Request_t *DCMF_rq_t;*/
+    void  *DCMF_rq_t;
+#endif
 };
 
 
