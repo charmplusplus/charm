@@ -1822,6 +1822,8 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   p|futureRemoteMsgs;
   p|futureLateMigrantMsgs;
   p|parent;
+  p|additionalGCount;
+  p|newAdditionalGCount;
   if(p.isUnpacking()) {
     gcount=CkNumNodes();
     thisProxy = thisgroup;
