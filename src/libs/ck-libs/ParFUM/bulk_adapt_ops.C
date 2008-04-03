@@ -679,8 +679,6 @@ void BulkAdapt::get_elemsToLock(adaptAdj startElem, adaptAdj **elemsToLock, int 
 	   (*elemsToLock)[i].elemType);
   }
   printf("\n");
-  
-  //delete (*nbrElems);
 }
 
 
@@ -984,9 +982,11 @@ void BulkAdapt::update_local_face_adj(adaptAdj elem, adaptAdj splitElem,
   neighbors[3] = *getFaceAdaptAdj(meshID, elem.localID, elem.elemType, face[3]);
   // elem's non-split faces have neighbors[2] and [3]
   // update elem's new nbr from neighbors[3] to splitElem
-  replaceAdaptAdj(meshPtr, elem, neighbors[3], splitElem);
+  setAdaptAdj(meshID, elem, face[3], splitElem);
+  //replaceAdaptAdj(meshPtr, elem, neighbors[3], splitElem);
   // update splitElem's neighbor from neighbors[2] to elem
-  replaceAdaptAdj(meshPtr, splitElem, neighbors[2], elem);
+  setAdaptAdj(meshID, splitElem, face[0], elem);
+  //replaceAdaptAdj(meshPtr, splitElem, neighbors[2], elem);
   // update elem's nbr's back-adjacency from elem to splitElem
   if (neighbors[3].partID == elem.partID) {
     replaceAdaptAdj(meshPtr, neighbors[3], elem, splitElem);
@@ -1081,7 +1081,7 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
       int edgeID = getEdgeID(r2, r3, 4, 3);
       replaceAdaptAdjOnEdge(meshPtr, adj, elem, splitElem, edgeID);
     }
-    else { // call remote replacement
+    else if (adj.partID != -1) { // call remote replacement
       double cds[2][3];  
       FEM_DataAttribute *coord = meshPtr->node.getCoord(); // local coords
       double *co1 = (coord->getDouble()).getRow(n2);
@@ -1104,7 +1104,7 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
       int edgeID = getEdgeID(r2, r4, 4, 3);
       replaceAdaptAdjOnEdge(meshPtr, adj, elem, splitElem, edgeID);
     }
-    else { // call remote replacement
+    else if (adj.partID != -1) { // call remote replacement
       double cds[2][3];  
       FEM_DataAttribute *coord = meshPtr->node.getCoord(); // local coords
       double *co1 = (coord->getDouble()).getRow(n2);
@@ -1131,7 +1131,7 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
       int edgeID = getEdgeID(r3, r4, 4, 3);
       addToAdaptAdj(meshID, adj, edgeID, splitElem);
     }
-    else { // call remote replacement
+    else if (adj.partID != -1) { // call remote replacement
       double cds[2][3];  
       FEM_DataAttribute *coord = meshPtr->node.getCoord(); // local coords
       double *co1 = (coord->getDouble()).getRow(n3);
