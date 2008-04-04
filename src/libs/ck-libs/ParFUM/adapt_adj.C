@@ -1192,13 +1192,14 @@ void copyEdgeAdaptAdj(
 		const adaptAdj* const srcElem, 
 		const adaptAdj* const destElem)
 {
-    int numAdjacencies;
+    int nAdj;
     CkVec<adaptAdj>** adaptAdjTable = lookupEdgeAdaptAdjacencies(meshPtr, 
-    		srcElem->elemType, &numAdjacencies);
+    		srcElem->elemType, &nAdj);
     
-    CkVec<adaptAdj>* src = adaptAdjTable[srcElem->localID];
-    CkVec<adaptAdj>* dst = adaptAdjTable[destElem->localID];
-    *dst = *src; // let CkVec operator= do the work
+    CkVec<adaptAdj>** srcTable = &adaptAdjTable[srcElem->localID*nAdj];
+    CkVec<adaptAdj>** dstTable = &adaptAdjTable[destElem->localID*nAdj];
+    for (int i=0; i<nAdj; ++i) 
+        *dstTable[i] = *srcTable[i]; // let CkVec operator= do the work
 }
 
 
