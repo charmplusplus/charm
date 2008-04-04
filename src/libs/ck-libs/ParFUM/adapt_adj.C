@@ -1041,7 +1041,8 @@ void addEdgeAdjacency(
 		const int edgeID,
 		const adaptAdj adj)
 {
-	getEdgeAdaptAdj(meshPtr, localID, elemType, edgeID)->push_back(adj);
+  CkAssert(adj.localID != -1);
+  getEdgeAdaptAdj(meshPtr, localID, elemType, edgeID)->push_back(adj);
 }
 
 void addEdgeAdjacency(
@@ -1051,9 +1052,10 @@ void addEdgeAdjacency(
 		const int edgeID,
 		const adaptAdj adj)
 {
-    FEM_Mesh *mesh = FEM_chunk::get("lookupAdaptAdjacencies")->
-        lookup(meshID,"lookupAdaptAdjacencies");
-    addEdgeAdjacency(mesh, localID, elemType, edgeID, adj);
+  CkAssert(adj.localID != -1);
+  FEM_Mesh *mesh = FEM_chunk::get("lookupAdaptAdjacencies")->
+    lookup(meshID,"lookupAdaptAdjacencies");
+  addEdgeAdjacency(mesh, localID, elemType, edgeID, adj);
 }
 
 /** Look up elemID in elemType array and determine the edge or face ID
@@ -1128,9 +1130,10 @@ void addToAdaptAdj(
         const int edgeID, 
         const adaptAdj nbr)
 {
-    CkVec<adaptAdj>* adjVec = getEdgeAdaptAdj(meshid, elem.localID, 
-            elem.elemType, edgeID);
-    adjVec->push_back(nbr);
+  CkAssert(nbr.localID != -1);
+  CkVec<adaptAdj>* adjVec = getEdgeAdaptAdj(meshid, elem.localID, 
+					    elem.elemType, edgeID);
+  adjVec->push_back(nbr);
 }
 
 void removeFromAdaptAdj(
@@ -1213,16 +1216,16 @@ void replaceAdaptAdj(
         const adaptAdj originalNbr, 
         const adaptAdj newNbr)
 {
-    int numAdjacencies;
-    adaptAdj *adaptAdjTable = lookupAdaptAdjacencies(meshPtr, elem.elemType,
-            &numAdjacencies);
-    for(int i=0;i<numAdjacencies;i++){
-        if(adaptAdjTable[elem.localID*numAdjacencies+i] == originalNbr){
-            adaptAdjTable[elem.localID*numAdjacencies+i] = newNbr;
-            return;
-        }
+  int numAdjacencies;
+  adaptAdj *adaptAdjTable = lookupAdaptAdjacencies(meshPtr, elem.elemType,
+						   &numAdjacencies);
+  for(int i=0;i<numAdjacencies;i++){
+    if(adaptAdjTable[elem.localID*numAdjacencies+i] == originalNbr){
+      adaptAdjTable[elem.localID*numAdjacencies+i] = newNbr;
+      return;
     }
-    CkAbort("replaceAdaptAdj did not find the specified originalNbr");
+  }
+  CkAbort("replaceAdaptAdj did not find the specified originalNbr");
 }
 
 
@@ -1232,9 +1235,9 @@ void replaceAdaptAdj(
         const adaptAdj originalNbr, 
         const adaptAdj newNbr)
 {
-    FEM_Mesh* meshPtr = FEM_chunk::get("ReplaceAdaptAdj")->lookup(
-            meshID,"ReplaceAdaptAdj");
-    replaceAdaptAdj(meshPtr, elem, originalNbr, newNbr);
+  FEM_Mesh* meshPtr = FEM_chunk::get("ReplaceAdaptAdj")->lookup(
+    meshID,"ReplaceAdaptAdj");
+  replaceAdaptAdj(meshPtr, elem, originalNbr, newNbr);
 }
 
 
@@ -1245,18 +1248,19 @@ void replaceAdaptAdjOnEdge(
         const adaptAdj newNbr,
         const int edgeID)
 {
-    int numAdjacencies;
-    CkVec<adaptAdj>** adaptAdjTable = lookupEdgeAdaptAdjacencies(
-            meshPtr, elem.elemType, &numAdjacencies);
-    CkVec<adaptAdj>* innerTable = 
-        adaptAdjTable[elem.localID*numAdjacencies + edgeID];
-    for (int n=0; n<innerTable->size(); ++n) {
-        if((*innerTable)[n] == originalNbr){
-            (*innerTable)[n] = newNbr;
-            return;
-        }
+  int numAdjacencies;
+  CkAssert(newNbr.localID != -1);
+  CkVec<adaptAdj>** adaptAdjTable = lookupEdgeAdaptAdjacencies(
+    meshPtr, elem.elemType, &numAdjacencies);
+  CkVec<adaptAdj>* innerTable = 
+    adaptAdjTable[elem.localID*numAdjacencies + edgeID];
+  for (int n=0; n<innerTable->size(); ++n) {
+    if((*innerTable)[n] == originalNbr){
+      (*innerTable)[n] = newNbr;
+      return;
     }
-    CkAbort("replaceAdaptAdjOnEdge did not find the specified originalNbr");
+  }
+  CkAbort("replaceAdaptAdjOnEdge did not find the specified originalNbr");
 }
 
 
@@ -1267,9 +1271,10 @@ void replaceAdaptAdjOnEdge(
         const adaptAdj newNbr,
         const int edgeID)
 {
-    FEM_Mesh* meshPtr = FEM_chunk::get("ReplaceAdaptAdj")->lookup(
-            meshID,"ReplaceAdaptAdj");
-    replaceAdaptAdjOnEdge(meshPtr, elem, originalNbr, newNbr, edgeID);
+  CkAssert(newNbr.localID != -1);
+  FEM_Mesh* meshPtr = FEM_chunk::get("ReplaceAdaptAdj")->lookup(
+    meshID,"ReplaceAdaptAdj");
+  replaceAdaptAdjOnEdge(meshPtr, elem, originalNbr, newNbr, edgeID);
 }
 
 

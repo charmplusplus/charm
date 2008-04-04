@@ -13,7 +13,8 @@ CProxy_ParFUMShadowArray meshSA;
 #ifdef DEBUG
 #undef DEBUG
 #endif
-#define DEBUG(x) x
+//#define DEBUG(x) x
+#define DEBUG(x) 
 
 
 void ParFUM_SA_Init(int meshId) {
@@ -206,7 +207,7 @@ bool ParFUMShadowArray::lockRegion(int numElements,adaptAdj *elements,RegionID *
 			if(list == NULL){
 				//first element of this type
 				list = new CkVec<adaptAdj>;
-				printf("[%d] Adding remoteElements %p for partition %d\n",idx,list,elements[i].partID);
+				DEBUG(printf("[%d] Adding remoteElements %p for partition %d\n",idx,list,elements[i].partID);)
 				region->remoteElements.put(elements[i].partID) = list;
 				CkAssert(region->remoteElements.get(elements[i].partID) ==list);
 			}
@@ -281,27 +282,27 @@ void ParFUMShadowArray::collectLocalNodes(int numElements,adaptAdj *elements,CkV
 
 
 bool ParFUMShadowArray::lockLocalNodes(LockRegion *region){
-	FEM_Node &fmNode = fmMesh->node;
-	AllocTable2d<int> &lockTable = ((FEM_DataAttribute *)fmNode.lookup(FEM_ADAPT_LOCK,"lockRegion"))->getInt();
-
-	bool success=true;
-	for(int i=0;i<region->localNodes.length();i++){
-		int node = region->localNodes[i];
-
-		if(lockTable[node][0]!= -1){
-			//the node is locked
-			printf("[%d] Node  %d was locked \n",thisIndex,node);
-			success = false;
-			break;
-		}else{
-			//the node is unlocked
-			lockTable[node][0] = idx;
-			lockTable[node][1] = region->myID.localID;
-			
-			printf("[%d] Locking Node  %d \n",thisIndex,node);
-		}
+  FEM_Node &fmNode = fmMesh->node;
+  AllocTable2d<int> &lockTable = ((FEM_DataAttribute *)fmNode.lookup(FEM_ADAPT_LOCK,"lockRegion"))->getInt();
+  
+  bool success=true;
+  for(int i=0;i<region->localNodes.length();i++){
+    int node = region->localNodes[i];
+    
+    if(lockTable[node][0]!= -1){
+      //the node is locked
+      DEBUG(printf("[%d] Node  %d was locked \n",thisIndex,node);)
+	success = false;
+      break;
+    }else{
+      //the node is unlocked
+      lockTable[node][0] = idx;
+      lockTable[node][1] = region->myID.localID;
+      
+      DEBUG(printf("[%d] Locking Node  %d \n",thisIndex,node);)
 	}
-	return success;
+  }
+  return success;
 }
 
 
@@ -451,7 +452,7 @@ void ParFUMShadowArray::unlockLocalNodes(LockRegion *region){
 			lockTable[region->localNodes[i]][0] = -1;
 			lockTable[region->localNodes[i]][1] = -1;
 			
-			printf("[%d] Un Locking Node  %d \n",thisIndex,region->localNodes[i]);
+			DEBUG(printf("[%d] Un Locking Node  %d \n",thisIndex,region->localNodes[i]);)
 		}
 	}
 
