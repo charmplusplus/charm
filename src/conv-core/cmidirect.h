@@ -3,24 +3,34 @@
 /* This file provides an interface for users to the CmiDirect functionality.
 
 */
-
+#ifdef CMK_BLUEGENEP
+typedef struct {
+    CmiFloat8 space[2];
+} cmkquad;  
+/* is equivalent to DCQUAD, but without including dmcf.h */
+#endif
 
 /* handle type definition */
 struct infiDirectUserHandle{
-	int handle;
-	int senderNode;
-	int recverNode;
-	void *recverBuf;
-	int recverBufSize;
-	char recverKey[32];
-	double initialValue;
 #ifdef CMK_BLUEGENEP
     void *senderBuf;
     void (*callbackFnPtr)(void *);
     void *callbackData;
     /*DCMF_Request_t *DCMF_rq_t;*/
-    void  *DCMF_rq_t;
+    void  *DCMF_rq_trecv;
 #endif
+#ifdef CMK_BLUEGENEP
+	void *DCMF_rq_tsend;
+#else
+	char recverKey[32];
+#endif
+	int handle;
+	int senderNode;
+	int recverNode;
+	int recverBufSize;
+	void *recverBuf;
+
+	double initialValue;
 };
 
 
