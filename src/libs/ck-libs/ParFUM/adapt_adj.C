@@ -861,7 +861,7 @@ void getAndDumpAdaptAdjacencies(
 }
 
 // Access functions
-inline adaptAdj* lookupAdaptAdjacencies(
+adaptAdj* lookupAdaptAdjacencies(
         const FEM_Mesh* const mesh,
         const int elemType,
         int* numAdjacencies)
@@ -877,7 +877,7 @@ inline adaptAdj* lookupAdaptAdjacencies(
     return (adaptAdj*)(adaptAttr->getChar().getData());
 }
 
-inline adaptAdj* lookupAdaptAdjacencies(
+adaptAdj* lookupAdaptAdjacencies(
         const int meshid,
         const int elemType,
         int* numAdjacencies)
@@ -887,7 +887,7 @@ inline adaptAdj* lookupAdaptAdjacencies(
     return lookupAdaptAdjacencies(mesh, elemType, numAdjacencies);
 }
 
-inline CkVec<adaptAdj>** lookupEdgeAdaptAdjacencies(
+CkVec<adaptAdj>** lookupEdgeAdaptAdjacencies(
         const FEM_Mesh* const mesh,
         const int elemType,
         int* numAdjacencies)
@@ -902,7 +902,7 @@ inline CkVec<adaptAdj>** lookupEdgeAdaptAdjacencies(
     return adaptAdjacencies;
 }
 
-inline CkVec<adaptAdj>** lookupEdgeAdaptAdjacencies(
+CkVec<adaptAdj>** lookupEdgeAdaptAdjacencies(
         const int meshID,
         const int elemType,
         int* numAdjacencies)
