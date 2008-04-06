@@ -53,7 +53,7 @@ int myrand(int numpes) {
 
 #define OOB		-111111111111.0
 
-#define NUM_ITER	101
+#define NUM_ITER	21
 
 #define MAX_LIMIT	9999999999.0
 
