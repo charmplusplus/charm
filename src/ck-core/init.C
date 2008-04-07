@@ -616,6 +616,17 @@ void InitCallTable::enumerateInitCalls()
 CpvCExtern(int, cmiArgDebugFlag);
 extern "C" void CpdFreeze(void);
 
+extern "C" void initQd()
+{
+	CpvInitialize(QdState*, _qd);
+	CpvAccess(_qd) = new QdState();
+	if (CmiMyRank() == 0) {
+#if !defined(CMK_CPV_IS_SMP) && !CMK_SHARED_VARS_UNIPROCESSOR
+	CpvAccessOther(_qd, 1) = new QdState(); // for i/o interrupt
+#endif
+	}
+	_qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
+}
 
 /**
   This is the main charm setup routine.  It's called
@@ -644,7 +655,6 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(CmiImmediateLockType, _groupTableImmLock);
 	CkpvInitialize(UInt, _numGroups);
 	CkpvInitialize(int, _numInitsRecd);
-	CpvInitialize(QdState*, _qd);
 	CkpvInitialize(char**, Ck_argv); CkpvAccess(Ck_argv)=argv;
 	CkpvInitialize(MsgPool*, _msgPool);
 	CkpvInitialize(CkCoreState *, _coreState);
@@ -693,15 +703,11 @@ void _initCharm(int unused_argc, char **argv)
 	}
 
 	CmiNodeAllBarrier();
-#ifdef __BLUEGENE__
-	if(BgNodeRank()==0)
+
+#if ! CMK_BLUEGENE_CHARM
+	initQd();
 #endif
-	{
-		CpvAccess(_qd) = new QdState();
-#if !defined(CMK_CPV_IS_SMP) && !CMK_SHARED_VARS_UNIPROCESSOR
-		CpvAccessOther(_qd, 1) = new QdState(); // for i/o interrupt
-#endif
-        }
+
 	CkpvAccess(_coreState)=new CkCoreState();
 
 	CkpvAccess(_numInitsRecd) = -1;  /*0;*/
@@ -716,12 +722,6 @@ void _initCharm(int unused_argc, char **argv)
 	_exitHandlerIdx = CkRegisterHandler((CmiHandler)_exitHandler);
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 	_nodeBocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
-#ifdef __BLUEGENE__
-	if(BgNodeRank()==0)
-#endif
-	{
-	_qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
-        }
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
 	_triggerHandlerIdx = CkRegisterHandler((CmiHandler)_triggerHandler);
 	_ckModuleInit();
