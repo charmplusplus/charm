@@ -2749,6 +2749,12 @@ void ConverseCommonInit(char **argv)
 */
 
   CmiInitCPUAffinity(argv);
+
+#if CMK_BLUEGENE_CHARM
+   /* have to initialize QD here instead of _initCharm */
+  extern void initQd();
+  initQd();
+#endif
 }
 
 void ConverseCommonExit(void)
