@@ -4,7 +4,15 @@
 #define NITER 1000
 #define PAYLOAD 100
 
+#ifdef CMK_DIRECT 
+#define USE_RDMA 1
+#endif
+
 #ifdef CMK_USE_IBVERBS 
+#define USE_RDMA 1
+#endif
+
+#ifdef USE_RDMA
 extern "C" {
 #include "cmidirect.h"
 }
@@ -121,20 +129,14 @@ public:
       case 5:
         gid[0].start();
         break;
-#ifndef CMK_USE_IBVERBS
+#ifndef USE_RDMA
       case 6:
         ngid[0].start();
         break;
 #else
       case 6:
-	if(CkNumNodes()==2)
-	  {
-	    ngid[0].startRDMA();
-	    break;
-	  }
-	else
-	  CkPrintf("RDMA skipped, you only have 1 node\n");
-	// drop through to next case
+	  ngid[0].startRDMA();
+	  break;
 #endif
       default:
         CkExit();
@@ -188,7 +190,7 @@ class PingN : public NodeGroup
   CProxyElement_PingN *pp;
   int niter;
   int me, nbr;
-#ifdef CMK_USE_IBVERBS 
+#ifdef USE_RDMA 
   struct infiDirectUserHandle shandle,rhandle;
   char *rbuff;
   char *sbuff;
@@ -206,7 +208,7 @@ public:
 
     pp = new CProxyElement_PingN(thisgroup,nbr);
     niter = 0;
-#ifdef CMK_USE_IBVERBS 
+#ifdef USE_RDMA 
     rbuff=(char *) malloc(payload*sizeof(char));
     sbuff=(char *) malloc(payload*sizeof(char));
     // setup persistent comm sender and receiver side
@@ -219,7 +221,7 @@ public:
   void recvHandle(char *ptr,int size)
   {
 
-#ifdef CMK_USE_IBVERBS 
+#ifdef USE_RDMA 
     struct infiDirectUserHandle *_shandle=(struct infiDirectUserHandle *) ptr;
     shandle=*_shandle;
     CmiDirect_assocLocalBuffer(&shandle,sbuff,payload);
@@ -234,7 +236,7 @@ public:
   {
     niter=0;
     start_time = CkWallTimer();
-#ifdef CMK_USE_IBVERBS 
+#ifdef USE_RDMA 
     CmiDirect_put(&shandle);
 #else
     CkAbort("do not call startRDMA if you don't actually have RDMA");
@@ -269,7 +271,7 @@ public:
   // not an entry method, called via Wrapper_To_Callback
   void recvRDMA()
   {
-#ifdef CMK_USE_IBVERBS 
+#ifdef USE_RDMA 
     CmiDirect_ready(&rhandle);
 #endif
     if(me==0) {
@@ -281,14 +283,14 @@ public:
                  1.0e6*(end_time-start_time)/titer);
         mainProxy.maindone();
       } else {
-#ifdef CMK_USE_IBVERBS 
+#ifdef USE_RDMA 
 	CmiDirect_put(&shandle);
 #else
 	CkAbort("do not call startRDMA if you don't actually have RDMA");
 #endif
       }
     } else {
-#ifdef CMK_USE_IBVERBS 
+#ifdef USE_RDMA 
       CmiDirect_put(&shandle);
 #else
       CkAbort("do not call startRDMA if you don't actually have RDMA");
