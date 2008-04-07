@@ -12,6 +12,11 @@ typedef struct {
 
 /* handle type definition */
 struct infiDirectUserHandle{
+	int handle;
+	int senderNode;
+	int recverNode;
+	void *recverBuf;
+	int recverBufSize;
 #ifdef CMK_BLUEGENEP
     void *senderBuf;
     void (*callbackFnPtr)(void *);
@@ -24,12 +29,6 @@ struct infiDirectUserHandle{
 #else
 	char recverKey[32];
 #endif
-	int handle;
-	int senderNode;
-	int recverNode;
-	int recverBufSize;
-	void *recverBuf;
-
 	double initialValue;
 };
 
