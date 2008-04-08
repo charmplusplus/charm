@@ -27,7 +27,7 @@ struct infiDirectUserHandle{
 #ifdef CMK_BLUEGENEP
 	void *DCMF_rq_tsend;
 #else
-	char recverKey[32];
+	char recverKey[64];
 #endif
 	double initialValue;
 };
