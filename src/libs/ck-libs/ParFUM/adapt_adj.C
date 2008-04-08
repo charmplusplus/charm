@@ -335,10 +335,10 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
             receivedReply->requestingNodeSetID] = receivedReply->replyingElem;
     }
     replyTable->sync();
+    delete requestTable;
+    delete replyTable;
 
     if (adaptEdgeAdjacencies != NULL) {
-        //delete requestTable;
-        //delete replyTable;
 
         // do the same thing for the edges
         if (myRank == 0) {
@@ -404,36 +404,36 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
                         receivedReply->replyingElem);
         }
         replyTable->sync();
+
+        delete requestTable;
+        delete replyTable;
     }
 
-    // cleanup
-    //delete requestTable;
-    //delete replyTable;
+    for (int i=0; i<numNodes; ++i) {
+        delete[] faceTable[i].sharedWithPartition;
+        delete[] faceTable[i].sharedWithLocalIdx;
+        adjElem* e = faceTable[i].adjElemList->next;
+        adjElem* dummy;
+        	while (e != NULL) {
+            dummy = e;
+            e = e->next;
+            delete dummy;
+        }
 
-    //for (int i=0; i<numNodes; ++i) {
-    //    delete[] faceTable[i].sharedWithPartition;
-    //    delete[] faceTable[i].sharedWithLocalIdx;
-    //    adjElem* e = faceTable[i].adjElemList->next;
-    //    adjElem* dummy;
-    //    //while (e != NULL) {
-    //    //    dummy = e;
-    //    //    e = e->next;
-    //    //    delete dummy;
-    //    //}
-
-    //    if (edgeTable) {
-    //        delete[] edgeTable[i].sharedWithPartition;
-    //        delete[] edgeTable[i].sharedWithLocalIdx;
-    //        e = edgeTable[i].adjElemList->next;
-    //        //while (e != NULL) {
-    //        //    dummy = e;
-    //        //    e = e->next;
-    //        //    delete dummy;
-    //        //}
-    //    }
-    //}
-    //delete[] faceTable;
-    //delete[] edgeTable;
+        if (edgeTable) {
+            delete[] edgeTable[i].sharedWithPartition;
+            delete[] edgeTable[i].sharedWithLocalIdx;
+            e = edgeTable[i].adjElemList->next;
+            while (e != NULL) {
+                dummy = e;
+                e = e->next;
+                delete dummy;
+            }
+        }
+    }
+    delete[] faceTable;
+    delete[] edgeTable;
+    
 }
 
 
@@ -491,10 +491,10 @@ void fillLocalAdaptAdjacencies(
 					// Remove both elem-nodeSet pairs from the list
 					adjElem *tmp = rover->next;
 					rover->next = rover->next->next;
-					//delete tmp;
+					delete tmp;
 					tmp = target;
 					preTarget->next = target->next;
-					//delete tmp;
+					delete tmp;
 
 					target = target->next;
 
@@ -687,7 +687,7 @@ void makeAdjacencyRequests(
                                     chunk,adjRequestList[countChunk]);
                             countChunk++;
                         }
-                        //delete [] adjRequestList;
+                        delete [] adjRequestList;
                     }
                     adjStart = adjStart->next;
                 }
@@ -772,7 +772,7 @@ void replyAdjacencyRequests(
             
             adjElem *tmp = rover->next;
             rover->next = tmp->next;
-            //delete tmp;
+            delete tmp;
 
             //Set requesting data in reply to that in receivedRequest
             //Put in data from rover->next into the replyElem portion of data
