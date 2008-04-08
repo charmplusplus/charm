@@ -1271,8 +1271,7 @@ static inline int pollSendCq(const int toBuffer){
 	
 	for(i=0;i<ne;i++){
 		if(wc[i].status != IBV_WC_SUCCESS){
-			infiPacket _packet = (infiPacket )wc[i].wr_id;
-			printf("[%d] wc[%d] status %d wc[i].opcode %d destnode %d \n",_Cmi_mynode,i,wc[i].status,wc[i].opcode,_packet->destNode->infiData->nodeNo);
+			printf("[%d] wc[%d] status %d wc[i].opcode %d\n",_Cmi_mynode,i,wc[i].status,wc[i].opcode);
 #if CMK_IBVERBS_STATS
 	printf("[%d] msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d minTokensLeft %d \n",_Cmi_mynode,msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft,minTokensLeft);
 #endif
@@ -2392,11 +2391,12 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
 	table->handles[idx].buf = recvBuf;
 	table->handles[idx].size = recvBufSize;
 #if CMI_DIRECT_DEBUG
-	CmiPrintf("[%d] RDMA create addr %p %d\n",CmiMyNode(),table->handles[idx].buf,recvBufSize);
+	CmiPrintf("[%d] RDMA create addr %p %d sizeof(struct ibv_mr) %d\n",CmiMyNode(),table->handles[idx].buf,recvBufSize,sizeof(struct ibv_mr));
 #endif
 	table->handles[idx].callbackFnPtr = callbackFnPtr;
 	table->handles[idx].callbackData = callbackData;
 	table->handles[idx].key = ibv_reg_mr(context->pd, recvBuf, recvBufSize,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+	CmiAssert(table->handles[idx].key != NULL);
 
 /*	table->handles[idx].rdmaPacket = CmiAlloc(sizeof(struct infiRdmaPacket));
 	table->handles[idx].rdmaPacket->type = INFI_DIRECT;
@@ -2457,10 +2457,11 @@ void CmiDirect_assocLocalBuffer(struct infiDirectUserHandle *userHandle,void *se
 
 	table->handles[idx].size = sendBufSize;
 #if CMI_DIRECT_DEBUG
-	CmiPrintf("[%d] RDMA assoc addr %p %d\n",CmiMyPe(),table->handles[idx].buf,sendBufSize);
+	CmiPrintf("[%d] RDMA assoc addr %p %d remote addr %p \n",CmiMyPe(),table->handles[idx].buf,sendBufSize,userHandle->recverBuf);
 #endif
 	table->handles[idx].callbackFnPtr = table->handles[idx].callbackData = NULL;
 	table->handles[idx].key =  ibv_reg_mr(context->pd, sendBuf, sendBufSize,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+	CmiAssert(table->handles[idx].key != NULL);
 	table->handles[idx].userHandle = *userHandle;
 	CmiAssert(sendBufSize == table->handles[idx].userHandle.recverBufSize);
 	
@@ -2493,13 +2494,16 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle){
 		/*when the sender and receiver are on the same
 		processor, just look up the sender and receiver
 		buffers and do a memcpy*/
+
 		infiDirectHandleTable *senderTable;
 		infiDirectHandleTable *recverTable;
 		
 		int tableIdx,idx,i;
+
 		
 		/*find entry for this handle in sender table*/
 		calcHandleTableIdx(handle,&tableIdx,&idx);
+		CmiAssert(sendHandleTable!= NULL);
 		senderTable = sendHandleTable[_Cmi_mynode];
 		CmiAssert(senderTable != NULL);
 		for(i=0;i<tableIdx;i++){
