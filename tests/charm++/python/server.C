@@ -35,12 +35,12 @@ void Main::ccs_kill (CkCcsRequestMsg *msg) {
 }
 
 void Main::runhigh(int i) {
-  if (pythonHandle1) pythonHandle2=i;
-  else pythonHandle1=i;
-  pythonSleep(i);
-  mypython.run();
+  void *total;
+  mypython.run(CkCallbackPython(total));
+  pythonReturn(i, Py_BuildValue("i",*(int*)total));
 }
 
+/*
 void Main::arrayResult (int value) {
   total += value;
   if (++count == elem) {
@@ -54,15 +54,18 @@ void Main::arrayResult (int value) {
     total=0;
   }
 }
+*/
 
 MyArray::MyArray () {mynumber = thisIndex+1000;}
 
 MyArray::MyArray (CkMigrateMessage *msg) {}
 
-void MyArray::run() {
+void MyArray::run(CkCallback &cb) {
   CkPrintf("[%d] in run %d\n",thisIndex,mynumber);
   sleep(0);
-  mainProxy.arrayResult(mynumber++);
+  //mainProxy.arrayResult(mynumber++);
+  mynumber++;
+  contribute(sizeof(int), &mynumber, CkReduction::sum_int, cb);
 }
 
 #include "server.def.h"

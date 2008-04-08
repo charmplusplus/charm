@@ -26,7 +26,7 @@ class MyArray : public CBase_MyArray {
  public:
   MyArray();
   MyArray(CkMigrateMessage *msg);
-  void run();
+  void run(CkCallback &cb);
  private:
   int mynumber;
 };

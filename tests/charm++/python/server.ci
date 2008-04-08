@@ -6,14 +6,14 @@ mainmodule server {
 	mainchare [python] Main {
 		entry Main(CkArgMsg *msg);
 		entry void exit(void);
-		entry void arrayResult(int value);
+		//entry void arrayResult(int value);
 		entry void ccs_kill (CkCcsRequestMsg *msg);
 		entry [python] void runhigh(int);
 	}
 
 	array [1D] MyArray {
 		entry MyArray();
-		entry void run(void);
+		entry void run(CkCallback &cb);
 	}
 
 }
