@@ -466,15 +466,33 @@ void BulkAdapt::remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, adaptAd
   replaceAdaptAdj(meshPtr, elem, oldElem, newElem);
 }
 
-void BulkAdapt::remote_edgeAdj_replace(adaptAdj elem, adaptAdj oldElem, adaptAdj newElem, double co1[3], double co2[3])
+void BulkAdapt::remote_edgeAdj_replace(int remotePartID, adaptAdj elem, adaptAdj oldElem, adaptAdj newElem, int n1_idxl, int n2_idxl)
 {
-  int edgeID = getEdgeIDfromCoords(elem, co1, co2, 4, 3);
-  //replaceAdaptAdjOnEdge(meshPtr, elem, oldElem, newElem, edgeID);
+  int n1 = get_node_from_idxl(n1_idxl, remotePartID), 
+    n2 = get_node_from_idxl(n2_idxl, remotePartID);
+  // Find the relative nodes on the edge to be bisected
+  int relNodes[4]; 
+  FEM_Elem &elems = meshPtr->elem[elem.elemType]; // elems is all local elements
+  int *conn = elems.connFor(elem.localID); // conn points at elemID's ACTUAL data!
+  fillNodes(relNodes, n1, n2, conn);
+  // find which edgeID is bisected
+  int edgeID = getEdgeID(relNodes[0], relNodes[1], 4, 3);
+
+  replaceAdaptAdjOnEdge(meshPtr, elem, oldElem, newElem, edgeID);
 }
 
-void BulkAdapt::remote_edgeAdj_add(adaptAdj adj, adaptAdj splitElem, double co1[3], double co2[3])
+void BulkAdapt::remote_edgeAdj_add(int remotePartID, adaptAdj adj, adaptAdj splitElem, int n1_idxl, int n2_idxl)
 {
-  int edgeID = getEdgeIDfromCoords(adj, co1, co2, 4, 3);
+  int n1 = get_node_from_idxl(n1_idxl, remotePartID), 
+    n2 = get_node_from_idxl(n2_idxl, remotePartID);
+  // Find the relative nodes on the edge to be bisected
+  int relNodes[4]; 
+  FEM_Elem &elems = meshPtr->elem[adj.elemType]; // elems is all local elements
+  int *conn = elems.connFor(adj.localID); // conn points at elemID's ACTUAL data!
+  fillNodes(relNodes, n1, n2, conn);
+  // find which edgeID is bisected
+  int edgeID = getEdgeID(relNodes[0], relNodes[1], 4, 3);
+
   addToAdaptAdj(meshID, adj, edgeID, splitElem);
 }
 
@@ -1083,11 +1101,10 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
       replaceAdaptAdjOnEdge(meshPtr, adj, elem, splitElem, edgeID);
     }
     else if (adj.partID != -1) { // call remote replacement
-      double cds[2][3];  
-      FEM_DataAttribute *coord = meshPtr->node.getCoord(); // local coords
-      double *co1 = (coord->getDouble()).getRow(n2);
-      double *co2 = (coord->getDouble()).getRow(n3);
-      shadowProxy[adj.partID].remote_edgeAdj_replace(adj, elem, splitElem, co1, co2);
+      int n2_idxl = get_idxl_for_node(n2, adj.partID);
+      int n3_idxl = get_idxl_for_node(n3, adj.partID);
+      shadowProxy[adj.partID].remote_edgeAdj_replace(partitionID, adj, elem, 
+						     splitElem, n2_idxl, n3_idxl);
     }
   }
   // wow!  all that was just for the (n2,n3) edge!  This sucks!
@@ -1105,11 +1122,10 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
       replaceAdaptAdjOnEdge(meshPtr, adj, elem, splitElem, edgeID);
     }
     else if (adj.partID != -1) { // call remote replacement
-      double cds[2][3];  
-      FEM_DataAttribute *coord = meshPtr->node.getCoord(); // local coords
-      double *co1 = (coord->getDouble()).getRow(n2);
-      double *co2 = (coord->getDouble()).getRow(n4);
-      shadowProxy[adj.partID].remote_edgeAdj_replace(adj, elem, splitElem, co1, co2);
+      int n2_idxl = get_idxl_for_node(n2, adj.partID);
+      int n4_idxl = get_idxl_for_node(n4, adj.partID);
+      shadowProxy[adj.partID].remote_edgeAdj_replace(partitionID, adj, elem, 
+						     splitElem, n2_idxl, n4_idxl);
     }
   }
   // n3_n4: elem needs to take it's original list and add splitElem to it; 
@@ -1131,42 +1147,15 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
       addToAdaptAdj(meshID, adj, edgeID, splitElem);
     }
     else if (adj.partID != -1) { // call remote replacement
-      double cds[2][3];  
-      FEM_DataAttribute *coord = meshPtr->node.getCoord(); // local coords
-      double *co1 = (coord->getDouble()).getRow(n3);
-      double *co2 = (coord->getDouble()).getRow(n4);
-      shadowProxy[adj.partID].remote_edgeAdj_add(adj, splitElem, co1, co2);
+      int n3_idxl = get_idxl_for_node(n3, adj.partID);
+      int n4_idxl = get_idxl_for_node(n4, adj.partID);
+      shadowProxy[adj.partID].remote_edgeAdj_add(partitionID, adj, splitElem, 
+						 n3_idxl, n4_idxl);
     }
   }
   addToAdaptAdj(meshID, splitElem, n3_n4, elem);
   addToAdaptAdj(meshID, elem, elem_n3_n4, splitElem);
   // The last two cases are performed elsewhere
-}
-
-
-int BulkAdapt::getEdgeIDfromCoords(adaptAdj elem, double *node1, double *node2, 
-				   int nodePerElem, int dim)
-{
-  FEM_Elem &elems = meshPtr->elem[elem.elemType];
-  FEM_DataAttribute *coord = meshPtr->node.getCoord();
-  int *conn = elems.connFor(elem.localID);
-  double *co1 = (coord->getDouble()).getRow(conn[0]);
-  double *co2 = (coord->getDouble()).getRow(conn[1]);
-  double *co3 = (coord->getDouble()).getRow(conn[2]);
-  double *co4 = (coord->getDouble()).getRow(conn[3]);
-  int n1, n2;
-  if (coordCompare(node1, co1, 3) == 0) n1 = conn[0];
-  else if (coordCompare(node1, co2, 3) == 0) n1 = conn[1];
-  else if (coordCompare(node1, co3, 3) == 0) n1 = conn[2];
-  else if (coordCompare(node1, co4, 3) == 0) n1 = conn[3];
-  if (coordCompare(node2, co1, 3) == 0) n2 = conn[0];
-  else if (coordCompare(node2, co2, 3) == 0) n2 = conn[1];
-  else if (coordCompare(node2, co3, 3) == 0) n2 = conn[2];
-  else if (coordCompare(node2, co4, 3) == 0) n2 = conn[3];
-  int r1, r2;
-  r1 = getRelNode(n1, conn, 4);
-  r2 = getRelNode(n2, conn, 4);
-  return(getEdgeID(r1, r2, nodePerElem, dim));
 }
 
 void BulkAdapt::updateStartElemAdj(adaptAdj elem, adaptAdj splitElem, 

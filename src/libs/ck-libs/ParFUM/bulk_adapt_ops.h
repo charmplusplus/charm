@@ -117,10 +117,10 @@ class BulkAdapt {
 
   void remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, 
 			       adaptAdj newElem);
-  void remote_edgeAdj_replace(adaptAdj adj, adaptAdj elem, adaptAdj splitElem, 
-			      double co1[3], double co2[3]);
-  void remote_edgeAdj_add(adaptAdj adj, adaptAdj splitElem, double co1[3],
-			  double co2[3]);
+  void remote_edgeAdj_replace(int remotePartID, adaptAdj adj, adaptAdj elem, 
+			      adaptAdj splitElem, int n1_idxl, int n2_idxl);
+  void remote_edgeAdj_add(int remotePartID, adaptAdj adj, adaptAdj splitElem,
+			  int n1_idxl, int n2_idxl);
 
   adaptAdj remote_edge_bisect_3D(adaptAdj nbrElem, adaptAdj splitElem, 
 				 int new_idxl, int n1_idxl, int n2_idxl, 
@@ -174,8 +174,6 @@ class BulkAdapt {
   void update_local_face_adj(const adaptAdj elem, const adaptAdj splitElem, int n1, int n2, int n5);
   /** Perform local edge adjacency updates associated with a split */
   void update_local_edge_adj(const adaptAdj elem, const adaptAdj splitElem, int n1, int n2, int n5);
-  int getEdgeIDfromCoords(adaptAdj elem, double *node1, double *node2, 
-			  int nodePerElem, int dim);
   void updateStartElemAdj(adaptAdj elem, adaptAdj splitElem, adaptAdj nbr1, 
 			  adaptAdj nbr2, adaptAdj splitNbr1, adaptAdj splitNbr2,
 			  adaptAdj *splitList1, adaptAdj *splitList2,

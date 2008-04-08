@@ -23,8 +23,8 @@ module ParFUM_SA {
 
     entry [sync] adaptAdjMsg *remote_bulk_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, int new_idxl, int n1_idxl, int n2_idxl, int partitionID);
     entry [sync] void remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, adaptAdj newElem);
-    entry [sync] void remote_edgeAdj_replace(adaptAdj adj, adaptAdj elem, adaptAdj splitElem, double co1[3], double co2[3]);
-    entry [sync] void remote_edgeAdj_add(adaptAdj elem, adaptAdj splitElem, double co1[3], double co2[3]);
+    entry [sync] void remote_edgeAdj_replace(int remotePartID, adaptAdj adj, adaptAdj elem, adaptAdj splitElem, int n1_idxl, int n2_idxl);
+    entry [sync] void remote_edgeAdj_add(int remotePartID, adaptAdj elem, adaptAdj splitElem, int n1_idxl, int n2_idxl);
     entry void recv_split_3D(int pos, int tableID, adaptAdj elem, adaptAdj splitElem);
     entry void handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj elem, int n1_idxl, int n2_idxl);
     entry [sync,threaded] void recv_splits(int tableID, int expectedSplits);

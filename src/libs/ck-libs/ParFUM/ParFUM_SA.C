@@ -607,14 +607,20 @@ void ParFUMShadowArray::remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem,
   bulkAdapt->remote_adaptAdj_replace(elem, oldElem, newElem);
 }
 
-void ParFUMShadowArray::remote_edgeAdj_replace(adaptAdj adj, adaptAdj elem, adaptAdj splitElem, double co1[3], double co2[3])
+void ParFUMShadowArray::remote_edgeAdj_replace(int remotePartID, adaptAdj adj, 
+					       adaptAdj elem, 
+					       adaptAdj splitElem, int n1_idxl,
+					       int n2_idxl)
 {
-  bulkAdapt->remote_edgeAdj_replace(adj, elem, splitElem, co1, co2);
+  bulkAdapt->remote_edgeAdj_replace(remotePartID, adj, elem, splitElem, 
+				    n1_idxl, n2_idxl);
 }
 
-void ParFUMShadowArray::remote_edgeAdj_add(adaptAdj adj, adaptAdj splitElem, double co1[3], double co2[3])
+void ParFUMShadowArray::remote_edgeAdj_add(int remotePartID, adaptAdj adj, 
+					   adaptAdj splitElem, int n1_idxl, 
+					   int n2_idxl)
 {
-  bulkAdapt->remote_edgeAdj_add(adj, splitElem, co1, co2);
+  bulkAdapt->remote_edgeAdj_add(remotePartID, adj, splitElem, n1_idxl, n2_idxl);
 }
 
 void ParFUMShadowArray::recv_split_3D(int pos, int tableID, adaptAdj elem, 
