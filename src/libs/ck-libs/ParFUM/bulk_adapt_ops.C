@@ -16,7 +16,7 @@ BulkAdapt::BulkAdapt(int meshid,FEM_Mesh *mPtr, int partID,
   partitionID = partID;
   shadowProxy = sa_proxy;
   localShadow = meshPtr->parfumSA;
-  for (int i=0; i<100; i++) { freeTable[i] = 1; }
+  for (int i=0; i<10; i++) { freeTable[i] = 1; }
   firstFree = 0;
 }
 

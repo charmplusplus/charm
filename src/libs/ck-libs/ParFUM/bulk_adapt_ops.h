@@ -25,9 +25,9 @@ class BulkAdapt {
   ParFUMShadowArray *localShadow;
 
   /// Data structure to gather elem-split pairs
-  adaptAdj *elemPairs[20];
-  int freeTable[20];
-  int numGathered[20];
+  adaptAdj *elemPairs[10];
+  int freeTable[10];
+  int numGathered[10];
   int firstFree;
  public:
   /// Construct array to be attached to the partitions of mesh mId
@@ -49,8 +49,14 @@ class BulkAdapt {
     int x = firstFree; 
     freeTable[x]=0; 
     numGathered[x] = 0;
-    firstFree++;
-    while (!freeTable[firstFree]) firstFree++;
+    firstFree++; 
+    while (!freeTable[firstFree]) {
+      firstFree++;
+      if (firstFree == 10) {
+	CkPrintf("ERROR: elemPairs table is full!\n");
+	break;
+      }
+    }
     return x; 
   }
   void freeTableID(int x) { 
