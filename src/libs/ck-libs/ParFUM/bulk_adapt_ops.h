@@ -25,9 +25,9 @@ class BulkAdapt {
   ParFUMShadowArray *localShadow;
 
   /// Data structure to gather elem-split pairs
-  adaptAdj *elemPairs[100];
-  int freeTable[100];
-  int numGathered[100];
+  adaptAdj *elemPairs[20];
+  int freeTable[20];
+  int numGathered[20];
   int firstFree;
  public:
   /// Construct array to be attached to the partitions of mesh mId

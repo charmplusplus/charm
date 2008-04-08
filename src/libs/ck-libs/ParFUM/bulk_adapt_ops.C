@@ -266,6 +266,8 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
   if (numParts > 1)
     make_node_shared(localNodes[2], numParts, &chunks[0]);
 
+  free(chunks);
+
   // Perform the splits on all affected elements
   int numRemote=0;
   int tableID = getTableID();
@@ -285,10 +287,10 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
   for (int i=0; i<numElemsToLock; i++) {
     if (elemsToLock[i].partID == partitionID) {
       elemPairs[tableID][2*i] = elemsToLock[i];
-      elemPairs[tableID][2*i+1] = *(local_split_3D(elemsToLock[i], 
-						   localNodes[0], 
-						   localNodes[1], 
-						   localNodes[2]));
+      adaptAdj *splitElem = local_split_3D(elemsToLock[i], localNodes[0], 
+					   localNodes[1], localNodes[2]);
+      elemPairs[tableID][2*i+1] = (*splitElem);
+      delete splitElem;
     }
   }
 
@@ -317,6 +319,7 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
 
   // clean up elemPairs
   freeTableID(tableID);
+  free(elemsToLock);
 
   // unlock the partitions
   localShadow->unlockRegion(lockRegionID);
@@ -526,8 +529,12 @@ void BulkAdapt::handle_split_3D(int remotePartID, int pos, int tableID,
   if (numParts > 1)
     make_node_shared(n5, numParts, &chunks[0]);
 
+  free(chunks);
+  free(elemsToLock);
+
   adaptAdj *splitElem = local_split_3D(elem, n1, n2, n5);
   shadowProxy[remotePartID].recv_split_3D(pos, tableID, elem, *splitElem);
+  delete splitElem;
 }
 
 void BulkAdapt::recv_split_3D(int pos, int tableID, adaptAdj elem,
