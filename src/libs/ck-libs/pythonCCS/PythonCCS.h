@@ -148,6 +148,8 @@ class PythonCCS : public CBase_PythonCCS {
 
 class CkCallbackPython : public CkCallbackResumeThread {
  public:
+  CkCallbackPython(void) { }
+  CkCallbackPython(void* &ptr) : CkCallbackResumeThread(ptr) { }
    ~CkCallbackPython(void) {
      void *res = thread_delay();
      if (result != NULL) *result = res;
