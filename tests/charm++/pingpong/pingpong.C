@@ -197,6 +197,7 @@ class PingN : public NodeGroup
 #endif
   double start_time, end_time;
 public:
+  CProxyElement_PingN *myProxy;
   PingN()
   {
     me = CkMyNode();    
@@ -207,10 +208,12 @@ public:
     // calculation.
 
     pp = new CProxyElement_PingN(thisgroup,nbr);
+    myProxy = new CProxyElement_PingN(thisgroup,me);
     niter = 0;
 #ifdef USE_RDMA 
     rbuff=(char *) malloc(payload*sizeof(char));
     sbuff=(char *) malloc(payload*sizeof(char));
+    bzero(sbuff,payload);
     // setup persistent comm sender and receiver side
     double OOB=9999999999.0;
     rhandle=CmiDirect_createHandle(nbr,rbuff,payload*sizeof(char),PingN::Wrapper_To_CallBack,(void *) this,OOB);
@@ -266,7 +269,11 @@ public:
     PingN* mySelf = (PingN*) pt2Object;
 
     // call member
-    mySelf->recvRDMA();
+    if(CkNumNodes() == 0){
+      mySelf->recvRDMA();
+    }else{
+      (*mySelf->myProxy).recvRDMA();   
+    }
   }
   // not an entry method, called via Wrapper_To_Callback
   void recvRDMA()
