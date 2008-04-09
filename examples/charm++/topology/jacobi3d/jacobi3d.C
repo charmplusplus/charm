@@ -36,22 +36,20 @@
 // See README for documentation
 
 /*readonly*/ CProxy_Main mainProxy;
-/*readonly*/ int blockDimX;
-/*readonly*/ int blockDimY;
-/*readonly*/ int blockDimZ;
 /*readonly*/ int arrayDimX;
 /*readonly*/ int arrayDimY;
 /*readonly*/ int arrayDimZ;
+/*readonly*/ int blockDimX;
+/*readonly*/ int blockDimY;
+/*readonly*/ int blockDimZ;
+/*readonly*/ int torusDimX;
+/*readonly*/ int torusDimY;
+/*readonly*/ int torusDimZ;
 
 // specify the number of worker chares in each dimension
 /*readonly*/ int num_chare_x;
 /*readonly*/ int num_chare_y;
 /*readonly*/ int num_chare_z;
-
-/*readonly*/ int numCharesPerPe;
-/*readonly*/ int numCharesPerPeX;
-/*readonly*/ int numCharesPerPeY;
-/*readonly*/ int numCharesPerPeZ;
 
 static unsigned long next = 1;
 
@@ -60,14 +58,15 @@ int myrand(int numpes) {
   return((unsigned)(next/65536) % numpes);
 }
 
-#define SMPWAYX		1
-#define SMPWAYY		2
-#define SMPWAYZ		2
-#define USE_TOPOMAP	0
-#define USE_RRMAP	0
-#define USE_BLOCKMAP	1
-#define USE_BLOCK_RRMAP	1
-#define USE_SMPMAP	0
+#define SMPWAYX			1
+#define SMPWAYY			2
+#define SMPWAYZ			2
+#define USE_TOPOMAP		0
+#define USE_RRMAP		0
+#define USE_BLOCKMAP		1
+#define USE_BLOCK_RNDMAP	0
+#define USE_BLOCK_RRMAP		0
+#define USE_SMPMAP		0
 
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
@@ -76,14 +75,14 @@ int myrand(int numpes) {
 #define wrap_z(a)	(((a)+num_chare_z)%num_chare_z)
 #define index(a, b, c)	(a*(blockDimY+2)*(blockDimZ+2) + b*(blockDimZ+2) + c)
 
-#define MAX_ITER	100
-#define LEFT		1
-#define RIGHT		2
-#define TOP		3
-#define BOTTOM		4
-#define FRONT		5
-#define BACK		6
-#define DIVIDEBY7       0.14285714285714285714
+#define MAX_ITER		100
+#define LEFT			1
+#define RIGHT			2
+#define TOP			3
+#define BOTTOM			4
+#define FRONT			5
+#define BACK			6
+#define DIVIDEBY7       	0.14285714285714285714
 
 double startTime;
 double endTime;
@@ -130,9 +129,9 @@ class Main : public CBase_Main {
         blockDimX = atoi(m->argv[4]); 
 	blockDimY = atoi(m->argv[5]); 
 	blockDimZ = atoi(m->argv[6]);
-	numCharesPerPeX = atoi(m->argv[7]);
-	numCharesPerPeY = atoi(m->argv[8]);
-	numCharesPerPeZ = atoi(m->argv[9]);
+	torusDimX = atoi(m->argv[7]);
+	torusDimY = atoi(m->argv[8]);
+	torusDimZ = atoi(m->argv[9]);
       }
 
       if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
@@ -152,9 +151,9 @@ class Main : public CBase_Main {
       CkPrintf("Block Dimensions: %d %d %d\n", blockDimX, blockDimY, blockDimZ);
 
       // Create new array of worker chares
-#if USE_TOPOMAP || USE_RRMAP || USE_BLOCKMAP || USE_SMPMAP
+#if USE_TOPOMAP || USE_RRMAP || USE_BLOCKMAP || USE_BLOCK_RRMAP || USE_BLOCK_RNDMAP || USE_SMPMAP
        CkPrintf("Topology Mapping is being done ... %d %d %d %d\n", USE_TOPOMAP, USE_RRMAP, USE_BLOCKMAP, USE_SMPMAP);
-      CProxy_JacobiMap map = CProxy_JacobiMap::ckNew(num_chare_x, num_chare_y, num_chare_z);
+      CProxy_JacobiMap map = CProxy_JacobiMap::ckNew(num_chare_x, num_chare_y, num_chare_z, torusDimX, torusDimY, torusDimZ);
       CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
       opts.setMap(map);
       array = CProxy_Jacobi::ckNew(opts);
@@ -464,52 +463,29 @@ class JacobiMap : public CkArrayMap {
     int X, Y, Z;
     int *mapping;
 
-    JacobiMap(int x, int y, int z) {
+    JacobiMap(int x, int y, int z, int tx, int ty, int tz) {
       X = x; Y = y; Z = z;
       mapping = new int[X*Y*Z];
 
       // we are assuming that the no. of chares in each dimension is a 
       // multiple of the torus dimension
-      numCharesPerPe = x*y*z/CkNumPes();
 
       TopoManager tmgr;
-      int dimX = tmgr.getDimNX();
-      int dimY = tmgr.getDimNY();
-      int dimZ = tmgr.getDimNZ();
-      int dimT = tmgr.getDimNT();
-
-      numCharesPerPeX = x / dimX;
-      numCharesPerPeY = y / dimY;
-      numCharesPerPeZ = z / dimZ;
+      int dimX, dimY, dimZ, dimT;
 
 #if USE_TOPOMAP
-      if(dimT < 2) {	// one core per node
-      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
-      for(int i=0; i<dimX; i++)
-	for(int j=0; j<dimY; j++)
-	  for(int k=0; k<dimZ; k++)
-	    for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
-	      for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
-		for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
-		  mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k);
-		}
-      } else {		// multiple cores per node
-      // In this case, we split the chares in the X dimension among the
-      // cores on the same node. The strange thing I figured out is that
-      // doing this in the Z dimension is not as good.
-      numCharesPerPeX /= dimT;
-      if(CkMyPe()==0) CkPrintf("%d %d %d : %d %d %d %d : %d %d %d \n", x, y, z, dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
-      for(int i=0; i<dimX; i++)
-	for(int j=0; j<dimY; j++)
-	  for(int k=0; k<dimZ; k++)
-	    for(int l=0; l<dimT; l++)
-	      for(int ci=(dimT*i+l)*numCharesPerPeX; ci<(dimT*i+l+1)*numCharesPerPeX; ci++)
-	        for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
-		  for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
-		    mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k, l);
-		  }
-      } // end of if
-#elif USE_RRMAP
+      dimX = tmgr.getDimNX();
+      dimY = tmgr.getDimNY();
+      dimZ = tmgr.getDimNZ();
+      dimT = tmgr.getDimNT();
+#elif USE_BLOCKMAP || USE_BLOCK_RRMAP
+      dimX = tx;
+      dimY = ty;
+      dimZ = tz;
+      dimT = 1;
+#endif
+
+#if USE_RRMAP
       if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d\n", x, y, z, numCharesPerPe, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
       int pe = 0;
       for(int i=0; i<x; i++)
@@ -520,43 +496,6 @@ class JacobiMap : public CkArrayMap {
 	    }
 	    mapping[i*Y*Z + j*Z + k] = pe;
 	    pe++;
-	  }
-#elif USE_BLOCKMAP
-      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d\n", dimX, dimY, dimZ, numCharesPerPe, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
-      int pe = 0, pes = CkNumPes();
-#if !USE_BLOCK_RRMAP
-      int used[pes];
-      for(int i=0; i<pes; i++)
-	used[i] = 0;
-#endif
-
-      x /= numCharesPerPeX;
-      y /= numCharesPerPeY;
-      z /= numCharesPerPeZ;
-
-#if USE_BLOCK_RRMAP
-	    pe = 0;
-#endif
-
-      for(int i=0; i<x; i++)
-	for(int j=0; j<y; j++)
-	  for(int k=0; k<z; k++) {
-#if !USE_BLOCK_RRMAP
-	    pe = myrand(pes); 
-            while(used[pe]!=0) {
-              pe = myrand(pes); 
-            }
-	    //if(CkMyPe() == 0) CkPrintf("PROC %d\n", pe);
-	    used[pe] = 1;
-#endif
-	    for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
-	      for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
-		for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
-		  mapping[ci*Y*Z + cj*Z + ck] = pe;
-		}
-#if USE_BLOCK_RRMAP
-	    pe++;
-#endif
 	  }
 #elif USE_SMPMAP
       if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d\n", x, y, z, numCharesPerPe, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
@@ -579,7 +518,72 @@ class JacobiMap : public CkArrayMap {
 			mapping[ci*Y*Z + cj*Z + ck] = pe;
 		      }
 		}
+#else
+
+      // we are assuming that the no. of chares in each dimension is a 
+      // multiple of the torus dimension
+      int numCharesPerPe = X*Y*Z/CkNumPes();
+
+      int numCharesPerPeX = X / dimX;
+      int numCharesPerPeY = Y / dimY;
+      int numCharesPerPeZ = Z / dimZ;
+      int pe = 0, pes = CkNumPes();
+
+#if USE_BLOCK_RNDMAP
+      int used[pes];
+      for(int i=0; i<pes; i++)
+	used[i] = 0;
 #endif
+
+      if(dimT < 2) {	// one core per node
+	if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
+	for(int i=0; i<dimX; i++)
+	  for(int j=0; j<dimY; j++)
+	    for(int k=0; k<dimZ; k++)
+	    {
+#if USE_BLOCK_RNDMAP
+	      pe = myrand(pes); 
+	      while(used[pe]!=0) {
+		pe = myrand(pes); 
+	      }
+	      used[pe] = 1;
+#endif
+
+	      for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
+		for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
+		  for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
+#if USE_TOPOMAP
+		    mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k);
+#elif USE_BLOCKMAP
+		    mapping[ci*Y*Z + cj*Z + ck] = i + j*dimX + k*dimX*dimY;
+#elif USE_BLOCK_RNDMAP
+		    mapping[ci*Y*Z + cj*Z + ck] = pe;
+#elif USE_BLOCK_RRMAP
+		    mapping[ci*Y*Z + cj*Z + ck] = pe;
+#endif
+		  }
+#if USE_BLOCK_RRMAP
+	      pe++;
+#endif
+	    }
+      } else {		// multiple cores per node
+      // In this case, we split the chares in the X dimension among the
+      // cores on the same node. The strange thing I figured out is that
+      // doing this in the Z dimension is not as good.
+      numCharesPerPeX /= dimT;
+      if(CkMyPe()==0) CkPrintf("%d %d %d : %d %d %d %d : %d %d %d \n", x, y, z, dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
+      for(int i=0; i<dimX; i++)
+	for(int j=0; j<dimY; j++)
+	  for(int k=0; k<dimZ; k++)
+	    for(int l=0; l<dimT; l++)
+	      for(int ci=(dimT*i+l)*numCharesPerPeX; ci<(dimT*i+l+1)*numCharesPerPeX; ci++)
+	        for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
+		  for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
+		    mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k, l);
+		  }
+      } // end of if
+#endif
+
       if(CkMyPe() == 0) CkPrintf("Map generated ... \n");
     }
 
