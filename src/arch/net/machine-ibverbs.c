@@ -2603,7 +2603,9 @@ void CmiDirect_ready(struct infiDirectUserHandle *userHandle){
 	for(i=0;i<tableIdx;i++){
 		table = table->next;
 	}
-	
+#if CMI_DIRECT_DEBUG
+  CmiPrintf("[%d] CmiDirect_ready receiver %p\n",CmiMyNode(),userHandle->recverBuf);
+#endif	
 	addHandleToPollingQ(&(table->handles[idx]));
 	
 }
@@ -2626,6 +2628,9 @@ static void pollCmiDirectQ(){
 	directPollingQNode *ptr = headDirectPollingQ, *prevPtr=NULL;
 	while(ptr != NULL){
 		if(receivedDirectMessage(ptr->handle)){
+#if CMI_DIRECT_DEBUG
+      CmiPrintf("[%d] polling detected recvd message at buf %p\n",CmiMyNode(),ptr->handle->userHandle.recverBuf);
+#endif
 			directPollingQNode *delPtr = ptr;
 			/** has been received and delete this node***/
 			if(prevPtr == NULL){
