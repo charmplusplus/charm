@@ -71,9 +71,10 @@ int myrand(int numpes) {
 
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
-#define wrap_x(a)  (((a)+num_chare_x)%num_chare_x)
-#define wrap_y(a)  (((a)+num_chare_y)%num_chare_y)
-#define wrap_z(a)  (((a)+num_chare_z)%num_chare_z)
+#define wrap_x(a)	(((a)+num_chare_x)%num_chare_x)
+#define wrap_y(a)	(((a)+num_chare_y)%num_chare_y)
+#define wrap_z(a)	(((a)+num_chare_z)%num_chare_z)
+#define index(a, b, c)	(a*(blockDimY+2)*(blockDimZ+2) + b*(blockDimZ+2) + c)
 
 #define MAX_ITER	100
 #define LEFT		1
@@ -219,25 +220,22 @@ class Jacobi: public CBase_Jacobi {
     int iterations;
     int msgs;
 
-    double ***temperature;
+    double *temperature;
 
     // Constructor, initialize values
     Jacobi() {
         int i, j, k;
         // allocate a three dimensional array
-        temperature = new double**[blockDimX+2];
-        for (i=0; i<blockDimX+2; i++) {
-          temperature[i] = new double*[blockDimY+2];
-	  for(j=0; j<blockDimY+2; j++)
-	    temperature[i][j] = new double[blockDimZ+2];
-	}
+        temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
+
         for(i=0; i<blockDimX+2; ++i) {
           for(j=0; j<blockDimY+2; ++j) {
             for(k=0; k<blockDimZ+2; ++k) {
-              temperature[i][j][k] = 0.0;
+              temperature[index(i, j, k)] = 0.0;
             }
           } 
 	}
+
 	iterations = 0;
 	arrived_left = 0;
 	arrived_right = 0;
@@ -254,13 +252,13 @@ class Jacobi: public CBase_Jacobi {
         // Heat left, top and front faces of each chare's block
 	for(int i=1; i<blockDimX+1; ++i)
 	  for(int k=1; k<blockDimZ+1; ++k)
-            temperature[i][1][k] = 255.0;
+            temperature[index(i, 1, k)] = 255.0;
         for(int j=1; j<blockDimY+1; ++j)
 	  for(int k=1; k<blockDimZ+1; ++k)
-            temperature[1][j][k] = 255.0;
+            temperature[index(1, j, k)] = 255.0;
 	for(int i=1; i<blockDimX+1; ++i)
           for(int j=1; j<blockDimY+1; ++j)
-            temperature[i][j][1] = 255.0;
+            temperature[index(i, j, 1)] = 255.0;
     }
 
     // a necessary function which we ignore now
@@ -269,11 +267,6 @@ class Jacobi: public CBase_Jacobi {
     Jacobi(CkMigrateMessage* m) {}
 
     ~Jacobi() { 
-      for (int i=0; i<blockDimX+2; i++) {
-	for(int j=0; j<blockDimY+2; j++)
-	  delete [] temperature[i][j];
-        delete [] temperature[i];
-      }
       delete [] temperature; 
     }
 
@@ -291,20 +284,20 @@ class Jacobi: public CBase_Jacobi {
 
         for(int j=0; j<blockDimY; ++j) 
 	  for(int k=0; k<blockDimZ; ++k) {
-            left_face[k*blockDimY+j] = temperature[1][j+1][k+1];
-            right_face[k*blockDimY+j] = temperature[blockDimX][j+1][k+1];
+            left_face[k*blockDimY+j] = temperature[index(1, j+1, k+1)];
+            right_face[k*blockDimY+j] = temperature[index(blockDimX, j+1, k+1)];
         }
 
 	for(int i=0; i<blockDimX; ++i) 
 	  for(int k=0; k<blockDimZ; ++k) {
-            top_face[k*blockDimX+i] = temperature[i+1][1][k+1];
-            bottom_face[k*blockDimX+i] = temperature[i+1][blockDimY][k+1];
+            top_face[k*blockDimX+i] = temperature[index(i+1, 1, k+1)];
+            bottom_face[k*blockDimX+i] = temperature[index(i+1, blockDimY, k+1)];
         }
 
 	for(int i=0; i<blockDimX; ++i) 
           for(int j=0; j<blockDimY; ++j) {
-            front_face[j*blockDimX+i] = temperature[i+1][j+1][1];
-            back_face[j*blockDimX+i] = temperature[i+1][j+1][blockDimZ];
+            front_face[j*blockDimX+i] = temperature[index(i+1, j+1, 1)];
+            back_face[j*blockDimX+i] = temperature[index(i+1, j+1, blockDimZ)];
         }
 
         // Send my left face
@@ -331,7 +324,7 @@ class Jacobi: public CBase_Jacobi {
     void ghostsFromRight(int height, int width, double ghost_values[]) {
         for(int j=0; j<height; ++j) 
 	  for(int k=0; k<width; ++k) {
-            temperature[blockDimX+1][j+1][k+1] = ghost_values[k*height+j];
+            temperature[index(blockDimX+1, j+1, k+1)] = ghost_values[k*height+j];
         }
         check_and_compute(RIGHT);
     }
@@ -339,7 +332,7 @@ class Jacobi: public CBase_Jacobi {
     void ghostsFromLeft(int height, int width, double ghost_values[]) {
         for(int j=0; j<height; ++j) 
 	  for(int k=0; k<width; ++k) {
-            temperature[0][j+1][k+1] = ghost_values[k*height+j];
+            temperature[index(0, j+1, k+1)] = ghost_values[k*height+j];
         }
         check_and_compute(LEFT);
     }
@@ -347,7 +340,7 @@ class Jacobi: public CBase_Jacobi {
     void ghostsFromBottom(int height, int width, double ghost_values[]) {
 	for(int i=0; i<height; ++i) 
 	  for(int k=0; k<width; ++k) {
-            temperature[i+1][blockDimY+1][k+1] = ghost_values[k*height+i];
+            temperature[index(i+1, blockDimY+1, k+1)] = ghost_values[k*height+i];
         }
         check_and_compute(BOTTOM);
     }
@@ -355,7 +348,7 @@ class Jacobi: public CBase_Jacobi {
     void ghostsFromTop(int height, int width, double ghost_values[]) {
 	for(int i=0; i<height; ++i) 
 	  for(int k=0; k<width; ++k) {
-            temperature[i+1][0][k+1] = ghost_values[k*height+i];
+            temperature[index(i+1, 0, k+1)] = ghost_values[k*height+i];
         }
         check_and_compute(TOP);
     }
@@ -363,7 +356,7 @@ class Jacobi: public CBase_Jacobi {
     void ghostsFromFront(int height, int width, double ghost_values[]) {
 	for(int i=0; i<height; ++i) 
           for(int j=0; j<width; ++j) {
-            temperature[i+1][j+1][blockDimZ+1] = ghost_values[j*height+i];
+            temperature[index(i+1, j+1, blockDimZ+1)] = ghost_values[j*height+i];
         }
         check_and_compute(FRONT);
     }
@@ -371,7 +364,7 @@ class Jacobi: public CBase_Jacobi {
     void ghostsFromBack(int height, int width, double ghost_values[]) {
 	for(int i=0; i<height; ++i) 
           for(int j=0; j<width; ++j) {
-            temperature[i+1][j+1][0] = ghost_values[j*height+i];
+            temperature[index(i+1, j+1, 0)] = ghost_values[j*height+i];
         }
         check_and_compute(BACK);
     }
@@ -432,14 +425,20 @@ class Jacobi: public CBase_Jacobi {
         // Other schemes could be used to accomplish this same problem. We just put
         // the new values in a temporary array and write them to temperature[][] 
         // after all of the new values are computed.
-        double new_temperature[blockDimX+2][blockDimY+2][blockDimZ+2];
+        double *new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
 
 #pragma unroll    
         for(int i=1; i<blockDimX+1; ++i) {
           for(int j=1; j<blockDimY+1; ++j) {
             for(int k=1; k<blockDimZ+1; ++k) {
               // update my value based on the surrounding values
-              new_temperature[i][j][k] = (temperature[i-1][j][k] + temperature[i+1][j][k] + temperature[i][j-1][k] + temperature[i][j+1][k] + temperature[i][j][k-1] + temperature[i][j][k+1] + temperature[i][j][k]) * DIVIDEBY7;
+              new_temperature[index(i, j, k)] = (temperature[index(i-1, j, k)] 
+					      +  temperature[index(i+1, j, k)]
+					      +  temperature[index(i, j-1, k)]
+					      +  temperature[index(i, j+1, k)]
+					      +  temperature[index(i, j, k-1)]
+					      +  temperature[index(i, j, k+1)]
+					      +  temperature[index(i, j, k)] ) * DIVIDEBY7;
             }
 	  }
         }
@@ -448,7 +447,7 @@ class Jacobi: public CBase_Jacobi {
         for(int i=0;i<blockDimX+2;++i)
           for(int j=0;j<blockDimY+2;++j)
             for(int k=1; k<blockDimZ+1; ++k)
-                temperature[i][j][k] = new_temperature[i][j][k];
+                temperature[index(i, j, k)] = new_temperature[index(i, j, k)];
 
         // Enforce the boundary conditions again
         BC();
