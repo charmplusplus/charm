@@ -63,10 +63,10 @@ int myrand(int numpes) {
 #define SMPWAYX		1
 #define SMPWAYY		2
 #define SMPWAYZ		2
-#define USE_TOPOMAP	1	
+#define USE_TOPOMAP	0
 #define USE_RRMAP	0
-#define USE_BLOCKMAP	0
-#define USE_BLOCK_RRMAP	0
+#define USE_BLOCKMAP	1
+#define USE_BLOCK_RRMAP	1
 #define USE_SMPMAP	0
 
 // We want to wrap entries around, and because mod operator % 
@@ -463,17 +463,11 @@ class Jacobi: public CBase_Jacobi {
 class JacobiMap : public CkArrayMap {
   public:
     int X, Y, Z;
-    int ***mapping;
+    int *mapping;
 
     JacobiMap(int x, int y, int z) {
       X = x; Y = y; Z = z;
-      int i, j, k;
-      mapping = new int**[x];
-      for (i=0; i<x; i++) {
-        mapping[i] = new int*[y];
-	for(j=0; j<y; j++)
-	  mapping[i][j] = new int[z];
-      }
+      mapping = new int[X*Y*Z];
 
       // we are assuming that the no. of chares in each dimension is a 
       // multiple of the torus dimension
@@ -498,7 +492,7 @@ class JacobiMap : public CkArrayMap {
 	    for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
 	      for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
 		for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
-		  mapping[ci][cj][ck] = tmgr.coordinatesToRank(i, j, k);
+		  mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k);
 		}
       } else {		// multiple cores per node
       // In this case, we split the chares in the X dimension among the
@@ -513,7 +507,7 @@ class JacobiMap : public CkArrayMap {
 	      for(int ci=(dimT*i+l)*numCharesPerPeX; ci<(dimT*i+l+1)*numCharesPerPeX; ci++)
 	        for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
 		  for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
-		    mapping[ci][cj][ck] = tmgr.coordinatesToRank(i, j, k, l);
+		    mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k, l);
 		  }
       } // end of if
 #elif USE_RRMAP
@@ -525,7 +519,7 @@ class JacobiMap : public CkArrayMap {
 	    if(pe == CkNumPes()) {
 	      pe = 0;
 	    }
-	    mapping[i][j][k] = pe;
+	    mapping[i*Y*Z + j*Z + k] = pe;
 	    pe++;
 	  }
 #elif USE_BLOCKMAP
@@ -559,7 +553,7 @@ class JacobiMap : public CkArrayMap {
 	    for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
 	      for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
 		for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
-		  mapping[ci][cj][ck] = pe;
+		  mapping[ci*Y*Z + cj*Z + ck] = pe;
 		}
 #if USE_BLOCK_RRMAP
 	    pe++;
@@ -583,7 +577,7 @@ class JacobiMap : public CkArrayMap {
 		    for(int cj=bj*numCharesPerPeY; cj<(bj+1)*numCharesPerPeY; cj++)
 		      for(int ck=bk*numCharesPerPeZ; ck<(bk+1)*numCharesPerPeZ; ck++) {
 			//if(CkMyPe()==0) CkPrintf("%d %d %d %d %d %d [%d]\n", i, j, k, ci, cj, ck, pe);
-			mapping[ci][cj][ck] = pe;
+			mapping[ci*Y*Z + cj*Z + ck] = pe;
 		      }
 		}
 #endif
@@ -591,17 +585,12 @@ class JacobiMap : public CkArrayMap {
     }
 
     ~JacobiMap() { 
-      for (int i=0; i<X; i++) {
-	for(int j=0; j<Y; j++)
-	  delete [] mapping[i][j];
-        delete [] mapping[i];
-      }
       delete [] mapping;
     }
 
     int procNum(int, const CkArrayIndex &idx) {
       int *index = (int *)idx.data();
-      return mapping[index[0]][index[1]][index[2]]; 
+      return mapping[index[0]*Y*Z + index[1]*Z + index[2]]; 
     }
 };
 
