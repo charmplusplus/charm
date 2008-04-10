@@ -329,10 +329,21 @@ void setAdaptAdj(
         const int faceID, 
         const adaptAdj nbr);
 
+void setAdaptAdj(
+        const FEM_Mesh* meshPtr, 
+        const adaptAdj elem, 
+        const int faceID, 
+        const adaptAdj nbr);
+
 /** 3D: Look up elemID in elemType array and add nbr to the adjacency on
     edgeID. */
 void addToAdaptAdj(
         const int meshid, 
+        const adaptAdj elem, 
+        const int edgeID, 
+        const adaptAdj nbr);
+void addToAdaptAdj(
+        const FEM_Mesh* meshPtr, 
         const adaptAdj elem, 
         const int edgeID, 
         const adaptAdj nbr);

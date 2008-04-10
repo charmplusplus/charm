@@ -1124,6 +1124,18 @@ void setAdaptAdj(
   adaptAdjTable[elem.localID*numAdjacencies + faceID] = nbr;
 }
 
+void setAdaptAdj(
+        const FEM_Mesh* meshPtr,
+        const adaptAdj elem, 
+        const int faceID, 
+        const adaptAdj nbr)
+{
+  int numAdjacencies;
+  adaptAdj *adaptAdjTable = lookupAdaptAdjacencies(meshPtr, elem.elemType,
+						   &numAdjacencies);
+  adaptAdjTable[elem.localID*numAdjacencies + faceID] = nbr;
+}
+
 void addToAdaptAdj(
         const int meshid, 
         const adaptAdj elem, 
@@ -1132,6 +1144,18 @@ void addToAdaptAdj(
 {
   CkAssert(nbr.localID != -1);
   CkVec<adaptAdj>* adjVec = getEdgeAdaptAdj(meshid, elem.localID, 
+					    elem.elemType, edgeID);
+  adjVec->push_back(nbr);
+}
+
+void addToAdaptAdj(
+        const FEM_Mesh* meshPtr, 
+        const adaptAdj elem, 
+        const int edgeID, 
+        const adaptAdj nbr)
+{
+  CkAssert(nbr.localID != -1);
+  CkVec<adaptAdj>* adjVec = getEdgeAdaptAdj(meshPtr, elem.localID, 
 					    elem.elemType, edgeID);
   adjVec->push_back(nbr);
 }

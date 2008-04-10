@@ -189,20 +189,6 @@ adaptAdj BulkAdapt::remote_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, 
   return nbrSplitElem;
 }
 
-/*
-  Top level 3D edge bisect algorithm:
-
-  . find nbr1 and nbr2, if they exist
-  . call local_split_3D on the startElem, returning splitElem
-  . call recursive_split_3D on the nbr1, returning splitNbr1 and a splitList1
-    of all splitNbrs on that path, and a "completed" status, and
-    splitNbr2 if "completed"
-  . if not "completed" i.e. the recursive call to recursive_split_3D on nbr1
-    did not traverse all the way around the split edge to reach nbr2, 
-  . call recursive_split_3D on the nbr2, returning splitNbr2 and splitList2
-  . update all face and edge adjacencies for startElem: updateStartElementAdj
- */
-
 /// Perform a 3D edge bisection on a tetrahedron
 int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
 { // ASSERT: An edge can only be on one surface.
@@ -323,6 +309,8 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
 
   // unlock the partitions
   localShadow->unlockRegion(lockRegionID);
+
+  //BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D successful.\n",partitionID));  
 
   return 1;
 }
@@ -493,7 +481,7 @@ void BulkAdapt::remote_edgeAdj_add(int remotePartID, adaptAdj adj, adaptAdj spli
   // find which edgeID is bisected
   int edgeID = getEdgeID(relNodes[0], relNodes[1], 4, 3);
 
-  addToAdaptAdj(meshID, adj, edgeID, splitElem);
+  addToAdaptAdj(meshPtr, adj, edgeID, splitElem);
 }
 
 void BulkAdapt::handle_split_3D(int remotePartID, int pos, int tableID, 
@@ -996,16 +984,16 @@ void BulkAdapt::update_local_face_adj(adaptAdj elem, adaptAdj splitElem,
   face[2] = (relNode[0] + relNode[3] + relNode[2]) - 3;
   face[3] = (relNode[1] + relNode[3] + relNode[2]) - 3;
   adaptAdj neighbors[4]; // elem's neighbors
-  neighbors[0] = *getFaceAdaptAdj(meshID, elem.localID, elem.elemType, face[0]);
-  neighbors[1] = *getFaceAdaptAdj(meshID, elem.localID, elem.elemType, face[1]);
-  neighbors[2] = *getFaceAdaptAdj(meshID, elem.localID, elem.elemType, face[2]);
-  neighbors[3] = *getFaceAdaptAdj(meshID, elem.localID, elem.elemType, face[3]);
+  neighbors[0] = *getFaceAdaptAdj(meshPtr,elem.localID, elem.elemType, face[0]);
+  neighbors[1] = *getFaceAdaptAdj(meshPtr,elem.localID, elem.elemType, face[1]);
+  neighbors[2] = *getFaceAdaptAdj(meshPtr,elem.localID, elem.elemType, face[2]);
+  neighbors[3] = *getFaceAdaptAdj(meshPtr,elem.localID, elem.elemType, face[3]);
   // elem's non-split faces have neighbors[2] and [3]
   // update elem's new nbr from neighbors[3] to splitElem
-  setAdaptAdj(meshID, elem, face[3], splitElem);
+  setAdaptAdj(meshPtr, elem, face[3], splitElem);
   //replaceAdaptAdj(meshPtr, elem, neighbors[3], splitElem);
   // update splitElem's neighbor from neighbors[2] to elem
-  setAdaptAdj(meshID, splitElem, face[2], elem);
+  setAdaptAdj(meshPtr, splitElem, face[2], elem);
   //replaceAdaptAdj(meshPtr, splitElem, neighbors[2], elem);
   // update elem's nbr's back-adjacency from elem to splitElem
   if (neighbors[3].partID == elem.partID) {
@@ -1144,7 +1132,7 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
       r4 = getRelNode(n4, adjConn, 4);
       // edgeID on adj
       int edgeID = getEdgeID(r3, r4, 4, 3);
-      addToAdaptAdj(meshID, adj, edgeID, splitElem);
+      addToAdaptAdj(meshPtr, adj, edgeID, splitElem);
     }
     else if (adj.partID != -1) { // call remote replacement
       int n3_idxl = get_idxl_for_node(n3, adj.partID);
@@ -1153,31 +1141,8 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
 						 n3_idxl, n4_idxl);
     }
   }
-  addToAdaptAdj(meshID, splitElem, n3_n4, elem);
-  addToAdaptAdj(meshID, elem, elem_n3_n4, splitElem);
+  addToAdaptAdj(meshPtr, splitElem, n3_n4, elem);
+  addToAdaptAdj(meshPtr, elem, elem_n3_n4, splitElem);
   // The last two cases are performed elsewhere
 }
 
-void BulkAdapt::updateStartElemAdj(adaptAdj elem, adaptAdj splitElem, 
-				   adaptAdj nbr1, adaptAdj nbr2,
-				   adaptAdj splitNbr1, adaptAdj splitNbr2,
-				   adaptAdj *splitList1, adaptAdj *splitList2,
-				   int sl1_len, int sl2_len, int n1, int n2, 
-				   int n3, int n4, int n5)
-{
-  // Face updates:
-  // replace nbr1 on splitElem with splitNbr1
-  // replace nbr2 on splitElem with splitNbr2
-  // Edge updates:  (assumes n3 is on nbr1 and n4 is on nbr2)
-  // (n3,n5)
-  // on elem, add nbr1 and splitNbr1 (splitElem should already be there)
-  // on splitElem, add nbr1 and splitNbr1 (elem should already be there)
-  // (n4,n5)
-  // on elem, add nbr2 and splitNbr2 (splitElem should already be there)
-  // on splitElem, add nbr2 and splitNbr2 (elem should already be there)
-  // (n2,n5)
-  // union splitList1 and splitList2 to make the splitList
-  // set (n2,n5) on splitElem to splitList
-  // for each elem in splitList, set (n2,n5) to splitList, remove self
-  // and add splitElem
-}
