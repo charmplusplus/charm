@@ -75,7 +75,7 @@ int myrand(int numpes) {
 #define wrap_z(a)	(((a)+num_chare_z)%num_chare_z)
 #define index(a, b, c)	(a*(blockDimY+2)*(blockDimZ+2) + b*(blockDimZ+2) + c)
 
-#define MAX_ITER		100
+#define MAX_ITER		21
 #define LEFT			1
 #define RIGHT			2
 #define TOP			3
@@ -93,9 +93,7 @@ double endTime;
 
 class Main : public CBase_Main {
   public:
-    int recieve_count;
     CProxy_Jacobi array;
-    int num_chares;
     int iterations;
 
     Main(CkArgMsg* m) {
@@ -106,7 +104,7 @@ class Main : public CBase_Main {
       }
 
       // set iteration counter to zero
-      iterations=0;
+      iterations = 0;
 
       // store the main proxy
       mainProxy = thisProxy;
@@ -184,21 +182,21 @@ class Main : public CBase_Main {
 	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][j][wrap_z(k-1)]);
 	  }
       CkPrintf("Total Hops: %d\n", hops);
-      // save the total number of worker chares we have in this simulation
-      num_chares = num_chare_x * num_chare_y * num_chare_z;
 
       //Start the computation
-      recieve_count = 0;
-      startTime = CmiWallTimer();
       array.begin_iteration();
     }
 
     // Each worker reports back to here when it completes an iteration
-    void report(int x, int y, int z) {
-      recieve_count++;
-      if (num_chares == recieve_count) {
+    void report() {
+      if (iterations == 0) {
+	iterations++;
+	startTime = CmiWallTimer();
+	array.begin_iteration();
+      }
+      else {
 	endTime = CmiWallTimer();
-	CkPrintf("TIME : %f\n", endTime - startTime);
+	CkPrintf("TIME : %f\n", (endTime - startTime)/(MAX_ITER-1));
         CkExit();
       }
     }
@@ -220,12 +218,14 @@ class Jacobi: public CBase_Jacobi {
     int msgs;
 
     double *temperature;
+    double *new_temperature;
 
     // Constructor, initialize values
     Jacobi() {
         int i, j, k;
         // allocate a three dimensional array
         temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
+        new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
 
         for(i=0; i<blockDimX+2; ++i) {
           for(j=0; j<blockDimY+2; ++j) {
@@ -267,6 +267,7 @@ class Jacobi: public CBase_Jacobi {
 
     ~Jacobi() { 
       delete [] temperature; 
+      delete [] new_temperature; 
     }
 
     // Perform one iteration of work
@@ -404,15 +405,10 @@ class Jacobi: public CBase_Jacobi {
 	  arrived_back--;
           compute();
 	  iterations++;
-          if (iterations == MAX_ITER) {
-            if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0) CkPrintf("Completed %d iterations\n", iterations);
-            mainProxy.report(thisIndex.x, thisIndex.y, thisIndex.z);
-            // CkExit();
-          } else {
-            // if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0) CkPrintf("%d ... \n", iterations);
-            // Call begin_iteration on all worker chares in array
+	  if (iterations == 1 || iterations == MAX_ITER)
+	    contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
+          else
             begin_iteration();
-          } 
         }
     }
 
@@ -424,7 +420,6 @@ class Jacobi: public CBase_Jacobi {
         // Other schemes could be used to accomplish this same problem. We just put
         // the new values in a temporary array and write them to temperature[][] 
         // after all of the new values are computed.
-        double *new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
 
 #pragma unroll    
         for(int i=1; i<blockDimX+1; ++i) {

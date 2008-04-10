@@ -16,7 +16,7 @@ mainmodule jacobi3d {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void report(int, int, int);
+    entry void report();
   };
 
   array [3D] Jacobi {
