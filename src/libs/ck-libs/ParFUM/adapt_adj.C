@@ -320,20 +320,20 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     requestTable->sync();
     replyTable->sync();
 
-    // Once the replies are back, loop through each reply and update the
-    // adjacencies for each element in the reply
-    CkVec<adjReply> *receivedReplyVec = replyTable->get(myRank).vec;
-    for(int i=0;i< receivedReplyVec->size();i++){
-        adjReply *receivedReply = &(*receivedReplyVec)[i];
-        printf("[%d] Replies received for (%d,%d) (%d,%d,%d)\n",
-                myRank,receivedReply->requestingElemID,
-                receivedReply->requestingNodeSetID,
-                receivedReply->replyingElem.partID,
-                receivedReply->replyingElem.localID,
-                receivedReply->replyingElem.elemType);
-        adaptFaceAdjacencies[receivedReply->requestingElemID*faceMapSize + 
-            receivedReply->requestingNodeSetID] = receivedReply->replyingElem;
-    }
+//    // Once the replies are back, loop through each reply and update the
+//    // adjacencies for each element in the reply
+//    CkVec<adjReply> *receivedReplyVec = replyTable->get(myRank).vec;
+//    for(int i=0;i< receivedReplyVec->size();i++){
+//        adjReply *receivedReply = &(*receivedReplyVec)[i];
+//        printf("[%d] Replies received for (%d,%d) (%d,%d,%d)\n",
+//                myRank,receivedReply->requestingElemID,
+//                receivedReply->requestingNodeSetID,
+//                receivedReply->replyingElem.partID,
+//                receivedReply->replyingElem.localID,
+//                receivedReply->replyingElem.elemType);
+//        adaptFaceAdjacencies[receivedReply->requestingElemID*faceMapSize + 
+//            receivedReply->requestingNodeSetID] = receivedReply->replyingElem;
+//    }
     replyTable->sync();
     delete requestTable;
     delete replyTable;
@@ -388,21 +388,21 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
         requestTable->sync();
         replyTable->sync();
 
-        // Once the replies are back, loop through each reply and update the
-        // adjacencies for each element in the reply
-        CkVec<adjReply> *receivedReplyVec = replyTable->get(myRank).vec;
-        for(int i=0;i< receivedReplyVec->size();i++){
-            adjReply *receivedReply = &(*receivedReplyVec)[i];
-            printf("[%d] Replies received for (%d,%d) (%d,%d,%d)\n",
-                    myRank,receivedReply->requestingElemID,
-                    receivedReply->requestingNodeSetID,
-                    receivedReply->replyingElem.partID,
-                    receivedReply->replyingElem.localID,
-                    receivedReply->replyingElem.elemType);
-            adaptEdgeAdjacencies[receivedReply->requestingElemID*edgeMapSize + 
-                receivedReply->requestingNodeSetID]->push_back(
-                        receivedReply->replyingElem);
-        }
+//        // Once the replies are back, loop through each reply and update the
+//        // adjacencies for each element in the reply
+//        CkVec<adjReply> *receivedReplyVec = replyTable->get(myRank).vec;
+//        for(int i=0;i< receivedReplyVec->size();i++){
+//            adjReply *receivedReply = &(*receivedReplyVec)[i];
+//            printf("[%d] Replies received for (%d,%d) (%d,%d,%d)\n",
+//                    myRank,receivedReply->requestingElemID,
+//                    receivedReply->requestingNodeSetID,
+//                    receivedReply->replyingElem.partID,
+//                    receivedReply->replyingElem.localID,
+//                    receivedReply->replyingElem.elemType);
+//            adaptEdgeAdjacencies[receivedReply->requestingElemID*edgeMapSize + 
+//                receivedReply->requestingNodeSetID]->push_back(
+//                        receivedReply->replyingElem);
+//        }
         replyTable->sync();
 
         delete requestTable;
