@@ -529,6 +529,17 @@ typedef struct {
   int ref;
 } CmiChunkHeader;
 
+#if CMK_USE_IBVERBS
+struct infiCmiChunkMetaDataStruct;
+
+typedef struct infiCmiChunkHeaderStruct{
+  struct infiCmiChunkMetaDataStruct *metaData;
+	CmiChunkHeader chunkHeader;
+} infiCmiChunkHeader;
+
+struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
+#endif
+
 /* Given a user chunk m, extract the enclosing chunk header fields: */
 #define SIZEFIELD(m) (((CmiChunkHeader *)(m))[-1].size)
 #define REFFIELD(m) (((CmiChunkHeader *)(m))[-1].ref)
@@ -827,14 +838,14 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
  * one of the new message).
  */
 
-#define VECTOR_COMPACT(outsize,outdata,inndata,insizes,indatas) {\
+#define VECTOR_COMPACT(outsize,outdata,inndata,insizes,indatas,chunkHeaderSize) {\
   int i;\
   char *tmp;\
   outsize=0;\
   if (inndata>=0) for(i=0; i<inndata; ++i) outsize += insizes[i];\
   else {\
     for(i=0; i<-inndata; ++i) outsize += ALIGN8(insizes[i]);\
-    outsize -= (inndata+1) * sizeof(CmiChunkHeader);\
+    outsize -= (inndata+1) * chunkHeaderSize;\
   }\
   outdata = (char *)CmiAlloc(outsize);\
   if (!outdata) fprintf(stderr, "%d: Out of mem\n", CmiMyNode());\
@@ -848,8 +859,8 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
     memcpy(tmp, indatas[0], insizes[0]);\
     tmp += ALIGN8(insizes[0]);\
     for (i=0; i<-inndata; ++i) {\
-      memcpy(tmp, indatas[i]-sizeof(CmiChunkHeader), insizes[i]+sizeof(CmiChunkHeader));\
-      tmp += ALIGN8(insizes[i])+sizeof(CmiChunkHeader);\
+      memcpy(tmp, indatas[i]-chunkHeaderSize, insizes[i]+chunkHeaderSize);\
+      tmp += ALIGN8(insizes[i])+chunkHeaderSize;\
     }\
   }\
 }

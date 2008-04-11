@@ -1687,7 +1687,11 @@ void CsdInit(argv)
 void CmiSyncVectorSend(int destPE, int n, int *sizes, char **msgs) {
   int total;
   char *mesg;
-  VECTOR_COMPACT(total, mesg, n, sizes, msgs);
+#if CMK_USE_IBVERBS
+  VECTOR_COMPACT(total, mesg, n, sizes, msgs,sizeof(infiCmiChunkHeader));
+#else
+  VECTOR_COMPACT(total, mesg, n, sizes, msgs,sizeof(CmiChunkHeader));
+#endif	
   CmiSyncSendAndFree(destPE, total, mesg);
 }
 
@@ -2369,14 +2373,25 @@ static void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *ms
 {
   CmiMultipleSendHeader header;
   int m; /* Outgoing message */
+
+#if CMK_USE_IBVERBS
+	infiCmiChunkHeader *msgHdr;
+#else
   CmiChunkHeader *msgHdr; /* Chunk headers for each message */
+#endif
+	
   double pad = 0; /* padding required */
   int vecLen; /* Number of pieces in outgoing message vector */
   int *vecSizes; /* Sizes of each piece we're sending out. */
   char **vecPtrs; /* Pointers to each piece we're sending out. */
   int vec; /* Entry we're currently filling out in above array */
-
+	
+#if CMK_USE_IBVERBS
+  msgHdr = (infiCmiChunkHeader *)CmiTmpAlloc(len * sizeof(infiCmiChunkHeader));
+#else
   msgHdr = (CmiChunkHeader *)CmiTmpAlloc(len * sizeof(CmiChunkHeader));
+#endif
+	
   /* Allocate memory for the outgoing vector*/
   vecLen=1+3*len; /* Header and 3 parts per message */
   vecSizes = (int *)CmiTmpAlloc(vecLen * sizeof(int));
@@ -2396,11 +2411,21 @@ static void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *ms
          | CmiChunkHeader | Message data | Message padding | ...next message entry ...
   */
   for (m=0;m<len;m++) {
+#if CMK_USE_IBVERBS
+    msgHdr[m].chunkHeader.size=roundUpSize(sizes[m]); /* Size of message and padding */
+    msgHdr[m].chunkHeader.ref=0; /* Reference count will be filled out on receive side */
+#else
     msgHdr[m].size=roundUpSize(sizes[m]); /* Size of message and padding */
     msgHdr[m].ref=0; /* Reference count will be filled out on receive side */
+#endif		
     
     /* First send the message's CmiChunkHeader (for use on receive side) */
-    vecSizes[vec]=sizeof(CmiChunkHeader); vecPtrs[vec]=(char *)&msgHdr[m];
+#if CMK_USE_IBVERBS
+    vecSizes[vec]=sizeof(infiCmiChunkHeader);
+#else
+    vecSizes[vec]=sizeof(CmiChunkHeader); 
+#endif		
+		vecPtrs[vec]=(char *)&msgHdr[m];
     vec++;
     
     /* Now send the actual message data */
@@ -2460,14 +2485,26 @@ static void CmiMultiMsgHandler(char *msgWhole)
   int offset=sizeof(CmiMultipleSendHeader);
   int m;
   for (m=0;m<len;m++) {
+#if CMK_USE_IBVERBS
+    infiCmiChunkHeader *ch=(infiCmiChunkHeader *)(msgWhole+offset);
+    char *msg=(msgWhole+offset+sizeof(infiCmiChunkHeader));
+    int msgSize=ch->chunkHeader.size; /* Size of user portion of message (plus padding at end) */
+    ch->chunkHeader.ref=msgWhole-msg; 
+		ch->metaData =  registerMultiSendMesg(msg,msgSize);
+#else
     CmiChunkHeader *ch=(CmiChunkHeader *)(msgWhole+offset);
     char *msg=(msgWhole+offset+sizeof(CmiChunkHeader));
     int msgSize=ch->size; /* Size of user portion of message (plus padding at end) */
-    /* Link new message to owner via a negative ref pointer */
     ch->ref=msgWhole-msg; 
+#endif		
+    /* Link new message to owner via a negative ref pointer */
     CmiReference(msg); /* Follows link & increases reference count of *msgWhole* */
     CmiSyncSendAndFree(CmiMyPe(), msgSize, msg);
+#if CMK_USE_IBVERBS
+    offset+= sizeof(infiCmiChunkHeader) + msgSize;
+#else
     offset+= sizeof(CmiChunkHeader) + msgSize;
+#endif		
   }
   /* Release our reference to the whole message.  The message will
      only actually be deleted once all its sub-messages are free'd as well. */
