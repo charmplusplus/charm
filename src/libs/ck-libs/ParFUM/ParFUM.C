@@ -1436,15 +1436,15 @@ FEM_chunk::print(int fem_mesh,int idxBase)
 }  
 
 
-/**  Isaac's new element to element adjacency interface
- *  Registers a set of tuples for a single element type
- *  Must be called for each element type for which we  
- *  want adjacencies to be computed.
+/** 
+ *  Register a set of tuples for a single element type
+ *  Must be called once for each element type.
  * 
  *  After a sequence of calls to this function, a call 
  *  should be made to
- *   FEM_Mesh_create_elem_elem_adjacency(int fem_mesh)
+ *  FEM_Mesh_create_elem_elem_adjacency(int fem_mesh)
  *
+ *   TODO: Make this work with multiple types of faces for a single element
  */
 
 CDECL void FEM_Add_elem2face_tuples(int fem_mesh, int elem_type, int nodesPerTuple, int tuplesPerElem,const int *elem2tuple) 
@@ -1460,8 +1460,7 @@ CDECL void FEM_Add_elem2face_tuples(int fem_mesh, int elem_type, int nodesPerTup
 	int idxBase=0;
 	cur->nodesPerTuple=nodesPerTuple;
 	cur->elem[elem_type].tuplesPerElem=tuplesPerElem;
-	cur->elem[elem_type].elem2tuple=CkCopyArray(elem2tuple,
-		          tuplesPerElem*cur->nodesPerTuple,idxBase);
+	cur->elem[elem_type].elem2tuple=CkCopyArray(elem2tuple, tuplesPerElem*cur->nodesPerTuple,idxBase);
 
 }
 FORTRAN_AS_C(FEM_ADD_ELEM2FACE_TUPLES,FEM_Add_elem2face_tuples,fem_add_elem2face_tuples,

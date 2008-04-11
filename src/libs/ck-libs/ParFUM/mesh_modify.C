@@ -365,113 +365,120 @@ void FEM_update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
     update_new_element_e2e(m, newEl, elemType);
 }
 
-void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType){
-  // this function most definitely will not yet work with mixed element types.
-  CkAssert(elemType==0); 
-  // Create tuple table
-  FEM_ElemAdj_Layer *g = m->getElemAdjLayer();
-  CkAssert(g->initialized);
-  const int nodesPerTuple = g->nodesPerTuple;
-  const int tuplesPerElem = g->elem[elemType].tuplesPerElem;
-  tupleTable table(nodesPerTuple);
-  FEM_Symmetries_t allSym;
-  // locate all elements adjacent to the nodes adjacent to the new 
-  // element, including ghosts, and the new element itself
-  const int nodesPerElem = m->elem[elemType].getNodesPer();
-  int *adjnodes = new int[nodesPerElem];
-  CkVec<int> elist;
-  m->e2n_getAll(newEl, adjnodes, elemType);
-  for(int i=0;i<nodesPerElem;i++){
-    int sz;
-    int *adjelements=0;
-    m->n2e_getAll(adjnodes[i], adjelements, sz);
-    for(int j=0;j<sz;j++){
-      int found=0;
-      // only insert if it is not already in the list
-      // we use a slow linear scan of the CkVec
-      for(int i=0;i<elist.length();i++) {
-	if(elist[i] == adjelements[j]) found=1;
-      }
-      if(!found){
-	elist.push_back(adjelements[j]);
-      }
-    }
-    if(sz!=0) delete[] adjelements;
-  }
-  delete[] adjnodes;
-  // Add all the potentially adjacent elements to the tuple table
-  for(int i=0;i<elist.length();i++){
-    int nextElem = elist[i];
-    int tuple[tupleTable::MAX_TUPLE];
-    int *conn;
-    if(FEM_Is_ghost_index(nextElem))
-      conn=((FEM_Elem*)m->elem[elemType].getGhost())->connFor(FEM_To_ghost_index(nextElem));
-    else
-      conn=m->elem[elemType].connFor(nextElem);
-    for (int u=0;u<tuplesPerElem;u++) {
-      for (int i=0;i<nodesPerTuple;i++) {
-	int eidx=g->elem[elemType].elem2tuple[i+u*g->nodesPerTuple];
-	if (eidx==-1)  //"not-there" node--
-	  tuple[i]=-1; //Don't map via connectivity
-	else           //Ordinary node
-	  tuple[i]=conn[eidx]; 
-      }
-      table.addTuple(tuple,new elemList(0,nextElem,elemType,allSym,u)); 
-    }
-  }
-  // extract true adjacencies from table and update all e2e tables for both newEl and the others
-  table.beginLookup();
-  // look through each elemList that is returned by the tuple table
-  elemList *l;
-  FEM_IndexAttribute *elemAdjTypesAttr = (FEM_IndexAttribute *)m->elem[elemType].lookup(FEM_ELEM_ELEM_ADJ_TYPES,"update_new_element_e2e");
-  FEM_IndexAttribute *elemAdjAttr = (FEM_IndexAttribute *)m->elem[elemType].lookup(FEM_ELEM_ELEM_ADJACENCY,"update_new_element_e2e");
-  FEM_IndexAttribute *elemAdjTypesAttrGhost = (FEM_IndexAttribute *)m->elem[elemType].getGhost()->lookup(FEM_ELEM_ELEM_ADJ_TYPES,"update_new_element_e2e");
-  FEM_IndexAttribute *elemAdjAttrGhost = (FEM_IndexAttribute *)m->elem[elemType].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"update_new_element_e2e");
-  //allocate some data structures
-  AllocTable2d<int> &adjTable = elemAdjAttr->get();
-  int *adjs = adjTable.getData();
-  AllocTable2d<int> &adjTypesTable = elemAdjTypesAttr->get();
-  int *adjTypes = adjTypesTable.getData();
-  AllocTable2d<int> &adjTableGhost = elemAdjAttrGhost->get();
-  int *adjsGhost = adjTableGhost.getData();
-  AllocTable2d<int> &adjTypesTableGhost = elemAdjTypesAttrGhost->get();
-  int *adjTypesGhost = adjTypesTableGhost.getData();
-  while (NULL!=(l=table.lookupNext())) {
-    if (l->next==NULL) {} // One-entry list: must be a symmetry
-    else { /* Several elements in list: normal case */
-      // for each a,b pair of adjacent edges
-      for (const elemList *a=l;a!=NULL;a=a->next){
-        for (const elemList *b=a->next;b!=NULL;b=b->next){
-	  // if a and b are different elements
-          if((a->localNo != b->localNo) || (a->type != b->type)){
-	    //CkPrintf("%d:%d:%d adj to %d:%d:%d\n", a->type, a->localNo, a->tupleNo, b->type, b->localNo, b->tupleNo);
-	    // Put b in a's adjacency list
-	    if(FEM_Is_ghost_index(a->localNo)){
-	      const int j = FEM_To_ghost_index(a->localNo)*tuplesPerElem + a->tupleNo;
-	      adjsGhost[j] = b->localNo;
-	      adjTypesGhost[j] = b->type;
-	    }
-	    else{
-	      const int j= a->localNo*tuplesPerElem + a->tupleNo;
-	      adjs[j] = b->localNo;
-	      adjTypes[j] = b->type;
-	    }
-	    // Put a in b's adjacency list
-	    if(FEM_Is_ghost_index(b->localNo)){
-	      const int j = FEM_To_ghost_index(b->localNo)*tuplesPerElem + b->tupleNo;
-	      adjsGhost[j] = a->localNo;
-	      adjTypesGhost[j] = a->type;
-	    }
-	    else{
-	      const int j= b->localNo*tuplesPerElem + b->tupleNo;
-	      adjs[j] = a->localNo;
-	      adjTypes[j] = a->type;
-	    }
-          }
-        }
-      }
-    }
-  }
+/** Regenerate the e2e connectivity for the given element.
+ *   Currently supports multiple element types.
+ */
+void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType) {
+
+	// Create tuple table
+	FEM_ElemAdj_Layer *g = m->getElemAdjLayer();
+	CkAssert(g->initialized);
+	tupleTable table(g->nodesPerTuple);
+
+	FEM_Symmetries_t allSym;
+	// locate all elements adjacent to the nodes adjacent to the new 
+	// element, including ghosts, and the new element itself
+	const int nodesPerElem = m->elem[elemType].getNodesPer();
+	int *adjnodes = new int[nodesPerElem];
+
+	/// A list of all elements adjacent to one of the nodes
+	CkVec<FEM_VarIndexAttribute::ID> nodeAdjacentElements;
+
+	m->e2n_getAll(newEl, adjnodes, elemType);
+	for(int i=0;i<nodesPerElem;i++){
+		CkVec<FEM_VarIndexAttribute::ID> adjElements = m->n2e_getAll(adjnodes[i]);
+		for(int j=0;j<adjElements.size();j++){
+			int found=0;
+			// only insert if it is not already in the list
+			// we use a slow linear scan of the CkVec
+			for(int i=0;i<nodeAdjacentElements.length();i++) {
+				if(nodeAdjacentElements[i] == adjElements[j]) found=1;
+			}
+			if(!found){
+				nodeAdjacentElements.push_back(adjElements[j]);
+			}
+		}
+	}
+
+	delete[] adjnodes;
+	// Add all the potentially adjacent elements to the tuple table
+	for(int i=0;i<nodeAdjacentElements.length();i++){
+		int nextElem = nodeAdjacentElements[i].getSignedId();
+		int nextElemType = nodeAdjacentElements[i].getSignedType();
+
+		int tuple[tupleTable::MAX_TUPLE];
+		int *conn;
+
+		if(FEM_Is_ghost_index(nextElem))
+			conn=((FEM_Elem*)m->elem[nextElemType].getGhost())->connFor(FEM_To_ghost_index(nextElem));
+		else
+			conn=m->elem[nextElemType].connFor(nextElem);
+
+		for (int u=0;u< g->elem[nextElemType].tuplesPerElem;u++) {
+			for (int i=0;i< g->nodesPerTuple; i++) {
+				int eidx=g->elem[nextElemType].elem2tuple[i+u*g->nodesPerTuple];
+				if (eidx==-1)  //"not-there" node--
+					tuple[i]=-1; //Don't map via connectivity
+				else           //Ordinary node
+					tuple[i]=conn[eidx]; 
+			}
+			table.addTuple(tuple,new elemList(0,nextElem,nextElemType,allSym,u)); 
+		}
+	}
+
+	// extract true adjacencies from table and update all e2e tables for both newEl and the others
+	table.beginLookup();
+	// look through each elemList that is returned by the tuple table
+	elemList *l;
+	FEM_IndexAttribute *elemAdjTypesAttr = (FEM_IndexAttribute *)m->elem[elemType].lookup(FEM_ELEM_ELEM_ADJ_TYPES,"update_new_element_e2e");
+	FEM_IndexAttribute *elemAdjAttr = (FEM_IndexAttribute *)m->elem[elemType].lookup(FEM_ELEM_ELEM_ADJACENCY,"update_new_element_e2e");
+	FEM_IndexAttribute *elemAdjTypesAttrGhost = (FEM_IndexAttribute *)m->elem[elemType].getGhost()->lookup(FEM_ELEM_ELEM_ADJ_TYPES,"update_new_element_e2e");
+	FEM_IndexAttribute *elemAdjAttrGhost = (FEM_IndexAttribute *)m->elem[elemType].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"update_new_element_e2e");
+	//allocate some data structures
+	AllocTable2d<int> &adjTable = elemAdjAttr->get();
+	int *adjs = adjTable.getData();
+	AllocTable2d<int> &adjTypesTable = elemAdjTypesAttr->get();
+	int *adjTypes = adjTypesTable.getData();
+	AllocTable2d<int> &adjTableGhost = elemAdjAttrGhost->get();
+	int *adjsGhost = adjTableGhost.getData();
+	AllocTable2d<int> &adjTypesTableGhost = elemAdjTypesAttrGhost->get();
+	int *adjTypesGhost = adjTypesTableGhost.getData();
+	while (NULL!=(l=table.lookupNext())) {
+		if (l->next==NULL) {} // One-entry list: must be a symmetry
+		else { /* Several elements in list: normal case */
+			// for each a,b pair of adjacent edges
+			for (const elemList *a=l;a!=NULL;a=a->next){
+				for (const elemList *b=a->next;b!=NULL;b=b->next){
+					// if a and b are different elements
+					if((a->localNo != b->localNo) || (a->type != b->type)){
+						//CkPrintf("%d:%d:%d adj to %d:%d:%d\n", a->type, a->localNo, a->tupleNo, b->type, b->localNo, b->tupleNo);
+						// Put b in a's adjacency list
+						if(FEM_Is_ghost_index(a->localNo)){
+							const int j = FEM_To_ghost_index(a->localNo)* g->elem[a->type].tuplesPerElem + a->tupleNo;
+							adjsGhost[j] = b->localNo;
+							adjTypesGhost[j] = b->type;
+						}
+						else{
+							const int j= a->localNo*g->elem[a->type].tuplesPerElem + a->tupleNo;
+							adjs[j] = b->localNo;
+							adjTypes[j] = b->type;
+						}
+						// Put a in b's adjacency list
+						if(FEM_Is_ghost_index(b->localNo)){
+							const int j = FEM_To_ghost_index(b->localNo)*g->elem[b->type].tuplesPerElem + b->tupleNo;
+							adjsGhost[j] = a->localNo;
+							adjTypesGhost[j] = a->type;
+						}
+						else{
+							const int j= b->localNo*g->elem[b->type].tuplesPerElem + b->tupleNo;
+							adjs[j] = a->localNo;
+							adjTypes[j] = a->type;
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 /** A helper function that adds the local element, and updates adjacencies
@@ -517,7 +524,9 @@ int FEM_add_element_local(FEM_Mesh *m, int *conn, int connSize, int elemType, bo
 	update_new_element_e2e(m,newEl,elemType);
 	int *adjes = new int[connSize];
 	m->e2e_getAll(newEl, adjes, 0);
-	CkAssert(!((adjes[0]==adjes[1] && adjes[0]!=-1) || (adjes[1]==adjes[2] && adjes[1]!=-1) || (adjes[2]==adjes[0] && adjes[2]!=-1)));
+	
+//	CkAssert( (m->elem[elemType].size()<2) || !((adjes[0]==adjes[1] && adjes[0]!=-1) || (adjes[1]==adjes[2] && adjes[1]!=-1) || (adjes[2]==adjes[0] && adjes[2]!=-1)));
+
 #ifdef DEBUG_2
 	CkPrintf("[%d]Adding element %d(%d,%d,%d)\n",m->getfmMM()->getfmUtil()->getIdx(),newEl,conn[0],conn[1],conn[2]);
 #endif

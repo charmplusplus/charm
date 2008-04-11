@@ -630,6 +630,9 @@ class FEM_VarIndexAttribute : public FEM_Attribute{
     bool operator ==(const ID &rhs)const {
       return (type == rhs.type) && (id == rhs.id);
     }
+    bool operator < (const ID &rhs)const {
+       return (type < rhs.type) || (id < rhs.id);
+     }
     const ID& operator =(const ID &rhs) {
       type = rhs.type;
       id = rhs.id;
@@ -661,6 +664,15 @@ class FEM_VarIndexAttribute : public FEM_Attribute{
     		return -(type+1);
     }
         
+    void println(){
+    	if(type<0){
+    		CkPrintf("ghost element with type=%d, id=%d\n", getUnsignedType(), id);    		
+    	} else    {
+    		CkPrintf("element with type=%d, id=%d\n", getUnsignedType(), id);    		
+    	}
+
+    }
+    
   };
  private:
   typedef FEM_Attribute super;
@@ -1228,12 +1240,16 @@ class FEM_Entity_Types {
     return *ret;
   }
 
-  /// Return true if we have a type t, and false otherwise
+  /// Return true if we have a type t, and false otherwise, can return true for empty entity
   bool has(int type) const {
-    if (type>=types.size()) return false;
-    return types[type]!=NULL;
+    return  (type<types.size()) && (types[type]!=NULL);
   }
 
+  /// Return true if we have a type t, and the type contains more than zero entities
+  bool hasNonEmpty(int type) const {
+    return  (type<types.size()) && (types[type]!=NULL) && (types[type]->size()>0);
+  }
+  
   /// Return a writable copy of this type, calling new T(mesh) if it's not there
   T &set(int type,const char *caller="") {
     if (type<0) FEM_Index_Check(caller,name,type,types.size());
@@ -1359,8 +1375,8 @@ class FEM_Mesh : public CkNoncopyable {
   /********** New methods ***********/
   /*
     This method creates the mapping from a node to all the elements that are
-    incident on it . It assumes the presence of one layer of ghost nodes that
-    share a node.
+    incident on it . To work correctly, this assumes the presence of one layer of 
+    ghost nodes that share a node.
   */
   void createNodeElemAdj();
   void createNodeNodeAdj();
@@ -1381,6 +1397,10 @@ class FEM_Mesh : public CkNoncopyable {
   int e2e_getIndex(int e, int nbr, int etype=0);
   /// Same as previous but also returning the element type
   FEM_VarIndexAttribute::ID e2e_getElem(int idx, int nbr, int etype=0);
+  /// Get an element adjacent to elem across its nbr'th face
+  FEM_VarIndexAttribute::ID e2e_getElem(FEM_VarIndexAttribute::ID elem, int nbr);
+  /// Same as above
+  FEM_VarIndexAttribute::ID e2e_getElem(FEM_VarIndexAttribute::ID *elem, int nbr);
   /// Set the element adjacencies of element e to neighbors; assumes neighbors
   /// has the correct size
   void e2e_setAll(int e, int *neighbors, int etype=0);
@@ -1434,6 +1454,10 @@ class FEM_Mesh : public CkNoncopyable {
   /// length of adjelements in sz; assumes adjelements is not allocated,
   /// but sz is. Ignore element types
   void n2e_getAll(int n, int *&adjelements, int &sz);
+ 
+  /// Return a reference to the structure holding all the elements adjacent to a node
+  const CkVec<FEM_VarIndexAttribute::ID> & n2e_getAll(int n); 
+  
   /// Get one of node n's adjacent elements
   FEM_VarIndexAttribute::ID  n2e_getElem(int n, int whichAdjElem);
   /// Adds newElem to node n's element adjacency list
@@ -1941,8 +1965,16 @@ void FEM_Mesh_split(FEM_Mesh *mesh,int nchunks,
 int *CkCopyArray(const int *src,int len,int indexBase);
 
 
-// Isaac's stuff:
-// Describes Element Faces. For use with finding element->element adjacencies
+/** 
+ *  This stores the types of faces for each element type. 
+ *  Each element type can have multiple types of faces. 
+ *  For example a triangular prism contains both triangles and quadralaterals.
+ * 
+ *  The faces stored in here will be used to compute the element->element adjacencies.
+ * 
+ * TODO: Fix this to work with multiple types of faces. Currently it only works with a single type of face
+ * 
+ */
 // based on FEM_Ghost_Layer
 class FEM_ElemAdj_Layer : public CkNoncopyable {
  public:
@@ -1965,24 +1997,27 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
   FEM_ElemAdj_Layer() {initialized=0;}
 
   virtual void pup(PUP::er &p){
-    p | nodesPerTuple;
-    p | initialized;
-    for(int i=0;i<FEM_MAX_ELTYPE;i++){
-      p | elem[i].tuplesPerElem;
-      if(elem[i].tuplesPerElem == 0){
-	continue;
-      }
-      int *arr;
-      if(p.isUnpacking()){
-	arr = new int[nodesPerTuple*elem[i].tuplesPerElem];
-      }else{
-	arr = elem[i].elem2tuple;
-      }
-      p(arr,nodesPerTuple*elem[i].tuplesPerElem);
-      if(p.isUnpacking()){
-	elem[i].elem2tuple = arr;
-      }
-    }
+	  p | initialized;
+	  p | nodesPerTuple;
+
+	  CkPrintf("Calling inefficient FEM_ElemAdj_Layer::pup method\n");
+	  
+	  for(int i=0;i<FEM_MAX_ELTYPE;i++){
+		  p | elem[i].tuplesPerElem;
+		  if(elem[i].tuplesPerElem == 0){
+			  continue;
+		  }
+		  int *arr;
+		  if(p.isUnpacking()){
+			  arr = new int[nodesPerTuple*elem[i].tuplesPerElem];
+		  }else{
+			  arr = elem[i].elem2tuple;
+		  }
+		  p(arr,nodesPerTuple*elem[i].tuplesPerElem);
+		  if(p.isUnpacking()){
+			  elem[i].elem2tuple = arr;
+		  }
+	  }
   }
 };
 
