@@ -303,10 +303,6 @@ typedef struct infiCmiChunkMetaDataStruct {
 } infiCmiChunkMetaData;
 
 
-typedef struct infiCmiChunkHeaderStruct{
-	infiCmiChunkMetaData *metaData;
-	CmiChunkHeader chunkHeader;
-} infiCmiChunkHeader;
 
 
 #define METADATAFIELD(m) (((infiCmiChunkHeader *)m)[-1].metaData)
@@ -319,6 +315,9 @@ typedef struct {
 
 #define INFINUMPOOLS 20
 #define INFIMAXPERPOOL 100
+#define INFIMULTIPOOL -5
+
+
 infiCmiChunkPool infiCmiChunkPools[INFINUMPOOLS];
 
 static void initInfiCmiChunkPools();
@@ -1001,6 +1000,7 @@ static void inline EnqueueDataPacket(OutgoingMsg ogm, OtherNode node, int rank,c
 	packet->ogm = ogm;
 	
 	struct ibv_mr *key = METADATAFIELD(ogm->data)->key;
+	CmiAssert(key != NULL);
 	
 	EnqueuePacket(node,packet,size,key);
 };
@@ -2073,6 +2073,20 @@ static void initInfiCmiChunkPools(){
 	}
 }
 
+/***********
+Register memory for a part of a received multisend message
+*************/
+infiCmiChunkMetaData *registerMultiSendMesg(char *msg,int size){
+	infiCmiChunkMetaData *metaData = malloc(sizeof(infiCmiChunkMetaData));
+	char *res=msg-sizeof(infiCmiChunkHeader);
+	metaData->key = ibv_reg_mr(context->pd,res,(size+sizeof(infiCmiChunkHeader)),IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+	metaData->owner = NULL;
+	metaData->poolIdx = INFIMULTIPOOL;
+
+	return metaData;
+};
+
+
 static inline void *getInfiCmiChunk(int dataSize){
 	//find out to which pool this dataSize belongs to
 	// poolIdx = floor(log2(dataSize/firstBinSize))+1
@@ -2199,6 +2213,13 @@ void infi_CmiFree(void *ptr){
 		freePtr = ptr - sizeof(infiCmiChunkHeader);
 		metaData = METADATAFIELD(ptr);
 		poolIdx = metaData->poolIdx;
+		if(poolIdx == INFIMULTIPOOL){
+			/** this is a part of a received mult message  
+			it will be freed correctly later
+			**/
+			
+			return;
+		}
 		MACHSTATE2(1,"CmiFree buf %p goes back to pool %d",ptr,poolIdx);
 //		CmiAssert(poolIdx >= 0);
 		if(poolIdx < INFINUMPOOLS && infiCmiChunkPools[poolIdx].count <= INFIMAXPERPOOL){
