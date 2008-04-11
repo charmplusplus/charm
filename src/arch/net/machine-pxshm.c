@@ -32,7 +32,7 @@
 
 #define MEMDEBUG(x) //x
 
-#define PXSHM_STATS 0
+#define PXSHM_STATS 1
 
 /************************
  * 	Implementation currently assumes that
@@ -165,10 +165,9 @@ void CmiExitPxshm(){
 			if(i != pxshmContext->noderank){
 				break;
 			}
+			free(pxshmContext->recvBufNames[i]);
+			free(pxshmContext->sendBufNames[i]);
 		}
-		free(pxshmContext->recvBufNames[i]);
-		free(pxshmContext->sendBufNames[i]);
-	
 		free(pxshmContext->recvBufNames);
 		free(pxshmContext->sendBufNames);
 
@@ -177,7 +176,7 @@ void CmiExitPxshm(){
 
 	}
 #if PXSHM_STATS
-	CmiPrintf("[%d] sendCount %d sendTime %6lf validCheckCount %d validCheckTime %.6lf commServerTime %6lf \n",_Cmi_mynode,pxshmContext->sendCount,pxshmContext->sendTime,pxshmContext->validCheckCount,pxshmContext->validCheckTime,pxshmContext->commServerTime);
+CmiPrintf("[%d] sendCount %d sendTime %6lf validCheckCount %d validCheckTime %.6lf commServerTime %6lf \n",_Cmi_mynode,pxshmContext->sendCount,pxshmContext->sendTime,pxshmContext->validCheckCount,pxshmContext->validCheckTime,pxshmContext->commServerTime);
 #endif
 	free(pxshmContext);
 }
@@ -234,20 +233,18 @@ void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int br
 	CmiAssert(dstRank >=0 && dstRank != pxshmContext->noderank);
 	
 	sharedBufData *dstBuf = &(pxshmContext->sendBufs[dstRank]);
-	
+
 	if(sem_trywait(dstBuf->mutex) < 0){
+
 		/**failed to get the lock 
 		insert into q and retain the message*/
 
 		pushSendQ(pxshmContext->sendQs[dstRank],ogm);
 		ogm->refcount++;
 		MEMDEBUG(CmiMemoryCheck());
-#if PXSHM_STATS
-		pxshmContext->sendCount ++;
-		pxshmContext->sendTime += (CmiWallTimer()-_startSendTime);
-#endif
 		return;
 	}else{
+
 		/***
 		 * We got the lock for this buffer
 		 * first write all the messages in the sendQ and then write this guy
@@ -264,6 +261,7 @@ void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int br
 				MACHSTATE1(3,"Pxshm flushSendQ sent %d messages",sent);
 		 }
 		 /* unlock the recvbuffer*/
+
 		 sem_post(dstBuf->mutex);
 	}
 #if PXSHM_STATS
@@ -531,12 +529,13 @@ inline void emptyAllRecvBufs(){
 	for(i=0;i<pxshmContext->nodesize;i++){
 		if(i != pxshmContext->noderank){
 			sharedBufData *recvBuf = &(pxshmContext->recvBufs[i]);
-
-			if(sem_trywait(recvBuf->mutex) < 0){
-			}else{
-				MACHSTATE1(3,"emptyRecvBuf to be called for rank %d",i);			
-				emptyRecvBuf(recvBuf);
-				sem_post(recvBuf->mutex);
+			if(recvBuf->header->count > 0){
+				if(sem_trywait(recvBuf->mutex) < 0){
+				}else{
+					MACHSTATE1(3,"emptyRecvBuf to be called for rank %d",i);			
+					emptyRecvBuf(recvBuf);
+					sem_post(recvBuf->mutex);
+				}
 			}
 		}
 	}
@@ -554,9 +553,8 @@ inline void flushAllSendQs(){
 				flushSendQ(i);
 				sem_post(pxshmContext->sendBufs[i].mutex);
 			}
-		}
-	}
-	
+		}        
+	}	
 };
 
 void static inline handoverPxshmMessage(char *newmsg,int total_size,int rank,int broot);
