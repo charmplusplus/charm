@@ -71,6 +71,8 @@
 
 #define CMK_LBDB_ON					   1
 
+#define CMK_DISABLE_SYNC       1
+
 #endif
 
 
