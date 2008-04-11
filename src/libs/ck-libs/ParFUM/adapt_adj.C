@@ -292,7 +292,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
             elemType);
 
     requestTable->sync();
-    printf("[%d] All face requests made \n",myRank);
+    //printf("[%d] All face requests made \n",myRank);
 
     MSA1DREPLYLIST *replyTable;
     if (myRank == 0) {
@@ -334,7 +334,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
 //        adaptFaceAdjacencies[receivedReply->requestingElemID*faceMapSize + 
 //            receivedReply->requestingNodeSetID] = receivedReply->replyingElem;
 //    }
-    replyTable->sync();
+//    replyTable->sync();
     delete requestTable;
     delete replyTable;
 
@@ -360,7 +360,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
                 elemType);
 
         requestTable->sync();
-        printf("[%d] All edge requests made \n",myRank);
+        //printf("[%d] All edge requests made \n",myRank);
 
         MSA1DREPLYLIST *replyTable;
         if (myRank == 0) {
@@ -522,12 +522,12 @@ void fillLocalAdaptAdjacencies(
 		if (node->is_valid(i) && adaptAdjTable[i].adjElemList != NULL) {
 			adjElem *preTarget = adaptAdjTable[i].adjElemList;
 			adjElem *target = adaptAdjTable[i].adjElemList->next;
-			printf("adjElemList for node %d [ ", i);
-			while (preTarget != NULL) {
-				printf("%d ", preTarget->elemID);
-				preTarget = preTarget->next;
-			}
-			printf("]\n");
+//			printf("adjElemList for node %d [ ", i);
+//			while (preTarget != NULL) {
+//				printf("%d ", preTarget->elemID);
+//				preTarget = preTarget->next;
+//			}
+//			printf("]\n");
 			
 			preTarget = adaptAdjTable[i].adjElemList;
 			target = preTarget->next;
@@ -630,6 +630,11 @@ void makeAdjacencyRequests(
                         // Translate the nodes in the nodeSet into the index in 
                         // the idxl list for each chunk in the 
                         // commonSharedChunks
+//                        CkPrintf("[%d] Creating request for NodeSet ( ", myRank);
+//                        for (int j=0; j<nodeSetSize; ++j) {
+//                        	CkPrintf("%d ", adjStart->nodeSet[j]);
+//                        }
+//                        CkPrintf(")\n");
                         for(int j=0;j<nodeSetSize;j++){
                             int sharedNode = adjStart->nodeSet[j];
                             const IDXL_Rec *recSharedNode = 
@@ -682,7 +687,13 @@ void makeAdjacencyRequests(
                                 chunkIterator != commonSharedChunks.end();
                                 chunkIterator++){
                             int chunk = *chunkIterator;
-                            printf("[%d] Sending to chunk %d request (%d,%d,%d,%d) \n",myRank,chunk,adjRequestList[countChunk].elemID,adjRequestList[countChunk].chunkID,adjRequestList[countChunk].elemType,adjRequestList[countChunk].nodeSetID);
+//                            printf("[%d] Sending to chunk %d request (%d,%d,%d,%d) \n",
+//                            		myRank,
+//                            		chunk,
+//                            		adjRequestList[countChunk].elemID,
+//                            		adjRequestList[countChunk].chunkID,
+//                            		adjRequestList[countChunk].elemType,
+//                            		adjRequestList[countChunk].nodeSetID);
                             (*requestTable).accumulate(
                                     chunk,adjRequestList[countChunk]);
                             countChunk++;
@@ -715,6 +726,9 @@ void replyAdjacencyRequests(
     // is (remote elemID, remote partition ID, remote elem type)
     // add adjacencies to local table
     // lots of error checking :)
+	
+	// TODO: adjustment of adj lists based on reply tables was unnecessary
+	// Can we get rid of reply table altogether?
 
     //Look at each request that in the requestTable for this chunk
     //Put the data for the requests in our own table and then create replies
@@ -742,25 +756,49 @@ void replyAdjacencyRequests(
                 nodeSetSize, 
                 -1, 
                 &found);
-        printf("[%d] Received request (%d,%d,%d,%d) minNode %d found %d\n",
-                myRank,receivedRequest.elemID,receivedRequest.chunkID,
-                receivedRequest.elemType,receivedRequest.nodeSetID,
-                sharedNodes[0],found);
+//        printf("[%d] Received request (%d,%d,%d,%d) minNode %d found %d\n",
+//                myRank,receivedRequest.elemID,receivedRequest.chunkID,
+//                receivedRequest.elemType,receivedRequest.nodeSetID,
+//                sharedNodes[0],found);
+        
+
+        
         if (found) { 
             //we have found a matching adjElem for the requested nodeset
             //we shall set the adjacency correctly in the adjacency Table
             //for the elemID in the found adjElem. We need to send a reply
             //to the requesting chunk
-            int matchingElemID;
-            matchingElemID = rover->next->elemID;
+        	
+        	// TODO: this is where we should loop
+            int matchingElemID = rover->next->elemID;
 
             if (isEdgeRequest) {
-                CkVec<adaptAdj>* matchingAdaptAdj = adaptEdgeAdjacencies[
-                    matchingElemID*numAdjElems + rover->next->nodeSetID];
-                matchingAdaptAdj->push_back(adaptAdj(
-                            receivedRequest.chunkID,
-                            receivedRequest.elemID, 
-                            receivedRequest.elemType));
+                // TODO: we cannot delete edge requests as we go because they
+            	// may be needed again. Deallocate whole list at end.
+        		while (found) {
+//                    printf("[%d] (%d,%d,%d,%d) adds adj (%d %d %d) to elem %d edge %d\n",
+//                            myRank,receivedRequest.elemID,receivedRequest.chunkID,
+//                            receivedRequest.elemType,receivedRequest.nodeSetID,
+//                            receivedRequest.chunkID, receivedRequest.elemID,
+//                            receivedRequest.elemType, matchingElemID, rover->next->nodeSetID);
+                    CkVec<adaptAdj>* matchingAdaptAdj = adaptEdgeAdjacencies[
+                        matchingElemID*numAdjElems + rover->next->nodeSetID];
+                    matchingAdaptAdj->push_back(adaptAdj(
+                                receivedRequest.chunkID,
+                                receivedRequest.elemID, 
+                                receivedRequest.elemType));
+
+                    rover = searchAdjElemInList(
+        	                rover->next, 
+        	                sharedNodes.getVec(), 
+        	                nodeSetSize, 
+        	                -1, 
+        	                &found);
+        			
+        			if (found) {
+            			matchingElemID = rover->next->elemID;
+        			}
+        		}
             } else {
                 adaptAdj *matchingAdaptAdj = &adaptFaceAdjacencies[
                     matchingElemID*numAdjElems + rover->next->nodeSetID];
@@ -768,12 +806,12 @@ void replyAdjacencyRequests(
                 matchingAdaptAdj->partID = receivedRequest.chunkID;
                 matchingAdaptAdj->localID = receivedRequest.elemID;
                 matchingAdaptAdj->elemType = receivedRequest.elemType;
+
+                adjElem *tmp = rover->next;
+                rover->next = tmp->next;
+                delete tmp;
             }
             
-            adjElem *tmp = rover->next;
-            rover->next = tmp->next;
-            delete tmp;
-
             //Set requesting data in reply to that in receivedRequest
             //Put in data from rover->next into the replyElem portion of data
             adjReply reply;
