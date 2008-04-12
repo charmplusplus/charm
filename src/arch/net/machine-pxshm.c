@@ -32,7 +32,7 @@
 
 #define MEMDEBUG(x) //x
 
-#define PXSHM_STATS 1
+#define PXSHM_STATS 0
 
 /************************
  * 	Implementation currently assumes that
