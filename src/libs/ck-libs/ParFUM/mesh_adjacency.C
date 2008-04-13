@@ -351,7 +351,7 @@ FEM_ElemAdj_Layer* FEM_Mesh::getElemAdjLayer(void) {
  */
 void FEM_Mesh::createElemElemAdj()
 {
-	CkPrintf("createElemElemAdj()\n");
+    //CkPrintf("createElemElemAdj()\n");
 	
   FEM_ElemAdj_Layer *g = getElemAdjLayer();
   if(! g->initialized)
@@ -462,11 +462,11 @@ void FEM_Mesh::createElemElemAdj()
 				  // UNHANDLED CASE: not sure exactly what this means
 			  }
 			  else { /* Several elements in list: normal case */
-				  CkPrintf("Found in table list: ");
-				  for(const elemList *c=l;c!=NULL;c=c->next){
-					  CkPrintf("     %d,%d", c->type, c->localNo);
-				  }
-				  CkPrintf("\n");
+				  //CkPrintf("Found in table list: ");
+				  //for(const elemList *c=l;c!=NULL;c=c->next){
+                                  //	  CkPrintf("     %d,%d", c->type, c->localNo);
+				  //}
+				  //CkPrintf("\n");
 				  
 				  // for each a,b from the list
 				  for (const elemList *a=l;a!=NULL;a=a->next){
@@ -485,7 +485,7 @@ void FEM_Mesh::createElemElemAdj()
 								  else {
 									  j = a->localNo*tuplesPerElem + a->tupleNo;
 									  CkAssert(j<numElements*tuplesPerElem);
-									  CkPrintf("Recording that %d,%d at position %d has neighbor %d,%d \n", a->type,a->localNo, a->tupleNo, b->type, b->localNo);
+									  //CkPrintf("Recording that %d,%d at position %d has neighbor %d,%d \n", a->type,a->localNo, a->tupleNo, b->type, b->localNo);
 									  adjs[j] = b->localNo;
 									  adjTypes[j] = b->type;
 								  }
