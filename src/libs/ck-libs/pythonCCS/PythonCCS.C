@@ -283,6 +283,7 @@ void PythonObject::finished (PythonFinished *pyMsg, CcsDelayedReply *reply) {
 
 void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
   // ATTN: be sure that in all possible paths pyLock is released!
+  double _startTime = CkWallTimer();
   PythonExecute *pyMsg = (PythonExecute *)msg->data;
   //PyEval_AcquireLock();
   //CmiLock(CsvAccess(pyLock));
@@ -363,6 +364,7 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
 		 ,Py_file_input,dict,dict);
 
   }
+  ckout<<"Python creation time "<<CmiWallTimer()-_startTime<<endl;
 
   pyWorkers[pyReference].inUse = true;
   if (pyMsg->isKeepPrint()) {
