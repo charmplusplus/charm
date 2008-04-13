@@ -20,6 +20,14 @@ class MyIterator : public PythonIterator {
 public:
   int s;
   MyIterator(int i) : s(i) { }
+
+  int size() {return 4;}
+  char *pack() {
+    void *memory = malloc(4);
+    *(int*)memory = s;
+    return (char *)memory;
+
+  }
 };
 
 int main (int argc, char** argv) {
@@ -43,19 +51,22 @@ int main (int argc, char** argv) {
   reuse = atoi(argv[4]);
   if(reuse > 0)
    reuse = 1;
+  int useGroups = atoi(argv[5]);
 
   CcsConnect (&server, host, port, NULL);
 
   PythonExecute *wrapper;
   char *pythonString;
 
-  wrapper = new PythonExecute((char*)code.c_str());
-  pythonString = "pyCode";
-
-  //MyIterator *myIter = new MyIterator(4);
-  //printf("size: %d (%d)\n",myIter->size(),sizeof(*myIter));
-  //wrapper = new PythonExecute((char*)code.c_str(), "metodo", myIter);
-  //pythonString = "CpdPythonGroup";
+  if (useGroups > 0) {
+    MyIterator *myIter = new MyIterator(htonl(4));
+    printf("size: %d (%d)\n",myIter->size(),sizeof(*myIter));
+    wrapper = new PythonExecute((char*)code.c_str(), "metodo", myIter);
+    pythonString = "CpdPythonGroup";
+  } else {
+    wrapper = new PythonExecute((char*)code.c_str());
+    pythonString = "pyCode";
+  }
 
   wrapper->setHighLevel(true);
   wrapper->setKeepPrint(true);
@@ -96,6 +107,8 @@ int main (int argc, char** argv) {
      _startTime = wallTimer();
      if(reuse>0){
        wrapper->setInterpreter(interpreter);
+       //char *tmp = " ";
+       //wrapper->setCode(tmp);
      }  
      CcsSendRequest (&server, pythonString, 0, wrapper->size(), wrapper->pack());
      CcsRecvResponse (&server, 10, &remoteValue, sizeof(remoteValue));
