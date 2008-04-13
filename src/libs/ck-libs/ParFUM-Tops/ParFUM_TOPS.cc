@@ -332,7 +332,7 @@ void topNode_SetId(TopModel* m, TopNode n, TopID id){
 TopElement topModel_InsertElem(TopModel*m, TopElemType type, TopNode* nodes){
   CkAssert(type ==  TOP_ELEMENT_TET4 || type == TOP_ELEMENT_TET10); 
          
- int newEl; 
+  TopElement newEl;
  
   if(type==TOP_ELEMENT_TET4){ 
           int conn[4]; 
@@ -340,7 +340,8 @@ TopElement topModel_InsertElem(TopModel*m, TopElemType type, TopNode* nodes){
           conn[1] = nodes[1]; 
           conn[2] = nodes[2]; 
           conn[3] = nodes[3]; 
-          newEl = FEM_add_element_local(m->mesh, conn, 4, 0, 0, 0); 
+          newEl.type = BULK_ELEMENT;
+          newEl.idx = FEM_add_element_local(m->mesh, conn, 4, 0, 0, 0); 
   } else if (type==TOP_ELEMENT_TET10){  
           int conn[10];  
           conn[0] = nodes[0];  
@@ -353,7 +354,8 @@ TopElement topModel_InsertElem(TopModel*m, TopElemType type, TopNode* nodes){
           conn[7] = nodes[7];  
           conn[8] = nodes[8];   
           conn[9] = nodes[9]; 
-          newEl = FEM_add_element_local(m->mesh, conn, 10, 0, 0, 0);  
+          newEl.type = BULK_ELEMENT;
+          newEl.idx = FEM_add_element_local(m->mesh, conn, 10, 0, 0, 0);  
   } 
  
          return newEl; 
@@ -363,9 +365,17 @@ TopElement topModel_InsertElem(TopModel*m, TopElemType type, TopNode* nodes){
 @todo Make this work with ghosts
 */
 void topElement_SetId(TopModel* m, TopElement e, TopID id){
-  CkAssert(e>=0);
-  (*m->elem_id_T)(e,0)=id;
-  m->elemIDHash->put(id) = e+1;
+  CkAssert(e.idx>=0);
+  (*m->elem_id_T)(e.idx,0)=id;
+  m->elemIDHash->put(id) = e.idx+1;
+}
+
+
+/** get the number of elements in the mesh */
+int topModel_GetNElem (TopModel* m){
+	const int numBulk = m->mesh->elem[BULK_ELEMENT].count_valid();
+	const int numCohesive = m->mesh->elem[COHESIVE_ELEMENT].count_valid();
+	return numBulk + numCohesive;
 }
 
 
@@ -397,13 +407,13 @@ See topNode_SetAttrib() for description
 */
 void topElement_SetAttrib(TopModel* m, TopElement e, void* d){
   unsigned char *data;
-  if (e < 0) {
+  if (e.idx < 0) {
       data = m->GhostElemData_T->getData();
-      e = FEM_From_ghost_index(e);
+      e.idx = FEM_From_ghost_index(e.idx);
   } else {
     data = m->ElemData_T->getData();
   }
-  memcpy(data + e*m->elem_attr_size, d, m->elem_attr_size);
+  memcpy(data + e.idx*m->elem_attr_size, d, m->elem_attr_size);
 }
 
 
@@ -412,16 +422,16 @@ See topNode_SetAttrib() for description
 */
 void* topElement_GetAttrib(TopModel* m, TopElement e)
 {
-    if(! m->mesh->elem[0].is_valid_any_idx(e))
+    if(! m->mesh->elem[0].is_valid_any_idx(e.idx))
         return NULL;
     unsigned char *data;
-    if (FEM_Is_ghost_index(e)) {
+    if (FEM_Is_ghost_index(e.idx)) {
        data = m->GhostElemData_T->getData();
-       e = FEM_From_ghost_index(e);
+       e.idx = FEM_From_ghost_index(e.idx);
     } else {
        data = m->ElemData_T->getData();
     }
-    return (data + e*m->elem_attr_size);
+    return (data + e.idx*m->elem_attr_size);
 }
 
 /** @brief Get nodal attribute
@@ -468,31 +478,40 @@ TopNode topModel_GetNodeAtId(TopModel* m, TopID id)
  */
 TopElement topModel_GetElemAtId(TopModel*m,TopID id)
 {
-    int hashelem = m->elemIDHash->get(id)-1;
-    if (hashelem != -1) return hashelem;
+	TopElement e;
+	e.idx = m->elemIDHash->get(id)-1;
+	e.type = BULK_ELEMENT;
+	
+	if (e.idx != -1) return e;
 
     AllocTable2d<int>* ghostElem_id_T = &((FEM_DataAttribute*)m->mesh->
             elem[0].getGhost()->lookup(FEM_DATA+0,""))->getInt();
     for(int i=0; i<ghostElem_id_T->size(); ++i) {
         if((*ghostElem_id_T)(i,0)==id){
-            return FEM_To_ghost_index(i);
+            e.idx = FEM_To_ghost_index(i);
+            e.type = BULK_ELEMENT;
+        	return e;
         }
     }
-    return -1;
+    
+    e.idx = -1;
+    e.type = BULK_ELEMENT;
+
+    return e;
 }
 
 
 TopNode topElement_GetNode(TopModel* m,TopElement e,int idx){
     int node = -1;
-    if (e < 0) {
+    if (e.idx < 0) {
         CkAssert(m->mesh->elem[0].getGhost());
         const AllocTable2d<int> &conn = ((FEM_Elem*)m->mesh->elem[0].getGhost())->getConn();
         CkAssert(idx>=0 && idx<conn.width());
-        node = conn(FEM_From_ghost_index(e),idx);
+        node = conn(FEM_From_ghost_index(e.idx),idx);
     } else {
         const AllocTable2d<int> &conn = m->mesh->elem[0].getConn();
         CkAssert(idx>=0 && idx<conn.width());
-        node = conn(e,idx);
+        node = conn(e.idx,idx);
     }
 
     return node;
@@ -586,7 +605,175 @@ void topModel_TestIterators(TopModel*m){
 
   CkAssert(iterated_node_count == expected_node_count);
   CkAssert(iterated_elem_count==expected_elem_count);
+}
 
+
+
+
+
+bool topElement_IsCohesive(TopModel* m, TopElement e){
+	return e.type == COHESIVE_ELEMENT;
+}
+
+
+
+/** currently we only support linear tets for the bulk elements */
+int topFacet_GetNNodes (TopModel* m, TopFacet f){
+	return 6;
+}
+
+TopNode topFacet_GetNode (TopModel* m, TopFacet f, int i){
+	return f.node[i];
+}
+
+TopElement topFacet_GetElem (TopModel* m, TopFacet f, int i){
+	return f.elem[i];
+}
+
+/** I'm not quite sure the point of this function
+ * TODO figure out what this is supposed to do
+ */
+bool topElement_IsValid(TopModel* m, TopElement e){
+ return m->mesh->elem[e.type].is_valid_any_idx(e.idx);
+}
+
+
+
+/** We will use the following to identify the original boundary nodes. 
+ * These are those that are adjacent to a facet that is on the boundary(has one adjacent element).
+ * Assume vertex=node.
+ */
+
+bool topVertex_IsBoundary (TopModel* m, TopVertex v){
+	return m->mesh->node.isBoundary(v);
+}
+
+
+TopVertex topNode_GetVertex (TopModel* m, TopNode n){
+	return n;
+}
+
+
+int topElement_GetId (TopModel* m, TopElement e) {
+  CkAssert(e.idx>=0);
+  return (*m->elem_id_T)(e.idx,0);
+}
+
+
+
+
+TopFacetItr* topModel_CreateFacetItr (TopModel* m){
+	TopFacetItr* itr = new TopFacetItr();
+	itr->model = m;
+	return itr;
+}
+
+void topFacetItr_Begin(TopFacetItr* itr){
+	itr->elemItr = topModel_CreateElemItr(itr->model);
+	itr->whichFacet = 0;
+}
+
+bool topFacetItr_IsValid(TopFacetItr* itr){
+	return topElemItr_IsValid(itr->elemItr);
+}
+
+/** Iterate to the next facet */
+void topFacetItr_Next(TopFacetItr* itr){
+	bool found = false;
+	
+	// Scan through all the faces on some elements until we get to the end, or we 
+	while( !found && topElemItr_IsValid(itr->elemItr) ){
+		found = true;
+		
+		itr->whichFacet++;
+		if(itr->whichFacet > 3){
+			topElemItr_Next(itr->elemItr);
+			itr->whichFacet=0;
+		}
+
+		TopElement currElem = topElemItr_GetCurr(itr->elemItr);
+		FEM_VarIndexAttribute::ID e = itr->model->mesh->e2e_getElem(currElem.idx, itr->whichFacet, currElem.type);
+
+		// TODO Adapt to work with cohesives
+		if (e.id < currElem.idx){
+			found = true;
+		}
+	}
+	
+}
+
+/** Determine whether an element contains the  given face */
+//inline bool elementContainsNodes(TopModel *model, TopElement e, int n3, int n2, int n1){
+//	const int *nodes = model->mesh->elem[e.type].connFor(e.idx);
+//	const int e0 = nodes[0];
+//	const int e1 = nodes[1];
+//	const int e2 = nodes[2];
+//	const int e3 = nodes[3];
+//	
+//	// We take in the three nodes in the original orientation in the other element,
+//	// so n1,n2,n3 is in the orientation of this element
+//	
+//	// Examine face 0 of the element (in 3 rotations)
+//	return	( n1==e0 && n2==e1 && n3==e3 ) ||
+//			( n1==e1 && n2==e3 && n3==e0 ) ||
+//			( n1==e3 && n2==e0 && n3==e1 ) ||
+//	// Examine face 1 of the element (in 3 rotations)
+//			( n1==e0 && n2==e2 && n3==e1 ) ||
+//			( n1==e2 && n2==e1 && n3==e0 ) ||
+//			( n1==e1 && n2==e0 && n3==e2 ) ||
+//	// Examine face 2 of the element (in 3 rotations)
+//			( n1==e1 && n2==e2 && n3==e3 ) ||
+//			( n1==e2 && n2==e3 && n3==e1 ) ||
+//			( n1==e3 && n2==e1 && n3==e2 ) ||
+//	// Examine face 3 of the element (in 3 rotations)
+//			( n1==e0 && n2==e3 && n3==e2 ) ||
+//			( n1==e3 && n2==e2 && n3==e0 ) ||
+//			( n1==e2 && n2==e0 && n3==e3 ) ;
+//
+//}
+
+
+TopFacet topFacetItr_GetCurr (TopFacetItr* itr){
+	TopFacet f;
+	
+	f.elem[0] = topElemItr_GetCurr(itr->elemItr);
+	FEM_VarIndexAttribute::ID e = itr->model->mesh->e2e_getElem(f.elem[0].idx, itr->whichFacet, f.elem[0].type);
+	f.elem[1].idx = e.id;
+	f.elem[1].type = e.type;
+	
+	// TODO adapt this to work with cohesives
+
+	// face 0 is nodes 0,1,3
+	if(itr->whichFacet==0){
+		f.node[0] = f.node[3] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[0];
+		f.node[1] = f.node[4] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[1];
+		f.node[2] = f.node[5] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[3];
+	}
+	// face 1 is nodes 0,2,1
+	else if(itr->whichFacet==1){
+		f.node[0] = f.node[3] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[0];
+		f.node[1] = f.node[4] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[2];
+		f.node[2] = f.node[5] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[1];
+	}
+	// face 2 is nodes 1,2,3
+	else if(itr->whichFacet==2){
+		f.node[0] = f.node[3] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[1];
+		f.node[1] = f.node[4] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[2];
+		f.node[2] = f.node[5] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[3];		
+	}
+	// face 3 is nodes 0,3,2
+	else if(itr->whichFacet==3){
+		f.node[0] = f.node[3] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[0];
+		f.node[1] = f.node[4] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[3];
+		f.node[2] = f.node[5] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[2];
+	}	
+	
+	return f;
+}
+
+
+void topFacetItr_Destroy (TopFacetItr* itr){
+	delete itr;
 }
 
 

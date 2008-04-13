@@ -34,8 +34,8 @@ all: $(DEST)
 
 ParFUM_TOPS.decl.h: ParFUM_TOPS.ci
 	$(CHARMC) ParFUM_TOPS.ci
-ParFUM_TOPS.def.h: ParFUM_TOPS.ci
-	$(CHARMC) ParFUM_TOPS.ci
+ParFUM_TOPS.def.h: ParFUM_TOPS.decl.h
+
 
 # Build libmoduleParFUM
 $(DEST): $(OBJS) headers $(HEADDEP)

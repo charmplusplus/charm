@@ -6,11 +6,8 @@
 
    ParFUM-TOPS provides a Tops-like API for ParFUM.
 
-\note \code
-put example here!
-\endcode
 
-@note ::NodeAtt and ::ElemAtt are just replaced with void* for this implementation.
+   @note ::NodeAtt and ::ElemAtt are just replaced with void* for this implementation.
 
 */
 
@@ -64,37 +61,49 @@ typedef struct{
 /** Node Iterator */
 class TopNodeItr{
 public:
-  /** The signed index used to refer to a ParFUM Element. Non-negatives are ghosts*/
-  int parfum_index;
-  /** The associated model */
-  TopModel *model;
+	/** The signed index used to refer to a ParFUM Element. Non-negatives are ghosts*/
+	int parfum_index;
+	/** The associated model */
+	TopModel *model;
 };
 
 /** Element Iterator */
 class TopElemItr{
 public:
-  int parfum_index;
-    TopModel *model;
+	int parfum_index;
+	TopModel *model;
 };
 
 /** Node->Element adjacency Iterator */
 class TopNodeElemItr{
 public:
-  int parfum_index;
-    TopModel *model;
+	/** which elem do we next supply  */
+	int current_index;
+	/** How many elements are adjacent to the node */
+	int numAdjElem;
+	
+	TopModel *model;
+	
+	/** The node we are iterating around */
+	long node;
 };
 
-/** Facet Iterator */
+
+/** Facet Iterator 
+ * 
+ * 
+ * @note implemented by iterating over all elements, and 
+ * in turn iterating over all the faces of each element, 
+ * emmitting facets if the current element has id < the 
+ * adjacent element
+ * 
+ * */
 class TopFacetItr{
 public:
-  int parfum_index;
-    TopModel *model;
+	TopModel *model;
+	TopElemItr *elemItr;
+	int whichFacet; // Will go from 0 to 3
 };
-
-
-
-
-
 
 
 
@@ -129,6 +138,9 @@ TopElement topModel_InsertElem(TopModel*, TopElemType, TopNode*);
 /** Set id of an element */
 void topElement_SetId(TopModel*, TopElement, TopID id);
 
+/** Get id of an element */
+int topElement_GetId (TopModel* m, TopElement e); 
+
 /** Set attribute of an element */
 void topElement_SetAttrib(TopModel*, TopElement, void*);
 
@@ -152,6 +164,7 @@ int topNode_GetId(TopModel* m, TopNode n);
 int topModel_GetNNodes(TopModel *model);
 
 int topElement_GetNNodes(TopModel* model, TopElement elem);
+bool topElement_IsCohesive(TopModel* m, TopElement e);
 
 void topNode_GetPosition(TopModel*model, TopNode node,float*x,float*y,float*z);
 void topNode_GetPosition(TopModel*model, TopNode node,double*x,double*y,double*z);
@@ -202,27 +215,27 @@ void top_retrieve_node_data(TopModel* m);
 void top_put_node_data(TopModel* m);
 
 
-
 //==============================================================
-//   New functions to be implemented for the new code to work
+//   New functions that have been implemented
 
-
-
-int topModel_GetNElem (TopModel* m);
-void topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f);
-
-bool topElement_IsCohesive(TopModel* m, TopElement e);
-bool topElement_IsValid(TopModel* m, TopElement e);
-int topElement_GetId (TopModel* m, TopElement e);
-
-void topNode_GetVertex (TopModel* m, TopNode n);
-
-bool topVertex_IsBoundary (TopModel* m, TopVertex v);
+TopNodeElemItr* topModel_CreateNodeElemItr (TopModel* m, TopNode n);
+bool topNodeElemItr_IsValid (TopNodeElemItr* neitr);
+void topNodeElemItr_Next (TopNodeElemItr* neitr);
+TopElement topNodeElemItr_GetCurr (TopNodeElemItr* neitr);
+void topNodeElemItr_Destroy (TopNodeElemItr* neitr);
 
 
 int topFacet_GetNNodes (TopModel* m, TopFacet f);
 TopNode topFacet_GetNode (TopModel* m, TopFacet f, int i);
 TopElement topFacet_GetElem (TopModel* m, TopFacet f, int i);
+
+bool topElement_IsValid(TopModel* m, TopElement e);
+
+bool topVertex_IsBoundary (TopModel* m, TopVertex v);
+
+TopVertex topNode_GetVertex (TopModel* m, TopNode n);
+
+
 
 TopFacetItr* topModel_CreateFacetItr (TopModel* m);
 void topFacetItr_Begin(TopFacetItr* itr);
@@ -232,11 +245,15 @@ TopFacet topFacetItr_GetCurr (TopFacetItr* itr);
 void topFacetItr_Destroy (TopFacetItr* itr);
 
 
-TopNodeElemItr* topModel_CreateNodeElemItr (TopModel* m, TopNode n);
-bool topNodeElemItr_IsValid (TopNodeElemItr* neitr);
-void topNodeElemItr_Next (TopNodeElemItr* neitr);
-TopElement topNodeElemItr_GetCurr (TopNodeElemItr* neitr);
-void topNodeElemItr_Destroy (TopNodeElemItr* neitr);
+//==============================================================
+//   New functions to be implemented for the new code to work
+
+// TODO: setup a correct boundary condition after loading the mesh
+// TODO: fixup everything to work with tet4s
+// TODO: fix everything to work with multiple element types
+// TODO: write tests
+
+void topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f);
 
 
 #endif

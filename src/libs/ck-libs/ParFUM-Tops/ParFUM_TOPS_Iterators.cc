@@ -130,6 +130,51 @@ void topElemItr_Next(TopElemItr* itr){
 }
 
 
-TopNode topElemItr_GetCurr(TopElemItr*itr){
-	return itr->parfum_index;
+TopElement topElemItr_GetCurr(TopElemItr*itr){	
+	TopElement e;
+	e.idx = itr->parfum_index; 
+	e.type = BULK_ELEMENT;
+	return e;
 }
+
+
+TopNodeElemItr* topModel_CreateNodeElemItr (TopModel* model, TopNode n){
+	TopNodeElemItr *itr = new TopNodeElemItr;
+	
+	itr->model = model;
+	itr->node = n;
+	itr->current_index=0;
+	
+	if( itr->model->mesh->node.is_valid_any_idx(n) ){
+		itr->numAdjElem = model->mesh->n2e_getLength(n);	
+	} else {
+		itr->numAdjElem = -1;
+	}
+	
+	return itr;
+}
+
+
+bool topNodeElemItr_IsValid (TopNodeElemItr* itr){
+    return (itr->current_index < itr->numAdjElem);
+}
+
+void topNodeElemItr_Next (TopNodeElemItr* itr){
+	itr->current_index ++;
+}
+
+
+TopElement topNodeElemItr_GetCurr (TopNodeElemItr* itr){
+	TopElement e;
+	// TODO Make this a const reference
+	FEM_VarIndexAttribute::ID elem = itr->model->mesh->n2e_getElem(itr->node, itr->current_index);
+	e.idx = elem.getSignedId();
+	e.type = elem.getUnsignedType();
+	return e;
+}
+
+
+void topNodeElemItr_Destroy (TopNodeElemItr* itr){
+	delete itr;
+}
+
