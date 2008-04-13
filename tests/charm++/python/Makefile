@@ -1,9 +1,10 @@
-CHARMC = ../../../../bin/charmc -g
+CHARMDIR=$(HOME)/installations/charm/net-linux-amd64
+CHARMC = $(CHARMDIR)/bin/charmc $(OPTS)
 INCL = -I/usr/include/python/
-LIBS = /usr/lib/python/config/libpython2.3.a -lpthread -lutil -ldl -lm
-INCLC = -I../../../../include/
-MODULES = -module PythonCCS
-PYMODULE = ../../../../lib/libmodulePythonCCS.a
+LIBS = -lpthread -lutil -ldl -lm -lpython2.5
+INCLC = -I$(CHARMDIR)/include/
+MODULES = -module PythonCCS -module charmdebug_python
+PYMODULE = $(CHARMDIR)/lib/libmodulePythonCCS.a
 
 OBJS = server.o
 
@@ -13,11 +14,11 @@ all: server client
 server: $(OBJS)
 	$(CHARMC) $(INCL) -language charm++ -o server $(OBJS) $(LIBS) $(MODULES)
 
-server.decl.h: server.ci $(PYMODULE) ../../../../bin/charmxi
+server.decl.h: server.ci $(PYMODULE) $(CHARMDIR)/bin/charmxi
 	$(CHARMC) $<
 
-client: client.C ../../../../tmp/libs/ck-libs/pythonCCS/PythonCCS-client.C
-	g++ $(INCLC) -o $@ $^
+client: client.C
+	g++ $(INCLC) $(OPTS) -o $@ $^ $(PYMODULE)
 
 clean:
 	rm -f *.decl.h *.def.h *.o server client charmrun *~

@@ -3,15 +3,25 @@
 /* global readonly variable */
 CProxy_Main mainProxy;
 CProxy_MyArray mypython;
+double granularity;
 
 Main::Main (CkArgMsg *msg) {
-
+  char **argv = msg->argv;
+  int argc = msg->argc;
   /* Load all data needed by the program and then create the interactor for python,
      it can also be created as Array or Nodegroup with the consequent differences
      for the python code been inserted */
   elem = 10;
+  granularity = 1e-5;
+  if(argc > 1){
+    elem = atoi(argv[1]);
+  }
+  if(argc > 2){
+    granularity = atof(argv[2]);
+  }
 
   mypython = CProxy_MyArray::ckNew(elem);
+
 
   count=0;
   total=0;
@@ -61,8 +71,13 @@ MyArray::MyArray () {mynumber = thisIndex+1000;}
 MyArray::MyArray (CkMigrateMessage *msg) {}
 
 void MyArray::run(CkCallback &cb) {
-  CkPrintf("[%d] in run %d\n",thisIndex,mynumber);
-  sleep(0);
+//  CkPrintf("[%d] in run %d\n",thisIndex,mynumber);
+   double _startTime = CmiWallTimer();
+
+   while(CmiWallTimer() - _startTime < granularity){
+   	mynumber++;
+   }
+//  sleep(0);
   //mainProxy.arrayResult(mynumber++);
   mynumber++;
   contribute(sizeof(int), &mynumber, CkReduction::sum_int, cb);

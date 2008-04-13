@@ -1,4 +1,2 @@
-ck.printstr('python')
 value=charm.runhigh()
-ck.printstr('python value: '+repr(value))
 ck.printclient('python value: '+repr(value))

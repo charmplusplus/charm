@@ -2,6 +2,7 @@ mainmodule server {
 
 	readonly CProxy_MyArray mypython;
 	readonly CProxy_Main mainProxy;
+	readonly double granularity;
 
 	mainchare [python] Main {
 		entry Main(CkArgMsg *msg);
