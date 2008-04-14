@@ -115,7 +115,7 @@ int main (int argc, char** argv) {
      double duration = wallTimer() - _startTime;
      
 
-     printf("buffer: %d   duration %.6lf \n",interpreter,duration);
+     printf("buffer: %d   duration %.6lf \n",remoteValue,duration);
      PythonPrint request(remoteValue);
       //request.print();
      CcsSendRequest (&server, pythonString, 0, request.size(), request.pack());

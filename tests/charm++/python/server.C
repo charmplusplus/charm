@@ -47,7 +47,9 @@ void Main::ccs_kill (CkCcsRequestMsg *msg) {
 void Main::runhigh(int i) {
   void *total;
   mypython.run(CkCallbackPython(total));
-  pythonReturn(i, Py_BuildValue("i",*(int*)total));
+  CkReductionMsg *msg = (CkReductionMsg*)total;
+  int *value = (int*)msg->getData();
+  pythonReturn(i, Py_BuildValue("i",*value));
 }
 
 /*
