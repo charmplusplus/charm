@@ -50,10 +50,10 @@ inline int coordLessThan(const double *key1, const double *key2, int dim) {
 
 void ParFUM_desharing(int meshid);
 void ParFUM_deghosting(int meshid);
-void ParFUM_generateGlobalNodeNumbers(int fem_mesh);
-void ParFUM_recreateSharedNodes(int meshid, int dim);
+void ParFUM_generateGlobalNodeNumbers(int fem_mesh, MPI_Comm comm);
+void ParFUM_recreateSharedNodes(int meshid, int dim, int nParts);
 
-void ParFUM_createComm(int meshid, int dim);
+void ParFUM_createComm(int meshid, int dim, MPI_Comm comm);
 
 void ParFUM_import_nodes(int meshid, int numNodes, double *nodeCoords, int dim);
 void ParFUM_import_elems(int meshid, int numElems, int nodesPer, int *conn, int type);

@@ -10,12 +10,12 @@
 void addToLists(int *listIndex,CkVec<CkVec<int> > &lists,int chunk,int node);
 
 
-void ParFUM_generateGlobalNodeNumbers(int fem_mesh){
+void ParFUM_generateGlobalNodeNumbers(int fem_mesh, MPI_Comm comm){
 	int myID;
 	int numberChunks;
-	MPI_Barrier(MPI_COMM_WORLD);
-	MPI_Comm_rank(MPI_COMM_WORLD,&myID);
-	MPI_Comm_size(MPI_COMM_WORLD,&numberChunks);
+	//MPI_Barrier(comm);
+	MPI_Comm_rank(comm,&myID);
+	MPI_Comm_size(comm,&numberChunks);
 	FEM_Mesh 	*mesh = (FEM_chunk::get("ParFUM_renumberMesh"))->lookup(fem_mesh,"ParFUM_renumberMesh");
 	
 	FEM_Node *node = &(mesh->node);
@@ -72,7 +72,7 @@ void ParFUM_generateGlobalNodeNumbers(int fem_mesh){
 	}
 	// perform a prefix sum of nodes owned by each processor
 	int globalUniqueNodes;
-	MPI_Scan((void*)&numberOwned , (void* ) &globalUniqueNodes, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD) ;
+	MPI_Scan((void*)&numberOwned , (void* ) &globalUniqueNodes, 1, MPI_INT, MPI_SUM, comm) ;
 
 	//assign global numbers to nodes owned by me
 	int firstGlobalNumber = globalUniqueNodes - numberOwned;
@@ -145,7 +145,7 @@ void ParFUM_generateGlobalNodeNumbers(int fem_mesh){
 			
 			CkVec<int> &recvList = listsToRecv[recvListIndex[j]];
 			recvdGlobalNumbers[countRequests] = new int[recvList.size()];
-			MPI_Irecv((void*)recvdGlobalNumbers[countRequests] , recvList.size(), MPI_INT, j, 42, MPI_COMM_WORLD, &req[countRequests]) ;
+			MPI_Irecv((void*)recvdGlobalNumbers[countRequests] , recvList.size(), MPI_INT, j, 42, comm, &req[countRequests]) ;
 			countRequests++;
 		}
 	}
@@ -158,7 +158,7 @@ void ParFUM_generateGlobalNodeNumbers(int fem_mesh){
 			for(int k=0;k<sendList.size();k++){
 				sendGlobalNumbers[k] = globalTable[sendList[k]][0];
 			}
-			MPI_Send((void*)sendGlobalNumbers , sendList.size(), MPI_INT, j, 42, MPI_COMM_WORLD); 
+			MPI_Send((void*)sendGlobalNumbers , sendList.size(), MPI_INT, j, 42, comm); 
 			delete [] sendGlobalNumbers;
 		}
 	}
