@@ -17,7 +17,6 @@
 #include <ParFUM.h>
 #include <ParFUM_internals.h>
 
-
 #include "ParFUM_TOPS_Types.h"
 #include "ParFUM_TOPS_CUDA.h"
 
@@ -71,7 +70,9 @@ public:
 class TopElemItr{
 public:
 	int parfum_index;
+	int type;
 	TopModel *model;
+	bool done;
 };
 
 /** Node->Element adjacency Iterator */
@@ -106,7 +107,7 @@ public:
 };
 
 
-
+ 
 /**
 Create and access a Tops model. Only call from Init
 Currently only one model can be created. To extend, each model must just reference a different FEM_Mesh object
@@ -187,6 +188,8 @@ void topNodeItr_Next(TopNodeItr*);
 /** Get TopNode associated with the iterator */
 TopNode topNodeItr_GetCurr(TopNodeItr*);
 
+/** Get total number of elements */
+int topModel_GetNElem (TopModel* m);
 
 /** Create Iterator for elements */
 TopElemItr*  topModel_CreateElemItr(TopModel*);
@@ -245,15 +248,11 @@ TopFacet topFacetItr_GetCurr (TopFacetItr* itr);
 void topFacetItr_Destroy (TopFacetItr* itr);
 
 
-//==============================================================
-//   New functions to be implemented for the new code to work
+TopElement topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f);
+
 
 // TODO: setup a correct boundary condition after loading the mesh
-// TODO: fixup everything to work with tet4s
 // TODO: fix everything to work with multiple element types
-// TODO: write tests
-
-void topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f);
 
 
 #endif

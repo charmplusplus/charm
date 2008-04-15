@@ -64,17 +64,22 @@ void topNodeItr_Next(TopNodeItr* itr){
 
 
 TopNode topNodeItr_GetCurr(TopNodeItr*itr){
+	CkAssert(topNodeItr_IsValid(itr));
 	return itr->parfum_index;
 }
 
 
 /**************************************************************************
  *     Iterator for elements
+ * 
+ *  TODO: Iterate through both cohesives & bulk elements ?
+ * 
  */
 
 TopElemItr*  topModel_CreateElemItr(TopModel* model){
     TopElemItr *itr = new TopElemItr;
     itr->model = model;
+    itr->type = TOP_ELEMENT_TET4;
     return itr;
 }
 
@@ -83,59 +88,72 @@ void topElemItr_Destroy(TopElemItr* itr){
 }
 
 void topElemItr_Begin(TopElemItr* itr){
-  if(itr->model->mesh->elem[0].ghost != NULL){
-	itr->parfum_index =  FEM_To_ghost_index(itr->model->mesh->elem[0].ghost->size());
-  }
-  else{
-	itr->parfum_index =  0;
-  }
+	itr->done = false;
 
-  // Make sure we start with a valid one:
-  while((!itr->model->mesh->elem[0].is_valid_any_idx(itr->parfum_index)) &&
-		(itr->parfum_index < itr->model->mesh->elem[0].size()))
-	itr->parfum_index++;
+	if(itr->model->mesh->elem[itr->type].ghost != NULL){
+		itr->parfum_index =  FEM_To_ghost_index(itr->model->mesh->elem[itr->type].ghost->size());
+	}
+	else{
+		itr->parfum_index =  0;
+	}
 
-  if(itr->parfum_index==itr->model->mesh->elem[0].size()){
-	itr->parfum_index = itr->model->mesh->elem[0].size()+1000; // way past the end
-  }
+	// Make sure we start with a valid one:
+	while((!itr->model->mesh->elem[itr->type].is_valid_any_idx(itr->parfum_index)) &&
+			(itr->parfum_index < itr->model->mesh->elem[itr->type].size()))
+		itr->parfum_index++;
+
+	if(itr->parfum_index==itr->model->mesh->elem[itr->type].size()){
+		itr->done = true;
+	}
 
 #ifdef PTOPS_ITERATOR_PRINT
-  CkPrintf("Initializing Elem[0] Iterator to %d\n", itr->parfum_index);
+	CkPrintf("Initializing elem[itr->type] Iterator to %d\n", itr->parfum_index);
 #endif
 
 }
 
 bool topElemItr_IsValid(TopElemItr*itr){
-  return itr->model->mesh->elem[0].is_valid_any_idx(itr->parfum_index);
+  return ! itr->done;
 }
 
 void topElemItr_Next(TopElemItr* itr){
-  CkAssert(topElemItr_IsValid(itr));
+	CkAssert(topElemItr_IsValid(itr));
 
-  // advance index until we hit a valid index
-  itr->parfum_index++;
-
-  while((!itr->model->mesh->elem[0].is_valid_any_idx(itr->parfum_index)) &&
-		(itr->parfum_index < itr->model->mesh->elem[0].size()))
+	// advance index until we hit a valid index
 	itr->parfum_index++;
 
+	while((!itr->model->mesh->elem[TOP_ELEMENT_TET4].is_valid_any_idx(itr->parfum_index)) &&
+			(itr->parfum_index < itr->model->mesh->elem[TOP_ELEMENT_TET4].size()))
+		itr->parfum_index++;
 
-  if(itr->parfum_index==itr->model->mesh->elem[0].size()){
-	itr->parfum_index = itr->model->mesh->elem[0].size()+1000; // way past the end
-  }
+
+	if(itr->parfum_index==itr->model->mesh->elem[TOP_ELEMENT_TET4].size()){
+		itr->done = true;
+	}
 
 #ifdef PTOPS_ITERATOR_PRINT
-  CkPrintf("Advancing Elem Iterator to %d\n", itr->parfum_index);
+	CkPrintf("Advancing Elem Iterator to %d\n", itr->parfum_index);
 #endif
 }
 
 
 TopElement topElemItr_GetCurr(TopElemItr*itr){	
+	CkAssert(topElemItr_IsValid(itr));
 	TopElement e;
-	e.idx = itr->parfum_index; 
-	e.type = BULK_ELEMENT;
+	e.id = itr->parfum_index; 
+	e.type = itr->type;
 	return e;
 }
+
+
+
+/**************************************************************************
+ *     Iterator for elements adjacent to a node
+ * 
+ *  TODO: Iterate through both cohesives & bulk elements ?
+ * 
+ */
+
 
 
 TopNodeElemItr* topModel_CreateNodeElemItr (TopModel* model, TopNode n){
@@ -165,10 +183,11 @@ void topNodeElemItr_Next (TopNodeElemItr* itr){
 
 
 TopElement topNodeElemItr_GetCurr (TopNodeElemItr* itr){
+	CkAssert(topNodeElemItr_IsValid(itr));
 	TopElement e;
 	// TODO Make this a const reference
 	FEM_VarIndexAttribute::ID elem = itr->model->mesh->n2e_getElem(itr->node, itr->current_index);
-	e.idx = elem.getSignedId();
+	e.id = elem.getSignedId();
 	e.type = elem.getUnsignedType();
 	return e;
 }
@@ -177,4 +196,110 @@ TopElement topNodeElemItr_GetCurr (TopNodeElemItr* itr){
 void topNodeElemItr_Destroy (TopNodeElemItr* itr){
 	delete itr;
 }
+
+
+/**************************************************************************
+ *     Iterator for Facets
+ * 
+ *  TODO : verify that we are counting the facets correctly. 
+ *               Should interior facets be found twice?
+ * 				  Should boundary facets be found at all?
+ * 
+ */
+
+TopFacetItr* topModel_CreateFacetItr (TopModel* m){
+	TopFacetItr* itr = new TopFacetItr();
+	itr->model = m;
+	return itr;
+}
+
+void topFacetItr_Begin(TopFacetItr* itr){
+	itr->elemItr = topModel_CreateElemItr(itr->model);
+	topElemItr_Begin(itr->elemItr);
+	itr->whichFacet = 0;
+}
+
+bool topFacetItr_IsValid(TopFacetItr* itr){
+	return topElemItr_IsValid(itr->elemItr);
+}
+
+/** Iterate to the next facet */
+void topFacetItr_Next(TopFacetItr* itr){
+	bool found = false;
+	
+	// Scan through all the faces on some elements until we get to the end, or we 
+	while( !found && topElemItr_IsValid(itr->elemItr) ){
+		
+		itr->whichFacet++;
+		if(itr->whichFacet > 3){
+			topElemItr_Next(itr->elemItr);
+			itr->whichFacet=0;
+		}
+
+		if( ! topElemItr_IsValid(itr->elemItr) ){
+			break;
+		}
+				
+		TopElement currElem = topElemItr_GetCurr(itr->elemItr);
+		FEM_VarIndexAttribute::ID e = itr->model->mesh->e2e_getElem(currElem.id, itr->whichFacet, currElem.type);
+
+		// TODO Adapt to work with cohesives
+		if (e.id < currElem.id){
+			found = true;
+		}
+	}
+	
+}
+
+
+
+TopFacet topFacetItr_GetCurr (TopFacetItr* itr){
+	TopFacet f;
+	
+	TopElement el = topElemItr_GetCurr(itr->elemItr);
+	f.elem[0] = el;
+	
+	int p1 = el.id;
+	int p2 =  itr->whichFacet;
+	int p3 =  el.type;
+
+	TopElement e = itr->model->mesh->e2e_getElem(p1,p2, p3);
+	
+	f.elem[1] = e;
+	
+	// TODO adapt this to work with cohesives
+
+	// face 0 is nodes 0,1,3
+	if(itr->whichFacet==0){
+		f.node[0] = f.node[3] = itr->model->mesh->elem[el.type].connFor(el.id)[0];
+		f.node[1] = f.node[4] = itr->model->mesh->elem[el.type].connFor(el.id)[1];
+		f.node[2] = f.node[5] = itr->model->mesh->elem[el.type].connFor(el.id)[3];
+	}
+	// face 1 is nodes 0,2,1
+	else if(itr->whichFacet==1){
+		f.node[0] = f.node[3] = itr->model->mesh->elem[el.type].connFor(el.id)[0];
+		f.node[1] = f.node[4] = itr->model->mesh->elem[el.type].connFor(el.id)[2];
+		f.node[2] = f.node[5] = itr->model->mesh->elem[el.type].connFor(el.id)[1];
+	}
+	// face 2 is nodes 1,2,3
+	else if(itr->whichFacet==2){
+		f.node[0] = f.node[3] = itr->model->mesh->elem[el.type].connFor(el.id)[1];
+		f.node[1] = f.node[4] = itr->model->mesh->elem[el.type].connFor(el.id)[2];
+		f.node[2] = f.node[5] = itr->model->mesh->elem[el.type].connFor(el.id)[3];		
+	}
+	// face 3 is nodes 0,3,2
+	else if(itr->whichFacet==3){
+		f.node[0] = f.node[3] = itr->model->mesh->elem[el.type].connFor(el.id)[0];
+		f.node[1] = f.node[4] = itr->model->mesh->elem[el.type].connFor(el.id)[3];
+		f.node[2] = f.node[5] = itr->model->mesh->elem[el.type].connFor(el.id)[2];
+	}	
+	
+	return f;
+}
+
+
+void topFacetItr_Destroy (TopFacetItr* itr){
+	delete itr;
+}
+
 

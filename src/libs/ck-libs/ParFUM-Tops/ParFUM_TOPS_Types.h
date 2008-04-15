@@ -26,15 +26,8 @@ typedef long TopNode;
 /** A type for a Vertex (would be different from nodes if using quadratic elements) */
 typedef TopNode TopVertex;
 
-/** A type for a node */
-class TopElement{
-public:
-	long type; // Should be BULK_ELEMENT or COHESIVE_ELEMENT
-	long idx; 
-};
-
-#define BULK_ELEMENT 0
-#define COHESIVE_ELEMENT 1
+/** A type for an element */
+typedef FEM_VarIndexAttribute::ID TopElement;
 
 
 /** A type for a facet */
@@ -42,10 +35,28 @@ class TopFacet{
 public:
 	TopNode node[6];
 	TopElement elem[2];
+	
+	bool operator==( const TopFacet& other){
+		return   
+					this->node[0] == other.node[0] &&
+                	this->node[1] == other.node[1] &&
+                	this->node[2] == other.node[2] &&
+                	this->node[3] == other.node[3] &&
+                	this->node[4] == other.node[4] &&
+                	this->node[5] == other.node[5] &&
+                	this->elem[0] == other.elem[0] &&
+                	this->elem[1] == other.elem[1] ;
+	}
+	
 };
 
 
-enum {
+/** Enumerates the possible tops element types. Note that all bulk types come
+ * first, then all cohesive types, starting with TOP_ELEMENT_MIN_COHESIVE.
+ * This allows us to determine whether an element type is cohesive or bulk
+ * by comparing it to TOP_ELEMENT_MIN_COHESIVE
+ */
+enum TopElementType {
   TOP_ELEMENT_T3 =0,
   TOP_ELEMENT_T6,
   TOP_ELEMENT_Q4,
@@ -56,13 +67,14 @@ enum {
   TOP_ELEMENT_HEX8_RESERVOIR,
   TOP_ELEMENT_HEX20,
   TOP_ELEMENT_WEDGE15,
+  TOP_ELEMENT_WEDGE6,
+  TOP_ELEMENT_MIN_COHESIVE,
   TOP_ELEMENT_COH2E2,
   TOP_ELEMENT_COH2E3,
   TOP_ELEMENT_COH3T3,
   TOP_ELEMENT_COH3T6,
   TOP_ELEMENT_COH3Q4,
   TOP_ELEMENT_COH3Q8,
-  TOP_ELEMENT_WEDGE6,
   TOP_ELEMENT_MAX
 };
 

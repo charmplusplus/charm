@@ -4,9 +4,11 @@
    @brief Implementation of ParFUM-TOPS layer, except for Iterators
 
    @author Isaac Dooley
+   @author Aaron Becker
 
    @todo add code to generate ghost layers
    @todo Support multiple models
+   @todo Specify element types to be used via input vector in topModel_Create
 
    @note FEM_DATA+0 holds the elemAttr or nodeAtt data
    @note FEM_DATA+1 holds the id
@@ -23,12 +25,20 @@
     #include <cuda_runtime.h>
 #endif
 
+#include <stack>
+
+
+int tetFaces[] = {0,1,3,  0,2,1,  1,2,3,   0,3,2};
+int cohFaces[] = {0,1,2,  3,4,5};  
+
+
+
 void setBasicTableReferences(TopModel* model)
 {
-  model->ElemConn_T = &((FEM_IndexAttribute*)model->mesh->elem[0].lookup(FEM_CONN,""))->get();
+  model->ElemConn_T = &((FEM_IndexAttribute*)model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_CONN,""))->get();
   model->node_id_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+0,""))->getInt();
-  model->elem_id_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+0,""))->getInt();
-  model->n2eConn_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+1,""))->getInt();
+  model->elem_id_T = &((FEM_DataAttribute*)model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_DATA+0,""))->getInt();
+  model->n2eConn_T = &((FEM_DataAttribute*)model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_DATA+1,""))->getInt();
 
 #ifdef FP_TYPE_FLOAT
   model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+1,""))->getFloat();
@@ -40,8 +50,8 @@ void setBasicTableReferences(TopModel* model)
 void setTableReferences(TopModel* model)
 {
     setBasicTableReferences(model);
-    model->ElemData_T = &((FEM_DataAttribute*)model->mesh->elem[0].lookup(FEM_DATA+2,""))->getChar();
-    FEM_Entity* ghost = model->mesh->elem[0].getGhost();
+    model->ElemData_T = &((FEM_DataAttribute*)model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_DATA+2,""))->getChar();
+    FEM_Entity* ghost = model->mesh->elem[TOP_ELEMENT_TET4].getGhost();
     if (ghost)
         model->GhostElemData_T = &((FEM_DataAttribute*)ghost->lookup(FEM_DATA+2,""))->getChar();
     model->NodeData_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+2,""))->getChar();
@@ -60,6 +70,7 @@ void fillIDHash(TopModel* model)
     }
 }
 
+/** Create a model  before partitioning. Given the number of nodes per element */
 TopModel* topModel_Create_Init(int nelnode){
   TopModel* model = new TopModel;
   memset(model, 0, sizeof(TopModel));
@@ -67,10 +78,9 @@ TopModel* topModel_Create_Init(int nelnode){
   model->nodeIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
   model->elemIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
   
-  // This only uses a single mesh, so better not create multiple ones of these
+  // This only uses a single mesh
   int which_mesh=FEM_Mesh_default_write();
   model->mesh = FEM_Mesh_lookup(which_mesh,"topModel_Create_Init");
-
 
 /** @note   Here we allocate the arrays with a single
             initial node and element, which are set as
@@ -78,31 +88,41 @@ TopModel* topModel_Create_Init(int nelnode){
             the AllocTable2d's would not ever get allocated,
             and insertNode or insertElement would fail.
  */
-  char temp_array[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+  char temp_array[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
   // Allocate node coords
-#ifdef FP_TYPE_FLOAT
+#ifdef FP_TYPE_FLOAT 
   FEM_Mesh_data(which_mesh,FEM_NODE,FEM_DATA+1,temp_array, 0, 1, FEM_FLOAT, 3);
 #else
   FEM_Mesh_data(which_mesh,FEM_NODE,FEM_DATA+1,temp_array, 0, 1, FEM_DOUBLE, 3);
 #endif
+  
   // Allocate element connectivity
-  FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_CONN,temp_array, 0, 1, FEM_INDEX_0, nelnode);
-  // Allocate element Id array
-  FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+0,temp_array, 0, 1, FEM_INT, 1);
-  // Allocate node Id array
+  FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_TET4,FEM_CONN,temp_array, 0, 1, FEM_INDEX_0, 4);
+  FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_COH3T3,FEM_CONN,temp_array, 0, 1, FEM_INDEX_0, 6);
+
+  // Allocate element id array
+  FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_TET4,FEM_DATA+0,temp_array, 0, 1, FEM_INT, 1);
+  FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_COH3T3,FEM_DATA+0,temp_array, 0, 1, FEM_INT, 1);
+
+  // Allocate node id array
   FEM_Mesh_data(which_mesh,FEM_NODE+0,FEM_DATA+0,temp_array, 0, 1, FEM_INT, 1);
 
+  
   FEM_Mesh_allocate_valid_attr(which_mesh, FEM_NODE);
-  FEM_Mesh_allocate_valid_attr(which_mesh, FEM_ELEM+0);
+  FEM_Mesh_allocate_valid_attr(which_mesh, FEM_ELEM+TOP_ELEMENT_TET4);
+  FEM_Mesh_allocate_valid_attr(which_mesh, FEM_ELEM+TOP_ELEMENT_COH3T3);
 
   FEM_set_entity_invalid(which_mesh, FEM_NODE, 0);
-  FEM_set_entity_invalid(which_mesh, FEM_ELEM+0, 0);
+  FEM_set_entity_invalid(which_mesh, FEM_ELEM+TOP_ELEMENT_TET4, 0);
+  FEM_set_entity_invalid(which_mesh, FEM_ELEM+TOP_ELEMENT_COH3T3, 0);
 
+  // Setup the adjacency lists
+  
   setBasicTableReferences(model);
   return model;
 }
 
+/** Get the mesh for use in the driver. It will be partitioned already */
 TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_attr_sz, void *mAtt){
 
     // This only uses a single mesh, so don't create multiple TopModels of these
@@ -119,40 +139,53 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
     model->mesh = FEM_Mesh_lookup(which_mesh,"topModel_Create_Driver");
     model->mAtt = mAtt;
 
-    model->num_local_elem = model->mesh->elem[0].size();
+    model->num_local_elem = model->mesh->elem[TOP_ELEMENT_TET4].size();
     model->num_local_node = model->mesh->node.size();
 
     // Allocate user model attributes
     FEM_Mesh_become_set(which_mesh);
     char* temp_array = (char*) malloc(model->num_local_elem * model->elem_attr_size);
-    FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+2,temp_array,0,model->num_local_elem,FEM_BYTE,model->elem_attr_size);
+    FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_TET4,FEM_DATA+2,temp_array,0,model->num_local_elem,FEM_BYTE,model->elem_attr_size);
     free(temp_array);
+ 
     temp_array = (char*) malloc(model->num_local_node * model->node_attr_size);
     FEM_Mesh_data(which_mesh,FEM_NODE+0,FEM_DATA+2,temp_array,0,model->num_local_node,FEM_BYTE,model->node_attr_size);
     free(temp_array);
 
-    // Allocate n2e connectivity
-    const int connSize = model->mesh->elem[0].getConn().width();
+    
+    const int connSize = model->mesh->elem[TOP_ELEMENT_TET4].getConn().width();
     temp_array = (char*) malloc(model->num_local_node * connSize);
-    FEM_Mesh_data(which_mesh,FEM_ELEM+0,FEM_DATA+1,temp_array, 0, 1, FEM_INT, connSize);
+    FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_TET4,FEM_DATA+1,temp_array, 0, 1, FEM_INT, connSize);
     free(temp_array);
 
     setTableReferences(model);
     model->nodeIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
     model->elemIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
     fillIDHash(model);
+    
+    // Setup the adjacencies
+    int nodesPerTuple = 3;
+    int tuplesPerTet = 4;
+    int tuplesPerCoh = 2;
 
+    FEM_Add_elem2face_tuples(which_mesh, TOP_ELEMENT_TET4,  nodesPerTuple, tuplesPerTet, tetFaces);
+    FEM_Add_elem2face_tuples(which_mesh, TOP_ELEMENT_COH3T3,  nodesPerTuple, tuplesPerCoh, cohFaces);
+
+    model->mesh->createNodeElemAdj();
+    model->mesh->createNodeNodeAdj();
+    model->mesh->createElemElemAdj();
+    
 
 #if CUDA
     /** Create n2e connectivity array and copy to device global memory */
     FEM_Mesh_create_node_elem_adjacency(which_mesh);
     FEM_Mesh* mesh = FEM_Mesh_lookup(which_mesh, "topModel_Create_Driver");
     FEM_DataAttribute * at = (FEM_DataAttribute*) 
-        model->mesh->elem[0].lookup(FEM_DATA+1,"topModel_Create_Driver");
+        model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_DATA+1,"topModel_Create_Driver");
     int* n2eTable  = at->getInt().getData();
 
     FEM_IndexAttribute * iat = (FEM_IndexAttribute*) 
-        model->mesh->elem[0].lookup(FEM_CONN,"topModel_Create_Driver");
+        model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_CONN,"topModel_Create_Driver");
     int* connTable  = iat->get().getData();
 
     int* adjElements;
@@ -211,7 +244,7 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
 
     /** Copy element Attribute array to device global memory */
     {
-        FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->elem[0].lookup(FEM_DATA+0,"topModel_Create_Driver");
+        FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_DATA+0,"topModel_Create_Driver");
         AllocTable2d<unsigned char> &dataTable  = at->getChar();
         unsigned char *ElemData = dataTable.getData();
         int size = dataTable.size()*dataTable.width();
@@ -233,7 +266,7 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
 
     /** Copy elem connectivity array to device global memory */
     {
-        FEM_IndexAttribute * at = (FEM_IndexAttribute*) model->mesh->elem[0].lookup(FEM_CONN,"topModel_Create_Driver");
+        FEM_IndexAttribute * at = (FEM_IndexAttribute*) model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_CONN,"topModel_Create_Driver");
         AllocTable2d<int> &dataTable  = at->get();
         int *data = dataTable.getData();
         int size = dataTable.size()*dataTable.width()*sizeof(int);
@@ -340,8 +373,8 @@ TopElement topModel_InsertElem(TopModel*m, TopElemType type, TopNode* nodes){
           conn[1] = nodes[1]; 
           conn[2] = nodes[2]; 
           conn[3] = nodes[3]; 
-          newEl.type = BULK_ELEMENT;
-          newEl.idx = FEM_add_element_local(m->mesh, conn, 4, 0, 0, 0); 
+          newEl.type = TOP_ELEMENT_TET4;
+          newEl.id = FEM_add_element_local(m->mesh, conn, 4, type, 0,0); 
   } else if (type==TOP_ELEMENT_TET10){  
           int conn[10];  
           conn[0] = nodes[0];  
@@ -354,8 +387,8 @@ TopElement topModel_InsertElem(TopModel*m, TopElemType type, TopNode* nodes){
           conn[7] = nodes[7];  
           conn[8] = nodes[8];   
           conn[9] = nodes[9]; 
-          newEl.type = BULK_ELEMENT;
-          newEl.idx = FEM_add_element_local(m->mesh, conn, 10, 0, 0, 0);  
+          newEl.type =  TOP_ELEMENT_TET10;
+          newEl.id = FEM_add_element_local(m->mesh, conn, 10, type, 0, 0);  
   } 
  
          return newEl; 
@@ -365,16 +398,16 @@ TopElement topModel_InsertElem(TopModel*m, TopElemType type, TopNode* nodes){
 @todo Make this work with ghosts
 */
 void topElement_SetId(TopModel* m, TopElement e, TopID id){
-  CkAssert(e.idx>=0);
-  (*m->elem_id_T)(e.idx,0)=id;
-  m->elemIDHash->put(id) = e.idx+1;
+  CkAssert(e.id>=0);
+  (*m->elem_id_T)(e.id,0)=id;
+  m->elemIDHash->put(id) = e.id+1;
 }
 
 
 /** get the number of elements in the mesh */
 int topModel_GetNElem (TopModel* m){
-	const int numBulk = m->mesh->elem[BULK_ELEMENT].count_valid();
-	const int numCohesive = m->mesh->elem[COHESIVE_ELEMENT].count_valid();
+	const int numBulk = m->mesh->elem[TOP_ELEMENT_TET4].count_valid();
+	const int numCohesive = m->mesh->elem[TOP_ELEMENT_COH3T3].count_valid();
 	return numBulk + numCohesive;
 }
 
@@ -394,9 +427,11 @@ void topNode_SetAttrib(TopModel* m, TopNode n, void* d)
 {
     unsigned char* data;
     if (n < 0) {
-        data = m->GhostNodeData_T->getData();
+    	assert(m->GhostNodeData_T);
+    	data = m->GhostNodeData_T->getData();
         n = FEM_From_ghost_index(n);
     } else {
+    	assert(m->NodeData_T);
         data = m->NodeData_T->getData();
     }
     memcpy(data + n*m->node_attr_size, d, m->node_attr_size);
@@ -407,13 +442,13 @@ See topNode_SetAttrib() for description
 */
 void topElement_SetAttrib(TopModel* m, TopElement e, void* d){
   unsigned char *data;
-  if (e.idx < 0) {
+  if (e.id < 0) {
       data = m->GhostElemData_T->getData();
-      e.idx = FEM_From_ghost_index(e.idx);
+      e.id = FEM_From_ghost_index(e.id);
   } else {
     data = m->ElemData_T->getData();
   }
-  memcpy(data + e.idx*m->elem_attr_size, d, m->elem_attr_size);
+  memcpy(data + e.id*m->elem_attr_size, d, m->elem_attr_size);
 }
 
 
@@ -422,16 +457,16 @@ See topNode_SetAttrib() for description
 */
 void* topElement_GetAttrib(TopModel* m, TopElement e)
 {
-    if(! m->mesh->elem[0].is_valid_any_idx(e.idx))
+    if(! m->mesh->elem[e.type].is_valid_any_idx(e.id))
         return NULL;
     unsigned char *data;
-    if (FEM_Is_ghost_index(e.idx)) {
+    if (FEM_Is_ghost_index(e.id)) {
        data = m->GhostElemData_T->getData();
-       e.idx = FEM_From_ghost_index(e.idx);
+       e.id = FEM_From_ghost_index(e.id);
     } else {
        data = m->ElemData_T->getData();
     }
-    return (data + e.idx*m->elem_attr_size);
+    return (data + e.id*m->elem_attr_size);
 }
 
 /** @brief Get nodal attribute
@@ -475,27 +510,28 @@ TopNode topModel_GetNodeAtId(TopModel* m, TopID id)
 
 /**
 	Get elem via id
+	Note: this will currently only work with TET4 elements
  */
 TopElement topModel_GetElemAtId(TopModel*m,TopID id)
 {
 	TopElement e;
-	e.idx = m->elemIDHash->get(id)-1;
-	e.type = BULK_ELEMENT;
+	e.id = m->elemIDHash->get(id)-1;
+	e.type = TOP_ELEMENT_TET4;
 	
-	if (e.idx != -1) return e;
+	if (e.id != -1) return e;
 
     AllocTable2d<int>* ghostElem_id_T = &((FEM_DataAttribute*)m->mesh->
-            elem[0].getGhost()->lookup(FEM_DATA+0,""))->getInt();
+            elem[TOP_ELEMENT_TET4].getGhost()->lookup(FEM_DATA+0,""))->getInt();
     for(int i=0; i<ghostElem_id_T->size(); ++i) {
         if((*ghostElem_id_T)(i,0)==id){
-            e.idx = FEM_To_ghost_index(i);
-            e.type = BULK_ELEMENT;
+            e.id = FEM_To_ghost_index(i);
+            e.type = TOP_ELEMENT_TET4;
         	return e;
         }
     }
     
-    e.idx = -1;
-    e.type = BULK_ELEMENT;
+    e.id = -1;
+    e.type = TOP_ELEMENT_TET4;
 
     return e;
 }
@@ -503,15 +539,15 @@ TopElement topModel_GetElemAtId(TopModel*m,TopID id)
 
 TopNode topElement_GetNode(TopModel* m,TopElement e,int idx){
     int node = -1;
-    if (e.idx < 0) {
-        CkAssert(m->mesh->elem[0].getGhost());
-        const AllocTable2d<int> &conn = ((FEM_Elem*)m->mesh->elem[0].getGhost())->getConn();
+    if (e.id < 0) {
+        CkAssert(m->mesh->elem[e.type].getGhost());
+        const AllocTable2d<int> &conn = ((FEM_Elem*)m->mesh->elem[e.type].getGhost())->getConn();
         CkAssert(idx>=0 && idx<conn.width());
-        node = conn(FEM_From_ghost_index(e.idx),idx);
+        node = conn(FEM_From_ghost_index(e.id),idx);
     } else {
-        const AllocTable2d<int> &conn = m->mesh->elem[0].getConn();
+        const AllocTable2d<int> &conn = m->mesh->elem[e.type].getConn();
         CkAssert(idx>=0 && idx<conn.width());
-        node = conn(e.idx,idx);
+        node = conn(e.id,idx);
     }
 
     return node;
@@ -530,7 +566,7 @@ int topModel_GetNNodes(TopModel *model){
 
 /** @todo How should we handle meshes with mixed elements? */
 int topElement_GetNNodes(TopModel* model, TopElement elem){
-    return model->mesh->elem[0].getConn().width();
+    return model->mesh->elem[elem.type].getConn().width();
 }
 
 /** @todo make sure we are in a getting mesh */
@@ -569,16 +605,17 @@ void topModel_Sync(TopModel*m){
   MPI_Barrier(MPI_COMM_WORLD);
 
 
-  //  CkPrintf("%d: %d local, %d ghost elements\n", FEM_My_partition(), m->mesh->elem[0].size(),m->mesh->elem[0].ghost->size() );
-  //  CkPrintf("%d: %d local, %d ghost valid elements\n", FEM_My_partition(), m->mesh->elem[0].count_valid(),m->mesh->elem[0].ghost->count_valid() );
+  //  CkPrintf("%d: %d local, %d ghost elements\n", FEM_My_partition(), m->mesh->elem[TOP_ELEMENT_TET4].size(),m->mesh->elem[TOP_ELEMENT_TET4].ghost->size() );
+  //  CkPrintf("%d: %d local, %d ghost valid elements\n", FEM_My_partition(), m->mesh->elem[TOP_ELEMENT_TET4].count_valid(),m->mesh->elem[TOP_ELEMENT_TET4].ghost->count_valid() );
 
 }
 
+/** Test the node and element iterators */
 void topModel_TestIterators(TopModel*m){
-  CkAssert(m->mesh->elem[0].ghost!=NULL);
+  CkAssert(m->mesh->elem[TOP_ELEMENT_TET4].ghost!=NULL);
   CkAssert(m->mesh->node.ghost!=NULL);
 
-  int expected_elem_count = m->mesh->elem[0].count_valid() + m->mesh->elem[0].ghost->count_valid();
+  int expected_elem_count = m->mesh->elem[TOP_ELEMENT_TET4].count_valid() + m->mesh->elem[TOP_ELEMENT_TET4].ghost->count_valid();
   int iterated_elem_count = 0;
 
   int expected_node_count = m->mesh->node.count_valid() + m->mesh->node.ghost->count_valid();
@@ -605,14 +642,13 @@ void topModel_TestIterators(TopModel*m){
 
   CkAssert(iterated_node_count == expected_node_count);
   CkAssert(iterated_elem_count==expected_elem_count);
+  CkPrintf("Completed Iterator Test!\n");
 }
 
 
 
-
-
 bool topElement_IsCohesive(TopModel* m, TopElement e){
-	return e.type == COHESIVE_ELEMENT;
+	return e.type > TOP_ELEMENT_MIN_COHESIVE;
 }
 
 
@@ -634,7 +670,7 @@ TopElement topFacet_GetElem (TopModel* m, TopFacet f, int i){
  * TODO figure out what this is supposed to do
  */
 bool topElement_IsValid(TopModel* m, TopElement e){
- return m->mesh->elem[e.type].is_valid_any_idx(e.idx);
+ return m->mesh->elem[e.type].is_valid_any_idx(e.id);
 }
 
 
@@ -655,126 +691,180 @@ TopVertex topNode_GetVertex (TopModel* m, TopNode n){
 
 
 int topElement_GetId (TopModel* m, TopElement e) {
-  CkAssert(e.idx>=0);
-  return (*m->elem_id_T)(e.idx,0);
+  CkAssert(e.id>=0);
+  return (*m->elem_id_T)(e.id,0);
+}
+
+/** Determine if two triangles are the same, but possibly varied under rotation/mirroring */
+bool areSameTriangle(int a1, int a2, int a3, int b1, int b2, int b3){
+	if(a1==b1 && a2==b2 && a3==b3) 
+		return true;
+	if(a1==b2 && a2==b3 && a3==b1) 
+		return true;
+	if(a1==b3 && a2==b1 && a3==b2) 
+		return true;
+	if(a1==b1 && a2==b3 && a3==b2) 
+		return true;
+	if(a1==b2 && a2==b1 && a3==b3) 
+		return true;
+	if(a1==b3 && a2==b2 && a3==b1) 
+		return true;
+	return false;
 }
 
 
+TopElement topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f){
+	TopElement newCohesiveElement;
+
+	const TopElement firstElement = f.elem[0];
+	const TopElement secondElement = f.elem[1];
+
+	CkAssert(firstElement.id != -1);
+	CkAssert(secondElement.id != -1);
+
+	CkPrintf("Insert cohesive of type=%d at facet %d,%d,%d\n", ElemType,  f.node[0], f.node[1], f.node[2]);
+
+	// Create a new element
+	//int newEl = m->mesh->elem[ElemType].get_next_invalid(m->mesh);
+	int conn[6];
+	conn[0] = f.node[0];
+	conn[1] = f.node[1];
+	conn[2] = f.node[2];
+	conn[3] = f.node[0];
+	conn[4] = f.node[1];
+	conn[5] = f.node[2];
+	//m->mesh->elem[ElemType].connIs(newEl,conn); 
 
 
-TopFacetItr* topModel_CreateFacetItr (TopModel* m){
-	TopFacetItr* itr = new TopFacetItr();
-	itr->model = m;
-	return itr;
-}
-
-void topFacetItr_Begin(TopFacetItr* itr){
-	itr->elemItr = topModel_CreateElemItr(itr->model);
-	itr->whichFacet = 0;
-}
-
-bool topFacetItr_IsValid(TopFacetItr* itr){
-	return topElemItr_IsValid(itr->elemItr);
-}
-
-/** Iterate to the next facet */
-void topFacetItr_Next(TopFacetItr* itr){
-	bool found = false;
+	/// The lists of elements that can be reached from element on one side of the facet by iterating around each of the three nodes
+	std::set<TopElement> reachableFromElement1[3];
+	std::set<TopNode> reachableNodeFromElement1[3];
+	bool canReachSecond[3];
 	
-	// Scan through all the faces on some elements until we get to the end, or we 
-	while( !found && topElemItr_IsValid(itr->elemItr) ){
-		found = true;
+
+	// Examine each node to determine if the node should be split
+	for(int whichNode = 0; whichNode<3; whichNode++){
+		CkPrintf("==========================\n");
+		CkPrintf("Determining whether to split node %d\n",  f.node[whichNode]);
+
+		canReachSecond[whichNode]=false;
+	
+		TopNode theNode = f.node[whichNode];
+
+		// Traverse across the faces to see which elements we can get to from the first element of this facet
+		std::stack<TopElement> traverseTheseElements;
+		traverseTheseElements.push(firstElement);
+
+		while(traverseTheseElements.size()>0 && ! canReachSecond[whichNode]){
+			TopElement traversedToElem = traverseTheseElements.top();
+			traverseTheseElements.pop();
+
+			// We should only examine elements that we have not yet already examined
+			if(reachableFromElement1[whichNode].find(traversedToElem) == reachableFromElement1[whichNode].end()){
+				reachableFromElement1[whichNode].insert(traversedToElem);
+				
+				// keep track of which nodes the split node would be adjacent to,
+				// if we split this node
+				for (int elemNode=0; elemNode<4; ++elemNode) {
+					int queryNode = e2n_getNode(traversedToElem, elemNode, traversedToElem.type);
+					if (n2n_exists(theNode, queryNode) &&
+							queryNode != f.node[0] &&
+							queryNode != f.node[1] &&
+							queryNode != f.node[2]) {
+						reachableNodeFromElement1[whichNode].insert(queryNode);
+					}
+				}
+
+				CkPrintf("Examining element %d,%d\n", traversedToElem.type, traversedToElem.id);
+
+				// Add all elements across this elements face, if they contain whichNode
+				for(int face=0;face<4;face++){
+
+					TopElement neighbor = m->mesh->e2e_getElem(traversedToElem, face); 
+					if(topElement_IsValid(m,neighbor)) {
+						bool containsTheNode = false;
+						for(int i=0;i<4;i++){
+							if(topElement_GetNode(m,neighbor,i) == theNode){
+								containsTheNode = true;
+							}
+						}
+
+						if(containsTheNode){
+							// Don't traverse across the face at which we are inserting the cohesive element
+							if(!areSameTriangle(f.node[0],f.node[1],f.node[2],  
+									topElement_GetNode(m,traversedToElem,tetFaces[face*3+0]),
+									topElement_GetNode(m,traversedToElem,tetFaces[face*3+1]),
+									topElement_GetNode(m,traversedToElem,tetFaces[face*3+2]) ) ){
+
+								// If this element is the second element adjacent to the new cohesive element, we can stop
+								if(neighbor == secondElement){
+									canReachSecond[whichNode] = true;
+									CkPrintf("We have traversed to the other side of the facet\n");
+								} else {
+									// Otherwise, add this element to the set remaining to be examined
+									traverseTheseElements.push(neighbor);
+									CkPrintf("Adding element %d,%d to list\n", neighbor.type, neighbor.id);
+								}
+							} else {
+								// ignore the element because it is not adjacent to the node we are considering splitting
+							}
+						}
+
+					}
+				}
+				CkPrintf("So far we have traversed through %d elements(%d remaining)\n", reachableFromElement1[whichNode].size(), traverseTheseElements.size() );
+			}
+		}
+
+	}
+
+	CkPrintf("\n\n");
+	
+	// Now do the actual splitting of the nodes
+	int myChunk = FEM_My_partition();
+	for(int whichNode = 0; whichNode<3; whichNode++){
+		if(canReachSecond[whichNode]){
+			CkPrintf("Node %d doesn't need to be split\n", f.node[whichNode]);			
+			// Do nothing
+		}else {
+			CkPrintf("Node %d needs to be split\n", f.node[whichNode]);
+			CkPrintf("There are %d elements that will be reassigned to the new node\n",
+					reachableFromElement1[whichNode].size());
+
+			// Create a new node. This will never be a shared node, it will always be owned by us
+			FEM_add_node(m->mesh, int* adjacentNodes, int numAdjacentNodes, &myChunk, 1, 0);
+
+			int n2n_getLength(int n);
+			/// Place all of node n's adjacent nodes in adjnodes and the resulting
+			/// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
+			void n2n_getAll(int n, int *&adjnodes, int &sz);
+			/// Adds newNode to node n's node adjacency list
+			void n2n_add(int n, int newNode);
+			/// Removes oldNode from n's node adjacency list
+			void n2n_remove(int n, int oldNode);
+			/// Finds oldNode in n's node adjacency list, and replaces it with newNode
+			void n2n_replace(int n, int oldNode, int newNode);
+			/// Remove all nodes from n's node adjacency list
+			void n2n_removeAll(int n);
+			/// Is queryNode in node n's adjacency vector?
+			int n2n_exists(int n, int queryNode);
+
+			// relabel one node in the cohesive element to the new node
+
+			// relabel the appropriate old node in the elements in reachableFromElement1
 		
-		itr->whichFacet++;
-		if(itr->whichFacet > 3){
-			topElemItr_Next(itr->elemItr);
-			itr->whichFacet=0;
+			// fix node-node adjacencies
 		}
-
-		TopElement currElem = topElemItr_GetCurr(itr->elemItr);
-		FEM_VarIndexAttribute::ID e = itr->model->mesh->e2e_getElem(currElem.idx, itr->whichFacet, currElem.type);
-
-		// TODO Adapt to work with cohesives
-		if (e.id < currElem.idx){
-			found = true;
-		}
+			
 	}
+
+
+	CkPrintf("\n\n");
 	
+
+return newCohesiveElement;
 }
 
-/** Determine whether an element contains the  given face */
-//inline bool elementContainsNodes(TopModel *model, TopElement e, int n3, int n2, int n1){
-//	const int *nodes = model->mesh->elem[e.type].connFor(e.idx);
-//	const int e0 = nodes[0];
-//	const int e1 = nodes[1];
-//	const int e2 = nodes[2];
-//	const int e3 = nodes[3];
-//	
-//	// We take in the three nodes in the original orientation in the other element,
-//	// so n1,n2,n3 is in the orientation of this element
-//	
-//	// Examine face 0 of the element (in 3 rotations)
-//	return	( n1==e0 && n2==e1 && n3==e3 ) ||
-//			( n1==e1 && n2==e3 && n3==e0 ) ||
-//			( n1==e3 && n2==e0 && n3==e1 ) ||
-//	// Examine face 1 of the element (in 3 rotations)
-//			( n1==e0 && n2==e2 && n3==e1 ) ||
-//			( n1==e2 && n2==e1 && n3==e0 ) ||
-//			( n1==e1 && n2==e0 && n3==e2 ) ||
-//	// Examine face 2 of the element (in 3 rotations)
-//			( n1==e1 && n2==e2 && n3==e3 ) ||
-//			( n1==e2 && n2==e3 && n3==e1 ) ||
-//			( n1==e3 && n2==e1 && n3==e2 ) ||
-//	// Examine face 3 of the element (in 3 rotations)
-//			( n1==e0 && n2==e3 && n3==e2 ) ||
-//			( n1==e3 && n2==e2 && n3==e0 ) ||
-//			( n1==e2 && n2==e0 && n3==e3 ) ;
-//
-//}
-
-
-TopFacet topFacetItr_GetCurr (TopFacetItr* itr){
-	TopFacet f;
-	
-	f.elem[0] = topElemItr_GetCurr(itr->elemItr);
-	FEM_VarIndexAttribute::ID e = itr->model->mesh->e2e_getElem(f.elem[0].idx, itr->whichFacet, f.elem[0].type);
-	f.elem[1].idx = e.id;
-	f.elem[1].type = e.type;
-	
-	// TODO adapt this to work with cohesives
-
-	// face 0 is nodes 0,1,3
-	if(itr->whichFacet==0){
-		f.node[0] = f.node[3] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[0];
-		f.node[1] = f.node[4] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[1];
-		f.node[2] = f.node[5] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[3];
-	}
-	// face 1 is nodes 0,2,1
-	else if(itr->whichFacet==1){
-		f.node[0] = f.node[3] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[0];
-		f.node[1] = f.node[4] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[2];
-		f.node[2] = f.node[5] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[1];
-	}
-	// face 2 is nodes 1,2,3
-	else if(itr->whichFacet==2){
-		f.node[0] = f.node[3] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[1];
-		f.node[1] = f.node[4] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[2];
-		f.node[2] = f.node[5] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[3];		
-	}
-	// face 3 is nodes 0,3,2
-	else if(itr->whichFacet==3){
-		f.node[0] = f.node[3] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[0];
-		f.node[1] = f.node[4] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[3];
-		f.node[2] = f.node[5] = itr->model->mesh->elem[f.elem[0].type].connFor(f.elem[0].idx)[2];
-	}	
-	
-	return f;
-}
-
-
-void topFacetItr_Destroy (TopFacetItr* itr){
-	delete itr;
-}
 
 
 #include "ParFUM_TOPS.def.h"
