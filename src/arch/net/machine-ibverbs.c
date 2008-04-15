@@ -392,6 +392,9 @@ static void checkAllQps(){
 	}
 }
 
+#if CMK_IBVERBS_FAST_START
+static void send_partial_init();
+#endif
 
 static void CmiMachineInit(char **argv){
 	struct ibv_device **devList;
@@ -444,7 +447,18 @@ static void CmiMachineInit(char **argv){
 	context->pd = ibv_alloc_pd(context->context);
 	CmiAssert(context->pd != NULL);
 	MACHSTATE2(3,"pd %p pd->handle %d",context->pd,context->pd->handle);
-	
+
+  /******** At this point we know that this node is more or less serviceable
+	So, this is a good point for sending the partial init message for the fast
+	start case
+	Moreover, no work dependent on the number of nodes has started yet.
+	************/
+
+#if CMK_IBVERBS_FAST_START
+  send_partial_init();
+#endif
+
+
 	context->header.nodeNo = _Cmi_mynode;
 
 	mtu_size=1200;

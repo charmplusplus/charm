@@ -23,6 +23,7 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <time.h>
+#include <assert.h>
 #if CMK_BPROC
 #include <sys/bproc.h>
 #endif
@@ -1831,25 +1832,60 @@ int client_connect_problem(int code,const char *msg)
 	return -1;
 }
 
-/* allow one client to connect */
-void req_one_client_connect(int client)
-{
+/** return 1 if connection is openned succesfully with client**/
+inline int errorcheck_one_client_connect(int client){
 	unsigned int clientPort;/*These are actually ignored*/
 	skt_ip_t clientIP;
 	if (arg_verbose) printf("Charmrun> Waiting for %d-th client to connect.\n",client);
 	if (0==skt_select1(server_fd,arg_timeout*1000))
 		client_connect_problem(client,"Timeout waiting for node-program to connect");
+
+		
 	req_clients[client]=skt_accept(server_fd,&clientIP,&clientPort);
+
+	
 	if (req_clients[client]==SOCKET_ERROR) 
 		client_connect_problem(client,"Failure in node accept");
-	else 
-	{ /*This client has just connected-- fetch his name and IP*/
+
+	return 1;
+};
+
+
+inline void read_initnode_one_client(int client){
 		ChMessage msg;
 		if (!skt_select1(req_clients[client],arg_timeout*1000))
 		   client_connect_problem(client,"Timeout on IP request");
 		ChMessage_recv(req_clients[client],&msg);
 		req_handle_initnode(&msg,req_clients[client]);
 		ChMessage_free(&msg);
+}
+
+
+#if CMK_IBVERBS_FAST_START
+void req_one_client_partinit(int client){
+   ChMessage partStartMsg;
+	 int clientNode;
+		
+	 if(errorcheck_one_client_connect(client)){
+	   if (!skt_select1(req_clients[client],arg_timeout*1000))
+		   client_connect_problem(client,"Timeout on partial init request");
+			 
+	   ChMessage_recv(req_clients[client],&partStartMsg);
+     	   clientNode = 	   ChMessageInt(*(ChMessageInt_t*)partStartMsg.data);
+	   assert(strncmp(partStartMsg.header.type,"partinit",8) == 0);
+	   ChMessage_free(&partStartMsg);
+	 } 
+	
+};
+#endif
+
+
+/* allow one client to connect */
+void req_one_client_connect(int client)
+{
+	if(errorcheck_one_client_connect(client))
+	{ /*This client has just connected-- fetch his name and IP*/
+		read_initnode_one_client(client);
 	}
 }
 
@@ -1907,10 +1943,20 @@ void req_client_connect(void)
 	
 	skt_set_abort(client_connect_problem);
 	
+#if CMK_IBVERBS_FAST_START
+	for (client=0;client<req_nClients;client++){
+		req_one_client_partinit(client);
+	}
+	for (client=0;client<req_nClients;client++){
+		read_initnode_one_client(client);
+	}
+#else
 	for (client=0;client<req_nClients;client++)
 	{/*Wait for the next client to connect to our server port.*/
 		req_one_client_connect(client);
 	}
+#endif
+	
         if (portOk == 0) exit(1);
 	if (arg_verbose) printf("Charmrun> All clients connected.\n");
 #if CMK_USE_IBVERBS
@@ -1949,10 +1995,22 @@ void req_client_start_and_connect(void)
 	    for (client=c; client<c+count; client++) {
 		finish_one_node(client);
             }
+#if CMK_IBVERBS_FAST_START
+	    for (client=c; client<c+count; client++) {
+            	req_one_client_partinit(client);
+	    }
+#else
 	    for (client=c; client<c+count; client++) {
 		req_one_client_connect(client);
             }
+#endif						
 	}
+
+#if CMK_IBVERBS_FAST_START
+	for (client=0;client<req_nClients;client++){
+		read_initnode_one_client(client);
+	}
+#endif
         if (portOk == 0) exit(1);
 	if (arg_verbose) printf("Charmrun> All clients connected.\n");
 	

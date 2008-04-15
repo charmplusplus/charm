@@ -1483,6 +1483,15 @@ int CmiRankOf(int pe)      { return pe - (nodes_by_pe[pe]->nodestart); }
 void copyInfiAddr(ChInfiAddr *qpList);
 #endif
 
+#if CMK_IBVERBS_FAST_START
+static void send_partial_init()
+{
+  ChMessageInt_t nodeNo = ChMessageInt_new(_Cmi_mynode);
+	ctrl_sendone_nolock("partinit",(const char *)&(nodeNo),sizeof(nodeNo),NULL,0);
+}	
+#endif
+
+
 /*Note: node_addresses_obtain is called before starting
   threads, so no locks are needed (or valid!)*/
 static void node_addresses_obtain(char **argv)
