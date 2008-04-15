@@ -25,3 +25,7 @@
 
 #undef CMK_DISABLE_SYNC
 #define CMK_DISABLE_SYNC       1
+
+
+#undef CMK_IBVERBS_FAST_START
+#define CMK_IBVERBS_FAST_START                         1
