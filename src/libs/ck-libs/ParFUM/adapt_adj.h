@@ -97,7 +97,7 @@ class adaptAdj{
                     localID!=rhs.localID || 
                     elemType!=rhs.elemType);
         }
-        virtual void pup(PUP::er &p){
+        void pup(PUP::er &p){
             p | partID;
             p | localID;
             p | elemType;

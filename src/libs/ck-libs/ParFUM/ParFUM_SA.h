@@ -40,7 +40,7 @@ public:
 		CkHashtableIterator *iter = remoteElements.iterator();
 		while(iter->hasNext()){
 			CkVec<adaptAdj> *list = *((CkVec<adaptAdj> **)iter->next());
-			printf("[%d] LockRegion destructor deleting list %p\n",myID.chunkID,list);
+			//printf("[%d] LockRegion destructor deleting list %p\n",myID.chunkID,list);
 			delete list;
 		}
 	}
@@ -147,19 +147,19 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
   int IdxlLookUpSecondary(int sharedChk, int sharedIdx, int idxlType);
 
   /// These are entry methods for bulk adaptivity
-  adaptAdjMsg *remote_bulk_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, int new_idxl, int n1_idxl, int n2_idxl, int partitionID);
+  adaptAdjMsg *remote_bulk_edge_bisect_2D(adaptAdj &nbrElem, adaptAdj &splitElem, int new_idxl, int n1_idxl, int n2_idxl, int partitionID);
 
-  void remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, adaptAdj newElem);
-  void remote_edgeAdj_replace(int remotePartID, adaptAdj adj, adaptAdj elem, 
-			      adaptAdj splitElem, int n1_idxl, int n2_idxl);
-  void remote_edgeAdj_add(int remotePartID, adaptAdj adj, adaptAdj splitElem,
+  void remote_adaptAdj_replace(adaptAdj &elem, adaptAdj &oldElem, adaptAdj &newElem);
+  void remote_edgeAdj_replace(int remotePartID, adaptAdj &adj, adaptAdj &elem, 
+			      adaptAdj &splitElem, int n1_idxl, int n2_idxl);
+  void remote_edgeAdj_add(int remotePartID, adaptAdj &adj, adaptAdj &splitElem,
 			  int n1_idxl, int n2_idxl);
-  void recv_split_3D(int pos, int tableID, adaptAdj elem, adaptAdj splitElem);
-  void handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj elem, 
+  void recv_split_3D(int pos, int tableID, adaptAdj &elem, adaptAdj &splitElem);
+  void handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj &elem, 
 		       int n1_idxl, int n2_idxl);
   void recv_splits(int tableID, int expectedSplits);
 
-  void update_asterisk_3D(int remotePartID, int i, adaptAdj elem, 
+  void update_asterisk_3D(int remotePartID, int i, adaptAdj &elem, 
 			  int numElemPairs, adaptAdj *elemPairs, int n1_idxl, 
 			  int n2_idxl, int n5_idxl);
 };

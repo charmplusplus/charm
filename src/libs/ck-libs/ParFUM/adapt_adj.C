@@ -449,130 +449,129 @@ void fillLocalAdaptAdjacencies(
         const int myRank, 
         const int elemType)
 {
-	// start with face adjacencies
-    adjNode* adaptAdjTable = faceTable;
-    for (int i=0; i<numNodes; i++) {
-		if (!adaptAdjTable)
-			break;
-		// For each node, match up incident elements
-		// Each adjacency between two elements is represented by two 
-		// adjElems. We try to match those up
-		if (node->is_valid(i) && adaptAdjTable[i].adjElemList != NULL) {
-			// CkAssert(adaptAdjTable[i].adjElemList != NULL);
-			adjElem *preTarget = adaptAdjTable[i].adjElemList;
-			adjElem *target = adaptAdjTable[i].adjElemList->next;
-			while (target != NULL) { //loop over adjElemList of a node
-				int found = 0;
-				// target represents an adjacency between two elements
-				// We search for the other adjElem corresponding to that 
-				// adjancency:
-				// Look for an entry in adjElemList after target such that 
-				// the nodeset of that entry and that of target match but 
-				// they do not belong to the same element. 
-				adjElem *rover = searchAdjElemInList(preTarget,
-						target->nodeSet.getVec(), target->nodeSet.size(),
-						target->elemID, &found);
-
-				if (found) {
-					// We found a local element adjacent to target->elemID
-					// Set adjacency of target->elemID corresponding to 
-					// nodeSet to rover->next->elemID, and vice versa
-					// Store adjacency info in adaptAdjacency of each one 
-					// and use nodeSetID to index into adaptAdjacency
-
-					adaptFaceAdjacencies[faceMapSize*target->elemID +
-					target->nodeSetID] = adaptAdj(myRank, rover->next->elemID,
-							elemType);
-					adaptFaceAdjacencies[
-					faceMapSize*rover->next->elemID +
-					rover->next->nodeSetID] = adaptAdj(myRank, target->elemID,
-							elemType);
-
-					// Remove both elem-nodeSet pairs from the list
-					adjElem *tmp = rover->next;
-					rover->next = rover->next->next;
-					delete tmp;
-					tmp = target;
-					preTarget->next = target->next;
-					delete tmp;
-
-					target = target->next;
-
-				} else {
-					// No match for target was found in adjElemList
-					// This means that either target is on the domain 
-					// boundary or it is on a partition boundary and its 
-					// neighbor is on another VP. Move target to next 
-					// entry in adjElemList
-					preTarget = target;
-					target = target->next;
-				}
-			}
-		}
+  // start with face adjacencies
+  adjNode* adaptAdjTable = faceTable;
+  for (int i=0; i<numNodes; i++) {
+    if (!adaptAdjTable)
+      break;
+    // For each node, match up incident elements
+    // Each adjacency between two elements is represented by two 
+    // adjElems. We try to match those up
+    if (node->is_valid(i) && adaptAdjTable[i].adjElemList != NULL) {
+      // CkAssert(adaptAdjTable[i].adjElemList != NULL);
+      adjElem *preTarget = adaptAdjTable[i].adjElemList;
+      adjElem *target = adaptAdjTable[i].adjElemList->next;
+      while (target != NULL) { //loop over adjElemList of a node
+	int found = 0;
+	// target represents an adjacency between two elements
+	// We search for the other adjElem corresponding to that 
+	// adjancency:
+	// Look for an entry in adjElemList after target such that 
+	// the nodeset of that entry and that of target match but 
+	// they do not belong to the same element. 
+	adjElem *rover = searchAdjElemInList(preTarget,
+					     target->nodeSet.getVec(), target->nodeSet.size(),
+					     target->elemID, &found);
+	
+	if (found) {
+	  // We found a local element adjacent to target->elemID
+	  // Set adjacency of target->elemID corresponding to 
+	  // nodeSet to rover->next->elemID, and vice versa
+	  // Store adjacency info in adaptAdjacency of each one 
+	  // and use nodeSetID to index into adaptAdjacency
+	  
+	  adaptFaceAdjacencies[faceMapSize*target->elemID +
+			       target->nodeSetID] = adaptAdj(myRank, rover->next->elemID,
+							     elemType);
+	  adaptFaceAdjacencies[
+			       faceMapSize*rover->next->elemID +
+			       rover->next->nodeSetID] = adaptAdj(myRank, target->elemID,
+								  elemType);
+	  
+	  // Remove both elem-nodeSet pairs from the list
+	  adjElem *tmp = rover->next;
+	  rover->next = rover->next->next;
+	  delete tmp;
+	  tmp = target;
+	  preTarget->next = target->next;
+	  delete tmp;
+	  
+	  target = target->next;
+	  
+	} else {
+	  // No match for target was found in adjElemList
+	  // This means that either target is on the domain 
+	  // boundary or it is on a partition boundary and its 
+	  // neighbor is on another VP. Move target to next 
+	  // entry in adjElemList
+	  preTarget = target;
+	  target = target->next;
 	}
-    
-    // now handle edge adjacencies
-    adaptAdjTable = edgeTable;
-	for (int i=0; i<numNodes; i++) {
-		if (!adaptAdjTable)
-			break;
-		// For each node, match up incident elements
-		// Each adjacency between two elements is represented by two 
-		// adjElems. We try to match those up
-		if (node->is_valid(i) && adaptAdjTable[i].adjElemList != NULL) {
-			adjElem *preTarget = adaptAdjTable[i].adjElemList;
-			adjElem *target = adaptAdjTable[i].adjElemList->next;
-//			printf("adjElemList for node %d [ ", i);
-//			while (preTarget != NULL) {
-//				printf("%d ", preTarget->elemID);
-//				preTarget = preTarget->next;
-//			}
-//			printf("]\n");
-			
-			preTarget = adaptAdjTable[i].adjElemList;
-			target = preTarget->next;
-			while (target != NULL) { //loop over adjElemList of a node
-				//if (target->elemID >= preTarget->elemID) {
-				//	target = target->next;
-				//	continue;
-				//}
-				int found = 0;
-				// target represents an adjacency between two elements
-				// We search for the other adjElem corresponding to that 
-				// adjancency:
-				// Look for an entry in adjElemList after target such that 
-				// the nodeset of that entry and that of target match but 
-				// they do not belong to the same element. 
-				adjElem *rover = searchAdjElemInList(preTarget,
-						target->nodeSet.getVec(), target->nodeSet.size(),
-						target->elemID, &found);
-
-				while (found) {
-					// We found a local element adjacent to target->elemID
-					// Set adjacency of target->elemID corresponding to 
-					// nodeSet to rover->next->elemID, and vice versa
-					// Store adjacency info in adaptAdjacency of each one 
-					// and use nodeSetID to index into adaptAdjacency
-				    
-					//printf("adding adj for elem %d position %d (%d %d %d)\n", target->elemID, target->nodeSetID, myRank, rover->next->elemID, elemType);
-					
-					adaptEdgeAdjacencies[edgeMapSize*target->elemID +
-					target->nodeSetID]->push_back(adaptAdj(myRank,
-							rover->next->elemID, elemType));
-					//adaptEdgeAdjacencies[
-					//edgeMapSize*rover->next->elemID +
-					//rover->next->nodeSetID]->push_back(adaptAdj(myRank,
-					//		target->elemID, elemType));
-					
-					rover = searchAdjElemInList(rover->next,
-						target->nodeSet.getVec(), target->nodeSet.size(),
-						target->elemID, &found);
-				}
-				target = target->next;
-			}
-		}
+      }
+    }
+  }
+  
+  // now handle edge adjacencies
+  adaptAdjTable = edgeTable;
+  for (int i=0; i<numNodes; i++) {
+    if (!adaptAdjTable)
+      break;
+    // For each node, match up incident elements
+    // Each adjacency between two elements is represented by two 
+    // adjElems. We try to match those up
+    if (node->is_valid(i) && adaptAdjTable[i].adjElemList != NULL) {
+      adjElem *preTarget = adaptAdjTable[i].adjElemList;
+      adjElem *target = adaptAdjTable[i].adjElemList->next;
+      //			printf("adjElemList for node %d [ ", i);
+      //			while (preTarget != NULL) {
+      //				printf("%d ", preTarget->elemID);
+      //				preTarget = preTarget->next;
+      //			}
+      //			printf("]\n");
+      
+      preTarget = adaptAdjTable[i].adjElemList;
+      target = preTarget->next;
+      while (target != NULL) { //loop over adjElemList of a node
+	//if (target->elemID >= preTarget->elemID) {
+	//	target = target->next;
+	//	continue;
+	//}
+	int found = 0;
+	// target represents an adjacency between two elements
+	// We search for the other adjElem corresponding to that 
+	// adjancency:
+	// Look for an entry in adjElemList after target such that 
+	// the nodeset of that entry and that of target match but 
+	// they do not belong to the same element. 
+	adjElem *rover = searchAdjElemInList(preTarget,
+					     target->nodeSet.getVec(), target->nodeSet.size(),
+					     target->elemID, &found);
+	
+	while (found) {
+	  // We found a local element adjacent to target->elemID
+	  // Set adjacency of target->elemID corresponding to 
+	  // nodeSet to rover->next->elemID, and vice versa
+	  // Store adjacency info in adaptAdjacency of each one 
+	  // and use nodeSetID to index into adaptAdjacency
+	  
+	  //printf("adding adj for elem %d position %d (%d %d %d)\n", target->elemID, target->nodeSetID, myRank, rover->next->elemID, elemType);
+	  
+	  adaptEdgeAdjacencies[edgeMapSize*target->elemID +
+			       target->nodeSetID]->push_back(adaptAdj(myRank,
+								      rover->next->elemID, elemType));
+	  //adaptEdgeAdjacencies[
+	  //edgeMapSize*rover->next->elemID +
+	  //rover->next->nodeSetID]->push_back(adaptAdj(myRank,
+	  //		target->elemID, elemType));
+	  
+	  rover = searchAdjElemInList(rover->next,
+				      target->nodeSet.getVec(), target->nodeSet.size(),
+				      target->elemID, &found);
 	}
-
+	target = target->next;
+      }
+    }
+  }
 }
 
 

@@ -595,42 +595,42 @@ int ParFUMShadowArray::IdxlLookUpSecondary(int sharedChk, int sharedIdx, int idx
 
 
 // BULK ADAPT ENTRY METHODS START HERE:
-adaptAdjMsg *ParFUMShadowArray::remote_bulk_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, int new_idxl, int n1_idxl, int n2_idxl, int partitionID)
+adaptAdjMsg *ParFUMShadowArray::remote_bulk_edge_bisect_2D(adaptAdj &nbrElem, adaptAdj &splitElem, int new_idxl, int n1_idxl, int n2_idxl, int partitionID)
 {
   adaptAdjMsg *am = new adaptAdjMsg;
   am->elem = bulkAdapt->remote_edge_bisect_2D(nbrElem, splitElem, new_idxl, n1_idxl, n2_idxl, partitionID);
   return am;
 }
 
-void ParFUMShadowArray::remote_adaptAdj_replace(adaptAdj elem, adaptAdj oldElem, adaptAdj newElem)
+void ParFUMShadowArray::remote_adaptAdj_replace(adaptAdj &elem, adaptAdj &oldElem, adaptAdj &newElem)
 {
   bulkAdapt->remote_adaptAdj_replace(elem, oldElem, newElem);
 }
 
-void ParFUMShadowArray::remote_edgeAdj_replace(int remotePartID, adaptAdj adj, 
-					       adaptAdj elem, 
-					       adaptAdj splitElem, int n1_idxl,
+void ParFUMShadowArray::remote_edgeAdj_replace(int remotePartID, adaptAdj &adj, 
+					       adaptAdj &elem, 
+					       adaptAdj &splitElem, int n1_idxl,
 					       int n2_idxl)
 {
   bulkAdapt->remote_edgeAdj_replace(remotePartID, adj, elem, splitElem, 
 				    n1_idxl, n2_idxl);
 }
 
-void ParFUMShadowArray::remote_edgeAdj_add(int remotePartID, adaptAdj adj, 
-					   adaptAdj splitElem, int n1_idxl, 
+void ParFUMShadowArray::remote_edgeAdj_add(int remotePartID, adaptAdj &adj, 
+					   adaptAdj &splitElem, int n1_idxl, 
 					   int n2_idxl)
 {
   bulkAdapt->remote_edgeAdj_add(remotePartID, adj, splitElem, n1_idxl, n2_idxl);
 }
 
-void ParFUMShadowArray::recv_split_3D(int pos, int tableID, adaptAdj elem, 
-				      adaptAdj splitElem)
+void ParFUMShadowArray::recv_split_3D(int pos, int tableID, adaptAdj &elem, 
+				      adaptAdj &splitElem)
 {
   bulkAdapt->recv_split_3D(pos, tableID, elem, splitElem);
 }
 
 void ParFUMShadowArray::handle_split_3D(int remotePartID, int pos, int tableID,
-					adaptAdj elem, int n1_idxl, int n2_idxl)
+					adaptAdj &elem, int n1_idxl, int n2_idxl)
 {
   bulkAdapt->handle_split_3D(remotePartID, pos, tableID, elem, n1_idxl, n2_idxl);
 }
@@ -642,7 +642,7 @@ void ParFUMShadowArray::recv_splits(int tableID, int expectedSplits)
 }
 
 void ParFUMShadowArray::update_asterisk_3D(int remotePartID, int i, 
-					   adaptAdj elem, int numElemPairs, 
+					   adaptAdj &elem, int numElemPairs, 
 					   adaptAdj *elemPairs, int n1_idxl, 
 					   int n2_idxl, int n5_idxl)
 {

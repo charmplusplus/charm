@@ -180,6 +180,7 @@ class BulkAdapt {
   void update_local_face_adj(const adaptAdj elem, const adaptAdj splitElem, int n1, int n2, int n5);
   /** Perform local edge adjacency updates associated with a split */
   void update_local_edge_adj(const adaptAdj elem, const adaptAdj splitElem, int n1, int n2, int n5);
+  void dumpConn();
 };
 
 // GENERAL HELPER FUNCTIONS

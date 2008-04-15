@@ -28,11 +28,10 @@ BulkAdapt::~BulkAdapt()
 /// Pack/Unpack this array element
 void BulkAdapt::pup(PUP::er &p)
 {
-}
-
 // MIGRATION NOTES:
 // * will need to fix meshPtr when this partition migrates
-
+// * will need to fix localShadow too.  shadowProxy? should be fine?
+}
 
 /* BULK MESH OPERATIONS: These are all called locally, but may invoke
    remote operations. */
@@ -144,12 +143,18 @@ int BulkAdapt::edge_bisect_2D(int elemID, int elemType, int edgeID)
 
   // unlock the two partitions
   localShadow->unlockRegion(lockRegionID);
-  getAndDumpAdaptAdjacencies(
-          meshID, 
-          meshPtr->nElems(),
-          elemType,
-          partitionID);
+  getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
   return 1;
+}
+
+void BulkAdapt::dumpConn()
+{
+  FEM_Elem &elem = meshPtr->elem[0]; // elem is local elements
+  int nelems=FEM_Mesh_get_length(meshID, FEM_ELEM+0); // Get number of elements
+  for (int i=0; i<nelems; i++) {
+    int *conn = elem.connFor(i);
+    CkPrintf("[%d] %d: %d %d %d %d\n", partitionID, i, conn[0], conn[1], conn[2], conn[3]);
+  }
 }
 
 adaptAdj BulkAdapt::remote_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, int new_idxl, int n1_idxl, int n2_idxl, int remotePartID)
@@ -210,6 +215,9 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
     //BULK_DEBUG(CkPrintf("[%d] Lock not obtained.\n",partitionID););
     return success;
   }
+
+  //dumpConn();
+  //getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
 
   // Find the nodes on the edge to be bisected
   int localNodes[3], localRelNodes[2]; 
@@ -307,10 +315,14 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
   freeTableID(tableID);
   free(elemsToLock);
 
+  //dumpConn();
+  //getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
+
+  //BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D of elem %d successful.\n",partitionID, elemID));  
+
   // unlock the partitions
   localShadow->unlockRegion(lockRegionID);
-
-  //BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D successful.\n",partitionID));  
+  //BULK_DEBUG(CkPrintf("[%d] Unlocked.\n",partitionID));  
 
   return 1;
 }
@@ -624,7 +636,7 @@ int BulkAdapt::add_node(int dim,double *coords){
   return newNode;
 }
 
-/** Update the co-ordimates of the given node
+/** Update the coordinates of the given node
 */
 void BulkAdapt::update_node_coord(int nodeID,int dim,double *coords){
   FEM_DataAttribute *coord = meshPtr->node.getCoord();
@@ -909,13 +921,15 @@ void BulkAdapt::local_update_asterisk_3D(int i, adaptAdj elem, int numElemPairs,
   // Here are the edges to update for elem:
   int n3_n5, n4_n5;
   // Here are the edges to update for splitElem:
-  int n5_n2, n5_n3, n5_n4;
+  int n5_n2, n5_n3, n5_n4, n2_n3, n2_n4;
   // set the edge IDs
   n3_n5 = getEdgeID(relNode[2], relNode[1], 4, 3);
   n4_n5 = getEdgeID(relNode[3], relNode[1], 4, 3);
   n5_n2 = getEdgeID(splitRelNode[0], splitRelNode[1], 4, 3);
   n5_n3 = getEdgeID(splitRelNode[0], splitRelNode[2], 4, 3);
   n5_n4 = getEdgeID(splitRelNode[0], splitRelNode[3], 4, 3);
+  n2_n3 = getEdgeID(splitRelNode[1], splitRelNode[2], 4, 3);
+  n2_n4 = getEdgeID(splitRelNode[1], splitRelNode[3], 4, 3);
 
   clearEdgeAdjacency(meshPtr, elem.localID, elem.elemType, n3_n5);  
   clearEdgeAdjacency(meshPtr, elem.localID, elem.elemType, n4_n5);  
@@ -953,6 +967,11 @@ void BulkAdapt::local_update_asterisk_3D(int i, adaptAdj elem, int numElemPairs,
 		       elemPairs[2*i+1]);
     }
   }
+
+  if(nbr1.localID != -1)
+    replaceAdaptAdjOnEdge(meshPtr, splitElem, nbr1, nbr1split, n2_n3);
+  if(nbr2.localID != -1)
+    replaceAdaptAdjOnEdge(meshPtr, splitElem, nbr2, nbr2split, n2_n4);
 }
 
 
@@ -1074,46 +1093,59 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
   int elem_n3_n5 = getEdgeID(relNode[2], relNode[1], 4, 3);
   int elem_n4_n5 = getEdgeID(relNode[3], relNode[1], 4, 3);
 
+  // split face IDs on elem
+  int face[4]; // face[0] and [1] are split; others are not
+  face[0] = (elem_relNode[0] + elem_relNode[5] + elem_relNode[2]) - 3;
+  face[1] = (elem_relNode[0] + elem_relNode[5] + elem_relNode[3]) - 3;
+  // split neighbors on elem
+  adaptAdj elem_neighbors[4]; // elem's neighbors
+  elem_neighbors[0] = *getFaceAdaptAdj(meshPtr,elem.localID, elem.elemType, face[0]);
+  elem_neighbors[1] = *getFaceAdaptAdj(meshPtr,elem.localID, elem.elemType, face[1]);
+
   // Now we're ready to go to town
   // n2_n3
   for (int i=0; i<elemEdgeAdj[elem_n3_n5]->size(); i++) {
     adaptAdj adj = (*elemEdgeAdj[elem_n3_n5])[i];
-    if (adj.partID == splitElem.partID) { // do the local replace on adj
-      int *adjConn = elems.connFor(adj.localID); 
-      // derive relative nodes
-      int r2, r3;
-      r2 = getRelNode(n2, adjConn, 4);
-      r3 = getRelNode(n3, adjConn, 4);
-      // edgeID on adj
-      int edgeID = getEdgeID(r2, r3, 4, 3);
-      replaceAdaptAdjOnEdge(meshPtr, adj, elem, splitElem, edgeID);
-    }
-    else if (adj.partID != -1) { // call remote replacement
-      int n2_idxl = get_idxl_for_node(n2, adj.partID);
-      int n3_idxl = get_idxl_for_node(n3, adj.partID);
-      shadowProxy[adj.partID].remote_edgeAdj_replace(partitionID, adj, elem, 
-						     splitElem, n2_idxl, n3_idxl);
+    if ((adj != elem_neighbors[0]) && (adj != elem_neighbors[1])) {
+      if (adj.partID == splitElem.partID) { // do the local replace on adj
+	int *adjConn = elems.connFor(adj.localID); 
+	// derive relative nodes
+	int r2, r3;
+	r2 = getRelNode(n2, adjConn, 4);
+	r3 = getRelNode(n3, adjConn, 4);
+	// edgeID on adj
+	int edgeID = getEdgeID(r2, r3, 4, 3);
+	replaceAdaptAdjOnEdge(meshPtr, adj, elem, splitElem, edgeID);
+      }
+      else if (adj.partID != -1) { // call remote replacement
+	int n2_idxl = get_idxl_for_node(n2, adj.partID);
+	int n3_idxl = get_idxl_for_node(n3, adj.partID);
+	shadowProxy[adj.partID].remote_edgeAdj_replace(partitionID, adj, elem, 
+						       splitElem, n2_idxl, n3_idxl);
+      }
     }
   }
   // wow!  all that was just for the (n2,n3) edge!  This sucks!
   // n2_n4 -- easy, just like the previous one
   for (int i=0; i<elemEdgeAdj[elem_n4_n5]->size(); i++) {
     adaptAdj adj = (*elemEdgeAdj[elem_n4_n5])[i];
-    if (adj.partID == splitElem.partID) { // do the local replace on adj
-      int *adjConn = elems.connFor(adj.localID); 
-      // derive relative nodes
-      int r2, r4;
-      r2 = getRelNode(n2, adjConn, 4);
-      r4 = getRelNode(n4, adjConn, 4);
-      // edgeID on adj
-      int edgeID = getEdgeID(r2, r4, 4, 3);
-      replaceAdaptAdjOnEdge(meshPtr, adj, elem, splitElem, edgeID);
-    }
-    else if (adj.partID != -1) { // call remote replacement
-      int n2_idxl = get_idxl_for_node(n2, adj.partID);
-      int n4_idxl = get_idxl_for_node(n4, adj.partID);
-      shadowProxy[adj.partID].remote_edgeAdj_replace(partitionID, adj, elem, 
-						     splitElem, n2_idxl, n4_idxl);
+    if ((adj != elem_neighbors[0]) && (adj != elem_neighbors[1])) {
+      if (adj.partID == splitElem.partID) { // do the local replace on adj
+	int *adjConn = elems.connFor(adj.localID); 
+	// derive relative nodes
+	int r2, r4;
+	r2 = getRelNode(n2, adjConn, 4);
+	r4 = getRelNode(n4, adjConn, 4);
+	// edgeID on adj
+	int edgeID = getEdgeID(r2, r4, 4, 3);
+	replaceAdaptAdjOnEdge(meshPtr, adj, elem, splitElem, edgeID);
+      }
+      else if (adj.partID != -1) { // call remote replacement
+	int n2_idxl = get_idxl_for_node(n2, adj.partID);
+	int n4_idxl = get_idxl_for_node(n4, adj.partID);
+	shadowProxy[adj.partID].remote_edgeAdj_replace(partitionID, adj, elem, 
+						       splitElem, n2_idxl, n4_idxl);
+      }
     }
   }
   // n3_n4: elem needs to take it's original list and add splitElem to it; 
