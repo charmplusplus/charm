@@ -25,6 +25,7 @@ PARFUMMAIN=$(LIBDIR)/libParFUMmain.o
 
 INCS=-I.
 
+.PHONY: all
 all: $(DEST) $(COMPATLIB) $(PARFUMMAIN)
 
 ParFUM.def.h: ParFUM.decl.h
@@ -52,11 +53,10 @@ $(PARFUMMAIN): main.C $(HEADDEP)
 	$(CHARMC) main.C -o $(PARFUMMAIN)
 
 # Copy header files to include directory
+.PHONY: headers
 headers: $(HEADDEP)
 	cp $(HEADERS) $(CDIR)/include/
 	cp $(GENHEADERS) $(CDIR)/include/
-	touch headers
-
 
 #Automatic rules for some reason break because they don't use the dependencies
 #.SUFFIXES: .c .o .C
@@ -157,5 +157,6 @@ docs: ParFUM.doxy ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUMf.h ParFUM.h ParFUM_i
 	doxygen ParFUM.doxy
 
 # clean up
+.PHONY: clean
 clean:
 	rm -rf *.a *.def.h *.decl.h *.o *~ SunWS_cache $(DEST) $(COMPATLIB) $(GENHEADERS)
