@@ -246,6 +246,10 @@ static uint64_t Cmi_nic_id=0; /* Machine-specific identifier (MX-only) */
   #include "clustercore/ccil_api.h"
 #endif
 
+#if CMK_MULTICORE
+int Cmi_commthread = 0;
+#endif
+
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "sockRoutines.h"
@@ -857,8 +861,8 @@ extern void CmiSignal(int sig1, int sig2, int sig3, void (*handler)());
 
 static void CmiStartThreads(char **argv)
 {
-	MACHSTATE2(3,"_Cmi_numpes %d _Cmi_numnodes %d",_Cmi_numpes,_Cmi_numnodes);
-	MACHSTATE1(3,"_Cmi_mynodesize %d",_Cmi_mynodesize);
+  MACHSTATE2(3,"_Cmi_numpes %d _Cmi_numnodes %d",_Cmi_numpes,_Cmi_numnodes);
+  MACHSTATE1(3,"_Cmi_mynodesize %d",_Cmi_mynodesize);
   if ((_Cmi_numpes != _Cmi_numnodes) || (_Cmi_mynodesize != 1))
     KillEveryone
       ("Multiple cpus unavailable, don't use cpus directive in nodesfile.\n");
@@ -2460,6 +2464,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #endif
   if (CmiGetArgFlagDesc(argv,"+asyncio","Use async IO")) Cmi_asyncio = 1;
   if (CmiGetArgFlagDesc(argv,"+asynciooff","Don not use async IO")) Cmi_asyncio = 0;
+#if CMK_MULTICORE
+  if (CmiGetArgFlagDesc(argv,"+commthread","Use communication thread")) {
+    Cmi_commthread = 1;
+    _Cmi_noprocforcommthread = 1;
+  }
+#endif
 
   skt_init();
   /* use special abort handler instead of default_skt_abort to 
