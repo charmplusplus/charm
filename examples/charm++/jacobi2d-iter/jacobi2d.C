@@ -20,7 +20,7 @@
 
 CkArrayID a;
 
-#define total_iterations 200
+//#define total_iterations 200
 
 class Main : public CBase_Main
 {
@@ -29,6 +29,8 @@ public:
     CProxy_Jacobi array;
     int num_chares;
     int iterations;
+    int total_iterations;
+    double startTime;
 
     Main(CkArgMsg* m) {
         if (m->argc < 3) {
@@ -52,6 +54,11 @@ public:
         // print info
         CkPrintf("Running Jacobi on %d processors with (%d,%d) elements\n", CkNumPes(), num_chare_rows, num_chare_cols);
 
+	total_iterations = 200;
+	if (m->argc > 3) {
+	  total_iterations = atoi(m->argv[3]);
+	}
+
         // Create new array of worker chares
         array = CProxy_Jacobi::ckNew(num_chare_cols, num_chare_rows);
 
@@ -64,6 +71,7 @@ public:
         liveVizInit(cfg,a,c);
 
         //Start the computation
+        startTime = CmiWallTimer();
         recieve_count = 0;
         array.begin_iteration();
     }
@@ -71,15 +79,17 @@ public:
     // Each worker reports back to here when it completes an iteration
     void report(int row, int col) {
         recieve_count++;
+        double totaltime = CmiWallTimer() - startTime;
         if (num_chares == recieve_count) {
             if (iterations == total_iterations) {
-                CkPrintf("Completed %d iterations\n", iterations);
+                CkPrintf("Completed %d iterations; last iteration time: %.6lf\n", iterations, totaltime);
                 CkExit();
             } else {
-                CkPrintf("starting new iteration %d.\n", iterations);
+                CkPrintf("starting new iteration; iteration %d time: %.6lf\n", iterations, totaltime);
                 recieve_count=0;
                 iterations++;
                 // Call begin_iteration on all worker chares in array
+                startTime = CmiWallTimer();
                 array.begin_iteration();
             }
         }
