@@ -36,9 +36,9 @@
 #define CMK_CONV_HOST_CSH_UNAVAILABLE			   1
 
 #define CMK_SHARED_VARS_EXEMPLAR                           0
-#define CMK_SHARED_VARS_UNAVAILABLE                        1
+#define CMK_SHARED_VARS_UNAVAILABLE                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
-#define CMK_SHARED_VARS_NT_THREADS                         0
+#define CMK_SHARED_VARS_NT_THREADS                         1
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  0
 
 #define CMK_SIGNAL_NOT_NEEDED                              0
