@@ -144,61 +144,61 @@ class adjNode { // struct to store each node's adjacency info
 };
 
 class adjRequest{
-    public:
-        int elemID,chunkID,elemType,nodeSetID;
-        int translatedNodeSet[MAX_NODESET_SIZE];
-        adjRequest():
-            elemID(-1), 
-            chunkID(-1), 
-            elemType(-1){};
-        adjRequest(int _elemID,int _chunkID,int _nodeSetID,int _elemType ): 
-            elemID(_elemID),
-            chunkID(_chunkID),
-            nodeSetID(_nodeSetID),
-            elemType(_elemType){};
-        adjRequest(const adjRequest &rhs){
-            *this = rhs;
-        }
-        inline adjRequest& operator=(const adjRequest &rhs) {
-            elemID = rhs.elemID;
-            chunkID = rhs.chunkID;
-            elemType = rhs.elemType;
-            nodeSetID = rhs.nodeSetID;
-            memcpy(&translatedNodeSet[0],&(rhs.translatedNodeSet[0]),
-                    MAX_NODESET_SIZE*sizeof(int));
-            return *this;
-        }
-        virtual void pup(PUP::er &p){
-            p | elemID;
-            p | chunkID;
-            p | elemType;
-            p | nodeSetID;
-            p(translatedNodeSet,MAX_NODESET_SIZE);
-        }
+ public:
+  int elemID,chunkID,elemType,nodeSetID;
+  int translatedNodeSet[MAX_NODESET_SIZE];
+ adjRequest():
+  elemID(-1), 
+    chunkID(-1), 
+    elemType(-1){};
+ adjRequest(int _elemID,int _chunkID,int _nodeSetID,int _elemType ): 
+  elemID(_elemID),
+    chunkID(_chunkID),
+    elemType(_elemType),
+    nodeSetID(_nodeSetID) {};
+  adjRequest(const adjRequest &rhs){
+    *this = rhs;
+  }
+  inline adjRequest& operator=(const adjRequest &rhs) {
+    elemID = rhs.elemID;
+    chunkID = rhs.chunkID;
+    elemType = rhs.elemType;
+    nodeSetID = rhs.nodeSetID;
+    memcpy(&translatedNodeSet[0],&(rhs.translatedNodeSet[0]),
+	   MAX_NODESET_SIZE*sizeof(int));
+    return *this;
+  }
+  void pup(PUP::er &p){
+    p | elemID;
+    p | chunkID;
+    p | elemType;
+    p | nodeSetID;
+    p(translatedNodeSet,MAX_NODESET_SIZE);
+  }
 };
 
 class adjReply {
-    public:
-        int requestingElemID,requestingNodeSetID;
-        adaptAdj replyingElem;
-        adjReply(): 
-            requestingElemID(-1),
-            requestingNodeSetID(-1), 
-            replyingElem(){};
-        adjReply(const adjReply &rhs){
-            *this = rhs;
-        }
-        inline adjReply& operator=(const adjReply &rhs){
-            requestingElemID = rhs.requestingElemID;
-            requestingNodeSetID = rhs.requestingNodeSetID;
-            replyingElem = rhs.replyingElem;
-            return *this;
-        }
-        virtual void pup(PUP::er &p){
-            p | requestingElemID;
-            p | requestingNodeSetID;
-            replyingElem.pup(p);
-        }
+ public:
+  int requestingElemID,requestingNodeSetID;
+  adaptAdj replyingElem;
+ adjReply(): 
+  requestingElemID(-1),
+    requestingNodeSetID(-1), 
+    replyingElem(){};
+  adjReply(const adjReply &rhs){
+    *this = rhs;
+  }
+  inline adjReply& operator=(const adjReply &rhs){
+    requestingElemID = rhs.requestingElemID;
+    requestingNodeSetID = rhs.requestingNodeSetID;
+    replyingElem = rhs.replyingElem;
+    return *this;
+  }
+  void pup(PUP::er &p){
+    p | requestingElemID;
+    p | requestingNodeSetID;
+    replyingElem.pup(p);
+  }
 };
 
 

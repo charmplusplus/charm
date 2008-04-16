@@ -2083,7 +2083,6 @@ class ElemList{
       add the new unique elements to the List
     */
     double _start = CkWallTimer();
-    int len = vec->size();
     for(int i=0;i<rhs.vec->length();i++){
       vec->push_back((*(rhs.vec))[i]);
     }

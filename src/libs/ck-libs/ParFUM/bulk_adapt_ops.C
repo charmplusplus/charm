@@ -50,6 +50,7 @@ int BulkAdapt::edge_bisect(int elemID, int elemType, int edgeID, int dim)
   else if (dim == 3) {
     return edge_bisect_3D(elemID, elemType, edgeID);
   }
+  else return 0;
 }
 
 /// Perform a 2D edge bisection on a triangle
@@ -197,7 +198,7 @@ adaptAdj BulkAdapt::remote_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, 
 /// Perform a 3D edge bisection on a tetrahedron
 int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
 { // ASSERT: An edge can only be on one surface.
-  //BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D starts at elemID %d \n",partitionID,elemID));
+  BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D starts at elemID %d \n",partitionID,elemID));
   // Lock region defined by all elements surrounding edgeID, i.e. the "star"
   int numElemsToLock = 0;
   adaptAdj *elemsToLock;
@@ -209,15 +210,15 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
   RegionID lockRegionID;
   bool success;
   if (success = (localShadow->lockRegion(numElemsToLock, elemsToLock, &lockRegionID))) {
-    //BULK_DEBUG(CkPrintf("[%d] Lock obtained.\n",partitionID););
+    BULK_DEBUG(CkPrintf("[%d] Lock obtained.\n",partitionID););
   }
   else {
-    //BULK_DEBUG(CkPrintf("[%d] Lock not obtained.\n",partitionID););
+    BULK_DEBUG(CkPrintf("[%d] Lock not obtained.\n",partitionID););
     return success;
   }
 
-  //dumpConn();
-  //getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
+  dumpConn();
+  getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
 
   // Find the nodes on the edge to be bisected
   int localNodes[3], localRelNodes[2]; 
@@ -274,7 +275,8 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
       shadowProxy[elemsToLock[i].partID].
 	handle_split_3D(partitionID, i, tableID, elemsToLock[i], 
 			get_idxl_for_node(localNodes[0], elemsToLock[i].partID), 
-			get_idxl_for_node(localNodes[1], elemsToLock[i].partID));
+			get_idxl_for_node(localNodes[1], elemsToLock[i].partID), 
+			get_idxl_for_node(localNodes[2], elemsToLock[i].partID));
     }
   }
 
@@ -315,14 +317,14 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
   freeTableID(tableID);
   free(elemsToLock);
 
-  //dumpConn();
-  //getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
+  dumpConn();
+  getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
 
   //BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D of elem %d successful.\n",partitionID, elemID));  
 
   // unlock the partitions
   localShadow->unlockRegion(lockRegionID);
-  //BULK_DEBUG(CkPrintf("[%d] Unlocked.\n",partitionID));  
+  BULK_DEBUG(CkPrintf("[%d] Unlocked.\n",partitionID));  
 
   return 1;
 }
@@ -497,58 +499,65 @@ void BulkAdapt::remote_edgeAdj_add(int remotePartID, adaptAdj adj, adaptAdj spli
 }
 
 void BulkAdapt::handle_split_3D(int remotePartID, int pos, int tableID, 
-				adaptAdj elem, int n1_idxl, int n2_idxl)
+				adaptAdj elem, int n1_idxl, int n2_idxl, 
+				int n5_idxl)
 {
   int n1 = get_node_from_idxl(n1_idxl, remotePartID), 
     n2 = get_node_from_idxl(n2_idxl, remotePartID), 
     n5;
-  
-  FEM_DataAttribute *coord = meshPtr->node.getCoord(); // all local coords
-  double *n0co = (coord->getDouble()).getRow(n1);
-  double *n1co = (coord->getDouble()).getRow(n2);
-  double nodeCoords[9];
-  nodeCoords[0] = n0co[0];
-  nodeCoords[1] = n0co[1];
-  nodeCoords[2] = n0co[2];
-  nodeCoords[3] = n1co[0];
-  nodeCoords[4] = n1co[1];
-  nodeCoords[5] = n1co[2];
-  midpoint(&(nodeCoords[0]), &(nodeCoords[3]), 3, &(nodeCoords[6]));
-  n5 = add_node(3, &(nodeCoords[6]));  
 
-  // Find the relative nodes on the edge to be bisected
-  int relNodes[4]; 
-  FEM_Elem &elems = meshPtr->elem[elem.elemType]; // elems is all local elements
-  int *conn = elems.connFor(elem.localID); // conn points at elemID's ACTUAL data!
-  fillNodes(relNodes, n1, n2, conn);
-  // find which edgeID is bisected
-  int edgeID = getEdgeID(relNodes[0], relNodes[1], 4, 3);
-
-  // find elements on edge to be bisected
-  int numElemsToLock = 0;
-  adaptAdj *elemsToLock;
-  get_elemsToLock(elem, &elemsToLock, edgeID, &numElemsToLock);
-
-  // find chunks that share the edge to be bisected
-  int *chunks = (int *)malloc(numElemsToLock*sizeof(int));
-  int numParts=0;
-  for (int i=0; i<numElemsToLock; i++) {
-    chunks[i] = -1;
-    int j;
-    for (j=0; j<numParts; j++) {
-      if (chunks[j] == elemsToLock[i].partID) {
-	break;
-      }
-    }
-    chunks[j] = elemsToLock[i].partID;
-    if (j==numParts) numParts++;
+  if (is_node_in_idxl(n5_idxl, remotePartID)) {
+    n5 = get_node_from_idxl(n5_idxl, remotePartID);
   }
-
-  if (numParts > 1)
-    make_node_shared(n5, numParts, &chunks[0]);
-
-  free(chunks);
-  free(elemsToLock);
+  else {
+    FEM_DataAttribute *coord = meshPtr->node.getCoord(); // all local coords
+    double *n0co = (coord->getDouble()).getRow(n1);
+    double *n1co = (coord->getDouble()).getRow(n2);
+    double nodeCoords[9];
+    nodeCoords[0] = n0co[0];
+    nodeCoords[1] = n0co[1];
+    nodeCoords[2] = n0co[2];
+    nodeCoords[3] = n1co[0];
+    nodeCoords[4] = n1co[1];
+    nodeCoords[5] = n1co[2];
+    midpoint(&(nodeCoords[0]), &(nodeCoords[3]), 3, &(nodeCoords[6]));
+    n5 = add_node(3, &(nodeCoords[6]));  
+    
+    // Find the relative nodes on the edge to be bisected
+    int relNodes[4]; 
+    FEM_Elem &elems = meshPtr->elem[elem.elemType]; // elems is all local elements
+    int *conn = elems.connFor(elem.localID); // conn points at elemID's ACTUAL data!
+    
+    fillNodes(relNodes, n1, n2, conn);
+    // find which edgeID is bisected
+    int edgeID = getEdgeID(relNodes[0], relNodes[1], 4, 3);
+    
+    // find elements on edge to be bisected
+    int numElemsToLock = 0;
+    adaptAdj *elemsToLock;
+    get_elemsToLock(elem, &elemsToLock, edgeID, &numElemsToLock);
+    
+    // find chunks that share the edge to be bisected
+    int *chunks = (int *)malloc(numElemsToLock*sizeof(int));
+    int numParts=0;
+    for (int i=0; i<numElemsToLock; i++) {
+      chunks[i] = -1;
+      int j;
+      for (j=0; j<numParts; j++) {
+	if (chunks[j] == elemsToLock[i].partID) {
+	  break;
+	}
+      }
+      chunks[j] = elemsToLock[i].partID;
+      if (j==numParts) numParts++;
+    }
+    
+    if (numParts > 1)
+      make_node_shared(n5, numParts, &chunks[0]);
+    
+    free(chunks);
+    free(elemsToLock);
+  }
 
   adaptAdj *splitElem = local_split_3D(elem, n1, n2, n5);
   shadowProxy[remotePartID].recv_split_3D(pos, tableID, elem, *splitElem);
@@ -572,9 +581,12 @@ void BulkAdapt::update_asterisk_3D(int remotePartID, int i, adaptAdj elem,
 				   int numElemPairs, adaptAdj *elemPairs, 
 				   int n1_idxl, int n2_idxl, int n5_idxl)
 {
+  CkAssert(remotePartID != elem.partID);
   int n1 = get_node_from_idxl(n1_idxl, remotePartID), 
     n2 = get_node_from_idxl(n2_idxl, remotePartID), 
     n5 = get_node_from_idxl(n5_idxl, remotePartID);
+  printf("[%d] update_asterisk_3D(from %d): elem %d n1=%d n2=%d n5=%d\n",
+	 elem.partID, remotePartID, elem.localID, n1, n2, n5);
   local_update_asterisk_3D(i, elem, numElemPairs, elemPairs, n1, n2, n5);
 }
 
@@ -661,6 +673,7 @@ int BulkAdapt::get_idxl_for_node(int nodeID, int partID)
     }
   }
   CkAssert(0);
+  return -1;
 }
 
 int BulkAdapt::get_node_from_idxl(int node_idxl, int partID)
@@ -669,6 +682,12 @@ int BulkAdapt::get_node_from_idxl(int node_idxl, int partID)
   CkAssert(list!=NULL);
   CkAssert(list->size()>node_idxl);
   return (*list)[node_idxl];
+}
+
+bool BulkAdapt::is_node_in_idxl(int node_idxl, int partID)
+{
+  IDXL_List *list = meshPtr->node.shared.getIdxlListN(partID);
+  return(list->size()>node_idxl);
 }
 
 
@@ -716,6 +735,7 @@ int getRelNode(int nodeIdx, int *conn, int nodesPerElem) {
     }
   }
   CkAbort("Could not find node in given connectivity");
+  return -1;
 }
 
 
@@ -743,11 +763,11 @@ void getRelNodes(int edgeID, int nodesPerElem, int *r1, int *r2)
 
 int getEdgeID(int node1, int node2, int nodesPerElem, int dim) {
   switch(dim){
-  case 2:
+  case 2: {
     switch(nodesPerElem){
     case 3:
       {
-	static int edgeFromNode[3][3]={-1,0,2,0,-1,1,2,1,-1};
+	static int edgeFromNode[3][3]={{-1,0,2},{0,-1,1},{2,1,-1}};
 	return edgeFromNode[node1][node2];
       }
       break;
@@ -755,11 +775,12 @@ int getEdgeID(int node1, int node2, int nodesPerElem, int dim) {
       CkAbort("This shape is not yet implemented");
     };
     break;
-  case 3:
+  }
+  case 3: {
     switch(nodesPerElem){
     case 4:
       {
-	static int edgeFromNode[4][4]={-1,0,1,2,0,-1,3,4,1,3,-1,5,2,4,5,-1};
+	static int edgeFromNode[4][4]={{-1,0,1,2},{0,-1,3,4},{1,3,-1,5},{2,4,5,-1}};
 	return edgeFromNode[node1][node2];
       }
       break;
@@ -767,6 +788,7 @@ int getEdgeID(int node1, int node2, int nodesPerElem, int dim) {
       CkAbort("This shape is not yet implemented");
     };
     break;
+  }
   default:
     CkAbort("This dimension not yet implemented");
   };
@@ -777,16 +799,15 @@ int getEdgeID(int node1, int node2, int nodesPerElem, int dim) {
 int getFaceID(int node1, int node2, int node3, int nodesPerElem)
 {
   switch(nodesPerElem){
-  case 4:
-    {
-      static int faceFromNode[4][4][4]=
-	{-1,-1,-1,-1,  -1,-1, 0, 1,  -1, 0,-1, 2,  -1, 1, 2,-1, 
-	 -1,-1, 0, 1,  -1,-1,-1,-1,   0,-1,-1, 3,   1,-1, 3,-1, 
-	 -1, 0,-1, 2,   0,-1,-1, 3,  -1,-1,-1,-1,   2, 3,-1,-1,
-	 -1, 1, 2,-1,   1,-1, 3,-1,   2, 3,-1,-1,  -1,-1,-1,-1};
-      return faceFromNode[node1][node2][node3];
-    }
+  case 4: {
+    static int faceFromNode[4][4][4]=
+      {{{-1,-1,-1,-1},  {-1,-1, 0, 1},  {-1, 0,-1, 2},  {-1, 1, 2,-1}}, 
+       {{-1,-1, 0, 1},  {-1,-1,-1,-1},   {0,-1,-1, 3},   {1,-1, 3,-1}}, 
+       {{-1, 0,-1, 2},   {0,-1,-1, 3},  {-1,-1,-1,-1},   {2, 3,-1,-1}},
+       {{-1, 1, 2,-1},   {1,-1, 3,-1},   {2, 3,-1,-1},  {-1,-1,-1,-1}}};
+    return faceFromNode[node1][node2][node3];
     break;
+  }
   default:
     CkAbort("This shape is not yet implemented");
   };
@@ -844,6 +865,7 @@ adaptAdj *BulkAdapt::local_split_3D(adaptAdj elem, int n1, int n2, int n5)
     if (conn[i] == n2) rel_n2 = i;
   }
   // adjust elem's conn to reflect the split
+  printf("[%d] modifying elem %d at idx %d to be %d\n", partitionID, elem.localID, rel_n2, n5);
   conn[rel_n2] = n5;
   // adjust splitElem's conn to reflect the split
   splitConn[rel_n1] = n5;
@@ -1095,8 +1117,8 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
 
   // split face IDs on elem
   int face[4]; // face[0] and [1] are split; others are not
-  face[0] = (elem_relNode[0] + elem_relNode[5] + elem_relNode[2]) - 3;
-  face[1] = (elem_relNode[0] + elem_relNode[5] + elem_relNode[3]) - 3;
+  face[0] = (elem_relNode[0] + elem_relNode[1] + elem_relNode[2]) - 3;
+  face[1] = (elem_relNode[0] + elem_relNode[1] + elem_relNode[3]) - 3;
   // split neighbors on elem
   adaptAdj elem_neighbors[4]; // elem's neighbors
   elem_neighbors[0] = *getFaceAdaptAdj(meshPtr,elem.localID, elem.elemType, face[0]);
@@ -1120,6 +1142,7 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
       else if (adj.partID != -1) { // call remote replacement
 	int n2_idxl = get_idxl_for_node(n2, adj.partID);
 	int n3_idxl = get_idxl_for_node(n3, adj.partID);
+	printf("[%d] A:calling remote edgeAdj replace on %don%d, to replace %don%d with %don%d, with edge at %d,%d thinking elem's forbidden face neighbors are %don%d and %don%d\n", partitionID, adj.localID, adj.partID, elem.localID, elem.partID, splitElem.localID, splitElem.partID, n2, n3, elem_neighbors[0].localID, elem_neighbors[0].partID, elem_neighbors[1].localID, elem_neighbors[1].partID);
 	shadowProxy[adj.partID].remote_edgeAdj_replace(partitionID, adj, elem, 
 						       splitElem, n2_idxl, n3_idxl);
       }
@@ -1143,6 +1166,7 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
       else if (adj.partID != -1) { // call remote replacement
 	int n2_idxl = get_idxl_for_node(n2, adj.partID);
 	int n4_idxl = get_idxl_for_node(n4, adj.partID);
+	printf("[%d] B:calling remote edgeAdj replace on %don%d, to replace %don%d with %don%d, with edge at %d,%d, thinking elem's forbidden face neighbors are %don%d and %don%d\n", partitionID, adj.localID, adj.partID, elem.localID, elem.partID, splitElem.localID, splitElem.partID, n2, n4, elem_neighbors[0].localID, elem_neighbors[0].partID, elem_neighbors[1].localID, elem_neighbors[1].partID);
 	shadowProxy[adj.partID].remote_edgeAdj_replace(partitionID, adj, elem, 
 						       splitElem, n2_idxl, n4_idxl);
       }

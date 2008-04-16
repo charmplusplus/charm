@@ -133,7 +133,7 @@ class BulkAdapt {
 				 int remotePartID);
 
   void handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj elem,
-		       int n1_idxl, int n2_idxl);
+		       int n1_idxl, int n2_idxl, int n5_idxl);
   void recv_split_3D(int pos, int tableID, adaptAdj elem, adaptAdj splitElem);
   bool all_splits_received(int tableID, int expectedSplits);
   void update_asterisk_3D(int remotePartID, int i, adaptAdj elem, 
@@ -166,6 +166,7 @@ class BulkAdapt {
   
   int get_idxl_for_node(int nodeID, int partID);
   int get_node_from_idxl(int node_idxl, int partID);
+  bool is_node_in_idxl(int node_idxl, int partID);
 
   /** Find all elements adjacent to an edge, for locking purposes */
   void get_elemsToLock(adaptAdj startElem, adaptAdj **elemsToLock, int edgeID, int *count);

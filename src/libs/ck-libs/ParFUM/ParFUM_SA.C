@@ -630,9 +630,11 @@ void ParFUMShadowArray::recv_split_3D(int pos, int tableID, adaptAdj &elem,
 }
 
 void ParFUMShadowArray::handle_split_3D(int remotePartID, int pos, int tableID,
-					adaptAdj &elem, int n1_idxl, int n2_idxl)
+					adaptAdj &elem, int n1_idxl, 
+					int n2_idxl, int n5_idxl)
 {
-  bulkAdapt->handle_split_3D(remotePartID, pos, tableID, elem, n1_idxl, n2_idxl);
+  bulkAdapt->handle_split_3D(remotePartID, pos, tableID, elem, n1_idxl, 
+			     n2_idxl, n5_idxl);
 }
 
 void ParFUMShadowArray::recv_splits(int tableID, int expectedSplits)

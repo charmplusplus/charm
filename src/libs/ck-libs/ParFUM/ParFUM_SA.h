@@ -156,7 +156,7 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
 			  int n1_idxl, int n2_idxl);
   void recv_split_3D(int pos, int tableID, adaptAdj &elem, adaptAdj &splitElem);
   void handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj &elem, 
-		       int n1_idxl, int n2_idxl);
+		       int n1_idxl, int n2_idxl, int n5_idxl);
   void recv_splits(int tableID, int expectedSplits);
 
   void update_asterisk_3D(int remotePartID, int i, adaptAdj &elem, 

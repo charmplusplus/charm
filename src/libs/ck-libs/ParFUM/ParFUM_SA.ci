@@ -26,7 +26,7 @@ module ParFUM_SA {
     entry [sync] void remote_edgeAdj_replace(int remotePartID, adaptAdj &adj, adaptAdj &elem, adaptAdj &splitElem, int n1_idxl, int n2_idxl);
     entry [sync] void remote_edgeAdj_add(int remotePartID, adaptAdj &elem, adaptAdj &splitElem, int n1_idxl, int n2_idxl);
     entry void recv_split_3D(int pos, int tableID, adaptAdj &elem, adaptAdj &splitElem);
-    entry void handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj &elem, int n1_idxl, int n2_idxl);
+    entry void handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj &elem, int n1_idxl, int n2_idxl, int n5_idxl);
     entry [sync,threaded] void recv_splits(int tableID, int expectedSplits);
     entry void update_asterisk_3D(int remotePartID, int i, adaptAdj &elem, int numElemPairs, adaptAdj elemPairs[2*numElemPairs], int n1_idxl, int n2_idxl, int n5_idxl);
   }
