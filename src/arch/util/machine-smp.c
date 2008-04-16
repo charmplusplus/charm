@@ -223,10 +223,11 @@ static void CmiStartThreads(char **argv)
   CmiStateInit(_Cmi_mynode+CmiNumPes(),_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize));
   
 #if CMK_MULTICORE
-  tocreate = _Cmi_mynodesize-1;
-#else
-  tocreate = _Cmi_mynodesize;
+  if (!Cmi_commthread)
+    tocreate = _Cmi_mynodesize-1;
+  else
 #endif
+  tocreate = _Cmi_mynodesize;
   for (i=1; i<=tocreate; i++) {
     if((thr = CreateThread(NULL, 0, call_startfn, (LPVOID)i, 0, &threadID)) 
        == NULL) PerrorExit("CreateThread");
@@ -392,10 +393,11 @@ static void CmiStartThreads(char **argv)
   CmiStateInit(_Cmi_mynode+CmiNumPes(),_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize));
 
 #if CMK_MULTICORE
-  tocreate = _Cmi_mynodesize-1;
-#else
-  tocreate = _Cmi_mynodesize;
+  if (!Cmi_commthread)
+    tocreate = _Cmi_mynodesize-1;
+  else
 #endif
+  tocreate = _Cmi_mynodesize;
   for (i=1; i<=tocreate; i++) {
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
@@ -428,10 +430,11 @@ void  CmiNodeBarrier(void) {
    net-win32, which actually is implemented as smp with comm. thread */
 void CmiNodeAllBarrier(void) {
 #if CMK_MULTICORE
+  if (!Cmi_commthread)
   CmiNodeBarrierCount(CmiMyNodeSize());
-#else
-  CmiNodeBarrierCount(CmiMyNodeSize()+1);
+  else
 #endif
+  CmiNodeBarrierCount(CmiMyNodeSize()+1);
 }
 
 #endif
