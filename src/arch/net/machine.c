@@ -2467,6 +2467,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #if CMK_MULTICORE
   if (CmiGetArgFlagDesc(argv,"+commthread","Use communication thread")) {
     Cmi_commthread = 1;
+    if (CmiMyPe() == 0) CmiPrintf("Charm++> communication thread is launched in multicore version. \n");
   }
 #endif
 
