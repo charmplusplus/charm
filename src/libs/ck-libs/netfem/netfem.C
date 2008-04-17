@@ -78,11 +78,11 @@ public:
 	void getCurrent(char *request,CcsDelayedReply reply)
 	{
 		//HACK: ignore requested data (should grab timestep, source, etc.)
-		int respLen;
-		void *respBuf=cur->pupMallocBuf(&respLen);
+		int respLen = 0;
+		void *respBuf=cur?cur->pupMallocBuf(&respLen):NULL;
 		//Deliver the response
 		CcsSendDelayedReply(reply,respLen,respBuf);
-		free(respBuf);
+		if (respBuf != NULL) free(respBuf);
 	}
 	NetFEM_update *stateForStep(int stepNo) {
 		/*HACK: need to look up based on element and step*/
