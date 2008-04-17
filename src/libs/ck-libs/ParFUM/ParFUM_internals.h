@@ -898,8 +898,8 @@ class FEM_Entity {
    * Allocate or Modify the FEM_IS_VALID attribute data
    */
   void allocateValid();
-  void set_valid(int idx, bool isNode);
-  void set_invalid(int idx, bool isNode);
+  void set_valid(int idx, bool isNode=false); // isNode argument is redundant, no longer used
+  void set_invalid(int idx, bool isNode=false);
   int is_valid(int idx);         // will fail assertions for out of range indices
   int is_valid_any_idx(int idx); // will not fail assertions for out of range indices
   int is_valid_nonghost_idx(int idx); // same as is_valid_any_idx except returns false for ghosts
