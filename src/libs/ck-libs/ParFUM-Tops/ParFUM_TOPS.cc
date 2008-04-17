@@ -722,10 +722,12 @@ TopElement topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f
 	CkAssert(firstElement.id != -1);
 	CkAssert(secondElement.id != -1);
 
-	CkPrintf("Insert cohesive of type=%d at facet %d,%d,%d\n", ElemType,  f.node[0], f.node[1], f.node[2]);
 
 	// Create a new element
-	//int newEl = m->mesh->elem[ElemType].get_next_invalid(m->mesh);
+	int newEl = m->mesh->elem[ElemType].get_next_invalid(m->mesh);
+	m->mesh->elem[ElemType].set_valid(newEl, false);
+	CkPrintf("Inserted cohesive %d of type %d at facet %d,%d,%d\n", newEl, ElemType,  f.node[0], f.node[1], f.node[2]);
+
 	int conn[6];
 	conn[0] = f.node[0];
 	conn[1] = f.node[1];
@@ -733,8 +735,6 @@ TopElement topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f
 	conn[3] = f.node[0];
 	conn[4] = f.node[1];
 	conn[5] = f.node[2];
-	//m->mesh->elem[ElemType].connIs(newEl,conn); 
-
 
 	/// The lists of elements that can be reached from element on one side of the facet by iterating around each of the three nodes
 	std::set<TopElement> reachableFromElement1[3];
@@ -766,8 +766,8 @@ TopElement topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f
 				// keep track of which nodes the split node would be adjacent to,
 				// if we split this node
 				for (int elemNode=0; elemNode<4; ++elemNode) {
-					int queryNode = e2n_getNode(traversedToElem, elemNode, traversedToElem.type);
-					if (n2n_exists(theNode, queryNode) &&
+					int queryNode = m->mesh->e2n_getNode(traversedToElem.id, elemNode, traversedToElem.type);
+					if (m->mesh->n2n_exists(theNode, queryNode) &&
 							queryNode != f.node[0] &&
 							queryNode != f.node[1] &&
 							queryNode != f.node[2]) {
@@ -831,38 +831,50 @@ TopElement topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f
 			CkPrintf("There are %d elements that will be reassigned to the new node\n",
 					reachableFromElement1[whichNode].size());
 
-			// Create a new node. This will never be a shared node, it will always be owned by us
-			FEM_add_node(m->mesh, int* adjacentNodes, int numAdjacentNodes, &myChunk, 1, 0);
-
-			int n2n_getLength(int n);
-			/// Place all of node n's adjacent nodes in adjnodes and the resulting
-			/// length of adjnodes in sz; assumes adjnodes is not allocated, but sz is
-			void n2n_getAll(int n, int *&adjnodes, int &sz);
-			/// Adds newNode to node n's node adjacency list
-			void n2n_add(int n, int newNode);
-			/// Removes oldNode from n's node adjacency list
-			void n2n_remove(int n, int oldNode);
-			/// Finds oldNode in n's node adjacency list, and replaces it with newNode
-			void n2n_replace(int n, int oldNode, int newNode);
-			/// Remove all nodes from n's node adjacency list
-			void n2n_removeAll(int n);
-			/// Is queryNode in node n's adjacency vector?
-			int n2n_exists(int n, int queryNode);
+			// Create a new node
+			int newNode = m->mesh->node.get_next_invalid(m->mesh);
+			m->mesh->node.set_valid(newNode);
+			CkPrintf("Splitting node %d into %d and %d\n", conn[whichNode], conn[whichNode], newNode);
+			
+			// can we use nilesh's idxl aware stuff here?
+			//FEM_add_node(m->mesh, int* adjacentNodes, int numAdjacentNodes, &myChunk, 1, 0);
 
 			// relabel one node in the cohesive element to the new node
-
-			// relabel the appropriate old node in the elements in reachableFromElement1
-		
-			// fix node-node adjacencies
-		}
+			conn[whichNode+3] = newNode;
 			
+			// relabel the appropriate old node in the elements in reachableFromElement1
+			for (std::set<TopElement>::iterator elem = 
+						reachableFromElement1[whichNode].begin();
+					elem != reachableFromElement1[whichNode].end();
+					++elem) {
+				m->mesh->e2n_replace(elem->id, conn[whichNode], newNode, ElemType);
+				CkPrintf("replacing node %d with %d in elem %d\n",
+						conn[whichNode], newNode, elem->id);
+			}
+			
+			// fix node-node adjacencies
+			for (std::set<TopNode>::iterator node =
+						reachableNodeFromElement1[whichNode].begin();
+					node != reachableNodeFromElement1[whichNode].end();
+					++node) {
+				m->mesh->n2n_replace(*node, conn[whichNode], newNode);
+				CkPrintf("node %d is now adjacent to %d instead of %d\n",
+						*node, newNode, conn[whichNode]);
+			}		
+		}
 	}
-
-
-	CkPrintf("\n\n");
 	
-
-return newCohesiveElement;
+	// fix elem-elem adjacencies
+	CkPrintf("elements %d and %d were adjacent, now both adjacent to %d instead\n",
+			firstElement.id, secondElement.id, newEl);
+	m->mesh->e2e_replace(firstElement.id, secondElement.id, newEl, ElemType);
+	m->mesh->e2e_replace(secondElement.id, firstElement.id, newEl, ElemType);
+	
+	// set cohesive connectivity
+	m->mesh->elem[ElemType].connIs(newEl,conn); 
+	CkPrintf("Setting connectivity of new cohesive %d to [%d %d %d %d %d %d]\n\n",
+			newEl, conn[0], conn[1], conn[2], conn[3], conn[4], conn[5]);
+	return newCohesiveElement;
 }
 
 
