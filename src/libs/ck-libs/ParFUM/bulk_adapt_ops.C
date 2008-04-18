@@ -198,7 +198,7 @@ adaptAdj BulkAdapt::remote_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, 
 /// Perform a 3D edge bisection on a tetrahedron
 int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
 { // ASSERT: An edge can only be on one surface.
-  BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D starts at elemID %d \n",partitionID,elemID));
+  //BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D starts at elemID %d \n",partitionID,elemID));
   // Lock region defined by all elements surrounding edgeID, i.e. the "star"
   int numElemsToLock = 0;
   adaptAdj *elemsToLock;
@@ -210,15 +210,15 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
   RegionID lockRegionID;
   bool success;
   if (success = (localShadow->lockRegion(numElemsToLock, elemsToLock, &lockRegionID))) {
-    BULK_DEBUG(CkPrintf("[%d] Lock obtained.\n",partitionID););
+    //BULK_DEBUG(CkPrintf("[%d] Lock obtained.\n",partitionID););
   }
   else {
-    BULK_DEBUG(CkPrintf("[%d] Lock not obtained.\n",partitionID););
+    //BULK_DEBUG(CkPrintf("[%d] Lock not obtained.\n",partitionID););
     return success;
   }
 
-  dumpConn();
-  getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
+  //dumpConn();
+  //getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
 
   // Find the nodes on the edge to be bisected
   int localNodes[3], localRelNodes[2]; 
@@ -317,14 +317,14 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
   freeTableID(tableID);
   free(elemsToLock);
 
-  dumpConn();
-  getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
+  //dumpConn();
+  //getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
 
   //BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D of elem %d successful.\n",partitionID, elemID));  
 
   // unlock the partitions
   localShadow->unlockRegion(lockRegionID);
-  BULK_DEBUG(CkPrintf("[%d] Unlocked.\n",partitionID));  
+  //BULK_DEBUG(CkPrintf("[%d] Unlocked.\n",partitionID));  
 
   return 1;
 }
@@ -865,7 +865,7 @@ adaptAdj *BulkAdapt::local_split_3D(adaptAdj elem, int n1, int n2, int n5)
     if (conn[i] == n2) rel_n2 = i;
   }
   // adjust elem's conn to reflect the split
-  printf("[%d] modifying elem %d at idx %d to be %d\n", partitionID, elem.localID, rel_n2, n5);
+  //printf("[%d] modifying elem %d at idx %d to be %d\n", partitionID, elem.localID, rel_n2, n5);
   conn[rel_n2] = n5;
   // adjust splitElem's conn to reflect the split
   splitConn[rel_n1] = n5;
@@ -1142,7 +1142,7 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
       else if (adj.partID != -1) { // call remote replacement
 	int n2_idxl = get_idxl_for_node(n2, adj.partID);
 	int n3_idxl = get_idxl_for_node(n3, adj.partID);
-	printf("[%d] A:calling remote edgeAdj replace on %don%d, to replace %don%d with %don%d, with edge at %d,%d thinking elem's forbidden face neighbors are %don%d and %don%d\n", partitionID, adj.localID, adj.partID, elem.localID, elem.partID, splitElem.localID, splitElem.partID, n2, n3, elem_neighbors[0].localID, elem_neighbors[0].partID, elem_neighbors[1].localID, elem_neighbors[1].partID);
+	//printf("[%d] A:calling remote edgeAdj replace on %don%d, to replace %don%d with %don%d, with edge at %d,%d thinking elem's forbidden face neighbors are %don%d and %don%d\n", partitionID, adj.localID, adj.partID, elem.localID, elem.partID, splitElem.localID, splitElem.partID, n2, n3, elem_neighbors[0].localID, elem_neighbors[0].partID, elem_neighbors[1].localID, elem_neighbors[1].partID);
 	shadowProxy[adj.partID].remote_edgeAdj_replace(partitionID, adj, elem, 
 						       splitElem, n2_idxl, n3_idxl);
       }
@@ -1166,7 +1166,7 @@ void BulkAdapt::update_local_edge_adj(adaptAdj elem, adaptAdj splitElem,
       else if (adj.partID != -1) { // call remote replacement
 	int n2_idxl = get_idxl_for_node(n2, adj.partID);
 	int n4_idxl = get_idxl_for_node(n4, adj.partID);
-	printf("[%d] B:calling remote edgeAdj replace on %don%d, to replace %don%d with %don%d, with edge at %d,%d, thinking elem's forbidden face neighbors are %don%d and %don%d\n", partitionID, adj.localID, adj.partID, elem.localID, elem.partID, splitElem.localID, splitElem.partID, n2, n4, elem_neighbors[0].localID, elem_neighbors[0].partID, elem_neighbors[1].localID, elem_neighbors[1].partID);
+	//printf("[%d] B:calling remote edgeAdj replace on %don%d, to replace %don%d with %don%d, with edge at %d,%d, thinking elem's forbidden face neighbors are %don%d and %don%d\n", partitionID, adj.localID, adj.partID, elem.localID, elem.partID, splitElem.localID, splitElem.partID, n2, n4, elem_neighbors[0].localID, elem_neighbors[0].partID, elem_neighbors[1].localID, elem_neighbors[1].partID);
 	shadowProxy[adj.partID].remote_edgeAdj_replace(partitionID, adj, elem, 
 						       splitElem, n2_idxl, n4_idxl);
       }
