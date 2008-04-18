@@ -357,11 +357,18 @@ bool ParFUMShadowArray::lockSharedIdxls(LockRegion *region){
 void ParFUMShadowArray::lockRegionForRemote(RegionID regionID,int *sharedIdxls,int numSharedIdxls,adaptAdj *elements,int numElements){
 	LockRegion *region = new LockRegion;
 	region->myID = regionID;
+
+	DEBUG(CkPrintf("[%d] Lockregion (%d,%d) needs to be locked numElements to lock %d \n",thisIndex,regionID.chunkID,regionID.localID,numElements));
+	
 	
 	//make a list of all the nodes that are specified in the elements
 	collectLocalNodes(numElements,elements,region->localNodes);
 	//try locking all the local nodes,
 	bool success = lockLocalNodes(region);
+
+	for(int i=0;i<numSharedIdxls;i++){
+		region->sharedIdxls.push_back(sharedIdxls[i]);
+	}
 	if(success){
 		//if we locked the local nodes, then we try locking the idxls
 		success = lockSharedIdxls(region);
@@ -376,6 +383,8 @@ void ParFUMShadowArray::lockRegionForRemote(RegionID regionID,int *sharedIdxls,i
 		//if the locking was successful, store the region
 		regionTable.put(regionID) = region;
 	}
+	
+	DEBUG(CkPrintf("[%d] Lockregion (%d,%d) success %d \n",thisIndex,regionID.chunkID,regionID.localID,success));
 	
 	//send a reply back to the requesting chunk with the result 
 	//of the lock attempt
@@ -491,6 +500,7 @@ void ParFUMShadowArray::unlockForRemote(RegionID regionID){
 		regionTable.remove(regionID);
 		delete region;
 	}
+	DEBUG(CkPrintf("[%d] Lockregion (%d,%d) unlocked \n",thisIndex,regionID.chunkID,regionID.localID));
 	thisProxy[regionID.chunkID].unlockReply(idx,regionID);
 }
 
