@@ -2748,10 +2748,10 @@ void ConverseCommonInit(char **argv)
 	if(CmiGetArgFlagDesc(argv,"+CmiNoProcForComThread","Is there an extra processor for the communication thread on each node(only for net-smp-*) ?")){
 		_Cmi_noprocforcommthread=1;
 	}
-    }
+   }
+#endif
 #if CMK_MULTICORE
     _Cmi_noprocforcommthread = 1;
-#endif
 #endif
 	
 #ifndef CMK_OPTIMIZE
