@@ -1833,7 +1833,7 @@ int client_connect_problem(int code,const char *msg)
 }
 
 /** return 1 if connection is openned succesfully with client**/
-inline int errorcheck_one_client_connect(int client){
+int errorcheck_one_client_connect(int client){
 	unsigned int clientPort;/*These are actually ignored*/
 	skt_ip_t clientIP;
 	if (arg_verbose) printf("Charmrun> Waiting for %d-th client to connect.\n",client);
