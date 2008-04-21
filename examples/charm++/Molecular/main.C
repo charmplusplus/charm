@@ -1,10 +1,23 @@
+/*
+ University of Illinois at Urbana-Champaign
+ Department of Computer Science
+ Parallel Programming Lab
+ 2008
+ Authors: Kumaresh Pattabiraman and Esteban Meneses
+*/
+
+#include "main.h"
 #include "main.decl.h"
 
 #define DEBUG 1
 
+#define A 2.0
+#define B 1.0
+
 #define DEFAULT_PARTICLES 1000
 #define DEFAULT_M 4
 #define DEFAULT_N 3
+#define DEFAULT_L 10
 #define DEFAULT_RADIUS 10
 #define DEFAULT_FINALSTEPCOUNT 2
 
@@ -12,22 +25,21 @@
 /* readonly */ CProxy_Cell cellArray; /* CHECKME */
 /* readonly */ CProxy_Interaction interactionArray; /* CHECKME */
 
-/* readonly */ int particles;
+/* readonly */ int numParts;
 /* readonly */ int m; // Number of Chare Rows
 /* readonly */ int n; // Number of Chare Columns
+/* readonly */ int L; 
 /* readonly */ double radius;
 /* readonly */ int finalStepCount; 
 
-/* FIXME
-struct Particle {
-  double x,y,z; // coordinates
-};*/
-
+// Class representing a cell in the grid. We consider each cell as a square of LxL units
 class Cell : public CBase_Cell {
   private:
-    //VECTOR OF PARTICLES /* FIXME */
-    int forceCount; // to count the returns from interactions
-    int stepCount;  // to count the number of steps, and decide when to stop
+    CkVec<Particle> particles;
+		CkVec<Particle> incomingParts;
+    int forceCount; 																	// to count the returns from interactions
+    int stepCount;  																	// to count the number of steps, and decide when to stop
+		int updateCount;
 
   public:
     Cell();
@@ -35,32 +47,36 @@ class Cell : public CBase_Cell {
     ~Cell();
 
     void start();
-    void force();
+    void updateParticles(CkVec<Particle> updates);
+    void force(CkVec<Particle> particles);
     void stepDone();
 };
 
+// Class representing the interaction agents between a couple of cells
 class Interaction : public CBase_Interaction {
   private:
-    // VARIABLES FOR FOCES COMPUTATION /* FIXME */
-    int cellCount;  // to count the number of interact() calls
-    
-    /* FIXME To Include the Vector of atom particles */
+    int cellCount;  																	// to count the number of interact() calls
+    CkVec<Particle> bufferedParticles;
     int bufferedX;
-    int bufferedY;
+ 		int bufferedY;
+
+		void interact(CkVec<Particle> &first, CkVec<Particle> &second);
+		void interact(Particle &first, Particle &second);
 
   public:
     Interaction();
     Interaction(CkMigrateMessage *msg);
 
-    void interact(/*CkVec<CkArrayIndex1D> particles,*/ int i, int j);
+    void interact(CkVec<Particle> particles, int i, int j);
+
 
 };
     
-
+// Main class
 class Main : public CBase_Main {
 
   private:
-    int checkInCount; // Count to terminate
+    int checkInCount; 																// Count to terminate
 
     #ifdef DEBUG
       int interactionCount;
@@ -77,10 +93,12 @@ class Main : public CBase_Main {
 
 // Entry point of Charm++ application
 Main::Main(CkArgMsg* msg) {
-  
-  particles = DEFAULT_PARTICLES;
+	int i, j, k, l;  
+
+  numParts = DEFAULT_PARTICLES;
   m = DEFAULT_M;
   n = DEFAULT_N;
+	L = DEFAULT_L;
   radius = DEFAULT_RADIUS;
   finalStepCount = DEFAULT_FINALSTEPCOUNT;
 
@@ -93,11 +111,12 @@ Main::Main(CkArgMsg* msg) {
 
   mainProxy = thisProxy;
 
+	// initializing the cell 2D array
   cellArray = CProxy_Cell::ckNew(m,n);
 
+	// initializing the interaction 4D array
   interactionArray = CProxy_Interaction::ckNew();
-
-  int i, j, k, l;
+  
   for (int x = 0; x < m ; x++ ) {
     for (int y = 0; y < n; y++ ) {
 
@@ -125,6 +144,8 @@ Main::Main(CkArgMsg* msg) {
         CkPrintf("INITIAL:( %d, %d) ( %d , %d )\n", x,j,x,l);
         interactionCount++;
       #endif
+
+			
       interactionArray( x, j, x, l ).insert( /* processor number */0 );
 
       // (x,y) and (x+1,y+1) pair, Irrespective of y /* UNDERSTAND */
@@ -166,8 +187,22 @@ void Main::checkIn() {
 
 }
 
-
+// Default constructor
 Cell::Cell() {
+	int i;
+
+	// starting random generator
+	srand48(time(NULL));
+
+	// initializing a number of particles
+	for(i = 0; i < numParts / (m * n); i++){
+		particles.push_back(Particle());
+		particles[i].x = drand48() * L + thisIndex.x * L;
+    particles[i].y = drand48() * L + thisIndex.y * L;
+	}	
+
+	/* Particle initialization */
+
   forceCount = 0;
   stepCount = 0;
 }
@@ -176,7 +211,7 @@ Cell::Cell() {
 // NOTE: This constructor does not need to appear in the ".ci" file
 Cell::Cell(CkMigrateMessage *msg) { }                                         
 Cell::~Cell() {
-  /* FIXME */ // Deallocate Atom lists
+  /* FIXME */ // Deallocate particle lists
 }
 
 
@@ -192,45 +227,45 @@ void Cell::start() {
   #endif
   
   // self interaction
-  interactionArray( x, y, x, y).interact( x, y);
+  interactionArray( x, y, x, y).interact(particles, x, y);
 
   // interaction with (x-1, y-1)
   (x == 0) ? ( i=x, k=(x-1+m)%m, j=y, l=(y-1+n)%n ) : (i=x-1, k=x, j=(y-1+n)%n, l=y);
-  interactionArray( i, j, k, l ).interact( x, y);
+  interactionArray( i, j, k, l ).interact(particles, x, y);
 
   // interaction with (x-1, y)
   (x == 0) ? (i=x, k=(x-1+m)%m) : (i=x-1, k=x);
-  interactionArray( i, y, k, y).interact( x, y);
+  interactionArray( i, y, k, y).interact(particles, x, y);
 
   // interaction with (x-1, y+1)
   (x == 0) ? ( i=x, k=(x-1+m)%m, j=y, l=(y+1)%n ) : (i=x-1, k=x, j=(y+1)%n, l=y);
-  interactionArray( i, j, k, l ).interact( x, y);
+  interactionArray( i, j, k, l ).interact(particles, x, y);
 
 
   // interaction with (x, y-1)
   (y == 0) ? (j=y, l=(y-1+n)%n) : (j=(y-1+n)%n, l=y);
-  interactionArray( x, j, x, l ).interact( x, y);
+  interactionArray( x, j, x, l ).interact(particles, x, y);
 
   // interaction with (x, y+1)
-  (y == n-1) ? (j=(y+1)%n, l=y) : (j=y, l=y+1);
-  interactionArray( x, j, x, l ).interact( x, y);
+  (y == n-1) ? (j=(y+1)%n, l=y) : (j=y, l=y+1);// compute
+  interactionArray( x, j, x, l ).interact(particles, x, y);
 
 
   // interaction with (x+1, y-1)
   (x == m-1) ? ( i=(x+1)%m, k=x, j=(y-1+n)%n, l=y ) : (i=x, k=x+1, j=y, l=(y-1+n)%n );
-  interactionArray( i, j, k, l ).interact( x, y);
+  interactionArray( i, j, k, l ).interact(particles, x, y);
 
   // interaction with (x+1, y)
   (x == m-1) ? (i=(x+1)%m, k=x) : (i=x, k=x+1);
-  interactionArray( i, y, k, y).interact( x, y);
+  interactionArray( i, y, k, y).interact(particles, x, y);
 
   // interaction with (x+1, y+1)
   (x == m-1) ? ( i=(x+1)%m, k=x, j=(y+1)%n, l=y ) : (i=x, k=x+1, j=y, l=(y+1)%n );
-  interactionArray( i, j, k, l ).interact( x, y);
+  interactionArray( i, j, k, l ).interact(particles, x, y);
 
 }
 
-void Cell::force() {
+void Cell::force(CkVec<Particle> particles) {
   forceCount++;
   if( forceCount >= 9) {
     
@@ -254,6 +289,22 @@ void Cell::force() {
     
 }
 
+// Function that receives a set of particles and updates the forces of them into the local set
+void Cell::updateParticles(CkVec<Particle> updates) {
+	updateCount++;
+
+	//CHECKincomingParts.append(updates);
+
+	if(updateCount >= 8 ) {
+	
+		
+		
+		updateCount = 0;
+	}
+
+}
+
+// Default constructor
 Interaction::Interaction() {
   cellCount = 0;
 
@@ -265,30 +316,71 @@ Interaction::Interaction() {
 Interaction::Interaction(CkMigrateMessage *msg) { }
   
 
-void Interaction::interact( int x, int y ) {
+// Function to receive vector of particles
+void Interaction::interact(CkVec<Particle> particles, int x, int y ) {
 
   if(cellCount == 0) {
-    bufferedX = x;
-    bufferedY = y;
 
     // self interaction check
     if( thisIndex.x == thisIndex.z && thisIndex.y == thisIndex.w ) {
       CkPrintf("SELF: ( %d , %d )\n", thisIndex.x, thisIndex.y );
       cellCount = 0;
-      cellArray( x, y).force();
-    }
+			interact(particles,particles);
+      cellArray( x, y).force(particles);
+    } else {
+			 bufferedX = x;
+    	 bufferedY = y;
+			 bufferedParticles = particles;
+		}
+
   }
 
   cellCount++;
 
-  if( cellCount >= 2) {
+	// if both particle sets are received, compute interaction
+  if(cellCount >= 2) {
 
     CkPrintf("PAIR:( %d , %d )  ( %d , %d ) \n", bufferedX, bufferedY, x, y );
     cellCount = 0;
-    cellArray( bufferedX, bufferedY).force();
-    cellArray( x, y).force();
+
+		interact(bufferedParticles,particles);
+
+    cellArray(bufferedX, bufferedY).force(bufferedParticles);
+    cellArray(x, y).force(particles);
 
   }
+}
+
+// Function to compute all the interactions between pairs of particles in two sets
+void Interaction::interact(CkVec<Particle> &first, CkVec<Particle> &second){
+	int i, j;
+	for(i = 0; i < first.length(); i++)
+		for(j = 0; j < second.length(); j++)
+			interact(first[i], second[j]);
+}
+
+// Function for computing interaction among two particles
+// There is an extra test for interaction of identical particles, in which case there is no effect
+void Interaction::interact(Particle &first, Particle &second){
+	float rx,ry,rz,r,fx,fy,fz,f;
+
+	// computing base values
+	rx = first.x - second.x;
+	ry = first.y - second.y;
+	r = sqrt(rx*rx + ry*ry);
+
+	if(r == 0.0 || r >= DEFAULT_RADIUS)
+		return;
+
+	f = A / pow(r,12) - B / pow(r,6);
+	fx = f * rx / r;
+	fy = f * ry / r;
+
+	// updating particle properties
+	second.fx += fx;
+	second.fy += fy;
+	first.fx += -fx;
+	first.fy += -fy;
 
 }
 
