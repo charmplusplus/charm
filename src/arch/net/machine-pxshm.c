@@ -443,7 +443,10 @@ void tearDownSharedBuffers(){
 	int i;
 	for(i= 0;i<pxshmContext->nodesize;i++){
 		if(i != pxshmContext->noderank){
-			shm_unlink(pxshmContext->recvBufNames[i]);
+			if(	shm_unlink(pxshmContext->recvBufNames[i]) < 0){
+				fprintf(stderr,"Error from shm_unlink %s \n",strerror(errno));
+			}
+
 			sem_close(pxshmContext->recvBufs[i].mutex);
 			sem_unlink(pxshmContext->recvBufNames[i]);
 
