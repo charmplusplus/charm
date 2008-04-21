@@ -1,38 +1,31 @@
-module cell {
-
-  array [2D] Cell {
-    entry Cell();
-    entry start();
-    entry forces(CkVec<CkArrayIndex1D> particles);
-  };
-
-};
-
-module interaction {
-
-  array [4D] Interaction {
-    entry Interaction(int i, int j, int k, int l);
-    entry interact(CkVec<CkArrayIndex1D> particles, int i, int j);
-  };
-
-};
-
-
 mainmodule main {
 
-	readonly CProxy_Main mainProxy;
-	readonly int particles;					// total number of particles
-	readonly int n;						// total number of rows in the grid
-	readonly int m;						// total number of columns in the grid
-	readonly double radius;					// maximum distance between two interacting particles
+	readonly CProxy_Main mainProxy;  
+  readonly CProxy_Cell cellArray;
+  readonly CProxy_Interaction interactionArray;
 
-	module cell;
-	module interaction;
+	readonly int particles;					// total number of particles
+	readonly int m;						// total number of rows in the grid
+	readonly int n;						// total number of columns in the grid
+	readonly double radius;					// maximum distance between two interacting particles
+  readonly int finalStepCount; // number of steps at which the cells should stop computation
 
 	mainchare Main {
 		entry Main(CkArgMsg* msg);
 	  // entry void stepDone(CkReductionMsg *m);
 		entry void done();
 	};
+
+  array [2D] Cell {
+    entry Cell();
+    entry void start();
+    entry void force( /*CkVec<CkArrayIndex1D> particles*/ );
+  };
+
+  array [4D] Interaction {
+    entry Interaction();
+    //entry Interaction(int i, int j, int k, int l);
+    entry void interact( /*CkVec<CkArrayIndex1D> particles,*/ int i, int j);
+  };
 
 };
