@@ -6,7 +6,7 @@
 #define DEFAULT_N 3
 #define DEFAULT_M 3
 #define DEFAULT_RADIUS 10
-#define DEFAULT_FINALSTEPCOUNT 1
+#define DEFAULT_FINALSTEPCOUNT 2
 
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ CProxy_Cell cellArray; /* CHECKME */
@@ -164,6 +164,12 @@ Main::Main(CkMigrateMessage* msg) { }
 void Main::done() {
   doneCount ++;
   if( doneCount >= m*n) {
+
+    #ifdef DEBUG
+      if(doneCount > m*n)
+        CkPrintf("ERROR: DONE COUNT\n");
+    #endif
+
     CkExit();
   }
 }
@@ -243,14 +249,17 @@ void Cell::force() {
     // Methods to migrate atoms.
 
     #ifdef DEBUG
-    if( forceCount > 9 )
-      CkPrintf("ERROR\n");
+      if( forceCount > 9 )
+        CkPrintf("FORCE COUNT ERROR\n");
+    #endif
+    
+    forceCount = 0;
+      
+    #ifdef DEBUG
+      CkPrintf("STEP: %d DONE:( %d , %d )\n", stepCount, thisIndex.x, thisIndex.y);
     #endif
 
     if(stepCount >= finalStepCount) {
-      #ifdef DEBUG
-        CkPrintf("STEP: %d DONE:( %d , %d )\n", stepCount, thisIndex.x, thisIndex.y);
-      #endif
       mainProxy.done();
     } else {
       thisProxy( thisIndex.x, thisIndex.y ).start();
@@ -279,6 +288,7 @@ void Interaction::interact( int x, int y ) {
     // self interaction check
     if( thisIndex.x == thisIndex.z && thisIndex.y == thisIndex.w ) {
       CkPrintf("SELF: ( %d , %d )\n", thisIndex.x, thisIndex.y );
+      cellCount = 0;
       cellArray( x, y).force();
     }
   }
@@ -286,7 +296,13 @@ void Interaction::interact( int x, int y ) {
   cellCount++;
 
   if( cellCount >= 2) {
+    #ifdef DEBUG
+      if( cellCount > 2)      
+        CkPrintf("Cell Count Error");
+    #endif
+
     CkPrintf("PAIR:( %d , %d )  ( %d , %d ) \n", bufferedX, bufferedY, x, y );
+    cellCount = 0;
     cellArray( bufferedX, bufferedY).force();
     cellArray( x, y).force();
   }
