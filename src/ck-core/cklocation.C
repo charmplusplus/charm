@@ -173,18 +173,20 @@ int CkArrayMap::registerArray(CkArrayIndexMax& numElements,CkArrayID aid)
               if (numElements.nInts == 2) { \
                 /* Make 2D indices */ \
                 i = i1 * numElements.data()[1] + i2; \
-                CkArrayIndex2D idx(i1, i2); \
+                CkArrayIndex2D real_idx(i1, i2); \
+                CkArrayIndex1D idx(i); \
                 if (POPULATE_CONDITION) \
-                  mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
+                  mgr->insertInitial(real_idx,CkCopyMsg(&ctorMsg)); \
               } else { \
                 /* higher dimensionality */ \
                 CkAssert(numElements.nInts == 3); \
                 for (int i3=0; i3<numElements.data()[2]; i3++) { \
                   /* Make 3D indices */ \
                   i = (i1 * numElements.data()[1] + i2) * numElements.data()[2] + i3; \
-                  CkArrayIndex3D idx(i1, i2, i3 ); \
+                  CkArrayIndex3D real_idx(i1, i2, i3 ); \
+                  CkArrayIndex1D idx(i); \
                   if (POPULATE_CONDITION) \
-                    mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
+                    mgr->insertInitial(real_idx,CkCopyMsg(&ctorMsg)); \
                 } \
               } \
             } \
