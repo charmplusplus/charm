@@ -537,11 +537,11 @@ void CmiAbort(const char *message)
   if (already_aborting) machine_exit(1);
   already_aborting=1;
 	{
-	 char str[100];
+/*	 char str[100];
 	 sprintf(str,"dead.%d",CmiMyNode());
 	 FILE *fp = fopen(str,"w");
 	 fprintf(fp,"%s",message);
-         fclose(fp);
+         fclose(fp);*/
 	}
   MACHSTATE1(5,"CmiAbort(%s)",message);
   
