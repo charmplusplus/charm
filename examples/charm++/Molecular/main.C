@@ -3,8 +3,8 @@
 #define DEBUG 1
 
 #define DEFAULT_PARTICLES 1000
+#define DEFAULT_M 4
 #define DEFAULT_N 3
-#define DEFAULT_M 3
 #define DEFAULT_RADIUS 10
 #define DEFAULT_FINALSTEPCOUNT 2
 
@@ -13,13 +13,12 @@
 /* readonly */ CProxy_Interaction interactionArray; /* CHECKME */
 
 /* readonly */ int particles;
-/* readonly */ int m;
-/* readonly */ int n;
+/* readonly */ int m; // Number of Chare Rows
+/* readonly */ int n; // Number of Chare Columns
 /* readonly */ double radius;
 /* readonly */ int finalStepCount; 
 
-/* FIXME */
-/*
+/* FIXME
 struct Particle {
   double x,y,z; // coordinates
 };*/
@@ -45,7 +44,7 @@ class Interaction : public CBase_Interaction {
     // VARIABLES FOR FOCES COMPUTATION /* FIXME */
     int cellCount;  // to count the number of interact() calls
     
-    /* FIXME */
+    /* FIXME To Include the Vector of atom particles */
     int bufferedX;
     int bufferedY;
 
@@ -61,9 +60,7 @@ class Interaction : public CBase_Interaction {
 class Main : public CBase_Main {
 
   private:
-    int checkinCount;
-    
-    int doneCount; // Count to terminate
+    int checkInCount; // Count to terminate
 
     #ifdef DEBUG
       int interactionCount;
@@ -75,7 +72,7 @@ class Main : public CBase_Main {
     Main(CkArgMsg* msg);
     Main(CkMigrateMessage* msg);
 
-    void done();
+    void checkIn();
 };
 
 // Entry point of Charm++ application
@@ -88,7 +85,7 @@ Main::Main(CkArgMsg* msg) {
   finalStepCount = DEFAULT_FINALSTEPCOUNT;
 
   delete msg;
-  doneCount = 0;
+  checkInCount = 0;
 
   #ifdef DEBUG
     interactionCount=0;
@@ -104,7 +101,7 @@ Main::Main(CkArgMsg* msg) {
   for (int x = 0; x < m ; x++ ) {
     for (int y = 0; y < n; y++ ) {
 
-      //Processor Round Robin needed
+      //Processor Round Robin needed /* FIXME */
  
       #ifdef DEBUG
         CkPrintf("INITIAL:( %d, %d) ( %d , %d )\n", x,y,x,y);
@@ -150,6 +147,7 @@ Main::Main(CkArgMsg* msg) {
   }
 
   interactionArray.doneInserting();
+
   #ifdef DEBUG
     CkPrintf("Interaction Count: %d\n", interactionCount);
   #endif
@@ -157,21 +155,15 @@ Main::Main(CkArgMsg* msg) {
   cellArray.start();
 }
 
-// Constructor needed for chare object migration (ignore for now)
-// NOTE: This constructor does not need to appear in the ".ci" file
+// Constructor needed for chare object migration
 Main::Main(CkMigrateMessage* msg) { }
 
-void Main::done() {
-  doneCount ++;
-  if( doneCount >= m*n) {
+void Main::checkIn() {
 
-    #ifdef DEBUG
-      if(doneCount > m*n)
-        CkPrintf("ERROR: DONE COUNT\n");
-    #endif
-
+  checkInCount ++;
+  if( checkInCount >= m*n)
     CkExit();
-  }
+
 }
 
 
@@ -184,8 +176,7 @@ Cell::Cell() {
 // NOTE: This constructor does not need to appear in the ".ci" file
 Cell::Cell(CkMigrateMessage *msg) { }                                         
 Cell::~Cell() {
-  /* FIXME */
-  // Deallocate Atom lists
+  /* FIXME */ // Deallocate Atom lists
 }
 
 
@@ -242,25 +233,20 @@ void Cell::start() {
 void Cell::force() {
   forceCount++;
   if( forceCount >= 9) {
+    
     // Received all it's forces from the interactions.
+    
     stepCount++;
-    
-    /* FIX ME*/
-    // Methods to migrate atoms.
-
-    #ifdef DEBUG
-      if( forceCount > 9 )
-        CkPrintf("FORCE COUNT ERROR\n");
-    #endif
-    
     forceCount = 0;
+    
+    /* FIX ME*/ // Methods to migrate atoms.
       
     #ifdef DEBUG
       CkPrintf("STEP: %d DONE:( %d , %d )\n", stepCount, thisIndex.x, thisIndex.y);
     #endif
 
     if(stepCount >= finalStepCount) {
-      mainProxy.done();
+      mainProxy.checkIn();
     } else {
       thisProxy( thisIndex.x, thisIndex.y ).start();
     }
@@ -296,15 +282,12 @@ void Interaction::interact( int x, int y ) {
   cellCount++;
 
   if( cellCount >= 2) {
-    #ifdef DEBUG
-      if( cellCount > 2)      
-        CkPrintf("Cell Count Error");
-    #endif
 
     CkPrintf("PAIR:( %d , %d )  ( %d , %d ) \n", bufferedX, bufferedY, x, y );
     cellCount = 0;
     cellArray( bufferedX, bufferedY).force();
     cellArray( x, y).force();
+
   }
 
 }

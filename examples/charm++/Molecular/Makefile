@@ -7,15 +7,13 @@ all: molecular
 
 
 molecular : main.o
-  $(CHARMC) -language charm++ -o molecular main.o
+	$(CHARMC)	-language	charm++	-g -o molecular main.o
 
-main.o : main.C main.decl.h main.def.h
-  $(CHARMC) -o main.o main.C
+main.o : main.C	main.decl.h	main.def.h
+	$(CHARMC) -g -o main.o main.C
 
 main.decl.h main.def.h : main.ci
 	$(CHARMC) main.ci
 
-
 clean:
-  rm -f main.decl.h main.def.h main.o molecular charmrun
-
+	rm -f main.decl.h main.def.h main.o hello charmrun
