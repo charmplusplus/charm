@@ -10,6 +10,7 @@
 #include "time.h"
 
 #define DEFAULT_MASS 1
+#define DEFAULT_DELTA 0.1
 
 // Class for keeping track of the properties for a particle
 class Particle{
