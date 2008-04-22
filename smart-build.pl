@@ -87,21 +87,34 @@ if($cpu =~ m/i[0-9]86/){
 
 
 
-# Determine converse architecture (net, mpi, ...)
-print "Do you want to specify a multi-core version that runs only on a single multi-core node? [y/N]";
-$multicore = promptUserYN();
-
-if($multicore eq "true"){
-    $converse_network_type = "multicore";
-}
-else {
-
-$skip_choosing = "false";
-
 # default to net
 $converse_network_type = "net";
 
 
+print << "EOF";
+How do you want to handle SMP/Multicore: [1-4]
+         1) single-threaded [default]
+         2) multicore(single node only)
+         3) SMP
+         4) POSIX Shared Memory
+
+EOF
+
+while($line = <>){
+	chomp $line;
+	if($line eq "1" || $line eq ""){
+	    last;
+	} elsif($line eq "2"){
+	    $converse_network_type = "multicore";
+	    last;
+	} elsif($line eq "3"){
+	    $options = "$options smp ";
+	    last;
+	} elsif($line eq "4"){
+	    $options = "$options pxshm ";
+	    last;
+	}
+}
 
 # check for MPI
 
@@ -119,9 +132,9 @@ if($m == 0){
 
 # Give option of just using the mpi version if mpicc and mpiCC are found
 if($mpi_found eq "true"){
-  print "\nI found that you have an mpicc available in your path.\nDo you want to build Charm++ on this MPI? [Y/n]: ";
+  print "\nI found that you have an mpicc available in your path.\nDo you want to build Charm++ on this MPI? [y/N]: ";
   $p = promptUserYN();
-  if($p eq "yes" || $p eq "default"){
+  if($p eq "yes"){
 	$converse_network_type = "mpi";
 	$skip_choosing = "true";
 	$options = "$options $mpioption";
@@ -204,7 +217,7 @@ EOF
 
 # construct an $arch string if we did not explicitly set one above
 if($arch eq ""){
-	  $arch = "${converse_network_type}-${arch_os}";
+  $arch = "${converse_network_type}-${arch_os}";
 	  if($amd64) {
 		$arch = $arch . "-amd64";
 	  } elsif($ia64){
@@ -218,6 +231,8 @@ if($arch eq ""){
   
 # Fixup $arch to match the inconsistent directories in src/archs
 
+print "arch=\"$arch\"\n";
+
 if($arch eq "net-darwin"){
 	$arch = "net-darwin-x86";
 } elsif($arch eq "net-darwin-ppc"){
@@ -228,15 +243,6 @@ if($arch eq "net-darwin"){
 
 
 
-# Determine whether to support SMP / Multicore
-print "\nDo you want SMP support? [y/N]";
-$p = promptUserYN();
-if($p eq "yes" ){
-  $options = "$options smp ";
-}
-
-
-}  # end of if multicore
 
 
 #================ Choose Compiler =================================
@@ -396,7 +402,7 @@ while($line = <>){
 		$compiler_flags = "-g -O0";
 		last;
 	} elsif($line eq "4" || $line eq ""){
-		$compiler_flags = "-O2 -DCMK_OPTIMIZE";
+ 		$compiler_flags = "-O2 -DCMK_OPTIMIZE";
 		last;
 	} elsif($line eq "3"){ 
                 $compiler_flags = "-O2"; 
