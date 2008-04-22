@@ -43,7 +43,7 @@ charmdebug_python.decl.h charmdebug_python.def.h: charmdebug-python.ci
 
 pythonIncludes.h:
 	(CHARMINC=../../../../include;. $$CHARMINC/conv-config.sh; \
-	echo "#include \"python$$CMK_BUILD_PYTHON/Python.h\"\n"\
+	echo -e "#include \"python$$CMK_BUILD_PYTHON/Python.h\"\n"\
 	"#include \"python$$CMK_BUILD_PYTHON/compile.h\"\n"\
 	"#include \"python$$CMK_BUILD_PYTHON/eval.h\"\n"\
 	"#include \"python$$CMK_BUILD_PYTHON/node.h\"" > pythonIncludes.h \
