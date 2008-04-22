@@ -19,7 +19,7 @@ mainmodule main {
   array [2D] Cell {
     entry Cell();
     entry void start();
-    entry void force(CkVec<Particle> particles);
+    entry void updateForces(CkVec<Particle> particles);
 		entry void updateParticles(CkVec<Particle> updates);
   };
 

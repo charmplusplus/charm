@@ -22,8 +22,8 @@
 #define DEFAULT_FINALSTEPCOUNT 2
 
 /* readonly */ CProxy_Main mainProxy;
-/* readonly */ CProxy_Cell cellArray; /* CHECKME */
-/* readonly */ CProxy_Interaction interactionArray; /* CHECKME */
+/* readonly */ CProxy_Cell cellArray;
+/* readonly */ CProxy_Interaction interactionArray;
 
 /* readonly */ int numParts;
 /* readonly */ int m; // Number of Chare Rows
@@ -36,7 +36,7 @@
 class Cell : public CBase_Cell {
   private:
     CkVec<Particle> particles;
-		CkVec<Particle> incomingParts;
+		CkVec<Particle> incomingParticles;
     int forceCount; 																	// to count the returns from interactions
     int stepCount;  																	// to count the number of steps, and decide when to stop
 		int updateCount;
@@ -47,8 +47,8 @@ class Cell : public CBase_Cell {
     ~Cell();
 
     void start();
-    void updateParticles(CkVec<Particle> updates);
-    void force(CkVec<Particle> particles);
+    void updateParticles(CkVec<Particle>&);
+    void updateForces(CkVec<Particle>&);
     void stepDone();
 };
 
@@ -193,7 +193,8 @@ Cell::Cell() {
 
 	// starting random generator
 	srand48(time(NULL));
-
+  
+	/* Particle initialization */
 	// initializing a number of particles
 	for(i = 0; i < numParts / (m * n); i++){
 		particles.push_back(Particle());
@@ -201,14 +202,11 @@ Cell::Cell() {
     particles[i].y = drand48() * L + thisIndex.y * L;
 	}	
 
-	/* Particle initialization */
-
   forceCount = 0;
   stepCount = 0;
 }
 
 // Constructor needed for chare object migration (ignore for now)
-// NOTE: This constructor does not need to appear in the ".ci" file
 Cell::Cell(CkMigrateMessage *msg) { }                                         
 Cell::~Cell() {
   /* FIXME */ // Deallocate particle lists
@@ -265,16 +263,16 @@ void Cell::start() {
 
 }
 
-void Cell::force(CkVec<Particle> particles) {
+void Cell::updateForces(CkVec<Particle> &particles) {
   forceCount++;
   if( forceCount >= 9) {
     
     // Received all it's forces from the interactions.
-    
     stepCount++;
     forceCount = 0;
     
-    /* FIX ME*/ // Methods to migrate atoms.
+    /* FIX ME*/ // Update forces on own particles and determine which of them are being displaced to neighbors
+    /* FIX ME*/ // Calls to updateParticles on neighbours.
       
     #ifdef DEBUG
       CkPrintf("STEP: %d DONE:( %d , %d )\n", stepCount, thisIndex.x, thisIndex.y);
@@ -290,16 +288,27 @@ void Cell::force(CkVec<Particle> particles) {
 }
 
 // Function that receives a set of particles and updates the forces of them into the local set
-void Cell::updateParticles(CkVec<Particle> updates) {
-	updateCount++;
+void Cell::updateParticles(CkVec<Particle> &updates) {
 
-	//CHECKincomingParts.append(updates);
+  updateCount++;
+
+  for( int i=0; i < updates.length(); i++) {
+    incomingParticles.push_back(updates[i]);
+  }
+
+
+  
+	//CHECKincomingParticles.append(updates);
+
+  
 
 	if(updateCount >= 8 ) {
+		
+		/* FIXME Synchronisation?? */
 	
-		
-		
-		updateCount = 0;
+  
+    updateCount = 0;
+    /* FIXME Empty incomingParticles vector after appending it with particles */
 	}
 
 }
@@ -326,11 +335,11 @@ void Interaction::interact(CkVec<Particle> particles, int x, int y ) {
       CkPrintf("SELF: ( %d , %d )\n", thisIndex.x, thisIndex.y );
       cellCount = 0;
 			interact(particles,particles);
-      cellArray( x, y).force(particles);
+      cellArray( x, y).updateForces(particles);
     } else {
 			 bufferedX = x;
     	 bufferedY = y;
-			 bufferedParticles = particles;
+			 bufferedParticles = particles; /* CHECKME */
 		}
 
   }
@@ -345,8 +354,8 @@ void Interaction::interact(CkVec<Particle> particles, int x, int y ) {
 
 		interact(bufferedParticles,particles);
 
-    cellArray(bufferedX, bufferedY).force(bufferedParticles);
-    cellArray(x, y).force(particles);
+    cellArray(bufferedX, bufferedY).updateForces(bufferedParticles);
+    cellArray(x, y).updateForces(particles);
 
   }
 }
