@@ -231,8 +231,6 @@ if($arch eq ""){
   
 # Fixup $arch to match the inconsistent directories in src/archs
 
-print "arch=\"$arch\"\n";
-
 if($arch eq "net-darwin"){
 	$arch = "net-darwin-x86";
 } elsif($arch eq "net-darwin-ppc"){
