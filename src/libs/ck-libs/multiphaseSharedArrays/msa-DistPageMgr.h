@@ -8,6 +8,7 @@
 #include <list>
 #include <stack>
 #include <map>
+#include <set>
 #include "msa-common.h"
 
 // forward decl needed in msa-DistPageMgr.ci, i.e. in msa.decl.h
@@ -476,6 +477,7 @@ protected:
     unsigned int enrollDoneq;                 // has enroll() been done on this processor?
     MSA_Listeners enrollWaiters;
     MSA_Listeners syncWaiters;
+    std::set<int> enrolledPEs;				// which PEs are involved?
 
     unsigned int nPages;            ///< number of pages
     ENTRY_TYPE** pageTable;          ///< the page table for this PE: stores actual data.
@@ -946,7 +948,7 @@ public:
         // @@ how to ensure that enroll is called only once?
 
         //ckout << "[" << CkMyPe() << "] sending sync ack to PE 0" << endl;
-        thisProxy[0].enrollAck();
+        thisProxy[0].enrollAck(CkMyPe());
         //ckout << "[" << CkMyPe() << "] suspening thread in Sync() " << endl;
         addAndSuspend(enrollWaiters);
         //ckout << "[" << CkMyPe() << "] rsuming thread in Sync()" << endl;
@@ -956,12 +958,13 @@ public:
     }
 
     /// Enroll phase 2: called on PE 0 from everywhere
-    inline void enrollAck()
+    inline void enrollAck(int originator)
     {
         CkAssert(CkMyPe() == 0);  // enrollAck is only called on PE 0
         CkAssert(enrollDoneq == 0);  // prevent multiple enroll operations
-
+        
         syncAckCount++;
+        enrolledPEs.insert(originator);
         //ckout << "[" << CkMyPe() << "] SyncAckcount = " << syncAckCount << endl;
         if(syncAckCount == numberOfWorkerThreads) {
 //             ckout << "[" << CkMyPe() << "]" << "Enroll operation is almost done" << endl;
@@ -1062,10 +1065,11 @@ public:
         //ckout << "[" << CkMyPe() << "] SyncAckcount = " << syncAckCount << endl;
         // DONE @@ what if fewer worker threads than pe's ?
         // @@ what if fewer worker threads than pe's and >1 threads on 1 pe?
-        if(syncAckCount == mymin(numberOfWorkerThreads, CkNumPes())){
-						MSADEBPRINT(printf("SyncAck starting reduction on pageArray of size %d number of pages %d\n",nEntries,nPages););
-            pageArray.Sync();					
-				}		
+        //if(syncAckCount == mymin(numberOfWorkerThreads, CkNumPes())){
+		if (syncAckCount == enrolledPEs.size()) {
+			MSADEBPRINT(printf("SyncAck starting reduction on pageArray of size %d number of pages %d\n",nEntries,nPages););
+			pageArray.Sync();
+		}		
     }
 
     inline void SyncDone()
