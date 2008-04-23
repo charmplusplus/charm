@@ -1467,9 +1467,10 @@ void CmiMachineProgressImpl()
 #endif
 
 /* Dummy implementation */
-extern "C" void CmiBarrier()
+extern "C" int CmiBarrier()
 {
   BGTsC_Barrier(0);
   //BGTr_Barrier(1);
+  return 0;
 }
 

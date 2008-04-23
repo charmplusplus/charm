@@ -270,15 +270,16 @@ double CmiCpuTimer(void)
 
 #endif
 
-void CmiBarrier()
+int CmiBarrier()
 {
   if (CmiMyRank() == 0)
     if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
         CmiAbort("Timernit: MPI_Barrier failed!\n");
+  return 0;
 }
 
 /* CmiBarrierZero make sure node 0 is the last one exiting the barrier */
-void CmiBarrierZero()
+int CmiBarrierZero()
 {
   int i;
   if (CmiMyRank() == 0) {
@@ -296,6 +297,7 @@ void CmiBarrierZero()
     }
   }
   CmiNodeAllBarrier();
+  return 0;
 }
 
 typedef struct ProcState {
