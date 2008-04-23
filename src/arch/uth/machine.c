@@ -249,6 +249,15 @@ char * msg;
 }
 
 
+int CmiBarrier()
+{
+  return -1;
+}
+
+int CmiBarrierZero()
+{
+  return -1;
+}
 
 /************************** SETUP ***********************************/
 
