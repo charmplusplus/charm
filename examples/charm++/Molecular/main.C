@@ -14,12 +14,12 @@
 #define A 2.0
 #define B 1.0
 
-#define DEFAULT_PARTICLES 350
-#define DEFAULT_M 5
-#define DEFAULT_N 7
+#define DEFAULT_PARTICLES 500
+#define DEFAULT_M 3
+#define DEFAULT_N 3
 #define DEFAULT_L 10
 #define DEFAULT_RADIUS 10
-#define DEFAULT_FINALSTEPCOUNT 2
+#define DEFAULT_FINALSTEPCOUNT 5
 
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ CProxy_Cell cellArray;
@@ -139,7 +139,7 @@ Main::Main(CkArgMsg* msg) {
       interactionArray( x, y, x, y ).insert( /* processor number */0 );
 
       // (x,y) and (x+1,y) pair
-      (x == m-1) ? (i=(x+1)%m, k=x) : (i=x, k=x+1);
+      (x == m-1) ? (i=0, k=x) : (i=x, k=x+1);
       #ifdef DEBUG
         //CkPrintf("INITIAL:( %d, %d) ( %d , %d )\n", i,y,k,y);
         interactionCount++;
@@ -147,24 +147,22 @@ Main::Main(CkArgMsg* msg) {
       interactionArray( i, y, k, y ).insert( /* processor number */0 );
 
       // (x,y) and (x,y+1) pair
-      (y == n-1) ? (j=(y+1)%n, l=y) : (j=y, l=y+1);
+      (y == n-1) ? (j=0, l=y) : (j=y, l=y+1);
       #ifdef DEBUG
         //CkPrintf("INITIAL:( %d, %d) ( %d , %d )\n", x,j,x,l);
         interactionCount++;
       #endif
-
-			
       interactionArray( x, j, x, l ).insert( /* processor number */0 );
 
-      // (x,y) and (x+1,y+1) pair, Irrespective of y /* UNDERSTAND */
-      (x == m-1) ? ( i=(x+1)%m, k=x, j=(y+1)%n, l=y ) : (i=x, k=x+1, j=y, l=(y+1)%n );
+      // (x,y) and (x+1,y+1) pair, Irrespective of y
+      (x == m-1) ? ( i=0, k=x, j=(y+1)%n, l=y ) : (i=x, k=x+1, j=y, l=(y+1)%n );
       #ifdef DEBUG
         //CkPrintf("INITIAL:( %d, %d) ( %d , %d )\n", i,j,k,l);
         interactionCount++;
       #endif
       interactionArray( i, j, k, l ).insert( /* processor number */0 );
 
-      // (x,y) and (x-1,y+1) pair /* UNDERSTAND */
+      // (x,y) and (x-1,y+1) pair
       (x == 0) ? ( i=x, k=(x-1+m)%m, j=y, l=(y+1)%n ) : (i=x-1, k=x, j=(y+1)%n, l=y );
       #ifdef DEBUG
         //CkPrintf("INITIAL:( %d, %d) ( %d , %d )\n", i,j,k,l);
@@ -210,10 +208,12 @@ Cell::Cell() {
     particles[i].y = drand48() * L + thisIndex.y * L;
 	}	
 
+  updateCount = 0;
   forceCount = 0;
   stepCount = 0;
 	updateFlag = false;
 	incomingFlag = false;
+  incomingParticles.resize(0);
 
 }
 
@@ -231,6 +231,9 @@ void Cell::start() {
 
   int i, j, k, l;
 
+  #ifdef DEBUG
+    //print();
+  #endif
   #ifdef DEBUG
     //CkPrintf("START:( %d, %d) ( %d , %d )\n", x,y,x,y);
   #endif
@@ -252,7 +255,7 @@ void Cell::start() {
 
 
   // interaction with (x, y-1)
-  (y == 0) ? (j=y, l=(y-1+n)%n) : (j=(y-1+n)%n, l=y);
+  (y == 0) ? (j=y, l=(y-1+n)%n) : (j=y-1, l=y);
   interactionArray( x, j, x, l ).interact(particles, x, y);
 
   // interaction with (x, y+1)
@@ -261,15 +264,15 @@ void Cell::start() {
 
 
   // interaction with (x+1, y-1)
-  (x == m-1) ? ( i=(x+1)%m, k=x, j=(y-1+n)%n, l=y ) : (i=x, k=x+1, j=y, l=(y-1+n)%n );
+  (x == m-1) ? ( i=0, k=x, j=(y-1+n)%n, l=y ) : (i=x, k=x+1, j=y, l=(y-1+n)%n );
   interactionArray( i, j, k, l ).interact(particles, x, y);
 
   // interaction with (x+1, y)
-  (x == m-1) ? (i=(x+1)%m, k=x) : (i=x, k=x+1);
+  (x == m-1) ? (i=0, k=x) : (i=x, k=x+1);
   interactionArray( i, y, k, y).interact(particles, x, y);
 
   // interaction with (x+1, y+1)
-  (x == m-1) ? ( i=(x+1)%m, k=x, j=(y+1)%n, l=y ) : (i=x, k=x+1, j=y, l=(y+1)%n );
+  (x == m-1) ? ( i=0, k=x, j=(y+1)%n, l=y ) : (i=x, k=x+1, j=y, l=(y+1)%n );
   interactionArray( i, j, k, l ).interact(particles, x, y);
 
 }
@@ -291,19 +294,19 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 	// if all forces are received, then it must recompute particles location
   if( forceCount >= 9) {
     
-		CkPrintf("Forces done!\n");
+		CkPrintf("Cell: %d %d Forces done!\n",thisIndex.x, thisIndex.y);
 
     // Received all it's forces from the interactions.
-    stepCount++;
+    //stepCount++; /* CHECKME */
     forceCount = 0;
     
     // Update properties on own particles
 		updateProperties();
-		updateFlag = true;
 
 		// Sending particles to neighboring cells
 		x = thisIndex.x;
 		y = thisIndex.y;
+
 		// particles sent to (x-1,y-1)		
 		outgoing.removeAll();
 		i = 0;
@@ -320,7 +323,7 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 		outgoing.removeAll();
 		i = 0;
 		while(i < particles.length()){
-			if(particles[i].x < x*L && particles[i].y <= y*(L+1)){
+			if(particles[i].x < x*L && particles[i].y <= (y+1)*L){
 				outgoing.push_back(wrapAround(particles[i]));
 				particles.remove(i);
 			}else
@@ -332,7 +335,7 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 		outgoing.removeAll();
 		i = 0;
 		while(i < particles.length()){
-			if(particles[i].x < x*L && particles[i].y > y*(L+1)){
+			if(particles[i].x < x*L && particles[i].y > (y+1)*L){
 				outgoing.push_back(wrapAround(particles[i]));
 				particles.remove(i);
 			}else
@@ -344,7 +347,7 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 		outgoing.removeAll();
 		i = 0;
 		while(i < particles.length()){
-			if(particles[i].x > x*(L+1) && particles[i].y < y*L){
+			if(particles[i].x > (x+1)*L && particles[i].y < y*L){
 				outgoing.push_back(wrapAround(particles[i]));
 				particles.remove(i);
 			}else
@@ -356,7 +359,7 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 		outgoing.removeAll();
 		i = 0;
 		while(i < particles.length()){
-			if(particles[i].x > x*(L+1) && particles[i].y <= y*(L+1)){
+			if(particles[i].x > (x+1)*L && particles[i].y <= (y+1)*L){
 				outgoing.push_back(wrapAround(particles[i]));
 				particles.remove(i);
 			}else
@@ -368,7 +371,7 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 		outgoing.removeAll();
 		i = 0;
 		while(i < particles.length()){
-			if(particles[i].x > x*(L+1) && particles[i].y > y*(L+1)){
+			if(particles[i].x > (x+1)*L && particles[i].y > (y+1)*L){
 				outgoing.push_back(wrapAround(particles[i]));
 				particles.remove(i);
 			}else
@@ -400,10 +403,13 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 		}
 		cellArray(x,(y+1)%n).updateParticles(outgoing);
 
+    outgoing.removeAll();
+
     #ifdef DEBUG
       CkPrintf("STEP: %d DONE:( %d , %d )\n", stepCount, thisIndex.x, thisIndex.y);
     #endif
-
+ 
+		updateFlag = true;
 		// checking whether to proceed with next step
 		checkNextStep();
 
@@ -432,6 +438,7 @@ void Cell::checkNextStep(){
 		// resetting flags
 		updateFlag = false;
 		incomingFlag = false;
+    stepCount++;
 
 		// adding new elements
 		for(i = 0; i < incomingParticles.length(); i++){
@@ -452,6 +459,7 @@ void Cell::checkNextStep(){
 
 // Function that receives a set of particles and updates the forces of them into the local set
 void Cell::updateParticles(CkVec<Particle> &updates) {
+
   updateCount++;
 
   for( int i=0; i < updates.length(); i++) {
@@ -481,7 +489,6 @@ void Cell::updateProperties(){
 		particles[i].vy = particles[i].vy + particles[i].ay * DEFAULT_DELTA;
 
     limitDisplacement( particles[i], xDisp, yDisp );
-
 
 		particles[i].x = particles[i].x + xDisp;
 		particles[i].y = particles[i].y + yDisp;
@@ -537,10 +544,8 @@ Particle& Cell::wrapAround(Particle &p) {
 // Default constructor
 Interaction::Interaction() {
   cellCount = 0;
-
-  /* FIXME */
-    bufferedX = 0;
-    bufferedY = 0;
+  bufferedX = 0;
+  bufferedY = 0;
 }
 
 Interaction::Interaction(CkMigrateMessage *msg) { }
@@ -549,34 +554,33 @@ Interaction::Interaction(CkMigrateMessage *msg) { }
 // Function to receive vector of particles
 void Interaction::interact(CkVec<Particle> particles, int x, int y ) {
 
-  if(cellCount == 0) {
+  int i;
 
-    // self interaction check
-    if( thisIndex.x == thisIndex.z && thisIndex.y == thisIndex.w ) {
-      //CkPrintf("SELF: ( %d , %d )\n", thisIndex.x, thisIndex.y );
+  // self interaction check
+  if( thisIndex.x == thisIndex.z && thisIndex.y == thisIndex.w ) {
+    //CkPrintf("SELF: ( %d , %d )\n", thisIndex.x, thisIndex.y );
+		interact(particles,particles);
+    cellArray( x, y).updateForces(particles);
+  } else {
+    if(cellCount == 0) {
+
+	      bufferedX = x;
+    	  bufferedY = y;
+        /*for(i=0;i<particles.length();i++) {
+			    bufferedParticles.push_back(particles[i]);
+        }*/
+        bufferedParticles = particles; /* CHECKME */
+        cellCount++;
+
+		} else if(cellCount == 1) {
+    
+	    // if both particle sets are received, compute interaction
       cellCount = 0;
-			interact(particles,particles);
-      cellArray( x, y).updateForces(particles);
-    } else {
-			 bufferedX = x;
-    	 bufferedY = y;
-			 bufferedParticles = particles; /* CHECKME */
-		}
-
-  }
-
-  cellCount++;
-
-	// if both particle sets are received, compute interaction
-  if(cellCount >= 2) {
-
-    //CkPrintf("PAIR:( %d , %d )  ( %d , %d ) \n", bufferedX, bufferedY, x, y );
-    cellCount = 0;
-
-		interact(bufferedParticles,particles);
-
-    cellArray(bufferedX, bufferedY).updateForces(bufferedParticles);
-    cellArray(x, y).updateForces(particles);
+		  interact(bufferedParticles,particles);
+      cellArray(bufferedX, bufferedY).updateForces(bufferedParticles);
+      cellArray(x, y).updateForces(particles);
+      //CkPrintf("PAIR:( %d , %d )  ( %d , %d ) \n", bufferedX, bufferedY, x, y );
+    }
 
   }
 }
@@ -605,6 +609,8 @@ void Interaction::interact(Particle &first, Particle &second){
 	f = A / pow(r,12) - B / pow(r,6);
 	fx = f * rx / r;
 	fy = f * ry / r;
+
+  //CkPrintf("%f %f %f \n",f,fx,fy);
 
 	// updating particle properties
 	second.fx += fx;
