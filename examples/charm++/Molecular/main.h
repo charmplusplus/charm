@@ -25,6 +25,7 @@ class Particle{
 		double vx;								// velocity on x axis
 		double vy;								// velocity on y axis
 
+    int id;
 	// Default constructor
 	Particle(){
 		fx = fy = 0.0;
@@ -41,6 +42,7 @@ class Particle{
 			p | ay;
 			p | vx;
 			p | vy;
+      p | id;
 		}
 
 };

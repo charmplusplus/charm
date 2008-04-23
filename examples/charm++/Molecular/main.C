@@ -5,22 +5,23 @@
  2008
  Authors: Kumaresh Pattabiraman and Esteban Meneses
 */
-
+#include "liveViz.h"
 #include "main.h"
 #include "main.decl.h"
 
-#define DEBUG 1
+//#define DEBUG 1
 
-#define A 2.0
-#define B 1.0
+double A=0.1;
+double B=0.01;
 
-#define DEFAULT_PARTICLES 500
-#define DEFAULT_M 3
-#define DEFAULT_N 3
+#define DEFAULT_PARTICLES 3000
+#define DEFAULT_M 5
+#define DEFAULT_N 5
 #define DEFAULT_L 10
-#define DEFAULT_RADIUS 10
-#define DEFAULT_FINALSTEPCOUNT 5
+#define DEFAULT_RADIUS 5
+#define DEFAULT_FINALSTEPCOUNT 1000
 
+#define MAX_VELOCITY 2.0
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ CProxy_Cell cellArray;
 /* readonly */ CProxy_Interaction interactionArray;
@@ -31,6 +32,59 @@
 /* readonly */ int L; 
 /* readonly */ double radius;
 /* readonly */ int finalStepCount; 
+
+
+
+
+class Color {
+public:
+	unsigned char R, G, B;
+
+	/// Generate a unique color for each index from 0 to total-1
+	Color(int index){
+    int total = 8;
+		if(index % total == 0){
+			R = 255;
+			G = 100;
+			B = 100;
+		} else if(index % total == 1){
+			R = 100;
+			G = 255;
+			B = 100;
+		} else if(index % total == 2){
+			R = 100;
+			G = 100;
+			B = 255;
+		} else if(index % total == 3){
+			R = 100;
+			G = 255;
+			B = 255;
+		} else if(index % total == 4){
+			R = 100;
+			G = 255;
+			B = 255;
+		} else if(index % total == 5){
+			R = 255;
+			G = 255;
+			B = 100;
+		} else if(index % total == 6){
+			R = 255;
+			G = 100;
+			B = 255;
+		} else {
+			R = 170;
+			G = 170;
+			B = 170;
+		}
+	}
+
+	
+};
+
+
+
+
+
 
 // Class representing a cell in the grid. We consider each cell as a square of LxL units
 class Cell : public CBase_Cell {
@@ -58,6 +112,7 @@ class Cell : public CBase_Cell {
     void limitDisplacement(Particle&, double&, double&);
     Particle& wrapAround(Particle &);
     void stepDone();
+    void requestNextFrame(liveVizRequestMsg *m);
 };
 
 // Class representing the interaction agents between a couple of cells
@@ -179,6 +234,11 @@ Main::Main(CkArgMsg* msg) {
     CkPrintf("Interaction Count: %d\n", interactionCount);
   #endif
 
+    // setup liveviz
+    CkCallback c(CkIndex_Cell::requestNextFrame(0),cellArray);
+    liveVizConfig cfg(liveVizConfig::pix_color,true);
+    liveVizInit(cfg,cellArray,c);
+
   cellArray.start();
 }
 
@@ -198,7 +258,7 @@ Cell::Cell() {
 	int i;
 
 	// starting random generator
-	srand48(time(NULL));
+	srand48(thisIndex.x * 10000 + thisIndex.y);
   
 	/* Particle initialization */
 	// initializing a number of particles
@@ -206,6 +266,7 @@ Cell::Cell() {
 		particles.push_back(Particle());
 		particles[i].x = drand48() * L + thisIndex.x * L;
     particles[i].y = drand48() * L + thisIndex.y * L;
+    particles[i].id = (thisIndex.x*m + thisIndex.y) * numParts / (m*n)  + i;
 	}	
 
   updateCount = 0;
@@ -293,9 +354,9 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 
 	// if all forces are received, then it must recompute particles location
   if( forceCount >= 9) {
-    
+#ifdef DEBUG
 		CkPrintf("Cell: %d %d Forces done!\n",thisIndex.x, thisIndex.y);
-
+#endif
     // Received all it's forces from the interactions.
     //stepCount++; /* CHECKME */
     forceCount = 0;
@@ -417,8 +478,84 @@ void Cell::updateForces(CkVec<Particle> &updates) {
     
 }
 
+
+
+    
+void color_pixel(unsigned char*buf,int width, int height, int xpos,int ypos,unsigned char R,unsigned char G,unsigned char B){
+  if(xpos>=0 && xpos<width && ypos>=0 && ypos<height){
+    buf[3*(ypos*width+xpos)+0] = R; 
+    buf[3*(ypos*width+xpos)+1] = G; 
+    buf[3*(ypos*width+xpos)+2] = B; 
+  }
+}
+    
+
+// provide my portion of the image to the graphical liveViz client
+// Currently we just provide some pretty color depending upon the thread id
+// In a real program we would provide a colored rectangle or pixel that
+// depends upon the local thread data.
+void Cell::requestNextFrame(liveVizRequestMsg *lvmsg) {
+  // These specify the desired total image size requested by the client viewer
+  int wdes = lvmsg->req.wid;
+  int hdes = lvmsg->req.ht;
+
+  // Deposit a rectangular region to liveViz
+
+  // where to deposit   
+  int myWidthPx = wdes / m;
+  int myHeightPx = hdes / n;
+  int sx=thisIndex.x*myWidthPx;
+  int sy=thisIndex.y*myHeightPx; 
+
+  // set the output pixel values for my rectangle
+  // Each component is a char which can have 256 possible values.
+  unsigned char *intensity= new unsigned char[3*myWidthPx*myHeightPx];
+  for(int i=0;i<myHeightPx;++i){
+    for(int j=0;j<myWidthPx;++j){
+        		
+      // black background
+      color_pixel(intensity,myWidthPx,myHeightPx,j,i,0,0,0);
+
+    } 
+  }
+
+  CkAssert(particles.length()>=1);
+
+  for (int i=0; i < particles.length(); i++ ){
+    
+    int xpos = (int)((particles[i].x /(double) (L*m)) * wdes) - sx;
+    int ypos = (int)((particles[i].y /(double) (L*n)) * hdes) - sy;
+
+    //        	CkPrintf("%d,%d\n", xpos,ypos);
+    Color c(particles[i].id);
+    color_pixel(intensity,myWidthPx,myHeightPx,xpos+1,ypos,c.R,c.B,c.G);
+    color_pixel(intensity,myWidthPx,myHeightPx,xpos-1,ypos,c.R,c.B,c.G);
+    color_pixel(intensity,myWidthPx,myHeightPx,xpos,ypos+1,c.R,c.B,c.G);
+    color_pixel(intensity,myWidthPx,myHeightPx,xpos,ypos-1,c.R,c.B,c.G);
+    color_pixel(intensity,myWidthPx,myHeightPx,xpos,ypos,c.R,c.B,c.G);
+  }
+        
+  for(int i=0;i<myHeightPx;++i){
+    for(int j=0;j<myWidthPx;++j){
+      
+    // Draw red lines
+    if(i==0 || j==0){
+      color_pixel(intensity,myWidthPx,myHeightPx,j,i,128,0,0);
+    }
+    }
+  }
+        
+  liveVizDeposit(lvmsg, sx,sy, myWidthPx,myHeightPx, intensity, this, max_image_data);
+  delete[] intensity;
+
+}
+
+
+
+
 // Prints all particle set
 void Cell::print(){
+#ifdef DEBUG
 	int i;
 	CkPrintf("*****************************************************\n");
 	CkPrintf("Cell (%d,%d)\n",thisIndex.x,thisIndex.y);
@@ -427,6 +564,7 @@ void Cell::print(){
 		CkPrintf("Cell (%d,%d) %-5d %7.4f %7.4f \n",thisIndex.x,thisIndex.y,i,particles[i].x,particles[i].y);
 	}
 	CkPrintf("*****************************************************\n");
+#endif
 }
 
 // Function that checks whether it must start the following step or wait until other messages are received
@@ -514,21 +652,24 @@ void Cell::limitDisplacement(Particle &p, double &xDisp, double &yDisp) {
 
     if( fabs(p.vx * DEFAULT_DELTA) > DEFAULT_RADIUS ) {
       if( p.vx * DEFAULT_DELTA < 0.0 )
-        xDisp = -DEFAULT_RADIUS;
+        //xDisp = -DEFAULT_RADIUS;
+        p.vx = -MAX_VELOCITY;
       else
-        xDisp = DEFAULT_RADIUS;
-    } else {
-      xDisp = p.vx * DEFAULT_DELTA;
+        //xDisp = DEFAULT_RADIUS;*/
+        p.vx = MAX_VELOCITY;
+      
     }
+    xDisp = p.vx * DEFAULT_DELTA;
 
     if( fabs(p.vy * DEFAULT_DELTA) > DEFAULT_RADIUS ) {
       if( p.vy * DEFAULT_DELTA < 0.0 )
-        yDisp = -DEFAULT_RADIUS;
+        //yDisp = -DEFAULT_RADIUS;
+        p.vy = -MAX_VELOCITY;
       else
-        yDisp = DEFAULT_RADIUS;
-    } else {
-      yDisp = p.vy * DEFAULT_DELTA;
+        //yDisp = DEFAULT_RADIUS;
+        p.vy = MAX_VELOCITY;
     }
+    yDisp = p.vy * DEFAULT_DELTA;
 }
 
 Particle& Cell::wrapAround(Particle &p) {
@@ -603,7 +744,7 @@ void Interaction::interact(Particle &first, Particle &second){
 	ry = first.y - second.y;
 	r = sqrt(rx*rx + ry*ry);
 
-	if(r == 0.0 || r >= DEFAULT_RADIUS)
+	if(r < 0.001 || r >= DEFAULT_RADIUS)
 		return;
 
 	f = A / pow(r,12) - B / pow(r,6);

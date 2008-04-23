@@ -21,7 +21,7 @@ mainmodule main {
     entry void start();
     entry void updateForces(CkVec<Particle> particles);
 		entry void updateParticles(CkVec<Particle> updates);
-    //entry void requestNextFrame(liveVizRequestMsg *m);
+    entry void requestNextFrame(liveVizRequestMsg *m);
   };
 
   array [4D] Interaction {
