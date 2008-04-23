@@ -712,7 +712,7 @@ int CmiScanf (const char *format, ...)
 ** TODO: This routine should use spanning trees if this machine layer has
 ** been configured for that type of message broadcast.
 */
-void CmiBarrier ()
+int CmiBarrier ()
 {
   VMI_STATUS status;
 
@@ -775,6 +775,7 @@ void CmiBarrier ()
     /* Reset the barrier count immediately to set up next barrier operation. */
     CMI_VMI_Barrier_Count = 0;
   }
+  return 0;
 }
 
 
@@ -782,11 +783,12 @@ void CmiBarrier ()
 /**************************************************************************
 **
 */
-void CmiBarrierZero ()
+int CmiBarrierZero ()
 {
   DEBUG_PRINT ("CmiBarrierZero() called.\n");
 
   CmiBarrier ();
+  return 0;
 }
 
 

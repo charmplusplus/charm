@@ -325,8 +325,8 @@ int    CmiTimerIsSynchronized();
    CMK_TIMER_USE_BLUEGENEL
 */
 
-void CmiBarrier();
-void CmiBarrierZero();
+int CmiBarrier();
+int CmiBarrierZero();
 
 
 /** PRINTF FUNCTIONS

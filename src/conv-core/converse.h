@@ -428,8 +428,8 @@ for each processor in the node.
 
 extern CmiNodeLock smp_mutex;
 
-extern void CmiBarrier(void);
-extern void CmiBarrierZero(void);
+extern int CmiBarrier(void);
+extern int CmiBarrierZero(void);
 
 /** Return 1 if our outgoing message queue 
    for this node is longer than this many bytes. */

@@ -791,7 +791,7 @@ static void recvBarrierMessage()
 }
 
 /* happen at node level */
-void CmiBarrier()
+int CmiBarrier()
 {
   int len, size, i;
   int status;
@@ -837,7 +837,7 @@ void CmiBarrier()
 }
 
 /* everyone sends a message to pe 0 and go on */
-void CmiBarrierZero()
+int CmiBarrierZero()
 {
   int i;
 

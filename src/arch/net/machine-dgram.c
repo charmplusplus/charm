@@ -784,18 +784,22 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 #elif CMK_USE_MX
 
 #include "machine-mx.c"
+#define BARRIER_NULL           1
 
 #elif CMK_USE_AMMASSO
 
 #include "machine-ammasso.c"
+#define BARRIER_NULL           1
 
 #elif CMK_USE_TCP
 
 #include "machine-tcp.c"
+#define BARRIER_NULL           1
 
 #elif CMK_USE_IBVERBS
 
 #include "machine-ibverbs.c"
+#define BARRIER_NULL           1
 
 #else
 
@@ -811,16 +815,16 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 
 
 
-
-#if ! CMK_USE_GM
-void CmiBarrier()
+#if  BARRIER_NULL
+int CmiBarrier()
 {
+  return -1;
 }
 
-void CmiBarrierZero()
+int CmiBarrierZero()
 {
+  return -1;
 }
-
 #endif
 
 /*@}*/

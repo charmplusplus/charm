@@ -641,8 +641,8 @@ void CmiPrintf (const char *format, ...);
 void CmiError (const char *format, ...);
 int CmiScanf (const char *format, ...);
 
-void CmiBarrier ();
-void CmiBarrierZero ();
+int CmiBarrier ();
+int CmiBarrierZero ();
 
 void CmiSyncSendFn (int destrank, int msgsize, char *msg);
 CmiCommHandle CmiAsyncSendFn (int destrank, int msgsize, char *msg);

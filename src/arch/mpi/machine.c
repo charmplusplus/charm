@@ -333,7 +333,7 @@ double CmiCpuTimer(void)
 
 #endif
 
-void CmiBarrier()
+int CmiBarrier()
 {
   if (CmiMyRank() == 0) {
 
@@ -344,10 +344,11 @@ void CmiBarrier()
 
     END_EVENT(10);
   }
+  return 0;
 }
 
 /* CmiBarrierZero make sure node 0 is the last one exiting the barrier */
-void CmiBarrierZero()
+int CmiBarrierZero()
 {
   int i;
   if (CmiMyRank() == 0) {
@@ -373,6 +374,7 @@ void CmiBarrierZero()
     }
   }
   CmiNodeAllBarrier();
+  return 0;
 }
 
 typedef struct ProcState {
