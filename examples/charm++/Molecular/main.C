@@ -55,6 +55,7 @@ class Cell : public CBase_Cell {
     void start();
     void updateParticles(CkVec<Particle>&);
     void updateForces(CkVec<Particle>&);
+    void limitDisplacement(Particle&, double&, double&);
     Particle& wrapAround(Particle &);
     void stepDone();
 };
@@ -479,12 +480,10 @@ void Cell::updateProperties(){
 		particles[i].vx = particles[i].vx + particles[i].ax * DEFAULT_DELTA;
 		particles[i].vy = particles[i].vy + particles[i].ay * DEFAULT_DELTA;
 
-    xDisp = ( particles[i].vx * DEFAULT_DELTA > DEFAULT_RADIUS ) ? 
-      ( DEFAULT_RADIUS ) : ( particles[i].vx * DEFAULT_DELTA );
-		particles[i].x = particles[i].x + xDisp;
+    limitDisplacement( particles[i], xDisp, yDisp );
 
-    yDisp = ( particles[i].vy * DEFAULT_DELTA > DEFAULT_RADIUS ) ? 
-      ( DEFAULT_RADIUS ) : ( particles[i].vy * DEFAULT_DELTA );
+
+		particles[i].x = particles[i].x + xDisp;
 		particles[i].y = particles[i].y + yDisp;
 
 		particles[i].fx = 0.0;
@@ -502,6 +501,27 @@ void Cell::updateProperties(){
 
 	}
 
+}
+
+void Cell::limitDisplacement(Particle &p, double &xDisp, double &yDisp) {
+
+    if( fabs(p.vx * DEFAULT_DELTA) > DEFAULT_RADIUS ) {
+      if( p.vx * DEFAULT_DELTA < 0.0 )
+        xDisp = -DEFAULT_RADIUS;
+      else
+        xDisp = DEFAULT_RADIUS;
+    } else {
+      xDisp = p.vx * DEFAULT_DELTA;
+    }
+
+    if( fabs(p.vy * DEFAULT_DELTA) > DEFAULT_RADIUS ) {
+      if( p.vy * DEFAULT_DELTA < 0.0 )
+        yDisp = -DEFAULT_RADIUS;
+      else
+        yDisp = DEFAULT_RADIUS;
+    } else {
+      yDisp = p.vy * DEFAULT_DELTA;
+    }
 }
 
 Particle& Cell::wrapAround(Particle &p) {
