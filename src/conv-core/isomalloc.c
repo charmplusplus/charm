@@ -24,6 +24,8 @@ generalized by Orion Lawlor November 2001.
 #include <stdlib.h>
 #include <errno.h> /* just so I can find dynamically-linked symbols */
 
+static int _sync_iso = 0;
+
 static int read_randomflag(void)
 {
   FILE *fp;
@@ -608,7 +610,7 @@ static int find_largest_free_region(memRegion_t *destRegion) {
     size_t mmapAnyLen = 1*meg;
     char *mmapAny = (char*) call_mmap_anywhere(mmapAnyLen);
 
-    int i,nRegions=8;
+    int i,nRegions=9;
     memRegion_t regions[10]; /*used portions of address space*/
     memRegion_t freeRegion; /*Largest unused block of address space*/
 
@@ -711,6 +713,59 @@ static void init_ranges(char **argv)
 	      freeRegion.len/meg);
 #endif
         
+          /*
+             on some machines, isomalloc memory regions on different nodes 
+             can be different. use +isomalloc_sync to calculate the
+             intersect of all memory regions on all nodes.
+          */
+        if (_sync_iso == 1) {
+          if (CmiBarrier() == -1) 
+            CmiAbort("Charm++ Error> +isomalloc_sync requires CmiBarrier() implemented.\n");
+          else {
+            CmiUInt8 s = (CmiUInt8)freeRegion.start;
+            CmiUInt8 e = (CmiUInt8)(freeRegion.start+freeRegion.len);
+            int fd, i;
+            char fname[128];
+
+            if (CmiMyNode()==0) printf("Charm++> synchronizing isomalloc memory region...\n");
+
+              /* write region into file */
+            sprintf(fname,".isomalloc.%d", CmiMyNode());
+            while ((fd = open(fname, O_WRONLY|O_TRUNC|O_CREAT, 0644)) == -1) sleep(1);
+            write(fd, &s, sizeof(CmiUInt8));
+            write(fd, &e, sizeof(CmiUInt8));
+            close(fd);
+
+            CmiBarrier();
+
+            for (i=0; i<CmiNumNodes(); i++) {
+              CmiUInt8 ss, ee; 
+              char fname[128];
+              if (i==CmiMyNode()) continue;
+              sprintf(fname,".isomalloc.%d", i);
+              while ((fd = open(fname, O_RDONLY)) == -1) sleep(1);
+              read(fd, &ss, sizeof(CmiUInt8));
+              read(fd, &ee, sizeof(CmiUInt8));
+              close(fd);
+              if (ss>s) s = ss;
+              if (ee<e) e = ee;
+            }
+
+            CmiBarrier();
+
+            unlink(fname);
+
+              /* update */
+            freeRegion.start = (void *)s;
+            freeRegion.len = (char *)e -(char *)s;
+#if CMK_THREADS_DEBUG
+            CmiPrintf("[%d] consolidated Isomalloc memory region: %p - %p (%d megs)\n",CmiMyPe(),
+	      freeRegion.start,freeRegion.start+freeRegion.len,
+	      freeRegion.len/meg);
+#endif
+          }   /* end of barrier test */
+        }
+
         /*Isomalloc covers entire unused region*/
         isomallocStart=freeRegion.start;
         isomallocEnd=freeRegion.start+freeRegion.len;
@@ -913,6 +968,8 @@ void CmiIsomallocInit(char **argv)
 #if CMK_NO_ISO_MALLOC
   disable_isomalloc("isomalloc disabled by conv-mach");
 #else
+  if (CmiGetArgFlagDesc(argv,"+isomalloc_sync","synchronize isomalloc region globaly"))
+  _sync_iso = 1;
   init_comm(argv);
   if (!init_map(argv)) {
     disable_isomalloc("mmap() does not work");
