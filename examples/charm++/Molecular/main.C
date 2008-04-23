@@ -55,6 +55,7 @@ class Cell : public CBase_Cell {
     void start();
     void updateParticles(CkVec<Particle>&);
     void updateForces(CkVec<Particle>&);
+    Particle& wrapAround(Particle &);
     void stepDone();
 };
 
@@ -307,7 +308,7 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 		i = 0;
 		while(i < particles.length()){
 			if(particles[i].x < x*L && particles[i].y < y*L){
-				outgoing.push_back(particles[i]);
+				outgoing.push_back(wrapAround(particles[i]));
 				particles.remove(i);
 			}else
 				i++;
@@ -319,7 +320,7 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 		i = 0;
 		while(i < particles.length()){
 			if(particles[i].x < x*L && particles[i].y <= y*(L+1)){
-				outgoing.push_back(particles[i]);
+				outgoing.push_back(wrapAround(particles[i]));
 				particles.remove(i);
 			}else
 				i++;
@@ -331,7 +332,7 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 		i = 0;
 		while(i < particles.length()){
 			if(particles[i].x < x*L && particles[i].y > y*(L+1)){
-				outgoing.push_back(particles[i]);
+				outgoing.push_back(wrapAround(particles[i]));
 				particles.remove(i);
 			}else
 				i++;
@@ -343,7 +344,7 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 		i = 0;
 		while(i < particles.length()){
 			if(particles[i].x > x*(L+1) && particles[i].y < y*L){
-				outgoing.push_back(particles[i]);
+				outgoing.push_back(wrapAround(particles[i]));
 				particles.remove(i);
 			}else
 				i++;
@@ -355,7 +356,7 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 		i = 0;
 		while(i < particles.length()){
 			if(particles[i].x > x*(L+1) && particles[i].y <= y*(L+1)){
-				outgoing.push_back(particles[i]);
+				outgoing.push_back(wrapAround(particles[i]));
 				particles.remove(i);
 			}else
 				i++;
@@ -367,7 +368,7 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 		i = 0;
 		while(i < particles.length()){
 			if(particles[i].x > x*(L+1) && particles[i].y > y*(L+1)){
-				outgoing.push_back(particles[i]);
+				outgoing.push_back(wrapAround(particles[i]));
 				particles.remove(i);
 			}else
 				i++;
@@ -379,7 +380,7 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 		i = 0;
 		while(i < particles.length()){
 			if(particles[i].y < y*L){
-				outgoing.push_back(particles[i]);
+				outgoing.push_back(wrapAround(particles[i]));
 				particles.remove(i);
 			}else
 				i++;
@@ -391,7 +392,7 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 		i = 0;
 		while(i < particles.length()){
 			if(particles[i].y > (y+1)*L){
-				outgoing.push_back(particles[i]);
+				outgoing.push_back(wrapAround(particles[i]));
 				particles.remove(i);
 			}else
 				i++;
@@ -412,13 +413,13 @@ void Cell::updateForces(CkVec<Particle> &updates) {
 // Prints all particle set
 void Cell::print(){
 	int i;
-	CkPrintf("*******************************************************************\n");
+	CkPrintf("*****************************************************\n");
 	CkPrintf("Cell (%d,%d)\n",thisIndex.x,thisIndex.y);
-	CkPrintf("Part     x     y\n");
+	//CkPrintf("Part     x     y\n");
 	for(i = 0; i < particles.length(); i++){
-		CkPrintf("%-5d %7.4f %7.4f \n",i,particles[i].x,particles[i].y);
+		CkPrintf("Cell (%d,%d) %-5d %7.4f %7.4f \n",thisIndex.x,thisIndex.y,i,particles[i].x,particles[i].y);
 	}
-	CkPrintf("*******************************************************************\n");
+	CkPrintf("*****************************************************\n");
 }
 
 // Function that checks whether it must start the following step or wait until other messages are received
@@ -468,6 +469,7 @@ void Cell::updateParticles(CkVec<Particle> &updates) {
 // Function to update properties (i.e. acceleration, velocity and position) in particles
 void Cell::updateProperties(){
 	int i;
+  double xDisp, yDisp;
 	
 	for(i = 0; i < particles.length(); i++){
 
@@ -476,21 +478,41 @@ void Cell::updateProperties(){
 		particles[i].ay = particles[i].fy / DEFAULT_MASS;
 		particles[i].vx = particles[i].vx + particles[i].ax * DEFAULT_DELTA;
 		particles[i].vy = particles[i].vy + particles[i].ay * DEFAULT_DELTA;
-		particles[i].x = particles[i].x + particles[i].vx * DEFAULT_DELTA;
-		particles[i].y = particles[i].y + particles[i].vy * DEFAULT_DELTA;
+
+    xDisp = ( particles[i].vx * DEFAULT_DELTA > DEFAULT_RADIUS ) ? 
+      ( DEFAULT_RADIUS ) : ( particles[i].vx * DEFAULT_DELTA );
+		particles[i].x = particles[i].x + xDisp;
+
+    yDisp = ( particles[i].vy * DEFAULT_DELTA > DEFAULT_RADIUS ) ? 
+      ( DEFAULT_RADIUS ) : ( particles[i].vy * DEFAULT_DELTA );
+		particles[i].y = particles[i].y + yDisp;
+
 		particles[i].fx = 0.0;
 		particles[i].fy = 0.0;
 
 		// checking boundary conditions
-		if(particles[i].x < 0.0) particles[i].x = 0.0;
-		if(particles[i].y < 0.0) particles[i].y = 0.0;
-		if(particles[i].x > L*m) particles[i].x = L*m;
-		if(particles[i].y > L*n) particles[i].y = L*n;
+		//if(particles[i].x < 0.0) particles[i].x = 0.0;
+    /*
+		if(particles[i].x < 0.0) particles[i].x += L*m;
+		if(particles[i].y < 0.0) particles[i].y += L*n;
+		if(particles[i].x > L*m) particles[i].x -= L*m;
+		if(particles[i].y > L*n) particles[i].y -= L*n;
+    */
+		//if(particles[i].x < 0.0) particles[i].x = 0.0;
 
 	}
 
 }
 
+Particle& Cell::wrapAround(Particle &p) {
+
+		if(p.x < 0.0) p.x += L*m;
+		if(p.y < 0.0) p.y += L*n;
+		if(p.x > L*m) p.x -= L*m;
+		if(p.y > L*n) p.y -= L*n;
+
+    return p;
+}
 
 // Default constructor
 Interaction::Interaction() {
