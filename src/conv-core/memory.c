@@ -54,6 +54,7 @@ void * memory_stack_top; /*The higher end of the stack (approximation)*/
 #if CMK_MEMORY_BUILD_OS
 #if CMK_MEMORY_BUILD_OS_WRAPPED
 
+void initialize_memory_wrapper();
 void * initialize_memory_wrapper_calloc(size_t nelem, size_t size);
 void * initialize_memory_wrapper_malloc(size_t size);
 void * initialize_memory_wrapper_realloc(void *ptr, size_t size);
@@ -197,13 +198,13 @@ int memory_chare_id=0;
 #include "memory-charmdebug.c"
 #endif
 
-void *malloc(size_t size) { meta_malloc(size); }
+void *malloc(size_t size) { return meta_malloc(size); }
 void free(void *ptr) { meta_free(ptr); }
-void *calloc(size_t nelem, size_t size) { meta_calloc(nelem,size); }
+void *calloc(size_t nelem, size_t size) { return meta_calloc(nelem,size); }
 void cfree(void *ptr) { meta_cfree(ptr); }
-void *realloc(void *ptr, size_t size) { meta_realloc(ptr,size); }
-void *memalign(size_t align, size_t size) { meta_memalign(align,size); }
-void *valloc(size_t size) { meta_valloc(size); }
+void *realloc(void *ptr, size_t size) { return meta_realloc(ptr,size); }
+void *memalign(size_t align, size_t size) { return meta_memalign(align,size); }
+void *valloc(size_t size) { return meta_valloc(size); }
 
 #endif
 
