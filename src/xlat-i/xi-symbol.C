@@ -298,7 +298,8 @@ Module::generate()
   declstr << 
   "#ifndef _DECL_"<<name<<"_H_\n"
   "#define _DECL_"<<name<<"_H_\n"
-  "#include \"charm++.h\"\n";
+  "#include \"charm++.h\"\n"
+  "#ifdef CMK_CHECK_CRC\nextern \"C\" void checkAllCRC(int);\n#endif\n";
   if (fortranMode) declstr << "#include \"charm-api.h\"\n";
   if (clist) clist->genDecls(declstr);
   declstr << "extern void _register"<<name<<"(void);\n";
@@ -3027,7 +3028,11 @@ void Entry::genCall(XStr& str, const XStr &preCall)
   else //Normal case: Unmarshall variables
 	param->beginUnmarshall(str);
 
-  str << "#ifndef CMK_OPTIMIZE\n  setMemoryChareID(impl_obj);\n#endif\n";
+  str << "#ifndef CMK_OPTIMIZE\n";
+  str << "  setMemoryChareID(impl_obj);\n";
+  if (!internalMode) str << "  setMemoryStatus(1);\n";
+  str << "#endif\n";
+  str << "#ifdef CMK_CHECK_CRC\n  checkAllCRC(0);\n#endif\n";
   str << preCall;
   if (!isConstructor() && fortranMode) {
     if (!container->isArray()) { // Currently, only arrays are supported
@@ -3076,7 +3081,11 @@ void Entry::genCall(XStr& str, const XStr &preCall)
         str<<"("; param->unmarshall(str); str<<");\n";
     }
   }
-  str << "#ifndef CMK_OPTIMIZE\n  setMemoryChareID(NULL);\n#endif\n";
+  str << "#ifdef CMK_CHECK_CRC\n  checkAllCRC(1);\n#endif\n";
+  str << "#ifndef CMK_OPTIMIZE\n";
+  str << "  setMemoryChareID(NULL);\n";
+  if (!internalMode) str << "  setMemoryStatus(0);\n";
+  str << "#endif\n";
 }
 
 void Entry::genDefs(XStr& str)
@@ -3550,7 +3559,7 @@ void Parameter::pupAllValues(XStr &str) {
 	if (isArray()) {
 	  str<<
 	  "  implDestP.synchronize(PUP::sync_begin_array);\n"
-	  "  { for (int impl_i=0;impl_i<impl_cnt_"<<name<<";impl_i++) { \n"
+	  "  { for (int impl_i=0;impl_i*(sizeof(*"<<name<<"))<impl_cnt_"<<name<<";impl_i++) { \n"
 	  "      implDestP.synchronize(PUP::sync_item);\n"
 	  "      implDestP|"<<name<<"[impl_i];\n"
 	  "  } } \n"
