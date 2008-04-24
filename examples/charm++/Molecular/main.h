@@ -3,46 +3,23 @@
  Department of Computer Science
  Parallel Programming Lab
  2008
- Authors: Kumaresh Pattabiraman, Esteban Meneses and Isaac Dooley
 */
 
-#include "charm++.h"
-#include "time.h"
+#ifndef __MAIN_H__
+#define __MAIN_H__
 
-#define DEFAULT_MASS 1
-#define DEFAULT_DELTA 0.1
+// Main class
+class Main : public CBase_Main {
 
-// Class for keeping track of the properties for a particle
-class Particle{
-	public:
-		double mass;							// mass of the particle
-		double x;									// position in x axis
-		double y;									// position in y axis
-		double fx;								// total forces on x axis
-		double fy;								// total forces on y axis
-		double ax;								// acceleration on x axis
-		double ay;								// acceleration on y axis
-		double vx;								// velocity on x axis
-		double vy;								// velocity on y axis
+  private:
+    int checkInCount; // Count to terminate
 
-    int id;
-	// Default constructor
-	Particle(){
-		fx = fy = 0.0;
-	}
+  public:
 
-		// Function for pupping properties
-		void pup(PUP::er &p) {
-			p | mass;
-			p | x;
-			p | y;
-			p | fx;
-			p | fy;
-			p | ax;
-			p | ay;
-			p | vx;
-			p | vy;
-      p | id;
-		}
+    Main(CkArgMsg* msg);
+    Main(CkMigrateMessage* msg);
 
+    void checkIn();
 };
+
+#endif
