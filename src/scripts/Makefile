@@ -321,7 +321,7 @@ MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
 	  $(L)/libmemory-charmdebug.o \
 	  $(L)/libmemory-os-verbose.o $(L)/libmemory-os-isomalloc.o \
 	  $(L)/libmemory-os-leak.o $(L)/libmemory-os-paranoid.o \
-	  $(L)/libmemory-os-charmdebug.o$(L)/libmemory-os-wrapper.o
+	  $(L)/libmemory-os-charmdebug.o $(L)/libmemory-os-wrapper.o
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o 	\
 	  $(L)/libthreads-context.o $(L)/libthreads-uJcontext.o \
 	  $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o \
