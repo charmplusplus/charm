@@ -1437,13 +1437,7 @@ CthThread t;
 */
 }
 
-#if !CMK_64BIT
-void CthStartThread(qt_userf_t fn,void *arg)
-{
-  fn(arg);
-  CthThreadFinished(CthSelf());
-}
-#else    /* makecontext only pass integer arguments */
+#if CMK_THREADS_USE_CONTEXT && CMK_64BIT /* makecontext only pass integer arguments */
 void CthStartThread(CmiUInt4 fn1, CmiUInt4 fn2, CmiUInt4 arg1, CmiUInt4 arg2)
 {
   CmiUInt8 fn0 = (((CmiUInt8)fn1) << 32) | fn2;
@@ -1451,6 +1445,12 @@ void CthStartThread(CmiUInt4 fn1, CmiUInt4 fn2, CmiUInt4 arg1, CmiUInt4 arg2)
   void *arg = (void *)arg0;
   qt_userf_t *fn = (qt_userf_t*)fn0;
   (*fn)(arg);
+  CthThreadFinished(CthSelf());
+}
+#else
+void CthStartThread(qt_userf_t fn,void *arg)
+{
+  fn(arg);
   CthThreadFinished(CthSelf());
 }
 #endif
@@ -1508,6 +1508,7 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   
   CthAliasEnable(B(result)); /* Change to new thread's stack while building context */
   errno = 0;
+#if CMK_THREADS_USE_CONTEXT
   if (sizeof(void *) == 8) {
     int fn1 = ((CmiUInt8)fn) >> 32;
     int fn2 = (CmiUInt8)fn & 0xFFFFFFFF;
@@ -1516,7 +1517,8 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
     makeJcontext(&result->context, (uJcontext_fn_t)CthStartThread, 4, fn1, fn2, arg1, arg2);
   }
   else
-    makeJcontext(&result->context, (uJcontext_fn_t)CthStartThread, 4, (void *)fn,(void *)arg, 0, 0);
+#endif
+    makeJcontext(&result->context, (uJcontext_fn_t)CthStartThread, 2, (void *)fn,(void *)arg);
   if(errno !=0) { 
     perror("makecontext"); 
     CmiAbort("CthCreateInner: makecontext failed.\n");
