@@ -83,7 +83,6 @@ class Compute: public CBase_Compute {
     int countA, countB, countC;
     infiDirectUserHandle *sHandles;
     infiDirectUserHandle *rHandles;
-    int numIterations;
     
     Compute();
     Compute(CkMigrateMessage* m);

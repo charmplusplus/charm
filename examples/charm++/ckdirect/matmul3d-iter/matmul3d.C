@@ -144,23 +144,28 @@ Compute::Compute() {
 #if USE_CKDIRECT
   tmpC = new float[blockDimX*blockDimZ];
 #endif
+
+  int indexX = thisIndex.x;
+  int indexY = thisIndex.y;
+  int indexZ = thisIndex.z;
+
   float tmp;
 
-  for(int i=0; i<blockDimX; i++)
+  for(int i=indexZ*subBlockDimXz; i<(indexZ+1)*subBlockDimXz; i++)
     for(int j=0; j<blockDimY; j++) {
       tmp = (float)drand48();
       while(tmp > MAX_LIMIT || tmp < (-1)*MAX_LIMIT)
-	tmp = (float)drand48();
-      
+        tmp = (float)drand48();
+
       A[i*blockDimY + j] = tmp;
   }
 
-  for(int j=0; j<blockDimY; j++)
+  for(int j=indexX*subBlockDimYx; j<(indexX+1)*subBlockDimYx; j++)
     for(int k=0; k<blockDimZ; k++) {
       tmp = (float)drand48();
       while(tmp > MAX_LIMIT || tmp < (-1)*MAX_LIMIT)
-	tmp = (float)drand48();
-      
+        tmp = (float)drand48();
+
       B[j*blockDimZ + k] = tmp;
   }
 
@@ -176,7 +181,6 @@ Compute::Compute() {
   countA = 0;
   countB = 0;
   countC = 0;
-  numIterations = 0;
 
 #if USE_CKDIRECT
   sHandles = new infiDirectUserHandle[num_chare_x + num_chare_y + num_chare_z];
@@ -203,25 +207,29 @@ void Compute::beginCopying() {
 }
 
 void Compute::resetArrays() {
+  int indexX = thisIndex.x;
+  int indexY = thisIndex.y;
+  int indexZ = thisIndex.z;
+  
   float tmp;
-
-  for(int i=0; i<blockDimX; i++)
+  
+  for(int i=indexZ*subBlockDimXz; i<(indexZ+1)*subBlockDimXz; i++)
     for(int j=0; j<blockDimY; j++) {
-      tmp = (float)drand48();
+      tmp = (float)drand48(); 
       while(tmp > MAX_LIMIT || tmp < (-1)*MAX_LIMIT)
-	tmp = (float)drand48();
-      
-      A[i*blockDimY + j] = tmp;
-    }
+        tmp = (float)drand48();
 
-  for(int j=0; j<blockDimY; j++)
+      A[i*blockDimY + j] = tmp;
+  }
+
+  for(int j=indexX*subBlockDimYx; j<(indexX+1)*subBlockDimYx; j++)
     for(int k=0; k<blockDimZ; k++) {
       tmp = (float)drand48();
       while(tmp > MAX_LIMIT || tmp < (-1)*MAX_LIMIT)
-	tmp = (float)drand48();
-      
+        tmp = (float)drand48();
+
       B[j*blockDimZ + k] = tmp;
-    }
+  }
 
   for(int i=0; i<blockDimX; i++)
     for(int k=0; k<blockDimZ; k++) {
@@ -237,11 +245,6 @@ void Compute::resetArrays() {
 
 void Compute::sendA() {
   int indexZ = thisIndex.z;
-  /* this copying of data is unnecessary ---
-  float *dataA = new float[subBlockDimXz * blockDimY];
-  for(int i=0; i<subBlockDimXz; i++)
-    for(int j=0; j<blockDimY; j++)
-      dataA[i*blockDimY + j] = A[indexZ*subBlockDimXz*blockDimY + i*blockDimY + j];*/
 
   for(int k=0; k<num_chare_z; k++)
     if(k != indexZ) {
@@ -260,11 +263,6 @@ void Compute::sendA() {
 
 void Compute::sendB() {
   int indexX = thisIndex.x;
-  /* this copying of data is unnecessary ---
-  float *dataB = new float[subBlockDimYx * blockDimZ];
-  for(int j=0; j<subBlockDimYx; j++)
-    for(int k=0; k<blockDimZ; k++)
-      dataB[j*blockDimZ + k] = B[indexX*subBlockDimYx*blockDimZ + j*blockDimZ + k];*/
 
   for(int i=0; i<num_chare_x; i++)
     if(i != indexX) {
@@ -285,12 +283,6 @@ void Compute::sendC() {
   int indexY = thisIndex.y;
   for(int j=0; j<num_chare_y; j++) {
     if(j != indexY) {
-      /* this copying of data is unnecessary ---
-      float *dataC = new float[subBlockDimXy * blockDimZ];
-      for(int i=0; i<subBlockDimXy; i++)
-	for(int k=0; k<blockDimZ; k++)
-	  dataC[i*blockDimZ + k] = C[j*subBlockDimXy*blockDimZ + i*blockDimZ + k];*/
-
 #if USE_CKDIRECT
       CkDirect_put(&sHandles[num_chare_x + j]);
 #else
@@ -399,7 +391,6 @@ void Compute::receiveC() {
   countB = 0;
   countC = 0;
 
-  numIterations++;
   contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::done(), mainProxy));
   // mainProxy.done();
 }
