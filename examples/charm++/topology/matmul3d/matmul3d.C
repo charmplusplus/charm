@@ -64,7 +64,7 @@ Main::Main(CkArgMsg* m) {
 
   subBlockDimXz = blockDimX/num_chare_z;
   subBlockDimYx = blockDimY/num_chare_x;
-  subBlockDimXy = blockDimZ/num_chare_y;
+  subBlockDimXy = blockDimX/num_chare_y;
 
   // print info
   CkPrintf("Running Matrix Multiplication on %d processors with (%d, %d, %d) chares\n", CkNumPes(), num_chare_x, num_chare_y, num_chare_z);
@@ -91,17 +91,24 @@ Main::Main(CkArgMsg* m) {
   // CkPrintf("Total Hops: %d\n", hops);
 
   // Start the computation
-  doneCount=0;
+  numIterations = 0;
   startTime = CmiWallTimer();
   compute.beginCopying();
 }
 
 void Main::done() {
-  doneCount++;
-  if(doneCount == num_chares) {
+  numIterations++;
+  if(numIterations == 1) {
+    firstTime = CmiWallTimer();
+    CkPrintf("FIRST ITER TIME %f secs\n", firstTime - startTime);
+  }
+
+  if(numIterations == NUM_ITER) {
     endTime = CmiWallTimer();
-    CkPrintf("TIME %f secs\n", endTime - startTime);
+    CkPrintf("AVG TIME %f secs\n", (endTime - firstTime)/(NUM_ITER-1));
     CkExit();
+  } else {
+    compute.resetArrays();
   }
 }
 
@@ -116,21 +123,25 @@ Compute::Compute() {
   int indexY = thisIndex.y;
   int indexZ = thisIndex.z;
 
-  for(int i=0; i<blockDimX; i++)
-    for(int j=0; j<blockDimY; j++) {
-      if(i>=indexZ*subBlockDimXz && i<(indexZ+1)*subBlockDimXz)
-	A[i*blockDimY + j] = 1.0;
-      else
-	A[i*blockDimY + j] = 0.0;
-    }
+  float tmp;
 
-  for(int j=0; j<blockDimY; j++)
+  for(int i=indexZ*subBlockDimXz; i<(indexZ+1)*subBlockDimXz; i++)
+    for(int j=0; j<blockDimY; j++) {
+      tmp = (float)drand48();
+      while(tmp > MAX_LIMIT || tmp < (-1)*MAX_LIMIT)
+        tmp = (float)drand48();
+
+      A[i*blockDimY + j] = tmp;
+  }
+
+  for(int j=indexX*subBlockDimYx; j<(indexX+1)*subBlockDimYx; j++)
     for(int k=0; k<blockDimZ; k++) {
-      if(j>=indexX*subBlockDimYx && j<(indexX+1)*subBlockDimYx)
-	B[j*blockDimZ + k] = 2.0;
-      else
-	B[j*blockDimZ + k] = 0.0;
-    }
+      tmp = (float)drand48();
+      while(tmp > MAX_LIMIT || tmp < (-1)*MAX_LIMIT)
+        tmp = (float)drand48();
+
+      B[j*blockDimZ + k] = tmp;
+  }
 
   for(int i=0; i<blockDimX; i++)
     for(int k=0; k<blockDimZ; k++)
@@ -157,13 +168,45 @@ void Compute::beginCopying() {
   sendB();
 }
 
+void Compute::resetArrays() {
+  int indexX = thisIndex.x;
+  int indexY = thisIndex.y;
+  int indexZ = thisIndex.z;
+
+  float tmp;
+
+  for(int i=indexZ*subBlockDimXz; i<(indexZ+1)*subBlockDimXz; i++)
+    for(int j=0; j<blockDimY; j++) {
+      tmp = (float)drand48();
+      while(tmp > MAX_LIMIT || tmp < (-1)*MAX_LIMIT)
+        tmp = (float)drand48();
+
+      A[i*blockDimY + j] = tmp;
+  }
+
+  for(int j=indexX*subBlockDimYx; j<(indexX+1)*subBlockDimYx; j++)
+    for(int k=0; k<blockDimZ; k++) {
+      tmp = (float)drand48();
+      while(tmp > MAX_LIMIT || tmp < (-1)*MAX_LIMIT)
+        tmp = (float)drand48();
+
+      B[j*blockDimZ + k] = tmp;
+  }
+
+  for(int i=0; i<blockDimX; i++)
+    for(int k=0; k<blockDimZ; k++) {
+      C[i*blockDimZ + k] = 0.0;
+#if USE_CKDIRECT
+      tmpC[i*blockDimZ + k] = 0.0;
+#endif
+    }
+
+  sendA();
+  sendB();
+}
+
 void Compute::sendA() {
   int indexZ = thisIndex.z;
-  /* this copying of data is unnecessary ---
-  float *dataA = new float[subBlockDimXz * blockDimY];
-  for(int i=0; i<subBlockDimXz; i++)
-    for(int j=0; j<blockDimY; j++)
-      dataA[i*blockDimY + j] = A[indexZ*subBlockDimXz*blockDimY + i*blockDimY + j];*/
 
   for(int k=0; k<num_chare_z; k++)
     if(k != indexZ) {
@@ -178,11 +221,6 @@ void Compute::sendA() {
 
 void Compute::sendB() {
   int indexX = thisIndex.x;
-  /* this copying of data is unnecessary ---
-  float *dataB = new float[subBlockDimYx * blockDimZ];
-  for(int j=0; j<subBlockDimYx; j++)
-    for(int k=0; k<blockDimZ; k++)
-      dataB[j*blockDimZ + k] = B[indexX*subBlockDimYx*blockDimZ + j*blockDimZ + k];*/
 
   for(int i=0; i<num_chare_x; i++)
     if(i != indexX) {
@@ -199,12 +237,6 @@ void Compute::sendC() {
   int indexY = thisIndex.y;
   for(int j=0; j<num_chare_y; j++) {
     if(j != indexY) {
-      /* this copying of data is unnecessary ---
-      float *dataC = new float[subBlockDimXy * blockDimZ];
-      for(int i=0; i<subBlockDimXy; i++)
-	for(int k=0; k<blockDimZ; k++)
-	  dataC[i*blockDimZ + k] = C[j*subBlockDimXy*blockDimZ + i*blockDimZ + k];*/
-
       // use a local pointer for chares on the same processor
       Compute *c = compute(thisIndex.x, j, thisIndex.z).ckLocal();
       if(c != NULL)
@@ -251,7 +283,14 @@ void Compute::receiveC(float *data, int size, int who) {
       fprintf(fp, "\n");
     }
     fclose(fp);*/
-    mainProxy.done();
+
+    // counters to keep track of how many messages have been received
+    countA = 0;
+    countB = 0;
+    countC = 0;
+
+    contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::done(), mainProxy));
+    // mainProxy.done();
   }
 }
 

@@ -27,6 +27,7 @@ mainmodule matmul3d {
   array [3D] Compute {
     entry Compute(void);
     entry void beginCopying();
+    entry void resetArrays();
     entry void receiveA(int indexZ, float data[size], int size);
     entry void receiveB(int indexX, float data[size], int size);
     entry void receiveC(float data[size], int size, int who);

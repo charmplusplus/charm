@@ -43,7 +43,12 @@ int myrand(int numpes) {
 #define USE_TOPOMAP	0
 #define USE_BLOCKMAP	1
 
+#define NUM_ITER	21
+
+#define MAX_LIMIT       9999999999.0
+
 double startTime;
+double firstTime;
 double endTime;
 
 /** \class Main
@@ -51,7 +56,7 @@ double endTime;
  */
 class Main : public CBase_Main {
   public:
-    int doneCount;
+    int numIterations;
 
     Main(CkArgMsg* m);
     void done();
@@ -64,12 +69,13 @@ class Compute: public CBase_Compute {
   public:
     float *A, *B, *C;
     int countA, countB, countC;
-    
+
     Compute();
     Compute(CkMigrateMessage* m);
     ~Compute();
 
     void beginCopying();
+    void resetArrays();
     void sendA();
     void sendB();
     void sendC();
