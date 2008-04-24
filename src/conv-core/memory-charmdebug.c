@@ -12,20 +12,25 @@
  * - sweep of the memory searching for leaks
  */
 
+#if ! CMK_MEMORY_BUILD_OS
 /* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
 #include "memory-gnu.c"
+#endif
 #include "tracec.h"
+#include <sys/mman.h>
 
 /* Utilities needed by the code */
 #include "ckhashtable.h"
 
 /*#include "pup_c.h" */
 
+#include "crc32.h"
+
 typedef struct _Slot Slot;
 typedef struct _SlotStack SlotStack;
 
 int nextChareID;
-int memory_chare_id;
+extern int memory_chare_id;
 
 /**
  * Struct Slot contains all of the information about a malloc buffer except
@@ -63,6 +68,10 @@ struct _Slot {
 
   /* Pointer to extra stacktrace, when the user requested more trace */
   SlotStack *extraStack;
+
+  /* CRC32 checksums */
+  unsigned int slotCRC;
+  unsigned int userCRC;
 };
 
 struct _SlotStack {
@@ -263,7 +272,7 @@ void check_memory_leaks(CpdListItemsRequest *req) {
   inProgress.prev = &inProgress;
   inProgress.next = &inProgress;
   begin_stack = (char*)&table;
-  end_stack = memory_stack_top;
+  end_stack = (char*)memory_stack_top;
   if (req->extraLen != 4*4/*sizeof(char*) FIXME: assumes 64 bit addresses of .data and .bss are small enough*/) {
     CmiPrintf("requested for a memory leak check with wrong information! %d bytes\n",req->extraLen);
   }
@@ -484,7 +493,7 @@ void printAllocationTree(AllocationPoint *node, FILE *fd, int depth) {
 AllocationPoint * CreateAllocationTree(int *nodesCount) {
   Slot *scanner;
   CkHashtable_c table;
-  int i, new;
+  int i, isnew;
   AllocationPoint *parent, **start, *cur;
   AllocationPoint *root = NULL;
   int numNodes = 0;
@@ -492,15 +501,26 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
   scanner=slot_first->next;
   table = CkCreateHashtable_pointer(sizeof(char *), 10000);
 
+  root = (AllocationPoint*) mm_malloc(sizeof(AllocationPoint));
+  *(AllocationPoint**)CkHashtablePut(table, &numNodes) = root;
+  numNodes ++;
+  root->key = 0;
+  root->parent = NULL;
+  root->size = 0;
+  root->count = 0;
+  root->flags = 0;
+  root->firstChild = NULL;
+  root->sibling = NULL;
+
   for ( ; scanner!=slot_first; scanner=scanner->next) {
-    parent = NULL;
+    parent = root;
     for (i=scanner->stackLen-1; i>=0; --i) {
-      new = 0;
-      start = CkHashtableGet(table, &scanner->from[i]);
+      isnew = 0;
+      start = (AllocationPoint**)CkHashtableGet(table, &scanner->from[i]);
       if (start == NULL) {
         cur = (AllocationPoint*) mm_malloc(sizeof(AllocationPoint));
         numNodes ++;
-        new = 1;
+        isnew = 1;
         cur->next = cur;
         *(AllocationPoint**)CkHashtablePut(table, &scanner->from[i]) = cur;
       } else {
@@ -508,27 +528,27 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
         if (cur->parent != parent) {
           cur = (AllocationPoint*) mm_malloc(sizeof(AllocationPoint));
           numNodes ++;
-          new = 1;
+          isnew = 1;
           cur->next = (*start)->next;
           (*start)->next = cur;
         }
       }
       // here "cur" points to the correct AllocationPoint for this stack frame
-      if (new) {
+      if (isnew) {
         cur->key = scanner->from[i];
         cur->parent = parent;
         cur->size = 0;
         cur->count = 0;
         cur->flags = 0;
         cur->firstChild = NULL;
-        if (parent == NULL) {
-          cur->sibling = NULL;
-          CmiAssert(root == NULL);
-          root = cur;
-        } else {
+        //if (parent == NULL) {
+        //  cur->sibling = NULL;
+        //  CmiAssert(root == NULL);
+        //  root = cur;
+        //} else {
           cur->sibling = parent->firstChild;
           parent->firstChild = cur;
-        }
+        //}
       }
       cur->size += scanner->userSize;
       cur->count ++;
@@ -543,7 +563,7 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
   fprintf(fd, "digraph %s {\n", filename);
   CkHashtableIterator_c it = CkHashtableGetIterator(table);
   AllocationPoint **startscan, *scan;
-  while ((startscan=CkHashtableIteratorNext(it,NULL))!=NULL) {
+  while ((startscan=(AllocationPoint**)CkHashtableIteratorNext(it,NULL))!=NULL) {
     fprintf(fd, "\t\"n%p\" [label=\"%p\\nsize=%d\\ncount=%d\"];\n",*startscan,(*startscan)->key,
           (*startscan)->size,(*startscan)->count);
     for (scan = (*startscan)->next; scan != *startscan; scan = scan->next) {
@@ -551,7 +571,7 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
     }
   }
   CkHashtableIteratorSeekStart(it);
-  while ((startscan=CkHashtableIteratorNext(it,NULL))!=NULL) {
+  while ((startscan=(AllocationPoint**)CkHashtableIteratorNext(it,NULL))!=NULL) {
     fprintf(fd, "\t\"n%p\" -> \"n%p\";\n",(*startscan)->parent,(*startscan));
     for (scan = (*startscan)->next; scan != *startscan; scan = scan->next) {
       fprintf(fd, "\t\"n%p\" -> \"n%p\";\n",scan->parent,scan);
@@ -616,6 +636,41 @@ void * MergeAllocationTree(void *data, void **remoteData, int numRemote) {
     MergeAllocationTreeSingle((AllocationPoint*)data, &root, numChildren, p);
   }
   return data;
+}
+
+
+int checkSlotCRC(void *userPtr) {
+  Slot *sl = UserToSlot(userPtr);
+  unsigned int crc = crc32((unsigned char*)sl, sizeof(Slot)-2*sizeof(unsigned int));
+  crc = crc32_update((unsigned char*)sl->from, sl->stackLen*sizeof(void*), crc);
+  return sl->slotCRC == crc;
+}
+
+int checkUserCRC(void *userPtr) {
+  Slot *sl = UserToSlot(userPtr);
+  return sl->userCRC == crc32((unsigned char*)userPtr, sl->userSize);
+}
+
+void resetUserCRC(void *userPtr) {
+  Slot *sl = UserToSlot(userPtr);
+  sl->userCRC = crc32((unsigned char*)userPtr, sl->userSize);
+}
+
+void checkAllCRC(int report) {
+  Slot *cur;
+  unsigned int crc1, crc2;
+  
+  for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
+    crc1 = crc32((unsigned char*)cur, sizeof(Slot)-2*sizeof(unsigned int));
+    crc1 = crc32_update((unsigned char*)cur->from, cur->stackLen*sizeof(void*), crc1);
+    crc2 = crc32((unsigned char*)SlotToUser(cur), cur->userSize);
+    /* Here we can check if a modification has occured */
+    if (report && cur->slotCRC != crc1) CmiPrintf("Object %d modified slot for %p\n",memory_chare_id,SlotToUser(cur));
+    cur->slotCRC = crc1;
+    if (report && cur->userCRC != crc2 && memory_chare_id != cur->chareID)
+      CmiPrintf("Object %d modified memory of object %d for %p\n",memory_chare_id,cur->chareID,SlotToUser(cur));
+    cur->userCRC = crc2;
+  }
 }
 
 /*
@@ -700,6 +755,9 @@ static void *setSlot(Slot *s,int userSize) {
   s->from=(void**)(user+userSize);
   memcpy(s->from, &stackFrames[4], numStackFrames*sizeof(void*));
   
+  unsigned int crc = crc32((unsigned char*)s, sizeof(Slot)-2*sizeof(unsigned int));
+  s->slotCRC = crc32_update((unsigned char*)s->from, numStackFrames*sizeof(void*), crc);
+  s->userCRC = crc32((unsigned char*)user, userSize);
   return (void *)user;
 }
 
@@ -756,7 +814,7 @@ static void meta_init(char **argv) {
   sprintf(buf,"slot size %d\n",sizeof(Slot));
   status(buf);
   charmEnvelopeSize = getCharmEnvelopeSize();
-  CpdDebugGetAllocationTree = CreateAllocationTree;
+  CpdDebugGetAllocationTree = (void* (*)(int*))CreateAllocationTree;
   CpdDebug_pupAllocationPoint = pupAllocationPoint;
   CpdDebug_deleteAllocationPoint = deleteAllocationPoint;
   CpdDebug_MergeAllocationTree = MergeAllocationTree;
@@ -768,19 +826,31 @@ static void *meta_malloc(size_t size) {
   dumpStackFrames();
   Slot *s=(Slot *)mm_malloc(sizeof(Slot)+size+numStackFrames*sizeof(void*));
   char *user = (char*)s;
-  if (s!=NULL) user = setSlot(s,size);
-  memory_allocated_user_total += size;
-  traceMalloc_c(user, size, s->from, s->stackLen);
+  if (s!=NULL) {
+    user = (char*)setSlot(s,size);
+    memory_allocated_user_total += size;
+    traceMalloc_c(user, size, s->from, s->stackLen);
+  }
   return user;
 }
 
 static void meta_free(void *mem) {
   Slot *s;
+  if (mem==NULL) return; /*Legal, but misleading*/
+#if CMK_MEMORY_BUILD_OS
+  /* In this situation, we can have frees that were not allocated by our malloc...
+   * for now simply skip over them. */
+  s=((Slot *)mem)-1;
+  if ((s->magic&~FLAGS_MASK) != SLOTMAGIC_VALLOC &&
+      (s->magic&~FLAGS_MASK) != SLOTMAGIC) {
+    mm_free(mem);
+    return;
+  }
+#endif
   int memSize = 0;
   if (mem!=NULL) memSize = (((Slot*)mem)-1)->userSize;
   memory_allocated_user_total -= memSize;
   traceFree_c(mem, memSize);
-  if (mem==NULL) return; /*Legal, but misleading*/
 
   s=((Slot *)mem)-1;
   if ((s->magic&~FLAGS_MASK)==SLOTMAGIC_VALLOC)
@@ -802,7 +872,7 @@ static void meta_free(void *mem) {
 
 static void *meta_calloc(size_t nelem, size_t size) {
   void *area=meta_malloc(nelem*size);
-  memset(area,0,nelem*size);
+  if (area != NULL) memset(area,0,nelem*size);
   return area;
 }
 
