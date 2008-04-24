@@ -15,9 +15,11 @@
  * of slowdown per malloc/free.
  */
 
+#if ! CMK_MEMORY_BUILD_OS
 /* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
 #include "memory-gnuold.c"
- 
+#endif
+
 
 typedef struct Slot Slot;
 /*
@@ -215,7 +217,7 @@ static void meta_free(void *mem)
 static void *meta_calloc(size_t nelem, size_t size)
 {
   void *area=meta_malloc(nelem*size);
-  memset(area,0,nelem*size);
+  if (area != NULL) memset(area,0,nelem*size);
   return area;
 }
 

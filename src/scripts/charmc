@@ -1418,6 +1418,13 @@ then
   Abort "charmc : No such memory mode $MEMORY"
 fi
 
+# For memory wrapping around the OS allocator, need to add also the wrapper object
+case $MEMORY in
+  os-*)
+  MEM_OBJ=$MEM_OBJ" $CHARMLIB/libmemory-os-wrapper.o"
+  ;;
+esac
+
 # Check for valid choice of THREAD
 
 if [ "$CHARM_SHARED" = "1" -a -n "$CMK_LD_SHARED_THREAD" -a "$THREAD" = "default" ]

@@ -47,10 +47,82 @@ void * memory_stack_top; /*The higher end of the stack (approximation)*/
 
 #endif
 
+#if CMK_MEMORY_BUILD_OS_WRAPPED
+#define CMK_MEMORY_BUILD_OS 1
+#endif
 	 
 #if CMK_MEMORY_BUILD_OS
+#if CMK_MEMORY_BUILD_OS_WRAPPED
+
+void * initialize_memory_wrapper_calloc(size_t nelem, size_t size);
+void * initialize_memory_wrapper_malloc(size_t size);
+void * initialize_memory_wrapper_realloc(void *ptr, size_t size);
+void * initialize_memory_wrapper_memalign(size_t align, size_t size);
+void * initialize_memory_wrapper_valloc(size_t size);
+void initialize_memory_wrapper_free(void *ptr);
+void initialize_memory_wrapper_cfree(void *ptr);
+
+void * (*mm_malloc)(size_t) = initialize_memory_wrapper_malloc;
+void * (*mm_calloc)(size_t,size_t) = initialize_memory_wrapper_calloc;
+void * (*mm_realloc)(void*,size_t) = initialize_memory_wrapper_realloc;
+void * (*mm_memalign)(size_t,size_t) = initialize_memory_wrapper_memalign;
+void * (*mm_valloc)(size_t) = initialize_memory_wrapper_valloc;
+void (*mm_free)(void*) = initialize_memory_wrapper_free;
+void (*mm_cfree)(void*) = initialize_memory_wrapper_cfree;
+
+void * initialize_memory_wrapper_calloc(size_t nelem, size_t size) {
+  static int calloc_wrapper = 0;
+  if (calloc_wrapper) return NULL;
+  calloc_wrapper = 1;
+  initialize_memory_wrapper();
+  return (*mm_calloc)(nelem,size);
+}
+
+void * initialize_memory_wrapper_malloc(size_t size) {
+  static int malloc_wrapper = 0;
+  if (malloc_wrapper) return NULL;
+  malloc_wrapper = 1;
+  initialize_memory_wrapper();
+  return (*mm_malloc)(size);
+}
+
+void * initialize_memory_wrapper_realloc(void *ptr, size_t size) {
+  initialize_memory_wrapper();
+  return (*mm_realloc)(ptr,size);
+}
+
+void * initialize_memory_wrapper_memalign(size_t align, size_t size) {
+  initialize_memory_wrapper();
+  return (*mm_memalign)(align,size);
+}
+
+void * initialize_memory_wrapper_valloc(size_t size) {
+  initialize_memory_wrapper();
+  return (*mm_valloc)(size);
+}
+
+void initialize_memory_wrapper_free(void *ptr) {
+  initialize_memory_wrapper();
+  (*mm_free)(ptr);
+}
+
+void initialize_memory_wrapper_cfree(void *ptr) {
+  initialize_memory_wrapper();
+  (*mm_cfree)(ptr);
+}
+
+#define mm_malloc   (*mm_malloc)
+#define mm_free     (*mm_free)
+#define mm_calloc   (*mm_calloc)
+#define mm_cfree    (*mm_cfree)
+#define mm_realloc  (*mm_realloc)
+#define mm_memalign (*mm_memalign)
+#define mm_valloc   (*mm_valloc)
+
+#else
 #define mm_malloc   malloc
 #define mm_free     free
+#endif
 #endif
 
 CMK_TYPEDEF_UINT8 memory_allocated = 0;
@@ -99,10 +171,48 @@ int memory_chare_id=0;
 */
 
 
+#if CMK_MEMORY_BUILD_OS_WRAPPED
+
+#if CMK_MEMORY_BUILD_VERBOSE
+#include "memory-verbose.c"
+#endif
+
+#if CMK_MEMORY_BUILD_PARANOID
+#include "memory-paranoid.c"
+#endif
+
+#if CMK_MEMORY_BUILD_LEAK
+#include "memory-leak.c"
+#endif
+
+#if CMK_MEMORY_BUILD_CACHE
+#include "memory-cache.c"
+#endif 
+
+#if CMK_MEMORY_BUILD_ISOMALLOC
+#include "memory-isomalloc.c"
+#endif 
+
+#if CMK_MEMORY_BUILD_CHARMDEBUG
+#include "memory-charmdebug.c"
+#endif
+
+void *malloc(size_t size) { meta_malloc(size); }
+void free(void *ptr) { meta_free(ptr); }
+void *calloc(size_t nelem, size_t size) { meta_calloc(nelem,size); }
+void cfree(void *ptr) { meta_cfree(ptr); }
+void *realloc(void *ptr, size_t size) { meta_realloc(ptr,size); }
+void *memalign(size_t align, size_t size) { meta_memalign(align,size); }
+void *valloc(size_t size) { meta_valloc(size); }
+
+#endif
 
 void CmiMemoryInit(argv)
   char **argv;
 {
+#if CMK_MEMORY_BUILD_OS_WRAPPED
+  meta_init(argv);
+#endif
   CmiOutOfMemoryInit();
 }
 void *malloc_reentrant(size_t size) { return malloc(size); }

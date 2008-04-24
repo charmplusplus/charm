@@ -318,7 +318,10 @@ MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
           $(L)/libmemory-gnuold.o $(L)/libmemory-verbose.o 	\
 	  $(L)/libmemory-paranoid.o \
 	  $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o \
-	  $(L)/libmemory-charmdebug.o 
+	  $(L)/libmemory-charmdebug.o \
+	  $(L)/libmemory-os-verbose.o $(L)/libmemory-os-isomalloc.o \
+	  $(L)/libmemory-os-leak.o $(L)/libmemory-os-paranoid.o \
+	  $(L)/libmemory-os-charmdebug.o$(L)/libmemory-os-wrapper.o
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o 	\
 	  $(L)/libthreads-context.o $(L)/libthreads-uJcontext.o \
 	  $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o \
@@ -506,6 +509,24 @@ $(L)/libmemory-default.o: $(MEM_DEPS)
 
 $(L)/libmemory-os.o: $(MEM_DEPS)
 	$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_OS memory.c
+
+$(L)/libmemory-os-verbose.o: memory-verbose.c $(MEM_DEPS)
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_VERBOSE memory.c || touch $@
+
+$(L)/libmemory-os-paranoid.o: memory-paranoid.c $(MEM_DEPS)
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_PARANOID memory.c || touch $@
+
+$(L)/libmemory-os-leak.o: $(MEM_DEPS)
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_LEAK memory.c || touch $@
+
+$(L)/libmemory-os-isomalloc.o: memory-isomalloc.c $(MEM_DEPS)
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_ISOMALLOC memory.c || touch $@
+
+$(L)/libmemory-os-charmdebug.o: memory-charmdebug.c $(MEM_DEPS)
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_CHARMDEBUG memory.c || touch $@
+
+$(L)/libmemory-os-wrapper.o: memory-os-wrapper.C $(MEM_DEPS)
+	-$(CHARMC) -o $@ memory-os-wrapper.C || touch $@
 
 # If the system doesn't have sbrk, these compilations may fail.
 #  This is OK, but then we can't use "-memory gnu" or friends.

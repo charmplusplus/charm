@@ -7,8 +7,10 @@ be wrapped in CmiMemLock.  (Doesn't hurt, tho')
 
 *****************************************************************************/
 
+#if ! CMK_MEMORY_BUILD_OS
 /* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
 #include "memory-gnu.c"
+#endif
 
 #include "memory-isomalloc.h"
 
@@ -74,7 +76,7 @@ static void meta_free(void *mem)
 static void *meta_calloc(size_t nelem, size_t size)
 {
 	void *ret=meta_malloc(nelem*size);
-	memset(ret,0,nelem*size);
+	if (ret != NULL) memset(ret,0,nelem*size);
 	return ret;
 }
 
