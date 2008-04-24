@@ -3,7 +3,7 @@
  Department of Computer Science
  Parallel Programming Lab
  2008
- Authors: Kumaresh Pattabiraman and Esteban Meneses
+ Authors: Kumaresh Pattabiraman, Esteban Meneses and Isaac Dooley
 */
 
 #include "charm++.h"

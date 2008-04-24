@@ -3,16 +3,17 @@
  Department of Computer Science
  Parallel Programming Lab
  2008
- Authors: Kumaresh Pattabiraman and Esteban Meneses
+ Authors: Kumaresh Pattabiraman, Esteban Meneses and Isaac Dooley
 */
+
 #include "liveViz.h"
 #include "main.h"
 #include "main.decl.h"
 
-//#define DEBUG 1
+//#define DEBUG 0
 
-double A=0.1;
-double B=0.01;
+double A=2.0;
+double B=1.0;
 
 #define DEFAULT_PARTICLES 3000
 #define DEFAULT_M 5
@@ -21,7 +22,8 @@ double B=0.01;
 #define DEFAULT_RADIUS 5
 #define DEFAULT_FINALSTEPCOUNT 1000
 
-#define MAX_VELOCITY 2.0
+#define MAX_VELOCITY 4.0
+
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ CProxy_Cell cellArray;
 /* readonly */ CProxy_Interaction interactionArray;
@@ -32,9 +34,6 @@ double B=0.01;
 /* readonly */ int L; 
 /* readonly */ double radius;
 /* readonly */ int finalStepCount; 
-
-
-
 
 class Color {
 public:
@@ -81,11 +80,6 @@ public:
 	
 };
 
-
-
-
-
-
 // Class representing a cell in the grid. We consider each cell as a square of LxL units
 class Cell : public CBase_Cell {
   private:
@@ -109,7 +103,7 @@ class Cell : public CBase_Cell {
     void start();
     void updateParticles(CkVec<Particle>&);
     void updateForces(CkVec<Particle>&);
-    void limitDisplacement(Particle&, double&, double&);
+    void limitVelocity(Particle&);
     Particle& wrapAround(Particle &);
     void stepDone();
     void requestNextFrame(liveVizRequestMsg *m);
@@ -134,7 +128,7 @@ class Interaction : public CBase_Interaction {
 
 
 };
-    
+
 // Main class
 class Main : public CBase_Main {
 
@@ -147,7 +141,6 @@ class Main : public CBase_Main {
 
   public:
 
-    /// Constructors ///
     Main(CkArgMsg* msg);
     Main(CkMigrateMessage* msg);
 
@@ -266,6 +259,8 @@ Cell::Cell() {
 		particles.push_back(Particle());
 		particles[i].x = drand48() * L + thisIndex.x * L;
     particles[i].y = drand48() * L + thisIndex.y * L;
+    particles[i].vx = (drand48() - 0.5) * 2 * MAX_VELOCITY;
+    particles[i].vy = (drand48() * 0.5) * 2 * MAX_VELOCITY;
     particles[i].id = (thisIndex.x*m + thisIndex.y) * numParts / (m*n)  + i;
 	}	
 
@@ -477,9 +472,6 @@ void Cell::updateForces(CkVec<Particle> &updates) {
   }
     
 }
-
-
-
     
 void color_pixel(unsigned char*buf,int width, int height, int xpos,int ypos,unsigned char R,unsigned char G,unsigned char B){
   if(xpos>=0 && xpos<width && ypos>=0 && ypos<height){
@@ -490,10 +482,7 @@ void color_pixel(unsigned char*buf,int width, int height, int xpos,int ypos,unsi
 }
     
 
-// provide my portion of the image to the graphical liveViz client
-// Currently we just provide some pretty color depending upon the thread id
-// In a real program we would provide a colored rectangle or pixel that
-// depends upon the local thread data.
+// Each chare provides its particle data to LiveViz
 void Cell::requestNextFrame(liveVizRequestMsg *lvmsg) {
   // These specify the desired total image size requested by the client viewer
   int wdes = lvmsg->req.wid;
@@ -519,7 +508,7 @@ void Cell::requestNextFrame(liveVizRequestMsg *lvmsg) {
     } 
   }
 
-  CkAssert(particles.length()>=1);
+  //CkAssert(particles.length()>=1);
 
   for (int i=0; i < particles.length(); i++ ){
     
@@ -626,50 +615,36 @@ void Cell::updateProperties(){
 		particles[i].vx = particles[i].vx + particles[i].ax * DEFAULT_DELTA;
 		particles[i].vy = particles[i].vy + particles[i].ay * DEFAULT_DELTA;
 
-    limitDisplacement( particles[i], xDisp, yDisp );
+    limitVelocity( particles[i] );
 
-		particles[i].x = particles[i].x + xDisp;
-		particles[i].y = particles[i].y + yDisp;
+		particles[i].x = particles[i].x + particles[i].vx * DEFAULT_DELTA;
+		particles[i].y = particles[i].y + particles[i].vy * DEFAULT_DELTA;
 
 		particles[i].fx = 0.0;
 		particles[i].fy = 0.0;
-
-		// checking boundary conditions
-		//if(particles[i].x < 0.0) particles[i].x = 0.0;
-    /*
-		if(particles[i].x < 0.0) particles[i].x += L*m;
-		if(particles[i].y < 0.0) particles[i].y += L*n;
-		if(particles[i].x > L*m) particles[i].x -= L*m;
-		if(particles[i].y > L*n) particles[i].y -= L*n;
-    */
-		//if(particles[i].x < 0.0) particles[i].x = 0.0;
 
 	}
 
 }
 
-void Cell::limitDisplacement(Particle &p, double &xDisp, double &yDisp) {
+void Cell::limitVelocity(Particle &p) {
 
     if( fabs(p.vx * DEFAULT_DELTA) > DEFAULT_RADIUS ) {
+      //CkPrintf("p.vx: %f\n",p.vx);
       if( p.vx * DEFAULT_DELTA < 0.0 )
-        //xDisp = -DEFAULT_RADIUS;
         p.vx = -MAX_VELOCITY;
       else
-        //xDisp = DEFAULT_RADIUS;*/
         p.vx = MAX_VELOCITY;
       
     }
-    xDisp = p.vx * DEFAULT_DELTA;
 
     if( fabs(p.vy * DEFAULT_DELTA) > DEFAULT_RADIUS ) {
+      //CkPrintf("vy: %f\n",p.vy);
       if( p.vy * DEFAULT_DELTA < 0.0 )
-        //yDisp = -DEFAULT_RADIUS;
         p.vy = -MAX_VELOCITY;
       else
-        //yDisp = DEFAULT_RADIUS;
         p.vy = MAX_VELOCITY;
     }
-    yDisp = p.vy * DEFAULT_DELTA;
 }
 
 Particle& Cell::wrapAround(Particle &p) {
@@ -707,10 +682,7 @@ void Interaction::interact(CkVec<Particle> particles, int x, int y ) {
 
 	      bufferedX = x;
     	  bufferedY = y;
-        /*for(i=0;i<particles.length();i++) {
-			    bufferedParticles.push_back(particles[i]);
-        }*/
-        bufferedParticles = particles; /* CHECKME */
+        bufferedParticles = particles;
         cellCount++;
 
 		} else if(cellCount == 1) {
@@ -744,7 +716,8 @@ void Interaction::interact(Particle &first, Particle &second){
 	ry = first.y - second.y;
 	r = sqrt(rx*rx + ry*ry);
 
-	if(r < 0.001 || r >= DEFAULT_RADIUS)
+  // We include 0.000001 to ensure that r doesn't tend to zero in the force calculation
+	if(r < 0.000001 || r >= DEFAULT_RADIUS)
 		return;
 
 	f = A / pow(r,12) - B / pow(r,6);
