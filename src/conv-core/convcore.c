@@ -1250,7 +1250,7 @@ void CmiHandleMessage(void *msg)
 #ifndef CMK_OPTIMIZE
 	CmiUInt2 handler=CmiGetHandler(msg); /* Save handler for use after msg is gone */
 	_LOG_E_HANDLER_BEGIN(handler); /* projector */
-	setMemoryStatus(1)  /* charmdebug */
+	/* setMemoryStatus(1) */ /* charmdebug */
 #endif
 
 /*
@@ -1265,7 +1265,7 @@ void CmiHandleMessage(void *msg)
 	h=&CmiGetHandlerInfo(msg);
 	(h->hdlr)(msg,h->userPtr);
 #ifndef CMK_OPTIMIZE
-	setMemoryStatus(0)  /* charmdebug */
+	/* setMemoryStatus(0) /* /* charmdebug */
 	_LOG_E_HANDLER_END(handler); 	/* projector */
 #endif
 }
@@ -1780,7 +1780,12 @@ CmiReductionsInit() {
   CpvInitialize(int, _reduce_data_size);
   CpvAccess(_reduce_num_children) = 0;
   CpvAccess(_reduce_received) = 0;
-  CpvAccess(_reduce_msg_list) = (char**)malloc(CmiNumSpanTreeChildren(CmiMyPe())*sizeof(void*));
+  int numChildren = CmiNumSpanTreeChildren(CmiMyPe());
+  if (numChildren > 0) {
+    CpvAccess(_reduce_msg_list) = (char**)malloc(CmiNumSpanTreeChildren(CmiMyPe())*sizeof(void*));
+  } else {
+    CpvAccess(_reduce_msg_list) = NULL;
+  }
 
   CpvInitialize(CmiUInt2, _reduce_seqID);
   CpvAccess(_reduce_seqID) = 0x8000;

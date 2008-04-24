@@ -406,6 +406,9 @@ void AssembleDatagram(OtherNode node, ExplicitDgram dg)
     if (!msg)
       fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
     if (size < dg->len) KillEveryoneCode(4559312);
+#ifndef CMK_OPTIMIZE
+    setMemoryTypeMessage(msg);
+#endif
     memcpy(msg, (char*)(dg->data), dg->len);
     node->asm_rank = dg->rank;
     node->asm_total = size;
