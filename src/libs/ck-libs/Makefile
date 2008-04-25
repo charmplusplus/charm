@@ -30,7 +30,10 @@ multiphaseSharedArrays:
 fem:  idxl ampi parmetis
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
-ParFUM:	idxl ampi parmetis collide
+ParFUM:	idxl ampi parmetis collide multiphaseSharedArrays
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
+
+ParFUM-Tops: ParFUM
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 ifem: fem
