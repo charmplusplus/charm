@@ -114,19 +114,29 @@ void Main::done() {
 #else
     CkPrintf("FIRST ITER TIME %f secs\n", firstTime - startTime);
 #endif
-  }
-
-  if(numIterations == NUM_ITER) {
-    endTime = CmiWallTimer();
-#if USE_CKDIRECT
-    CkPrintf("AVG TIME %f secs\n", (endTime - firstTime)/(NUM_ITER-1));
-#else
-    CkPrintf("AVG TIME %f secs\n", (endTime - firstTime)/(NUM_ITER-1));
-#endif
-    CkExit();
-  } else {
     compute.resetArrays();
+  } else {
+    if(numIterations == NUM_ITER) {
+      endTime[numIterations-2] = CmiWallTimer() - firstTime;
+      double sum = 0;
+      for(int i=0; i<NUM_ITER-1; i++)
+	sum += endTime[i];
+#if USE_CKDIRECT
+      CkPrintf("AVG TIME %f secs\n", sum/(NUM_ITER-1));
+#else
+      CkPrintf("AVG TIME %f secs\n", sum/(NUM_ITER-1));
+#endif
+      CkExit();
+    } else {
+      endTime[numIterations-2] = CmiWallTimer() - firstTime;
+      compute.resetArrays();
+    }
   }
+}
+
+void Main::resetDone() {
+  firstTime = CmiWallTimer();
+  compute.beginCopying();
 }
 
 void Main::setupDone() {
@@ -238,9 +248,8 @@ void Compute::resetArrays() {
       tmpC[i*blockDimZ + k] = 0.0;
 #endif
     }
-  
-  sendA();
-  sendB();
+
+  contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::resetDone(), mainProxy));
 }
 
 void Compute::sendA() {

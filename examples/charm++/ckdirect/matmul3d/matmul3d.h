@@ -60,7 +60,7 @@ int myrand(int numpes) {
 double startTime;
 double setupTime;
 double firstTime;
-double endTime;
+double endTime[NUM_ITER-1];
 
 /** \class Main
  *
@@ -71,6 +71,7 @@ class Main : public CBase_Main {
 
     Main(CkArgMsg* m);
     void done();
+    void resetDone();
     void setupDone();
 };
 
