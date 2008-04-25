@@ -2300,6 +2300,7 @@ struct infiDirectHandleStruct;
 typedef struct directPollingQNodeStruct {
 	struct infiDirectHandleStruct *handle;
 	struct directPollingQNodeStruct *next;
+	double *lastDouble;
 } directPollingQNode;
 
 typedef struct infiDirectHandleStruct{
@@ -2449,6 +2450,11 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
 	
 	initializeLastDouble(recvBuf,recvBufSize,initialValue);
 
+  {
+	 int index = table->handles[idx].size - sizeof(double);
+   table->handles[idx].pollingQNode.lastDouble = (double *)(((char *)table->handles[idx].buf)+index);
+	} 
+	
 	addHandleToPollingQ(&(table->handles[idx]));
 	
 //	MACHSTATE4(3," Newhandle created %d senderProc %d recvBuf %p recvBufSize %d",newHandle,senderProc,recvBuf,recvBufSize);
@@ -2647,9 +2653,9 @@ void CmiDirect_ready(struct infiDirectUserHandle *userHandle){
 
 
 static int receivedDirectMessage(infiDirectHandle *handle){
-	int index = handle->size - sizeof(double);
-	double *lastDouble = (double *)(((char *)handle->buf)+index);
-	if(*lastDouble == handle->userHandle.initialValue){
+//	int index = handle->size - sizeof(double);
+//	double *lastDouble = (double *)(((char *)handle->buf)+index);
+	if(*(handle->pollingQNode.lastDouble) == handle->userHandle.initialValue){
 		return 0;
 	}else{
 		(*(handle->callbackFnPtr))(handle->callbackData);	
