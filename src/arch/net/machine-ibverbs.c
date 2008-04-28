@@ -2630,6 +2630,31 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle){
 };
 
 /**** need not be called the first time *********/
+void CmiDirect_readyMark(struct infiDirectUserHandle *userHandle){
+  initializeLastDouble(userHandle->recverBuf,userHandle->recverBufSize,userHandle->initialValue);
+}
+
+/**** need not be called the first time *********/
+void CmiDirect_readyPollQ(struct infiDirectUserHandle *userHandle){
+	int handle = userHandle->handle;
+	int tableIdx,idx,i;
+	infiDirectHandleTable *table;
+	calcHandleTableIdx(handle,&tableIdx,&idx);
+	
+	table = recvHandleTable[userHandle->senderNode];
+	CmiAssert(table != NULL);
+	for(i=0;i<tableIdx;i++){
+		table = table->next;
+	}
+#if CMI_DIRECT_DEBUG
+  CmiPrintf("[%d] CmiDirect_ready receiver %p\n",CmiMyNode(),userHandle->recverBuf);
+#endif	
+	addHandleToPollingQ(&(table->handles[idx]));
+	
+
+}
+
+/**** need not be called the first time *********/
 void CmiDirect_ready(struct infiDirectUserHandle *userHandle){
 	int handle = userHandle->handle;
 	int tableIdx,idx,i;
