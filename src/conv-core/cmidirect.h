@@ -55,6 +55,12 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle);
 
 /**** Should not be called the first time *********/
 void CmiDirect_ready(struct infiDirectUserHandle *userHandle);
+
+/**** Should not be called the first time *********/
+void CmiDirect_readyMark(struct infiDirectUserHandle *userHandle);
+
+/**** Should not be called the first time *********/
+void CmiDirect_readyPollQ(struct infiDirectUserHandle *userHandle);
 #ifdef __cplusplus
 }
 #endif
