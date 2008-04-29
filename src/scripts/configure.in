@@ -473,6 +473,19 @@ EOT
 test_cxx "whether GCC IA64 assembly works" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_GCC_IA64_ASM, $strictpass, [Allows gcc IA64 assembly.])
 
+#### test if we can use __thread ####
+cat > $t <<EOT
+__thread unsigned long long int x;
+static __thread  int y;
+void foo(void)
+{
+	x = 1;
+	y = 1;
+}
+EOT
+test_cxx "whether __thread (Thread Local Storage) is supported" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_TLS_THREAD, $strictpass, [Allows __thread.])
+
 
 ################### Syscalls and Libraries ###################
 

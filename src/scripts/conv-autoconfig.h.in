@@ -80,8 +80,6 @@
 
 /* whether Python is installed */
 #undef CMK_HAS_PYTHON
-/* Python version */
-#undef CMK_PYTHON_VERSION
 
 /* whether the sched_setaffinity() exists */
 #undef CMK_HAS_SETAFFINITY
@@ -125,6 +123,9 @@
 /* whether it has zlib */
 #undef CMK_PROJECTIONS_USE_ZLIB
 
+/* Python version */
+#undef CMK_PYTHON_VERSION
+
 /* whether C++ signed char and char differ */
 #undef CMK_SIGNEDCHAR_DIFF_CHAR
 
@@ -139,6 +140,9 @@
 
 /* whether templated member functions work */
 #undef CMK_TEMPLATE_MEMBERS_BROKEN
+
+/* Allows __thread. */
+#undef CMK_TLS_THREAD
 
 /* whether glibc backtrace works */
 #undef CMK_USE_BACKTRACE

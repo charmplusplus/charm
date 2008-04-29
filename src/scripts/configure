@@ -2185,6 +2185,23 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test if we can use __thread ####
+cat > $t <<EOT
+__thread unsigned long long int x;
+static __thread  int y;
+void foo(void)
+{
+	x = 1;
+	y = 1;
+}
+EOT
+test_cxx "whether __thread (Thread Local Storage) is supported" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_TLS_THREAD $strictpass
+_ACEOF
+
+
 
 ################### Syscalls and Libraries ###################
 
