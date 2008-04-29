@@ -162,10 +162,8 @@ void CmiOutOfMemory(int nBytes)
 }
 
 /* Global variables keeping track of the status of the system (mostly used by charmdebug) */
-#ifndef CMK_OPTIMIZE
 int memory_status_info=0;
 int memory_chare_id=0;
-#endif
 
 #if CMK_MEMORY_BUILD_OS
 /* Just use the OS's built-in malloc.  All we provide is CmiMemoryInit.
