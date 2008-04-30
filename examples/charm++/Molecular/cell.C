@@ -35,13 +35,20 @@ Cell::Cell() {
 
 	/* Particle initialization */
 	for(i = 0; i < numParts / (m * n); i++){
+	    particles.push_back(Particle());
 
-		particles.push_back(Particle());
-		particles[i].x = drand48() * L + thisIndex.x * L;
-    particles[i].y = drand48() * L + thisIndex.y * L;
-    particles[i].vx = (drand48() - 0.5) * 2 * MAX_VELOCITY;
-    particles[i].vy = (drand48() - 0.5) * 2 * MAX_VELOCITY;
-    particles[i].id = (thisIndex.x*m + thisIndex.y) * numParts / (m*n)  + i;
+	    particles[i].x = drand48() * L + thisIndex.x * L;
+	    particles[i].y = drand48() * L + thisIndex.y * L;
+	    particles[i].vx = (drand48() - 0.5) * .2 * MAX_VELOCITY;
+	    particles[i].vy = (drand48() - 0.5) * .2 * MAX_VELOCITY;
+	    particles[i].id = (thisIndex.x*m + thisIndex.y) * numParts / (m*n)  + i;
+/*
+	    particles[i].x = 0.0 + thisIndex.x * L;
+	    particles[i].y = (float) i* 0.9 * L + thisIndex.y * L;
+	    particles[i].vx = (drand48() - 0.5) * .2 * MAX_VELOCITY;
+	    particles[i].vy = 0.0;
+	    particles[i].id = (thisIndex.x*m + thisIndex.y) * numParts / (m*n)  + i;
+*/
 	}	
 
   updateCount = 0;
@@ -481,12 +488,11 @@ void Interaction::interact(Particle &first, Particle &second){
 	fy = f * ry / r;
 
 	// updating particle properties
-	second.fx += fx;
-	second.fy += fy;
-	first.fx += -fx;
-	first.fy += -fy;
+	second.fx -= fx;
+	second.fy -= fy;
+	first.fx += fx;
+	first.fy += fy;
 
 }
 
 #include "cell.def.h"
-

@@ -80,6 +80,7 @@ Main::Main(CkArgMsg* msg) {
   liveVizConfig cfg(liveVizConfig::pix_color,true);
   liveVizInit(cfg,cellArray,c);
 
+  sleep(1);
   cellArray.start();
 }
 

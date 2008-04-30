@@ -1,5 +1,5 @@
-CHARMDIR = /expand/home/kpattab2/charm
-CHARMC = $(CHARMDIR)/bin/charmc $(OPTS)
+
+CHARMC=../../../bin/charmc -module liveViz $(OPTS)
 
 default: all
 all: molecular

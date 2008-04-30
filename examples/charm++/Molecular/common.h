@@ -9,14 +9,14 @@
 #define __COMMON_H__
 
 #define DEFAULT_MASS 1
-#define DEFAULT_DELTA 0.1
-#define DEFAULT_PARTICLES 4000
+#define DEFAULT_DELTA 0.005
+#define DEFAULT_PARTICLES 2000
 #define DEFAULT_M 5
 #define DEFAULT_N 5
 #define DEFAULT_L 10
 #define DEFAULT_RADIUS 5
-#define DEFAULT_FINALSTEPCOUNT 1000
-#define MAX_VELOCITY 5.0
+#define DEFAULT_FINALSTEPCOUNT 10000
+#define MAX_VELOCITY 30.0
 
 // Class for keeping track of the properties for a particle
 class Particle{
