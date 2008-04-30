@@ -81,6 +81,7 @@ void* CkCopyMsg(void **pMsg)
     UsrToEnv(srcMsg)->setPacked(0);
   } else srcMsg = EnvToUsr(newenv);
 
+  setMemoryTypeMessage(newenv);
   return srcMsg;
 }
 
