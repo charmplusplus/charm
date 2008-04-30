@@ -1473,7 +1473,7 @@ void CmiMachineProgressImpl()
 #endif
 
 /* Dummy implementation */
-extern void CmiBarrier()
+extern int CmiBarrier()
 {
   //Use DCMF barrier later
 }
@@ -1633,6 +1633,7 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
     userHandle.callbackFnPtr=callbackFnPtr;
     userHandle.callbackData=callbackData;
     userHandle.DCMF_rq_trecv=ALIGN_16(CmiAlloc(sizeof(DCMF_Request_t)+16));
+
 #if CMI_DIRECT_DEBUG
     CmiPrintf("[%d] RDMA create addr %p %d callback %p callbackdata %p\n",CmiMyPe(),userHandle.recverBuf,userHandle.recverBufSize, userHandle.callbackFnPtr, userHandle.callbackData);
 #endif
@@ -1705,6 +1706,18 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle)
 
 /**** Should not be called the first time *********/
 void CmiDirect_ready(struct infiDirectUserHandle *userHandle)
+{
+    /* no op on BGP */
+}
+
+/**** Should not be called the first time *********/
+void CmiDirect_readyPollQ(struct infiDirectUserHandle *userHandle)
+{
+    /* no op on BGP */
+}
+
+/**** Should not be called the first time *********/
+void CmiDirect_readyMark(struct infiDirectUserHandle *userHandle)
 {
     /* no op on BGP */
 }
