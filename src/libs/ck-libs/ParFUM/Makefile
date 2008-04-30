@@ -26,7 +26,7 @@ PARFUMMAIN=$(LIBDIR)/libParFUMmain.o
 INCS=-I.
 
 .PHONY: all
-all: $(DEST) $(COMPATLIB) $(PARFUMMAIN)
+all: $(DEST) $(COMPATLIB) $(PARFUMMAIN) headers
 
 ParFUM.def.h: ParFUM.decl.h
 ParFUM.decl.h: ParFUM.ci
@@ -39,7 +39,7 @@ ParFUM_SA.decl.h: ParFUM_SA.ci
 	$(CHARMC) ParFUM_SA.ci
 
 # Build libmoduleParFUM
-$(DEST): $(OBJS) $(COMPAT) headers $(HEADDEP)
+$(DEST): $(OBJS) $(COMPAT) $(HEADDEP)
 	$(CHARMC) $(OBJS) -o $@
 	cp $(LIB).dep $(LIBDIR)/$(LIB).dep
 
