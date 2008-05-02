@@ -1632,6 +1632,7 @@ static void ConverseRunPE(int everReturn)
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   int n,i;
+  int ver, subver;
 
 #if MACHINE_DEBUG
   debugLog=NULL;
@@ -1645,6 +1646,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &_Cmi_numnodes);
   MPI_Comm_rank(MPI_COMM_WORLD, &_Cmi_mynode);
+
+  MPI_Get_version(&ver, &subver);
+  if (_Cmi_mynode == 0) printf("Charm++> Running on MPI version: %d.%d\n", ver, subver);
+
   /* processor per node */
   _Cmi_mynodesize = 1;
   if (!CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize))
