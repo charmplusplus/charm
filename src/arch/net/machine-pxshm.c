@@ -628,7 +628,6 @@ inline void flushAllSendQs(){
 			CmiMemoryReadFence(0,0);			
 			CmiMemoryWriteFence(0,0);
 			if(!(pxshmContext->sendBufs[i].header->flagReceiver && pxshmContext->sendBufs[i].header->turn == RECEIVER)){
-			  pxshmContext->sendBufs[i].header->flagSender = 0;
 #endif
 				MACHSTATE1(3,"flushSendQ %d",i);
 				flushSendQ(i);
@@ -639,7 +638,12 @@ inline void flushAllSendQs(){
 				CmiMemoryWriteFence(0,0);
 				pxshmContext->sendBufs[i].header->flagSender = 0;
 #endif
+			}else{
+#if ! PXSHM_LOCK
+			  pxshmContext->sendBufs[i].header->flagSender = 0;
+#endif				
 			}
+
 		}        
 	}	
 };
@@ -649,6 +653,7 @@ void static inline handoverPxshmMessage(char *newmsg,int total_size,int rank,int
 void emptyRecvBuf(sharedBufData *recvBuf){
  	int numMessages = recvBuf->header->count;
 	int i=0;
+//	int initialBytes = recvBuf->header->bytes;
 	
 	char *ptr=recvBuf->data;
 
@@ -673,7 +678,10 @@ void emptyRecvBuf(sharedBufData *recvBuf){
 
 		MACHSTATE3(3,"message of size %d recvd ends at ptr-data %d total bytes %d bytes %d",size,ptr-recvBuf->data,recvBuf->header->bytes);
 	}
-	
+	/*
+  if(ptr - recvBuf->data != recvBuf->header->bytes){
+		CmiPrintf("[%d] ptr - recvBuf->data  %d recvBuf->header->bytes %d numMessages %d initialBytes %d \n",_Cmi_mynode, ptr - recvBuf->data, recvBuf->header->bytes,numMessages,initialBytes);
+	}*/
 	CmiAssert(ptr - recvBuf->data == recvBuf->header->bytes);
 
 	recvBuf->header->count=0;
