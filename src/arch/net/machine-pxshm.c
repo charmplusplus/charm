@@ -34,6 +34,39 @@
 
 #define PXSHM_STATS 0
 
+#define PXSHM_LOCK 1
+#define PXSHM_FENCE !PXSHM_LOCK
+
+
+/*** The following code was copied verbatim from pcqueue.h file ***/
+#define PCQUEUE_FENCE
+#ifdef PCQUEUE_FENCE
+#ifdef POWER_PC
+#define CmiMemoryWriteFence(startPtr,nBytes) asm volatile("eieio":::"memory")
+#else
+#define CmiMemoryWriteFence(startPtr,nBytes) {int i=0;asm("lock incl %0" :: "m" (i));}
+#define CmiMemoryWriteFence(startPtr,nBytes) asm volatile("sfence":::"memory")
+//#define CmiMemoryWriteFence(startPtr,nBytes)  asm volatile("mfence":::"memory")
+#endif
+#else
+#define CmiMemoryWriteFence(startPtr,nBytes)  
+#endif
+
+#ifdef PCQUEUE_FENCE
+#ifdef POWER_PC
+#define CmiMemoryReadFence(startPtr,nBytes) asm volatile("eieio":::"memory")
+#else
+//#define CmiMemoryReadFence(startPtr,nBytes) CmiMemoryWriteFence(startPtr,nBytes)
+#define CmiMemoryReadFence(startPtr,nBytes) asm volatile("lfence":::"memory")
+#endif
+#else
+#define CmiMemoryReadFence(startPtr,nBytes) 
+#endif
+
+/***************************************************************************************/
+
+enum entities {SENDER,RECEIVER};
+
 /************************
  * 	Implementation currently assumes that
  * 	1) all nodes have the same number of processors
@@ -53,6 +86,11 @@
 typedef struct {
 	int count; //number of messages
 	int bytes; //number of bytes
+#if PXSHM_FENCE
+	int flagSender;
+	int flagReceiver;
+	int turn;
+#endif	
 } sharedBufHeader;
 
 typedef struct {
@@ -234,8 +272,15 @@ void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int br
 	
 	sharedBufData *dstBuf = &(pxshmContext->sendBufs[dstRank]);
 
+#if PXSHM_LOCK
 	if(sem_trywait(dstBuf->mutex) < 0){
-
+#else
+	dstBuf->header->flagSender = 1;
+	dstBuf->header->turn = RECEIVER;
+	CmiMemoryReadFence(0,0);
+	CmiMemoryWriteFence(0,0);
+	if(!(dstBuf->header->flagReceiver && dstBuf->header->turn == RECEIVER)){
+#endif
 		/**failed to get the lock 
 		insert into q and retain the message*/
 
@@ -261,8 +306,11 @@ void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int br
 				MACHSTATE1(3,"Pxshm flushSendQ sent %d messages",sent);
 		 }
 		 /* unlock the recvbuffer*/
-
+#if PXSHM_LOCK
 		 sem_post(dstBuf->mutex);
+#else
+		dstBuf->header->flagSender = 0;
+#endif
 	}
 #if PXSHM_STATS
 		pxshmContext->sendCount ++;
@@ -533,11 +581,23 @@ inline void emptyAllRecvBufs(){
 		if(i != pxshmContext->noderank){
 			sharedBufData *recvBuf = &(pxshmContext->recvBufs[i]);
 			if(recvBuf->header->count > 0){
+#if PXSHM_LOCK
 				if(sem_trywait(recvBuf->mutex) < 0){
+#else
+				recvBuf->header->flagReceiver = 1;
+				recvBuf->header->turn = SENDER;
+				CmiMemoryReadFence(0,0);
+				CmiMemoryWriteFence(0,0);
+				if(!(recvBuf->header->flagSender && recvBuf->header->turn == SENDER)){
+#endif
 				}else{
 					MACHSTATE1(3,"emptyRecvBuf to be called for rank %d",i);			
 					emptyRecvBuf(recvBuf);
+#if PXSHM_LOCK
 					sem_post(recvBuf->mutex);
+#else
+					recvBuf->header->flagReceiver = 0;
+#endif
 				}
 			}
 		}
@@ -551,10 +611,22 @@ inline void flushAllSendQs(){
 
 	for(i=0;i<pxshmContext->nodesize;i++){
 		if(i != pxshmContext->noderank && pxshmContext->sendQs[i]->numEntries > 0){
+#if PXSHM_LOCK
 			if(sem_trywait(pxshmContext->sendBufs[i].mutex) >= 0){
+#else
+			pxshmContext->sendBufs[i].header->flagSender = 1;
+			pxshmContext->sendBufs[i].header->turn = RECEIVER;
+			CmiMemoryReadFence(0,0);			
+			CmiMemoryWriteFence(0,0);
+			if(!(pxshmContext->sendBufs[i].header->flagReceiver && pxshmContext->sendBufs[i].header->turn == RECEIVER)){
+#endif
 				MACHSTATE1(3,"flushSendQ %d",i);
 				flushSendQ(i);
+#if PXSHM_LOCK
 				sem_post(pxshmContext->sendBufs[i].mutex);
+#else
+				pxshmContext->sendBufs[i].header->flagSender = 0;
+#endif
 			}
 		}        
 	}	
