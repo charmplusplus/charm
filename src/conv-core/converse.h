@@ -100,8 +100,10 @@ void setMemoryChareID(void *p);
 #ifdef __cplusplus
 /* In C++, use new so t's constructor gets called */
 # define CpvInit_Alloc(t,n) new t[n]
+# define CpvInit_Alloc_scalar(t) new t
 #else
 # define CpvInit_Alloc(t,n) (t *)calloc(n,sizeof(t))
+# define CpvInit_Alloc_scalar(t) (t *)calloc(1,sizeof(t))
 #endif
 
 #if CMK_SHARED_VARS_UNAVAILABLE /* Non-SMP version of shared vars. */
@@ -395,6 +397,39 @@ for each processor in the node.
 */
 #ifdef CMK_CPV_IS_SMP
 
+#if CMK_TLS_THREAD && CMK_USE_TLS_THREAD
+#define CpvDeclare(t,v) __thread t* CMK_TAG(Cpv_,v) = NULL;   \
+                        int CMK_TAG(Cpv_inited_,v) = 0;  \
+                        t * CMK_TAG(Cpv_addr_,v)[32] = {0}
+#define CpvExtern(t,v)  extern __thread t* CMK_TAG(Cpv_,v);  \
+                        extern int CMK_TAG(Cpv_inited_,v);  \
+                        extern t * CMK_TAG(Cpv_addr_,v)[32]
+#ifdef __cplusplus
+#define CpvCExtern(t,v) extern "C"  __thread t* CMK_TAG(Cpv_,v);  \
+                        extern "C" int CMK_TAG(Cpv_inited_,v);  \
+                        extern "C" t * CMK_TAG(Cpv_addr_,v)[32]
+#else
+#define CpvCExtern(t,v)    CpvExtern(t,v)
+#endif
+#define CpvStaticDeclare(t,v) static __thread t* CMK_TAG(Cpv_,v);   \
+                        static int CMK_TAG(Cpv_inited_,v) = 0;  \
+                        static t * CMK_TAG(Cpv_addr_,v)[32] = {0}
+#define CpvInitialize(t,v)\
+    do { \
+       if (CmiMyRank()) { \
+		while (!CpvInitialized(v)) CMK_CPV_IS_SMP; \
+       } else { \
+	       CMK_TAG(Cpv_inited_,v)=1; \
+       } \
+    } while(0); \
+    CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t);\
+    CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v) 
+#define CpvInitialized(v) (0!=CMK_TAG(Cpv_inited_,v))
+#define CpvAccess(v) (*CMK_TAG(Cpv_,v))
+#define CpvAccessOther(v, r) (*(CMK_TAG(Cpv_addr_,v)[r]))
+
+#else
+
 #define CpvDeclare(t,v) t* CMK_TAG(Cpv_,v)
 #define CpvExtern(t,v)  extern t* CMK_TAG(Cpv_,v)
 #ifdef __cplusplus
@@ -414,6 +449,7 @@ for each processor in the node.
 #define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
 #define CpvAccess(v) CMK_TAG(Cpv_,v)[CmiMyRank()]
 #define CpvAccessOther(v, r) CMK_TAG(Cpv_,v)[r]
+#endif
 
 #endif
 
