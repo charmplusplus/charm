@@ -249,12 +249,23 @@ static void CmiDestoryLocks()
 /***************** Pthreads kernel SMP threads ******************/
 #elif CMK_SHARED_VARS_POSIX_THREADS_SMP
 
-static pthread_key_t Cmi_state_key=(pthread_key_t)(-1);
-static CmiState     Cmi_state_vector;
 CmiNodeLock CmiMemLock_lock;
 int _Cmi_noprocforcommthread=0;/*this variable marks if there is an extra processor for comm thread
 in smp*/
 
+#if CMK_TLS_THREAD && CMK_USE_TLS_THREAD
+static __thread struct CmiStateStruct     Cmi_mystate;
+static CmiState     *Cmi_state_vector;
+
+CmiState CmiGetState() {
+	return &Cmi_mystate;
+}
+#define CmiGetStateN(n) Cmi_state_vector[n]
+
+#else
+
+static pthread_key_t Cmi_state_key=(pthread_key_t)(-1);
+static CmiState     Cmi_state_vector;
 
 #if 0
 #define CmiGetState() ((CmiState)pthread_getspecific(Cmi_state_key))
@@ -266,7 +277,11 @@ CmiState CmiGetState() {
 	}
 	return ret;
 }
+
 #endif
+#define CmiGetStateN(n) (Cmi_state_vector+(n))
+#endif
+
 
 CmiNodeLock CmiCreateLock(void)
 {
@@ -294,7 +309,7 @@ void CmiNodeBarrierCount(int nThreads)
   int cur;
   pthread_mutex_lock(&barrier_mutex);
   cur = level;
-  /*CmiPrintf("[%d] CmiNodeBarrierCount: %d of %d level:%d\n", CmiMyPe(), barrier, nThreads, level);*/
+  /* CmiPrintf("[%d] CmiNodeBarrierCount: %d of %d level:%d\n", CmiMyPe(), barrier, nThreads, level); */
   barrier++;
   if(barrier != nThreads) {
       /* occasionally it wakes up without having reach the count */
@@ -308,8 +323,6 @@ void CmiNodeBarrierCount(int nThreads)
   }
   pthread_mutex_unlock(&barrier_mutex);
 }
-
-#define CmiGetStateN(n) (Cmi_state_vector+(n))
 
 static CmiNodeLock comm_mutex;
 
@@ -355,8 +368,16 @@ static void *call_startfn(void *vindex)
 static void *call_startfn(void *vindex)
 {
   size_t index = (size_t)vindex;
+#if CMK_TLS_THREAD && CMK_USE_TLS_THREAD
+  if (index<_Cmi_mynodesize) 
+    CmiStateInit(index+Cmi_nodestart, index, &Cmi_mystate);
+  else
+    CmiStateInit(_Cmi_mynode+CmiNumPes(),_Cmi_mynodesize,&Cmi_mystate);
+  Cmi_state_vector[index] = &Cmi_mystate;
+#else
   CmiState state = Cmi_state_vector + index;
   pthread_setspecific(Cmi_state_key, state);
+#endif
 
   ConverseRunPE(0);
 #if 0
@@ -383,6 +404,7 @@ static void CmiStartThreads(char **argv)
   comm_mutex=CmiCreateLock();
   smp_mutex = CmiCreateLock();
 
+#if ! (CMK_TLS_THREAD && CMK_USE_TLS_THREAD)
   pthread_key_create(&Cmi_state_key, 0);
   Cmi_state_vector =
     (CmiState)calloc(_Cmi_mynodesize+1, sizeof(struct CmiStateStruct));
@@ -391,6 +413,11 @@ static void CmiStartThreads(char **argv)
   /*Create a fake state structure for the comm. thread*/
 /*  CmiStateInit(-1,_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize)); */
   CmiStateInit(_Cmi_mynode+CmiNumPes(),_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize));
+#else
+  Cmi_state_vector = (CmiState *)calloc(_Cmi_mynodesize+1, sizeof(CmiState));
+  CmiStateInit(Cmi_nodestart, 0, &Cmi_mystate);
+  Cmi_state_vector[0] = &Cmi_mystate;
+#endif
 
 #if CMK_MULTICORE
   if (!Cmi_commthread)
@@ -405,7 +432,9 @@ static void CmiStartThreads(char **argv)
     if (ok<0) PerrorExit("pthread_create"); 
     pthread_attr_destroy(&attr);
   }
+#if ! (CMK_TLS_THREAD && CMK_USE_TLS_THREAD)
   pthread_setspecific(Cmi_state_key, Cmi_state_vector);
+#endif
 }
 
 static void CmiDestoryLocks()
