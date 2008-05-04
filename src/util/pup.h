@@ -157,7 +157,7 @@ class er {
   CmiBool isSizing(void) const {return (PUP_er_state&IS_SIZING)!=0?CmiTrue:CmiFalse;}
   CmiBool isPacking(void) const {return (PUP_er_state&IS_PACKING)!=0?CmiTrue:CmiFalse;}
   CmiBool isUnpacking(void) const {return (PUP_er_state&IS_UNPACKING)!=0?CmiTrue:CmiFalse;}
-  char *  typeString() const;
+  const char *  typeString() const;
   unsigned int getStateFlags(void) const {return PUP_er_state;}
 
   //This indicates that the pup routine should free memory during packing.

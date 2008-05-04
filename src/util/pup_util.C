@@ -28,7 +28,7 @@ void PUP::er::operator()(able& a)
 void PUP::er::comment(const char *message)
   { /* ignored by default */ }
 
-char * PUP::er::typeString() const
+const char * PUP::er::typeString() const
 {
   if (isSizing()) return "sizing";
   else if (isPacking()) return "packing";
