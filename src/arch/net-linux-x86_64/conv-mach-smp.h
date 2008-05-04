@@ -13,3 +13,5 @@
 /*
 #define CMK_PCQUEUE_LOCK				   1
 */
+
+#define CMK_USE_TLS_THREAD                                 0
