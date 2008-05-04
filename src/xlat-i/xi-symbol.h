@@ -142,7 +142,7 @@ class BuiltinType : public Type {
   private:
     char *name;
   public:
-    BuiltinType(char *n) : name(n) {}
+    BuiltinType(const char *n) : name((char *)n) {}
     int isBuiltin(void) const {return 1;}
     void print(XStr& str) { str << name; }
     int isVoid(void) const { return !strcmp(name, "void"); }
@@ -155,8 +155,8 @@ class NamedType : public Type {
     char *name;
     TParamList *tparams;
   public:
-    NamedType(char* n, TParamList* t=0)
-       : name(n), tparams(t) {}
+    NamedType(const char* n, TParamList* t=0)
+       : name((char *)n), tparams(t) {}
     int isTemplated(void) const { return (tparams!=0); }
     int isCkArgMsg(void) const {return 0==strcmp(name,"CkArgMsg");}
     int isCkMigMsg(void) const {return 0==strcmp(name,"CkMigrateMessage");}
@@ -785,7 +785,7 @@ class Entry : public Member {
     ParamList *connectParam;
     int isConnect;
     int isWhenEntry;
-    Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, char *e=0, int connect=0, ParamList *connectPList =0);
+    Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, char *e=0, int connect=0, ParamList *connectPList =0);
     void setChare(Chare *c);
     int isConnectEntry(void) { return isConnect; }
     int paramIsMarshalled(void) { return param->isMarshalled(); }

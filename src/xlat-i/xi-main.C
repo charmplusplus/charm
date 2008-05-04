@@ -34,7 +34,7 @@ public:
     }
     else {
       key = str;
-      val = "";
+      val = (char*)"";
     }
   }
   char *match(char *k) { if (!strcmp(k, key)) return val; return NULL; }

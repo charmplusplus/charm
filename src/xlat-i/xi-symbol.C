@@ -587,7 +587,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, MemberList *l)
 			Entry *e=new Entry(ln,SMIGRATE,NULL,
 			  (char *)type->getBaseName(),
 			  new ParamList(new Parameter(line,
-				new PtrType(new NamedType("CkMigrateMessage")))),0,0,0);
+				new PtrType(new NamedType((char *)"CkMigrateMessage")))),0,0,0);
 			e->setChare(this);
 			list=new MemberList(e,list);
 		}
@@ -2238,8 +2238,8 @@ SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr
 ///////////////////////////// ENTRY ////////////////////////////
 
 
-Entry::Entry(int l, int a, Type *r, char *n, ParamList *p, Value *sz, SdagConstruct *sc, char *e, int connect, ParamList *connectPList) :
-      attribs(a), retType(r), name(n), param(p), stacksize(sz), sdagCon(sc), intExpr(e), isConnect(connect), connectParam(connectPList)
+Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, char *e, int connect, ParamList *connectPList) :
+      attribs(a), retType(r), name((char *)n), param(p), stacksize(sz), sdagCon(sc), intExpr(e), isConnect(connect), connectParam(connectPList)
 { 
   line=l; container=NULL; 
   entryCount=-1;
