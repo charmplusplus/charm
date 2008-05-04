@@ -1366,21 +1366,20 @@ int CsdScheduler(int maxmsgs)
 /*Declare the standard scheduler housekeeping*/
 #define SCHEDULE_TOP \
       void *msg;\
-			int rank = CmiMyRank();\
-      int cycle = Cpv_CsdStopFlag_[rank]; \
+      int cycle = CpvAccess(CsdStopFlag); \
       CsdSchedulerState_t state;\
       CsdSchedulerState_new(&state);\
 
 /*A message is available-- process it*/
 #define SCHEDULE_MESSAGE \
       CmiHandleMessage(msg);\
-      if (Cpv_CsdStopFlag_[rank] != cycle) break;\
+      if (CpvAccess(CsdStopFlag) != cycle) break;\
 
 /*No message available-- go (or remain) idle*/
 #define SCHEDULE_IDLE \
       if (!isIdle) {isIdle=1;CsdBeginIdle();}\
       else CsdStillIdle();\
-      if (Cpv_CsdStopFlag_[rank] != cycle) {\
+      if (CpvAccess(CsdStopFlag) != cycle) {\
 	CsdEndIdle();\
 	break;\
       }\
