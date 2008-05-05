@@ -3030,7 +3030,7 @@ void Entry::genCall(XStr& str, const XStr &preCall)
 
   str << "#ifndef CMK_OPTIMIZE\n";
   str << "  setMemoryChareID(impl_obj);\n";
-  if (!internalMode) str << "  setMemoryStatus(1);\n";
+  if (!internalMode) str << "  int alreadyUserCode = 1;\n  setMemoryStatus(alreadyUserCode);\n";
   str << "#endif\n";
   str << "#ifdef CMK_CHECK_CRC\n  checkAllCRC(0);\n#endif\n";
   str << preCall;
@@ -3084,7 +3084,7 @@ void Entry::genCall(XStr& str, const XStr &preCall)
   str << "#ifdef CMK_CHECK_CRC\n  checkAllCRC(1);\n#endif\n";
   str << "#ifndef CMK_OPTIMIZE\n";
   str << "  setMemoryChareID(NULL);\n";
-  if (!internalMode) str << "  setMemoryStatus(0);\n";
+  if (!internalMode) str << "  setMemoryStatus(alreadyUserCode);\n";
   str << "#endif\n";
 }
 

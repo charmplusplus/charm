@@ -80,7 +80,11 @@ extern "C" {
 #ifndef CMK_OPTIMIZE
 extern int memory_status_info;
 extern int memory_chare_id;
-#define setMemoryStatus(p) memory_status_info = p;
+#define setMemoryStatus(p) { \
+  int tmp = memory_status_info; \
+  memory_status_info = p; \
+  p = tmp; \
+}
 void setMemoryChareID(void *p);
 #else
 #define setMemoryStatus(p) /* empty */
