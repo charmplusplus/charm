@@ -73,5 +73,8 @@
 #define CMK_NO_ISO_MALLOC				   1
 */
 
+
+#define USE_DARWIN_LOCKS_IN_PXSHM                          1
+
 #endif
 
