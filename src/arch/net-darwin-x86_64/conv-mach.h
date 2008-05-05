@@ -74,6 +74,9 @@
 */
 
 
+
+/* These optimizations were added by Isaac after some various studies */
+#define CMK_USE_POLL                                       0
 #define USE_DARWIN_LOCKS_IN_PXSHM                          1
 
 #endif
