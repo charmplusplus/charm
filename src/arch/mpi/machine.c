@@ -29,6 +29,8 @@
 #include <unistd.h> /*For getpid()*/
 #include <stdlib.h> /*For sleep()*/
 
+#define MULTI_SENDQUEUE    0
+
 #if defined(CMK_SHARED_VARS_POSIX_THREADS_SMP)
 #define CMK_SMP 1
 #endif
@@ -125,7 +127,7 @@ static int checksum_flag = 0;
 #ifndef MPI_POST_RECV_SIZE
 #define MPI_POST_RECV_SIZE 200
 #endif
-// #undef  MPI_POST_RECV_DEBUG 
+/* #undef  MPI_POST_RECV_DEBUG  */
 CpvDeclare(unsigned long long, Cmi_posted_recv_total);
 CpvDeclare(unsigned long long, Cmi_unposted_recv_total);
 CpvDeclare(MPI_Request*, CmiPostedRecvRequests); /* An array of request handles for posted recvs */
@@ -378,7 +380,9 @@ int CmiBarrierZero()
 }
 
 typedef struct ProcState {
-/* PCQueue      sendMsgBuf; */      /* per processor message sending queue */
+#if MULTI_SENDQUEUE
+PCQueue      sendMsgBuf;       /* per processor message sending queue */
+#endif
 CmiNodeLock  recvLock;		    /* for cs->recv */
 } ProcState;
 
@@ -386,8 +390,10 @@ static ProcState  *procState;
 
 #if CMK_SMP
 
+#if !MULTI_SENDQUEUE
 static PCQueue sendMsgBuf;
 static CmiNodeLock  sendMsgBufLock = NULL;        /* for sendMsgBuf */
+#endif
 
 #endif
 
@@ -610,9 +616,6 @@ int PumpMsgs(void)
         if (MPI_SUCCESS != MPI_Get_count(&sts, MPI_BYTE, &nbytes))
             CmiAbort("PumpMsgs: MPI_Get_count failed!\n");
 
-
-	//        CmiPrintf("Received a posted message of %d bytes\n",nbytes);
-
 	recd = 1;
         msg = (char *) CmiAlloc(nbytes);
         memcpy(msg,&(CpvAccess(CmiPostedRecvBuffers)[completed_index*MPI_POST_RECV_SIZE]),nbytes);
@@ -767,7 +770,7 @@ static CmiNodeLock  exitLock = 0;
 static int MsgQueueEmpty()
 {
   int i;
-#if 0
+#if MULTI_SENDQUEUE
   for (i=0; i<_Cmi_mynodesize; i++)
     if (!PCQueueEmpty(procState[i].sendMsgBuf)) return 0;
 #else
@@ -881,9 +884,9 @@ void *CmiGetNonLocal(void)
   PumpMsgs();
 #endif
 
-  CmiLock(procState[cs->rank].recvLock);
+  /* CmiLock(procState[cs->rank].recvLock); */
   msg =  PCQueuePop(cs->recv);
-  CmiUnlock(procState[cs->rank].recvLock);
+  /* CmiUnlock(procState[cs->rank].recvLock); */
 
 /*
   if (msg) {
@@ -1002,17 +1005,17 @@ static int SendMsgBuf()
   int sent = 0;
 
   MACHSTATE(2,"SendMsgBuf begin {");
-#if 0
+#if MULTI_SENDQUEUE
   for (i=0; i<_Cmi_mynodesize; i++)
   {
-    while (!PCQueueEmpty(procState[i].sendMsgBuf))
+    if (!PCQueueEmpty(procState[i].sendMsgBuf))
     {
       msg_tmp = (SMSG_LIST *)PCQueuePop(procState[i].sendMsgBuf);
 #else
     /* single message sending queue */
-    CmiLock(sendMsgBufLock);
+    /* CmiLock(sendMsgBufLock); */
     msg_tmp = (SMSG_LIST *)PCQueuePop(sendMsgBuf);
-    CmiUnlock(sendMsgBufLock);
+    /* CmiUnlock(sendMsgBufLock); */
     while (NULL != msg_tmp)
     {
 #endif
@@ -1058,11 +1061,13 @@ static int SendMsgBuf()
         end_sent->next = msg_tmp;
       end_sent = msg_tmp;
       sent=1;
-      CmiLock(sendMsgBufLock);
+#if ! MULTI_SENDQUEUE
+      /* CmiLock(sendMsgBufLock); */
       msg_tmp = (SMSG_LIST *)PCQueuePop(sendMsgBuf);
-      CmiUnlock(sendMsgBufLock);
+      /* CmiUnlock(sendMsgBufLock); */
+#endif
     }
-#if 0
+#if MULTI_SENDQUEUE
   }
 #endif
   MACHSTATE(2,"}SendMsgBuf end ");
@@ -1076,9 +1081,13 @@ void EnqueueMsg(void *m, int size, int node)
   msg_tmp->msg = m;
   msg_tmp->size = size;
   msg_tmp->destpe = node;
+#if MULTI_SENDQUEUE
+  PCQueuePush(procState[CmiMyRank()].sendMsgBuf,(char *)msg_tmp);
+#else
   CmiLock(sendMsgBufLock);
   PCQueuePush(sendMsgBuf,(char *)msg_tmp);
   CmiUnlock(sendMsgBufLock);
+#endif
   MACHSTATE3(3,"}} EnqueueMsg to %d finish with queue %p len: %d", node, sendMsgBuf, PCQueueLength(sendMsgBuf));
 }
 
@@ -1446,7 +1455,7 @@ void CmiFreeNodeBroadcastAllFn(int s, char *m)
 #endif
 
 /************************** MAIN ***********************************/
-#define MPI_REQUEST_MAX 16      //1024*10
+#define MPI_REQUEST_MAX 16      /* 1024*10 */
 
 void ConverseExit(void)
 {
@@ -1633,6 +1642,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   int n,i;
   int ver, subver;
+  int provided;
+  int thread_level;
 
 #if MACHINE_DEBUG
   debugLog=NULL;
@@ -1643,12 +1654,17 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
 #endif
 
-  MPI_Init(&argc, &argv);
+#if CMK_SMP
+  thread_level = MPI_THREAD_FUNNELED;
+#else
+  thread_level = MPI_THREAD_SINGLE;
+#endif
+  MPI_Init_thread(&argc, &argv, thread_level, &provided);
   MPI_Comm_size(MPI_COMM_WORLD, &_Cmi_numnodes);
   MPI_Comm_rank(MPI_COMM_WORLD, &_Cmi_mynode);
 
   MPI_Get_version(&ver, &subver);
-  if (_Cmi_mynode == 0) printf("Charm++> Running on MPI version: %d.%d\n", ver, subver);
+  if (_Cmi_mynode == 0) printf("Charm++> Running on MPI version: %d.%d multi-thread support: %d/%d\n", ver, subver, provided, thread_level);
 
   /* processor per node */
   _Cmi_mynodesize = 1;
@@ -1749,12 +1765,16 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   procState = (ProcState *)malloc((_Cmi_mynodesize+1) * sizeof(ProcState));
 
   for (i=0; i<_Cmi_mynodesize+1; i++) {
-    /*    procState[i].sendMsgBuf = PCQueueCreate();   */
+#if MULTI_SENDQUEUE
+    procState[i].sendMsgBuf = PCQueueCreate();
+#endif
     procState[i].recvLock = CmiCreateLock();
   }
 #if CMK_SMP
+#if !MULTI_SENDQUEUE
   sendMsgBuf = PCQueueCreate();
   sendMsgBufLock = CmiCreateLock();
+#endif
   exitLock = CmiCreateLock();            /* exit count lock */
 #endif
 
