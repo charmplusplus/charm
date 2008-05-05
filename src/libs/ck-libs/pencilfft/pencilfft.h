@@ -5,6 +5,8 @@
 #include "charm++.h"
 #include "ckcomplex.h"
 
+#include "sfftw.h"
+
 #define LineFFTAssert(x)  //CkAssert(x)
 #define __LINEFFT_DEBUG__  0
 

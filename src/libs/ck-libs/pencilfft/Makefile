@@ -1,4 +1,4 @@
-FFTW_HOME=/bgl/local/fftw-2.1.5/
+FFTW_HOME=/home/bohm/fftw64
 CHARMC=$(CDIR)/bin/charmc $(OPTS) $(FLAGS)
 
 CDIR=../../../..
