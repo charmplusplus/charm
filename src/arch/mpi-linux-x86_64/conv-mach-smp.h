@@ -20,6 +20,11 @@
 #undef CMK_SYNCHRONIZE_ON_TCP_CLOSE
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       1
 
-/*#define  CMK_USE_MFENCE                                    1 */
-#define  CMK_PCQUEUE_LOCK                                  1
+#undef CMK_TIMER_USE_GETRUSAGE
+#undef CMK_TIMER_USE_SPECIAL
+#define CMK_TIMER_USE_GETRUSAGE                            1
+#define CMK_TIMER_USE_SPECIAL                              0
 
+#define  CMK_USE_MFENCE                                    1 
+/*#define  CMK_PCQUEUE_LOCK                                  1 */
+#define CMK_USE_TLS_THREAD                                 0
