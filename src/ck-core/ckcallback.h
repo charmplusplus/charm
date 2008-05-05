@@ -175,6 +175,7 @@ class CkCallbackResumeThread : public CkCallback {
 	~CkCallbackResumeThread(void) {
 	    void * res = thread_delay(); //<- block thread here if it hasn't already
 	    if (result != NULL) *result = res;
+	    else CkFreeMsg(res);
 	}
 };
 
