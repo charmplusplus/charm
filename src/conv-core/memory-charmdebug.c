@@ -511,6 +511,7 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
   root->flags = 0;
   root->firstChild = NULL;
   root->sibling = NULL;
+  root->next = root;
 
   for ( ; scanner!=slot_first; scanner=scanner->next) {
     parent = root;
