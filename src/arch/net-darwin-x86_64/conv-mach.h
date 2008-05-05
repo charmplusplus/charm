@@ -74,10 +74,13 @@
 */
 
 
-
 /* These optimizations were added by Isaac after some various studies */
+#undef CMK_USE_POLL
 #define CMK_USE_POLL                                       0
-#define USE_DARWIN_LOCKS_IN_PXSHM                          1
+#define PXSHM_OSSPINLOCK                                   1
+#define PXSHM_LOCK                                  0
+#define PXSHM_FENCE                                   0
+
 
 #endif
 

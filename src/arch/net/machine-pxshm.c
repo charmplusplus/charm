@@ -13,6 +13,12 @@
  * - CommunicationServerPxshm()
  * - CmiMachineExitPxshm()
 
+
+There are three options here for synchronization:
+      PXSHM_FENCE is the default. It uses memory fences
+      PXSHM_OSSPINLOCK will cause OSSpinLock's to be used (available on OSX)
+      PXSHM_LOCK will cause POSIX semaphores to be used
+
   created by 
 	Sayantan Chakravorty, sayantan@gmail.com ,21st March 2007
 */
@@ -28,14 +34,23 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+
+/************** 
+   Determine which type of synchronization to use 
+*/
+#if PXSHM_OSSPINLOCK
+#include <libkern/OSAtomic.h>
+#elif PXSHM_LOCK
 #include <semaphore.h>
+#else
+/* Default to using fences */
+#define PXSHM_FENCE 1
+#endif
+
 
 #define MEMDEBUG(x) //x
 
 #define PXSHM_STATS 0
-
-#define PXSHM_LOCK 0
-#define PXSHM_FENCE !PXSHM_LOCK
 
 
 /*** The following code was copied verbatim from pcqueue.h file ***/
@@ -81,18 +96,29 @@ enum entities {SENDER,RECEIVER};
 
 #define SENDQSTARTSIZE 128
 
+
+/// This struct is used as the first portion of a shared memory region, followed by data
 typedef struct {
 	int count; //number of messages
 	int bytes; //number of bytes
+
+#if PXSHM_OSSPINLOCK
+	OSSpinLock lock;
+#endif
+
 #if PXSHM_FENCE
 	volatile int flagSender;
 	volatile int flagReceiver;
 	volatile int turn;
 #endif	
+
 } sharedBufHeader;
 
+
 typedef struct {
+#if PXSHM_LOCK
 	sem_t *mutex;
+#endif
 	sharedBufHeader *header;	
 	char *data;
 } sharedBufData;
@@ -256,10 +282,13 @@ inline int flushSendQ(int dstRank);
  * ****************************/
 
 void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int broot){
+
+	
 #if PXSHM_STATS
 	double _startSendTime = CmiWallTimer();
 #endif
 
+	
 	int dstRank = PxshmRank(ogm->dst);
 	MEMDEBUG(CmiMemoryCheck());
   
@@ -272,16 +301,20 @@ void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int br
 	
 	sharedBufData *dstBuf = &(pxshmContext->sendBufs[dstRank]);
 
-#if PXSHM_LOCK
+
+#if PXSHM_OSSPINLOCK
+	if(! OSSpinLockTry(&dstBuf->header->lock)){
+#elif PXSHM_LOCK
 	if(sem_trywait(dstBuf->mutex) < 0){
-#else
+#elif PXSHM_FENCE
 	dstBuf->header->flagSender = 1;
 	dstBuf->header->turn = RECEIVER;
 	CmiMemoryReadFence(0,0);
 	CmiMemoryWriteFence(0,0);
-	if((dstBuf->header->flagReceiver && dstBuf->header->turn == RECEIVER)){
+	if(dstBuf->header->flagReceiver && dstBuf->header->turn == RECEIVER){
 	  dstBuf->header->flagSender = 0;
 #endif
+
 		/**failed to get the lock 
 		insert into q and retain the message*/
 
@@ -296,6 +329,7 @@ void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int br
 		 * first write all the messages in the sendQ and then write this guy
 		 * */
 		 if(pxshmContext->sendQs[dstRank]->numEntries == 0){
+		   // send message user event
 				int ret = sendMessage(ogm,dstBuf,pxshmContext->sendQs[dstRank]);
 				MACHSTATE(3,"Pxshm Send succeeded immediately");
 		 }else{
@@ -307,12 +341,15 @@ void CmiSendMessagePxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int br
 				MACHSTATE1(3,"Pxshm flushSendQ sent %d messages",sent);
 		 }
 		 /* unlock the recvbuffer*/
-#if PXSHM_LOCK
+
+#if PXSHM_OSSPINLOCK
+		 OSSpinLockUnlock(&dstBuf->header->lock);
+#elif PXSHM_LOCK
 		 sem_post(dstBuf->mutex);
-#else
-			CmiMemoryReadFence(0,0);			
-			CmiMemoryWriteFence(0,0);
-		dstBuf->header->flagSender = 0;
+#elif PXSHM_FENCE
+		 CmiMemoryReadFence(0,0);			
+		 CmiMemoryWriteFence(0,0);
+		 dstBuf->header->flagSender = 0;
 #endif
 	}
 #if PXSHM_STATS
@@ -331,6 +368,7 @@ inline void flushAllSendQs();
  * Flush all sendQs
  * ***/
 inline void CommunicationServerPxshm(){
+	
 #if PXSHM_STATS
 	double _startCommServerTime =CmiWallTimer();
 #endif	
@@ -338,10 +376,11 @@ inline void CommunicationServerPxshm(){
 	MEMDEBUG(CmiMemoryCheck());
 	emptyAllRecvBufs();
 	flushAllSendQs();
-	
+
 #if PXSHM_STATS
 	pxshmContext->commServerTime += (CmiWallTimer()-_startCommServerTime);
 #endif
+
 	MEMDEBUG(CmiMemoryCheck());
 };
 
@@ -352,7 +391,7 @@ static void CmiNotifyStillIdlePxshm(CmiIdleState *s){
 
 static void CmiNotifyBeginIdlePxshm(CmiIdleState *s)
 {
-  CmiNotifyStillIdle(s);
+	CmiNotifyStillIdle(s);
 }
 
 
@@ -458,11 +497,17 @@ void createShmObjectsAndSems(sharedBufData **bufs,char **bufNames){
 		if(i != pxshmContext->noderank){
 			createShmObject(bufNames[i],SHMBUFLEN+sizeof(sharedBufHeader),(char **)&((*bufs)[i].header));
 			(*bufs)[i].data = ((char *)((*bufs)[i].header))+sizeof(sharedBufHeader);
+#if PXSHM_OSSPINLOCK
+			(*bufs)[i].header->lock = 0; // by convention(see man page) 0 means unlocked
+#elif PXSHM_LOCK
 			(*bufs)[i].mutex = sem_open(bufNames[i],O_CREAT, S_IRUSR | S_IWUSR,1);
+#endif
 		}else{
 			(*bufs)[i].header = NULL;
 			(*bufs)[i].data = NULL;
+#if PXSHM_LOCK
 			(*bufs)[i].mutex = NULL;
+#endif
 		}
 	}	
 }
@@ -470,16 +515,22 @@ void createShmObjectsAndSems(sharedBufData **bufs,char **bufNames){
 
 
 void createShmObject(char *name,int size,char **pPtr){
-	int fd;
+	int fd=-1;
 	int flags;	// opening flags for shared object
-	
+	int open_repeat_count = 0;
+
 	flags= O_RDWR | O_CREAT; // open file in read-write mode and create it if its not there
 	
-	fd = shm_open(name,flags, S_IRUSR | S_IWUSR); // create the shared object with permissions for only the user to read and write
-
-	if(fd < 0){
-		fprintf(stderr,"Error from shm_open %s\n",strerror(errno));
+	while(fd<0 && open_repeat_count < 100){
+	  open_repeat_count++;
+	  fd = shm_open(name,flags, S_IRUSR | S_IWUSR); // create the shared object with permissions for only the user to read and write
+	  
+	  if(fd < 0){
+	    fprintf(stderr,"Error(attempt=%d) from shm_open %s while opening %s \n",open_repeat_count, strerror(errno),name);
+	    fflush(stderr);
+	  }
 	}
+
 	CmiAssert(fd >= 0);
 
 	ftruncate(fd,size); //set the size of the shared memory object
@@ -498,10 +549,11 @@ void tearDownSharedBuffers(){
 				fprintf(stderr,"Error from shm_unlink %s \n",strerror(errno));
 			}
 
+#if PXSHM_LOCK
 			sem_close(pxshmContext->recvBufs[i].mutex);
 			sem_unlink(pxshmContext->recvBufNames[i]);
-
 			sem_close(pxshmContext->sendBufs[i].mutex);
+#endif
 		}
 	}
 };
@@ -542,6 +594,7 @@ int sendMessage(OutgoingMsg ogm,sharedBufData *dstBuf,PxshmSendQ *dstSendQ){
 	/***
 	 * Shared Buffer is too full for this message
 	 * **/
+	printf("send buffer is too full\n");
 	pushSendQ(dstSendQ,ogm);
 	ogm->refcount++;
 	MACHSTATE3(3,"Pxshm send ogm %p size %d queued refcount %d",ogm,ogm->size,ogm->refcount);
@@ -558,7 +611,6 @@ inline OutgoingMsg popSendQ(PxshmSendQ *q);
 inline int flushSendQ(int dstRank){
 	sharedBufData *dstBuf = &(pxshmContext->sendBufs[dstRank]);
 	PxshmSendQ *dstSendQ = pxshmContext->sendQs[dstRank];
-	
 	int count=dstSendQ->numEntries;
 	int sent=0;
 	while(count > 0){
@@ -579,17 +631,21 @@ inline void emptyRecvBuf(sharedBufData *recvBuf);
 
 inline void emptyAllRecvBufs(){
 	int i;
-
 	for(i=0;i<pxshmContext->nodesize;i++){
 		if(i != pxshmContext->noderank){
 			sharedBufData *recvBuf = &(pxshmContext->recvBufs[i]);
 			if(recvBuf->header->count > 0){
+
 #if PXSHM_STATS
 				pxshmContext->lockRecvCount++;
 #endif
-#if PXSHM_LOCK
+
+
+#if PXSHM_OSSPINLOCK
+				if(! OSSpinLockTry(&recvBuf->header->lock)){
+#elif PXSHM_LOCK
 				if(sem_trywait(recvBuf->mutex) < 0){
-#else
+#elif PXSHM_FENCE
 				recvBuf->header->flagReceiver = 1;
 				recvBuf->header->turn = SENDER;
 				CmiMemoryReadFence(0,0);
@@ -598,50 +654,66 @@ inline void emptyAllRecvBufs(){
 					recvBuf->header->flagReceiver = 0;
 #endif
 				}else{
+
+
 					MACHSTATE1(3,"emptyRecvBuf to be called for rank %d",i);			
 					emptyRecvBuf(recvBuf);
-#if PXSHM_LOCK
+
+#if PXSHM_OSSPINLOCK
+					OSSpinLockUnlock(&recvBuf->header->lock);
+#elif PXSHM_LOCK
 					sem_post(recvBuf->mutex);
-#else
-			CmiMemoryReadFence(0,0);			
-			CmiMemoryWriteFence(0,0);
+#elif PXSHM_FENCE
+					CmiMemoryReadFence(0,0);			
+					CmiMemoryWriteFence(0,0);
 					recvBuf->header->flagReceiver = 0;
 #endif
+
 				}
+			
 			}
 		}
 	}
-
-
 };
 
 inline void flushAllSendQs(){
 	int i=0;
-
+	
 	for(i=0;i<pxshmContext->nodesize;i++){
 		if(i != pxshmContext->noderank && pxshmContext->sendQs[i]->numEntries > 0){
-#if PXSHM_LOCK
+	
+#if PXSHM_OSSPINLOCK
+		        if(OSSpinLockTry(&pxshmContext->sendBufs[i].header->lock)){
+#elif PXSHM_LOCK
 			if(sem_trywait(pxshmContext->sendBufs[i].mutex) >= 0){
-#else
+#elif PXSHM_FENCE
 			pxshmContext->sendBufs[i].header->flagSender = 1;
 			pxshmContext->sendBufs[i].header->turn = RECEIVER;
 			CmiMemoryReadFence(0,0);			
 			CmiMemoryWriteFence(0,0);
 			if(!(pxshmContext->sendBufs[i].header->flagReceiver && pxshmContext->sendBufs[i].header->turn == RECEIVER)){
 #endif
+
 				MACHSTATE1(3,"flushSendQ %d",i);
 				flushSendQ(i);
-#if PXSHM_LOCK
+
+
+				
+#if PXSHM_OSSPINLOCK	
+				OSSpinLockUnlock(&pxshmContext->sendBufs[i].header->lock);
+#elif PXSHM_LOCK
 				sem_post(pxshmContext->sendBufs[i].mutex);
-#else
+#elif PXSHM_FENCE
 				CmiMemoryReadFence(0,0);			
 				CmiMemoryWriteFence(0,0);
 				pxshmContext->sendBufs[i].header->flagSender = 0;
 #endif
 			}else{
-#if ! PXSHM_LOCK
+
+#if PXSHM_FENCE
 			  pxshmContext->sendBufs[i].header->flagSender = 0;
 #endif				
+
 			}
 
 		}        
@@ -653,8 +725,7 @@ void static inline handoverPxshmMessage(char *newmsg,int total_size,int rank,int
 void emptyRecvBuf(sharedBufData *recvBuf){
  	int numMessages = recvBuf->header->count;
 	int i=0;
-//	int initialBytes = recvBuf->header->bytes;
-	
+
 	char *ptr=recvBuf->data;
 
 	for(i=0;i<numMessages;i++){
@@ -667,10 +738,8 @@ void emptyRecvBuf(sharedBufData *recvBuf){
 		DgramHeaderBreak(msg, rank, srcpe, magic, seqno, broot);
 		size = CmiMsgHeaderGetLength(msg);
 	
-		
 		newMsg = (char *)CmiAlloc(size);
 		memcpy(newMsg,msg,size);
-		
 
 		handoverPxshmMessage(newMsg,size,rank,broot);
 		
@@ -683,7 +752,6 @@ void emptyRecvBuf(sharedBufData *recvBuf){
 		CmiPrintf("[%d] ptr - recvBuf->data  %d recvBuf->header->bytes %d numMessages %d initialBytes %d \n",_Cmi_mynode, ptr - recvBuf->data, recvBuf->header->bytes,numMessages,initialBytes);
 	}*/
 	CmiAssert(ptr - recvBuf->data == recvBuf->header->bytes);
-
 	recvBuf->header->count=0;
 	recvBuf->header->bytes=0;
 }
