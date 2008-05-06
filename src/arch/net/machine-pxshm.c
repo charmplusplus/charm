@@ -525,7 +525,7 @@ void createShmObject(char *name,int size,char **pPtr){
 	  open_repeat_count++;
 	  fd = shm_open(name,flags, S_IRUSR | S_IWUSR); // create the shared object with permissions for only the user to read and write
 	  
-	  if(fd < 0){
+	  if(fd < 0 && open_repeat_count > 10){
 	    fprintf(stderr,"Error(attempt=%d) from shm_open %s while opening %s \n",open_repeat_count, strerror(errno),name);
 	    fflush(stderr);
 	  }
