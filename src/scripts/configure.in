@@ -486,6 +486,32 @@ EOT
 test_cxx "whether __thread (Thread Local Storage) is supported" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_TLS_THREAD, $strictpass, [Allows __thread.])
 
+#### test if we can build MPI ####
+cat > $t <<EOT
+#include "mpi.h"
+int main(int argc, char **argv)
+{
+  MPI_Init(&argc, &argv);
+}
+EOT
+test_cxx "whether build on MPI" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_BUILD_ON_MPI, $strictpass, [build MPI.])
+
+if test $strictpass -eq 1
+then
+cat > $t <<EOT
+#include "mpi.h"
+int main(int argc, char **argv)
+{
+  int thread_level, provided;
+  thread_level = MPI_THREAD_FUNNELED;
+  MPI_Init_thread(&argc, &argv, thread_level, &provided);
+}
+EOT
+test_cxx "whether MPI_Init_thread is supported" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_MPI_INIT_THREAD, $strictpass, [Allows MPI_Init_thread.])
+fi
+
 
 ################### Syscalls and Libraries ###################
 
