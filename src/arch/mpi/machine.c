@@ -1006,7 +1006,7 @@ static int SendMsgBuf()
 
   MACHSTATE(2,"SendMsgBuf begin {");
 #if MULTI_SENDQUEUE
-  for (i=0; i<_Cmi_mynodesize; i++)
+  for (i=0; i<_Cmi_mynodesize=1; i++)  /* subtle: including comm thread */
   {
     if (!PCQueueEmpty(procState[i].sendMsgBuf))
     {
@@ -1654,12 +1654,18 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
 #endif
 
+#if CMK_MPI_INIT_THREAD
 #if CMK_SMP
   thread_level = MPI_THREAD_FUNNELED;
 #else
   thread_level = MPI_THREAD_SINGLE;
 #endif
   MPI_Init_thread(&argc, &argv, thread_level, &provided);
+#else
+  MPI_Init(&argc, &argv);
+  thread_level = 0;
+  provided = -1;
+#endif
   MPI_Comm_size(MPI_COMM_WORLD, &_Cmi_numnodes);
   MPI_Comm_rank(MPI_COMM_WORLD, &_Cmi_mynode);
 
