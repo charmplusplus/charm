@@ -175,7 +175,7 @@ int CkArrayMap::registerArray(CkArrayIndexMax& numElements,CkArrayID aid)
                 i = i1 * numElements.data()[1] + i2; \
                 CkArrayIndex2D idx(i1, i2); \
                 if (POPULATE_CONDITION) \
-                  mgr->insertInitial(real_idx,CkCopyMsg(&ctorMsg)); \
+                  mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
               } else { \
                 /* higher dimensionality */ \
                 CkAssert(numElements.nInts == 3); \
@@ -184,7 +184,7 @@ int CkArrayMap::registerArray(CkArrayIndexMax& numElements,CkArrayID aid)
                   i = (i1 * numElements.data()[1] + i2) * numElements.data()[2] + i3; \
                   CkArrayIndex3D idx(i1, i2, i3 ); \
                   if (POPULATE_CONDITION) \
-                    mgr->insertInitial(real_idx,CkCopyMsg(&ctorMsg)); \
+                    mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
                 } \
               } \
             } \
