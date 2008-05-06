@@ -25,6 +25,6 @@
 #define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
 
-#define  CMK_USE_MFENCE                                    1 
-/*#define  CMK_PCQUEUE_LOCK                                  1 */
+/*#define  CMK_USE_MFENCE                                    1 */
+#define  CMK_PCQUEUE_LOCK                                  1 
 #define CMK_USE_TLS_THREAD                                 0
