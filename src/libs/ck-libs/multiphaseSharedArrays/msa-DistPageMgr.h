@@ -899,8 +899,8 @@ public:
     // synchronize all the pages and also clear up the cache
     inline void SyncReq(int single)
     {
-				MSADEBPRINT(printf("SyncReq single %d\n",single););
-        if(single)
+	  MSADEBPRINT(printf("SyncReq single %d\n",single););
+	  if(single)
         {
             /*ask all the caches to send their updates to the page array, but we don't need to empty the caches on the other PEs*/
             SingleSync();
@@ -910,7 +910,7 @@ public:
         }
         else{
             Sync();
-				}		
+				}
     }
 
     // MSA_CacheGroup::
@@ -1000,7 +1000,7 @@ public:
         syncThreadCount++;
         //ckout << "[" << CkMyPe() << "] syncThreadCount = " << syncThreadCount << " " << numberLocalWorkerThreads << endl;
         //ckout << "[" << CkMyPe() << "] syncThreadCount = " << syncThreadCount << ", registered threads = " << getNumRegisteredThreads()
-        //    << ", number of suspended threads = " << getNumSuspendedThreads() << endl;
+		//  << ", number of suspended threads = " << getNumSuspendedThreads() << endl;
 
         // First, all threads on this processor need to reach the sync
         // call; only then can we proceed with merging the data.  Only
@@ -1009,11 +1009,11 @@ public:
 				MSADEBPRINT(printf("Sync syncThreadCount %d \n",syncThreadCount););
         if(syncThreadCount < numberLocalWorkerThreads)
         {
-						MSADEBPRINT(printf("Sync addAndSuspend \n"););
+		  MSADEBPRINT(printf("Sync addAndSuspend \n"););
             addAndSuspend(syncWaiters);
             return;
         }
-
+		
         //ckout << "[" << CkMyPe() << "] Sync started" << endl;
 
         // flush the cache asynchronously and also empty it
@@ -1026,9 +1026,9 @@ public:
         // Now, we suspend too (if we had at least one dirty page).
         // We will be awoken when all our dirty pages have been
         // written and acknowledged.
-				MSADEBPRINT(printf("Sync calling suspend on getListener\n"););
+		MSADEBPRINT(printf("Sync calling suspend on getListener\n"););
         getListener()->suspend();
-				MSADEBPRINT(printf("Sync awakening after suspend\n"););
+		MSADEBPRINT(printf("Sync awakening after suspend\n"););
 
         // So far, the sync has been asynchronous, i.e. PE0 might be ahead
         // of PE1.  Next we basically do a barrier to ensure that all PE's
@@ -1050,8 +1050,8 @@ public:
         /* Wait until sync is reflected from PE 0 */
         addAndSuspend(syncWaiters);
 				
-				MSADEBPRINT(printf("Sync all local threads done waking up after addAndSuspend\n"););
-	
+		MSADEBPRINT(printf("Sync all local threads done waking up after addAndSuspend\n"););
+		//ckout << "[" << CkMyPe() << "] Sync finished" << endl;	
     }
 
     inline unsigned int getNumEntries() { return nEntries; }
@@ -1062,7 +1062,6 @@ public:
     {
         CkAssert(CkMyPe() == 0);  // SyncAck is only called on PE 0
         syncAckCount++;
-        //ckout << "[" << CkMyPe() << "] SyncAckcount = " << syncAckCount << endl;
         // DONE @@ what if fewer worker threads than pe's ?
         // @@ what if fewer worker threads than pe's and >1 threads on 1 pe?
         //if(syncAckCount == mymin(numberOfWorkerThreads, CkNumPes())){
@@ -1209,7 +1208,7 @@ public:
         CkAssert( pageNum < nPages );
         CkAssert( offset < ENTRIES_PER_PAGE );
 
-        ckout << "p" << CkMyPe() << "ID" << ID;
+        //ckout << "p" << CkMyPe() << "ID" << ID;
 //         if (pageTable[pageNum] == 0)
 //             ckout << "emitBufferValue: page " << pageNum << " not available in local cache." << endl;
 //         else
@@ -1373,7 +1372,7 @@ public:
 
     inline void emit(int ID, int index)
     {
-        ckout << "p" << CkMyPe() << "ID" << ID;
+	  //ckout << "p" << CkMyPe() << "ID" << ID;
 //         if(epage == NULL)
 //             ckout << "emit: epage is NULL" << endl;
 //         else

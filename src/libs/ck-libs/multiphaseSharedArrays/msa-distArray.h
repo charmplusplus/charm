@@ -204,7 +204,9 @@ public:
     }
 
     /// Synchronize reads and writes across the entire array.
-    inline void sync(int single=0) { cache->SyncReq(single); }
+    inline void sync(int single=0) { 
+	  cache->SyncReq(single); 
+	}
 
     /// Fetch the ENTRY at idx to be accumulated.
     ///   You must perform the accumulation on 
