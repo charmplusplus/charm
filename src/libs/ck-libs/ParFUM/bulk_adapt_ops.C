@@ -420,7 +420,7 @@ void BulkAdapt::one_side_split_2D(adaptAdj &startElem, adaptAdj &splitElem,
   // in splitConn, replace node1idx with bisectNode
   splitConn[relNode1] = bisectNode;
   // add element split with splitConn
-  int splitElemID = add_element(startElem.elemType, 3, &splitConn[0]);
+  int splitElemID = add_element(startElem.elemType, 3, &splitConn[0], elem.getMeshSizing(startElem.localID));
   //BULK_DEBUG(printf("[%d] new element %d with conn %d %d %d added \n", partitionID, splitElemID, splitConn[0], splitConn[1], splitConn[2]);)
   // copy startElem.localID's adapt adj for all edges.
   splitElem = adaptAdj(partitionID, splitElemID, startElem.elemType);
@@ -597,13 +597,15 @@ void BulkAdapt::update_asterisk_3D(int remotePartID, int i, adaptAdj elem,
  * Update its connectivity
  * Return index of new element
  * */
-int BulkAdapt::add_element(int elemType,int nodesPerElem,int *conn){ 
+int BulkAdapt::add_element(int elemType,int nodesPerElem,int *conn, double sizing){ 
   //since the element array might be resized we need to set the correct thread
   //context before we call get_next_invalid
   localShadow->setRunningTCharm();
   FEM_Elem &elem = meshPtr->elem[elemType];
   int newElem = elem.get_next_invalid();
   elem.connIs(newElem,conn);
+
+  elem.setMeshSizing(newElem, sizing);
 
   int nAdj;
   adaptAdj* adaptAdjacencies = lookupAdaptAdjacencies(
@@ -870,7 +872,7 @@ adaptAdj *BulkAdapt::local_split_3D(adaptAdj elem, int n1, int n2, int n5)
   // adjust splitElem's conn to reflect the split
   splitConn[rel_n1] = n5;
   // add splitElem
-  int splitElemID = add_element(elem.elemType, 4, &splitConn[0]);
+  int splitElemID = add_element(elem.elemType, 4, &splitConn[0], elems.getMeshSizing(elem.localID));
   adaptAdj *splitElem = new adaptAdj(partitionID, splitElemID, elem.elemType);
   // call updates here
   update_local_face_adj(elem, *splitElem, n1, n2, n5);

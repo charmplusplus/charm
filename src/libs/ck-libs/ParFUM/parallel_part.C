@@ -815,11 +815,13 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
   MPI_Bcast_pup(*distTab,masterRank,comm);
   distTab->table.enroll(numChunks);
   DEBUG(printf("[%d] distributed table calling sync \n",myChunk));
+
+
   //	distTab->table.sync((numChunks == 1));
   distTab->table.sync();
 	
   DEBUG(printf("Chunk %d Mesh: *********************************** \n",myChunk));
-  DEBUG(m->print(0));
+  //DEBUG(m->print(0));
   DEBUG(printf("**********************************\n"));
 	
   //printf("Chunk %d Ghost layer nodesPerTuple %d numSlots %d \n",myChunk,layer->nodesPerTuple,distTab->numSlots);
@@ -885,6 +887,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
   //to form more ghosts for this chunk. However since we never send ghost elements as
   //ghosts to other chunks, they are not added to the tupleVec or indexVec
 
+
   int ghostcount=0;
   for(int i=0;i<m->elem.size();i++){
     if(m->elem.has(i)){
@@ -919,13 +922,17 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
     }
   }
   distTab->table.sync();
+
+
   //debug - print the whole table
   /*	printf("Ghosts chunk %d \n",myChunk);*/
   if(myChunk == masterRank){
     DEBUG(distTab->print());
   }
+
   distTab->sync();
-	DEBUG(printf("[%d] id %d says Ghost distributed hashtable printed \n",CkMyPe(),myChunk));
+
+  DEBUG(printf("[%d] id %d says Ghost distributed hashtable printed \n",CkMyPe(),myChunk));
   /* create a new FEM_Mesh msa to transfer the ghost elements from the original mesh to target meshes */
   MSA1DFEMMESH *ghostmeshes;
   if(myChunk == masterRank){
@@ -935,9 +942,11 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
   }
   MPI_Bcast_pup(*ghostmeshes,masterRank,comm);
   ghostmeshes->enroll(numChunks);
-	DEBUG(printf("[%d] id %d says ghostmeshes enroll done \n",CkMyPe(),myChunk));
+  DEBUG(printf("[%d] id %d says ghostmeshes enroll done \n",CkMyPe(),myChunk));
+
   ghostmeshes->sync();
-	DEBUG(printf("[%d] id %d says ghostmeshes sync done \n",CkMyPe(),myChunk));
+
+  DEBUG(printf("[%d] id %d says ghostmeshes sync done \n",CkMyPe(),myChunk));
   /*
     For each shared tuple (a tuple in which all nodes are shared) find the other chunks that share this 
     tuple. Add the element corresponding to this tuple, as a ghost to the other chunk's meshes. While adding 
@@ -1031,15 +1040,19 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
     }
     //	printf("Elements equivalent ----------- \n");
   }
+
+
   DEBUG(printf("[%d] finished creating ghost mesh \n",myChunk));
+
   ghostmeshes->sync();
+
   /*
     Go through the ghost nodes and check for nodes that dont exist in the hashtable
     already. Add them to the hashtable as -j, where j is the local ghost number
     In the same routine, if they have not been seen earlier, add them to the 
     ghost nodes.
   */	
-	MPI_Barrier(comm);
+
   FEM_Mesh *gmesh = ghostmeshes->get(myChunk).m;
   DEBUG(printf("[%d] my ghost mesh is at %p \n",myChunk,gmesh));
 	
@@ -1118,6 +1131,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
   DEBUG(m->node.getGhostSend().print());
   DEBUG(printf("[%d] Recv ghost nodes \n",myChunk));
   DEBUG(m->node.getGhostRecv().print());
+
 	
   delete distTab;	
   delete ghostmeshes;

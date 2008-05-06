@@ -80,9 +80,10 @@ class Bulk_Adapt {
   friend class FEM_Interpolate;
  protected: 
   ///cross-pointer to theMesh object on this chunk
-  FEM_Mesh *theMesh;
+  FEM_Mesh *theMesh; 
+  int theMeshID;
   /// The number of dimensions of this mesh (adaptivity works only for 2D)
-  int dim;
+    int dim, elemType;
  public:
   ///default constructor
   Bulk_Adapt() { theMesh = NULL; }
@@ -92,6 +93,7 @@ class Bulk_Adapt {
   void Bulk_Adapt_SetMesh(FEM_Mesh *m) { theMesh = m; }
   /// Initialize the coord_attr and boundary attr and number of dimensions for this mesh
   void Bulk_Adapt_SetDim(int dimension) { dim = dimension; }
+  void Bulk_Adapt_SetElemType(int et) { elemType = et; }
   /// default destructor
   ~Bulk_Adapt() {}
   /// pup for this object 
@@ -99,23 +101,40 @@ class Bulk_Adapt {
     p|dim;
   }
 
+  void Bulk_Adapt_Init(int mid, FEM_Mesh *mp, int d) { 
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    theMesh = mp;
+    theMeshID = mid;
+    dim = d;
+    CkPrintf("[%d] Adapt init...\n", rank);
+    FEM_Mesh_allocate_valid_attr(theMeshID,FEM_NODE);
+    FEM_Mesh_allocate_valid_attr(theMeshID,FEM_ELEM);
+    MPI_Barrier(MPI_COMM_WORLD);
+    CkPrintf("[%d] Creating adapt adjacencies...\n", rank);
+    CreateAdaptAdjacencies(theMeshID, 0);
+    ParFUM_SA_Init(theMeshID);  
+    MPI_Barrier(MPI_COMM_WORLD);
+    CkPrintf("[%d] End Adapt init...\n", rank);
+  }
+
   /// Perform refinements on a mesh
-  void Refine(int qm, int method, double factor, double *sizes);
+  void ParFUM_Refine(int qm, int method, double factor, double *sizes);
   /// Perform coarsening on a mesh
-  void Coarsen(int qm, int method, double factor, double *sizes);
+  void ParFUM_Coarsen(int qm, int method, double factor, double *sizes);
   /// Perform refinement/coarsening on a mesh
-  void AdaptMesh(int qm, int method, double factor, double *sizes);
+  void ParFUM_AdaptMesh(int qm, int method, double factor, double *sizes);
   /// Smooth the mesh using method according to some quality measure qm
-  void Smooth(int qm, int method);
+  void ParFUM_Smooth(int qm, int method);
   /// Repair the bad quality elements of a mesh
-  void Repair(int qm);
+  void ParFUM_Repair(int qm);
   /// Remesh entire mesh
-  void Remesh(int qm, int method, double factor, double *sizes);
+  void ParFUM_Remesh(int qm, int method, double factor, double *sizes);
   
   /// Set sizes on mesh elements based on their average edge length 
-  void SetReferenceMesh();
+  void ParFUM_SetReferenceMesh();
   /// Adjust sizes on mesh elements to avoid sharp discontinuities 
-  void GradateMesh(double smoothness);
+  void ParFUM_GradateMesh(double smoothness);
 
  private:
   // Helper methods
@@ -131,6 +150,8 @@ class Bulk_Adapt {
   double length(int n1, int n2);
   /// Returns the length between these two points
   double length(double *n1_coord, double *n2_coord);
+  void findEdgeLengths(int elemID, double *avgEdgeLength, double *maxEdgeLength, int *maxEdge, 
+		       double *minEdgeLength, int *minEdge);
   /// Returns the area of the triangle formed by n1, n2 aand n3
   double getArea(int n1, int n2, int n3);
   /// Returns the area between these three points
@@ -159,7 +180,6 @@ class Bulk_Adapt {
   /// same as above only takes in point coordinates instead of node indices
   bool controlQualityC(double *n1_coord, double *n2_coord, double *n3_coord, double *n4_coord);
   bool flipOrBisect(int elId, int n1, int n2, int maxEdgeIdx, double maxlen);
-  void tests(bool b);
 };
 
 #endif

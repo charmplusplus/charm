@@ -13,7 +13,7 @@
 #define MINAREA 1.0e-18
 #define MAXAREA 1.0e12
 #define GRADATION 1.2
-//#define ADAPT_VERBOSE
+#define ADAPT_VERBOSE
 
 CtvDeclare(Bulk_Adapt *, _bulkAdapt);
 
@@ -94,10 +94,10 @@ int Element_Bucket::Delete_Min(int cflag)
  * if method = 1, refine elements down to sizes specified in sizes array
  * Negative entries in size array indicate no refinement. 
  */
-void Bulk_Adapt::Refine(int qm, int method, double factor, double *sizes)
+void Bulk_Adapt::ParFUM_Refine(int qm, int method, double factor, double *sizes)
 {
   SetMeshSize(method, factor, sizes);
-  GradateMesh(GRADATION);
+  ParFUM_GradateMesh(GRADATION);
   (void)Refine_h(qm, method, factor, sizes);
 }
 
@@ -105,6 +105,7 @@ void Bulk_Adapt::Refine(int qm, int method, double factor, double *sizes)
 int Bulk_Adapt::Refine_h(int qm, int method, double factor, double *sizes)
 {
   // loop through elemsToRefine
+  int numNodes, numElements;
   int elId, mods=0, iter_mods=1;
   int elemWidth = theMesh->elem[0].getConn().width();
   Element_Bucket elemsToRefine;
@@ -143,27 +144,27 @@ int Bulk_Adapt::Refine_h(int qm, int method, double factor, double *sizes)
 	int n1, n2;
 	double avgEdgeLength, maxEdgeLength, minEdgeLength;
 	int maxEdge, minEdge;
-	findEdgeLengths(i, &avgEdgeLength, &maxEdgeLength, &maxEdge, 
+	findEdgeLengths(elId, &avgEdgeLength, &maxEdgeLength, &maxEdge, 
 			&minEdgeLength, &minEdge);
 	//double qFactor=getAreaQuality(elId);
 	if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
 	    (avgEdgeLength>(theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))){
 	  //|| (qFactor < QUALITY_MIN)) {
 	  //decide if we should do a flip or bisect
-	  if (edge_bisect(elId, 0, maxEdge, dim) > 0)  iter_mods++;
+	  if (theMesh->parfumSA->bulkAdapt->edge_bisect(elId, 0, maxEdge, dim) > 0)  iter_mods++;
 	}
       }
       CthYield(); // give other chunks on the same PE a chance
     }
     mods += iter_mods;
 #ifdef ADAPT_VERBOSE
-    CkPrintf("[%d]ParFUM_Refine: %d modifications in last pass.\n",theMod->idx,iter_mods);
+    CkPrintf("[]ParFUM_Refine: %d modifications in last pass.\n",iter_mods);
 #endif
   }
 #ifdef ADAPT_VERBOSE
-  CkPrintf("[%d]ParFUM_Refine: %d total modifications.\n",theMod->idx,mods);
+  CkPrintf("[]ParFUM_Refine: %d total modifications.\n",mods);
 #endif
-  elemsToRefine.Reset();
+  elemsToRefine.Reset(0);
   return mods;
 }
 
@@ -173,17 +174,17 @@ int Bulk_Adapt::Refine_h(int qm, int method, double factor, double *sizes)
  * if method = 1, coarsen elements up to sizes specified in sizes array
  * Negative entries in size array indicate no coarsening. 
  */
-void FEM_Adapt_Algs::FEM_Coarsen(int qm, int method, double factor, 
+void Bulk_Adapt::ParFUM_Coarsen(int qm, int method, double factor, 
 				 double *sizes)
 {
   SetMeshSize(method, factor, sizes);
-  GradateMesh(GRADATION);
-  (void)Coarsen_h(qm, method, factor, sizes);
+  ParFUM_GradateMesh(GRADATION);
+  //  (void)Coarsen_h(qm, method, factor, sizes);
 }
 
 /** The actual coarsen in the previous operation
 */
-int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
+int Bulk_Adapt::Coarsen_h(int qm, int method, double factor, double *sizes)
 {
   /*
   // loop through elemsToRefine
@@ -320,7 +321,7 @@ int FEM_Adapt_Algs::Coarsen(int qm, int method, double factor, double *sizes)
 /** Performs a sequence of refinements or coarsening as is needed
  * to achieve the target areas for elements
  */
-void FEM_Adapt_Algs::FEM_AdaptMesh(int qm, int method, double factor, 
+void Bulk_Adapt::ParFUM_AdaptMesh(int qm, int method, double factor, 
 				   double *sizes)
 {
   /*
@@ -358,7 +359,7 @@ void FEM_Adapt_Algs::FEM_AdaptMesh(int qm, int method, double factor,
 
 /** Smooth the mesh using method according to some quality measure qm
  */
-void Bulk_Adapt::Smooth(int qm, int method)
+void Bulk_Adapt::ParFUM_Smooth(int qm, int method)
 {
   CkPrintf("WARNING: Bulk_Adapt::Smooth: Not yet implemented.\n");
 }
@@ -429,7 +430,7 @@ void  FEM_Adapt_Algs::FEM_mesh_smooth(FEM_Mesh *meshP, int *nodes, int nNodes, i
 /** Elements with a bad quality metric are either flipped or coarsened to 
  * newer elements which are of better quality
  */
-void Bulk_Adapt::Repair(int qm)
+void Bulk_Adapt::ParFUM_Repair(int qm)
 {
   /*
   double avgQual = 0.0, minQual = getAreaQuality(0);
@@ -589,7 +590,7 @@ void Bulk_Adapt::Repair(int qm)
  * if method = 1, keep regional mesh sizes, and scale by factor
  * if method = 2, uses sizes to size mesh by regions 
  */
-void Bulk_Adapt::Remesh(int qm, int method, double factor, double *sizes)
+void Bulk_Adapt::ParFUM_Remesh(int qm, int method, double factor, double *sizes)
 {
   CkPrintf("WARNING: ParFUM_Remesh: Under construction.\n");
 }
@@ -597,7 +598,7 @@ void Bulk_Adapt::Remesh(int qm, int method, double factor, double *sizes)
 
 /** For each element, set its size to its average edge length
  */
-void Bulk_Adapt::SetReferenceMesh()
+void Bulk_Adapt::ParFUM_SetReferenceMesh()
 {
   // TODO: do we need to run this loop for element types other than 0?
   double avgLength = 0.0;
@@ -623,12 +624,12 @@ void Bulk_Adapt::SetReferenceMesh()
     Mesh Gradation Control, Borouchaki et al
     IJNME43 1998 www.ann.jussieu.fr/~frey/publications/ijnme4398.pdf 
 */
-void Bulk_Adapt::GradateMesh(double smoothness)
+void Bulk_Adapt::ParFUM_GradateMesh(double smoothness)
 {
   const double beta = smoothness;
   double maxShock, minShock;
   int iteration = 0, updates = 0;
-  int* adjNodes, *boundNodes;
+  int *adjNodes, *boundNodes;
   int nadjNodes, nnodes;
   int meshNum = FEM_Mesh_default_read();
   //if (smoothness < 1.0) {
@@ -723,7 +724,8 @@ void Bulk_Adapt::GradateMesh(double smoothness)
 	//}
 	
       }
-      free(adjNodes);
+      if (nadjNodes > 0)
+	delete[] adjNodes;
     } 
     
     //printf("Finished iteration %d\n", iteration);
@@ -742,8 +744,8 @@ void Bulk_Adapt::GradateMesh(double smoothness)
 /** Set sizes on elements throughout the mesh; note: size is edge length */
 void Bulk_Adapt::SetMeshSize(int method, double factor, double *sizes)
 {
-  numNodes = theMesh->node.size();
-  numElements = theMesh->elem[0].size();
+  int numNodes = theMesh->node.size();
+  int numElements = theMesh->elem[0].size();
   int elemConn[3];
 
   if (method == 0) { // set uniform sizing specified in factor
@@ -825,6 +827,36 @@ double Bulk_Adapt::length(double *n1_coord, double *n2_coord) {
   return (sqrt(ds_sum));
 }
 
+void Bulk_Adapt::findEdgeLengths(int elemID, double *avgEdgeLength, double *maxEdgeLength, int *maxEdge, 
+				 double *minEdgeLength, int *minEdge)
+{
+  FEM_Elem &elem = theMesh->elem[elemType]; // elem is local elements
+  int *conn = elem.connFor(elemID);
+  // assuming tets for now
+  double edgeLengths[6];
+  edgeLengths[0] = length(conn[0], conn[1]);
+  edgeLengths[1] = length(conn[0], conn[2]);
+  edgeLengths[2] = length(conn[0], conn[3]);
+  edgeLengths[3] = length(conn[1], conn[2]);
+  edgeLengths[4] = length(conn[1], conn[3]);
+  edgeLengths[5] = length(conn[2], conn[3]);
+  (*maxEdgeLength) = (*minEdgeLength) = (*avgEdgeLength) = edgeLengths[0];
+  (*maxEdge) = (*minEdge) = 0;
+  for (int i=1; i<6; i++) {
+    (*avgEdgeLength) += edgeLengths[i];
+    if (edgeLengths[i] > (*maxEdgeLength)) {
+      (*maxEdgeLength) = edgeLengths[i]; 
+      (*maxEdge) = i;
+    }
+    else if (edgeLengths[i] < (*minEdgeLength)) {
+      (*minEdgeLength) = edgeLengths[i];
+      (*minEdge) = i;
+    }
+  }
+  (*avgEdgeLength) /= 6;
+}
+
+
 double Bulk_Adapt::getArea(int n1, int n2, int n3)
 {
   double coordsn1[2], coordsn2[2], coordsn3[2];
@@ -889,29 +921,12 @@ double Bulk_Adapt::getSignedArea(double *n1_coord, double *n2_coord, double *n3_
 }
 
 int Bulk_Adapt::getCoord(int n1, double *crds) {
-  if(!FEM_Is_ghost_index(n1)) {
-    FEM_Mesh_dataP(theMesh, FEM_NODE, coord_attr, (void *)crds, n1, 1, FEM_DOUBLE, dim);
-  }
-  else {
-    int numchunks;
-    IDXL_Share **chunks1;
-    theMod->fmUtil->getChunkNos(0,n1,&numchunks,&chunks1);
-    int index = theMod->idx;
-    for(int j=0; j<numchunks; j++) {
-      int chk = chunks1[j]->chk;
-      if(chk==index) continue;
-      int ghostidx = theMod->fmUtil->exists_in_IDXL(theMesh,n1,chk,2);
-      double2Msg *d = meshMod[chk].getRemoteCoord(index,ghostidx);
-      crds[0] = d->i;
-      crds[1] = d->j;
-      for(int j=0; j<numchunks; j++) {
-	delete chunks1[j];
-      }
-      if(numchunks != 0) free(chunks1);
-      delete d;
-      break;
-    }
-  }
+  FEM_DataAttribute *coord = theMesh->node.getCoord(); // entire local coords
+  double *nodeCoords = (coord->getDouble()).getRow(n1); // ptrs to ACTUAL coords!
+  crds[0] = nodeCoords[0];
+  crds[1] = nodeCoords[1];
+  if (dim == 3) 
+    crds[2] = nodeCoords[2];
   return 1;
 }
 
@@ -1016,26 +1031,6 @@ bool Bulk_Adapt::controlQualityF(int n1, int n2, int n3, int n4) {
   return flag;
 }
 
-/** Verify the quality of the four new elements that will be created by flip
- */
-bool Bulk_Adapt::controlQualityR(int n1, int n2, int n3, int n4) {
-  //n1 or n2 will be replaced by n4
-  double coordsn1[2], coordsn2[2], coordsn3[2], coordsn4[2], coordsn5[2];
-  if(n4==-1) return false;
-  getCoord(n1, coordsn1);
-  getCoord(n2, coordsn2);
-  getCoord(n3, coordsn3);
-  getCoord(n4, coordsn4);
-  coordsn5[0] = (coordsn1[0]+coordsn2[0])*0.5;
-  coordsn5[1] = (coordsn1[1]+coordsn2[1])*0.5;
-  bool flag = false;
-  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn1,coordsn3,coordsn5);
-  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn2,coordsn3,coordsn5);
-  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn1,coordsn4,coordsn5);
-  if(!flag) flag = theMod->fmAdaptAlgs->controlQualityR(coordsn2,coordsn4,coordsn5);
-  return flag;
-}
-
 bool Bulk_Adapt::controlQualityR(double *coordsn1, double *coordsn2, double *coordsn3) {
   double area = getArea(coordsn1, coordsn2, coordsn3);
   //do some quality preservation
@@ -1121,20 +1116,3 @@ bool Bulk_Adapt::flipOrBisect(int elId, int n1, int n2, int maxEdgeIdx, double m
   else return false;
 }
 
-void Bulk_Adapt::tests(bool b=true) {
-  //test the mesh for slivered triangles
-  if(!b) {
-    theMod->fmUtil->AreaTest(theMesh);
-    return;
-  }
-  theMod->fmUtil->AreaTest(theMesh);
-  theMod->fmUtil->StructureTest(theMesh);
-  theMod->fmUtil->IdxlListTest(theMesh);
-  theMod->fmUtil->residualLockTest(theMesh);
-  /*for(int i=0; i<theMesh->node.size(); i++) {
-    if(theMesh->node.is_valid(i)) CkPrintf("Valid -- ");
-    else  CkPrintf("Invalid -- ");
-    theMod->fmUtil->FEM_Print_coords(theMesh,i);
-    }*/
-  return;
-}

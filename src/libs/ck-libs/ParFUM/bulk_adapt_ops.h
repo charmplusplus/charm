@@ -148,7 +148,7 @@ class BulkAdapt {
    * Update its connectivity
    * Return index of new element
    * */
-  int add_element(int elemType,int nodesPerElem,int *conn);
+  int add_element(int elemType,int nodesPerElem,int *conn,double sizing);
   
   /** Update the conn of an element*/
   void update_element_conn(int elemType,int elemID,int nodesPerElem,int *conn);
@@ -159,7 +159,7 @@ class BulkAdapt {
    * */
   int add_node(int dim,double *coords);
   
-  /** Update the co-ordimates of the given node */
+  /** Update the co-ordinates of the given node */
   void update_node_coord(int nodeID,int dim,double *coords);
   
   void make_node_shared(int nodeID,int numSharedChunks,int *sharedChunks);
