@@ -42,8 +42,6 @@
 #define CMK_SIGNAL_USE_SIGACTION                           1
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
-#define CMK_NETPOLL					   1
-
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 #define CMK_THREADS_COPY_STACK                             0
 
@@ -75,7 +73,6 @@
 
 
 /* These optimizations were added by Isaac after some various studies */
-#undef CMK_USE_POLL
 #define CMK_USE_POLL                                       0
 #define PXSHM_OSSPINLOCK                                   1
 #define PXSHM_LOCK                                  0
