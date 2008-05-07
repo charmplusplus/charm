@@ -104,7 +104,7 @@ RingMulticastStrategy::createObjectOnIntermediatePe(int nindices,
     
   //here we check if have reached the end of the ring
   if(obj->npes > 0 && isEndOfRing(*obj->pelist, src_pe)) {
-    delete obj->pelist;
+    delete [] obj->pelist;
     obj->pelist = NULL;
     obj->npes = 0;
   }
