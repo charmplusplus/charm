@@ -2210,7 +2210,9 @@ int main(int argc, char **argv)
   MPI_Init(&argc, &argv);
 }
 EOT
+mv -f ../include/mpi.h ../include/mpi.h.bak 2>/dev/null
 test_cxx "whether build on MPI" "yes" "no" ""
+mv -f ../include/mpi.h.bak ../include/mpi.h 2>/dev/null
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_BUILD_ON_MPI $strictpass
