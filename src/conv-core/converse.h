@@ -1528,6 +1528,20 @@ extern int _immRunning;
 #define smp_wmb()
 #endif
 
+/** Atomically increment/decrement this integer. */
+#ifdef CMK_CPV_IS_SMP
+#if CMK_AMD64 || CMK_GCC_X86_ASM
+#define CmiMemoryAtomicIncrement(someInt) asm("lock incl %0" :: "m" (someInt))
+#define CmiMemoryAtomicDecrement(someInt) asm("lock decl %0" :: "m" (someInt))
+#else
+#define CmiMemoryAtomicIncrement(someInt) someInt=someInt+1
+#define CmiMemoryAtomicDecrement(someInt) someInt=someInt-1
+#endif
+#else
+#define CmiMemoryAtomicIncrement(someInt)  someInt=someInt+1
+#define CmiMemoryAtomicDecrement(someInt)  someInt=someInt-1
+#endif
+
 /******** Performance Counters ********/
 void CmiInitCounters();
 void CmiStartCounters(int events[], int numEvents);
