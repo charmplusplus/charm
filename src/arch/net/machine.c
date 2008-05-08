@@ -1656,11 +1656,11 @@ inline void DeliverViaNetworkOrPxshm(OutgoingMsg ogm,OtherNode node,int rank,uns
 #if CMK_USE_PXSHM
      {
 #if PXSHM_STATS
-				double _startValidTime = CmiWallTimer();
+	double _startValidTime = CmiWallTimer();
 #endif
       int ret=CmiValidPxshm(ogm,node);
 #if PXSHM_STATS
-				pxshmContext->validCheckTime += CmiWallTimer() - _startValidTime;
+	pxshmContext->validCheckTime += CmiWallTimer() - _startValidTime;
 #endif			
       MACHSTATE4(3,"Msg ogm %p size %d dst %d usePxShm %d",ogm,ogm->size,ogm->dst,ret);
       if(ret){
@@ -1697,6 +1697,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     for (rank = 0; rank<_Cmi_mynodesize; rank++) {
       CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
     }
+    CmiCommLock();
 #if CMK_BROADCAST_SPANNING_TREE
     SendSpanningChildren(ogm, 1, 0, NULL, 0, DGRAM_BROADCAST);
 #elif CMK_BROADCAST_HYPERCUBE
@@ -1711,12 +1712,14 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
       }	
 #endif
     GarbageCollectMsg(ogm);
+    CmiCommUnlock();
     break;
   case PE_BROADCAST_OTHERS:
     for (rank = 0; rank<_Cmi_mynodesize; rank++)
       if (rank + Cmi_nodestart != ogm->src) {
 	CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
       }
+    CmiCommLock();
 #if CMK_BROADCAST_SPANNING_TREE
     SendSpanningChildren(ogm, 1, 0, NULL, 0, DGRAM_BROADCAST);
 #elif CMK_BROADCAST_HYPERCUBE
@@ -1731,6 +1734,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
       }	
 #endif
     GarbageCollectMsg(ogm);
+    CmiCommUnlock();
     break;
   default:
 #ifndef CMK_OPTIMIZE
@@ -1740,8 +1744,10 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     node = nodes_by_pe[dst];
     rank = dst - node->nodestart;
     if (node->nodestart != Cmi_nodestart) {
+        CmiCommLock();
     	DeliverViaNetworkOrPxshm(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
 	GarbageCollectMsg(ogm);
+        CmiCommUnlock();
     } else {
       if (ogm->freemode == 'A') {
 	CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
@@ -1927,9 +1933,9 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 
   CmiMsgHeaderSetLength(data, size);
   ogm=PrepareOutgoing(cs,pe,size,freemode,data);
-  CmiCommLock();
+  /* CmiCommLock(); */
   DeliverOutgoingMessage(ogm);
-  CmiCommUnlock();
+  /* CmiCommUnlock(); */
   /* Check if any packets have arrived recently (preserves kernel network buffers). */
 #if CMK_USE_PXSHM
 	CommunicationServerPxshm();
