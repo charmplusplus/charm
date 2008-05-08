@@ -20,7 +20,7 @@ module CkArray {
   PUPable CkArrayReducer;
   PUPable ComlibArrayListener;
 
-  initnode void _ckArrayInit(void);
+  initproc void _ckArrayInit(void);
 
   array [none] ArrayElement {
     entry ArrayElement();
