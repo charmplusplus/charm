@@ -30,7 +30,7 @@ class BaseLB: public CBase_BaseLB
 {
 protected:
   int  seqno;
-  char *lbname;
+  const char *lbname;
   LBDatabase *theLbdb;
   LDBarrierReceiver receiver;
   int  notifier;
@@ -119,7 +119,7 @@ public:
   virtual ~BaseLB();
 
   void unregister(); 
-  inline char *lbName() { return lbname; }
+  inline const char *lbName() { return lbname; }
   inline int step() { return theLbdb->step(); }
   virtual void turnOff() { CmiAbort("turnOff not implemented"); }
   virtual void turnOn()  { CmiAbort("turnOn not implemented"); }
