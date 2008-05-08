@@ -1902,7 +1902,9 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
       /* but to avoid infinite recursive call, don't do this if _immRunning */
     if (CmiIsImmediate(data)) {
       CmiPushImmediateMsg(data);
+#if !CMK_SMP
       CmiHandleImmediate();
+#endif
       return 0;
     }
 #endif
