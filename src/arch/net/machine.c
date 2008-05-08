@@ -1836,7 +1836,10 @@ CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
     /* execute the immediate message right away */
   if (node == CmiMyNode() && CmiIsImmediate(data)) {
     CmiPushImmediateMsg(data);
+#if ! CMK_SMP
+      /* only communication thread executes immediate messages in SMP */
     if (!_immRunning) CmiHandleImmediate();
+#endif
     return;
   }
 #endif
