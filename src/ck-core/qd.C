@@ -32,6 +32,8 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
   msg->setPhase(1);
   DEBUGP(("[%d] _bcastQD1: State: getCreated:%d getProcessed:%d\n", CmiMyPe(), state->getCreated(), state->getProcessed()));
 #if ! CMK_SHARED_VARS_UNIPROCESSOR && !CMK_MULTICORE
+/* immediate message does not count in QD now */
+/*
   QdState *comm_state;
   static int comm_create=0, comm_process=0;
   if (CmiMyRank()==0) {
@@ -39,11 +41,14 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
     int new_create = comm_state->getCreated();
     int new_process = comm_state->getProcessed();
     // combine counters with comm thread
+    CmiAssert(new_create==0);
+    CmiAssert(new_create == 0&& new_process==0);
     state->create(new_create-comm_create);
     state->process(new_process-comm_process);
     comm_create = new_create;
     comm_process = new_process;
   }
+*/
 #endif
   msg->setCreated(state->getCreated());
   msg->setProcessed(state->getProcessed());

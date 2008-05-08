@@ -1310,8 +1310,12 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
   _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
   _TRACE_CREATION_N(env, numPes);
-  if (opts & CK_MSG_SKIP_OR_IMM)
+  if (opts & CK_MSG_SKIP_OR_IMM) {
     _noCldNodeEnqueue(node, env);
+    if (opts & CK_MSG_IMMEDIATE) {    // immediate msg is invisible to QD
+      CkpvAccess(_coreState)->create(-numPes);
+    }
+  }
   else
     CldNodeEnqueue(node, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
@@ -1334,7 +1338,8 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
   _TRACE_CREATION_N(env, numPes);
   _noCldNodeEnqueue(node, env);
   _STATS_RECORD_SEND_BRANCH_1();
-  CkpvAccess(_coreState)->create();
+  /* immeidate message is invisible to QD */
+//  CkpvAccess(_coreState)->create();
   _TRACE_CREATION_DONE(1);
 #else
   // no support for immediate message, send inline
