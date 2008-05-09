@@ -637,7 +637,7 @@ void CkMemCheckPT::recoverBuddies()
   // cannot be CkMemCheckPT::restart because destory will modify states
   double curTime = CmiWallTimer();
   CkPrintf("[%d] CkMemCheckPT ----- %s  in %f seconds\n",CkMyPe(), stage, curTime-startTime);
-  stage = "recoverBuddies";
+  stage = (char *)"recoverBuddies";
   startTime = curTime;
 
   // recover buddies
@@ -671,7 +671,7 @@ void CkMemCheckPT::recoverArrayElements()
   double curTime = CmiWallTimer();
   int len = ckTable.length();
   CkPrintf("[%d] CkMemCheckPT ----- %s len: %d in %f seconds \n",CkMyPe(), stage, len, curTime-startTime);
-  stage = "recoverArrayElements";
+  stage = (char *)"recoverArrayElements";
   startTime = curTime;
 
   // recover all array elements
