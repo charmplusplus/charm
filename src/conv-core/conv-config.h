@@ -52,4 +52,8 @@
 # define CMK_USE_HP_MAIN_FIX 0
 #endif
 
+#if CMK_AMD64 && !defined(CMK_64BIT)
+#define CMK_64BIT 1
+#endif
+
 #endif
