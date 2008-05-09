@@ -11,6 +11,7 @@
 #define CMK_SMP						   1
 #define CMK_MULTICORE                                      1
 #define CMK_AMD64					   1
+#define CMK_64BIT    1
 
 #define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
@@ -66,13 +67,13 @@
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   0
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
 
-#define CMK_64BIT    1
-
-
 #define CMK_DEBUG_MODE					   0 
 #define CMK_WEB_MODE                                       1
 
 #define CMK_LBDB_ON					   1
+
+#define CMK_PCQUEUE_LOCK                                   1
+#define CMK_USE_TLS_THREAD                                 1
 
 #endif
 
