@@ -186,6 +186,7 @@ void Bulk_Adapt::ParFUM_Coarsen(int qm, int method, double factor,
 */
 int Bulk_Adapt::Coarsen_h(int qm, int method, double factor, double *sizes)
 {
+  return 0;
   /*
   // loop through elemsToRefine
   int elId, mods=0, iter_mods=1, pass=0;
