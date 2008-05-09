@@ -68,7 +68,7 @@ class Element_Bucket {
   /// Insert element to be refined/coarsened
   void Insert(int elID, double len, int cFlag);
   /// Get next element to be refined/coarsenen
-  int Delete_Min(int cFlag);
+    int Delete_Min(int cFlag, double *len);
 };
 
 
@@ -135,6 +135,8 @@ class Bulk_Adapt {
   void ParFUM_SetReferenceMesh();
   /// Adjust sizes on mesh elements to avoid sharp discontinuities 
   void ParFUM_GradateMesh(double smoothness);
+  void findEdgeLengths(int elemID, double *avgEdgeLength, double *maxEdgeLength, int *maxEdge, 
+		       double *minEdgeLength, int *minEdge);
 
  private:
   // Helper methods
@@ -148,10 +150,11 @@ class Bulk_Adapt {
 
   /// Returns the length of the edge formed by nodes n1, n2
   double length(int n1, int n2);
+  double length3D(int n1, int n2);
   /// Returns the length between these two points
   double length(double *n1_coord, double *n2_coord);
-  void findEdgeLengths(int elemID, double *avgEdgeLength, double *maxEdgeLength, int *maxEdge, 
-		       double *minEdgeLength, int *minEdge);
+  double length3D(double *n1_coord, double *n2_coord);
+
   /// Returns the area of the triangle formed by n1, n2 aand n3
   double getArea(int n1, int n2, int n3);
   /// Returns the area between these three points

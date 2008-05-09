@@ -44,11 +44,12 @@ void Element_Bucket::Insert(int eIdx, double len, int cFlag)
 }
 
 // Removes and returns the minimum element from the refine/coarsen heap
-int Element_Bucket::Delete_Min(int cflag)
+int Element_Bucket::Delete_Min(int cflag, double *len)
 {
   int Child, i, Min_ID; 
   if (cflag) {
     Min_ID=coarsenElements[1].elID;
+    (*len) = coarsenElements[1].len;
     for (i=1; i*2 <= coarsenHeapSize-1; i=Child) { // Find smaller child
       Child = i*2; // child is left child  
       if (Child != coarsenHeapSize)  // right child exists
@@ -68,6 +69,7 @@ int Element_Bucket::Delete_Min(int cflag)
   }
   else {
     Min_ID=refineElements[1].elID;
+    (*len)=refineElements[1].len;
     for (i=1; i*2 <= refineHeapSize-1; i=Child) { // Find smaller child
       Child = i*2;       // child is left child  
       if (Child !=refineHeapSize)  // right child exists
@@ -104,14 +106,17 @@ void Bulk_Adapt::ParFUM_Refine(int qm, int method, double factor, double *sizes)
 /** The actual refine in the previous operation */
 int Bulk_Adapt::Refine_h(int qm, int method, double factor, double *sizes)
 {
-  // loop through elemsToRefine
   int numNodes, numElements;
-  int elId, mods=0, iter_mods=1;
+  int elId, mods, iter_mods;
   int elemWidth = theMesh->elem[0].getConn().width();
   Element_Bucket elemsToRefine;
   int elemConn[3];
   int count = 0;
-  while (iter_mods != 0 && count<20) {
+  int myId = FEM_My_partition();
+
+  mods=0;
+  iter_mods=1;
+  while ((iter_mods != 0) || (count<20)) {
     count++;
     iter_mods=0;
     numNodes = theMesh->node.size();
@@ -123,46 +128,73 @@ int Bulk_Adapt::Refine_h(int qm, int method, double factor, double *sizes)
 	// find avg and max edge length of element i
 	double avgEdgeLength, maxEdgeLength, minEdgeLength;
 	int maxEdge, minEdge;
-	// write findEdgeLengths
 	findEdgeLengths(i, &avgEdgeLength, &maxEdgeLength, &maxEdge, 
 			&minEdgeLength, &minEdge);
 	double qFactor=getAreaQuality(i);
 	if (theMesh->elem[0].getMeshSizing(i) <= 0.0) 
 	  CkPrintf("WARNING: mesh element %d has no sizing!\n", i);
 	if ((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
-	    (avgEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))){
+	  (avgEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))){
 	    //|| (qFactor < QUALITY_MIN)) {
-	  elemsToRefine.Insert(i, qFactor*(1.0/maxEdgeLength), 0);
+	  //elemsToRefine.Insert(i, qFactor*(1.0/(avgEdgeLength+maxEdgeLength)), 0);
+	  elemsToRefine.Insert(i, 1.0/maxEdgeLength, 0);
+#ifdef ADAPT_VERBOSE
+	  CkPrintf("[%d]ParFUM_Refine: Added element %d to refine list: targetSize=%6.4f maxEdgeLength=%6.4f maxEdge=%d\n", myId, i, theMesh->elem[0].getMeshSizing(i), maxEdgeLength, maxEdge);
+#endif	  
 	}
       }
     }
     while (!elemsToRefine.RefineEmpty()) { // loop through the elements
       int n1, n2;
-      if ((elId = elemsToRefine.Delete_Top()) == -1)
-	elId = elemsToRefine.Delete_Min(0);
+      double len;
+      if ((elId = elemsToRefine.Delete_Top()) == -1) {
+	elId = elemsToRefine.Delete_Min(0, &len);
+      }
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
 	int n1, n2;
 	double avgEdgeLength, maxEdgeLength, minEdgeLength;
 	int maxEdge, minEdge;
 	findEdgeLengths(elId, &avgEdgeLength, &maxEdgeLength, &maxEdge, 
 			&minEdgeLength, &minEdge);
-	//double qFactor=getAreaQuality(elId);
-	if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
-	    (avgEdgeLength>(theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))){
-	  //|| (qFactor < QUALITY_MIN)) {
-	  //decide if we should do a flip or bisect
-	  if (theMesh->parfumSA->bulkAdapt->edge_bisect(elId, 0, maxEdge, dim) > 0)  iter_mods++;
+	double qFactor=getAreaQuality(elId);
+#ifdef ADAPT_VERBOSE
+	CkPrintf("[%d]ParFUM_Refine: 1.0/len=%6.4f maxEdgeLength=%6.4f\n", myId, 1.0/len, maxEdgeLength);
+#endif	  
+	//if (len == qFactor*(1.0/(avgEdgeLength+maxEdgeLength))) { // this elem does not appear to be modified; refine it
+	if (len == (1.0/maxEdgeLength)) { // this elem does not appear to be modified; refine it
+	  if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
+	      (avgEdgeLength>(theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))){
+	    //|| (qFactor < QUALITY_MIN)) {
+	    //decide if we should do a flip or bisect
+#ifdef ADAPT_VERBOSE
+	    CkPrintf("[%d]ParFUM_Refine: Refining element %d: targetSize=%6.4f maxEdgeLength=%6.4f maxEdge=%d\n", myId, elId, theMesh->elem[0].getMeshSizing(elId), maxEdgeLength, maxEdge);
+#endif	  
+	    if (theMesh->parfumSA->bulkAdapt->edge_bisect(elId, 0, maxEdge, dim) > 0) {
+	      iter_mods = iter_mods + 1;
+	    }
+	  }
+	}
+	else { //elem is modified, reinsert it if necessary
+	  if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
+	      (avgEdgeLength > (theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))){
+	    //|| (qFactor < QUALITY_MIN)) {
+	    //elemsToRefine.Insert(elId, qFactor*(1.0/(avgEdgeLength+maxEdgeLength)), 0);
+	    elemsToRefine.Insert(elId, 1.0/maxEdgeLength, 0);
+#ifdef ADAPT_VERBOSE
+	    CkPrintf("[%d]ParFUM_Refine: Added element %d to refine list: targetSize=%6.4f maxEdgeLength=%6.4f maxEdge=%d\n", myId, elId, theMesh->elem[0].getMeshSizing(elId), maxEdgeLength, maxEdge);
+#endif	  
+	  }
 	}
       }
       CthYield(); // give other chunks on the same PE a chance
     }
     mods += iter_mods;
 #ifdef ADAPT_VERBOSE
-    CkPrintf("[]ParFUM_Refine: %d modifications in last pass.\n",iter_mods);
+    CkPrintf("[%d]ParFUM_Refine: %d modifications in last pass.\n",myId,iter_mods);
 #endif
   }
 #ifdef ADAPT_VERBOSE
-  CkPrintf("[]ParFUM_Refine: %d total modifications.\n",mods);
+  CkPrintf("[%d]ParFUM_Refine: %d total modifications.\n",myId,mods);
 #endif
   elemsToRefine.Reset(0);
   return mods;
@@ -817,10 +849,30 @@ double Bulk_Adapt::length(int n1, int n2)
   return ret;
 }
 
+double Bulk_Adapt::length3D(int n1, int n2) {
+  double coordsn1[3], coordsn2[3];
+  getCoord(n1, coordsn1);
+  getCoord(n2, coordsn2);
+
+  double ret = length3D(coordsn1, coordsn2);
+  return ret;
+}
+
 double Bulk_Adapt::length(double *n1_coord, double *n2_coord) { 
   double d, ds_sum=0.0;
 
   for (int i=0; i<dim; i++) {
+    if(n1_coord[i]<-1.0 || n2_coord[i]<-1.0) return -2.0;
+    d = n1_coord[i] - n2_coord[i];
+    ds_sum += d*d;
+  }
+  return (sqrt(ds_sum));
+}
+
+double Bulk_Adapt::length3D(double *n1_coord, double *n2_coord) { 
+  double d, ds_sum=0.0;
+
+  for (int i=0; i<3; i++) {
     if(n1_coord[i]<-1.0 || n2_coord[i]<-1.0) return -2.0;
     d = n1_coord[i] - n2_coord[i];
     ds_sum += d*d;
@@ -833,17 +885,30 @@ void Bulk_Adapt::findEdgeLengths(int elemID, double *avgEdgeLength, double *maxE
 {
   FEM_Elem &elem = theMesh->elem[elemType]; // elem is local elements
   int *conn = elem.connFor(elemID);
+  //CkPrintf("conn[%d]:[%d,%d,%d,%d]\n", elemID, conn[0], conn[1], conn[2], conn[3]);
+  FEM_DataAttribute *coord = theMesh->node.getCoord(); // all local coords
+  double *n0co = (coord->getDouble()).getRow(conn[0]);
+  double *n1co = (coord->getDouble()).getRow(conn[1]);
+  double *n2co = (coord->getDouble()).getRow(conn[2]);
+  double *n3co = (coord->getDouble()).getRow(conn[3]);
+  //CkPrintf(" node %d = (%6.4f, %6.4f, %6.4f)\n", conn[0], n0co[0], n0co[1], n0co[2]);
+  //CkPrintf(" node %d = (%6.4f, %6.4f, %6.4f)\n", conn[1], n1co[0], n1co[1], n1co[2]);
+  //CkPrintf(" node %d = (%6.4f, %6.4f, %6.4f)\n", conn[2], n2co[0], n2co[1], n2co[2]);
+  //CkPrintf(" node %d = (%6.4f, %6.4f, %6.4f)\n", conn[3], n3co[0], n3co[1], n3co[2]);
+
   // assuming tets for now
   double edgeLengths[6];
-  edgeLengths[0] = length(conn[0], conn[1]);
-  edgeLengths[1] = length(conn[0], conn[2]);
-  edgeLengths[2] = length(conn[0], conn[3]);
-  edgeLengths[3] = length(conn[1], conn[2]);
-  edgeLengths[4] = length(conn[1], conn[3]);
-  edgeLengths[5] = length(conn[2], conn[3]);
+  edgeLengths[0] = length3D(conn[0], conn[1]);
+  edgeLengths[1] = length3D(conn[0], conn[2]);
+  edgeLengths[2] = length3D(conn[0], conn[3]);
+  edgeLengths[3] = length3D(conn[1], conn[2]);
+  edgeLengths[4] = length3D(conn[1], conn[3]);
+  edgeLengths[5] = length3D(conn[2], conn[3]);
+  //CkPrintf("edge 0 has length %6.4f\n", edgeLengths[0]);
   (*maxEdgeLength) = (*minEdgeLength) = (*avgEdgeLength) = edgeLengths[0];
   (*maxEdge) = (*minEdge) = 0;
   for (int i=1; i<6; i++) {
+    //CkPrintf("edge %d has length %6.4f\n", i, edgeLengths[i]);
     (*avgEdgeLength) += edgeLengths[i];
     if (edgeLengths[i] > (*maxEdgeLength)) {
       (*maxEdgeLength) = edgeLengths[i]; 
@@ -855,6 +920,7 @@ void Bulk_Adapt::findEdgeLengths(int elemID, double *avgEdgeLength, double *maxE
     }
   }
   (*avgEdgeLength) /= 6;
+  CkAssert((*minEdgeLength) > 0.0);
 }
 
 
