@@ -799,6 +799,9 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
     return;
   }
   CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
+#if CMK_IMMEDIATE_MSG	 
+  if (!CmiIsImmediate(env)) 
+#endif
   ck->process();
   env->setMsgtype(ForChareMsg);
   env->setObjPtr(obj);
