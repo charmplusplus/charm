@@ -1694,10 +1694,10 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
   dst = ogm->dst;
   switch (dst) {
   case PE_BROADCAST_ALL:
+    CmiCommLock();
     for (rank = 0; rank<_Cmi_mynodesize; rank++) {
       CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
     }
-    CmiCommLock();
 #if CMK_BROADCAST_SPANNING_TREE
     SendSpanningChildren(ogm, 1, 0, NULL, 0, DGRAM_BROADCAST);
 #elif CMK_BROADCAST_HYPERCUBE
@@ -1715,11 +1715,11 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
     CmiCommUnlock();
     break;
   case PE_BROADCAST_OTHERS:
+    CmiCommLock();
     for (rank = 0; rank<_Cmi_mynodesize; rank++)
       if (rank + Cmi_nodestart != ogm->src) {
 	CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
       }
-    CmiCommLock();
 #if CMK_BROADCAST_SPANNING_TREE
     SendSpanningChildren(ogm, 1, 0, NULL, 0, DGRAM_BROADCAST);
 #elif CMK_BROADCAST_HYPERCUBE
@@ -1842,10 +1842,8 @@ CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
     /* execute the immediate message right away */
   if (node == CmiMyNode() && CmiIsImmediate(data)) {
     CmiPushImmediateMsg(data);
-#if ! CMK_SMP
       /* only communication thread executes immediate messages in SMP */
     if (!_immRunning) CmiHandleImmediate();
-#endif
     return;
   }
 #endif
@@ -1908,9 +1906,7 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
       /* but to avoid infinite recursive call, don't do this if _immRunning */
     if (CmiIsImmediate(data)) {
       CmiPushImmediateMsg(data);
-#if !CMK_SMP
       CmiHandleImmediate();
-#endif
       return 0;
     }
 #endif
