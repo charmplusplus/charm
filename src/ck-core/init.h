@@ -26,6 +26,7 @@ class TableEntry {
     inline IrrGroup* getObj(void) { return obj; }
     inline void setObj(void *_obj) { obj=(IrrGroup *)_obj; }
     PtrQ* getPending(void) { return pending; }
+    inline void clearPending(void) { delete pending; pending = NULL; }
     void enqMsg(void *msg) {
       if (pending==0)
         pending=new PtrQ();
