@@ -178,6 +178,8 @@ public:
   inline LBDB *getLBDB() {return (LBDB*)(myLDHandle.handle);}
 #endif
 
+  static void initnodeFn(void);
+
   void pup(PUP::er& p);
 
   /*

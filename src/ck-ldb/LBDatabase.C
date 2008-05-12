@@ -17,7 +17,6 @@
  */
 
 #include "LBDatabase.h"
-#include "LBDatabase.def.h"
 #include "LBSimulation.h"
 #include "topology.h"
 
@@ -303,20 +302,24 @@ void _loadbalancerInit()
 
 int LBDatabase::manualOn = 0;
 char *LBDatabase::avail_vector = NULL;
+CmiNodeLock avail_vector_lock;
 
+void LBDatabase::initnodeFn()
+{
+  int num_proc = CkNumPes();
+  avail_vector= new char[num_proc];
+  for(int proc = 0; proc < num_proc; proc++)
+      avail_vector[proc] = 1;
+  avail_vector_lock = CmiCreateLock();
+}
+
+// called my constructor
 void LBDatabase::init(void) 
 {
   myLDHandle = LDCreate();
 
   mystep = 0;
   nloadbalancers = 0;
-
-  int num_proc = CkNumPes();
-  if (!avail_vector) {
-    avail_vector = new char[num_proc];
-    for(int proc = 0; proc < num_proc; proc++)
-        avail_vector[proc] = 1;
-  }
   new_ld_balancer = 0;
 
   CkpvAccess(lbdatabaseInited) = 1;
@@ -420,12 +423,13 @@ void LBDatabase::pup(PUP::er& p)
   int np;
   if (!p.isUnpacking()) np = CkNumPes();
   p|np;
-  CmiAssert(avail_vector);
   // in case number of processors changes
   if (p.isUnpacking() && np > CkNumPes()) {
+    CmiLock(avail_vector_lock);
     delete [] avail_vector;
     avail_vector = new char[np];
     for (int i=0; i<np; i++) avail_vector[i] = 1;
+    CmiUnlock(avail_vector_lock);
   }
   p(avail_vector, np);
 }
@@ -526,5 +530,7 @@ void LBSetPeriod(double second) {
     _lb_args.lbperiod() = second;
 #endif
 }
+
+#include "LBDatabase.def.h"
 
 /*@}*/
