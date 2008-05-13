@@ -305,8 +305,8 @@ pthread_mutex_t barrier_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void CmiNodeBarrierCount(int nThreads)
 {
-  static int volatile level = 0;
-  int cur;
+  static unsigned int volatile level = 0;
+  unsigned int cur;
   pthread_mutex_lock(&barrier_mutex);
   cur = level;
   /* CmiPrintf("[%d] CmiNodeBarrierCount: %d of %d level:%d\n", CmiMyPe(), barrier, nThreads, level); */
@@ -318,7 +318,7 @@ void CmiNodeBarrierCount(int nThreads)
   }
   else{
     barrier = 0;
-    level = !level;
+    level++;  /* !level;  */
     pthread_cond_broadcast(&barrier_cond);
   }
   pthread_mutex_unlock(&barrier_mutex);
@@ -525,8 +525,8 @@ static void getTimespec(int msFromNow,struct timespec *dest) {
   dest->tv_sec+=secFromNow;
   dest->tv_nsec+=1000*1000*msFromNow;
   /*Wrap around if we overflowed the nsec field*/
-  while (dest->tv_nsec>1000000000u) {
-    dest->tv_nsec-=1000000000;
+  while (dest->tv_nsec>=1000000000ul) {
+    dest->tv_nsec-=1000000000ul;
     dest->tv_sec++;
   }
 }
