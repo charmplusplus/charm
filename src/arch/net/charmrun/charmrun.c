@@ -2637,8 +2637,8 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
     fprintf(f,"DISPLAY='%s';export DISPLAY\n",arg_display);
   netstart = create_netstart(rank0no);
   fprintf(f,"NETSTART='%s';export NETSTART\n",netstart);
-  fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",nodeno);
-  fprintf(f,"CmiMyNodeSize='%d'; export CmiMyNodeSize\n",nodetab_getnodeinfo(nodeno)->cpus);
+  fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",rank0no);
+  fprintf(f,"CmiMyNodeSize='%d'; export CmiMyNodeSize\n",nodetab_getnodeinfo(rank0no)->cpus);
   fprintf(f,"CmiNumNodes='%d'; export CmiNumNodes\n",nodetab_rank0_size);
 #if CONVERSE_VERSION_VMI
   /* VMI environment variable */
