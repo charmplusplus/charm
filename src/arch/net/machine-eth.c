@@ -836,6 +836,7 @@ static void recvBarrierMessage()
 }
 
 /* happen at node level */
+/* must be called on every PE including communication processors */
 int CmiBarrier()
 {
   int len, size, i;
