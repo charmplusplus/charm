@@ -481,7 +481,8 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
     void *pending;
     while((pending=ptrq->deq())!=0)
       CldEnqueue(CkMyPe(), pending, _infoIdx);
-    delete ptrq;
+//    delete ptrq;
+      CkpvAccess(_groupTable)->find(groupID).clearPending();
   }
   CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
 
@@ -515,15 +516,16 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
   CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
   CksvAccess(_nodeGroupIDTable).push_back(groupID);
-  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
 
   PtrQ *ptrq = CksvAccess(_nodeGroupTable)->find(groupID).getPending();
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0)
       CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
-    delete ptrq;
+//    delete ptrq;
+      CksvAccess(_nodeGroupTable)->find(groupID).clearPending();
   }
+  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
 }
 
 void _createGroup(CkGroupID groupID, envelope *env)
@@ -537,7 +539,7 @@ void _createGroup(CkGroupID groupID, envelope *env)
   if(_chareTable[gIdx]->isIrr == 0){
 		CProxy_CkArrayReductionMgr rednMgrProxy = CProxy_CkArrayReductionMgr::ckNew(0, groupID);
 		rednMgr = rednMgrProxy;
-		rednMgrProxy.setAttachedGroup(groupID);
+//		rednMgrProxy.setAttachedGroup(groupID);
   }else{
 	rednMgr.setZero();
   }
@@ -793,7 +795,7 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
     if (CmiIsImmediate(env))     // buffer immediate message	 
       CmiDelayImmediate();	 
     else	 
- #endif
+#endif
     CksvAccess(_nodeGroupTable)->find(groupID).enqMsg(env);
     CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
     return;
@@ -1280,6 +1282,7 @@ void CkSendMsgBranchMultiImmediate(int eIdx,void *msg,int npes,int *pes,CkGroupI
   _TRACE_CREATION_DONE(1);      // since it only creates one creation event.
 #else
   _sendMsgBranchMulti(eIdx, msg, gID, npes, pes);
+  CpvAccess(_qd)->create(-npes);
 #endif
   _STATS_RECORD_SEND_BRANCH_N(npes);
   CpvAccess(_qd)->create(npes);
