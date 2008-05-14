@@ -345,7 +345,7 @@ static char    pparam_optc='-';
 char           pparam_error[100];
 
 static ppdef pparam_find(lname)
-    char *lname;
+    const char *lname;
 {
   ppdef def;
   for (def=ppdefs; def; def=def->next)
@@ -355,7 +355,7 @@ static ppdef pparam_find(lname)
 }
 
 static ppdef pparam_cell(lname)
-    char *lname;
+    const char *lname;
 {
   ppdef def = pparam_find(lname);
   if (def) return def;
@@ -3026,7 +3026,7 @@ void start_nodes_local(char ** env)
   int envc, rank0no, i;
 
   /* copy environ and expanded to hold NETSTART */ 
-  for (envc=0; env[envc]; envc++);  envc--;
+  for (envc=0; env[envc]; envc++);
   envp = (char **)malloc((envc+2)*sizeof(void *));
   for (i=0; i<envc; i++) envp[i] = env[i];
   envp[envc] = (char *)malloc(256);
