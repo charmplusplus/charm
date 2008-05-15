@@ -496,7 +496,6 @@ int main(int argc, char **argv)
 EOT
 mv -f ../include/mpi.h ../include/mpi.h.bak 2>/dev/null
 test_cxx "whether build on MPI" "yes" "no" ""
-mv -f ../include/mpi.h.bak ../include/mpi.h 2>/dev/null
 AC_DEFINE_UNQUOTED(CMK_BUILD_ON_MPI, $strictpass, [build MPI.])
 
 if test $strictpass -eq 1
@@ -513,6 +512,7 @@ EOT
 test_cxx "whether MPI_Init_thread is supported" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_MPI_INIT_THREAD, $strictpass, [Allows MPI_Init_thread.])
 fi
+mv -f ../include/mpi.h.bak ../include/mpi.h 2>/dev/null
 
 
 ################### Syscalls and Libraries ###################
