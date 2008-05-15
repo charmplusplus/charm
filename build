@@ -205,7 +205,12 @@ BUILD_EMULATOR=0
 [ $# -lt 2 ] && ./smart-build.pl && exit 1
 PROGRAM=$1
 shift
-VERSION=$1; BASEVERSION=$1; ARCH=`echo $1 | sed -e 's@-.*@@'`
+VERSION=$1; BASEVERSION=$1; 
+if test -f $src/$BASEVERSION/vdir_link
+then
+  BASEVERSION=`cat $src/$BASEVERSION/vdir_link`
+fi
+ARCH=`echo $1 | sed -e 's@-.*@@'`
 shift
 
 #echo $src
