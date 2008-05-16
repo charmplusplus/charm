@@ -157,7 +157,7 @@ Choose an interconnect from below: [1-11]
 	 6) Cray XT3, XT4 (not yet tested on CNL)
 	 7) Bluegene/L Native (only at T. J. Watson)
 	 8) Bluegene/L MPI
-	 9) Bluegene/P Native (only at T. J. Watson)
+	 9) Bluegene/P Native
 	10) Bluegene/P MPI
 	11) VMI
 
@@ -219,7 +219,7 @@ EOF
 if($arch eq ""){
   $arch = "${converse_network_type}-${arch_os}";
 	  if($amd64) {
-		$arch = $arch . "-amd64";
+		$arch = $arch . "-x86_64";
 	  } elsif($ia64){
 	  	$arch = $arch . "-ia64";
 	  } elsif($ppc){
@@ -233,10 +233,12 @@ if($arch eq ""){
 
 if($arch eq "net-darwin"){
 	$arch = "net-darwin-x86";
-} elsif($arch eq "net-darwin-ppc"){
-	$arch = "net-ppc-darwin";
-} elsif($arch eq "mpi-darwin-ppc"){
-	$arch = "mpi-ppc-darwin";
+} elsif($arch eq "net-ppc-darwin"){
+	$arch = "net-darwin-ppc";
+} elsif($arch eq "mpi-ppc-darwin"){
+	$arch = "mpi-darwin-ppc";
+} elsif($arch eq "multicore-linux-x86_64"){
+	$arch = "multicore-linux64";
 } 
 
 
