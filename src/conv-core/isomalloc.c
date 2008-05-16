@@ -390,7 +390,7 @@ map_slots(CmiInt8 slot, CmiInt8 nslots)
     return NULL;
   }
 #if CMK_THREADS_DEBUG
-  CmiPrintf("[%d] mmap'd slots %d-%d to address %p\n",CmiMyPe(),
+  CmiPrintf("[%d] mmap'd slots %ld-%ld to address %p\n",CmiMyPe(),
 	    slot,slot+nslots-1,addr);
 #endif
   return (CmiIsomallocBlock *)pa;
@@ -405,7 +405,7 @@ unmap_slots(CmiInt8 slot, CmiInt8 nslots)
   void *addr=slot2addr(slot);
   call_munmap(addr, slotsize*nslots);
 #if CMK_THREADS_DEBUG
-  CmiPrintf("[%d] munmap'd slots %d-%d from address %p\n",CmiMyPe(),
+  CmiPrintf("[%d] munmap'd slots %ld-%ld from address %p\n",CmiMyPe(),
 	    slot,slot+nslots-1,addr);
 #endif
 }
