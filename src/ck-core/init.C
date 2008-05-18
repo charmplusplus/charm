@@ -437,6 +437,7 @@ void _initDone(void)
   DEBUGF(("[%d] _initDone.\n", CkMyPe()));
   if (!_triggersSent) _sendTriggers();
   CkNumberHandler(_triggerHandlerIdx, (CmiHandler)_discardHandler);
+  CmiNodeBarrier();
   if(CkMyRank() == 0) {
     _processBufferedNodeBocInits();
   }
