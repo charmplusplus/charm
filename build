@@ -117,10 +117,6 @@ syntax() {
   echo ' 3. Does a "make <target> <version> OPTS=<charmc-options>" in <version>/tmp.'
   echo "That's all build does.  The rest is handled by the Makefile."
   echo ''
-  echo 'You should register your copy of Charm++ with us by sending email'
-  echo 'to tms@charm.cs.uiuc.edu containing the message "subscribe charm-users"'
-  echo 'This will allow us to notify you of new releases of Charm++.'
-  echo ''
   echo 'Thank you for using Charm++, please send questions or comments to '
   echo 'Parallel Programming Lab at University of Illinois at Urbana-Champaign'
   echo '(email: ppl@cs.uiuc.edu).'
