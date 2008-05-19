@@ -27,7 +27,7 @@
 
 /*#define  CMK_USE_MFENCE                                    1 */
 #define  CMK_PCQUEUE_LOCK                                  1 
-#define CMK_USE_TLS_THREAD                                 0
+#define CMK_USE_TLS_THREAD                                 1
 
 #undef CMK_MALLOC_USE_GNU_MALLOC
 #undef CMK_MALLOC_USE_OS_BUILTIN
