@@ -758,7 +758,8 @@ void CmiTimerInit()
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
 
-  CmiBarrierZero();
+  CmiBarrier();
+/*  CmiBarrierZero(); */
 }
 
 double CmiCpuTimer()
@@ -1347,7 +1348,7 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 #endif
         if(!CsdLocalMax) {
 	  CqsDequeue(s->schedQ,(void **)&msg);
-            if (msg!=NULL) return msg;	    
+          if (msg!=NULL) return msg;	    
         }
 
 	return NULL;
