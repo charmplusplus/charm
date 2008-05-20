@@ -1,6 +1,6 @@
-DIRS=1darray 3darray fancyarray \
+DIRS=3darray fancyarray \
 	darray dgroup \
-	group \
+	group local \
 	stl_array sdag
 
 all: 
