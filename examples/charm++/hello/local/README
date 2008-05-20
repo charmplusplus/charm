@@ -1,0 +1,5 @@
+Hello World in Charm with a Chare Array, a Chare Group and LOCAL entry methods
+
+Demonstrates usage of LOCAL entry methods. It is a modification of
+the simple 1darray version. Each chare element calls a local method on
+the group branch, and prints the answer together with its Hi message.

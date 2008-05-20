@@ -1,0 +1,21 @@
+mainmodule hello {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_HelloGroup groupProxy;
+  readonly int nElements;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void startIter(void);
+    entry void done(void);
+  };
+
+  array [1D] Hello {
+    entry Hello(void);
+    entry void SayHi(int hiNo);
+  };
+  
+  group HelloGroup {
+    entry HelloGroup(void);
+    entry [local] void request(int*);
+  };
+};
