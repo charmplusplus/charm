@@ -7,6 +7,8 @@ be wrapped in CmiMemLock.  (Doesn't hurt, tho')
 
 *****************************************************************************/
 
+#define CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS   0
+
 #if ! CMK_MEMORY_BUILD_OS
 /* Use Gnumalloc as meta-meta malloc fallbacks (mm_*) */
 #include "memory-gnu.c"
@@ -53,6 +55,12 @@ static void *meta_malloc(size_t size)
 	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)) 
 	{ /*Isomalloc a new block and link it in*/
 		ISOMALLOC_PUSH /*Disable isomalloc while inside isomalloc*/
+#if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
+		if (CmiIsFortranLibraryCall()==1) {
+		  ret=mm_malloc(size);
+		}
+		else
+#endif
 		ret=CmiIsomallocBlockListMalloc(pushed_blocklist,size);
 		ISOMALLOC_POP
 	}
@@ -89,7 +97,7 @@ static void *meta_realloc(void *oldBuffer, size_t newSize)
 {
 	void *newBuffer;
 	/*Just forget it for regular malloc's:*/
-	if (!CmiIsomallocInRange(oldBuffer)) 
+	if (!CmiIsomallocInRange(oldBuffer))
 		return mm_realloc(oldBuffer,newSize);
 	
 	newBuffer = meta_malloc(newSize);
