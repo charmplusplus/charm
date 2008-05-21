@@ -762,9 +762,7 @@ void replyAdjacencyRequests(
             //we have found a matching adjElem for the requested nodeset
             //we shall set the adjacency correctly in the adjacency Table
             //for the elemID in the found adjElem. We need to send a reply
-            //to the requesting chunk
-        	
-        	// TODO: this is where we should loop
+            //to the requesting chunk        	
             int matchingElemID = rover->next->elemID;
 
             if (isEdgeRequest) {
