@@ -470,7 +470,7 @@ void CmiBacktracePrint(void **retPtrs,int nLevels) {
     int i;
     char **names=CmiBacktraceLookup(retPtrs,nLevels);
     if (names==NULL) return;
-    CmiPrintf("Stack Traceback:\n");
+    CmiPrintf("[%d] Stack Traceback:\n", CmiMyPe());
     for (i=0;i<nLevels;i++) {
       const char *trimmed=_implTrimParenthesis(names[i]);
       const char *print=trimmed;
@@ -495,6 +495,28 @@ void CmiPrintStackTrace(int nSkip) {
 	void *stackPtrs[max_stack];
 	CmiBacktraceRecord(stackPtrs,1+nSkip,&nLevels);
 	CmiBacktracePrint(stackPtrs,nLevels);
+#endif
+}
+
+int CmiIsFortranLibraryCall() {
+#if CMK_USE_BACKTRACE
+  int ret = 0;
+  int nLevels=max_stack;
+  void *stackPtrs[max_stack];
+  CmiBacktraceRecord(stackPtrs,1,&nLevels);
+  if (nLevels>0) {
+    int i;
+    char **names=CmiBacktraceLookup(stackPtrs,nLevels);
+    if (names==NULL) return 0;
+    for (i=0;i<nLevels;i++) {
+      const char *trimmed=_implTrimParenthesis(names[i]);
+      if (strncmp(trimmed, "for__", 5) == 0) { ret = 1; break; }  /* ifort */
+    }
+    free(names);
+  }
+  return ret;
+#else
+  return 0;
 #endif
 }
 

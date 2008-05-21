@@ -1419,6 +1419,7 @@ void CmiBacktracePrint(void **retPtrs,int nLevels);
    called up to this point. nSkip is the number of routines on the
    top of the stack to *not* print out. */
 void CmiPrintStackTrace(int nSkip);
+int CmiIsFortranLibraryCall();
 
 #if CMK_CMIDELIVERS_USE_COMMON_CODE
 CpvExtern(void*, CmiLocalQueue);
