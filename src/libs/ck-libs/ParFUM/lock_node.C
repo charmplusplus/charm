@@ -53,7 +53,9 @@ int FEM_lockN::rlock() {
     return -1;
   }
   else {
-    //CkPrintf("Got read lock on node %d\n", idx);
+#ifdef DEBUG_LOCKS
+    CkPrintf("Got read lock on node %d\n", FEM_My_partition(), idx);
+#endif
     noreadLocks++;
     return 1;
   }
@@ -63,7 +65,9 @@ int FEM_lockN::rlock() {
 int FEM_lockN::runlock() {
   CkAssert(noreadLocks>0 && nowriteLocks==0);
   if(noreadLocks > 0) {
-    //CkPrintf("Unlocked read lock on node %d\n", idx);
+#ifdef DEBUG_LOCKS
+    CkPrintf("[%d] Unlocked read lock on node %d\n", FEM_My_partition(), idx);
+#endif
     noreadLocks--;
     return 1;
   }
