@@ -619,12 +619,12 @@ class FEM_VarIndexAttribute : public FEM_Attribute{
     ///constructor - initializer
     ID(int _type,int _id){
       if(_id < 0) {
-	type = -(_type+1);
-	id = FEM_To_ghost_index(_id);
+    	  type = -(_type+1);
+    	  id = FEM_To_ghost_index(_id);
       }
       else {
-	type = _type;
-	id = _id;
+    	  type = _type;
+    	  id = _id;
       }
     };
     bool operator ==(const ID &rhs)const {
@@ -649,7 +649,7 @@ class FEM_VarIndexAttribute : public FEM_Attribute{
     }
     int getSignedId() {
       if(type<0){
-	return FEM_From_ghost_index(id);
+    	  return FEM_From_ghost_index(id);
       }
       else return id;
     }
@@ -658,7 +658,7 @@ class FEM_VarIndexAttribute : public FEM_Attribute{
     }
     /** Return the element's type. This is necessary because the type member itself is negative for ghosts(for some stupid reason) */
     int getUnsignedType(){
-    	if(type>0)
+    	if(type>=0)
     		return type;
     	else 
     		return -(type+1);
