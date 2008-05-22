@@ -224,6 +224,11 @@ int printf(const char *fmt, ...) {
 
 #include "machine-smp.h"
 
+#if CMK_USE_KQUEUE
+#include <sys/event.h>
+int _kq = -1;
+#endif
+
 #if CMK_USE_POLL
 #include <poll.h>
 #endif
@@ -462,6 +467,27 @@ Horrific #defines to hide the differences between select() and poll().
 	do {fds[*nFds].fd=wr_fd; fds[*nFds].events=POLLOUT; (*nFds)++;} while(0)
 # define CMK_PIPE_CHECKREAD(rd_fd) fds[(*nFds)++].revents&POLLIN
 # define CMK_PIPE_CHECKWRITE(wr_fd) fds[(*nFds)++].revents&POLLOUT
+
+#elif CMK_USE_KQUEUE /* kqueue version */
+
+# define CMK_PIPE_DECL(delayMs) \
+        if (_kq == -1) _kq = kqueue(); \
+    struct kevent ke_sto; \
+    struct kevent* ke = &ke_sto; \
+    struct timespec tmo; \
+    tmo.tv_sec = 0; tmo.tv_nsec = delayMs*1e6;
+# define CMK_PIPE_SUB ke
+# define CMK_PIPE_CALL() kevent(_kq, NULL, 0, ke, 1, &tmo)
+
+# define CMK_PIPE_PARAM struct kevent* ke
+# define CMK_PIPE_ADDREAD(rd_fd) \
+        do { EV_SET(ke, rd_fd, EVFILT_READ, EV_ADD, 0, 10, NULL); \
+                kevent(_kq, ke, 1, NULL, 0, NULL); memset(ke, 0, sizeof(ke));} while(0)
+# define CMK_PIPE_ADDWRITE(wr_fd) \
+        do { EV_SET(ke, wr_fd, EVFILT_WRITE, EV_ADD, 0, 10, NULL); \
+                kevent(_kq, ke, 1, NULL, 0, NULL); memset(ke, 0, sizeof(ke));} while(0)
+# define CMK_PIPE_CHECKREAD(rd_fd) (ke->ident == rd_fd && ke->filter == EVFILT_READ)
+# define CMK_PIPE_CHECKWRITE(wr_fd) (ke->ident == wr_fd && ke->filter == EVFILT_WRITE)
 
 #else /*select() version*/
 
