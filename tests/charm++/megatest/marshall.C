@@ -262,11 +262,11 @@ public:
                 long m,unsigned long n,
                 float f,double d)
     {
-       if (b!=basicData[0] || c!=basicData[1] ||
-           i!=basicData[2] || j!=basicData[3] ||
-           k!=basicData[4] || l!=basicData[5] ||
-           m!=basicData[6] || n!=basicData[7] ||
-           f!=basicData[8] || d!=basicData[9])
+       if (b!=basicData[0] || c!=(char)basicData[1] ||
+           i!=(short)basicData[2] || j!=(unsigned short)basicData[3] ||
+           k!=(int)basicData[4] || l!=(unsigned int)basicData[5] ||
+           m!=(long)basicData[6] || n!=(unsigned long)basicData[7] ||
+           f!=(float)basicData[8] || d!=(double)basicData[9])
                CkAbort("Basic data marshalling test failed\n");
        next();
     }
