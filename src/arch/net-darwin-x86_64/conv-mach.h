@@ -8,6 +8,9 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_64BIT    1
+
+#define CMK_NETPOLL                                        1
 
 #define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
@@ -58,21 +61,19 @@
 #define CMK_TYPEDEF_FLOAT4 float
 #define CMK_TYPEDEF_FLOAT8 double
 
-#define CMK_64BIT    1
-
-
 #define CMK_DEBUG_MODE					   0 
 #define CMK_WEB_MODE                                       1
 
 #define CMK_LBDB_ON					   1
 
-#define CMK_STACKSIZE_DEFAULT				   65536
+#define CMK_STACKSIZE_DEFAULT				   262144
 /*
 #define CMK_NO_ISO_MALLOC				   1
 */
 
 
 /* These optimizations were added by Isaac after some various studies */
+#undef CMK_USE_POLL
 #define CMK_USE_POLL                                       0
 #define PXSHM_OSSPINLOCK                                   1
 #define PXSHM_LOCK                                  0

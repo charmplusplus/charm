@@ -7,7 +7,7 @@ CMK_CXX="g++ -arch x86_64 -Wno-long-double -fPIC -dynamic -fno-common "
 CMK_CXXPP="g++ -arch x86_64 -x g++ -E "
 CMK_LDXX="$CMK_CXX -multiply_defined suppress "
 CMK_XIOPTS=""
-CMK_QT="generic-light"
+CMK_QT="generic64-light"
 CMK_LIBS="-lckqt"
 CMK_RANLIB="ranlib"
 
