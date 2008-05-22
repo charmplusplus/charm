@@ -72,6 +72,7 @@
 /*
 #define CMK_NO_ISO_MALLOC				   1
 */
+#define CMK_USE_KQUEUE                                     1
 
 #endif
 
