@@ -797,7 +797,7 @@ if [ "$BUILD_SHARE" = "1" ]
 then
 	# ignore BUILD_SHARE if the target is not .a or .so
 	case "$OBJECT" in
-	*.a|*.so|*.sl|*.dylib)
+	*.a|*.so|*.so.*|*.sl|*.dylib)
  		OPTS_LD="$OPTS_LD $CMK_LD_SHARED $OPTS_LDRO -L$CHARMLIBSO"
 		;;
 	*)	
@@ -1113,7 +1113,7 @@ do
 	*.fc|*.FC)
 		Abort "I'm not yet smart enough to compile $FILE"
 		;;
-	*.o|*.so|*.sl|*.a|*.dylib)
+	*.o|*.so|*.so.*|*.sl|*.a|*.dylib)
 		[ ! -s $FILE ] && Abort "$FILE: file not recognized: File truncated"
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
@@ -1205,7 +1205,7 @@ case "$OBJECT" in
 	fi
 	Copyobj
 	;;
-*.so|*.sl|*.dylib)
+*.so|*.so.*|*.sl|*.dylib)
 # Make shared library
 	# if no build share is set, exit normally.
 	if [ "$BUILD_SHARE" = 0 ]
