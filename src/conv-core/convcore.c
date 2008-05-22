@@ -1421,6 +1421,11 @@ void CsdScheduleForever(void)
     int progressCount = CMK_CELL_PROGRESS_FREQ;
   #endif
 
+  #ifdef CMK_CUDA
+    #define CMK_CUDA_PROGRESS_FREQ 50
+    int cudaProgressCount = CMK_CUDA_PROGRESS_FREQ;
+  #endif
+
   int isIdle=0;
   SCHEDULE_TOP
   while (1) {
@@ -1438,6 +1443,14 @@ void CsdScheduleForever(void)
         progressCount--;
       #endif
 
+      #ifdef CMK_CUDA
+	if (cudaProgressCount == 0) {
+	  gpuProgressFn(); 
+	  cudaProgressCount = CMK_CUDA_PROGRESS_FREQ; 
+	}
+	cudaProgressCount--; 
+      #endif
+
     } else { /*No message available-- go (or remain) idle*/
       SCHEDULE_IDLE
 
@@ -1445,6 +1458,11 @@ void CsdScheduleForever(void)
         //OffloadAPIProgress();
         machine_OffloadAPIProgress();
         progressCount = CMK_CELL_PROGRESS_FREQ;
+      #endif
+
+      #ifdef CMK_CUDA
+	gpuProgressFn(); 
+	cudaProgressCount = CMK_CUDA_PROGRESS_FREQ;
       #endif
 
     }
@@ -2809,6 +2827,11 @@ void ConverseCommonInit(char **argv)
   void CmiInitCell();
   CmiInitCell();
 #endif
+
+#ifdef CMK_CUDA
+  initAPI(); 
+#endif
+
   /* main thread is suspendable */
 /*
   CthSetSuspendable(CthSelf(), 0);
@@ -2839,6 +2862,11 @@ void ConverseCommonExit(void)
 #if CMK_CELL
   CloseOffloadAPI();
 #endif
+
+#if CMK_CUDA
+  exitAPI(); 
+#endif
+
 }
 
 
