@@ -129,42 +129,130 @@ message is immediately sent to the user's client function or entry point,
 so you {\em do} need to document the type of message you will send to the 
 callback so the user knows what to expect.
 
-Threaded clients are a bit more complicated-- you need to suspend the
-calling thread using ``thread\_delay'' which, after the corresponding
-``send'', returns the sent message to its caller.  For example:
+In alternative to ``send'', the callback can be used in a {\em contribute}
+collective operation. This will internally invoke the ``send'' method on the
+callback when the contribute operation has finished.
+
+Thread clients are a bit more complicated as they need to suspend while waiting
+for the operation invoked finishes. They will resume when the ``send'' method is
+invoked on the callback.
+In these situations, the class {\em CkCallbackResumeThread} is more useful. This
+class is a subclass of {\em CkCallback} with specific functionality for threads.
+This class automatically suspends the thread when its destructor is called. It
+can be used in situations when the return value is not needed, and only the
+synchronization is important. For example:
 
 \begin{alltt}
-//Main library entry point, called by threaded users:
-myLibMsg *myThreadedLibrary(...library parameters...) 
-\{
-  CkCallback cb(CkCallback::resumeThread);
-  myLibrary(...,cb); //Just call normal library with new cb
-  return cb.thread\_delay(); //Will suspend until cb.send() is called
+// Call the "doWork" method and wait until it has completed
+void mainControlFlow() \{
+  ...perform some work...
+  // call a library
+  doWork(...,CkCallbackResumeThread());
+  // or send a broadcast to a chare collection
+  myProxy.doWork(...,CkCallbackResumeThread());
+  // The thread is suspended until doWork calls send on the callback
+  ...some more work...
 \}
 \end{alltt}
 
-``thread\_delay'' just immediately returns NULL for non-threaded callbacks,
-so you can even combine the threaded and non-threaded interfaces
-using C++'s default parameters.  For example:
+Alternatively, if doWork returns a value of interest, this can be retrieved by
+passing a pointer to {\em CkCallbackResumeThread}. This pointer will be modified
+by {\em CkCallbackResume} thread to point to the incoming message.
 
 \begin{alltt}
-//Main library entry point, called by threaded users:
-myLibMsg *myGenericLibrary(...library parameters...,
-  CkCallback cb=CkCallback(CkCallback::resumeThread)) 
-\{
-  myLibrary(...,cb);
-  //For threaded clients, suspends until cb.send, then returns message;
-  // for non-threaded clients, just returns NULL:
-  return cb.thread\_delay(); 
+// Call the "doWork" method and wait until it has completed
+void mainControlFlow() \{
+  ...perform some work...
+  MyMessage *mymsg;
+  myProxy.doWork(...,CkCallbackResumeThread(mymsg));
+  // The thread is suspended until doWork calls send on the callback
+  ...some more work using "mymsg"...
 \}
 \end{alltt}
 
+Notice that the instance of {\em CkCallbackResumeThread} is constructed
+on-the-fly as a parameter to the ``doWork'' call. This insures that the callback
+is destroyed as soon as the function returns, therefore suspending the thread.
 
+It is also possible to allocate a {\em CkCallbackResumeThread} on the heap or on
+the stack. We suggest to avoid such usage, and favor the on-the-fly construction
+shown above. For completeness, we still report code for heap and stack
+allocation of CkCallbackResumeThread callbacks.
 
+For heap allocation, the user will have to explicitely call ``delete'' to
+suspend the thread.
 
+\begin{alltt}
+// Call the "doWork" method and wait until it has completed
+void mainControlFlow() \{
+  ...perform some work...
+  CkCallbackResumeThread cb = new CkCallbackResumeThread();
+  myProxy.doWork(...,cb);
+  ...do not suspend yet, continue some more work...
+  delete cb;
+  // The thread suspends now
+  ...some more work using "mymsg"...
+\}
+\end{alltt}
 
+For callbacks allocated on the stack, its destructor will be called only at the
+end of the function, when the current stack goes out of scope. In this
+situation, the function ``thread_delay'' can be called on the callback to
+force the thread to suspend. This works also for heap allocated callbacks.
 
+\begin{alltt}
+// Call the "doWork" method and wait until it has completed
+void mainControlFlow() \{
+  ...perform some work...
+  CkCallbackResumeThread cb;
+  myProxy.doWork(...,cb);
+  ...do not suspend yet, continue some more work...
+  cb.thread_delay();
+  // The thread suspends now
+  ...some more work using "mymsg"...
+\}
+\end{alltt}
 
+{\em Notice}: a {\em CkCallbackResumeThread} can be used to suspend a thread
+only once.
 
+{\em Deprecated usage}: in the past, ``thread_delay'' was used to retrieve the
+incoming message from the callback. While that is still allowed for backward
+compatibility, its usage is deprecated. The old usage is subject to memory
+leaking and dangling pointers.
 
+%Threaded clients are a bit more complicated-- you need to suspend the
+%calling thread using ``thread\_delay'' which, after the corresponding
+%``send'', returns the sent message to its caller.  For example:
+
+%\begin{alltt}
+%//Main library entry point, called by threaded users:
+%myLibMsg *myThreadedLibrary(...library parameters...) 
+%\{
+%  CkCallback cb(CkCallback::resumeThread);
+%  myLibrary(...,cb); //Just call normal library with new cb
+%  return cb.thread\_delay(); //Will suspend until cb.send() is called
+%\}
+%\end{alltt}
+
+%``thread\_delay'' just immediately returns NULL for non-threaded callbacks,
+%so you can even combine the threaded and non-threaded interfaces
+%using C++'s default parameters.  For example:
+
+%\begin{alltt}
+%//Main library entry point, called by threaded users:
+%myLibMsg *myGenericLibrary(...library parameters...,
+%  CkCallback cb=CkCallback(CkCallback::resumeThread)) 
+%\{
+%  myLibrary(...,cb);
+%  //For threaded clients, suspends until cb.send, then returns message;
+%  // for non-threaded clients, just returns NULL:
+%  return cb.thread\_delay(); 
+%\}
+%\end{alltt}
+
+%When using CkCallbacks of type {\em CkCallback::resumeThread}, the user {\em
+%must} explicitely get the return value from the callback with ``thread\_delay''.
+%If the value is not needed, the user is responsible to delete it by using {\em
+%CkFreeMsg}.
 
