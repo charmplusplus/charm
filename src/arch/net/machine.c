@@ -340,6 +340,7 @@ static void CmiDestoryLocks();
 
 static void machine_exit(int status)
 {
+  MACHSTATE(3,"     machine_exit");
   machine_initiated_shutdown=1;
 
   CmiDestoryLocks();		/* destory locks to prevent dead locking */
@@ -1602,7 +1603,7 @@ static void node_addresses_obtain(char **argv)
   	CommLock hasn't been initialized yet-- 
   	use non-locking version*/
   	ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),NULL,0);
-        MACHSTATE(5,"send initnode");
+        MACHSTATE1(5,"send initnode - dataport:%d", dataport);
   
   	/*We get the other node addresses from a message sent
   	  back via the charmrun control port.*/
