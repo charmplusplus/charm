@@ -197,7 +197,7 @@ void mainControlFlow() \{
 
 For callbacks allocated on the stack, its destructor will be called only at the
 end of the function, when the current stack goes out of scope. In this
-situation, the function ``thread_delay'' can be called on the callback to
+situation, the function ``thread\_delay'' can be called on the callback to
 force the thread to suspend. This works also for heap allocated callbacks.
 
 \begin{alltt}
@@ -207,7 +207,7 @@ void mainControlFlow() \{
   CkCallbackResumeThread cb;
   myProxy.doWork(...,cb);
   ...do not suspend yet, continue some more work...
-  cb.thread_delay();
+  cb.thread\_delay();
   // The thread suspends now
   ...some more work using "mymsg"...
 \}
@@ -216,7 +216,7 @@ void mainControlFlow() \{
 {\em Notice}: a {\em CkCallbackResumeThread} can be used to suspend a thread
 only once.
 
-{\em Deprecated usage}: in the past, ``thread_delay'' was used to retrieve the
+{\em Deprecated usage}: in the past, ``thread\_delay'' was used to retrieve the
 incoming message from the callback. While that is still allowed for backward
 compatibility, its usage is deprecated. The old usage is subject to memory
 leaking and dangling pointers.
