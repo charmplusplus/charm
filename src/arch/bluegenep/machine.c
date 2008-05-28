@@ -18,7 +18,7 @@ char *ALIGN_16(char *p){
 
 CpvDeclare(PCQueue, broadcast_q);                 //queue to send broadcast messages
 
-#define PROGRESS_PERIOD 8
+#define PROGRESS_PERIOD 1024
 
 /*
     To reduce the buffer used in broadcast and distribute the load from
@@ -34,7 +34,7 @@ CpvDeclare(PCQueue, broadcast_q);                 //queue to send broadcast mess
 #define CMK_BROADCAST_HYPERCUBE        0
 #endif /* CMK_SMP */
 
-#define BROADCAST_SPANNING_FACTOR      4
+#define BROADCAST_SPANNING_FACTOR     2
 
 #define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
 #define CMI_GET_CYCLE(msg)               ((CmiMsgHeaderBasic *)msg)->root
@@ -105,11 +105,14 @@ void ConverseRunPE(int everReturn);
 //static void CommunicationServer(int sleepTime);
 //static void CommunicationServerThread(int sleepTime);
 
+//So far we dont define any comm threads
+int Cmi_commthread = 0;
+
 #include "machine-smp.c"
 CsvDeclare(CmiNodeState, NodeState);
 #include "immediate.c"
 
-static void AdvanceCommunications();
+void AdvanceCommunications();
 
 
 #if !CMK_SMP
@@ -135,6 +138,7 @@ static void CmiStartThreads(char **argv)
 #endif  /* !CMK_SMP */
 
 int received_immediate;
+//int received_broadcast;
 
 /*Add a message to this processor's receive queue, pe is a rank */
 static void CmiPushPE(int pe,void *msg)
@@ -186,10 +190,8 @@ static void CmiPushNode(void *msg)
 }
 #endif /* CMK_NODE_QUEUE_AVAILABLE */
 
-static volatile int msgQueueLen;
-static volatile int outstanding_recvs;
-
-static int no_outstanding_sends=0; /*FLAG: consume outstanding Isends in scheduler loop*/
+volatile int msgQueueLen;
+volatile int outstanding_recvs;
 
 static int Cmi_dim;     /* hypercube dim of network */
 
@@ -278,15 +280,33 @@ DCMF_Request_t * direct_first_pkt_recv_done (void              * clientdata,
 #endif
 
 typedef struct msg_list {
-  DCMF_Request_t             send;
-  DCQuad             info;
-  DCMF_Callback_t    cb;
-  char              *msg;
-  int                size;
-  int                destpe;
-  int               *pelist;
-} SMSG_LIST;
+  char              * msg;
+  int                 size;
+  int                 destpe;
+  int               * pelist;
+  DCMF_Callback_t     cb;
+  DCQuad              info __attribute__((__aligned__(16)));
+  DCMF_Request_t      send __attribute__((__aligned__(16)));
+} SMSG_LIST __attribute__((__aligned__(16)));
 
+#define MAX_NUM_SMSGS   64
+CpvDeclare(PCQueue, smsg_list_q);
+
+inline SMSG_LIST * smsg_allocate() {
+  SMSG_LIST *smsg = (SMSG_LIST *)PCQueuePop(CpvAccess(smsg_list_q));
+  if (smsg != NULL)
+    return smsg;
+  
+  return  (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
+}
+
+inline void smsg_free (SMSG_LIST *smsg) {
+  int size = PCQueueLength (CpvAccess(smsg_list_q));  
+  if (size < MAX_NUM_SMSGS)
+    PCQueuePush (CpvAccess(smsg_list_q), (char *) smsg);
+  else 
+    free (smsg);
+}
 
 typedef struct {
   int sleepMs; /*Milliseconds to sleep while idle*/
@@ -307,7 +327,8 @@ static CmiIdleState *CmiNotifyGetState(void)
 static void send_done(void *data){
   SMSG_LIST *msg_tmp = (SMSG_LIST *)(data);
   CmiFree(msg_tmp->msg);
-  free(data);
+  //free(data);
+  smsg_free (msg_tmp);
 
   msgQueueLen--;
 }
@@ -318,7 +339,8 @@ static void send_multi_done(void *data){
   CmiFree(msg_tmp->msg);
   CmiFree(msg_tmp->pelist);
 
-  free(data);
+  //free(data);
+  smsg_free (msg_tmp);
 
   msgQueueLen--;
 }
@@ -351,7 +373,8 @@ static void recv_done(void *clientdata){
     char *copymsg;
     copymsg = (char *)CmiAlloc(sndlen);
     CmiMemcpy(copymsg,msg,sndlen);
-    
+
+    //received_broadcast = 1;    
 #if CMK_SMP
     CmiLock(procState[pe].recvLock);
     PCQueuePush(CpvAccessOther(broadcast_q, pe), copymsg);
@@ -414,7 +437,6 @@ DCMF_Request_t * first_pkt_recv_done (void              * clientdata,
 
   return (DCMF_Request_t *) ALIGN_16(*buffer + sndlen);
 }
-
 
 void sendBroadcastMessages() {
 
@@ -517,7 +539,7 @@ extern void bgl_machine_RectBcast (unsigned                 commid,
 }
 
 extern void        bgl_machine_RectBcastInit  (unsigned               commID,
-					const BGTsRC_Geometry_t* geometry) {
+					       const BGTsRC_Geometry_t* geometry) {
   
   CmiAssert (commID < 256);
   CmiAssert (comm_table [commID] == NULL);
@@ -546,43 +568,6 @@ int mysleep (int sec) {
    return count;
 }
 
-//#define RESEARCH_CONTRIB  0
-
-#if 0
-static void CmiStartThreadsBG(char **argv)
-{
-  pthread_t pid;
-  int i, ok;
-  pthread_attr_t attr;
-
-  int nthreads = _Cmi_mynodesize;
-
-  CmiMemLock_lock=CmiCreateLock();
-  comm_mutex=CmiCreateLock();
-  smp_mutex = CmiCreateLock();
-
-  pthread_key_create(&Cmi_state_key, 0);
-  Cmi_state_vector =
-    (CmiState)calloc(nthreads , sizeof(struct CmiStateStruct));
-  for (i=0; i< nthreads; i++)
-    CmiStateInit(i+Cmi_nodestart, i, CmiGetStateN(i));
-
-  for (i=1; i < nthreads; i++) {
-    pthread_attr_init(&attr);
-    pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
-    ok = pthread_create(&pid, &attr, call_startfn, (void *)i);
-    if (ok<0) {
-      printf("pthread_create failed"); 
-      exit (-1);
-    }
-    pthread_attr_destroy(&attr);
-  }
-
-  //set in call_startfn
-  pthread_setspecific(Cmi_state_key, Cmi_state_vector);
-}
-#endif
-
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret){
   int n, i, count;
@@ -591,51 +576,34 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
   
   DCMF_Messager_initialize();
-
 #if CMK_SMP
   DCMF_Configure_t  config_in, config_out;
-
   config_in.thread_level= DCMF_THREAD_MULTIPLE;
   config_in.interrupts  = DCMF_INTERRUPTS_OFF;
-
-  DCMF_Messager_configure(&config_in, &config_out);
-
-  //assert (config_out.thread_level == DCMF_THREAD_MULTIPLE);
+  
+  DCMF_Messager_configure(&config_in, &config_out);  
+  assert (config_out.thread_level == DCMF_THREAD_MULTIPLE);
 #endif
 
   DCMF_Send_Configuration_t short_config, eager_config, rzv_config;
 
 
-#if RESEARCH_CONTRIB
-  short_config.protocol      = DCMF_SHORT_CONTRIB_PROTOCOL;
-#else
   short_config.protocol      = DCMF_DEFAULT_SEND_PROTOCOL;
-#endif
   short_config.cb_recv_short = short_pkt_recv;
   short_config.cb_recv       = first_pkt_recv_done;
 
-#if RESEARCH_CONTRIB  
-  eager_config.protocol      = DCMF_EAGER_CONTRIB_PROTOCOL;
-#else
   eager_config.protocol      = DCMF_DEFAULT_SEND_PROTOCOL;
-#endif
   eager_config.cb_recv_short = short_pkt_recv;
   eager_config.cb_recv       = first_pkt_recv_done;
   
-#if RESEARCH_CONTRIB  
-  rzv_config.protocol        = DCMF_RZV_CONTRIB_PROTOCOL;
-#else
 #ifdef  OPT_RZV
 #warning "Enabling Optimize Rzv"
   rzv_config.protocol        = DCMF_RZV_SEND_PROTOCOL;
 #else
   rzv_config.protocol        = DCMF_DEFAULT_SEND_PROTOCOL;
 #endif
-#endif
   rzv_config.cb_recv_short   = short_pkt_recv;
   rzv_config.cb_recv         = first_pkt_recv_done;
-
-
   
   DCMF_Send_register (&cmi_dcmf_short_registration, &short_config);
   DCMF_Send_register (&cmi_dcmf_eager_registration, &eager_config);
@@ -649,8 +617,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   DCMF_Send_register (&cmi_dcmf_direct_registration,   &direct_config);
   directcb.function=direct_send_done_cb;
   directcb.clientdata=NULL;
-
-
 #endif
  
   //fprintf(stderr, "Initializing Eager Protocol\n");
@@ -658,8 +624,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   _Cmi_numnodes = DCMF_Messager_size();
   _Cmi_mynode = DCMF_Messager_rank();
   
-  //  CpvInitialize(PcQueue, broadcast_q);
-
   unsigned rank = DCMF_Messager_rank();
   unsigned size = DCMF_Messager_size();
   
@@ -675,15 +639,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     CmiAbort("+ppn cannot be used in non SMP version!\n");
 #endif
 
-#if CMK_NO_OUTSTANDING_SENDS
-  no_outstanding_sends=1;
-#endif
-  if (CmiGetArgFlag(argv,"+no_outstanding_sends")) {
-    no_outstanding_sends = 1;
-    if (_Cmi_mynode == 0)
-      CmiPrintf("Charm++: Will%s consume outstanding sends in scheduler loop\n",        no_outstanding_sends?"":" not");
-  }
-  
   _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
   Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
   Cmi_argvcopy = CmiCopyArgs(argv);
@@ -741,8 +696,6 @@ void ConverseRunPE(int everReturn)
   char** CmiMyArgv;
   CmiNodeAllBarrier();
 
-  mysleep (1);
-
   cs = CmiGetState();
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
@@ -766,6 +719,9 @@ void ConverseRunPE(int everReturn)
 
   CpvInitialize(PCQueue, broadcast_q);
   CpvAccess(broadcast_q) = PCQueueCreate();
+
+  CpvInitialize(PCQueue, smsg_list_q);
+  CpvAccess(smsg_list_q) = PCQueueCreate();
 
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
   
@@ -858,7 +814,7 @@ void CmiAbort(const char * message){
   }
   
   CmiBarrier(); 
-  exit(-1);
+  assert (0);
 }
 
 
@@ -885,7 +841,7 @@ char *CmiGetNonLocalNodeQ(void)
 
 
 void *CmiGetNonLocal(){
-  static int count=0;
+
   CmiState cs = CmiGetState();
 
   void *msg = NULL;
@@ -895,26 +851,10 @@ void *CmiGetNonLocal(){
 
   AdvanceCommunications();
   
-  int length = PCQueueLength(cs->recv);
-  //if(length != 0)
-  //fprintf(stderr, "%d: PCQueue length = %d\n", CmiMyPe(), length);
-  
   CmiLock(procState[cs->rank].recvLock);
 
-  //if(length > 0)
   msg =  PCQueuePop(cs->recv); 
   CmiUnlock(procState[cs->rank].recvLock);
-
-#if !CMK_SMP
-  if (no_outstanding_sends) {
-    SendMsgsUntil(0);
-  }
-  
-  if(!msg) {
-    AdvanceCommunications();
-    return PCQueuePop(cs->recv);
-  }
-#endif /* !CMK_SMP */
 
   return msg;
 }
@@ -1024,15 +964,12 @@ void CmiGeneralFreeSendN (int node, int rank, int size, char * msg) {
   
   CmiState cs = CmiGetState();     
 
-  SMSG_LIST *msg_tmp = (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
+  SMSG_LIST *msg_tmp = smsg_allocate(); //(SMSG_LIST *) malloc(sizeof(SMSG_LIST));
   msg_tmp->destpe = node; //destPE;
   msg_tmp->size = size;
   msg_tmp->msg = msg;
   
   machineSend(msg_tmp);    
-  
-  //now in machineSend
-  //msgQueueLen++;  
 }
 
 void CmiSyncSendFn(int destPE, int size, char *msg){
@@ -1069,11 +1006,11 @@ void CmiSyncSendFn1(int destPE, int size, char *msg)
 
 /* send msg to its spanning children in broadcast. G. Zheng */
 void SendSpanningChildren(int size, char *msg)
-{
+{  
   CmiState cs = CmiGetState();
   int startpe = CMI_BROADCAST_ROOT(msg)-1;
   int i;
-
+  
   CmiAssert(startpe>=0 && startpe<_Cmi_numpes);
   int dist = cs->pe-startpe;
   if(dist<0) dist+=_Cmi_numpes;
@@ -1083,9 +1020,9 @@ void SendSpanningChildren(int size, char *msg)
     p += startpe;
     p = p%_Cmi_numpes;
     CmiAssert(p>=0 && p<_Cmi_numpes && p!=cs->pe);
-
+    
     //printf ("%d: Sending Spanning Tree Msg to %d\n",  CmiMyPe(), p);
-
+    
     CmiSyncSendFn1(p, size, msg);
   }
 }
@@ -1169,96 +1106,59 @@ void CmiFreeBroadcastAllFn(int size, char *msg){
   CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
   SendSpanningChildren(size, msg);
   CmiFree(msg);
+
 #elif CMK_BROADCAST_HYPERCUBE
   CmiSyncSendFn(cs->pe,size,msg);
   CMI_SET_CYCLE(msg, 0);
   SendHypercube(size, msg);
   CmiFree(msg);
 #else
-  int i ;
-  
+  int i ;  
+
+  DCMF_CriticalSection_enter (0);
+
   for ( i=0; i<_Cmi_numpes; i++ ) {
-    if (i== CmiMyPe() ||
-	(CmiNodeOf(i) == CmiMyNode()))
-      CmiSyncSendFn(i,size,msg);    
+    CmiSyncSendFn(i,size,msg);    
+
+    if ( (i % 32) == 0 )
+      SendMsgsUntil (0);
   }
   
-#if CMK_SMP
-  DCMF_CriticalSection_enter(0);
-#endif
-
-  CMI_SET_BROADCAST_ROOT(msg,0);  
-  CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
-  ((CmiMsgHeaderBasic *)msg)->size = size;  
-  CMI_SET_CHECKSUM(msg, size);
-
-  for ( i=0; i<_Cmi_numpes; i++ ) {
-    if (i== CmiMyPe() ||
-	(CmiNodeOf(i) == CmiMyNode()))
-      continue;
-
-    CmiReference (msg);  //Other threads shouldnt call advance and free the msg.
-    CmiGeneralFreeSend(i,size,msg);
-  }      
+  DCMF_CriticalSection_exit (0);
 
   CmiFree(msg);
-
-#if CMK_SMP
-  DCMF_CriticalSection_exit(0);
-#endif
-
 #endif
 }
 
-static void AdvanceCommunications(){
+void AdvanceCommunications(){
   
-  sendBroadcastMessages();
-
 #if CMK_SMP
-  //if (CmiTryLock(comm_mutex) != 0)
-  //return;
-
   DCMF_CriticalSection_enter (0);
 #endif
 
-  int adv = DCMF_Messager_advance();
-  while (adv > 0) {
-#if CMK_SMP    
-    DCMF_CriticalSection_cycle (0);
-#endif
-    adv = DCMF_Messager_advance();
-  }
+  DCMF_Messager_advance();
 
 #if CMK_SMP
   DCMF_CriticalSection_exit (0);
-  //CmiUnlock (comm_mutex);
 #endif  
   
   sendBroadcastMessages();
   
 #if CMK_IMMEDIATE_MSG
   if(received_immediate) {
+    received_immediate = 0;
     CmiHandleImmediate();
   }
-  received_immediate = 0;
 #endif
 }
 
 
-#if !CMK_SMP
 static void SendMsgsUntil(int targetm){
   
-  sendBroadcastMessages();
-  
   while(msgQueueLen>targetm){
-    while(DCMF_Messager_advance()>0) ;
-  }
-  
-  while ( DCMF_Messager_advance() > 0 );
-  
-  sendBroadcastMessages();
+    AdvanceCommunications ();
+  }  
 }
-#endif
 
 void CmiNotifyIdle(){  
   AdvanceCommunications();
@@ -1319,21 +1219,15 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg){
   CmiFreeListSendFn(npes, pes, size, msg);
 }
 
-static int iteration_count = 0;
-
 void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
   CMI_SET_BROADCAST_ROOT(msg,0);  
   CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
   ((CmiMsgHeaderBasic *)msg)->size = size;  
   CMI_SET_CHECKSUM(msg, size);
   
-  //printf("%d: In Free List Send Fn\n", CmiMyPe());
-  
-  //CmiBecomeImmediate(msg);
-  iteration_count ++;
-
+  //printf("%d: In Free List Send Fn\n", CmiMyPe());  
   int new_npes = 0;
-
+  
   int i, count = 0, my_loc = -1;
   for(i=0; i<npes; i++) {
     if(pes[i] == CmiMyPe()) {
@@ -1359,7 +1253,7 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
   else 
     CmiFree(msg);
   
-  AdvanceCommunications();
+  //AdvanceCommunications();
 }
 
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int size, char *msg){
@@ -1633,7 +1527,6 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
     userHandle.callbackFnPtr=callbackFnPtr;
     userHandle.callbackData=callbackData;
     userHandle.DCMF_rq_trecv=ALIGN_16(CmiAlloc(sizeof(DCMF_Request_t)+16));
-
 #if CMI_DIRECT_DEBUG
     CmiPrintf("[%d] RDMA create addr %p %d callback %p callbackdata %p\n",CmiMyPe(),userHandle.recverBuf,userHandle.recverBufSize, userHandle.callbackFnPtr, userHandle.callbackData);
 #endif
