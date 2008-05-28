@@ -223,8 +223,18 @@ End() {
         done
 else
   [ -n "$MPI_MACHINEFILE" ] && args=" -machinefile $MPI_MACHINEFILE $args"
-  echo "charmrun> mpirun -np $pes $args"
-  mpirun -np $pes $args
+  setarch_cmd=`which setarch 2>/dev/null`
+  if test -n "$setarch_cmd"
+  then
+    # Disables randomization of the virtual address  space  (turns  on
+    #          ADDR_NO_RANDOMIZE).
+    cur_arch=`uname -m`
+    echo "charmrun>  $setarch_cmd $cur_arch -R  mpirun -np $pes $args"
+    $setarch_cmd $cur_arch -R  mpirun -np $pes $args
+  else
+    echo "charmrun> mpirun -np $pes $args"
+    mpirun -np $pes $args
+  fi
 fi
 
 
