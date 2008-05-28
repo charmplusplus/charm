@@ -157,14 +157,15 @@ void mainControlFlow() \{
 
 Alternatively, if doWork returns a value of interest, this can be retrieved by
 passing a pointer to {\em CkCallbackResumeThread}. This pointer will be modified
-by {\em CkCallbackResume} thread to point to the incoming message.
+by {\em CkCallbackResume} thread to point to the incoming message. Notice that
+the input pointer has to be cast to {\em (void*\&)}.
 
 \begin{alltt}
 // Call the "doWork" method and wait until it has completed
 void mainControlFlow() \{
   ...perform some work...
   MyMessage *mymsg;
-  myProxy.doWork(...,CkCallbackResumeThread(mymsg));
+  myProxy.doWork(...,CkCallbackResumeThread((void*\&)mymsg));
   // The thread is suspended until doWork calls send on the callback
   ...some more work using "mymsg"...
 \}
