@@ -471,7 +471,7 @@ void memory_preallocate_hack()
      then releasing the memory back to malloc(), except for one block
      at the end, which is used to prevent malloc from moving brk() back down. 
   */
-#define MEMORY_PREALLOCATE_MAX 1024
+#define MEMORY_PREALLOCATE_MAX 4096
   void *ptrs[MEMORY_PREALLOCATE_MAX];
   int i,len=0;
   for (i=0;i<MEMORY_PREALLOCATE_MAX;i++) {
