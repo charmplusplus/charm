@@ -12,6 +12,10 @@ then
   then
     CMK_INCDIR="-I /opt/gm/include"
     CMK_LIBDIR="-L /opt/gm/lib"
+  elif test -f /usr/local/gm/include/gm.h
+  then
+    CMK_INCDIR="-I /usr/local/gm/include"
+    CMK_LIBDIR="-L /usr/local/gm/lib"
   fi
 fi
 
