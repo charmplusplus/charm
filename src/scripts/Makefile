@@ -321,6 +321,7 @@ MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
 	  $(L)/libmemory-charmdebug.o \
 	  $(L)/libmemory-os-verbose.o $(L)/libmemory-os-isomalloc.o \
 	  $(L)/libmemory-os-leak.o $(L)/libmemory-os-paranoid.o \
+          $(L)/libmemory-os-lock.o \
 	  $(L)/libmemory-os-charmdebug.o $(L)/libmemory-os-wrapper.o
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o 	\
 	  $(L)/libthreads-context.o $(L)/libthreads-uJcontext.o \
@@ -521,6 +522,9 @@ $(L)/libmemory-os-leak.o: $(MEM_DEPS)
 
 $(L)/libmemory-os-isomalloc.o: memory-isomalloc.c $(MEM_DEPS)
 	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_ISOMALLOC memory.c || touch $@
+
+$(L)/libmemory-os-lock.o: memory-lock.c $(MEM_DEPS)
+	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_LOCK memory.c || touch $@
 
 $(L)/libmemory-os-charmdebug.o: memory-charmdebug.c $(MEM_DEPS)
 	-$(CHARMC) -o $@ -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_CHARMDEBUG memory.c || touch $@
