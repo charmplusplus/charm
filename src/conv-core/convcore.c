@@ -501,8 +501,8 @@ void CmiPrintStackTrace(int nSkip) {
 int CmiIsFortranLibraryCall() {
 #if CMK_USE_BACKTRACE
   int ret = 0;
-  int nLevels=max_stack;
-  void *stackPtrs[max_stack];
+  int nLevels=8;
+  void *stackPtrs[12];
   CmiBacktraceRecord(stackPtrs,1,&nLevels);
   if (nLevels>0) {
     int i;
