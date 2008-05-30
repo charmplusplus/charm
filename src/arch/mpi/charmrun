@@ -224,7 +224,7 @@ End() {
 else
   [ -n "$MPI_MACHINEFILE" ] && args=" -machinefile $MPI_MACHINEFILE $args"
   setarch_cmd=`which setarch 2>/dev/null`
-  if test -n "$setarch_cmd"
+  if [ -n "$setarch_cmd" -a -x "$setarch_cmd" ]
   then
     # Disables randomization of the virtual address  space  (turns  on
     #          ADDR_NO_RANDOMIZE).
