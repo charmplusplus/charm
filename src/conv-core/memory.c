@@ -192,6 +192,10 @@ int memory_chare_id=0;
 #include "memory-isomalloc.c"
 #endif 
 
+#if CMK_MEMORY_BUILD_LOCK
+#include "memory-lock.c"
+#endif 
+
 #if CMK_MEMORY_BUILD_CHARMDEBUG
 #include "memory-charmdebug.c"
 #endif
