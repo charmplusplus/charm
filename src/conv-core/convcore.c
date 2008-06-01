@@ -428,8 +428,9 @@ int CmiGetArgFlag(char **argv,const char *arg) {
 /*
 Convert "X(Y) Z" to "Y Z"-- remove text prior to first '(', and supress
 the next parenthesis.  Operates in-place on the character data.
+or Convert X(Y) to "Y" only, when trimname=1
 */
-static char *_implTrimParenthesis(char *str) {
+static char *_implTrimParenthesis(char *str, int trimname) {
   char *lParen=str, *ret=NULL, *rParen=NULL;
   while (*lParen!='(') {
     if (*lParen==0) return str; /* No left parenthesis at all. */
@@ -443,7 +444,7 @@ static char *_implTrimParenthesis(char *str) {
     rParen++;
   }
   /* now *rParen==')', so trim it*/
-  *rParen=' ';
+  *rParen=trimname?0:' ';
   return ret;  
 }
 
@@ -472,7 +473,8 @@ void CmiBacktracePrint(void **retPtrs,int nLevels) {
     if (names==NULL) return;
     CmiPrintf("[%d] Stack Traceback:\n", CmiMyPe());
     for (i=0;i<nLevels;i++) {
-      const char *trimmed=_implTrimParenthesis(names[i]);
+      if (names[i] == NULL) continue;
+      const char *trimmed=_implTrimParenthesis(names[i], 0);
       const char *print=trimmed;
       const char *sys=_implGetBacktraceSys(print);
       if (sys) {
@@ -501,16 +503,22 @@ void CmiPrintStackTrace(int nSkip) {
 int CmiIsFortranLibraryCall() {
 #if CMK_USE_BACKTRACE
   int ret = 0;
-  int nLevels=8;
-  void *stackPtrs[12];
+  int nLevels=9;
+  void *stackPtrs[18];
   CmiBacktraceRecord(stackPtrs,1,&nLevels);
   if (nLevels>0) {
     int i;
     char **names=CmiBacktraceLookup(stackPtrs,nLevels);
     if (names==NULL) return 0;
     for (i=0;i<nLevels;i++) {
-      const char *trimmed=_implTrimParenthesis(names[i]);
-      if (strncmp(trimmed, "for__", 5) == 0) { ret = 1; break; }  /* ifort */
+      if (names[i] == NULL) continue;
+      const char *trimmed=_implTrimParenthesis(names[i], 1);
+      if (strncmp(trimmed, "for__", 5) == 0                /* ifort */
+          || strncmp(trimmed, "_xlf", 4) == 0               /* xlf90 */
+          || strncmp(trimmed, "_xlfBeginIO", 11) == 0 
+	 )
+          {  /* CmiPrintf("[%d] NAME:%s\n", CmiMyPe(), trimmed); */
+             ret = 1; break; }
     }
     free(names);
   }
