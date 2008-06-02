@@ -518,5 +518,6 @@ int get_memory_allocated_user_total() { return 0; }
 #ifdef setMemoryChareID
 #undef setMemoryChareID
 #endif
-void setMemoryChareID(void *ptr) { }
+int setMemoryChareIDFromPtr(void *ptr) { return 0; }
+void setMemoryChareID(int id) { }
 #endif

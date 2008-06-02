@@ -85,9 +85,11 @@ extern int memory_chare_id;
   memory_status_info = p; \
   p = tmp; \
 }
-void setMemoryChareID(void *p);
+int setMemoryChareIDFromPtr(void *p);
+void setMemoryChareID(int id);
 #else
 #define setMemoryStatus(p) /* empty */
+#define setMemoryChareIDFromPtr(p) /* empty */
 #define setMemoryChareID(p) /* empty */
 #endif
 

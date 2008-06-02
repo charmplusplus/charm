@@ -946,7 +946,13 @@ void setMemoryTypeMessage(void *ptr) {
   }
 }
 
-void setMemoryChareID(void *ptr) {
+int setMemoryChareIDFromPtr(void *ptr) {
+  int tmp = memory_chare_id;
   if (ptr == NULL || ptr == 0) memory_chare_id = 0;
   else memory_chare_id = UserToSlot(ptr)->chareID;
+  return tmp;
+}
+
+void setMemoryChareID(int chareID) {
+  memory_chare_id = chareID;
 }
