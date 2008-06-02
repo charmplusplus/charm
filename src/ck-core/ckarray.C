@@ -59,6 +59,8 @@ Orion Sky Lawlor, olawlor@acm.org
 
 CpvDeclare(int ,serializer);
 
+CmiBool isAnytimeMigration;
+
 /************************** Debugging Utilities **************/
 
 //For debugging: convert given index to a string (NOT threadsafe)
@@ -486,6 +488,7 @@ void _ckArrayInit(void)
   CkDisableTracing(CkIndex_CkArray::recvBroadcast(0));
     // disable because broadcast listener may deliver broadcast message
   CkDisableTracing(CkIndex_CkLocMgr::immigrate(0));
+  // by default anytime migration is allowed
 }
 
 CkArray::CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionID)
@@ -824,10 +827,14 @@ CkArrayBroadcaster::~CkArrayBroadcaster()
 
 void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 {
-  DEBB((AA"Received broadcast %d\n"AB,bcastNo));
   bcastNo++;
-  CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
-  oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
+  if (isAnytimeMigration) {
+    DEBB((AA"Received broadcast %d\n"AB,bcastNo));
+    CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
+    oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
+  } else {
+    CkFreeMsg(msg);
+  }
 }
 
 /// Deliver a copy of the given broadcast to the given local element
@@ -845,6 +852,7 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
 /// Deliver all needed broadcasts to the given local element
 CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 {
+  if (! isAnytimeMigration) CmiTrue;
   int &elBcastNo=getData(el);
   if (elBcastNo<bcastNo)
   {//This element needs some broadcasts-- it must have
@@ -872,6 +880,7 @@ CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 
 void CkArrayBroadcaster::springCleaning(void)
 {
+  if (! isAnytimeMigration) return;
   //Remove old broadcast messages
   int nDelete=oldBcasts.length()-(bcastNo-oldBcastNo);
   if (nDelete>0) {
@@ -946,7 +955,6 @@ void CkArray::recvBroadcast(CkMessage *m)
 {
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
-	broadcaster->incoming(msg);
 	//Run through the list of local elements
 	int idx=0;
 	ArrayElement *el;
@@ -956,6 +964,7 @@ void CkArray::recvBroadcast(CkMessage *m)
                 BgEntrySplit();
 #endif
 	}
+    broadcaster->incoming(msg);
 }
 
 #include "CkArray.def.h"

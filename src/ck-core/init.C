@@ -199,6 +199,12 @@ static inline void _parseCommandLineOpts(char **argv)
 	if(CmiGetArgStringDesc(argv,"+raiseevac", &_raiseEvacFile,"Generates processor evacuation on random processors")){
 		_raiseEvac = 1;
 	}
+	
+	/* Anytime migration flag */
+	isAnytimeMigration = CmiTrue;
+	if (CmiGetArgFlagDesc(argv,"+noAnytimeMigration","The program does not require support for anytime migration")) {
+	  isAnytimeMigration = CmiFalse;
+	}
 }
 
 static void _bufferHandler(void *msg)
