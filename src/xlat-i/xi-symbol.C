@@ -2280,10 +2280,10 @@ void Entry::setChare(Chare *c) {
 
 // "parameterType *msg" or "void".
 // Suitable for use as the only parameter
-XStr Entry::paramType(int withDefaultVals,int withEO)
+XStr Entry::paramType(int withDefaultVals,int withEO,int useConst)
 {
   XStr str;
-  param->print(str,withDefaultVals);
+  param->print(str,withDefaultVals,useConst);
   if (withEO) str<<eo(withDefaultVals,!param->isVoid());
   return str;
 }
@@ -2469,7 +2469,9 @@ void Entry::genArrayDecl(XStr& str)
     if ((isSync() || isLocal()) && !container->isForElement()) return; //No sync broadcast
     if(isIget())
       str << "    "<<"CkFutureID"<<" "<<name<<"("<<paramType(1,1)<<") ;\n"; //no const
-    else		
+    else if(isLocal())
+      str << "    "<<retType<<" "<<name<<"("<<paramType(1,1,0)<<") ;\n";
+    else
       str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<") ;\n"; //no const
   }
 }
@@ -2495,6 +2497,8 @@ void Entry::genArrayDefs(XStr& str)
     XStr retStr; retStr<<retType;
     if(isIget())
       str << makeDecl("CkFutureID ",1)<<"::"<<name<<"("<<paramType(0,1)<<") \n"; //no const
+    else if(isLocal())
+      str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1,0)<<") \n";
     else
       str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<") \n"; //no const
     str << "{\n  ckCheck();\n";
@@ -2639,7 +2643,10 @@ void Entry::genGroupDecl(XStr& str)
     genGroupStaticConstructorDecl(str);
   } else {
     if ((isSync() || isLocal()) && !container->isForElement()) return; //No sync broadcast
-    str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<");\n";
+    if (isLocal())
+      str << "    "<<retType<<" "<<name<<"("<<paramType(1,1,0)<<");\n";
+    else
+      str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<");\n";
     // entry method on multiple PEs declaration
     if(!container->isForElement() && !isSync() && !isLocal() && !container->isNodeGroup()) {
       str << "    "<<retType<<" "<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(1)<<");\n";
@@ -2668,7 +2675,10 @@ void Entry::genGroupDefs(XStr& str)
     if ((isSync() || isLocal()) && !container->isForElement()) return; //No sync broadcast
     
     XStr retStr; retStr<<retType;
-    str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<")\n";
+    if (isLocal()) 
+      str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1,0)<<")\n";
+    else
+      str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<")\n";
     str << "{\n  ckCheck();\n";
     if (!isLocal()) str <<marshallMsg();
 
@@ -3029,7 +3039,7 @@ void Entry::genCall(XStr& str, const XStr &preCall)
 	param->beginUnmarshall(str);
 
   str << "#ifndef CMK_OPTIMIZE\n";
-  str << "  setMemoryChareID(impl_obj);\n";
+  str << "  int previousChareID = setMemoryChareIDFromPtr(impl_obj);\n";
   if (!internalMode) str << "  int alreadyUserCode = 1;\n  setMemoryStatus(alreadyUserCode);\n";
   str << "#endif\n";
   str << "#ifdef CMK_CHECK_CRC\n  checkAllCRC(0);\n#endif\n";
@@ -3083,7 +3093,7 @@ void Entry::genCall(XStr& str, const XStr &preCall)
   }
   str << "#ifdef CMK_CHECK_CRC\n  checkAllCRC(1);\n#endif\n";
   str << "#ifndef CMK_OPTIMIZE\n";
-  str << "  setMemoryChareID(NULL);\n";
+  str << "  setMemoryChareID(previousChareID);\n";
   if (!internalMode) str << "  setMemoryStatus(alreadyUserCode);\n";
   str << "#endif\n";
 }
@@ -3339,25 +3349,27 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
 	}
 }
 
-void ParamList::print(XStr &str,int withDefaultValues)
+void ParamList::print(XStr &str,int withDefaultValues,int useConst)
 {
-    	param->print(str,withDefaultValues);
+    	param->print(str,withDefaultValues,useConst);
     	if (next) {
     		str<<", ";
-    		next->print(str,withDefaultValues);
+    		next->print(str,withDefaultValues,useConst);
     	}
 }
-void Parameter::print(XStr &str,int withDefaultValues) 
+void Parameter::print(XStr &str,int withDefaultValues,int useConst) 
 {
 	if (arrLen!=NULL) 
 	{ //Passing arrays by const pointer-reference
-		str<<"const "<<type<<" *";
+		if (useConst) str<<"const ";
+		str<<type<<" *";
 		if (name!=NULL) str<<name;
 	}
 	else {
 		if (byReference) 
 		{ //Pass named types by const C++ reference 
-			str<<"const "<<type<<" &";
+			if (useConst) str<<"const ";
+			str<<type<<" &";
 		        if (name!=NULL) str<<name;
 		}
 		else 
@@ -3527,26 +3539,26 @@ void Parameter::unmarshallArrayData(XStr &str)
 		str<<"  "<<dt<<" *"<<name<<"=("<<dt<<" *)(impl_buf+impl_off_"<<name<<");\n";
 	}
 }
-void ParamList::unmarshall(XStr &str)  //Pass-by-value
+void ParamList::unmarshall(XStr &str, int isFirst)  //Pass-by-value
 {
-    	if (isMessage()) str<<"("<<param->type<<")impl_msg";
-    	else if (isMarshalled()) {
+    	if (isFirst && isMessage()) str<<"("<<param->type<<")impl_msg";
+    	else if (!isVoid()) {
     		str<<param->getName();
 		if (next) {
     			str<<", ";
-    			next->unmarshall(str);
+    			next->unmarshall(str, 0);
     		}
     	}
 }
-void ParamList::unmarshallAddress(XStr &str)  //Pass-by-reference, for Fortran
+void ParamList::unmarshallAddress(XStr &str, int isFirst)  //Pass-by-reference, for Fortran
 {
-    	if (isMessage()) str<<"("<<param->type<<")impl_msg";
-    	else if (isMarshalled()) {
+    	if (isFirst && isMessage()) str<<"("<<param->type<<")impl_msg";
+    	else if (!isVoid()) {
     		if (param->isArray()) str<<param->getName(); //Arrays are already pointers
 		else str<<"& "<<param->getName(); //Take address of simple types and structs
 		if (next) {
     			str<<", ";
-    			next->unmarshallAddress(str);
+    			next->unmarshallAddress(str, 0);
     		}
     	}
 }

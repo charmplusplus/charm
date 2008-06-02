@@ -255,7 +255,7 @@ class Parameter {
   public:
     Parameter(int Nline,Type *Ntype,const char *Nname=0,
     	const char *NarrLen=0,Value *Nvalue=0);
-    void print(XStr &str,int withDefaultValues=0);
+    void print(XStr &str,int withDefaultValues=0,int useConst=1);
     void printAddress(XStr &str);
     void printValue(XStr &str);
     int isMessage(void) const {return type->isMessage();}
@@ -287,7 +287,7 @@ class ParamList {
     ParamList(ParamList *pl) :param(pl->param), next(pl->next) {}
     ParamList(Parameter *Nparam,ParamList *Nnext=NULL)
     	:param(Nparam), next(Nnext) {}
-    void print(XStr &str,int withDefaultValues=0);
+    void print(XStr &str,int withDefaultValues=0,int useConst=1);
     void printAddress(XStr &str);
     void printValue(XStr &str);
     int isNamed(void) const {return param->type->isNamed();}
@@ -332,8 +332,8 @@ class ParamList {
     }
     void marshall(XStr &str);
     void beginUnmarshall(XStr &str);
-    void unmarshall(XStr &str);
-    void unmarshallAddress(XStr &str);
+    void unmarshall(XStr &str, int isFirst=1);
+    void unmarshallAddress(XStr &str, int isFirst=1);
     void pupAllValues(XStr &str);
     void endUnmarshall(XStr &str);
     int operator==(const ParamList &plist) const {
@@ -766,7 +766,7 @@ class Entry : public Member {
     void genPythonStaticDefs(XStr& str);
     void genPythonStaticDocs(XStr& str);
     
-    XStr paramType(int withDefaultVals,int withEO=0);
+    XStr paramType(int withDefaultVals,int withEO=0,int useConst=1);
     XStr paramComma(int withDefaultVals,int withEO=0);
     XStr eo(int withDefaultVals,int priorComma=1);
     XStr syncReturn(void);
