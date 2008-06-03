@@ -1,0 +1,131 @@
+<project name="Charj" default="dist" basedir=".">
+    <description>
+        A translator and standard library for Charj, a language based on the
+        Charm++ runtime system.
+    </description>
+    
+    <property name="project.name" value="Charj" />
+    
+    <!-- set global properties for this build -->
+    <property name="build" location="build"/>
+    <property name="src" location="src"/>
+    <property name="buildsrc" location="${build}/src"/>
+    <property name="buildlib" location="${build}/lib" />
+    <property name="classes" location="${build}/classes"/>
+    <property name="lib" location="lib" />
+    <property name="doc" location="docs"/>
+
+    <property name="package" value="charj"/>
+    
+    <!-- where to write/find token files -->
+    <property name="token.lib" location="${buildsrc}/${package}" />
+
+    <!-- Define path used for classpath later -->
+    <path id="project.class.path">
+        <pathelement location="lib/antlr-2.7.7.jar"/>
+        <pathelement location="lib/antlr-3.0.1.jar"/>
+        <pathelement location="lib/antlr-runtime-3.0.1.jar"/>
+        <pathelement location="lib/stringtemplate-3.1b1.jar"/>
+    </path>
+
+    <!-- antlr options -->
+    <property name="profile" value="false" />
+    <property name="report" value="false" />
+    <property name="multithreaded" value="true" />
+    <property name="depend" value="true" />
+
+    <target name="init">
+        <tstamp />
+        <!-- Create the build directory structure used by compile -->
+        <copy todir="${buildsrc}">
+            <fileset dir="${src}"/>
+        </copy>
+        <mkdir dir="${classes}" />
+        <mkdir dir="${classes}/META-INF" />
+        <mkdir dir="${buildlib}" />
+        <mkdir dir="${doc}" />
+    </target>
+
+    <macrodef name="antlr3">
+        <attribute name="grammar.name"/>
+        <attribute name="grammar.path"/>
+        <sequential>
+            <echo message="antlr @{grammar.name}" />
+            <antlr:antlr3 xmlns:antlr="antlib:org/apache/tools/ant/antlr" 
+                target="@{grammar.path}/@{grammar.name}" 
+                outputdirectory="@{grammar.path}"
+                libdirectory="@{grammar.path}"
+                multithreaded="${multithreaded}"
+                report="${report}"
+                depend="${depend}"
+                profile="${profile}">
+                <classpath refid="project.class.path"/>
+            </antlr:antlr3>
+        </sequential>
+    </macrodef>
+    
+    <target name="Charj" depends="init">
+        <antlr3 grammar.name="Charj.g" 
+            grammar.path="${buildsrc}/charj/translator"/>
+    </target>
+
+    <target name="CharjEmitter" depends="Charj">
+        <antlr3 grammar.name="CharjEmitter.g" 
+            grammar.path="${buildsrc}/charj/translator"/>
+    </target>
+    
+    <target name="compile" depends="Charj, CharjEmitter" description="compile">
+        <javac debug="true" srcdir="${buildsrc}" destdir="${classes}"
+               target="1.5" listfiles="Yes" deprecation="Yes">
+            <classpath refid="project.class.path"/>
+        </javac>
+    </target>
+
+    <target name="manifest">
+        <manifest file="${classes}/META-INF/MANIFEST.MF">
+            <attribute name="Main-Class" value="charj.Main" />
+        </manifest>
+    </target>
+
+    <target name="dist" depends="compile, manifest" 
+       description="create jarfiles">
+       <jar jarfile="${buildlib}/charj.jar" basedir="${classes}"
+           manifest="${classes}/META-INF/MANIFEST.MF"/>
+    </target>
+
+    <target name="doc" description="generate documentation">
+       <javadoc destdir="${doc}"
+                author="true"
+                version="true"
+                use="true"
+                windowtitle="${project.name}"
+                sourcepath="${src}"
+                Protected="All" Private="All"
+                Public="All"
+                Locale="de"
+                linksource="yes"
+                breakiterator="Yes">
+       </javadoc>
+    </target>
+
+    <target name="clean" description="clean up">
+       <delete>
+          <fileset dir="${buildsrc}" />
+          <fileset dir="${classes}" />
+          <fileset dir="${buildlib}" />
+          <fileset dir="${doc}" />
+       </delete>
+    </target>
+    
+    <target name="redo" depends="init">
+        <!--
+       <touch>
+         <fileset dir="${src}" includes="*.g"/>
+       </touch>
+       -->
+    </target>
+    
+    <target name="all" depends="clean, redo, dist, doc" 
+        description="do all"/>
+            
+</project>

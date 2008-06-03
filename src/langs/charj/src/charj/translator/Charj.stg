@@ -1,0 +1,10 @@
+group Charj;
+
+classExtends(type) ::= ": public CBase_<type>"
+
+
+interfaceExtends(ts) ::=
+<<
+: public CBase_<ts; separator=", public CBase_">
+>>
+
