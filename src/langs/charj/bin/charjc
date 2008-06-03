@@ -1,0 +1,53 @@
+#!/bin/bash
+
+CHARJCHOME=${0%${0##*/}}
+ANTLR_VERSION="3.1"
+ANTLRHOME=$CHARJCHOME/../lib
+ANTLR_CLASSPATH=""
+
+if test "$ANTLR_VERSION" = "3.0"
+then
+    ANTLRJAR=$ANTLRHOME/antlr-3.0.1.jar
+    ANTLR27JAR=$ANTLRHOME/antlr-2.7.7.jar
+    ANTLR_RTJAR=$ANTLRHOME/antlr-runtime-3.0.1.jar
+    STJAR=$ANTLRHOME/stringtemplate-3.1b1.jar
+    ANTLR_CLASSPATH=$ANTLRJAR:$STJAR:$ANTLR_RTJAR:$ANTLR27JAR
+fi
+
+if test "$ANTLR_VERSION" = "3.1"
+then
+    ANTLRJAR=$ANTLRHOME/antlr-3.1b1.jar
+    ANTLR27JAR=$ANTLRHOME/antlr-2.7.7.jar
+    ANTLR_RTJAR=$ANTLRHOME/antlr-runtime-3.1b1.jar
+    STJAR=$ANTLRHOME/stringtemplate-3.1.jar
+    ANTLR_CLASSPATH=$ANTLRJAR:$STJAR:$ANTLR_RTJAR:$ANTLR27JAR
+fi
+
+CHARJ_JAR=$CHARJCHOME/../build/lib/charj.jar
+CHARJ_JFLAGS="-classpath $CLASSPATH:$ANTLR_CLASSPATH:$CHARJ_JAR"
+
+# flag processing
+VERBOSE=false
+FILES=
+processArgs() {
+    while [ ! $# -eq 0 ]
+    do
+        arg="$1"
+        shift
+
+        case "$arg" in
+        "-v"|"--verbose")
+            VERBOSE=true
+            ;;
+        *.*)
+            FILES="$FILES $arg"
+        esac
+    done
+}
+
+processArgs "$@"
+if test "$VERBOSE" = "true"
+then
+    echo "java $CHARJ_JFLAGS charj.Main $*"
+fi
+java $CHARJ_JFLAGS charj.Main $FILES
