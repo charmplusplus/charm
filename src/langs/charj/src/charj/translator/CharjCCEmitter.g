@@ -2,7 +2,7 @@
  * ANTLR (v3) Tree Parser for the Charj Language
  */
 
-tree grammar CharjEmitter;
+tree grammar CharjCCEmitter;
 
 options {
     backtrack = true; 
@@ -107,11 +107,13 @@ typeDeclaration
 
 
 classExtendsClause
-    :   ^(EXTENDS_CLAUSE t=type) -> classExtends(type={$t.st})
+    :   ^(EXTENDS_CLAUSE t=type) 
+        -> classExtends(type={$t.st})
     ;   
 
 interfaceExtendsClause 
-    :   ^(EXTENDS_CLAUSE (typeList+=type)+) -> interfaceExtends(ts={$typeList})
+    :   ^(EXTENDS_CLAUSE (typeList+=type)+) 
+        -> interfaceExtends(ts={$typeList})
     ;   
     
 implementsClause
@@ -140,7 +142,8 @@ enumConstant
     
     
 classTopLevelScope
-    :   ^(CLASS_TOP_LEVEL_SCOPE classScopeDeclarations*)
+    :   ^(CLASS_TOP_LEVEL_SCOPE (csd+=classScopeDeclarations)*) 
+        -> classTopLevelScope(classScopeDeclarations={$csd})
     ;
     
 classScopeDeclarations
@@ -226,7 +229,8 @@ localModifier
     ;
 
 type
-    :   ^(TYPE (primitiveType | qualifiedTypeIdent) arrayDeclaratorList?) -> template(t={$text}) "<t>"
+    :   ^(TYPE (primitiveType | qualifiedTypeIdent) arrayDeclaratorList?) 
+        -> template(t={$text}) "<t>"
     ;
 
 qualifiedTypeIdent

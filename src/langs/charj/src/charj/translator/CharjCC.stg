@@ -1,0 +1,12 @@
+group CharjCC;
+
+classExtends(type) ::= ": public CBase_<type>"
+
+
+interfaceExtends(ts) ::=
+<<
+: public CBase_<ts; separator=", public CBase_">
+>>
+
+
+classTopLevelScope(classScopeDeclarations) ::= "!!<classScopeDeclarations>!!"

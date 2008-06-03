@@ -1,0 +1,10 @@
+group CharjCI;
+
+classExtends(type) ::= ": <type>"
+
+
+interfaceExtends(ts) ::=
+<<
+: <ts; separator=", ">
+>>
+

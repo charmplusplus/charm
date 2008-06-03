@@ -2,7 +2,7 @@
  * ANTLR (v3) Tree Parser for the Charj Language
  */
 
-tree grammar CharjEmitter;
+tree grammar CharjCIEmitter;
 
 options {
     backtrack = true; 

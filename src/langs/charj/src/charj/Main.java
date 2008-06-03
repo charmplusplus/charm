@@ -7,6 +7,8 @@ public class Main
 {
     public static void main(String[] args) throws Exception
     {
-        System.out.println(Translator.translate(new FileInputStream(args[0])));
+        for (String filename : args) { 
+            System.out.println(Translator.translate(filename));
+        }
     }
 }
