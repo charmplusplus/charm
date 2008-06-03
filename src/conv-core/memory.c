@@ -515,9 +515,12 @@ void setMemoryTypeChare(void *ptr) { }
 void setMemoryTypeMessage(void *ptr) { }
 
 int get_memory_allocated_user_total() { return 0; }
+#ifdef setMemoryChareIDFromPtr
+#undef setMemoryChareIDFromPtr
+#endif
+int setMemoryChareIDFromPtr(void *ptr) { return 0; }
 #ifdef setMemoryChareID
 #undef setMemoryChareID
 #endif
-int setMemoryChareIDFromPtr(void *ptr) { return 0; }
 void setMemoryChareID(int id) { }
 #endif
