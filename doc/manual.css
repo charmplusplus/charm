@@ -21,10 +21,16 @@ H2		{ color: white; background: navy; padding: 8pt; text-align: center; letter-s
 H3		{ color: white; background: navy; padding: 5pt; padding-top: 10pt; letter-spacing: 2; word-spacing: 1 }
 H4		{ color: black; background: lightyellow; padding: 3pt  }
 H5		{  }
+H1 a	{ color: navy  }
+H2 a	{ color: white  }
+H3 a	{ color: white  }
+H4 a	{ color: black  }
 H1 a:hover	{ color: navy  }
 H2 a:hover	{ color: white  }
 H3 a:hover	{ color: white  }
 H4 a:hover	{ color: black  }
+
+
 
 /* mathematics styles */
 DIV.displaymath		{ }	/* math displays */
