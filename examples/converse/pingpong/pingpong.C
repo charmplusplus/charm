@@ -82,7 +82,7 @@ CmiHandler node0HandlerFunc(char *msg)
         CmiSetHandler(msg,CpvAccess(node1Handler));
         *((int *)(msg+CmiMsgHeaderSizeBytes)) = CpvAccess(msgSize);
         
-        CmiSyncSendAndFree(0,CpvAccess(msgSize),msg);
+        CmiSyncSendAndFree(1,CpvAccess(msgSize),msg);
     }
     return 0;
 }

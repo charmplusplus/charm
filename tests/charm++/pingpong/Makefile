@@ -6,7 +6,7 @@ OBJS = pingpong.o
 all:	cifiles pgm
 
 pgm: $(OBJS)
-	$(CHARMC) -language charm++ -pg -o pgm $(OBJS)
+	$(CHARMC) -language charm++ -o pgm $(OBJS)
 
 cifiles: pingpong.ci
 	$(CHARMC)  pingpong.ci
@@ -15,11 +15,7 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o pgm charmrun
 
 pingpong.o: pingpong.C
-<<<<<<< Makefile
-	$(CHARMC) -pg -c pingpong.C
-=======
 	$(CHARMC) -I$(SRC)/conv-core pingpong.C
->>>>>>> 1.4
 
 test: all
 	@echo "Intra-processor Pingpong.."
