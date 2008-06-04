@@ -17,7 +17,7 @@
 #include "wrqueue.h"
 #include "cuda-hybrid-api.h"
 
-workRequestQueue *wrQueue; 
+workRequestQueue *wrQueue = NULL; 
 
 /*
   TO DO
@@ -26,6 +26,8 @@ workRequestQueue *wrQueue;
   stream 3 - memory copies
 */
 
+/* setupMemory
+   set up memory on the gpu for this kernel's execution */
 void setupMemory(workRequest *wr) {
 
   cudaMalloc((void **)&(wr->readWriteDevicePtr), wr->readWriteLen);
@@ -38,6 +40,8 @@ void setupMemory(workRequest *wr) {
 		  cudaMemcpyHostToDevice); 
 } 
 
+/* cleanupMemory
+   free memory no longer needed on the gpu */ 
 void cleanupMemory(workRequest *wr) {
 
   cudaMemcpy(wr->readWriteHostPtr, wr->readWriteDevicePtr, wr->readWriteLen, cudaMemcpyDeviceToHost); 
@@ -49,24 +53,38 @@ void cleanupMemory(workRequest *wr) {
 
 }
 
+/* kernelSelect
+   a switch statement defined by the user to allow the library to execute
+   the correct kernel */ 
 void kernelSelect(workRequest *wr);
 
+/* initHybridAPI
+   initializes the work request queue
+*/
 void initHybridAPI() {
-  init_wrqueue(wrQueue); 
+  initWRqueue(&wrQueue); 
 }
 
+/* gpuProgressFn
+   called periodically to check if the current kernel has completed,
+   and invoke subsequent kernel */
 void gpuProgressFn() {
-  while (!isEmpty(wrQueue)) {
+  if (wrQueue == NULL) {
+    return; 
+  }
 
+  while (!isEmpty(wrQueue)) {
     workRequest *wr = head(wrQueue); 
     
     if (wr->executing == 0) {
       setupMemory(wr); 
       kernelSelect(wr); 
-      cudaEventRecord(wr->completionEvent, 0); 
+      // cudaEventRecord(wr->completionEvent, 0);
+      wr->executing = 1; 
       return; 
     }  
-    else if (cudaEventQuery(wr->completionEvent) == cudaSuccess ) {      
+    // else if (cudaEventQuery(wr->completionEvent) == cudaSuccess ) {      
+    else if (cudaStreamQuery(0) == cudaSuccess ) {      
       cleanupMemory(wr);
       dequeue(wrQueue);
       wr->callbackFn();
@@ -75,6 +93,9 @@ void gpuProgressFn() {
   }
 }
 
+/* exitHybridAPI
+   cleans up and deletes memory allocated for the queue
+*/
 void exitHybridAPI() {
-  delete_wrqueue(wrQueue); 
+  deleteWRqueue(wrQueue); 
 }

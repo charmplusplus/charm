@@ -334,8 +334,7 @@ THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o 	\
 CVLIBS=$(L)/libconv-core.a \
 	$(L)/libconv-cplus-y.a $(L)/libconv-cplus-n.a \
 	$(L)/libconv-util.a $(L)/libconv-utilf.a \
-	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) $(THREADLIBS) \
-	$(L)/libccs-client.a
+	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) $(THREADLIBS)
 
 LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o topology.o random.o \
@@ -367,9 +366,9 @@ LIBCONV_UTILF=pup_f.o
 
 converse: basics
 	$(MAKE) QuickThreads/libqt.a
-	$(MAKE) converse-target
+	$(MAKE) converse-target 
 
-converse-target:  $(CVLIBS) fmain-ok charmrun-target swapglobal-target conv-cpm
+converse-target:  $(CVLIBS) fmain-ok charmrun-target swapglobal-target conv-cpm 
 
 charmrun-target: sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o
 	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS)' ) ; fi
@@ -401,7 +400,7 @@ CONVLIBS: converse
 	cd libs; $(MAKE) convlibs OPTS='$(OPTS)'
 
 $(L)/libconv-core.a: $(LIBCONV_CORE)
-	$(CHARMC) -o $@ $(LIBCONV_CORE)
+	$(CHARMC) -fPIC -o $@ $(LIBCONV_CORE)
 
 $(L)/libconv-cplus-y.a: $(L)/libconv-cplus-n.a
 
@@ -624,7 +623,7 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o  \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) \
 	   charmProjections.o
 
-charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs
+charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs 
 
 CHARMLIBS: charm++
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'

@@ -1,0 +1,16 @@
+mainmodule hello {
+  readonly CProxy_Main mainProxy;
+  readonly int nElements;
+  readonly CProxy_Hello arr;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void done(void);
+  };
+
+  array [1D] Hello {
+    entry Hello(void);
+    entry void SayHi(void);
+    entry void SendHi(void); 
+  };        	
+};

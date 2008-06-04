@@ -107,6 +107,10 @@ extern void CmiInitCPUAffinity(char **);
 #include <sys/timeb.h>
 #endif
 
+#ifdef CMK_CUDA
+#include "cuda-hybrid-api.h"
+#endif
+
 #include "quiescence.h"
 
 int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
@@ -2837,7 +2841,7 @@ void ConverseCommonInit(char **argv)
 #endif
 
 #ifdef CMK_CUDA
-  initAPI(); 
+  initHybridAPI(); 
 #endif
 
   /* main thread is suspendable */
@@ -2872,7 +2876,7 @@ void ConverseCommonExit(void)
 #endif
 
 #if CMK_CUDA
-  exitAPI(); 
+  exitHybridAPI(); 
 #endif
 
 }

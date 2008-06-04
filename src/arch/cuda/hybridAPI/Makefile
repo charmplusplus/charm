@@ -1,25 +1,30 @@
 CHARMDIR=~/charm
 CHARMC=$(CHARMDIR)/bin/charmc
 
-#LDFLAGS += -L/usr/local/cuda/lib -L~/NVIDIA_CUDA_SDK/lib
-#LDLIBS += -lcuda -lcudart -lGL -lGLU -lcutil
-
-
 NVCC = /usr/local/cuda/bin/nvcc
-NVCC_FLAGS = -c -use_fast_math #-device-debug -deviceemu
-NVCC_INC = -I/usr/local/cuda/include -I/~/NVIDIA_CUDA_SDK/common/inc
+NVCC_FLAGS = -g -c -use_fast_math #-device-debug -deviceemu
+NVCC_INC = -I/usr/local/cuda/include -I~/NVIDIA_CUDA_SDK/common/inc
 
 RM = rm -f
 
-install: cudahybridapi.a
-	cp cudahybridapi.a $(CHARMDIR)/lib
+all: libs
+	cp libcudahybridapi.a $(CHARMDIR)/lib
 
-cudahybridapi.a: hybridapi.o wrqueue.o
-	ar q cudahybridapi.a hybridapi.o wrqueue.o 
+libs: libcudahybridapi.a
 
-hybridapi.o: cuda-hybrid-api.h cuda-hybrid-api.cu
+install: libcudahybridapi.a
+	cp libcudahybridapi.a $(CHARMDIR)/lib
+#	cp hybridapi.o wrqueue.o $(CHARMDIR)/tmp
+
+libcudahybridapi.a: hybridapi.o wrqueue.o
+	-rm $@
+	ar q $@ hybridapi.o wrqueue.o 
+
+hybridapi.o: cuda-hybrid-api.cu cuda-hybrid-api.h
 	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o hybridapi.o cuda-hybrid-api.cu
 
-wrqueue.o: wrqueue.cu wrqueue.h
+wrqueue.o: wrqueue.cu wrqueue.h wr.h 
 	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o wrqueue.o wrqueue.cu 
 
+clean:
+	rm -f *.o *.a 

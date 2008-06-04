@@ -10,16 +10,16 @@
 
 #include "wrqueue.h"
 
-void init_wrqueue(workRequestQueue *q) {
+void initWRqueue(workRequestQueue **qptr) {
 
-  q = (workRequestQueue*) malloc(sizeof(workRequestQueue));  
+  (*qptr) = (workRequestQueue*) malloc(sizeof(workRequestQueue));  
 
-  q->head = -1; 
-  q->tail = -1;
-  q->size = 0; 
-  q->capacity = QUEUE_SIZE_INIT; 
+  (*qptr)->head = 0; 
+  (*qptr)->tail = -1;
+  (*qptr)->size = 0; 
+  (*qptr)->capacity = QUEUE_SIZE_INIT; 
 
-  q->requests = (workRequest *) malloc(QUEUE_SIZE_INIT * sizeof(workRequest)); 
+  (*qptr)->requests = (workRequest *) malloc(QUEUE_SIZE_INIT * sizeof(workRequest)); 
 
 }
 
@@ -64,7 +64,7 @@ void enqueue(workRequestQueue *q, workRequest *wr) {
     q->tail = 0; 
   }
 
-  memcpy(&q->requests[q->tail], wr, sizeof(workRequest));
+  memcpy(&q->requests[q->tail], &(*wr), sizeof(workRequest));
   free(wr); 
 
   q->size++; 
@@ -78,7 +78,7 @@ void dequeue(workRequestQueue *q) {
   q->size--; 
 }
 
-int delete_wrqueue(workRequestQueue *q) {
+int deleteWRqueue(workRequestQueue *q) {
   if (q->size != 0) {
     return -1; 
   }

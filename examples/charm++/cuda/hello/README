@@ -1,0 +1,8 @@
+Hello World in Charm with CUDA using the hybrid API.
+
+This example passes a Hi message along the array from index 0 to N. Each chare 
+executes an empty kernel on the GPU when it receives the message. 
+When the kernel returns, the runtime system executes the specified callback 
+function which passes the message to the subsequent chare in the array. 
+
+
