@@ -58,6 +58,9 @@ public:
                 // Compute the logical bitvector OR of the integers passed by each element.
                 bitvec_or,
 
+	// Select one message at random to pass on
+		random,
+
 	//Concatenate the (arbitrary) data passed by each element
 		concat,
 

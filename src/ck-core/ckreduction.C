@@ -985,6 +985,11 @@ SIMPLE_REDUCTION(logical_or,int,"%d",
 SIMPLE_REDUCTION(bitvec_and,int,"%d",ret[i]&=value[i];)
 SIMPLE_REDUCTION(bitvec_or,int,"%d",ret[i]|=value[i];)
 
+//Select one random message to pass on
+static CkReductionMsg *random(int nMsg,CkReductionMsg **msg) {
+  return CkReductionMsg::buildNew(msg[0]->getLength(),(void *)msg[0]->getData(), CkReduction::invalid, msg[0]);
+}
+
 /////////////// concat ////////////////
 /*
 This reducer simply appends the data it recieves from each element,
@@ -1138,6 +1143,9 @@ CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
 
     // Compute the logical bitvector OR of the integers passed by each element.
     ::bitvec_or,
+
+    // Select one of the messages at random to pass on
+    ::random,
 
   //Concatenate the (arbitrary) data passed by each element
     ::concat,
