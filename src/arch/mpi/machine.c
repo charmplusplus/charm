@@ -1716,12 +1716,16 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
   }
 
-  if (CmiGetArgFlag(argv,"++debug"))
+  {
+  int debug = CmiGetArgFlag(argv,"++debug");
+  int debug_no_pause = CmiGetArgFlag(argv,"++debug-no-pause");
+  if (debug || debug_no_pause)
   {   /*Pause so user has a chance to start and attach debugger*/
     printf("CHARMDEBUG> Processor %d has PID %d\n",_Cmi_mynode,getpid());
     fflush(stdout);
-    if (!CmiGetArgFlag(argv,"++debug-no-pause"))
+    if (!debug_no_pause)
       sleep(10);
+  }
   }
 
 #if MPI_POST_RECV_COUNT > 0
