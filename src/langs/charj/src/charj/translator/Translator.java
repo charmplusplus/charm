@@ -102,12 +102,15 @@ public class Translator {
     {
         int lastDot = filename.lastIndexOf(".");
         int lastSlash = filename.lastIndexOf("/");
-        baseFilename = filename.substring(0, lastSlash) + 
+        String baseFilename = filename.substring(0, lastSlash) + 
             "/.charj/" + filename.substring(lastSlash + 1, lastDot);
         String cmd = charmc + " " + baseFilename + ".ci";
         File currentDir = new File(".");
         exec(cmd, currentDir);
         cmd = charmc + " -c " + baseFilename + ".cc";
+        exec(cmd, currentDir);
+        cmd = "cp " + baseFilename + ".o" + " " + 
+            filename.substring(0, lastSlash);
         exec(cmd, currentDir);
     }
 
