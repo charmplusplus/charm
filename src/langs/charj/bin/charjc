@@ -23,11 +23,13 @@ then
     ANTLR_CLASSPATH=$ANTLRJAR:$STJAR:$ANTLR_RTJAR:$ANTLR27JAR
 fi
 
+JSAP_JAR=$CHARJCHOME/../lib/JSAP-2.1.jar
 CHARJ_JAR=$CHARJCHOME/../build/lib/charj.jar
-CHARJ_JFLAGS="-classpath $CLASSPATH:$ANTLR_CLASSPATH:$CHARJ_JAR"
+CHARJ_JFLAGS="-classpath $CLASSPATH:$ANTLR_CLASSPATH:$JSAP_JAR:$CHARJ_JAR"
 
 # flag processing
 VERBOSE=false
+CHARMC=$CHARJCHOME../../../../bin/charmc
 FILES=
 processArgs() {
     while [ ! $# -eq 0 ]
@@ -39,6 +41,10 @@ processArgs() {
         "-v"|"--verbose")
             VERBOSE=true
             ;;
+        "--charmc")
+            CHARMC="$1"
+            shift
+            ;;
         *.*)
             FILES="$FILES $arg"
         esac
@@ -48,6 +54,6 @@ processArgs() {
 processArgs "$@"
 if test "$VERBOSE" = "true"
 then
-    echo "java $CHARJ_JFLAGS charj.Main $*"
+    echo "java $CHARJ_JFLAGS charj.Main $FILES"
 fi
-java $CHARJ_JFLAGS charj.Main $FILES
+java $CHARJ_JFLAGS charj.Main --charmc $CHARMC $FILES

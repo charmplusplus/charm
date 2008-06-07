@@ -3,35 +3,57 @@
 
 package charj.translator;
 
+import java.io.*;
 import org.antlr.runtime.*;
 import org.antlr.runtime.tree.*;
 import org.antlr.stringtemplate.*;
-import java.io.*;
+import charj.translator.StreamEmitter;
 
 enum OutputMode {
-    cc, ci
+    cc(".cc"), 
+    ci(".ci");
+
+    private final String extension;
+
+    OutputMode(String ext) {
+        this.extension = ext;
+    }
+
+    public String extension() {
+        return extension;
+    }
 }
 
 public class Translator {
 
-    public static final String ccTemplateFile = "src/charj/translator/CharjCC.stg";
-    public static final String ciTemplateFile = "src/charj/translator/CharjCI.stg";
+    public static final String ccTemplateFile = 
+        "src/charj/translator/CharjCC.stg";
+    public static final String ciTemplateFile = 
+        "src/charj/translator/CharjCI.stg";
     public static boolean debug = true;
     public static boolean errorCondition = false;
 
-    public static String translate(String filename) throws Exception {
-
+    public static String translate(
+            String filename,
+            String charmc) throws Exception 
+    {
         ANTLRFileStream input = new ANTLRFileStream(filename);
             
         CharjLexer lexer = new CharjLexer(input);
         String output = translationPass(lexer, OutputMode.cc);
+        writeTempFile(filename, output, OutputMode.cc);
         input.seek(0);
-        output += translationPass(lexer, OutputMode.ci);
+        output = translationPass(lexer, OutputMode.ci);
+
+        writeTempFile(filename, output, OutputMode.ci);
+        compileTempFiles(filename, charmc);
         
         return output;
     }
 
-    public static String translationPass(CharjLexer lexer, OutputMode m) throws
+    private static String translationPass(
+            CharjLexer lexer, 
+            OutputMode m) throws
         RecognitionException, IOException, InterruptedException
     {
         // Use lexer tokens to feed tree parser. Note that the parser is a
@@ -48,14 +70,66 @@ public class Translator {
 
         String output = null;
         if (m == OutputMode.cc) {
-            output = "\nCC File\n-----------------------\n" + generateCC(nodes);
+            output = generateCC(nodes);
         } else if (OutputMode.ci == m) {
-            output = "\nCI File\n-----------------------\n" + generateCI(nodes);
+            output = generateCI(nodes);
         }
         return output;
     }
 
-    public static String generateCC(CommonTreeNodeStream nodes) throws
+    private static void writeTempFile(
+            String filename, 
+            String output,
+            OutputMode m) throws
+        IOException
+    {
+        int lastDot = filename.lastIndexOf(".");
+        int lastSlash = filename.lastIndexOf("/");
+        String tempFile = filename.substring(0, lastSlash) + 
+            "/.charj/";
+        new File(tempFile).mkdir();
+        tempFile += filename.substring(lastSlash + 1, lastDot) + m.extension();
+        FileWriter fw = new FileWriter(tempFile);
+        fw.write(output);
+        fw.close();
+        return;
+    }
+
+    private static void compileTempFiles(
+            String filename,
+            String charmc) throws
+        IOException, InterruptedException
+    {
+        int lastDot = filename.lastIndexOf(".");
+        int lastSlash = filename.lastIndexOf("/");
+        baseFilename = filename.substring(0, lastSlash) + 
+            "/.charj/" + filename.substring(lastSlash + 1, lastDot);
+        String cmd = charmc + " " + baseFilename + ".ci";
+        File currentDir = new File(".");
+        exec(cmd, currentDir);
+        cmd = charmc + " -c " + baseFilename + ".cc";
+        exec(cmd, currentDir);
+    }
+
+    private static int exec(String cmd, File outputDir) throws
+        IOException, InterruptedException
+    {
+        System.out.println("exec: " + cmd);
+        Process p = Runtime.getRuntime().exec(cmd, null, outputDir);
+        StreamEmitter stdout = new StreamEmitter(
+                p.getInputStream(), System.out);
+        StreamEmitter stderr = new StreamEmitter(
+                p.getErrorStream(), System.err);
+        stdout.start();
+        stderr.start();
+        p.waitFor();
+        stdout.join();
+        stderr.join();
+        int retVal = p.exitValue();
+        return retVal;
+    }
+
+    private static String generateCC(CommonTreeNodeStream nodes) throws
         RecognitionException, IOException, InterruptedException
     {
         CharjCCEmitter emitter = new CharjCCEmitter(nodes);
@@ -65,7 +139,7 @@ public class Translator {
         return st.toString();
     }
 
-    public static String generateCI(CommonTreeNodeStream nodes) throws
+    private static String generateCI(CommonTreeNodeStream nodes) throws
         RecognitionException, IOException, InterruptedException
     {
         CharjCIEmitter emitter = new CharjCIEmitter(nodes);
@@ -75,7 +149,7 @@ public class Translator {
         return st.toString();
     }
 
-    public static StringTemplateGroup getTemplates(String templateFile)
+    private static StringTemplateGroup getTemplates(String templateFile)
     {
         StringTemplateGroup templates = null;
         try {
@@ -90,7 +164,10 @@ public class Translator {
         return templates;
     }
     
-    public static void error(String sourceName, String msg, CommonTree node) 
+    private static void error(
+            String sourceName, 
+            String msg, 
+            CommonTree node) 
     {
         errorCondition = true;
         String linecol = ":";
@@ -103,7 +180,9 @@ public class Translator {
     }
 
 
-    public static void error(String sourceName, String msg) {
+    private static void error(
+            String sourceName, 
+            String msg) {
         error(sourceName, msg, (CommonTree)null);
     }
 
@@ -113,7 +192,9 @@ public class Translator {
     }
 
 
-    public static void error(String msg, Exception e) {
+    public static void error(
+            String msg, 
+            Exception e) {
         error(msg);
         e.printStackTrace(System.err);
     }
