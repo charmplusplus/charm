@@ -91,17 +91,17 @@ charjSource
 
 packageDeclaration
     :   ^(PACKAGE qualifiedIdentifier)  
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "//<t>"
     ;
     
 importDeclaration
     :   ^(IMPORT STATIC? qualifiedIdentifier DOTSTAR?)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "//<t>"
     ;
     
 typeDeclaration
-    :   ^(CLASS m=modifierList IDENT g=genericTypeParameterList? e=classExtendsClause? i=implementsClause? c=classTopLevelScope) {System.out.println($IDENT.text);}
-        -> classDeclatation(
+    :   ^(CLASS m=modifierList IDENT g=genericTypeParameterList? e=classExtendsClause? i=implementsClause? c=classTopLevelScope) 
+        -> classDeclaration(
             mod={$m.st}, 
             ident={$IDENT.text}, 
             gen={$g.st}, 
@@ -166,9 +166,19 @@ classScopeDeclarations
         -> template(t={$text}) "/*cii*/ <t>"
     |   ^(CLASS_STATIC_INITIALIZER block)
         -> template(t={$text}) "/*csi*/ <t>"
-    |   ^(FUNCTION_METHOD_DECL modifierList genericTypeParameterList? type IDENT 
-            formalParameterList arrayDeclaratorList? throwsClause? block?)
-        -> template(t={$text}) "/*funcmethod*/ <t>"
+    |   ^(FUNCTION_METHOD_DECL m=modifierList g=genericTypeParameterList? 
+            ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
+            tt=throwsClause? b=block?)
+        //-> template(t={$text}) "/*funcmethod*/ <t>"
+        -> funcMethodDecl(
+            modl={$m.st}, 
+            gtpl={$g.st}, 
+            ty={$t.text},
+            id={$IDENT.text}, 
+            fpl={$f.st}, 
+            adl={$a.st},
+            tc={$tt.st}, 
+            block={$b.st})
     |   ^(VOID_METHOD_DECL m=modifierList g=genericTypeParameterList? IDENT 
             f=formalParameterList t=throwsClause? b=block?)
         -> voidMethodDecl(
@@ -257,8 +267,8 @@ throwsClause
     ;
 
 modifierList
-    :   ^(MODIFIER_LIST modifier*)
-        -> template(t={$text}) "<t>"
+    :   ^(MODIFIER_LIST (m+=modifier)*)
+        -> template(mod={$m}) "<mod; separator=\" \">"
     ;
 
 modifier
@@ -268,6 +278,8 @@ modifier
         -> template(t={$text}) "<t>"
     |   PRIVATE
         -> template(t={$text}) "<t>"
+    |   ENTRY
+        -> template() "public"
     |   STATIC
         -> template(t={$text}) "<t>"
     |   ABSTRACT

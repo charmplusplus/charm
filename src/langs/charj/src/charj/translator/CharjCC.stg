@@ -14,16 +14,16 @@ classExtends(type) ::= ": public CBase_<type>"
 
 interfaceExtends(ts) ::=
 <<
-: public CBase_<ts; separator=", public CBase_">
+: public <ts; separator=", public ">
 >>
 
 
-classDeclatation(mod, ident, gen, ext, impl, ctls) ::=
+classDeclaration(mod, ident, gen, ext, impl, ctls) ::=
 <<
 
 
 #include "<ident>.decl.h"
-<mod> class <ident> <gen> <ext> <impl> {
+<mod> class <ident> <gen>: public CBase_<ident> <impl> {
     <ctls>
 };
 #include "<ident>.def.h"
@@ -39,6 +39,18 @@ classTopLevelScope(classScopeDeclarations) ::=
 // _!classTopLevelScope_
 >>
 
+
+funcMethodDecl(modl, 
+            gtpl,
+            ty,
+            id,
+            fpl,
+            adl,
+            tc,
+            block) ::=
+<<
+<modl>: <ty> <gtpl> <id><fpl> <adl> <tc> <block>
+>>
 
 voidMethodDecl(modl, gtpl, id, fpl, tc, block) ::=
 <<

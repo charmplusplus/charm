@@ -106,6 +106,7 @@ tokens {
     PRIVATE                 = 'private'         ;
     PROTECTED               = 'protected'       ;
     PUBLIC                  = 'public'          ;
+    ENTRY                   = 'entry'           ;
     RETURN                  = 'return'          ;
     SHORT                   = 'short'           ;
     STATIC                  = 'static'          ;
@@ -478,6 +479,7 @@ modifierList
 modifier
     :   PUBLIC
     |   PROTECTED
+    |   ENTRY
     |   PRIVATE
     |   STATIC
     |   ABSTRACT
