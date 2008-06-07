@@ -1,5 +1,14 @@
 group CharjCC;
 
+
+charjSource(pd, ids, tds) ::= 
+<<
+<pd>
+<ids>
+<tds>
+>>
+
+
 classExtends(type) ::= ": public CBase_<type>"
 
 
@@ -9,4 +18,35 @@ interfaceExtends(ts) ::=
 >>
 
 
-classTopLevelScope(classScopeDeclarations) ::= "!!<classScopeDeclarations>!!"
+classDeclatation(mod, ident, gen, ext, impl, ctls) ::=
+<<
+
+
+#include "<ident>.decl.h"
+<mod> class <ident> <gen> <ext> <impl> {
+    <ctls>
+};
+#include "<ident>.def.h"
+
+
+>>
+
+
+classTopLevelScope(classScopeDeclarations) ::= 
+<<
+// _classTopLevelScope_
+<classScopeDeclarations; separator="\n">
+// _!classTopLevelScope_
+>>
+
+
+voidMethodDecl(modl, gtpl, id, fpl, tc, block) ::=
+<<
+<modl>: void<gtpl> <id><fpl> <tc> <block>
+>>
+
+
+ctorDecl(modl, gtpl, id, fpl, tc, block) ::=
+<<
+<modl>:<gtpl> <id><fpl> <tc> <block>
+>>

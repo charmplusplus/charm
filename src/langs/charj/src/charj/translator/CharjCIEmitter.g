@@ -10,7 +10,7 @@ options {
     tokenVocab = Charj;
     ASTLabelType = CommonTree;
     output = template;
-    rewrite = true;
+//    rewrite = true;
 }
 
 
@@ -149,7 +149,7 @@ classScopeDeclarations
     |   ^(FUNCTION_METHOD_DECL modifierList genericTypeParameterList? type IDENT formalParameterList arrayDeclaratorList? throwsClause? block?)
     |   ^(VOID_METHOD_DECL modifierList genericTypeParameterList? IDENT formalParameterList throwsClause? block?)
     |   ^(VAR_DECLARATION modifierList type variableDeclaratorList)
-    |   ^(CONSTRUCTOR_DECL modifierList genericTypeParameterList? formalParameterList throwsClause? block)
+    |   ^(CONSTRUCTOR_DECL modifierList genericTypeParameterList? IDENT formalParameterList throwsClause? block)
     |   typeDeclaration
     ;
     

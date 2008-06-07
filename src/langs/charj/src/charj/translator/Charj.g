@@ -396,7 +396,8 @@ classScopeDeclarations
             |   VOID IDENT formalParameterList throwsClause? (block | SEMI)
                 ->  ^(VOID_METHOD_DECL modifierList genericTypeParameterList? IDENT formalParameterList throwsClause? block?)
             |   ident=IDENT formalParameterList throwsClause? block
-                ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList genericTypeParameterList? formalParameterList throwsClause? block)
+                ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList genericTypeParameterList? IDENT formalParameterList throwsClause? block)
+                //->  ^(CONSTRUCTOR_DECL[$ident, $ident.text] modifierList genericTypeParameterList? formalParameterList throwsClause? block)
             )
         |   type classFieldDeclaratorList SEMI
             ->  ^(VAR_DECLARATION modifierList type classFieldDeclaratorList)

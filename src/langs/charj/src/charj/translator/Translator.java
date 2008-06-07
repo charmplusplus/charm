@@ -36,7 +36,8 @@ public class Translator {
     {
         // Use lexer tokens to feed tree parser. Note that the parser is a
         // rewriter, so a TokenRewriteStream is needed
-        TokenRewriteStream tokens = new TokenRewriteStream(lexer);
+        //TokenRewriteStream tokens = new TokenRewriteStream(lexer);
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
         CharjParser parser = new CharjParser(tokens);
         CharjParser.charjSource_return r = parser.charjSource();
 

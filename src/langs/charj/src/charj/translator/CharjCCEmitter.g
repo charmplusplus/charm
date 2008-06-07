@@ -10,7 +10,7 @@ options {
     tokenVocab = Charj;
     ASTLabelType = CommonTree;
     output = template;
-    rewrite = true;
+//    rewrite = true;
 }
 
 
@@ -85,8 +85,8 @@ package charj.translator;
 
 // Starting point for parsing a Charj file.
 charjSource
-    :   ^(CHARJ_SOURCE packageDeclaration? importDeclaration* (ts+=typeDeclaration)*)
-        -> template(t={$text}) "<t>"
+    :   ^(CHARJ_SOURCE (p=packageDeclaration)? (i+=importDeclaration)* (t+=typeDeclaration)*)
+        -> charjSource(pd={$p.st}, ids={$i}, tds={$t})
     ;
 
 packageDeclaration
@@ -100,8 +100,14 @@ importDeclaration
     ;
     
 typeDeclaration
-    :   ^(CLASS modifierList IDENT genericTypeParameterList? classExtendsClause? implementsClause? classTopLevelScope)
-        -> template(t={$text}) "<t>"
+    :   ^(CLASS m=modifierList IDENT g=genericTypeParameterList? e=classExtendsClause? i=implementsClause? c=classTopLevelScope) {System.out.println($IDENT.text);}
+        -> classDeclatation(
+            mod={$m.st}, 
+            ident={$IDENT.text}, 
+            gen={$g.st}, 
+            ext={$e.st}, 
+            impl={$i.st},
+            ctls={$c.st})
     |   ^(INTERFACE modifierList IDENT genericTypeParameterList? interfaceExtendsClause? interfaceTopLevelScope)
         -> template(t={$text}) "<t>"
     |   ^(ENUM modifierList IDENT implementsClause? enumTopLevelScope)
@@ -157,19 +163,36 @@ classTopLevelScope
     
 classScopeDeclarations
     :   ^(CLASS_INSTANCE_INITIALIZER block)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*cii*/ <t>"
     |   ^(CLASS_STATIC_INITIALIZER block)
-        -> template(t={$text}) "<t>"
-    |   ^(FUNCTION_METHOD_DECL modifierList genericTypeParameterList? type IDENT formalParameterList arrayDeclaratorList? throwsClause? block?)
-        -> template(t={$text}) "<t>"
-    |   ^(VOID_METHOD_DECL modifierList genericTypeParameterList? IDENT formalParameterList throwsClause? block?)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*csi*/ <t>"
+    |   ^(FUNCTION_METHOD_DECL modifierList genericTypeParameterList? type IDENT 
+            formalParameterList arrayDeclaratorList? throwsClause? block?)
+        -> template(t={$text}) "/*funcmethod*/ <t>"
+    |   ^(VOID_METHOD_DECL m=modifierList g=genericTypeParameterList? IDENT 
+            f=formalParameterList t=throwsClause? b=block?)
+        -> voidMethodDecl(
+            modl={$m.st}, 
+            gtpl={$g.st}, 
+            id={$IDENT.text}, 
+            fpl={$f.st}, 
+            tc={$t.st}, 
+            block={$b.st})
+// template(t={$text}) "/*voidmethod*/ <t>"
     |   ^(VAR_DECLARATION modifierList type variableDeclaratorList)
-        -> template(t={$text}) "<t>"
-    |   ^(CONSTRUCTOR_DECL modifierList genericTypeParameterList? formalParameterList throwsClause? block)
-        -> template(t={$text}) "<t>"
-    |   typeDeclaration
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "vardecl <t>"
+    |   ^(CONSTRUCTOR_DECL m=modifierList g=genericTypeParameterList? IDENT f=formalParameterList 
+            t=throwsClause? b=block)
+        -> ctorDecl(
+            modl={$m.st}, 
+            gtpl={$g.st}, 
+            id={$IDENT.text}, 
+            fpl={$f.st}, 
+            tc={$t.st}, 
+            block={$b.st})
+        //-> template(t={$text}) "ctor <t>"
+    |   d=typeDeclaration
+        -> template(t={$d.st}) "type <t>"
     ;
     
 interfaceTopLevelScope
