@@ -27,9 +27,9 @@ enum OutputMode {
 public class Translator {
 
     public static final String ccTemplateFile = 
-        "src/charj/translator/CharjCC.stg";
+        "charj/translator/CharjCC.stg";
     public static final String ciTemplateFile = 
-        "src/charj/translator/CharjCI.stg";
+        "charj/translator/CharjCI.stg";
     public static boolean debug = true;
     public static boolean errorCondition = false;
 
