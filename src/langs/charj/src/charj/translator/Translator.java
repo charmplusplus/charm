@@ -85,8 +85,7 @@ public class Translator {
     {
         int lastDot = filename.lastIndexOf(".");
         int lastSlash = filename.lastIndexOf("/");
-        String tempFile = filename.substring(0, lastSlash) + 
-            "/.charj/";
+        String tempFile = filename.substring(0, lastSlash + 1) + ".charj/";
         new File(tempFile).mkdir();
         tempFile += filename.substring(lastSlash + 1, lastDot) + m.extension();
         FileWriter fw = new FileWriter(tempFile);
@@ -102,15 +101,18 @@ public class Translator {
     {
         int lastDot = filename.lastIndexOf(".");
         int lastSlash = filename.lastIndexOf("/");
-        String baseFilename = filename.substring(0, lastSlash) + 
-            "/.charj/" + filename.substring(lastSlash + 1, lastDot);
+        String baseFilename = filename.substring(0, lastSlash + 1) + 
+            ".charj/" + filename.substring(lastSlash + 1, lastDot);
         String cmd = charmc + " " + baseFilename + ".ci";
         File currentDir = new File(".");
-        exec(cmd, currentDir);
+        int retVal = exec(cmd, currentDir);
+        if (retVal != 0) return;
+        
         cmd = charmc + " -c " + baseFilename + ".cc";
-        exec(cmd, currentDir);
-        cmd = "cp " + baseFilename + ".o" + " " + 
-            filename.substring(0, lastSlash);
+        retVal = exec(cmd, currentDir);
+        if (retVal != 0) return;
+
+        cmd = "mv -f " + baseFilename + ".o" + " .";
         exec(cmd, currentDir);
     }
 
