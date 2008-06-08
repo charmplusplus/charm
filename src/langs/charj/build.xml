@@ -102,8 +102,11 @@
 
     <target name="dist" depends="compile, manifest" 
        description="create jarfiles">
-       <jar jarfile="${buildlib}/charj.jar" basedir="${classes}"
-           manifest="${classes}/META-INF/MANIFEST.MF"/>
+       <jar jarfile="${buildlib}/charj.jar" 
+           basedir="${classes}"
+           manifest="${classes}/META-INF/MANIFEST.MF">
+            <fileset dir="${buildsrc}" includes="**/*.stg" />
+        </jar>
     </target>
 
     <target name="doc" description="generate documentation">
