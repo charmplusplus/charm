@@ -69,8 +69,8 @@ processArgs() {
 }
 
 processArgs "$@"
-if test "$VERBOSE" = "true"
-then
-    echo "java $CHARJ_JFLAGS charj.Main $ARGS $FILES"
-fi
+#if test "$VERBOSE" = "true"
+#then
+#    echo "java $CHARJ_JFLAGS charj.Main $ARGS $FILES"
+#fi
 java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" $ARGS $FILES
