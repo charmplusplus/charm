@@ -9,6 +9,9 @@ import org.antlr.runtime.tree.*;
 import org.antlr.stringtemplate.*;
 import charj.translator.StreamEmitter;
 
+/**
+ * Indicates whether we are working on .ci or .cc output.
+ */
 enum OutputMode {
     cc(".cc"), 
     ci(".ci");
@@ -24,41 +27,64 @@ enum OutputMode {
     }
 }
 
+/**
+ * Driver class for lexing, parsing, and output.
+ * Takes in file names, parses them and generates code
+ * for .ci and .cc files in a .charj directory. Invokes
+ * charmc on these outputs and moves any resulting .o file 
+ * to the appropriate directory.
+ */
 public class Translator {
 
+    // template file locations
     public static final String ccTemplateFile = 
         "charj/translator/CharjCC.stg";
     public static final String ciTemplateFile = 
         "charj/translator/CharjCI.stg";
-    public static boolean debug = true;
-    public static boolean errorCondition = false;
 
-    public static String translate(
-            String filename,
-            String charmc) throws Exception 
+    // variables controlled by command-line arguments
+    public String charmc;
+    public boolean debug;
+    public boolean verbose;
+    public boolean errorCondition;
+
+    public Translator(
+            String _charmc,
+            boolean _debug,
+            boolean _verbose)
+    {
+        charmc = _charmc;
+        debug = _debug;
+        verbose = _verbose;
+
+        errorCondition = false;
+    }
+
+    public String translate(String filename) throws Exception 
     {
         ANTLRFileStream input = new ANTLRFileStream(filename);
             
         CharjLexer lexer = new CharjLexer(input);
-        String output = translationPass(lexer, OutputMode.cc);
-        writeTempFile(filename, output, OutputMode.cc);
-        input.seek(0);
-        output = translationPass(lexer, OutputMode.ci);
-
-        writeTempFile(filename, output, OutputMode.ci);
-        compileTempFiles(filename, charmc);
+        String ciOutput = translationPass(lexer, OutputMode.ci);
+        writeTempFile(filename, ciOutput, OutputMode.ci);
         
-        return output;
+        input.seek(0);
+        String ccOutput = translationPass(lexer, OutputMode.cc);
+        writeTempFile(filename, ccOutput, OutputMode.cc);
+        compileTempFiles(filename, charmc);
+
+        String ciHeader = "-----CI----------------------------\n";
+        String ccHeader = "-----CC----------------------------\n";
+        String footer =   "-----------------------------------\n";
+        return ciHeader + ciOutput + ccHeader + ccOutput + footer;
     }
 
-    private static String translationPass(
+    private String translationPass(
             CharjLexer lexer, 
             OutputMode m) throws
         RecognitionException, IOException, InterruptedException
     {
-        // Use lexer tokens to feed tree parser. Note that the parser is a
-        // rewriter, so a TokenRewriteStream is needed
-        //TokenRewriteStream tokens = new TokenRewriteStream(lexer);
+        // Use lexer tokens to feed tree parser.
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         CharjParser parser = new CharjParser(tokens);
         CharjParser.charjSource_return r = parser.charjSource();
@@ -77,7 +103,13 @@ public class Translator {
         return output;
     }
 
-    private static void writeTempFile(
+    /**
+     * Utility function to write a generated .ci or .cc
+     * file to disk. Takes a .cj filename and writes a .cc
+     * or .ci file to the .charj directory depending on
+     * the OutputMode.
+     */
+    private void writeTempFile(
             String filename, 
             String output,
             OutputMode m) throws
@@ -88,13 +120,20 @@ public class Translator {
         String tempFile = filename.substring(0, lastSlash + 1) + ".charj/";
         new File(tempFile).mkdir();
         tempFile += filename.substring(lastSlash + 1, lastDot) + m.extension();
+        if (verbose) System.out.println("\n [charjc] create: " + tempFile);
         FileWriter fw = new FileWriter(tempFile);
         fw.write(output);
         fw.close();
         return;
     }
 
-    private static void compileTempFiles(
+    /**
+     * Enters the .charj directory and compiles the .cc and .ci files 
+     * generated from the given filename. The given charmc string 
+     * include all options to be passed to charmc. Any generated .o 
+     * file is moved back to the initial directory.
+     */
+    private void compileTempFiles(
             String filename,
             String charmc) throws
         IOException, InterruptedException
@@ -116,10 +155,13 @@ public class Translator {
         exec(cmd, currentDir);
     }
 
-    private static int exec(String cmd, File outputDir) throws
+    /**
+     * Utility function to execute a given command line.
+     */
+    private int exec(String cmd, File outputDir) throws
         IOException, InterruptedException
     {
-        System.out.println("exec: " + cmd);
+        if (verbose) System.out.println("\n [charjc] exec: " + cmd + "\n");
         Process p = Runtime.getRuntime().exec(cmd, null, outputDir);
         StreamEmitter stdout = new StreamEmitter(
                 p.getInputStream(), System.out);
@@ -134,7 +176,7 @@ public class Translator {
         return retVal;
     }
 
-    private static String generateCC(CommonTreeNodeStream nodes) throws
+    private String generateCC(CommonTreeNodeStream nodes) throws
         RecognitionException, IOException, InterruptedException
     {
         CharjCCEmitter emitter = new CharjCCEmitter(nodes);
@@ -144,7 +186,7 @@ public class Translator {
         return st.toString();
     }
 
-    private static String generateCI(CommonTreeNodeStream nodes) throws
+    private String generateCI(CommonTreeNodeStream nodes) throws
         RecognitionException, IOException, InterruptedException
     {
         CharjCIEmitter emitter = new CharjCIEmitter(nodes);
@@ -154,7 +196,7 @@ public class Translator {
         return st.toString();
     }
 
-    private static StringTemplateGroup getTemplates(String templateFile)
+    private StringTemplateGroup getTemplates(String templateFile)
     {
         StringTemplateGroup templates = null;
         try {
@@ -169,7 +211,7 @@ public class Translator {
         return templates;
     }
     
-    private static void error(
+    private void error(
             String sourceName, 
             String msg, 
             CommonTree node) 
@@ -185,19 +227,19 @@ public class Translator {
     }
 
 
-    private static void error(
+    private void error(
             String sourceName, 
             String msg) {
         error(sourceName, msg, (CommonTree)null);
     }
 
 
-    public static void error(String msg) {
+    public void error(String msg) {
         error("charj", msg, (CommonTree)null);
     }
 
 
-    public static void error(
+    public void error(
             String msg, 
             Exception e) {
         error(msg);

@@ -14,5 +14,5 @@ all:
 	$(ANT) all
 
 test:
-	./bin/charjc tests/hello.cj
+	./bin/charjc --debug --verbose --stdout tests/hello.cj
 

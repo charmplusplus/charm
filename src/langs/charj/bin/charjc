@@ -28,9 +28,13 @@ CHARJ_JAR=$CHARJCHOME/../build/lib/charj.jar
 CHARJ_JFLAGS="-classpath $CLASSPATH:$ANTLR_CLASSPATH:$JSAP_JAR:$CHARJ_JAR"
 
 # flag processing
+# We need to aggregate all charmc options into one quoted string, while leaving
+# the charjc options alone.
 VERBOSE=false
 CHARMC=$CHARJCHOME../../../../bin/charmc
+CHARMC_ARGS=
 FILES=
+ARGS=
 processArgs() {
     while [ ! $# -eq 0 ]
     do
@@ -40,20 +44,33 @@ processArgs() {
         case "$arg" in
         "-v"|"--verbose")
             VERBOSE=true
+            ARGS="$ARGS $arg"
+            ;;
+        "--debug")
+            ARGS="$ARGS $arg"
+            ;;
+        "--stdout")
+            ARGS="$ARGS $arg"
             ;;
         "--charmc")
-            CHARMC="$1"
+            CHARMC="$arg"
             shift
             ;;
-        *.*)
+        *.cj)
             FILES="$FILES $arg"
+            ;;
+        --*|-*)
+            # unrecognized options are passed through to charmc
+            CHARMC_ARGS="$CHARMC_ARGS $arg"
+            ;;
         esac
     done
+    CHARMC="$CHARMC $CHARMC_ARGS"
 }
 
 processArgs "$@"
 if test "$VERBOSE" = "true"
 then
-    echo "java $CHARJ_JFLAGS charj.Main $FILES"
+    echo "java $CHARJ_JFLAGS charj.Main $ARGS $FILES"
 fi
-java $CHARJ_JFLAGS charj.Main --charmc $CHARMC $FILES
+java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" $ARGS $FILES
