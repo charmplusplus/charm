@@ -9,26 +9,9 @@ import org.antlr.runtime.tree.*;
 import org.antlr.stringtemplate.*;
 import charj.translator.StreamEmitter;
 
-/**
- * Indicates whether we are working on .ci or .cc output.
- */
-enum OutputMode {
-    cc(".cc"), 
-    ci(".ci");
-
-    private final String extension;
-
-    OutputMode(String ext) {
-        this.extension = ext;
-    }
-
-    public String extension() {
-        return extension;
-    }
-}
 
 /**
- * Driver class for lexing, parsing, and output.
+ * Driver class for lm_exing, parsing, and output.
  * Takes in file names, parses them and generates code
  * for .ci and .cc files in a .charj directory. Invokes
  * charmc on these outputs and moves any resulting .o file 
@@ -37,27 +20,24 @@ enum OutputMode {
 public class Translator {
 
     // template file locations
-    public static final String ccTemplateFile = 
-        "charj/translator/CharjCC.stg";
-    public static final String ciTemplateFile = 
-        "charj/translator/CharjCI.stg";
+    public static final String templateFile = "charj/translator/Charj.stg";
 
     // variables controlled by command-line arguments
-    public String charmc;
-    public boolean debug;
-    public boolean verbose;
-    public boolean errorCondition;
+    public String m_charmc;
+    public boolean m_debug;
+    public boolean m_verbose;
+    public boolean m_errorCondition;
 
     public Translator(
             String _charmc,
             boolean _debug,
             boolean _verbose)
     {
-        charmc = _charmc;
-        debug = _debug;
-        verbose = _verbose;
+        m_charmc = _charmc;
+        m_debug = _debug;
+        m_verbose = _verbose;
 
-        errorCondition = false;
+        m_errorCondition = false;
     }
 
     public String translate(String filename) throws Exception 
@@ -71,7 +51,7 @@ public class Translator {
         input.seek(0);
         String ccOutput = translationPass(lexer, OutputMode.cc);
         writeTempFile(filename, ccOutput, OutputMode.cc);
-        compileTempFiles(filename, charmc);
+        compileTempFiles(filename, m_charmc);
 
         String ciHeader = "-----CI----------------------------\n";
         String ccHeader = "-----CC----------------------------\n";
@@ -95,11 +75,7 @@ public class Translator {
         nodes.setTokenStream(tokens);
 
         String output = null;
-        if (m == OutputMode.cc) {
-            output = generateCC(nodes);
-        } else if (OutputMode.ci == m) {
-            output = generateCI(nodes);
-        }
+        output = emit(nodes, m);
         return output;
     }
 
@@ -120,7 +96,7 @@ public class Translator {
         String tempFile = filename.substring(0, lastSlash + 1) + ".charj/";
         new File(tempFile).mkdir();
         tempFile += filename.substring(lastSlash + 1, lastDot) + m.extension();
-        if (verbose) System.out.println("\n [charjc] create: " + tempFile);
+        if (m_verbose) System.out.println("\n [charjc] create: " + tempFile);
         FileWriter fw = new FileWriter(tempFile);
         fw.write(output);
         fw.close();
@@ -161,7 +137,7 @@ public class Translator {
     private int exec(String cmd, File outputDir) throws
         IOException, InterruptedException
     {
-        if (verbose) System.out.println("\n [charjc] exec: " + cmd + "\n");
+        if (m_verbose) System.out.println("\n [charjc] exec: " + cmd + "\n");
         Process p = Runtime.getRuntime().exec(cmd, null, outputDir);
         StreamEmitter stdout = new StreamEmitter(
                 p.getInputStream(), System.out);
@@ -176,23 +152,15 @@ public class Translator {
         return retVal;
     }
 
-    private String generateCC(CommonTreeNodeStream nodes) throws
+    private String emit(
+            CommonTreeNodeStream nodes, 
+            OutputMode m) throws
         RecognitionException, IOException, InterruptedException
     {
-        CharjCCEmitter emitter = new CharjCCEmitter(nodes);
-        StringTemplateGroup templates = getTemplates(ccTemplateFile);
+        CharjEmitter emitter = new CharjEmitter(nodes);
+        StringTemplateGroup templates = getTemplates(templateFile);
         emitter.setTemplateLib(templates);
-        StringTemplate st = (StringTemplate)emitter.charjSource().getTemplate();
-        return st.toString();
-    }
-
-    private String generateCI(CommonTreeNodeStream nodes) throws
-        RecognitionException, IOException, InterruptedException
-    {
-        CharjCIEmitter emitter = new CharjCIEmitter(nodes);
-        StringTemplateGroup templates = getTemplates(ciTemplateFile);
-        emitter.setTemplateLib(templates);
-        StringTemplate st = (StringTemplate)emitter.charjSource().getTemplate();
+        StringTemplate st = (StringTemplate)emitter.charjSource(m).getTemplate();
         return st.toString();
     }
 
@@ -202,7 +170,8 @@ public class Translator {
         try {
             ClassLoader loader = Thread.currentThread().getContextClassLoader();
             InputStream istream = loader.getResourceAsStream(templateFile);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(istream));
+            BufferedReader reader = 
+                new BufferedReader(new InputStreamReader(istream));
             templates = new StringTemplateGroup(reader);
             reader.close();
         } catch(IOException ex) {
@@ -216,7 +185,7 @@ public class Translator {
             String msg, 
             CommonTree node) 
     {
-        errorCondition = true;
+        m_errorCondition = true;
         String linecol = ":";
         if ( node!=null ) {
             CommonToken t = (CommonToken)node.getToken();

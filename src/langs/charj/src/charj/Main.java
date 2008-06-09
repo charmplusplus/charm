@@ -7,17 +7,17 @@ import com.martiansoftware.jsap.*;
 
 public class Main 
 {
-    public static String charmc;
-    public static boolean debug;
-    public static boolean verbose;
-    public static boolean stdout;
+    public static String m_charmc;
+    public static boolean m_debug;
+    public static boolean m_verbose;
+    public static boolean m_stdout;
 
     public static void main(String[] args) throws Exception
     {
         String[] files = processArgs(args);
-        Translator t = new Translator(charmc, debug, verbose);
+        Translator t = new Translator(m_charmc, m_debug, m_verbose);
         for (String filename : files) { 
-            if (!stdout) {
+            if (!m_stdout) {
                 t.translate(filename);
             } else {
                 String header = "\n\n" + filename + "\n";
@@ -74,10 +74,10 @@ public class Main
             System.exit(1);
         }
 
-        charmc = config.getString("charmc") + charmcFlags;
-        debug = config.getBoolean("debug", false);
-        verbose = config.getBoolean("verbose", false);
-        stdout = config.getBoolean("stdout", false);
+        m_charmc = config.getString("charmc") + charmcFlags;
+        m_debug = config.getBoolean("debug", false);
+        m_verbose = config.getBoolean("verbose", false);
+        m_stdout = config.getBoolean("stdout", false);
         String[] files = config.getStringArray("files");
         return files;
     }

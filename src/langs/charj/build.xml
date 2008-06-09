@@ -81,9 +81,7 @@
     </target>
 
     <target name="CharjEmitter" depends="Charj">
-        <antlr3 grammar.name="CharjCCEmitter.g" 
-            grammar.path="${buildsrc}/charj/translator"/>
-        <antlr3 grammar.name="CharjCIEmitter.g" 
+        <antlr3 grammar.name="CharjEmitter.g" 
             grammar.path="${buildsrc}/charj/translator"/>
     </target>
 

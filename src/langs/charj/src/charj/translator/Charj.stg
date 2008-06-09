@@ -1,10 +1,114 @@
 group Charj;
 
-classExtends(type) ::= ": public CBase_<type>"
-
-
-interfaceExtends(ts) ::=
+charjSource_ci(pd, ids, tds) ::= 
+//<pd>
+//<ids>
 <<
-: public CBase_<ts; separator=", public CBase_">
+<tds>
 >>
+
+
+charjSource_cc(pd, ids, tds) ::= 
+<<
+<pd>
+<ids>
+<tds>
+>>
+
+
+classExtends_ci(type) ::= "<type>"
+
+
+classExtends_cc(type) ::= ": public CBase_<type>"
+
+
+interfaceExtends_ci(ts) ::=
+<<
+: public <ts; separator=", public ">
+>>
+
+
+interfaceExtends_cc(ts) ::=
+<<
+: public <ts; separator=", public ">
+>>
+
+
+classDeclaration_ci(mod, ident, gen, ext, impl, ctls) ::=
+<<
+module <ident> {
+    <ident> <gen>: public <ext> {
+        <ctls>
+    }
+}
+
+>>
+
+
+classDeclaration_cc(mod, ident, gen, ext, impl, ctls) ::=
+<<
+
+
+#include "<ident>.decl.h"
+<mod> class <ident> <gen>: public CBase_<ident> <impl> {
+    <ctls>
+};
+#include "<ident>.def.h"
+
+
+>>
+
+
+classTopLevelScope_ci(classScopeDeclarations) ::= 
+<<
+// _classTopLevelScope_
+<classScopeDeclarations; separator="\n">
+// _!classTopLevelScope_
+>>
+
+
+classTopLevelScope_cc(classScopeDeclarations) ::= 
+<<
+// _classTopLevelScope_
+<classScopeDeclarations; separator="\n">
+// _!classTopLevelScope_
+>>
+
+
+funcMethodDecl_cc(modl, 
+            gtpl,
+            ty,
+            id,
+            fpl,
+            adl,
+            tc,
+            block) ::=
+<<
+<modl>: <ty> <gtpl> <id><fpl> <adl> <tc> <block>
+>>
+
+
+voidMethodDecl_ci(modl, gtpl, id, fpl, tc, block) ::=
+<<
+entry void<gtpl> <id><fpl> <tc>;
+>>
+
+
+voidMethodDecl_cc(modl, gtpl, id, fpl, tc, block) ::=
+<<
+<modl>: void<gtpl> <id><fpl> <tc> <block>
+>>
+
+
+ctorDecl_ci(modl, gtpl, id, fpl, tc, block) ::=
+<<
+entry<gtpl> <id><fpl> <tc>;
+>>
+
+
+ctorDecl_cc(modl, gtpl, id, fpl, tc, block) ::=
+<<
+<modl>:<gtpl> <id><fpl> <tc> <block>
+>>
+
 
