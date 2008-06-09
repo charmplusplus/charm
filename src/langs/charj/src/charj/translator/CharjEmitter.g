@@ -108,22 +108,32 @@ importDeclaration
     ;
     
 typeDeclaration
-    :   ^(CLASS m=modifierList IDENT g=genericTypeParameterList? e=classExtendsClause? i=implementsClause? c=classTopLevelScope) 
+    :   ^(CLASS m=modifierList IDENT g=genericTypeParameterList? 
+                e=classExtendsClause? i=implementsClause? c=classTopLevelScope) 
         -> {emitCC()}? classDeclaration_cc(
-            mod={$m.st}, 
-            ident={$IDENT.text}, 
-            gen={$g.st}, 
-            ext={$e.st}, 
-            impl={$i.st},
-            ctls={$c.st})
-        -> classDeclaration_ci(
-            mod={$m.st}, 
-            ident={$IDENT.text}, 
-            gen={$g.st}, 
-            ext={$e.st}, 
-            impl={$i.st},
-            ctls={$c.st})
-    |   ^(INTERFACE modifierList IDENT genericTypeParameterList? interfaceExtendsClause? interfaceTopLevelScope)
+                mod={$m.st}, 
+                ident={$IDENT.text}, 
+                gen={$g.st}, 
+                ext={$e.st}, 
+                impl={$i.st},
+                ctls={$c.st})
+        -> {emitCI()}? classDeclaration_ci(
+                mod={$m.st}, 
+                ident={$IDENT.text}, 
+                gen={$g.st}, 
+                ext={$e.st}, 
+                impl={$i.st},
+                ctls={$c.st})
+        -> {emitH()}? classDeclaration_h(
+                mod={$m.st}, 
+                ident={$IDENT.text}, 
+                gen={$g.st}, 
+                ext={$e.st}, 
+                impl={$i.st},
+                ctls={$c.st})
+        ->
+    |   ^(INTERFACE modifierList IDENT genericTypeParameterList? 
+                interfaceExtendsClause? interfaceTopLevelScope)
         -> template(t={$text}) "<t>"
     |   ^(ENUM modifierList IDENT implementsClause? enumTopLevelScope)
         -> template(t={$text}) "<t>"
@@ -132,14 +142,14 @@ typeDeclaration
 
 classExtendsClause
     :   ^(EXTENDS_CLAUSE t=type) 
-        -> {emitCC()}? classExtends_cc(type={$t.st})
-        -> classExtends_ci(type={$t.st})
+        -> {emitCC() || emitH()}? classExtends_cc(type={$t.st})
+        -> {emitCI()}? classExtends_ci(type={$t.st})
+        ->
     ;   
 
 interfaceExtendsClause 
     :   ^(EXTENDS_CLAUSE (typeList+=type)+) 
-        -> {emitCC()}? interfaceExtends_cc(ts={$typeList})
-        -> interfaceExtends_ci(ts={$typeList})
+        -> interfaceExtends(ts={$typeList})
     ;   
     
 implementsClause
@@ -175,8 +185,7 @@ enumConstant
     
 classTopLevelScope
     :   ^(CLASS_TOP_LEVEL_SCOPE (csd+=classScopeDeclarations)*) 
-        -> {emitCC()}? classTopLevelScope_cc(classScopeDeclarations={$csd})
-        -> classTopLevelScope_ci(classScopeDeclarations={$csd})
+        -> classTopLevelScope(classScopeDeclarations={$csd})
     ;
     
 classScopeDeclarations
@@ -186,32 +195,50 @@ classScopeDeclarations
         -> template(t={$text}) "/*csi*/ <t>"
     |   ^(FUNCTION_METHOD_DECL m=modifierList g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
-            tt=throwsClause? b=block?)
-        -> funcMethodDecl_cc(
-            modl={$m.st}, 
-            gtpl={$g.st}, 
-            ty={$t.text},
-            id={$IDENT.text}, 
-            fpl={$f.st}, 
-            adl={$a.st},
-            tc={$tt.st}, 
-            block={$b.st})
+            tc=throwsClause? b=block?)
+        -> {emitCC()}? funcMethodDecl_cc(
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                ty={$ty.text},
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                adl={$a.st},
+                tc={$tc.st}, 
+                block={$b.st})
+        -> {emitH()}? funcMethodDecl_h(
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                ty={$ty.text},
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                adl={$a.st},
+                tc={$tc.st}, 
+                block={$b.st})
+        ->
     |   ^(VOID_METHOD_DECL m=modifierList g=genericTypeParameterList? IDENT 
             f=formalParameterList t=throwsClause? b=block?)
         -> {emitCC()}? voidMethodDecl_cc(
-            modl={$m.st}, 
-            gtpl={$g.st}, 
-            id={$IDENT.text}, 
-            fpl={$f.st}, 
-            tc={$t.st}, 
-            block={$b.st})
-        -> voidMethodDecl_ci(
-            modl={$m.st}, 
-            gtpl={$g.st}, 
-            id={$IDENT.text}, 
-            fpl={$f.st}, 
-            tc={$t.st}, 
-            block={$b.st})
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                tc={$t.st}, 
+                block={$b.st})
+        -> {emitCI()}? voidMethodDecl_ci(
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                tc={$t.st}, 
+                block={$b.st})
+        -> {emitH()}? voidMethodDecl_h(
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                tc={$t.st}, 
+                block={$b.st})
+        ->
 
 // template(t={$text}) "/*voidmethod*/ <t>"
     |   ^(VAR_DECLARATION modifierList type variableDeclaratorList)
@@ -219,20 +246,27 @@ classScopeDeclarations
     |   ^(CONSTRUCTOR_DECL m=modifierList g=genericTypeParameterList? IDENT f=formalParameterList 
             t=throwsClause? b=block)
         -> {emitCC()}? ctorDecl_cc(
-            modl={$m.st}, 
-            gtpl={$g.st}, 
-            id={$IDENT.text}, 
-            fpl={$f.st}, 
-            tc={$t.st}, 
-            block={$b.st})
-        -> ctorDecl_ci(
-            modl={$m.st}, 
-            gtpl={$g.st}, 
-            id={$IDENT.text}, 
-            fpl={$f.st}, 
-            tc={$t.st}, 
-            block={$b.st})
-        //-> template(t={$text}) "ctor <t>"
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                tc={$t.st}, 
+                block={$b.st})
+        -> {emitCI()}? ctorDecl_ci(
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                tc={$t.st}, 
+                block={$b.st})
+        -> {emitH()}? ctorDecl_h(
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                tc={$t.st}, 
+                block={$b.st})
+        ->
     |   d=typeDeclaration
         -> template(t={$d.st}) "type <t>"
     ;

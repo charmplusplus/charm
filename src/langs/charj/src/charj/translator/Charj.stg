@@ -22,13 +22,7 @@ classExtends_ci(type) ::= "<type>"
 classExtends_cc(type) ::= ": public CBase_<type>"
 
 
-interfaceExtends_ci(ts) ::=
-<<
-: public <ts; separator=", public ">
->>
-
-
-interfaceExtends_cc(ts) ::=
+interfaceExtends(ts) ::=
 <<
 : public <ts; separator=", public ">
 >>
@@ -37,7 +31,7 @@ interfaceExtends_cc(ts) ::=
 classDeclaration_ci(mod, ident, gen, ext, impl, ctls) ::=
 <<
 module <ident> {
-    <ident> <gen>: public <ext> {
+    chare <ident> <gen>: <ext> {
         <ctls>
     }
 }
@@ -45,12 +39,23 @@ module <ident> {
 >>
 
 
+classDeclaration_h(mod, ident, gen, ext, impl, ctls) ::=
+<<
+
+
+class <ident> <gen>: public CBase_<ident> <impl> {
+    <ctls>
+};
+
+
+>>
+
 classDeclaration_cc(mod, ident, gen, ext, impl, ctls) ::=
 <<
 
 
 #include "<ident>.decl.h"
-<mod> class <ident> <gen>: public CBase_<ident> <impl> {
+class <ident> <gen>: public CBase_<ident> <impl> {
     <ctls>
 };
 #include "<ident>.def.h"
@@ -59,7 +64,7 @@ classDeclaration_cc(mod, ident, gen, ext, impl, ctls) ::=
 >>
 
 
-classTopLevelScope_ci(classScopeDeclarations) ::= 
+classTopLevelScope(classScopeDeclarations) ::= 
 <<
 // _classTopLevelScope_
 <classScopeDeclarations; separator="\n">
@@ -67,11 +72,16 @@ classTopLevelScope_ci(classScopeDeclarations) ::=
 >>
 
 
-classTopLevelScope_cc(classScopeDeclarations) ::= 
+funcMethodDecl_h(modl, 
+            gtpl,
+            ty,
+            id,
+            fpl,
+            adl,
+            tc,
+            block) ::=
 <<
-// _classTopLevelScope_
-<classScopeDeclarations; separator="\n">
-// _!classTopLevelScope_
+<modl>: <ty> <gtpl> <id><fpl> <adl> <tc>;
 >>
 
 
@@ -94,6 +104,12 @@ entry void<gtpl> <id><fpl> <tc>;
 >>
 
 
+voidMethodDecl_h(modl, gtpl, id, fpl, tc, block) ::=
+<<
+<modl>: void<gtpl> <id><fpl> <tc>;
+>>
+
+
 voidMethodDecl_cc(modl, gtpl, id, fpl, tc, block) ::=
 <<
 <modl>: void<gtpl> <id><fpl> <tc> <block>
@@ -103,6 +119,12 @@ voidMethodDecl_cc(modl, gtpl, id, fpl, tc, block) ::=
 ctorDecl_ci(modl, gtpl, id, fpl, tc, block) ::=
 <<
 entry<gtpl> <id><fpl> <tc>;
+>>
+
+
+ctorDecl_h(modl, gtpl, id, fpl, tc, block) ::=
+<<
+<modl>:<gtpl> <id><fpl> <tc>;
 >>
 
 

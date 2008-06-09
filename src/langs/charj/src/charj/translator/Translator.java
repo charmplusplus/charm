@@ -7,7 +7,6 @@ import java.io.*;
 import org.antlr.runtime.*;
 import org.antlr.runtime.tree.*;
 import org.antlr.stringtemplate.*;
-import charj.translator.StreamEmitter;
 
 
 /**
@@ -103,7 +102,7 @@ public class Translator {
         String tempFile = filename.substring(0, lastSlash + 1) + ".charj/";
         new File(tempFile).mkdir();
         tempFile += filename.substring(lastSlash + 1, lastDot) + m.extension();
-        if (m_verbose) System.out.println("\n [charjc] create: " + tempFile);
+        if (m_verbose) System.out.println(" [charjc] create: " + tempFile);
         FileWriter fw = new FileWriter(tempFile);
         fw.write(output);
         fw.close();
@@ -123,17 +122,34 @@ public class Translator {
     {
         int lastDot = filename.lastIndexOf(".");
         int lastSlash = filename.lastIndexOf("/");
-        String baseFilename = filename.substring(0, lastSlash + 1) + 
-            ".charj/" + filename.substring(lastSlash + 1, lastDot);
-        String cmd = charmc + " " + baseFilename + ".ci";
+        String baseDirectory = filename.substring(0, lastSlash + 1);
+        String tempDirectory = baseDirectory + ".charj/";
+        String moduleName = filename.substring(lastSlash + 1, lastDot);
+        String baseTempFilename = tempDirectory + moduleName;
+
+        // Compile interface file
+        String cmd = charmc + " " + baseTempFilename + ".ci";
         File currentDir = new File(".");
         int retVal = exec(cmd, currentDir);
         if (retVal != 0) {
             error("Could not compile generated interface file");
             return;
         }
-        
-        cmd = charmc + " -c " + baseFilename + ".cc";
+
+        // Move decl.h and def.h into temp directory.
+        // charmxi/charmc doesn't offer control over where to generate these
+        cmd = "mv " + moduleName + ".decl.h " + moduleName + ".def.h " +
+            tempDirectory;
+        retVal = exec(cmd, currentDir);
+         if (retVal != 0) {
+            error("Could not move .decl.h and .def.h files " +
+                    "into temp directory");
+            return;
+        }       
+
+        // Compile c++ output
+        cmd = charmc + " -c " + baseTempFilename + ".cc" + 
+            " -o " + baseTempFilename + ".o";
         retVal = exec(cmd, currentDir);
         if (retVal != 0) {
             error("Could not compile generated C++ file");
@@ -141,9 +157,9 @@ public class Translator {
         }
 
         // move generated .o and .h file into .cj directory
-        cmd = "mv -f " + baseFilename + ".o" + " .";
+        cmd = "mv -f " + baseTempFilename + ".o " + baseDirectory;
         exec(cmd, currentDir);
-        cmd = "cp -f " + baseFilename + ".h" + " .";
+        cmd = "cp -f " + baseTempFilename + ".h " + baseDirectory;
         exec(cmd, currentDir);
     }
 
@@ -153,7 +169,7 @@ public class Translator {
     private int exec(String cmd, File outputDir) throws
         IOException, InterruptedException
     {
-        if (m_verbose) System.out.println("\n [charjc] exec: " + cmd + "\n");
+        if (m_verbose) System.out.println(" [charjc] exec: " + cmd);
         Process p = Runtime.getRuntime().exec(cmd, null, outputDir);
         StreamEmitter stdout = new StreamEmitter(
                 p.getInputStream(), System.out);
