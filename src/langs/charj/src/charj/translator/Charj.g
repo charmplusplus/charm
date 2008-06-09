@@ -12,7 +12,7 @@ options {
     backtrack = true; 
     memoize = true;
     output = AST;
-    ASTLabelType = CommonTree;
+    ASTLabelType = CharjAST;
 }
 
 tokens {

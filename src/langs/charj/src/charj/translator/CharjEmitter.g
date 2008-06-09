@@ -8,7 +8,7 @@ options {
     backtrack = true; 
     memoize = true;
     tokenVocab = Charj;
-    ASTLabelType = CommonTree;
+    ASTLabelType = CharjAST;
     output = template;
 }
 
@@ -38,7 +38,7 @@ package charj.translator;
      *
      *  The default value is <code>false</code>.
      *
-     *  @param pNewState  <code>true</code> if error messages should be collected.
+     *  @param newState  <code>true</code> if error messages should be collected.
      */
     public void enableErrorMessageCollection(boolean newState) {
         m_messageCollectionEnabled = newState;
@@ -54,7 +54,7 @@ package charj.translator;
      *  The actual behaviour depends on whether collecting error messages
      *  has been enabled or not.
      *
-     *  @param pMessage  The error message.
+     *  @param message  The error message.
      */
      @Override
     public void emitErrorMessage(String message) {

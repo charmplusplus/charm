@@ -70,7 +70,7 @@ public class Translator {
             OutputMode m) throws
         RecognitionException, IOException, InterruptedException
     {
-        // Use lexer tokens to feed tree parser.
+        // Use lexer tokens to feed tree parser
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         CharjParser parser = new CharjParser(tokens);
         CharjParser.charjSource_return r = parser.charjSource();
@@ -80,8 +80,7 @@ public class Translator {
         CommonTreeNodeStream nodes = new CommonTreeNodeStream(t);
         nodes.setTokenStream(tokens);
 
-        String output = null;
-        output = emit(nodes, m);
+        String output = emit(nodes, m);
         return output;
     }
 
@@ -112,7 +111,7 @@ public class Translator {
     /**
      * Enters the .charj directory and compiles the .cc and .ci files 
      * generated from the given filename. The given charmc string 
-     * include all options to be passed to charmc. Any generated .o 
+     * includes all options to be passed to charmc. Any generated .o 
      * file is moved back to the initial directory.
      */
     private void compileTempFiles(
@@ -123,6 +122,9 @@ public class Translator {
         int lastDot = filename.lastIndexOf(".");
         int lastSlash = filename.lastIndexOf("/");
         String baseDirectory = filename.substring(0, lastSlash + 1);
+        if (baseDirectory.equals("")) {
+            baseDirectory = "./";
+        }
         String tempDirectory = baseDirectory + ".charj/";
         String moduleName = filename.substring(lastSlash + 1, lastDot);
         String baseTempFilename = tempDirectory + moduleName;
