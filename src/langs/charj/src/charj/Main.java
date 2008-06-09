@@ -35,7 +35,7 @@ public class Main
             .setRequired(true)
             .setShortFlag(JSAP.NO_SHORTFLAG)
             .setLongFlag("charmc");
-        _charmc.setHelp("charm compiler used on generated charm code");
+        _charmc.setHelp("Charm compiler used on generated charm code.");
         processor.registerParameter(_charmc);
 
         Switch _debug = new Switch("debug")
