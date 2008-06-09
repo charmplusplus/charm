@@ -11,7 +11,7 @@ import charj.translator.StreamEmitter;
 
 
 /**
- * Driver class for lm_exing, parsing, and output.
+ * Driver class for lexing, parsing, and output.
  * Takes in file names, parses them and generates code
  * for .ci and .cc files in a .charj directory. Invokes
  * charmc on these outputs and moves any resulting .o file 
@@ -36,7 +36,6 @@ public class Translator {
         m_charmc = _charmc;
         m_debug = _debug;
         m_verbose = _verbose;
-
         m_errorCondition = false;
     }
 
@@ -47,16 +46,24 @@ public class Translator {
         CharjLexer lexer = new CharjLexer(input);
         String ciOutput = translationPass(lexer, OutputMode.ci);
         writeTempFile(filename, ciOutput, OutputMode.ci);
+
+        input.seek(0);
+        String hOutput = translationPass(lexer, OutputMode.h);
+        writeTempFile(filename, hOutput, OutputMode.h);
         
         input.seek(0);
         String ccOutput = translationPass(lexer, OutputMode.cc);
         writeTempFile(filename, ccOutput, OutputMode.cc);
         compileTempFiles(filename, m_charmc);
 
+        // Build a string representing all emitted code. This will be printed
+        // by the main driver if requested via command-line argument. 
         String ciHeader = "-----CI----------------------------\n";
+        String hHeader  = "-----H-----------------------------\n";
         String ccHeader = "-----CC----------------------------\n";
-        String footer =   "-----------------------------------\n";
-        return ciHeader + ciOutput + ccHeader + ccOutput + footer;
+        String footer   = "-----------------------------------\n";
+        return ciHeader + ciOutput + hHeader + hOutput + 
+            ccHeader + ccOutput + footer;
     }
 
     private String translationPass(
@@ -121,13 +128,22 @@ public class Translator {
         String cmd = charmc + " " + baseFilename + ".ci";
         File currentDir = new File(".");
         int retVal = exec(cmd, currentDir);
-        if (retVal != 0) return;
+        if (retVal != 0) {
+            error("Could not compile generated interface file");
+            return;
+        }
         
         cmd = charmc + " -c " + baseFilename + ".cc";
         retVal = exec(cmd, currentDir);
-        if (retVal != 0) return;
+        if (retVal != 0) {
+            error("Could not compile generated C++ file");
+            return;
+        }
 
+        // move generated .o and .h file into .cj directory
         cmd = "mv -f " + baseFilename + ".o" + " .";
+        exec(cmd, currentDir);
+        cmd = "cp -f " + baseFilename + ".h" + " .";
         exec(cmd, currentDir);
     }
 
@@ -189,9 +205,9 @@ public class Translator {
         String linecol = ":";
         if ( node!=null ) {
             CommonToken t = (CommonToken)node.getToken();
-            linecol = "line " + t.getLine() + ":" + t.getCharPositionInLine();
+            linecol = ": line " + t.getLine() + ":" + t.getCharPositionInLine();
         }
-        System.err.println(sourceName + ": " + linecol + " " + msg);
+        System.err.println(sourceName + linecol + " " + msg);
         System.err.flush();
     }
 
@@ -204,7 +220,7 @@ public class Translator {
 
 
     public void error(String msg) {
-        error("charj", msg, (CommonTree)null);
+        error(" [charjc] error", msg, (CommonTree)null);
     }
 
 
