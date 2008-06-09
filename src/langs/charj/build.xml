@@ -123,12 +123,10 @@
     </target>
 
     <target name="clean" description="clean up">
-       <delete>
-          <fileset dir="${buildsrc}" />
-          <fileset dir="${classes}" />
-          <fileset dir="${buildlib}" />
-          <fileset dir="${doc}" />
-       </delete>
+        <echo message="removing build directory" />
+        <delete includeEmptyDirs="true">
+            <fileset dir="${build}" />
+        </delete>
     </target>
     
     <target name="all" depends="clean, dist, doc" 
