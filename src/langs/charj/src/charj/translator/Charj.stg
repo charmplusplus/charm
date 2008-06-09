@@ -101,6 +101,19 @@ funcMethodDecl_h(modl,
 >>
 
 
+funcMethodDecl_ci(modl, 
+            gtpl,
+            ty,
+            id,
+            fpl,
+            adl,
+            tc,
+            block) ::=
+<<
+entry <ty> <gtpl> <id><fpl> <adl> <tc>;
+>>
+
+
 funcMethodDecl_cc(modl, 
             gtpl,
             ty,

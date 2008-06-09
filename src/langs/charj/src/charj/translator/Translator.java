@@ -38,6 +38,19 @@ public class Translator {
         m_errorCondition = false;
     }
 
+    public static TreeAdaptor adaptor = new CommonTreeAdaptor() {
+        public Object create(Token token) {
+            return new CharjAST(token);
+        }
+        
+        public Object dupNode(Object t) {
+            if (t == null) {
+                return null;
+            }
+            return create(((CharjAST)t).token);
+        }
+    };
+
     public String translate(String filename) throws Exception 
     {
         ANTLRFileStream input = new ANTLRFileStream(filename);
@@ -73,12 +86,14 @@ public class Translator {
         // Use lexer tokens to feed tree parser
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         CharjParser parser = new CharjParser(tokens);
+        parser.setTreeAdaptor(adaptor);
         CharjParser.charjSource_return r = parser.charjSource();
 
         // Create node stream for emitters
         CommonTree t = (CommonTree)r.getTree();
         CommonTreeNodeStream nodes = new CommonTreeNodeStream(t);
         nodes.setTokenStream(tokens);
+        nodes.setTreeAdaptor(adaptor);
 
         String output = emit(nodes, m);
         return output;

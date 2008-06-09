@@ -296,7 +296,7 @@ typeDeclaration
         )
     ;
     
-classTypeDeclaration[CommonTree modifiers]
+classTypeDeclaration[CharjAST modifiers]
     :   CLASS IDENT genericTypeParameterList? classExtendsClause? implementsClause? classBody
         ->  ^(CLASS {$modifiers} IDENT genericTypeParameterList? classExtendsClause? implementsClause? classBody)
     ;
@@ -341,7 +341,7 @@ bound
         ->  ^(EXTENDS_BOUND_LIST[$EXTENDS, "EXTENDS_BOUND_LIST"] type+)
     ;
 
-enumTypeDeclaration[CommonTree modifiers]
+enumTypeDeclaration[CharjAST modifiers]
     :   ENUM IDENT implementsClause? enumBody
         ->  ^(ENUM {$modifiers} IDENT implementsClause? enumBody)
     ;
@@ -368,7 +368,7 @@ enumConstant
     :   IDENT^ arguments? classBody?
     ;
     
-interfaceTypeDeclaration[CommonTree modifiers]
+interfaceTypeDeclaration[CharjAST modifiers]
     :   INTERFACE IDENT genericTypeParameterList? interfaceExtendsClause? interfaceBody
         ->  ^(INTERFACE {$modifiers} IDENT genericTypeParameterList? interfaceExtendsClause? interfaceBody)
     ;

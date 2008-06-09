@@ -191,6 +191,7 @@ classTopLevelScope
     ;
     
 classScopeDeclarations
+//@init { boolean entry = false; }
     :   ^(CLASS_INSTANCE_INITIALIZER block)
         -> template(t={$text}) "/*cii*/ <t>"
     |   ^(CLASS_STATIC_INITIALIZER block)
@@ -198,6 +199,15 @@ classScopeDeclarations
     |   ^(FUNCTION_METHOD_DECL m=modifierList g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             tc=throwsClause? b=block?)
+//        { 
+//            // determine whether this is an entry method
+//            CharjAST modList = (CharjAST)$m.start;
+//            for (CharjAST mod : (List<CharjAST>)modList.getChildren()) {
+//                if (mod.token.getType() == ENTRY) {
+//                    entry = true;
+//                }
+//            }
+//        }
         -> {emitCC()}? funcMethodDecl_cc(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
@@ -216,6 +226,15 @@ classScopeDeclarations
                 adl={$a.st},
                 tc={$tc.st}, 
                 block={$b.st})
+//        -> {(emitCI() && entry)}? funcMethodDecl_ci(
+//                modl={$m.st}, 
+//                gtpl={$g.st}, 
+//                ty={$ty.text},
+//                id={$IDENT.text}, 
+//                fpl={$f.st}, 
+//                adl={$a.st},
+//                tc={$tc.st}, 
+//                block={$b.st})
         ->
     |   ^(VOID_METHOD_DECL m=modifierList g=genericTypeParameterList? IDENT 
             f=formalParameterList t=throwsClause? b=block?)
