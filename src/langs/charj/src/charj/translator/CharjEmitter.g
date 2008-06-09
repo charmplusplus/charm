@@ -94,7 +94,9 @@ charjSource[OutputMode m]
 }
     :   ^(CHARJ_SOURCE (p=packageDeclaration)? (i+=importDeclaration)* (t+=typeDeclaration)*)
         -> {emitCC()}? charjSource_cc(pd={$p.st}, ids={$i}, tds={$t})
-        -> charjSource_ci(pd={$p.st}, ids={$i}, tds={$t})
+        -> {emitCI()}? charjSource_ci(pd={$p.st}, ids={$i}, tds={$t})
+        -> {emitH()}? charjSource_h(pd={$p.st}, ids={$i}, tds={$t})
+        ->
     ;
 
 packageDeclaration
@@ -142,7 +144,7 @@ typeDeclaration
 
 classExtendsClause
     :   ^(EXTENDS_CLAUSE t=type) 
-        -> {emitCC() || emitH()}? classExtends_cc(type={$t.st})
+        -> {emitCC() || emitH()}? classExtends_cc_h(type={$t.st})
         -> {emitCI()}? classExtends_ci(type={$t.st})
         ->
     ;   
