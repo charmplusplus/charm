@@ -799,7 +799,7 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 #elif CMK_USE_IBVERBS
 
 #include "machine-ibverbs.c"
-#define BARRIER_NULL           1
+/*#define BARRIER_NULL           1*/
 
 #else
 
