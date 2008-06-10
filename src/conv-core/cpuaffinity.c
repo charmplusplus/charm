@@ -362,6 +362,8 @@ void CmiInitCPUAffinity(char **argv)
 
 #else           /* not supporting affinity */
 
+int excludecore = -1;
+
 void CmiInitCPUAffinity(char **argv)
 {
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
