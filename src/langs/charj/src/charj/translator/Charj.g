@@ -69,7 +69,11 @@ tokens {
     XOR                     = '^'               ;
     XOR_ASSIGN              = '^='              ;
 
-    // keywords
+    // Charj-specific operators
+    DOUBLE_LCURLY           = '{{'              ;
+    DOUBLE_RCURLY           = '}}'              ;
+
+    // Keywords common to Java and Charj
     
     ABSTRACT                = 'abstract'        ;
     ASSERT                  = 'assert'          ;
@@ -82,6 +86,7 @@ tokens {
     CLASS                   = 'class'           ;
     CONTINUE                = 'continue'        ;
     DEFAULT                 = 'default'         ;
+    DELETE                  = 'delete'          ;
     DO                      = 'do'              ;
     DOUBLE                  = 'double'          ;
     ELSE                    = 'else'            ;
@@ -106,7 +111,6 @@ tokens {
     PRIVATE                 = 'private'         ;
     PROTECTED               = 'protected'       ;
     PUBLIC                  = 'public'          ;
-    ENTRY                   = 'entry'           ;
     RETURN                  = 'return'          ;
     SHORT                   = 'short'           ;
     STATIC                  = 'static'          ;
@@ -122,6 +126,45 @@ tokens {
     VOID                    = 'void'            ;
     VOLATILE                = 'volatile'        ;
     WHILE                   = 'while'           ;
+
+    // Charj-specific keywords
+    EMBED                   = 'embed'           ;
+    ENTRY                   = 'entry'           ;
+
+
+    // C++ keywords that aren't used in charj. 
+    // We don't use these ourselves, but they're still reserved
+    ASM                     = 'asm'             ;
+    AUTO                    = 'auto'            ;
+    BOOL                    = 'bool'            ;
+    CONST_CAST              = 'const_cast'      ;
+    DYNAMIC_CAST            = 'dynamic_cast'    ;
+    EXPLICIT                = 'explicit'        ;
+    EXPORT                  = 'export'          ;
+    EXTERN                  = 'extern'          ;
+    FRIEND                  = 'friend'          ;
+    GOTO                    = 'goto'            ;
+    INLINE                  = 'inline'          ;
+    MUTABLE                 = 'mutable'         ;
+    NAMESPACE               = 'namespace'       ;
+    OPERATOR                = 'operator'        ;
+    REGISTER                = 'register'        ;
+    REINTERPRET_CAST        = 'reinterpret_cast';
+    SIGNED                  = 'signed'          ;
+    SIZEOF                  = 'sizeof'          ;
+    STATIC_CAST             = 'static_cast'     ;
+    STRUCT                  = 'struct'          ;
+    TEMPLATE                = 'template'        ;
+    TYPEDEF                 = 'typedef'         ;
+    TYPEID                  = 'typeid'          ;
+    TYPENAME                = 'typename'        ;
+    UNION                   = 'union'           ;
+    UNSIGNED                = 'unsigned'        ;
+    USING                   = 'using'           ;
+    VIRTUAL                 = 'virtual'         ;
+    WCHAR_T                 = 'wchar_t'         ;
+    
+    
     
     // tokens for imaginary nodes
     
@@ -650,6 +693,7 @@ statement
     |   BREAK IDENT? SEMI                                                   ->  ^(BREAK IDENT?)
     |   CONTINUE IDENT? SEMI                                                ->  ^(CONTINUE IDENT?)
     |   IDENT COLON statement                                               ->  ^(LABELED_STATEMENT IDENT statement)
+    |   EMBED STRING_LITERAL EMBED_BLOCK                                    ->  ^(EMBED STRING_LITERAL EMBED_BLOCK)
     |   expression SEMI!
     |   SEMI // Preserve empty statements.
     ;           
@@ -1042,6 +1086,12 @@ WS  :  (' '|'\r'|'\t'|'\u000C'|'\n')
             $channel = HIDDEN;
         }
     }
+    ;
+
+EMBED_BLOCK
+    :   DOUBLE_LCURLY '\n'?
+        ( options {greedy=false;} : . )* 
+        DOUBLE_RCURLY 
     ;
 
 COMMENT

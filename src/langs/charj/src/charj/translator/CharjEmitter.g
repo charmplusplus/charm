@@ -191,7 +191,7 @@ classTopLevelScope
     ;
     
 classScopeDeclarations
-//@init { boolean entry = false; }
+@init { boolean entry = false; }
     :   ^(CLASS_INSTANCE_INITIALIZER block)
         -> template(t={$text}) "/*cii*/ <t>"
     |   ^(CLASS_STATIC_INITIALIZER block)
@@ -199,15 +199,15 @@ classScopeDeclarations
     |   ^(FUNCTION_METHOD_DECL m=modifierList g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             tc=throwsClause? b=block?)
-//        { 
-//            // determine whether this is an entry method
-//            CharjAST modList = (CharjAST)$m.start;
-//            for (CharjAST mod : (List<CharjAST>)modList.getChildren()) {
-//                if (mod.token.getType() == ENTRY) {
-//                    entry = true;
-//                }
-//            }
-//        }
+        { 
+            // determine whether this is an entry method
+            CharjAST modList = (CharjAST)$m.start;
+            for (CharjAST mod : (List<CharjAST>)modList.getChildren()) {
+                if (mod.token.getType() == ENTRY) {
+                    entry = true;
+                }
+            }
+        }
         -> {emitCC()}? funcMethodDecl_cc(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
@@ -226,18 +226,27 @@ classScopeDeclarations
                 adl={$a.st},
                 tc={$tc.st}, 
                 block={$b.st})
-//        -> {(emitCI() && entry)}? funcMethodDecl_ci(
-//                modl={$m.st}, 
-//                gtpl={$g.st}, 
-//                ty={$ty.text},
-//                id={$IDENT.text}, 
-//                fpl={$f.st}, 
-//                adl={$a.st},
-//                tc={$tc.st}, 
-//                block={$b.st})
+        -> {(emitCI() && entry)}? funcMethodDecl_ci(
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                ty={$ty.text},
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                adl={$a.st},
+                tc={$tc.st}, 
+                block={$b.st})
         ->
     |   ^(VOID_METHOD_DECL m=modifierList g=genericTypeParameterList? IDENT 
             f=formalParameterList t=throwsClause? b=block?)
+        { 
+            // determine whether this is an entry method
+            CharjAST modList = (CharjAST)$m.start;
+            for (CharjAST mod : (List<CharjAST>)modList.getChildren()) {
+                if (mod.token.getType() == ENTRY) {
+                    entry = true;
+                }
+            }
+        }
         -> {emitCC()}? voidMethodDecl_cc(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
@@ -245,7 +254,7 @@ classScopeDeclarations
                 fpl={$f.st}, 
                 tc={$t.st}, 
                 block={$b.st})
-        -> {emitCI()}? voidMethodDecl_ci(
+        -> {emitCI() && entry}? voidMethodDecl_ci(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 
@@ -266,6 +275,15 @@ classScopeDeclarations
         -> template(t={$text}) "vardecl <t>"
     |   ^(CONSTRUCTOR_DECL m=modifierList g=genericTypeParameterList? IDENT f=formalParameterList 
             t=throwsClause? b=block)
+        { 
+            // determine whether this is an entry method
+            CharjAST modList = (CharjAST)$m.start;
+            for (CharjAST mod : (List<CharjAST>)modList.getChildren()) {
+                if (mod.token.getType() == ENTRY) {
+                    entry = true;
+                }
+            }
+        }
         -> {emitCC()}? ctorDecl_cc(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
@@ -273,7 +291,7 @@ classScopeDeclarations
                 fpl={$f.st}, 
                 tc={$t.st}, 
                 block={$b.st})
-        -> {emitCI()}? ctorDecl_ci(
+        -> {emitCI() && entry}? ctorDecl_ci(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 
@@ -469,8 +487,12 @@ qualifiedIdentifier
     ;
     
 block
-    :   ^(BLOCK_SCOPE blockStatement*)
-        -> template(t={$text}) "<t>"
+@init { boolean emptyBlock = true; }
+    :   ^(BLOCK_SCOPE (b+=blockStatement)*)
+        { emptyBlock = ($b == null || $b.size() == 0); }
+        -> {emitCC() && emptyBlock}? template(bsl={$b}) "{ }"
+        -> {emitCC()}? block_cc(bsl={$b})
+        ->
     ;
     
 blockStatement
@@ -479,7 +501,7 @@ blockStatement
     |   typeDeclaration
         -> template(t={$text}) "<t>"
     |   statement
-        -> template(t={$text}) "<t>"
+        -> {$statement.st}
     ;
     
 localVariableDeclaration
@@ -521,6 +543,9 @@ statement
         -> template(t={$text}) "<t>"
     |   expression
         -> template(t={$text}) "<t>"
+    |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
+        ->  embed_cc(str={$STRING_LITERAL.text}, blk={$EMBED_BLOCK.text})
+//template(t={$EMBED_BLOCK.text}) "<t>"
     |   SEMI // Empty statement.
         -> template(t={$text}) "<t>"
     ;

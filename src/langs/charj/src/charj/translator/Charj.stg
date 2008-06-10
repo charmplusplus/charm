@@ -35,7 +35,7 @@ charjSource_cc(pd, ids, tds) ::=
 classExtends_ci(type) ::= "<type>"
 
 
-classExtends_cc_h(type) ::= ": public CBase_<type>"
+classExtends_cc_h(type) ::= "#include \<<type>.h\>"
 
 
 interfaceExtends(ts) ::=
@@ -47,6 +47,7 @@ interfaceExtends(ts) ::=
 classDeclaration_ci(mod, ident, gen, ext, impl, ctls) ::=
 <<
 module <ident> {
+    extern module <ext>;
     chare <ident> <gen>: <ext> {
         <ctls>
     }
@@ -58,7 +59,8 @@ module <ident> {
 classDeclaration_h(mod, ident, gen, ext, impl, ctls) ::=
 <<
 
-
+#include "<ident>.decl.h"
+<ext>
 class <ident> <gen>: public CBase_<ident> <impl> {
     <ctls>
 };
@@ -71,6 +73,7 @@ classDeclaration_cc(mod, ident, gen, ext, impl, ctls) ::=
 
 
 #include "<ident>.decl.h"
+<ext>
 class <ident> <gen>: public CBase_<ident> <impl> {
     <ctls>
 };
@@ -82,46 +85,23 @@ class <ident> <gen>: public CBase_<ident> <impl> {
 
 classTopLevelScope(classScopeDeclarations) ::= 
 <<
-// _classTopLevelScope_
 <classScopeDeclarations; separator="\n">
-// _!classTopLevelScope_
 >>
 
 
-funcMethodDecl_h(modl, 
-            gtpl,
-            ty,
-            id,
-            fpl,
-            adl,
-            tc,
-            block) ::=
+funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, tc, block) ::=
 <<
 <modl>: <ty> <gtpl> <id><fpl> <adl> <tc>;
 >>
 
 
-funcMethodDecl_ci(modl, 
-            gtpl,
-            ty,
-            id,
-            fpl,
-            adl,
-            tc,
-            block) ::=
+funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, tc, block) ::=
 <<
 entry <ty> <gtpl> <id><fpl> <adl> <tc>;
 >>
 
 
-funcMethodDecl_cc(modl, 
-            gtpl,
-            ty,
-            id,
-            fpl,
-            adl,
-            tc,
-            block) ::=
+funcMethodDecl_cc(modl, gtpl, ty, id, fpl, adl, tc, block) ::=
 <<
 <modl>: <ty> <gtpl> <id><fpl> <adl> <tc> <block>
 >>
@@ -163,3 +143,17 @@ ctorDecl_cc(modl, gtpl, id, fpl, tc, block) ::=
 >>
 
 
+block_cc(bsl) ::=
+<<
+{
+    <bsl; separator="\n">
+}
+>>
+
+
+embed_cc(str, blk) ::=
+<<
+// embedded block: <str>
+<blk>
+// end embedded block: <str>
+>>
