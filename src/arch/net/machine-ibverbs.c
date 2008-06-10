@@ -2798,7 +2798,7 @@ static void sendBarrierMessage(int pe)
   packet->header.code = INFIBARRIERPACKET;
   struct ibv_mr *key = METADATAFIELD(packet->buf)->key;
   MACHSTATE2(3,"Barrier packet to %d size %d",node->infiData->nodeNo,size);
-  pollSendCq(0);
+  /*  pollSendCq(0);*/
   EnqueuePacket(node,packet,size,key);
 }
 
@@ -2824,7 +2824,7 @@ static void recvBarrierMessage()
       if(ne != 0){
 	MACHSTATE1(3,"recvBarrier ne %d",ne);
       }
-      pollSendCq(0);
+      /*      pollSendCq(0); shouldn't need this*/
       for(i=0;i<ne;i++){
 	if(wc[i].status != IBV_WC_SUCCESS){
 	  CmiAssert(0);
