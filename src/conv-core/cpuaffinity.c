@@ -45,6 +45,7 @@ long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr
 #include <sys/mpctl.h>
 #endif
 
+int excludecore = -1;
 
 int num_cores(void) {
   int a = 1;
@@ -222,7 +223,7 @@ static void cpuAffinityHandler(void *m)
   hostnameMsg *msg = (hostnameMsg *)m;
   hostnameMsg *tmpm;
   char str[128];
-  int tag, tag1, pe;
+  int tag, tag1, pe, myrank;
   CmiAssert(rankmsg != NULL);
 
 /*   for debug
@@ -238,7 +239,12 @@ static void cpuAffinityHandler(void *m)
     rec = msg;
     CmmPut(hostTable, 1, &tag, msg);
   }
-  rankmsg->ranks[pe] = rec->rank%rec->ncores;
+  myrank = rec->rank%rec->ncores;
+  if (myrank == excludecore) {             /* skip excluded core */
+    myrank = (myrank+1)%rec->ncores;
+    rec->rank ++;
+  }
+  rankmsg->ranks[pe] = myrank;
   rec->rank ++;
   count ++;
   if (count == CmiNumPes()) {
@@ -290,8 +296,10 @@ void CmiInitCPUAffinity(char **argv)
   static skt_ip_t myip;
   int ret;
   hostnameMsg  *msg;
+ 
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
+  while (CmiGetArgIntDesc(argv,"+excludecore",&excludecore, "avoid core when setting cpuaffinity"));
 
   cpuAffinityHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityHandler);
@@ -299,8 +307,11 @@ void CmiInitCPUAffinity(char **argv)
        CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler);
 
   if (!affinity_flag) return;
-  else if (CmiMyPe() == 0)
+  else if (CmiMyPe() == 0) {
      CmiPrintf("Charm++> cpu affinity enabled! \n");
+     if (excludecore != -1)
+       CmiPrintf("Charm++> cpuaffinity excludes core %d. \n", excludecore);
+  }
 
   if (CmiMyPe() >= CmiNumPes()) {
       /* comm thread either can float around, or pin down to the last rank.
@@ -355,6 +366,7 @@ void CmiInitCPUAffinity(char **argv)
 {
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
+  while (CmiGetArgIntDesc(argv,"+excludecore",&excludecore, "avoid core when setting cpuaffinity"));
   if (affinity_flag)
     CmiPrintf("sched_setaffinity() is not supported, +affinity_flag disabled.\n");
 }
