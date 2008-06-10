@@ -85,6 +85,20 @@ package charj.translator;
     public boolean hasErrors() {
         return m_hasErrors;
     }
+
+    /**
+     *  Test a list of CharjAST nodes to see if any of them has the given token
+     *  type.
+     */
+    public boolean listContainsToken(List<CharjAST> list, int tokenType) {
+        for (CharjAST node : list) {
+            if (node.token.getType() == tokenType) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }
 
 // Starting point for parsing a Charj file.
@@ -201,12 +215,13 @@ classScopeDeclarations
             tc=throwsClause? b=block?)
         { 
             // determine whether this is an entry method
-            CharjAST modList = (CharjAST)$m.start;
-            for (CharjAST mod : (List<CharjAST>)modList.getChildren()) {
-                if (mod.token.getType() == ENTRY) {
-                    entry = true;
-                }
-            }
+            entry = listContainsToken($m.start.getChildren(), ENTRY);
+//            CharjAST modList = (CharjAST)$m.start;
+//            for (CharjAST mod : (List<CharjAST>)modList.getChildren()) {
+//                if (mod.token.getType() == ENTRY) {
+//                    entry = true;
+//                }
+//            }
         }
         -> {emitCC()}? funcMethodDecl_cc(
                 modl={$m.st}, 
@@ -269,8 +284,6 @@ classScopeDeclarations
                 tc={$t.st}, 
                 block={$b.st})
         ->
-
-// template(t={$text}) "/*voidmethod*/ <t>"
     |   ^(VAR_DECLARATION modifierList type variableDeclaratorList)
         -> template(t={$text}) "vardecl <t>"
     |   ^(CONSTRUCTOR_DECL m=modifierList g=genericTypeParameterList? IDENT f=formalParameterList 

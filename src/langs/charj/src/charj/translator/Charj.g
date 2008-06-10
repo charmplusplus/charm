@@ -1089,7 +1089,7 @@ WS  :  (' '|'\r'|'\t'|'\u000C'|'\n')
     ;
 
 EMBED_BLOCK
-    :   DOUBLE_LCURLY '\n'?
+    :   DOUBLE_LCURLY
         ( options {greedy=false;} : . )* 
         DOUBLE_RCURLY 
     ;

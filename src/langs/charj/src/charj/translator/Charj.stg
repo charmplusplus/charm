@@ -153,7 +153,7 @@ block_cc(bsl) ::=
 
 embed_cc(str, blk) ::=
 <<
-// embedded block: <str>
+// begin embedded block: <str>
 <blk>
 // end embedded block: <str>
 >>
