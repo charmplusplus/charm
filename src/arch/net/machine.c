@@ -351,6 +351,9 @@ static void machine_exit(int status)
     gm_finalize();
   }
 #endif
+#if CMK_USE_SYSVSHM
+	tearDownSharedBuffers();
+#endif
   exit(status);
 }
 
@@ -1680,7 +1683,23 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
 #endif
 
 inline void DeliverViaNetworkOrPxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int broot,int copy){
-#if CMK_USE_PXSHM
+#if CMK_USE_SYSVSHM
+	{
+#if SYSVSHM_STATS
+	double _startValidTime = CmiWallTimer();
+#endif
+	int ret=CmiValidSysvshm(ogm,node);
+#if SYSVSHM_STATS
+	sysvshmContext->validCheckTime += CmiWallTimer() - _startValidTime;
+#endif			
+	MACHSTATE4(3,"Msg ogm %p size %d dst %d useSysvShm %d",ogm,ogm->size,ogm->dst,ret);
+	if(ret){
+		CmiSendMessageSysvshm(ogm,node,rank,broot);
+	}else{
+		DeliverViaNetwork(ogm, node, rank, broot,copy);
+	}
+	} 
+#elif CMK_USE_PXSHM
      {
 #if PXSHM_STATS
 	double _startValidTime = CmiWallTimer();
@@ -1960,7 +1979,9 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   DeliverOutgoingMessage(ogm);
   /* CmiCommUnlock(); */
   /* Check if any packets have arrived recently (preserves kernel network buffers). */
-#if CMK_USE_PXSHM
+#if CMK_USE_SYSVSHM
+	CommunicationServerSysvshm();
+#elif CMK_USE_PXSHM
 	CommunicationServerPxshm();
 #endif
   CommunicationServer(0, COMM_SERVER_FROM_WORKER);
@@ -2228,7 +2249,9 @@ void CmiProbeImmediateMsg()
    messages. This flushes receive buffers on some implementations*/ 
 void CmiMachineProgressImpl()
 {
-#if CMK_USE_PXSHM
+#if CMK_USE_SYSVSHM
+	CommunicationServerSysvshm();
+#elif CMK_USE_PXSHM
 	CommunicationServerPxshm();
 #endif
   CommunicationServer(0, COMM_SERVER_FROM_SMP);
@@ -2294,7 +2317,10 @@ static void ConverseRunPE(int everReturn)
       (CcdVoidFn) CmiNotifyBeginIdle, (void *) s);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) CmiNotifyStillIdle, (void *) s);
-#if CMK_USE_PXSHM
+#if CMK_USE_SYSVSHM
+ 	 CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn) CmiNotifyBeginIdleSysvshm, NULL);
+ 	 CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn) CmiNotifyStillIdleSysvshm, NULL);
+#elif CMK_USE_PXSHM
 		//TODO: add pxshm notify idle
  	 CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn) CmiNotifyBeginIdlePxshm, NULL);
  	 CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn) CmiNotifyStillIdlePxshm, NULL);
@@ -2401,7 +2427,9 @@ void ConverseExit(void)
       printNetStatistics();
     log_done();
   }
-#if CMK_USE_PXSHM
+#if CMK_USE_SYSVSHM
+	CmiExitSysvshm();
+#elif CMK_USE_PXSHM
 	CmiExitPxshm();
 #endif
   CmiMachineExit();
@@ -2559,7 +2587,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   open_tcp_sockets();
 #endif
 
-#if CMK_USE_PXSHM
+#if CMK_USE_SYSVSHM
+	CmiInitSysvshm(argv);
+#elif CMK_USE_PXSHM
 	CmiInitPxshm(argv);
 #endif
 

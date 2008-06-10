@@ -234,6 +234,9 @@ struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]);
 void	infiPostInitialRecvs();
 #endif
 
+#if CMK_USE_SYSVSHM
+inline void CommunicationServerSysvshm();
+#endif
 #if CMK_USE_PXSHM
 inline void CommunicationServerPxshm();
 #endif
@@ -757,6 +760,9 @@ static void CommunicationsClockCaller(void *ignored)
 
 static void CommunicationPeriodic(void) 
 { /*Poll on the communications server*/
+#if CMK_USE_SYSVSHM
+	CommunicationServerSysvshm();
+#endif
 #if CMK_USE_PXSHM
 	CommunicationServerPxshm();
 #endif
@@ -807,10 +813,11 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 
 #endif
 
+#if CMK_USE_SYSVSHM
+#include "machine-sysvshm.c"
+#endif
 #if CMK_USE_PXSHM
-
 #include "machine-pxshm.c"
-
 #endif
 
 
