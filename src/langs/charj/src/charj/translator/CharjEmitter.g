@@ -105,18 +105,38 @@ package charj.translator;
 charjSource[OutputMode m]
 @init {
     this.m_mode = m;
+    String closingBraces = "";
 }
     :   ^(CHARJ_SOURCE (p=packageDeclaration)? (i+=importDeclaration)* (t+=typeDeclaration)*)
-        -> {emitCC()}? charjSource_cc(pd={$p.st}, ids={$i}, tds={$t})
+        {
+            // construct string of }'s to close namespace 
+            if ($p.st != null) {
+                String temp_p = $p.st.toString();
+                for (int idx=0; idx<temp_p.length(); ++idx) {
+                    if (temp_p.charAt(idx) == '{') {
+                        closingBraces += "} ";
+                    }
+                }
+            }
+        }
+        -> {emitCC()}? charjSource_cc(
+            pd={$p.st}, ids={$i}, tds={$t}, cb={closingBraces})
         -> {emitCI()}? charjSource_ci(pd={$p.st}, ids={$i}, tds={$t})
-        -> {emitH()}? charjSource_h(pd={$p.st}, ids={$i}, tds={$t})
+        -> {emitH()}? charjSource_h(
+            pd={$p.st}, ids={$i}, tds={$t}, cb={closingBraces})
         ->
     ;
 
 packageDeclaration
-    :   ^(PACKAGE qualifiedIdentifier)  
+@init { 
+    List<String> names = null; 
+}
+    :   ^(PACKAGE qualifiedIdentifier)  {
+            names =  java.util.Arrays.asList($qualifiedIdentifier.text.split("[.]"));
+        }
         -> {(emitCC() || emitH())}? packageDeclaration_cc_h(
-            id={$qualifiedIdentifier.text.replaceAll("[.]","::")})
+            ids={names})
+            //ids={names})//{$qualifiedIdentifier.text.split("[.]")})
         ->
     ;
     
