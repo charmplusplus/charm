@@ -1,5 +1,5 @@
 package tests.Hello;
-import charj.lang.someObject;
+//import charj.lang.someObject;
 
 public class Hello extends Chare {
     entry Hello() {}
@@ -18,7 +18,8 @@ public class Hello extends Chare {
         //    myGenericArray[i] = payload * i;
         //}
     }
-    entry int SayHello() { }
+    // Non-void entry methods aren't handled yet.
+    //entry int SayHello() { }
     public void anotherMethod() { }
     public int anotherMethod(int x) { return x; }
     private void aVoidMethod() {}

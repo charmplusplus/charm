@@ -115,12 +115,17 @@ charjSource[OutputMode m]
 
 packageDeclaration
     :   ^(PACKAGE qualifiedIdentifier)  
-        -> template(t={$text}) "//<t>"
+        -> {(emitCC() || emitH())}? packageDeclaration_cc_h(
+            id={$qualifiedIdentifier.text.replaceAll("[.]","::")})
+        ->
     ;
     
 importDeclaration
     :   ^(IMPORT STATIC? qualifiedIdentifier DOTSTAR?)
-        -> template(t={$text}) "//<t>"
+        -> {(emitCC() || emitH())}? importDeclaration_cc_h(
+            inc_id={$qualifiedIdentifier.text.replaceAll("[.]","/")},
+            use_id={$qualifiedIdentifier.text.replaceAll("[.]","::")})
+        ->
     ;
     
 typeDeclaration
