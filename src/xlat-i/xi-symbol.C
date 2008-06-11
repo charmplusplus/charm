@@ -2328,7 +2328,10 @@ XStr Entry::epStr(void)
 {
   XStr str;
   str << name << "_";
-  if (param->isMessage()) str<<param->getBaseName();
+  if (param->isMessage()) {
+    str<<param->getBaseName();
+    str.replace(':', '_');
+  }
   else if (param->isVoid()) str<<"void";
   else str<<"marshall"<<entryCount;
   return str;

@@ -90,3 +90,9 @@ XStr::spew(const char*b, const char *a1, const char *a2, const char *a3,
   }
 }
 
+void XStr::replace (const char a, const char b) {
+  for(int i=0; i<len; i++) {
+    if (s[i] == a) s[i] = b;
+  }
+}
+

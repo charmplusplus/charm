@@ -45,6 +45,8 @@ class XStr {
     // MAB: this method appends character c to every line
     // basically substitutes every \n with a "c\n"
     void line_append(const char c);
+    // Replace all occurences of character "a" in string with character "b"
+    void replace (const char a, const char b);
   public:
     XStr();
     XStr(const char *_s);
