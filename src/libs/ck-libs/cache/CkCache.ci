@@ -1,0 +1,24 @@
+module CkCache {
+  message CkCacheRequestMsg;
+  message CkCacheFillMsg {
+    char data[];
+  };
+
+  group [migratable] CkCacheManager {
+    entry CkCacheManager(CkGroupID gid, int size);
+    entry [local] void * requestData(CkCacheKey what, CkArrayIndexMax &toWhom, int chunk, CkCacheEntryType *type, CkCacheRequestorData &req);
+    entry [local] void * requestDataNoFetch(CkCacheKey key, int chunk);
+    //entry void recvNodes(FillBinaryNodeMsg *msg);
+    //entry void recvNodes(FillNodeMsg *msg);
+    entry [local] void cacheSync(int &numChunks, CkArrayIndexMax &chareIdx, int &localIdx);
+    //entry void recvParticles(FillParticleMsg *msg);
+    entry void recvData(CkCacheFillMsg *msg);
+    entry [local] void recvData(CkCacheKey key, CkArrayIndexMax &from, CkCacheEntryType *type, int chunk, void *data);
+    entry void finishedChunk(int num, u_int64_t weight);
+//    entry void allDone();
+    entry void collectStatistics(CkCallback &cb);
+    //entry void stopHPM(CkCallback &cb);
+  };
+  
+  //initnode void initNodeLock();
+};

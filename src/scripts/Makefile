@@ -74,7 +74,10 @@ AMPIF: AMPIC
 
 f90charm: charm++ $(L)/libf90charm.a
 
-default_libs: multicast pythonCCS
+default_libs: cache multicast pythonCCS
+
+cache:
+	cd libs/ck-libs/cache && $(MAKE)
 
 multicast:
 	cd libs/ck-libs/multicast && $(MAKE)

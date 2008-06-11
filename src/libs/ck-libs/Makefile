@@ -2,12 +2,15 @@ CHARMC=../../bin/charmc $(OPTS)
 CHARMINC=.
 DIRS=   sparseContiguousReducer tcharm ampi idxl parmetis \
         multiphaseSharedArrays fem ifem ParFUM \
-        armci collide mblock barrier \
+        armci collide mblock barrier cache \
 	irecv netfem liveViz taskGraph search datatransfer pythonCCS
 
 .PHONY: $(DIRS)
 
 all:  $(DIRS)
+
+cache:
+	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 sparseContiguousReducer:
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
