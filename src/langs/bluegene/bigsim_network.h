@@ -5,11 +5,11 @@ class BigSimNetwork
 {
 protected:
   double alpha;
-  char *myname;
+  const char *myname;
 public:
   inline double alphacost() { return alpha; }
   inline double charmcost() { return CHARM_OVERHEAD; }
-  inline char *name() { return myname; }
+  inline const char *name() { return myname; }
   virtual double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) = 0;
   virtual void print() = 0;
 };
