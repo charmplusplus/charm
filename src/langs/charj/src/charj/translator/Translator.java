@@ -22,10 +22,10 @@ public class Translator {
     public static final String templateFile = "charj/translator/Charj.stg";
 
     // variables controlled by command-line arguments
-    public String m_charmc;
-    public boolean m_debug;
-    public boolean m_verbose;
-    public boolean m_errorCondition;
+    private String m_charmc;
+    private boolean m_debug;
+    private boolean m_verbose;
+    private boolean m_errorCondition;
 
     public Translator(
             String _charmc,
@@ -37,6 +37,9 @@ public class Translator {
         m_verbose = _verbose;
         m_errorCondition = false;
     }
+
+    public boolean debug()      { return m_debug; }
+    public boolean verbose()    { return m_verbose; }
 
     public static TreeAdaptor adaptor = new CommonTreeAdaptor() {
         public Object create(Token token) {
@@ -227,6 +230,23 @@ public class Translator {
             error("Failed to load template file", ex); 
         }
         return templates;
+    }
+
+    public File findPackage(String packageName)
+    {
+        // TODO: implement me
+        // turn package name into a file path
+        // look in: current directory, stdlib, user specified directory
+        return null;
+    }
+
+    /** Load a class from disk looking in lib/package
+     *  Side-effect: add class to symtab.
+     */
+    public ClassSymbol loadType(String packageName, String typeName)
+    {
+        // TODO: implement me
+        return null;
     }
     
     private void error(
