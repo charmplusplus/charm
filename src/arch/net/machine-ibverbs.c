@@ -2824,7 +2824,7 @@ static void recvBarrierMessage()
       if(ne != 0){
 	MACHSTATE1(3,"recvBarrier ne %d",ne);
       }
-      /*      pollSendCq(0); shouldn't need this*/
+      pollSendCq(1); 
       for(i=0;i<ne;i++){
 	if(wc[i].status != IBV_WC_SUCCESS){
 	  CmiAssert(0);
