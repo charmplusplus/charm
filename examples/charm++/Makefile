@@ -1,6 +1,6 @@
 DIRS=hello integrate integrate2 integrateArray \
 	piArray queens RedExample \
-	ring rings speeds commlib
+	ring rings speeds
 
 all: 
 	for d in $(DIRS); do \
