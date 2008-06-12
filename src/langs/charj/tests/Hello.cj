@@ -1,7 +1,7 @@
 package tests.Hello;
 //import charj.lang.someObject;
 
-public class Hello extends Chare {
+public class Hello {
     entry Hello() {}
     public Hello(int x) {}
     private Hello(int x, int y) {}
@@ -10,6 +10,7 @@ public class Hello extends Chare {
         embed "c++" {{
             int* x = &y;
         }}
+        Hello h = new Hello();
         //MyObject someObject = new MyObject(1, 2, "hello", new Array<int>(1));
         //int myArray[25] = new int[25];
         //Array<int> myGenericArray = new Array<int>(25);
