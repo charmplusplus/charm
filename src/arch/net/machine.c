@@ -978,6 +978,9 @@ static void CmiPushPE(int pe,void *msg)
   }
 #endif
   PCQueuePush(cs->recv,msg);
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+  if (_Cmi_noprocforcommthread) 
+#endif
   CmiIdleLock_addMessage(&cs->idle);
 }
 
@@ -1002,6 +1005,9 @@ static void CmiPushNode(void *msg)
   PCQueuePush(CsvAccess(NodeState).NodeRecv,msg);
   /*Silly: always try to wake up processor 0, so at least *somebody*
     will be awake to handle the message*/
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+  if (_Cmi_noprocforcommthread) 
+#endif
   CmiIdleLock_addMessage(&cs->idle);
 }
 #endif
