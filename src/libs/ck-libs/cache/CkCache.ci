@@ -14,7 +14,7 @@ module CkCache {
     //entry void recvParticles(FillParticleMsg *msg);
     entry void recvData(CkCacheFillMsg *msg);
     entry [local] void recvData(CkCacheKey key, CkArrayIndexMax &from, CkCacheEntryType *type, int chunk, void *data);
-    entry void finishedChunk(int num, u_int64_t weight);
+    entry void finishedChunk(int num, CmiUInt8 weight);
 //    entry void allDone();
     entry void collectStatistics(CkCallback &cb);
     //entry void stopHPM(CkCallback &cb);

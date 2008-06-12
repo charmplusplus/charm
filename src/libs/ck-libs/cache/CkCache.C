@@ -5,7 +5,7 @@
   CkCacheManager::CkCacheManager(CkGroupID gid, int size) {
     init();
     locMgr = gid;
-    maxSize = (u_int64_t)size * 1024 * 1024;
+    maxSize = (CmiUInt8)size * 1024 * 1024;
   }
 
   CkCacheManager::CkCacheManager(CkMigrateMessage* m) : CBase_CkCacheManager(m) {
@@ -175,7 +175,7 @@
         numChunks = _numChunks;
         cacheTable = new std::map<CkCacheKey,CkCacheEntry*>[numChunks];
         chunkAck = new int[numChunks];
-        chunkWeight = new u_int64_t[numChunks];
+        chunkWeight = new CmiUInt8[numChunks];
       }
       for (int i=0; i<numChunks; ++i) {
         chunkAck[i] = localChares.count;
@@ -191,7 +191,7 @@
     CkAssert(localIdx != 0);
   }
 
-  void CkCacheManager::finishedChunk(int chunk, u_int64_t weight) {
+  void CkCacheManager::finishedChunk(int chunk, CmiUInt8 weight) {
     CkAssert(chunkAck[chunk] > 0);
     chunkWeight[chunk] += weight;
     if (--chunkAck[chunk] == 0) {
@@ -320,7 +320,7 @@ CacheManager::CacheManager(int size){
 
   treePieceLocMgr = NULL;
 
-  maxSize = (u_int64_t)size * 1024 * 1024 / (sizeof(NodeCacheEntry) + sizeof(CacheNode));
+  maxSize = (CmiUInt8)size * 1024 * 1024 / (sizeof(NodeCacheEntry) + sizeof(CacheNode));
   if (verbosity) CkPrintf("Cache: accepting at most %llu nodes\n",maxSize);
   
   CpvInitialize(int, cacheNodeRegisteredChares);
@@ -1169,7 +1169,7 @@ void CacheManager::cacheSync(int &TPnumChunks, Tree::NodeKey *&TProot) {
 #else
     prototype->getChunks(_numChunks, prefetchRoots);
 #endif
-    chunkWeight = new u_int64_t[numChunks];
+    chunkWeight = new CmiUInt8[numChunks];
     nodeCacheTable = new map<CacheKey,NodeCacheEntry *>[numChunks];
     particleCacheTable = new map<CacheKey,ParticleCacheEntry *>[numChunks];
     delayedRequests = new map<NodeCacheEntry*,int>[numChunks];
@@ -1257,7 +1257,7 @@ void CacheManager::revokePresence(int index) {
 
 extern LDObjid idx2LDObjid(const CkArrayIndex &idx);
 
-void CacheManager::finishedChunk(int num, u_int64_t weight) {
+void CacheManager::finishedChunk(int num, CmiUInt8 weight) {
 #if COSMO_STATS > 0
   //static int counter = 0;
   if (++finishedChunkCounter == registeredChares.size()*numChunks) {

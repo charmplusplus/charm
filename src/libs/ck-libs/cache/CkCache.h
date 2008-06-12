@@ -27,7 +27,7 @@ chares that request it.***/
 //using namespace SFC;
 
 //typedef GenericTreeNode CacheNode;
-typedef u_int64_t CkCacheKey;
+typedef CmiUInt8 CkCacheKey;
 
 //CpvExtern(int, cacheNodeRegisteredChares);
 //typedef map<int,GenericTreeNode*> cacheNodeMapIntGenericTreeNode;
@@ -43,13 +43,13 @@ class CkCacheRequestorData;
 #include "CkCache.decl.h"
 
 class CkCacheStatistics {
-  u_int64_t dataArrived;
-  u_int64_t dataTotalArrived;
-  u_int64_t dataMisses;
-  u_int64_t dataLocal;
-  u_int64_t dataError;
-  u_int64_t totalDataRequested;
-  u_int64_t maxData;
+  CmiUInt8 dataArrived;
+  CmiUInt8 dataTotalArrived;
+  CmiUInt8 dataMisses;
+  CmiUInt8 dataLocal;
+  CmiUInt8 dataError;
+  CmiUInt8 totalDataRequested;
+  CmiUInt8 maxData;
   int index;
 
   CkCacheStatistics() : dataArrived(0), dataTotalArrived(0),
@@ -57,9 +57,9 @@ class CkCacheStatistics {
     totalDataRequested(0), maxData(0), index(-1) { }
 
  public:
-  CkCacheStatistics(u_int64_t pa, u_int64_t pta, u_int64_t pm,
-          u_int64_t pl, u_int64_t pe, u_int64_t tpr,
-          u_int64_t mp, int i) :
+  CkCacheStatistics(CmiUInt8 pa, CmiUInt8 pta, CmiUInt8 pm,
+          CmiUInt8 pl, CmiUInt8 pe, CmiUInt8 tpr,
+          CmiUInt8 mp, int i) :
     dataArrived(pa), dataTotalArrived(pta), dataMisses(pm),
     dataLocal(pl), dataError(pe), totalDataRequested(tpr),
     maxData(mp), index(i) { }
@@ -206,7 +206,7 @@ public:
   CkCacheFillMsg (CkCacheKey k) : key(k) {}
 };
 
-typedef void (*CkCacheCallback)(CkArrayID, CkArrayIndexMax&, CkCacheKey, u_int64_t, void*, int);
+typedef void (*CkCacheCallback)(CkArrayID, CkArrayIndexMax&, CkCacheKey, CmiUInt8, void*, int);
 
 /*class RequestorData {//: public CkPool<RequestorData, 128> {
  public:
@@ -236,12 +236,12 @@ typedef void (*CkCacheCallback)(CkArrayID, CkArrayIndexMax&, CkCacheKey, u_int64
 */
 class CkCacheRequestorData {
 public:
-  u_int64_t userData;
+  CmiUInt8 userData;
   CkCacheCallback fn;
   CkArrayID requestorID;
   CkArrayIndexMax requestorIdx;
 
-  CkCacheRequestorData(CProxyElement_ArrayElement &el, CkCacheCallback f, u_int64_t data) {
+  CkCacheRequestorData(CProxyElement_ArrayElement &el, CkCacheCallback f, CmiUInt8 data) {
     userData = data;
     requestorID = el.ckGetArrayID();
     requestorIdx = el.ckGetIndex();
@@ -424,29 +424,29 @@ class CkCacheManager : public CBase_CkCacheManager {
 
 #if COSMO_STATS > 0
   /// particles arrived from remote processors, this counts only the entries in the cache
-  u_int64_t dataArrived;
+  CmiUInt8 dataArrived;
   /// particles arrived from remote processors, this counts the real
   /// number of particles arrived
-  u_int64_t dataTotalArrived;
+  CmiUInt8 dataTotalArrived;
   /// particles missed while walking the tree for computation
-  u_int64_t dataMisses;
+  CmiUInt8 dataMisses;
   /// particles that have been imported from local TreePieces
-  u_int64_t dataLocal;
+  CmiUInt8 dataLocal;
   /// particles arrived which were never requested, basically errors
-  u_int64_t dataError;
+  CmiUInt8 dataError;
   /** counts the total number of particles requested by all
     the chares on the processor***/
-  u_int64_t totalDataRequested;
+  CmiUInt8 totalDataRequested;
   /// maximum number of nodes stored at some point in the cache
-  u_int64_t maxData;
+  CmiUInt8 maxData;
 #endif
 
   /// weights of the chunks in which the tree is divided, the cache will
   /// update the chunk division based on these values
-  u_int64_t *chunkWeight;
+  CmiUInt8 *chunkWeight;
 
   /// Maximum number of allowed data stored
-  u_int64_t maxSize;
+  CmiUInt8 maxSize;
   
   /// number of acknowledgements awaited before deleting the chunk of the tree
   int *chunkAck;
@@ -488,7 +488,7 @@ class CkCacheManager : public CBase_CkCacheManager {
 
   /** Called from the TreePieces to acknowledge that a particular chunk
       has been completely used, and can be deleted */
-  void finishedChunk(int num, u_int64_t weight);
+  void finishedChunk(int num, CmiUInt8 weight);
   /** Called from the TreePieces to acknowledge that they have completely
       finished their computation */
 //  void allDone();
