@@ -8,7 +8,7 @@
 #include "converse.h"
 #include "sockRoutines.h"
 
-#define DEBUGP(x)   /*  CmiPrintf x;  */
+#define DEBUGP(x)  /* CmiPrintf x;  */
 
 /*
  This scheme relies on using IP address to identify nodes and assigning 
@@ -45,7 +45,22 @@ long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr
 #include <sys/mpctl.h>
 #endif
 
-int excludecore = -1;
+static int excludecore[8] = {-1};
+static int excludecount = 0;
+
+static int in_exclude(int core)
+{
+  int i;
+  for (i=0; i<excludecount; i++) if (core == excludecore[i]) return 1;
+  return 0;
+}
+
+static void add_exclude(int core)
+{
+  if (in_exclude(core)) return;
+  CmiAssert(excludecount < 8);
+  excludecore[excludecount++] = core;
+}
 
 int num_cores(void) {
   int a = 1;
@@ -240,7 +255,7 @@ static void cpuAffinityHandler(void *m)
     CmmPut(hostTable, 1, &tag, msg);
   }
   myrank = rec->rank%rec->ncores;
-  if (myrank == excludecore) {             /* skip excluded core */
+  while (in_exclude(myrank)) {             /* skip excluded core */
     myrank = (myrank+1)%rec->ncores;
     rec->rank ++;
   }
@@ -294,12 +309,14 @@ extern int getXT3NodeID(int mype, int numpes);
 void CmiInitCPUAffinity(char **argv)
 {
   static skt_ip_t myip;
-  int ret;
+  int ret, i, exclude;
   hostnameMsg  *msg;
  
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
-  while (CmiGetArgIntDesc(argv,"+excludecore",&excludecore, "avoid core when setting cpuaffinity"));
+
+  while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity")) 
+    if (CmiMyRank() == 0) add_exclude(exclude);
 
   cpuAffinityHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityHandler);
@@ -309,8 +326,11 @@ void CmiInitCPUAffinity(char **argv)
   if (!affinity_flag) return;
   else if (CmiMyPe() == 0) {
      CmiPrintf("Charm++> cpu affinity enabled! \n");
-     if (excludecore != -1)
-       CmiPrintf("Charm++> cpuaffinity excludes core %d. \n", excludecore);
+     if (excludecount > 0) {
+       CmiPrintf("Charm++> cpuaffinity excludes core: %d", excludecore[0]);
+       for (i=1; i<excludecount; i++) CmiPrintf(" %d", excludecore[i]);
+       CmiPrintf(".\n");
+     }
   }
 
   if (CmiMyPe() >= CmiNumPes()) {
@@ -362,10 +382,10 @@ void CmiInitCPUAffinity(char **argv)
 
 #else           /* not supporting affinity */
 
-int excludecore = -1;
 
 void CmiInitCPUAffinity(char **argv)
 {
+  int excludecore = -1;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
   while (CmiGetArgIntDesc(argv,"+excludecore",&excludecore, "avoid core when setting cpuaffinity"));
