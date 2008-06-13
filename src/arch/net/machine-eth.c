@@ -122,7 +122,6 @@ int CheckSocketsReady(int withDelayMs)
     if (dataWrite)  
       CMK_PIPE_ADDWRITE(dataskt);  
   }  
-}  
 #endif 
 
   nreadable=CMK_PIPE_CALL();
