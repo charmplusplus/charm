@@ -35,6 +35,14 @@
 
 #define PCQueueSize 0x100
 
+/** This data type is at least one cache line of padding, used to avoid
+ *  cache line thrashing on SMP systems.  On x86, this is just for performance;
+ *  on other CPUs, this can affect your choice of fence operations.
+ **/
+typedef struct CmiMemorySMPSeparation_t {
+        unsigned char padding[128];
+} CmiMemorySMPSeparation_t;
+
 typedef struct CircQueueStruct
 {
   struct CircQueueStruct *next;
@@ -141,6 +149,7 @@ char *PCQueuePop(PCQueue Q)
   CircQueue circ; int pull; char *data;
 
 #ifdef CMK_PCQUEUE_LOCK
+    if (Q->len == 0) return 0;            /* len is accurate when using lock */
     CmiLock(Q->lock);
 #endif
     circ = Q->head;
