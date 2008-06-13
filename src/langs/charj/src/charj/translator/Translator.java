@@ -4,6 +4,7 @@
 package charj.translator;
 
 import java.io.*;
+import java.util.*;
 import org.antlr.runtime.*;
 import org.antlr.runtime.tree.*;
 import org.antlr.stringtemplate.*;
@@ -27,14 +28,22 @@ public class Translator {
     private boolean m_verbose;
     private boolean m_errorCondition;
 
+    // library locations to search for classes
+    private String m_stdlib;
+    private List<String> m_usrlibs;
+
     public Translator(
             String _charmc,
             boolean _debug,
-            boolean _verbose)
+            boolean _verbose,
+            String _stdlib,
+            List<String> _usrlibs)
     {
-        m_charmc = _charmc;
-        m_debug = _debug;
-        m_verbose = _verbose;
+        m_charmc    = _charmc;
+        m_debug     = _debug;
+        m_verbose   = _verbose;
+        m_stdlib    = _stdlib;
+        m_usrlibs   = _usrlibs;
         m_errorCondition = false;
     }
 
@@ -234,9 +243,37 @@ public class Translator {
 
     public File findPackage(String packageName)
     {
-        // TODO: implement me
-        // turn package name into a file path
-        // look in: current directory, stdlib, user specified directory
+        String packageDir = packageName.replaceAll("::", "/");
+        File p = new File(packageDir);
+        if ( debug() ) System.out.println(
+                "findPackage " + packageName + 
+                " trying " + p.getAbsoluteFile());
+       
+        // check current directory
+        if ( p.exists() ) {
+            return p;
+        }
+
+        // look in user libs if any
+        if ( m_usrlibs != null ) {
+            for (String lib : m_usrlibs) {
+                p = new File(lib, packageDir);
+                if (debug() ) System.out.println(
+                        "not found, now trying " + p.getAbsoluteFile());
+                if ( p.exists() ) {
+                    return p;
+                }
+            }
+        }
+
+        // look in standard lib
+        p = new File(m_stdlib, packageDir);
+        if ( debug() ) System.out.println(
+                "not found, now trying " + p.getAbsoluteFile());
+        if ( p.exists() ) {
+            return p;
+        }
+
         return null;
     }
 
