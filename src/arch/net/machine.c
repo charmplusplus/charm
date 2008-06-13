@@ -1739,9 +1739,10 @@ inline void DeliverViaNetworkOrPxshm(OutgoingMsg ogm,OtherNode node,int rank,uns
  * queues. For non-local transmission, the function DeliverViaNetwork()
  * is called
  ***********************************************************************/
-void DeliverOutgoingMessage(OutgoingMsg ogm)
+int DeliverOutgoingMessage(OutgoingMsg ogm)
 {
   int i, rank, dst; OtherNode node;
+  int network = 1;
   
   dst = ogm->dst;
   switch (dst) {
@@ -1801,6 +1802,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
 	GarbageCollectMsg(ogm);
         CmiCommUnlock();
     } else {
+      network = 0;
       if (ogm->freemode == 'A') {
 	CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
 	ogm->freemode = 'X';
@@ -1810,6 +1812,7 @@ void DeliverOutgoingMessage(OutgoingMsg ogm)
       }
     }
   }
+  return network;
 }
 
 
@@ -1928,6 +1931,7 @@ CmiCommHandle CmiGeneralNodeSend(int node, int size, int freemode, char *data)
 
 CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 {
+  int sendonnetwork;
   CmiState cs = CmiGetState(); OutgoingMsg ogm;
   MACHSTATE(1,"CmiGeneralSend {");
 
@@ -1982,13 +1986,16 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
   CmiMsgHeaderSetLength(data, size);
   ogm=PrepareOutgoing(cs,pe,size,freemode,data);
   /* CmiCommLock(); */
-  DeliverOutgoingMessage(ogm);
+  sendonnetwork = DeliverOutgoingMessage(ogm);
   /* CmiCommUnlock(); */
   /* Check if any packets have arrived recently (preserves kernel network buffers). */
 #if CMK_USE_SYSVSHM
 	CommunicationServerSysvshm();
 #elif CMK_USE_PXSHM
 	CommunicationServerPxshm();
+#endif
+#if !CMK_SHARED_VARS_UNAVAILABLE
+  if (sendonnetwork)   /* only call server when we send msg on network in SMP */
 #endif
   CommunicationServer(0, COMM_SERVER_FROM_WORKER);
   MACHSTATE(1,"}  CmiGeneralSend");

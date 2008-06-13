@@ -784,7 +784,7 @@ static void CommunicationServer(int sleepTime, int where)
   CmiCommUnlock();
 
   /* when called by communication thread or in interrupt */
-  if (where == 0 || where == 1) {
+  if (where == COMM_SERVER_FROM_SMP || where == COMM_SERVER_FROM_INTERRUPT) {
 #if CMK_IMMEDIATE_MSG
   CmiHandleImmediate();
 #endif
