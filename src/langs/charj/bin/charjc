@@ -1,8 +1,9 @@
 #!/bin/bash
 
-CHARJCHOME=${0%${0##*/}}
+ECHO="false"                        # should we echo the our command to stdout?
+CHARJCHOME=${0%${0##*/}}            # location of charjc
+ANTLRHOME=$CHARJCHOME/../lib        # location of antlr jars
 ANTLR_VERSION="3.1"
-ANTLRHOME=$CHARJCHOME/../lib
 ANTLR_CLASSPATH=""
 
 if test "$ANTLR_VERSION" = "3.0"
@@ -32,6 +33,7 @@ CHARJ_JFLAGS="-classpath $CLASSPATH:$ANTLR_CLASSPATH:$JSAP_JAR:$CHARJ_JAR"
 # the charjc options alone.
 VERBOSE=false
 CHARMC=$CHARJCHOME../../../../bin/charmc
+STDLIB=$CHARJCHOME../charj/src/
 CHARMC_ARGS=
 FILES=
 ARGS=
@@ -52,8 +54,16 @@ processArgs() {
         "--stdout")
             ARGS="$ARGS $arg"
             ;;
+        "--stdlib")
+            STDLIB="$1"
+            shift
+            ;;
+        "--lib")
+            ARGS="$ARGS $arg $1"
+            shift
+            ;;
         "--charmc")
-            CHARMC="$arg"
+            CHARMC="$1"
             shift
             ;;
         *.cj)
@@ -69,8 +79,9 @@ processArgs() {
 }
 
 processArgs "$@"
-#if test "$VERBOSE" = "true"
-#then
-#    echo "java $CHARJ_JFLAGS charj.Main $ARGS $FILES"
-#fi
-java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" $ARGS $FILES
+if test "$ECHO" = "true"
+then
+    echo "java $CHARJ_JFLAGS charj.Main --charmc \"$CHARMC\" \
+    --stdlib $STDLIB $ARGS $FILES"
+fi
+java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" --stdlib $STDLIB $ARGS $FILES

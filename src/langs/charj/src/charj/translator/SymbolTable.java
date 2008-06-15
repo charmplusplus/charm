@@ -74,7 +74,7 @@ public class SymbolTable {
         if ( outerPackage == null ) {
             if ( debug() ) {
                 System.out.println(
-                        "definePkg(" + packageName + 
+                        " SymbolTable.definePkg(" + packageName + 
                         "): defining outer pkg: " + outerPackageName);
             }
             outerPackage = new PackageScope(this,outerPackageName,defaultPkg);
@@ -87,7 +87,7 @@ public class SymbolTable {
             PackageScope p = (PackageScope)enclosingPackage.resolve(pname);
             if ( p==null ) {
                 if ( debug() ) System.out.println(
-                        "definePkg(" + packageName + 
+                        " SymbolTable.definePkg(" + packageName + 
                         "): defining inner pkg: " + pname +
                         " in "+enclosingPackage.toString());
                 
@@ -109,7 +109,7 @@ public class SymbolTable {
     public PackageScope resolvePackage(String packageName) 
     {
         if ( debug() ) System.out.println(
-                "SymbolTable.resolvePackage(" + packageName + 
+                " SymbolTable.resolvePackage(" + packageName + 
                 "): examine: " + topLevelPackageScopes.keySet());
         String[] packageNames = packageName.split("::");
         String outerPackageName = packageNames[0];
@@ -118,7 +118,8 @@ public class SymbolTable {
 
         if ( enclosingPackage==null ) {
             if ( debug() ) System.out.println(
-                    "resolvePackage(" + packageName + "): outer package " +
+                    " SymbolTable.resolvePackage(" + packageName + 
+                    "): outer package " +
                     outerPackageName + " not found in top level " +
                     topLevelPackageScopes.keySet());
             return null;
@@ -134,7 +135,7 @@ public class SymbolTable {
             p = (PackageScope)enclosingPackage.resolve(pname);
             if ( p==null ) {
                 if ( debug() ) System.out.println(
-                        "SymbolTable.resolvePackage(" + packageName +
+                        " SymbolTable.resolvePackage(" + packageName +
                         "): not found in " + topLevelPackageScopes.keySet());
                 return null;
             }
@@ -142,7 +143,7 @@ public class SymbolTable {
         }
 
         if ( p!=null && debug() ) System.out.println(
-                "SymbolTable.resolvePackage(" + packageName + "): found in " +
+                " SymbolTable.resolvePackage(" + packageName + "): found in " +
                 topLevelPackageScopes.keySet());
         return p;
     }

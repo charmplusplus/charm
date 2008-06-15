@@ -108,7 +108,7 @@ package charj.translator;
         }
 
         for (CharjAST pkg : imports) {
-            String pkgName = pkg.getTokenStream().toString(
+            String pkgName = input.getTokenStream().toString(
                     pkg.getTokenStartIndex(),
                     pkg.getTokenStopIndex());
             // find imported class and add to cs.imports
@@ -134,6 +134,7 @@ charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
         (p=packageDeclaration)? 
         (i+=importDeclaration)* 
         (t+=typeDeclaration)*)
+        { $cs = null; }
     ;
 
 packageDeclaration
@@ -141,7 +142,8 @@ packageDeclaration
     List<String> names = null; 
 }
     :   ^(PACKAGE qualifiedIdentifier)  {
-            names =  java.util.Arrays.asList($qualifiedIdentifier.text.split("[.]"));
+            names =  java.util.Arrays.asList(
+                    $qualifiedIdentifier.text.split("[.]"));
         }
     ;
     

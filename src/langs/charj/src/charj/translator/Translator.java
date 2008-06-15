@@ -1,5 +1,3 @@
-/***
-***/
 
 package charj.translator;
 
@@ -19,7 +17,6 @@ import org.antlr.stringtemplate.*;
  */
 public class Translator {
 
-    // template file locations
     public static final String templateFile = "charj/translator/Charj.stg";
 
     // variables controlled by command-line arguments
@@ -31,6 +28,8 @@ public class Translator {
     // library locations to search for classes
     private String m_stdlib;
     private List<String> m_usrlibs;
+
+    private SymbolTable m_symtab;
 
     public Translator(
             String _charmc,
@@ -44,13 +43,14 @@ public class Translator {
         m_verbose   = _verbose;
         m_stdlib    = _stdlib;
         m_usrlibs   = _usrlibs;
+        m_symtab    = new SymbolTable(this);
         m_errorCondition = false;
     }
 
     public boolean debug()      { return m_debug; }
     public boolean verbose()    { return m_verbose; }
 
-    public static TreeAdaptor adaptor = new CommonTreeAdaptor() {
+    public static TreeAdaptor m_adaptor = new CommonTreeAdaptor() {
         public Object create(Token token) {
             return new CharjAST(token);
         }
@@ -68,6 +68,10 @@ public class Translator {
         ANTLRFileStream input = new ANTLRFileStream(filename);
             
         CharjLexer lexer = new CharjLexer(input);
+
+        semanticPass(lexer);
+
+        input.seek(0);
         String ciOutput = translationPass(lexer, OutputMode.ci);
         writeTempFile(filename, ciOutput, OutputMode.ci);
 
@@ -90,25 +94,158 @@ public class Translator {
             ccHeader + ccOutput + footer;
     }
 
-    private String translationPass(
-            CharjLexer lexer, 
-            OutputMode m) throws
+    private CommonTreeNodeStream prepareNodes(
+            CommonTokenStream tokens,
+            CharjLexer lexer) throws
         RecognitionException, IOException, InterruptedException
     {
         // Use lexer tokens to feed tree parser
-        CommonTokenStream tokens = new CommonTokenStream(lexer);
         CharjParser parser = new CharjParser(tokens);
-        parser.setTreeAdaptor(adaptor);
+        parser.setTreeAdaptor(m_adaptor);
         CharjParser.charjSource_return r = parser.charjSource();
 
         // Create node stream for emitters
         CommonTree t = (CommonTree)r.getTree();
         CommonTreeNodeStream nodes = new CommonTreeNodeStream(t);
         nodes.setTokenStream(tokens);
-        nodes.setTreeAdaptor(adaptor);
+        nodes.setTreeAdaptor(m_adaptor);
+        return nodes;
+    }
+
+    private String translationPass(
+            CharjLexer lexer, 
+            OutputMode m) throws
+        RecognitionException, IOException, InterruptedException
+    {
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        CommonTreeNodeStream nodes = prepareNodes(tokens, lexer);
+        nodes.setTokenStream(tokens);
+        nodes.setTreeAdaptor(m_adaptor);
 
         String output = emit(nodes, m);
         return output;
+    }
+
+    private ClassSymbol semanticPass(CharjLexer lexer) throws
+        RecognitionException, IOException, InterruptedException
+    {
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        CommonTreeNodeStream nodes = prepareNodes(tokens, lexer);
+        nodes.setTokenStream(tokens);
+        nodes.setTreeAdaptor(m_adaptor);
+
+        CharjSemantics sem = new CharjSemantics(nodes);
+        ClassSymbol cs = sem.charjSource(m_symtab).cs;
+        return cs;
+    }
+
+    private String emit(
+            CommonTreeNodeStream nodes, 
+            OutputMode m) throws
+        RecognitionException, IOException, InterruptedException
+    {
+        CharjEmitter emitter = new CharjEmitter(nodes);
+        StringTemplateGroup templates = getTemplates(templateFile);
+        emitter.setTemplateLib(templates);
+        StringTemplate st = 
+            (StringTemplate)emitter.charjSource(m).getTemplate();
+        return st.toString();
+    }
+
+
+
+    private StringTemplateGroup getTemplates(String templateFile)
+    {
+        StringTemplateGroup templates = null;
+        try {
+            ClassLoader loader = Thread.currentThread().getContextClassLoader();
+            InputStream istream = loader.getResourceAsStream(templateFile);
+            BufferedReader reader = 
+                new BufferedReader(new InputStreamReader(istream));
+            templates = new StringTemplateGroup(reader);
+            reader.close();
+        } catch(IOException ex) {
+            error("Failed to load template file", ex); 
+        }
+        return templates;
+    }
+
+    public File findPackage(String packageName)
+    {
+        String packageDir = packageName.replaceAll("::", "/");
+        File p = new File(packageDir);
+        if ( debug() ) System.out.println(
+                " [charj] findPackage " + packageName + 
+                " trying " + p.getAbsoluteFile());
+       
+        // check current directory
+        if ( p.exists() ) {
+            return p;
+        }
+
+        // look in user libs if any
+        if ( m_usrlibs != null ) {
+            for (String lib : m_usrlibs) {
+                p = new File(lib, packageDir);
+                if (debug() ) System.out.println(
+                        " \tnot found, now trying " + p.getAbsoluteFile());
+                if ( p.exists() ) {
+                    return p;
+                }
+            }
+        }
+
+        // look in standard lib
+        p = new File(m_stdlib, packageDir);
+        if ( debug() ) System.out.println(
+                " \tnot found, now trying " + p.getAbsoluteFile());
+        if ( p.exists() ) {
+            return p;
+        }
+
+        return null;
+    }
+
+    /** Load a class from disk looking in lib/package
+     *  Side-effect: add class to symtab. This is used by ClassSymbol to
+     *  load unknown types from disk. packageName comes from the output
+     *  of PackageScope.getFullyQualifiedName
+     */
+    public ClassSymbol loadType(String packageName, String typeName)
+    {
+        if (debug()) System.out.println(
+                " [charj] loadType(" + typeName + ") from " + packageName);
+        
+        ClassSymbol cs = null;
+        try {
+            String packageDir = ".";
+            if ( packageName!=null ) {
+                packageDir = packageName.replaceAll("::", "/");
+            }
+            String fullName = packageDir + "/" + typeName + ".cj";
+		
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            boolean fileExists = (cl.getResource(fullName) == null);
+            if (!fileExists) {
+                if (debug()) System.out.println(
+                        " \tloadType(" + typeName + "): not found");
+                return null;
+            }
+
+            if (debug()) System.out.println(
+                    " \tloadType(" + typeName + "): parsing " + 
+                    packageName + "::" + typeName);
+            
+            ANTLRInputStream fs = new ANTLRInputStream(
+                    cl.getResourceAsStream(fullName));
+            fs.name = packageDir + "/" + typeName + ".cj";
+            CharjLexer lexer = new CharjLexer(fs);
+            
+            cs = semanticPass(lexer);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return cs;
     }
 
     /**
@@ -212,105 +349,46 @@ public class Translator {
         int retVal = p.exitValue();
         return retVal;
     }
-
-    private String emit(
-            CommonTreeNodeStream nodes, 
-            OutputMode m) throws
-        RecognitionException, IOException, InterruptedException
-    {
-        CharjEmitter emitter = new CharjEmitter(nodes);
-        StringTemplateGroup templates = getTemplates(templateFile);
-        emitter.setTemplateLib(templates);
-        StringTemplate st = (StringTemplate)emitter.charjSource(m).getTemplate();
-        return st.toString();
-    }
-
-    private StringTemplateGroup getTemplates(String templateFile)
-    {
-        StringTemplateGroup templates = null;
-        try {
-            ClassLoader loader = Thread.currentThread().getContextClassLoader();
-            InputStream istream = loader.getResourceAsStream(templateFile);
-            BufferedReader reader = 
-                new BufferedReader(new InputStreamReader(istream));
-            templates = new StringTemplateGroup(reader);
-            reader.close();
-        } catch(IOException ex) {
-            error("Failed to load template file", ex); 
-        }
-        return templates;
-    }
-
-    public File findPackage(String packageName)
-    {
-        String packageDir = packageName.replaceAll("::", "/");
-        File p = new File(packageDir);
-        if ( debug() ) System.out.println(
-                "findPackage " + packageName + 
-                " trying " + p.getAbsoluteFile());
-       
-        // check current directory
-        if ( p.exists() ) {
-            return p;
-        }
-
-        // look in user libs if any
-        if ( m_usrlibs != null ) {
-            for (String lib : m_usrlibs) {
-                p = new File(lib, packageDir);
-                if (debug() ) System.out.println(
-                        "not found, now trying " + p.getAbsoluteFile());
-                if ( p.exists() ) {
-                    return p;
-                }
-            }
-        }
-
-        // look in standard lib
-        p = new File(m_stdlib, packageDir);
-        if ( debug() ) System.out.println(
-                "not found, now trying " + p.getAbsoluteFile());
-        if ( p.exists() ) {
-            return p;
-        }
-
-        return null;
-    }
-
-    /** Load a class from disk looking in lib/package
-     *  Side-effect: add class to symtab.
-     */
-    public ClassSymbol loadType(String packageName, String typeName)
-    {
-        // TODO: implement me
-        return null;
-    }
     
+    public void error(
+            BaseRecognizer recog, 
+            String msg, 
+            CharjAST node) 
+    {
+        String sourceName = "";
+        if (recog == null) {
+            sourceName = "<anonymous>";
+        } else {
+            sourceName = recog.getSourceName();
+        }
+        error(sourceName, msg, node);
+    } 
+
     private void error(
             String sourceName, 
             String msg, 
-            CommonTree node) 
+            CharjAST node) 
     {
         m_errorCondition = true;
         String linecol = ":";
         if ( node!=null ) {
             CommonToken t = (CommonToken)node.getToken();
-            linecol = ": line " + t.getLine() + ":" + t.getCharPositionInLine();
+            linecol = ": line " + t.getLine() + ":" + 
+                t.getCharPositionInLine();
         }
         System.err.println(sourceName + linecol + " " + msg);
         System.err.flush();
     }
 
-
     private void error(
             String sourceName, 
             String msg) {
-        error(sourceName, msg, (CommonTree)null);
+        error(sourceName, msg, (CharjAST)null);
     }
 
 
     public void error(String msg) {
-        error(" [charjc] error", msg, (CommonTree)null);
+        error(" [charjc] error", msg, (CharjAST)null);
     }
 
 

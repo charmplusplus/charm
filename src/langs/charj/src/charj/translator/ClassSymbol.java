@@ -88,7 +88,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
             return p;
         }
 
-        if ( symtab.translator.findPackage(packageName)!=null ) {
+        if ( symtab.translator.findPackage(packageName) != null ) {
             p = symtab.definePkg(packageName);
             imports.put(packageName, p);
         }

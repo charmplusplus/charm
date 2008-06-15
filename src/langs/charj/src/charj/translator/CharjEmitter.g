@@ -132,11 +132,11 @@ packageDeclaration
     List<String> names = null; 
 }
     :   ^(PACKAGE qualifiedIdentifier)  {
-            names =  java.util.Arrays.asList($qualifiedIdentifier.text.split("[.]"));
+            names =  java.util.Arrays.asList(
+                    $qualifiedIdentifier.text.split("[.]"));
         }
         -> {(emitCC() || emitH())}? packageDeclaration_cc_h(
             ids={names})
-            //ids={names})//{$qualifiedIdentifier.text.split("[.]")})
         ->
     ;
     
@@ -241,12 +241,6 @@ classScopeDeclarations
         { 
             // determine whether this is an entry method
             entry = listContainsToken($m.start.getChildren(), ENTRY);
-//            CharjAST modList = (CharjAST)$m.start;
-//            for (CharjAST mod : (List<CharjAST>)modList.getChildren()) {
-//                if (mod.token.getType() == ENTRY) {
-//                    entry = true;
-//                }
-//            }
         }
         -> {emitCC()}? funcMethodDecl_cc(
                 modl={$m.st}, 
@@ -280,12 +274,7 @@ classScopeDeclarations
             f=formalParameterList t=throwsClause? b=block?)
         { 
             // determine whether this is an entry method
-            CharjAST modList = (CharjAST)$m.start;
-            for (CharjAST mod : (List<CharjAST>)modList.getChildren()) {
-                if (mod.token.getType() == ENTRY) {
-                    entry = true;
-                }
-            }
+            entry = listContainsToken($m.start.getChildren(), ENTRY);
         }
         -> {emitCC()}? voidMethodDecl_cc(
                 modl={$m.st}, 
@@ -315,12 +304,7 @@ classScopeDeclarations
             t=throwsClause? b=block)
         { 
             // determine whether this is an entry method
-            CharjAST modList = (CharjAST)$m.start;
-            for (CharjAST mod : (List<CharjAST>)modList.getChildren()) {
-                if (mod.token.getType() == ENTRY) {
-                    entry = true;
-                }
-            }
+            entry = listContainsToken($m.start.getChildren(), ENTRY);
         }
         -> {emitCC()}? ctorDecl_cc(
                 modl={$m.st}, 

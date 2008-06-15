@@ -33,7 +33,7 @@ public class PackageScope extends SymbolWithScope {
     public ClassSymbol resolveType(String type) 
     {
         if (debug()) System.out.println(
-                "PackageScope.resolveType(" + type + 
+                " PackageScope.resolveType(" + type + 
                 "): examine " + toString());
 
         // look for type in this package's members (other packages, classes)
@@ -41,7 +41,7 @@ public class PackageScope extends SymbolWithScope {
             Symbol s = getMembers().get(type);
             if ( s!=null && s instanceof ClassSymbol ) {
                 if (debug()) System.out.println(
-                        "PackageScope.resolveType(" + type + "): found in " + 
+                        " PackageScope.resolveType(" + type + "): found in " + 
                         toString());
                 return (ClassSymbol)s;
             }

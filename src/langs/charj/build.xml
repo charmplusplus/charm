@@ -80,12 +80,17 @@
             grammar.path="${buildsrc}/charj/translator"/>
     </target>
 
-    <target name="CharjEmitter" depends="Charj">
+    <target name="CharjSemantics" depends="Charj">
+        <antlr3 grammar.name="CharjSemantics.g" 
+            grammar.path="${buildsrc}/charj/translator"/>
+    </target>
+
+    <target name="CharjEmitter" depends="CharjSemantics">
         <antlr3 grammar.name="CharjEmitter.g" 
             grammar.path="${buildsrc}/charj/translator"/>
     </target>
 
-    <target name="compile" depends="Charj, CharjEmitter" description="compile">
+    <target name="compile" depends="CharjEmitter" description="compile">
         <javac debug="true" srcdir="${buildsrc}" destdir="${classes}"
                target="1.5" listfiles="Yes" deprecation="Yes">
                <classpath refid="${classpath}"/>

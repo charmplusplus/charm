@@ -2,12 +2,14 @@ package charj;
 
 import charj.translator.Translator;
 import java.io.FileInputStream;
-import java.util.Iterator;
+import java.util.*;
 import com.martiansoftware.jsap.*;
 
 public class Main 
 {
     public static String m_charmc;
+    public static String m_stdlib;
+    public static List<String> m_usrlibs;
     public static boolean m_debug;
     public static boolean m_verbose;
     public static boolean m_stdout;
@@ -15,7 +17,12 @@ public class Main
     public static void main(String[] args) throws Exception
     {
         String[] files = processArgs(args);
-        Translator t = new Translator(m_charmc, m_debug, m_verbose);
+        Translator t = new Translator(
+                m_charmc, 
+                m_debug, 
+                m_verbose,
+                m_stdlib,
+                m_usrlibs);
         for (String filename : files) { 
             if (!m_stdout) {
                 t.translate(filename);
@@ -37,6 +44,23 @@ public class Main
             .setLongFlag("charmc");
         _charmc.setHelp("Charm compiler used on generated charm code.");
         processor.registerParameter(_charmc);
+
+        FlaggedOption _stdlib = new FlaggedOption("stdlib")
+            .setStringParser(JSAP.STRING_PARSER)
+            .setRequired(false)
+            .setShortFlag(JSAP.NO_SHORTFLAG)
+            .setLongFlag("stdlib");
+        _stdlib.setHelp("Directory containing the Charj standard libary.");
+        processor.registerParameter(_stdlib);
+
+        FlaggedOption _usrlib = new FlaggedOption("usrlib")
+            .setStringParser(JSAP.STRING_PARSER)
+            .setRequired(false)
+            .setShortFlag(JSAP.NO_SHORTFLAG)
+            .setLongFlag("lib");
+        _usrlib.setHelp("Directories containing user Charj code, " +
+                "colon-delimited.");
+        processor.registerParameter(_usrlib);
 
         Switch _debug = new Switch("debug")
             .setShortFlag(JSAP.NO_SHORTFLAG)
@@ -75,9 +99,18 @@ public class Main
         }
 
         m_charmc = config.getString("charmc") + charmcFlags;
+        m_stdlib = config.getString("stdlib");
         m_debug = config.getBoolean("debug", false);
         m_verbose = config.getBoolean("verbose", false);
         m_stdout = config.getBoolean("stdout", false);
+        
+        String usrlib = config.getString("usrlib");
+        if (usrlib != null) {
+            m_usrlibs = Arrays.asList(usrlib.split(":"));
+        } else {
+            m_usrlibs = null;
+        }
+
         String[] files = config.getStringArray("files");
         return files;
     }

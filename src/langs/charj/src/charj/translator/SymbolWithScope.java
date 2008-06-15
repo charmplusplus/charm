@@ -146,7 +146,7 @@ public abstract class SymbolWithScope
         members.put(name, sym);
         sym.scope = this; // track the scope in each symbol
         
-        if (debug()) System.out.println("define " + name + " as " + sym);
+        if (debug()) System.out.println(" \tdefine " + name + " as " + sym);
         return sym;
     }
 
