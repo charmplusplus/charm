@@ -65,15 +65,21 @@ int myrand(int numpes) {
 #define USE_RRMAP		0
 #define USE_BLOCKMAP		1
 #define USE_BLOCK_RNDMAP	0
-#define USE_BLOCK_RRMAP		0
+#define USE_BLOCK_RRMAP		1
 #define USE_SMPMAP		0
+#define USE_3D_ARRAYS		0
 
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
 #define wrap_x(a)	(((a)+num_chare_x)%num_chare_x)
 #define wrap_y(a)	(((a)+num_chare_y)%num_chare_y)
 #define wrap_z(a)	(((a)+num_chare_z)%num_chare_z)
+
+#if USE_3D_ARRAYS
+#define index(a, b, c)	a][b][c	
+#else
 #define index(a, b, c)	(a*(blockDimY+2)*(blockDimZ+2) + b*(blockDimZ+2) + c)
+#endif
 
 #define MAX_ITER		21
 #define LEFT			1
@@ -217,15 +223,33 @@ class Jacobi: public CBase_Jacobi {
     int iterations;
     int msgs;
 
+#if USE_3D_ARRAYS
+    double ***temperature;
+    double ***new_temperature;
+#else
     double *temperature;
     double *new_temperature;
+#endif
 
     // Constructor, initialize values
     Jacobi() {
         int i, j, k;
         // allocate a three dimensional array
+#if USE_3D_ARRAYS
+	temperature = new double**[blockDimX+2];
+	new_temperature = new double**[blockDimX+2];
+        for (i=0; i<blockDimX+2; i++) {
+          temperature[i] = new double*[blockDimY+2];
+          new_temperature[i] = new double*[blockDimY+2];
+          for(j=0; j<blockDimY+2; j++) {
+            temperature[i][j] = new double[blockDimZ+2];
+            new_temperature[i][j] = new double[blockDimZ+2];
+	  }
+	}
+#else
         temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
         new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
+#endif
 
         for(i=0; i<blockDimX+2; ++i) {
           for(j=0; j<blockDimY+2; ++j) {
@@ -266,8 +290,21 @@ class Jacobi: public CBase_Jacobi {
     Jacobi(CkMigrateMessage* m) {}
 
     ~Jacobi() { 
+#if USE_3D_ARRAYS
+      for (int i=0; i<blockDimX+2; i++) {
+        for(int j=0; j<blockDimY+2; j++) {
+          delete [] temperature[i][j];
+          delete [] new_temperature[i][j];
+	}
+        delete [] temperature[i];
+        delete [] new_temperature[i];
+      }
       delete [] temperature; 
       delete [] new_temperature; 
+#else
+      delete [] temperature; 
+      delete [] new_temperature; 
+#endif
     }
 
     // Perform one iteration of work
@@ -473,7 +510,7 @@ class JacobiMap : public CkArrayMap {
       dimY = tmgr.getDimNY();
       dimZ = tmgr.getDimNZ();
       dimT = tmgr.getDimNT();
-#elif USE_BLOCKMAP || USE_BLOCK_RRMAP
+#elif USE_BLOCKMAP
       dimX = tx;
       dimY = ty;
       dimZ = tz;
@@ -551,10 +588,11 @@ class JacobiMap : public CkArrayMap {
 		    mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k);
 #elif USE_BLOCKMAP
 		    mapping[ci*Y*Z + cj*Z + ck] = i + j*dimX + k*dimX*dimY;
-#elif USE_BLOCK_RNDMAP
+  #if USE_BLOCK_RNDMAP
 		    mapping[ci*Y*Z + cj*Z + ck] = pe;
-#elif USE_BLOCK_RRMAP
+  #elif USE_BLOCK_RRMAP
 		    mapping[ci*Y*Z + cj*Z + ck] = pe;
+  #endif
 #endif
 		  }
 #if USE_BLOCK_RRMAP
