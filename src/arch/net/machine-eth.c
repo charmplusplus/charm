@@ -98,21 +98,24 @@ int CheckSocketsReady(int withDelayMs)
   CMK_PIPE_DECL(withDelayMs);
 
 
-#if CMK_USE_KQUEUE 
-  /* Only setup the CMK_PIPE structures the first time they are used.  
-     This makes the kqueue implementation much faster. 
-  */ 
-  static int first = 1; 
-  if(first){ 
-    first = 0; 
-    CmiStdoutAdd(CMK_PIPE_SUB); 
-    if (Cmi_charmrun_fd!=-1) { CMK_PIPE_ADDREAD(Cmi_charmrun_fd); } 
-    else return 0; /* If there's no charmrun, none of this matters. */ 
-    if (dataskt!=-1) { 
-      CMK_PIPE_ADDREAD(dataskt);  
-      CMK_PIPE_ADDWRITE(dataskt); 
-    } 
-  } 
+#if CMK_USE_KQUEUE && 0
+  // This implementation doesn't yet work, but potentially is much faster
+
+  /* Only setup the CMK_PIPE structures the first time they are used. 
+     This makes the kqueue implementation much faster.
+  */
+  static int first = 1;
+  if(first){
+    first = 0;
+    CmiStdoutAdd(CMK_PIPE_SUB);
+    if (Cmi_charmrun_fd!=-1) { CMK_PIPE_ADDREAD(Cmi_charmrun_fd); }
+    else return 0; /* If there's no charmrun, none of this matters. */
+    if (dataskt!=-1) {
+      CMK_PIPE_ADDREAD(dataskt); 
+      CMK_PIPE_ADDWRITE(dataskt);
+    }
+  }
+
 #else  
   CmiStdoutAdd(CMK_PIPE_SUB);  
   if (Cmi_charmrun_fd!=-1) { CMK_PIPE_ADDREAD(Cmi_charmrun_fd); }  
