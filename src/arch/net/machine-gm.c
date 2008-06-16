@@ -834,6 +834,7 @@ int CmiBarrier()
   }
   CmiNodeAllBarrier();
   /* printf("[%d] OUT of barrier \n", CmiMyPe()); */
+  return 0;
 }
 
 /* everyone sends a message to pe 0 and go on */
@@ -853,6 +854,7 @@ int CmiBarrierZero()
     }
   }
   CmiNodeAllBarrier();
+  return 0;
 }
 
 /***********************************************************************

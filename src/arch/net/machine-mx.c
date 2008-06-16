@@ -672,47 +672,41 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
   MACHSTATE(2, "} DeliverViaNetwork");
 }
 
-#if 0
 static void sendBarrierMessage(int pe)
 {
-  int len = 32;
-  char *buf = (char *)gm_dma_malloc(gmport, len);
-  int size = gm_min_size_for_length(len);
+  mx_request_t send_handle;
+  mx_segment_t buffer_desc;
+  mx_return_t rc;
+  mx_status_t status;
+  uint32_t result;
+  char msg[10];
+
   OtherNode  node = nodes + pe;
-  CmiAssert(buf);
-  gm_send_with_callback(gmport, buf, size, len,
-              GM_HIGH_PRIORITY, node->mach_id, node->dataport,
-              send_callback_nothing, buf);
+  buffer_desc.segment_ptr = msg;
+  buffer_desc.segment_length = 10;
+  rc = mx_issend(endpoint, &buffer_desc, 1, node->endpoint_addr, MATCH_FILTER, NULL, &send_handle);
+  do {
+    rc = mx_test(endpoint, &send_handle, &status, &result);
+  } while (rc == MX_SUCCESS && !result);
 }
 
 static void recvBarrierMessage()
 {
-  gm_recv_event_t *e;
-  int size, len;
-  char *msg;
-  while (1) {
-    e = gm_receive(gmport);
-    switch (gm_ntohc(e->recv.type))
-    {
-      case GM_HIGH_RECV_EVENT:
-      case GM_RECV_EVENT:
-        MACHSTATE(4,"Incoming message")
-        size = gm_ntohc(e->recv.size);
-        msg = gm_ntohp(e->recv.buffer);
-        len = gm_ntohl(e->recv.length);
-        gm_provide_receive_buffer(gmport, msg, size, GM_HIGH_PRIORITY);
-        return;
-      case GM_NO_RECV_EVENT:
-        continue ;
-      default:
-        MACHSTATE1(3,"Unrecognized GM event %d", gm_ntohc(e->recv.type))
-        gm_unknown(gmport, e);
-    }
-  }
+  mx_segment_t buffer_desc;
+  char msg[10];
+  mx_return_t rc;
+  mx_status_t status;
+  mx_request_t recv_handle;
+  uint32_t result;
+
+  buffer_desc.segment_length = 10;
+  buffer_desc.segment_ptr = msg;
+  rc = mx_irecv(endpoint, &buffer_desc, 1, MATCH_FILTER, MATCH_MASK, NULL, &recv_handle);
+  rc = mx_wait(endpoint, &recv_handle, MX_INFINITE, &status, &result);
 }
 
 /* happen at node level */
-void CmiBarrier()
+int CmiBarrier()
 {
   int len, size, i;
   int status;
@@ -755,10 +749,11 @@ void CmiBarrier()
   }
   CmiNodeAllBarrier();
   /* printf("[%d] OUT of barrier \n", CmiMyPe()); */
+  return 0;
 }
 
 /* everyone sends a message to pe 0 and go on */
-void CmiBarrierZero()
+int CmiBarrierZero()
 {
   int i;
 
@@ -774,8 +769,8 @@ void CmiBarrierZero()
     }
   }
   CmiNodeAllBarrier();
+  return 0;
 }
-#endif
 
 /***********************************************************************
  * CmiMachineInit()

@@ -790,7 +790,6 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 #elif CMK_USE_MX
 
 #include "machine-mx.c"
-#define BARRIER_NULL           1
 
 #elif CMK_USE_AMMASSO
 
