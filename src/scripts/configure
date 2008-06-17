@@ -1977,6 +1977,12 @@ fi
 cat > $t <<EOT
 #include <ucontext.h>
 vrregset_t *v_regs;
+ucontext_t  uc;
+
+void foo()
+{
+  vrregset_t *ptr = uc.uc_mcontext.v_regs;
+}
 EOT
 test_cxx "whether ucontext has pointer (v_regs) of vector type" "yes" "no" ""
 
