@@ -3,7 +3,7 @@
 
 #define CMK_NO_OUTSTANDING_SENDS			   0
 
-#define CMK_MEMORY_PREALLOCATE_HACK                        1
+#define CMK_MEMORY_PREALLOCATE_HACK                        1 
 
 #define CMK_CONVERSE_MPI                                   1
 
@@ -21,7 +21,7 @@
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             1
 
-#define CMK_NODE_QUEUE_AVAILABLE                           0
+#define CMK_NODE_QUEUE_AVAILABLE                           0 
 
 #define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_UNAVAILABLE                        1

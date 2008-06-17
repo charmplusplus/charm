@@ -9,6 +9,7 @@
 #include "converse.h"
 #include "pcqueue.h"
 #include "assert.h"
+#include "malloc.h"
 
 #include "dcmf.h"
 
@@ -210,15 +211,15 @@ static void SendMsgsUntil(int);
 void SendSpanningChildren(int size, char *msg);
 void SendHypercube(int size, char *msg);
 
-DCMF_Protocol_t  cmi_dcmf_short_registration;
-DCMF_Protocol_t  cmi_dcmf_eager_registration;
-DCMF_Protocol_t  cmi_dcmf_rzv_registration;
+DCMF_Protocol_t  cmi_dcmf_short_registration __attribute__((__aligned__(16)));
+DCMF_Protocol_t  cmi_dcmf_eager_registration __attribute__((__aligned__(16)));
+DCMF_Protocol_t  cmi_dcmf_rzv_registration   __attribute__((__aligned__(16)));
 #define BGP_USE_RDMA 1
 /*#define CMI_DIRECT_DEBUG 1*/
 #ifdef BGP_USE_RDMA
 
 
-DCMF_Protocol_t  cmi_dcmf_direct_registration;
+DCMF_Protocol_t  cmi_dcmf_direct_registration __attribute__((__aligned__(16)));
 /** The receive side of a put implemented in DCMF_Send */
 
 
@@ -297,7 +298,10 @@ inline SMSG_LIST * smsg_allocate() {
   if (smsg != NULL)
     return smsg;
   
-  return  (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
+  void * buf = memalign(32, sizeof(SMSG_LIST));  //malloc(sizeof(SMSG_LIST));
+  assert (((unsigned)buf & 0x0f) == 0);
+  
+  return (SMSG_LIST *) buf;
 }
 
 inline void smsg_free (SMSG_LIST *smsg) {
@@ -351,7 +355,6 @@ static void recv_done(void *clientdata){
 
   char *msg = (char *) clientdata;
   int sndlen = ((CmiMsgHeaderBasic *) msg)->size;
-  int count = 0;
 
   //fprintf (stderr, "%d Recv message done \n", CmiMyPe());
 
@@ -366,9 +369,9 @@ static void recv_done(void *clientdata){
 
 #if CMK_BROADCAST_SPANNING_TREE | CMK_BROADCAST_HYPERCUBE
   if(CMI_BROADCAST_ROOT(msg) != 0) {
-    //printf ("%d: Receiving bcast message from %d with %d bytes\n", CmiMyPe(), CMI_BROADCAST_ROOT(msg), sndlen);
-
     int pe = CMI_DEST_RANK(msg);
+
+    //printf ("%d: Receiving bcast message from %d with %d bytes for %d\n", CmiMyPe(), CMI_BROADCAST_ROOT(msg), sndlen, pe);
 
     char *copymsg;
     copymsg = (char *)CmiAlloc(sndlen);
@@ -568,21 +571,26 @@ int mysleep (int sec) {
    return count;
 }
 
+static void * test_buf;
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret){
   int n, i, count;
 
+  mcheck_check_all ();
+
   //fprintf(stderr, "Initializing Converse Blue Gene/P machine Layer\n");
 
-  
   DCMF_Messager_initialize();
+
+  mcheck_check_all ();
+
 #if CMK_SMP
   DCMF_Configure_t  config_in, config_out;
   config_in.thread_level= DCMF_THREAD_MULTIPLE;
   config_in.interrupts  = DCMF_INTERRUPTS_OFF;
   
   DCMF_Messager_configure(&config_in, &config_out);  
-  assert (config_out.thread_level == DCMF_THREAD_MULTIPLE);
+  //assert (config_out.thread_level == DCMF_THREAD_MULTIPLE); //not supported in vn mode
 #endif
 
   DCMF_Send_Configuration_t short_config, eager_config, rzv_config;
@@ -619,6 +627,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   directcb.clientdata=NULL;
 #endif
  
+  mcheck_check_all ();
+
   //fprintf(stderr, "Initializing Eager Protocol\n");
  
   _Cmi_numnodes = DCMF_Messager_size();
@@ -676,6 +686,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   //printf ("Starting Threads\n");
 
   CmiStartThreads(argv);  
+
+  mcheck_check_all ();
+
   ConverseRunPE(initret);
 }
 
@@ -691,6 +704,8 @@ void ConverseRunPE(int everReturn)
 {
   //printf ("ConverseRunPE on rank %d\n", CmiMyPe());
 
+  mcheck_check_all ();
+
   CmiIdleState *s=CmiNotifyGetState();
   CmiState cs;
   char** CmiMyArgv;
@@ -704,12 +719,15 @@ void ConverseRunPE(int everReturn)
     CmiMyArgv=CmiCopyArgs(Cmi_argvcopy);
   else   
     CmiMyArgv=Cmi_argv;
-    
+  
   CthInit(CmiMyArgv);
-
+  
+  mcheck_check_all ();
+  
   //printf ("Before Converse Common Init\n");
-
   ConverseCommonInit(CmiMyArgv);
+
+  mcheck_check_all ();
 
   /* initialize the network progress counter*/
   /* Network progress function is used to poll the network when for
@@ -962,8 +980,6 @@ void CmiGeneralFreeSendN (int node, int rank, int size, char * msg) {
   }
 #endif
   
-  CmiState cs = CmiGetState();     
-
   SMSG_LIST *msg_tmp = smsg_allocate(); //(SMSG_LIST *) malloc(sizeof(SMSG_LIST));
   msg_tmp->destpe = node; //destPE;
   msg_tmp->size = size;
@@ -1011,6 +1027,8 @@ void SendSpanningChildren(int size, char *msg)
   int startpe = CMI_BROADCAST_ROOT(msg)-1;
   int i;
   
+  //printf ("%d [%d]: In Send Spanning Tree\n",  CmiMyPe(), CmiMyNode());    
+
   CmiAssert(startpe>=0 && startpe<_Cmi_numpes);
   int dist = cs->pe-startpe;
   if(dist<0) dist+=_Cmi_numpes;
@@ -1021,8 +1039,7 @@ void SendSpanningChildren(int size, char *msg)
     p = p%_Cmi_numpes;
     CmiAssert(p>=0 && p<_Cmi_numpes && p!=cs->pe);
     
-    //printf ("%d: Sending Spanning Tree Msg to %d\n",  CmiMyPe(), p);
-    
+    //printf ("%d [%d]: Sending Spanning Tree Msg to %d\n",  CmiMyPe(), CmiMyNode(), p);    
     CmiSyncSendFn1(p, size, msg);
   }
 }
@@ -1062,6 +1079,8 @@ void CmiSyncBroadcastFn(int size, char *msg){
 
 void CmiFreeBroadcastFn(int size, char *msg){
   
+  //printf("%d: Calling Broadcast %d\n", CmiMyPe(), size);
+
   CmiState cs = CmiGetState();
 #if CMK_BROADCAST_SPANNING_TREE
   //printf ("%d: Starting Spanning Tree Broadcast of size %d bytes\n", CmiMyPe(), size);
