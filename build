@@ -31,7 +31,7 @@ syntax() {
   echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 gcc4 mpcc pathscale'
   echo 'help smp gm tcp vmi scyld clustermatic bigemulator ooc syncft papi'
   echo 'pthreads lam'
-  echo '--incdir --libdir --basedir --no-build-shared -j'
+  echo '--incdir --libdir --basedir --no-build-shared --destination --suffix -j'
   if test $more = 1
   then
   echo ''
@@ -81,11 +81,13 @@ syntax() {
   echo "  --no-build-shared  don't build Charm++'s shared libraries"
   echo ''
   echo 'Miscellaneous options:'
-  echo '  --incdir=DIR	  specify additional include path for compiler'
-  echo '  --libdir=DIR	  specify additional lib path for compiler'
-  echo '  --basedir=DIR	  shortcut for the above two - DIR/include and DIR/lib'
-  echo '  -j[N]           parallel make, N is the number of paralle make jobs'
-  echo "  --with-romio    build AMPI with ROMIO library"
+  echo '  --incdir=DIR       specify additional include path for compiler'
+  echo '  --libdir=DIR	     specify additional lib path for compiler'
+  echo '  --basedir=DIR	     shortcut for the above two - DIR/include and DIR/lib'
+  echo '  -j[N]              parallel make, N is the number of paralle make jobs'
+  echo "  --with-romio       build AMPI with ROMIO library"
+  echo "  --destination=DIR  build Charm++ inside DIR, by default the destination is <version>"
+  echo "  --suffix=DIR       append DIR to the destination directory of the Charm++ build"
   fi
   echo ''
   echo '<charmc-options>: normal compiler options e.g. -g -O -save -verbose'
@@ -112,9 +114,9 @@ syntax() {
   echo '  ./build charm++ mpi-linux --basedir /usr/local/mpich -O'
   echo ''
   echo 'Note: This script:'
-  echo ' 1. Creates directories <version> and <version>/tmp';
-  echo ' 2. Copies src/scripts/Makefile into <version>/tmp';
-  echo ' 3. Does a "make <target> <version> OPTS=<charmc-options>" in <version>/tmp.'
+  echo ' 1. Creates directories <destination> and <destination>/tmp';
+  echo ' 2. Copies src/scripts/Makefile into <destination>/tmp';
+  echo ' 3. Does a "make <target> <version> OPTS=<charmc-options>" in <destination>/tmp.'
   echo "That's all build does.  The rest is handled by the Makefile."
   echo ''
   echo 'Thank you for using Charm++, please send questions or comments to '
@@ -196,6 +198,8 @@ ARCH=
 BUILD_SHARED=
 WITH_ROMIO=
 BUILD_EMULATOR=0
+DESTINATION=""
+DESTINATION_SUFFIX=""
 
 [ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | more && exit 1
 [ $# -lt 2 ] && ./smart-build.pl && exit 1
@@ -282,6 +286,24 @@ do
 		# obsolete, do nothing
 		shift
 		;;
+    --destination)
+		shift
+		DESTINATION="$1"
+		shift
+		;;
+    --destination=*)
+		DESTINATION="`echo $1 | awk -F= '{print $2}'`"
+		shift
+		;;
+    --suffix)
+		shift
+		DESTINATION_SUFFIX="$1"
+		shift
+		;;
+    --suffix=*)
+		DESTINATION_SUFFIX="`echo $1 | awk -F= '{print $2}'`"
+		shift
+		;;
     -j*)
                 PMAKENUM=`echo $1 | awk -Fj '{print $2}'`
 		MAKEOPTS="$MAKEOPTS -j $PMAKENUM"
@@ -349,16 +371,28 @@ then
   done
 fi
 
-[ -d $VERSION ] || echo "Creating dir: $VERSION" 
-[ -d $VERSION ] || mkdir $VERSION
-[ -d $VERSION/tmp ] || echo "Creating dir: $VERSION/tmp" 
-[ -d $VERSION/tmp ] || mkdir $VERSION/tmp
+echo "|$DESTINATION|$DESTINATION_SUFFIX|"
 
-echo "Copying src/scripts/Makefile to $VERSION/tmp"
-rm -f $VERSION/tmp/Makefile
-rm -f $VERSION/tmp/Make.depends
-rm -f $VERSION/tmp/Make.lb
-rm -f $VERSION/tmp/Make.machine
+if [ -z "$DESTINATION" ]
+then
+  DESTINATION="$VERSION"
+fi
+
+if [ -n "$DESTINATION_SUFFIX" ]
+then
+  DESTINATION="$DESTINATION-$DESTINATION_SUFFIX"
+fi
+
+[ -d $DESTINATION ] || echo "Creating dir: $DESTINATION" 
+[ -d $DESTINATION ] || mkdir $DESTINATION
+[ -d $DESTINATION/tmp ] || echo "Creating dir: $DESTINATION/tmp" 
+[ -d $DESTINATION/tmp ] || mkdir $DESTINATION/tmp
+
+echo "Copying src/scripts/Makefile to $DESTINATION/tmp"
+rm -f $DESTINATION/tmp/Makefile
+rm -f $DESTINATION/tmp/Make.depends
+rm -f $DESTINATION/tmp/Make.lb
+rm -f $DESTINATION/tmp/Make.machine
 
 
 # Create the bin, lib, include, etc. links:
@@ -368,27 +402,27 @@ then
 # source files.
 	echo "Copying compilers for win32 into cygwin /bin directory"
 	cp $src/win32/unix2nt* /bin
-	cp $src/win32/system_ln $VERSION/tmp
-	cp $src/win32/unistd.h $VERSION/tmp
+	cp $src/win32/system_ln $DESTINATION/tmp
+	cp $src/win32/unistd.h $DESTINATION/tmp
 	cp $src/win32/createlink.exe /bin
-  chmod +x $VERSION/tmp/system_ln
+  chmod +x $DESTINATION/tmp/system_ln
 elif [ "x_`echo $VERSION | awk -F- '{print $2}'`" = "x_win64" ]
 then
 #Win64 version needs special compilers and *copied* (not linked)
 # source files.
 	echo "Copying compilers for win64 into cygwin /bin directory"
 	cp $src/win64/unix2nt* /bin
-	cp $src/win32/system_ln $VERSION/tmp
-	cp $src/win32/unistd.h $VERSION/tmp
-	cp $src/win32/unistd.h $VERSION/include
+	cp $src/win32/system_ln $DESTINATION/tmp
+	cp $src/win32/unistd.h $DESTINATION/tmp
+	cp $src/win32/unistd.h $DESTINATION/include
 	cp $src/win32/createlink.exe /bin
-  chmod +x $VERSION/tmp/system_ln
+  chmod +x $DESTINATION/tmp/system_ln
 else
-	cat > $VERSION/tmp/system_ln <<EOF
+	cat > $DESTINATION/tmp/system_ln <<EOF
 #!/bin/sh
 ln -f -s \$@
 EOF
-  chmod +x $VERSION/tmp/system_ln
+  chmod +x $DESTINATION/tmp/system_ln
   for newdir in `echo bin lib lib_so include tmp`
   do
     echo "Soft-linking over $newdir"
@@ -396,18 +430,18 @@ EOF
     then
       rm -fr $newdir || exit 1
     fi
-    $VERSION/tmp/system_ln $VERSION/$newdir $newdir
+    $DESTINATION/tmp/system_ln $DESTINATION/$newdir $newdir
   done
   rm -f VERSION
-  $VERSION/tmp/system_ln $VERSION/include/VERSION VERSION
+  $DESTINATION/tmp/system_ln $DESTINATION/include/VERSION VERSION
 fi
 
-$VERSION/tmp/system_ln "../../src/scripts/Make.depends" $VERSION/tmp/Make.depends
-$VERSION/tmp/system_ln "../../src/ck-ldb/Make.lb" $VERSION/tmp/Make.lb
-$VERSION/tmp/system_ln "../../src/scripts/Makefile" $VERSION/tmp/Makefile
-touch $VERSION/tmp/Makefile.machine
+$DESTINATION/tmp/system_ln "../../src/scripts/Make.depends" $DESTINATION/tmp/Make.depends
+$DESTINATION/tmp/system_ln "../../src/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
+$DESTINATION/tmp/system_ln "../../src/scripts/Makefile" $DESTINATION/tmp/Makefile
+touch $DESTINATION/tmp/Makefile.machine
 
-ConvUsr="$VERSION/tmp/conv-mach-pre.sh"
+ConvUsr="$DESTINATION/tmp/conv-mach-pre.sh"
 echo "Generating $ConvUsr"
 echo > $ConvUsr
 if test -n "$LIBDIR" 
@@ -423,8 +457,8 @@ fi
 chmod +x $ConvUsr
 
 # Create conv-mach-opt headers with special build-time options
-ConvHeader="$VERSION/tmp/conv-mach-opt.h"
-ConvSh="$VERSION/tmp/conv-mach-opt.sh"
+ConvHeader="$DESTINATION/tmp/conv-mach-opt.h"
+ConvSh="$DESTINATION/tmp/conv-mach-opt.sh"
 if [ ! -f $ConvSh -o ! -f $ConvHeader ]
 then
   echo "Generating $ConvHeader, conv-mach-opt.sh"
@@ -457,7 +491,7 @@ then
     echo "CMK_AMPI_WITH_ROMIO=\"true\"" >> $ConvSh
 fi
 
-echo $BASEVERSION > $VERSION/tmp/.vdir
+echo $BASEVERSION > $DESTINATION/tmp/.vdir
 
 if test $BUILD_EMULATOR = 1
 then
@@ -465,7 +499,7 @@ then
 fi
 
 echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS"' in $VERSION/tmp"
-cd $VERSION/tmp 
+cd $DESTINATION/tmp 
 $MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS $BUILD_SHARED"
 
 MAKEEXIT=$?
@@ -477,7 +511,7 @@ then
 	     "tests/charm++/simplearrayhello"
 else
 	echo "-------------------------------------------------"
-	echo "Charm++ NOT BUILT. Either cd into $VERSION/tmp and try"
+	echo "Charm++ NOT BUILT. Either cd into $DESTINATION/tmp and try"
 	echo "to resolve the problems yourself, visit"
 	echo "    http://charm.cs.uiuc.edu/"
 	echo "for more information. Otherwise, email the developers at ppl@cs.uiuc.edu"
