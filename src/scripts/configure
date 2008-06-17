@@ -1974,6 +1974,17 @@ _ACEOF
 
 fi
 
+cat > $t <<EOT
+#include <ucontext.h>
+vrregset_t *v_regs;
+EOT
+test_cxx "whether ucontext has pointer (v_regs) of vector type" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_CONTEXT_V_REGS $pass
+_ACEOF
+
+
 ###################### C++ Compiler Features #####################
 
 #### check C inline ####

@@ -18,6 +18,9 @@
 /* whether ucontext uses uc_regs union */
 #undef CMK_CONTEXT_FPU_POINTER_UCREGS
 
+/* whether ucontext has pointer (v_regs) of vector type */
+#undef CMK_CONTEXT_V_REGS
+
 /* C++ *_casts<> does not work */
 #undef CMK_CPP_CAST_ILLEGAL
 
