@@ -154,7 +154,8 @@ where $c$ is a constant. Although we have used different symbols (\code{p} and
 
 The parameters are produced and consumed in the program order. Namely, a
 parameter produced in an early statement will be consumed by the next consuming
-statement, but will no longer be visible to any consuming statement after that.
+statement, but will no longer be visible to any consuming statement after a 
+subsequent statement producing the same parameter in program order.
 Special rules involving loops are discussed later with loop statement.
 
 $\bullet$ {\bf Overlap Statement}
