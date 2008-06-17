@@ -1573,6 +1573,13 @@ CthThread CthPup(pup_er p, CthThread t)
   }
 #endif
 #endif
+#if !CMK_THREADS_USE_JCONTEXT && CMK_CONTEXT_V_REGS
+    /* linux-ppc  64 bit */
+  if (pup_isUnpacking(p)) {
+      t->context.uc_mcontext.v_regs = malloc(sizeof(vrregset_t));
+  }
+  pup_bytes(p,t->context.uc_mcontext.v_regs,sizeof(vrregset_t));
+#endif
   if (pup_isUnpacking(p)) {
       t->context.uc_link = 0;
   }
