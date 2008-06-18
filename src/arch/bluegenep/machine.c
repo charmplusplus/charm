@@ -360,7 +360,7 @@ static void recv_done(void *clientdata){
 
   /* then we do what PumpMsgs used to do:
    * push msg to recv queue */
-  
+  int count=0;
   CMI_CHECK_CHECKSUM(msg, sndlen);
   if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
     CmiAbort("Charm++ Warning: Non Charm++ Message Received. \n");
