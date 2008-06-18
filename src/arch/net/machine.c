@@ -338,6 +338,10 @@ static int already_in_signal_handler=0;
 
 static void CmiDestoryLocks();
 
+#if CMK_USE_SYSVSHM /* define teardown function before use */
+void tearDownSharedBuffers();
+#endif 
+
 static void machine_exit(int status)
 {
   MACHSTATE(3,"     machine_exit");

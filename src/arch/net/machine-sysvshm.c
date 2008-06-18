@@ -34,13 +34,27 @@
 #include <sys/shm.h>
 #include <sys/sem.h>
 
-#define SYSVSHM_BITS 5 			// Number of bits to represent number of cpus in a node - currently 32 cpus supported
-#define SYSVSHM_SIZE (1<<SYSVSHM_BITS)	// Number of bits to represent number of cpus in a node - currently 32 cpus supported
+#define SYSVSHM_BITS 5 			/* Number of bits to represent number of cpus in a node - currently 32 cpus supported */
+#define SYSVSHM_SIZE (1<<SYSVSHM_BITS)	/* Number of bits to represent number of cpus in a node - currently 32 cpus supported */
 
-#define MEMDEBUG(x) //x
+#define MEMDEBUG(x) /* x */
 
 #define SYSVSHM_STATS 0
 
+#define ACQUIRENW(i) sb.sem_num=i; sb.sem_op=-1; sb.sem_flg=IPC_NOWAIT
+//FIXME: FIGURE OUT WHICH IS BEST AND REMOVE OTHERS
+#define ACQUIRE(i)   sb.sem_num=i; sb.sem_op=-1; sb.sem_flg=SEM_UNDO
+#define RELEASE(i)   sb.sem_num=i; sb.sem_op=1;  sb.sem_flg=SEM_UNDO
+
+#define TESTARRAY 1
+
+#define SNDBITS(i) ((sysvshmContext->nodestart+i)%SYSVSHM_SIZE)
+#define RCVBITS(i) ((sysvshmContext->nodestart+sysvshmContext->noderank)%SYSVSHM_SIZE)
+#define PIDBITS    Cmi_charmrun_pid%(sizeof(int)-2*SYSVSHM_SIZE)
+#define SHMSNDNAME(i)   (PIDBITS<<(SYSVSHM_BITS*2))+(RCVBITS(i)<<SYSVSHM_BITS)+SNDBITS(i)
+#define SHMRCVNAME(i)   (PIDBITS<<(SYSVSHM_BITS*2))+(SNDBITS(i)<<SYSVSHM_BITS)+RCVBITS(i)
+#define SEMSNDNAME(i)   (PIDBITS<<(SYSVSHM_BITS*2))+SNDBITS(i)
+#define SEMRCVNAME(i)   (PIDBITS<<(SYSVSHM_BITS*2))+RCVBITS(i)
 
 
 /************************
@@ -57,10 +71,10 @@
 #define SENDQSTARTSIZE 128
 
 
-/// This struct is used as the first portion of a shared memory region, followed by data
+/* This struct is used as the first portion of a shared memory region, followed by data */
 typedef struct {
-	int count; //number of messages
-	int bytes; //number of bytes
+	int count; /* number of messages */
+	int bytes; /* number of bytes */
 
 } sharedBufHeader;
 
@@ -73,10 +87,10 @@ typedef struct {
 } sharedBufData;
 
 typedef struct {
-	int size; //total size of data array
-	int begin; //position of first element
-	int end;	//position of next element
-	int numEntries; //number of entries
+	int size;  /* total size of data array */
+	int begin; /* position of first element */
+	int end;   /*	position of next element */
+	int numEntries; /* number of entries */
 
 	OutgoingMsg *data;
 
@@ -85,7 +99,9 @@ typedef struct {
 typedef struct {
 	int nodesize;
 	int noderank;
-	int nodestart,nodeend;//proc numbers for the start and end of this node
+	int nodestart,nodeend; /* proc numbers for the start and end of this node */
+
+	ushort *semarray;
 
         int *sendbufnames;
         int *recvbufnames;
@@ -107,14 +123,7 @@ typedef struct {
 
 } SysvshmContext;
 
-struct sembuf
-acquire = {0, -1, SEM_UNDO},
-release = {0,  1, SEM_UNDO},
-zero    = {0,  0, SEM_UNDO},
-test    = {0, -1, IPC_NOWAIT};
-
-
-SysvshmContext *sysvshmContext=NULL; //global context
+SysvshmContext *sysvshmContext=NULL; /* global context */
 
 
 void calculateNodeSizeAndRank(char **);
@@ -172,8 +181,10 @@ void CmiExitSysvshm(){
 	if(sysvshmContext->nodesize != 1){
 		tearDownSharedBuffers();
 
+
 		free(sysvshmContext->recvbufnames);
 		free(sysvshmContext->sendbufnames);
+		free(sysvshmContext->semarray);
 
 		free(sysvshmContext->recvBufs);
 		free(sysvshmContext->sendBufs);
@@ -218,7 +229,7 @@ inline int flushSendQ(int dstRank);
  * ****************************/
 
 void CmiSendMessageSysvshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int broot){
-
+	struct sembuf sb;
 	
 #if SYSVSHM_STATS
 	double _startSendTime = CmiWallTimer();
@@ -237,8 +248,8 @@ void CmiSendMessageSysvshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int 
 	
 	sharedBufData *dstBuf = &(sysvshmContext->sendBufs[dstRank]);
 
-	if(semop(dstBuf->semid, &acquire, 1)<0) {
-
+	ACQUIRENW(sysvshmContext->noderank);
+	if(semop(dstBuf->semid, &sb, 1)<0) {
 		/**failed to get the lock 
 		insert into q and retain the message*/
 
@@ -252,7 +263,7 @@ void CmiSendMessageSysvshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int 
 		 * first write all the messages in the sendQ and then write this guy
 		 * */
 		 if(sysvshmContext->sendQs[dstRank]->numEntries == 0){
-				// send message user event
+				/* send message user event */
 				int ret = sendMessage(ogm,dstBuf,sysvshmContext->sendQs[dstRank]);
 				MACHSTATE(3,"Sysvshm Send succeeded immediately");
 		 }else{
@@ -264,7 +275,8 @@ void CmiSendMessageSysvshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int 
 				MACHSTATE1(3,"Sysvshm flushSendQ sent %d messages",sent);
 		 }
 		 /* unlock the recvbuffer*/
-		CmiAssert(semop(dstBuf->semid, &release, 1)>=0);
+		RELEASE(sysvshmContext->noderank);
+		CmiAssert(semop(dstBuf->semid, &sb, 1)>=0);
 	}
 #if SYSVSHM_STATS
 		sysvshmContext->sendCount ++;
@@ -312,7 +324,6 @@ static void CmiNotifyBeginIdleSysvshm(CmiIdleState *s)
 void calculateNodeSizeAndRank(char **argv){
 	sysvshmContext->nodesize=1;
 	MACHSTATE(3,"calculateNodeSizeAndRank start");
-	//CmiGetArgIntDesc(argv, "+nodesize", &(sysvshmContext->nodesize),"Number of cores in this node (for non-smp case).Used by the shared memory communication layer");
 	CmiGetArgIntDesc(argv, "+nodesize", &(sysvshmContext->nodesize),"Number of cores in this node");
 	MACHSTATE1(3,"calculateNodeSizeAndRank argintdesc %d",sysvshmContext->nodesize);
 
@@ -334,7 +345,7 @@ void calculateNodeSizeAndRank(char **argv){
 	MACHSTATE3(3,"calculateNodeSizeAndRank nodestart %d nodesize %d noderank %d",sysvshmContext->nodestart,sysvshmContext->nodesize,sysvshmContext->noderank);
 }
 
-void createShmObjectsAndSems(sharedBufData **bufs, int *bufnames);
+void createShmObjectsAndSems(sharedBufData **bufs, int *bufnames,int issend);
 /***************
  * 	calculate the name of the shared objects and semaphores
  * 	
@@ -346,25 +357,22 @@ void createShmObjectsAndSems(sharedBufData **bufs, int *bufnames);
 
 void setupSharedBuffers(){
 	int i=0;
-	int snd,rcv,pid;
 
-	if((sysvshmContext->recvbufnames=(int *)malloc(sizeof(int)*(sysvshmContext->nodesize)))==NULL)
-		CmiPrintf("problem with malloc recvbufnames : %s\n",strerror(errno));
-	if((sysvshmContext->sendbufnames=(int *)malloc(sizeof(int)*(sysvshmContext->nodesize)))==NULL)
-		CmiPrintf("problem with malloc sendbufnames : %s\n",strerror(errno));
+        CmiAssert((sysvshmContext->recvbufnames=(int *)malloc(sizeof(int)*(sysvshmContext->nodesize)))!=NULL);
+        CmiAssert((sysvshmContext->sendbufnames=(int *)malloc(sizeof(int)*(sysvshmContext->nodesize)))!=NULL);
+	CmiAssert((sysvshmContext->semarray= (ushort *)malloc(sizeof(int)*(sysvshmContext->nodesize)))!=NULL);
+
 		
 	for(i=0;i<sysvshmContext->nodesize;i++){
+		sysvshmContext->semarray[i]=1;
 		if(i != sysvshmContext->noderank){
-			snd=(sysvshmContext->nodestart+i)%SYSVSHM_SIZE; 				//sender
-			rcv=(sysvshmContext->nodestart+sysvshmContext->noderank)%SYSVSHM_SIZE; 		//receiver
-			pid=Cmi_charmrun_pid%(sizeof(int)-2*SYSVSHM_SIZE);				//pid
-			sysvshmContext->sendbufnames[i]=(pid<<(SYSVSHM_BITS*2))+(rcv<<SYSVSHM_BITS)+snd; // Equivalent to 00..00{pid bits}{rcvbits}{sndbits}
-			sysvshmContext->recvbufnames[i]=(pid<<(SYSVSHM_BITS*2))+(snd<<SYSVSHM_BITS)+rcv; // Equivalent to 00,,00{pid bits}{sndbits}{rcvbits}
+			sysvshmContext->sendbufnames[i]=SHMSNDNAME(i);
+			sysvshmContext->recvbufnames[i]=SHMRCVNAME(i);
 		}
 	}
 	
-	createShmObjectsAndSems(&(sysvshmContext->recvBufs),sysvshmContext->recvbufnames);
-	createShmObjectsAndSems(&(sysvshmContext->sendBufs),sysvshmContext->sendbufnames);
+	createShmObjectsAndSems(&(sysvshmContext->recvBufs),sysvshmContext->recvbufnames,0);
+	createShmObjectsAndSems(&(sysvshmContext->sendBufs),sysvshmContext->sendbufnames,1);
 
 	for(i=0;i<sysvshmContext->nodesize;i++){
 		if(i != sysvshmContext->noderank){
@@ -377,33 +385,39 @@ void setupSharedBuffers(){
 
 
 
-void createShmObjectsAndSems(sharedBufData **bufs, int *bufnames) {
-	int i,j;
-	int id;
+void createShmObjectsAndSems(sharedBufData **bufs, int *bufnames,int issend) {
+	int i;
+	int name;
 
 	union semun {
 	int val;
 	struct semid_ds *buf;
-	ushort array[1];
+	ushort *array;
 	} arg;
 	struct semid_ds seminfo;
-	arg.array[0]=1;
-	arg.buf=&seminfo;
+	arg.array=sysvshmContext->semarray;
 
 	*bufs = (sharedBufData *)malloc(sizeof(sharedBufData)*sysvshmContext->nodesize);
 	
 	for(i=0;i<sysvshmContext->nodesize;i++){
 		if(i != sysvshmContext->noderank){
-			if(((*bufs)[i].semid=semget(bufnames[i],1,0666|IPC_CREAT|IPC_EXCL))>=0) {
-				arg.val=1;
-				CmiAssert((semctl((*bufs)[i].semid,0,SETVAL,arg))>=0);
+                        if(issend)
+                                name=SEMSNDNAME(i);
+                         else
+                                name=SEMRCVNAME(i);
+
+			if(((*bufs)[i].semid=semget(name,sysvshmContext->nodesize,0666|IPC_CREAT|IPC_EXCL))>=0) {
+				CmiAssert((semctl((*bufs)[i].semid,sysvshmContext->nodesize,SETALL,arg))>=0);
 			} else if(errno==EEXIST) {
-				CmiAssert((((*bufs)[i].semid)=semget(bufnames[i],1,0666))>=0);
-			} else
+				CmiAssert((((*bufs)[i].semid)=semget(name,sysvshmContext->nodesize,0666))>=0);
+			} else {
+				tearDownSharedBuffers();
 				CmiPrintf("problem getting sem : %s\n",strerror(errno));
+				CmiAbort("sem\n");
+			}
 
 			(*bufs)[i].shmid=-1;
-			(*bufs)[i].shmid=shmget(bufnames[i],SHMBUFLEN+sizeof(sharedBufHeader),0666|IPC_CREAT|IPC_EXCL); //Atempt to get shmid
+			(*bufs)[i].shmid=shmget(bufnames[i],SHMBUFLEN+sizeof(sharedBufHeader),0666|IPC_CREAT|IPC_EXCL); /*Attempt to get shmid*/
 			if(errno==EEXIST) 
 				(*bufs)[i].shmid=shmget(bufnames[i],SHMBUFLEN+sizeof(sharedBufHeader),0666);
 			CmiAssert(((*bufs)[i].shmid)>0);
@@ -425,12 +439,12 @@ void tearDownSharedBuffers(){
 	struct shmid_ds arg;
 	for(i= 0;i<sysvshmContext->nodesize;i++){
 		if(i != sysvshmContext->noderank){
-			//Shared memory detach
+			/* Shared memory detach */
 			shmdt(sysvshmContext->sendBufs[i].header);
 			shmdt(sysvshmContext->recvBufs[i].header);
 
-			shmctl(sysvshmContext->sendBufs[i].shmid,IPC_STAT,&arg); //See if anyone is attached
-			if(arg.shm_nattch==0) { // No one is attached remove id's
+			shmctl(sysvshmContext->sendBufs[i].shmid,IPC_STAT,&arg); /* See if anyone is attached */
+			if(arg.shm_nattch==0) { /* No one is attached remove id's */
 				shmctl(sysvshmContext->sendBufs[i].shmid,IPC_RMID,NULL);
 				shmctl(sysvshmContext->recvBufs[i].shmid,IPC_RMID,NULL);
 				semctl(sysvshmContext->sendBufs[i].semid,0, IPC_RMID,0);
@@ -512,6 +526,7 @@ inline int flushSendQ(int dstRank){
 inline void emptyRecvBuf(sharedBufData *recvBuf);
 
 inline void emptyAllRecvBufs(){
+	struct sembuf sb;
 	int i;
 	int j,ret;
 	union semun {
@@ -528,10 +543,12 @@ inline void emptyAllRecvBufs(){
 				sysvshmContext->lockRecvCount++;
 #endif
 
-				if(semop(recvBuf->semid, &acquire, 1)>=0) {
+				ACQUIRE(i);
+				if(semop(recvBuf->semid, &sb, 1)>=0) {
 					MACHSTATE1(3,"emptyRecvBuf to be called for rank %d",i);
 					emptyRecvBuf(recvBuf);
-					CmiAssert((semop(recvBuf->semid, &release, 1))>=0);
+					RELEASE(i);
+					CmiAssert((semop(recvBuf->semid, &sb, 1))>=0);
 				}
 
 			}
@@ -540,14 +557,17 @@ inline void emptyAllRecvBufs(){
 };
 
 inline void flushAllSendQs(){
+	struct sembuf sb;
 	int i=0;
 	
 	for(i=0;i<sysvshmContext->nodesize;i++){
 		if(i != sysvshmContext->noderank && sysvshmContext->sendQs[i]->numEntries > 0){
-                        if(semop(sysvshmContext->sendBufs[i].semid, &acquire, 1)>=0) {
-                                MACHSTATE1(3,"flushSendQ %d",i);
-                                flushSendQ(i);
-				CmiAssert(semop(sysvshmContext->sendBufs[i].semid, &release, 1)>=0);
+			ACQUIRE(sysvshmContext->noderank);
+                        if(semop(sysvshmContext->sendBufs[i].semid, &sb, 1)>=0) {
+				MACHSTATE1(3,"flushSendQ %d",i);
+				flushSendQ(i);
+				RELEASE(sysvshmContext->noderank);
+				CmiAssert(semop(sysvshmContext->sendBufs[i].semid, &sb, 1)>=0);
                         }
 
 		}        
@@ -637,11 +657,11 @@ void initSendQ(SysvshmSendQ *q,int size){
 
 void pushSendQ(SysvshmSendQ *q,OutgoingMsg msg){
 	if(q->numEntries == q->size){
-		//need to resize 
+		/* need to resize */
 		OutgoingMsg *oldData = q->data;
 		int newSize = q->size<<1;
 		q->data = (OutgoingMsg *)malloc(sizeof(OutgoingMsg)*newSize);
-		//copy head to the beginning of the new array
+		/* copy head to the beginning of the new array */
 		
 		CmiAssert(q->begin == q->end);
 
