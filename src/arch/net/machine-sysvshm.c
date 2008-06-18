@@ -42,7 +42,6 @@
 #define SYSVSHM_STATS 0
 
 #define ACQUIRENW(i) sb.sem_num=i; sb.sem_op=-1; sb.sem_flg=IPC_NOWAIT
-//FIXME: FIGURE OUT WHICH IS BEST AND REMOVE OTHERS
 #define ACQUIRE(i)   sb.sem_num=i; sb.sem_op=-1; sb.sem_flg=SEM_UNDO
 #define RELEASE(i)   sb.sem_num=i; sb.sem_op=1;  sb.sem_flg=SEM_UNDO
 
