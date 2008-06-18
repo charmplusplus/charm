@@ -576,13 +576,9 @@ static void * test_buf;
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret){
   int n, i, count;
 
-  mcheck_check_all ();
-
   //fprintf(stderr, "Initializing Converse Blue Gene/P machine Layer\n");
 
   DCMF_Messager_initialize();
-
-  mcheck_check_all ();
 
 #if CMK_SMP
   DCMF_Configure_t  config_in, config_out;
@@ -627,8 +623,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   directcb.clientdata=NULL;
 #endif
  
-  mcheck_check_all ();
-
   //fprintf(stderr, "Initializing Eager Protocol\n");
  
   _Cmi_numnodes = DCMF_Messager_size();
@@ -687,8 +681,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
   CmiStartThreads(argv);  
 
-  mcheck_check_all ();
-
   ConverseRunPE(initret);
 }
 
@@ -703,8 +695,6 @@ int PerrorExit (char *err) {
 void ConverseRunPE(int everReturn)
 {
   //printf ("ConverseRunPE on rank %d\n", CmiMyPe());
-
-  mcheck_check_all ();
 
   CmiIdleState *s=CmiNotifyGetState();
   CmiState cs;
@@ -722,12 +712,8 @@ void ConverseRunPE(int everReturn)
   
   CthInit(CmiMyArgv);
   
-  mcheck_check_all ();
-  
   //printf ("Before Converse Common Init\n");
   ConverseCommonInit(CmiMyArgv);
-
-  mcheck_check_all ();
 
   /* initialize the network progress counter*/
   /* Network progress function is used to poll the network when for
