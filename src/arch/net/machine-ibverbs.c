@@ -76,6 +76,9 @@ static int processBufferedCount;
 // flag for using a pool for every thread
 #define THREAD_MULTI_POOL 0
 
+//TODO: erase this constant value if ++ppn capture is possible
+#define INFI_NODE_SIZE 8
+
 #if THREAD_MULTI_POOL 
 #include "pcqueue.h"
 PCQueue **queuePool;
@@ -86,7 +89,6 @@ PCQueue **queuePool;
 struct infiIncTokenAckPacket{
 	int a;
 };
-
 
 
 
@@ -313,6 +315,7 @@ typedef struct infiCmiChunkMetaDataStruct {
 	void *nextBuf;
 	struct infiCmiChunkHeaderStruct *owner;
 	int count;
+
 #if THREAD_MULTI_POOL
 	int parentPe;						// the PE that allocated the buffer and must release it
 #endif
@@ -511,9 +514,12 @@ static void CmiMachineInit(char **argv){
 	CmiAssert(rdmaThreshold > firstBinSize);
 	blockAllocRatio=16;
 	blockThreshold=8;
+
+	
 	
 	initInfiCmiChunkPools();
 		
+
 	/*create the pool of send packets*/
 	sendPacketPoolSize = maxTokens/2;	
 	if(sendPacketPoolSize > 2000){
@@ -527,6 +533,7 @@ static void CmiMachineInit(char **argv){
 	for(i=0;i<sendPacketPoolSize;i++){
 		MallocInfiPacket(pktPtrs[i]);	
 	}
+
 	for(i=0;i<sendPacketPoolSize;i++){
 		FreeInfiPacket(pktPtrs[i]);	
 	}
@@ -2086,15 +2093,15 @@ static void increasePostedRecvs(int nodeNo){
 static void initInfiCmiChunkPools(){
 	int i,j;
 	int size = firstBinSize;
-
-	//printf("Hello %d of %d\n",CmiMyPe(),CmiNumPes());
+	int nodeSize;
 
 #if THREAD_MULTI_POOL
-	infiCmiChunkPools = malloc(sizeof(infiCmiChunkPool *) * CmiNumPes());
-	for(i = 0; i < CmiNumPes(); i++){
+	nodeSize = INFI_NODE_SIZE;
+	infiCmiChunkPools = malloc(sizeof(infiCmiChunkPool *) * nodeSize);
+	for(i = 0; i < nodeSize; i++){
 		infiCmiChunkPools[i] = malloc(sizeof(infiCmiChunkPool) * INFINUMPOOLS);
 	}
-	for(j = 0; j < CmiNumPes(); j++){
+	for(j = 0; j < nodeSize; j++){
 		size = firstBinSize;
 		for(i=0;i<INFINUMPOOLS;i++){
 			infiCmiChunkPools[j][i].size = size;
@@ -2105,15 +2112,17 @@ static void initInfiCmiChunkPools(){
 	}
 
 	// creating the n^2 system of queues
-	queuePool = malloc(sizeof(PCQueue *) * CmiNumPes());
-	for(i = 0; i < CmiNumPes(); i++){
-		queuePool[i] = malloc(sizeof(PCQueue) * CmiNumPes());
+	queuePool = malloc(sizeof(PCQueue *) * nodeSize);
+	for(i = 0; i < nodeSize; i++){
+		queuePool[i] = malloc(sizeof(PCQueue) * nodeSize);
 	}
-	for(i = 0; i < CmiNumPes(); i++)
-		for(j = 0; j < CmiNumPes(); j++)
+	for(i = 0; i < nodeSize; i++)
+		for(j = 0; j < nodeSize; j++)
 			queuePool[i][j] = PCQueueCreate();
 
-#else	
+#else
+
+	size = firstBinSize;	
 	for(i=0;i<INFINUMPOOLS;i++){
 		infiCmiChunkPools[i].size = size;
 		infiCmiChunkPools[i].startBuf = NULL;
@@ -2145,13 +2154,17 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 	int ratio = dataSize/firstBinSize;
 	int poolIdx=0;
 	void *res;
+
+	//printf("Hi\n");
+	MACHSTATE1(3,"Rank=%d",CmiMyRank());
 	
 	while(ratio > 0){
 		ratio  = ratio >> 1;
 		poolIdx++;
 	}
+	MACHSTATE1(2,"This is %d",CmiMyRank());
 	MACHSTATE2(2,"getInfiCmiChunk for size %d in poolIdx %d",dataSize,poolIdx);
-	if((poolIdx < INFINUMPOOLS && infiCmiChunkPools[CmiMyPe()][poolIdx].startBuf == NULL) || poolIdx >= INFINUMPOOLS){
+	if((poolIdx < INFINUMPOOLS && infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf == NULL) || poolIdx >= INFINUMPOOLS){
 		infiCmiChunkMetaData *metaData;		
 		infiCmiChunkHeader *hdr;
 		int allocSize;
@@ -2162,7 +2175,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 		
 		
 		if(poolIdx < INFINUMPOOLS ){
-			allocSize = infiCmiChunkPools[CmiMyPe()][poolIdx].size;
+			allocSize = infiCmiChunkPools[CmiMyRank()][poolIdx].size;
 		}else{
 			allocSize = dataSize;
 		}
@@ -2183,16 +2196,16 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 			metaData->key = key;
 			metaData->owner = hdr;
 			metaData->poolIdx = poolIdx;
-			metaData->parentPe = CmiMyPe();						// setting the parent PE
+			metaData->parentPe = CmiMyRank();						// setting the parent PE
 
 			if(i == 0){
 				metaData->owner->metaData->count = count;
 				metaData->nextBuf = NULL;
 			}else{
 				void *startBuf = res - sizeof(infiCmiChunkHeader);
-				metaData->nextBuf = infiCmiChunkPools[CmiMyPe()][poolIdx].startBuf;
-				infiCmiChunkPools[CmiMyPe()][poolIdx].startBuf = startBuf;
-				infiCmiChunkPools[CmiMyPe()][poolIdx].count++;
+				metaData->nextBuf = infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf;
+				infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf = startBuf;
+				infiCmiChunkPools[CmiMyRank()][poolIdx].count++;
 				
 			}
 			if(i != count-1){
@@ -2201,26 +2214,26 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 	  }	
 		
 		
-		MACHSTATE3(2,"AllocSize %d buf %p key %p",allocSize,res,metaData->key);
+		MACHSTATE3(3,"AllocSize %d buf %p key %p",allocSize,res,metaData->key);
 		
 		return origres;
 	}
 	if(poolIdx < INFINUMPOOLS){
 		infiCmiChunkMetaData *metaData;				
 	
-		res = infiCmiChunkPools[CmiMyPe()][poolIdx].startBuf;
+		res = infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf;
 		res += sizeof(infiCmiChunkHeader);
 
 		MACHSTATE2(2,"Reusing old pool %d buf %p",poolIdx,res);
 		metaData = METADATAFIELD(res);
 
-		infiCmiChunkPools[CmiMyPe()][poolIdx].startBuf = metaData->nextBuf;
-		MACHSTATE2(1,"Pool %d now has startBuf at %p",poolIdx,infiCmiChunkPools[CmiMyPe()][poolIdx].startBuf);
+		infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf = metaData->nextBuf;
+		MACHSTATE2(1,"Pool %d now has startBuf at %p",poolIdx,infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf);
 		
 		metaData->nextBuf = NULL;
 //		CmiAssert(metaData->poolIdx == poolIdx);
 
-		infiCmiChunkPools[CmiMyPe()][poolIdx].count--;
+		infiCmiChunkPools[CmiMyRank()][poolIdx].count--;
 		return res;
 	}
 
@@ -2317,15 +2330,16 @@ static inline void *getInfiCmiChunk(int dataSize){
 
 
 };
-
 #endif
 
 
 void * infi_CmiAlloc(int size){
 	void *res;
 
+
 #if THREAD_MULTI_POOL
 	res = getInfiCmiChunkThread(size-sizeof(CmiChunkHeader));
+	res -= sizeof(CmiChunkHeader);
 	return res;
 #else
 #if CMK_SMP	
@@ -2333,6 +2347,7 @@ void * infi_CmiAlloc(int size){
 #endif
 /*(	if(size-sizeof(CmiChunkHeader) > firstBinSize){*/
 		MACHSTATE1(1,"infi_CmiAlloc for dataSize %d",size-sizeof(CmiChunkHeader));
+
 		res = getInfiCmiChunk(size-sizeof(CmiChunkHeader));	
 		res -= sizeof(CmiChunkHeader);
 #if CMK_SMP	
@@ -2346,12 +2361,13 @@ void * infi_CmiAlloc(int size){
 }
 
 #if THREAD_MULTI_POOL
+//Note: this function receives a pointer to the data, so that it is not necessary to add any sizeof(CmiChunkHeader) to it.
 void infi_CmiFreeDirect(void *ptr){
         int size;
         int parentPe;
         void *freePtr = ptr;
 
-        ptr += sizeof(CmiChunkHeader);
+        //ptr += sizeof(CmiChunkHeader);
         size = SIZEFIELD (ptr);
 /*      if(size > firstBinSize){*/
         infiCmiChunkMetaData *metaData;
@@ -2363,12 +2379,12 @@ void infi_CmiFreeDirect(void *ptr){
 
         MACHSTATE2(1,"CmiFree buf %p goes back to pool %d",ptr,poolIdx);
 //      CmiAssert(poolIdx >= 0);
-        if(poolIdx < INFINUMPOOLS && infiCmiChunkPools[CmiMyPe()][poolIdx].count <= INFIMAXPERPOOL){
-                metaData->nextBuf = infiCmiChunkPools[CmiMyPe()][poolIdx].startBuf;
-                infiCmiChunkPools[CmiMyPe()][poolIdx].startBuf = freePtr;
-                        infiCmiChunkPools[CmiMyPe()][poolIdx].count++;
+        if(poolIdx < INFINUMPOOLS && infiCmiChunkPools[CmiMyRank()][poolIdx].count <= INFIMAXPERPOOL){
+                metaData->nextBuf = infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf;
+                infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf = freePtr;
+                        infiCmiChunkPools[CmiMyRank()][poolIdx].count++;
 
-                        MACHSTATE3(2,"Pool %d now has startBuf at %p count %d",poolIdx,infiCmiChunkPools[poolIdx].startBuf,infiCmiChunkPools[poolIdx].count);
+                        MACHSTATE3(2,"Pool %d now has startBuf at %p count %d",poolIdx,infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf,infiCmiChunkPools[CmiMyRank()][poolIdx].count);
                 }else{
                         MACHSTATE2(2,"Freeing up buf %p poolIdx %d",ptr,poolIdx);
                         metaData->owner->metaData->count--;
@@ -2403,6 +2419,8 @@ void infi_CmiFree(void *ptr){
 	void *pointer;
         void *freePtr = ptr;
 
+	MACHSTATE(3,"Freeing");
+
         ptr += sizeof(CmiChunkHeader);
         size = SIZEFIELD (ptr);
 /*      if(size > firstBinSize){*/
@@ -2423,18 +2441,18 @@ void infi_CmiFree(void *ptr){
 
 	// checking if this free operation is my responsibility
 	parentPe = metaData->parentPe;
-	if(parentPe != CmiMyPe()){
-		PCQueuePush(queuePool[parentPe][CmiMyPe()],(char *)ptr);
+	if(parentPe != CmiMyRank()){
+		PCQueuePush(queuePool[parentPe][CmiMyRank()],(char *)ptr);
 		return;
 	}
 
 	infi_CmiFreeDirect(ptr);
 
 	// checking free request queues
-	for(i = 0; i < CmiNumPes(); i++){
-		if(!PCQueueEmpty(queuePool[CmiMyPe()][i])){
-			for(j = 0; j < PCQueueLength(queuePool[CmiMyPe()][i]); j++){
-				pointer = (void *)PCQueuePop(queuePool[CmiMyPe()][i]);
+	for(i = 0; i < INFI_NODE_SIZE; i++){
+		if(!PCQueueEmpty(queuePool[CmiMyRank()][i])){
+			for(j = 0; j < PCQueueLength(queuePool[CmiMyRank()][i]); j++){
+				pointer = (void *)PCQueuePop(queuePool[CmiMyRank()][i]);
 				infi_CmiFreeDirect(pointer);	
 			}
 		}
