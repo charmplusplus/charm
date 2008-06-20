@@ -2600,16 +2600,13 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   node_addresses_obtain(argv);
   MACHSTATE(5,"node_addresses_obtain done");
 
-#if CMK_USE_TCP
-  open_tcp_sockets();
-#endif
+  CmiCommunicationInit(argv);
 
 #if CMK_USE_SYSVSHM
-	CmiInitSysvshm(argv);
+  CmiInitSysvshm(argv);
 #elif CMK_USE_PXSHM
-	CmiInitPxshm(argv);
+  CmiInitPxshm(argv);
 #endif
-
 
   skt_set_idle(CmiYield);
   Cmi_check_delay = 1.0+0.25*_Cmi_numnodes;
@@ -2629,9 +2626,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 
   CmiStartThreads(argv);
 
-  #if CMK_USE_AMMASSO
-    CmiAmmassoOpenQueuePairs();
-  #endif
+#if CMK_USE_AMMASSO
+  CmiAmmassoOpenQueuePairs();
+#endif
 
   ConverseRunPE(everReturn);
 }

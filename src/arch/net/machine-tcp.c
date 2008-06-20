@@ -3,6 +3,7 @@
  * @ingroup NET
  * contains only TCP specific code for:
  * - CmiMachineInit()
+ * - CmiCommunicationInit()
  * - CheckSocketsReady()
  * - CmiNotifyIdle()
  * - DeliverViaNetwork()
@@ -604,6 +605,11 @@ void CmiMachineInit(char **argv)
 #else
   Cmi_dgram_max_data = PACKET_MAX;
 #endif
+}
+
+void CmiCommunicationInit(char **argv)
+{
+  open_tcp_sockets();
 }
 
 void CmiMachineExit()

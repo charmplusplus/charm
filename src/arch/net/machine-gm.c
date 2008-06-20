@@ -3,6 +3,7 @@
  * @ingroup NET
  * contains only GM API specific code for:
  * - CmiMachineInit()
+ * - CmiCommunicationInit()
  * - CmiNotifyIdle()
  * - DeliverViaNetwork()
  * - CommunicationServer()
@@ -965,6 +966,10 @@ void CmiMachineInit(char **argv)
   gm_initialize_alarm(&gmalarm);
 
   MACHSTATE(3,"} CmiMachineInit");
+}
+
+void CmiCommunicationInit(char **argv)
+{
 }
 
 void CmiMachineExit()

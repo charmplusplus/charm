@@ -4,6 +4,7 @@
  * @ingroup NET
  * contains only Ibverbs specific code for:
  * - CmiMachineInit()
+ * - CmiCommunicationInit()
  * - CmiNotifyStillIdle()
  * - DeliverViaNetwork()
  * - CommunicationServer()
@@ -582,6 +583,10 @@ static void CmiMachineInit(char **argv){
 	
 
 	MACHSTATE(3,"} CmiMachineInit");
+}
+
+void CmiCommunicationInit(char **argv)
+{
 }
 
 /*********

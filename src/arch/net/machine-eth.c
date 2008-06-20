@@ -3,6 +3,7 @@
  * @ingroup NET
  * contains only UDP specific code for:
  * - CmiMachineInit()
+ * - CmiCommunicationInit()
  * - CmiNotifyIdle()
  * - DeliverViaNetwork()
  * - CommunicationServer()
@@ -819,6 +820,10 @@ static void CommunicationServer(int sleepTime, int where)
 }
 
 void CmiMachineInit(char **argv)
+{
+}
+
+void CmiCommunicationInit(char **argv)
 {
 }
 

@@ -3,6 +3,7 @@
  ** Contains Ammasso specific
  ** code for:
  ** CmiMachineInit()
+ ** CmiCommunicationInit()
  ** CmiNotifyIdle()
  ** DeliverViaNetwork()
  ** CommunicationServer()
@@ -446,6 +447,9 @@ void CmiMachineInit(char **argv) {
   AMMASSO_STATS_END(MachineInit)
 }
 
+void CmiCommunicationInit(char **argv)
+{
+}
 
 void CmiAmmassoNodeAddressesStoreHandler(int pe, struct sockaddr_in *addr, int port) {
 

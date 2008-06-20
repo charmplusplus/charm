@@ -4,6 +4,7 @@
  * @ingroup NET
  * contains only MX API specific code for:
  * - CmiMachineInit()
+ * - CmiCommunicationInit()
  * - CmiNotifyIdle()
  * - DeliverViaNetwork()
  * - CommunicationServer()
@@ -830,6 +831,10 @@ void CmiMachineInit(char **argv)
 #endif
 
   MACHSTATE(3,"} CmiMachineInit");
+}
+
+void CmiCommunicationInit(char **argv)
+{
 }
 
 void CmiMachineExit()
