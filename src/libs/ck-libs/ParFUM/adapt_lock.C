@@ -6,6 +6,8 @@
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
 
+#define DEBUG_LOCKS
+
 //#define DEBUG_1
 #define ERVAL -1000000000  //might cause a problem if there are 100million nodes
 #define ERVAL1 -1000000001
@@ -228,7 +230,9 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
 
   isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
   if(isEdge == -1) {
-    //CkPrintf("[%d]Warning: Bisect %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
+#ifdef DEBUG_1
+    CkPrintf("[%d]Warning: Bisect %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
+#endif
     return -1;
   }
   locknodes[0] = n1;
@@ -239,35 +243,47 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
     gotlocks[i] = -1;
   }
   while(!done) {
+#ifdef CPSD_HACKS_4
+      int gotlock = 1;
+#else
     int gotlock = lockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+#endif
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
     if(isEdge == -1) {
+#ifndef CPSD_HACKS_4
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
-      //CkPrintf("[%d]Warning: Bisect %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
+#endif
+#ifdef DEBUG_1
+      CkPrintf("[%d]Warning: Bisect %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
+#endif
       return -1;
     }
     if(gotlock==1 && locknodes[2]==n3 && locknodes[3]==n4) {
       done = true;
     }
     else {
+#ifndef CPSD_HACKS_4
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+#endif
       locknodes[2] = n3;
       locknodes[3] = n4;
       numtries++;
       if(numtries>=13+(7*theMod->idx)%43) {
 	if(!warned) {
-	  //CkPrintf("[%d]Warning: Possibly a livelock in edge_bisect %d & %d, supporting %d, %d\n",theMod->idx,n1,n2,n3,n4);
+	  CkPrintf("[%d]Warning: Possibly a livelock in edge_bisect %d & %d, supporting %d, %d\n",theMod->idx,n1,n2,n3,n4);
 	  warned = true;
 	}
 	numtries = 0;
-	//CthYield();
+	CthYield();
 	return -1;
       }
       CthYield();
     }
   }
   int ret = edge_bisect_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
+#ifndef CPSD_HACKS_4
   unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
+#endif
 
   return ret;
 }

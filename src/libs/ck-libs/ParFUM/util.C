@@ -736,6 +736,10 @@ void FEM_MUtil::removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, in
     also clears off the adjacencies of oldIdx and updates adjacencies of
     neighboring nodes and elements */
 int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
+#ifdef CPSD_HACKS
+  bool dropLock = false;
+#endif
+
   if(newIdx==-1) {
     //this function creates a new node at the end of the list,
     //it does not try to fill in the holes in the list of nodes
@@ -746,6 +750,9 @@ int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
     m->n2n_removeAll(newIdx);    // initialize node adjacencies
     mmod->fmLockN.push_back(FEM_lockN(newIdx,mmod));
     mmod->fmLockN[newIdx].wlock(idx); //lock it anyway, will unlock if needed in lockupdate
+#ifdef CPSD_HACKS
+    dropLock = true;
+#endif
   }
   //copy the node attributes from oldIdx to newIdx
   FEM_Interpolate *inp = mmod->getfmInp();
@@ -772,6 +779,10 @@ int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
   m->n2e_removeAll(oldIdx);
   if(nsize>0) delete[] nnbrs;
   if(esize>0) delete[] enbrs;
+#ifdef CPSD_HACKS
+  if (dropLock)
+    mmod->fmLockN[newIdx].wunlock(idx); 
+#endif
   return newIdx;  // return a new index
 }
 
@@ -914,6 +925,7 @@ int FEM_MUtil::eatIntoElement(int localIdx) {
 #endif
   //a ghost elem should be coming from only one chunk
   int remChk = mmod->fmMesh->elem[0].ghost->ghostRecv.getRec(FEM_From_ghost_index(localIdx))->getChk(0);
+#ifndef CPSD_HACKS_2
   for(int i=0; i<nodesPerEl; i++) {
     if(FEM_Is_ghost_index(adjnodes[i])) { 
       //this will be a new node on this chunk, lock it on all shared chunks
@@ -921,7 +933,14 @@ int FEM_MUtil::eatIntoElement(int localIdx) {
       meshMod[remChk].modifyLockAll(idx,sharedIdx);
     }
   }
+#endif
+#ifdef DEBUG_1
+  CkPrintf("eatIntoElement::remove\n");
+#endif
   FEM_remove_element(mmod->fmMesh,localIdx,elemtype,idx);
+#ifdef DEBUG_1
+  CkPrintf("eatIntoElement::done removing\n");
+#endif
   for(int j=0; j<nodesPerEl; j++) oldnodes[j] = adjnodes[j];
   //if a new node had been added in FEM_remove_element (happens for a local->ghost 
   //transition on a corner node), then we update that node in adjnodes
@@ -937,15 +956,23 @@ int FEM_MUtil::eatIntoElement(int localIdx) {
     }
     if(flag1) break;
   }
+#ifdef DEBUG_1
+  CkPrintf("eatIntoElement::add\n");
+#endif
   int newEl = FEM_add_element(mmod->fmMesh, adjnodes, nodesPerEl, elemtype, idx);
+#ifdef DEBUG_1
+  CkPrintf("eatIntoElement::done adding\n");
+#endif
   copyElemData(0,localIdx,newEl); //special copy across chunk
   FEM_purge_element(mmod->fmMesh,localIdx,elemtype);
+#ifndef CPSD_HACKS_2
   for(int i=0; i<nodesPerEl; i++) {
     if(adjnodes[i]!=oldnodes[i]) {
       //correct the lock
       FEM_Modify_LockUpdate(mmod->fmMesh,adjnodes[i]);
     }
   }
+#endif
   free(adjnodes);
   free(oldnodes);
   return newEl;

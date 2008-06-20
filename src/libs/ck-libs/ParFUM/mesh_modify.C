@@ -404,7 +404,7 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType) {
 	// Add all the potentially adjacent elements to the tuple table
 	for(int i=0;i<nodeAdjacentElements.length();i++){
 		int nextElem = nodeAdjacentElements[i].getSignedId();
-		int nextElemType = nodeAdjacentElements[i].getSignedType();
+		int nextElemType = nodeAdjacentElements[i].getUnsignedType();
 
 		int tuple[tupleTable::MAX_TUPLE];
 		int *conn;
@@ -558,6 +558,10 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
   int localcount=0;
   CkAssert(conn[0]!=conn[1] &&conn[1]!=conn[2] &&conn[2]!=conn[0]);
   int *nodetype = (int *)malloc(connSize *sizeof(int)); //0 -- local, 1 -- shared, 2--ghost
+
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
   for(int i=0;i<connSize;i++){
     //make sure that every connectivity is valid
     CkAssert(conn[i]!=-1); 
@@ -576,6 +580,9 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
   //if it is not shared or ghost, it should be local
   localcount = connSize - (sharedcount + ghostcount);
 
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
   if(sharedcount==0 && ghostcount==0){
     // add a local elem with all local nodes
     newEl = FEM_add_element_local(m,conn,connSize,elemType,0);
@@ -622,11 +629,17 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
     //I will assume that this is a correct call.. the caller never gives junk ghost elements
     //it is a remote elem with some shared nodes
     //this is the part when it eats a ghost element
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
     if((chunkNo!=-1) && (chunkNo==index)) { 
       //this is because the chunk doing this operation is supposed to eat into someone else.
       //change all ghost nodes to shared nodes
       //this also involves going to allchunks that it was local/shared 
       //on and make it shared and add this chunk to the list of chunks it is shared to.
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
       for(int i=0; i<connSize; i++) {
 	if(nodetype[i]==2) {
 	  //build up the list of chunks it is shared/local to
@@ -635,38 +648,71 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	  //make sure that the ghostRecv table is completely populated...
 	  //if this is a ghost->local transition, then it will be local on only one
 	  //chunk, i.e. on the chunk where it was local before this eat operation started.
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
 	  m->getfmMM()->getfmUtil()->getChunkNos(0,conn[i],&numchunks,&chunks1);
 	  //add a new node with the same attributes as this ghost node,
 	  //do not remove the ghost node yet
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
 	  int newN = m->getfmMM()->getfmUtil()->Replace_node_local(m, conn[i], -1);
 	  //need to know if the newly added node will be local or shared
 	  //if shared, add index to the shared list of this node on all the chunks
 	  //if local, remove the oldIdx on the other chunk, if the oldIdx
 	  //will be local only on this chunk after this operation
 	  //(happens during a local->ghost transition)
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
 	  for(int j=0; j<numchunks; j++) {
 	    int chk = chunks1[j]->chk;
 	    if(chk==index) continue;
 	    //coarser lock
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
 	    m->getfmMM()->getfmUtil()->idxllock(m,chk,0);
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
 	    //this new node, might be a shared node or a local node... 
 	    m->node.shared.addNode(newN,chk);
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
 	    //find out what chk calls this node (from the ghostrecv idxl list)
 	    int idx = m->getfmMM()->getfmUtil()->exists_in_IDXL(m, conn[i], chk, 2);
 	    m->node.ghost->ghostRecv.removeNode(FEM_To_ghost_index(conn[i]), chk);
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
 	    //when doing this add, make all idxl lists consistent, and return the list 
 	    //of n2e connections for this node, which are local to this chunk, 
 	    //and also a list of the connectivity
 	    meshMod[chk].addToSharedList(index, idx); 
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
 	    //when adding a new node, always verify if this new node is a corner on
 	    //the other chunk, if so add it to the list of fixed nodes (corners)
 	    int idx1 = m->getfmMM()->getfmUtil()->exists_in_IDXL(m, newN, chk, 0);
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
 	    boolMsg* bmsg1 = meshMod[chk].isFixedNodeRemote(index,idx1);
 	    bool isfixed = bmsg1->b;
 	    delete bmsg1;
 	    if(isfixed) m->getfmMM()->fmfixedNodes.push_back(newN);
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
 	    //coarser lock
 	    m->getfmMM()->getfmUtil()->idxlunlock(m, chk, 0);
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
 	  }
 	  nodetype[i] = 1;
 	  sharedcount++;
@@ -675,17 +721,34 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 	  FEM_remove_node_local(m,conn[i]);
 	  conn[i] = newN;
 	  //lock the newly formed node, if it needs to be
-	  //FEM_Modify_LockUpdate(m,conn[i]);
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
+#ifndef CPSD_HACKS
+	  FEM_Modify_LockUpdate(m,conn[i]);
+#endif
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
 	  for(int j=0; j<numchunks; j++) {
 	    delete chunks1[j];
 	  }
 	  if(numchunks != 0) free(chunks1);
 	}
       }
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
       newEl = FEM_add_element_local(m,conn,connSize,elemType,0);
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
       buildGhosts = 1;
     }
     else {
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
       int numSharedChunks = 0;
       int remoteChunk = -1;
       if(chunkNo==-1) {
@@ -786,6 +849,9 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       newEl = ilist[shidx];
       newEl = FEM_To_ghost_index(newEl);
     }
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
   }
   else if(ghostcount > 0 && localcount == 0 && sharedcount == 0) { 
     // it is a remote elem with no shared nodes
@@ -819,6 +885,9 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
     //   update local adjacencies
     //   return the new element id
     //build a mapping of all shared chunks to all nodes in this element    
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
     CkVec<int> **allShared;
     int numSharedChunks = 0;
     CkVec<int> *allChunks = NULL;
@@ -884,6 +953,9 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
       addGhostElemMsg *fm = new (connSize, connSize, 0)addGhostElemMsg;
       fm->chk = index;
       fm->elemType = elemType;
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
       for(int j=0; j<connSize; j++) {
 	fm->indices[j] = sharedIndices[j];
 	fm->typeOfIndex[j] = typeOfIndex[j];
@@ -907,8 +979,14 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
     free(allShared);
     allChunks->free();
     if(allChunks!=NULL) free(allChunks);
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
   }
   free(nodetype);
+#ifdef DEBUG_2
+  CkPrintf("addElement, line %d\n", __LINE__);
+#endif
   return newEl;
 }
 
@@ -1000,6 +1078,9 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
 */
 int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
   //CkAssert(elementid != -1);
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
   if(elementid == -1) return -1;
   int index = m->getfmMM()->getfmUtil()->getIdx();
   if(FEM_Is_ghost_index(elementid)){
@@ -1018,6 +1099,9 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
     rm->permanent = permanent;
     meshMod[remoteChunk].removeElementRemote(rm);
     // remove local ghost element, now done in purge
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
     return remoteChunk;
   }
   else {
@@ -1096,7 +1180,9 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	  for(int i=0; i<connSize; i++) {
 	    if(losingThisNode[i]) {
 	      //lock it on the min chunk on which this node is local
+#ifndef CPSD_HACKS
 	      FEM_Modify_LockAll(m,nodes[i],false);
+#endif
 	    }
 	    if(losingThisNode[i]==1 && willBeGhost[i]==1) {
 	      newghost[i] = FEM_add_node_local(m,1);
@@ -1200,7 +1286,13 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 		  //convert this local index to a shared index
 		  int shidx = m->getfmMM()->fmUtil->exists_in_IDXL(m,nodes[j],chk,1);
 		  if(shidx!=-1) {
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 		    m->node.ghostSend.removeNode(nodes[j], chk);
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 		    ghostIndices[numGhostNodes] = shidx;
 		    numGhostNodes++;
 		  }
@@ -1233,7 +1325,13 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 		    //and mark the element invalid in the fem_elem list
 		    if(geShouldBeDeleted) {
 		      int sge = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,elems[k],chk,4,elemtype);
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 		      m->elem[elemtype].ghost->ghostRecv.removeNode(FEM_To_ghost_index(elems[k]), chk);
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 		      FEM_remove_element_local(m,elems[k],elemtype);
 		      m->elem[elemtype].ghost->set_invalid(FEM_From_ghost_index(elems[k]),false);
 		      ghostREIndices.push_back(sge);
@@ -1245,6 +1343,11 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 			m->n2e_getAll(nds[l], elts, numElts);
 			//if this is no longer connected to this chunk through 
 			//any of its neighboring elements, it should no longer be a ghost
+// NOTE:
+// for edge flips, this will remove needed nodes on processor boundaries. The right
+// solution is to properly figure out when that situation applies, but for now just keep
+// the nodes always.
+//#ifndef CPSD_HACKS
 			if(nds[l]<-1) { //it is a ghost
 			  bool removeflag = true;
 			  for(int lm=0; lm<numElts; lm++) {
@@ -1258,12 +1361,19 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 			  if(removeflag) {
 			    //remove this ghost node on this chunk
 			    int sgn = m->getfmMM()->getfmUtil()->exists_in_IDXL(m,nds[l],chk,2);
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 			    m->node.ghost->ghostRecv.removeNode(FEM_To_ghost_index(nds[l]), chk);
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 			    if(numElts==0) FEM_remove_node_local(m,nds[l]);
 			    ghostRNIndices.push_back(sgn);
 			    numGhostRN++;
 			  }
 			}
+//#endif
 			if(numElts!=0) delete[] elts;
 		      }
 		    }
@@ -1294,18 +1404,28 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 		  sharedIndices[numSharedNodes] = ssn;
 		  numSharedNodes++;
 		}
-		else if(ssn!=-1) {
+		else 
+                    if(ssn!=-1) {
 		  if(willBeGhost[j]==1) {
 		    m->node.ghost->ghostRecv.addNode(newghost[j],chk);
 		  }
 		  else { //happens when it was shared but won't even be a ghost now
 		    ssn -= 500000000; //to tell the other chunk, not to add it in ghostsend
 		  }
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 		  m->node.shared.removeNode(nodes[j], chk);
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 		  sharedIndices[numSharedNodes] = ssn;
 		  numSharedNodes++;
 		}
 	        if(i==numSharedChunks-1) { //this is the last time
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 		  //so, update this element's adjacencies now
 		  //since this node is about to be lost, so update the neighboring 
 		  //elements and nodes that this node has a connectivity with,
@@ -1345,6 +1465,12 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 		  if(numn2ns!=0) delete[] n2ns;
 		  //if it is not shared, then all shared entries have been deleted
 		  const IDXL_Rec *irec1 = m->node.shared.getRec(nodes[j]);
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
+// This code removes nodes that we still need in cases involving acquisition/flip for
+// CPSD. I don't really follow the logic here, so I'm just cutting this bit out for now
+#ifndef CPSD_HACKS
 		  if(!irec1) {
 		    if(!losinglocal) {
 		      FEM_remove_node_local(m,nodes[j]);
@@ -1352,11 +1478,15 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 		    else {
 		      deleteNodeLater = nodes[j];
 		    }
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 		    //if losing a local node, then can remove it only after its attributes 
 		    //have been copied, since this is the only copy.. 
 		    //(as no other chunk has this node as local/shared)
 		    //so we'll need to delete the ghostsend idxl entry and the node later
 		  }
+#endif
 		}
 	      }
 	      if(numElems!=0) delete[] elems;
@@ -1364,6 +1494,9 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	    //now that all ghost nodes to be removed have been decided, we add the elem,
 	    // and call the entry method test if all the elems added are valid
 	    //sanity testing code START
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 	    for(int testelemscnt=0; testelemscnt <testelems.size(); testelemscnt++) {
 	      int el = testelems[testelemscnt];
 	      if(FEM_Is_ghost_index(el)) {
@@ -1373,8 +1506,14 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 		CkAssert(m->elem[0].is_valid(el)==1);
 	      }
 	    }
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 	    //sanity testing code END
 	  }
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 	  removeGhostElemMsg *rm = new (numGhostNodes, numGhostRN, numGhostRE, numSharedNodes, 0) removeGhostElemMsg;
 	  rm->chk = index;
 	  rm->elemtype = elemtype;
@@ -1395,11 +1534,23 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	  for(int j=0; j<numSharedNodes; j++) {
 	    rm->sharedIndices[j] = sharedIndices[j];
 	  }
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 	  meshMod[chk].removeGhostElem(rm);  //update the ghosts on all shared chunks
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 	  //can delete the ghostSend and node now, if it was not deleted earlier
 	  if((i==numSharedChunks-1) && (deleteNodeLater!=-1)) {
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
 	    m->node.ghostSend.removeNode(deleteNodeLater, permanent);
 	    FEM_remove_node_local(m,deleteNodeLater);
+#ifdef DEBUG_2
+  CkPrintf("leaving removeElement, line %d\n", __LINE__);
+#endif
 	    //finally if it is on the fmfixednodes list, remove it
 	    //an O(n) search, but fmfixedNodes is a small list and called rarely
 	    for(int cnt=0; cnt<m->getfmMM()->fmfixedNodes.size(); cnt++) {
@@ -1425,8 +1576,17 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
       }
     }
     // remove local element
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
     FEM_remove_element_local(m, elementid, elemtype);
+#ifdef DEBUG_2
+  CkPrintf("removeElement, line %d\n", __LINE__);
+#endif
   }
+#ifdef DEBUG_2
+  CkPrintf("leaving removeElement, line %d\n", __LINE__);
+#endif
   return index;
 }
 
