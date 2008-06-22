@@ -607,11 +607,6 @@ void CmiMachineInit(char **argv)
 #endif
 }
 
-void CmiCommunicationInit(char **argv)
-{
-  open_tcp_sockets();
-}
-
 void CmiMachineExit()
 {
 }
@@ -668,6 +663,11 @@ static void open_tcp_sockets()
 #endif
 #endif
   }
+}
+
+void CmiCommunicationInit(char **argv)
+{
+  open_tcp_sockets();
 }
 
 /*@}*/
