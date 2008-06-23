@@ -52,7 +52,7 @@ void BgWriteThreadTimeLine(char *pgm, int x, int y, int z, int th, BgTimeLine &t
   free(fname);
 }
 
-void BgWriteTraceSummary(int nlocalProcs, int numPes, int x, int y, int z, int numWth, int numCth, char *traceroot)
+void BgWriteTraceSummary(int numPes, int x, int y, int z, int numWth, int numCth, char *traceroot)
 {
   char* d = new char[512];
   BGMach bgMach;
@@ -68,6 +68,7 @@ void BgWriteTraceSummary(int nlocalProcs, int numPes, int x, int y, int z, int n
   }
   PUP::toDisk p(f);
   p((char *)&machInfo, sizeof(machInfo));
+  int nlocalProcs = x*y*x*numWth;               // ???
   p|nlocalProcs;
   bgMach.x = x;
   bgMach.y = y;
