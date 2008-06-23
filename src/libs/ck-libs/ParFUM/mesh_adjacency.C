@@ -700,6 +700,57 @@ void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr, int etype)
   }
 }
 
+
+
+/** Find element oldNbr in e's adjacent elements and replace with newNbr
+ */
+void FEM_Mesh::e2e_replace(FEM_VarIndexAttribute::ID e, FEM_VarIndexAttribute::ID oldNbr, FEM_VarIndexAttribute::ID newNbr) 
+{
+  if (e.id == -1) return;
+
+//	CkPrintf("replacing %d,%d with %d,%d\n", oldNbr.type, oldNbr.id, newNbr.type, newNbr.id);
+
+  
+  FEM_IndexAttribute *eAdj;
+  if(FEM_Is_ghost_index(e.id)){
+	  FEM_IndexAttribute *elemAdjTypesAttrGhost = (FEM_IndexAttribute *)elem[e.type].getGhost()->lookup(FEM_ELEM_ELEM_ADJ_TYPES,"e2e_replace");
+	  FEM_IndexAttribute *elemAdjAttrGhost = (FEM_IndexAttribute *)elem[e.type].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_replace");
+   
+	  AllocTable2d<int> &eAdjs = elemAdjAttrGhost->get();
+	  AllocTable2d<int> &eAdjTypes = elemAdjTypesAttrGhost->get();
+	  
+	  for (int i=0; i<eAdjs.width(); i++) {
+		  if (eAdjs[FEM_To_ghost_index(e.id)][i] == oldNbr.id && eAdjTypes[FEM_To_ghost_index(e.id)][i] == oldNbr.type ) {
+			  eAdjs[FEM_To_ghost_index(e.id)][i] = newNbr.id;
+			  eAdjTypes[FEM_To_ghost_index(e.id)][i] = newNbr.type;
+			  break;
+		  }
+	  }
+  }
+  else{
+    eAdj = (FEM_IndexAttribute *)elem[e.type].lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_replace");
+  
+    FEM_IndexAttribute *elemAdjTypesAttr = (FEM_IndexAttribute *)elem[e.type].lookup(FEM_ELEM_ELEM_ADJ_TYPES,"e2e_replace");
+    FEM_IndexAttribute *elemAdjAttr = (FEM_IndexAttribute *)elem[e.type].lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_replace");
+    
+    AllocTable2d<int> &eAdjs = elemAdjAttr->get();
+    AllocTable2d<int> &eAdjTypes = elemAdjTypesAttr->get();
+
+    for (int i=0; i<eAdjs.width(); i++) {
+    	if (eAdjs[e.id][i] == oldNbr.id && eAdjTypes[e.id][i] == oldNbr.type ) {
+//    		CkPrintf("eAdjTypes[e.id][i] was %d eAdjs[e.id][i] was %d\n", eAdjTypes[e.id][i], eAdjs[e.id][i]);
+    		eAdjs[e.id][i] = newNbr.id;
+    		eAdjTypes[e.id][i] = newNbr.type;
+//    		CkPrintf("newNbr.type = %d\n", newNbr.type);
+//    		CkPrintf("eAdjTypes[e.id][i] is %d eAdjs[e.id][i] is %d\n", eAdjTypes[e.id][i], eAdjs[e.id][i]);
+    		break;
+    	}
+    }
+    
+  }
+}
+
+
 /** Remove all neighboring elements in adjacency
  */
 void FEM_Mesh::e2e_removeAll(int e, int etype)
@@ -721,6 +772,41 @@ void FEM_Mesh::e2e_removeAll(int e, int etype)
     }
   }
 }
+
+
+/**  Print all the elements adjacent to the given element.
+*/
+void FEM_Mesh::e2e_printAll(FEM_VarIndexAttribute::ID e) 
+{
+	if (e.id == -1) return; // non existent element
+	
+	FEM_IndexAttribute *eAdj;
+	FEM_IndexAttribute *eAdjType;
+	
+	if(FEM_Is_ghost_index(e.id)){
+		eAdj = (FEM_IndexAttribute *)elem[e.type].getGhost()->lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_printAll");
+		eAdjType = (FEM_IndexAttribute *)elem[e.type].getGhost()->lookup(FEM_ELEM_ELEM_ADJ_TYPES,"e2e_printAll");
+	}
+	else {
+		eAdj = (FEM_IndexAttribute *)elem[e.type].lookup(FEM_ELEM_ELEM_ADJACENCY,"e2e_printAll");
+		eAdjType = (FEM_IndexAttribute *)elem[e.type].lookup(FEM_ELEM_ELEM_ADJ_TYPES,"e2e_printAll");
+	}
+	
+	
+	AllocTable2d<int> &eAdjs = eAdj->get();
+	AllocTable2d<int> &eAdjTypes = eAdjType->get();
+	CkAssert(eAdjs.width() == eAdjTypes.width());
+
+	CkAssert(e.getSignedId()>=0);
+
+	for (int i=0; i<eAdjs.width(); i++) {
+		CkPrintf("Element %d,%d is adjacent to %d,%d\n", e.type, e.id, eAdjTypes[e.getSignedId()][i], eAdjs[e.getSignedId()][i]);
+
+	}
+
+}
+
+
 
 /**  ------- Element-to-node: preserve initial ordering
      Place all of element e's adjacent nodes in adjnodes; assumes

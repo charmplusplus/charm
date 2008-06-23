@@ -631,7 +631,7 @@ class FEM_VarIndexAttribute : public FEM_Attribute{
       return (type == rhs.type) && (id == rhs.id);
     }
     bool operator < (const ID &rhs)const {
-       return (type < rhs.type) || (id < rhs.id);
+       return (type < rhs.type) || ( type == rhs.type && id < rhs.id);
      }
     const ID& operator =(const ID &rhs) {
       type = rhs.type;
@@ -1408,9 +1408,15 @@ class FEM_Mesh : public CkNoncopyable {
   void e2e_setIndex(int e, short idx, int newElem, int etype=0);
   /// Find element oldNbr in e's adjacent elements and replace with newNbr
   void e2e_replace(int e, int oldNbr, int newNbr, int etype=0);
+  /// Find element oldNbr in e's adjacent elements and replace with newNbr
+  void e2e_replace(FEM_VarIndexAttribute::ID e, FEM_VarIndexAttribute::ID oldNbr, FEM_VarIndexAttribute::ID newNbr); 
+  
   /// Remove all neighboring elements in adjacency
   void e2e_removeAll(int e, int etype=0);
 
+  void e2e_printAll(FEM_VarIndexAttribute::ID e); 
+
+  
 
   //  ------- Element-to-node: preserve initial ordering
   /// Place all of element e's adjacent nodes in adjnodes; assumes
@@ -1428,6 +1434,7 @@ class FEM_Mesh : public CkNoncopyable {
   void e2n_setIndex(int e, short idx, int newNode, int etype=0);
   /// Find node oldNode in e's adjacent ndoes and replace with newNode
   void e2n_replace(int e, int oldNode, int newNode, int etype=0);
+
   /// Replace all entries with -1
   void e2n_removeAll(int e, int etype=0);
 
