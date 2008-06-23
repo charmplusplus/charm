@@ -217,11 +217,25 @@ void topFacetItr_Begin(TopFacetItr* itr){
 	itr->elemItr = topModel_CreateElemItr(itr->model);
 	topElemItr_Begin(itr->elemItr);
 	itr->whichFacet = 0;
+	
+	// We break the ties between two copies of a facet by looking at the two adjacent elements
+	// We must ensure that the first facet we just found is actually a valid one
+	// If it is not valid, then we go to the next one
+
+	TopElement currElem = topElemItr_GetCurr(itr->elemItr);
+	FEM_VarIndexAttribute::ID e = itr->model->mesh->e2e_getElem(currElem.id, itr->whichFacet, currElem.type);
+	if (e < currElem) {
+		// Good, this facet is valid
+	} else {
+		topFacetItr_Next(itr);
+	}
+
 }
 
 bool topFacetItr_IsValid(TopFacetItr* itr){
 	return topElemItr_IsValid(itr->elemItr);
 }
+
 
 /** Iterate to the next facet */
 void topFacetItr_Next(TopFacetItr* itr){
@@ -239,14 +253,15 @@ void topFacetItr_Next(TopFacetItr* itr){
 		if( ! topElemItr_IsValid(itr->elemItr) ){
 			break;
 		}
-				
+
 		TopElement currElem = topElemItr_GetCurr(itr->elemItr);
 		FEM_VarIndexAttribute::ID e = itr->model->mesh->e2e_getElem(currElem.id, itr->whichFacet, currElem.type);
-
-		// TODO Adapt to work with cohesives
-		if (e.id < currElem.id){
+		
+		if (e < currElem) {
 			found = true;
-		}
+//			CkPrintf("e.id=%d currElem.id=%d\n", e.id, currElem.id);
+		} 
+		
 	}
 	
 }

@@ -28,6 +28,10 @@
 #include <stack>
 
 
+#undef DEBUG
+#define DEBUG 0
+
+
 int tetFaces[] = {0,1,3,  0,2,1,  1,2,3,   0,3,2};
 int cohFaces[] = {0,1,2,  3,4,5};  
 
@@ -408,6 +412,7 @@ void topElement_SetId(TopModel* m, TopElement e, TopID id){
 int topModel_GetNElem (TopModel* m){
 	const int numBulk = m->mesh->elem[TOP_ELEMENT_TET4].count_valid();
 	const int numCohesive = m->mesh->elem[TOP_ELEMENT_COH3T3].count_valid();
+	cout << " numBulk = " << numBulk << " numCohesive " << numCohesive << endl;
 	return numBulk + numCohesive;
 }
 
@@ -715,19 +720,31 @@ bool areSameTriangle(int a1, int a2, int a3, int b1, int b2, int b3){
 
 TopElement topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f){
 	TopElement newCohesiveElement;
+	
+	CkAssert(ElemType == TOP_ELEMENT_COH3T3);
 
 	const TopElement firstElement = f.elem[0];
 	const TopElement secondElement = f.elem[1];
 
+	CkAssert(firstElement.type != TOP_ELEMENT_COH3T3);
+	CkAssert(secondElement.type != TOP_ELEMENT_COH3T3);
+		
 	CkAssert(firstElement.id != -1);
 	CkAssert(secondElement.id != -1);
-
 
 	// Create a new element
 	int newEl = m->mesh->elem[ElemType].get_next_invalid(m->mesh);
 	m->mesh->elem[ElemType].set_valid(newEl, false);
-	CkPrintf("Inserted cohesive %d of type %d at facet %d,%d,%d\n", newEl, ElemType,  f.node[0], f.node[1], f.node[2]);
-
+	
+	newCohesiveElement.id = newEl;
+	newCohesiveElement.type = ElemType;
+	
+	
+#if DEBUG
+	CkPrintf("/\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\/ \n");
+	CkPrintf("Inserting cohesive %d of type %d at facet %d,%d,%d\n", newEl, ElemType,  f.node[0], f.node[1], f.node[2]);
+#endif
+	
 	int conn[6];
 	conn[0] = f.node[0];
 	conn[1] = f.node[1];
@@ -744,15 +761,18 @@ TopElement topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f
 
 	// Examine each node to determine if the node should be split
 	for(int whichNode = 0; whichNode<3; whichNode++){
-		CkPrintf("==========================\n");
+#if DEBUG
+		CkPrintf("--------------------------------\n");
 		CkPrintf("Determining whether to split node %d\n",  f.node[whichNode]);
+#endif
 
 		canReachSecond[whichNode]=false;
-	
+
 		TopNode theNode = f.node[whichNode];
 
 		// Traverse across the faces to see which elements we can get to from the first element of this facet
 		std::stack<TopElement> traverseTheseElements;
+		CkAssert(firstElement.type != TOP_ELEMENT_COH3T3);
 		traverseTheseElements.push(firstElement);
 
 		while(traverseTheseElements.size()>0 && ! canReachSecond[whichNode]){
@@ -762,7 +782,9 @@ TopElement topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f
 			// We should only examine elements that we have not yet already examined
 			if(reachableFromElement1[whichNode].find(traversedToElem) == reachableFromElement1[whichNode].end()){
 				reachableFromElement1[whichNode].insert(traversedToElem);
-				
+#if DEBUG
+				CkPrintf("Can iterate from first element %d to element %d\n", firstElement.id, traversedToElem.id);
+#endif
 				// keep track of which nodes the split node would be adjacent to,
 				// if we split this node
 				for (int elemNode=0; elemNode<4; ++elemNode) {
@@ -774,106 +796,152 @@ TopElement topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f
 						reachableNodeFromElement1[whichNode].insert(queryNode);
 					}
 				}
-
-				CkPrintf("Examining element %d,%d\n", traversedToElem.type, traversedToElem.id);
-
+#if DEBUG
+//				CkPrintf("Examining element %s,%d\n", traversedToElem.type==TOP_ELEMENT_COH3T3?"TOP_ELEMENT_COH3T3":"TOP_ELEMENT_TET4", traversedToElem.id);
+#endif
+				
 				// Add all elements across this elements face, if they contain whichNode
 				for(int face=0;face<4;face++){
 
 					TopElement neighbor = m->mesh->e2e_getElem(traversedToElem, face); 
-					if(topElement_IsValid(m,neighbor)) {
-						bool containsTheNode = false;
-						for(int i=0;i<4;i++){
-							if(topElement_GetNode(m,neighbor,i) == theNode){
-								containsTheNode = true;
-							}
-						}
-
-						if(containsTheNode){
-							// Don't traverse across the face at which we are inserting the cohesive element
-							if(!areSameTriangle(f.node[0],f.node[1],f.node[2],  
-									topElement_GetNode(m,traversedToElem,tetFaces[face*3+0]),
-									topElement_GetNode(m,traversedToElem,tetFaces[face*3+1]),
-									topElement_GetNode(m,traversedToElem,tetFaces[face*3+2]) ) ){
-
-								// If this element is the second element adjacent to the new cohesive element, we can stop
-								if(neighbor == secondElement){
-									canReachSecond[whichNode] = true;
-									CkPrintf("We have traversed to the other side of the facet\n");
-								} else {
-									// Otherwise, add this element to the set remaining to be examined
-									traverseTheseElements.push(neighbor);
-									CkPrintf("Adding element %d,%d to list\n", neighbor.type, neighbor.id);
+					// Only traverse to neighboring bulk elements
+					if(neighbor.type == TOP_ELEMENT_TET4){
+#if DEBUG
+						CkPrintf("element %d,%d is adjacent to bulk element %d on face %d\n", traversedToElem.type,traversedToElem.id, neighbor.id, face);
+#endif
+						if(topElement_IsValid(m,neighbor)) {
+							bool containsTheNode = false;
+							for(int i=0;i<4;i++){
+								if(topElement_GetNode(m,neighbor,i) == theNode){
+									containsTheNode = true;
 								}
-							} else {
-								// ignore the element because it is not adjacent to the node we are considering splitting
+							}
+
+							if(containsTheNode){
+								// Don't traverse across the face at which we are inserting the cohesive element
+								if(!areSameTriangle(f.node[0],f.node[1],f.node[2],  
+										topElement_GetNode(m,traversedToElem,tetFaces[face*3+0]),
+										topElement_GetNode(m,traversedToElem,tetFaces[face*3+1]),
+										topElement_GetNode(m,traversedToElem,tetFaces[face*3+2]) ) ){
+
+									// If this element is the second element adjacent to the new cohesive element, we can stop
+									if(neighbor == secondElement){
+										canReachSecond[whichNode] = true;
+#if DEBUG
+										CkPrintf("We have traversed to the other side of the facet\n");
+#endif
+									} else {
+										// Otherwise, add this element to the set remaining to be examined
+										CkAssert(neighbor.type != TOP_ELEMENT_COH3T3);
+										traverseTheseElements.push(neighbor);
+#if DEBUG
+										//									CkPrintf("Adding element %d,%d to list\n", neighbor.type, neighbor.id);
+#endif
+									}
+								} else {
+									// ignore the element because it is not adjacent to the node we are considering splitting
+								}
 							}
 						}
-
 					}
 				}
-				CkPrintf("So far we have traversed through %d elements(%d remaining)\n", reachableFromElement1[whichNode].size(), traverseTheseElements.size() );
+#if DEBUG
+//				CkPrintf("So far we have traversed through %d elements(%d remaining)\n", reachableFromElement1[whichNode].size(), traverseTheseElements.size() );
+#endif
 			}
 		}
 
 	}
 
-	CkPrintf("\n\n");
+#if DEBUG
+	CkPrintf("\n");
+#endif
 	
 	// Now do the actual splitting of the nodes
 	int myChunk = FEM_My_partition();
 	for(int whichNode = 0; whichNode<3; whichNode++){
 		if(canReachSecond[whichNode]){
+#if DEBUG
 			CkPrintf("Node %d doesn't need to be split\n", f.node[whichNode]);			
+#endif
 			// Do nothing
 		}else {
+#if DEBUG
 			CkPrintf("Node %d needs to be split\n", f.node[whichNode]);
 			CkPrintf("There are %d elements that will be reassigned to the new node\n",
 					reachableFromElement1[whichNode].size());
+#endif
 
 			// Create a new node
 			int newNode = m->mesh->node.get_next_invalid(m->mesh);
 			m->mesh->node.set_valid(newNode);
+
+			// copy its coordinates
+			// TODO: copy its other data as well
+			(*m->coord_T)(newNode,0) = (*m->coord_T)(conn[whichNode],0);
+			(*m->coord_T)(newNode,1) = (*m->coord_T)(conn[whichNode],1);
+			(*m->coord_T)(newNode,2) = (*m->coord_T)(conn[whichNode],2);
+
+#if DEBUG
 			CkPrintf("Splitting node %d into %d and %d\n", conn[whichNode], conn[whichNode], newNode);
-			
+#endif			
 			// can we use nilesh's idxl aware stuff here?
 			//FEM_add_node(m->mesh, int* adjacentNodes, int numAdjacentNodes, &myChunk, 1, 0);
 
 			// relabel one node in the cohesive element to the new node
 			conn[whichNode+3] = newNode;
-			
+
 			// relabel the appropriate old node in the elements in reachableFromElement1
-			for (std::set<TopElement>::iterator elem = 
-						reachableFromElement1[whichNode].begin();
-					elem != reachableFromElement1[whichNode].end();
-					++elem) {
-				m->mesh->e2n_replace(elem->id, conn[whichNode], newNode, ElemType);
-				CkPrintf("replacing node %d with %d in elem %d\n",
-						conn[whichNode], newNode, elem->id);
+			std::set<TopElement>::iterator elem;
+			for (elem = reachableFromElement1[whichNode].begin(); elem != reachableFromElement1[whichNode].end(); ++elem) {
+				m->mesh->e2n_replace(elem->id, conn[whichNode], newNode, elem->type);
+
+
+#if DEBUG
+				CkPrintf("replacing node %d with %d in elem %d\n", conn[whichNode], newNode, elem->id);
+#endif
 			}
-			
+
 			// fix node-node adjacencies
-			for (std::set<TopNode>::iterator node =
-						reachableNodeFromElement1[whichNode].begin();
-					node != reachableNodeFromElement1[whichNode].end();
-					++node) {
+			std::set<TopNode>::iterator node;
+			for (node = reachableNodeFromElement1[whichNode].begin(); node != reachableNodeFromElement1[whichNode].end(); ++node) {
 				m->mesh->n2n_replace(*node, conn[whichNode], newNode);
+#if DEBUG
 				CkPrintf("node %d is now adjacent to %d instead of %d\n",
 						*node, newNode, conn[whichNode]);
+#endif
 			}		
 		}
 	}
+
+#if DEBUG
+	m->mesh->e2e_printAll(firstElement);
+	m->mesh->e2e_printAll(secondElement);
+#endif
 	
 	// fix elem-elem adjacencies
-	CkPrintf("elements %d and %d were adjacent, now both adjacent to %d instead\n",
+	m->mesh->e2e_replace(firstElement, secondElement, newCohesiveElement);
+	m->mesh->e2e_replace(secondElement, firstElement, newCohesiveElement);
+
+#if DEBUG
+	CkPrintf("elements %d and %d were adjacent, now both adjacent to cohesive %d instead\n",
 			firstElement.id, secondElement.id, newEl);
-	m->mesh->e2e_replace(firstElement.id, secondElement.id, newEl, ElemType);
-	m->mesh->e2e_replace(secondElement.id, firstElement.id, newEl, ElemType);
+	
+	m->mesh->e2e_printAll(firstElement);
+	m->mesh->e2e_printAll(secondElement);
+	
+#endif
+	
+	
+	
+	
 	
 	// set cohesive connectivity
-	m->mesh->elem[ElemType].connIs(newEl,conn); 
+	m->mesh->elem[newCohesiveElement.type].connIs(newEl,conn); 
+#if DEBUG
 	CkPrintf("Setting connectivity of new cohesive %d to [%d %d %d %d %d %d]\n\n",
 			newEl, conn[0], conn[1], conn[2], conn[3], conn[4], conn[5]);
+#endif
 	return newCohesiveElement;
 }
 
