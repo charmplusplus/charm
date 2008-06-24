@@ -77,9 +77,6 @@ static int processBufferedCount;
 // flag for using a pool for every thread
 #define THREAD_MULTI_POOL 0
 
-//TODO: erase this constant value if ++ppn capture is possible
-#define INFI_NODE_SIZE 8
-
 #if THREAD_MULTI_POOL 
 #include "pcqueue.h"
 PCQueue **queuePool;
@@ -91,11 +88,13 @@ struct infiIncTokenAckPacket{
 	int a;
 };
 
-
-
 typedef struct {
 char none;  
 } CmiIdleState;
+
+//TODO:ERASE this
+static int TESTneighbor;
+static int TESTfrees;
 
 
 /********
@@ -431,6 +430,7 @@ static void CmiMachineInit(char **argv){
 
 	MACHSTATE(3,"CmiMachineInit {");
 	MACHSTATE2(3,"_Cmi_numnodes %d CmiNumNodes() %d",_Cmi_numnodes,CmiNumNodes());
+	MACHSTATE1(3,"CmiMyNodeSize() %d",CmiMyNodeSize());
 	
 	//TODO: make the device and ibport configureable by commandline parameter
 	//Check example for how to do that
@@ -516,10 +516,14 @@ static void CmiMachineInit(char **argv){
 	blockAllocRatio=16;
 	blockThreshold=8;
 
+	//TODO:erase this
+	int ppn = 0;
+	CmiGetArgInt(argv,"+ppn",&CmiMyNodeSize());
+	MACHSTATE1(3,"CmiMyNodeSize %d",CmiMyNodeSize());
 	
-	
+#if !THREAD_MULTI_POOL
 	initInfiCmiChunkPools();
-		
+#endif
 
 	/*create the pool of send packets*/
 	sendPacketPoolSize = maxTokens/2;	
@@ -531,6 +535,7 @@ static void CmiMachineInit(char **argv){
 	pktPtrs = malloc(sizeof(infiPacket)*sendPacketPoolSize);
 
 	//Silly way of allocating the memory buffers (slow as well) but simplifies the code
+#if !THREAD_MULTI_POOL
 	for(i=0;i<sendPacketPoolSize;i++){
 		MallocInfiPacket(pktPtrs[i]);	
 	}
@@ -539,6 +544,7 @@ static void CmiMachineInit(char **argv){
 		FreeInfiPacket(pktPtrs[i]);	
 	}
 	free(pktPtrs);
+#endif
 	
 	context->bufferedBcastList=NULL;
 	context->bufferedRdmaAcks = NULL;
@@ -587,6 +593,9 @@ static void CmiMachineInit(char **argv){
 
 void CmiCommunicationInit(char **argv)
 {
+#if THREAD_MULTI_POOL
+	initInfiCmiChunkPools();
+#endif
 }
 
 /*********
@@ -899,6 +908,9 @@ static void CmiMachineExit()
 #if CMK_IBVERBS_STATS	
 	printf("[%d] msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d \n",_Cmi_mynode,msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft);
 #endif
+
+	//TODO: ERASE this
+	MACHSTATE2(3,"Free msgs %d not owned %d",TESTfrees,TESTneighbor);
 }
 static void ServiceCharmrun_nolock();
 
@@ -2101,7 +2113,7 @@ static void initInfiCmiChunkPools(){
 	int nodeSize;
 
 #if THREAD_MULTI_POOL
-	nodeSize = INFI_NODE_SIZE;
+	nodeSize = CmiMyNodeSize() + 1;
 	infiCmiChunkPools = malloc(sizeof(infiCmiChunkPool *) * nodeSize);
 	for(i = 0; i < nodeSize; i++){
 		infiCmiChunkPools[i] = malloc(sizeof(infiCmiChunkPool) * INFINUMPOOLS);
@@ -2161,7 +2173,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 	void *res;
 
 	//printf("Hi\n");
-	MACHSTATE1(3,"Rank=%d",CmiMyRank());
+	MACHSTATE1(2,"Rank=%d",CmiMyRank());
 	
 	while(ratio > 0){
 		ratio  = ratio >> 1;
@@ -2421,8 +2433,10 @@ void infi_CmiFree(void *ptr){
 	int i,j;
         int size;
 	int parentPe;
+	int nodeSize;
 	void *pointer;
         void *freePtr = ptr;
+	nodeSize = CmiMyNodeSize() + 1;
 
 	MACHSTATE(3,"Freeing");
 
@@ -2444,17 +2458,23 @@ void infi_CmiFree(void *ptr){
 		return;
         }
 
+
+	//TODO: erase this
+	TESTfrees++;
+
 	// checking if this free operation is my responsibility
 	parentPe = metaData->parentPe;
 	if(parentPe != CmiMyRank()){
+		TESTneighbor++;
 		PCQueuePush(queuePool[parentPe][CmiMyRank()],(char *)ptr);
 		return;
 	}
 
+
 	infi_CmiFreeDirect(ptr);
 
 	// checking free request queues
-	for(i = 0; i < INFI_NODE_SIZE; i++){
+	for(i = 0; i < nodeSize; i++){
 		if(!PCQueueEmpty(queuePool[CmiMyRank()][i])){
 			for(j = 0; j < PCQueueLength(queuePool[CmiMyRank()][i]); j++){
 				pointer = (void *)PCQueuePop(queuePool[CmiMyRank()][i]);
