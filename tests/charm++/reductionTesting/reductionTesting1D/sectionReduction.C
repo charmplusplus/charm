@@ -53,23 +53,6 @@ void Test1D::compute(DummyMsg *m)
 	CkCallback cb(CkIndex_Main::reportSum(NULL), mainProxy);
 	mCastGrp->contribute(sizeof(double)*vectorSize, myVector.getVec(), CkReduction::sum_double, cookies[section], cb);
 	delete m;
-
-
-
-/***
-	CkSectionInfo cookie;
-	cookies.push_back(cookie);
-	CkVec<double> myVector(vectorSize);	//creates elements with vectorSize elements
-	for(int i = 0; i < vectorSize; i++)	{
-		myVector[i] = doubleVector[i];
-	}
-	int index = m->index;
-	CkGetSectionInfo(cookies[index], m);
-	CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpID).ckLocalBranch();
-	CkCallback cb(CkIndex_Main::reportSum(NULL), mainProxy);
-	mCastGrp->contribute(sizeof(double)*vectorSize, myVector.getVec(), CkReduction::sum_double, cookies[index], cb);
-	delete m;
-****/
 };
 
 /*Test1D::~Test1D()
