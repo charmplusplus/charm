@@ -1,0 +1,18 @@
+mainmodule main {
+	extern module sectionReduction;
+	
+	readonly CProxy_Main mainProxy;
+	readonly CkChareID mainhandle;
+	readonly CkGroupID mCastGrpID;
+	readonly int arrayDimensionX;
+	readonly int arrayDimensionY;
+	readonly int arrayDimensionZ;
+	readonly int vectorSize;
+	
+	mainchare Main
+	{
+		entry Main(CkArgMsg* msg);
+		entry [threaded] void QuiDetect();
+		entry void reportSum(CkReductionMsg *m);
+	};
+};

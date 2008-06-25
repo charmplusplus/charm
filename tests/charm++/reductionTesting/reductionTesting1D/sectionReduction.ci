@@ -1,0 +1,10 @@
+module sectionReduction {
+
+	message DummyMsg;
+	
+	array [1D] Test1D {
+		entry Test1D();
+		entry void compute(DummyMsg *m);
+	};
+};
+
