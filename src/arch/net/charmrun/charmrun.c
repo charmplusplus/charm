@@ -1851,7 +1851,10 @@ int errorcheck_one_client_connect(int client){
 };
 
 
-inline void read_initnode_one_client(int client){
+#if CMK_C_INLINE
+inline 
+#endif
+void read_initnode_one_client(int client){
 		ChMessage msg;
 		if (!skt_select1(req_clients[client],arg_timeout*1000))
 		   client_connect_problem(client,"Timeout on IP request");
