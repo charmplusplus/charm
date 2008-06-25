@@ -43,7 +43,7 @@ Main::Main(CkArgMsg *m)
 		mCastGrp->setReductionClient(sectionProxy[i], cb);
 		//msg for sectionProxy[i]
 		DummyMsg *msg = new DummyMsg;
-		msg->index = i;
+		msg->section = i;
 		sectionProxy[i].compute(msg);	//multicast to the section array.
 	}
 	
@@ -56,13 +56,13 @@ void Main::reportSum(CkReductionMsg *m)
 {
 	int reducedVecSize = m->getSize() / sizeof(double);
 	double *sum = (double*)m->getData();
-	delete m;
 	CkPrintf("Size of reduced vector is %d.\nContents of reduced vector are:\n", reducedVecSize);
 	for(int i = 0; i < reducedVecSize; i++)
 	{
 		CkPrintf("%f  ",sum[i]);
 	}
 	CkPrintf("\n");
+	delete m;
 };
 
 void Main::QuiDetect()

@@ -16,7 +16,7 @@ extern int vectorSize;
 class DummyMsg: public CkMcastBaseMsg, public CMessage_DummyMsg
 {
 	public:
-		int index;
+		int section;
 };
 
 class Test1D: public CBase_Test1D

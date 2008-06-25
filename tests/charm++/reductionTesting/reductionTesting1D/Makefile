@@ -1,11 +1,13 @@
 CHARMDIR = ../../../..
-OPTS = -g -Wno-deprecated
+#OPTS = -g -Wno-deprecated
+OPTS = -Wno-deprecated
 CHARMC = $(CHARMDIR)/bin/charmc $(OPTS)
 
 all: pgm
 
 pgm: Main.o sectionReduction.o
-	$(CHARMC) -memory charmdebug -o pgm sectionReduction.o Main.o -module CkMulticast 
+	$(CHARMC) -language charm++ -o pgm sectionReduction.o Main.o -module CkMulticast 
+#	$(CHARMC) -memory charmdebug -o pgm sectionReduction.o Main.o -module CkMulticast 
 
 Main.o: Main.C Main.h main.decl.h main.def.h sectionReduction.decl.h
 	$(CHARMC) -c Main.C
