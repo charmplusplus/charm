@@ -70,18 +70,21 @@ class TCharm: public CBase_TCharm
 
 //User's heap-allocated/global data:
 	class UserData {
-		void *data; //user data pointer
+//		void *data; //user data pointer
+                CthThread t;
+                size_t    pos;
 		char mode;
 		TCHARM_Pup_fn cfn;
 		TCHARM_Pup_global_fn gfn;
 	public:
-		UserData(int i=0) {data=NULL; mode='?'; cfn=NULL; gfn=NULL;}
-		UserData(TCHARM_Pup_fn cfn_,void *data_)
-			{cfn=cfn_; data=data_; mode='c';}
-		UserData(TCHARM_Pup_global_fn gfn_,void *data_)
-			{gfn=gfn_; data=data_; mode='g';}
-		inline void *getData(void) const {return data;}
+		UserData(int i=0) {pos=0; mode='?'; cfn=NULL; gfn=NULL;}
+		UserData(TCHARM_Pup_fn cfn_,CthThread t_,void *p)
+			{cfn=cfn_; t=t_; pos=CthStackOffset(t, (char *)p); mode='c';}
+		UserData(TCHARM_Pup_global_fn gfn_,CthThread t_,void *p)
+			{gfn=gfn_; t=t_; pos=CthStackOffset(t, (char *)p); mode='g';}
+		inline void *getData(void) const {return pos==0?NULL:CthPointer(t, pos);}
 		void pup(PUP::er &p);
+                void update(CthThread t_) { t=t_; }
 		friend inline void operator|(PUP::er &p,UserData &d) {d.pup(p);}
 	};
 	//New interface for user data:

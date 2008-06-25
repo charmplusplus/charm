@@ -232,8 +232,12 @@ void TCharm::pup(PUP::er &p) {
   s.seek(0);
   checkPupMismatch(p,5135,"before TCHARM user data");
   p(nUd);
-  for(int i=0;i<nUd;i++) ud[i].pup(p);
+  for(int i=0;i<nUd;i++) {
+    if (p.isUnpacking()) ud[i].update(tid);
+    ud[i].pup(p);
+  }
   checkPupMismatch(p,5137,"after TCHARM_Register user data");
+
   if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
     deactivateThread();
   p|sud;           //  sud vector block can not be in isomalloc
@@ -281,19 +285,21 @@ void TCharm::UserData::pup(PUP::er &p)
   p(mode);
   switch(mode) {
   case 'c': { /* C mode: userdata is on the stack, so keep address */
-     p((char*)&data,sizeof(data));
+//     p((char*)&data,sizeof(data));
+     p(pos);
      //FIXME: function pointers may not be valid across processors
      p((char*)&cfn, sizeof(TCHARM_Pup_fn));
+     char *data = CthPointer(t, pos);
      if (cfn) cfn(pext,data);
      } break;
   case 'g': { /* Global mode: zero out userdata on arrival */
      if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
      {
         // keep the pointer value if using isomalloc, no need to use pup
-       p((char*)&data,sizeof(data));
+       p(pos);
      }
      else if (p.isUnpacking())      //  zero out userdata on arrival
-       data=0;
+       pos=0;
 
        //FIXME: function pointers may not be valid across processors
      p((char*)&gfn, sizeof(TCHARM_Pup_global_fn));
@@ -708,7 +714,7 @@ FDECL int FTN_NAME(TCHARM_NUM_ELEMENTS,tcharm_num_elements)(void)
 static void checkAddress(void *data)
 {
 	if (tcharm_nomig||tcharm_nothreads) return; //Stack is not isomalloc'd
-	if (CmiThreadIs(CMI_THREAD_IS_ALIAS)) return; // memory alias thread
+	if (CmiThreadIs(CMI_THREAD_IS_ALIAS)||CmiThreadIs(CMI_THREAD_IS_STACKCOPY)) return; // memory alias thread
 	if (!CmiIsomallocInRange(data))
 	    CkAbort("The UserData you register must be allocated on the stack!\n");
 }
@@ -718,14 +724,14 @@ CDECL int TCHARM_Register(void *data,TCHARM_Pup_fn pfn)
 { 
 	TCHARMAPI("TCHARM_Register");
 	checkAddress(data);
-	return TCharm::get()->add(TCharm::UserData(pfn,data));
+	return TCharm::get()->add(TCharm::UserData(pfn,TCharm::get()->getThread(),data));
 }
 FDECL int FTN_NAME(TCHARM_REGISTER,tcharm_register)
 	(void *data,TCHARM_Pup_fn pfn)
 { 
 	TCHARMAPI("TCHARM_Register");
 	checkAddress(data);
-	return TCharm::get()->add(TCharm::UserData(pfn,data));
+	return TCharm::get()->add(TCharm::UserData(pfn,TCharm::get()->getThread(),data));
 }
 
 CDECL void *TCHARM_Get_userdata(int id)
@@ -746,7 +752,7 @@ CDECL void TCHARM_Set_global(int globalID,void *new_value,TCHARM_Pup_global_fn p
 		int newLen=2*globalID;
 		tc->sud.resize(newLen);
 	}
-	tc->sud[globalID]=TCharm::UserData(pup_or_NULL,new_value);
+	tc->sud[globalID]=TCharm::UserData(pup_or_NULL,tc->getThread(),new_value);
 }
 CDECL void *TCHARM_Get_global(int globalID)
 {
