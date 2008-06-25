@@ -22,8 +22,18 @@ then
 fi
 
 # Configurable option: Location of MSDEV
-VCC_DIR="C:/Program Files/Microsoft Visual Studio 8/VC"
-SDK_DIR="C:/Program Files/Microsoft Platform SDK"
+if test -z "$VCINSTALLDIR"
+then
+  VCC_DIR="C:/Program Files/Microsoft Visual Studio 8/VC"
+else
+  VCC_DIR=$VCINSTALLDIR
+fi
+if test -z "$WINDOWSSDKDIR"
+then
+  SDK_DIR="C:/Program Files/Microsoft Platform SDK"
+else
+  SDK_DIR=$WINDOWSSDKDIR
+fi
 
 #CL command-line options for -O and -g mode
 CL_CMD="$VCC_DIR/BIN/CL.EXE"
