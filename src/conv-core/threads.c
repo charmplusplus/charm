@@ -714,7 +714,7 @@ Gengbin Zheng March, 2006
 
 #if CMK_THREADS_USE_STACKCOPY
 
-#define SWITCHBUF_SIZE 16384
+#define SWITCHBUF_SIZE 32768
 
 typedef struct CthProcInfo *CthProcInfo;
 
@@ -811,7 +811,7 @@ void CthInit(char **argv)
   /* leave some space for current stack frame < 256 bytes */
   /* sp must be same on all processors for migration to work ! */
   sp = (qt_t*)(((size_t)&t) & ~((size_t)0xFF));
-/*printf("System stack base: %p\n", sp);*/
+/*printf("[%d] System stack base: %p\n", CmiMyPe(), sp);*/
   p->stackbase = QT_SP(sp, 0x100);
 
   /* printf("sp: %p\n", sp); */

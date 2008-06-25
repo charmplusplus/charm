@@ -478,6 +478,7 @@ void CmiBacktracePrint(void **retPtrs,int nLevels) {
     CmiPrintf("[%d] Stack Traceback:\n", CmiMyPe());
     for (i=0;i<nLevels;i++) {
       if (names[i] == NULL) continue;
+      {
       const char *trimmed=_implTrimParenthesis(names[i], 0);
       const char *print=trimmed;
       const char *sys=_implGetBacktraceSys(print);
@@ -487,6 +488,7 @@ void CmiBacktracePrint(void **retPtrs,int nLevels) {
       } else {
           CmiPrintf("  [%d] %s\n",i,print);
       }
+     }
     }
     free(names);
   }
@@ -1822,6 +1824,7 @@ int CmiGetReductionHandler() { return CpvAccess(CmiReductionMessageHandler); }
 CmiHandler CmiGetReductionDestination() { return _reduce_destination; }
 
 CmiReductionsInit() {
+  int numChildren;
   CpvInitialize(int, CmiReductionMessageHandler);
   CpvAccess(CmiReductionMessageHandler) = CmiRegisterHandler((CmiHandler)CmiHandleReductionMessage);
   CpvInitialize(int, _reduce_num_children);
@@ -1832,7 +1835,7 @@ CmiReductionsInit() {
   CpvInitialize(int, _reduce_data_size);
   CpvAccess(_reduce_num_children) = 0;
   CpvAccess(_reduce_received) = 0;
-  int numChildren = CmiNumSpanTreeChildren(CmiMyPe());
+  numChildren = CmiNumSpanTreeChildren(CmiMyPe());
   if (numChildren > 0) {
     CpvAccess(_reduce_msg_list) = (char**)malloc(CmiNumSpanTreeChildren(CmiMyPe())*sizeof(void*));
   } else {
