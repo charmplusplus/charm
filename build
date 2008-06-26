@@ -371,7 +371,7 @@ then
   done
 fi
 
-echo "|$DESTINATION|$DESTINATION_SUFFIX|"
+#echo "|$DESTINATION|$DESTINATION_SUFFIX|"
 
 if [ -z "$DESTINATION" ]
 then
