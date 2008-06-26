@@ -4,6 +4,10 @@
 #include <alloca.h>
 #endif
 
+#ifdef __MINGW_H
+#include <malloc.h>
+#endif
+
 #include "ComlibManager.h"
 #include "ComlibSectionInfo.h"
 
