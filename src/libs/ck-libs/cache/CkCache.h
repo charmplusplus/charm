@@ -417,8 +417,10 @@ class CkCacheManager : public CBase_CkCacheManager {
   /// A list of all the elements that are present in the local processor
   /// for the current iteration
   CkCacheArrayCounter localChares;
-  /// The group id of the location manager of the array this Manager serves
-  CkGroupID locMgr;
+  /// The number of arrays this Manager serves
+  int numLocMgr;
+  /// The group ids of the location managers of the arrays this Manager serves
+  CkGroupID *locMgr;
   /// number of chares that have checked in for the next iteration
   int syncdChares;
 
@@ -468,6 +470,7 @@ class CkCacheManager : public CBase_CkCacheManager {
  public:
   
   CkCacheManager(CkGroupID gid, int size);
+  CkCacheManager(int n, CkGroupID *gid, int size);
   CkCacheManager(CkMigrateMessage *m);
   ~CkCacheManager() {}
   void pup(PUP::er &p);

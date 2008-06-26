@@ -6,6 +6,7 @@ module CkCache {
 
   group [migratable] CkCacheManager {
     entry CkCacheManager(CkGroupID gid, int size);
+    entry CkCacheManager(int n, CkGroupID gid[n], int size);
     entry [local] void * requestData(CkCacheKey what, CkArrayIndexMax &toWhom, int chunk, CkCacheEntryType *type, CkCacheRequestorData &req);
     entry [local] void * requestDataNoFetch(CkCacheKey key, int chunk);
     //entry void recvNodes(FillBinaryNodeMsg *msg);

@@ -4,7 +4,17 @@
 
   CkCacheManager::CkCacheManager(CkGroupID gid, int size) {
     init();
-    locMgr = gid;
+    numLocMgr = 1;
+    locMgr = new CkGroupID[1];
+    locMgr[0] = gid;
+    maxSize = (CmiUInt8)size * 1024 * 1024;
+  }
+
+  CkCacheManager::CkCacheManager(int n, CkGroupID *gid, int size) {
+    init();
+    numLocMgr = n;
+    locMgr = new CkGroupID[n];
+    for (int i=0; i<n; ++i) locMgr[i] = gid[i];
     maxSize = (CmiUInt8)size * 1024 * 1024;
   }
 
@@ -14,7 +24,8 @@
 
   void CkCacheManager::init() {
     numChunks = 0;
-    locMgr.setZero();
+    numLocMgr = 0;
+    locMgr = NULL;
     maxSize = 0;
     syncdChares = 0;
     cacheTable = NULL;
@@ -31,7 +42,9 @@
   }
 
   void CkCacheManager::pup(PUP::er &p) {
-    p | locMgr;
+    p | numLocMgr;
+    if (p.isUnpacking()) locMgr = new CkGroupID[numLocMgr];
+    PUParray(p,locMgr,numLocMgr);
     p | maxSize;
   }
 
@@ -149,8 +162,10 @@
       syncdChares = 1;
 
       localChares.reset();
-      CkLocMgr *mgr = (CkLocMgr *)CkLocalBranch(locMgr);
-      mgr->iterate(localChares);
+      for (int i=0; i<numLocMgr; ++i) {
+        CkLocMgr *mgr = (CkLocMgr *)CkLocalBranch(locMgr[i]);
+        mgr->iterate(localChares);
+      }
 
 #if COSMO_STATS > 0
       dataArrived = 0;
