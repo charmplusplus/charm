@@ -2,7 +2,11 @@
 
        Copyright (C) 1989-2000 Regents of the University of Illinois
 
-Now you can compile charm++ under Windows9x/2000/NT/XP with Cygwin.
+Now you can compile charm++ under Windows9x/2000/NT/XP with Cygwin using its 
+GNU compiler. The generated executables require cygwin1.dll, and have to run
+under cygwin environment. To build Charm++ program that do not depend on 
+Cygwin DLL and only depend on runtime libraries distributed as part of the 
+OS (Win9x/NT), one needs to compile Charm++ using Mingw.
 Note: This version of cygwin is still under testing.
 Check the FAQ at end of this file for more help.
 
@@ -116,6 +120,23 @@ host localhost
    3. logout the cvs server
 
       cvs logout
+
+ * How to compile Charm++ executable using Mingw?
+
+   Make sure mingw-runtime is installed using Cygwin setup program. 
+
+   Download "MinGW API for MS-Windows" from mingw website: 
+      http://www.mingw.org/download.shtml 
+   The downloaded file should be named as w32api-3.11.tar.gz.
+   Install the file under /usr/local/mingw
+
+   Now build charm++ with "mingw" option:
+     ./build charm++ net-cygwin mingw
+
+   One can then compile Charm++ application using mingw support and run 
+   applications outside of Cygwin. However, note that one can not use 
+   ssh mode in charmrun to start a parallel job. Instead, use charmd which 
+   is a daemon process that listen charm command and start processes.
 
  * Problem: Charm++ build script stops when it compile "ckfutures.ci", with 
    error message: "Syntax error at line 1: parse error"
