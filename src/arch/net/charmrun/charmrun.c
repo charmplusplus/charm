@@ -58,7 +58,9 @@
 
 #else /*Use RSH to start node-programs*/
 #  define CMK_USE_RSH 1
-#ifndef __CYGWIN__
+#ifdef __MINGW_H
+#  include <rpc.h>
+#elif !defined(__CYGWIN__)
 #  include <rpc/rpc.h>
 #else
 #  include <w32api/rpc.h>
