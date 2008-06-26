@@ -20,6 +20,7 @@ generalized by Orion Lawlor November 2001.
 
 #define CMK_THREADS_DEBUG 0
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h> /* just so I can find dynamically-linked symbols */
@@ -731,7 +732,11 @@ static void init_ranges(char **argv)
 
               /* write region into file */
             sprintf(fname,".isomalloc.%d", CmiMyNode());
-            while ((fd = open(fname, O_WRONLY|O_TRUNC|O_CREAT, 0644)) == -1) sleep(1);
+            while ((fd = open(fname, O_WRONLY|O_TRUNC|O_CREAT, 0644)) == -1) 
+#ifndef __MINGW_H
+              sleep(1)
+#endif
+            ;
             write(fd, &s, sizeof(CmiUInt8));
             write(fd, &e, sizeof(CmiUInt8));
             close(fd);
@@ -743,7 +748,11 @@ static void init_ranges(char **argv)
               char fname[128];
               if (i==CmiMyNode()) continue;
               sprintf(fname,".isomalloc.%d", i);
-              while ((fd = open(fname, O_RDONLY)) == -1) sleep(1);
+              while ((fd = open(fname, O_RDONLY)) == -1)
+#ifndef __MINGW_H
+              sleep(1)
+#endif
+              ;
               read(fd, &ss, sizeof(CmiUInt8));
               read(fd, &ee, sizeof(CmiUInt8));
               close(fd);
