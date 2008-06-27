@@ -24,15 +24,25 @@ fi
 # Configurable option: Location of MSDEV
 if test -z "$VCINSTALLDIR"
 then
-  VCC_DIR="C:/Program Files/Microsoft Visual Studio 8/VC"
+  VCC_DIR="C:/Program Files/Microsoft Visual Studio 9.0/VC"
 else
   VCC_DIR=$VCINSTALLDIR
+fi
+if test ! -d "`cygpath -u "$VCC_DIR"`"
+then
+  echo VCC_DIR: $VCC_DIR is not set properly!
+  exit 1
 fi
 if test -z "$WINDOWSSDKDIR"
 then
   SDK_DIR="C:/Program Files/Microsoft Platform SDK"
 else
   SDK_DIR=$WINDOWSSDKDIR
+fi
+if test ! -d "`cygpath -u "$SDK_DIR"`"
+then
+  echo SDK_DIR: $SDK_DIR is not set properly!
+  exit 1
 fi
 
 #CL command-line options for -O and -g mode
