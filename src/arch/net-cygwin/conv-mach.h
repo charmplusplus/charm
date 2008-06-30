@@ -22,7 +22,7 @@
 #define CMK_MALLOC_USE_GNUOLD_MALLOC			   1
 
 #define CMK_MEMORY_PAGESIZE                                4096
-#define CMK_MEMORY_PROTECTABLE                             1
+#define CMK_MEMORY_PROTECTABLE                             0
 
 #define CMK_NODE_QUEUE_AVAILABLE                           0
 
@@ -65,6 +65,8 @@
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   0
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
 
+#undef CMK_IMMEDIATE_MSG
+#define CMK_IMMEDIATE_MSG                                  0
 
 #define CMK_DEBUG_MODE					   0
 #define CMK_WEB_MODE                                       1
