@@ -1,4 +1,4 @@
-%expect 5 
+%expect 6
 %{
 #include "xi-symbol.h"
 #include "EToken.h"
@@ -875,6 +875,10 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
 		{ $$ = new SdagConstruct(SWHILE, 0, new SdagConstruct(SINT_EXPR, $3), 0,0,0,$6,0); }
 		| FORWARD ForwardList ';'
 		{ $$ = $2; }
+		| ParamBraceStart CCode ParamBraceEnd
+                 { RemoveSdagComments($2);
+                   $$ = new SdagConstruct(SATOMIC, new XStr($2), NULL, 0,0,0,0, 0 );
+                 }
 	 	;	
 
 HasElse		: /* Empty */
