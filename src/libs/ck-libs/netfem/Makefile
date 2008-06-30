@@ -26,8 +26,8 @@ clean:
 	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache
 
 # Text-only client
-textclient: textclient.o $(LIB)
-	$(CHARMC) textclient.o $(LIB) -o $@ -lccs-client
+textclient: textclient.o $(DEST)
+	$(CHARMC) textclient.o $(DEST) -o $@ -lccs-client
 
 textclient.o: textclient.C
 	$(CHARMC) -c textclient.C
