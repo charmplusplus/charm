@@ -17,9 +17,9 @@ struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *old; void *new; };
 
 #ifdef __CYGWIN__
 # ifdef QT_GROW_DOWN
-#define SHIFTSP(pos) asm ( "mov %0, %%esp\n"::"m"((char*)pos-256));
+#define SHIFTSP(pos) {char *newpos=(char *)pos-256; asm ( "mov %0, %%esp\n"::"m"(newpos));}
 # else
-#define SHIFTSP(pos) asm ( "mov %0, %%esp\n"::"m"((char*)pos+256));
+#define SHIFTSP(pos) {char *newpos=(char *)pos+256; asm ( "mov %0, %%esp\n"::"m"(newpos));}
 # endif
 #else
 # ifdef QT_GROW_DOWN
