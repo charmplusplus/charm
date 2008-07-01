@@ -23,11 +23,6 @@ CpvDeclare(PCQueue, broadcast_q);                 //queue to send broadcast mess
 
 #define NODE_LEVEL_ST_IMPLEMENTATION 1
 
-//There are two roles of comm thread:
-// 1. polling other cores' bcast msg queue
-// 2. bcast msg is handled only by comm thd
-#define BCASTMSG_ONLY_TO_COMMTHD 0
-
 /*
     To reduce the buffer used in broadcast and distribute the load from
   broadcasting node, define CMK_BROADCAST_SPANNING_TREE enforce the use of
@@ -400,13 +395,7 @@ static void recv_done(void *clientdata) {
     else
 #endif
 
-#if CMK_SMP && !CMK_MULTICORE && BCASTMSG_ONLY_TO_COMMTHD
-        if (CMI_DEST_RANK(msg)!=_Cmi_mynodesize) { //not the comm thd
-            CmiPushPE(CMI_DEST_RANK(msg), (void *)msg);
-        }
-#else
-        CmiPushPE(CMI_DEST_RANK(msg), (void *)msg);
-#endif
+       CmiPushPE(CMI_DEST_RANK(msg), (void *)msg);
 
     outstanding_recvs --;
 }
@@ -453,15 +442,7 @@ DCMF_Request_t * first_pkt_recv_done (void              * clientdata,
 }
 
 void sendBroadcastMessages() {
-#if !CMK_MULTICORE && !BCASTMSG_ONLY_TO_COMMTHD
-//in the presence of comm thd, and it is not responsible for broadcasting msg,
-//the comm thd will help to pull the msg from rank 0 which is predefined as the
-//core on a smp node to receive bcast msg.
-    int toPullRank = CmiMyRank();
-    if (CmiMyRank()==_Cmi_mynodesize) toPullRank = 0; //comm thd only pulls msg from rank 0
-#else
-    int toPullRank = CmiMyRank();
-#endif
+   int toPullRank = CmiMyRank();
     PCQueue toPullQ;
 
     /*
@@ -475,11 +456,7 @@ void sendBroadcastMessages() {
     CmiLock(procState[toPullRank].recvLock);
 #endif
 
-#if !CMK_MULTICORE && !BCASTMSG_ONLY_TO_COMMTHD
-    toPullQ = CpvAccessOther(broadcast_q, toPullRank);
-#else
-    toPullQ = CpvAccess(broadcast_q);
-#endif
+   toPullQ = CpvAccess(broadcast_q);
     char *msg = (char *) PCQueuePop(toPullQ);
 
 #if CMK_SMP
@@ -500,11 +477,7 @@ void sendBroadcastMessages() {
         CmiLock(procState[toPullRank].recvLock);
 #endif
 
-#if !CMK_MULTICORE && !BCASTMSG_ONLY_TO_COMMTHD
-        toPullQ = CpvAccessOther(broadcast_q, toPullRank);
-#else
-        toPullQ = CpvAccess(broadcast_q);
-#endif
+       toPullQ = CpvAccess(broadcast_q);
         msg = (char *) PCQueuePop(toPullQ);
 
 #if CMK_SMP
@@ -924,9 +897,7 @@ void *CmiGetNonLocal() {
     /* although it seems that lock is not needed, I found it crashes very often
        on mpi-smp without lock */
 
-#if CMK_MULTICORE  || !BCASTMSG_ONLY_TO_COMMTHD
     AdvanceCommunications();
-#endif
 
     /*if(CmiMyRank()==0) printf("Got stuck here on proc[%d] node[%d]\n", CmiMyPe(), CmiMyNode());*/
 
@@ -1022,21 +993,8 @@ void  CmiGeneralFreeSend(int destPE, int size, char* msg) {
         return;
     }
 
-#if CMK_SMP && !CMK_MULTICORE && BCASTMSG_ONLY_TO_COMMTHD
-    //In the presence of comm thd shouldering responsibility of sending bcast msgs, then
-    //CmiNodeOf and CmiRankOf may return incorrect information if the destPE is considered
-    //as a comm thd.
-    if (destPE >= _Cmi_numpes) { //destination is a comm thd
-        int nid = destPE - _Cmi_numpes;
-        int rid = _Cmi_mynodesize;
-        CmiGeneralFreeSendN (nid, rid, size, msg);
-    } else {
-        CmiGeneralFreeSendN (CmiNodeOf (destPE), CmiRankOf (destPE), size, msg);
-    }
-#else
-    //printf ("%d: Sending Message to %d \n", CmiMyPe(), destPE);
+   //printf ("%d: Sending Message to %d \n", CmiMyPe(), destPE);
     CmiGeneralFreeSendN (CmiNodeOf (destPE), CmiRankOf (destPE), size, msg);
-#endif
 }
 
 void CmiGeneralFreeSendN (int node, int rank, int size, char * msg) {
@@ -1100,17 +1058,6 @@ static void CmiSendChildrenPeers(int rank, int size, char *msg) {
     //printf ("%d [%d]: Send children peers except rank %d\n",  CmiMyPe(), CmiMyNode(), CmiMyRank());
     int r=0;
 
-//With comm thd, broadcast msg will be pulled from bcast queue from the comm thd
-//And the msg would be finally pushed into other cores on the same node by the
-//comm thd. But it's possible a msg has already been pushed into rank 0 in
-//recv_done func call. So there's no need to push the bcast msg into the recv
-//queue again in the case BCASTMSG_ONLY_TO_COMMTHD is not set
-
-#if !CMK_MULTICORE && !BCASTMSG_ONLY_TO_COMMTHD
-    //indicate this is called from comm thread.
-    if (rank == _Cmi_mynodesize) r = 1;
-#endif
-
     for (;r<rank; r++) {
         char *copymsg;
         copymsg = (char *)CmiAlloc(size);
@@ -1141,19 +1088,8 @@ void SendSpanningChildren(int size, char *msg) {
 
     int startNid = CmiNodeOf(startpe);
     int thisNid, thisRid;
-#if !CMK_MULTICORE
-//if having comm thd, the comm thd will process broadcast msgs.
-    if (cs->pe >= _Cmi_numpes) { //a comm thd
-        thisNid = cs->pe - _Cmi_numpes;
-        thisRid = _Cmi_mynodesize;
-    } else {
-        thisNid = CmiNodeOf(cs->pe);
-        thisRid = CmiRankOf(cs->pe);
-    }
-#else
-    thisNid = CmiNodeOf(cs->pe);
-    thisRid = CmiRankOf(cs->pe);
-#endif
+    thisNid = CmiMyNode();
+    thisRid = CmiMyRank();
 
     //printf ("%d [%d/%d]: In Send Spanning Tree with startpe %d\n",  CmiMyPe(), CmiMyNode(), thisRid, startpe);
 
@@ -1166,11 +1102,7 @@ void SendSpanningChildren(int size, char *msg) {
         nid += startNid;
         nid = nid%_Cmi_numnodes;
         CmiAssert(nid>=0 && nid<_Cmi_numnodes && nid!=thisNid);
-#if !CMK_MULTICORE && BCASTMSG_ONLY_TO_COMMTHD
-        int p = nid + _Cmi_numpes;
-#else
         int p = CmiNodeFirst(nid);
-#endif
         //printf ("%d [%d]: Sending Spanning Tree Msg to %d\n",  CmiMyPe(), CmiMyNode(), p);
         CmiSyncSendFn1(p, size, msg);
     }
