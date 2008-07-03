@@ -37,7 +37,7 @@ CpvDeclare(PCQueue, broadcast_q);                 //queue to send broadcast mess
 #define CMK_BROADCAST_HYPERCUBE        0
 #endif /* CMK_SMP */
 
-#define BROADCAST_SPANNING_FACTOR     4
+#define BROADCAST_SPANNING_FACTOR    4
 
 #define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
 #define CMI_GET_CYCLE(msg)               ((CmiMsgHeaderBasic *)msg)->root
@@ -301,6 +301,7 @@ inline SMSG_LIST * smsg_allocate() {
         return smsg;
 
     void * buf = memalign(32, sizeof(SMSG_LIST));  //malloc(sizeof(SMSG_LIST));
+    assert(buf!=NULL);
     assert (((unsigned)buf & 0x0f) == 0);
 
     return (SMSG_LIST *) buf;
@@ -950,7 +951,7 @@ void machineSend(SMSG_LIST *msg_tmp) {
     if (msg_tmp->destpe == CmiMyNode())
         CmiAbort("Sending to self\n");
 
-    CmiAssert(msg_tmp->destpe >= 0 && msg_tmp->destpe < CmiNumPes());
+    CmiAssert(msg_tmp->destpe >= 0 && msg_tmp->destpe < CmiNumNodes());
     msg_tmp->cb.function     =   send_done;
     msg_tmp->cb.clientdata   =   msg_tmp;
 
