@@ -31,6 +31,9 @@ class eventQueue {
   unsigned int mem_usage;
   /// Keep track of last logged VT for this object so no duplicates are logged
   POSE_TimeType lastLoggedVT;
+#ifdef MEM_TEMPORAL
+  TimePool *localTimePool;
+#endif
   /// Basic Constructor
   /** Creates front and back sentinel nodes, connects them, and inits pointers
       and heap. */

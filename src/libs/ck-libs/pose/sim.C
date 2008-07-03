@@ -144,17 +144,10 @@ void sim::Commit()
     eq->CommitEvents(this, POSE_endtime); // commit all events in queue
     Terminate();// call terminus on all posers
   }
-#ifdef MEM_TEMPORAL
-  else {  // What's the constant doing to us?
-    lastGVT = curGVT;
-    eq->CommitEvents(this, lastGVT); // commit events up to GVT
-  }
-#else
   else if (curGVT > lastGVT + 100) {  // What's the constant doing to us?
     lastGVT = curGVT;
     eq->CommitEvents(this, lastGVT); // commit events up to GVT
   }
-#endif
 #ifndef CMK_OPTIMIZE
   if(pose_config.trace) {
     traceUserBracketEvent(50, critStart, CmiWallTimer());

@@ -40,6 +40,9 @@ eventQueue::eventQueue()
   frontPtr->next = backPtr;
   backPtr->prev = frontPtr;
   RBevent = NULL;
+#ifdef MEM_TEMPORAL
+  localTimePool = (TimePool *)CkLocalBranch(TempMemID);
+#endif
 #ifdef EQ_SANITIZE
   sanitize();
 #endif
@@ -184,9 +187,6 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
   sanitize();
 #endif
   Event *target = frontPtr->next, *commitPtr = frontPtr->next;
-#ifdef MEM_TEMPORAL
-  TimePool *localTimePool = (TimePool *)CkLocalBranch(TempMemID);
-#endif
   if (ts == POSE_endtime) {
     CommitAll(obj);
 #ifdef MEM_TEMPORAL
@@ -277,9 +277,6 @@ void eventQueue::CommitAll(sim *obj)
   // now free up the memory
   Event *link = commitPtr;
   commitPtr = commitPtr->prev;
-#ifdef MEM_TEMPORAL
-  TimePool *localTimePool = (TimePool *)CkLocalBranch(TempMemID);
-#endif
   while (commitPtr != frontPtr) {
 #ifdef MEM_TEMPORAL
     if (commitPtr->serialCPdata) {
