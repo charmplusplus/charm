@@ -7,6 +7,7 @@
  */
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
+#include "ParFUM_SA.h"
 #include "bulk_adapt.h"
 #include "bulk_adapt_ops.h"
 
@@ -16,79 +17,6 @@
 #define ADAPT_VERBOSE
 
 CtvDeclare(Bulk_Adapt *, _bulkAdapt);
-
-// Insert this element to the refine or coarsen heap
-void Element_Bucket::Insert(int eIdx, double len, int cFlag)
-{
-  int i;
-  if (cFlag) {
-    i = ++coarsenHeapSize; 
-    while ((coarsenElements[i/2].len>=len) && (i != 1)) {
-      coarsenElements[i].len=coarsenElements[i/2].len;
-      coarsenElements[i].elID=coarsenElements[i/2].elID;
-      i/=2;
-    }
-    coarsenElements[i].elID=eIdx;
-    coarsenElements[i].len=len; 
-  }
-  else {
-    i = ++refineHeapSize; 
-    while ((refineElements[i/2].len>=len) && (i != 1)) {
-      refineElements[i].len=refineElements[i/2].len;
-      refineElements[i].elID=refineElements[i/2].elID;
-      i/=2;
-    }
-    refineElements[i].elID=eIdx;
-    refineElements[i].len=len; 
-  }
-}
-
-// Removes and returns the minimum element from the refine/coarsen heap
-int Element_Bucket::Delete_Min(int cflag, double *len)
-{
-  int Child, i, Min_ID; 
-  if (cflag) {
-    Min_ID=coarsenElements[1].elID;
-    (*len) = coarsenElements[1].len;
-    for (i=1; i*2 <= coarsenHeapSize-1; i=Child) { // Find smaller child
-      Child = i*2; // child is left child  
-      if (Child != coarsenHeapSize)  // right child exists
-	if (coarsenElements[Child+1].len < coarsenElements[Child].len)
-	  Child++; 
-      // Percolate one level
-      if (coarsenElements[coarsenHeapSize].len >= coarsenElements[Child].len) {
-	coarsenElements[i].elID = coarsenElements[Child].elID;
-	coarsenElements[i].len = coarsenElements[Child].len;
-      }
-      else break; 
-    }
-    coarsenElements[i].elID = coarsenElements[coarsenHeapSize].elID;
-    coarsenElements[i].len = coarsenElements[coarsenHeapSize].len; 
-    coarsenHeapSize--;
-    return Min_ID; 
-  }
-  else {
-    Min_ID=refineElements[1].elID;
-    (*len)=refineElements[1].len;
-    for (i=1; i*2 <= refineHeapSize-1; i=Child) { // Find smaller child
-      Child = i*2;       // child is left child  
-      if (Child !=refineHeapSize)  // right child exists
-	if (refineElements[Child+1].len < refineElements[Child].len)
-	  Child++; 
-      // Percolate one level
-      if (refineElements[refineHeapSize].len >= refineElements[Child].len){  
-	refineElements[i].elID = refineElements[Child].elID;   
-	refineElements[i].len = refineElements[Child].len;
-      }
-      else break; 
-    }
-    refineElements[i].elID = refineElements[refineHeapSize].elID;
-    refineElements[i].len = refineElements[refineHeapSize].len; 
-    refineHeapSize--;
-    return Min_ID; 
-  }
-}
-
 
 /** Perform refinements on a mesh.  Tries to maintain/improve element quality
  * as specified by a quality measure qm;
@@ -116,13 +44,18 @@ int Bulk_Adapt::Refine_h(int qm, int method, double factor, double *sizes)
 
   mods=0;
   iter_mods=1;
-  while ((iter_mods != 0) || (count<20)) {
-    count++;
+
+  while ((iter_mods != 0) || (count < 20)) {
+    if (iter_mods == 0)
+      count++;
+    else 
+      count = 0;
     iter_mods=0;
     numNodes = theMesh->node.size();
     numElements = theMesh->elem[0].size();
     // sort elements to be refined by quality into elemsToRefine
-    elemsToRefine.Reset(numElements);
+    elemsToRefine.Clear();
+    elemsToRefine.Alloc(numElements);
     for (int i=0; i<numElements; i++) { 
       if (theMesh->elem[0].is_valid(i)) {
 	// find avg and max edge length of element i
@@ -130,36 +63,35 @@ int Bulk_Adapt::Refine_h(int qm, int method, double factor, double *sizes)
 	int maxEdge, minEdge;
 	findEdgeLengths(i, &avgEdgeLength, &maxEdgeLength, &maxEdge, 
 			&minEdgeLength, &minEdge);
-	double qFactor=getAreaQuality(i);
+	//double qFactor=getAreaQuality(i);
 	if (theMesh->elem[0].getMeshSizing(i) <= 0.0) 
 	  CkPrintf("WARNING: mesh element %d has no sizing!\n", i);
 	if ((theMesh->elem[0].getMeshSizing(i) > 0.0) &&
 	  (avgEdgeLength > (theMesh->elem[0].getMeshSizing(i)*REFINE_TOL))){
 	    //|| (qFactor < QUALITY_MIN)) {
 	  //elemsToRefine.Insert(i, qFactor*(1.0/(avgEdgeLength+maxEdgeLength)), 0);
-	  elemsToRefine.Insert(i, 1.0/maxEdgeLength, 0);
+	  elemsToRefine.Insert(i, 1.0/maxEdgeLength);
 #ifdef ADAPT_VERBOSE
 	  CkPrintf("[%d]ParFUM_Refine: Added element %d to refine list: targetSize=%6.4f maxEdgeLength=%6.4f maxEdge=%d\n", myId, i, theMesh->elem[0].getMeshSizing(i), maxEdgeLength, maxEdge);
 #endif	  
 	}
       }
     }
-    while (!elemsToRefine.RefineEmpty()) { // loop through the elements
+
+    while (!elemsToRefine.IsBucketEmpty()) { // loop through the elements
       int n1, n2;
       double len;
-      if ((elId = elemsToRefine.Delete_Top()) == -1) {
-	elId = elemsToRefine.Delete_Min(0, &len);
-      }
+
+      elId = elemsToRefine.Remove(&len);
+
       if ((elId != -1) && (theMesh->elem[0].is_valid(elId))) {
 	int n1, n2;
 	double avgEdgeLength, maxEdgeLength, minEdgeLength;
 	int maxEdge, minEdge;
 	findEdgeLengths(elId, &avgEdgeLength, &maxEdgeLength, &maxEdge, 
 			&minEdgeLength, &minEdge);
-	double qFactor=getAreaQuality(elId);
-#ifdef ADAPT_VERBOSE
-	CkPrintf("[%d]ParFUM_Refine: 1.0/len=%6.4f maxEdgeLength=%6.4f\n", myId, 1.0/len, maxEdgeLength);
-#endif	  
+	//double qFactor=getAreaQuality(elId);
+
 	//if (len == qFactor*(1.0/(avgEdgeLength+maxEdgeLength))) { // this elem does not appear to be modified; refine it
 	if (len == (1.0/maxEdgeLength)) { // this elem does not appear to be modified; refine it
 	  if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
@@ -169,21 +101,70 @@ int Bulk_Adapt::Refine_h(int qm, int method, double factor, double *sizes)
 #ifdef ADAPT_VERBOSE
 	    CkPrintf("[%d]ParFUM_Refine: Refining element %d: targetSize=%6.4f maxEdgeLength=%6.4f maxEdge=%d\n", myId, elId, theMesh->elem[0].getMeshSizing(elId), maxEdgeLength, maxEdge);
 #endif	  
-	    if (theMesh->parfumSA->bulkAdapt->edge_bisect(elId, 0, maxEdge, dim) > 0) {
+	    RegionID lockRegionID;
+	    int success;
+	    lockRegionID.localID = -1;
+	    success = theMesh->parfumSA->bulkAdapt->lock_3D_region(elId, 0, maxEdge, maxEdgeLength, 
+								   &lockRegionID);
+	    if (success == 2) { // lock obtained straight away
+#ifdef ADAPT_VERBOSE
+	      CkPrintf("[%d]ParFUM_Refine: Refining element %d: GOT THE LOCK\n", myId, elId);
+#endif	  
 	      iter_mods = iter_mods + 1;
+	      CkAssert(theMesh->parfumSA->holdingLock == lockRegionID);
+	      (void) theMesh->parfumSA->bulkAdapt->edge_bisect(elId, 0, maxEdge, dim, lockRegionID);
+	      theMesh->parfumSA->bulkAdapt->unlock_3D_region(lockRegionID);
+	    }
+ 	    else if (success == 1) { // lock is pending
+#ifdef ADAPT_VERBOSE
+	      CkPrintf("[%d]ParFUM_Refine: Refining element %d: LOCK PENDING\n", myId, elId);
+#endif	  
+	      while (success == 1) {
+		CthYield();
+		double DavgEdgeLength, DmaxEdgeLength, DminEdgeLength;
+		int DmaxEdge, DminEdge;
+		findEdgeLengths(elId, &DavgEdgeLength, &DmaxEdgeLength, &DmaxEdge, 
+				&DminEdgeLength, &DminEdge);
+		if (len == (1.0/DmaxEdgeLength)) { // element is unchanged: i.e. still needs refinement
+		  success = theMesh->parfumSA->bulkAdapt->lock_3D_region(elId, 0, DmaxEdge, DmaxEdgeLength, 
+									 &lockRegionID);
+		}
+		else {
+		  theMesh->parfumSA->bulkAdapt->unpend_3D_region(lockRegionID);
+#ifdef ADAPT_VERBOSE
+		  CkPrintf("[%d]ParFUM_Refine: Refining element %d: FAILED TO GET LOCK\n", myId, elId);
+#endif	  
+		  elemsToRefine.Insert(elId, 1.0/DmaxEdgeLength);	  
+		  break; // element was modified by a different operation
+		}
+	      }
+	      if (success==2) { // broke out of loop with a successful lock
+#ifdef ADAPT_VERBOSE
+		CkPrintf("[%d]ParFUM_Refine: Refining element %d: GOT THE LOCK\n", myId, elId);
+#endif	  
+		iter_mods = iter_mods + 1;
+		CkAssert(theMesh->parfumSA->holdingLock == lockRegionID);
+		(void) theMesh->parfumSA->bulkAdapt->edge_bisect(elId, 0, maxEdge, dim, lockRegionID);
+		theMesh->parfumSA->bulkAdapt->unlock_3D_region(lockRegionID);
+	      }
+	      else if (success==0) {
+		theMesh->parfumSA->bulkAdapt->unpend_3D_region(lockRegionID);
+#ifdef ADAPT_VERBOSE
+		CkPrintf("[%d]ParFUM_Refine: Refining element %d: FAILED TO GET LOCK\n", myId, elId);
+#endif	  
+		elemsToRefine.Insert(elId, 1.0/maxEdgeLength);	  
+	      }
+	    }
+	    else if (success == 0) { // lock failed immediately
+#ifdef ADAPT_VERBOSE
+	      CkPrintf("[%d]ParFUM_Refine: Refining element %d: FAILED TO GET LOCK\n", myId, elId);
+#endif	  
+	      elemsToRefine.Insert(elId, 1.0/maxEdgeLength);	  
 	    }
 	  }
 	}
-	else { //elem is modified, reinsert it if necessary
-	  if ((theMesh->elem[0].getMeshSizing(elId) > 0.0) &&
-	      (avgEdgeLength > (theMesh->elem[0].getMeshSizing(elId)*REFINE_TOL))){
-	    //|| (qFactor < QUALITY_MIN)) {
-	    //elemsToRefine.Insert(elId, qFactor*(1.0/(avgEdgeLength+maxEdgeLength)), 0);
-	    elemsToRefine.Insert(elId, 1.0/maxEdgeLength, 0);
-#ifdef ADAPT_VERBOSE
-	    CkPrintf("[%d]ParFUM_Refine: Added element %d to refine list: targetSize=%6.4f maxEdgeLength=%6.4f maxEdge=%d\n", myId, elId, theMesh->elem[0].getMeshSizing(elId), maxEdgeLength, maxEdge);
-#endif	  
-	  }
+	else { // elem was modified; return to bucket
+	  elemsToRefine.Insert(elId, 1.0/maxEdgeLength);	  
 	}
       }
       CthYield(); // give other chunks on the same PE a chance
@@ -196,7 +177,7 @@ int Bulk_Adapt::Refine_h(int qm, int method, double factor, double *sizes)
 #ifdef ADAPT_VERBOSE
   CkPrintf("[%d]ParFUM_Refine: %d total modifications.\n",myId,mods);
 #endif
-  elemsToRefine.Reset(0);
+  elemsToRefine.Clear();
   return mods;
 }
 

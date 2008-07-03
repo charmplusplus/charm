@@ -152,8 +152,9 @@ extern "C" {
 #define FEM_ADAPT_FACE_ADJ (FEM_ATTRIB_FIRST+16) ///< Element to element adjacency used for adaptivity (does not have ghosts)
 #define FEM_ADAPT_EDGE_ADJ (FEM_ATTRIB_FIRST+17) ///< Element to element adjacency used for adaptivity (does not have ghosts)
 #define FEM_ADAPT_LOCK (FEM_ATTRIB_FIRST+18) /// Lock for the bulk adaptivity.. Used for nodes
+#define FEM_ADAPT_LOCK_PRIO (FEM_ATTRIB_FIRST+19) /// Lock for the bulk adaptivity.. Used for nodes
 
-#define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+19) ///< This is the last valid attribute code
+#define FEM_ATTRIB_LAST (FEM_ATTRIB_FIRST+20) ///< This is the last valid attribute code
 
   // Specialized routines: 
   void FEM_Mesh_set_conn(int fem_mesh,int entity,

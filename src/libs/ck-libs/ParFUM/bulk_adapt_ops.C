@@ -42,15 +42,15 @@ void BulkAdapt::pup(PUP::er &p)
     lists. Returns zero if the lock fails, positive if the operation
     suceeds, and negative if the operations fails for some other
     reason. */
-int BulkAdapt::edge_bisect(int elemID, int elemType, int edgeID, int dim)
+bool BulkAdapt::edge_bisect(int elemID, int elemType, int edgeID, int dim, RegionID lockRegionID)
 {
   if (dim == 2) {
     return edge_bisect_2D(elemID, elemType, edgeID);
   }
   else if (dim == 3) {
-    return edge_bisect_3D(elemID, elemType, edgeID);
+    return edge_bisect_3D(elemID, elemType, edgeID, lockRegionID);
   }
-  else return 0;
+  else return false;
 }
 
 /// Perform a 2D edge bisection on a triangle
@@ -69,7 +69,7 @@ int BulkAdapt::edge_bisect(int elemID, int elemType, int edgeID, int dim)
               \|/		                    \|/	 
                o         	                     o         
  */
-int BulkAdapt::edge_bisect_2D(int elemID, int elemType, int edgeID)
+bool BulkAdapt::edge_bisect_2D(int elemID, int elemType, int edgeID)
 {
   //BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_2D starts elemID %d \n",partitionID,elemID));
   // lock partitions for the two involved elements
@@ -80,13 +80,12 @@ int BulkAdapt::edge_bisect_2D(int elemID, int elemType, int edgeID)
   elemsToLock[0] = startElem;
   elemsToLock[1] = nbrElem;
   RegionID lockRegionID;
-  bool success;
-  if (success = (localShadow->lockRegion(2, elemsToLock, &lockRegionID))) {
+  if (localShadow->lockRegion(2, elemsToLock, &lockRegionID,0.0)) {
     //BULK_DEBUG(CkPrintf("[%d] Lock obtained.\n",partitionID););
   }
   else {
     //BULK_DEBUG(CkPrintf("[%d] Lock not obtained.\n",partitionID););
-    return success;
+    return false;
   }
 
   // ******** LOCAL OPS *********
@@ -145,7 +144,7 @@ int BulkAdapt::edge_bisect_2D(int elemID, int elemType, int edgeID)
   // unlock the two partitions
   localShadow->unlockRegion(lockRegionID);
   getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
-  return 1;
+  return true;
 }
 
 void BulkAdapt::dumpConn()
@@ -195,30 +194,69 @@ adaptAdj BulkAdapt::remote_edge_bisect_2D(adaptAdj nbrElem, adaptAdj splitElem, 
   return nbrSplitElem;
 }
 
-/// Perform a 3D edge bisection on a tetrahedron
-int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
-{ // ASSERT: An edge can only be on one surface.
-  BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D starts at elemID %d \n",partitionID,elemID));
-  // Lock region defined by all elements surrounding edgeID, i.e. the "star"
-  int numElemsToLock = 0;
+int BulkAdapt::lock_3D_region(int elemID, int elemType, int edgeID, double prio, RegionID *lockRegionID)
+{ // Lock region defined by all elements surrounding edgeID, i.e. the "star"
+  int numElemsToLock=0, success=-1;
   adaptAdj *elemsToLock;
   adaptAdj startElem(partitionID, elemID, elemType);
 
-  //BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D acquiring list of elements to build locked region.\n",partitionID));
+  BULK_DEBUG(CkPrintf("[%d] BulkAdapt::lock_3D_region acquiring list of elements to build locked region.\n",
+		      partitionID));
   get_elemsToLock(startElem, &elemsToLock, edgeID, &numElemsToLock);
 
-  RegionID lockRegionID;
-  bool success;
-  if (success = (localShadow->lockRegion(numElemsToLock, elemsToLock, &lockRegionID))) {
-    BULK_DEBUG(CkPrintf("[%d] Lock obtained.\n",partitionID););
+  success = localShadow->lockRegion(numElemsToLock, elemsToLock, lockRegionID, prio);
+  free(elemsToLock);
+  if (success==2) { // got the lock free and clear; refine the element
+    BULK_DEBUG(CkPrintf("[%d] BulkAdapt::lock_3D_region: Lock (%d,%d,%6.4f) obtained.\n", partitionID,
+			lockRegionID->chunkID, lockRegionID->localID, lockRegionID->prio));
+  }
+  else if (success==1) { // lock is pending
+    BULK_DEBUG(CkPrintf("[%d] BulkAdapt::lock_3D_region: Lock (%d,%d,%6.4f) pending.\n", partitionID,
+			lockRegionID->chunkID, lockRegionID->localID, lockRegionID->prio));
+  }
+  else if (success==0) { // lock failed
+    BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D: Lock (%d,%d,%6.4f) not obtained.\n", partitionID,
+			lockRegionID->chunkID, lockRegionID->localID, lockRegionID->prio));
   }
   else {
-    BULK_DEBUG(CkPrintf("[%d] Lock not obtained.\n",partitionID););
-    return success;
+    CkPrintf("Lock status=%d\n", success);
+    CkAbort("Invalid lock return status!\n");
   }
+  return success;
+}
 
+void BulkAdapt::unlock_3D_region(RegionID lockRegionID)
+{ // unlock the region
+  BULK_DEBUG(CkPrintf("[%d] BulkAdapt::unlock_3D_region: Unlocking lock (%d,%d,%6.4f).\n", partitionID,
+		      lockRegionID.chunkID, lockRegionID.localID, lockRegionID.prio));
+  localShadow->unlockRegion(lockRegionID);
+}
+
+void BulkAdapt::unpend_3D_region(RegionID lockRegionID)
+{ // unlock the region
+  BULK_DEBUG(CkPrintf("[%d] BulkAdapt::unpend_3D_region: Unlocking lock (%d,%d,%6.4f).\n", partitionID,
+		      lockRegionID.chunkID, lockRegionID.localID, lockRegionID.prio));
+  localShadow->unpendRegion(lockRegionID);
+}
+
+
+/// Perform a 3D edge bisection on a tetrahedron
+bool BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID, RegionID lockRegionID)
+{ // ASSERT: An edge can only be on one surface. Region around edge is locked, along with appropriate 
+  // partitions and IDXL lists.
+  BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D starts at elemID %d \n",partitionID,elemID));
   //dumpConn();
   //getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
+
+  int numElemsToLock=0;
+  adaptAdj *elemsToLock;
+  adaptAdj startElem(partitionID, elemID, elemType);
+
+  CkAssert(lockRegionID == localShadow->holdingLock);
+
+  BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D acquiring list of elements surrounding edge.\n",
+		      partitionID));
+  get_elemsToLock(startElem, &elemsToLock, edgeID, &numElemsToLock);
 
   // Find the nodes on the edge to be bisected
   int localNodes[3], localRelNodes[2]; 
@@ -226,7 +264,7 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
   FEM_Elem &elems = meshPtr->elem[elemType]; // elems is all local elements
   FEM_DataAttribute *coord = meshPtr->node.getCoord(); // all local coords
   int *conn = elems.connFor(elemID); // conn points at elemID's ACTUAL data!
-  
+
   // edgeID has element-relative node indices localRelNodes[0], localRelNodes[1]
   getRelNodes(edgeID, 4, &(localRelNodes[0]), &(localRelNodes[1]));
   localNodes[0] = conn[localRelNodes[0]];
@@ -273,7 +311,7 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
       elemPairs[tableID][2*i] = elemsToLock[i];
       numRemote++;
       shadowProxy[elemsToLock[i].partID].
-	handle_split_3D(partitionID, i, tableID, elemsToLock[i], 
+	handle_split_3D(partitionID, i, tableID, elemsToLock[i], lockRegionID,
 			get_idxl_for_node(localNodes[0], elemsToLock[i].partID), 
 			get_idxl_for_node(localNodes[1], elemsToLock[i].partID), 
 			get_idxl_for_node(localNodes[2], elemsToLock[i].partID));
@@ -300,7 +338,7 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
     if (elemsToLock[i].partID != partitionID) {
       shadowProxy[elemsToLock[i].partID].
 	update_asterisk_3D(partitionID, i, elemsToLock[i], numElemsToLock, 
-			   elemPairs[tableID], 
+			   elemPairs[tableID], lockRegionID,
 			   get_idxl_for_node(localNodes[0], elemsToLock[i].partID), 
 			   get_idxl_for_node(localNodes[1], elemsToLock[i].partID),
 			   get_idxl_for_node(localNodes[2], elemsToLock[i].partID));
@@ -320,13 +358,8 @@ int BulkAdapt::edge_bisect_3D(int elemID, int elemType, int edgeID)
   //dumpConn();
   //getAndDumpAdaptAdjacencies(meshID, meshPtr->nElems(), elemType, partitionID);
 
-  //BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D of elem %d successful.\n",partitionID, elemID));  
-
-  // unlock the partitions
-  localShadow->unlockRegion(lockRegionID);
-  //BULK_DEBUG(CkPrintf("[%d] Unlocked.\n",partitionID));  
-
-  return 1;
+  BULK_DEBUG(CkPrintf("[%d] BulkAdapt::edge_bisect_3D of elem %d successful.\n",partitionID, elemID));  
+  return true;
 }
 
 /// Perform an edge flip (2D)
@@ -498,9 +531,8 @@ void BulkAdapt::remote_edgeAdj_add(int remotePartID, adaptAdj adj, adaptAdj spli
   addToAdaptAdj(meshPtr, adj, edgeID, splitElem);
 }
 
-void BulkAdapt::handle_split_3D(int remotePartID, int pos, int tableID, 
-				adaptAdj elem, int n1_idxl, int n2_idxl, 
-				int n5_idxl)
+void BulkAdapt::handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj elem, 
+				RegionID lockRegionID, int n1_idxl, int n2_idxl, int n5_idxl)
 {
   int n1 = get_node_from_idxl(n1_idxl, remotePartID), 
     n2 = get_node_from_idxl(n2_idxl, remotePartID), 
@@ -578,7 +610,7 @@ bool BulkAdapt::all_splits_received(int tableID, int expectedSplits)
 }
 
 void BulkAdapt::update_asterisk_3D(int remotePartID, int i, adaptAdj elem, 
-				   int numElemPairs, adaptAdj *elemPairs, 
+				   int numElemPairs, adaptAdj *elemPairs, RegionID lockRegionID,
 				   int n1_idxl, int n2_idxl, int n5_idxl)
 {
   CkAssert(remotePartID != elem.partID);
@@ -604,7 +636,6 @@ int BulkAdapt::add_element(int elemType,int nodesPerElem,int *conn, double sizin
   FEM_Elem &elem = meshPtr->elem[elemType];
   int newElem = elem.get_next_invalid();
   elem.connIs(newElem,conn);
-
   elem.setMeshSizing(newElem, sizing);
 
   int nAdj;
@@ -616,7 +647,6 @@ int BulkAdapt::add_element(int elemType,int nodesPerElem,int *conn, double sizin
     adaptAdjacencies[newElem*nAdj + a].localID = -1;
     adaptAdjacencies[newElem*nAdj + a].elemType = elemType;
   }
-
   CkVec<adaptAdj>** adaptEdgeAdjacencies = 
     lookupEdgeAdaptAdjacencies(meshPtr,elemType,&nAdj);
   for (int a=0; a<nAdj; ++a) {
@@ -630,6 +660,17 @@ void BulkAdapt::update_element_conn(int elemType,int elemID,int nodesPerElem,int
   FEM_Elem &elem = meshPtr->elem[elemType];
   elem.connIs(elemID,conn);
 };
+
+bool BulkAdapt::isLongest(int elem, int elemType, double len) {
+  FEM_Elem &elems = meshPtr->elem[elemType];
+  int *conn = elems.connFor(elem);
+  if ((len < length(conn[0], conn[1], 3)) || (len < length(conn[0], conn[2], 3)) || (len < length(conn[0], conn[3], 3)) || (len < length(conn[1], conn[2], 3)) || (len < length(conn[1], conn[3], 3)) || (len < length(conn[2], conn[3], 3))) {
+    return false;
+  }
+  return true;
+}
+
+
 
 /**
  * Add a new node to the mesh
@@ -649,6 +690,26 @@ int BulkAdapt::add_node(int dim,double *coords){
   lockTable[newNode][1] = -1;
   return newNode;
 }
+
+
+double BulkAdapt::length(int n1, int n2, int dim) {
+  FEM_DataAttribute *coord = meshPtr->node.getCoord();
+  double *coordsn1 = (coord->getDouble()).getRow(n1);
+  double *coordsn2 = (coord->getDouble()).getRow(n2);
+  return length(coordsn1, coordsn2, dim);
+}
+
+double BulkAdapt::length(double *n1, double *n2, int dim) {
+  double d, ds_sum=0.0;
+  for (int i=0; i<dim; i++) {
+    if(n1[i]<-1.0 || n2[i]<-1.0) return -2.0;
+    d = n1[i] - n2[i];
+    ds_sum += d*d;
+  }
+  return (sqrt(ds_sum));
+}
+
+
 
 /** Update the coordinates of the given node
 */
@@ -691,7 +752,6 @@ bool BulkAdapt::is_node_in_idxl(int node_idxl, int partID)
   IDXL_List *list = meshPtr->node.shared.getIdxlListN(partID);
   return(list->size()>node_idxl);
 }
-
 
 void BulkAdapt::get_elemsToLock(adaptAdj startElem, adaptAdj **elemsToLock, int edgeID, int *count)
 {
@@ -854,6 +914,14 @@ void fillNodes(int *relNode, int n1, int n2, int *conn)
 /** Perform all local mesh mods and updates for a local tet split */
 adaptAdj *BulkAdapt::local_split_3D(adaptAdj elem, int n1, int n2, int n5)
 {
+  CkPrintf("[%d] BEGIN local_split_3D\n", partitionID);
+  int nElems = meshPtr->lookup(FEM_ELEM+elem.elemType,"BulkAdapt::local_split_3D")->size();  // Get number of elements
+  int nNodes=meshPtr->lookup(FEM_NODE,"BulkAdapt::local_split_3D")->size();    // Get number of nodes
+  CkAssert(elem.localID < nElems);
+  CkAssert((n1 < nNodes) && (n1 >= 0));
+  CkAssert((n2 < nNodes) && (n2 >= 0));
+  CkAssert((n5 < nNodes) && (n5 >= 0));
+
   // get elem's conn
   FEM_Elem &elems = meshPtr->elem[elem.elemType];
   int *conn = elems.connFor(elem.localID);
@@ -861,25 +929,27 @@ adaptAdj *BulkAdapt::local_split_3D(adaptAdj elem, int n1, int n2, int n5)
   int splitConn[4];
   memcpy(&splitConn[0], conn, 4*sizeof(int));
   // find relative node numbers for n1 and n2
-  int rel_n1, rel_n2;
+  int rel_n1 = -1, rel_n2 = -1;
   for (int i=0; i<4; i++) {
     if (conn[i] == n1) rel_n1 = i;
     if (conn[i] == n2) rel_n2 = i;
   }
+  CkAssert((rel_n1 != -1) && (rel_n2 != -1));
   // adjust elem's conn to reflect the split
-  //CkPrintf("[%d] elem %d conn was %d,%d,%d,%d\n", partitionID, elem.localID, conn[0], conn[1], conn[2], conn[3]);
-  //CkPrintf("[%d] old edge is %d,%d, inserting node %d in between\n", partitionID, n1, n2, n5);
+  CkPrintf("[%d] elem %d conn was %d,%d,%d,%d\n", partitionID, elem.localID, conn[0], conn[1], conn[2], conn[3]);
+  CkPrintf("[%d] old edge is %d,%d, inserting node %d in between\n", partitionID, n1, n2, n5);
   conn[rel_n2] = n5;
-  //CkPrintf("[%d] modifying elem %d to be %d,%d,%d,%d\n", partitionID, elem.localID, conn[0], conn[1], conn[2], conn[3]);
+  CkPrintf("[%d] modifying elem %d to be %d,%d,%d,%d\n", partitionID, elem.localID, conn[0], conn[1], conn[2], conn[3]);
   // adjust splitElem's conn to reflect the split
   splitConn[rel_n1] = n5;
   // add splitElem
   int splitElemID = add_element(elem.elemType, 4, &splitConn[0], elems.getMeshSizing(elem.localID));
-  //CkPrintf("[%d] Adding elem %d with conn %d,%d,%d,%d\n", partitionID, splitElemID, splitConn[0], splitConn[1], splitConn[2], splitConn[3]); 
+  CkPrintf("[%d] Adding elem %d with conn %d,%d,%d,%d\n", partitionID, splitElemID, splitConn[0], splitConn[1], splitConn[2], splitConn[3]); 
   adaptAdj *splitElem = new adaptAdj(partitionID, splitElemID, elem.elemType);
   // call updates here
   update_local_face_adj(elem, *splitElem, n1, n2, n5);
   update_local_edge_adj(elem, *splitElem, n1, n2, n5);
+  CkPrintf("[%d] END local_split_3D\n", partitionID);
   return splitElem;
 }
 
@@ -908,10 +978,10 @@ void BulkAdapt::local_update_asterisk_3D(int i, adaptAdj elem, int numElemPairs,
   face[2] = (relNode[0] + relNode[3] + relNode[2]) - 3;
   face[3] = (relNode[1] + relNode[3] + relNode[2]) - 3;
   adaptAdj neighbors[4]; // elem's neighbors
-  neighbors[0] = *getFaceAdaptAdj(meshID, elem.localID, elem.elemType, face[0]);
-  neighbors[1] = *getFaceAdaptAdj(meshID, elem.localID, elem.elemType, face[1]);
-  neighbors[2] = *getFaceAdaptAdj(meshID, elem.localID, elem.elemType, face[2]);
-  neighbors[3] = *getFaceAdaptAdj(meshID, elem.localID, elem.elemType, face[3]);
+  neighbors[0] = *getFaceAdaptAdj(meshPtr, elem.localID, elem.elemType, face[0]);
+  neighbors[1] = *getFaceAdaptAdj(meshPtr, elem.localID, elem.elemType, face[1]);
+  neighbors[2] = *getFaceAdaptAdj(meshPtr, elem.localID, elem.elemType, face[2]);
+  neighbors[3] = *getFaceAdaptAdj(meshPtr, elem.localID, elem.elemType, face[3]);
 
   adaptAdj splitElem = neighbors[3], nbr1 = neighbors[0], nbr2 = neighbors[1];
   adaptAdj nbr1split(-1,-1,0), nbr2split(-1,-1,0);
@@ -1007,6 +1077,7 @@ void BulkAdapt::update_local_face_adj(adaptAdj elem, adaptAdj splitElem,
 				      int n1, int n2, int n5)
 {
   // init splitElem's face and edge adjacencies to elem's
+  CmiMemoryCheck();
   copyAdaptAdj(meshPtr, &elem, &splitElem);
   // get n3 and n4 from conn
   FEM_Elem &elems = meshPtr->elem[elem.elemType];

@@ -74,9 +74,9 @@ class BulkAdapt {
       lists. Returns zero if the lock fails, positive if the operation
       suceeds, and negative if the operations fails for some other
       reason. */
-  int edge_bisect(int elemID, int elemType, int edgeID, int dim);
-  int edge_bisect_2D(int elemID, int elemType, int edgeID);
-  int edge_bisect_3D(int elemID, int elemType, int edgeID);
+    bool edge_bisect(int elemID, int elemType, int edgeID, int dim, RegionID lockRegionID);
+  bool edge_bisect_2D(int elemID, int elemType, int edgeID);
+  bool edge_bisect_3D(int elemID, int elemType, int edgeID, RegionID lockRegionID);
 
   //TODO: add elemType to the prototype of all the following mesh-modification functions
   /// Perform an edge flip (2D)
@@ -132,17 +132,21 @@ class BulkAdapt {
 				 int new_idxl, int n1_idxl, int n2_idxl, 
 				 int remotePartID);
 
-  void handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj elem,
+  void handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj elem, RegionID lockRegionID,
 		       int n1_idxl, int n2_idxl, int n5_idxl);
   void recv_split_3D(int pos, int tableID, adaptAdj elem, adaptAdj splitElem);
   bool all_splits_received(int tableID, int expectedSplits);
   void update_asterisk_3D(int remotePartID, int i, adaptAdj elem, 
-			  int numElemPairs, adaptAdj *elemPairs, 
+			  int numElemPairs, adaptAdj *elemPairs, RegionID lockRegionID,
 			  int n1_idxl, int n2_idxl, int n5_idxl);
 
-    
+  bool isLongest(int elem, int elemType, double len);
 
   /* LOCAL HELPERS FOR BULK ADAPTIVITY OPERATIONS */
+
+  int lock_3D_region(int elemID, int elemType, int edgeID, double prio, RegionID *lockRegionID);
+  void unlock_3D_region(RegionID lockRegionID);
+  void unpend_3D_region(RegionID lockRegionID);
 	
   /** Add a new element to the mesh. 
    * Update its connectivity
@@ -181,6 +185,8 @@ class BulkAdapt {
   void update_local_face_adj(const adaptAdj elem, const adaptAdj splitElem, int n1, int n2, int n5);
   /** Perform local edge adjacency updates associated with a split */
   void update_local_edge_adj(const adaptAdj elem, const adaptAdj splitElem, int n1, int n2, int n5);
+  double length(int n1, int n2, int dim);
+  double length(double *n1, double *n2, int dim);
   void dumpConn();
 };
 

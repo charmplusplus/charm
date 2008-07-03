@@ -16,14 +16,24 @@ class RegionID{
 public:
 	int chunkID;
 	int localID;
+	double prio;
  	operator CkHashCode() const {
 		return (CkHashCode )(localID + 1<< chunkID); 
 	};
-	inline bool operator ==(const RegionID &rhs) const {
-		return (rhs.chunkID == chunkID) && (rhs.localID == localID);
+	void pup(PUP::er &p) {
+	  p|chunkID; p|localID; p|prio;
+	} 
+	inline bool operator==(const RegionID &rhs) const {
+	  return (rhs.chunkID == chunkID) && (rhs.localID == localID);
+	}
+	inline RegionID& operator=(const RegionID& rhs) {
+	  chunkID = rhs.chunkID;
+	  localID = rhs.localID;
+	  prio = rhs.prio;
+	  return *this;
 	}
 };
-PUPbytes(RegionID);
+//PUPbytes(RegionID);
 
 /** Class that represent a region that is being locked 
  */
@@ -35,7 +45,7 @@ public:
 	CkHashtableT<CkHashtableAdaptorT<int>, CkVec<adaptAdj> *> remoteElements;
 	CthThread tid;
 	int numReplies;
-	bool success;
+	int success;
 	~LockRegion(){
 		CkHashtableIterator *iter = remoteElements.iterator();
 		while(iter->hasNext()){
@@ -68,13 +78,14 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
   ///cross-pointer to the fem mesh on this chunk
   FEM_Mesh *fmMesh;
   ///Deprecated: used to lock this chunk
-
-	CkHashtableT<CkHashtableAdaptorT<RegionID>,LockRegion *> regionTable;
-	int regionCount;
-
+  CkHashtableT<CkHashtableAdaptorT<RegionID>,LockRegion *> regionTable;
+  int regionCount;
+  
  public:
-	BulkAdapt *bulkAdapt;
-
+  BulkAdapt *bulkAdapt;
+  RegionID holdingLock;
+  RegionID pendingLock;
+  
  public:
   ///constructor
   ParFUMShadowArray(int s, int i);
@@ -98,37 +109,33 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
   ///Initialize the mesh pointer for this chunk
   void setFemMesh(FEMMeshMsg *m);
 
-	void setRunningTCharm(){CtvAccess(_curTCharm)= tc;};
+  void setRunningTCharm(){CtvAccess(_curTCharm)= tc;};
 
   ///Sort this list of numbers in increasing order
   void sort(int *chkList, int chkListSize);
   
-	//Lock all the nodes belonging to these elements
-	//Some of the elements might be remote
-	//You also have to lock idxls with all those chunks with which
-	//any of the nodes are shared
-	bool lockRegion(int numElements,adaptAdj *elements,RegionID *regionID);
+  //Lock all the nodes belonging to these elements
+  //Some of the elements might be remote
+  //You also have to lock idxls with all those chunks with which
+  //any of the nodes are shared
+  int lockRegion(int numElements,adaptAdj *elements,RegionID *regionID, double prio);
+  void unlockRegion(RegionID regionID);
+  void unpendRegion(RegionID regionID);
 
-	void unlockRegion(RegionID regionID);
-	
-	void collectLocalNodes(int numElements,adaptAdj *elements,CkVec<int> &localNodes);
-	bool lockLocalNodes(LockRegion *region);
-	bool lockSharedIdxls(LockRegion *region);
-	void lockRegionForRemote(RegionID regionID,int *sharedIdxls,int numSharedIdxls,adaptAdj *elements,int numElements);
-	void lockReply(int remoteChunk,RegionID regionID,bool success);
-	void unlockRegion(LockRegion *region);
-	void unlockLocalNodes(LockRegion *region);
-	void unlockSharedIdxls(LockRegion *region);
-	void unlockForRemote(RegionID regionID);
-	void unlockReply(int remoteChunk,RegionID regionID);
-
-
-	void freeRegion(LockRegion *region);
-
-
-	
-	
-	///Translates the sharedChk and the idxlType to the idxl side
+  void collectLocalNodes(int numElements,adaptAdj *elements,CkVec<int> &localNodes);
+  bool lockLocalNodes(LockRegion *region);
+  bool lockSharedIdxls(LockRegion *region);
+  void lockRegionForRemote(RegionID regionID,int *sharedIdxls,int numSharedIdxls,adaptAdj *elements,int numElements);
+  void lockReply(int remoteChunk,RegionID regionID,int success,int tag, int otherSuccess);
+  void unlockRegion(LockRegion *region);
+  void unlockLocalNodes(LockRegion *region);
+  void unlockSharedIdxls(LockRegion *region);
+  void unlockForRemote(RegionID regionID);
+  void unpendForRemote(RegionID regionID);
+  void unlockReply(int remoteChunk,RegionID regionID);
+  void freeRegion(LockRegion *region);
+  
+  ///Translates the sharedChk and the idxlType to the idxl side
   FEM_Comm *FindIdxlSide(int idxlType);
 
 
@@ -155,13 +162,15 @@ class ParFUMShadowArray : public CBase_ParFUMShadowArray {
   void remote_edgeAdj_add(int remotePartID, adaptAdj &adj, adaptAdj &splitElem,
 			  int n1_idxl, int n2_idxl);
   void recv_split_3D(int pos, int tableID, adaptAdj &elem, adaptAdj &splitElem);
-  void handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj &elem, 
+  void handle_split_3D(int remotePartID, int pos, int tableID, adaptAdj &elem, RegionID lockRegionID,
 		       int n1_idxl, int n2_idxl, int n5_idxl);
   void recv_splits(int tableID, int expectedSplits);
 
+  longestMsg *isLongest(int elem, int elemType, double len);
+
   void update_asterisk_3D(int remotePartID, int i, adaptAdj &elem, 
-			  int numElemPairs, adaptAdj *elemPairs, int n1_idxl, 
-			  int n2_idxl, int n5_idxl);
+			  int numElemPairs, adaptAdj *elemPairs, RegionID lockRegionID,
+			  int n1_idxl, int n2_idxl, int n5_idxl);
 };
 
 ///This is a message which packs all the chunk indices together
@@ -200,6 +209,11 @@ class lockChunksMsg : public CMessage_lockChunksMsg {
 class adaptAdjMsg : public CMessage_adaptAdjMsg {
  public:
   adaptAdj elem;
+};
+
+class longestMsg : public CMessage_longestMsg {
+ public:
+  bool longest;
 };
   
 #endif
