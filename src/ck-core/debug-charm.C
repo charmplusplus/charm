@@ -22,6 +22,21 @@
 
 #include "ck.h"
 
+CkVec<DebugEntryInfo> _debugEntryTable;
+
+void CpdFinishInitialization() {
+  _debugEntryTable.reserve(_entryTable.size());
+}
+
+// Function called right before an entry method
+void CpdBeforeEp(int ep) {
+  //if (_debugEntryTable[ep].isBreakpoint) printf("CpdBeforeEp breakpointed %d\n",ep);
+}
+
+// Function called right after an entry method
+void CpdAfterEp(int ep) {
+  
+}
 
 /************ Array Element CPD Lists ****************/
 
@@ -336,7 +351,7 @@ public:
       beginItem(p, -1);
       envelope *env=(envelope *)UsrToEnv(CpvAccess(lastBreakPointMsg));
       p.comment("name");
-      char *type="Breakpoint";
+      char *type=(char*)"Breakpoint";
       p(type,strlen(type));
       p.comment("charmMsg");
       p.synchronize(PUP::sync_begin_object);
@@ -431,7 +446,7 @@ static void _call_freeze_on_break_point(void * msg, void * object)
       CpvAccess(lastBreakPointObject) = object;
       CpvAccess(lastBreakPointIndex) = CkMessageToEpIdx(msg);
       EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CpvAccess(lastBreakPointIndex));
-      CmiPrintf("Break point reached for Function = %s\n", breakPointEntryInfo->name);
+      CmiPrintf("Break point reached in proc %d for Function = %s\n",CkMyPe(),breakPointEntryInfo->name);
       CpdFreeze();
   }
 }
@@ -501,6 +516,7 @@ void CpdSetBreakPoint (char *msg)
            _entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
            _entryTable[tableIdx]->msgIdx = CpvAccess(_debugMsg); 
            _entryTable[tableIdx]->chareIdx = CpvAccess(_debugChare);
+           //_debugEntryTable[tableIdx].isBreakpoint = CmiTrue;
            //break;
        //}
     //}
@@ -543,6 +559,7 @@ void CpdRemoveBreakPoint (char *msg)
         _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
         _entryTable[idx]->msgIdx = breakPointEntryInfo->msgIdx;
         _entryTable[idx]->chareIdx = breakPointEntryInfo->chareIdx;
+        //_debugEntryTable[idx].isBreakpoint = CmiFalse;
         CmiPrintf("Breakpoint is removed for function %s with epIdx %ld\n", _entryTable[idx]->name, idx);
     //}
   //}
@@ -569,7 +586,8 @@ void CpdRemoveAllBreakPoints ()
 extern "C" int CpdIsCharmDebugMessage(void *msg) {
   envelope *env = (envelope*)msg;
   // Later should use "isDebug" value, but for now just bypass all intrinsic EPs
-  return CmiGetHandler(msg) != _charmHandlerIdx || _entryTable[env->getEpIdx()]->inCharm;
+  return CmiGetHandler(msg) != _charmHandlerIdx || env->getMsgtype() == ForVidMsg ||
+         env->getMsgtype() == FillVidMsg || _entryTable[env->getEpIdx()]->inCharm;
 }
 
 

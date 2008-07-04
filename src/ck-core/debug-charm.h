@@ -13,6 +13,22 @@
 #include "debug-conv.h"
 #include "pup.h"
 
+//Hooks inside the debugger before and after an entry method is invoked
+extern void CpdBeforeEp(int);
+extern void CpdAfterEp(int);
+extern void CpdFinishInitialization();
+
+// This class is the parallel of EntryInfo declared in register.h and is used
+// to extend the former with additional debug information. There is a direct
+// correspondence between elements on the two arrays.
+class DebugEntryInfo {
+public:
+  // true if this entry method has a breakpoint set
+  CmiBool isBreakpoint;
+
+  DebugEntryInfo() : isBreakpoint(CmiFalse) { }
+};
+
 //These pup functions are useful in CpdLists, as they document the name
 //  of the variable.  Your object must be named "c" (a stupid hack).
 #define PCOM(field) p.comment(#field); p(c->field);

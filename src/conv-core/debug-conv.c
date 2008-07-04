@@ -113,6 +113,7 @@ static void CpdDebugHandler(char *msg)
  */
 void CpdFreeze(void)
 {
+  CmiPrintf("Frozen processor %d\n",CmiMyPe());
   if (CpvAccess(freezeModeFlag)) return; /*Already frozen*/
   CpvAccess(freezeModeFlag) = 1;
   CpdFreezeModeScheduler();
