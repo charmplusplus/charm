@@ -387,6 +387,11 @@ static void KillOnAllSigs(int sigNo)
   	machine_exit(1); /*Don't infinite loop if there's a signal during a signal handler-- just die.*/
   already_in_signal_handler=1;
 
+  if (CpvAccess(cmiArgDebugFlag)) {
+    CmiPrintf("CPD: Signal received on processor %d: %d\n",CmiMyPe(),sigNo);
+    CpdFreeze();
+  }
+  
   CmiDestoryLocks();		/* destory locks */
 
   if (sigNo==SIGSEGV) {
@@ -578,6 +583,12 @@ void CmiAbort(const char *message)
          fclose(fp);*/
 	}
   MACHSTATE1(5,"CmiAbort(%s)",message);
+
+  /* if CharmDebug is attached simply try to send a message to it */
+  if (CpvAccess(cmiArgDebugFlag)) {
+    CmiPrintf("CPD: CmiAbort called on processor %d\n",CmiMyPe());
+    CpdFreeze();
+  }
   
   /* CmiDestoryLocks();  */
 
