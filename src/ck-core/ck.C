@@ -389,7 +389,18 @@ extern "C" int CkGetArgc(void) {
 /******************** Basic support *****************/
 extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
+#ifndef CMK_OPTIMIZE
+  int previousChareID = setMemoryChareIDFromPtr(obj);
+  int alreadyUserCode = _entryTable[epIdx]->inCharm ? 0 : 1;
+  setMemoryStatus(alreadyUserCode);
+  CpdBeforeEp(epIdx);
+#endif
   _entryTable[epIdx]->call(msg, obj);
+#ifndef CMK_OPTIMIZE
+  CpdAfterEp(epIdx);
+  setMemoryChareID(previousChareID);
+  setMemoryStatus(alreadyUserCode);
+#endif
   if (_entryTable[epIdx]->noKeep)
   { /* Method doesn't keep/delete the message, so we have to: */
      CkFreeMsg(msg);
@@ -410,7 +421,16 @@ extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
       CkAbort("CkDeliverMessageReadonly: message pack/unpack changed message pointer!");
 #endif
   }
+#ifndef CMK_OPTIMIZE
+  int previousChareID = setMemoryChareIDFromPtr(obj);
+  int alreadyUserCode = 1;
+  setMemoryStatus(alreadyUserCode);
+#endif
   _entryTable[epIdx]->call(deliverMsg, obj);
+#ifndef CMK_OPTIMIZE
+  setMemoryChareID(previousChareID);
+  setMemoryStatus(alreadyUserCode);
+#endif
 }
 
 static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)

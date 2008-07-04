@@ -298,8 +298,7 @@ Module::generate()
   declstr << 
   "#ifndef _DECL_"<<name<<"_H_\n"
   "#define _DECL_"<<name<<"_H_\n"
-  "#include \"charm++.h\"\n"
-  "#ifdef CMK_CHECK_CRC\nextern \"C\" void checkAllCRC(int);\n#endif\n";
+  "#include \"charm++.h\"\n";
   if (fortranMode) declstr << "#include \"charm-api.h\"\n";
   if (clist) clist->genDecls(declstr);
   declstr << "extern void _register"<<name<<"(void);\n";
@@ -2517,9 +2516,20 @@ void Entry::genArrayDefs(XStr& str)
       str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a non-local element\");\n";
       str << "#endif\n";
       if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,"<<epIdx()<<",CkMyPe(),0,((CkArrayIndexMax&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
-      str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n  ";
+      str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
+      str << "#ifndef CMK_OPTIMIZE\n"
+      "  int previousChareID = setMemoryChareIDFromPtr(obj);\n"
+      "  int alreadyUserCode = " << ( internalMode ? "0" : "1" ) << ";\n"
+      "  setMemoryStatus(alreadyUserCode);\n"
+      "  CpdBeforeEp("<<epIdx()<<");\n"
+      "#endif\n   ";
       if (!retType->isVoid()) str << retType<< " retValue = ";
       str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
+      str << "#ifndef CMK_OPTIMIZE\n"
+      "  CpdAfterEp("<<epIdx()<<");\n"
+      "  setMemoryChareID(previousChareID);\n"
+      "  setMemoryStatus(alreadyUserCode);\n"
+      "#endif\n";
       str << "#if CMK_LBDB_ON\n  obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
       if (!retType->isVoid()) str << "  return retValue;\n";
@@ -2690,7 +2700,7 @@ void Entry::genGroupDefs(XStr& str)
       str << "  "<<container->baseName()<<" *obj = ckLocalBranch();\n";
       str << "  CkAssert(obj);\n";
       if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,"<<epIdx()<<",CkMyPe(),0,NULL);\n";
-      str << "  #if CMK_LBDB_ON\n"
+      str << "#if CMK_LBDB_ON\n"
 "  // if there is a running obj being measured, stop it temporarily\n"
 "  LDObjHandle objHandle;\n"
 "  int objstopped = 0;\n"
@@ -2699,9 +2709,20 @@ void Entry::genGroupDefs(XStr& str)
 "    objstopped = 1;\n"
 "    the_lbdb->ObjectStop(objHandle);\n"
 "  }\n"
-"#endif\n  ";
+"#endif\n";
+      str << "#ifndef CMK_OPTIMIZE\n"
+      "  int previousChareID = setMemoryChareIDFromPtr(obj);\n"
+      "  int alreadyUserCode = " << ( internalMode ? "0" : "1" ) << ";\n"
+      "  setMemoryStatus(alreadyUserCode);\n"
+      "  CpdBeforeEp("<<epIdx()<<");\n"
+      "#endif\n  ";
       if (!retType->isVoid()) str << retType << " retValue = ";
       str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
+      str << "#ifndef CMK_OPTIMIZE\n"
+      "  CpdAfterEp("<<epIdx()<<");\n"
+      "  setMemoryChareID(previousChareID);\n"
+      "  setMemoryStatus(alreadyUserCode);\n"
+      "#endif\n";
       str << "#if CMK_LBDB_ON\n"
 "  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"
 "#endif\n";
@@ -3041,11 +3062,6 @@ void Entry::genCall(XStr& str, const XStr &preCall)
   else //Normal case: Unmarshall variables
 	param->beginUnmarshall(str);
 
-  str << "#ifndef CMK_OPTIMIZE\n";
-  str << "  int previousChareID = setMemoryChareIDFromPtr(impl_obj);\n";
-  if (!internalMode) str << "  int alreadyUserCode = 1;\n  setMemoryStatus(alreadyUserCode);\n";
-  str << "#endif\n";
-  str << "#ifdef CMK_CHECK_CRC\n  checkAllCRC(0);\n#endif\n";
   str << preCall;
   if (!isConstructor() && fortranMode) {
     if (!container->isArray()) { // Currently, only arrays are supported
@@ -3094,11 +3110,6 @@ void Entry::genCall(XStr& str, const XStr &preCall)
         str<<"("; param->unmarshall(str); str<<");\n";
     }
   }
-  str << "#ifdef CMK_CHECK_CRC\n  checkAllCRC(1);\n#endif\n";
-  str << "#ifndef CMK_OPTIMIZE\n";
-  str << "  setMemoryChareID(previousChareID);\n";
-  if (!internalMode) str << "  setMemoryStatus(alreadyUserCode);\n";
-  str << "#endif\n";
 }
 
 void Entry::genDefs(XStr& str)
