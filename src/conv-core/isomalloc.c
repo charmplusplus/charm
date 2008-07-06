@@ -293,9 +293,11 @@ static void disable_isomalloc(const char *why)
 /****************** Manipulate memory map (Win32 non-version) *****************/
 static void *call_mmap_fixed(void *addr,size_t len) {
 	CmiAbort("isomalloc.c: mmap_fixed should never be called here.");
+	return NULL;
 }
 static void *call_mmap_anywhere(size_t len) {
 	CmiAbort("isomalloc.c: mmap_anywhere should never be called here.");
+	return NULL;
 }
 static void call_munmap(void *addr,size_t len) {
 	CmiAbort("isomalloc.c: munmap should never be called here.");
@@ -734,7 +736,7 @@ static void init_ranges(char **argv)
             sprintf(fname,".isomalloc.%d", CmiMyNode());
             while ((fd = open(fname, O_WRONLY|O_TRUNC|O_CREAT, 0644)) == -1) 
 #ifndef __MINGW_H
-              sleep(1)
+              CMK_CPV_IS_SMP
 #endif
             ;
             write(fd, &s, sizeof(CmiUInt8));
@@ -750,7 +752,7 @@ static void init_ranges(char **argv)
               sprintf(fname,".isomalloc.%d", i);
               while ((fd = open(fname, O_RDONLY)) == -1)
 #ifndef __MINGW_H
-              sleep(1)
+              CMK_CPV_IS_SMP
 #endif
               ;
               read(fd, &ss, sizeof(CmiUInt8));
