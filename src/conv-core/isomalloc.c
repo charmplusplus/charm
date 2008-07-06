@@ -677,6 +677,10 @@ static int find_largest_free_region(memRegion_t *destRegion) {
     }
 }
 
+#ifndef CMK_CPV_IS_SMP
+#define CMK_CPV_IS_SMP
+#endif
+
 static void init_ranges(char **argv)
 {
   /*Largest value a signed int can hold*/
