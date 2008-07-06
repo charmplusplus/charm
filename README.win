@@ -36,7 +36,7 @@ To compile charm with VC++:
    For Microsoft Visual C++ 8.0 and beyond, it is usually located at:
    C:\Program Files\Microsoft Visual Studio 9.0\VC\vcvarsall.bat
 
-   However VCVARS32.BAT, or vcvarsall.bat (a DOS Batch) cannot be executed 
+   Note that VCVARS32.BAT, or vcvarsall.bat (a DOS Batch) cannot be executed 
    under Bash Shell, you have to: 
    for Win8x: put it into AUTOEXEC.BAT; 
    for WinNT/WindowsXP/Vista: you have to call VCVARS32.BAT in cygwin.bat 
@@ -54,6 +54,10 @@ To compile charm with VC++:
 
    bash --login -i
    >>>>>>>>>>>>>>>>>>>>
+
+   NOTE, for VC++ 64 bit, change the above line to:
+
+   call "C:\Program Files\Microsoft Visual Studio 9.0\VC\vcvarsall" amd64
 
 3. This step is optional if you have installed Microsoft Visual Studio under 
    the following (default) location: 
