@@ -414,7 +414,6 @@ then
 	cp $src/win64/unix2nt* /bin
 	cp $src/win32/system_ln $DESTINATION/tmp
 	cp $src/win32/unistd.h $DESTINATION/tmp
-	cp $src/win32/unistd.h $DESTINATION/include
 	cp $src/win32/createlink.exe /bin
   chmod +x $DESTINATION/tmp/system_ln
 else
