@@ -34,6 +34,7 @@ do
     destFile=$dest
     test -d $dest && destFile=$dest/`basename $src`
 #    echo $junction $src $destFile
+    test -f $destFile && /bin/rm -f $destFile
     $junction $src $destFile
     status=$?
     test $status -ne 0 && echo "ERROR" &&exit $status
