@@ -462,7 +462,7 @@ if($target eq "charm++"){
 
 
 # Compose the build line
-$build_line = "./build $target $arch $compilers $options $smp $j ${compiler_flags}\n";
+$build_line = "./build $target $arch $compilers $options $smp $j $nobs ${compiler_flags}\n";
 
 
 # Save the build line in the log
