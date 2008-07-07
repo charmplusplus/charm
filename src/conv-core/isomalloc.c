@@ -928,7 +928,7 @@ static btreenode *btree_delete(slotset *ss, btreenode *node, CmiInt8 startslot) 
 
 static slotset *new_slotset(CmiInt8 startslot, CmiInt8 nslots) {
 
-  CmiPrintf("*** New Isomalloc ***\n");
+  //CmiPrintf("*** New Isomalloc ***\n");
 
   // allocate memory for the slotset
   slotset *ss = (slotset *)(malloc_reentrant(sizeof(slotset)));
@@ -1254,7 +1254,7 @@ typedef struct _slotset
 static slotset *
 new_slotset(CmiInt8 startslot, CmiInt8 nslots)
 {
-  CmiPrintf("*** Old isomalloc ***\n");
+  //CmiPrintf("*** Old isomalloc ***\n");
   int i;
   slotset *ss = (slotset*) malloc_reentrant(sizeof(slotset));
   _MEMCHECK(ss);
