@@ -784,7 +784,7 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
   int adjnodes[2];
   adjnodes[0] = n; //looks like it will never be shared, since according to later code, all n1, n & n2 should be local.. appears to be not correct
   //the new node will be shared to wahtever the old node was shared to, we'll do this later
-  int *chunks;
+  int *chunks = NULL;
   int numChunks = 0;
   int np = FEM_add_node(theMesh,adjnodes,1,chunks,numChunks,0);
   locknodes[3] = np;

@@ -621,7 +621,7 @@ void ParFUMShadowArray::unpendForRemote(RegionID regionID){
 
 void ParFUMShadowArray::unlockRegion(RegionID regionID){
   CkAssert(regionID.chunkID == idx);
-  CkAssert((regionID == holdingLock) || (regionID.localID = -1));
+  CkAssert((regionID == holdingLock) || (regionID.localID == -1));
   if (regionID.localID != -1) {
     LockRegion *region = regionTable.get(regionID);
     CkAssert(region!=NULL);

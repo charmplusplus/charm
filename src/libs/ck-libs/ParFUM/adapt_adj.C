@@ -1113,6 +1113,7 @@ int getElemFace(
 
   // uh-oh, didn't find it
   CkAbort("ERROR: GetEdgeFace: vertexList is not a valid face./n");
+  return -1;
 }
 
 int getElemEdge(
@@ -1137,6 +1138,7 @@ int getElemEdge(
 
   // uh-oh, didn't find it
   CkAbort("ERROR: GetEdgeFace: vertexList is not a valid edge./n");
+  return -1;
 }
 
 
