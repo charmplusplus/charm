@@ -68,7 +68,7 @@ void BgWriteTraceSummary(int numPes, int x, int y, int z, int numWth, int numCth
   }
   PUP::toDisk p(f);
   p((char *)&machInfo, sizeof(machInfo));
-  int nlocalProcs = x*y*x*numWth;               // ???
+  int nlocalProcs = x*y*z*numWth;               // ???
   p|nlocalProcs;
   bgMach.x = x;
   bgMach.y = y;
