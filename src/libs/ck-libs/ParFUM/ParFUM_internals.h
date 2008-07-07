@@ -1484,6 +1484,10 @@ class FEM_Mesh : public CkNoncopyable {
   /// Get two elements adjacent to both n1 and n2
   void get2ElementsOnEdge(int n1, int n2, int *result_e1, int *result_e2) ;
 
+  /// Get two elements adjacent to both n1 and n2                                                                                                                                                            
+  void get2ElementsOnEdgeSorted(int n1, int n2, int *result_e1, int *result_e2) ;
+
+
   /// Count the number of elements adjacent to both n1 and n2
   int countElementsOnEdge(int n1, int n2);
   

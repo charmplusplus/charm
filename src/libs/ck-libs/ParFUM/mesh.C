@@ -2238,6 +2238,26 @@ void FEM_writeMesh(FEM_Mesh *m,const char *prefix,int chunkNo,int nChunks)
 	fclose(fp);
 }
 
+// A subroutine that can enable projections tracing
+CDECL void FEM_traceBegin(){
+  traceBegin();
+}
+FORTRAN_AS_C(FEM_TRACEBEGIN,
+             FEM_traceBegin,
+             fem_tracebegin,
+             (),  () )
+
+// A subroutine that can disable projections tracing                                                                                
+CDECL void FEM_traceEnd(){
+  traceEnd();
+}
+FORTRAN_AS_C(FEM_TRACEEND,
+             FEM_traceEnd,
+             fem_traceend,
+             (),  () )
+
+
+
 
 // Setup the entity FEM_IS_VALID tables
 CDECL void FEM_Mesh_allocate_valid_attr(int fem_mesh, int entity_type){

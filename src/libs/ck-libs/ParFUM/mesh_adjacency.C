@@ -75,6 +75,18 @@ FORTRAN_AS_C(FEM_MESH_GET2ELEMENTSONEDGE,
              (*fem_mesh,*n1,*n2,e1,e2) )
 
 
+CDECL void
+FEM_Mesh_get2ElementsOnEdgeSorted(int fem_mesh, int n1, int n2, int *e1, int *e2){
+  const char *caller="FEM_Mesh_get2ElementsOnEdge"; FEMAPI(caller);
+  FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
+  m->get2ElementsOnEdgeSorted(n1, n2, e1, e2);
+}
+FORTRAN_AS_C(FEM_MESH_GET2ELEMENTSONEDGESORTED,
+             FEM_Mesh_get2ElementsOnEdgeSorted,
+             fem_mesh_get2elementsonedgesorted,
+             (int *fem_mesh, int *n1, int *n2, int *e1, int *e2),
+             (*fem_mesh,*n1,*n2,e1,e2) )
+
 
 void FEM_Node::allocateElemAdjacency(){
 	if(elemAdjacency){
@@ -1435,6 +1447,48 @@ void FEM_Mesh::get2ElementsOnEdge(int n1, int n2, int *result_e1, int *result_e2
   delete[] n1AdjElems;
   delete[] n2AdjElems;
 }
+
+/** 
+    Get an id out of FEM_DATA+3 for an element of type 0.
+ */
+int getID(FEM_Mesh *mesh, int elem){
+    int id = 0;
+
+    if(elem<0){
+      AllocTable2d<int> &idTable = ((FEM_DataAttribute *)mesh->elem[0].getGhost()->lookup(FEM_DATA+3,"getID"))->getInt();
+      id = idTable(0,FEM_To_ghost_index(elem));
+    } else {
+      AllocTable2d<int> &idTable = ((FEM_DataAttribute *)mesh->elem[0].lookup(FEM_DATA+3,"getID"))->getInt();
+      id = idTable(0,elem);
+    }
+    
+  return id;
+}
+
+
+/** Get 2 elements on edge (n1, n2) where n1, n2 are chunk-local
+    node numberings; return the edges in result_e1 and result_e2
+
+    Elements will be sorted by their integer stored in FEM_DATA+3.
+    Only works for element type 0
+
+*/
+void FEM_Mesh::get2ElementsOnEdgeSorted(int n1, int n2, int *result_e1, int *result_e2)
+{
+  int *n1AdjElems=0, *n2AdjElems=0;
+  int n1NumElems, n2NumElems;
+  
+  get2ElementsOnEdge(n1, n2, result_e1, result_e2);
+
+  //   Swap the two elements if the first has greater id than the second 
+    if(getID(this,*result_e1) > getID(this,*result_e2)){
+    int temp = *result_e1;
+    *result_e1 = *result_e2;
+    *result_e2 = temp;
+  }
+}
+
+
 
 
 /** Count the number of elements on edge (n1, n2) */

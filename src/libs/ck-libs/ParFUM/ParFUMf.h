@@ -311,14 +311,20 @@
          integer, intent(in) :: fem_mesh
        end subroutine
          
-       subroutine   FEM_Mesh_get2ElementsOnEdge(fem_mesh,n1,n2,e1,e2)
+	 subroutine   FEM_Mesh_get2ElementsOnEdge(fem_mesh,n1,n2,e1,e2)
          integer, intent(in)  :: fem_mesh, n1, n2
          integer, intent(out) :: e1, e2
-       end subroutine      
-
-	   subroutine  FEM_Mesh_allocate_valid_attr(fem_mesh, entity_type)
+	 end subroutine      
+	 
+	 subroutine FEM_Mesh_get2ElementsOnEdgeSorted(fem_mesh,n1,n2,e1,e2)
+         integer, intent(in)  :: fem_mesh, n1, n2
+         integer, intent(out) :: e1, e2
+	 end subroutine
+	 
+	 
+	 subroutine  FEM_Mesh_allocate_valid_attr(fem_mesh, entity_type)
          integer, intent(in)  :: fem_mesh, entity_type
-       end subroutine   
+	 end subroutine   
          
        integer function  FEM_is_valid(fem_mesh,entityType,entityIdx)
          integer, intent(in)  :: fem_mesh, entityType, entityIdx
@@ -327,6 +333,14 @@
        integer function FEM_count_valid(fem_mesh,entityType,entityIdx)
          integer, intent(in)  :: fem_mesh, entityType, entityIdx
        end function    
+
+	 subroutine FEM_traceBegin()
+	 end subroutine
+
+         subroutine FEM_traceEnd()
+         end subroutine
+
+
 
        end interface
 
