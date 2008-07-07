@@ -7,8 +7,8 @@ class Name
 {
   private:
     char *curname;
-    int curbuflen;
-    int curlen;
+    size_t curbuflen;
+    size_t curlen;
   public:
     Name(void)
     {
@@ -19,7 +19,7 @@ class Name
     }
     void add(const char *n)
     {
-      int len = strlen(n);
+      size_t len = strlen(n);
       if((curlen+len+2) > curbuflen) {
         char *t = new char[curlen+len+2];
         strcpy(t, curname);
@@ -36,7 +36,7 @@ class Name
     }
     void remove(const char *n)
     {
-      int len = strlen(n);
+      size_t len = strlen(n);
       curlen = curlen-len;
       curname[curlen] = '\0';
       if(curlen!=0) {
@@ -421,7 +421,7 @@ class CkInPortString : public CharismaInPort
     }
     void send(char *str)
     {
-      CkMarshallMsg *impl_msg=new (strlen(str)+1,0)CkMarshallMsg;
+      CkMarshallMsg *impl_msg=new ((int)strlen(str)+1,0)CkMarshallMsg;
       strcpy((char *)(impl_msg->msgBuf),str);
       CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;
       impl_amsg->array_setIfNotThere(CkArray_IfNotThere_buffer);

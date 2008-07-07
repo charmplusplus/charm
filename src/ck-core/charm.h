@@ -116,7 +116,7 @@ extern int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx,
 
 /** Register this type of chare (group, or array), with this size.
     Returns the Chare's index in the _chareTable. */
-extern int CkRegisterChare(const char *name, int dataSz);
+extern int CkRegisterChare(const char *name, size_t dataSz);
 /** Register this chare as internal to Charm++.*/
 extern void CkRegisterChareInCharm(int chareIndex);
 /** Register this chare as a mainchare, with this entry point as its constructor.*/

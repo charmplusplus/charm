@@ -916,10 +916,10 @@ typedef CProxyElement_Group CProxyElement_IrrGroup;
 
 class CkQdMsg {
   public:
-    void *operator new(size_t s) { return CkAllocMsg(0,s,0); }
+    void *operator new(size_t s) { return CkAllocMsg(0,(int)s,0); }
     void operator delete(void* ptr) { CkFreeMsg(ptr); }
     static void *alloc(int, size_t s, int*, int) {
-      return CkAllocMsg(0,s,0);
+      return CkAllocMsg(0,(int)s,0);
     }
     static void *pack(CkQdMsg *m) { return (void*) m; }
     static CkQdMsg *unpack(void *buf) { return (CkQdMsg*) buf; }

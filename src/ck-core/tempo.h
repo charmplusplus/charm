@@ -31,7 +31,7 @@ class TempoMessage : public CMessage_TempoMessage
       memcpy(data, d, l);
     }
     static void *alloc(int msgnum, size_t size, int *sizes, int pbits) {
-      return CkAllocMsg(msgnum, size+sizes[0], pbits);
+      return CkAllocMsg(msgnum, (int)size+sizes[0], pbits);
     }
     static void *pack(TempoMessage *in) { return (void *) in; }
     static TempoMessage *unpack(void *in) { return new (in) TempoMessage; }
