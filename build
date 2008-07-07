@@ -396,22 +396,13 @@ rm -f $DESTINATION/tmp/Make.machine
 
 
 # Create the bin, lib, include, etc. links:
-if [ "x_`echo $VERSION | awk -F- '{print $2}'`" = "x_win32" ]
+WINNAME=`echo $VERSION | awk -F- '{print $2}'`
+if [ "x_$WINNAME" = "x_win32" -o "x_$WINNAME" = "x_win64" ]
 then
-#Win32 version needs special compilers and *copied* (not linked)
+#Win32/64 version needs special compilers and *copied* (not linked)
 # source files.
-	echo "Copying compilers for win32 into cygwin /bin directory"
-	cp $src/win32/unix2nt* /bin
-	cp $src/win32/system_ln $DESTINATION/tmp
-	cp $src/win32/unistd.h $DESTINATION/tmp
-	cp $src/win32/createlink.exe /bin
-  chmod +x $DESTINATION/tmp/system_ln
-elif [ "x_`echo $VERSION | awk -F- '{print $2}'`" = "x_win64" ]
-then
-#Win64 version needs special compilers and *copied* (not linked)
-# source files.
-	echo "Copying compilers for win64 into cygwin /bin directory"
-	cp $src/win64/unix2nt* /bin
+	echo "Copying compilers for $WINNAME into cygwin /bin directory"
+	cp $src/$WINNAME/unix2nt* /bin
 	cp $src/win32/system_ln $DESTINATION/tmp
 	cp $src/win32/unistd.h $DESTINATION/tmp
 	cp $src/win32/createlink.exe /bin
