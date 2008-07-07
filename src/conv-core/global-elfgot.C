@@ -104,7 +104,7 @@ static void readBlacklist()
   const char *fname = "blacklist";
   FILE *bl = fopen(fname, "r");
   if (bl == NULL){
-		printf("WARNING: Running swapglobals without blacklist, globals from libraries might be getting un-necessarily swapped\n");
+		if (CmiMyPe() == 0) printf("WARNING: Running swapglobals without blacklist, globals from libraries might be getting un-necessarily swapped\n");
 		loaded = 1;
 		return;
   }
