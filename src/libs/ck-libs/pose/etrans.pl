@@ -21,7 +21,7 @@ my $outci = "$infile\_sim.ci";
 my $outh = "$infile\_sim.h";
 #my $outC = "$infile\_sim.C";
 my (@strategies,@representations,@posera,@groups,@newline);
-my (%posers,%strat, %methods,%rep,%base,%events,%nonevents,%messages,%needsopeq,%puppy,%cppuppy,%emessages,%extradecl);
+my (%posers,%strat, %methods,%rep,%base,%events,%nonevents,%messages,%needsopeq,%puppy,%cppuppy,%emessages,%extradecl, %inits);
 my ($class,$method,$message);
 my ($template,$tdef, $classpattern); #for template support
 my $wantindent=0;
@@ -228,9 +228,12 @@ while (@line=split(' ',($thisline=getcodeline($inhhandle)))) {
 	my @newline = split;
 	next if (/array \[1D\]/); #skip classdef
 	next if (/\}\;/);	#skip close
+	next if (/initproc/);	#skip init
+	next if (/initnode/);	#skip init
 	if ($newline[0] ne "entry") {
 	  $outhhandle->print("$_\n");
-	} else {
+	}
+	else {
 	  s/entry\s//;
 	  s/\[.+\]\s//;
 	  $outhhandle->print("  $_\n");
@@ -249,6 +252,12 @@ while (@line=split(' ',($thisline=getcodeline($inhhandle)))) {
 	    }
 	}
       }
+      foreach my $thisinit (@{$inits{$class}}) {
+	  # output the wrapper version this init method
+	  # if we had to handle this generically there would be less hardcode
+	  $outhhandle->print("   static void ".$thisinit."(void);\n");
+
+	}
       $outhhandle->print("};\n\n");
       if (($curstrat =~ /((opt)|(adapt))/) || ($currep eq "chpt")) {
 	print "warning ! no ::operator= in class $class" if (exists($needsopeq{$class}) &&( $opeq!=1));
@@ -425,7 +434,7 @@ foreach my $incfile ($inC,@otherfiles)
   $inChandle->open("$incfile") or die "cannot open $incfile";
   inithandle($inChandle);
   my ($thefnidx);
-  my($iseventmethod,$isweird,$isnoneventmethod);
+  my($iseventmethod,$isweird,$isnoneventmethod, $isinitmethod);
   my ($returntype,,$messagename,$found);
   while (@line=split(' ',($thisline=getcodeline($inChandle)))) {
     if (($line[0] eq "#define") || ($line[0] eq "#include")) {
@@ -443,7 +452,7 @@ foreach my $incfile ($inC,@otherfiles)
       # sim classes and event methods
       # get class name and method name
       #    	print "open on $thisline :level".$blocklevel{$inChandle}." open:".$openblock{$inChandle}." close:".$closeblock{$inChandle}."\n";
-      $iseventmethod=$isnoneventmethod=$isconstructor=$isweird=$issim=0;
+      $iseventmethod=$isnoneventmethod=$isconstructor=$isweird=$issim=$isinitmethod=0;
       $class=$message=$messagename=$returntype=$method='';
       $declaration=$lastline{$inChandle};
       $inbody=1;
@@ -497,7 +506,7 @@ foreach my $incfile ($inC,@otherfiles)
       } else {
 	#funkulation: non class subroutine perhaps just pass
 	#these for now since we have no handling instructions.
-	print STDERR "$thisline at $incfile ".$inChandle->input_line_number." is weird \n";
+	print STDERR "$thisline at $incfile ".$inChandle->input_line_number." is being passed untranslated\n";
 	$isweird=1;
 	$inbody=1;
 	$outChandle->print($lastline{$inChandle}."\n");
@@ -517,6 +526,20 @@ foreach my $incfile ($inC,@otherfiles)
 	  $isnoneventmethod = 1;
 	}
       }
+      foreach $j (@{$inits{$class}}) {
+	if ($method eq $j) {
+	  $isinitmethod = 1;
+	}
+      }
+      if ($isinitmethod)
+	{
+	  my $retval =$returntype;
+	  $retval =undef if $retval =~ /void/;
+	  $outChandle->print("$declaration\n");
+	  $outChandle->print("  state_".$class."::".$method."();\n");
+	  $outChandle->print("}\n");
+
+	}
       #      print "class is $class, method is $method close=".$closeblock{$inChandle}." issim = $issim iseventmethod = $iseventmethod isnoneventmethod $isnoneventmethod \n";
 
       if ($iseventmethod &&  ($messagename ne '')) {
@@ -710,7 +733,7 @@ foreach my $incfile ($inC,@otherfiles)
       }
       $inbody=0;
     } elsif (!$inbody) {	#regular line
-      #    print "regular line $thisline at $incfile isweird \n";
+      #    print "regular line $thisline at $incfile is passed untranslated \n";
       $outChandle->print($lastline{$inChandle}."\n");
     } else {
     }
@@ -1022,10 +1045,18 @@ sub poserdeal
 	push(@{$poser->{entry}},$thisline);
 	push(@{$poser->{outarr}}, "  ".$thisline);
       }
-      else # non entry stuff, comments, initnode whatever fluff
-	{
-	  push(@{$poser->{literal}}, $thisline);
-	}
+      elsif($thisline =~ /(initnode|initproc).*\s(.*)\(\s*(\S[^\*\s\)]*)/) {
+	$method= $2;
+	$message= $3;
+	push(@{$inits{$class}}, ($method)) if $class ne $method;
+	printf("inits for $class $method\n");
+	# there is no transformation for the literal method in ci
+	# .h and .C just need to support static keyword and simple
+	# callthru wrapper
+	push(@{$poser->{literal}}, $thisline);
+	push(@{$poser->{outarr}}, "  ".$thisline);
+      }
+
     }
     return $poser;
   }
