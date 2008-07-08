@@ -1006,12 +1006,13 @@ sub poserdeal
 	push(@{$poser->{literal}}, $lastline{$inhandle});
 	push(@{$poser->{outarr}}, "  ".$thisline);
 	last;
-      } elsif ($line[0] eq "entry") {
+      } 
+      elsif ($line[0] eq "entry") {
 	if ($thisline =~ /(\,event\,|\,event|event\,|\s\[event\]).*\s(.*)\(\s*(\S[^\*\s\)]*)/) {
 	  $method = $2;
 	  $message = $3;
 	  push(@{$events{$class}}, [$method,$message]);
-#	  print " poserdeal events  class $class  method $method message $message \n";
+	  #	  print " poserdeal events  class $class  method $method message $message \n";
 	} elsif ($thisline =~ /\s+[\*]*\s*(\S+)\(/) {
 	  $method = $1;
 	  push(@{$nonevents{$class}}, ($method)) if $class ne $method;
@@ -1021,6 +1022,10 @@ sub poserdeal
 	push(@{$poser->{entry}},$thisline);
 	push(@{$poser->{outarr}}, "  ".$thisline);
       }
+      else # non entry stuff, comments, initnode whatever fluff
+	{
+	  push(@{$poser->{literal}}, $thisline);
+	}
     }
     return $poser;
   }
