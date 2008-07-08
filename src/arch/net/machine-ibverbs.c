@@ -522,11 +522,6 @@ static void CmiMachineInit(char **argv){
 	blockAllocRatio=16;
 	blockThreshold=8;
 
-	//TODO:erase this
-	int ppn = 0;
-	CmiGetArgInt(argv,"+ppn",&CmiMyNodeSize());
-	MACHSTATE1(3,"CmiMyNodeSize %d",CmiMyNodeSize());
-	
 #if !THREAD_MULTI_POOL
 	initInfiCmiChunkPools();
 #endif
