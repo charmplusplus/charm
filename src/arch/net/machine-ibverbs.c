@@ -57,6 +57,10 @@ static int minTokensLeft;
 
 static double regTime;
 
+//TODO: erase this
+static double processLockTime;
+static double _auxTime;
+
 static double processBufferedTime;
 static int processBufferedCount;
 
@@ -80,6 +84,8 @@ static int processBufferedCount;
 #if THREAD_MULTI_POOL 
 #include "pcqueue.h"
 PCQueue **queuePool;
+void infi_CmiFreeDirect(void *ptr);
+static inline void fillBufferPools();
 #endif
 
 #define INFIBARRIERPACKET 128
@@ -583,6 +589,9 @@ static void CmiMachineInit(char **argv){
 	processBufferedCount=0;
 	processBufferedTime=0;
 
+	//TODO: erase this
+	processLockTime = 0;
+
 	minTokensLeft = maxTokens;
 #endif	
 
@@ -595,6 +604,7 @@ void CmiCommunicationInit(char **argv)
 {
 #if THREAD_MULTI_POOL
 	initInfiCmiChunkPools();
+	fillBufferPools();
 #endif
 }
 
@@ -908,6 +918,13 @@ static void CmiMachineExit()
 #if CMK_IBVERBS_STATS	
 	printf("[%d] msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d \n",_Cmi_mynode,msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft);
 #endif
+
+#if THREAD_MULTI_POOL
+	printf("IBVERBS Multi pool version\n");
+#endif
+
+	//TODO: erase this
+	printf("Alloc time = %.8f  Lock time = %.8f count = %d\n",processBufferedTime/processBufferedCount,processLockTime/processBufferedCount,processBufferedCount);
 
 	//TODO: ERASE this
 	MACHSTATE2(3,"Free msgs %d not owned %d",TESTfrees,TESTneighbor);
@@ -2165,15 +2182,70 @@ infiCmiChunkMetaData *registerMultiSendMesg(char *msg,int size){
 
 
 #if THREAD_MULTI_POOL
+
+// Fills up the buffer pools for every thread in the node
+static inline void fillBufferPools(){
+	int nodeSize, poolIdx, thread;
+	infiCmiChunkMetaData *metaData;		
+	infiCmiChunkHeader *hdr;
+	int allocSize;
+	int count=1;
+	int i;
+	struct ibv_mr *key;
+	void *res;
+
+	// initializing values
+	nodeSize = CmiMyNodeSize() + 1;
+
+	// iterating over all threads and all pools
+	for(thread = 0; thread < nodeSize; thread++){
+		for(poolIdx = 0; poolIdx < INFINUMPOOLS; poolIdx++){
+			allocSize = infiCmiChunkPools[thread][poolIdx].size;
+			if(poolIdx < blockThreshold){
+				count = blockAllocRatio;
+			}else{
+				count = 1;
+			}
+			res = malloc((allocSize+sizeof(infiCmiChunkHeader))*count);
+			hdr = res;
+			key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+			CmiAssert(key != NULL);
+			res += sizeof(infiCmiChunkHeader);
+			for(i=0;i<count;i++){
+				metaData = METADATAFIELD(res) = malloc(sizeof(infiCmiChunkMetaData));
+				metaData->key = key;
+				metaData->owner = hdr;
+				metaData->poolIdx = poolIdx;
+				metaData->parentPe = thread;						// setting the parent PE
+				if(i == 0){
+					metaData->owner->metaData->count = count;
+					metaData->nextBuf = NULL;
+				}else{
+					void *startBuf = res - sizeof(infiCmiChunkHeader);
+					metaData->nextBuf = infiCmiChunkPools[thread][poolIdx].startBuf;
+					infiCmiChunkPools[thread][poolIdx].startBuf = startBuf;
+					infiCmiChunkPools[thread][poolIdx].count++;
+				}
+				if(i != count-1){
+					res += (allocSize+sizeof(infiCmiChunkHeader));
+				}
+			}
+		}
+	}	
+}
+
 static inline void *getInfiCmiChunkThread(int dataSize){
 	//find out to which pool this dataSize belongs to
 	// poolIdx = floor(log2(dataSize/firstBinSize))+1
 	int ratio = dataSize/firstBinSize;
 	int poolIdx=0;
 	void *res;
+	int i,j,nodeSize;
+	void *pointer;
 
 	//printf("Hi\n");
 	MACHSTATE1(2,"Rank=%d",CmiMyRank());
+	MACHSTATE1(3,"INFI_ALLOC %d",CmiMyRank());
 	
 	while(ratio > 0){
 		ratio  = ratio >> 1;
@@ -2181,6 +2253,21 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 	}
 	MACHSTATE1(2,"This is %d",CmiMyRank());
 	MACHSTATE2(2,"getInfiCmiChunk for size %d in poolIdx %d",dataSize,poolIdx);
+
+	// checking whether to analyze the free queues to reuse buffers	
+	nodeSize = CmiMyNodeSize() + 1;
+	if(poolIdx < INFINUMPOOLS && infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf == NULL){
+		MACHSTATE1(3,"Disposing memory %d",CmiMyRank());
+		for(i = 0; i < nodeSize; i++){
+			if(!PCQueueEmpty(queuePool[CmiMyRank()][i])){
+				for(j = 0; j < PCQueueLength(queuePool[CmiMyRank()][i]); j++){
+					pointer = (void *)PCQueuePop(queuePool[CmiMyRank()][i]);
+					infi_CmiFreeDirect(pointer);	
+				}
+			}
+		}	
+	}
+
 	if((poolIdx < INFINUMPOOLS && infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf == NULL) || poolIdx >= INFINUMPOOLS){
 		infiCmiChunkMetaData *metaData;		
 		infiCmiChunkHeader *hdr;
@@ -2353,14 +2440,23 @@ static inline void *getInfiCmiChunk(int dataSize){
 void * infi_CmiAlloc(int size){
 	void *res;
 
+	//TODO: erase this
+	_startTime = CmiWallTimer();	
 
 #if THREAD_MULTI_POOL
 	res = getInfiCmiChunkThread(size-sizeof(CmiChunkHeader));
 	res -= sizeof(CmiChunkHeader);
+
+	//TODO: erase this	
+	processBufferedTime += CmiWallTimer() - _startTime;
+	processBufferedCount++;
+
 	return res;
 #else
-#if CMK_SMP	
+#if CMK_SMP
+	_auxTime = CmiWallTimer();
 	CmiMemLock();
+	processLockTime += CmiWallTimer() - _auxTime;
 #endif
 /*(	if(size-sizeof(CmiChunkHeader) > firstBinSize){*/
 		MACHSTATE1(1,"infi_CmiAlloc for dataSize %d",size-sizeof(CmiChunkHeader));
@@ -2368,11 +2464,18 @@ void * infi_CmiAlloc(int size){
 		res = getInfiCmiChunk(size-sizeof(CmiChunkHeader));	
 		res -= sizeof(CmiChunkHeader);
 #if CMK_SMP	
+	_auxTime = CmiWallTimer();
 	CmiMemUnlock();
+	processLockTime += CmiWallTimer() - _auxTime;
 #endif
 /*	}else{
 		res = malloc(size);
 	}*/
+	
+	//TODO: erase this	
+	processBufferedTime += CmiWallTimer() - _startTime;
+	processBufferedCount++;
+
 	return res;
 #endif
 }
@@ -2473,7 +2576,8 @@ void infi_CmiFree(void *ptr){
 
 	infi_CmiFreeDirect(ptr);
 
-	// checking free request queues
+// TODO: erase following code
+/*	// checking free request queues
 	for(i = 0; i < nodeSize; i++){
 		if(!PCQueueEmpty(queuePool[CmiMyRank()][i])){
 			for(j = 0; j < PCQueueLength(queuePool[CmiMyRank()][i]); j++){
@@ -2482,6 +2586,8 @@ void infi_CmiFree(void *ptr){
 			}
 		}
 	}
+*/
+
 }
 
 #else
