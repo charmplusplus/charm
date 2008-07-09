@@ -71,6 +71,23 @@ void *CkCallback::impl_thread_delay(void) const
 /*These can't be defined in the .h file like the other constructors
  * because we need CkCallback before CProxyElement* are defined.
  */
+CkCallback::CkCallback(Chare *p, int ep, CmiBool doInline)
+		:type(doInline?isendChare:sendChare)
+{
+	d.chare.ep=ep; 
+	d.chare.id=p->ckGetChareID();
+}
+CkCallback::CkCallback(Group *p, int ep, CmiBool doInline)
+		:type(doInline?isendGroup:sendGroup)
+{
+	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyPe();
+}
+CkCallback::CkCallback(NodeGroup *p, int ep, CmiBool doInline)
+		:type(doInline?isendNodeGroup:sendNodeGroup)
+{
+	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyNode();
+}
+
 CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp)
 		:type(bcastNodeGroup) 
 {
@@ -96,6 +113,14 @@ CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doIn
 	d.array.ep=ep; 
 	d.array.id=arrElt.ckGetArrayID(); 
 	d.array.idx.asMax()=arrElt.ckGetIndex();
+}
+
+CkCallback::CkCallback(ArrayElement *p, int ep,CmiBool doInline)
+	:type(doInline?isendArray:sendArray) 
+{
+        d.array.ep=ep; 
+	d.array.id=p->ckGetArrayID(); 
+	d.array.idx.asMax()=p->ckGetArrayIndex();
 }
 
 void CkCallback::send(int length,const void *data) const

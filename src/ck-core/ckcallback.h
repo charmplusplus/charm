@@ -20,6 +20,12 @@ typedef void (*Ck1CallbackFn)(void *message);
 class CProxyElement_ArrayBase; /*forward declaration*/
 class CProxyElement_Group; /*forward declaration*/
 class CProxy_NodeGroup;
+class Chare;
+class Group;
+class NodeGroup;
+class ArrayElement;
+
+#define CkSelfCallback(ep)  CkCallback(this, ep)
 
 class CkCallback {
 public:
@@ -122,7 +128,12 @@ public:
 		:type(doInline?isendArray:sendArray) 
 		{d.array.ep=ep; d.array.id=id; d.array.idx.asMax()=idx;}
 	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline=CmiFalse);
-	
+
+	CkCallback(Chare *p, int ep, CmiBool doInline=CmiFalse);
+	CkCallback(Group *p, int ep, CmiBool doInline=CmiFalse);
+	CkCallback(NodeGroup *p, int ep, CmiBool doInline=CmiFalse);
+ 	CkCallback(ArrayElement *p, int ep,CmiBool doInline=CmiFalse);
+
 	CkCallback(const CcsDelayedReply &reply) 
 		:type(replyCCS) {d.ccsReply.reply=reply;}
 
