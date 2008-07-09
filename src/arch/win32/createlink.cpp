@@ -14,7 +14,7 @@ int main(int argc, char **argv)
   }
   char *src = argv[1];
   char *dest = argv[2];
-  bool fCreatedLink  = CreateHardLink(dest, src, NULL);
+  BOOL fCreatedLink  = CreateHardLink(dest, src, NULL);
   if (!fCreatedLink) {
     int err=GetLastError();
     if (err == ERROR_ALREADY_EXISTS) {
