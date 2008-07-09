@@ -78,8 +78,10 @@ static int processBufferedCount;
 #define INCTOKENS_FRACTION 0.04
 #define INCTOKENS_INCREASE .50
 
-// flag for using a pool for every thread
-#define THREAD_MULTI_POOL 0
+// flag for using a pool for every thread in SMP mode
+#if CMK_SMP
+#define THREAD_MULTI_POOL 1
+#endif
 
 #if THREAD_MULTI_POOL 
 #include "pcqueue.h"
