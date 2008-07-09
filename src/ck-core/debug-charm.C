@@ -664,4 +664,10 @@ void CpdCharmInit()
 {
 }
 
+void CpdBeforeEp(int ep) {
+}
+
+void CpdAfterEp(int ep) {
+}
+
 #endif /*CMK_CCS_AVAILABLE*/
