@@ -704,19 +704,17 @@ void PythonObject::pythonReturn(int handle, PyObject* data) {
   //CthAwaken(handleThread);
 }
 
-/*
 void PythonObject::pythonAwake(int handle) {
-  CmiLock(CsvAccess(pyLock));
-  PyThreadState *handleThread = ((*CsvAccess(pyWorkers))[handle]).pythread;
-  CmiUnlock(CsvAccess(pyLock));
-  PyEval_AcquireLock();
-  PyThreadState_Swap(handleThread);
+  //CmiLock(CsvAccess(pyLock));
+  //PyThreadState *handleThread = ((*CsvAccess(pyWorkers))[handle]).pythread;
+  //CmiUnlock(CsvAccess(pyLock));
+  //PyEval_AcquireLock();
+  //PyThreadState_Swap(handleThread);
 }
 
 void PythonObject::pythonSleep(int handle) {
-  PyEval_ReleaseLock();
+  //PyEval_ReleaseLock();
 }
-*/
 
 PythonCCS::PythonCCS(CkArgMsg *arg) {
   pythonCcsProxy = thishandle;
