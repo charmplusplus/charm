@@ -90,7 +90,7 @@ static void *slot2addr(CmiInt8 slot) {
 	return isomallocStart+((memRange_t)slotsize)*((memRange_t)slot);
 }
 static int slot2pe(CmiInt8 slot) {
-	return slot/numslots;
+	return (int)(slot/numslots);
 }
 static CmiInt8 pe2slot(int pe) {
 	return pe*numslots;
@@ -275,9 +275,9 @@ static void list_move(slotset *ss, dllnode *dlln, CmiInt8 old_nslots) {
  *****************************************************************/
 
 static btreenode *create_btree_node() {
+  int i;
   btreenode *btn = (btreenode *)malloc_reentrant(sizeof(btreenode));
   btn->num_blocks = 0;
-  int i;
   for (i = 0; i < TREE_NODE_SIZE; i++) {
     btn->blocks[i].listblock = NULL;
   }
@@ -620,6 +620,7 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 			     CmiInt8 startslot, slotblock *sb) {
 
   int index, inc;
+  int i;
 
   // If sb is not NULL, we're sending sb down the tree to a leaf to be
   // swapped with the next larger startslot so it can be deleted from
@@ -645,7 +646,6 @@ static void btree_delete_int(slotset *ss, btreenode *node,
       sb->listblock->sb = sb;
 
       // delete the slotblock
-      int i;
       for (i = 0; i < (node->num_blocks - 1); i++) {
 	node->blocks[i].startslot     = node->blocks[i+1].startslot;
 	node->blocks[i].nslots        = node->blocks[i+1].nslots;
@@ -675,9 +675,9 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 			   startslot, &(node->blocks[index]));
 	  break;
 	} else {                                          // is a leaf
+	  int i;
 	  // delete the slotblock
 	  list_delete(ss, &(node->blocks[index]));
-	  int i;
 	  for (i = index; i < (node->num_blocks - 1); i++) {
 	    node->blocks[i].startslot     = node->blocks[i+1].startslot;
 	    node->blocks[i].nslots        = node->blocks[i+1].nslots;
@@ -717,6 +717,7 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 
   }
 
+  {   // BLOCK
   // At this point, the desired slotblock has been removed, and we're
   // going back up the tree.  We must check for deficient nodes that
   // require the rotating or combining of elements to maintain a
@@ -835,7 +836,7 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 	node->child[def_child+1]->child[i] = 
 	  node->child[def_child+1]->child[i+1];
       }
-
+      }    // BLOCK
     }
 
     // otherwise, merge the deficient node, parent, and the parent's
@@ -855,6 +856,7 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 	&(node->child[index]->blocks[i]);
       node->child[index]->num_blocks++;
 
+      {   // BLOCK
       // move the elements and children of the right child node to the
       // left child node
       int num_left  = node->child[index]->num_blocks;
@@ -893,7 +895,7 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 	node->blocks[i].listblock->sb = &(node->blocks[i]);
 	node->child[i+1]              = node->child[i+2];
       }
-
+      }  // BLOCK
     }
 
   }
@@ -927,6 +929,8 @@ static btreenode *btree_delete(slotset *ss, btreenode *node, CmiInt8 startslot) 
  *****************************************************************/
 
 static slotset *new_slotset(CmiInt8 startslot, CmiInt8 nslots) {
+  int i;
+  int list_bin;
 
   //CmiPrintf("*** New Isomalloc ***\n");
 
@@ -942,11 +946,10 @@ static slotset *new_slotset(CmiInt8 startslot, CmiInt8 nslots) {
   ss->btree_root->blocks[0].nslots    = nslots;
 
   // initialize the list array
-  int i;
   for (i = 0; i < LIST_ARRAY_SIZE; i++) {
     ss->list_array[i] = NULL;
   }
-  int list_bin = find_list_bin(nslots);
+  list_bin = find_list_bin(nslots);
   ss->list_array[list_bin] = (dllnode *)(malloc_reentrant(sizeof(dllnode)));
   ss->list_array[list_bin]->previous = NULL;
   ss->list_array[list_bin]->next = NULL;
@@ -1196,10 +1199,10 @@ static void print_btree_top_down(btreenode *node) {
  *****************************************************************/
 
 static void print_list_array(slotset *ss) {
-  CmiPrintf("List Array\n");
-  CmiPrintf("----------\n");
   int i;
   dllnode *dlln;
+  CmiPrintf("List Array\n");
+  CmiPrintf("----------\n");
   for (i = 0; i < LIST_ARRAY_SIZE; i++) {
     CmiPrintf("List %2d: ", i);
     dlln = ss->list_array[i];
@@ -1814,7 +1817,7 @@ static int find_largest_free_region(memRegion_t *destRegion) {
     
     /*Align each memory region*/
     for (i=0;i<nRegions;i++) {
-      memRegion_t old=regions[i];
+      /* memRegion_t old=regions[i]; */
       memRange_t p=(memRange_t)regions[i].start;
       p&=~(regions[i].len-1); /*Round start down to a len-boundary (mask off low bits)*/
       regions[i].start=(char *)p;
