@@ -405,6 +405,13 @@ then
 	cp $src/$WINNAME/unix2nt* /bin
 	cp $src/win32/system_ln $DESTINATION/tmp
 	cp $src/win32/unistd.h $DESTINATION/tmp
+	echo "Compiling createlink.cpp ..."
+        (cd $src/win32; unix2nt_cc  -c createlink.cpp -o createlink.o -D_WIN32_WINNT=0x0500; unix2nt_cc createlink.o)
+	if test ! -x $src/win32/createlink.exe
+	then
+		echo "VC++ is not properly installed!"
+		exit 1
+	fi
 	cp $src/win32/createlink.exe /bin
   chmod +x $DESTINATION/tmp/system_ln
 else
