@@ -80,7 +80,7 @@ static int processBufferedCount;
 
 // flag for using a pool for every thread in SMP mode
 #if CMK_SMP
-#define THREAD_MULTI_POOL 1
+#define THREAD_MULTI_POOL 0
 #endif
 
 #if THREAD_MULTI_POOL 
