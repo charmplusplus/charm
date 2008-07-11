@@ -22,8 +22,7 @@ CpvDeclare(int, multisend_replies);
 
 void multisend_fail()
 {
-  CmiPrintf("data corrupted in multisend.\n");
-  exit(1);
+  CmiAbort("data corrupted in multisend.\n");
 }
 
 static void checkMsg(multisendmsg *msg) {
