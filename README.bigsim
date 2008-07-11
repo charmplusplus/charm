@@ -131,6 +131,8 @@ with 16 processors.
 B-3) Running a BigSim simulation:
 --------------------------------
 
+a) All network models
+
 To run a simulation, one needs files "bigsimulator" and
 "netconfig" produced in step (A). Those two files must be
 placed in the same directory as the BigSim tracefiles (i.e.
@@ -163,6 +165,42 @@ the simulation. In particular, to change the topology of the
 network for a topology different than the one originally
 assumed in the emulation, one should have a line like the
 following in file 'netconfig': OVERRIDE_TRACE_TOPOLOGY 1
+
+b) Simple latency model
+
+To use the simple latency model, follow the setup procedure
+in part (a) of this section, noting that the files are located
+in the trunk/SimpleLatency directory.  This will produce the
+"bigsimulator" file.
+
+The command line parameters used for this model are different.
+The format is as follows:
+
+   [charmrun +p#] bigsimulator -lat <latency> -bw <bandwidth>
+                  [-cpp <cost per packet> -psize <packet size>]
+                  [-skip] [-print_params]
+
+Latency (lat)         - type double; in microseconds
+Bandwidth (bw)        - type double; in GB/s
+Cost per packet (cpp) - type double; in microseconds
+Packet size (psize)   - type int; in bytes
+
+The implemented equation is: lat + (N/bw) + cpp*(N/psize)
+
+Latency and bandwidth are required.  If cost per packet is
+given, then packet size must be given, as well.  Otherwise,
+cost per packet defaults to 0.0.  Packet size, if given, must
+be a positive integer.
+
+As with the second parameter in the examples of part (a) of
+this section, the -skip flag indicates that the simulation
+should skip forward to the time stamp set during trace creation
+(see the BigSim tutorial talk from the 2008 Charm++ workshop).
+If -skip is not included, then no skipping will occur.
+
+The -print_params flag is provided for debugging convenience.
+When present, the simple latency model parameters will be
+displayed during simulation initilization.
 
 
 B-4) Generating performance data for Projections:
