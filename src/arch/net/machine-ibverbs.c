@@ -57,10 +57,6 @@ static int minTokensLeft;
 
 static double regTime;
 
-//TODO: erase this
-static double processLockTime;
-static double _auxTime;
-
 static double processBufferedTime;
 static int processBufferedCount;
 
@@ -80,7 +76,7 @@ static int processBufferedCount;
 
 // flag for using a pool for every thread in SMP mode
 #if CMK_SMP
-#define THREAD_MULTI_POOL 0
+#define THREAD_MULTI_POOL 1
 #endif
 
 #if THREAD_MULTI_POOL 
@@ -99,10 +95,6 @@ struct infiIncTokenAckPacket{
 typedef struct {
 char none;  
 } CmiIdleState;
-
-//TODO:ERASE this
-static int TESTneighbor;
-static int TESTfrees;
 
 
 /********
@@ -586,9 +578,6 @@ static void CmiMachineInit(char **argv){
 	processBufferedCount=0;
 	processBufferedTime=0;
 
-	//TODO: erase this
-	processLockTime = 0;
-
 	minTokensLeft = maxTokens;
 #endif	
 
@@ -916,15 +905,6 @@ static void CmiMachineExit()
 	printf("[%d] msgCount %d pktCount %d packetSize %d total Time %.6lf s processBufferedCount %d processBufferedTime %.6lf s maxTokens %d tokensLeft %d \n",_Cmi_mynode,msgCount,pktCount,packetSize,CmiTimer(),processBufferedCount,processBufferedTime,maxTokens,context->tokensLeft);
 #endif
 
-#if THREAD_MULTI_POOL
-	printf("IBVERBS Multi pool version\n");
-#endif
-
-	//TODO: erase this
-	//printf("Alloc time = %.8f  Lock time = %.8f count = %d\n",processBufferedTime/processBufferedCount,processLockTime/processBufferedCount,processBufferedCount);
-
-	//TODO: ERASE this
-	MACHSTATE2(3,"Free msgs %d not owned %d",TESTfrees,TESTneighbor);
 }
 static void ServiceCharmrun_nolock();
 
@@ -2437,23 +2417,14 @@ static inline void *getInfiCmiChunk(int dataSize){
 void * infi_CmiAlloc(int size){
 	void *res;
 
-	//TODO: erase this
-	_startTime = CmiWallTimer();	
-
 #if THREAD_MULTI_POOL
 	res = getInfiCmiChunkThread(size-sizeof(CmiChunkHeader));
 	res -= sizeof(CmiChunkHeader);
 
-	//TODO: erase this	
-	processBufferedTime += CmiWallTimer() - _startTime;
-	processBufferedCount++;
-
 	return res;
 #else
 #if CMK_SMP
-	_auxTime = CmiWallTimer();
 	CmiMemLock();
-	processLockTime += CmiWallTimer() - _auxTime;
 #endif
 /*(	if(size-sizeof(CmiChunkHeader) > firstBinSize){*/
 		MACHSTATE1(1,"infi_CmiAlloc for dataSize %d",size-sizeof(CmiChunkHeader));
@@ -2461,18 +2432,12 @@ void * infi_CmiAlloc(int size){
 		res = getInfiCmiChunk(size-sizeof(CmiChunkHeader));	
 		res -= sizeof(CmiChunkHeader);
 #if CMK_SMP	
-	_auxTime = CmiWallTimer();
 	CmiMemUnlock();
-	processLockTime += CmiWallTimer() - _auxTime;
 #endif
 /*	}else{
 		res = malloc(size);
 	}*/
 	
-	//TODO: erase this	
-	processBufferedTime += CmiWallTimer() - _startTime;
-	processBufferedCount++;
-
 	return res;
 #endif
 }
@@ -2559,31 +2524,15 @@ void infi_CmiFree(void *ptr){
         }
 
 
-	//TODO: erase this
-	TESTfrees++;
-
 	// checking if this free operation is my responsibility
 	parentPe = metaData->parentPe;
 	if(parentPe != CmiMyRank()){
-		TESTneighbor++;
 		PCQueuePush(queuePool[parentPe][CmiMyRank()],(char *)ptr);
 		return;
 	}
 
 
 	infi_CmiFreeDirect(ptr);
-
-// TODO: erase following code
-/*	// checking free request queues
-	for(i = 0; i < nodeSize; i++){
-		if(!PCQueueEmpty(queuePool[CmiMyRank()][i])){
-			for(j = 0; j < PCQueueLength(queuePool[CmiMyRank()][i]); j++){
-				pointer = (void *)PCQueuePop(queuePool[CmiMyRank()][i]);
-				infi_CmiFreeDirect(pointer);	
-			}
-		}
-	}
-*/
 
 }
 
