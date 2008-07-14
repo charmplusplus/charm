@@ -11,7 +11,8 @@ use strict;
 use Getopt::Std;
 my %opts;
 our($opt_s);
-my $result=getopts('s');
+my $result=getopts('sD:',\%opts);
+my $result=$opts{'s'};
 my $infile = shift @ARGV;
 my @otherfiles = @ARGV;
 my $inci = "$infile.ci";
@@ -37,7 +38,16 @@ my %lastline;
 # BEGIN READ HEADERS & MESSAGES
 #read inci
 my $incihandle= new FileHandle();
-$incihandle->open("$inci") or die "cannot open $inci";
+if(defined($opts{'D'}))
+{
+
+    $incihandle->open(" cpp -D $opts{'D'} $inci| grep -v '^#'|") or die "cannot open $inci";
+}
+else
+{
+    $incihandle->open(" cpp $inci| grep -v '^#'|") or die "cannot open $inci";
+
+}
 inithandle($incihandle);
 my $outcihandle=new FileHandle();
 $outcihandle->open(">$outci") or die "cannot open $outci";
