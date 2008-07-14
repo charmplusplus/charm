@@ -921,7 +921,7 @@ static void CmiMachineExit()
 #endif
 
 	//TODO: erase this
-	printf("Alloc time = %.8f  Lock time = %.8f count = %d\n",processBufferedTime/processBufferedCount,processLockTime/processBufferedCount,processBufferedCount);
+	//printf("Alloc time = %.8f  Lock time = %.8f count = %d\n",processBufferedTime/processBufferedCount,processLockTime/processBufferedCount,processBufferedCount);
 
 	//TODO: ERASE this
 	MACHSTATE2(3,"Free msgs %d not owned %d",TESTfrees,TESTneighbor);
