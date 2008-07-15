@@ -2,7 +2,7 @@
 
 #include "CkCache.h"
 
-  CkCacheManager::CkCacheManager(CkGroupID gid, int size) {
+  CkCacheManager::CkCacheManager(int size, CkGroupID gid) {
     init();
     numLocMgr = 1;
     locMgr = new CkGroupID[1];
@@ -10,11 +10,22 @@
     maxSize = (CmiUInt8)size * 1024 * 1024;
   }
 
-  CkCacheManager::CkCacheManager(int n, CkGroupID *gid, int size) {
+  CkCacheManager::CkCacheManager(int size, int n, CkGroupID *gid) {
     init();
     numLocMgr = n;
     locMgr = new CkGroupID[n];
     for (int i=0; i<n; ++i) locMgr[i] = gid[i];
+    maxSize = (CmiUInt8)size * 1024 * 1024;
+  }
+
+  CkCacheManager::CkCacheManager(int size, int n, CkGroupID *gid, int nWB, CkGroupID *gidWB) {
+    init();
+    numLocMgr = n;
+    locMgr = new CkGroupID[n];
+    for (int i=0; i<n; ++i) locMgr[i] = gid[i];
+    numLocMgrWB = nWB;
+    locMgrWB = new CkGroupID[nWB];
+    for (int i=0; i<n; ++i) locMgrWB[i] = gidWB[i];
     maxSize = (CmiUInt8)size * 1024 * 1024;
   }
 
@@ -162,9 +173,15 @@
       syncdChares = 1;
 
       localChares.reset();
+      localCharesWB.reset();
       for (int i=0; i<numLocMgr; ++i) {
         CkLocMgr *mgr = (CkLocMgr *)CkLocalBranch(locMgr[i]);
         mgr->iterate(localChares);
+      }
+      for (int i=0; i<numLocMgrWB; ++i) {
+        CkLocMgr *mgr = (CkLocMgr *)CkLocalBranch(locMgrWB[i]);
+        mgr->iterate(localChares);
+        mgr->iterate(localCharesWB);
       }
 
 #if COSMO_STATS > 0
@@ -179,6 +196,7 @@
       for (int chunk=0; chunk<numChunks; ++chunk) {
         CkAssert(cacheTable[chunk].empty());
         CkAssert(chunkAck[chunk]==0);
+        CkAssert(chunkAckWB[chunk]==0);
       }
       CkAssert(outStandingRequests.empty());
       storedData = 0;
@@ -186,14 +204,17 @@
       if (numChunks != _numChunks) {
         delete []cacheTable;
         delete []chunkAck;
+        delete []chunkAckWB;
         delete []chunkWeight;
         numChunks = _numChunks;
         cacheTable = new std::map<CkCacheKey,CkCacheEntry*>[numChunks];
         chunkAck = new int[numChunks];
+        chunkAckWB = new int[numChunks];
         chunkWeight = new CmiUInt8[numChunks];
       }
       for (int i=0; i<numChunks; ++i) {
         chunkAck[i] = localChares.count;
+        chunkAckWB[i] = localCharesWB.count;
         chunkWeight[i] = 0;
       }
       
@@ -204,6 +225,21 @@
 
     localIdx = localChares.registered.get(chareIdx);
     CkAssert(localIdx != 0);
+  }
+
+  void CkCacheManager::writebackChunk(int chunk) {
+    CkAssert(chunkAckWB[chunk] > 0);
+    if (--chunkAckWB[chunk] == 0) {
+      // we can safely write back the chunk to the senders
+      // at this point no more changes to the data can be made until next fetch
+
+      std::map<CkCacheKey,CkCacheEntry*>::iterator iter;
+      for (iter = cacheTable[chunk].begin(); iter != cacheTable[chunk].end(); iter++) {
+        CkCacheEntry *e = iter->second;
+        e->writeback();
+      }
+
+    }
   }
 
   void CkCacheManager::finishedChunk(int chunk, CmiUInt8 weight) {

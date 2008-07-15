@@ -273,6 +273,7 @@ public:
   virtual void * request(CkArrayIndexMax&, CkCacheKey) = 0;
   virtual void * unpack(CkCacheFillMsg *, int, CkArrayIndexMax &) = 0;
   virtual void writeback(CkArrayIndexMax&, CkCacheKey, void *) = 0;
+  virtual void free(void *) = 0;
   virtual int size(void *) = 0;
 };
 
@@ -291,6 +292,7 @@ public:
   
   bool requestSent;
   bool replyRecvd;
+  bool writtenBack;
 #if COSMO_STATS > 1
   /// total number of requests to this cache entry
   int totalRequests;
@@ -301,6 +303,7 @@ public:
   CkCacheEntry(CkCacheKey key, CkArrayIndex &home, CkCacheEntryType *type) {
     replyRecvd = false;
     requestSent = false;
+    writtenBack = false;
     data = NULL;
     this->key = key;
     this->home = home;
@@ -321,10 +324,15 @@ public:
 //      data->pupWriteBack(pp);
 //      home.(type->writebackFn)(msg);
 //    }
-    type->writeback(home, key, data);
+    if (!writtenBack) writeback();
 //    delete data;
+    type->free(data);
   }
 
+  inline void writeback() {
+    type->writeback(home, key, data);
+    writtenBack = true;
+  }
   //virtual void sendRequest() = 0;
 };
 
@@ -411,18 +419,28 @@ class CkCacheManager : public CBase_CkCacheManager {
   
   /// Number of chunks in which the cache is splitted
   int numChunks;
-  /// Number of chunks that have already been completele acknowledged
+  /// Number of chunks that have already been completely acknowledged
   int finishedChunks;
   
   /// A list of all the elements that are present in the local processor
   /// for the current iteration
   CkCacheArrayCounter localChares;
-  /// The number of arrays this Manager serves
-  int numLocMgr;
-  /// The group ids of the location managers of the arrays this Manager serves
-  CkGroupID *locMgr;
+  /// A list of all the elements that are present in the local processor
+  /// for the current iteration with respect to writeback
+  CkCacheArrayCounter localCharesWB;
   /// number of chares that have checked in for the next iteration
   int syncdChares;
+
+  /// The number of arrays this Manager serves without support for writeback
+  int numLocMgr;
+  /// The group ids of the location managers of the arrays this Manager serves
+  /// with support for writeback
+  CkGroupID *locMgr;
+  /// The number of arrays this Manager serves with support for writeback
+  int numLocMgrWB;
+  /// The group ids of the location managers of the arrays this Manager serves
+  /// with support for writeback
+  CkGroupID *locMgrWB;
 
 #if COSMO_STATS > 0
   /// particles arrived from remote processors, this counts only the entries in the cache
@@ -450,8 +468,10 @@ class CkCacheManager : public CBase_CkCacheManager {
   /// Maximum number of allowed data stored
   CmiUInt8 maxSize;
   
-  /// number of acknowledgements awaited before deleting the chunk of the tree
+  /// number of acknowledgements awaited before deleting the chunk
   int *chunkAck;
+  /// number of acknowledgements awaited before writing back the chunk
+  int *chunkAckWB;
 
   /// hash table containing all the entries currently in the cache
   std::map<CkCacheKey,CkCacheEntry*> *cacheTable;
@@ -469,8 +489,9 @@ class CkCacheManager : public CBase_CkCacheManager {
 
  public:
   
-  CkCacheManager(CkGroupID gid, int size);
-  CkCacheManager(int n, CkGroupID *gid, int size);
+  CkCacheManager(int size, CkGroupID gid);
+  CkCacheManager(int size, int n, CkGroupID *gid);
+  CkCacheManager(int size, int n, CkGroupID *gid, int nWB, CkGroupID *gidWB);
   CkCacheManager(CkMigrateMessage *m);
   ~CkCacheManager() {}
   void pup(PUP::er &p);
@@ -489,6 +510,9 @@ class CkCacheManager : public CBase_CkCacheManager {
 
   void cacheSync(int &numChunks, CkArrayIndexMax &chareIdx, int &localIdx);
 
+  /** Called from the TreePieces to acknowledge that a particular chunk
+      can be written back to the original senders */
+  void writebackChunk(int num);
   /** Called from the TreePieces to acknowledge that a particular chunk
       has been completely used, and can be deleted */
   void finishedChunk(int num, CmiUInt8 weight);
