@@ -84,6 +84,8 @@
 #endif
 
 static double ftTimer;
+
+int *rsh_pids=NULL;
                                                                                 
 double GetClock(void)
 {
@@ -878,6 +880,7 @@ typedef struct nodetab_host {
   pathfixlist pathfixes;
   char    *ext;  /*FIXME: What the heck is this?  OSL 9/8/00*/
   int      cpus;  /* # of physical CPUs*/
+  int      forks; /* number of processes to fork on remote node */
   int      rank;  /*Rank of this CPU*/
   double   speed; /*Relative speed of each CPU*/
   int      nice;  /* process priority */
@@ -914,6 +917,7 @@ void nodetab_reset(nodetab_host *h)
   h->ext = NULL;
   h->speed = 1.0;
   h->cpus = 1;
+  h->forks = 0;
   h->rank = 0;
   h->nice=-100;
   h->dataport=-1;
@@ -1884,6 +1888,52 @@ void req_one_client_partinit(int client){
 };
 #endif
 
+void req_set_client_connect(int start,int end) {
+	fd_set sockset;
+	ChMessage msg;
+	int client,i;
+	int done,maxdesc;
+	int *finished;
+	int curclient,curclientend,curclientstart;
+	
+	curclient=curclientend=curclientstart=start;
+
+	finished=malloc((end-start)*sizeof(int));
+	for(i=0;i<(end-start);i++)
+		finished[i]=0;
+
+	done=0;
+	while(!done) {
+		/* check server socket for messages */
+		while(curclientstart==curclientend||skt_select1(server_fd,1)!=0) {
+			errorcheck_one_client_connect(curclientend++);
+		}
+		/* check appropriate clients for messages */
+		for(client=curclientstart;client<curclientend;client++)
+			if(req_clients[client]>0) {
+				if(skt_select1(req_clients[client],1)!=0) {
+					ChMessage_recv(req_clients[client],&msg);
+					req_handle_initnode(&msg,req_clients[client]);
+					finished[client-start]=1;
+				}
+			}
+
+
+		/* test if done */
+		done=1;
+		for(i=curclientstart-start;i<(end-start);i++)
+			if(finished[i]==0) {
+				curclientstart=start+i;
+				done=0;
+				break;
+			}
+
+	}
+	ChMessage_free(&msg);
+
+	free(finished);
+}
+
 
 /* allow one client to connect */
 void req_one_client_connect(int client)
@@ -1945,6 +1995,8 @@ void req_client_connect(void)
 	nodeinfo_allocate();
 	req_nClients=nodetab_rank0_size;
 	req_clients=(SOCKET *)malloc(req_nClients*sizeof(SOCKET));
+	for(client=0;client<req_nClients;client++)
+		req_clients[client]=-1;
 	
 	skt_set_abort(client_connect_problem);
 	
@@ -1956,20 +2008,17 @@ void req_client_connect(void)
 		read_initnode_one_client(client);
 	}
 #else
-	for (client=0;client<req_nClients;client++)
-	{/*Wait for the next client to connect to our server port.*/
-		req_one_client_connect(client);
-	}
+	req_set_client_connect(0,req_nClients);
 #endif
 	
         if (portOk == 0) exit(1);
 	if (arg_verbose) printf("Charmrun> All clients connected.\n");
 #if CMK_USE_IBVERBS
-		exchange_qpdata_clients();
-		send_clients_nodeinfo_qpdata();
+	exchange_qpdata_clients();
+	send_clients_nodeinfo_qpdata();
 #else
 	for (client=0;client<req_nClients;client++)
-	  req_handle_initnodetab(NULL,req_clients[client]);
+		req_handle_initnodetab(NULL,req_clients[client]);
 #endif
 	if (arg_verbose) printf("Charmrun> IP tables sent.\n");
 }
@@ -1978,38 +2027,46 @@ void req_client_connect(void)
 
 void start_one_node_rsh(int rank0no);
 void finish_one_node(int rank0no);
+void finish_set_nodes(int start, int stop);
+
+
 
 void req_client_start_and_connect(void)
 {
 	int client, c;
 	int batch = arg_batch_spawn;	    /* fire several at a time */
+	int clientgroup,clientstart;
+	int counter;
 
 	nodeinfo_allocate();
 	req_nClients=nodetab_rank0_size;
 	req_clients=(SOCKET *)malloc(req_nClients*sizeof(SOCKET));
 	
 	skt_set_abort(client_connect_problem);
-	
-	for (c=0;c<req_nClients;c+=batch)
-	{/*Wait for the next client to connect to our server port.*/
-	    int count = batch;
-	    if (c+batch-1 >= req_nClients) count = req_nClients-c;
-	    for (client=c; client<c+count; client++) {
-		start_one_node_rsh(client);
-	    }
-	    for (client=c; client<c+count; client++) {
-		finish_one_node(client);
-            }
+
+	client=0;
+	while(client<req_nClients) { /* initiate a batch */
+		clientstart=client;
+
+		for(counter=0;counter<batch;counter++) { /* initiate batch number of nodes */
+			clientgroup=start_set_node_rsh(client);
+			client+=clientgroup;
+			if(client>=req_nClients) {
+				client=req_nClients;
+				break;
+			}
+		}
+		finish_set_nodes(clientstart,client);
+
 #if CMK_IBVERBS_FAST_START
-	    for (client=c; client<c+count; client++) {
-            	req_one_client_partinit(client);
-	    }
+		for (c=clientstart;c<client;c++) { 
+        		req_one_client_partinit(c);
+		}
 #else
-	    for (client=c; client<c+count; client++) {
-		req_one_client_connect(client);
-            }
+		req_set_client_connect(clientstart,client);
 #endif						
 	}
+
 
 #if CMK_IBVERBS_FAST_START
 	for (client=0;client<req_nClients;client++){
@@ -2020,14 +2077,14 @@ void req_client_start_and_connect(void)
 	if (arg_verbose) printf("Charmrun> All clients connected.\n");
 	
 #if CMK_USE_IBVERBS
-		exchange_qpdata_clients();	
-		send_clients_nodeinfo_qpdata();
+	exchange_qpdata_clients();	
+	send_clients_nodeinfo_qpdata();
 #else
-	
 	for (client=0;client<req_nClients;client++)
-	  req_handle_initnodetab(NULL,req_clients[client]);
+		req_handle_initnodetab(NULL,req_clients[client]);
 #endif	  
 	if (arg_verbose) printf("Charmrun> IP tables sent.\n");
+	free(rsh_pids); /* done with rsh_pids */
 }
 
 #endif
@@ -2644,6 +2701,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   fprintf(f,"NETSTART='%s';export NETSTART\n",netstart);
   fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",rank0no);
   fprintf(f,"CmiMyNodeSize='%d'; export CmiMyNodeSize\n",nodetab_getnodeinfo(rank0no)->cpus);
+  fprintf(f,"CmiMyForks='%d'; export CmiMyForks\n",nodetab_getnodeinfo(rank0no)->forks);
   fprintf(f,"CmiNumNodes='%d'; export CmiNumNodes\n",nodetab_rank0_size);
 #if CONVERSE_VERSION_VMI
   /* VMI environment variable */
@@ -2843,7 +2901,6 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   fprintf(f,"Exit 0\n");
 }
 
-int *rsh_pids=NULL;
 
 /* use the command "size" to get information about the position of the ".data"
    and ".bss" segments inside the program memory */
@@ -2957,53 +3014,70 @@ void start_one_node_rsh(int rank0no)
      rsh_pids[rank0no] = rsh_fork(pe,startScript);
 }
 
-void start_nodes_rsh()
-{
-  int rank0no;
-  rsh_pids=(int *)malloc(sizeof(int)*nodetab_rank0_size);
+int start_set_node_rsh(int client) {
+	/* a search function could be inserted here instead of sequential lookup for more complex node lists (e.g. interleaving) */
+	int clientgroup;
+#if CMK_SMP
+	clientgroup=client+1; /* smp already handles this functionality */
+#else
+	clientgroup=client;
+	do {
+		clientgroup++; /* add one more client to group if not greater than nodes and shares the same name as client */
+	} while(clientgroup<nodetab_rank0_size&&(!strcmp(nodetab_name(clientgroup),nodetab_name(client))));
+#endif
 
-  /*Start up the user program, by sending a message
-  to PE 0 on each node.*/
-  for (rank0no=0;rank0no<nodetab_rank0_size;rank0no++)
-  {
-     start_one_node_rsh(rank0no);
-  }
+	nodetab_getnodeinfo(client)->forks=clientgroup-client-1; /* already have 1 process launching */
+
+	start_one_node_rsh(client);
+	return clientgroup-client; /* return number of entries in group */
 }
 
-void finish_one_node(int rank0no)
+void start_nodes_rsh()
 {
-  const char *host=nodetab_name(nodetab_rank0_table[rank0no]);
-  int status=0;
-  if (!rsh_pids) return; /*nothing to do*/
-  if (arg_verbose) printf("Charmrun> waiting for remote shell (%s:%d), pid %d\n",
-		host,rank0no,rsh_pids[rank0no]);
-    /* on gcc4, charmrun hangs here waiting for rsh processors to finish
-       this should not cause any problem since gdb will kill residue processes
-    */
-  if (arg_debug_no_pause || arg_debug) ;
-  else {
-  do {
-     	waitpid(rsh_pids[rank0no],&status,0);
-  } while (!WIFEXITED(status));
-  if (WEXITSTATUS(status)!=0)
-  {
-     fprintf(stderr,"Charmrun> Error %d returned from rsh (%s:%d)\n",
-     		WEXITSTATUS(status),host,rank0no);
-     exit(1);
-  }     
-  }
+	int client,clientgroup;
+	rsh_pids=(int *)malloc(sizeof(int)*nodetab_rank0_size);
+
+	client=0;
+	while(client<nodetab_rank0_size) {
+		/* start a group of processes per node */
+		clientgroup=start_set_node_rsh(client);
+		client+=clientgroup;
+	}
+}
+
+void finish_set_nodes(int start, int stop) {
+	int status,done,i;
+	char *host;
+
+	if (!rsh_pids) return; /*nothing to do*/
+
+	done=0;
+	while(!done) {
+		done=1;
+		for(i=start;i<stop;i++) { /* check all nodes */
+			if(rsh_pids[i]!=0) {
+				done=0; /* we are not finished yet */
+				status=0;
+				waitpid(rsh_pids[i],&status,0); /* check if the process is finished */
+				if(WIFEXITED(status)) {
+					if (!WEXITSTATUS(status)) { /* good */
+						rsh_pids[i]=0; /* process is finished */
+					} else {
+  						host=nodetab_name(nodetab_rank0_table[i]);
+						fprintf(stderr,"Charmrun> Error %d returned from rsh (%s:%d)\n",
+						WEXITSTATUS(status),host,i);
+						exit(1);
+					} 
+				}
+			}
+		}
+	}
 }
 
 void finish_nodes()
 {
-  int rank0no;
-  if (!rsh_pids) return; /*nothing to do*/
-  /*Now wait for all the rsh'es to finish*/
-  for (rank0no=0;rank0no<nodetab_rank0_size;rank0no++)
-  {
-    finish_one_node(rank0no);
-  }
-  free(rsh_pids);
+	finish_set_nodes(0,nodetab_rank0_size);
+	free(rsh_pids);
 }
 
 void kill_nodes()

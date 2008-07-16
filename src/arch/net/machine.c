@@ -690,6 +690,30 @@ static int    Cmi_idlepoll;
 static int    Cmi_syncprint;
 static int Cmi_print_stats = 0;
 
+#if ! CMK_SMP
+/* parse forks only used in non-smp mode */
+static void parse_forks(void) {
+  char *forkstr;
+  int nread;
+  int forks;
+  int i,pid;
+  forkstr=getenv("CmiMyForks");
+  if(forkstr!=0) { /* charmrun */
+	nread = sscanf(forkstr,"%d",&forks);
+	for(i=1;i<=forks;i++) { /* by default forks = 0 */ 
+		pid=fork();
+		if(pid<0) CmiAbort("Fork returned an error");
+		if(pid==0) { /* forked process */
+			/* reset mynode,pe & exit loop */
+			_Cmi_mynode+=i;
+			_Cmi_mype+=i;
+			break;
+		}
+	}
+  }
+}
+#endif
+
 static void parse_netstart(void)
 {
   char *ns;
@@ -2573,6 +2597,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   skt_set_abort(net_default_skt_abort);
   atexit(machine_atexit_check);
   parse_netstart();
+#if ! CMK_SMP
+  /* only get forks in non-smp mode */
+  parse_forks();
+#endif
   extract_args(argv);
   log_init();
   Cmi_scanf_mutex = CmiCreateLock();
