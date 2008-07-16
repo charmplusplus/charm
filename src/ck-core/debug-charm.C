@@ -664,6 +664,9 @@ void CpdCharmInit()
 {
 }
 
+void CpdFinishInitialization() {
+}
+
 void CpdBeforeEp(int ep) {
 }
 
