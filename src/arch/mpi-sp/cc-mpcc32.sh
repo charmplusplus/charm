@@ -3,7 +3,7 @@ if [ "$OBJECT_MODE" != "32" ]
 then
 	echo "WARNING: Charm built in 32-bit mode, but OBJECT_MODE=$OBJECT_MODE"
 fi
-CMK_CC='mpcc_r -q32 '
+CMK_CC='mpcc_r -q32 -qcpluscmt '
 CMK_CXX='mpCC_r -q32 -qstaticinline '
 CMK_LD="mpcc_r -q32 -brtl"
 CMK_LDXX="mpCC_r -q32 -brtl"

@@ -4,7 +4,7 @@ then
         echo "WARNING: Charm built in 64-bit mode, but OBJECT_MODE=$OBJECT_MODE"
 fi
 
-CMK_CC='mpcc_r -q64 '
+CMK_CC='mpcc_r -q64 -qcpluscmt '
 CMK_CXX='mpCC_r -q64 -qstaticinline '
 CMK_LD="mpcc_r -q64 -brtl"
 CMK_LDXX="mpCC_r -q64 -brtl"
