@@ -22,15 +22,15 @@ added by Ryan Mokos in July 2008.
 
 #define CMK_THREADS_DEBUG 0
 
-// 0: use the old isomalloc implementation (array)
-// 1: use the new isomalloc implementation (b-tree)
+/* 0: use the old isomalloc implementation (array)
+   1: use the new isomalloc implementation (b-tree)  */
 #define USE_BTREE_ISOMALLOC 1
 
-// b-tree definitions
-#define TREE_NODE_SIZE 128 // a power of 2 is probably best
-#define TREE_NODE_MID  63  // must be cieling(TREE_NODE_SIZE / 2) - 1
+/* b-tree definitions */
+#define TREE_NODE_SIZE 128 /* a power of 2 is probably best  */
+#define TREE_NODE_MID  63  /* must be cieling(TREE_NODE_SIZE / 2) - 1  */
 
-// linked list definitions
+/* linked list definitions  */
 #define LIST_ARRAY_SIZE 64
 
 #include <fcntl.h>
@@ -107,14 +107,14 @@ static int length2slots(int nBytes) {
 
 #if USE_BTREE_ISOMALLOC
 
-// doubly-linked list node
+/* doubly-linked list node */
 struct _dllnode {
   struct _dllnode   *previous;
   struct _slotblock *sb;
   struct _dllnode   *next;
 };
 
-// slotblock
+/* slotblock */
 struct _slotblock {
   CmiInt8 startslot;
   CmiInt8 nslots;
@@ -124,7 +124,7 @@ struct _slotblock {
 typedef struct _dllnode   dllnode;
 typedef struct _slotblock slotblock;
 
-// b-tree node
+/* b-tree node */
 struct _btreenode {
   int num_blocks;
   slotblock blocks[TREE_NODE_SIZE];
@@ -132,13 +132,13 @@ struct _btreenode {
 };
 typedef struct _btreenode btreenode;
 
-// slotset
+/* slotset */
 typedef struct _slotset {
   btreenode *btree_root;
   dllnode *list_array[LIST_ARRAY_SIZE];
 } slotset;
 
-// return value for a b-tree insert
+/* return value for a b-tree insert */
 typedef struct _insert_ret_val {
   slotblock sb;
   btreenode *btn;
@@ -157,17 +157,17 @@ static int find_list_bin(CmiInt8 nslots) {
 
   while (1) {
     if ((nslots > (comp_num >> 1)) && (nslots <= comp_num)) {
-      // found it
+      /* found it */
       return list_bin;
     } else if (nslots < comp_num) {
-      // look left
+      /* look left  */
       list_bin -= inc;
       comp_num  = comp_num >> inc;
       if ((inc = inc >> 1) == 0) {
 	inc = 1;
       }
     } else {
-      // look right
+      /* look right */
       list_bin += inc;
       comp_num  = comp_num << inc;
       if ((inc = inc >> 1) == 0) {
@@ -186,10 +186,10 @@ static int find_list_bin(CmiInt8 nslots) {
 
 static dllnode *list_insert(slotset *ss, slotblock *sb) {
 
-  // find the list bin to put the new dllnode in
+  /* find the list bin to put the new dllnode in  */
   int list_bin = find_list_bin(sb->nslots);
 
-  // allocate memory for the new node
+  /* allocate memory for the new node */
   dllnode *new_dlln = (dllnode *)(malloc_reentrant(sizeof(dllnode)));
 
   // insert the dllnode
@@ -246,8 +246,8 @@ static void list_move(slotset *ss, dllnode *dlln, CmiInt8 old_nslots) {
   // if the old bin and new bin are different, move the slotblock
   if (new_bin != old_bin) {
 
-    // remove from old bin
-    if (dlln->previous == NULL) {  // dlln is the 1st element in the list
+    /* remove from old bin */
+    if (dlln->previous == NULL) {  /* dlln is the 1st element in the list */
       if (dlln->next != NULL) {
 	dlln->next->previous = NULL;
       }
@@ -579,8 +579,8 @@ static insert_ret_val btree_insert_int(slotset *ss, btreenode *node,
 static btreenode *btree_insert(slotset *ss, btreenode *node, 
 			       CmiInt8 startslot, CmiInt8 nslots) {
 
-  // check the b-tree root: if it's empty, insert the element in the
-  // first position
+  /* check the b-tree root: if it's empty, insert the element in the
+     first position */
   if (node->num_blocks == 0) {
 
     node->num_blocks          = 1;
@@ -622,11 +622,11 @@ static void btree_delete_int(slotset *ss, btreenode *node,
   int index, inc;
   int i;
 
-  // If sb is not NULL, we're sending sb down the tree to a leaf to be
-  // swapped with the next larger startslot so it can be deleted from
-  // a leaf node (deletions from non-leaf nodes are not allowed
-  // here).  At this point, the next larger startslot will always be
-  // found by taking the leftmost child.
+  /* If sb is not NULL, we're sending sb down the tree to a leaf to be
+     swapped with the next larger startslot so it can be deleted from
+     a leaf node (deletions from non-leaf nodes are not allowed
+     here).  At this point, the next larger startslot will always be
+     found by taking the leftmost child.  */
   if (sb != NULL) {
 
     if (node->child[0] != NULL) {
@@ -635,10 +635,10 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 
     } else {
 
-      // we're now at a leaf node, so the slotblock can be deleted
+      /* we're now at a leaf node, so the slotblock can be deleted
 
-      // first, copy slotblock 0 to the block passed down (sb) and
-      // delete the list array node
+         first, copy slotblock 0 to the block passed down (sb) and
+         delete the list array node  */
       list_delete(ss, sb);
       sb->startslot     = node->blocks[0].startslot;
       sb->nslots        = node->blocks[0].nslots;
@@ -717,15 +717,15 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 
   }
 
-  {   // BLOCK
-  // At this point, the desired slotblock has been removed, and we're
-  // going back up the tree.  We must check for deficient nodes that
-  // require the rotating or combining of elements to maintain a
-  // balanced b-tree.
+  {   /* BLOCK
+     At this point, the desired slotblock has been removed, and we're
+     going back up the tree.  We must check for deficient nodes that
+     require the rotating or combining of elements to maintain a
+     balanced b-tree. */
   int i;
   int def_child = -1;
 
-  // check if one of the child nodes is deficient
+  /* check if one of the child nodes is deficient  */
   if (node->child[index]->num_blocks < TREE_NODE_MID) {
     def_child = index;
   } else if (node->child[index+1]->num_blocks < TREE_NODE_MID) {
@@ -766,8 +766,8 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 	&(node->child[def_child]->blocks[0]);
       node->child[def_child]->num_blocks++;
 
-      // move the right-most child of the parent's left child to the
-      // left-most child of the formerly deficient child
+      /* move the right-most child of the parent's left child to the
+         left-most child of the formerly deficient child  */
       i = node->child[def_child-1]->num_blocks;
       node->child[def_child]->child[0] = 
 	node->child[def_child-1]->child[i];
@@ -804,13 +804,13 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 	&(node->child[def_child]->blocks[i]);
       node->child[def_child]->num_blocks++;
 
-      // move the left-most child of the parent's right child to the
-      // right-most child of the formerly deficient child
+      /* move the left-most child of the parent's right child to the
+         right-most child of the formerly deficient child  */
       i++;
       node->child[def_child]->child[i] = 
 	node->child[def_child+1]->child[0];
 
-      // move smallest element from right child up to the parent
+      /* move smallest element from right child up to the parent */
       node->blocks[def_child].startslot = 
 	node->child[def_child+1]->blocks[0].startslot;
       node->blocks[def_child].nslots = 
@@ -821,7 +821,7 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 	&(node->blocks[def_child]);
       node->child[def_child+1]->num_blocks--;
 
-      // move all elements in the parent's right child to the left
+      /* move all elements in the parent's right child to the left  */
       for (i = 0; i < node->child[def_child+1]->num_blocks; i++) {
 	node->child[def_child+1]->blocks[i].startslot = 
 	  node->child[def_child+1]->blocks[i+1].startslot;
@@ -839,9 +839,9 @@ static void btree_delete_int(slotset *ss, btreenode *node,
       }    // BLOCK
     }
 
-    // otherwise, merge the deficient node, parent, and the parent's
-    // other child (one of the deficient node's siblings) by dropping
-    // the parent down to the level of the children
+    /* otherwise, merge the deficient node, parent, and the parent's
+       other child (one of the deficient node's siblings) by dropping
+       the parent down to the level of the children */
     else {
 
       // move the parent element into the left child node
@@ -1163,7 +1163,7 @@ static void print_btree_node(btreenode *node, int node_num) {
   CmiPrintf("\n");
 }
 
-// returns 1 if there's another level to print; 0 if not
+/* returns 1 if there's another level to print; 0 if not */
 static int print_btree_level(btreenode *node, int level, int current_level, int node_num) {
   int i, another_level;
   for (i = 0; i <= node->num_blocks; i++) {
