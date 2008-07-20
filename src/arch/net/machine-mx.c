@@ -111,6 +111,7 @@ static void PumpMsgs(int getone);
 static void ReleaseSentMsgs(void);
 #if MX_ACTIVE_MESSAGE
 static void PumpEvents(int getone);
+static volatile int gotone = 0;
 #endif
 
 /******************************************************************************
@@ -309,6 +310,13 @@ static void PumpEvents(int getone) {
         else CmiFree(pm->data);
       }
       else if (pm->flag == 2) {                  /* recv */
+#if MX_ACTIVE_MESSAGE
+        if (status.msg_length == 4)  {
+         gotone ++;
+         CmiFree(pm->data);
+        }
+        else
+#endif
         processMessage(pm->data, status.msg_length);
       }
       else {
@@ -320,7 +328,7 @@ static void PumpEvents(int getone) {
   }
 }
 
-/* active message model */
+/* active message model, default */
 void recv_callback(void * context, uint64_t match_info, int length)
 {
   mx_segment_t buffer_desc;
@@ -680,30 +688,45 @@ static void sendBarrierMessage(int pe)
   mx_return_t rc;
   mx_status_t status;
   uint32_t result;
-  char msg[10];
+  char msg[4];
 
   OtherNode  node = nodes + pe;
   buffer_desc.segment_ptr = msg;
-  buffer_desc.segment_length = 10;
-  rc = mx_issend(endpoint, &buffer_desc, 1, node->endpoint_addr, MATCH_FILTER, NULL, &send_handle);
+  buffer_desc.segment_length = 4;
+  rc = mx_isend(endpoint, &buffer_desc, 1, node->endpoint_addr, MATCH_FILTER, NULL, &send_handle);
   do {
     rc = mx_test(endpoint, &send_handle, &status, &result);
-  } while (rc == MX_SUCCESS && !result);
+  } while (rc != MX_SUCCESS || result==0);
 }
 
 static void recvBarrierMessage()
 {
   mx_segment_t buffer_desc;
-  char msg[10];
+  char msg[4];
   mx_return_t rc;
   mx_status_t status;
   mx_request_t recv_handle;
   uint32_t result;
 
-  buffer_desc.segment_length = 10;
+#if MX_ACTIVE_MESSAGE
+  while (gotone == 0) {
+    mx_progress(endpoint);
+    PumpEvents(1);
+  }
+  gotone--;
+#else
+  do {
+  rc = mx_probe(endpoint, 100, MATCH_FILTER, MATCH_MASK, &status, &result);
+  } while (result == 0);
+  CmiAssert(status.msg_length == 4);
+
+  buffer_desc.segment_length = 4;
   buffer_desc.segment_ptr = msg;
   rc = mx_irecv(endpoint, &buffer_desc, 1, MATCH_FILTER, MATCH_MASK, NULL, &recv_handle);
+  do {
   rc = mx_wait(endpoint, &recv_handle, MX_INFINITE, &status, &result);
+  } while (rc!=MX_SUCCESS || result == 0);
+#endif
 }
 
 /* happen at node level */
