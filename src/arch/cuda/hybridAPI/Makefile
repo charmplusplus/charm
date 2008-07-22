@@ -1,4 +1,4 @@
-CHARMDIR=~/charm
+CHARMDIR=../../
 CHARMC=$(CHARMDIR)/bin/charmc
 
 NVCC = /usr/local/cuda/bin/nvcc
