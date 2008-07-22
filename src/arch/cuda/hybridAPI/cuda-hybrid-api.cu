@@ -29,23 +29,24 @@ workRequestQueue *wrQueue = NULL;
 /* setupMemory
    set up memory on the gpu for this kernel's execution */
 void setupMemory(workRequest *wr) {
-
   cudaMalloc((void **)&(wr->readWriteDevicePtr), wr->readWriteLen);
   cudaMalloc((void **)&(wr->readOnlyDevicePtr), wr->readOnlyLen); 
   cudaMalloc((void **)&(wr->writeOnlyDevicePtr), wr->writeOnlyLen);
-
+  
   cudaMemcpy(wr->readWriteDevicePtr, wr->readWriteHostPtr, wr->readWriteLen, 
 		  cudaMemcpyHostToDevice); 
   cudaMemcpy(wr->readOnlyDevicePtr, wr->readOnlyHostPtr, wr->readOnlyLen, 
 		  cudaMemcpyHostToDevice); 
+  
 } 
 
 /* cleanupMemory
    free memory no longer needed on the gpu */ 
 void cleanupMemory(workRequest *wr) {
-
+  
   cudaMemcpy(wr->readWriteHostPtr, wr->readWriteDevicePtr, wr->readWriteLen, cudaMemcpyDeviceToHost); 
-  cudaMemcpy(wr->writeOnlyHostPtr, wr->writeOnlyDevicePtr, wr->writeOnlyLen, cudaMemcpyHostToDevice); 
+  cudaMemcpy(wr->writeOnlyHostPtr, wr->writeOnlyDevicePtr, wr->writeOnlyLen, cudaMemcpyDeviceToHost); 
+  
 
   cudaFree(wr->readWriteDevicePtr); 
   cudaFree(wr->readOnlyDevicePtr); 
