@@ -690,7 +690,7 @@ static int    Cmi_idlepoll;
 static int    Cmi_syncprint;
 static int Cmi_print_stats = 0;
 
-#if ! CMK_SMP
+#if ! CMK_SMP && ! defined(_WIN32)
 /* parse forks only used in non-smp mode */
 static void parse_forks(void) {
   char *forkstr;
@@ -2597,7 +2597,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   skt_set_abort(net_default_skt_abort);
   atexit(machine_atexit_check);
   parse_netstart();
-#if ! CMK_SMP
+#if ! CMK_SMP && ! defined(_WIN32)
   /* only get forks in non-smp mode */
   parse_forks();
 #endif
