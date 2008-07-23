@@ -309,6 +309,15 @@ void CkSectionID::pup(PUP::er &p) {
 
 /**** Tiny random API routines */
 
+#ifdef CMK_CUDA
+void CUDACallbackManager(void *fn) {
+  CkPrintf("inside the callback manager\n"); 
+  CkCallback *cb = (CkCallback*) fn;
+  cb->send(); 
+}
+
+#endif
+
 extern "C"
 void CkSetRefNum(void *msg, int ref)
 {
