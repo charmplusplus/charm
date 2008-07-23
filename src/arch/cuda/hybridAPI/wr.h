@@ -47,8 +47,9 @@ typedef struct workRequest {
 
   /* to be called after the kernel finishes executing on the GPU */ 
 
-  void (*callbackFn)(); 
-
+  // void (*callbackFn)();
+  void *callbackFn; 
+ 
   /* id to select the correct kernel in kernelSelect */
 
   int id; 
