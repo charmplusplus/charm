@@ -349,6 +349,10 @@ int BgTimeLog::bDepExists(BgTimeLog* log){
   return 0;
 }
 
+#if defined(_WIN32)
+#define strcasecmp stricmp
+#endif
+
 void BgTimeLog::pup(PUP::er &p){
     int l=0,idx;
     int i;
