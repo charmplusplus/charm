@@ -64,7 +64,7 @@ void enqueue(workRequestQueue *q, workRequest *wr) {
     q->tail = 0; 
   }
 
-  memcpy(&q->requests[q->tail], &(*wr), sizeof(workRequest));
+  memcpy(&q->requests[q->tail], wr, sizeof(workRequest));
   free(wr); 
 
   q->size++; 

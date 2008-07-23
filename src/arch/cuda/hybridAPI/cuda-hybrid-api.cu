@@ -19,6 +19,8 @@
 
 workRequestQueue *wrQueue = NULL; 
 
+extern void CUDACallbackManager(void * fn); 
+
 /*
   TO DO
   stream 1 - kernel execution
@@ -88,7 +90,7 @@ void gpuProgressFn() {
     else if (cudaStreamQuery(0) == cudaSuccess ) {      
       cleanupMemory(wr);
       dequeue(wrQueue);
-      wr->callbackFn();
+      CUDACallbackManager(wr->callbackFn);
     }
       
   }
@@ -99,4 +101,5 @@ void gpuProgressFn() {
 */
 void exitHybridAPI() {
   deleteWRqueue(wrQueue); 
+
 }
