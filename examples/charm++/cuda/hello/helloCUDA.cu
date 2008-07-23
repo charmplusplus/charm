@@ -3,13 +3,12 @@
 #include "wr.h"
 
 extern workRequestQueue* wrQueue; 
-extern void kernelReturn(); 
 
 __global__ void helloKernel() { 
 
 }
 
-void kernelSetup() {
+void kernelSetup(void *cb) {
   workRequest *wr; 
   wr = (workRequest*) malloc(sizeof(workRequest)); 
 
@@ -29,7 +28,7 @@ void kernelSetup() {
   wr->writeOnlyHostPtr = NULL;
   wr->writeOnlyLen = 0; 
 
-  wr->callbackFn = kernelReturn; 
+  wr->callbackFn = cb; 
 
   wr->id = 0; 
 

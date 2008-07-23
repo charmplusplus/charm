@@ -5,15 +5,7 @@
 /*readonly*/ int nElements;
 /*readonly*/ CProxy_Hello arr; 
 
-int currentIndex; 
-
-extern void kernelSetup(); 
-
-void kernelReturn() {
-  printf("Kernel returned\n"); 
-  arr[currentIndex].SendHi(); 
-  //  sendHi(); 
-}
+extern void kernelSetup(void *cb); 
 
 /*mainchare*/
 class Main : public CBase_Main
@@ -32,8 +24,6 @@ public:
     mainProxy = thisProxy;
 
     arr = CProxy_Hello::ckNew(nElements);
-
-    currentIndex = 0; 
 
     arr[0].SayHi();
   };
@@ -58,10 +48,13 @@ public:
 
   void SayHi()
   {
-    currentIndex = thisIndex; 
+    CkArrayIndex1D myIndex = CkArrayIndex1D(thisIndex); 
+    CkCallback *cb; 
+    cb = new CkCallback(CkIndex_Hello::SendHi(), myIndex, thisArrayID); 
+
     CkPrintf("Hi from element %d\n", thisIndex);
     if (thisIndex < nElements-1)
-      kernelSetup(); 
+      kernelSetup((void *) cb); 
     else 
       //We've been around once-- we're done.
       mainProxy.done();
@@ -69,7 +62,7 @@ public:
 
   void SendHi() {
     //Pass the hello on:
-    CkPrintf("Executing sendHi\n"); 
+    CkPrintf("Sending a Hi Message\n"); 
     thisProxy[thisIndex+1].SayHi();
   }
 

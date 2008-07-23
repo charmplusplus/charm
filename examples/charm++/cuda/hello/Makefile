@@ -2,11 +2,11 @@ CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = hello.o helloCUDA.o
 
-NVCC = /usr/local/cuda/bin/nvcc
+NVCC = /usr/local/cuda/bin/nvcc 
 NVCC_FLAGS = -c -use_fast_math #-device-debug -deviceemu 
 NVCC_INC = -I/usr/local/cuda/include -I../../../../../NVIDIA_CUDA_SDK/common/inc
 
-LDLIBS += -lcuda -lcudart -lGL -lGLU -lcutil
+LD_LIBS += -lcuda -lcudart -lGL -lGLU -lcutil
 
 export LD_RUN_PATH = /usr/local/cuda/lib
 
