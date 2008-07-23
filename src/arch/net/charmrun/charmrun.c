@@ -2353,6 +2353,9 @@ void finish_nodes(void) {}
 void start_one_node_rsh(int rank0no) {}
 void finish_one_node(int rank0no) {}
 
+int start_set_node_rsh(int client) {}
+void finish_set_nodes(int start, int stop) {}
+
 void envCat(char *dest,LPTSTR oldEnv)
 {
   char *src=oldEnv;
