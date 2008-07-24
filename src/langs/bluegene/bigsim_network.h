@@ -1,3 +1,5 @@
+#ifndef __BLUE_NETWORK_H
+#define __BLUE_NETWORK_H
 
 const double CHARM_OVERHEAD = 0.5E-6;    // time to enqueue a msg - 0.5 us
 
@@ -161,4 +163,41 @@ public:
 };
 
 
+// Used for the Simple Latency model
+class ParamNetwork: public BigSimNetwork
+{
+private:
+  double bandwidth;        // in Bytes/second
+  double cost_per_packet;  // in seconds
+  int    packet_size;      // in bytes
+public:
+  ParamNetwork() {
+    myname = "parameter";
+    alpha = 0.123;
+    bandwidth = 0.0;
+    cost_per_packet = 0.0;
+    packet_size = 0;
+  }
+  void set_latency(double lat) {alpha = lat;}
+  void set_bandwidth(double bw) {bandwidth = bw;}
+  void set_cost_per_packet(double cpp) {cost_per_packet = cpp;}
+  void set_packet_size(int ps) {packet_size = ps;}
+  inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
+    double lat = 0.0;
+    if (cost_per_packet > 0.0) {
+      CmiAssert(packet_size != 0);
+      int num_packets = bytes / packet_size;
+      if (bytes > (num_packets * packet_size)) {  // ceiling of (bytes / packet_size)
+	num_packets++;
+      }
+      return (alpha + (bytes / bandwidth) + (cost_per_packet * num_packets));
+    }
+    return (alpha + (bytes / bandwidth));
+  }
+  void print() {
+    CmiPrintf("alpha: %e, bandwidth: %e, cost per packet: %e, packet size: %d\n", 
+	      alpha, bandwidth, cost_per_packet, packet_size);
+  }
+};
 
+#endif
