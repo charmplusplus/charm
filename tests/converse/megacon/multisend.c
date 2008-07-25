@@ -40,7 +40,7 @@ void multisend_handler(multisendmsg *msg,multisend_info *info)
   checkMsg(msg);
   /* Forward message back to master: */
   CmiSetHandler(msg, CpvAccess(multisend_done_index));
-  CmiSyncSendAndFree(0, sizeof(multisendmsg), msg);
+  CmiSyncSendAndFree(0, sizeof(multisendmsg)-sizeof(double)*msg->me, msg);
 }
 
 void multisend_done_handler(multisendmsg *msg)
