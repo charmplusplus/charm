@@ -171,20 +171,9 @@ public abstract class SymbolWithScope
             parent = getEnclosingScope().getFullyQualifiedName();
         }
         if ( parent!=null ) {
-            return parent + "::" + name;
-        }
-        return name;
-    }
-
-    public String getFullyQualifiedJavaName() 
-    {
-        String parent = null;
-        if ( getEnclosingScope()!=null ) {
-            parent = getEnclosingScope().getFullyQualifiedJavaName();
-        }
-        if ( parent!=null ) {
             return parent + "." + name;
         }
         return name;
     }
+
 }

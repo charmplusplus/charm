@@ -15,8 +15,6 @@ public interface Scope {
 
     public String getFullyQualifiedName();
 
-    public String getFullyQualifiedJavaName();    
-
     /** Return a Map of all contained members */
     public Map<String, Symbol> getMembers();
 

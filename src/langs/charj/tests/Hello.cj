@@ -1,4 +1,4 @@
-package tests.Hello;
+package tests;
 //import charj.lang.someObject;
 
 public class Hello {

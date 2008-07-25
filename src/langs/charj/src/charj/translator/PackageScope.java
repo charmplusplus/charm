@@ -26,8 +26,8 @@ public class PackageScope extends SymbolWithScope {
 
     /** See if type is already defined in this package.  If not, look
      *  for type on the disk in same package.  For example, first time
-     *  mantra::io::File fails to resolve.  Load from disk and put File
-     *  in package io which is in package mantra.  Next time, File will
+     *  charj.io.File fails to resolve.  Load from disk and put File
+     *  in package io which is in package charj.  Next time, File will
      *  be found.
      */
     public ClassSymbol resolveType(String type) 

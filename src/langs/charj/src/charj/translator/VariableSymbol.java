@@ -21,7 +21,7 @@ public class VariableSymbol extends Symbol {
         StringBuffer buf = new StringBuffer();
         if ( scope!=null ) {
             buf.append(scope.getScopeName());
-            buf.append("::");
+            buf.append(".");
         }
         buf.append(name);
         return buf.toString();

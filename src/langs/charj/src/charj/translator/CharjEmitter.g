@@ -107,7 +107,10 @@ charjSource[OutputMode m]
     this.m_mode = m;
     String closingBraces = "";
 }
-    :   ^(CHARJ_SOURCE (p=packageDeclaration)? (i+=importDeclaration)* (t+=typeDeclaration)*)
+    :   ^(CHARJ_SOURCE (p=packageDeclaration)? 
+        (i+=importDeclaration)* 
+        (t=typeDeclaration))
+        //(t+=typeDeclaration)*)
         {
             // construct string of }'s to close namespace 
             if ($p.st != null) {
@@ -120,10 +123,10 @@ charjSource[OutputMode m]
             }
         }
         -> {emitCC()}? charjSource_cc(
-            pd={$p.st}, ids={$i}, tds={$t}, cb={closingBraces})
-        -> {emitCI()}? charjSource_ci(pd={$p.st}, ids={$i}, tds={$t})
+            pd={$p.st}, ids={$i}, tds={$t.st}, cb={closingBraces})
+        -> {emitCI()}? charjSource_ci(pd={$p.st}, ids={$i}, tds={$t.st})
         -> {emitH()}? charjSource_h(
-            pd={$p.st}, ids={$i}, tds={$t}, cb={closingBraces})
+            pd={$p.st}, ids={$i}, tds={$t.st}, cb={closingBraces})
         ->
     ;
 
@@ -143,8 +146,8 @@ packageDeclaration
 importDeclaration
     :   ^(IMPORT STATIC? qualifiedIdentifier DOTSTAR?)
         -> {(emitCC() || emitH())}? importDeclaration_cc_h(
-            inc_id={$qualifiedIdentifier.text.replaceAll("[.]","/")},
-            use_id={$qualifiedIdentifier.text.replaceAll("[.]","::")})
+            inc_id={$qualifiedIdentifier.text.replace(".","/")},
+            use_id={$qualifiedIdentifier.text.replace(".","::")})
         ->
     ;
     

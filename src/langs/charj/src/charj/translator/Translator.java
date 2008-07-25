@@ -172,7 +172,7 @@ public class Translator {
 
     public File findPackage(String packageName)
     {
-        String packageDir = packageName.replaceAll("::", "/");
+        String packageDir = packageName.replace(".", "/");
         File p = new File(packageDir);
         if ( debug() ) System.out.println(
                 " [charj] findPackage " + packageName + 
@@ -220,7 +220,7 @@ public class Translator {
         try {
             String packageDir = ".";
             if ( packageName!=null ) {
-                packageDir = packageName.replaceAll("::", "/");
+                packageDir = packageName.replace(".", "/");
             }
             String fullName = packageDir + "/" + typeName + ".cj";
 		
@@ -234,7 +234,7 @@ public class Translator {
 
             if (debug()) System.out.println(
                     " \tloadType(" + typeName + "): parsing " + 
-                    packageName + "::" + typeName);
+                    packageName + "." + typeName);
             
             ANTLRInputStream fs = new ANTLRInputStream(
                     cl.getResourceAsStream(fullName));

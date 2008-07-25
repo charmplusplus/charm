@@ -315,7 +315,8 @@ charjSource
 compilationUnit
     :   packageDeclaration? 
         importDeclaration* 
-        typeDecls*
+        typeDecls
+        //typeDecls*
     ;
 
 typeDecls

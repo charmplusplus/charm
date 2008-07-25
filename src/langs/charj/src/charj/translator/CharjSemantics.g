@@ -130,10 +130,13 @@ charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
     symtab = _symtab;
     currentScope = symtab.getDefaultPkg();
 }
+    // TODO: go back to allowing multiple type definitions per file, check that
+    // there is exactly one public type and return that one.
     :   ^(CHARJ_SOURCE 
         (p=packageDeclaration)? 
         (i+=importDeclaration)* 
-        (t+=typeDeclaration)*)
+        (t=typeDeclaration))
+        //(t+=typeDeclaration)*)
         { $cs = null; }
     ;
 
@@ -142,6 +145,12 @@ packageDeclaration
     List<String> names = null; 
 }
     :   ^(PACKAGE qualifiedIdentifier)  {
+            String packageName = $qualifiedIdentifier.text;
+            PackageScope ps = symtab.resolvePackage(packageName);
+            if (ps == null) {
+                ps = symtab.definePackage(packageName);
+                symtab.addScope(ps);
+            }
             names =  java.util.Arrays.asList(
                     $qualifiedIdentifier.text.split("[.]"));
         }
@@ -198,45 +207,16 @@ classTopLevelScope
     ;
     
 classScopeDeclarations
-@init { boolean entry = false; }
     :   ^(CLASS_INSTANCE_INITIALIZER block)
     |   ^(CLASS_STATIC_INITIALIZER block)
     |   ^(FUNCTION_METHOD_DECL m=modifierList g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             tc=throwsClause? b=block?)
-        { 
-            // determine whether this is an entry method
-            entry = listContainsToken($m.start.getChildren(), ENTRY);
-//            CharjAST modList = (CharjAST)$m.start;
-//            for (CharjAST mod : (List<CharjAST>)modList.getChildren()) {
-//                if (mod.token.getType() == ENTRY) {
-//                    entry = true;
-//                }
-//            }
-        }
     |   ^(VOID_METHOD_DECL m=modifierList g=genericTypeParameterList? IDENT 
             f=formalParameterList t=throwsClause? b=block?)
-        { 
-            // determine whether this is an entry method
-            CharjAST modList = (CharjAST)$m.start;
-            for (CharjAST mod : (List<CharjAST>)modList.getChildren()) {
-                if (mod.token.getType() == ENTRY) {
-                    entry = true;
-                }
-            }
-        }
     |   ^(VAR_DECLARATION modifierList type variableDeclaratorList)
     |   ^(CONSTRUCTOR_DECL m=modifierList g=genericTypeParameterList? IDENT f=formalParameterList 
             t=throwsClause? b=block)
-        { 
-            // determine whether this is an entry method
-            CharjAST modList = (CharjAST)$m.start;
-            for (CharjAST mod : (List<CharjAST>)modList.getChildren()) {
-                if (mod.token.getType() == ENTRY) {
-                    entry = true;
-                }
-            }
-        }
     |   d=typeDeclaration
     ;
     

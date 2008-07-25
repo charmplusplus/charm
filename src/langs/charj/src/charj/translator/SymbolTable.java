@@ -9,7 +9,7 @@ public class SymbolTable {
     public static final List<String> AUTO_IMPORTS = 
         new ArrayList<String>() {
             {
-                add("charj::lang");
+                add("charj.lang");
                 add(DEFAULT_PACKAGE_NAME);
             }
         };
@@ -31,7 +31,7 @@ public class SymbolTable {
     /** This is the list of all scopes created during symbol table building. */
     public List scopes = new ArrayList();
 
-    /** Root of the object hierarchy, Charj::Object */
+    /** Root of the object hierarchy, Charj.Object */
     ClassSymbol objectRoot;
 
     public SymbolTable(Translator _translator) 
@@ -40,8 +40,7 @@ public class SymbolTable {
         // define default package
         defaultPkg = new PackageScope(this, DEFAULT_PACKAGE_NAME, null);
         topLevelPackageScopes.put(DEFAULT_PACKAGE_NAME, defaultPkg);
-        // define mantra::lang
-        PackageScope lang = definePkg("charj::lang");
+        PackageScope lang = definePackage("charj.lang");
         addScope(defaultPkg);
     }
 
@@ -51,7 +50,7 @@ public class SymbolTable {
 
     protected void initObjectHierarchy() 
     {
-        PackageScope lang = resolvePackage("charj::lang");
+        PackageScope lang = resolvePackage("charj.lang");
         objectRoot = new ClassSymbol(this, "Object", null, lang);
         objectRoot.define("EOF", new VariableSymbol(this,"EOF",null));
         lang.define("Object", objectRoot);
@@ -61,20 +60,20 @@ public class SymbolTable {
         return objectRoot.resolveType(type);
     }
 
-    /** Given a package like foo or charj::io, define it by breaking it up and
+    /** Given a package like foo or charj.io, define it by breaking it up and
      *  looking up the packages to left of last id.  Add last id to that 
      *  package.
      */
-    public PackageScope definePkg(String packageName) 
+    public PackageScope definePackage(String packageName) 
     {
-        String[] packageNames = packageName.split("::");
+        String[] packageNames = packageName.split("[.]");
         String outerPackageName = packageNames[0];
         PackageScope outerPackage = (PackageScope)defaultPkg.resolve(
                 outerPackageName);
         if ( outerPackage == null ) {
             if ( debug() ) {
                 System.out.println(
-                        " SymbolTable.definePkg(" + packageName + 
+                        " SymbolTable.definePackage(" + packageName + 
                         "): defining outer pkg: " + outerPackageName);
             }
             outerPackage = new PackageScope(this,outerPackageName,defaultPkg);
@@ -87,7 +86,7 @@ public class SymbolTable {
             PackageScope p = (PackageScope)enclosingPackage.resolve(pname);
             if ( p==null ) {
                 if ( debug() ) System.out.println(
-                        " SymbolTable.definePkg(" + packageName + 
+                        " SymbolTable.definePackage(" + packageName + 
                         "): defining inner pkg: " + pname +
                         " in "+enclosingPackage.toString());
                 
@@ -111,7 +110,7 @@ public class SymbolTable {
         if ( debug() ) System.out.println(
                 " SymbolTable.resolvePackage(" + packageName + 
                 "): examine: " + topLevelPackageScopes.keySet());
-        String[] packageNames = packageName.split("::");
+        String[] packageNames = packageName.split("[.]");
         String outerPackageName = packageNames[0];
         PackageScope enclosingPackage = topLevelPackageScopes.get(
                 outerPackageName);

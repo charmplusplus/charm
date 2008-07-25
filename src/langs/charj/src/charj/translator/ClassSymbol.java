@@ -89,7 +89,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         }
 
         if ( symtab.translator.findPackage(packageName) != null ) {
-            p = symtab.definePkg(packageName);
+            p = symtab.definePackage(packageName);
             imports.put(packageName, p);
         }
 
@@ -127,7 +127,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         return name;
     }
 
-    /** Using the list of imports, resolve a package name like charj::lang.
+    /** Using the list of imports, resolve a package name like charj.lang.
      *  There may be many packages defined and visible to the symbol table
      *  but this class can only see those packages in the implicit or explicit
      *  import list.
@@ -147,10 +147,11 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
      */
     public ClassSymbol resolveType(String type) 
     {
-        if ( debug() ) System.out.println(
+        if (debug()) System.out.println(
                 "ClassSymbol.resolveType(" + type + "): context is " + name +
                 ":" + members.keySet());
-        if ( type==null ) {
+
+        if (type == null) {
             return null;
         }
 
@@ -243,7 +244,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
             parent = scope.getFullyQualifiedName();
         }
         if ( parent!=null ) {
-            return parent+"::"+name;
+            return parent+"."+name;
         }
         return name;
     }

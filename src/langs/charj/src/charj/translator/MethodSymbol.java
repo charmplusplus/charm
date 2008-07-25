@@ -91,7 +91,7 @@ public class MethodSymbol
     public String toString() 
     {
         StringTemplate st = new StringTemplate(
-                "<if(parent)><parent>::<endif><name>(<args; separator=\",\">)" +
+                "<if(parent)><parent>.<endif><name>(<args; separator=\",\">)" +
                 "<if(locals)>{<locals; separator=\",\">}<endif>",
                 AngleBracketTemplateLexer.class);
         st.setAttribute("parent", enclosingScope.getScopeName());
