@@ -12,7 +12,7 @@ use Getopt::Std;
 my %opts;
 our($opt_s);
 my $result=getopts('sD:',\%opts);
-my $result=$opts{'s'};
+$opt_s=$opts{'s'};
 my $infile = shift @ARGV;
 my @otherfiles = @ARGV;
 my $inci = "$infile.ci";
