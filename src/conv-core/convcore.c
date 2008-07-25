@@ -177,6 +177,8 @@ void* elan_CmiAlloc(int size);
 #if CMK_USE_IBVERBS
 void *infi_CmiAlloc(int size);
 void infi_CmiFree(void *ptr);
+void infi_freeMultipleSend(void *ptr);
+void infi_unregAndFreeMeta(void *ch);
 #endif
 
 
@@ -2090,6 +2092,8 @@ typedef struct MultiMsg
   int origlen;
 }
 *MultiMsg;
+CpvDeclare(int, CmiMainHandlerIDP); /* Main handler that is run on every node */
+
 
 CpvDeclare(int, CmiMulticastHandlerIndex);
 
@@ -2281,7 +2285,7 @@ void CmiFree(void *blk)
     int size=SIZEFIELD(parentBlk);
     if (size > 1000000000) /* Absurdly large size field-- warning */
       CmiPrintf("MEMSTAT Uh-oh -- SIZEFIELD=%d\n",size);
-    CpvAccess(MemoryUsage) -= (size + sizeof(CmiChunkHeader);
+    CpvAccess(MemoryUsage) -= (size + sizeof(CmiChunkHeader));
     CpvAccess(BlocksAllocated)--;
 #endif
 
@@ -2290,7 +2294,14 @@ void CmiFree(void *blk)
 #elif CONVERSE_VERSION_VMI
     CMI_VMI_CmiFree(BLKSTART(parentBlk));
 #elif CMK_USE_IBVERBS
-		infi_CmiFree(BLKSTART(parentBlk));
+    /* is this message the head of a MultipleSend that we received?
+       Then the parts with INFIMULTIPOOL have metadata which must be 
+       unregistered and freed.  */
+    if(CmiGetHandler(parentBlk)==CpvAccess(CmiMainHandlerIDP))
+      {
+	infi_freeMultipleSend(parentBlk);
+      }
+    infi_CmiFree(BLKSTART(parentBlk));
 #elif CONVERSE_POOL
     CmiPoolFree(BLKSTART(parentBlk));
 #else
@@ -2401,7 +2412,9 @@ void CmiMkdir(const char *dirName) {
 
   ****************************************************************************/
 
-CpvDeclare(int, CmiMainHandlerIDP); /* Main handler that is run on every node */
+
+
+
 
 /****************************************************************************
 * DESCRIPTION : This function call allows the user to send multiple messages
@@ -2432,6 +2445,30 @@ typedef struct {
   int nMessages; /* Number of distinct messages bundled below. */
   double pad; /* To align the first message, which follows this header */
 } CmiMultipleSendHeader;
+
+#if CMK_USE_IBVERBS
+/* given a pointer to a multisend message clean up the metadata */
+
+void infi_freeMultipleSend(void *msgWhole)
+{
+  int len=((CmiMultipleSendHeader *)msgWhole)->nMessages;
+  int offset=sizeof(CmiMultipleSendHeader);
+  int m;
+  void *thisMsg=NULL;
+  for(m=0;m<len;m++)
+    {
+      /*unreg meta, free meta, move the ptr */
+      /* note these weird little things are not pooled */
+      /* do NOT free the message here, we are only a part of this buffer*/
+      infiCmiChunkHeader *ch=(infiCmiChunkHeader *)(msgWhole+offset);
+      char *msg=(msgWhole+offset+sizeof(infiCmiChunkHeader));
+      int msgSize=ch->chunkHeader.size; /* Size of user portion of message (plus padding at end) */
+      infi_unregAndFreeMeta(ch->metaData);
+      offset+= sizeof(infiCmiChunkHeader) + msgSize;
+    }
+}
+#endif
+
 
 static void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[], int immed)
 {
@@ -2478,6 +2515,7 @@ static void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *ms
 #if CMK_USE_IBVERBS
     msgHdr[m].chunkHeader.size=roundUpSize(sizes[m]); /* Size of message and padding */
     msgHdr[m].chunkHeader.ref=0; /* Reference count will be filled out on receive side */
+    msgHdr[m].metaData=NULL;
 #else
     msgHdr[m].size=roundUpSize(sizes[m]); /* Size of message and padding */
     msgHdr[m].ref=0; /* Reference count will be filled out on receive side */
@@ -2554,7 +2592,7 @@ static void CmiMultiMsgHandler(char *msgWhole)
     char *msg=(msgWhole+offset+sizeof(infiCmiChunkHeader));
     int msgSize=ch->chunkHeader.size; /* Size of user portion of message (plus padding at end) */
     ch->chunkHeader.ref=msgWhole-msg; 
-		ch->metaData =  registerMultiSendMesg(msg,msgSize);
+    ch->metaData =  registerMultiSendMesg(msg,msgSize);
 #else
     CmiChunkHeader *ch=(CmiChunkHeader *)(msgWhole+offset);
     char *msg=(msgWhole+offset+sizeof(CmiChunkHeader));

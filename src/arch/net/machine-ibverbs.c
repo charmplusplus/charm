@@ -386,6 +386,15 @@ static inline infiPacket newPacket(){
 
 
 
+void infi_unregAndFreeMeta(void *md)
+{
+  if(md!=NULL && (((infiCmiChunkMetaData *)md)->poolIdx == INFIMULTIPOOL))
+    {
+      ibv_dereg_mr(((infiCmiChunkMetaData*)md)->key);
+      free(((infiCmiChunkMetaData *)md));
+    }
+}
+
 
 /******************CmiMachineInit and its helper functions*/
 static inline int pollSendCq(const int toBuffer);
