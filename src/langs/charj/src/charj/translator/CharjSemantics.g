@@ -160,7 +160,7 @@ importDeclaration
     :   ^(IMPORT STATIC? qualifiedIdentifier DOTSTAR?)
     ;
     
-typeDeclaration
+typeDeclaration returns [ClassSymbol sym]
     :   ^(CLASS m=modifierList IDENT g=genericTypeParameterList? 
                 e=classExtendsClause? i=implementsClause? c=classTopLevelScope) 
     |   ^(INTERFACE modifierList IDENT genericTypeParameterList? 
