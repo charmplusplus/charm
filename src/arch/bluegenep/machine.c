@@ -11,17 +11,26 @@
 #include "assert.h"
 #include "malloc.h"
 
+#include <bpcore/ppc450_inlines.h>
+
 #include "dcmf.h"
 
 char *ALIGN_16(char *p) {
     return((char *)((((unsigned long)p)+0xf)&0xfffffff0));
 }
 
-CpvDeclare(PCQueue, broadcast_q);                 //queue to send broadcast messages
-
 #define PROGRESS_PERIOD 1024
 
-#define NODE_LEVEL_ST_IMPLEMENTATION 1
+//There are two roles of comm thread:
+// 1. polling other cores' bcast msg queue
+// 2. bcast msg is handled only by comm thd
+#define BCASTMSG_ONLY_TO_COMMTHD 0
+
+CpvDeclare(PCQueue, broadcast_q);                 //queue to send broadcast messages
+#if CMK_NODE_QUEUE_AVAILABLE
+CsvDeclare(PCQueue, node_bcastq);
+CsvDeclare(CmiNodeLock, node_bcastLock);
+#endif
 
 /*
     To reduce the buffer used in broadcast and distribute the load from
@@ -31,15 +40,21 @@ CpvDeclare(PCQueue, broadcast_q);                 //queue to send broadcast mess
   root.
 */
 #if CMK_SMP
-#define CMK_BROADCAST_SPANNING_TREE    1
+#define CMK_BROADCAST_SPANNING_TREE   1
 #else
 #define CMK_BROADCAST_SPANNING_TREE    1
 #define CMK_BROADCAST_HYPERCUBE        0
 #endif /* CMK_SMP */
 
-#define BROADCAST_SPANNING_FACTOR    4
+#define BROADCAST_SPANNING_FACTOR     4
 
+//The root of the message infers the type of the message
+// 1. root is 0, then it is a normal point-to-point message
+// 2. root is larger than 0 (>=1), then it is a broadcast message across all processors (cores)
+// 3. root is less than 0 (<=-1), then it is a broadcast message across all nodes
 #define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
+#define CMI_IS_BCAST_ON_CORES(msg) (CMI_BROADCAST_ROOT(msg) > 0)
+#define CMI_IS_BCAST_ON_NODES(msg) (CMI_BROADCAST_ROOT(msg) < 0)
 #define CMI_GET_CYCLE(msg)               ((CmiMsgHeaderBasic *)msg)->root
 
 #define CMI_DEST_RANK(msg)               ((CmiMsgHeaderBasic *)msg)->rank
@@ -100,12 +115,13 @@ CpvDeclare(void*, CmiLocalQueue);
 typedef struct ProcState {
     /* PCQueue      sendMsgBuf; */      /* per processor message sending queue */
     CmiNodeLock  recvLock;              /* for cs->recv */
+    CmiNodeLock bcastLock;
 } ProcState;
 
 static ProcState  *procState;
 
 #if CMK_SMP && !CMK_MULTICORE
-static int commThdExit = 0;
+static volatile int commThdExit = 0;
 static CmiNodeLock commThdExitLock = 0;
 #endif
 
@@ -144,7 +160,7 @@ static void CmiStartThreads(char **argv) {
 }
 #endif  /* !CMK_SMP */
 
-int received_immediate;
+//int received_immediate;
 //int received_broadcast;
 
 /*Add a message to this processor's receive queue, pe is a rank */
@@ -154,8 +170,9 @@ static void CmiPushPE(int pe,void *msg) {
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
         /**(CmiUInt2 *)msg = pe;*/
-        received_immediate = 1;
-        CMI_DEST_RANK(msg) = pe;
+        //received_immediate = 1;
+        //printf("PushPE: N[%d]P[%d]R[%d] received an imm msg with hdl: %p\n", CmiMyNode(), CmiMyPe(), CmiMyRank(), CmiGetHandler(msg));
+        //CMI_DEST_RANK(msg) = pe;
         CmiPushImmediateMsg(msg);
         return;
     }
@@ -180,7 +197,8 @@ static void CmiPushNode(void *msg) {
     MACHSTATE(3,"Pushing message into NodeRecv queue");
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
-        CMI_DEST_RANK(msg) = 0;
+        //printf("PushNode: N[%d]P[%d]R[%d] received an imm msg with hdl: %p\n", CmiMyNode(), CmiMyPe(), CmiMyRank(), CmiGetHandler(msg));
+        //CMI_DEST_RANK(msg) = 0;
         CmiPushImmediateMsg(msg);
         return;
     }
@@ -213,6 +231,9 @@ static void SendMsgsUntil(int);
 
 
 void SendSpanningChildren(int size, char *msg);
+#if CMK_NODE_QUEUE_AVAILABLE
+void SendSpanningChildrenNode(int size, char *msg);
+#endif
 void SendHypercube(int size, char *msg);
 
 DCMF_Protocol_t  cmi_dcmf_short_registration __attribute__((__aligned__(16)));
@@ -345,8 +366,8 @@ static void send_multi_done(void *data) {
     CmiFree(msg_tmp->msg);
     CmiFree(msg_tmp->pelist);
 
-    //free(data);
-    smsg_free (msg_tmp);
+    free(data);
+    //smsg_free (msg_tmp);
 
     msgQueueLen--;
 }
@@ -370,7 +391,7 @@ static void recv_done(void *clientdata) {
     }
 
 #if CMK_BROADCAST_SPANNING_TREE | CMK_BROADCAST_HYPERCUBE
-    if (CMI_BROADCAST_ROOT(msg) != 0) {
+    if (CMI_IS_BCAST_ON_CORES(msg) ) {
         int pe = CMI_DEST_RANK(msg);
 
         //printf ("%d: Receiving bcast message from %d with %d bytes for %d\n", CmiMyPe(), CMI_BROADCAST_ROOT(msg), sndlen, pe);
@@ -381,9 +402,9 @@ static void recv_done(void *clientdata) {
 
         //received_broadcast = 1;
 #if CMK_SMP
-        CmiLock(procState[pe].recvLock);
+        CmiLock(procState[pe].bcastLock);
         PCQueuePush(CpvAccessOther(broadcast_q, pe), copymsg);
-        CmiUnlock(procState[pe].recvLock);
+        CmiUnlock(procState[pe].bcastLock);
 #else
         PCQueuePush(CpvAccess(broadcast_q), copymsg);
 #endif
@@ -391,12 +412,30 @@ static void recv_done(void *clientdata) {
 #endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
+#if CMK_BROADCAST_SPANNING_TREE
+    if (CMI_IS_BCAST_ON_NODES(msg)) {
+        //printf ("%d: Receiving node bcast message from %d with %d bytes for %d\n", CmiMyPe(), CMI_BROADCAST_ROOT(msg), sndlen, CMI_DEST_RANK(msg));
+        char *copymsg = (char *)CmiAlloc(sndlen);
+        CmiMemcpy(copymsg,msg,sndlen);
+        //CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
+        CmiLock(CsvAccess(node_bcastLock));
+        PCQueuePush(CsvAccess(node_bcastq), copymsg);
+        CmiUnlock(CsvAccess(node_bcastLock));
+        //CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+    }
+#endif
     if (CMI_DEST_RANK(msg) == SMP_NODEMESSAGE)
         CmiPushNode(msg);
     else
 #endif
 
-       CmiPushPE(CMI_DEST_RANK(msg), (void *)msg);
+#if CMK_SMP && !CMK_MULTICORE && BCASTMSG_ONLY_TO_COMMTHD
+        if (CMI_DEST_RANK(msg)<_Cmi_mynodesize) { //not the comm thd
+            CmiPushPE(CMI_DEST_RANK(msg), (void *)msg);
+        }
+#else
+        CmiPushPE(CMI_DEST_RANK(msg), (void *)msg);
+#endif
 
     outstanding_recvs --;
 }
@@ -442,8 +481,42 @@ DCMF_Request_t * first_pkt_recv_done (void              * clientdata,
     return (DCMF_Request_t *) ALIGN_16(*buffer + sndlen);
 }
 
+
+#if CMK_NODE_QUEUE_AVAILABLE
+void sendBroadcastMessagesNode() {
+    if (PCQueueLength(CsvAccess(node_bcastq))==0) return;
+    //node broadcast message could be always handled by any cores (including
+    //comm thd) on this node
+    //CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
+    CmiLock(CsvAccess(node_bcastLock));
+    char *msg = PCQueuePop(CsvAccess(node_bcastq));
+    CmiUnlock(CsvAccess(node_bcastLock));
+    //CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+    while (msg) {
+#if CMK_BROADCAST_SPANNING_TREE
+        //printf("sendBroadcastMessagesNode: node %d rank %d with msg root %d\n", CmiMyNode(), CmiMyRank(), CMI_BROADCAST_ROOT(msg));
+        SendSpanningChildrenNode(((CmiMsgHeaderBasic *) msg)->size, msg);
+#endif
+        CmiFree(msg);
+        //CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
+        CmiLock(CsvAccess(node_bcastLock));
+        msg = PCQueuePop(CsvAccess(node_bcastq));
+        CmiUnlock(CsvAccess(node_bcastLock));
+        //CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+    }
+}
+#endif
+
 void sendBroadcastMessages() {
-   int toPullRank = CmiMyRank();
+#if !CMK_MULTICORE && !BCASTMSG_ONLY_TO_COMMTHD
+//in the presence of comm thd, and it is not responsible for broadcasting msg,
+//the comm thd will help to pull the msg from rank 0 which is predefined as the
+//core on a smp node to receive bcast msg.
+    int toPullRank = CmiMyRank();
+    if (CmiMyRank()==_Cmi_mynodesize) toPullRank = 0; //comm thd only pulls msg from rank 0
+#else
+    int toPullRank = CmiMyRank();
+#endif
     PCQueue toPullQ;
 
     /*
@@ -452,16 +525,21 @@ void sendBroadcastMessages() {
     else
       printf("Work thd [%d] on node [%d] is pulling bcast msg\n", CmiMyRank(), CmiMyNode());
     */
-
-#if CMK_SMP
-    CmiLock(procState[toPullRank].recvLock);
+#if !CMK_MULTICORE && !BCASTMSG_ONLY_TO_COMMTHD
+    toPullQ = CpvAccessOther(broadcast_q, toPullRank);
+#else
+    toPullQ = CpvAccess(broadcast_q);
 #endif
 
-   toPullQ = CpvAccess(broadcast_q);
+    if (PCQueueLength(toPullQ)==0) return;
+#if CMK_SMP
+    CmiLock(procState[toPullRank].bcastLock);
+#endif
+
     char *msg = (char *) PCQueuePop(toPullQ);
 
 #if CMK_SMP
-    CmiUnlock(procState[toPullRank].recvLock);
+    CmiUnlock(procState[toPullRank].bcastLock);
 #endif
 
     while (msg) {
@@ -475,14 +553,18 @@ void sendBroadcastMessages() {
         CmiFree (msg);
 
 #if CMK_SMP
-        CmiLock(procState[toPullRank].recvLock);
+        CmiLock(procState[toPullRank].bcastLock);
 #endif
 
-       toPullQ = CpvAccess(broadcast_q);
+#if !CMK_MULTICORE && !BCASTMSG_ONLY_TO_COMMTHD
+        toPullQ = CpvAccessOther(broadcast_q, toPullRank);
+#else
+        toPullQ = CpvAccess(broadcast_q);
+#endif
         msg = (char *) PCQueuePop(toPullQ);
 
 #if CMK_SMP
-        CmiUnlock(procState[toPullRank].recvLock);
+        CmiUnlock(procState[toPullRank].bcastLock);
 #endif
     }
 }
@@ -572,14 +654,15 @@ extern void        bgl_machine_RectBcastInit  (unsigned               commID,
 //--------------------------------------------------------------
 #endif
 
-
 //approx sleep command
-int mysleep (int sec) {
-    unsigned long long niter = sec * 1000000000ULL, count = 0;
+void mysleep (int cycles) {
+    unsigned long long start = DCMF_Timebase();
+    unsigned long long end = start + cycles;
 
-    for (count = 0; count < niter; count++);
+    while (start < end)
+        start = DCMF_Timebase();
 
-    return count;
+    return;
 }
 
 static void * test_buf;
@@ -679,14 +762,23 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     CsvInitialize(CmiNodeState, NodeState);
     CmiNodeStateInit(&CsvAccess(NodeState));
 
+#if CMK_NODE_QUEUE_AVAILABLE
+    CsvInitialize(PCQueue, node_bcastq);
+    CsvAccess(node_bcastq) = PCQueueCreate();
+    CsvInitialize(CmiNodeLock, node_bcastLock);
+    CsvAccess(node_bcastLock) = CmiCreateLock();
+#endif
+
     int actualNodeSize = _Cmi_mynodesize;
 #if !CMK_MULTICORE
     actualNodeSize++; //considering the extra comm thread
 #endif
+
     procState = (ProcState *)CmiAlloc((actualNodeSize) * sizeof(ProcState));
     for (i=0; i<actualNodeSize; i++) {
         /*    procState[i].sendMsgBuf = PCQueueCreate();   */
         procState[i].recvLock = CmiCreateLock();
+        procState[i].bcastLock = CmiCreateLock();
     }
 
 #if CMK_SMP && !CMK_MULTICORE
@@ -758,7 +850,7 @@ void ConverseRunPE(int everReturn) {
     /* communication thread */
     if (CmiMyRank() == CmiMyNodeSize()) {
         Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-        while (1) CommunicationServerThread(5);
+        while (1) CommunicationServer(5);
     } else {
         //printf ("Calling Start Fn and the scheduler \n");
 
@@ -808,9 +900,11 @@ void ConverseExit(void) {
 //  CmiNodeAllBarrier ();
 
 #if CMK_SMP && !CMK_MULTICORE
-    CmiLock(commThdExitLock);
+    //CmiLock(commThdExitLock);
     commThdExit = 1;
-    CmiUnlock(commThdExitLock);
+    //CmiUnlock(commThdExitLock);
+
+    _bgp_msync();
 #endif
 
     int rank0 = 0;
@@ -847,7 +941,7 @@ void CmiAbort(const char * message) {
 
 static void CommunicationServer(int sleepTime) {
 #if CMK_SMP && !CMK_MULTICORE
-    CmiLock(commThdExitLock);
+    //CmiLock(commThdExitLock);
     if (commThdExit) {
         while (msgQueueLen > 0 || outstanding_recvs > 0) {
             AdvanceCommunications();
@@ -856,9 +950,15 @@ static void CommunicationServer(int sleepTime) {
         pthread_exit(NULL);
         return;
     }
-    CmiUnlock(commThdExitLock);
+    //CmiUnlock(commThdExitLock);
 #endif
     AdvanceCommunications();
+
+#if CMK_IMMEDIATE_MSG && CMK_SMP && !CMK_MULTICORE
+    CmiHandleImmediate();
+#endif
+
+    //mysleep(sleepTime);
 }
 
 static void CommunicationServerThread(int sleepTime) {
@@ -898,14 +998,24 @@ void *CmiGetNonLocal() {
     /* although it seems that lock is not needed, I found it crashes very often
        on mpi-smp without lock */
 
+#if !CMK_SMP || CMK_MULTICORE  /*|| !BCASTMSG_ONLY_TO_COMMTHD*/
+//ChaoMei changes
     AdvanceCommunications();
+#endif
 
     /*if(CmiMyRank()==0) printf("Got stuck here on proc[%d] node[%d]\n", CmiMyPe(), CmiMyNode());*/
 
+    if (PCQueueLength(cs->recv)==0) return NULL;
+
+#if CMK_SMP
     CmiLock(procState[cs->rank].recvLock);
+#endif
 
     msg =  PCQueuePop(cs->recv);
+
+#if CMK_SMP
     CmiUnlock(procState[cs->rank].recvLock);
+#endif
 
     return msg;
 }
@@ -914,13 +1024,15 @@ static void CmiSendSelf(char *msg) {
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
         /* CmiBecomeNonImmediate(msg); */
+        //printf("In SendSelf, N[%d]P[%d]R[%d] received an imm msg with hdl: %p\n", CmiMyNode(), CmiMyPe(), CmiMyRank(), CmiGetHandler(msg));
         CmiPushImmediateMsg(msg);
+#if CMK_MULTICORE
         CmiHandleImmediate();
+#endif
         return;
     }
 #endif
-
-    CQdCreate(CpvAccess(cQdState), 1);
+    
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),msg);
 }
 
@@ -932,21 +1044,18 @@ static void CmiSendPeer (int rank, int size, char *msg) {
         copymsg = (char *)CmiAlloc(size);
         CmiMemcpy(copymsg,msg,size);
 
-        CmiLock(procState[rank].recvLock);
+        CmiLock(procState[rank].bcastLock);
         PCQueuePush(CpvAccessOther(broadcast_q, rank), copymsg);
-        CmiUnlock(procState[rank].recvLock);
+        CmiUnlock(procState[rank].bcastLock);
     }
 #endif
-
-    CQdCreate(CpvAccess(cQdState), 1);
+    
     CmiPushPE (rank, msg);
 }
 #endif
 
 
-void machineSend(SMSG_LIST *msg_tmp) {
-
-    CQdCreate(CpvAccess(cQdState), 1);
+void machineSend(SMSG_LIST *msg_tmp) {    
 
     if (msg_tmp->destpe == CmiMyNode())
         CmiAbort("Sending to self\n");
@@ -974,6 +1083,15 @@ void machineSend(SMSG_LIST *msg_tmp) {
                DCMF_MATCH_CONSISTENCY, msg_tmp->destpe,
                msg_tmp->size, msg_tmp->msg, &msg_tmp->info, 1);
 
+/*    
+    #if CMK_SMP && !CMK_MULTICORE
+    //Adding this advance call here improves the SMP performance
+    //a little bit although it is possible that some more bugs are
+    //introduced
+    DCMF_Messager_advance();
+    #endif
+*/
+
 #if CMK_SMP
     DCMF_CriticalSection_exit (0);
 #endif
@@ -994,8 +1112,21 @@ void  CmiGeneralFreeSend(int destPE, int size, char* msg) {
         return;
     }
 
-   //printf ("%d: Sending Message to %d \n", CmiMyPe(), destPE);
+#if CMK_SMP && !CMK_MULTICORE && BCASTMSG_ONLY_TO_COMMTHD
+    //In the presence of comm thd which is responsible for sending bcast msgs, then
+    //CmiNodeOf and CmiRankOf may return incorrect information if the destPE is considered
+    //as a comm thd.
+    if (destPE >= _Cmi_numpes) { //destination is a comm thd
+        int nid = destPE - _Cmi_numpes;
+        int rid = _Cmi_mynodesize;
+        CmiGeneralFreeSendN (nid, rid, size, msg);
+    } else {
+        CmiGeneralFreeSendN (CmiNodeOf (destPE), CmiRankOf (destPE), size, msg);
+    }
+#else
+    //printf ("%d: Sending Message to %d \n", CmiMyPe(), destPE);
     CmiGeneralFreeSendN (CmiNodeOf (destPE), CmiRankOf (destPE), size, msg);
+#endif
 }
 
 void CmiGeneralFreeSendN (int node, int rank, int size, char * msg) {
@@ -1005,7 +1136,7 @@ void CmiGeneralFreeSendN (int node, int rank, int size, char * msg) {
 
 #if CMK_SMP
     CMI_DEST_RANK(msg) = rank;
-    CMI_SET_CHECKSUM(msg, size);
+    //CMI_SET_CHECKSUM(msg, size);
 
     if (node == CmiMyNode()) {
         CmiSendPeer (rank, size, msg);
@@ -1025,10 +1156,14 @@ void CmiSyncSendFn(int destPE, int size, char *msg) {
     char *copymsg;
     copymsg = (char *)CmiAlloc(size);
     CmiMemcpy(copymsg,msg,size);
+    //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiSyncSendFn on comm thd on node %d\n", CmiMyNode());
     CmiFreeSendFn(destPE,size,copymsg);
 }
 
-void CmiFreeSendFn(int destPE, int size, char *msg) {
+void CmiFreeSendFn(int destPE, int size, char *msg) {    
+    CQdCreate(CpvAccess(cQdState), 1);
+    //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiFreeSendFn on comm thd on node %d\n", CmiMyNode());
+
     CMI_SET_BROADCAST_ROOT(msg,0);
     CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
     ((CmiMsgHeaderBasic *)msg)->size = size;
@@ -1052,26 +1187,35 @@ void CmiSyncSendFn1(int destPE, int size, char *msg) {
     CmiGeneralFreeSend(destPE,size,copymsg);
 }
 
-
+#define NODE_LEVEL_ST_IMPLEMENTATION 1
 #if NODE_LEVEL_ST_IMPLEMENTATION
 //send msgs to other ranks except the rank specified in the argument
 static void CmiSendChildrenPeers(int rank, int size, char *msg) {
     //printf ("%d [%d]: Send children peers except rank %d\n",  CmiMyPe(), CmiMyNode(), CmiMyRank());
     int r=0;
 
+//With comm thd, broadcast msg will be pulled from bcast queue from the comm thd
+//And the msg would be finally pushed into other cores on the same node by the
+//comm thd. But it's possible a msg has already been pushed into rank 0 in
+//recv_done func call. So there's no need to push the bcast msg into the recv
+//queue again in the case BCASTMSG_ONLY_TO_COMMTHD is not set
+
+#if !CMK_MULTICORE && !BCASTMSG_ONLY_TO_COMMTHD
+    //indicate this is called from comm thread.
+    if (rank == _Cmi_mynodesize) r = 1;
+#endif
+
     for (;r<rank; r++) {
         char *copymsg;
         copymsg = (char *)CmiAlloc(size);
-        CmiMemcpy(copymsg,msg,size);
-        CQdCreate(CpvAccess(cQdState), 1);
+        CmiMemcpy(copymsg,msg,size);        
         CmiPushPE (r, copymsg);
     }
 
     for (r=rank+1; r<_Cmi_mynodesize; r++) {
         char *copymsg;
         copymsg = (char *)CmiAlloc(size);
-        CmiMemcpy(copymsg,msg,size);
-        CQdCreate(CpvAccess(cQdState), 1);
+        CmiMemcpy(copymsg,msg,size);        
         CmiPushPE (r, copymsg);
     }
 }
@@ -1103,7 +1247,11 @@ void SendSpanningChildren(int size, char *msg) {
         nid += startNid;
         nid = nid%_Cmi_numnodes;
         CmiAssert(nid>=0 && nid<_Cmi_numnodes && nid!=thisNid);
+#if CMK_SMP && !CMK_MULTICORE && BCASTMSG_ONLY_TO_COMMTHD
+        int p = nid + _Cmi_numpes;
+#else
         int p = CmiNodeFirst(nid);
+#endif
         //printf ("%d [%d]: Sending Spanning Tree Msg to %d\n",  CmiMyPe(), CmiMyNode(), p);
         CmiSyncSendFn1(p, size, msg);
     }
@@ -1166,6 +1314,7 @@ void CmiSyncBroadcastFn(int size, char *msg) {
     char *copymsg;
     copymsg = (char *)CmiAlloc(size);
     CmiMemcpy(copymsg,msg,size);
+    //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiSyncBroadcastFn on comm thd on node %d\n", CmiMyNode());
     CmiFreeBroadcastFn(size,copymsg);
 }
 
@@ -1174,13 +1323,18 @@ void CmiFreeBroadcastFn(int size, char *msg) {
     //printf("%d: Calling Broadcast %d\n", CmiMyPe(), size);
 
     CmiState cs = CmiGetState();
-#if CMK_BROADCAST_SPANNING_TREE
+#if CMK_BROADCAST_SPANNING_TREE    
+    CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);
+    //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiFreeBroadcastFn on comm thd on node %d\n", CmiMyNode());
+
     //printf ("%d: Starting Spanning Tree Broadcast of size %d bytes\n", CmiMyPe(), size);
 
     CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
     SendSpanningChildren(size, msg);
     CmiFree(msg);
-#elif CMK_BROADCAST_HYPERCUBE
+#elif CMK_BROADCAST_HYPERCUBE    
+    CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);
+
     CMI_SET_CYCLE(msg, 0);
     SendHypercube(size, msg);
     CmiFree(msg);
@@ -1201,6 +1355,7 @@ void CmiSyncBroadcastAllFn(int size, char *msg) {
     char *copymsg;
     copymsg = (char *)CmiAlloc(size);
     CmiMemcpy(copymsg,msg,size);
+    //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiSyncBroadcastAllFn on comm thd on node %d\n", CmiMyNode());
     CmiFreeBroadcastAllFn(size,copymsg);
 }
 
@@ -1212,14 +1367,21 @@ void CmiFreeBroadcastAllFn(int size, char *msg) {
 #if CMK_BROADCAST_SPANNING_TREE
 
     //printf ("%d: Starting Spanning Tree Broadcast of size %d bytes\n", CmiMyPe(), size);
+    //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiFreeBroadcastAllFn on comm thd on node %d\n", CmiMyNode());
 
     CmiSyncSendFn(cs->pe,size,msg);
+    
+    CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);
+
     CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
     SendSpanningChildren(size, msg);
     CmiFree(msg);
 
 #elif CMK_BROADCAST_HYPERCUBE
     CmiSyncSendFn(cs->pe,size,msg);
+    
+    CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);
+
     CMI_SET_CYCLE(msg, 0);
     SendHypercube(size, msg);
     CmiFree(msg);
@@ -1247,6 +1409,7 @@ void AdvanceCommunications() {
     DCMF_CriticalSection_enter (0);
 #endif
 
+    //while(DCMF_Messager_advance()>0);
     DCMF_Messager_advance();
 
 #if CMK_SMP
@@ -1254,12 +1417,12 @@ void AdvanceCommunications() {
 #endif
 
     sendBroadcastMessages();
+#if CMK_NODE_QUEUE_AVAILABLE
+    sendBroadcastMessagesNode();
+#endif
 
-#if CMK_IMMEDIATE_MSG
-    if (received_immediate) {
-        received_immediate = 0;
-        CmiHandleImmediate();
-    }
+#if CMK_IMMEDIATE_MSG && CMK_MULTICORE
+    CmiHandleImmediate();
 #endif
 }
 
@@ -1272,7 +1435,9 @@ static void SendMsgsUntil(int targetm) {
 }
 
 void CmiNotifyIdle() {
+#if !CMK_SMP || CMK_MULTICORE
     AdvanceCommunications();
+#endif
 }
 
 
@@ -1331,26 +1496,33 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg) {
 }
 
 void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
+#if CMK_SMP && !CMK_MULTICORE
+    //DCMF_CriticalSection_enter (0);
+#endif
     CMI_SET_BROADCAST_ROOT(msg,0);
     CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
     ((CmiMsgHeaderBasic *)msg)->size = size;
     CMI_SET_CHECKSUM(msg, size);
+
+    //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiFreeListSendFn on comm thd on node %d\n", CmiMyNode());
 
     //printf("%d: In Free List Send Fn\n", CmiMyPe());
     int new_npes = 0;
 
     int i, count = 0, my_loc = -1;
     for (i=0; i<npes; i++) {
-        if (pes[i] == CmiMyPe()) {
+        //if (pes[i] == CmiMyPe() || CmiNodeOf(pes[i]) == CmiMyNode()) {
+        if (CmiNodeOf(pes[i]) == CmiMyNode()) {
             CmiSyncSend(pes[i], size, msg);
-            my_loc = i;
+            //my_loc = i;
         }
     }
 
     for (i=0;i<npes;i++) {
-        if (pes[i] == CmiMyPe());
+        //if (pes[i] == CmiMyPe() || CmiNodeOf(pes[i]) == CmiMyNode());
+        if (CmiNodeOf(pes[i]) == CmiMyNode());
         else if (i < npes - 1) {
-#if !CMK_SMP
+#if !CMK_SMP /*|| (CMK_SMP && !CMK_MULTICORE)*/
             CmiReference(msg);
             CmiGeneralFreeSend(pes[i], size, msg);
 #else
@@ -1359,12 +1531,16 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
         }
     }
 
-    if (npes  && (pes[npes-1] != CmiMyPe()))
-        CmiSyncSendAndFree(pes[npes-1], size, msg);
+    //if (npes  && (pes[npes-1] != CmiMyPe() && CmiNodeOf(pes[i]) != CmiMyNode()))
+    if (npes  && CmiNodeOf(pes[npes-1]) != CmiMyNode())
+        CmiSyncSendAndFree(pes[npes-1], size, msg); //Sameto CmiFreeSendFn
     else
         CmiFree(msg);
 
     //AdvanceCommunications();
+#if CMK_SMP && !CMK_MULTICORE
+    //DCMF_CriticalSection_exit (0);
+#endif
 }
 
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int size, char *msg) {
@@ -1488,17 +1664,17 @@ extern int CmiBarrier() {
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
-
 static void CmiSendNodeSelf(char *msg) {
 #if CMK_IMMEDIATE_MSG
-    if (CmiIsImmediate(msg) && !_immRunning) {
-        /*CmiHandleImmediateMessage(msg); */
+    if (CmiIsImmediate(msg)) {
+        //printf("SendNodeSelf: N[%d]P[%d]R[%d] received an imm msg with hdl: %p\n", CmiMyNode(), CmiMyPe(), CmiMyRank(), CmiGetHandler(msg));
         CmiPushImmediateMsg(msg);
+#if CMK_MULTICORE
         CmiHandleImmediate();
+#endif
         return;
     }
-#endif
-    CQdCreate(CpvAccess(cQdState), 1);
+#endif    
     CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
     PCQueuePush(CsvAccess(NodeState).NodeRecv, msg);
     CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
@@ -1509,38 +1685,19 @@ CmiCommHandle CmiAsyncNodeSendFn(int dstNode, int size, char *msg) {
 }
 
 void CmiFreeNodeSendFn(int node, int size, char *msg) {
-    int i = 0;
 
     CMI_SET_BROADCAST_ROOT(msg,0);
     CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
     ((CmiMsgHeaderBasic *)msg)->size = size;
     CMI_SET_CHECKSUM(msg, size);
+    //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiFreeNodeSendFn on comm thd on node %d\n", CmiMyNode());
+    
+    CQdCreate(CpvAccess(cQdState), 1);
 
-    char *dupmsg;
-
-    switch (node) {
-    case NODE_BROADCAST_ALL:
-        dupmsg = (char *)CmiAlloc(size);
-        CmiMemcpy(dupmsg, msg, size);
-        CmiSendNodeSelf(dupmsg);
-    case NODE_BROADCAST_OTHERS:
-        for (i=0; i<_Cmi_numnodes; i++)
-            if (i!=_Cmi_mynode) {
-                dupmsg = (char *)CmiAlloc(size);
-                CmiMemcpy(dupmsg, msg, size);
-                CmiGeneralFreeSendN(i, SMP_NODEMESSAGE, size, dupmsg);
-            }
-
-        CmiFree (msg);
-        break;
-
-    default:
-        if (node == _Cmi_mynode) {
-            CmiSendNodeSelf(msg);
-        } else {
-            CmiGeneralFreeSendN(node, SMP_NODEMESSAGE, size, msg);
-        }
-        break;
+    if (node == _Cmi_mynode) {
+        CmiSendNodeSelf(msg);
+    } else {
+        CmiGeneralFreeSendN(node, SMP_NODEMESSAGE, size, msg);
     }
 }
 
@@ -1548,44 +1705,99 @@ void CmiSyncNodeSendFn(int p, int s, char *m) {
     char *dupmsg;
     dupmsg = (char *)CmiAlloc(s);
     CmiMemcpy(dupmsg,m,s);
+    //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiSyncNodeSendFn on comm thd on node %d\n", CmiMyNode());
     CmiFreeNodeSendFn(p, s, dupmsg);
-}
-
-
-void CmiSyncNodeBroadcastFn(int s, char *m) {
-    char *dupmsg;
-    dupmsg = (char *)CmiAlloc(s);
-    CmiMemcpy(dupmsg,m,s);
-    CmiFreeNodeSendFn(NODE_BROADCAST_OTHERS, s, dupmsg);
 }
 
 CmiCommHandle CmiAsyncNodeBroadcastFn(int s, char *m) {
     return NULL;
 }
 
-/* need */
-void CmiFreeNodeBroadcastFn(int s, char *m) {
-    CmiFreeNodeSendFn(NODE_BROADCAST_OTHERS, s, m);
+void SendSpanningChildrenNode(int size, char *msg) {
+    int startnode = -CMI_BROADCAST_ROOT(msg)-1;
+    //printf("on node %d rank %d, send node spanning children with root %d\n", CmiMyNode(), CmiMyRank(), startnode);
+    assert(startnode>=0 && startnode<CmiNumNodes());
+
+    int dist = CmiMyNode()-startnode;
+    if (dist<0) dist += CmiNumNodes();
+    int i;
+    for (i=1; i <= BROADCAST_SPANNING_FACTOR; i++) {
+        int nid = BROADCAST_SPANNING_FACTOR*dist + i;
+        if (nid > CmiNumNodes() - 1) break;
+        nid += startnode;
+        nid = nid%CmiNumNodes();
+        assert(nid>=0 && nid<CmiNumNodes() && nid!=CmiMyNode());
+        char *dupmsg = (char *)CmiAlloc(size);
+        CmiMemcpy(dupmsg,msg,size);
+        //printf("In SendSpanningChildrenNode, sending bcast msg (root %d) from node %d to node %d\n", startnode, CmiMyNode(), nid);
+        CmiGeneralFreeSendN(nid, SMP_NODEMESSAGE, size, dupmsg);
+    }
 }
 
+/* need */
+void CmiFreeNodeBroadcastFn(int s, char *m) {
+#if CMK_BROADCAST_SPANNING_TREE
+    //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiFreeNodeBcastFn on comm thd on node %d\n", CmiMyNode());
+    
+    CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
+
+    int mynode = CmiMyNode();
+    CMI_SET_BROADCAST_ROOT(m, -mynode-1);
+    CMI_MAGIC(m) = CHARM_MAGIC_NUMBER;
+    ((CmiMsgHeaderBasic *)m)->size = s;
+    CMI_SET_CHECKSUM(m, s);
+    //printf("In CmiFreeNodeBroadcastFn, sending bcast msg from root node %d\n", CMI_BROADCAST_ROOT(m));
+
+    SendSpanningChildrenNode(s, m);
+#else
+    int i;
+    for (i=0; i<CmiNumNodes(); i++) {
+        if (i==CmiMyNode()) continue;
+        char *dupmsg = (char *)CmiAlloc(s);
+        CmiMemcpy(dupmsg,m,s);
+        CmiFreeNodeSendFn(i, s, dupmsg);
+    }
+#endif
+    CmiFree(m);    
+}
+
+void CmiSyncNodeBroadcastFn(int s, char *m) {
+    char *dupmsg;
+    dupmsg = (char *)CmiAlloc(s);
+    CmiMemcpy(dupmsg,m,s);
+    //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiSyncNodeBcastFn on comm thd on node %d\n", CmiMyNode());
+    CmiFreeNodeBroadcastFn(s, dupmsg);
+}
+
+/* need */
+void CmiFreeNodeBroadcastAllFn(int s, char *m) {
+    char *dupmsg = (char *)CmiAlloc(s);
+    CmiMemcpy(dupmsg,m,s);
+    CMI_MAGIC(dupmsg) = CHARM_MAGIC_NUMBER;
+    ((CmiMsgHeaderBasic *)dupmsg)->size = s;
+    CMI_SET_CHECKSUM(dupmsg, s);
+
+    //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiFreeNodeBcastAllFn on comm thd on node %d\n", CmiMyNode());
+    
+    CQdCreate(CpvAccess(cQdState), 1);
+    CmiSendNodeSelf(dupmsg);
+
+    CmiFreeNodeBroadcastFn(s, m);
+}
 
 void CmiSyncNodeBroadcastAllFn(int s, char *m) {
     char *dupmsg;
     dupmsg = (char *)CmiAlloc(s);
     CmiMemcpy(dupmsg,m,s);
-    CmiFreeNodeSendFn(NODE_BROADCAST_ALL, s, dupmsg);
-}
-
-/* need */
-void CmiFreeNodeBroadcastAllFn(int s, char *m) {
-    CmiFreeNodeSendFn(NODE_BROADCAST_ALL, s, m);
+    //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiSyncNodeBcastAllFn on comm thd on node %d\n", CmiMyNode());
+    CmiFreeNodeBroadcastAllFn(s, dupmsg);
 }
 
 
 CmiCommHandle CmiAsyncNodeBroadcastAllFn(int s, char *m) {
     return NULL;
 }
-#endif
+#endif //end of CMK_NODE_QUEUE_AVAILABLE
 /*********************************************************************************************
 This section is for CmiDirect. This is a variant of the  persistent communication in which
 the user can transfer data between processors without using Charm++ messages. This lets the user
