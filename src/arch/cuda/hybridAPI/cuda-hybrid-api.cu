@@ -17,7 +17,25 @@
 #include "wrqueue.h"
 #include "cuda-hybrid-api.h"
 
+/* initial size of host/device buffer arrays - dynamically expanded by
+ *  the runtime system if needed
+ */ 
+#define NUM_BUFFERS 100
+
+/* work request queue */
 workRequestQueue *wrQueue = NULL; 
+
+/* The runtime system keeps track of all allocated buffers on the GPU.
+ * The following arrays contain pointers to host (CPU) data and the
+ * corresponding data on the device (GPU). 
+ */ 
+
+
+/* host buffers  */ 
+void **hostBuffers = NULL; 
+
+/* device buffers */
+void **devBuffers = NULL; 
 
 extern void CUDACallbackManager(void * fn); 
 
@@ -31,6 +49,27 @@ extern void CUDACallbackManager(void * fn);
 /* setupMemory
    set up memory on the gpu for this kernel's execution */
 void setupMemory(workRequest *wr) {
+  dataInfo *bufferInfo = wr->bufferInfo; 
+
+  if (bufferInfo != NULL) {
+    for (int i=0; i<wr->nBuffers; i++) {
+      int index = bufferInfo[i].bufferID; 
+      int size = bufferInfo[i].size; 
+      hostBuffers[index] = bufferInfo[i].hostBuffer; 
+      
+      /* allocate if the buffer for the corresponding index is NULL */
+      if (devBuffers[index] == NULL) {
+	cudaMalloc((void **)&devBuffers[i], size); 
+      }
+      
+      if (bufferInfo[i].transferToDevice) {
+	cudaMemcpy(devBuffers[index], hostBuffers[index], size, 
+		   cudaMemcpyHostToDevice);
+      }
+    }
+  }
+
+  /*
   cudaMalloc((void **)&(wr->readWriteDevicePtr), wr->readWriteLen);
   cudaMalloc((void **)&(wr->readOnlyDevicePtr), wr->readOnlyLen); 
   cudaMalloc((void **)&(wr->writeOnlyDevicePtr), wr->writeOnlyLen);
@@ -39,13 +78,33 @@ void setupMemory(workRequest *wr) {
 		  cudaMemcpyHostToDevice); 
   cudaMemcpy(wr->readOnlyDevicePtr, wr->readOnlyHostPtr, wr->readOnlyLen, 
 		  cudaMemcpyHostToDevice); 
+  */
   
 } 
 
 /* cleanupMemory
    free memory no longer needed on the gpu */ 
 void cleanupMemory(workRequest *wr) {
-  
+  dataInfo *bufferInfo = wr->bufferInfo; 
+
+  if (bufferInfo != NULL) {
+    int nBuffers = wr->nBuffers; 
+    
+    for (int i=0; i<nBuffers; i++) {
+      int index = bufferInfo[i].bufferID; 
+      int size = bufferInfo[i].size; 
+      
+      if (bufferInfo[i].transferFromDevice) {
+	cudaMemcpy(devBuffers[index], hostBuffers[index], size, cudaMemcpyDeviceToHost);
+      }
+      
+      if (bufferInfo[i].freeBuffer) {
+	cudaFree(devBuffers[index]); 
+      }
+    }
+  }
+
+  /*
   cudaMemcpy(wr->readWriteHostPtr, wr->readWriteDevicePtr, wr->readWriteLen, cudaMemcpyDeviceToHost); 
   cudaMemcpy(wr->writeOnlyHostPtr, wr->writeOnlyDevicePtr, wr->writeOnlyLen, cudaMemcpyDeviceToHost); 
   
@@ -53,19 +112,31 @@ void cleanupMemory(workRequest *wr) {
   cudaFree(wr->readWriteDevicePtr); 
   cudaFree(wr->readOnlyDevicePtr); 
   cudaFree(wr->writeOnlyDevicePtr);
+  */
 
 }
 
 /* kernelSelect
-   a switch statement defined by the user to allow the library to execute
-   the correct kernel */ 
+ * a switch statement defined by the user to allow the library to execute
+ * the correct kernel 
+ */ 
 void kernelSelect(workRequest *wr);
 
 /* initHybridAPI
-   initializes the work request queue
-*/
+ *   initializes the work request queue and host/device buffer pointer arrays
+ */
 void initHybridAPI() {
-  initWRqueue(&wrQueue); 
+  initWRqueue(&wrQueue);
+
+  /* allocate host/device buffers array */
+  hostBuffers = (void **) malloc(NUM_BUFFERS * sizeof(void *)); 
+  devBuffers = (void **) malloc(NUM_BUFFERS * sizeof(void *)); 
+
+  /* initialize device array to NULL */ 
+  for (int i=0; i<NUM_BUFFERS; i++) {
+    devBuffers[i] = NULL; 
+  }
+  
 }
 
 /* gpuProgressFn

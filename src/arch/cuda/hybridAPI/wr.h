@@ -11,6 +11,44 @@
 #ifndef __WR_H__
 #define __WR_H__
 
+/* struct bufferInfo
+ * 
+ * purpose: 
+ * structure to indicate which actions the runtime system should
+ * perform in relation to the buffer
+ *
+ * usage: 
+ *
+ * value of device buffer in the runtime system table dictates
+ * whether allocation  will take place;  NULL -> allocate; 
+ * otherwise -> no allocation
+ * 
+ *  
+ *
+ */
+typedef struct bufferInfo {
+
+  /* ID of buffer in the runtime system's buffer table*/
+  int bufferID; 
+
+  /* flags to indicate if the buffer should be transferred */
+  int transferToDevice; 
+  int transferFromDevice; 
+  
+  /* flag to indicate if the device buffer memory should be freed
+     after  execution of work request */
+  int freeBuffer; 
+
+  /* pointer to host data buffer */
+  void *hostBuffer; 
+
+  /* size of buffer in bytes */
+  int size; 
+
+} dataInfo; 
+
+
+
 /* struct workRequest
  * 
  * purpose:  
@@ -30,9 +68,16 @@ typedef struct workRequest {
   dim3 dimBlock; 
   int smemSize;
   
+  /* buffer information for the execution of the work request */ 
+  dataInfo *bufferInfo; 
+  
+  /* number of buffers used by the work request */ 
+  int nBuffers; 
+
+
   /* pointers to queues and their lengths on the device(gpu) and
      host(cpu)  */
-
+  /*
   void *readWriteDevicePtr;
   void *readWriteHostPtr; 
   int readWriteLen; 
@@ -44,6 +89,7 @@ typedef struct workRequest {
   void *writeOnlyDevicePtr;
   void *writeOnlyHostPtr; 
   int writeOnlyLen; 
+  */
 
   /* to be called after the kernel finishes executing on the GPU */ 
 
