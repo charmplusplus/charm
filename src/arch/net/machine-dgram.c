@@ -20,7 +20,7 @@
 #include "machine-ammasso.h"
 #endif
 
-#if CMK_USE_IBVERBS
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
 #include <infiniband/verbs.h>
 #endif
 
@@ -228,6 +228,11 @@ typedef struct ImplicitDgramStruct
 
 struct PendingMsgStruct;
 
+
+#if CMK_USE_IBUD
+struct infiOtherNodeData;
+struct infiOtherNodeData *initinfiData(int node,int lid,int qpn,int psn);
+#endif
 #if CMK_USE_IBVERBS
 struct infiOtherNodeData;
 struct infiOtherNodeData *initInfiOtherNodeData(int node,int addr[3]);
@@ -271,7 +276,7 @@ typedef struct OtherNodeStruct
   unsigned int mach_id;
   unsigned int dataport;
   struct sockaddr_in addr;
-#if CMK_USE_TCP
+#if CMK_USE_TCP 
   SOCKET	sock;		/* for TCP */
 #endif
 #if CMK_USE_MX
@@ -295,7 +300,7 @@ typedef struct OtherNodeStruct
   int 			   gm_pending;
 #endif
 
-#if CMK_USE_IBVERBS
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
 	struct infiOtherNodeData *infiData;
 #endif
 
@@ -524,6 +529,11 @@ static void node_addresses_store(ChMessage *msg)
 #if CMK_USE_MX
     nodes[i].nic_id = ChMessageLong(d[i].nic_id);
 #endif
+
+#if CMK_USE_IBUD
+    nodes[i].infiData=initinfiData(i,ChMessageInt(d[i].qp.lid),ChMessageInt(d[i].qp.qpn),ChMessageInt(d[i].qp.psn));
+#endif
+
 #if CMK_USE_GM
     CmiGmConvertMachineID(& nodes[i].mach_id);
 #endif
@@ -533,7 +543,8 @@ static void node_addresses_store(ChMessage *msg)
       _Cmi_mynodesize=nodes[i].nodesize;
       Cmi_self_IP=nodes[i].IP;
     }
-#if CMK_USE_IBVERBS
+
+#if CMK_USE_IBVERBS 
 		{
 			if(i != _Cmi_mynode){
 				int addr[3];
@@ -805,6 +816,9 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 
 #include "machine-ibverbs.c"
 /*#define BARRIER_NULL           1*/
+
+#elif CMK_USE_IBUD
+#include "machine-ibud.c"
 
 #else
 

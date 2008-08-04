@@ -21,7 +21,7 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o commSpeed charmrun *~
 
 test: all
-	./charmrun commSpeed +p1 100 100
-	./charmrun commSpeed +p2 100 100
-	./charmrun commSpeed +p4 100 100
-	./charmrun commSpeed +p8 100 100
+	./charmrun commSpeed +p1 100 100 $(TESTOPTS)
+	./charmrun commSpeed +p2 100 100 $(TESTOPTS)
+	./charmrun commSpeed +p4 100 100 $(TESTOPTS)
+	./charmrun commSpeed +p8 100 100 $(TESTOPTS)

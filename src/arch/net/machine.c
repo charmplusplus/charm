@@ -1075,6 +1075,7 @@ static void ctrl_sendone_nolock(const char *type,
 				const char *data1,int dataLen1,
 				const char *data2,int dataLen2)
 {
+  MACHSTATE(5,"ctrl_sendone_nolock test ");
   const void *bufs[3]; int lens[3]; int nBuffers=0;
   ChMessageHeader hdr;
   skt_abortFn oldAbort=skt_set_abort(sendone_abort_fn);
@@ -1576,7 +1577,7 @@ static void send_partial_init()
 static void node_addresses_obtain(char **argv)
 {
   ChMessage nodetabmsg; /* info about all nodes*/
-  MACHSTATE(3,"node_addresses_obtain");
+  MACHSTATE(3,"node_addresses_obtain { ");
   if (Cmi_charmrun_fd==-1) 
   {/*Standalone-- fake a single-node nodetab message*/
   	int npes=1;
@@ -1622,28 +1623,21 @@ static void node_addresses_obtain(char **argv)
 		MACHSTATE1(3,"me.info.qpList created and copied size %d bytes",qpListSize);
 		ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),(const char *)me.info.qpList,qpListSize);
 		free(me.info.qpList);
-  	
-		MACHSTATE(3,"initnode sent");
-		
-		/*We get the other node addresses from a message sent
-  	  back via the charmrun control port.*/
-  	if (!skt_select1(Cmi_charmrun_fd,1200*1000)) {
-			MACHSTATE(3,"Aborting due to timeout");
-			CmiAbort("Timeout waiting for nodetab!\n");
-		}
-        MACHSTATE(2,"recv initnode {");
-  	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
-        MACHSTATE(2,"} recv initnode");
 	}
 #else
 	/*The nPE and IP fields are set by charmrun--
-	  these values don't matter.
-	*/
+	  these values don't matter. */
 	me.info.nPE=ChMessageInt_new(0);
 	me.info.IP=_skt_invalid_ip;
 	me.info.mach_id=ChMessageInt_new(Cmi_mach_id);
 #ifdef CMK_USE_MX
 	me.info.nic_id=ChMessageLong_new(Cmi_nic_id);
+#endif
+#if CMK_USE_IBUD
+	me.info.qp.lid=ChMessageInt_new(context->localAddr.lid);
+	me.info.qp.qpn=ChMessageInt_new(context->localAddr.qpn);
+	me.info.qp.psn=ChMessageInt_new(context->localAddr.psn);
+	MACHSTATE3(3,"IBUD Information lid=%i qpn=%i psn=%i\n",me.info.qp.lid,me.info.qp.qpn,me.info.qp.psn);
 #endif
   	me.info.dataport=ChMessageInt_new(dataport);
 
@@ -1652,22 +1646,25 @@ static void node_addresses_obtain(char **argv)
   	use non-locking version*/
   	ctrl_sendone_nolock("initnode",(const char *)&me,sizeof(me),NULL,0);
         MACHSTATE1(5,"send initnode - dataport:%d", dataport);
+#endif	//CMK_USE_IBVERBS
+
+	MACHSTATE(3,"initnode sent");
   
   	/*We get the other node addresses from a message sent
   	  back via the charmrun control port.*/
   	if (!skt_select1(Cmi_charmrun_fd,1200*1000)){
-	 CmiAbort("Timeout waiting for nodetab!\n");
+		CmiAbort("Timeout waiting for nodetab!\n");
 	}
         MACHSTATE(2,"recv initnode {");
   	ChMessage_recv(Cmi_charmrun_fd,&nodetabmsg);
         MACHSTATE(2,"} recv initnode");
-#endif	//CMK_USE_IBVERBS
   }
 //#if CMK_USE_IBVERBS	
 //#else
   node_addresses_store(&nodetabmsg);
   ChMessage_free(&nodetabmsg);
 //#endif	
+  MACHSTATE(3,"} node_addresses_obtain ");
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE

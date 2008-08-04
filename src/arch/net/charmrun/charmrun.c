@@ -901,6 +901,9 @@ typedef struct nodetab_host {
 #if CMK_USE_IBVERBS
 	ChInfiAddr *qpData;
 #endif
+#if CMK_USE_IBUD
+	ChInfiAddr qp;
+#endif
 
 
 } nodetab_host;
@@ -1178,18 +1181,20 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 	unsigned int nt;
 	unsigned int pe;
 	unsigned int dataport;
+	int lid,qpn,psn;
 	if (node<0 || node>=nodetab_rank0_size)
 		{fprintf(stderr,"Unexpected node %d registered!\n",node);exit(1);}
 	nt=nodetab_rank0_table[node];/*Nodetable index for this node*/	
 	i.nPE=ChMessageInt_new(nodetab_cpus(nt));
 	i.IP=nodetab_ip(nt);
-#if CMK_USE_IBVERBS
+#if CMK_USE_IBVERBS 
 	nodeinfo_arr[node] = i;
 	for (pe=0;pe<nodetab_cpus(nt);pe++){
 		nodetab_table[nt+pe]->ctrlfd=ctrlfd;
 	}
+	printf("Charmrun> client %d connected\n", nt);
 #else
-  dataport = ChMessageInt(i.dataport);
+	dataport = ChMessageInt(i.dataport);
 	if (0==dataport)
 		{fprintf(stderr,"Node %d could not initialize network!\n",node);exit(1);}
 	nodeinfo_arr[node]=i;
@@ -1197,11 +1202,17 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 	  {
 	    nodetab_table[nt+pe]->dataport=dataport;
 	    nodetab_table[nt+pe]->ctrlfd=ctrlfd;
+#if CMK_USE_IBUD
+	    nodetab_table[nt+pe]->qp=i.qp;
+#endif
 	  }
         if (arg_verbose) {
 	  char ips[200];
 	  skt_print_ip(ips,nodetab_ip(nt));
 	  printf("Charmrun> client %d connected (IP=%s data_port=%d)\n", nt, ips, dataport);
+#if CMK_USE_IBUD
+	  printf("Charmrun> client %d lid=%d qpn=%i psn=%i\n",nt,ChMessageInt(i.qp.lid),ChMessageInt(i.qp.qpn),ChMessageInt(i.qp.psn));
+#endif
 	}
 #endif
 }
@@ -2082,8 +2093,9 @@ void req_client_start_and_connect(void)
 	exchange_qpdata_clients();	
 	send_clients_nodeinfo_qpdata();
 #else
-	for (client=0;client<req_nClients;client++)
+	for (client=0;client<req_nClients;client++) {
 		req_handle_initnodetab(NULL,req_clients[client]);
+	}
 #endif	  
 	if (arg_verbose) printf("Charmrun> IP tables sent.\n");
 	free(rsh_pids); /* done with rsh_pids */

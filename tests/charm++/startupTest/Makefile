@@ -20,7 +20,7 @@ startupTest.o: startupTest.C startupTest.decl.h startupTest.h
 	$(CHARMC) -c startupTest.C
 
 test: all
-	./charmrun ./startupTest 20 10 0.01 1 
+	./charmrun ./startupTest 20 10 0.01 1 $(TESTOPTS) 
 
 bgtest: all
 	./charmrun ./startupTest 20 10 0.01 1 +p4 +x2 +y2 +z2

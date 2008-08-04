@@ -12,7 +12,7 @@ hello.decl.h hello.def.h : hello.ci
 	$(CHARMC) hello.ci
 
 test: all
-	./charmrun +p3 ./hello 10
+	./charmrun +p3 ./hello 10 $(TESTOPTS)
 
 bgtest: all
 	./charmrun +p3 ./hello 10 +x1 +y1 +z3

@@ -17,5 +17,5 @@ rtc.o: rtc.C topo.decl.h
 	$(CHARMC) -c rtc.C
 
 test: all
-	./charmrun ./rtc +p4
+	./charmrun ./rtc +p4 $(TESTOPTS)
 

@@ -13,7 +13,7 @@ clean:
 	rm -f *.o conv-host pgm charmrun *.def.h *.decl.h
 
 test:  pgm
-	./charmrun +p4 ./pgm +balancer RandCentLB +LBDebug 1
+	./charmrun +p4 ./pgm +balancer RandCentLB +LBDebug 1 $(TESTOPTS)
 
 bgtest:  pgm
 	./charmrun +p4 ./pgm +balancer RandCentLB +LBDebug 1 +x2 +y4 +z1 +cth1 +wth1

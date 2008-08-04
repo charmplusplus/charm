@@ -17,5 +17,5 @@ hello.o: hello.C hello.decl.h
 	$(CHARMC) -c hello.C
 
 test: all
-	./charmrun hello +p1 2
+	./charmrun hello +p1 2 $(TESTOPTS)
 
