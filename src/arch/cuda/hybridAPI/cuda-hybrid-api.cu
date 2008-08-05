@@ -100,6 +100,7 @@ void cleanupMemory(workRequest *wr) {
       
       if (bufferInfo[i].freeBuffer) {
 	cudaFree(devBuffers[index]); 
+	devBuffers[index] = NULL; 
       }
     }
   }
