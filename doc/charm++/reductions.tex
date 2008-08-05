@@ -47,7 +47,15 @@ every element, from each element call:
 Note that since C++ arrays (like \uw{forces}[2]) are already pointers, we 
 don't use \&\uw{forces}.
 
-The result of the reduction operation is passed to the {\em reduction
+Sometimes it is not important the data to be reduced, but only the fact that all
+elements have reached a synchronization point. In this case a simpler version of
+contribute can be used:
+
+\begin{alltt}
+    contribute();
+\end{alltt}
+
+In all cases, the result of the reduction operation is passed to the {\em reduction
 client}.  Many different kinds of reduction clients can be used, as
 explained below (Section~\ref{reductionClients}).
 
@@ -72,6 +80,12 @@ unreliable) callback will be chosen for use.
     //When done, broadcast the CkReductionMsg to ``myReductionEntry''
     CkCallback cb(CkIndex_myArrayType::myReductionEntry(NULL), thisProxy);
     contribute(2*sizeof(double), forces,CkReduction::sum_double, cb);
+\end{alltt}
+
+In the case of the reduced version used for synchronization purposes, the
+callback parameter will be the only input parameter:
+\begin{alltt}
+    contribute( CkCallback(CkIndex_myArrayType::myReductionEntry(NULL), thisProxy) );
 \end{alltt}
 
 If no member passes a callback to \kw{contribute}, the reduction will use
