@@ -26,7 +26,7 @@
  *  
  *
  */
-typedef struct bufferInfo {
+typedef struct dataInfo {
 
   /* ID of buffer in the runtime system's buffer table*/
   int bufferID; 
