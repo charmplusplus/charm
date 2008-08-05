@@ -121,7 +121,9 @@ private:
 	int userFlag=-1); \
   void contribute(int dataSize,const void *data,CkReduction::reducerType type, \
 	const CkCallback &cb,int userFlag=-1); \
-  void contribute(CkReductionMsg *msg);\
+  void contribute(CkReductionMsg *msg); \
+  void contribute(const CkCallback &cb,int userFlag=-1);\
+  void contribute(int userFlag=-1);\
 
 
 

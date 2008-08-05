@@ -327,6 +327,21 @@ void me::contribute(CkReductionMsg *msg) \
 	msg->setMigratableContributor(migratable);\
 	myRednMgr->contribute(&myRednInfo,msg);\
 	}\
+void me::contribute(const CkCallback &cb,int userFlag)\
+{\
+	CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::random);\
+    msg->setUserFlag(userFlag);\
+    msg->setCallback(cb);\
+    msg->setMigratableContributor(migratable);\
+    myRednMgr->contribute(&myRednInfo,msg);\
+}\
+void me::contribute(int userFlag)\
+{\
+    CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::random);\
+    msg->setUserFlag(userFlag);\
+    msg->setMigratableContributor(migratable);\
+    myRednMgr->contribute(&myRednInfo,msg);\
+}\
 
 
 //A group that can contribute to reductions
