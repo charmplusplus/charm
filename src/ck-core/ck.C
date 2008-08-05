@@ -311,9 +311,10 @@ void CkSectionID::pup(PUP::er &p) {
 
 #ifdef CMK_CUDA
 void CUDACallbackManager(void *fn) {
-  CkPrintf("inside the callback manager\n"); 
-  CkCallback *cb = (CkCallback*) fn;
-  cb->send(); 
+  if (fn != NULL) {
+    CkCallback *cb = (CkCallback*) fn;
+    cb->send(); 
+  }
 }
 
 #endif
