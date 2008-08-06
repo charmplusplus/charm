@@ -818,7 +818,12 @@ void _initCharm(int unused_argc, char **argv)
 	CmiNodeAllBarrier();
 
 #ifndef CMK_OPTIMIZE
-    CpdFinishInitialization();
+#ifdef __BLUEGENE__
+        if(BgNodeRank()==0)
+#else
+        if(CkMyRank()==0)
+#endif
+          CpdFinishInitialization();
 #endif
 
     // Execute the initcalls registered in modules
