@@ -25,9 +25,9 @@
 /* readonly */ CProxy_Compute computeArray;
 
 /* readonly */ int numParts;
-/* readonly */ int patchDimX;	// Number of Chare Rows
-/* readonly */ int patchDimY;	// Number of Chare Columns
-/* readonly */ int L; 
+/* readonly */ int patchArrayDimX;	// Number of Chare Rows
+/* readonly */ int patchArrayDimY;	// Number of Chare Columns
+/* readonly */ int patchSize; 
 /* readonly */ double radius;
 /* readonly */ int finalStepCount; 
 
@@ -39,9 +39,9 @@ Main::Main(CkArgMsg* msg) {
   int i, j, k, l;  
 
   numParts = DEFAULT_PARTICLES;
-  patchDimX = PATCH_DIM_X;
-  patchDimY = PATCH_DIM_Y;
-  L = DEFAULT_L;
+  patchArrayDimX = PATCHARRAY_DIM_X;
+  patchArrayDimY = PATCHARRAY_DIM_Y;
+  patchSize = PATCH_SIZE;
   radius = DEFAULT_RADIUS;
   finalStepCount = DEFAULT_FINALSTEPCOUNT;
 
@@ -51,7 +51,7 @@ Main::Main(CkArgMsg* msg) {
   mainProxy = thisProxy;
 
   // initializing the cell 2D array
-  patchArray = CProxy_Patch::ckNew(patchDimX, patchDimY);
+  patchArray = CProxy_Patch::ckNew(patchArrayDimX, patchArrayDimY);
   CkPrintf("patches inserted\n");
 
   // initializing the interaction 4D array
@@ -60,17 +60,17 @@ Main::Main(CkArgMsg* msg) {
   // For Round Robin insertion
   int numPes = CkNumPes();
   int currPE = -1;
-  int check[patchDimX][patchDimY][patchDimX][patchDimY];
+  int check[patchArrayDimX][patchArrayDimY][patchArrayDimX][patchArrayDimY];
   
-  for (int x=0; x<patchDimX; x++)
-    for (int y=0; y<patchDimY; y++)
-      for (int z=0; z<patchDimX; z++)
-	for (int w=0; w<patchDimY; w++)
+  for (int x=0; x<patchArrayDimX; x++)
+    for (int y=0; y<patchArrayDimY; y++)
+      for (int z=0; z<patchArrayDimX; z++)
+	for (int w=0; w<patchArrayDimY; w++)
 	  check[x][y][z][w] = 0;
 
 
-  for (int x=0; x<patchDimX; x++) {
-    for (int y=0; y<patchDimY; y++) {
+  for (int x=0; x<patchArrayDimX; x++) {
+    for (int y=0; y<patchArrayDimY; y++) {
 
       // self interaction
       if(check[x][y][x][y])
@@ -80,7 +80,7 @@ Main::Main(CkArgMsg* msg) {
       computeArray( x, y, x, y ).insert( (currPE++) % numPes );
 
       // (x,y) and (x+1,y) pair
-      (x == patchDimX-1) ? (i=0, k=x) : (i=x, k=x+1);
+      (x == patchArrayDimX-1) ? (i=0, k=x) : (i=x, k=x+1);
       if(check[i][y][k][y])
 	CkPrintf("error %d %d %d %d\n", i, y, k, y);
       else
@@ -88,7 +88,7 @@ Main::Main(CkArgMsg* msg) {
       computeArray( i, y, k, y ).insert( (currPE++) % numPes );
 
       // (x,y) and (x,y+1) pair
-      (y == patchDimY-1) ? (j=0, l=y) : (j=y, l=y+1);
+      (y == patchArrayDimY-1) ? (j=0, l=y) : (j=y, l=y+1);
       if(check[x][j][x][l])
 	CkPrintf("error %d %d %d %d\n", x, j, x, l);
       else
@@ -96,7 +96,7 @@ Main::Main(CkArgMsg* msg) {
       computeArray( x, j, x, l ).insert( (currPE++) % numPes );
 
       // (x,y) and (x+1,y+1) pair, Irrespective of y
-      (x == patchDimX-1) ? ( i=0, k=x, j=(y+1)%patchDimY, l=y ) : (i=x, k=x+1, j=y, l=(y+1)%patchDimY );
+      (x == patchArrayDimX-1) ? ( i=0, k=x, j=(y+1)%patchArrayDimY, l=y ) : (i=x, k=x+1, j=y, l=(y+1)%patchArrayDimY );
       if(check[i][j][k][l])
 	CkPrintf("error %d %d %d %d\n", i, j, k, l);
       else
@@ -104,7 +104,7 @@ Main::Main(CkArgMsg* msg) {
       computeArray( i, j, k, l ).insert( (currPE++) % numPes );
 
       // (x,y) and (x-1,y+1) pair
-      (x == 0) ? ( i=x, k=(patchDimX-1), j=y, l=(y+1)%patchDimY ) : (i=x-1, k=x, j=(y+1)%patchDimY, l=y );
+      (x == 0) ? ( i=x, k=(patchArrayDimX-1), j=y, l=(y+1)%patchArrayDimY ) : (i=x-1, k=x, j=(y+1)%patchArrayDimY, l=y );
       if(check[i][j][k][l])
 	CkPrintf("error %d %d %d %d\n", i, j, k, l);
       else
@@ -145,17 +145,17 @@ Patch::Patch() {
   srand48( thisIndex.x * 1000 + thisIndex.y +time(NULL));
 
   /* Particle initialization */
-  for(i=0; i < numParts/(patchDimX*patchDimY); i++) {
+  for(i=0; i < numParts/(patchArrayDimX*patchArrayDimY); i++) {
     particles.push_back(Particle());
 
-    particles[i].x = drand48() * L + thisIndex.x * L;
-    particles[i].y = drand48() * L + thisIndex.y * L;
+    particles[i].x = drand48() * patchSize + thisIndex.x * patchSize;
+    particles[i].y = drand48() * patchSize + thisIndex.y * patchSize;
     particles[i].vx = (drand48() - 0.5) * .2 * MAX_VELOCITY;
     particles[i].vy = (drand48() - 0.5) * .2 * MAX_VELOCITY;
-    particles[i].id = (thisIndex.x*patchDimX + thisIndex.y) * numParts / (patchDimX*patchDimY)  + i;
+    particles[i].id = (thisIndex.x*patchArrayDimX + thisIndex.y) * numParts / (patchArrayDimX*patchArrayDimY)  + i;
 
-    /* particles[i].x = 0.0 + thisIndex.x * L;
-    particles[i].y = (float) i* 0.9 * L + thisIndex.y * L;
+    /* particles[i].x = 0.0 + thisIndex.x * patchSize;
+    particles[i].y = (float) i* 0.9 * patchSize + thisIndex.y * patchSize;
     particles[i].vx = (drand48() - 0.5) * .2 * MAX_VELOCITY;
     particles[i].vy = 0.0;
     particles[i].id = (thisIndex.x*m + thisIndex.y) * numParts / (m*n)  + i; */
@@ -185,35 +185,35 @@ void Patch::start() {
   computeArray( x, y, x, y).interact(particles, x, y);
 
   // interaction with (x-1, y-1)
-  (x == 0) ? ( i=x, k=(x-1+patchDimX)%patchDimX, j=y, l=(y-1+patchDimY)%patchDimY ) : (i=x-1, k=x, j=(y-1+patchDimY)%patchDimY, l=y);
+  (x == 0) ? ( i=x, k=(x-1+patchArrayDimX)%patchArrayDimX, j=y, l=(y-1+patchArrayDimY)%patchArrayDimY ) : (i=x-1, k=x, j=(y-1+patchArrayDimY)%patchArrayDimY, l=y);
   computeArray( i, j, k, l ).interact(particles, x, y);
 
   // interaction with (x-1, y)
-  (x == 0) ? (i=x, k=(x-1+patchDimX)%patchDimX) : (i=x-1, k=x);
+  (x == 0) ? (i=x, k=(x-1+patchArrayDimX)%patchArrayDimX) : (i=x-1, k=x);
   computeArray( i, y, k, y).interact(particles, x, y);
 
   // interaction with (x-1, y+1)
-  (x == 0) ? ( i=x, k=(x-1+patchDimX)%patchDimX, j=y, l=(y+1)%patchDimY ) : (i=x-1, k=x, j=(y+1)%patchDimY, l=y);
+  (x == 0) ? ( i=x, k=(x-1+patchArrayDimX)%patchArrayDimX, j=y, l=(y+1)%patchArrayDimY ) : (i=x-1, k=x, j=(y+1)%patchArrayDimY, l=y);
   computeArray( i, j, k, l ).interact(particles, x, y);
 
   // interaction with (x, y-1)
-  (y == 0) ? (j=y, l=(y-1+patchDimY)%patchDimY) : (j=y-1, l=y);
+  (y == 0) ? (j=y, l=(y-1+patchArrayDimY)%patchArrayDimY) : (j=y-1, l=y);
   computeArray( x, j, x, l ).interact(particles, x, y);
 
   // interaction with (x, y+1)
-  (y == patchDimY-1) ? (j=(y+1)%patchDimY, l=y) : (j=y, l=y+1);// compute
+  (y == patchArrayDimY-1) ? (j=(y+1)%patchArrayDimY, l=y) : (j=y, l=y+1);// compute
   computeArray( x, j, x, l ).interact(particles, x, y);
 
   // interaction with (x+1, y-1)
-  (x == patchDimX-1) ? ( i=0, k=x, j=(y-1+patchDimY)%patchDimY, l=y ) : (i=x, k=x+1, j=y, l=(y-1+patchDimY)%patchDimY );
+  (x == patchArrayDimX-1) ? ( i=0, k=x, j=(y-1+patchArrayDimY)%patchArrayDimY, l=y ) : (i=x, k=x+1, j=y, l=(y-1+patchArrayDimY)%patchArrayDimY );
   computeArray( i, j, k, l ).interact(particles, x, y);
 
   // interaction with (x+1, y)
-  (x == patchDimX-1) ? (i=0, k=x) : (i=x, k=x+1);
+  (x == patchArrayDimX-1) ? (i=0, k=x) : (i=x, k=x+1);
   computeArray( i, y, k, y).interact(particles, x, y);
 
   // interaction with (x+1, y+1)
-  (x == patchDimX-1) ? ( i=0, k=x, j=(y+1)%patchDimY, l=y ) : (i=x, k=x+1, j=y, l=(y+1)%patchDimY );
+  (x == patchArrayDimX-1) ? ( i=0, k=x, j=(y+1)%patchArrayDimY, l=y ) : (i=x, k=x+1, j=y, l=(y+1)%patchArrayDimY );
   computeArray( i, j, k, l ).interact(particles, x, y);
 
 }
@@ -248,97 +248,97 @@ void Patch::updateForces(CkVec<Particle> &updates) {
     outgoing.removeAll();
     i = 0;
     while(i < particles.length()){
-      if (particles[i].x < x*L && particles[i].y < y*L) {
+      if (particles[i].x < x*patchSize && particles[i].y < y*patchSize) {
 	outgoing.push_back(wrapAround(particles[i]));
 	particles.remove(i);
       } else
 	i++;
     }
-    patchArray((x-1+patchDimX)%patchDimX, (y-1+patchDimY)%patchDimY).updateParticles(outgoing);
+    patchArray((x-1+patchArrayDimX)%patchArrayDimX, (y-1+patchArrayDimY)%patchArrayDimY).updateParticles(outgoing);
 	  
     // particles sent to (x-1,y)		
     outgoing.removeAll();
     i = 0;
     while (i < particles.length()) {
-      if(particles[i].x < x*L && particles[i].y <= (y+1)*L){
+      if(particles[i].x < x*patchSize && particles[i].y <= (y+1)*patchSize){
 	outgoing.push_back(wrapAround(particles[i]));
 	particles.remove(i);
       } else
 	i++;
     }
-    patchArray((x-1+patchDimX)%patchDimX,y).updateParticles(outgoing);
+    patchArray((x-1+patchArrayDimX)%patchArrayDimX,y).updateParticles(outgoing);
 
     // particles sent to (x-1,y+1)
     outgoing.removeAll();
     i = 0;
     while (i < particles.length()) {
-      if(particles[i].x < x*L && particles[i].y > (y+1)*L){
+      if(particles[i].x < x*patchSize && particles[i].y > (y+1)*patchSize){
 	outgoing.push_back(wrapAround(particles[i]));
 	particles.remove(i);
       } else
 	i++;
     }
-    patchArray((x-1+patchDimX)%patchDimX,(y+1)%patchDimY).updateParticles(outgoing);
+    patchArray((x-1+patchArrayDimX)%patchArrayDimX,(y+1)%patchArrayDimY).updateParticles(outgoing);
 
     // particles sent to (x+1,y-1)
     outgoing.removeAll();
     i = 0;
     while(i < particles.length()){
-      if(particles[i].x > (x+1)*L && particles[i].y < y*L){
+      if(particles[i].x > (x+1)*patchSize && particles[i].y < y*patchSize){
         outgoing.push_back(wrapAround(particles[i]));
 	particles.remove(i);
       } else
 	i++;
     }
-    patchArray((x+1)%patchDimY, (y-1+patchDimY)%patchDimY).updateParticles(outgoing);
+    patchArray((x+1)%patchArrayDimY, (y-1+patchArrayDimY)%patchArrayDimY).updateParticles(outgoing);
 
     // particles sent to (x+1,y)
     outgoing.removeAll();
     i = 0;
     while(i < particles.length()){
-      if(particles[i].x > (x+1)*L && particles[i].y <= (y+1)*L){
+      if(particles[i].x > (x+1)*patchSize && particles[i].y <= (y+1)*patchSize){
         outgoing.push_back(wrapAround(particles[i]));
         particles.remove(i);
       } else
 	i++;
     }
-    patchArray((x+1)%patchDimX, y).updateParticles(outgoing);
+    patchArray((x+1)%patchArrayDimX, y).updateParticles(outgoing);
 
     // particles sent to (x+1,y+1)
     outgoing.removeAll();
     i = 0;
     while(i < particles.length()){
-      if(particles[i].x > (x+1)*L && particles[i].y > (y+1)*L){
+      if(particles[i].x > (x+1)*patchSize && particles[i].y > (y+1)*patchSize){
         outgoing.push_back(wrapAround(particles[i]));
 	particles.remove(i);
       } else
 	i++;
     }
-    patchArray((x+1)%patchDimX, (y+1)%patchDimY).updateParticles(outgoing);
+    patchArray((x+1)%patchArrayDimX, (y+1)%patchArrayDimY).updateParticles(outgoing);
 
     // particles sent to (x,y-1)
     outgoing.removeAll();
     i = 0;
     while(i < particles.length()){
-      if(particles[i].y < y*L){
+      if(particles[i].y < y*patchSize){
 	outgoing.push_back(wrapAround(particles[i]));
 	particles.remove(i);
       } else
 	i++;
     }
-    patchArray(x,(y-1+patchDimY)%patchDimY).updateParticles(outgoing);
+    patchArray(x,(y-1+patchArrayDimY)%patchArrayDimY).updateParticles(outgoing);
 
     // particles sent to (x,y+1)
     outgoing.removeAll();
     i = 0;
     while(i < particles.length()){
-      if(particles[i].y > (y+1)*L){
+      if(particles[i].y > (y+1)*patchSize){
         outgoing.push_back(wrapAround(particles[i]));
 	particles.remove(i);
       } else
 	i++;
     }
-    patchArray(x,(y+1)%patchDimY).updateParticles(outgoing);
+    patchArray(x,(y+1)%patchArrayDimY).updateParticles(outgoing);
 
     outgoing.removeAll();
 
@@ -439,10 +439,10 @@ void Patch::limitVelocity(Particle &p) {
 }
 
 Particle& Patch::wrapAround(Particle &p) {
-  if(p.x < 0.0) p.x += L*patchDimX;
-  if(p.y < 0.0) p.y += L*patchDimY;
-  if(p.x > L*patchDimX) p.x -= L*patchDimX;
-  if(p.y > L*patchDimY) p.y -= L*patchDimY;
+  if(p.x < 0.0) p.x += patchSize*patchArrayDimX;
+  if(p.y < 0.0) p.y += patchSize*patchArrayDimY;
+  if(p.x > patchSize*patchArrayDimX) p.x -= patchSize*patchArrayDimX;
+  if(p.y > patchSize*patchArrayDimY) p.y -= patchSize*patchArrayDimY;
 
   return p;
 }
@@ -480,8 +480,8 @@ void Patch::requestNextFrame(liveVizRequestMsg *lvmsg) {
   }
 
   for (int i=0; i < particles.length(); i++ ) {
-    int xpos = (int)((particles[i].x /(double) (L*m)) * wdes) - sx;
-    int ypos = (int)((particles[i].y /(double) (L*n)) * hdes) - sy;
+    int xpos = (int)((particles[i].x /(double) (patchSize*m)) * wdes) - sx;
+    int ypos = (int)((particles[i].y /(double) (patchSize*n)) * hdes) - sy;
 
     Color c(particles[i].id);
     color_pixel(intensity,myWidthPx,myHeightPx,xpos+1,ypos,c.R,c.B,c.G);

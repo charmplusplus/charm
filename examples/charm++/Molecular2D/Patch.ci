@@ -5,9 +5,9 @@ mainmodule Patch {
   readonly CProxy_Compute computeArray;
 
   readonly int numParts;	// total number of particles
-  readonly int patchDimX;	// total number of rows in the grid
-  readonly int patchDimY;	// total number of columns in the grid
-  readonly int L;
+  readonly int patchArrayDimX;	// X dimension of the Patch array 
+  readonly int patchArrayDimY;	// Y dimension of the Patch array
+  readonly int patchSize;	// size of each Patch
   readonly double radius;	// maximum distance between two interacting particles
   readonly int finalStepCount;	// number of steps at which the cells should stop computation
 

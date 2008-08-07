@@ -21,9 +21,9 @@ extern /* readonly */ CProxy_Patch patchArray;
 extern /* readonly */ CProxy_Compute computeArray;
 
 extern /* readonly */ int numParts;
-extern /* readonly */ int patchDimX;	// Number of Chare Rows
-extern /* readonly */ int patchDimY;	// Number of Chare Columns
-extern /* readonly */ int L; 
+extern /* readonly */ int patchArrayDimX;	// Number of Chare Rows
+extern /* readonly */ int patchArrayDimY;	// Number of Chare Columns
+extern /* readonly */ int patchSize;
 extern /* readonly */ double radius;
 extern /* readonly */ int finalStepCount; 
 
@@ -84,7 +84,7 @@ void Compute::interact(Particle &first, Particle &second){
 
   // We include 0.000001 to ensure that r doesn't tend to zero in the force calculation
   // if(r < 0.000001 || r >= DEFAULT_RADIUS)
-  if(r < 0.000001 || r >= L)
+  if(r < 0.000001 || r >= patchSize)
     return;
 
   f = A / pow(r,12) - B / pow(r,6);
