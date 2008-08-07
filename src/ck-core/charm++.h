@@ -284,8 +284,8 @@ class CkArrayIndexMax : public CkArrayIndex {
 	void copyFrom(const CkArrayIndex &that)
 	{
 		nInts=that.nInts;
-		//index=((const CkArrayIndexMax *)&that)->index;
-		for (int i=0;i<nInts;i++) index.data[i]=that.data()[i];
+		index=((const CkArrayIndexMax *)&that)->index;
+		//for (int i=0;i<nInts;i++) index.data[i]=that.data()[i];
 	}
 public:
 	CkArrayIndexMax(void) { nInts=0; }
