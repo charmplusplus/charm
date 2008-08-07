@@ -453,11 +453,42 @@ while($line = <>){
 # Currently LIBS cannot be safely built with -j4
 $j = "";
 if($target eq "charm++"){
-	print "\nDo you want to do a parallel build (-j4)?[Y/n]";
-	$p = promptUserYN();
-	if($p eq "yes" || $p eq "default"){
-	  $j = "-j4";
+    print << "EOF";
+    
+Do you want to compile in parallel?
+        1) No
+        2) Build with -j2
+        3) Build with -j4 [default]
+        4) Build with -j8
+        5) Build with -j16
+        6) Build with -j32
+
+EOF
+
+    while($line = <>) {
+        chomp $line;
+        if($line eq "1"){
+	    $j = "";
+	    last;
+        } elsif($line eq "2") {
+	    $j = "-j2";
+	    last; 
+	} elsif($line eq "3" || $line eq "") {
+	    $j = "-j4";
+	    last;
+	}  elsif($line eq "4") {
+	    $j = "-j8";
+	    last;
+	}  elsif($line eq "5") {
+	    $j = "-j16";
+	    last;
+	}  elsif($line eq "6") {
+            $j = "-j32";
+            last;
+        }  else {
+	    print "Invalid option, please try again :P\n";
 	}
+}
 }
 
 
