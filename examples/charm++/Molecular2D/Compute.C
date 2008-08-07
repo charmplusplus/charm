@@ -12,7 +12,7 @@
  */
 
 #include "common.h"
-#include "liveViz.h"
+//#include "liveViz.h"
 #include "Patch.decl.h"
 #include "Compute.h"
 
@@ -21,14 +21,14 @@ extern /* readonly */ CProxy_Patch patchArray;
 extern /* readonly */ CProxy_Compute computeArray;
 
 extern /* readonly */ int numParts;
-extern /* readonly */ int m; // Number of Chare Rows
-extern /* readonly */ int n; // Number of Chare Columns
+extern /* readonly */ int patchDimX;	// Number of Chare Rows
+extern /* readonly */ int patchDimY;	// Number of Chare Columns
 extern /* readonly */ int L; 
 extern /* readonly */ double radius;
 extern /* readonly */ int finalStepCount; 
 
-extern double A; // Force Calculation parameter 1
-extern double B; // Force Calculation parameter 2
+extern double A;			// Force Calculation parameter 1
+extern double B;			// Force Calculation parameter 2
 
 // Compute - Default constructor
 Compute::Compute() {

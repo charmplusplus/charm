@@ -57,7 +57,9 @@ class Patch : public CBase_Patch {
     void updateForces(CkVec<Particle>&);
     void limitVelocity(Particle&);
     Particle& wrapAround(Particle &);
-    // void requestNextFrame(liveVizRequestMsg *m);
+#ifdef RUN_LIVEVIZ
+    void requestNextFrame(liveVizRequestMsg *m);
+#endif
 };
 
 #endif
