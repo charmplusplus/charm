@@ -95,25 +95,50 @@ class ReadArrZero : public CBase_ReadArrZero
  public:
   int size;
   double units;
-  
+  bool workdone;
+  bool reddone;
   ReadArrZero(int arrSize, double WasteUnits) :size(arrSize), units(WasteUnits)
     {
       int a=1;
+      workdone=false;
+      reddone=false;
       contribute(sizeof(int),&a,CkReduction::sum_int,CkCallback(CkIndex_main::createReport(NULL),mainProxy),0);
     }
 
   ReadArrZero()
     {
+      workdone=false;
+      reddone=false;
     }
 
   ReadArrZero(CkMigrateMessage *m) {};
 
+  void receiveRed(CkReductionMsg *msg)
+    {
+
+      int *data   = (int *)msg->getData();
+      int sender      = msg->getUserFlag();  
+
+      CkPrintf("{%d} on [%d] gets reduction from %d, recv %d\n",thisIndex, CkMyPe(), sender, data[0]);
+      CkAssert(sender==thisIndex+1);
+      reddone=true;
+      if(workdone)
+	{
+	  contribute(sizeof(int),data,CkReduction::sum_int,CkCallback(CkIndex_main::doneReport(NULL),mainProxy),0);
+	}
+      delete msg;
+    }
   
   void dowork()
   {
     WasteTime(WasteUnits);
     int a=1;
-    contribute(sizeof(int),&a,CkReduction::sum_int,CkCallback(CkIndex_main::doneReport(NULL),mainProxy),0);
+    workdone=true;
+    if(reddone || thisIndex>6)
+      {
+	contribute(sizeof(int),&a,CkReduction::sum_int,CkCallback(CkIndex_main::doneReport(NULL),mainProxy),0);
+      }
+
   }
 
 };
@@ -124,9 +149,9 @@ class ReadArrOne : public CBase_ReadArrOne
  public:
   int size;
   double units;
+  CkCallback callbacktoZero;  
   
-  
-  ReadArrOne(int arrSize, double WasteUnits) :size(arrSize), units(WasteUnits) 
+  ReadArrOne(int arrSize, double WasteUnits, CkCallback _cb) :size(arrSize), units(WasteUnits), callbacktoZero(_cb)
     {
       int a=1;
       contribute(sizeof(int),&a,CkReduction::sum_int,CkCallback(CkIndex_main::createReport(NULL),mainProxy),1);
@@ -138,6 +163,8 @@ class ReadArrOne : public CBase_ReadArrOne
     WasteTime(WasteUnits);
     int a=1;
     contribute(sizeof(int),&a,CkReduction::sum_int,CkCallback(CkIndex_main::doneReport(NULL),mainProxy),1);
+    contribute(sizeof(int), &a, CkReduction::sum_int,  callbacktoZero,1);
+
   }
 
 };
@@ -148,9 +175,9 @@ class ReadArrTwo : public CBase_ReadArrTwo
  public:
   int size;
   double units;
-  
+  CkCallback callbacktoZero;
 
-  ReadArrTwo(int arrSize, double WasteUnits) :size(arrSize), units(WasteUnits) 
+  ReadArrTwo(int arrSize, double WasteUnits, CkCallback _cb) :size(arrSize), units(WasteUnits), callbacktoZero(_cb)
     {
       int a=1;
       contribute(sizeof(int),&a,CkReduction::sum_int,CkCallback(CkIndex_main::createReport(NULL),mainProxy),2);
@@ -163,6 +190,7 @@ class ReadArrTwo : public CBase_ReadArrTwo
     WasteTime(WasteUnits);
     int a=1;
     contribute(sizeof(int),&a,CkReduction::sum_int,CkCallback(CkIndex_main::doneReport(NULL),mainProxy),2);
+    contribute(sizeof(int), &a, CkReduction::sum_int,  callbacktoZero,2);
   }
 
 
@@ -174,8 +202,8 @@ class ReadArrThree : public CBase_ReadArrThree
  public:
   int size;
   double units;
-  
-  ReadArrThree(int arrSize, double WasteUnits) :size(arrSize), units(WasteUnits) 
+  CkCallback callbacktoZero;
+  ReadArrThree(int arrSize, double WasteUnits, CkCallback _cb) :size(arrSize), units(WasteUnits), callbacktoZero(_cb)
     {
       int a=1;
       if(CkMyPe()%2)
@@ -189,6 +217,7 @@ class ReadArrThree : public CBase_ReadArrThree
     WasteTime(WasteUnits);
     int a=1;
     contribute(sizeof(int),&a,CkReduction::sum_int,CkCallback(CkIndex_main::doneReport(NULL),mainProxy),3);
+    contribute(sizeof(int), &a, CkReduction::sum_int,  callbacktoZero,3);
   }
 
 
@@ -202,9 +231,9 @@ class ReadArrFour : public CBase_ReadArrFour
   int size;
   double units;
   int *data;
-
+  CkCallback callbacktoZero;
   
-  ReadArrFour(int arrSize, double WasteUnits) :size(arrSize), units(WasteUnits) 
+  ReadArrFour(int arrSize, double WasteUnits, CkCallback _cb) :size(arrSize), units(WasteUnits), callbacktoZero(_cb) 
     {
       int a=1;
       data=new int[arrSize];
@@ -220,6 +249,7 @@ class ReadArrFour : public CBase_ReadArrFour
     WasteTime(WasteUnits);
     int a=1;
     contribute(sizeof(int),&a,CkReduction::sum_int,CkCallback(CkIndex_main::doneReport(NULL),mainProxy),4);
+    contribute(sizeof(int), &a, CkReduction::sum_int,  callbacktoZero,4);
   }
 
 
@@ -234,8 +264,8 @@ class ReadArrFive : public CBase_ReadArrFive
   int size;
   double units;
   bool validate; 
-
-  ReadArrFive(int arrSize, double WasteUnits, bool validate) :size(arrSize), units(WasteUnits), validate(validate) 
+  CkCallback callbacktoZero;
+  ReadArrFive(int arrSize, double WasteUnits, bool validate, CkCallback _cb) :size(arrSize), units(WasteUnits), validate(validate), callbacktoZero(_cb) 
     {
       int a=1;
       // we shadow four, use its data member
@@ -255,6 +285,8 @@ class ReadArrFive : public CBase_ReadArrFive
     WasteTime(WasteUnits);
     int a=1;
     contribute(sizeof(int),&a,CkReduction::sum_int,CkCallback(CkIndex_main::doneReport(NULL),mainProxy),5);
+    contribute(sizeof(int), &a, CkReduction::sum_int,  callbacktoZero,5);
+
   }
 
 };
@@ -268,8 +300,8 @@ class ReadArrSix : public CBase_ReadArrSix
   int size;
   int size2;
   double units;
-  
-  ReadArrSix(int arrSize, int arrSize2, double WasteUnits) :size(arrSize), size2(arrSize2), units(WasteUnits) 
+  CkCallback callbacktoZero;
+  ReadArrSix(int arrSize, int arrSize2, double WasteUnits, CkCallback _cb) :size(arrSize), size2(arrSize2), units(WasteUnits), callbacktoZero(_cb) 
     {
       int a=1;
       data=new int[arrSize];
@@ -283,6 +315,8 @@ class ReadArrSix : public CBase_ReadArrSix
     WasteTime(WasteUnits);
     int a=1;
     contribute(sizeof(int),&a,CkReduction::sum_int,CkCallback(CkIndex_main::doneReport(NULL),mainProxy),6);
+    contribute(sizeof(int), &a, CkReduction::sum_int,  callbacktoZero,6);
+
   }
 
 };
@@ -296,8 +330,9 @@ class ReadArrSeven : public CBase_ReadArrSeven
   int size2;
   double units;
   bool validate;
-  
-  ReadArrSeven(int arrSize, int arrSize2, double WasteUnits, bool validate) :size(arrSize), size2(arrSize2), units(WasteUnits), validate(validate) 
+  CkCallback callbacktoZero;
+
+  ReadArrSeven(int arrSize, int arrSize2, double WasteUnits, bool validate, CkCallback _cb) :size(arrSize), size2(arrSize2), units(WasteUnits), validate(validate), callbacktoZero(_cb) 
     {
       int a=1;
       // we shadow six, use its data member
@@ -324,6 +359,8 @@ class ReadArrSeven : public CBase_ReadArrSeven
     WasteTime(WasteUnits);
     int a=1;
     contribute(sizeof(int),&a,CkReduction::sum_int,CkCallback(CkIndex_main::doneReport(NULL),mainProxy),7);
+    contribute(sizeof(int), &a, CkReduction::sum_int,  callbacktoZero,7);
+
   }
 
 };

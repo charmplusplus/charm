@@ -21,6 +21,8 @@ startupTest.o: startupTest.C startupTest.decl.h startupTest.h
 
 test: all
 	./charmrun ./startupTest 20 10 0.01 1 $(TESTOPTS) 
+	./charmrun ./startupTest 200 10 0.0001 1 $(TESTOPTS) +p2
+	./charmrun ./startupTest 200 10 0.0001 1 $(TESTOPTS) +p4
 
 bgtest: all
 	./charmrun ./startupTest 20 10 0.01 1 +p4 +x2 +y2 +z2

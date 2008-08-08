@@ -42,41 +42,42 @@ mainmodule startupTest {
 
   array [1D] ReadArrZero {
     entry ReadArrZero(int, double);
+    entry void receiveRed(CkReductionMsg *m);
     entry void dowork(void);	
   };        	
 
   array [1D] ReadArrOne {
-    entry ReadArrOne(int, double);
+    entry ReadArrOne(int, double, CkCallback);
     entry void dowork(void);	
   };        	
 
   array [1D] ReadArrTwo {
-    entry ReadArrTwo(int, double);
+    entry ReadArrTwo(int, double, CkCallback);
     entry void dowork(void);	
   };        	
 
   array [1D] ReadArrThree {
-    entry ReadArrThree(int, double);
+    entry ReadArrThree(int, double, CkCallback);
     entry void dowork(void);	
   };        	
 
   array [1D] ReadArrFour {
-    entry ReadArrFour(int, double);
+    entry ReadArrFour(int, double, CkCallback);
     entry void dowork(void);	
   };        	
 
   array [1D] ReadArrFive {
-    entry ReadArrFive(int, double, bool);
+    entry ReadArrFive(int, double, bool, CkCallback);
     entry void dowork(void);	
   };        	
 
   array [2D] ReadArrSix {
-    entry ReadArrSix(int, int, double);
+    entry ReadArrSix(int, int, double, CkCallback);
     entry void dowork(void);	
   };        	
 
   array [2D] ReadArrSeven {
-    entry ReadArrSeven(int, int, double, bool);
+    entry ReadArrSeven(int, int, double, bool, CkCallback);
     entry void dowork(void);	
   };        	
 

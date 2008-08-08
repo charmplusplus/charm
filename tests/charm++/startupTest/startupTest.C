@@ -71,34 +71,43 @@ main::main(CkArgMsg *msg)
   for(int i=0;i<arrSize;i++)
     zeroProxy(i).insert(arrSize, WasteUnits);
   zeroProxy.doneInserting();
+
+  // make our callbacks
+
+  CkCallback cb[9];
+  for(int i=0;i<7;i++)
+    {
+      cb[i]=CkCallback(CkIndex_ReadArrZero::receiveRed(NULL),CkArrayIndex1D(i),zeroProxy);
+    }
   //create one-five by map then array
+
   CProxy_OneMap oneMap = CProxy_OneMap::ckNew(WasteUnits);
   CkArrayOptions arrOpts;
   arrOpts.setMap(oneMap);
-  oneProxy  = CProxy_ReadArrOne::ckNew(arrSize, WasteUnits, arrOpts);  
+  oneProxy  = CProxy_ReadArrOne::ckNew(arrSize, WasteUnits, cb[0],arrOpts);  
   for(int i=0;i<arrSize;i++)
-    oneProxy(i).insert(arrSize, WasteUnits);
+    oneProxy(i).insert(arrSize, WasteUnits,cb[0]);
   oneProxy.doneInserting();
 
   CProxy_TwoMap twoMap = CProxy_TwoMap::ckNew(WasteUnits);
   arrOpts.setMap(twoMap);
-  twoProxy  = CProxy_ReadArrTwo::ckNew(arrSize, WasteUnits,arrOpts);  
+  twoProxy  = CProxy_ReadArrTwo::ckNew(arrSize, WasteUnits, cb[1],arrOpts);  
   for(int i=0;i<arrSize;i++)
-    twoProxy(i).insert(arrSize, WasteUnits);
+    twoProxy(i).insert(arrSize, WasteUnits,cb[1]);
   twoProxy.doneInserting();
 
   CProxy_ThreeMap threeMap = CProxy_ThreeMap::ckNew(WasteUnits);
   arrOpts.setMap(threeMap);
-  threeProxy  = CProxy_ReadArrThree::ckNew(arrSize, WasteUnits, arrOpts);  
+  threeProxy  = CProxy_ReadArrThree::ckNew(arrSize, WasteUnits, cb[2],arrOpts);  
   for(int i=0;i<arrSize;i++)
-    threeProxy(i).insert(arrSize, WasteUnits);
+    threeProxy(i).insert(arrSize, WasteUnits,cb[2]);
   threeProxy.doneInserting();
 
   // make 4 new style
   CkArrayOptions arrOptsBulk(arrSize);
   CProxy_FourMap fourMap = CProxy_FourMap::ckNew(WasteUnits);
   arrOptsBulk.setMap(fourMap);
-  fourProxy  = CProxy_ReadArrFour::ckNew(arrSize,WasteUnits,arrOptsBulk);  
+  fourProxy  = CProxy_ReadArrFour::ckNew(arrSize,WasteUnits,cb[3],arrOptsBulk);  
   /*  for(int i=0;i<arrSize;i++)
       fourProxy(i).insert(arrSize, WasteUnits);*/
   fourProxy.doneInserting();
@@ -106,7 +115,7 @@ main::main(CkArgMsg *msg)
   // make 5 a shadow of 4
   CkArrayOptions arrOptsBind4(arrSize);
   arrOptsBind4.bindTo(fourProxy);
-  fiveProxy  = CProxy_ReadArrFive::ckNew(arrSize, WasteUnits, validateBoundOrder,arrOptsBind4);  
+  fiveProxy  = CProxy_ReadArrFive::ckNew(arrSize, WasteUnits, validateBoundOrder,cb[4],arrOptsBind4);  
   //  for(int i=0;i<arrSize;i++)
   //    fiveProxy(i).insert(arrSize, WasteUnits);
   fiveProxy.doneInserting();
@@ -117,17 +126,17 @@ main::main(CkArgMsg *msg)
   // if you make six this way it may lose the race with seven 
   CProxy_SixMap sixMap = CProxy_SixMap::ckNew(WasteUnits);
   arrOpts.setMap(sixMap);
-  sixProxy  = CProxy_ReadArrSix::ckNew(arrSize, arrSize2, WasteUnits, arrOpts);  
+  sixProxy  = CProxy_ReadArrSix::ckNew(arrSize, arrSize2, WasteUnits,cb[5], arrOpts);  
   for(int i=0;i<arrSize;i++)
     for(int j=0;j<arrSize2;j++)
-      sixProxy(i,j).insert(arrSize,arrSize2, WasteUnits);
+      sixProxy(i,j).insert(arrSize,arrSize2, WasteUnits,cb[5]);
   sixProxy.doneInserting();
 #else
   // bulk build six
   CkArrayOptions arrOptsSix(arrSize,arrSize2);
   CProxy_SixMap sixMap = CProxy_SixMap::ckNew(WasteUnits);
   arrOptsSix.setMap(sixMap);
-  sixProxy  = CProxy_ReadArrSix::ckNew(arrSize,arrSize2, WasteUnits, arrOptsSix);  
+  sixProxy  = CProxy_ReadArrSix::ckNew(arrSize,arrSize2, WasteUnits, cb[5],arrOptsSix);  
   sixProxy.doneInserting();
 
 #endif
@@ -138,17 +147,17 @@ main::main(CkArgMsg *msg)
 
   CkArrayOptions arrOptsBind6;
   arrOptsBind6.bindTo(sixProxy);
-  sevenProxy  = CProxy_ReadArrSeven::ckNew(arrSize, arrSize2,WasteUnits, validateBoundOrder,arrOptsBind6);  
+  sevenProxy  = CProxy_ReadArrSeven::ckNew(arrSize, arrSize2,WasteUnits, validateBoundOrder,cb[6],arrOptsBind6);  
   for(int i=0;i<arrSize;i++)
     for(int j=0;j<arrSize2;j++)
-      sevenProxy(i,j).insert(arrSize, arrSize2,WasteUnits,validateBoundOrder);
+      sevenProxy(i,j).insert(arrSize, arrSize2,WasteUnits,validateBoundOrder,cb[6]);
   sevenProxy.doneInserting();
 
 #else
 
   CkArrayOptions arrOptsBind6(arrSize,arrSize2);
   arrOptsBind6.bindTo(sixProxy);
-  sevenProxy  = CProxy_ReadArrSeven::ckNew(arrSize, arrSize2,WasteUnits, validateBoundOrder,arrOptsBind6);  
+  sevenProxy  = CProxy_ReadArrSeven::ckNew(arrSize, arrSize2,WasteUnits, validateBoundOrder,cb[6],arrOptsBind6);  
   sevenProxy.doneInserting();
 #endif  
 
