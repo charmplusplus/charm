@@ -19,14 +19,11 @@
  *
  */
 class Main : public CBase_Main {
-  private:
-    int checkInCount; // Count to terminate
-
   public:
     Main(CkArgMsg* msg);
     Main(CkMigrateMessage* msg);
 
-    void checkIn();
+    void allDone();
     void computeCreationDone();
 };
 
@@ -43,8 +40,9 @@ class Patch : public CBase_Patch {
     int updateCount;
     bool updateFlag;
     bool incomingFlag;
-    int computesList[NUM_COMPUTES][4];
+    int computesList[NUM_NEIGHBORS][4];
 
+    void migrateToPatch(Particle p, int &px, int &py);
     void updateProperties();	// updates properties after receiving forces from computes
     void checkNextStep();	// checks whether to continue with next step
     void print();		// prints all its particles
@@ -56,10 +54,10 @@ class Patch : public CBase_Patch {
 
     void start();
     void createComputes();
-    void updateParticles(CkVec<Particle>&);
-    void updateForces(CkVec<Particle>&);
-    void limitVelocity(Particle&);
-    Particle& wrapAround(Particle &);
+    void updateParticles(CkVec<Particle> &);
+    void updateForces(CkVec<Particle> &);
+    void limitVelocity(Particle &p);
+    Particle& wrapAround(Particle &p);
 #ifdef RUN_LIVEVIZ
     void requestNextFrame(liveVizRequestMsg *m);
 #endif

@@ -13,7 +13,7 @@ mainmodule Patch {
 
   mainchare Main {
     entry Main(CkArgMsg* msg);
-    entry void checkIn();
+    entry void allDone();
     entry void computeCreationDone();
   };
 

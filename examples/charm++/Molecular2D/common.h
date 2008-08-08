@@ -27,7 +27,7 @@
 #define DEFAULT_RADIUS		5
 #define DEFAULT_FINALSTEPCOUNT	10
 #define MAX_VELOCITY		30.0
-#define NUM_COMPUTES		9
+#define NUM_NEIGHBORS		9
 
 #define WRAP_X(a)		(((a)+patchArrayDimX)%patchArrayDimX)
 #define WRAP_Y(a)		(((a)+patchArrayDimY)%patchArrayDimY)

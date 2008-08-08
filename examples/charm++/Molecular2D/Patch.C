@@ -47,8 +47,6 @@ Main::Main(CkArgMsg* msg) {
   finalStepCount = DEFAULT_FINALSTEPCOUNT;
 
   delete msg;
-  checkInCount = 0;
-
   mainProxy = thisProxy;
 
   // initializing the cell 2D array
@@ -69,12 +67,9 @@ Main::Main(CkArgMsg* msg) {
 // Constructor for chare object migration
 Main::Main(CkMigrateMessage* msg) { }
 
-void Main::checkIn() {
-  checkInCount ++;
-  if( checkInCount > 0) {
-    CkPrintf("SIMULATION COMPLETE.\n\n");
-    CkExit();
-  }
+void Main::allDone() {
+  CkPrintf("SIMULATION COMPLETE.\n\n");
+  CkExit();
 }
 
 void Main::computeCreationDone() {
@@ -97,7 +92,7 @@ Patch::Patch() {
   // starting random generator
   srand48( thisIndex.x * 1000 + thisIndex.y +time(NULL));
 
-  /* Particle initialization */
+  // Particle initialization
   for(i=0; i < numParts/(patchArrayDimX*patchArrayDimY); i++) {
     particles.push_back(Particle());
 
@@ -106,12 +101,6 @@ Patch::Patch() {
     particles[i].vx = (drand48() - 0.5) * .2 * MAX_VELOCITY;
     particles[i].vy = (drand48() - 0.5) * .2 * MAX_VELOCITY;
     particles[i].id = (thisIndex.x*patchArrayDimX + thisIndex.y) * numParts / (patchArrayDimX*patchArrayDimY)  + i;
-
-    /* particles[i].x = 0.0 + thisIndex.x * patchSize;
-    particles[i].y = (float) i* 0.9 * patchSize + thisIndex.y * patchSize;
-    particles[i].vx = (drand48() - 0.5) * .2 * MAX_VELOCITY;
-    particles[i].vy = 0.0;
-    particles[i].id = (thisIndex.x*m + thisIndex.y) * numParts / (m*n)  + i; */
   }	
 
   updateCount = 0;
@@ -154,16 +143,16 @@ void Patch::createComputes() {
 
   // interaction with (x-1, y)
   (x==0) ? (i=x, j=y, k=WRAP_X(x-1), l=y) : (i=x-1, j=y, k=x, l=y);
-  computesList[num][0] = i; computesList[num][1] = y; computesList[num][2] = k; computesList[num][3] = y; num++;
+  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
   
   // interaction with (x-1, y+1)
   (x==0) ? (i=x, j=y, k=WRAP_X(x-1), l=WRAP_Y(y+1)) : (i=x-1, j=WRAP_Y(y+1), k=x, l=y);
-  computesList[num][0] = i; computesList[num][1] = y; computesList[num][2] = k; computesList[num][3] = y; num++;
+  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
   computeArray(i, j, k, l).insert((currPE++) % numPes);
 
   // interaction with (x, y-1)
   (y==0) ? (i=x, j=y, k=x, l=WRAP_Y(y-1)) : (i=x, j=y-1, k=x, l=y);
-  computesList[num][0] = i; computesList[num][1] = y; computesList[num][2] = k; computesList[num][3] = y; num++;
+  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
 
   // interaction with (x, y) -- SELF
   i=x; j=y; k=x; l=y;
@@ -172,22 +161,22 @@ void Patch::createComputes() {
 
   // interaction with (x, y+1)
   (y==patchArrayDimY-1) ? (i=x, j=0, k=x, l=y) : (i=x, j=y, k=x, l=y+1);
-  computesList[num][0] = i; computesList[num][1] = y; computesList[num][2] = k; computesList[num][3] = y; num++;
+  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
   computeArray(i, j, k, l).insert((currPE++) % numPes);
 
   // interaction with (x+1, y-1)
   (x==patchArrayDimX-1) ? (i=0, j=WRAP_Y(y-1), k=x, l=y) : (i=x, j=y, k=x+1, l=WRAP_Y(y-1));
-  computesList[num][0] = i; computesList[num][1] = y; computesList[num][2] = k; computesList[num][3] = y; num++;
+  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
 
   // interaction with (x+1, y)
   (x==patchArrayDimX-1) ? (i=0, j=y, k=x, l=y) : (i=x, j=y, k=x+1, l=y);
-  computesList[num][0] = i; computesList[num][1] = y; computesList[num][2] = k; computesList[num][3] = y; num++;
+  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
   computeArray(i, j, k, l).insert((currPE++) % numPes);
 
   // interaction with (x+1, y+1)
   (x==patchArrayDimX-1) ? (i=0, j=WRAP_Y(y+1), k=x, l=y ) : (i=x, j=y, k=x+1, l=WRAP_Y(y+1));
-  computesList[num][0] = i; computesList[num][1] = y; computesList[num][2] = k; computesList[num][3] = y; num++;
-  computeArray(i, j, k, l).insert( (currPE++) % numPes );
+  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
+  computeArray(i, j, k, l).insert((currPE++) % numPes);
 
   contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::computeCreationDone(), mainProxy));
 }
@@ -198,48 +187,21 @@ void Patch::start() {
   int x = thisIndex.x;
   int y = thisIndex.y;
   int i, j, k, l;
-  
-  // self interaction
-  computeArray( x, y, x, y).interact(particles, x, y);
-
-  // interaction with (x-1, y-1)
-  (x == 0) ? ( i=x, k=(x-1+patchArrayDimX)%patchArrayDimX, j=y, l=(y-1+patchArrayDimY)%patchArrayDimY ) : (i=x-1, k=x, j=(y-1+patchArrayDimY)%patchArrayDimY, l=y);
-  computeArray( i, j, k, l ).interact(particles, x, y);
-
-  // interaction with (x-1, y)
-  (x == 0) ? (i=x, k=(x-1+patchArrayDimX)%patchArrayDimX) : (i=x-1, k=x);
-  computeArray( i, y, k, y).interact(particles, x, y);
-
-  // interaction with (x-1, y+1)
-  (x == 0) ? ( i=x, k=(x-1+patchArrayDimX)%patchArrayDimX, j=y, l=(y+1)%patchArrayDimY ) : (i=x-1, k=x, j=(y+1)%patchArrayDimY, l=y);
-  computeArray( i, j, k, l ).interact(particles, x, y);
-
-  // interaction with (x, y-1)
-  (y == 0) ? (j=y, l=(y-1+patchArrayDimY)%patchArrayDimY) : (j=y-1, l=y);
-  computeArray( x, j, x, l ).interact(particles, x, y);
-
-  // interaction with (x, y+1)
-  (y == patchArrayDimY-1) ? (j=(y+1)%patchArrayDimY, l=y) : (j=y, l=y+1);// compute
-  computeArray( x, j, x, l ).interact(particles, x, y);
-
-  // interaction with (x+1, y-1)
-  (x == patchArrayDimX-1) ? ( i=0, k=x, j=(y-1+patchArrayDimY)%patchArrayDimY, l=y ) : (i=x, k=x+1, j=y, l=(y-1+patchArrayDimY)%patchArrayDimY );
-  computeArray( i, j, k, l ).interact(particles, x, y);
-
-  // interaction with (x+1, y)
-  (x == patchArrayDimX-1) ? (i=0, k=x) : (i=x, k=x+1);
-  computeArray( i, y, k, y).interact(particles, x, y);
-
-  // interaction with (x+1, y+1)
-  (x == patchArrayDimX-1) ? ( i=0, k=x, j=(y+1)%patchArrayDimY, l=y ) : (i=x, k=x+1, j=y, l=(y+1)%patchArrayDimY );
-  computeArray( i, j, k, l ).interact(particles, x, y);
+ 
+  for(int num=0; num<NUM_NEIGHBORS; num++) {
+    i = computesList[num][0];
+    j = computesList[num][1];
+    k = computesList[num][2];
+    l = computesList[num][3];
+    computeArray(i, j, k, l).interact(particles, x, y);
+  }
 
 }
 
 // Function to update forces coming from a neighbor interaction chare
 void Patch::updateForces(CkVec<Particle> &updates) {
-  int i, x ,y;
-  CkVec<Particle> outgoing;
+  int i, x, y, x1, y1;
+  CkVec<Particle> outgoing[NUM_NEIGHBORS];
 
   // incrementing the counter for receiving updates
   forceCount++;
@@ -251,7 +213,7 @@ void Patch::updateForces(CkVec<Particle> &updates) {
   }
 
   // if all forces are received, then it must recompute particles location
-  if( forceCount >= 9) {
+  if( forceCount == NUM_NEIGHBORS) {
     // Received all it's forces from the interactions.
     forceCount = 0;
   
@@ -262,103 +224,16 @@ void Patch::updateForces(CkVec<Particle> &updates) {
     x = thisIndex.x;
     y = thisIndex.y;
 
-    // particles sent to (x-1,y-1)		
-    outgoing.removeAll();
-    i = 0;
-    while(i < particles.length()){
-      if (particles[i].x < x*patchSize && particles[i].y < y*patchSize) {
-	outgoing.push_back(wrapAround(particles[i]));
+    for(i=0; i<particles.length(); i++) {
+      migrateToPatch(particles[i], x1, y1);
+      if(x1 !=0 || y1!=0) {
+	outgoing[(x1+1)*3+(y1+1)].push_back(wrapAround(particles[i]));
 	particles.remove(i);
-      } else
-	i++;
+      }
     }
-    patchArray((x-1+patchArrayDimX)%patchArrayDimX, (y-1+patchArrayDimY)%patchArrayDimY).updateParticles(outgoing);
-	  
-    // particles sent to (x-1,y)		
-    outgoing.removeAll();
-    i = 0;
-    while (i < particles.length()) {
-      if(particles[i].x < x*patchSize && particles[i].y <= (y+1)*patchSize){
-	outgoing.push_back(wrapAround(particles[i]));
-	particles.remove(i);
-      } else
-	i++;
-    }
-    patchArray((x-1+patchArrayDimX)%patchArrayDimX,y).updateParticles(outgoing);
-
-    // particles sent to (x-1,y+1)
-    outgoing.removeAll();
-    i = 0;
-    while (i < particles.length()) {
-      if(particles[i].x < x*patchSize && particles[i].y > (y+1)*patchSize){
-	outgoing.push_back(wrapAround(particles[i]));
-	particles.remove(i);
-      } else
-	i++;
-    }
-    patchArray((x-1+patchArrayDimX)%patchArrayDimX,(y+1)%patchArrayDimY).updateParticles(outgoing);
-
-    // particles sent to (x+1,y-1)
-    outgoing.removeAll();
-    i = 0;
-    while(i < particles.length()){
-      if(particles[i].x > (x+1)*patchSize && particles[i].y < y*patchSize){
-        outgoing.push_back(wrapAround(particles[i]));
-	particles.remove(i);
-      } else
-	i++;
-    }
-    patchArray((x+1)%patchArrayDimY, (y-1+patchArrayDimY)%patchArrayDimY).updateParticles(outgoing);
-
-    // particles sent to (x+1,y)
-    outgoing.removeAll();
-    i = 0;
-    while(i < particles.length()){
-      if(particles[i].x > (x+1)*patchSize && particles[i].y <= (y+1)*patchSize){
-        outgoing.push_back(wrapAround(particles[i]));
-        particles.remove(i);
-      } else
-	i++;
-    }
-    patchArray((x+1)%patchArrayDimX, y).updateParticles(outgoing);
-
-    // particles sent to (x+1,y+1)
-    outgoing.removeAll();
-    i = 0;
-    while(i < particles.length()){
-      if(particles[i].x > (x+1)*patchSize && particles[i].y > (y+1)*patchSize){
-        outgoing.push_back(wrapAround(particles[i]));
-	particles.remove(i);
-      } else
-	i++;
-    }
-    patchArray((x+1)%patchArrayDimX, (y+1)%patchArrayDimY).updateParticles(outgoing);
-
-    // particles sent to (x,y-1)
-    outgoing.removeAll();
-    i = 0;
-    while(i < particles.length()){
-      if(particles[i].y < y*patchSize){
-	outgoing.push_back(wrapAround(particles[i]));
-	particles.remove(i);
-      } else
-	i++;
-    }
-    patchArray(x,(y-1+patchArrayDimY)%patchArrayDimY).updateParticles(outgoing);
-
-    // particles sent to (x,y+1)
-    outgoing.removeAll();
-    i = 0;
-    while(i < particles.length()){
-      if(particles[i].y > (y+1)*patchSize){
-        outgoing.push_back(wrapAround(particles[i]));
-	particles.remove(i);
-      } else
-	i++;
-    }
-    patchArray(x,(y+1)%patchArrayDimY).updateParticles(outgoing);
-
-    outgoing.removeAll();
+   
+    for(i=0; i<NUM_NEIGHBORS; i++)
+      patchArray(WRAP_X(x + i/3 - 2), WRAP_Y(y + i%3 -2)).updateParticles(outgoing[i]);
 
     updateFlag = true;
 	      
@@ -366,6 +241,19 @@ void Patch::updateForces(CkVec<Particle> &updates) {
     checkNextStep();
   }
   
+}
+
+void Patch::migrateToPatch(Particle p, int &px, int &py) {
+  int x = thisIndex.x * patchSize;
+  int y = thisIndex.y * patchSize;
+
+  if (p.x < x) px = -1;
+  else if (p.x > x+patchSize) px = 1;
+  else px = 0;
+
+  if (p.y < y) py = -1;
+  else if (p.y > y+patchSize) py = 1;
+  else py = 0;
 }
 
 // Function that checks whether it must start the following step or wait until other messages are received
@@ -389,9 +277,9 @@ void Patch::checkNextStep(){
     // checking for next step
     if(stepCount >= finalStepCount) {
       print();
-      mainProxy.checkIn();
+      contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::allDone(), mainProxy)); 
     } else {
-      thisProxy( thisIndex.x, thisIndex.y ).start();
+      thisProxy(thisIndex.x, thisIndex.y).start();
     }
   }
 }
@@ -407,7 +295,7 @@ void Patch::updateParticles(CkVec<Particle> &updates) {
 
   // if all the incoming particle updates have been received, we must check 
   // whether to proceed with next step
-  if(updateCount >= 8 ) {
+  if(updateCount == NUM_NEIGHBORS-1 ) {
     updateCount = 0;
     incomingFlag = true;
     checkNextStep();
@@ -415,7 +303,7 @@ void Patch::updateParticles(CkVec<Particle> &updates) {
 }
 
 // Function to update properties (i.e. acceleration, velocity and position) in particles
-void Patch::updateProperties(){
+void Patch::updateProperties() {
   int i;
   double xDisp, yDisp;
 	
@@ -520,7 +408,6 @@ void Patch::requestNextFrame(liveVizRequestMsg *lvmsg) {
         
   liveVizDeposit(lvmsg, sx,sy, myWidthPx,myHeightPx, intensity, this, max_image_data);
   delete[] intensity;
-
 }
 #endif
 
