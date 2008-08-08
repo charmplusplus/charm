@@ -76,12 +76,13 @@ void Main::computeCreationDone() {
   computeArray.doneInserting();
   CkPrintf("%d COMPUTES CREATED\n", 5*patchArrayDimX*patchArrayDimY);
 
+#ifdef RUN_LIVEVIZ
   // setup liveviz
-  // CkCallback c(CkIndex_Patch::requestNextFrame(0),patchArray);
-  // liveVizConfig cfg(liveVizConfig::pix_color,true);
-  // liveVizInit(cfg,patchArray,c);
+  CkCallback c(CkIndex_Patch::requestNextFrame(0), patchArray);
+  liveVizConfig cfg(liveVizConfig::pix_color,true);
+  liveVizInit(cfg,patchArray,c);
+#endif
 
-  // sleep(1);
   patchArray.start();
 }
 
@@ -370,8 +371,8 @@ void Patch::requestNextFrame(liveVizRequestMsg *lvmsg) {
   int wdes = lvmsg->req.wid;
   int hdes = lvmsg->req.ht;
    
-  int myWidthPx = wdes / m;
-  int myHeightPx = hdes / n;
+  int myWidthPx = wdes / patchArrayDimX;
+  int myHeightPx = hdes / patchArrayDimY;
   int sx=thisIndex.x*myWidthPx;
   int sy=thisIndex.y*myHeightPx; 
 
@@ -386,8 +387,8 @@ void Patch::requestNextFrame(liveVizRequestMsg *lvmsg) {
   }
 
   for (int i=0; i < particles.length(); i++ ) {
-    int xpos = (int)((particles[i].x /(double) (patchSize*m)) * wdes) - sx;
-    int ypos = (int)((particles[i].y /(double) (patchSize*n)) * hdes) - sy;
+    int xpos = (int)((particles[i].x /(double) (patchSize*patchArrayDimX)) * wdes) - sx;
+    int ypos = (int)((particles[i].y /(double) (patchSize*patchArrayDimY)) * hdes) - sy;
 
     Color c(particles[i].id);
     color_pixel(intensity,myWidthPx,myHeightPx,xpos+1,ypos,c.R,c.B,c.G);

@@ -12,7 +12,9 @@
  */
 
 #include "common.h"
-//#include "liveViz.h"
+#ifdef RUN_LIVEVIZ
+  #include "liveViz.h"
+#endif
 #include "Patch.decl.h"
 #include "Compute.h"
 
