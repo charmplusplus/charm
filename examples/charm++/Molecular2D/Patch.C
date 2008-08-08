@@ -124,7 +124,7 @@ void Patch::createComputes() {
 
   // For Round Robin insertion
   int numPes = CkNumPes();
-  int currPE = -1;
+  int currPE = CkMyPe();
  
   num = 0;
 
@@ -260,8 +260,8 @@ void Patch::migrateToPatch(Particle p, int &px, int &py) {
 void Patch::checkNextStep(){
   int i;
   if(updateFlag && incomingFlag) {
-    if(thisIndex.x==0 && thisIndex.y==0)
-      CkPrintf("Step %d\n", stepCount);
+    if(thisIndex.x==0 && thisIndex.y==0 && stepCount%10==0)
+      CkPrintf("Step %d %f\n", stepCount, CmiWallTimer());
 
     // resetting flags
     updateFlag = false;
