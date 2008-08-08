@@ -14,11 +14,13 @@ mainmodule Patch {
   mainchare Main {
     entry Main(CkArgMsg* msg);
     entry void checkIn();
+    entry void computeCreationDone();
   };
 
   array [2D] Patch {
     entry Patch();
     entry void start();
+    entry void createComputes();
     entry void updateForces(CkVec<Particle> particles);
     entry void updateParticles(CkVec<Particle> updates);
   };

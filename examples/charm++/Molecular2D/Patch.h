@@ -27,6 +27,7 @@ class Main : public CBase_Main {
     Main(CkMigrateMessage* msg);
 
     void checkIn();
+    void computeCreationDone();
 };
 
 /** \class Patch
@@ -42,6 +43,7 @@ class Patch : public CBase_Patch {
     int updateCount;
     bool updateFlag;
     bool incomingFlag;
+    int computesList[NUM_COMPUTES][4];
 
     void updateProperties();	// updates properties after receiving forces from computes
     void checkNextStep();	// checks whether to continue with next step
@@ -53,6 +55,7 @@ class Patch : public CBase_Patch {
     ~Patch();
 
     void start();
+    void createComputes();
     void updateParticles(CkVec<Particle>&);
     void updateForces(CkVec<Particle>&);
     void limitVelocity(Particle&);

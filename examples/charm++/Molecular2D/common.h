@@ -19,12 +19,18 @@
 #define DEFAULT_MASS		1
 #define DEFAULT_DELTA		0.005
 #define DEFAULT_PARTICLES	2000
+
 #define PATCHARRAY_DIM_X	5
 #define PATCHARRAY_DIM_Y	5
 #define PATCH_SIZE		1
+
 #define DEFAULT_RADIUS		5
 #define DEFAULT_FINALSTEPCOUNT	10
 #define MAX_VELOCITY		30.0
+#define NUM_COMPUTES		9
+
+#define WRAP_X(a)		(((a)+patchArrayDimX)%patchArrayDimX)
+#define WRAP_Y(a)		(((a)+patchArrayDimY)%patchArrayDimY)
 
 // Class for keeping track of the properties for a particle
 class Particle{

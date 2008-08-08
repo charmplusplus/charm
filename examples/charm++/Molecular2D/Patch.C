@@ -36,7 +36,8 @@ double B = 1.0;			// Force Calculation parameter 2
 
 // Entry point of Charm++ application
 Main::Main(CkArgMsg* msg) {
-  int i, j, k, l;  
+
+  CkPrintf("\nLENNARD JONES MOLECULAR DYNAMICS RUNNING ...\n");
 
   numParts = DEFAULT_PARTICLES;
   patchArrayDimX = PATCHARRAY_DIM_X;
@@ -52,70 +53,33 @@ Main::Main(CkArgMsg* msg) {
 
   // initializing the cell 2D array
   patchArray = CProxy_Patch::ckNew(patchArrayDimX, patchArrayDimY);
-  CkPrintf("patches inserted\n");
+  CkPrintf("%d PATCHES CREATED\n", patchArrayDimX*patchArrayDimY);
 
   // initializing the interaction 4D array
   computeArray = CProxy_Compute::ckNew();
  
-  // For Round Robin insertion
-  int numPes = CkNumPes();
-  int currPE = -1;
-  int check[patchArrayDimX][patchArrayDimY][patchArrayDimX][patchArrayDimY];
-  
-  for (int x=0; x<patchArrayDimX; x++)
-    for (int y=0; y<patchArrayDimY; y++)
-      for (int z=0; z<patchArrayDimX; z++)
-	for (int w=0; w<patchArrayDimY; w++)
-	  check[x][y][z][w] = 0;
-
-
   for (int x=0; x<patchArrayDimX; x++) {
     for (int y=0; y<patchArrayDimY; y++) {
-
-      // self interaction
-      if(check[x][y][x][y])
-	CkPrintf("error %d %d %d %d\n", x, y, x, y);
-      else
-	check[x][y][x][y] = 1;
-      computeArray( x, y, x, y ).insert( (currPE++) % numPes );
-
-      // (x,y) and (x+1,y) pair
-      (x == patchArrayDimX-1) ? (i=0, k=x) : (i=x, k=x+1);
-      if(check[i][y][k][y])
-	CkPrintf("error %d %d %d %d\n", i, y, k, y);
-      else
-	check[i][y][k][y] = 1;
-      computeArray( i, y, k, y ).insert( (currPE++) % numPes );
-
-      // (x,y) and (x,y+1) pair
-      (y == patchArrayDimY-1) ? (j=0, l=y) : (j=y, l=y+1);
-      if(check[x][j][x][l])
-	CkPrintf("error %d %d %d %d\n", x, j, x, l);
-      else
-	check[x][j][x][l] = 1;
-      computeArray( x, j, x, l ).insert( (currPE++) % numPes );
-
-      // (x,y) and (x+1,y+1) pair, Irrespective of y
-      (x == patchArrayDimX-1) ? ( i=0, k=x, j=(y+1)%patchArrayDimY, l=y ) : (i=x, k=x+1, j=y, l=(y+1)%patchArrayDimY );
-      if(check[i][j][k][l])
-	CkPrintf("error %d %d %d %d\n", i, j, k, l);
-      else
-	check[i][j][k][l] = 1;
-      computeArray( i, j, k, l ).insert( (currPE++) % numPes );
-
-      // (x,y) and (x-1,y+1) pair
-      (x == 0) ? ( i=x, k=(patchArrayDimX-1), j=y, l=(y+1)%patchArrayDimY ) : (i=x-1, k=x, j=(y+1)%patchArrayDimY, l=y );
-      if(check[i][j][k][l])
-	CkPrintf("error %d %d %d %d\n", i, j, k, l);
-      else
-	check[i][j][k][l] = 1;
-      computeArray( i, j, k, l ).insert( (currPE++) % numPes );
-
+      patchArray(x, y).createComputes();
     }
   }
 
+}
+
+// Constructor for chare object migration
+Main::Main(CkMigrateMessage* msg) { }
+
+void Main::checkIn() {
+  checkInCount ++;
+  if( checkInCount > 0) {
+    CkPrintf("SIMULATION COMPLETE.\n\n");
+    CkExit();
+  }
+}
+
+void Main::computeCreationDone() {
   computeArray.doneInserting();
-  CkPrintf("computes inserted\n");
+  CkPrintf("%d COMPUTES CREATED\n", 5*patchArrayDimX*patchArrayDimY);
 
   // setup liveviz
   // CkCallback c(CkIndex_Patch::requestNextFrame(0),patchArray);
@@ -123,18 +87,7 @@ Main::Main(CkArgMsg* msg) {
   // liveVizInit(cfg,patchArray,c);
 
   // sleep(1);
-  CkPrintf("computes start");
   patchArray.start();
-}
-
-
-// Constructor for chare object migration
-Main::Main(CkMigrateMessage* msg) { }
-
-void Main::checkIn() {
-  checkInCount ++;
-  if( checkInCount > 0)
-    CkExit();
 }
 
 // Default constructor
@@ -173,6 +126,71 @@ Patch::Patch() {
 Patch::Patch(CkMigrateMessage *msg) { }  
                                        
 Patch::~Patch() {}
+
+void Patch::createComputes() {
+  int i, j, k, l, num;  
+  
+  int x = thisIndex.x;
+  int y = thisIndex.y;
+
+  // For Round Robin insertion
+  int numPes = CkNumPes();
+  int currPE = -1;
+ 
+  num = 0;
+
+  /*  The computes X are inserted by a given patch:
+   *
+   *	^  X  X  X
+   *	|  0  X  X
+   *	y  0  0  0
+   *	   x ---->
+   *
+   */
+
+  // interaction with (x-1, y-1)
+  (x==0) ? (i=x, j=y, k=WRAP_X(x-1), l=WRAP_Y(y-1)) : (i=x-1, j=WRAP_Y(y-1), k=x, l=y);
+  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
+
+  // interaction with (x-1, y)
+  (x==0) ? (i=x, j=y, k=WRAP_X(x-1), l=y) : (i=x-1, j=y, k=x, l=y);
+  computesList[num][0] = i; computesList[num][1] = y; computesList[num][2] = k; computesList[num][3] = y; num++;
+  
+  // interaction with (x-1, y+1)
+  (x==0) ? (i=x, j=y, k=WRAP_X(x-1), l=WRAP_Y(y+1)) : (i=x-1, j=WRAP_Y(y+1), k=x, l=y);
+  computesList[num][0] = i; computesList[num][1] = y; computesList[num][2] = k; computesList[num][3] = y; num++;
+  computeArray(i, j, k, l).insert((currPE++) % numPes);
+
+  // interaction with (x, y-1)
+  (y==0) ? (i=x, j=y, k=x, l=WRAP_Y(y-1)) : (i=x, j=y-1, k=x, l=y);
+  computesList[num][0] = i; computesList[num][1] = y; computesList[num][2] = k; computesList[num][3] = y; num++;
+
+  // interaction with (x, y) -- SELF
+  i=x; j=y; k=x; l=y;
+  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
+  computeArray(i, j, k, l).insert((currPE++) % numPes);
+
+  // interaction with (x, y+1)
+  (y==patchArrayDimY-1) ? (i=x, j=0, k=x, l=y) : (i=x, j=y, k=x, l=y+1);
+  computesList[num][0] = i; computesList[num][1] = y; computesList[num][2] = k; computesList[num][3] = y; num++;
+  computeArray(i, j, k, l).insert((currPE++) % numPes);
+
+  // interaction with (x+1, y-1)
+  (x==patchArrayDimX-1) ? (i=0, j=WRAP_Y(y-1), k=x, l=y) : (i=x, j=y, k=x+1, l=WRAP_Y(y-1));
+  computesList[num][0] = i; computesList[num][1] = y; computesList[num][2] = k; computesList[num][3] = y; num++;
+
+  // interaction with (x+1, y)
+  (x==patchArrayDimX-1) ? (i=0, j=y, k=x, l=y) : (i=x, j=y, k=x+1, l=y);
+  computesList[num][0] = i; computesList[num][1] = y; computesList[num][2] = k; computesList[num][3] = y; num++;
+  computeArray(i, j, k, l).insert((currPE++) % numPes);
+
+  // interaction with (x+1, y+1)
+  (x==patchArrayDimX-1) ? (i=0, j=WRAP_Y(y+1), k=x, l=y ) : (i=x, j=y, k=x+1, l=WRAP_Y(y+1));
+  computesList[num][0] = i; computesList[num][1] = y; computesList[num][2] = k; computesList[num][3] = y; num++;
+  computeArray(i, j, k, l).insert( (currPE++) % numPes );
+
+  contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::computeCreationDone(), mainProxy));
+}
 
 // Function to start interaction among particles in neighboring cells as well as its own particles
 void Patch::start() {
@@ -353,10 +371,10 @@ void Patch::updateForces(CkVec<Particle> &updates) {
 // Function that checks whether it must start the following step or wait until other messages are received
 void Patch::checkNextStep(){
   int i;
-  if(thisIndex.x==0 && thisIndex.y==0)
-  CkPrintf("Step %d\n", stepCount);
-
   if(updateFlag && incomingFlag) {
+    if(thisIndex.x==0 && thisIndex.y==0)
+      CkPrintf("Step %d\n", stepCount);
+
     // resetting flags
     updateFlag = false;
     incomingFlag = false;
