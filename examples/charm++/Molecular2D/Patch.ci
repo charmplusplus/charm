@@ -10,6 +10,7 @@ mainmodule Patch {
   readonly int patchSize;	// size of each Patch
   readonly double radius;	// maximum distance between two interacting particles
   readonly int finalStepCount;	// number of steps at which the cells should stop computation
+  readonly double stepTime;
 
   mainchare Main {
     entry Main(CkArgMsg* msg);

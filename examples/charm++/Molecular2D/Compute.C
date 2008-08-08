@@ -28,6 +28,7 @@ extern /* readonly */ int patchArrayDimY;	// Number of Chare Columns
 extern /* readonly */ int patchSize;
 extern /* readonly */ double radius;
 extern /* readonly */ int finalStepCount; 
+extern /* readonly */ double stepTime; 
 
 extern double A;			// Force Calculation parameter 1
 extern double B;			// Force Calculation parameter 2

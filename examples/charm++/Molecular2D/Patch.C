@@ -30,6 +30,7 @@
 /* readonly */ int patchSize; 
 /* readonly */ double radius;
 /* readonly */ int finalStepCount; 
+/* readonly */ double stepTime; 
 
 double A = 2.0;			// Force Calculation parameter 1
 double B = 1.0;			// Force Calculation parameter 2
@@ -37,6 +38,7 @@ double B = 1.0;			// Force Calculation parameter 2
 // Entry point of Charm++ application
 Main::Main(CkArgMsg* msg) {
 
+  stepTime = CmiWallTimer();
   CkPrintf("\nLENNARD JONES MOLECULAR DYNAMICS RUNNING ...\n");
 
   numParts = DEFAULT_PARTICLES;
@@ -228,13 +230,13 @@ void Patch::updateForces(CkVec<Particle> &updates) {
     for(i=0; i<particles.length(); i++) {
       migrateToPatch(particles[i], x1, y1);
       if(x1 !=0 || y1!=0) {
-	outgoing[(x1+1)*3+(y1+1)].push_back(wrapAround(particles[i]));
+	outgoing[(x1+1)*NBRS_Y + (y1+1)].push_back(wrapAround(particles[i]));
 	particles.remove(i);
       }
     }
    
     for(i=0; i<NUM_NEIGHBORS; i++)
-      patchArray(WRAP_X(x + i/3 - 2), WRAP_Y(y + i%3 -2)).updateParticles(outgoing[i]);
+      patchArray(WRAP_X(x + i/NBRS_Y - NBRS_X/2), WRAP_Y(y + i%NBRS_Y - NBRS_Y/2)).updateParticles(outgoing[i]);
 
     updateFlag = true;
 	      
@@ -245,6 +247,8 @@ void Patch::updateForces(CkVec<Particle> &updates) {
 }
 
 void Patch::migrateToPatch(Particle p, int &px, int &py) {
+  // currently this is assuming that particles are
+  // migrating only to the immediate neighbors
   int x = thisIndex.x * patchSize;
   int y = thisIndex.y * patchSize;
 
@@ -260,23 +264,27 @@ void Patch::migrateToPatch(Particle p, int &px, int &py) {
 // Function that checks whether it must start the following step or wait until other messages are received
 void Patch::checkNextStep(){
   int i;
-  if(updateFlag && incomingFlag) {
-    if(thisIndex.x==0 && thisIndex.y==0 && stepCount%10==0)
-      CkPrintf("Step %d %f\n", stepCount, CmiWallTimer());
+  double timer;
 
+  if (updateFlag && incomingFlag) {
     // resetting flags
     updateFlag = false;
     incomingFlag = false;
     stepCount++;
 
     // adding new elements
-    for(i = 0; i < incomingParticles.length(); i++){
+    for (i = 0; i < incomingParticles.length(); i++)
       particles.push_back(incomingParticles[i]);
-    }
     incomingParticles.removeAll();
 
+    if (thisIndex.x==0 && thisIndex.y==0 && stepCount%10==0) {
+      timer = CmiWallTimer();
+      CkPrintf("Step %d Benchmark Time %f ms/step\n", stepCount, ((timer - stepTime)/10)*1000);
+      stepTime = timer;
+    }
+
     // checking for next step
-    if(stepCount >= finalStepCount) {
+    if (stepCount >= finalStepCount) {
       print();
       contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::allDone(), mainProxy)); 
     } else {

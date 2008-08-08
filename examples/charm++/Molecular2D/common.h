@@ -25,9 +25,14 @@
 #define PATCH_SIZE		1
 
 #define DEFAULT_RADIUS		5
-#define DEFAULT_FINALSTEPCOUNT	21
+#define DEFAULT_FINALSTEPCOUNT	51
 #define MAX_VELOCITY		30.0
-#define NUM_NEIGHBORS		9
+
+#define KAWAY_X			1
+#define KAWAY_Y			1
+#define NBRS_X			(2*KAWAY_X+1)
+#define NBRS_Y			(2*KAWAY_Y+1)
+#define NUM_NEIGHBORS		(NBRS_X * NBRS_Y)
 
 #define WRAP_X(a)		(((a)+patchArrayDimX)%patchArrayDimX)
 #define WRAP_Y(a)		(((a)+patchArrayDimY)%patchArrayDimY)
