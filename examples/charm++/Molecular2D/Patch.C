@@ -8,7 +8,6 @@
 /** \file Patch.C
  *  Author: Abhinav S Bhatele
  *  Date Created: July 1st, 2008
- *
  */
 
 #include "time.h"
@@ -37,7 +36,6 @@ double B = 1.0;			// Force Calculation parameter 2
 
 // Entry point of Charm++ application
 Main::Main(CkArgMsg* msg) {
-
   stepTime = CmiWallTimer();
   CkPrintf("\nLENNARD JONES MOLECULAR DYNAMICS RUNNING ...\n");
 
@@ -58,11 +56,9 @@ Main::Main(CkArgMsg* msg) {
   // initializing the interaction 4D array
   computeArray = CProxy_Compute::ckNew();
  
-  for (int x=0; x<patchArrayDimX; x++) {
-    for (int y=0; y<patchArrayDimY; y++) {
+  for (int x=0; x<patchArrayDimX; x++)
+    for (int y=0; y<patchArrayDimY; y++)
       patchArray(x, y).createComputes();
-    }
-  }
 
 }
 
@@ -124,69 +120,55 @@ void Patch::createComputes() {
   
   int x = thisIndex.x;
   int y = thisIndex.y;
+  int px1, py1, dx, dy, px2, py2;
 
   // For Round Robin insertion
   int numPes = CkNumPes();
   int currPE = CkMyPe();
  
-  num = 0;
-
   /*  The computes X are inserted by a given patch:
    *
    *	^  X  X  X
    *	|  0  X  X
    *	y  0  0  0
    *	   x ---->
-   *
    */
 
-  // interaction with (x-1, y-1)
-  (x==0) ? (i=x, j=y, k=WRAP_X(x-1), l=WRAP_Y(y-1)) : (i=x-1, j=WRAP_Y(y-1), k=x, l=y);
-  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
+  // these computes will be created by other patches
+  for (num=0; num<NUM_NEIGHBORS; num++) {
+    dx = num/NBRS_Y - NBRS_X/2;
+    dy = num%NBRS_Y - NBRS_Y/2;
+    if (dx == 0) {
+      px1 = px2 = x;
+      if (dy == 0) { py1 = py2 = y; }
+      if (dy > 0) { (y >= patchArrayDimY - NBRS_Y/2) ? ( py1 = WRAP_Y(y+dy), py2 = y ) : ( py1 = y, py2 = y+dy ); }
+      if (dy < 0) { (y < NBRS_Y/2) ? ( py1 = y, py2 = WRAP_Y(y+dy) ) : ( py1 = y+dy, py2 = y ); }
+    }
 
-  // interaction with (x-1, y)
-  (x==0) ? (i=x, j=y, k=WRAP_X(x-1), l=y) : (i=x-1, j=y, k=x, l=y);
-  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
-  
-  // interaction with (x-1, y+1)
-  (x==0) ? (i=x, j=y, k=WRAP_X(x-1), l=WRAP_Y(y+1)) : (i=x-1, j=WRAP_Y(y+1), k=x, l=y);
-  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
-  computeArray(i, j, k, l).insert((currPE++) % numPes);
+    if (dx > 0) {
+      (x >= patchArrayDimX - NBRS_X/2) ? 
+      ( px1 = WRAP_X(x+dx), py1 = WRAP_Y(y+dy), px2 = x, py2 = y ) : 
+      ( px1 = x, py1 = y, px2 = WRAP_X(x+dx), py2 = WRAP_Y(y+dy) ) ;
+    }
 
-  // interaction with (x, y-1)
-  (y==0) ? (i=x, j=y, k=x, l=WRAP_Y(y-1)) : (i=x, j=y-1, k=x, l=y);
-  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
+    if (dx < 0) {
+      (x < NBRS_X/2) ? 
+      ( px1 = x, py1 = y, px2 = WRAP_X(x+dx), py2 = WRAP_Y(y+dy) ) :
+      ( px1 = WRAP_X(x+dx), py1 = WRAP_Y(y+dy), px2 = x, py2 = y ) ;
+    }
 
-  // interaction with (x, y) -- SELF
-  i=x; j=y; k=x; l=y;
-  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
-  computeArray(i, j, k, l).insert((currPE++) % numPes);
+    computesList[num][0] = px1; computesList[num][1] = py1; computesList[num][2] = px2; computesList[num][3] = py2;
 
-  // interaction with (x, y+1)
-  (y==patchArrayDimY-1) ? (i=x, j=0, k=x, l=y) : (i=x, j=y, k=x, l=y+1);
-  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
-  computeArray(i, j, k, l).insert((currPE++) % numPes);
-
-  // interaction with (x+1, y-1)
-  (x==patchArrayDimX-1) ? (i=0, j=WRAP_Y(y-1), k=x, l=y) : (i=x, j=y, k=x+1, l=WRAP_Y(y-1));
-  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
-
-  // interaction with (x+1, y)
-  (x==patchArrayDimX-1) ? (i=0, j=y, k=x, l=y) : (i=x, j=y, k=x+1, l=y);
-  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
-  computeArray(i, j, k, l).insert((currPE++) % numPes);
-
-  // interaction with (x+1, y+1)
-  (x==patchArrayDimX-1) ? (i=0, j=WRAP_Y(y+1), k=x, l=y ) : (i=x, j=y, k=x+1, l=WRAP_Y(y+1));
-  computesList[num][0] = i; computesList[num][1] = j; computesList[num][2] = k; computesList[num][3] = l; num++;
-  computeArray(i, j, k, l).insert((currPE++) % numPes);
+    //insert only the upper right half computes
+    if (num >= NUM_NEIGHBORS/2)
+      computeArray(px1, py1, px2, py2).insert((currPE++) % numPes);
+  } // end of for loop
 
   contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::computeCreationDone(), mainProxy));
 }
 
 // Function to start interaction among particles in neighboring cells as well as its own particles
 void Patch::start() {
-
   int x = thisIndex.x;
   int y = thisIndex.y;
   int i, j, k, l;
@@ -198,10 +180,9 @@ void Patch::start() {
     l = computesList[num][3];
     computeArray(i, j, k, l).interact(particles, x, y);
   }
-
 }
 
-// Function to update forces coming from a neighbor interaction chare
+// Function to update forces coming from a compute
 void Patch::updateForces(CkVec<Particle> &updates) {
   int i, x, y, x1, y1;
   CkVec<Particle> outgoing[NUM_NEIGHBORS];
@@ -334,18 +315,14 @@ void Patch::updateProperties() {
 }
 
 void Patch::limitVelocity(Particle &p) {
-  //if( fabs(p.vx * DEFAULT_DELTA) > DEFAULT_RADIUS ) {
   if( fabs( p.vx ) > MAX_VELOCITY ) {
-    //if( p.vx * DEFAULT_DELTA < 0.0 )
     if( p.vx < 0.0 )
       p.vx = -MAX_VELOCITY;
     else
       p.vx = MAX_VELOCITY;
   }
 
-  //if( fabs(p.vy * DEFAULT_DELTA) > DEFAULT_RADIUS ) {
   if( fabs(p.vy) > MAX_VELOCITY ) {
-    //if( p.vy * DEFAULT_DELTA < 0.0 )
     if( p.vy < 0.0 )
       p.vy = -MAX_VELOCITY;
     else
@@ -387,12 +364,9 @@ void Patch::requestNextFrame(liveVizRequestMsg *lvmsg) {
   // set the output pixel values for rectangle
   // Each component is a char which can have 256 possible values
   unsigned char *intensity= new unsigned char[3*myWidthPx*myHeightPx];
-  for(int i=0;i<myHeightPx;++i) {
-    for(int j=0;j<myWidthPx;++j) {
-      // black background
-      color_pixel(intensity,myWidthPx,myHeightPx,j,i,0,0,0);
-    } 
-  }
+  for(int i=0; i<myHeightPx; ++i)
+    for(int j=0; j<myWidthPx; ++j)
+      color_pixel(intensity,myWidthPx,myHeightPx,j,i,0,0,0);	// black background
 
   for (int i=0; i < particles.length(); i++ ) {
     int xpos = (int)((particles[i].x /(double) (patchSize*patchArrayDimX)) * wdes) - sx;
@@ -406,14 +380,13 @@ void Patch::requestNextFrame(liveVizRequestMsg *lvmsg) {
     color_pixel(intensity,myWidthPx,myHeightPx,xpos,ypos,c.R,c.B,c.G);
   }
         
-  for(int i=0;i<myHeightPx;++i) {
-    for(int j=0;j<myWidthPx;++j) {
+  for(int i=0; i<myHeightPx; ++i)
+    for(int j=0; j<myWidthPx; ++j) {
       // Draw red lines
       if(i==0 || j==0) {
 	color_pixel(intensity,myWidthPx,myHeightPx,j,i,128,0,0);
       }
     }
-  }
         
   liveVizDeposit(lvmsg, sx,sy, myWidthPx,myHeightPx, intensity, this, max_image_data);
   delete[] intensity;
@@ -425,12 +398,10 @@ void Patch::print(){
 #ifdef PRINT
   int i;
   CkPrintf("*****************************************************\n");
-  CkPrintf("Patch (%d,%d)\n",thisIndex.x,thisIndex.y);
+  CkPrintf("Patch (%d, %d)\n", thisIndex.x, thisIndex.y);
 
-  // CkPrintf("Part     x     y\n");
   for(i=0; i < particles.length(); i++)
-    CkPrintf("Patch (%d,%d) %-5d %7.4f %7.4f \n", thisIndex.x, thisIndex.y, i,
-					      particles[i].x, particles[i].y);
+    CkPrintf("Patch (%d,%d) %-5d %7.4f %7.4f \n", thisIndex.x, thisIndex.y, i, particles[i].x, particles[i].y);
   CkPrintf("*****************************************************\n");
 #endif
 }
