@@ -174,7 +174,7 @@ void CMI_VMI_CmiFree (void *ptr);
 void* elan_CmiAlloc(int size);
 #endif
 
-#if CMK_USE_IBVERBS
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
 void *infi_CmiAlloc(int size);
 void infi_CmiFree(void *ptr);
 void infi_freeMultipleSend(void *ptr);
@@ -2210,7 +2210,7 @@ void *CmiAlloc(int size)
   res = (char *) elan_CmiAlloc(size+sizeof(CmiChunkHeader));
 #elif CONVERSE_VERSION_VMI
   res = (char *) CMI_VMI_CmiAlloc(size+sizeof(CmiChunkHeader));
-#elif CMK_USE_IBVERBS
+#elif CMK_USE_IBVERBS | CMK_USE_IBUD
 	res = (char *) infi_CmiAlloc(size+sizeof(CmiChunkHeader));
 #elif CONVERSE_POOL
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
@@ -2293,7 +2293,7 @@ void CmiFree(void *blk)
     elan_CmiFree(BLKSTART(parentBlk));
 #elif CONVERSE_VERSION_VMI
     CMI_VMI_CmiFree(BLKSTART(parentBlk));
-#elif CMK_USE_IBVERBS
+#elif CMK_USE_IBVERBS | CMK_USE_IBUD
     /* is this message the head of a MultipleSend that we received?
        Then the parts with INFIMULTIPOOL have metadata which must be 
        unregistered and freed.  */
@@ -2446,7 +2446,7 @@ typedef struct {
   double pad; /* To align the first message, which follows this header */
 } CmiMultipleSendHeader;
 
-#if CMK_USE_IBVERBS
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
 /* given a pointer to a multisend message clean up the metadata */
 
 void infi_freeMultipleSend(void *msgWhole)

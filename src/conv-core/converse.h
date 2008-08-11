@@ -572,7 +572,7 @@ typedef struct {
   int ref;
 } CmiChunkHeader;
 
-#if CMK_USE_IBVERBS
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
 struct infiCmiChunkMetaDataStruct;
 
 typedef struct infiCmiChunkHeaderStruct{
