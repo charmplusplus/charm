@@ -331,7 +331,7 @@ int main()
 
 #ifdef WRITE_OUTPUT_FILES
     // Write out the timelines to the same number of files as we started with.
-    BgWriteTraceSummary(totalProcs, numPes, numX, numY, numZ, numCth, numWth, OUTPUTDIR);
+    BgWriteTraceSummary(numPes, numX, numY, numZ, numCth, numWth, OUTPUTDIR);
 #endif
 
     delete [] allNodeOffsets;
