@@ -1358,8 +1358,10 @@ static void recvBarrierMessage() {
 	struct infiPacketHeader *header = NULL;
 	int nodeNo=-1;
 	int len=-1;
+int count=0; // FIXME: remove debug
 MACHSTATE(3,"recvBarrierMessage 0"); // FIXME: REMOVE this debug
 	while(!barrierReached) {
+if(count++>20) CmiAbort(0); // FIXME: remove debug
 		/* gengbin's semantic will implode if more than one q is polled at a time */
 		ne = ibv_poll_cq(context->recvCq,1,&wc[0]);
 		if(ne!=0){
@@ -1426,9 +1428,17 @@ MACHSTATE1(3,"Barrier 1 rank=%i",CmiMyRank());
 		if (CmiMyNode() != 0) {
 MACHSTATE(3,"Barrier sendmsg");
 			sendBarrierMessage(0);
-		}
-MACHSTATE(3,"Barrier 2");
-		if (CmiMyNode() == 0) {
+			recvBarrierMessage();
+			for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
+				int p = CmiMyNode();
+				p = BROADCAST_SPANNING_FACTOR*p + i;
+				if (p > numnodes - 1) break;
+				p = p%numnodes;
+				/* printf("[%d] RELAY => %d \n", CmiMyPe(), p); */
+				sendBarrierMessage(p);
+			}
+		} else {
+MACHSTATE(3,"Barrier else");
 			for (count = 1; count < numnodes; count ++) {
 				recvBarrierMessage();
 			}
@@ -1441,18 +1451,6 @@ MACHSTATE(3,"Barrier 2");
 			}
 		}
 MACHSTATE(3,"Barrier 3");
-		/* non 0 node waiting */
-		if (CmiMyNode() != 0) {
-			recvBarrierMessage();
-			for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
-				int p = CmiMyNode();
-				p = BROADCAST_SPANNING_FACTOR*p + i;
-				if (p > numnodes - 1) break;
-				p = p%numnodes;
-				/* printf("[%d] RELAY => %d \n", CmiMyPe(), p); */
-				sendBarrierMessage(p);
-			}
-		}
 	}
 MACHSTATE(3,"Barrier 4");
 	CmiNodeAllBarrier();
@@ -1513,7 +1511,6 @@ void createqp(struct ibv_device *dev){
 			.max_send_sge = 2,
 		},
 */
-		// FIXME: reduce cq to 1 instead of 2
 		.qp_type = IBV_QPT_UD,
 		.send_cq = context->sendCq,
 		.recv_cq = context->recvCq,
@@ -1524,26 +1521,42 @@ void createqp(struct ibv_device *dev){
 			.max_recv_sge = 1
 		},
 	};
-	struct ibv_qp_attr attr;
-
-	attr.qp_state        = IBV_QPS_INIT;
-	attr.pkey_index      = 0;
-	attr.port_num        = context->ibPort;
+	context->qp = ibv_create_qp(context->pd,&initAttr);
+    CmiAssert(context->qp != NULL);
+    MACHSTATE1(3,"qp created %p",context->qp);
+    {
+    	struct ibv_qp_attr attr;
+    	attr.qp_state        = IBV_QPS_INIT;
+    	attr.pkey_index      = 0;
+    	attr.port_num        = context->ibPort; 
+        attr.qkey            = 0;
 //	attr.qp_access_flags = IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE; // FIXME: Don't need
 
-	context->qp = ibv_create_qp(context->pd,&initAttr);
-	CmiAssert(context->qp != NULL);
-	MACHSTATE1(3,"qp created %p",context->qp);
 			
-	ibv_modify_qp(context->qp, &attr,
-		IBV_QP_STATE              |
-		IBV_QP_PKEY_INDEX         |
-		IBV_QP_PORT               |
-		IBV_QP_ACCESS_FLAGS);		
-
+	    if(ibv_modify_qp(context->qp, &attr,
+		    IBV_QP_STATE              |
+    		IBV_QP_PKEY_INDEX         |
+	    	IBV_QP_PORT               |
+		    IBV_QP_QKEY))
+            CmiAbort("Could not modify QP to INIT");
+    }
 	context->localAddr.qpn = context->qp->qp_num;
 	context->localAddr.psn = lrand48() & 0xffffff;
-	MACHSTATE3(4,"qp information (lid=%i qpn=%i psn=%i)\n",context->localAddr.lid,context->localAddr.qpn,context->localAddr.psn);
+    {
+    	struct ibv_qp_attr attr;
+        attr.qp_state = IBV_QPS_RTR;
+        if(ibv_modify_qp(context->qp, &attr, IBV_QP_STATE))
+            CmiAbort("Could not modify QP to RTR");
+    }
+    {
+    	struct ibv_qp_attr attr;
+        attr.qp_state = IBV_QPS_RTS;
+        attr.sq_psn=context->localAddr.psn;
+        if(ibv_modify_qp(context->qp, &attr, IBV_QP_STATE|IBV_QP_SQ_PSN))
+            CmiAbort("Could not modify QP to RTS");
+    }
+
+	MACHSTATE3(4,"qp information (lid=%i qpn=%i psn=%i)",context->localAddr.lid,context->localAddr.qpn,context->localAddr.psn);
 }
 
 void createah() {
