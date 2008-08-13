@@ -786,6 +786,26 @@ fi
 
 fi
 
+### test for libjpeg ####
+cat > $tc <<EOT
+#include <stdio.h>
+#include <stdlib.h>
+#include "jpeglib.h"
+
+int main()
+{
+  struct jpeg_compress_struct cinfo;
+  jpeg_create_compress(&cinfo);
+  return 0;
+}
+EOT
+test_linkc "whether it has libjpeg" "yes" "no" "-ljpeg"
+AC_DEFINE_UNQUOTED(CMK_USE_LIBJPEG, $pass, [whether it has libjpeg])
+if test $pass -eq 1
+then
+        add_flag 'CMK_LIBJPEG="-ljpeg"' "libjpeg"
+fi
+
 #### test if has values.h ####
 cat > $t <<EOT
 #include <values.h>

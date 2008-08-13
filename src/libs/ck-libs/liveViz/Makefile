@@ -7,11 +7,13 @@ HEADDEP=$(HEADERS) liveViz.def.h ImageData.h
 OBJS=liveViz0.o liveViz.o liveVizPoll.o \
 	colorScale.o ImageData.o compat_float2rgb.o
 DEST=$(CDIR)/lib/libmoduleliveViz.a
+DEP=$(CDIR)/lib/libmoduleliveViz.dep
 
 all: $(DEST)
 
 $(DEST): $(OBJS) $(COMPAT) headers
 	$(CHARMC) $(OBJS) $(COMPAT) -o $@
+	. $(CDIR)/tmp/conv-mach-opt.sh && echo "$$CMK_LIBJPEG" > $(DEP)
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/

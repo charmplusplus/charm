@@ -156,6 +156,9 @@
 /* whether glibc backtrace works */
 #undef CMK_USE_BACKTRACE
 
+/* whether it has libjpeg */
+#undef CMK_USE_LIBJPEG
+
 /* whether it has mkstemp */
 #undef CMK_USE_MKSTEMP
 

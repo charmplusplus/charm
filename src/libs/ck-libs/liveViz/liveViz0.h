@@ -19,6 +19,10 @@ struct liveVizRequest {
 	int code; ///< Application-defined request type
 	int wid,ht;///< Size (pixels) of requested image
 	
+	typedef enum {compressionNone=0, compressionJPEG=1} compressionType_t;
+	int compressionType; ///< 0: uncompressed; 1: JPEG; 2: zip?
+	int compressionQuality; ///< For jpeg, 0..100 percent quality.
+	
 	void pupNetwork(PUP::er &p);
 };
 
@@ -57,6 +61,7 @@ void liveViz0Deposit(const liveVizRequest &req,byte * imageData);
 */
 class liveVizConfig {
 public:
+	/* This enum determines how images are combined on the parallel machine */
 	typedef enum {
 		/* Greyscale pixels: 1 byte (grey) per pixel */
 		pix_greyscale=0,
