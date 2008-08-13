@@ -17,6 +17,11 @@
 #include "charm.h"
 #include "middle.h"
 
+//typedef float floatType;
+typedef double floatType;
+
+//#define COMPRESS_LDB                       1
+
 extern int _lb_version;
 
 #ifdef __cplusplus
@@ -104,9 +109,11 @@ typedef struct {
 
 typedef struct {
   LDObjHandle handle;
-  double cpuTime;
-  double wallTime;
-  double minWall, maxWall;
+  floatType cpuTime;
+  floatType wallTime;
+#if ! COMPRESS_LDB
+  floatType minWall, maxWall;
+#endif
   CmiBool migratable;
   CmiBool asyncArrival;
 #ifdef __cplusplus
@@ -396,8 +403,10 @@ inline void LDObjData::pup(PUP::er &p) {
   p|handle;
   p|cpuTime;
   p|wallTime;
+#if ! COMPRESS_LDB
   p|minWall;
   p|maxWall;
+#endif
   p|migratable;
   if (_lb_version > -1) p|asyncArrival;
 }
