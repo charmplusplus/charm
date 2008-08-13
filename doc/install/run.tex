@@ -138,6 +138,27 @@ file, because {\tt rsh} does not run the {\tt .login} file.
 \end{enumerate}
 
 
+\subsubsection{Multicore Options}
+
+On multicore platforms, operating systems (by default) are free to move
+processes and threads among cores to balance load. This however sometimes can
+degrade the performance of Charm++ applications due to the extra overhead of
+moving processes and threads, especailly when Charm++ applications has already
+implemented its own dynamic load balancing.
+
+Charm++ provides the following runtime options to set the processor affinity
+automatically so that processes or threads no longer move. When cpu affinity
+is supported by an operating system (tested at Charm++ configuration time),
+same runtime options can be used for all flavors of Charm++ versions including
+network and MPI versions, smp and non-smp versions.
+
+\begin{description}
+
+\item[{\tt +setcpuaffinity}]             set cpu affinity automatically for processes (when Charm++ is based on non-smp versions) or threads (when smp)
+
+\item[{\tt +excludecore <core \#>}]       does not set cpu affinity for the given core number. One can use this option multiple times to provide a list of core numbers to avoid.
+
+\end{description}
 
 \subsection{Nodelist file}
 
