@@ -16,7 +16,7 @@ mainmodule LB_Bench {
     entry void fromRight();
     entry void fromUp();
     entry void fromDown();
-	entry void startup();
+    entry void startup();
     entry void next_iter();
   };
 };

@@ -194,11 +194,12 @@ public:
 
   virtual void pup(PUP::er &p)
   {
-	p | iterations;
+    CBase_LB_Bench::pup(p);
+    p | iterations;
     p | received_right;
-	p | received_left;
-	p | received_up;
-	p | received_down;
+    p | received_left;
+    p | received_up;
+    p | received_down;
   }
 
 
