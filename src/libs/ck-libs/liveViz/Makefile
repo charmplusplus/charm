@@ -13,7 +13,7 @@ all: $(DEST)
 
 $(DEST): $(OBJS) $(COMPAT) headers
 	$(CHARMC) $(OBJS) $(COMPAT) -o $@
-	. $(CDIR)/tmp/conv-mach-opt.sh && echo "$$CMK_LIBJPEG" > $(DEP)
+	(cd $(CDIR)/tmp; . ./conv-mach-opt.sh && echo "$$CMK_LIBJPEG") > $(DEP)
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
