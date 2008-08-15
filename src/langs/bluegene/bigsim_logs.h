@@ -314,7 +314,7 @@ int BgReadProc(int procNum, int numWth, int numPes, int totalProcs, int* allNode
 int* BgLoadOffsets(int totalProcs, int numPes);
 void BgWriteThreadTimeLine(char *fname, int x, int y, int z, int th, BgTimeLine &tline);
 void BgWriteTraceSummary(int numPes, int x, int y=1, int z=1, int numWth=1, int numCth=1, char *traceroot=NULL);
-void BgWriteTimelines(int seqno, BgTimeLineRec *tlinerecs, int nlocalProcs, int numWth=1, char *traceroot=NULL);
+void BgWriteTimelines(int seqno, BgTimeLineRec **tlinerecs, int nlocalNodes, char *traceroot=NULL);
 extern "C" void BgGenerateLogs();
 
 #endif

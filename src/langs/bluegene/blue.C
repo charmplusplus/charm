@@ -1670,7 +1670,7 @@ static void writeToDisk()
 
   char* d = new char[1025];
   //Num of simulated procs on this real pe
-  int numProcs = cva(numNodes)*cva(bgMach).numWth;
+  int numLocalProcs = cva(numNodes)*cva(bgMach).numWth;
 
   const PUP::machineInfo &machInfo = PUP::machineInfo::current();
 
@@ -1679,7 +1679,7 @@ static void writeToDisk()
     
     sprintf(d, "%sbgTrace", cva(bgMach).traceroot?cva(bgMach).traceroot:""); 
     FILE *f2 = fopen(d,"w");
-    //Total real and toal BG processors
+    //Total emulating processors and total target BG processors
     int numPes=CmiNumPes();
     int totalProcs = BgNumNodes()*cva(bgMach).numWth;
 
@@ -1702,17 +1702,18 @@ static void writeToDisk()
   sprintf(d, "%sbgTrace%d", cva(bgMach).traceroot?cva(bgMach).traceroot:"", CmiMyPe()); 
   FILE *f = fopen(d,"w");
  
-  int *procOffsets = new int[numProcs];
   if(f==NULL)
     CmiPrintf("Creating bgTrace%d failed\n",CmiMyPe());
   PUP::toDisk p(f);
   
   p((char *)&machInfo, sizeof(machInfo));	// machine info
-  p|numProcs;
+  p|numLocalProcs;
 
   // CmiPrintf("Timelines are: \n");
   int procTablePos = ftell(f);
-  int procTableSize = (numProcs)*sizeof(int);
+
+  int *procOffsets = new int[numLocalProcs];
+  int procTableSize = (numLocalProcs)*sizeof(int);
   fseek(f,procTableSize,SEEK_CUR); 
 
   for (int j=0; j<cva(numNodes); j++){
@@ -1724,7 +1725,7 @@ static void writeToDisk()
   }
   
   fseek(f,procTablePos,SEEK_SET);
-  p(procOffsets,numProcs);
+  p(procOffsets,numLocalProcs);
   fclose(f);
 
   CmiPrintf("[%d] Wrote to disk for %d BG nodes. \n", CmiMyPe(), cva(numNodes));

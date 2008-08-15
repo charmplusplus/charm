@@ -38,6 +38,11 @@ void BgEndLastLog(BgTimeLineRec &tlinerec)
   tlinerec.logEntryClose();
 }
 
+//
+// BigSim APIs for writing trace log files
+//
+
+//  dump timeline into ASCII format
 void BgWriteThreadTimeLine(char *pgm, int x, int y, int z, int th, BgTimeLine &tline)
 {
   char *fname = (char *)malloc(strlen(pgm)+100);
@@ -52,6 +57,7 @@ void BgWriteThreadTimeLine(char *pgm, int x, int y, int z, int th, BgTimeLine &t
   free(fname);
 }
 
+// write bgTrace file
 void BgWriteTraceSummary(int numPes, int x, int y, int z, int numWth, int numCth, char *traceroot)
 {
   char* d = new char[512];
@@ -84,7 +90,14 @@ void BgWriteTraceSummary(int numPes, int x, int y, int z, int numWth, int numCth
   fclose(f);
 }
 
-void BgWriteTimelines(int seqno, BgTimeLineRec *tlinerecs, int nlocalProcs, int numWth, char *traceroot)
+// write bgTrace<seqno> file with an array of timelines
+//
+// note that target processors are mapped to bgTrace* files in round-robin 
+// fashion
+// that is "tlinerecs" should contains timelines of target processors of 
+//   i, i+p, i+2p ..., where p is the number of emulating processors, i.e.
+//   the number of bgTrace* files to write.
+void BgWriteTimelines(int seqno, BgTimeLineRec **tlinerecs, int nlocalProcs, char *traceroot)
 {
   int *procOffsets = new int[nlocalProcs];
 
@@ -102,11 +115,11 @@ void BgWriteTimelines(int seqno, BgTimeLineRec *tlinerecs, int nlocalProcs, int 
   int procTableSize = (nlocalProcs)*sizeof(int);
   fseek(f,procTableSize,SEEK_CUR); 
 
-  int numNodes = nlocalProcs / numWth;
+//  int numNodes = nlocalProcs / numWth;
   for(int i=0;i<nlocalProcs;i++) {
-    BgTimeLineRec &t = tlinerecs[i];
+    BgTimeLineRec *t = tlinerecs[i];
     procOffsets[i] = ftell(f);
-    t.pup(p);
+    t->pup(p);
   }
   
   fseek(f,procTablePos,SEEK_SET);
@@ -116,3 +129,4 @@ void BgWriteTimelines(int seqno, BgTimeLineRec *tlinerecs, int nlocalProcs, int 
   CmiPrintf("BgWriteTimelines> Wrote to disk for %d simulated nodes. \n", nlocalProcs);
   delete [] d;
 }
+
