@@ -119,12 +119,13 @@ int main()
 
 
     for (int fileNum=0; fileNum<numPes; fileNum++){
-        BgTimeLineRec *tlinerecs = new BgTimeLineRec[totalProcs/numPes+1];
+        BgTimeLineRec **tlinerecs = new BgTimeLineRec*[totalProcs/numPes+1];
         int rec_count = 0;
 
         for(int procNum=fileNum;procNum<totalProcs;procNum+=numPes){
 
-            BgTimeLineRec &tlinerec = tlinerecs[rec_count];
+            tlinerecs[rec_count] = new BgTimeLineRec;
+            BgTimeLineRec &tlinerec = *tlinerecs[rec_count];
             rec_count++;
 
             currTline = &tlinerec;
@@ -303,7 +304,7 @@ int main()
 #ifdef WRITE_OUTPUT_FILES
             // Write out the file
             cout << "writing " << rec_count << " simulated processors to this bgTrace file" << endl;
-            BgWriteTimelines(fileNum,tlinerecs,rec_count,numWth,OUTPUTDIR);
+            BgWriteTimelines(fileNum,tlinerecs,rec_count,OUTPUTDIR);
 #endif
         delete[] tlinerecs;
 
