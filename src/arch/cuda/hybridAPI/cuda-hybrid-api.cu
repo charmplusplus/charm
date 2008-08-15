@@ -164,7 +164,9 @@ void gpuProgressFn() {
       dequeue(wrQueue);
       CUDACallbackManager(wr->callbackFn);
     }
-      
+    else {
+      return; 
+    }
   }
 }
 
