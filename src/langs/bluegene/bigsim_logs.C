@@ -183,7 +183,7 @@ BgTimeLog::BgTimeLog(int _ep, int srcpe, int msgid, double _startTime, double _e
 BgTimeLog::BgTimeLog(int epc, char* namestr,double sTime)
 { 
   if(namestr == NULL)
-    namestr = "dummyname1";
+    namestr = (char*)"dummyname1";
   strncpy(name,namestr,20);
   ep = epc;
   startTime = sTime;
@@ -201,7 +201,7 @@ BgTimeLog::BgTimeLog(int epc, char* namestr,double sTime)
 BgTimeLog::BgTimeLog(int epc, char* namestr, double sTime, double eTime)
 {
   if(namestr == NULL)
-    namestr = "dummyname2";
+    namestr = (char*)"dummyname2";
   strncpy(name,namestr, 20);
   ep = epc;
   startTime = sTime;
@@ -489,7 +489,7 @@ void BgTimeLineRec::logEntrySplit()
   logEntryClose();
 
   // make up a new bglog to start, setting up dependencies.
-  BgTimeLog *newLog = new BgTimeLog(-1, "split-broadcast", timerFunc());
+  BgTimeLog *newLog = new BgTimeLog(-1, (char*)"split-broadcast", timerFunc());
   newLog->addBackwardDep(rootLog);
   logEntryInsert(newLog);
   bgCurLog = newLog;

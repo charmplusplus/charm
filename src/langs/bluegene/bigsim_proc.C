@@ -1,7 +1,7 @@
 
 #include "blue.h"
 #include "blue_impl.h"    	// implementation header file
-#include "blue_timing.h" 	// timing module
+//#include "blue_timing.h" 	// timing module
 
 #define  DEBUGF(x)      //CmiPrintf x;
 
@@ -91,7 +91,7 @@ void BgScheduler(int nmsg)
   if (genTimeLog && isinterrupt) 
   {
     BgTimeLog *curlog = BgLastLog(tTIMELINEREC);
-    BgTimeLog *newLog = BgStartLogByName(tTIMELINEREC, -1, "BgSchedulerEnd", BgGetCurTime(), curlog);
+    BgTimeLog *newLog = BgStartLogByName(tTIMELINEREC, -1, (char*)"BgSchedulerEnd", BgGetCurTime(), curlog);
   }
 }
 

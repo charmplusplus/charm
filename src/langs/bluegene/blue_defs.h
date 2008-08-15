@@ -78,7 +78,7 @@ inline int isEqual(double v1, double v2){
 		  /*CmiAssert(0);*/ 			\
 		  /*double curT = CmiBgMsgRecvTime(m);*/		\
 		  double curT = BgGetTime();		\
-		  BgTimeLog *newLog = new BgTimeLog(-1, "addMsg", curT, curT); \
+		  BgTimeLog *newLog = new BgTimeLog(-1, (char*)"addMsg", curT, curT); \
 		  newLog->recvTime = newLog->effRecvTime = curT;	\
                   newLog->addMsg(m, node, tid, local, group);		\
 		  tlinerec.logEntryInsert(newLog);		\

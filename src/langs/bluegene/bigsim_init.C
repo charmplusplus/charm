@@ -29,7 +29,7 @@
 #include "queueing.h"
 #include "blue.h"
 #include "blue_impl.h"    	// implementation header file
-#include "blue_timing.h" 	// timing module
+//#include "blue_timing.h" 	// timing module
 
 extern CmiStartFn bgMain(int argc, char **argv);
 

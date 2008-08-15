@@ -59,7 +59,7 @@ void BgWriteTraceSummary(int numPes, int x, int y, int z, int numWth, int numCth
 
   const PUP::machineInfo &machInfo = PUP::machineInfo::current();
 
-  if (!traceroot) traceroot="";
+  if (!traceroot) traceroot=(char*)"";
   sprintf(d, "%sbgTrace", traceroot);
   FILE *f = fopen(d,"w");
   if(f==NULL) {

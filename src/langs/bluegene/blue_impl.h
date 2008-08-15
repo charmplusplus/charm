@@ -7,8 +7,8 @@
 #include "ckliststring.h"
 
 #include "blue_types.h"
-#include "blue_timing.h"
-#include "blue_network.h"
+#include "bigsim_timing.h"
+#include "bigsim_network.h"
 
 /* alway use handler table per node */
 #if ! defined(CMK_BLUEGENE_NODE) && ! defined(CMK_BLUEGENE_THREAD)

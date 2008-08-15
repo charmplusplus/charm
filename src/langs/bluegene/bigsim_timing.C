@@ -3,7 +3,7 @@
 
 #include "blue.h"
 #include "blue_impl.h"
-#include "blue_timing.h"
+//#include "blue_timing.h"
 
 #define INTEGRITY_CHECK		1
 
@@ -702,7 +702,7 @@ void bgAddProjEvent(void *data, int idx, double t, bgEventCallBackFn fn, void *u
     // ignore standalone event
     // return;
     double endT = tlog->endTime;
-    tlog = new BgTimeLog(-1, "standalone", endT, endT);	
+    tlog = new BgTimeLog(-1, (char*)"standalone", endT, endT);	
     tlog->recvTime = tlog->effRecvTime = endT;
     tlinerec.enq(tlog, 0);
   }
