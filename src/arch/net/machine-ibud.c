@@ -37,6 +37,7 @@ static int maxtokens;
 static int firstBinSize;
 static int blockThreshold;
 static int blockAllocRatio;
+static int packetsize;
 
 
 struct ibudstruct {
@@ -82,10 +83,12 @@ struct infiContext {
 	struct ibv_srq  	*srq;
 	struct ibv_mr		*mr;
 	struct ibv_ah		**ah;
-	
+
 	struct ibv_qp		*qp;
 
 	struct infiAddr localAddr; //store the lid,qpn,msn address of ur qpair until they are sent
+
+    struct infiBufferPool *recvBufferPool;
 
 	infiPacket infiPacketFreeList;
 
@@ -137,6 +140,13 @@ typedef struct infiCmiChunkMetaDataStruct {
         int count;
 } infiCmiChunkMetaData;
 
+struct infiBufferPool{
+    int numBuffers;
+    struct infiBuffer *buffers;
+    struct infiBufferPool *next;
+};
+
+
 /*
 typedef struct infiCmiChunkHeaderStruct{
 	struct infiCmiChunkMetaDataStruct *metaData;
@@ -145,6 +155,37 @@ typedef struct infiCmiChunkHeaderStruct{
 
 struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
 */
+
+// FIXME: temp for error reading
+static const char *const __ibv_wc_status_str[] = {
+   "Success",
+   "Local Length Error",
+   "Local QP Operation Error",
+   "Local EE Context Operation Error",
+   "Local Protection Error",
+   "Work Request Flushed Error",
+   "Memory Management Operation Error",
+   "Bad Response Error",
+   "Local Access Error",
+   "Remote Invalid Request Error",
+   "Remote Access Error",
+   "Remote Operation Error",
+   "Transport Retry Counter Exceeded",
+   "RNR Retry Counter Exceeded",
+   "Local RDD Violation Error",
+   "Remote Invalid RD Request",
+   "Aborted Error",
+   "Invalid EE Context Number",
+   "Invalid EE Context State",
+   "Fatal Error",
+   "Response Timeout Error",
+   "General Error"
+};
+const char *ibv_wc_status_str(enum ibv_wc_status status) {
+   if (status < IBV_WC_SUCCESS || status > IBV_WC_GENERAL_ERR)
+       status = IBV_WC_GENERAL_ERR;
+   return (__ibv_wc_status_str[status]);
+}
 
 /***** BEGIN MEMORY MANAGEMENT STUFF *****/
 typedef struct {
@@ -205,6 +246,7 @@ static inline void *getInfiCmiChunk(int dataSize){
 
                 if(poolIdx < INFINUMPOOLS ){
                         allocSize = infiCmiChunkPools[poolIdx].size;
+//                        CmiAssert(allocSize>=dataSize); // FIXME: added this assertion
                 }else{
                         allocSize = dataSize;
                 }
@@ -215,7 +257,7 @@ static inline void *getInfiCmiChunk(int dataSize){
                 res = malloc((allocSize+sizeof(infiCmiChunkHeader))*count);
                 hdr = res;
 
-                key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+                key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_LOCAL_WRITE);
                 CmiAssert(key != NULL);
 
                 origres = (res += sizeof(infiCmiChunkHeader));
@@ -239,7 +281,7 @@ static inline void *getInfiCmiChunk(int dataSize){
                         if(i != count-1){
                                 res += (allocSize+sizeof(infiCmiChunkHeader));
                         }
-          }
+                }
                 MACHSTATE3(2,"AllocSize %d buf %p key %p",allocSize,res,metaData->key);
 
                 return origres;
@@ -281,7 +323,6 @@ void * infi_CmiAlloc(int size){
 	#endif
 	return res;
 }
-
 
 
 void infi_CmiFree(void *ptr){
@@ -340,10 +381,111 @@ void infi_CmiFree(void *ptr){
 }
 
 
+static void initInfiCmiChunkPools(){
+    int i,j;
+    int size = firstBinSize;
+    int nodeSize;
 
+    size = firstBinSize;    
+    for(i=0;i<INFINUMPOOLS;i++){
+        infiCmiChunkPools[i].size = size;
+        infiCmiChunkPools[i].startBuf = NULL;
+        infiCmiChunkPools[i].count = 0;
+        size *= 2;
+    }
+
+} 
+  
 
 
 /***** END MEMORY MANAGEMENT STUFF *****/
+
+
+
+//     Post the buffers as recv work requests
+void postInitialRecvs(struct infiBufferPool *recvBufferPool,int numRecvs,int sizePerBuffer){
+    int j,err;
+    struct ibv_recv_wr *workRequests = malloc(sizeof(struct ibv_recv_wr)*numRecvs);
+    struct ibv_sge *sgElements = malloc(sizeof(struct ibv_sge)*numRecvs);
+    struct ibv_recv_wr *bad_wr;
+
+    int startBufferIdx=0;
+    MACHSTATE2(3,"posting %d receives of size %d",numRecvs,sizePerBuffer);
+    for(j=0;j<numRecvs;j++){
+
+
+        sgElements[j].addr = (uint64_t) recvBufferPool->buffers[startBufferIdx+j].buf;
+        sgElements[j].length = sizePerBuffer;
+        sgElements[j].lkey = recvBufferPool->buffers[startBufferIdx+j].key->lkey;
+
+        workRequests[j].wr_id = (uint64_t)&(recvBufferPool->buffers[startBufferIdx+j]);
+        workRequests[j].sg_list = &sgElements[j];
+        workRequests[j].num_sge = 1;
+        if(j != numRecvs-1){
+            workRequests[j].next = &workRequests[j+1];
+        }
+
+    }
+    workRequests[numRecvs-1].next = NULL;
+    MACHSTATE(3,"About to call ibv_post_recv");
+    CmiAssert(ibv_post_recv(context->qp,workRequests,&bad_wr)==0); 
+
+    free(workRequests);
+    free(sgElements);
+}
+
+struct infiBufferPool * allocateInfiBufferPool(int numRecvs,int sizePerBuffer){
+    int numBuffers;
+    int i;
+    int bigSize;
+    char *bigBuf;
+    struct infiBufferPool *ret;
+    struct ibv_mr *bigKey;
+
+    MACHSTATE2(3,"allocateInfiBufferPool numRecvs %d sizePerBuffer%d ",numRecvs,sizePerBuffer);
+
+    //page_size = sysconf(_SC_PAGESIZE);
+    ret = malloc(sizeof(struct infiBufferPool));
+    ret->next = NULL;
+    numBuffers=ret->numBuffers = numRecvs;
+
+    ret->buffers = malloc(sizeof(struct infiBuffer)*numBuffers);
+
+    bigSize = numBuffers*sizePerBuffer;
+    bigBuf=malloc(bigSize);
+    bigKey = ibv_reg_mr(context->pd,bigBuf,bigSize,IBV_ACCESS_LOCAL_WRITE);
+    CmiAssert(bigKey != NULL);
+
+    for(i=0;i<numBuffers;i++){
+        struct infiBuffer *buffer =  &(ret->buffers[i]);
+        buffer->type = 1;
+        buffer->size = sizePerBuffer;
+
+        buffer->buf = &bigBuf[i*sizePerBuffer];
+        buffer->key = bigKey;
+
+        if(buffer->key == NULL){
+            MACHSTATE2(3,"i %d buffer->buf %p",i,buffer->buf);
+            CmiAssert(buffer->key != NULL);
+        }
+    }
+    return ret;
+};
+
+
+
+void    infiPostInitialRecvs(){
+    //create the pool and post the receives 
+    int numPosts;
+    
+    context->recvBufferPool=allocateInfiBufferPool(maxrecvbuffers,packetsize);
+    postInitialRecvs(context->recvBufferPool,maxrecvbuffers,packetsize);
+
+}   
+
+/*
+*/
+
 
 
 
@@ -450,129 +592,6 @@ int CheckSocketsReady(int withDelayMs)
   return nreadable;
 }
 
-/***********************************************************************
- * TransmitAckDatagram
- *
- * This function sends the ack datagram, after setting the window
- * array to show which of the datagrams in the current window have been
- * received. The sending side will then use this information to resend
- * packets, mark packets as received, etc. This system also prevents
- * multiple retransmissions/acks when acks are lost.
- ***********************************************************************/
-//													OPTIONAL - can be removed
-/*
-void TransmitAckDatagram(OtherNode node)
-{
-  DgramAck ack; int i, seqno, slot; ExplicitDgram dg;
-  int retval;
-  
-  seqno = node->recv_next;
-  MACHSTATE2(3,"  TransmitAckDgram [seq %d to 'pe' %d]",seqno,node->nodestart)
-  DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, Cmi_charmrun_pid, seqno, 0);
-  LOG(Cmi_clock, Cmi_nodestart, 'A', node->nodestart, seqno);
-  for (i=0; i<Cmi_window_size; i++) {
-    slot = seqno % Cmi_window_size;
-    dg = node->recv_window[slot];
-    ack.window[i] = (dg && (dg->seqno == seqno));
-    seqno = ((seqno+1) & DGRAM_SEQNO_MASK);
-  }
-  memcpy(&ack.window[Cmi_window_size], &(node->send_ack_seqno), 
-          sizeof(unsigned int));
-  node->send_ack_seqno = ((node->send_ack_seqno + 1) & DGRAM_SEQNO_MASK);
-  retval = (-1);
-  while(retval==(-1))
-    retval = sendto(dataskt, (char *)&ack,
-	 DGRAM_HEADER_SIZE + Cmi_window_size + sizeof(unsigned int), 0,
-	 (struct sockaddr *)&(node->addr),
-	 sizeof(struct sockaddr_in));
-  node->stat_send_ack++;
-}
-*/
-
-/***********************************************************************
- * TransmitAcknowledgement
- *
- * This function sends the ack datagrams, after checking to see if the 
- * Recv Window is atleast half-full. After that, if the Recv window size 
- * is 0, then the count of un-acked datagrams, and the time at which
- * the ack should be sent is reset.
- ***********************************************************************/
-//													OPTIONAL - can be removed
-/*
-int TransmitAcknowledgement()
-{
-  int skip; static int nextnode=0; OtherNode node;
-  for (skip=0; skip<_Cmi_numnodes; skip++) {
-    node = nodes+nextnode;
-    nextnode = (nextnode + 1) % _Cmi_numnodes;
-    if (node->recv_ack_cnt) {
-      if ((node->recv_ack_cnt > Cmi_half_window) ||
-	  (Cmi_clock >= node->recv_ack_time)) {
-	TransmitAckDatagram(node);
-	if (node->recv_winsz) {
-	  node->recv_ack_cnt  = 1;
-	  node->recv_ack_time = Cmi_clock + Cmi_ack_delay;
-	} else {
-	  node->recv_ack_cnt  = 0;
-	  node->recv_ack_time = 0.0;
-	}
-	return 1;
-      }
-    }
-  }
-  return 0;
-}
-*/
-
-/***********************************************************************
- * TransmitDatagram()
- *
- * This function fills up the Send Window with the contents of the
- * Send Queue. It also sets the node->send_primer variable, which
- * indicates when a retransmission will be attempted.
- ***********************************************************************/
-//													OPTIONAL - can be removed
-/*
-int TransmitDatagram()
-{
-  ImplicitDgram dg; OtherNode node;
-  static int nextnode=0; int skip, count, slot;
-  unsigned int seqno;
-  
-  for (skip=0; skip<_Cmi_numnodes; skip++) {
-    node = nodes+nextnode;
-    nextnode = (nextnode + 1) % _Cmi_numnodes;
-    dg = node->send_queue_h;
-    if (dg) {
-      seqno = dg->seqno;
-      slot = seqno % Cmi_window_size;
-      if (node->send_window[slot] == 0) {
-	node->send_queue_h = dg->next;
-	node->send_window[slot] = dg;
-	TransmitImplicitDgram(dg);
-	if (seqno == ((node->send_last+1)&DGRAM_SEQNO_MASK))
-	  node->send_last = seqno;
-	node->send_primer = Cmi_clock + Cmi_delay_retransmit;
-	return 1;
-      }
-    }
-    if (Cmi_clock > node->send_primer) {
-      slot = (node->send_last % Cmi_window_size);
-      for (count=0; count<Cmi_window_size; count++) {
-	dg = node->send_window[slot];
-	if (dg) break;
-	slot = ((slot+Cmi_window_size-1) % Cmi_window_size);
-      }
-      if (dg) {
-	TransmitImplicitDgram1(node->send_window[slot]);
-	node->send_primer = Cmi_clock + Cmi_delay_retransmit;
-	return 1;
-      }
-    }
-  }
-  return 0;
-}
-*/
 
 
 static inline infiPacket newPacket(){
@@ -592,7 +611,7 @@ static inline infiPacket newPacket(){
 	
 	pkt->wr.wr_id = (uint64_t)pkt;
 	pkt->wr.sg_list = &(pkt->elemList[0]);
-	pkt->wr.num_sge = 1;
+	pkt->wr.num_sge = 1; // FIXME: original ibverbs has 2, but this breaks sending
 	pkt->wr.opcode = IBV_WR_SEND;
 	pkt->wr.send_flags = IBV_SEND_SIGNALED;
 	pkt->wr.next = NULL;
@@ -601,21 +620,72 @@ static inline infiPacket newPacket(){
 };
 
 static void inline EnqueuePacket(OtherNode node,infiPacket packet,int size,struct ibv_mr *dataKey){
+
+/*
+
+	struct ibv_send_wr wr,*bad_wr=NULL;
+    struct ibv_sge list;
+    void *buffer;
+    struct ibv_mr *mr;
+    int pe=node->infiData->nodeNo;
+    int retval;
+
+buffer=malloc(128);
+mr=ibv_reg_mr(context->pd, buffer, 128, IBV_ACCESS_LOCAL_WRITE);
+
+
+    //memset(&list, 0, sizeof(struct ibv_sge));
+    list.addr = (uintptr_t) buffer + 40;
+    list.length = 128;
+    list.lkey = mr->lkey;
+
+        memset(&wr, 0, sizeof(struct ibv_send_wr));
+        //wr.wr_id = 1234;
+        wr.wr_id = (uint64_t)packet;
+        wr.sg_list = &list;
+        wr.num_sge = 1;
+        wr.opcode = IBV_WR_SEND;
+        //wr.send_flags = IBV_SEND_SIGNALED | IBV_SEND_SOLICITED;
+        wr.send_flags = IBV_SEND_SIGNALED;
+        wr.wr.ud.ah = context->ah[pe]; 
+        wr.wr.ud.remote_qpn = nodes[pe].infiData->qp.qpn; 
+        wr.wr.ud.remote_qkey = 0;
+
+        MACHSTATE3(3,"   wr_id=%i qp_num=%i lkey=%p",wr.wr_id,wr.wr.ud.remote_qpn,mr->lkey); 
+
+	if(retval = ibv_post_send(context->qp,&wr,&bad_wr)){ 
+		CmiPrintf("[%d] Sending to node %d failed with return value %d\n",_Cmi_mynode,node->infiData->nodeNo,retval);
+		CmiAssert(0);
+    }
+        ibv_dereg_mr(mr);
+        free(buffer);
+*/
+
 	int retval;
 	struct ibv_send_wr *bad_wr=NULL;
+    MACHSTATE(2," here");
 
-	packet->elemList[1].addr = (uintptr_t)packet->buf;
+// FIXME: these were originally [1], but I don't know why 
+	packet->elemList[1].addr = (uintptr_t)packet->buf; // FIXME: It works if I add 40 here
 	packet->elemList[1].length = size;
 	packet->elemList[1].lkey = dataKey->lkey;
-	
+    MACHSTATE(2," here");
+
 	packet->destNode = node;
 	
-	if(retval = ibv_post_send(context->qp,&(packet->wr),&bad_wr)){ 
+    MACHSTATE(2," here1");
+    MACHSTATE1(2," here qp=%i",context->qp);
+    MACHSTATE1(2," here wr=%i",&(packet->wr));
+    MACHSTATE1(2," here wr=%i",&bad_wr);
+	if(ibv_post_send(context->qp,&(packet->wr),&bad_wr)){ 
+        MACHSTATE(2," problem sending");
 		CmiPrintf("[%d] Sending to node %d failed with return value %d\n",_Cmi_mynode,node->infiData->nodeNo,retval);
 		CmiAssert(0);
 	}
+    MACHSTATE(2," here");
+    MACHSTATE2(3,"Packet send size %d node %d ",size,packet->destNode->infiData->nodeNo);
+    MACHSTATE2(2,"            addr %p lkey %p ",(uintptr_t)packet->buf,dataKey->lkey);
 
-        MACHSTATE2(3,"Packet send size %d node %d ",size,packet->destNode->infiData->nodeNo);
 }
 
 static void inline EnqueueDataPacket(OutgoingMsg ogm, char *data, int size, OtherNode node, int rank, int broot) {
@@ -664,350 +734,6 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 		EnqueueDataPacket(ogm, data, size, node, rank, broot);
 
 }
-
-/***********************************************************************
- * AssembleDatagram()
- *
- * This function does the actual assembly of datagrams into a
- * message. node->asm_msg holds the current message being
- * assembled. Once the message assemble is complete (known by checking
- * if the total number of datagrams is equal to the number of datagrams
- * constituting the assembled message), the message is pushed into the
- * Producer-Consumer queue
- ***********************************************************************/
-//													OPTIONAL - can be removed
-/*
-void AssembleDatagram(OtherNode node, ExplicitDgram dg)
-{
-  int i;
-  unsigned int size; char *msg;
-  OtherNode myNode = nodes+CmiMyNode();
-  
-  MACHSTATE3(2,"  AssembleDatagram [seq %d from 'pe' %d, packet len %d]",
-  	dg->seqno,node->nodestart,dg->len)
-  LOG(Cmi_clock, Cmi_nodestart, 'X', dg->srcpe, dg->seqno);
-  msg = node->asm_msg;
-  if (msg == 0) {
-    size = CmiMsgHeaderGetLength(dg->data);
-    MACHSTATE3(4,"  Assemble new datagram seq %d from 'pe' %d, len %d",
-    	dg->seqno,node->nodestart,size)
-    msg = (char *)CmiAlloc(size);
-    if (!msg)
-      fprintf(stderr, "%d: Out of mem\n", _Cmi_mynode);
-    if (size < dg->len) KillEveryoneCode(4559312);
-#ifndef CMK_OPTIMIZE
-    setMemoryTypeMessage(msg);
-#endif
-    memcpy(msg, (char*)(dg->data), dg->len);
-    node->asm_rank = dg->rank;
-    node->asm_total = size;
-    node->asm_fill = dg->len;
-    node->asm_msg = msg;
-  } else {
-    size = dg->len - DGRAM_HEADER_SIZE;
-    memcpy(msg + node->asm_fill, ((char*)(dg->data))+DGRAM_HEADER_SIZE, size);
-    node->asm_fill += size;
-  }
-  MACHSTATE3(2,"  AssembleDatagram: now have %d of %d bytes from %d",
-  	node->asm_fill, node->asm_total, node->nodestart)
-  if (node->asm_fill > node->asm_total) {
-      fprintf(stderr, "\n\n\t\tLength mismatch!!\n\n");
-      fflush(stderr);
-      MACHSTATE4(5,"Length mismatch seq %d, from 'pe' %d, fill %d, total %d\n", dg->seqno,node->nodestart,node->asm_fill,node->asm_total)
-      KillEveryoneCode(4559313);
-  }
-  if (node->asm_fill == node->asm_total) {
-    // spanning tree broadcast - send first to avoid invalid msg ptr 
-#if CMK_BROADCAST_SPANNING_TREE
-    if (node->asm_rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE 
-          || node->asm_rank == DGRAM_NODEBROADCAST
-#endif
-      )
-        SendSpanningChildren(NULL, 0, node->asm_total, msg, dg->broot, dg->rank);
-#elif CMK_BROADCAST_HYPERCUBE
-    if (node->asm_rank == DGRAM_BROADCAST
-#if CMK_NODE_QUEUE_AVAILABLE
-          || node->asm_rank == DGRAM_NODEBROADCAST
-#endif
-      )
-        SendHypercube(NULL, 0, node->asm_total, msg, dg->broot, dg->rank);
-#endif
-    if (node->asm_rank == DGRAM_BROADCAST) {
-      int len = node->asm_total;
-      for (i=1; i<_Cmi_mynodesize; i++)
-         CmiPushPE(i, CopyMsg(msg, len));
-      CmiPushPE(0, msg);
-    } else {
-#if CMK_NODE_QUEUE_AVAILABLE
-         if (node->asm_rank==DGRAM_NODEMESSAGE ||
-	     node->asm_rank==DGRAM_NODEBROADCAST) 
-	 {
-	   CmiPushNode(msg);
-         }
-	 else
-#endif
-	   CmiPushPE(node->asm_rank, msg);
-    }
-    node->asm_msg = 0;
-    myNode->recd_msgs++;
-    myNode->recd_bytes += node->asm_total;
-  }
-  FreeExplicitDgram(dg);
-}
-*/
-
-
-/***********************************************************************
- * AssembleReceivedDatagrams()
- *
- * This function assembles the datagrams received so far, into a
- * single message. This also results in part of the Receive Window being 
- * freed.
- ***********************************************************************/
-//													OPTIONAL - can be removed
-/*
-void AssembleReceivedDatagrams(OtherNode node)
-{
-  unsigned int next, slot; ExplicitDgram dg;
-  next = node->recv_next;
-  while (1) {
-    slot = (next % Cmi_window_size);
-    dg = node->recv_window[slot];
-    if (dg == 0) break;
-    AssembleDatagram(node, dg);
-    node->recv_window[slot] = 0;
-    node->recv_winsz--;
-    next = ((next + 1) & DGRAM_SEQNO_MASK);
-  }
-  node->recv_next = next;
-}
-*/
-
-
-
-/************************************************************************
- * IntegrateMessageDatagram()
- *
- * This function integrates the received datagrams. It first
- * increments the count of un-acked datagrams. (This is to aid the
- * heuristic that an ack should be sent when the Receive window is half
- * full). If the current datagram is the first missing packet, then this 
- * means that the datagram that was missing in the incomplete sequence
- * of datagrams so far, has arrived, and hence the datagrams can be
- * assembled. 
- ************************************************************************/
-
-//													OPTIONAL - can be removed
-/*
-void IntegrateMessageDatagram(ExplicitDgram dg)
-{
-  int seqno;
-  unsigned int slot; OtherNode node;
-
-  LOG(Cmi_clock, Cmi_nodestart, 'M', dg->srcpe, dg->seqno);
-  MACHSTATE2(2,"  IntegrateMessageDatagram [seq %d from pe %d]", dg->seqno,dg->srcpe)
-
-  node = nodes_by_pe[dg->srcpe];
-  node->stat_recv_pkt++;
-  seqno = dg->seqno;
-  writeableAcks=1;
-  node->recv_ack_cnt++;
-  if (node->recv_ack_time == 0.0)
-    node->recv_ack_time = Cmi_clock + Cmi_ack_delay;
-  if (((seqno - node->recv_next) & DGRAM_SEQNO_MASK) < Cmi_window_size) {
-    slot = (seqno % Cmi_window_size);
-    if (node->recv_window[slot] == 0) {
-      node->recv_window[slot] = dg;
-      node->recv_winsz++;
-      if (seqno == node->recv_next)
-	AssembleReceivedDatagrams(node);
-      if (seqno > node->recv_expect)
-	node->recv_ack_time = 0.0;
-      if (seqno >= node->recv_expect)
-	node->recv_expect = ((seqno+1)&DGRAM_SEQNO_MASK);
-      LOG(Cmi_clock, Cmi_nodestart, 'Y', node->recv_next, dg->seqno);
-      return;
-    }
-  }
-  LOG(Cmi_clock, Cmi_nodestart, 'y', node->recv_next, dg->seqno);
-  FreeExplicitDgram(dg);
-}
-*/
-
-
-/***********************************************************************
- * IntegrateAckDatagram()
- * 
- * This function is called on the message sending side, on receipt of
- * an ack for a message that it sent. Since messages and acks could be 
- * lost, our protocol works in such a way that acks for higher sequence
- * numbered packets act as implict acks for lower sequence numbered
- * packets, in case the acks for the lower sequence numbered packets
- * were lost.
-
- * Recall that the Send and Receive windows are circular queues, and the
- * sequence numbers of the packets (datagrams) are monotically
- * increasing. Hence it is important to know for which sequence number
- * the ack is for, and to correspodinly relate that to tha actual packet 
- * sitting in the Send window. Since every 20th packet occupies the same
- * slot in the windows, a number of sanity checks are required for our
- * protocol to work. 
- * 1. If the ack number (first missing packet sequence number) is less
- * than the last ack number received then this ack can be ignored. 
-
- * 2. The last ack number received must be set to the current ack
- * sequence number (This is done only if 1. is not true).
-
- * 3. Now the whole Send window is examined, in a kind of reverse
- * order. The check starts from a sequence number = 20 + the first
- * missing packet's sequence number. For each of these sequence numbers, 
- * the slot in the Send window is checked for existence of a datagram
- * that should have been sent. If there is no datagram, then the search
- * advances. If there is a datagram, then the sequence number of that is 
- * checked with the expected sequence number for the current iteration
- * (This is decremented in each iteration of the loop).
-
- * If the sequence numbers do not match, then checks are made (for
- * the unlikely scenarios where the current slot sequence number is 
- * equal to the first missing packet's sequence number, and where
- * somehow, packets which have greater sequence numbers than allowed for 
- * the current window)
-
- * If the sequence numbers DO match, then the flag 'rxing' is
- * checked. The semantics for this flag is that : If any packet with a
- * greater sequence number than the current packet (and hence in the
- * previous iteration of the for loop) has been acked, then the 'rxing'
- * flag is set to 1, to imply that all the packets of lower sequence
- * number, for which the ack->window[] element does not indicate that the 
- * packet has been received, must be retransmitted.
- * 
- ***********************************************************************/
-
-//													OPTIONAL - can be removed
-/*
-void IntegrateAckDatagram(ExplicitDgram dg)
-{
-  OtherNode node; DgramAck *ack; ImplicitDgram idg;
-  int i; unsigned int slot, rxing, dgseqno, seqno, ackseqno;
-  int diff;
-  unsigned int tmp;
-
-  node = nodes_by_pe[dg->srcpe];
-  ack = ((DgramAck*)(dg->data));
-  memcpy(&ackseqno, &(ack->window[Cmi_window_size]), sizeof(unsigned int));
-  dgseqno = dg->seqno;
-  seqno = (dgseqno + Cmi_window_size) & DGRAM_SEQNO_MASK;
-  slot = seqno % Cmi_window_size;
-  rxing = 0;
-  node->stat_recv_ack++;
-  LOG(Cmi_clock, Cmi_nodestart, 'R', node->nodestart, dg->seqno);
-
-  tmp = node->recv_ack_seqno;
-  // check that the ack being received is actually appropriate 
-  if ( !((node->recv_ack_seqno >= 
-	  ((DGRAM_SEQNO_MASK >> 1) + (DGRAM_SEQNO_MASK >> 2))) &&
-	 (ackseqno < (DGRAM_SEQNO_MASK >> 1))) &&
-       (ackseqno <= node->recv_ack_seqno))
-    {
-      FreeExplicitDgram(dg);
-      return;
-    } 
-  // higher ack so adjust 
-  node->recv_ack_seqno = ackseqno;
-  writeableDgrams=1; // May have freed up some send slots 
-  
-  for (i=Cmi_window_size-1; i>=0; i--) {
-    slot--; if (slot== ((unsigned int)-1)) slot+=Cmi_window_size;
-    seqno = (seqno-1) & DGRAM_SEQNO_MASK;
-    idg = node->send_window[slot];
-    if (idg) {
-      if (idg->seqno == seqno) {
-	if (ack->window[i]) {
-	  // remove those that have been received and are within a window
-	  // of the first missing packet 
-	  node->stat_ack_pkts++;
-	  LOG(Cmi_clock, Cmi_nodestart, 'r', node->nodestart, seqno);
-	  node->send_window[slot] = 0;
-	  DiscardImplicitDgram(idg);
-	  rxing = 1;
-	} else if (rxing) {
-	  node->send_window[slot] = 0;
-	  idg->next = node->send_queue_h;
-	  if (node->send_queue_h == 0) {
-	    node->send_queue_t = idg;
-	  }
-	  node->send_queue_h = idg;
-	}
-      } else {
-        diff = dgseqno >= idg->seqno ? 
-	  ((dgseqno - idg->seqno) & DGRAM_SEQNO_MASK) :
-	  ((dgseqno + (DGRAM_SEQNO_MASK - idg->seqno) + 1) & DGRAM_SEQNO_MASK);
-	  
-	if ((diff <= 0) || (diff > Cmi_window_size))
-	{
-	  continue;
-	}
-
-        // if ack is really less than our packet seq (consider wrap around) 
-        if (dgseqno < idg->seqno && (idg->seqno - dgseqno <= Cmi_window_size))
-        {
-          continue;
-        }
-        if (dgseqno == idg->seqno)
-        {
-	  continue;
-        }
-	node->stat_ack_pkts++;
-	LOG(Cmi_clock, Cmi_nodestart, 'o', node->nodestart, idg->seqno);
-	node->send_window[slot] = 0;
-	DiscardImplicitDgram(idg);
-      }
-    }
-  }
-  FreeExplicitDgram(dg);  
-}
-
-//													OPTIONAL - can be removed
-void ReceiveDatagram()
-{
-  ExplicitDgram dg; int ok, magic;
-  MACHLOCK_ASSERT(comm_flag,"ReceiveDatagram")
-  MallocExplicitDgram(dg);
-  ok = recv(dataskt,(char*)(dg->data),Cmi_max_dgram_size,0);
-  //ok = recvfrom(dataskt,(char*)(dg->data),Cmi_max_dgram_size,0, 0, 0);
-  if (ok < 0) {
-    MACHSTATE1(4,"  recv dgram failed (errno=%d)",errno)
-    FreeExplicitDgram(dg);
-    if (errno == EINTR) return;  // A SIGIO interrupted the receive 
-    if (errno == EAGAIN) return; // Just try again later 
-#if !defined(_WIN32) || defined(__CYGWIN__) 
-    if (errno == EWOULDBLOCK) return; // No more messages on that socket. 
-    if (errno == ECONNREFUSED) return;  // A "Host unreachable" ICMP packet came in 
-#endif
-    CmiPrintf("ReceiveDatagram: recv: %s(%d)\n", strerror(errno), errno) ;
-    KillEveryoneCode(37489437);
-  }
-  dg->len = ok;
-
-  if (ok >= DGRAM_HEADER_SIZE) {
-    DgramHeaderBreak(dg->data, dg->rank, dg->srcpe, magic, dg->seqno, dg->broot);
-    MACHSTATE3(2,"  recv dgram [seq %d, for rank %d, from pe %d]",
-	       dg->seqno,dg->rank,dg->srcpe)
-    if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK))
-    {
-      if (dg->rank == DGRAM_ACKNOWLEDGE)
-	IntegrateAckDatagram(dg);
-      else IntegrateMessageDatagram(dg);
-    } else FreeExplicitDgram(dg);
-  } else {
-    MACHSTATE1(4,"  recv dgram failed (len=%d)",ok)
-    FreeExplicitDgram(dg);
-  }
-}
-*/
-
-
 
 
 static void ServiceCharmrun_nolock() {
@@ -1140,7 +866,6 @@ static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffe
 
 
 void processSendWC(struct ibv_wc *sendWC) {
-	//nothing really
 	MACHSTATE(3,"processSendWC {");
 	infiPacket packet = (infiPacket )sendWC->wr_id;
 	FreeInfiPacket(packet);
@@ -1205,7 +930,22 @@ static inline int pollCq(const int toBuffer,struct ibv_cq *cq) {
 	}
 	
 	for(i=0;i<ne;i++){
-		CmiAssert(wc[i].status==IBV_WC_SUCCESS);
+//		CmiAssert(wc[i].status==IBV_WC_SUCCESS);
+        if(wc[i].status!=IBV_WC_SUCCESS) {
+                MACHSTATE3(3,"wc[%i].status=%i (%s)",i,wc[i].status,ibv_wc_status_str(wc[i].status)); 
+                MACHSTATE3(3,"   wr_id=%i qp_num=%i vendor_err=%i",wc[i].wr_id,wc[i].qp_num,wc[i].vendor_err); 
+                MACHSTATE1(3,"  key=%p ",
+                    ((struct infiBuffer *)((&wc[i])->wr_id))->key);
+/*
+                MACHSTATE4(3,"  lkey=%p buffer=%d length=%d end=%d",
+                    ((struct infiBuffer *)((&wc[i])->wr_id))->key->lkey,
+                    ((struct infiBuffer *)((&wc[i])->wr_id))->buf, 
+                    ((struct infiBuffer *)((&wc[i])->wr_id))->size,
+                    ((struct infiBuffer *)((&wc[i])->wr_id))->buf+((struct infiBuffer *)((&wc[i])->wr_id))->size); 
+*/
+		        CmiAssert(wc[i].status==IBV_WC_SUCCESS);
+        }
+
 
 		switch(wc[i].opcode){
 			case IBV_WC_SEND: //sending message
@@ -1283,11 +1023,14 @@ struct infiOtherNodeData *initinfiData(int node,int lid,int qpn,int psn) {
 
         ret->nodeNo = node;
         ret->state = INFI_HEADER_DATA; 
+	
+    MACHSTATE4(3,"Storing node[%i] (lid=%i qpn=%i psn=%i)",node,lid,qpn,psn);
 
-//        ret->qp = context->qp[node];
+//        ret->qp = context->qp;
 //      ret->totalTokens = tokensPerProcessor;
 //      ret->tokensLeft = tokensPerProcessor;
 //      ret->postedRecvs = tokensPerProcessor;
+    return ret;
 }
 
 
@@ -1325,22 +1068,28 @@ static void CommunicationServer(int sleepTime, int where) {
 }
 
 
+
+
+
+
+
 static void sendBarrierMessage(int pe) {
 	/* we will only need one packet */
 	int size=32;
 	OtherNode node=nodes+pe;
 	infiPacket packet;
-	MallocInfiPacket(packet);
+	//MallocInfiPacket(packet); // FIXME: put back in!
+	packet=newPacket();
 	packet->size = size;
-	packet->buf = CmiAlloc(size);
+	packet->buf = CmiAlloc(size); 
 	packet->header.code=INFIBARRIERPACKET;
 	packet->wr.wr.ud.ah=context->ah[pe];
 	packet->wr.wr.ud.remote_qpn=nodes[pe].infiData->qp.qpn;
 	packet->wr.wr.ud.remote_qkey=0;
 
-MACHSTATE1(3,"sending to qpn=%i",nodes[pe].infiData->qp.qpn);	
+MACHSTATE2(3,"sending to qpn=%i pe=%i",nodes[pe].infiData->qp.qpn,pe);	
 	struct ibv_mr *key=METADATAFIELD(packet->buf)->key;
-	MACHSTATE2(3,"Barrier packet to %d size %d",node->infiData->nodeNo,size);
+	MACHSTATE3(3,"Barrier packet to %d size %d wr_id %d",node->infiData->nodeNo,size,packet->wr.wr_id);
 	EnqueuePacket(node,packet,size,key);
 }
 
@@ -1361,19 +1110,32 @@ static void recvBarrierMessage() {
 int count=0; // FIXME: remove debug
 MACHSTATE(3,"recvBarrierMessage 0"); // FIXME: REMOVE this debug
 	while(!barrierReached) {
-if(count++>20) CmiAbort(0); // FIXME: remove debug
 		/* gengbin's semantic will implode if more than one q is polled at a time */
+		pollCq(toBuffer,context->sendCq); // FIXME: just put this in to fix pollSendCq req - not sure if its correct
 		ne = ibv_poll_cq(context->recvCq,1,&wc[0]);
 		if(ne!=0){
 			MACHSTATE1(3,"recvBarrier ne %d",ne);
+            CmiAssert(ne>0);
 		}
-		pollCq(toBuffer,context->sendCq); // FIXME: just put this in to fix pollSendCq req - not sure if its correct
 		for(i=0;i<ne;i++){
 			if(wc[i].status != IBV_WC_SUCCESS){
-				CmiAssert(0); 
+                MACHSTATE3(3,"wc[%i].status=%i (%s)",i,wc[i].status,ibv_wc_status_str(wc[i].status)); 
+                MACHSTATE3(3,"   wr_id=%i qp_num=%i vendor_err=%i",wc[i].wr_id,wc[i].qp_num,wc[i].vendor_err); 
+/*
+                MACHSTATE4(3,"  lkey=%d buffer=%d length=%d end=%d",
+                    ((struct infiBuffer *)((&wc[i])->wr_id))->key->lkey,
+                    ((struct infiBuffer *)((&wc[i])->wr_id))->buf, 
+                    ((struct infiBuffer *)((&wc[i])->wr_id))->size,
+                    ((struct infiBuffer *)((&wc[i])->wr_id))->buf+((struct infiBuffer *)((&wc[i])->wr_id))->size); 
+                MACHSTATE1(3,"  key=%p ",
+                    ((struct infiBuffer *)((&wc[i])->wr_id))->key);
+*/
+                
+				CmiAbort("wc.status !=IBV_WC_SUCCESS"); 
 			}
 			switch(wc[i].opcode){
 				case IBV_WC_RECV: /* we have something to consider*/
+				    MACHSTATE(3," IN HERE !!!!!!!!!!");
 					recvWC=&wc[i];
 					buffer = (struct infiBuffer *) recvWC->wr_id;
 					header = (struct infiPacketHeader *)buffer->buf;
@@ -1425,7 +1187,8 @@ int CmiBarrier() {
 	int numnodes = CmiNumNodes();
 MACHSTATE1(3,"Barrier 1 rank=%i",CmiMyRank());
 	if (CmiMyRank() == 0) { /* every one send to pe 0 */
-		if (CmiMyNode() != 0) {
+		if (CmiMyNode() != 0) { // FIXME: CHANGE TO !=0      FIXME FIXME FIXME
+
 MACHSTATE(3,"Barrier sendmsg");
 			sendBarrierMessage(0);
 			recvBarrierMessage();
@@ -1486,53 +1249,40 @@ int CmiBarrierZero() {
 
 
 void createqp(struct ibv_device *dev){
-	context->localAddr.lid=getLocalLid(context->context,context->ibPort);
 
-	context->sendCqSize = maxrecvbuffers+2;
 	context->sendCq = ibv_create_cq(context->context,context->sendCqSize,NULL,NULL,0);
 	CmiAssert(context->sendCq != NULL);
 	MACHSTATE1(3,"sendCq created %p",context->sendCq);
 	
-	context->recvCqSize = maxrecvbuffers;
 	context->recvCq = ibv_create_cq(context->context,context->recvCqSize,NULL,NULL,0);
 	CmiAssert(context->recvCq != NULL);
 	MACHSTATE2(3,"recvCq created %p %d",context->recvCq,context->recvCqSize);
 
-	struct ibv_qp_init_attr initAttr = {
-/*
-		.qp_type = IBV_QPT_RC,
-		.send_cq = context->sendCq,
-		.recv_cq = context->recvCq,
-		.srq	 = context->srq,
-		.sq_sig_all = 0,
-		.qp_context = NULL,
-			.cap     = {
-			.max_send_wr  = maxrecvbuffers,
-			.max_send_sge = 2,
-		},
-*/
-		.qp_type = IBV_QPT_UD,
-		.send_cq = context->sendCq,
-		.recv_cq = context->recvCq,
-		.cap     = {
-			.max_send_wr  = maxrecvbuffers, // FIXME: this isn't right - need to make a smaller number
-			.max_recv_wr  = maxrecvbuffers, // FIXME: this isn't right - need to make a smaller number
-			.max_send_sge = 1,
-			.max_recv_sge = 1
-		},
-	};
-	context->qp = ibv_create_qp(context->pd,&initAttr);
-    CmiAssert(context->qp != NULL);
-    MACHSTATE1(3,"qp created %p",context->qp);
+    {
+    	struct ibv_qp_init_attr attr = {
+            .qp_context = context->context,
+		    .qp_type = IBV_QPT_UD,
+	    	.send_cq = context->sendCq,
+    		.recv_cq = context->recvCq,
+            .srq = NULL,
+            .sq_sig_all=0,
+    		.cap     = {
+		    	.max_send_wr  = context->sendCqSize, // FIXME: this isn't right - need to make a smaller number
+	    		.max_recv_wr  = context->recvCqSize, // FIXME: this isn't right - need to make a smaller number
+    			.max_send_sge = 1,
+			    .max_recv_sge = 1,
+		    },
+	    };
+    	context->qp = ibv_create_qp(context->pd,&attr);
+        CmiAssert(context->qp != NULL);
+        MACHSTATE1(3,"qp created %p",context->qp);
+    }
     {
     	struct ibv_qp_attr attr;
     	attr.qp_state        = IBV_QPS_INIT;
     	attr.pkey_index      = 0;
     	attr.port_num        = context->ibPort; 
         attr.qkey            = 0;
-//	attr.qp_access_flags = IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE; // FIXME: Don't need
-
-			
 	    if(ibv_modify_qp(context->qp, &attr,
 		    IBV_QP_STATE              |
     		IBV_QP_PKEY_INDEX         |
@@ -1540,8 +1290,6 @@ void createqp(struct ibv_device *dev){
 		    IBV_QP_QKEY))
             CmiAbort("Could not modify QP to INIT");
     }
-	context->localAddr.qpn = context->qp->qp_num;
-	context->localAddr.psn = lrand48() & 0xffffff;
     {
     	struct ibv_qp_attr attr;
         attr.qp_state = IBV_QPS_RTR;
@@ -1556,6 +1304,10 @@ void createqp(struct ibv_device *dev){
             CmiAbort("Could not modify QP to RTS");
     }
 
+	context->localAddr.lid=getLocalLid(context->context,context->ibPort);
+	context->localAddr.qpn = context->qp->qp_num;
+	context->localAddr.psn = lrand48() & 0xffffff;
+
 	MACHSTATE3(4,"qp information (lid=%i qpn=%i psn=%i)",context->localAddr.lid,context->localAddr.qpn,context->localAddr.psn);
 }
 
@@ -1566,27 +1318,62 @@ void createah() {
 	context->ah=(struct ibv_ah **)malloc(sizeof(struct ibv_ah *)*numnodes);
 
 	for(i=0;i<numnodes;i++) { 
-		if(i!=_Cmi_mynode) {
-			struct ibv_ah_attr ah_attr = {
-				.is_global = 0,
-				.dlid = nodes[i].infiData->qp.lid,
-				.sl = 0,
-				.src_path_bits = 0,
-				.port_num = context->ibPort,
-			};
-			context->ah[i]=ibv_create_ah(context->pd,&ah_attr);
-			CmiAssert(context->ah[i]!=0);
-		}
+//		if(i!=_Cmi_mynode) {
+            {
+    			struct ibv_ah_attr ah_attr = {
+    				.is_global     = 0,
+    				.dlid          = nodes[i].infiData->qp.lid,
+    				.sl            = 0,
+    				.src_path_bits = 0,
+    				.port_num      = context->ibPort,
+    			};
+    			context->ah[i]=ibv_create_ah(context->pd,&ah_attr);
+    			CmiAssert(context->ah[i]!=0);
+                MACHSTATE2(4,"ah for node %i lid=%i ",i,ah_attr.dlid);
+            }
+//		}
 	}
+}
+
+
+
+
+static int pp_post_recv() { 
+MACHSTATE(4,"pp_post_recv ");
+    int count=100;
+    void *buffer;
+    struct ibv_mr *mr;
+buffer=malloc(sizeof(int)*maxrecvbuffers);
+mr=ibv_reg_mr(context->pd, buffer, sizeof(int)*maxrecvbuffers, IBV_ACCESS_LOCAL_WRITE);
+
+
+        struct ibv_sge list = {
+            .addr   = (uintptr_t) buffer, 
+            .length = sizeof(int)*maxrecvbuffers,
+            .lkey   = mr->lkey,
+        };
+
+        struct ibv_recv_wr wr = {
+            .wr_id = (uint64_t)buffer,
+            .sg_list = &list,
+            .num_sge = 1,
+        };
+        struct ibv_recv_wr *bad_wr;
+        int i;
+        for (i=0;i<count;i++)
+            if(ibv_post_recv(context->qp,&wr,&bad_wr))
+                break;
+
+        ibv_dereg_mr(mr);
+        free(buffer);
+        CmiAssert(i==count);
+        return i;
 }
 
 void CmiMachineInit(char **argv)
 {
-	struct ibv_device **devlist;
-	struct ibv_device *dev;
 	int i;
 	int calcmaxsize;
-	int packetsize;
 	int lid;
 
 	MACHSTATE(3,"CmiMachineInit {");
@@ -1598,7 +1385,6 @@ void CmiMachineInit(char **argv)
 	blockThreshold=8;
 	blockAllocRatio=16;
 
-
 	mtu_size=1200;
 	packetsize = mtu_size*4;
 	Cmi_dgram_max_data=packetsize-sizeof(struct infiPacketHeader);
@@ -1608,21 +1394,25 @@ void CmiMachineInit(char **argv)
 
 	maxrecvbuffers=calcmaxsize;
 	maxtokens = calcmaxsize;
+
+    initInfiCmiChunkPools();
 	
 	ibud.devlist = ibv_get_device_list(NULL);
 	CmiAssert(ibud.devlist != NULL);
 
-	dev = *(ibud.devlist);
-	CmiAssert(dev != NULL);
+	ibud.dev = *(ibud.devlist);
+	CmiAssert(ibud.dev != NULL);
 
-	MACHSTATE1(3,"device name %s",ibv_get_device_name(dev));
+	MACHSTATE1(3,"device name %s",ibv_get_device_name(ibud.dev));
 
 	context = (struct infiContext *)malloc(sizeof(struct infiContext));
 	
 	MACHSTATE1(3,"context allocated %p",context);
 	
+	context->sendCqSize = 2; // FIXME: 1?
+	context->recvCqSize = calcmaxsize+1; 
 	context->ibPort = 1;
-	context->context = ibv_open_device(dev);  //the context for this infiniband device 
+	context->context = ibv_open_device(ibud.dev);  //the context for this infiniband device 
 	CmiAssert(context->context != NULL);
 	
 	MACHSTATE1(3,"device opened %p",context->context);
@@ -1632,13 +1422,10 @@ void CmiMachineInit(char **argv)
 
 	context->header.nodeNo = _Cmi_mynode;
 
-	context->buffer=malloc(sizeof(int)*maxrecvbuffers);
-
-	context->mr=ibv_reg_mr(context->pd, context->buffer, sizeof(int)*maxrecvbuffers, IBV_ACCESS_LOCAL_WRITE);
-
 	if(_Cmi_numnodes>1) {
-		createqp(dev);
-	}
+		createqp(ibud.dev);
+//MACHSTATE1(3,"pp post recv=%i",pp_post_recv());	
+    }
 
 	MACHSTATE(3,"} CmiMachineInit");
 }
@@ -1646,15 +1433,14 @@ void CmiMachineInit(char **argv)
 void CmiCommunicationInit(char **argv) {
 	MACHSTATE(3,"CmiCommunicationInit {");
 	if(_Cmi_numnodes>1) {
-		createah();
+        infiPostInitialRecvs();
+	 	createah();
 	}
 	MACHSTATE(3,"} CmiCommunicationInit");
 }
 
 void CmiMachineExit()
 {
-	ibv_dereg_mr(context->mr);
-	free(context->buffer);
 	ibv_destroy_qp(context->qp);
 	ibv_dealloc_pd(context->pd); 
 	ibv_close_device(context->context);
