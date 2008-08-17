@@ -95,7 +95,7 @@ void cleanupMemory(workRequest *wr) {
       int size = bufferInfo[i].size; 
       
       if (bufferInfo[i].transferFromDevice) {
-	cudaMemcpy(devBuffers[index], hostBuffers[index], size, cudaMemcpyDeviceToHost);
+	cudaMemcpy(hostBuffers[index], devBuffers[index], size, cudaMemcpyDeviceToHost);
       }
       
       if (bufferInfo[i].freeBuffer) {
