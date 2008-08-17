@@ -59,7 +59,7 @@ void setupMemory(workRequest *wr) {
       
       /* allocate if the buffer for the corresponding index is NULL */
       if (devBuffers[index] == NULL) {
-	cudaMalloc((void **)&devBuffers[i], size); 
+	cudaMalloc((void **)&devBuffers[index], size); 
       }
       
       if (bufferInfo[i].transferToDevice) {
