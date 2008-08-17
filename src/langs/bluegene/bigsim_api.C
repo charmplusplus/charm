@@ -130,3 +130,13 @@ void BgWriteTimelines(int seqno, BgTimeLineRec **tlinerecs, int nlocalProcs, cha
   delete [] d;
 }
 
+void BgWriteTimelines(int seqno, BgTimeLineRec *tlinerecs, int nlocalProcs, char *traceroot)
+{
+  BgTimeLineRec **tlines = new BgTimeLineRec*[nlocalProcs];
+  for (int i=0; i<nlocalProcs; i++)
+    tlines[i] = &tlinerecs[i];
+
+  BgWriteTimelines(seqno, tlines, nlocalProcs, traceroot);
+}
+
+
