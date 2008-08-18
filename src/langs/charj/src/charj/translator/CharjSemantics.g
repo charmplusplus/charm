@@ -131,7 +131,7 @@ package charj.translator;
 
 // Starting point for parsing a Charj file.
 charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
-scope ScopeStack;
+scope ScopeStack; // default scope
 @init {
     symtab = _symtab;
     $ScopeStack::current = symtab.getDefaultPkg();
@@ -146,6 +146,7 @@ scope ScopeStack;
         { $cs = null; }
     ;
 
+// note: no new scope here--this replaces the default scope
 packageDeclaration
 @init { 
     List<String> names = null; 
@@ -168,8 +169,19 @@ importDeclaration
     ;
     
 typeDeclaration returns [ClassSymbol sym]
+scope ScopeStack; // top-level type scope
     :   ^(CLASS m=modifierList IDENT g=genericTypeParameterList? 
                 e=classExtendsClause? i=implementsClause? c=classTopLevelScope) 
+        {
+            Scope outerScope = ScopeStack[-1]::current;
+            $sym = new ClassSymbol(symtab, $IDENT.text, null, outerScope);
+            outerScope.define($sym.name, $sym);
+            currentClass = $sym;
+            $sym.definition = $typeDeclaration.start;
+            $sym.definitionTokenStream = input.getTokenStream();
+            $IDENT.symbol = $sym;
+            $ScopeStack::current = $sym;
+        }
     |   ^(INTERFACE modifierList IDENT genericTypeParameterList? 
                 interfaceExtendsClause? interfaceTopLevelScope)
     |   ^(ENUM modifierList IDENT implementsClause? enumTopLevelScope)
