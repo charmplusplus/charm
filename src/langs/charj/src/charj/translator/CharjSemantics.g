@@ -13,6 +13,9 @@ options {
     ASTLabelType = CharjAST;
 }
 
+scope ScopeStack {
+    Scope current;
+}
 
 @header {
 package charj.translator;
@@ -20,8 +23,11 @@ package charj.translator;
 
 @members {
     SymbolTable symtab = null;
-    Scope currentScope = null;
+
+    PackageScope currentPackage = null;
+    ClassSymbol currentClass = null;
     MethodSymbol currentMethod = null;
+    LocalScope currentLocalScope = null;
 
     Translator translator;
 
@@ -125,9 +131,10 @@ package charj.translator;
 
 // Starting point for parsing a Charj file.
 charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
+scope ScopeStack;
 @init {
     symtab = _symtab;
-    currentScope = symtab.getDefaultPkg();
+    $ScopeStack::current = symtab.getDefaultPkg();
 }
     // TODO: go back to allowing multiple type definitions per file, check that
     // there is exactly one public type and return that one.
@@ -150,8 +157,9 @@ packageDeclaration
                 ps = symtab.definePackage(packageName);
                 symtab.addScope(ps);
             }
-            names =  java.util.Arrays.asList(
-                    $qualifiedIdentifier.text.split("[.]"));
+            currentPackage = ps;
+            $ScopeStack::current = ps;
+            $qualifiedIdentifier.start.symbol = ps;
         }
     ;
     
