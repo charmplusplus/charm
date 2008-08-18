@@ -20,6 +20,9 @@ public class SymbolTable {
     public static final Set<String> METHOD_NAMES_TO_MANGLE = 
         new HashSet<String>() { {} };
 
+    public static Map<String, ClassSymbol> primitiveTypes =
+        new HashMap<String, ClassSymbol>() { {} };
+
     /** Provides runtime variables and loads classes */
     public Translator translator;
 
@@ -31,7 +34,7 @@ public class SymbolTable {
     /** This is the list of all scopes created during symbol table building. */
     public List scopes = new ArrayList();
 
-    /** Root of the object hierarchy, Charj.Object */
+    /** Root of the object hierarchy, Charj.lang.Object */
     ClassSymbol objectRoot;
 
     public SymbolTable(Translator _translator) 
@@ -42,6 +45,7 @@ public class SymbolTable {
         topLevelPackageScopes.put(DEFAULT_PACKAGE_NAME, defaultPkg);
         PackageScope lang = definePackage("charj.lang");
         addScope(defaultPkg);
+        initObjectHierarchy();
     }
 
     public boolean debug() {
@@ -54,9 +58,17 @@ public class SymbolTable {
         objectRoot = new ClassSymbol(this, "Object", null, lang);
         objectRoot.define("EOF", new VariableSymbol(this,"EOF",null));
         lang.define("Object", objectRoot);
+
+        primitiveTypes.put("int",    new ClassSymbol(this, "int",    null, lang));
+        primitiveTypes.put("float",  new ClassSymbol(this, "float",  null, lang));
+        primitiveTypes.put("double", new ClassSymbol(this, "double", null, lang));
+        primitiveTypes.put("char",   new ClassSymbol(this, "char",   null, lang)); 
+        primitiveTypes.put("short",  new ClassSymbol(this, "short",  null, lang)); 
     }
 
-    public ClassSymbol resolveBuiltInType(String type) {
+    public ClassSymbol resolveBuiltinType(String type) {
+        ClassSymbol ptype = primitiveTypes.get(type);
+        if (ptype != null) return ptype;
         return objectRoot.resolveType(type);
     }
 

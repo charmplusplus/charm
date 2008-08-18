@@ -12,6 +12,7 @@ public class Main
     public static List<String> m_usrlibs;
     public static boolean m_debug;
     public static boolean m_verbose;
+    public static boolean m_printAST;
     public static boolean m_stdout;
 
     public static void main(String[] args) throws Exception
@@ -21,6 +22,7 @@ public class Main
                 m_charmc, 
                 m_debug, 
                 m_verbose,
+                m_printAST,
                 m_stdlib,
                 m_usrlibs);
         for (String filename : files) { 
@@ -74,6 +76,11 @@ public class Main
         _verbose.setHelp("output extra information");
         processor.registerParameter(_verbose);
 
+        Switch _printAST = new Switch("printAST")
+            .setLongFlag("AST");
+        _verbose.setHelp("print abstract syntax tree");
+        processor.registerParameter(_printAST);
+
         Switch _stdout = new Switch("stdout")
             .setShortFlag(JSAP.NO_SHORTFLAG)
             .setLongFlag("stdout");
@@ -102,6 +109,7 @@ public class Main
         m_stdlib = config.getString("stdlib");
         m_debug = config.getBoolean("debug", false);
         m_verbose = config.getBoolean("verbose", false);
+        m_printAST = config.getBoolean("printAST", false);
         m_stdout = config.getBoolean("stdout", false);
         
         String usrlib = config.getString("usrlib");

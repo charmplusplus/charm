@@ -957,13 +957,17 @@ qualifiedIdentExpression
 
 newExpression
     :   NEW  
-        (   primitiveType newArrayConstruction      // new static array of primitive type elements
-            ->  ^(STATIC_ARRAY_CREATOR[$NEW, "STATIC_ARRAY_CREATOR"] primitiveType newArrayConstruction)
-        |   genericTypeArgumentListSimplified? qualifiedTypeIdentSimplified
+            (   primitiveType newArrayConstruction      // new static array of primitive type elements
+                ->  ^(STATIC_ARRAY_CREATOR[$NEW, "STATIC_ARRAY_CREATOR"] primitiveType newArrayConstruction
+            )
+    |   genericTypeArgumentListSimplified? qualifiedTypeIdentSimplified
             (   newArrayConstruction                // new static array of object type reference elements
-                ->  ^(STATIC_ARRAY_CREATOR[$NEW, "STATIC_ARRAY_CREATOR"] genericTypeArgumentListSimplified? qualifiedTypeIdentSimplified newArrayConstruction)
-            |   arguments classBody?                // new object type via constructor invocation
-                ->  ^(CLASS_CONSTRUCTOR_CALL[$NEW, "STATIC_ARRAY_CREATOR"] genericTypeArgumentListSimplified? qualifiedTypeIdentSimplified arguments classBody?)
+                ->  ^(STATIC_ARRAY_CREATOR[$NEW, "STATIC_ARRAY_CREATOR"] 
+                    genericTypeArgumentListSimplified? qualifiedTypeIdentSimplified newArrayConstruction
+            )
+    |   arguments classBody?                // new object type via constructor invocation
+                ->  ^(CLASS_CONSTRUCTOR_CALL[$NEW, "STATIC_ARRAY_CREATOR"] genericTypeArgumentListSimplified? 
+                    qualifiedTypeIdentSimplified arguments classBody?)
             )
         )
     ;

@@ -33,7 +33,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
             String name) 
     {
         super(symtab, name);
-        type = this;;
+        type = this;
         for (String pkg : SymbolTable.AUTO_IMPORTS) {
             importPackage(pkg);
         }
@@ -42,8 +42,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     public ClassSymbol(
             SymbolTable symtab, 
             String name,
-            ClassSymbol
-            superClass,
+            ClassSymbol superClass,
             Scope scope)
     {
         this(symtab, name);
@@ -245,18 +244,6 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         }
         if ( parent!=null ) {
             return parent+"."+name;
-        }
-        return name;
-    }
-
-    public String getFullyQualifiedJavaName() 
-    {
-        String parent = null;
-        if ( scope!=null ) { // in a package?
-            parent = scope.getFullyQualifiedJavaName();
-        }
-        if ( parent!=null ) {
-            return parent+"."+getMangledName();
         }
         return name;
     }

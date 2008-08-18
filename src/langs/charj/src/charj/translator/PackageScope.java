@@ -26,7 +26,7 @@ public class PackageScope extends SymbolWithScope {
 
     /** See if type is already defined in this package.  If not, look
      *  for type on the disk in same package.  For example, first time
-     *  charj.io.File fails to resolve.  Load from disk and put File
+     *  charj.lang.Chare fails to resolve.  Load from disk and put File
      *  in package io which is in package charj.  Next time, File will
      *  be found.
      */
@@ -60,14 +60,6 @@ public class PackageScope extends SymbolWithScope {
             return null;
         }
         return super.getFullyQualifiedName();
-    }
-
-    public String getFullyQualifiedJavaName() 
-    {
-        if ( name.equals(SymbolTable.DEFAULT_PACKAGE_NAME) ) {
-            return null;
-        }
-        return super.getFullyQualifiedJavaName();
     }
 
     public String toString() 

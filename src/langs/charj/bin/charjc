@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ECHO="false"                        # should we echo the our command to stdout?
+ECHO="true"                        # should we echo the our command to stdout?
 CHARJCHOME=${0%${0##*/}}            # location of charjc
 ANTLRHOME=$CHARJCHOME/../lib        # location of antlr jars
 ANTLR_VERSION="3.1"
@@ -46,6 +46,9 @@ processArgs() {
         case "$arg" in
         "-v"|"--verbose")
             VERBOSE=true
+            ARGS="$ARGS $arg"
+            ;;
+        "--AST")
             ARGS="$ARGS $arg"
             ;;
         "--debug")

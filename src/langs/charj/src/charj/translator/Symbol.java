@@ -38,9 +38,7 @@ public class Symbol {
         type = _type;
     }
 
-    /** Some mantra types and methods must be mangled before
-     *  emitting to Java like int.
-     */
+    /** Just in case we need to do some name mangling */
     public String getMangledName() 
     {
         return name;
@@ -49,5 +47,16 @@ public class Symbol {
     public boolean debug()
     {
         return symtab.translator.debug();
+    }
+
+    public String toString() {
+        String info = "";
+        if (name != null)
+            info += name + ", ";
+        if (type != null)
+            info += type + ", ";
+        if (scope != null)
+            info += scope;
+        return "Symbol(" + info + ")";
     }
 }

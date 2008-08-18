@@ -11,7 +11,6 @@ options {
     memoize = true;
     tokenVocab = Charj;
     ASTLabelType = CharjAST;
-    output = template;
 }
 
 
@@ -133,10 +132,10 @@ charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
     // TODO: go back to allowing multiple type definitions per file, check that
     // there is exactly one public type and return that one.
     :   ^(CHARJ_SOURCE 
-        (p=packageDeclaration)? 
-        (i+=importDeclaration)* 
-        (t=typeDeclaration))
-        //(t+=typeDeclaration)*)
+        (packageDeclaration)? 
+        (importDeclaration)* 
+        (typeDeclaration))
+        //(typeDeclaration)*)
         { $cs = null; }
     ;
 
@@ -174,7 +173,7 @@ classExtendsClause
     ;   
 
 interfaceExtendsClause 
-    :   ^(EXTENDS_CLAUSE (typeList+=type)+) 
+    :   ^(EXTENDS_CLAUSE (type)+) 
     ;   
     
 implementsClause
@@ -203,7 +202,7 @@ enumConstant
     
     
 classTopLevelScope
-    :   ^(CLASS_TOP_LEVEL_SCOPE (csd+=classScopeDeclarations)*) 
+    :   ^(CLASS_TOP_LEVEL_SCOPE (classScopeDeclarations)*) 
     ;
     
 classScopeDeclarations
@@ -268,7 +267,7 @@ throwsClause
     ;
 
 modifierList
-    :   ^(MODIFIER_LIST (m+=modifier)*)
+    :   ^(MODIFIER_LIST (modifier)*)
     ;
 
 modifier
@@ -306,14 +305,14 @@ typeIdent
     ;
 
 primitiveType
-    :   BOOLEAN
-    |   CHAR
-    |   BYTE
-    |   SHORT
-    |   INT
-    |   LONG
-    |   FLOAT
-    |   DOUBLE
+    :   BOOLEAN     { $start.symbol = new Symbol(symtab, "bool_primitive", symtab.resolveBuiltinType("bool")); }
+    |   CHAR        { $start.symbol = new Symbol(symtab, "char_primitive", symtab.resolveBuiltinType("char")); }
+    |   BYTE        { $start.symbol = new Symbol(symtab, "byte_primitive", symtab.resolveBuiltinType("char")); }
+    |   SHORT       { $start.symbol = new Symbol(symtab, "short_primitive", symtab.resolveBuiltinType("short")); }
+    |   INT         { $start.symbol = new Symbol(symtab, "int_primitive", symtab.resolveBuiltinType("int")); }
+    |   LONG        { $start.symbol = new Symbol(symtab, "long_primitive", symtab.resolveBuiltinType("long")); }
+    |   FLOAT       { $start.symbol = new Symbol(symtab, "float_primitive", symtab.resolveBuiltinType("float")); }
+    |   DOUBLE      { $start.symbol = new Symbol(symtab, "double_primitive", symtab.resolveBuiltinType("double")); }
     ;
 
 genericTypeArgumentList
@@ -348,9 +347,7 @@ qualifiedIdentifier
     ;
     
 block
-@init { boolean emptyBlock = true; }
-    :   ^(BLOCK_SCOPE (b+=blockStatement)*)
-        { emptyBlock = ($b == null || $b.size() == 0); }
+    :   ^(BLOCK_SCOPE (blockStatement)*)
     ;
     
 blockStatement
@@ -535,7 +532,7 @@ literal
     |   DECIMAL_LITERAL
     |   FLOATING_POINT_LITERAL
     |   CHARACTER_LITERAL
-    |   STRING_LITERAL
+    |   STRING_LITERAL          
     |   TRUE
     |   FALSE
     |   NULL

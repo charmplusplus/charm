@@ -14,7 +14,7 @@ all:
 	$(ANT) all
 
 test:
-	./bin/charjc --debug --verbose --stdout tests/Hello.cj
+	./bin/charjc --debug --verbose --AST --stdout tests/Hello.cj
 
 
 # The lousy antlrv3 ant task won't give proper output from antlr errors, so

@@ -24,23 +24,28 @@ public class Translator {
     private boolean m_debug;
     private boolean m_verbose;
     private boolean m_errorCondition;
+    private boolean m_printAST;
 
     // library locations to search for classes
     private String m_stdlib;
     private List<String> m_usrlibs;
 
     private SymbolTable m_symtab;
+    private CommonTree m_ast;
+    private CommonTreeNodeStream m_nodes;
 
     public Translator(
             String _charmc,
             boolean _debug,
             boolean _verbose,
+            boolean _printAST,
             String _stdlib,
             List<String> _usrlibs)
     {
         m_charmc    = _charmc;
         m_debug     = _debug;
         m_verbose   = _verbose;
+        m_printAST  = _printAST;
         m_stdlib    = _stdlib;
         m_usrlibs   = _usrlibs;
         m_symtab    = new SymbolTable(this);
@@ -68,19 +73,33 @@ public class Translator {
         ANTLRFileStream input = new ANTLRFileStream(filename);
             
         CharjLexer lexer = new CharjLexer(input);
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
 
-        semanticPass(lexer);
+        // Use lexer tokens to feed tree parser
+        CharjParser parser = new CharjParser(tokens);
+        parser.setTreeAdaptor(m_adaptor);
+        CharjParser.charjSource_return r = parser.charjSource();
 
-        input.seek(0);
-        String ciOutput = translationPass(lexer, OutputMode.ci);
+        // Create node stream for AST traversals
+        m_ast = (CommonTree)r.getTree();
+        m_nodes = new CommonTreeNodeStream(m_ast);
+        m_nodes.setTokenStream(tokens);
+        m_nodes.setTreeAdaptor(m_adaptor);
+
+        printAST("Before Semantic Pass");
+        semanticPass();
+        printAST("After Semantic Pass");
+
+        m_nodes.reset();
+        String ciOutput = translationPass(OutputMode.ci);
         writeTempFile(filename, ciOutput, OutputMode.ci);
 
-        input.seek(0);
-        String hOutput = translationPass(lexer, OutputMode.h);
+        m_nodes.reset();
+        String hOutput = translationPass(OutputMode.h);
         writeTempFile(filename, hOutput, OutputMode.h);
         
-        input.seek(0);
-        String ccOutput = translationPass(lexer, OutputMode.cc);
+        m_nodes.reset();
+        String ccOutput = translationPass(OutputMode.cc);
         writeTempFile(filename, ccOutput, OutputMode.cc);
         compileTempFiles(filename, m_charmc);
 
@@ -94,65 +113,23 @@ public class Translator {
             ccHeader + ccOutput + footer;
     }
 
-    private CommonTreeNodeStream prepareNodes(
-            CommonTokenStream tokens,
-            CharjLexer lexer) throws
+    private ClassSymbol semanticPass() throws
         RecognitionException, IOException, InterruptedException
     {
-        // Use lexer tokens to feed tree parser
-        CharjParser parser = new CharjParser(tokens);
-        parser.setTreeAdaptor(m_adaptor);
-        CharjParser.charjSource_return r = parser.charjSource();
-
-        // Create node stream for emitters
-        CommonTree t = (CommonTree)r.getTree();
-        CommonTreeNodeStream nodes = new CommonTreeNodeStream(t);
-        nodes.setTokenStream(tokens);
-        nodes.setTreeAdaptor(m_adaptor);
-        return nodes;
+        CharjSemantics sem = new CharjSemantics(m_nodes);
+        return sem.charjSource(m_symtab);
     }
 
-    private String translationPass(
-            CharjLexer lexer, 
-            OutputMode m) throws
+    private String translationPass(OutputMode m) throws
         RecognitionException, IOException, InterruptedException
     {
-        CommonTokenStream tokens = new CommonTokenStream(lexer);
-        CommonTreeNodeStream nodes = prepareNodes(tokens, lexer);
-        nodes.setTokenStream(tokens);
-        nodes.setTreeAdaptor(m_adaptor);
-
-        String output = emit(nodes, m);
-        return output;
-    }
-
-    private ClassSymbol semanticPass(CharjLexer lexer) throws
-        RecognitionException, IOException, InterruptedException
-    {
-        CommonTokenStream tokens = new CommonTokenStream(lexer);
-        CommonTreeNodeStream nodes = prepareNodes(tokens, lexer);
-        nodes.setTokenStream(tokens);
-        nodes.setTreeAdaptor(m_adaptor);
-
-        CharjSemantics sem = new CharjSemantics(nodes);
-        ClassSymbol cs = sem.charjSource(m_symtab).cs;
-        return cs;
-    }
-
-    private String emit(
-            CommonTreeNodeStream nodes, 
-            OutputMode m) throws
-        RecognitionException, IOException, InterruptedException
-    {
-        CharjEmitter emitter = new CharjEmitter(nodes);
+        CharjEmitter emitter = new CharjEmitter(m_nodes);
         StringTemplateGroup templates = getTemplates(templateFile);
         emitter.setTemplateLib(templates);
         StringTemplate st = 
             (StringTemplate)emitter.charjSource(m).getTemplate();
         return st.toString();
     }
-
-
 
     private StringTemplateGroup getTemplates(String templateFile)
     {
@@ -241,7 +218,7 @@ public class Translator {
             fs.name = packageDir + "/" + typeName + ".cj";
             CharjLexer lexer = new CharjLexer(fs);
             
-            cs = semanticPass(lexer);
+            cs = semanticPass();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -348,6 +325,19 @@ public class Translator {
         stderr.join();
         int retVal = p.exitValue();
         return retVal;
+    }
+
+    public void printAST(String message)
+    {
+        String header = "----------\n" + "AST: " + message + "\n----------\n";
+        String footer = "\n----------\n";
+        String body = null;
+        if (m_printAST && m_ast != null) {
+            body = m_ast.toStringTree();
+        } else if (m_printAST) {
+            body = "Null tree, no AST available";
+        }
+        System.out.println(header + body + footer);
     }
     
     public void error(
