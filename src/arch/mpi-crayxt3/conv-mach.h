@@ -8,9 +8,11 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_XT3                                            1
+#define CMK_CRAYXT                                         1
 
-#define XT3_ONLY_PCQUEUE_WORKAROUND                        0
+#define XT3_PCQUEUE_HACK				   1
+
+#define XT3_TOPOLOGY					   1
 
 #define CMK_CONVERSE_MPI                                   1
 
@@ -26,9 +28,9 @@
 #define CMI_IO_BUFFER_EXPLICIT                             1
 #define CMI_IO_FLUSH_USER                                  1
 
-#define CMK_GETPAGESIZE_AVAILABLE                      1
+#define CMK_GETPAGESIZE_AVAILABLE                      	   1
 #define CMK_MEMORY_PAGESIZE                                8192
-#define CMK_MEMORY_PROTECTABLE                          0
+#define CMK_MEMORY_PROTECTABLE                             0
 
 #define CMK_NODE_QUEUE_AVAILABLE                           0
 
