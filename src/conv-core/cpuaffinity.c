@@ -302,8 +302,8 @@ static void cpuAffinityRecvHandler(void *msg)
   CmiFree(m);
 }
 
-#if CMK_XT3
-extern int getXT3NodeID(int mype, int numpes);
+#if CMK_CRAYXT
+extern int getXTNodeID(int mype, int numpes);
 #endif
 
 void CmiInitCPUAffinity(char **argv)
@@ -350,8 +350,8 @@ void CmiInitCPUAffinity(char **argv)
     /* get my ip address */
   if (CmiMyRank() == 0)
   {
-#if CMK_XT3
-    ret = getXT3NodeID(CmiMyPe(), CmiNumPes());
+#if CMK_CRAYXT
+    ret = getXTNodeID(CmiMyPe(), CmiNumPes());
     memcpy(&myip, &ret, sizeof(int));
 #elif CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
