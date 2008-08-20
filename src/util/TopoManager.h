@@ -1,4 +1,11 @@
-/** \file TopoManager.h
+ /*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
+ /** \file TopoManager.h
  *  Author: Abhinav S Bhatele
  *  Date Created: March 19th, 2007
  *
@@ -17,8 +24,10 @@
 #include "BGLTorus.h"
 #elif CMK_BLUEGENEP
 #include "BGPTorus.h"
-#elif CMK_XT3
-#include "CrayTorus.h"
+#elif XT3_TOPOLOGY
+#include "XT3Torus.h"
+#elif XT4_TOPOLOGY
+#include "XT4Torus.h"
 #endif
 
 class TopoManager {
@@ -37,8 +46,10 @@ class TopoManager {
     BGLTorusManager bgltm;
 #elif CMK_BLUEGENEP
     BGPTorusManager bgptm;
-#elif CMK_XT3
-    CrayTorusManager crtm;
+#elif XT3_TOPOLOGY
+    XT3TorusManager xt3tm;
+#elif XT4_TOPOLOGY
+    XT4TorusManager xt4tm;
 #endif
 
   public:
@@ -80,19 +91,37 @@ class TopoManager {
       torusZ = torus[2];
       torusT = torus[3];
 
-#elif CMK_XT3
-      dimX = crtm.getDimX();
-      dimY = crtm.getDimY();
-      dimZ = crtm.getDimZ();
+#elif XT3_TOPOLOGY
+      dimX = xt3tm.getDimX();
+      dimY = xt3tm.getDimY();
+      dimZ = xt3tm.getDimZ();
     
-      dimNX = crtm.getDimNX();
-      dimNY = crtm.getDimNY();
-      dimNZ = crtm.getDimNZ();
-      dimNT = crtm.getDimNT();
+      dimNX = xt3tm.getDimNX();
+      dimNY = xt3tm.getDimNY();
+      dimNZ = xt3tm.getDimNZ();
+      dimNT = xt3tm.getDimNT();
 
-      procsPerNode = crtm.getProcsPerNode();
+      procsPerNode = xt3tm.getProcsPerNode();
       int *torus;
-      torus = crtm.isTorus();
+      torus = xt3tm.isTorus();
+      torusX = torus[0];
+      torusY = torus[1];
+      torusZ = torus[2];
+      torusT = torus[3];
+
+#elif XT4_TOPOLOGY
+      dimX = xt4tm.getDimX();
+      dimY = xt4tm.getDimY();
+      dimZ = xt4tm.getDimZ();
+    
+      dimNX = xt4tm.getDimNX();
+      dimNY = xt4tm.getDimNY();
+      dimNZ = xt4tm.getDimNZ();
+      dimNT = xt4tm.getDimNT();
+
+      procsPerNode = xt4tm.getProcsPerNode();
+      int *torus;
+      torus = xt4tm.isTorus();
       torusX = torus[0];
       torusY = torus[1];
       torusZ = torus[2];

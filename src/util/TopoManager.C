@@ -1,4 +1,11 @@
-/** \file TopoManager.C
+ /*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
+ /** \file TopoManager.C
  *  Author: Abhinav S Bhatele
  *  Date Created: March 19th, 2007
  *
@@ -22,8 +29,8 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
   bgltm.rankToCoordinates(pe, x, y, z);
 #elif CMK_BLUEGENEP
   bgptm.rankToCoordinates(pe, x, y, z);
-#elif CMK_XT3
-
+#elif XT3_TOPOLOGY || XT4_TOPOLOGY
+  CmiAbort("This function should not be called on Cray XT machines\n");
 #else
   if(dimY > 1){
     // Assumed TXYZ
@@ -44,8 +51,10 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
   bgltm.rankToCoordinates(pe, x, y, z, t);
 #elif CMK_BLUEGENEP
   bgptm.rankToCoordinates(pe, x, y, z, t);
-#elif CMK_XT3
-  crtm.rankToCoordinates(pe, x, y, z, t);
+#elif XT3_TOPOLOGY
+  xt3tm.rankToCoordinates(pe, x, y, z, t);
+#elif XT4_TOPOLOGY
+  xt4tm.rankToCoordinates(pe, x, y, z, t);
 #else
   if(dimNY > 1) {
     t = pe % dimNT;
@@ -66,8 +75,8 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
   return bgltm.coordinatesToRank(x, y, z);
 #elif CMK_BLUEGENEP
   return bgptm.coordinatesToRank(x, y, z);
-#elif CMK_XT3
-
+#elif XT3_TOPOLOGY || XT4_TOPOLOGY
+  CmiAbort("This function should not be called on Cray XT machines\n");
 #else
   if(dimY > 1)
     return x + y*dimX + z*dimX*dimY;
@@ -81,8 +90,10 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
   return bgltm.coordinatesToRank(x, y, z, t);
 #elif CMK_BLUEGENEP
   return bgptm.coordinatesToRank(x, y, z, t);
-#elif CMK_XT3
-  return crtm.coordinatesToRank(x, y, z, t);
+#elif XT3_TOPOLOGY
+  return xt3tm.coordinatesToRank(x, y, z, t);
+#elif XT4_TOPOLOGY
+  return xt4tm.coordinatesToRank(x, y, z, t);
 #else
   if(dimNY > 1)
     return t + (x + (y + z*dimNY) * dimNX) * dimNT;
@@ -111,7 +122,7 @@ void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
 int TopoManager::pickClosestRank(int mype, int *pes, int n) {
 #ifdef CMK_VERSION_BLUEGENE
   return(bgltm->pickClosestRank(mype, pes, n));
-#elif CMK_XT3
+#elif XT3_TOPOLOGY
 #else 
   return(pickClosestRank(mype,pes,n));
 #endif
