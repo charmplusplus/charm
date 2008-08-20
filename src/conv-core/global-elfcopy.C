@@ -28,7 +28,7 @@
 
 CpvDeclare(int, CmiPICMethod);
 
-#if CMK_AMD64 || CMK_XT3
+#if CMK_AMD64 || CMK_CRAYXT
 typedef Elf64_Addr    ELFXX_TYPE_Addr;
 typedef Elf64_Dyn     ELFXX_TYPE_Dyn;
 typedef Elf64_Rela    ELFXX_TYPE_Rel;
