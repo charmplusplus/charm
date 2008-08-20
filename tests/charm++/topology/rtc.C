@@ -16,8 +16,10 @@ class Main : public Chare
 #if CMK_VERSION_BLUEGENE
       BGLPersonality bgl_p;
       int i = rts_get_personality(&bgl_p, sizeof(BGLPersonality));
-#elif CMK_XT3
-      CrayTorusManager crtm;
+#elif XT3_TOPOLOGY
+      XT3TorusManager xt3tm;
+#elif XT4_TOPOLOGY
+      XT4TorusManager xt4tm;
 #endif
 
       mainProxy = thishandle;
@@ -33,9 +35,13 @@ class Main : public Chare
 	  unsigned int tmp_t, tmp_x, tmp_y, tmp_z;
 	  rts_coordinatesForRank(i, &tmp_x, &tmp_y, &tmp_z, &tmp_t);
 	  CkPrintf("Real Processor %d ---> x %d y %d z %d t %d\n", i, tmp_x, tmp_y, tmp_z, tmp_t);
-#elif CMK_XT3
+#elif XT3_TOPOLOGY
 	  int tmp_t, tmp_x, tmp_y, tmp_z;
-          crtm.realRankToCoordinates(i, tmp_x, tmp_y, tmp_z, tmp_t);
+          xt3tm.realRankToCoordinates(i, tmp_x, tmp_y, tmp_z, tmp_t);
+	  CkPrintf("Real Processor %d ---> x %d y %d z %d t %d\n", i, tmp_x, tmp_y, tmp_z, tmp_t);
+#elif XT4_TOPOLOGY
+	  int tmp_t, tmp_x, tmp_y, tmp_z;
+          xt4tm.realRankToCoordinates(i, tmp_x, tmp_y, tmp_z, tmp_t);
 	  CkPrintf("Real Processor %d ---> x %d y %d z %d t %d\n", i, tmp_x, tmp_y, tmp_z, tmp_t);
 #endif
         }
