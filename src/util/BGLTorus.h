@@ -17,7 +17,7 @@
 #include <string.h>
 #include "converse.h"
 
-#if CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
 
 #include <bglpersonality.h>
 
@@ -163,5 +163,5 @@ class BGLTorusManager {
     }
 };
 
-#endif // CMK_VERSION_BLUEGENE
+#endif // CMK_BLUEGENEL
 #endif //_BGL_TORUS_H_

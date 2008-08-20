@@ -25,7 +25,7 @@ int TopoManager::hasMultipleProcsPerNode() {
 }
 
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
-#ifdef CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
   bgltm.rankToCoordinates(pe, x, y, z);
 #elif CMK_BLUEGENEP
   bgptm.rankToCoordinates(pe, x, y, z);
@@ -47,7 +47,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
 }
 
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
-#ifdef CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
   bgltm.rankToCoordinates(pe, x, y, z, t);
 #elif CMK_BLUEGENEP
   bgptm.rankToCoordinates(pe, x, y, z, t);
@@ -71,7 +71,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
 }
 
 int TopoManager::coordinatesToRank(int x, int y, int z) {
-#ifdef CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
   return bgltm.coordinatesToRank(x, y, z);
 #elif CMK_BLUEGENEP
   return bgptm.coordinatesToRank(x, y, z);
@@ -86,7 +86,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
 }
 
 int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
-#ifdef CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
   return bgltm.coordinatesToRank(x, y, z, t);
 #elif CMK_BLUEGENEP
   return bgptm.coordinatesToRank(x, y, z, t);
@@ -120,7 +120,7 @@ void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
 
 /*
 int TopoManager::pickClosestRank(int mype, int *pes, int n) {
-#ifdef CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
   return(bgltm->pickClosestRank(mype, pes, n));
 #elif XT3_TOPOLOGY
 #else 

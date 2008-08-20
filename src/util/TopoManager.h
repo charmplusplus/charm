@@ -20,7 +20,7 @@
 
 #include "charm.h"
 
-#ifdef CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
 #include "BGLTorus.h"
 #elif CMK_BLUEGENEP
 #include "BGPTorus.h"
@@ -42,7 +42,7 @@ class TopoManager {
     int torusX, torusY, torusZ, torusT; 
     int procsPerNode;
 
-#ifdef CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
     BGLTorusManager bgltm;
 #elif CMK_BLUEGENEP
     BGPTorusManager bgptm;
@@ -55,7 +55,7 @@ class TopoManager {
   public:
 
     TopoManager() {
-#ifdef CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
       dimX = bgltm.getDimX();
       dimY = bgltm.getDimY();
       dimZ = bgltm.getDimZ();
