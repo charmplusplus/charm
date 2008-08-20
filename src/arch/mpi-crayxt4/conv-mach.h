@@ -8,9 +8,9 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_XT3                                            1
+#define CMK_CRAYXT                                         1
 
-#define XT3_ONLY_PCQUEUE_WORKAROUND                        0
+#define XT4_TOPOLOGY					   1
 
 #define CMK_CONVERSE_MPI                                   1
 

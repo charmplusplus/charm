@@ -1,5 +1,5 @@
 #CMK_DEFS="-I/opt/xt-mpt/1.5.47/mpich2-64/T/include "
-#CMK_LD_DEFS="-L/opt/xt-mpt/1.5.47/mpich2-64/T/lib "
+#CMK_LD_DEFS="-lrca "
 
 CMK_CPP_CHARM="/lib/cpp -P"
 CMK_CPP_C="cc -E $CMK_DEFS "
@@ -8,7 +8,7 @@ CMK_CC="cc $CMK_DEFS "
 CMK_CXX="CC  $CMK_DEFS "
 CMK_LD="$CMK_CC $CMK_LD_DEFS"
 CMK_LDXX="$CMK_CXX $CMK_LD_DEFS"
-CMK_LIBS="-lckqt"
+CMK_LIBS="-lckqt -lrca"
 
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 
