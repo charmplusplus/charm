@@ -205,7 +205,7 @@ extern CmiNodeLock CmiMemLock_lock;
 
 #include "string.h"
 
-#if CMK_VERSION_BLUEGENE || CMK_BLUEGENEP
+#if CMK_BLUEGENEL || CMK_BLUEGENEP
 #include "cmimemcpy.h"
 #else
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))

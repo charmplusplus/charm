@@ -41,7 +41,7 @@
 
 #define FLIPBIT(node,bitnumber) (node ^ (1 << bitnumber))
 
-#if CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
 #define MAX_QLEN 8
 #define NETWORK_PROGRESS_PERIOD_DEFAULT 16
 #else
@@ -550,7 +550,7 @@ void CmiReleaseCommHandle(CmiCommHandle c)
   return;
 }
 
-#if CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
 extern void MPID_Progress_test();
 #endif
 
@@ -563,7 +563,7 @@ void CmiReleaseSentMessages(void)
   MPI_Status sts;
 
 
-#if CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
   MPID_Progress_test();
 #endif
 
@@ -600,7 +600,7 @@ int PumpMsgs(void)
   MPI_Status sts;
   int recd=0;
 
-#if CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
   MPID_Progress_test();
 #endif
 

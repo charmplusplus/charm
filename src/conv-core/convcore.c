@@ -906,7 +906,7 @@ double CmiCpuTimer()
 
 #endif
 
-#if CMK_VERSION_BLUEGENE || CMK_BLUEGENEP
+#if CMK_BLUEGENEL || CMK_BLUEGENEP
 #include "dcopy.h"
 #endif
 

@@ -8,6 +8,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_BLUEGENEL					   1
+
 #define CMK_NO_OUTSTANDING_SENDS			   1
 
 #define CMK_MEMORY_PREALLOCATE_HACK                        1
@@ -50,8 +52,6 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 #define CMK_TIMER_USE_BLUEGENEL				   1
-
-#define CMK_VERSION_BLUEGENE                               1
 
 #define CMK_TYPEDEF_INT2 short
 #define CMK_TYPEDEF_INT4 int

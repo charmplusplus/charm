@@ -104,7 +104,7 @@
 #if CMK_MEMORY_PROTECTABLE
 #include <malloc.h> /*<- for memalign*/
 #endif
-#if CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
 #include "rts.h"	/*<- for rts_memory_alias */
 #endif
 
@@ -264,7 +264,7 @@ void CthAliasEnable(CthThreadBase *t) {
 	_curMappedStack=t;
 	if (0) printf("Mmapping in thread %p from runtime stack %p\n",t,&s);
 	
-#if CMK_VERSION_BLUEGENE
+#if CMK_BLUEGENEL
         /* Blue Gene/L does not have mmap */
         /* So this depends on a hack in CNK for syscall rts_memory_alias to
            map stack pointer to a fix address */

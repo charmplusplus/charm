@@ -103,7 +103,7 @@ NormalSlabArray::acceptDataForFFT(int numPoints, complex *points, int posn, int 
 		     (fftw_complex*)dataPtr + p * planeSize,
 		     lineSize, 1, //stride, nextFFT
 		     NULL, 0, 0);
-#ifdef CMK_VERSION_BLUEGENE
+#ifdef CMK_BLUEGENEL
 		CmiNetworkProgress();
 #endif
 	}
@@ -212,7 +212,7 @@ NormalSlabArray::acceptDataForIFFT(int numPoints, complex *points, int posn, int
 		     (fftw_complex*)dataPtr + p * planeSize,
 		     lineSize, 1, //stride, nextFFT
 		     NULL, 0, 0);
-#ifdef CMK_VERSION_BLUEGENE
+#ifdef CMK_BLUEGENEL
 		CmiNetworkProgress();
 #endif
 
