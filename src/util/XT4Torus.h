@@ -75,10 +75,9 @@ class XT4TorusManager {
       for(int i=0; i<CmiNumPes(); i++)
       {
         nid = pid2nid[i];
-	//if (nid != oldnid)
+	if (nid != oldnid)
 	  getMeshCoord(nid, &lx, &ly, &lz);
-	printf("PID %d NID %d x %d y %d z %d\n", i, nid, lx, ly, lz);
-	//oldnid = nid;
+	oldnid = nid;
 
         pid2coords[i].x = lx;      
         pid2coords[i].y = ly;
@@ -148,7 +147,6 @@ class XT4TorusManager {
       x = pid2coords[pe].x - origin.x; 
       y = pid2coords[pe].y - origin.y; 
       z = pid2coords[pe].z - origin.z; 
-      // printf("z %d %d %d\n", z, pid2coords[pe].z, origin.z);
       t = pid2coords[pe].t - origin.t; 
     }
 
