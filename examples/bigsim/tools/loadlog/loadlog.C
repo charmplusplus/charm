@@ -36,7 +36,8 @@ int main()
       BgTimeLog *bglog = tline[idx];
 #if 1
       if (fabs(bglog->execTime - ( bglog->endTime - bglog->startTime)) > 1e-6)
-        printf("Invalid log: startT: %f endT: %f execT: %f\n", bglog->startTime, bglog->endTime, bglog->execTime);
+        printf("Invalid log [%d,%d]: startT: %f endT: %f execT: %f\n", i, idx,
+	       bglog->startTime, bglog->endTime, bglog->execTime);
 #endif
       for(int midx=0; midx < bglog->msgs.length(); midx++){
         BgMsgEntry *msg = bglog->msgs[midx];
