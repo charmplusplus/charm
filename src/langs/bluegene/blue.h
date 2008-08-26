@@ -240,7 +240,7 @@ void BgStartCorrection();
 #define BG_EVENT_MARK           3
 
 void *BgCreateEvent(int eidx);
-void BgEntrySplit();
+void BgEntrySplit(const char *name);
 void bgAddProjEvent(void *data, int idx, double t, 
 		    bgEventCallBackFn fn, void *uptr, int eType);
 void bgUpdateProj(int eType);

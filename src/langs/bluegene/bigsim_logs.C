@@ -479,7 +479,7 @@ void BgTimeLineRec::logEntryClose() {
   bgCurLog = NULL;
 }
 
-void BgTimeLineRec::logEntrySplit()
+void BgTimeLineRec::logEntrySplit(const char *name)
 {
 //CmiPrintf("BgTimeLineRec::logEntrySplit\n");
   CmiAssert(genTimeLog);
@@ -489,7 +489,7 @@ void BgTimeLineRec::logEntrySplit()
   logEntryClose();
 
   // make up a new bglog to start, setting up dependencies.
-  BgTimeLog *newLog = new BgTimeLog(-1, (char*)"split-broadcast", timerFunc());
+  BgTimeLog *newLog = new BgTimeLog(-1, (char*)name, timerFunc());
   newLog->addBackwardDep(rootLog);
   logEntryInsert(newLog);
   bgCurLog = newLog;

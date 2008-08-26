@@ -76,10 +76,10 @@ void *BgCreateEvent(int eidx)
 // This is used for broadcast where several entry functions coexist
 // in one starting bglog
 // the parent log is bgCurLog
-void BgEntrySplit()
+void BgEntrySplit(const char* name)
 {
   stopVTimer();
-  if (genTimeLog) tTIMELINEREC.logEntrySplit();
+  if (genTimeLog) tTIMELINEREC.logEntrySplit(name);
   startVTimer();
 }
 
