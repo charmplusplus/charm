@@ -46,7 +46,7 @@ struct loc {
   int t;
 };
 
-class CrayTorusManager {
+class XT3TorusManager {
   private:
     int dimX;	// dimension of the allocation in X (processors)
     int dimY;	// dimension of the allocation in Y (processors)
@@ -64,7 +64,7 @@ class CrayTorusManager {
     struct loc origin;
 
   public:
-    CrayTorusManager() {
+    XT3TorusManager() {
       // open file to load data from CrayNeighborTable
       FILE *fp = fopen("/usr/users/4/abhatele/work/charm/src/util/CrayNeighbourTable", "r");
 
@@ -144,7 +144,7 @@ class CrayTorusManager {
       torus[3] = 0;
     }
 
-    ~CrayTorusManager() { }
+    ~XT3TorusManager() { }
 
     inline int getDimX() { return dimX; }
     inline int getDimY() { return dimY; }
