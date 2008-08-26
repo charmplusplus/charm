@@ -203,6 +203,10 @@ void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void 
            how many of them are used */
         CKARRAYMAP_POPULATE_INITIAL(procNum(arrayHdl,idx)==thisPe);
 
+#if CMK_BLUEGENE_CHARM
+        BgEntrySplit("split-array-new-end");
+#endif
+
 	mgr->doneInserting();
 	CkFreeMsg(ctorMsg);
 }

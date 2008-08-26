@@ -694,6 +694,9 @@ void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg, int local)
 	if (local) {
 	  int onPe=CkMyPe();
 	  prepareCtorMsg(m,onPe,idx);
+#if CMK_BLUEGENE_CHARM
+          BgEntrySplit("split-array-new");
+#endif
 	  insertElement(m);
   	}
 	else {
@@ -960,7 +963,7 @@ void CkArray::recvBroadcast(CkMessage *m)
 	while (NULL!=(el=elements->next(idx))) {
 		broadcaster->deliver(msg,el);
 #if CMK_BLUEGENE_CHARM
-                BgEntrySplit();
+                BgEntrySplit("split-broadcast");
 #endif
 	}
 	if (! isAnytimeMigration) {
