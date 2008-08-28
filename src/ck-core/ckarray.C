@@ -961,11 +961,14 @@ void CkArray::recvBroadcast(CkMessage *m)
 	int idx=0;
 	ArrayElement *el;
 	while (NULL!=(el=elements->next(idx))) {
-		broadcaster->deliver(msg,el);
 #if CMK_BLUEGENE_CHARM
                 BgEntrySplit("split-broadcast");
 #endif
+		broadcaster->deliver(msg,el);
 	}
+#if CMK_BLUEGENE_CHARM
+                BgEntrySplit("end-broadcast");
+#endif
 	if (! isAnytimeMigration) {
 	  CkFreeMsg(msg);
 	}
