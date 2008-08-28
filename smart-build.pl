@@ -458,8 +458,8 @@ if($target eq "charm++"){
 Do you want to compile in parallel?
         1) No
         2) Build with -j2
-        3) Build with -j4 [default]
-        4) Build with -j8
+        3) Build with -j4
+        4) Build with -j8  [default]
         5) Build with -j16
         6) Build with -j32
 
@@ -473,10 +473,10 @@ EOF
         } elsif($line eq "2") {
 	    $j = "-j2";
 	    last; 
-	} elsif($line eq "3" || $line eq "") {
+	} elsif($line eq "3") {
 	    $j = "-j4";
 	    last;
-	}  elsif($line eq "4") {
+	}  elsif($line eq "4"  || $line eq "") {
 	    $j = "-j8";
 	    last;
 	}  elsif($line eq "5") {
