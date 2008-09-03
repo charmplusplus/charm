@@ -1,21 +1,23 @@
 #include "liveViz.h"
 #include "wave2d.decl.h"
 
-// This program solves the 2-d wave equation over a grid, displaying pretty results through liveViz
+// Author: Isaac Dooley 2008
 
+// This program solves the 2-d wave equation over a grid, displaying pretty results through liveViz
+// The program could be made more efficient, but is kept this way for simplicity.
+// Migration is not supported yet. Please add the PUP function if you get a chance!
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ CProxy_Wave arrayProxy;
 
 #define TotalDataWidth  800
-#define TotalDataHeight 600
+#define TotalDataHeight 400
 
 #define chareArrayWidth  8
 #define chareArrayHeight  8
 
+// A modulo operator that works for a==-1
 #define wrap(a,b)  (((a)+b)%b)
-
-CkArrayID a;
 
 class Main : public CBase_Main
 {
@@ -50,6 +52,8 @@ public:
 		// setup liveviz
 		CkCallback c(CkIndex_Wave::requestNextFrame(0),arrayProxy);
 		liveVizConfig cfg(liveVizConfig::pix_color,true);
+
+    CkArrayID a; // unused???
 		liveVizInit(cfg,a,c);
 
 		//Start the computation
@@ -76,6 +80,8 @@ public:
 			  // Start the next iteration
 			  recieve_count=0;
 			  iterations++;
+				CkPrintf("Completed %d iterations; iteration time: %.6lf\n", iterations, totaltime);
+
 			  startTime = CmiWallTimer();
 
 			  for(int i=0;i<chareArrayWidth;i++){
@@ -83,7 +89,6 @@ public:
 			      arrayProxy(i,j).begin_iteration();
 			    }
 			  }
-
 
 			}
 		}
@@ -117,36 +122,35 @@ public:
 		temperature_old = new double[mywidth*myheight];
 
 		buffer_left = new double[myheight];
-                buffer_right = new double[myheight];
-                buffer_up = new double[mywidth];
-                buffer_down = new double[mywidth];
+    buffer_right = new double[myheight];
+    buffer_up = new double[mywidth];
+    buffer_down = new double[mywidth];
 
 		messages_due = 4;
-		for(int i=0;i<myheight;++i){
-			buffer_left[i] = 0.0;
-			buffer_right[i] = 0.0;
-			for(int j=0;j<mywidth;++j){
-				temperature[i*mywidth+j] = 0.0;
-				temperature_old[i*mywidth+j] = 0.0;
-			}
-		}
 
-		BC();
+		InitialConditions();
 	}
 
 
-	// Enforce some boundary conditions
-	void BC(){
+	// Setup some Initial conditions
+	void InitialConditions(){
 
-		// Good for use with wave equation
 		int numInitialSpots = 5;
 		double spotScaleX = (double)TotalDataWidth / 800.0 ;
 		double spotScaleY = (double)TotalDataHeight / 800.0 ;
 		double spotScale = spotScaleX<spotScaleY ? spotScaleX : spotScaleY;
 
-		int xcenters[] = {210,300,420,580,380};
-		int ycenters[] = {210,300,420,580,511};
-		int rs[] = {40,30,10,20,15};
+		int xcenters[] = {50,300,420,580,380}; // X  coordinate of the initial pertubations
+		int ycenters[] = {50,300,420,580,511}; // Y coordinate of the initial pertubations
+		int rs[] = {10,30,10,20,15}; // radius of the initial pertubations
+
+    for(int i=0;i<myheight;i++){
+      for(int j=0; j<mywidth; j++){
+					
+        temperature[i*mywidth+j] = 0.0;
+        temperature_old[i*mywidth+j] = 0.0;
+      }
+    }
 
 		for(int n=0;n<numInitialSpots; n++){
 
@@ -172,10 +176,8 @@ public:
 						temperature_old[i*mywidth+j] = t;
 					}
 					
-					
 				}						
-
-			}
+      }
 		}
 
 	}
@@ -266,6 +268,8 @@ public:
 		// See http://www.mtnmath.com/whatrh/node66.html for description of this standard 2-d discretization of the wave equation
 
 
+    // Compute the new values based on the current and previous step values
+
 		double temperature_new[mywidth*myheight];
 		for(int i=0;i<mywidth*myheight;i++)
 			temperature_new[i] = 0.0;
@@ -273,25 +277,32 @@ public:
 		for(int i=0;i<myheight;++i){
 			for(int j=0;j<mywidth;++j){
 
+        // Current values for neighboring array elements
 				double left  = (j==0          ? buffer_left[i]  : temperature[i*mywidth+j-1] );
 				double right = (j==mywidth-1  ? buffer_right[i] : temperature[i*mywidth+j+1] );
 				double up    = (i==0          ? buffer_up[j]    : temperature[(i-1)*mywidth+j] );
 				double down  = (i==myheight-1 ? buffer_down[j]  : temperature[(i+1)*mywidth+j] );
 
-				double old  = temperature_old[i*mywidth+j];
+        // Current values for this array element
 				double curr = temperature[i*mywidth+j];
 
+        // Old value for this array element
+				double old  = temperature_old[i*mywidth+j];
+
+        // The wave speed
 				double c = 0.4;
 
+        // Compute the new value
 				temperature_new[i*mywidth+j] = c*c*(left+right+up+down - 4.0*curr)-old+2.0*curr;
 
+        // Round any near-zero values to zero (avoid denorms)
 				if(temperature_new[i*mywidth+j] < 0.0001 && temperature_new[i*mywidth+j] >  -0.0001)
 					temperature_new[i*mywidth+j] = 0.0;
 
 			}
 		}
 		
-		// Copy arrays back in time
+		// Advance to next step by copying values to the arrays for the previous steps
 		for(int i=0;i<myheight;++i){
 			for(int j=0;j<mywidth;++j){
 				temperature_old[i*mywidth+j] = temperature[i*mywidth+j];
@@ -302,7 +313,7 @@ public:
 	}
 
 
-  // provide my portion of the image to the graphical liveViz client                                                                                                       
+  // provide my portion of the image to the graphical liveViz client                           
   void requestNextFrame(liveVizRequestMsg *m){
     // Draw my part of the image, plus a nice 1px border along my right/bottom boundary
     int sx=thisIndex.x*mywidth; // where to deposit
@@ -315,22 +326,22 @@ public:
     unsigned char *intensity= new unsigned char[3*w*h];
     for(int i=0;i<myheight;++i){
       for(int j=0;j<mywidth;++j){
-	double t = temperature[i*mywidth+j];
-	if(t > 255.0){
-	  t = 255.0;
-	} else if (t < -255.0){
-	  t = -255.0;
-	}
+        double t = temperature[i*mywidth+j];
+        if(t > 255.0){
+          t = 255.0;
+        } else if (t < -255.0){
+          t = -255.0;
+        }
 	
-	if(t > 0) {
-	  intensity[3*(i*w+j)+0] = 255; // RED component
-	  intensity[3*(i*w+j)+1] = 255-t; // GREEN component
-	  intensity[3*(i*w+j)+2] = 255-t; // BLUE component
-	} else {
-	  intensity[3*(i*w+j)+0] = 255+t; // RED component
-	  intensity[3*(i*w+j)+1] = 255+t; // GREEN component
-	  intensity[3*(i*w+j)+2] = 255; // BLUE component
-	}
+        if(t > 0) {
+          intensity[3*(i*w+j)+0] = 255; // RED component
+          intensity[3*(i*w+j)+1] = 255-t; // GREEN component
+          intensity[3*(i*w+j)+2] = 255-t; // BLUE component
+        } else {
+          intensity[3*(i*w+j)+0] = 255+t; // RED component
+          intensity[3*(i*w+j)+1] = 255+t; // GREEN component
+          intensity[3*(i*w+j)+2] = 255; // BLUE component
+        }
 	
       }
     }
@@ -351,8 +362,6 @@ public:
     }
     liveVizDeposit(m, sx,sy, w,h, intensity, this);
     delete[] intensity;
-    
-    
   }
 
 

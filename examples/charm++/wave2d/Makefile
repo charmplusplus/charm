@@ -1,4 +1,4 @@
-CHARMC=../charm/bin/charmc -module liveViz $(OPTS)
+CHARMC=../../../bin/charmc -module liveViz $(OPTS)
 
 OBJS = wave2d.o
 
