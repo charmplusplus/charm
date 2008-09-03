@@ -1,0 +1,25 @@
+mainmodule wave2d {
+
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Wave arrayProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void report(int, int);
+  };
+
+  array [2D] Wave {
+    entry Wave(void);
+    entry void begin_iteration(void);
+    entry void ghostsFromLeft(int width, double s[width]);
+    entry void ghostsFromRight(int width, double s[width]);
+    entry void ghostsFromTop(int width, double s[width]);
+    entry void ghostsFromBottom(int width, double s[width]);
+
+    // A method for requesting data to be displayed graphically to the user
+    entry void requestNextFrame(liveVizRequestMsg *m);
+  };
+
+
+};
+
