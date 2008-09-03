@@ -7,14 +7,20 @@
 // The program could be made more efficient, but is kept this way for simplicity.
 // Migration is not supported yet. Please add the PUP function if you get a chance!
 
+// This program is based on the description here:
+// http://www.mtnmath.com/whatrh/node66.html
+// "The wave equation is the universal equation of physics. It works for light, 
+//  sound, waves on the surface of water and a great deal more"
+
+
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ CProxy_Wave arrayProxy;
 
-#define TotalDataWidth  800
-#define TotalDataHeight 400
+#define TotalDataWidth  600
+#define TotalDataHeight 600
 
-#define chareArrayWidth  8
-#define chareArrayHeight  8
+#define chareArrayWidth  4
+#define chareArrayHeight  4
 
 // A modulo operator that works for a==-1
 #define wrap(a,b)  (((a)+b)%b)
