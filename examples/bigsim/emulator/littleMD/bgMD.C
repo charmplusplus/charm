@@ -11,9 +11,6 @@
  *                        charm-bluegene version written previously.
 *******************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <iostream.h>
 #include "blue.h"
 #include "bgMD.h"
 
