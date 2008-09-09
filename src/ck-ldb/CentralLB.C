@@ -939,7 +939,12 @@ void CentralLB::simulationRead() {
 
     // now we have the simulation data, so print it and loop
     CmiPrintf("Charm++> LBSim: Simulation of load balancing step %d done.\n",LBSimulation::simStep);
-    simResults->PrintSimulationResults();
+    // **CWL** Officially recording my disdain here for using ints for bool
+    if (LBSimulation::showDecisionsOnly) {
+      simResults->PrintDecisions(migrateMsg);
+    } else {
+      simResults->PrintSimulationResults();
+    }
 
     delete migrateMsg;
     CmiPrintf("Charm++> LBSim: Passing to the next step\n");

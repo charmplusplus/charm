@@ -21,12 +21,15 @@ public:
   static int simStepSize;
   static int simProcs;
   static int procsChanged;
+
+  static int showDecisionsOnly;
 public:
   LBSimulation(int numPes_);
   ~LBSimulation();
   void reset();
   void SetProcessorLoad(int pe, double load, double bgload);
   void PrintSimulationResults();
+  void PrintDecisions(LBMigrateMsg *m);
   void PrintDifferences(LBSimulation *realSim, BaseLB::LDStats *stats);
 private:
   LBInfo  lbinfo;

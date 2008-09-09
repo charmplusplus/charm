@@ -229,6 +229,11 @@ void _loadbalancerInit()
   LBSimulation::simProcs = 0;
   CmiGetArgIntDesc(argv, "+LBSimProcs", &LBSimulation::simProcs, "Number of target processors.");
 
+  LBSimulation::showDecisionsOnly = 
+    CmiGetArgFlagDesc(argv, "+LBShowDecisions",
+		      "Display only Load Balancing Object to Processor Map decisions during LB Simulation");
+		    
+
   // force a global barrier after migration done
   _lb_args.syncResume() = CmiGetArgFlagDesc(argv, "+LBSyncResume", 
                   "LB performs a barrier after migration is finished");

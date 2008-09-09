@@ -19,6 +19,7 @@ int LBSimulation::simStepSize = 1;           /// number of steps to simulate
 int LBSimulation::simProcs = 0; 	     /// simulation target procs
 int LBSimulation::procsChanged = 0;          /// flag if the number of procs has been changed
 
+int LBSimulation::showDecisionsOnly = 0;     /// flag to write all LB decisions
 int _lb_version = LB_FORMAT_VERSION;	     /// data file version
 
 /*****************************************************************************
@@ -257,6 +258,17 @@ void LBSimulation::SetProcessorLoad(int pe, double load, double bgload)
 void LBSimulation::PrintSimulationResults()
 {
   lbinfo.print();
+}
+
+void LBSimulation::PrintDecisions(LBMigrateMsg *m)
+{
+  for (int i=0; i<m->n_moves; i++) {
+    CkPrintf("%d ", m->moves[i].obj.id.id[0]);
+    CkPrintf("%d ", m->moves[i].obj.id.id[1]);
+    CkPrintf("%d ", m->moves[i].obj.id.id[2]);
+    CkPrintf("%d ", m->moves[i].obj.id.id[3]);
+    CkPrintf("%d\n",m->moves[i].to_pe);
+  }
 }
 
 void LBSimulation::PrintDifferences(LBSimulation *realSim, BaseLB::LDStats *stats)
