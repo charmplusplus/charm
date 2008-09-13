@@ -1,0 +1,15 @@
+module TraceSimple {
+
+  mainchare TraceSimpleInit {
+    entry TraceSimpleInit(CkArgMsg *m);
+  };
+
+  initnode void initTraceSimpleBOC();
+  readonly CkGroupID traceSimpleGID;
+
+  group [migratable] TraceSimpleBOC {
+    entry TraceSimpleBOC(void);
+  };
+
+};
+
