@@ -1455,6 +1455,9 @@ for trace in $TRACEMODE; do
     elif test $trace = "projections"
     then
       echo "  extern void _registerTraceProjections();" >> $modInitSrc
+    elif test $trace = "simple"
+    then
+      echo "  extern void _registerTraceSimple();" >> $modInitSrc
     elif test $trace = "all"
     then
       echo "  extern void _registerTraceProjections();" >> $modInitSrc
@@ -1477,6 +1480,9 @@ for trace in $TRACEMODE; do
     elif test $trace = "projections"
     then
       echo "  _registerTraceProjections();" >> $modInitSrc
+    elif test $trace = "simple"
+    then
+      echo "  _registerTraceSimple();" >> $modInitSrc
     elif test $trace = "all"
     then
       echo "  _registerTraceProjections();" >> $modInitSrc

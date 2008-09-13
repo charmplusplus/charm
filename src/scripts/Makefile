@@ -165,7 +165,7 @@ include $(DEPENDFILE)
 
 CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       queueing.h conv-cpath.h conv-cpm.h persistent.h\
-      trace.h trace-bluegene.h trace-projections.h charm-api.h \
+      trace.h trace-bluegene.h trace-projections.h trace-simple.h charm-api.h \
       conv-ccs.h ccs-client.c ccs-client.h \
       ccs-server.h ccs-auth.c ccs-auth.h \
       memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
@@ -219,7 +219,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           NeighborCommLB.decl.h HbmLB.decl.h \
           HybridBaseLB.decl.h HybridLB.decl.h WSLB.decl.h EveryLB.decl.h \
           charisma.decl.h TraceSummary.decl.h TraceProjections.decl.h \
-          BlueGene.decl.h \
+          TraceSimple.decl.h BlueGene.decl.h \
 	  comlib.decl.h ComlibManager.h DummyStrategy.h	\
 	  DirectMulticastStrategy.h RingMulticastStrategy.h	\
 	  MultiRingMulticast.h \
@@ -314,6 +314,7 @@ dirs+sources:
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-neighbor.o $(L)/libldb-none.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
 TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
+	  $(L)/libtrace-simple.a \
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a \
           $(L)/libtrace-recordreplay.a  $(L)/libtracef_f.a $(L)/libtrace-memory.a
@@ -675,6 +676,11 @@ TraceSummary.def.h: TraceSummary.decl.h
 TraceSummary.decl.h: trace-summary.ci charmxi
 	$(CHARMXI) trace-summary.ci
 
+TraceSimple.def.h: TraceSimple.decl.h
+
+TraceSimple.decl.h: trace-simple.ci charmxi
+	$(CHARMXI) trace-simple.ci
+
 CkReduction.def.h: CkReduction.decl.h
 
 CkReduction.decl.h: ckreduction.ci charmxi
@@ -762,6 +768,10 @@ LIBTRACE_SUMM=trace-summary.o
 $(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
 	$(CHARMC) -o $@ $(LIBTRACE_SUMM)
 
+LIBTRACE_SIMPLE=trace-simple.o
+$(L)/libtrace-simple.a: $(LIBTRACE_SIMPLE)
+	$(CHARMC) -o $@ $(LIBTRACE_SIMPLE)
+
 LIBTRACE_RECREP=trace-recordreplay.o
 $(L)/libtrace-recordreplay.a: $(LIBTRACE_RECREP)
 	$(CHARMC) -o $@ $(LIBTRACE_RECREP)
@@ -778,7 +788,7 @@ LIBTRACE_MEMORY=trace-memory.o
 $(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)
 	$(CHARMC) -o $@ $(LIBTRACE_MEMORY)
 
-LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-recordreplay.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o
+LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-simple.o trace-recordreplay.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
 
@@ -798,7 +808,8 @@ tracef_f.o: tracef_f.f90
 	-$(CHARMC) -o $@ -c tracef_f.f90 && $(CHARMC) -cpmod ../include tracemod.M  || touch $@
 
 # used for make depends
-TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-counter.o	\
+TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
+	      trace-counter.o	\
 	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
               trace-recordreplay.o trace-memory.o
 
