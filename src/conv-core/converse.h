@@ -1554,12 +1554,30 @@ void CmiStopCounters(int events[], CMK_TYPEDEF_INT8 values[], int numEvents);
 /******** Trace ********/
 
 /* this is the type for thread ID, mainly used for projection. */
+#define OBJ_ID_SZ 4
 typedef struct _CmiObjId {
-int id[4];
-#if defined(__cplusplus)
- _CmiObjId() { id[0] = id[1] = id[2] = id[3] = -1; }
-  int isNull() { return id[0] == -1 && id[1] == -1 && 
-		   id[2] == -1 && id[3] == -1; }
+int id[OBJ_ID_SZ];
+  /* 
+   * **CWL** Note: setting initial values to -1 does not seem to be done for 
+   *               LDObjid. Potential consistency problems could arise. This
+   *               will probably have to be dealt with later.
+   */
+#ifdef __cplusplus
+  _CmiObjId() { 
+    for (int i=0; i<OBJ_ID_SZ; i++) {
+      id[i] = -1;
+    }
+  }
+  int isNull() {
+    for (int i=0; i<OBJ_ID_SZ; i++) {
+      if (id[i] != -1) return CmiFalse;
+    }
+    return CmiTrue;
+  }
+  CmiBool operator==(const struct _CmiObjId& objid) const {
+    for (int i=0; i<OBJ_ID_SZ; i++) if (id[i] != objid.id[i]) return CmiFalse;
+    return CmiTrue;
+  }
 #endif
 } CmiObjId;
 

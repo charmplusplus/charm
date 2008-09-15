@@ -31,8 +31,8 @@ extern "C" {
 typedef void* cvoid; /* To eliminate warnings, because a C void* is not
 			the same as a C++ void* */
 
-  /*  User-defined object ID is 4 ints long */
-#define OBJ_ID_SZ 4
+  /*  User-defined object ID is 4 ints long (as defined in converse.h) */
+  /*  as OBJ_ID_SZ */
 
 #if CMK_LBDB_ON
 typedef struct {
