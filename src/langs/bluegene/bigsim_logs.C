@@ -285,7 +285,7 @@ void BgTimeLog::write(FILE *fp)
   fprintf(fp," recvtime:%f startTime:%f endTime:%f execTime:%f\n", recvTime, startTime, endTime, execTime);
   if (bglog_version >= 2) {
     if (!objId.isNull())
-      fprintf(fp," ObjID: %d %d %d\n", objId.id[0], objId.id[1], objId.id[2]);
+      fprintf(fp," ObjID: %d %d %d %d\n", objId.id[0], objId.id[1], objId.id[2], objId.id[3]);
   }
   for (i=0; i<msgs.length(); i++)
     msgs[i]->write(fp);
