@@ -133,7 +133,15 @@ public:
 
   void compute() {
     double timeStamp = CkWallTimer();
-    double a[2000], b[2000], c[2000];
+    //    double a[2000], b[2000], c[2000];
+    // This is to get around the tiny default stack size used by the
+    // bigsim emulator on certain machines.
+    double *a;
+    double *b;
+    double *c;
+    a = new double[2000];
+    b = new double[2000];
+    c = new double[2000];
     for(int j=0;j<1000*work_factor;j++){
       for(int i=0;i<2000;i++){
 	a[i] = 7.0;
@@ -144,6 +152,9 @@ public:
 	c[2*i] = a[2*i];
       }
     }
+    delete [] a;
+    delete [] b;
+    delete [] c;
     double timeTaken = CkWallTimer() - timeStamp;
     // Sanity output
     if (((iteration == 0) || (iteration == total_iterations-1)) &&
