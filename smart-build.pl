@@ -81,6 +81,8 @@ if($cpu =~ m/i[0-9]86/){
   $ppc = 1;
 } elsif($cpu =~ m/Power Mac/){
   $ppc = 1;
+} elsif($cpu =~ m/ppc*/){
+  $ppc = 1;
 } elsif($cpu =~ m/alpha/){
   $alpha = 1;
 }
