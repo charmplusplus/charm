@@ -10,7 +10,7 @@ LIBDEST =  $(CDIR)/lib/$(LIB)
 
 CIFILES = CkCache.ci
 
-all: $(LIBDEST) $(HEADERS)
+all: $(LIBDEST)
 
 $(HEADERS): CkCache.decl.h CkCache.h 
 	/bin/cp CkCache.decl.h $(CDIR)/include

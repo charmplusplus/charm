@@ -22,6 +22,7 @@ syntax() {
   echo '  pose            build POSE parallel discrete event simulator'
   echo '  jade            build Jade compiler (auto-builds charm++, msa)'
   echo '  msa             build Multiphase Shared Arrays(MSA) library'
+  echo '  ChaNGa          compile Charm++ core and necessary libraries for ChaNGa'
   echo ''
   fi
   echo '<versions>: ' 
@@ -489,6 +490,7 @@ then
 fi
 
 echo $BASEVERSION > $DESTINATION/tmp/.vdir
+echo $VERSION | sed -e 's@-.*@@' > $DESTINATION/tmp/.gdir
 
 if test $BUILD_EMULATOR = 1
 then

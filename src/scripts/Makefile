@@ -74,9 +74,11 @@ AMPIF: AMPIC
 
 f90charm: charm++ $(L)/libf90charm.a
 
-default_libs: cache multicast pythonCCS
+default_libs: multicast pythonCCS
 
-cache:
+ChaNGa: charm++ cache
+
+cache: charm++
 	cd libs/ck-libs/cache && $(MAKE)
 
 multicast:
@@ -252,8 +254,8 @@ headerlinks: dirs+sources Makefile $(ALLHEADERS)
 	touch headerlinks
 
 dirs+sources:
-	rm -f .gdir
-	(cd .. ; basename "`pwd`" | sed -e 's@-.*@@') 	> .gdir
+#	rm -f .gdir
+#	(cd .. ; basename "`pwd`" | sed -e 's@-.*@@') 	> .gdir
 	pwd
 	find . -type l -exec rm {} \;
 	rm -rf QuickThreads
@@ -299,7 +301,7 @@ dirs+sources:
 	-ln -s ../../java/bin ../bin/charmjavabin
 	-ln -s charmjavabin/* ../bin/
 	-ln -s ../java ..
-	rm -f .gdir
+#	rm -f .gdir
 	rm -rf ../include ; mkdir ../include
 	-./system_ln  ../tmp/conv-*.*h ../include
 	-./system_ln  ../tmp/cc-*.*h ../include
