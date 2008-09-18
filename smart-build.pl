@@ -118,6 +118,8 @@ while($line = <>){
 
 # check for MPI
 
+$skip_choosing = "false";
+
 $mpi_found = "false";
 $m = system("which mpicc mpiCC > /dev/null 2>/dev/null") / 256;
 if($m == 0){
