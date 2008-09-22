@@ -5,6 +5,7 @@
   CkCacheManager::CkCacheManager(int size, CkGroupID gid) {
     init();
     numLocMgr = 1;
+    numLocMgrWB = 0;
     locMgr = new CkGroupID[1];
     locMgr[0] = gid;
     maxSize = (CmiUInt8)size * 1024 * 1024;
@@ -13,6 +14,7 @@
   CkCacheManager::CkCacheManager(int size, int n, CkGroupID *gid) {
     init();
     numLocMgr = n;
+    numLocMgrWB = 0;
     locMgr = new CkGroupID[n];
     for (int i=0; i<n; ++i) locMgr[i] = gid[i];
     maxSize = (CmiUInt8)size * 1024 * 1024;
@@ -202,10 +204,13 @@
       storedData = 0;
 
       if (numChunks != _numChunks) {
-        delete []cacheTable;
-        delete []chunkAck;
-        delete []chunkAckWB;
-        delete []chunkWeight;
+        if(numChunks != 0) {
+          delete []cacheTable;
+          delete []chunkAck;
+          delete []chunkAckWB;
+          delete []chunkWeight;
+        }
+	  
         numChunks = _numChunks;
         cacheTable = new std::map<CkCacheKey,CkCacheEntry*>[numChunks];
         chunkAck = new int[numChunks];
