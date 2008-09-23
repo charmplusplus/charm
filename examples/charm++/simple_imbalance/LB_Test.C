@@ -78,6 +78,7 @@ public:
   void report_done() {
     done_count++;
     if (num_chare_blocks*4*CkNumPes() == done_count) {
+      CkPrintf("Total work performed = %f seconds\n", totalChareWorkTime);
       CkPrintf("Average total chare work per iteration = %f seconds\n",
 	       totalChareWorkTime/total_iterations);
       CkPrintf("Average iteration time = %f seconds\n",
