@@ -5,15 +5,15 @@ LIB = libmoduleCkSparseContiguousReducer.a
 LIBOBJ = cksparsecontiguousreducer.o
 
 HEADERS = $(CDIR)/include/CkSparseContiguousReducer.decl.h \
+          $(CDIR)/include/CkSparseContiguousReducer.def.h \
           $(CDIR)/include/cksparsecontiguousreducer.h
+
 LIBDEST =  $(CDIR)/lib/$(LIB)
 
 all: $(LIBDEST) $(HEADERS)
 
-$(HEADERS): CkSparseContiguousReducer.decl.h cksparsecontiguousreducer.h
-	/bin/cp CkSparseContiguousReducer.decl.h $(CDIR)/include
-	/bin/cp CkSparseContiguousReducer.def.h $(CDIR)/include
-	/bin/cp cksparsecontiguousreducer.h $(CDIR)/include
+$(CDIR)/include/%.h: %.h
+	/bin/cp $< $@
 
 $(LIBDEST) : $(LIB)
 	/bin/cp $(LIB) $(LIBDEST)
@@ -24,8 +24,14 @@ $(LIB): $(LIBOBJ)
 cksparsecontiguousreducer.o: cksparsecontiguousreducer.C cksparsecontiguousreducer.h CkSparseContiguousReducer.decl.h CkSparseContiguousReducer.def.h
 	$(CHARMC) -c cksparsecontiguousreducer.C
 
-CkSparseContiguousReducer.decl.h CkSparseContiguousReducer.def.h: cksparsecontiguousreducer.ci
+CkSparseContiguousReducer.decl.h CkSparseContiguousReducer.def.h: INTERFACE
+
+INTERFACE: cksparsecontiguousreducer.ci
 	$(CHARMC) -c cksparsecontiguousreducer.ci
+	touch $@
 
 clean:
-	rm -f conv-host *.o *.decl.h *.def.h core  $(LIB)
+	rm -f conv-host *.o *.decl.h *.def.h core  $(LIB) INTERFACE
+
+realclean: clean
+	rm -f $(LIBDEST) $(HEADERS)
