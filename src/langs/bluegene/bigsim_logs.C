@@ -11,7 +11,7 @@
      * objId changed to 4 ints 
 */
 
-int bglog_version = 3;
+int bglog_version = BG_CURRENT_VERSION;
 
 int genTimeLog = 0;			// was 1 for guna 's seq correction
 int correctTimeLog = 0;
@@ -134,6 +134,7 @@ BgTimeLog::BgTimeLog(BgTimeLog *log)
 {
   strncpy(name,log->name,20);
   ep = log->ep;
+  charm_ep = -1;
   startTime = log->startTime;
   recvTime = log->recvTime;
   endTime = 0.0;
@@ -151,6 +152,7 @@ BgTimeLog::BgTimeLog(const BgMsgID &msgID)
   msgId = msgID;
   strcpy(name, "msgep");
   ep = -1;
+  charm_ep = -1;
   startTime = -1.0;
   recvTime = -1.0;
   endTime = execTime = 0.0;
@@ -186,6 +188,7 @@ BgTimeLog::BgTimeLog(int epc, char* namestr,double sTime)
     namestr = (char*)"dummyname1";
   strncpy(name,namestr,20);
   ep = epc;
+  charm_ep = -1;
   startTime = sTime;
   recvTime = -1.0;//stime;
   endTime = execTime = 0.0;
@@ -204,6 +207,7 @@ BgTimeLog::BgTimeLog(int epc, char* namestr, double sTime, double eTime)
     namestr = (char*)"dummyname2";
   strncpy(name,namestr, 20);
   ep = epc;
+  charm_ep = -1;
   startTime = sTime;
   recvTime = -1.0; //sTime;
   endTime = eTime;
@@ -228,6 +232,7 @@ BgTimeLog::BgTimeLog(char *msg, char *str)
   execTime = 0.0;
   recvTime = 0.0;
   ep = -1;
+  charm_ep = -1;
   if (msg) {
     ep = CmiBgMsgHandle(msg);
     recvTime = CmiBgMsgRecvTime(msg);  //startTime;
@@ -281,7 +286,11 @@ void BgTimeLog::write(FILE *fp)
 { 
   int i;
 //  fprintf(fp,"%p ep:%d name:%s (srcnode:%d msgID:%d) startTime:%f endTime:%f recvime:%f effRecvTime:%e seqno:%d startevent:%d\n", this, ep, name, msgId.node(), msgId.msgID(), startTime, endTime, recvTime, effRecvTime, seqno, isStartEvent());
-  fprintf(fp,"%p name:%s (srcnode:%d msgID:%d) ep:%d %s\n", this, name, msgId.node(), msgId.msgID(), ep, isStartEvent()?"STARTEVENT":"");
+  fprintf(fp,"%p name:%s (srcnode:%d msgID:%d) ep:%d ", this, name, msgId.node(), msgId.msgID(), ep);
+  if (isStartEvent()) fprintf(fp, "STARTEVENT");
+  if (isQDEvent()) fprintf(fp, "QDEVENT");
+  fprintf(fp, "\n");
+
   fprintf(fp," recvtime:%f startTime:%f endTime:%f execTime:%f\n", recvTime, startTime, endTime, execTime);
   if (bglog_version >= 2) {
     if (!objId.isNull())
@@ -370,6 +379,7 @@ void BgTimeLog::pup(PUP::er &p){
 
     p|ep; 
     p|seqno; p|msgId;
+    if (bglog_version >= 4) p(charm_ep);
     p|recvTime; p|effRecvTime;p|startTime; p|execTime; p|endTime; 
     p|flag; p(name,20);
     if (bglog_version >= 3)
@@ -412,6 +422,7 @@ void BgTimeLog::pup(PUP::er &p){
     for(i=0;i<l;i++){
       if(p.isUnpacking()){
 	p|idx;
+        CmiAssert(currTline != NULL);
 	addBackwardDep(currTline->timeline[idx]);
       }
       else{

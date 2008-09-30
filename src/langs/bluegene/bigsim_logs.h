@@ -15,6 +15,8 @@
 #include "blue_defs.h"
 #include "cklists.h"
 
+#define BG_CURRENT_VERSION      4
+
 extern int bglog_version;
 
 extern int bgcorroff;
@@ -107,6 +109,7 @@ public:
 };
 
 #define BG_STARTSIM     0x1
+#define BG_QD           0x2
 
 extern void BgDelaySend(BgMsgEntry *msgEntry);
 
@@ -120,6 +123,7 @@ public:
   int ep;
   int seqno;
   BgMsgID  msgId;	// incoming message that generates this log
+  short charm_ep;
 
   CmiObjId objId;
 
@@ -143,7 +147,7 @@ public:
   BgTimeLog(BgTimeLog *);
   BgTimeLog(const BgMsgID &msgID);
   BgTimeLog(char *msg, char *str=NULL);
-  BgTimeLog(): ep(-1), recvTime(.0), startTime(.0), endTime(.0), execTime(.0), 
+  BgTimeLog(): ep(-1), charm_ep(-1), recvTime(.0), startTime(.0), endTime(.0), execTime(.0), 
 	       effRecvTime(INVALIDTIME), seqno(0), doCorrect(1), flag(0) 
     {strcpy(name,"dummyname");}
   BgTimeLog(int epc, char* name, double sTime, double eTime);
@@ -152,6 +156,7 @@ public:
 
   inline void setName(char *_name) { strncpy(name, _name, 20); }
   inline void setEP(int _ep) { ep = _ep; }
+  inline void setCharmEP(short _ep) { charm_ep = _ep; }
   inline void setTime(double stime, double etime) {
          startTime = stime;
          endTime = etime;
@@ -178,6 +183,7 @@ public:
 
   inline void setStartEvent() { flag |= BG_STARTSIM; }
   inline int isStartEvent() { return (flag & BG_STARTSIM); }
+  inline int isQDEvent() { return (flag & BG_QD); }
 
   // add backward dep of the log corresponent to msg
   void addMsgBackwardDep(BgTimeLineRec &tlinerec, void* msg);
