@@ -151,6 +151,7 @@ void TraceBluegene::beginExecute(int event,int msgType,int ep,int srcPe, int mle
   else
     return;
   log->setObjId(idx);
+  log->setCharmEP(ep);
 }
 
 void TraceBluegene::getForwardDep(void* log, void** fDepPtr){

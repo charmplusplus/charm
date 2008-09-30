@@ -94,7 +94,7 @@ void ftraceRegisterFunc(char *name,int *outIdx,int lenName){
 }
 
 void ftraceBeginFunc(int *idx){
-	traceBeginFuncIndexProj(*idx,"FORTRAN",0);
+	traceBeginFuncIndexProj(*idx,(char*)"FORTRAN",0);
 }
 
 void ftraceEndFunc(int *idx){
