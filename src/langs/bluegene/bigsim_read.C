@@ -76,7 +76,7 @@ int* BgLoadOffsets(int totalProcs, int numPes){
 }
 
 
-int BgLoadTraceSummary(char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes)
+int BgLoadTraceSummary(const char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes)
 {
   BGMach  bgMach ;
   PUP::machineInfo machInfo;

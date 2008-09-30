@@ -315,7 +315,7 @@ void BgAddBackwardDep(BgTimeLog *curlog, BgTimeLog* deplog);
 BgTimeLog *BgStartLogByName(BgTimeLineRec &tlinerec, int ep, char *name, double starttime, BgTimeLog *prevLog);
 void BgEndLastLog(BgTimeLineRec &tlinerec);
 
-int BgLoadTraceSummary(char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes);
+int BgLoadTraceSummary(const char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes);
 int BgReadProc(int procNum, int numWth, int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec);
 int* BgLoadOffsets(int totalProcs, int numPes);
 void BgWriteThreadTimeLine(char *fname, int x, int y, int z, int th, BgTimeLine &tline);
