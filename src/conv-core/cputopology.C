@@ -5,7 +5,7 @@
  * $Revision$
  *****************************************************************************/
 
-#include "charm++.h"
+#include "converse.h"
 #include "sockRoutines.h"
 
 #define DEBUGP(x)  /* CmiPrintf x;  */
@@ -92,16 +92,20 @@ typedef struct _nodeTopoMsg {
 static nodeTopoMsg *topomsg = NULL;
 static CmmTable hostTable;
 
+typedef void (*CallbackFn)(void *cb);
+
 // nodenum[pe] is the node number of processor pe
 class CpuTopology {
 public:
 static int *nodenum;
-CkCallback   *cb;
+CallbackFn   fn;
+void        *cb;
 
-CpuTopology(): cb(NULL) {}
+CpuTopology(): fn(NULL), cb(NULL) {}
 };
 
 CpvDeclare(CpuTopology, cpuTopo);
+CmiNodeLock topoLock;
 
 /* called on PE 0 */
 static void cpuAffinityHandler(void *m)
@@ -149,14 +153,18 @@ static void cpuAffinityRecvHandler(void *msg)
   int myrank;
   nodeTopoMsg *m = (nodeTopoMsg *)msg;
   m->nodes = (int *)((char*)m + sizeof(nodeTopoMsg));
-    // need to make a copy
-  CpvAccess(cpuTopo).nodenum = m->nodes;
+
+  CmiLock(topoLock);
+  if (CpvAccess(cpuTopo).nodenum == NULL)
+    CpvAccess(cpuTopo).nodenum = m->nodes;
+  else
+    CmiFree(m);
+  CmiUnlock(topoLock);
 
     // call callback
-  if (CpvAccess(cpuTopo).cb!=NULL)
-    CpvAccess(cpuTopo).cb->send();
+  if (CpvAccess(cpuTopo).fn!=NULL)
+    CpvAccess(cpuTopo).fn(CpvAccess(cpuTopo).cb);
 
-  CmiFree(m);
 }
 
 #if CMK_CRAYXT
@@ -164,8 +172,9 @@ extern int getXTNodeID(int mype, int numpes);
 #endif
 
 // only one callback is allowed right now
-extern "C" void CmiRegisterCPUTopologyCallback(CkCallback *cb)
+extern "C" void CmiRegisterCPUTopologyCallback(CallbackFn fn, void *cb)
 {
+  CpvAccess(cpuTopo).fn = fn;
   CpvAccess(cpuTopo).cb = cb;
 }
 
@@ -176,6 +185,10 @@ extern "C" void CmiInitCPUTopology(char **argv)
   hostnameMsg  *msg;
  
   CpvInitialize(CpuTopology, cpuTopo);
+  if (CmiMyRank() ==0) {
+        topoLock = CmiCreateLock();
+  }
+
 
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
