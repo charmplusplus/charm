@@ -1,5 +1,4 @@
-CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
+include ../common.mk
 
 LIB = libmoduleCkCache.a
 LIBOBJ = CkCache.o
@@ -7,14 +6,11 @@ LIBOBJ = CkCache.o
 HEADERS = $(CDIR)/include/CkCache.decl.h \
           $(CDIR)/include/CkCache.def.h \
           $(CDIR)/include/CkCache.h 
-LIBDEST =  $(CDIR)/lib/$(LIB)
+LIBDEST =  $(LIBDIR)/$(LIB)
 
 CIFILES = CkCache.ci
 
 all: $(LIBDEST) $(HEADERS)
-
-$(CDIR)/include/%.h: %.h
-	/bin/cp $< $@
 
 $(LIBDEST): $(LIBOBJ)
 	$(CHARMC) -o $(LIBDEST) $(LIBOBJ) 

@@ -1,5 +1,4 @@
-CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
+include ../common.mk
 
 LIB = libmoduleCkSparseContiguousReducer.a
 LIBOBJ = cksparsecontiguousreducer.o
@@ -11,9 +10,6 @@ HEADERS = $(CDIR)/include/CkSparseContiguousReducer.decl.h \
 LIBDEST =  $(CDIR)/lib/$(LIB)
 
 all: $(LIBDEST) $(HEADERS)
-
-$(CDIR)/include/%.h: %.h
-	/bin/cp $< $@
 
 $(LIBDEST) : $(LIB)
 	/bin/cp $(LIB) $(LIBDEST)

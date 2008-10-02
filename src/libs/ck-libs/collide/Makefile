@@ -1,6 +1,8 @@
-CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
-LIBDIR=$(CDIR)/lib
+include ../common.mk
+
+#CDIR=../../../..
+#CHARMC=$(CDIR)/bin/charmc $(OPTS)
+#LIBDIR=$(CDIR)/lib
 
 HEADERS=collide_util.h bbox.h collide_cfg.h collide_buffers.h \
 	collidecharm.h collidec.h collidef.h 
@@ -16,8 +18,7 @@ OBJS=$(COBJS) threadCollide.o
 LIB=libmodulecollide
 DEST=$(LIBDIR)/$(LIB).a
 
-all: $(DEST) $(CDEST)
-	$(MAKE)  headers
+all: $(DEST) $(CDEST) headers
 
 $(DEST): $(OBJS) $(COMPAT) 
 	$(CHARMC) $(OBJS) $(COMPAT) -o $@
@@ -26,6 +27,9 @@ $(DEST): $(OBJS) $(COMPAT)
 $(CDEST): $(COBJS) $(COMPAT) 
 	$(CHARMC) $(COBJS) $(COMPAT) -o $@
 #	cp $(CLIB).dep $(LIBDIR)/$(CLIB).dep
+
+#$(CDIR)/include/%.h: %.h
+#	/bin/cp $< $@
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
@@ -46,18 +50,21 @@ collide_buffers.o: collide_buffers.C $(HEADDEP)
 threadCollide.o: threadCollide.C $(HEADDEP)
 	$(CHARMC) -c threadCollide.C
 
-collide.def.h: collide.decl.h
+collide.decl.h collide.def.h: INTERFACE.threadCollide
 
-collide.decl.h: threadCollide.ci
+INTERFACE.threadCollide: threadCollide.ci
 	$(CHARMC) threadCollide.ci
+	touch $@
 
-collidecharm.def.h: collidecharm.decl.h
+collidecharm.decl.h collidecharm.def.h: INTERFACE.collidecharm
 
-collidecharm.decl.h: collidecharm.ci
+INTERFACE.collidecharm: collidecharm.ci
 	$(CHARMC) collidecharm.ci
+	touch $@
 
 call_init.o: call_init.c
 	$(CHARMC) -c call_init.c
 
 clean:
 	rm -rf *.a *.def.h *.decl.h *.o SunWS_cache $(DEST) headers
+

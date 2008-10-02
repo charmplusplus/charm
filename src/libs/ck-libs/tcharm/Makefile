@@ -1,11 +1,10 @@
-CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
+include ../common.mk
 
-HEADERS=tcharm_impl.h tcharm.h tcharmc.h tcharmf.h tcharm.decl.h
+HEADERS=$(CDIR)/include/tcharm_impl.h $(CDIR)/include/tcharm.h \
+        $(CDIR)/include/tcharmc.h $(CDIR)/include/tcharmf.h \
+        $(CDIR)/include/tcharm.decl.h
 OBJS=tcharm.o
 COMPAT=compat_uns.o compat_us.o compat_funs.o compat_fus.o compat_regmm.o
-
-LIBDIR=$(CDIR)/lib
 
 LIB=libmoduletcharm
 DEST=$(LIBDIR)/$(LIB).a
@@ -35,8 +34,6 @@ $(COMPATLIB): $(COMPAT)
 	$(CHARMC) $(COMPAT) -o $@
 
 headers: $(HEADERS)
-	cp $(HEADERS) $(CDIR)/include/
-	touch headers
 
 compat_uns.o: compat_uns.c
 
@@ -61,4 +58,7 @@ tcharmmain.decl.h: tcharmmain.ci
 	$(CHARMC) tcharmmain.ci
 
 clean: 
-	-rm -fr *.o *~ *.decl.h *.def.h gmon.out headers $(DEST) $(COMPATLIB) conv-host charmrun
+	-rm -fr *.o *~ *.decl.h *.def.h gmon.out headers conv-host charmrun
+
+realclean: clean
+	rm -f $(HEADERS) $(DEST) $(DEST2) $(COMPATLIB)
