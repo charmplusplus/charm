@@ -5,24 +5,25 @@ LIB = libmoduleCkCache.a
 LIBOBJ = CkCache.o
 
 HEADERS = $(CDIR)/include/CkCache.decl.h \
+          $(CDIR)/include/CkCache.def.h \
           $(CDIR)/include/CkCache.h 
 LIBDEST =  $(CDIR)/lib/$(LIB)
 
 CIFILES = CkCache.ci
 
-all: $(LIBDEST)
+all: $(LIBDEST) $(HEADERS)
 
-$(HEADERS): CkCache.decl.h CkCache.h 
-	/bin/cp CkCache.decl.h $(CDIR)/include
-	/bin/cp CkCache.h $(CDIR)/include
+$(CDIR)/include/%.h: %.h
+	/bin/cp $< $@
 
 $(LIBDEST): $(LIBOBJ)
 	$(CHARMC) -o $(LIBDEST) $(LIBOBJ) 
 
-CkCache.def.h: CkCache.decl.h
+CkCache.def.h CkCache.decl.h: INTERFACE
 
-CkCache.decl.h : CkCache.ci $(CDIR)/bin/charmxi
+INTERFACE: $(CIFILES)
 	$(CHARMC) -c CkCache.ci
+	touch INTERFACE
 
 CkCache.o: CkCache.C $(HEADERS)
 	$(CHARMC) -c -o CkCache.o CkCache.C
@@ -30,3 +31,5 @@ CkCache.o: CkCache.C $(HEADERS)
 clean:
 	rm -f conv-host *.o *.decl.h *.def.h core  $(LIB)
 
+realclean: clean
+	rm -f $(LIBDEST) $(HEADERS)
