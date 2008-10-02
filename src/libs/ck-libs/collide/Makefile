@@ -1,9 +1,5 @@
 include ../common.mk
 
-#CDIR=../../../..
-#CHARMC=$(CDIR)/bin/charmc $(OPTS)
-#LIBDIR=$(CDIR)/lib
-
 HEADERS=collide_util.h bbox.h collide_cfg.h collide_buffers.h \
 	collidecharm.h collidec.h collidef.h 
 HEADDEP=$(HEADERS) collidecharm_impl.h \
@@ -27,9 +23,6 @@ $(DEST): $(OBJS) $(COMPAT)
 $(CDEST): $(COBJS) $(COMPAT) 
 	$(CHARMC) $(COBJS) $(COMPAT) -o $@
 #	cp $(CLIB).dep $(LIBDIR)/$(CLIB).dep
-
-#$(CDIR)/include/%.h: %.h
-#	/bin/cp $< $@
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
