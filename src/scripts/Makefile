@@ -31,9 +31,9 @@ all-test: bigsim AMPI
 	cd ../tests ; $(MAKE) all OPTS='$(OPTS)'
 	cd ../examples ; $(MAKE) all OPTS='$(OPTS)'
 
-charm++: basics
-	$(MAKE) charm-target
+charm++: charm-target
 	@echo "$(OPTS)" > OPTS
+	touch charm++
 
 bgampi: bigsim AMPI
 
@@ -46,14 +46,9 @@ PVM: converse $(L)/libpvmc.a
 AMR: charm++ LIBS
 	cd libs/ck-libs/amr; make all OPTS='$(OPTS)'
 
-FEM: charm++
-	$(MAKE) CONVLIBS
-	$(MAKE) FEMC LIBS FEMF
-
-FEMC: charm++ LIBS
-
-FEMF: FEMC
-
+FEM: charm++ LIBS
+FEMC: FEM
+FEMF: FEM
 ParFUM: FEM
 
 MBLOCK: AMPI MBLOCKC MBLOCKF
@@ -62,15 +57,11 @@ MBLOCKC: charm++ LIBS
 
 MBLOCKF: MBLOCKC
 
-AMPI:  charm++
-	$(MAKE) CONVLIBS
-	$(MAKE) AMPIC AMPIF
+AMPI:  charm++ LIBS
+AMPIC AMPIF: AMPI
 
 ARMCI: charm++ LIBS
 
-AMPIC: charm++ LIBS
-
-AMPIF: AMPIC
 
 f90charm: charm++ $(L)/libf90charm.a
 
@@ -371,14 +362,10 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 
 LIBCONV_UTILF=pup_f.o
 
-converse: basics
-	$(MAKE) QuickThreads/libqt.a
-	$(MAKE) converse-target
+converse: fmain-ok charmrun-target swapglobal-target conv-cpm
 
-converse-target:  $(CVLIBS) fmain-ok charmrun-target swapglobal-target conv-cpm
-
-charmrun-target: sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o
-	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS)' ) ; fi
+charmrun-target: sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o $(L)/libck.a $(CVLIBS)
+	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS)' -j1 ) ; fi
 	if [ -f charmrun ] ; then ( cp -f charmrun ../bin ) ; fi
 
 fmain-ok: fmain.f90
@@ -386,19 +373,16 @@ fmain-ok: fmain.f90
 	-@cp fmain.o ../lib
 	-@touch fmain-ok
 
-QT:
+QUICKTHREADS: $(CVHEADERS)
 	cd QuickThreads && make clean
-	make QuickThreads/libqt.a
-
-QuickThreads/libqt.a:  $(CVHEADERS)
 	cd QuickThreads;./configure
-	rm -f QuickThreads/libqt.a
 	cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS)'
 	cp -f QuickThreads/libqt.a ../lib/libckqt.a
 	-(CHARMINC=.; . ./conv-config.sh; \
 	  test -d ../lib_so && \
 	  cp -f QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so && \
 	  cp -f QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so/libckqt.$$CMK_SHARED_SUF)
+	touch QUICKTHREADS
 
 METIS:  charm++
 	cd libs/ck-libs/parmetis/METISLib && $(MAKE) OPTS='$(OPTS)'
@@ -565,37 +549,40 @@ $(L)/libmemory-charmdebug.o: memory-charmdebug.c $(MEM_DEPS)
 	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG memory.c || touch $@
 
 ## Thread libraries (-thread)
-$(L)/libthreads-default.o: threads.c $(CVHEADERS)
+
+LIBTHREADSDEPS := threads.c $(CVHEADERS) QUICKTHREADS
+
+$(L)/libthreads-default.o: $(LIBTHREADSDEPS)
 	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_DEFAULT=1 -IQuickThreads -I. threads.c
 
-$(L)/libthreads-qt.o: threads.c $(CVHEADERS)
+$(L)/libthreads-qt.o: $(LIBTHREADSDEPS) 
 	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_QT=1 -IQuickThreads threads.c
 
-$(L)/libthreads-context.o: threads.c $(CVHEADERS)
+$(L)/libthreads-context.o: $(LIBTHREADSDEPS) 
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c || touch $@
 
-$(L)/libthreads-uJcontext.o: threads.c uJcontext.c $(CVHEADERS)
+$(L)/libthreads-uJcontext.o: $(LIBTHREADSDEPS) uJcontext.c
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_JCONTEXT=1 -IQuickThreads -I. threads.c || touch $@
 
-$(L)/libthreads-pthreads.o: threads.c $(CVHEADERS)
+$(L)/libthreads-pthreads.o: $(LIBTHREADSDEPS) 
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_PTHREADS=1 -IQuickThreads threads.c || touch $@
 
-$(L)/libthreads-fibers.o: threads.c $(CVHEADERS)
+$(L)/libthreads-fibers.o: $(LIBTHREADSDEPS)
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_FIBERS=1 -IQuickThreads threads.c 2> /dev/null || touch $@
 
-$(L)/libthreads-stackcopy.o: threads.c $(CVHEADERS)
+$(L)/libthreads-stackcopy.o: $(LIBTHREADSDEPS) 
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_STACKCOPY=1 -IQuickThreads threads.c || touch $@
 
-$(L)/libthreads-memoryalias.o: threads.c $(CVHEADERS)
+$(L)/libthreads-memoryalias.o: $(LIBTHREADSDEPS) 
 	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_DEFAULT=1 -IQuickThreads threads.c || touch $@
 
-$(L)/libthreads-qt-memoryalias.o: threads.c $(CVHEADERS)
+$(L)/libthreads-qt-memoryalias.o: $(LIBTHREADSDEPS) 
 	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_QT=1 -IQuickThreads threads.c || touch $@
 
-$(L)/libthreads-context-memoryalias.o: threads.c $(CVHEADERS)
+$(L)/libthreads-context-memoryalias.o: $(LIBTHREADSDEPS) 
 	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c || touch $@
 
-$(L)/libthreads-uJcontext-memoryalias.o: threads.c $(CVHEADERS)
+$(L)/libthreads-uJcontext-memoryalias.o: $(LIBTHREADSDEPS) 
 	-$(CHARMC) -o $@ -DCMK_THREADS_ALIAS_STACK=1 -DCMK_THREADS_BUILD_JCONTEXT=1 -IQuickThreads -I. threads.c || touch $@
 
 ## Global swapping (-swapglobal)
@@ -632,7 +619,7 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o  \
 
 charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs
 
-CHARMLIBS: charm++
+CHARMLIBS: charm++ CONVLIBS
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
 
 $(L)/libck.a: $(LIBCK_CORE)
@@ -871,8 +858,7 @@ $(L)/libmodulecomlib.a: $(COMLIB_OBJS)
 #
 ###############################################################################
 
-bigsim:  basics
-	$(MAKE) bigsim-target
+bigsim:  bigsim-target
 
 bigemulator: bigsim
 
@@ -981,22 +967,22 @@ PVMC=pvmc_buf.o pvmc_comm.o pvmc_conv.o pvmc_main.o pvmc_pack.o pvmc_groups.o
 $(L)/libpvmc.a: $(PVMC)
 	$(CHARMC) -o $@ $(PVMC)
 
-pvmc_buf.o: pvmc_buf.c pvmc.h pvm3.h
+pvmc_buf.o: pvmc_buf.c pvmc.h pvm3.h converse.h
 	$(CHARMC) -o $@ pvmc_buf.c
 
-pvmc_conv.o: pvmc_conv.c pvmc.h pvm3.h
+pvmc_conv.o: pvmc_conv.c pvmc.h pvm3.h converse.h
 	$(CHARMC) -o $@ pvmc_conv.c
 
-pvmc_pack.o: pvmc_pack.c pvmc.h pvm3.h
+pvmc_pack.o: pvmc_pack.c pvmc.h pvm3.h converse.h
 	$(CHARMC) -o $@ pvmc_pack.c
 
-pvmc_comm.o: pvmc_comm.c pvmc.h pvm3.h
+pvmc_comm.o: pvmc_comm.c pvmc.h pvm3.h converse.h
 	$(CHARMC) -o $@ pvmc_comm.c
 
-pvmc_groups.o: pvmc_groups.c pvmc.h pvm3.h
+pvmc_groups.o: pvmc_groups.c pvmc.h pvm3.h converse.h
 	$(CHARMC) -o $@ pvmc_groups.c
 
-pvmc_main.o: pvmc_main.c pvmc.h pvm3.h
+pvmc_main.o: pvmc_main.c pvmc.h pvm3.h converse.h
 	$(CHARMC) -o $@ pvmc_main.c
 
 $(L)/libf90charm.a: charmxi f90main.ci f90main.h f90main.C futil.f90
