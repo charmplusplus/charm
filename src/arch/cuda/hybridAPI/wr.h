@@ -74,26 +74,8 @@ typedef struct workRequest {
   /* number of buffers used by the work request */ 
   int nBuffers; 
 
-
-  /* pointers to queues and their lengths on the device(gpu) and
-     host(cpu)  */
-  /*
-  void *readWriteDevicePtr;
-  void *readWriteHostPtr; 
-  int readWriteLen; 
-
-  void *readOnlyDevicePtr; 
-  void *readOnlyHostPtr; 
-  int readOnlyLen; 
-
-  void *writeOnlyDevicePtr;
-  void *writeOnlyHostPtr; 
-  int writeOnlyLen; 
-  */
-
   /* to be called after the kernel finishes executing on the GPU */ 
 
-  // void (*callbackFn)();
   void *callbackFn; 
  
   /* id to select the correct kernel in kernelSelect */
