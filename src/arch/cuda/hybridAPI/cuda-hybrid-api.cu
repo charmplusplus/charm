@@ -16,11 +16,16 @@
 
 #include "wrqueue.h"
 #include "cuda-hybrid-api.h"
+#include "stdio.h"
+
+extern void CUDACallbackManager(void *); 
 
 /* initial size of host/device buffer arrays - dynamically expanded by
  *  the runtime system if needed
  */ 
 #define NUM_BUFFERS 100
+#define GPU_DEBUG 0
+
 
 /* work request queue */
 workRequestQueue *wrQueue = NULL; 
@@ -30,7 +35,6 @@ workRequestQueue *wrQueue = NULL;
  * corresponding data on the device (GPU). 
  */ 
 
-
 /* host buffers  */ 
 void **hostBuffers = NULL; 
 
@@ -38,13 +42,6 @@ void **hostBuffers = NULL;
 void **devBuffers = NULL; 
 
 extern void CUDACallbackManager(void * fn); 
-
-/*
-  TO DO
-  stream 1 - kernel execution
-  stream 2 - memory setup
-  stream 3 - memory copies
-*/
 
 /* setupMemory
    set up memory on the gpu for this kernel's execution */
@@ -59,27 +56,21 @@ void setupMemory(workRequest *wr) {
       
       /* allocate if the buffer for the corresponding index is NULL */
       if (devBuffers[index] == NULL) {
+#ifdef GPU_DEBUG
+	printf("buffer %d allocated\n", index); 
+#endif
 	cudaMalloc((void **)&devBuffers[index], size); 
       }
       
       if (bufferInfo[i].transferToDevice) {
+#ifdef GPU_DEBUG
+	printf("transferToDevice: %d bufId: %d\n", i, index); 
+#endif
 	cudaMemcpy(devBuffers[index], hostBuffers[index], size, 
 		   cudaMemcpyHostToDevice);
       }
     }
   }
-
-  /*
-  cudaMalloc((void **)&(wr->readWriteDevicePtr), wr->readWriteLen);
-  cudaMalloc((void **)&(wr->readOnlyDevicePtr), wr->readOnlyLen); 
-  cudaMalloc((void **)&(wr->writeOnlyDevicePtr), wr->writeOnlyLen);
-  
-  cudaMemcpy(wr->readWriteDevicePtr, wr->readWriteHostPtr, wr->readWriteLen, 
-		  cudaMemcpyHostToDevice); 
-  cudaMemcpy(wr->readOnlyDevicePtr, wr->readOnlyHostPtr, wr->readOnlyLen, 
-		  cudaMemcpyHostToDevice); 
-  */
-  
 } 
 
 /* cleanupMemory
@@ -95,26 +86,21 @@ void cleanupMemory(workRequest *wr) {
       int size = bufferInfo[i].size; 
       
       if (bufferInfo[i].transferFromDevice) {
+#ifdef GPU_DEBUG
+	printf("transferFromDevice: %d\n", i); 
+#endif
 	cudaMemcpy(hostBuffers[index], devBuffers[index], size, cudaMemcpyDeviceToHost);
       }
       
       if (bufferInfo[i].freeBuffer) {
+#ifdef GPU_DEBUG
+	printf("buffer %d freed\n", i);
+#endif 
 	cudaFree(devBuffers[index]); 
 	devBuffers[index] = NULL; 
       }
     }
   }
-
-  /*
-  cudaMemcpy(wr->readWriteHostPtr, wr->readWriteDevicePtr, wr->readWriteLen, cudaMemcpyDeviceToHost); 
-  cudaMemcpy(wr->writeOnlyHostPtr, wr->writeOnlyDevicePtr, wr->writeOnlyLen, cudaMemcpyDeviceToHost); 
-  
-
-  cudaFree(wr->readWriteDevicePtr); 
-  cudaFree(wr->readOnlyDevicePtr); 
-  cudaFree(wr->writeOnlyDevicePtr);
-  */
-
 }
 
 /* kernelSelect
@@ -154,19 +140,23 @@ void gpuProgressFn() {
     if (wr->executing == 0) {
       setupMemory(wr); 
       kernelSelect(wr); 
-      // cudaEventRecord(wr->completionEvent, 0);
       wr->executing = 1; 
       return; 
     }  
-    // else if (cudaEventQuery(wr->completionEvent) == cudaSuccess ) {      
     else if (cudaStreamQuery(0) == cudaSuccess ) {      
+#ifdef GPU_DEBUG
+      printf("completion event success \n");
+#endif  
       cleanupMemory(wr);
       dequeue(wrQueue);
       CUDACallbackManager(wr->callbackFn);
-    }
+    } 
+#ifdef GPU_DEBUG
     else {
+      printf("GPU is busy, return code %d\n", cudaStreamQuery(0)); 
       return; 
     }
+#endif
   }
 }
 
