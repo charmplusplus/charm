@@ -72,8 +72,8 @@ struct _SYSTEM_INFO sysinfo;
   return a;
 }
 
-static int cpuAffinityHandlerIdx;
-static int cpuAffinityRecvHandlerIdx;
+static int cpuTopoHandlerIdx;
+static int cpuTopoRecvHandlerIdx;
 
 typedef struct _hostnameMsg {
   char core[CmiMsgHeaderSizeBytes];
@@ -92,17 +92,18 @@ typedef struct _nodeTopoMsg {
 static nodeTopoMsg *topomsg = NULL;
 static CmmTable hostTable;
 
-typedef void (*CallbackFn)(void *cb);
-
 // nodenum[pe] is the node number of processor pe
 class CpuTopology {
 public:
 static int *nodenum;
-CallbackFn   fn;
-void        *cb;
 
-CpuTopology(): fn(NULL), cb(NULL) {}
+void print() {
+               for (int i=0; i<CmiNumPes(); i++) CmiPrintf("%d ", nodenum[i]);
+               CmiPrintf("\n");
+             }
 };
+
+int *CpuTopology::nodenum = NULL;
 
 CpvDeclare(CpuTopology, cpuTopo);
 CmiNodeLock topoLock;
@@ -155,28 +156,19 @@ static void cpuAffinityRecvHandler(void *msg)
   m->nodes = (int *)((char*)m + sizeof(nodeTopoMsg));
 
   CmiLock(topoLock);
-  if (CpvAccess(cpuTopo).nodenum == NULL)
+  if (CpvAccess(cpuTopo).nodenum == NULL) {
     CpvAccess(cpuTopo).nodenum = m->nodes;
+  }
   else
     CmiFree(m);
   CmiUnlock(topoLock);
 
-    // call callback
-  if (CpvAccess(cpuTopo).fn!=NULL)
-    CpvAccess(cpuTopo).fn(CpvAccess(cpuTopo).cb);
-
+  if (CmiMyPe() == 0) CpvAccess(cpuTopo).print();
 }
 
 #if CMK_CRAYXT
 extern int getXTNodeID(int mype, int numpes);
 #endif
-
-// only one callback is allowed right now
-extern "C" void CmiRegisterCPUTopologyCallback(CallbackFn fn, void *cb)
-{
-  CpvAccess(cpuTopo).fn = fn;
-  CpvAccess(cpuTopo).cb = cb;
-}
 
 extern "C" void CmiInitCPUTopology(char **argv)
 {
@@ -189,18 +181,17 @@ extern "C" void CmiInitCPUTopology(char **argv)
         topoLock = CmiCreateLock();
   }
 
+  int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpua_topology",
+						"obtain cpu topology info");
 
-  int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
-						"set cpu affinity");
-
-  cpuAffinityHandlerIdx =
+  cpuTopoHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityHandler);
-  cpuAffinityRecvHandlerIdx =
+  cpuTopoRecvHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler);
 
-  if (!affinity_flag) return;
+  if (!obtain_flag) return;
   else if (CmiMyPe() == 0) {
-     CmiPrintf("Charm++> cpu affinity enabled! \n");
+     CmiPrintf("Charm++> cpu topology info is being gathered! \n");
   }
 
   if (CmiMyPe() >= CmiNumPes()) {
@@ -232,7 +223,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
 
     /* prepare a msg to send */
   msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg));
-  CmiSetHandler((char *)msg, cpuAffinityHandlerIdx);
+  CmiSetHandler((char *)msg, cpuTopoHandlerIdx);
   msg->pe = CmiMyPe();
   msg->ip = myip;
   msg->ncores = Cmi_num_cores();
@@ -243,10 +234,16 @@ extern "C" void CmiInitCPUTopology(char **argv)
     int i;
     hostTable = CmmNew();
     topomsg = (nodeTopoMsg *)CmiAlloc(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int));
-    CmiSetHandler((char *)topomsg, cpuAffinityRecvHandlerIdx);
+    CmiSetHandler((char *)topomsg, cpuTopoRecvHandlerIdx);
     topomsg->nodes = (int *)((char*)topomsg + sizeof(nodeTopoMsg));
     for (i=0; i<CmiNumPes(); i++) topomsg->nodes[i] = -1;
+    CsdScheduleCount(CmiNumPes());
   }
+
+    // receive broadcast from PE 0
+  CsdScheduleCount(1);
+
+    // now every one should have the node info
 }
 
 #else           /* not supporting affinity */
@@ -255,6 +252,8 @@ extern "C" void CmiInitCPUTopology(char **argv)
 extern "C" void CmiInitCPUTopology(char **argv)
 {
   /* do nothing */
+  int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpua_topology",
+						"obtain cpu topology info");
 }
 
 #endif
