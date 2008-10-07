@@ -108,14 +108,14 @@ ComlibAssociateProxy (CharmStrategy *strat, CProxy &proxy);
 ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 \end{alltt}
 
-%% \subsubsection{Proxy interface}
+%% \ subsubsection{Proxy interface}
 
 %% A proxy containing the delegation should be kept, and reused every time the
 %% associated stragety wants to be used.
 
-%% \begin{enumerate}
-%% \item main.C global
-%% \begin{alltt}
+%% \ begin{enumerate}
+%% \ item main.C global
+%% \ begin{alltt}
 %% // Include the appropriate header file
 %% #include <EachToManyMulticastStrategy.h>
 %% #include <StreamingStrategy.h>
@@ -123,10 +123,10 @@ ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 %% // Declare the global variable
 %% CProxy_MyArray aproxy;
 %% CProxy_MyArray dproxy;
-%% \end{alltt}
+%% \ end{alltt}
 
-%% \item main.C:main()
-%% \begin{alltt}
+%% \ item main.C:main()
+%% \ begin{alltt}
 %% // Create the array
 %% aproxy = CProxy_Hello::ckNew();
 
@@ -139,10 +139,10 @@ ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 %% // while dproxy uses it
 %% dproxy = aproxy;
 %% ComlibAssociateProxy(strategy, dproxy);
-%% \end{alltt}
+%% \ end{alltt}
 
-%% \item In the array element
-%% \begin{alltt}
+%% \ item In the array element
+%% \ begin{alltt}
 %% // First proxy should be delegated
 %% ComlibBeginIteration(dproxy);   // Only for bracketed strategies
 %% dproxy[index].entry(message);   // Sending a message
@@ -150,8 +150,8 @@ ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 %% .....
 %% aproxy[index].entry2{message2); // Send a message without commlib
 %% ComlibEndIteration(dproxy);     // Only for bracketed strategies
-%% \end{alltt}
-%% \end{enumerate}
+%% \ end{alltt}
+%% \ end{enumerate}
 
 %% The above example shows the usage of EachToManyStrategy. Notice the
 %% ComlibBeginIteration and ComlibEndIteration calls, needed for bracketed
@@ -159,13 +159,13 @@ ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 %% from where they are broadcasted and initialized in every processor before being
 %% used.
 
-%% \subsubsection{Instance interface}
+%% \ subsubsection{Instance interface}
 
 %% In this interface, the chares need to keep information about the commlib instance.
 
-%% \begin{enumerate}
-%% \item main.C global
-%% \begin{alltt}
+%% \ begin{enumerate}
+%% \ item main.C global
+%% \ begin{alltt}
 %% // Include the appropriate header file
 %% #include <EachToManyMulticastStrategy.h>
 %% #include <StreamingStrategy.h>
@@ -173,10 +173,10 @@ ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 %% // Declare the global variable
 %% CProxy_MyArray aproxy;
 %% ComlibInstanceHandle cinst;
-%% \end{alltt}
+%% \ end{alltt}
 
-%% \item main.C:main()
-%% \begin{alltt}
+%% \ item main.C:main()
+%% \ begin{alltt}
 %% // Create the array
 %% aproxy = CProxy_Hello::ckNew();
 
@@ -190,10 +190,10 @@ ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 
 %% // Register the strategy
 %% cinst.setStrategy(strategy);
-%% \end{alltt}
+%% \ end{alltt}
 
-%% \item In the array element 
-%% \begin{alltt}
+%% \ item In the array element 
+%% \ begin{alltt}
 %% // Before calling an entry method whose message should go thorough the
 %% // library the proxy has to be delegated. Create a new copy of the
 %% // proxy and delegate it before using it.
@@ -206,15 +206,15 @@ ComlibAssociateProxy (ComlibInstanceHandle *cinst, CProxy &proxy);
 %% .....
 %% aproxy[index].entry2();       // Send a message without commlib
 %% cinst.endIteration();         // Only for bracketed strategies
-%% \end{alltt}
-%% \end{enumerate}
+%% \ end{alltt}
+%% \ end{enumerate}
 
-%% \subsubsection{Sections}
+%% \ subsubsection{Sections}
 
 %% In order to multicast only to a part of the array instead of the entire array,
-%% it is necessary to create a {\textrm{CProxySection\_class}}
-%% (\ref{array_section_multicast}) of the desired portion of the destination array,
-%% delegate it with {\textrm{ComlibAssociateProxy()}}, and send a broadcast to it.
+%% it is necessary to create a {\ textrm{CProxySection\ _class}}
+%% (\ ref{array_section_multicast}) of the desired portion of the destination array,
+%% delegate it with {\ textrm{ComlibAssociateProxy()}}, and send a broadcast to it.
 %% This broadcast on the section will result in the desired multicast on the global
 %% array. Only multicast strategies can be used for this.
 
