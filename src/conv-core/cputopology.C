@@ -7,6 +7,7 @@
 
 #include "converse.h"
 #include "sockRoutines.h"
+#include "cklists.h"
 
 #define DEBUGP(x)  /* CmiPrintf x;  */
 
@@ -96,14 +97,39 @@ static CmmTable hostTable;
 class CpuTopology {
 public:
 static int *nodenum;
+static int numNodes;
+static CkVec<int> *bynodes;
 
+int numUniqNodes() {
+               if (numNodes != 0) return numNodes;
+               int n = 0;
+               for (int i=0; i<CmiNumPes(); i++) 
+                 if (nodenum[i] > n) n = nodenum[i];
+               numNodes = n+1;
+               return numNodes;
+             }
+void sort() {
+               int i;
+               numUniqNodes();
+               bynodes = new CkVec<int>[numNodes];
+               for (i=0; i<CmiNumPes(); i++) 
+                 bynodes[nodenum[i]].push_back(i);
+             }
 void print() {
-               for (int i=0; i<CmiNumPes(); i++) CmiPrintf("%d ", nodenum[i]);
+               int i;
+               for (i=0; i<CmiNumPes(); i++) CmiPrintf("%d ", nodenum[i]);
                CmiPrintf("\n");
+               for (i=0; i<numNodes; i++) {
+                 CmiPrintf("Chip %d: ", i);
+                 for (int j=0; j<bynodes[i].size(); j++) CmiPrintf("%d ", bynodes[i][j]);
+                 CmiPrintf("\n");
+               }
              }
 };
 
 int *CpuTopology::nodenum = NULL;
+int CpuTopology::numNodes = 0;
+CkVec<int> *CpuTopology::bynodes = NULL;
 
 CpvDeclare(CpuTopology, cpuTopo);
 CmiNodeLock topoLock;
@@ -158,12 +184,37 @@ static void cpuAffinityRecvHandler(void *msg)
   CmiLock(topoLock);
   if (CpvAccess(cpuTopo).nodenum == NULL) {
     CpvAccess(cpuTopo).nodenum = m->nodes;
+    CpvAccess(cpuTopo).sort();
   }
   else
     CmiFree(m);
   CmiUnlock(topoLock);
 
   if (CmiMyPe() == 0) CpvAccess(cpuTopo).print();
+}
+
+
+extern "C" int CmiOnSameChip(int pe1, int pe2)
+{
+  int *nodenum = CpvAccess(cpuTopo).nodenum;
+  return nodenum[pe1] == nodenum[pe2];
+}
+
+extern "C" int CmiNumChips()
+{
+  return CpvAccess(cpuTopo).numUniqNodes();
+}
+
+extern "C" int CmiNumProcessorsOnChip(int pe)
+{
+  return CpvAccess(cpuTopo).bynodes[CpvAccess(cpuTopo).nodenum[pe]].size();
+}
+
+extern "C" void CmiGetProcessorsOnChip(int pe, int **pelist, int *num)
+{
+  CmiAssert(pe >=0 && pe < CmiNumPes());
+  *pelist = CpvAccess(cpuTopo).bynodes[CpvAccess(cpuTopo).nodenum[pe]].getVec();
+  *num = CpvAccess(cpuTopo).numUniqNodes();
 }
 
 #if CMK_CRAYXT
@@ -181,7 +232,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
         topoLock = CmiCreateLock();
   }
 
-  int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpua_topology",
+  int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
 						"obtain cpu topology info");
 
   cpuTopoHandlerIdx =
@@ -252,7 +303,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
 extern "C" void CmiInitCPUTopology(char **argv)
 {
   /* do nothing */
-  int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpua_topology",
+  int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
 						"obtain cpu topology info");
 }
 
