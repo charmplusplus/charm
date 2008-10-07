@@ -68,7 +68,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
     CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
   } else {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-    if (pfn) {
+    if (pfn && CmiNodeOf(pe) != CmiMyNode()) {
       pfn(&msg);
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     }
