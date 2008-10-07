@@ -2,7 +2,7 @@
 #
 ### Command Line Argument Defaults #######################################
 
-$MAX_SPLIT_DEPTH = 5;	# Stop making separate files at this depth
+# $MAX_SPLIT_DEPTH = 5;	# Stop making separate files at this depth
 
 $MAX_LINK_DEPTH = 4;    # Stop showing child nodes at this depth   
 
