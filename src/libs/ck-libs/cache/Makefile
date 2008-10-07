@@ -25,7 +25,7 @@ CkCache.o: CkCache.C $(HEADERS)
 	$(CHARMC) -c -o CkCache.o CkCache.C
 
 clean:
-	rm -f conv-host *.o *.decl.h *.def.h core  $(LIB)
+	rm -f conv-host *.o *.decl.h *.def.h core  $(LIB) INTERFACE
 
 realclean: clean
 	rm -f $(LIBDEST) $(HEADERS)
