@@ -301,7 +301,7 @@ public:
   //...
   
   //Return an ``arrayHdl'', given some information about the array
-  virtual int registerArray(int numInitialElements,CkArrayID aid);
+  virtual int registerArray(CkArrayIndexMax& numElements,CkArrayID aid);
   //Return the home processor number for this element of this array
   virtual int procNum(int arrayHdl,const CkArrayIndex &element);
 \}
@@ -316,8 +316,7 @@ class BlockMap : public CkArrayMap
  public:
   BlockMap(void) \{\}
   BlockMap(CkMigrateMessage *m)\{\}
-  int registerArray(CkArrayMapRegisterMessage *m) \{
-    delete m;
+  int registerArray(CkArrayIndexMax& numElements,CkArrayID aid) \{
     return 0;
   \}
   int procNum(int /*arrayHdl*/,const CkArrayIndex &idx) \{
