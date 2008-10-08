@@ -28,6 +28,9 @@ cpu affinity.
 #include <stdlib.h>
 #include <stdio.h>
 
+#if defined(__APPLE__) 
+#include <Carbon/Carbon.h>
+#endif
 
 extern "C" int Cmi_num_cores(void) {
   int a = 1;
