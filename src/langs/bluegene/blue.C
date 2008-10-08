@@ -1175,7 +1175,8 @@ static void sanityCheck()
   } 
   else if (cva(bgMach).numCth==0 || cva(bgMach).numWth==0) { 
 #if 1
-    cva(bgMach).numCth = cva(bgMach).numWth = 1;
+    if (cva(bgMach).numCth==0) cva(bgMach).numCth=1;
+    if (cva(bgMach).numWth==0) cva(bgMach).numWth=1;
 #else
     if (CmiMyPe() == 0)
       CmiPrintf("\nMissing parameters for number of communication/worker threads!\n<tip> use command line options: +cth or +wth.\n");
