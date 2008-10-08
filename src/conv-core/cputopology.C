@@ -12,11 +12,9 @@
 #define DEBUGP(x)  /* CmiPrintf x;  */
 
 /*
- This scheme relies on using IP address to identify nodes and assigning 
-cpu affinity.  
+ This scheme relies on using IP address to identify physical nodes 
 
- when CMK_NO_SOCKETS, which is typically on cray xt3 and bluegene/L.
- There is no hostname for the compute nodes.
+  written by Gengbin Zheng  9/2008
 */
 #if 1
 
@@ -32,7 +30,7 @@ cpu affinity.
 #include <Carbon/Carbon.h>
 #endif
 
-extern "C" int Cmi_num_cores(void) {
+extern "C" int CmiNumCores(void) {
   int a = 1;
 #ifdef _WIN32
 struct _SYSTEM_INFO sysinfo;
@@ -120,10 +118,11 @@ void sort() {
              }
 void print() {
                int i;
+               CmiPrintf("Cpu topology info:\n");
                for (i=0; i<CmiNumPes(); i++) CmiPrintf("%d ", nodenum[i]);
                CmiPrintf("\n");
                for (i=0; i<numNodes; i++) {
-                 CmiPrintf("Chip %d: ", i);
+                 CmiPrintf("Chip #%d: ", i);
                  for (int j=0; j<bynodes[i].size(); j++) CmiPrintf("%d ", bynodes[i][j]);
                  CmiPrintf("\n");
                }
@@ -134,11 +133,11 @@ int *CpuTopology::nodenum = NULL;
 int CpuTopology::numNodes = 0;
 CkVec<int> *CpuTopology::bynodes = NULL;
 
-CpvDeclare(CpuTopology, cpuTopo);
-CmiNodeLock topoLock;
+static CpuTopology cpuTopo;
+static CmiNodeLock topoLock;
 
 /* called on PE 0 */
-static void cpuAffinityHandler(void *m)
+static void cpuTopoHandler(void *m)
 {
   static int count = 0;
   static int nodecount = 0;
@@ -168,7 +167,7 @@ static void cpuAffinityHandler(void *m)
   rec->rank ++;
   count ++;
   if (count == CmiNumPes()) {
-    CmiPrintf("Cpuaffinity> %d unique compute nodes detected! \n", CmmEntries(hostTable));
+    CmiPrintf("Charm++> %d unique compute nodes detected! \n", CmmEntries(hostTable));
     //hostnameMsg *tmpm;
     tag = CmmWildCard;
     while (tmpm = (hostnameMsg *)CmmGet(hostTable, 1, &tag, &tag1)) CmiFree(tmpm);
@@ -178,46 +177,46 @@ static void cpuAffinityHandler(void *m)
 }
 
 /* called on each processor */
-static void cpuAffinityRecvHandler(void *msg)
+static void cpuTopoRecvHandler(void *msg)
 {
   int myrank;
   nodeTopoMsg *m = (nodeTopoMsg *)msg;
   m->nodes = (int *)((char*)m + sizeof(nodeTopoMsg));
 
   CmiLock(topoLock);
-  if (CpvAccess(cpuTopo).nodenum == NULL) {
-    CpvAccess(cpuTopo).nodenum = m->nodes;
-    CpvAccess(cpuTopo).sort();
+  if (cpuTopo.nodenum == NULL) {
+    cpuTopo.nodenum = m->nodes;
+    cpuTopo.sort();
   }
   else
     CmiFree(m);
   CmiUnlock(topoLock);
 
-  if (CmiMyPe() == 0) CpvAccess(cpuTopo).print();
+  if (CmiMyPe() == 0) cpuTopo.print();
 }
 
 
-extern "C" int CmiOnSameChip(int pe1, int pe2)
+extern "C" int CmiOnSamePhysicalNode(int pe1, int pe2)
 {
-  int *nodenum = CpvAccess(cpuTopo).nodenum;
+  int *nodenum = cpuTopo.nodenum;
   return nodenum[pe1] == nodenum[pe2];
 }
 
-extern "C" int CmiNumChips()
+extern "C" int CmiNumPhysicalNodes()
 {
-  return CpvAccess(cpuTopo).numUniqNodes();
+  return cpuTopo.numUniqNodes();
 }
 
-extern "C" int CmiNumProcessorsOnChip(int pe)
+extern "C" int CmiNumPesOnPhysicalNode(int pe)
 {
-  return CpvAccess(cpuTopo).bynodes[CpvAccess(cpuTopo).nodenum[pe]].size();
+  return cpuTopo.bynodes[cpuTopo.nodenum[pe]].size();
 }
 
-extern "C" void CmiGetProcessorsOnChip(int pe, int **pelist, int *num)
+extern "C" void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num)
 {
   CmiAssert(pe >=0 && pe < CmiNumPes());
-  *pelist = CpvAccess(cpuTopo).bynodes[CpvAccess(cpuTopo).nodenum[pe]].getVec();
-  *num = CpvAccess(cpuTopo).numUniqNodes();
+  *pelist = cpuTopo.bynodes[cpuTopo.nodenum[pe]].getVec();
+  *num = cpuTopo.numUniqNodes();
 }
 
 #if CMK_CRAYXT
@@ -230,18 +229,17 @@ extern "C" void CmiInitCPUTopology(char **argv)
   int ret, i;
   hostnameMsg  *msg;
  
-  CpvInitialize(CpuTopology, cpuTopo);
   if (CmiMyRank() ==0) {
-        topoLock = CmiCreateLock();
+       topoLock = CmiCreateLock();
   }
 
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
 						"obtain cpu topology info");
 
   cpuTopoHandlerIdx =
-       CmiRegisterHandler((CmiHandler)cpuAffinityHandler);
+       CmiRegisterHandler((CmiHandler)cpuTopoHandler);
   cpuTopoRecvHandlerIdx =
-       CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler);
+       CmiRegisterHandler((CmiHandler)cpuTopoRecvHandler);
 
   if (!obtain_flag) return;
   else if (CmiMyPe() == 0) {
@@ -280,7 +278,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
   CmiSetHandler((char *)msg, cpuTopoHandlerIdx);
   msg->pe = CmiMyPe();
   msg->ip = myip;
-  msg->ncores = Cmi_num_cores();
+  msg->ncores = CmiNumCores();
   msg->rank = 0;
   CmiSyncSendAndFree(0, sizeof(hostnameMsg), (char *)msg);
 

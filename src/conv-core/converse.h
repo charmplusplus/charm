@@ -474,6 +474,13 @@ extern CmiNodeLock smp_mutex;
 extern int CmiBarrier(void);
 extern int CmiBarrierZero(void);
 
+/* cpu topology */
+extern int CmiNumCores(void);
+extern int CmiOnSamePhysicalNode(int pe1, int pe2);
+extern int CmiNumPhysicalNodes();
+extern int CmiNumPesOnPhysicalNode(int pe);
+extern void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num);
+
 /** Return 1 if our outgoing message queue 
    for this node is longer than this many bytes. */
 int CmiLongSendQueue(int forNode,int longerThanBytes);
