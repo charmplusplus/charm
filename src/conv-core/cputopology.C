@@ -118,7 +118,7 @@ void sort() {
              }
 void print() {
                int i;
-               CmiPrintf("Cpu topology info:\n");
+               CmiPrintf("Charm++> Cpu topology info:\n");
                for (i=0; i<CmiNumPes(); i++) CmiPrintf("%d ", nodenum[i]);
                CmiPrintf("\n");
                for (i=0; i<numNodes; i++) {
@@ -199,7 +199,7 @@ static void cpuTopoRecvHandler(void *msg)
 extern "C" int CmiOnSamePhysicalNode(int pe1, int pe2)
 {
   int *nodenum = cpuTopo.nodenum;
-  return nodenum[pe1] == nodenum[pe2];
+  return nodenum==NULL?-1:nodenum[pe1] == nodenum[pe2];
 }
 
 extern "C" int CmiNumPhysicalNodes()
@@ -209,14 +209,14 @@ extern "C" int CmiNumPhysicalNodes()
 
 extern "C" int CmiNumPesOnPhysicalNode(int pe)
 {
-  return cpuTopo.bynodes[cpuTopo.nodenum[pe]].size();
+  return cpuTopo.bynodes==NULL?-1:cpuTopo.bynodes[cpuTopo.nodenum[pe]].size();
 }
 
 extern "C" void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num)
 {
   CmiAssert(pe >=0 && pe < CmiNumPes());
-  *pelist = cpuTopo.bynodes[cpuTopo.nodenum[pe]].getVec();
   *num = cpuTopo.numUniqNodes();
+  if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[cpuTopo.nodenum[pe]].getVec();
 }
 
 #if CMK_CRAYXT
