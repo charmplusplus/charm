@@ -72,10 +72,10 @@ ChaNGa: charm++ cache
 cache: charm++
 	cd libs/ck-libs/cache && $(MAKE)
 
-multicast:
+multicast: charmxi
 	cd libs/ck-libs/multicast && $(MAKE)
 
-pythonCCS:
+pythonCCS: charmxi
 	cd libs/ck-libs/pythonCCS && $(MAKE)
 
 translators: charmxi conv-cpm
@@ -374,7 +374,7 @@ fmain-ok: fmain.f90
 	-@touch fmain-ok
 
 QUICKTHREADS: $(CVHEADERS)
-	cd QuickThreads && make clean
+	-cd QuickThreads && make clean
 	cd QuickThreads;./configure
 	cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS)'
 	cp -f QuickThreads/libqt.a ../lib/libckqt.a
