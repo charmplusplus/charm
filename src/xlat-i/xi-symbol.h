@@ -893,10 +893,10 @@ public:
 };
 
 class PUPableClass : public Member {
-    const char *name; //Name of class that is PUP::able
+    NamedType* type;
     PUPableClass *next; //Linked-list of PUPable classes
 public:
-    PUPableClass(int l, const char *name_, PUPableClass *next_);
+    PUPableClass(int l, NamedType* type_, PUPableClass *next_);
     void print(XStr& str);
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);

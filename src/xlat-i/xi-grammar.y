@@ -599,12 +599,11 @@ InitProc	: INITPROC OptVoid QualName
 		{ $$ = new InitCall(lineno, $3, 0); }
 		;
 
-PUPableClass    : QualName
+PUPableClass    : QualNamedType
 		{ $$ = new PUPableClass(lineno,$1,0); } 
-		| QualName ',' PUPableClass
+		| QualNamedType ',' PUPableClass
 		{ $$ = new PUPableClass(lineno,$1,$3); }
 		;
-
 IncludeFile    : LITERAL
 		{ $$ = new IncludeFile(lineno,$1); } 
 		;

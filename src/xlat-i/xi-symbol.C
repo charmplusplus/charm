@@ -3629,14 +3629,14 @@ void InitCall::genReg(XStr& str)
 }
 
 /***************** PUP::able support **************/
-PUPableClass::PUPableClass(int l, const char *n,PUPableClass *next_)
-	    : name(n), next(next_)
+PUPableClass::PUPableClass(int l, NamedType* type_,PUPableClass *next_)
+	    : type(type_), next(next_)
 { 
 	line=l; setChare(0); 
 }
 void PUPableClass::print(XStr& str)
 {
-	str<<"  PUPable "<<name<<";\n";
+	str << "  PUPable " << type <<";\n";
 	if (next) next->print(str);
 }
 void PUPableClass::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
@@ -3644,12 +3644,18 @@ void PUPableClass::genDecls(XStr& str) {}
 void PUPableClass::genIndexDecls(XStr& str) {}
 void PUPableClass::genDefs(XStr& str) 
 {
-	str<<"  PUPable_def("<<name<<");\n";
+        if (type->isTemplated()) {
+                str << "#ifdef CK_TEMPLATES_ONLY\n";
+                str << "  PUPable_def_template(" << type << ");\n";
+                str << "#endif\n";
+        } else {
+                str<<"  PUPable_def(" << type << ");\n";
+        }
 	if (next) next->genDefs(str);
 }
 void PUPableClass::genReg(XStr& str)
 {
-	str<<"      PUPable_reg("<<name<<");\n";
+	str<<"      PUPable_reg(" << type << ");\n";
 	if (next) next->genReg(str);
 }
 
