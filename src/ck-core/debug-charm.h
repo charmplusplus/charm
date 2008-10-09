@@ -12,11 +12,25 @@
 #include "converse.h"
 #include "debug-conv.h"
 #include "pup.h"
+#include "cklists.h"
 
 //Hooks inside the debugger before and after an entry method is invoked
-extern void CpdBeforeEp(int);
+extern void CpdBeforeEp(int, void*);
 extern void CpdAfterEp(int);
 extern void CpdFinishInitialization();
+
+class CpdPersistentChecker {
+public:
+  virtual void cpdCheck(void*) {}
+};
+
+typedef struct DebugPersistentCheck {
+  CpdPersistentChecker *object;
+  void *msg;
+  
+  DebugPersistentCheck() : object(NULL), msg(NULL) {}
+  DebugPersistentCheck(CpdPersistentChecker *o, void *m) : object(o), msg(m) {}
+} DebugPersistentCheck;
 
 // This class is the parallel of EntryInfo declared in register.h and is used
 // to extend the former with additional debug information. There is a direct
@@ -25,9 +39,12 @@ class DebugEntryInfo {
 public:
   // true if this entry method has a breakpoint set
   CmiBool isBreakpoint;
+  CkVec<DebugPersistentCheck> postProcess;
 
   DebugEntryInfo() : isBreakpoint(CmiFalse) { }
 };
+
+extern CkVec<DebugEntryInfo> _debugEntryTable;
 
 //These pup functions are useful in CpdLists, as they document the name
 //  of the variable.  Your object must be named "c" (a stupid hack).

@@ -400,16 +400,11 @@ extern "C" int CkGetArgc(void) {
 extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
 #ifndef CMK_OPTIMIZE
-  int previousChareID = setMemoryChareIDFromPtr(obj);
-  int alreadyUserCode = _entryTable[epIdx]->inCharm ? 0 : 1;
-  setMemoryStatus(alreadyUserCode);
-  CpdBeforeEp(epIdx);
+  CpdBeforeEp(epIdx, obj);
 #endif
   _entryTable[epIdx]->call(msg, obj);
 #ifndef CMK_OPTIMIZE
   CpdAfterEp(epIdx);
-  setMemoryChareID(previousChareID);
-  setMemoryStatus(alreadyUserCode);
 #endif
   if (_entryTable[epIdx]->noKeep)
   { /* Method doesn't keep/delete the message, so we have to: */
@@ -432,14 +427,11 @@ extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 #endif
   }
 #ifndef CMK_OPTIMIZE
-  int previousChareID = setMemoryChareIDFromPtr(obj);
-  int alreadyUserCode = 1;
-  setMemoryStatus(alreadyUserCode);
+  CpdBeforeEp(epIdx, obj);
 #endif
   _entryTable[epIdx]->call(deliverMsg, obj);
 #ifndef CMK_OPTIMIZE
-  setMemoryChareID(previousChareID);
-  setMemoryStatus(alreadyUserCode);
+  CpdAfterEp(epIdx);
 #endif
 }
 
@@ -1104,6 +1096,9 @@ static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
   env->setMsgtype(ForChareMsg);
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
+#ifndef CMK_OPTIMIZE
+  setMemoryOwnedBy(env, 0);
+#endif
 #if CMK_OBJECT_QUEUE_AVAILABLE
   CmiSetHandler(env, index_objectQHandler);
 #else
@@ -1203,6 +1198,9 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
+#ifndef CMK_OPTIMIZE
+  setMemoryOwnedBy(env, 0);
+#endif
   CmiSetHandler(env, _charmHandlerIdx);
   return env;
 }
@@ -1393,7 +1391,11 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
     CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
     if (obj!=NULL) 
     { //Just directly call the group:
+#ifndef CMK_OPTIMIZE
+      envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
+#else
       envelope *env=UsrToEnv(msg);
+#endif
       _deliverForNodeBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
       return;
     }
@@ -1456,6 +1458,9 @@ static void _prepareOutgoingArrayMsg(envelope *env,int type)
   _CHECK_USED(env);
   _SET_USED(env, 1);
   env->setMsgtype(type);
+#ifndef CMK_OPTIMIZE
+  setMemoryOwnedBy(env, 0);
+#endif
   CmiSetHandler(env, _charmHandlerIdx);
   CpvAccess(_qd)->create();
 }

@@ -2518,17 +2518,12 @@ void Entry::genArrayDefs(XStr& str)
       if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,"<<epIdx()<<",CkMyPe(),0,((CkArrayIndexMax&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
       str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
       str << "#ifndef CMK_OPTIMIZE\n"
-      "  int previousChareID = setMemoryChareIDFromPtr(obj);\n"
-      "  int alreadyUserCode = " << ( internalMode ? "0" : "1" ) << ";\n"
-      "  setMemoryStatus(alreadyUserCode);\n"
-      "  CpdBeforeEp("<<epIdx()<<");\n"
+      "  CpdBeforeEp("<<epIdx()<<", obj);\n"
       "#endif\n   ";
       if (!retType->isVoid()) str << retType<< " retValue = ";
       str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
       str << "#ifndef CMK_OPTIMIZE\n"
       "  CpdAfterEp("<<epIdx()<<");\n"
-      "  setMemoryChareID(previousChareID);\n"
-      "  setMemoryStatus(alreadyUserCode);\n"
       "#endif\n";
       str << "#if CMK_LBDB_ON\n  obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
@@ -2711,17 +2706,12 @@ void Entry::genGroupDefs(XStr& str)
 "  }\n"
 "#endif\n";
       str << "#ifndef CMK_OPTIMIZE\n"
-      "  int previousChareID = setMemoryChareIDFromPtr(obj);\n"
-      "  int alreadyUserCode = " << ( internalMode ? "0" : "1" ) << ";\n"
-      "  setMemoryStatus(alreadyUserCode);\n"
-      "  CpdBeforeEp("<<epIdx()<<");\n"
+      "  CpdBeforeEp("<<epIdx()<<", obj);\n"
       "#endif\n  ";
       if (!retType->isVoid()) str << retType << " retValue = ";
       str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
       str << "#ifndef CMK_OPTIMIZE\n"
       "  CpdAfterEp("<<epIdx()<<");\n"
-      "  setMemoryChareID(previousChareID);\n"
-      "  setMemoryStatus(alreadyUserCode);\n"
       "#endif\n";
       str << "#if CMK_LBDB_ON\n"
 "  if (objstopped) the_lbdb->ObjectStart(objHandle);\n"

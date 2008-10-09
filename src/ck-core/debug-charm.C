@@ -23,19 +23,52 @@
 #include "ck.h"
 
 CkVec<DebugEntryInfo> _debugEntryTable;
+CpdPersistentChecker persistentCheckerUselessClass;
 
 void CpdFinishInitialization() {
   _debugEntryTable.reserve(_entryTable.size());
 }
 
+extern "C" void resetAllCRC();
+extern "C" void checkAllCRC(int report);
+
+typedef struct DebugRecursiveEntry {
+  int previousChareID;
+  int alreadyUserCode;
+  char *memoryBackup;
+} DebugRecursiveEntry;
+
+CkQ<DebugRecursiveEntry> _debugData;
+
 // Function called right before an entry method
-void CpdBeforeEp(int ep) {
+void CpdBeforeEp(int ep, void *obj) {
+  DebugRecursiveEntry entry;
+  entry.previousChareID = setMemoryChareIDFromPtr(obj);
+  entry.alreadyUserCode = _entryTable[ep]->inCharm ? 0 : 1;
+  entry.memoryBackup = NULL;
+  _debugData.push(entry);
+  setMemoryStatus(entry.alreadyUserCode);
   //if (_debugEntryTable[ep].isBreakpoint) printf("CpdBeforeEp breakpointed %d\n",ep);
+  memoryBackup = &_debugData.peek().memoryBackup;
+  if (!_entryTable[ep]->inCharm) {
+    CpdResetMemory();
+  }
 }
 
 // Function called right after an entry method
 void CpdAfterEp(int ep) {
-  
+  DebugRecursiveEntry entry = _debugData.peek();
+  CkVec<DebugPersistentCheck> &postExecutes = _debugEntryTable[ep].postProcess;
+  for (int i=0; i<postExecutes.size(); ++i) {
+    postExecutes[i].object->cpdCheck(postExecutes[i].msg);
+  }
+  memoryBackup = &entry.memoryBackup;
+  if (!_entryTable[ep]->inCharm) {
+    CpdCheckMemory();
+  }
+  setMemoryChareID(entry.previousChareID);
+  setMemoryStatus(entry.alreadyUserCode);
+  _debugData.deq();
 }
 
 /************ Array Element CPD Lists ****************/
@@ -111,7 +144,8 @@ public:
    { /* Walk the groupTable for arrays (FIXME: get rid of _groupIDTable) */
      int numGroups=CkpvAccess(_groupIDTable)->size();
      for(int i=0;i<numGroups;i++) {
-        IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
+       CkGroupID groupID = (*CkpvAccess(_groupIDTable))[i];
+        IrrGroup *obj = CkpvAccess(_groupTable)->find(groupID).getObj();
 	/*if (obj->isArrMgr()) 
 	{ / * This is an array manager: examine its array elements * /
 	  CkArray *mgr=(CkArray *)obj;
@@ -119,7 +153,7 @@ public:
 	  ait.iterate(cur, mgr);
           cur+=ait.getCount();
 	} else {*/
-          dest->add(cur,obj,i);
+          dest->add(cur,obj,groupID.idx);
           cur++;
         //}
      }
@@ -446,7 +480,7 @@ static void _call_freeze_on_break_point(void * msg, void * object)
       CpvAccess(lastBreakPointObject) = object;
       CpvAccess(lastBreakPointIndex) = CkMessageToEpIdx(msg);
       EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CpvAccess(lastBreakPointIndex));
-      CmiPrintf("Break point reached in proc %d for Function = %s\n",CkMyPe(),breakPointEntryInfo->name);
+      CmiPrintf("CPD: Break point reached in proc %d for Function = %s\n",CkMyPe(),breakPointEntryInfo->name);
       CpdFreeze();
   }
 }
@@ -541,28 +575,27 @@ void CpdRemoveBreakPoint (char *msg)
   char functionName[128];
   sscanf(msg+CmiMsgHeaderSizeBytes, "%s", functionName);
   if (strlen(functionName) > 0) {
-  int idx = atoi(functionName);
-  if (idx < 0 || idx >= _entryTable.size()) {
-    CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName); 
-    return;
-  }
-  //void *objPointer;
-  //void *keyPointer; 
-  //CkHashtableIterator *it = CpvAccess(breakPointEntryTable)->iterator();
-  //while(NULL!=(objPointer = it->next(&keyPointer)))
-  //{
-  //EntryInfo * breakPointEntryInfo = *(EntryInfo **)objPointer;
-  EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(idx);
-    //int idx = *(int *)keyPointer;
-    //if (strstr(breakPointEntryInfo->name, functionName) != NULL){
-        _entryTable[idx]->name =  breakPointEntryInfo->name;
-        _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
-        _entryTable[idx]->msgIdx = breakPointEntryInfo->msgIdx;
-        _entryTable[idx]->chareIdx = breakPointEntryInfo->chareIdx;
-        //_debugEntryTable[idx].isBreakpoint = CmiFalse;
-        CmiPrintf("Breakpoint is removed for function %s with epIdx %ld\n", _entryTable[idx]->name, idx);
-    //}
-  //}
+    int idx = atoi(functionName);
+    if (idx < 0 || idx >= _entryTable.size()) {
+      CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName); 
+      return;
+    }
+    //void *objPointer;
+    //void *keyPointer; 
+    //CkHashtableIterator *it = CpvAccess(breakPointEntryTable)->iterator();
+    //while(NULL!=(objPointer = it->next(&keyPointer)))
+    //{
+    //EntryInfo * breakPointEntryInfo = *(EntryInfo **)objPointer;
+    EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(idx);
+    if (breakPointEntryInfo != NULL) {
+      _entryTable[idx]->name =  breakPointEntryInfo->name;
+      _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+      _entryTable[idx]->msgIdx = breakPointEntryInfo->msgIdx;
+      _entryTable[idx]->chareIdx = breakPointEntryInfo->chareIdx;
+      //_debugEntryTable[idx].isBreakpoint = CmiFalse;
+      CmiPrintf("Breakpoint is removed for function %s with epIdx %ld\n", _entryTable[idx]->name, idx);
+      CpvAccess(breakPointEntryTable)->remove(idx);
+    }
   }
 }
 
