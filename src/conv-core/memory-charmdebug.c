@@ -44,7 +44,9 @@ struct _Slot {
   /*The number of bytes of user data*/
   int userSize;
 
-#define FLAGS_MASK        0xF
+#define FLAGS_MASK        0x3F
+#define MODIFIED          0x20
+#define NEW_BLOCK         0x10
 #define LEAK_FLAG         0x8
 #define UNKNOWN_TYPE      0x0
 #define SYSTEM_TYPE       0x1
@@ -54,8 +56,8 @@ struct _Slot {
   /* A magic number field, to verify this is an actual malloc'd buffer, and what
      type of allocation it is. The last 4 bits of the magic number are used to
      define a classification of mallocs. */
-#define SLOTMAGIC            0x8402a5e0
-#define SLOTMAGIC_VALLOC     0x7402a5e0
+#define SLOTMAGIC            0x8402a5c0
+#define SLOTMAGIC_VALLOC     0x7402a5c0
 #define SLOTMAGIC_FREED      0xDEADBEEF
   int magic;
 
@@ -639,6 +641,77 @@ void * MergeAllocationTree(void *data, void **remoteData, int numRemote) {
   return data;
 }
 
+Slot **allocatedSince = NULL;
+int allocatedSinceSize;
+int allocatedSinceMaxSize = 0;
+int saveAllocationHistory = 1;
+int reportMEM = 0;
+int CpdMemBackup = 0;
+
+void backupMemory() {
+  Slot *cur;
+  if (*memoryBackup != NULL) 
+    CmiAbort("memoryBackup != NULL\n");
+
+  int totalMemory = sizeof(Slot);
+  for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
+    totalMemory += sizeof(Slot) + cur->userSize + cur->stackLen*sizeof(void*);
+  }
+  
+  if (reportMEM) CmiPrintf("CPD: total memory in use (%d): %d\n",CmiMyPe(),totalMemory);
+  *memoryBackup = mm_malloc(totalMemory);
+  memcpy(*memoryBackup, slot_first, sizeof(Slot));
+  char * ptr = *memoryBackup + sizeof(Slot);
+  for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
+    int tocopy = sizeof(Slot) + cur->userSize + cur->stackLen*sizeof(void*);
+    memcpy(ptr, cur, tocopy);
+    cur->magic &= ~ (NEW_BLOCK | MODIFIED);
+    ptr += tocopy;
+  }
+  allocatedSinceSize = 0;
+}
+
+void checkBackup() {
+  Slot *cur = slot_first->next;
+  char *ptr = *memoryBackup + sizeof(Slot);
+  
+  // skip over the new allocated blocks
+  //while (cur != ((Slot*)*memoryBackup)->next) cur = cur->next;
+  int idx = allocatedSinceSize-1;
+  while (idx >= 0) {
+    while (idx >= 0 && allocatedSince[idx] != cur) idx--;
+    if (idx >= 0) {
+      cur = cur->next;
+      idx --;
+    }
+  }
+  
+  while (cur != slot_first) {
+    // ptr is the old copy of cur
+    if (memory_chare_id != cur->chareID) {
+      int res = memcmp(ptr+sizeof(Slot), ((char*)cur)+sizeof(Slot), cur->userSize + cur->stackLen*sizeof(void*));
+      if (res != 0) {
+        cur->magic |= MODIFIED;
+        if (reportMEM) CmiPrintf("CPD: Object %d modified memory of object %d for %p on pe %d\n",memory_chare_id,cur->chareID,cur+1,CmiMyPe());
+      }
+    }
+    
+    // advance to next, skipping deleted memory blocks
+    cur = cur->next;
+    char *last;
+    do {
+      last = ptr;
+      ptr += sizeof(Slot) + ((Slot*)ptr)->userSize + ((Slot*)ptr)->stackLen*sizeof(void*);
+    } while (((Slot*)last)->next != cur);
+  }
+
+  mm_free(*memoryBackup);
+  *memoryBackup = NULL;
+}
+
+
+
+int CpdCRC32 = 0;
 
 int checkSlotCRC(void *userPtr) {
   Slot *sl = UserToSlot(userPtr);
@@ -657,22 +730,89 @@ void resetUserCRC(void *userPtr) {
   sl->userCRC = crc32((unsigned char*)userPtr, sl->userSize);
 }
 
-void checkAllCRC(int report) {
+void resetSlotCRC(void *userPtr) {
+  Slot *sl = UserToSlot(userPtr);
+  unsigned int crc = crc32((unsigned char*)sl, sizeof(Slot)-2*sizeof(unsigned int));
+  crc = crc32_update((unsigned char*)sl->from, sl->stackLen*sizeof(void*), crc);
+  sl->slotCRC = crc;
+}
+
+void ResetAllCRC() {
+  Slot *cur;
+
+  for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
+    resetUserCRC(cur+1);
+    resetSlotCRC(cur+1);
+  }
+}
+
+void CheckAllCRC(int report) {
   Slot *cur;
   unsigned int crc1, crc2;
-  
+
   for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
     crc1 = crc32((unsigned char*)cur, sizeof(Slot)-2*sizeof(unsigned int));
     crc1 = crc32_update((unsigned char*)cur->from, cur->stackLen*sizeof(void*), crc1);
     crc2 = crc32((unsigned char*)SlotToUser(cur), cur->userSize);
     /* Here we can check if a modification has occured */
-    if (report && cur->slotCRC != crc1) CmiPrintf("Object %d modified slot for %p\n",memory_chare_id,SlotToUser(cur));
+    if (report && cur->slotCRC != crc1) CmiPrintf("CRC: Object %d modified slot for %p\n",memory_chare_id,SlotToUser(cur));
     cur->slotCRC = crc1;
     if (report && cur->userCRC != crc2 && memory_chare_id != cur->chareID)
-      CmiPrintf("Object %d modified memory of object %d for %p\n",memory_chare_id,cur->chareID,SlotToUser(cur));
+      CmiPrintf("CRC: Object %d modified memory of object %d for %p\n",memory_chare_id,cur->chareID,SlotToUser(cur));
     cur->userCRC = crc2;
   }
 }
+
+void CpdResetMemory() {
+  if (CpdMemBackup) backupMemory();
+  if (CpdCRC32) ResetAllCRC();
+#ifdef CPD_USE_MMAP
+  Slot *cur;
+  for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
+    if (cur->chareID != memory_chare_id && cur->chareID > 0) {
+      mprotect(cur, cur->userSize+sizeof(Slot)+cur->stackLen*sizeof(void*), PROT_READ);
+    }
+  }
+#endif
+}
+
+void CpdCheckMemory(int report) {
+#ifdef CPD_USE_MMAP
+  Slot *cur;
+  for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
+    mprotect(cur, cur->userSize+sizeof(Slot)+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+  }
+#endif
+  if (CpdCRC32) CheckAllCRC(report);
+  if (CpdMemBackup) checkBackup();
+}
+
+int cpdInSystem;
+
+void CpdSystemEnter() {
+#ifdef CPD_USE_MMAP
+  Slot *cur;
+  if (++cpdInSystem == 1)
+    for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
+      if (cur->chareID == 0) {
+        mprotect(cur, cur->userSize+sizeof(Slot)+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+      }
+    }
+#endif
+}
+
+void CpdSystemExit() {
+#ifdef CPD_USE_MMAP
+  Slot *cur;
+  if (--cpdInSystem == 0)
+    for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
+      if (cur->chareID == 0) {
+        mprotect(cur, cur->userSize+sizeof(Slot)+cur->stackLen*sizeof(void*), PROT_READ);
+      }
+    }
+#endif
+}
+
 
 /*
 
@@ -743,9 +883,14 @@ static void *setSlot(Slot *s,int userSize) {
   s->prev=slot_first;
   s->next->prev=s;
   s->prev->next=s;
+  if (CpdCRC32) {
+    /* fix crc for previous and next block */
+    resetSlotCRC(s->next + 1);
+    resetSlotCRC(s->prev + 1);
+  }
   
   /* Set the last 4 bits of magic to classify the memory together with the magic */
-  s->magic=SLOTMAGIC + (memory_status_info>0? USER_TYPE : SYSTEM_TYPE);
+  s->magic=SLOTMAGIC + NEW_BLOCK + (memory_status_info>0? USER_TYPE : SYSTEM_TYPE);
   //if (memory_status_info>0) printf("user allocation\n");
   s->chareID = memory_chare_id;
   s->userSize=userSize;
@@ -759,6 +904,14 @@ static void *setSlot(Slot *s,int userSize) {
   unsigned int crc = crc32((unsigned char*)s, sizeof(Slot)-2*sizeof(unsigned int));
   s->slotCRC = crc32_update((unsigned char*)s->from, numStackFrames*sizeof(void*), crc);
   s->userCRC = crc32((unsigned char*)user, userSize);
+  if (saveAllocationHistory) {
+    if (allocatedSinceSize >= allocatedSinceMaxSize) {
+      mm_free(allocatedSince);
+      allocatedSinceMaxSize += 10;
+      allocatedSince = (Slot**)mm_malloc((allocatedSinceMaxSize)*sizeof(void*));
+    }
+    allocatedSince[allocatedSinceSize++] = s;
+  }
   return (void *)user;
 }
 
@@ -767,6 +920,11 @@ static void freeSlot(Slot *s) {
   /* Splice out of the slot list */
   s->next->prev=s->prev;
   s->prev->next=s->next;
+  if (CpdCRC32) {
+    /* fix crc for previous and next block */
+    resetSlotCRC(s->next + 1);
+    resetSlotCRC(s->prev + 1);
+  }
   s->prev=s->next=(Slot *)0;//0x0F00; why was it not 0?
 
   s->magic=SLOTMAGIC_FREED;
@@ -807,7 +965,25 @@ static void status(char *msg) {
   }
 }
 
+#ifdef CPD_USE_MMAP
+#include <signal.h>
+
+static void* lastAddressSegv;
+static void CpdMMAPhandler(int sig, siginfo_t *si, void *unused){
+  if (lastAddressSegv == si->si_addr) {
+    CmiPrintf("Second SIGSEGV at address 0x%lx\n", (long) si->si_addr);
+    CpdFreeze();
+  }
+  lastAddressSegv = si->si_addr;
+  mprotect((void*)((CmiUInt8)si->si_addr & ~(meta_getpagesize()-1)), 4, PROT_READ|PROT_WRITE);
+  CmiPrintf("Got SIGSEGV at address: 0x%lx\n", (long) si->si_addr);
+  CmiPrintStackTrace(0);
+}
+#endif
+
 extern int getCharmEnvelopeSize();
+
+static int recursive_call = 1;
 
 static void meta_init(char **argv) {
   status("Converse -memory mode: charmdebug\n");
@@ -821,16 +997,43 @@ static void meta_init(char **argv) {
   CpdDebug_MergeAllocationTree = MergeAllocationTree;
   memory_allocated_user_total = 0;
   nextChareID = 1;
+  slot_first->userSize = 0;
+  slot_first->stackLen = 0;
+  if (CmiGetArgFlagDesc(argv,"+memory_report", "Print all cross-object violations")) { 
+    reportMEM = 1;
+  }
+  if (CmiGetArgFlagDesc(argv,"+memory_backup", "Backup all memory at every entry method")) { 
+    CpdMemBackup = 1;
+  }
+  if (CmiGetArgFlagDesc(argv,"+memory_verbose", "Print all memory-related operations")) { 
+    recursive_call = 0;
+  }
+#ifdef CPD_USE_MMAP
+  struct sigaction sa;
+  sa.sa_flags = SA_SIGINFO | SA_NODEFER | SA_RESTART;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_sigaction = CpdMMAPhandler;
+  if (sigaction(SIGSEGV, &sa, NULL) == -1) CmiPrintf("failed to install signal handler\n");
+#endif
 }
 
 static void *meta_malloc(size_t size) {
   dumpStackFrames();
+#if CPD_USE_MMAP
+  Slot *s=(Slot *)mmap(NULL, sizeof(Slot)+size+numStackFrames*sizeof(void*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#else
   Slot *s=(Slot *)mm_malloc(sizeof(Slot)+size+numStackFrames*sizeof(void*));
+#endif
   char *user = (char*)s;
   if (s!=NULL) {
     user = (char*)setSlot(s,size);
     memory_allocated_user_total += size;
     traceMalloc_c(user, size, s->from, s->stackLen);
+  }
+  if (recursive_call == 0) {
+    recursive_call = 1;
+    CmiPrintf("allocating %p: %d bytes\n",s,size);
+    recursive_call = 0;
   }
   return user;
 }
@@ -854,6 +1057,13 @@ static void meta_free(void *mem) {
   traceFree_c(mem, memSize);
 
   s=((Slot *)mem)-1;
+
+  if (recursive_call == 0) {
+    recursive_call = 1;
+    CmiPrintf("freeing %p\n",s);
+    recursive_call = 0;
+  }
+  
   if ((s->magic&~FLAGS_MASK)==SLOTMAGIC_VALLOC)
   { /*Allocated with special alignment*/
     freeSlot(s);
@@ -863,7 +1073,11 @@ static void meta_free(void *mem) {
   else if ((s->magic&~FLAGS_MASK)==SLOTMAGIC) 
   { /*Ordinary allocated block */
     freeSlot(s);
+#if CPD_USE_MMAP
+    munmap(s, sizeof(Slot)+s->userSize+s->stackLen*sizeof(void*));
+#else
     mm_free(s);
+#endif
   }
   else if (s->magic==SLOTMAGIC_FREED)
     CmiAbort("Free'd block twice");
@@ -930,10 +1144,21 @@ void setProtection(char* mem, char *ptr, int len, int flag) {
   }
 }
 
+void **chareObjectMemory = NULL;
+int chareObjectMemorySize = 0;
+
 void setMemoryTypeChare(void *ptr) {
   Slot *sl = UserToSlot(ptr);
   sl->magic = (sl->magic & ~FLAGS_MASK) | CHARE_TYPE;
   sl->chareID = nextChareID;
+  if (nextChareID >= chareObjectMemorySize) {
+    void **newChare = (void**)mm_malloc((nextChareID+100) * sizeof(void*));
+    memcpy(newChare, chareObjectMemory, chareObjectMemorySize*sizeof(void*));
+    chareObjectMemorySize = nextChareID+100;
+    mm_free(chareObjectMemory);
+    chareObjectMemory = newChare;
+  }
+  chareObjectMemory[nextChareID] = ptr;
   nextChareID ++;
 }
 
@@ -955,4 +1180,9 @@ int setMemoryChareIDFromPtr(void *ptr) {
 
 void setMemoryChareID(int chareID) {
   memory_chare_id = chareID;
+}
+
+void setMemoryOwnedBy(void *ptr, int chareID) {
+  Slot *sl = UserToSlot(ptr);
+  sl->chareID = chareID;
 }
