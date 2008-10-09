@@ -408,7 +408,6 @@ do
                 # Requested support from charmdebug: add some modules and libraries
                 CHARMDEBUG=1
                 MEMORY="charmdebug"
-		shift
                 ;;
 
 	"-module"|"-modules")
@@ -711,6 +710,23 @@ processArgs "$@"
 #
 ##############################################################################
 
+Debug "About to read machine config script"
+Debug "Read config script, setting defaults..."
+
+[ ! -r $CHARMINC/conv-config.sh ] && Abort "Cannot find conv-config.sh in $CHARMINC"
+. $CHARMINC/conv-config.sh $CHARMINC
+
+Debug "Setting vars..."
+
+# If we are debugging, add "-g -O0" to the C/C++ flags
+if [ -n "$CHARMDEBUG" ]; then
+       if [ -n "$CMK_BUILD_PYTHON" ]; then
+         	AddModules PythonCCS charmdebug_python
+		POST_LIBRARIES=`AddList $POST_LIBRARIES -lpython${CMK_BUILD_PYTHON}`
+   	fi
+    	OPTS_CPP="$OPTS_CPP -O0 -g"
+fi
+
 PROCESSED_MODULES=""
 
 # Look up and add the dependencies for module $1
@@ -767,23 +783,6 @@ Debugf "----------- Module dependency search complete ------------"
 #
 ##############################################################################
 
-
-Debug "About to read machine config script"
-Debug "Read config script, setting defaults..."
-
-[ ! -r $CHARMINC/conv-config.sh ] && Abort "Cannot find conv-config.sh in $CHARMINC"
-. $CHARMINC/conv-config.sh $CHARMINC
-
-Debug "Setting vars..."
-
-# If we are debugging, add "-g -O0" to the C/C++ flags
-if [ -n "$CHARMDEBUG" ]; then
-       if [ -n "$CMK_BUILD_PYTHON" ]; then
-         	AddModules PythonCCS charmdebug_python
-		POST_LIBRARIES=`AddList $POST_LIBRARIES -lpython${CMK_BUILD_PYTHON}`
-   	fi
-    	OPTS_CPP="$OPTS_CPP -O0 -g"
-fi
 
 if [ "$BUILD_SHARE" = "1" ]
 then
