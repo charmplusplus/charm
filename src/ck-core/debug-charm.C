@@ -26,7 +26,9 @@ CkVec<DebugEntryInfo> _debugEntryTable;
 CpdPersistentChecker persistentCheckerUselessClass;
 
 void CpdFinishInitialization() {
+#ifndef CMK_OPTIMIZE
   _debugEntryTable.reserve(_entryTable.size());
+#endif
 }
 
 extern "C" void resetAllCRC();
@@ -42,33 +44,41 @@ CkQ<DebugRecursiveEntry> _debugData;
 
 // Function called right before an entry method
 void CpdBeforeEp(int ep, void *obj) {
-  DebugRecursiveEntry entry;
-  entry.previousChareID = setMemoryChareIDFromPtr(obj);
-  entry.alreadyUserCode = _entryTable[ep]->inCharm ? 0 : 1;
-  entry.memoryBackup = NULL;
-  _debugData.push(entry);
-  setMemoryStatus(entry.alreadyUserCode);
-  //if (_debugEntryTable[ep].isBreakpoint) printf("CpdBeforeEp breakpointed %d\n",ep);
-  memoryBackup = &_debugData.peek().memoryBackup;
-  if (!_entryTable[ep]->inCharm) {
-    CpdResetMemory();
+#ifndef CMK_OPTIMIZE
+  if (CpdAccess(cmiArgDebugFlag)) {
+    DebugRecursiveEntry entry;
+    entry.previousChareID = setMemoryChareIDFromPtr(obj);
+    entry.alreadyUserCode = _entryTable[ep]->inCharm ? 0 : 1;
+    entry.memoryBackup = NULL;
+    _debugData.push(entry);
+    setMemoryStatus(entry.alreadyUserCode);
+    //if (_debugEntryTable[ep].isBreakpoint) printf("CpdBeforeEp breakpointed %d\n",ep);
+    memoryBackup = &_debugData.peek().memoryBackup;
+    if (!_entryTable[ep]->inCharm) {
+      CpdResetMemory();
+    }
   }
+#endif
 }
 
 // Function called right after an entry method
 void CpdAfterEp(int ep) {
-  DebugRecursiveEntry entry = _debugData.peek();
-  CkVec<DebugPersistentCheck> &postExecutes = _debugEntryTable[ep].postProcess;
-  for (int i=0; i<postExecutes.size(); ++i) {
-    postExecutes[i].object->cpdCheck(postExecutes[i].msg);
+#ifndef CMK_OPTIMIZE
+  if (CpdAccess(cmiArgDebugFlag)) {
+    DebugRecursiveEntry entry = _debugData.peek();
+    CkVec<DebugPersistentCheck> &postExecutes = _debugEntryTable[ep].postProcess;
+    for (int i=0; i<postExecutes.size(); ++i) {
+      postExecutes[i].object->cpdCheck(postExecutes[i].msg);
+    }
+    memoryBackup = &entry.memoryBackup;
+    if (!_entryTable[ep]->inCharm) {
+      CpdCheckMemory();
+    }
+    setMemoryChareID(entry.previousChareID);
+    setMemoryStatus(entry.alreadyUserCode);
+    _debugData.deq();
   }
-  memoryBackup = &entry.memoryBackup;
-  if (!_entryTable[ep]->inCharm) {
-    CpdCheckMemory();
-  }
-  setMemoryChareID(entry.previousChareID);
-  setMemoryStatus(entry.alreadyUserCode);
-  _debugData.deq();
+#endif
 }
 
 /************ Array Element CPD Lists ****************/

@@ -823,12 +823,15 @@ void _initCharm(int unused_argc, char **argv)
 #else
         if(CkMyRank()==0)
 #endif
-          CpdFinishInitialization();
 #endif
 
     // Execute the initcalls registered in modules
 	_initCallTable.enumerateInitCalls();
-	
+
+#ifndef CMK_OPTIMIZE
+    CpdFinishInitialization();
+#endif
+
 	//CmiNodeAllBarrier();
 
 	CkpvAccess(_myStats) = new Stats();
