@@ -817,19 +817,16 @@ void _initCharm(int unused_argc, char **argv)
 	}
 	CmiNodeAllBarrier();
 
+    // Execute the initcalls registered in modules
+	_initCallTable.enumerateInitCalls();
+
 #ifndef CMK_OPTIMIZE
 #ifdef __BLUEGENE__
         if(BgNodeRank()==0)
 #else
         if(CkMyRank()==0)
 #endif
-#endif
-
-    // Execute the initcalls registered in modules
-	_initCallTable.enumerateInitCalls();
-
-#ifndef CMK_OPTIMIZE
-    CpdFinishInitialization();
+          CpdFinishInitialization();
 #endif
 
 	//CmiNodeAllBarrier();
