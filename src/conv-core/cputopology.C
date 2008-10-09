@@ -22,7 +22,6 @@
 #include <stdio.h>
 #include <unistd.h>
 
-
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -192,7 +191,7 @@ static void cpuTopoRecvHandler(void *msg)
     CmiFree(m);
   CmiUnlock(topoLock);
 
-  if (CmiMyPe() == 0) cpuTopo.print();
+  // if (CmiMyPe() == 0) cpuTopo.print();
 }
 
 
@@ -230,16 +229,17 @@ extern "C" void CmiInitCPUTopology(char **argv)
   hostnameMsg  *msg;
  
   if (CmiMyRank() ==0) {
-       topoLock = CmiCreateLock();
+     topoLock = CmiCreateLock();
   }
 
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
 						"obtain cpu topology info");
+  obtain_flag = 1;
 
   cpuTopoHandlerIdx =
-       CmiRegisterHandler((CmiHandler)cpuTopoHandler);
+     CmiRegisterHandler((CmiHandler)cpuTopoHandler);
   cpuTopoRecvHandlerIdx =
-       CmiRegisterHandler((CmiHandler)cpuTopoRecvHandler);
+     CmiRegisterHandler((CmiHandler)cpuTopoRecvHandler);
 
   if (!obtain_flag) return;
   else if (CmiMyPe() == 0) {
