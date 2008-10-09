@@ -1322,6 +1322,14 @@ sockets.
 
 #if CMK_CCS_AVAILABLE
 
+#define REDIRECT_STDIO  "redirect stdio"
+#define FETCH_STDIO "fetch stdio"
+char *stdio_buffer = NULL;
+int stdio_size = 0;
+int stdio_alloc = 0;
+int stdio_waiting = 0;
+CcsImplHeader stdio_waiting_hdr;
+
 /*The Ccs Server socket became active-- 
 rec'v the message and respond to the request,
 by forwarding the request to the appropriate node.
@@ -1345,6 +1353,31 @@ void req_ccs_connect(void)
 	h.hdr.pe=ChMessageInt_new(pe);
   }
 
+  if (strncmp(REDIRECT_STDIO, h.hdr.handler, strlen(REDIRECT_STDIO))==0) {
+    /*This is a request to make a duplicate to stdio*/
+    if (stdio_alloc == 0) {
+      stdio_alloc = 4096;
+      stdio_buffer = malloc(stdio_alloc);
+    }
+    CcsServer_sendReply(&h.hdr,0,0);
+  }
+  else if (strncmp(FETCH_STDIO, h.hdr.handler, strlen(FETCH_STDIO))==0) {
+    /*Reply with the data loaded until now*/
+    if (stdio_size > 0) {
+      h.hdr.len = ChMessageInt_new(1); /* fake len to prevent socket closed without reply! */
+      CcsServer_sendReply(&h.hdr,stdio_size,stdio_buffer);
+      stdio_size = 0;
+    } else {
+      if (stdio_waiting) {
+        CcsServer_sendReply(&stdio_waiting_hdr,0,0);
+      }
+      stdio_waiting = 1;
+      stdio_waiting_hdr = h.hdr;
+      stdio_waiting_hdr.len = ChMessageInt_new(1); /* fake len to prevent socket closed without reply! */
+    }
+  }
+  else {
+
 #define LOOPBACK 0
 #if LOOPBACK /*Immediately reply "there's nothing!" (for performance testing)*/
   CcsServer_sendReply(&h.hdr,0,0);
@@ -1357,6 +1390,7 @@ void req_ccs_connect(void)
   skt_sendV(nodetab_ctrlfd(pe),2,bufs,lens);
 
 #endif
+  }
   free(reqData);
 }
 
@@ -1509,10 +1543,33 @@ static void checkPrintfError(int err) {
   }
 }
 
+void write_stdio_duplicate(char* data) {
+  if (stdio_alloc > 0) {
+    int size = strlen(data);
+    
+    if (stdio_waiting) {
+      stdio_waiting = 0;
+      CcsServer_sendReply(&stdio_waiting_hdr,size+1,data);
+    }
+    else {
+      if (size+stdio_size >= stdio_alloc) {
+        stdio_alloc += (size>4096 ? size : 4096);
+        char *newbuf = malloc(stdio_alloc);
+        memcpy(newbuf, stdio_buffer, stdio_size);
+        free(stdio_buffer);
+        stdio_buffer = newbuf;
+      }
+      strcpy(&stdio_buffer[stdio_size], data);
+      stdio_size += size;
+    }
+  }
+}
+
 int req_handle_print(ChMessage *msg,SOCKET fd)
 {
   checkPrintfError(printf("%s",msg->data));
   checkPrintfError(fflush(stdout));
+  write_stdio_duplicate(msg->data);
   return REQ_OK;
 }
 
@@ -1529,6 +1586,7 @@ int req_handle_printsyn(ChMessage *msg,SOCKET fd)
 {
   checkPrintfError(printf("%s",msg->data));
   checkPrintfError(fflush(stdout));
+  write_stdio_duplicate(msg->data);
   req_reply(fd, "printdone", "", 1);
   return REQ_OK;
 }
