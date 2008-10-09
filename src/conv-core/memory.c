@@ -516,6 +516,9 @@ void setProtection(char *mem, char *ptr, int len, int flag) { }
 void setMemoryTypeChare(void *ptr) { }
 void setMemoryTypeMessage(void *ptr) { }
 
+void CpdResetMemory() { }
+void CpdCheckMemory() { }
+
 int get_memory_allocated_user_total() { return 0; }
 #ifdef setMemoryChareIDFromPtr
 #undef setMemoryChareIDFromPtr
@@ -526,3 +529,7 @@ int setMemoryChareIDFromPtr(void *ptr) { return 0; }
 #endif
 void setMemoryChareID(int id) { }
 #endif
+#ifdef setMemoryOwnedBy
+#undef setMemoryOwnedBy
+#endif
+void setMemoryOwnedBy(void *ptr, int id) { }

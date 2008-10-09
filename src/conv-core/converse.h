@@ -87,10 +87,12 @@ extern int memory_chare_id;
 }
 int setMemoryChareIDFromPtr(void *p);
 void setMemoryChareID(int id);
+void setMemoryOwnedBy(void *p, int id);
 #else
 #define setMemoryStatus(p) /* empty */
 #define setMemoryChareIDFromPtr(p) /* empty */
 #define setMemoryChareID(p) /* empty */
+#define setMemoryOwnedBy(p, id) /* empty */
 #endif
 
 /******************************************************************************

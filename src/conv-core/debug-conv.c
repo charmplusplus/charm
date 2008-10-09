@@ -19,6 +19,8 @@ CpvDeclare(void *, debugQueue);
 int _debugHandlerIdx;
 CpvDeclare(int, skipBreakpoint); /* This is a counter of how many breakpoints we should skip */
 
+char ** memoryBackup;
+
 /***************************************************
   The CCS interface to the debugger
 */
@@ -93,6 +95,10 @@ static void CpdDebugHandler(char *msg)
       CpvAccess(continueFlag) = 1;
       CpdUnFreeze();
     }
+    else if (strncmp(name, "status", strlen("status")) == 0) {
+      char reply = CpdIsFrozen() ? 0 : 1;
+      CcsSendReply(1, &reply);
+    }
 #if 0
     else if (strncmp(name, "setBreakPoint", strlen("setBreakPoint")) == 0){
       CmiPrintf("setBreakPoint received\n");
@@ -113,7 +119,7 @@ static void CpdDebugHandler(char *msg)
  */
 void CpdFreeze(void)
 {
-  CmiPrintf("Frozen processor %d\n",CmiMyPe());
+  CmiPrintf("CPD: Frozen processor %d\n",CmiMyPe());
   if (CpvAccess(freezeModeFlag)) return; /*Already frozen*/
   CpvAccess(freezeModeFlag) = 1;
   CpdFreezeModeScheduler();

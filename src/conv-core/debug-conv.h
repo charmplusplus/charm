@@ -17,6 +17,9 @@ extern void (*CpdDebug_deleteAllocationPoint)(void *ptr);
 extern void * (*CpdDebug_MergeAllocationTree)(void *data, void **remoteData, int numRemote);
 
 CpvExtern(int, cmiArgDebugFlag);
+extern char ** memoryBackup;
+extern void CpdCheckMemory();
+extern void CpdResetMemory();
 
 void CpdInit(void); 
 void CpdFreeze(void);  
