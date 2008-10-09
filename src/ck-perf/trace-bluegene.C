@@ -141,16 +141,23 @@ void TraceBluegene::bgEndExec(int commit)
     BgEndLastLog(tTIMELINEREC);
 }
 
+void TraceBluegene::beginExecute(envelope *e)
+{
+  if (e==NULL || !genTimeLog) return;
+  BgTimeLog* log = tTIMELINE[tTIMELINE.length()-1];
+  CmiAssert(log!=NULL);
+  log->setCharmEP(e->getEpIdx());
+}
+
 void TraceBluegene::beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx)
 {
   //printf("SET OBJ ID\n");
-  if (idx == NULL) return;
   BgTimeLog* log;
   if(genTimeLog)
     log = tTIMELINE[tTIMELINE.length()-1];
   else
     return;
-  log->setObjId(idx);
+  if (idx!=NULL) log->setObjId(idx);
   log->setCharmEP(ep);
 }
 

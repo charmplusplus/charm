@@ -35,7 +35,7 @@ class TraceBluegene : public Trace {
     void bgAmpiBeginExec(char *msg, char *str, void **logs, int count);
     void bgSetInfo(char *msg, char *str, void **logs, int count);
     void bgEndExec(int);
-    virtual void beginExecute(envelope *) {}
+    virtual void beginExecute(envelope *);
     virtual void beginExecute(CmiObjId *tid) {}
     virtual void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx);
     void addBackwardDep(void *log);
