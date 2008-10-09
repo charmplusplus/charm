@@ -84,6 +84,10 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
       block[first] = elt;
       len++;
     }
+    // stack semantics: look at the element on top of the stack
+    T& peek() {
+      return block[first];
+    }
     // insert an element at pos.
     void insert(int pos, const T &elt) {
       while(len==blklen || pos>=blklen) _expand();
