@@ -45,7 +45,7 @@ CkQ<DebugRecursiveEntry> _debugData;
 // Function called right before an entry method
 void CpdBeforeEp(int ep, void *obj) {
 #ifndef CMK_OPTIMIZE
-  if (CpdAccess(cmiArgDebugFlag)) {
+  if (CpvAccess(cmiArgDebugFlag)) {
     DebugRecursiveEntry entry;
     entry.previousChareID = setMemoryChareIDFromPtr(obj);
     entry.alreadyUserCode = _entryTable[ep]->inCharm ? 0 : 1;
@@ -64,7 +64,7 @@ void CpdBeforeEp(int ep, void *obj) {
 // Function called right after an entry method
 void CpdAfterEp(int ep) {
 #ifndef CMK_OPTIMIZE
-  if (CpdAccess(cmiArgDebugFlag)) {
+  if (CpvAccess(cmiArgDebugFlag)) {
     DebugRecursiveEntry entry = _debugData.peek();
     CkVec<DebugPersistentCheck> &postExecutes = _debugEntryTable[ep].postProcess;
     for (int i=0; i<postExecutes.size(); ++i) {
