@@ -59,19 +59,24 @@ class PythonObject {
   CmiUInt4 pyNumber;
   PythonTable pyWorkers;
 
-  PythonObject() : pyNumber(0) { }
   void pyRequest(CkCcsRequestMsg *msg);
   void execute(CkCcsRequestMsg *msg, CcsDelayedReply *reply);
   void print(PythonPrint *pyMsg, CcsDelayedReply *reply);
   void finished(PythonFinished *pyMsg, CcsDelayedReply *reply);
-
-  void replyIntValue(CcsDelayedReply *reply, CmiUInt4 *value);
+ protected:
+  int prepareInterpreter(PythonExecute *pyMsg);
+   
+ public:
+  static void replyIntValue(PythonObject* obj, CcsDelayedReply *reply, CmiUInt4 *value);
+  void (*replyIntFn)(PythonObject*,CcsDelayedReply*,CmiUInt4*);
   void cleanup(PythonExecute *pyMsg, PyThreadState *pts, CmiUInt4 pyVal);
   void getPrint(CkCcsRequestMsg *msg);
   static void _callthr_executeThread(CkThrCallArg *impl_arg);
   void executeThread(PythonExecute *pyMsg);
   virtual PyMethodDef *getMethods() {return CkPy_MethodsCustom;}
   virtual char *getMethodsDoc() {return CkPy_MethodsCustomDoc;}
+
+  PythonObject() : pyNumber(0) { replyIntFn=&PythonObject::replyIntValue; }
 
   // utility functions to manipulate python objects
   // in order to use Dictionaries, Lists, Tuples, refer to
@@ -155,9 +160,11 @@ class CkCallbackPython : public CkCallbackResumeThread {
      if (result != NULL) *result = res;
    }
    void *thread_delay(void) const {
+     PyThreadState *myState = PyThreadState_Get();
      PyEval_ReleaseLock();
      void *res = impl_thread_delay();
      PyEval_AcquireLock();
+     PyThreadState_Swap(myState);
      return res;
    }
 };

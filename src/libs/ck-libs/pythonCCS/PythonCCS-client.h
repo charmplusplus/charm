@@ -66,6 +66,7 @@ class PythonAbstract {
 /* all the integers (CmiUInt4) are interpreted in network byte order */
 class PythonExecute : private PythonAbstract {
   friend class PythonObject;
+  friend class CpdPythonGroup;
  private:
   CmiUInt4 codeLength;
   union {

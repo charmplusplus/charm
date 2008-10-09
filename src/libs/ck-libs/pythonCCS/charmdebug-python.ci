@@ -1,7 +1,7 @@
 module charmdebug_python {
-  mainchare [python] CpdPython {
+  mainchare CpdPython {
     entry CpdPython(CkArgMsg*);
-    entry [python] void get(int);
+    //entry [python] void get(int);
   };
   
   group [python] CpdPythonGroup {
@@ -10,5 +10,6 @@ module charmdebug_python {
     entry [python] void getValue(int);
     entry [python] void getCast(int);
     entry [python] void getStatic(int);
+    entry void registerPersistent(CkCcsRequestMsg*);
   };
 };

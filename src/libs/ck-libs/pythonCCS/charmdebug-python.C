@@ -4,7 +4,7 @@
 class CpdPython : public CBase_CpdPython {
 public:
   CpdPython (CkArgMsg *msg) {
-    ((CProxy_CpdPython)thishandle).registerPython("CpdPython");
+    //((CProxy_CpdPython)thishandle).registerPython("CpdPython");
     //CkCallback cb(CkIndex_CpdPython::pyRequest(0),thishandle);
     //CcsRegisterHandler("pycode", cb);
     CProxy_CpdPythonGroup group = CProxy_CpdPythonGroup::ckNew();
@@ -13,13 +13,25 @@ public:
     //CkPrintf("CpdPython registered\n");
     //char *string = "pycode";
     //CkAssert(CkHashtableGet(CpvAccess(ccsTab),(void *)&string) != NULL);
+    CcsRegisterHandler("CpdPythonPersistent", CkCallback(CkIndex_CpdPythonGroup::registerPersistent(0), group));
   }
-  void get(int handle) {
-    CkPrintf("CpdPython::get\n");
+  //void get(int handle) {
+  //  CkPrintf("CpdPython::get\n");
+  //}
+};
+
+class CpdPythonArrayIterator : public CkLocIterator {
+public:
+  CkVec<CkMigratable*> elems;
+  CkArray *arr;
+  virtual void addLocation(CkLocation &loc) {
+    elems.insertAtEnd(arr->lookup(loc.getIndex()));
   }
 };
 
-class CpdPythonGroup : public CBase_CpdPythonGroup {
+class CpdPythonGroup : public CBase_CpdPythonGroup, public CpdPersistentChecker {
+  CpdPythonArrayIterator arriter;
+  int nextElement;
 public:
   CpdPythonGroup() {
     //CkPrintf("[%d] CpdPythonGroup::constructor\n",CkMyPe());
@@ -32,28 +44,56 @@ public:
   void getValue(int handle);
   void getCast(int handle);
   void getStatic(int handle);
+  
+  void cpdCheck(void*);
+  void registerPersistent(CkCcsRequestMsg*);
 };
 
 int CpdPythonGroup::buildIterator(PyObject *&data, void *iter) {
   int group = ntohl(*(int*)iter);
   CkGroupID id;
   id.idx = group;
-  void *ptr = CkLocalBranch(id);
-  data = PyLong_FromVoidPtr(ptr);
-  CkPrintf("[%d] Building iterator for %i: %p\n", CkMyPe(), group, ptr);
-  return 1;
+  IrrGroup *ptr = _localBranch(id);
+  if (ptr->isArrMgr()) {
+    arriter.arr = (CkArray*)ptr;
+    arriter.arr->getLocMgr()->iterate(arriter);
+    if (arriter.elems.size() > 0) {
+      data = PyLong_FromVoidPtr(arriter.elems[0]);
+      nextElement = 1;
+    } else {
+      return 0;
+    }
+  } else {
+    nextElement = 0;
+    data = PyLong_FromVoidPtr(ptr);
+    //CkPrintf("[%d] Building iterator for %i: %p\n", CkMyPe(), group, ptr);
+    return 1;
+  }
 }
 
 int CpdPythonGroup::nextIteratorUpdate(PyObject *&data, PyObject *result, void *iter) {
-  CkPrintf("[%d] Asked for next iterator\n",CkMyPe());
+  //CkPrintf("[%d] Asked for next iterator\n",CkMyPe());
+  if (nextElement > 0) {
+    if (nextElement == arriter.elems.size()) {
+      nextElement = 0;
+      arriter.elems.removeAll();
+      return 0;
+    } else {
+      data = PyLong_FromVoidPtr(arriter.elems[nextElement++]);
+      return 1;
+    }
+  }
+  //static int next = 0;
+  //next = 1 - next;
+  //return next;
   return 0;
 }
 
 void CpdPythonGroup::getArray(int handle) {
   PyObject *arg = pythonGetArg(handle);
-  PyObject *obj, *type;
+  PyObject *obj;
   int num, size;
-  if (PyArg_ParseTuple(arg, "OOii", &obj, &type, &num, &size) == 0) return;
+  if (PyArg_ParseTuple(arg, "Oii", &obj, &size, &num) == 0) return;
   char *ptr = (char*)PyLong_AsVoidPtr(obj);
   ptr += num * size;
   pythonReturn(handle, PyLong_FromVoidPtr(ptr));
@@ -61,10 +101,10 @@ void CpdPythonGroup::getArray(int handle) {
 
 void CpdPythonGroup::getValue(int handle) {
   PyObject *arg = pythonGetArg(handle);
-  PyObject *obj, *type;
+  PyObject *obj;
   int offset;
-  char *name, restype;
-  if (PyArg_ParseTuple(arg, "OOsic", &obj, &type, &name, &offset, &restype) == 0) return;
+  char restype;
+  if (PyArg_ParseTuple(arg, "Oic", &obj, &offset, &restype) == 0) return;
   char *ptr = (char*)PyLong_AsVoidPtr(obj);
   ptr += offset;
   PyObject *result = NULL;
@@ -99,9 +139,9 @@ void CpdPythonGroup::getValue(int handle) {
 
 void CpdPythonGroup::getCast(int handle) {
   PyObject *arg = pythonGetArg(handle);
-  PyObject *obj, *type, *newtype;
+  PyObject *obj;
   int offset;
-  if (PyArg_ParseTuple(arg, "OOOi", &obj, &type, &newtype, &offset) == 0) return;
+  if (PyArg_ParseTuple(arg, "Oi", &obj, &offset) == 0) return;
   char *ptr = (char*)PyLong_AsVoidPtr(obj);
   ptr += offset;
   pythonReturn(handle, PyLong_FromVoidPtr(ptr));
@@ -110,9 +150,9 @@ void CpdPythonGroup::getCast(int handle) {
 void CpdPythonGroup::getStatic(int handle) {
   PyObject *arg = pythonGetArg(handle);
   PyObject *location;
-  char *name, restype;
+  char restype;
   CkPrintf("Parsing arguments\n");
-  if (PyArg_ParseTuple(arg, "sOc", &name, &location, &restype) == 0) return;
+  if (PyArg_ParseTuple(arg, "Oc", &location, &restype) == 0) return;
   CkPrintf("Arguments parsed\n");
   char *ptr = (char*)PyLong_AsVoidPtr(location);
   CkPrintf("Pointer: %p",ptr);
@@ -144,6 +184,41 @@ void CpdPythonGroup::getStatic(int handle) {
     break;
   }
   pythonReturn(handle, result);
+}
+
+void CpdPythonGroup::cpdCheck(void *m) {
+  CkCcsRequestMsg *msg = (CkCcsRequestMsg *)m;
+  //CkPrintf("[%d] CpdPythonGroup::cpdCheck reached\n",CkMyPe());
+  PythonExecute *pyMsg = (PythonExecute *)msg->data;
+  CmiUInt4 pyReference = prepareInterpreter(pyMsg);
+  if (pyReference == 0) {
+    CkPrintf("[%d] CpdPythonGroup::cpdCheck error while preparing interpreter\n",CkMyPe());
+  }
+  pyWorkers[pyReference].inUse = true;
+  CmiReference(UsrToEnv(msg));
+  CthResume(CthCreate((CthVoidFn)_callthr_executeThread, new CkThrCallArg(msg,(PythonObject*)this), 0));
+}
+
+void CpdPythonGroup::registerPersistent(CkCcsRequestMsg *msg) {
+  PythonAbstract *pyAbstract = (PythonAbstract *)msg->data;
+  pyAbstract->unpack();
+  if (! pyAbstract->isExecute()) return;
+  PythonExecute *pyMsg = (PythonExecute *)pyAbstract;
+  pyMsg->unpack();
+  CmiUInt4 pyReference = prepareInterpreter(pyMsg);
+  PyEval_ReleaseLock();
+  CcsSendDelayedReply(msg->reply, sizeof(pyReference), &pyReference);
+  if (pyReference == 0) return;
+  pyMsg->setInterpreter(pyReference);
+  PythonIterator *iter = pyMsg->info.info;
+  int n = ntohl(((int*)iter)[1]);
+  DebugPersistentCheck dpc(this, msg);
+  for (int i=0; i<n; ++i) {
+    CkPrintf("registering method for EP %d\n",ntohl(((int*)iter)[i+2]));
+    _debugEntryTable[ntohl(((int*)iter)[i+2])].postProcess.push_back(dpc);
+  }
+  CkPrintf("[%d] Registering Persistent method (reference=%d)\n",CkMyPe(),pyReference);
+  
 }
 
 #include "charmdebug_python.def.h"
