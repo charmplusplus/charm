@@ -710,7 +710,7 @@ void CpdCharmInit()
 void CpdFinishInitialization() {
 }
 
-void CpdBeforeEp(int ep) {
+void CpdBeforeEp(int ep, void *obj) {
 }
 
 void CpdAfterEp(int ep) {
