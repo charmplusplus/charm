@@ -280,18 +280,18 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     }
     MPI_Bcast_pup(*requestTable,0,MPI_COMM_WORLD);
     requestTable->enroll(numChunks);
-    requestTable->sync();
+    MSA1DREQLIST::Accum &requestTableAcc = requestTable->getInitialAccum();
 
     makeAdjacencyRequests(
             numNodes,
             node,
             faceTable,
-            requestTable,
+            requestTableAcc,
             faceSize,
             myRank,
             elemType);
 
-    requestTable->sync();
+    MSA1DREQLIST::Read &reqTableRead = requestTable->syncToRead(requestTableAcc);
     //printf("[%d] All face requests made \n",myRank);
 
     MSA1DREPLYLIST *replyTable;
@@ -302,11 +302,11 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     }
     MPI_Bcast_pup(*replyTable,0,MPI_COMM_WORLD);
     replyTable->enroll(numChunks);
-    replyTable->sync();
+    MSA1DREPLYLIST::Accum &replyAcc = replyTable->getInitialAccum();
 
     replyAdjacencyRequests(
-            requestTable,
-            replyTable,
+            reqTableRead.get(myRank).vec,
+            replyAcc,
             node,
             faceTable,
             adaptFaceAdjacencies,
@@ -317,8 +317,8 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
             elemType,
             false);
 
-    requestTable->sync();
-    replyTable->sync();
+    requestTable->syncToRead(reqTableRead);
+    replyTable->syncToRead(replyAcc);
 
 //    // Once the replies are back, loop through each reply and update the
 //    // adjacencies for each element in the reply
@@ -339,42 +339,43 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     delete replyTable;
 
     if (adaptEdgeAdjacencies != NULL) {
+	    MSA1DREQLIST *edgeRequestTable;
+	    MSA1DREPLYLIST *edgeReplyTable;
 
         // do the same thing for the edges
         if (myRank == 0) {
-            requestTable = new MSA1DREQLIST(numChunks,numChunks);
+            edgeRequestTable = new MSA1DREQLIST(numChunks,numChunks);
         } else {
-            requestTable = new MSA1DREQLIST;
+            edgeRequestTable = new MSA1DREQLIST;
         }
-        MPI_Bcast_pup(*requestTable,0,MPI_COMM_WORLD);
-        requestTable->enroll(numChunks);
-        requestTable->sync();
+        MPI_Bcast_pup(*edgeRequestTable,0,MPI_COMM_WORLD);
+        edgeRequestTable->enroll(numChunks);
+	MSA1DREQLIST::Accum &edgeRequestTableAcc = requestTable->getInitialAccum();
 
         makeAdjacencyRequests(
                 numNodes,
                 node,
                 edgeTable,
-                requestTable,
+                edgeRequestTableAcc,
                 2,
                 myRank,
                 elemType);
 
-        requestTable->sync();
+	MSA1DREQLIST::Read &edgeReqRead = edgeRequestTable->syncToRead(edgeRequestTableAcc);
         //printf("[%d] All edge requests made \n",myRank);
 
-        MSA1DREPLYLIST *replyTable;
         if (myRank == 0) {
-            replyTable = new MSA1DREPLYLIST(numChunks,numChunks);
+            edgeReplyTable = new MSA1DREPLYLIST(numChunks,numChunks);
         } else {
-            replyTable = new MSA1DREPLYLIST;
+            edgeReplyTable = new MSA1DREPLYLIST;
         }
-        MPI_Bcast_pup(*replyTable,0,MPI_COMM_WORLD);
-        replyTable->enroll(numChunks);
-        replyTable->sync();
+        MPI_Bcast_pup(*edgeReplyTable,0,MPI_COMM_WORLD);
+        edgeReplyTable->enroll(numChunks);
+	MSA1DREPLYLIST::Accum &edgeReplyAcc = edgeReplyTable->getInitialAccum();
 
         replyAdjacencyRequests(
-                requestTable,
-                replyTable,
+                edgeReqRead.get(myRank).vec,
+                edgeReplyAcc,
                 node,
                 edgeTable,
                 adaptFaceAdjacencies,
@@ -385,12 +386,12 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
                 elemType,
                 true);
 
-        requestTable->sync();
-        replyTable->sync();
+        edgeRequestTable->syncToRead(edgeReqRead);
+        edgeReplyTable->syncToRead(edgeReplyAcc);
 
 //        // Once the replies are back, loop through each reply and update the
 //        // adjacencies for each element in the reply
-//        CkVec<adjReply> *receivedReplyVec = replyTable->get(myRank).vec;
+//        CkVec<adjReply> *receivedReplyVec = edgeReplyTable->get(myRank).vec;
 //        for(int i=0;i< receivedReplyVec->size();i++){
 //            adjReply *receivedReply = &(*receivedReplyVec)[i];
 //            printf("[%d] Replies received for (%d,%d) (%d,%d,%d)\n",
@@ -403,10 +404,10 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
 //                receivedReply->requestingNodeSetID]->push_back(
 //                        receivedReply->replyingElem);
 //        }
-        replyTable->sync();
+//        edgeReplyTable->sync();
 
-        delete requestTable;
-        delete replyTable;
+        delete edgeRequestTable;
+        delete edgeReplyTable;
     }
 
     for (int i=0; i<numNodes; ++i) {
@@ -575,7 +576,7 @@ void makeAdjacencyRequests(
         const int numNodes,
         FEM_Node *node,
         adjNode *adaptAdjTable,
-        MSA1DREQLIST *requestTable, 
+        MSA1DREQLIST::Accum &requestTable, 
         const int nodeSetSize,
         const int myRank,
         const int elemType)
@@ -682,14 +683,15 @@ void makeAdjacencyRequests(
                                 chunkIterator != commonSharedChunks.end();
                                 chunkIterator++){
                             int chunk = *chunkIterator;
-//                            printf("[%d] Sending to chunk %d request (%d,%d,%d,%d) \n",
-//                            		myRank,
-//                            		chunk,
-//                            		adjRequestList[countChunk].elemID,
-//                            		adjRequestList[countChunk].chunkID,
-//                            		adjRequestList[countChunk].elemType,
-//                            		adjRequestList[countChunk].nodeSetID);
-                            (*requestTable).accumulate(
+#if 0
+                            printf("[%d] Sending to chunk %d request (%d,%d,%d,%d) \n",
+				   myRank, chunk,
+				   adjRequestList[countChunk].elemID,
+				   adjRequestList[countChunk].chunkID,
+				   adjRequestList[countChunk].elemType,
+				   adjRequestList[countChunk].nodeSetID);
+#endif
+                            requestTable.accumulate(
                                     chunk,adjRequestList[countChunk]);
                             countChunk++;
                         }
@@ -704,8 +706,8 @@ void makeAdjacencyRequests(
 
 
 void replyAdjacencyRequests(
-        MSA1DREQLIST* requestTable,
-        MSA1DREPLYLIST* replyTable,
+	CkVec<adjRequest> *receivedRequestVec,
+        MSA1DREPLYLIST::Accum &replyTable,
         FEM_Node* node,
         adjNode* adaptAdjTable,
         adaptAdj* adaptFaceAdjacencies,
@@ -727,7 +729,6 @@ void replyAdjacencyRequests(
 
     //Look at each request that in the requestTable for this chunk
     //Put the data for the requests in our own table and then create replies
-    CkVec<adjRequest> *receivedRequestVec = requestTable->get(myRank).vec;
     for (int i=0;i<receivedRequestVec->length();i++) {    
         adjRequest &receivedRequest = (*receivedRequestVec)[i];
         const IDXL_List &sharedNodeList = 
@@ -814,7 +815,7 @@ void replyAdjacencyRequests(
             reply.replyingElem.localID = matchingElemID;
             reply.replyingElem.elemType = elemType;
             //Write into the replyTable
-            replyTable->accumulate(receivedRequest.chunkID,reply);
+            replyTable.accumulate(receivedRequest.chunkID,reply);
         } else {
             //we have no matching nodeset for this request.. hopefully some
             //other chunk does; we can ignore this request

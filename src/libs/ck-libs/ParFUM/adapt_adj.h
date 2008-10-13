@@ -436,13 +436,13 @@ void makeAdjacencyRequests(
         const int numNodes, 
         FEM_Node* node, 
         adjNode* adaptAdjTable,
-        MSA1DREQLIST* requestTable, 
+        MSA1DREQLIST::Accum &requestTable, 
         const int nodeSetSize, 
         const int myRank,
         int elemType);
 void replyAdjacencyRequests(
-        MSA1DREQLIST* requestTable, 
-        MSA1DREPLYLIST* replyTable,
+        CkVec<adjRequest> *requests, 
+        MSA1DREPLYLIST::Accum &replyTable,
         FEM_Node* node, 
         adjNode* adaptAdjTable, 
         adaptAdj* adaptFaceAdjacencies, 

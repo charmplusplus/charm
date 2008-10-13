@@ -74,21 +74,23 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
 
   eptrMSA.enroll(numChunks);
   eindMSA.enroll(numChunks);
+  MSA1DINT::Write &wPtr = eptrMSA.getInitialWrite();
+  MSA1DINT::Write &wInd = eindMSA.getInitialWrite();
   int indcount=0,ptrcount=0;
   for(int t=0;t<m->elem.size();t++){
     if(m->elem.has(t)){
       FEM_Elem &k=m->elem[t];
       for(int e=0;e<k.size();e++){
-				eptrMSA.set(ptrcount)=indcount;
+				wPtr.set(ptrcount)=indcount;
 				ptrcount++;
 				for(int n=0;n<k.getNodesPer();n++){
-				  eindMSA.set(indcount)=k.getConn(e,n);
+				  wInd.set(indcount)=k.getConn(e,n);
 				  indcount++;
 				}
       }
     }
   }
-  eptrMSA.set(ptrcount) = indcount;
+  wPtr.set(ptrcount) = indcount;
   printf("master -> ptrcount %d indcount %d sizeof(MSA1DINT) %d sizeof(MSA1DINTLIST) %d memory %d\n",ptrcount,indcount,sizeof(MSA1DINT),sizeof(MSA1DINTLIST),CmiMemoryUsage());
   /*
     break up the mesh such that each chunk gets the same number of elements
@@ -124,10 +126,12 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   MSA1DINTLIST nodepart(totalNodes,numChunks);
   MPI_Bcast_pup(nodepart,masterRank,(MPI_Comm)comm_context);
   nodepart.enroll(numChunks);
+  MSA1DINTLIST::Accum &nodepartAcc = nodepart.getInitialAccum();
 	
-  FEM_write_nodepart(nodepart,partdata,(MPI_Comm)comm_context);
-	printf("Creating mapping of node to partition took %.6lf\n",CkWallTimer()-dataArrangeStartTime);
-	dataArrangeStartTime = CkWallTimer();
+  FEM_write_nodepart(nodepartAcc,partdata,(MPI_Comm)comm_context);
+  printf("Creating mapping of node to partition took %.6lf\n",CkWallTimer()-dataArrangeStartTime);
+  dataArrangeStartTime = CkWallTimer();
+  MSA1DINTLIST::Read &nodepartRead = nodepart.syncToRead(nodepartAcc);
 	
   /*
     Set up a msa to store the nodes that belong to a partition
@@ -135,15 +139,17 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   MSA1DNODELIST part2node(numChunks,numChunks);
   MPI_Bcast_pup(part2node,masterRank,(MPI_Comm)comm_context);
   part2node.enroll(numChunks);
+  MSA1DNODELIST::Accum &part2nodeAcc = part2node.getInitialAccum();
 
-  FEM_write_part2node(nodepart,part2node,partdata,(MPI_Comm)comm_context);
+  FEM_write_part2node(nodepartRead, part2nodeAcc, partdata, (MPI_Comm)comm_context);
 
 	
   /*
     Get the list of elements and nodes that belong to this partition
   */
-  NodeList lnodes = part2node.get(masterRank);
-	lnodes.uniquify();
+  MSA1DNODELIST::Read &rPart2node = part2node.syncToRead(part2nodeAcc);
+  NodeList lnodes = rPart2node.get(masterRank);
+  lnodes.uniquify();
 //  IntList lelems = part2elem.get(masterRank);
 	
 
@@ -157,11 +163,14 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   MSA1DFEMMESH part2mesh(numChunks,numChunks);
   MPI_Bcast_pup(part2mesh,masterRank,(MPI_Comm)comm_context);
   part2mesh.enroll(numChunks);
-  FEM_write_part2mesh(part2mesh,partdata, &data,nodepart,numChunks,masterRank,&mypiece);
+  MSA1DFEMMESH::Accum &aPart2mesh = part2mesh.getInitialAccum();
+
+  FEM_write_part2mesh(aPart2mesh,partdata, &data,nodepartRead,numChunks,masterRank,&mypiece);
   /*
     Get your mesh consisting of elements and nodes out of the mesh MSA
   */
-  MeshElem me = part2mesh.get(masterRank);
+  MSA1DFEMMESH::Read &rPart2mesh = part2mesh.syncToRead(aPart2mesh);
+  MeshElem me = rPart2mesh.get(masterRank);
   //printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",masterRank,me.m->nElems(),me.m->node.size());
 	
   DEBUG(printf("[%d] Memory usage on vp 0 close to max %d \n",CkMyPe(),CmiMemoryUsage()));
@@ -228,7 +237,7 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   /*Receive the name of the msa arrays that contain the
     connectivity information*/
   struct conndata data;
-  MPI_Bcast_pup(data,masterRank,(MPI_Comm)comm_context);		
+  MPI_Bcast_pup(data,masterRank,(MPI_Comm)comm_context);
   data.arr1.enroll(numChunks);
   data.arr2.enroll(numChunks);
   DEBUG(printf("Recv -> %d \n",data.nelem));
@@ -252,8 +261,9 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   MSA1DINTLIST nodepart;
   MPI_Bcast_pup(nodepart,masterRank,(MPI_Comm)comm_context);
   nodepart.enroll(numChunks);
+  MSA1DINTLIST::Accum &nodepartAcc = nodepart.getInitialAccum();
 	
-  FEM_write_nodepart(nodepart,partdata,(MPI_Comm)comm_context);
+  FEM_write_nodepart(nodepartAcc,partdata,(MPI_Comm)comm_context);
 	
   /*
     write to the msa that stores the nodes that belong to each partition
@@ -262,14 +272,18 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   MSA1DNODELIST part2node;
   MPI_Bcast_pup(part2node,masterRank,(MPI_Comm)comm_context);
   part2node.enroll(numChunks);
-		
-  FEM_write_part2node(nodepart,part2node,partdata,(MPI_Comm)comm_context);
+  MSA1DNODELIST::Accum &part2nodeAcc = part2node.getInitialAccum();
+  MSA1DINTLIST::Read &nodepartRead = nodepart.syncToRead(nodepartAcc);
+
+
+  FEM_write_part2node(nodepartRead, part2nodeAcc, partdata, (MPI_Comm)comm_context);
 
   /*
     Get the list of elements and nodes that belong to this partition
   */
-  NodeList lnodes = part2node.get(myRank);
-	lnodes.uniquify();
+  MSA1DNODELIST::Read &part2nodeRead = part2node.syncToRead(part2nodeAcc);
+  NodeList lnodes = part2nodeRead.get(myRank);
+  lnodes.uniquify();
 //  IntList lelems = part2elem.get(myRank);
 
   /*
@@ -278,12 +292,14 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   MSA1DFEMMESH part2mesh;
   MPI_Bcast_pup(part2mesh,masterRank,(MPI_Comm)comm_context);
   part2mesh.enroll(numChunks);
-  FEM_write_part2mesh(part2mesh,partdata,&data,nodepart,numChunks,myRank,&mypiece);
+  MSA1DFEMMESH::Accum &aPart2mesh = part2mesh.getInitialAccum();
+  FEM_write_part2mesh(aPart2mesh, partdata, &data, nodepartRead,numChunks, myRank, &mypiece);
 	
   /*
     Get your mesh consisting of elements and nodes out of the mesh MSA
   */
-  MeshElem me = part2mesh.get(myRank);
+  MSA1DFEMMESH::Read &rPart2mesh = part2mesh.syncToRead(aPart2mesh);
+  MeshElem me = rPart2mesh.get(myRank);
   //printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",myRank,me.m->nElems(),me.m->node.size());
 	
 	//Free up the eptr and eind MSA arrays stored in data
@@ -415,8 +431,7 @@ struct partconndata * FEM_call_parmetis(struct conndata &data,FEM_Comm_t comm_co
   Write the partition number of the nodes to the msa array nodepart
   A node might belong to more than one partition
 */
-void FEM_write_nodepart(MSA1DINTLIST	&nodepart,struct partconndata *data,MPI_Comm comm_context){
-  nodepart.sync();
+void FEM_write_nodepart(MSA1DINTLIST::Accum &nodepart,struct partconndata *data,MPI_Comm comm_context){
   for(int i=0;i<data->nelem;i++){
     int start=data->eptr[i];
     int end = data->eptr[i+1];
@@ -425,15 +440,17 @@ void FEM_write_nodepart(MSA1DINTLIST	&nodepart,struct partconndata *data,MPI_Com
      	DEBUG(printf(" write_nodepart %d %d \n",data->eind[j],data->part[i]));
     }
   }
-  nodepart.sync();
-  
 }
 
 /*
   Read the msa array written in FEM_write_nodepart and for each node
   write it to the msa array containing the nodes for each partition
 */
-void FEM_write_part2node(MSA1DINTLIST	&nodepart,MSA1DNODELIST &part2node,struct partconndata *data,MPI_Comm comm_context){
+void FEM_write_part2node(MSA1DINTLIST::Read &nodepart,
+			 MSA1DNODELIST::Accum &part2node,
+			 struct partconndata *data,
+			 MPI_Comm comm_context)
+{
   int nodes = nodepart.length();
   int myRank,numChunks;
   /*
@@ -444,7 +461,6 @@ void FEM_write_part2node(MSA1DINTLIST	&nodepart,MSA1DNODELIST &part2node,struct 
   MPI_Comm_size(comm_context,&numChunks);
   int start = (nodes*myRank)/numChunks;
   int end = (nodes*(myRank+1))/numChunks;
-  part2node.sync();
   for(int i=start;i<end;i++){
     IntList t = nodepart.get(i);
 		t.uniquify();
@@ -464,20 +480,19 @@ void FEM_write_part2node(MSA1DINTLIST	&nodepart,MSA1DNODELIST &part2node,struct 
       part2node.accumulate((*t.vec)[j],en);
     }
   }
-  part2node.sync();
   DEBUG(printf("done write_part2node\n"));
 }
 
 /*
   Read the element partition data and write it to the msa
 */
-void FEM_write_part2elem(MSA1DINTLIST &part2elem,struct partconndata *data,MPI_Comm comm_context){
-  part2elem.sync();
+void FEM_write_part2elem(MSA1DINTLIST::Accum &part2elem,struct partconndata *data,MPI_Comm comm_context)
+{
   for(int i=0;i<data->nelem;i++){
     part2elem.accumulate(data->part[i],data->startindex+i);
   }
-  part2elem.sync();
 }
+
 /*
   Break the mesh up into numChunks pieces randomly.
   Pass  nEl/numChunks elements to each 
@@ -534,8 +549,15 @@ void sendBrokenMeshes(FEM_Mesh *mesh_array,FEM_Comm_t comm_context){
     MPI_Send_pup(mesh_array[i],i,MESH_CHUNK_TAG,(MPI_Comm)comm_context);
   }
 }
-void	FEM_write_part2mesh(MSA1DFEMMESH &part2mesh,struct partconndata *partdata,struct conndata *data,MSA1DINTLIST &nodepart,int numChunks,int myChunk,FEM_Mesh *m){
-  part2mesh.sync();
+
+void FEM_write_part2mesh(MSA1DFEMMESH::Accum &part2mesh,
+			 struct partconndata *partdata,
+			 struct conndata *data,
+			 MSA1DINTLIST::Read &nodepart,
+			 int numChunks,
+			 int myChunk,
+			 FEM_Mesh *m)
+{
   int count=0;
   /// reading my part of the broken mesh and  sending the element data to the mesh 
   /// that actually should have it according to parmetis
@@ -551,7 +573,6 @@ void	FEM_write_part2mesh(MSA1DFEMMESH &part2mesh,struct partconndata *partdata,s
       }
     }
   }
-  nodepart.sync();
   /// send out the nodes that I have the data for to the meshes that have them
   int startnode=(myChunk * data->nnode)/numChunks;
   for(int i=0;i<m->node.size();i++){
@@ -563,8 +584,8 @@ void	FEM_write_part2mesh(MSA1DFEMMESH &part2mesh,struct partconndata *partdata,s
       (myme.m->node).push_back(m->node,i);
     }
   }
-  part2mesh.sync();
 }
+
 /*
   horrible bubble sort, replace by quicksort : done
 */
@@ -690,7 +711,8 @@ struct ghostdata *gatherGhosts(){
 double listSearchTime=0;
 double sharedSearchTime=0;
 
-void makeGhosts(FEM_Mesh *m,MPI_Comm comm,int masterRank,int numLayers,FEM_Ghost_Layer **layers){
+void makeGhosts(FEM_Mesh *m, MPI_Comm comm, int masterRank, int numLayers, FEM_Ghost_Layer **layers)
+{
   int myChunk;
   int numChunks;
   MPI_Comm_rank((MPI_Comm)comm,&myChunk);
@@ -796,7 +818,14 @@ bool listContains(FEM_Comm_List &list,int entry){
   return false;
 };
 
-void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghost_Layer *layer,	CkHashtableT<CkHashtableAdaptorT<int>,char> &sharedNode,CkHashtableT<CkHashtableAdaptorT<int>,int> &global2local){
+void makeGhost(FEM_Mesh *m, 
+	       MPI_Comm comm,
+	       int masterRank,
+	       int totalShared,
+	       FEM_Ghost_Layer *layer,
+	       CkHashtableT<CkHashtableAdaptorT<int>,char> &sharedNode,
+	       CkHashtableT<CkHashtableAdaptorT<int>,int> &global2local)
+{
   int myChunk;
   int numChunks;
   MPI_Comm_rank((MPI_Comm)comm,&myChunk);
@@ -808,18 +837,18 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
   */
   MsaHashtable *distTab;
   if(myChunk == masterRank){
-    distTab = new MsaHashtable(totalShared,numChunks);	
+    distTab = new MsaHashtable(totalShared, numChunks);	
   }else{
     distTab = new MsaHashtable;
   }
   MPI_Bcast_pup(*distTab,masterRank,comm);
-  distTab->table.enroll(numChunks);
+  distTab->enroll(numChunks);
   DEBUG(printf("[%d] distributed table calling sync \n",myChunk));
 
 
   //	distTab->table.sync((numChunks == 1));
-  distTab->table.sync();
-	
+  MsaHashtable::Add &aDistTab = distTab->getInitialAdd();
+
   DEBUG(printf("Chunk %d Mesh: *********************************** \n",myChunk));
   //DEBUG(m->print(0));
   DEBUG(printf("**********************************\n"));
@@ -872,7 +901,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 	    }
 	    // if the tuple is a possible ghost add it to the distributed hashtable
 	    if(possibleGhost){
-	      int index=distTab->addTuple(globalNodeTuple,nodesPerTuple,myChunk,m->nElems(i)+e);
+	      int index = aDistTab.addTuple(globalNodeTuple,nodesPerTuple,myChunk,m->nElems(i)+e);
 	      tupleVec.push_back(Hashnode::tupledata(globalNodeTuple));
 	      indexVec.push_back(index);
 	      elementVec.push_back(i);
@@ -915,22 +944,20 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 	      }
 	    }
 	    //all the tuples of a ghost element are possible generators of ghosts
-	    distTab->addTuple(globalNodeTuple,nodesPerTuple,myChunk,ghostcount);
+	    aDistTab.addTuple(globalNodeTuple,nodesPerTuple,myChunk,ghostcount);
 	  }
 	}
       }
     }
   }
-  distTab->table.sync();
+  MsaHashtable::Read &rDistTab = distTab->syncToRead(aDistTab);
 
 
   //debug - print the whole table
   /*	printf("Ghosts chunk %d \n",myChunk);*/
   if(myChunk == masterRank){
-    DEBUG(distTab->print());
+    DEBUG(rDistTab.print());
   }
-
-  distTab->sync();
 
   DEBUG(printf("[%d] id %d says Ghost distributed hashtable printed \n",CkMyPe(),myChunk));
   /* create a new FEM_Mesh msa to transfer the ghost elements from the original mesh to target meshes */
@@ -944,7 +971,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
   ghostmeshes->enroll(numChunks);
   DEBUG(printf("[%d] id %d says ghostmeshes enroll done \n",CkMyPe(),myChunk));
 
-  ghostmeshes->sync();
+  MSA1DFEMMESH::Accum &aGhostMeshes = ghostmeshes->getInitialAccum();
 
   DEBUG(printf("[%d] id %d says ghostmeshes sync done \n",CkMyPe(),myChunk));
   /*
@@ -955,7 +982,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
   */
   char str[100];
   for(int i=0;i<tupleVec.size();i++){
-    const Hashtuple &listTuple = distTab->get(indexVec[i]);
+    const Hashtuple &listTuple = rDistTab.get(indexVec[i]);
     //		printf("[%d] Elements for index %d tuple< %s> number %d \n",myChunk,indexVec[i],tupleVec[i].toString(layer->nodesPerTuple,str),listTuple.vec->size());
     int elType = elementVec[2*i];
     int elNo = elementVec[2*i+1];
@@ -987,7 +1014,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 
 					
 	  //add an element to the ghost mesh for this chunk
-	  MeshElem &myme = ghostmeshes->accumulate(destChunk);
+	  MeshElem &myme = aGhostMeshes.accumulate(destChunk);
 	  myme.m->elem[elType].copyShape(m->elem[elType]);
 	  int index=myme.m->elem[elType].push_back(m->elem[elType],elNo);
 	  int globalelem = m->elem[elType].getGlobalno(elNo);
@@ -1044,7 +1071,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
 
   DEBUG(printf("[%d] finished creating ghost mesh \n",myChunk));
 
-  ghostmeshes->sync();
+  MSA1DFEMMESH::Read& rGhostMeshes = ghostmeshes->syncToRead(aGhostMeshes);
 
   /*
     Go through the ghost nodes and check for nodes that dont exist in the hashtable
@@ -1053,7 +1080,7 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
     ghost nodes.
   */	
 
-  FEM_Mesh *gmesh = ghostmeshes->get(myChunk).m;
+  FEM_Mesh *gmesh = rGhostMeshes.get(myChunk).m;
   DEBUG(printf("[%d] my ghost mesh is at %p \n",myChunk,gmesh));
 	
   FEM_Node *gnodes = (FEM_Node *)m->node.getGhost();
@@ -1132,8 +1159,9 @@ void makeGhost(FEM_Mesh *m,MPI_Comm comm,int masterRank,int totalShared,FEM_Ghos
   DEBUG(printf("[%d] Recv ghost nodes \n",myChunk));
   DEBUG(m->node.getGhostRecv().print());
 
-	
-  delete distTab;	
+  delete &rDistTab;
+  delete &rGhostMeshes;
+  delete distTab;
   delete ghostmeshes;
   MPI_Barrier(comm);
 }
@@ -1160,3 +1188,4 @@ bool sharedWith(int lnode,int chunk,FEM_Mesh *m){
 }
 #include "ParFUM.def.h"
 /*@}*/
+
