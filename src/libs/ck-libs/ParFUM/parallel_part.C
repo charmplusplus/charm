@@ -14,6 +14,7 @@
 
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
+#include "MsaHashtable.h"
 
 #include "../parmetis/parmetis.h"
 
@@ -111,9 +112,11 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   /*
     call parmetis
   */
-	double  parStartTime = CkWallTimer();
-	printf("starting FEM_call_parmetis \n");
-  struct partconndata *partdata = FEM_call_parmetis(data,comm_context);
+  double  parStartTime = CkWallTimer();
+  MSA1DINT::Read &rPtr = eptrMSA.syncToRead(wPtr);
+  MSA1DINT::Read &rInd = eindMSA.syncToRead(wInd);
+  printf("starting FEM_call_parmetis \n");
+  struct partconndata *partdata = FEM_call_parmetis(data.nelem, rPtr, rInd, comm_context);
 
   printf("done with parmetis %d FEM_Mesh %d in %.6lf \n",CmiMemoryUsage(),sizeof(FEM_Mesh),CkWallTimer()-parStartTime);
 	
@@ -175,9 +178,11 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
 	
   DEBUG(printf("[%d] Memory usage on vp 0 close to max %d \n",CkMyPe(),CmiMemoryUsage()));
 	//Free up the eptr and eind MSA arrays stored in data
-	data.arr1.FreeMem();
-	data.arr2.FreeMem();
-	nodepart.FreeMem();
+  delete &rPtr;
+  delete &rInd;
+  data.arr1.FreeMem();
+  data.arr2.FreeMem();
+  nodepart.FreeMem();
   DEBUG(printf("[%d] Memory usage on vp 0 after FreeMem %d \n",CkMyPe(),CmiMemoryUsage()));
 	
   addIDXLists(me.m,lnodes,masterRank);
@@ -246,14 +251,15 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
     These will be used later to give each partitioned mesh
     its elements and data.
   */
-	
   FEM_Mesh mypiece;
   MPI_Recv_pup(mypiece,masterRank,MESH_CHUNK_TAG,(MPI_Comm)comm_context);
 	
   /*
     call parmetis and get the resuts back from it
   */
-  struct partconndata *partdata = FEM_call_parmetis(data,comm_context);
+  MSA1DINT::Read &rPtr = data.arr1.syncToRead(data.arr1.getInitialWrite());
+  MSA1DINT::Read &rInd = data.arr2.syncToRead(data.arr1.getInitialWrite());
+  struct partconndata *partdata = FEM_call_parmetis(data.nelem, rPtr, rInd, comm_context);
 	
   /*
     write to the msa that contains the partitions to which a node belongs
@@ -303,6 +309,8 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   //printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",myRank,me.m->nElems(),me.m->node.size());
 	
 	//Free up the eptr and eind MSA arrays stored in data
+  delete &rPtr;
+  delete &rInd;
 	data.arr1.FreeMem();
 	data.arr2.FreeMem();
 	nodepart.FreeMem();
@@ -342,12 +350,12 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   parmetis. It returns the partition and the connectivity of
   the elements for which this processor is responsible.
 */
-struct partconndata * FEM_call_parmetis(struct conndata &data,FEM_Comm_t comm_context){
+struct partconndata * FEM_call_parmetis(int nelem, MSA1DINT::Read &rPtr, MSA1DINT::Read &rInd, FEM_Comm_t comm_context)
+{
   int myRank,numChunks;
   MPI_Comm_size((MPI_Comm)comm_context,&numChunks);
   MPI_Comm_rank((MPI_Comm)comm_context,&myRank);
 	
-  int nelem = data.nelem;
   /*
     Setup the elmdist array. All processors
     get equal number of elements. This is not
@@ -363,26 +371,24 @@ struct partconndata * FEM_call_parmetis(struct conndata &data,FEM_Comm_t comm_co
   }
   DEBUG(printf("\n"));
   int startindex = elmdist[myRank];
-  int endindex = elmdist[myRank+1];	
-  data.arr1.sync();
-  data.arr2.sync();
+  int endindex = elmdist[myRank+1];
   int numindices = endindex - startindex;
   int *eptr = new int[numindices+1];
   /*
     Read the msa arrays to extract the data
     Store it in the eptr and eind arrays
   */
-  int startConn = data.arr1.get(startindex);
-  int endConn = data.arr1.get(endindex);
+  int startConn = rPtr.get(startindex);
+  int endConn = rPtr.get(endindex);
   int numConn = endConn - startConn;
   int *eind = new int[numConn];
   DEBUG(printf("%d startindex %d endindex %d startConn %d endConn %d \n",myRank,startindex,endindex,startConn,endConn));
   for(int i=startindex;i<endindex;i++){
-    int conn1 = data.arr1.get(i);
-    int conn2 = data.arr1.get(i+1);
+    int conn1 = rPtr.get(i);
+    int conn2 = rPtr.get(i+1);
     eptr[i-startindex] = conn1 - startConn;
     for(int j=conn1;j<conn2;j++){
-      eind[j-startConn] = data.arr2.get(j);
+      eind[j-startConn] = rInd.get(j);
     }
   }
   eptr[numindices] = endConn - startConn;
@@ -399,8 +405,6 @@ struct partconndata * FEM_call_parmetis(struct conndata &data,FEM_Comm_t comm_co
     }
     printf("\n");
   */
-  data.arr1.sync();
-  data.arr2.sync();
   int wgtflag=0,numflag=0,ncon=1,ncommonnodes=2,options[5],edgecut=0;
   double ubvec = 1.05;
   double *tpwgts = new double[numChunks];
@@ -586,21 +590,9 @@ void FEM_write_part2mesh(MSA1DFEMMESH::Accum &part2mesh,
   }
 }
 
-/*
-  horrible bubble sort, replace by quicksort : done
-*/
 void sortNodeList(NodeList &lnodes){
   CkVec<NodeElem> *vec = lnodes.vec;
-/*  for(int i=0;i<vec->size();i++){
-    for(int j=i+1;j<vec->size();j++){
-      if((*vec)[i].global > (*vec)[j].global){
-	NodeElem t = (*vec)[i];
-	(*vec)[i] = (*vec)[j];
-	(*vec)[j] = t;
-      }
-    }
-  }*/
-	vec->quickSort();
+  vec->quickSort();
 }
 
 

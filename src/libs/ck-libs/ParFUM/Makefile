@@ -13,7 +13,7 @@ GENHEADERS= ParFUM.def.h ParFUM.decl.h ParFUM_Adapt.decl.h ParFUM_Adapt.def.h Pa
 
 HEADDEP= $(GENHEADERS) $(HEADERS) $(INTERNALHEADERS)
 
-OBJS=ParFUM.o mesh.o symmetries.o partition.o map.o compat.o call_init.o parallel_part.o mesh_modify.o mesh_adjacency.o adapt.o adapt_algs.o adapt_if.o interpolate.o lock.o util.o lock_node.o adapt_lock.o ParFUM_SA.o global_numbering.o import.o adapt_adj.o bulk_adapt_ops.o bulk_adapt.o mesh_feature_detect.o
+OBJS=ParFUM.o mesh.o symmetries.o partition.o map.o compat.o call_init.o parallel_part.o mesh_modify.o mesh_adjacency.o adapt.o adapt_algs.o adapt_if.o interpolate.o lock.o util.o lock_node.o adapt_lock.o ParFUM_SA.o global_numbering.o import.o adapt_adj.o bulk_adapt_ops.o bulk_adapt.o mesh_feature_detect.o MsaHashtable.o
 
 COMPAT=compat_init.o compat_finit.o compat_driver.o compat_fdriver.o 
 LIB=libmoduleParFUM
@@ -66,6 +66,9 @@ headers: $(HEADDEP)
 #	$(CHARMC) -c $<
 
 
+MsaHashtable.o: MsaHashtable.C ParFUM.h ParFUM_internals.h MsaHashtable.h
+	$(CHARMC) -c MsaHashtable.C $(INCS)
+
 mesh_modify.o: mesh_modify.C $(HEADDEP)
 	$(CHARMC) -c mesh_modify.C $(INCS)
 
@@ -93,7 +96,7 @@ compat.o: compat.C $(HEADDEP)
 call_init.o: call_init.c $(HEADDEP)
 	$(CHARMC) -c call_init.c $(INCS)
 
-parallel_part.o: parallel_part.C $(HEADDEP)
+parallel_part.o: parallel_part.C $(HEADDEP) MsaHashtable.h
 	$(CHARMC) -c parallel_part.C $(INCS)
 
 mesh_adjacency.o: mesh_adjacency.C $(HEADDEP)
@@ -156,7 +159,7 @@ bulk_adapt_ops.o: bulk_adapt_ops.C $(HEADDEP)
 bulk_adapt.o: bulk_adapt.C $(HEADDEP)
 	$(CHARMC) -c bulk_adapt.C $(INCS)
 
-docs: ParFUM.doxy ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUMf.h ParFUM.h ParFUM_internals.h ParFUM_Interpolate.h ParFUM_locking.h ParFUM_Mesh_Modify.h adapt_algs.C adapt.C adapt_if.C adapt_lock.C collide.C compat.C interpolate.C lock.C lock_node.C main.C map.C mesh_adjacency.C mesh.C mesh_modify.C parallel_part.C ParFUM.C partition.C symmetries.C util.C call_init.c compat_driver.c compat_fdriver.c compat_finit.c compat_init.c ParFUM_SA.C global_numbering.C import.C import.h
+docs: ParFUM.doxy ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUMf.h ParFUM.h ParFUM_internals.h ParFUM_Interpolate.h ParFUM_locking.h ParFUM_Mesh_Modify.h adapt_algs.C adapt.C adapt_if.C adapt_lock.C collide.C compat.C interpolate.C lock.C lock_node.C main.C map.C mesh_adjacency.C mesh.C mesh_modify.C MsaHashtable.C parallel_part.C ParFUM.C partition.C symmetries.C util.C call_init.c compat_driver.c compat_fdriver.c compat_finit.c compat_init.c ParFUM_SA.C global_numbering.C import.C import.h
 	doxygen ParFUM.doxy
 
 # clean up

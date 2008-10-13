@@ -2456,9 +2456,6 @@ typedef MSA1D<NodeList, DefaultListEntry<NodeList,true>,MSA_DEFAULT_ENTRIES_PER_
 
 typedef MSA1D<MeshElem,DefaultEntry<MeshElem,true>,1> MSA1DFEMMESH;
 
-typedef UniqElemList<Hashnode> Hashtuple;
-typedef MSA1D<Hashtuple,DefaultListEntry<Hashtuple,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DHASH;
-
 
 
 struct conndata{
@@ -2520,127 +2517,11 @@ struct ghostdata{
 };
 
 
-class MsaHashtable : private MSA1DHASH
-{
-public:
-	class Read; class Add;
-	Read& syncToRead(Add&);
-	Add&  syncToAdd(Read&);
-	Add& getInitialAdd();
-	using MSA1DHASH::pup;
-	using MSA1DHASH::enroll;
-
-	class Read : private MSA1DHASH::Read
-	{
-	public:
-		using MSA1DHASH::Read::get;
-		friend Read &MsaHashtable::syncToRead(Add&);
-		friend Add& MsaHashtable::syncToAdd(Read&);
-		void print();
-
-	private:
-	Read(MsaHashtable &m) : MSA1DHASH::Read(m) { }
-	};
-
-	class Add : private MSA1DHASH::Accum
-	{
-		using MSA1DHASH::Accum::accumulate;
-		friend Add& MsaHashtable::syncToAdd(Read&);
-		friend Read &MsaHashtable::syncToRead(Add&);
-		friend Add& MsaHashtable::getInitialAdd();
-	Add(MsaHashtable &m) : MSA1DHASH::Accum(m) { }
-	public:
-		int addTuple(int *tuple, int nodesPerTuple, int chunk, int elementNo);
-
-	};
-
-
-MsaHashtable(int _numSlots,int numWorkers)
-	: MSA1DHASH(_numSlots, numWorkers) { }
-	MsaHashtable(){};
-};
-
-MsaHashtable::Add& MsaHashtable::getInitialAdd()
-{
-	if(initHandleGiven)
-		throw MSA_InvalidHandle();
-	
-	Add *a = new Add(*this);
-	sync();
-	initHandleGiven = true;
-	return *a;
-}
-
-MsaHashtable::Add& MsaHashtable::syncToAdd(Read &r)
-{
-	r.checkInvalidate(this);
-	delete &r;
-	sync();
-	Add *a = new Add(*this);
-	return *a;
-}
-
-MsaHashtable::Read& MsaHashtable::syncToRead(Add &a)
-{
-	a.checkInvalidate(this);
-	delete &a;
-	sync();
-	Read *r = new Read(*this);
-	return *r;
-}
-
-void MsaHashtable::Read::print()
-{
-	unsigned nEntries = MSA1DHASH::Read::msa.length();
-	char str[100];
-	for(int i=0;i<nEntries;i++){
-		const Hashtuple &t = get(i);
-		for(int j=0;j<t.vec->size();j++){
-			Hashnode &tuple = (*t.vec)[j];
-			printf("ghost element chunk %d element %d index %d tuple < %s>\n", 
-			       tuple.chunk, tuple.elementNo, i, 
-			       tuple.nodes.toString(tuple.numnodes,str));
-		}
-	}
-}
-
-int MsaHashtable::Add::addTuple(int *tuple,int nodesPerTuple,int chunk,int elementNo)
-{
-	int slots = msa.length();
-
-	// sort the tuples to get a canonical form
-	// bubble sort should do just as well since the number
-	// of nodes is less than 10.
-	for(int i=0;i<nodesPerTuple-1;i++){
-		for(int j=i+1;j<nodesPerTuple;j++){
-			if(tuple[j] < tuple[i]){
-				int t = tuple[j];
-				tuple[j] = tuple[i];
-				tuple[i] = t;
-			}
-		}
-	}
-
-	//find out the index
-	long long sum = 0;
-	for(int i=0;i<nodesPerTuple;i++){
-		sum = sum*slots + tuple[i];
-	}
-	int index = (int )(sum %(long )slots);
-	Hashnode entry(nodesPerTuple,chunk,elementNo,tuple);
-
-	Hashtuple &list=accumulate(index);
-	list.vec->push_back(entry);
-	char str[100];
-	DEBUG(printf("[%d] adding tuple %s element %d to index %d \n",chunk,entry.nodes.toString(nodesPerTuple,str),elementNo,index));
-	return index;
-}
-
 
 
 int FEM_master_parallel_part(int ,int ,FEM_Comm_t);
 int FEM_slave_parallel_part(int ,int ,FEM_Comm_t);
-struct partconndata* FEM_call_parmetis(struct conndata &data,FEM_Comm_t comm_context);
+struct partconndata* FEM_call_parmetis(int nelem, MSA1DINT::Read &rPtr, MSA1DINT::Read &rInd, FEM_Comm_t comm_context);
 void FEM_write_nodepart(MSA1DINTLIST::Accum &nodepart, struct partconndata *data, MPI_Comm comm_context);
 void FEM_write_part2node(MSA1DINTLIST::Read &nodepart, MSA1DNODELIST::Accum &part2node, struct partconndata *data, MPI_Comm comm_context);
 void FEM_write_part2elem(MSA1DINTLIST::Accum &part2elem, struct partconndata *data, MPI_Comm comm_context);
