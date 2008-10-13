@@ -24,7 +24,7 @@ extern void CUDACallbackManager(void *);
  *  the runtime system if needed
  */ 
 #define NUM_BUFFERS 100
-#define GPU_DEBUG 0
+#define GPU_DEBUG 1
 
 
 /* work request queue */
@@ -64,7 +64,7 @@ void setupMemory(workRequest *wr) {
       
       if (bufferInfo[i].transferToDevice) {
 #ifdef GPU_DEBUG
-	printf("transferToDevice: %d bufId: %d\n", i, index); 
+	printf("transferToDevice bufId: %d\n", index); 
 #endif
 	cudaMemcpy(devBuffers[index], hostBuffers[index], size, 
 		   cudaMemcpyHostToDevice);
@@ -87,14 +87,14 @@ void cleanupMemory(workRequest *wr) {
       
       if (bufferInfo[i].transferFromDevice) {
 #ifdef GPU_DEBUG
-	printf("transferFromDevice: %d\n", i); 
+	printf("transferFromDevice: %d\n", index); 
 #endif
 	cudaMemcpy(hostBuffers[index], devBuffers[index], size, cudaMemcpyDeviceToHost);
       }
       
       if (bufferInfo[i].freeBuffer) {
 #ifdef GPU_DEBUG
-	printf("buffer %d freed\n", i);
+	printf("buffer %d freed\n", index);
 #endif 
 	cudaFree(devBuffers[index]); 
 	devBuffers[index] = NULL; 
