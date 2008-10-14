@@ -34,31 +34,26 @@ public:
     typedef MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CacheGroup_t;
     typedef CProxy_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_CacheGroup_t;
     typedef CProxy_MSA_PageArray<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_PageArray_t;
-    typedef MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> curMSA1D;
 
-    // Forward-declare so that things returning them can be friended
-    class Read; class Write; class Accum;
-
-	class MSA1D_Handle
+	class Handle
 	{
     public:
         inline unsigned int length() const { return msa.length(); }
 
 	protected:
-        curMSA1D &msa;
+        MSA1D &msa;
         bool valid;
 
-        friend Read  &curMSA1D::syncToRead (MSA1D_Handle &m, int single);
-        friend Write &curMSA1D::syncToWrite(MSA1D_Handle &m, int single);
-        friend Accum &curMSA1D::syncToAccum(MSA1D_Handle &m, int single);
-        void inline checkInvalidate(curMSA1D *m) 
+        friend class MSA1D;
+
+        void inline checkInvalidate(MSA1D *m) 
         {
             if (m != &msa || !valid)
                 throw MSA_InvalidHandle();
             valid = false;
         }
 
-        MSA1D_Handle(curMSA1D &msa_) 
+        Handle(MSA1D &msa_) 
             : msa(msa_), valid(true) 
         { }
         void checkValid()
@@ -69,66 +64,64 @@ public:
 
     private:
         // Disallow copy construction
-        MSA1D_Handle(MSA1D_Handle &m) {}
+        Handle(Handle &m) {}
     };
 
-    class Read : public MSA1D_Handle
+    class Read : public Handle
     {
     protected:
-        friend Read &curMSA1D::syncToRead(MSA1D_Handle &, int);
-        Read(curMSA1D &msa_)
-            :  MSA1D_Handle(msa_) { }
-        using MSA1D_Handle::checkValid;
-        using MSA1D_Handle::checkInvalidate;
+        friend class MSA1D;
+        Read(MSA1D &msa_)
+            :  Handle(msa_) { }
+        using Handle::checkValid;
+        using Handle::checkInvalidate;
 
     public:
         inline const ENTRY& get(unsigned int idx)
         {
             checkValid();
-            return MSA1D_Handle::msa.get(idx); 
+            return Handle::msa.get(idx); 
         }
         inline const ENTRY& operator[](unsigned int idx) { return get(idx); }
         inline const ENTRY& get2(unsigned int idx)
         {
             checkValid();
-            return MSA1D_Handle::msa.get2(idx);
+            return Handle::msa.get2(idx);
         }
     };
 
-    class Write : public MSA1D_Handle
+    class Write : public Handle
     {
     protected:
-        friend Write &curMSA1D::syncToWrite(MSA1D_Handle &, int);
-        friend Write &curMSA1D::getInitialWrite();
-        Write(curMSA1D &msa_)
-            : MSA1D_Handle(msa_) { }
+        friend class MSA1D;
+        Write(MSA1D &msa_)
+            : Handle(msa_) { }
 
     public:
         inline ENTRY& set(unsigned int idx)
         {
-            MSA1D_Handle::checkValid();
-            return MSA1D_Handle::msa.set(idx);
+            Handle::checkValid();
+            return Handle::msa.set(idx);
         }
     };
 
-    class Accum : public MSA1D_Handle
+    class Accum : public Handle
     {
     protected:
-        friend Accum &curMSA1D::syncToAccum(MSA1D_Handle &, int);
-        friend Accum &curMSA1D::getInitialAccum();
-        Accum(curMSA1D &msa_)
-            : MSA1D_Handle(msa_) { }
-        using MSA1D_Handle::checkInvalidate;
+        friend class MSA1D;
+        Accum(MSA1D &msa_)
+            : Handle(msa_) { }
+        using Handle::checkInvalidate;
     public:
         inline ENTRY& accumulate(unsigned int idx)
         { 
-            MSA1D_Handle::checkValid();
-            return MSA1D_Handle::msa.accumulate(idx);
+            Handle::checkValid();
+            return Handle::msa.accumulate(idx);
         }
         inline void accumulate(unsigned int idx, const ENTRY& ent)
         {
-            MSA1D_Handle::checkValid();
-            MSA1D_Handle::msa.accumulate(idx, ent);
+            Handle::checkValid();
+            Handle::msa.accumulate(idx, ent);
         }
     };
 
@@ -306,7 +299,7 @@ public:
 
     static const int DEFAULT_SYNC_SINGLE = 0;
 
-    inline Read &syncToRead(MSA1D_Handle &m, int single = DEFAULT_SYNC_SINGLE)
+    inline Read &syncToRead(Handle &m, int single = DEFAULT_SYNC_SINGLE)
     {
         m.checkInvalidate(this);
         delete &m;
@@ -314,7 +307,7 @@ public:
         return *(new Read(*this));
     }
 
-    inline Write &syncToWrite(MSA1D_Handle &m, int single = DEFAULT_SYNC_SINGLE)
+    inline Write &syncToWrite(Handle &m, int single = DEFAULT_SYNC_SINGLE)
     {
         m.checkInvalidate(this);
         delete &m;
@@ -322,7 +315,7 @@ public:
         return *(new Write(*this));
     }
 
-    inline Accum &syncToAccum(MSA1D_Handle &m, int single = DEFAULT_SYNC_SINGLE)
+    inline Accum &syncToAccum(Handle &m, int single = DEFAULT_SYNC_SINGLE)
     {
         m.checkInvalidate(this);
         delete &m;
@@ -426,7 +419,6 @@ class MSA2D : public MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>
 public:
     typedef CProxy_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_CacheGroup_t;
     typedef MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> super;
-    typedef MSA2D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE, ARRAY_LAYOUT> curMSA2D;
 
 protected:
     unsigned int rows, cols;
@@ -439,25 +431,22 @@ public:
        p|rows; p|cols;
     };
 
-    class Read; class Write; class Accum;
-
-	class MSA2D_Handle
+	class Handle
 	{
 	protected:
-        curMSA2D &msa;
+        MSA2D &msa;
         bool valid;
 
-        friend Read  &curMSA2D::syncToRead (MSA2D_Handle&, int);
-        friend Write &curMSA2D::syncToWrite(MSA2D_Handle&, int);
-        friend Accum &curMSA2D::syncToAccum(MSA2D_Handle&, int);
-        inline void checkInvalidate(curMSA2D *m)
+        friend class MSA2D;
+
+        inline void checkInvalidate(MSA2D *m)
         {
             if (&msa != m || !valid)
                 throw MSA_InvalidHandle();
             valid = false;
         }
 
-        MSA2D_Handle(curMSA2D &msa_) 
+        Handle(MSA2D &msa_) 
             : msa(msa_), valid(true) 
         { }
         inline void checkValid()
@@ -467,42 +456,41 @@ public:
         }
     private:
         // Disallow copy construction
-        MSA2D_Handle(MSA2D_Handle &m) {}
+        Handle(Handle &m) {}
     };
 
-    class Read : public MSA2D_Handle
+    class Read : public Handle
     {
     private:
-        friend Read &curMSA2D::syncToRead(MSA2D_Handle &, int);
-        Read(curMSA2D &msa_)
-            :  MSA2D_Handle(msa_) { }
+        friend class MSA2D;
+        Read(MSA2D &msa_)
+            :  Handle(msa_) { }
 
     public: 
         inline const ENTRY& get(unsigned int row, unsigned int col)
         {
-            MSA2D_Handle::checkValid();
-            return MSA2D_Handle::msa.get(row, col);
+            Handle::checkValid();
+            return Handle::msa.get(row, col);
         }
         inline const ENTRY& get2(unsigned int row, unsigned int col)
         {
-            MSA2D_Handle::checkValid();
-            return MSA2D_Handle::msa.get2(row, col);
+            Handle::checkValid();
+            return Handle::msa.get2(row, col);
         }
     };
 
-    class Write : public MSA2D_Handle
+    class Write : public Handle
     {
     private:
-        friend Write &curMSA2D::syncToWrite(MSA2D_Handle &, int);
-        friend Write &curMSA2D::getInitialWrite();
-       Write(curMSA2D &msa_)
-            :  MSA2D_Handle(msa_) { }
+        friend class MSA2D;
+        Write(MSA2D &msa_)
+            :  Handle(msa_) { }
 
     public: 
         inline ENTRY& set(unsigned int row, unsigned int col)
         {
-            MSA2D_Handle::checkValid();
-            return MSA2D_Handle::msa.set(row, col);
+            Handle::checkValid();
+            return Handle::msa.set(row, col);
         }
     };
 
@@ -578,7 +566,7 @@ public:
         MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::Unlock(index1, index2);
     }
 
-    inline Read& syncToRead(MSA2D_Handle &m, int single = super::DEFAULT_SYNC_SINGLE)
+    inline Read& syncToRead(Handle &m, int single = super::DEFAULT_SYNC_SINGLE)
     {
         m.checkInvalidate(this);
         delete &m;
@@ -586,7 +574,7 @@ public:
         return *(new Read(*this));
     }
 
-    inline Write& syncToWrite(MSA2D_Handle &m, int single = super::DEFAULT_SYNC_SINGLE)
+    inline Write& syncToWrite(Handle &m, int single = super::DEFAULT_SYNC_SINGLE)
     {
         m.checkInvalidate(this);
         delete &m;
