@@ -48,9 +48,9 @@ public:
         curMSA1D &msa;
         bool valid;
 
-        friend Read  &curMSA1D::syncToRead (MSA1D_Handle &m, int single = DEFAULT_SYNC_SINGLE);
-        friend Write &curMSA1D::syncToWrite(MSA1D_Handle &m, int single = DEFAULT_SYNC_SINGLE);
-        friend Accum &curMSA1D::syncToAccum(MSA1D_Handle &m, int single = DEFAULT_SYNC_SINGLE);
+        friend Read  &curMSA1D::syncToRead (MSA1D_Handle &m, int single);
+        friend Write &curMSA1D::syncToWrite(MSA1D_Handle &m, int single);
+        friend Accum &curMSA1D::syncToAccum(MSA1D_Handle &m, int single);
         void inline checkInvalidate(curMSA1D *m) 
         {
             if (m != &msa || !valid)
