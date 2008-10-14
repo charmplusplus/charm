@@ -1,0 +1,7 @@
+mainmodule log2proj {
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+  };
+
+};
