@@ -61,7 +61,7 @@ Main(CkArgMsg* m)
       LogEntry *beginLog = new LogEntry(bglog->startTime, 2);
       beginLog->event = bglog->msgId.msgID();
       beginLog->pe = bglog->msgId.node();
-      beginLog->eIdx = bglog->charm_ep==-1?0:bglog->charm_ep + 4; // jump dummies
+      beginLog->eIdx = bglog->charm_ep==-1?0:bglog->charm_ep + 6;   // IMPORTANT: there is chance when trace summary was linked, the EP is shifted by 6
       beginLog->pup(p);
       delete beginLog;
 
