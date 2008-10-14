@@ -55,7 +55,25 @@ int macroDefined(char *str, int istrue)
   return 0;
 }
 
+FILE *openFile(char *interfacefile)
+{
+  if (interfacefile == NULL) {
+    cur_file = "STDIN";
+    return stdin;
+  }
+  else {
+    cur_file=interfacefile;
+    FILE *fp = fopen (interfacefile, "r") ;
+    if (fp == NULL) {
+      cout << "ERROR : could not open " << interfacefile << endl;
+      exit(1);
+    }
+    return fp;
+  }
+  return NULL;
+}
 
+/*
 ModuleList *Parse(char *interfacefile)
 {
   cur_file=interfacefile;
@@ -70,6 +88,17 @@ ModuleList *Parse(char *interfacefile)
   }
   return modlist;
 }
+*/
+
+ModuleList *Parse(FILE *fp)
+{
+  yyin = fp ;
+  if(yyparse())
+      exit(1);
+  fclose(fp) ;
+  return modlist;
+}
+
 
 void abortxi(char *name)
 {
@@ -94,9 +123,9 @@ int main(int argc, char *argv[])
     else
       fname = argv[i];
   }
-  if (fname==NULL) abortxi(argv[0]);
+  //if (fname==NULL) abortxi(argv[0]);
 
-  ModuleList *m = Parse(fname) ;
+  ModuleList *m = Parse(openFile(fname)) ;
   m->generate();
   return 0 ;
 }
