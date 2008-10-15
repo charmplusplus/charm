@@ -154,7 +154,10 @@ protected:
 
 public:
     // @@ Needed for Jade
-    inline MSA1D(){}
+    inline MSA1D() 
+        :initHandleGiven(false) 
+    {}
+
     virtual void pup(PUP::er &p){
         p|nEntries;
         p|cg;
