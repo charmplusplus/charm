@@ -458,64 +458,10 @@ You then attach frameworks to the new threads.  The order in which
 frameworks are attached is irrelevant, but attach commands always apply
 to the current set of threads.
   
-The commands to attach the various frameworks are:
+To attach a chare array to the \tcharm{} array, use:
 
-\begin{description}
-\item[AMPI] You attach a new \kw{MPI\_COMM\_WORLD} to the current threads
-using the \kw{MPI\_Attach} routine, which takes a string, the name of the
-communicator.  These threads will then be able to use AMPI calls.
-
-\item[FEM Framework] You attach the current FEM mesh to the current threads
-using the \kw{FEM\_Attach} routine, which takes an integer which is normally
-zero.  These threads will then be able to use FEM calls.  Be sure to set up 
-an FEM mesh using the \kw{FEM\_Set} calls before your \kw{FEM\_Attach}.
-
-\item[Multiblock Framework] You attach the current multiblock mesh to the current threads
-using the \kw{MBLK\_Attach} routine, which takes no parameters.  
-These threads will then be able to use Multiblock calls.  Be sure to set up 
-the multiblock mesh using the \kw{MBLK\_Set} calls before your \kw{MBLK\_Attach}.
-
-\end{description}
-
-For example, the C code to start an application having one set of threads
-that performs both AMPI communication and FEM computations inside a 
-routine called \uw{myDriver} would be:
-
-\begin{alltt}
-     #include "tcharmc.h"
-     #include "ampi.h"
-     #include "fem.h"
-     
-     /* Called to start the program */
-     void TCHARM\_User\_setup(void)
-     \{
-         TCHARM\_Create(TCHARM\_Get\_num\_chunks(),myDriver);
-         MPI\_Attach("myAMPIFEM");        
-         ... Usual FEM_Set calls, as normally made from init() ...
-         FEM\_Attach(0);
-     \}
-\end{alltt}
-
-The Fortran code to start an application consisting of two sets of threads,
-both of which perform AMPI communication, would be:
-
-\begin{alltt}
-     SUBROUTINE tcharm\_user\_setup()
-       IMPLICIT NONE
-       include 'tcharmf.h'
-       include 'ampif.h'
-       
-    ! First set of threads, running "compute1"
-       call tcharm\_create(tcharm\_get\_num\_chunks(),compute1)
-       call ampi\_attach('part1')
-       
-    ! Second set of threads, running "compute2"
-       call tcharm\_create(tcharm\_get\_num\_chunks(),compute2)
-       call ampi\_attach('part2')
-     END SUBROUTINE
-\end{alltt}
-
-
+\function{CkArrayOptions TCHARM\_Attach\_start(CkArrayID *retTCharmArray,int *retNumElts)}
+This function returns a CkArrayOptions object that will bind your chare array to the \tcharm{} array, in addition to returning the \tcharm{} array proxy and number of elements by reference. If you are using frameworks like AMPI, they will automatically attach themselves to the \tcharm{} array in their initialization routines.
 
 \section{Command-line Options}
 \label{sec:cla}
