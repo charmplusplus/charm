@@ -1,6 +1,3 @@
-% Authors: Isaac Dooley, Sandhya Mangala, Laxmikant Kale, and Philippe Geubelle
-% Journal: Submitting to CSD
-
 
 \documentclass{article}
 
@@ -30,7 +27,8 @@ The left hand side term $\frac{\partial^2p}{\partial p^2}$ is represented in ter
 p_{x,y}^{t+1} = c^2 \left(p_{x+1,y}^{t}+p_{x-1,y}^{t}+p_{x,y+1}^{t}+p_{x,y-1}^{t}-4p_{x,y}^{t}\right)- p_{x,y}^{t-1} +2 p_{x,y}^{t} .
 \end{equation}
 
-This update rule specifies how the $p$ value for each location in the grid should be computed, using $p$ values from the two previous time steps. This update rule is easy to code in an application. The application simply maintains two timesteps' worth of $p$ grids, and using these, the next timestep's $p$ grid can be computed.
+This update rule specifies how the $p$ value for each location in the grid should be computed, using $p$ values from the two previous time steps. This update rule is easy to code in an application. The application simply maintains two timesteps' worth of $p$ grids, and using these, the next timestep's $p$ grid can be computed. The $c$ term determines the wave speed. This value must be small enough such that the wave cannot move across more than one grid square in a single timestep. Smaller values for $c$ will make the simulation take longer to propagate a wave by a fixed distance, but larger values for $c$ can introduce dispersive and diffusive errors.
+
 
 \end{document}
 
