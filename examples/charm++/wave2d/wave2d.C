@@ -4,14 +4,7 @@
 // Author: Isaac Dooley 2008
 
 // This program solves the 2-d wave equation over a grid, displaying pretty results through liveViz
-// The program could be made more efficient, but is kept this way for simplicity.
-// Migration is not supported yet. Please add the PUP function if you get a chance!
-
-// This program is based on the description here:
-// http://www.mtnmath.com/whatrh/node66.html
-// "The wave equation is the universal equation of physics. It works for light, 
-//  sound, waves on the surface of water and a great deal more"
-
+// The discretization used below is described in the accompanying pdf paper.pdf
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ CProxy_Wave arrayProxy;
@@ -250,15 +243,8 @@ public:
 	  // Previous step's value for this array element
 	  double old  = pressure_old[i*mywidth+j];
 
-	  // Wave speed
-	  double c = 0.4;
-
 	  // Compute the new value
-	  pressure_new[i*mywidth+j] = c*c*(left+right+up+down - 4.0*curr)-old+2.0*curr;
-
-	  // Round any near-zero values to zero (avoid denorms)
-	  //	  if(pressure_new[i*mywidth+j] < 0.0001 && pressure_new[i*mywidth+j] >  -0.0001)
-	  //  pressure_new[i*mywidth+j] = 0.0;
+	  pressure_new[i*mywidth+j] = 0.4*0.4*(left+right+up+down - 4.0*curr)-old+2.0*curr;
 
 	}
       }
