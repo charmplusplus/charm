@@ -14,11 +14,10 @@
 #include "wr.h"
 
 /* number of work requests the queue is initialized to handle */
-#define QUEUE_SIZE_INIT 10
+#define QUEUE_SIZE_INIT 100
 
-/* if the queue is filled, it will be expanded by this many additional 
-   units */ 
-#define QUEUE_EXPANSION_SIZE 10
+/* if the queue is filled, it will be expanded by this factor */ 
+#define QUEUE_EXPANSION_FACTOR 2
 
 /* initWRqueue
  *

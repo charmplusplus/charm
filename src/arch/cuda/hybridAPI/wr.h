@@ -57,13 +57,13 @@ typedef struct dataInfo {
  * usage model: 
  * 1. declare a pointer to a workRequest 
  * 2. allocate dynamic memory for the work request
- * 3. call setupMemory to copy over the data to the GPU 
- * 4. enqueue the work request by using addWorkRequest
+ * 3. enqueue the work request
  */
 typedef struct workRequest {
 
-  /* parameters for kernel execution */
+  /* The following parameters need to be set by the user */
 
+  /* parameters for kernel execution */
   dim3 dimGrid; 
   dim3 dimBlock; 
   int smemSize;
@@ -75,21 +75,26 @@ typedef struct workRequest {
   int nBuffers; 
 
   /* to be called after the kernel finishes executing on the GPU */ 
-
   void *callbackFn; 
  
   /* id to select the correct kernel in kernelSelect */
-
   int id; 
 
   /* event which will be polled to check if kernel has finished
      execution */
+  /* cudaEvent_t completionEvent; */
 
-  cudaEvent_t completionEvent;  
 
-  /* flags */
 
+  /* The following flags are used for control by the system */
+
+  /* indicates work request is currently executing
+     User needs to set this flag to 0 before enqueueing */
   int executing; 
+
+  /* indicates that data transfer to the device is complete
+     User needs to set this flag to 0 before enqueueing */
+  int transferDone; 
 
 } workRequest; 
 

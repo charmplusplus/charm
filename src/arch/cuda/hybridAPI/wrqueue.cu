@@ -26,14 +26,14 @@ void initWRqueue(workRequestQueue **qptr) {
 void enqueue(workRequestQueue *q, workRequest *wr) {
   workRequest *newArray; 
   int newSize; 
-  int tailendIndex;  /* index for the second part of the array in the new array */
+  int tailendIndex;  /* the starting index for the second part of the array */
 
   if (q->size == q->capacity) {
 
-    /* queue is out of space: create a new queue with
-       QUEUE_EXPANSION_SIZE more slots */
+    /* queue is out of space: create a new queue that is a factor
+       QUEUE_EXPANSION_FACTOR larger */
 
-    newSize = q->capacity + QUEUE_EXPANSION_SIZE;
+    newSize = q->capacity * QUEUE_EXPANSION_FACTOR;
     newArray = (workRequest *) malloc(newSize * sizeof(workRequest));
 
     /* copy requests to the new array */
@@ -44,17 +44,19 @@ void enqueue(workRequestQueue *q, workRequest *wr) {
        be copied from the beginning of the array */
     if (q->head != 0) {
       tailendIndex = q->capacity - q->head; 
-      memcpy(&newArray[tailendIndex], q->requests, q->head); 
+      memcpy(&newArray[tailendIndex], q->requests, 
+	     q->head * sizeof(workRequest)); 
     }
+
+    /* free the old queue's memory */
+    
+    free(q->requests); 
 
     /* update bookkeeping variables in the expanded queue */
     q->tail = q->size; 
-    q->capacity += QUEUE_EXPANSION_SIZE;
+    q->capacity *= QUEUE_EXPANSION_FACTOR;
     q->head = 0;
     
-    /* free the old queue's memory */
-    free(q->requests); 
-
     /* reassign the pointer to the new queue */
     q->requests = newArray;
   }

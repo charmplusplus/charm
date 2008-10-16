@@ -41,6 +41,9 @@ void **hostBuffers = NULL;
 /* device buffers */
 void **devBuffers = NULL; 
 
+cudaStream_t kernel_stream; 
+cudaStream_t memory_stream; 
+
 extern void CUDACallbackManager(void * fn); 
 
 /* setupMemory
@@ -124,6 +127,9 @@ void initHybridAPI() {
     devBuffers[i] = NULL; 
   }
   
+  cudaStreamCreate(&kernel_stream); 
+  cudaStreamCreate(&memory_stream); 
+
 }
 
 /* gpuProgressFn
@@ -143,7 +149,8 @@ void gpuProgressFn() {
       wr->executing = 1; 
       return; 
     }  
-    else if (cudaStreamQuery(0) == cudaSuccess ) {      
+    else if (cudaStreamQuery(kernel_stream) == cudaSuccess) {
+      // else if (cudaStreamQuery(0) == cudaSuccess ) {
 #ifdef GPU_DEBUG
       printf("completion event success \n");
 #endif  
