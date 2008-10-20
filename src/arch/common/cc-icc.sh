@@ -1,16 +1,17 @@
 CMK_CPP_C='icc -E '
-CMK_CC="icc -fpic -cxxlib-icc "
-CMK_CXX="icpc -fpic -cxxlib-icc "
-CMK_CXXPP='icpc -E -cxxlib-icc '
-CMK_LD='icc -i_dynamic -cxxlib-icc '
-CMK_LDXX='icpc -i_dynamic -cxxlib-icc '
+CMK_DEPRECATED="-cxxlib-icc"
+CMK_CC="icc -fpic "
+CMK_CXX="icpc -fpic "
+CMK_CXXPP='icpc -E '
+CMK_LD='icc -i_dynamic '
+CMK_LDXX='icpc -i_dynamic '
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_NATIVE_CC="$CMK_CC"
 CMK_NATIVE_CXX="$CMK_CXX"
 CMK_NATIVE_LD="$CMK_LD"
 CMK_NATIVE_LDXX="$CMK_LDXX"
-CPPFLAGS="$CPPFLAGS -fpic -cxxlib-icc "
-LDFLAGS="$LDFLAGS -i_dynamic -cxxlib-icc "
+CPPFLAGS="$CPPFLAGS -fpic "
+LDFLAGS="$LDFLAGS -i_dynamic "
 
 # for absoft?
 #CMK_F90LIBS='-L/usr/local/intel/compiler70/ia32/lib -L/opt/intel/compiler70/ia32/lib -lintrins -lIEPCF90 -lPEPCF90 -lF90 -lintrins -limf '
