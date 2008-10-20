@@ -22,11 +22,11 @@ DEST2=$(LIBDIR)/$(LIB2).a
 
 all: $(DEST) $(COMPATLIB) $(DEST2)
 
-$(DEST): $(OBJS) headers
+$(DEST): $(OBJS) $(HEADERS)
 	$(CHARMC) $(OBJS) -o $@
 	cp $(LIB).dep $(LIBDIR)/$(LIB).dep
 
-$(DEST2): $(OBJS2) headers
+$(DEST2): $(OBJS2) $(HEADERS)
 	$(CHARMC) $(OBJS2) -o $@
 	cp $(LIB2).dep $(LIBDIR)/$(LIB2).dep
 
