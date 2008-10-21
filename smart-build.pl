@@ -453,8 +453,7 @@ while($line = <>){
 	
 }
 
-# Determine whether to use a -j4 flag for faster building
-# Currently LIBS cannot be safely built with -j4
+# Determine whether to use a -j flag for faster building
 $j = "";
     print << "EOF";
     
@@ -465,6 +464,7 @@ Do you want to compile in parallel?
         4) Build with -j8 
         5) Build with -j16 [default]
         6) Build with -j32
+        7) Build with -j
 
 EOF
 
@@ -488,7 +488,10 @@ EOF
 	}  elsif($line eq "6") {
             $j = "-j32";
             last;
-        }  else {
+        }  elsif($line eq "7") {
+            $j = "-j";
+            last;
+        }   else {
 	    print "Invalid option, please try again :P\n";
 	}
 }
