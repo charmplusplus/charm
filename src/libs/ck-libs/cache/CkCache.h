@@ -29,6 +29,12 @@ chares that request it.***/
 //typedef GenericTreeNode CacheNode;
 typedef CmiUInt8 CkCacheKey;
 
+typedef struct _CkCacheUserData {
+  CmiUInt8 d0;
+  CmiUInt8 d1;
+} CkCacheUserData;
+
+
 //CpvExtern(int, cacheNodeRegisteredChares);
 //typedef map<int,GenericTreeNode*> cacheNodeMapIntGenericTreeNode;
 //CpvExtern(cacheNodeMapIntGenericTreeNode*, cacheNodeRegisteredRoots);
@@ -206,7 +212,7 @@ public:
   CkCacheFillMsg (CkCacheKey k) : key(k) {}
 };
 
-typedef void (*CkCacheCallback)(CkArrayID, CkArrayIndexMax&, CkCacheKey, CmiUInt8, void*, int);
+typedef void (*CkCacheCallback)(CkArrayID, CkArrayIndexMax&, CkCacheKey, CkCacheUserData &, void*, int);
 
 /*class RequestorData {//: public CkPool<RequestorData, 128> {
  public:
@@ -234,14 +240,15 @@ typedef void (*CkCacheCallback)(CkArrayID, CkArrayIndexMax&, CkCacheKey, CmiUInt
   }
 };
 */
+
 class CkCacheRequestorData {
 public:
-  CmiUInt8 userData;
+  CkCacheUserData userData;
   CkCacheCallback fn;
   CkArrayID requestorID;
   CkArrayIndexMax requestorIdx;
 
-  CkCacheRequestorData(CProxyElement_ArrayElement &el, CkCacheCallback f, CmiUInt8 data) {
+  CkCacheRequestorData(CProxyElement_ArrayElement &el, CkCacheCallback f, CkCacheUserData &data) {
     userData = data;
     requestorID = el.ckGetArrayID();
     requestorIdx = el.ckGetIndex();
@@ -501,6 +508,7 @@ class CkCacheManager : public CBase_CkCacheManager {
 
   void * requestData(CkCacheKey what, CkArrayIndex &toWhom, int chunk, CkCacheEntryType *type, CkCacheRequestorData &req);
   void * requestDataNoFetch(CkCacheKey key, int chunk);
+  CkCacheEntry * requestCacheEntryNoFetch(CkCacheKey key, int chunk);
   //void recvParticles(CacheKey key,GravityParticle *part,int num, int from);
   void recvData(CkCacheFillMsg *msg);
   void recvData(CkCacheKey key, CkArrayIndex &from, CkCacheEntryType *type, int chunk, void *data);
@@ -523,6 +531,9 @@ class CkCacheManager : public CBase_CkCacheManager {
 
   /** Collect the statistics for the latest iteration */
   void collectStatistics(CkCallback& cb);
+  std::map<CkCacheKey,CkCacheEntry*> *getCache(){
+    return cacheTable;
+  }
 
 };
 

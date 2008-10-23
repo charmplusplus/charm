@@ -122,6 +122,14 @@
     return NULL;
   }
   
+  CkCacheEntry * CkCacheManager::requestCacheEntryNoFetch(CkCacheKey key, int chunk) {
+    std::map<CkCacheKey,CkCacheEntry *>::iterator p = cacheTable[chunk].find(key);
+    if (p != cacheTable[chunk].end()) {
+      return p->second;
+    }
+    return NULL;
+  }
+
   void CkCacheManager::recvData(CkCacheFillMsg *msg) {
     CkCacheKey key = msg->key;
     std::map<CkCacheKey,int>::iterator pchunk = outStandingRequests.find(key);
