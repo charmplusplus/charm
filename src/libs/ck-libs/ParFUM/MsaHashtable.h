@@ -21,8 +21,15 @@ public:
 	{
 	public:
 		using MSA1DHASH::Read::get;
+		// Non-specific friend declarations because Sun's
+		// C++ compiler doesn't understand that it should
+		// fully parse outer classes before examining nested
+		// classes. (2008-10-23)
+		/*
 		friend Read &MsaHashtable::syncToRead(Add&);
 		friend Add& MsaHashtable::syncToAdd(Read&);
+		*/
+		friend class MsaHashtable;
 		void print();
 
 	private:
@@ -32,13 +39,16 @@ public:
 	class Add : private MSA1DHASH::Accum
 	{
 		using MSA1DHASH::Accum::accumulate;
+		// See comments above about non-specific friends
+		/*
 		friend Add& MsaHashtable::syncToAdd(Read&);
 		friend Read &MsaHashtable::syncToRead(Add&);
 		friend Add& MsaHashtable::getInitialAdd();
+		*/
+		friend class MsaHashtable;
 	Add(MsaHashtable &m) : MSA1DHASH::Accum(m) { }
 	public:
 		int addTuple(int *tuple, int nodesPerTuple, int chunk, int elementNo);
-
 	};
 
 
