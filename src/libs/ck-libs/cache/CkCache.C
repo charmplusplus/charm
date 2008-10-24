@@ -129,6 +129,10 @@
     }
     return NULL;
   }
+  
+  std::map<CkCacheKey,CkCacheEntry*> *CkCacheManager::getCache(){
+    return cacheTable;
+  }
 
   void CkCacheManager::recvData(CkCacheFillMsg *msg) {
     CkCacheKey key = msg->key;

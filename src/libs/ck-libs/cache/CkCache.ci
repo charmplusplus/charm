@@ -21,6 +21,8 @@ module CkCache {
 //    entry void allDone();
     entry void collectStatistics(CkCallback &cb);
     //entry void stopHPM(CkCallback &cb);
+    entry [local] std::map<CkCacheKey,CkCacheEntry*> *getCache();
+    entry [local] CkCacheEntry *requestCacheEntryNoFetch(CkCacheKey key, int chunk);
   };
   
   //initnode void initNodeLock();

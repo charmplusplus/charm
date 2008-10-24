@@ -45,6 +45,7 @@ typedef struct _CkCacheUserData {
 
 class CkCacheEntryType;
 class CkCacheRequestorData;
+class CkCacheEntry;
 
 #include "CkCache.decl.h"
 
@@ -531,9 +532,7 @@ class CkCacheManager : public CBase_CkCacheManager {
 
   /** Collect the statistics for the latest iteration */
   void collectStatistics(CkCallback& cb);
-  std::map<CkCacheKey,CkCacheEntry*> *getCache(){
-    return cacheTable;
-  }
+  std::map<CkCacheKey,CkCacheEntry*> *getCache();
 
 };
 
