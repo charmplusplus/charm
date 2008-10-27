@@ -1604,6 +1604,7 @@ CpvExtern(char *,_validProcessors);
 #define CmiNodeAlive(x)  (CpvAccess(_validProcessors)[x])
 #endif
 
+int CmiEndianness();
 
 #include "conv-cpm.h"
 #include "conv-cpath.h"

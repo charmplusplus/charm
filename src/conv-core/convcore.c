@@ -1341,6 +1341,9 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 #endif
 }
 
+#if CMK_C_INLINE
+inline
+#endif
 void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
 	if((*(s->localCounter))-- >0)
@@ -1388,7 +1391,6 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	  CqsDequeue(s->schedQ,(void **)&msg);
           if (msg!=NULL) return msg;	    
         }
-
 	return NULL;
 }
 
@@ -1405,6 +1407,7 @@ int CsdScheduler(int maxmsgs)
 /*Declare the standard scheduler housekeeping*/
 #define SCHEDULE_TOP \
       void *msg;\
+      int *CsdStopFlag_ptr = &CpvAccess(CsdStopFlag); \
       int cycle = CpvAccess(CsdStopFlag); \
       CsdSchedulerState_t state;\
       CsdSchedulerState_new(&state);\
@@ -1412,13 +1415,13 @@ int CsdScheduler(int maxmsgs)
 /*A message is available-- process it*/
 #define SCHEDULE_MESSAGE \
       CmiHandleMessage(msg);\
-      if (CpvAccess(CsdStopFlag) != cycle) break;\
+      if (*CsdStopFlag_ptr != cycle) break;\
 
 /*No message available-- go (or remain) idle*/
 #define SCHEDULE_IDLE \
       if (!isIdle) {isIdle=1;CsdBeginIdle();}\
       else CsdStillIdle();\
-      if (CpvAccess(CsdStopFlag) != cycle) {\
+      if (*CsdStopFlag_ptr != cycle) {\
 	CsdEndIdle();\
 	break;\
       }\
@@ -2799,6 +2802,28 @@ void CommunicationServerInit()
   CQdCpvInit();
   CpvInitialize(int,CmiImmediateMsgHandlerIdx); 
 #endif
+}
+
+
+static int testEndian(void)
+{
+        int test=0x1c;
+        unsigned char *c=(unsigned char *)&test;
+        if (c[sizeof(int)-1]==0x1c)
+                /* Macintosh and most workstations are big-endian */
+                return 1;   /* Big-endian machine */
+        if (c[0]==0x1c)
+                /* Intel x86 PC's, and DEC VAX are little-endian */
+                return 0;  /* Little-endian machine */
+        return -2;  /*Unknown integer type */
+}
+
+int CmiEndianness()
+{
+  static int _cmi_endianness = -1;
+  if (_cmi_endianness == -1) _cmi_endianness = testEndian();
+  CmiAssert(_cmi_endianness != -2);
+  return  _cmi_endianness;
 }
 
 /**
