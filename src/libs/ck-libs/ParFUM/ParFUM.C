@@ -18,7 +18,13 @@ Parallel Programming Lab, Univ. of Illinois 2006
 /* Some Globals */
 int femVersion = 1;
 static FEM_Partition *mypartition=NULL;
-int FEM_Partition_Mode=1;// is it serial or parallel partition: 1 - serial 2 - parallel
+
+enum PartitionMode {
+    SerialPartitionMode = 1,
+    ParallelPartitionMode = 2,
+    ManualPartitionMode
+};
+PartitionMode FEM_Partition_Mode = SerialPartitionMode;
 
 /* TCharm semaphore ID, used for mesh startup */
 #define FEM_TCHARM_SEMAID 0x00FE300 /* __FEM__ */
@@ -67,9 +73,12 @@ CDECL void FEM_Init(FEM_Comm_t defaultComm)
 		TCHARM_Set_global(FEM_globalID,c,pupFEM_Chunk);
 	}
 	char **argv = CkGetArgv();
-  if(CmiGetArgFlagDesc(argv,"+Parfum_parallel_partition","ParFUM should use the parallel partitioner")){
-		FEM_Partition_Mode = 2;
+        if(CmiGetArgFlagDesc(argv,"+Parfum_parallel_partition","ParFUM should use the parallel partitioner")){
+            FEM_Partition_Mode = ParallelPartitionMode;
 	}
+        if (CmiGetArgFlagDesc(argv, "+Parfum_manual_partition", "Specify manual mesh partitioning")) {
+            FEM_Partition_Mode = ManualPartitionMode;
+        }
 }
 FORTRAN_AS_C(FEM_INIT,FEM_Init,fem_init, (int *comm), (*comm))
 
@@ -307,7 +316,7 @@ extern int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t co
 CDECL int 
 FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 {
-	if(FEM_Partition_Mode == 1){ //serial partition
+	if (FEM_Partition_Mode == SerialPartitionMode){ //serial partition
 		int tag=89375;
 		int myRank; MPI_Comm_rank((MPI_Comm)comm_context,&myRank);
 		if (myRank==masterRank) 
@@ -329,13 +338,17 @@ FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 		{ /* I'm a slave-- recv new mesh from master: */
 			return FEM_Mesh_recv(masterRank,tag,comm_context);
 		}
-	}else{
+        } else if (FEM_Partition_Mode == ManualPartitionMode) {
+
+	} else if (FEM_Partition_Mode == ParallelPartitionMode) {
 		//parallel partition
 		MPI_Barrier((MPI_Comm)comm_context);
 		//_registerfem();
 		MPI_Barrier((MPI_Comm)comm_context);
 		return FEM_Mesh_Parallel_broadcast(fem_mesh,masterRank,comm_context);
-	}
+	} else {
+            CkAbort("Unrecognized ParFUM partitioning mode");
+        }
 }
 FORTRAN_AS_C_RETURN(int,FEM_MESH_BROADCAST,FEM_Mesh_broadcast,fem_mesh_broadcast, 
 	(int *mesh,int *rank,int *comm),(*mesh,*rank,*comm))
