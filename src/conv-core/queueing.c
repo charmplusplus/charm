@@ -539,7 +539,7 @@ void CqsEnqueueGeneral(Queue q, void *data, int strategy,
            int priobits,unsigned int *prioptr)
 {
   deq d; int iprio;
-  CmiInt8 *lprio;
+  CmiInt8 lprio0, lprio;
   switch (strategy) {
   case CQS_QUEUEING_FIFO: 
     CqsDeqEnqueueFifo(&(q->zeroprio), data); 
@@ -575,24 +575,34 @@ void CqsEnqueueGeneral(Queue q, void *data, int strategy,
     break;
 
   case CQS_QUEUEING_LFIFO:     
-    /* allow signed priority queueing on 64 bit integers */
-    lprio =(CmiInt8 *)prioptr;
-    if (*lprio<0)
-      {
-	d=CqsPrioqGetDeq(&(q->negprioq), priobits, prioptr);
-      }
+    CmiAssert(priobits == CLONGBITS);
+    lprio0 =((CmiUInt8 *)prioptr)[0];
+    lprio0 += (1ULL<<(CLONGBITS-1));
+    if (CmiEndianness() == 0) {           /* little-endian */
+      lprio =(((CmiUInt4 *)&lprio0)[0]*1LL)<<CINTBITS | ((CmiUInt4 *)&lprio0)[1];
+    }
+    else {                /* little-endian */
+      lprio = lprio0;
+    }
+    if (lprio0<0)
+        d=CqsPrioqGetDeq(&(q->posprioq), priobits, &lprio);
     else
-      {
-	d=CqsPrioqGetDeq(&(q->posprioq), priobits, prioptr);
-      }
+        d=CqsPrioqGetDeq(&(q->negprioq), priobits, &lprio);
     CqsDeqEnqueueFifo(d, data);
     break;
   case CQS_QUEUEING_LLIFO:
-    lprio =(CmiInt8 *)prioptr;
-    if (*lprio<0)
-      d=CqsPrioqGetDeq(&(q->negprioq), priobits, prioptr);
+    lprio0 =((CmiUInt8 *)prioptr)[0];
+    lprio0 += (1ULL<<(CLONGBITS-1));
+    if (CmiEndianness() == 0) {           /* little-endian happen to compare least significant part first */
+      lprio =(((CmiUInt4 *)&lprio0)[0]*1LL)<<CINTBITS | ((CmiUInt4 *)&lprio0)[1];
+    }
+    else {                /* little-endian */
+      lprio = lprio0;
+    }
+    if (lprio0<0)
+        d=CqsPrioqGetDeq(&(q->posprioq), priobits, &lprio);
     else
-      d=CqsPrioqGetDeq(&(q->posprioq), priobits, prioptr);
+        d=CqsPrioqGetDeq(&(q->negprioq), priobits, &lprio);
     CqsDeqEnqueueLifo(d, data);
     break;
   default:

@@ -16,6 +16,9 @@ extern "C" {
 #ifndef CINTBITS
 #define CINTBITS ((unsigned int) (sizeof(int)*8))
 #endif
+#ifndef CLONGBITS
+#define CLONGBITS ((unsigned int) (sizeof(CmiInt8)*8))
+#endif
 typedef struct prio_struct
 {
   unsigned short bits;
