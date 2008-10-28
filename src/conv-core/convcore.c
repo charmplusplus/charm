@@ -1304,7 +1304,7 @@ void CmiHandleMessage(void *msg)
 	h=&CmiGetHandlerInfo(msg);
 	(h->hdlr)(msg,h->userPtr);
 #ifndef CMK_OPTIMIZE
-	/* setMemoryStatus(0) /* /* charmdebug */
+	/* setMemoryStatus(0) */ /* charmdebug */
 	_LOG_E_HANDLER_END(handler); 	/* projector */
 #endif
 }
