@@ -1341,9 +1341,6 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 #endif
 }
 
-#if CMK_C_INLINE
-inline
-#endif
 void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
 	if((*(s->localCounter))-- >0)
@@ -1828,7 +1825,7 @@ CpvStaticDeclare(CmiUInt2, _reduce_seqID);
 int CmiGetReductionHandler() { return CpvAccess(CmiReductionMessageHandler); }
 CmiHandler CmiGetReductionDestination() { return _reduce_destination; }
 
-CmiReductionsInit() {
+void CmiReductionsInit() {
   int numChildren;
   CpvInitialize(int, CmiReductionMessageHandler);
   CpvAccess(CmiReductionMessageHandler) = CmiRegisterHandler((CmiHandler)CmiHandleReductionMessage);
