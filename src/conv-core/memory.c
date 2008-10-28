@@ -16,7 +16,7 @@
  * The major possibilities here are empty (use the system's malloc),
  * GNU (use malloc-gnu.c), and meta (use malloc-cache.c or malloc-paranoid.c).
  * On machines without sbrk(), only the system's malloc is available.
- * 
+ *
  * The CMK_MEMORY_BUILD_* symbols come in from the compiler command line.
  *
  *****************************************************************************/
@@ -50,7 +50,7 @@ void * memory_stack_top; /*The higher end of the stack (approximation)*/
 #if CMK_MEMORY_BUILD_OS_WRAPPED
 #define CMK_MEMORY_BUILD_OS 1
 #endif
-	 
+
 #if CMK_MEMORY_BUILD_OS
 #if CMK_MEMORY_BUILD_OS_WRAPPED
 
@@ -145,14 +145,14 @@ int CmiMemoryIs(int flag)
 
 /**
  * memory_lifeRaft is a very small heap-allocated region.
- * The lifeRaft is supposed to be just big enough to provide 
+ * The lifeRaft is supposed to be just big enough to provide
  * enough memory to cleanly shut down if we run out of memory.
  */
 static char *memory_lifeRaft=NULL;
 
 void CmiOutOfMemoryInit(void);
 
-void CmiOutOfMemory(int nBytes) 
+void CmiOutOfMemory(int nBytes)
 { /* We're out of memory: free up the liferaft memory and abort */
   char errMsg[200];
   if (memory_lifeRaft) free(memory_lifeRaft);
@@ -186,15 +186,15 @@ int memory_chare_id=0;
 
 #if CMK_MEMORY_BUILD_CACHE
 #include "memory-cache.c"
-#endif 
+#endif
 
 #if CMK_MEMORY_BUILD_ISOMALLOC
 #include "memory-isomalloc.c"
-#endif 
+#endif
 
 #if CMK_MEMORY_BUILD_LOCK
 #include "memory-lock.c"
-#endif 
+#endif
 
 #if CMK_MEMORY_BUILD_CHARMDEBUG
 #include "memory-charmdebug.c"
@@ -272,11 +272,11 @@ static void meta_init(char **argv) {
 
 #if CMK_MEMORY_BUILD_CACHE
 #include "memory-cache.c"
-#endif 
+#endif
 
 #if CMK_MEMORY_BUILD_ISOMALLOC
 #include "memory-isomalloc.c"
-#endif 
+#endif
 
 #if CMK_MEMORY_BUILD_CHARMDEBUG
 #include "memory-charmdebug.c"
@@ -288,7 +288,7 @@ static void meta_init(char **argv) {
 #include "memory-gnu.c"
 static void meta_init(char **argv)
 {
-  
+
 }
 static void *meta_malloc(size_t size)
 {
@@ -389,7 +389,7 @@ void *memalign(size_t align, size_t size)
   void *result;
   MEM_LOCK_AROUND( result = meta_memalign(align, size); )
   if (result==NULL) CmiOutOfMemory(align*size);
-  return result;    
+  return result;
 }
 
 void *valloc(size_t size)
@@ -457,7 +457,7 @@ CmiIsomallocBlockList *CmiIsomallocBlockListActivate(CmiIsomallocBlockList *l)
    {return l;}
 CmiIsomallocBlockList *CmiIsomallocBlockListCurrent(){
 	return NULL;
-}	 
+}
 void isomalloc_push() {}
 void isomalloc_pop() {}
 #endif
@@ -475,7 +475,7 @@ void memory_preallocate_hack()
   /* Work around problems with brk() on some systems (e.g., Blue Gene/L)
      by grabbing a bunch of memory from the OS (which calls brk()),
      then releasing the memory back to malloc(), except for one block
-     at the end, which is used to prevent malloc from moving brk() back down. 
+     at the end, which is used to prevent malloc from moving brk() back down.
   */
 #define MEMORY_PREALLOCATE_MAX 4096
   void *ptrs[MEMORY_PREALLOCATE_MAX];
@@ -515,6 +515,8 @@ void setProtection(char *mem, char *ptr, int len, int flag) { }
 /* Routines used to specify how the memory will the used */
 void setMemoryTypeChare(void *ptr) { }
 void setMemoryTypeMessage(void *ptr) { }
+void CpdSystemEnter() { }
+void CpdSystemExit() { }
 
 void CpdResetMemory() { }
 void CpdCheckMemory() { }
@@ -528,8 +530,9 @@ int setMemoryChareIDFromPtr(void *ptr) { return 0; }
 #undef setMemoryChareID
 #endif
 void setMemoryChareID(int id) { }
-#endif
 #ifdef setMemoryOwnedBy
 #undef setMemoryOwnedBy
 #endif
 void setMemoryOwnedBy(void *ptr, int id) { }
+
+#endif
