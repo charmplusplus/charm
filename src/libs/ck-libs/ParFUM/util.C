@@ -736,7 +736,7 @@ void FEM_MUtil::removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, in
     also clears off the adjacencies of oldIdx and updates adjacencies of
     neighboring nodes and elements */
 int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
-#ifdef CPSD_HACKS
+#ifdef CPSD
   bool dropLock = false;
 #endif
 
@@ -750,7 +750,7 @@ int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
     m->n2n_removeAll(newIdx);    // initialize node adjacencies
     mmod->fmLockN.push_back(FEM_lockN(newIdx,mmod));
     mmod->fmLockN[newIdx].wlock(idx); //lock it anyway, will unlock if needed in lockupdate
-#ifdef CPSD_HACKS
+#ifdef CPSD
     dropLock = true;
 #endif
   }
@@ -779,7 +779,7 @@ int FEM_MUtil::Replace_node_local(FEM_Mesh *m, int oldIdx, int newIdx) {
   m->n2e_removeAll(oldIdx);
   if(nsize>0) delete[] nnbrs;
   if(esize>0) delete[] enbrs;
-#ifdef CPSD_HACKS
+#ifdef CPSD
   if (dropLock)
     mmod->fmLockN[newIdx].wunlock(idx); 
 #endif
@@ -925,7 +925,7 @@ int FEM_MUtil::eatIntoElement(int localIdx) {
 #endif
   //a ghost elem should be coming from only one chunk
   int remChk = mmod->fmMesh->elem[0].ghost->ghostRecv.getRec(FEM_From_ghost_index(localIdx))->getChk(0);
-#ifndef CPSD_HACKS_2
+#ifndef CPSD_2
   for(int i=0; i<nodesPerEl; i++) {
     if(FEM_Is_ghost_index(adjnodes[i])) { 
       //this will be a new node on this chunk, lock it on all shared chunks
@@ -965,7 +965,7 @@ int FEM_MUtil::eatIntoElement(int localIdx) {
 #endif
   copyElemData(0,localIdx,newEl); //special copy across chunk
   FEM_purge_element(mmod->fmMesh,localIdx,elemtype);
-#ifndef CPSD_HACKS_2
+#ifndef CPSD_2
   for(int i=0; i<nodesPerEl; i++) {
     if(adjnodes[i]!=oldnodes[i]) {
       //correct the lock

@@ -724,7 +724,7 @@ int FEM_add_element(FEM_Mesh *m, int* conn, int connSize, int elemType, int chun
 #ifdef DEBUG_2
   CkPrintf("addElement, line %d\n", __LINE__);
 #endif
-#ifndef CPSD_HACKS
+#ifndef CPSD
 	  FEM_Modify_LockUpdate(m,conn[i]);
 #endif
 #ifdef DEBUG_2
@@ -1180,7 +1180,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 	  for(int i=0; i<connSize; i++) {
 	    if(losingThisNode[i]) {
 	      //lock it on the min chunk on which this node is local
-#ifndef CPSD_HACKS
+#ifndef CPSD
 	      FEM_Modify_LockAll(m,nodes[i],false);
 #endif
 	    }
@@ -1347,7 +1347,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 // for edge flips, this will remove needed nodes on processor boundaries. The right
 // solution is to properly figure out when that situation applies, but for now just keep
 // the nodes always.
-//#ifndef CPSD_HACKS
+//#ifndef CPSD
 			if(nds[l]<-1) { //it is a ghost
 			  bool removeflag = true;
 			  for(int lm=0; lm<numElts; lm++) {
@@ -1470,7 +1470,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 #endif
 // This code removes nodes that we still need in cases involving acquisition/flip for
 // CPSD. I don't really follow the logic here, so I'm just cutting this bit out for now
-#ifndef CPSD_HACKS
+#ifndef CPSD
 		  if(!irec1) {
 		    if(!losinglocal) {
 		      FEM_remove_node_local(m,nodes[j]);
