@@ -319,7 +319,7 @@ FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
     if (FEM_Partition_Mode == ManualPartitionMode) {
         const char* caller = "FEM_Mesh_broadcast";
     	FEM_Mesh* mesh = FEM_chunk::get(caller)->lookup(fem_mesh, caller);
-        
+
         // Look into each element type and read a map of elements to
         // partitions out of FEM_PARTITION
         int nelems = mesh->nElems();
@@ -327,7 +327,7 @@ FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
         int index=0;
         for (int elemType=0; elemType<mesh->elem.size(); ++elemType) {
             FEM_Elem& elems = mesh->elem[elemType];
-            FEM_DataAttribute* partitionMap = (FEM_DataAttribute*) elems.lookup(FEM_PARTITION, caller);	
+            FEM_DataAttribute* partitionMap = (FEM_DataAttribute*) elems.lookup(FEM_PARTITION, caller);
             for (int elem=0; elem<elems.size(); ++elem) {
                 elem2chunk[index++] = partitionMap->getInt().getData()[elem];
             }
@@ -357,17 +357,15 @@ FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 		{ /* I'm a slave-- recv new mesh from master: */
 			return FEM_Mesh_recv(masterRank,tag,comm_context);
 		}
-        } else if (FEM_Partition_Mode == ManualPartitionMode) {
-
-	} else if (FEM_Partition_Mode == ParallelPartitionMode) {
+    } else if (FEM_Partition_Mode == ParallelPartitionMode) {
 		//parallel partition
 		MPI_Barrier((MPI_Comm)comm_context);
 		//_registerfem();
 		MPI_Barrier((MPI_Comm)comm_context);
 		return FEM_Mesh_Parallel_broadcast(fem_mesh,masterRank,comm_context);
 	} else {
-            CkAbort("Unrecognized ParFUM partitioning mode");
-        }
+        CkAbort("Unrecognized ParFUM partitioning mode");
+    }
 }
 FORTRAN_AS_C_RETURN(int,FEM_MESH_BROADCAST,FEM_Mesh_broadcast,fem_mesh_broadcast, 
 	(int *mesh,int *rank,int *comm),(*mesh,*rank,*comm))
