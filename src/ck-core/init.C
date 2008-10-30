@@ -597,6 +597,7 @@ extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
 extern void _loadbalancerInit();
 extern "C" void initCharmProjections();
+extern "C" void CmiInitCPUTopology(char **argv);
 
 void _registerInitCall(CkInitCallFn fn, int isNodeCall)
 {
@@ -867,6 +868,10 @@ void _initCharm(int unused_argc, char **argv)
 		}*/
 	}	
 	
+#if ! CMK_BLUEGENE_CHARM
+        CmiInitCPUTopology(argv);    // blocking
+#endif
+
 	if (faultFunc) {
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
 		if (!inCommThread) {
