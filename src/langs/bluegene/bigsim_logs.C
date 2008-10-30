@@ -287,6 +287,7 @@ void BgTimeLog::write(FILE *fp)
   int i;
 //  fprintf(fp,"%p ep:%d name:%s (srcnode:%d msgID:%d) startTime:%f endTime:%f recvime:%f effRecvTime:%e seqno:%d startevent:%d\n", this, ep, name, msgId.node(), msgId.msgID(), startTime, endTime, recvTime, effRecvTime, seqno, isStartEvent());
   fprintf(fp,"%p name:%s (srcnode:%d msgID:%d) ep:%d ", this, name, msgId.node(), msgId.msgID(), ep);
+  if (ep == BgLogGetThreadEP() && ep!=-1) fprintf(fp, "(thread resume) ");
   if (bglog_version >= 4) fprintf(fp, "charm_ep:%d ", charm_ep);
   if (isStartEvent()) fprintf(fp, "STARTEVENT");
   if (isQDEvent()) fprintf(fp, "QDEVENT");

@@ -137,6 +137,7 @@ void BgWriteTimelines(int seqno, BgTimeLineRec *tlinerecs, int nlocalProcs, char
     tlines[i] = &tlinerecs[i];
 
   BgWriteTimelines(seqno, tlines, nlocalProcs, traceroot);
+  delete [] tlines;
 }
 
 

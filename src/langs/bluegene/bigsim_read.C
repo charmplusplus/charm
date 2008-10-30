@@ -18,6 +18,8 @@ int BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNode
   char fName[20];
   //BgTimeLineRec* tlinerec = new BgTimeLineRec;
   
+  currTline = &tlinerec;
+
   for(int i=0;i<fileNum;i++)
     arrayID += (numNodes/numPes + ((i < numNodes%numPes)?1:0))*numWth;
   
@@ -43,6 +45,7 @@ int BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNode
   tlinerec.pup(p);
   fclose(f);
 
+  currTline = NULL;
   return fileNum;
 }
 
@@ -75,6 +78,7 @@ int* BgLoadOffsets(int totalProcs, int numPes){
   return  allProcOffsets;
 }
 
+static int thread_ep = -1;
 
 int BgLoadTraceSummary(const char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes)
 {
@@ -103,7 +107,15 @@ int BgLoadTraceSummary(const char *fname, int &totalProcs, int &numX, int &numY,
   bglog_version = 0;
   if (!feof(f)) p|bglog_version;
 
+  if (!feof(f)) p|thread_ep;
+
   fclose(f);
   return 0;
+}
+
+
+int BgLogGetThreadEP()
+{
+  return thread_ep;
 }
 

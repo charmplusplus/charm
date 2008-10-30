@@ -15,7 +15,7 @@
 #include "blue_defs.h"
 #include "cklists.h"
 
-#define BG_CURRENT_VERSION      4
+#define BG_CURRENT_VERSION      5
 
 extern int bglog_version;
 
@@ -315,6 +315,7 @@ void BgAddBackwardDep(BgTimeLog *curlog, BgTimeLog* deplog);
 BgTimeLog *BgStartLogByName(BgTimeLineRec &tlinerec, int ep, char *name, double starttime, BgTimeLog *prevLog);
 void BgEndLastLog(BgTimeLineRec &tlinerec);
 
+int BgLogGetThreadEP();
 int BgLoadTraceSummary(const char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes);
 int BgReadProc(int procNum, int numWth, int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec);
 int* BgLoadOffsets(int totalProcs, int numPes);

@@ -1694,6 +1694,7 @@ static void writeToDisk()
     p|cva(bgMach);
     p|numPes;
     p|bglog_version;
+    p|CpvAccess(CthResumeBigSimThreadIdx);
     
     CmiPrintf("[0] Number is numX:%d numY:%d numZ:%d numCth:%d numWth:%d numPes:%d totalProcs:%d bglog_ver:%d\n",cva(bgMach).x,cva(bgMach).y,cva(bgMach).z,cva(bgMach).numCth,cva(bgMach).numWth,numPes,totalProcs,bglog_version);
     
@@ -1733,7 +1734,7 @@ static void writeToDisk()
 }
 
 
-// application COnverse thread hook
+// application Converse thread hook
 
 CpvExtern(int      , CthResumeBigSimThreadIdx);
 
