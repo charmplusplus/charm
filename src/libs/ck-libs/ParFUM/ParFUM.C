@@ -1,8 +1,7 @@
 /**
  * \addtogroup ParFUM
-*/
+ */
 /*@{*/
-
 
 
 /*
