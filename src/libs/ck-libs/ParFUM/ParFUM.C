@@ -316,7 +316,26 @@ extern int FEM_Mesh_Parallel_broadcast(int fem_mesh,int masterRank,FEM_Comm_t co
 CDECL int 
 FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 {
-	if (FEM_Partition_Mode == SerialPartitionMode){ //serial partition
+    if (FEM_Partition_Mode == ManualPartitionMode) {
+        const char* caller = "FEM_Mesh_broadcast";
+    	FEM_Mesh* mesh = FEM_chunk::get(caller)->lookup(fem_mesh, caller);
+        
+        // Look into each element type and read a map of elements to
+        // partitions out of FEM_PARTITION
+        int nelems = mesh->nElems();
+        int* elem2chunk = new int [nelems];
+        int index=0;
+        for (int elemType=0; elemType<mesh->elem.size(); ++elemType) {
+            FEM_Elem& elems = mesh->elem[elemType];
+            FEM_DataAttribute* partitionMap = (FEM_DataAttribute*) elems.lookup(FEM_PARTITION, caller);	
+            for (int elem=0; elem<elems.size(); ++elem) {
+                elem2chunk[index++] = partitionMap->getInt().getData()[elem];
+            }
+        }
+        // Setting the partition preemptively prevents Metis from being called
+        FEM_Set_partition(elem2chunk);
+    }
+	if (FEM_Partition_Mode == SerialPartitionMode || FEM_Partition_Mode == ManualPartitionMode) {
 		int tag=89375;
 		int myRank; MPI_Comm_rank((MPI_Comm)comm_context,&myRank);
 		if (myRank==masterRank) 
