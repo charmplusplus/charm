@@ -25,8 +25,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#if defined(__APPLE__) 
+#if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
 #include <Carbon/Carbon.h>
+#include <Multiprocessing.h>
 #endif
 
 extern "C" int CmiNumCores(void) {
@@ -46,7 +47,7 @@ struct _SYSTEM_INFO sysinfo;
     }
   }
 
-#if defined(__APPLE__) 
+#if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
   a = MPProcessorsScheduled(); /* Number of active/running CPUs */
 #endif
 
