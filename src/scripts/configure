@@ -2675,6 +2675,35 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test if has Multiprocessing.h for apple ####
+cat > $t <<EOT
+#include <Carbon/Carbon.h>
+#include <Multiprocessing.h>
+int main() {
+  int a = MPProcessorsScheduled();
+}
+EOT
+test_cxx "whether has Multiprocessing.h for Apple " "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_MULTIPROCESSING_H $pass
+_ACEOF
+
+
+#### test if has stdint.h ####
+cat > $t <<EOT
+#include <stdint.h>
+int main() {
+  return 0;
+}
+EOT
+test_cxx "whether has stdint.h " "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_STDINT_H $pass
+_ACEOF
+
+
 #### check if PAPI exists ####
 if test -n "$CMK_USE_PAPI"
 then

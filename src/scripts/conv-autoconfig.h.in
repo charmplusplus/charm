@@ -63,7 +63,7 @@
 /* whether PAPI exists */
 #undef CMK_HAS_COUNTER_PAPI
 
-/* wether has elf.h */
+/* whether has elf.h */
 #undef CMK_HAS_ELF_H
 
 /* whether gethostname() exists */
@@ -80,6 +80,9 @@
 
 /* whether mmap() accepts MAP_ANON */
 #undef CMK_HAS_MMAP_ANON
+
+/* whether has Multiprocessing.h */
+#undef CMK_HAS_MULTIPROCESSING_H
 
 /* whether the pthread_setaffinity_np() exists */
 #undef CMK_HAS_PTHREAD_SETAFFINITY

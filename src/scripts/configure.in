@@ -847,12 +847,33 @@ int main() {
 }
 EOT
 test_cxx "whether has elf.h " "yes" "no" ""
-AC_DEFINE_UNQUOTED([CMK_HAS_ELF_H], $pass, [wether has elf.h])
+AC_DEFINE_UNQUOTED([CMK_HAS_ELF_H], $pass, [whether has elf.h])
 
 #### test if has stdint.h ####
 cat > $t <<EOT
 #include <stdint.h>
 int main() { 
+  return 0;
+}
+EOT
+test_cxx "whether has stdint.h " "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_STDINT_H, $pass, [whether has stdint.h])
+
+#### test if has Multiprocessing.h for apple ####
+cat > $t <<EOT
+#include <Carbon/Carbon.h>
+#include <Multiprocessing.h>
+int main() {
+  int a = MPProcessorsScheduled();
+}
+EOT
+test_cxx "whether has Multiprocessing.h for Apple " "yes" "no" ""
+AC_DEFINE_UNQUOTED([CMK_HAS_MULTIPROCESSING_H], $pass, [whether has Multiprocessing.h])
+
+#### test if has stdint.h ####
+cat > $t <<EOT
+#include <stdint.h>
+int main() {
   return 0;
 }
 EOT
