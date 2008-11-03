@@ -364,7 +364,7 @@ int BgTimeLog::bDepExists(BgTimeLog* log){
 #define strcasecmp stricmp
 #endif
 
-void BgTimeLog::pup(PUP::er &p){
+void BgTimeLog::pup(PUP::er &p) {
     int l=0,idx;
     int i;
 
@@ -447,6 +447,113 @@ void BgTimeLog::pup(PUP::er &p){
       CmiPrintf("Potential error in log: (a floating event) \n");
       print(-1,-1);
     }
+}
+
+void BgTimeLog::winPup(PUP::er &p, int& firstLogToRead, int& numLogsToRead, int& tLineLength) {
+
+  int l=0, idx;
+  int i, j;
+
+  if (p.isPacking()) {           // sanity check
+    if (!strcasecmp(name, "BgSchedulerEnd")) {       // exit event
+      if (endTime == 0.0) {
+	endTime = startTime;
+	if (msgs.length() > 0 && msgs[msgs.length()-1]->sendTime > endTime)
+	  endTime = msgs[msgs.length()-1]->sendTime;
+	execTime = endTime - startTime;
+      }
+    }
+  }
+
+  p|ep; 
+  p|seqno; p|msgId;
+  p|recvTime; p|effRecvTime;p|startTime; p|execTime; p|endTime; 
+  p|flag; p(name,20);
+  if (bglog_version >= 3)
+    p((int *)&objId, sizeof(CmiObjId)/sizeof(int));
+  else if (bglog_version == 2)
+    p((int *)&objId, 3);           // only 3 ints before
+
+  // CmiPrintf("            *** BgTimeLog::pup: ep=%d seqno=%d msgId:[node=%d msgID=%d] name=%s\n", ep, seqno, msgId.node(), msgId.msgID(), name);
+    
+  // pup for BgMsgEntry
+  if (!p.isUnpacking()) l=msgs.length();
+  p|l;
+
+  // CmiPrintf("               *** number of messages: %d\n", l);
+
+  for (i = 0; i < l; i++) {
+    if (p.isUnpacking()) msgs.push_back(new BgMsgEntry);
+    msgs[i]->pup(p);
+  }
+
+  // pup events list for projections
+  if (!p.isUnpacking()) l = evts.length();
+  p|l;
+
+  for (i = 0; i < l; i++) {
+    if (p.isUnpacking()) evts.push_back(new bgEvents);
+    evts[i]->pup(p);
+  }
+
+  // pup for backwardDeps
+  if (!p.isUnpacking()) l = backwardDeps.length();
+  p|l;    
+
+  // CmiPrintf("               *** number of bDeps: %d\n", l);
+
+  for (i = 0; i < l; i++) {
+    if (p.isUnpacking()) {
+      p|idx;
+      CmiAssert(currTline != NULL);
+      if (idx >= firstLogToRead) {
+	// bDep is in the current window
+	addBackwardDep(currTline->timeline[idx - firstLogToRead]);
+      } else {
+	// bDep is in a previous window -> create placeholder for
+	// linking later when converted to a Task
+	BgTimeLog* emptyLog = new BgTimeLog();
+	emptyLog->seqno = -idx;
+	for (j = 0; j<backwardDeps.length(); j++)
+	  if (backwardDeps[j]->seqno == emptyLog->seqno) continue;  // already exists
+	backwardDeps.insertAtEnd(emptyLog);
+      }
+    }
+    else{
+      p|backwardDeps[i]->seqno;
+    }
+  }
+ 
+  if (!p.isUnpacking()) l=forwardDeps.length();
+  p|l;
+
+  // CmiPrintf("               *** number of fDeps: %d\n", l);
+
+  for (i = 0; i < l; i++) {
+    if (p.isUnpacking()) {
+      p|idx;
+      if (idx >= (firstLogToRead + numLogsToRead)) {
+	// fDep is not in this window -> create placeholder for
+	// linking later when the correct window is loaded
+	BgTimeLog* emptyLog = new BgTimeLog();
+	emptyLog->seqno = -idx;
+	for (j = 0; j<forwardDeps.length(); j++)
+	  if (forwardDeps[j]->seqno == emptyLog->seqno) continue;  // already exists
+	forwardDeps.insertAtEnd(emptyLog);
+      }
+      // ignore fDep if it's in this window -> it will be linked
+      // when its corresponding bDep is PUPed
+    }
+    else
+      p|forwardDeps[i]->seqno;
+  }
+
+  // a sanity check for floatable events
+  if (msgId == BgMsgID(-1,-1) && backwardDeps.length() == 0 && recvTime == -1.0) {
+    CmiPrintf("Potential error in log: (a floating event) \n");
+    print(-1,-1);
+  }
+
 }
 
 // create a log with msg and insert into timeline
@@ -549,3 +656,41 @@ void BgTimeLineRec::pup(PUP::er &p)
     }
 }
 
+void BgTimeLineRec::winPup(PUP::er &p, int& firstLogToRead, int& numLogsToRead, int& tLineLength) {
+
+  int l;
+
+  if (!p.isUnpacking()) {
+
+    // if we're packing, pack the whole thing
+    l = length();
+    p|l;
+    // ensure the seqno has been assigned
+    for (int i = 0; i < l; i++)
+      timeline[i]->seqno = i;
+    for (int i = 0; i < l; i++)
+      timeline[i]->winPup(p, firstLogToRead, numLogsToRead, tLineLength);
+
+  } else {
+
+    // unpack based on the values of the global variables
+    if (firstLogToRead == 0) {
+      p|l;
+      tLineLength = l;
+    }
+    // ensure that we don't read more logs than there are in the time
+    // line
+    if ((firstLogToRead + numLogsToRead) > tLineLength) {
+      numLogsToRead = tLineLength - firstLogToRead;
+    }
+    // CmiPrintf("         *** BgTimeLineRec::winPup: tLineLength=%d firstLogToRead=%d numLogsToRead=%d\n", tLineLength, firstLogToRead, numLogsToRead);
+    // unpack and enqueue the logs in the time line
+    for (int i = 0; i < numLogsToRead; i++) {
+      BgTimeLog* t = new BgTimeLog();
+      t->winPup(p, firstLogToRead, numLogsToRead, tLineLength);
+      timeline.enq(t);
+    }
+
+  }
+
+}
