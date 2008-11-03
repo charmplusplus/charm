@@ -221,6 +221,7 @@ public:
     return (otherLog==this);
   }
   void pup(PUP::er &p);
+  void winPup(PUP::er &p, int& firstLogToRead, int& numLogsToRead, int& tLineLength);
 
 #if DELAY_SEND
   void send() {
@@ -306,6 +307,7 @@ public:
   BgTimeLog *getTimeLogOnThread(const BgMsgID &msgId, int *index);
 
   void pup(PUP::er &p);
+  void winPup(PUP::er &p, int& firstLogToRead, int& numLogsToRead, int& tLineLength);
 };
 
 // BigSim log function API
@@ -318,6 +320,8 @@ void BgEndLastLog(BgTimeLineRec &tlinerec);
 int BgLogGetThreadEP();
 int BgLoadTraceSummary(const char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes);
 int BgReadProc(int procNum, int numWth, int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec);
+int BgReadProcWindow(int procNum, int numWth, int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec,
+		     int& fileLoc, int& totalTlineLength, int firstLog, int numLogs);
 int* BgLoadOffsets(int totalProcs, int numPes);
 void BgWriteThreadTimeLine(char *fname, int x, int y, int z, int th, BgTimeLine &tline);
 void BgWriteTraceSummary(int numPes, int x, int y=1, int z=1, int numWth=1, int numCth=1, char *traceroot=NULL);
