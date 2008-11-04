@@ -3,6 +3,9 @@ CMK_CC='xlc_r -q64 '
 CMK_CXX='xlC_r -q64 -qstaticinline '
 CMK_C_OPTIMIZE='-O3 -qstrict -Q!  '
 CMK_CXX_OPTIMIZE='-O3 -qstrict -Q! '
+CMK_CC64=true
+CMK_PIC='-qpic=small'
+
 CMK_LD="$CMK_CC -brtl "
 CMK_LDXX="$CMK_CXX -brtl "
 
@@ -17,4 +20,3 @@ CMK_CF90_FIXED='xlf90_r -q64 '
 
 CMK_AR='ar -X 64 cq'
 CMK_NM='nm -X 64'
-CMK_CC64=true
