@@ -320,7 +320,7 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
     replyIntFn(this, reply, &returnValue);
     return;
   }
-  
+
   pyWorkers[pyReference].inUse = true;
 
   //if (((*CsvAccess(pyWorkers))[pyReference]).object != this) ckout<<"object not this"<<endl;
@@ -355,7 +355,7 @@ void PythonObject::execute (CkCcsRequestMsg *msg, CcsDelayedReply *reply) {
  * It either allocates a new interpreter or uses an existing one, depending on
  * the input parameters. The python lock is acquired if the interpreter is
  * successfully prepared.
- * 
+ *
  * @return the ID of the interpreter allocated. zero means failure
  */
 int PythonObject::prepareInterpreter(PythonExecute *pyMsg) {
@@ -456,12 +456,12 @@ std::string getTraceback() {
     */
     PyObject* tbstr = PyString_FromString("traceback");
     PyObject* tbmod = PyImport_Import(tbstr);
-    if (!tbmod) 
+    if (!tbmod)
       return NULL;//throw new NException("Unable to import traceback module. Is your Python installed?");
     PyObject* tbdict = PyModule_GetDict(tbmod);
     PyObject* formatFunc = PyDict_GetItemString(tbdict,
 "format_exception");
-    if (!formatFunc) 
+    if (!formatFunc)
       return NULL;//throw new NException("Can't find traceback.format_exception");
     if (!traceback) {
       traceback = Py_None;
@@ -594,7 +594,7 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
     PyRun_String("class CharmContainer:\n\tpass\n\n", Py_file_input, dict, dict);
     }
     CkPythonDebugf("Item: %d %d %d\n",PyFunction_Check(item),PyMethod_Check(item),PyCallable_Check(item));
-    
+
     // create the container for the data
     CkPythonDebugf("Status 2 %p\n",PyErr_Occurred());
     PyObject *part = PyRun_String("CharmContainer()", Py_eval_input, dict, dict);
@@ -854,6 +854,7 @@ void PythonObject::pythonSleep(int handle) {
 
 PythonCCS::PythonCCS(CkArgMsg *arg) {
   pythonCcsProxy = thishandle;
+  delete arg;
 }
 
 CkReductionMsg *pythonCombinePrint(int nMsg, CkReductionMsg **msgs) {
@@ -864,9 +865,9 @@ CkReductionMsg *pythonCombinePrint(int nMsg, CkReductionMsg **msgs) {
   for (int i=0; i<nMsg; ++i) {
     length += msgs[i]->getSize();
   }
-  
+
   CkReductionMsg *result = CkReductionMsg::buildNew(length,NULL);
-  
+
   PythonReplyString *data = (PythonReplyString*)(result->getData());
   data->reply = ((PythonReplyString*)msgs[0]->getData())->reply;
   char *cur=data->data;
@@ -901,7 +902,7 @@ static void initializePythonDefault(void) {
   CtvInitialize(PyObject *,pythonReturnValue);
 
   PythonCCS::reduceString = CkReduction::addReducer(pythonCombinePrint);
-  
+
   Py_Initialize();
   PyEval_InitThreads();
 

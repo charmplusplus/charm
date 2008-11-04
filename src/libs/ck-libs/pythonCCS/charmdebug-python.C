@@ -4,6 +4,7 @@
 class CpdPython : public CBase_CpdPython {
 public:
   CpdPython (CkArgMsg *msg) {
+    delete msg;
     //((CProxy_CpdPython)thishandle).registerPython("CpdPython");
     //CkCallback cb(CkIndex_CpdPython::pyRequest(0),thishandle);
     //CcsRegisterHandler("pycode", cb);
@@ -39,12 +40,12 @@ public:
 
   int buildIterator(PyObject*&, void*);
   int nextIteratorUpdate(PyObject*&, PyObject*, void*);
-  
+
   void getArray(int handle);
   void getValue(int handle);
   void getCast(int handle);
   void getStatic(int handle);
-  
+
   void cpdCheck(void*);
   void registerPersistent(CkCcsRequestMsg*);
 };
@@ -218,7 +219,7 @@ void CpdPythonGroup::registerPersistent(CkCcsRequestMsg *msg) {
     _debugEntryTable[ntohl(((int*)iter)[i+2])].postProcess.push_back(dpc);
   }
   CkPrintf("[%d] Registering Persistent method (reference=%d)\n",CkMyPe(),pyReference);
-  
+
 }
 
 #include "charmdebug_python.def.h"
