@@ -198,22 +198,22 @@ CkDelegateData *CkDelegateMgr::DelegatePointerPup(PUP::er &p,CkDelegateData *pd)
 
 void CProxy::ckDelegate(CkDelegateMgr *dTo,CkDelegateData *dPtr) {
  	if (dPtr) dPtr->ref();
-	ckUndelegate(); 
-	delegatedMgr = dTo; 
+	ckUndelegate();
+	delegatedMgr = dTo;
 	delegatedPtr = dPtr;
 }
 void CProxy::ckUndelegate(void) {
-	delegatedMgr=NULL; 
-	if (delegatedPtr) delegatedPtr->unref(); 
-	delegatedPtr=NULL; 
+	delegatedMgr=NULL;
+	if (delegatedPtr) delegatedPtr->unref();
+	delegatedPtr=NULL;
 }
 
 /// Copy constructor
-CProxy::CProxy(const CProxy &src) 
-    :delegatedMgr(src.delegatedMgr) 
+CProxy::CProxy(const CProxy &src)
+    :delegatedMgr(src.delegatedMgr)
 {
     delegatedPtr = NULL;
-    if(delegatedMgr != NULL && src.delegatedPtr != NULL) 
+    if(delegatedMgr != NULL && src.delegatedPtr != NULL)
         delegatedPtr = src.delegatedMgr->ckCopyDelegateData(src.delegatedPtr);
 }
 
@@ -227,7 +227,7 @@ CProxy& CProxy::operator=(const CProxy &src) {
             delegatedPtr = delegatedMgr->ckCopyDelegateData(src.delegatedPtr);
         else
             delegatedPtr = NULL;
-        
+
         // subtle: do unref *after* ref, because it's possible oldPtr == delegatedPtr
 	if (oldPtr) oldPtr->unref();
 	return *this;
@@ -252,7 +252,7 @@ void CProxy::pup(PUP::er &p) {
 	  else
 		delegatedMgr=(CkDelegateMgr *)CkLocalBranch(delegatedTo);
 	}
-        
+
         delegatedPtr = delegatedMgr->DelegatePointerPup(p,delegatedPtr);
 	if (p.isUnpacking() && delegatedPtr)
             delegatedPtr->ref();
@@ -294,8 +294,8 @@ void CkSectionID::operator=(const CkSectionID &sid) {
   for (int i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
 }
 
-CkSectionID::~CkSectionID() { 
-    delete [] _elems; 
+CkSectionID::~CkSectionID() {
+    delete [] _elems;
     if(pelist != NULL)
         delete [] pelist;
 }
@@ -313,7 +313,7 @@ void CkSectionID::pup(PUP::er &p) {
 void CUDACallbackManager(void *fn) {
   if (fn != NULL) {
     CkCallback *cb = (CkCallback*) fn;
-    cb->send(); 
+    cb->send();
   }
 }
 
@@ -348,7 +348,7 @@ void *CkLocalBranch(CkGroupID gID) {
   return _localBranch(gID);
 }
 
-static 
+static
 void *_ckLocalNodeBranch(CkGroupID groupID) {
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
   void *retval = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
@@ -361,9 +361,9 @@ void *CkLocalNodeBranch(CkGroupID groupID)
 {
   void *retval;
   // we are called in a constructor
-  if (CkpvAccess(_currentNodeGroupObj) && CkpvAccess(_currentGroup) == groupID) 
+  if (CkpvAccess(_currentNodeGroupObj) && CkpvAccess(_currentGroup) == groupID)
     return CkpvAccess(_currentNodeGroupObj);
-  while (NULL== (retval=_ckLocalNodeBranch(groupID))) 
+  while (NULL== (retval=_ckLocalNodeBranch(groupID)))
   { // Nodegroup hasn't finished being created yet-- schedule...
     CsdScheduler(0);
   }
@@ -380,7 +380,7 @@ void *CkLocalChare(const CkChareID *pCid)
 		VidBlock *v=(VidBlock *)pCid->objPtr;
 		return v->getLocalChare();
 	}
-	else 
+	else
 	{ //An ordinary chare ID
 		if (pe!=CkMyPe())
 			return NULL;//Chare not on this PE
@@ -414,15 +414,15 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 {
   void *deliverMsg;
-  if (_entryTable[epIdx]->noKeep) 
+  if (_entryTable[epIdx]->noKeep)
   { /* Deliver a read-only copy of the message */
     deliverMsg=(void *)msg;
-  } else 
+  } else
   { /* Method needs a copy of the message to keep/delete */
     void *oldMsg=(void *)msg;
     deliverMsg=CkCopyMsg(&oldMsg);
 #ifndef CMK_OPTIMIZE
-    if (oldMsg!=msg) 
+    if (oldMsg!=msg)
       CkAbort("CkDeliverMessageReadonly: message pack/unpack changed message pointer!");
 #endif
   }
@@ -524,7 +524,7 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   CkpvAccess(_currentGroup) = groupID;
 
 // Now that the NodeGroup is created, add it to the table.
-//  NodeGroups can be accessed by multiple processors, so 
+//  NodeGroups can be accessed by multiple processors, so
 //  this is in the opposite order from groups - invoking the constructor
 //  before registering it.
 // User may call CkLocalNodeBranch() inside the nodegroup constructor
@@ -533,7 +533,7 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   _invokeEntryNoTrace(epIdx,env,obj);
   CkpvAccess(_currentNodeGroupObj) = NULL;
   _STATS_RECORD_PROCESS_NODE_GROUP_1();
-  
+
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
   CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
   CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
@@ -556,7 +556,7 @@ void _createGroup(CkGroupID groupID, envelope *env)
   _SET_USED(env, 1);
   register int epIdx = env->getEpIdx();
   register int msgIdx = env->getMsgIdx();
-  int gIdx = _entryTable[epIdx]->chareIdx;  
+  int gIdx = _entryTable[epIdx]->chareIdx;
   CkNodeGroupID rednMgr;
   if(_chareTable[gIdx]->isIrr == 0){
 		CProxy_CkArrayReductionMgr rednMgrProxy = CProxy_CkArrayReductionMgr::ckNew(0, groupID);
@@ -635,11 +635,11 @@ static CkGroupID _nodeGroupCreate(envelope *env)
   return groupNum;
 }
 
-/**** generate the group idx when group is creator pe is not pe0 
+/**** generate the group idx when group is creator pe is not pe0
  **** the 32 bit index has msb set to 1 (+ve indices are used by proc 0)
- **** remaining bits contain the group creator processor number and 
+ **** remaining bits contain the group creator processor number and
  **** the idx number which starts from 1(_numGroups or _numNodeGroups) on each proc ****/
-   	
+
 int _getGroupIdx(int numNodes,int myNode,int numGroups)
 {
         int idx;
@@ -647,7 +647,7 @@ int _getGroupIdx(int numNodes,int myNode,int numGroups)
         int n = 32 - (x+1);                                     // number of bits remaining for the index
         idx = (myNode<<n) + numGroups;                          // add number of processors, shift by the no. of bits needed,
                                                                 // then add the next available index
-	// of course this won't work when int is 8 bytes long on T3E 
+	// of course this won't work when int is 8 bytes long on T3E
         //idx |= 0x80000000;                                      // set the most significant bit to 1
 	idx = - idx;
 								// if int is not 32 bits, wouldn't this be wrong?
@@ -689,7 +689,7 @@ static inline void *_allocNewChare(envelope *env)
   setMemoryTypeChare(tmp);
   return tmp;
 }
- 
+
 static void _processNewChareMsg(CkCoreState *ck,envelope *env)
 {
   register void *obj = _allocNewChare(env);
@@ -699,7 +699,7 @@ static void _processNewChareMsg(CkCoreState *ck,envelope *env)
 static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
 {
   register void *obj = _allocNewChare(env);
-  register CkChareID *pCid = (CkChareID *) 
+  register CkChareID *pCid = (CkChareID *)
       _allocMsg(FillVidMsg, sizeof(CkChareID));
   pCid->onPE = CkMyPe();
   pCid->objPtr = obj;
@@ -744,7 +744,7 @@ static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
 /************** Receive: Groups ****************/
 
 /**
- This message is sent to this groupID--prepare to 
+ This message is sent to this groupID--prepare to
  handle this message by looking up the group,
  and possibly stashing the message.
 */
@@ -779,14 +779,14 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
 #if CMK_LBDB_ON
   if (objstopped) the_lbdb->ObjectStart(objHandle);
 #endif
-  _STATS_RECORD_PROCESS_BRANCH_1();  
+  _STATS_RECORD_PROCESS_BRANCH_1();
 }
 
 static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID =  env->getGroupNum();
   register IrrGroup *obj = _lookupGroup(ck,env,env->getGroupNum());
-  if(obj) { 
+  if(obj) {
     _deliverForBocMsg(ck,env->getEpIdx(),env,obj);
   }
 }
@@ -813,18 +813,18 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
   obj = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
   if(!obj) { // groupmember not yet created
-#if CMK_IMMEDIATE_MSG	 
-    if (CmiIsImmediate(env))     // buffer immediate message	 
-      CmiDelayImmediate();	 
-    else	 
+#if CMK_IMMEDIATE_MSG
+    if (CmiIsImmediate(env))     // buffer immediate message
+      CmiDelayImmediate();
+    else
 #endif
     CksvAccess(_nodeGroupTable)->find(groupID).enqMsg(env);
     CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
     return;
   }
   CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
-#if CMK_IMMEDIATE_MSG	 
-  if (!CmiIsImmediate(env)) 
+#if CMK_IMMEDIATE_MSG
+  if (!CmiIsImmediate(env))
 #endif
   ck->process();
   env->setMsgtype(ForChareMsg);
@@ -897,7 +897,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       _processForNodeBocMsg(ck,env);
       // stats record moved to _processForNodeBocMsg because it is conditional
       break;
-      
+
 // Array support
     case ArrayEltInitMsg:
       if(env->isPacked()) CkUnpackMessage(&env);
@@ -907,7 +907,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       if(env->isPacked()) CkUnpackMessage(&env);
       _processArrayEltMsg(ck,env);
       break;
-    
+
 // Chare support
     case NewChareMsg :
       ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
@@ -932,7 +932,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       ck->process();
       _processFillVidMsg(ck,env);
       break;
-    
+
     default:
       CmiAbort("Fatal Charm++ Error> Unknown msg-type in _processHandler.\n");
   }
@@ -1044,7 +1044,7 @@ static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, (char *)env); }
     else{
 			CmiSyncSendAndFree(pe, len, (char *)env);
-		}	
+		}
   }
 }
 
@@ -1065,7 +1065,7 @@ static void _noCldEnqueue(int pe, envelope *env)
 /*
   if (pe == CkMyPe()) {
     CmiHandleMessage(env);
-  } else 
+  } else
 */
   CkPackMessage(&env);
   int len=env->getTotalsize();
@@ -1097,7 +1097,7 @@ static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
 #ifndef CMK_OPTIMIZE
-  setMemoryOwnedBy(env, 0);
+  setMemoryOwnedBy(((char*)env)-sizeof(CmiChunkHeader), 0);
 #endif
 #if CMK_OBJECT_QUEUE_AVAILABLE
   CmiSetHandler(env, index_objectQHandler);
@@ -1109,7 +1109,7 @@ static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
     if(pe==CkMyPe()) {
       VidBlock *vblk = (VidBlock *) pCid->objPtr;
       void *objPtr;
-      if (NULL!=(objPtr=vblk->getLocalChare())) 
+      if (NULL!=(objPtr=vblk->getLocalChare()))
       { //A ready local chare
 	env->setObjPtr(objPtr);
 	return pe;
@@ -1169,7 +1169,7 @@ extern "C"
 void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 {
   if (pCid->onPE==CkMyPe())
-  { 
+  {
     if(!CmiNodeAlive(CkMyPe())){
 	return;
     }
@@ -1199,7 +1199,7 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
 #ifndef CMK_OPTIMIZE
-  setMemoryOwnedBy(env, 0);
+  setMemoryOwnedBy(((char*)env)-sizeof(CmiChunkHeader), 0);
 #endif
   CmiSetHandler(env, _charmHandlerIdx);
   return env;
@@ -1239,8 +1239,8 @@ extern "C"
 void CkSendMsgBranchImmediate(int eIdx, void *msg, int destPE, CkGroupID gID)
 {
 #if CMK_IMMEDIATE_MSG && ! CMK_SMP
-  if (destPE==CkMyPe()) 
-  { 
+  if (destPE==CkMyPe())
+  {
     CkSendMsgBranchInline(eIdx, msg, destPE, gID);
     return;
   }
@@ -1359,8 +1359,8 @@ extern "C"
 void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
 {
 #if CMK_IMMEDIATE_MSG
-  if (node==CkMyNode()) 
-  { 
+  if (node==CkMyNode())
+  {
     CkSendMsgNodeBranchInline(eIdx, msg, node, gID);
     return;
   }
@@ -1384,12 +1384,12 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
 extern "C"
 void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int opts)
 {
-  if (node==CkMyNode()) 
-  { 
+  if (node==CkMyNode())
+  {
     CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
     void *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();
     CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
-    if (obj!=NULL) 
+    if (obj!=NULL)
     { //Just directly call the group:
 #ifndef CMK_OPTIMIZE
       envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
@@ -1459,7 +1459,7 @@ static void _prepareOutgoingArrayMsg(envelope *env,int type)
   _SET_USED(env, 1);
   env->setMsgtype(type);
 #ifndef CMK_OPTIMIZE
-  setMemoryOwnedBy(env, 0);
+  setMemoryOwnedBy(((char*)env)-sizeof(CmiChunkHeader), 0);
 #endif
   CmiSetHandler(env, _charmHandlerIdx);
   CpvAccess(_qd)->create();
@@ -1542,7 +1542,7 @@ public:
 		fprintf(f,"-1 -1 -1");
 		fclose(f);
 	}
-	
+
 	virtual CmiBool processMessage(envelope *env,CkCoreState *ck) {
                 if (env->getEvent())
 		     fprintf(f,"%d %d %d %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg);
@@ -1574,10 +1574,10 @@ class CkMessageReplay : public CkMessageWatcher {
                 }
 		return CmiTrue;
 	}
-	
+
 	/// This is a (short) list of messages we aren't yet ready for:
-	CkQ<envelope *> delayed; 
-	
+	CkQ<envelope *> delayed;
+
 	/// Try to flush out any delayed messages
 	void flush(void) {
 		int len=delayed.length();
@@ -1596,13 +1596,13 @@ class CkMessageReplay : public CkMessageWatcher {
 			  }
 		}
 	}
-	
+
 public:
-	CkMessageReplay(FILE *f_) :f(f_) { getNext(); 
+	CkMessageReplay(FILE *f_) :f(f_) { getNext();
 	REPLAYDEBUG("Constructing ckMessageReplay: "<< nextPE <<" "<< nextSize <<" "<<nextEvent);
 		    }
 	~CkMessageReplay() {fclose(f);}
-	
+
 	virtual CmiBool processMessage(envelope *env,CkCoreState *ck) {
 	  REPLAYDEBUG("ProcessMessage message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent() <<" " <<env->getMsgtype() <<" " <<env->getMsgIdx());
                 if (env->getEvent() == 0) return CmiTrue;
