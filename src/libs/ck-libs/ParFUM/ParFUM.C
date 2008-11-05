@@ -337,8 +337,7 @@ FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 	if (FEM_Partition_Mode == SerialPartitionMode || FEM_Partition_Mode == ManualPartitionMode) {
 		int tag=89375;
 		int myRank; MPI_Comm_rank((MPI_Comm)comm_context,&myRank);
-		if (myRank==masterRank) 
-		{ /* I'm the master-- split up and send */
+		if (myRank==masterRank) { /* I'm the master-- split up and send */
 			int p, nParts; MPI_Comm_size((MPI_Comm)comm_context,&nParts);
 			int *parts=new int[nParts];
 			FEM_Mesh_partition(fem_mesh,nParts,parts);
@@ -348,12 +347,11 @@ FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 					FEM_Mesh_send(parts[p],p,tag,comm_context);
 					FEM_Mesh_deallocate(parts[p]);
 				}
-				else /* Just keep my own partition */
+				else { /* Just keep my own partition */
 					new_mesh=parts[p];
+				}
 			return new_mesh;
-		}
-		else
-		{ /* I'm a slave-- recv new mesh from master: */
+		} else { /* I'm a slave-- recv new mesh from master: */
 			return FEM_Mesh_recv(masterRank,tag,comm_context);
 		}
     } else if (FEM_Partition_Mode == ParallelPartitionMode) {
@@ -365,6 +363,7 @@ FEM_Mesh_broadcast(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
 	} else {
         CkAbort("Unrecognized ParFUM partitioning mode");
     }
+    return -1; // we should never get here
 }
 FORTRAN_AS_C_RETURN(int,FEM_MESH_BROADCAST,FEM_Mesh_broadcast,fem_mesh_broadcast, 
 	(int *mesh,int *rank,int *comm),(*mesh,*rank,*comm))

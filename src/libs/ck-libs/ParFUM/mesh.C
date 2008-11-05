@@ -1543,6 +1543,11 @@ void FEM_Entity::create(int attr,const char *caller) {
       adaptLockPrio->setDatatype(FEM_DOUBLE);
       adaptLockPrio->setWidth(1);
       add(adaptLockPrio);
+  } else if (attr == FEM_PARTITION) {
+      FEM_DataAttribute* partition = new FEM_DataAttribute(this, attr);
+      partition->setDatatype(FEM_INT);
+      partition->setWidth(1);
+      add(partition);
   }
   else {
 	//It's an unrecognized tag: abort
