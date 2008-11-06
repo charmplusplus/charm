@@ -62,7 +62,7 @@ private:
   BgMsgEntry() {}
 public:
   BgMsgEntry(int seqno, int _msgSize, double _sendTime, double _recvTime, int dstNode, int destrank);
-  BgMsgEntry(char *msg, int node, int tid, int local, int g=1);
+  BgMsgEntry(char *msg, int node, int tid, double sendT, int local, int g=1);
   inline void print() {
     CmiPrintf("msgID:%d sent:%f recvtime:%f dstPe:%d group:%d\n", msgID, sendTime, recvTime, dstPe, group);
   }
@@ -80,6 +80,7 @@ public:
 #endif
   void pup(PUP::er &p) {
     p|msgID; p|dstPe; p|sendTime; p|recvTime; p|tID; p|msgsize; 
+    CmiAssert(recvTime>=sendTime);
     if (p.isUnpacking()) group = 1;    // default value
     if (bglog_version>0) p|group;
   }
@@ -171,8 +172,8 @@ public:
   inline void addMsg(BgMsgEntry *mentry) {
            msgs.push_back(mentry);
          }
-  inline void addMsg(char *msg, int node, int tid, int local, int group=1) { 
-           msgs.push_back(new BgMsgEntry(msg, node, tid, local, group)); 
+  inline void addMsg(char *msg, int node, int tid, double sendT, int local, int group=1) { 
+           msgs.push_back(new BgMsgEntry(msg, node, tid, sendT, local, group)); 
          }
   inline void setObjId(CmiObjId *idx) {
            memcpy(&objId, idx, sizeof(CmiObjId));

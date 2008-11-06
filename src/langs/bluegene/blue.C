@@ -677,10 +677,11 @@ void sendPacket_(nodeInfo *myNode, int x, int y, int z, int threadID, int handle
     latency = MSGTIME(myNode->x, myNode->y, myNode->z, x,y,z, numbytes);
     CmiAssert(latency >= 0);
   }
-  CmiBgMsgRecvTime(sendmsg) = latency + BgGetTime();
+  double sendT = BgGetTime();
+  CmiBgMsgRecvTime(sendmsg) = latency + sendT;
   
   // timing
-  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, local, 1);
+  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, sendT, local, 1);
 
   if (local)
     addBgNodeInbuffer(sendmsg, myNode->id);
@@ -707,11 +708,12 @@ static inline void nodeBroadcastPacketExcept_(int node, CmiInt2 threadID, int ha
   CmiBgMsgFlag(sendmsg) = 0;
   CmiBgMsgRefCount(sendmsg) = 0;
   /* FIXME */
-  CmiBgMsgRecvTime(sendmsg) = MSGTIME(myNode->x, myNode->y, myNode->z, 0,0,0, numbytes) + BgGetTime();
+  double sendT = BgGetTime();
+  CmiBgMsgRecvTime(sendmsg) = MSGTIME(myNode->x, myNode->y, myNode->z, 0,0,0, numbytes) + sendT;
 
   // timing
   // FIXME
-  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, 0, 1);
+  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, sendT, 0, 1);
 
   DEBUGF(("[%d]CmiSyncBroadcastAllAndFree node: %d\n", BgMyNode(), node));
 #if DELAY_SEND
@@ -738,7 +740,8 @@ static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int 
   CmiBgMsgRefCount(sendmsg) = 0;
   /* FIXME */
   BgAdvance(cva(bgMach).network->alphacost());
-  CmiBgMsgRecvTime(sendmsg) = BgGetTime();	
+  double sendT = BgGetTime();
+  CmiBgMsgRecvTime(sendmsg) = sendT;	
 
   // timing
 #if 0
@@ -755,7 +758,7 @@ static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int 
   }
 #else
   // FIXME
-  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, 0, 1);
+  BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, sendT, 0, 1);
 #endif
 
   DEBUGF(("[%d]CmiSyncBroadcastAllAndFree node: %d tid:%d recvT:%f\n", BgMyNode(), node, threadID, CmiBgMsgRecvTime(sendmsg)));
@@ -866,7 +869,7 @@ void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbyt
 
     // timing and make sure all msgID are the same
     if (i!=0) CpvAccess(msgCounter) --;
-    BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), t, local, i==0?npes:-1);
+    BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), t, now, local, i==0?npes:-1);
 
     if (myNode->x == x && myNode->y == y && myNode->z == z)
       addBgNodeInbuffer(sendmsg, myNode->id);

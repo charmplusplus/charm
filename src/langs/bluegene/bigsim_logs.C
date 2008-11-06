@@ -34,10 +34,10 @@ extern "C" void BgGenerateLogs()
 }
 
 // dstNode is the dest bg node, can be -1
-BgMsgEntry::BgMsgEntry(char *msg, int dstNode, int tid, int local, int g)
+BgMsgEntry::BgMsgEntry(char *msg, int dstNode, int tid, double sendT, int local, int g)
 {
   msgID = CmiBgMsgID(msg);
-  sendTime = timerFunc();
+  sendTime = sendT;
   recvTime = CmiBgMsgRecvTime(msg);
   dstPe = dstNode;
   tID = tid;                   // CmiBgMsgThreadID(msg);
