@@ -220,7 +220,7 @@ extern "C" void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num)
 }
 
 #if CMK_CRAYXT
-extern int getXTNodeID(int mype, int numpes);
+extern "C" int getXTNodeID(int mype, int numpes);
 #endif
 
 extern "C" void CmiInitCPUTopology(char **argv)
