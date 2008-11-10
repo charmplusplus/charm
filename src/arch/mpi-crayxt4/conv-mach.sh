@@ -13,8 +13,8 @@ CMK_LIBS="-lckqt -lrca"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 
 # compiler for compiling sequential programs
-CMK_SEQ_CC="gcc "
-CMK_SEQ_LD="gcc "
+CMK_SEQ_CC="gcc -fPIC"
+CMK_SEQ_LD="gcc -fPIC"
 CMK_SEQ_CXX="g++ "
 CMK_SEQ_LDXX="g++ "
 CMK_SEQ_LIBS=""
