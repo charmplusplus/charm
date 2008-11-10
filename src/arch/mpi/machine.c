@@ -1638,6 +1638,22 @@ static void ConverseRunPE(int everReturn)
   }
 }
 
+static char *thread_level_tostring(int thread_level)
+{
+  switch (thread_level) {
+  case MPI_THREAD_SINGLE:
+      return "MPI_THREAD_SINGLE";
+  case MPI_THREAD_FUNNELED:
+      return "MPI_THREAD_FUNNELED";
+  default: {
+      char *str = (char*)malloc(5);
+      sprintf(str,"%d", thread_level);
+      return str;
+      }
+  }
+  return  "unknown";
+}
+
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 {
   int n,i;
@@ -1670,7 +1686,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   MPI_Comm_rank(MPI_COMM_WORLD, &_Cmi_mynode);
 
   MPI_Get_version(&ver, &subver);
-  if (_Cmi_mynode == 0) printf("Charm++> Running on MPI version: %d.%d multi-thread support: %d/%d\n", ver, subver, provided, thread_level);
+  if (_Cmi_mynode == 0) {
+    printf("Charm++> Running on MPI version: %d.%d multi-thread support: %s (max supported: %s)\n", ver, subver, thread_level_tostring(thread_level), thread_level_tostring(provided));
+  }
 
   /* processor per node */
   _Cmi_mynodesize = 1;
