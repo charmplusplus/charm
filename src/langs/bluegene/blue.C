@@ -243,7 +243,7 @@ void resetVTime()
   /* reset start time */
   int timingMethod = cva(bgMach).timingMethod;
   if (timingMethod == BG_WALLTIME) {
-    double ct = CmiWallTimer();
+    double ct = BG_TIMER();
     if (tTIMERON) CmiAssert(ct >= tSTARTTIME);
     tSTARTTIME = ct;
   }
@@ -291,10 +291,10 @@ void stopVTimer()
   tTIMERON = 0;
   const int timingMethod = cva(bgMach).timingMethod;
   if (timingMethod == BG_WALLTIME) {
-    const double tp = CmiWallTimer();
+    const double tp = BG_TIMER();
     double inc = tp-tSTARTTIME;
     advanceTime(inc);
-//    tSTARTTIME = CmiWallTimer();	// skip the above time
+//    tSTARTTIME = BG_TIMER();	// skip the above time
   }
   else if (timingMethod == BG_ELAPSE) {
     // if no bgelapse called, assume it takes 1us
@@ -321,11 +321,11 @@ double BgGetTime()
   if (timingMethod == BG_WALLTIME) {
     /* accumulate time since last starttime, and reset starttime */
     if (tTIMERON) {
-      const double tp2= CmiWallTimer();
+      const double tp2= BG_TIMER();
       double &startTime = tSTARTTIME;
       double inc = tp2 - startTime;
       advanceTime(inc);
-      startTime = CmiWallTimer();
+      startTime = BG_TIMER();
     }
     return tCURRTIME;
   }

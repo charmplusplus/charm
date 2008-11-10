@@ -228,6 +228,14 @@ void BgSetNodeData(char *data);
 #define BG_WALLTIME    2
 #define BG_COUNTER     3
 
+/*#define BG_CPUTIMER    1*/
+
+#if BG_CPUTIMER
+#define BG_TIMER       CmiCpuTimer
+#else
+#define BG_TIMER       CmiWallTimer
+#endif
+
 typedef void (*bgEventCallBackFn)(void *data, double adjust, double recvT, void *usrPtr);
 
 void BgElapse(double t);
