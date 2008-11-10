@@ -24,7 +24,7 @@ extern void CUDACallbackManager(void *);
  *  the runtime system if needed
  */ 
 #define NUM_BUFFERS 100
-#define GPU_DEBUG 1
+// #define GPU_DEBUG
 
 
 /* work request queue */
@@ -49,6 +49,7 @@ extern void CUDACallbackManager(void * fn);
 /* setupMemory
    set up memory on the gpu for this kernel's execution */
 void setupMemory(workRequest *wr) {
+  int returnVal; 
   dataInfo *bufferInfo = wr->bufferInfo; 
 
   if (bufferInfo != NULL) {
@@ -62,15 +63,24 @@ void setupMemory(workRequest *wr) {
 #ifdef GPU_DEBUG
 	printf("buffer %d allocated\n", index); 
 #endif
-	cudaMalloc((void **)&devBuffers[index], size); 
+	/*
+	returnVal = cudaMallocHost((void **)&devBuffers[index], size); 
+	*/
+	returnVal = cudaMalloc((void **) &devBuffers[index], size); 
+#ifdef GPU_DEBUG
+	printf("cudaMallocHost returned %d\n", returnVal); 
+#endif
       }
       
       if (bufferInfo[i].transferToDevice) {
 #ifdef GPU_DEBUG
 	printf("transferToDevice bufId: %d\n", index); 
 #endif
-	cudaMemcpy(devBuffers[index], hostBuffers[index], size, 
-		   cudaMemcpyHostToDevice);
+	/*
+	cudaMemcpyAsync(devBuffers[index], hostBuffers[index], size, 
+		   cudaMemcpyHostToDevice, memory_stream);
+	*/
+	cudaMemcpy(devBuffers[index], hostBuffers[index], size, cudaMemcpyHostToDevice); 
       }
     }
   }
@@ -92,17 +102,25 @@ void cleanupMemory(workRequest *wr) {
 #ifdef GPU_DEBUG
 	printf("transferFromDevice: %d\n", index); 
 #endif
-	cudaMemcpy(hostBuffers[index], devBuffers[index], size, cudaMemcpyDeviceToHost);
+	/*
+	cudaMemcpyAsync(hostBuffers[index], devBuffers[index], size,
+	cudaMemcpyDeviceToHost, memory_stream);
+	*/
+	cudaMemcpy(hostBuffers[index], devBuffers[index], size, cudaMemcpyDeviceToHost); 
       }
       
       if (bufferInfo[i].freeBuffer) {
 #ifdef GPU_DEBUG
 	printf("buffer %d freed\n", index);
 #endif 
+	/*
+	cudaFreeHost(devBuffers[index]); 
+	*/
 	cudaFree(devBuffers[index]); 
 	devBuffers[index] = NULL; 
       }
     }
+    free(bufferInfo); 
   }
 }
 
@@ -150,7 +168,7 @@ void gpuProgressFn() {
       return; 
     }  
     else if (cudaStreamQuery(kernel_stream) == cudaSuccess) {
-      // else if (cudaStreamQuery(0) == cudaSuccess ) {
+    // else if (cudaStreamQuery(0) == cudaSuccess ) {
 #ifdef GPU_DEBUG
       printf("completion event success \n");
 #endif  
@@ -160,7 +178,7 @@ void gpuProgressFn() {
     } 
 #ifdef GPU_DEBUG
     else {
-      printf("GPU is busy, return code %d\n", cudaStreamQuery(0)); 
+      printf("GPU is busy, return code %d\n", cudaStreamQuery(kernel_stream)); 
       return; 
     }
 #endif
