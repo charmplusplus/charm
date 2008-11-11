@@ -1640,6 +1640,7 @@ static void ConverseRunPE(int everReturn)
 
 static char *thread_level_tostring(int thread_level)
 {
+#if CMK_MPI_INIT_THREAD
   switch (thread_level) {
   case MPI_THREAD_SINGLE:
       return "MPI_THREAD_SINGLE";
@@ -1652,6 +1653,11 @@ static char *thread_level_tostring(int thread_level)
       }
   }
   return  "unknown";
+#else
+  char *str = (char*)malloc(5);
+  sprintf(str,"%d", thread_level);
+  return str;
+#endif
 }
 
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
