@@ -1,0 +1,50 @@
+module ControlPoints {
+
+  readonly CProxy_controlPointManager localControlPointManagerProxy;
+  readonly int random_seed;
+
+  mainchare controlPointMain {
+    entry controlPointMain(CkArgMsg*);
+  };
+
+ initnode void controlPointInitNode();
+
+ nodegroup controlPointManager {
+    entry controlPointManager();
+
+    entry void requestMemoryUsage(CkCallback cb);
+    entry void gatherMemoryUsage(CkReductionMsg *msg);
+ }   
+
+
+
+
+
+ message controlPointMsg { 
+ 	 char data[];
+ };
+
+
+
+
+
+ message redistributor2DMsg {  
+	double data[]; 
+ }; 
+ 
+ 
+  array [2D] redistributor2D {
+   entry redistributor2D(void);
+
+   entry void startup();	
+
+    entry void resizeGranules(int, int);
+//    entry void receiveTransposeData(int top, int left, int height, int width, int new_chare_cols, int  new_chare_rows, int which_array, double d[width*height]);
+    entry void receiveTransposeData(redistributor2DMsg *msg);
+
+  } 
+
+
+
+
+};
