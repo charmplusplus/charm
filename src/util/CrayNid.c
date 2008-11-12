@@ -14,6 +14,8 @@
  *  can be called from C++ files
  */
 
+#include "converse.h"
+
 #if XT3_TOPOLOGY || XT4_TOPOLOGY
 
 #include <rca_lib.h>
