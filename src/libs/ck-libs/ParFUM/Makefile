@@ -66,7 +66,7 @@ headers: $(HEADDEP)
 #	$(CHARMC) -c $<
 
 
-MsaHashtable.o: MsaHashtable.C ParFUM.h ParFUM_internals.h MsaHashtable.h
+MsaHashtable.o: MsaHashtable.C $(HEADDEP)
 	$(CHARMC) -c MsaHashtable.C $(INCS)
 
 mesh_modify.o: mesh_modify.C $(HEADDEP)
