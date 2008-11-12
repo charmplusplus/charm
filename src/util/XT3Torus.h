@@ -24,6 +24,7 @@
 #define _CRAY_TORUS_H_
 
 #include "converse.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -36,8 +37,9 @@
 #define MAXNID 2784
 
 extern "C" int *pid2nid;
-extern "C" int nid2pid[MAXNID][2];
+extern "C" int nid2pid[MAXNID][TDIM];
 extern "C" int pidtonid(int numpes);
+extern "C" int getMeshCoord(int nid, int *x, int *y, int *z);
 
 struct loc {
   int x;
@@ -58,6 +60,7 @@ class XT3TorusManager {
 
     int torus[4];
     int procsPerNode;   // number of cores per node
+    char mapping[10];
     
     int coords2pid[XDIM][YDIM][ZDIM][TDIM];     // coordinates to rank
     struct loc *pid2coords;                     // rank to coordinates
@@ -65,61 +68,52 @@ class XT3TorusManager {
 
   public:
     XT3TorusManager() {
-      // open file to load data from CrayNeighborTable
-      FILE *fp = fopen("/usr/users/4/abhatele/work/charm/src/util/CrayNeighbourTable", "r");
-
-      int temp, nid, pid0, pid1, num, lx, ly, lz;
+      int nid = 0, oldnid = -1, lx, ly, lz;
       int minX=XDIM, minY=YDIM, minZ=ZDIM, minT=0, maxX=0, maxY=0, maxZ=0;
-      char header[50];
-      pid2coords = (struct loc*)malloc(sizeof(struct loc) * CmiNumPes());
+
+      int numprocs = CmiNumPes();
+      pid2coords = (struct loc*)malloc(sizeof(struct loc) * numprocs);
 
       // first fill the nid2pid and pid2nid data structures
-      pidtonid(CmiNumPes());
-      
-      // skip header
-      for(int i=0; i<10;i++)
-        temp = fscanf(fp, "%s", header);
+      pidtonid(numprocs);
+ 
+      for(int i=0; i<XDIM; i++)
+	for(int j=0; j<YDIM; j++)
+	  for(int k=0; k<ZDIM; k++)
+	    for(int l=0; l<TDIM; l++)
+	      coords2pid[i][j][k][l] = -1;
 
-      dimNT = 1; 			// assume SN mode first        
-      // now read the lines one at a time and fill the two arrays
-      // for pid2coords and coords2pid
-      for(int i=0; i<2112;i++)
+      dimNT = 1;			// assume SN mode first
+      // now fill the coords2pid and pid2coords data structures
+      for(int i=0; i<numprocs; i++)
       {
-        temp = fscanf(fp, "%d%d%d%d%d%d%d%d%d%d", &nid, &num, &num, &num, &num, &num, &num, &lx, &ly, &lz);
+        nid = pid2nid[i];
+	if (nid != oldnid)
+	  getMeshCoord(nid, &lx, &ly, &lz);
+	oldnid = nid;
 
-        // look for the first position (0) on the node for a pid
-	// this will be assigned 't' of 0
-        pid0 = nid2pid[nid][0];
-        
-        if (pid0 != -1) {		// if the pid exists
-          pid2coords[pid0].x = lx;      
-          pid2coords[pid0].y = ly;
-          pid2coords[pid0].z = lz;
-          pid2coords[pid0].t = 0;	// give it position 0 on the node
-          coords2pid[lx][ly][lz][0] = pid0;
+        pid2coords[i].x = lx;      
+        pid2coords[i].y = ly;
+        pid2coords[i].z = lz;
+
+        if(lx >= XDIM) printf("ERROR in X %d lx %d ly %d lz %d\n", i, lx, ly, lz);
+        if(ly >= YDIM) printf("ERROR in Y %d lx %d ly %d lz %d\n", i, lx, ly, lz);
+        if(lz >= ZDIM) printf("ERROR in Z %d lx %d ly %d lz %d\n", i, lx, ly, lz);
+
+	if (coords2pid[lx][ly][lz][0] == -1) {
+	  coords2pid[lx][ly][lz][0] = i;
+	  pid2coords[i].t = 0;
+	} else {
+	  dimNT = 2;			// 2 cores per node
+          coords2pid[lx][ly][lz][1] = i;
+	  pid2coords[i].t = 1;
+	}
           
-          if(lx<minX) minX = lx; if(lx>maxX) maxX = lx;
-          if(ly<minY) minY = ly; if(ly>maxY) maxY = ly;
-          if(lz<minZ) minZ = lz; if(lz>maxZ) maxZ = lz;
-        }
-
-        // look for the second position (1) on the node for a pid
-	// this will be assigned 't' of 1
-        pid1 = nid2pid[nid][1];
-        if (pid1 != -1) {		// if the pid exists
-	  dimNT = 2;			// we are running in VN mode
-          pid2coords[pid1].x = lx;
-          pid2coords[pid1].y = ly;
-          pid2coords[pid1].z = lz;
-          pid2coords[pid1].t = 1;	// give it position 1 on the node
-          coords2pid[lx][ly][lz][1] = pid1;
-
-          if(lx<minX) minX = lx; if(lx>maxX) maxX = lx;
-          if(ly<minY) minY = ly; if(ly>maxY) maxY = ly;
-          if(lz<minZ) minZ = lz; if(lz>maxZ) maxZ = lz;
-        }
+        if (lx<minX) minX = lx; if (lx>maxX) maxX = lx;
+        if (ly<minY) minY = ly; if (ly>maxY) maxY = ly;
+        if (lz<minZ) minZ = lz; if (lz>maxZ) maxZ = lz;
       }
-      fclose(fp); 
+     
 
       // set the origin as the element on the lower end of the torus
       origin.x =  minX;
@@ -142,6 +136,15 @@ class XT3TorusManager {
       torus[1] = (dimNY == YDIM) ? 1 : 0;
       torus[2] = (dimNZ == ZDIM) ? 1 : 0;
       torus[3] = 0;
+
+      if(dimNT == 2) {
+        int pe1 = coordinatesToRank(0, 0, 0, 0);
+        int pe2 = coordinatesToRank(0, 0, 0, 1);
+        if(pe2 == pe1 +1)
+          sprintf(mapping, "%s", "TXYZ");
+        else
+          sprintf(mapping, "%s", "XYZT");
+      }
     }
 
     ~XT3TorusManager() { }

@@ -14,52 +14,24 @@
  *  can be called from C++ files
  */
 
-#include "converse.h"
+#if XT3_TOPOLOGY || XT4_TOPOLOGY
 
-#if CMK_CRAYXT
+#include <rca_lib.h>
 
 #if XT3_TOPOLOGY
-
 #include <catamount/cnos_mpi_os.h>
 #define MAXNID 2784
-
-int *pid2nid;                   /* rank to node ID */
-int nid2pid[MAXNID][2];         /* node ID to rank */
-                                /* assuming 2 ppn for cray xt3 */
-
-/** \function getXTNodeID
- *  returns nodeID corresponding to the CkMyPe() passed to it
- */
-int getXTNodeID(int mype, int numpes) {
-  cnos_nidpid_map_t *nidpid; 
-  int ierr;
-  
-  nidpid = (cnos_nidpid_map_t *)malloc(sizeof(cnos_nidpid_map_t) * numpes);
-
-  ierr = cnos_get_nidpid_map(&nidpid);
-  int nid = nidpid[mype].nid;
-  free(nidpid);
-  return nid;
-}
+#define TDIM 2
 
 #elif XT4_TOPOLOGY
-
 #include <pmi.h>
-#include <rca_lib.h>
 #define MAXNID 9000
+#define TDIM 4
+
+#endif
 
 int *pid2nid;                   /* rank to node ID */
-int nid2pid[MAXNID][4];         /* node ID to rank */
-                                /* assuming 4 ppn for cray xt4 */
-
-/** \function getXTNodeID
- *  returns nodeID corresponding to the CkMyPe() passed to it
- */
-int getXTNodeID(int mype, int numpes) {
-  int nid;
-  PMI_Portals_get_nid(mype, &nid);
-  return nid;
-}
+int nid2pid[MAXNID][TDIM];      /* node ID to rank */
 
 /** \function getMeshCoord
  *  wrapper function for rca_get_meshcoord
@@ -72,7 +44,28 @@ int getMeshCoord(int nid, int *x, int *y, int *z) {
   *z = xyz.mesh_z;
 }
 
+/** \function getXTNodeID
+ *  returns nodeID corresponding to the CkMyPe() passed to it
+ */
+int getXTNodeID(int mype, int numpes) {
+  int nid;
+
+#if XT3_TOPOLOGY
+  cnos_nidpid_map_t *nidpid; 
+  int ierr;
+  
+  nidpid = (cnos_nidpid_map_t *)malloc(sizeof(cnos_nidpid_map_t) * numpes);
+
+  ierr = cnos_get_nidpid_map(&nidpid);
+  nid = nidpid[mype].nid;
+  /* free(nidpid); */
+
+#elif XT4_TOPOLOGY
+  PMI_Portals_get_nid(mype, &nid);
 #endif
+
+  return nid;
+}
 
 /** \function pidtonid
  *  finds nids for pids 1 to CmiNumPes and stores them in an array
@@ -86,9 +79,10 @@ void pidtonid(int numpes) {
   nidpid = (cnos_nidpid_map_t *)malloc(sizeof(cnos_nidpid_map_t) * numpes);
   pid2nid = (int *)malloc(sizeof(int) * numpes);
 
-  for(i=0; i<MAXNID; i++)
-    for(j=0; j<2; j++)
-      nid2pid[i][j] = -1;
+  for(i=0; i<MAXNID; i++) {
+    nid2pid[i][0] = -1;
+    nid2pid[i][1] = -1;
+  }
       
   ierr = cnos_get_nidpid_map(&nidpid);
   for(i=0; i<numpes; i++) {
@@ -103,6 +97,19 @@ void pidtonid(int numpes) {
       nid2pid[nid][1] = i;
   }
   /* free(nidpid); */
+
+  /* CORRECTION FOR MPICH_RANK_REORDER_METHOD */
+
+  int k = -1;
+  for(i=0; i<MAXNID; i++) {
+    if(nid2pid[i][0] != -1) {
+      nid2pid[i][0] = k++;
+      pid2nid[k] = i;
+      nid2pid[i][1] = k++;
+      pid2nid[k] = i;
+    }
+  }
+  
 #elif XT4_TOPOLOGY
   int i, j, nid;
   pid2nid = (int *)malloc(sizeof(int) * numpes);
@@ -126,4 +133,4 @@ void pidtonid(int numpes) {
 #endif
 }
 
-#endif /* CMK_CRAYXT */
+#endif /* XT3 or XT4 TOPOLOGY */
