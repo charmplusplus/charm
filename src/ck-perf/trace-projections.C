@@ -247,7 +247,7 @@ LogPool::LogPool(char *pgm) {
   strcpy(pgmname, pgm);
 }
 
-void LogPool::createFile(char *fix)
+void LogPool::createFile(const char *fix)
 {
   if (fileCreated) {
     return;
@@ -310,7 +310,7 @@ void LogPool::createFile(char *fix)
   CLOSE_LOG 
 }
 
-void LogPool::createSts(char *fix)
+void LogPool::createSts(const char *fix)
 {
   CkAssert(CkMyPe() == 0);
   // create the sts file

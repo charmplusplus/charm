@@ -8,6 +8,11 @@
 #ifndef _TRACE_H
 #define _TRACE_H
 
+/*
+ *   File: trace.h -- header file defines the super class of all trace modules
+ *         written by Gengbin Zheng, gzheng@uiuc.edu 
+ */ 
+
 #if CMK_HAS_COUNTER_PAPI
 #include <papi.h>
 #endif
