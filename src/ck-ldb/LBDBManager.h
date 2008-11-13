@@ -269,6 +269,12 @@ private:
   int            startLBFn_count;
 public:
   int useMem();
+
+  int getObjCount() {return objCount;}
+  const ObjList& getObjs() {return objs;}
+
+
+
 };
 
 #endif
