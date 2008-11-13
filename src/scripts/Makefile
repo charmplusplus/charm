@@ -158,7 +158,7 @@ include $(DEPENDFILE)
 
 CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       queueing.h conv-cpath.h conv-cpm.h persistent.h\
-      trace.h trace-bluegene.h trace-projections.h trace-simple.h charm-api.h \
+      trace.h trace-bluegene.h trace-projections.h trace-simple.h trace-controlPoints.h charm-api.h \
       conv-ccs.h ccs-client.c ccs-client.h \
       ccs-server.h ccs-auth.c ccs-auth.h \
       memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
@@ -168,7 +168,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 	routerstrategy.h convcomlib.h dummyconversestrategy.h  treerouter.h \
 	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h \
 	prefixrouter.h pipebroadcastconverse.h pipelinestrategy.h cmipool.h \
-	comlib.h cmidirect.h
+	comlib.h cmidirect.h controlPoints.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -183,7 +183,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  ckarrayreductionmgr.h cknodegroupreduction.h cksection.h \
 	  ckarray.h cklocation.h ckreduction.h ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
-	  ckobjQ.h readonly.h charisma.h ComlibArrayListener.h ComlibStrategy.h\
+	  ckobjQ.h readonly.h charisma.h ComlibArrayListener.h ComlibStrategy.h \
 	  ComlibLearner.h $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h lbdb++.h LBProfit.h \
           LBDBManager.h	LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
@@ -200,6 +200,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h 	\
           CkReduction.decl.h CkArrayReductionMgr.decl.h\
           tempo.decl.h waitqd.decl.h \
+	  ControlPoints.decl.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkMemCheckpoint.decl.h \
           LBDatabase.decl.h CentralLB.decl.h ComboCentLB.decl.h NullLB.decl.h \
           RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h MetisLB.decl.h \
@@ -212,7 +213,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           NeighborCommLB.decl.h HbmLB.decl.h \
           HybridBaseLB.decl.h HybridLB.decl.h WSLB.decl.h EveryLB.decl.h \
           charisma.decl.h TraceSummary.decl.h TraceProjections.decl.h \
-          TraceSimple.decl.h BlueGene.decl.h \
+          TraceSimple.decl.h TraceControlPoints.decl.h BlueGene.decl.h \
 	  comlib.decl.h ComlibManager.h DummyStrategy.h	\
 	  DirectMulticastStrategy.h RingMulticastStrategy.h	\
 	  MultiRingMulticast.h \
@@ -267,6 +268,7 @@ dirs+sources:
 	./gatherflat ../../src/ck-perf          .
 	./gatherflat ../../src/ck-ldb           .
 	./gatherflat ../../src/ck-com           .
+	./gatherflat ../../src/ck-cp           .
 	./gatherflat ../../src/conv-com           .
 	./gatherflat ../../src/langs/simplemsg  .
 	./gatherflat ../../src/langs/pvmc       .
@@ -307,7 +309,7 @@ dirs+sources:
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-neighbor.o $(L)/libldb-none.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
 TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
-	  $(L)/libtrace-simple.a \
+	  $(L)/libtrace-simple.a $(L)/libtrace-controlPoints.a\
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a \
           $(L)/libtrace-recordreplay.a  $(L)/libtracef_f.a $(L)/libtrace-memory.a
@@ -617,7 +619,7 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o  \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) \
 	   charmProjections.o
 
-charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs
+charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs controlPoints_objs
 
 CHARMLIBS: charm++ CONVLIBS
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
@@ -669,6 +671,12 @@ TraceSimple.def.h: TraceSimple.decl.h
 
 TraceSimple.decl.h: trace-simple.ci charmxi
 	$(CHARMXI) trace-simple.ci
+
+
+TraceControlPoints.def.h: TraceControlPoints.decl.h
+
+TraceControlPoints.decl.h: trace-controlPoints.ci charmxi
+	$(CHARMXI) trace-controlPoints.ci
 
 CkReduction.def.h: CkReduction.decl.h
 
@@ -761,6 +769,11 @@ LIBTRACE_SIMPLE=trace-simple.o
 $(L)/libtrace-simple.a: $(LIBTRACE_SIMPLE)
 	$(CHARMC) -o $@ $(LIBTRACE_SIMPLE)
 
+
+LIBTRACE_CONTROLPOINTS=trace-controlPoints.o
+$(L)/libtrace-controlPoints.a: $(LIBTRACE_CONTROLPOINTS)
+	$(CHARMC) -o $@ $(LIBTRACE_CONTROLPOINTS)
+
 LIBTRACE_RECREP=trace-recordreplay.o
 $(L)/libtrace-recordreplay.a: $(LIBTRACE_RECREP)
 	$(CHARMC) -o $@ $(LIBTRACE_RECREP)
@@ -777,7 +790,7 @@ LIBTRACE_MEMORY=trace-memory.o
 $(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)
 	$(CHARMC) -o $@ $(LIBTRACE_MEMORY)
 
-LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-simple.o trace-recordreplay.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o
+LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-simple.o trace-recordreplay.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-controlPoints.o
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
 
@@ -798,9 +811,29 @@ tracef_f.o: tracef_f.f90
 
 # used for make depends
 TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
-	      trace-counter.o	\
+	      trace-counter.o trace-controlPoints.o	\
 	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
               trace-recordreplay.o trace-memory.o
+
+######################################################################
+#
+#Control Point Library
+#
+######################################################################
+
+
+CONTROLPOINTS_OBJS = controlPoints.o
+
+ControlPoints.def.h: ControlPoints.decl.h
+
+ControlPoints.decl.h : controlPoints.ci charmxi
+	$(CHARMXI) controlPoints.ci
+
+controlPoints_objs: $(L)/libmoduleControlPoints.a
+
+$(L)/libmoduleControlPoints.a: $(CONTROLPOINTS_OBJS)
+	$(CHARMC) -o $(L)/libmoduleControlPoints.a $(CONTROLPOINTS_OBJS)
+
 
 ###############################################################################
 #
