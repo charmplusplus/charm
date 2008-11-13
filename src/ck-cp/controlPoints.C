@@ -576,12 +576,13 @@ public:
   void gotoNextPhase(){
 
     LBDatabase * myLBdatabase = LBDatabaseObj();
+
+#if CMK_LBDB_ON
     LBDB * myLBDB = myLBdatabase->getLBDB();       // LBDB is Defined in LBDBManager.h
     const CkVec<LBObj*> objs = myLBDB->getObjs();
     const int objCount = myLBDB->getObjCount();
-
     CkPrintf("LBDB info: objCount=%d objs contains %d LBObj* \n", objCount, objs.length());
-
+    
     floatType maxObjWallTime = -1.0;
     
     for(int i=0;i<objs.length();i++){
@@ -599,7 +600,7 @@ public:
 
     myLBDB->ClearLoads(); // BUG: Probably very dangerous if we are actually using load balancing
     
-    
+#endif    
     
     
     // increment phase id
