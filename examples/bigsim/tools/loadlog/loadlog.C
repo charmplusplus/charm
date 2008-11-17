@@ -31,6 +31,7 @@ int main()
     printf("Loading bglog of proc %d from bgTrace%d succeed. \n", i, fileNum);
                                                                                 
     // some senity checking
+    printf("Proc %d has %d events. \n", i, tline.length());
     for (int idx = 0; idx < tline.length(); idx ++)
     {
       BgTimeLog *bglog = tline[idx];
@@ -42,7 +43,7 @@ int main()
       for(int midx=0; midx < bglog->msgs.length(); midx++){
         BgMsgEntry *msg = bglog->msgs[midx];
         if (msg->sendTime < bglog->startTime || msg->sendTime > bglog->endTime)
-          printf("Invalid MsgEntry [%d]: sendTime: %f in log startT: %f endT: %f execT: %f\n", idx, msg->sendTime, bglog->startTime, bglog->endTime, bglog->execTime);
+          printf("[%d] Invalid MsgEntry [%d]: sendTime: %f in log startT: %f endT: %f execT: %f\n", i, idx, msg->sendTime, bglog->startTime, bglog->endTime, bglog->execTime);
       }
     }
 
