@@ -3070,7 +3070,7 @@ unsigned char computeCheckSum(unsigned char *data, int len)
 }
 
 #if !CMK_HAS_LOG2
-unsigned int ilog2(unsigned int val) {
+unsigned int CmiLog2(unsigned int val) {
   unsigned int log = 0u;
   if ( val != 0u ) {
       while ( val > (1u<<log) ) { log++; }
