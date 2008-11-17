@@ -851,7 +851,7 @@ int valueProvidedByOptimizer(const char * name){
   }
    
 
-  std::string s[numDimensions];
+  std::string *s = new std::string[numDimensions];
   d=0;
   for(std::map<string, pair<int,int> >::iterator niter=controlPointSpace.begin(); niter!=controlPointSpace.end(); niter++){
     s[d] = niter->first;
@@ -934,6 +934,7 @@ int valueProvidedByOptimizer(const char * name){
   CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by exhaustive search to be: %d\n", name, phase_id, result); 
   return result; 
 
+  delete [] s;
 
 #endif
   
