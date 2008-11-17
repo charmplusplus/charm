@@ -88,6 +88,7 @@ Main(CkArgMsg* m)
 
   delete [] allNodeOffsets;
   printf("End of program\n");
+  CkExit();
 }
 
 };
