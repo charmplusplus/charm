@@ -530,6 +530,17 @@ mv -f ../include/mpi.h.bak ../include/mpi.h 2>/dev/null
 
 ################### Syscalls and Libraries ###################
 
+#### test for log2 ###
+cat > $t <<EOT
+#include <math.h>
+int main() {
+  int i = log2(10);
+  return 0;
+}
+EOT
+test_link "whether it has log2" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_LOG2, $pass, [whether it has log2])
+
 #### test for mkstemp ###
 cat > $t <<EOT
 #include <stdlib.h>
