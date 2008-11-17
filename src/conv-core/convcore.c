@@ -1621,7 +1621,7 @@ void CthResumeNormalThread(CthThreadToken* token)
 	        resumeTraceCore();*/
 #endif
 #endif
-    
+
   CthResume(t);
 }
 
@@ -3068,5 +3068,15 @@ unsigned char computeCheckSum(unsigned char *data, int len)
   for (i=0; i<len; i++) ret ^= (unsigned char)data[i];
   return ret;
 }
+
+#if !CMK_HAS_LOG2
+unsigned int ilog2(unsigned int val) {
+  unsigned int log = 0u;
+  if ( val != 0u ) {
+      while ( val > (1u<<log) ) { log++; }
+  }
+  return log;
+}
+#endif
 
 /*@}*/

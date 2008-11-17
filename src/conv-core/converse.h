@@ -1648,5 +1648,10 @@ extern int CmiGridQueueLookupMsg (char *msg);
 
 #include "debug-conv.h"
 
+#if CMK_HAS_LOG2
+#define ilog2  log2
+#else
+extern unsigned int ilog2(unsigned int);
+#endif
 
 #endif /* CONVERSE_H */
