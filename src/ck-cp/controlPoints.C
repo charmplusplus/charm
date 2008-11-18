@@ -9,6 +9,7 @@
 #include <set>
 #include <vector>
 #include <utility>
+#include <limits>
 #include <sys/time.h>
 
 #include "ControlPoints.decl.h"
@@ -830,8 +831,8 @@ int valueProvidedByOptimizer(const char * name){
   int numDimensions = controlPointSpace.size();
   CkAssert(numDimensions > 0);
   
-  int lowerBounds[numDimensions];
-  int upperBounds[numDimensions]; 
+  vector<int> lowerBounds(numDimensions);
+  vector<int> upperBounds(numDimensions); 
   
   int d=0;
   std::map<string, pair<int,int> >::iterator iter;
@@ -851,7 +852,7 @@ int valueProvidedByOptimizer(const char * name){
   }
    
 
-  std::string *s = new std::string[numDimensions];
+  vector<std::string> s(numDimensions);
   d=0;
   for(std::map<string, pair<int,int> >::iterator niter=controlPointSpace.begin(); niter!=controlPointSpace.end(); niter++){
     s[d] = niter->first;
@@ -861,13 +862,8 @@ int valueProvidedByOptimizer(const char * name){
   
   
   // Create the first possible configuration
-  int config[numDimensions+1]; // one value for each dimension and a
-			       // final one to hold the carry
-			       // producing an invalid config
-  config[numDimensions] = 0;
-  for(int i=0;i<numDimensions;i++){
-    config[i] = lowerBounds[i];
-  }
+  vector<int> config = lowerBounds;
+  config.push_back(0);
   
   // Increment until finding an unused configuration
   localControlPointManagerProxy.ckLocalBranch()->allData.cleanupNames(); // put -1 values in for any control points missing
@@ -933,8 +929,6 @@ int valueProvidedByOptimizer(const char * name){
 
   CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by exhaustive search to be: %d\n", name, phase_id, result); 
   return result; 
-
-  delete [] s;
 
 #endif
   
