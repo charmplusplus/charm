@@ -1618,7 +1618,7 @@ CHARMINC="."
 test -r ./conv-config.sh && . ./conv-config.sh
 
 #keep it a decimal
-VERSION=060100
+VERSION=60100
 echo $VERSION > ../include/VERSION
 
 cat >>confdefs.h <<_ACEOF
