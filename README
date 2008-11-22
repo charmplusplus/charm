@@ -226,6 +226,7 @@ and run
 	"charm++"  The basic Charm++ language.
 	"AMPI"     An implementation of MPI on top of Charm++
 	"FEM"      A Finite-Element framework on top of Charm++
+	"Tau"      TAU's performance profiling/tracing
 
 <version> is described above
 

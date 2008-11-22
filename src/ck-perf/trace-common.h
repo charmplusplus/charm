@@ -53,6 +53,7 @@
 
 CkpvExtern(int, CtrLogBufSize);
 CkpvExtern(char*, traceRoot);
+CkpvExtern(char*, selective);
 CkpvExtern(bool, verbose);
 CkpvExtern(double, traceInitTime);
 CkpvExtern(double, traceInitCpuTime);

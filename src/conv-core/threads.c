@@ -1220,7 +1220,9 @@ void CthResume(CthThread t)
   pthread_cond_signal(&(t->cond)); /* wake up the next thread */
   if (tc->base.exiting) {
     pthread_mutex_unlock(&CthCpvAccess(sched_mutex));
-    pthread_exit(0);
+
+	printf("calling tau_pthread_exit");
+    tau_pthread_exit(0);
   } else {
     /* pthread_cond_wait might (with low probability) return when the 
       condition variable has not been signaled, guarded with 
@@ -1273,8 +1275,9 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
         reported = 1;
       }
   }
-
-  r = pthread_create(&(result->self), &attr, CthOnly, (void*) result);
+	
+	printf("calling tau_pthread_create");
+  r = tau_pthread_create(&(result->self), &attr, CthOnly, (void*) result);
   if (0 != r) {
     CmiPrintf("pthread_create failed with %d\n", r);
     CmiAbort("CthCreate failed to created a new pthread\n");

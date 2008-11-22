@@ -83,6 +83,8 @@ CHARM_SHARED="0"
 BUILD_SHARE="1"
 SWAPGLOBALS="0"
 
+TAU_MAKEFILE=/expand/home/cheelee/work/tau-charm/tau-2.17.3b2/x86_64/lib/Makefile.tau
+TAU_TRACE_MPI=1
 ####################################################################
 #
 #  Utility routines used below
@@ -108,7 +110,7 @@ printUsage() {
     echo "        -cpp-option <opt> -ldro-option <opt> -cc-option <opt>"
     echo "        -c++-option <opt> -ld-option <opt> -ld++-option <opt>"
     echo "        -fmoddir <f90mod path>"
-    echo "        -pg <opt> -build-shared -charm-shared"
+    echo "        -pg <opt> -build-shared -charm-shared -no-trace-mpi"
     echo
     echo "  Charmc compiles C, C++, f77, f90, Converse, Converse++, Charm, "
     echo "and Charm++ programs.  The flags generally match those of cc or f77."
@@ -452,6 +454,9 @@ do
 			TRACEMODE=$TRACEMODE_NEW
 		fi
 		shift
+		;;
+	"-no-trace-mpi")
+		TAU_TRACE_MPI=0
 		;;
 	
 	"-swapglobal"|"-swapglobals")
@@ -1457,6 +1462,9 @@ for trace in $TRACEMODE; do
     elif test $trace = "simple"
     then
       echo "  extern void _registerTraceSimple();" >> $modInitSrc
+    elif test $trace = "Tau"
+    then
+      echo "  extern void _registerTraceTau();" >> $modInitSrc
     elif test $trace = "controlPoints"
     then
       echo "  extern void _registerTraceControlPoints();" >> $modInitSrc
@@ -1482,6 +1490,10 @@ for trace in $TRACEMODE; do
     elif test $trace = "projections"
     then
       echo "  _registerTraceProjections();" >> $modInitSrc
+    elif test $trace = "Tau"
+    then
+		  TRACE_WITH_TAU=1
+      echo "  _registerTraceTau();" >> $modInitSrc
     elif test $trace = "simple"
     then
       echo "  _registerTraceSimple();" >> $modInitSrc
@@ -1528,11 +1540,37 @@ MAKE_LD="0"
 
 CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ "
 
+# get TAU stub makefile variables
+echo "include $TAU_MAKEFILE" > _make.tau.tmp
+echo "print-%:; @echo \$(\$*)" >> _make.tau.tmp
+TAU_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_LIBS`
+TAU_MPI_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_LIBS` 
+TAU_MPI_FLIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_FLIBS`
+#rm _make.tau.tmp
+# done getting TAU variables
+
 case "$LANGUAGE" in
+"f90charm")
+	MAKE_LDXX="1"
+	MIDDLE_LIBS="-lck -lconv-cplus-y $CORE_LIBS "
+        CMK_SYSLIBS="$CMK_SYSLIBS -lm"
+	if [ "$TAU_TRACE_MPI" = "1" ]
+	then
+		TAU_LIBS="$TAU_MPI_FLIBS $TAU_LIBS"
+	else
+		TAU_LIBS="$TAU_LIBS"
+	fi
+	;;
 "charm"|"charm++"|"f90charm"|"ckbluegene"|"bgcharm++")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS="-lck -lconv-cplus-y $CORE_LIBS "
         CMK_SYSLIBS="$CMK_SYSLIBS -lm"
+	if [ "$TAU_TRACE_MPI" = "1" ]
+	then
+		TAU_LIBS="$TAU_MPI_LIBS $TAU_LIBS"
+	else
+		TAU_LIBS="$TAU_LIBS"
+	fi
 	;;
 "converse")
 	MAKE_LD="1"
@@ -1568,7 +1606,14 @@ then
 else
   LANG_LIBS="-L$CHARMLIB -I$CHARMINC $BAL_OBJ $OBJECTFILES $modInitObj $PRE_LIBRARIES"
 fi
-ALL_LIBS="$LANG_LIBS $MIDDLE_LIBS $CMK_LIBS $POST_LIBRARIES $CMK_SYSLIBS"
+if [ "$TRACE_WITH_TAU" = 1 ]
+then
+	echo "Linking with the TAU libraries: $TAU_LIBS"
+	ALL_LIBS="$LANG_LIBS $MIDDLE_LIBS $CMK_LIBS $POST_LIBRARIES $CMK_SYSLIBS $TAU_LIBS"
+else
+	ALL_LIBS="$LANG_LIBS $MIDDLE_LIBS $CMK_LIBS $POST_LIBRARIES $CMK_SYSLIBS"
+fi
+Debugf "All libraries are: $ALL_LIBS"
 
 if [ "$BUILD_SHARE" = "1" -a "$CHARM_SHARED" = "1" ]
 then

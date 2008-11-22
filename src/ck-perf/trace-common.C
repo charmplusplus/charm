@@ -59,6 +59,7 @@ CkpvDeclare(double, traceInitCpuTime);
 CpvDeclare(int, traceOn);
 CkpvDeclare(int, traceOnPe);
 CkpvDeclare(char*, traceRoot);
+CkpvDeclare(char*, selective);
 CkpvDeclare(bool, verbose);
 
 typedef void (*mTFP)();                   // function pointer for
@@ -126,6 +127,34 @@ static void traceCommonInit(char **argv)
     CkpvAccess(traceRoot) = (char *) malloc(strlen(argv[0])+1);
     _MEMCHECK(CkpvAccess(traceRoot));
     strcpy(CkpvAccess(traceRoot), argv[0]);
+  }
+	/* added for TAU trace module. */
+	char *cwd;
+  CkpvInitialize(char*, selective);
+  if (CmiGetArgStringDesc(argv, "+selective", &temproot, "TAU's selective instrumentation file")) {
+    int i;
+    // Trying to decide if the traceroot path is absolute or not. If it is not
+    // then create an absolute pathname for it.
+    if (temproot[0] != PATHSEP) {
+      cwd = GETCWD(NULL,0);
+      root = (char *)malloc(strlen(cwd)+strlen(temproot)+2);
+      strcpy(root, cwd);
+      strcat(root, PATHSEPSTR);
+      strcat(root, temproot);
+    } else {
+      root = (char *)malloc(strlen(temproot)+1);
+      strcpy(root,temproot);
+    }
+    CkpvAccess(selective) = (char *) malloc(strlen(root)+1);
+    _MEMCHECK(CkpvAccess(selective));
+    strcpy(CkpvAccess(selective), root);
+    if (CkMyPe() == 0) 
+      CmiPrintf("Trace: selective: %s\n", CkpvAccess(selective));
+  }
+  else {
+    CkpvAccess(selective) = (char *) malloc(3);
+    _MEMCHECK(CkpvAccess(selective));
+    strcpy(CkpvAccess(selective), "");
   }
   
 #ifdef __BLUEGENE__

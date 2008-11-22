@@ -1,3 +1,5 @@
+include $(HOME)/tau2-new/x86_64/lib/Makefile.tau-icpc-mpi-pthread
+
 SRC=../../../src
 CHARMC=../../../bin/charmc $(OPTS)
 
@@ -6,7 +8,7 @@ OBJS = pingpong.o
 all:	cifiles pgm
 
 pgm: $(OBJS)
-	$(CHARMC) -language charm++ -o pgm $(OBJS)
+	$(CHARMC) -language charm++ -o pgm $(OBJS) $(TAU_LIBS)
 
 cifiles: pingpong.ci
 	$(CHARMC)  pingpong.ci

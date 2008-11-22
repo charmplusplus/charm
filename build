@@ -22,6 +22,7 @@ syntax() {
   echo '  pose            build POSE parallel discrete event simulator'
   echo '  jade            build Jade compiler (auto-builds charm++, msa)'
   echo '  msa             build Multiphase Shared Arrays(MSA) library'
+  echo '  Tau             build the TAU tracing library for generating TAU performance data' 
   echo '  ChaNGa          compile Charm++ core and necessary libraries for ChaNGa'
   echo ''
   fi
@@ -89,6 +90,7 @@ syntax() {
   echo "  --with-romio       build AMPI with ROMIO library"
   echo "  --destination=DIR  build Charm++ inside DIR, by default the destination is <version>"
   echo "  --suffix=DIR       append DIR to the destination directory of the Charm++ build"
+  echo "  --tau-makefile=FILE Specify which TAU stub makefile to use"
   fi
   echo ''
   echo '<charmc-options>: normal compiler options e.g. -g -O -save -verbose'
@@ -113,6 +115,7 @@ syntax() {
   echo '  ./build charm++ mpi-linux --incdir /usr/local/mpich/include --libdir /usr/local/mpich/lib -O'
   echo '   or in short,'
   echo '  ./build charm++ mpi-linux --basedir /usr/local/mpich -O'
+  echo '  ./build Tau --tau-makefile=/usr/local/packages/TAU/x86_64/lib/Makefile.tau-mpi'
   echo ''
   echo 'Note: This script:'
   echo ' 1. Creates directories <destination> and <destination>/tmp';
@@ -305,6 +308,14 @@ do
 		DESTINATION_SUFFIX="`echo $1 | awk -F= '{print $2}'`"
 		shift
 		;;
+    --tau-makefile)
+		TAU_MAKEFILE=$1
+		shift
+		;;
+    --tau-makefile=*)
+		TAU_MAKEFILE=`echo $1 | awk -F= '{print $2}'`
+		shift
+		;;
     -j*)
                 PMAKENUM=`echo $1 | awk -Fj '{print $2}'`
 		MAKEOPTS="$MAKEOPTS -j $PMAKENUM"
@@ -343,6 +354,34 @@ do
 	;;
   esac
 done
+if [ "$PROGRAM" = "Tau" ]
+then
+	echo "TAU>>>> makefile config option: $TAU_MAKEFILE"
+	if [ -f $TAU_MAKEFILE ]
+	then
+	#Setting up TAU trace library:
+	echo "TAU>>>> configuring with this TAU makefile: $TAU_MAKEFILE"
+
+	SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
+
+	echo $SED_CHARMC
+	sed -i -e $SED_CHARMC src/scripts/Makefile 
+	echo $SED_CHARMC
+	sed -i -e $SED_CHARMC src/scripts/charmc  
+	else
+	echo "TAU>>>> ERROR could not find Makefile: $TAU_MAKEFILE"
+	fi
+else
+    # Still need to set the variables in Makefile and charmc to ""
+    # even in the non-Tau case.
+    TAU_MAKEFILE=""
+    SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
+
+    echo $SED_CHARMC
+    sed -i -e $SED_CHARMC src/scripts/Makefile
+    echo $SED_CHARMC
+    sed -i -e $SED_CHARMC src/scripts/charmc
+fi
 
 [ "x$VERSION" = "x" ] && syntax && exit 1
 

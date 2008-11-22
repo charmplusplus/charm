@@ -103,6 +103,15 @@ jadeall: jade
 #	make the jade.jar file
 	cd ../java/charm/jade && $(MAKE)
 
+#include TAU defs
+TAU_MAKEFILE=/expand/home/cheelee/work/tau-charm/tau-2.17.3b2/x86_64/lib/Makefile.tau
+include	$(TAU_MAKEFILE) #stub-makefile
+
+#builds TAU's trace library
+Tau: 
+	echo "buliding charm trace library with support for TAU."
+	$(MAKE) $(L)/libtrace-Tau.a $(L)/libtrace-all.a TAU_TRACE_OBJ=libtrace-Tau.o
+
 LIBS: CONVLIBS CHARMLIBS
 	cd libs; $(MAKE) otherlibs
 
@@ -213,7 +222,8 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           NeighborCommLB.decl.h HbmLB.decl.h \
           HybridBaseLB.decl.h HybridLB.decl.h WSLB.decl.h EveryLB.decl.h \
           charisma.decl.h TraceSummary.decl.h TraceProjections.decl.h \
-          TraceSimple.decl.h TraceControlPoints.decl.h BlueGene.decl.h \
+          TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
+	  BlueGene.decl.h \
 	  comlib.decl.h ComlibManager.h DummyStrategy.h	\
 	  DirectMulticastStrategy.h RingMulticastStrategy.h	\
 	  MultiRingMulticast.h \
@@ -393,7 +403,7 @@ CONVLIBS: converse
 	cd libs; $(MAKE) convlibs OPTS='$(OPTS)'
 
 $(L)/libconv-core.a: $(LIBCONV_CORE)
-	$(CHARMC) -o $@ $(LIBCONV_CORE)
+	$(CHARMC) $(TAU_LIBS) -o $@ $(LIBCONV_CORE) 
 
 $(L)/libconv-cplus-y.a: $(L)/libconv-cplus-n.a
 
@@ -672,6 +682,10 @@ TraceSimple.def.h: TraceSimple.decl.h
 TraceSimple.decl.h: trace-simple.ci charmxi
 	$(CHARMXI) trace-simple.ci
 
+TraceTau.def.h: TraceTau.decl.h
+
+TraceTau.decl.h: trace-Tau.ci charmxi
+	$(CHARMXI) trace-Tau.ci
 
 TraceControlPoints.def.h: TraceControlPoints.decl.h
 
@@ -769,6 +783,31 @@ LIBTRACE_SIMPLE=trace-simple.o
 $(L)/libtrace-simple.a: $(LIBTRACE_SIMPLE)
 	$(CHARMC) -o $@ $(LIBTRACE_SIMPLE)
 
+libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h \
+  conv-mach-ifort.h pup_c.h conv-cpm.h conv-cpath.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h \
+  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
+  ckhashtable.h debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h \
+  conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
+  CkReduction.decl.h cknodegroupreduction.h CkArrayReductionMgr.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
+  cklocation.h LBDatabase.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
+  LBMachineUtil.h lbdb++.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h \
+  CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h trace-bluegene.h trace-simple.h \
+  register.h trace-common.h trace-simpleBOC.h TraceSimple.decl.h \
+  TraceSimple.def.h
+	$(CHARMC) -c -I. $(TAU_INCLUDE) $(TAU_DEFS) trace-Tau.C -o libtrace-Tau.o
+
+tau_selective.o: $(TAUROOT)/utils/tau_selective.cpp 
+	$(CHARMC) -I$(TAUROOT)/utils -DTAU_DYNINST $(TAUROOT)/utils/tau_selective.cpp
+
+$(L)/libtrace-Tau.a: $(TAU_TRACE_OBJ) tau_selective.o
+	$(CHARMC) $(TAU_LIBS) -o $@ $(TAU_TRACE_OBJ) tau_selective.o $(TAU_TRACE_OBJ)
 
 LIBTRACE_CONTROLPOINTS=trace-controlPoints.o
 $(L)/libtrace-controlPoints.a: $(LIBTRACE_CONTROLPOINTS)
@@ -790,7 +829,9 @@ LIBTRACE_MEMORY=trace-memory.o
 $(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)
 	$(CHARMC) -o $@ $(LIBTRACE_MEMORY)
 
-LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-simple.o trace-recordreplay.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-controlPoints.o
+LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-simple.o \
+$(TAU_TRACE_OBJ) trace-recordreplay.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-controlPoints.o
+
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
 
