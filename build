@@ -354,29 +354,6 @@ do
 	;;
   esac
 done
-if [ "$PROGRAM" = "Tau" ]
-then
-	echo "TAU>>>> makefile config option: $TAU_MAKEFILE"
-	if [ -f $TAU_MAKEFILE ]
-	then
-	#Setting up TAU trace library:
-	echo "TAU>>>> configuring with this TAU makefile: $TAU_MAKEFILE"
-
-	SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
-
-	else
-	echo "TAU>>>> ERROR could not find Makefile: $TAU_MAKEFILE"
-        TAU_MAKEFILE=""
-	fi
-else
-    # Still need to set the variables in Makefile and charmc to ""
-    # even in the non-Tau case.
-    TAU_MAKEFILE=""
-    SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
-
-fi
-sed -e $SED_CHARMC src/scripts/Makefile > .Makefile.$$ && cp .Makefile.$$ src/scripts/Makefile && rm -f  .Makefile.$$
-sed -e $SED_CHARMC src/scripts/charmc > .charmc.$$ && cp .charmc.$$ src/scripts/charmc && rm -f .charmc.$$
 
 [ "x$VERSION" = "x" ] && syntax && exit 1
 
@@ -523,10 +500,39 @@ then
     echo "CMK_AMPI_WITH_ROMIO=\"true\"" >> $ConvSh
 fi
 
+
+# build with Tau
+if [ "$PROGRAM" = "Tau" ]
+then
+	echo "TAU>>>> makefile config option: $TAU_MAKEFILE"
+	if [ -f $TAU_MAKEFILE ]
+	then
+	#Setting up TAU trace library:
+	echo "TAU>>>> configuring with this TAU makefile: $TAU_MAKEFILE"
+
+	SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
+
+	else
+	echo "TAU>>>> ERROR could not find Makefile: $TAU_MAKEFILE"
+        TAU_MAKEFILE=""
+	fi
+else
+    # Still need to set the variables in Makefile and charmc to ""
+    # even in the non-Tau case.
+    TAU_MAKEFILE=""
+    SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
+
+fi
+sed -e $SED_CHARMC src/scripts/Makefile > .Makefile.$$ && cp .Makefile.$$ src/scripts/Makefile && rm -f  .Makefile.$$
+sed -e $SED_CHARMC src/scripts/charmc > .charmc.$$ && cp .charmc.$$ src/scripts/charmc && rm -f .charmc.$$
+
 if test -n "$TAU_MAKEFILE"
 then
-    echo "#define CMK_WITH_TAU                  1" >> $ConvHeader
+    echo "#define CMK_WITH_TAU               1" >> $ConvHeader
+    echo "#define pthread_create             tau_pthread_create" >> $ConvHeader
+    echo "#define pthread_exit               tau_pthread_exit" >> $ConvHeader
 fi
+
 
 echo $BASEVERSION > $DESTINATION/tmp/.vdir
 echo $VERSION | sed -e 's@-.*@@' > $DESTINATION/tmp/.gdir
