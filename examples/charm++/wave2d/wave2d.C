@@ -1,44 +1,41 @@
 #include "liveViz.h"
 #include "wave2d.decl.h"
 
-// Author: Isaac Dooley 2008
-
 // This program solves the 2-d wave equation over a grid, displaying pretty results through liveViz
-// The discretization used below is described in the accompanying pdf paper.pdf
+// The discretization used below is described in the accompanying paper.pdf
+// Author: Isaac Dooley 2008
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ CProxy_Wave arrayProxy;
 
 #define TotalDataWidth  800
-#define TotalDataHeight 800
-
+#define TotalDataHeight 700
 #define chareArrayWidth  4
-#define chareArrayHeight  4
-#define num_chares ((chareArrayWidth)*(chareArrayHeight))
-
+#define chareArrayHeight  3
 #define total_iterations 5000
-
 #define numInitialPertubations 5
 
+#define mod(a,b)  (((a)+b)%b)
 
-// A modulo operator that works for a==-1
-#define wrap(a,b)  (((a)+b)%b)
+enum {
+  right,
+  left,
+  up,
+  down,
+};
+
 
 class Main : public CBase_Main
 {
 public:
-  int recieve_count;
-  int iterations;
+  int iteration;
+  int count;
 
   Main(CkArgMsg* m) {
-
-    // set iteration counter to zero
-    iterations=0;
-
-    // store the main proxy
-    mainProxy = thisProxy;
-
-    // print info
+    iteration = 0;
+    count = 0;
+    mainProxy = thisProxy; // store the main proxy
+    
     CkPrintf("Running wave2d on %d processors\n", CkNumPes());
 
     // Create new array of worker chares
@@ -47,41 +44,30 @@ public:
     // setup liveviz
     CkCallback c(CkIndex_Wave::requestNextFrame(0),arrayProxy);
     liveVizConfig cfg(liveVizConfig::pix_color,true);
-
-    CkArrayID a; // unused???
-    liveVizInit(cfg,a,c);
+    liveVizInit(cfg,arrayProxy,c);
 
     //Start the computation
-    recieve_count = 0;
     arrayProxy.begin_iteration();
   }
 
-
-
-  // Each worker reports back to here when it completes an iteration
-  void report(int row, int col) {
-
-    recieve_count++;
-
-    if (num_chares == recieve_count) {
-
-      if (iterations == total_iterations) {
+  // Each worker calls this method
+  void iterationCompleted() {
+    count++;
+    if(count == chareArrayWidth*chareArrayHeight){
+      if (iteration == total_iterations) {
 	CkPrintf("Program Done!\n");
 	CkExit();
-      } else {
-
+      } else { 
 	// Start the next iteration
-	recieve_count=0;
-	iterations++;
-	CkPrintf("Completed %d iterations\n", iterations);
-
+	count = 0;
+	iteration++;
+	if(iteration % 20 == 0) CkPrintf("Completed %d iterations\n", iteration);    
 	arrayProxy.begin_iteration();
-			  
       }
     }
   }
-
-
+  
+  
 };
 
 class Wave: public CBase_Wave {
@@ -121,12 +107,10 @@ public:
 
   // Setup some Initial pressure pertubations
   void InitialConditions(){
-    srand(0);
+    srand(0); // ensure that the same random numbers are used for each chare array element
 
-    for(int i=0;i<myheight*mywidth;i++){
-        pressure[i] = 0.0;
-        pressure_old[i] = 0.0;
-    }
+    for(int i=0;i<myheight*mywidth;i++)
+      pressure[i] = pressure_old[i] = 0.0;
     
     for(int s=0; s<numInitialPertubations; s++){    
       // Randomly place a circle within the 2-d data array (without wrapping around)
@@ -139,27 +123,18 @@ public:
 	  int globaly = thisIndex.y*myheight + i;
 	  double distanceToCenter = sqrt((globalx-xcenter)*(globalx-xcenter) + (globaly-ycenter)*(globaly-ycenter));
 	  if (distanceToCenter < radius) {
-	    double rscaled = distanceToCenter / radius; // ranges from 0 to 1
-	    double rscaled2 = rscaled*3.0*3.14159/2.0; // ranges from 0 to 3pi/2						
-	    double t = 400.0 * cos(rscaled2) ; // Range not to exceed -400 to 400
-	    pressure[i*mywidth+j] = t;
-	    pressure_old[i*mywidth+j] = t;
+	    double rscaled = (distanceToCenter/radius)*3.0*3.14159/2.0; // ranges from 0 to 3pi/2						
+	    double t = 700.0 * cos(rscaled) ; // Range won't exceed -700 to 700
+	    pressure[i*mywidth+j] = pressure_old[i*mywidth+j] = t;
 	  }
 	}						
       }
     }
   }
 
+  Wave(CkMigrateMessage* m) { } // Migration is not supported in this example
 
-
-  Wave(CkMigrateMessage* m) {
-    CkAbort("Migration of this class is not supported yet. Write PUP function if migration is used\n"); 
-  }
-
-  ~Wave() { 
-    delete [] pressure; 
-    delete [] pressure_old;
-  }
+  ~Wave() { }
 
   void begin_iteration(void) {
 
@@ -179,13 +154,13 @@ public:
     }
 
     // Send my left edge
-    thisProxy(wrap(thisIndex.x-1,chareArrayWidth), thisIndex.y).ghostsFromRight(myheight, left_edge);
+    thisProxy(mod(thisIndex.x-1, chareArrayWidth), thisIndex.y).recvGhosts(right, myheight, left_edge);
     // Send my right edge
-    thisProxy(wrap(thisIndex.x+1,chareArrayWidth), thisIndex.y).ghostsFromLeft(myheight, right_edge);
+    thisProxy(mod(thisIndex.x+1, chareArrayWidth), thisIndex.y).recvGhosts(left, myheight, right_edge);
     // Send my top edge
-    thisProxy(thisIndex.x, wrap(thisIndex.y-1,chareArrayHeight)).ghostsFromBottom(mywidth, top_edge);
+    thisProxy(thisIndex.x, mod(thisIndex.y-1, chareArrayHeight)).recvGhosts(down, mywidth, top_edge);
     // Send my bottom edge
-    thisProxy(thisIndex.x, wrap(thisIndex.y+1,chareArrayHeight)).ghostsFromTop(mywidth, bottom_edge);
+    thisProxy(thisIndex.x, mod(thisIndex.y+1, chareArrayHeight)).recvGhosts(up, mywidth, bottom_edge);
 
     delete [] right_edge;
     delete [] left_edge;
@@ -193,31 +168,24 @@ public:
     delete [] bottom_edge;
   }
 
-  void ghostsFromRight(int width, double ghost_values[]) {
-    for(int i=0;i<width;++i){
-      buffer_right[i] = ghost_values[i];
-    }
-    check_and_compute();
-  }
+  void recvGhosts(int whichSide, int size, double ghost_values[]) {
+    
+    if(whichSide == right)
+      for(int i=0;i<size;++i)
+	buffer_right[i] = ghost_values[i];
 
-  void ghostsFromLeft(int width, double ghost_values[]) {
-    for(int i=0;i<width;++i){
-      buffer_left[i] = ghost_values[i];
-    }
-    check_and_compute();
-  }
-
-  void ghostsFromBottom(int width, double ghost_values[]) {
-    for(int i=0;i<width;++i){
-      buffer_down[i] = ghost_values[i];
-    }
-    check_and_compute();
-  }
-
-  void ghostsFromTop(int width, double ghost_values[]) {
-    for(int i=0;i<width;++i){
-      buffer_up[i] = ghost_values[i];
-    }
+    else if(whichSide == left)
+      for(int i=0;i<size;++i)
+	buffer_left[i] = ghost_values[i];
+    
+    else if(whichSide == down)
+      for(int i=0;i<size;++i)
+	buffer_down[i] = ghost_values[i];
+    
+    else if(whichSide == up)    
+      for(int i=0;i<size;++i)
+	buffer_up[i] = ghost_values[i];
+        
     check_and_compute();
   }
 
@@ -231,76 +199,72 @@ public:
       for(int i=0;i<myheight;++i){
 	for(int j=0;j<mywidth;++j){
 
-	  // Current step's values for neighboring array elements
+	  // Current time's pressures for neighboring array locations
 	  double left  = (j==0          ? buffer_left[i]  : pressure[i*mywidth+j-1] );
 	  double right = (j==mywidth-1  ? buffer_right[i] : pressure[i*mywidth+j+1] );
 	  double up    = (i==0          ? buffer_up[j]    : pressure[(i-1)*mywidth+j] );
 	  double down  = (i==myheight-1 ? buffer_down[j]  : pressure[(i+1)*mywidth+j] );
 
-	  // Current values for this array element
+	  // Current time's pressure for this array location
 	  double curr = pressure[i*mywidth+j];
 
-	  // Previous step's value for this array element
+	  // Previous time's pressure for this array location
 	  double old  = pressure_old[i*mywidth+j];
 
-	  // Compute the new value
+	  // Compute the future time's pressure for this array location
 	  pressure_new[i*mywidth+j] = 0.4*0.4*(left+right+up+down - 4.0*curr)-old+2.0*curr;
 
 	}
       }
 		
       // Advance to next step by copying values to the arrays for the previous steps
-      for(int i=0;i<myheight;++i){
+      for(int i=0;i<myheight;++i)
 	for(int j=0;j<mywidth;++j){
 	  pressure_old[i*mywidth+j] = pressure[i*mywidth+j];
 	  pressure[i*mywidth+j] = pressure_new[i*mywidth+j];
 	}
-      }
-
+      
       delete[] pressure_new;
-
       messages_due = 4;
-      mainProxy.report(thisIndex.x, thisIndex.y);
+      mainProxy.iterationCompleted();
     }
   }
 
 
-
   // provide my portion of the image to the graphical liveViz client                           
   void requestNextFrame(liveVizRequestMsg *m){
+
     // Draw my part of the image, plus a nice 1px border along my right/bottom boundary
-    int sx=thisIndex.x*mywidth; // where to deposit
+    int sx=thisIndex.x*mywidth; // where my portion of the image is located
     int sy=thisIndex.y*myheight;
-    int w=mywidth; // Size of my rectangular part of the image
+    int w=mywidth; // Size of my rectangular portion of the image
     int h=myheight;
     
     // set the output pixel values for my rectangle
-    // Each component is a char which can have 256 possible values.
+    // Each RGB component is a char which can have 256 possible values.
     unsigned char *intensity= new unsigned char[3*w*h];
     for(int i=0;i<myheight;++i){
       for(int j=0;j<mywidth;++j){
-        double t = pressure[i*mywidth+j];
-        if(t > 255.0){
-          t = 255.0;
-        } else if (t < -255.0){
-          t = -255.0;
-        }
-	
-        if(t > 0) { // Positive values are red
+
+        double p = pressure[i*mywidth+j];
+        if(p > 255.0) p = 255.0;    // Keep values in valid range
+        if(p < -255.0) p = -255.0;  // Keep values in valid range
+        	
+        if(p > 0) { // Positive values are red
           intensity[3*(i*w+j)+0] = 255; // RED component
-          intensity[3*(i*w+j)+1] = 255-t; // GREEN component
-          intensity[3*(i*w+j)+2] = 255-t; // BLUE component
+          intensity[3*(i*w+j)+1] = 255-p; // GREEN component
+          intensity[3*(i*w+j)+2] = 255-p; // BLUE component
         } else { // Negative values are blue
-          intensity[3*(i*w+j)+0] = 255+t; // RED component
-          intensity[3*(i*w+j)+1] = 255+t; // GREEN component
+          intensity[3*(i*w+j)+0] = 255+p; // RED component
+          intensity[3*(i*w+j)+1] = 255+p; // GREEN component
           intensity[3*(i*w+j)+2] = 255; // BLUE component
         }
 	
       }
     }
     
-    
-    // Draw a green border on right and bottom, overwrites data being plotted
+    // Draw a green border on right and bottom of this chare array's pixel buffer. 
+    // This will overwrite some pressure values at these pixels.
     for(int i=0;i<h;++i){
       intensity[3*(i*w+w-1)+0] = 0;     // RED component
       intensity[3*(i*w+w-1)+1] = 255;   // GREEN component
@@ -314,10 +278,9 @@ public:
 
     liveVizDeposit(m, sx,sy, w,h, intensity, this);
     delete[] intensity;
+
   }
-
-
-
+  
 };
 
 #include "wave2d.def.h"

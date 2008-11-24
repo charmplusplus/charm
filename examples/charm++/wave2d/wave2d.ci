@@ -5,16 +5,13 @@ mainmodule wave2d {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void report(int, int);
+    entry void iterationCompleted();
   };
 
   array [2D] Wave {
     entry Wave(void);
-    entry void begin_iteration(void);
-    entry void ghostsFromLeft(int width, double s[width]);
-    entry void ghostsFromRight(int width, double s[width]);
-    entry void ghostsFromTop(int width, double s[width]);
-    entry void ghostsFromBottom(int width, double s[width]);
+    entry void begin_iteration();
+    entry void recvGhosts(int whichSide, int height, double s[height]);
 
     // A method for requesting data to be displayed graphically to the user
     entry void requestNextFrame(liveVizRequestMsg *m);
