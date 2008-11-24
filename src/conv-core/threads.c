@@ -1274,6 +1274,11 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
       }
   }
 	
+  /* **CWL** Am assuming Gengbin left this unchanged because the macro
+     re-definition of pthread_create would not happen before this part of
+     the code. If the assumption is not true, then we can simply replace
+     this hash-if with the else portion.
+  */
 #if CMK_WITH_TAU
   r = tau_pthread_create(&(result->self), &attr, CthOnly, (void*) result);
 #else
