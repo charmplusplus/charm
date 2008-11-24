@@ -1220,9 +1220,7 @@ void CthResume(CthThread t)
   pthread_cond_signal(&(t->cond)); /* wake up the next thread */
   if (tc->base.exiting) {
     pthread_mutex_unlock(&CthCpvAccess(sched_mutex));
-
-	printf("calling tau_pthread_exit");
-    tau_pthread_exit(0);
+    pthread_exit(0);
   } else {
     /* pthread_cond_wait might (with low probability) return when the 
       condition variable has not been signaled, guarded with 
@@ -1269,15 +1267,18 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   if (size<1024) size = CthCpvAccess(_defaultStackSize);
   if (0!=(r=pthread_attr_setstacksize(&attr,size))) {
       if (!reported) {
-        CmiPrintf("Warning: pthread_attr_setstacksize failed");
+        CmiPrintf("Warning: pthread_attr_setstacksize failed\n");
 	errno = r;
 	perror("pthread_attr_setstacksize");
         reported = 1;
       }
   }
 	
-	printf("calling tau_pthread_create");
+#if CMK_WITH_TAU
   r = tau_pthread_create(&(result->self), &attr, CthOnly, (void*) result);
+#else
+  r = pthread_create(&(result->self), &attr, CthOnly, (void*) result);
+#endif
   if (0 != r) {
     CmiPrintf("pthread_create failed with %d\n", r);
     CmiAbort("CthCreate failed to created a new pthread\n");
