@@ -2563,8 +2563,7 @@ void* pthread_func(void* arg) {
     fprintf(stderr, "OffloadAPI :: ERROR : Unable to destroy SPE Context\n");
     exit(EXIT_FAILURE);
   }
-  printf("called tau pthread exit");
-  tau_pthread_exit(NULL);
+  pthread_exit(NULL);
   return NULL;
 }
 
@@ -2685,8 +2684,7 @@ SPEThread* createSPEThread(SPEData *speData) {
   }
 
   // Create the pthread for the SPE Thread
-	printf("calling tau_pthread_create");
-  int rtnCode = tau_pthread_create(&(speThread->pThread), NULL, pthread_func, speThread);
+  int rtnCode = pthread_create(&(speThread->pThread), NULL, pthread_func, speThread);
   if (rtnCode != 0) {
     fprintf(stderr, "OffloadAPI :: ERROR : Unable to create pthread (rtnCode = %d)\n", rtnCode);
     exit(EXIT_FAILURE);
@@ -2837,8 +2835,7 @@ SPEThread** createSPEThreads(SPEThread **speThreads, int numThreads) {
     }
 
     // Create the pthread for the SPE Thread
-	  printf("calling tau_pthread_create");
-    int rtnCode = tau_pthread_create(&(speThreads[i]->pThread), NULL, pthread_func, speThreads[i]);
+    int rtnCode = pthread_create(&(speThreads[i]->pThread), NULL, pthread_func, speThreads[i]);
     if (rtnCode != 0) {
       fprintf(stderr, "OffloadAPI :: ERROR : Unable to create pthread (rtnCode = %d)\n", rtnCode);
       exit(EXIT_FAILURE);
