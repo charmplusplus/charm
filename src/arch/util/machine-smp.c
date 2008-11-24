@@ -428,11 +428,7 @@ static void CmiStartThreads(char **argv)
   for (i=1; i<=tocreate; i++) {
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
-#if CMK_WITH_TAU
-    ok = tau_pthread_create(&pid, &attr, call_startfn, (void *)i);
-#else
     ok = pthread_create(&pid, &attr, call_startfn, (void *)i);
-#endif
     if (ok<0) PerrorExit("pthread_create"); 
     pthread_attr_destroy(&attr);
   }
