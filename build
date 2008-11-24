@@ -364,12 +364,9 @@ then
 
 	SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
 
-	echo $SED_CHARMC
-	sed -i -e $SED_CHARMC src/scripts/Makefile 
-	echo $SED_CHARMC
-	sed -i -e $SED_CHARMC src/scripts/charmc  
 	else
 	echo "TAU>>>> ERROR could not find Makefile: $TAU_MAKEFILE"
+        TAU_MAKEFILE=""
 	fi
 else
     # Still need to set the variables in Makefile and charmc to ""
@@ -377,11 +374,9 @@ else
     TAU_MAKEFILE=""
     SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
 
-    echo $SED_CHARMC
-    sed -i -e $SED_CHARMC src/scripts/Makefile
-    echo $SED_CHARMC
-    sed -i -e $SED_CHARMC src/scripts/charmc
 fi
+sed -e $SED_CHARMC src/scripts/Makefile > .Makefile.$$ && cp .Makefile.$$ src/scripts/Makefile && rm -f  .Makefile.$$
+sed -e $SED_CHARMC src/scripts/charmc > .charmc.$$ && cp .charmc.$$ src/scripts/charmc && rm -f .charmc.$$
 
 [ "x$VERSION" = "x" ] && syntax && exit 1
 
@@ -526,6 +521,11 @@ fi
 if test  -n "$WITH_ROMIO" 
 then
     echo "CMK_AMPI_WITH_ROMIO=\"true\"" >> $ConvSh
+fi
+
+if test -n "$TAU_MAKEFILE"
+then
+    echo "#define CMK_WITH_TAU                  1" >> $ConvHeader
 fi
 
 echo $BASEVERSION > $DESTINATION/tmp/.vdir
