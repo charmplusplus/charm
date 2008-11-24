@@ -1,6 +1,7 @@
 
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
+MPICC=$(CDIR)/bin/mpiCC $(OPTS)
 
 #Headers internal to ParFUM
 INTERNALHEADERS= ParFUM_internals.h ParFUM_locking.h ParFUM_Mesh_Modify.h ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUM_Interpolate.h ParFUM_SA.h import.h adapt_adj.h bulk_adapt_ops.h bulk_adapt.h
@@ -50,7 +51,7 @@ $(COMPATLIB): $(COMPAT)
 # Build fortran file with definitions for init and driver. 
 # This allows us to use a single library with either fortran or c
 $(PARFUMMAIN): main.C $(HEADDEP)
-	$(CHARMC) main.C -o $(PARFUMMAIN)
+	$(MPICC) main.C -o $(PARFUMMAIN)
 
 # Copy header files to include directory
 .PHONY: headers
@@ -67,67 +68,67 @@ headers: $(HEADDEP)
 
 
 MsaHashtable.o: MsaHashtable.C $(HEADDEP)
-	$(CHARMC) -c MsaHashtable.C $(INCS)
+	$(MPICC) -c MsaHashtable.C $(INCS)
 
 mesh_modify.o: mesh_modify.C $(HEADDEP)
-	$(CHARMC) -c mesh_modify.C $(INCS)
+	$(MPICC) -c mesh_modify.C $(INCS)
 
 ParFUM_SA.o: ParFUM_SA.C $(HEADDEP)
-	$(CHARMC) -c ParFUM_SA.C $(INCS)
+	$(MPICC) -c ParFUM_SA.C $(INCS)
 
 ParFUM.o: ParFUM.C $(HEADDEP)
-	$(CHARMC) -c ParFUM.C $(INCS)
+	$(MPICC) -c ParFUM.C $(INCS)
 
 mesh.o: mesh.C $(HEADDEP)
-	$(CHARMC) -c mesh.C $(INCS)
+	$(MPICC) -c mesh.C $(INCS)
 
 symmetries.o: symmetries.C $(HEADDEP)
-	$(CHARMC) -c symmetries.C $(INCS)
+	$(MPICC) -c symmetries.C $(INCS)
 
 partition.o: partition.C $(HEADDEP)
-	$(CHARMC) -c partition.C $(INCS)
+	$(MPICC) -c partition.C $(INCS)
 
 map.o: map.C $(HEADDEP)
-	$(CHARMC) -c map.C $(INCS)
+	$(MPICC) -c map.C $(INCS)
 
 compat.o: compat.C $(HEADDEP)
-	$(CHARMC) -c compat.C $(INCS)
+	$(MPICC) -c compat.C $(INCS)
 
 call_init.o: call_init.c $(HEADDEP)
 	$(CHARMC) -c call_init.c $(INCS)
 
 parallel_part.o: parallel_part.C $(HEADDEP) MsaHashtable.h
-	$(CHARMC) -c parallel_part.C $(INCS)
+	$(MPICC) -c parallel_part.C $(INCS)
 
 mesh_adjacency.o: mesh_adjacency.C $(HEADDEP)
-	$(CHARMC) -c mesh_adjacency.C $(INCS)
+	$(MPICC) -c mesh_adjacency.C $(INCS)
 
 mesh_feature_detect.o: mesh_feature_detect.C $(HEADDEP)
-	$(CHARMC) -c mesh_feature_detect.C $(INCS)
+	$(MPICC) -c mesh_feature_detect.C $(INCS)
 
 adapt.o: adapt.C $(HEADDEP)
-	$(CHARMC) -c adapt.C $(INCS)
+	$(MPICC) -c adapt.C $(INCS)
 
 adapt_if.o: adapt_if.C $(HEADDEP)
-	$(CHARMC) -c adapt_if.C $(INCS)
+	$(MPICC) -c adapt_if.C $(INCS)
 
 adapt_algs.o: adapt_algs.C $(HEADDEP)
-	$(CHARMC) -c adapt_algs.C $(INCS)
+	$(MPICC) -c adapt_algs.C $(INCS)
 
 interpolate.o: interpolate.C $(HEADDEP)
-	$(CHARMC) -c interpolate.C $(INCS)
+	$(MPICC) -c interpolate.C $(INCS)
 
 lock.o: lock.C $(HEADDEP)
-	$(CHARMC) -c lock.C $(INCS)
+	$(MPICC) -c lock.C $(INCS)
 
 util.o: util.C $(HEADDEP)
-	$(CHARMC) -c util.C $(INCS)
+	$(MPICC) -c util.C $(INCS)
 
 lock_node.o: lock_node.C $(HEADDEP)
-	$(CHARMC) -c lock_node.C $(INCS)
+	$(MPICC) -c lock_node.C $(INCS)
 
 adapt_lock.o: adapt_lock.C $(HEADDEP)
-	$(CHARMC) -c adapt_lock.C $(INCS)
+	$(MPICC) -c adapt_lock.C $(INCS)
 
 collide.o: collide.C $(HEADDEP)
 	$(CHARMC) -c collide.C $(INCS)
@@ -145,19 +146,19 @@ compat_fdriver.o: compat_fdriver.c $(HEADDEP)
 	$(CHARMC) -c compat_fdriver.c $(INCS)
 
 global_numbering.o: global_numbering.C $(HEADDEP)
-	$(CHARMC) -c global_numbering.C $(INCS)
+	$(MPICC) -c global_numbering.C $(INCS)
 
 import.o: import.C $(HEADDEP)
-	$(CHARMC) -c import.C $(INCS)
+	$(MPICC) -c import.C $(INCS)
 
 adapt_adj.o: adapt_adj.C $(HEADDEP)
-	$(CHARMC) -c adapt_adj.C $(INCS)
+	$(MPICC) -c adapt_adj.C $(INCS)
 
 bulk_adapt_ops.o: bulk_adapt_ops.C $(HEADDEP)
-	$(CHARMC) -c bulk_adapt_ops.C $(INCS)
+	$(MPICC) -c bulk_adapt_ops.C $(INCS)
 
 bulk_adapt.o: bulk_adapt.C $(HEADDEP)
-	$(CHARMC) -c bulk_adapt.C $(INCS)
+	$(MPICC) -c bulk_adapt.C $(INCS)
 
 docs: ParFUM.doxy ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUMf.h ParFUM.h ParFUM_internals.h ParFUM_Interpolate.h ParFUM_locking.h ParFUM_Mesh_Modify.h adapt_algs.C adapt.C adapt_if.C adapt_lock.C collide.C compat.C interpolate.C lock.C lock_node.C main.C map.C mesh_adjacency.C mesh.C mesh_modify.C MsaHashtable.C parallel_part.C ParFUM.C partition.C symmetries.C util.C call_init.c compat_driver.c compat_fdriver.c compat_finit.c compat_init.c ParFUM_SA.C global_numbering.C import.C import.h
 	doxygen ParFUM.doxy
