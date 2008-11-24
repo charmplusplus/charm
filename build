@@ -531,6 +531,8 @@ then
     echo "#define CMK_WITH_TAU               1" >> $ConvHeader
     echo "#define pthread_create             tau_pthread_create" >> $ConvHeader
     echo "#define pthread_exit               tau_pthread_exit" >> $ConvHeader
+
+    echo "CMK_WITH_TAU=\"true\"" >> $ConvSh
 fi
 
 
