@@ -183,8 +183,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     usrparam->argv = CmiCopyArgs(argv);
     usrparam->mype = i;
 
-	  printf("calling tau_pthread_create");
+#if CMK_WITH_TAU
     tau_pthread_create(&aThread[i],(pthread_attr_t *)0,threadInit,(void *)usrparam);
+#else
+    pthread_create(&aThread[i],(pthread_attr_t *)0,threadInit,(void *)usrparam);
+#endif
   }
   usrparam = (USER_PARAMETERS *) CmiAlloc(sizeof(USER_PARAMETERS));
   usrparam->argv = CmiCopyArgs(argv);
