@@ -14,7 +14,7 @@
 #ifndef __parmetis_h__
 #define __parmetis_h__
 
-#include <mpi.h>
+#include <ampi.h>
 
 #ifndef _MSC_VER
 #define __cdecl
