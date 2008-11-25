@@ -180,6 +180,7 @@ private:
     void   setMsgIdx(const UChar idx) { attribs.msgIdx = idx; }
     UInt   getTotalsize(void) const { return totalsize; }
     void   setTotalsize(const UInt s) { totalsize = s; }
+    UInt   getUsersize(void) const { return totalsize - priobits - sizeof(envelope); }
     UChar  isPacked(void) const { return attribs.isPacked; }
     void   setPacked(const UChar p) { attribs.isPacked = p; }
     UShort getPriobits(void) const { return priobits; }
