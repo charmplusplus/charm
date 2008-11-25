@@ -261,75 +261,6 @@ void CpdMachineArchitecture(char *msg) {
   CcsSendReply(6, (void*)reply);
 }
 
-#include "ccs-builtins.h"
-
-void PUP_fmt::fieldHeader(typeCode_t typeCode,int nItems) {
-    // Compute and write intro byte:
-    lengthLen_t ll;
-    if (nItems==1) ll=lengthLen_single;
-    else if (nItems<256) ll=lengthLen_byte;
-    else ll=lengthLen_int;
-    // CmiPrintf("Intro byte: l=%d t=%d\n",(int)ll,(int)typeCode);
-    byte intro=(((int)ll)<<4)+(int)typeCode;
-    p(intro);
-    // Compute and write length:
-    switch(ll) {
-    case lengthLen_single: break; // Single item
-    case lengthLen_byte: {
-        byte l=nItems;
-        p(l);
-        } break;
-    case lengthLen_int: {
-        p(nItems); 
-        } break; 
-    };
-}
-
-void PUP_fmt::comment(const char *message) {
-	int nItems=strlen(message);
-	fieldHeader(typeCode_comment,nItems);
-	p((char *)message,nItems);
-}
-void PUP_fmt::synchronize(unsigned int m) {
-	fieldHeader(typeCode_sync,1);
-	p(m);
-}
-void PUP_fmt::bytes(void *ptr,int n,size_t itemSize,PUP::dataType t) {
-	switch(t) {
-	case PUP::Tchar:
-	case PUP::Tuchar:
-	case PUP::Tbyte:
-		fieldHeader(typeCode_byte,n);
-		p.bytes(ptr,n,itemSize,t);
-		break;
-	case PUP::Tshort: case PUP::Tint:
-	case PUP::Tushort: case PUP::Tuint:
-	case PUP::Tbool:
-		fieldHeader(typeCode_int,n);
-		p.bytes(ptr,n,itemSize,t);
-		break;
-	// treat "long" and "pointer" as 8-bytes, in conformity with pup_toNetwork.C
-	case PUP::Tlong: case PUP::Tlonglong:
-	case PUP::Tulong: case PUP::Tulonglong:
-		fieldHeader(typeCode_long,n);
-		p.bytes(ptr,n,itemSize,t);
-		break;
-	case PUP::Tfloat:
-		fieldHeader(typeCode_float,n);
-		p.bytes(ptr,n,itemSize,t);
-		break;
-	case PUP::Tdouble: case PUP::Tlongdouble:
-		fieldHeader(typeCode_double,n);
-		p.bytes(ptr,n,itemSize,t);
-		break;
-    case PUP::Tpointer:
-        fieldHeader(typeCode_pointer,n);
-        p.bytes(ptr,n,itemSize,t);
-        break;
-	default: CmiAbort("Unrecognized type code in PUP_fmt::bytes");
-	};
-}
-
 static void CpdList_ccs_list_items_fmt(char *msg)
 {
   CpdListItemsRequest req;
@@ -747,6 +678,74 @@ extern "C" void CcsBuiltinsInit(char **argv)
 
 #endif /*CMK_CCS_AVAILABLE*/
 
+#include "ccs-builtins.h"
+
+void PUP_fmt::fieldHeader(typeCode_t typeCode,int nItems) {
+    // Compute and write intro byte:
+    lengthLen_t ll;
+    if (nItems==1) ll=lengthLen_single;
+    else if (nItems<256) ll=lengthLen_byte;
+    else ll=lengthLen_int;
+    // CmiPrintf("Intro byte: l=%d t=%d\n",(int)ll,(int)typeCode);
+    byte intro=(((int)ll)<<4)+(int)typeCode;
+    p(intro);
+    // Compute and write length:
+    switch(ll) {
+    case lengthLen_single: break; // Single item
+    case lengthLen_byte: {
+        byte l=nItems;
+        p(l);
+        } break;
+    case lengthLen_int: {
+        p(nItems); 
+        } break; 
+    };
+}
+
+void PUP_fmt::comment(const char *message) {
+	int nItems=strlen(message);
+	fieldHeader(typeCode_comment,nItems);
+	p((char *)message,nItems);
+}
+void PUP_fmt::synchronize(unsigned int m) {
+	fieldHeader(typeCode_sync,1);
+	p(m);
+}
+void PUP_fmt::bytes(void *ptr,int n,size_t itemSize,PUP::dataType t) {
+	switch(t) {
+	case PUP::Tchar:
+	case PUP::Tuchar:
+	case PUP::Tbyte:
+		fieldHeader(typeCode_byte,n);
+		p.bytes(ptr,n,itemSize,t);
+		break;
+	case PUP::Tshort: case PUP::Tint:
+	case PUP::Tushort: case PUP::Tuint:
+	case PUP::Tbool:
+		fieldHeader(typeCode_int,n);
+		p.bytes(ptr,n,itemSize,t);
+		break;
+	// treat "long" and "pointer" as 8-bytes, in conformity with pup_toNetwork.C
+	case PUP::Tlong: case PUP::Tlonglong:
+	case PUP::Tulong: case PUP::Tulonglong:
+		fieldHeader(typeCode_long,n);
+		p.bytes(ptr,n,itemSize,t);
+		break;
+	case PUP::Tfloat:
+		fieldHeader(typeCode_float,n);
+		p.bytes(ptr,n,itemSize,t);
+		break;
+	case PUP::Tdouble: case PUP::Tlongdouble:
+		fieldHeader(typeCode_double,n);
+		p.bytes(ptr,n,itemSize,t);
+		break;
+    case PUP::Tpointer:
+        fieldHeader(typeCode_pointer,n);
+        p.bytes(ptr,n,itemSize,t);
+        break;
+	default: CmiAbort("Unrecognized type code in PUP_fmt::bytes");
+	};
+}
 
 
 
