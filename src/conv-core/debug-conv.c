@@ -28,6 +28,51 @@ char ** memoryBackup;
 #include <string.h>
 
 #include "pup_c.h"
+
+CpvDeclare(int, CpdSearchLeaks_Index);
+CpvDeclare(int, CpdSearchLeaksDone_Index);
+CpvStaticDeclare(CcsDelayedReply, leakSearchDelayedReply);
+
+void CpdSearchLeaksDone(void *msg) {
+  CmiInt4 ok = 1;
+  CcsSendDelayedReply(CpvAccess(leakSearchDelayedReply), 4, &ok);
+  CmiFree(msg);
+}
+
+void CpdSearchLeaks(char * msg) {
+  LeakSearchInfo *info = (LeakSearchInfo *)(msg+CmiMsgHeaderSizeBytes);
+  if (CmiMyPe() == info->pe || (info->pe == -1 && CmiMyPe() == 0)) {
+    if (sizeof(char*) == 8) {
+      info->begin_data = (((CmiUInt8)ntohl(((int*)&info->begin_data)[0]))<<32) + ntohl(((int*)&info->begin_data)[1]);
+      info->end_data = (((CmiUInt8)ntohl(((int*)&info->end_data)[0]))<<32) + ntohl(((int*)&info->end_data)[1]);
+      info->begin_bss = (((CmiUInt8)ntohl(((int*)&info->begin_bss)[0]))<<32) + ntohl(((int*)&info->begin_bss)[1]);
+      info->end_bss = (((CmiUInt8)ntohl(((int*)&info->end_bss)[0]))<<32) + ntohl(((int*)&info->end_bss)[1]);
+    } else {
+      info->begin_data = ntohl((int)info->begin_data);
+      info->end_data = ntohl((int)info->end_data);
+      info->begin_bss = ntohl((int)info->begin_bss);
+      info->end_bss = ntohl((int)info->end_bss);
+    }
+    info->quick = ntohl(info->quick);
+    info->pe = ntohl(info->pe);
+    CpvAccess(leakSearchDelayedReply) = CcsDelayReply();
+    if (info->pe == -1) {
+      CmiSetXHandler(msg, CpvAccess(CpdSearchLeaks_Index));
+      CmiSetHandler(msg, _debugHandlerIdx);
+      CmiSyncBroadcast(CmiMsgHeaderSizeBytes+sizeof(LeakSearchInfo), msg);
+    }
+  }
+  check_memory_leaks(info);
+  if (info->pe == CmiMyPe()) CpdSearchLeaksDone(msg);
+  else if (info->pe == -1) {
+    void *reduceMsg = CmiAlloc(0);
+    CmiSetHandler(reduceMsg, CpvAccess(CpdSearchLeaksDone_Index));
+    CmiReduce(reduceMsg, CmiMsgHeaderSizeBytes, CmiReduceMergeFn_random);
+    CmiFree(msg);
+  }
+  else CmiAbort("Received allocationTree request for another PE!");
+}
+
 void * (*CpdDebugGetAllocationTree)(int *);
 void (*CpdDebug_pupAllocationPoint)(pup_er p, void *data);
 void (*CpdDebug_deleteAllocationPoint)(void *ptr);
@@ -70,6 +115,55 @@ static void CpdDebugCallAllocationTree(char *msg)
   if (forPE == CmiMyPe()) CpdDebugReturnAllocationTree(tree);
   else if (forPE == -1) CmiReduceStruct(tree, CpdDebug_pupAllocationPoint, CpdDebug_MergeAllocationTree,
                                 CpdDebugReturnAllocationTree, CpdDebug_deleteAllocationPoint);
+  else CmiAbort("Received allocationTree request for another PE!");
+  CmiFree(msg);
+}
+
+void * (*CpdDebugGetMemStat)(void);
+void (*CpdDebug_pupMemStat)(pup_er p, void *data);
+void (*CpdDebug_deleteMemStat)(void *ptr);
+void * (*CpdDebug_mergeMemStat)(void *data, void **remoteData, int numRemote);
+CpvDeclare(int, CpdDebugCallMemStat_Index);
+CpvStaticDeclare(CcsDelayedReply, memStatDelayedReply);
+
+static void CpdDebugReturnMemStat(void *stat) {
+  pup_er sizerNet = pup_new_network_sizer();
+  pup_er sizer = pup_new_fmt(sizerNet);
+  char *buf;
+  pup_er packerNet;
+  pup_er packer;
+  int i;
+  CpdDebug_pupMemStat(sizer, stat);
+  buf = (char *)malloc(pup_size(sizer));
+  packerNet = pup_new_network_pack(buf);
+  packer = pup_new_fmt(packerNet);
+  CpdDebug_pupMemStat(packer, stat);
+  /*CmiPrintf("size=%d tree:",pup_size(sizer));
+  for (i=0;i<100;++i) CmiPrintf(" %02x",((unsigned char*)buf)[i]);
+  CmiPrintf("\n");*/
+  CcsSendDelayedReply(CpvAccess(memStatDelayedReply), pup_size(sizer),buf);
+  pup_destroy(sizerNet);
+  pup_destroy(sizer);
+  pup_destroy(packerNet);
+  pup_destroy(packer);
+  free(buf);
+}
+
+static void CpdDebugCallMemStat(char *msg) {
+  int forPE;
+  void *stat;
+  sscanf(msg+CmiMsgHeaderSizeBytes, "%d", &forPE);
+  if (CmiMyPe() == forPE) CpvAccess(memStatDelayedReply) = CcsDelayReply();
+  if (forPE == -1 && CmiMyPe()==0) {
+    CpvAccess(memStatDelayedReply) = CcsDelayReply();
+    CmiSetXHandler(msg, CpvAccess(CpdDebugCallMemStat_Index));
+    CmiSetHandler(msg, _debugHandlerIdx);
+    CmiSyncBroadcast(CmiMsgHeaderSizeBytes+strlen(msg+CmiMsgHeaderSizeBytes)+1, msg);
+  }
+  stat = CpdDebugGetMemStat();
+  if (forPE == CmiMyPe()) CpdDebugReturnMemStat(stat);
+  else if (forPE == -1) CmiReduceStruct(stat, CpdDebug_pupMemStat, CpdDebug_mergeMemStat,
+                                CpdDebugReturnMemStat, CpdDebug_deleteMemStat);
   else CmiAbort("Received allocationTree request for another PE!");
   CmiFree(msg);
 }
@@ -136,7 +230,7 @@ int CpdIsFrozen(void) {
 
 /* Deliver a single message in the queue while not unfreezing the program */
 void CpdNext(void) {
-  
+
 }
 
 /* This converse handler is used by the debugger itself, to send messages
@@ -190,7 +284,7 @@ void CpdFreezeModeScheduler(void)
 	    CdsFifo_Enqueue(debugQ, msg);
       } else CmiNotifyIdle();
     }
-    /* Before leaving freeze mode, execute the messages 
+    /* Before leaving freeze mode, execute the messages
        in the order they would have executed before.*/
     while (!CdsFifo_Empty(debugQ))
     {
@@ -210,9 +304,20 @@ void CpdInit(void)
   CpvAccess(debugQueue) = CdsFifo_Create();
 
   CcsRegisterHandler("ccs_debug", (CmiHandler)CpdDebugHandler);
+
   CcsRegisterHandler("ccs_debug_allocationTree", (CmiHandler)CpdDebugCallAllocationTree);
   CpvInitialize(int, CpdDebugCallAllocationTree_Index);
   CpvAccess(CpdDebugCallAllocationTree_Index) = CmiRegisterHandler((CmiHandler)CpdDebugCallAllocationTree);
+  
+  CcsRegisterHandler("ccs_debug_memStat", (CmiHandler)CpdDebugCallMemStat);
+  CpvInitialize(int, CpdDebugCallMemStat_Index);
+  CpvAccess(CpdDebugCallMemStat_Index) = CmiRegisterHandler((CmiHandler)CpdDebugCallMemStat);
+
+  CcsRegisterHandler("converse_memory_leak",(CmiHandler)CpdSearchLeaks);
+  CpvInitialize(int, CpdSearchLeaks_Index);
+  CpvAccess(CpdSearchLeaks_Index) = CmiRegisterHandler((CmiHandler)CpdSearchLeaks);
+  CpvInitialize(int, CpdSearchLeaksDone_Index);
+  CpvAccess(CpdSearchLeaksDone_Index) = CmiRegisterHandler((CmiHandler)CpdSearchLeaksDone);
   
   _debugHandlerIdx = CmiRegisterHandler((CmiHandler)handleDebugMessage);
 #if 0
@@ -224,7 +329,7 @@ void CpdInit(void)
   msgListCleanup();
   msgListCache();
 #endif
-  
+
 }
 
 

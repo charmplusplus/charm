@@ -16,13 +16,18 @@ extern void (*CpdDebug_pupAllocationPoint)(pup_er p, void *data);
 extern void (*CpdDebug_deleteAllocationPoint)(void *ptr);
 extern void * (*CpdDebug_MergeAllocationTree)(void *data, void **remoteData, int numRemote);
 
+extern void * (*CpdDebugGetMemStat)(void);
+extern void (*CpdDebug_pupMemStat)(pup_er p, void *data);
+extern void (*CpdDebug_deleteMemStat)(void *ptr);
+extern void * (*CpdDebug_mergeMemStat)(void *data, void **remoteData, int numRemote);
+
 CpvExtern(int, cmiArgDebugFlag);
 extern char ** memoryBackup;
 extern void CpdCheckMemory();
 extern void CpdResetMemory();
 
-void CpdInit(void); 
-void CpdFreeze(void);  
+void CpdInit(void);
+void CpdFreeze(void);
 void CpdUnFreeze(void);
 int  CpdIsFrozen(void);
 void CpdFreezeModeScheduler(void);
@@ -31,11 +36,19 @@ void Cpd_CmiHandleMessage(void *msg);
 
 extern int (*CpdIsDebugMessage)(void*);
 
+typedef struct LeakSearchInfo {
+  char *begin_data, *end_data;
+  char *begin_bss, *end_bss;
+  int quick;
+  int pe;
+} LeakSearchInfo;
+extern void CpdSearchLeaks(char*);
+
 /* C bindings for CpdList functions: */
 
 /**
   When a CCS client asks for some data in a CpdList, the
-  system generates this struct to describe the range of 
+  system generates this struct to describe the range of
   items the client asked for (the items are numbered lo to hi-1),
   as well as store any extra data the CCS client passed in.
 */
@@ -61,7 +74,7 @@ typedef void (*CpdListItemsFn_c)(void *itemsParam,pup_er p,
 				CpdListItemsRequest *req);
 
 /**
-  User-written C routine to return the length (number of items) 
+  User-written C routine to return the length (number of items)
   in this CpdList.
     \param lenParam User-defined parameter passed to CpdListRegister_c.
     \param return Length of the CpdList.
@@ -70,7 +83,7 @@ typedef int  (*CpdListLengthFn_c)(void *lenParam);
 
 /**
   Create a new CpdList at the given path.  When a CCS client requests
-  this CpdList, Cpd will use these user-written C routines to extract 
+  this CpdList, Cpd will use these user-written C routines to extract
   the list's length and items.
     \param path CpdList request path.  The CCS client passes in this path.
     \param lenFn User-written subroutine to calculate the list's current length.
