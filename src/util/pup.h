@@ -563,6 +563,7 @@ protected:
 	er &p;
 public:
 	wrap_er(er &p_,unsigned int newFlags=0) :er(p_.getStateFlags()|newFlags), p(p_) {}
+	virtual int size(void) const { return p.size(); }
 	
 	virtual void impl_startSeek(seekBlock &s); /*Begin a seeking block*/
 	virtual int impl_tell(seekBlock &s); /*Give the current offset*/
