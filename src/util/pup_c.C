@@ -34,7 +34,7 @@ CDECL pup_er pup_new_network_pack(void *Nbuf)
   { return new PUP_toNetwork_pack(Nbuf); }
 CDECL pup_er pup_new_network_unpack(const void *Nbuf)
   { return new PUP_toNetwork_unpack(Nbuf); }
-#ifdef CMK_CCS_AVAILABLE
+#if CMK_CCS_AVAILABLE
 #include "ccs-builtins.h"
 CDECL pup_er pup_new_fmt(pup_er p)
   { return new PUP_fmt(mp); }

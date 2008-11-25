@@ -75,7 +75,7 @@ pup_er pup_new_fromMem(const void *Nbuf);
 pup_er pup_new_network_sizer();
 pup_er pup_new_network_pack(void *Nbuf);
 pup_er pup_new_network_unpack(const void *Nbuf);
-#ifdef CMK_CCS_AVAILABLE
+#if CMK_CCS_AVAILABLE
 pup_er pup_new_fmt(pup_er p);
 void pup_fmt_sync_begin_object(pup_er p);
 void pup_fmt_sync_end_object(pup_er p);
