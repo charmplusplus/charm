@@ -34,6 +34,21 @@ CDECL pup_er pup_new_network_pack(void *Nbuf)
   { return new PUP_toNetwork_pack(Nbuf); }
 CDECL pup_er pup_new_network_unpack(const void *Nbuf)
   { return new PUP_toNetwork_unpack(Nbuf); }
+#ifdef CMK_CCS_AVAILABLE
+#include "ccs-builtins.h"
+CDECL pup_er pup_new_fmt(pup_er p)
+  { return new PUP_fmt(mp); }
+CDECL void pup_fmt_sync_begin_object(pup_er p)
+  { mp.synchronize(PUP::sync_begin_object); }
+CDECL void pup_fmt_sync_end_object(pup_er p)
+  { mp.synchronize(PUP::sync_end_object); }
+CDECL void pup_fmt_sync_begin_array(pup_er p)
+  { mp.synchronize(PUP::sync_begin_array); }
+CDECL void pup_fmt_sync_end_array(pup_er p)
+  { mp.synchronize(PUP::sync_end_array); }
+CDECL void pup_fmt_sync_item(pup_er p)
+  { mp.syncComment(PUP::sync_item); }
+#endif
 CDECL void pup_destroy(pup_er p)
   { delete ((PUP::er *)p); }
 
