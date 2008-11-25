@@ -2,7 +2,7 @@
 Orion Sky Lawlor, olawlor@acm.org, 11/21/1999
 
 This file defines the interface for the C++ Hashtable
-class.  A Hashtable stores pointers to arbitrary Hashable 
+class.  A Hashtable stores pointers to arbitrary Hashable
 objects so that they can be accessed in constant time.
 
 This is a simple Hashtable implementation, with the interface
@@ -250,14 +250,14 @@ void CkHashtableIterator::seek(int n)
   if (curNo<0) curNo=0;
   if (curNo>len) curNo=len;
 }
-	
+
 //Return 1 if next will be non-NULL
 int CkHashtableIterator::hasNext(void)
 {
   while (curNo<len) {
     if (!layout.isEmpty(entry(curNo)))
       return 1;//We have a next object
-    else 
+    else
       curNo++;//This spot is blank-- skip over it
   }
   return 0;//We went through the whole table-- no object
@@ -359,7 +359,7 @@ static unsigned int primeLargerThan(unsigned int x)
 }
 
 /*************** C Interface routines ****************/
-#define CDECL extern "C" 
+#define CDECL extern "C"
 
 /*Create hashtable with a single integer as the key*/
 CDECL CkHashtable_c CkCreateHashtable_int(int objBytes,int initSize)
@@ -375,7 +375,7 @@ CDECL CkHashtable_c CkCreateHashtable_string(int objBytes,int initSize)
 {
   int objStart=2*sizeof(char *);
   CkHashtableLayout layout(sizeof(char *),sizeof(char *),
-			   objStart,objBytes,objStart+objBytes);  
+			   objStart,objBytes,objStart+objBytes);
   return (CkHashtable_c)new CkHashtable(layout,initSize,0.5,
 					CkHashFunction_string,CkHashCompare_string);
 }
@@ -384,7 +384,7 @@ CDECL CkHashtable_c CkCreateHashtable_pointer(int objBytes,int initSize)
 {
   int objStart=2*sizeof(char *);
   CkHashtableLayout layout(sizeof(char *),sizeof(char *),
-			   objStart,objBytes,objStart+objBytes);  
+			   objStart,objBytes,objStart+objBytes);
   return (CkHashtable_c)new CkHashtable(layout,initSize,0.5,
 					CkHashFunction_pointer,CkHashCompare_pointer);
 }
@@ -407,6 +407,11 @@ CDECL void *CkHashtableGet(CkHashtable_c h,const void *fromKey)
 CDECL void CkHashtableRemove(CkHashtable_c h,const void *doomedKey)
 {
 	((CkHashtable *)h)->remove(doomedKey);
+}
+/*Number of elements stored in the hashtable */
+CDECL int CkHashtableSize(CkHashtable_c h)
+{
+    return ((CkHashtable *)h)->numObjects();
 }
 
 /*Return the iterator for the given hashtable. It is reset to the beginning */

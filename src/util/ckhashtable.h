@@ -48,8 +48,14 @@ void *CkHashtablePut(CkHashtable_c h,const void *atKey);
 /*  returns NULL if key not found.*/
 void *CkHashtableGet(CkHashtable_c h,const void *fromKey);
 
+/*Return the key associated with this object (previously returned with one of the above functions) */
+void *CkHashtableKeyFromObject(CkHashtable_c h,const void *object);
+
 /*Remove this key, rehashing as needed */
 void CkHashtableRemove(CkHashtable_c h,const void *doomedKey);
+
+/*Number of elements stored in the hashtable */
+int CkHashtableSize(CkHashtable_c h);
 
 /*C Version of Hashtable iterator */
 typedef void *CkHashtableIterator_c;
@@ -167,6 +173,9 @@ class CkHashtableLayout {
 
   /// Get entry pointer from key pointer
   inline char *entryFromKey(char *key) const {return key-ko;}
+  
+  /// Get entry pointer from object pointer
+  inline char *entryFromObject(char *obj) const {return obj-oo;}
 };
 
 /**
