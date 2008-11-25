@@ -127,6 +127,7 @@ CpvDeclare(int, CpdDebugCallMemStat_Index);
 CpvStaticDeclare(CcsDelayedReply, memStatDelayedReply);
 
 static void CpdDebugReturnMemStat(void *stat) {
+#if CMK_CCS_AVAILABLE
   pup_er sizerNet = pup_new_network_sizer();
   pup_er sizer = pup_new_fmt(sizerNet);
   char *buf;
@@ -147,6 +148,7 @@ static void CpdDebugReturnMemStat(void *stat) {
   pup_destroy(packerNet);
   pup_destroy(packer);
   free(buf);
+#endif
 }
 
 static void CpdDebugCallMemStat(char *msg) {
