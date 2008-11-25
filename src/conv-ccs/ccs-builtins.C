@@ -15,6 +15,7 @@
 #include "conv-ccs.h"
 #include "sockRoutines.h"
 #include "queueing.h"
+#include "ccs-builtins.h"
 
 #if CMK_CCS_AVAILABLE
 
@@ -678,8 +679,6 @@ extern "C" void CcsBuiltinsInit(char **argv)
 
 #endif /*CMK_CCS_AVAILABLE*/
 
-#include "ccs-builtins.h"
-
 void PUP_fmt::fieldHeader(typeCode_t typeCode,int nItems) {
     // Compute and write intro byte:
     lengthLen_t ll;
@@ -746,14 +745,5 @@ void PUP_fmt::bytes(void *ptr,int n,size_t itemSize,PUP::dataType t) {
 	default: CmiAbort("Unrecognized type code in PUP_fmt::bytes");
 	};
 }
-
-
-
-
-
-
-
-
-
 
 
