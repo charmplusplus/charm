@@ -309,8 +309,8 @@ extern "C" void traceInit(char **argv)
 {
 #if ! CMK_TRACE_IN_CHARM
   _traceInit(argv);
-#endif
   initTraceCore(argv);
+#endif
 }
 
 /// Charm++ version
