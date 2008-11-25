@@ -85,6 +85,7 @@ struct rwtable rwtable[] = {
   "nodegroup",  NODEGROUP,
   "array",	ARRAY,
   "message",	MESSAGE,
+  "conditional",CONDITIONAL,
   "extern",	EXTERN,
   "initcall",	INITCALL,
   "initnode",	INITNODE,

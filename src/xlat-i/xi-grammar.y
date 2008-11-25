@@ -60,6 +60,7 @@ extern char *python_doc;
 %token PUPABLE
 %token <intval> CHARE MAINCHARE GROUP NODEGROUP ARRAY
 %token MESSAGE
+%token CONDITIONAL
 %token CLASS
 %token INCLUDE
 %token STACKSIZE
@@ -95,6 +96,7 @@ extern char *python_doc;
 %type <strval>		OptTraceName
 %type <val>		OptStackSize
 %type <intval>		OptExtern OptSemiColon MAttribs MAttribList MAttrib
+%type <intval>		OptConditional MsgArray
 %type <intval>		EAttribs EAttribList EAttrib OptVoid
 %type <cattr>		CAttribs CAttribList CAttrib
 %type <cattr>		ArrayAttribs ArrayAttribList ArrayAttrib
@@ -411,8 +413,18 @@ CAttrib		: MIGRATABLE
 		{ $$ = Chare::CPYTHON; }
 		;
 
-Var		: Type Name '[' ']' ';'
-		{ $$ = new MsgVar($1, $2); }
+OptConditional	: /* Empty */
+		{ $$ = 0; }
+		| CONDITIONAL
+		{ $$ = 1; }
+
+MsgArray	: /* Empty */
+		{ $$ = 0; }
+		| '[' ']'
+		{ $$ = 1; }
+
+Var		: OptConditional Type Name MsgArray ';'
+		{ $$ = new MsgVar($2, $3, $1, $4); }
 		;
 
 VarList		: Var

@@ -659,10 +659,14 @@ class MsgVar {
  public:
   Type *type;
   const char *name;
-  MsgVar(Type *t, const char *n) : type(t), name(n) {}
+  int cond;
+  int array;
+  MsgVar(Type *t, const char *n, int c, int a) : type(t), name(n), cond(c), array(a) { }
   Type *getType() { return type; }
   const char *getName() { return name; }
-  void print(XStr &str) {type->print(str);str<<" "<<name<<"[];";}
+  int isConditional() { return cond; }
+  int isArray() { return array; }
+  void print(XStr &str) {str<<(isConditional()?"conditional ":"");type->print(str);str<<" "<<name<<(isArray()?"[]":"")<<";";}
 };
 
 class MsgVarList : public Printable {
@@ -699,6 +703,20 @@ class Message : public TEntity {
     void genReg(XStr& str);
     virtual const char *proxyPrefix(void) {return Prefix::Message;}
     void genAllocDecl(XStr& str);
+    int numArrays(void) {
+      if (mvlist==0) return 0;
+      int count = 0;
+      MsgVarList *mv = mvlist;
+      for (int i=0; i<mvlist->len(); ++i, mv=mv->next) if (mv->msg_var->isArray()) count ++;
+      return count;
+    }
+    int numConditional(void) {
+      if (mvlist==0) return 0;
+      int count = 0;
+      MsgVarList *mv = mvlist;
+      for (int i=0; i<mvlist->len(); ++i, mv=mv->next) if (mv->msg_var->isConditional()) count ++;
+      return count;
+    }
     int numVars(void) { return ((mvlist==0) ? 0 : mvlist->len()); }
 };
 
