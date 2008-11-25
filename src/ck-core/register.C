@@ -7,14 +7,14 @@
 /**
 \addtogroup CkRegister
 
-These routines keep track of the various chares 
+These routines keep track of the various chares
 (see ChareInfo and the _chareTable in register.h)
 and entry methods (see EntryInfo and the _entryTable)
 that exist in the program.
 
 These routines are normally called by a translator-generated
 _registerModule routine in the .def file.  Because these routines
-fill out global tables, they are normally called exactly 
+fill out global tables, they are normally called exactly
 once per node at Charm startup time.
 */
 #include "ck.h"
@@ -37,7 +37,7 @@ void _registerInit(void)
 }
 
 extern "C"
-int CkRegisterMsg(const char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack, 
+int CkRegisterMsg(const char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack,
                   size_t size)
 {
   return _msgTable.add(new MsgInfo(name, pack, unpack, size));
@@ -70,7 +70,7 @@ void CkRegisterChareInCharm(int chareIndex){
   _chareTable[chareIndex]->inCharm = CmiTrue;
 }
 
-extern "C" 
+extern "C"
 void CkRegisterGroupIrr(int chareIndex,int isIrr){
   _chareTable[chareIndex]->isIrr = isIrr;
 }
@@ -129,14 +129,14 @@ void CkRegisterMessagePupFn(int epIndex,CkMessagePupFn m)
 {
 	_entryTable[epIndex]->messagePup=m;
 }
-extern "C" 
+extern "C"
 int CkDisableTracing(int epIdx) {
 	int oldStatus = _entryTable[epIdx]->traceEnabled;
 	_entryTable[epIdx]->traceEnabled=CmiFalse;
 	return oldStatus;
 }
 
-extern "C" 
+extern "C"
 void CkEnableTracing(int epIdx) {
 	_entryTable[epIdx]->traceEnabled=CmiTrue;
 }
@@ -145,10 +145,10 @@ void CkEnableTracing(int epIdx) {
 static void pupEntry(PUP::er &p,int index)
 {
   EntryInfo *c=_entryTable[index];
-  PCOMS(name) 
+  PCOMS(name)
   p.comment("index");
   p(index);
-  PCOM(msgIdx) 
+  PCOM(msgIdx)
   PCOM(chareIdx)
   PCOM(inCharm);
 }
@@ -160,7 +160,7 @@ static void pupMsg(PUP::er &p,int i)
 static void pupChare(PUP::er &p,int i)
 {
   ChareInfo *c=_chareTable[i];
-  PCOMS(name) PCOM(size) 
+  PCOMS(name) PCOM(size)
   PCOM(defCtor) PCOM(migCtor)
   PCOM(numbases)
   PCOM(inCharm)
@@ -175,7 +175,7 @@ static void pupMain(PUP::er &p,int i)
 static void pupReadonly(PUP::er &p,int i)
 {
   ReadonlyInfo *c=_readonlyTable[i];
-  PCOMS(name) PCOMS(type) PCOM(size) 
+  PCOMS(name) PCOMS(type) PCOM(size)
   p.comment("value");
   //c->pupData(p); Do not use puppers, just copy memory
   p((char *)c->ptr,c->size);
@@ -189,13 +189,6 @@ static void pupReadonlyMsg(PUP::er &p,int i)
 }
 
 extern void CpdCharmInit(void);
-extern "C" {
-  int cpd_memory_length(void*);
-  void cpd_memory_pup(void*,void*,CpdListItemsRequest*);
-  void cpd_memory_leak(void*,void*,CpdListItemsRequest*);
-  int cpd_memory_getLength(void*);
-  void cpd_memory_get(void*,void*,CpdListItemsRequest*);
-}
 
 void _registerDone(void)
 {
@@ -205,9 +198,7 @@ void _registerDone(void)
   CpdListRegister(new CpdSimpleListAccessor("charm/mains",_mainTable.size(),pupMain));
   CpdListRegister(new CpdSimpleListAccessor("charm/readonly",_readonlyTable.size(),pupReadonly));
   CpdListRegister(new CpdSimpleListAccessor("charm/readonlyMsg",_readonlyMsgs.size(),pupReadonlyMsg));
-  CpdListRegister(new CpdListAccessor_c("converse/memory",cpd_memory_length,0,cpd_memory_pup,0));
-  CpdListRegister(new CpdListAccessor_c("converse/memory/leak",cpd_memory_length,0,cpd_memory_leak,0));
-  CpdListRegister(new CpdListAccessor_c("converse/memory/data",cpd_memory_getLength,0,cpd_memory_get,0,false));
+
 #if CMK_CCS_AVAILABLE
   CpdCharmInit();
 #endif
@@ -215,7 +206,7 @@ void _registerDone(void)
 
 //Print a debugging version of this entry method index:
 void CkPrintEntryMethod(int epIdx) {
-	if (epIdx<=0 || epIdx>=_entryTable.size()) 
+	if (epIdx<=0 || epIdx>=_entryTable.size())
 		CkPrintf("INVALID ENTRY METHOD %d!",epIdx);
 	else {
 		EntryInfo *e=_entryTable[epIdx];

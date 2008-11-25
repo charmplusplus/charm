@@ -84,7 +84,7 @@ void CpdAfterEp(int ep) {
 /************ Array Element CPD Lists ****************/
 
 /**
-  Count array elements going by until they reach this 
+  Count array elements going by until they reach this
   range (lo to hi), then start passing them to dest.
 */
 template <class T>
@@ -94,9 +94,9 @@ private:
    CkArray *mgr;
    int cur,lo,hi;
 public:
-   CkArrayElementRangeIterator(T *dest_,int l,int h) 
+   CkArrayElementRangeIterator(T *dest_,int l,int h)
    	:dest(dest_),mgr(0),cur(0),lo(l),hi(h) {}
-   
+
   /** Called to iterate only on a specific array manager.
       Returs the number of objects it iterate on.
   */
@@ -114,30 +114,30 @@ public:
      int numGroups=CkpvAccess(_groupIDTable)->size();
      for(int i=0;i<numGroups;i++) {
         IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
-	if (obj->isArrMgr()) 
+	if (obj->isArrMgr())
 	{ /* This is an array manager: examine its array elements */
 	  mgr=(CkArray *)obj;
 	  mgr->getLocMgr()->iterate(*this);
 	}
      }
    }
-   
+
    // Called by location manager's iterate function
    virtual void addLocation (CkLocation &loc)
    {
-     if (cur>=lo && cur<hi) 
+     if (cur>=lo && cur<hi)
      { /* This element is in our range-- look it up */
        dest->add(cur,mgr->lookup(loc.getIndex()),mgr->getGroupID().idx);
      }
      cur++;
    }
-   
+
    // Return the number of total array elements seen so far.
    int getCount(void) {return cur;}
 };
 
 /**
-  Count charm++ objects going by until they reach this 
+  Count charm++ objects going by until they reach this
   range (lo to hi), then start passing them to dest.
 */
 template <class T>
@@ -146,9 +146,9 @@ private:
    T *dest;
    int cur,lo,hi;
 public:
-   CkObjectRangeIterator(T *dest_,int l,int h) 
+   CkObjectRangeIterator(T *dest_,int l,int h)
    	:dest(dest_),cur(0),lo(l),hi(h) {}
-   
+
    /** Call add for every in-range array element on this processor */
    void iterate(void)
    { /* Walk the groupTable for arrays (FIXME: get rid of _groupIDTable) */
@@ -156,7 +156,7 @@ public:
      for(int i=0;i<numGroups;i++) {
        CkGroupID groupID = (*CkpvAccess(_groupIDTable))[i];
         IrrGroup *obj = CkpvAccess(_groupTable)->find(groupID).getObj();
-	/*if (obj->isArrMgr()) 
+	/*if (obj->isArrMgr())
 	{ / * This is an array manager: examine its array elements * /
 	  CkArray *mgr=(CkArray *)obj;
           CkArrayElementRangeIterator<T> ait(dest,lo,hi);
@@ -168,7 +168,7 @@ public:
         //}
      }
    }
-   
+
    // Return the number of total array elements seen so far.
    int getCount(void) {return cur;}
 };
@@ -263,7 +263,7 @@ public:
     CkArrayElementRangeIterator<CpdList_arrayElementNames> it(this,req.lo,req.hi);
     it.iterate(); // calls "add" for in-range elements
   }
-  void add(int cur,Chare *e,int group) 
+  void add(int cur,Chare *e,int group)
   { // Just grab the name and nothing else:
     ArrayElement *elt = (ArrayElement*)e;
          PUP::er &p=*pp;
@@ -290,7 +290,7 @@ public:
     CkArrayElementRangeIterator<CpdList_arrayElements> it(this,req.lo,req.hi);
     it.iterate(); // calls "add" for in-range elements
   }
-  void add(int cur, Chare *e, int group) 
+  void add(int cur, Chare *e, int group)
   { // Pup the element data
     ArrayElement *elt = (ArrayElement*)e;
     PUP::er &p=*pp;
@@ -357,14 +357,14 @@ void CpdPupMessage(PUP::er &p, void *msg)
   PUPn(msgFor);
 
   //p.synchronize(PUP::sync_last_system);
-  
+
   int ep=CkMessageToEpIdx(msg);
   PUPn(ep);
-  
+
   /* user data */
   p.comment("data");
   p.synchronize(PUP::sync_begin_object);
-  if (_entryTable[ep]->messagePup!=NULL) 
+  if (_entryTable[ep]->messagePup!=NULL)
     _entryTable[ep]->messagePup(p,msg);
   else
     CkMessage::ckDebugPup(p,msg);
@@ -403,7 +403,7 @@ public:
       CpdPupMessage(p, EnvToUsr(env));
       p.synchronize(PUP::sync_end_object);
     }
-    
+
     for(curObj=req.lo; curObj<req.hi; curObj++)
       if ((curObj>=0) && (curObj<length))
       {
@@ -417,8 +417,8 @@ public:
         if (CmiGetXHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Network Charm";}
         sprintf(name,"%s %d: %s (%d)","Message",curObj,type,CmiGetHandler(msg));
         p(name, strlen(name));
-        
-        if (isCharm) 
+
+        if (isCharm)
         { /* charm message */
           p.comment("charmMsg");
           p.synchronize(PUP::sync_begin_object);
@@ -476,9 +476,9 @@ void CpdBreakPointInit()
 static void _call_freeze_on_break_point(void * msg, void * object)
 {
       //Save breakpoint entry point index. This is retrieved from msg.
-      //So that the appropriate EntryInfo can be later retrieved from the hash table 
+      //So that the appropriate EntryInfo can be later retrieved from the hash table
       //of break point function entries, on continue.
-  
+
   // If the counter "skipBreakpoint" is not zero we actually do not freeze and deliver the regular message
   if (CpvAccess(skipBreakpoint) > 0) {
     EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CkMessageToEpIdx(msg));
@@ -550,15 +550,15 @@ void CpdSetBreakPoint (char *msg)
        //{
     tableIdx = atoi(functionName);
     if (tableIdx < 0 || tableIdx >= tableSize) {
-      CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName); 
+      CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName);
       return;
     }
             EntryInfo * breakPointEntryInfo = new EntryInfo(_entryTable[tableIdx]->name, _entryTable[tableIdx]->call, _entryTable[tableIdx]->msgIdx, _entryTable[tableIdx]->chareIdx );
            CmiPrintf("Breakpoint is set for function %s with an epIdx = %ld\n", _entryTable[tableIdx]->name, tableIdx);
-           CpvAccess(breakPointEntryTable)->put(tableIdx) = breakPointEntryInfo;  
-           _entryTable[tableIdx]->name = "debug_breakpoint_ep";  
+           CpvAccess(breakPointEntryTable)->put(tableIdx) = breakPointEntryInfo;
+           _entryTable[tableIdx]->name = "debug_breakpoint_ep";
            _entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
-           _entryTable[tableIdx]->msgIdx = CpvAccess(_debugMsg); 
+           _entryTable[tableIdx]->msgIdx = CpvAccess(_debugMsg);
            _entryTable[tableIdx]->chareIdx = CpvAccess(_debugChare);
            //_debugEntryTable[tableIdx].isBreakpoint = CmiTrue;
            //break;
@@ -566,7 +566,7 @@ void CpdSetBreakPoint (char *msg)
     //}
     //if (tableIdx == tableSize)
     //{
-    //  CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName); 
+    //  CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName);
     //  return;
     //}
 
@@ -587,11 +587,11 @@ void CpdRemoveBreakPoint (char *msg)
   if (strlen(functionName) > 0) {
     int idx = atoi(functionName);
     if (idx < 0 || idx >= _entryTable.size()) {
-      CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName); 
+      CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName);
       return;
     }
     //void *objPointer;
-    //void *keyPointer; 
+    //void *keyPointer;
     //CkHashtableIterator *it = CpvAccess(breakPointEntryTable)->iterator();
     //while(NULL!=(objPointer = it->next(&keyPointer)))
     //{
@@ -613,7 +613,7 @@ void CpdRemoveAllBreakPoints ()
 {
   //all breakpoints removed
   void *objPointer;
-  void *keyPointer; 
+  void *keyPointer;
   CkHashtableIterator *it = CpvAccess(breakPointEntryTable)->iterator();
   while(NULL!=(objPointer = it->next(&keyPointer)))
   {
@@ -682,8 +682,21 @@ void CpdStartGdb(void)
 #endif
 }
 
+extern "C" {
+  int cpd_memory_length(void*);
+  void cpd_memory_pup(void*,void*,CpdListItemsRequest*);
+  void cpd_memory_leak(void*,void*,CpdListItemsRequest*);
+  int cpd_memory_getLength(void*);
+  void cpd_memory_get(void*,void*,CpdListItemsRequest*);
+}
+
+
 void CpdCharmInit()
 {
+  CpdListRegister(new CpdListAccessor_c("converse/memory",cpd_memory_length,0,cpd_memory_pup,0));
+  //CpdListRegister(new CpdListAccessor_c("converse/memory/leak",cpd_memory_length,0,cpd_memory_leak,0));
+  CpdListRegister(new CpdListAccessor_c("converse/memory/data",cpd_memory_getLength,0,cpd_memory_get,0,false));
+
   CpdBreakPointInit();
   CcsRegisterHandler("ccs_set_break_point",(CmiHandler)CpdSetBreakPoint);
   CcsRegisterHandler("ccs_remove_break_point",(CmiHandler)CpdRemoveBreakPoint);
