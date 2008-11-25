@@ -180,6 +180,8 @@ static inline void CkDeliverMsgs(int nmsg)	{ BgDeliverMsgs(nmsg); }
 #undef CsdEnqueueLifo
 #define CsdEnqueueLifo(m)  CmiSyncSendAndFree(CmiMyPe(),sizeof(m), (char*)(m));
 
+#undef CmiNodeAllBarrier
+#define CmiNodeAllBarrier()
 
 /** common functions for two versions */
 namespace BGConverse {
