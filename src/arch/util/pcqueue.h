@@ -21,7 +21,7 @@
 
 /*****************************************************************************
  * #define CMK_PCQUEUE_LOCK
- * PCQueue doesn't need any lock, the lock here is only 
+ * PCQueue doesn't need any lock, the lock here is only
  * for debugging and testing purpose! it only make sense in smp version
  ****************************************************************************/
 /*#define CMK_PCQUEUE_LOCK  1 */
@@ -109,7 +109,7 @@ typedef struct PCQueueStruct
 }
 #endif
 
-PCQueue PCQueueCreate(void)
+static PCQueue PCQueueCreate(void)
 {
   CircQueue circ;
   PCQueue Q;
@@ -132,19 +132,30 @@ PCQueue PCQueueCreate(void)
   return Q;
 }
 
-int PCQueueEmpty(PCQueue Q)
+static void PCQueueDestroy(PCQueue Q)
+{
+  CircQueue circ = Q->head;
+  while (circ != Q->tail) {
+    free(circ);
+    circ = circ->next;
+  }
+  free(circ);
+  free(Q);
+}
+
+static int PCQueueEmpty(PCQueue Q)
 {
   CircQueue circ = Q->head;
   char *data = circ->data[circ->pull];
   return (data == 0);
 }
 
-int PCQueueLength(PCQueue Q)
+static int PCQueueLength(PCQueue Q)
 {
   return Q->len;
 }
 
-char *PCQueuePop(PCQueue Q)
+static char *PCQueuePop(PCQueue Q)
 {
   CircQueue circ; int pull; char *data;
 
@@ -170,10 +181,10 @@ char *PCQueuePop(PCQueue Q)
         smp_rmb();
         Q->head = circ-> next; /* next buffer must exist, because "Push"  */
         CmiAssert(Q->head != NULL);
-	
+
 	/* FreeCircQueueStruct(circ); */
         free(circ);
-	
+
 	/* links in the next buffer *before* filling */
                                /* in the last slot. See below. */
       }
@@ -192,17 +203,17 @@ char *PCQueuePop(PCQueue Q)
     }
 }
 
-void PCQueuePush(PCQueue Q, char *data)
+static void PCQueuePush(PCQueue Q, char *data)
 {
   CircQueue circ, circ1; int push;
-  
+
 #ifdef CMK_PCQUEUE_LOCK
   CmiLock(Q->lock);
 #endif
   circ1 = Q->tail;
   push = circ1->push;
   if (push == (PCQueueSize -1)) { /* last slot is about to be filled */
-    /* this way, the next buffer is linked in before data is filled in 
+    /* this way, the next buffer is linked in before data is filled in
        in the last slot of this buffer */
 
 #if !XT3_PCQUEUE_HACK
