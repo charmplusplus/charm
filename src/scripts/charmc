@@ -83,7 +83,7 @@ CHARM_SHARED="0"
 BUILD_SHARE="1"
 SWAPGLOBALS="0"
 
-TAU_MAKEFILE=/expand/home/cheelee/work/tau-charm/tau-2.17.3b2/x86_64/lib/Makefile.tau
+TAU_MAKEFILE=
 TAU_TRACE_MPI=1
 ####################################################################
 #
@@ -1492,7 +1492,7 @@ for trace in $TRACEMODE; do
       echo "  _registerTraceProjections();" >> $modInitSrc
     elif test $trace = "Tau"
     then
-		  TRACE_WITH_TAU=1
+      TRACE_WITH_TAU=1
       echo "  _registerTraceTau();" >> $modInitSrc
     elif test $trace = "simple"
     then
@@ -1541,12 +1541,15 @@ MAKE_LD="0"
 CORE_LIBS="-lconv-core -lconv-util $TRACE_OBJ "
 
 # get TAU stub makefile variables
-echo "include $TAU_MAKEFILE" > _make.tau.tmp
-echo "print-%:; @echo \$(\$*)" >> _make.tau.tmp
-TAU_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_LIBS`
-TAU_MPI_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_LIBS` 
-TAU_MPI_FLIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_FLIBS`
-#rm _make.tau.tmp
+if test "$CMK_WITH_TAU" = "true"
+then
+  echo "include $TAU_MAKEFILE" > _make.tau.tmp
+  echo "print-%:; @echo \$(\$*)" >> _make.tau.tmp
+  TAU_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_LIBS`
+  TAU_MPI_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_LIBS` 
+  TAU_MPI_FLIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_FLIBS`
+  rm -f _make.tau.tmp
+fi
 # done getting TAU variables
 
 case "$LANGUAGE" in
