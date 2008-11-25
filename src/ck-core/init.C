@@ -672,8 +672,8 @@ void _initCharm(int unused_argc, char **argv)
 #ifndef __BLUEGENE__
 	CpvInitialize(char *,_validProcessors);
 	CpvInitialize(char ,startedEvac);
-	CpvInitialize(int,serializer);
 #endif
+	CpvInitialize(int,serializer);
 
 	CksvInitialize(UInt, _numNodeGroups);
 	CksvInitialize(GroupTable*, _nodeGroupTable);
