@@ -951,6 +951,8 @@ typedef struct {
   } ops;
 } CmiReduction;
 
+extern void *CmiReduceMergeFn_random(void*,void**,int);
+
 void CmiReduce(void *msg, int size, void * (*mergeFn)(void*,void**,int));
 void CmiReduceStruct(void *data, void (*pupFn)(void*,void*),
                      void * (*mergeFn)(void*,void**,int), CmiHandler dest,

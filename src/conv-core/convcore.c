@@ -1890,6 +1890,10 @@ void CmiSendReduce() {
   }
 }
 
+void *CmiReduceMergeFn_random(void *data, void** remote, int n) {
+  return data;
+}
+
 void CmiReduce(void *data, int size, void * (*mergeFn)(void*,void**,int)) {
   CpvAccess(_reduce_data) = data;
   CpvAccess(_reduce_data_size) = size;
