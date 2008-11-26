@@ -3,7 +3,7 @@ CDIR=../../../../..
 LIBDIR=$(CDIR)/lib
 
 # Which compiler to use
-CC = ../../../../../bin/charmc
+CC = ../../../../../bin/mpicc
 
 
 # What optimization level to use
