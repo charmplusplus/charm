@@ -11,6 +11,12 @@
 #ifndef __WR_H__
 #define __WR_H__
 
+/* work request states */
+#define QUEUED 0            /* work request waiting in queue */
+#define TRANSFERRING_IN 1   /* data is being transferred to the GPU */
+#define EXECUTING       2   /* kernel is executing */
+#define TRANSFERRING_OUT 3   /* data is being transferred from the GPU */
+
 /* struct bufferInfo
  * 
  * purpose: 
@@ -86,15 +92,9 @@ typedef struct workRequest {
 
 
 
-  /* The following flags are used for control by the system */
+  /* The following flag is used for control by the system */
 
-  /* indicates work request is currently executing
-     User needs to set this flag to 0 before enqueueing */
-  int executing; 
-
-  /* indicates that data transfer to the device is complete
-     User needs to set this flag to 0 before enqueueing */
-  int transferDone; 
+  int state; 
 
 } workRequest; 
 

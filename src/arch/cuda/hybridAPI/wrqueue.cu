@@ -68,6 +68,8 @@ void enqueue(workRequestQueue *q, workRequest *wr) {
 
   memcpy(&q->requests[q->tail], wr, sizeof(workRequest));
 
+  q->requests[q->tail].state = QUEUED; 
+
   q->size++; 
 }
 

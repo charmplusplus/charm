@@ -24,7 +24,7 @@ extern void CUDACallbackManager(void *);
  *  the runtime system if needed
  */ 
 #define NUM_BUFFERS 100
-// #define GPU_DEBUG
+#define GPU_DEBUG
 
 
 /* work request queue */
@@ -63,12 +63,10 @@ void setupMemory(workRequest *wr) {
 #ifdef GPU_DEBUG
 	printf("buffer %d allocated\n", index); 
 #endif
-	/*
-	returnVal = cudaMallocHost((void **)&devBuffers[index], size); 
-	*/
 	returnVal = cudaMalloc((void **) &devBuffers[index], size); 
+	//returnVal = cudaMallocHost((void **)&devBuffers[index], size); 
 #ifdef GPU_DEBUG
-	printf("cudaMallocHost returned %d\n", returnVal); 
+	printf("cudaMalloc returned %d\n", returnVal); 
 #endif
       }
       
@@ -76,19 +74,21 @@ void setupMemory(workRequest *wr) {
 #ifdef GPU_DEBUG
 	printf("transferToDevice bufId: %d\n", index); 
 #endif
-	/*
+
 	cudaMemcpyAsync(devBuffers[index], hostBuffers[index], size, 
-		   cudaMemcpyHostToDevice, memory_stream);
+			cudaMemcpyHostToDevice, memory_stream);
+	/*
+	cudaMemcpy(devBuffers[index], hostBuffers[index], size,
+		   cudaMemcpyHostToDevice); 
 	*/
-	cudaMemcpy(devBuffers[index], hostBuffers[index], size, cudaMemcpyHostToDevice); 
       }
     }
   }
 } 
 
-/* cleanupMemory
-   free memory no longer needed on the gpu */ 
-void cleanupMemory(workRequest *wr) {
+/* copybackMemory
+   transfer memory from the GPU to the CPU after a work request is done */ 
+void copybackMemory(workRequest *wr) {
   dataInfo *bufferInfo = wr->bufferInfo; 
 
   if (bufferInfo != NULL) {
@@ -102,20 +102,28 @@ void cleanupMemory(workRequest *wr) {
 #ifdef GPU_DEBUG
 	printf("transferFromDevice: %d\n", index); 
 #endif
-	/*
+
 	cudaMemcpyAsync(hostBuffers[index], devBuffers[index], size,
-	cudaMemcpyDeviceToHost, memory_stream);
+			cudaMemcpyDeviceToHost, memory_stream);
+
+	/*	cudaMemcpy(hostBuffers[index], devBuffers[index],
+	  size, cudaMemcpyDeviceToHost); 
 	*/
-	cudaMemcpy(hostBuffers[index], devBuffers[index], size, cudaMemcpyDeviceToHost); 
       }
-      
+    }     
+  }
+}
+
+void freeMemory(workRequest *wr) {
+  dataInfo *bufferInfo = wr->bufferInfo;   
+  int nBuffers = wr->nBuffers; 
+  if (bufferInfo != NULL) {
+    for (int i=0; i<nBuffers; i++) {    
+      int index = bufferInfo[i].bufferID; 
       if (bufferInfo[i].freeBuffer) {
 #ifdef GPU_DEBUG
 	printf("buffer %d freed\n", index);
 #endif 
-	/*
-	cudaFreeHost(devBuffers[index]); 
-	*/
 	cudaFree(devBuffers[index]); 
 	devBuffers[index] = NULL; 
       }
@@ -154,6 +162,8 @@ void initHybridAPI() {
    called periodically to check if the current kernel has completed,
    and invoke subsequent kernel */
 void gpuProgressFn() {
+  int returnVal; 
+
   if (wrQueue == NULL) {
     return; 
   }
@@ -161,24 +171,43 @@ void gpuProgressFn() {
   while (!isEmpty(wrQueue)) {
     workRequest *wr = head(wrQueue); 
     
-    if (wr->executing == 0) {
+    if (wr->state == QUEUED) {
       setupMemory(wr); 
-      kernelSelect(wr); 
-      wr->executing = 1; 
+      wr->state = TRANSFERRING_IN; 
       return; 
     }  
-    else if (cudaStreamQuery(kernel_stream) == cudaSuccess) {
-    // else if (cudaStreamQuery(0) == cudaSuccess ) {
+    else if (wr->state == TRANSFERRING_IN) {
+
+      if ((returnVal = cudaStreamQuery(memory_stream)) == cudaSuccess) {
+	kernelSelect(wr); 
+	wr->state = EXECUTING; 
+      }
+
 #ifdef GPU_DEBUG
-      printf("completion event success \n");
+      printf("Querying memory stream returned: %d\n", returnVal);
 #endif  
-      cleanupMemory(wr);
-      dequeue(wrQueue);
-      CUDACallbackManager(wr->callbackFn);
-    } 
+      
+    }
+    else if (wr->state == EXECUTING) {
+      if ((returnVal = cudaStreamQuery(kernel_stream)) == cudaSuccess) {
+        copybackMemory(wr);
+	wr->state = TRANSFERRING_OUT;
+      }
+#ifdef GPU_DEBUG
+      printf("Querying kernel completion returned: %d \n", returnVal);
+#endif  
+
+    }
+    else if (wr->state == TRANSFERRING_OUT) {
+      if (cudaStreamQuery(memory_stream) == cudaSuccess) {
+	freeMemory(wr); 
+	dequeue(wrQueue);
+	CUDACallbackManager(wr->callbackFn);
+      }
+    }
 #ifdef GPU_DEBUG
     else {
-      printf("GPU is busy, return code %d\n", cudaStreamQuery(kernel_stream)); 
+      printf("Error: unrecognized state\n"); 
       return; 
     }
 #endif
