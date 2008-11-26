@@ -26,5 +26,5 @@
 #include <stdarg.h>
 #include <limits.h>
 #include <time.h>
-#include <mpi.h>
+#include <ampi.h>
 
