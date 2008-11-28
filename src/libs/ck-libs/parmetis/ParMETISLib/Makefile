@@ -1,5 +1,7 @@
 include ../Makefile.in
 
+CC = $(MPICC)
+
 
 CFLAGS = $(OPTFLAGS) -I. 
 
