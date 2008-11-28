@@ -1,5 +1,6 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc -I. $(OPTS)
+MPICC=$(CDIR)/bin/mpiCC -I. $(OPTS)
 
 # Directory where Magic software headers live:
 MGC=.
@@ -67,7 +68,7 @@ clean:
 .SUFFIXES: .C .cpp
 
 .C.o:
-	$(CHARMC) -c $<
+	$(MPICC) -c $<
 
 .cpp.o:
 	$(CHARMC) -c $< 
