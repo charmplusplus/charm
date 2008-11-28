@@ -17,13 +17,7 @@
 
 #define mod(a,b)  (((a)+b)%b)
 
-enum {
-  right,
-  left,
-  up,
-  down,
-};
-
+enum { left=0, right, up, down };
 
 class Main : public CBase_Main
 {
@@ -76,14 +70,11 @@ public:
   int mywidth;
   int myheight;
 
-  double *pressure;
-  double *pressure_old;
+  double *pressure_old;  // time t-1
+  double *pressure; // time t
+  double *pressure_new;  // time t+1
 
-  double *buffer_left;
-  double *buffer_right;
-  double *buffer_up;
-  double *buffer_down;
-
+  double *buffers[4];
 
   // Constructor, initialize values
   Wave() {
@@ -91,13 +82,14 @@ public:
     mywidth=TotalDataWidth / chareArrayWidth;
     myheight= TotalDataHeight / chareArrayHeight;
 
+    pressure_new  = new double[mywidth*myheight];
     pressure = new double[mywidth*myheight];
-    pressure_old = new double[mywidth*myheight];
+    pressure_old  = new double[mywidth*myheight];
 
-    buffer_left = new double[myheight];
-    buffer_right = new double[myheight];
-    buffer_up = new double[mywidth];
-    buffer_down = new double[mywidth];
+    buffers[left] = new double[myheight];
+    buffers[right]= new double[myheight];
+    buffers[up]   = new double[mywidth];
+    buffers[down] = new double[mywidth];
 
     messages_due = 4;
 
@@ -105,25 +97,26 @@ public:
   }
 
 
-  // Setup some Initial pressure pertubations
+  // Setup some Initial pressure pertubations for timesteps t-1 and t
   void InitialConditions(){
-    srand(0); // ensure that the same random numbers are used for each chare array element
+    srand(0); // Force the same random numbers to be used for each chare array element
 
     for(int i=0;i<myheight*mywidth;i++)
       pressure[i] = pressure_old[i] = 0.0;
     
     for(int s=0; s<numInitialPertubations; s++){    
-      // Randomly place a circle within the 2-d data array (without wrapping around)
+      // Determine where to place a circle within the interior of the 2-d domain
       int radius = 20+rand() % 30;
       int xcenter = radius + rand() % (TotalDataWidth - 2*radius);
       int ycenter = radius + rand() % (TotalDataHeight - 2*radius);
+      // Draw the circle
       for(int i=0;i<myheight;i++){
 	for(int j=0; j<mywidth; j++){
 	  int globalx = thisIndex.x*mywidth + j; // The coordinate in the global data array (not just in this chare's portion)
 	  int globaly = thisIndex.y*myheight + i;
 	  double distanceToCenter = sqrt((globalx-xcenter)*(globalx-xcenter) + (globaly-ycenter)*(globaly-ycenter));
 	  if (distanceToCenter < radius) {
-	    double rscaled = (distanceToCenter/radius)*3.0*3.14159/2.0; // ranges from 0 to 3pi/2						
+	    double rscaled = (distanceToCenter/radius)*3.0*3.14159/2.0; // ranges from 0 to 3pi/2 
 	    double t = 700.0 * cos(rscaled) ; // Range won't exceed -700 to 700
 	    pressure[i*mywidth+j] = pressure_old[i*mywidth+j] = t;
 	  }
@@ -132,25 +125,20 @@ public:
     }
   }
 
-  Wave(CkMigrateMessage* m) { } // Migration is not supported in this example
+  Wave(CkMigrateMessage* m) { }
 
   ~Wave() { }
 
   void begin_iteration(void) {
 
-    double *left_edge = new double[myheight];
-    double *right_edge = new double[myheight];		
-    double *top_edge = new double[mywidth];
-    double *bottom_edge = new double[mywidth];
+    double *top_edge = &pressure[0];
+    double *bottom_edge = &pressure[(myheight-1)*mywidth];
 
+    double *left_edge = new double[myheight];
+    double *right_edge = new double[myheight];
     for(int i=0;i<myheight;++i){
       left_edge[i] = pressure[i*mywidth];
       right_edge[i] = pressure[i*mywidth + mywidth-1];
-    }
-
-    for(int i=0;i<mywidth;++i){
-      top_edge[i] = pressure[i];
-      bottom_edge[i] = pressure[(myheight-1)*mywidth + i];
     }
 
     // Send my left edge
@@ -164,28 +152,11 @@ public:
 
     delete [] right_edge;
     delete [] left_edge;
-    delete [] top_edge;
-    delete [] bottom_edge;
   }
-
+  
   void recvGhosts(int whichSide, int size, double ghost_values[]) {
-    
-    if(whichSide == right)
-      for(int i=0;i<size;++i)
-	buffer_right[i] = ghost_values[i];
-
-    else if(whichSide == left)
-      for(int i=0;i<size;++i)
-	buffer_left[i] = ghost_values[i];
-    
-    else if(whichSide == down)
-      for(int i=0;i<size;++i)
-	buffer_down[i] = ghost_values[i];
-    
-    else if(whichSide == up)    
-      for(int i=0;i<size;++i)
-	buffer_up[i] = ghost_values[i];
-        
+    for(int i=0;i<size;++i)
+      buffers[whichSide][i] = ghost_values[i];   
     check_and_compute();
   }
 
@@ -194,16 +165,14 @@ public:
 
       // Compute the new values based on the current and previous step values
 
-      double *pressure_new = new double[mywidth*myheight];
-
       for(int i=0;i<myheight;++i){
 	for(int j=0;j<mywidth;++j){
 
 	  // Current time's pressures for neighboring array locations
-	  double left  = (j==0          ? buffer_left[i]  : pressure[i*mywidth+j-1] );
-	  double right = (j==mywidth-1  ? buffer_right[i] : pressure[i*mywidth+j+1] );
-	  double up    = (i==0          ? buffer_up[j]    : pressure[(i-1)*mywidth+j] );
-	  double down  = (i==myheight-1 ? buffer_down[j]  : pressure[(i+1)*mywidth+j] );
+	  double L = (j==0          ? buffers[left][i]  : pressure[i*mywidth+j-1] );
+	  double R = (j==mywidth-1  ? buffers[right][i] : pressure[i*mywidth+j+1] );
+	  double U = (i==0          ? buffers[up][j]    : pressure[(i-1)*mywidth+j] );
+	  double D = (i==myheight-1 ? buffers[down][j]  : pressure[(i+1)*mywidth+j] );
 
 	  // Current time's pressure for this array location
 	  double curr = pressure[i*mywidth+j];
@@ -212,19 +181,17 @@ public:
 	  double old  = pressure_old[i*mywidth+j];
 
 	  // Compute the future time's pressure for this array location
-	  pressure_new[i*mywidth+j] = 0.4*0.4*(left+right+up+down - 4.0*curr)-old+2.0*curr;
+	  pressure_new[i*mywidth+j] = 0.4*0.4*(L+R+U+D - 4.0*curr)-old+2.0*curr;
 
 	}
       }
 		
-      // Advance to next step by copying values to the arrays for the previous steps
-      for(int i=0;i<myheight;++i)
-	for(int j=0;j<mywidth;++j){
-	  pressure_old[i*mywidth+j] = pressure[i*mywidth+j];
-	  pressure[i*mywidth+j] = pressure_new[i*mywidth+j];
-	}
-      
-      delete[] pressure_new;
+      // Advance to next step by shifting the data back one step in time
+      double *tmp = pressure_old;
+      pressure_old = pressure;
+      pressure = pressure_new;
+      pressure_new = tmp;
+
       messages_due = 4;
       mainProxy.iterationCompleted();
     }
