@@ -126,6 +126,7 @@ int main(int argc, char *argv[])
   //if (fname==NULL) abortxi(argv[0]);
 
   ModuleList *m = Parse(openFile(fname)) ;
+  m->preprocess();
   m->generate();
   return 0 ;
 }

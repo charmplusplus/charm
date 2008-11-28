@@ -770,8 +770,8 @@ ParamBraceEnd 	: '}'
 
 Parameter	: Type
 		{ $$ = new Parameter(lineno, $1);}
-		| Type Name
-		{ $$ = new Parameter(lineno, $1,$2);}
+		| Type Name OptConditional
+		{ $$ = new Parameter(lineno, $1,$2); $$->setConditional($3); }
 		| Type Name '=' DefaultParameter
 		{ $$ = new Parameter(lineno, $1,$2,0,$4);} 
 		| ParamBracketStart CCode ']'

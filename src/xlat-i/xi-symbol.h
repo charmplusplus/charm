@@ -78,17 +78,22 @@ class ValueList : public Printable {
     }
 };
 
+class Module;
+
 class Construct : public Printable {
   protected:
     int external;
   public:
     int line;
+    Module *containerModule;
     Construct() {external=0;line=-1;}
     void setExtern(int e) { external = e; }
+    void setModule(Module *m) { containerModule = m; }
     virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) = 0;
     virtual void genDecls(XStr& str) = 0;
     virtual void genDefs(XStr& str) = 0;
     virtual void genReg(XStr& str) = 0;
+    virtual void preprocess() { }
 };
 
 class ConstructList : public Construct {
@@ -98,11 +103,13 @@ class ConstructList : public Construct {
     ConstructList(int l, Construct *c, ConstructList *n=0) :
       construct(c), next(n) {line = l;}
     void setExtern(int e);
+    void setModule(Module *m);
     void print(XStr& str);
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
+    void preprocess();
 };
 
 /*********************** Type System **********************/
@@ -245,8 +252,10 @@ class Parameter {
     Value *val; /*Initial value, if any*/
     int line;
     int byReference; //Fake a pass-by-reference (for efficiency)
+    int conditional; //If the parameter is conditionally packed
     friend class ParamList;
     void pup(XStr &str);
+    void copyPtr(XStr &str);
     void marshallArraySizes(XStr &str);
     void marshallArrayData(XStr &str);
     void beginUnmarshall(XStr &str);
@@ -255,6 +264,7 @@ class Parameter {
   public:
     Parameter(int Nline,Type *Ntype,const char *Nname=0,
     	const char *NarrLen=0,Value *Nvalue=0);
+    void setConditional(int c) { conditional = c; if (c) byReference = false; };
     void print(XStr &str,int withDefaultValues=0,int useConst=1);
     void printAddress(XStr &str);
     void printValue(XStr &str);
@@ -263,6 +273,7 @@ class Parameter {
     int isCkArgMsgPtr(void) const {return type->isCkArgMsgPtr();}
     int isCkMigMsgPtr(void) const {return type->isCkMigMsgPtr();}
     int isArray(void) const {return arrLen!=NULL;}
+    int isConditional(void) const {return conditional;}
     Type *getType(void) {return type;}
     const char *getArrayLen(void) const {return arrLen;}
     const char *getGivenName(void) const {return given_name;}
@@ -330,7 +341,9 @@ class ParamList {
            pl = pl->next;
         } 
     }
-    void marshall(XStr &str);
+    void preprocess();
+    int hasConditional();
+    void marshall(XStr &str, XStr &entry);
     void beginUnmarshall(XStr &str);
     void unmarshall(XStr &str, int isFirst=1);
     void unmarshallAddress(XStr &str, int isFirst=1);
@@ -533,6 +546,7 @@ class MemberList : public Printable {
     void genPythonDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
+    void preprocess();
     void genPythonDefs(XStr& str);
     void genPythonStaticDefs(XStr& str);
     void genPythonStaticDocs(XStr& str);
@@ -603,6 +617,7 @@ class Chare : public TEntity {
     void genReg(XStr& str);
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr &str);
+    void preprocess();
     int nextEntry(void) {return entryCount++;}
     virtual void genSubDecls(XStr& str);
     void genPythonDecls(XStr& str);
@@ -829,6 +844,7 @@ class Entry : public Member {
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
+    void preprocess();
     char *getEntryName() { return name; }
     void generateEntryList(TList<CEntry*>&, SdagConstruct *);
     void collectSdagCode(CParsedFile *pf, int& sdagPresent);
@@ -852,10 +868,14 @@ class Module : public Construct {
     ConstructList *clist;
     Module(int l, char *n, ConstructList *c) : name(n), clist(c) { 
 	    line = l;
-	    _isMain=0; 
+	    _isMain=0;
+	    if (clist!=NULL) clist->setModule(this);
     }
     void print(XStr& str);
     void generate();
+    void setModule();
+    void prependConstruct(Construct *c) { clist = new ConstructList(-1, c, clist); }
+    void preprocess();
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
@@ -872,6 +892,7 @@ class ModuleList : public Printable {
     ModuleList(int l, Module *m, ModuleList *n=0) : line(l),module(m),next(n) {}
     void print(XStr& str);
     void generate();
+    void preprocess();
 };
 
 class Readonly : public Member {

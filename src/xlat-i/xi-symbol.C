@@ -107,6 +107,16 @@ ConstructList::setExtern(int e)
 }
 
 void
+ConstructList::setModule(Module *m)
+{
+  Construct::setModule(m);
+  if(construct)
+    construct->setModule(m);
+  if(next)
+    next->setModule(m);
+}
+
+void
 ConstructList::print(XStr& str)
 {
   if(construct)
@@ -356,6 +366,12 @@ Module::generate()
 }
 
 void
+Module::preprocess()
+{
+  if (clist!=NULL) clist->preprocess();
+}
+
+void
 ModuleList::print(XStr& str)
 {
   module->print(str);
@@ -369,6 +385,14 @@ ModuleList::generate()
   module->generate();
   if(next)
     next->generate();
+}
+
+void
+ModuleList::preprocess()
+{
+  module->preprocess();
+  if(next)
+    next->preprocess();
 }
 
 void
@@ -440,6 +464,16 @@ ConstructList::genReg(XStr& str)
   }
   if(next)
     next->genReg(str);
+}
+
+void
+ConstructList::preprocess()
+{
+  if(construct) {
+    construct->preprocess();
+  }
+  if(next)
+    next->preprocess();
 }
 
 XStr Chare::proxyName(int withTemplates)
@@ -748,6 +782,12 @@ Chare::genDecls(XStr& str)
       };
     }
   }
+}
+
+void
+Chare::preprocess()
+{
+  if(list) list->preprocess();
 }
 
 void
@@ -1535,6 +1575,23 @@ Message::genDecls(XStr& str)
     str << "    }\n";
   }
   str << "};\n";
+  
+  if (strncmp(type->getBaseName(), "MarshallMsg_", 12) == 0) {
+    MsgVarList *ml;
+    MsgVar *mv;
+    int i;
+    str << "class " << type << " : public " << ptype << " {\n";
+    str << "  public:\n";
+    int num = numVars();
+    for(i=0, ml=mvlist; i<num; i++, ml=ml->next) {
+      mv = ml->msg_var;
+      if (mv->isConditional() || mv->isArray()) {
+        str << "    /* "; mv->print(str); str << " */\n";
+        str << "    " << mv->type << " *" << mv->name << ";\n";
+      }
+    }
+    str <<"};\n";
+  }
 }
 
 void
@@ -2050,6 +2107,14 @@ void MemberList::genReg(XStr& str)
   }
 }
 
+void MemberList::preprocess()
+{
+  if(member)
+    member->preprocess();
+  if(next)
+    next->preprocess();
+}
+
 void MemberList::lookforCEntry(CEntry *centry)
 {
   if(member){
@@ -2404,7 +2469,8 @@ void Entry::collectSdagCode(CParsedFile *pf, int& sdagPresent)
 XStr Entry::marshallMsg(void)
 {
   XStr ret;
-  param->marshall(ret);
+  XStr epName = epStr();
+  param->marshall(ret, epName);
   return ret;
 }
 
@@ -3062,7 +3128,8 @@ void Entry::genPub(XStr &declstr, XStr& defstr, XStr& defconstr, int& connectPre
 
      // Traverse thru parameter list and set the local messages accordingly
      defstr <<"    const CkEntryOptions *impl_e_opts = NULL;\n";
-     connectParam->marshall(defstr);
+     XStr epName = epStr();
+     connectParam->marshall(defstr, epName);
      defstr << "   " << getEntryName() << "_msg = impl_msg;\n";
      defstr << "   " << "if (getflag_" << getEntryName() <<" == 1) {\n";
      // FIX THE FOLLOWING IN CASE MSG IS VOID
@@ -3283,11 +3350,15 @@ void Entry::genDefs(XStr& str)
   if (!isLocal()) {
     if(isThreaded()) str << callThread(epStr());
     str << preMarshall;
-    if (param->isMarshalled()) str << "  char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
+    if (param->isMarshalled()) {
+      if (param->hasConditional()) str << "  MarshallMsg_"<<epStr()<<" *impl_msg_typed=(MarshallMsg_"<<epStr()<<" *)impl_msg;\n";
+      else str << "  CkMarshallMsg *impl_msg_typed=(CkMarshallMsg *)impl_msg;\n";
+      str << "  char *impl_buf=impl_msg_typed->msgBuf;\n";
+    }
     genCall(str,preCall);
     param->endUnmarshall(str);
     str << postCall;
-    if(isThreaded() && param->isMarshalled()) str << "  delete (CkMarshallMsg *)impl_msg;\n";
+    if(isThreaded() && param->isMarshalled()) str << "  delete impl_msg_typed;\n";
   } else {
     str << "  CkAbort(\"This method should never be called as it refers to a LOCAL entry method!\");\n";
   }
@@ -3296,11 +3367,16 @@ void Entry::genDefs(XStr& str)
   if (hasCallMarshall) {
     str << makeDecl("int")<<"::_callmarshall_"<<epStr()<<"(char* impl_buf,"<<containerType<<" * impl_obj) {\n";
     if (!isLocal()) {
-      genCall(str,preCall);
-      /*FIXME: implP.size() is wrong if the parameter list contains arrays--
+      if (!param->hasConditional()) {
+        genCall(str,preCall);
+        /*FIXME: implP.size() is wrong if the parameter list contains arrays--
         need to add in the size of the arrays.
-      */
-      str << "  return implP.size();\n";
+         */
+        str << "  return implP.size();\n";
+      } else {
+        str << "  CkAbort(\"This method is not implemented for EPs using conditional packing\");\n";
+        str << "  return 0;\n";
+      }
     } else {
       str << "  CkAbort(\"This method should never be called as it refers to a LOCAL entry method!\");\n";
       str << "  return 0;\n";
@@ -3310,7 +3386,9 @@ void Entry::genDefs(XStr& str)
   if (param->isMarshalled()) {
      str << makeDecl("void")<<"::_marshallmessagepup_"<<epStr()<<"(PUP::er &implDestP,void *impl_msg) {\n";
      if (!isLocal()) {
-       str << "  char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
+       if (param->hasConditional()) str << "  MarshallMsg_"<<epStr()<<" *impl_msg_typed=(MarshallMsg_"<<epStr()<<" *)impl_msg;\n";
+       else str << "  CkMarshallMsg *impl_msg_typed=(CkMarshallMsg *)impl_msg;\n";
+       str << "  char *impl_buf=impl_msg_typed->msgBuf;\n";
        param->beginUnmarshall(str);
        param->pupAllValues(str);
      } else {
@@ -3365,6 +3443,26 @@ void Entry::genReg(XStr& str)
   else if (param->isMessage() && !attribs&SMIGRATE) {
       str << "  CkRegisterMessagePupFn("<<epIdx(0)<<", (CkMessagePupFn)";
       str << param->param->getType()->getBaseName() <<"::ckDebugPup);\n";
+  }
+}
+
+void Entry::preprocess() {
+  ParamList *pl = param;
+  if (pl != NULL && pl->hasConditional()) {
+    XStr str;
+    str << "MarshallMsg_" << epStr();
+    NamedType *nt = new NamedType(strdup(str));
+    MsgVar *var = new MsgVar(new BuiltinType("char"), "msgBuf", 0, 1);
+    MsgVarList *list = new MsgVarList(var);
+    do {
+      if (pl->param->isConditional()) {
+        var = new MsgVar(pl->param->getType(), pl->param->getName(), 1, 0);
+        list = new MsgVarList(var, list);
+      }
+    } while (NULL!=(pl=pl->next));
+    Message *m = new Message(-1, nt, list);
+    m->setModule(container->containerModule);
+    container->containerModule->prependConstruct(m);
   }
 }
 
@@ -3455,7 +3553,10 @@ void Parameter::print(XStr &str,int withDefaultValues,int useConst)
 		if (name!=NULL) str<<name;
 	}
 	else {
-		if (byReference)
+	    if (conditional) {
+	        str<<type<<" *"<<name; 
+	    }
+	    else if (byReference)
 		{ //Pass named types by const C++ reference
 			if (useConst) str<<"const ";
 			str<<type<<" &";
@@ -3523,8 +3624,12 @@ void ParamList::callEach(fn_t f,XStr &str)
 	} while (NULL!=(cur=cur->next));
 }
 
+int ParamList::hasConditional() {
+  return orEach(&Parameter::isConditional);
+}
+
 /** marshalling: pack fields into flat byte buffer **/
-void ParamList::marshall(XStr &str)
+void ParamList::marshall(XStr &str, XStr &entry)
 {
 	if (isVoid())
 		str<<"  void *impl_msg = CkAllocSysMsg();\n";
@@ -3550,11 +3655,13 @@ void ParamList::marshall(XStr &str)
 		  str<<"    impl_off+=implP.size();\n";
 		str<<"  }\n";
 		//Now that we know the size, allocate the packing buffer
-		str<<"  CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,impl_e_opts);\n";
+		if (hasConditional()) str<<"  MarshallMsg_"<<entry<<" *impl_msg=CkAllocateMarshallMsgT<MarshallMsg_"<<entry<<" >(impl_off,impl_e_opts);\n";
+		else str<<"  CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,impl_e_opts);\n";
 		//Second pass: write the data
 		str<<"  { //Copy over the PUP'd data\n";
 		str<<"    PUP::toMem implP((void *)impl_msg->msgBuf);\n";
 		callEach(&Parameter::pup,str);
+		callEach(&Parameter::copyPtr,str);
 		str<<"  }\n";
 		if (hasArrays)
 		{ //Marshall each array
@@ -3580,7 +3687,7 @@ void Parameter::pup(XStr &str) {
 	   str<<"    implP|impl_off_"<<name<<";\n";
 	   str<<"    implP|impl_cnt_"<<name<<";\n";
 	}
-	else  {
+	else if (!conditional) {
 	  if (byReference) {
 	    str<<"    //Have to cast away const-ness to get pup routine\n";
 	    str<<"    implP|("<<type<<" &)"<<name<<";\n";
@@ -3594,6 +3701,12 @@ void Parameter::marshallArrayData(XStr &str)
 	if (isArray())
 		str<<"  memcpy(impl_buf+impl_off_"<<name<<
 			","<<name<<",impl_cnt_"<<name<<");\n";
+}
+void Parameter::copyPtr(XStr &str)
+{
+  if (isConditional()) {
+    str<<"    impl_msg->"<<name<<"="<<name<<";\n";
+  }
 }
 
 /** unmarshalling: unpack fields from flat buffer **/
@@ -3618,6 +3731,8 @@ void Parameter::beginUnmarshall(XStr &str)
 		str<<"  implP|impl_off_"<<name<<";\n";
 		str<<"  implP|impl_cnt_"<<name<<";\n";
 	}
+	else if (isConditional())
+        str<<"  "<<dt<<" *"<<name<<"=impl_msg_typed->"<<name<<";\n";
 	else
 		str<<"  "<<dt<<" "<<name<<"; implP|"<<name<<";\n";
 }
@@ -3668,7 +3783,8 @@ void Parameter::pupAllValues(XStr &str) {
 	  ;
 	}
 	else /* not an array */ {
-	  str<<"  implDestP|"<<name<<";\n";
+	  if (isConditional()) str<<"  pup_pointer(&implDestP, (void**)&"<<name<<");\n";
+	  else str<<"  implDestP|"<<name<<";\n";
 	}
 }
 void ParamList::endUnmarshall(XStr &str)
