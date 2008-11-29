@@ -11,21 +11,21 @@
 #include "stdlib.h"
 
 Main::Main(CkArgMsg* m) {
-  if ( (m->argc != 3) && (m->argc != 5) && (m->argc != 7) ) {
-    CkPrintf("%s [array_size] [block_size]\n", m->argv[0]);
-    CkPrintf("OR %s [array_size_X] [array_size_Y] [block_size_X] [block_size_Y]\n", m->argv[0]);
-    CkPrintf("OR %s [array_size_X] [array_size_Y] [block_size_X] [block_size_Y] [torus_dim_X] [torus_dim_Y]\n", m->argv[0]);
+  if (m->argc != 4){ 
+    CkPrintf("%s [N] [K] [num_chares_per_dim]\n", m->argv[0]);
     CkAbort("Abort");
+  }
+  else {
+    N = atoi(m->argv[1]);
+    K = atoi(m->argv[2]);
+    num_chares_per_dim = atoi(m->argv[3]);
+    T = N/num_chares_per_dim;
   }
 
   // store the main proxy
   mainProxy = thisProxy;
 
   // get the size of the global array, size of each chare and size of the torus [optional]
-  if(m->argc == 3) {
-    arrayDimX = arrayDimY = atoi(m->argv[1]);
-    blockDimX = blockDimY = atoi(m->argv[2]);
-  }
   /*
   else if (m->argc == 5) {
     arrayDimX = atoi(m->argv[1]);
@@ -41,33 +41,30 @@ Main::Main(CkArgMsg* m) {
     torusDimY = atoi(m->argv[6]);
   }
   */
-  else{
-    CkAbort("Square matrices only: matmul2d array_dim block_dim\n");
-  }
 
-  if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
-    CkAbort("array_size_X % block_size_X != 0!");
-  if (arrayDimY < blockDimY || arrayDimY % blockDimY != 0)
-    CkAbort("array_size_Y % block_size_Y != 0!");
-
-  num_chare_x = arrayDimX / blockDimX;
-  num_chare_y = arrayDimY / blockDimY;
+  if (N < T || N % T != 0)
+    CkAbort("N % T != 0!");
+  if (K < T || K % T != 0)
+    CkAbort("K % T != 0!");
 
   // print info
-  CkPrintf("Running Matrix Multiplication on %d processors with (%d, %d) chares\n", CkNumPes(), num_chare_x);
-  CkPrintf("Array Dimensions: %d %d\n", arrayDimX, arrayDimY);
-  CkPrintf("Block Dimensions: %d %d\n", blockDimX, blockDimY);
-  CkPrintf("Chare-array Dimensions: %d %d\n", num_chare_x, num_chare_y);
+  CkPrintf("Running Matrix Multiplication on %d processors with (%d, %d) chares\n", CkNumPes(), num_chares_per_dim, num_chares_per_dim);
+  CkPrintf("Array Dimensions: %d %d\n", N, K);
+  CkPrintf("Block Dimensions: %dx%d, %dx%d\n", T, K/num_chares_per_dim, K/num_chares_per_dim, T);
+  CkPrintf("Chare-array Dimensions: %d %d\n", num_chares_per_dim, num_chares_per_dim);
 
   // Create new array of worker chares
-  compute = CProxy_Compute::ckNew(num_chare_x, num_chare_y);
+  compute = CProxy_Compute::ckNew(num_chares_per_dim, num_chares_per_dim);
 
   // Start the computation
   startTime = CmiWallTimer();
-  if(num_chare_x == 1 && num_chare_y == 1)
+  if(num_chares_per_dim == 1){
     compute(0,0).compute();
-  else
-    compute.start();
+  }
+  else{
+    compute.compute();
+    //compute.start();
+  }
 }
 
 void Main::done(){
@@ -79,15 +76,19 @@ void Main::done(){
 // Constructor, initialize values
 Compute::Compute() {
 
+  int s1 = (K/num_chares_per_dim)*T;
+  int s2 = T*T;
   for(int i = 0; i < 2; i++){
-    A[i] = new float[blockDimX*blockDimY];
-    B[i] = new float[blockDimX*blockDimY];
+    A[i] = new float[s1];
+    B[i] = new float[s1];
   }
-  C = new float[blockDimX*blockDimY];
+  C = new float[s2];
 
-  for(int i = 0; i < blockDimX*blockDimY; i++){
+  for(int i = 0; i < s1; i++){
     A[0][i] = MAGIC_A;
     B[0][i] = MAGIC_B;
+  }
+  for(int i = 0; i < s2; i++){
     C[i] = 0;
   }
     
@@ -98,6 +99,8 @@ Compute::Compute() {
   whichLocal = 0;
   remaining = 2;
   iteration = 0;
+
+  //comps = 0;
 }
 
 Compute::Compute(CkMigrateMessage* m) {
@@ -113,6 +116,7 @@ Compute::~Compute() {
 
 void Compute::start(){
   int newBuf = 1 - whichLocal;
+  /*
   //1. send A
   Compute *c = thisProxy((col-row+num_chare_x)%num_chare_x, row).ckLocal();
   if(c == 0){
@@ -130,24 +134,39 @@ void Compute::start(){
   else{
     c->recvBlockB(B[whichLocal], blockDimX*blockDimY, newBuf);
   }
-
+  */
   whichLocal = newBuf;
 }
 
 void Compute::compute(){
   //int count = 0;
-  for(int i = 0; i < blockDimX; i++){
-    for(int j = 0; j < blockDimX; j++){
-      for(int k = 0; k < blockDimX; k++){
-        //CkPrintf("%d: C[%d,%d]: %f\n", count, i, j, C[i*blockDimX+j]);
-        C[i*blockDimX+j] += A[whichLocal][i*blockDimX+k]*B[whichLocal][k*blockDimX+j];
-        //count++;
+#ifdef USE_OPT_ROUTINES
+  const char trans = 'N';
+  const double alpha = 1.0;
+  const double beta = 0.0;
+
+  sgemm(&trans, &trans, blockDimX, blockDimZ, blockDimY, alpha, A, blockDimX, B, blockDimY, beta, C, blockDimX);
+#else
+  int i, j, k;
+
+  float *thisa = A[whichLocal];
+  float *thisb = B[whichLocal];
+
+  for(i = 0; i < T; i++){
+    for(j = 0; j < T; j++){
+      float sum = 0.0;
+      for(k = 0; k < (K/num_chares_per_dim); k++){
+        sum += thisa[i*(K/num_chares_per_dim)+k]*thisb[k*(T)+j];
+        //comps++;
       }
+      C[i*T+j] += sum;
     }
   }
+#endif
+
   remaining = 2;
   iteration++;
-  if(iteration == num_chare_x){
+  if(iteration == num_chares_per_dim){
 #ifdef MATMUL2D_WRITE_FILE
     // create a file
     //ostringstream oss;
@@ -170,6 +189,7 @@ void Compute::compute(){
     fclose(fp);
 #endif
     contribute(0,0,CkReduction::concat, CkCallback(CkIndex_Main::done(), mainProxy));
+    CkPrintf("[%d,%d] comps: %d iter: %d\n", thisIndex.x, thisIndex.y, -1, iteration);
   }
   else{
     contribute(0,0,CkReduction::concat,CkCallback(CkIndex_Compute::resumeFromBarrier(), thisProxy));
@@ -191,21 +211,23 @@ void Compute::resumeFromBarrier(){
   CkPrintf("(%d,%d): B nbr: (%d,%d)\n", thisIndex.y, thisIndex.x, (row-1+num_chare_y)%num_chare_y, col);
   */
 
-  Compute *c = thisProxy((col-1+num_chare_x)%num_chare_x, row).ckLocal();
-  if(c == 0){
-    thisProxy((col-1+num_chare_x)%num_chare_x, row).recvBlockA(A[whichLocal], blockDimX*blockDimY, newBuf);
-  }
-  else{
-    c->recvBlockA(A[whichLocal], blockDimX*blockDimY, newBuf);
-  }
+  int size = (K/num_chares_per_dim)*T;
+
+  //Compute *c = thisProxy((col-1+num_chares_per_dim)%num_chares_per_dim, row).ckLocal();
+  //if(c == 0){
+  thisProxy((col-1+num_chares_per_dim)%num_chares_per_dim, row).recvBlockA(A[whichLocal], size, newBuf);
+  //}
+  //else{
+  //  c->recvBlockA(A[whichLocal], blockDimX*blockDimY, newBuf);
+  //}
   // 2. Then put B
-  c =  thisProxy(col, (row-1+num_chare_y)%num_chare_y).ckLocal();
-  if(c == 0){
-    thisProxy(col, (row-1+num_chare_y)%num_chare_y).recvBlockB(B[whichLocal], blockDimX*blockDimY, newBuf);
-  }
-  else{
-    c->recvBlockB(B[whichLocal], blockDimX*blockDimY, newBuf);
-  }
+  //c =  thisProxy(col, (row-1+num_chare_y)%num_chare_y).ckLocal();
+  //if(c == 0){
+  thisProxy(col, (row-1+num_chares_per_dim)%num_chares_per_dim).recvBlockB(B[whichLocal], size, newBuf);
+  //}
+  //else{
+  //  c->recvBlockB(B[whichLocal], blockDimX*blockDimY, newBuf);
+  //}
   // toggle between local buffers
   whichLocal = newBuf;
 }

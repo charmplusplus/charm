@@ -3,17 +3,10 @@
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ CProxy_Compute compute;
 
-/*readonly*/ int arrayDimX;
-/*readonly*/ int arrayDimY;
-
-/*readonly*/ int blockDimX;
-/*readonly*/ int blockDimY;
-
-/*readonly*/ int torusDimX;
-/*readonly*/ int torusDimY;
-
-/*readonly*/ int num_chare_x;
-/*readonly*/ int num_chare_y;
+/*readonly*/ int N;
+/*readonly*/ int K;
+/*readonly*/ int num_chares_per_dim;
+/*readonly*/ int T;
 
 static unsigned long next = 1;
 
@@ -49,6 +42,7 @@ class Compute: public CBase_Compute {
   int remaining;
   int whichLocal;
   int iteration;
+  //int comps;
 
 
   public:

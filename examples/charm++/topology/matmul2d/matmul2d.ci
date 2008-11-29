@@ -2,14 +2,10 @@ mainmodule matmul2d {
   readonly CProxy_Main mainProxy;
   readonly CProxy_Compute compute;
 
-  readonly int num_chare_x;
-  readonly int num_chare_y;
-
-  readonly int blockDimX;
-  readonly int blockDimY;
-
-  readonly int arrayDimX;
-  readonly int arrayDimY;
+  readonly int N;
+  readonly int K;
+  readonly int num_chares_per_dim;
+  readonly int T;
 
   mainchare Main {
     entry Main(CkArgMsg *m);

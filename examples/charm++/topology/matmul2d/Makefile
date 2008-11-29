@@ -1,5 +1,4 @@
-OPTS=-O3
-CHARMC=../../../../bin/charmc $(OPTS)
+CHARMC=/home/jetley/workspace/charm/net-linux/bin/charmc $(OPTS)
 
 OBJS = matmul2d.o
 
@@ -9,7 +8,7 @@ matmul2d: $(OBJS)
 	$(CHARMC) -language charm++ -o matmul2d $(OBJS)
 
 projections: $(OBJS)
-	$(CHARMC) -language charm++ -tracemode projections -lz -o matmul2d.prj $(OBJS)
+	$(CHARMC) -language charm++ -tracemode projections -o matmul2d.prj $(OBJS)
 
 summary: $(OBJS)
 	$(CHARMC) -language charm++ -tracemode summary -lz -o matmul2d.sum $(OBJS)
