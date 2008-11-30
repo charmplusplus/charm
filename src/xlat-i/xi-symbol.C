@@ -3510,6 +3510,7 @@ Parameter::Parameter(int Nline,Type *Ntype,const char *Nname,
 	const char *NarrLen,Value *Nvalue)
     	:type(Ntype), name(Nname), arrLen(NarrLen), val(Nvalue),line(Nline)
 {
+        conditional=0;
         given_name = Nname;
 	if (isMessage()) {
 		name="impl_msg";
