@@ -24,7 +24,7 @@ extern void CUDACallbackManager(void *);
  *  the runtime system if needed
  */ 
 #define NUM_BUFFERS 100
-#define GPU_DEBUG
+//#define GPU_DEBUG
 
 
 /* work request queue */
@@ -42,13 +42,14 @@ void **hostBuffers = NULL;
 void **devBuffers = NULL; 
 
 cudaStream_t kernel_stream; 
-cudaStream_t memory_stream; 
+cudaStream_t data_in_stream;
+cudaStream_t data_out_stream; 
 
 extern void CUDACallbackManager(void * fn); 
 
-/* setupMemory
-   set up memory on the gpu for this kernel's execution */
-void setupMemory(workRequest *wr) {
+/* setupData
+   set up data on the gpu for this kernel's execution */
+void setupData(workRequest *wr) {
   int returnVal; 
   dataInfo *bufferInfo = wr->bufferInfo; 
 
@@ -64,7 +65,6 @@ void setupMemory(workRequest *wr) {
 	printf("buffer %d allocated\n", index); 
 #endif
 	returnVal = cudaMalloc((void **) &devBuffers[index], size); 
-	//returnVal = cudaMallocHost((void **)&devBuffers[index], size); 
 #ifdef GPU_DEBUG
 	printf("cudaMalloc returned %d\n", returnVal); 
 #endif
@@ -76,7 +76,7 @@ void setupMemory(workRequest *wr) {
 #endif
 
 	cudaMemcpyAsync(devBuffers[index], hostBuffers[index], size, 
-			cudaMemcpyHostToDevice, memory_stream);
+			cudaMemcpyHostToDevice, data_in_stream);
 	/*
 	cudaMemcpy(devBuffers[index], hostBuffers[index], size,
 		   cudaMemcpyHostToDevice); 
@@ -86,9 +86,9 @@ void setupMemory(workRequest *wr) {
   }
 } 
 
-/* copybackMemory
-   transfer memory from the GPU to the CPU after a work request is done */ 
-void copybackMemory(workRequest *wr) {
+/* copybackData
+   transfer data from the GPU to the CPU after a work request is done */ 
+void copybackData(workRequest *wr) {
   dataInfo *bufferInfo = wr->bufferInfo; 
 
   if (bufferInfo != NULL) {
@@ -104,7 +104,7 @@ void copybackMemory(workRequest *wr) {
 #endif
 
 	cudaMemcpyAsync(hostBuffers[index], devBuffers[index], size,
-			cudaMemcpyDeviceToHost, memory_stream);
+			cudaMemcpyDeviceToHost, data_out_stream);
 
 	/*	cudaMemcpy(hostBuffers[index], devBuffers[index],
 	  size, cudaMemcpyDeviceToHost); 
@@ -154,7 +154,8 @@ void initHybridAPI() {
   }
   
   cudaStreamCreate(&kernel_stream); 
-  cudaStreamCreate(&memory_stream); 
+  cudaStreamCreate(&data_in_stream); 
+  cudaStreamCreate(&data_out_stream); 
 
 }
 
@@ -172,13 +173,13 @@ void gpuProgressFn() {
     workRequest *wr = head(wrQueue); 
     
     if (wr->state == QUEUED) {
-      setupMemory(wr); 
+      setupData(wr); 
       wr->state = TRANSFERRING_IN; 
       return; 
     }  
     else if (wr->state == TRANSFERRING_IN) {
 
-      if ((returnVal = cudaStreamQuery(memory_stream)) == cudaSuccess) {
+      if ((returnVal = cudaStreamQuery(data_in_stream)) == cudaSuccess) {
 	kernelSelect(wr); 
 	wr->state = EXECUTING; 
       }
@@ -190,7 +191,7 @@ void gpuProgressFn() {
     }
     else if (wr->state == EXECUTING) {
       if ((returnVal = cudaStreamQuery(kernel_stream)) == cudaSuccess) {
-        copybackMemory(wr);
+        copybackData(wr);
 	wr->state = TRANSFERRING_OUT;
       }
 #ifdef GPU_DEBUG
@@ -199,7 +200,7 @@ void gpuProgressFn() {
 
     }
     else if (wr->state == TRANSFERRING_OUT) {
-      if (cudaStreamQuery(memory_stream) == cudaSuccess) {
+      if (cudaStreamQuery(data_out_stream) == cudaSuccess) {
 	freeMemory(wr); 
 	dequeue(wrQueue);
 	CUDACallbackManager(wr->callbackFn);
