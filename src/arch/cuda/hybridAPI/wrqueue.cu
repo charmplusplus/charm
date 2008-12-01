@@ -92,7 +92,26 @@ int deleteWRqueue(workRequestQueue *q) {
 }
 
 workRequest * head(workRequestQueue *q) {
+  if (q->size == 0) {
+    return NULL; 
+  }
+  else {
     return &q->requests[q->head]; 
+  }
+}
+
+workRequest * next(workRequestQueue *q) {
+  if (q->size < 2) {
+    return NULL; 
+  }
+  else {
+    if (q->head == (q->capacity-1)) {
+      return &q->requests[0];
+    }
+    else {
+      return &q->requests[q->head+1]; 
+    }
+  }
 }
 
 int isEmpty(workRequestQueue *q) {

@@ -50,7 +50,7 @@ extern void CUDACallbackManager(void * fn);
 /* setupData
    set up data on the gpu for this kernel's execution */
 void setupData(workRequest *wr) {
-  int returnVal; 
+  int returnVal;
   dataInfo *bufferInfo = wr->bufferInfo; 
 
   if (bufferInfo != NULL) {
@@ -171,6 +171,7 @@ void gpuProgressFn() {
 
   while (!isEmpty(wrQueue)) {
     workRequest *wr = head(wrQueue); 
+    workRequest *second = next(wrQueue); 
     
     if (wr->state == QUEUED) {
       setupData(wr); 
@@ -197,7 +198,11 @@ void gpuProgressFn() {
 #ifdef GPU_DEBUG
       printf("Querying kernel completion returned: %d \n", returnVal);
 #endif  
-
+      if (second != NULL && second->state == QUEUED) {
+	setupData(second); 
+	second->state = TRANSFERRING_IN; 
+	return; 
+      }
     }
     else if (wr->state == TRANSFERRING_OUT) {
       if (cudaStreamQuery(data_out_stream) == cudaSuccess) {
@@ -220,5 +225,7 @@ void gpuProgressFn() {
 */
 void exitHybridAPI() {
   deleteWRqueue(wrQueue); 
-
+  cudaStreamDestroy(kernel_stream); 
+  cudaStreamDestroy(data_in_stream); 
+  cudaStreamDestroy(data_out_stream); 
 }
