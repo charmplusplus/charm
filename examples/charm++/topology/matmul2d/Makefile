@@ -1,4 +1,4 @@
-CHARMC=/home/jetley/workspace/charm/net-linux/bin/charmc $(OPTS)
+CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = matmul2d.o
 
