@@ -47,9 +47,13 @@ then
   mpirun_cmd=`which mpirun`
   if echo $mpirun_cmd | grep 'mvapich2'  > /dev/null 2>/dev/null
   then
-    mvapich2-start-mpd
+    # if daemon not started, start it
+    if ! mpdtrace > /dev/null 2>/dev/null
+    then
+      mvapich2-start-mpd
+    fi
     mpirun -np $pes $args
-    mpdallexit
+#    mpdallexit
   else   # normal case
     test -z "$machinefile" && args=-machinefile" "$PBS_NODEFILE" "$args
     echo mpirun -np $pes $args
