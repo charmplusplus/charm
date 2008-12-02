@@ -1,49 +1,22 @@
-#include <vector>
-#include <utility>
-#include <stdlib.h>
+// Shared allocation for bulk data used in emulated processes
+// Author: Phil Miller
 
-namespace SharedAlloc {
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-  typedef std::pair<void*, int> Alloc;
+  // At program point i, allocate sz bytes, or get the address of a previous
+  // allocation at i
+  void *shalloc(int i, size_t sz);
+  // Free p from the perspective of the current process. The memory will be 
+  // released when all processes that allocated at i call shfree
+  void shfree(int i, void *p);
 
-  std::vector<Alloc> allocs;
+#ifdef __cplusplus
+}
+#endif
 
-  void *shalloc(int i, size_t s)
-  {
-    // Make space to record at least i allocations
-    if(allocs.size() <= i)
-      allocs.resize(i+1, Alloc(0,0));
+#ifdef __cplusplus
+// Define something like shnew and shdelete here?
 
-    // Ensure allocation i is initialized
-    if(allocs[i].first == 0)
-      allocs[i].first = malloc(s);
-
-    // Increment its reference count
-    allocs[i].second++;
-
-    // Return the address
-    return allocs[i].first;
-  }
-
-  void shfree(int i, void *p)
-  {
-    // Check that pointer matches
-    //CkAssert(p == allocs[i].first);
-	    
-    // Decrement refcount
-    allocs[i].second--;
-
-    // Free if 0
-    if (allocs[i].second == 0)
-      {
-	free(allocs[i].first);
-	allocs[i].first = 0;
-      }
-  }
-
-
-
-};
-
-using SharedAlloc::shalloc;
-using SharedAlloc::shfree;
+#endif
