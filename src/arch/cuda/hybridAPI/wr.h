@@ -4,18 +4,12 @@
  * by Lukasz Wesolowski
  * 06.02.2008
  *
- * header containing declarations needed by the user of hybridAPI
+ * header containing declarations needed by the user of the API
  *
  */
 
 #ifndef __WR_H__
 #define __WR_H__
-
-/* work request states */
-#define QUEUED 0            /* work request waiting in queue */
-#define TRANSFERRING_IN 1   /* data is being transferred to the GPU */
-#define EXECUTING       2   /* kernel is executing */
-#define TRANSFERRING_OUT 3   /* data is being transferred from the GPU */
 
 /* struct bufferInfo
  * 
@@ -25,12 +19,10 @@
  *
  * usage: 
  *
- * value of device buffer in the runtime system table dictates
- * whether allocation  will take place;  NULL -> allocate; 
- * otherwise -> no allocation
+ * the user associates an array of dataInfo structures with each
+ * submitted work request; device memory will be allocated if there is
+ * no buffer in use for that index
  * 
- *  
- *
  */
 typedef struct dataInfo {
 
@@ -58,12 +50,13 @@ typedef struct dataInfo {
 /* struct workRequest
  * 
  * purpose:  
- * structure for holding information about work requests on the GPU
+ * structure for organizing work units for execution on the GPU
  *
  * usage model: 
  * 1. declare a pointer to a workRequest 
  * 2. allocate dynamic memory for the work request
- * 3. enqueue the work request
+ * 3. define the data members for the work request
+ * 4. enqueue the work request
  */
 typedef struct workRequest {
 
@@ -74,23 +67,19 @@ typedef struct workRequest {
   dim3 dimBlock; 
   int smemSize;
   
-  /* buffer information for the execution of the work request */ 
+  /* array of dataInfo structs containing buffer information for the
+     execution of the work request */ 
   dataInfo *bufferInfo; 
   
   /* number of buffers used by the work request */ 
   int nBuffers; 
 
-  /* to be called after the kernel finishes executing on the GPU */ 
+  /* a Charm++ callback function (cast to a void *) to be called after
+     the kernel finishes executing on the GPU */ 
   void *callbackFn; 
  
   /* id to select the correct kernel in kernelSelect */
   int id; 
-
-  /* event which will be polled to check if kernel has finished
-     execution */
-  /* cudaEvent_t completionEvent; */
-
-
 
   /* The following flag is used for control by the system */
 
@@ -101,15 +90,15 @@ typedef struct workRequest {
 
 /* struct workRequestQueue 
  *
- * purpose: container/mechanism for GPU work requests 
+ * purpose: container for GPU work requests 
  *
  * usage model: 
  * 1. declare a workRequestQueue
  * 2. call init to allocate memory for the queue and initialize
  *    bookkeeping variables
- * 3. call enqueue for each request which needs to be 
+ * 3. enqueue each work request which needs to be 
  *    executed on the GPU
- * 4. in the hybrid API gpuProgressFn will execute periodically to
+ * 4. the runtime system will be invoked periodically to
  *    handle the details of executing the work request on the GPU
  *             
  * implementation notes: 

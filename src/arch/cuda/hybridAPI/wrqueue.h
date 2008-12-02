@@ -19,6 +19,12 @@
 /* if the queue is filled, it will be expanded by this factor */ 
 #define QUEUE_EXPANSION_FACTOR 2
 
+/* work request states */
+#define QUEUED 0            /* work request waiting in queue */
+#define TRANSFERRING_IN 1   /* data is being transferred to the GPU */
+#define EXECUTING       2   /* kernel is executing */
+#define TRANSFERRING_OUT 3  /* data is being transferred from the GPU */
+
 /* initWRqueue
  *
  * allocate memory for the queue and initialize bookkeeping variables

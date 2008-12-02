@@ -18,17 +18,16 @@ void initWRqueue(workRequestQueue **qptr) {
   (*qptr)->tail = -1;
   (*qptr)->size = 0; 
   (*qptr)->capacity = QUEUE_SIZE_INIT; 
-
-  (*qptr)->requests = (workRequest *) malloc(QUEUE_SIZE_INIT * sizeof(workRequest)); 
+  (*qptr)->requests = (workRequest *) 
+    malloc(QUEUE_SIZE_INIT * sizeof(workRequest)); 
 
 }
 
 void enqueue(workRequestQueue *q, workRequest *wr) {
-  workRequest *newArray; 
-  int newSize; 
-  int tailendIndex;  /* the starting index for the second part of the array */
-
   if (q->size == q->capacity) {
+    workRequest *newArray; 
+    int newSize; 
+    int tailendIndex;/* the starting index for the second part of the array */
 
     /* queue is out of space: create a new queue that is a factor
        QUEUE_EXPANSION_FACTOR larger */
@@ -53,7 +52,7 @@ void enqueue(workRequestQueue *q, workRequest *wr) {
     free(q->requests); 
 
     /* update bookkeeping variables in the expanded queue */
-    q->tail = q->size; 
+    q->tail = q->size - 1; 
     q->capacity *= QUEUE_EXPANSION_FACTOR;
     q->head = 0;
     
