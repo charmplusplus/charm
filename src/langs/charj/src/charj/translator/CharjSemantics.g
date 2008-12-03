@@ -173,7 +173,7 @@ scope ScopeStack; // top-level type scope
     :   ^(CLASS m=modifierList IDENT g=genericTypeParameterList? 
                 e=classExtendsClause? i=implementsClause? c=classTopLevelScope) 
         {
-            Scope outerScope = ScopeStack[-1]::current;
+            Scope outerScope = $ScopeStack[-1]::current;
             $sym = new ClassSymbol(symtab, $IDENT.text, null, outerScope);
             outerScope.define($sym.name, $sym);
             currentClass = $sym;

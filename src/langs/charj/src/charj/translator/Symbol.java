@@ -18,7 +18,7 @@ public class Symbol {
     public SymbolTable symtab;
 
     /** Often we want to know where in tree this symbol was defined. */
-    public CharjAST defintion;
+    public CharjAST definition;
 
     /** To print definition, we need to know where tokens live */
     public TokenStream definitionTokenStream;
