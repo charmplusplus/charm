@@ -6,7 +6,7 @@
 
 typedef std::pair<void*, int> Alloc;
 
-std::vector<Alloc> allocs;
+static std::vector<Alloc> allocs;
 
 void *shalloc(int i, size_t s)
 {
