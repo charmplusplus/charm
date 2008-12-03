@@ -55,13 +55,21 @@ void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
 void CldEnqueue(int pe, void *msg, int infofn)
 {
   int len, queueing, priobits; unsigned int *prioptr;
-  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  CldInfoFn ifn;
   CldPackFn pfn;
   if (pe == CLD_ANYWHERE) {
     pe = (((CrnRand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes());
+      /* optimizationfor SMP */
+#if CMK_SMP
+    if (CmiNodeOf(pe) == CmiMyNode()) {
+      CldNodeEnqueue(CmiMyNode(), msg, infofn);
+      return;
+    }
+#endif
     if (pe != CmiMyPe())
       CpvAccess(CldRelocatedMessages)++;
   }
+  ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   if (pe == CmiMyPe() && !CmiImmIsRunning()) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     /* CsdEnqueueGeneral is not thread or SIGIO safe */
