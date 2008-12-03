@@ -423,7 +423,7 @@ static void CldComputeNeighborData()
     sprintf(str, "SeedLB> Fatal error: Unknown topology: %s", _lbtopo);
     CmiAbort(str);
   }
-  topo = topofn();
+  topo = topofn(CmiNumPes());
   npe = getTopoMaxNeighbors(topo);
   pes = (int *)malloc(npe*sizeof(int));
   getTopoNeighbors(topo, CmiMyPe(), pes, &npe);
