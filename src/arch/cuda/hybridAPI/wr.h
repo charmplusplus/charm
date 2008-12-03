@@ -11,6 +11,10 @@
 #ifndef __WR_H__
 #define __WR_H__
 
+extern workRequestQueue *wrQueue; 
+extern void **devBuffers; 
+extern cudaStream_t kernel_stream; 
+
 /* struct bufferInfo
  * 
  * purpose: 
