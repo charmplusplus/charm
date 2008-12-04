@@ -21,6 +21,7 @@ typedef struct CldProcInfo_s {
 } *CldProcInfo;
 
 extern char *_lbtopo;			/* topology name string */
+int _lbsteal = 0;                       /* work stealing flag */
 
 void gengraph(int, int, int, int *, int *);
 
@@ -518,11 +519,14 @@ void CldGraphModuleInit(char **argv)
   }
 
 #if 1
+  CmiGetArgStringDesc(argv, "+workstealing", &_lbsteal, "Enable work stealing at idle time");
+  if (_lbsteal) {
   /* register idle handlers - when idle, keep asking work from neighbors */
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
       (CcdVoidFn) CldStillIdle, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) CldStillIdle, NULL);
+  }
 #endif
 }
 
