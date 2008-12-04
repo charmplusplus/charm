@@ -148,6 +148,34 @@ public:
     return true;
   }
 
+  
+  int medianCriticalPathIdx() const{
+    // Bubble sort the critical path indices by Time
+    int numPaths = criticalPaths.size();
+    if(numPaths>0){
+      int *sortedPaths = new int[numPaths];
+      for(int i=0;i<numPaths;i++){
+	sortedPaths[i] = i;
+      }
+      
+      for(int j=0;j<numPaths;j++){
+	for(int i=0;i<numPaths-1;i++){
+	  if(criticalPaths[sortedPaths[i]].getTotalTime() < criticalPaths[sortedPaths[i+1]].getTotalTime()){
+	    // swap sortedPaths[i], sortedPaths[i+1]
+	    int tmp = sortedPaths[i+1];
+	    sortedPaths[i+1] = sortedPaths[i];
+	    sortedPaths[i] = tmp;
+	  }
+	}
+      }
+      int result = sortedPaths[numPaths/2];
+      delete[] sortedPaths;
+      return result;
+    } else {
+      return 0;
+    }
+  }
+
 
 
   bool operator==(const instrumentedPhase& p){
@@ -620,17 +648,7 @@ public:
 
     CkPrintf("[%d] processControlPoints() haveGranularityCallback=%d frameworkShouldAdvancePhase=%d\n", CkMyPe(), (int)haveGranularityCallback, (int)frameworkShouldAdvancePhase);
 
-    
-    if(haveGranularityCallback){
-      if(frameworkShouldAdvancePhase){
-	gotoNextPhase();	
-      }
-      
-      controlPointMsg *msg = new(0) controlPointMsg;
-      granularityCallback.send(msg); 
-    }
-    
-    
+        
     if(CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
       alreadyRequestedMemoryUsage = true;
       CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
@@ -646,7 +664,7 @@ public:
     }
     
     
-    int s = allData.phases.size();
+    const int s = allData.phases.size();
     
     CkPrintf("\n\nExamining critical paths and priorities and idle times (num phases=%d)\n", s );
     
@@ -691,9 +709,61 @@ public:
       CkPrintf("\n");
 
     }
- 
     
     CkPrintf("\n\n");
+
+
+    if(s==10){
+      
+      int whichPhase=-1;
+      for(int p=0; p<s; ++p){
+	const instrumentedPhase &phase = allData.phases[p];
+	const idleTimeContainer &idle = phase.idleTime;
+	if(idle.isValid() && phase.criticalPaths.size()>0 ){
+	  whichPhase = p;
+	}
+      }
+      
+      
+      CkPrintf("Examining phase %d which has a valid idle time and critical paths\n", whichPhase);
+      const instrumentedPhase &phase = allData.phases[whichPhase];
+      const idleTimeContainer &idle = phase.idleTime;
+      
+      if(idle.min > 0.1){
+	CkPrintf("Min PE idle is HIGH. %.2lf%% > 10%%\n", idle.min*100.0);
+	
+	// Determine the median critical path for this phase
+	int medianCriticalPathIdx = phase.medianCriticalPathIdx();
+	const PathHistory &path = phase.criticalPaths[medianCriticalPathIdx];
+	
+	CkPrintf("Median Critical Path has time %lf\n", path.getTotalTime());
+	
+	if(phase.times[medianCriticalPathIdx] > 1.2 * path.getTotalTime()){
+	  CkPrintf("The application step(%lf) is taking significantly longer than the critical path(%lf). BAD\n",phase.times[medianCriticalPathIdx], path.getTotalTime() );
+	} else {
+	  CkPrintf("The application step(%lf) is dominated mostly by the critical path(%lf). GOOD\n",phase.times[medianCriticalPathIdx], path.getTotalTime() );
+	}
+	
+	
+      }
+            
+    }
+    
+
+
+    if(haveGranularityCallback){
+      if(frameworkShouldAdvancePhase){
+	gotoNextPhase();	
+      }
+      
+      controlPointMsg *msg = new(0) controlPointMsg;
+      granularityCallback.send(msg); 
+    }
+    
+
+
+
+
 
   }
   
