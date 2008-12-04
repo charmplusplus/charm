@@ -36,13 +36,25 @@ int controlPoint(const char *name, int lb, int ub);
 /// The value returned will likely change between subsequent invocations
 int controlPoint(const char *name, std::vector<int>& values);
 
-/// Return an integral power of 2 between c1 and c2
-/// The value returned is static throughout the life of the program
-//int beginPoint2Pow(const char *name, int c1, int c2);
-
 /// Return an integer between lb and ub inclusive
 /// The value returned is static throughout the life of the program
 int staticPoint(const char *name, int lb, int ub);
+
+
+/// Associate a control point as affecting priorities for an array
+void controlPointPriorityArray(const char *name, CProxy_ArrayBase &arraybase);
+
+/// Associate a control point with an entry method, whose priorities are affected by the control point
+void controlPointPriorityEntry(const char *name, int idx);
+
+
+
+// The application specifies that it is ready to proceed to a new set of control point values.
+// This should be called after registerControlPointTiming()
+// This should be called before calling controlPoint()
+void gotoNextPhase();
+
+
 
 /// Return an integer from the provided vector of values
 /// The value returned is static throughout the life of the program
@@ -61,7 +73,6 @@ static int mini(int a, int b){
   else
     return b;
 }
-
 
 
 class controlPointMsg : public CMessage_controlPointMsg {

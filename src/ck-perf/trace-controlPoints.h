@@ -21,6 +21,18 @@ class TraceControlPoints : public Trace {
   double lastBeginExecuteTime;
   int lastbeginMessageSize;
 
+  /** The amount of time spent executing entry methods */
+  double totalEntryMethodTime;
+
+  /** The start of the idle region */
+  double lastBeginIdle;
+  
+  /** The amount of time spent idle */
+  double totalIdleTime;
+  
+  /** The time we last rest the idle/entry totals */
+  double lastResetTime;
+
  public:
   TraceControlPoints(char **argv);
   
@@ -65,7 +77,26 @@ class TraceControlPoints : public Trace {
   
   // do any clean-up necessary for tracing
   void traceClose();
+
+
+
+
+  // ==================================================================
+  // The following methods are not required for a tracing module
+
+  /** reset the idle time and entry method execution time accumulators */
+  void resetTimings();
+
+  /** What fraction of the time is spent idle */
+  double idleRatio(){
+    return (totalIdleTime) / (CmiWallTimer() - lastResetTime);
+  }
+
 };
+
+
+TraceControlPoints *localControlPointTracingInstance();
+
 
 #endif
 

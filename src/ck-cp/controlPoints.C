@@ -13,13 +13,15 @@
 #include <sys/time.h>
 
 #include "ControlPoints.decl.h"
-
+#include "trace-controlPoints.h"
 #include "LBDatabase.h"
 #include "controlPoints.h"
 
+
 using namespace std;
 
-#define CONTROL_POINT_PERIOD 8000
+#define CONTROL_POINT_SAMPLE_PERIOD 4000
+#define NUM_SAMPLES_BEFORE_TRANSISTION 5
 #define OPTIMIZER_TRANSITION 5
 
 static void periodicProcessControlPoints(void* ptr, double currWallTime);
@@ -30,13 +32,73 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ int random_seed;
 
 
+// A reduction to take min/sum/avg
+CkReduction::reducerType idleTimeReductionType;
+CkReductionMsg *idleTimeReduction(int nMsg,CkReductionMsg **msgs){
+  double ret[3];
+  if(nMsg > 0){
+    CkAssert(msgs[0]->getSize()==3*sizeof(double));
+    double *m=(double *)msgs[0]->getData();
+    ret[0]=m[0];
+    ret[1]=m[1];
+    ret[2]=m[2];
+  }
+  for (int i=1;i<nMsg;i++) {
+    CkAssert(msgs[i]->getSize()==3*sizeof(double));
+    double *m=(double *)msgs[i]->getData();
+    ret[0]=min(ret[0],m[0]);
+    ret[1]+=m[1];
+    ret[2]=max(ret[2],m[2]);
+  }  
+  return CkReductionMsg::buildNew(3*sizeof(double),ret);   
+}
+/*initcall*/ void registerIdleTimeReduction(void) {
+  idleTimeReductionType=CkReduction::addReducer(idleTimeReduction);
+}
+
+
+
+
+class idleTimeContainer {
+public:
+  double min;
+  double avg;
+  double max;
+  
+  idleTimeContainer(){
+    min = -1.0;
+    max = -1.0;
+    avg = -1.0;
+  }
+  
+  bool isValid() const{
+    return (min >= 0.0 && avg >= min && max >= avg && max <= 1.0);
+  }
+  
+  void print() const{
+    if(isValid())
+      CkPrintf("[%d] Idle Time is Min=%.2lf%% Avg=%.2lf%% Max=%.2lf%%\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);    
+    else
+      CkPrintf("[%d] Idle Time is invalid\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);
+  }
+  
+}; 
+
+
+
+
 class instrumentedPhase {
 public:
   std::map<string,int> controlPoints; // The control point values for this phase(don't vary within the phase)
-  std::multiset<double> times;  // A list of times observed for iterations in this phase
+  std::vector<double> times;  // A list of times observed for iterations in this phase
+
+  std::vector<PathHistory> criticalPaths;
+
   
   int memoryUsageMB;
-  
+
+  idleTimeContainer idleTime;
+
   instrumentedPhase(){
     memoryUsageMB = -1;
   }
@@ -44,6 +106,7 @@ public:
   void clear(){
     controlPoints.clear();
     times.clear();
+    criticalPaths.clear();
   }
 
   // Provide a previously computed value, or a value from a previous run
@@ -262,7 +325,7 @@ public:
 	s << "     ";
 
 	// Print the times
-	std::multiset<double>::iterator titer;
+	std::vector<double>::iterator titer;
 	for(titer = runiter->times.begin(); titer != runiter->times.end(); titer++){
 	  s << *titer << " ";
 	}
@@ -311,7 +374,7 @@ public:
 	int phase_count = 0;
 
 	// iterate over all times for this control point configuration
-	std::multiset<double>::iterator titer;
+	std::vector<double>::iterator titer;
 	for(titer = iter->times.begin(); titer != iter->times.end(); titer++){
 	  total_count++;
 	  total_time += *titer;
@@ -342,7 +405,7 @@ public:
     double sumx=0.0;
     for(iter = phases.begin();iter!=phases.end();iter++){
       if(iter->hasValidControlPointValues()){
-	std::multiset<double>::iterator titer;
+	std::vector<double>::iterator titer;
 	for(titer = iter->times.begin(); titer != iter->times.end(); titer++){
 	  sumx += (avg - *titer)*(avg - *titer);
 	} 
@@ -415,6 +478,10 @@ public:
 
   std::set<string> staticControlPoints;
 
+  std::map<string, std::set<int> > affectsPrioritiesEP;
+  std::map<string, std::set<int> > affectsPrioritiesArray;
+
+
 
   CkCallback granularityCallback;
   bool haveGranularityCallback;
@@ -423,9 +490,17 @@ public:
   int phase_id;
 
   bool alreadyRequestedMemoryUsage;
+  bool alreadyRequestedIdleTime;
+
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  PathHistory maxTerminalPathHistory;
+#endif
 
   controlPointManager(){
-    alreadyRequestedMemoryUsage = false;
+
+    alreadyRequestedMemoryUsage = false;   
+    alreadyRequestedIdleTime = false;
     
     dataFilename = (char*)malloc(128);
     sprintf(dataFilename, "controlPointData.txt");
@@ -445,7 +520,7 @@ public:
     }
     
     if(CkMyPe() == 0)
-      CcdCallFnAfterOnPE((CcdVoidFn)periodicProcessControlPoints, (void*)NULL, CONTROL_POINT_PERIOD, CkMyPe());
+      CcdCallFnAfterOnPE((CcdVoidFn)periodicProcessControlPoints, (void*)NULL, CONTROL_POINT_SAMPLE_PERIOD, CkMyPe());
 
   }
   
@@ -507,7 +582,7 @@ public:
       double time;
 
       while(iss >> time){
-	ips.times.insert(time);
+	ips.times.push_back(time);
 #if DEBUG > 5
 	CkPrintf("read time %lf from file\n", time);
 #endif
@@ -542,9 +617,10 @@ public:
   /// Called periodically by the runtime to handle the control points
   /// Currently called on each PE
   void processControlPoints(){
-#if DEBUG
-    CkPrintf("[%d] processControlPoints()\n", CkMyPe());
-#endif
+
+    CkPrintf("[%d] processControlPoints() haveGranularityCallback=%d frameworkShouldAdvancePhase=%d\n", CkMyPe(), (int)haveGranularityCallback, (int)frameworkShouldAdvancePhase);
+
+    
     if(haveGranularityCallback){
       if(frameworkShouldAdvancePhase){
 	gotoNextPhase();	
@@ -553,15 +629,93 @@ public:
       controlPointMsg *msg = new(0) controlPointMsg;
       granularityCallback.send(msg); 
     }
-
-
+    
+    
     if(CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
       alreadyRequestedMemoryUsage = true;
       CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
-      //      thisProxy.requestMemoryUsage(*cb);
+      // thisProxy.requestMemoryUsage(*cb);
       delete cb;
     }
+    
+    if(CkMyPe() == 0 && !alreadyRequestedIdleTime){
+      alreadyRequestedIdleTime = true;
+      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherIdleTime(NULL), 0, thisProxy);
+      thisProxy.requestIdleTime(*cb);
+      delete cb;
+    }
+    
+    
+    int s = allData.phases.size();
+    
+    CkPrintf("\n\nExamining critical paths and priorities and idle times (num phases=%d)\n", s );
+    
+    for(int p=0;p<s;++p){
+      const instrumentedPhase &phase = allData.phases[p];
+      const idleTimeContainer &idle = phase.idleTime;
+      vector<PathHistory> const &criticalPaths = phase.criticalPaths;
+      vector<double> const &times = phase.times;
 
+      CkPrintf("Phase %d:\n", p);
+      idle.print();
+      CkPrintf("critical paths: (* affected by control point)\n");
+      for(int i=0;i<criticalPaths.size(); i++){
+	// If affected by a control point
+	//	criticalPaths[i].print();
+
+
+	CkPrintf("Critical Path Time=%lf : ", (double)criticalPaths[i].getTotalTime());
+	for(int e=0;e<numEpIdxs;e++){
+
+	  if(criticalPaths[i].getEpIdxCount(e)>0){
+	    if(controlPointAffectsThisEP(e))
+	      CkPrintf("* ");
+	    CkPrintf("EP %d count=%d : ", e, (int)criticalPaths[i].getEpIdxCount(e));
+	  }
+	}
+	for(int a=0;a<numArrayIds;a++){
+	  if(criticalPaths[i].getArrayIdxCount(a)>0){
+	    if(controlPointAffectsThisArray(a))
+	      CkPrintf("* ");
+	    CkPrintf("Array %d count=%d : ", a, (int)criticalPaths[i].getArrayIdxCount(a));
+	  }
+	}
+	CkPrintf("\n");
+	
+
+      }
+      CkPrintf("Timings:\n");
+      for(int i=0;i<times.size(); i++){
+	CkPrintf("%lf ", times[i]);
+      }
+      CkPrintf("\n");
+
+    }
+ 
+    
+    CkPrintf("\n\n");
+
+  }
+  
+  bool controlPointAffectsThisEP(int ep){
+    std::map<string, std::set<int> >::iterator iter;
+    for(iter=affectsPrioritiesEP.begin(); iter!= affectsPrioritiesEP.end(); ++iter){
+      if(iter->second.count(ep)>0){
+	return true;
+      }
+    }
+    return false;    
+  }
+  
+  
+  bool controlPointAffectsThisArray(int array){
+    std::map<string, std::set<int> >::iterator iter;
+    for(iter=affectsPrioritiesArray.begin(); iter!= affectsPrioritiesArray.end(); ++iter){
+      if(iter->second.count(array)>0){
+	return true;
+      }
+    }
+    return false;   
   }
   
   instrumentedPhase *previousPhaseData(){
@@ -609,7 +763,7 @@ public:
     
     CkPrintf("Now in phase %d\n", phase_id);
     
-    // save the timing information from this phase
+    // save a copy of the timing information from this phase
     allData.phases.push_back(thisPhaseData);
         
     // clear the timing information that will be used for the next phase
@@ -619,11 +773,64 @@ public:
 
   // The application can set the instrumented time for this phase
   void setTiming(double time){
-     thisPhaseData.times.insert(time);
+    thisPhaseData.times.push_back(time);
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+       
+    // First we should register this currently executing message as a path, because it is likely an important one to consider.
+    registerTerminalEntryMethod();
+    
+    // save the critical path for this phase
+    thisPhaseData.criticalPaths.push_back(maxTerminalPathHistory);
+    maxTerminalPathHistory.reset();
+    
+    
+    // Reset the counts for the currently executing message
+    resetThisEntryPath();
+    
+    
+#endif
+    
+  }
+  
+  // Entry method called on all PEs to request memory usage
+  void requestIdleTime(CkCallback cb){
+    double i = localControlPointTracingInstance()->idleRatio();
+    double idle[3];
+    idle[0] = i;
+    idle[1] = i;
+    idle[2] = i;
+    
+    localControlPointTracingInstance()->resetTimings();
+
+    //   CkPrintf("PE %d Idle Time is %lf\n",CkMyPe(), idle);
+    contribute(3*sizeof(double),idle,idleTimeReductionType, cb);
+  }
+  
+  // All processors reduce their memory usages to this method
+  void gatherIdleTime(CkReductionMsg *msg){
+    int size=msg->getSize() / sizeof(double);
+    CkAssert(size==3);
+    double *r=(double *) msg->getData();
+        
+    instrumentedPhase* prevPhase = previousPhaseData();
+    if(prevPhase != NULL){
+      CkPrintf("Storing idle time measurements\n");
+      prevPhase->idleTime.min = r[0];
+      prevPhase->idleTime.avg = r[1]/CkNumPes();
+      prevPhase->idleTime.max = r[2];
+      prevPhase->idleTime.print();
+      CkPrintf("Stored idle time min=%lf in prevPhase=%p\n", prevPhase->idleTime.min, prevPhase);
+    } else {
+      CkPrintf("No place to store idle time measurements\n");
+    }
+    
+    alreadyRequestedIdleTime = false;
+    delete msg;
   }
   
 
 
+  // Entry method called on all PEs to request memory usage
   void requestMemoryUsage(CkCallback cb){
     int m = CmiMaxMemoryUsage() / 1024 / 1024;
     CmiResetMaxMemory();
@@ -631,6 +838,7 @@ public:
     contribute(sizeof(int),&m,CkReduction::max_int, cb);
   }
 
+  // All processors reduce their memory usages to this method
   void gatherMemoryUsage(CkReductionMsg *msg){
     int size=msg->getSize() / sizeof(int);
     CkAssert(size==1);
@@ -651,6 +859,97 @@ public:
 
 
 
+  void registerTerminalPath(PathHistory &path){
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  
+    double beginTime = CmiWallTimer();
+        
+    if(maxTerminalPathHistory.updateMax(path) ) {
+      // The new path is more critical than the previous one
+      // propogate it towards processor 0 in a binary tree
+      if(CkMyPe() > 0){
+	int dest = (CkMyPe() -1) / 2;
+	//	CkPrintf("Forwarding better critical path from PE %d to %d\n", CkMyPe(), dest);
+
+	// This is part of a reduction-like propagation of the maximum back to PE 0
+	resetThisEntryPath();
+
+	thisProxy[dest].registerTerminalPath(path);
+      }
+    }
+
+    traceRegisterUserEvent("registerTerminalPath", 100); 
+    traceUserBracketEvent(100, beginTime, CmiWallTimer());
+#endif
+  }
+
+  void printTerminalPath(){
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+    maxTerminalPathHistory.print();
+#endif
+  }
+  
+  void resetTerminalPath(){
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+    maxTerminalPathHistory.reset();
+#endif
+  }
+  
+  void associatePriorityArray(const char *name, int groupIdx){
+    CkPrintf("Associating control point \"%s\" affects priority of array id=%d\n", name, groupIdx );
+    
+    if(affectsPrioritiesArray.count(std::string(name)) > 0 ) {
+      affectsPrioritiesArray[std::string(name)].insert(groupIdx);
+    } else {
+      std::set<int> s;
+      s.insert(groupIdx);
+      affectsPrioritiesArray[std::string(name)] = s;
+    }
+    
+#if DEBUG   
+    std::map<string, std::set<int> >::iterator f;
+    for(f=affectsPrioritiesArray.begin(); f!=affectsPrioritiesArray.end();++f){
+      std::string name = f->first;
+      std::set<int> &vals = f->second;
+      cout << "Control point " << name << " affects arrays: ";
+      std::set<int>::iterator i;
+      for(i=vals.begin(); i!=vals.end();++i){
+	cout << *i << " ";
+      }
+      cout << endl;
+    }
+#endif
+    
+  }
+  
+  void associatePriorityEntry(const char *name, int idx){
+    CkPrintf("Associating control point \"%s\" with EP id=%d\n", name, idx);
+
+      if(affectsPrioritiesEP.count(std::string(name)) > 0 ) {
+      affectsPrioritiesEP[std::string(name)].insert(idx);
+    } else {
+      std::set<int> s;
+      s.insert(idx);
+      affectsPrioritiesEP[std::string(name)] = s;
+    }
+    
+#if DEBUG
+    std::map<string, std::set<int> >::iterator f;
+    for(f=affectsPrioritiesEP.begin(); f!=affectsPrioritiesEP.end();++f){
+      std::string name = f->first;
+      std::set<int> &vals = f->second;
+      cout << "Control point " << name << " affects EP: ";
+      std::set<int>::iterator i;
+      for(i=vals.begin(); i!=vals.end();++i){
+	cout << *i << " ";
+      }
+      cout << endl;
+    }
+#endif
+
+
+  }
+  
 };
 
 
@@ -707,7 +1006,7 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime){
   CkPrintf("[%d] periodicProcessControlPoints()\n", CkMyPe());
 #endif
   localControlPointManagerProxy.ckLocalBranch()->processControlPoints();
-  CcdCallFnAfterOnPE((CcdVoidFn)periodicProcessControlPoints, (void*)NULL, CONTROL_POINT_PERIOD, CkMyPe());
+  CcdCallFnAfterOnPE((CcdVoidFn)periodicProcessControlPoints, (void*)NULL, CONTROL_POINT_SAMPLE_PERIOD, CkMyPe());
 }
 
 
@@ -839,12 +1138,14 @@ int valueProvidedByOptimizer(const char * name){
   for(iter = controlPointSpace.begin(); iter != controlPointSpace.end(); iter++){
     //    CkPrintf("Examining dimension %d\n", d);
 
+#if DEBUG
     string name = iter->first;
     if(staticControlPoints.count(name) >0 ){
       cout << " control point " << name << " is static " << endl;
     } else{
       cout << " control point " << name << " is not static " << endl;
     }
+#endif
 
     lowerBounds[d] = iter->second.first;
     upperBounds[d] = iter->second.second;
@@ -1031,6 +1332,26 @@ int controlPoint(const char *name, std::vector<int>& values){
 
 
 
+
+void controlPointPriorityArray(const char *name, CProxy_ArrayBase &arraybase){
+  CkGroupID aid = arraybase.ckGetArrayID();
+  int groupIdx = aid.idx;
+  localControlPointManagerProxy.ckLocalBranch()->associatePriorityArray(name, groupIdx);
+  //  CkPrintf("Associating control point \"%s\" with array id=%d\n", name, groupIdx );
+}
+
+
+
+void controlPointPriorityEntry(const char *name, int idx){
+  localControlPointManagerProxy.ckLocalBranch()->associatePriorityEntry(name, idx);
+  //  CkPrintf("Associating control point \"%s\" with EP id=%d\n", name, idx);
+}
+
+
+
+
+
+
 // The index in the global array for my top row  
 int redistributor2D::top_data_idx(){ 
   return (data_height * thisIndex.y) / y_chares; 
@@ -1079,6 +1400,31 @@ int redistributor2D::myheight(){
 
 
 
+
+
+
+
+
+
+
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+
+
+
+void registerTerminalEntryMethod(){
+  localControlPointManagerProxy.ckLocalBranch()->registerTerminalPath(currentlyExecutingMsg->pathHistory);
+}
+
+void printPECriticalPath(){
+  localControlPointManagerProxy.ckLocalBranch()->printTerminalPath();
+}
+
+void resetPECriticalPath(){
+  localControlPointManagerProxy.ckLocalBranch()->resetTerminalPath();
+}
+
+#endif
 
 
 

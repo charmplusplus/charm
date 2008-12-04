@@ -1004,13 +1004,17 @@ void CkMigratable::timingAfterCall(LDObjHandle objHandle,int *objstopped){
 }
 /****************************************************************************/
 
+
 CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	int epIdx,CmiBool doFree) 
 {
+
 	DEBS((AA"   Invoking entry %d on element %s\n"AB,epIdx,idx2str(idx)));
 	CmiBool isDeleted=CmiFalse; //Enables us to detect deletion during processing
 	deletedMarker=&isDeleted;
 	startTiming();
+
+
 #ifndef CMK_OPTIMIZE
 	if (msg) { /* Tracing: */
 		envelope *env=UsrToEnv(msg);
@@ -1024,7 +1028,8 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	   CkDeliverMessageFree(epIdx,msg,obj);
 	else /* !doFree */
 	   CkDeliverMessageReadonly(epIdx,msg,obj);
-	
+
+
 #ifndef CMK_OPTIMIZE
 	if (msg) { /* Tracing: */
 		if (_entryTable[epIdx]->traceEnabled)
@@ -1042,6 +1047,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 
 CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 {
+
 	if (type==CkDeliver_queue) { /*Send via the message queue */
 		if (opts & CK_MSG_KEEP)
 			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
@@ -1082,7 +1088,47 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 		CpvAccess(CkGridObject) = obj;
 #endif
 
-		CmiBool status = invokeEntry(obj,(void *)msg,msg->array_ep(),doFree);
+
+
+
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+	// store the pointer to the currently executing msg
+	envelope *env = UsrToEnv(msg);
+	currentlyExecutingMsg = env; 
+	thisMethodSentAMessage = false;
+
+	// Increase the counts for the entry that we are about to execute
+	env->updateCounts();
+	
+	// Increase the reference count for the message so the user won't delete it
+	CmiReference(env);
+
+	// Store the current time
+	timeEntryMethodStarted = CmiWallTimer();
+#endif
+
+	CmiBool status = invokeEntry(obj,(void *)msg,msg->array_ep(),doFree);
+	
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  double timeEntryMethodEnded = CmiWallTimer();
+  env->pathHistory.incrementTotalTime(timeEntryMethodEnded-timeEntryMethodStarted);
+  if(!thisMethodSentAMessage){
+    registerTerminalEntryMethod();
+  }
+
+  CmiFree(env); // free the message, because we incremented its reference count above
+
+  // set to NULL the pointer to the currently executing msg
+  currentlyExecutingMsg = NULL;
+  //  CkPrintf("This entry method is %s\n", (int)thisMethodSentAMessage?"non-terminal":"terminal");
+#endif
+
+
+
+
+
 
 #if CMK_GRID_QUEUE_AVAILABLE
 		CpvAccess(CkGridObject) = NULL;
@@ -1092,6 +1138,9 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 #endif
 		return status;
 	}
+
+
+
 }
 
 #if CMK_LBDB_ON
@@ -1644,6 +1693,8 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 	DEBS((AA"deliver \n"AB));
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
+
+
 	const CkArrayIndex &idx=msg->array_index();
 	DEBS((AA"deliver %s\n"AB,idx2str(idx)));
 	if (type==CkDeliver_queue)
@@ -1757,6 +1808,7 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
 		deliverUnknown(msg,type,opts);
 	}
+
 }
 
 /// This index is not hashed-- somehow figure out what to do.

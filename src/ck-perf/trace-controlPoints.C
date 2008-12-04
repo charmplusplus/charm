@@ -22,6 +22,9 @@ void _createTracecontrolPoints(char **argv)
 
 TraceControlPoints::TraceControlPoints(char **argv)
 {
+
+  resetTimings();
+
   if (CkpvAccess(traceOnPe) == 0) return;
 
   // Process runtime arguments intended for the module
@@ -63,7 +66,7 @@ void TraceControlPoints::beginExecute(CmiObjId *tid)
   lastBeginExecuteTime = CmiWallTimer();
   lastbeginMessageSize = -1;
 
-  CkPrintf("[%d] WARNING ignoring TraceControlPoints::beginExecute(CmiObjId *tid)\n", CkMyPe());
+  //  CkPrintf("[%d] TraceControlPoints::beginExecute(CmiObjId *tid)\n", CkMyPe());
 }
 
 void TraceControlPoints::beginExecute(envelope *e)
@@ -71,13 +74,15 @@ void TraceControlPoints::beginExecute(envelope *e)
   lastBeginExecuteTime = CmiWallTimer();
   lastbeginMessageSize = e->getTotalsize();
 
-  CkPrintf("[%d] WARNING ignoring TraceControlPoints::beginExecute(envelope *e)\n", CkMyPe());
+  //  CkPrintf("[%d] WARNING ignoring TraceControlPoints::beginExecute(envelope *e)\n", CkMyPe());
 
   // no message means thread execution
   //  if (e != NULL) {
   //  CkPrintf("[%d] TraceControlPoints::beginExecute  Method=%d, type=%d, source pe=%d, size=%d\n", 
   //	     CkMyPe(), e->getEpIdx(), e->getMsgtype(), e->getSrcPe(), e->getTotalsize() );
   //}  
+
+  //  CkPrintf("[%d] TraceControlPoints::beginExecute(envelope *e=%p)\n", CkMyPe(), e);
 
 }
 
@@ -87,25 +92,31 @@ void TraceControlPoints::beginExecute(int event,int msgType,int ep,int srcPe,
   lastBeginExecuteTime = CmiWallTimer();
   lastbeginMessageSize = mlen;
   //  CkPrintf("[%d] TraceControlPoints::beginExecute event=%d, msgType=%d, ep=%d, srcPe=%d, mlen=%d CmiObjId is also avaliable\n", CkMyPe(), event, msgType, ep, srcPe, mlen);
+  //  CkPrintf("[%d] TraceControlPoints::beginExecute(int event,int msgType,int ep,int srcPe, int mlen, CmiObjId *idx)\n", CkMyPe());
+
 }
 
 void TraceControlPoints::endExecute(void)
 {
   double executionTime = CmiWallTimer() - lastBeginExecuteTime;
-  CkPrintf("[%d] Previously executing Entry Method completes. lastbeginMessageSize=%d executionTime=%lf\n", CkMyPe(), lastbeginMessageSize, executionTime);
+  totalEntryMethodTime += executionTime;
+  
+  //  CkPrintf("[%d] Previously executing Entry Method completes. lastbeginMessageSize=%d executionTime=%lf\n", CkMyPe(), lastbeginMessageSize, executionTime);
 }
 
 void TraceControlPoints::beginIdle(double curWallTime) {
+  lastBeginIdle = CmiWallTimer();
   // CkPrintf("[%d] Scheduler has no useful user-work\n", CkMyPe());
 }
 
 void TraceControlPoints::endIdle(double curWallTime) {
+  totalIdleTime += CmiWallTimer() - lastBeginIdle;
   //  CkPrintf("[%d] Scheduler now has useful user-work\n", CkMyPe());
 }
-  
+
 void TraceControlPoints::beginComputation(void)
 {
-  CkPrintf("[%d] Computation Begins\n", CkMyPe());
+  //  CkPrintf("[%d] Computation Begins\n", CkMyPe());
   // Code Below shows what trace-summary would do.
   // initialze arrays because now the number of entries is known.
   // _logPool->initMem();
@@ -131,6 +142,18 @@ void TraceControlPoints::traceClose(void)
   // remove myself from traceArray so that no tracing will be called.
   CkpvAccess(_traces)->removeTrace(this);
 }
+
+void TraceControlPoints::resetTimings(){
+  totalIdleTime = 0.0;
+  totalEntryMethodTime = 0.0;
+  lastResetTime = CmiWallTimer();
+}
+
+TraceControlPoints *localControlPointTracingInstance(){
+  return CkpvAccess(_trace);
+}
+
+
 
 extern "C" void traceControlPointsExitFunction() {
   // The exit function of any Charm++ module must call CkExit() or

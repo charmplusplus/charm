@@ -22,6 +22,49 @@ clients, including the rest of Charm++, are actually C++.
 
 #define CK_MSG_SKIP_OR_IMM    (CK_MSG_EXPEDITED | CK_MSG_IMMEDIATE)
 
+
+
+
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+// store the pointer to the currently executing msg
+// see envelope.h
+// TODO: convert to CkPv
+envelope * currentlyExecutingMsg = NULL;
+bool thisMethodSentAMessage = false;
+double timeEntryMethodStarted = 0.0;
+
+void resetCricitalPathDetection(){
+  CkAbort("shouldn't be called anymore. Deprecated");
+  
+  // First we should register this currently executing message as a path, because it is likely an important one to consider.
+  registerTerminalEntryMethod();
+
+  // Print the Critical path known to this PE
+  if(CkMyPe() == 0){
+    CkPrintf("[pe=%d] Critical paths discovered on this pe (in resetCriticalPathCounts() ):\n", CkMyPe());
+    printPECriticalPath();
+  }
+  
+  // Reset the counts for the critical path on this PE
+  resetPECriticalPath();
+  
+  // Reset the counts for the currently executing message
+  resetThisEntryPath();
+  
+}
+
+void resetThisEntryPath(){
+  // Reset the counts for the currently executing message
+  if(currentlyExecutingMsg != NULL){
+    currentlyExecutingMsg->resetEpIdxHistory();
+  }
+}
+
+
+#endif
+
+
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
 
 int CMessage_CkMessage::__idx=-1;
@@ -444,6 +487,24 @@ static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
 
 static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
 {
+
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  // store the pointer to the currently executing msg
+  currentlyExecutingMsg = env; 
+  thisMethodSentAMessage = false;
+
+  // Increase the counts for the entry that we are about to execute
+  env->updateCounts();
+  
+  // Increase the reference count for the message so the user won't delete it
+  CmiReference(env);
+  timeEntryMethodStarted = CmiWallTimer();
+
+#endif
+
+
+
 #ifndef CMK_OPTIMIZE /* Consider tracing: */
   if (_entryTable[epIdx]->traceEnabled) {
     _TRACE_BEGIN_EXECUTE(env);
@@ -453,6 +514,23 @@ static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
   else
 #endif
     _invokeEntryNoTrace(epIdx,env,obj);
+
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+ double timeEntryMethodEnded = CmiWallTimer();
+ env->pathHistory.incrementTotalTime(timeEntryMethodEnded-timeEntryMethodStarted);
+ if(!thisMethodSentAMessage){
+    registerTerminalEntryMethod();
+  }
+
+  CmiFree(env); // free the message, because we incremented its reference count above
+
+  // set to NULL the pointer to the currently executing msg
+  currentlyExecutingMsg = NULL; 
+  //  CkPrintf("This entry method is %s\n", (int)thisMethodSentAMessage?"non-terminal":"terminal");
+
+#endif
+
 }
 
 /********************* Creation ********************/

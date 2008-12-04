@@ -3,17 +3,29 @@ module ControlPoints {
   readonly CProxy_controlPointManager localControlPointManagerProxy;
   readonly int random_seed;
 
+
+
+  initcall void registerIdleTimeReduction(void);	
+
+
+
   mainchare controlPointMain {
     entry controlPointMain(CkArgMsg*);
   };
 
  initnode void controlPointInitNode();
 
- nodegroup controlPointManager {
+ group controlPointManager {
     entry controlPointManager();
 
     entry void requestMemoryUsage(CkCallback cb);
     entry void gatherMemoryUsage(CkReductionMsg *msg);
+
+    entry void requestIdleTime(CkCallback cb);
+    entry void gatherIdleTime(CkReductionMsg *msg);
+
+    entry void registerTerminalPath(PathHistory &path);
+
  }   
 
 
