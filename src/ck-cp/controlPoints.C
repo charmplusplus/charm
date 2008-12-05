@@ -713,7 +713,7 @@ public:
     CkPrintf("\n\n");
 
 
-    if(s==10){
+    if(s==5){
       
       int whichPhase=-1;
       for(int p=0; p<s; ++p){
@@ -740,6 +740,39 @@ public:
 	
 	if(phase.times[medianCriticalPathIdx] > 1.2 * path.getTotalTime()){
 	  CkPrintf("The application step(%lf) is taking significantly longer than the critical path(%lf). BAD\n",phase.times[medianCriticalPathIdx], path.getTotalTime() );
+
+
+	  CkPrintf("Finding control points related to the critical path\n");
+	  int cpcount = 0;
+	  std::set<string> controlPointsAffectingCriticalPath;
+
+
+	  for(int e=0;e<numEpIdxs;e++){
+	    if(path.getEpIdxCount(e)>0){
+	      
+	      std::map<string, std::set<int> >::iterator iter;
+	      for(iter=affectsPrioritiesEP.begin(); iter!= affectsPrioritiesEP.end(); ++iter){
+		if(iter->second.count(e)>0){
+		  controlPointsAffectingCriticalPath.insert(iter->first);
+		  CkPrintf("Control Point \"%s\" affects the critical path\n", iter->first.c_str());
+		  cpcount++;
+		}
+	      }
+	      
+	    }
+	  }
+	  
+
+	  if(cpcount==0){
+	    CkPrintf("No control points are known to affect the critical path\n");
+	  } else {
+	    CkPrintf("Attempting to modify control point values for %d control points that affect the critical path\n", controlPointsAffectingCriticalPath.size());
+   
+	  }
+
+	  
+
+	  
 	} else {
 	  CkPrintf("The application step(%lf) is dominated mostly by the critical path(%lf). GOOD\n",phase.times[medianCriticalPathIdx], path.getTotalTime() );
 	}
@@ -748,7 +781,8 @@ public:
       }
             
     }
-    
+
+    CkPrintf("\n");
 
 
     if(haveGranularityCallback){
