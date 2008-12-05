@@ -126,6 +126,17 @@ int CldLoad(void)
   return (CsdLength() - CpvAccess(CldLoadOffset));
 }
 
+int CldLoadRank(int rank)
+{
+  int len, offset;
+  /* CmiLock(CpvAccessOther(cldLock, rank));  */
+  len = CqsLength(CpvAccessOther(CsdSchedQueue, rank));
+     /* CldLoadOffset is the empty token counter */
+  offset = CpvAccessOther(CldLoadOffset, rank);
+  /* CmiUnlock(CpvAccessOther(cldLock, rank)); */
+  return len - offset;
+}
+
 void CldPutToken(char *msg)
 {
   CldProcInfo proc = CpvAccess(CldProc);
@@ -152,6 +163,7 @@ void CldPutToken(char *msg)
   CmiUnlock(CpvAccess(cldLock));
 }
 
+
 static void * _CldGetTokenMsg(CldProcInfo proc)
 {
   CldToken tok;
@@ -172,10 +184,11 @@ static void * _CldGetTokenMsg(CldProcInfo proc)
 void CldGetToken(char **msg)
 {
   CldProcInfo proc = CpvAccess(CldProc);
-  CmiLock(CpvAccess(cldLock));
+  CmiNodeLock cldlock = CpvAccess(cldLock);
+  CmiLock(cldlock);
   *msg = _CldGetTokenMsg(proc);
   if (*msg) CpvAccess(CldLoadOffset)++;
-  CmiUnlock(CpvAccess(cldLock));
+  CmiUnlock(cldlock);
 }
 
 /* called at node level */
@@ -183,10 +196,11 @@ void CldGetToken(char **msg)
 static void CldGetTokenFromRank(char **msg, int rank)
 {
   CldProcInfo proc = CpvAccessOther(CldProc, rank);
-  CmiLock(CpvAccessOther(cldLock, rank));
+  CmiNodeLock cldlock = CpvAccessOther(cldLock, rank);
+  CmiLock(cldlock);
   *msg = _CldGetTokenMsg(proc);
   if (*msg) CpvAccessOther(CldLoadOffset, rank)++;
-  CmiUnlock(CpvAccessOther(cldLock, rank));
+  CmiUnlock(cldlock);
 }
 
 /* Bit Vector Stuff */
@@ -269,6 +283,7 @@ void CldMultipleSend(int pe, int numToSend, int rank, int immed)
 
   if (numToSend == 0)
     return;
+
   msgs = (char **)calloc(numToSend, sizeof(char *));
   msgSizes = (int *)calloc(numToSend, sizeof(int));
 
@@ -319,3 +334,35 @@ void CldMultipleSend(int pe, int numToSend, int rank, int immed)
   free(msgSizes);
 }
 
+/* simple scheme - just send one by one. useful for multicore */
+void CldSimpleMultipleSend(int pe, int numToSend)
+{
+  char *msg;
+  int len, queueing, priobits, *msgSizes, i, numSent, done=0;
+  unsigned int *prioptr;
+  CldInfoFn ifn;
+  CldPackFn pfn;
+
+  if (numToSend == 0)
+    return;
+
+  numSent = 0;
+  while (!done) {
+    for (i=0; i<numToSend; i++) {
+      CldGetToken(&msg);
+      if (msg != 0) {
+	done = 1;
+	numToSend--;
+	ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
+	ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+	CldSwitchHandler(msg, CpvAccessOther(CldBalanceHandlerIndex, pe));
+        CmiSyncSendAndFree(pe, len, msg);
+        if (numToSend == 0) done = 1;
+      }
+      else {
+	done = 1;
+	break;
+      }
+    }
+  }
+}

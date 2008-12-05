@@ -139,6 +139,24 @@ static void CldAskLoadHandler(requestmsg *msg)
 
 void CldSendLoad()
 {
+#if CMK_MULTICORE
+  /* directly send load to neighbors */
+  double myload = CldLoad();
+  int nNeighbors = CpvAccess(numNeighbors);
+  int i;
+  for (i=0; i<nNeighbors; i++) {
+    int neighbor_pe = CpvAccess(neighbors)[i].pe;
+    int j, found=0;
+    for (j=0; j<CpvAccessOther(numNeighbors, neighbor_pe); j++)
+      if (CpvAccessOther(neighbors, neighbor_pe)[j].pe == CmiMyPe())
+      {
+        CpvAccessOther(neighbors, neighbor_pe)[j].load = myload;
+        found = 1;
+        break;
+      }
+    CmiAssert(found == 1);
+  }
+#else
   loadmsg msg;
 
   msg.pe = CmiMyPe();
@@ -146,6 +164,7 @@ void CldSendLoad()
   CmiSetHandler(&msg, CpvAccess(CldLoadResponseHandlerIndex));
   CmiSyncMulticast(CpvAccess(neighborGroup), sizeof(loadmsg), &msg);
   CpvAccess(CldLoadBalanceMessages) += CpvAccess(numNeighbors);
+#endif
 }
 
 int CldMinAvg()
@@ -153,14 +172,22 @@ int CldMinAvg()
   int sum=0, i;
   static int start=-1;
 
+  int nNeighbors = CpvAccess(numNeighbors);
   if (start == -1)
-    start = CmiMyPe() % CpvAccess(numNeighbors);
+    start = CmiMyPe() % nNeighbors;
+
+#if 0
+    /* update load from neighbors for multicore */
+  for (i=0; i<nNeighbors; i++) {
+    CpvAccess(neighbors)[i].load = CldLoadRank(CpvAccess(neighbors)[i].pe);
+  }
+#endif
   CpvAccess(MinProc) = CpvAccess(neighbors)[start].pe;
   CpvAccess(MinLoad) = CpvAccess(neighbors)[start].load;
   sum = CpvAccess(neighbors)[start].load;
   CpvAccess(Mindex) = start;
-  for (i=1; i<CpvAccess(numNeighbors); i++) {
-    start = (start+1) % CpvAccess(numNeighbors);
+  for (i=1; i<nNeighbors; i++) {
+    start = (start+1) % nNeighbors;
     sum += CpvAccess(neighbors)[start].load;
     if (CpvAccess(MinLoad) > CpvAccess(neighbors)[start].load) {
       CpvAccess(MinLoad) = CpvAccess(neighbors)[start].load;
@@ -168,13 +195,13 @@ int CldMinAvg()
       CpvAccess(Mindex) = start;
     }
   }
-  start = (start+2) % CpvAccess(numNeighbors);
+  start = (start+2) % nNeighbors;
   sum += CldLoad();
   if (CldLoad() < CpvAccess(MinLoad)) {
     CpvAccess(MinLoad) = CldLoad();
     CpvAccess(MinProc) = CmiMyPe();
   }
-  i = (int)(1.0 + (((float)sum) /((float)(CpvAccess(numNeighbors)+1))));
+  i = (int)(1.0 + (((float)sum) /((float)(nNeighbors+1))));
   return i;
 }
 
@@ -194,7 +221,8 @@ void CldBalance()
     overload = CldCountTokens();
 
   if (overload > MAXOVERLOAD) {
-    for (i=0; i<CpvAccess(numNeighbors); i++)
+    int nNeighbors = CpvAccess(numNeighbors);
+    for (i=0; i<nNeighbors; i++)
       if (CpvAccess(neighbors)[i].load < avgLoad) {
         totalUnderAvg += avgLoad-CpvAccess(neighbors)[i].load;
         if (avgLoad - CpvAccess(neighbors)[i].load > maxUnderAvg)
@@ -202,14 +230,17 @@ void CldBalance()
         numUnderAvg++;
       }
     if (numUnderAvg > 0)
-      for (i=0; ((i<CpvAccess(numNeighbors)) && (overload>0)); i++) {
+      for (i=0; ((i<nNeighbors) && (overload>0)); i++) {
 	j = (i+CpvAccess(Mindex))%CpvAccess(numNeighbors);
         if (CpvAccess(neighbors)[j].load < avgLoad) {
-          numToMove = avgLoad - CpvAccess(neighbors)[j].load;
+          numToMove = (avgLoad - CpvAccess(neighbors)[j].load)/numUnderAvg;
           if (numToMove > overload)
             numToMove = overload;
           overload -= numToMove;
 	  CpvAccess(neighbors)[j].load += numToMove;
+#if CMK_MULTICORE
+          CldSimpleMultipleSend(CpvAccess(neighbors)[j].pe, numToMove);
+#else
           CldMultipleSend(CpvAccess(neighbors)[j].pe, 
 			  numToMove, CmiMyRank(), 
 #if CMK_SMP
@@ -218,6 +249,7 @@ void CldBalance()
 			  1
 #endif
                           );
+#endif
         }
       }
   }
@@ -515,17 +547,22 @@ void CldGraphModuleInit(char **argv)
     CldReadNeighborData();
 #endif
     CldComputeNeighborData();
+#if CMK_MULTICORE
+    CmiNodeBarrier();
+#endif
     CldBalance();
   }
 
 #if 1
-  CmiGetArgStringDesc(argv, "+workstealing", &_lbsteal, "Enable work stealing at idle time");
+  _lbsteal = CmiGetArgFlagDesc(argv, "+workstealing", "Charm++> Enable work stealing at idle time");
   if (_lbsteal) {
   /* register idle handlers - when idle, keep asking work from neighbors */
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
       (CcdVoidFn) CldStillIdle, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) CldStillIdle, NULL);
+    if (CmiMyPe() == 0) 
+      CmiPrintf("Charm++> Work stealing is enabled. \n");
   }
 #endif
 }
@@ -540,8 +577,8 @@ void CldModuleInit(char **argv)
   CpvAccess(CldRelocatedMessages) = CpvAccess(CldLoadBalanceMessages) = 
   CpvAccess(CldMessageChunks) = 0;
 
-  CpvAccess(CldLoadNotify) = 1;
-
   CldModuleGeneralInit(argv);
   CldGraphModuleInit(argv);
+
+  CpvAccess(CldLoadNotify) = 1;
 }
