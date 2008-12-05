@@ -13,7 +13,7 @@ int ampi_registerFunc(char *funcName);
 void ampi_beginFunc(int funcNo,MPI_Comm comm);
 void ampi_endFunc(int funcNo,MPI_Comm comm);
 #if CMK_BLUEGENE_CHARM
-void BgPrintf(char *str);
+void BgPrintf(const char *str);
 #endif
 #ifdef __cplusplus
 }

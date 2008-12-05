@@ -227,7 +227,7 @@ void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** pa
 extern "C" void isomalloc_push();
 extern "C" void isomalloc_pop();
 
-void TraceBluegene::bgPrint(char* str){
+void TraceBluegene::bgPrint(const char* str){
   if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) isomalloc_push();
   double curT = BgGetTime();
   if (genTimeLog)
@@ -238,7 +238,7 @@ void TraceBluegene::bgPrint(char* str){
   if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) isomalloc_pop();
 }
 
-extern "C" void BgPrintf(char *str)
+extern "C" void BgPrintf(const char *str)
 {
   BgPrint(str);
 }
