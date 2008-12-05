@@ -8,7 +8,7 @@ typedef std::pair<void*, int> Alloc;
 
 static std::vector<Alloc> allocs;
 
-void *shalloc(int i, size_t s)
+void *shalloc(size_t s, int i)
 {
   // Make space to record at least i allocations
   if(allocs.size() <= i)
@@ -25,7 +25,7 @@ void *shalloc(int i, size_t s)
   return allocs[i].first;
 }
 
-void shfree(int i, void *p)
+void shfree(void *p, int i)
 {
   // Check that pointer matches
   //CkAssert(p == allocs[i].first);
@@ -40,3 +40,15 @@ void shfree(int i, void *p)
       allocs[i].first = 0;
     }
 }
+
+
+// Note that these are liable to crash and burn in the face of alignment 
+// requirements
+void* operator new(size_t sz, int i)
+{ return shalloc(sz, i); }
+void operator delete(void *p, int i)
+{ shfree(p, i); }
+void* operator new[](size_t sz, int i)
+{ return shalloc(sz, i); }
+void operator delete[](void *p, int i)
+{ shfree(p, i); }
