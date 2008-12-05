@@ -1998,6 +1998,9 @@ bigsim_timing.o: bigsim_timing.C blue.h converse.h conv-config.h \
   bigsim_logs.h blue_defs.h bigsim_network.h
 	$(CHARMC) -c -I. bigsim_timing.C
 
+shared_alloc.o: shared_alloc.C shared-alloc.h
+	$(CHARMC) -c -I. shared_alloc.C
+
 bigsim_read.o: bigsim_read.C blue.h converse.h conv-config.h \
   conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
