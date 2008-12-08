@@ -18,6 +18,7 @@
 #include "cuda-hybrid-api.h"
 #include "stdio.h"
 
+
 /* A function in ck.C which casts the void * to a CkCallback object
  *  and executes the callback 
  */ 
@@ -29,6 +30,13 @@ extern void CUDACallbackManager(void * fn);
 #define NUM_BUFFERS 100
 
 //#define GPU_DEBUG
+
+
+/* a flag which tells the system to record the time for invocation and
+ *  completion of GPU events: memory allocation, transfer and
+ *  kernel execution
+ */  
+// #define GPUTIME
 
 /* work request queue */
 workRequestQueue *wrQueue = NULL; 
@@ -43,6 +51,28 @@ void **hostBuffers = NULL;
 
 /* device buffers */
 void **devBuffers = NULL; 
+
+
+#ifdef GPUTIME
+#include <time.h>
+/* event types */
+#define MEMORY_ALLOCATION     1
+#define CPU_GPU_TRANSFER      2
+#define GPU_CPU_TRANSFER      3
+#define MEMORY_FREE           4
+#define KERNEL_EXECUTION      5
+
+typedef struct gpuEventTimer {
+  clock_t startTime; 
+  clock_t endTime; 
+  int eventType;
+  int ID; 
+} gpuEventTimer; 
+
+gpuEventTimer gpuEvents[QUEUE_SIZE_INIT * 3]; 
+int timeIndex = 0; 
+
+#endif
 
 /* There are separate CUDA streams for kernel execution, data transfer
  *  into the device, and data transfer out. This allows prefetching of
@@ -71,7 +101,16 @@ void setupData(workRequest *wr) {
 #ifdef GPU_DEBUG
 	printf("buffer %d allocated\n", index); 
 #endif
+#ifdef GPUTIME
+	gpuEvents[timeIndex].startTime = clock(); 
+	gpuEvents[timeIndex].eventType = MEMORY_ALLOCATION; 
+	gpuEvents[timeIndex].ID = index; 
+#endif
 	returnVal = cudaMalloc((void **) &devBuffers[index], size); 
+#ifdef GPUTIME
+	gpuEvents[timeIndex].endTime = clock(); 
+	timeIndex++;
+#endif
 #ifdef GPU_DEBUG
 	printf("cudaMalloc returned %d\n", returnVal); 
 #endif
@@ -185,6 +224,12 @@ void gpuProgressFn() {
     }  
     else if (wr->state == TRANSFERRING_IN) {
       if ((returnVal = cudaStreamQuery(data_in_stream)) == cudaSuccess) {
+
+#ifdef GPUTIME
+	gpuEvents[timeIndex].startTime = clock(); 
+	gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
+	gpuEvents[timeIndex].ID = wr->id; 
+#endif
 	kernelSelect(wr); 
 	wr->state = EXECUTING; 
       }
@@ -194,6 +239,10 @@ void gpuProgressFn() {
     }
     else if (wr->state == EXECUTING) {
       if ((returnVal = cudaStreamQuery(kernel_stream)) == cudaSuccess) {
+#ifdef GPUTIME
+	gpuEvents[timeIndex].endTime = clock(); 
+	timeIndex++; 
+#endif
         copybackData(wr);
 	wr->state = TRANSFERRING_OUT;
       }
@@ -232,4 +281,26 @@ void exitHybridAPI() {
   cudaStreamDestroy(kernel_stream); 
   cudaStreamDestroy(data_in_stream); 
   cudaStreamDestroy(data_out_stream); 
+
+#ifdef GPU_DEBUG
+  for (int i=0; i<timeIndex; i++) {
+    switch (gpuEvents[timeIndex].eventType) {
+    case (MEMORY_ALLOCATION) :
+      printf("Buffer %d allocation ", gpuEvents[timeIndex].ID); 
+      break; 
+    case (KERNEL_EXECUTION) :
+      printf("Kernel %d execution ", gpuEvents[timeIndex].ID); 
+      break;
+    default:
+      printf("Error, invalid timer identifier\n"); 
+    }
+    printf("%d:%d\n", gpuEvents[timeIndex].startTime, gpuEvents[timeIndex].endTime); 
+  }
+#endif
 }
+
+
+
+
+
+
