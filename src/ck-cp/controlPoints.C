@@ -18,6 +18,15 @@
 #include "controlPoints.h"
 
 
+/**
+ *  \addtogroup ControlPointFramework
+ *   @{
+ *
+ */
+
+
+
+
 using namespace std;
 
 #define CONTROL_POINT_SAMPLE_PERIOD 4000
@@ -32,8 +41,9 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ int random_seed;
 
 
-// A reduction to take min/sum/avg
+/// A reduction type that combines idle time statistics (min/max/avg etc.)
 CkReduction::reducerType idleTimeReductionType;
+/// A reducer that combines idle time statistics (min/max/avg etc.)
 CkReductionMsg *idleTimeReduction(int nMsg,CkReductionMsg **msgs){
   double ret[3];
   if(nMsg > 0){
@@ -52,13 +62,14 @@ CkReductionMsg *idleTimeReduction(int nMsg,CkReductionMsg **msgs){
   }  
   return CkReductionMsg::buildNew(3*sizeof(double),ret);   
 }
+/// An initcall that registers the idle time reducer idleTimeReduction()
 /*initcall*/ void registerIdleTimeReduction(void) {
   idleTimeReductionType=CkReduction::addReducer(idleTimeReduction);
 }
 
 
 
-
+/// A container that stores idle time statistics (min/max/avg etc.)
 class idleTimeContainer {
 public:
   double min;
@@ -86,7 +97,9 @@ public:
 
 
 
-
+/// Stores data for a phase (a time range in which a single set of control point values is used).
+/// The data stored includes the control point values, a set of timings registered by the application, 
+/// The critical paths detected, the max memory usage, and the idle time.
 class instrumentedPhase {
 public:
   std::map<string,int> controlPoints; // The control point values for this phase(don't vary within the phase)
@@ -250,9 +263,11 @@ public:
 };
 
 
-
+/// Stores and manipulate all known instrumented phases. One instance of this exists on each PE in its local controlPointManager
 class instrumentedData {
 public:
+
+  /// Stores all known instrumented phases(loaded from file, or from this run)
   std::vector<instrumentedPhase> phases;
 
   /// get control point names for all phases
@@ -492,7 +507,7 @@ unsigned int randInt(unsigned int num, const char* name, int seed=0){
 //=============================================================================
 
 
-// A group with representatives on all nodes
+/// A chare group that contains most of the control point framework data and code.
 class controlPointManager : public CBase_controlPointManager {
 public:
   
@@ -502,15 +517,24 @@ public:
   instrumentedPhase thisPhaseData;
   instrumentedPhase best_phase;
   
+  /// The lower and upper bounds for each named control point
   std::map<string, pair<int,int> > controlPointSpace;
 
+  /// A set of named control points whose values cannot change within a single run of an application
   std::set<string> staticControlPoints;
 
+  /// Sets of entry point ids that are affected by some named control points
   std::map<string, std::set<int> > affectsPrioritiesEP;
+  /// Sets of entry array ids that are affected by some named control points
   std::map<string, std::set<int> > affectsPrioritiesArray;
 
-
-
+  
+  /// The control points to be used in the next phase. In gotoNextPhase(), these will be used
+  std::map<string,int> newControlPoints;
+  /// Whether to use newControlPoints in gotoNextPhase()
+  bool newControlPointsAvailable;
+  
+  /// A user supplied callback to call when control point values are to be changed
   CkCallback granularityCallback;
   bool haveGranularityCallback;
   bool frameworkShouldAdvancePhase;
@@ -522,11 +546,12 @@ public:
 
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  /// The path history
   PathHistory maxTerminalPathHistory;
 #endif
 
   controlPointManager(){
-
+    newControlPointsAvailable = false;
     alreadyRequestedMemoryUsage = false;   
     alreadyRequestedIdleTime = false;
     
@@ -627,15 +652,19 @@ public:
 
   /// Add the current data to allData and output it to a file
   void writeDataFile(){
+#if WRITEDATAFILE
     CkPrintf("============= writeDataFile() ============\n");
     ofstream outfile(dataFilename);
     allData.phases.push_back(thisPhaseData);
     allData.cleanupNames();
     outfile << allData.toString();
     outfile.close();
+#else
+    CkPrintf("NOT WRITING OUTPUT FILE\n");
+#endif
   }
 
-
+  /// User can register a callback that is called when application should advance to next phase
   void setGranularityCallback(CkCallback cb, bool _frameworkShouldAdvancePhase){
     frameworkShouldAdvancePhase = _frameworkShouldAdvancePhase;
     granularityCallback = cb;
@@ -767,9 +796,38 @@ public:
 	    CkPrintf("No control points are known to affect the critical path\n");
 	  } else {
 	    CkPrintf("Attempting to modify control point values for %d control points that affect the critical path\n", controlPointsAffectingCriticalPath.size());
-   
-	  }
+	    
+	    newControlPoints = phase.controlPoints;
+	    
+	    if(frameworkShouldAdvancePhase){
+	      gotoNextPhase();	
+	    }
+	    
+	    if(haveGranularityCallback){ 
+	      controlPointMsg *msg = new(0) controlPointMsg;
+	      granularityCallback.send(msg);
+	    }
+	    
+	    
+	    // adjust the control points that can affect the critical path
+	    
+	    std::map<string,int>::iterator newCP;
+	    for(newCP = newControlPoints.begin(); newCP != newControlPoints.end(); ++ newCP){
+	      if( controlPointsAffectingCriticalPath.count(newCP->first) > 0 ){
+		// decrease the value (increase priority) if within range
+		int lowerbound = controlPointSpace[newCP->first].first;
+		if(newCP->second > lowerbound){
+		  newControlPointsAvailable = true;
+  		  newCP->second --;
+		  CkPrintf("New control point \"%s\"=%d", newCP->first.c_str(), newCP->second);
+		}
+		
+	      }
 
+	    }
+	    
+	  }
+	  
 	  
 
 	  
@@ -783,8 +841,9 @@ public:
     }
 
     CkPrintf("\n");
-
-
+    
+    
+    
     if(haveGranularityCallback){
       if(frameworkShouldAdvancePhase){
 	gotoNextPhase();	
@@ -794,13 +853,11 @@ public:
       granularityCallback.send(msg); 
     }
     
-
-
-
-
-
+    
+    
   }
   
+  /// Determine if any control point is known to affect an entry method
   bool controlPointAffectsThisEP(int ep){
     std::map<string, std::set<int> >::iterator iter;
     for(iter=affectsPrioritiesEP.begin(); iter!= affectsPrioritiesEP.end(); ++iter){
@@ -811,7 +868,7 @@ public:
     return false;    
   }
   
-  
+  /// Determine if any control point is known to affect a chare array  
   bool controlPointAffectsThisArray(int array){
     std::map<string, std::set<int> >::iterator iter;
     for(iter=affectsPrioritiesArray.begin(); iter!= affectsPrioritiesArray.end(); ++iter){
@@ -822,6 +879,7 @@ public:
     return false;   
   }
   
+  /// The data from the previous phase
   instrumentedPhase *previousPhaseData(){
     int s = allData.phases.size();
     if(s >= 1 && phase_id > 0) {
@@ -831,7 +889,8 @@ public:
     }
   }
   
-  
+
+  /// Called by either the application or the Control Point Framework to advance to the next phase  
   void gotoNextPhase(){
 
     LBDatabase * myLBdatabase = LBDatabaseObj();
@@ -869,13 +928,13 @@ public:
     
     // save a copy of the timing information from this phase
     allData.phases.push_back(thisPhaseData);
-        
+    
     // clear the timing information that will be used for the next phase
     thisPhaseData.clear();
     
   }
 
-  // The application can set the instrumented time for this phase
+  /// An application uses this to register an instrumented timing for this phase
   void setTiming(double time){
     thisPhaseData.times.push_back(time);
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
@@ -896,7 +955,7 @@ public:
     
   }
   
-  // Entry method called on all PEs to request memory usage
+  /// Entry method called on all PEs to request memory usage
   void requestIdleTime(CkCallback cb){
     double i = localControlPointTracingInstance()->idleRatio();
     double idle[3];
@@ -906,11 +965,10 @@ public:
     
     localControlPointTracingInstance()->resetTimings();
 
-    //   CkPrintf("PE %d Idle Time is %lf\n",CkMyPe(), idle);
     contribute(3*sizeof(double),idle,idleTimeReductionType, cb);
   }
   
-  // All processors reduce their memory usages to this method
+  /// All processors reduce their memory usages in requestIdleTime() to this method
   void gatherIdleTime(CkReductionMsg *msg){
     int size=msg->getSize() / sizeof(double);
     CkAssert(size==3);
@@ -934,7 +992,7 @@ public:
   
 
 
-  // Entry method called on all PEs to request memory usage
+  /// Entry method called on all PEs to request memory usage
   void requestMemoryUsage(CkCallback cb){
     int m = CmiMaxMemoryUsage() / 1024 / 1024;
     CmiResetMaxMemory();
@@ -942,7 +1000,7 @@ public:
     contribute(sizeof(int),&m,CkReduction::max_int, cb);
   }
 
-  // All processors reduce their memory usages to this method
+  /// All processors reduce their memory usages to this method
   void gatherMemoryUsage(CkReductionMsg *msg){
     int size=msg->getSize() / sizeof(int);
     CkAssert(size==1);
@@ -962,7 +1020,7 @@ public:
   }
 
 
-
+  /// An entry method used to both register and reduce the maximal critical paths back to PE 0
   void registerTerminalPath(PathHistory &path){
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   
@@ -987,18 +1045,22 @@ public:
 #endif
   }
 
+  /// Print the maximal known critical path on this PE
   void printTerminalPath(){
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
     maxTerminalPathHistory.print();
 #endif
   }
-  
+
+  /// Reset the maximal known critical path on this PE  
   void resetTerminalPath(){
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
     maxTerminalPathHistory.reset();
 #endif
   }
-  
+
+
+  /// Inform the control point framework that a named control point affects the priorities of some array  
   void associatePriorityArray(const char *name, int groupIdx){
     CkPrintf("Associating control point \"%s\" affects priority of array id=%d\n", name, groupIdx );
     
@@ -1026,6 +1088,7 @@ public:
     
   }
   
+  /// Inform the control point framework that a named control point affects the priority of some entry method
   void associatePriorityEntry(const char *name, int idx){
     CkPrintf("Associating control point \"%s\" with EP id=%d\n", name, idx);
 
@@ -1057,13 +1120,13 @@ public:
 };
 
 
-
+/// An interface callable by the application.
 void gotoNextPhase(){
   localControlPointManagerProxy.ckLocalBranch()->gotoNextPhase();
 }
 
 
-// A mainchare that is used just to create our controlPointManager group at startup
+/// A mainchare that is used just to create our controlPointManager group at startup
 class controlPointMain : public CBase_controlPointMain {
 public:
   controlPointMain(CkArgMsg* args){
@@ -1076,13 +1139,14 @@ public:
   ~controlPointMain(){}
 };
 
+/// An interface callable by the application.
 void registerGranularityChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase){
   CkAssert(CkMyPe() == 0);
   CkPrintf("registerGranularityChangeCallback\n");
   localControlPointManagerProxy.ckLocalBranch()->setGranularityCallback(cb, frameworkShouldAdvancePhase);
 }
 
-
+/// An interface callable by the application.
 void registerControlPointTiming(double time){
   CkAssert(CkMyPe() == 0);
 #if DEBUG>0
@@ -1091,20 +1155,21 @@ void registerControlPointTiming(double time){
   localControlPointManagerProxy.ckLocalBranch()->setTiming(time);
 }
 
+/// Shutdown the control point framework, writing data to disk if necessary
 extern "C" void controlPointShutdown(){
   CkAssert(CkMyPe() == 0);
   CkPrintf("[%d] controlPointShutdown() at CkExit()\n", CkMyPe());
-
   localControlPointManagerProxy.ckLocalBranch()->writeDataFile();
   CkExit();
 }
 
-
+/// A function called at startup on each node to register controlPointShutdown() to be called at CkExit()
 void controlPointInitNode(){
   CkPrintf("controlPointInitNode()\n");
   registerExitFn(controlPointShutdown);
 }
 
+/// Called periodically to allow control point framework to do things periodically
 static void periodicProcessControlPoints(void* ptr, double currWallTime){
 #ifdef DEBUG
   CkPrintf("[%d] periodicProcessControlPoints()\n", CkMyPe());
@@ -1132,7 +1197,7 @@ int staticPoint(const char *name, int lb, int ub){
 }
 
 
-
+/// Should an optimizer determine the control point values
 bool valueShouldBeProvidedByOptimizer(){
   
   const int effective_phase = localControlPointManagerProxy.ckLocalBranch()->allData.phases.size();
@@ -1159,13 +1224,23 @@ bool valueShouldBeProvidedByOptimizer(){
 
 
 
-
-
-
-
+/// Determine a control point value using some optimization scheme (use max known, simmulated annealling, 
+/// user observed characteristic to adapt specific control point values.
+/// @note eventually there should be a plugin system where multiple schemes can be plugged in(similar to LB)
 int valueProvidedByOptimizer(const char * name){
   const int phase_id = localControlPointManagerProxy.ckLocalBranch()->phase_id;
   const int effective_phase = localControlPointManagerProxy.ckLocalBranch()->allData.phases.size();
+
+  if(localControlPointManagerProxy.ckLocalBranch()->newControlPointsAvailable){
+    int result = localControlPointManagerProxy.ckLocalBranch()->newControlPoints[string(name)];
+    CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d  from \"newControlPoints\" is: %d\n", name, phase_id, result);
+    return result;
+  }
+  
+
+
+
+
 
   //#define OPTIMIZER_USE_BEST_TIME  
 #if OPTIMIZER_USE_BEST_TIME  
@@ -1385,7 +1460,7 @@ int controlPoint2Pow(const char *name, int fine_granularity, int coarse_granular
 }
 
 
-
+/// Get control point value from range of integers [lb,ub]
 int controlPoint(const char *name, int lb, int ub){
   instrumentedPhase &thisPhaseData = localControlPointManagerProxy.ckLocalBranch()->thisPhaseData;
   const int phase_id = localControlPointManagerProxy.ckLocalBranch()->phase_id;
@@ -1409,7 +1484,7 @@ int controlPoint(const char *name, int lb, int ub){
   return result;
 }
 
-
+/// Get control point value from set of provided integers
 int controlPoint(const char *name, std::vector<int>& values){
   instrumentedPhase &thisPhaseData = localControlPointManagerProxy.ckLocalBranch()->thisPhaseData;
   const int phase_id = localControlPointManagerProxy.ckLocalBranch()->phase_id;
@@ -1436,7 +1511,7 @@ int controlPoint(const char *name, std::vector<int>& values){
 
 
 
-
+/// Inform the control point framework that a named control point affects the priorities of some array  
 void controlPointPriorityArray(const char *name, CProxy_ArrayBase &arraybase){
   CkGroupID aid = arraybase.ckGetArrayID();
   int groupIdx = aid.idx;
@@ -1445,7 +1520,7 @@ void controlPointPriorityArray(const char *name, CProxy_ArrayBase &arraybase){
 }
 
 
-
+/// Inform the control point framework that a named control point affects the priorities of some entry method  
 void controlPointPriorityEntry(const char *name, int idx){
   localControlPointManagerProxy.ckLocalBranch()->associatePriorityEntry(name, idx);
   //  CkPrintf("Associating control point \"%s\" with EP id=%d\n", name, idx);
@@ -1456,7 +1531,7 @@ void controlPointPriorityEntry(const char *name, int idx){
 
 
 
-// The index in the global array for my top row  
+/// The index in the global array for my top row  
 int redistributor2D::top_data_idx(){ 
   return (data_height * thisIndex.y) / y_chares; 
 } 
@@ -1496,7 +1571,7 @@ int redistributor2D::mywidth(){
 } 
    
    
-// the height of the non-ghost part of the local partition 
+/// the height of the non-ghost part of the local partition 
 int redistributor2D::myheight(){ 
   return bottom_data_idx() - top_data_idx() + 1; 
 } 
@@ -1515,7 +1590,7 @@ int redistributor2D::myheight(){
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
 
 
-
+/// Inform control point framework that the just executed entry method is a terminal one. This is used to maintain the maximum known critical path .
 void registerTerminalEntryMethod(){
   localControlPointManagerProxy.ckLocalBranch()->registerTerminalPath(currentlyExecutingMsg->pathHistory);
 }
@@ -1531,6 +1606,7 @@ void resetPECriticalPath(){
 #endif
 
 
+/*! @} */
 
 
 #include "ControlPoints.def.h"

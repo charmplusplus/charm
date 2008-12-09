@@ -14,14 +14,22 @@
 
 #include<pup_stl.h>
 
+
+
+/**
+ * \addtogroup ControlPointFramework
+ *   @{
+ */
+
+
 #define DEBUG 0
 
 void registerGranularityChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase);
 void registerControlPointTiming(double time);
 
-// The application specifies that it is ready to proceed to a new set of control point values.
-// This should be called after registerControlPointTiming()
-// This should be called before calling controlPoint()
+/// The application specifies that it is ready to proceed to a new set of control point values.
+/// This should be called after registerControlPointTiming()
+/// This should be called before calling controlPoint()
 void gotoNextPhase();
 
 /// Return an integral power of 2 between c1 and c2
@@ -49,17 +57,13 @@ void controlPointPriorityEntry(const char *name, int idx);
 
 
 
-// The application specifies that it is ready to proceed to a new set of control point values.
-// This should be called after registerControlPointTiming()
-// This should be called before calling controlPoint()
+/// The application specifies that it is ready to proceed to a new set of control point values.
+/// This should be called after registerControlPointTiming()
+/// This should be called before calling controlPoint()
 void gotoNextPhase();
 
 
-
-/// Return an integer from the provided vector of values
-/// The value returned is static throughout the life of the program
-//int beginPoint(const char *name, std::vector<int>& values);
-
+/// Integer Maximum
 static int maxi(int a, int b){
   if(a>b)
     return a;
@@ -67,6 +71,7 @@ static int maxi(int a, int b){
     return b;
 }
 
+/// Integer Minimum
 static int mini(int a, int b){
   if(a<b)
     return a;
@@ -75,6 +80,7 @@ static int mini(int a, int b){
 }
 
 
+/// A message used for signaling changes in control point values
 class controlPointMsg : public CMessage_controlPointMsg {
  public:
   char *data;
@@ -83,7 +89,7 @@ class controlPointMsg : public CMessage_controlPointMsg {
 
 
 
-
+/// A message containing a chunk of a data array used when redistributing to a different set of active chares 
 class redistributor2DMsg : public CMessage_redistributor2DMsg { 
  public: 
   int top;         
@@ -100,8 +106,7 @@ class redistributor2DMsg : public CMessage_redistributor2DMsg {
 
 
 
-// A array that can redistribute user data arrays
-// It will be used by binding it to some user Chare Array
+/// A chare group that can redistribute user data arrays. It is used by binding it to a user's Chare Array
 class redistributor2D: public CBase_redistributor2D {
  public:
 
@@ -671,6 +676,7 @@ class redistributor2D: public CBase_redistributor2D {
   }
 };
 
+/** @} */
 
 
 #endif
