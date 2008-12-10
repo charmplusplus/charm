@@ -381,9 +381,10 @@ void CcsInit(char **argv)
         if (CpvAccess(displayArgument) == NULL)
             CmiPrintf("WARNING> NULL parameter for +DebugDisplay\n***");
      }
-     else
+     else if (CmiMyPe() == 0)
      {
-            CmiPrintf("WARNING> x term for gdb needs to be specified as +DebugDisplay by debugger\n***");
+            /* only one processor prints the warning */
+            CmiPrintf("WARNING> x term for gdb needs to be specified as +DebugDisplay by debugger\n***\n");
      }
 
   }
