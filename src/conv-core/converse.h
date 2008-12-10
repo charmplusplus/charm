@@ -407,27 +407,29 @@ for each processor in the node.
 #ifdef CMK_CPV_IS_SMP
 
 #if CMK_TLS_THREAD && CMK_USE_TLS_THREAD
+#define CMK_MAX_PTHREADS     64
 #define CpvDeclare(t,v) __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         int CMK_TAG(Cpv_inited_,v) = 0;  \
-                        t * CMK_TAG(Cpv_addr_,v)[32] = {0}
+                        t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS] = {0}
 #define CpvExtern(t,v)  extern __thread t* CMK_TAG(Cpv_,v);  \
                         extern int CMK_TAG(Cpv_inited_,v);  \
-                        extern t * CMK_TAG(Cpv_addr_,v)[32]
+                        extern t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS]
 #ifdef __cplusplus
 #define CpvCExtern(t,v) extern "C"  __thread t* CMK_TAG(Cpv_,v);  \
                         extern "C" int CMK_TAG(Cpv_inited_,v);  \
-                        extern "C" t * CMK_TAG(Cpv_addr_,v)[32]
+                        extern "C" t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS]
 #else
 #define CpvCExtern(t,v)    CpvExtern(t,v)
 #endif
-#define CpvStaticDeclare(t,v) static __thread t* CMK_TAG(Cpv_,v);   \
+#define CpvStaticDeclare(t,v) static __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         static int CMK_TAG(Cpv_inited_,v) = 0;  \
-                        static t * CMK_TAG(Cpv_addr_,v)[32] = {0}
+                        static t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS] = {0}
 #define CpvInitialize(t,v)\
     do { \
        if (CmiMyRank()) { \
 		while (!CpvInitialized(v)) CMK_CPV_IS_SMP; \
        } else { \
+               CmiAssert(CMK_MAX_PTHREADS >= CmiMyNodeSize()); \
 	       CMK_TAG(Cpv_inited_,v)=1; \
        } \
     } while(0); \
