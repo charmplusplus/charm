@@ -261,7 +261,7 @@ void CpdFreezeModeScheduler(void)
     /* While frozen, queue up messages */
     while (CpvAccess(freezeModeFlag)) {
 #if NODE_0_IS_CONVHOST
-      CcsServerCheck(); /*Make sure we can get CCS messages*/
+      if (CmiMyPe()==0) CcsServerCheck(); /*Make sure we can get CCS messages*/
 #endif
       msg = CsdNextMessage(&state);
 
