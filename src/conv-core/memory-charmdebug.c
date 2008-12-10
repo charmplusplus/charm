@@ -32,15 +32,21 @@ typedef struct _SlotStack SlotStack;
 int nextChareID;
 extern int memory_chare_id;
 
+int memory_charmdebug_internal = 0;
+
 /**
  * Struct Slot contains all of the information about a malloc buffer except
  * for the contents of its memory.
  */
 struct _Slot {
+#ifdef CMK_SEPARATE_SLOT
+  char *userData;
+#else
   /*Doubly-linked allocated block list*/
   Slot *next;
   Slot *prev;
-	
+#endif
+
   /*The number of bytes of user data*/
   int userSize;
 
@@ -84,15 +90,23 @@ struct _SlotStack {
 
 /*Convert a slot to a user address*/
 static char *SlotToUser(Slot *s) {
+#ifdef CMK_SEPARATE_SLOT
+  return s->userData;
+#else
   return ((char *)s)+sizeof(Slot);
+#endif
 }
 
 
 /*Convert a user address to a slot*/
 static Slot *UserToSlot(void *user) {
+#ifdef CMK_SEPARATE_SLOT
+  return (Slot *)CkHashtableGet(block_slots, &user);
+#else
   char *cu=(char *)user;
   Slot *s=(Slot *)(cu-sizeof(Slot));
   return s;
+#endif
 }
 
 static int isLeakSlot(Slot *s) {
@@ -105,11 +119,15 @@ static void printSlot(Slot *s) {
   CmiBacktracePrint(s->from,s->stackLen);
 }
 
-/********* Circural list of allocated memory *********/
+/********* List of allocated memory *********/
 
 /* First memory slot */
+#ifdef CMK_SEPARATE_SLOT
+CkHashtable_c block_slots = NULL;
+#else
 Slot slot_first_storage = {&slot_first_storage, &slot_first_storage};
 Slot *slot_first = &slot_first_storage;
+#endif
 
 int memory_allocated_user_total;
 int get_memory_allocated_user_total() {return memory_allocated_user_total;}
@@ -118,23 +136,36 @@ int get_memory_allocated_user_total() {return memory_allocated_user_total;}
 
 int cpd_memory_length(void *lenParam) {
   int n=0;
+#ifdef CMK_SEPARATE_SLOT
+  n = CkHashtableSize(block_slots) - 1;
+#else
   Slot *cur = slot_first->next;
   while (cur != slot_first) {
     n++;
     cur = cur->next;
   }
+#endif
   return n;
 }
 
+#ifdef CMK_SEPARATE_SLOT
+void cpd_memory_single_pup(CkHashtable_c h, pup_er p) {
+  CkHashtableIterator_c hashiter = CkHashtableGetIterator(h);
+  void *key;
+  Slot *cur;
+  while ((cur = (Slot *)CkHasthableIteratorNext(hashiter, &key)) != NULL) {
+    if (cur->userData == lastMemoryAllocated) continue;
+#else
 void cpd_memory_single_pup(Slot* list, pup_er p) {
   Slot *cur = list->next;
   /* Stupid hack to avoid sending the memory we just allocated for this packing,
      otherwise the lenghts will mismatch */
   if (pup_isPacking(p)) cur = cur->next;
-  while (cur != list) {
+  for ( ; cur != list; cur = cur->next) {
+#endif
     int i;
     int flags;
-    void *loc = (void*)(cur+1);
+    void *loc = SlotToUser(cur);
     CpdListBeginItem(p, 0);
     pup_comment(p, "loc");
     pup_pointer(p, &loc);
@@ -151,8 +182,13 @@ void cpd_memory_single_pup(Slot* list, pup_er p) {
       //      if (cur->from[i] > 0) pup_uint(p, (unsigned int*)&cur->from[i]);
       //      else break;
     //}
-    pup_pointers(p, cur->from, cur->stackLen);
-    cur = cur->next;
+    if (cur->from != NULL)
+      pup_pointers(p, cur->from, cur->stackLen);
+    else {
+      void *myNULL = NULL;
+      printf("Block %p has no stack!\n",cur);
+      pup_pointer(p, &myNULL);
+    }
   }
 }
 
@@ -162,10 +198,15 @@ void cpd_memory_pup(void *itemParam, pup_er p, CpdListItemsRequest *req) {
   pup_chars(p, "memory", strlen("memory"));
   pup_comment(p, "slots");
   pup_syncComment(p, pup_sync_begin_array, 0);
+#ifdef CMK_SEPARATE_SLOT
+  cpd_memory_single_pup(block_slots, p);
+#else
   cpd_memory_single_pup(slot_first, p);
+#endif
   pup_syncComment(p, pup_sync_end_array, 0);
 }
 
+/*
 void check_memory_leaks(CpdListItemsRequest *);
 void cpd_memory_leak(void *iterParam, pup_er p, CpdListItemsRequest *req) {
   if (pup_isSizing(p)) {
@@ -176,11 +217,12 @@ void cpd_memory_leak(void *iterParam, pup_er p, CpdListItemsRequest *req) {
   }
   cpd_memory_pup(iterParam, p, req);
 }
+*/
 
 int cpd_memory_getLength(void *lenParam) { return 1; }
 void cpd_memory_get(void *iterParam, pup_er p, CpdListItemsRequest *req) {
   void *userData = (void*)(((unsigned int)req->lo) + (((unsigned long)req->hi)<<32));
-  Slot *sl = ((Slot*)userData)-1;
+  Slot *sl = UserToSlot(userData);
   CpdListBeginItem(p, 0);
   pup_comment(p, "size");
   //printf("value: %x %x %x %d\n",sl->magic, sl->magic&~FLAGS_MASK, SLOTMAGIC, ((sl->magic&~FLAGS_MASK) != SLOTMAGIC));
@@ -198,37 +240,48 @@ void cpd_memory_get(void *iterParam, pup_er p, CpdListItemsRequest *req) {
 
 int charmEnvelopeSize = 0;
 
+#include "pcqueue.h"
+
+#ifdef CMK_SEPARATE_SLOT
+#define SLOTSPACE 0
+#define SLOT_ITERATE(scanner) \
+  CkHashtableIterator_c hashiter = CkHashtableGetIterator(block_slots); \
+  void *key; \
+  while ((scanner = (Slot *)CkHashtableIteratorNext(hashiter, &key)) != NULL)
+#else
+#define SLOTSPACE sizeof(Slot)
+#define SLOT_ITERATE(scanner) \
+  for (scanner=slot_first->next; scanner!=slot_first; scanner=scanner->next)
+#endif
+
 // FIXME: this function assumes that all memory is allocated in slot_unknown!
-void check_memory_leaks(CpdListItemsRequest *req) {
-  FILE* fd=fopen("check_memory_leaks", "w");
+void check_memory_leaks(LeakSearchInfo *info) {
+  memory_charmdebug_internal = 1;
+  //FILE* fd=fopen("check_memory_leaks", "w");
   // Step 1)
   // index all memory into a CkHashtable, with a scan of 4 bytes.
   CkHashtable_c table;
-  Slot leaking, inProgress;
+  PCQueue inProgress = PCQueueCreate();
   Slot *sl, **fnd, *found;
   char *scanner;
   char *begin_stack, *end_stack;
-  char *begin_data, *end_data;
-  char *begin_bss, *end_bss;
+  //char *begin_data, *end_data;
+  //char *begin_bss, *end_bss;
   int growing_dimension = 0;
 
   // copy all the memory from "slot_first" to "leaking"
-  slot_first->next->prev = &leaking;
-  slot_first->prev->next = &leaking;
-  leaking.prev = slot_first->prev;
-  leaking.next = slot_first->next;
-  slot_first->next = slot_first;
-  slot_first->prev = slot_first;
 
+  Slot *slold1=0, *slold2=0, *slold3=0;
   table = CkCreateHashtable_pointer(sizeof(char *), 10000);
-  for (sl = leaking.next; sl != &leaking; sl = sl->next) {
+  SLOT_ITERATE(sl) {
     // index the i-th memory slot
+    //printf("hashing slot %p\n",sl);
     char *ptr;
     sl->magic |= LEAK_FLAG;
-    if (req->lo > 0) {
+    if (info->quick > 0) {
       //CmiPrintf("checking memory fast\n");
       // means index only specific offsets of the memory region
-      ptr = ((char*)sl)+sizeof(Slot);
+      ptr = SlotToUser(sl);
       char **object = (char**)CkHashtablePut(table, &ptr);
       *object = (char*)sl;
       ptr += 4;
@@ -236,26 +289,26 @@ void check_memory_leaks(CpdListItemsRequest *req) {
       *object = (char*)sl;
       // beginning of converse header
       ptr += sizeof(CmiChunkHeader) - 4;
-      if (ptr < ((char*)sl)+2*sizeof(Slot)+sl->userSize) {
+      if (ptr < SlotToUser(sl)+sizeof(Slot)+sl->userSize) {
         object = (char**)CkHashtablePut(table, &ptr);
         *object = (char*)sl;
       }
       // beginning of charm header
       ptr += CmiReservedHeaderSize;
-      if (ptr < ((char*)sl)+2*sizeof(Slot)+sl->userSize) {
+      if (ptr < SlotToUser(sl)+sizeof(Slot)+sl->userSize) {
         object = (char**)CkHashtablePut(table, &ptr);
         *object = (char*)sl;
       }
       // beginning of ampi header
       ptr += charmEnvelopeSize - CmiReservedHeaderSize;
-      if (ptr < ((char*)sl)+2*sizeof(Slot)+sl->userSize) {
+      if (ptr < SlotToUser(sl)+sizeof(Slot)+sl->userSize) {
         object = (char**)CkHashtablePut(table, &ptr);
         *object = (char*)sl;
       }
     } else {
       //CmiPrintf("checking memory extensively\n");
       // means index every fourth byte of the memory region
-      for (ptr = ((char*)sl)+sizeof(Slot); ptr < ((char*)sl)+sizeof(Slot)+sl->userSize; ptr+=sizeof(char*)) {
+      for (ptr = SlotToUser(sl); ptr <= SlotToUser(sl)+sl->userSize; ptr+=sizeof(char*)) {
         //printf("memory %p\n",ptr);
         //growing_dimension++;
         //if ((growing_dimension&0xFF) == 0) printf("inserted %d objects\n",growing_dimension);
@@ -263,6 +316,9 @@ void check_memory_leaks(CpdListItemsRequest *req) {
         *object = (char*)sl;
       }
     }
+    slold3 = slold2;
+    slold2 = slold1;
+    slold1 = sl;
   }
 
   // Step 2)
@@ -271,20 +327,18 @@ void check_memory_leaks(CpdListItemsRequest *req) {
   // the stack grows toward decreasing addresses). The pointers to the global
   // data (segments .data and .bss) are passed in with "req" as the "extra"
   // field, with the structure "begin .data", "end .data", "begin .bss", "end .bss".
-  inProgress.prev = &inProgress;
-  inProgress.next = &inProgress;
   begin_stack = (char*)&table;
   end_stack = (char*)memory_stack_top;
-  if (req->extraLen != 4*4/*sizeof(char*) FIXME: assumes 64 bit addresses of .data and .bss are small enough*/) {
+  /*if (req->extraLen != 4*4 / *sizeof(char*) FIXME: assumes 64 bit addresses of .data and .bss are small enough * /) {
     CmiPrintf("requested for a memory leak check with wrong information! %d bytes\n",req->extraLen);
-  }
-  //if (sizeof(char*) == 4) {
-    /* 32 bit addresses; for 64 bit machines it assumes the following addresses were small enough */
+  }*/
+  /*if (sizeof(char*) == 4) {
+    / * 32 bit addresses; for 64 bit machines it assumes the following addresses were small enough * /
     begin_data = (char*)ntohl(((int*)(req->extra))[0]);
     end_data = (char*)ntohl(((int*)(req->extra))[1]) - sizeof(char*) + 1;
     begin_bss = (char*)ntohl(((int*)(req->extra))[2]);
     end_bss = (char*)ntohl(((int*)(req->extra))[3]) - sizeof(char*) + 1;
-  /*} else {
+  / *} else {
     CmiAbort("not ready yet");
     begin_data = ntohl(((char**)(req->extra))[0]);
     end_data = ntohl(((char**)(req->extra))[1]) - sizeof(char*) + 1;
@@ -300,19 +354,14 @@ void check_memory_leaks(CpdListItemsRequest *req) {
       /* mark slot as not leak */
       //printf("stack pointing to %p\n",found+1);
       found->magic &= ~LEAK_FLAG;
-      /* move the slot a inProgress */
-      found->next->prev = found->prev;
-      found->prev->next = found->next;
-      found->next = inProgress.next;
-      found->prev = &inProgress;
-      found->next->prev = found;
-      found->prev->next = found;
+      /* move the slot into inProgress */
+      PCQueuePush(inProgress, (char*)found);
     }
   }
-  printf("scanning data from %p (%d) to %p (%d)\n",begin_data,begin_data,end_data,end_data);
-  for (scanner = begin_data; scanner < end_data; scanner+=sizeof(char*)) {
+  printf("scanning data from %p (%d) to %p (%d)\n",info->begin_data,info->begin_data,info->end_data,info->end_data);
+  for (scanner = info->begin_data; scanner < info->end_data; scanner+=sizeof(char*)) {
     //fprintf(fd, "scanner = %p\n",scanner);
-    fflush(fd);
+    //fflush(fd);
     fnd = (Slot**)CkHashtableGet(table, scanner);
     //if (fnd != NULL) printf("scanning data %p, %d\n",*fnd,isLeakSlot(*fnd));
     if (fnd != NULL && isLeakSlot(*fnd)) {
@@ -320,17 +369,12 @@ void check_memory_leaks(CpdListItemsRequest *req) {
       /* mark slot as not leak */
       //printf("data pointing to %p\n",found+1);
       found->magic &= ~LEAK_FLAG;
-      /* move the slot a inProgress */
-      found->next->prev = found->prev;
-      found->prev->next = found->next;
-      found->next = inProgress.next;
-      found->prev = &inProgress;
-      found->next->prev = found;
-      found->prev->next = found;
+      /* move the slot into inProgress */
+      PCQueuePush(inProgress, (char*)found);
     }
   }
-  printf("scanning bss from %p (%d) to %p (%d)\n",begin_bss,begin_bss,end_bss,end_bss);
-  for (scanner = begin_bss; scanner < end_bss; scanner+=sizeof(char*)) {
+  printf("scanning bss from %p (%d) to %p (%d)\n",info->begin_bss,info->begin_bss,info->end_bss,info->end_bss);
+  for (scanner = info->begin_bss; scanner < info->end_bss; scanner+=sizeof(char*)) {
     //printf("bss: %p %p\n",scanner,*(char**)scanner);
     fnd = (Slot**)CkHashtableGet(table, scanner);
     //if (fnd != NULL) printf("scanning bss %p, %d\n",*fnd,isLeakSlot(*fnd));
@@ -339,47 +383,29 @@ void check_memory_leaks(CpdListItemsRequest *req) {
       /* mark slot as not leak */
       //printf("bss pointing to %p\n",found+1);
       found->magic &= ~LEAK_FLAG;
-      /* move the slot a inProgress */
-      found->next->prev = found->prev;
-      found->prev->next = found->next;
-      found->next = inProgress.next;
-      found->prev = &inProgress;
-      found->next->prev = found;
-      found->prev->next = found;
+      /* move the slot into inProgress */
+      PCQueuePush(inProgress, (char*)found);
     }
   }
 
   // Step 3)
   // continue iteratively to check the memory by sweeping it with the
   // "inProcess" list
-  while (inProgress.next != &inProgress) {
-    sl = inProgress.next;
-    printf("scanning memory %p of size %d\n",sl,sl->userSize);
-    /* move slot back to the main list (slot_first) */
-    sl->next->prev = sl->prev;
-    sl->prev->next = sl->next;
-    sl->next = slot_first->next;
-    sl->prev = slot_first;
-    sl->next->prev = sl;
-    sl->prev->next = sl;
+  while ((sl = (Slot *)PCQueuePop(inProgress)) != NULL) {
+    //printf("scanning memory %p of size %d\n",sl,sl->userSize);
     /* scan through this memory and pick all the slots which are still leaking
        and add them to the inProgress list */
     if (sl->extraStack != NULL && sl->extraStack->protectedMemory != NULL) mprotect(sl->extraStack->protectedMemory, sl->extraStack->protectedMemoryLength, PROT_READ);
-    for (scanner = ((char*)sl)+sizeof(Slot); scanner < ((char*)sl)+sizeof(Slot)+sl->userSize-sizeof(char*)+1; scanner+=sizeof(char*)) {
+    for (scanner = SlotToUser(sl); scanner < SlotToUser(sl)+sl->userSize-sizeof(char*)+1; scanner+=sizeof(char*)) {
       fnd = (Slot**)CkHashtableGet(table, scanner);
       //if (fnd != NULL) printf("scanning heap %p, %d\n",*fnd,isLeakSlot(*fnd));
       if (fnd != NULL && isLeakSlot(*fnd)) {
-	found = *fnd;
-	/* mark slot as not leak */
-	//printf("heap pointing to %p\n",found+1);
-	found->magic &= ~LEAK_FLAG;
-	/* move the slot a inProgress */
-	found->next->prev = found->prev;
-	found->prev->next = found->next;
-	found->next = inProgress.next;
-	found->prev = &inProgress;
-	found->next->prev = found;
-	found->prev->next = found;
+        found = *fnd;
+        /* mark slot as not leak */
+        //printf("heap pointing to %p\n",found+1);
+        found->magic &= ~LEAK_FLAG;
+        /* move the slot into inProgress */
+        PCQueuePush(inProgress, (char*)found);
       }
     }
     if (sl->extraStack != NULL && sl->extraStack->protectedMemory != NULL) mprotect(sl->extraStack->protectedMemory, sl->extraStack->protectedMemoryLength, PROT_NONE);
@@ -387,12 +413,12 @@ void check_memory_leaks(CpdListItemsRequest *req) {
 
   // Step 4)
   // move back all the entries in leaking to slot_first
-  if (leaking.next != &leaking) {
+  /*if (leaking.next != &leaking) {
     leaking.next->prev = slot_first;
     leaking.prev->next = slot_first->next;
     slot_first->next->prev = leaking.prev;
     slot_first->next = leaking.next;
-  }
+  }*/
 
 
   // mark all the entries in the leaking list as leak, and put them back
@@ -406,10 +432,13 @@ void check_memory_leaks(CpdListItemsRequest *req) {
     leaking.prev->next = slot_first->next;
     leaking.next->prev = slot_first;
     slot_first->next = leaking.next;
-  }  
+  }
   */
 
+  PCQueueDestroy(inProgress);
   CkDeleteHashtable(table);
+
+  memory_charmdebug_internal = 0;
 }
 
 /****************** memory allocation tree ******************/
@@ -459,7 +488,7 @@ void pupAllocationPointSingle(pup_er p, AllocationPoint *node, int *numChildren)
   AllocationPoint *child;
   for (child = node->firstChild; child != NULL; child = child->sibling) (*numChildren) ++;
   pup_int(p, numChildren);
- 
+
 }
 
 // TODO: the following pup does not work for unpacking!
@@ -485,7 +514,7 @@ void printAllocationTree(AllocationPoint *node, FILE *fd, int depth) {
   if (node==NULL) return;
   int numChildren = 0;
   AllocationPoint *child;
-  for (child = node->firstChild; child != NULL; child = child->sibling) numChildren ++; 
+  for (child = node->firstChild; child != NULL; child = child->sibling) numChildren ++;
   for (i=0; i<depth; ++i) fprintf(fd, " ");
   fprintf(fd, "node %p: bytes=%d, count=%d, child=%d\n",node->key,node->size,node->count,numChildren);
   printAllocationTree(node->sibling, fd, depth);
@@ -499,8 +528,7 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
   AllocationPoint *parent, **start, *cur;
   AllocationPoint *root = NULL;
   int numNodes = 0;
-  
-  scanner=slot_first->next;
+
   table = CkCreateHashtable_pointer(sizeof(char *), 10000);
 
   root = (AllocationPoint*) mm_malloc(sizeof(AllocationPoint));
@@ -515,7 +543,7 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
   root->sibling = NULL;
   root->next = root;
 
-  for ( ; scanner!=slot_first; scanner=scanner->next) {
+  SLOT_ITERATE(scanner) {
     parent = root;
     for (i=scanner->stackLen-1; i>=0; --i) {
       isnew = 0;
@@ -559,7 +587,7 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
       parent = cur;
     }
   }
-  
+
   char filename[100];
   sprintf(filename, "allocationTree_%d", CmiMyPe());
   FILE *fd = fopen(filename, "w");
@@ -582,12 +610,12 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
   }
   fprintf(fd, "}\n");
   fclose(fd);
-  
+
   sprintf(filename, "allocationTree_%d.tree", CmiMyPe());
   fd = fopen(filename, "w");
   printAllocationTree(root, fd, 0);
   fclose(fd);
- 
+
   CkDeleteHashtable(table);
   if (nodesCount != NULL) *nodesCount = numNodes;
   return root;
@@ -641,6 +669,109 @@ void * MergeAllocationTree(void *data, void **remoteData, int numRemote) {
   return data;
 }
 
+/******* Memory statistics *********/
+
+typedef struct MemStatSingle {
+  // [0] is total, [1] is the leaking part
+  int pe;
+  int sizes[2][5];
+  int counts[2][5];
+} MemStatSingle;
+
+typedef struct MemStat {
+  int count;
+  MemStatSingle array[1];
+} MemStat;
+
+void pupMemStat(pup_er p, void *st) {
+  int i;
+  MemStat *comb = (MemStat*)st;
+  pup_fmt_sync_begin_object(p);
+  pup_comment(p, "count");
+  pup_int(p, &comb->count);
+  pup_comment(p, "list");
+  pup_fmt_sync_begin_array(p);
+  for (i=0; i<comb->count; ++i) {
+    MemStatSingle *stat = &comb->array[i];
+    pup_fmt_sync_item(p);
+    pup_comment(p, "pe");
+    pup_int(p, &stat->pe);
+    pup_comment(p, "totalsize");
+    pup_ints(p, stat->sizes[0], 5);
+    pup_comment(p, "totalcount");
+    pup_ints(p, stat->counts[0], 5);
+    pup_comment(p, "leaksize");
+    pup_ints(p, stat->sizes[1], 5);
+    pup_comment(p, "leakcount");
+    pup_ints(p, stat->counts[1], 5);
+  }
+  pup_fmt_sync_end_array(p);
+  pup_fmt_sync_end_object(p);
+}
+
+void deleteMemStat(void *ptr) {
+  mm_free(ptr);
+}
+
+static int memStatReturnOnlyOne = 1;
+void * mergeMemStat(void *data, void **remoteData, int numRemote) {
+  int i,j,k;
+  if (memStatReturnOnlyOne) {
+    MemStatSingle *l = &((MemStat*) data)->array[0];
+    l->pe = -1;
+    MemStat r;
+    MemStatSingle *m = &r.array[0];
+    for (i=0; i<numRemote; ++i) {
+      pup_er p = pup_new_fromMem(remoteData[i]);
+      pupMemStat(p, &r);
+      for (j=0; j<2; ++j) {
+        for (k=0; k<5; ++k) {
+          l->sizes[j][k] += m->sizes[j][k];
+          l->counts[j][k] += m->counts[j][k];
+        }
+      }
+    }
+    return data;
+  } else {
+    MemStat *l = (MemStat*)data;
+    int count = l->count;
+    for (i=0; i<numRemote; ++i) count += ((MemStat*)remoteData[i])->count;
+    MemStat *result = (MemStat*)mm_malloc(sizeof(MemStat) + (count-1)*sizeof(MemStatSingle));
+    memset(result, 0, sizeof(MemStat)+(count-1)*sizeof(MemStatSingle));
+    result->count = count;
+    memcpy(result->array, l->array, l->count*sizeof(MemStatSingle));
+    count = l->count;
+    MemStat r;
+    for (i=0; i<numRemote; ++i) {
+      pup_er p = pup_new_fromMem(remoteData[i]);
+      pupMemStat(p, &r);
+      memcpy(&result->array[count], r.array, r.count*sizeof(MemStatSingle));
+      count += r.count;
+    }
+    deleteMemStat(data);
+    return result;
+  }
+}
+
+MemStat * CreateMemStat() {
+  Slot *cur;
+  MemStat *st = (MemStat*)mm_calloc(1, sizeof(MemStat));
+  st->count = 1;
+  MemStatSingle *stat = &st->array[0];
+  SLOT_ITERATE(cur) {
+    stat->sizes[0][(cur->magic&0x7)] += cur->userSize;
+    stat->counts[0][(cur->magic&0x7)] ++;
+    if (cur->magic & 0x8) {
+      stat->sizes[1][(cur->magic&0x7)] += cur->userSize;
+      stat->counts[1][(cur->magic&0x7)] ++;
+    }
+  }
+  stat->pe=CmiMyPe();
+  return st;
+}
+
+
+void *lastMemoryAllocated = NULL;
 Slot **allocatedSince = NULL;
 int allocatedSinceSize;
 int allocatedSinceMaxSize = 0;
@@ -650,21 +781,29 @@ int CpdMemBackup = 0;
 
 void backupMemory() {
   Slot *cur;
-  if (*memoryBackup != NULL) 
+  if (*memoryBackup != NULL)
     CmiAbort("memoryBackup != NULL\n");
 
-  int totalMemory = sizeof(Slot);
-  for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
-    totalMemory += sizeof(Slot) + cur->userSize + cur->stackLen*sizeof(void*);
+  int totalMemory = SLOTSPACE;
+  SLOT_ITERATE(cur) {
+    totalMemory += SLOTSPACE + cur->userSize + cur->stackLen*sizeof(void*);
   }
-  
   if (reportMEM) CmiPrintf("CPD: total memory in use (%d): %d\n",CmiMyPe(),totalMemory);
   *memoryBackup = mm_malloc(totalMemory);
+
+#ifndef CMK_SEPARATE_SLOT
   memcpy(*memoryBackup, slot_first, sizeof(Slot));
   char * ptr = *memoryBackup + sizeof(Slot);
-  for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
-    int tocopy = sizeof(Slot) + cur->userSize + cur->stackLen*sizeof(void*);
-    memcpy(ptr, cur, tocopy);
+#endif
+  SLOT_ITERATE(cur) {
+    int tocopy = SLOTSPACE + cur->userSize + cur->stackLen*sizeof(void*);
+    char *data = (char *)cur;
+#ifdef CMK_SEPARATE_SLOT
+    memcpy(ptr, cur, sizeof(Slot));
+    ptr += sizeof(Slot);
+    data = SlotToUser(cur);
+#endif
+    memcpy(ptr, data, tocopy);
     cur->magic &= ~ (NEW_BLOCK | MODIFIED);
     ptr += tocopy;
   }
@@ -672,9 +811,10 @@ void backupMemory() {
 }
 
 void checkBackup() {
+#ifndef CMK_SEPARATE_SLOT
   Slot *cur = slot_first->next;
   char *ptr = *memoryBackup + sizeof(Slot);
-  
+
   // skip over the new allocated blocks
   //while (cur != ((Slot*)*memoryBackup)->next) cur = cur->next;
   int idx = allocatedSinceSize-1;
@@ -685,7 +825,7 @@ void checkBackup() {
       idx --;
     }
   }
-  
+
   while (cur != slot_first) {
     // ptr is the old copy of cur
     if (memory_chare_id != cur->chareID) {
@@ -695,7 +835,7 @@ void checkBackup() {
         if (reportMEM) CmiPrintf("CPD: Object %d modified memory of object %d for %p on pe %d\n",memory_chare_id,cur->chareID,cur+1,CmiMyPe());
       }
     }
-    
+
     // advance to next, skipping deleted memory blocks
     cur = cur->next;
     char *last;
@@ -705,6 +845,7 @@ void checkBackup() {
     } while (((Slot*)last)->next != cur);
   }
 
+#endif
   mm_free(*memoryBackup);
   *memoryBackup = NULL;
 }
@@ -740,7 +881,7 @@ void resetSlotCRC(void *userPtr) {
 void ResetAllCRC() {
   Slot *cur;
 
-  for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
+  SLOT_ITERATE(cur) {
     resetUserCRC(cur+1);
     resetSlotCRC(cur+1);
   }
@@ -750,7 +891,7 @@ void CheckAllCRC(int report) {
   Slot *cur;
   unsigned int crc1, crc2;
 
-  for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
+  SLOT_ITERATE(cur) {
     crc1 = crc32((unsigned char*)cur, sizeof(Slot)-2*sizeof(unsigned int));
     crc1 = crc32_update((unsigned char*)cur->from, cur->stackLen*sizeof(void*), crc1);
     crc2 = crc32((unsigned char*)SlotToUser(cur), cur->userSize);
@@ -768,23 +909,28 @@ void CpdResetMemory() {
   if (CpdCRC32) ResetAllCRC();
 #ifdef CPD_USE_MMAP
   Slot *cur;
-  for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
+  SLOT_ITERATE(cur) {
     if (cur->chareID != memory_chare_id && cur->chareID > 0) {
-      mprotect(cur, cur->userSize+sizeof(Slot)+cur->stackLen*sizeof(void*), PROT_READ);
+      mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
     }
   }
 #endif
 }
 
 void CpdCheckMemory(int report) {
-#ifdef CPD_USE_MMAP
   Slot *cur;
-  for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
-    mprotect(cur, cur->userSize+sizeof(Slot)+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+#ifdef CPD_USE_MMAP
+  SLOT_ITERATE(cur) {
+    mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
   }
 #endif
   if (CpdCRC32) CheckAllCRC(report);
   if (CpdMemBackup) checkBackup();
+  SLOT_ITERATE(cur) {
+    if (cur->magic == SLOTMAGIC_FREED) CmiAbort("SLOT deallocate in list");
+    if (cur->from == NULL) printf("SLOT %p has no stack\n",cur);
+    if (cur->next == NULL) printf("SLOT %p has null next!\n",cur);
+  }
 }
 
 int cpdInSystem;
@@ -793,9 +939,9 @@ void CpdSystemEnter() {
 #ifdef CPD_USE_MMAP
   Slot *cur;
   if (++cpdInSystem == 1)
-    for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
+    SLOT_ITERATE(cur) {
       if (cur->chareID == 0) {
-        mprotect(cur, cur->userSize+sizeof(Slot)+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+        mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
       }
     }
 #endif
@@ -805,9 +951,9 @@ void CpdSystemExit() {
 #ifdef CPD_USE_MMAP
   Slot *cur;
   if (--cpdInSystem == 0)
-    for (cur = slot_first->next; cur != slot_first; cur = cur->next) {
+    SLOT_ITERATE(cur) {
       if (cur->chareID == 0) {
-        mprotect(cur, cur->userSize+sizeof(Slot)+cur->stackLen*sizeof(void*), PROT_READ);
+        mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
       }
     }
 #endif
@@ -875,20 +1021,30 @@ static int numStackFrames; // the number of frames presetn in stackFrames - 4 (t
 static void *stackFrames[MAX_STACK_FRAMES];
 
 /* Write a valid slot to this field */
-static void *setSlot(Slot *s,int userSize) {
-  char *user=SlotToUser(s);
-  
+static void *setSlot(Slot **sl,int userSize) {
+#ifdef CMK_SEPARATE_SLOT
+  char *user = *sl;
+  Slot *s = (Slot *)CkHashtablePut(block_slots, sl);
+  *sl = s;
+
+  s->userData = user;
+#else
+  Slot *s = *sl;
+  char *user=(char*)(s+1);
+
   /* Splice into the slot list just past the head */
   s->next=slot_first->next;
   s->prev=slot_first;
   s->next->prev=s;
   s->prev->next=s;
+
   if (CpdCRC32) {
     /* fix crc for previous and next block */
     resetSlotCRC(s->next + 1);
     resetSlotCRC(s->prev + 1);
   }
-  
+#endif
+
   /* Set the last 4 bits of magic to classify the memory together with the magic */
   s->magic=SLOTMAGIC + NEW_BLOCK + (memory_status_info>0? USER_TYPE : SYSTEM_TYPE);
   //if (memory_status_info>0) printf("user allocation\n");
@@ -900,7 +1056,7 @@ static void *setSlot(Slot *s,int userSize) {
   s->stackLen=numStackFrames;
   s->from=(void**)(user+userSize);
   memcpy(s->from, &stackFrames[4], numStackFrames*sizeof(void*));
-  
+
   unsigned int crc = crc32((unsigned char*)s, sizeof(Slot)-2*sizeof(unsigned int));
   s->slotCRC = crc32_update((unsigned char*)s->from, numStackFrames*sizeof(void*), crc);
   s->userCRC = crc32((unsigned char*)user, userSize);
@@ -912,11 +1068,22 @@ static void *setSlot(Slot *s,int userSize) {
     }
     allocatedSince[allocatedSinceSize++] = s;
   }
+  lastMemoryAllocated = user;
+
+#ifdef CMK_SEPARATE_SLOT
+  static int mallocFirstTime = 1;
+  if (mallocFirstTime) {
+    mallocFirstTime = 0;
+    block_slots = CkCreateHashtable_pointer(sizeof(_SeparateSlot), 10000);
+  }
+#endif
+
   return (void *)user;
 }
 
 /* Delete this slot structure */
 static void freeSlot(Slot *s) {
+#ifndef CMK_SEPARATE_SLOT
   /* Splice out of the slot list */
   s->next->prev=s->prev;
   s->prev->next=s->next;
@@ -926,6 +1093,7 @@ static void freeSlot(Slot *s) {
     resetSlotCRC(s->prev + 1);
   }
   s->prev=s->next=(Slot *)0;//0x0F00; why was it not 0?
+#endif
 
   s->magic=SLOTMAGIC_FREED;
   s->userSize=-1;
@@ -995,17 +1163,21 @@ static void meta_init(char **argv) {
   CpdDebug_pupAllocationPoint = pupAllocationPoint;
   CpdDebug_deleteAllocationPoint = deleteAllocationPoint;
   CpdDebug_MergeAllocationTree = MergeAllocationTree;
+  CpdDebugGetMemStat = (void* (*)(void))CreateMemStat;
+  CpdDebug_pupMemStat = pupMemStat;
+  CpdDebug_deleteMemStat = deleteMemStat;
+  CpdDebug_mergeMemStat = mergeMemStat;
   memory_allocated_user_total = 0;
   nextChareID = 1;
   slot_first->userSize = 0;
   slot_first->stackLen = 0;
-  if (CmiGetArgFlagDesc(argv,"+memory_report", "Print all cross-object violations")) { 
+  if (CmiGetArgFlagDesc(argv,"+memory_report", "Print all cross-object violations")) {
     reportMEM = 1;
   }
-  if (CmiGetArgFlagDesc(argv,"+memory_backup", "Backup all memory at every entry method")) { 
+  if (CmiGetArgFlagDesc(argv,"+memory_backup", "Backup all memory at every entry method")) {
     CpdMemBackup = 1;
   }
-  if (CmiGetArgFlagDesc(argv,"+memory_verbose", "Print all memory-related operations")) { 
+  if (CmiGetArgFlagDesc(argv,"+memory_verbose", "Print all memory-related operations")) {
     recursive_call = 0;
   }
 #ifdef CPD_USE_MMAP
@@ -1018,71 +1190,79 @@ static void meta_init(char **argv) {
 }
 
 static void *meta_malloc(size_t size) {
-  dumpStackFrames();
+  void *user;
+  if (memory_charmdebug_internal==0) {
+    dumpStackFrames();
 #if CPD_USE_MMAP
-  Slot *s=(Slot *)mmap(NULL, sizeof(Slot)+size+numStackFrames*sizeof(void*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    Slot *s=(Slot *)mmap(NULL, SLOTSPACE+size+numStackFrames*sizeof(void*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #else
-  Slot *s=(Slot *)mm_malloc(sizeof(Slot)+size+numStackFrames*sizeof(void*));
+    Slot *s=(Slot *)mm_malloc(SLOTSPACE+size+numStackFrames*sizeof(void*));
 #endif
-  char *user = (char*)s;
-  if (s!=NULL) {
-    user = (char*)setSlot(s,size);
-    memory_allocated_user_total += size;
-    traceMalloc_c(user, size, s->from, s->stackLen);
-  }
-  if (recursive_call == 0) {
-    recursive_call = 1;
-    CmiPrintf("allocating %p: %d bytes\n",s,size);
-    recursive_call = 0;
+    if (s!=NULL) {
+      user = (char*)setSlot(&s,size);
+      memory_allocated_user_total += size;
+      traceMalloc_c(user, size, s->from, s->stackLen);
+    }
+    if (recursive_call == 0) {
+      recursive_call = 1;
+      CmiPrintf("allocating %p: %d bytes\n",s,size);
+      recursive_call = 0;
+    }
+  } else {
+    user = mm_malloc(size);
   }
   return user;
 }
 
 static void meta_free(void *mem) {
-  Slot *s;
-  if (mem==NULL) return; /*Legal, but misleading*/
+  if (memory_charmdebug_internal==0) {
+    Slot *s;
+    if (mem==NULL) return; /*Legal, but misleading*/
 #if CMK_MEMORY_BUILD_OS
-  /* In this situation, we can have frees that were not allocated by our malloc...
-   * for now simply skip over them. */
-  s=((Slot *)mem)-1;
-  if ((s->magic&~FLAGS_MASK) != SLOTMAGIC_VALLOC &&
-      (s->magic&~FLAGS_MASK) != SLOTMAGIC) {
-    mm_free(mem);
-    return;
-  }
+    /* In this situation, we can have frees that were not allocated by our malloc...
+     * for now simply skip over them. */
+    s=UserToSlot(mem);
+    if ((s->magic&~FLAGS_MASK) != SLOTMAGIC_VALLOC &&
+        (s->magic&~FLAGS_MASK) != SLOTMAGIC) {
+      mm_free(mem);
+      return;
+    }
 #endif
-  int memSize = 0;
-  if (mem!=NULL) memSize = (((Slot*)mem)-1)->userSize;
-  memory_allocated_user_total -= memSize;
-  traceFree_c(mem, memSize);
+    int memSize = 0;
+    if (mem!=NULL) memSize = UserToSlot(mem)->userSize;
+    memory_allocated_user_total -= memSize;
+    traceFree_c(mem, memSize);
 
-  s=((Slot *)mem)-1;
+    s=UserToSlot(mem);
 
-  if (recursive_call == 0) {
-    recursive_call = 1;
-    CmiPrintf("freeing %p\n",s);
-    recursive_call = 0;
-  }
-  
-  if ((s->magic&~FLAGS_MASK)==SLOTMAGIC_VALLOC)
-  { /*Allocated with special alignment*/
-    freeSlot(s);
-    mm_free(s->extraStack);
-    /*mm_free(((char *)mem)-meta_getpagesize());*/
-  }
-  else if ((s->magic&~FLAGS_MASK)==SLOTMAGIC) 
-  { /*Ordinary allocated block */
-    freeSlot(s);
+    if (recursive_call == 0) {
+      recursive_call = 1;
+      CmiPrintf("freeing %p\n",s);
+      recursive_call = 0;
+    }
+
+    if ((s->magic&~FLAGS_MASK)==SLOTMAGIC_VALLOC)
+    { /*Allocated with special alignment*/
+      freeSlot(s);
+      mm_free(s->extraStack);
+      /*mm_free(((char *)mem)-meta_getpagesize());*/
+    }
+    else if ((s->magic&~FLAGS_MASK)==SLOTMAGIC)
+    { /*Ordinary allocated block */
+      freeSlot(s);
 #if CPD_USE_MMAP
-    munmap(s, sizeof(Slot)+s->userSize+s->stackLen*sizeof(void*));
+      munmap(s, SLOTSPACE+s->userSize+s->stackLen*sizeof(void*));
 #else
-    mm_free(s);
+      mm_free(s);
 #endif
+    }
+    else if (s->magic==SLOTMAGIC_FREED)
+      CmiAbort("Free'd block twice");
+    else /*Unknown magic number*/
+      CmiAbort("Free'd non-malloc'd block");
+  } else {
+    mm_free(mem);
   }
-  else if (s->magic==SLOTMAGIC_FREED)
-    CmiAbort("Free'd block twice");
-  else /*Unknown magic number*/
-    CmiAbort("Free'd non-malloc'd block");
 }
 
 static void *meta_calloc(size_t nelem, size_t size) {
@@ -1112,20 +1292,20 @@ static void *meta_realloc(void *oldBuffer, size_t newSize) {
 
 static void *meta_memalign(size_t align, size_t size) {
   int overhead = align;
-  while (overhead < sizeof(Slot)+sizeof(SlotStack)) overhead += align;
+  while (overhead < SLOTSPACE+sizeof(SlotStack)) overhead += align;
   /* Allocate the required size + the overhead needed to keep the user alignment */
   dumpStackFrames();
-  
+
   char *alloc=(char *)mm_memalign(align,overhead+size+numStackFrames*sizeof(void*));
-  Slot *s=(Slot *)(alloc+overhead-sizeof(Slot));  
-  void *user=setSlot(s,size);
+  Slot *s=(Slot*)(alloc+overhead-SLOTSPACE);
+  void *user=setSlot(&s,size);
   s->magic = SLOTMAGIC_VALLOC + (s->magic&0xF);
   s->extraStack = (SlotStack *)alloc; /* use the extra space as stack */
   s->extraStack->protectedMemory = NULL;
   s->extraStack->protectedMemoryLength = 0;
   memory_allocated_user_total += size;
   traceMalloc_c(user, size, s->from, s->stackLen);
-  return user;  
+  return user;
 }
 
 static void *meta_valloc(size_t size) {
@@ -1133,7 +1313,7 @@ static void *meta_valloc(size_t size) {
 }
 
 void setProtection(char* mem, char *ptr, int len, int flag) {
-  Slot *sl = (Slot*)(mem-sizeof(Slot));
+  Slot *sl = UserToSlot(mem);
   if (sl->extraStack == NULL) CmiAbort("Tried to protect memory not memaligned\n");
   if (flag != 0) {
     sl->extraStack->protectedMemory = ptr;
