@@ -14,20 +14,6 @@
 
 #include "middle.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-#ifndef CMK_OPTIMIZE
-extern void setMemoryTypeChare(void*); /* for memory debugging */
-extern void setMemoryTypeMessage(void*); /* for memory debugging */
-#else
-#define setMemoryTypeChare(p) /* empty memory debugging method */
-#define setMemoryTypeMessage(p) /* empty memory debugging method */
-#endif
-#ifdef __cplusplus
-}
-#endif
-
 class CMessage_CkArgMsg {
 public: static int __idx;
 };
