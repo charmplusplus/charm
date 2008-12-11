@@ -10,7 +10,8 @@
 #include <vector>
 #include <utility>
 #include <limits>
-#include <sys/time.h>
+//#include <sys/time.h>
+#include <float.h>
 
 #include "ControlPoints.decl.h"
 #include "trace-controlPoints.h"
@@ -32,6 +33,10 @@ using namespace std;
 #define CONTROL_POINT_SAMPLE_PERIOD 4000
 #define NUM_SAMPLES_BEFORE_TRANSISTION 5
 #define OPTIMIZER_TRANSITION 5
+
+#define WRITEDATAFILE 1
+
+
 
 static void periodicProcessControlPoints(void* ptr, double currWallTime);
 
@@ -404,7 +409,11 @@ public:
     int total_count = 0;
 
     instrumentedPhase best_phase;
+#if OLDMAXDOUBLE
     double best_phase_avgtime = std::numeric_limits<double>::max();
+#else
+    double best_phase_avgtime = DBL_MAX;
+#endif
 
     int valid_phase_count = 0;
 
@@ -795,6 +804,8 @@ public:
 	  if(cpcount==0){
 	    CkPrintf("No control points are known to affect the critical path\n");
 	  } else {
+	    double beginTime = CmiWallTimer();
+
 	    CkPrintf("Attempting to modify control point values for %d control points that affect the critical path\n", controlPointsAffectingCriticalPath.size());
 	    
 	    newControlPoints = phase.controlPoints;
@@ -825,6 +836,9 @@ public:
 	      }
 
 	    }
+	   
+	    traceRegisterUserEvent("Adjusting control points affecting critical path ***", 101); 
+	    traceUserBracketEvent(101, beginTime, CmiWallTimer());
 	    
 	  }
 	  
@@ -1130,9 +1144,16 @@ void gotoNextPhase(){
 class controlPointMain : public CBase_controlPointMain {
 public:
   controlPointMain(CkArgMsg* args){
+#if OLDRANDSEED
     struct timeval tp;
     gettimeofday(& tp, NULL);
     random_seed = (int)tp.tv_usec ^ (int)tp.tv_sec;
+#else
+    double time = CmiWallTimer();
+    int sec = (int)time;
+    int usec = (int)((time - (double)sec)*1000000.0);
+    random_seed =  sec ^ usec;
+#endif
 
     localControlPointManagerProxy = CProxy_controlPointManager::ckNew();
   }
