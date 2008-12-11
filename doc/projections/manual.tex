@@ -119,9 +119,8 @@ Prevents the runtime from tracing events (including all user events) on the loca
 \subsubsection{User Events}
 \label{sec::user events}
 
-\projections{} has a limited ability to visualize traceable user
-specified events. You can make use of the following API calls to do
-this. The general steps to do this are:
+\projections{} has the ability to visualize traceable user
+specified events. User events are usually displayed in the Timeline view as short vertical bars above the entry methods. Alternatively the user event can be displayed as a vertical bar that vertically spans all timelines. Follow these following basic steps for creating user events in a charm++ program:
 
 \begin{enumerate}
 \item
@@ -140,19 +139,14 @@ The functions available are as follows:
 
 This function registers a user event by associating {\tt EventNum} to
 {\tt EventDesc}. If {\tt EventNum} is not specified, a globally unique
-event identifier is obtained from the runtime and returned.
+event identifier is obtained from the runtime and returned. The string {\tt EventDesc} must either be a constant string, or it can be a dynamically allocated string that is {\bf NOT} freed by the program. If the {\tt EventDesc} contains a substring ``***'' then the Projections Timeline tool will draw the event vertically spanning all PE timelines.
 
-{\tt EventNum} has to be the same on all processors. There are 3 ways
-to ensure that, and correspondingly 3 ways to call the function:
+{\tt EventNum} has to be the same on all processors. Therefore use one of the following methods to ensure the same value for any PEs generating the user events:
 
 \begin{enumerate}
 \item
-Call {\tt traceRegisterUserEvent} on node 0 in main::main without specifying
+Call {\tt traceRegisterUserEvent} on PE 0 in main::main without specifying
 an event number, and store returned event number into a readonly variable.
-\item
-Call {\tt traceRegisterUserEvent} on all nodes without specifying an
-event number. The returned value is the common event number that is
-agreed on system-wide.
 \item
 Call {\tt traceRegisterUserEvent} and specify the event number on
 processor 0. Doing this on other processors would have no
@@ -164,32 +158,37 @@ Eg. {\tt traceRegisterUserEvent("Time Step Begin", 10);}
 
 Eg. {\tt eventID = traceRegisterUserEvent(``Time Step Begin'');}
 
+\end{itemize}
+
+
+
+There are two types of user events, differentiated by the call used to generate each:
+
+\begin{itemize}
+
+
 \item
 {\tt void traceUserEvent(int EventNum) }
 
-This function works like a marker, indicating an occurrence of a
-user-defined point event with the given {\tt EventNum}.
+This function creates a user event that marks a specific point in time, .
 
 Eg. {\tt traceUserEvent(10);}
 
 \item
 {\tt void traceUserBracketEvent(int EventNum, double StartTime, double EndTime) }
 
-This function records an event interval or activity identified by {\tt
-EventNum} that lasts the period of time between {\tt StartTime} and
-{\tt EndTime}. Both {\tt StartTime} and {\tt EndTime} can be obtained
-from function call {\tt CmiWallTimer()} in seconds.
+This function records a user event spanning a time interval from {\tt StartTime} to {\tt EndTime}. Both {\tt StartTime} and {\tt EndTime} should be obtained from a call to {\tt CmiWallTimer()} at the appropriate point in the program.
 
 Eg.
 \begin{verbatim}
-   traceRegisterUserEvent("Critical Code", 20);
-   double critStart;  // times of start
-   critStart = CmiWallTimer();
+   traceRegisterUserEvent("Critical Code", 20); // on PE 0
+   double critStart = CmiWallTimer();;  // start time
    // do the critical code
    traceUserBracketEvent(20, critStart,CmiWallTimer());
 \end{verbatim}
 
 \end{itemize}
+
 
 \subsubsection{Function-level Tracing for Adaptive MPI Applications}
 \label{sec::AMPI functions}
