@@ -979,9 +979,9 @@ LBTOPO_MACRO(LBTopo_4_arytree);
 
 class LBTopoMap {
 public:
-  char *name;
+  const char *name;
   LBtopoFn fn;
-  LBTopoMap(char *s, LBtopoFn f): name(s), fn(f) {}
+  LBTopoMap(const char *s, LBtopoFn f): name(s), fn(f) {}
   LBTopoMap(const LBTopoMap &p);		// You don't want to copy
   void operator=(const LBTopoMap &p);		// You don't want to copy
 };

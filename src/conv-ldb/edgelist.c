@@ -12,8 +12,7 @@
 
 extern VerticesListType graph;
 
-void * InitEdgeList(E)
-int E;
+void * InitEdgeList(int E)
 {
   EdgeListType * edgesRec;
 
@@ -25,11 +24,9 @@ int E;
   return(edgesRec);
 }
 
-void addEdge(EdgeList, v,w)
-     EdgeListType * EdgeList;
-     int v;
-     int w;
-{ int n, index;
+void addEdge(EdgeListType * EdgeList, int v, int w)
+{
+  int n, index;
   n = EdgeList->next;
   EdgeList->next++;
 
@@ -45,9 +42,9 @@ void addEdge(EdgeList, v,w)
    graph.vertexArray[w].degree++;
 }
 
-void printEdges(EdgeList)
-     EdgeListType * EdgeList;
-{int i;
+void printEdges(EdgeListType *EdgeList)
+{
+ int i;
  Edge * edges;
  edges = EdgeList->edges;
  for (i=0; i< (EdgeList->next ); i++)
@@ -55,7 +52,7 @@ void printEdges(EdgeList)
   }
 }
 
-int edgeExists(x,y)
+int edgeExists(int x, int y)
 {
   int i, ind;
   ind = graph.vertexArray[x].adjListInd; 
@@ -72,11 +69,9 @@ int edgeExists(x,y)
   connect v with y and x with w
 */
 
-void addspEdge(EdgeList, v,w)
-     EdgeListType * EdgeList;
-     int v;
-     int w;
-{ int n, index,i,x,y,ind;
+void addspEdge(EdgeListType * EdgeList, int v, int w)
+{ 
+  int n, index,i,x,y,ind;
   n = EdgeList->next;
   EdgeList->next++;
 

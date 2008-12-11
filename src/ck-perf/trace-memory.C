@@ -71,7 +71,7 @@ inline void TraceMemory::checkFlush(int increment) {
 inline void TraceMemory::flush() {
   traceDisabled = true;
   //CmiPrintf("[%d] TraceMemory::flush %d\n",CmiMyPe(),usedBuffer);
-  char *mode;
+  const char *mode;
   if (firstTime) mode = "w";
   else mode = "a";
   firstTime = 0;
