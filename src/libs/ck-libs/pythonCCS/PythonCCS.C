@@ -26,7 +26,7 @@ static PyObject *CkPy_printstr(PyObject *self, PyObject *args) {
 
 // TODO: This method should forward strings through PythonCCS mainchare instead
 // of replying directly
-static inline void Ck_printclient(PythonObject *object, CmiUInt4 ref, char* str) {
+static inline void Ck_printclient(PythonObject *object, CmiUInt4 ref, const char* str) {
   //  CmiLock(CsvAccess(pyLock));
   PythonStruct &worker = object->pyWorkers[ref];
   //PythonObject *pyWorker = ((*CsvAccess(pyWorkers))[pyReference]).object;
@@ -149,7 +149,7 @@ PyMethodDef PythonObject::CkPy_MethodsCustom[] = {
   {NULL,      NULL}        /* Sentinel */
 };
 
-char* PythonObject::CkPy_MethodsCustomDoc = "";
+const char* PythonObject::CkPy_MethodsCustomDoc = "";
 
 PyMethodDef CkPy_MethodsDefault[] = {
   {"printstr", CkPy_printstr, METH_VARARGS},

@@ -54,7 +54,7 @@ typedef std::map<CmiUInt4,PythonStruct> PythonTable;
 
 class PythonObject {
   static PyMethodDef CkPy_MethodsCustom[];
-  static char* CkPy_MethodsCustomDoc;
+  static const char* CkPy_MethodsCustomDoc;
  public:
   CmiUInt4 pyNumber;
   PythonTable pyWorkers;
@@ -74,7 +74,7 @@ class PythonObject {
   static void _callthr_executeThread(CkThrCallArg *impl_arg);
   void executeThread(PythonExecute *pyMsg);
   virtual PyMethodDef *getMethods() {return CkPy_MethodsCustom;}
-  virtual char *getMethodsDoc() {return CkPy_MethodsCustomDoc;}
+  virtual const char *getMethodsDoc() {return CkPy_MethodsCustomDoc;}
 
   PythonObject() : pyNumber(0) { replyIntFn=&PythonObject::replyIntValue; }
 
