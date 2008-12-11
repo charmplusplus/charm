@@ -1075,7 +1075,6 @@ static void ctrl_sendone_nolock(const char *type,
 				const char *data1,int dataLen1,
 				const char *data2,int dataLen2)
 {
-  MACHSTATE(5,"ctrl_sendone_nolock test ");
   const void *bufs[3]; int lens[3]; int nBuffers=0;
   ChMessageHeader hdr;
   skt_abortFn oldAbort=skt_set_abort(sendone_abort_fn);
