@@ -407,7 +407,7 @@ void FEM_Register_array_layout(int fem_mesh,int entity,int attr,void *data,int f
 	}
 }
 void FEM_Register_entity_impl(int fem_mesh,int entity,void *args,int len,int max,FEM_Mesh_alloc_fn fn){
-	char *caller = "FEM_Register_entity";
+	const char *caller = "FEM_Register_entity";
 	FEM_Mesh *m=FEM_Mesh_lookup(fem_mesh,caller);
 /*	if(!m->isSetting()){
 		CmiAbort("Register entity called on mesh that can't be written into");

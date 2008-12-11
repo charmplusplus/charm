@@ -580,7 +580,7 @@ void Chare::sharedDisambiguation(XStr &str,const XStr &super)
     genProxyNames(str,"      ",NULL,"::pup(p);\n","");
     str<<"    }\n";
     if (isPython()) {
-      str<<"    void registerPython(char *str) {\n";
+      str<<"    void registerPython(const char *str) {\n";
       str<<"      CcsRegisterHandler(str, CkCallback("<<Prefix::Index<<type<<"::pyRequest(0), ";//<<Prefix::Proxy<<type<<"(";
       //if (isArray()) str<<"ckGetArrayID()";
       //else if (isGroup()) str <<"ckGetGroupID()";
@@ -869,8 +869,8 @@ void Chare::genPythonDecls(XStr& str) {
   // define the python custom methods and their documentation
   str << "    static PyMethodDef CkPy_MethodsCustom[];\n";
   str << "    PyMethodDef *getMethods(void) {return CkPy_MethodsCustom;}\n";
-  str << "    static char *CkPy_MethodsCustomDoc;\n";
-  str << "    char *getMethodsDoc(void) {return CkPy_MethodsCustomDoc;}\n";
+  str << "    static const char *CkPy_MethodsCustomDoc;\n";
+  str << "    const char *getMethodsDoc(void) {return CkPy_MethodsCustomDoc;}\n";
 
   str << CIClassEnd;
 
@@ -893,7 +893,7 @@ void Chare::genPythonDefs(XStr& str) {
     list->genPythonStaticDefs(str);
   str << "  {NULL, NULL}\n};\n\n";
   // generate documentaion for the methods
-  str << "char * "<<ptype<<"::CkPy_MethodsCustomDoc = \"charm.__doc__ = \\\"Available methods for object "<<type<<":\\\\n\"";
+  str << "const char * "<<ptype<<"::CkPy_MethodsCustomDoc = \"charm.__doc__ = \\\"Available methods for object "<<type<<":\\\\n\"";
   if (list)
     list->genPythonStaticDocs(str);
   str << "\n  \"\\\"\";\n\n";

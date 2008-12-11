@@ -210,8 +210,8 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   
   void mallocClient(CkReductionMsg *msg);
   void resumeThread(void);
-  void startCheckpoint(char* dname);
-  void checkpoint(int len, char* dname);
+  void startCheckpoint(const char* dname);
+  void checkpoint(int len, const char* dname);
 };
 
 class AddressMsg : public CMessage_AddressMsg {

@@ -498,21 +498,21 @@ void ArmciVirtualProcessor::mallocClient(CkReductionMsg *msg) {
 // reduction client data - preparation for checkpointing
 class ckptClientStruct {
 public:
-  char *dname;
+  const char *dname;
   ArmciVirtualProcessor *vp;
-  ckptClientStruct(char *s, ArmciVirtualProcessor *p): dname(s), vp(p) {}
+  ckptClientStruct(const char *s, ArmciVirtualProcessor *p): dname(s), vp(p) {}
 };
 
 static void checkpointClient(void *param,void *msg)
 {       
   ckptClientStruct *client = (ckptClientStruct*)param;
-  char *dname = client->dname;
+  const char *dname = client->dname;
   ArmciVirtualProcessor *vp = client->vp;
   vp->checkpoint(strlen(dname), dname);
   delete client;
 }               
                 
-void ArmciVirtualProcessor::startCheckpoint(char* dname){
+void ArmciVirtualProcessor::startCheckpoint(const char* dname){
   if (thisIndex==0) {
     ckptClientStruct *clientData = new ckptClientStruct(dname, this);
     CkCallback cb(checkpointClient, clientData);
@@ -522,7 +522,7 @@ void ArmciVirtualProcessor::startCheckpoint(char* dname){
   }
   thread->suspend();
 }
-void ArmciVirtualProcessor::checkpoint(int len, char* dname){
+void ArmciVirtualProcessor::checkpoint(int len, const char* dname){
   if (len == 0) { // memory checkpoint
     CkCallback cb(CkIndex_ArmciVirtualProcessor::resumeThread(),thisProxy);
     CkStartMemCheckpoint(cb);
