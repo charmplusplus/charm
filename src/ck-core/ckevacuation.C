@@ -105,9 +105,10 @@ void CkStopScheduler(){
     IrrGroup *obj = CksvAccess(_nodeGroupTable)->find((CksvAccess(_nodeGroupIDTable))[i]).getObj();	
 		obj->doneEvacuate();
 	}
-	printf("[%d] Stopping Scheduler \n");
+	int thisPE = CkMyPe();
+	printf("[%d] Stopping Scheduler \n", thisPE);
 	/*stops putting messages into the scheduler queue*/
-	CpvAccess(_validProcessors)[CkMyPe()]=0;
+	CpvAccess(_validProcessors)[thisPE]=0;
 }
 
 void CkEmmigrateElement(void *arg){

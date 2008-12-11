@@ -200,7 +200,7 @@ extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
     fprintf(stsfp, "ENTRY CHARE %d %s %d %d\n", i, _entryTable[i]->name,
                  _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
   for(i=0;i<_msgTable.size();i++)
-    fprintf(stsfp, "MESSAGE %d %d\n", i, _msgTable[i]->size);
+    fprintf(stsfp, "MESSAGE %d %u\n", i, _msgTable[i]->size);
 }
 
 extern "C"
