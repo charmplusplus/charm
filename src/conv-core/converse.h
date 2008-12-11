@@ -1610,6 +1610,14 @@ CpvExtern(char *,_validProcessors);
 
 int CmiEndianness();
 
+#ifndef CMK_OPTIMIZE
+extern void setMemoryTypeChare(void*); /* for memory debugging */
+extern void setMemoryTypeMessage(void*); /* for memory debugging */
+#else
+#define setMemoryTypeChare(p) /* empty memory debugging method */
+#define setMemoryTypeMessage(p) /* empty memory debugging method */
+#endif
+
 #include "conv-cpm.h"
 #include "conv-cpath.h"
 #include "conv-qd.h"
@@ -1651,14 +1659,6 @@ extern int CmiGridQueueLookupMsg (char *msg);
 #endif
 
 #include "debug-conv.h"
-
-#ifndef CMK_OPTIMIZE
-extern void setMemoryTypeChare(void*); /* for memory debugging */
-extern void setMemoryTypeMessage(void*); /* for memory debugging */
-#else
-#define setMemoryTypeChare(p) /* empty memory debugging method */
-#define setMemoryTypeMessage(p) /* empty memory debugging method */
-#endif
 
 #if CMK_HAS_LOG2
 #define CmiLog2  log2
