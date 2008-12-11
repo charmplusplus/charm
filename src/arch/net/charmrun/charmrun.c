@@ -1553,8 +1553,9 @@ void write_stdio_duplicate(char* data) {
     }
     else {
       if (size+stdio_size >= stdio_alloc) {
+        char *newbuf;
         stdio_alloc += (size>4096 ? size : 4096);
-        char *newbuf = malloc(stdio_alloc);
+        newbuf = malloc(stdio_alloc);
         memcpy(newbuf, stdio_buffer, stdio_size);
         free(stdio_buffer);
         stdio_buffer = newbuf;
