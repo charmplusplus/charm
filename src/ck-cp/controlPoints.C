@@ -701,11 +701,11 @@ public:
       delete cb;
     }
     
-    
+
+    //==========================================================================================
+    // Print the data for each phase
     const int s = allData.phases.size();
-    
     CkPrintf("\n\nExamining critical paths and priorities and idle times (num phases=%d)\n", s );
-    
     for(int p=0;p<s;++p){
       const instrumentedPhase &phase = allData.phases[p];
       const idleTimeContainer &idle = phase.idleTime;
@@ -751,8 +751,16 @@ public:
     CkPrintf("\n\n");
 
 
-    if(s==5){
-      
+
+
+
+
+    //==========================================================================================
+    // If this is a phase during which we try to adapt control point values based on critical path
+
+    if( s%5 == 4){
+
+      // Find the most recent phase with valid critical path data and idle time measurements      
       int whichPhase=-1;
       for(int p=0; p<s; ++p){
 	const instrumentedPhase &phase = allData.phases[p];
@@ -821,7 +829,10 @@ public:
 	    
 	    
 	    // adjust the control points that can affect the critical path
-	    
+
+	    char textDescription[4096*2];
+	    textDescription[0] = '\0';
+
 	    std::map<string,int>::iterator newCP;
 	    for(newCP = newControlPoints.begin(); newCP != newControlPoints.end(); ++ newCP){
 	      if( controlPointsAffectingCriticalPath.count(newCP->first) > 0 ){
@@ -830,20 +841,31 @@ public:
 		if(newCP->second > lowerbound){
 		  newControlPointsAvailable = true;
   		  newCP->second --;
-		  CkPrintf("New control point \"%s\"=%d", newCP->first.c_str(), newCP->second);
 		}
-		
 	      }
-
 	    }
 	   
-	    traceRegisterUserEvent("Adjusting control points affecting critical path ***", 101); 
-	    traceUserBracketEvent(101, beginTime, CmiWallTimer());
+	    // Create a string for a projections user event
+	    if(1){
+	      std::map<string,int>::iterator newCP;
+	      for(newCP = newControlPoints.begin(); newCP != newControlPoints.end(); ++ newCP){
+		sprintf(textDescription+strlen(textDescription), "<br>\"%s\"=%d", newCP->first.c_str(), newCP->second);
+	      }
+	    }
+
+
+
+	    char *userEventString = new char[4096*2];
+	    sprintf(userEventString, "Adjusting control points affecting critical path: %s ***", textDescription);
+	    
+	    static int userEventCounter = 20000;
+	    CkPrintf("USER EVENT: %s\n", userEventString);
+	    
+	    traceRegisterUserEvent(userEventString, userEventCounter); 
+	    traceUserBracketEvent(userEventCounter, beginTime, CmiWallTimer());
+	    userEventCounter++;
 	    
 	  }
-	  
-	  
-
 	  
 	} else {
 	  CkPrintf("The application step(%lf) is dominated mostly by the critical path(%lf). GOOD\n",phase.times[medianCriticalPathIdx], path.getTotalTime() );
@@ -851,9 +873,9 @@ public:
 	
 	
       }
-            
+      
     }
-
+    
     CkPrintf("\n");
     
     
@@ -1252,19 +1274,31 @@ int valueProvidedByOptimizer(const char * name){
   const int phase_id = localControlPointManagerProxy.ckLocalBranch()->phase_id;
   const int effective_phase = localControlPointManagerProxy.ckLocalBranch()->allData.phases.size();
 
+
+#define OPTIMIZER_ADAPT_CRITICAL_PATHS 1
+  
+  // -----------------------------------------------------------
+#if OPTIMIZER_ADAPT_CRITICAL_PATHS
+  // This scheme will return the median value for the range 
+  // early on, and then will transition over to the new control points
+  // determined by the critical path adapting code
   if(localControlPointManagerProxy.ckLocalBranch()->newControlPointsAvailable){
     int result = localControlPointManagerProxy.ckLocalBranch()->newControlPoints[string(name)];
     CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d  from \"newControlPoints\" is: %d\n", name, phase_id, result);
     return result;
+  } 
+  
+  std::map<string, pair<int,int> > &controlPointSpace = localControlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
+
+  if(controlPointSpace.count(std::string(name))>0){
+    int minValue =  controlPointSpace[std::string(name)].first;
+    int maxValue =  controlPointSpace[std::string(name)].second;
+    return (minValue+maxValue)/2;
   }
   
-
-
-
-
-
-  //#define OPTIMIZER_USE_BEST_TIME  
-#if OPTIMIZER_USE_BEST_TIME  
+  
+  // -----------------------------------------------------------
+#elif OPTIMIZER_USE_BEST_TIME  
   static bool firstTime = true;
   if(firstTime){
     firstTime = false;
@@ -1281,6 +1315,8 @@ int valueProvidedByOptimizer(const char * name){
   int result = p.controlPoints[std::string(name)];
   CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen out of best previous phase to be: %d\n", name, phase_id, result);
   return result;
+
+  // -----------------------------------------------------------
 #elsif SIMULATED_ANNEALING
   
   // Simulated Annealing style hill climbing method
@@ -1322,7 +1358,9 @@ int valueProvidedByOptimizer(const char * name){
   CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by hill climbing to be: %d\n", name, phase_id, result); 
   return result; 
 
+  // -----------------------------------------------------------
 #else
+  // Exhaustive search
 
   std::map<string, pair<int,int> > &controlPointSpace = localControlPointManagerProxy.ckLocalBranch()->controlPointSpace;
   std::set<string> &staticControlPoints = localControlPointManagerProxy.ckLocalBranch()->staticControlPoints;  
