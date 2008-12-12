@@ -17,6 +17,7 @@
 #include "wrqueue.h"
 #include "cuda-hybrid-api.h"
 #include "stdio.h"
+#include <cutil.h>
 
 
 /* A function in ck.C which casts the void * to a CkCallback object
@@ -36,7 +37,7 @@ extern void CUDACallbackManager(void * fn);
  *  completion of GPU events: memory allocation, transfer and
  *  kernel execution
  */  
-// #define GPUTIME
+// #define GPU_TIME
 
 /* work request queue */
 workRequestQueue *wrQueue = NULL; 
@@ -53,24 +54,27 @@ void **hostBuffers = NULL;
 void **devBuffers = NULL; 
 
 
-#ifdef GPUTIME
-#include <time.h>
+#ifdef GPU_TIME
+
+unsigned int timerHandle; 
+
 /* event types */
-#define MEMORY_ALLOCATION     1
-#define CPU_GPU_TRANSFER      2
-#define GPU_CPU_TRANSFER      3
-#define MEMORY_FREE           4
-#define KERNEL_EXECUTION      5
+#define DATA_SETUP          1            
+#define KERNEL_EXECUTION    2
+#define DATA_CLEANUP        3
 
 typedef struct gpuEventTimer {
-  clock_t startTime; 
-  clock_t endTime; 
+  float startTime; 
+  float endTime; 
   int eventType;
   int ID; 
 } gpuEventTimer; 
 
-gpuEventTimer gpuEvents[QUEUE_SIZE_INIT * 3]; 
+gpuEventTimer gpuEvents[QUEUE_SIZE_INIT * 10]; 
 int timeIndex = 0; 
+int runningKernelIndex = 0; 
+int dataSetupIndex = 0; 
+int dataCleanupIndex = 0; 
 
 #endif
 
@@ -87,7 +91,6 @@ cudaStream_t data_out_stream;
  *  sets up data on the gpu before kernel execution 
  */
 void setupData(workRequest *wr) {
-  int returnVal;
   dataInfo *bufferInfo = wr->bufferInfo; 
 
   if (bufferInfo != NULL) {
@@ -101,28 +104,15 @@ void setupData(workRequest *wr) {
 #ifdef GPU_DEBUG
 	printf("buffer %d allocated\n", index); 
 #endif
-#ifdef GPUTIME
-	gpuEvents[timeIndex].startTime = clock(); 
-	gpuEvents[timeIndex].eventType = MEMORY_ALLOCATION; 
-	gpuEvents[timeIndex].ID = index; 
-#endif
-	returnVal = cudaMalloc((void **) &devBuffers[index], size); 
-#ifdef GPUTIME
-	gpuEvents[timeIndex].endTime = clock(); 
-	timeIndex++;
-#endif
-#ifdef GPU_DEBUG
-	printf("cudaMalloc returned %d\n", returnVal); 
-#endif
+	CUDA_SAFE_CALL_NO_SYNC(cudaMalloc((void **) &devBuffers[index], size));
       }
       
       if (bufferInfo[i].transferToDevice) {
 #ifdef GPU_DEBUG
 	printf("transferToDevice bufId: %d\n", index); 
 #endif
-
-	cudaMemcpyAsync(devBuffers[index], hostBuffers[index], size, 
-			cudaMemcpyHostToDevice, data_in_stream);
+	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpyAsync(devBuffers[index], 
+          hostBuffers[index], size, cudaMemcpyHostToDevice, data_in_stream));
       }
     }
   }
@@ -145,9 +135,8 @@ void copybackData(workRequest *wr) {
 #ifdef GPU_DEBUG
 	printf("transferFromDevice: %d\n", index); 
 #endif
-
-	cudaMemcpyAsync(hostBuffers[index], devBuffers[index], size,
-			cudaMemcpyDeviceToHost, data_out_stream);
+	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpyAsync(hostBuffers[index], 
+          devBuffers[index], size, cudaMemcpyDeviceToHost, data_out_stream));
       }
     }     
   }
@@ -166,7 +155,7 @@ void freeMemory(workRequest *wr) {
 #ifdef GPU_DEBUG
 	printf("buffer %d freed\n", index);
 #endif 
-	cudaFree(devBuffers[index]); 
+	CUDA_SAFE_CALL_NO_SYNC(cudaFree(devBuffers[index])); 
 	devBuffers[index] = NULL; 
       }
     }
@@ -196,10 +185,14 @@ void initHybridAPI() {
     devBuffers[i] = NULL; 
   }
   
-  cudaStreamCreate(&kernel_stream); 
-  cudaStreamCreate(&data_in_stream); 
-  cudaStreamCreate(&data_out_stream); 
+  CUDA_SAFE_CALL_NO_SYNC(cudaStreamCreate(&kernel_stream)); 
+  CUDA_SAFE_CALL_NO_SYNC(cudaStreamCreate(&data_in_stream)); 
+  CUDA_SAFE_CALL_NO_SYNC(cudaStreamCreate(&data_out_stream)); 
 
+#ifdef GPU_TIME
+  CUT_SAFE_CALL(cutCreateTimer(&timerHandle));
+  CUT_SAFE_CALL(cutStartTimer(timerHandle));
+#endif
 }
 
 /* gpuProgressFn
@@ -209,6 +202,7 @@ void initHybridAPI() {
 void gpuProgressFn() {
 
   if (wrQueue == NULL) {
+    printf("Error: work request queue not initialized\n"); 
     return; 
   }
 
@@ -218,29 +212,46 @@ void gpuProgressFn() {
     workRequest *second = next(wrQueue); 
     
     if (wr->state == QUEUED) {
+#ifdef GPU_TIME
+	gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
+	gpuEvents[timeIndex].eventType = DATA_SETUP; 
+	gpuEvents[timeIndex].ID = wr->id; 
+	dataSetupIndex = timeIndex; 
+	timeIndex++; 
+#endif
       setupData(wr); 
       wr->state = TRANSFERRING_IN; 
-      return; 
     }  
-    else if (wr->state == TRANSFERRING_IN) {
+    if (wr->state == TRANSFERRING_IN) {
       if ((returnVal = cudaStreamQuery(data_in_stream)) == cudaSuccess) {
-
-#ifdef GPUTIME
-	gpuEvents[timeIndex].startTime = clock(); 
-	gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
-	gpuEvents[timeIndex].ID = wr->id; 
+#ifdef GPU_TIME
+	gpuEvents[dataSetupIndex].endTime = cutGetTimerValue(timerHandle); 
 #endif
-	kernelSelect(wr); 
-	wr->state = EXECUTING; 
+	wr->state = READY; 
       }
 #ifdef GPU_DEBUG
       printf("Querying memory stream returned: %d\n", returnVal);
 #endif  
     }
-    else if (wr->state == EXECUTING) {
+    if (wr->state == READY) {
+#ifdef GPU_TIME
+      gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
+      gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
+      gpuEvents[timeIndex].ID = wr->id; 
+      runningKernelIndex = timeIndex; 
+      timeIndex++; 
+#endif
+      kernelSelect(wr); 
+      wr->state = EXECUTING; 
+    }
+    if (wr->state == EXECUTING) {
       if ((returnVal = cudaStreamQuery(kernel_stream)) == cudaSuccess) {
-#ifdef GPUTIME
-	gpuEvents[timeIndex].endTime = clock(); 
+#ifdef GPU_TIME
+	gpuEvents[runningKernelIndex].endTime = cutGetTimerValue(timerHandle); 
+	gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
+	gpuEvents[timeIndex].eventType = DATA_CLEANUP; 
+	gpuEvents[timeIndex].ID = wr->id; 
+	dataCleanupIndex = timeIndex; 
 	timeIndex++; 
 #endif
         copybackData(wr);
@@ -252,24 +263,35 @@ void gpuProgressFn() {
 
       /* prefetch data for the subsequent kernel */
       if (second != NULL && second->state == QUEUED) {
+#ifdef GPU_TIME
+	gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
+	gpuEvents[timeIndex].eventType = DATA_SETUP; 
+	gpuEvents[timeIndex].ID = second->id; 
+	dataSetupIndex = timeIndex; 
+	timeIndex++; 
+#endif
 	setupData(second); 
 	second->state = TRANSFERRING_IN; 
-	return; 
+      }      
+      if (second != NULL && second->state == TRANSFERRING_IN) {
+	if (cudaStreamQuery(data_in_stream) == cudaSuccess) {
+#ifdef GPU_TIME
+	  gpuEvents[dataSetupIndex].endTime = cutGetTimerValue(timerHandle); 
+#endif
+	  second->state = READY; 
+	}
       }
     }
-    else if (wr->state == TRANSFERRING_OUT) {
+    if (wr->state == TRANSFERRING_OUT) {
       if (cudaStreamQuery(data_out_stream) == cudaSuccess) {
 	freeMemory(wr); 
+#ifdef GPU_TIME
+	gpuEvents[dataCleanupIndex].endTime = cutGetTimerValue(timerHandle);
+#endif
 	dequeue(wrQueue);
 	CUDACallbackManager(wr->callbackFn);
       }
     }
-#ifdef GPU_DEBUG
-    else {
-      printf("Error: unrecognized state\n"); 
-      return; 
-    }
-#endif
   }
 }
 
@@ -278,24 +300,31 @@ void gpuProgressFn() {
  */
 void exitHybridAPI() {
   deleteWRqueue(wrQueue); 
-  cudaStreamDestroy(kernel_stream); 
-  cudaStreamDestroy(data_in_stream); 
-  cudaStreamDestroy(data_out_stream); 
+  CUDA_SAFE_CALL_NO_SYNC(cudaStreamDestroy(kernel_stream)); 
+  CUDA_SAFE_CALL_NO_SYNC(cudaStreamDestroy(data_in_stream)); 
+  CUDA_SAFE_CALL_NO_SYNC(cudaStreamDestroy(data_out_stream)); 
 
-#ifdef GPU_DEBUG
+#ifdef GPU_TIME
   for (int i=0; i<timeIndex; i++) {
-    switch (gpuEvents[timeIndex].eventType) {
-    case (MEMORY_ALLOCATION) :
-      printf("Buffer %d allocation ", gpuEvents[timeIndex].ID); 
+    switch (gpuEvents[i].eventType) {
+    case DATA_SETUP:
+      printf("Kernel %d data setup", gpuEvents[i].ID); 
+      break;
+    case DATA_CLEANUP:
+      printf("Kernel %d data cleanup", gpuEvents[i].ID); 
       break; 
-    case (KERNEL_EXECUTION) :
-      printf("Kernel %d execution ", gpuEvents[timeIndex].ID); 
+    case KERNEL_EXECUTION:
+      printf("Kernel %d execution", gpuEvents[i].ID); 
       break;
     default:
       printf("Error, invalid timer identifier\n"); 
     }
-    printf("%d:%d\n", gpuEvents[timeIndex].startTime, gpuEvents[timeIndex].endTime); 
+    printf(" %.2f:%.2f\n", gpuEvents[i].startTime, gpuEvents[i].endTime); 
   }
+
+  CUT_SAFE_CALL(cutStopTimer(timerHandle));
+  CUT_SAFE_CALL(cutDeleteTimer(timerHandle));  
+
 #endif
 }
 

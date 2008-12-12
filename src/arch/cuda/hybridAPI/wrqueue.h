@@ -20,10 +20,11 @@
 #define QUEUE_EXPANSION_FACTOR 2
 
 /* work request states */
-#define QUEUED 0            /* work request waiting in queue */
-#define TRANSFERRING_IN 1   /* data is being transferred to the GPU */
-#define EXECUTING       2   /* kernel is executing */
-#define TRANSFERRING_OUT 3  /* data is being transferred from the GPU */
+#define QUEUED           0   /* work request waiting in queue */
+#define TRANSFERRING_IN  1   /* data is being transferred to the GPU */
+#define READY            2   /* ready for kernel execution */
+#define EXECUTING        3   /* kernel is executing */
+#define TRANSFERRING_OUT 4   /* data is being transferred from the GPU */
 
 /* initWRqueue
  *
