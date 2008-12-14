@@ -38,9 +38,9 @@ void _registerInit(void)
 
 extern "C"
 int CkRegisterMsg(const char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack,
-                  size_t size)
+                  CkDeallocFnPtr dealloc, size_t size)
 {
-  return _msgTable.add(new MsgInfo(name, pack, unpack, size));
+  return _msgTable.add(new MsgInfo(name, pack, unpack, dealloc, size));
 }
 
 extern "C"

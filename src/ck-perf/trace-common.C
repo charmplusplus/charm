@@ -162,22 +162,22 @@ static void traceCommonInit(char **argv)
 #else
   if(CkMyRank()==0) {
 #endif
-    _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0);
+    _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
     _threadChare = CkRegisterChare("dummy_thread_chare", 0);
     CkRegisterChareInCharm(_threadChare);
     _threadEP = CkRegisterEp("dummy_thread_ep", 0, _threadMsg,_threadChare, 0+CK_EP_INTRINSIC);
 
-    _packMsg = CkRegisterMsg("dummy_pack_msg", 0, 0, 0);
+    _packMsg = CkRegisterMsg("dummy_pack_msg", 0, 0, 0, 0);
     _packChare = CkRegisterChare("dummy_pack_chare", 0);
     CkRegisterChareInCharm(_packChare);
     _packEP = CkRegisterEp("dummy_pack_ep", 0, _packMsg,_packChare, 0+CK_EP_INTRINSIC);
 
-    _unpackMsg = CkRegisterMsg("dummy_unpack_msg", 0, 0, 0);
+    _unpackMsg = CkRegisterMsg("dummy_unpack_msg", 0, 0, 0, 0);
     _unpackChare = CkRegisterChare("dummy_unpack_chare", 0);
     CkRegisterChareInCharm(_unpackChare);
     _unpackEP = CkRegisterEp("dummy_unpack_ep", 0, _unpackMsg,_unpackChare, 0+CK_EP_INTRINSIC);
 
-    _dummyMsg = CkRegisterMsg("dummy_msg", 0, 0, 0);
+    _dummyMsg = CkRegisterMsg("dummy_msg", 0, 0, 0, 0);
     _dummyChare = CkRegisterChare("dummy_chare", 0);
     CkRegisterChareInCharm(_dummyChare);
     _dummyEP = CkRegisterEp("dummy_ep", 0, _dummyMsg,_dummyChare, 0+CK_EP_INTRINSIC);

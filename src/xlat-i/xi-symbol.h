@@ -837,6 +837,7 @@ class Entry : public Member {
     int isCreateHere(void) { return (attribs & SCREATEHERE); }
     int isPython(void) { return (attribs & SPYTHON); }
     int isNoTrace(void) { return (attribs & SNOTRACE); }
+    int isNoKeep(void) { return (attribs & SNOKEEP); }
     int isSdag(void) { return (sdagCon!=0); }
     void print(XStr& str);
     void genIndexDecls(XStr& str);

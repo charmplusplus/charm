@@ -887,7 +887,7 @@ void CkArrayBroadcaster::springCleaning(void)
   if (nDelete>0) {
     DEBK((AA"Cleaning out %d old broadcasts\n"AB,nDelete));
     for (int i=0;i<nDelete;i++)
-      CkFreeMsg((void *)oldBcasts.deq());
+      delete oldBcasts.deq();
   }
   oldBcastNo=bcastNo;
 }
@@ -970,7 +970,7 @@ void CkArray::recvBroadcast(CkMessage *m)
                 BgEntrySplit("end-broadcast");
 #endif
 	if (! isAnytimeMigration) {
-	  CkFreeMsg(msg);
+	  delete msg;
 	}
 }
 

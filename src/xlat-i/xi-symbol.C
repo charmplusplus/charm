@@ -1571,7 +1571,7 @@ Message::genDecls(XStr& str)
   if(!(external||type->isTemplated())) {
    // generate register function
     str << "    static void __register(const char *s, size_t size, CkPackFnPtr pack, CkUnpackFnPtr unpack) {\n";
-    str << "      __idx = CkRegisterMsg(s, pack, unpack, size);\n";
+    str << "      __idx = CkRegisterMsg(s, pack, unpack, dealloc, size);\n";
     str << "    }\n";
   }
   str << "};\n";
@@ -3408,7 +3408,8 @@ void Entry::genReg(XStr& str)
   	"     (CkCallFnPtr)_call_"<<epStr()<<", ";
   /* messageIdx: */
   if (param->isMarshalled()) {
-    str<<"CkMarshallMsg::__idx";
+    if (param->hasConditional())  str<<"MarshallMsg_"<<epStr()<<"::__idx";
+    else str<<"CkMarshallMsg::__idx";
   } else if(!param->isVoid() && !(attribs&SMIGRATE)) {
     param->genMsgProxyName(str);
     str <<"::__idx";

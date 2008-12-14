@@ -769,7 +769,7 @@ void _initCharm(int unused_argc, char **argv)
 		CmiArgGroup("Charm++",NULL);
 		_parseCommandLineOpts(argv);
 		_registerInit();
-		CkRegisterMsg("System", 0, 0, sizeof(int));
+		CkRegisterMsg("System", 0, 0, CkFreeMsg, sizeof(int));
 		CkRegisterChareInCharm(CkRegisterChare("null", 0));
 		CkIndex_Chare::__idx=CkRegisterChare("Chare", sizeof(Chare));
 		CkRegisterChareInCharm(CkIndex_Chare::__idx);

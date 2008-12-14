@@ -465,7 +465,7 @@ void CpdBreakPointInit()
   CpvAccess(lastBreakPointMsg) = NULL;
   CpvAccess(lastBreakPointObject) = NULL;
   CpvAccess(lastBreakPointIndex) = 0;
-  CpvAccess(_debugMsg) = CkRegisterMsg("debug_msg",0,0,0);
+  CpvAccess(_debugMsg) = CkRegisterMsg("debug_msg",0,0,0,0);
   CpvAccess(_debugChare) = CkRegisterChare("debug_Chare",0);
   CkRegisterChareInCharm(CpvAccess(_debugChare));
   CpvAccess(breakPointEntryTable) = new CpdBpFuncTable_t(10,0.5,CkHashFunction_int,CkHashCompare_int );

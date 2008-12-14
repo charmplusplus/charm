@@ -97,10 +97,12 @@ These are implemented in register.C.
 typedef void* (*CkPackFnPtr)(void *msg);
 /** Message unpack function: convert a buffer into a message. */
 typedef void* (*CkUnpackFnPtr)(void *buf);
+/** Message dealloc function: deletes a message. */
+typedef void (*CkDeallocFnPtr)(void *msg);
 
 /** Register this message name, with this basic size and pack and unpack functions. */
 extern int CkRegisterMsg(const char *name, CkPackFnPtr pack, 
-                       CkUnpackFnPtr unpack, size_t size);
+                       CkUnpackFnPtr unpack, CkDeallocFnPtr dealloc, size_t size);
 
 /** This entry point flag indicates the method does not keep the passed-in message. */
 #define CK_EP_NOKEEP        (1<<2) 

@@ -121,14 +121,19 @@ class MsgInfo {
      */
     CkUnpackFnPtr unpack;
     /**
+     A message deallocation function deletes the message with the
+     appropriate actions.
+     */
+    CkDeallocFnPtr dealloc;
+    /**
      This message body's allocation size.  This does *not* include
      any dynamically allocated portion of the message, so is a lower
      bound on the message size.
      */
     size_t size;
 
-    MsgInfo(const char *n,CkPackFnPtr p,CkUnpackFnPtr u,int s):
-      name(n), pack(p), unpack(u), size(s)
+    MsgInfo(const char *n,CkPackFnPtr p,CkUnpackFnPtr u,CkDeallocFnPtr d,int s):
+      name(n), pack(p), unpack(u), dealloc(d), size(s)
     {}
 };
 

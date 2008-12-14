@@ -451,7 +451,7 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 #endif
   if (_entryTable[epIdx]->noKeep)
   { /* Method doesn't keep/delete the message, so we have to: */
-     CkFreeMsg(msg);
+    _msgTable[_entryTable[epIdx]->msgIdx]->dealloc(msg);
   }
 }
 extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
