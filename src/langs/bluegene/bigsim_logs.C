@@ -364,58 +364,73 @@ int BgTimeLog::bDepExists(BgTimeLog* log){
 #define strcasecmp stricmp
 #endif
 
+// pup data common to both BgTimeLog::pup and BgTimeLog::winPup
+void BgTimeLog::pupCommon(PUP::er &p) {
+
+  int l, i;
+
+  if (p.isPacking()) {           // sanity check
+    if (!strcasecmp(name, "BgSchedulerEnd")) {       // exit event
+      if (endTime == 0.0) {
+	endTime = startTime;
+	if (msgs.length() > 0 && msgs[msgs.length()-1]->sendTime > endTime)
+	  endTime = msgs[msgs.length()-1]->sendTime;
+	execTime = endTime - startTime;
+      }
+    }
+  }
+
+  p|ep; 
+  p|seqno; p|msgId;
+  if (bglog_version >= 4) p(charm_ep);
+  p|recvTime; p|effRecvTime; p|startTime; p|execTime; p|endTime; 
+  p|flag; p(name,20);
+  if (bglog_version >= 3)
+    p((int *)&objId, sizeof(CmiObjId)/sizeof(int));
+  else if (bglog_version == 2)
+    p((int *)&objId, 3);           // only 3 ints before
+
+/*
+  CmiPrintf("            *** BgTimeLog::pup: ep=%d seqno=%d msgId:[node=%d msgID=%d] name=%s\n", ep, seqno, msgId.node(), msgId.msgID(), name);
+
+  if (p.isUnpacking())
+    CmiPrintf("Puping: %d %d %d %d %e %e %e %e %e %s\n",ep,seqno,srcnode,msgID,recvTime,effRecvTime,startTime,execTime,endTime,name);
+*/
+
+/*
+  if (p.isUnpacking()) {
+    threadNum = currTlineIdx;
+  }
+*/
+
+  // pup for BgMsgEntry
+  if (!p.isUnpacking()) l=msgs.length();
+  p|l;
+
+  // CmiPrintf("               *** number of messages: %d\n", l);
+
+  for (i = 0; i < l; i++) {
+    if (p.isUnpacking()) msgs.push_back(new BgMsgEntry);
+    msgs[i]->pup(p);
+  }
+
+  // pup events list for projections
+  if (!p.isUnpacking()) l=evts.length();
+  p|l;
+
+  for (i = 0; i < l; i++) {
+    if (p.isUnpacking()) evts.push_back(new bgEvents);
+    evts[i]->pup(p);
+  }
+
+}
+
 void BgTimeLog::pup(PUP::er &p) {
     int l=0,idx;
     int i;
 
-    if(p.isPacking()) {           // sanity check
-      if (!strcasecmp(name, "BgSchedulerEnd")) {       // exit event
-        if (endTime == 0.0) {
-          endTime = startTime;
-          if (msgs.length() > 0 && msgs[msgs.length()-1]->sendTime > endTime)
-            endTime = msgs[msgs.length()-1]->sendTime;
-          execTime = endTime - startTime;
-        }
-      }
-    }
-
-    p|ep; 
-    p|seqno; p|msgId;
-    if (bglog_version >= 4) p(charm_ep);
-    p|recvTime; p|effRecvTime;p|startTime; p|execTime; p|endTime; 
-    p|flag; p(name,20);
-    if (bglog_version >= 3)
-      p((int *)&objId, sizeof(CmiObjId)/sizeof(int));
-    else if (bglog_version == 2)
-      p((int *)&objId, 3);           // only 3 ints before
-    
-    /*    if(p.isUnpacking())
-      CmiPrintf("Puping: %d %d %d %d %e %e %e %e %e %s\n",ep,seqno,srcnode,msgID,recvTime,effRecvTime,startTime,execTime,endTime,name);
-    */
-
-/*
-    if(p.isUnpacking()){
-      threadNum = currTlineIdx;
-    }
-*/
-
-    // pup for BgMsgEntry
-    if(!p.isUnpacking()) l=msgs.length();
-    p|l;
-
-    for(i=0;i<l;i++) {
-      if (p.isUnpacking()) msgs.push_back(new BgMsgEntry);
-      msgs[i]->pup(p);
-    }
-
-    // pup events list for projections
-    if(!p.isUnpacking()) l=evts.length();
-    p|l;
-
-    for(i=0;i<l;i++) {
-      if (p.isUnpacking()) evts.push_back(new bgEvents);
-      evts[i]->pup(p);
-    }
+    // pup data common to both BgTimeLog::pup and BgTimeLog::winPup
+    pupCommon(p);
 
     // pup for backwardDeps
     if(!p.isUnpacking()) l = backwardDeps.length();
@@ -449,52 +464,13 @@ void BgTimeLog::pup(PUP::er &p) {
     }
 }
 
-void BgTimeLog::winPup(PUP::er &p, int& firstLogToRead, int& numLogsToRead, int& tLineLength) {
+void BgTimeLog::winPup(PUP::er &p, int& firstLogToRead, int& numLogsToRead) {
 
   int l=0, idx;
   int i, j;
 
-  if (p.isPacking()) {           // sanity check
-    if (!strcasecmp(name, "BgSchedulerEnd")) {       // exit event
-      if (endTime == 0.0) {
-	endTime = startTime;
-	if (msgs.length() > 0 && msgs[msgs.length()-1]->sendTime > endTime)
-	  endTime = msgs[msgs.length()-1]->sendTime;
-	execTime = endTime - startTime;
-      }
-    }
-  }
-
-  p|ep; 
-  p|seqno; p|msgId;
-  p|recvTime; p|effRecvTime;p|startTime; p|execTime; p|endTime; 
-  p|flag; p(name,20);
-  if (bglog_version >= 3)
-    p((int *)&objId, sizeof(CmiObjId)/sizeof(int));
-  else if (bglog_version == 2)
-    p((int *)&objId, 3);           // only 3 ints before
-
-  // CmiPrintf("            *** BgTimeLog::pup: ep=%d seqno=%d msgId:[node=%d msgID=%d] name=%s\n", ep, seqno, msgId.node(), msgId.msgID(), name);
-    
-  // pup for BgMsgEntry
-  if (!p.isUnpacking()) l=msgs.length();
-  p|l;
-
-  // CmiPrintf("               *** number of messages: %d\n", l);
-
-  for (i = 0; i < l; i++) {
-    if (p.isUnpacking()) msgs.push_back(new BgMsgEntry);
-    msgs[i]->pup(p);
-  }
-
-  // pup events list for projections
-  if (!p.isUnpacking()) l = evts.length();
-  p|l;
-
-  for (i = 0; i < l; i++) {
-    if (p.isUnpacking()) evts.push_back(new bgEvents);
-    evts[i]->pup(p);
-  }
+  // pup data common to both BgTimeLog::pup and BgTimeLog::winPup
+  pupCommon(p);
 
   // pup for backwardDeps
   if (!p.isUnpacking()) l = backwardDeps.length();
@@ -669,7 +645,7 @@ void BgTimeLineRec::winPup(PUP::er &p, int& firstLogToRead, int& numLogsToRead, 
     for (int i = 0; i < l; i++)
       timeline[i]->seqno = i;
     for (int i = 0; i < l; i++)
-      timeline[i]->winPup(p, firstLogToRead, numLogsToRead, tLineLength);
+      timeline[i]->winPup(p, firstLogToRead, numLogsToRead);
 
   } else {
 
@@ -687,7 +663,7 @@ void BgTimeLineRec::winPup(PUP::er &p, int& firstLogToRead, int& numLogsToRead, 
     // unpack and enqueue the logs in the time line
     for (int i = 0; i < numLogsToRead; i++) {
       BgTimeLog* t = new BgTimeLog();
-      t->winPup(p, firstLogToRead, numLogsToRead, tLineLength);
+      t->winPup(p, firstLogToRead, numLogsToRead);
       timeline.enq(t);
     }
 

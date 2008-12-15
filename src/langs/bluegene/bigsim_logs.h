@@ -221,8 +221,9 @@ public:
   inline int isEqual(BgTimeLog* otherLog){
     return (otherLog==this);
   }
+  void pupCommon(PUP::er &p);
   void pup(PUP::er &p);
-  void winPup(PUP::er &p, int& firstLogToRead, int& numLogsToRead, int& tLineLength);
+  void winPup(PUP::er &p, int& firstLogToRead, int& numLogsToRead);
 
 #if DELAY_SEND
   void send() {
