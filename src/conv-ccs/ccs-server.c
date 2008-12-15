@@ -7,6 +7,7 @@ of the CCS Server.  Here's where Ccs requests from the
 network are actually received.
 */
 #include <stdio.h>
+#include <ctype.h>
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "ccs-auth.h"
