@@ -30,7 +30,7 @@
 
 using namespace std;
 
-#define CONTROL_POINT_SAMPLE_PERIOD 4000
+#define CONTROL_POINT_SAMPLE_PERIOD 7000
 #define NUM_SAMPLES_BEFORE_TRANSISTION 5
 #define OPTIMIZER_TRANSITION 5
 
@@ -704,7 +704,10 @@ public:
 
     //==========================================================================================
     // Print the data for each phase
+
     const int s = allData.phases.size();
+
+#if DEBUG
     CkPrintf("\n\nExamining critical paths and priorities and idle times (num phases=%d)\n", s );
     for(int p=0;p<s;++p){
       const instrumentedPhase &phase = allData.phases[p];
@@ -751,14 +754,14 @@ public:
     CkPrintf("\n\n");
 
 
-
+#endif
 
 
 
     //==========================================================================================
     // If this is a phase during which we try to adapt control point values based on critical path
 
-    if( s%5 == 4){
+    if( s%5 == 4) {
 
       // Find the most recent phase with valid critical path data and idle time measurements      
       int whichPhase=-1;
@@ -781,6 +784,8 @@ public:
 	// Determine the median critical path for this phase
 	int medianCriticalPathIdx = phase.medianCriticalPathIdx();
 	const PathHistory &path = phase.criticalPaths[medianCriticalPathIdx];
+	CkAssert(phase.criticalPaths.size() > 0);
+        CkAssert(phase.criticalPaths.size() > medianCriticalPathIdx); 
 	
 	CkPrintf("Median Critical Path has time %lf\n", path.getTotalTime());
 	
@@ -823,6 +828,9 @@ public:
 	    }
 	    
 	    if(haveGranularityCallback){ 
+#if DEBUG
+	      CkPrintf("Calling granularity change callback\n");
+#endif
 	      controlPointMsg *msg = new(0) controlPointMsg;
 	      granularityCallback.send(msg);
 	    }
@@ -853,8 +861,6 @@ public:
 	      }
 	    }
 
-
-
 	    char *userEventString = new char[4096*2];
 	    sprintf(userEventString, "Adjusting control points affecting critical path: %s ***", textDescription);
 	    
@@ -874,23 +880,30 @@ public:
 	
       }
       
-    }
-    
-    CkPrintf("\n");
-    
-    
-    
-    if(haveGranularityCallback){
+    } else {
+      // This is a phase during which we should just advance to the
+      // next phase
+
       if(frameworkShouldAdvancePhase){
 	gotoNextPhase();	
       }
       
-      controlPointMsg *msg = new(0) controlPointMsg;
-      granularityCallback.send(msg); 
+      if(haveGranularityCallback){ 
+#if DEBUG
+	CkPrintf("Calling granularity change callback\n");
+#endif
+	controlPointMsg *msg = new(0) controlPointMsg;
+	granularityCallback.send(msg);
+      }
+      
+      
     }
     
-    
-    
+
+
+
+    CkPrintf("\n");
+        
   }
   
   /// Determine if any control point is known to affect an entry method
@@ -1019,7 +1032,7 @@ public:
       prevPhase->idleTime.print();
       CkPrintf("Stored idle time min=%lf in prevPhase=%p\n", prevPhase->idleTime.min, prevPhase);
     } else {
-      CkPrintf("No place to store idle time measurements\n");
+      CkPrintf("There is no previous phase to store the idle time measurements\n");
     }
     
     alreadyRequestedIdleTime = false;
