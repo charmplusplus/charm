@@ -315,7 +315,16 @@ localModifier
     ;
 
 type
-    :   ^(TYPE (primitiveType | qualifiedTypeIdent) arrayDeclaratorList?) 
+    :   simpleType
+    |   objectType 
+    ;
+
+simpleType
+    :   ^(TYPE primitiveType arrayDeclaratorList?)
+    ;
+    
+objectType
+    :   ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
     ;
 
 qualifiedTypeIdent
@@ -380,7 +389,7 @@ blockStatement
     
 localVariableDeclaration
     :   ^(PRIMITIVE_VAR_DECLARATION localModifierList simpleType variableDeclaratorList)
-    :   ^(OBJECT_VAR_DECLARATION localModifierList objectType variableDeclaratorList)
+    |   ^(OBJECT_VAR_DECLARATION localModifierList objectType variableDeclaratorList)
     ;
 
 

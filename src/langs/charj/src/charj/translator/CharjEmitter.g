@@ -302,9 +302,9 @@ classScopeDeclarations
                 block={$b.st})
         ->
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
-        -> template(t={$text}) "vardecl <t>"
+        -> template(t={$text}) "primvardecl <t>"
     |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
-        -> template(t={$text}) "vardecl <t>"
+        -> template(t={$text}) "objvardecl <t>"
     |   ^(CONSTRUCTOR_DECL m=modifierList g=genericTypeParameterList? IDENT f=formalParameterList 
             t=throwsClause? b=block)
         { 
@@ -351,9 +351,9 @@ interfaceScopeDeclarations
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "prim...<t>..."
     |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "obj...<t>..."
     |   typeDeclaration
         -> template(t={$text}) "<t>"
     ;
@@ -440,8 +440,19 @@ localModifier
         -> template(t={$text}) "<t>"
     ;
 
+    
 type
-    :   ^(TYPE (primitiveType | qualifiedTypeIdent) arrayDeclaratorList?) 
+    :   simpleType
+    |   objectType 
+    ;
+
+simpleType
+    :   ^(TYPE primitiveType arrayDeclaratorList?)
+        -> template(t={$text}) "<t>"
+    ;
+
+objectType
+    :   ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
         -> template(t={$text}) "<t>"
     ;
 
@@ -535,9 +546,9 @@ blockStatement
     
 localVariableDeclaration
     :   ^(PRIMITIVE_VAR_DECLARATION localModifierList simpleType variableDeclaratorList)
-        -> template(t={$text}) "<t>"
-    :   ^(OBJECT_VAR_DECLARATION localModifierList objectType variableDeclaratorList)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "prim!<t>!"
+    |   ^(OBJECT_VAR_DECLARATION localModifierList objectType variableDeclaratorList)
+        -> template(t={$text}) "obj!<t>!"
     ;
     
         

@@ -671,7 +671,7 @@ blockStatement
 localVariableDeclaration
     :   localModifierList simpleType classFieldDeclaratorList
         ->  ^(PRIMITIVE_VAR_DECLARATION localModifierList simpleType classFieldDeclaratorList)
-    :   localModifierList objectType classFieldDeclaratorList
+    |   localModifierList objectType classFieldDeclaratorList
         ->  ^(OBJECT_VAR_DECLARATION localModifierList objectType classFieldDeclaratorList)
     ;
     
