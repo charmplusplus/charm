@@ -179,11 +179,53 @@ embed_cc(str, blk) ::=
 
 primitive_var_decl(modList, type, declList) ::=
 <<
-<modList> <type> <declList>;
+<if(modList)>
+<modList>: <type> <declList>;
+<else>
+<type> <declList>;
+<endif>
 >>
 
 
 object_var_decl(modList, type, declList) ::=
 <<
-<modList> <type>* <declList>;
+<if(modList)>
+<modList>: <type>* <declList>;
+<else>
+<type>* <declList>;
+<endif>
+>>
+
+
+type(typeID, arrDeclList) ::=
+<<
+<typeID><arrDeclList>
+>>
+
+/*
+object_type(typeID, arrDeclList) ::=
+<<
+<typeID>*<arrDeclList>
+>>
+
+
+chare_type(typeID, arrDeclList) ::=
+<<
+CProxy_<typeID><arrDeclList>
+>>*/
+
+
+formal_param_list(sdecl, vdecl) ::=
+<<
+<if(vdecl)>
+(<sdecl; separator=", ">, <vdecl>)
+<else>
+(<sdecl; separator=", ">)
+<endif>
+>>
+
+
+formal_param_decl(modList, type, declID) ::=
+<<
+    <modList> <type> <declID>
 >>

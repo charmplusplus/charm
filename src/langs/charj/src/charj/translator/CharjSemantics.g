@@ -140,10 +140,10 @@ scope ScopeStack; // default scope
     // there is exactly one public type and return that one.
     :   ^(CHARJ_SOURCE 
         (packageDeclaration)? 
-        (importDeclaration)* 
-        (typeDeclaration))
+        (importDeclarations) 
+        (typeDeclaration[$importDeclarations.packageNames]))
         //(typeDeclaration)*)
-        { $cs = null; }
+        { $cs = $typeDeclaration.sym; }
     ;
 
 // note: no new scope here--this replaces the default scope
@@ -164,11 +164,16 @@ packageDeclaration
         }
     ;
     
-importDeclaration
-    :   ^(IMPORT STATIC? qualifiedIdentifier DOTSTAR?)
+importDeclarations returns [List<CharjAST> packageNames]
+@init {
+	packageNames = new ArrayList<CharjAST>();
+}
+    :   (^(IMPORT STATIC? qualifiedIdentifier DOTSTAR?)
+		{ packageNames.add($qualifiedIdentifier.start); })*
     ;
-    
-typeDeclaration returns [ClassSymbol sym]
+
+
+typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
 scope ScopeStack; // top-level type scope
     :   ^(CLASS m=modifierList IDENT g=genericTypeParameterList? 
                 e=classExtendsClause? i=implementsClause? c=classTopLevelScope) 
@@ -181,6 +186,7 @@ scope ScopeStack; // top-level type scope
             $sym.definitionTokenStream = input.getTokenStream();
             $IDENT.symbol = $sym;
             $ScopeStack::current = $sym;
+			importPackages($sym, $imports);
         }
     |   ^(INTERFACE modifierList IDENT genericTypeParameterList? 
                 interfaceExtendsClause? interfaceTopLevelScope)
@@ -237,7 +243,7 @@ classScopeDeclarations
     |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
     |   ^(CONSTRUCTOR_DECL m=modifierList g=genericTypeParameterList? IDENT f=formalParameterList 
             t=throwsClause? b=block)
-    |   d=typeDeclaration
+    |   d=typeDeclaration[null]
     ;
     
 interfaceTopLevelScope
@@ -252,7 +258,7 @@ interfaceScopeDeclarations
         // there's an obligatory initializer.
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
     |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
-    |   typeDeclaration
+    |   typeDeclaration[null]
     ;
 
 variableDeclaratorList
@@ -383,7 +389,7 @@ block
     
 blockStatement
     :   localVariableDeclaration
-    |   typeDeclaration
+    |   typeDeclaration[null]
     |   statement
     ;
     

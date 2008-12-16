@@ -302,9 +302,17 @@ classScopeDeclarations
                 block={$b.st})
         ->
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
-        -> template(t={$text}) "primvardecl <t>"
+        -> {emitCC() || emitH()}? primitive_var_decl(
+            modList={$modifierList.st},
+            type={$simpleType.st},
+            declList={$variableDeclaratorList.st})
+        ->
     |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
-        -> template(t={$text}) "objvardecl <t>"
+        -> {emitCC() || emitH()}? object_var_decl(
+            modList={$modifierList.st},
+            type={$objectType.st},
+            declList={$variableDeclaratorList.st})
+        ->
     |   ^(CONSTRUCTOR_DECL m=modifierList g=genericTypeParameterList? IDENT f=formalParameterList 
             t=throwsClause? b=block)
         { 
@@ -334,7 +342,7 @@ classScopeDeclarations
                 block={$b.st})
         ->
     |   d=typeDeclaration
-        -> template(t={$d.st}) "type <t>"
+        -> template(t={$d.st}) "/*typeDeclaration*/ <t>"
     ;
     
 interfaceTopLevelScope
@@ -443,17 +451,19 @@ localModifier
     
 type
     :   simpleType
+        -> template(type={$simpleType.st}) "<type>"
     |   objectType 
+        -> template(type={$objectType.st}) "<type>"
     ;
 
 simpleType
     :   ^(TYPE primitiveType arrayDeclaratorList?)
-        -> template(t={$text}) "<t>"
+        -> type(typeID={$primitiveType.st}, arrDeclList={$arrayDeclaratorList.st})
     ;
 
 objectType
     :   ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
-        -> template(t={$text}) "<t>"
+        -> type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
     ;
 
 qualifiedTypeIdent
@@ -468,7 +478,7 @@ typeIdent
 
 primitiveType
     :   BOOLEAN
-        -> template(t={$text}) "<t>"
+        -> template() "bool"
     |   CHAR
         -> template(t={$text}) "<t>"
     |   BYTE
@@ -505,18 +515,19 @@ genericWildcardBoundType
     ;
 
 formalParameterList
-    :   ^(FORMAL_PARAM_LIST formalParameterStandardDecl* formalParameterVarargDecl?) 
-        -> template(t={$text}) "<t>"
+    :   ^(FORMAL_PARAM_LIST (fpsd+=formalParameterStandardDecl)* fpvd=formalParameterVarargDecl?)
+        -> formal_param_list(sdecl={$fpsd}, vdecl={$fpvd.st})
     ;
     
 formalParameterStandardDecl
-    :   ^(FORMAL_PARAM_STD_DECL localModifierList type variableDeclaratorId)
-        -> template(t={$text}) "<t>"
+    :   ^(FORMAL_PARAM_STD_DECL lms=localModifierList t=type vdid=variableDeclaratorId)
+        -> formal_param_decl(modList={$lms.st}, type={$t.st}, declID={$vdid.st})
+        //-> template(t={$text}) "/*fpsd*/ <t>"
     ;
     
 formalParameterVarargDecl
     :   ^(FORMAL_PARAM_VARARG_DECL localModifierList type variableDeclaratorId)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*fpvd*/ <t>"
     ;
     
 qualifiedIdentifier
@@ -548,12 +559,12 @@ blockStatement
 localVariableDeclaration
     :   ^(PRIMITIVE_VAR_DECLARATION localModifierList simpleType variableDeclaratorList)
         -> primitive_var_decl(
-            modList={$localModifierList.st},
+            modList={null},
             type={$simpleType.st},
             declList={$variableDeclaratorList.st})
     |   ^(OBJECT_VAR_DECLARATION localModifierList objectType variableDeclaratorList)
         -> object_var_decl(
-            modList={$localModifierList.st},
+            modList={null},
             type={$objectType.st},
             declList={$variableDeclaratorList.st})
     ;
@@ -594,7 +605,6 @@ statement
         -> template(t={$text}) "<t>"
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
         ->  embed_cc(str={$STRING_LITERAL.text}, blk={$EMBED_BLOCK.text})
-//template(t={$EMBED_BLOCK.text}) "<t>"
     |   SEMI // Empty statement.
         -> template(t={$text}) "<t>"
     ;
