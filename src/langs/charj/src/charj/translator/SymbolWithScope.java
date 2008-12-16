@@ -7,21 +7,18 @@ public abstract class SymbolWithScope
     extends Symbol 
     implements Scope {
 
-    public SymbolWithScope(SymbolTable symtab) 
-    {
+    public SymbolWithScope(SymbolTable symtab) {
         super(symtab);
     }
 
     public SymbolWithScope(
             SymbolTable symtab, 
-            String name) 
-    {
+            String name) {
         super(symtab, name, null);
     }
 
     /** Find any symbol matching name; won't look on disk for classes though */
-    public Symbol resolve(String name) 
-    {
+    public Symbol resolve(String name) {
         Symbol s = null;
         
         // in this scope?
@@ -30,8 +27,7 @@ public abstract class SymbolWithScope
         }
 
         // if not, check any enclosing scope
-        if ( s==null && getEnclosingScope() != null ) 
-        {
+        if ( s==null && getEnclosingScope() != null ) {
             return getEnclosingScope().resolve(name);
         }
 
@@ -41,16 +37,14 @@ public abstract class SymbolWithScope
     /** Scopes other other package and class don't know how to resolve types
      *  (e.g., MethodSymbol).  Look to enclosing scope.
      */
-    public ClassSymbol resolveType(String type) 
-    {
+    public ClassSymbol resolveType(String type) {
         if ( getEnclosingScope()!=null ) {
             return getEnclosingScope().resolveType(type);
         }
         return null;
     }
 
-    public VariableSymbol resolveVariable(String name) 
-    {
+    public VariableSymbol resolveVariable(String name) {
         Symbol s = getMembers().get(name);
         if (debug()) System.out.println(
                 "SymbolWithScope.resolveVariable(" + name + 
@@ -79,8 +73,7 @@ public abstract class SymbolWithScope
 
     public MethodSymbol resolveMethod(
             String name, 
-            int numargs) 
-    {
+            int numargs) {
         if (debug()) System.out.println(
                 "SymbolWithScope.resolveMethod(" + name + "," + numargs +
                 "): examine " + this.getClass().getName() + "=" + toString());
@@ -114,16 +107,14 @@ public abstract class SymbolWithScope
     /** By default, pass up responsibility in scope hierarchy until we
      *  find a class.
      */
-    public boolean isMethod(String name) 
-    {
+    public boolean isMethod(String name) {
         if ( getEnclosingScope()!=null ) {
             return getEnclosingScope().isMethod(name);
         }
         return false;
     }
 
-    public Symbol remove(String name) 
-    {
+    public Symbol remove(String name) {
         Symbol s = (Symbol)getMembers().get(name);
         if ( s==null && getEnclosingScope() != null) {
             return getEnclosingScope().remove(name);
@@ -136,8 +127,7 @@ public abstract class SymbolWithScope
 
     public Symbol define(
             String name, 
-            Symbol sym) 
-    {
+            Symbol sym) {
         // check for error
         Map members = getMembers();
         if ( members == null ) {
@@ -151,21 +141,18 @@ public abstract class SymbolWithScope
     }
 
     /** create the member list; we're about to add stuff */
-    protected Map<String, Symbol> createMembers() 
-    {
+    protected Map<String, Symbol> createMembers() {
         return getMembers();
     }
 
     /** Scope defaults to just the symbol name; method f's scope is f by 
      *  default. 
      */
-    public String getScopeName() 
-    {
+    public String getScopeName() {
         return name;
     }
 
-    public String getFullyQualifiedName() 
-    {
+    public String getFullyQualifiedName() {
         String parent = null;
         if ( getEnclosingScope()!=null ) {
             parent = getEnclosingScope().getFullyQualifiedName();

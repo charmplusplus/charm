@@ -127,7 +127,7 @@ public class Translator {
         StringTemplateGroup templates = getTemplates(templateFile);
         emitter.setTemplateLib(templates);
         StringTemplate st = 
-            (StringTemplate)emitter.charjSource(m).getTemplate();
+            (StringTemplate)emitter.charjSource(m_symtab, m).getTemplate();
         return st.toString();
     }
 

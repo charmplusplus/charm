@@ -13,8 +13,7 @@ public class PackageScope extends SymbolWithScope {
     public PackageScope(
             SymbolTable symtab, 
             String name, 
-            Scope enclosingScope) 
-    {
+            Scope enclosingScope) {
         super(symtab, name);
         this.enclosingScope = enclosingScope;
     }
@@ -30,8 +29,7 @@ public class PackageScope extends SymbolWithScope {
      *  in package io which is in package charj.  Next time, File will
      *  be found.
      */
-    public ClassSymbol resolveType(String type) 
-    {
+    public ClassSymbol resolveType(String type) {
         if (debug()) System.out.println(
                 " PackageScope.resolveType(" + type + 
                 "): examine " + toString());
@@ -49,21 +47,18 @@ public class PackageScope extends SymbolWithScope {
         return null;
     }
 
-    public Map<String, Symbol> getMembers() 
-    {
+    public Map<String, Symbol> getMembers() {
         return members;
     }
 
-    public String getFullyQualifiedName() 
-    {
+    public String getFullyQualifiedName() {
         if ( name.equals(SymbolTable.DEFAULT_PACKAGE_NAME) ) {
             return null;
         }
         return super.getFullyQualifiedName();
     }
 
-    public String toString() 
-    {
+    public String toString() {
         return "PackageScope[" + name + "]: " + members.keySet();
     }
 }

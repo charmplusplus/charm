@@ -11,13 +11,11 @@ public class VariableSymbol extends Symbol {
     public VariableSymbol(
             SymbolTable symtab,
             String name,
-            ClassSymbol type) 
-    {
+            ClassSymbol type) {
         super(symtab, name, type);
     }
 
-    public String toString() 
-    {
+    public String toString() {
         StringBuffer buf = new StringBuffer();
         if ( scope!=null ) {
             buf.append(scope.getScopeName());

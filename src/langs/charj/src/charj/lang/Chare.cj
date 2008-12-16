@@ -1,5 +1,5 @@
 package charj.lang;
 
-class Chare {
+class _Charj_Chare {
     
 }

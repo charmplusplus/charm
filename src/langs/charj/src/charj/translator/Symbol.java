@@ -23,29 +23,25 @@ public class Symbol {
     /** To print definition, we need to know where tokens live */
     public TokenStream definitionTokenStream;
 
-    public Symbol(SymbolTable _symtab) 
-    {
+    public Symbol(SymbolTable _symtab) {
         symtab = _symtab;
     }
 
     public Symbol(
             SymbolTable _symtab, 
             String _name, 
-            ClassSymbol _type) 
-    {
+            ClassSymbol _type) {
         this(_symtab);
         name = _name;
         type = _type;
     }
 
     /** Just in case we need to do some name mangling */
-    public String getMangledName() 
-    {
+    public String getMangledName() {
         return name;
     }
 
-    public boolean debug()
-    {
+    public boolean debug() {
         return symtab.translator.debug();
     }
 

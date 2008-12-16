@@ -18,14 +18,23 @@ package charj.translator;
 }
 
 @members {
-    OutputMode m_mode;
-    boolean m_messageCollectionEnabled = false;
-    private boolean m_hasErrors = false;
-    List<String> m_messages;
+    SymbolTable symtab_ = null;
 
-    private boolean emitCC() { return m_mode == OutputMode.cc; }
-    private boolean emitCI() { return m_mode == OutputMode.ci; }
-    private boolean emitH() { return m_mode == OutputMode.h; }
+    PackageScope currentPackage_ = null;
+    ClassSymbol currentClass_ = null;
+    MethodSymbol currentMethod_ = null;
+    LocalScope currentLocalScope_ = null;
+
+    Translator translator_;
+
+    OutputMode mode_;
+    boolean messageCollectionEnabled_ = false;
+    private boolean hasErrors_ = false;
+    List<String> messages_;
+
+    private boolean emitCC() { return mode_ == OutputMode.cc; }
+    private boolean emitCI() { return mode_ == OutputMode.ci; }
+    private boolean emitH() { return mode_ == OutputMode.h; }
 
     /**
      *  Switches error message collection on or off.
@@ -41,9 +50,9 @@ package charj.translator;
      *  @param newState  <code>true</code> if error messages should be collected.
      */
     public void enableErrorMessageCollection(boolean newState) {
-        m_messageCollectionEnabled = newState;
-        if (m_messages == null && m_messageCollectionEnabled) {
-            m_messages = new ArrayList<String>();
+        messageCollectionEnabled_ = newState;
+        if (messages_ == null && messageCollectionEnabled_) {
+            messages_ = new ArrayList<String>();
         }
     }
     
@@ -58,8 +67,8 @@ package charj.translator;
      */
      @Override
     public void emitErrorMessage(String message) {
-        if (m_messageCollectionEnabled) {
-            m_messages.add(message);
+        if (messageCollectionEnabled_) {
+            messages_.add(message);
         } else {
             super.emitErrorMessage(message);
         }
@@ -73,7 +82,7 @@ package charj.translator;
      *           list may be empty if no error message has been emited.
      */
     public List<String> getMessages() {
-        return m_messages;
+        return messages_;
     }
     
     /**
@@ -83,7 +92,7 @@ package charj.translator;
      *           least one error message.
      */
     public boolean hasErrors() {
-        return m_hasErrors;
+        return hasErrors_;
     }
 
     /**
@@ -102,9 +111,10 @@ package charj.translator;
 }
 
 // Starting point for parsing a Charj file.
-charjSource[OutputMode m]
+charjSource[SymbolTable symtab, OutputMode m]
 @init {
-    this.m_mode = m;
+    this.symtab_ = symtab;
+    this.mode_ = m;
     String closingBraces = "";
 }
     :   ^(CHARJ_SOURCE (p=packageDeclaration)? 
