@@ -2,6 +2,20 @@
 #ifndef   __CMID_MANY_TO_MANY_H__
 #define   __CMID_MANY_TO_MANY_H__
 
+#ifndef CMI_DIRECT_MANY_TO_MANY_DEFINED
+#define CmiDirect_manytomany_allocate_handle ()
+
+#define CmiDirect_manytomany_initialize_recvbase (a, b, c, d, e, f, g, h)
+
+#define CmiDirect_manytomany_initialize_recv     (a, b, c, d, e, f)
+
+#define CmiDirect_manytomany_initialize_sendbase  (a, b, c, d, e, f, g) 
+
+#define CmiDirect_manytomany_initialize_send (a, b, c, d, e, f)
+
+#define CmiDirect_manytomany_start (a, b) 
+#else
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -11,9 +25,9 @@ extern "C" {
   
   void   CmiDirect_manytomany_initialize_recvbase ( void                 * handle,
 						    unsigned               tag,
-						    char                 * rcvbuf,
 						    CmiDirectM2mHandler    donecb,
 						    void                 * context,
+						    char                 * rcvbuf,
 						    unsigned               nranks,
 						    unsigned               myIdx );
   
@@ -46,4 +60,6 @@ extern "C" {
 }
 #endif
 
-#endif
+#endif    //end CMI_DIRECT_MANY_TO_MANY_DEFINED
+
+#endif    //end __CMID_MANY_TO_MANY_H__
