@@ -178,9 +178,9 @@ typeDeclaration
         ->
     |   ^(INTERFACE modifierList IDENT genericTypeParameterList? 
                 interfaceExtendsClause? interfaceTopLevelScope)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*INTERFACE*/ <t>"
     |   ^(ENUM modifierList IDENT implementsClause? enumTopLevelScope)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*ENUM*/ <t>"
     ;
 
 
@@ -198,32 +198,32 @@ interfaceExtendsClause
     
 implementsClause
     :   ^(IMPLEMENTS_CLAUSE type+)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*IMPLEMENTS_CLAUSE*/ <t>"
     ;
         
 genericTypeParameterList
     :   ^(GENERIC_TYPE_PARAM_LIST genericTypeParameter+)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*GENERIC_TYPE_PARAM_LIST*/ <t>"
     ;
 
 genericTypeParameter
     :   ^(IDENT bound?)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*genericTypeParameter*/ <t>"
     ;
         
 bound
     :   ^(EXTENDS_BOUND_LIST type+)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*EXTENDS_BOUND_LIST*/ <t>"
     ;
 
 enumTopLevelScope
     :   ^(ENUM_TOP_LEVEL_SCOPE enumConstant+ classTopLevelScope?)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*enumTopLevelScope*/ <t>"
     ;
     
 enumConstant
     :   ^(IDENT arguments? classTopLevelScope?)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*enumConstant*/ <t>"
     ;
     
     
@@ -351,26 +351,26 @@ interfaceScopeDeclarations
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
-        -> template(t={$text}) "prim...<t>..."
+        -> template(t={$text}) "<t>"
     |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
-        -> template(t={$text}) "obj...<t>..."
+        -> template(t={$text}) "<t>"
     |   typeDeclaration
         -> template(t={$text}) "<t>"
     ;
 
 variableDeclaratorList
     :   ^(VAR_DECLARATOR_LIST variableDeclarator+)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*variableDeclaratorList*/ <t>"
     ;
 
 variableDeclarator
     :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*variableDeclarator*/ <t>"
     ;
     
 variableDeclaratorId
     :   ^(IDENT arrayDeclaratorList?)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*variableDeclaratorId*/ <t>"
     ;
 
 variableInitializer
@@ -537,24 +537,31 @@ block
     
 blockStatement
     :   localVariableDeclaration
-        -> template(t={$text}) "<t>"
+        -> {$localVariableDeclaration.st}
     |   typeDeclaration
-        -> template(t={$text}) "<t>"
+        -> {$typeDeclaration.st}
     |   statement
         -> {$statement.st}
     ;
-    
+
+
 localVariableDeclaration
     :   ^(PRIMITIVE_VAR_DECLARATION localModifierList simpleType variableDeclaratorList)
-        -> template(t={$text}) "prim!<t>!"
+        -> primitive_var_decl(
+            modList={$localModifierList.st},
+            type={$simpleType.st},
+            declList={$variableDeclaratorList.st})
     |   ^(OBJECT_VAR_DECLARATION localModifierList objectType variableDeclaratorList)
-        -> template(t={$text}) "obj!<t>!"
+        -> object_var_decl(
+            modList={$localModifierList.st},
+            type={$objectType.st},
+            declList={$variableDeclaratorList.st})
     ;
-    
-        
+
+
 statement
     :   block
-        -> template(t={$text}) "<t>"
+        -> {$block.st}
     |   ^(ASSERT expression expression?)
         -> template(t={$text}) "<t>"
     |   ^(IF parenthesizedExpression statement statement?)

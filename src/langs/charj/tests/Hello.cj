@@ -11,8 +11,8 @@ public class Hello {
             int* x = &y;
         }}
         Hello h = new Hello();
-        //MyObject someObject = new MyObject(1, 2, "hello", new Array<int>(1));
-        //int myArray[25] = new int[25];
+        //MyObject someObject = new MyObject(1, 2, "hello");
+        int myArray[] = new int[25];
         //Array<int> myGenericArray = new Array<int>(25);
         //for (int i=0; i<25; ++i) {
         //    myArray[i] = payload + i;

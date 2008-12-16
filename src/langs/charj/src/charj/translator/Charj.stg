@@ -175,3 +175,15 @@ embed_cc(str, blk) ::=
 <blk>
 // end embedded block: <str>
 >>
+
+
+primitive_var_decl(modList, type, declList) ::=
+<<
+<modList> <type> <declList>;
+>>
+
+
+object_var_decl(modList, type, declList) ::=
+<<
+<modList> <type>* <declList>;
+>>
