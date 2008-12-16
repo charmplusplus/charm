@@ -33,7 +33,7 @@ CHARJ_JFLAGS="-classpath $CLASSPATH:$ANTLR_CLASSPATH:$JSAP_JAR:$CHARJ_JAR"
 # the charjc options alone.
 VERBOSE=false
 CHARMC=$CHARJCHOME../../../../bin/charmc
-STDLIB=$CHARJCHOME../charj/src/
+STDLIB=$CHARJCHOME../src
 CHARMC_ARGS=
 FILES=
 ARGS=

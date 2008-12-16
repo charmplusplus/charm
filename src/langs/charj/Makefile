@@ -12,7 +12,6 @@ doc:
 all:
 	$(ANT) all
 
-
 # The lousy antlrv3 ant task won't give proper output from antlr errors, so
 # use these horrible direct invocations instead
 debug-charj:
@@ -28,4 +27,3 @@ debug-emitter:
 # For any unrecognized rules, try to compile a test program with that name
 %:
 	./bin/charjc --debug --verbose --AST --stdout tests/$@.cj
-
