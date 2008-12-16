@@ -216,7 +216,8 @@ tokens {
     TYPE;
     UNARY_MINUS;
     UNARY_PLUS;
-    VAR_DECLARATION;
+    PRIMITIVE_VAR_DECLARATION;
+    OBJECT_VAR_DECLARATION;
     VAR_DECLARATOR;
     VAR_DECLARATOR_LIST;
     VOID_METHOD_DECL;
@@ -444,8 +445,10 @@ classScopeDeclarations
                 ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList genericTypeParameterList? IDENT formalParameterList throwsClause? block)
                 //->  ^(CONSTRUCTOR_DECL[$ident, $ident.text] modifierList genericTypeParameterList? formalParameterList throwsClause? block)
             )
-        |   type classFieldDeclaratorList SEMI
-            ->  ^(VAR_DECLARATION modifierList type classFieldDeclaratorList)
+        |   simpleType classFieldDeclaratorList SEMI
+            ->  ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType classFieldDeclaratorList)
+        |   objectType classFieldDeclaratorList SEMI
+            ->  ^(OBJECT_VAR_DECLARATION modifierList objectType classFieldDeclaratorList)
         )
     |   typeDeclaration
     |   SEMI!
@@ -459,8 +462,10 @@ interfaceScopeDeclarations
             |   VOID IDENT formalParameterList throwsClause? SEMI
                 ->  ^(VOID_METHOD_DECL modifierList genericTypeParameterList? IDENT formalParameterList throwsClause?)
             )
-        |   type interfaceFieldDeclaratorList SEMI
-            ->  ^(VAR_DECLARATION modifierList type interfaceFieldDeclaratorList)
+        |   simpleType interfaceFieldDeclaratorList SEMI
+            ->  ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType interfaceFieldDeclaratorList)
+        |   objectType interfaceFieldDeclaratorList SEMI
+            ->  ^(OBJECT_VAR_DECLARATION modifierList objectType interfaceFieldDeclaratorList)        
         )
     |   typeDeclaration
     |   SEMI!
@@ -664,8 +669,10 @@ blockStatement
     ;
     
 localVariableDeclaration
-    :   localModifierList type classFieldDeclaratorList
-        ->  ^(VAR_DECLARATION localModifierList type classFieldDeclaratorList)
+    :   localModifierList simpleType classFieldDeclaratorList
+        ->  ^(PRIMITIVE_VAR_DECLARATION localModifierList simpleType classFieldDeclaratorList)
+    :   localModifierList objectType classFieldDeclaratorList
+        ->  ^(OBJECT_VAR_DECLARATION localModifierList objectType classFieldDeclaratorList)
     ;
     
         

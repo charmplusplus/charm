@@ -233,7 +233,8 @@ classScopeDeclarations
             tc=throwsClause? b=block?)
     |   ^(VOID_METHOD_DECL m=modifierList g=genericTypeParameterList? IDENT 
             f=formalParameterList t=throwsClause? b=block?)
-    |   ^(VAR_DECLARATION modifierList type variableDeclaratorList)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
+    |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
     |   ^(CONSTRUCTOR_DECL m=modifierList g=genericTypeParameterList? IDENT f=formalParameterList 
             t=throwsClause? b=block)
     |   d=typeDeclaration
@@ -249,7 +250,8 @@ interfaceScopeDeclarations
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
-    |   ^(VAR_DECLARATION modifierList type variableDeclaratorList)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
+    |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
     |   typeDeclaration
     ;
 
@@ -377,10 +379,11 @@ blockStatement
     ;
     
 localVariableDeclaration
-    :   ^(VAR_DECLARATION localModifierList type variableDeclaratorList)
+    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList simpleType variableDeclaratorList)
+    :   ^(OBJECT_VAR_DECLARATION localModifierList objectType variableDeclaratorList)
     ;
-    
-        
+
+
 statement
     :   block
     |   ^(ASSERT expression expression?)

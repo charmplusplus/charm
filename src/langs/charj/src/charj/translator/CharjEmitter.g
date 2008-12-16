@@ -301,7 +301,9 @@ classScopeDeclarations
                 tc={$t.st}, 
                 block={$b.st})
         ->
-    |   ^(VAR_DECLARATION modifierList type variableDeclaratorList)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
+        -> template(t={$text}) "vardecl <t>"
+    |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
         -> template(t={$text}) "vardecl <t>"
     |   ^(CONSTRUCTOR_DECL m=modifierList g=genericTypeParameterList? IDENT f=formalParameterList 
             t=throwsClause? b=block)
@@ -348,7 +350,9 @@ interfaceScopeDeclarations
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
-    |   ^(VAR_DECLARATION modifierList type variableDeclaratorList)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
+        -> template(t={$text}) "<t>"
+    |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
         -> template(t={$text}) "<t>"
     |   typeDeclaration
         -> template(t={$text}) "<t>"
@@ -530,7 +534,9 @@ blockStatement
     ;
     
 localVariableDeclaration
-    :   ^(VAR_DECLARATION localModifierList type variableDeclaratorList)
+    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList simpleType variableDeclaratorList)
+        -> template(t={$text}) "<t>"
+    :   ^(OBJECT_VAR_DECLARATION localModifierList objectType variableDeclaratorList)
         -> template(t={$text}) "<t>"
     ;
     
