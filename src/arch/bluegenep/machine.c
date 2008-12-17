@@ -14,6 +14,7 @@
 #include <bpcore/ppc450_inlines.h>
 
 #include "dcmf.h"
+#include "dcmf_multisend.h"
 
 char *ALIGN_16(char *p) {
     return((char *)((((unsigned long)p)+0xf)&0xfffffff0));
@@ -239,6 +240,8 @@ void SendHypercube(int size, char *msg);
 DCMF_Protocol_t  cmi_dcmf_short_registration __attribute__((__aligned__(16)));
 DCMF_Protocol_t  cmi_dcmf_eager_registration __attribute__((__aligned__(16)));
 DCMF_Protocol_t  cmi_dcmf_rzv_registration   __attribute__((__aligned__(16)));
+DCMF_Protocol_t  cmi_dcmf_multicast_registration   __attribute__((__aligned__(16)));
+
 #define BGP_USE_RDMA 1
 /*#define CMI_DIRECT_DEBUG 1*/
 #ifdef BGP_USE_RDMA
@@ -250,15 +253,20 @@ DCMF_Protocol_t  cmi_dcmf_direct_registration __attribute__((__aligned__(16)));
 
 typedef struct {
     void *recverBuf;
-    void (*callbackFnPtr)(void *);
+  void (*callbackFnPtr)(void *);
     void *callbackData;
     DCMF_Request_t *DCMF_rq_t;
 } dcmfDirectMsgHeader;
 
 /* nothing for us to do here */
-void direct_send_done_cb(void*nothing) {
+#if (DCMF_VERSION_MAJOR >= 2)
+void direct_send_done_cb(void*nothing, DCMF_Error_t *err) 
+#else 
+  void direct_send_done_cb(void*nothing) 
+#endif
+{
 #if CMI_DIRECT_DEBUG
-    CmiPrintf("[%d] RDMA send_done_cb\n", CmiMyPe());
+  CmiPrintf("[%d] RDMA send_done_cb\n", CmiMyPe());
 #endif
 }
 
@@ -279,6 +287,12 @@ void     direct_short_pkt_recv (void             * clientdata,
 }
 
 
+#if (DCMF_VERSION_MAJOR >= 2)
+typedef void (*cbhdlr) (void *, DCMF_Error_t *);
+#else
+typedef void (*cbhdlr) (void *);
+#endif
+
 DCMF_Request_t * direct_first_pkt_recv_done (void              * clientdata,
         const DCQuad      * info,
         unsigned            count,
@@ -294,7 +308,7 @@ DCMF_Request_t * direct_first_pkt_recv_done (void              * clientdata,
     /* pull the data we need out of the header */
     *rcvlen=sndlen;
     dcmfDirectMsgHeader *msgHead=  (dcmfDirectMsgHeader *) info;
-    cb->function=msgHead->callbackFnPtr;
+    cb->function= (cbhdlr)msgHead->callbackFnPtr;
     cb->clientdata=msgHead->callbackData;
     *buffer=msgHead->recverBuf;
     return msgHead->DCMF_rq_t;
@@ -321,7 +335,7 @@ inline SMSG_LIST * smsg_allocate() {
     if (smsg != NULL)
         return smsg;
 
-    void * buf = memalign(32, sizeof(SMSG_LIST));  //malloc(sizeof(SMSG_LIST));
+    void * buf = malloc(sizeof(SMSG_LIST)); 
     assert(buf!=NULL);
     assert (((unsigned)buf & 0x0f) == 0);
 
@@ -350,8 +364,14 @@ static CmiIdleState *CmiNotifyGetState(void) {
     return s;
 }
 
+
+#if (DCMF_VERSION_MAJOR >= 2)
+static void send_done(void *data, DCMF_Error_t *err) 
+#else 
+static void send_done(void *data) 
+#endif
 /* send done callback: sets the smsg entry to done */
-static void send_done(void *data) {
+{
     SMSG_LIST *msg_tmp = (SMSG_LIST *)(data);
     CmiFree(msg_tmp->msg);
     //free(data);
@@ -360,21 +380,30 @@ static void send_done(void *data) {
     msgQueueLen--;
 }
 
+#if (DCMF_VERSION_MAJOR >= 2)
+static void send_multi_done(void *data, DCMF_Error_t *err) 
+#else 
+static void send_multi_done(void *data) 
+#endif
 /* send done callback: sets the smsg entry to done */
-static void send_multi_done(void *data) {
+{
     SMSG_LIST *msg_tmp = (SMSG_LIST *)(data);
     CmiFree(msg_tmp->msg);
-    CmiFree(msg_tmp->pelist);
+    free(msg_tmp->pelist);
 
-    free(data);
-    //smsg_free (msg_tmp);
+    smsg_free(msg_tmp);
 
     msgQueueLen--;
 }
 
 
+#if (DCMF_VERSION_MAJOR >= 2)
+static void recv_done(void *clientdata, DCMF_Error_t * err) 
+#else 
+static void recv_done(void *clientdata) 
+#endif
 /* recv done callback: push the recved msg to recv queue */
-static void recv_done(void *clientdata) {
+{
 
     char *msg = (char *) clientdata;
     int sndlen = ((CmiMsgHeaderBasic *) msg)->size;
@@ -452,7 +481,41 @@ void     short_pkt_recv (void             * clientdata,
 
     char * new_buffer = (char *)CmiAlloc(alloc_size);
     CmiMemcpy (new_buffer, buffer, sndlen);
+    
+#if (DCMF_VERSION_MAJOR >= 2)
+    recv_done (new_buffer, NULL);
+#else
     recv_done (new_buffer);
+#endif
+}
+
+
+DCMF_Request_t * first_multi_pkt_recv_done (const DCQuad      * info,
+					    unsigned            count,
+					    unsigned            senderrank,				       
+					    const unsigned      sndlen,
+					    unsigned            connid,
+					    void              * clientdata,
+					    unsigned          * rcvlen,
+					    char             ** buffer,
+					    unsigned          * pw,
+					    DCMF_Callback_t   * cb
+					    ) {
+    outstanding_recvs ++;
+    int alloc_size = sndlen + sizeof(DCMF_Request_t) + 16;
+
+    //printf ("%d: Receiving message %d bytes from %d\n", CmiMyPe(), sndlen, senderrank);
+
+    /* printf ("Receiving %d bytes\n", sndlen); */
+    *rcvlen = sndlen;  /* to avoid malloc(0) which might
+                                   return NULL */
+
+    *buffer = (char *)CmiAlloc(alloc_size);
+    cb->function = recv_done;
+    cb->clientdata = *buffer;
+
+    *pw  = 0x7fffffff;
+    return (DCMF_Request_t *) ALIGN_16(*buffer + sndlen);
 }
 
 
@@ -471,7 +534,7 @@ DCMF_Request_t * first_pkt_recv_done (void              * clientdata,
     //printf ("%d: Receiving message %d bytes from %d\n", CmiMyPe(), sndlen, senderrank);
 
     /* printf ("Receiving %d bytes\n", sndlen); */
-    *rcvlen = sndlen>0?sndlen:1;  /* to avoid malloc(0) which might
+    *rcvlen = sndlen;  /* to avoid malloc(0) which might
                                    return NULL */
 
     *buffer = (char *)CmiAlloc(alloc_size);
@@ -611,7 +674,7 @@ static  void *  bcast_recv     (unsigned               root,
 
     int alloc_size = sndlen + sizeof(BGTsRC_t) + 16;
 
-    *rcvlen = sndlen>0?sndlen:1;  /* to avoid malloc(0) which might
+    *rcvlen = sndlen;  /* to avoid malloc(0) which might
                                    return NULL */
 
     *rcvbuf       =  (char *)CmiAlloc(alloc_size);
@@ -743,6 +806,17 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     Cmi_argv = argv;
     Cmi_startfn = fn;
     Cmi_usrsched = usched;
+
+    //printf ("Starting Charm with %d nodes and %d processors\n", CmiNumNodes(), CmiNumPes());
+
+    DCMF_Multicast_Configuration_t mconfig;
+    mconfig.protocol = DCMF_MEMFIFO_DMA_MSEND_PROTOCOL;
+    mconfig.cb_recv  = first_multi_pkt_recv_done;
+    mconfig.clientdata = NULL;
+    mconfig.connectionlist = (void **) malloc (CmiNumPes() * sizeof(unsigned long));
+    mconfig.nconnections = CmiNumPes();  
+    DCMF_Multicast_register(&cmi_dcmf_multicast_registration, &mconfig);
+
 
     /* find dim = log2(numpes), to pretend we are a hypercube */
     for ( Cmi_dim=0,n=_Cmi_numpes; n>1; n/=2 )
@@ -1097,6 +1171,49 @@ void machineSend(SMSG_LIST *msg_tmp) {
 #endif
 }
 
+#define MAX_MULTICAST 128
+DCMF_Opcode_t  CmiOpcodeList [MAX_MULTICAST];
+
+void  machineMulticast(int npes, int *pelist, int size, char* msg){  
+  CQdCreate(CpvAccess(cQdState), npes);
+  
+  CmiAssert (npes < MAX_MULTICAST);
+
+  CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
+  ((CmiMsgHeaderBasic *)msg)->size = size;  
+  CMI_SET_BROADCAST_ROOT(msg,0);
+  CMI_SET_CHECKSUM(msg, size);
+  
+  SMSG_LIST *msg_tmp = smsg_allocate(); //(SMSG_LIST *) malloc(sizeof(SMSG_LIST));
+  
+  msg_tmp->destpe    = -1;      //multicast operation
+  msg_tmp->size      = size * npes; //keep track of #bytes outstanding
+  msg_tmp->msg       = msg;
+  msg_tmp->pelist    = pelist;
+  
+  msgQueueLen ++;
+  
+  DCMF_Multicast_t  mcast_info __attribute__((__aligned__(16)));
+  
+  mcast_info.registration   = & cmi_dcmf_multicast_registration;
+  mcast_info.request        = & msg_tmp->send;
+  mcast_info.cb_done.function    =   send_multi_done;
+  mcast_info.cb_done.clientdata  =   msg_tmp;
+  mcast_info.consistency    =   DCMF_MATCH_CONSISTENCY;
+  mcast_info.connection_id  =   CmiMyPe();
+  mcast_info.bytes          =   size;
+  mcast_info.src            =   msg;
+  mcast_info.nranks         =   npes;
+  mcast_info.ranks          =   (unsigned *)pelist;
+  mcast_info.opcodes        =   CmiOpcodeList;   //static list of MAX_MULTICAST entires with 0 in them
+  mcast_info.flags          =   0;
+  mcast_info.msginfo        =   &msg_tmp->info;
+  mcast_info.count          =   1;
+
+  DCMF_Multicast (&mcast_info);
+}
+
+
 
 void CmiGeneralFreeSendN (int node, int rank, int size, char * msg);
 
@@ -1104,6 +1221,11 @@ void CmiGeneralFreeSendN (int node, int rank, int size, char * msg);
  * Send is synchronous, and free msg after posted
  */
 void  CmiGeneralFreeSend(int destPE, int size, char* msg) {
+
+  if (destPE < 0 || destPE > CmiNumPes ())
+    printf ("Sending to %d\n", destPE);
+
+  CmiAssert (destPE >= 0 && destPE < CmiNumPes());
 
     CmiState cs = CmiGetState();
 
@@ -1409,8 +1531,8 @@ void AdvanceCommunications() {
     DCMF_CriticalSection_enter (0);
 #endif
 
-    //while(DCMF_Messager_advance()>0);
-    DCMF_Messager_advance();
+    while(DCMF_Messager_advance()>0);
+    //DCMF_Messager_advance();
 
 #if CMK_SMP
     DCMF_CriticalSection_exit (0);
@@ -1495,6 +1617,8 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg) {
     CmiFreeListSendFn(npes, pes, size, msg);
 }
 
+//#define OPTIMIZED_MULTICAST  0
+
 void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
 #if CMK_SMP && !CMK_MULTICORE
     //DCMF_CriticalSection_enter (0);
@@ -1517,6 +1641,27 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
             //my_loc = i;
         }
     }
+
+#if OPTIMIZED_MULTICAST
+#warning "Using Optimized Multicast"
+    if (npes > 1) {    
+      int *newpelist = (int *) malloc (sizeof(int) * npes);
+      int new_npes = 0;
+    
+      for(i=0; i<npes; i++) {
+	if(CmiNodeOf(pes[i]) == CmiMyNode()) 
+	  continue;
+	else
+	  newpelist[new_npes++] = pes[i];
+      }
+
+      if (new_npes >= 1)
+	machineMulticast (new_npes, newpelist, size, msg);
+      else
+	CmiFree (msg);
+      return;
+    }
+#endif
 
     for (i=0;i<npes;i++) {
         //if (pes[i] == CmiMyPe() || CmiNodeOf(pes[i]) == CmiMyNode());
@@ -1798,6 +1943,10 @@ CmiCommHandle CmiAsyncNodeBroadcastAllFn(int s, char *m) {
     return NULL;
 }
 #endif //end of CMK_NODE_QUEUE_AVAILABLE
+
+#include "manytomany.c"
+
+
 /*********************************************************************************************
 This section is for CmiDirect. This is a variant of the  persistent communication in which
 the user can transfer data between processors without using Charm++ messages. This lets the user

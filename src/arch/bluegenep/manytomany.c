@@ -94,7 +94,12 @@ void   CmiDirect_manytomany_initialize_recvbase ( void                 * h,
   assert ( tag < MAX_CONN  );
   handle->m2m_rcvbuf  [tag] = rcvbuf;
 
+#if (DCMF_VERSION_MAJOR >= 2)
   handle->m2m_rcb_done[tag].function   = (void (*)(void*, DCMF_Error_t *)) donecb;
+#else
+  handle->m2m_rcb_done[tag].function   = donecb;
+#endif
+
   handle->m2m_rcb_done[tag].clientdata = (void *) context;
   handle->m2m_nrcvranks  [tag] = nranks;
   
@@ -154,7 +159,12 @@ void   CmiDirect_manytomany_initialize_sendbase  ( void                 * h,
 
   assert ( tag < MAX_CONN  );
   handle->m2m_sndbuf[tag] = sndbuf;
+
+#if (DCMF_VERSION_MAJOR >= 2)
   handle->m2m_scb_done[tag].function   = (void (*)(void*, DCMF_Error_t *)) donecb;
+#else
+  handle->m2m_scb_done[tag].function   = donecb;
+#endif
   handle->m2m_scb_done[tag].clientdata = context;
   handle->m2m_nsndranks  [tag] = nranks;
   handle->m2m_srankIndex [tag] = myIdx;
