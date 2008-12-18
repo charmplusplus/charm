@@ -531,6 +531,7 @@ void NamedType::genProxyName(XStr& str,forWhom forElement)
    const char *prefix=forWhomStr(forElement);
    if (prefix==NULL)
 	   die("Unrecognized forElement type passed to NamedType::genProxyName");
+   if (scope) str << scope;
    str << prefix;
    print(str);
 }
@@ -770,12 +771,16 @@ Chare::genDecls(XStr& str)
     } else { //Generate normal CBase_me definition
       switch(b->length()) {
       case 1: //Just one base class: typedef CBaseT<parent,CProxy_me> CBase_me;
-	str << "typedef CBaseT<"<<b->getFirst()<<",CProxy_"<<type<<"> "
-	    <<" CBase_"<<type<<";\n";
+	str << "typedef CBaseT<";
+        if (b->getFirst()->getScope()) str << b->getFirst()->getScope();
+        str <<b->getFirst()<<",CProxy_"<<type<<"> "<<" CBase_"<<type<<";\n";
 	break;
       case 2: //Two base classes: typedef CBaseT2<parent1,parent2,CProxy_me> CBase_me;
-	str << "typedef CBaseT2<"<<b->getFirst()<<","<<b->getSecond()<<","
-	    <<"CProxy_"<<type<<"> "<<" CBase_"<<type<<";\n";
+	str << "typedef CBaseT2<";
+        if (b->getFirst()->getScope()) str << b->getFirst()->getScope();
+        str << b->getFirst() << ",";
+        if (b->getSecond()->getScope()) str << b->getSecond()->getScope();
+        str << b->getSecond() << "," <<"CProxy_"<<type<<"> "<<" CBase_"<<type<<";\n";
 	break;
       default: //No base class, or several: give up, don't generate a CBase_me.
 	break;

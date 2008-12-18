@@ -11,7 +11,7 @@ extern TList<Entry *> *connectEntries;
 ModuleList *modlist;
 extern int macroDefined(char *str, int istrue);
 extern char *python_doc;
-
+void splitScopedName(char* name, char** scope, char** basename);
 %}
 
 %union {
@@ -200,9 +200,9 @@ Construct	: OptExtern '{' ConstructList '}' OptSemiColon
                 | NAMESPACE Name '{' ConstructList '}'
                 { $$ = new Scope($2, $4); }
                 | USING NAMESPACE QualName ';'
-                { $$ = new UsingScope($3); }
+                { $$ = new UsingScope($3, false); }
                 | USING QualName ';'
-                { $$ = NULL; }
+                { $$ = new UsingScope($2, true); }
 		| OptExtern Module
 		{ $2->setExtern($1); $$ = $2; }
 		| OptExtern NonEntryMember 
@@ -284,7 +284,12 @@ BuiltinType	: INT
 		;
 
 NamedType	: Name OptTParams { $$ = new NamedType($1,$2); };
-QualNamedType	: QualName OptTParams { $$ = new NamedType($1,$2); };
+QualNamedType	: QualName OptTParams { 
+                    char* basename, *scope;
+                    splitScopedName($1, &scope, &basename);
+                    $$ = new NamedType(basename, $2, scope);
+                }
+                ;
 
 SimpleType	: BuiltinType
 		{ $$ = $1; }
@@ -453,9 +458,9 @@ OptBaseList	: /* Empty */
 		{ $$ = $2; }
 		;
 
-BaseList	: NamedType
+BaseList	: QualNamedType
 		{ $$ = new TypeList($1); }
-		| NamedType ',' BaseList
+		| QualNamedType ',' BaseList
 		{ $$ = new TypeList($1, $3); }
 		;
 

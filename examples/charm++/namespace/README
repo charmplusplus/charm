@@ -1,9 +1,5 @@
 This is a demonstration of using namespaces and inheritance in Charm++.
 The base class A is created in namespace Base, and a class B in namespace
-Base::Derived is derived from A. The main chare, Driver, imports the
-Base::Derived namespace to create a chare of type B, on which it then calls
-a method defined in A and a method defined in B.
+Base::Derived is derived from A. Class C in the global namespace inherits from
+B. The main chare, Driver, instantiates objects of types B and C.
 
-Note that the "using namespace" statement in Inherit.ci is not really
-necessary--it could be moved to Inherit.cc. However, it would be needed in
-the .ci file to inherit from a class inside a namespace.
