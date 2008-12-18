@@ -18,7 +18,10 @@
 #include <unistd.h>
 
 #include "trace.h"
+#include "trace-common.h"
 #include "ckhashtable.h"
+
+
 
 #if CMK_HAS_COUNTER_PAPI
 #include <papi.h>
@@ -55,8 +58,9 @@ class LogEntry {
     CmiObjId   id;
     int numpes;
     int *pes;
-	int userSuppliedData;
-	unsigned long memUsage;
+    int userSuppliedData;
+    char *userSuppliedNote;
+    unsigned long memUsage;
 
     // this is taken out so as to provide a placeholder value for non-PAPI
     // versions (whose value is *always* zero).
@@ -68,8 +72,13 @@ class LogEntry {
     unsigned char type; 
     char *fName;
     int flen;
+
   public:
-    LogEntry() {fName=NULL;flen=0;pes=NULL;numpes=0;}
+    
+    LogEntry() {
+      fName=NULL;flen=0;pes=NULL;numpes=0;userSuppliedNote = NULL;
+    }
+
     LogEntry(double tm, unsigned char t, unsigned short m=0, 
 	     unsigned short e=0, int ev=0, int p=0, int ml=0, 
 	     CmiObjId *d=NULL, double rt=0., double cputm=0., int numPe=0) {
@@ -79,20 +88,82 @@ class LogEntry {
       recvTime = rt; cputime = cputm;
       // initialize for papi as well as non papi versions.
       numPapiEvents = 0;
+      userSuppliedNote = NULL;
 #if CMK_HAS_COUNTER_PAPI
       papiIDs = NULL;
       papiValues = NULL;
 #endif
-      fName = NULL; flen=0;
+      fName = NULL;
+      flen=0;
       pes=NULL;
       numpes=numPe;
     }
+
     LogEntry(double _time,unsigned char _type,unsigned short _funcID,
 	     int _lineNum,char *_fileName){
       time = _time;
       type = _type;
       mIdx = _funcID;
       event = _lineNum;
+      userSuppliedNote = NULL;      
+      pes=NULL;
+      numpes=0;
+      setFName(_fileName);
+    }
+
+    // Constructor for User Supplied Data
+    LogEntry(double _time,unsigned char _type, int value,
+	     int _lineNum,char *_fileName){
+      time = _time;
+      type = _type;
+      userSuppliedData = value;
+      userSuppliedNote = NULL;
+      pes=NULL;
+      numpes=0;
+      setFName(_fileName);
+    }
+
+    // Constructor for User Supplied Data
+    LogEntry(double _time,unsigned char _type, char* note,
+	     int _lineNum,char *_fileName){
+      time = _time;
+      type = _type;
+      pes=NULL;
+      numpes=0;
+      setFName(_fileName);
+      if(note != NULL)
+	setUserSuppliedNote(note);
+    }
+
+    // Constructor for multicast data
+    LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
+	     int ml, CmiObjId *d, double rt, int numPe, int *pelist){
+
+      type = CREATION_MULTICAST; 
+      mIdx = m; 
+      eIdx = e; 
+      event = ev; 
+      pe = p; 
+      time = tm; 
+      msglen = ml;
+      
+      if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=-1; };
+      recvTime = rt; 
+      numpes = numPe;
+      userSuppliedNote = NULL;
+      if (pelist != NULL) {
+	pes = new int[numPe];
+	for (int i=0; i<numPe; i++) {
+	  pes[i] = pelist[i];
+	}
+      } else {
+	pes= NULL;
+      }
+
+    }
+
+
+    void setFName(char *_fileName){
       if(_fileName == NULL){
 	fName = NULL;
 	flen = 0;
@@ -102,46 +173,41 @@ class LogEntry {
 	memcpy(fName+1,_fileName,strlen(_fileName)+1);
 	flen = strlen(fName)+1;
       }	
-      pes=NULL;numpes=0;
     }
 
-	// Constructor for User Supplied Data
-	LogEntry(double _time,unsigned char _type, int value,
-	     int _lineNum,char *_fileName){
-      time = _time;
-      type = _type;
-      userSuppliedData = value;
-      if(_fileName == NULL){
-		fName = NULL;
-		flen = 0;
-      }else{
-		fName = new char[strlen(_fileName)+2];
-		fName[0] = ' ';
-		memcpy(fName+1,_fileName,strlen(_fileName)+1);
-		flen = strlen(fName)+1;
-      }	
-      pes=NULL;numpes=0;
-    }
 
-    // **CW** new constructor for multicast data
-    LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
-	     int ml, CmiObjId *d, double rt, int numPe, int *pelist);
+
     // complementary function for adding papi data
     void addPapi( int numPapiEvts, int *papi_ids, LONG_LONG_PAPI *papiVals);
-   	void setUserSuppliedData(int data){
-	  userSuppliedData = data;
-	}
+   
+    void setUserSuppliedData(int data){
+      userSuppliedData = data;
+    }
 
-	/// A constructor for a memory usage record
-	LogEntry(unsigned char _type, double _time, long _memUsage) {
-	    time = _time;
-		type = _type;
-		memUsage = _memUsage;
-		fName = NULL;
-		flen = 0;
-		pes=NULL;
-		numpes=0;
+    void setUserSuppliedNote(char *note){
+
+      int length = strlen(note)+1;
+      userSuppliedNote = new char[length];
+      memcpy(userSuppliedNote,note,length);
+      for(int i=0;i<length;i++){
+	if(userSuppliedNote[i] == '\n' || userSuppliedNote[i] == '\r'){
+	  userSuppliedNote[i] = ' ';
 	}
+      }
+	  
+    }
+	
+
+    /// A constructor for a memory usage record
+    LogEntry(unsigned char _type, double _time, long _memUsage) {
+      time = _time;
+      type = _type;
+      memUsage = _memUsage;
+      fName = NULL;
+      flen = 0;
+      pes=NULL;
+      numpes=0;
+    }
 
 
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
@@ -153,6 +219,7 @@ class LogEntry {
     void pup(PUP::er &p);
     ~LogEntry(){
       if (fName) delete [] fName;
+      if (userSuppliedNote) delete [] userSuppliedNote;
     }
 };
 
@@ -221,6 +288,10 @@ class LogPool {
 
 	/** add a record for a user supplied piece of data */
 	void addUserSupplied(int data);
+
+	/** add a record for a user supplied piece of data */
+	void addUserSuppliedNote(char *note);
+
 
     void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
   
@@ -319,6 +390,7 @@ class TraceProjections : public Trace {
     void userEvent(int e);
     void userBracketEvent(int e, double bt, double et);
     void userSuppliedData(int e);
+    void userSuppliedNote(char* note);
     void memoryUsage(double m);
     void creation(envelope *e, int epIdx, int num=1);
     void creationMulticast(envelope *e, int epIdx, int num=1, int *pelist=NULL);

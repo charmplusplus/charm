@@ -10,8 +10,15 @@
 #include "trace-common.h"
 
 /**
- *  TraceControlPoints is a template for an instrumentation module making use of
- *    the tracing framework hooks provided in Charm++.
+ *   \addtogroup ControlPointFramework
+ *   @{
+ */
+
+
+/**
+ *    An instrumentation module making use of
+ *    the tracing framework hooks provided in Charm++. It is used 
+ *    by the control point framework to monitor idle time.
  *
  *  Only the more common hooks are listened to in this module.
  */
@@ -98,6 +105,6 @@ class TraceControlPoints : public Trace {
 TraceControlPoints *localControlPointTracingInstance();
 
 
+/*! @} */
 #endif
 
-/*@}*/

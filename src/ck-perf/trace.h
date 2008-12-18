@@ -73,6 +73,9 @@ class Trace {
 	// a user supplied integer value(likely a timestep)
 	virtual void userSuppliedData(int e) {}
 
+	// a user supplied integer value(likely a timestep)
+	virtual void userSuppliedNote(char *note) {}
+
 	// the current memory usage as a double
 	virtual void memoryUsage(double currentMemUsage) {}
 	
@@ -186,6 +189,9 @@ public:
     inline void userBracketEvent(int e,double bt, double et) {ALLDO(userBracketEvent(e,bt,et));}
     
 	inline void userSuppliedData(int d) { ALLDO(userSuppliedData(d));}
+
+	inline void userSuppliedNote(char *note) { ALLDO(userSuppliedNote(note));}
+
 
 	inline void memoryUsage(double memUsage) { ALLDO(memoryUsage(memUsage));}
 

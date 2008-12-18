@@ -383,6 +383,15 @@ void traceUserSuppliedData(int d)
 }
 
 extern "C"
+void traceUserSuppliedNote(char * note)
+{
+#ifndef CMK_OPTIMIZE
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->userSuppliedNote(note);
+#endif
+}
+
+extern "C"
 void traceMemoryUsage()
 {
 #ifndef CMK_OPTIMIZE

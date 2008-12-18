@@ -2,6 +2,13 @@
 #include "trace-controlPoints.h"
 #include "trace-controlPointsBOC.h"
 
+
+/**
+ *   \addtogroup ControlPointFramework
+ *   @{
+ */
+
+
 // Charm++ "processor"(user thread)-private global variable
 CkpvStaticDeclare(TraceControlPoints*, _trace);
 

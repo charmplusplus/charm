@@ -598,6 +598,17 @@ void LogPool::addUserSupplied(int data){
 	pool[numEntries-1].setUserSuppliedData(data);
   }
 
+
+void LogPool::addUserSuppliedNote(char *note){
+	// add an event
+	add(USER_SUPPLIED_NOTE, 0, 0, TraceTimer(), -1, -1, 0, 0, 0, 0, 0 );
+
+	// set the user supplied note for the previously created event 
+	pool[numEntries-1].setUserSuppliedNote(note);
+  }
+
+
+
 /* **CW** Not sure if this is the right thing to do. Feels more like
    a hack than a solution to Sameer's request to add the destination
    processor information to multicasts and broadcasts.
@@ -624,23 +635,27 @@ void LogPool::postProcessLog()
 #endif
 }
 
-/** Constructor for a multicast log entry */
-LogEntry::LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
-	     int ml, CmiObjId *d, double rt, int numPe, int *pelist) 
-{
-    type = CREATION_MULTICAST; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
-    if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=-1; };
-    recvTime = rt; 
-    numpes = numPe;
-    if (pelist != NULL) {
-	pes = new int[numPe];
-	for (int i=0; i<numPe; i++) {
-	  pes[i] = pelist[i];
-	}
-    } else {
-	pes= NULL;
-    }
-}
+// /** Constructor for a multicast log entry */
+// 
+//  THIS WAS MOVED TO trace-projections.h with the other constructors
+// 
+// LogEntry::LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
+// 	     int ml, CmiObjId *d, double rt, int numPe, int *pelist) 
+// {
+//     type = CREATION_MULTICAST; mIdx = m; eIdx = e; event = ev; pe = p; time = tm; msglen = ml;
+//     if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=-1; };
+//     recvTime = rt; 
+//     numpes = numPe;
+//     userSuppliedNote = NULL;
+//     if (pelist != NULL) {
+// 	pes = new int[numPe];
+// 	for (int i=0; i<numPe; i++) {
+// 	  pes[i] = pelist[i];
+// 	}
+//     } else {
+// 	pes= NULL;
+//     }
+// }
 
 void LogEntry::addPapi(int numPapiEvts, int *papi_ids, LONG_LONG_PAPI *papiVals)
 {
@@ -724,6 +739,20 @@ void LogEntry::pup(PUP::er &p)
 	  p|userSuppliedData;
 	  p|itime;
 	break;
+    case USER_SUPPLIED_NOTE:
+	  p|itime;
+	  int length;
+	  if (p.isPacking()) length = strlen(userSuppliedNote);
+          p | length;
+	  char space;
+	  space = ' ';
+          p | space;
+	  if (p.isUnpacking()) {
+	    userSuppliedNote = new char[length+1];
+	    userSuppliedNote[length] = '\0';
+	  }
+   	  PUParray(p,userSuppliedNote, length);
+	  break;
     case MEMORY_USAGE_CURRENT:
       p | memUsage;
       p | itime;
@@ -990,6 +1019,12 @@ void TraceProjections::userSuppliedData(int d)
 {
   if (!computationStarted) return;
   _logPool->addUserSupplied(d);
+}
+
+void TraceProjections::userSuppliedNote(char *note)
+{
+  if (!computationStarted) return;
+  _logPool->addUserSuppliedNote(note);
 }
 
 void TraceProjections::memoryUsage(double m)
