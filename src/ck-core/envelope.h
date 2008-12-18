@@ -34,7 +34,7 @@
 
 
 
-#define USE_CRITICAL_PATH_HEADER_ARRAY
+// #define USE_CRITICAL_PATH_HEADER_ARRAY
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
 // This critical path detection is still experimental
