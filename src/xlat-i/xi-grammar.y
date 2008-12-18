@@ -85,7 +85,9 @@ extern char *python_doc;
 %token CONNECT
 %token PUBLISHES 
 %token PYTHON LOCAL
-%token <strval> IDENT NUMBER LITERAL CPROGRAM HASHIF HASHIFDEF SCOPE
+%token NAMESPACE
+%token USING 
+%token <strval> IDENT NUMBER LITERAL CPROGRAM HASHIF HASHIFDEF
 %token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED
 
 %type <modlist>		ModuleEList File
@@ -162,10 +164,10 @@ Name		: IDENT
 
 QualName	: IDENT
 		{ $$ = $1; }
-		| QualName SCOPE IDENT
+		| QualName ':'':' IDENT
 		{
-		  char *tmp = new char[strlen($1)+strlen($3)+3];
-		  sprintf(tmp,"%s::%s", $1, $3);
+		  char *tmp = new char[strlen($1)+strlen($4)+3];
+		  sprintf(tmp,"%s::%s", $1, $4);
 		  $$ = tmp;
 		}
 		;
@@ -195,6 +197,12 @@ ConstructList	: /* Empty */
 
 Construct	: OptExtern '{' ConstructList '}' OptSemiColon
 		{ if($3) $3->setExtern($1); $$ = $3; }
+                | NAMESPACE Name '{' ConstructList '}'
+                { $$ = new Scope($2, $4); }
+                | USING NAMESPACE QualName ';'
+                { $$ = new UsingScope($3); }
+                | USING QualName ';'
+                { $$ = NULL; }
 		| OptExtern Module
 		{ $2->setExtern($1); $$ = $2; }
 		| OptExtern NonEntryMember 
@@ -445,13 +453,13 @@ OptBaseList	: /* Empty */
 		{ $$ = $2; }
 		;
 
-BaseList	: QualNamedType
+BaseList	: NamedType
 		{ $$ = new TypeList($1); }
-		| QualNamedType ',' BaseList
+		| NamedType ',' BaseList
 		{ $$ = new TypeList($1, $3); }
 		;
 
-Chare		: CHARE CAttribs QualNamedType OptBaseList MemberEList
+Chare		: CHARE CAttribs NamedType OptBaseList MemberEList
 		{ $$ = new Chare(lineno, $2, $3, $4, $5); }
 		| MAINCHARE CAttribs NamedType OptBaseList MemberEList
 		{ $$ = new MainChare(lineno, $2, $3, $4, $5); }
@@ -475,9 +483,9 @@ ArrayIndexType	: '[' NUMBER Name ']'
 		{ $$ = new NamedType($2); }
 		;
 
-Array		: ARRAY ArrayAttribs ArrayIndexType QualNamedType OptBaseList MemberEList
+Array		: ARRAY ArrayAttribs ArrayIndexType NamedType OptBaseList MemberEList
 		{  $$ = new Array(lineno, $2, $3, $4, $5, $6); }
-		| ARRAY ArrayIndexType ArrayAttribs QualNamedType OptBaseList MemberEList
+		| ARRAY ArrayIndexType ArrayAttribs NamedType OptBaseList MemberEList
 		{  $$ = new Array(lineno, $3, $2, $4, $5, $6); }
 		;
 

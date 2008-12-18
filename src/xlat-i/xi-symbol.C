@@ -531,47 +531,8 @@ void NamedType::genProxyName(XStr& str,forWhom forElement)
    const char *prefix=forWhomStr(forElement);
    if (prefix==NULL)
 	   die("Unrecognized forElement type passed to NamedType::genProxyName");
-   str << scope << prefix << unscopedName;
-   if(tparams) {
-       str << "<"<<tparams<<" >";
-   }
-
-    /*
-   char* scopeDelimiter = strrchr(name, ':');
-   if (!scopeDelimiter) {
-       str << prefix;
-       print(str);
-       return;
-   }
-   // handle scoped names
-   char tmp = *(scopeDelimiter+1);
-   *(scopeDelimiter+1) = '\0';
-   str << name;
    str << prefix;
-   *(scopeDelimiter+1) = tmp;
-   str << scopeDelimiter+1;
-   if(tparams) {
-       str << "<"<<tparams<<" >";
-   }
-   */
-}
-
-void NamedType::genIndexName(XStr& str)
-{ 
-    str << scope << Prefix::Index << unscopedName;
-    if (tparams) {
-        str << "<" << tparams << " >";
-    }
-    //str << Prefix::Index; 
-    //print(str);
-}
-
-void NamedType::genMsgProxyName(XStr& str) {
-    str << scope << Prefix::Message << unscopedName;
-    if (tparams) {
-        str << "<" << tparams << " >";
-    }
-    //str << Prefix::Message; print(str);
+   print(str);
 }
 
 void TypeList::genProxyNames(XStr& str, const char *prefix, const char *middle,
@@ -658,7 +619,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, MemberList *l)
 		if(isMigratable()) {
 			Entry *e=new Entry(ln,SMIGRATE,NULL,
 			  (char *)type->getBaseName(),
-			/Users/abecker/code/charm.git/bin/charmxi  new ParamList(new Parameter(line,
+			  new ParamList(new Parameter(line,
 				new PtrType(new NamedType((char *)"CkMigrateMessage")))),0,0,0);
 			e->setChare(this);
 			list=new MemberList(e,list);
@@ -760,7 +721,7 @@ Chare::genDecls(XStr& str)
   else
   { //Actual implementation
     str << CIClassStart;
-    genTypedefs(str);/Users/abecker/code/charm.git/bin/charmxi
+    genTypedefs(str);
     str << "    static int __idx;\n";
     str << "    static void __register(const char *s, size_t size);\n";
     if(list)

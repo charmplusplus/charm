@@ -89,20 +89,21 @@
      PUBLISHES = 305,
      PYTHON = 306,
      LOCAL = 307,
-     IDENT = 308,
-     NUMBER = 309,
-     LITERAL = 310,
-     CPROGRAM = 311,
-     HASHIF = 312,
-     HASHIFDEF = 313,
-     SCOPE = 314,
-     INT = 315,
-     LONG = 316,
-     SHORT = 317,
-     CHAR = 318,
-     FLOAT = 319,
-     DOUBLE = 320,
-     UNSIGNED = 321
+     NAMESPACE = 308,
+     USING = 309,
+     IDENT = 310,
+     NUMBER = 311,
+     LITERAL = 312,
+     CPROGRAM = 313,
+     HASHIF = 314,
+     HASHIFDEF = 315,
+     INT = 316,
+     LONG = 317,
+     SHORT = 318,
+     CHAR = 319,
+     FLOAT = 320,
+     DOUBLE = 321,
+     UNSIGNED = 322
    };
 #endif
 /* Tokens.  */
@@ -156,20 +157,21 @@
 #define PUBLISHES 305
 #define PYTHON 306
 #define LOCAL 307
-#define IDENT 308
-#define NUMBER 309
-#define LITERAL 310
-#define CPROGRAM 311
-#define HASHIF 312
-#define HASHIFDEF 313
-#define SCOPE 314
-#define INT 315
-#define LONG 316
-#define SHORT 317
-#define CHAR 318
-#define FLOAT 319
-#define DOUBLE 320
-#define UNSIGNED 321
+#define NAMESPACE 308
+#define USING 309
+#define IDENT 310
+#define NUMBER 311
+#define LITERAL 312
+#define CPROGRAM 313
+#define HASHIF 314
+#define HASHIFDEF 315
+#define INT 316
+#define LONG 317
+#define SHORT 318
+#define CHAR 319
+#define FLOAT 320
+#define DOUBLE 321
+#define UNSIGNED 322
 
 
 
@@ -213,7 +215,7 @@ typedef union YYSTYPE
   SdagConstruct *sc;
 }
 /* Line 1489 of yacc.c.  */
-#line 217 "y.tab.h"
+#line 219 "y.tab.h"
 	YYSTYPE;
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1

@@ -64,7 +64,6 @@ nonIntExpr [^();,:]*
 "#if" 		{ Return Token(HASHIF); }
 "#ifdef" 	{ Return Token(HASHIFDEF); }
 "#endif" 	{ in_comment = 0; /* comments */ }
-"::"            { Return Token(SCOPE); }
 {ws}		{ /* ignore white space */ }
 {nl}		{ lineno++;}
 {number}	{ Yval; Return Token(NUMBER); }
@@ -137,6 +136,8 @@ struct rwtable rwtable[] = {
   "connect",    CONNECT,
   "publishes",  PUBLISHES,
   "python",     PYTHON,
+  "namespace",  NAMESPACE,
+  "using",      USING,
   "",		0
 };
 

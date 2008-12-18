@@ -159,45 +159,27 @@ class BuiltinType : public Type {
 
 class NamedType : public Type {
   private:
-    char* name;
-    char* scope;
-    char* unscopedName;
-    TParamList* tparams;
+    char *name;
+    TParamList *tparams;
   public:
     NamedType(const char* n, TParamList* t=0)
-       : name((char *)n), tparams(t) {
-            if (!name) return;
-            scope = new char[strlen(name)];
-            unscopedName = new char[strlen(name)];
-            char* lastScope = strrchr(name, ':');
-            if (lastScope) {
-                strncpy(scope, name, lastScope-name);
-                strcpy(unscopedName, lastScope+1);
-            } else {
-                strcpy(unscopedName, name);
-            }
-       }
-    ~NamedType() {
-        delete[] scope;
-        delete[] unscopedName;
-    }
+       : name((char *)n), tparams(t) {}
     int isTemplated(void) const { return (tparams!=0); }
     int isCkArgMsg(void) const {return 0==strcmp(name,"CkArgMsg");}
     int isCkMigMsg(void) const {return 0==strcmp(name,"CkMigrateMessage");}
     void print(XStr& str);
     int isNamed(void) const {return 1;}
-    char *getBaseName(void) const {
-        return name;
-    }
-    char* getUnscopedName(void) const {
-        return unscopedName;
-    }
-    char* getScope(void) const {
-        return scope;
-    }
+    char *getBaseName(void) const { return name; }
     virtual void genProxyName(XStr& str,forWhom forElement);
-    virtual void genIndexName(XStr& str);
-    virtual void genMsgProxyName(XStr& str);
+    virtual void genIndexName(XStr& str) 
+    { 
+      str << Prefix::Index; 
+      print(str);
+    }
+    virtual void genMsgProxyName(XStr& str) 
+    { 
+      str << Prefix::Message; print(str);
+    }
 };
 
 class PtrType : public Type {
@@ -426,6 +408,58 @@ class TParamVal : public TParam {
     void print(XStr& str) { str << val; }
     void genSpec(XStr& str) { str << val; }
 };
+
+class Scope : public Construct {
+  protected:
+    char* name_;
+    ConstructList* contents_;
+  public:
+    Scope(char* name, ConstructList* contents) : contents_(contents), name_(name) {}
+    virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {
+        contents_->genPub(declstr, defstr, defconstr, connectPresent);
+    }
+    virtual void genDecls(XStr& str) {
+        str << "namespace " << name_ << " {\n";
+        contents_->genDecls(str);
+        str << "} // namespace " << name_ << "\n";
+    }
+    virtual void genDefs(XStr& str) {
+        str << "namespace " << name_ << " {\n";
+        contents_->genDefs(str);
+        str << "} // namespace " << name_ << "\n";
+    }
+    virtual void genReg(XStr& str) {
+        str << "using namespace " << name_ << ";\n";
+        contents_->genReg(str);
+    }
+    virtual void preprocess() {
+        contents_->preprocess();
+    }
+    virtual void print(XStr& str) {
+        str << "namespace " << name_ << "{\n";
+        contents_->print(str);
+        str << "} // namespace " << name_ << "\n";
+    }
+};
+
+class UsingScope : public Construct {
+  protected:
+    char* name_;
+  public:
+    UsingScope(char* name) : name_(name) {}
+    virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
+    virtual void genDecls(XStr& str) {
+        str << "using namespace " << name_ << ";\n";
+    }
+    virtual void genDefs(XStr& str) {}
+    virtual void genReg(XStr& str) {}
+    virtual void preprocess() {}
+    virtual void print(XStr& str) {
+        str << "using namespace " << name_ << ";\n";
+    }
+};
+
+
 /* A template construct */
 class TVarList;
 class TEntity;
@@ -617,9 +651,6 @@ class Chare : public TEntity {
     	str<<type->getBaseName();
     	if (withTemplates) str<<tvars();
     	return str;
-    }
-    char* unscopedName() {
-        return type->getUnscopedName();
     }
     int  isTemplated(void) { return (templat!=0); }
     int  isMigratable(void) { return attrib&CMIGRATABLE; }
@@ -847,10 +878,7 @@ class Entry : public Member {
     int isThreaded(void) { return (attribs & STHREADED); }
     int isSync(void) { return (attribs & SSYNC); }
     int isIget(void) { return (attribs & SIGET); }
-    int isConstructor(void) { 
-        printf("comparing %s with %s\n", name, container->unscopedName());
-        return !strcmp(name, container->unscopedName());
-    }
+    int isConstructor(void) { return !strcmp(name, container->baseName(0).get_string());}
     int isExclusive(void) { return (attribs & SLOCKED); }
     int isImmediate(void) { return (attribs & SIMMEDIATE); }
     int isSkipscheduler(void) { return (attribs & SSKIPSCHED); }
