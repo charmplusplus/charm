@@ -34,7 +34,7 @@ using namespace std;
 #define NUM_SAMPLES_BEFORE_TRANSISTION 5
 #define OPTIMIZER_TRANSITION 5
 
-#define WRITEDATAFILE 1
+#define WRITEDATAFILE 0
 
 
 
@@ -584,6 +584,14 @@ public:
     if(CkMyPe() == 0)
       CcdCallFnAfterOnPE((CcdVoidFn)periodicProcessControlPoints, (void*)NULL, CONTROL_POINT_SAMPLE_PERIOD, CkMyPe());
 
+    traceRegisterUserEvent("No currently executing message", 5000);
+    traceRegisterUserEvent("Zero time along critical path", 5010);
+    traceRegisterUserEvent("Positive total time along critical path", 5020);
+
+#if USER_EVENT_FOR_REGISTERTERMINALPATH
+    traceRegisterUserEvent("registerTerminalPath", 100); 
+#endif
+
   }
   
   ~controlPointManager(){
@@ -1089,8 +1097,10 @@ public:
       }
     }
 
-    traceRegisterUserEvent("registerTerminalPath", 100); 
+#if USER_EVENT_FOR_REGISTERTERMINALPATH
     traceUserBracketEvent(100, beginTime, CmiWallTimer());
+#endif
+
 #endif
   }
 
@@ -1674,6 +1684,32 @@ void printPECriticalPath(){
 void resetPECriticalPath(){
   localControlPointManagerProxy.ckLocalBranch()->resetTerminalPath();
 }
+
+
+
+
+
+/// A debugging routine that outputs critical path info as user events.
+void  saveCriticalPathAsUserEvent(){
+  if(currentlyExecutingMsg==NULL){
+    traceUserEvent(5000);
+  } else if(currentlyExecutingMsg->pathHistory.getTotalTime() > 0.0){
+    //traceUserEvent(5020);
+
+    char *note = new char[4096];
+    currentlyExecutingMsg->pathHistory.printHTMLToString(note);
+    traceUserSuppliedNote(note); // stores a copy of the string
+    delete[] note;
+
+  } else {
+    traceUserEvent(5010);
+  }
+
+  
+
+  
+}
+
 
 #endif
 

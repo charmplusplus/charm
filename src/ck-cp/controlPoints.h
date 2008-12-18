@@ -56,6 +56,8 @@ void controlPointPriorityArray(const char *name, CProxy_ArrayBase &arraybase);
 void controlPointPriorityEntry(const char *name, int idx);
 
 
+/// A debugging routine that outputs critical path info as user events.
+void  saveCriticalPathAsUserEvent();
 
 /// The application specifies that it is ready to proceed to a new set of control point values.
 /// This should be called after registerControlPointTiming()
