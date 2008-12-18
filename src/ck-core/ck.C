@@ -62,6 +62,48 @@ void resetThisEntryPath(){
 }
 
 
+void  saveCriticalPathAsUserEvent(void);
+
+void bracketStartCriticalPathMethod(envelope * env){ 
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  // store the pointer to the currently executing msg
+  currentlyExecutingMsg = env; 
+  thisMethodSentAMessage = false;
+
+  // Increase the counts for the entry that we are about to execute
+  env->updateCounts();
+  
+  // Increase the reference count for the message so the user won't delete it
+  CmiReference(env);
+  
+  saveCriticalPathAsUserEvent();
+
+  timeEntryMethodStarted = CmiWallTimer();
+
+#endif
+}
+
+
+void bracketEndCriticalPathMethod(envelope * env){ 
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  double timeEntryMethodEnded = CmiWallTimer();
+  env->pathHistory.incrementTotalTime(timeEntryMethodEnded-timeEntryMethodStarted);
+  if(!thisMethodSentAMessage){
+    registerTerminalEntryMethod();
+  }
+
+  CmiFree(env); // free the message, because we incremented its reference count above
+
+  // set to NULL the pointer to the currently executing msg
+  currentlyExecutingMsg = NULL; 
+  //  CkPrintf("This entry method is %s\n", (int)thisMethodSentAMessage?"non-terminal":"terminal");
+
+#endif
+
+}
+
+
 #endif
 
 
@@ -488,23 +530,6 @@ static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
 static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
 {
 
-
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  // store the pointer to the currently executing msg
-  currentlyExecutingMsg = env; 
-  thisMethodSentAMessage = false;
-
-  // Increase the counts for the entry that we are about to execute
-  env->updateCounts();
-  
-  // Increase the reference count for the message so the user won't delete it
-  CmiReference(env);
-  timeEntryMethodStarted = CmiWallTimer();
-
-#endif
-
-
-
 #ifndef CMK_OPTIMIZE /* Consider tracing: */
   if (_entryTable[epIdx]->traceEnabled) {
     _TRACE_BEGIN_EXECUTE(env);
@@ -514,22 +539,6 @@ static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
   else
 #endif
     _invokeEntryNoTrace(epIdx,env,obj);
-
-
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
- double timeEntryMethodEnded = CmiWallTimer();
- env->pathHistory.incrementTotalTime(timeEntryMethodEnded-timeEntryMethodStarted);
- if(!thisMethodSentAMessage){
-    registerTerminalEntryMethod();
-  }
-
-  CmiFree(env); // free the message, because we incremented its reference count above
-
-  // set to NULL the pointer to the currently executing msg
-  currentlyExecutingMsg = NULL; 
-  //  CkPrintf("This entry method is %s\n", (int)thisMethodSentAMessage?"non-terminal":"terminal");
-
-#endif
 
 }
 
@@ -948,11 +957,19 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
 void _processHandler(void *converseMsg,CkCoreState *ck)
 {
   register envelope *env = (envelope *) converseMsg;
+
 //#if CMK_RECORD_REPLAY
   if (ck->watcher!=NULL) {
     if (!ck->watcher->processMessage(env,ck)) return;
   }
 //#endif
+
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  bracketStartCriticalPathMethod(env);
+#endif
+
+
   switch(env->getMsgtype()) {
 // Group support
     case BocInitMsg :
@@ -1014,6 +1031,12 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
     default:
       CmiAbort("Fatal Charm++ Error> Unknown msg-type in _processHandler.\n");
   }
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  bracketEndCriticalPathMethod(env);
+#endif
+
+
 }
 
 

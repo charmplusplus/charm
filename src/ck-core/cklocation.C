@@ -1024,6 +1024,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 		    		 ForChareMsg,epIdx,env->getsetArraySrcPe(), env->getTotalsize(), idx.getProjectionID((((CkGroupID)env->getsetArrayMgr())).idx));
 	}
 #endif
+
 	if (doFree) 
 	   CkDeliverMessageFree(epIdx,msg,obj);
 	else /* !doFree */
@@ -1088,48 +1089,8 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 		CpvAccess(CkGridObject) = obj;
 #endif
 
-
-
-
-
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-	// store the pointer to the currently executing msg
-	envelope *env = UsrToEnv(msg);
-	currentlyExecutingMsg = env; 
-	thisMethodSentAMessage = false;
-
-	// Increase the counts for the entry that we are about to execute
-	env->updateCounts();
-	
-	// Increase the reference count for the message so the user won't delete it
-	CmiReference(env);
-
-	// Store the current time
-	timeEntryMethodStarted = CmiWallTimer();
-#endif
-
 	CmiBool status = invokeEntry(obj,(void *)msg,msg->array_ep(),doFree);
 	
-
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  double timeEntryMethodEnded = CmiWallTimer();
-  env->pathHistory.incrementTotalTime(timeEntryMethodEnded-timeEntryMethodStarted);
-  if(!thisMethodSentAMessage){
-    registerTerminalEntryMethod();
-  }
-
-  CmiFree(env); // free the message, because we incremented its reference count above
-
-  // set to NULL the pointer to the currently executing msg
-  currentlyExecutingMsg = NULL;
-  //  CkPrintf("This entry method is %s\n", (int)thisMethodSentAMessage?"non-terminal":"terminal");
-#endif
-
-
-
-
-
-
 #if CMK_GRID_QUEUE_AVAILABLE
 		CpvAccess(CkGridObject) = NULL;
 #endif
@@ -1138,7 +1099,6 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 #endif
 		return status;
 	}
-
 
 
 }

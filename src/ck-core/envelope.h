@@ -34,7 +34,7 @@
 
 
 
-// #define USE_CRITICAL_PATH_HEADER_ARRAY
+#define USE_CRITICAL_PATH_HEADER_ARRAY
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
 // This critical path detection is still experimental
@@ -63,6 +63,11 @@ extern void resetCricitalPathDetection();
 
 // Reset the counts for the currently executing message
 extern void resetThisEntryPath();
+
+
+extern void bracketStartCriticalPathMethod(envelope * env);
+extern void bracketEndCriticalPathMethod(envelope * env);
+
 
 #endif
 
@@ -167,6 +172,23 @@ class PathHistory {
       }
     }
     CkPrintf("\n");
+  }
+
+  /// Write a description of the path into the beginning of the provided buffer. The buffer ought to be large enough.
+  void printHTMLToString(char* buf) const {
+    buf[0] = '\0';
+
+    sprintf(buf+strlen(buf), "Path Time=%lf<br>", (double)totalTime);
+    for(int i=0;i<numEpIdxs;i++){
+      if(epIdxCount[i]>0){
+	sprintf(buf+strlen(buf),"EP %d count=%d<br>", i, (int)epIdxCount[i]);
+      }
+    }
+    for(int i=0;i<numArrayIds;i++){
+      if(arrayIdxCount[i]>0){
+	sprintf(buf+strlen(buf), "Array %d count=%d<br>", i, (int)arrayIdxCount[i]);
+      }
+    }
   }
   
   void incrementTotalTime(double time){
