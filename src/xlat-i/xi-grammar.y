@@ -85,7 +85,7 @@ extern char *python_doc;
 %token CONNECT
 %token PUBLISHES 
 %token PYTHON LOCAL
-%token <strval> IDENT NUMBER LITERAL CPROGRAM HASHIF HASHIFDEF
+%token <strval> IDENT NUMBER LITERAL CPROGRAM HASHIF HASHIFDEF SCOPE
 %token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED
 
 %type <modlist>		ModuleEList File
@@ -162,10 +162,10 @@ Name		: IDENT
 
 QualName	: IDENT
 		{ $$ = $1; }
-		| QualName ':'':' IDENT
+		| QualName SCOPE IDENT
 		{
-		  char *tmp = new char[strlen($1)+strlen($4)+3];
-		  sprintf(tmp,"%s::%s", $1, $4);
+		  char *tmp = new char[strlen($1)+strlen($3)+3];
+		  sprintf(tmp,"%s::%s", $1, $3);
 		  $$ = tmp;
 		}
 		;
@@ -445,13 +445,13 @@ OptBaseList	: /* Empty */
 		{ $$ = $2; }
 		;
 
-BaseList	: NamedType
+BaseList	: QualNamedType
 		{ $$ = new TypeList($1); }
-		| NamedType ',' BaseList
+		| QualNamedType ',' BaseList
 		{ $$ = new TypeList($1, $3); }
 		;
 
-Chare		: CHARE CAttribs NamedType OptBaseList MemberEList
+Chare		: CHARE CAttribs QualNamedType OptBaseList MemberEList
 		{ $$ = new Chare(lineno, $2, $3, $4, $5); }
 		| MAINCHARE CAttribs NamedType OptBaseList MemberEList
 		{ $$ = new MainChare(lineno, $2, $3, $4, $5); }
@@ -475,9 +475,9 @@ ArrayIndexType	: '[' NUMBER Name ']'
 		{ $$ = new NamedType($2); }
 		;
 
-Array		: ARRAY ArrayAttribs ArrayIndexType NamedType OptBaseList MemberEList
+Array		: ARRAY ArrayAttribs ArrayIndexType QualNamedType OptBaseList MemberEList
 		{  $$ = new Array(lineno, $2, $3, $4, $5, $6); }
-		| ARRAY ArrayIndexType ArrayAttribs NamedType OptBaseList MemberEList
+		| ARRAY ArrayIndexType ArrayAttribs QualNamedType OptBaseList MemberEList
 		{  $$ = new Array(lineno, $3, $2, $4, $5, $6); }
 		;
 
