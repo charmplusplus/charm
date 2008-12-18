@@ -1,0 +1,7 @@
+mainmodule Inherit {
+    extern module B;
+    using namespace Base::Derived;
+    mainchare Driver {
+        entry Driver(CkArgMsg*);
+    }
+}

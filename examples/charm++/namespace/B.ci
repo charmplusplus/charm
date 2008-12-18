@@ -1,0 +1,9 @@
+module B {
+    extern module A;
+    namespace Base { namespace Derived {
+        chare B : A {
+            entry B();
+            entry void quit();
+        }
+    } }
+}
