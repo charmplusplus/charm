@@ -786,14 +786,11 @@ Chare::genDecls(XStr& str)
       switch(b->length()) {
       case 1: //Just one base class: typedef CBaseT<parent,CProxy_me> CBase_me;
 	str << "typedef CBaseT<";
-        if (b->getFirst()->getScope()) str << b->getFirst()->getScope();
         str <<b->getFirst()<<",CProxy_"<<type<<"> "<<" CBase_"<<type<<";\n";
 	break;
       case 2: //Two base classes: typedef CBaseT2<parent1,parent2,CProxy_me> CBase_me;
 	str << "typedef CBaseT2<";
-        if (b->getFirst()->getScope()) str << b->getFirst()->getScope();
         str << b->getFirst() << ",";
-        if (b->getSecond()->getScope()) str << b->getSecond()->getScope();
         str << b->getSecond() << "," <<"CProxy_"<<type<<"> "<<" CBase_"<<type<<";\n";
 	break;
       default: //No base class, or several: give up, don't generate a CBase_me.
