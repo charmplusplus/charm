@@ -30,14 +30,14 @@ extern void CUDACallbackManager(void * fn);
  */ 
 #define NUM_BUFFERS 100
 
-//#define GPU_DEBUG
+// #define GPU_DEBUG
 
 
 /* a flag which tells the system to record the time for invocation and
  *  completion of GPU events: memory allocation, transfer and
  *  kernel execution
  */  
-// #define GPU_TIME
+#define GPU_TIME
 
 /* work request queue */
 workRequestQueue *wrQueue = NULL; 
@@ -87,8 +87,33 @@ cudaStream_t kernel_stream;
 cudaStream_t data_in_stream;
 cudaStream_t data_out_stream; 
 
+/* allocateBuffers
+ * allocates a work request's data on the GPU
+ */
+void allocateBuffers(workRequest *wr) {
+  dataInfo *bufferInfo = wr->bufferInfo; 
+
+  if (bufferInfo != NULL) {
+
+    for (int i=0; i<wr->nBuffers; i++) {
+      int index = bufferInfo[i].bufferID; 
+      int size = bufferInfo[i].size; 
+      
+      /* allocate if the buffer for the corresponding index is NULL */
+      if (devBuffers[index] == NULL) {
+	CUDA_SAFE_CALL_NO_SYNC(cudaMalloc((void **) &devBuffers[index], size));
+#ifdef GPU_DEBUG
+	printf("buffer %d allocated %.2f\n", index, 
+	       cutGetTimerValue(timerHandle)); 
+#endif
+      }
+    }
+  }
+}
+
+
 /* setupData
- *  sets up data on the gpu before kernel execution 
+ *  sets up data on the GPU before kernel execution 
  */
 void setupData(workRequest *wr) {
   dataInfo *bufferInfo = wr->bufferInfo; 
@@ -101,18 +126,25 @@ void setupData(workRequest *wr) {
       
       /* allocate if the buffer for the corresponding index is NULL */
       if (devBuffers[index] == NULL) {
-#ifdef GPU_DEBUG
-	printf("buffer %d allocated\n", index); 
-#endif
 	CUDA_SAFE_CALL_NO_SYNC(cudaMalloc((void **) &devBuffers[index], size));
+#ifdef GPU_DEBUG
+	printf("buffer %d allocated %.2f\n", index,
+	       cutGetTimerValue(timerHandle)); 
+#endif
       }
       
       if (bufferInfo[i].transferToDevice) {
-#ifdef GPU_DEBUG
-	printf("transferToDevice bufId: %d\n", index); 
-#endif
 	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpyAsync(devBuffers[index], 
           hostBuffers[index], size, cudaMemcpyHostToDevice, data_in_stream));
+#ifdef GPU_DEBUG
+	printf("transferToDevice bufId: %d %.2f\n", index,
+	       cutGetTimerValue(timerHandle)); 
+#endif	
+	/*
+	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpy(devBuffers[index], 
+          hostBuffers[index], size, cudaMemcpyHostToDevice));
+	*/
+
       }
     }
   }
@@ -133,10 +165,18 @@ void copybackData(workRequest *wr) {
       
       if (bufferInfo[i].transferFromDevice) {
 #ifdef GPU_DEBUG
-	printf("transferFromDevice: %d\n", index); 
+	printf("transferFromDevice: %d %.2f\n", index, 
+	       cutGetTimerValue(timerHandle)); 
 #endif
+	
 	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpyAsync(hostBuffers[index], 
-          devBuffers[index], size, cudaMemcpyDeviceToHost, data_out_stream));
+          devBuffers[index], size, cudaMemcpyDeviceToHost,
+          data_out_stream));
+	
+	/*
+	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpy(hostBuffers[index], 
+          devBuffers[index], size, cudaMemcpyDeviceToHost));
+	*/
       }
     }     
   }
@@ -153,7 +193,7 @@ void freeMemory(workRequest *wr) {
       int index = bufferInfo[i].bufferID; 
       if (bufferInfo[i].freeBuffer) {
 #ifdef GPU_DEBUG
-	printf("buffer %d freed\n", index);
+	printf("buffer %d freed %.2f\n", index, cutGetTimerValue(timerHandle));
 #endif 
 	CUDA_SAFE_CALL_NO_SYNC(cudaFree(devBuffers[index])); 
 	devBuffers[index] = NULL; 
@@ -230,7 +270,7 @@ void gpuProgressFn() {
 	wr->state = READY; 
       }
 #ifdef GPU_DEBUG
-      printf("Querying memory stream returned: %d\n", returnVal);
+      printf("Querying memory stream returned: %d %.2f\n", returnVal, cutGetTimerValue(timerHandle));
 #endif  
     }
     if (wr->state == READY) {
@@ -241,6 +281,16 @@ void gpuProgressFn() {
       runningKernelIndex = timeIndex; 
       timeIndex++; 
 #endif
+      
+      /* data transfer will not overlap with kernel if cudaMalloc is
+	 called in between, so it's best to perform the cudaMalloc for 
+	 subsequent work request's data before current work request's
+	 kernel starts execution */
+
+      if (second != NULL) {
+	allocateBuffers(second); 
+      }
+
       kernelSelect(wr); 
       wr->state = EXECUTING; 
     }
@@ -258,7 +308,8 @@ void gpuProgressFn() {
 	wr->state = TRANSFERRING_OUT;
       }
 #ifdef GPU_DEBUG
-      printf("Querying kernel completion returned: %d \n", returnVal);
+      printf("Querying kernel completion returned: %d %.2f\n", returnVal,
+	     cutGetTimerValue(timerHandle));
 #endif  
 
       /* prefetch data for the subsequent kernel */
