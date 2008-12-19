@@ -129,7 +129,6 @@ class Type : public Printable {
     virtual int isReference(void) const {return 0;}
     virtual Type *deref(void) {return this;}
     virtual char *getBaseName(void) const = 0;
-    virtual char *getScope(void) const = 0;
     virtual int getNumStars(void) const {return 0;}
     virtual void genProxyName(XStr &str,forWhom forElement);
     virtual void genIndexName(XStr &str);
@@ -156,36 +155,30 @@ class BuiltinType : public Type {
     int isVoid(void) const { return !strcmp(name, "void"); }
     int isInt(void) const { return !strcmp(name, "int"); }
     char *getBaseName(void) const { return name; }
-    char *getScope(void) const { return NULL; }
 };
 
 class NamedType : public Type {
   private:
-    char* name;
-    char* scope;
+    char *name;
     TParamList *tparams;
   public:
-    NamedType(const char* n, TParamList* t=0, char* scope_=NULL)
-       : name((char *)n), tparams(t), scope(scope_) {}
+    NamedType(const char* n, TParamList* t=0)
+       : name((char *)n), tparams(t) {}
     int isTemplated(void) const { return (tparams!=0); }
     int isCkArgMsg(void) const {return 0==strcmp(name,"CkArgMsg");}
     int isCkMigMsg(void) const {return 0==strcmp(name,"CkMigrateMessage");}
     void print(XStr& str);
     int isNamed(void) const {return 1;}
-    virtual char *getBaseName(void) const { return name; }
-    virtual char *getScope(void) const { return scope; }
+    char *getBaseName(void) const { return name; }
     virtual void genProxyName(XStr& str,forWhom forElement);
     virtual void genIndexName(XStr& str) 
     { 
-      if (scope) str << scope;
       str << Prefix::Index; 
       print(str);
     }
     virtual void genMsgProxyName(XStr& str) 
     { 
-      if (scope) str << scope;
-      str << Prefix::Message;
-      print(str);
+      str << Prefix::Message; print(str);
     }
 };
 
@@ -203,7 +196,6 @@ class PtrType : public Type {
     int getNumStars(void) const {return numstars; }
     void print(XStr& str);
     char *getBaseName(void) const { return type->getBaseName(); }
-    char *getScope(void) const { return NULL; }
     virtual void genMsgProxyName(XStr& str) { 
       if(numstars != 1) {
         die("too many stars-- entry parameter must have form 'MTYPE *msg'"); 
@@ -224,7 +216,6 @@ class ReferenceType : public Type {
     void print(XStr& str) {str<<referant<<" &";}
     virtual Type *deref(void) {return referant;}
     char *getBaseName(void) const { return referant->getBaseName(); }
-    char *getScope(void) const { return NULL; }
 };
 /* I don't think these are useful any longer (OSL 11/30/2001)
 class ConstType : public Type {
@@ -381,7 +372,6 @@ class FuncType : public Type {
         params->print(str);
     }
     char *getBaseName(void) const { return name; }
-    char *getScope(void) const { return NULL; }
 };
 
 /****************** Template Support **************/
@@ -455,22 +445,17 @@ class Scope : public Construct {
 class UsingScope : public Construct {
   protected:
     char* name_;
-    bool symbol_;
   public:
-    UsingScope(char* name, bool symbol=false) : name_(name), symbol_(symbol) {}
+    UsingScope(char* name) : name_(name) {}
     virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
     virtual void genDecls(XStr& str) {
-        str << "using ";
-        if (!symbol_) str << "namespace ";
-        str << name_ << ";\n";
+        str << "using namespace " << name_ << ";\n";
     }
     virtual void genDefs(XStr& str) {}
     virtual void genReg(XStr& str) {}
     virtual void preprocess() {}
     virtual void print(XStr& str) {
-        str << "using ";
-        if (!symbol_) str << "namespace ";
-        str << name_ << ";\n";
+        str << "using namespace " << name_ << ";\n";
     }
 };
 
