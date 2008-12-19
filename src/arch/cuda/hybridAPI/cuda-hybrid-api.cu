@@ -88,7 +88,14 @@ cudaStream_t data_in_stream;
 cudaStream_t data_out_stream; 
 
 /* allocateBuffers
+ *
  * allocates a work request's data on the GPU
+ *
+ * used to allocate memory for work request data in advance in order
+ * to allow overlapping the work request's data transfer to the GPU
+ * with the execution of the previous kernel; the allocation needs to
+ * take place before the kernel starts executing in order to allow overlap
+ *
  */
 void allocateBuffers(workRequest *wr) {
   dataInfo *bufferInfo = wr->bufferInfo; 
