@@ -330,7 +330,7 @@ typedef struct msg_list {
 #define MAX_NUM_SMSGS   64
 CpvDeclare(PCQueue, smsg_list_q);
 
-inline SMSG_LIST * smsg_allocate() {
+static inline SMSG_LIST * smsg_allocate() {
     SMSG_LIST *smsg = (SMSG_LIST *)PCQueuePop(CpvAccess(smsg_list_q));
     if (smsg != NULL)
         return smsg;
@@ -342,7 +342,7 @@ inline SMSG_LIST * smsg_allocate() {
     return (SMSG_LIST *) buf;
 }
 
-inline void smsg_free (SMSG_LIST *smsg) {
+static inline void smsg_free (SMSG_LIST *smsg) {
     int size = PCQueueLength (CpvAccess(smsg_list_q));
     if (size < MAX_NUM_SMSGS)
         PCQueuePush (CpvAccess(smsg_list_q), (char *) smsg);
@@ -752,10 +752,16 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     short_config.protocol      = DCMF_DEFAULT_SEND_PROTOCOL;
     short_config.cb_recv_short = short_pkt_recv;
     short_config.cb_recv       = first_pkt_recv_done;
+#if (DCMF_VERSION_MAJOR >= 2)
+    short_config.network  = DCMF_DefaultNetwork;
+#endif
 
     eager_config.protocol      = DCMF_DEFAULT_SEND_PROTOCOL;
     eager_config.cb_recv_short = short_pkt_recv;
     eager_config.cb_recv       = first_pkt_recv_done;
+#if (DCMF_VERSION_MAJOR >= 2)
+    eager_config.network  = DCMF_DefaultNetwork;
+#endif
 
 #ifdef  OPT_RZV
 #warning "Enabling Optimize Rzv"
@@ -765,6 +771,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
     rzv_config.cb_recv_short   = short_pkt_recv;
     rzv_config.cb_recv         = first_pkt_recv_done;
+#if (DCMF_VERSION_MAJOR >= 2)
+    rzv_config.network  = DCMF_DefaultNetwork;
+#endif
 
     DCMF_Send_register (&cmi_dcmf_short_registration, &short_config);
     DCMF_Send_register (&cmi_dcmf_eager_registration, &eager_config);
