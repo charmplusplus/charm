@@ -25,6 +25,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#if CMK_BLUEGENEP
+#include <dcmf.h>
+#endif
+
 #if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
 #include <Carbon/Carbon.h>
 #include <Multiprocessing.h>
@@ -263,7 +267,11 @@ extern "C" void CmiInitCPUTopology(char **argv)
     /* get my ip address */
   if (CmiMyRank() == 0)
   {
-#if CMK_CRAYXT
+#if CMK_BLUEGENEP
+    //CmiAbort("Can not get unique name for the compute nodes. \n");
+    ret = DCMF_Messager_rank();
+    memcpy(&myip, &ret, sizeof(int));
+#elif CMK_CRAYXT
     ret = getXTNodeID(CmiMyPe(), CmiNumPes());
     memcpy(&myip, &ret, sizeof(int));
 #elif CMK_HAS_GETHOSTNAME
