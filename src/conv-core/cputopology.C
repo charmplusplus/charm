@@ -269,7 +269,11 @@ extern "C" void CmiInitCPUTopology(char **argv)
   {
 #if CMK_BLUEGENEP
     //CmiAbort("Can not get unique name for the compute nodes. \n");
-    ret = DCMF_Messager_rank();
+    unsigned rank = DCMF_Messager_rank();    
+    unsigned x,y,z,t;
+    DCMF_Messager_rank2torus (rank, &x, &y, &z, &t);
+    DCMF_Messager_torus2rank (x,y,z,0, (unsigned *)&ret);
+
     memcpy(&myip, &ret, sizeof(int));
 #elif CMK_CRAYXT
     ret = getXTNodeID(CmiMyPe(), CmiNumPes());
