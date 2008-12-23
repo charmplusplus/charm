@@ -178,12 +178,13 @@ The format is as follows:
 
    [charmrun +p#] bigsimulator -lat <latency> -bw <bandwidth>
                   [-cpp <cost per packet> -psize <packet size>]
-                  [-skip] [-print_params]
+                  [-winsize <window size>] [-skip] [-print_params]
 
 Latency (lat)         - type double; in microseconds
 Bandwidth (bw)        - type double; in GB/s
 Cost per packet (cpp) - type double; in microseconds
 Packet size (psize)   - type int; in bytes
+Window size (winsize) - type int; in log entries
 
 The implemented equation is: lat + (N/bw) + cpp*(N/psize)
 
@@ -191,6 +192,14 @@ Latency and bandwidth are required.  If cost per packet is
 given, then packet size must be given, as well.  Otherwise,
 cost per packet defaults to 0.0.  Packet size, if given, must
 be a positive integer.
+
+The -winsize flag allows the user to specify the size of the
+window (number of log entries) used when reading in the bgTrace
+log files.  This is useful if the log files are large.  If
+-winsize is not specified, the value defaults to 0, which
+indicates that no windowing will be used (i.e., there will be
+one window for each time line that is equal to the size of the
+time line).
 
 As with the second parameter in the examples of part (a) of
 this section, the -skip flag indicates that the simulation
