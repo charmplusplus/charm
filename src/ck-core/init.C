@@ -364,8 +364,8 @@ static void _exitHandler(envelope *env)
 
 static inline void _processBufferedBocInits(void)
 {
-  CkNumberHandlerEx(_bocHandlerIdx,(CmiHandlerEx)_processHandler,
-  	CkpvAccess(_coreState));
+  CkCoreState *ck = CkpvAccess(_coreState);
+  CkNumberHandlerEx(_bocHandlerIdx,(CmiHandlerEx)_processHandler, ck);
   register int i = 0;
   PtrVec &inits=*CkpvAccess(_bocInitVec);
   register int len = inits.size();
@@ -374,15 +374,15 @@ static inline void _processBufferedBocInits(void)
     if(env==0) continue;
     if(env->isPacked())
       CkUnpackMessage(&env);
-    _processBocInitMsg(CkpvAccess(_coreState),env);
+    _processBocInitMsg(ck,env);
   }
   delete &inits;
 }
 
 static inline void _processBufferedNodeBocInits(void)
 {
-  CkNumberHandlerEx(_nodeBocHandlerIdx,(CmiHandlerEx)_processHandler,
-  	CkpvAccess(_coreState));
+  CkCoreState *ck = CkpvAccess(_coreState);
+  CkNumberHandlerEx(_nodeBocHandlerIdx,(CmiHandlerEx)_processHandler,ck);
   register int i = 0;
   PtrVec &inits=*CksvAccess(_nodeBocInitVec);
   register int len = inits.size();
@@ -391,7 +391,7 @@ static inline void _processBufferedNodeBocInits(void)
     if(env==0) continue;
     if(env->isPacked())
       CkUnpackMessage(&env);
-    _processNodeBocInitMsg(CkpvAccess(_coreState),env);
+    _processNodeBocInitMsg(ck,env);
   }
   delete &inits;
 }
