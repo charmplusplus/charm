@@ -29,6 +29,10 @@
 #include <dcmf.h>
 #endif
 
+#if CMK_BLUEGENEL
+#include <rts.h>
+#endif
+
 #if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
 #include <Carbon/Carbon.h>
 #include <Multiprocessing.h>
@@ -267,7 +271,14 @@ extern "C" void CmiInitCPUTopology(char **argv)
     /* get my ip address */
   if (CmiMyRank() == 0)
   {
-#if CMK_BLUEGENEP
+#if CMK_BLUEGENEL
+    unsigned rank = CmiMyPe();    
+    unsigned x,y,z,t;
+    unsigned npes;
+    rts_coordinatesForRank (rank, &x, &y, &z, &t);
+    rts_rankForCoordinates (x,y,z,0, (unsigned *)&ret, &npes);
+
+#elif CMK_BLUEGENEP
     //CmiAbort("Can not get unique name for the compute nodes. \n");
     unsigned rank = DCMF_Messager_rank();    
     unsigned x,y,z,t;
