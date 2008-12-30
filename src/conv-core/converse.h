@@ -1127,6 +1127,10 @@ void       CthFree(CthThread);
 void       CthSetSuspendable(CthThread, int);
 int        CthIsSuspendable(CthThread);
 
+/* added for bigsim out-of-core emulation */
+void	   CthPrintThdMagic(CthThread); 
+void 	   CthPrintThdStack(CthThread);
+
 void       CthSuspend(void);
 void       CthAwaken(CthThread);
 void       CthAwakenPrio(CthThread, int, int, unsigned int *);
@@ -1322,6 +1326,7 @@ CmmTable CmmPup(pup_er p, CmmTable t, CmmPupMessageFn msgpup);
 
 CmmTable   CmmNew();
 void       CmmFree(CmmTable t);
+void	   CmmFreeAll(CmmTable t);
 void       CmmPut(CmmTable t, int ntags, int *tags, void *msg);
 void      *CmmFind(CmmTable t, int ntags, int *tags, int *returntags, int del);
 int        CmmEntries(CmmTable t);
@@ -1659,6 +1664,10 @@ extern int CmiGridQueueLookupMsg (char *msg);
 #endif
 
 #include "debug-conv.h"
+
+/* The flag tells whether we are in the process of doing out-of-core emulation in BigSim */
+extern int BgOutOfCoreFlag;
+extern int BgInOutOfCoreMode;
 
 #if CMK_HAS_LOG2
 #define CmiLog2  log2
