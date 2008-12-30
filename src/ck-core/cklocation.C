@@ -672,6 +672,7 @@ void CkMigratable::ckDestroy(void) {
 
 void CkMigratable::ckAboutToMigrate(void) { }
 void CkMigratable::ckJustMigrated(void) { }
+void CkMigratable::ckJustRestored(void) { }
 
 CkMigratable::~CkMigratable() {
 	DEBC((AA"In CkMigratable::~CkMigratable %s\n"AB,idx2str(thisIndexMax)));
@@ -854,6 +855,8 @@ CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
 {
 #if CMK_LBDB_ON
 	DEBL((AA"Registering element %s with load balancer\n"AB,idx2str(idx)));
+	//BIGSIM_OOC DEBUGGING
+	//CkPrintf("LocMgr on %d: Registering element %s with load balancer\n", CkMyPe(), idx2str(idx));
 	nextPe = -1;
 	asyncMigrate = CmiFalse;
 	readyMigrate = CmiTrue;
@@ -1386,9 +1389,14 @@ void CkLocMgr::flushAllRecs(void)
     CkLocRec *rec=*(CkLocRec **)objp;
     CkArrayIndex &idx=*(CkArrayIndex *)keyp;
     if (rec->type() != CkLocRec::local) {
-      hash.remove(*(CkArrayIndexMax *)&idx);
-      delete rec;
-      it->seek(-1);//retry this hash slot
+      //In the case of taking core out of memory (in BigSim's emulation)
+      //the meta data in the location manager are not deleted so we need
+      //this condition
+      if(BgOutOfCoreFlag!=1){
+        hash.remove(*(CkArrayIndexMax *)&idx);
+        delete rec;
+        it->seek(-1);//retry this hash slot
+      }
     }
     else {
         callMethod((CkLocRec_local*)rec, &CkMigratable::ckDestroy);
@@ -1546,6 +1554,8 @@ CkLocRec_local *CkLocMgr::createLocal(const CkArrayIndex &idx,
 	DEBC((AA"Adding new record for element %s at local index %d\n"AB,idx2str(idx),localIdx));
 	CkLocRec_local *rec=new CkLocRec_local(this,forMigration,ignoreArrival,idx,localIdx);
 	insertRec(rec,idx); //Add to global hashtable
+
+
 	if (notifyHome) informHome(idx,CkMyPe());
 	return rec;
 }
@@ -1613,8 +1623,20 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 	//Link local index into free list
 	freeList[localIdx]=firstFree;
 	firstFree=localIdx;
+	
+		
 	if (!duringMigration) 
 	{ //This is a local element dying a natural death
+	    #if CMK_BLUEGENE_CHARM
+		//After migration, reclaimRemote will be called through 
+		//the CkRemoveArrayElement in the pupping routines for those 
+		//objects that are not on the home processors. However,
+		//those remote records should not be deleted since the corresponding
+		//objects are not actually deleted but on disk. If deleted, msgs
+		//that seeking where is the object will be accumulated (a circular
+		//msg chain) and causes the program no progress
+		if(BgOutOfCoreFlag==1) return; 
+	    #endif
 		int home=homePe(idx);
 		if (home!=CkMyPe())
 			thisProxy[home].reclaimRemote(idx,CkMyPe());
@@ -1873,6 +1895,7 @@ void CkLocMgr::iterate(CkLocIterator &dest) {
   void *objp;
   CkHashtableIterator *it=hash.iterator();
   CmiImmediateLock(hashImmLock);
+
   while (NULL!=(objp=it->next())) {
     CkLocRec *rec=*(CkLocRec **)objp;
     if (rec->type()==CkLocRec::local) {
@@ -1919,7 +1942,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 	for (m=firstManager;m!=NULL;m=m->next) {
 		CkMigratable *elt=m->element(localIdx);
 		if (elt!=NULL) 
-                {
+                {	
                        elt->pup(p);
                 }
 	}
@@ -2098,10 +2121,22 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 
 void CkLocMgr::restore(const CkArrayIndex &idx, PUP::er &p)
 {
-	CkLocRec_local *rec=createLocal(idx,CmiFalse,CmiFalse,CmiTrue /* home doesn't know yet */ );
+	//This is in broughtIntoMem during out-of-core emulation in BigSim,
+	//informHome should not be called since such information is already
+	//immediately updated real migration
+#ifndef CMK_OPTIMIZE
+	if(BgOutOfCoreFlag!=2)
+	    CmiAbort("CkLocMgr::restore should only be used in out-of-core emulation for BigSim and be called when object is brought into memory!\n");
+#endif
+	CkLocRec_local *rec=createLocal(idx,CmiFalse,CmiFalse,CmiFalse);
+	
+	//BIGSIM_OOC DEBUGGING
+	//CkPrintf("Proc[%d]: Registering element %s with LDB\n", CkMyPe(), idx2str(idx));
 
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec,CkElementCreation_restore);
+
+	callMethod(rec,&CkMigratable::ckJustRestored);
 }
 
 

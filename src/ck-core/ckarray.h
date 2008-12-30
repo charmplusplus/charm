@@ -479,6 +479,9 @@ public:
   /// Called by the system just before and after migration to another processor:
   virtual void ckAboutToMigrate(void);
   virtual void ckJustMigrated(void);
+  
+  virtual void ckJustRestored(void);
+  
   virtual void ckDestroy(void);
   virtual char *ckDebugChareName(void);
   virtual int ckDebugChareID(char*, int);

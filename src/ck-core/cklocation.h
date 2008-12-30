@@ -297,6 +297,9 @@ public:
   virtual void ckAboutToMigrate(void); /*default is empty*/
   virtual void ckJustMigrated(void); /*default is empty*/
 
+  //used for out-of-core emulation
+  virtual void ckJustRestored(void); /*default is empty*/
+
   /// Delete this object
   virtual void ckDestroy(void);
 

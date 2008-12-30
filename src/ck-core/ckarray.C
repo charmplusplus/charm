@@ -238,14 +238,21 @@ void ArrayElement::ckJustMigrated(void) {
 	      if (!l->ckElementArriving(this)) return;);
 }
 
+void ArrayElement::ckJustRestored(void) {
+    CkMigratable::ckJustRestored();
+    //empty for out-of-core emulation
+}
+
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(ArrayElement,thisArray,
    *(contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()],true);
 
 /// Remote method: calls destructor
 void ArrayElement::ckDestroy(void)
 {
-	CK_ARRAYLISTENER_LOOP(thisArray->listeners,
+	if(BgOutOfCoreFlag!=1){ //in case of taking core out of memory
+	    CK_ARRAYLISTENER_LOOP(thisArray->listeners,
 			   l->ckElementDied(this));
+	}
 	CkMigratable::ckDestroy();
 }
 

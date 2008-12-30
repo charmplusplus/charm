@@ -329,16 +329,19 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
         }
 	else {
 	  // loop and create all array elements ourselves
+	  //CkPrintf("total chare array cnts: %d\n", numElements);
 	  for (int i=0; i<numElements; i++) {
 		CkGroupID gID;
 		CkArrayIndexMax idx;
 		p|gID;
                 p|idx;
 		CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
-		if (notifyListeners)
+		if (notifyListeners){
   		  mgr->resume(idx,p);
-                else
+		}
+                else{
   		  mgr->restore(idx,p);
+		}
 	  }
 	}
 	// finish up
@@ -406,7 +409,29 @@ void CkRemoveArrayElements()
   int i;
   int numGroups = CkpvAccess(_groupIDTable)->size();
   CKLOCMGR_LOOP(mgr->flushAllRecs(););
+/*  GroupTable *gTbl = CkpvAccess(_groupTable);
+  for(i=0; i<numGroups; i++){
+    IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
+    if(obj->isLocMgr()) {
+	CkLocMgr *mgr = (CkLocMgr *)obj;
+	mgr->flushAllRecs();
+    }
+  }*/
 }
+
+/*
+void CkTestArrayElements()
+{
+  int i;
+  int numGroups = CkpvAccess(_groupIDTable)->size();
+  //CKLOCMGR_LOOP(mgr->flushAllRecs(););
+  GroupTable *gTbl = CkpvAccess(_groupTable);
+  for(i=0; i<numGroups; i++){
+    IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
+    CkPrintf("An object at [%d]: %p | isLocMgr: %d\n", i, obj, obj->isLocMgr());
+  }
+}
+*/
 
 void CkStartCheckpoint(char* dirname,const CkCallback& cb)
 {
