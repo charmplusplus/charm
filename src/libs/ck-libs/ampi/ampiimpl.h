@@ -600,6 +600,9 @@ public:
 		p(comm);
 		p(isvalid);
 	}
+	
+	//added due to BIGSIM_OOC DEBUGGING
+	virtual void print();
 };
 
 class PersReq : public AmpiRequest {
@@ -623,18 +626,20 @@ public:
 		AmpiRequest::pup(p);
 		p(sndrcv);
 	}
+	//added due to BIGSIM_OOC DEBUGGING
+	virtual void print();
 };
 
 class IReq : public AmpiRequest {
 public:
-	bool status;
+	bool statusIreq;
 	int length;     // recv'ed length
 	IReq(void *buf_, int count_, int type_, int src_, int tag_, MPI_Comm comm_)
 	{
 		buf=buf_;  count=count_;  type=type_;  src=src_;  tag=tag_; 
-		comm=comm_;  isvalid=true; status=false; length=0;
+		comm=comm_;  isvalid=true; statusIreq=false; length=0;
 	}
-	IReq(): status(false){};
+	IReq(): statusIreq(false){};
 	~IReq(){ }
 	CmiBool test(MPI_Status *sts);
 	void complete(MPI_Status *sts);
@@ -643,8 +648,10 @@ public:
 	void receive(ampi *ptr, AmpiMsg *msg); 
 	virtual void pup(PUP::er &p){
 		AmpiRequest::pup(p);
-		p|status;  p|length;
+		p|statusIreq;  p|length;
 	}
+	//added due to BIGSIM_OOC DEBUGGING
+	virtual void print();
 };
 
 class ATAReq : public AmpiRequest {
@@ -701,6 +708,8 @@ public:
 			delete []myreqs;
 		}
 	}
+	//added due to BIGSIM_OOC DEBUGGING
+	virtual void print();
 };
 
 /// Special CkVec<AmpiRequest*> for AMPI. Most code copied from cklist.h
@@ -771,13 +780,31 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
       push_back(elt);
       return len-1;
     }
-    
+
     inline void checkRequest(MPI_Request idx){
       if(!(idx==-1 || (idx < this->len && (block[idx])->isValid())))
         CkAbort("Invalide MPI_Request\n");
     }
 
+    //find an AmpiRequest by its pointer value
+    //return -1 if not found!
+    int findRequestIndex(AmpiRequest *req){
+	for(int i=0; i<len; i++){
+	    if(block[i]==req) return i;
+	}
+	return -1;
+    }
+
     void pup(PUP::er &p);
+    
+    //BIGSIM_OOC DEBUGGING
+    void print(){
+	for(int i=0; i<len; i++){
+	    if(block[i]==NULL) continue;
+	    CmiPrintf("AmpiRequestList Element %d [%p]: \n", i+1, block[i]);
+	    block[i]->print();
+	}
+    }
 };
 
 //A simple memory buffer
@@ -1092,9 +1119,13 @@ class ampiParent : public CBase_ampiParent {
     CProxy_ampi tmpRProxy;
 
 public:
+    int ampiInitCallDone;
+
+public:
     ampiParent(MPI_Comm worldNo_,CProxy_TCharm threads_);
     ampiParent(CkMigrateMessage *msg);
     void ckJustMigrated(void);
+    void ckJustRestored(void);
     ~ampiParent();
 
     ampi *lookupComm(MPI_Comm comm) {
@@ -1161,6 +1192,7 @@ public:
     void startCheckpoint(char* dname);
     void Checkpoint(int len, char* dname);
     void ResumeThread(void);
+    TCharm* getTCharmThread() {return thread;}
 
     inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) {
       if (comm==MPI_COMM_WORLD) return worldStruct;
@@ -1174,6 +1206,8 @@ public:
       if (isIntra(comm)) return getIntra(comm);
       return universeComm2CommStruct(comm);
     }
+    
+     //ampi *comm2ampi(MPI_Comm comm);
     inline ampi *comm2ampi(MPI_Comm comm) {
       if (comm==MPI_COMM_WORLD) return worldPtr;
       if (comm==MPI_COMM_SELF) return worldPtr;
@@ -1275,6 +1309,10 @@ public:
     CkDDT myDDTsto;
     CkDDT *myDDT;
     AmpiRequestList ampiReqs;
+
+    //added to make sure post_ireqs in ampi class share the same pointers
+    //with those in ampiReqs after pupping routines.
+    //AmpiRequestList oldAmpiReqs;
     
     int addWinStruct(WinStruct* win);
     WinStruct getWinStruct(MPI_Win win);
@@ -1351,9 +1389,14 @@ friend class IReq;
     	ComlibInstanceHandle ciBcast_,ComlibInstanceHandle ciAllgather_,ComlibInstanceHandle ciAlltoall_);
     ampi(CkMigrateMessage *msg);
     void ckJustMigrated(void);
+    void ckJustRestored(void);
     ~ampi();
 
     virtual void pup(PUP::er &p);
+
+    void allInitDone(CkReductionMsg *m);
+    void setInitDoneFlag();
+  
     void block(void);
     void unblock(void);
     void yield(void);
