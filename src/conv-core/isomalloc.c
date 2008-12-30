@@ -1414,12 +1414,25 @@ print_slots(slotset *ss)
   CmiPrintf("[%d] emptyslots = %d\n", CmiMyPe(), ss->emptyslots);
   for(i=0;i<ss->maxbuf;i++) {
     if(ss->buf[i].nslots)
-      CmiPrintf("[%d] (%d, %d) \n", CmiMyPe(), ss->buf[i].startslot, 
-          ss->buf[i].nslots);
+      CmiPrintf("[%d] (start[%d], end[%d], num=%d) \n", CmiMyPe(), ss->buf[i].startslot, 
+          ss->buf[i].startslot+ss->buf[i].nslots, ss->buf[i].nslots);
   }
 }
 #else
-#  define print_slots(ss) /*empty*/
+//#  define print_slots(ss) /*empty*/
+static void
+print_slots(slotset *ss)
+{
+  int i;
+  CmiPrintf("[%d] maxbuf = %d\n", CmiMyPe(), ss->maxbuf);
+  CmiPrintf("[%d] emptyslots = %d\n", CmiMyPe(), ss->emptyslots);
+  for(i=0;i<ss->maxbuf;i++) {
+    if(ss->buf[i].nslots)
+      CmiPrintf("[%d] (start[%d], end[%d], num=%d) \n", CmiMyPe(), ss->buf[i].startslot, 
+          ss->buf[i].startslot+ss->buf[i].nslots, ss->buf[i].nslots);
+  }
+}
+
 #endif
 
 
@@ -2188,12 +2201,19 @@ CmiIsomallocBlockList *CmiIsomallocBlockListNew(void)
 	return ret;
 }
 
+
+//BIGSIM_OOC DEBUGGING
+static void print_myslots();
+
 /*Pup all the blocks in this list.  This amounts to two circular
 list traversals.  Because everything's isomalloc'd, we don't even
 have to restore the pointers-- they'll be restored automatically!
 */
 void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
 {
+	//BIGSIM_OOC DEBUGGING
+	//if(!pup_isUnpacking(p)) print_myslots();
+
 	int i,nBlocks=0;
 	Slot *cur=NULL, *start=*lp;
 #if 0 /*#ifndef CMK_OPTIMIZE*/
@@ -2224,6 +2244,9 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
 	}
 	if (pup_isDeleting(p))
 		*lp=NULL;
+
+	//BIGSIM_OOC DEBUGGING
+	//if(pup_isUnpacking(p)) print_myslots();
 }
 
 /*Delete all the blocks in this list.*/
@@ -2268,6 +2291,12 @@ void CmiIsomallocBlockListFree(void *block)
 }
 
 
+
+//BIGSIM_OOC DEBUGGING
+static void print_myslots(){
+    CmiPrintf("[%d] my slot set=%p\n", CmiMyPe(), CpvAccess(myss));
+    print_slots(CpvAccess(myss));
+}
 
 
 
