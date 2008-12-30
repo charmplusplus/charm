@@ -484,6 +484,9 @@ extern "C" int CkGetArgc(void) {
 /******************** Basic support *****************/
 extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
+  //BIGSIM_OOC DEBUGGING
+  //CkPrintf("CkDeliverMessageFree: name of entry fn: %s\n", _entryTable[epIdx]->name);
+  //fflush(stdout);
 #ifndef CMK_OPTIMIZE
   CpdBeforeEp(epIdx, obj);
 #endif
@@ -498,6 +501,10 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 }
 extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 {
+  //BIGSIM_OOC DEBUGGING
+  //CkPrintf("CkDeliverMessageReadonly: name of entry fn: %s\n", _entryTable[epIdx]->name);
+  //fflush(stdout);
+
   void *deliverMsg;
   if (_entryTable[epIdx]->noKeep)
   { /* Deliver a read-only copy of the message */
@@ -954,6 +961,10 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
 /**
  * This is the main converse-level handler used by all of Charm++.
  */
+
+//BIGSIM_OOC DEBUGGING
+#define TELLMSGTYPE(x) //x
+
 void _processHandler(void *converseMsg,CkCoreState *ck)
 {
   register envelope *env = (envelope *) converseMsg;
@@ -973,20 +984,24 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
   switch(env->getMsgtype()) {
 // Group support
     case BocInitMsg :
+      TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: BocInitMsg\n", CkMyPe());)
       ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
       _processBocInitMsg(ck,env);
       break;
     case NodeBocInitMsg :
+      TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: NodeBocInitMsg\n", CkMyPe());)
       ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
       _processNodeBocInitMsg(ck,env);
       break;
     case ForBocMsg :
+      TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForBocMsg\n", CkMyPe());)
       // QD processing moved inside _processForBocMsg because it is conditional
       if(env->isPacked()) CkUnpackMessage(&env);
       _processForBocMsg(ck,env);
       // stats record moved inside _processForBocMsg because it is conditional
       break;
     case ForNodeBocMsg :
+      TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForNodeBocMsg\n", CkMyPe());)
       // QD processing moved to _processForNodeBocMsg because it is conditional
       if(env->isPacked()) CkUnpackMessage(&env);
       _processForNodeBocMsg(ck,env);
@@ -995,35 +1010,42 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 
 // Array support
     case ArrayEltInitMsg:
+      TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ArrayEltInitMsg\n", CkMyPe());)
       if(env->isPacked()) CkUnpackMessage(&env);
       _processArrayEltInitMsg(ck,env);
       break;
     case ForArrayEltMsg:
+      TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForArrayEltMsg\n", CkMyPe());)
       if(env->isPacked()) CkUnpackMessage(&env);
       _processArrayEltMsg(ck,env);
       break;
 
 // Chare support
     case NewChareMsg :
+      TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: NewChareMsg\n", CkMyPe());)
       ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
       _processNewChareMsg(ck,env);
       _STATS_RECORD_PROCESS_CHARE_1();
       break;
     case NewVChareMsg :
+      TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: NewVChareMsg\n", CkMyPe());)
       ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
       _processNewVChareMsg(ck,env);
       _STATS_RECORD_PROCESS_CHARE_1();
       break;
     case ForChareMsg :
+      TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForChareMsg\n", CkMyPe());)
       ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
       _processForChareMsg(ck,env);
       _STATS_RECORD_PROCESS_MSG_1();
       break;
     case ForVidMsg   :
+      TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: ForVidMsg\n", CkMyPe());)
       ck->process();
       _processForVidMsg(ck,env);
       break;
     case FillVidMsg  :
+      TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: FillVidMsg\n", CkMyPe());)
       ck->process();
       _processFillVidMsg(ck,env);
       break;
