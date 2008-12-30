@@ -7,7 +7,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #include "tcharm.h"
 #include <ctype.h>
 
-#if 0
+#if 0 
     /*Many debugging statements:*/
 #    define DBG(x) ckout<<"["<<thisIndex<<","<<CkMyPe()<<"] TCHARM> "<<x<<endl;
 #    define DBGX(x) ckout<<"PE("<<CkMyPe()<<") TCHARM> "<<x<<endl;
@@ -119,6 +119,7 @@ static void startTCharmThread(TCharmInitMsg *msg)
 	DBGX("thread started");
 	TCharm::activateThread();
 	typedef void (*threadFn_t)(void *);
+
 #if CMK_TCHARM_FNPTR_HACK
 	((threadFn_t)AMPI_threadstart)(msg->data);
 #else
@@ -147,6 +148,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     }
 #if CMK_BLUEGENE_CHARM
     BgAttach(tid);
+    BgUnsetStartOutOfCore();
 #endif
   }
   CtvAccessOther(tid,_curTCharm)=this;
@@ -156,6 +158,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
 	AsyncEvacuate(CmiTrue);
   skipResume=false;
   exitWhenDone=initMsg->opts.exitWhenDone;
+  isSelfDone = false;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
   threadInfo.thisElement=thisIndex;
   threadInfo.numElements=initMsg->numElements;
@@ -193,19 +196,27 @@ void TCharm::pup(PUP::er &p) {
 //Pup superclass
   ArrayElement1D::pup(p);
 
+  //BIGSIM_OOC DEBUGGING
+  //if(!p.isUnpacking()){
+  //  CmiPrintf("TCharm[%d] packing: ", thisIndex);
+  //  CthPrintThdStack(tid);
+  //}
+
   checkPupMismatch(p,5134,"before TCHARM");
-  p(isStopped); p(resumeAfterMigration); p(exitWhenDone); p(skipResume);
+  p(isStopped); p(resumeAfterMigration); p(exitWhenDone); p(isSelfDone); p(skipResume);
   p(threadInfo.thisElement);
   p(threadInfo.numElements);
   
-  if (sema.size()>0) 
+  if (sema.size()>0){
   	CkAbort("TCharm::pup> Cannot migrate with unconsumed semaphores!\n");
+  }
 
 #ifndef CMK_OPTIMIZE
   DBG("Packing thread");
   if (!isStopped && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
-    CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
-	}	
+    if(BgOutOfCoreFlag==0) //not doing out-of-core scheduling
+	CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
+  }	
   if (tcharm_nomig) CkAbort("Cannot migrate with the +tcharm_nomig option!\n");
 #endif
 
@@ -259,6 +270,13 @@ void TCharm::pup(PUP::er &p) {
   
   s.endBlock(); //End of seeking block
   checkPupMismatch(p,5140,"after TCHARM");
+  
+  //BIGSIM_OOC DEBUGGING
+  //if(p.isUnpacking()){
+  //  CmiPrintf("TCharm[%d] unpacking: ", thisIndex);
+  //  CthPrintThdStack(tid);
+  //}
+
 }
 
 // Pup our thread and related data
@@ -312,6 +330,9 @@ void TCharm::UserData::pup(PUP::er &p)
 
 TCharm::~TCharm()
 {
+  //BIGSIM_OOC DEBUGGING
+  //CmiPrintf("TCharm destructor called with heapBlocks=%p!\n", heapBlocks);
+  
   if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
   CthFree(tid);
   CtgFree(threadGlobals);
@@ -334,6 +355,15 @@ void TCharm::ckJustMigrated(void) {
 	 	resumeAfterMigration=false;
 		resume(); //Start the thread running
 	}
+}
+
+void TCharm::ckJustRestored(void) {
+	//CkPrintf("call just restored from TCharm[%d]\n", thisIndex);
+	ArrayElement::ckJustRestored();
+	//if (resumeAfterMigration) {
+	// 	resumeAfterMigration=false;
+	//	resume(); //Start the thread running
+	//}
 }
 
 /*
@@ -394,6 +424,7 @@ void TCharm::stop(void)
   stopTiming();
   isStopped=true;
   DBG("thread suspended");
+
   CthSuspend();
 // 	DBG("thread resumed");
   /*SUBTLE: We have to do the get() because "this" may have changed
@@ -404,7 +435,7 @@ void TCharm::stop(void)
   TCharm *dis=TCharm::get();
   dis->isStopped=false;
   dis->startTiming();
-//	printf("[%d] Thread resumed  for tid %p\n",dis->thisIndex,dis->tid);
+  //CkPrintf("[%d] Thread resumed  for tid %p\n",dis->thisIndex,dis->tid);
 }
 
 //Resume the waiting thread
@@ -413,6 +444,8 @@ void TCharm::start(void)
   //  since this thread is scheduled, it is not a good idea to migrate 
   isStopped=false;
   DBG("thread resuming soon");
+  //CkPrintf("TCharm[%d]::start()\n", thisIndex);
+  //CmiPrintStackTrace(0);
   CthAwaken(tid);
 }
 
@@ -487,6 +520,7 @@ void TCharm::allow_migrate(void)
 //Resume from sync: start the thread again
 void TCharm::ResumeFromSync(void)
 {
+  if(isSelfDone) return;
   if (!skipResume) start();
 }
 
@@ -538,21 +572,24 @@ void TCharm::atBarrier(CkReductionMsg *m) {
 
 //Called when the thread is done running
 void TCharm::done(void) {
+	//CmiPrintStackTrace(0);
 	DBG("TCharm thread "<<thisIndex<<" done")
 	if (exitWhenDone) {
 		//Contribute to a synchronizing reduction
 		CkCallback cb(index_t::atExit(0), thisProxy[0]);
 		contribute(sizeof(vals),&vals,CkReduction::sum_int,cb);
 	}
+	isSelfDone = true;
 	stop();
 }
 //Called when all threads are done running
 void TCharm::atExit(CkReductionMsg *m) {
-	DBGX("TCharm::atExit> exiting");
+	DBGX("TCharm::atExit1> exiting");
 	delete m;
+	//thisProxy.unsetFlags();
 	CkExit();
+	//CkPrintf("After CkExit()!!!!!!!\n");
 }
-
 
 /************* Setup **************/
 
@@ -679,6 +716,9 @@ CkArrayOptions TCHARM_Attach_start(CkArrayID *retTCharmArray,int *retNumElts)
 	if (!tc)
 		CkAbort("You must call TCHARM initialization routines from a TCHARM thread!");
 	int nElts=tc->getNumElements();
+      
+        //CmiPrintf("TCHARM Elements = %d\n", nElts);  
+      
 	if (retNumElts!=NULL) *retNumElts=nElts;
 	*retTCharmArray=tc->getProxy();
 	CkArrayOptions opts(nElts);
