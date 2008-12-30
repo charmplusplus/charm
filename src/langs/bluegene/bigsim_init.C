@@ -24,12 +24,17 @@
    using namespace std;
 #endif
 
-#define  DEBUGF(x)      //CmiPrintf x;
+#include "bigsim_debug.h"
+#undef DEBUGLEVEL
+#define DEBUGLEVEL 10 
+//#define  DEBUGF(x)      //CmiPrintf x;
 
 #include "queueing.h"
 #include "blue.h"
 #include "blue_impl.h"    	// implementation header file
 //#include "blue_timing.h" 	// timing module
+
+#include "bigsim_ooc.h"
 
 extern CmiStartFn bgMain(int argc, char **argv);
 
@@ -40,6 +45,20 @@ extern "C" void BgAttach(CthThread t)
   CtvAccessOther(t, threadinfo)= cta(threadinfo);
     // special thread scheduling
   BgSetStrategyBigSimDefault(t);
+}
+
+extern "C" void BgSetStartOutOfCore(){
+    DEBUGM(4, ("Set startOutOfCore!(node: %d, gId: %d, id: %d)\n", tMYNODEID, tMYGLOBALID, tMYID));
+    if(cta(threadinfo)->startOutOfCore==0)
+	cta(threadinfo)->startOOCChanged=1;
+    cta(threadinfo)->startOutOfCore = 1;
+}
+
+extern "C" void BgUnsetStartOutOfCore(){
+    DEBUGM(4, ("UnSet startOutOfCore!(node: %d, gId: %d, id: %d)\n", tMYNODEID, tMYGLOBALID, tMYID));
+    if(cta(threadinfo)->startOutOfCore==1)
+	cta(threadinfo)->startOOCChanged=1;
+    cta(threadinfo)->startOutOfCore = 0;
 }
 
 // quiescence detection callback
@@ -83,6 +102,10 @@ void BgShutdown()
     /* don't return */
     // ConverseExit();
     CmiDeliverMsgs(-1);
+
+    if(bgUseOutOfCore)
+        deInitTblThreadInMem();
+
     CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
     CmiPrintf("BG> Emulation took %f seconds!\n", CmiWallTimer()-cva(simState).simStartTime);
     ConverseExit();
@@ -221,6 +244,13 @@ int BGMach::read(char *file)
       procList.set(strdup(parameterValue));
       continue;
     }
+    /* Parameters related with out-of-core execution */
+//    if (!strcmp(parameterName, "bgooc")) {      
+//        bgUseOutOfCore = 1;
+//        bgOOCMaxMemSize = atof(parameterValue);
+//        continue;
+//    }           
+
     if (CmiMyPe() == 0)
       CmiPrintf("skip %s '%s'\n", parameterName, parameterValue);
   }

@@ -1,9 +1,15 @@
-
+#include <assert.h>
 #include "blue.h"
 #include "blue_impl.h"    	// implementation header file
 //#include "blue_timing.h" 	// timing module
+#include "ckcheckpoint.h"
 
-#define  DEBUGF(x)      //CmiPrintf x;
+#include "bigsim_ooc.h"
+
+#include "bigsim_debug.h"
+
+#undef DEBUGLEVEL
+#define DEBUGLEVEL 10
 
 extern BgStartHandler  workStartFunc;
 extern "C" void CthResumeNormalThread(CthThreadToken* token);
@@ -30,6 +36,7 @@ void commThreadInfo::run()
 
   threadQueue *commQ = myNode->commThQ;
 
+  //int recvd=0; //for debugging only
   for (;;) {
     char *msg = getFullBuffer();
     if (!msg) { 
@@ -42,6 +49,8 @@ void commThreadInfo::run()
       continue;
     }
     DEBUGF(("[%d] comm thread has a msg.\n", BgMyNode()));
+	
+	//printf("on node %d, comm thread process a msg %p with type %d\n", BgMyNode(), msg, CmiBgMsgType(msg));
     /* schedule a worker thread, if small work do it itself */
     if (CmiBgMsgType(msg) == SMALL_WORK) {
       if (CmiBgMsgRecvTime(msg) > tCURRTIME)  tCURRTIME = CmiBgMsgRecvTime(msg);
@@ -53,14 +62,23 @@ void commThreadInfo::run()
 #if BLUEGENE_TIMING
       correctMsgTime(msg);
 #endif
-      if (CmiBgMsgThreadID(msg) == ANYTHREAD) {
+    
+    //recvd++;
+    //DEBUGM(4, ("[N%d] C[%d] will add a msg (handler=%d | cnt=%d", BgMyNode(), id, CmiBgMsgHandle(msg), recvd));
+    int msgLen = CmiBgMsgLength(msg);
+    DEBUGM(4, (" | len: %d | type: %d | node id: %d | src pe: %d\n" , msgLen, CmiBgMsgType(msg), CmiBgMsgNodeID(msg), CmiBgMsgSrcPe(msg)));
+      
+     if (CmiBgMsgThreadID(msg) == ANYTHREAD) {
         DEBUGF(("anythread, call addBgNodeMessage\n"));
         addBgNodeMessage(msg);			/* non-affinity message */
+	DEBUGM(4, ("The message is added to node\n\n"));
       }
       else {
         DEBUGF(("[N%d] affinity msg, call addBgThreadMessage to tID:%d\n", 
 			BgMyNode(), CmiBgMsgThreadID(msg)));
+	
         addBgThreadMessage(msg, CmiBgMsgThreadID(msg));
+	DEBUGM(4, ("The message is added to thread(%d)\n\n", CmiBgMsgThreadID(msg)));
       }
     }
     /* let other communication thread do their jobs */
@@ -107,6 +125,16 @@ void BgDeliverMsgs(int nmsg)
   BgScheduler(nmsg);
 }
 
+//static int inCore();
+//static int outCore();
+
+//If AMPI_Init is called, then we begin to do out-of-core emulation
+//in the case of emulating AMPI programs. This is based on the assumption
+//that during initialization, the memory should be enough
+//Later this is not necessary if the out-of-core emulation is triggered
+//by the free memory available.
+
+//The original version of scheduler
 void workThreadInfo::scheduler(int count)
 {
   ckMsgQueue &q1 = myNode->nodeQ;
@@ -138,8 +166,9 @@ void workThreadInfo::scheduler(int count)
     /* if no msg is ready, go back to sleep */
     if ( msg == NULL ) {
 //      tCURRTIME += (CmiWallTimer()-tSTARTTIME);
+      DEBUGM(4,("N[%d] work thread %d has no msg and go to sleep!\n", BgMyNode(), id));
       CthSuspend();
-      DEBUGF(("[N-%d] work thread T-%d awakened.\n", BgMyNode(), id));
+      DEBUGM(4, ("N[%d] work thread %d awakened!\n", BgMyNode(), id));      
       continue;
     }
 #if BLUEGENE_TIMING
@@ -160,7 +189,7 @@ void workThreadInfo::scheduler(int count)
     }
 #endif
 #endif   /* TIMING */
-    DEBUGF(("[N%d] work thread T%d has a msg with recvT:%e msgId:%d.\n", BgMyNode(), id, CmiBgMsgRecvTime(msg), CmiBgMsgID(msg)));
+    DEBUGM(2, ("[N%d] work thread T%d has a msg with recvT:%e msgId:%d.\n", BgMyNode(), id, CmiBgMsgRecvTime(msg), CmiBgMsgID(msg)));
 
 //if (tMYNODEID==0)
 //CmiPrintf("[%d] recvT: %e\n", tMYNODEID, CmiBgMsgRecvTime(msg));
@@ -174,9 +203,59 @@ void workThreadInfo::scheduler(int count)
     else q1.deq();
 #endif
 
+
+    recvd ++;  
+    DEBUGM(4, ("[N%d] W[%d] will process a msg (handler=%d | cnt=%d", BgMyNode(), id, CmiBgMsgHandle(msg), recvd));
+    int msgLen = CmiBgMsgLength(msg);
+    DEBUGM(4, (" | len: %d | type: %d | node id: %d | src pe: %d\n" , msgLen, CmiBgMsgType(msg), CmiBgMsgNodeID(msg), CmiBgMsgSrcPe(msg)));
+    for(int msgIndex=CmiBlueGeneMsgHeaderSizeBytes-1; msgIndex<msgLen; msgIndex++)
+        DEBUGM(2, ("%d,", msg[msgIndex]));
+    DEBUGM(2,("\n"));
+
+    DEBUGM(4, ("[N%d] W[%d] now has %d msgs from own queue and %d from affinity before processing msg\n", BgMyNode(), id, q1.length(), q2.length()));
+
     BG_ENTRYSTART(msg);
+
+    //CmiMemoryCheck();
+
     // BgProcessMessage may trap into scheduler
-    BgProcessMessage(msg);
+    if(bgUseOutOfCore){
+#if 0 
+    	if(startOutOfCore){
+    	    DEBUGM(4, ("to execute in ooc mode\n"));
+    	    if(isCoreOnDisk) this->broughtIntoMem();  
+    	    BgProcessMessage(msg); //startOutOfCore may be changed in processing this msg (AMPI_Init)    
+    
+    	    if(startOOCChanged){ 
+                //indicate AMPI_Init is called and before it is finished, out-of-core is not executed
+                //just to track the 0->1 change phase (which means MPI_Init is finished)
+                //the 1->0 phase is not tracked because "startOutOfCore" is unset so that
+                //the next processing of a msg will not go into this part of code
+                startOOCChanged=0;
+    	    }else{
+                //if(!isCoreOnDisk) { //the condition is added for virtual process
+                    this->takenOutofMem();
+                //}
+    	    }
+    	}else{
+    	    DEBUGM(4, ("to execute not in ooc mode\n"));
+    	    if(isCoreOnDisk) {
+                CmiAbort("This should never be entered!\n");
+                this->broughtIntoMem();  
+    	    }
+    	    //put before processing msg since thread may be scheduled during processing the msg
+    	    BgProcessMessage(msg);
+    	}
+#else
+        bgOutOfCoreSchedule(this);
+        BgProcessMessage(msg);
+#endif
+    }else{
+        DEBUGM(4, ("to execute not in ooc mode\n"));
+        BgProcessMessage(msg);
+    }
+    
+    DEBUGM(4, ("[N%d] W[%d] now has %d msgs from own queue and %d from affinity after processing msg\n\n", BgMyNode(), id, q1.length(), q2.length()));
     BG_ENTRYEND();
 
     // counter of processed real mesgs
@@ -188,9 +267,11 @@ void workThreadInfo::scheduler(int count)
     else q1.deq();
 #endif
 
-    DEBUGF(("[N%d] work thread T%d finish a msg.\n", BgMyNode(), id));
+    //recvd ++;
 
-    recvd ++;
+    //DEBUGF(("[N%d] work thread T%d finish a msg.\n", BgMyNode(), id));
+    //CmiPrintf("[N%d] work thread T%d finish a msg (msg=%s, cnt=%d).\n", BgMyNode(), id, msg, recvd);
+    
     if ( recvd == count) return;
 
     if (cycle != CsdStopFlag) break;
@@ -254,3 +335,127 @@ void workThreadInfo::addAffMessage(char *msgPtr)
   }
 }
 
+
+//=====Begin of stuff related with out-of-core scheduling======
+extern int BgOutOfCoreFlag;
+
+void threadInfo::broughtIntoMem(){
+    DEBUGM(5, ("=====[N%d] work thread T[%d] into mem=====.\n", BgMyNode(), id));
+    //CmiPrintStackTrace(0);    
+
+    assert(isCoreOnDisk==1);
+
+    char *dirname = "/tmp/CORE";
+    //every body make dir in case it is local directory
+    CmiMkdir(dirname);
+    char filename[128];
+    sprintf(filename, "%s/%d.dat", dirname, globalId);
+    FILE* fp = fopen(filename, "r");
+    if(fp==NULL){
+        printf("Error: %s cannot be opened when bringing thread %d to core\n", filename, globalId);
+        return;
+    }
+
+    BgOutOfCoreFlag=2;
+    PUP::fromDisk p(fp);
+    //out-of-core is not a real migration, so turn off the notifyListener option
+    CkPupArrayElementsData(p, 0);
+    fclose(fp);
+    BgOutOfCoreFlag=0;
+    
+    //printf("mem usage after thread %d in: %fMB\n",globalId, CmiMemoryUsage()/1024.0/1024.0);    
+    isCoreOnDisk = 0;
+}
+
+void threadInfo::takenOutofMem(){
+    DEBUGM(5, ("=====[N%d] work thread T[%d] outof mem=====.\n", BgMyNode(), id));
+    //CmiPrintStackTrace(0);    
+
+    assert(isCoreOnDisk==0);
+
+    char *dirname = "/tmp/CORE";
+    //every body make dir in case it is local directory
+    CmiMkdir(dirname);
+    char filename[128];
+    sprintf(filename, "%s/%d.dat", dirname, globalId);
+    FILE* fp = fopen(filename, "wb");
+    if(fp==NULL){
+        printf("Error: %s cannot be opened when bringing thread %d to core\n", filename, globalId);
+        return;
+    }
+
+    BgOutOfCoreFlag=1;
+    PUP::toDisk p(fp);
+    //out-of-core is not a real migration, so turn off the notifyListener option
+    p.becomeDeleting();
+    CkPupArrayElementsData(p, 0);
+
+    long fsize = 0;
+    fseek(fp, 0, SEEK_END);
+    fsize = ftell(fp);
+    //set this thread's memory usage
+    memUsed = fsize/1024.0/1024.0;
+
+    fflush(fp);
+
+    fclose(fp);
+
+    DEBUGM(6,("Before removing array elements on proc[%d]\n", globalId));   
+ 
+    CkRemoveArrayElements();
+    BgOutOfCoreFlag=0;
+    isCoreOnDisk=1;
+    //printf("mem usage after thread %d out: %fMB\n", globalId, CmiMemoryUsage()/1024.0/1024.0);  
+}
+
+/*
+static int outCore()
+{
+  BgOutOfCoreFlag = 1;
+  //printf("memory usage: out core before remove arrays %fMB\n", CmiMemoryUsage()/1024.0/1024.0);
+  int id = BgGetGlobalWorkerThreadID();
+  //printf("[%d] Out core\n", id);
+  char *dirname = "/tmp/COREORIG";
+  // every body make dir in case it is local directory
+  CmiMkdir(dirname);
+  char filename[128];
+  sprintf(filename,"%s/%d.dat",dirname,id);
+  FILE* fp = fopen(filename,"wb");
+  if (fp == 0) {
+    perror("file");
+    exit(1);
+  }
+  PUP::toDisk p(fp);
+  CkPupArrayElementsData(p, 0);
+  fdatasync(fileno(fp));
+  fclose(fp);
+
+  CkRemoveArrayElements();
+  //printf("memory usage: out core after remove arrays %fMB\n", CmiMemoryUsage()/1024.0/1024.0);
+  BgOutOfCoreFlag = 0;
+}
+
+static int inCore()
+{
+  BgOutOfCoreFlag = 2;
+//CmiPrintStackTrace(0);
+  //printf("memory usage: in core before load core %fMB\n", CmiMemoryUsage()/1024.0/1024.0);
+  int id = BgGetGlobalWorkerThreadID();
+  //printf("[%d] In core\n", id);
+  char *dirname = "/tmp/COREORIG";
+  // every body make dir in case it is local directory
+  CmiMkdir(dirname);
+  char filename[128];
+  sprintf(filename,"%s/%d.dat",dirname,id);
+  FILE* fp = fopen(filename,"r");
+  if (fp == NULL) return 0;
+  PUP::fromDisk p(fp);
+  CkPupArrayElementsData(p, 0);
+  fdatasync(fileno(fp));
+  fclose(fp);
+  //printf("memory usage: in core after load core %fMB\n", CmiMemoryUsage()/1024.0/1024.0);
+  BgOutOfCoreFlag = 0;
+}
+*/
+
+//=====End of stuff related with out-of-core scheduling=======

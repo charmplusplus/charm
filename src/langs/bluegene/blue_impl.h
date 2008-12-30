@@ -222,8 +222,10 @@ public:
     Global2XYZ(Local2Global(num), x, y, z);
   }
 
+#define NOT_FAST_CODE 1
     /* map global serial node number to PE ++++ */
   inline static int Global2PE(int num) { 
+#if NOT_FAST_CODE
     int n = _bgSize/CmiNumPes();
     int bn = _bgSize%CmiNumPes();
     int start = 0; 
@@ -236,6 +238,38 @@ public:
     }
     CmiAbort("Global2PE: unknown pe!");
     return -1;
+#else
+   int avgNs = _bgSize/CmiNumPes();
+   int remains = _bgSize%CmiNumPes();
+   /*
+    * the bg nodes are mapped like the following:
+    * avgNs+1, avgNs+1, ..., avgNs+1 (of remains proccessors)
+    * avgNs, ..., avgNs (of CmiNumPes()-remains processors)
+    */
+
+   int middleCnt = (avgNs+1)*remains;
+   if(num < middleCnt){
+      //in the first part of emulating processors
+      int ret = num/(avgNs+1);
+   #if !CMK_OPTIMIZE
+      if(ret<0){
+          CmiAbort("Global2PE: unknown pe!");
+          return -1;
+      }
+   #endif
+      return ret;
+   }else{
+      //in the second part of emulating processors
+      int ret = (num-middleCnt)/avgNs+remains;
+   #if !CMK_OPTIMIZE
+      if(ret>=CmiNumPes()){
+          CmiAbort("Global2PE: unknown pe!");
+          return -1;
+      }
+   #endif
+      return ret;
+   }
+#endif
   }
 
     /* map global serial node ID to local node array index  ++++ */
@@ -385,16 +419,41 @@ public:
   nodeInfo *myNode;		/* the node belonged to */
   double  currTime;		/* thread timer */
 
+  /*
+   * It is needed for out-of-core scheduling
+   * If it is set to 0, then we know its core file is not on disk
+   * and it is first time for this thread to process a msg
+   * thus no need to bring it into memory.
+   * It is initialized to be 0;
+   * It is should be set to 1 when it is taken out of memory to disk
+   * and set to 0 when it is brought into memory
+   */
+    int isCoreOnDisk;
+    
+    double memUsed;            /* thread's memory footprint (unit is MB) */ 
+   
+    //Used for AMPI programs
+    int startOutOfCore;
+    int startOOCChanged;
+
 #if  CMK_BLUEGENE_THREAD
   HandlerTable   handlerTable;      /* thread level handler table */
 #endif
 
 public:
   threadInfo(int _id, ThreadType _type, nodeInfo *_node): 
-  	id(_id), globalId(-1), type(_type), myNode(_node), currTime(0.0) {}
+  	id(_id), globalId(-1), type(_type), myNode(_node), currTime(0.0), isCoreOnDisk(0), memUsed(0.0),
+	startOutOfCore(1), startOOCChanged(0){}
   inline void setThread(CthThread t) { me = t; }
   inline CthThread getThread() const { return me; }
   virtual void run() { CmiAbort("run not imlplemented"); }
+
+  //=====Begin of stuff related with out-of-core scheduling===========
+  void broughtIntoMem();
+  void takenOutofMem();
+  //=====End of stuff related with out-of-core scheduling=============
+
+
 }; 
 
 class workThreadInfo : public threadInfo {

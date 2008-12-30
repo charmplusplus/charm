@@ -13,6 +13,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
+#include <strings.h>
+#include <unistd.h>
 
 #include "cklists.h"
 #include "queueing.h"
@@ -20,7 +23,13 @@
 #include "blue_impl.h"    	// implementation header file
 //#include "blue_timing.h" 	// timing module
 
-#define  DEBUGF(x)      //CmiPrintf x;
+#include "bigsim_ooc.h" //out-of-core module
+#include "bigsim_debug.h"
+
+//#define  DEBUGF(x)      //CmiPrintf x;
+
+#undef DEBUGLEVEL
+#define DEBUGLEVEL 10
 
 /* node level variables */
 CpvDeclare(nodeInfo*, nodeinfo);		/* represent a bluegene node */
@@ -180,7 +189,7 @@ inline BgHandlerInfo * HandlerTable::getHandle(int handler)
       CmiAbort("Invalid handler!");
     }
 #endif
-    if (handler >= handlerTableCount) return NULL;
+    if (handler >= handlerTableCount || handler<0) return NULL;
     return &handlerTable[handler];
 }
 
@@ -402,6 +411,9 @@ void addBgNodeInbuffer(char *msgPtr, int lnodeID)
   if (lnodeID >= cva(numNodes)) CmiAbort("NodeID is out of range!");
 #endif
   nodeInfo &nInfo = cva(nodeinfo)[lnodeID];
+
+  //printf("Adding a msg %p to local node %d and its thread %d\n", msgPtr, lnodeID, CmiBgMsgThreadID(msgPtr));	
+	
   nInfo.addBgNodeInbuffer(msgPtr);
 }
 
@@ -659,6 +671,8 @@ void CmiSendPacket(int x, int y, int z, int msgSize,char *msg)
 /* user data is not free'd in this routine, user can reuse the data ! */
 void sendPacket_(nodeInfo *myNode, int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* sendmsg, int local)
 {
+  //CmiPrintStackTrace(0);
+
   double latency;
   CmiSetHandler(sendmsg, cva(simState).msgHandler);
   CmiBgMsgNodeID(sendmsg) = nodeInfo::XYZ2Global(x,y,z);
@@ -683,8 +697,17 @@ void sendPacket_(nodeInfo *myNode, int x, int y, int z, int threadID, int handle
   // timing
   BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), threadID, sendT, local, 1);
 
-  if (local)
-    addBgNodeInbuffer(sendmsg, myNode->id);
+  //static int addCnt=1; //for debugging only
+  //DEBUGM(4, ("N[%d] add a msg (handler=%d | cnt=%d | len=%d | type=%d | node id:%d\n", BgMyNode(), handlerID, addCnt, numbytes, type, CmiBgMsgNodeID(sendmsg)));  
+  //addCnt++;
+
+  if (local){
+      /* Here local refers to the fact that msg is sent to the processor itself
+       * therefore, we just add this msg to the thread itself
+       */
+      //addBgThreadMessage(sendmsg,threadID);
+      addBgNodeInbuffer(sendmsg, myNode->id);
+  }    
   else
     CmiSendPacket(x, y, z, numbytes, sendmsg);
 
@@ -1019,17 +1042,22 @@ void BgSetWorkerThreadStart(BgStartHandler f)
   workStartFunc = f;
 }
 
+extern "C" void CthResumeNormalThread(CthThreadToken* token);
+
 // kernel function for processing a bluegene message
 void BgProcessMessage(char *msg)
 {
+  DEBUGM(5, ("=====Begin of BgProcessing a msg on node[%d]=====\n", BgMyNode()));
   int handler = CmiBgMsgHandle(msg);
   DEBUGF(("[%d] call handler %d\n", BgMyNode(), handler));
 
   BgHandlerInfo *handInfo;
 #if  CMK_BLUEGENE_NODE
-  handInfo = tMYNODE->handlerTable.getHandle(handler);
+  HandlerTable hdlTbl = tMYNODE->handlerTable;
+  handInfo = hdlTbl.getHandle(handler);
 #else
-  handInfo = tHANDLETAB.getHandle(handler);
+  HandlerTable hdlTbl = tHANDLETAB;
+  handInfo = hdlTbl.getHandle(handler);
   if (handInfo == NULL) handInfo = tMYNODE->handlerTable.getHandle(handler);
 #endif
 
@@ -1050,9 +1078,13 @@ void BgProcessMessage(char *msg)
   // don't count thread overhead and timing overhead
   startVTimer();
 
+  DEBUGM(5, ("Executing function %p\n", entryFunc));    
+
   entryFunc(msg, handInfo->userPtr);
 
   stopVTimer();
+
+  DEBUGM(5, ("=====End of BgProcessing a msg on node[%d]=====\n\n", BgMyNode()));
 }
 
 
@@ -1281,6 +1313,25 @@ CmiStartFn bgMain(int argc, char **argv)
     cva(bgMach).traceroot = root;
   }
 
+  /* parameters related with out-of-core execution */
+  if (CmiGetArgDoubleDesc(argv, "+bgooc", &bgOOCMaxMemSize, "Simulate with out-of-core support and the threshhold of memory size")){
+      bgUseOutOfCore = 1;
+      BgInOutOfCoreMode = 1; //the global (the whole converse layer) out-of-core flag
+
+      double curFreeMem = bgGetSysFreeMemSize();
+      if(fabs(bgOOCMaxMemSize - 0.0)<=1e-6){
+	//using the memory available of the system right now
+	//assuming no other programs will run after this program runs
+	bgOOCMaxMemSize = curFreeMem;
+	CmiPrintf("Using the system's current memory available: %.3fMB\n", bgOOCMaxMemSize);
+      }
+      if(bgOOCMaxMemSize > curFreeMem){
+	CmiPrintf("Warning: not enough memory for the specified memory size, now use the current available memory %3.fMB.\n", curFreeMem);
+	bgOOCMaxMemSize = curFreeMem;
+      }
+      DEBUGF(("out-of-core turned on!\n"));
+  }      
+
 #if BLUEGENE_DEBUG_LOG
   {
     char ln[200];
@@ -1376,6 +1427,15 @@ CmiStartFn bgMain(int argc, char **argv)
 
   cva(simState).simStartTime = CmiWallTimer();
 
+  if(bgUseOutOfCore)
+      initTblThreadInMem();
+
+  //initialize variables related to get precise
+  //physical memory usage info for a process
+  bgMemPageSize = getpagesize();
+  memset(bgMemStsFile, 0, 25); 
+  sprintf(bgMemStsFile, "/proc/%d/statm", getpid());
+    
   return 0;
 }
 
@@ -1756,6 +1816,9 @@ void CthEnqueueBigSimThread(CthThreadToken* token, int s,
   #error "ERROR HERE"
 #endif
     // local message into queue
+  DEBUGM(4, ("In EnqueueBigSimThread method!\n"));
+
+  DEBUGM(4, ("token [%p] is added to queue pointing to thread[%p]\n", token, token->thread));
   BgSendPacket(x,y,z, t, CpvAccess(CthResumeBigSimThreadIdx), LARGE_WORK, sizeof(CthThreadToken), (char *)token);
 } 
 

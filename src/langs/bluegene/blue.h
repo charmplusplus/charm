@@ -264,6 +264,8 @@ void BgDeliverMsgs(int);
 /************************ Supporting AMPI ************************/
 
 void BgAttach(CthThread t);
+void BgSetStartOutOfCore();
+void BgUnsetStartOutOfCore();
 
 #if defined(__cplusplus)
 }
