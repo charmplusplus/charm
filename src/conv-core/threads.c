@@ -148,6 +148,8 @@
 
 */
 
+#define THD_MAGIC_NUM 0x12345678
+
 typedef struct CthThreadBase
 {
   CthThreadToken *token; /* token that shall be enqueued into the ready queue*/
@@ -168,6 +170,9 @@ typedef struct CthThreadBase
   void      *stack; /*Pointer to thread stack*/
   int        stacksize; /*Size of thread stack (bytes)*/
   struct CthThreadListener *listener; /* pointer to the first of the listeners */
+
+  int magic; /* magic number for checking corruption */
+
 } CthThreadBase;
 
 /* By default, there are no flags */
@@ -412,6 +417,9 @@ static void CthThreadBaseInit(CthThreadBase *th)
   th->tid.id[2] = 0;
 
   th->listener = NULL;
+
+
+  th->magic = THD_MAGIC_NUM;
 }
 
 static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable)
@@ -500,13 +508,51 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 	if ((CthThread)t==CthCpvAccess(CthCurrent))
 		CmiAbort("CthPupBase: Cannot pack running thread!");
 #endif
-	/*recreate the token when unpacking and set the thread
-	  pointer in it to NULL if the thread is being deleted*/
-	if(pup_isUnpacking(p)){
-		t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
-		t->token->thread = S(t);
-		t->scheduled = 0;
+	/*
+	 * Token will never be freed, so its pointer should be pupped.
+	 * When packing, set the thread pointer in this token to be NULL.
+	 * When unpacking, reset the thread pointer in token to this thread.
+	 */
+	  
+        if(BgOutOfCoreFlag!=0){
+	    pup_bytes(p, &t->token, sizeof(void *));
+	    if(!pup_isUnpacking(p)){
+		t->token->thread = NULL;
+	    }
+	    pup_int(p, &t->scheduled);
 	}
+	if(pup_isUnpacking(p)){
+		if(BgOutOfCoreFlag==0){
+		    t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
+		    t->token->thread = S(t);
+		    //For normal runs where this pup is needed,
+		    //set scheduled to 0 in the unpacking period since the thread has
+		    //not been scheduled
+		    t->scheduled = 0;
+		}else{
+		/* During out-of-core emulation */
+		    /* 
+		     * When t->scheduled is set, the thread is in the queue so the token
+		     * should be kept. Otherwise, allocate a new space for the token
+		     */
+		    if(t->scheduled==0){
+			/*CmiPrintf("Creating a new token for %p!\n", t->token);*/
+			t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
+		    }
+		    t->token->thread = S(t);
+		}
+	}
+	
+	//BIGSIM_OOC DEBUGGING
+	//if(BgOutOfCoreFlag!=0){
+	//   if(pup_isUnpacking(p)){
+	//	CmiPrintf("Unpacking: ");
+	//    }else{
+	//	CmiPrintf("Packing: ");
+	//    }	
+	//    CmiPrintf("thd=%p, its token=%p, token's thd=%p\n", t, t->token, t->token->thread); 
+	//}
+
 	/*Really need a pup_functionPtr here:*/
 	pup_bytes(p,&t->awakenfn,sizeof(t->awakenfn));
 	pup_bytes(p,&t->choosefn,sizeof(t->choosefn));
@@ -542,6 +588,8 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 		/* FIXME:  restore thread listener */
 		t->listener = NULL;
 	}
+
+	pup_int(p, &t->magic);
 }
 
 static void CthThreadFinished(CthThread t)
@@ -549,6 +597,7 @@ static void CthThreadFinished(CthThread t)
 	B(t)->exiting=1;
 	CthSuspend();
 }
+
 
 /************ Scheduler Interface **********/
 
@@ -613,7 +662,14 @@ void CthSuspend(void)
   }
   if (cur->choosefn == 0) CthNoStrategy();
   next = cur->choosefn();
-  cur->scheduled=0;
+  //cur->scheduled=0;
+  //changed due to out-of-core emulation in BigSim
+  cur->scheduled--;
+#ifndef CMK_OPTIMIZE
+  if(cur->scheduled<0)
+    CmiAbort("A thread's scheduler should not be less than 0!\n");
+#endif    
+
 #ifndef CMK_OPTIMIZE
 #if !CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
@@ -626,6 +682,13 @@ void CthSuspend(void)
 void CthAwaken(CthThread th)
 {
   if (B(th)->awakenfn == 0) CthNoStrategy();
+
+  //BIGSIM_OOC DEBUGGING
+  //if(B(th)->scheduled==1){
+    //CmiPrintf("====Thread %p is already scheduled!!!!\n", th);
+    //return;
+  //}
+
 #ifndef CMK_OPTIMIZE
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
@@ -633,7 +696,9 @@ void CthAwaken(CthThread th)
 #endif
 #endif
   B(th)->awakenfn(B(th)->token, CQS_QUEUEING_FIFO, 0, 0);
-  B(th)->scheduled = 1;
+  //B(th)->scheduled = 1;
+  //changed due to out-of-core emulation in BigSim
+  B(th)->scheduled++;
 }
 
 void CthYield()
@@ -652,7 +717,9 @@ void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 #endif
 #endif
   B(th)->awakenfn(B(th)->token, s, pb, prio);
-	B(th)->scheduled = 1;
+  //B(th)->scheduled = 1;
+  //changed due to out-of-core emulation in BigSim
+  B(th)->scheduled++;
 }
 
 void CthYieldPrio(int s, int pb, unsigned int *prio)
@@ -747,9 +814,10 @@ CthThread CthPup(pup_er p, CthThread t)
 
     if (pup_isDeleting(p))
       {CthFree(t);t=0;}
-
     return t;
 }
+
+
 
 struct CthProcInfo
 {
@@ -1809,3 +1877,13 @@ void CthTraceResume(CthThread t)
   traceResume(&t->base.tid);
 }
 
+//Functions that help debugging of out-of-core emulation in BigSim
+void CthPrintThdMagic(CthThread t){
+    CmiPrintf("CthThread[%p]'s magic: %x\n", t, t->base.magic);
+}
+
+#if !CMK_THREADS_USE_CONTEXT
+void CthPrintThdStack(CthThread t){
+    CmiPrintf("thread=%p, base stack=%p, stack pointer=%p\n", t, t->base.stack, t->stackp);
+}
+#endif
