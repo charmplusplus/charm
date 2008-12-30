@@ -26,7 +26,11 @@ class LocalBarrier {
 friend class LBDB;
 public:
   LocalBarrier() { cur_refcount = 1; client_count = 0; max_client = 0;
-                   max_receiver= 0; at_count = 0; on = CmiFalse; };
+                   max_receiver= 0; at_count = 0; on = CmiFalse; 
+	#if CMK_BLUEGENE_CHARM
+	first_free_client_slot = 0;
+	#endif
+    };
   ~LocalBarrier() { };
 
   LDBarrierClient AddClient(LDResumeFn fn, void* data);
@@ -64,6 +68,10 @@ private:
   int max_receiver;
   int at_count;
   CmiBool on;
+
+  #if CMK_BLUEGENE_CHARM
+  int first_free_client_slot;
+  #endif
 };
 
 class LBDB {
