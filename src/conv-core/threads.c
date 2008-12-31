@@ -662,9 +662,12 @@ void CthSuspend(void)
   }
   if (cur->choosefn == 0) CthNoStrategy();
   next = cur->choosefn();
-  //cur->scheduled=0;
-  //changed due to out-of-core emulation in BigSim
-  cur->scheduled--;
+  if(BgOutOfCoreFlag==0) cur->scheduled=0;
+  else{
+    //cur->scheduled=0;
+    //changed due to out-of-core emulation in BigSim
+    cur->scheduled--;
+  }
 #ifndef CMK_OPTIMIZE
   if(cur->scheduled<0)
     CmiAbort("A thread's scheduler should not be less than 0!\n");
@@ -696,9 +699,12 @@ void CthAwaken(CthThread th)
 #endif
 #endif
   B(th)->awakenfn(B(th)->token, CQS_QUEUEING_FIFO, 0, 0);
-  //B(th)->scheduled = 1;
-  //changed due to out-of-core emulation in BigSim
-  B(th)->scheduled++;
+  if(BgOutOfCoreFlag==0) B(th)->scheduled=1;
+  else{
+    //B(th)->scheduled = 1;
+    //changed due to out-of-core emulation in BigSim
+    B(th)->scheduled++;
+  }
 }
 
 void CthYield()
@@ -717,9 +723,12 @@ void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 #endif
 #endif
   B(th)->awakenfn(B(th)->token, s, pb, prio);
-  //B(th)->scheduled = 1;
-  //changed due to out-of-core emulation in BigSim
-  B(th)->scheduled++;
+  if(BgOutOfCoreFlag==0) B(th)->scheduled=1;
+  else{
+    //B(th)->scheduled = 1;
+    //changed due to out-of-core emulation in BigSim
+    B(th)->scheduled++;
+  }
 }
 
 void CthYieldPrio(int s, int pb, unsigned int *prio)
