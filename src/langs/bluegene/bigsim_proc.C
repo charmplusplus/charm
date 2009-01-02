@@ -339,6 +339,16 @@ void workThreadInfo::addAffMessage(char *msgPtr)
 //=====Begin of stuff related with out-of-core scheduling======
 extern int BgOutOfCoreFlag;
 
+//The Out-of-core implementation reuses the functions in the checkpoint
+//module. For standalone bigsim emulator programs, the definitions of
+//those functions (inside libck.a ) are not linked into the final binary.
+//Considering the tricky relations between libck.a and standalone bigsim
+//emulator program, defining the following macro to temporarily resolve the
+//issue. When compiling the bigsim emulator with out-of-core support for
+//normal charm++ or AMPI programs, this macro should be turned to 1.
+//-Chao Mei
+#define REUSE_CHECKPOINT_FUNCS 0
+
 void threadInfo::broughtIntoMem(){
     DEBUGM(5, ("=====[N%d] work thread T[%d] into mem=====.\n", BgMyNode(), id));
     //CmiPrintStackTrace(0);    
@@ -359,7 +369,9 @@ void threadInfo::broughtIntoMem(){
     BgOutOfCoreFlag=2;
     PUP::fromDisk p(fp);
     //out-of-core is not a real migration, so turn off the notifyListener option
+    #if REUSE_CHECKPOINT_FUNCS
     CkPupArrayElementsData(p, 0);
+    #endif
     fclose(fp);
     BgOutOfCoreFlag=0;
     
@@ -388,7 +400,10 @@ void threadInfo::takenOutofMem(){
     PUP::toDisk p(fp);
     //out-of-core is not a real migration, so turn off the notifyListener option
     p.becomeDeleting();
+
+    #if REUSE_CHECKPOINT_FUNCS
     CkPupArrayElementsData(p, 0);
+    #endif 
 
     long fsize = 0;
     fseek(fp, 0, SEEK_END);
@@ -402,7 +417,10 @@ void threadInfo::takenOutofMem(){
 
     DEBUGM(6,("Before removing array elements on proc[%d]\n", globalId));   
  
+    #if REUSE_CHECKPOINT_FUNCS
     CkRemoveArrayElements();
+    #endif
+
     BgOutOfCoreFlag=0;
     isCoreOnDisk=1;
     //printf("mem usage after thread %d out: %fMB\n", globalId, CmiMemoryUsage()/1024.0/1024.0);  
