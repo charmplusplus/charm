@@ -17,8 +17,6 @@ module ampi {
     entry [notrace] ampi(CkArrayID parent_,ampiCommStruct s);
     entry [notrace] ampi(CkArrayID parent_,ampiCommStruct s,ComlibInstanceHandle ciStreaming_,
 		ComlibInstanceHandle ciBcast_,ComlibInstanceHandle ciAllgather_,ComlibInstanceHandle ciAlltoall_);
-    entry void allInitDone(CkReductionMsg *m);
-    entry void setInitDoneFlag();
     entry void unblock(void);
     entry void generic(AmpiMsg *);
     entry void reduceResult(CkReductionMsg *m);
