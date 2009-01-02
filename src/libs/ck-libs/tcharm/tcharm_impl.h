@@ -141,10 +141,7 @@ class TCharm: public CBase_TCharm
 	CtgGlobals threadGlobals; //Global data
 	void pupThread(PUP::er &p);
 
-	//isSelfDone is added for out-of-core emulation in BigSim
-	//when thread is brought back into core, ResumeFromSync is called
-	//so if the thread has finished its stuff, it should not start again
-	bool isStopped, resumeAfterMigration, exitWhenDone, isSelfDone, skipResume;
+	bool isStopped, resumeAfterMigration, exitWhenDone, skipResume;
 	ThreadInfo threadInfo;
 	double timeOffset; //Value to add to CkWallTimer to get my clock
 
@@ -161,7 +158,6 @@ class TCharm: public CBase_TCharm
 	~TCharm();
 	
 	virtual void ckJustMigrated(void);
-	virtual void ckJustRestored(void);
 	virtual void ckAboutToMigrate(void);
 	
 	void migrateDelayed(int destPE);
@@ -218,13 +214,8 @@ class TCharm: public CBase_TCharm
 	void start(void);
 	//Aliases:
 	inline void suspend(void) {stop();}
-	inline void resume(void) {
-		//printf("in thcarm::resume, isStopped=%d\n", isStopped); 
-		if (isStopped){ 
-		    start(); 
-		}
-		else {
-		    //printf("[%d] TCharm resume called on already running thread pe %d \n",thisIndex,CkMyPe());
+	inline void resume(void) { if (isStopped) start(); else {
+	//	printf("[%d] TCharm resume called on already running thread pe %d \n",thisIndex,CkMyPe());
 		}
 	}
 
@@ -266,8 +257,6 @@ class TCharm: public CBase_TCharm
 	/// System() call emulation:
 	int system(const char *cmd);
 	void callSystem(const callSystemStruct &s);
-
-	inline CthThread getTid() { return tid; }
 };
 
 
