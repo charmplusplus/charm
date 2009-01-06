@@ -1,14 +1,17 @@
 \documentclass[10pt]{article}
 \usepackage{../pplmanual}
 \input{../pplmanual}
+\usepackage{fancyvrb}
+\usepackage{shortvrb}
+
 \def\smallfbox#1{{\small {\fbox{#1}}}}
 \def\code#1{{\small {\tt {#1}}}}
 
 \title{Charisma Manual}
 \version{1.0}
 \credits{
-Charisma started as an orchestration language by Laxmikant Kale, Mark Hills and
-Chao Huang. It has been developed and maintained by Chao Huang.
+Charisma is an orchestration language authored by Laxmikant Kal\'{e}, Mark Hills,
+Chao Huang and Pritish Jetley. It was developed by Chao Huang and is currently maintained by Pritish Jetley.
 }
 
 \begin{document}
@@ -18,6 +21,14 @@ Chao Huang. It has been developed and maintained by Chao Huang.
 
 This manual describes Charisma, an orchestration language for migratable
 parallel objects. 
+Charisma can be downloaded from the CVS repository hosted on
+\texttt{charm.cs.uiuc.edu}:
+
+\begin{SaveVerbatim}{foodecl}
+  cvs co orchestration
+\end{SaveVerbatim}
+\smallfbox{\BUseVerbatim{foodecl}}
+
 
 \section{Charisma Syntax}
 A Charisma program is composed of two parts: the orchestration code in a .or
