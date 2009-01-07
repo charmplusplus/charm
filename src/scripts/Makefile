@@ -105,7 +105,6 @@ jadeall: jade
 
 #include TAU defs
 TAU_MAKEFILE=
-
 include	$(TAU_MAKEFILE) #stub-makefile
 
 #builds TAU's trace library
@@ -168,7 +167,8 @@ include $(DEPENDFILE)
 
 CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       queueing.h conv-cpath.h conv-cpm.h persistent.h\
-      trace.h trace-bluegene.h trace-projections.h trace-simple.h trace-controlPoints.h charm-api.h \
+      trace.h trace-common.h trace-bluegene.h trace-projections.h  \
+      trace-simple.h trace-controlPoints.h charm-api.h \
       conv-ccs.h ccs-client.c ccs-client.h \
       ccs-server.h ccs-auth.c ccs-auth.h \
       memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
