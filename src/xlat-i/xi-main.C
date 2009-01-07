@@ -66,8 +66,10 @@ void splitScopedName(char* name, char** scope, char** basename) {
         return;
     }
     *basename = scopeEnd+1;
-    *scope = new char[scopeEnd-name+1];
-    strncpy(*scope, name, scopeEnd-name+1);
+    int len=scopeEnd-name+1; /* valid characters to copy */
+    *scope = new char[len+1];
+    strncpy(*scope, name, len);
+    (*scope)[len]=0; /* gotta nul-terminate C string! */
 }
 
 FILE *openFile(char *interfacefile)
