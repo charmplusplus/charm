@@ -1930,7 +1930,7 @@ int errorcheck_one_client_connect(int client){
 
 
 #if CMK_C_INLINE
-inline 
+inline static
 #endif
 void read_initnode_one_client(int client){
 		ChMessage msg;
