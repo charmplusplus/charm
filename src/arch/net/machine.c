@@ -1724,7 +1724,7 @@ void DeliverOutgoingNodeMessage(OutgoingMsg ogm)
 #endif
 
 #if CMK_C_INLINE
-inline 
+inline static
 #endif
 void DeliverViaNetworkOrPxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned int broot,int copy){
 #if CMK_USE_SYSVSHM
