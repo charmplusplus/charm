@@ -67,7 +67,7 @@ class GList {
 };
 */
 
-#define ALIGN8(x)       (int)((~7)&((x)+7))
+/*#define ALIGN8(x)       (int)((~7)&((x)+7)) */
 
 /* Reduce the no. of mallocs by allocating from
  * a free list. By allocating 21 at a time, it allocates
