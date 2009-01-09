@@ -1671,7 +1671,7 @@ Message::genDefs(XStr& str)
     // alloc(int, size_t, int*, priobits)
     str << tspec << "void* " << ptype;
     str << "::alloc(int msgnum, size_t sz, int *sizes, int pb) {\n";
-    str << "  int offsets[" << numArray+1 << "];\n";
+    str << "  size_t offsets[" << numArray+1 << "];\n";
     str << "  offsets[0] = ALIGN8(sz);\n";
     for(i=0, count=0, ml=mvlist; i<num; i++, ml=ml->next) {
       mv = ml->msg_var;
