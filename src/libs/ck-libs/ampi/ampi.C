@@ -620,9 +620,7 @@ static ampi *ampiInit(char **argv)
 	ciAlltoall=CkGetComlibInstance();
 #endif
 
-        CkVec<int> _indices;
-        for(int i=0;i<_nchunks;i++) _indices.push_back(i);
-        ampiCommStruct worldComm(new_world,empty,_nchunks,_indices);
+        ampiCommStruct worldComm(new_world,empty,_nchunks);
         CProxy_ampi arr;
 #if AMPI_COMLIB
         arr=CProxy_ampi::ckNew(parent,worldComm,ciStreaming,ciBcast,ciAllgather,ciAlltoall,opts);
