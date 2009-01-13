@@ -1034,7 +1034,7 @@ void ComlibDoneCreating(){
 char *router;
 int sfactor=0;
 
-class ComlibManagerMain {
+class ComlibManagerMain: public Chare {
 public:
     ComlibManagerMain(CkArgMsg *msg) {
         
