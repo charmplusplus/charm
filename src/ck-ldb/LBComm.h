@@ -129,7 +129,11 @@ private:
   
   void Resize();
 
+#ifdef __BLUEGENE__
+  enum { initial_sz = 1 };
+#else
   enum { initial_sz = 10000 };
+#endif
   enum TableState { nil, InUse } ;
   LBCommData* set;
   TableState* state;
