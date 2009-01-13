@@ -15,7 +15,7 @@ extern "C" {
 		}  } while(0);
 #endif
 
-void RegisterLanguage(int lID, char* ln);
+void RegisterLanguage(int lID, const char* ln);
 void RegisterEvent(int lID, int eID);
 /* TODO some cleanup required below */
 void LogEvent(int lID, int eID);

@@ -52,7 +52,7 @@ TraceCore::~TraceCore()
 	if(traceLogger) delete traceLogger; 
 }
 
-void TraceCore::RegisterLanguage(int lID, char* ln)
+void TraceCore::RegisterLanguage(int lID, const char* ln)
 {
 	//CmiPrintf("Register Language called for %s at %d \n",ln,lID);
   if(traceCoreOn == 0){
@@ -347,7 +347,7 @@ TraceLogger::~TraceLogger()
   }
 }
 
-void TraceLogger::RegisterLanguage(int lID, char* ln)
+void TraceLogger::RegisterLanguage(int lID, const char* ln)
 {
 	numLangs++;
 

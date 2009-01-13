@@ -79,7 +79,7 @@ extern "C" void endTraceCore(void) {}
 /* Tracing API 
  * Implementation of functions declared in traceCoreAPI.h 
  *****************************************************************/
-extern "C" void RegisterLanguage(int lID, char* ln)
+extern "C" void RegisterLanguage(int lID, const char* ln)
 { LOGCONDITIONAL(CpvAccess(_traceCore)->RegisterLanguage(lID, ln)); }
 
 extern "C" void RegisterEvent(int lID, int eID)

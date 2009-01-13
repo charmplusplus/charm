@@ -47,7 +47,7 @@ class TraceCore
 
 	//TODO: some of these methods are for temporary use only
 	void RegisterLanguage(int lID);
-	void RegisterLanguage(int lID, char* lName);
+	void RegisterLanguage(int lID, const char* lName);
 	void RegisterEvent(int lID, int eID);
 	void LogEvent(int lID, int eID);
 	void LogEvent(int lID, int eID, int iLen, const int* iData);
@@ -115,7 +115,7 @@ class TraceLogger
     TraceLogger(char* program, int b);
     ~TraceLogger();
 
-	void RegisterLanguage(int lID, char* ln);
+    void RegisterLanguage(int lID, const char* ln);
 
     void write(void);
     void writeBinary(void);
