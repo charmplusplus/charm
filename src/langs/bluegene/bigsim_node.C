@@ -79,7 +79,7 @@ void nodeInfo::addBgNodeInbuffer(char *msgPtr)
   /* awake a communication thread to schedule it */
   CthThread t = commThQ->deq();
   if (t) {
-    DEBUGF(("activate communication thread on node %d: %p.\n", nodeID, t));
+    DEBUGF(("activate communication thread on node %d: %p.\n", id, t));
 #if 0
     unsigned int prio = 0;
     CthAwakenPrio(t, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
