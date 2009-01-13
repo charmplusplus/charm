@@ -8,12 +8,18 @@
 #ifndef _AMPIIMPL_H
 #define _AMPIIMPL_H
 
+#include <string.h> /* for strlen */
+
 #include "ampi.h"
 #include "charm++.h"
+
+#if AMPI_COMLIB
 #include "StreamingStrategy.h"
 #include "EachToManyMulticastStrategy.h" /* for ComlibManager Strategy*/
 #include "BroadcastStrategy.h"
-#include <string.h> /* for strlen */
+#else
+#define ComlibInstanceHandle int
+#endif
 
 #if 0
 #define AMPI_DEBUG CkPrintf

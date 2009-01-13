@@ -1,1 +1,1 @@
--module tcharm -lmetis -lddt -module comlib -flibs -lampi-compat
+-module tcharm -lmetis -lddt -flibs -lampi-compat

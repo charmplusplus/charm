@@ -991,7 +991,9 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
   nbcasts = 0;
 
   comlibProxy = thisProxy;
+#if AMPI_COMLIB
   ComlibDelegateProxy(&comlibProxy);
+#endif
   
   seqEntries=parent->numElements;
   oorder.init (seqEntries);
@@ -1013,11 +1015,13 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s, ComlibInstanceHandle ciStr
   nbcasts = 0;
 
   comlibProxy = thisProxy;
+#if AMPI_COMLIB
   ComlibDelegateProxy(&comlibProxy);
   ciStreaming.setSourcePe();
   ciBcast.setSourcePe();
   ciAllgather.setSourcePe();
   ciAlltoall.setSourcePe();
+#endif
 
   seqEntries=parent->numElements;
   oorder.init (seqEntries);
@@ -1068,12 +1072,14 @@ void ampi::pup(PUP::er &p)
   p|ciAllgather;
   p|ciAlltoall;
 
+#if AMPI_COMLIB
   if(p.isUnpacking()){
     ciStreaming.setSourcePe();
     ciBcast.setSourcePe();
     ciAllgather.setSourcePe();
     ciAlltoall.setSourcePe();
   }
+#endif
 
   msgs=CmmPup((pup_er)&p,msgs,cmm_pup_ampi_message);
   posted_ireqs = CmmNew();		// FIXME 
