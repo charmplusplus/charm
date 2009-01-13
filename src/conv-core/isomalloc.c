@@ -1952,11 +1952,11 @@ static void init_ranges(char **argv)
               /* update */
             freeRegion.start = (void *)s;
             freeRegion.len = (char *)e -(char *)s;
-#if CMK_THREADS_DEBUG
+
+            if (CmiMyPe() == 0)
             CmiPrintf("[%d] consolidated Isomalloc memory region: %p - %p (%d megs)\n",CmiMyPe(),
 	      freeRegion.start,freeRegion.start+freeRegion.len,
 	      freeRegion.len/meg);
-#endif
           }   /* end of barrier test */
         }
 
