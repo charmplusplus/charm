@@ -609,7 +609,7 @@ void InitCallTable::enumerateInitCalls()
 {
   int i;
 #ifdef __BLUEGENE__
-  if(BgNodeRank()==0) 
+  if(BgNodeRank()==0)        // called only once on an emulating node
 #else
   if(CkMyRank()==0) 
 #endif
