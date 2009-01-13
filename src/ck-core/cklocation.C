@@ -405,8 +405,8 @@ arrInfo::distrib(int *speeds)
     qsort(pes, npes, sizeof(int), cmp);
     for(i=0;i<nr;i++)
       cp[pes[i]]++;
-    delete[] CkpvAccess(rem);
     delete[] pes;
+    delete[] CkpvAccess(rem);
   }
   k = 0;
   for(i=0;i<npes;i++)
@@ -414,8 +414,8 @@ arrInfo::distrib(int *speeds)
     for(j=0;j<cp[i];j++)
       _map[k++] = i;
   }
-  delete[] nspeeds;
   delete[] cp;
+  delete[] nspeeds;
 }
 
 int
@@ -448,6 +448,7 @@ static void _speedHdlr(void *m)
   CmiFree(m);
 }
 
+// initnode call
 void _propMapInit(void)
 {
   speeds = new int[CkNumPes()];
