@@ -309,13 +309,19 @@ int LBDatabase::manualOn = 0;
 char *LBDatabase::avail_vector = NULL;
 CmiNodeLock avail_vector_lock;
 
+static double * _expectedLoad = NULL;
+
 void LBDatabase::initnodeFn()
 {
+  int proc;
   int num_proc = CkNumPes();
   avail_vector= new char[num_proc];
-  for(int proc = 0; proc < num_proc; proc++)
+  for(proc = 0; proc < num_proc; proc++)
       avail_vector[proc] = 1;
   avail_vector_lock = CmiCreateLock();
+
+  _expectedLoad = new double[num_proc];
+  for (proc=0; proc<num_proc; proc++) _expectedLoad[proc]=0.0;
 }
 
 // called my constructor
@@ -331,6 +337,11 @@ void LBDatabase::init(void)
 #if CMK_LBDB_ON
   if (manualOn) TurnManualLBOn();
 #endif
+}
+
+LBDatabase::LastLBInfo::LastLBInfo()
+{
+  expectedLoad = _expectedLoad;
 }
 
 void LBDatabase::get_avail_vector(char * bitmap) {
