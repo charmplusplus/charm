@@ -30,6 +30,10 @@ CkpvDeclare(int, binCount);
 CkpvDeclare(double, binSize);
 CkpvDeclare(double, version);
 
+// Global Readonly
+CProxy_TraceSummaryInit initProxy;
+bool summaryCcsStreaming;
+
 int sumonly = 0;
 int sumDetail = 0;
 
@@ -362,7 +366,9 @@ void SumLogPool::writeSts(void)
 void SumLogPool::add(double time, int pe) 
 {
   new (&pool[numBins++]) BinEntry(time);
-  if(poolSize==numBins) shrink();
+  if (poolSize==numBins) {
+    shrink();
+  }
 }
 
 // Called once per run of an EP
@@ -394,9 +400,9 @@ void SumLogPool::updateSummaryDetail(int epIdx, double startTime, double endTime
 	while (endingBinIdx >= poolSize) {
 	  shrink();
 	  CmiAssert(CkpvAccess(binSize) > binSz);
-          binSz = CkpvAccess(binSize);
+	  binSz = CkpvAccess(binSize);
 	  startingBinIdx = (int)(startTime/binSz);
-          endingBinIdx = (int)(endTime/binSz);
+	  endingBinIdx = (int)(endTime/binSz);
 	}
 
         if (startingBinIdx == endingBinIdx) {
@@ -451,6 +457,36 @@ int  BinEntry::getU()
 void BinEntry::write(FILE* fp)
 {
   writeU(fp, getU());
+}
+
+void TraceSummaryInit::ccsClientRequest(CkCcsRequestMsg *m) {
+  char *sendBuffer;
+
+  CkPrintf("[%d] Request from Client detected. Data reads as:\n", CkMyPe());
+  CkPrintf("%s\n",m->data);
+  CkPrintf("\n");
+
+  CkPrintf("Responding ...\n");
+  sendBuffer = (char *)ccsBufferedData->getVec();
+  CcsSendDelayedReply(m->reply, ccsBufferedData->length()*sizeof(double), 
+		      sendBuffer);
+  // clear the buffer
+  ccsBufferedData->removeAll();
+  CkPrintf("Response Sent. Proceeding with computation.\n");
+}
+
+void TraceSummaryInit::dataCollected(CkReductionMsg *msg) {
+  // **CWL** No memory management for the ccs buffer for now.
+
+  // CkPrintf("[%d] Reduction completed and received\n", CkMyPe());
+  double *recvData = (double *)msg->getData();
+  int numBins = msg->getSize()/sizeof(double);
+
+  // if there's an easier way to append a data block to a CkVec, I'll take it
+  for (int i=0; i<numBins; i++) {
+    ccsBufferedData->insertAtEnd(recvData[i]);
+  }
+  delete msg;
 }
 
 TraceSummary::TraceSummary(char **argv):binStart(0.0),bin(0.0),msgNum(0)
@@ -650,6 +686,29 @@ void TraceSummary::startPhase(int phase)
    _logPool->startPhase(phase);
 }
 
+void TraceSummary::fillData(double *buffer, double reqStartTime, 
+			    double reqBinSize, int reqNumBins) {
+  // buffer has to be pre-allocated by the requester and must be an array of
+  // size reqNumBins.
+  //
+  // Assumptions: **CWL** FOR DEMO ONLY - a production-capable version will
+  //              need a number of these assumptions dropped:
+  //              1) reqBinSize == binSize (unrealistic)
+  //              2) bins boundary aligned (ok even under normal circumstances)
+  //              3) bins are "factor"-aligned (where reqBinSize != binSize)
+  //              4) bins are always available (true unless flush)
+  //              5) bins always starts from 0 (unrealistic)
+
+  // works only because of 1)
+  // **CWL** - FRACKING STUPID NAME "binStart" has nothing to do with 
+  //           "starting" at all!
+  int binOffset = (int)(reqStartTime/reqBinSize); 
+  for (int i=binOffset; i<binOffset + reqNumBins; i++) {
+    // CkPrintf("[%d] %f\n", i, pool()->getTime(i));
+    buffer[i-binOffset] = pool()->getTime(i);
+  }
+}
+
 
 /// for TraceSummaryBOC
 
@@ -756,6 +815,28 @@ void TraceSummaryBOC::write(void)
   fprintf(sumfp, "\n");
   fclose(sumfp);
 
+}
+
+void TraceSummaryBOC::collectData(double startTime, double binSize,
+				  int numBins) {
+  // CkPrintf("[%d] asked to contribute performance data\n", CkMyPe());
+
+  double *contribution = new double[numBins];
+  for (int i=0; i<numBins; i++) {
+    contribution[i] = 0.0;
+  }
+
+  CkpvAccess(_trace)->fillData(contribution, startTime, binSize, numBins);
+
+  // DEBUG - print out pe 0's contribution.
+  /*
+  for (int i=0; i<numBins; i++) {
+    CkPrintf("[%d] %f\n", i, contribution[i]);
+  }
+  */
+  CkCallback cb(CkIndex_TraceSummaryInit::dataCollected(NULL), initProxy);
+  contribute(sizeof(double)*numBins, contribution, CkReduction::sum_double, 
+	     cb);
 }
 
 extern "C" void CombineSummary()

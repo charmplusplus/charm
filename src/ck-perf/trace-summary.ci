@@ -1,19 +1,26 @@
 
 module TraceSummary {
 
+  readonly CkGroupID traceSummaryGID;
+  readonly CProxy_TraceSummaryInit initProxy;
+
+  readonly bool summaryCcsStreaming;
+
   mainchare TraceSummaryInit {
     entry TraceSummaryInit(CkArgMsg *m);
+    entry void ccsClientRequest(CkCcsRequestMsg *m);
+    entry void dataCollected(CkReductionMsg *);
   };
 
   initnode void initTraceSummaryBOC();
   
-  readonly CkGroupID traceSummaryGID;
-
   group [migratable] TraceSummaryBOC {
     entry TraceSummaryBOC(void);
     entry void startSumOnly();
     entry void askSummary(int size);
     entry void sendSummaryBOC(CkReductionMsg *);
+
+    entry void collectData(double startTime, double binSize, int numBins);
   };
 
 };

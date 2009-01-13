@@ -218,12 +218,17 @@ class SumLogPool {
 	epInfo[i].clear();
       }
     }
-    void shrink(void) ;
+    void shrink(void);
     void addEventType(int eventType, double time);
     void startPhase(int phase) { phaseTab.startPhase(phase); }
     BinEntry *bins() { return pool; }
     int getNumEntries() { return numBins; }
     void updateSummaryDetail(int epIdx, double startTime, double endTime);
+
+    // accessors to normal summary data
+    inline double getTime(unsigned int interval) {
+      return pool[interval].time();
+    }
 };
 
 /// class for recording trace summary events 
@@ -273,6 +278,8 @@ class TraceSummary : public Trace {
        query utilities
     */
     SumLogPool *pool() { return _logPool; }
+    void fillData(double *buffer, double reqStartTime, 
+		  double reqBinSize, int reqNumBins);
 };
 
 #endif
