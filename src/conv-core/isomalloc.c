@@ -1463,9 +1463,8 @@ static void disable_isomalloc(const char *why)
 {
     isomallocStart=NULL;
     isomallocEnd=NULL;
-#if CMK_THREADS_DEBUG
+    if (CmiMyPe() == 0)
     CmiPrintf("[%d] isomalloc.c> Disabling isomalloc because %s\n",CmiMyPe(),why);
-#endif
 }
 
 #if ! CMK_HAS_MMAP
@@ -1834,6 +1833,7 @@ static int find_largest_free_region(memRegion_t *destRegion) {
       memRange_t p=(memRange_t)regions[i].start;
       p&=~(regions[i].len-1); /*Round start down to a len-boundary (mask off low bits)*/
       regions[i].start=(char *)p;
+      regions[i].len *= 2;
 #if CMK_THREADS_DEBUG
       CmiPrintf("[%d] Memory map: %p - %p %s (at %p)\n",CmiMyPe(),
 	      regions[i].start,regions[i].start+regions[i].len,
