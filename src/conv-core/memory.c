@@ -514,7 +514,13 @@ void cpd_memory_get(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
    memory has been protected */
 void setProtection(char *mem, char *ptr, int len, int flag) { }
 /* Routines used to specify how the memory will the used */
+#ifdef setMemoryTypeChare
+#undef setMemoryTypeChare
+#endif
 void setMemoryTypeChare(void *ptr) { }
+#ifdef setMemoryTypeMessage
+#undef setMemoryTypeMessage
+#endif
 void setMemoryTypeMessage(void *ptr) { }
 void CpdSystemEnter() { }
 void CpdSystemExit() { }
