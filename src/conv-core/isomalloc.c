@@ -1829,15 +1829,17 @@ static int find_largest_free_region(memRegion_t *destRegion) {
     
     /*Align each memory region*/
     for (i=0;i<nRegions;i++) {
-      /* memRegion_t old=regions[i]; */
+      memRegion_t old=regions[i];
       memRange_t p=(memRange_t)regions[i].start;
       p&=~(regions[i].len-1); /*Round start down to a len-boundary (mask off low bits)*/
       regions[i].start=(char *)p;
-      regions[i].len *= 2;
+#if CMK_ISOMALLOC_MACHACK
+      if (regions[i].start+regions[i].len*2>regions[i].start) regions[i].len *= 2;
+#endif
 #if CMK_THREADS_DEBUG
-      CmiPrintf("[%d] Memory map: %p - %p %s (at %p)\n",CmiMyPe(),
+      CmiPrintf("[%d] Memory map: %p - %p (len: %lu => %lu) %s \n",CmiMyPe(),
 	      regions[i].start,regions[i].start+regions[i].len,
-	      regions[i].type, old.start);
+	      old.len, regions[i].len, regions[i].type);
 #endif
     }
     
