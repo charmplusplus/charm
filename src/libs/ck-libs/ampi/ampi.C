@@ -419,10 +419,25 @@ CDECL void AMPI_Setup_Switch(void) {
 static int nodeinit_has_been_called=0;
 CtvDeclare(ampiParent*, ampiPtr);
 CtvDeclare(int, ampiInitDone);
+CtvDeclare(void*,stackBottom);
 CtvDeclare(int, ampiFinalized);
 CkpvDeclare(Builtin_kvs, bikvs);
 CkpvDeclare(int,argvExtracted);
 static int enableStreaming = 0;
+
+CDECL long ampiCurrentStackUsage(){
+  int localVariable;
+  
+  unsigned long p1 =  (unsigned long)((void*)&localVariable);
+  unsigned long p2 =  (unsigned long)(CtvAccess(stackBottom));
+
+
+  if(p1 > p2)
+    return p1 - p2;
+  else
+    return  p2 - p1;
+ 
+}
 
 static void ampiNodeInit(void)
 {
@@ -460,6 +475,8 @@ static void ampiProcInit(void){
   CtvInitialize(ampiParent*, ampiPtr);
   CtvInitialize(int,ampiInitDone);
   CtvInitialize(int,ampiFinalized);
+  CtvInitialize(void*,stackBottom);
+
 
   CtvInitialize(MPI_Op_Array, mpi_ops);
   CtvInitialize(int, mpi_opc);
@@ -511,6 +528,11 @@ public:
 	void start(void) {
 		char **argv=CmiCopyArgs(CkGetArgv());
 		int argc=CkGetArgc();
+
+		// Set a pointer to somewhere close to the bottom of the stack.
+		// This is used for roughly estimating the stack usage later.
+		CtvAccess(stackBottom) = &argv;
+
 #if CMK_AMPI_FNPTR_HACK
 		AMPI_Fallback_Main(argc,argv);
 #else

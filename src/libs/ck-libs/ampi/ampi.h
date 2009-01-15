@@ -749,6 +749,11 @@ extern void traceEndFuncProj(char *);
 extern void traceBeginFuncIndexProj(int, char *, int);
 extern void traceEndFuncIndexProj(int);
 
+
+// Determine approximate depth of stack at the point of this call
+extern long ampiCurrentStackUsage();
+
+
 /*
 #define TRACEFUNC(code,name) traceBeginFuncProj(name,__FILE__,__LINE__); \
 code;\
