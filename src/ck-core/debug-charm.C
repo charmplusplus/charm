@@ -17,6 +17,7 @@
 #include "cklists.h"
 #include "register.h"
 //#include "queueing.h"
+#include <unistd.h>
 
 #if CMK_CCS_AVAILABLE && !defined(_WIN32)
 
