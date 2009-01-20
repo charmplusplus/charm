@@ -1,4 +1,5 @@
-DIRS=megampi stacksize chkpt 
+DIRS=megampi stacksize
+#DIRS=megampi stacksize chkpt 
 
 all:
 	for d in $(DIRS); do \
