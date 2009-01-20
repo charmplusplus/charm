@@ -506,7 +506,9 @@ void deleteAllocationPoint(void *ptr) {
   AllocationPoint *node = (AllocationPoint*)ptr;
   AllocationPoint *child;
   for (child = node->firstChild; child != NULL; child = child->sibling) deleteAllocationPoint(child);
+  BEFORE_MALLOC_CALL;
   mm_free(node);
+  AFTER_MALLOC_CALL;
 }
 
 void printAllocationTree(AllocationPoint *node, FILE *fd, int depth) {
@@ -531,7 +533,9 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
 
   table = CkCreateHashtable_pointer(sizeof(char *), 10000);
 
+  BEFORE_MALLOC_CALL;
   root = (AllocationPoint*) mm_malloc(sizeof(AllocationPoint));
+  AFTER_MALLOC_CALL;
   *(AllocationPoint**)CkHashtablePut(table, &numNodes) = root;
   numNodes ++;
   root->key = 0;
@@ -549,7 +553,9 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
       isnew = 0;
       start = (AllocationPoint**)CkHashtableGet(table, &scanner->from[i]);
       if (start == NULL) {
+        BEFORE_MALLOC_CALL;
         cur = (AllocationPoint*) mm_malloc(sizeof(AllocationPoint));
+        AFTER_MALLOC_CALL;
         numNodes ++;
         isnew = 1;
         cur->next = cur;
@@ -557,7 +563,9 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
       } else {
         for (cur = (*start)->next; cur != *start && cur->parent != parent; cur = cur->next);
         if (cur->parent != parent) {
+          BEFORE_MALLOC_CALL;
           cur = (AllocationPoint*) mm_malloc(sizeof(AllocationPoint));
+          AFTER_MALLOC_CALL;
           numNodes ++;
           isnew = 1;
           cur->next = (*start)->next;
@@ -642,7 +650,9 @@ void MergeAllocationTreeSingle(AllocationPoint *node, AllocationPoint *remote, i
     }
     if (localChild == NULL) {
       /* This child did not exist locally, allocate it */
+      BEFORE_MALLOC_CALL;
       localChild = (AllocationPoint*) mm_malloc(sizeof(AllocationPoint));
+      AFTER_MALLOC_CALL;
       localChild->key = child.key;
       localChild->flags = 0;
       localChild->count = 0;
@@ -710,7 +720,9 @@ void pupMemStat(pup_er p, void *st) {
 }
 
 void deleteMemStat(void *ptr) {
+  BEFORE_MALLOC_CALL;
   mm_free(ptr);
+  AFTER_MALLOC_CALL;
 }
 
 static int memStatReturnOnlyOne = 1;
@@ -736,7 +748,9 @@ void * mergeMemStat(void *data, void **remoteData, int numRemote) {
     MemStat *l = (MemStat*)data;
     int count = l->count;
     for (i=0; i<numRemote; ++i) count += ((MemStat*)remoteData[i])->count;
+    BEFORE_MALLOC_CALL;
     MemStat *result = (MemStat*)mm_malloc(sizeof(MemStat) + (count-1)*sizeof(MemStatSingle));
+    AFTER_MALLOC_CALL;
     memset(result, 0, sizeof(MemStat)+(count-1)*sizeof(MemStatSingle));
     result->count = count;
     memcpy(result->array, l->array, l->count*sizeof(MemStatSingle));
@@ -755,7 +769,9 @@ void * mergeMemStat(void *data, void **remoteData, int numRemote) {
 
 MemStat * CreateMemStat() {
   Slot *cur;
+  BEFORE_MALLOC_CALL;
   MemStat *st = (MemStat*)mm_calloc(1, sizeof(MemStat));
+  AFTER_MALLOC_CALL;
   st->count = 1;
   MemStatSingle *stat = &st->array[0];
   SLOT_ITERATE(cur) {
@@ -789,7 +805,9 @@ void backupMemory() {
     totalMemory += SLOTSPACE + cur->userSize + cur->stackLen*sizeof(void*);
   }
   if (reportMEM) CmiPrintf("CPD: total memory in use (%d): %d\n",CmiMyPe(),totalMemory);
+  BEFORE_MALLOC_CALL;
   *memoryBackup = mm_malloc(totalMemory);
+  AFTER_MALLOC_CALL;
 
 #ifndef CMK_SEPARATE_SLOT
   memcpy(*memoryBackup, slot_first, sizeof(Slot));
@@ -846,7 +864,9 @@ void checkBackup() {
   }
 
 #endif
+  BEFORE_MALLOC_CALL;
   mm_free(*memoryBackup);
+  AFTER_MALLOC_CALL;
   *memoryBackup = NULL;
 }
 
@@ -1062,9 +1082,11 @@ static void *setSlot(Slot **sl,int userSize) {
   s->userCRC = crc32((unsigned char*)user, userSize);
   if (saveAllocationHistory) {
     if (allocatedSinceSize >= allocatedSinceMaxSize) {
+      BEFORE_MALLOC_CALL;
       mm_free(allocatedSince);
       allocatedSinceMaxSize += 10;
       allocatedSince = (Slot**)mm_malloc((allocatedSinceMaxSize)*sizeof(void*));
+      AFTER_MALLOC_CALL;
     }
     allocatedSince[allocatedSinceSize++] = s;
   }
@@ -1193,11 +1215,13 @@ static void *meta_malloc(size_t size) {
   void *user;
   if (memory_charmdebug_internal==0) {
     dumpStackFrames();
+    BEFORE_MALLOC_CALL;
 #if CPD_USE_MMAP
     Slot *s=(Slot *)mmap(NULL, SLOTSPACE+size+numStackFrames*sizeof(void*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #else
     Slot *s=(Slot *)mm_malloc(SLOTSPACE+size+numStackFrames*sizeof(void*));
 #endif
+    AFTER_MALLOC_CALL;
     if (s!=NULL) {
       user = (char*)setSlot(&s,size);
       memory_allocated_user_total += size;
@@ -1209,7 +1233,9 @@ static void *meta_malloc(size_t size) {
       recursive_call = 0;
     }
   } else {
+    BEFORE_MALLOC_CALL;
     user = mm_malloc(size);
+    AFTER_MALLOC_CALL;
   }
   return user;
 }
@@ -1224,7 +1250,9 @@ static void meta_free(void *mem) {
     s=UserToSlot(mem);
     if ((s->magic&~FLAGS_MASK) != SLOTMAGIC_VALLOC &&
         (s->magic&~FLAGS_MASK) != SLOTMAGIC) {
+      BEFORE_MALLOC_CALL;
       mm_free(mem);
+      AFTER_MALLOC_CALL;
       return;
     }
 #endif
@@ -1244,24 +1272,30 @@ static void meta_free(void *mem) {
     if ((s->magic&~FLAGS_MASK)==SLOTMAGIC_VALLOC)
     { /*Allocated with special alignment*/
       freeSlot(s);
+      BEFORE_MALLOC_CALL;
       mm_free(s->extraStack);
       /*mm_free(((char *)mem)-meta_getpagesize());*/
+      AFTER_MALLOC_CALL;
     }
     else if ((s->magic&~FLAGS_MASK)==SLOTMAGIC)
     { /*Ordinary allocated block */
       freeSlot(s);
+      BEFORE_MALLOC_CALL;
 #if CPD_USE_MMAP
       munmap(s, SLOTSPACE+s->userSize+s->stackLen*sizeof(void*));
 #else
       mm_free(s);
 #endif
+      AFTER_MALLOC_CALL;
     }
     else if (s->magic==SLOTMAGIC_FREED)
       CmiAbort("Free'd block twice");
     else /*Unknown magic number*/
       CmiAbort("Free'd non-malloc'd block");
   } else {
+    BEFORE_MALLOC_CALL;
     mm_free(mem);
+    AFTER_MALLOC_CALL;
   }
 }
 
@@ -1296,7 +1330,9 @@ static void *meta_memalign(size_t align, size_t size) {
   /* Allocate the required size + the overhead needed to keep the user alignment */
   dumpStackFrames();
 
+  BEFORE_MALLOC_CALL;
   char *alloc=(char *)mm_memalign(align,overhead+size+numStackFrames*sizeof(void*));
+  AFTER_MALLOC_CALL;
   Slot *s=(Slot*)(alloc+overhead-SLOTSPACE);
   void *user=setSlot(&s,size);
   s->magic = SLOTMAGIC_VALLOC + (s->magic&0xF);
@@ -1332,10 +1368,14 @@ void setMemoryTypeChare(void *ptr) {
   sl->magic = (sl->magic & ~FLAGS_MASK) | CHARE_TYPE;
   sl->chareID = nextChareID;
   if (nextChareID >= chareObjectMemorySize) {
+    BEFORE_MALLOC_CALL;
     void **newChare = (void**)mm_malloc((nextChareID+100) * sizeof(void*));
+    AFTER_MALLOC_CALL;
     memcpy(newChare, chareObjectMemory, chareObjectMemorySize*sizeof(void*));
     chareObjectMemorySize = nextChareID+100;
+    BEFORE_MALLOC_CALL;
     mm_free(chareObjectMemory);
+    AFTER_MALLOC_CALL;
     chareObjectMemory = newChare;
   }
   chareObjectMemory[nextChareID] = ptr;

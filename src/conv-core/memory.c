@@ -50,6 +50,11 @@ void * memory_stack_top; /*The higher end of the stack (approximation)*/
 #if CMK_MEMORY_BUILD_OS_WRAPPED
 #define CMK_MEMORY_BUILD_OS 1
 #endif
+#if CMK_MEMORY_BUILD_GNU_HOOKS
+/*While in general on could build hooks on the GNU we have, for now the hooks
+ * are setup to work only with OS memory libraries --Filippo*/
+#define CMK_MEMORY_BUILD_OS 1
+#endif
 
 #if CMK_MEMORY_BUILD_OS
 #if CMK_MEMORY_BUILD_OS_WRAPPED
@@ -122,6 +127,8 @@ void initialize_memory_wrapper_cfree(void *ptr) {
 
 #else
 #define mm_malloc   malloc
+#define mm_calloc   calloc
+#define mm_memalign memalign
 #define mm_free     free
 #endif
 #endif
@@ -170,7 +177,38 @@ int memory_chare_id=0;
 */
 
 
-#if CMK_MEMORY_BUILD_OS_WRAPPED
+#if CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS
+
+#if CMK_MEMORY_BUILD_GNU_HOOKS
+#define BEFORE_MALLOC_CALL \
+  __malloc_hook = old_malloc_hook; \
+  __realloc_hook = old_realloc_hook; \
+  __memalign_hook = old_memalign_hook; \
+  __free_hook = old_free_hook;
+#define AFTER_MALLOC_CALL \
+  old_malloc_hook = __malloc_hook; \
+  old_realloc_hook = __realloc_hook; \
+  old_memalign_hook = __memalign_hook; \
+  old_free_hook = __free_hook; \
+  __malloc_hook = meta_malloc; \
+  __realloc_hook = meta_realloc; \
+  __memalign_hook = meta_memalign; \
+  __free_hook = meta_free;
+
+#include <malloc.h>
+static void *(*old_malloc_hook) (size_t);
+static void *(*old_realloc_hook) (void*,size_t);
+static void *(*old_memalign_hook) (size_t,size_t);
+static void (*old_free_hook) (void*);
+
+static void *meta_malloc(size_t);
+static void *meta_realloc(void*,size_t);
+static void *meta_memalign(size_t,size_t);
+static void meta_free(void*);
+#else
+#define BEFORE_MALLOC_CALL   /*empty*/
+#define AFTER_MALLOC_CALL    /*empty*/
+#endif
 
 #if CMK_MEMORY_BUILD_VERBOSE
 #include "memory-verbose.c"
@@ -200,6 +238,23 @@ int memory_chare_id=0;
 #include "memory-charmdebug.c"
 #endif
 
+#if CMK_MEMORY_BUILD_GNU_HOOKS
+
+static void
+my_init_hook (void)
+{
+  old_malloc_hook = __malloc_hook;
+  old_realloc_hook = __realloc_hook;
+  old_memalign_hook = __memalign_hook;
+  old_free_hook = __free_hook;
+  __malloc_hook = meta_malloc;
+  __realloc_hook = meta_realloc;
+  __memalign_hook = meta_memalign;
+  __free_hook = meta_free;
+}
+/* Override initializing hook from the C library. */
+void (*__malloc_initialize_hook) (void) = my_init_hook;
+#else
 void *malloc(size_t size) { return meta_malloc(size); }
 void free(void *ptr) { meta_free(ptr); }
 void *calloc(size_t nelem, size_t size) { return meta_calloc(nelem,size); }
@@ -207,13 +262,14 @@ void cfree(void *ptr) { meta_cfree(ptr); }
 void *realloc(void *ptr, size_t size) { return meta_realloc(ptr,size); }
 void *memalign(size_t align, size_t size) { return meta_memalign(align,size); }
 void *valloc(size_t size) { return meta_valloc(size); }
+#endif
 
 #endif
 
 void CmiMemoryInit(argv)
   char **argv;
 {
-#if CMK_MEMORY_BUILD_OS_WRAPPED
+#if CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS
   meta_init(argv);
 #endif
   CmiOutOfMemoryInit();
@@ -257,6 +313,9 @@ static void meta_init(char **argv) {
 #endif
 
 #endif /* CMK_MEMORY_BUILD_GNU or old*/
+
+#define BEFORE_MALLOC_CALL   /*empty*/
+#define AFTER_MALLOC_CALL    /*empty*/
 
 #if CMK_MEMORY_BUILD_VERBOSE
 #include "memory-verbose.c"
