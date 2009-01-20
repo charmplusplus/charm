@@ -2879,10 +2879,8 @@ void ConverseCommonInit(char **argv)
   CIdleTimeoutInit(argv);
   
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the net-*-smp versions*/
-  if(CmiMyRank() == 0){
-	if(CmiGetArgFlagDesc(argv,"+CmiNoProcForComThread","Is there an extra processor for the communication thread on each node(only for net-smp-*) ?")){
-		_Cmi_noprocforcommthread=1;
-	}
+  if(CmiGetArgFlagDesc(argv,"+CmiNoProcForComThread","Is there an extra processor for the communication thread on each node(only for net-smp-*) ?")){
+    if(CmiMyRank() == 0) _Cmi_noprocforcommthread=1;
    }
 #endif
 #if CMK_MULTICORE
