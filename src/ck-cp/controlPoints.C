@@ -1319,7 +1319,6 @@ int valueProvidedByOptimizer(const char * name){
     return (minValue+maxValue)/2;
   }
   
-  
   // -----------------------------------------------------------
 #elif OPTIMIZER_USE_BEST_TIME  
   static bool firstTime = true;
@@ -1493,6 +1492,9 @@ int valueProvidedByOptimizer(const char * name){
   return result; 
 
 #endif
+
+CkAbort("valueProvidedByOptimizer(): ERROR: could not find a value for a control point.\n");
+return 0;
   
 }
 
