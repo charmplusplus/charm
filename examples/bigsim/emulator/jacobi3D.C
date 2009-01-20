@@ -101,6 +101,7 @@ public:
 };
 
 typedef struct {
+  double gdata[MAX_ARRAY_SIZE][MAX_ARRAY_SIZE][MAX_ARRAY_SIZE];
   double maindata[MAX_ARRAY_SIZE][MAX_ARRAY_SIZE][MAX_ARRAY_SIZE];
   double tempdata[MAX_ARRAY_SIZE][MAX_ARRAY_SIZE][MAX_ARRAY_SIZE];
   double ghost_x1[1][MAX_ARRAY_SIZE][MAX_ARRAY_SIZE];
@@ -129,7 +130,6 @@ typedef struct {
   int iteration_count;
 } nodeData;
 
-double gdata[MAX_ARRAY_SIZE][MAX_ARRAY_SIZE][MAX_ARRAY_SIZE];
 int g_x_blocksize;
 int g_y_blocksize;
 int g_z_blocksize;
@@ -175,9 +175,6 @@ void BgEmulatorInit(int argc, char **argv)
     g_x_blocksize = g_dataXsize/numBgX;
     g_y_blocksize = g_dataYsize/numBgY;
     g_z_blocksize = g_dataZsize/numBgZ;
-
-    // populate global data with default values
-    initArray(gdata, g_dataXsize, g_dataYsize, g_dataZsize);
 
     CmiPrintf("Bluegene size: %d %d %d\n",
 	     numBgX, numBgY, numBgZ);
@@ -231,6 +228,10 @@ void BgNodeStart(int argc, char **argv)
 
   //create node private data
   nodeData *nd = new nodeData;
+
+  // populate global data with default values
+  initArray(nd->gdata, g_dataXsize, g_dataYsize, g_dataZsize);
+
   nd->my_x_size = x_end - x_start + 1;
   nd->my_y_size = y_end - y_start + 1;
   nd->my_z_size = z_end - z_start + 1;
@@ -279,7 +280,7 @@ void BgNodeStart(int argc, char **argv)
 	   nd->my_x_size, nd->my_y_size, nd->my_z_size);
   */
   // create and populate main data from global data structure
-  copyArray(gdata, nd->maindata, 
+  copyArray(nd->gdata, nd->maindata, 
 	    nd->my_x_size, nd->my_y_size, nd->my_z_size,
 	    x_start, y_start, z_start);
 
@@ -289,37 +290,37 @@ void BgNodeStart(int argc, char **argv)
   // boundary conditions have to be checked
   // "x-left" plane
   if  (x != 0) {
-    copyXArray(gdata, nd->ghost_x1,
+    copyXArray(nd->gdata, nd->ghost_x1,
 	       1, nd->my_y_size, nd->my_z_size,
 	       x_start - 1, y_start, z_start);
   }
   // "x-right" plane
   if (x != numBgX) {
-    copyXArray(gdata, nd->ghost_x2, 
+    copyXArray(nd->gdata, nd->ghost_x2, 
 	       1, nd->my_y_size, nd->my_z_size,
 	       x_end + 1, y_start, z_start);
   }
   // "y-bottom" plane
   if  (y != 0) {
-    copyYArray(gdata, nd->ghost_y1, 
+    copyYArray(nd->gdata, nd->ghost_y1, 
 	       nd->my_x_size, 1, nd->my_z_size,
 	       x_start, y_start - 1, z_start);
   }
   // "y-top" plane
   if  (y != numBgY) {
-    copyYArray(gdata, nd->ghost_y2, 
+    copyYArray(nd->gdata, nd->ghost_y2, 
 	       nd->my_x_size, 1, nd->my_z_size,
 	       x_start, y_end + 1, z_start);
   }
   // "z-front" plane
   if  (z != 0) {
-    copyZArray(gdata, nd->ghost_z1, 
+    copyZArray(nd->gdata, nd->ghost_z1, 
 	       nd->my_x_size, nd->my_y_size, 1,
 	       x_start, y_start, z_start - 1);
   }
   // "z-back" plane
   if  (z != numBgZ) {
-    copyZArray(gdata, nd->ghost_z2, 
+    copyZArray(nd->gdata, nd->ghost_z2, 
 	       nd->my_x_size, nd->my_y_size, 1,
 	       x_start, y_start, z_end + 1);
   }
