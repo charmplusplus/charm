@@ -235,20 +235,25 @@ void TraceArray::traceEnd() {
 
 /*Install the beginIdle/endIdle condition handlers.*/
 extern "C" void traceBegin(void) {
-  OPTIMIZE_WARNING
+#ifndef CMK_OPTIMIZE
   DEBUGF(("[%d] traceBegin called with %d at %f\n", CkMyPe(), CpvAccess(traceOn), TraceTimer()));
   if (CpvAccess(traceOn)==1) return;
   CkpvAccess(_traces)->traceBegin();
   CpvAccess(traceOn) = 1;
+#endif
 }
 
 /*Cancel the beginIdle/endIdle condition handlers.*/
 extern "C" void traceEnd(void) {
-  OPTIMIZE_WARNING
+#ifndef CMK_OPTIMIZE
   DEBUGF(("[%d] traceEnd called with %d at %f\n", CkMyPe(), CpvAccess(traceOn), TraceTimer()));
   if (CpvAccess(traceOn)==0) return;
+  if (CkpvAccess(_traces) == NULL) {
+    CmiPrintf("Warning: did you mix compilation with and without -DCMK_OPTIMIZE? \n");
+  }
   CkpvAccess(_traces)->traceEnd();
   CpvAccess(traceOn) = 0;
+#endif
 }
 
 static int checkTraceOnPe(char **argv)
