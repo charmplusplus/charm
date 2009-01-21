@@ -1864,6 +1864,7 @@ static int find_largest_free_region(memRegion_t *destRegion) {
 
 static void init_ranges(char **argv)
 {
+  memRegion_t freeRegion;
   /*Largest value a signed int can hold*/
   memRange_t intMax=(((memRange_t)1)<<(sizeof(int)*8-1))-1;
 
@@ -1874,10 +1875,10 @@ static void init_ranges(char **argv)
   CmiPrintf("[%d] Using slotsize of %d\n", CmiMyPe(), slotsize);
 #endif
 
+  freeRegion.len=0u;
+
   if (CmiMyRank()==0 && numslots==0)
   { /* Find the largest unused region of virtual address space */
-      memRegion_t freeRegion;
-      freeRegion.len=0u;
 #ifdef CMK_MMAP_START_ADDRESS /* Hardcoded start address, for machines where automatic fails */
       freeRegion.start=CMK_MMAP_START_ADDRESS;
       freeRegion.len=CMK_MMAP_LENGTH_MEGS*meg;
@@ -1900,13 +1901,17 @@ static void init_ranges(char **argv)
 	      freeRegion.start,freeRegion.start+freeRegion.len,
 	      freeRegion.len/meg);
 #endif
-        
-          /*
-             on some machines, isomalloc memory regions on different nodes 
-             can be different. use +isomalloc_sync to calculate the
-             intersect of all memory regions on all nodes.
-          */
-        if (_sync_iso == 1) {
+      }
+  }
+
+    /*
+       on some machines, isomalloc memory regions on different nodes 
+       can be different. use +isomalloc_sync to calculate the
+       intersect of all memory regions on all nodes.
+    */
+  if (_sync_iso == 1)
+  {
+        if (CmiMyRank() == 0 && freeRegion.len > 0u) {
           if (CmiBarrier() == -1) 
             CmiAbort("Charm++ Error> +isomalloc_sync requires CmiBarrier() implemented.\n");
           else {
@@ -1917,8 +1922,17 @@ static void init_ranges(char **argv)
 
             if (CmiMyNode()==0) printf("Charm++> synchronizing isomalloc memory region...\n");
 
-              /* write region into file */
             sprintf(fname,".isomalloc.%d", CmiMyNode());
+
+              /* remove file before writing for safe */
+            unlink(fname);
+#if CMK_HAS_SYNC && ! CMK_DISABLE_SYNC
+            system("sync");
+#endif
+
+            CmiBarrier();
+
+              /* write region into file */
             while ((fd = open(fname, O_WRONLY|O_TRUNC|O_CREAT, 0644)) == -1) 
 #ifndef __MINGW_H
               CMK_CPV_IS_SMP
@@ -1927,6 +1941,10 @@ static void init_ranges(char **argv)
             write(fd, &s, sizeof(CmiUInt8));
             write(fd, &e, sizeof(CmiUInt8));
             close(fd);
+
+#if CMK_HAS_SYNC && ! CMK_DISABLE_SYNC
+            system("sync");
+#endif
 
             CmiBarrier();
 
@@ -1942,6 +1960,7 @@ static void init_ranges(char **argv)
               ;
               read(fd, &ss, sizeof(CmiUInt8));
               read(fd, &ee, sizeof(CmiUInt8));
+printf("[%d] read ss: %lx ee: %lx \n", CmiMyPe(), ss, ee);
               close(fd);
               if (ss>s) s = ss;
               if (ee<e) e = ee;
@@ -1950,18 +1969,31 @@ static void init_ranges(char **argv)
             CmiBarrier();
 
             unlink(fname);
+#if CMK_HAS_SYNC && ! CMK_DISABLE_SYNC
+            system("sync");
+#endif
 
               /* update */
             freeRegion.start = (void *)s;
             freeRegion.len = (char *)e -(char *)s;
+            CmiAssert(freeRegion.len >= 0u);
 
             if (CmiMyPe() == 0)
             CmiPrintf("[%d] consolidated Isomalloc memory region: %p - %p (%d megs)\n",CmiMyPe(),
 	      freeRegion.start,freeRegion.start+freeRegion.len,
 	      freeRegion.len/meg);
           }   /* end of barrier test */
+        } /* end of rank 0 */
+        else {
+          CmiBarrier();
+          CmiBarrier();
+          CmiBarrier();
+          CmiBarrier();
         }
+  }
 
+  if (CmiMyRank() == 0 && freeRegion.len > 0u)
+  {
         /*Isomalloc covers entire unused region*/
         isomallocStart=freeRegion.start;
         isomallocEnd=freeRegion.start+freeRegion.len;
@@ -1971,9 +2003,9 @@ static void init_ranges(char **argv)
         CmiPrintf("[%d] Can isomalloc up to %lu megs per pe\n",CmiMyPe(),
 	      ((memRange_t)numslots)*slotsize/meg);
 #endif
-      }
   }
-  /*SMP Mode: wait here for rank 0 to initialize numslots so we can set up myss*/
+
+  /*SMP Mode: wait here for rank 0 to initialize numslots before calculating myss*/
   CmiNodeAllBarrier(); 
   
   if (isomallocStart!=NULL) {
