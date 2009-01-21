@@ -129,7 +129,7 @@
 
     <target name="clean" description="clean up">
         <echo message="removing build directory" />
-        <delete includeEmptyDirs="true">
+        <delete includeEmptyDirs="true" quiet="yes">
             <fileset dir="${build}" />
         </delete>
     </target>
