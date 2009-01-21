@@ -337,7 +337,12 @@ double CmiCpuTimer(void)
 
 int CmiBarrier()
 {
-  if (CmiMyRank() == 0) {
+#if CMK_SMP
+  if (CmiMyRank() == CmiMyNodeSize()) 
+#else
+  if (CmiMyRank() == 0) 
+#endif
+  {
 
     START_EVENT();
 
@@ -346,6 +351,7 @@ int CmiBarrier()
 
     END_EVENT(10);
   }
+  CmiNodeAllBarrier();
   return 0;
 }
 
@@ -353,7 +359,12 @@ int CmiBarrier()
 int CmiBarrierZero()
 {
   int i;
-  if (CmiMyRank() == 0) {
+#if CMK_SMP
+  if (CmiMyRank() == CmiMyNodeSize()) 
+#else
+  if (CmiMyRank() == 0) 
+#endif
+  {
     char msg[1];
     MPI_Status sts;
     if (CmiMyNode() == 0)  {
