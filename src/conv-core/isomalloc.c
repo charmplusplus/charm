@@ -1960,7 +1960,6 @@ static void init_ranges(char **argv)
               ;
               read(fd, &ss, sizeof(CmiUInt8));
               read(fd, &ee, sizeof(CmiUInt8));
-printf("[%d] read ss: %lx ee: %lx \n", CmiMyPe(), ss, ee);
               close(fd);
               if (ss>s) s = ss;
               if (ee<e) e = ee;
