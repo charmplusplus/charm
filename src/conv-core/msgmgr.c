@@ -44,8 +44,9 @@ CmmTable t;
 //free all table entries but not the space
 //pointed by "msg"
 void CmmFreeAll(CmmTable t){
+    CmmEntry cur;
     if(t==NULL) return;
-    CmmEntry cur = t->first;
+    cur = t->first;
     while(cur){
 	CmmEntry toDel = cur;
 	cur = cur->next;
