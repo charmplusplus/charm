@@ -414,9 +414,17 @@ static void CmiStartThreads(char **argv)
 /*  CmiStateInit(-1,_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize)); */
   CmiStateInit(_Cmi_mynode+CmiNumPes(),_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize));
 #else
+    /* for main thread */
   Cmi_state_vector = (CmiState *)calloc(_Cmi_mynodesize+1, sizeof(CmiState));
+#if CMK_CONVERSE_MPI
+      /* main thread is communication thread */
+  CmiStateInit(_Cmi_mynode+CmiNumPes(), _Cmi_mynodesize, &Cmi_mystate);
+  Cmi_state_vector[_Cmi_mynodesize] = &Cmi_mystate;
+#else
+      /* main thread is of rank 0 */
   CmiStateInit(Cmi_nodestart, 0, &Cmi_mystate);
   Cmi_state_vector[0] = &Cmi_mystate;
+#endif
 #endif
 
 #if CMK_MULTICORE
@@ -425,7 +433,11 @@ static void CmiStartThreads(char **argv)
   else
 #endif
   tocreate = _Cmi_mynodesize;
-  for (i=1; i<=tocreate; i++) {
+#if CMK_CONVERSE_MPI
+  for (i=0; i<=tocreate-1; i++) {          /* skip comm thread */
+#else
+  for (i=1; i<=tocreate; i++) {            /* skip rank 0 main thread */
+#endif
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     ok = pthread_create(&pid, &attr, call_startfn, (void *)i);
