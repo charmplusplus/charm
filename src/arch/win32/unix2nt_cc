@@ -30,18 +30,18 @@ else
 fi
 if test ! -d "`cygpath -u "$VCC_DIR"`"
 then
-  echo VCC_DIR: $VCC_DIR is not set properly!
+  echo $0> VCC_DIR: $VCC_DIR is not set properly!
   exit 1
 fi
 if test -z "$WINDOWSSDKDIR"
 then
-  SDK_DIR="C:/Program Files/Microsoft Platform SDK"
+  SDK_DIR="C:/Program Files/Microsoft SDKs/Windows/v6.0A"
 else
   SDK_DIR=$WINDOWSSDKDIR
 fi
 if test ! -d "`cygpath -u "$SDK_DIR"`"
 then
-  echo SDK_DIR: $SDK_DIR is not set properly!
+  echo $0> SDK_DIR: $SDK_DIR is not set properly!
   exit 1
 fi
 
