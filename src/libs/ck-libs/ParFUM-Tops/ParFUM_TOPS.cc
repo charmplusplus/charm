@@ -246,16 +246,16 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
 
 
 
-    /** Copy element Attribute array to device global memory */
+    /** Copy element Attribute array to device global memory *//*
     {
-        FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_DATA+0,"topModel_Create_Driver");
+        FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->elem[FEM_ELEM+TOP_ELEMENT_TET4].lookup(FEM_DATA+0,"topModel_Create_Driver");
         AllocTable2d<unsigned char> &dataTable  = at->getChar();
         unsigned char *ElemData = dataTable.getData();
         int size = dataTable.size()*dataTable.width();
         cudaMalloc((void**)&(model->device_model.ElemDataDevice), size);
         cudaMemcpy(model->device_model.ElemDataDevice,ElemData,size,
                 cudaMemcpyHostToDevice);
-    }
+    }*/
 
     /** Copy node Attribute array to device global memory */
     {
@@ -270,7 +270,7 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
 
     /** Copy elem connectivity array to device global memory */
     {
-        FEM_IndexAttribute * at = (FEM_IndexAttribute*) model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_CONN,"topModel_Create_Driver");
+        FEM_IndexAttribute * at = (FEM_IndexAttribute*) model->mesh->elem[FEM_ELEM+TOP_ELEMENT_TET4].lookup(FEM_CONN,"topModel_Create_Driver");
         AllocTable2d<int> &dataTable  = at->get();
         int *data = dataTable.getData();
         int size = dataTable.size()*dataTable.width()*sizeof(int);
