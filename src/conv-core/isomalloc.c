@@ -1,3 +1,10 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$ 
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
 /**************************************************************************
 Isomalloc:
   A way to allocate memory at the same address on every processor.
@@ -2119,6 +2126,11 @@ void *CmiIsomalloc(int size)
 	blk->slot=s;
 	blk->length=size;
 	return block2pointer(blk);
+}
+
+int CmiIsomallocEnabled()
+{
+  return (isomallocStart!=NULL);
 }
 
 void CmiIsomallocPup(pup_er p,void **blockPtrPtr)
