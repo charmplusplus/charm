@@ -729,6 +729,11 @@ typedef struct CthThreadStruct
   qt_t      *savedptr;   /* stack pointer */	
 } CthThreadStruct;
 
+int CthMigratable()
+{
+  return 1;
+}
+
 CthThread CthPup(pup_er p, CthThread t)
 {
     if (pup_isUnpacking(p))
@@ -1131,6 +1136,10 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   return result;
 }
 
+int CthMigratable()
+{
+  return 0;
+}
 CthThread CthPup(pup_er p, CthThread t)
 {
   CmiAbort("CthPup not implemented.\n");
@@ -1294,6 +1303,10 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   return result;
 }
 
+int CthMigratable()
+{
+  return 0;
+}
 CthThread CthPup(pup_er p, CthThread t)
 {
   CmiAbort("CthPup not implemented.\n");
@@ -1545,6 +1558,11 @@ CthThread CthCreateMigratable(CthVoidFn fn,void *arg,int size)
   return CthCreateInner(fn,arg,size,1);
 }
 
+int CthMigratable()
+{
+  return CmiIsomallocEnabled();
+}
+
 CthThread CthPup(pup_er p, CthThread t)
 {
   int flag;
@@ -1759,6 +1777,15 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
 
 CthThread CthCreateMigratable(CthVoidFn fn, void *arg, int size)
 { return CthCreateInner(fn,arg,size,1);}
+
+int CthMigratable()
+{
+#if CMK_THREADS_ALIAS_STACK
+  return 1;
+#else
+  return CmiIsomallocEnabled();
+#endif
+}
 
 CthThread CthPup(pup_er p, CthThread t)
 {
