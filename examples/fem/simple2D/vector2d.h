@@ -90,7 +90,7 @@ vector^vector (cross?),real+vector, vector+=real, etc.
 	vector2d &scale(const vector2d &b) {x*=b.x;y*=b.y;return *this;}
 	
 	//Return the largest coordinate in this vector
-	real max(void) {return (x>y)?x:y;}
+	real max_(void) {return (x>y)?x:y;}
 	//Make each of this vector's coordinates at least as big
 	// as the given vector's coordinates.
 	void enlarge(const vector2d &by)
