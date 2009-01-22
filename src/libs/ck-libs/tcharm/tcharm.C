@@ -770,6 +770,10 @@ CDECL void *TCHARM_Get_global(int globalID)
 CDECL void TCHARM_Migrate(void)
 {
 	TCHARMAPI("TCHARM_Migrate");
+	if (CthMigratable() == 0) {
+          CkPrintf("Charm++ warning: thread migration is not supported!\n");
+          return;
+        }
 	TCharm::get()->migrate();
 }
 FORTRAN_AS_C(TCHARM_MIGRATE,TCHARM_Migrate,tcharm_migrate,(void),())
@@ -872,8 +876,8 @@ CDECL void TCHARM_Init(int *argc,char ***argv) {
 FDECL void FTN_NAME(TCHARM_INIT,tcharm_init)(void)
 {
 	int argc=1;
-	char *argv_sto[2]={"foo",NULL};
-	char **argv=argv_sto;
+	const char *argv_sto[2]={"foo",NULL};
+	char **argv=(char **)argv_sto;
 	TCHARM_Init(&argc,&argv);
 }
 
