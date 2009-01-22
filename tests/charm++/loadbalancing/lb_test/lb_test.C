@@ -10,7 +10,6 @@ Load-balancing test program:
 */
 
 #include <stdio.h>
-#include <unistd.h>
 #include <math.h>
 #include "charm++.h"
 #include "LBDatabase.h"
@@ -31,6 +30,10 @@ Load-balancing test program:
 #include "HbmLB.h"
 
 #include "lb_test.decl.h"
+
+#if defined(_WIN32)
+#define strcasecmp stricmp
+#endif
 
 CkChareID mid;//Main ID
 CkGroupID topoid;

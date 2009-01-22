@@ -1,6 +1,10 @@
 #include <math.h>
 #include <charm++.h>
 
+#if defined(_WIN32)
+#define strcasecmp stricmp
+#endif
+
 #include "Topo.h"
 #include "Topo.def.h"
 
