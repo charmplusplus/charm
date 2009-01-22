@@ -2593,30 +2593,6 @@ fi
 
 fi
 
-### test for libjpeg ####
-cat > $tc <<EOT
-#include <stdio.h>
-#include <stdlib.h>
-#include "jpeglib.h"
-
-int main()
-{
-  struct jpeg_compress_struct cinfo;
-  jpeg_create_compress(&cinfo);
-  return 0;
-}
-EOT
-test_linkc "whether it has libjpeg" "yes" "no" "-ljpeg"
-
-cat >>confdefs.h <<_ACEOF
-#define CMK_USE_LIBJPEG $pass
-_ACEOF
-
-if test $pass -eq 1
-then
-        add_flag 'CMK_LIBJPEG="-ljpeg"' "libjpeg"
-fi
-
 #### test if has values.h ####
 cat > $t <<EOT
 #include <values.h>
@@ -2718,6 +2694,31 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_STDINT_H $pass
 _ACEOF
 
+
+### test for libjpeg ####
+cat > $tc <<EOT
+#include <stdio.h>
+#include <stdlib.h>
+#include "converse.h"    /* cygwin does not like this */
+#include "jpeglib.h"
+
+int main()
+{
+  struct jpeg_compress_struct cinfo;
+  jpeg_create_compress(&cinfo);
+  return 0;
+}
+EOT
+test_linkc "whether it has libjpeg" "yes" "no" "-ljpeg"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_USE_LIBJPEG $pass
+_ACEOF
+
+if test $pass -eq 1
+then
+        add_flag 'CMK_LIBJPEG="-ljpeg"' "libjpeg"
+fi
 
 #### check if PAPI exists ####
 if test -n "$CMK_USE_PAPI"
