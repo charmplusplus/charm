@@ -1637,6 +1637,10 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #include "conv-onesided.h"
 #endif
 
+/* The flag tells whether we are in the process of doing out-of-core emulation in BigSim */
+extern int BgOutOfCoreFlag;
+extern int BgInOutOfCoreMode;
+
 #if defined(__cplusplus)
 }
 #endif
@@ -1664,10 +1668,6 @@ extern int CmiGridQueueLookupMsg (char *msg);
 #endif
 
 #include "debug-conv.h"
-
-/* The flag tells whether we are in the process of doing out-of-core emulation in BigSim */
-extern int BgOutOfCoreFlag;
-extern int BgInOutOfCoreMode;
 
 #if CMK_HAS_LOG2
 #define CmiLog2  log2
