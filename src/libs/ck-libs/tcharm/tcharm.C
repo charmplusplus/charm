@@ -719,8 +719,12 @@ static void checkAddress(void *data)
 {
 	if (tcharm_nomig||tcharm_nothreads) return; //Stack is not isomalloc'd
 	if (CmiThreadIs(CMI_THREAD_IS_ALIAS)||CmiThreadIs(CMI_THREAD_IS_STACKCOPY)) return; // memory alias thread
-	if (!CmiIsomallocInRange(data))
+	if (CmiIsomallocEnabled()) {
+          if (!CmiIsomallocInRange(data))
 	    CkAbort("The UserData you register must be allocated on the stack!\n");
+        }
+        else 
+          CkPrintf("Warning> checkAddress failed because isomalloc not supported.\n");
 }
 
 /* Old "register"-based userdata: */
@@ -771,7 +775,7 @@ CDECL void TCHARM_Migrate(void)
 {
 	TCHARMAPI("TCHARM_Migrate");
 	if (CthMigratable() == 0) {
-          CkPrintf("Charm++ warning: thread migration is not supported!\n");
+          CkPrintf("Warning> thread migration is not supported!\n");
           return;
         }
 	TCharm::get()->migrate();
