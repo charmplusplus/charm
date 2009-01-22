@@ -14,7 +14,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
-#include <strings.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "cklists.h"
@@ -1430,11 +1430,13 @@ CmiStartFn bgMain(int argc, char **argv)
   if(bgUseOutOfCore)
       initTblThreadInMem();
 
+#if CMK_OUT_OF_CORE
   //initialize variables related to get precise
   //physical memory usage info for a process
   bgMemPageSize = getpagesize();
   memset(bgMemStsFile, 0, 25); 
   sprintf(bgMemStsFile, "/proc/%d/statm", getpid());
+#endif
     
   return 0;
 }
