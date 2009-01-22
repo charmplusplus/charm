@@ -51,8 +51,8 @@ CpvDeclare(int, reduction_struct_idx);
 
 void * addMessage(void *data, void **remote, int count) {
   mesg msg = (mesg)data;
-  DebugPrintf("[%d] called addMessage with local(%d), %d remote(",CmiMyPe(),msg->sum,count);
   int i;
+  DebugPrintf("[%d] called addMessage with local(%d), %d remote(",CmiMyPe(),msg->sum,count);
   for (i=0; i<count; ++i) {
     DebugPrintf("%d,",((mesg)remote[i])->sum);
     msg->sum += ((mesg)remote[i])->sum;
@@ -93,8 +93,8 @@ void reduction_struct(void *data) {
 }
 
 void broadcast_struct(mesg m) {
-  CmiFree(m);
   struct twoInts *two = (struct twoInts*)malloc(sizeof(struct twoInts));
+  CmiFree(m);
   DebugPrintf("[%d] allocated struct %p\n",CmiMyPe(),two);
   two->positive = CmiMyPe()+1;
   two->negative = -2*(CmiMyPe()+1);
