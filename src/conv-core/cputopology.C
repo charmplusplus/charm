@@ -243,7 +243,9 @@ extern "C" void CmiInitCPUTopology(char **argv)
 
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
 						"obtain cpu topology info");
+#ifndef _WIN32
   obtain_flag = 1;
+#endif
 
   cpuTopoHandlerIdx =
      CmiRegisterHandler((CmiHandler)cpuTopoHandler);
