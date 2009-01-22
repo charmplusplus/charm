@@ -414,7 +414,7 @@ then
 #Win32/64 version needs special compilers and *copied* (not linked)
 # source files.
 	echo "Copying compilers for $WINNAME into cygwin /bin directory"
-	cp $src/$WINNAME/unix2nt* /bin
+	cp -f $src/$WINNAME/unix2nt* /bin
 	cp $src/win32/system_ln $DESTINATION/tmp
 	cp $src/win32/unistd.h $DESTINATION/tmp
 	echo "Compiling createlink.cpp ..."
