@@ -1076,6 +1076,7 @@ void   CmiHandleMessage(void *msg);
 void *CmiIsomalloc(int sizeInBytes);
 void  CmiIsomallocPup(pup_er p,void **block);
 void  CmiIsomallocFree(void *block);
+int   CmiIsomallocEnabled();
 
 CmiInt8   CmiIsomallocLength(void *block);
 int   CmiIsomallocInRange(void *addr);
@@ -1116,6 +1117,7 @@ typedef CthThread   (*CthThFn)();
 
 int        CthImplemented(void);
 
+int        CthMigratable();
 CthThread  CthPup(pup_er, CthThread);
 
 CthThread  CthSelf(void);
