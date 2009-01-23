@@ -12,6 +12,7 @@ void check_test(int argc, char** argv) {
   CmiFloat4 float4;
   CmiFloat8 float8;
 
+  if (CkMyPe()!=0) return;
   if (sizeof(int2) != 2) {
     CmiPrintf("Error: sizeof(CmiInt2) is %d!\n",sizeof(int2));
     exit(1);
