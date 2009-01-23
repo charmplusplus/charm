@@ -1736,7 +1736,7 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
           test_result 1 "$1" "$2" "$3"
         else
           echo $CMK_LDXX -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 >> $charmout
-          $CMK_LDXX -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 > out 2>&1
+          $CMK_LDXX -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 >> out 2>&1
           ret=$?
 	  test ! -x testlink && ret=1
           test_result $ret "$1" "$2" "$3"
@@ -1769,7 +1769,7 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
           test_result 1 "$1" "$2" "$3"
         else
           echo $CMK_LD -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 >> $charmout
-          $CMK_LD -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 > out 2>&1
+          $CMK_LD -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 >> out 2>&1
           test_result $? "$1" "$2" "$3"
         fi
  	strictpass=$pass
