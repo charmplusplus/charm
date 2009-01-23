@@ -1731,7 +1731,7 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
 	cat $t >> $charmout
 	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 >> $charmout
 	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 > out 2>&1
-        if test $? = 1
+        if test $? -ne 0
         then
           test_result 1 "$1" "$2" "$3"
         else
@@ -1764,7 +1764,7 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
 	cat $tc >> $charmout
 	echo $CMK_CC -I../include -I. $CMK_INCDIR $OPTS_CC -c $tc -o test.o $4 >> $charmout
 	$CMK_CC -I../include -I. $CMK_INCDIR $OPTS_CC -c $tc -o test.o $4 > out 2>&1
-        if test $? = 1
+        if test $? -ne 0
         then
           test_result 1 "$1" "$2" "$3"
         else
