@@ -2696,7 +2696,7 @@ _ACEOF
 
 
 ### test for libjpeg ####
-cat > $tc <<EOT
+cat > $t <<EOT
 #include <stdio.h>
 #include <stdlib.h>
 #include "converse.h"    /* cygwin does not like this */
@@ -2709,7 +2709,7 @@ int main()
   return 0;
 }
 EOT
-test_linkc "whether it has libjpeg" "yes" "no" "-ljpeg"
+test_link "whether it has libjpeg" "yes" "no" "-ljpeg"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_USE_LIBJPEG $pass

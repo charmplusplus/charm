@@ -872,7 +872,7 @@ test_cxx "whether has stdint.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_STDINT_H, $pass, [whether has stdint.h])
 
 ### test for libjpeg ####
-cat > $tc <<EOT
+cat > $t <<EOT
 #include <stdio.h>
 #include <stdlib.h>
 #include "converse.h"    /* cygwin does not like this */
@@ -885,7 +885,7 @@ int main()
   return 0;
 }
 EOT
-test_linkc "whether it has libjpeg" "yes" "no" "-ljpeg"
+test_link "whether it has libjpeg" "yes" "no" "-ljpeg"
 AC_DEFINE_UNQUOTED(CMK_USE_LIBJPEG, $pass, [whether it has libjpeg])
 if test $pass -eq 1
 then
