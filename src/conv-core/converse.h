@@ -1529,7 +1529,7 @@ void CmiDelayImmediate();
   for smp, this doesnot matter - CkMyPe() comparasion normaly fails and
            non threadsafe CqsEnqueueGeneral is avoided.
 */
-#if CMK_NET_VERSION && ! CMK_SMP
+#if CMK_NET_VERSION && ! CMK_SMP && ! defined(CMK_CPV_IS_SMP)
 extern int _immRunning;
 #  define CmiImmIsRunning()        (_immRunning)
 #else
