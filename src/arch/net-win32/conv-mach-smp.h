@@ -11,3 +11,8 @@
 #define CMK_SHARED_VARS_NT_THREADS                         1
 */
 
+#undef CMK_THREADS_USE_JCONTEXT
+#undef CMK_THREADS_ARE_WIN32_FIBERS
+#define CMK_THREADS_USE_JCONTEXT                           0
+#define CMK_THREADS_ARE_WIN32_FIBERS                       1
+
