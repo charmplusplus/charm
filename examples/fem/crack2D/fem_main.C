@@ -1,7 +1,6 @@
 /**
  * Main implementation file for FEM version of crack propagation code.
  */
-#include <fstream.h>
 #include <stddef.h>
 #include "crack.h"
 #include "netfem.h"

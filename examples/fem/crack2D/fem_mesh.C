@@ -1,7 +1,6 @@
 /**
  * Connect mesh to FEM framework for crack propagation code.
  */
-#include <fstream.h>
 #include <stddef.h>
 #include "crack.h"
 
