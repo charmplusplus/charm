@@ -1836,7 +1836,12 @@ CthThread CthPup(pup_er p, CthThread t)
 #if ! USE_SPECIAL_STACKPOINTER
 size_t CthStackOffset(CthThread t, char *p)
 {
-  size_t s = p - (char *)B(t)->stack;
+  size_t s;
+  CmiAssert(t);
+  if (B(t)->stack == NULL)      /* fiber, pthread */
+    s = p - (char *)t;
+  else
+    s = p - (char *)B(t)->stack;
   /* size_t s = (size_t)p; */
   return s;
 }
@@ -1844,8 +1849,11 @@ size_t CthStackOffset(CthThread t, char *p)
 char * CthPointer(CthThread t, size_t pos)
 {
   char *p;
-  CmiAssert(t && B(t)->stack);
-  p = (char *)B(t)->stack + pos;
+  CmiAssert(t);
+  if (B(t)->stack == NULL)      /* fiber, pthread */
+    p = (char*)t + pos;
+  else
+    p = (char *)B(t)->stack + pos;
   /* char *p = (char *)size; */
   return p;
 }
