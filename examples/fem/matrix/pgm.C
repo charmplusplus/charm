@@ -5,7 +5,6 @@ Orion Sky Lawlor, olawlor@acm.org, 1/27/2003
 */
 #include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <math.h>
 #include "charm++.h"
 #include "tcharmc.h"
