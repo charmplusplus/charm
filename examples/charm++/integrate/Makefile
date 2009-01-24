@@ -15,4 +15,4 @@ test: pgm
 	./charmrun pgm +p4 100 5 $(TESTOPTS)
 
 bgtest: pgm
-	./charmrun pgm +p4 100 5 +x2 +y2 +z1
+	./charmrun pgm +p4 100 5 +x2 +y2 +z1 $(TESTOPTS)
