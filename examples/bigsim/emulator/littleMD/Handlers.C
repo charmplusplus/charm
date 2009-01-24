@@ -11,6 +11,9 @@
 #include "blue.h"
 #include "bgMD.h"
 
+#ifdef _MSC_VER
+#define erand48(x) CrnDrand()
+#endif
 
 /*******************************************************************************
 		UTILITY FUNCTIONS
