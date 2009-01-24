@@ -989,9 +989,10 @@ struct CthThreadStruct
 
 CthCpvStatic(CthThread,  CthPrevious);
 
-typedef CthThread threadTable[100];
+typedef CthThread *threadTable;
+CthCpvStatic(int,     tablesize);
 CthCpvStatic(threadTable, exitThreads);
-CthCpvStatic(int, 	nExit);
+CthCpvStatic(int,     nExit);
 
 static void CthThreadInit(CthThread t)
 {
@@ -1001,10 +1002,17 @@ static void CthThreadInit(CthThread t)
 void CthInit(char **argv)
 {
   CthThread t;
+  int i;
 
   CthCpvInitialize(CthThread,  CthPrevious);
   CthCpvInitialize(int,        nExit);
   CthCpvInitialize(threadTable,        exitThreads);
+  CthCpvInitialize(int, tablesize);
+
+#define INITIALSIZE 128
+  CthCpvAccess(tablesize) = INITIALSIZE;   /* initial size */
+  CthCpvAccess(exitThreads) = (threadTable)malloc(sizeof(CthThread)*INITIALSIZE);
+  for (i=0; i<INITIALSIZE; i++) CthCpvAccess(exitThreads)[i] = NULL;
 
   CthCpvAccess(CthPrevious)=0;
   CthCpvAccess(nExit)=0;
@@ -1054,7 +1062,20 @@ static void CthClearThreads()
 
 void CthFree(CthThread t)
 {
+  int i;
   if (t==NULL) return;
+
+  if(CthCpvAccess(nExit) >= CthCpvAccess(tablesize)) {   /* expand */
+    threadTable newtable;
+    int oldsize = CthCpvAccess(tablesize);
+    CthCpvAccess(tablesize) *= 2;
+    newtable = (threadTable)malloc(sizeof(CthThread)*CthCpvAccess(tablesize));
+    for (i=0; i<CthCpvAccess(tablesize); i++) newtable[i] = NULL;
+    for (i=0; i<oldsize; i++) newtable[i] = CthCpvAccess(exitThreads)[i];
+    free(CthCpvAccess(exitThreads));
+    CthCpvAccess(exitThreads) = newtable;
+  }
+
   /* store into exiting threads table to avoid delete thread itself */
   CthCpvAccess(exitThreads)[CthCpvAccess(nExit)++] = t;
   if (t==CthCpvAccess(CthCurrent)) 
