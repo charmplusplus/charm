@@ -8,7 +8,6 @@
 
 #include <stdlib.h>
 #include <converse.h>
-#include <unistd.h>
 
 enum {nCycles =4096};
 enum { maxMsgSize = 1 << 16 };
