@@ -57,15 +57,23 @@ int deleteWRqueue(workRequestQueue *q);
  * or NULL if the queue is empty
  *
  */
-workRequest * head(workRequestQueue *q);
+workRequest * firstElement(workRequestQueue *q);
 
-/* next
+/* second
  * 
  * returns the second element in the queue or NULL if the queue has
  * fewer than 2 elements
  *
  */
-workRequest * next(workRequestQueue *q); 
+workRequest * secondElement(workRequestQueue *q); 
+
+/* third
+ * 
+ * returns the third element in the queue or NULL if the queue has
+ * fewer than 3 elements
+ *
+ */
+workRequest * thirdElement(workRequestQueue *q); 
 
 /*
  * isEmpty

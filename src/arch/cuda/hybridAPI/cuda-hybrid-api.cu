@@ -97,6 +97,8 @@ cudaStream_t data_out_stream;
  * take place before the kernel starts executing in order to allow overlap
  *
  */
+
+/*
 void allocateBuffers(workRequest *wr) {
   dataInfo *bufferInfo = wr->bufferInfo; 
 
@@ -106,7 +108,7 @@ void allocateBuffers(workRequest *wr) {
       int index = bufferInfo[i].bufferID; 
       int size = bufferInfo[i].size; 
       
-      /* allocate if the buffer for the corresponding index is NULL */
+      // allocate if the buffer for the corresponding index is NULL 
       if (devBuffers[index] == NULL) {
 	CUDA_SAFE_CALL_NO_SYNC(cudaMalloc((void **) &devBuffers[index], size));
 #ifdef GPU_DEBUG
@@ -117,6 +119,7 @@ void allocateBuffers(workRequest *wr) {
     }
   }
 }
+*/
 
 
 /* setupData
@@ -255,99 +258,121 @@ void gpuProgressFn() {
 
   while (!isEmpty(wrQueue)) {
     int returnVal; 
-    workRequest *wr = head(wrQueue); 
-    workRequest *second = next(wrQueue); 
+    workRequest *head = firstElement(wrQueue); 
+    workRequest *second = secondElement(wrQueue);
+    workRequest *third = thirdElement(wrQueue); 
     
-    if (wr->state == QUEUED) {
+    if (head->state == QUEUED) {
 #ifdef GPU_TIME
 	gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
 	gpuEvents[timeIndex].eventType = DATA_SETUP; 
-	gpuEvents[timeIndex].ID = wr->id; 
+	gpuEvents[timeIndex].ID = head->id; 
 	dataSetupIndex = timeIndex; 
 	timeIndex++; 
 #endif
-      setupData(wr); 
-      wr->state = TRANSFERRING_IN; 
+      setupData(head); 
+      head->state = TRANSFERRING_IN; 
     }  
-    if (wr->state == TRANSFERRING_IN) {
+
+    if (head->state == TRANSFERRING_IN) {
+
       if ((returnVal = cudaStreamQuery(data_in_stream)) == cudaSuccess) {
 #ifdef GPU_TIME
 	gpuEvents[dataSetupIndex].endTime = cutGetTimerValue(timerHandle); 
 #endif
-	wr->state = READY; 
+
+#ifdef GPU_TIME
+	gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
+	gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
+	gpuEvents[timeIndex].ID = head->id; 
+	runningKernelIndex = timeIndex; 
+	timeIndex++; 
+#endif
+	
+	if (second != NULL /*&& (second->state == QUEUED)*/) {
+#ifdef GPU_TIME
+	  gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
+	  gpuEvents[timeIndex].eventType = DATA_SETUP; 
+	  gpuEvents[timeIndex].ID = second->id; 
+	  dataSetupIndex = timeIndex; 
+	  timeIndex++; 
+#endif
+	  setupData(second); 
+	  second->state = TRANSFERRING_IN; 	
+	}
+	
+	kernelSelect(head); 
+	head->state = EXECUTING; 
+
       }
 #ifdef GPU_DEBUG
-      printf("Querying memory stream returned: %d %.2f\n", returnVal, cutGetTimerValue(timerHandle));
+      printf("Querying memory stream returned: %d %.2f\n", returnVal, 
+	     cutGetTimerValue(timerHandle));
 #endif  
-    }
-    if (wr->state == READY) {
-#ifdef GPU_TIME
-      gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
-      gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
-      gpuEvents[timeIndex].ID = wr->id; 
-      runningKernelIndex = timeIndex; 
-      timeIndex++; 
-#endif
-      
-      /* data transfer will not overlap with kernel if cudaMalloc is
-	 called in between, so it's best to perform the cudaMalloc for 
-	 subsequent work request's data before current work request's
-	 kernel starts execution */
 
-      if (second != NULL) {
-	allocateBuffers(second); 
-      }
-
-      kernelSelect(wr); 
-      wr->state = EXECUTING; 
     }
-    if (wr->state == EXECUTING) {
+
+    if (head->state == EXECUTING) {
       if ((returnVal = cudaStreamQuery(kernel_stream)) == cudaSuccess) {
 #ifdef GPU_TIME
 	gpuEvents[runningKernelIndex].endTime = cutGetTimerValue(timerHandle); 
 	gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
 	gpuEvents[timeIndex].eventType = DATA_CLEANUP; 
-	gpuEvents[timeIndex].ID = wr->id; 
+	gpuEvents[timeIndex].ID = head->id; 
 	dataCleanupIndex = timeIndex; 
 	timeIndex++; 
 #endif
-        copybackData(wr);
-	wr->state = TRANSFERRING_OUT;
+
+	if (second != NULL && second->state == QUEUED) {
+#ifdef GPU_TIME
+	  gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
+	  gpuEvents[timeIndex].eventType = DATA_SETUP; 
+	  gpuEvents[timeIndex].ID = second->id; 
+	  dataSetupIndex = timeIndex; 
+	  timeIndex++; 
+#endif
+	  setupData(second); 
+	  second->state = TRANSFERRING_IN; 	
+	} 
+
+	if (second != NULL && second->state == TRANSFERRING_IN) {
+	  if (cudaStreamQuery(data_in_stream) == cudaSuccess) {
+#ifdef GPU_TIME
+	    gpuEvents[dataSetupIndex].endTime = cutGetTimerValue(timerHandle); 
+#endif
+	    if (third != NULL /*&& (third->state == QUEUED)*/) {
+#ifdef GPU_TIME
+	      gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
+	      gpuEvents[timeIndex].eventType = DATA_SETUP; 
+	      gpuEvents[timeIndex].ID = third->id; 
+	      dataSetupIndex = timeIndex; 
+	      timeIndex++; 
+#endif
+	      setupData(third); 
+	      third->state = TRANSFERRING_IN; 	
+	    }
+	  }
+	}
+
+        copybackData(head);
+	head->state = TRANSFERRING_OUT;
+
       }
 #ifdef GPU_DEBUG
       printf("Querying kernel completion returned: %d %.2f\n", returnVal,
 	     cutGetTimerValue(timerHandle));
 #endif  
-
-      /* prefetch data for the subsequent kernel */
-      if (second != NULL && second->state == QUEUED) {
-#ifdef GPU_TIME
-	gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
-	gpuEvents[timeIndex].eventType = DATA_SETUP; 
-	gpuEvents[timeIndex].ID = second->id; 
-	dataSetupIndex = timeIndex; 
-	timeIndex++; 
-#endif
-	setupData(second); 
-	second->state = TRANSFERRING_IN; 
-      }      
-      if (second != NULL && second->state == TRANSFERRING_IN) {
-	if (cudaStreamQuery(data_in_stream) == cudaSuccess) {
-#ifdef GPU_TIME
-	  gpuEvents[dataSetupIndex].endTime = cutGetTimerValue(timerHandle); 
-#endif
-	  second->state = READY; 
-	}
-      }
+      
     }
-    if (wr->state == TRANSFERRING_OUT) {
+
+    if (head->state == TRANSFERRING_OUT) {
       if (cudaStreamQuery(data_out_stream) == cudaSuccess) {
-	freeMemory(wr); 
+	freeMemory(head); 
 #ifdef GPU_TIME
 	gpuEvents[dataCleanupIndex].endTime = cutGetTimerValue(timerHandle);
 #endif
 	dequeue(wrQueue);
-	CUDACallbackManager(wr->callbackFn);
+	CUDACallbackManager(head->callbackFn);
       }
     }
   }
@@ -385,9 +410,3 @@ void exitHybridAPI() {
 
 #endif
 }
-
-
-
-
-
-

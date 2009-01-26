@@ -90,7 +90,7 @@ int deleteWRqueue(workRequestQueue *q) {
   }
 }
 
-workRequest * head(workRequestQueue *q) {
+workRequest * firstElement(workRequestQueue *q) {
   if (q->size == 0) {
     return NULL; 
   }
@@ -99,7 +99,7 @@ workRequest * head(workRequestQueue *q) {
   }
 }
 
-workRequest * next(workRequestQueue *q) {
+workRequest * secondElement(workRequestQueue *q) {
   if (q->size < 2) {
     return NULL; 
   }
@@ -110,6 +110,21 @@ workRequest * next(workRequestQueue *q) {
     else {
       return &q->requests[q->head+1]; 
     }
+  }
+}
+
+workRequest * thirdElement(workRequestQueue *q) {
+  if (q->size < 3) {
+    return NULL; 
+  }
+  else {
+    int wrIndex = q->head+2;
+
+    if (wrIndex >= q->capacity) {
+      wrIndex -= q->capacity; 
+    }
+
+    return &q->requests[wrIndex]; 
   }
 }
 
