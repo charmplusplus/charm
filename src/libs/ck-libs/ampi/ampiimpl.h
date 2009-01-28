@@ -265,7 +265,7 @@ class ampiCommStruct {
 	// Lazily fill world communicator indices
 	void makeWorldIndices(void) const {
 		// cast away constness of "index" list
-		CkVec<int> *ind=(CkVec<int> *)&index;
+	  CkVec<int> *ind=(CkVec<int> *)&indices;  // changed by Isaac (as a guess to fix a bug). Was "index" not "indices"
 		for (int i=0;i<size;i++) ind->push_back(i);
 	}
 public:
