@@ -284,10 +284,38 @@ for (int loop=0;loop<nLoop;loop++) {
 		MPI_Tester splitTester(split);
 		splitTester.test();
 	}
-	if (1 && loop!=nLoop-1) 
-		masterTester.testMigrate();
-}
+
+	if(1)
+	  { // Test construction of group and new communicator 
+	    int rank;
+	    int np;
+	    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+	    MPI_Comm_size( MPI_COMM_WORLD, &np );
+
+	    if(np >= 4){
+	      int groupranks[] = {0,2,3};
+	      MPI_Comm newcomm;
+	      MPI_Group mpi_base_group, new_grp;
+	      MPI_Comm_group( MPI_COMM_WORLD, &mpi_base_group );
+	      MPI_Group_incl( mpi_base_group, 3, groupranks, &new_grp );
+	      MPI_Comm_create(MPI_COMM_WORLD, new_grp, &newcomm );
+	      
+	      // Verify the correct ranks are in the new communicator
+	      if ( newcomm == MPI_COMM_NULL ){
+		if(rank== 0 || rank== 2 || rank== 3 )
+		  testFailed("Testing construction of group and new communicator");
+	      } else {
+		if(rank == 1 || rank > 3)
+		  testFailed("Testing construction of group and new communicator");		
+	      }
+	    }
+	  }
 	
+	
+	if (1 && loop!=nLoop-1) 
+	  masterTester.testMigrate();
+ }
+ 
 	if (getRank()==0) CkPrintf("All tests passed\n");
 	MPI_Finalize();
 	return 0;
