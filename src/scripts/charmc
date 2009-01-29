@@ -585,6 +585,10 @@ do
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
 		;;
+        "-preprocess")
+# Run preprocessor as an extra step, continue after preprocessing
+		PREPROCESS="yes"
+                ;;
 	"-M"|"-P"|"-S")
 # Run preprocessor/assembler only
 		SKIPLINK="yes"
@@ -1084,12 +1088,14 @@ do
 	NU_OBJ=""
 	case "$FILE" in
 	*.ci)
-		if [ "$LANGUAGE" = "f90charm" ]
-		then
-		    Do $CHARMBIN/charmxi -f90 $CMK_XIOPTS $FILE
-		else
-		    Do $CHARMBIN/charmxi $CMK_XIOPTS $FILE
-		fi
+                XIOPTS=$CMK_XIOPTS
+                test "$LANGUAGE" = "f90charm" && XIOPTS="$XIOPTS -f90"
+                if [ -n "$PREPROCESS" ]
+                then
+		  Do $CMK_CPP_CHARM $FILE | Do $CHARMBIN/charmxi $XIOPTS
+                else
+		  Do $CHARMBIN/charmxi $XIOPTS $FILE
+                fi
 		;;
 	*.c|*.s)
 		Do $CMK_CC -I$CHARMINC $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CC -c $FILE $DESTO
