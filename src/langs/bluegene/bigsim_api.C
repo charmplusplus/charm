@@ -67,7 +67,7 @@ void BgWriteTraceSummary(int numPes, int x, int y, int z, int numWth, int numCth
 
   if (!traceroot) traceroot=(char*)"";
   sprintf(d, "%sbgTrace", traceroot);
-  FILE *f = fopen(d,"w");
+  FILE *f = fopen(d,"wb");
   if(f==NULL) {
       CmiPrintf("Creating trace file %s  failed\n", d);
       CmiAbort("BG> Abort");
@@ -103,7 +103,7 @@ void BgWriteTimelines(int seqno, BgTimeLineRec **tlinerecs, int nlocalProcs, cha
 
   char *d = new char[512];
   sprintf(d, "%sbgTrace%d", traceroot?traceroot:"", seqno); 
-  FILE *f = fopen(d,"w");
+  FILE *f = fopen(d,"wb");
   PUP::toDisk p(f);
   const PUP::machineInfo &machInfo = PUP::machineInfo::current();
 

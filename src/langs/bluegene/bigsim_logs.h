@@ -81,6 +81,7 @@ public:
   void pup(PUP::er &p) {
     p|msgID; p|dstPe; p|sendTime; p|recvTime; p|tID; p|msgsize; 
     CmiAssert(recvTime>=sendTime);
+    CmiAssert(msgsize >= 0);
     if (p.isUnpacking()) group = 1;    // default value
     if (bglog_version>0) p|group;
   }

@@ -1744,7 +1744,7 @@ static void writeToDisk()
   if(CmiMyPe()==0){
     
     sprintf(d, "%sbgTrace", cva(bgMach).traceroot?cva(bgMach).traceroot:""); 
-    FILE *f2 = fopen(d,"w");
+    FILE *f2 = fopen(d,"wb");
     //Total emulating processors and total target BG processors
     int numPes=CmiNumPes();
     int totalProcs = BgNumNodes()*cva(bgMach).numWth;
@@ -1767,7 +1767,7 @@ static void writeToDisk()
   }
   
   sprintf(d, "%sbgTrace%d", cva(bgMach).traceroot?cva(bgMach).traceroot:"", CmiMyPe()); 
-  FILE *f = fopen(d,"w");
+  FILE *f = fopen(d,"wb");
  
   if(f==NULL)
     CmiPrintf("Creating bgTrace%d failed\n",CmiMyPe());

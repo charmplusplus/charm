@@ -29,7 +29,7 @@ int BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNode
    //   CmiPrintf("nodeNum: %d arrayId:%d numNodes:%d numPes:%d\n",nodeNum,arrayID,numNodes,numPes);
  
   sprintf(fName,"bgTrace%d",fileNum);
-  FILE*  f = fopen(fName,"r");
+  FILE*  f = fopen(fName,"rb");
   if (f == NULL) {
     printf("Error> Open failed with %s. \n", fName);
     return -1;
@@ -125,7 +125,7 @@ int* BgLoadOffsets(int totalProcs, int numPes){
   PUP::machineInfo machInfo;
   for (int i=0; i<numPes; i++){
     sprintf(d,"bgTrace%d",i);
-    FILE *f = fopen(d,"r");
+    FILE *f = fopen(d,"rb");
     if (f == NULL) {
       CmiPrintf("BgLoadOffsets: can not open file %s!\n", d);
       CmiAbort("BgLoadOffsets failed!\n");
@@ -150,7 +150,7 @@ int BgLoadTraceSummary(const char *fname, int &totalProcs, int &numX, int &numY,
   BGMach  bgMach ;
   PUP::machineInfo machInfo;
 
-  FILE* f = fopen(fname,"r");
+  FILE* f = fopen(fname,"rb");
   if (f == NULL) {
     printf("Error> Open failed with %s. \n", fname);
     return -1;
