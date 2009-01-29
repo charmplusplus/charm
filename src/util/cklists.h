@@ -218,18 +218,12 @@ class CkVec : private CkSTLHelper<T> {
     const T *getVec(void) const { return block; }
     
     T& operator[](size_t n) {
-#if CMK_PARANOID 
-      if (n >= len || n < 0) 
-	CmiAbort("CkVec Out Of Bounds\n\n"); 
-#endif
+      CmiAssert(n>=0 && n<len);
       return block[n]; 
     }
     
     const T& operator[](size_t n) const { 
-#if CMK_PARANOID 
-      if (n >= len || n < 0) 
-	CmiAbort("CkVec Out Of Bounds\n\n");  
-#endif
+      CmiAssert(n>=0 && n<len);
       return block[n]; 
     }
     
