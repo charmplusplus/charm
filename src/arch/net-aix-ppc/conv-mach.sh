@@ -1,7 +1,7 @@
 CMK_CPP_CHARM='/usr/lib/cpp'
 CMK_CPP_C='xlc -E'
-CMK_CC='xlc_r'
-CMK_CXX='xlC_r -qstaticinline'
+CMK_CC='xlc_r '
+CMK_CXX='xlC_r -qstaticinline -qcpluscmt'
 CMK_LD="xlc_r -brtl -bmaxdata:0x80000000 -bmaxstack:0x80000000 "
 CMK_LDXX="xlC_r -brtl -bmaxdata:0x80000000 -bmaxstack:0x80000000"
 CMK_CXXPP='xlC -E'
