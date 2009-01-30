@@ -2883,7 +2883,7 @@ void ConverseCommonInit(char **argv)
     if(CmiMyRank() == 0) _Cmi_noprocforcommthread=1;
    }
 #endif
-#if CMK_MULTICORE
+#if CMK_MULTICORE && CMK_SHARED_VARS_POSIX_THREADS_SMP
     _Cmi_noprocforcommthread = 1;
 #endif
 	
