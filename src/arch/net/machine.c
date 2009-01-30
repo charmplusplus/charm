@@ -2583,7 +2583,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
     if (CmiMyPe() == 0) CmiPrintf("Charm++> communication thread is launched in multicore version. \n");
   }
   else {      /* run without comm thread */
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
     _Cmi_noprocforcommthread = 1;   /* worker thread can't go sleep */
+#endif
   }
 #endif
 
