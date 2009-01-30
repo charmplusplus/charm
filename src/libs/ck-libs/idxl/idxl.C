@@ -275,6 +275,7 @@ void IDXL_Comm::wait(void) {
 	if (!isPosted()) post();
 	CkAssert(msg.size()>=nMsgs);
 	CkAssert(msgReq.size()==nMsgs);
+        if (nMsgs == 0) { isDone=true; return; }
 	msgSts.resize(nMsgs);
 	MPI_Waitall(nMsgs,&msgReq[0],&msgSts[0]);
 	//Process all received messages:
