@@ -13,7 +13,7 @@ test.o: test.C
 # clean up .o, .mod, .exe and EMACS backup files
 #
 clean:
-	rm -f *.o *.mod pgm *~ conv-host charmrun
+	rm -f *.o *.mod pgm *~ conv-host charmrun test.o
 
 test: pgm
 	./charmrun ./pgm +p1 +vp1 $(TESTOPTS)
