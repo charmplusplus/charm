@@ -109,7 +109,8 @@ void BgResetRecvTime()
 void BgMsgSetTiming(char *msg)
 {
   CmiBgMsgID(msg) = CpvAccess(msgCounter)++;
-  CmiBgMsgSrcPe(msg) = BgMyNode();	// global serial number
+  //CmiBgMsgSrcPe(msg) = BgMyNode();	// global serial number
+  CmiBgMsgSrcPe(msg) = BgGetGlobalWorkerThreadID();	// global serial number
 }
 
 void BgLogEntryCommit(BgTimeLineRec &tlinerec) {
