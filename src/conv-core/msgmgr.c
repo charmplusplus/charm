@@ -41,8 +41,7 @@ CmmTable t;
   CmiFree(t);
 }
 
-//free all table entries but not the space
-//pointed by "msg"
+/* free all table entries but not the space pointed by "msg" */
 void CmmFreeAll(CmmTable t){
     CmmEntry cur;
     if(t==NULL) return;
@@ -96,8 +95,8 @@ int *rtags;
 int del;
 {
   CmmEntry *enth; CmmEntry ent; void *msg; int i;
-  //added by Chao Mei in case that t is already freed
-  //which happens in ~ampi() when doing out-of-core emulation for AMPI programs
+/* added by Chao Mei in case that t is already freed
+  which happens in ~ampi() when doing out-of-core emulation for AMPI programs */
   if(t==NULL) return NULL;
 
   enth = &(t->first);
