@@ -110,7 +110,10 @@ void BgMsgSetTiming(char *msg)
 {
   CmiBgMsgID(msg) = CpvAccess(msgCounter)++;
   //CmiBgMsgSrcPe(msg) = BgMyNode();	// global serial number
-  CmiBgMsgSrcPe(msg) = BgGetGlobalWorkerThreadID();	// global serial number
+  if (tTHREADTYPE == WORK_THREAD)
+    CmiBgMsgSrcPe(msg) = BgGetGlobalWorkerThreadID();	// global serial number
+  else
+    CmiBgMsgSrcPe(msg) = -BgMyNode();                   // comm thread
 }
 
 void BgLogEntryCommit(BgTimeLineRec &tlinerec) {
