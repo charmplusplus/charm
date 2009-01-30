@@ -137,6 +137,10 @@ int  BgGetGlobalThreadID();
 /** return thread's global id(including only worker threads) */
 int  BgGetGlobalWorkerThreadID();
 
+void BgSetThreadID(int pe);
+void BgSetGlobalWorkerThreadID(int pe);
+void BgSetNumNodes(int x);
+
 /**
    register user defined function and get a handler, 
    should only be called in BgGlobalInit() 

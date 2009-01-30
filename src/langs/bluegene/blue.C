@@ -22,6 +22,7 @@
 #include "blue.h"
 #include "blue_impl.h"    	// implementation header file
 //#include "blue_timing.h" 	// timing module
+#include "bigsim_record.h"
 
 #include "bigsim_ooc.h" //out-of-core module
 #include "bigsim_debug.h"
@@ -411,9 +412,6 @@ void addBgNodeInbuffer(char *msgPtr, int lnodeID)
   if (lnodeID >= cva(numNodes)) CmiAbort("NodeID is out of range!");
 #endif
   nodeInfo &nInfo = cva(nodeinfo)[lnodeID];
-
-  //printf("Adding a msg %p to local node %d and its thread %d\n", msgPtr, lnodeID, CmiBgMsgThreadID(msgPtr));	
-	
   nInfo.addBgNodeInbuffer(msgPtr);
 }
 
@@ -460,6 +458,12 @@ void msgHandlerFunc(char *msg)
       CmiAbort("msgHandlerFunc received wrong message!");
 #endif
     int lnodeID = nodeInfo::Global2Local(gnodeID);
+    if (cva(bgMach).inReplayMode()) {
+      int x, y, z;
+      BgGetXYZ(cva(bgMach).replay, &x, &y, &z);
+      if (nodeInfo::XYZ2Local(x,y,z) != lnodeID) return;
+      else lnodeID = 0;
+    }
     addBgNodeInbuffer(msg, lnodeID);
   }
   else {
@@ -793,10 +797,13 @@ static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int 
   resetVTime();
 }
 
+
 /* sendPacket to route */
 /* this function can be called by any thread */
 void BgSendNonLocalPacket(nodeInfo *myNode, int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
+  if (cva(bgMach).inReplayMode()) return;     // replay mode, no outgoing msg
+
 #ifndef CMK_OPTIMIZE
   if (x<0 || y<0 || z<0 || x>=cva(bgMach).x || y>=cva(bgMach).y || z>=cva(bgMach).z) {
     CmiPrintf("Trying to send packet to a nonexisting node: (%d %d %d)!\n", x,y,z);
@@ -816,6 +823,9 @@ void BgSendLocalPacket(int threadID, int handlerID, WorkType type,
                        int numbytes, char* data)
 {
   nodeInfo *myNode = cta(threadinfo)->myNode;
+
+  if (cva(bgMach).inReplayMode()) threadID = 0;    // replay mode
+
   _BgSendLocalPacket(myNode, threadID, handlerID, type, numbytes, data);
 }
 
@@ -841,11 +851,16 @@ void BgBroadcastAllPacket(int handlerID, WorkType type, int numbytes, char * dat
 
 void BgThreadBroadcastPacketExcept(int node, CmiInt2 threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
+  if (cva(bgMach).inReplayMode()) return;    // replay mode
   threadBroadcastPacketExcept_(node, threadID, handlerID, type, numbytes, data);
 }
 
 void BgThreadBroadcastAllPacket(int handlerID, WorkType type, int numbytes, char * data)
 {
+  if (cva(bgMach).inReplayMode()) {      // replay mode, send only to itself
+    BgSendLocalPacket(ANYTHREAD, handlerID, type, numbytes, data);
+    return;
+  }
   threadBroadcastPacketExcept_(BG_BROADCASTALL, ANYTHREAD, handlerID, type, numbytes, data);
 }
 
@@ -937,6 +952,11 @@ int BgNumNodes()
   return _bgSize;
 }
 
+void BgSetNumNodes(int x)
+{
+  _bgSize = x;
+}
+
 /* can only called in emulatorinit */
 void BgSetSize(int sx, int sy, int sz)
 {
@@ -984,6 +1004,11 @@ int BgGetThreadID()
   return tMYID;
 }
 
+void BgSetThreadID(int x)
+{
+  tMYID = x;
+}
+
 int BgGetGlobalThreadID()
 {
   ASSERT(tTHREADTYPE == WORK_THREAD || tTHREADTYPE == COMM_THREAD);
@@ -996,6 +1021,13 @@ int BgGetGlobalWorkerThreadID()
   ASSERT(tTHREADTYPE == WORK_THREAD);
 //  return nodeInfo::Local2Global(tMYNODEID)*cva(bgMach).numWth+tMYID;
   return tMYGLOBALID;
+}
+
+void BgSetGlobalWorkerThreadID(int pe)
+{
+  ASSERT(tTHREADTYPE == WORK_THREAD);
+//  return nodeInfo::Local2Global(tMYNODEID)*cva(bgMach).numWth+tMYID;
+  tMYGLOBALID = pe;
 }
 
 char *BgGetNodeData()
@@ -1016,7 +1048,7 @@ int BgGetNumWorkThread()
 
 void BgSetNumWorkThread(int num)
 {
-  ASSERT(cva(simState).inEmulatorInit);
+  if (!cva(bgMach).inReplayMode()) ASSERT(cva(simState).inEmulatorInit);
   cva(bgMach).numWth = num;
 }
 
@@ -1045,7 +1077,7 @@ void BgSetWorkerThreadStart(BgStartHandler f)
 extern "C" void CthResumeNormalThread(CthThreadToken* token);
 
 // kernel function for processing a bluegene message
-void BgProcessMessage(char *msg)
+void BgProcessMessage(threadInfo *tinfo, char *msg)
 {
   DEBUGM(5, ("=====Begin of BgProcessing a msg on node[%d]=====\n", BgMyNode()));
   int handler = CmiBgMsgHandle(msg);
@@ -1074,6 +1106,8 @@ void BgProcessMessage(char *msg)
   if (CmiBgMsgFlag(msg) == BG_CLONE) {
     msg = BgExpandMsg(msg);
   }
+
+  if (tinfo->watcher) tinfo->watcher->record(msg);
 
   // don't count thread overhead and timing overhead
   startVTimer();
@@ -1313,6 +1347,15 @@ CmiStartFn bgMain(int argc, char **argv)
     cva(bgMach).traceroot = root;
   }
 
+  // record/replay
+  if (CmiGetArgFlagDesc(argv,"+bgrecord","Record message processing order for BigSim"))
+    cva(bgMach).record = 1;
+  int replaype;
+  if (CmiGetArgIntDesc(argv,"+bgreplay", &replaype, "Re-play message processing order for BigSim")) {
+    cva(bgMach).replay = replaype;
+  }
+
+
   /* parameters related with out-of-core execution */
   if (CmiGetArgDoubleDesc(argv, "+bgooc", &bgOOCMaxMemSize, "Simulate with out-of-core support and the threshhold of memory size")){
       bgUseOutOfCore = 1;
@@ -1461,6 +1504,7 @@ extern "C" int CmiSwitchToPEFn(int pe)
   else if (pe < 0) {
   }
   else {
+    if (cva(bgMach).inReplayMode()) pe = 0;         /* replay mode */
     int t = pe%cva(bgMach).numWth;
     int newpe = nodeInfo::Global2Local(pe/cva(bgMach).numWth);
     nodeInfo *ninfo = cva(nodeinfo) + newpe;;

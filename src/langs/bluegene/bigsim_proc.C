@@ -1,6 +1,8 @@
 #include <assert.h>
 #include "blue.h"
 #include "blue_impl.h"    	// implementation header file
+#include "bigsim_record.h"
+
 //#include "blue_timing.h" 	// timing module
 #include "ckcheckpoint.h"
 
@@ -56,7 +58,7 @@ void commThreadInfo::run()
       if (CmiBgMsgRecvTime(msg) > tCURRTIME)  tCURRTIME = CmiBgMsgRecvTime(msg);
 //      tSTARTTIME = CmiWallTimer();
       /* call user registered handler function */
-      BgProcessMessage(msg);
+      BgProcessMessage(this, msg);
     }
     else {
 #if BLUEGENE_TIMING
@@ -125,9 +127,6 @@ void BgDeliverMsgs(int nmsg)
   BgScheduler(nmsg);
 }
 
-//static int inCore();
-//static int outCore();
-
 //If AMPI_Init is called, then we begin to do out-of-core emulation
 //in the case of emulating AMPI programs. This is based on the assumption
 //that during initialization, the memory should be enough
@@ -167,6 +166,7 @@ void workThreadInfo::scheduler(int count)
     if ( msg == NULL ) {
 //      tCURRTIME += (CmiWallTimer()-tSTARTTIME);
       DEBUGM(4,("N[%d] work thread %d has no msg and go to sleep!\n", BgMyNode(), id));
+      if (watcher) watcher->replay();
       CthSuspend();
       DEBUGM(4, ("N[%d] work thread %d awakened!\n", BgMyNode(), id));      
       continue;
@@ -248,11 +248,11 @@ void workThreadInfo::scheduler(int count)
     	}
 #else
         bgOutOfCoreSchedule(this);
-        BgProcessMessage(msg);
+        BgProcessMessage(this, msg);
 #endif
     }else{
         DEBUGM(4, ("to execute not in ooc mode\n"));
-        BgProcessMessage(msg);
+        BgProcessMessage(this, msg);
     }
     
     DEBUGM(4, ("[N%d] W[%d] now has %d msgs from own queue and %d from affinity after processing msg\n\n", BgMyNode(), id, q1.length(), q2.length()));
@@ -290,12 +290,35 @@ void workThreadInfo::scheduler(int count)
   CsdStopFlag --;
 }
 
+static FILE *openBinaryReplayFile(int pe, const char* flags) {
+        char fName[200];
+        sprintf(fName,"ckfullreplay_%06d.log",pe);
+        FILE *f;
+        CkPrintf("openBinaryReplayFile %s\n", fName);
+        f = fopen(fName, flags);
+        if (f==NULL) {
+                CkPrintf("[%d] Could not open replay file '%s'.\n",
+                        CkMyPe(),fName);
+                CkAbort("openBinaryReplayFile> Could not open replay file");
+        }
+        return f;
+}
+
 void workThreadInfo::run()
 {
   tSTARTTIME = CmiWallTimer();
 
     //  register for charm++ applications threads
   CpvAccess(CthResumeBigSimThreadIdx) = BgRegisterHandler((BgHandler)CthResumeNormalThread);
+
+  if (cva(bgMach).record != -1)
+  {
+    watcher = new BgMessageRecorder(openBinaryReplayFile(BgGetGlobalWorkerThreadID(), "wb"));
+  }
+  if (cva(bgMach).replay != -1)
+  {
+    watcher = new BgMessageReplay(openBinaryReplayFile(cva(bgMach).replay, "rb"));
+  }
 
 //  InitHandlerTable();
   // before going into scheduler loop, call workStartFunc
@@ -337,6 +360,7 @@ void workThreadInfo::addAffMessage(char *msgPtr)
 
 
 //=====Begin of stuff related with out-of-core scheduling======
+
 extern int BgOutOfCoreFlag;
 
 //The Out-of-core implementation reuses the functions in the checkpoint

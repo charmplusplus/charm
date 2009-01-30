@@ -30,6 +30,7 @@ public:
   int timingMethod;	   /* timing method */
   double cpufactor;	   /* cpu factor to multiply to the time for walltime */
   double fpfactor;         /* fp time factor */
+  int    record, replay;   /* record/replay */
   char *traceroot;	   /* bgTraceFile prefix */
   BigSimNetwork *network;  /* network setup */
   CkListString procList;
@@ -39,6 +40,7 @@ public:
   void nullify() { 
 	x=y=z=0; 
 	numCth=numWth=0; stacksize=0; 
+        record=replay=-1;
 	timingMethod = BG_WALLTIME; cpufactor=1.0; fpfactor=0.0;
 	traceroot=NULL; 
 	network=new BlueGeneNetwork;
@@ -58,6 +60,7 @@ public:
        }
   int traceProejctions(int pe);
   void setNetworkModel(char *model);
+  int inReplayMode() { return replay != -1; }
 };
 
 // simulation state
@@ -410,6 +413,8 @@ public:
       me:   point to the CthThread converse thread handler.
 *****************************************************************************/
 
+class BgMessageWatcher;
+
 class threadInfo {
 public:
   short id;
@@ -418,6 +423,8 @@ public:
   CthThread me;			/* Converse thread handler */
   nodeInfo *myNode;		/* the node belonged to */
   double  currTime;		/* thread timer */
+
+  BgMessageWatcher *watcher;
 
   /*
    * It is needed for out-of-core scheduling
@@ -463,6 +470,7 @@ public:
   workThreadInfo(int _id, nodeInfo *_node): 
         threadInfo(_id, WORK_THREAD, _node) { 
     CsdStopFlag=0; 
+    watcher = NULL;
     if (_id != -1) {
       globalId = nodeInfo::Local2Global(_node->id)*(cva(bgMach).numWth)+_id;
     }
@@ -492,7 +500,7 @@ void    resetVTime();
 char * getFullBuffer();
 void   addBgNodeMessage(char *msgPtr);
 void   addBgThreadMessage(char *msgPtr, int threadID);
-void   BgProcessMessage(char *msg);
+void   BgProcessMessage(threadInfo *t, char *msg);
 
 
 /* blue gene debug */
