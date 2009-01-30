@@ -449,7 +449,8 @@ public:
 
 public:
   threadInfo(int _id, ThreadType _type, nodeInfo *_node): 
-  	id(_id), globalId(-1), type(_type), myNode(_node), currTime(0.0), isCoreOnDisk(0), memUsed(0.0),
+  	id(_id), globalId(-1), type(_type), myNode(_node), currTime(0.0), 
+        watcher(NULL), isCoreOnDisk(0), memUsed(0.0),
 	startOutOfCore(1), startOOCChanged(0){}
   inline void setThread(CthThread t) { me = t; }
   inline CthThread getThread() const { return me; }
