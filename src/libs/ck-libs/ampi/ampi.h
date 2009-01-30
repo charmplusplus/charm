@@ -186,7 +186,12 @@ the real (non-virtual) processors. */
 #define AMPI_KEYVAL_NUMNODES -17
 
 
+/** Communicators give a communication context to a set of processors.
+    An intercommunicator can be used for point to point messaging between two groups.
+    An intracommunicator can be used to send messages within a single group. */
 typedef int MPI_Comm;
+
+/** Groups represent an set of processors 0...n-1. They can be created locally */
 typedef int MPI_Group;
 
 #define MPI_COMM_FIRST_SPLIT (MPI_Comm)(1000000) /*Communicator from MPI_Comm_split */

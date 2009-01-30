@@ -617,7 +617,7 @@ static ampi *ampiInit(char **argv)
 		CkAbort("AMPI> Number of registered comm_worlds exceeded limit.\n");
 	}
 	int new_idx=mpi_nworlds;
-	new_world=MPI_COMM_WORLD+1+new_idx;
+	new_world=MPI_COMM_WORLD+new_idx; // Isaac guessed there shouldn't be a +1 here
 
         //Create and attach the ampiParent array
         CkArrayID threads;
@@ -700,7 +700,7 @@ public:
     ampiWorlds(CkMigrateMessage *m): CBase_ampiWorlds(m) {}
     void pup(PUP::er &p)  { CBase_ampiWorlds::pup(p); }
     void add(const ampiCommStruct &nextWorld) {
-        int new_idx=nextWorld.getComm()-(MPI_COMM_WORLD+1);
+      int new_idx=nextWorld.getComm()-(MPI_COMM_WORLD); // Isaac guessed there shouldn't be a +1 after the MPI_COMM_WORLD
         mpi_worlds[new_idx].comm=nextWorld;
 	if (mpi_nworlds<=new_idx) mpi_nworlds=new_idx+1;
 	STARTUP_DEBUG("ampiInit> listed MPI_COMM_UNIVERSE "<<new_idx)
