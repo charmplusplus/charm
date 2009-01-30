@@ -221,8 +221,8 @@ trace-summary.o: trace-summary.C charm++.h charm.h converse.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h trace-summary.h \
-  register.h trace-common.h trace-summaryBOC.h TraceSummary.decl.h \
-  TraceSummary.def.h
+  register.h trace-common.h trace-summaryBOC.h ckcallback-ccs.h \
+  CkCallback.decl.h TraceSummary.decl.h TraceSummary.def.h
 	$(CHARMC) -c -I. trace-summary.C
 
 trace-simple.o: trace-simple.C charm++.h charm.h converse.h conv-config.h \
@@ -1970,8 +1970,8 @@ blue.o: blue.C cklists.h pup.h converse.h conv-config.h conv-autoconfig.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
   persistent.h conv-onesided.h debug-conv.h queueing.h blue.h converse.h \
   blue-conv.h blue_impl.h conv-mach.h ckliststring.h blue_types.h \
-  bigsim_timing.h bigsim_logs.h blue_defs.h bigsim_network.h bigsim_ooc.h \
-  bigsim_debug.h
+  bigsim_timing.h bigsim_logs.h blue_defs.h bigsim_network.h \
+  bigsim_record.h bigsim_ooc.h bigsim_debug.h
 	$(CHARMC) -c -I. blue.C
 
 bigsim_node.o: bigsim_node.C blue.h converse.h conv-config.h \
@@ -1987,11 +1987,11 @@ bigsim_proc.o: bigsim_proc.C blue.h converse.h conv-config.h \
   conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
   conv-trace.h persistent.h conv-onesided.h debug-conv.h blue-conv.h \
   blue_impl.h ckliststring.h blue_types.h bigsim_timing.h cklists.h pup.h \
-  converse.h bigsim_logs.h blue_defs.h bigsim_network.h ckcheckpoint.h \
-  CkCheckpoint.decl.h charm++.h charm.h middle.h middle-conv.h \
-  ckbitvector.h ckstream.h init.h ckhashtable.h debug-charm.h \
-  CkMarshall.decl.h cksection.h ckcallback.h conv-ccs.h sockRoutines.h \
-  ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
+  converse.h bigsim_logs.h blue_defs.h bigsim_network.h bigsim_record.h \
+  ckcheckpoint.h CkCheckpoint.decl.h charm++.h charm.h middle.h \
+  middle-conv.h ckbitvector.h ckstream.h init.h ckhashtable.h \
+  debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h conv-ccs.h \
+  sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
   cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h \
@@ -2019,6 +2019,14 @@ bigsim_timing.o: bigsim_timing.C blue.h converse.h conv-config.h \
   blue_impl.h ckliststring.h blue_types.h bigsim_timing.h cklists.h pup.h \
   converse.h bigsim_logs.h blue_defs.h bigsim_network.h
 	$(CHARMC) -c -I. bigsim_timing.C
+
+bigsim_record.o: bigsim_record.C blue.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h persistent.h conv-onesided.h debug-conv.h blue-conv.h \
+  bigsim_record.h blue_impl.h ckliststring.h blue_types.h bigsim_timing.h \
+  cklists.h pup.h converse.h bigsim_logs.h blue_defs.h bigsim_network.h
+	$(CHARMC) -c -I. bigsim_record.C
 
 bigsim_ooc.o: bigsim_ooc.C blue.h converse.h conv-config.h \
   conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
