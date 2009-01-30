@@ -1647,14 +1647,15 @@ fi
 
 if test "$COPY_CHARMRUN" = "true"
 then
-targ=charmrun$CMK_POST_EXE
-convhost=conv-host$CMK_POST_EXE
+  targ=charmrun$CMK_POST_EXE
+  [ ! -x $CHARMBIN/$targ -a -n "$CMK_POST_EXE" ] && targ=charmrun
+  convhost=conv-host$CMK_POST_EXE
 
-if [ -x $CHARMBIN/$targ ]
-then
+  if [ -x $CHARMBIN/$targ ]
+  then
 	DoNoErrCheck $RM $targ
 	Do $CP $CHARMBIN/$targ $targ
-fi
+  fi
 fi
 
 [ -z "$SAVE" ] && DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
