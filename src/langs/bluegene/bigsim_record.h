@@ -9,8 +9,8 @@ public:
          * This message is about to be processed by Charm.
          * If this function returns false, the message will not be processed.
          */
-        virtual CmiBool record(char *msg) {}
-        virtual int replay() {}
+        virtual CmiBool record(char *msg) { return CmiFalse; }
+        virtual int replay() { return 0; }
 };
 
 class BgMessageRecorder : public BgMessageWatcher {
@@ -35,7 +35,7 @@ printf("replay: %d %d\n", m[0], m[1]);
                 fwrite(msg, sizeof(char), d, f);
                 return CmiTrue;
         }
-        virtual int replay() {}
+        virtual int replay() { return 0; }
 };
 
 class BgMessageReplay : public BgMessageWatcher {
@@ -44,7 +44,7 @@ class BgMessageReplay : public BgMessageWatcher {
 public:
         BgMessageReplay(FILE * f_);
         ~BgMessageReplay() {fclose(f);}
-        CmiBool record(char *msg) {}
+        CmiBool record(char *msg) { return CmiFalse; }
         int replay(void) {
                 int nextPE;
                 int ret =  fread(&nextPE, sizeof(int), 1, f);
