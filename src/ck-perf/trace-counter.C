@@ -14,6 +14,7 @@
 // http://www.support.compaq.com/nttools
 
 #include "charm++.h"
+
 #ifdef CMK_ORIGIN2000
 #include "trace-counter.h"
 #include "ck.h"
@@ -1220,6 +1221,10 @@ void TraceCounter::printHelp()
   }
 }
 
+#else   /* not implemented */
+void _createTracecounter(char **argv)
+{
+}
 #endif // CMK_ORIGIN2000
 
 /*@}*/
