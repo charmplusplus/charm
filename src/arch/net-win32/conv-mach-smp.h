@@ -16,3 +16,5 @@
 #define CMK_THREADS_USE_JCONTEXT                           0
 #define CMK_THREADS_ARE_WIN32_FIBERS                       1
 
+
+#define CMK_PCQUEUE_LOCK                                   1

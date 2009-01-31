@@ -67,13 +67,11 @@
 
 #define CMK_64BIT    0
 
-
 #define CMK_WEB_MODE                                       0
 
 #define CMK_LBDB_ON					   1
 
-#define CMK_COMPILEMODE_ANSI				   1
-
+#define CMK_PCQUEUE_LOCK                                   1
 
 #endif
 
