@@ -545,11 +545,23 @@ then
   PROGRAM="$PROGRAM bigsim"
 fi
 
+printError()
+{
+	echo "-------------------------------------------------"
+	echo "Charm++ NOT BUILT. Either cd into $DESTINATION/tmp and try"
+	echo "to resolve the problems yourself, visit"
+	echo "    http://charm.cs.uiuc.edu/"
+	echo "for more information. Otherwise, email the developers at ppl@cs.uiuc.edu"
+	exit $MAKEEXIT
+}
+
 echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS"' in $VERSION/tmp"
 cd $DESTINATION/tmp 
 $MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED"
-$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS $BUILD_SHARED"
+MAKEEXIT=$?
+[ $MAKEEXIT -ne 0 ] && printError
 
+$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS $BUILD_SHARED"
 MAKEEXIT=$?
 if [ $MAKEEXIT -eq 0 ]
 then
@@ -558,10 +570,5 @@ then
 	echo "Next, try out a sample program like" \
 	     "tests/charm++/simplearrayhello"
 else
-	echo "-------------------------------------------------"
-	echo "Charm++ NOT BUILT. Either cd into $DESTINATION/tmp and try"
-	echo "to resolve the problems yourself, visit"
-	echo "    http://charm.cs.uiuc.edu/"
-	echo "for more information. Otherwise, email the developers at ppl@cs.uiuc.edu"
-	exit $MAKEEXIT
+        printError
 fi
