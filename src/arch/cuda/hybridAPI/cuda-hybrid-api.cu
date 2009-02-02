@@ -25,8 +25,10 @@
  */ 
 extern void CUDACallbackManager(void * fn); 
 
-/* initial size of host/device buffer arrays - dynamically expanded by
- *  the runtime system if needed
+/* initial size of the user-addressed portion of host/device buffer
+ * arrays; the system-addressed portion of host/device buffer arrays
+ * (used when there is no need to share buffers between work requests)
+ * will be equivalant in size.  
  */ 
 #define NUM_BUFFERS 100
 
@@ -53,6 +55,9 @@ void **hostBuffers = NULL;
 /* device buffers */
 void **devBuffers = NULL; 
 
+/* used to assign bufferIDs automatically by the system if the user 
+   specifies an invalid bufferID */
+unsigned int nextBuffer; 
 
 #ifdef GPU_PROFILE
 
@@ -106,6 +111,41 @@ void allocateBuffers(workRequest *wr) {
     for (int i=0; i<wr->nBuffers; i++) {
       int index = bufferInfo[i].bufferID; 
       int size = bufferInfo[i].size; 
+
+      // if index value is invalid, use an available ID  
+      if (index < 0 || index >= NUM_BUFFERS) {
+	int found = 0; 
+	for (int i=nextBuffer; i<NUM_BUFFERS*2; i++) {
+	  if (devBuffers[i] == NULL) {
+	    bufferInfo[i].bufferID = i; 
+	    index = i;
+	    found = 1; 
+	    break;
+	  }
+	}
+
+	/* if no index was found, try to search for a value at the
+	 * beginning of the system addressed space 
+	 */
+	
+	if (!found) {
+	  for (int i=NUM_BUFFERS; i<nextBuffer; i++) {
+	    if (devBuffers[i] == NULL) {
+	      bufferInfo[i].bufferID = i; 
+	      index = i;
+	      found = 1; 
+	      break;
+	    }
+	  }
+	}
+
+	/* if no index was found, print an error */
+	if (!found) {
+	  printf("Error: devBuffers is full \n");
+	}
+
+	nextBuffer = index+1; 
+      }      
       
       // allocate if the buffer for the corresponding index is NULL 
       if (devBuffers[index] == NULL) {
@@ -121,7 +161,7 @@ void allocateBuffers(workRequest *wr) {
 
 
 /* setupData
- *  sets up data on the GPU before kernel execution 
+ *  copy data to the GPU before kernel execution 
  */
 void setupData(workRequest *wr) {
   dataInfo *bufferInfo = wr->bufferInfo; 
@@ -133,6 +173,7 @@ void setupData(workRequest *wr) {
       hostBuffers[index] = bufferInfo[i].hostBuffer; 
       
       /* allocate if the buffer for the corresponding index is NULL */
+      /*      
       if (devBuffers[index] == NULL) {
 	CUDA_SAFE_CALL_NO_SYNC(cudaMalloc((void **) &devBuffers[index], size));
 #ifdef GPU_DEBUG
@@ -140,6 +181,7 @@ void setupData(workRequest *wr) {
 	       cutGetTimerValue(timerHandle)); 
 #endif
       }
+      */
       
       if (bufferInfo[i].transferToDevice) {
 	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpyAsync(devBuffers[index], 
@@ -224,12 +266,13 @@ void kernelSelect(workRequest *wr);
 void initHybridAPI() {
   initWRqueue(&wrQueue);
 
-  /* allocate host/device buffers array */
-  hostBuffers = (void **) malloc(NUM_BUFFERS * sizeof(void *)); 
-  devBuffers = (void **) malloc(NUM_BUFFERS * sizeof(void *)); 
+  /* allocate host/device buffers array (both user and
+     system-addressed) */
+  hostBuffers = (void **) malloc(NUM_BUFFERS * 2 * sizeof(void *)); 
+  devBuffers = (void **) malloc(NUM_BUFFERS * 2 * sizeof(void *)); 
 
   /* initialize device array to NULL */ 
-  for (int i=0; i<NUM_BUFFERS; i++) {
+  for (int i=0; i<NUM_BUFFERS*2; i++) {
     devBuffers[i] = NULL; 
   }
   
@@ -241,6 +284,8 @@ void initHybridAPI() {
   CUT_SAFE_CALL(cutCreateTimer(&timerHandle));
   CUT_SAFE_CALL(cutStartTimer(timerHandle));
 #endif
+
+  nextBuffer = NUM_BUFFERS;  
 }
 
 /* gpuProgressFn
@@ -262,12 +307,13 @@ void gpuProgressFn() {
     
     if (head->state == QUEUED) {
 #ifdef GPU_PROFILE
-	gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
-	gpuEvents[timeIndex].eventType = DATA_SETUP; 
-	gpuEvents[timeIndex].ID = head->id; 
-	dataSetupIndex = timeIndex; 
-	timeIndex++; 
+      gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
+      gpuEvents[timeIndex].eventType = DATA_SETUP; 
+      gpuEvents[timeIndex].ID = head->id; 
+      dataSetupIndex = timeIndex; 
+      timeIndex++; 
 #endif
+      allocateBuffers(head); 
       setupData(head); 
       head->state = TRANSFERRING_IN; 
     }  
@@ -330,6 +376,7 @@ void gpuProgressFn() {
 	  dataSetupIndex = timeIndex; 
 	  timeIndex++; 
 #endif
+	  allocateBuffers(second); 
 	  setupData(second); 
 	  second->state = TRANSFERRING_IN; 	
 	} 
