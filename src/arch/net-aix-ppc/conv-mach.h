@@ -71,6 +71,7 @@
 #define CMK_DEBUG_MODE                                     0
 #define CMK_WEB_MODE                                       0  
 
+#define CMK_ISATTY_DECL                                    1
 
 #endif
 
