@@ -20,6 +20,9 @@
    using namespace std;
 #endif
 
+#ifdef __cplusplus
+extern "C" int isatty (int );
+#endif
 
 #define SZ 1024
 
