@@ -20,8 +20,10 @@
    using namespace std;
 #endif
 
+#if CMK_ISATTY_DECL
 #ifdef __cplusplus
 extern "C" int isatty (int );
+#endif
 #endif
 
 #define SZ 1024
