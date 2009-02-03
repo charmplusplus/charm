@@ -26,8 +26,6 @@ template <class ENTRY, class MERGER,
          class MSA_PageT;
 #include "msa.decl.h"
 
-using namespace std;
-
 inline int mymin(int a, int b)
 {
     return (a<b)?a:b;
@@ -252,7 +250,7 @@ protected:
     unsigned int nPages;            // number of pages
     const page_ptr_t* pageTable; // actual data for pages (NULL means page is gone)
     MSA_Page_State** pageState;  // state of each page
-    list<unsigned int> stackOfPages;
+    std::list<unsigned int> stackOfPages;
     unsigned int lastPageAccessed;
 
 public:
@@ -266,7 +264,7 @@ public:
             lastPageAccessed = page;
 
             // delete this page from the stack and push it at the top
-            list<unsigned int>::iterator i;
+			std::list<unsigned int>::iterator i;
             for(i = stackOfPages.begin(); i != stackOfPages.end(); i++)
                 if(*i == page)
                     i = stackOfPages.erase(i);
@@ -281,7 +279,7 @@ public:
             return MSA_INVALID_PAGE_NO;
 
         // find a non-empty unlocked page to swap, delete all empty pages from the stack
-        list<unsigned int>::iterator i = stackOfPages.begin();
+		std::list<unsigned int>::iterator i = stackOfPages.begin();
         while(i != stackOfPages.end())
         {
             if(pageTable[*i] == NULL) i = stackOfPages.erase(i);
@@ -522,7 +520,7 @@ protected:
 			l->suspend();
     }
 
-    stack<ENTRY_TYPE*> pagePool;     // a pool of unused pages
+    std::stack<ENTRY_TYPE*> pagePool;     // a pool of unused pages
     
     typedef vmNRUReplacementPolicy vmPageReplacementPolicy;
     vmPageReplacementPolicy* replacementPolicy;
@@ -531,7 +529,7 @@ protected:
     typedef struct { unsigned int begin; unsigned int end; } writebounds_t;
 
     // a list of write bounds associated with a given page
-    typedef list<writebounds_t> writelist_t;
+    typedef std::list<writebounds_t> writelist_t;
 
     writelist_t** writes;           // the write lists for each page
 
