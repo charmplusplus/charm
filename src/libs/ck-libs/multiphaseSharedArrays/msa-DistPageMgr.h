@@ -26,11 +26,6 @@ template <class ENTRY, class MERGER,
          class MSA_PageT;
 #include "msa.decl.h"
 
-inline int mymin(int a, int b)
-{
-    return (a<b)?a:b;
-}
-
 //=======================================================
 // Utility Classes
 
@@ -1062,7 +1057,7 @@ public:
         syncAckCount++;
         // DONE @@ what if fewer worker threads than pe's ?
         // @@ what if fewer worker threads than pe's and >1 threads on 1 pe?
-        //if(syncAckCount == mymin(numberOfWorkerThreads, CkNumPes())){
+        //if(syncAckCount == min(numberOfWorkerThreads, CkNumPes())){
 		if (syncAckCount == enrolledPEs.size()) {
 			MSADEBPRINT(printf("SyncAck starting reduction on pageArray of size %d number of pages %d\n",nEntries,nPages););
 			pageArray.Sync();
