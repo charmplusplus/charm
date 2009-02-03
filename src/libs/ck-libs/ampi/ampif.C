@@ -6,6 +6,9 @@ FDECL {
 #define mpi_recv FTN_NAME( MPI_RECV , mpi_recv )
 #define mpi_get_count FTN_NAME( MPI_GET_COUNT , mpi_get_count )
 #define mpi_isend FTN_NAME( MPI_ISEND , mpi_isend )
+#define mpi_bsend FTN_NAME( MPI_BSEND , mpi_bsend )
+#define mpi_rsend FTN_NAME( MPI_RSEND , mpi_rsend )
+#define mpi_ssend FTN_NAME( MPI_SSEND , mpi_ssend )
 #define mpi_irecv FTN_NAME( MPI_IRECV , mpi_irecv )
 #define mpi_wait FTN_NAME( MPI_WAIT , mpi_wait )
 #define mpi_test FTN_NAME( MPI_TEST , mpi_test )
@@ -259,6 +262,24 @@ void mpi_recv(void *msg, int *count, int *type, int *src,
 {
   *ierr = AMPI_Recv(msg, *count, *type, *src, *tag, *comm,
                     (MPI_Status*) status);
+}
+
+void mpi_bsend(void *msg, int *count, int *type, int *dest,
+  int *tag, int *comm, int *ierr)
+{
+  *ierr = AMPI_Bsend(msg, *count, *type, *dest, *tag, *comm);
+}
+
+void mpi_rsend(void *msg, int *count, int *type, int *dest,
+  int *tag, int *comm, int *ierr)
+{
+  *ierr = AMPI_Rsend(msg, *count, *type, *dest, *tag, *comm);
+}
+
+void mpi_ssend(void *msg, int *count, int *type, int *dest,
+  int *tag, int *comm, int *ierr)
+{
+  *ierr = AMPI_Ssend(msg, *count, *type, *dest, *tag, *comm);
 }
 
 void mpi_probe(int *src, int *tag, int *comm, int *status, int *ierr)

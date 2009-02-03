@@ -264,9 +264,12 @@ int AMPI_Recv(void *msg, int count, int type, int src, int tag,
              MPI_Comm comm, MPI_Status *status);
 #define MPI_Get_count AMPI_Get_count
 int AMPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count);
-#define MPI_Bsend AMPI_Send
-#define MPI_Rsend AMPI_Send   /* FIXME: MPI_Rsend can be posted only after recv */
-#define MPI_Ssend AMPI_Send   /* FIXME: MPI_Ssend blocks until recv has been posted */
+#define AMPI_Bsend AMPI_Send
+#define AMPI_Rsend AMPI_Send
+#define AMPI_Ssend AMPI_Send
+#define MPI_Bsend AMPI_Bsend
+#define MPI_Rsend AMPI_Rsend   /* FIXME: MPI_Rsend can be posted only after recv */
+#define MPI_Ssend AMPI_Ssend   /* FIXME: MPI_Ssend blocks until recv has been posted */
 #define MPI_Buffer_attach(buf,len) /*LIE: emtpy*/ /*Silly: default send is buffering in Charm++*/
 #define MPI_Buffer_detach(buf,len) /*LIE: emtpy*/
 #define MPI_Isend AMPI_Isend
