@@ -6,10 +6,10 @@ pgm: pgm.o
 	$(CHARMC) pgm.o  -o pgm -language charm++
 
 test: pgm
-	./charmrun +p4 pgm 100000 100 $(TESTOPTS)
+	./charmrun +p4 ./pgm 100000 100 $(TESTOPTS)
 
 bgtest: pgm
-	./charmrun +p4 pgm 100000 100 +x2 +y2 +z1
+	./charmrun +p4 ./pgm 100000 100 +x2 +y2 +z1
 
 pgm.o : pgm.C pgm.h pgm.decl.h
 	$(CHARMC) -c pgm.C

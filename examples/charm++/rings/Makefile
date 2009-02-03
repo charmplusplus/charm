@@ -9,10 +9,10 @@ rings.o : rings.C rings.h rings.ci
 	$(CHARMC) -c rings.ci rings.C
 
 test: pgm
-	./charmrun +p4 pgm $(TESTOPTS)
+	./charmrun +p4 ./pgm $(TESTOPTS)
 
 bgtest: pgm
-	./charmrun +p4 pgm +x2 +y2 +z2
+	./charmrun +p4 ./pgm +x2 +y2 +z2
 
 clean:
 	rm -f conv-host pgm *.o *.decl.h *.def.h *~ charmrun
