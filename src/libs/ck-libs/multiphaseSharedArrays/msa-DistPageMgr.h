@@ -120,20 +120,23 @@ public:
 	enum { len=(NUM_BITS+(store_bits-1))/store_bits };
 	store_t store[len];
 	
+	fixedlength_bitvector() {reset();}
+
 	/// Fill the entire vector with this value.
 	void fill(store_t s) {
 		for (int i=0;i<len;i++) store[i]=s;
 	}
-	void clear(void) {fill(0);}
-	fixedlength_bitvector() {clear();}
+
+	void reset(void) {fill(0);}
 	
 	/// Set-to-1 bit i of the vector.
 	void set(unsigned int i) { store[i/store_bits] |= (1lu<<(i%store_bits)); }
+
 	/// Clear-to-0 bit i of the vector.
-	void clear(unsigned int i) { store[i/store_bits] &= ~(1lu<<(i%store_bits)); }
+	void reset(unsigned int i) { store[i/store_bits] &= ~(1lu<<(i%store_bits)); }
 	
 	/// Return the i'th bit of the vector.
-	bool get(unsigned int i) { return (store[i/store_bits] & (1lu<<(i%store_bits))); }
+	bool test(unsigned int i) { return (store[i/store_bits] & (1lu<<(i%store_bits))); }
 };
 
 /// Templated page housekeeping class.  
@@ -194,13 +197,13 @@ public:
 					cur=roundUp(cur+1,writes2_bits);
 				else if (writes.store[cur/writes_bits]==(writes_store_t)0)
 					cur=roundUp(cur+1,writes_bits); 
-				else if (writes.get(cur)==false)
+				else if (writes.test(cur)==false)
 					cur++;
-				else /* writes.get(cur)==true */
+				else /* writes.test(cur)==true */
 					break;
 				if (cur>=ENTRIES_PER_PAGE) return nSpans;
 			}
-			/* now writes.get(cur)==true */
+			/* now writes.test(cur)==true */
 			span[nSpans].start=cur;
 			/* skip over written space */
 			while (true) { 
@@ -210,16 +213,16 @@ public:
 				else */
 				if (writes.store[cur/writes_bits]==~(writes_store_t)0)
 					cur=roundUp(cur+1,writes_bits); 
-				else if (writes.get(cur)==true)
+				else if (writes.test(cur)==true)
 					cur++;
-				else /* writes.get(cur)==false */
+				else /* writes.test(cur)==false */
 					break;
 				if (cur>=ENTRIES_PER_PAGE) {
 					span[nSpans++].end=ENTRIES_PER_PAGE; /* finish the last span */
 					return nSpans;
 				}
 			}
-			/* now writes.get(cur)==false */
+			/* now writes.test(cur)==false */
 			span[nSpans++].end=cur;
 		}
 	}
