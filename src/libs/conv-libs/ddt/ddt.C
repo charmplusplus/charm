@@ -322,6 +322,7 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
 #if CMK_LONG_LONG_DEFINED
     case CkDDT_LONG_LONG_INT:
       size = sizeof(CmiInt8);
+      break;
 #endif
     default:
       size = 0;
