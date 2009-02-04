@@ -844,56 +844,58 @@ int CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], int a[], int d[
 CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
                        int* arrDisp, int *bindex, CkDDT_DataType** arrBase)
 {
-  int basesize ;
-  int baseextent ;
+  int basesize;
+  int baseextent;
   int idxLB=-1, idxUB=-1;
   int lblb, ubub; // lb and ub collected from LB and UB types
 
   datatype = CkDDT_STRUCT;
-  count = nCount ;
+  baseSize = 0;
+  count = nCount;
 
-  arrayBlockLength = new int[count] ;
-  arrayDisplacements = new int[count] ;
+  arrayBlockLength = new int[count];
+  arrayDisplacements = new int[count];
   arrayDataType = new CkDDT_DataType*[count];
   index = new int[count];
   //check this...
 
-  int i;
-  for(i=0 ; i < count ; i++) {
-    arrayBlockLength[i] = arrBlock[i] ;
-    arrayDisplacements[i] = arrDisp[i] ;
-    arrayDataType[i] =  arrBase[i];
-    index[i] = bindex[i];
-    basesize = arrayDataType[i]->getSize();
-    baseextent = arrayDataType[i]->getExtent();
+  size = 0;
+  for (int i=0; i<count; i++) {
+      arrayBlockLength[i] = arrBlock[i];
+      arrayDisplacements[i] = arrDisp[i];
+      arrayDataType[i] =  arrBase[i];
+      index[i] = bindex[i];
+      basesize = arrayDataType[i]->getSize();
+      baseextent = arrayDataType[i]->getExtent();
 
-    size = size + ( arrBlock[i] * basesize) ;
-    //extent += ((arrBlock[i]*baseextent) + (arrayDisplacements[i]*baseextent));
+      size += arrBlock[i] * basesize;
+      //extent += ((arrBlock[i]*baseextent) + (arrayDisplacements[i]*baseextent));
   }
+  DDTDEBUG("struct size = %d\n", size);
 
-  lblb = lb = 1>>31;//arrDisp[0] + arrBase[0]->getLB();
-  ubub = ub = (-1)*lb;//arrDisp[0] + arrBase[0]->getUB();
-  for(i=0 ; i < count ; i++) {
-    if(arrayDataType[i]->getType() == CkDDT_LB){
-      if(lblb > arrDisp[i])
-        lblb = arrDisp[i];
-    }else{
-      if(lb > arrDisp[i] + arrBase[i]->getLB())
-        lb = arrDisp[i] + arrBase[i]->getLB();
-    }
-    if(arrayDataType[i]->getType() == CkDDT_UB){
-      if(ubub < arrDisp[i])
-        ubub = arrDisp[i];
-    }else{
-      if(ub < arrDisp[i] + arrBase[i]->getUB())
-        ub = arrDisp[i] + arrBase[i]->getUB();
-    }
+  lblb = lb = 1>>31; //arrDisp[0] + arrBase[0]->getLB();
+  ubub = ub = -1*lb; //arrDisp[0] + arrBase[0]->getUB();
+  for (int i=0; i<count; i++) {
+      if(arrayDataType[i]->getType() == CkDDT_LB) {
+          if (lblb > arrDisp[i])
+              lblb = arrDisp[i];
+      } else {
+          if(lb > arrDisp[i] + arrBase[i]->getLB())
+              lb = arrDisp[i] + arrBase[i]->getLB();
+      }
+      if (arrayDataType[i]->getType() == CkDDT_UB) {
+          if (ubub < arrDisp[i])
+              ubub = arrDisp[i];
+      } else {
+          if(ub < arrDisp[i] + arrBase[i]->getUB())
+              ub = arrDisp[i] + arrBase[i]->getUB();
+      }
   }
   DDTDEBUG("ub=%d, ubub=%d, lb=%d, lblb=%d\n",ub,ubub,lb,lblb);
-  if(ub > ubub) ub = ubub;
-  if(lb < lblb) lb = lblb;
+  if (ub > ubub) ub = ubub;
+  if (lb < lblb) lb = lblb;
   extent = ub - lb;
-  iscontig = 0;  
+  iscontig = 0;
 }
 
 int
