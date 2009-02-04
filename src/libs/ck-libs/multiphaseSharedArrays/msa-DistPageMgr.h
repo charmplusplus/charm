@@ -108,6 +108,7 @@ public:
 };
 
 /// Fast, fixed-size bitvector class.
+// TODO: Replace with std::bitset
 template <unsigned int NUM_BITS>
 class fixedlength_bitvector {
 public:
@@ -138,7 +139,6 @@ public:
 /// Templated page housekeeping class.  
 template <class ENTRY, unsigned int ENTRIES_PER_PAGE>
 class MSA_Page_StateT : public MSA_Page_State {
-public:
 	/** Write tracking:
 	   Somehow, we have to identify the entries in a page 
 	 that have been written to.  Our method for doing this is
@@ -157,7 +157,8 @@ public:
 	writes2_t writes2;
 	typedef typename writes2_t::store_t writes2_store_t;
 	enum {writes2_bits=writes2_t::store_bits*writes_t::store_bits};
-	
+
+public:
 	/// Write entry i of this page.
 	void write(unsigned int i) {
 		writes.set(i);
@@ -167,12 +168,12 @@ public:
 	/// Clear the write list for this page.
 	void writeClear(void) {
 		for (int i2=0;i2<writes2_t::len;i2++)
-		if (writes2.store[i2]) { /* some bits set: clear them all */
+		  if (writes2.store[i2]) { /* some bits set: clear them all */
 			int o=i2*writes2_t::store_bits;
 			for (int i=0;i<writes_t::len;i++) 
-				writes.store[o+i]=0;
+			  writes.store[o+i]=0;
 			writes2.store[i2]=0;
-		}
+		  }
 	}
 	
 	/// Return the nearest multiple of m >= v.
