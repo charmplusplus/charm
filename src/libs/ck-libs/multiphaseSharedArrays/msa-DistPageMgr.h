@@ -244,17 +244,19 @@ public:
      where n is the number of pages.  A heap would be a better choice,
      as both operations would then become O(lg(n))
  */
+template <class ENTRY_TYPE, unsigned int ENTRIES_PER_PAGE>
 class vmLRUReplacementPolicy
 {
 protected:
     unsigned int nPages;            // number of pages
-  const std::vector<page_ptr_t> &pageTable; // actual data for pages (NULL means page is gone)
-  const std::vector<MSA_Page_State*> &pageState;  // state of each page
+  const std::vector<ENTRY_TYPE *> &pageTable; // actual data for pages (NULL means page is gone)
+  typedef MSA_Page_StateT<ENTRY_TYPE, ENTRIES_PER_PAGE> pageState_t;
+  const std::vector<pageState_t *> &pageState;  // state of each page
     std::list<unsigned int> stackOfPages;
     unsigned int lastPageAccessed;
 
 public:
-  inline vmLRUReplacementPolicy(unsigned int nPages_, const std::vector<page_ptr_t> &pageTable_, const std::vector<MSA_Page_State *> &pageState_)
+  inline vmLRUReplacementPolicy(unsigned int nPages_, const std::vector<ENTRY_TYPE *> &pageTable_, const std::vector<pageState_t *> &pageState_)
     : nPages(nPages_), pageTable(pageTable_), pageState(pageState_), lastPageAccessed(MSA_INVALID_PAGE_NO) {}
 
     inline void pageAccessed(unsigned int page)
@@ -307,12 +309,14 @@ public:
   selectPage best-case is O(K) (if we immediately find a doomed page); 
              worst-case is O(K n) (if there are no doomed pages).
  */
+template <class ENTRY_TYPE, unsigned int ENTRIES_PER_PAGE>
 class vmNRUReplacementPolicy
 {
 protected:
     unsigned int nPages;            // number of pages
-  const std::vector<page_ptr_t> &pageTable; // actual pages (NULL means page is gone)
-  const std::vector<MSA_Page_State*> &pageState;  // state of each page
+  const std::vector<ENTRY_TYPE *> &pageTable; // actual pages (NULL means page is gone)
+  typedef MSA_Page_StateT<ENTRY_TYPE, ENTRIES_PER_PAGE> pageState_t;
+  const std::vector<pageState_t *> &pageState;  // state of each page
     enum {K=5}; // Number of distinct pages to remember
     unsigned int last[K]; // pages that have been used recently
     unsigned int Klast; // index into last array.
@@ -325,7 +329,7 @@ protected:
     }
 
 public:
-  inline vmNRUReplacementPolicy(unsigned int nPages_, const std::vector<page_ptr_t> &pageTable_, const std::vector<MSA_Page_State *> &pageState_)
+  inline vmNRUReplacementPolicy(unsigned int nPages_, const std::vector<ENTRY_TYPE *> &pageTable_, const std::vector<pageState_t *> &pageState_)
     : nPages(nPages_), pageTable(pageTable_), pageState(pageState_), Klast(0), victim(0)
     {
         for (int k=0;k<K;k++) last[k]=MSA_INVALID_PAGE_NO;
@@ -520,7 +524,7 @@ protected:
 
     std::stack<ENTRY_TYPE*> pagePool;     // a pool of unused pages
     
-    typedef vmNRUReplacementPolicy vmPageReplacementPolicy;
+  typedef vmNRUReplacementPolicy<ENTRY_TYPE, ENTRIES_PER_PAGE> vmPageReplacementPolicy;
     vmPageReplacementPolicy* replacementPolicy;
 
     // structure for the bounds of a single write
