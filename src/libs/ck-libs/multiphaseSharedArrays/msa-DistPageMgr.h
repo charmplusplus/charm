@@ -759,32 +759,24 @@ public:
     // 
     //
     // MSA_CacheGroup::
-    inline MSA_CacheGroup(unsigned int nPages_, CkArrayID pageArrayID,
-                      unsigned int max_bytes_, unsigned int nEntries_, unsigned int numberOfWorkerThreads_)
-	  : nPages(nPages_), nEntries(nEntries_), numberOfWorkerThreads(numberOfWorkerThreads_), pageTable(nPages, NULL), pageStateStorage(nPages, NULL)
-    {
-        numberLocalWorkerThreads = 0;  // populated after enroll
-        enrollDoneq = 0;  // populated after enroll
-
-        pageArray = pageArrayID;
-        thisProxy=thisgroup;
-        resident_pages = 0;
-        max_resident_pages = max_bytes_/(sizeof(ENTRY_TYPE)*ENTRIES_PER_PAGE);
-	
-        outOfBufferInPrefetch = 0;
-        entryOpsObject = new ENTRY_OPS_CLASS();
-
-        // initialize the page table
-        typedef ENTRY_TYPE* entry_type_ptr;
-
-        // this is the number of sync ack's received till yet
-        syncAckCount = 0;
-        syncThreadCount = 0;
-
-        replacementPolicy = new vmPageReplacementPolicy(nPages, pageTable, pageStateStorage);
-
-		MSADEBPRINT(printf("MSA_CacheGroup nEntries %d \n",nEntries););
-    }
+  inline MSA_CacheGroup(unsigned int nPages_, CkArrayID pageArrayID,
+						unsigned int max_bytes_, unsigned int nEntries_, 
+						unsigned int numberOfWorkerThreads_)
+	: numberOfWorkerThreads(numberOfWorkerThreads_),
+	  nPages(nPages_),
+	  nEntries(nEntries_), 
+	  pageTable(nPages, NULL),
+	  pageStateStorage(nPages, NULL),
+	  pageArray(pageArrayID),
+	  thisProxy(thisgroup),
+	  max_resident_pages(max_bytes_/(sizeof(ENTRY_TYPE)*ENTRIES_PER_PAGE)),
+	  entryOpsObject(new ENTRY_OPS_CLASS),
+	  replacementPolicy(new vmPageReplacementPolicy(nPages, pageTable, pageStateStorage)),
+	  outOfBufferInPrefetch(0), syncAckCount(0),syncThreadCount(0),
+	  resident_pages(0),numberLocalWorkerThreads(0), enrollDoneq(0)
+  {
+	MSADEBPRINT(printf("MSA_CacheGroup nEntries %d \n",nEntries););
+  }
 
     // MSA_CacheGroup::
     inline ~MSA_CacheGroup()
