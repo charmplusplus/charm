@@ -3,7 +3,11 @@
 #include "main.decl.h"
 #include "main.h"
 #include "jacobi.decl.h"
-#include "jacobi_shared.h"
+#include "jacobi_config.h"
+
+
+/* readonly */ CProxy_Main mainProxy;
+/* readonly */ CProxy_Jacobi jacobiProxy;
 
 
 Main::Main(CkArgMsg *msg) {
@@ -24,7 +28,9 @@ Main::Main(CkArgMsg *msg) {
   CkPrintf("  CHARE_MAPPING_TO_PES__STRIPE = %d\n", CHARE_MAPPING_TO_PES__STRIPE);
   CkPrintf("  WORK_MULTIPLIER = %d\n", WORK_MULTIPLIER);
   CkPrintf("  FORCE_NO_SPE_OPT = %d\n", FORCE_NO_SPE_OPT);
-  OffloadAPIDisplayConfig(stdout);
+  #if CMK_CELL != 0
+    OffloadAPIDisplayConfig(stdout);
+  #endif
 
   // Init the member variables
   iterationCount = 0;

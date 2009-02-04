@@ -2,7 +2,11 @@
 #define __JACOBI_H__
 
 #include "jacobi.decl.h"
-#include "jacobi_shared.h"
+#include "jacobi_config.h"
+
+
+// DMK - DEBUG
+#include "main.h"  // Include temp for malloc_aligned and malloc_free calls
 
 
 #define SWAP(a, b, t) { register t __tmp__ = a; a = b; b = __tmp__; }
@@ -28,9 +32,10 @@ class Jacobi : public CBase_Jacobi {
 
   ////////////////////////////////////////////////////////////////////////////////////////////////
   //  Member Variables
+  public:
+    float* matrix;     // Pointer to the first buffer (the read buffer per iteration)
+    float* matrixTmp;  // Pointer to the second buffer (the write buffer per iteration)
   private:
-    volatile float* matrix;     // Pointer to the first buffer (the read buffer per iteration)
-    volatile float* matrixTmp;  // Pointer to the second buffer (the write buffer per iteration)
     int ghostCount;
     int ghostCountNeeded;
     int iterCount;

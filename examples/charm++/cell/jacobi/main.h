@@ -3,11 +3,18 @@
 
 #include "main.decl.h"
 #include "jacobi.decl.h"
-#include "jacobi_shared.h"
+#include "jacobi_config.h"
 
 
-/* readonly */ CProxy_Main mainProxy;
-/* readonly */ CProxy_Jacobi jacobiProxy;
+/* readonly */ extern CProxy_Main mainProxy;
+/* readonly */ extern CProxy_Jacobi jacobiProxy;
+
+
+// DMK - DEBUG
+#if (!(defined(CMK_CELL))) || (CMK_CELL == 0)
+  void* malloc_aligned(int size, int align) { return malloc(size); }
+  void free_aligned(void* p) { free(p); }
+#endif
 
 
 class Main : public CBase_Main {

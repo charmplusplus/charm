@@ -2,7 +2,7 @@
 
 #include "jacobi.decl.h"
 #include "jacobi.h"
-#include "jacobi_shared.h"
+#include "jacobi_config.h"
 
 #include "main.decl.h"
 
@@ -25,8 +25,8 @@ Jacobi::Jacobi() {
 
   // Allocate memory for the buffers
   // NOTE: Each buffer will have enough room for all the data (local data + ghost data from bordering chares)
-  matrix = (volatile float*)malloc_aligned(sizeof(float) * DATA_BUFFER_SIZE, 128);
-  matrixTmp = (volatile float*)malloc_aligned(sizeof(float) * DATA_BUFFER_SIZE, 128);
+  matrix = (float*)malloc_aligned(sizeof(float) * DATA_BUFFER_SIZE, 128);
+  matrixTmp = (float*)malloc_aligned(sizeof(float) * DATA_BUFFER_SIZE, 128);
 
   // Initialize the data
   memset((float*)matrix, 0, sizeof(float) * DATA_BUFFER_SIZE);
@@ -271,62 +271,16 @@ void Jacobi::attemptCalculation() {
     // NOTE: No two iterations can overlap because of the reduction
     ghostCount = 0;
 
-    #if USE_CALLBACK == 0
+    //#if USE_CALLBACK == 0
       // Send a message so the threaded doCalculation() entry method will be called
       thisProxy[thisIndex].doCalculation();  // NOTE: Message needed because doCalculation is [threaded].
                                              //   DO NOT call doCalculation directly!
-    #else
+    //#else
       // NOTE : Since the Offload API callback mechanism is being used, no message is needed
       //   here (i.e. - just call doCalculation() directly).
-      doCalculation();
-    #endif
+    // doCalculation();
+    //#endif
   }
-}
-
-
-#if USE_CALLBACK != 0
-  void doCalculation_callback(void* obj) {
-    //((Jacobi*)obj)->doCalculation_post();
-    jacobiProxy[(int)obj].doCalculation_post();
-  }
-#endif
-
-
-void Jacobi::doCalculation() {
-
-  // Send the work request to the Offload API
-  #if USE_CALLBACK == 0
-
-    WRHandle wrHandle = sendWorkRequest(FUNC_DoCalculation + (iterCount % 2),
-                                        NULL, 0,                                              // readWrite data
-                                        (float*)matrix, sizeof(float) * DATA_BUFFER_SIZE,     // readOnly data
-                                        (float*)matrixTmp, sizeof(float) * DATA_BUFFER_SIZE,  // writeOnly data
-                                        CthSelf()
-                                       );
-
-    disableTrace();
-
-    if (wrHandle == INVALID_WRHandle)
-      CkPrintf("Jacobi[%d]::doCalculation() - ERROR - sendWorkRequest() returned INVALID_WRHandle\n", thisIndex);
-    else
-      CthSuspend();
-
-    doCalculation_post();
-
-  #else
-
-    WRHandle wrHandle = sendWorkRequest(FUNC_DoCalculation + (iterCount % 2),
-                                        NULL, 0,                                      // readWrite data
-                                        (float*)matrix, sizeof(float) * DATA_BUFFER_SIZE,     // readOnly data
-                                        (float*)matrixTmp, sizeof(float) * DATA_BUFFER_SIZE,  // writeOnly data
-                                        (void*)thisIndex,
-                                        WORK_REQUEST_FLAGS_NONE,
-                                        doCalculation_callback
-                                       );
-    if (wrHandle == INVALID_WRHandle)
-      CkPrintf("Jacobi[%d]::doCalculation() - ERROR - sendWorkRequest() returned INVALID_WRHandle\n", thisIndex);
-
-  #endif
 }
 
 void Jacobi::doCalculation_post() {
@@ -364,7 +318,7 @@ void Jacobi::doCalculation_post() {
   #endif
 
   // Swap the matrix and matrixTmp pointers
-  volatile float *tmp = matrix;
+  float *tmp = matrix;
   matrix = matrixTmp;
   matrixTmp = tmp;
 
