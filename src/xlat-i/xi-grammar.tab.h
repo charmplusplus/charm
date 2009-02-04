@@ -103,7 +103,12 @@
      CHAR = 319,
      FLOAT = 320,
      DOUBLE = 321,
-     UNSIGNED = 322
+     UNSIGNED = 322,
+     ACCEL = 323,
+     INOUT = 324,
+     IN = 325,
+     OUT = 326,
+     ACCELBLOCK = 327
    };
 #endif
 /* Tokens.  */
@@ -172,13 +177,18 @@
 #define FLOAT 320
 #define DOUBLE 321
 #define UNSIGNED 322
+#define ACCEL 323
+#define INOUT 324
+#define IN 325
+#define OUT 326
+#define ACCELBLOCK 327
 
 
 
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
-#line 17 "xi-grammar.y"
+#line 18 "xi-grammar.y"
 {
   ModuleList *modlist;
   Module *module;
@@ -213,9 +223,11 @@ typedef union YYSTYPE
   int intval;
   Chare::attrib_t cattr;
   SdagConstruct *sc;
+  XStr* xstrptr;
+  AccelBlock* accelBlock;
 }
 /* Line 1489 of yacc.c.  */
-#line 219 "y.tab.h"
+#line 231 "y.tab.h"
 	YYSTYPE;
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1

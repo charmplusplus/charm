@@ -1,3 +1,4 @@
+
 %expect 6
 %{
 #include "xi-symbol.h"
@@ -48,6 +49,8 @@ void splitScopedName(char* name, char** scope, char** basename);
   int intval;
   Chare::attrib_t cattr;
   SdagConstruct *sc;
+  XStr* xstrptr;
+  AccelBlock* accelBlock;
 }
 
 %token MODULE
@@ -89,6 +92,11 @@ void splitScopedName(char* name, char** scope, char** basename);
 %token USING 
 %token <strval> IDENT NUMBER LITERAL CPROGRAM HASHIF HASHIFDEF
 %token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED
+%token ACCEL
+%token INOUT
+%token IN
+%token OUT
+%token ACCELBLOCK
 
 %type <modlist>		ModuleEList File
 %type <module>		Module
@@ -115,8 +123,11 @@ void splitScopedName(char* name, char** scope, char** basename);
 %type <entry>		Entry SEntry
 %type <entrylist>	SEntryList
 %type <templat>		Template
-%type <pname>           Parameter ParamBracketStart
-%type <plist>           ParamList EParameters
+%type <pname>           Parameter ParamBracketStart AccelParameter AccelArrayParam
+%type <plist>           ParamList EParameters AccelParamList AccelEParameters
+%type <intval>          AccelBufferType
+%type <xstrptr>         AccelInstName
+%type <accelBlock>      AccelBlock
 %type <typelist>	BaseList OptBaseList
 %type <mbrlist>		MemberEList MemberList
 %type <member>		Member NonEntryMember InitNode InitProc
@@ -223,6 +234,8 @@ Construct	: OptExtern '{' ConstructList '}' OptSemiColon
 		{ $$ = NULL; }
 		| HashIFDefComment
 		{ $$ = NULL; }
+                | AccelBlock
+                { $$ = $1; }
 		;
 
 TParam		: Type
@@ -622,6 +635,12 @@ InitProc	: INITPROC OptVoid QualName
 		{ $$ = new InitCall(lineno, $3, 0); }
 		| INITPROC OptVoid QualName '(' OptVoid ')'
 		{ $$ = new InitCall(lineno, $3, 0); }
+                | INITPROC '[' ACCEL ']' OptVoid QualName '(' OptVoid ')'
+                {
+                  InitCall* rtn = new InitCall(lineno, $6, 0);
+                  rtn->setAccel();
+                  $$ = rtn;
+		}
 		;
 
 PUPableClass    : QualNamedType
@@ -661,7 +680,29 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
                   }
 		  $$ = new Entry(lineno, $2,     0, $3, $4,  0, $5, 0, 0); 
 		}
+		| ENTRY '[' ACCEL ']' VOID Name EParameters AccelEParameters ParamBraceStart CCode ParamBraceEnd Name /* DMK : Accelerated Entry Method */
+                {
+                  int attribs = SACCEL;
+                  char* name = $6;
+                  ParamList* paramList = $7;
+                  ParamList* accelParamList = $8;
+		  XStr* codeBody = new XStr($10);
+                  char* callbackName = $12;
+
+                  $$ = new Entry(lineno, attribs, new BuiltinType("void"), name, paramList,
+                                 0, 0, 0, 0, 0
+                                );
+                  $$->setAccelParam(accelParamList);
+                  $$->setAccelCodeBody(codeBody);
+                  $$->setAccelCallbackName(new XStr(callbackName));
+                }
 		;
+
+AccelBlock      : ACCELBLOCK ParamBraceStart CCode ParamBraceEnd ';'
+                { $$ = new AccelBlock(lineno, new XStr($3)); }
+                | ACCELBLOCK ';'
+                { $$ = new AccelBlock(lineno, NULL); }
+                ;
 
 EReturn		: VOID
 		{ $$ = new BuiltinType("void"); }
@@ -794,9 +835,51 @@ Parameter	: Type
 		} 
 		;
 
+AccelBufferType : INOUT { $$ = Parameter::ACCEL_BUFFER_TYPE_INOUT; }
+                | IN    { $$ = Parameter::ACCEL_BUFFER_TYPE_IN;    }
+                | OUT   { $$ = Parameter::ACCEL_BUFFER_TYPE_OUT;   }
+                ;
+
+AccelInstName   : Name               { $$ = new XStr($1);                         }
+                | Name '-' '>' Name  { $$ = new XStr(""); *($$) << $1 << "->" << $4; }
+                ;
+
+AccelArrayParam : ParamBracketStart CCode ']'
+                {
+                  in_bracket = 0;
+                  $$ = new Parameter(lineno, $1->getType(), $1->getName(), $2);
+                }
+                ;
+
+AccelParameter	: AccelBufferType ':' Type Name '<' AccelInstName '>'
+                {
+                  $$ = new Parameter(lineno, $3, $4);
+                  $$->setAccelInstName($6);
+                  $$->setAccelBufferType($1);
+                }
+                | Type Name '<' AccelInstName '>'
+                {
+		  $$ = new Parameter(lineno, $1, $2);
+                  $$->setAccelInstName($4);
+                  $$->setAccelBufferType(Parameter::ACCEL_BUFFER_TYPE_INOUT);
+		}
+                | AccelBufferType ':' AccelArrayParam '<' AccelInstName '>'
+                {
+                  $$ = $3;
+                  $$->setAccelInstName($5);
+                  $$->setAccelBufferType($1);
+		}
+		;
+
 ParamList	: Parameter
 		{ $$ = new ParamList($1); }
 		| Parameter ',' ParamList
+		{ $$ = new ParamList($1,$3); }
+		;
+
+AccelParamList	: AccelParameter
+		{ $$ = new ParamList($1); }
+		| AccelParameter ',' AccelParamList
 		{ $$ = new ParamList($1,$3); }
 		;
 
@@ -805,6 +888,12 @@ EParameters	: '(' ParamList ')'
 		| '(' ')'
 		{ $$ = 0; }
 		;
+
+AccelEParameters  : '[' AccelParamList ']'
+                  { $$ = $2; }
+		  | '[' ']'
+		  { $$ = 0; }
+		  ;
 
 OptStackSize	: /* Empty */
 		{ $$ = 0; }

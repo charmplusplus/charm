@@ -94,6 +94,14 @@ class Construct : public Printable {
     virtual void genDefs(XStr& str) = 0;
     virtual void genReg(XStr& str) = 0;
     virtual void preprocess() { }
+
+    // DMK - Accel Support
+    virtual int genAccels_spe_c_funcBodies(XStr& str) = 0;
+    virtual void genAccels_spe_c_regFuncs(XStr& str) = 0;
+    virtual void genAccels_spe_c_callInits(XStr& str) = 0;
+    virtual void genAccels_spe_h_includes(XStr& str) = 0;
+    virtual void genAccels_spe_h_fiCountDefs(XStr& str) = 0;
+    virtual void genAccels_ppe_c_regFuncs(XStr& str) = 0;
 };
 
 class ConstructList : public Construct {
@@ -110,6 +118,34 @@ class ConstructList : public Construct {
     void genDefs(XStr& str);
     void genReg(XStr& str);
     void preprocess();
+
+    // DMK - Accel Support
+    int genAccels_spe_c_funcBodies(XStr& str) {
+      int rtn = 0;
+      if (construct) { rtn += construct->genAccels_spe_c_funcBodies(str); }
+      if (next) { rtn += next->genAccels_spe_c_funcBodies(str); }
+      return rtn;
+    }
+    void genAccels_spe_c_regFuncs(XStr& str) {
+      if (construct) { construct->genAccels_spe_c_regFuncs(str); }
+      if (next) { next->genAccels_spe_c_regFuncs(str); }
+    }
+    void genAccels_spe_c_callInits(XStr& str) {
+      if (construct) { construct->genAccels_spe_c_callInits(str); }
+      if (next) { next->genAccels_spe_c_callInits(str); }
+    }
+    void genAccels_spe_h_includes(XStr& str) {
+      if (construct) { construct->genAccels_spe_h_includes(str); }
+      if (next) { next->genAccels_spe_h_includes(str); }
+    }
+    void genAccels_spe_h_fiCountDefs(XStr& str) {
+      if (construct) { construct->genAccels_spe_h_fiCountDefs(str); }
+      if (next) { next->genAccels_spe_h_fiCountDefs(str); }
+    }
+    void genAccels_ppe_c_regFuncs(XStr& str) {
+      if (construct) { construct->genAccels_ppe_c_regFuncs(str); }
+      if (next) { next->genAccels_ppe_c_regFuncs(str); }
+    }
 };
 
 /*********************** Type System **********************/
@@ -252,6 +288,11 @@ class Parameter {
     int line;
     int byReference; //Fake a pass-by-reference (for efficiency)
     int conditional; //If the parameter is conditionally packed
+
+    // DMK - Added field for accelerator options
+    int accelBufferType;
+    XStr* accelInstName;
+
     friend class ParamList;
     void pup(XStr &str);
     void copyPtr(XStr &str);
@@ -285,6 +326,24 @@ class Parameter {
     int operator==(const Parameter &parm) const {
       return *type == *parm.type;
     }
+
+    // DMK - Added for accelerator options
+    public:
+    enum {
+      ACCEL_BUFFER_TYPE_UNKNOWN = 0,
+      ACCEL_BUFFER_TYPE_MIN     = 1,
+      ACCEL_BUFFER_TYPE_INOUT   = 1,
+      ACCEL_BUFFER_TYPE_IN      = 2,
+      ACCEL_BUFFER_TYPE_OUT     = 3,
+      ACCEL_BUFFER_TYPE_MAX     = 3
+    };
+    void setAccelBufferType(int abt) {
+      accelBufferType = ((abt < ACCEL_BUFFER_TYPE_MIN || abt > ACCEL_BUFFER_TYPE_MAX) ? (ACCEL_BUFFER_TYPE_UNKNOWN) : (abt));
+    }
+    int getAccelBufferType() { return accelBufferType; }
+    void setAccelInstName(XStr* ain) { accelInstName = ain; }
+    XStr* getAccelInstName(void) { return accelInstName; }
+
 };
 class ParamList {
     typedef int (Parameter::*pred_t)(void) const;
@@ -440,6 +499,26 @@ class Scope : public Construct {
         contents_->print(str);
         str << "} // namespace " << name_ << "\n";
     }
+
+    // DMK - Accel Support
+    virtual int genAccels_spe_c_funcBodies(XStr& str) {
+      return contents_->genAccels_spe_c_funcBodies(str);
+    }
+    virtual void genAccels_spe_c_regFuncs(XStr& str) {
+      contents_->genAccels_spe_c_regFuncs(str);
+    }
+    virtual void genAccels_spe_c_callInits(XStr& str) {
+      contents_->genAccels_spe_c_callInits(str);
+    }
+    virtual void genAccels_spe_h_includes(XStr& str) {
+      contents_->genAccels_spe_h_includes(str);
+    }
+    virtual void genAccels_spe_h_fiCountDefs(XStr& str) {
+      contents_->genAccels_spe_h_fiCountDefs(str);
+    }
+    virtual void genAccels_ppe_c_regFuncs(XStr& str) {
+      contents_->genAccels_ppe_c_regFuncs(str);
+    }
 };
 
 class UsingScope : public Construct {
@@ -462,6 +541,14 @@ class UsingScope : public Construct {
         if (!symbol_) str << "namespace ";
         str << name_ << ";\n";
     }
+
+    // DMK - Accel Support
+    virtual int genAccels_spe_c_funcBodies(XStr& str) { return 0; }
+    virtual void genAccels_spe_c_regFuncs(XStr& str) { }
+    virtual void genAccels_spe_c_callInits(XStr& str) { }
+    virtual void genAccels_spe_h_includes(XStr& str) { }
+    virtual void genAccels_spe_h_fiCountDefs(XStr& str) { }
+    virtual void genAccels_ppe_c_regFuncs(XStr& str) { }
 };
 
 
@@ -482,6 +569,14 @@ class Template : public Construct {
     void genReg(XStr& str);
     void genSpec(XStr& str);
     void genVars(XStr& str);
+
+    // DMK - Accel Support
+    int genAccels_spe_c_funcBodies(XStr& str);
+    void genAccels_spe_c_regFuncs(XStr& str);
+    void genAccels_spe_c_callInits(XStr& str);
+    void genAccels_spe_h_includes(XStr& str);
+    void genAccels_spe_h_fiCountDefs(XStr& str);
+    void genAccels_ppe_c_regFuncs(XStr& str);
 };
 
 /* An entity that could be templated, i.e. chare, group or a message */
@@ -604,6 +699,35 @@ class MemberList : public Printable {
     void genDefs(XStr& str);
     void genReg(XStr& str);
     void preprocess();
+
+    // DMK - Accel Support
+    int genAccels_spe_c_funcBodies(XStr& str) {
+      int rtn = 0;
+      if (member) { rtn += member->genAccels_spe_c_funcBodies(str); }
+      if (next) { rtn += next->genAccels_spe_c_funcBodies(str); }
+      return rtn;
+    }
+    void genAccels_spe_c_regFuncs(XStr& str) {
+      if (member) { member->genAccels_spe_c_regFuncs(str); }
+      if (next) { next->genAccels_spe_c_regFuncs(str); }
+    }
+    void genAccels_spe_c_callInits(XStr& str) {
+      if (member) { member->genAccels_spe_c_callInits(str); }
+      if (next) { next->genAccels_spe_c_callInits(str); }
+    }
+    void genAccels_spe_h_includes(XStr& str) {
+      if (member) { member->genAccels_spe_h_includes(str); }
+      if (next) { next->genAccels_spe_h_includes(str); }
+    }
+    void genAccels_spe_h_fiCountDefs(XStr& str) {
+      if (member) { member->genAccels_spe_h_fiCountDefs(str); }
+      if (next) { next->genAccels_spe_h_fiCountDefs(str); }
+    }
+    void genAccels_ppe_c_regFuncs(XStr& str) {
+      if (member) { member->genAccels_ppe_c_regFuncs(str); }
+      if (next) { next->genAccels_ppe_c_regFuncs(str); }
+    }
+
     void genPythonDefs(XStr& str);
     void genPythonStaticDefs(XStr& str);
     void genPythonStaticDocs(XStr& str);
@@ -675,6 +799,29 @@ class Chare : public TEntity {
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr &str);
     void preprocess();
+
+    // DMK - Accel Support
+    int genAccels_spe_c_funcBodies(XStr& str) {
+      int rtn = 0;
+      if (list) { rtn += list->genAccels_spe_c_funcBodies(str); }
+      return rtn;
+    }
+    void genAccels_spe_c_regFuncs(XStr& str) {
+      if (list) { list->genAccels_spe_c_regFuncs(str); }
+    }
+    void genAccels_spe_c_callInits(XStr& str) {
+      if (list) { list->genAccels_spe_c_callInits(str); }
+    }
+    void genAccels_spe_h_includes(XStr& str) {
+      if (list) { list->genAccels_spe_h_includes(str); }
+    }
+    void genAccels_spe_h_fiCountDefs(XStr& str) {
+      if (list) { list->genAccels_spe_h_fiCountDefs(str); }
+    }
+    void genAccels_ppe_c_regFuncs(XStr& str) {
+      if (list) { list->genAccels_ppe_c_regFuncs(str); }
+    }
+
     int nextEntry(void) {return entryCount++;}
     virtual void genSubDecls(XStr& str);
     void genPythonDecls(XStr& str);
@@ -773,6 +920,15 @@ class Message : public TEntity {
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
+
+    // DMK - Accel Support
+    int genAccels_spe_c_funcBodies(XStr& str) { return 0; }
+    void genAccels_spe_c_regFuncs(XStr& str) { }
+    void genAccels_spe_c_callInits(XStr& str) { }
+    void genAccels_spe_h_includes(XStr& str) { }
+    void genAccels_spe_h_fiCountDefs(XStr& str) { }
+    void genAccels_ppe_c_regFuncs(XStr& str) { }
+
     virtual const char *proxyPrefix(void) {return Prefix::Message;}
     void genAllocDecl(XStr& str);
     int numArrays(void) {
@@ -813,6 +969,7 @@ class Message : public TEntity {
 #define SINLINE       0x2000 //<- inline message
 #define SIGET   0x4000 
 #define SLOCAL        0x8000 //<- local message
+#define SACCEL  0x10000
 
 /* An entry construct */
 class Entry : public Member {
@@ -855,7 +1012,21 @@ class Entry : public Member {
     void genPythonDefs(XStr& str);
     void genPythonStaticDefs(XStr& str);
     void genPythonStaticDocs(XStr& str);
-    
+
+    // DMK - Accel Support
+    void genAccelFullParamList(XStr& str, int makeRefs);
+    void genAccelFullCallList(XStr& str);
+    void genAccelIndexWrapperDecl_general(XStr& str);
+    void genAccelIndexWrapperDef_general(XStr& str);
+    void genAccelIndexWrapperDecl_spe(XStr& str);
+    void genAccelIndexWrapperDef_spe(XStr& str);
+    int genAccels_spe_c_funcBodies(XStr& str);
+    void genAccels_spe_c_regFuncs(XStr& str);
+    void genAccels_spe_c_callInits(XStr& str) { }
+    void genAccels_spe_h_includes(XStr& str) { }
+    void genAccels_spe_h_fiCountDefs(XStr& str) { }
+    void genAccels_ppe_c_regFuncs(XStr& str);
+
     XStr paramType(int withDefaultVals,int withEO=0,int useConst=1);
     XStr paramComma(int withDefaultVals,int withEO=0);
     XStr eo(int withDefaultVals,int priorComma=1);
@@ -875,6 +1046,23 @@ class Entry : public Member {
     ParamList *connectParam;
     int isConnect;
     int isWhenEntry;
+
+    // DMK - Accel Support
+    ParamList* accelParam;
+    XStr* accelCodeBody;
+    XStr* accelCallbackName;
+    void setAccelParam(ParamList* apl) { accelParam = apl; }
+    void setAccelCodeBody(XStr* acb) { accelCodeBody = acb; }
+    void setAccelCallbackName(XStr* acbn) { accelCallbackName = acbn; }
+
+    // DMK - Accel Support
+    int accel_numScalars;
+    int accel_numArrays;
+    int accel_dmaList_numReadOnly;
+    int accel_dmaList_numReadWrite;
+    int accel_dmaList_numWriteOnly;
+    int accel_dmaList_scalarNeedsWrite;
+
     Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, char *e=0, int connect=0, ParamList *connectPList =0);
     void setChare(Chare *c);
     int isConnectEntry(void) { return isConnect; }
@@ -896,6 +1084,10 @@ class Entry : public Member {
     int isNoTrace(void) { return (attribs & SNOTRACE); }
     int isNoKeep(void) { return (attribs & SNOKEEP); }
     int isSdag(void) { return (sdagCon!=0); }
+
+    // DMK - Accel support
+    int isAccel(void) { return (attribs & SACCEL); }
+
     void print(XStr& str);
     void genIndexDecls(XStr& str);
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
@@ -918,10 +1110,56 @@ class EntryList {
     	entry(e), next(elist) {}
     void generateEntryList(TList<CEntry*>&, SdagConstruct *);
 };
+
+
+/******************** AccelBlock : Block of code for accelerator **********************/
+class AccelBlock : public Construct {
+
+ protected:
+
+  XStr* code;
+
+ private:
+
+  void outputCode(XStr& str) {
+    if (code != NULL) {
+      str << "\n\n/***** Accel_Block Start *****/\n"
+          << (*(code))
+          << "\n/***** Accel_Block End *****/\n\n";
+    }
+  }
+
+ public:
+
+  /// Constructor(s)/Destructor ///
+  AccelBlock(int l, XStr* c) { line = l; code = c; }
+  ~AccelBlock() { if (code != NULL) { delete code; } }
+
+  /// Printable Methods ///
+  void print(XStr& str) { }
+
+  /// Construct Methods ///
+  void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) { }
+  void genDecls(XStr& str) { }
+  void genDefs(XStr& str) { outputCode(str); }
+  void genReg(XStr& str) { }
+  void preprocess(XStr& str) { }
+
+  /// Construct Accel Support Methods ///
+  int genAccels_spe_c_funcBodies(XStr& str) { outputCode(str); return 0; }
+  void genAccels_spe_c_regFuncs(XStr& str) { }
+  void genAccels_spe_c_callInits(XStr& str) { }
+  void genAccels_spe_h_includes(XStr& str) { }
+  void genAccels_spe_h_fiCountDefs(XStr& str) { }
+  void genAccels_ppe_c_regFuncs(XStr& str) { }
+};
+
+
 /****************** Modules, etc. ****************/
 class Module : public Construct {
     int _isMain;
     char *name;
+    
   public:
     ConstructList *clist;
     Module(int l, char *n, ConstructList *c) : name(n), clist(c) { 
@@ -940,6 +1178,14 @@ class Module : public Construct {
     void genReg(XStr& str);
     void setMain(void) { _isMain = 1; }
     int isMain(void) { return _isMain; }
+
+    // DMK - Accel Support
+    int genAccels_spe_c_funcBodies(XStr& str);
+    void genAccels_spe_c_regFuncs(XStr& str);
+    void genAccels_spe_c_callInits(XStr& str);
+    void genAccels_spe_h_includes(XStr& str);
+    void genAccels_spe_h_fiCountDefs(XStr& str);
+    void genAccels_ppe_c_regFuncs(XStr& str);
 };
 
 class ModuleList : public Printable {
@@ -974,12 +1220,26 @@ class Readonly : public Member {
     void genIndexDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
+
+    // DMK - Accel Support
+    int genAccels_spe_c_funcBodies(XStr& str) { return 0; }
+    void genAccels_spe_c_regFuncs(XStr& str) { }
+    void genAccels_spe_c_callInits(XStr& str) { }
+    void genAccels_spe_h_includes(XStr& str) { }
+    void genAccels_spe_h_fiCountDefs(XStr& str) { }
+    void genAccels_ppe_c_regFuncs(XStr& str) { }
 };
 
 class InitCall : public Member {
+
     const char *name; //Name of subroutine to call
     int isNodeCall;
+
+    // DMK - Accel Support
+    int isAccelFlag;
+
 public:
+
     InitCall(int l, const char *n, int nodeCall);
     void print(XStr& str);
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
@@ -987,6 +1247,18 @@ public:
     void genIndexDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
+
+    // DMK - Accel Support
+    int genAccels_spe_c_funcBodies(XStr& str) { return 0; }
+    void genAccels_spe_c_regFuncs(XStr& str) { }
+    void genAccels_spe_c_callInits(XStr& str);
+    void genAccels_spe_h_includes(XStr& str) { }
+    void genAccels_spe_h_fiCountDefs(XStr& str) { }
+    void genAccels_ppe_c_regFuncs(XStr& str) { }
+
+    void setAccel() { isAccelFlag = 1; }
+    void clearAccel() { isAccelFlag = 0; }
+    int isAccel() { return isAccelFlag; }
 };
 
 class PUPableClass : public Member {
@@ -1000,6 +1272,28 @@ public:
     void genIndexDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
+
+    // DMK - Accel Support
+    int genAccels_spe_c_funcBodies(XStr& str) {
+      int rtn;
+      if (next) { rtn += next->genAccels_spe_c_funcBodies(str); }
+      return rtn;
+    }
+    void genAccels_spe_c_regFuncs(XStr& str) {
+      if (next) { next->genAccels_spe_c_regFuncs(str); }
+    }
+    void genAccels_spe_c_callInits(XStr& str) {
+      if (next) { next->genAccels_spe_c_callInits(str); }
+    }
+    void genAccels_spe_h_includes(XStr& str) {
+      if (next) { next->genAccels_spe_h_includes(str); }
+    }
+    void genAccels_spe_h_fiCountDefs(XStr& str) {
+      if (next) { next->genAccels_spe_h_fiCountDefs(str); }
+    }
+    void genAccels_ppe_c_regFuncs(XStr& str) {
+      if (next) { next->genAccels_ppe_c_regFuncs(str); }
+    }
 };
 
 class IncludeFile : public Member {
@@ -1012,6 +1306,14 @@ public:
     void genIndexDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
+
+    // DMK - Accel Support
+    int genAccels_spe_c_funcBodies(XStr& str) { return 0; }
+    void genAccels_spe_c_regFuncs(XStr& str) { }
+    void genAccels_spe_c_callInits(XStr& str) { }
+    void genAccels_spe_h_includes(XStr& str) { }
+    void genAccels_spe_h_fiCountDefs(XStr& str) { }
+    void genAccels_ppe_c_regFuncs(XStr& str) { }
 };
 
 class ClassDeclaration : public Member {
@@ -1024,6 +1326,14 @@ public:
     void genIndexDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
+
+    // DMK - Accel Support
+    int genAccels_spe_c_funcBodies(XStr& str) { return 0; }
+    void genAccels_spe_c_regFuncs(XStr& str) { }
+    void genAccels_spe_c_callInits(XStr& str) { }
+    void genAccels_spe_h_includes(XStr& str) { }
+    void genAccels_spe_h_fiCountDefs(XStr& str) { }
+    void genAccels_ppe_c_regFuncs(XStr& str) { }
 };
 
 

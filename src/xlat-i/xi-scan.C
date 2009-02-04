@@ -1545,7 +1545,7 @@ static int yy_get_next_buffer (void)
 				case EOB_ACT_END_OF_FILE:
 					{
 					if ( yywrap( ) )
-						return 0;
+						return EOF;
 
 					if ( ! (yy_did_buffer_switch_on_eof) )
 						YY_NEW_FILE;
@@ -2203,6 +2203,11 @@ struct rwtable rwtable[] = {
   "python",     PYTHON,
   "namespace",  NAMESPACE,
   "using",      USING,
+  "accel",      ACCEL,
+  "inout",      INOUT,
+  "in",         IN,
+  "out",        OUT,
+  "accelblock", ACCELBLOCK,
   "",		0
 };
 

@@ -138,6 +138,11 @@ struct rwtable rwtable[] = {
   "python",     PYTHON,
   "namespace",  NAMESPACE,
   "using",      USING,
+  "accel",      ACCEL,
+  "inout",      INOUT,
+  "in",         IN,
+  "out",        OUT,
+  "accelblock", ACCELBLOCK,
   "",		0
 };
 

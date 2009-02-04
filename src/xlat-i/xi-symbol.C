@@ -318,6 +318,12 @@ Module::generate()
 {
   XStr declstr, defstr;
   XStr pubDeclStr, pubDefStr, pubDefConstr;
+
+  // DMK - Accel Support
+  #if CMK_CELL != 0
+  XStr accelstr_spe_c, accelstr_spe_h;
+  #endif
+
   declstr <<
   "#ifndef _DECL_"<<name<<"_H_\n"
   "#define _DECL_"<<name<<"_H_\n"
@@ -336,10 +342,10 @@ Module::generate()
      pubDeclStr << "};\n\n";
      pubDefConstr <<"}\n\n";
   }
+
   // defstr << "#ifndef _DEFS_"<<name<<"_H_"<<endx;
   // defstr << "#define _DEFS_"<<name<<"_H_"<<endx;
-  if (clist) clist->genDefs(defstr);
-
+  genDefs(defstr);
   defstr <<
   "#ifndef CK_TEMPLATES_ONLY\n"
   "void _register"<<name<<"(void)\n"
@@ -360,6 +366,30 @@ Module::generate()
   }
   defstr << "#endif\n";
   // defstr << "#endif"<<endx;
+
+
+  // DMK - Accel Support
+  #if CMK_CELL != 0
+
+  /// Generate the SPE code file contents ///
+  accelstr_spe_c << "#ifndef __ACCEL_" << name << "_C__\n"
+                 << "#define __ACCEL_" << name << "_C__\n\n\n";
+  int numAccelEntries = genAccels_spe_c_funcBodies(accelstr_spe_c);
+  accelstr_spe_c << "\n\n#endif //__ACCEL_" << name << "_C__\n";
+
+  /// Generate the SPE header file contents ///
+  accelstr_spe_h << "#ifndef __ACCEL_" << name << "_H__\n"
+                 << "#define __ACCEL_" << name << "_H__\n\n\n";
+  genAccels_spe_h_includes(accelstr_spe_h);
+  accelstr_spe_h << "\n\n";
+  accelstr_spe_h << "#define MODULE_" << name << "_FUNC_INDEX_COUNT (" << numAccelEntries;
+  genAccels_spe_h_fiCountDefs(accelstr_spe_h);
+  accelstr_spe_h << ")\n\n\n";
+  accelstr_spe_h << "#endif //__ACCEL_" << name << "_H__\n";
+
+  #endif
+
+
   XStr topname, botname;
   topname<<name<<".decl.h";
   botname<<name<<".def.h";
@@ -376,6 +406,59 @@ Module::generate()
     def << pubDefConstr.charstar();
     def << pubDefStr.charstar();
   }
+
+  // DMK - Accel Support
+  #if CMK_CELL != 0
+
+  /// Generate this module's code (actually create the files) ///
+  XStr accelname_c, accelname_h;
+  accelname_c << name << ".genSPECode.c";
+  accelname_h << name << ".genSPECode.h";
+  ofstream accel_c(accelname_c.get_string()), accel_h(accelname_h.get_string());
+  if (!accel_c) {
+    cerr << "Cannot open " << accelname_c.get_string() << " for writing!!\n";
+    die("Cannot create output files (check directory permissions)\n");
+  }
+  if (!accel_h) {
+    cerr << "Cannot open " << accelname_h.get_string() << " for writing!!\n";
+    die("Cannot create output files (check directory permissions)\n");
+  }
+  accel_c << accelstr_spe_c.get_string();
+  accel_h << accelstr_spe_h.get_string();
+  
+  // If this is the main module, generate the general C file and include this modules accel.h file
+  if (isMain()) {
+
+    XStr mainAccelStr_c;
+    mainAccelStr_c << "#include \"main__funcLookup__.genSPECode.h" << "\"\n"
+                   << "#include \"" << name << ".genSPECode.c" << "\"\n";
+    ofstream mainAccel_c("main__funcLookup__.genSPECode.c");
+    if (!mainAccel_c) {
+      cerr << "Cannot open main__funcLookup__.genSPECode.c for writing!!\n";
+      die("Cannot create output files (check directory permissions)");
+    }
+    mainAccel_c << mainAccelStr_c.get_string();
+
+    XStr mainAccelStr_h;
+    mainAccelStr_h << "#ifndef __MAIN_FUNCLOOKUP_H__\n"
+                   << "#define __MAIN_FUNCLOOKUP_H__\n\n"
+		   << "#include <spu_intrinsics.h>\n"
+		   << "#include <stdlib.h>\n"
+		   << "#include <stdio.h>\n"
+		   << "#include \"spert.h\"\n\n"
+		   << "#include \"simd.h\"\n"
+                   << "#include \"" << name << ".genSPECode.h" << "\"\n\n"
+                   << "#endif //__MAIN_FUNCLOOKUP_H__\n";
+    ofstream mainAccel_h("main__funcLookup__.genSPECode.h");
+    if (!mainAccel_h) {
+      cerr << "Cannot open main__funcLookup__.genSPECode.h for writing!!\n";
+      die("Cannot create output files (check directory permissions)");
+    }
+    mainAccel_h << mainAccelStr_h.get_string();
+
+  }
+
+  #endif
 }
 
 void
@@ -1864,6 +1947,32 @@ Template::genReg(XStr& str)
 {
 }
 
+int Template::genAccels_spe_c_funcBodies(XStr& str) {
+  int rtn = 0;
+  if (!external && entity) { rtn += entity->genAccels_spe_c_funcBodies(str); }
+  return rtn;
+}
+
+void Template::genAccels_spe_c_regFuncs(XStr& str) {
+  if (!external && entity) { entity->genAccels_spe_c_regFuncs(str); }
+}
+
+void Template::genAccels_spe_c_callInits(XStr& str) {
+  if (!external && entity) { entity->genAccels_spe_c_callInits(str); }
+}
+
+void Template::genAccels_spe_h_includes(XStr& str) {
+  if (!external && entity) { entity->genAccels_spe_h_includes(str); }
+}
+
+void Template::genAccels_spe_h_fiCountDefs(XStr& str) {
+  if (!external && entity) { entity->genAccels_spe_h_fiCountDefs(str); }
+}
+
+void Template::genAccels_ppe_c_regFuncs(XStr& str) {
+  if (!external && entity) { entity->genAccels_ppe_c_regFuncs(str); }
+}
+
 void
 TVarList::genLong(XStr& str)
 {
@@ -1935,6 +2044,13 @@ Module::genDecls(XStr& str)
   } else {
     if (clist) clist->genDecls(str);
   }
+
+  #if CMK_CELL != 0
+    str << "extern int register_accel_spe_funcs__module_" << name << "(int curIndex);\n";
+    if (isMain()) {
+      str << "extern void register_accel_spe_funcs(int curIndex);\n";
+    }
+  #endif
 }
 
 void
@@ -1943,6 +2059,27 @@ Module::genDefs(XStr& str)
   if(!external)
     if (clist)
       clist->genDefs(str);
+
+  // DMK - Accel Support
+  #if CMK_CELL != 0
+
+    if (!external) {
+
+      // Create the registration function
+      str << "int register_accel_spe_funcs__module_" << name << "(int curIndex) {\n";
+      genAccels_ppe_c_regFuncs(str);
+      str << "  return curIndex;\n"
+          << "}\n";
+
+      // Check to see if this is the main module (create top register function if so)
+      if (isMain()) {
+        str << "void register_accel_spe_funcs(int curIndex) {\n"
+	    << "  register_accel_spe_funcs__module_" << name << "(curIndex);\n"
+	    << "}\n";
+      }
+    }
+
+  #endif
 }
 
 void
@@ -1952,6 +2089,103 @@ Module::genReg(XStr& str)
     str << "      _register"<<name<<"();"<<endx;
   } else {
     if (clist) clist->genDefs(str);
+  }
+}
+
+
+int Module::genAccels_spe_c_funcBodies(XStr& str) {
+
+  // If this is an external module decloration, just place an include
+  if (external) {
+    str << "#include \"" << name << ".genSPECode.c\"\n";
+    return 0;
+  }
+
+  // If this is the main module, generate the function lookup table
+  if (isMain()) {
+    str << "typedef void(*AccelFuncPtr)(DMAListEntry*);\n\n"
+        << "typedef struct __func_lookup_table_entry {\n"
+        << "  int funcIndex;\n"
+        << "  AccelFuncPtr funcPtr;\n"
+        << "} FuncLookupTableEntry;\n\n"
+        << "FuncLookupTableEntry funcLookupTable[MODULE_" << name << "_FUNC_INDEX_COUNT];\n\n\n";
+  }
+
+  // Process each of the sub-constructs
+  int rtn = 0;
+  if (clist) { rtn += clist->genAccels_spe_c_funcBodies(str); }
+
+  // Create the accelerated function registration function for accelerated entries local to this module
+  str << "int register_accel_funcs_" << name << "(int curIndex) {\n";
+  genAccels_spe_c_regFuncs(str);
+  str << "  return curIndex;\n"
+      << "}\n\n\n";
+
+  // If this is the main module, generate the funcLookup function
+  if (isMain()) {
+
+    str << "\n\n";
+    str << "void funcLookup(int funcIndex,\n"
+        << "                void* readWritePtr, int readWriteLen,\n"
+        << "                void* readOnlyPtr, int readOnlyLen,\n"
+        << "                void* writeOnlyPtr, int writeOnlyLen,\n"
+        << "                DMAListEntry* dmaList\n"
+        << "               ) {\n\n";
+
+    str << "  if ((funcIndex >= SPE_FUNC_INDEX_USER) && (funcIndex < (SPE_FUNC_INDEX_USER + MODULE_" << name << "_FUNC_INDEX_COUNT))) {\n"
+
+        //<< "    // DMK - DEBUG\n"
+        //<< "    printf(\"[DEBUG-ACCEL] :: [SPE_%d] - Calling funcIndex %d...\\n\", (int)getSPEID(), funcIndex);\n"
+
+        << "    (funcLookupTable[funcIndex - SPE_FUNC_INDEX_USER].funcPtr)(dmaList);\n"
+        << "  } else if (funcIndex == SPE_FUNC_INDEX_INIT) {\n"
+        << "    if (register_accel_funcs_" << name << "(0) != MODULE_" << name << "_FUNC_INDEX_COUNT) {\n"
+        << "      printf(\"ERROR : register_accel_funcs_" << name << "() returned an invalid value.\\n\");\n"
+	<< "    };\n";
+    genAccels_spe_c_callInits(str);
+    str << "  } else if (funcIndex == SPE_FUNC_INDEX_CLOSE) {\n"
+        << "    // NOTE : Do nothing on close, but handle case...\n"
+        << "  } else {\n"
+	<< "    printf(\"ERROR : Unknown funcIndex (%d) passed to funcLookup()... ignoring.\\n\", funcIndex);\n"
+	<< "  }\n";
+
+    str << "}\n";
+  }
+
+  return rtn;
+}
+
+void Module::genAccels_spe_c_regFuncs(XStr& str) {
+  if (external) {
+    str << "  curIndex = register_accel_funcs_" << name << "(curIndex);\n";
+  } else {
+    if (clist) { clist->genAccels_spe_c_regFuncs(str); }
+  }
+}
+
+void Module::genAccels_spe_c_callInits(XStr& str) {
+  if (clist) { clist->genAccels_spe_c_callInits(str); }
+}
+
+void Module::genAccels_spe_h_includes(XStr& str) {
+  if (external) {
+    str << "#include \"" << name << ".genSPECode.h\"\n";
+  }
+  if (clist) { clist->genAccels_spe_h_includes(str); }
+}
+
+void Module::genAccels_spe_h_fiCountDefs(XStr& str) {
+  if (external) {
+    str << " + MODULE_" << name << "_FUNC_INDEX_COUNT";
+  }
+  if (clist) { clist->genAccels_spe_h_fiCountDefs(str); }
+}
+
+void Module::genAccels_ppe_c_regFuncs(XStr& str) {
+  if (external) {
+    str << "  curIndex = register_accel_spe_funcs__module_" << name << "(curIndex);\n";
+  } else {
+    if (clist) { clist->genAccels_ppe_c_regFuncs(str); }
   }
 }
 
@@ -3002,6 +3236,637 @@ void Entry::genPythonStaticDocs(XStr& str) {
   }
 }
 
+
+/******************* Accelerator (Accel) Entry Point Code ********************/
+
+void Entry::genAccelFullParamList(XStr& str, int makeRefs) {
+
+  if (!isAccel()) return;
+
+  ParamList* curParam = NULL;
+  int isFirst = 1;
+
+  // Parameters (which are read only by default)
+  curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+
+    if (!isFirst) { str << ", "; }
+
+    Parameter* param = curParam->param;
+
+    if (param->isArray()) {
+      str << param->getType()->getBaseName() << "* " << param->getName();
+    } else {
+      str << param->getType()->getBaseName() << " " << param->getName();
+    }
+
+    isFirst = 0;
+    curParam = curParam->next;
+  }
+
+  // Accel parameters
+  curParam = accelParam;
+  while (curParam != NULL) {
+
+    if (!isFirst) { str << ", "; }
+
+    Parameter* param = curParam->param;
+    int bufType = param->getAccelBufferType();
+    int needWrite = makeRefs && ((bufType == Parameter::ACCEL_BUFFER_TYPE_INOUT) || (bufType == Parameter::ACCEL_BUFFER_TYPE_OUT));
+    if (param->isArray()) {
+      str << param->getType()->getBaseName() << "* " << param->getName();
+    } else {
+      str << param->getType()->getBaseName() << ((needWrite) ? (" &") : (" ")) << param->getName();
+    }
+
+    isFirst = 0;
+    curParam = curParam->next;
+  }
+
+  // Implied object pointer
+  if (!isFirst) { str << ", "; }
+  str << container->baseName() << "* impl_obj";
+}
+
+void Entry::genAccelFullCallList(XStr& str) {
+  if (!isAccel()) return;
+
+  int isFirstFlag = 1;
+
+  // Marshalled parameters to entry method
+  ParamList* curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+    if (!isFirstFlag) str << ", ";
+    isFirstFlag = 0;
+    str << curParam->param->getName();
+    curParam = curParam->next;
+  }
+
+  // General variables (prefix with "impl_obj->" for member variables of the current object)
+  curParam = accelParam;
+  while (curParam != NULL) {
+    if (!isFirstFlag) str << ", ";
+    isFirstFlag = 0;
+    str << (*(curParam->param->getAccelInstName()));
+    curParam = curParam->next;
+  }
+
+  // Implied object
+  if (!isFirstFlag) str << ", ";
+  isFirstFlag = 0;
+  str << "impl_obj";
+}
+
+void Entry::genAccelIndexWrapperDecl_general(XStr& str) {
+  str << "    static void _accelCall_general_" << epStr() << "(";
+  genAccelFullParamList(str, 1);
+  str << ");\n";
+}
+
+void Entry::genAccelIndexWrapperDef_general(XStr& str) {
+  str << makeDecl("void") << "::_accelCall_general_" << epStr() << "(";
+  genAccelFullParamList(str, 1);
+  str << ") {\n\n";
+
+  //// DMK - DEBUG
+  //str << "  // DMK - DEBUG\n";
+  //str << "  CkPrintf(\"[DEBUG-ACCEL] :: [PPE] - "
+  //    << makeDecl("void") << "::_accelCall_general_" << epStr()
+  //    << "(...) - Called...\\n\");\n\n";
+
+  str << (*accelCodeBody);
+
+  str << "\n\n";
+  str << "  impl_obj->" << (*accelCallbackName) << "();\n";
+  str << "}\n";
+}
+
+void Entry::genAccelIndexWrapperDecl_spe(XStr& str) {
+  str << "    static void _accelCall_spe_" << epStr() << "(";
+  genAccelFullParamList(str, 0);
+  str << ");\n";
+}
+
+// DMK - Accel Support
+#if CMK_CELL != 0
+  #include "spert.h"
+#endif
+
+void Entry::genAccelIndexWrapperDef_spe(XStr& str) {
+
+  XStr containerType = container->baseName();
+
+  // Some blank space for readability
+  str << "\n\n";
+
+
+  ///// Generate struct that will be passed to callback function /////
+
+  str << "typedef struct __spe_callback_struct_" << epStr() << " {\n"
+      << "  " << containerType << "* impl_obj;\n"
+      << "  WRHandle wrHandle;\n"
+      << "  void* scalar_buf_ptr;\n";
+
+  // Pointers for marshalled parameter buffers
+  ParamList* curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+    if (curParam->param->isArray()) {
+      str << "  void* param_buf_ptr_" << curParam->param->getName() << ";\n";
+    }
+    curParam = curParam->next;
+  }
+  curParam = accelParam;
+  while (curParam != NULL) {
+    if (curParam->param->isArray()) {
+      str << "  void* accelParam_buf_ptr_" << curParam->param->getName() << ";\n";
+    }
+    curParam = curParam->next;
+  }
+
+  str << "} SpeCallbackStruct_" << epStr() << ";\n\n";
+
+
+  ///// Generate callback function /////
+
+  str << "void _accelCall_spe_callback_" << epStr() << "(void* userPtr) {\n";
+  str << "  SpeCallbackStruct_" << epStr() << "* cbStruct = (SpeCallbackStruct_" << epStr() << "*)userPtr;\n";
+  str << "  " << containerType << "* impl_obj = cbStruct->impl_obj;\n";
+
+  // Write scalars that are 'out' or 'inout' from the scalar buffer back into memory
+
+  if (accel_numScalars > 0) {
+
+    // Get the pointer to the scalar buffer
+    int dmaList_scalarBufIndex = 0;
+    if (accel_dmaList_scalarNeedsWrite) {
+      dmaList_scalarBufIndex += accel_dmaList_numReadOnly;
+    }
+    str << "  char* __scalar_buf_offset = (char*)(cbStruct->scalar_buf_ptr);\n";
+
+    // Parameters
+    curParam = param;
+    if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+    while (curParam != NULL) {
+      if (!(curParam->param->isArray())) {
+        str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+      curParam = curParam->next;
+    }
+
+    // Read only accel parameters
+    curParam = accelParam;
+    while (curParam != NULL) {
+      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_IN)) {
+        str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+      curParam = curParam->next;
+    }
+
+    // Read write accel parameters
+    curParam = accelParam;
+    while (curParam != NULL) {
+      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_INOUT)) {
+        str << "  " << (*(curParam->param->getAccelInstName())) << " = *((" << curParam->param->getType()->getBaseName() << "*)__scalar_buf_offset);\n";
+        str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+      curParam = curParam->next;
+    }
+
+    // Write only accel parameters
+    curParam = accelParam;
+    while (curParam != NULL) {
+      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_OUT)) {
+        str << "  " << (*(curParam->param->getAccelInstName())) << " = *((" << curParam->param->getType()->getBaseName() << "*)__scalar_buf_offset);\n";
+        str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+      curParam = curParam->next;
+    }
+  }
+
+  // Call the callback function
+  str << "  (cbStruct->impl_obj)->" << (*accelCallbackName) << "();\n";
+
+  // Free memory
+  str << "  if (cbStruct->scalar_buf_ptr != NULL) { free_aligned(cbStruct->scalar_buf_ptr); }\n";
+  curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+    if (curParam->param->isArray()) {
+      str << "  if (cbStruct->param_buf_ptr_" << curParam->param->getName() << " != NULL) { "
+          <<      "free_aligned(cbStruct->param_buf_ptr_" << curParam->param->getName() << "); "
+          <<   "}\n";
+    }
+    curParam = curParam->next;
+  }
+  str << "  delete cbStruct;\n";
+
+  str << "}\n\n";
+
+
+  ///// Generate function to issue work request /////
+
+  str << makeDecl("void") << "::_accelCall_spe_" << epStr() << "(";
+  genAccelFullParamList(str, 0);
+  str << ") {\n\n";
+
+  //// DMK - DEBUG
+  //str << "  // DMK - DEBUG\n"
+  //    << "  CkPrintf(\"[DEBUG-ACCEL] :: [PPE] - "
+  //    << makeDecl("void") << "::_accelCall_spe_" << epStr()
+  //    << "(...) - Called... (funcIndex:%d)\\n\", accel_spe_func_index__" << epStr() << ");\n\n";
+
+
+  str << "  // Allocate a user structure to be passed to the callback function\n"
+      << "  SpeCallbackStruct_" << epStr() << "* cbStruct = new SpeCallbackStruct_" << epStr() << ";\n"
+      << "  cbStruct->impl_obj = impl_obj;\n"
+      << "  cbStruct->wrHandle = INVALID_WRHandle;  // NOTE: Set actual value later...\n"
+      << "  cbStruct->scalar_buf_ptr = NULL;\n";
+  // Set all parameter buffer pointers in the callback structure to NULL
+  curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+    if (curParam->param->isArray()) {
+      str << "  cbStruct->param_buf_ptr_" << curParam->param->getName() << " = NULL;\n";
+    }
+    curParam = curParam->next;
+  }
+  curParam = accelParam;
+  while (curParam != NULL) {
+    if (curParam->param->isArray()) {
+      str << "  cbStruct->accelParam_buf_ptr_" << curParam->param->getName() << " = NULL;\n";
+    }
+    curParam = curParam->next;
+  }
+  str << "\n";
+
+
+  // Create the DMA list
+  int dmaList_curIndex = 0;
+  int numDMAListEntries = accel_numArrays;
+  if (accel_numScalars > 0) { numDMAListEntries++; }
+  if (numDMAListEntries <= 0) {
+    die("Accel entry with no parameters");
+  }
+
+  // DMK - NOTE : TODO : FIXME - For now, force DMA lists to only be the static length or less.
+  //   Fix this in the future to handle any length supported by hardware.  Also, for now,
+  //   #if this check since non-Cell architectures do not have SPE_DMA_LIST_LENGTH defined and
+  //   this code should not be called unless this is a Cell architecture.
+  #if CMK_CELL != 0
+  if (numDMAListEntries > SPE_DMA_LIST_LENGTH) {
+    die("Accel entries do not support parameter lists of length > SPE_DMA_LIST_LENGTH yet... fix me...");
+  }
+  #endif
+
+  // Do a pass of all the parameters, determine the size of all scalars (to pack them)
+  if (accel_numScalars > 0) {
+    str << "  // Create a single buffer to hold all the scalar values\n";
+    str << "  int scalar_buf_len = 0;\n";
+    curParam = param;
+    if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+    while (curParam != NULL) {
+      if (!(curParam->param->isArray())) {
+        str << "  scalar_buf_len += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+      curParam = curParam->next;
+    }
+    curParam = accelParam;
+    while (curParam != NULL) {
+      if (!(curParam->param->isArray())) {
+        str << "  scalar_buf_len += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+      curParam = curParam->next;
+    }
+    str << "  scalar_buf_len = ROUNDUP_128(scalar_buf_len);\n"
+        << "  cbStruct->scalar_buf_ptr = malloc_aligned(scalar_buf_len, 128);\n"
+        << "  char* scalar_buf_offset = (char*)(cbStruct->scalar_buf_ptr);\n\n";
+  }
+
+
+  // Declare the DMA list
+  str << "  // Declare and populate the DMA list for the work request\n";
+  str << "  DMAListEntry dmaList[" << numDMAListEntries << "];\n\n";
+
+
+  // Parameters: read only by default & arrays need to be copied since message will be deleted
+  curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+
+    // Check to see if the scalar buffer needs slipped into the dma list here
+    if (accel_numScalars > 0) {
+      if (((dmaList_curIndex == 0) && (!(accel_dmaList_scalarNeedsWrite))) ||
+          ((dmaList_curIndex == accel_dmaList_numReadOnly) && (accel_dmaList_scalarNeedsWrite))
+	 ) {
+
+        str << "  /*** Scalar Buffer ***/\n"
+            << "  dmaList[" << dmaList_curIndex << "].size = scalar_buf_len;\n"
+	    << "  dmaList[" << dmaList_curIndex << "].ea = (unsigned int)(cbStruct->scalar_buf_ptr);\n\n";
+        dmaList_curIndex++;
+      }
+    }
+
+    // Add this parameter to the dma list (somehow)
+    str << "  /*** Param: '" << curParam->param->getName() << "' ***/\n";
+    if (curParam->param->isArray()) {
+      str << "  {\n"
+	  << "    int bufSize = sizeof(" << curParam->param->getType()->getBaseName() << ") * (" << curParam->param->getArrayLen() << ");\n"
+	  << "    bufSize = ROUNDUP_128(bufSize);\n"
+          << "    cbStruct->param_buf_ptr_" << curParam->param->getName() << " = malloc_aligned(bufSize, 128);\n"
+	  << "    memcpy(cbStruct->param_buf_ptr_" << curParam->param->getName() << ", " << curParam->param->getName() << ", bufSize);\n"
+	  << "    dmaList[" << dmaList_curIndex << "].size = bufSize;\n"
+	  << "    dmaList[" << dmaList_curIndex << "].ea = (unsigned int)(cbStruct->param_buf_ptr_" << curParam->param->getName() << ");\n"
+	  << "  }\n";
+      dmaList_curIndex++;
+    } else {
+      str << "  *((" << curParam->param->getType()->getBaseName() << "*)scalar_buf_offset) = "
+          << curParam->param->getName() << ";\n"
+          << "  scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+    }
+    curParam = curParam->next;
+    str << "\n";
+  }
+
+  // Read only accel params
+  curParam = accelParam;
+  while (curParam != NULL) {
+
+    // Check to see if the scalar buffer needs slipped into the dma list here
+    if (accel_numScalars > 0) {
+      if (((dmaList_curIndex == 0) && (!(accel_dmaList_scalarNeedsWrite))) ||
+          ((dmaList_curIndex == accel_dmaList_numReadOnly) && (accel_dmaList_scalarNeedsWrite))
+	 ) {
+
+        str << "  /*** Scalar Buffer ***/\n"
+            << "  dmaList[" << dmaList_curIndex << "].size = scalar_buf_len;\n"
+	    << "  dmaList[" << dmaList_curIndex << "].ea = (unsigned int)(cbStruct->scalar_buf_ptr);\n\n";
+        dmaList_curIndex++;
+      }
+    }
+
+    // Add this parameter
+    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_IN) {
+      str << "  /*** Accel Param: '" << curParam->param->getName() << " ("
+          << (*(curParam->param->getAccelInstName())) << ")' ***/\n";
+      if (curParam->param->isArray()) {
+        str << "  dmaList[" << dmaList_curIndex << "].size = ROUNDUP_128("
+	    << "sizeof(" << curParam->param->getType()->getBaseName() << ") * "
+            << "(" << curParam->param->getArrayLen() << "));\n"
+  	    << "  dmaList[" << dmaList_curIndex << "].ea = (unsigned int)(" << (*(curParam->param->getAccelInstName())) << ");\n";
+        dmaList_curIndex++;
+      } else {
+        str << "  *((" << curParam->param->getType()->getBaseName() << "*)scalar_buf_offset) = "
+            << (*(curParam->param->getAccelInstName())) << ";\n"
+            << "  scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+      str << "\n";
+    }
+
+    curParam = curParam->next;
+  }
+
+  // Read/write accel params
+  curParam = accelParam;
+  while (curParam != NULL) {
+
+    // Check to see if the scalar buffer needs slipped into the dma list here
+    if (accel_numScalars > 0) {
+      if (((dmaList_curIndex == 0) && (!(accel_dmaList_scalarNeedsWrite))) ||
+          ((dmaList_curIndex == accel_dmaList_numReadOnly) && (accel_dmaList_scalarNeedsWrite))
+	 ) {
+
+        str << "  /*** Scalar Buffer ***/\n"
+            << "  dmaList[" << dmaList_curIndex << "].size = scalar_buf_len;\n"
+	    << "  dmaList[" << dmaList_curIndex << "].ea = (unsigned int)(cbStruct->scalar_buf_ptr);\n\n";
+        dmaList_curIndex++;
+      }
+    }
+
+    // Add this parameter
+    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_INOUT) {
+      str << "  /*** Accel Param: '" << curParam->param->getName() << " ("
+          << (*(curParam->param->getAccelInstName())) << ")' ***/\n";
+      if (curParam->param->isArray()) {
+        str << "  dmaList[" << dmaList_curIndex << "].size = ROUNDUP_128("
+	    << "sizeof(" << curParam->param->getType()->getBaseName() << ") * "
+            << "(" << curParam->param->getArrayLen() << "));\n"
+  	    << "  dmaList[" << dmaList_curIndex << "].ea = (unsigned int)(" << (*(curParam->param->getAccelInstName())) << ");\n";
+        dmaList_curIndex++;
+      } else {
+        str << "  *((" << curParam->param->getType()->getBaseName() << "*)scalar_buf_offset) = "
+            << (*(curParam->param->getAccelInstName())) << ";\n"
+            << "  scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+      str << "\n";
+    }
+
+    curParam = curParam->next;
+  }
+
+  // Write only accel params
+  curParam = accelParam;
+  while (curParam != NULL) {
+
+    // Add this parameter
+    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_OUT) {
+      str << "  /*** Accel Param: '" << curParam->param->getName() << " ("
+          << (*(curParam->param->getAccelInstName())) << ")' ***/\n";
+      if (curParam->param->isArray()) {
+        str << "  dmaList[" << dmaList_curIndex << "].size = ROUNDUP_128("
+	    << "sizeof(" << curParam->param->getType()->getBaseName() << ") * "
+            << "(" << curParam->param->getArrayLen() << "));\n"
+  	    << "  dmaList[" << dmaList_curIndex << "].ea = (unsigned int)(" << (*(curParam->param->getAccelInstName())) << ");\n";
+        dmaList_curIndex++;
+      } else {
+        str << "  *((" << curParam->param->getType()->getBaseName() << "*)scalar_buf_offset) = "
+            << (*(curParam->param->getAccelInstName())) << ";\n"
+            << "  scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+      str << "\n";
+    }
+
+    curParam = curParam->next;
+  }
+
+  str << "  // Issue the work request\n";
+  str << "  cbStruct->wrHandle = sendWorkRequest_list(accel_spe_func_index__" << epStr() << ",\n"
+      << "                                            0,\n"
+      << "                                            dmaList,\n"
+      << "                                            " << accel_dmaList_numReadOnly << ",\n"
+      << "                                            " << accel_dmaList_numReadWrite << ",\n"
+      << "                                            " << accel_dmaList_numWriteOnly << ",\n"
+      << "                                            cbStruct,\n"
+      << "                                            WORK_REQUEST_FLAGS_NONE,\n"
+      << "                                            _accelCall_spe_callback_" << epStr() << "\n"
+      << "                                           );\n";
+
+  str << "}\n\n";
+
+
+  // Some blank space for readability
+  str << "\n";
+}
+
+int Entry::genAccels_spe_c_funcBodies(XStr& str) {
+
+  // Make sure this is an accelerated entry method (just return if not)
+  if (!isAccel()) { return 0; }
+
+  // Declare the spe function
+  str << "void __speFunc__" << indexName() << "__" << epStr() << "(DMAListEntry* dmaList) {\n";
+
+  ParamList* curParam = NULL;
+  int dmaList_curIndex = 0;
+
+  // Identify the scalar buffer if there is one
+  if (accel_numScalars > 0) {
+    if (accel_dmaList_scalarNeedsWrite) {
+      str << "  void* __scalar_buf_ptr = (void*)(dmaList[" << accel_dmaList_numReadOnly << "].ea);\n";
+    } else {
+      str << "  void* __scalar_buf_ptr = (void*)(dmaList[0].ea);\n";
+      dmaList_curIndex++;
+    }
+    str << "  char* __scalar_buf_offset = (char*)(__scalar_buf_ptr);\n";
+  }
+
+  // Pull out all the parameters
+  curParam = param;
+  if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+  while (curParam != NULL) {
+    if (curParam->param->isArray()) {
+      str << "  " << curParam->param->getType()->getBaseName() << "* " << curParam->param->getName() << " = (" << curParam->param->getType()->getBaseName() << "*)(dmaList[" << dmaList_curIndex << "].ea);\n";
+      dmaList_curIndex++;
+    } else {
+      str << "  " << curParam->param->getType()->getBaseName() << " " << curParam->param->getName() << " = *((" << curParam->param->getType()->getBaseName() << "*)__scalar_buf_offset);\n";
+      str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+    }
+    curParam = curParam->next;
+  }
+
+  // Read only accel params
+  curParam = accelParam;
+  while (curParam != NULL) {
+    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_IN) {
+      if (curParam->param->isArray()) {
+        str << "  " << curParam->param->getType()->getBaseName() << "* " << curParam->param->getName() << " = (" << curParam->param->getType()->getBaseName() << "*)(dmaList[" << dmaList_curIndex << "].ea);\n";
+        dmaList_curIndex++;
+      } else {
+        str << "  " << curParam->param->getType()->getBaseName() << " " << curParam->param->getName() << " = *((" << curParam->param->getType()->getBaseName() << "*)__scalar_buf_offset);\n";
+        str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+    }
+    curParam = curParam->next;
+  }
+
+  // Reset the dmaList_curIndex to the read-write portion of the dmaList
+  dmaList_curIndex = accel_dmaList_numReadOnly;
+  if ((accel_numScalars > 0) && (accel_dmaList_scalarNeedsWrite)) {
+    dmaList_curIndex++;
+  }
+
+  // Read-write accel params
+  curParam = accelParam;
+  while (curParam != NULL) {
+    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_INOUT) {
+      if (curParam->param->isArray()) {
+        str << "  " << curParam->param->getType()->getBaseName() << "* " << curParam->param->getName() << " = (" << curParam->param->getType()->getBaseName() << "*)(dmaList[" << dmaList_curIndex << "].ea);\n";
+        dmaList_curIndex++;
+      } else {
+        str << "  " << curParam->param->getType()->getBaseName() << " " << curParam->param->getName() << " = *((" << curParam->param->getType()->getBaseName() << "*)__scalar_buf_offset);\n";
+        str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+    }
+    curParam = curParam->next;
+  }
+
+  // Write only accel params
+  curParam = accelParam;
+  while (curParam != NULL) {
+    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_OUT) {
+      if (curParam->param->isArray()) {
+        str << "  " << curParam->param->getType()->getBaseName() << "* " << curParam->param->getName() << " = (" << curParam->param->getType()->getBaseName() << "*)(dmaList[" << dmaList_curIndex << "].ea);\n";
+        dmaList_curIndex++;
+      } else {
+        str << "  " << curParam->param->getType()->getBaseName() << " " << curParam->param->getName() << " = *((" << curParam->param->getType()->getBaseName() << "*)__scalar_buf_offset);\n";
+        str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+    }
+    curParam = curParam->next;
+  }
+
+
+  // Function body from the interface file
+  str << "  {\n    " << (*accelCodeBody) << "\n  }\n";
+
+
+  // Write the scalar values that are not read only back into the scalar buffer
+  if ((accel_numScalars > 0) && (accel_dmaList_scalarNeedsWrite)) {
+
+    str << "  __scalar_buf_offset = (char*)(__scalar_buf_ptr);\n";
+
+    // Parameters
+    curParam = param;
+    if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+    while (curParam != NULL) {
+      if (!(curParam->param->isArray())) {
+        str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+      curParam = curParam->next;
+    }
+
+    // Read only accel parameters
+    curParam = accelParam;
+    while (curParam != NULL) {
+      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_IN)) {
+        str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+      curParam = curParam->next;
+    }
+
+    // Read only accel parameters
+    curParam = accelParam;
+    while (curParam != NULL) {
+      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_INOUT)) {
+        str << "  *((" << curParam->param->getType()->getBaseName() << "*)__scalar_buf_offset) = " << curParam->param->getName() << ";\n";
+        str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+      curParam = curParam->next;
+    }
+
+    // Read only accel parameters
+    curParam = accelParam;
+    while (curParam != NULL) {
+      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_OUT)) {
+        str << "  *((" << curParam->param->getType()->getBaseName() << "*)__scalar_buf_offset) = " << curParam->param->getName() << ";\n";
+        str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
+      }
+      curParam = curParam->next;
+    }
+
+  }
+
+  str << "}\n\n\n";
+
+  return 1;
+}
+
+void Entry::genAccels_spe_c_regFuncs(XStr& str) {
+  if (isAccel()) {
+    str << "  funcLookupTable[curIndex  ].funcIndex = curIndex;\n"
+        << "  funcLookupTable[curIndex++].funcPtr = __speFunc__" << indexName() << "__" << epStr() << ";\n";
+  }
+}
+
+void Entry::genAccels_ppe_c_regFuncs(XStr& str) {
+  if (isAccel()) {
+    str << "  " << indexName() << "::accel_spe_func_index__" << epStr() << " = curIndex++;\n";
+  }
+}
+
+
 /******************* Shared Entry Point Code **************************/
 void Entry::genIndexDecls(XStr& str)
 {
@@ -3010,11 +3875,26 @@ void Entry::genIndexDecls(XStr& str)
   // Entry point index storage
   str << "    static int "<<epIdx(0)<<";\n";
 
+  // DMK - Accel Support
+  #if CMK_CELL != 0
+    if (isAccel()) {
+      str << "    static int accel_spe_func_index__" << epStr() << ";\n";
+    }
+  #endif
+
   // Index function, so user can find the entry point number
   str << "    static int ";
   if (isConstructor()) str <<"ckNew";
   else str <<name;
   str << "("<<paramType(1,0)<<") { return "<<epIdx(0)<<"; }\n";
+
+  // DMK - Accel Support
+  if (isAccel()) {
+    genAccelIndexWrapperDecl_general(str);
+    #if CMK_CELL != 0
+      genAccelIndexWrapperDecl_spe(str);
+    #endif
+  }
 
   // call function declaration
   str << "    static void _call_"<<epStr()<<"(void* impl_msg,"<<
@@ -3249,6 +4129,28 @@ void Entry::genCall(XStr& str, const XStr &preCall)
     str<<");\n";
     str << "/* FORTRAN END */\n";
   }
+
+  // DMK : Accel Support
+  else if (isAccel()) {
+
+    #if CMK_CELL != 0
+      str << "  if (1) {   // DMK : TODO : For now, hardcode the condition (i.e. for now, do not dynamically load-balance between host and accelerator)\n";
+      str << "    _accelCall_spe_" << epStr() << "(";
+      genAccelFullCallList(str);
+      str << ");\n";
+      str << "  } else {\n  ";
+    #endif
+
+    str << "  _accelCall_general_" << epStr() << "(";
+    genAccelFullCallList(str);
+    str << ");\n";
+
+    #if CMK_CELL != 0
+      str << "  }\n";
+    #endif
+
+  }
+
   else { //Normal case: call regular method
     if (isArgcArgv) str<<"  CkArgMsg *m=(CkArgMsg *)impl_msg;\n"; //Hack!
 
@@ -3291,6 +4193,13 @@ void Entry::genDefs(XStr& str)
 
   //Define storage for entry point number
   str << container->tspec()<<" int "<<indexName()<<"::"<<epIdx(0)<<"=0;\n";
+
+  // DMK - Accel Support
+  #if CMK_CELL != 0
+    if (isAccel()) {
+      str << "int " << indexName() << "::" << "accel_spe_func_index__" << epStr() << "=0;\n";
+    }
+  #endif
 
   // Add special pre- and post- call code
   if(isSync() || isIget()) {
@@ -3359,6 +4268,16 @@ void Entry::genDefs(XStr& str)
       str << "}\n";
       str << "/* FORTRAN SECTION END */\n";
     }
+
+  // DMK - Accel Support
+  //   Create the wrapper function for the acceleration call
+  //   TODO : FIXME : For now, just use the standard C++ code... create OffloadAPI wrappers later
+  if (isAccel()) {
+    genAccelIndexWrapperDef_general(str);
+    #if CMK_CELL != 0
+      genAccelIndexWrapperDef_spe(str);
+    #endif
+  }
 
   //Generate the call-method body
   str << makeDecl("void")<<"::_call_"<<epStr()<<"(void* impl_msg,"<<containerType<<" * impl_obj)\n";
@@ -3481,6 +4400,57 @@ void Entry::preprocess() {
     m->setModule(container->containerModule);
     container->containerModule->prependConstruct(m);
   }
+
+  // DMK - Accel Support
+  // Count the total number of scalar and array parameters if this is an accelerated entry
+  accel_numScalars = 0;
+  accel_numArrays = 0;
+  accel_dmaList_numReadOnly = 0;
+  accel_dmaList_numReadWrite = 0;
+  accel_dmaList_numWriteOnly = 0;
+  accel_dmaList_scalarNeedsWrite = 0;
+  if (isAccel()) {
+    ParamList* curParam = param;
+    if ((curParam->param->getType()->isVoid()) && (curParam->param->getName() == NULL)) { curParam = curParam->next; }
+    while (curParam != NULL) {
+      if (curParam->param->isArray()) {
+        accel_numArrays++;
+        accel_dmaList_numReadOnly++;
+      } else {
+        accel_numScalars++;
+      }
+      curParam = curParam->next;
+    }
+    curParam = accelParam;
+    while (curParam != NULL) {
+      if (curParam->param->isArray()) {
+        accel_numArrays++;
+        switch (curParam->param->getAccelBufferType()) {
+          case Parameter::ACCEL_BUFFER_TYPE_INOUT:  accel_dmaList_numReadWrite++;  break;
+          case Parameter::ACCEL_BUFFER_TYPE_IN:     accel_dmaList_numReadOnly++;   break;
+          case Parameter::ACCEL_BUFFER_TYPE_OUT:    accel_dmaList_numWriteOnly++;  break;
+          default:     die("Unknown accel param type");                            break;
+        }
+      } else {
+        accel_numScalars++;
+        switch (curParam->param->getAccelBufferType()) {
+          case Parameter::ACCEL_BUFFER_TYPE_INOUT:  accel_dmaList_scalarNeedsWrite++;  break;
+          case Parameter::ACCEL_BUFFER_TYPE_IN:                                        break;
+          case Parameter::ACCEL_BUFFER_TYPE_OUT:    accel_dmaList_scalarNeedsWrite++;  break;
+          default:     die("Unknown accel param type");                                break;
+        }
+      }
+      curParam = curParam->next;
+    }
+    if (accel_numScalars > 0) {
+      if (accel_dmaList_scalarNeedsWrite) {
+        accel_dmaList_numReadWrite++;
+      } else {
+        accel_dmaList_numReadOnly++;
+      }
+    }
+  }
+
 }
 
 
@@ -3819,6 +4789,9 @@ InitCall::InitCall(int l, const char *n, int nodeCall)
 	    : name(n)
 {
 	line=l; setChare(0); isNodeCall=nodeCall;
+
+        // DMK - Accel Support
+        isAccelFlag = 0;
 }
 void InitCall::print(XStr& str)
 {
@@ -3836,6 +4809,13 @@ void InitCall::genReg(XStr& str)
 	str<<name;
 	str<<","<<isNodeCall<<");\n";
 }
+
+void InitCall::genAccels_spe_c_callInits(XStr& str) {
+  if (isAccel()) {
+    str << "    " << name << "();\n";
+  }
+}
+
 
 /***************** PUP::able support **************/
 PUPableClass::PUPableClass(int l, NamedType* type_,PUPableClass *next_)
@@ -3867,6 +4847,7 @@ void PUPableClass::genReg(XStr& str)
 	str<<"      PUPable_reg(" << type << ");\n";
 	if (next) next->genReg(str);
 }
+
 
 /***************** Include support **************/
 IncludeFile::IncludeFile(int l, const char *n)
@@ -3904,7 +4885,6 @@ void ClassDeclaration::genDecls(XStr& str) {
 void ClassDeclaration::genIndexDecls(XStr& str) {}
 void ClassDeclaration::genDefs(XStr& str) {}
 void ClassDeclaration::genReg(XStr& str) {}
-
 
 
 /****************** Registration *****************/
