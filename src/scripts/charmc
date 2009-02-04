@@ -1284,6 +1284,23 @@ case "$LANGUAGE" in
 	;;
 esac
 
+# DMK - ACCEL SUPPORT - If this is a cell build, add the spe code object to POST_LIBRARIES
+if [ "$CMK_CELL" == "1" ]
+then
+  if [ "$LANGUAGE" == "charm++" ]
+  then
+
+    # Make the spe object file to be included
+    Do $CMK_SPU_CC -c -I$CHARMINC -o main__funcLookup__.genSPECode.o main__funcLookup__.genSPECode.c -DCMK_CELL_SPE=1
+    Do $CMK_SPU_LD -L$CHARMLIB -o main__funcLookup__.genSPECode main__funcLookup__.genSPECode.o $CMK_SPERT_LIBS
+    Do $CMK_PPU_EMBEDSPU spert_main main__funcLookup__.genSPECode main__funcLookup__.genSPECode.ppe.o
+
+    # Include the spe object file for linking into main executable
+    POST_LIBRARIES="$POST_LIBRARIES main__funcLookup__.genSPECode.ppe.o"
+
+  fi
+fi
+
 if [ "$AMPIMAIN" != "" ]
 then
 	OBJECTFILES="$CHARMLIB/lib$AMPIMAIN.o $OBJECTFILES"
