@@ -24,6 +24,7 @@ public: static int __idx;
 #include "ckbitvector.h"
 #include "init.h"
 #include "debug-charm.h"
+#include "simd.h"
 
 PUPbytes(CkChareID)
 PUPbytes(CkGroupID)
