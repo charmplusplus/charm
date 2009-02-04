@@ -126,7 +126,12 @@ static int skt_should_retry(void)
 #else /*UNIX systems-- check errno*/
 	int err=errno;
 	if (err==EINTR) isinterrupt=1;
-	if (err==EAGAIN||err==ECONNREFUSED||err==EWOULDBLOCK||err==ECONNRESET||err==ENOBUFS)
+	if (err==EAGAIN||err==ECONNREFUSED
+               ||err==EWOULDBLOCK||err==ENOBUFS
+#ifndef __CYGWIN__
+               ||err==ECONNRESET
+#endif
+        )
 		istransient=1;
 #endif
 	if (isinterrupt) {
