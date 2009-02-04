@@ -30,13 +30,13 @@ jacobi-get-tokens:
 	make jacobi-get;
 
 test: ampi
-	./charmrun +p3 jacobi 2 2 2 +vp8 +balancer RotateLB +LBDebug 1 $(TESTOPTS)
-	-./charmrun +p3 jacobi.iso 2 2 2 +vp8 +balancer RotateLB +LBDebug 1 $(TESTOPTS) &  \
+	./charmrun +p3 ./jacobi 2 2 2 +vp8 +balancer RotateLB +LBDebug 1 $(TESTOPTS)
+	-./charmrun +p3 ./jacobi.iso 2 2 2 +vp8 +balancer RotateLB +LBDebug 1 $(TESTOPTS) &  \
  pid=$$!; (sleep 30; echo killall jacobi.iso; killall -9 jacobi.iso)
 
 bgtest: jacobi
-	./charmrun +p2 jacobi 2 2 2 10 +vp8 +balancer RotateLB +x2 +y2 +z1 $(TESTOPTS)
-	-./charmrun +p2 jacobi.iso 2 2 2 10 +vp8 +balancer RotateLB +x2 +y2 +z1 $(TESTOPTS)
+	./charmrun +p2 ./jacobi 2 2 2 10 +vp8 +balancer RotateLB +x2 +y2 +z1 $(TESTOPTS)
+	-./charmrun +p2 ./jacobi.iso 2 2 2 10 +vp8 +balancer RotateLB +x2 +y2 +z1 $(TESTOPTS)
 
 clean:
 	rm -f *.o jacobi *~ moduleinit.C charmrun conv-host jacobi-cpp jacobi.iso jacobi-get
