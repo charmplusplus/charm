@@ -234,6 +234,22 @@ public:
 // Page-out policy
 
 /**
+   class vmPageReplacementPolicy
+   Abstract base class providing the interface to the various page
+   replacement policies available for use with an MSA
+*/
+template <class ENTRY_TYPE, unsigned int ENTRIES_PER_PAGE>
+class MSA_PageReplacementPolicy
+{
+public:
+  /// Note that a page was just accessed
+  virtual void pageAccessed(unsigned int page) = 0;
+
+  /// Ask for the index of a page to discard
+  virtual unsigned int selectPage() = 0;
+};
+
+/**
   class vmLRUPageReplacementPolicy
   This class provides the functionality of least recently used page replacement policy.
   It needs to be notified when a page is accessed using the pageAccessed() function and
@@ -245,7 +261,7 @@ public:
      as both operations would then become O(lg(n))
  */
 template <class ENTRY_TYPE, unsigned int ENTRIES_PER_PAGE>
-class vmLRUReplacementPolicy
+class vmLRUReplacementPolicy : public MSA_PageReplacementPolicy <ENTRY_TYPE, ENTRIES_PER_PAGE>
 {
 protected:
     unsigned int nPages;            // number of pages
@@ -310,10 +326,10 @@ public:
              worst-case is O(K n) (if there are no doomed pages).
  */
 template <class ENTRY_TYPE, unsigned int ENTRIES_PER_PAGE>
-class vmNRUReplacementPolicy
+class vmNRUReplacementPolicy : public MSA_PageReplacementPolicy <ENTRY_TYPE, ENTRIES_PER_PAGE>
 {
 protected:
-    unsigned int nPages;            // number of pages
+  unsigned int nPages;            // number of pages
   const std::vector<ENTRY_TYPE *> &pageTable; // actual pages (NULL means page is gone)
   typedef MSA_Page_StateT<ENTRY_TYPE, ENTRIES_PER_PAGE> pageState_t;
   const std::vector<pageState_t *> &pageState;  // state of each page
@@ -525,7 +541,7 @@ protected:
     std::stack<ENTRY_TYPE*> pagePool;     // a pool of unused pages
     
   typedef vmNRUReplacementPolicy<ENTRY_TYPE, ENTRIES_PER_PAGE> vmPageReplacementPolicy;
-    vmPageReplacementPolicy* replacementPolicy;
+    MSA_PageReplacementPolicy<ENTRY_TYPE, ENTRIES_PER_PAGE> *replacementPolicy;
 
     // structure for the bounds of a single write
     typedef struct { unsigned int begin; unsigned int end; } writebounds_t;
