@@ -9,6 +9,7 @@
 #include <stack>
 #include <map>
 #include <set>
+#include <vector>
 #include "msa-common.h"
 
 // forward decl needed in msa-DistPageMgr.ci, i.e. in msa.decl.h
@@ -247,13 +248,13 @@ class vmLRUReplacementPolicy
 {
 protected:
     unsigned int nPages;            // number of pages
-    const page_ptr_t* pageTable; // actual data for pages (NULL means page is gone)
-    MSA_Page_State** pageState;  // state of each page
+  const std::vector<page_ptr_t> &pageTable; // actual data for pages (NULL means page is gone)
+  const std::vector<MSA_Page_State*> &pageState;  // state of each page
     std::list<unsigned int> stackOfPages;
     unsigned int lastPageAccessed;
 
 public:
-    inline vmLRUReplacementPolicy(unsigned int nPages_,const page_ptr_t* pageTable_, MSA_Page_State ** pageState_)
+  inline vmLRUReplacementPolicy(unsigned int nPages_, const std::vector<page_ptr_t> &pageTable_, const std::vector<MSA_Page_State *> &pageState_)
     : nPages(nPages_), pageTable(pageTable_), pageState(pageState_), lastPageAccessed(MSA_INVALID_PAGE_NO) {}
 
     inline void pageAccessed(unsigned int page)
@@ -310,8 +311,8 @@ class vmNRUReplacementPolicy
 {
 protected:
     unsigned int nPages;            // number of pages
-    const page_ptr_t* pageTable; // actual pages (NULL means page is gone)
-    MSA_Page_State** pageState;  // state of each page
+  const std::vector<page_ptr_t> &pageTable; // actual pages (NULL means page is gone)
+  const std::vector<MSA_Page_State*> &pageState;  // state of each page
     enum {K=5}; // Number of distinct pages to remember
     unsigned int last[K]; // pages that have been used recently
     unsigned int Klast; // index into last array.
@@ -324,12 +325,10 @@ protected:
     }
 
 public:
-    inline vmNRUReplacementPolicy(unsigned int nPages_,const page_ptr_t* pageTable_,MSA_Page_State ** pageState_)
-    : nPages(nPages_), pageTable(pageTable_), pageState(pageState_)
+  inline vmNRUReplacementPolicy(unsigned int nPages_, const std::vector<page_ptr_t> &pageTable_, const std::vector<MSA_Page_State *> &pageState_)
+    : nPages(nPages_), pageTable(pageTable_), pageState(pageState_), Klast(0), victim(0)
     {
-        Klast=0;
         for (int k=0;k<K;k++) last[k]=MSA_INVALID_PAGE_NO;
-        victim=0;
     }
 
     inline void pageAccessed(unsigned int page)
@@ -477,9 +476,9 @@ protected:
     std::set<int> enrolledPEs;				// which PEs are involved?
 
     unsigned int nPages;            ///< number of pages
-    ENTRY_TYPE** pageTable;          ///< the page table for this PE: stores actual data.
+  std::vector<ENTRY_TYPE*> pageTable;          ///< the page table for this PE: stores actual data.
     typedef MSA_Page_StateT<ENTRY_TYPE,ENTRIES_PER_PAGE> pageState_t;
-    pageState_t **pageStateStorage; ///< Housekeeping information for each allocated page.
+  std::vector<pageState_t *> pageStateStorage; ///< Housekeeping information for each allocated page.
     
     /// Return the state for this page, returning NULL if no state available.
     inline pageState_t *stateN(unsigned int pageNo) {
@@ -762,12 +761,11 @@ public:
     // MSA_CacheGroup::
     inline MSA_CacheGroup(unsigned int nPages_, CkArrayID pageArrayID,
                       unsigned int max_bytes_, unsigned int nEntries_, unsigned int numberOfWorkerThreads_)
-        : nEntries(nEntries_), numberOfWorkerThreads(numberOfWorkerThreads_) 
+	  : nPages(nPages_), nEntries(nEntries_), numberOfWorkerThreads(numberOfWorkerThreads_), pageTable(nPages, NULL), pageStateStorage(nPages, NULL)
     {
         numberLocalWorkerThreads = 0;  // populated after enroll
         enrollDoneq = 0;  // populated after enroll
 
-        nPages = nPages_;
         pageArray = pageArrayID;
         thisProxy=thisgroup;
         resident_pages = 0;
@@ -778,30 +776,20 @@ public:
 
         // initialize the page table
         typedef ENTRY_TYPE* entry_type_ptr;
-        pageTable = new entry_type_ptr[nPages];
-        pageStateStorage = new pageState_t*[nPages];
 
         // this is the number of sync ack's received till yet
         syncAckCount = 0;
         syncThreadCount = 0;
 
-        replacementPolicy = new vmPageReplacementPolicy(nPages,(page_ptr_t*) pageTable, (MSA_Page_State **)pageStateStorage);
+        replacementPolicy = new vmPageReplacementPolicy(nPages, pageTable, pageStateStorage);
 
-        for(unsigned int i = 0; i < nPages; i++)
-        {
-            pageTable[i] = 0;
-            pageStateStorage[i] = 0;
-        }
-				MSADEBPRINT(printf("MSA_CacheGroup nEntries %d \n",nEntries););
+		MSADEBPRINT(printf("MSA_CacheGroup nEntries %d \n",nEntries););
     }
 
     // MSA_CacheGroup::
     inline ~MSA_CacheGroup()
     {
         FreeMem();
-	
-        delete[] pageTable; pageTable = 0;
-        delete[] pageStateStorage; pageStateStorage = 0;
     }
 
     /* To change the accumulate function TBD @@ race conditions */
