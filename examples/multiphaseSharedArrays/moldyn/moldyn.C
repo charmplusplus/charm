@@ -218,29 +218,6 @@ protected:
     }
 
     // ================================================================
-    // 2D calculations
-
-    inline int numWorkers2D() {
-        static int n = 0;
-
-        if (n==0) {
-            n = (int)(sqrt(numWorkers));
-            CkAssert(n*n == numWorkers);
-        }
-
-        return n;
-    }
-
-    // Convert a 1D ChareArray index into a 2D x dimension index
-    inline unsigned int toX() {
-        return thisIndex/numWorkers2D();
-    }
-    // Convert a 1D ChareArray index into a 2D y dimension index
-    inline unsigned int toY() {
-        return thisIndex%numWorkers2D();
-    }
-
-    // ================================================================
 
     void DoWork()
     {
