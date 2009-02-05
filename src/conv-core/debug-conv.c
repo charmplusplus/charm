@@ -21,6 +21,15 @@ CpvDeclare(int, skipBreakpoint); /* This is a counter of how many breakpoints we
 
 char ** memoryBackup;
 
+#if ! CMK_HAS_NTOHL
+uint32_t ntohl(uint32_t netlong) {
+  union { uint32_t i; unsigned char c[4]; } uaw;
+  uaw.i = netlong;
+  netlong = uaw.c[0]<<24 + uaw.c[1]<<16 + uaw.c[2]<<8 + uaw.c[3];
+  return netlong;
+}
+#endif
+
 /***************************************************
   The CCS interface to the debugger
 */

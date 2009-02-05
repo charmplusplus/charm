@@ -93,6 +93,9 @@
 /* whether Python is installed */
 #undef CMK_HAS_PYTHON
 
+/* whether ntohl is available */
+#undef CMK_HAS_NTOHL
+
 /* whether the sched_setaffinity() exists */
 #undef CMK_HAS_SETAFFINITY
 

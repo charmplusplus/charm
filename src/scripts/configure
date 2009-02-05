@@ -2776,6 +2776,24 @@ then
 	add_flag "CMK_BUILD_PYTHON=$PYTHON_VERSION" "python"
 fi
 
+#### test if "ntohl" is available ####
+cat > $t <<EOT
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+int main() {
+  int i = 100;
+  i = ntohl(i);
+  return 0;
+}
+EOT
+test_link "whether ntohl is available" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_NTOHL $pass
+_ACEOF
+
+
 #### test if it can build shared library ####
 cat > $t <<EOT
 extern int foo();
