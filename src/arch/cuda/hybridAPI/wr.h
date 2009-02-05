@@ -43,10 +43,6 @@ typedef struct dataInfo {
   /* size of buffer in bytes */
   int size; 
 
-  /* user data, may be used to pass scalar values to kernel calls */
-  void *userData; 
-  
-
 } dataInfo; 
 
 
@@ -88,6 +84,8 @@ typedef struct workRequest {
   /* The following flag is used for control by the system */
 
   int state; 
+  /* user data, may be used to pass scalar values to kernel calls */
+  void *userData; 
 
 } workRequest; 
 
