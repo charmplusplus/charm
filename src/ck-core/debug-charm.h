@@ -76,7 +76,7 @@ public:
   /// Return the CpdList path CCS clients should use to access this data.
   virtual const char *getPath(void) const =0;
   /// Return the length of this CpdList.
-  virtual int getLength(void) const =0;
+  virtual size_t getLength(void) const =0;
   /// Does this CpdList requires boundary checking?
   virtual bool checkBoundary(void) const { return checkBound; }
   /// Pup the items listed in this request.  Be sure to call beginItem between items!
@@ -106,7 +106,7 @@ public:
   void operator=(const CpdListAccessor_c &p);	// You don't want to copy
   
   virtual const char *getPath(void) const {return path;}
-  virtual int getLength(void) const {return (*lenFn)(lenParam);}
+  virtual size_t getLength(void) const {return (*lenFn)(lenParam);}
   virtual void pup(PUP::er &p,CpdListItemsRequest &req) {
     (itemsFn)(itemsParam,(pup_er *)&p,&req);
   }
@@ -124,7 +124,7 @@ public:
 	typedef void (*pupFn)(PUP::er &p,int itemNo);
 private:
 	const char *path;
-	int &length;
+	size_t &length;
 	pupFn pfn;
 public:
 	/**
@@ -136,11 +136,11 @@ public:
 			    In particular, this means length must not be moved!
 	     \param pfn_ Function to pup the items in the list.
 	*/
-	CpdSimpleListAccessor(const char *path_,int &length_,pupFn pfn_)
+	CpdSimpleListAccessor(const char *path_,size_t &length_,pupFn pfn_)
 		:path(path_),length(length_),pfn(pfn_) { }
 	virtual ~CpdSimpleListAccessor();
 	virtual const char *getPath(void) const;
-	virtual int getLength(void) const;
+	virtual size_t getLength(void) const;
 	virtual void pup(PUP::er &p,CpdListItemsRequest &req);
 };
 

@@ -206,7 +206,7 @@ void _registerDone(void)
 
 //Print a debugging version of this entry method index:
 void CkPrintEntryMethod(int epIdx) {
-	if (epIdx<=0 || epIdx>=_entryTable.size())
+	if (epIdx<=0 || epIdx>=(int)_entryTable.size())
 		CkPrintf("INVALID ENTRY METHOD %d!",epIdx);
 	else {
 		EntryInfo *e=_entryTable[epIdx];
@@ -217,7 +217,7 @@ void CkPrintEntryMethod(int epIdx) {
 
 //Print a debugging version of this chare index:
 void CkPrintChareName(int chareIdx) {
-	if (chareIdx<=0 || chareIdx>=_chareTable.size())
+	if (chareIdx<=0 || chareIdx>=(int)_chareTable.size())
 		CkPrintf("INVALID CHARE INDEX %d!",chareIdx);
 	else {
 		ChareInfo *c=_chareTable[chareIdx];

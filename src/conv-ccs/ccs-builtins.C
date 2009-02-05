@@ -298,8 +298,8 @@ class CpdList_introspect : public CpdListAccessor {
 public:
   CpdList_introspect(CpdListTable_t *tab_) :tab(tab_) { }
   virtual const char *getPath(void) const { return "converse/lists";}
-  virtual int getLength(void) const {
-    int len=0;
+  virtual size_t getLength(void) const {
+    size_t len=0;
     CkHashtableIterator *it=tab->iterator();
     while (NULL!=it->next()) len++;
     delete it;
@@ -332,7 +332,7 @@ disabled, to avoid bizarre link-time errors.*/
 CpdListAccessor::~CpdListAccessor() { }
 CpdSimpleListAccessor::~CpdSimpleListAccessor() { }
 const char *CpdSimpleListAccessor::getPath(void) const {return path;}
-int CpdSimpleListAccessor::getLength(void) const {return length;}
+size_t CpdSimpleListAccessor::getLength(void) const {return length;}
 void CpdSimpleListAccessor::pup(PUP::er &p,CpdListItemsRequest &req) 
 {
 	for (int i=req.lo;i<req.hi;i++) {

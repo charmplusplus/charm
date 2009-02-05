@@ -31,7 +31,7 @@ class ComlibArrayListener : public CkArrayListener{
     //remove strategy from table, and now it will not get updates
     //about this array
     void unregisterStrategy(StrategyTableEntry *entry) {
-        for(int count = 0; count < strategyList.size(); count++)
+        for(size_t count = 0; count < strategyList.size(); count++)
             if(strategyList[count] == entry)
                 strategyList.remove(count);
     }

@@ -250,7 +250,7 @@ public:
 	*/
 	CkRegisteredInfo() :vec(CkSkipInitialization()) {}
         ~CkRegisteredInfo() {
-        	for (int i=0; i<vec.size(); i++) if (vec[i]) delete vec[i];
+        	for (size_t i=0; i<vec.size(); i++) if (vec[i]) delete vec[i];
   	} 
 
 	/// Add a heap-allocated registration record,
@@ -267,10 +267,10 @@ public:
 	
 	/// Return the number of registered entities in this table.
 	/// (This is a reference so the CpdLists can stay up to date).
-	int &size(void) {return vec.length();}
+	size_t &size(void) {return vec.length();}
 	
 	/// Return the registered data at this index.
-	T *operator[](int idx) {
+	T *operator[](size_t idx) {
 #ifndef CMK_OPTIMIZE
 		/* Bounds-check the index: */
 		if (idx<0 || idx>=vec.size()) outOfBounds(idx);

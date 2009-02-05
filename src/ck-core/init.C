@@ -475,7 +475,7 @@ static inline void _processRODataMsg(envelope *env)
 {
   //Unpack each readonly:
   PUP::fromMem pu((char *)EnvToUsr(env));
-  for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pu);
+  for(size_t i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pu);
   CmiFree(env);
 }
 
@@ -883,7 +883,7 @@ void _initCharm(int unused_argc, char **argv)
                 }
 	}else if(CkMyPe()==0){
 		_allStats = new Stats*[CkNumPes()];
-		register int i, nMains=_mainTable.size();
+		register size_t i, nMains=_mainTable.size();
 		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{
 			register int size = _chareTable[_mainTable[i]->chareIdx]->size;

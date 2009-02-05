@@ -132,7 +132,6 @@ static void traceCommonInit(char **argv)
 	char *cwd;
   CkpvInitialize(char*, selective);
   if (CmiGetArgStringDesc(argv, "+selective", &temproot, "TAU's selective instrumentation file")) {
-    int i;
     // Trying to decide if the traceroot path is absolute or not. If it is not
     // then create an absolute pathname for it.
     if (temproot[0] != PATHSEP) {
@@ -193,7 +192,7 @@ extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "TOTAL_MSGS %d\n", _msgTable.size());
   fprintf(stsfp, "TOTAL_PSEUDOS %d\n", 0);
   fprintf(stsfp, "TOTAL_EVENTS %d\n", nUserEvents);
-  int i;
+  size_t i;
   for(i=0;i<_chareTable.size();i++)
     fprintf(stsfp, "CHARE %d %s\n", i, _chareTable[i]->name);
   for(i=0;i<_entryTable.size();i++)
@@ -258,7 +257,6 @@ extern "C" void traceEnd(void) {
 
 static int checkTraceOnPe(char **argv)
 {
-  int i;
   int traceOnPE = 1;
   char *procs = NULL;
 #if CMK_BLUEGENE_CHARM
@@ -400,7 +398,7 @@ extern "C"
 void traceMemoryUsage()
 {
 #ifndef CMK_OPTIMIZE
-  long d = CmiMemoryUsage();
+  double d = CmiMemoryUsage()*1.0;
 
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
     CkpvAccess(_traces)->memoryUsage(d);

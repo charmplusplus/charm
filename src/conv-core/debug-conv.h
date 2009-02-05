@@ -79,7 +79,7 @@ typedef void (*CpdListItemsFn_c)(void *itemsParam,pup_er p,
     \param lenParam User-defined parameter passed to CpdListRegister_c.
     \param return Length of the CpdList.
 */
-typedef int  (*CpdListLengthFn_c)(void *lenParam);
+typedef size_t  (*CpdListLengthFn_c)(void *lenParam);
 
 /**
   Create a new CpdList at the given path.  When a CCS client requests

@@ -184,7 +184,7 @@ class CpdList_objectNames : public CpdListAccessor {
   int curGroup;
 public:
   virtual const char * getPath(void) const {return "charm/objectNames";}
-  virtual int getLength(void) const {
+  virtual size_t getLength(void) const {
     CkObjectRangeIterator<ignoreAdd> it(0,0,0);
     it.iterate();
     return it.getCount();
@@ -218,7 +218,7 @@ class CpdList_object : public CpdListAccessor {
   CpdListItemsRequest *reqq; // Only used while inside pup routine.
 public:
   virtual const char * getPath(void) const {return "charm/object";}
-  virtual int getLength(void) const {
+  virtual size_t getLength(void) const {
     CkObjectRangeIterator<ignoreAdd> it(0,0,0);
     it.iterate();
     return it.getCount();
@@ -254,7 +254,7 @@ class CpdList_arrayElementNames : public CpdListAccessor {
   PUP::er *pp; // Only used while inside pup routine.
 public:
   virtual const char * getPath(void) const {return "charm/arrayElementNames";}
-  virtual int getLength(void) const {
+  virtual size_t getLength(void) const {
     CkArrayElementRangeIterator<ignoreAdd> it(0,0,0);
     it.iterate();
     return it.getCount();
@@ -281,7 +281,7 @@ class CpdList_arrayElements : public CpdListAccessor {
   PUP::er *pp; // Only used while inside pup routine.
 public:
   virtual const char * getPath(void) const {return "charm/arrayElements";}
-  virtual int getLength(void) const {
+  virtual size_t getLength(void) const {
     CkArrayElementRangeIterator<ignoreAdd> it(0,0,0);
     it.iterate();
     return it.getCount();
@@ -380,7 +380,7 @@ class CpdList_localQ : public CpdListAccessor {
 public:
   CpdList_localQ() {}
   virtual const char * getPath(void) const {return "converse/localqueue";}
-  virtual int getLength(void) const {
+  virtual size_t getLength(void) const {
     int x = CdsFifo_Length((CdsFifo)(CpvAccess(debugQueue)));
     //CmiPrintf("*******Returning fifo length %d*********\n", x);
     //return CdsFifo_Length((CdsFifo)(CpvAccess(CmiLocalQueue)));
