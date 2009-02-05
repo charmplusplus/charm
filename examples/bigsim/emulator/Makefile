@@ -27,11 +27,11 @@ ring: ring.C
 test: all
 	./charmrun ./maxReduce +p4 +cth3 +wth10 +bgstacksize 102400 $(TESTOPTS)
 	./charmrun +p4 ./octo 3 3 3 4 5  +bgstacksize 102400 $(TESTOPTS)
-	./charmrun +p4 ./line 6 6 6 5 6 10 +bgstacksize 102400 $(TESTOPTS)
+	./charmrun +p4 ./line 6 6 6 3 4 10 +bgstacksize 102400 $(TESTOPTS)
 	./charmrun +p4 ./jacobi3D 3 3 3 2 10 0.1 +bgstacksize 204800 $(TESTOPTS)
 	./charmrun +p4 ./prime 3 3 3 3 4 1000 +bgstacksize 102400 $(TESTOPTS)
 	./charmrun +p4 ./ring 2 2 2 1 1 $(TESTOPTS)
-	./charmrun +p4 littleMD/bgMD 6 6 6 5 6 +bgstacksize 102400 $(TESTOPTS)
+	./charmrun +p4 littleMD/bgMD 6 6 6 3 4 +bgstacksize 102400 $(TESTOPTS)
 
 clean:
 	rm -f core *.cpm.h
