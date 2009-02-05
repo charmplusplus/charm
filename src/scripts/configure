@@ -2697,7 +2697,6 @@ _ACEOF
 
 #### test if "ntohl" is available ####
 cat > $t <<EOT
-#include "converse.h"
 #if defined(_WIN32) && ! defined(__CYGWIN__)
 #include <winsock.h>
 #else
@@ -2722,7 +2721,6 @@ _ACEOF
 cat > $t <<EOT
 #include <stdio.h>
 #include <stdlib.h>
-#include "converse.h"    /* cygwin does not like this */
 #include "jpeglib.h"
 
 int main()

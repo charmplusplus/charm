@@ -873,7 +873,6 @@ AC_DEFINE_UNQUOTED(CMK_HAS_STDINT_H, $pass, [whether has stdint.h])
 
 #### test if "ntohl" is available ####
 cat > $t <<EOT
-#include "converse.h"
 #if defined(_WIN32) && ! defined(__CYGWIN__)
 #include <winsock.h>
 #else
@@ -894,7 +893,6 @@ AC_DEFINE_UNQUOTED(CMK_HAS_NTOHL, $pass, [whether ntohl is available])
 cat > $t <<EOT
 #include <stdio.h>
 #include <stdlib.h>
-#include "converse.h"    /* cygwin does not like this */
 #include "jpeglib.h"
 
 int main()
