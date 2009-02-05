@@ -13,8 +13,6 @@
 
 #define CMK_GETPAGESIZE_AVAILABLE                          1
 
-#define CMK_IS_HETERO                                      0
-
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          0
 #define CMK_MALLOC_USE_GNUOLD_MALLOC                       1
@@ -29,12 +27,12 @@
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
 #define CMK_THREADS_USE_CONTEXT                            1
+#define CMK_THREADS_USE_PTHREADS                           0
+#define CMK_THREADS_USE_JCONTEXT                           0
 
 #define CMK_SIGNAL_NOT_NEEDED                              0
 #define CMK_SIGNAL_USE_SIGACTION                           0
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              1
-
-#define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 
@@ -56,12 +54,12 @@
 
 #define CMK_64BIT    1
 
-
 #define CMK_WEB_MODE                                       1
 #define CMK_DEBUG_MODE                                     0
 
 #define CMK_LBDB_ON					   1
 
+#define CMK_DISABLE_SYNC                                   1
 
 #endif
 
