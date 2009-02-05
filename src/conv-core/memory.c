@@ -563,11 +563,11 @@ void CmiOutOfMemoryInit(void) {
 
 #ifndef CMK_MEMORY_BUILD_CHARMDEBUG
 /* declare the cpd_memory routines */
-int  cpd_memory_length(void *lenParam) { return 0; }
+size_t  cpd_memory_length(void *lenParam) { return 0; }
 void cpd_memory_pup(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
 void cpd_memory_leak(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
 void check_memory_leaks(LeakSearchInfo* i) { }
-int  cpd_memory_getLength(void *lenParam) { return 0; }
+size_t  cpd_memory_getLength(void *lenParam) { return 0; }
 void cpd_memory_get(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
 /* routine used by CthMemory{Protect,Unprotect} to specify that some region of
    memory has been protected */

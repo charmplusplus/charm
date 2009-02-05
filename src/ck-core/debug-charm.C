@@ -316,7 +316,7 @@ public:
 #include <rpc/rpc.h>
 #endif
 
-int hostInfoLength(void *) {return 1;}
+size_t hostInfoLength(void *) {return 1;}
 
 void hostInfo(void *itemIter, pup_er pp, CpdListItemsRequest *req) {
   PUP::er &p = *(PUP::er *)pp;
@@ -684,10 +684,10 @@ void CpdStartGdb(void)
 }
 
 extern "C" {
-  int cpd_memory_length(void*);
+  size_t cpd_memory_length(void*);
   void cpd_memory_pup(void*,void*,CpdListItemsRequest*);
   void cpd_memory_leak(void*,void*,CpdListItemsRequest*);
-  int cpd_memory_getLength(void*);
+  size_t cpd_memory_getLength(void*);
   void cpd_memory_get(void*,void*,CpdListItemsRequest*);
 }
 

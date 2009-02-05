@@ -134,8 +134,8 @@ int get_memory_allocated_user_total() {return memory_allocated_user_total;}
 
 /********* Cpd routines for pupping data to the debugger *********/
 
-int cpd_memory_length(void *lenParam) {
-  int n=0;
+size_t cpd_memory_length(void *lenParam) {
+  size_t n=0;
 #ifdef CMK_SEPARATE_SLOT
   n = CkHashtableSize(block_slots) - 1;
 #else
@@ -219,7 +219,7 @@ void cpd_memory_leak(void *iterParam, pup_er p, CpdListItemsRequest *req) {
 }
 */
 
-int cpd_memory_getLength(void *lenParam) { return 1; }
+size_t cpd_memory_getLength(void *lenParam) { return 1; }
 void cpd_memory_get(void *iterParam, pup_er p, CpdListItemsRequest *req) {
   void *userData = (void*)(((unsigned int)req->lo) + (((unsigned long)req->hi)<<32));
   Slot *sl = UserToSlot(userData);
