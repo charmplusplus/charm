@@ -871,6 +871,25 @@ EOT
 test_cxx "whether has stdint.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_STDINT_H, $pass, [whether has stdint.h])
 
+#### test if "ntohl" is available ####
+cat > $t <<EOT
+#include "converse.h"
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+#include <winsock.h>
+#else
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#endif
+
+int main() {
+  int i = 100;
+  i = ntohl(i);
+  return 0;
+}
+EOT
+test_link "whether ntohl is available" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_NTOHL, $pass, [whether ntohl is available])
+
 ### test for libjpeg ####
 cat > $t <<EOT
 #include <stdio.h>
@@ -935,20 +954,6 @@ if test $pass -eq 1
 then
 	add_flag "CMK_BUILD_PYTHON=$PYTHON_VERSION" "python"
 fi
-
-#### test if "ntohl" is available ####
-cat > $t <<EOT
-#include <netinet/in.h>
-#include <arpa/inet.h>
-
-int main() {
-  int i = 100;
-  i = ntohl(i);
-  return 0;
-}
-EOT
-test_link "whether ntohl is available" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_NTOHL, $pass, [whether ntohl is available])
 
 #### test if it can build shared library ####
 cat > $t <<EOT
