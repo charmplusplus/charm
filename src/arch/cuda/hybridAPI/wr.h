@@ -43,6 +43,10 @@ typedef struct dataInfo {
   /* size of buffer in bytes */
   int size; 
 
+  /* user data, may be used to pass scalar values to kernel calls */
+  void *userData; 
+  
+
 } dataInfo; 
 
 

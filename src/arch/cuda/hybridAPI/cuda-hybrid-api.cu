@@ -39,7 +39,7 @@ extern void CUDACallbackManager(void * fn);
  *  completion of GPU events: memory allocation, transfer and
  *  kernel execution
  */  
-// #define GPU_PROFILE
+#define GPU_PROFILE
 
 /* work request queue */
 workRequestQueue *wrQueue = NULL; 
