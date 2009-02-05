@@ -21,6 +21,7 @@ hello.o: hello.C hello.decl.h
 test: all
 	-rm -fr log
 	./charmrun ./hello +p3 $(TESTOPTS)
+	-sync
 	./charmrun ./hello +p3 +restart log $(TESTOPTS)
 	./charmrun ./hello +p4 +restart log $(TESTOPTS)
 

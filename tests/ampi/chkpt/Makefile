@@ -10,6 +10,7 @@ hello: hello.c
 test: hello
 	rm -rf log
 	./charmrun +p3 ./hello +vp8 $(TESTOPTS)
+	-sync
 	./charmrun +p3 ./hello +vp8 +restart log $(TESTOPTS)
 	./charmrun +p2 ./hello +vp8 +restart log $(TESTOPTS)
 
