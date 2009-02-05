@@ -180,8 +180,8 @@ class CkVec : private CkSTLHelper<T> {
     typedef CkVec<T> this_type;
 
     T *block; //Elements of vector
-    int blklen; //Allocated size of block (STL capacity) 
-    int len; //Number of used elements in block (STL size; <= capacity)
+    size_t blklen; //Allocated size of block (STL capacity) 
+    size_t len; //Number of used elements in block (STL size; <= capacity)
     void makeBlock(int blklen_,int len_) {
        if (blklen_==0) block=NULL; //< saves 1-byte allocations
        else {
@@ -212,23 +212,23 @@ class CkVec : private CkSTLHelper<T> {
       return *this;
     }
 
-    int &length(void) { return len; }
-    int length(void) const {return len;}
+    size_t &length(void) { return len; }
+    size_t length(void) const {return len;}
     T *getVec(void) { return block; }
     const T *getVec(void) const { return block; }
     
     T& operator[](size_t n) {
-      CmiAssert(n>=0 && n<len);
+      CmiAssert(n<len);
       return block[n]; 
     }
     
     const T& operator[](size_t n) const { 
-      CmiAssert(n>=0 && n<len);
+      CmiAssert(n<len);
       return block[n]; 
     }
     
     /// Reserve at least this much space (changes capacity, size unchanged)
-    int reserve(int newcapacity) {
+    int reserve(size_t newcapacity) {
       if (newcapacity<=blklen) return 1; /* already there */
       T *oldBlock=block; 
       makeBlock(newcapacity,len);
@@ -237,10 +237,10 @@ class CkVec : private CkSTLHelper<T> {
       delete[] oldBlock; //WARNING: leaks if element copy throws exception
       return 1;
     }
-    inline int capacity(void) const {return blklen;}
+    inline size_t capacity(void) const {return blklen;}
 
     /// Set our length to this value
-    int resize(int newsize) {
+    int resize(size_t newsize) {
       if (!reserve(newsize)) return 0;
       len=newsize;
       return 1;
@@ -252,23 +252,23 @@ class CkVec : private CkSTLHelper<T> {
     }
 
     //Grow to contain at least this position:
-    void growAtLeast(int pos) {
+    void growAtLeast(size_t pos) {
       if (pos>=blklen) reserve(pos*2+16);
     }
-    void insert(int pos, const T &elt) {
+    void insert(size_t pos, const T &elt) {
       if (pos>=len) { 
         growAtLeast(pos);
         len=pos+1;
       }
       block[pos] = elt;
     }
-    void remove(int pos) {
+    void remove(size_t pos) {
       if (pos<0 || pos>=len) 
 	{
 	  CmiAbort("CkVec ERROR: out of bounds\n\n"); 
 	  return;
 	}
-      for (int i=pos; i<len-1; i++)
+      for (size_t i=pos; i<len-1; i++)
         block[i] = block[i+1];
       len--;
     }
@@ -279,16 +279,16 @@ class CkVec : private CkSTLHelper<T> {
 
 //STL-compatability:
     void push_back(const T &elt) {insert(length(),elt);}
-    int size(void) const {return len;}
+    size_t size(void) const {return len;}
 
 //verbose position for easier removal
-    int push_back_v(const T &elt) {insert(length(),elt);return length()-1;}
+    size_t push_back_v(const T &elt) {insert(length(),elt);return length()-1;}
 
  
 //PUP routine help:
     //Only pup the length of this vector, which is returned:
     int pupbase(PUP::er &p) {
-       int l=len;
+       size_t l=len;
        p(l);
        if (p.isUnpacking()) resize(l); 
        return l;
@@ -373,7 +373,7 @@ class CkVec : private CkSTLHelper<T> {
 /// Default pup routine for CkVec: pup each of the elements
 template <class T>
 inline void pupCkVec(PUP::er &p,CkVec<T> &vec) {
-    int len=vec.pupbase(p);
+    size_t len=vec.pupbase(p);
     if (len) PUParray(p,&vec[0],len);
 }
 
@@ -497,11 +497,11 @@ class CkPupAblePtrVec : public CkVec< CkZeroPtr<T, CkPupAblePtr<T> > > {
 		return *this;
 	}
 	void copy_from(const this_type &t) {
-		for (int i=0;i<t.length();i++)
+		for (size_t i=0;i<t.length();i++)
 			push_back((T *)t[i]->clone());
 	}
 	void destroy(void) {
-		for (int i=0;i<this->length();i++)
+		for (size_t i=0;i<this->length();i++)
 			this->operator[] (i).destroy();
 		this->length()=0;
 	}

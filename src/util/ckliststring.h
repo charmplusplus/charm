@@ -20,7 +20,8 @@ public:
   void set(char *s) { list = s; }
   int isEmpty() { return list == NULL; }
   int includes(int p) {
-    int i, ret = 0;
+    size_t i; 
+    int ret = 0;
     char *dupstr = strdup(list);   // don't touch the orignal string
     char *str = strtok(dupstr, ",");
     while (str) {
