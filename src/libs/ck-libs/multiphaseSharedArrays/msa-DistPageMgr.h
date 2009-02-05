@@ -77,39 +77,8 @@ public:
 };
 
 
-/// Stores all housekeeping information about a cached copy of a page: 
-///   everything but the actual page data.
-/// This is the non-templated superclass, which doesn't depend on the 
-///   page size or datatype.
-class MSA_Page_State {
-public:
-	/// e.g., Read_Fault for a read-only page.
-	MSA_Page_Fault_t state;
-	
-	/// If true, this page is locked in memory.
-	///   Pages get locked so people can safely use the non-checking version of "get".
-	bool locked;
-	
-	/// Threads waiting for this page to be paged in from the network.
-	MSA_Listeners readRequests;
-	/// Threads waiting for this page to be paged out to the network.
-	MSA_Listeners writeRequests;
-	
-	/// Return true if this page can be safely written back.
-	bool canPageOut(void) const {
-		return (!locked) && canDelete();
-	}
-	
-	/// Return true if this page can be safely purged from memory.
-	bool canDelete(void) const {
-		return (readRequests.size()==0) && (writeRequests.size()==0);
-	}
-	
-	MSA_Page_State() :state(Uninit_State), locked(false) {}
-};
 
 /// Fast, fixed-size bitvector class.
-// TODO: Replace with std::bitset
 template <unsigned int NUM_BITS>
 class fixedlength_bitvector {
 public:
@@ -140,9 +109,11 @@ public:
 	bool test(unsigned int i) { return (store[i/store_bits] & (1lu<<(i%store_bits))); }
 };
 
-/// Templated page housekeeping class.  
+/// Stores all housekeeping information about a cached copy of a page: 
+///   everything but the actual page data.
 template <class ENTRY, unsigned int ENTRIES_PER_PAGE>
-class MSA_Page_StateT : public MSA_Page_State {
+class MSA_Page_StateT
+{
 	/** Write tracking:
 	   Somehow, we have to identify the entries in a page 
 	 that have been written to.  Our method for doing this is
@@ -163,6 +134,32 @@ class MSA_Page_StateT : public MSA_Page_State {
 	enum {writes2_bits=writes2_t::store_bits*writes_t::store_bits};
 
 public:
+	/// e.g., Read_Fault for a read-only page.
+	MSA_Page_Fault_t state;
+	
+	/// If true, this page is locked in memory.
+	///   Pages get locked so people can safely use the non-checking version of "get".
+	bool locked;
+	
+	/// Threads waiting for this page to be paged in from the network.
+	MSA_Listeners readRequests;
+	/// Threads waiting for this page to be paged out to the network.
+	MSA_Listeners writeRequests;
+	
+	/// Return true if this page can be safely written back.
+	bool canPageOut(void) const {
+		return (!locked) && canDelete();
+	}
+	
+	/// Return true if this page can be safely purged from memory.
+	bool canDelete(void) const {
+		return (readRequests.size()==0) && (writeRequests.size()==0);
+	}
+	
+	MSA_Page_StateT()
+	  : state(Uninit_State), locked(false)
+    { }
+
 	/// Write entry i of this page.
 	void write(unsigned int i) {
 		writes.set(i);
