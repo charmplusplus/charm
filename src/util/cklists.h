@@ -473,7 +473,7 @@ class CkPupPtrVec : public CkVec< CkZeroPtr<T, PUP_PTR> > {
   CkPupPtrVec(int size) :super(size) {}
   
   ~CkPupPtrVec() {
-    for (int i=0;i<this->length();i++)
+    for (size_t i=0;i<this->length();i++)
       this->operator[] (i).destroy();
   }
   void pup(PUP::er &p) { pupCkVec(p,*this); }
