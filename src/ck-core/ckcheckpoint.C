@@ -131,9 +131,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	fclose(datFile);
 
 #if CMK_HAS_SYNC && ! CMK_DISABLE_SYNC
-#if 0
 	system("sync");
-#endif
 #endif
 
 	restartCB = cb;
