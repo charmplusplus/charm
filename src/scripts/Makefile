@@ -441,13 +441,13 @@ pup_util.o: pup_util.C $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o pup_util.o pup_util.C
 
 pup_toNetwork.o: pup_toNetwork.C $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -o pup_toNetwork.o pup_toNetwork.C
+	$(CHARMC) -I. -o pup_toNetwork.o pup_toNetwork.C
 
 pup_toNetwork4.o: pup_toNetwork4.C $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -o pup_toNetwork4.o pup_toNetwork4.C
+	$(CHARMC) -I. -o pup_toNetwork4.o pup_toNetwork4.C
 
 pup_xlater.o: pup_xlater.C $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -o pup_xlater.o pup_xlater.C
+	$(CHARMC) -I. -o pup_xlater.o pup_xlater.C
 
 pup_c.o: pup_c.C $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o pup_c.o pup_c.C
