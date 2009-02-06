@@ -40,10 +40,18 @@ static void callDrivers(void) {
 	FTN_NAME(DRIVER,driver)();
 }
 
+static int callDrivers_idx = -1;
+
+void MBlockNodeInit(void) 
+{
+  CmiAssert(callDrivers_idx == -1);
+  callDrivers_idx = TCHARM_Register_thread_function((TCHARM_Thread_data_start_fn)callDrivers);
+}
+
 //Startup routine to use if the user doesn't register one
 static void MBlockFallbackSetup(void)
 {
-	TCHARM_Create(TCHARM_Get_num_chunks(),callDrivers);
+	TCHARM_Create(TCHARM_Get_num_chunks(),callDrivers_idx);
 }
 
 void MBlockProcInit(void) 
