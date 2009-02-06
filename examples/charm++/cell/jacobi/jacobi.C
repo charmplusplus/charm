@@ -90,12 +90,6 @@ void Jacobi::startIteration() {
   int chareX = GET_CHARE_X(thisIndex);
   int chareY = GET_CHARE_Y(thisIndex);
 
-  //// DEBUG
-  //if (northMsgSave[0] == NULL  && chareY > 0) CkPrintf("[%d @ %d] northMsgSave[0] = NULL...\n", thisIndex, iterCount);
-  //if (southMsgSave[0] == NULL && chareY < (NUM_CHARES - 1)) CkPrintf("[%d @ %d] southMsgSave[0] = NULL...\n", thisIndex, iterCount);
-  //if (eastMsgSave[0] == NULL && chareX < (NUM_CHARES - 1)) CkPrintf("[%d @ %d] eastMsgSave[0] = NULL...\n", thisIndex, iterCount);
-  //if (westMsgSave[0] == NULL && chareX > 0) CkPrintf("[%d @ %d] westMsgSave[0] = NULL...\n", thisIndex, iterCount);
-
   // Send to the north
   if (chareY > 0) {
     #if USE_MESSAGES != 0
@@ -104,7 +98,7 @@ void Jacobi::startIteration() {
       thisProxy[GET_CHARE_I(chareX, chareY-1)].southData_msg(northMsgSave[0]);
       northMsgSave[0] = NULL;
     #else
-      thisProxy[GET_CHARE_I(chareX, chareY-1)].southData(NUM_COLS, (float*)matrix + DATA_NORTH_DATA_OFFSET, iterCount);
+      thisProxy[GET_CHARE_I(chareX, chareY - 1)].southData(NUM_COLS, (float*)matrix + DATA_NORTH_DATA_OFFSET, iterCount);
     #endif
   }
 
@@ -116,7 +110,7 @@ void Jacobi::startIteration() {
       thisProxy[GET_CHARE_I(chareX, chareY+1)].northData_msg(southMsgSave[0]);
       southMsgSave[0] = NULL;
     #else
-      thisProxy[GET_CHARE_I(chareX, chareY+1)].northData(NUM_COLS, (float*)matrix + DATA_SOUTH_DATA_OFFSET, iterCount);
+      thisProxy[GET_CHARE_I(chareX, chareY + 1)].northData(NUM_COLS, (float*)matrix + DATA_SOUTH_DATA_OFFSET, iterCount);
     #endif
   }
 
@@ -159,10 +153,12 @@ void Jacobi::startIteration() {
   //   doCalculation_post()... i.e. iterCount is incremented and then these future
   //   messages are processed before control is passed back to the Charm++ scheduler that
   //   way no messages can be received inbetween (and thus a future message overwritten).
-  if (futureNorthMsg != NULL) { northData_msg(futureNorthMsg); futureNorthMsg = NULL; }
-  if (futureSouthMsg != NULL) { southData_msg(futureSouthMsg); futureSouthMsg = NULL; }
-  if (futureEastMsg != NULL) { eastData_msg(futureEastMsg); futureEastMsg = NULL; }
-  if (futureWestMsg != NULL) { westData_msg(futureWestMsg); futureWestMsg = NULL; }
+  #if USE_MESSAGES != 0
+    if (futureNorthMsg != NULL) { northData_msg(futureNorthMsg); futureNorthMsg = NULL; }
+    if (futureSouthMsg != NULL) { southData_msg(futureSouthMsg); futureSouthMsg = NULL; }
+    if (futureEastMsg != NULL) { eastData_msg(futureEastMsg); futureEastMsg = NULL; }
+    if (futureWestMsg != NULL) { westData_msg(futureWestMsg); futureWestMsg = NULL; }
+  #endif
 }
 
 void Jacobi::northData(int size, float* ghostData, int iterRef) {
@@ -264,22 +260,10 @@ void Jacobi::westData_msg(EastWestGhost* msg) {
 }
 
 void Jacobi::attemptCalculation() {
-
   ghostCount++;
   if (ghostCount >= ghostCountNeeded) {
-    // Reset ghostCount for the next iteration
-    // NOTE: No two iterations can overlap because of the reduction
     ghostCount = 0;
-
-    //#if USE_CALLBACK == 0
-      // Send a message so the threaded doCalculation() entry method will be called
-      thisProxy[thisIndex].doCalculation();  // NOTE: Message needed because doCalculation is [threaded].
-                                             //   DO NOT call doCalculation directly!
-    //#else
-      // NOTE : Since the Offload API callback mechanism is being used, no message is needed
-      //   here (i.e. - just call doCalculation() directly).
-    // doCalculation();
-    //#endif
+    thisProxy[thisIndex].doCalculation();  // NOTE: Message needed because doCalculation is [accel].
   }
 }
 

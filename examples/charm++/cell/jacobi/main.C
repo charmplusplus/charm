@@ -20,17 +20,11 @@ Main::Main(CkArgMsg *msg) {
   unsigned int memNeeded = ((NUM_ROWS + 2) * (NUM_COLS + 2)) * sizeof(float) * 2;
   CkPrintf("   Per Work Request Memory : %d (0x%08x) bytes\n", memNeeded, memNeeded);
 
-  // DEBUG
+  // Display some information on the configuration of the run
   CkPrintf("Config:\n");
-  CkPrintf("  USE_CALLBACK = %d\n", USE_CALLBACK);
   CkPrintf("  USE_REDUCTION = %d\n", USE_REDUCTION);
   CkPrintf("  USE_MESSAGES = %d\n", USE_MESSAGES);
   CkPrintf("  CHARE_MAPPING_TO_PES__STRIPE = %d\n", CHARE_MAPPING_TO_PES__STRIPE);
-  CkPrintf("  WORK_MULTIPLIER = %d\n", WORK_MULTIPLIER);
-  CkPrintf("  FORCE_NO_SPE_OPT = %d\n", FORCE_NO_SPE_OPT);
-  #if CMK_CELL != 0
-    OffloadAPIDisplayConfig(stdout);
-  #endif
 
   // Init the member variables
   iterationCount = 0;
@@ -100,7 +94,7 @@ void Main::maxErrorReductionClient(CkReductionMsg *msg) {
   float maxError = *((float*)(msg->getData()));
 
   #if DISPLAY_MAX_ERROR_FREQ > 0
-    if (iterationCount == 1 || (iterationCount % DISPLAY_MAX_ERROR_FREQ) == 0)
+    if (iterationCount == 0 || (iterationCount % DISPLAY_MAX_ERROR_FREQ) == 0)
       CkPrintf("Iteration %d Finished... maxError = %f...\n", iterationCount, maxError);
   #endif
 
@@ -156,6 +150,10 @@ void Main::reportMaxError(float val, int iter) {
 
     //CkPrintf("Iteration %d Finished... maxError = %f...\n",
     //         iterationCount, partialMaxError[0]);
+    #if DISPLAY_MAX_ERROR_FREQ > 0
+      if (iterationCount == 0 || (iterationCount % DISPLAY_MAX_ERROR_FREQ) == 0)
+        CkPrintf("Iteration %d Finished... maxError = %f...\n", iterationCount, partialMaxError[0]);
+    #endif
 
     if (partialMaxError[0] <= MAX_ERROR) {
 

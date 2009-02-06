@@ -22,25 +22,39 @@
 //    --- SSS SSS ... SSS SSS ---
 //
 // Where:
-//   DDD : Matrix data
-//   MMM : Holds the maxError for a sub-matrix per iteration (filled in by doCalculation on SPE)
+//   DDD : Local matrix data
+//   MMM : Holds the maxError for a sub-matrix per iteration (filled in by doCalculation())
 //   NNN : Is the nothern ghost data
 //   SSS : Is the southern ghost data
 //   WWW : Is the western ghost data
 //   EEE : Is the eastern ghost data
-//   FFF : Is a flag set for the first element (most north-west) so the single constant value
-//           is not changed on the SPE.  For all other elements, it is not set.
-//   --- : Ignored
+//   FFF : Is a flag set for the first chare array element (most north-west element).  For all
+//           other elements, it is not set. (Used by doCalculation() to know which elements
+//           should be held constant and thus not updated each iteration).
+//   --- : Unused (forced to 0)
 //
 
-#define NUM_ROWS      62  // The number of data rows each chare has
-#define NUM_COLS      58  // The number of data columns each chare has (vectorized code used on SPE if this is a '(multiple of 4) +/- 2')
-#define NUM_CHARES    16  // The number of chares (per dimension)
+
+////////////////////////////////////////////////////////////////////////////////
+// Configuration Defines set by User
+
+#define NUM_ROWS      58  // The number of data rows each chare has
+#define NUM_COLS      62  // The number of data columns each chare has (vectorized code used on SPE if this is a '(multiple of 4) +/- 2')
+#define NUM_CHARES    32  // The number of chares (per dimension)
 
 #define MAX_ERROR  0.001f  // The value that all errors have to be below for the program to finish
 
 #define DISPLAY_MATRIX          0
-#define DISPLAY_MAX_ERROR_FREQ  1
+#define DISPLAY_MAX_ERROR_FREQ  5
+
+#define USE_REDUCTION                   (1)
+#define USE_MESSAGES                    (0)
+#define CHARE_MAPPING_TO_PES__STRIPE    (1)
+#define REPORT_MAX_ERROR_BUFFER_DEPTH  (16)
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Generated Configuration Defines and Utility Defines
 
 #define DATA_BUFFER_ROWS   (NUM_ROWS + 2)
 #define DATA_BUFFER_COLS   (NUM_COLS + 2)
@@ -69,23 +83,39 @@
 #define GET_CHARE_X(i)     ( (i) % NUM_CHARES )
 #define GET_CHARE_Y(i)     ( (i) / NUM_CHARES )
 
-#define FUNC_DoCalculation   (1)
 
-#define REPORT_MAX_ERROR_BUFFER_DEPTH  16
+////////////////////////////////////////////////////////////////////////////////
+// Configuration Checks 
 
-// NOTE: If setting USE_CALLBACK to 0, then the doCalculation() entry methods should
-//   be marked as '[threaded]' in the jacobi.ci file.
-#define USE_CALLBACK  1
+#if (NUM_ROWS <= 0)
+  #error "NUM_ROWS must be greater than 0"
+#endif
 
-#define USE_REDUCTION  1
+#if (NUM_COLS <= 0)
+  #error "NUM_COLS must be greater than 0"
+#endif
 
-#define USE_MESSAGES 1
+#if (((NUM_COLS % 2) != 0) || ((NUM_COLS % 4) == 0))
+  #error "NUM_COLS must be a multiple of 2 but not a multiple of 4 (for vectorized code)"
+#endif
 
-#define CHARE_MAPPING_TO_PES__STRIPE  1
+// DMK - TODO : FIXME - Architecture specific check... Currently the Offload API has a
+//   maximum limit on the size of each buffer that is passed to a work request.  If this is a
+//   Cell architecture, check to make sure the tile size is not too large to DMA.  Once the
+//   Offload API is able to handle large DMAs, this check can be removed.
+// NOTE: Constant of 4 comes from sizeof(float) since floats are used for the calculation.
+#if ((CMK_CELL != 0) && ((DATA_BUFFER_SIZE * 4) > SPE_DMA_LIST_ENTRY_MAX_LENGTH))
+  #error "Matrix size per chare is too large (cannot DMA to SPE).  Reduce NUM_COLS and/or NUM_ROWS."
+#endif
 
-#define WORK_MULTIPLIER  24
-
-#define FORCE_NO_SPE_OPT  0
+// DMK - TODO : FIXME - Architecture specific check... Currently, heterogeneous architectures cannot
+//   properly auto-generate pack/unpack routines for some messages.  If this is a heterogeneous
+//   architecture, do not use messages (force parameter marshalling).
+#if ((CMK_HETERO_SUPPORT != 0) && (USE_MESSAGES != 0))
+  #undef USE_MESSAGES
+  #define USE_MESSAGES (0)
+  #warning "USE_MESSAGES cannot be enabled for hetergeneous architectures... disabling USE_MESSAGES..."
+#endif
 
 
 #endif //__JACOBI_CONFIG_H__
