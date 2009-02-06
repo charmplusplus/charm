@@ -3,6 +3,7 @@
 
 using namespace std;
 
+
 // FIXME: might be memory leakage in put
 // This is the way to adapt a library's preferred start interface with the
 // one provided by TCharm (eg. argc,argv vs void).
@@ -12,12 +13,19 @@ extern "C" void armciLibStart(void) {
   ARMCI_Main_cpp(argc, argv);
 }
 
+static int armciLibStart_idx = -1;
+
+void armciNodeInit(void) {
+  CmiAssert(armciLibStart_idx == -1);
+  armciLibStart_idx = TCHARM_Register_thread_function((TCHARM_Thread_data_start_fn)armciLibStart);
+};
+
 // Default startup routine (can be overridden by user's own)
 // This will be registered with TCharm's startup routine
 // in the Node initialization function.
 static void ArmciDefaultSetup(void) {
   // Create the base threads on TCharm using user-defined start routine.
-  TCHARM_Create(TCHARM_Get_num_chunks(), armciLibStart);
+  TCHARM_Create(TCHARM_Get_num_chunks(), armciLibStart_idx);
 }
 
 CtvDeclare(ArmciVirtualProcessor *, _armci_ptr);
