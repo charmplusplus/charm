@@ -39,7 +39,7 @@ extern void CUDACallbackManager(void * fn);
  *  completion of GPU events: memory allocation, transfer and
  *  kernel execution
  */  
-#define GPU_PROFILE
+//#define GPU_PROFILE
 
 /* work request queue */
 workRequestQueue *wrQueue = NULL; 
@@ -145,6 +145,12 @@ void allocateBuffers(workRequest *wr) {
 	}
 
 	nextBuffer = index+1; 
+	if (nextBuffer == NUM_BUFFERS * 2) {
+	  nextBuffer = NUM_BUFFERS; 
+	}
+	
+	bufferInfo[i].bufferID = index; 
+
       }      
       
       // allocate if the buffer for the corresponding index is NULL 
@@ -173,7 +179,7 @@ void setupData(workRequest *wr) {
       hostBuffers[index] = bufferInfo[i].hostBuffer; 
       
       /* allocate if the buffer for the corresponding index is NULL */
-      /*      
+
       if (devBuffers[index] == NULL) {
 	CUDA_SAFE_CALL_NO_SYNC(cudaMalloc((void **) &devBuffers[index], size));
 #ifdef GPU_DEBUG
@@ -181,7 +187,7 @@ void setupData(workRequest *wr) {
 	       cutGetTimerValue(timerHandle)); 
 #endif
       }
-      */
+
       
       if (bufferInfo[i].transferToDevice) {
 	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpyAsync(devBuffers[index], 
