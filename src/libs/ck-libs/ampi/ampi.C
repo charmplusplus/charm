@@ -746,6 +746,7 @@ void ampiParent::pup(PUP::er &p) {
 //	printf("[%d] Ampiparent being pupped \n",thisIndex);
   p|threads;
 
+  p|worldNo;           // why it was missing from here before??
   p|worldStruct;
   myDDT->pup(p);
   p|splitComm;
