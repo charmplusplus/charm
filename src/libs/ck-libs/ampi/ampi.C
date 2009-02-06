@@ -439,6 +439,9 @@ CDECL long ampiCurrentStackUsage(){
  
 }
 
+CDECL void AMPI_threadstart(void *data);
+static int AMPI_threadstart_idx = -1;
+
 static void ampiNodeInit(void)
 {
   mpi_nworlds=0;
@@ -450,6 +453,9 @@ static void ampiNodeInit(void)
 
   AmpiReducer = CkReduction::addReducer(AmpiReducerFunc);
   
+  CmiAssert(AMPI_threadstart_idx == -1);    // only initialize once
+  AMPI_threadstart_idx = TCHARM_Register_thread_function(AMPI_threadstart);
+
   nodeinit_has_been_called=1;
 }
 
@@ -560,7 +566,7 @@ void ampiCreateMain(MPI_MainFn mainFn, const char *name,int nameLen)
 	//Make a new threads array:
 	MPI_threadstart_t s(mainFn);
 	memBuf b; pupIntoBuf(b,s);
-	TCHARM_Create_data( _nchunks,AMPI_threadstart,
+	TCHARM_Create_data( _nchunks,AMPI_threadstart_idx,
 			  b.getData(), b.getSize());
 }
 
