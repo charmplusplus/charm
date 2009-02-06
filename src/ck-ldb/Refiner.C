@@ -324,8 +324,8 @@ void Refiner::Refine(int count, BaseLB::LDStats* stats,
   computeAverage();
 
   if (_lb_args.debug()>2)  {
-    CkPrintf("Old PE load: ");
-    for (i=0; i<count; i++) CkPrintf("%f(%f) ", processors[i].load, processors[i].backgroundLoad);
+    CkPrintf("Old PE load (bg load): ");
+    for (i=0; i<count; i++) CkPrintf("%d:%f(%f) ", i, processors[i].load, processors[i].backgroundLoad);
     CkPrintf("\n");
   }
 
