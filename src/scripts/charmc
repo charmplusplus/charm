@@ -1285,7 +1285,7 @@ case "$LANGUAGE" in
 esac
 
 # DMK - ACCEL SUPPORT - If this is a cell build, add the spe code object to POST_LIBRARIES
-if [ -n "$CMK_CELL" -a "$CMK_CELL" == "1" ]
+if [ $CMK_CELL -eq 1 ]
 then
   if [ "$LANGUAGE" == "charm++" ]
   then
