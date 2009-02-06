@@ -157,7 +157,8 @@ public:
 	}
 	
 	MSA_Page_StateT()
-	  : state(Uninit_State), locked(false)
+	  : writes(), writes2(), state(Uninit_State), locked(false),
+		readRequests(), writeRequests()
     { }
 
 	/// Write entry i of this page.
@@ -417,14 +418,15 @@ class MSA_PageT {
   bool duplicate;
 
 public:
-	MSA_PageT():duplicate(false), n(ENTRIES_PER_PAGE) {
-		data=new ENTRY[ENTRIES_PER_PAGE];
-		for (int i=0;i<ENTRIES_PER_PAGE;i++){
-			data[i]=m.getIdentity();
-		}
-		//shouldn't n be set to ENTRIES_PER_PAGE
-		n = ENTRIES_PER_PAGE;
+
+  MSA_PageT()
+  : n(ENTRIES_PER_PAGE), data(new ENTRY[ENTRIES_PER_PAGE]), duplicate(false)
+  {
+	for (int i=0;i<ENTRIES_PER_PAGE;i++){
+	  data[i]=m.getIdentity();
 	}
+  }
+
     // This constructor is used in PageArray to quickly convert an
     // array of ENTRY into an MSA_PageT.  So we just make a copy of
     // the pointer.  When it comes time to destruct the object, we
@@ -497,44 +499,6 @@ protected:
     typedef MSA_Page_StateT<ENTRY_TYPE,ENTRIES_PER_PAGE> pageState_t;
   std::vector<pageState_t *> pageStateStorage; ///< Housekeeping information for each allocated page.
     
-    /// Return the state for this page, returning NULL if no state available.
-    inline pageState_t *stateN(unsigned int pageNo) {
-        return pageStateStorage[pageNo];
-    }
-    
-    /// Return the state for this page, allocating if needed.
-    pageState_t *state(unsigned int pageNo) {
-        pageState_t *ret=pageStateStorage[pageNo];
-	if (ret==NULL) {
-	    ret=new pageState_t;
-	    pageStateStorage[pageNo]=ret;
-	}
-	return ret;
-    }
-
-    typedef CProxy_MSA_PageArray<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_PageArray_t;
-    CProxy_PageArray_t pageArray;     // a proxy to the page array
-    typedef CProxy_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_CacheGroup_t;
-    CProxy_CacheGroup_t thisProxy; // a proxy to myself.
-
-    std::map<CthThread, MSA_Thread_Listener *> threadList;
-    /// Look up or create the listener for the current thread.
-    MSA_Thread_Listener *getListener(void) {
-    	CthThread t=CthSelf();
-    	MSA_Thread_Listener *l=threadList[t];
-			if (l==NULL) {
-	    	l=new MSA_Thread_Listener;
-	    	threadList[t]=l;
-			}
-			return l;
-    }
-    /// Add our thread to this list and suspend
-    void addAndSuspend(MSA_Listeners &dest) {
-    	MSA_Thread_Listener *l=getListener();
-			dest.add(l);
-			l->suspend();
-    }
-
     std::stack<ENTRY_TYPE*> pagePool;     // a pool of unused pages
     
   typedef vmNRUReplacementPolicy<ENTRY_TYPE, ENTRIES_PER_PAGE> vmPageReplacementPolicy;
@@ -560,6 +524,47 @@ protected:
     // used during output
     MSA_WriteSpan_t writeSpans[ENTRIES_PER_PAGE];
     ENTRY_TYPE writeEntries[ENTRIES_PER_PAGE];
+
+    typedef CProxy_MSA_PageArray<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_PageArray_t;
+    CProxy_PageArray_t pageArray;     // a proxy to the page array
+    typedef CProxy_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_CacheGroup_t;
+    CProxy_CacheGroup_t thisProxy; // a proxy to myself.
+
+    std::map<CthThread, MSA_Thread_Listener *> threadList;
+
+    /// Return the state for this page, returning NULL if no state available.
+    inline pageState_t *stateN(unsigned int pageNo) {
+        return pageStateStorage[pageNo];
+    }
+    
+  /// Return the state for this page, allocating if needed.
+  pageState_t *state(unsigned int pageNo)
+  {
+	pageState_t *ret=pageStateStorage[pageNo];
+	if (ret==NULL)
+	  {
+		ret=new pageState_t;
+		pageStateStorage[pageNo]=ret;
+	  }
+	return ret;
+  }
+
+    /// Look up or create the listener for the current thread.
+    MSA_Thread_Listener *getListener(void) {
+    	CthThread t=CthSelf();
+    	MSA_Thread_Listener *l=threadList[t];
+			if (l==NULL) {
+	    	l=new MSA_Thread_Listener;
+	    	threadList[t]=l;
+			}
+			return l;
+    }
+    /// Add our thread to this list and suspend
+    void addAndSuspend(MSA_Listeners &dest) {
+    	MSA_Thread_Listener *l=getListener();
+			dest.add(l);
+			l->suspend();
+    }
 
     /*********************************************************************************/
     /** these routines deal with managing the page queue **/
