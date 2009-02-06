@@ -110,20 +110,31 @@ void TCHARM_Api_trace(const char *routineName,const char *libraryName)
 	CmiPrintf("\n");
 }
 
-#if CMK_TCHARM_FNPTR_HACK
-CDECL void AMPI_threadstart(void *data);
-#endif
+// register thread start functions to get a function handler
+// this is portable across heterogeneous platforms, or on machines with
+// random stack/function pointer
+
+static CkVec<TCHARM_Thread_data_start_fn> threadFnTable;
+
+int TCHARM_Register_thread_function(TCHARM_Thread_data_start_fn fn)
+{
+  int idx = threadFnTable.size();
+  threadFnTable.push_back(fn);
+  return idx+1;                     // make 0 invalid number
+}
+
+TCHARM_Thread_data_start_fn getTCharmThreadFunction(int idx)
+{
+  CmiAssert(idx > 0);
+  return threadFnTable[idx-1];
+}
 
 static void startTCharmThread(TCharmInitMsg *msg)
 {
 	DBGX("thread started");
 	TCharm::activateThread();
-	typedef void (*threadFn_t)(void *);
-#if CMK_TCHARM_FNPTR_HACK
-	((threadFn_t)AMPI_threadstart)(msg->data);
-#else
-	((threadFn_t)msg->threadFn)(msg->data);
-#endif
+        TCHARM_Thread_data_start_fn threadFn = getTCharmThreadFunction(msg->threadFn);
+	threadFn(msg->data);
 	TCharm::deactivateThread();
 	CtvAccess(_curTCharm)->done();
 }
@@ -618,26 +629,26 @@ CDECL void TCHARM_Set_exit(void) { g_tcharmOptions.exitWhenDone=1; }
 
 /*Create a new array of threads, which will be bound to by subsequent libraries*/
 CDECL void TCHARM_Create(int nThreads,
-			TCHARM_Thread_start_fn threadFn)
+			int threadFn)
 {
 	TCHARMAPI("TCHARM_Create");
 	TCHARM_Create_data(nThreads,
-			 (TCHARM_Thread_data_start_fn)threadFn,NULL,0);
+			 threadFn,NULL,0);
 }
 FDECL void FTN_NAME(TCHARM_CREATE,tcharm_create)
-	(int *nThreads,TCHARM_Thread_start_fn threadFn)
+	(int *nThreads,int threadFn)
 { TCHARM_Create(*nThreads,threadFn); }
 
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg);
 
 /*As above, but pass along (arbitrary) data to threads*/
 CDECL void TCHARM_Create_data(int nThreads,
-		  TCHARM_Thread_data_start_fn threadFn,
+		  int threadFn,
 		  void *threadData,int threadDataLen)
 {
 	TCHARMAPI("TCHARM_Create_data");
 	TCharmInitMsg *msg=new (threadDataLen,0) TCharmInitMsg(
-		(CthVoidFn)threadFn,g_tcharmOptions);
+		threadFn,g_tcharmOptions);
 	msg->numElements=nThreads;
 	memcpy(msg->data,threadData,threadDataLen);
 	TCHARM_Build_threads(msg);
@@ -648,7 +659,7 @@ CDECL void TCHARM_Create_data(int nThreads,
 
 FDECL void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
 	(int *nThreads,
-		  TCHARM_Thread_data_start_fn threadFn,
+		  int threadFn,
 		  void *threadData,int *threadDataLen)
 { TCHARM_Create_data(*nThreads,threadFn,threadData,*threadDataLen); }
 

@@ -49,7 +49,8 @@ public:
 class TCharmInitMsg : public CMessage_TCharmInitMsg {
  public:
 	//Function to start thread with:
-	CthVoidFn threadFn;
+	//CthVoidFn threadFn;
+	int threadFn;
 	//Initial thread parameters:
 	TCHARM_Thread_options opts;
 	//Array size (number of elements)
@@ -57,7 +58,7 @@ class TCharmInitMsg : public CMessage_TCharmInitMsg {
 	//Data to pass to thread:
 	char *data;
 
-	TCharmInitMsg(CthVoidFn threadFn_,const TCHARM_Thread_options &opts_)
+	TCharmInitMsg(int threadFn_,const TCHARM_Thread_options &opts_)
 		:threadFn(threadFn_), opts(opts_) {}
 };
 

@@ -31,11 +31,11 @@ int TCHARM_Get_num_chunks(void);
 
 /*Create a new array of threads, which will be bound to by subsequent libraries*/
 typedef void (*TCHARM_Thread_start_fn)(void);
-void TCHARM_Create(int nThreads,TCHARM_Thread_start_fn threadFn);
+void TCHARM_Create(int nThreads,int threadFn);
 
 /*As above, but pass along (arbitrary) data to thread*/
 typedef void (*TCHARM_Thread_data_start_fn)(void *threadData);
-void TCHARM_Create_data(int nThreads,TCHARM_Thread_data_start_fn threadFn,
+void TCHARM_Create_data(int nThreads,int threadFn,
 		  void *threadData,int threadDataLen);
 
 

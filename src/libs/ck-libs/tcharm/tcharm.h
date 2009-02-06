@@ -33,6 +33,8 @@ void TCHARM_Set_fallback_setup(TCHARM_Fallback_setup_fn f);
 
 #include "tcharm_impl.h"
 
+int TCHARM_Register_thread_function(TCHARM_Thread_data_start_fn fn);
+
 /*
 This "start" call finds the currently running set of tcharm threads,
 copies their arrayID into retTCharmArray, and returns an 
