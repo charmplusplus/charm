@@ -2048,7 +2048,7 @@ Module::genDecls(XStr& str)
   #if CMK_CELL != 0
     str << "extern int register_accel_spe_funcs__module_" << name << "(int curIndex);\n";
     if (isMain()) {
-      str << "extern void register_accel_spe_funcs(int curIndex);\n";
+      str << "extern \"C\" void register_accel_spe_funcs(void);\n";
     }
   #endif
 }
@@ -2066,15 +2066,22 @@ Module::genDefs(XStr& str)
     if (!external) {
 
       // Create the registration function
-      str << "int register_accel_spe_funcs__module_" << name << "(int curIndex) {\n";
+      // NOTE: Add a check so modules won't register more than once.  It is possible that to modules
+      //   could have 'extern' references to each other, creating infinite loops in the registration
+      //   process.  Avoid this problem.
+      str << "int register_accel_spe_funcs__module_" << name << "(int curIndex) {\n"
+          << "  static int hasAlreadyRegisteredFlag = 0;\n"
+          << "  if (hasAlreadyRegisteredFlag) { return curIndex; };\n"
+          << "  hasAlreadyRegisteredFlag = 1;\n";
       genAccels_ppe_c_regFuncs(str);
       str << "  return curIndex;\n"
           << "}\n";
 
       // Check to see if this is the main module (create top register function if so)
       if (isMain()) {
-        str << "void register_accel_spe_funcs(int curIndex) {\n"
-	    << "  register_accel_spe_funcs__module_" << name << "(curIndex);\n"
+        str << "#include\"spert.h\"\n"  // NOTE: Make sure SPE_FUNC_INDEX_USER is defined
+            << "extern \"C\" void register_accel_spe_funcs(void) {\n"
+	    << "  register_accel_spe_funcs__module_" << name << "(SPE_FUNC_INDEX_USER);\n"
 	    << "}\n";
       }
     }
@@ -2116,7 +2123,13 @@ int Module::genAccels_spe_c_funcBodies(XStr& str) {
   if (clist) { rtn += clist->genAccels_spe_c_funcBodies(str); }
 
   // Create the accelerated function registration function for accelerated entries local to this module
-  str << "int register_accel_funcs_" << name << "(int curIndex) {\n";
+  // NOTE: Add a check so modules won't register more than once.  It is possible that to modules
+  //   could have 'extern' references to each other, creating infinite loops in the registration
+  //   process.  Avoid this problem.
+  str << "int register_accel_funcs_" << name << "(int curIndex) {\n"
+      << "  static int hasAlreadyRegisteredFlag = 0;\n"
+      << "  if (hasAlreadyRegisteredFlag) { return curIndex; };\n"
+      << "  hasAlreadyRegisteredFlag = 1;\n";
   genAccels_spe_c_regFuncs(str);
   str << "  return curIndex;\n"
       << "}\n\n\n";
