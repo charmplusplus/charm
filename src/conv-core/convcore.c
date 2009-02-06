@@ -2958,13 +2958,15 @@ void ConverseCommonExit(void)
 }
 
 
-#if CMK_CELL
+#if CMK_CELL != 0
+
+extern void register_accel_spe_funcs(void);
 
 void CmiInitCell()
 {
   // Create a unique string for each PPE to use for the timing
   //   data file's name
-  char fileNameBuf[128];
+  char fileNameBuf[64];
   sprintf(fileNameBuf, "speTiming.%d", CmiMyPe());
 
   InitOffloadAPI(offloadCallback, NULL, NULL, fileNameBuf);
@@ -2972,6 +2974,9 @@ void CmiInitCell()
   //      (CcdVoidFn) OffloadAPIProgress, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) OffloadAPIProgress, NULL);
+
+  // Register accelerated entry methods on the PPE
+  register_accel_spe_funcs();
 }
 
 #include "cell-api.c"
