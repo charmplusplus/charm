@@ -952,6 +952,18 @@ CreateFiber(
     );
 
 WINBASEAPI
+LPVOID 
+WINAPI 
+CreateFiberEx(
+    SIZE_T dwStackCommitSize,
+    SIZE_T dwStackReserveSize,
+    DWORD dwFlags,
+    LPFIBER_START_ROUTINE lpStartAddress,
+    LPVOID lpParameter
+);
+
+
+WINBASEAPI
 VOID
 WINAPI
 DeleteFiber(
@@ -1150,7 +1162,8 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
-  result->fiber = CreateFiber(size, FiberSetUp, (PVOID) fiberData);
+  /* result->fiber = CreateFiber(size, FiberSetUp, (PVOID) fiberData); */
+  result->fiber = CreateFiberEx(size, size, 0, FiberSetUp, (PVOID) fiberData);
   if (!result->fiber)
     CmiAbort("CthCreate failed to create fiber!\n");
   
