@@ -6,6 +6,9 @@ CMK_LD="$CMK_LD -mno-cygwin -L/usr/local/mingw/lib "
 CMK_LDXX="$CMK_LDXX -mno-cygwin -L/usr/local/mingw/lib "
 CMK_SYSLIBS="-lwsock32"
 
+CMK_LIBS=""
+CMK_QT="none"
+
 CMK_NATIVE_CC="gcc "
 CMK_NATIVE_CXX="g++ "
 CMK_NATIVE_LD="gcc "
