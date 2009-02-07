@@ -1735,8 +1735,8 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
         then
           test_result 1 "$1" "$2" "$3"
         else
-          echo $CMK_LDXX -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 >> $charmout
-          $CMK_LDXX -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 >> out 2>&1
+          echo $CMK_LDXX -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> $charmout
+          $CMK_LDXX -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> out 2>&1
           ret=$?
 	  test ! -x testlink && ret=1
           test_result $ret "$1" "$2" "$3"
@@ -1768,8 +1768,8 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
         then
           test_result 1 "$1" "$2" "$3"
         else
-          echo $CMK_LD -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 >> $charmout
-          $CMK_LD -o testlink test.o $CMK_LIBDIR $OPTS_LD $4 >> out 2>&1
+          echo $CMK_LD -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> $charmout
+          $CMK_LD -o testlink test.o $CMK_LIBDIR $OPTS_LD $CMK_SYSLIBS $4 >> out 2>&1
           test_result $? "$1" "$2" "$3"
         fi
  	strictpass=$pass
@@ -2697,7 +2697,7 @@ _ACEOF
 
 #### test if "ntohl" is available ####
 cat > $t <<EOT
-#if defined(_WIN32) && ! defined(__CYGWIN__)
+#if defined(_WIN32) && ! defined(__CYGWIN__) || defined(__MINGW_H)
 #include <winsock.h>
 #else
 #include <netinet/in.h>
