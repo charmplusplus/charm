@@ -15,6 +15,10 @@
 #  define alloca _alloca
 #endif
 
+#ifdef __MINGW_H
+#error "not supported under cygwin and mingw!"
+#endif
+
 /* Enable this define to get lots of debugging printouts */
 #define VERBOSE(x) /* x */
 
