@@ -387,7 +387,7 @@ fmain-ok: fmain.f90
 	-@cp fmain.o ../lib
 	-@touch fmain-ok
 
-QUICKTHREADS: $(CVHEADERS)
+QUICK_THREADS: $(CVHEADERS)
 	-cd QuickThreads && make clean
 	cd QuickThreads;./configure
 	cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS)'
@@ -396,7 +396,7 @@ QUICKTHREADS: $(CVHEADERS)
 	  test -d ../lib_so && \
 	  cp -f QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so && \
 	  cp -f QuickThreads/libqt.$$CMK_SHARED_SUF ../lib_so/libckqt.$$CMK_SHARED_SUF)
-	touch QUICKTHREADS
+	touch QUICK_THREADS
 
 METIS:  charm++
 	cd libs/ck-libs/parmetis/METISLib && $(MAKE) OPTS='$(OPTS)'
@@ -567,7 +567,7 @@ $(L)/libmemory-charmdebug.o: memory-charmdebug.c $(MEM_DEPS)
 
 ## Thread libraries (-thread)
 
-LIBTHREADSDEPS := threads.c $(CVHEADERS) QUICKTHREADS
+LIBTHREADSDEPS := threads.c $(CVHEADERS) QUICK_THREADS
 
 $(L)/libthreads-default.o: $(LIBTHREADSDEPS)
 	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_DEFAULT=1 -IQuickThreads -I. threads.c
