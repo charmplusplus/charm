@@ -115,10 +115,10 @@ void allocateBuffers(workRequest *wr) {
       // if index value is invalid, use an available ID  
       if (index < 0 || index >= NUM_BUFFERS) {
 	int found = 0; 
-	for (int i=nextBuffer; i<NUM_BUFFERS*2; i++) {
-	  if (devBuffers[i] == NULL) {
-	    bufferInfo[i].bufferID = i; 
-	    index = i;
+	for (int j=nextBuffer; j<NUM_BUFFERS*2; j++) {
+	  if (devBuffers[j] == NULL) {
+	    bufferInfo[i].bufferID = j; 
+	    index = j;
 	    found = 1; 
 	    break;
 	  }
@@ -129,10 +129,10 @@ void allocateBuffers(workRequest *wr) {
 	 */
 	
 	if (!found) {
-	  for (int i=NUM_BUFFERS; i<nextBuffer; i++) {
-	    if (devBuffers[i] == NULL) {
-	      bufferInfo[i].bufferID = i; 
-	      index = i;
+	  for (int j=NUM_BUFFERS; j<nextBuffer; j++) {
+	    if (devBuffers[j] == NULL) {
+	      bufferInfo[i].bufferID = j; 
+	      index = j;
 	      found = 1; 
 	      break;
 	    }
