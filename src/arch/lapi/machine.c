@@ -186,7 +186,8 @@ CsvDeclare(CmiNodeState, NodeState);
 /* To conform with the call made in SMP mode */
 static void CmiStartThreads(char **argv) {
   CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
-  /* _Cmi_mype = Cmi_nodestart; // already set! */
+  /* _Cmi_mype = Cmi_nodestart; // already set! 
+  */
   _Cmi_myrank = 0;
 }
 #endif
@@ -553,7 +554,7 @@ void CmiNotifyIdle(void) {
    immediate messages. If we are not in lapiInterruptMode check for progress.
 */
 #if CMK_IMMEDIATE_MSG
-void CmiProbeImmediateMsg() {
+void CmiMachineProgressImpl() {
   MACHSTATE1(2,"[%p] Probing Immediate Messages",CmiGetState());
   if (!CsvAccess(lapiInterruptMode)) LAPI_Probe(lapiContext);
   MACHSTATE1(3, "[%p] Handling Immediate Message",CmiGetState());
@@ -563,8 +564,8 @@ void CmiProbeImmediateMsg() {
 
 /* These two barriers are only needed by CmiTimerInit to synchronize all the
    threads. They do not need to provide a general barrier. */
-void CmiBarrier() {}
-void CmiBarrierZero() {}
+int CmiBarrier() {return 0;}
+int CmiBarrierZero() {return 0;}
 
 /********************* MESSAGE SEND FUNCTIONS ******************/
 
