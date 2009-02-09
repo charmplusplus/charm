@@ -104,7 +104,7 @@ jadeall: jade
 	cd ../java/charm/jade && $(MAKE)
 
 #include TAU defs
-TAU_MAKEFILE=
+TAU_MAKEFILE=Make.tau
 include	$(TAU_MAKEFILE) #stub-makefile
 
 #builds TAU's trace library
