@@ -61,7 +61,7 @@ class bar {
 #endif
 
 #ifndef CHARM_H
-#  include <converse.h> // <- for CmiBool, CMK_* defines
+#  include "converse.h" // <- for CmiBool, CMK_* defines
 #endif
 
 //We need CkMigrateMessage only to distinguish the migration
