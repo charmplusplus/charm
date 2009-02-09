@@ -758,7 +758,7 @@ extern void traceBeginFuncIndexProj(int, char *, int);
 extern void traceEndFuncIndexProj(int);
 
 
-// Determine approximate depth of stack at the point of this call
+/* Determine approximate depth of stack at the point of this call */
 extern long ampiCurrentStackUsage();
 
 
