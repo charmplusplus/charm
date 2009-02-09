@@ -567,7 +567,7 @@ $(L)/libmemory-charmdebug.o: memory-charmdebug.c $(MEM_DEPS)
 
 ## Thread libraries (-thread)
 
-LIBTHREADSDEPS := threads.c $(CVHEADERS) QUICK_THREADS
+LIBTHREADSDEPS = threads.c $(CVHEADERS) QUICK_THREADS
 
 $(L)/libthreads-default.o: $(LIBTHREADSDEPS)
 	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_DEFAULT=1 -IQuickThreads -I. threads.c
