@@ -449,6 +449,7 @@ fi
 $DESTINATION/tmp/system_ln "../../src/scripts/Make.depends" $DESTINATION/tmp/Make.depends
 $DESTINATION/tmp/system_ln "../../src/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
 $DESTINATION/tmp/system_ln "../../src/scripts/Makefile" $DESTINATION/tmp/Makefile
+$DESTINATION/tmp/system_ln "../../src/scripts/Make.tau" $DESTINATION/tmp/Make.tau
 touch $DESTINATION/tmp/Makefile.machine
 
 ConvUsr="$DESTINATION/tmp/conv-mach-pre.sh"
@@ -508,19 +509,19 @@ then
 	echo "TAU>>>> makefile config option: $TAU_MAKEFILE"
 	if [ -f $TAU_MAKEFILE ]
 	then
-	#Setting up TAU trace library:
-	echo "TAU>>>> configuring with this TAU makefile: $TAU_MAKEFILE"
+	  #Setting up TAU trace library:
+	  echo "TAU>>>> configuring with this TAU makefile: $TAU_MAKEFILE"
 
-	SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
+	  SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
 
 	else
-	echo "TAU>>>> ERROR could not find Makefile: $TAU_MAKEFILE"
-        TAU_MAKEFILE=""
+	  echo "TAU>>>> ERROR could not find Makefile: $TAU_MAKEFILE, ignored"
+          TAU_MAKEFILE="Make.tau"
 	fi
 else
     # Still need to set the variables in Makefile and charmc to ""
     # even in the non-Tau case.
-    TAU_MAKEFILE=""
+    TAU_MAKEFILE="Make.tau"
     SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
 
 fi
