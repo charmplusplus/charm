@@ -128,6 +128,15 @@ public:
             Handle::checkValid();
             Handle::msa.accumulate(idx, ent);
         }
+
+        void contribute(unsigned int idx, const ENTRY *begin, const ENTRY *end)
+        {
+            Handle::checkValid();
+            for (const ENTRY *e = begin; e != end; ++e, ++idx)
+                {
+                    Handle::msa.accumulate(idx, *e);
+                }
+        }
     };
 
 protected:
@@ -177,12 +186,8 @@ public:
                  unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES) 
         : nEntries(nEntries_), initHandleGiven(false)
     {
-        // first create the Page Array and the Page Group
         unsigned int nPages = (nEntries + ENTRIES_PER_PAGE - 1)/ENTRIES_PER_PAGE;
-        CProxy_PageArray_t pageArray = CProxy_PageArray_t::ckNew(nPages);
-        cg = CProxy_CacheGroup_t::ckNew(nPages, pageArray, maxBytes, nEntries, num_wrkrs);
-        pageArray.setCacheProxy(cg);
-        pageArray.ckSetReductionClient(new CkCallback(CkIndex_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(), cg));
+        cg = CProxy_CacheGroup_t::ckNew(nPages, maxBytes, nEntries, num_wrkrs);
         cache = cg.ckLocalBranch();
     }
 

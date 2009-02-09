@@ -6,9 +6,11 @@ module msa
     // this is the per processor cache of pages.
     template<class ENTRY_TYPE, class ENTRY_OPS_CLASS,unsigned int ENTRIES_PER_PAGE> group MSA_CacheGroup
     {
-        entry MSA_CacheGroup(unsigned int nPages, CkArrayID pageArrayID,
-                         unsigned int max_bytes, unsigned int nEntries, unsigned int numberOfWorkerThreads);
-        entry void AckPage(unsigned int page);
+	    entry MSA_CacheGroup(unsigned int nPages,
+							 unsigned int max_bytes,
+							 unsigned int nEntries,
+							 unsigned int numberOfWorkerThreads);
+	    entry void AckPage(unsigned int page);
         entry void ReceivePage(unsigned int page, ENTRY_TYPE pageData[size], int size);
         entry void ReceivePageWithPUP(unsigned int page, MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> pageData, int size);
         entry void enroll(unsigned int numberOfWorkerThreads);
