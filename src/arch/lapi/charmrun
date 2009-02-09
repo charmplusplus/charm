@@ -234,6 +234,12 @@ EOF
 # user exports
 grep -E -v "#@" $llfile | grep "export" >> $filename
 
+if [ ! -x "$PWD/$executable" ]
+    then
+    echo "Executable not found: $PWD/$executable"
+    exit
+fi
+
 if [ $interactive -eq 0 ]
     then
     # submit the job as poe, iterating 
