@@ -1,26 +1,33 @@
-CDIR :=../../../..
-INCDIR:=$(CDIR)/include
-CHARMC:=$(CDIR)/bin/charmc $(OPTS)
+CDIR =../../../..
+INCDIR=$(CDIR)/include
+CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-LIB := libmoduleCkMulticast.a
-LIBOBJ := ckmulticast.o
+LIB = libmoduleCkMulticast.a
+LIBOBJ = ckmulticast.o
 
-HEADERS := $(INCDIR)/CkMulticast.decl.h \
+HEADERS = $(INCDIR)/CkMulticast.decl.h \
           $(INCDIR)/CkMulticast.def.h \
           $(INCDIR)/ckmulticast.h
-LIBDEST :=  $(CDIR)/lib/$(LIB)
+LIBDEST =  $(CDIR)/lib/$(LIB)
 
-CIFILES := ckmulticast.ci
+CIFILES = ckmulticast.ci
 
 all: $(LIBDEST) $(HEADERS)
 
-$(INCDIR)/%: %
-	cp $< $@
+#$(INCDIR)/%: %
+#	cp $< $@
 
 #$(HEADERS): CkMulticast.decl.h ckmulticast.h 
 #	/bin/cp CkMulticast.decl.h $(CDIR)/include
 #	/bin/cp CkMulticast.def.h $(CDIR)/include
 #	/bin/cp ckmulticast.h $(CDIR)/include
+
+$(INCDIR)/CkMulticast.decl.h: CkMulticast.decl.h
+	/bin/cp CkMulticast.decl.h $(CDIR)/include
+$(INCDIR)/CkMulticast.def.h: CkMulticast.def.h
+	/bin/cp CkMulticast.def.h $(CDIR)/include
+$(INCDIR)/ckmulticast.h: ckmulticast.h
+	/bin/cp ckmulticast.h $(CDIR)/include
 
 $(LIBDEST): $(LIBOBJ)
 	$(CHARMC) -o $(LIBDEST) $(LIBOBJ) 
