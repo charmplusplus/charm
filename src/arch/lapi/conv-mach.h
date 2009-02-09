@@ -8,6 +8,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_AIX                                           1
+
 #define CMK_GETPAGESIZE_AVAILABLE                          0
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
