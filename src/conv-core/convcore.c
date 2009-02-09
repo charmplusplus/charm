@@ -1610,8 +1610,9 @@ void CthResumeNormalThread(CthThreadToken* token)
 {
   CthThread t = token->thread;
 
-  //BIGSIM_OOC DEBUGGING
-  //CmiPrintf("Resume normal thread with token[%p] ==> thread[%p]\n", token, t);
+  /* BIGSIM_OOC DEBUGGING
+  CmiPrintf("Resume normal thread with token[%p] ==> thread[%p]\n", token, t);
+  */
 
   if(t == NULL){
     free(token);
@@ -1626,9 +1627,10 @@ void CthResumeNormalThread(CthThreadToken* token)
 #endif
 #endif
 
-  //BIGSIM_OOC DEBUGGING
-  //CmiPrintf("In CthResumeNormalThread:   ");
-  //CthPrintThdMagic(t);
+  /* BIGSIM_OOC DEBUGGING
+  CmiPrintf("In CthResumeNormalThread:   ");
+  CthPrintThdMagic(t);
+  */
   CthResume(t);
 }
 
@@ -3084,8 +3086,8 @@ unsigned char computeCheckSum(unsigned char *data, int len)
 }
 
 /* Flag for bigsim's out-of-core emulation */
-int BgOutOfCoreFlag=0; //indicate the type of memory operation (in or out)
-int BgInOutOfCoreMode=0; //indicate whether the emulation is in the out-of-core emulation mode
+int BgOutOfCoreFlag=0; /*indicate the type of memory operation (in or out) */
+int BgInOutOfCoreMode=0; /*indicate whether the emulation is in the out-of-core emulation mode */
 
 #if !CMK_HAS_LOG2
 unsigned int CmiLog2(unsigned int val) {
