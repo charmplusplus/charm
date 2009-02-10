@@ -68,7 +68,7 @@ public:
 
     private:
         // Disallow copy construction
-        Handle(Handle &m) {}
+        Handle(Handle &);
     };
 
     class Read : public Handle
@@ -468,7 +468,7 @@ public:
         }
     private:
         // Disallow copy construction
-        Handle(Handle &m) {}
+        Handle(Handle &);
     };
 
     class Read : public Handle
