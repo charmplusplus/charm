@@ -31,9 +31,10 @@ public:
   double cpufactor;	   /* cpu factor to multiply to the time for walltime */
   double fpfactor;         /* fp time factor */
   int    record, replay;   /* record/replay */
+  CkListString recordprocs;
   char *traceroot;	   /* bgTraceFile prefix */
   BigSimNetwork *network;  /* network setup */
-  CkListString procList;
+  CkListString procList;   /* a list of processor numbers with projections */
 public:
   BGMach() {  nullify(); }
   ~BGMach() { if (network) delete network; }

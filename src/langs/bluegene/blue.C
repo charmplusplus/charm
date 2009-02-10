@@ -1354,6 +1354,10 @@ CmiStartFn bgMain(int argc, char **argv)
   if (CmiGetArgIntDesc(argv,"+bgreplay", &replaype, "Re-play message processing order for BigSim")) {
     cva(bgMach).replay = replaype;
   }
+  char *procs = NULL;
+  if (CmiGetArgStringDesc(argv, "+bgrecordprocessors", &procs, "A list of processors to record, e.g. 0,10,20-30")) {
+    cva(bgMach).recordprocs.set(strdup(procs));
+  }
 
 
   /* parameters related with out-of-core execution */

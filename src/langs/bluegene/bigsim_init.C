@@ -244,6 +244,15 @@ int BGMach::read(char *file)
       procList.set(strdup(parameterValue));
       continue;
     }
+    if (!strcmp(parameterName, "record")) {
+      if (!strcmp(parameterValue, "yes"))
+        record = 1;
+      continue;
+    }
+    if (!strcmp(parameterName, "recordprocessors")) {
+      recordprocs.set(strdup(parameterValue));
+      continue;
+    }
     /* Parameters related with out-of-core execution */
 //    if (!strcmp(parameterName, "bgooc")) {      
 //        bgUseOutOfCore = 1;
