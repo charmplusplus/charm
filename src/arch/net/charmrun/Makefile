@@ -19,11 +19,11 @@ charmrun-notify: charmrun.c $(INCLUDED)
 	(cd ..; CHARMINC=.; . ./conv-config.sh; cp ../bin/charmrun-notify$$CMK_POST_EXE ../bin/charmrun$$CMK_POST_EXE)
 
 charmd: daemon.c daemon.h ../sockRoutines-seq.o
-	$(CHARMC) -c daemon.c -o daemon.o
+	$(CHARMC) -seq -c daemon.c -o daemon.o
 	$(CHARMC) -cp $(BIN) -seq daemon.o ../sockRoutines-seq.o -o charmd
 
 charmd_faceless: daemon.c daemon.h ../sockRoutines-seq.o
-	$(CHARMC) -DFACELESS -c daemon.c -o daemon-faceless.o
+	$(CHARMC) -seq -DFACELESS -c daemon.c -o daemon-faceless.o
 	$(CHARMC) -cp $(BIN) -seq -DFACELESS daemon-faceless.o ../sockRoutines-seq.o -o charmd_faceless;
 
 clean:
