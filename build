@@ -204,6 +204,7 @@ WITH_ROMIO=
 BUILD_EMULATOR=0
 DESTINATION=""
 DESTINATION_SUFFIX=""
+TAU_MAKEFILE=""
 
 [ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | more && exit 1
 [ $# -lt 2 ] && ./smart-build.pl && exit 1
@@ -504,31 +505,28 @@ fi
 
 
 # build with Tau
+WITH_TAU=0
 if [ "$PROGRAM" = "Tau" ]
 then
 	echo "TAU>>>> makefile config option: $TAU_MAKEFILE"
-	if [ -f $TAU_MAKEFILE ]
+	if [ -n "$TAU_MAKEFILE" -a -f $TAU_MAKEFILE ]
 	then
 	  #Setting up TAU trace library:
 	  echo "TAU>>>> configuring with this TAU makefile: $TAU_MAKEFILE"
 
-	  SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
-
+          WITH_TAU=1
 	else
 	  echo "TAU>>>> ERROR could not find Makefile: $TAU_MAKEFILE, ignored"
-          TAU_MAKEFILE="Make.tau"
+          TAU_MAKEFILE=""
 	fi
-else
-    # Still need to set the variables in Makefile and charmc to ""
-    # even in the non-Tau case.
-    TAU_MAKEFILE="Make.tau"
-    SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
-
 fi
+[ -z "$TAU_MAKEFILE" ] && TAU_MAKEFILE="Make.tau"
+SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
+
 sed -e $SED_CHARMC src/scripts/Makefile > .Makefile.$$ && cp .Makefile.$$ src/scripts/Makefile && rm -f  .Makefile.$$
 sed -e $SED_CHARMC src/scripts/charmc > .charmc.$$ && cp .charmc.$$ src/scripts/charmc && rm -f .charmc.$$
 
-if test -n "$TAU_MAKEFILE"
+if test $WITH_TAU -eq 1
 then
     echo "#define CMK_WITH_TAU               1" >> $ConvHeader
     echo "#define pthread_create             tau_pthread_create" >> $ConvHeader
