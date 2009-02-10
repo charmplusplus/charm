@@ -1346,7 +1346,7 @@ public:
     /// Receive a runlength encoded page from the network:
     inline void PAReceiveRLEPageWithPup(
     	const MSA_WriteSpan_t *spans, unsigned int nSpans, 
-        MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> &entries, unsigned int nEntries, 
+        page_t &entries, unsigned int nEntries, 
         int pe, MSA_Page_Fault_t pageState)
 		{
 			PAReceiveRLEPage(spans, nSpans, entries.getData(), nEntries, pe, pageState);
