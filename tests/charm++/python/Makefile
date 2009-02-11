@@ -1,4 +1,4 @@
-CHARMDIR=$(HOME)/installations/charm/net-linux-amd64
+CHARMDIR = ../../..
 CHARMC = $(CHARMDIR)/bin/charmc $(OPTS)
 INCL = -I/usr/include/python/
 LIBS = -lpthread -lutil -ldl -lm -lpython2.5
@@ -29,8 +29,7 @@ server.o: server.C server.decl.h server.h
 
 test: all
 	./charmrun ./server ++remote-shell ssh ++server ++server-port 1234 +p2 $(OPTS) &
-	./client localhost 1234 <python.code
+	./client localhost 1234 4 1 0 <python.code
 	sleep 2
-	./client localhost 1234 <python.code
-	sleep 2
-	./client localhost 1234 kill <python.code
+	./charmrun ./server ++remote-shell ssh ++server ++server-port 1234 +p2 $(OPTS) &
+	./client localhost 1234 4 0 0 <python.code

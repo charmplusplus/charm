@@ -32,7 +32,7 @@ public:
 
 int main (int argc, char** argv) {
 
-  if (argc<3) return 1;
+  if (argc<5) return 1;
 
   char codeline[1000];
   std::string code;
