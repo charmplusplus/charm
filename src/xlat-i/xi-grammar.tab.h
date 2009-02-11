@@ -105,10 +105,9 @@
      DOUBLE = 321,
      UNSIGNED = 322,
      ACCEL = 323,
-     INOUT = 324,
-     IN = 325,
-     OUT = 326,
-     ACCELBLOCK = 327
+     READWRITE = 324,
+     WRITEONLY = 325,
+     ACCELBLOCK = 326
    };
 #endif
 /* Tokens.  */
@@ -178,10 +177,9 @@
 #define DOUBLE 321
 #define UNSIGNED 322
 #define ACCEL 323
-#define INOUT 324
-#define IN 325
-#define OUT 326
-#define ACCELBLOCK 327
+#define READWRITE 324
+#define WRITEONLY 325
+#define ACCELBLOCK 326
 
 
 
@@ -227,7 +225,7 @@ typedef union YYSTYPE
   AccelBlock* accelBlock;
 }
 /* Line 1489 of yacc.c.  */
-#line 231 "y.tab.h"
+#line 229 "y.tab.h"
 	YYSTYPE;
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1

@@ -2204,9 +2204,8 @@ struct rwtable rwtable[] = {
   "namespace",  NAMESPACE,
   "using",      USING,
   "accel",      ACCEL,
-  "inout",      INOUT,
-  "in",         IN,
-  "out",        OUT,
+  "readwrite",  READWRITE,
+  "writeonly",  WRITEONLY,
   "accelblock", ACCELBLOCK,
   "",		0
 };

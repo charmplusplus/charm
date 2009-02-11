@@ -330,12 +330,12 @@ class Parameter {
     // DMK - Added for accelerator options
     public:
     enum {
-      ACCEL_BUFFER_TYPE_UNKNOWN = 0,
-      ACCEL_BUFFER_TYPE_MIN     = 1,
-      ACCEL_BUFFER_TYPE_INOUT   = 1,
-      ACCEL_BUFFER_TYPE_IN      = 2,
-      ACCEL_BUFFER_TYPE_OUT     = 3,
-      ACCEL_BUFFER_TYPE_MAX     = 3
+      ACCEL_BUFFER_TYPE_UNKNOWN   = 0,
+      ACCEL_BUFFER_TYPE_MIN       = 1,
+      ACCEL_BUFFER_TYPE_READWRITE = 1,
+      ACCEL_BUFFER_TYPE_READONLY  = 2,
+      ACCEL_BUFFER_TYPE_WRITEONLY = 3,
+      ACCEL_BUFFER_TYPE_MAX       = 3
     };
     void setAccelBufferType(int abt) {
       accelBufferType = ((abt < ACCEL_BUFFER_TYPE_MIN || abt > ACCEL_BUFFER_TYPE_MAX) ? (ACCEL_BUFFER_TYPE_UNKNOWN) : (abt));

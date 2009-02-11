@@ -3286,7 +3286,7 @@ void Entry::genAccelFullParamList(XStr& str, int makeRefs) {
 
     Parameter* param = curParam->param;
     int bufType = param->getAccelBufferType();
-    int needWrite = makeRefs && ((bufType == Parameter::ACCEL_BUFFER_TYPE_INOUT) || (bufType == Parameter::ACCEL_BUFFER_TYPE_OUT));
+    int needWrite = makeRefs && ((bufType == Parameter::ACCEL_BUFFER_TYPE_READWRITE) || (bufType == Parameter::ACCEL_BUFFER_TYPE_WRITEONLY));
     if (param->isArray()) {
       str << param->getType()->getBaseName() << "* " << param->getName();
     } else {
@@ -3432,7 +3432,7 @@ void Entry::genAccelIndexWrapperDef_spe(XStr& str) {
     // Read only accel parameters
     curParam = accelParam;
     while (curParam != NULL) {
-      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_IN)) {
+      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_READONLY)) {
         str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
       }
       curParam = curParam->next;
@@ -3441,7 +3441,7 @@ void Entry::genAccelIndexWrapperDef_spe(XStr& str) {
     // Read write accel parameters
     curParam = accelParam;
     while (curParam != NULL) {
-      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_INOUT)) {
+      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_READWRITE)) {
         str << "  " << (*(curParam->param->getAccelInstName())) << " = *((" << curParam->param->getType()->getBaseName() << "*)__scalar_buf_offset);\n";
         str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
       }
@@ -3451,7 +3451,7 @@ void Entry::genAccelIndexWrapperDef_spe(XStr& str) {
     // Write only accel parameters
     curParam = accelParam;
     while (curParam != NULL) {
-      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_OUT)) {
+      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_WRITEONLY)) {
         str << "  " << (*(curParam->param->getAccelInstName())) << " = *((" << curParam->param->getType()->getBaseName() << "*)__scalar_buf_offset);\n";
         str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
       }
@@ -3621,7 +3621,7 @@ void Entry::genAccelIndexWrapperDef_spe(XStr& str) {
     }
 
     // Add this parameter
-    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_IN) {
+    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_READONLY) {
       str << "  /*** Accel Param: '" << curParam->param->getName() << " ("
           << (*(curParam->param->getAccelInstName())) << ")' ***/\n";
       if (curParam->param->isArray()) {
@@ -3659,7 +3659,7 @@ void Entry::genAccelIndexWrapperDef_spe(XStr& str) {
     }
 
     // Add this parameter
-    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_INOUT) {
+    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_READWRITE) {
       str << "  /*** Accel Param: '" << curParam->param->getName() << " ("
           << (*(curParam->param->getAccelInstName())) << ")' ***/\n";
       if (curParam->param->isArray()) {
@@ -3684,7 +3684,7 @@ void Entry::genAccelIndexWrapperDef_spe(XStr& str) {
   while (curParam != NULL) {
 
     // Add this parameter
-    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_OUT) {
+    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_WRITEONLY) {
       str << "  /*** Accel Param: '" << curParam->param->getName() << " ("
           << (*(curParam->param->getAccelInstName())) << ")' ***/\n";
       if (curParam->param->isArray()) {
@@ -3762,7 +3762,7 @@ int Entry::genAccels_spe_c_funcBodies(XStr& str) {
   // Read only accel params
   curParam = accelParam;
   while (curParam != NULL) {
-    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_IN) {
+    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_READONLY) {
       if (curParam->param->isArray()) {
         str << "  " << curParam->param->getType()->getBaseName() << "* " << curParam->param->getName() << " = (" << curParam->param->getType()->getBaseName() << "*)(dmaList[" << dmaList_curIndex << "].ea);\n";
         dmaList_curIndex++;
@@ -3783,7 +3783,7 @@ int Entry::genAccels_spe_c_funcBodies(XStr& str) {
   // Read-write accel params
   curParam = accelParam;
   while (curParam != NULL) {
-    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_INOUT) {
+    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_READWRITE) {
       if (curParam->param->isArray()) {
         str << "  " << curParam->param->getType()->getBaseName() << "* " << curParam->param->getName() << " = (" << curParam->param->getType()->getBaseName() << "*)(dmaList[" << dmaList_curIndex << "].ea);\n";
         dmaList_curIndex++;
@@ -3798,7 +3798,7 @@ int Entry::genAccels_spe_c_funcBodies(XStr& str) {
   // Write only accel params
   curParam = accelParam;
   while (curParam != NULL) {
-    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_OUT) {
+    if (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_WRITEONLY) {
       if (curParam->param->isArray()) {
         str << "  " << curParam->param->getType()->getBaseName() << "* " << curParam->param->getName() << " = (" << curParam->param->getType()->getBaseName() << "*)(dmaList[" << dmaList_curIndex << "].ea);\n";
         dmaList_curIndex++;
@@ -3833,7 +3833,7 @@ int Entry::genAccels_spe_c_funcBodies(XStr& str) {
     // Read only accel parameters
     curParam = accelParam;
     while (curParam != NULL) {
-      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_IN)) {
+      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_READONLY)) {
         str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
       }
       curParam = curParam->next;
@@ -3842,7 +3842,7 @@ int Entry::genAccels_spe_c_funcBodies(XStr& str) {
     // Read only accel parameters
     curParam = accelParam;
     while (curParam != NULL) {
-      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_INOUT)) {
+      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_READWRITE)) {
         str << "  *((" << curParam->param->getType()->getBaseName() << "*)__scalar_buf_offset) = " << curParam->param->getName() << ";\n";
         str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
       }
@@ -3852,7 +3852,7 @@ int Entry::genAccels_spe_c_funcBodies(XStr& str) {
     // Read only accel parameters
     curParam = accelParam;
     while (curParam != NULL) {
-      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_OUT)) {
+      if ((!(curParam->param->isArray())) && (curParam->param->getAccelBufferType() == Parameter::ACCEL_BUFFER_TYPE_WRITEONLY)) {
         str << "  *((" << curParam->param->getType()->getBaseName() << "*)__scalar_buf_offset) = " << curParam->param->getName() << ";\n";
         str << "  __scalar_buf_offset += sizeof(" << curParam->param->getType()->getBaseName() << ");\n";
       }
@@ -4439,17 +4439,17 @@ void Entry::preprocess() {
       if (curParam->param->isArray()) {
         accel_numArrays++;
         switch (curParam->param->getAccelBufferType()) {
-          case Parameter::ACCEL_BUFFER_TYPE_INOUT:  accel_dmaList_numReadWrite++;  break;
-          case Parameter::ACCEL_BUFFER_TYPE_IN:     accel_dmaList_numReadOnly++;   break;
-          case Parameter::ACCEL_BUFFER_TYPE_OUT:    accel_dmaList_numWriteOnly++;  break;
+          case Parameter::ACCEL_BUFFER_TYPE_READWRITE:  accel_dmaList_numReadWrite++;  break;
+          case Parameter::ACCEL_BUFFER_TYPE_READONLY:   accel_dmaList_numReadOnly++;   break;
+          case Parameter::ACCEL_BUFFER_TYPE_WRITEONLY:  accel_dmaList_numWriteOnly++;  break;
           default:     die("Unknown accel param type");                            break;
         }
       } else {
         accel_numScalars++;
         switch (curParam->param->getAccelBufferType()) {
-          case Parameter::ACCEL_BUFFER_TYPE_INOUT:  accel_dmaList_scalarNeedsWrite++;  break;
-          case Parameter::ACCEL_BUFFER_TYPE_IN:                                        break;
-          case Parameter::ACCEL_BUFFER_TYPE_OUT:    accel_dmaList_scalarNeedsWrite++;  break;
+          case Parameter::ACCEL_BUFFER_TYPE_READWRITE:  accel_dmaList_scalarNeedsWrite++;  break;
+          case Parameter::ACCEL_BUFFER_TYPE_READONLY:                                      break;
+          case Parameter::ACCEL_BUFFER_TYPE_WRITEONLY:  accel_dmaList_scalarNeedsWrite++;  break;
           default:     die("Unknown accel param type");                                break;
         }
       }

@@ -93,9 +93,8 @@ void splitScopedName(char* name, char** scope, char** basename);
 %token <strval> IDENT NUMBER LITERAL CPROGRAM HASHIF HASHIFDEF
 %token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED
 %token ACCEL
-%token INOUT
-%token IN
-%token OUT
+%token READWRITE
+%token WRITEONLY
 %token ACCELBLOCK
 
 %type <modlist>		ModuleEList File
@@ -835,9 +834,9 @@ Parameter	: Type
 		} 
 		;
 
-AccelBufferType : INOUT { $$ = Parameter::ACCEL_BUFFER_TYPE_INOUT; }
-                | IN    { $$ = Parameter::ACCEL_BUFFER_TYPE_IN;    }
-                | OUT   { $$ = Parameter::ACCEL_BUFFER_TYPE_OUT;   }
+AccelBufferType : READONLY  { $$ = Parameter::ACCEL_BUFFER_TYPE_READONLY; }
+                | READWRITE { $$ = Parameter::ACCEL_BUFFER_TYPE_READWRITE; }
+                | WRITEONLY { $$ = Parameter::ACCEL_BUFFER_TYPE_WRITEONLY; }
                 ;
 
 AccelInstName   : Name               { $$ = new XStr($1);                         }
@@ -861,7 +860,7 @@ AccelParameter	: AccelBufferType ':' Type Name '<' AccelInstName '>'
                 {
 		  $$ = new Parameter(lineno, $1, $2);
                   $$->setAccelInstName($4);
-                  $$->setAccelBufferType(Parameter::ACCEL_BUFFER_TYPE_INOUT);
+                  $$->setAccelBufferType(Parameter::ACCEL_BUFFER_TYPE_READWRITE);
 		}
                 | AccelBufferType ':' AccelArrayParam '<' AccelInstName '>'
                 {
