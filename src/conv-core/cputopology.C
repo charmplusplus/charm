@@ -154,6 +154,15 @@ static void cpuTopoHandler(void *m)
   hostnameMsg *tmpm;
   char str[128];
   int tag, tag1, pe, myrank;
+
+  if (topomsg == NULL) {
+    int i;
+    hostTable = CmmNew();
+    topomsg = (nodeTopoMsg *)CmiAlloc(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int));
+    CmiSetHandler((char *)topomsg, cpuTopoRecvHandlerIdx);
+    topomsg->nodes = (int *)((char*)topomsg + sizeof(nodeTopoMsg));
+    for (i=0; i<CmiNumPes(); i++) topomsg->nodes[i] = -1;
+  }
   CmiAssert(topomsg != NULL);
 
 /*   for debug
@@ -294,7 +303,10 @@ extern "C" void CmiInitCPUTopology(char **argv)
 #elif CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
 #else
-    CmiAbort("Can not get unique name for the compute nodes. \n");
+    if (!CmiMyPe())
+    CmiPrintf("CmiInitCPUTopology Warning: Can not get unique name for the compute nodes. \n");
+    CmiNodeAllBarrier();
+    return;    /* abort */
 #endif
   }
   CmiNodeAllBarrier();
@@ -309,13 +321,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
   CmiSyncSendAndFree(0, sizeof(hostnameMsg), (char *)msg);
 
   if (CmiMyPe() == 0) {
-    int i;
-    hostTable = CmmNew();
-    topomsg = (nodeTopoMsg *)CmiAlloc(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int));
-    CmiSetHandler((char *)topomsg, cpuTopoRecvHandlerIdx);
-    topomsg->nodes = (int *)((char*)topomsg + sizeof(nodeTopoMsg));
-    for (i=0; i<CmiNumPes(); i++) topomsg->nodes[i] = -1;
-    CsdScheduleCount(CmiNumPes());
+    CsdScheduleCount(CmiNumPes());   // collecting node IP from every processor
   }
 
     // receive broadcast from PE 0
