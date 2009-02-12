@@ -22,6 +22,7 @@ public:
   int includes(int p) {
     size_t i; 
     int ret = 0;
+    if (list == NULL) return 1;    // subtle: empty string means ALL
     char *dupstr = strdup(list);   // don't touch the orignal string
     char *str = strtok(dupstr, ",");
     while (str) {
