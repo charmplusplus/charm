@@ -294,7 +294,7 @@ static FILE *openBinaryReplayFile(int pe, const char* flags) {
         char fName[200];
         sprintf(fName,"ckfullreplay_%06d.log",pe);
         FILE *f;
-        CkPrintf("openBinaryReplayFile %s\n", fName);
+        // CkPrintf("openBinaryReplayFile %s\n", fName);
         f = fopen(fName, flags);
         if (f==NULL) {
                 CkPrintf("[%d] Could not open replay file '%s'.\n",
