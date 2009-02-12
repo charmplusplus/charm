@@ -156,7 +156,7 @@ public:
   BgTimeLog(int epc, char* name, double sTime);
   ~BgTimeLog();
 
-  inline void setName(char *_name) { strncpy(name, _name, 20); }
+  inline void setName(char *_name) { CmiAssert(strlen(_name)<20); strcpy(name, _name); }
   inline void setEP(int _ep) { ep = _ep; }
   inline void setCharmEP(short _ep) { charm_ep = _ep; }
   inline void setTime(double stime, double etime) {
