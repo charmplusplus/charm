@@ -10,6 +10,15 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Vector Types
 
+typedef struct __vec_8_c  {           char v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15; } __vec16c;
+typedef struct __vec_8_uc {  unsigned char v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15; } __vec16uc;
+typedef struct __vec_8_s  {          short v0, v1, v2, v3, v4, v5, v6, v7; } __vec8s;
+typedef struct __vec_8_us { unsigned short v0, v1, v2, v3, v4, v5, v6, v7; } __vec8us;
+typedef struct __vec_4_i  {            int v0, v1, v2, v3; } __vec4i;
+typedef struct __vec_4_ui {   unsigned int v0, v1, v2, v3; } __vec4ui;
+typedef struct __vec_4_f  {          float v0, v1, v2, v3; } __vec4f;
+typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
+
 #if CMK_CELL_SPE != 0    // Cell - SPE
 
   typedef vector signed char vec16c;
@@ -23,14 +32,14 @@
 
 #else                    // General C
 
-  typedef struct __vec_8_c  {           char v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15; } vec16c;
-  typedef struct __vec_8_uc {  unsigned char v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15; } vec16uc;
-  typedef struct __vec_8_s  {          short v0, v1, v2, v3, v4, v5, v6, v7; } vec8s;
-  typedef struct __vec_8_us { unsigned short v0, v1, v2, v3, v4, v5, v6, v7; } vec8us;
-  typedef struct __vec_4_i  {            int v0, v1, v2, v3; } vec4i;
-  typedef struct __vec_4_ui {   unsigned int v0, v1, v2, v3; } vec4ui;
-  typedef struct __vec_4_f  {          float v0, v1, v2, v3; } vec4f;
-  typedef struct __vec_2_lf {         double v0, v1; } vec2lf;
+  typedef  __vec16c  vec16c;
+  typedef __vec16uc vec16uc;
+  typedef   __vec8s   vec8s;
+  typedef  __vec8us  vec8us;
+  typedef   __vec4i   vec4i;
+  typedef  __vec4ui  vec4ui;
+  typedef   __vec4f   vec4f;
+  typedef  __vec2lf  vec2lf;
 
 #endif
 
@@ -302,6 +311,26 @@
   inline vec2lf vmadd2lfs(const vec2lf &a, const vec2lf &b, const double &s) { vec2lf c; c.v0 = a.v0 * b.v0 + s; c.v1 = a.v1 * b.v1 + s; return c; }
 
 #endif
+
+
+///// Divide /////
+
+// DMK - TODO : FIXME - Figure out the SPE version of these functions (for now, just use general C++)
+//   SPE version of the functions to use the "frest" and "fi" 
+#if CMK_CELL_SPE != 0
+
+  inline vec4i vdiv4i(const vec4i a, const vec4i b) { vec4i c; __vec4i* __c = (__vec4i*)(&c); __vec4i* __a = (__vec4i*)(&a); __vec4i* __b = (__vec4i*)(&b); __c->v0 = __a->v0 / __b->v0; __c->v1 = __a->v1 / __b->v1; return c; }
+  #define vdiv4f (a, b) (spu_mul(a, spu_re(b)))
+  inline vec2lf vdiv2lf(const vec2lf a, const vec2lf b) { vec2lf c; __vec2lf* __c = (__vec2lf*)(&c); __vec2lf* __a = (__vec2lf*)(&a); __vec2lf* __b = (__vec2lf*)(&b); __c->v0 = __a->v0 / __b->v0; __c->v1 = __a->v1 / __b->v1; return c; }
+
+#else
+
+  inline vec4i vdiv4i(const vec4i &a, const vec4i &b) { vec4i c; c.v0 = a.v0 / b.v0; c.v1 = a.v1 / b.v1; c.v2 = a.v2 / b.v2; c.v3 = a.v3 / b.v3; return c; }
+  inline vec4f vdiv4f(const vec4f &a, const vec4f &b) { vec4f c; c.v0 = a.v0 / b.v0; c.v1 = a.v1 / b.v1; c.v2 = a.v2 / b.v2; c.v3 = a.v3 / b.v3; return c; }
+  inline vec2lf vdiv2lf(const vec2lf &a, const vec2lf &b) { vec2lf c; c.v0 = a.v0 / b.v0; c.v1 = a.v1 / b.v1; return c; }
+
+#endif
+
 
 
 
