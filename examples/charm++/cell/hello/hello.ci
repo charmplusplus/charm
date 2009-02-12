@@ -27,12 +27,18 @@ mainmodule hello {
     entry Hello(void);
 
     entry [accel] void testAccelEntry(int fromIndex)
-                                     [ inout : int s <impl_obj->s>,
-                                       inout : int a[4] <impl_obj->a>
+                                     [ readwrite : int s <impl_obj->s>,
+                                       readwrite : int a[4] <impl_obj->a>
                                      ] {
 
       // Display the original contents
-      printf("Hello[%d]::testAccelEntry() - Called by Hello[%d]... s:%d, a[0-3]:{ %d %d %d %d }...\n",
+      #if CMK_CELL_SPE != 0
+      printf("SPE --- Hello[%d]::testAccelEntry() - Called by Hello[%d]... s:%d, a[0-3]:{ %d %d %d %d }...\n",
+      #elif CMK_CELL != 0
+      printf("PPE --- Hello[%d]::testAccelEntry() - Called by Hello[%d]... s:%d, a[0-3]:{ %d %d %d %d }...\n",
+      #else
+      printf("GEN --- Hello[%d]::testAccelEntry() - Called by Hello[%d]... s:%d, a[0-3]:{ %d %d %d %d }...\n",
+      #endif
              s, fromIndex, s, a[0], a[1], a[2], a[3]
             );
 
