@@ -1885,3 +1885,14 @@ void BgSetStrategyBigSimDefault(CthThread t)
                  CthSuspendBigSimThread);
 }
 
+
+int BgIsRecord()
+{
+    return cva(bgMach).record == 1;
+}
+
+int BgIsReplay()
+{
+    return cva(bgMach).replay != -1;
+}
+

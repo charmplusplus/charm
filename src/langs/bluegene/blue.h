@@ -271,6 +271,10 @@ void BgAttach(CthThread t);
 void BgSetStartOutOfCore();
 void BgUnsetStartOutOfCore();
 
+/*********************** Record / Replay *************************/
+int BgIsRecord();
+int BgIsReplay();
+
 #if defined(__cplusplus)
 }
 #endif
