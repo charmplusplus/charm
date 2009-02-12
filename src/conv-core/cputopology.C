@@ -46,7 +46,7 @@ struct _SYSTEM_INFO sysinfo;
 
   /* Allow the user to override the number of CPUs for use
      in scalability testing, debugging, etc. */
-  char *forcecount = getenv("VMDFORCECPUCOUNT");
+  char *forcecount = getenv("FORCECPUCOUNT");
   if (forcecount != NULL) {
     if (sscanf(forcecount, "%d", &a) == 1) {
       return a; /* if we got a valid count, return it */
@@ -87,8 +87,8 @@ static int cpuTopoRecvHandlerIdx;
 
 typedef struct _hostnameMsg {
   char core[CmiMsgHeaderSizeBytes];
-  int pe;
   skt_ip_t ip;
+  int pe;
   int ncores;
   int rank;
   int nodenum;
@@ -189,6 +189,7 @@ static void cpuTopoHandler(void *m)
     tag = CmmWildCard;
     while (tmpm = (hostnameMsg *)CmmGet(hostTable, 1, &tag, &tag1)) CmiFree(tmpm);
     CmmFree(hostTable);
+
     CmiSyncBroadcastAllAndFree(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int), (char *)topomsg);
   }
 }
@@ -196,7 +197,6 @@ static void cpuTopoHandler(void *m)
 /* called on each processor */
 static void cpuTopoRecvHandler(void *msg)
 {
-  int myrank;
   nodeTopoMsg *m = (nodeTopoMsg *)msg;
   m->nodes = (int *)((char*)m + sizeof(nodeTopoMsg));
 
@@ -226,7 +226,7 @@ extern "C" int CmiNumPhysicalNodes()
 
 extern "C" int CmiNumPesOnPhysicalNode(int pe)
 {
-  return cpuTopo.bynodes==NULL?-1:cpuTopo.bynodes[cpuTopo.nodenum[pe]].size();
+  return cpuTopo.bynodes==NULL?-1:(int)cpuTopo.bynodes[cpuTopo.nodenum[pe]].size();
 }
 
 extern "C" void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num)
@@ -265,6 +265,8 @@ extern "C" void CmiInitCPUTopology(char **argv)
   else if (CmiMyPe() == 0) {
      CmiPrintf("Charm++> cpu topology info is being gathered! \n");
   }
+
+  CmiBarrier();
 
   if (CmiMyPe() >= CmiNumPes()) {
       /* comm thread either can float around, or pin down to the last rank.
@@ -309,6 +311,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
     return;    /* abort */
 #endif
   }
+
   CmiNodeAllBarrier();
 
     /* prepare a msg to send */
@@ -321,13 +324,15 @@ extern "C" void CmiInitCPUTopology(char **argv)
   CmiSyncSendAndFree(0, sizeof(hostnameMsg), (char *)msg);
 
   if (CmiMyPe() == 0) {
-    CsdScheduleCount(CmiNumPes());   // collecting node IP from every processor
+    for (i=0; i<CmiNumPes(); i++) CmiDeliverSpecificMsg(cpuTopoHandlerIdx);
+    //CsdScheduleCount(CmiNumPes());   // collecting node IP from every processor
   }
 
     // receive broadcast from PE 0
-  CsdScheduleCount(1);
+  CmiDeliverSpecificMsg(cpuTopoRecvHandlerIdx);
+  //CsdScheduleCount(1);
 
-    // now every one should have the node info
+  // now every one should have the node info
 }
 
 #else           /* not supporting affinity */
