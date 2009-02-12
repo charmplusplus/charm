@@ -22,8 +22,8 @@ module jacobi {
     entry void westData_msg(EastWestGhost*);
 
     entry [accel] void doCalculation()
-                                    [  in : float    matrix[DATA_BUFFER_SIZE] <impl_obj->matrix>,
-                                      out : float matrixTmp[DATA_BUFFER_SIZE] <impl_obj->matrixTmp>
+                                    [  readonly : float    matrix[DATA_BUFFER_SIZE] <impl_obj->matrix>,
+                                      writeonly : float matrixTmp[DATA_BUFFER_SIZE] <impl_obj->matrixTmp>
                                     ] {
       int x, y;
       register float oneFifth_f = 1.0f / 5.0f;
