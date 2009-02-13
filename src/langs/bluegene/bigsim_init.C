@@ -204,7 +204,7 @@ int BGMach::read(char *file)
       continue;
     }
     if (!strcmp(parameterName, "timing")) {
-      if (!strcmp(parameterValue, "bgelapse"))
+      if (!strcmp(parameterValue, "elapse"))
         timingMethod = BG_ELAPSE;
       else if (!strcmp(parameterValue, "walltime"))
         timingMethod = BG_WALLTIME;
