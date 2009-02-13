@@ -556,6 +556,9 @@ CDECL void AMPI_threadstart(void *data)
 	STARTUP_DEBUG("MPI_threadstart")
 	MPI_threadstart_t t;
 	pupFromBuf(data,t);
+#if CMK_TRACE_IN_CHARM
+        if(CpvAccess(traceOn)) CthTraceResume(CthSelf());
+#endif
 	t.start();
 }
 
@@ -1689,6 +1692,9 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   void *curLog;		// store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
 //  TRACE_BG_AMPI_SUSPEND();
+#if CMK_TRACE_IN_CHARM
+  if(CpvAccess(traceOn)) traceSuspend();
+#endif
 #endif
 
   if(isInter()){
@@ -1722,10 +1728,15 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   if (status != 0) return status;
 
   _LOG_E_BEGIN_AMPI_PROCESSING(thisIndex,s,count)
+
 #if CMK_BLUEGENE_CHARM
+#if CMK_TRACE_IN_CHARM
+  if(CpvAccess(traceOn)) CthTraceResume(thread->getThread());
+#endif
   //TRACE_BG_AMPI_RESUME(thread->getThread(), msg, "RECV_RESUME", &curLog, 1);
-  TRACE_BG_AMPI_BREAK(NULL, "RECV_RESUME", NULL, 0);
-  _TRACE_BG_SET_INFO((char *)msg, "RECV_RESUME",  &curLog, 1);
+  //TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0);
+  //_TRACE_BG_SET_INFO((char *)msg, "RECV_RESUME",  &curLog, 1);
+  TRACE_BG_ADD_TAG("RECV_RESUME");
 #endif
 
   delete msg;
@@ -2181,11 +2192,16 @@ int AMPI_Finalize(void)
     getAmpiParent()->counters.output(getAmpiInstance(MPI_COMM_WORLD)->getRank(MPI_COMM_WORLD));
 #endif
   CtvAccess(ampiFinalized)=1;
-#if 0
+
 #if CMK_BLUEGENE_CHARM
+#if 0
   TRACE_BG_AMPI_SUSPEND();
 #endif
+#if CMK_TRACE_IN_CHARM
+  if(CpvAccess(traceOn)) traceSuspend();
 #endif
+#endif
+
 //  getAmpiInstance(MPI_COMM_WORLD)->outputCounter();
   AMPI_Exit(0);
   return 0;
