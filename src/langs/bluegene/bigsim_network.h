@@ -43,6 +43,7 @@ public:
     bandwidth = BANDWIDTH; alpha = 8E-6; 
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
+    if (ox == nx && oy == ny && oz == nz) return 0.0;    // same PE
     return bytes/bandwidth;
   }
   void print() {
@@ -128,6 +129,7 @@ public:
     hoplatency = 44.8e-9;
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
+    if (ox == nx && oy == ny && oz == nz) return 0.0;    // same PE
     int xd=BG_ABS(ox-nx), yd=BG_ABS(oy-ny), zd=BG_ABS(oz-nz);
     CmiAssert(xd>=0 && yd>=0 && zd>=0);
     int hops = xd+yd+zd;
@@ -155,6 +157,7 @@ public:
     bandwidth = 1.7*1e9; 
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
+    if (ox == nx && oy == ny && oz == nz) return 0.0;    // same PE
     return permsg + bytes/bandwidth;
   }
   void print() {
