@@ -687,11 +687,11 @@ void sendPacket_(nodeInfo *myNode, int x, int y, int z, int threadID, int handle
   CmiBgMsgFlag(sendmsg) = 0;
   CmiBgMsgRefCount(sendmsg) = 0;
   if (local) {
-    BgAdvance(cva(bgMach).network->charmcost());
+    if (correctTimeLog) BgAdvance(cva(bgMach).network->charmcost());
     latency = 0.0;
   }
   else {
-    BgAdvance(cva(bgMach).network->alphacost());
+    if (correctTimeLog) BgAdvance(cva(bgMach).network->alphacost());
     latency = MSGTIME(myNode->x, myNode->y, myNode->z, x,y,z, numbytes);
     CmiAssert(latency >= 0);
   }
@@ -766,7 +766,7 @@ static inline void threadBroadcastPacketExcept_(int node, CmiInt2 threadID, int 
   CmiBgMsgFlag(sendmsg) = 0;
   CmiBgMsgRefCount(sendmsg) = 0;
   /* FIXME */
-  BgAdvance(cva(bgMach).network->alphacost());
+  if (correctTimeLog) BgAdvance(cva(bgMach).network->alphacost());
   double sendT = BgGetTime();
   CmiBgMsgRecvTime(sendmsg) = sendT;	
 
@@ -878,7 +878,7 @@ void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbyt
   CmiBgMsgFlag(msg) = 0;
   CmiBgMsgRefCount(msg) = 0;
 
-  BgAdvance(cva(bgMach).network->alphacost());
+  if (correctTimeLog) BgAdvance(cva(bgMach).network->alphacost());
 
   double now = BgGetTime();
 
