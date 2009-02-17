@@ -113,7 +113,7 @@ void BgMsgSetTiming(char *msg)
   if (tTHREADTYPE == WORK_THREAD)
     CmiBgMsgSrcPe(msg) = BgGetGlobalWorkerThreadID();	// global serial number
   else
-    CmiBgMsgSrcPe(msg) = -BgMyNode();                   // comm thread
+    CmiBgMsgSrcPe(msg) = BgNumNodes()*cva(bgMach).numWth+BgMyNode()*cva(bgMach).numCth + BgGetThreadID();                   // comm thread
 }
 
 void BgLogEntryCommit(BgTimeLineRec &tlinerec) {
