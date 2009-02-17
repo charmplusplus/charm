@@ -263,7 +263,7 @@ class CkVec : private CkSTLHelper<T> {
       block[pos] = elt;
     }
     void remove(size_t pos) {
-      if (pos<0 || pos>=len) 
+      if (pos>=len) 
 	{
 	  CmiAbort("CkVec ERROR: out of bounds\n\n"); 
 	  return;
