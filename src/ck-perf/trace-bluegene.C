@@ -79,7 +79,7 @@ void TraceBluegene::tlineEnd(void** parentLogPtr){
     *parentLogPtr = NULL;
 }
 
-void TraceBluegene::bgAddTag(char* str){
+void TraceBluegene::bgAddTag(const char* str){
   if (!genTimeLog) return;
   BgTimeLog * log = BgLastLog(tTIMELINEREC);
   CmiAssert(log != NULL);

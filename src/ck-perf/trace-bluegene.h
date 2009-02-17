@@ -29,7 +29,7 @@ class TraceBluegene : public Trace {
     void getForwardDep(void* log, void** fDepPtr);
     void getForwardDepForAll(void** logs1, void** logs2, int logsize,void* fDepPtr);
     void tlineEnd(void** parentLogPtr);
-    void bgAddTag(char *str);
+    void bgAddTag(const char *str);
     void bgDummyBeginExec(char* name,void** parentLogPtr);
     void bgBeginExec(char* msg, char *str);
     void bgAmpiBeginExec(char *msg, char *str, void **logs, int count);
@@ -128,7 +128,8 @@ extern "C" void BgSetStartEvent();
 # define TRACE_BG_AMPI_RESUME(t, msg, str, log)
 # define TRACE_BG_AMPI_START(t, str)
 # define TRACE_BG_NEWSTART(t, str, events, count)
-#define TRACE_BG_AMPI_WAITALL(reqs)
+# define TRACE_BG_AMPI_BREAK(t, str, event, count)
+# define TRACE_BG_AMPI_WAITALL(reqs)
 #endif   /* CMK_TRACE_IN_CHARM */
 
 extern "C" void BgPrintf(const char *str);
