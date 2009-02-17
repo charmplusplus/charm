@@ -60,7 +60,7 @@ Main(CkArgMsg* m)
 
       LogEntry *beginLog = new LogEntry(bglog->startTime, 2);
       beginLog->event = bglog->msgId.msgID();
-      beginLog->pe = bglog->msgId.node();
+      beginLog->pe = bglog->msgId.pe();
       beginLog->eIdx = bglog->charm_ep==-1?0:bglog->charm_ep; 
       beginLog->pup(p);
       delete beginLog;
