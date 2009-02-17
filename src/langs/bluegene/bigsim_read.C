@@ -145,7 +145,7 @@ int* BgLoadOffsets(int totalProcs, int numPes){
 
 static int thread_ep = -1;
 
-int BgLoadTraceSummary(const char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes)
+int BgLoadTraceSummary(const char *fname, int &totalWorkerProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numEmulatingPes)
 {
   BGMach  bgMach ;
   PUP::machineInfo machInfo;
@@ -160,14 +160,14 @@ int BgLoadTraceSummary(const char *fname, int &totalProcs, int &numX, int &numY,
   pd((char *)&machInfo, sizeof(machInfo));	// load machine info
   if (!machInfo.valid()) CmiAbort("Invalid machineInfo on disk file!\n");
   PUP::xlater p(machInfo, pd);
-  p|totalProcs;
+  p|totalWorkerProcs;
   p|bgMach;
   numX = bgMach.x;
   numY = bgMach.y;
   numZ = bgMach.z;
   numCth = bgMach.numCth;
   numWth = bgMach.numWth;
-  p|numPes;
+  p|numEmulatingPes;
 
   bglog_version = 0;
   if (!feof(f)) p|bglog_version;

@@ -26,19 +26,19 @@ extern int bgcorroff;
 class BgMsgID
 {
 private:
-  int _node;		// node number where the message is created
+  int _pe;		// PE number where the message is created
   int _msgID;		// local index number on pe
 
 public:
-  BgMsgID(): _node(-1), _msgID(-1) {}
-  BgMsgID(int p, int m): _node(p), _msgID(m) {}
+  BgMsgID(): _pe(-1), _msgID(-1) {}
+  BgMsgID(int p, int m): _pe(p), _msgID(m) {}
   void pup(PUP::er &p) {
-    p|_node; p|_msgID;
+    p|_pe; p|_msgID;
   }
   inline int operator == (const BgMsgID &m) {
-    return _node == m._node && _msgID == m._msgID;
+    return _pe == m._pe && _msgID == m._msgID;
   }
-  int node() { return _node; }
+  int pe() { return _pe; }
   int msgID() { return _msgID; }
 };
 
@@ -321,7 +321,7 @@ BgTimeLog *BgStartLogByName(BgTimeLineRec &tlinerec, int ep, char *name, double 
 void BgEndLastLog(BgTimeLineRec &tlinerec);
 
 int BgLogGetThreadEP();
-int BgLoadTraceSummary(const char *fname, int &totalProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numPes);
+int BgLoadTraceSummary(const char *fname, int &totalWorkerProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numEmulatingPes);
 int BgReadProc(int procNum, int numWth, int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec);
 int BgReadProcWindow(int procNum, int numWth, int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec,
 		     int& fileLoc, int& totalTlineLength, int firstLog, int numLogs);

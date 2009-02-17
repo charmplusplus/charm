@@ -1794,8 +1794,8 @@ static void writeToDisk()
     sprintf(d, "%sbgTrace", cva(bgMach).traceroot?cva(bgMach).traceroot:""); 
     FILE *f2 = fopen(d,"wb");
     //Total emulating processors and total target BG processors
-    int numPes=CmiNumPes();
-    int totalProcs = BgNumNodes()*cva(bgMach).numWth;
+    int numEmulatingPes=CmiNumPes();
+    int totalWorkerProcs = BgNumNodes()*cva(bgMach).numWth;
 
     if(f2==NULL) {
       CmiPrintf("[%d] Creating trace file %s  failed\n", CmiMyPe(), d);
@@ -1803,13 +1803,13 @@ static void writeToDisk()
     }
     PUP::toDisk p(f2);
     p((char *)&machInfo, sizeof(machInfo));
-    p|totalProcs;
+    p|totalWorkerProcs;
     p|cva(bgMach);
-    p|numPes;
+    p|numEmulatingPes;
     p|bglog_version;
     p|CpvAccess(CthResumeBigSimThreadIdx);
     
-    CmiPrintf("[0] Number is numX:%d numY:%d numZ:%d numCth:%d numWth:%d numPes:%d totalProcs:%d bglog_ver:%d\n",cva(bgMach).x,cva(bgMach).y,cva(bgMach).z,cva(bgMach).numCth,cva(bgMach).numWth,numPes,totalProcs,bglog_version);
+    CmiPrintf("[0] Number is numX:%d numY:%d numZ:%d numCth:%d numWth:%d numEmulatingPes:%d totalWorkerProcs:%d bglog_ver:%d\n",cva(bgMach).x,cva(bgMach).y,cva(bgMach).z,cva(bgMach).numCth,cva(bgMach).numWth,numEmulatingPes,totalWorkerProcs,bglog_version);
     
     fclose(f2);
   }
