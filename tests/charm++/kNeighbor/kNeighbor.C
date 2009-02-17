@@ -1,0 +1,341 @@
+#include "kNeighbor.decl.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+#define STRIDEK 3
+#define CALCPERSTEP 6
+#define WRAPROUND 1
+#define BLOCKMAPPING 1
+#define USE_ARRAY_REDUCTION 0
+
+CProxy_Main mainProxy;
+
+class toNeighborMsg: public CMessage_toNeighborMsg {
+public:
+    char *data;
+    int fromX;
+    int nID;
+
+public:
+    void setMsgSrc(int X, int id) {
+        fromX = X;
+        nID = id;
+    }
+
+};
+
+//#define MSGSIZECNT 1
+
+class Main: public CBase_Main {
+public:
+    CProxy_Block array;
+
+    //static int msgSizeArr[MSGSIZECNT];
+
+    int numSteps;
+    int currentStep;
+    int currentMsgSize;
+    int totalElems;
+
+    int elementsRecved;
+    double totalTime;
+    double maxTime;
+    double minTime;
+    double *timeRec;
+
+    double gStarttime;
+
+public:
+    Main(CkArgMsg *m) {
+        mainProxy = thisProxy;
+
+        if (m->argc!=4) {
+            CkPrintf("Usage: %s <#elements> <#iterations> <msg size>\n", m->argv[0]);
+            delete m;
+            CkExit();
+        }
+
+        int numElems = atoi(m->argv[1]);
+
+        numSteps = atoi(m->argv[2]);
+
+        currentMsgSize = atoi(m->argv[3]);
+
+        currentStep = 0;
+
+        totalElems = numElems;
+        timeRec = new double[numSteps];
+
+        CProxy_MyMap myMap = CProxy_MyMap::ckNew(totalElems);
+        CkArrayOptions opts(totalElems);
+        opts.setMap(myMap);
+        array = CProxy_Block::ckNew(totalElems, opts);
+
+        CkCallback *cb = new CkCallback(CkIndex_Main::nextStep(NULL), thisProxy);
+        array.ckSetReductionClient(cb);
+
+        beginIteration();
+    }
+
+    void beginIteration() {
+        currentStep++;
+        if (currentStep>numSteps) {
+            CkPrintf("kNeighbor program finished!\n");
+            CkCallback *cb = new CkCallback(CkIndex_Main::terminate(NULL), thisProxy);
+            array.ckSetReductionClient(cb);
+
+            array.printSts(numSteps);
+            //CkExit();
+        }
+
+        elementsRecved = 0;
+        totalTime = 0.0;
+        maxTime = 0.0;
+        minTime = 3600.0;
+
+        //int msgSize = msgSizeArr[currentStep%MSGSIZECNT];
+        //int msgSize = msgSizeArr[rand()%MSGSIZECNT];
+        //currentMsgSize = msgSize;
+
+        gStarttime = CmiWallTimer();
+        //array.commWithNeighbors(msgSize);
+        for (int i=0; i<totalElems; i++)
+            array(i).commWithNeighbors(currentMsgSize);
+        //array.commWithNeighbors(currentMsgSize);
+    }
+
+    void terminate(CkReductionMsg  *msg){
+        delete msg;
+        double total = 0.0;
+        for (int i=1; i<numSteps; i++) total += timeRec[i]*1e6;
+        total /= (numSteps-1);
+        CkPrintf("The average time for each %d-kNeighbor iteration with msg size %d is %f (us)\n", STRIDEK, currentMsgSize, total);
+        CkExit();
+    }
+
+    void nextStep_plain(double iterTime) {
+        elementsRecved++;
+        totalTime += iterTime;
+        maxTime = maxTime>iterTime?maxTime:iterTime;
+        minTime = minTime<iterTime?minTime:iterTime;
+
+        if (elementsRecved == totalElems) {
+            double wholeStepTime = CmiWallTimer() - gStarttime;
+            timeRec[currentStep] = wholeStepTime/CALCPERSTEP;
+            //CkPrintf("Step %d with msg size %d finished: max=%f, total=%f\n", currentStep, currentMsgSize, maxTime/CALCPERSTEP, wholeStepTime/CALCPERSTEP);
+
+            beginIteration();
+        }
+    }
+
+    void nextStep(CkReductionMsg  *msg) {
+        maxTime = *((double *)msg->getData());
+        delete msg;
+        double wholeStepTime = CmiWallTimer() - gStarttime;
+        timeRec[currentStep] = wholeStepTime/CALCPERSTEP;
+        //CkPrintf("Step %d with msg size %d finished: max=%f, total=%f\n", currentStep, currentMsgSize, maxTime/CALCPERSTEP, wholeStepTime/CALCPERSTEP);
+        beginIteration();
+    }
+
+};
+
+//int Main::msgSizeArr[MSGSIZECNT] = {16, 32, 128, 256, 512, 1024, 2048, 4096};
+//int Main::msgSizeArr[MSGSIZECNT] = {10000};
+
+
+class MyMap : public CkArrayMap{
+private:
+    int totalElems;
+public:
+    MyMap(int n) {
+        totalElems = n;
+    }
+    MyMap(CkMigrateMessage *m){}
+    /*int registerArray(CkArrayMapRegisterMessage *m){
+    	delete m;
+    	return 0;
+    }*/
+    int procNum(int arrayHdl, const CkArrayIndex &idx){
+        int elem = *(int *)idx.data();
+        int penum;
+#if BLOCKMAPPING
+        int blkSize = totalElems/CkNumPes();
+        penum = (elem/blkSize)%CkNumPes();
+#else
+        //Default is RoundRobin Mapping
+        penum = elem%CkNumPes();
+#endif
+        return penum;
+    }
+};
+
+//#define WORKSIZECNT 5
+#define WORKSIZECNT 1
+//no wrap around for sending messages to neighbors
+class Block: public CBase_Block {
+public:
+    /** actual work size is of workSize^3 */
+    static int workSizeArr[WORKSIZECNT];
+    int totalElems;
+
+    int numNeighbors;
+    int neighborsRecved;
+    int *neighbors;
+    double *recvTimes;
+
+    double startTime;
+
+    int random;
+
+    int curIterMsgSize;
+    int curIterWorkSize;
+    int internalStepCnt;
+
+public:
+    Block(int numElems) {
+        //srand(thisIndex.x+thisIndex.y);
+
+        totalElems = numElems;
+
+#if WRAPROUND
+        numNeighbors = 2*STRIDEK;
+        neighbors = new int[numNeighbors];
+        recvTimes = new double[numNeighbors];
+        int nidx=0;
+        //setting left neighbors
+        for (int i=thisIndex-STRIDEK; i<thisIndex; i++, nidx++) {
+            int tmpnei = i;
+            while (tmpnei<0) tmpnei += totalElems;
+            neighbors[nidx] = tmpnei;
+        }
+        //setting right neighbors
+        for (int i=thisIndex+1; i<=thisIndex+STRIDEK; i++, nidx++) {
+            int tmpnei = i;
+            while (tmpnei>=totalElems) tmpnei -= totalElems;
+            neighbors[nidx] = tmpnei;
+        }
+#else
+        //calculate the neighbors this element has
+        numNeighbors = 0;
+        numNeighbors += thisIndex - MAX(0, thisIndex-STRIDEK); //left
+        numNeighbors += MIN(totalElems-1, thisIndex+STRIDEK)-thisIndex; //right
+        neighbors = new int[numNeighbors];
+        recvTimes = new double[numNeighbors];
+        int nidx=0;
+        for (int i=MAX(0, thisIndex-STRIDEK); i<thisIndex; i++, nidx++) neighbors[nidx]=i;
+        for (int i=thisIndex+1; i<=MIN(totalElems-1, thisIndex+STRIDEK); i++, nidx++) neighbors[nidx] = i;
+#endif
+
+        for (int i=0; i<numNeighbors; i++)
+            recvTimes[i] = 0.0;
+
+#ifdef DEBUG
+        CkPrintf("Neighbors of %d: ");
+        for (int i=0; i<numNeighbors; i++)
+            CkPrintf("%d ", neighbors[i]);
+        CkPrintf("\n");
+#endif
+
+        random = thisIndex*31+73;
+    }
+
+    ~Block() {
+        delete [] neighbors;
+        delete [] recvTimes;
+    }
+
+    Block(CkMigrateMessage *m) {}
+
+    void printSts(int totalSteps){
+        /*for(int i=0; i<numNeighbors; i++){
+        	CkPrintf("Elem[%d]: avg RTT from neighbor %d (actual elem id %d): %lf\n", thisIndex, i, neighbors[i], recvTimes[i]/totalSteps);
+        }*/
+        contribute(0,0,CkReduction::max_int);
+    }
+
+    void startInternalIteration() {
+#ifdef DEBUG
+        CkPrintf("Start internal iteration for %d\n", thisIndex);
+#endif
+
+        neighborsRecved = 0;
+#ifdef DOCOMP
+        //1: pick a work size and do some computation
+        int sum=0;
+        int N=curIterWorkSize;
+        for (int i=0; i<N; i++)
+            for (int j=0; j<N; j++)
+                for (int k=0; k<N; k++)
+                    sum += (thisIndex*i+thisIndex*j+k)%WORKSIZECNT;
+#endif
+        //2. send msg to K neighbors
+        int msgSize = curIterMsgSize;
+
+        //Send msgs to neighbors
+        for (int i=0; i<numNeighbors; i++) {
+            double memtimer = CmiWallTimer();
+            toNeighborMsg *msg = new(msgSize) toNeighborMsg;
+            msg->setMsgSrc(thisIndex, i);
+            double entrytimer = CmiWallTimer();
+            thisProxy(neighbors[i]).recvMsgs(msg);
+            double entrylasttimer = CmiWallTimer();
+            //if(thisIndex==0){
+            //	CkPrintf("At current step %d to neighbor %d, msg creation time: %f, entrymethod fire time: %f\n", internalStepCnt, neighbors[i], entrytimer-memtimer, entrylasttimer-entrytimer);
+            //}
+        }
+    }
+
+    void commWithNeighbors(int msgSize) {
+        internalStepCnt = 0;
+        curIterMsgSize = msgSize;
+        //currently the work size is only changed every big steps (which
+        //are initiated by the main proxy
+        curIterWorkSize = workSizeArr[random%WORKSIZECNT];
+        random++;
+
+        startTime = CmiWallTimer();
+        startInternalIteration();
+    }
+
+    void recvReplies(int fromNID) {
+        recvTimes[fromNID] += (CmiWallTimer() - startTime);
+
+        //get one step time and send it back to mainProxy
+        neighborsRecved++;
+        if (neighborsRecved == numNeighbors) {
+            internalStepCnt++;
+            if (internalStepCnt==CALCPERSTEP) {
+                double iterCommTime = CmiWallTimer() - startTime;
+	    #if USE_ARRAY_REDUCTION
+                contribute(sizeof(double), &iterCommTime, CkReduction::max_double);
+	    #else
+                mainProxy.nextStep_plain(iterCommTime);
+	    #endif
+                /*if(thisIndex==0){
+                	for(int i=0; i<numNeighbors; i++){
+                		CkPrintf("RTT time from neighbor %d (actual elem id %d): %lf\n", i, neighbors[i], recvTimes[i]);
+                	}
+                }*/
+            } else {
+                startInternalIteration();
+            }
+        }
+    }
+
+    void recvMsgs(toNeighborMsg *m) {
+        thisProxy(m->fromX).recvReplies(m->nID);
+        delete m;
+    }
+
+    inline int MAX(int a, int b) {
+        return (a>b)?a:b;
+    }
+    inline int MIN(int a, int b) {
+        return (a<b)?a:b;
+    }
+};
+
+//int Block::workSizeArr[WORKSIZECNT] = {20, 60, 120, 180, 240};
+int Block::workSizeArr[WORKSIZECNT] = {20};
+
+#include "kNeighbor.def.h"
