@@ -2138,7 +2138,10 @@ int Module::genAccels_spe_c_funcBodies(XStr& str) {
   if (isMain()) {
 
     str << "\n\n";
-    str << "void funcLookup(int funcIndex,\n"
+    str << "#ifdef __cplusplus\n"
+        << "extern \"C\"\n"
+        << "#endif\n"
+        << "void funcLookup(int funcIndex,\n"
         << "                void* readWritePtr, int readWriteLen,\n"
         << "                void* readOnlyPtr, int readOnlyLen,\n"
         << "                void* writeOnlyPtr, int writeOnlyLen,\n"
