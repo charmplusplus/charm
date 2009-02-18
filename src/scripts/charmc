@@ -85,6 +85,10 @@ SWAPGLOBALS="0"
 
 TAU_MAKEFILE=Make.tau
 TAU_TRACE_MPI=1
+
+SPU_USE_CPP=0
+SPU_EXTRA_LIBS=""
+
 ####################################################################
 #
 #  Utility routines used below
@@ -111,6 +115,9 @@ printUsage() {
     echo "        -c++-option <opt> -ld-option <opt> -ld++-option <opt>"
     echo "        -fmoddir <f90mod path>"
     echo "        -pg <opt> -build-shared -charm-shared -no-trace-mpi"
+    echo
+    echo "  Cell specific flags:"
+    echo "        -spu-cpp -spu-lib <libname>"
     echo
     echo "  Charmc compiles C, C++, f77, f90, Converse, Converse++, Charm, "
     echo "and Charm++ programs.  The flags generally match those of cc or f77."
@@ -478,6 +485,15 @@ do
 	"-verbose")
 		echo "Verbose mode set"
 		VERBOSE=true
+		;;
+
+        "-spu-cpp")
+		SPU_USE_CPP=1
+		;;
+
+        "-spu-lib")
+		SPU_EXTRA_LIBS="$SPU_EXTRA_LIBS $1"
+		shift
 		;;
 
         "-intrinsic")
@@ -1290,9 +1306,18 @@ then
   if [ "$LANGUAGE" == "charm++" ]
   then
 
+    if [ $SPU_USE_CPP -eq 1 ]
+    then
+        SPU_COMPILER=$CMK_SPU_CXX
+        SPU_LINKER=$CMK_SPU_LDXX
+    else
+        SPU_COMPILER=$CMK_SPU_CC
+        SPU_LINKER=$CMK_SPU_LD
+    fi
+
     # Make the spe object file to be included
-    Do $CMK_SPU_CC -c -I$CHARMINC -o main__funcLookup__.genSPECode.o main__funcLookup__.genSPECode.c -DCMK_CELL_SPE=1
-    Do $CMK_SPU_LD -L$CHARMLIB -o main__funcLookup__.genSPECode main__funcLookup__.genSPECode.o $CMK_SPERT_LIBS
+    Do $SPU_COMPILER -c -I$CHARMINC -o main__funcLookup__.genSPECode.o main__funcLookup__.genSPECode.c -DCMK_CELL_SPE=1
+    Do $SPU_LINKER -L$CHARMLIB -o main__funcLookup__.genSPECode main__funcLookup__.genSPECode.o $CMK_SPERT_LIBS $SPU_EXTRA_LIBS
     Do $CMK_PPU_EMBEDSPU spert_main main__funcLookup__.genSPECode main__funcLookup__.genSPECode.ppe.o
 
     # Include the spe object file for linking into main executable
