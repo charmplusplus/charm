@@ -1,13 +1,29 @@
 
+# test version
 ICC_ver=`icc -v 2>&1`
 ICC_ver=`echo $ICC_ver | awk '{ print $2; }' | awk 'BEGIN {FS="."}; { print $1; }'`
 test -z "$ICC_ver" && echo "ICC compiler not found!" && exit 1
+
+
+#test intel or AMD
+CPU_model="Intel"
+model=`cat /proc/cpuinfo | grep 'model name'`
+if echo $model | grep 'AMD' > /dev/null 2>/dev/null
+then
+  CPU_model="AMD"
+fi
+#echo CPU: $CPU_model
 
 if test $ICC_ver  -eq 10
 then
 
 # for version 10 
-ICCOPTS="-xT"
+if test $CPU_model = "AMD"
+then
+  ICCOPTS="-xO"
+else
+  ICCOPTS="-xT"
+fi
 
 CMK_CPP_C='icc -E '
 CMK_CC="icc -fpic $ICCOPTS "
