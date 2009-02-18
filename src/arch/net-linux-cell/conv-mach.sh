@@ -49,11 +49,11 @@ CMK_QT='aix32-gcc'
 CMK_F90LIBS=''
 
 ## DMK - Accel Support for this architecture (CBEA, aka "Cell")
-CMK_CELL="1"
+CMK_CELL=1
 CMK_PPU_CC="ppu32-gcc -fPIC -w $OPTS"
 CMK_PPU_CXX="ppu32-g++ -fPIC -w $OPTS"
 CMK_SPU_CC="spu-gcc -W -Winline -Wno-main $OPTS"
-CMK_SPU_CXX="spu-g++ -W -Winline -Wno-main $OPTS"
+CMK_SPU_CXX="spu-g++ -W -Winline $OPTS"
 CMK_SPU_LD="spu-gcc -Wl,-N"
 CMK_SPU_LDXX="spu-g++ -Wl,-N"
 CMK_SPU_AR="spu-ar"
