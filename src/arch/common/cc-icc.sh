@@ -25,7 +25,7 @@ then
 fi
 #echo CPU: $CPU_model
 
-if test $ICC_ver  -eq 10
+if test $ICC_ver  -ge 9
 then
 
 # for version 10 
