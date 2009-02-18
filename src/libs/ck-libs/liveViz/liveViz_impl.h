@@ -24,11 +24,15 @@ void liveVizInitComplete(void *rednMessage);
 extern CkCallback clientGetImageCallback;
 
 //The liveVizGroup is only used to set lv_config on every processor.
-class liveVizGroup : public Group {
+class liveVizGroup : public CBase_liveVizGroup {
 public:
 	liveVizGroup(const liveVizConfig &cfg) {
 		lv_config=cfg;
 		contribute(0,0,CkReduction::sum_int,CkCallback(liveVizInitComplete));
+	}
+	liveVizGroup(CkMigrateMessage *m): CBase_liveVizGroup(m) {}
+	void pup(PUP::er &p) {
+		lv_config.pupNetwork(p);
 	}
 };
 
