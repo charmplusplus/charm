@@ -3360,9 +3360,14 @@ void Entry::genAccelIndexWrapperDef_general(XStr& str) {
 }
 
 void Entry::genAccelIndexWrapperDecl_spe(XStr& str) {
+
+  // Function to issue work request
   str << "    static void _accelCall_spe_" << epStr() << "(";
   genAccelFullParamList(str, 0);
   str << ");\n";
+
+  // Callback function that is a member of CkIndex_xxx
+  str << "    static void _accelCall_spe_callback_" << epStr() << "(void* userPtr);\n";
 }
 
 // DMK - Accel Support
@@ -3407,7 +3412,11 @@ void Entry::genAccelIndexWrapperDef_spe(XStr& str) {
 
   ///// Generate callback function /////
 
-  str << "void _accelCall_spe_callback_" << epStr() << "(void* userPtr) {\n";
+  str << "void _accelCall_spe_callback_" << epStr() << "(void* userPtr) {\n"
+      << "  " << container->indexName() << "::_accelCall_spe_callback_" << epStr() << "(userPtr);\n"
+      << "}\n";
+
+  str << makeDecl("void") << "::_accelCall_spe_callback_" << epStr() << "(void* userPtr) {\n";
   str << "  SpeCallbackStruct_" << epStr() << "* cbStruct = (SpeCallbackStruct_" << epStr() << "*)userPtr;\n";
   str << "  " << containerType << "* impl_obj = cbStruct->impl_obj;\n";
 
@@ -3891,7 +3900,7 @@ void Entry::genIndexDecls(XStr& str)
   // Entry point index storage
   str << "    static int "<<epIdx(0)<<";\n";
 
-  // DMK - Accel Support
+  // DMK - Accel Support - Also declare the function index for the Offload API call
   #if CMK_CELL != 0
     if (isAccel()) {
       str << "    static int accel_spe_func_index__" << epStr() << ";\n";
