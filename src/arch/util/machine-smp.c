@@ -214,6 +214,7 @@ static void CmiStartThreads(char **argv)
   barrier_mutex = CmiCreateLock();
 #ifdef CMK_NO_ASM_AVAILABLE
   cmiMemoryLock = CmiCreateLock();
+  if (CmiMyNode()==0) CmiPrintf("CmiMemory: fences and atomic operations not available in native assembly\n");
 #endif
 
   Cmi_state_key = TlsAlloc();
@@ -250,7 +251,9 @@ static void CmiDestoryLocks()
   CloseHandle(CmiMemLock_lock);
   CmiMemLock_lock = 0;
   CloseHandle(barrier_mutex);
+#ifdef CMK_NO_ASM_AVAILABLE
   CloseHandle(cmiMemoryLock);
+#endif
 }
 
 /***************** Pthreads kernel SMP threads ******************/
@@ -415,6 +418,7 @@ static void CmiStartThreads(char **argv)
   smp_mutex = CmiCreateLock();
 #ifdef CMK_NO_ASM_AVAILABLE
   cmiMemoryLock = CmiCreateLock();
+  if (CmiMyNode()==0) CmiPrintf("CmiMemory: fences and atomic operations not available in native assembly\n");
 #endif
 
 #if ! (CMK_TLS_THREAD && CMK_USE_TLS_THREAD)

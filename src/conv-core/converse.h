@@ -1574,9 +1574,6 @@ extern int _immRunning;
   : "=m"(someInt) : "m"(input) : "memory")
 #else
 #define CMK_NO_ASM_AVAILABLE    1
-#warning "******"
-#warning "****** CmiMemory operations not available natively! Might be slow! *********"
-#warning "******"
 extern CmiNodeLock cmiMemoryLock;
 #define CmiMemoryReadFence()               { CmiLock(cmiMemoryLock); CmiUnlock(cmiMemoryLock); }
 #define CmiMemoryWriteFence()              { CmiLock(cmiMemoryLock); CmiUnlock(cmiMemoryLock); }
