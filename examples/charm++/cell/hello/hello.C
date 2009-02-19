@@ -39,7 +39,11 @@ class Main : public CBase_Main {
 
 class Hello : public CBase_Hello {
 
-  public:
+  // Declare the CkIndex_Hello class as a friend of this class so that the accelerated
+  //   entry methods can access the member variables of this class
+  friend class CkIndex_Hello;
+
+  private:
     int  s;
     int* a;
 
