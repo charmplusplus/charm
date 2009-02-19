@@ -486,6 +486,21 @@ EOT
 test_cxx "whether GCC IA64 assembly works" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_GCC_IA64_ASM, $strictpass, [Allows gcc IA64 assembly.])
 
+
+#### test if we can use PPC assembly like this ####
+cat > $t <<EOT
+double foo(void)
+{
+        unsigned long long int x;
+	asm volatile("eieio" ::: "memory");
+        return x;
+}
+EOT
+test_cxx "whether PPC assembly works" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_PPC_ASM, $strictpass, [Allows PPC assembly.])
+
+
+
 #### test if we can use __thread ####
 cat > $t <<EOT
 __thread unsigned long long int x;

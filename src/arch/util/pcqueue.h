@@ -26,11 +26,18 @@
  ****************************************************************************/
 /*#define CMK_PCQUEUE_LOCK  1 */
 
-#if CMK_PCQUEUE_LOCK || !defined(CMK_USE_MFENCE) || !CMK_USE_MFENCE
-#undef smp_rmb
-#undef smp_wmb
-#define smp_rmb()
-#define smp_wmb()
+/* If we are using locks in PCQueue, we disable any other fence operation,
+ * otherwise we use the ones provided by converse.h */
+#ifdef CMK_PCQUEUE_LOCK
+#define PCQueue_CmiMemoryReadFence()
+#define PCQueue_CmiMemoryWriteFence()
+#define PCQueue_CmiMemoryAtomicIncrement(someInt)  someInt=someInt+1
+#define PCQueue_CmiMemoryAtomicDecrement(someInt)  someInt=someInt-1
+#else
+#define PCQueue_CmiMemoryReadFence()               CmiMemoryReadFence()
+#define PCQueue_CmiMemoryWriteFence()              CmiMemoryWriteFence()
+#define PCQueue_CmiMemoryAtomicIncrement(someInt)  CmiMemoryAtomicIncrement(someInt)
+#define PCQueue_CmiMemoryAtomicDecrement(someInt)  CmiMemoryAtomicDecrement(someInt)
 #endif
 
 #define PCQueueSize 0x100
@@ -159,16 +166,16 @@ static char *PCQueuePop(PCQueue Q)
 {
   CircQueue circ; int pull; char *data;
 
+    if (Q->len == 0) return 0;        /* If atomic increment are used, Q->len is always right */
 #ifdef CMK_PCQUEUE_LOCK
-    if (Q->len == 0) return 0;            /* len is accurate when using lock */
     CmiLock(Q->lock);
 #endif
     circ = Q->head;
-
-    smp_rmb();
-
     pull = circ->pull;
     data = circ->data[pull];
+
+    PCQueue_CmiMemoryReadFence();
+
 #if XT3_ONLY_PCQUEUE_WORKAROUND
     if (data && (Q->len > 0)) {
 #else
@@ -178,7 +185,7 @@ static char *PCQueuePop(PCQueue Q)
       circ->data[pull] = 0;
       if (pull == PCQueueSize - 1) { /* just pulled the data from the last slot
                                      of this buffer */
-        smp_rmb();
+        PCQueue_CmiMemoryReadFence();
         Q->head = circ-> next; /* next buffer must exist, because "Push"  */
         CmiAssert(Q->head != NULL);
 
@@ -188,7 +195,7 @@ static char *PCQueuePop(PCQueue Q)
 	/* links in the next buffer *before* filling */
                                /* in the last slot. See below. */
       }
-      Q->len --;
+      PCQueue_CmiMemoryAtomicDecrement(Q->len);
 #ifdef CMK_PCQUEUE_LOCK
       CmiUnlock(Q->lock);
 #endif
@@ -224,17 +231,14 @@ static void PCQueuePush(PCQueue Q, char *data)
 #endif
     /* MallocCircQueueStruct(circ); */
 
-    smp_wmb();
-
     Q->tail->next = circ;
     Q->tail = circ;
-
-    smp_wmb();
   }
+  PCQueue_CmiMemoryWriteFence();
+  
   circ1->data[push] = data;
   circ1->push = (push + 1);
-  Q->len ++;
-  smp_wmb();
+  PCQueue_CmiMemoryAtomicIncrement(Q->len);
 
 #ifdef CMK_PCQUEUE_LOCK
   CmiUnlock(Q->lock);

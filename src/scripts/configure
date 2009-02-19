@@ -2202,6 +2202,25 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+
+#### test if we can use PPC assembly like this ####
+cat > $t <<EOT
+double foo(void)
+{
+        unsigned long long int x;
+	asm volatile("eieio" ::: "memory");
+        return x;
+}
+EOT
+test_cxx "whether PPC assembly works" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_PPC_ASM $strictpass
+_ACEOF
+
+
+
+
 #### test if we can use __thread ####
 cat > $t <<EOT
 __thread unsigned long long int x;

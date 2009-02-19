@@ -89,6 +89,9 @@ static struct CmiStateStruct Cmi_default_state; /* State structure to return dur
 #if CMK_SHARED_VARS_NT_THREADS
 
 CmiNodeLock CmiMemLock_lock;
+#ifdef CMK_NO_ASM_AVAILABLE
+CmiNodeLock cmiMemoryLock;
+#endif
 static HANDLE comm_mutex;
 #define CmiCommLockOrElse(x) /*empty*/
 #define CmiCommLock() (WaitForSingleObject(comm_mutex, INFINITE))
@@ -209,6 +212,9 @@ static void CmiStartThreads(char **argv)
   CmiMemLock_lock=CmiCreateLock();
   comm_mutex = CmiCreateLock();
   barrier_mutex = CmiCreateLock();
+#ifdef CMK_NO_ASM_AVAILABLE
+  cmiMemoryLock = CmiCreateLock();
+#endif
 
   Cmi_state_key = TlsAlloc();
   if(Cmi_state_key == 0xFFFFFFFF) PerrorExit("TlsAlloc main");
@@ -244,12 +250,16 @@ static void CmiDestoryLocks()
   CloseHandle(CmiMemLock_lock);
   CmiMemLock_lock = 0;
   CloseHandle(barrier_mutex);
+  CloseHandle(cmiMemoryLock);
 }
 
 /***************** Pthreads kernel SMP threads ******************/
 #elif CMK_SHARED_VARS_POSIX_THREADS_SMP
 
 CmiNodeLock CmiMemLock_lock;
+#ifdef CMK_NO_ASM_AVAILABLE
+CmiNodeLock cmiMemoryLock;
+#endif
 int _Cmi_noprocforcommthread=0;/*this variable marks if there is an extra processor for comm thread
 in smp*/
 
@@ -403,6 +413,9 @@ static void CmiStartThreads(char **argv)
   CmiMemLock_lock=CmiCreateLock();
   comm_mutex=CmiCreateLock();
   smp_mutex = CmiCreateLock();
+#ifdef CMK_NO_ASM_AVAILABLE
+  cmiMemoryLock = CmiCreateLock();
+#endif
 
 #if ! (CMK_TLS_THREAD && CMK_USE_TLS_THREAD)
   pthread_key_create(&Cmi_state_key, 0);
@@ -455,6 +468,9 @@ static void CmiDestoryLocks()
   pthread_mutex_destroy(CmiMemLock_lock);
   CmiMemLock_lock = 0;
   pthread_mutex_destroy(&barrier_mutex);
+#ifdef CMK_NO_ASM_AVAILABLE
+  pthread_mutex_destroy(cmiMemoryLock);
+#endif
 }
 
 #endif

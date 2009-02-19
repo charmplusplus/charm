@@ -1544,24 +1544,48 @@ extern int _immRunning;
 
 /******** Memory Fence ********/
 
-#if  CMK_AMD64
-#define smp_rmb()    asm volatile("lfence":::"memory")
-#define smp_wmb()    asm volatile("sfence" ::: "memory")
+#if  CMK_SMP
+#if CMK_GCC_X86_ASM
+#define CmiMemoryReadFence()               asm volatile("lfence" ::: "memory")
+#define CmiMemoryWriteFence()              asm volatile("sfence" ::: "memory")
+#define CmiMemoryAtomicIncrement(someInt)  asm("lock incl %0" :: "m" (someInt))
+#define CmiMemoryAtomicDecrement(someInt)  asm("lock decl %0" :: "m" (someInt))
+#elif CMK_GCC_IA64_ASM
+#define CmiMemoryReadFence()               asm volatile("mf" ::: "memory")
+#define CmiMemoryWriteFence()              asm volatile("mf" ::: "memory")
+#define CmiMemoryAtomicIncrement(someInt)  { int someInt_private; \
+  asm volatile("fetchadd4.rel %0=[%1],1": "=r" (someInt_private): "r"(&someInt) :"memory") }
+#define CmiMemoryAtomicDecrement(someInt)  { int someInt_private; \
+  asm volatile("fetchadd4.rel %0=[%1],-1": "=r" (someInt_private): "r"(&someInt) :"memory") }
+#elif CMK_PPC_ASM
+#define CmiMemoryReadFence()               asm volatile("eieio":::"memory")
+#define CmiMemoryWriteFence()              asm volatile("eieio":::"memory")
+#define CmiMemoryAtomicIncrement(someInt)  asm ( \
+  "loop:  lwarx %1, 0, %0\n\t" \
+  "addi %2, %1, 1\n\t" \
+  "stwcx. %2, 0, %0\n\t" \
+  "bne- loop" \
+  : "=m"(someInt) : "m"(input) : "memory")
+#define CmiMemoryAtomicDecrement(someInt)  asm ( \
+  "loop:  lwarx %1, 0, %0\n\t" \
+  "subi %2, %1, 1\n\t" \
+  "stwcx. %2, 0, %0\n\t" \
+  "bne- loop" \
+  : "=m"(someInt) : "m"(input) : "memory")
 #else
-#define smp_rmb()
-#define smp_wmb()
+#define CMK_NO_ASM_AVAILABLE    1
+#warning "******"
+#warning "****** CmiMemory operations not available natively! Might be slow! *********"
+#warning "******"
+extern CmiNodeLock cmiMemoryLock;
+#define CmiMemoryReadFence()               { CmiLock(cmiMemoryLock); CmiUnlock(cmiMemoryLock); }
+#define CmiMemoryWriteFence()              { CmiLock(cmiMemoryLock); CmiUnlock(cmiMemoryLock); }
+#define CmiMemoryAtomicIncrement(someInt)  { CmiLock(cmiMemoryLock); someInt=someInt+1; CmiUnlock(cmiMemoryLock); }
+#define CmiMemoryAtomicDecrement(someInt)  { CmiLock(cmiMemoryLock); someInt=someInt-1; CmiUnlock(cmiMemoryLock); }
 #endif
-
-/** Atomically increment/decrement this integer. */
-#ifdef CMK_CPV_IS_SMP
-#if CMK_AMD64 || CMK_GCC_X86_ASM
-#define CmiMemoryAtomicIncrement(someInt) asm("lock incl %0" :: "m" (someInt))
-#define CmiMemoryAtomicDecrement(someInt) asm("lock decl %0" :: "m" (someInt))
 #else
-#define CmiMemoryAtomicIncrement(someInt) someInt=someInt+1
-#define CmiMemoryAtomicDecrement(someInt) someInt=someInt-1
-#endif
-#else
+#define CmiMemoryReadFence()
+#define CmiMemoryWriteFence()
 #define CmiMemoryAtomicIncrement(someInt)  someInt=someInt+1
 #define CmiMemoryAtomicDecrement(someInt)  someInt=someInt-1
 #endif
