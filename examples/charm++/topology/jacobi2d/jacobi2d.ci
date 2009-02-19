@@ -9,17 +9,13 @@ mainmodule jacobi2d {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void report(int, int);
+    entry void report(CkReductionMsg *msg);
   };
 
   array [2D] Jacobi {
-    // Normal Charm++ entry methods
     entry Jacobi(void);
     entry void begin_iteration(void);
-    entry void ghostsFromLeft(int width, double s[width]);
-    entry void ghostsFromRight(int width, double s[width]);
-    entry void ghostsFromTop(int width, double s[width]);
-    entry void ghostsFromBottom(int width, double s[width]);
+    entry void receiveGhosts(int dir, int size, double gh[size]);
   };
 
   group JacobiMap : CkArrayMap {
