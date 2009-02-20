@@ -1,5 +1,6 @@
 mainmodule kNeighbor {
     readonly CProxy_Main mainProxy;
+    readonly int gMsgSize;
 
     message toNeighborMsg {
 	char data[];
@@ -14,6 +15,7 @@ mainmodule kNeighbor {
 
     array [1D] Block {
 	entry Block(int);
+	entry void commWithNeighbors();
 	entry void commWithNeighbors(int);
 	entry void recvReplies(toNeighborMsg *);
 	entry void recvMsgs(toNeighborMsg *);

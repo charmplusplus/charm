@@ -8,7 +8,11 @@
 #define BLOCKMAPPING 1
 #define USE_ARRAY_REDUCTION 0
 
+#define DEBUG 0
+#define REUSE_ITER_MSG 0
+
 CProxy_Main mainProxy;
+int gMsgSize;
 
 class toNeighborMsg: public CMessage_toNeighborMsg {
 public:
@@ -61,6 +65,10 @@ public:
 
         currentMsgSize = atoi(m->argv[3]);
 
+	#if REUSE_ITER_MSG
+	gMsgSize = currentMsgSize;
+	#endif
+
         currentStep = 0;
 
         totalElems = numElems;
@@ -98,9 +106,13 @@ public:
         //currentMsgSize = msgSize;
 
         gStarttime = CmiWallTimer();
-        //array.commWithNeighbors(msgSize);
+#if REUSE_ITER_MSG
+        for (int i=0; i<totalElems; i++)
+            array(i).commWithNeighbors();
+#else
         for (int i=0; i<totalElems; i++)
             array(i).commWithNeighbors(currentMsgSize);
+#endif	
         //array.commWithNeighbors(currentMsgSize);
     }
 
@@ -191,6 +203,10 @@ public:
     int curIterWorkSize;
     int internalStepCnt;
 
+#if REUSE_ITER_MSG
+    toNeighborMsg **iterMsg;
+#endif
+
 public:
     Block(int numElems) {
         //srand(thisIndex.x+thisIndex.y);
@@ -229,8 +245,14 @@ public:
         for (int i=0; i<numNeighbors; i++)
             recvTimes[i] = 0.0;
 
-#ifdef DEBUG
-        CkPrintf("Neighbors of %d: ");
+#if REUSE_ITER_MSG
+	iterMsg = new toNeighborMsg *[numNeighbors];
+        for (int i=0; i<numNeighbors; i++)
+	    iterMsg[i] = NULL;	
+#endif
+
+#if DEBUG
+        CkPrintf("Neighbors of %d: ", thisIndex);
         for (int i=0; i<numNeighbors; i++)
             CkPrintf("%d ", neighbors[i]);
         CkPrintf("\n");
@@ -242,6 +264,9 @@ public:
     ~Block() {
         delete [] neighbors;
         delete [] recvTimes;
+#if REUSE_ITER_MSG
+	delete [] iterMsg;
+#endif
     }
 
     Block(CkMigrateMessage *m) {}
@@ -254,8 +279,8 @@ public:
     }
 
     void startInternalIteration() {
-#ifdef DEBUG
-        CkPrintf("Start internal iteration for %d\n", thisIndex);
+#if DEBUG
+        CkPrintf("[%d]: Start internal iteration \n", thisIndex);
 #endif
 
         neighborsRecved = 0;
@@ -274,7 +299,16 @@ public:
         //Send msgs to neighbors
         for (int i=0; i<numNeighbors; i++) {
             //double memtimer = CmiWallTimer();
+
+#if REUSE_ITER_MSG
+	    toNeighborMsg *msg = iterMsg[i];
+#else
             toNeighborMsg *msg = new(msgSize, 0) toNeighborMsg;
+#endif
+
+#if DEBUG
+	    CkPrintf("[%d]: send msg to neighbor[%d]=%d\n", thisIndex, i, neighbors[i]);
+#endif
             msg->setMsgSrc(thisIndex, i);
             //double entrytimer = CmiWallTimer();
             thisProxy(neighbors[i]).recvMsgs(msg);
@@ -297,9 +331,37 @@ public:
         startInternalIteration();
     }
 
+    void commWithNeighbors() {
+        internalStepCnt = 0;
+        curIterMsgSize = gMsgSize;
+        //currently the work size is only changed every big steps (which
+        //are initiated by the main proxy
+        curIterWorkSize = workSizeArr[random%WORKSIZECNT];
+        random++;
+	
+#if REUSE_ITER_MSG
+	if(iterMsg[0]==NULL){ //indicating the messages have not been created
+	    for(int i=0; i<numNeighbors; i++)
+		iterMsg[i] = new(curIterMsgSize, 0) toNeighborMsg;
+	}
+#endif
+	
+        startTime = CmiWallTimer();
+        startInternalIteration();
+    }
+
     void recvReplies(toNeighborMsg *m) {
         int fromNID = m->nID;
+
+#if DEBUG
+	CkPrintf("[%d]: receive ack from neighbor[%d]=%d\n", thisIndex, fromNID, neighbors[fromNID]);
+#endif
+
+#if REUSE_ITER_MSG
+	iterMsg[fromNID] = m;
+#else
         delete m;
+#endif
         //recvTimes[fromNID] += (CmiWallTimer() - startTime);
 
         //get one step time and send it back to mainProxy
@@ -325,6 +387,9 @@ public:
     }
 
     void recvMsgs(toNeighborMsg *m) {
+#if DEBUG
+	CkPrintf("[%d]: recv msg from %d as its %dth neighbor\n", thisIndex, m->fromX, m->nID);
+#endif
         thisProxy(m->fromX).recvReplies(m);
     }
 
