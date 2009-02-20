@@ -30,7 +30,7 @@ extern void CUDACallbackManager(void * fn);
  * (used when there is no need to share buffers between work requests)
  * will be equivalant in size.  
  */ 
-#define NUM_BUFFERS 100
+#define NUM_BUFFERS 128
 
 // #define GPU_DEBUG
 
@@ -39,7 +39,7 @@ extern void CUDACallbackManager(void * fn);
  *  completion of GPU events: memory allocation, transfer and
  *  kernel execution
  */  
-//#define GPU_PROFILE
+// #define GPU_PROFILE
 
 /* work request queue */
 workRequestQueue *wrQueue = NULL; 
@@ -112,12 +112,15 @@ void allocateBuffers(workRequest *wr) {
       int index = bufferInfo[i].bufferID; 
       int size = bufferInfo[i].size; 
 
+      if (bufferInfo[i].transferToDevice == 0) {
+	continue; 
+      }
+
       // if index value is invalid, use an available ID  
       if (index < 0 || index >= NUM_BUFFERS) {
 	int found = 0; 
 	for (int j=nextBuffer; j<NUM_BUFFERS*2; j++) {
 	  if (devBuffers[j] == NULL) {
-	    bufferInfo[i].bufferID = j; 
 	    index = j;
 	    found = 1; 
 	    break;
@@ -130,8 +133,7 @@ void allocateBuffers(workRequest *wr) {
 	
 	if (!found) {
 	  for (int j=NUM_BUFFERS; j<nextBuffer; j++) {
-	    if (devBuffers[j] == NULL) {
-	      bufferInfo[i].bufferID = j; 
+	    if (devBuffers[j] == NULL) {	
 	      index = j;
 	      found = 1; 
 	      break;
@@ -179,7 +181,7 @@ void setupData(workRequest *wr) {
       hostBuffers[index] = bufferInfo[i].hostBuffer; 
       
       /* allocate if the buffer for the corresponding index is NULL */
-
+      /*
       if (devBuffers[index] == NULL) {
 	CUDA_SAFE_CALL_NO_SYNC(cudaMalloc((void **) &devBuffers[index], size));
 #ifdef GPU_DEBUG
@@ -187,7 +189,7 @@ void setupData(workRequest *wr) {
 	       cutGetTimerValue(timerHandle)); 
 #endif
       }
-
+      */
       
       if (bufferInfo[i].transferToDevice) {
 	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpyAsync(devBuffers[index], 
