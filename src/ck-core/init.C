@@ -598,6 +598,7 @@ extern void _ckModuleInit(void);
 extern void _loadbalancerInit();
 extern "C" void initCharmProjections();
 extern "C" void CmiInitCPUTopology(char **argv);
+extern "C" void CmiInitCPUAffinity(char **argv);
 
 void _registerInitCall(CkInitCallFn fn, int isNodeCall)
 {
@@ -869,6 +870,7 @@ void _initCharm(int unused_argc, char **argv)
 	}	
 	
 #if ! CMK_BLUEGENE_CHARM
+        CmiInitCPUAffinity(argv);    // blocking
         CmiInitCPUTopology(argv);    // blocking
 #endif
 
