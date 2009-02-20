@@ -2360,7 +2360,7 @@ static void ConverseRunPE(int everReturn)
 #if MEMORYUSAGE_OUTPUT
   memoryusage_counter = 0;
 #endif
-#if CMK_USE_GM || CMK_USE_MX
+#if CMK_USE_GM || CMK_USE_MX || CMK_MULTICORE
   if (Cmi_charmrun_fd != -1)
 #endif
   {
