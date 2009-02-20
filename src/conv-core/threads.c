@@ -1917,6 +1917,10 @@ CthThread CthPup(pup_er p, CthThread t)
   return t;
 }
 
+/* Functions that help debugging of out-of-core emulation in BigSim */
+void CthPrintThdStack(CthThread t){
+    CmiPrintf("thread=%p, base stack=%p, stack pointer=%p\n", t, t->base.stack, t->stackp);
+}
 #endif
 
 #if ! USE_SPECIAL_STACKPOINTER
@@ -1951,13 +1955,8 @@ void CthTraceResume(CthThread t)
   traceResume(&t->base.tid);
 }
 
-//Functions that help debugging of out-of-core emulation in BigSim
+/* Functions that help debugging of out-of-core emulation in BigSim */
 void CthPrintThdMagic(CthThread t){
     CmiPrintf("CthThread[%p]'s magic: %x\n", t, t->base.magic);
 }
 
-#if !CMK_THREADS_USE_CONTEXT
-void CthPrintThdStack(CthThread t){
-    CmiPrintf("thread=%p, base stack=%p, stack pointer=%p\n", t, t->base.stack, t->stackp);
-}
-#endif
