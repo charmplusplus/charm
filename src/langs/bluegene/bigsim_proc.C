@@ -220,11 +220,11 @@ void workThreadInfo::scheduler(int count)
 
     // BgProcessMessage may trap into scheduler
     if(bgUseOutOfCore){
-#if 0 
+#if 0
     	if(startOutOfCore){
     	    DEBUGM(4, ("to execute in ooc mode\n"));
     	    if(isCoreOnDisk) this->broughtIntoMem();  
-    	    BgProcessMessage(msg); //startOutOfCore may be changed in processing this msg (AMPI_Init)    
+    	    BgProcessMessage(this, msg); //startOutOfCore may be changed in processing this msg (AMPI_Init)    
     
     	    if(startOOCChanged){ 
                 //indicate AMPI_Init is called and before it is finished, out-of-core is not executed
@@ -244,7 +244,7 @@ void workThreadInfo::scheduler(int count)
                 this->broughtIntoMem();  
     	    }
     	    //put before processing msg since thread may be scheduled during processing the msg
-    	    BgProcessMessage(msg);
+    	    BgProcessMessage(this, msg);
     	}
 #else
         bgOutOfCoreSchedule(this);
