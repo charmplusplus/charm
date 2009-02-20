@@ -273,12 +273,12 @@ public:
 
         //Send msgs to neighbors
         for (int i=0; i<numNeighbors; i++) {
-            double memtimer = CmiWallTimer();
-            toNeighborMsg *msg = new(msgSize) toNeighborMsg;
+            //double memtimer = CmiWallTimer();
+            toNeighborMsg *msg = new(msgSize, 0) toNeighborMsg;
             msg->setMsgSrc(thisIndex, i);
-            double entrytimer = CmiWallTimer();
+            //double entrytimer = CmiWallTimer();
             thisProxy(neighbors[i]).recvMsgs(msg);
-            double entrylasttimer = CmiWallTimer();
+            //double entrylasttimer = CmiWallTimer();
             //if(thisIndex==0){
             //	CkPrintf("At current step %d to neighbor %d, msg creation time: %f, entrymethod fire time: %f\n", internalStepCnt, neighbors[i], entrytimer-memtimer, entrylasttimer-entrytimer);
             //}
@@ -297,7 +297,9 @@ public:
         startInternalIteration();
     }
 
-    void recvReplies(int fromNID) {
+    void recvReplies(toNeighborMsg *m) {
+        int fromNID = m->nID;
+        delete m;
         recvTimes[fromNID] += (CmiWallTimer() - startTime);
 
         //get one step time and send it back to mainProxy
@@ -323,8 +325,7 @@ public:
     }
 
     void recvMsgs(toNeighborMsg *m) {
-        thisProxy(m->fromX).recvReplies(m->nID);
-        delete m;
+        thisProxy(m->fromX).recvReplies(m);
     }
 
     inline int MAX(int a, int b) {
