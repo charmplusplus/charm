@@ -73,7 +73,6 @@ CpvExtern(int, _traceCoreOn);   /* projector */
 extern void CcdModuleInit(char **);
 extern void CmiMemoryInit(char **);
 extern void CldModuleInit(char **);
-extern void CmiInitCPUAffinity(char **);
 
 #if CMK_WHEN_PROCESSOR_IDLE_USLEEP
 #include <sys/types.h>
@@ -2926,8 +2925,6 @@ void ConverseCommonInit(char **argv)
 /*
   CthSetSuspendable(CthSelf(), 0);
 */
-
-  CmiInitCPUAffinity(argv);
 
 #if CMK_BLUEGENE_CHARM
    /* have to initialize QD here instead of _initCharm */
