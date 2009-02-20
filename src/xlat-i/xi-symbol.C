@@ -2065,6 +2065,9 @@ Module::genDefs(XStr& str)
 
     if (!external) {
 
+      // Protected this functioni with CK_TEMPLATES_ONLY check
+      str << "#ifndef CK_TEMPLATES_ONLY\n";
+
       // Create the registration function
       // NOTE: Add a check so modules won't register more than once.  It is possible that to modules
       //   could have 'extern' references to each other, creating infinite loops in the registration
@@ -2084,6 +2087,8 @@ Module::genDefs(XStr& str)
 	    << "  register_accel_spe_funcs__module_" << name << "(SPE_FUNC_INDEX_USER);\n"
 	    << "}\n";
       }
+
+      str << "#endif /*CK_TEMPLATES_ONLY*/\n";
     }
 
   #endif

@@ -1123,9 +1123,11 @@ class AccelBlock : public Construct {
 
   void outputCode(XStr& str) {
     if (code != NULL) {
-      str << "\n\n/***** Accel_Block Start *****/\n"
+      str << "\n#ifndef CK_TEMPLATES_ONLY\n"
+          << "/***** Accel_Block Start *****/\n"
           << (*(code))
-          << "\n/***** Accel_Block End *****/\n\n";
+          << "\n/***** Accel_Block End *****/\n"
+          << "#endif /*CK_TEMPLATES_ONLY*/\n\n";
     }
   }
 
