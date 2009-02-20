@@ -493,7 +493,7 @@ do
 		;;
 
         "-spu-lib")
-		SPU_EXTRA_LIBS="$SPU_EXTRA_LIBS $1"
+		SPU_EXTRA_LIBS="$SPU_EXTRA_LIBS -l$1"
 		shift
 		;;
 
