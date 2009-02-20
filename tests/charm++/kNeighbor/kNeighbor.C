@@ -300,7 +300,7 @@ public:
     void recvReplies(toNeighborMsg *m) {
         int fromNID = m->nID;
         delete m;
-        recvTimes[fromNID] += (CmiWallTimer() - startTime);
+        //recvTimes[fromNID] += (CmiWallTimer() - startTime);
 
         //get one step time and send it back to mainProxy
         neighborsRecved++;
