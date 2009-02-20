@@ -29,6 +29,8 @@
 
 //#define  DEBUGF(x)      //CmiPrintf x;
 
+#define BIGSIM_OUT_OF_CORE 0
+
 #undef DEBUGLEVEL
 #define DEBUGLEVEL 10
 
@@ -412,6 +414,9 @@ void addBgNodeInbuffer(char *msgPtr, int lnodeID)
   if (lnodeID >= cva(numNodes)) CmiAbort("NodeID is out of range!");
 #endif
   nodeInfo &nInfo = cva(nodeinfo)[lnodeID];
+
+  //printf("Adding a msg %p to local node %d and its thread %d\n", msgPtr, lnodeID, CmiBgMsgThreadID(msgPtr));	
+	
   nInfo.addBgNodeInbuffer(msgPtr);
 }
 
@@ -1477,7 +1482,7 @@ CmiStartFn bgMain(int argc, char **argv)
   if(bgUseOutOfCore)
       initTblThreadInMem();
 
-#if CMK_OUT_OF_CORE
+#if BIGSIM_OUT_OF_CORE
   //initialize variables related to get precise
   //physical memory usage info for a process
   bgMemPageSize = getpagesize();
