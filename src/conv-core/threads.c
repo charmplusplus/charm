@@ -525,9 +525,9 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 		if(BgOutOfCoreFlag==0){
 		    t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
 		    t->token->thread = S(t);
-		    //For normal runs where this pup is needed,
-		    //set scheduled to 0 in the unpacking period since the thread has
-		    //not been scheduled
+		    /*For normal runs where this pup is needed,
+		    set scheduled to 0 in the unpacking period since the thread has
+		    not been scheduled */
 		    t->scheduled = 0;
 		}else{
 		/* During out-of-core emulation */
@@ -543,15 +543,15 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 		}
 	}
 	
-	//BIGSIM_OOC DEBUGGING
-	//if(BgOutOfCoreFlag!=0){
-	//   if(pup_isUnpacking(p)){
-	//	CmiPrintf("Unpacking: ");
-	//    }else{
-	//	CmiPrintf("Packing: ");
-	//    }	
-	//    CmiPrintf("thd=%p, its token=%p, token's thd=%p\n", t, t->token, t->token->thread); 
-	//}
+	/*BIGSIM_OOC DEBUGGING */
+	/*if(BgOutOfCoreFlag!=0){
+	   if(pup_isUnpacking(p)){
+		CmiPrintf("Unpacking: ");
+	    }else{
+		CmiPrintf("Packing: ");
+	    }	
+	    CmiPrintf("thd=%p, its token=%p, token's thd=%p\n", t, t->token, t->token->thread); 
+	} */
 
 	/*Really need a pup_functionPtr here:*/
 	pup_bytes(p,&t->awakenfn,sizeof(t->awakenfn));
@@ -688,11 +688,11 @@ void CthAwaken(CthThread th)
 {
   if (B(th)->awakenfn == 0) CthNoStrategy();
 
-  //BIGSIM_OOC DEBUGGING
-  //if(B(th)->scheduled==1){
-    //CmiPrintf("====Thread %p is already scheduled!!!!\n", th);
-    //return;
-  //}
+  /*BIGSIM_OOC DEBUGGING
+  if(B(th)->scheduled==1){
+    CmiPrintf("====Thread %p is already scheduled!!!!\n", th);
+    return;
+  } */
 
 #ifndef CMK_OPTIMIZE
 #if ! CMK_TRACE_IN_CHARM
@@ -701,8 +701,8 @@ void CthAwaken(CthThread th)
 #endif
 #endif
   B(th)->awakenfn(B(th)->token, CQS_QUEUEING_FIFO, 0, 0);
-  //B(th)->scheduled = 1;
-  //changed due to out-of-core emulation in BigSim
+  /*B(th)->scheduled = 1; */
+  /*changed due to out-of-core emulation in BigSim */
   B(th)->scheduled++;
 }
 
@@ -722,8 +722,8 @@ void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 #endif
 #endif
   B(th)->awakenfn(B(th)->token, s, pb, prio);
-  //B(th)->scheduled = 1;
-  //changed due to out-of-core emulation in BigSim
+  /*B(th)->scheduled = 1; */
+  /*changed due to out-of-core emulation in BigSim */
   B(th)->scheduled++;
 }
 
