@@ -377,7 +377,12 @@ void CmiInitCPUAffinity(char **argv)
     CmiSetHandler((char *)rankmsg, cpuAffinityRecvHandlerIdx);
     rankmsg->ranks = (int *)((char*)rankmsg + sizeof(rankMsg));
     for (i=0; i<CmiNumPes(); i++) rankmsg->ranks[i] = 0;
+
+    for (i=0; i<CmiNumPes(); i++) CmiDeliverSpecificMsg(cpuAffinityHandlerIdx);
   }
+
+    // receive broadcast from PE 0
+  CmiDeliverSpecificMsg(cpuAffinityRecvHandlerIdx);
 }
 
 #else           /* not supporting affinity */
