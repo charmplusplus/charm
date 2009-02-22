@@ -44,6 +44,8 @@
 
 #if CMK_SMP
 #define CMK_SMP_volatile volatile
+#else
+#define CMK_SMP_volatile
 #endif
 
 #define PCQueueSize 0x100
