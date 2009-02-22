@@ -25,6 +25,8 @@
  * for debugging and testing purpose! it only make sense in smp version
  ****************************************************************************/
 /*#define CMK_PCQUEUE_LOCK  1 */
+/*#define PCQUEUE_MULTIQUEUE  1 */
+/*#define CMK_PCQUEUE_PUSH_LOCK 1 */
 
 /* If we are using locks in PCQueue, we disable any other fence operation,
  * otherwise we use the ones provided by converse.h */
@@ -34,10 +36,14 @@
 #define PCQueue_CmiMemoryAtomicIncrement(someInt)  someInt=someInt+1
 #define PCQueue_CmiMemoryAtomicDecrement(someInt)  someInt=someInt-1
 #else
-#define PCQueue_CmiMemoryReadFence()               CmiMemoryReadFence()
-#define PCQueue_CmiMemoryWriteFence()              CmiMemoryWriteFence()
-#define PCQueue_CmiMemoryAtomicIncrement(someInt)  CmiMemoryAtomicIncrement(someInt)
-#define PCQueue_CmiMemoryAtomicDecrement(someInt)  CmiMemoryAtomicDecrement(someInt)
+#define PCQueue_CmiMemoryReadFence                 CmiMemoryReadFence
+#define PCQueue_CmiMemoryWriteFence                CmiMemoryWriteFence
+#define PCQueue_CmiMemoryAtomicIncrement           CmiMemoryAtomicIncrement
+#define PCQueue_CmiMemoryAtomicDecrement           CmiMemoryAtomicDecrement
+#endif
+
+#if CMK_SMP
+#define CMK_SMP_volatile volatile
 #endif
 
 #define PCQueueSize 0x100
@@ -47,14 +53,18 @@
  *  on other CPUs, this can affect your choice of fence operations.
  **/
 typedef struct CmiMemorySMPSeparation_t {
+#if CMK_SMP
         unsigned char padding[128];
+#endif
 } CmiMemorySMPSeparation_t;
 
 typedef struct CircQueueStruct
 {
-  struct CircQueueStruct *next;
+  struct CircQueueStruct * CMK_SMP_volatile next;
   int push;
+  CmiMemorySMPSeparation_t pad1;
   int pull;
+  CmiMemorySMPSeparation_t pad2;
   char *data[PCQueueSize];
 }
 *CircQueue;
@@ -62,9 +72,11 @@ typedef struct CircQueueStruct
 typedef struct PCQueueStruct
 {
   CircQueue head;
-  CircQueue tail;
+  CmiMemorySMPSeparation_t pad1;
+  CircQueue CMK_SMP_volatile tail;
+  CmiMemorySMPSeparation_t pad2;
   int  len;
-#ifdef CMK_PCQUEUE_LOCK
+#if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
   CmiNodeLock  lock;
 #endif
 }
@@ -133,7 +145,7 @@ static PCQueue PCQueueCreate(void)
   Q->head = circ;
   Q->tail = circ;
   Q->len = 0;
-#ifdef CMK_PCQUEUE_LOCK
+#if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
   Q->lock = CmiCreateLock();
 #endif
   return Q;
@@ -186,6 +198,7 @@ static char *PCQueuePop(PCQueue Q)
       if (pull == PCQueueSize - 1) { /* just pulled the data from the last slot
                                      of this buffer */
         PCQueue_CmiMemoryReadFence();
+        /*while (circ->next == 0);   This instruciton does not seem needed... but it might */
         Q->head = circ-> next; /* next buffer must exist, because "Push"  */
         CmiAssert(Q->head != NULL);
 
@@ -214,11 +227,27 @@ static void PCQueuePush(PCQueue Q, char *data)
 {
   CircQueue circ, circ1; int push;
 
-#ifdef CMK_PCQUEUE_LOCK
+#if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
   CmiLock(Q->lock);
 #endif
   circ1 = Q->tail;
+#ifdef PCQUEUE_MULTIQUEUE
+  CmiMemoryAtomicFetchAndInc(circ1->push, push);
+#else
   push = circ1->push;
+  circ1->push = (push + 1);
+#endif
+#ifdef PCQUEUE_MULTIQUEUE
+  while (push >= PCQueueSize) {
+    /* this circqueue is full, and we need to wait for the thread writing
+ *        the last slot to allocate the new queue */
+    PCQueue_CmiMemoryReadFence();
+    while (Q->tail == circ1);
+    circ1 = Q->tail;
+    CmiMemoryAtomicFetchAndInc(circ1->push, push);
+  }
+#endif
+
   if (push == (PCQueueSize -1)) { /* last slot is about to be filled */
     /* this way, the next buffer is linked in before data is filled in
        in the last slot of this buffer */
@@ -231,16 +260,19 @@ static void PCQueuePush(PCQueue Q, char *data)
 #endif
     /* MallocCircQueueStruct(circ); */
 
+#ifdef PCQUEUE_MULTIQUEUE
+    PCQueue_CmiMemoryWriteFence();
+#endif
+
     Q->tail->next = circ;
     Q->tail = circ;
   }
   PCQueue_CmiMemoryWriteFence();
   
   circ1->data[push] = data;
-  circ1->push = (push + 1);
   PCQueue_CmiMemoryAtomicIncrement(Q->len);
 
-#ifdef CMK_PCQUEUE_LOCK
+#if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
   CmiUnlock(Q->lock);
 #endif
 }
