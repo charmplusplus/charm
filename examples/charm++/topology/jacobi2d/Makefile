@@ -1,4 +1,5 @@
-CHARMC=../../../../bin/charmc $(OPTS)
+OPTS	= -O3
+CHARMC	= ../../../../bin/charmc $(OPTS)
 
 OBJS = jacobi2d.o
 

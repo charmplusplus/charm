@@ -41,7 +41,7 @@
 #define wrap_x(a)  (((a)+num_chare_x)%num_chare_x)
 #define wrap_y(a)  (((a)+num_chare_y)%num_chare_y)
 
-#define MAX_ITER	10
+#define MAX_ITER	100
 #define LEFT		1
 #define RIGHT		2
 #define TOP		3
@@ -113,7 +113,7 @@ class Main : public CBase_Main
       iterations++;
       double error = *((double *)msg->getData());
 
-      if (error > 0.0001 /*&& iterations < MAX_ITER*/) {
+      if (error > 0.001 && iterations < MAX_ITER) {
 	array.begin_iteration();
       } else {
 	CkPrintf("Completed %d iterations\n", iterations);
@@ -135,7 +135,7 @@ class Jacobi: public CBase_Jacobi {
     // Constructor, initialize values
     Jacobi() {
       int i,j;
-      // allocate two dimensional array
+      // allocate two dimensional arrays
       temperature = new double*[blockDimX+2];
       new_temperature = new double*[blockDimX+2];
       for (i=0; i<blockDimX+2; i++) {
@@ -144,8 +144,8 @@ class Jacobi: public CBase_Jacobi {
       }
       for(i=0;i<blockDimX+2; i++) {
 	for(j=0;j<blockDimY+2; j++) {
-	  temperature[i][j] = 0.0;
-	  new_temperature[i][j] = 0.0;
+	  temperature[i][j] = 0.5;
+	  new_temperature[i][j] = 0.5;
 	}
       }
 
@@ -220,13 +220,15 @@ class Jacobi: public CBase_Jacobi {
 
       if (msgs == 4) {
 	msgs = 0;
-	compute_kernel();
+
+	compute_kernel();	
 
 	for(int i=1; i<blockDimX+1; i++) {
 	  for(int j=1; j<blockDimY+1; j++) {
-	    error = new_temperature[i][j] - temperature[i][j];
-	    if(error > max_error)
+	    error = fabs(new_temperature[i][j] - temperature[i][j]);
+	    if(error > max_error) {
 	      max_error = error;
+	    }
 	  }
 	}
 
@@ -237,6 +239,8 @@ class Jacobi: public CBase_Jacobi {
 
 	constrainBC();
 
+	// if(thisIndex.x == 0 && thisIndex.y == 0) CkPrintf("Iteration %f %f %f\n", max_error, temperature[1][1], temperature[1][2]);
+	 
 	contribute(sizeof(double), &max_error, CkReduction::max_double,
 	      CkCallback(CkIndex_Main::report(NULL), mainProxy));
       }
@@ -257,14 +261,14 @@ class Jacobi: public CBase_Jacobi {
     // Enforce some boundary conditions
     void constrainBC()
     {
-     if(thisIndex.y == 0 && thisIndex.x < arrayDimX/2) {
+     if(thisIndex.y == 0 && thisIndex.x < num_chare_x/2) {
 	for(int i=1; i<=blockDimX; i++)
-	  temperature[i][1] = 255.0;
+	  temperature[i][1] = 1.0;
       }
 
-      if(thisIndex.x == arrayDimX-1 && thisIndex.y >= arrayDimY/2) {
+      if(thisIndex.x == num_chare_x-1 && thisIndex.y >= num_chare_y/2) {
 	for(int j=1; j<=blockDimY; j++)
-	  temperature[blockDimX][j] = 255.0;
+	  temperature[blockDimX][j] = 0.0;
       }
     }
 
