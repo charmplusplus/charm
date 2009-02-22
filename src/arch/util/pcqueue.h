@@ -166,8 +166,8 @@ static char *PCQueuePop(PCQueue Q)
 {
   CircQueue circ; int pull; char *data;
 
-    if (Q->len == 0) return 0;        /* If atomic increment are used, Q->len is always right */
 #ifdef CMK_PCQUEUE_LOCK
+    if (Q->len == 0) return 0;        /* If atomic increment are used, Q->len is always right */
     CmiLock(Q->lock);
 #endif
     circ = Q->head;
