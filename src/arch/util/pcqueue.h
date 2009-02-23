@@ -55,18 +55,20 @@
  *  on other CPUs, this can affect your choice of fence operations.
  **/
 typedef struct CmiMemorySMPSeparation_t {
-#if CMK_SMP
         unsigned char padding[128];
-#endif
 } CmiMemorySMPSeparation_t;
 
 typedef struct CircQueueStruct
 {
   struct CircQueueStruct * CMK_SMP_volatile next;
   int push;
+#if CMK_SMP
   CmiMemorySMPSeparation_t pad1;
+#endif
   int pull;
+#if CMK_SMP
   CmiMemorySMPSeparation_t pad2;
+#endif
   char *data[PCQueueSize];
 }
 *CircQueue;
@@ -74,9 +76,13 @@ typedef struct CircQueueStruct
 typedef struct PCQueueStruct
 {
   CircQueue head;
+#if CMK_SMP
   CmiMemorySMPSeparation_t pad1;
+#endif
   CircQueue CMK_SMP_volatile tail;
+#if CMK_SMP
   CmiMemorySMPSeparation_t pad2;
+#endif
   int  len;
 #if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
   CmiNodeLock  lock;
