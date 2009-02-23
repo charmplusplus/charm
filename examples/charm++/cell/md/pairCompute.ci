@@ -1,0 +1,128 @@
+module pairCompute {
+
+  // Include md_config.h on the accelerator (for physics constants)
+  accelblock { #include "md_config.h" };
+
+  array[2D] PairCompute {
+
+    entry PairCompute(int numParticlesPerPatch);
+
+    entry void patchData(int numParticles,
+                         float particleX[numParticles],
+                         float particleY[numParticles],
+                         float particleZ[numParticles],
+                         float particleQ[numParticles],
+                         int fromPatch
+                        );
+
+    entry [accel] void doCalc()[  readonly : int numParticles <impl_obj->numParticles>,
+                                  readonly : int thisIndex_x <impl_obj->thisIndex.x>,
+                                  readonly : int thisIndex_y <impl_obj->thisIndex.y>,
+                                  readonly : float p0_x[numParticles] <impl_obj->particleX[0]>,
+                                  readonly : float p1_x[numParticles] <impl_obj->particleX[1]>,
+                                  readonly : float p0_y[numParticles] <impl_obj->particleY[0]>,
+                                  readonly : float p1_y[numParticles] <impl_obj->particleY[1]>,
+                                  readonly : float p0_z[numParticles] <impl_obj->particleZ[0]>,
+                                  readonly : float p1_z[numParticles] <impl_obj->particleZ[1]>,
+                                  readonly : float p0_q[numParticles] <impl_obj->particleQ[0]>,
+                                  readonly : float p1_q[numParticles] <impl_obj->particleQ[1]>,
+                                 writeonly : float f0_x[numParticles] <impl_obj->forceX[0]>,
+                                 writeonly : float f1_x[numParticles] <impl_obj->forceX[1]>,
+                                 writeonly : float f0_y[numParticles] <impl_obj->forceY[0]>,
+                                 writeonly : float f1_y[numParticles] <impl_obj->forceY[1]>,
+                                 writeonly : float f0_z[numParticles] <impl_obj->forceZ[0]>,
+                                 writeonly : float f1_z[numParticles] <impl_obj->forceZ[1]>
+                               ] {
+
+      // Calculate the electrostatic force (coulumb's law) between the particles
+      //   F = (k_e * (q_0 * q_1)) / (r^2)
+
+      register vec4f* p1_x_vec = (vec4f*)p1_x;
+      register vec4f* p1_y_vec = (vec4f*)p1_y;
+      register vec4f* p1_z_vec = (vec4f*)p1_z;
+      register vec4f* p1_q_vec = (vec4f*)p1_q;
+      register vec4f* f1_x_vec = (vec4f*)f1_x;
+      register vec4f* f1_y_vec = (vec4f*)f1_y;
+      register vec4f* f1_z_vec = (vec4f*)f1_z;
+      register int i;
+      register int j;
+      register const int numParticlesByVecSize = numParticles / (sizeof(vec4f) / sizeof(float));
+
+      // Zero out the force array for p1 (p0's force array will be zero'ed for each
+      //   particle in the outer loop)
+      for (j = 0; j < numParticlesByVecSize; j++) {
+        f1_x_vec[j] = vspread4f(0.0f);
+        f1_y_vec[j] = vspread4f(0.0f);
+        f1_z_vec[j] = vspread4f(0.0f);
+      }
+
+      // Spread coulumb's constant across a vector
+      vec4f coulomb_vec = vspread4f(COULOMBS_CONSTANT);
+
+      // Outer-loop (p0)
+      for (i = 0; i < numParticles; i++) {
+
+        // Spread this particle's values out over vectors
+        vec4f p0_x_i_vec = vspread4f(p0_x[i]);
+        vec4f p0_y_i_vec = vspread4f(p0_y[i]);
+        vec4f p0_z_i_vec = vspread4f(p0_z[i]);
+        vec4f p0_q_i_vec = vspread4f(p0_q[i]);
+        vec4f f0_x_i_vec = vspread4f(0.0f);
+        vec4f f0_y_i_vec = vspread4f(0.0f);
+        vec4f f0_z_i_vec = vspread4f(0.0f);
+
+        // Inner-loop (p1)
+        for (j = 0; j < numParticlesByVecSize; j++) {
+
+          // Load the particles' data
+          vec4f p1_x_j_vec = p1_x_vec[j];
+          vec4f p1_y_j_vec = p1_y_vec[j];
+          vec4f p1_z_j_vec = p1_z_vec[j];
+          vec4f p1_q_j_vec = p1_q_vec[j];
+
+          // Calculate the vector between the particles
+          vec4f p_x_diff_vec = p0_x_i_vec - p1_x_j_vec;
+          vec4f p_y_diff_vec = p0_y_i_vec - p1_y_j_vec;
+          vec4f p_z_diff_vec = p0_z_i_vec - p1_z_j_vec;
+
+          // Calculate r and r^2 between the particles
+          vec4f p_x_diff_2_vec = p_x_diff_vec * p_x_diff_vec;
+          vec4f p_y_diff_2_vec = p_y_diff_vec * p_y_diff_vec;
+          vec4f p_z_diff_2_vec = p_z_diff_vec * p_z_diff_vec;
+          vec4f r_2_vec = p_x_diff_2_vec + p_y_diff_2_vec + p_z_diff_2_vec;
+          vec4f r_vec = vsqrt4f(r_2_vec);
+
+          // Normalize the vector between the particles
+          vec4f p_x_diff_norm_vec = p_x_diff_vec / r_vec;
+          vec4f p_y_diff_norm_vec = p_y_diff_vec / r_vec;
+          vec4f p_z_diff_norm_vec = p_z_diff_vec / r_vec;
+
+          // Calculate the magnitude of the electrostatic force between the particles
+          vec4f f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec) / r_2_vec);
+
+          // Multiply the magnitude by the normalized postition difference vector to
+          //   create the force vector
+          vec4f f_x_vec = p_x_diff_norm_vec * f_mag_vec;
+          vec4f f_y_vec = p_y_diff_norm_vec * f_mag_vec;
+          vec4f f_z_vec = p_z_diff_norm_vec * f_mag_vec;
+
+          // Add the force to the outer-loop particle and subtract it from the inner-loop particles
+          f0_x_i_vec += f_x_vec;
+          f0_y_i_vec += f_y_vec;
+          f0_z_i_vec += f_z_vec;
+          f1_x_vec[j] -= f_x_vec;
+          f1_y_vec[j] -= f_y_vec;
+          f1_z_vec[j] -= f_z_vec;
+        }
+
+        // Write force values for the outer-loop particle back to memory
+        f0_x[i] += vextract4f(f0_x_i_vec, 0) + vextract4f(f0_x_i_vec, 1) + vextract4f(f0_x_i_vec, 2) + vextract4f(f0_x_i_vec, 3);
+        f0_y[i] += vextract4f(f0_y_i_vec, 0) + vextract4f(f0_y_i_vec, 1) + vextract4f(f0_y_i_vec, 2) + vextract4f(f0_y_i_vec, 3);
+        f0_z[i] += vextract4f(f0_z_i_vec, 0) + vextract4f(f0_z_i_vec, 1) + vextract4f(f0_z_i_vec, 2) + vextract4f(f0_z_i_vec, 3);
+      }
+
+    } doCalc_callback;
+
+  };
+
+};

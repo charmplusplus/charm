@@ -1,0 +1,23 @@
+mainmodule main {
+
+  extern module patch;
+  extern module selfCompute;
+  extern module pairCompute;
+
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Patch patchArrayProxy;
+  readonly CProxy_SelfCompute selfComputeArrayProxy;
+  readonly CProxy_PairCompute pairComputeArrayProxy;
+  readonly int numPatchesX;
+  readonly int numPatchesY;
+  readonly int numPatchesZ;
+
+  mainchare Main {
+    entry Main(CkArgMsg *msg);
+    entry void proxyCheckIn();
+    entry void patchCheckIn();
+  };
+
+  initproc void seedRand();
+
+};

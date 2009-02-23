@@ -1,0 +1,91 @@
+module patch {
+
+  accelblock { #include "md_config.h" };
+
+  array[3D] Patch {
+
+    entry Patch(int numParticles);
+
+    entry void startIteration();
+    entry void startIterations(int numIters);
+
+    entry [accel] void forceCheckIn(int numParticles,
+                                    float forceX[numParticles],
+                                    float forceY[numParticles],
+                                    float forceZ[numParticles]
+                                   )[
+                                    readwrite : float forceSumX[numParticles] <impl_obj->forceSumX>,
+                                    readwrite : float forceSumY[numParticles] <impl_obj->forceSumY>,
+                                    readwrite : float forceSumZ[numParticles] <impl_obj->forceSumZ>
+                                   ] {
+
+      // Combine the incoming force with the accumulated forces for this patch
+      register vec4f* fsx = (vec4f*)forceSumX;
+      register vec4f* fsy = (vec4f*)forceSumY;
+      register vec4f* fsz = (vec4f*)forceSumZ;
+      register vec4f* fx = (vec4f*)forceX;
+      register vec4f* fy = (vec4f*)forceY;
+      register vec4f* fz = (vec4f*)forceZ;
+      register const int numParticles_vec = numParticles / (sizeof(vec4f) * sizeof(float));
+      register int i;
+      for (i = 0; i < numParticles_vec; i++) {
+        fsx[i] = vadd4f(fsx[i], fx[i]);
+        fsy[i] = vadd4f(fsy[i], fy[i]);
+        fsz[i] = vadd4f(fsz[i], fz[i]);
+      }
+
+    } forceCheckIn_callback;
+
+    entry [accel] void integrate()[  readonly : int numParticles <impl_obj->numParticles>,
+                                     readonly : int thisIndex_x <impl_obj->thisIndex.x>,
+                                     readonly : int thisIndex_y <impl_obj->thisIndex.y>,
+                                     readonly : int thisIndex_z <impl_obj->thisIndex.z>,
+                                    readwrite : float p_x[numParticles] <impl_obj->particleX>,
+                                    readwrite : float p_y[numParticles] <impl_obj->particleY>,
+                                    readwrite : float p_z[numParticles] <impl_obj->particleZ>,
+                                     readonly : float p_m[numParticles] <impl_obj->particleM>,
+                                     readonly : float f_x[numParticles] <impl_obj->forceSumX>,
+                                     readonly : float f_y[numParticles] <impl_obj->forceSumY>,
+                                     readonly : float f_z[numParticles] <impl_obj->forceSumZ>,
+                                    readwrite : float v_x[numParticles] <impl_obj->velocityX>,
+                                    readwrite : float v_y[numParticles] <impl_obj->velocityY>,
+                                    readwrite : float v_z[numParticles] <impl_obj->velocityZ>
+                                  ] {
+
+      register vec4f* p_x_vec = (vec4f*)p_x;
+      register vec4f* p_y_vec = (vec4f*)p_y;
+      register vec4f* p_z_vec = (vec4f*)p_z;
+      register vec4f* p_m_vec = (vec4f*)p_m;
+      register vec4f* f_x_vec = (vec4f*)f_x;
+      register vec4f* f_y_vec = (vec4f*)f_y;
+      register vec4f* f_z_vec = (vec4f*)f_z;
+      register vec4f* v_x_vec = (vec4f*)v_x;
+      register vec4f* v_y_vec = (vec4f*)v_y;
+      register vec4f* v_z_vec = (vec4f*)v_z;
+      register int i;
+      register const int numParticles_vec = numParticles / (sizeof(vec4f) / sizeof(float));
+
+      vec4f delta_time_vec = vspread4f(TIME_PER_STEP);
+
+      // Add the acceleration to the velocity and add the update velocity to the position
+      for (i = 0; i < numParticles_vec; i++) {
+
+        //// Update the velocity : v_new = v_old + (F/m)
+        vec4f new_v_x_vec = v_x_vec[i] + (delta_time_vec * (f_x_vec[i] / p_m_vec[i]));
+        vec4f new_v_y_vec = v_y_vec[i] + (delta_time_vec * (f_y_vec[i] / p_m_vec[i]));
+        vec4f new_v_z_vec = v_z_vec[i] + (delta_time_vec * (f_z_vec[i] / p_m_vec[i]));
+        v_x_vec[i] = new_v_x_vec;
+        v_y_vec[i] = new_v_y_vec;
+        v_z_vec[i] = new_v_z_vec;
+
+        //// Update the position : pos_new = pos_old + v_new
+        p_x_vec[i] += delta_time_vec * new_v_x_vec;
+        p_y_vec[i] += delta_time_vec * new_v_y_vec;
+        p_z_vec[i] += delta_time_vec * new_v_z_vec;
+      }
+
+    } integrate_callback;
+
+  };
+
+};

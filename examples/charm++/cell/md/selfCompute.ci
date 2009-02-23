@@ -1,0 +1,141 @@
+module selfCompute {
+
+  // Include md_config.h on the accelerator (for physics constants)
+  accelblock { #include "md_config.h" };
+
+  array[3D] SelfCompute {
+
+    entry SelfCompute(int numParticlesPerPatch);
+
+    entry [accel] void doCalc(int numParticles,
+                              float particleX[numParticles],
+                              float particleY[numParticles],
+                              float particleZ[numParticles],
+                              float particleQ[numParticles]
+                             )[
+                               readonly : int thisIndex_x <impl_obj->thisIndex.x>,
+                               readonly : int thisIndex_y <impl_obj->thisIndex.y>,
+                              writeonly : float f0_x[numParticles] <impl_obj->forceX>,
+                              writeonly : float f0_y[numParticles] <impl_obj->forceY>,
+                              writeonly : float f0_z[numParticles] <impl_obj->forceZ>
+                             ] {
+
+      // Calculate the electrostatic force (coulumb's law) between the particles
+      //   F = (k_e * (q_0 * q_1)) / (r^2)
+
+      register vec4f* p0_x_vec = (vec4f*)particleX;
+      register vec4f* p0_y_vec = (vec4f*)particleY;
+      register vec4f* p0_z_vec = (vec4f*)particleZ;
+      register vec4f* p0_q_vec = (vec4f*)particleQ;
+      register vec4f* f0_x_vec = (vec4f*)f0_x;
+      register vec4f* f0_y_vec = (vec4f*)f0_y;
+      register vec4f* f0_z_vec = (vec4f*)f0_z;
+      register int i;
+      register int j;
+      register const int numParticlesByVecSize = numParticles / (sizeof(vec4f) / sizeof(float));
+
+      // Zero out the force output
+      for (j = 0; j < numParticlesByVecSize; j++) {
+        f0_x_vec[j] = vspread4f(0.0f);
+        f0_y_vec[j] = vspread4f(0.0f);
+        f0_z_vec[j] = vspread4f(0.0f);
+      }
+
+      // Spread coulumb's constant across a vector
+      vec4f coulomb_vec = vspread4f(COULOMBS_CONSTANT);
+
+      // Outer-loop
+      for (i = 0; i < numParticles; i++) {
+
+        // Interact with all particles (one-by-one) until the vector boundary
+        for (j = i + 1; ((j & 0x3) != 0x0) && (j < numParticles); j++) {
+
+          float p_x_diff = particleX[i] - particleX[j];
+          float p_y_diff = particleY[i] - particleY[j];
+          float p_z_diff = particleZ[i] - particleZ[j];
+          float r_2 = (p_x_diff * p_x_diff) + (p_y_diff * p_y_diff) + (p_z_diff * p_z_diff);
+          float r = sqrt(r_2);
+
+          float p_x_diff_norm = p_x_diff / r;
+          float p_y_diff_norm = p_y_diff / r;
+          float p_z_diff_norm = p_z_diff / r;
+
+          float p_q_prod = particleQ[i] * particleQ[j];
+          float f_mag = COULOMBS_CONSTANT * (p_q_prod / r_2);
+
+          float f_x = f_mag * p_x_diff_norm;
+          float f_y = f_mag * p_y_diff_norm;
+          float f_z = f_mag * p_z_diff_norm;
+
+          f0_x[i] += f_x;
+          f0_y[i] += f_y;
+          f0_z[i] += f_z;
+          f0_x[j] -= f_x;
+          f0_y[j] -= f_y;
+          f0_z[j] -= f_z;
+        }
+
+        // Spread this particle's (p0[i]) values out over vectors
+        vec4f p0_x_i_vec = vspread4f(particleX[i]);
+        vec4f p0_y_i_vec = vspread4f(particleY[i]);
+        vec4f p0_z_i_vec = vspread4f(particleZ[i]);
+        vec4f p0_q_i_vec = vspread4f(particleQ[i]);
+        vec4f f0_x_i_vec = vspread4f(0.0f);
+        vec4f f0_y_i_vec = vspread4f(0.0f);
+        vec4f f0_z_i_vec = vspread4f(0.0f);
+
+        // Switch to vectorized loop for the remaining elements in the particle array
+        for (j = j >> 2; j < numParticlesByVecSize; j++) {
+
+          // Load the particles' data
+          vec4f p0_x_j_vec = p0_x_vec[j];
+          vec4f p0_y_j_vec = p0_y_vec[j];
+          vec4f p0_z_j_vec = p0_z_vec[j];
+          vec4f p0_q_j_vec = p0_q_vec[j];
+
+          // Calculate the vector between the particles
+          vec4f p_x_diff_vec = p0_x_i_vec - p0_x_j_vec;
+          vec4f p_y_diff_vec = p0_y_i_vec - p0_y_j_vec;
+          vec4f p_z_diff_vec = p0_z_i_vec - p0_z_j_vec;
+
+          // Calculate r and r^2 between the particles
+          vec4f p_x_diff_2_vec = p_x_diff_vec * p_x_diff_vec;
+          vec4f p_y_diff_2_vec = p_y_diff_vec * p_y_diff_vec;
+          vec4f p_z_diff_2_vec = p_z_diff_vec * p_z_diff_vec;
+          vec4f r_2_vec = p_x_diff_2_vec + p_y_diff_2_vec + p_z_diff_2_vec;
+          vec4f r_vec = vsqrt4f(r_2_vec);
+
+          // Normalize the vector between the particles
+          vec4f p_x_diff_norm_vec = p_x_diff_vec / r_vec;
+          vec4f p_y_diff_norm_vec = p_y_diff_vec / r_vec;
+          vec4f p_z_diff_norm_vec = p_z_diff_vec / r_vec;
+
+          // Calculate the magnitude of the electrostatic force between the particles
+          vec4f f_mag_vec = coulomb_vec * ((p0_q_i_vec * p0_q_j_vec) / r_2_vec);
+
+          // Multiply the magnitude by the normalized postition difference vector to
+          //   create the force vector
+          vec4f f_x_vec = p_x_diff_norm_vec * f_mag_vec;
+          vec4f f_y_vec = p_y_diff_norm_vec * f_mag_vec;
+          vec4f f_z_vec = p_z_diff_norm_vec * f_mag_vec;
+
+          // Add the force to the outer-loop particle and subtract it from the inner-loop particles
+          f0_x_i_vec += f_x_vec;
+          f0_y_i_vec += f_y_vec;
+          f0_z_i_vec += f_z_vec;
+          f0_x_vec[j] -= f_x_vec;
+          f0_y_vec[j] -= f_y_vec;
+          f0_z_vec[j] -= f_z_vec;
+        }
+
+        // Add force values for p0[i] into f0
+        f0_x[i] += vextract4f(f0_x_i_vec, 0) + vextract4f(f0_x_i_vec, 1) + vextract4f(f0_x_i_vec, 2) + vextract4f(f0_x_i_vec, 3);
+        f0_y[i] += vextract4f(f0_y_i_vec, 0) + vextract4f(f0_y_i_vec, 1) + vextract4f(f0_y_i_vec, 2) + vextract4f(f0_y_i_vec, 3);
+        f0_z[i] += vextract4f(f0_z_i_vec, 0) + vextract4f(f0_z_i_vec, 1) + vextract4f(f0_z_i_vec, 2) + vextract4f(f0_z_i_vec, 3);
+      }
+
+    } doCalc_callback;
+
+  };
+
+};
