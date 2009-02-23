@@ -1,224 +1,181 @@
-\section{BigSim Simulator Installation and Usage}
+\section{BigSim Emulator Installation and Usage}
 \label{install}
 
 \subsection{Installing Charm++ and BigSim}
 
-% #CLM# BigSim Simulator is distributed as a part of the Charm++ standard distribution.
-    The BigSim Simulator is distributed as part of the Charm++ standard distribution.
-One needs to download Charm++ and compile the BigSim Simulator.
-% #CLM# One should begin with downloading Charm++ from the website:
+    The BigSim Emulator is distributed as part of the Charm++ standard
+distribution.  One needs to download Charm++ and compile the BigSim Simulator.
 This process should begin with downloading Charm++ from the website:
 http://charm.cs.uiuc.edu.
 
 Please refer to ``Charm++ Installation and Usage Manual'' and also the file
 README in the source code for detailed instructions on how to compile Charm++.
 In short, the ``build'' script is the main tool for compiling \charmpp{}.  One
-% #CLM# need to provide target and platform options: \begin{verbatim} ./build <target>
-        needs to provide {\em target} and {\em platform} selections: 
+needs to provide {\em target} and {\em platform} selections: 
 \begin{verbatim} ./build <target> <platform> [options ...] [charmc-options ...] \end{verbatim}
 
-For example, to compile on a Linux machine, one would type:
+For example, to compile on a 64-bit Linux machine, one would type:
 \begin{verbatim}
-./build charm++ net-linux -O
+./build charm++ net-linux-x86_64 -O2
 \end{verbatim}
 
-\noindent
-% #CLM# which builds essential \charmpp{} kernel using UDP sockets as 
-        which builds essential \charmpp{} kernel using UDP sockets as the
-communication method; 
-% #CLM# alternatively, you can build Charm++ kernel on MPI using:
-        alternatively, it is possible to build the Charm++ kernel on MPI using:
+\noindent which builds essential \charmpp{} kernel using UDP sockets as the
+communication method; alternatively, it is possible to build the Charm++ kernel
+on MPI using:
 \begin{verbatim}
-./build charm++ mpi-linux -O
+./build charm++ mpi-linux-x86_64 -O2
 \end{verbatim}
 
-% #CLM# For other platforms, change net-linux to whatever platform you are compiling 
-        For other platforms, net-linux should be replaced by whatever platform is being used. 
+For other platforms, net-linux-x86\_64 should be replaced by whatever platform is being used. 
 See the charm/README file for a complete list of supported platforms.
 
-% #CLM# \subsubsection{Build Only the BigSim Emulator}
-        \subsubsection{Building Only the BigSim Emulator}
+\subsubsection{Building Only the BigSim Emulator}
 
-The BigSim Emulator is implemented on top of Converse in Charm++.
-To compile the BigSim Emulator, one can compile Emulator libraries
-directly on top of normal \charmpp{} using ``bigsim'' as the compilation
-target, like
+The BigSim Emulator is implemented on top of Converse in Charm++.  To compile
+the BigSim Emulator, one can compile Emulator libraries directly on top of
+normal \charmpp{} using ``bgampi'' as the compilation target, like
 \begin{verbatim}
-./build bigsim net-linux -O
+./build bgampi net-linux-x86_64 -O2
 \end{verbatim}
 
 With Emulator libraries, one can write BigSim applications using its
-% #CLM# low level emulator message passing API.
-        low level machine API.
+low level machine API.
 
-% #CLM# \subsubsection{Build Charm++ on BigSim Emulator}
-        \subsubsection{Building Charm++ or AMPI on the BigSim Emulator}
+\subsubsection{Building Charm++ or AMPI on the BigSim Emulator}
 
-In order to build Charm++ on top of BigSim Emulator (which itself is 
-implemented on top of Converse), a special build option ``bigsim''
-needs to be specified:
+In order to build Charm++ or AMPI on top of BigSim Emulator (which itself is
+implemented on top of Converse), a special build option ``bigemulator'' needs
+to be specified:
 \begin{verbatim}
-./build bigsim net-linux bigsim -O
+./build bgampi net-linux-x86_64 bigemulator -O2
 \end{verbatim}
 
-The first ``bigsim'' is the compilation {\em target} that tells ``build'' to
+The ``bgampi'' option is the compilation {\em target} that tells ``build'' to
 compile BigSim Emulator libraries in addition to \charmpp{} kernel libraries.
-The second ``bigsim'' is a build {\em option} to platform ``net-linux'', which tells
-``build'' to build Charm++ on top of the BigSim Emulator. 
-% #CLM# To build AMPI on BigSim, use ``bgampi'' as make target, which subsumes target
-        To build AMPI on BigSim, one should use ``bgampi'' as the make target, which subsumes the target
-``bigsim":
-\begin{verbatim}
-./build bgampi net-linux bigsim -O
-\end{verbatim}
+The ``bigemulator'' option is a build {\em option} to platform ``net-linux'',
+which tells ``build'' to build Charm++ on top of the BigSim Emulator. 
 
-% #CLM# For the above ``build" command, it creates a directory named 
-        The above ``build" command creates a directory named 
-``net-linux-bigsim" under charm, which contains all the header files and
-libraries needed for compiling a user application.
+The above ``build" command creates a directory named
+``net-linux-x86\_64-bigemulator" under charm, which contains all the header
+files and libraries needed for compiling a user application.
 
 \subsection{Compiling BigSim Applications}
 
-\charmpp{} provides a compiler script {\tt charmc} to compile all programs.
-% #CLM#
-As will be described in this subsection, there are three methods to write a BigSim application:
-(a) using the low level machine API, (b) using \charmpp{} or (c) using AMPI. Methods
-(b) and~(c) are essentially used to obtain traces from the BigSim Emulator, such that
-one can use those traces in a post-mortem simulation as explained in
-Section~\ref{bignetsim}.
+\charmpp{} provides a compiler script {\tt charmc} to compile all programs.  As
+will be described in this subsection, there are three methods to write a BigSim
+application: (a) using the low level machine API, (b) using \charmpp{} or (c)
+using AMPI. Methods (b) and~(c) are essentially used to obtain traces from the
+BigSim Emulator, such that one can use those traces in a post-mortem simulation
+as explained in Section~\ref{bignetsim}.
 
 \subsubsection{Writing a BigSim application using low level machine API}
-% #CLM# The low level machine API mimics the actual machine low level programming
-        The original goal of the low level machine API was to mimic the BlueGene/C low level programming
-API. It is defined in section~\ref{bgemulator}. Writing a program in the 
-% #CLM# low level machine API, you just need to link \charmpp{}'s BigSim emulator
-        low level machine API, one just needs to link \charmpp{}'s BigSim emulator
-libraries, which provide the emulation of the machine API using Converse as
-the communication layer.
+The original goal of the low level machine API was to mimic the BlueGene/C low
+level programming API. It is defined in section~\ref{bgemulator}. Writing a
+program in the low level machine API, one just needs to link \charmpp{}'s
+BigSim emulator libraries, which provide the emulation of the machine API using
+Converse as the communication layer.
 
-% #CLM# In order to link against the BigSim library, specify 
-        In order to link against the BigSim library, one must specify 
-% #CLM# \texttt{-language bigsim} as an argument to the {\tt charmc} linker, 
-        \texttt{-language bigsim} as an argument to the {\tt charmc} command, 
-% #CLM# for example:
-        such as:
+In order to link against the BigSim library, one must specify
+\texttt{-language bigsim} as an argument to the {\tt charmc} command, for
+example:
+
 \begin{verbatim}
 charmc -o hello hello.C -language bigsim
 \end{verbatim}
 
-% #CLM# Sample applications in low level machine API can be found under directory
-        Sample applications in low level machine API can be found in directory
-% #CLM# charm/pgms/converse/bluegene.
-        charm/examples/bigsim/emulator/.
+Sample applications in low level machine API can be found in the directory
+charm/examples/bigsim/emulator/.
 
 \subsubsection{Writing a BigSim application in Charm++}
 
-One can write a normal \charmpp{} application which can automatically 
-% #CLM# run on the emulator after compilation. \charmpp{} implements
-        run on the BigSim Emulator after compilation. \charmpp{} implements
-an object-based message-driven execution model. In \charmpp{} applications,
-there are collections of C++ objects, which communicate by remotely invoking
-% #CLM# methods on other objects by messages.
-        methods on other objects via messages.
+One can write a normal \charmpp{} application which can automatically run on
+the BigSim Emulator after compilation. \charmpp{} implements an object-based
+message-driven execution model. In \charmpp{} applications, there are
+collections of C++ objects, which communicate by remotely invoking methods on
+other objects via messages.
 
-% #CLM# In order to compile a program written in \charmpp{} on Blue Gene simulator, 
-                 To compile a program written in \charmpp{} on the BigSim Emulator, one
-specifies \texttt{-language charm++} as an argument to the {\tt charmc} command:
+To compile a program written in \charmpp{} on the BigSim Emulator, one
+specifies \texttt{-language charm++} as an argument to the {\tt charmc}
+command:
 \begin{verbatim}
 charmc -o hello hello.C -language charm++
 \end{verbatim}
-% #CLM# This will link both \charmpp{} runtime libraries and BigSim simulator 
-        This will link both \charmpp{} runtime libraries and BigSim Emulator
-libraries.
+This will link both \charmpp{} runtime libraries and BigSim Emulator libraries.
 
-Sample applications in \charmpp{} can be found under directory
-% #CLM# charm/pgms/charm++, specifically charm/pgms/charm++/littleMD.
-        charm/examples/bigsim, specifically charm/examples/bigsim/emulator/littleMD.
+Sample applications in \charmpp{} can be found in the directory
+charm/examples/bigsim, specifically charm/examples/bigsim/emulator/littleMD.
 
-% #CLM# \subsubsection{Writing a Blue Gene application in MPI}
-        \subsubsection{Writing a BigSim application in MPI}
+\subsubsection{Writing a BigSim application in MPI}
 
-% #CLM# One can also write a MPI application for Blue Gene Simulator.
-        One can also write an MPI application for the BigSim Emulator.
-% #CLM# The Adaptive MPI, or AMPI, is implemented on top of Charm++ that supports
-            Adaptive MPI, or AMPI, is implemented on top of Charm++, supporting
-% #CLM# dynamic load balancing and multithreading for MPI applications. This is based
-        dynamic load balancing and multithreading for MPI applications. Those are based
-on the user-level migrating threads and load balancing capabilities provided
-by the \charmpp{} framework. This allows legacy MPI programs to run 
-% #CLM# on top of Blue Gene \charmpp{} and take advantage of the \charmpp{}'s
-        on top of BigSim \charmpp{} and take advantage of the \charmpp{}'s
-virtualization and adaptive load balancing capability.
+One can also write an MPI application for the BigSim Emulator.  Adaptive MPI,
+or AMPI, is implemented on top of Charm++, supporting dynamic load balancing
+and multithreading for MPI applications. Those are based on the user-level
+migrating threads and load balancing capabilities provided by the \charmpp{}
+framework. This allows legacy MPI programs to run on top of BigSim \charmpp{}
+and take advantage of the \charmpp{}'s virtualization and adaptive load
+balancing capability.
 
-% #CLM# Current AMPI implements most features in the MPI version 1.0, with a few
-        Currently, AMPI implements most features in the MPI version 1.0, with a few
+Currently, AMPI implements most features in the MPI version 1.0, with a few
 extensions for migrating threads and asynchronous reduction.
 
-% #CLM# In order to compile an AMPI application on Blue Gene simulator, you need 
-                 To compile an AMPI application for the BigSim Emulator, one needs
-% #CLM# to link against the AMPI library as well as Blue Gene \charmpp{} runtime
-        to link against the AMPI library as well as the BigSim \charmpp{} runtime
-libraries by specifying \texttt{-language ampi} as an argument to 
-% #CLM# the {\tt charmc} linker:
-        the {\tt charmc} command:
+To compile an AMPI application for the BigSim Emulator, one needs to link
+against the AMPI library as well as the BigSim \charmpp{} runtime libraries by
+specifying \texttt{-language ampi} as an argument to the {\tt charmc} command:
 \begin{verbatim}
 charmc -o hello hello.C -language ampi
 \end{verbatim}
 
-Sample applications in AMPI can be found under directory
-% #CLM# charm/pgms/charm++/ampi, specifically charm/pgms/charm++/Cjacobi3D.
-        charm/examples/ampi, specifically charm/examples/ampi/pingpong.
+Sample applications in AMPI can be found in the directory charm/examples/ampi,
+specifically charm/examples/ampi/pingpong.
 
-% #CLM# \subsection{Run a BigSim Application}
-        \subsection{Running a BigSim Application}
+\subsection{Running a BigSim Application}
 
-% #CLM# To run a parallel Blue Gene application, \charmpp{} provides a utility program
-        To run a parallel BigSim application, \charmpp{} provides a utility program
-% #CLM# called {\tt charmrun} to start the parallel program. 
-        called {\tt charmrun} that starts the parallel execution.
-For detailed description on how to run a \charmpp{} application, 
-refer to the file charm/README in the source code distribution.
+To run a parallel BigSim application, \charmpp{} provides a utility program
+called {\tt charmrun} that starts the parallel execution.  For detailed
+description on how to run a \charmpp{} application, refer to the file
+charm/README in the source code distribution.
 
-% #CLM# To run a Blue Gene application, you need to specify these parameters to 
-        To run a BigSim application, one needs to specify the following parameters to 
-% #CLM# {\tt charmrun} to define the simulated Blue Gene machine size:
-        {\tt charmrun} to define the simulated machine size:
+To run a BigSim application, one needs to specify the following parameters to
+{\tt charmrun} to define the simulated machine size:
+
 \begin{enumerate}
-\item {\tt +x, +y} and {\tt +z}:  define the size of the machine in three dimensions, these define the number of nodes along each dimension of the machine;
-\item {\tt +wth} and {\tt +cth}:  For one node, these two parameters define the number of worker processors~({\tt +wth}) and the number of communication processors~({\tt +cth}).
-\item {\tt +bgcorrect}: starts the simulation mode for performance prediction. Otherwise the program runs without doing parallel event simulation for performance prediction of the application.
-\item {\tt +bgwalltime}: used only in simulation mode, when specified, use wallclock measurement of the time taken on the simulating machine to estimate the time it takes to run on the target machine.
-\item {\tt +bgcounter}:  used only in simulation mode, when specified, use the performance counter to estimate the time on target machine. This is currently only supported when perfex is installed, like Origin2000.
+
+\item {\tt +vp}: define the number of processors of the hypothetical (future)
+system
+\item {\tt +x, +y} and {\tt +z}:  optionally define the size of the machine in
+three dimensions, these define the number of nodes along each dimension of the
+machine (assuming a torus/mesh topology);
+\item {\tt +wth} and {\tt +cth}:  For one node, these two parameters define the
+number of worker processors~({\tt +wth}) and the number of communication
+processors~({\tt +cth}).
+\item {\tt +bglog}: used so that BigSim logfiles get created
+\item {\tt +bgcorrect}: starts the simulation mode for performance prediction.
+Otherwise the program runs without doing parallel event simulation for
+performance prediction of the application.
+\item {\tt +bgwalltime}: used only in simulation mode, when specified, use
+wallclock measurement of the time taken on the simulating machine to estimate
+the time it takes to run on the target machine.
+\item {\tt +bgcounter}:  used only in simulation mode, when specified, use the
+performance counter to estimate the time on target machine. This is currently
+only supported when perfex is installed, like Origin2000.
 \end{enumerate}
 
-% #CLM# For example, to simulate a Blue Gene/L machine of size 64K in 40x40x40, with 
-        For example, to simulate a parallel machine of size 64K as 40x40x40, with 
-% #CLM# one worker processor and one I/O processor on each node, and use 100 
-        one worker processor and one communication processor on each node, and use 100 
-% #CLM# real processors to simulate:
-        real processors to run the simulation, the command to be issued should be:
+For example, to simulate a parallel machine of size 64K as 40x40x40, with one
+worker processor and one communication processor on each node, and use 100 real
+processors to run the simulation, the command to be issued should be:
 \begin{verbatim}
 ./charmrun +p100 ./hello +x40 +y40 +z40 +cth1 +wth1
 \end{verbatim}
 
-% #CLM# To run an AMPI program, you may also want to specify the number of virtual 
-        To run an AMPI program, one may also want to specify the number of virtual 
-% #CLM# processors to run the MPI by using {\tt +vp}, for example:
-        processors to run the MPI code by using {\tt +vp}. As an example,
+To run an AMPI program, one may also want to specify the number of virtual
+processors to run the MPI code by using {\tt +vp}. As an example,
 \begin{verbatim}
 ./charmrun +p100 ./hello +x40 +y40 +z40 +cth1 +wth1 +vp 128000
 \end{verbatim}
-% #CLM# starts the simulation of Blue Gene/L of size 40x40x40 with 2 processors 
-        starts the simulation of a machine   of size 40x40x40 with one worker processor
-% #CLM# in each node, running 128000 MPI threads (2 MPI threads on each Blue Gene node),
-        in each node, running 128000 MPI tasks (2 MPI tasks on each node),
-% #CLM#  using 100 real processors to simulate. In this case, {\tt MPI\_Comm\_size()}
-         using 100 real processors to run the simulation. In this case, {\tt MPI\_Comm\_size()}
-returns 128000 for {\tt MPI\_COMM\_WORLD}.
-% #CLM# If you do not specify the {\tt +vp} option,
-        If the {\tt +vp} option is not specified,
-the number of virtual processors will be equal to the number of 
-% #CLM# processors of the simulated machine, in this case 64000.
-        worker processors of the simulated machine, in this case 64000.
-
+\noindent starts the simulation of a machine   of size 40x40x40 with one worker
+processor in each node, running 128000 MPI tasks (2 MPI tasks on each node),
+using 100 real processors to run the simulation. In this case, {\tt
+MPI\_Comm\_size()} returns 128000 for {\tt MPI\_COMM\_WORLD}.  If the {\tt +vp}
+option is not specified, the number of virtual processors will be equal to the
+number of worker processors of the simulated machine, in this case 64000.
 
