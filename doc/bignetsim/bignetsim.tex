@@ -186,9 +186,10 @@ the input parameters.}
 
 \subsection{Which Interconnection networks are implemented?}
 A large number of topologies and routing strategies are implemented in the
-software. Here, we present a list of interconnection networks. For a complete list of
-routing strategies, input/output VC selectors, refer to the corresponding 
-directories in the software.
+software. Here, we present a list of interconnection networks. For a complete
+list of routing strategies, input/output VC selectors, refer to the
+corresponding directories in the software.
+
 \begin{itemize}
 \item HyperCube
 \item FatTree
@@ -216,9 +217,8 @@ in the netconfig file.  When set to 0, trace based simulation is used,
 when set to 1, traffic generation is used.}
 \end{itemize}
 
-Trace based simulation.  This is used to study target application
-performance, or detailed network performance when loaded by a specific
-application.
+Trace based simulation.  This is used to study target application performance,
+or detailed network performance when loaded by a specific application.
 
 There are two command line parameters for traced based simulation.
 \begin{alltt}./bigsimulator arg1 arg2\end{alltt}
@@ -228,7 +228,8 @@ There are two command line parameters for traced based simulation.
 	arg2 = N => starts execution at the time marked by skip point N	(0 is start) 
 \end{alltt}
 
-Artificial traffic generation based simulation is use to study the performance of interconnects under standard network load schemes.
+Artificial traffic generation based simulation is use to study the performance
+of interconnects under standard network load schemes.
 
 
 \begin{alltt}./bigsimulator arg1 arg2 arg3 arg4 arg5 arg6\end{alltt}
@@ -252,15 +253,15 @@ example
 \end{alltt}
 
 \subsection{Build your own Interconnection network}
-To build a new interconnection network, one has to create a new directory
-for that interconnection network and then create the routing strategy,
-topology, input virtual channel selection and output virtual channel selection
-strategies for that network. If existing strategies could be used, then
-reuse them, but if new ones are required, one has to write these new
-strategies in the corresponding directories for routing, topology, etc.
+To build a new interconnection network, one has to create a new directory for
+that interconnection network and then create the routing strategy, topology,
+input virtual channel selection and output virtual channel selection strategies
+for that network. If existing strategies could be used, then reuse them, but if
+new ones are required, one has to write these new strategies in the
+corresponding directories for routing, topology, etc.
 
-The InitNetwork function must be provided in InitNetwork.C for this 
-new interconnection network. It builds up all the nodes and 
-switches and NICs and channels that form the network. Look at one
-of the existing interconnection topologies for reference.
+The InitNetwork function must be provided in InitNetwork.C for this new
+interconnection network. It builds up all the nodes and switches and NICs and
+channels that form the network. Look at one of the existing interconnection
+topologies for reference.
 
