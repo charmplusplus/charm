@@ -2309,10 +2309,12 @@ void CmiFree(void *blk)
     /* is this message the head of a MultipleSend that we received?
        Then the parts with INFIMULTIPOOL have metadata which must be 
        unregistered and freed.  */
+#ifdef CMK_IBVERS_CLEAN_MULTIPLESEND
     if(CmiGetHandler(parentBlk)==CpvAccess(CmiMainHandlerIDP))
       {
 	infi_freeMultipleSend(parentBlk);
       }
+#endif
     infi_CmiFree(BLKSTART(parentBlk));
 #elif CONVERSE_POOL
     CmiPoolFree(BLKSTART(parentBlk));

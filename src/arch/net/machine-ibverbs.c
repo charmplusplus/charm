@@ -333,8 +333,8 @@ typedef struct {
 } infiCmiChunkPool;
 
 #define INFINUMPOOLS 20
-#define INFIMAXPERPOOL 100
-#define INFIMULTIPOOL -5
+#define INFIMAXPERPOOL 10000
+#define INFIMULTIPOOL 0xDEAFB00D
 
 #if THREAD_MULTI_POOL
 infiCmiChunkPool **infiCmiChunkPools;
