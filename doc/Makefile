@@ -3,7 +3,8 @@ LNCMD=test ! -f pplmanual.sty && ln -f -s ../pplmanual.sty .
 RMCMD=rm -f ./pplmanual.sty
 WEBDIR=/www/ppl_manuals
 DIRS=install converse convext charm++ libraries f90charm charisma pose \
-	fem ifem netfem ampi bigsim mblock projections tcharm debugger faq
+	fem ifem netfem ampi bigsim mblock projections tcharm debugger faq \
+	bignetsim
 
 all: pdf ps html
 
