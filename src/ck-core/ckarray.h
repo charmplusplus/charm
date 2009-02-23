@@ -535,12 +535,12 @@ template <class T>
 class ArrayElementT : public ArrayElement
 {
 public:
-  ArrayElementT(void) {thisIndex=*(T *)thisIndexMax.data();}
+  ArrayElementT(void): thisIndex(*(const T *)thisIndexMax.data()) {}
   ArrayElementT(CkMigrateMessage *msg)
-	:ArrayElement(msg)
-	{thisIndex=*(T *)thisIndexMax.data();}
+	:ArrayElement(msg),
+	thisIndex(*(const T *)thisIndexMax.data()) {}
 
-  T thisIndex;/// Object array index
+  const T thisIndex;/// Object array index
 };
 
 typedef int CkIndex1D;
