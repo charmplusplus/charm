@@ -104,10 +104,13 @@ class CkDDT_DataType {
     int baseIndex;
 
   public:
-    CkDDT_DataType() { } ;
-    virtual ~CkDDT_DataType() { }  ;
-    CkDDT_DataType(int type) ;
-    CkDDT_DataType(const CkDDT_DataType& obj) ;
+    CkDDT_DataType() { }
+    virtual ~CkDDT_DataType() { }
+    CkDDT_DataType(int type);
+    CkDDT_DataType(int datatype, int size, int extent, int count, int lb, int ub,
+            int iscontig, int baseSize, int baseExtent,
+            CkDDT_DataType* baseType, int baseIndex);
+    CkDDT_DataType(const CkDDT_DataType& obj);
     CkDDT_DataType& operator=(const CkDDT_DataType& obj);
 
     virtual int isContig(void);
