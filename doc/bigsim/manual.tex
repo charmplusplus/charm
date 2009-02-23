@@ -4,17 +4,14 @@
 
 \title{BigSim Parallel Simulator for Extremely Large Parallel Machines}
 \version{1.01}
-% #CLM# \credits{Charm++ BigSim Emulator was developed by Arun Singla, Neelam Saboo
-        \credits{The Charm++ BigSim Emulator was developed by Arun Singla, Neelam Saboo
-and Joshua Unger under the guidance of Prof. L. V. Kale. The new Converse 
-% #CLM# BigSim Emulator is completely rewritten by Gengbin Zheng. Converse BigSim 
-        BigSim Emulator was completely rewritten by Gengbin Zheng. The Converse BigSim 
-Emulator is the only version under maintenance now. Charm++ and Adaptive MPI
-% #CLM# (AMPI) was ported onto the BigSim Emulator by Gengbin Zheng. The parallel
-        (AMPI) were ported onto the BigSim Emulator by Gengbin Zheng. The parallel
-performance simulator was developed by Gengbin Zheng and 
-Gunavardhan Kakulapati. A postmortem network simulator was developed by 
-Terry Wilmarth, Eric Bohm and Gengbin Zheng}
+	\credits{The Charm++ BigSim Emulator was developed by Arun Singla,
+Neelam Saboo and Joshua Unger under the guidance of Prof. L. V. Kale. The new
+Converse BigSim Emulator was completely rewritten by Gengbin Zheng. The
+Converse BigSim Emulator is the only version under maintenance now. Charm++ and
+Adaptive MPI (AMPI) were ported onto the BigSim Emulator by Gengbin Zheng. The
+parallel performance simulator was developed by Gengbin Zheng and Gunavardhan
+Kakulapati. A postmortem network simulator was developed by Terry Wilmarth,
+Eric Bohm and Gengbin Zheng}
 
 \begin{document}
 \maketitle
@@ -42,8 +39,8 @@ of parallel applications on such machines even before the machine is built.
 Thus, we have developed a parallel simulator -- BigSim, to facilitate this research.
 
 % #CLM# Since our research was initiated by Blue Gene/C project, in this manual, 
-Since our research was initiated by the BlueGene/C project, in previous editions of this manual
-we also called our simulator as Blue Gene Simulator.
+Since our research was initiated by the BlueGene/C project, in previous
+editions of this manual we also called our simulator as Blue Gene Simulator.
 Our simulator is capable of simulating a broad class of "Massively Parallel
 Processors-In-Memory", or MPPIM machines. 
 
@@ -51,41 +48,29 @@ Processors-In-Memory", or MPPIM machines.
 
 Our simulator system includes these components: 
 \begin{enumerate}
-% #CLM# \item a parallel emulator which emulates the low level machine API; 
-        \item a parallel emulator which emulates a low level machine API targeting an architecture like BlueGene; 
+\item a parallel emulator which emulates a low level machine API targeting an architecture like BlueGene; 
 \item a message driven programming language (Charm++) running on top of the emulator; 
-% #CLM# \item adaptive MPI (an implementation of MPI on top of Charm++) environment; 
-        \item the Adaptive MPI (an implementation of MPI on top of Charm++) environment; 
-% #CLM# Remove support for Online Simulator
-% #CLM# \item a parallel online mode simulator for performance prediction; 
-% #CLM# \item a parallel post-mortem mode network simulator for performance prediction. 
-        \item a parallel post-mortem mode simulator for performance prediction, including network simulation. 
+\item the Adaptive MPI (an implementation of MPI on top of Charm++) environment; 
+\item a parallel post-mortem mode simulator for performance prediction, including network simulation. 
 \end{enumerate}
 
 \subsection{History}
-
-% #CLM# The first version of Blue Gene emulator was written in Charm++, a 
-        The first version of the BlueGene emulator was written in Charm++, a 
-parallel object language, in fall 2001. 
-
-% #CLM# The second version of Blue Gene emulator was completely rewritten on top 
-        The second version of the BlueGene emulator was completely rewritten on top 
-of Converse instead of Charm++ in spring 2002. 
-% #CLM# While the API supported by the original emulator remains almost same,
-        While the API supported by the original emulator remains almost the same,
-many new features were added.
+	The first version of the BlueGene emulator was written in Charm++, a
+parallel object language, in fall 2001.  The second version of the BlueGene
+emulator was completely rewritten on top of Converse instead of Charm++ in
+spring 2002.  While the API supported by the original emulator remains almost
+the same, many new features were added.
 % - support of thread-committed messages that 
-%can be send to a specific thread in a Blue Gene node; support of Blue Gene 
+%can be send to a specific thread in a Blue Gene node; support of Blue Gene
 %node level broadcast.
-The new emulator was implemented on a portable low layer communication 
-library - Converse, in order to achieve better 
-performance by avoiding the cross layer overhead.
-%Another advantage is that the lighter weighted emulator makes it easier
-%to port higher level of programming language onto the emulator.
+The new emulator was implemented on a portable low layer communication library
+- Converse, in order to achieve better performance by avoiding the cross layer
+overhead.
+%Another advantage is that the lighter weighted emulator makes it easier to
+%port higher level of programming language onto the emulator.
 
-% #CLM# Charm++ was soon ported to the emulator in 2002 which provided the
-        Charm++ was ported to the emulator in 2002, providing the
- first parallel language model on top of the emulator.
+	Charm++ was ported to the emulator in 2002, providing the first
+parallel language model on top of the emulator.
 
 A performance simulation capability was added to the emulator in spring 2003.
 The new simulator was renamed to BigSim at the same time.
@@ -94,22 +79,21 @@ simulator called BigNetSim. In fall 2006, we renamed BigNetSim as simply
 BigSim simulator.
 
 In the following sections, we will first describe how to download and compile
-% #CLM# Blue Gene simulator(Section ~\ref{install}). Section~\ref{bgemulator} will describe
-    the BigSim system (Section~\ref{install}). Section~\ref{bgemulator} describes
-% #CLM# the low level machine API in detail. 
-    the BigSim Emulator and the low level machine API in detail. 
+the BigSim system (Section~\ref{install}). Section~\ref{bgemulator} describes
+the BigSim Emulator and the low level machine API in detail. 
 
 
 \input{install}
+
 \input{emulator}
-% #CLM# REMOVE ONLINE SIMULATOR; MOVE BGAPI HERE
-% #CLM# \input{simulator}
+
+% \input{simulator}
 
 \input{interpolation}
+
 \input{bgapi}
-\input{bignetsim}
 
 \input{index}
-\end{document}
 
+\end{document}
 
