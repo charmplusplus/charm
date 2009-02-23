@@ -1,0 +1,31 @@
+\subsection{Compiling BigSimulator}
+
+To compile the simulator which is called BigSimulator (or BigNetSim), we need
+the regular Charm++ build (net-linux-x86\_64 in our example).  It needs to be
+complemented with a few more libaries from BigSim and with the Pose
+discrete-event simulator. These pieces can be built, respectively, with:
+
+\begin{verbatim}
+./build bgampi net-linux-x86_64 -O2
+./build pose net-linux-x86_64 -O2
+\end{verbatim}
+
+Access to the discrete-event simulation is realized via a Charm++ package
+originally named BigNetSim (now called BigSimulator). Assuming that the
+'subversion' (svn) package is available, this package can be obtained from the
+Web with a subversion checkout such as:
+
+\begin{verbatim}
+   svn co https://charm.cs.uiuc.edu/svn/repos/BigNetSim/
+\end{verbatim}
+
+In the subdir 'trunk/' created by the checkout, the file Makefile.common must
+be edited so that 'CHARMBASE' points to the regular Charm++ installation.
+Having that done, one chooses a topology in that subdir (e.g. BlueGene for a
+torus topology) by doing a "cd" into the corresponding directory (e.g. 'cd
+BlueGene').  Inside that directory, one should simply "make". This will produce
+the binary "../tmp/bigsimulator". That file, together with file
+"BlueGene/netconfig.vc", will be used during a simulation. It may be useful to
+set the variable SEQUENTIAL to 1 in Makefile.common to build a sequential
+(non-parallel) version of bigsimulator.
+

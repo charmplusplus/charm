@@ -1,0 +1,95 @@
+\subsection{Using BigSimulator}
+
+BigSimulator (BigNetSim) has 2 major modes.
+
+\begin{itemize}
+\item{ Trace based traffic simulation }
+\item{Artificial traffic generation based simulation.
+The mode of the simulator is governed by the $USE\_TRANSCEIVER$ parameter
+in the netconfig file.  When set to 0, trace based simulation is used,
+when set to 1, traffic generation is used.}
+\end{itemize}
+
+Trace based simulation.  This is used to study target application performance,
+or detailed network performance when loaded by a specific application.
+
+There are two command line parameters for traced based simulation.
+\begin{alltt}
+  ./charmrun +p2 ./bigsimulator arg1 arg2
+\end{alltt}
+\begin{alltt}
+  arg1 = 0 => Latency only mode
+         1 => Detailed contention model
+  arg2 = N => starts execution at the time marked by skip point N (0 is start)
+\end{alltt}
+
+\subsubsection{Simple Latency Model}
+To use the simple latency model, follow the setup procedure above, noting that
+the files are located in the trunk/SimpleLatency directory. This will produce
+the "bigsimulator" file.
+
+The command line parameters used for this model are different.  The format is
+as follows:
+
+\begin{alltt}
+  [charmrun +p#] bigsimulator -lat <latency> -bw <bandwidth>
+               [-cpp <cost per packet> -psize <packet size>]
+               [-winsize <window size>] [-skip] [-print\_params]
+\end{alltt}
+
+\begin{alltt}
+  Latency (lat)         - type double; in microseconds
+  Bandwidth (bw)        - type double; in GB/s
+  Cost per packet (cpp) - type double; in microseconds
+  Packet size (psize)   - type int; in bytes
+  Window size (winsize) - type int; in log entries
+\end{alltt}
+
+The implemented equation is: $lat + (N/bw) + cpp \times (N/psize)$
+
+Latency and bandwidth are required.  If cost per packet is given, then packet
+size must be given, as well.  Otherwise, cost per packet defaults to 0.0.
+Packet size, if given, must be a positive integer.
+
+The -winsize flag allows the user to specify the size of the window (number of
+log entries) used when reading in the bgTrace log files.  This is useful if the
+log files are large.  If -winsize is not specified, the value defaults to 0,
+which indicates that no windowing will be used (i.e., there will be one window
+for each time line that is equal to the size of the time line).
+
+As with the second parameter in the examples of part (a) of this section, the
+-skip flag indicates that the simulation should skip forward to the time stamp
+set during trace creation (see the BigSim tutorial talk from the 2008 Charm++
+workshop).  If -skip is not included, then no skipping will occur.
+
+The -print\_params flag is provided for debugging convenience.  When present,
+the simple latency model parameters will be displayed during simulation
+initilization.
+
+\subsubsection{Artificial Traffic Models}
+Artificial traffic generation based simulation is use to study the performance
+of interconnects under standard network load schemes.
+
+\begin{alltt}
+  ./bigsimulator arg1 arg2 arg3 arg4 arg5 arg6
+\end{alltt}
+example
+\begin{alltt}
+  ./bigsimulator 1 2 3 100 2031 0.1
+\end{alltt}
+
+\begin{alltt}
+  arg1 = 0 => Latency only mode
+         1 => Detailed contention model
+  arg2 = 1 => deterministic traffic
+         2 => poisson traffic
+  arg3 = 1 => KSHIFT
+         2 => RING
+         3 => BITTRANSPOSE
+         4 => BITREVERSAL
+         5 => BITCOMPLEMENT
+         6 => UNIFORM\_DISTRIBUTION
+  arg4 = number of packets
+  arg5 = message size
+  arg6 = load factor
+\end{alltt}

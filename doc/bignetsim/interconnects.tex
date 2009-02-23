@@ -1,0 +1,33 @@
+\subsection{Which Interconnection networks are implemented?}
+A large number of topologies and routing strategies are implemented in the
+software. Here, we present a list of interconnection networks. For a complete
+list of routing strategies, input/output VC selectors, refer to the
+corresponding directories in the software.
+
+\begin{itemize}
+\item HyperCube
+\item FatTree
+\item DenseGraph
+\item Three dimensional Mesh
+\item K-ary-N-cube
+\item K-ary-N-fly
+\item K-ary-N-mesh
+\item K-ary-N-tree
+\item N-mesh
+\item Hybrid of Fattree and Dense Graph
+\item Hybrid of Fattree and HyperCube
+\end{itemize}
+
+\subsection{Build your own Interconnection network}
+To build a new interconnection network, one has to create a new directory for
+that interconnection network and then create the routing strategy, topology,
+input virtual channel selection and output virtual channel selection strategies
+for that network. If existing strategies could be used, then reuse them, but if
+new ones are required, one has to write these new strategies in the
+corresponding directories for routing, topology, etc.
+
+The InitNetwork function must be provided in InitNetwork.C for this new
+interconnection network. It builds up all the nodes and switches and NICs and
+channels that form the network. Look at one of the existing interconnection
+topologies for reference.
+
