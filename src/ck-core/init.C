@@ -870,8 +870,11 @@ void _initCharm(int unused_argc, char **argv)
 	}	
 	
 #if ! CMK_BLUEGENE_CHARM
-        CmiInitCPUAffinity(argv);    // blocking
-        CmiInitCPUTopology(argv);    // blocking
+        if (faultFunc == NULL) {         // this is not restart
+            // blocking calls
+          CmiInitCPUAffinity(argv);
+          CmiInitCPUTopology(argv);
+        }
 #endif
 
 	if (faultFunc) {
