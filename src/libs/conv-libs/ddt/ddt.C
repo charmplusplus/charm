@@ -762,6 +762,10 @@ int CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], int a[], int d[]
   return 0;
 }
 
+#ifndef WIN32
+#define max  std::max
+#endif
+
 CkDDT_HIndexed::CkDDT_HIndexed(int nCount, int* arrBlock, int* arrDisp,  int bindex,
                            CkDDT_DataType* base)
     : CkDDT_Indexed(nCount, arrBlock, arrDisp, bindex, base)
@@ -771,7 +775,7 @@ CkDDT_HIndexed::CkDDT_HIndexed(int nCount, int* arrBlock, int* arrDisp,  int bin
   ub = INT_MIN;
   for (int i = 0; i<count; i++) {
       size += (arrBlock[i] * baseSize);
-      ub = std::max(arrBlock[i]*baseExtent + baseType->getLB() + arrayDisplacements[i], ub);
+      ub = max(arrBlock[i]*baseExtent + baseType->getLB() + arrayDisplacements[i], ub);
   }
 
   lb = baseType->getLB() + *std::min_element(arrDisp, arrDisp+nCount+1);
