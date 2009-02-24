@@ -305,6 +305,11 @@ public:
     }
     return start+num;
   }
+
+  inline static int FileOffset(int pe, int numWth, int numEmulatingPes, int totalWorkerProcs, int &fileNum, int &offset) {
+    fileNum = offset = -1;
+    return -1;                   /* fix me */
+  }
 };
 
 class CyclicMapInfo {
@@ -319,7 +324,7 @@ public:
     return n;
   }
 
-    /* map global serial number to (x,y,z) ++++ */
+    /* map global serial node number to (x,y,z) ++++ */
   inline static void Global2XYZ(int seq, int *x, int *y, int *z) {
     *x = seq / (cva(bgMach).y * cva(bgMach).z);
     *y = (seq - *x * cva(bgMach).y * cva(bgMach).z) / cva(bgMach).z;
@@ -354,6 +359,23 @@ public:
 
     /* map local node index to global serial node id ++++ */
   inline static int Local2Global(int num) { return CmiMyPe()+num*CmiNumPes();}
+
+    /* timeline for each worker thread is dump to a bgTrace file.
+       All nodes on a emulating processor is dumped to a single file
+       this function identify the sequence number of a given PE. 
+    */
+  inline static int FileOffset(int pe, int numWth, int numEmulatingPes, int totalWorkerProcs, int &fileNum, int &offset) {
+    int nodeNum = pe/numWth;
+    int numNodes = totalWorkerProcs/numWth;
+    fileNum = nodeNum%numEmulatingPes;
+    offset=0;
+
+    for(int i=0;i<fileNum;i++)
+      offset += (numNodes/numEmulatingPes + ((i < numNodes%numEmulatingPes)?1:0))*numWth;
+
+    offset += (nodeNum/numEmulatingPes)*numWth + pe%numWth;
+    return 1;
+  }
 };
 
 

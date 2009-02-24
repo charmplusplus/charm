@@ -322,7 +322,7 @@ void BgEndLastLog(BgTimeLineRec &tlinerec);
 
 int BgLogGetThreadEP();
 int BgLoadTraceSummary(const char *fname, int &totalWorkerProcs, int &numX, int &numY, int &numZ, int &numCth, int &numWth, int &numEmulatingPes);
-int BgReadProc(int procNum, int numWth, int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec);
+int BgReadProc(int procNum, int numWth, int numPes, int totalWorkerProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec);
 int BgReadProcWindow(int procNum, int numWth, int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec,
 		     int& fileLoc, int& totalTlineLength, int firstLog, int numLogs);
 int* BgLoadOffsets(int totalProcs, int numPes);

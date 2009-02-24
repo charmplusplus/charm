@@ -8,26 +8,18 @@ BgTimeLineRec* currTline = NULL;
 int currTlineIdx=0;
 
 //Used for parallel file I/O
-int BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec){
+int BgReadProc(int procNum, int numWth ,int numEmulatingPes, int totalWorkerProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec){
 
-  /*Right now works only for cyclicMapInfo - needs a more general scheme*/
-  int nodeNum = procNum/numWth;
-  int numNodes = totalProcs/numWth;
-  int fileNum = nodeNum%numPes;
-  int arrayID=0, fileOffset;
-  char fName[20];
-  //BgTimeLineRec* tlinerec = new BgTimeLineRec;
-  
   currTline = &tlinerec;
 
-  for(int i=0;i<fileNum;i++)
-    arrayID += (numNodes/numPes + ((i < numNodes%numPes)?1:0))*numWth;
-  
-  arrayID += (nodeNum/numPes)*numWth + procNum%numWth;
-  fileOffset = allNodeOffsets[arrayID];
+  /*Right now works only for cyclicMapInfo - needs a more general scheme*/
+  int arrayIdx, fileNum;
+  int arrayID = CyclicMapInfo::FileOffset(procNum, numWth, numEmulatingPes, totalWorkerProcs, fileNum, arrayIdx);
+  int fileOffset = allNodeOffsets[arrayIdx];
 
    //   CmiPrintf("nodeNum: %d arrayId:%d numNodes:%d numPes:%d\n",nodeNum,arrayID,numNodes,numPes);
  
+  char fName[20];
   sprintf(fName,"bgTrace%d",fileNum);
   FILE*  f = fopen(fName,"rb");
   if (f == NULL) {
@@ -50,28 +42,21 @@ int BgReadProc(int procNum, int numWth ,int numPes, int totalProcs, int* allNode
 }
 
 // This version only reads in a part (window) of the time line
-int BgReadProcWindow(int procNum, int numWth ,int numPes, int totalProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec,
+int BgReadProcWindow(int procNum, int numWth ,int numEmulatingPes, int totalWorkerProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec,
 		     int& fileLoc, int& totalTlineLength, int firstLog, int numLogs) {
 
   int firstLogToRead, numLogsToRead, tLineLength;
 
-  /*Right now works only for cyclicMapInfo - needs a more general scheme*/
-  int nodeNum = procNum/numWth;
-  int numNodes = totalProcs/numWth;
-  int fileNum = nodeNum%numPes;
-  int arrayID=0, fileOffset;
-  char fName[20];
-
   currTline = &tlinerec;
   
-  for(int i=0;i<fileNum;i++)
-    arrayID += (numNodes/numPes + ((i < numNodes%numPes)?1:0))*numWth;
-  
-  arrayID += (nodeNum/numPes)*numWth + procNum%numWth;
-  fileOffset = allNodeOffsets[arrayID];
+  /*Right now works only for cyclicMapInfo - needs a more general scheme*/
+  int arrayIdx, fileNum;
+  int arrayID = CyclicMapInfo::FileOffset(procNum, numWth, numEmulatingPes, totalWorkerProcs, fileNum, arrayIdx);
+  int fileOffset = allNodeOffsets[arrayIdx];
 
   //  CmiPrintf("   BgReadProc: fileOffset=%d arrayID=%d nodeNum=%d numNodes=%d fileNum=%d\n", fileOffset, arrayID, nodeNum, numNodes, fileNum);
 
+  char fName[20];
   sprintf(fName,"bgTrace%d",fileNum);
   FILE* f = fopen(fName,"r");
   if (f == NULL) {
