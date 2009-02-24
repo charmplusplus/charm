@@ -28,6 +28,8 @@
 #include "XT3Torus.h"
 #elif XT4_TOPOLOGY
 #include "XT4Torus.h"
+#elif CMK_BLUEGENE_CHARM
+#include "blue.h"
 #endif
 
 class TopoManager {
@@ -127,6 +129,17 @@ class TopoManager {
       torusZ = torus[2];
       torusT = torus[3];
 
+#elif CMK_BLUEGENE_CHARM
+      BgGetSize(&dimNX, &dimNY, &dimNZ);
+
+      procsPerNode = BgGetNumWorkThread();
+      dimX = dimNX * procsPerNode;
+      dimY = dimNY;
+      dimZ = dimNZ;
+
+      torusX = true;
+      torusY = true;
+      torusZ = true;
 #else
       dimX = CkNumPes();
       dimY = 1;
