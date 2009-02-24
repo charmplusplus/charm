@@ -26,7 +26,7 @@ class Fancy
     Fancy(char *str) {
       strncpy(_str, str, 12);
     }
-    int equals(char *str) { return !strcmp(str, _str); }
+    int equals(char *str) const { return !strcmp(str, _str); }
 };
 
 class CkArrayIndexFancy : public CkArrayIndex {
