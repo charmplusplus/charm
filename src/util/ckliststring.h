@@ -3,7 +3,8 @@
 #define _CKLISTSTRING_H
 
 // a simple class which maintain a list of numbers in such format:
-//  0-10,20-40,100,200
+//  0-10,20-40:2,100,200
+//  no space is allowed
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,9 +16,9 @@ private:
   char *list;
 public:
   CkListString(): list(NULL) {}
-  CkListString(char *s): list(s) {}
+  CkListString(char *s) { list = strdup(s); }
   ~CkListString() { if (list) free(list); }
-  void set(char *s) { list = s; }
+  void set(char *s) { list = strdup(s); }
   int isEmpty() { return list == NULL; }
   int includes(int p) {
     size_t i; 
@@ -26,17 +27,26 @@ public:
     char *dupstr = strdup(list);   // don't touch the orignal string
     char *str = strtok(dupstr, ",");
     while (str) {
-      for (i=0; i<strlen(str); i++)
-          if (str[i] == '-') break;
-      int start, end;
-      if (i<strlen(str))
-          sscanf(str, "%d-%d", &start, &end);
+      int hasdash=0, hascolon=0;
+      for (i=0; i<strlen(str); i++) {
+          if (str[i] == '-') hasdash=1;
+          if (str[i] == ':') hascolon=1;
+      }
+      int start, end, stride=1;
+      if (hasdash) {
+          if (hascolon)
+            if (sscanf(str, "%d-%d:%d", &start, &end, &stride) != 3)
+                 printf("Warning: Check the format of \"%s\".\n", str);
+          else
+            if (sscanf(str, "%d-%d", &start, &end) != 2)
+                 printf("Warning: Check the format of \"%s\".\n", str);
+      }
       else {
           sscanf(str, "%d", &start);
           end = start;
       }
       if (p<=end && p>=start) {
-          ret = 1;
+          if ((p-start)%stride == 0) ret = 1;
           break;
       }
       str = strtok(NULL, ",");
