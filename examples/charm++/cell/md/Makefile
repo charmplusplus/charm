@@ -14,7 +14,7 @@ md: $(OBJS)
 	$(CHARMC) -language charm++ -o $(PGM) $(OBJS) -spu-lib m
 
 md_proj: $(OBJS)
-	$(CHARMC) -language charm++ -o $(PGM) $(OBJS) -tracemode summary -tracemode projections
+	$(CHARMC) -language charm++ -o $(PGM) $(OBJS) -spu-lib m -tracemode summary -tracemode projections
 
 
 main.decl.h main.def.h: main.ci
