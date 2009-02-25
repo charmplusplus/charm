@@ -920,17 +920,26 @@ int CkInRestarting()
                 module initialization
 *****************************************************************************/
 
+static int arg_where = CkCheckPoint_inMEM;
+
+#if CMK_MEM_CHECKPOINT
+void init_memcheckpt(char **argv)
+{
+    if (CmiGetArgFlagDesc(argv, "+ftc_disk", "Double-disk Checkpointing")) {
+      arg_where = CkCheckPoint_inDISK;
+    }
+}
+#endif
+
 class CkMemCheckPTInit: public Chare {
 public:
   CkMemCheckPTInit(CkArgMsg *m) {
 #if CMK_MEM_CHECKPOINT
-    int  where = CkCheckPoint_inMEM;
-    if (CmiGetArgFlagDesc(m->argv, "+ftc_disk", "Double-disk Checkpointing")) {
-      where = CkCheckPoint_inDISK;
+    if (arg_where == CkCheckPoint_inDISK) {
       CkPrintf("Charm++> Double-disk Checkpointing. \n");
     }
-    ckCheckPTGroupID = CProxy_CkMemCheckPT::ckNew(where);
-    CkPrintf("CkMemCheckPTInit main chare created!\n");
+    ckCheckPTGroupID = CProxy_CkMemCheckPT::ckNew(arg_where);
+    CkPrintf("Charm++> CkMemCheckPTInit mainchare is created!\n");
 #endif
   }
 };

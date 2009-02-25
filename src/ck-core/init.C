@@ -596,6 +596,9 @@ extern void _registerLBDatabase(void);
 extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
 extern void _loadbalancerInit();
+#if CMK_MEM_CHECKPOINT
+extern void init_memcheckpt(char **argv);
+#endif
 extern "C" void initCharmProjections();
 extern "C" void CmiInitCPUTopology(char **argv);
 extern "C" void CmiInitCPUAffinity(char **argv);
@@ -740,6 +743,10 @@ void _initCharm(int unused_argc, char **argv)
 	_futuresModuleInit(); // part of futures implementation is a converse module
 	_loadbalancerInit();
 	
+#if CMK_MEM_CHECKPOINT
+        init_memcheckpt(argv);
+#endif
+
 	initCharmProjections();
 #if CMK_TRACE_IN_CHARM
         // initialize trace module in ck
