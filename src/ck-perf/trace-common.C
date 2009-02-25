@@ -266,7 +266,7 @@ static int checkTraceOnPe(char **argv)
 #endif
   if (CmiGetArgStringDesc(argv, "+traceprocessors", &procs, "A list of processors to trace, e.g. 0,10,20-30"))
   {
-    CkListString procList(strdup(procs));
+    CkListString procList(procs);
     traceOnPE = procList.includes(CkMyPe());
   }
   // must include pe 0, otherwise sts file is not generated
