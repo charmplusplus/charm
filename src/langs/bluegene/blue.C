@@ -1361,7 +1361,7 @@ CmiStartFn bgMain(int argc, char **argv)
   }
   char *procs = NULL;
   if (CmiGetArgStringDesc(argv, "+bgrecordprocessors", &procs, "A list of processors to record, e.g. 0,10,20-30")) {
-    cva(bgMach).recordprocs.set(strdup(procs));
+    cva(bgMach).recordprocs.set(procs);
   }
 
 
