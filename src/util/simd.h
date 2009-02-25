@@ -4,6 +4,8 @@
 
 #if CMK_CELL_SPE != 0
   #include "spu_intrinsics.h"
+#else
+  #include "math.h"
 #endif
 
 
@@ -224,6 +226,19 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   inline   vec4f   vadd4fs(const   vec4f &a, const          float &s) {   vec4f c; c.v0 = a.v0 + s; c.v1 = a.v1 + s; c.v2 = a.v2 + s; c.v3 = a.v3 + s; return c; }
   inline  vec2lf  vadd2lfs(const  vec2lf &a, const         double &s) {  vec2lf c; c.v0 = a.v0 + s; c.v1 = a.v1 + s; return c; }
 
+  // Overide C++ operators
+  #if defined(__cplusplus)
+
+    inline  vec4i operator+(const  vec4i& a, const  vec4i& b) { return  vadd4i(a,b); }
+    inline  vec4f operator+(const  vec4f& a, const  vec4f& b) { return  vadd4f(a,b); }
+    inline vec2lf operator+(const vec2lf& a, const vec2lf& b) { return vadd2lf(a,b); }
+
+    inline  vec4i operator+=( vec4i& a, const  vec4i& b) { return (a =  vadd4i(a,b)); }
+    inline  vec4f operator+=( vec4f& a, const  vec4f& b) { return (a =  vadd4f(a,b)); }
+    inline vec2lf operator+=(vec2lf& a, const vec2lf& b) { return (a = vadd2lf(a,b)); }
+
+  #endif
+
 #endif
 
 
@@ -258,7 +273,7 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   inline  vec8us  vsub8us(const  vec8us &a, const  vec8us &b) {  vec8us c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; c.v2 = a.v2 - b.v2; c.v3 = a.v3 - b.v3; c.v4 = a.v4 - b.v4; c.v5 = a.v5 - b.v5; c.v6 = a.v6 - b.v6; c.v7 = a.v7 - b.v7; return c; }
   inline   vec4i   vsub4i(const   vec4i &a, const   vec4i &b) {   vec4i c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; c.v2 = a.v2 - b.v2; c.v3 = a.v3 - b.v3; return c; }
   inline  vec4ui  vsub4ui(const  vec4ui &a, const  vec4ui &b) {  vec4ui c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; c.v2 = a.v2 - b.v2; c.v3 = a.v3 - b.v3; return c; }
-  inline   vec4f   vsub2f(const   vec4f &a, const   vec4f &b) {   vec4f c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; c.v2 = a.v2 - b.v2; c.v3 = a.v3 - b.v3; return c; }
+  inline   vec4f   vsub4f(const   vec4f &a, const   vec4f &b) {   vec4f c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; c.v2 = a.v2 - b.v2; c.v3 = a.v3 - b.v3; return c; }
   inline  vec2lf  vsub2lf(const  vec2lf &a, const  vec2lf &b) {  vec2lf c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; return c; }
 
   inline  vec16c  vsub16c(const  vec16c &a, const           char &s) {  vec16c c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; c.v2 = a.v2 - s; c.v3 = a.v3 - s; c.v4 = a.v4 - s; c.v5 = a.v5 - s; c.v6 = a.v6 - s; c.v7 = a.v7 - s; c.v8 = a.v8 - s; c.v9 = a.v9 - s; c.v10 = a.v10 - s; c.v11 = a.v11 - s; c.v12 = a.v12 - s; c.v13 = a.v13 - s; c.v14 = a.v14 - s; c.v15 = a.v15 - s; return c; }
@@ -267,8 +282,21 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   inline  vec8us  vsub8us(const  vec8us &a, const unsigned short &s) {  vec8us c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; c.v2 = a.v2 - s; c.v3 = a.v3 - s; c.v4 = a.v4 - s; c.v5 = a.v5 - s; c.v6 = a.v6 - s; c.v7 = a.v7 - s; return c; }
   inline   vec4i   vsub4i(const   vec4i &a, const            int &s) {   vec4i c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; c.v2 = a.v2 - s; c.v3 = a.v3 - s; return c; }
   inline  vec4ui  vsub4ui(const  vec4ui &a, const unsigned   int &s) {  vec4ui c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; c.v2 = a.v2 - s; c.v3 = a.v3 - s; return c; }
-  inline   vec4f   vsub2f(const   vec4f &a, const          float &s) {   vec4f c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; c.v2 = a.v2 - s; c.v3 = a.v3 - s; return c; }
+  inline   vec4f   vsub4f(const   vec4f &a, const          float &s) {   vec4f c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; c.v2 = a.v2 - s; c.v3 = a.v3 - s; return c; }
   inline  vec2lf  vsub2lf(const  vec2lf &a, const         double &s) {  vec2lf c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; return c; }
+
+  // Overide C++ operators
+  #if defined(__cplusplus)
+
+    inline  vec4i operator-(const  vec4i& a, const  vec4i& b) { return  vsub4i(a,b); }
+    inline  vec4f operator-(const  vec4f& a, const  vec4f& b) { return  vsub4f(a,b); }
+    inline vec2lf operator-(const vec2lf& a, const vec2lf& b) { return vsub2lf(a,b); }
+
+    inline  vec4i operator-=( vec4i& a, const  vec4i& b) { return (a =  vsub4i(a,b)); }
+    inline  vec4f operator-=( vec4f& a, const  vec4f& b) { return (a =  vsub4f(a,b)); }
+    inline vec2lf operator-=(vec2lf& a, const vec2lf& b) { return (a = vsub2lf(a,b)); }
+
+  #endif
 
 #endif
 
@@ -310,6 +338,15 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   inline  vec4f  vmadd4fs(const  vec4f &a, const  vec4f &b, const  float &s) {  vec4f c; c.v0 = a.v0 * b.v0 + s; c.v1 = a.v1 * b.v1 + s; c.v2 = a.v2 * b.v2 + s; c.v3 = a.v3 * b.v3 + s; return c; }
   inline vec2lf vmadd2lfs(const vec2lf &a, const vec2lf &b, const double &s) { vec2lf c; c.v0 = a.v0 * b.v0 + s; c.v1 = a.v1 * b.v1 + s; return c; }
 
+  // Overide C++ operators
+  #if defined(__cplusplus)
+
+    //inline  vec4i operator*(const  vec4i& a, const  vec4i& b) { return  vmul4i(a,b); }
+    inline  vec4f operator*(const  vec4f& a, const  vec4f& b) { return  vmul4f(a,b); }
+    inline vec2lf operator*(const vec2lf& a, const vec2lf& b) { return vmul2lf(a,b); }
+
+  #endif
+
 #endif
 
 
@@ -320,7 +357,7 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 #if CMK_CELL_SPE != 0
 
   inline vec4i vdiv4i(const vec4i a, const vec4i b) { vec4i c; __vec4i* __c = (__vec4i*)(&c); __vec4i* __a = (__vec4i*)(&a); __vec4i* __b = (__vec4i*)(&b); __c->v0 = __a->v0 / __b->v0; __c->v1 = __a->v1 / __b->v1; return c; }
-  #define vdiv4f (a, b) (spu_mul(a, spu_re(b)))
+  #define vdiv4f(a, b) (spu_mul((a), spu_re(b)))
   inline vec2lf vdiv2lf(const vec2lf a, const vec2lf b) { vec2lf c; __vec2lf* __c = (__vec2lf*)(&c); __vec2lf* __a = (__vec2lf*)(&a); __vec2lf* __b = (__vec2lf*)(&b); __c->v0 = __a->v0 / __b->v0; __c->v1 = __a->v1 / __b->v1; return c; }
 
 #else
@@ -329,9 +366,32 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   inline vec4f vdiv4f(const vec4f &a, const vec4f &b) { vec4f c; c.v0 = a.v0 / b.v0; c.v1 = a.v1 / b.v1; c.v2 = a.v2 / b.v2; c.v3 = a.v3 / b.v3; return c; }
   inline vec2lf vdiv2lf(const vec2lf &a, const vec2lf &b) { vec2lf c; c.v0 = a.v0 / b.v0; c.v1 = a.v1 / b.v1; return c; }
 
+  // Overide C++ operators
+  #if defined(__cplusplus)
+
+    //inline  vec4i operator*(const  vec4i& a, const  vec4i& b) { return  vmul4i(a,b); }
+    inline  vec4f operator/(const  vec4f& a, const  vec4f& b) { return  vdiv4f(a,b); }
+    inline vec2lf operator/(const vec2lf& a, const vec2lf& b) { return vdiv2lf(a,b); }
+
+  #endif
+
 #endif
 
 
+///// Misc : TODO : Organize later /////
+#if CMK_CELL_SPE != 0
+
+  #define vrecip4f(a) (spu_re(a))
+  #define vsqrt4f(a) (spu_re(spu_rsqrte(a)))
+  #define vrsqrt4f(a) (spu_rsqrte(a))
+
+#else
+
+  inline vec4f vrecip4f(const vec4f &a) { vec4f b; b.v0 = 1.0f / a.v0; b.v1 = 1.0f / a.v1; b.v2 = 1.0f / a.v2; b.v3 = 1.0f / a.v3; return b; }
+  inline vec4f vsqrt4f(const vec4f &a) { vec4f b; b.v0 = sqrtf(a.v0); b.v1 = sqrtf(a.v1); b.v2 = sqrtf(a.v2); b.v3 = sqrtf(a.v3); return b; }
+  inline vec4f vrsqrt4f(const vec4f &a) { vec4f b; b.v0 = 1.0f / sqrtf(a.v0); b.v1 = 1.0f / sqrtf(a.v1); b.v2 = 1.0f / sqrtf(a.v2); b.v3 = 1.0f / sqrtf(a.v3); return b; }
+
+#endif
 
 
 #endif //__SIMD_H__
