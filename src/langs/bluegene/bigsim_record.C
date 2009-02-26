@@ -36,9 +36,10 @@ BgMessageRecorder::BgMessageRecorder(FILE * f_) :f(f_) {
 }
 
 BgMessageReplay::BgMessageReplay(FILE * f_) :f(f_) {
+  lcount = rcount = 0;
+
   int d;
   fread(&d, sizeof(int), 1, f);
-printf("d: %d\n", d);
   BgSetGlobalWorkerThreadID(d);
 
   nodeInfo *myNode = cta(threadinfo)->myNode;

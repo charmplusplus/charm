@@ -40,6 +40,7 @@ printf("replay: %d %d\n", m[0], m[1]);
 
 class BgMessageReplay : public BgMessageWatcher {
         FILE * f;
+        int lcount, rcount;
         /// Read the next message we need from the file:
 public:
         BgMessageReplay(FILE * f_);
@@ -49,11 +50,14 @@ public:
                 int nextPE;
                 int ret =  fread(&nextPE, sizeof(int), 1, f);
                 if (-1 == ret || ret == 0) {
+                        printf("BgMessageReplay> Emulation replay finished due to end of log.\n");
+                        printf("BgMessageReplay> Replayed %d local records and %d remote records, total of %d bytes.\n", lcount, rcount, ftell(f));
                         ConverseExit();
                         return 0;
                 }
                 if (nextPE == BgGetGlobalWorkerThreadID()) {
 //printf("BgMessageReplay> local message\n");
+                  lcount ++;
                   return 0;
                 }
                 int nextSize;
@@ -62,10 +66,14 @@ public:
                 CmiAssert(nextSize > 0);
                 char *msg = (char*)CmiAlloc(nextSize);
                 ret = fread(msg, sizeof(char), nextSize, f);
+                if (ret != nextSize) {
+                  CmiPrintf("Bigsim replay> fread returns only %d when asked %d bytes!\n", ret, nextSize);
                 CmiAssert(ret == nextSize);
+                }
                 CmiAssert(CmiBgMsgLength(msg) == nextSize);
 //                CmiPrintf("BgMessageReplay>  pe:%d size: %d handle: %d msg: %p\n", nextPE, nextSize, CmiBgMsgHandle(msg), msg);
                 BgSendLocalPacket(ANYTHREAD, CmiBgMsgHandle(msg), LARGE_WORK, nextSize, msg);
+                rcount ++;
                 return 1;
         }
 };
