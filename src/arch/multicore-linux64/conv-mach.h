@@ -72,7 +72,7 @@
 
 #define CMK_LBDB_ON					   1
 
-#define CMK_PCQUEUE_LOCK                                   1
+/*#define CMK_PCQUEUE_LOCK                                   1 */
 #define CMK_USE_TLS_THREAD                                 1
 
 #endif
