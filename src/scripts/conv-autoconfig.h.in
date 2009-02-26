@@ -57,9 +57,6 @@
 /* Allows gcc x86 assembly. */
 #undef CMK_GCC_X86_ASM
 
-/* Allows PPC assembly. */
-#undef CMK_PPC_ASM
-
 /* whether has alloca.h */
 #undef CMK_HAS_ALLOCA_H
 
@@ -108,6 +105,9 @@
 /* whether it has socklen_t */
 #undef CMK_HAS_SOCKLEN
 
+/* whether it has sqrtf */
+#undef CMK_HAS_SQRTF
+
 /* whether has stdint.h */
 #undef CMK_HAS_STDINT_H
 
@@ -140,6 +140,9 @@
 
 /* whether namespaces work */
 #undef CMK_NAMESPACES_BROKEN
+
+/* Allows PPC assembly. */
+#undef CMK_PPC_ASM
 
 /* whether it has zlib */
 #undef CMK_PROJECTIONS_USE_ZLIB

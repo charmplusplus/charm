@@ -2292,6 +2292,21 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test for sqrtf ###
+cat > $t <<EOT
+#include <math.h>
+int main() {
+  float i = sqrtf((float)10.0);
+  return 0;
+}
+EOT
+test_link "whether it has sqrtf" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_SQRTF $pass
+_ACEOF
+
+
 #### test for mkstemp ###
 cat > $t <<EOT
 #include <stdlib.h>
