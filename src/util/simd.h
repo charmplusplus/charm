@@ -10,8 +10,8 @@
 
 
 // Solaris does not support sqrtf (float), so just map it to sqrt (double) instead
-#if defined(__sun) || defined(__sun__) || defined(Solaris)  
-  inline float sqrtf(float a) { return (float)(sqrt((double)(a))); }
+#if !CMK_HAS_SQRTF
+  #define sqrtf(a) ((float)(sqrt((double)(a))))
 #endif
 
 
