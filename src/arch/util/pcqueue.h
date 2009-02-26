@@ -25,8 +25,10 @@
  * for debugging and testing purpose! it only make sense in smp version
  ****************************************************************************/
 /*#define CMK_PCQUEUE_LOCK  1 */
+#if CMK_SMP && !defined(CMK_PCQUEUE_LOCK)
 /*#define PCQUEUE_MULTIQUEUE  1 */
-/*#define CMK_PCQUEUE_PUSH_LOCK 1 */
+#define CMK_PCQUEUE_PUSH_LOCK 1 
+#endif
 
 /* If we are using locks in PCQueue, we disable any other fence operation,
  * otherwise we use the ones provided by converse.h */
