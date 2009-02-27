@@ -2502,9 +2502,9 @@ int AMPI_Barrier(MPI_Comm comm)
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Barrier not allowed for Inter-communicator!");
 #if CMK_BLUEGENE_CHARM
   void *barrierLog;		// store current log in timeline
-  _TRACE_BG_TLINE_END(&barrierLog); 
   //TRACE_BG_AMPI_BARRIER_START(barrierLog);
   TRACE_BG_AMPI_BREAK(NULL, "AMPI_Barrier", NULL, 0);
+  _TRACE_BG_TLINE_END(&barrierLog); 
 #endif
   //HACK: Use collective operation as a barrier.
   AMPI_Allreduce(NULL,NULL,0,MPI_INT,MPI_SUM,comm);
