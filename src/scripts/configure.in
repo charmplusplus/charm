@@ -474,6 +474,22 @@ EOT
 test_cxx "whether GCC x86 assembly works" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_GCC_X86_ASM, $strictpass, [Allows gcc x86 assembly.])
 
+#### test if we can use gcc x86 assembly like this ####
+if test $strictpass = 1
+then
+cat > $t <<EOT
+int foo(void)
+{
+  int x;
+  asm("lock incl %0" :: "m" (x));
+  asm("lock decl %0" :: "m" (x));
+  return x;
+}
+EOT
+test_cxx "whether GCC x86 assembly for atomic increment works" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_GCC_X86_ASM_ATOMICINCREMENT, $strictpass, [Allows gcc x86 assembly for atomic increment.])
+fi
+
 #### test if we can use gcc IA64 assembly like this ####
 cat > $t <<EOT
 double foo(void)
