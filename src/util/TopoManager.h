@@ -132,7 +132,7 @@ class TopoManager {
 #elif CMK_BLUEGENE_CHARM
       BgGetSize(&dimNX, &dimNY, &dimNZ);
 
-      procsPerNode = BgGetNumWorkThread();
+      dimNT = procsPerNode = BgGetNumWorkThread();
       dimX = dimNX * procsPerNode;
       dimY = dimNY;
       dimZ = dimNZ;
@@ -149,7 +149,7 @@ class TopoManager {
       dimNY = 1;
       dimNZ = 1;
 
-      procsPerNode = 1;
+      dimNT = procsPerNode = 1;
       torusX = true;
       torusY = true;
       torusZ = true;
