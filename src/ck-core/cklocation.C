@@ -213,54 +213,6 @@ void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void 
 
 CkGroupID _defaultArrayMapID;
 
-/**
- *The default map object-- round-robin homes.  This is 
- * almost always what you want.
- */
-class DefaultArrayMap : public CkArrayMap
-{
-private:
-  CkPupPtrVec<CkArrayIndexMax> arrs;
-
-public:
-  DefaultArrayMap(void) {
-	  DEBC((AA"Creating DefaultArrayMap\n"AB));
-  }
-
-  DefaultArrayMap(CkMigrateMessage *m):CkArrayMap(m){}
-
-  int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
-  {
-    int idx = arrs.size();
-    arrs.resize(idx+1);
-    arrs[idx] = new CkArrayIndexMax(numElements);
-    return idx;
-  }
- 
-  int procNum(int arrayHdl, const CkArrayIndex &i) {
-    int thisPe=CkMyPe();
-    int numPes=CkNumPes();
-    int flati, binSize;
-    if (i.nInts == 1) {
-      flati = i.data()[0];
-      binSize = (int)ceil((double)(arrs[arrayHdl]->data()[0])/(double)numPes);
-    } else if (i.nInts == 2) {
-      flati = i.data()[0] * arrs[arrayHdl]->data()[1] + i.data()[1];
-      binSize = (int)ceil((double)(arrs[arrayHdl]->data()[0]*arrs[arrayHdl]->data()[1])/(double)numPes);
-    } else if (i.nInts == 3) {
-      flati = (i.data()[0] * arrs[arrayHdl]->data()[1] + i.data()[1]) * arrs[arrayHdl]->data()[2] + i.data()[2];
-      binSize = (int)ceil((double)(arrs[arrayHdl]->data()[0]*arrs[arrayHdl]->data()[1]*arrs[arrayHdl]->data()[2])/(double)numPes);
-    } else {
-      CkAbort("CkArrayIndex has dimension greater than 3!");
-    }
-    return (flati/binSize);
-  }
-
-  void pup(PUP::er& p){
-    p|arrs;
-  }
-};
-
 class RRMap : public CkArrayMap
 {
 public:
@@ -292,6 +244,93 @@ public:
 	return ans;
 
       }
+  }
+};
+
+/** 
+ * Class used to store the dimensions of the array and precalculate binSize for
+ * the DefaultArrayMap -- ASB
+ */
+class dimInfo {
+public:
+  CkArrayIndexMax _nelems;
+  int _binSize;
+
+  dimInfo(void) { }
+
+  dimInfo(CkArrayIndexMax& n, int bs) {
+    _nelems = n;
+    _binSize = bs;
+  }
+
+  ~dimInfo() { }
+
+  void pup(PUP::er& p){
+    p|_nelems;
+    p|_binSize;
+  }
+};
+
+
+/**
+ * The default map object -- This does blocked mapping in the general case and
+ * calls the round-robin procNum for the dynamic insertion case -- ASB
+ */
+class DefaultArrayMap : public RRMap
+{
+private:
+  CkPupPtrVec<dimInfo> arrs;
+
+public:
+  DefaultArrayMap(void) {
+    DEBC((AA"Creating DefaultArrayMap\n"AB));
+  }
+
+  DefaultArrayMap(CkMigrateMessage *m):RRMap(m){}
+
+  int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
+  {
+    int numPes=CkNumPes();
+    int binSize;
+    if (numElements.nInts == 1) {
+      binSize = (int)ceil((double)(numElements.data()[0])/(double)numPes);
+    } else if (numElements.nInts == 2) {
+      binSize = (int)ceil((double)(numElements.data()[0]*numElements.data()[1])/(double)numPes);
+    } else if (numElements.nInts == 3) {
+      binSize = (int)ceil((double)(numElements.data()[0]*numElements.data()[1]*numElements.data()[2])/(double)numPes);
+    } else {
+      CkAbort("CkArrayIndex has dimension greater than 3!");
+    }
+
+    int idx = arrs.size();
+    arrs.resize(idx+1);
+    arrs[idx] = new dimInfo(numElements, binSize);
+    return idx;
+  }
+ 
+  int procNum(int arrayHdl, const CkArrayIndex &i) {
+    int numPes=CkNumPes();
+    int flati;
+    if (arrs[arrayHdl]->_nelems.nInts == 0) {
+      return RRMap::procNum(arrayHdl, i);
+    }
+
+    if (i.nInts == 1) {
+      flati = i.data()[0];
+    } else if (i.nInts == 2) {
+      flati = i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1];
+    } else if (i.nInts == 3) {
+      flati = (i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1]) * arrs[arrayHdl]->_nelems.data()[2] + i.data()[2];
+    } else {
+      CkAbort("CkArrayIndex has dimension greater than 3!");
+    }
+
+    return (flati/arrs[arrayHdl]->_binSize);
+  }
+
+  void pup(PUP::er& p){
+    RRMap::pup(p);
+    p|arrs;
   }
 };
 
