@@ -11,4 +11,6 @@
 
 #define CMK_MACOSX_PTHREAD_HACK                            1
 
-#define CMK_PCQUEUE_LOCK				   1
+#if !CMK_GCC_X86_ASM || !CMK_GCC_X86_ASM_ATOMICINCREMENT
+#define CMK_PCQUEUE_LOCK                                   1
+#endif
