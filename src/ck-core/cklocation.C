@@ -211,11 +211,56 @@ void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void 
 	CkFreeMsg(ctorMsg);
 }
 
-CkGroupID _RRMapID;
+CkGroupID _defaultArrayMapID;
+
 /**
  *The default map object-- round-robin homes.  This is 
  * almost always what you want.
  */
+class DefaultArrayMap : public CkArrayMap
+{
+private:
+  CkPupPtrVec<CkArrayIndexMax> arrs;
+
+public:
+  DefaultArrayMap(void) {
+	  DEBC((AA"Creating DefaultArrayMap\n"AB));
+  }
+
+  DefaultArrayMap(CkMigrateMessage *m):CkArrayMap(m){}
+
+  int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
+  {
+    int idx = arrs.size();
+    arrs.resize(idx+1);
+    arrs[idx] = new CkArrayIndexMax(numElements);
+    return idx;
+  }
+ 
+  int procNum(int arrayHdl, const CkArrayIndex &i) {
+    int thisPe=CkMyPe();
+    int numPes=CkNumPes();
+    int flati, binSize;
+    if (i.nInts == 1) {
+      flati = i.data()[0];
+      binSize = (int)ceil((double)(arrs[arrayHdl]->data()[0])/(double)numPes);
+    } else if (i.nInts == 2) {
+      flati = i.data()[0] * arrs[arrayHdl]->data()[1] + i.data()[1];
+      binSize = (int)ceil((double)(arrs[arrayHdl]->data()[0]*arrs[arrayHdl]->data()[1])/(double)numPes);
+    } else if (i.nInts == 3) {
+      flati = (i.data()[0] * arrs[arrayHdl]->data()[1] + i.data()[1]) * arrs[arrayHdl]->data()[2] + i.data()[2];
+      binSize = (int)ceil((double)(arrs[arrayHdl]->data()[0]*arrs[arrayHdl]->data()[1]*arrs[arrayHdl]->data()[2])/(double)numPes);
+    } else {
+      CkAbort("CkArrayIndex has dimension greater than 3!");
+    }
+    return (flati/binSize);
+  }
+
+  void pup(PUP::er& p){
+    p|arrs;
+  }
+};
+
 class RRMap : public CkArrayMap
 {
 public:
@@ -509,7 +554,7 @@ class CkMapsInit : public Chare
 {
 public:
   CkMapsInit(CkArgMsg *msg) {
-    _RRMapID = CProxy_RRMap::ckNew();
+    _defaultArrayMapID = CProxy_DefaultArrayMap::ckNew();
     delete msg;
   }
   CkMapsInit(CkMigrateMessage *m) {}
@@ -1454,7 +1499,7 @@ void CkLocMgr::pup(PUP::er &p){
 	IrrGroup::pup(p);
 	p|mapID;
 	p|lbdbID;
-	mapID = _RRMapID;
+	mapID = _defaultArrayMapID;
 	if(p.isUnpacking()){
 		thisProxy=thisgroup;
 		CProxyElement_CkLocMgr newlocalproxy(thisgroup,CkMyPe());

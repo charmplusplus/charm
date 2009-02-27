@@ -66,7 +66,7 @@ public:
 
 /******************* Map object ******************/
 
-extern CkGroupID _RRMapID;
+extern CkGroupID _defaultArrayMapID;
 class CkLocMgr;
 class CkArrMgr;
 

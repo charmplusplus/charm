@@ -21,10 +21,16 @@ module CkLocation {
   group [migratable] CkArrayMap {
   };
 
-  readonly CkGroupID _RRMapID;
+  readonly CkGroupID _defaultArrayMapID;
+
+  group [migratable] DefaultArrayMap : CkArrayMap {
+    entry DefaultArrayMap(void);
+  };
+
   group [migratable] RRMap : CkArrayMap {
     entry RRMap(void);
   };
+
   group [migratable] BlockMap : RRMap {
     entry BlockMap(void);
   };

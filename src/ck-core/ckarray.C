@@ -353,25 +353,25 @@ CkLocMgr *CProxy_ArrayBase::ckLocMgr(void) const
 CK_REDUCTION_CLIENT_DEF(CProxy_ArrayBase,ckLocalBranch());
 
 CkArrayOptions::CkArrayOptions(void) //Default: empty array
-	:numInitial(0),map(_RRMapID)
+	:numInitial(0),map(_defaultArrayMapID)
 {
 	locMgr.setZero();
 }
 
 CkArrayOptions::CkArrayOptions(int ni1) //With initial elements (1D)
-	:numInitial(CkArrayIndex1D(ni1)),map(_RRMapID)
+	:numInitial(CkArrayIndex1D(ni1)),map(_defaultArrayMapID)
 {
 	locMgr.setZero();
 }
 
 CkArrayOptions::CkArrayOptions(int ni1, int ni2) //With initial elements (2D)
-	:numInitial(CkArrayIndex2D(ni1, ni2)),map(_RRMapID)
+	:numInitial(CkArrayIndex2D(ni1, ni2)),map(_defaultArrayMapID)
 {
 	locMgr.setZero();
 }
 
 CkArrayOptions::CkArrayOptions(int ni1, int ni2, int ni3) //With initial elements (3D)
-	:numInitial(CkArrayIndex3D(ni1, ni2, ni3)),map(_RRMapID)
+	:numInitial(CkArrayIndex3D(ni1, ni2, ni3)),map(_defaultArrayMapID)
 {
 	locMgr.setZero();
 }
