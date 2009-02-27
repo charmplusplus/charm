@@ -159,15 +159,15 @@ inline int adjustTimeLog(BgTimeLog* log, BgTimeLine& tline,
             msg->tID = msgEntry->tID;
 	    //msg->tAdjust is absolute recvTime at destination node
 	    msg->tAdjust = msgEntry->recvTime;  // new recvTime
-            msg->destNode = msgEntry->dstPe;
+            msg->destNode = msgEntry->dstNode;
 		
 	    CmiSetHandler(msg, CpvAccess(bgCorrectionHandler));
 #if ! USE_MULTISEND
-	    if (log->msgs[i]->dstPe < 0) {
+	    if (log->msgs[i]->dstNode < 0) {
 	      CmiSyncBroadcastAllAndFree(sizeof(bgCorrectionMsg),(char*)msg);
 	    }
 	    else{
-	      CmiSyncSendAndFree(BgNodeToPE(log->msgs[i]->dstPe),sizeof(bgCorrectionMsg),(char*)msg);
+	      CmiSyncSendAndFree(BgNodeToRealPE(log->msgs[i]->dstNode),sizeof(bgCorrectionMsg),(char*)msg);
 	    }  
 #else
 	    if (log->msgs[i]->dstPe < 0) {
@@ -178,7 +178,7 @@ inline int adjustTimeLog(BgTimeLog* log, BgTimeLine& tline,
 	      }
 	    }
 	    else {
-	      corrMsgBucket[BgNodeToPE(log->msgs[i]->dstPe)].push_back((char *)msg);
+	      corrMsgBucket[BgNodeToRealPE(log->msgs[i]->dstPe)].push_back((char *)msg);
 	    }
 #endif
 	}
@@ -1029,8 +1029,8 @@ void BgDelaySend(BgMsgEntry *msgEntry)
   char *sendMsg = msgEntry->sendMsg;
   if (!sendMsg) return;
   CmiBgMsgRecvTime(sendMsg) = msgEntry->recvTime;
-  if (msgEntry->dstPe >= 0) {
-    CmiSyncSendAndFree(nodeInfo::Global2PE(msgEntry->dstPe),CmiBgMsgLength(sendMsg),sendMsg);
+  if (msgEntry->dstNode >= 0) {
+    CmiSyncSendAndFree(nodeInfo::Global2PE(msgEntry->dstNode),CmiBgMsgLength(sendMsg),sendMsg);
   }
   else {
     CmiSyncBroadcastAllAndFree(CmiBgMsgLength(sendMsg),sendMsg);

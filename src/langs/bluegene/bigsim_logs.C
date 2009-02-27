@@ -34,12 +34,12 @@ extern "C" void BgGenerateLogs()
 }
 
 // dstNode is the dest bg node, can be -1
-BgMsgEntry::BgMsgEntry(char *msg, int dstNode, int tid, double sendT, int local, int g)
+BgMsgEntry::BgMsgEntry(char *msg, int _dstNode, int tid, double sendT, int local, int g)
 {
   msgID = CmiBgMsgID(msg);
   sendTime = sendT;
   recvTime = CmiBgMsgRecvTime(msg);
-  dstPe = dstNode;
+  dstNode = _dstNode;
   tID = tid;                   // CmiBgMsgThreadID(msg);
   msgsize = CmiBgMsgLength(msg);
   group = g;
@@ -50,12 +50,12 @@ BgMsgEntry::BgMsgEntry(char *msg, int dstNode, int tid, double sendT, int local,
 #endif
 }
 
-BgMsgEntry::BgMsgEntry(int seqno, int _msgSize, double _sendTime, double _recvTime, int dstNode, int rank)
+BgMsgEntry::BgMsgEntry(int seqno, int _msgSize, double _sendTime, double _recvTime, int _dstNode, int rank)
 {
   msgID = seqno;
   sendTime = _sendTime;
   recvTime = _recvTime;
-  dstPe = dstNode;
+  dstNode = _dstNode;
   tID = rank;                   // CmiBgMsgThreadID(msg);
   msgsize = _msgSize;
   CmiAssert(msgsize > 0);

@@ -61,7 +61,7 @@ typedef struct CMK_MSG_HEADER_BLUEGENE   CmiBlueGeneMsgHeader;
 /**
    indicate a message is a broacast to all message
 */
-#define BG_BROADCASTALL	-1
+#define BG_BROADCASTALL	        -1
 
 /************************* API data structures *************************/
 /** 
@@ -119,7 +119,7 @@ int  BgNodeSize();      /* return the number of nodes on this emulator pe */
 int  BgMyRank();	/* node ID, this is local ID */
 int  BgMyNode();
 
-int BgNodeToPE(int node);         /* return a real processor number from a bg node */
+int BgNodeToRealPE(int node);         /* return a real processor number from a bg node */
 int BgTraceProjectionOn(int pe);    /* true if pe is on for trace projections */
 
 /**

@@ -26,7 +26,7 @@ extern int bgcorroff;
 class BgMsgID
 {
 private:
-  int _pe;		// PE number where the message is created
+  int _pe;		// src PE number where the message is created
   int _msgID;		// local index number on pe
 
 public:
@@ -49,7 +49,7 @@ class BgMsgEntry {
   friend class BgTimeLog;
 public:
   int msgID;
-  int dstPe;          // dest bg node in global sequence
+  int dstNode;          // dest bg node in global sequence
   double sendTime;	// msg sending offset in the event
   double recvTime;	// predicted recv time with delay
 #if DELAY_SEND
@@ -64,22 +64,22 @@ public:
   BgMsgEntry(int seqno, int _msgSize, double _sendTime, double _recvTime, int dstNode, int destrank);
   BgMsgEntry(char *msg, int node, int tid, double sendT, int local, int g=1);
   inline void print() {
-    CmiPrintf("msgID:%d sent:%f recvtime:%f dstPe:%d group:%d\n", msgID, sendTime, recvTime, dstPe, group);
+    CmiPrintf("msgID:%d sent:%f recvtime:%f dstNode:%d tid:%d group:%d\n", msgID, sendTime, recvTime, dstNode, tID, group);
   }
   void write(FILE *fp) {
-    if(dstPe >= 0)
-      fprintf(fp, "msgID:%d sent:%f recvtime:%f dstPe:%d size:%d group:%d\n", msgID, sendTime, recvTime, dstPe, msgsize, group);
-    if(dstPe == -1)
-      fprintf(fp, "msgID:%d sent:%f recvtime:%f dstPe:BG_BROADCASTALL size:%d group:%d\n", msgID, sendTime, recvTime, msgsize, group);
-    if(dstPe <= -100)
-      fprintf(fp, "msgID:%d sent:%f recvtime:%f dstPe:BG_BROADCASTALL except %d size:%d group:%d\n", msgID, sendTime, recvTime, -100-dstPe, msgsize, group);
+    if(dstNode >= 0)
+      fprintf(fp, "msgID:%d sent:%f recvtime:%f dstNode:%d tid:%d size:%d group:%d\n", msgID, sendTime, recvTime, dstNode, tID, msgsize, group);
+    if(dstNode == -1)
+      fprintf(fp, "msgID:%d sent:%f recvtime:%f dstNode:BG_BROADCASTALL tid:%d size:%d group:%d\n", msgID, sendTime, recvTime, tID, msgsize, group);
+    if(dstNode <= -100)
+      fprintf(fp, "msgID:%d sent:%f recvtime:%f dstNode:BG_BROADCASTALL except %d tid:%d size:%d group:%d\n", msgID, sendTime, recvTime, -100-dstNode, tID, msgsize, group);
     
   }
 #if DELAY_SEND
 //  void send();
 #endif
   void pup(PUP::er &p) {
-    p|msgID; p|dstPe; p|sendTime; p|recvTime; p|tID; p|msgsize; 
+    p|msgID; p|dstNode; p|sendTime; p|recvTime; p|tID; p|msgsize; 
     CmiAssert(recvTime>=sendTime);
     CmiAssert(msgsize >= 0);
     if (p.isUnpacking()) group = 1;    // default value

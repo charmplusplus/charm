@@ -213,7 +213,7 @@ public:
   }
 
     /* map (x,y,z) to emulator PE ++++ */
-  inline static int XYZ2PE(int x, int y, int z) {
+  inline static int XYZ2RealPE(int x, int y, int z) {
     return Global2PE(XYZ2Global(x,y,z));
   }
 
@@ -227,7 +227,7 @@ public:
   }
 
 #define NOT_FAST_CODE 1
-    /* map global serial node number to PE ++++ */
+    /* map global serial node number to real PE ++++ */
   inline static int Global2PE(int num) { 
 #if NOT_FAST_CODE
     int n = _bgSize/CmiNumPes();
@@ -338,7 +338,7 @@ public:
   }
 
     /* map (x,y,z) to emulator PE ++++ */
-  inline static int XYZ2PE(int x, int y, int z) {
+  inline static int XYZ2RealPE(int x, int y, int z) {
     return Global2PE(XYZ2Global(x,y,z));
   }
 

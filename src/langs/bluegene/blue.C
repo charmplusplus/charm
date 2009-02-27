@@ -661,13 +661,13 @@ void CmiSendPacketWrapper(int pe, int msgSize,char *msg, int streaming)
 
 void CmiSendPacket(int x, int y, int z, int msgSize,char *msg)
 {
-//  CmiSyncSendAndFree(nodeInfo::XYZ2PE(x,y,z),msgSize,(char *)msg);
+//  CmiSyncSendAndFree(nodeInfo::XYZ2RealPE(x,y,z),msgSize,(char *)msg);
 #if !DELAY_SEND
-  const int pe = nodeInfo::XYZ2PE(x,y,z);
+  const int pe = nodeInfo::XYZ2RealPE(x,y,z);
   CmiSendPacketWrapper(pe, msgSize, msg, bg_streaming);
 #else
   if (!correctTimeLog) {
-    const int pe = nodeInfo::XYZ2PE(x,y,z);
+    const int pe = nodeInfo::XYZ2RealPE(x,y,z);
     CmiSendPacketWrapper(pe, msgSize, msg, bg_streaming);
   }
   // else messages are kept in the log (MsgEntry), and only will be sent
@@ -996,7 +996,7 @@ int BgMyNode()
 }
 
 /* return a real processor number from a bg node */
-int BgNodeToPE(int node)
+int BgNodeToRealPE(int node)
 {
   return nodeInfo::Global2PE(node);
 }
