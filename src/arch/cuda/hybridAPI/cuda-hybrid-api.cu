@@ -19,7 +19,6 @@
 #include "stdio.h"
 #include <cutil.h>
 
-
 /* A function in ck.C which casts the void * to a CkCallback object
  *  and executes the callback 
  */ 
@@ -34,15 +33,22 @@ extern void CUDACallbackManager(void * fn);
 
 // #define GPU_DEBUG
 
+#define MAX_PINNED_REQ 64  
 
 /* a flag which tells the system to record the time for invocation and
  *  completion of GPU events: memory allocation, transfer and
  *  kernel execution
  */  
-// #define GPU_PROFILE
+//#define GPU_PROFILE
 
 /* work request queue */
 workRequestQueue *wrQueue = NULL; 
+
+/* pending page-locked memory allocation requests */
+unsigned int pinnedMemQueueIndex; 
+pinnedMemReq pinnedMemQueue[MAX_PINNED_REQ];
+
+
 
 /* The runtime system keeps track of all allocated buffers on the GPU.
  * The following arrays contain pointers to host (CPU) data and the
@@ -76,10 +82,10 @@ typedef struct gpuEventTimer {
 } gpuEventTimer; 
 
 gpuEventTimer gpuEvents[QUEUE_SIZE_INIT * 3]; 
-int timeIndex = 0; 
-int runningKernelIndex = 0; 
-int dataSetupIndex = 0; 
-int dataCleanupIndex = 0; 
+unsigned int timeIndex = 0; 
+unsigned int runningKernelIndex = 0; 
+unsigned int dataSetupIndex = 0; 
+unsigned int dataCleanupIndex = 0; 
 
 #endif
 
@@ -91,6 +97,56 @@ int dataCleanupIndex = 0;
 cudaStream_t kernel_stream; 
 cudaStream_t data_in_stream;
 cudaStream_t data_out_stream; 
+
+/* pinnedMallocHost
+ *
+ * schedules a pinned memory allocation so that it does not impede
+ * concurrent asynchronous execution 
+ *
+ */
+void pinnedMallocHost(pinnedMemReq *reqs) {
+  if ( (cudaStreamQuery(kernel_stream) == cudaSuccess) &&
+       (cudaStreamQuery(data_in_stream) == cudaSuccess) &&
+       (cudaStreamQuery(data_out_stream) == cudaSuccess) ) {    
+
+    for (int i=0; i<reqs->nBuffers; i++) {
+      CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **) reqs->hostPtrs[i], 
+					    reqs->sizes[i])); 
+    }
+
+    free(reqs->hostPtrs);
+    free(reqs->sizes);
+
+    CUDACallbackManager(reqs->callbackFn);
+  }
+  else {
+    pinnedMemQueue[pinnedMemQueueIndex].hostPtrs = reqs->hostPtrs;
+    pinnedMemQueue[pinnedMemQueueIndex].sizes = reqs->sizes; 
+    pinnedMemQueue[pinnedMemQueueIndex].callbackFn = reqs->callbackFn;     
+    pinnedMemQueueIndex++;
+    if (pinnedMemQueueIndex == MAX_PINNED_REQ) {
+      printf("Error: pinned memory request buffer is overflowing\n"); 
+    }
+  }  
+}
+
+/* flushPinnedMemQueue
+ *
+ * executes pending pinned memory allocation requests
+ *
+ */
+void flushPinnedMemQueue() {
+  for (int i=0; i<pinnedMemQueueIndex; i++) {
+    pinnedMemReq *req = &pinnedMemQueue[pinnedMemQueueIndex]; 
+    for (int j=0; j<req->nBuffers; j++) {
+      CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost(req->hostPtrs[j], req->sizes[j])); 
+    }
+    free(req->hostPtrs);
+    free(req->sizes);
+    CUDACallbackManager(pinnedMemQueue[pinnedMemQueueIndex].callbackFn);    
+  }
+  pinnedMemQueueIndex = 0; 
+}
 
 /* allocateBuffers
  *
@@ -344,7 +400,7 @@ void gpuProgressFn() {
 	runningKernelIndex = timeIndex; 
 	timeIndex++; 
 #endif
-
+	flushPinnedMemQueue();
 	kernelSelect(head); 
 	head->state = EXECUTING; 
 
@@ -406,7 +462,7 @@ void gpuProgressFn() {
 	    runningKernelIndex = timeIndex; 
 	    timeIndex++; 
 #endif
-	    
+	    flushPinnedMemQueue();	    
 	    kernelSelect(second); 
 	    second->state = EXECUTING; 
 

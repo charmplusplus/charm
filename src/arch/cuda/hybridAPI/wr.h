@@ -11,6 +11,28 @@
 #ifndef __WR_H__
 #define __WR_H__
 
+/* struct pinnedMemReq
+ *
+ * a structure for submitting page-locked memory allocation requests;
+ * passed as input into pinnedMallocHost 
+ *
+ */
+typedef struct pinnedMemReq {
+  void ***hostPtrs; 
+  size_t *sizes;
+  int nBuffers;
+  void *callbackFn; 
+} pinnedMemReq;
+
+/* pinnedMallocHost
+ *
+ * schedules a pinned memory allocation so that it does not impede
+ * concurrent asynchronous execution 
+ *
+ */
+void pinnedMallocHost(pinnedMemReq *reqs);
+
+
 /* struct bufferInfo
  * 
  * purpose: 
@@ -41,7 +63,7 @@ typedef struct dataInfo {
   void *hostBuffer; 
 
   /* size of buffer in bytes */
-  int size; 
+  size_t size; 
 
 } dataInfo; 
 
