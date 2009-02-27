@@ -298,8 +298,6 @@ public:
       binSize = (int)ceil((double)(numElements.data()[0]*numElements.data()[1])/(double)numPes);
     } else if (numElements.nInts == 3) {
       binSize = (int)ceil((double)(numElements.data()[0]*numElements.data()[1]*numElements.data()[2])/(double)numPes);
-    } else {
-      CkAbort("CkArrayIndex has dimension greater than 3!");
     }
 
     int idx = arrs.size();
