@@ -2186,6 +2186,26 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test if we can use gcc x86 assembly like this ####
+if test $strictpass = 1
+then
+cat > $t <<EOT
+int foo(void)
+{
+  int x;
+  asm("lock incl %0" :: "m" (x));
+  asm("lock decl %0" :: "m" (x));
+  return x;
+}
+EOT
+test_cxx "whether GCC x86 assembly for atomic increment works" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_GCC_X86_ASM_ATOMICINCREMENT $strictpass
+_ACEOF
+
+fi
+
 #### test if we can use gcc IA64 assembly like this ####
 cat > $t <<EOT
 double foo(void)
@@ -2864,7 +2884,13 @@ then
 { echo "$as_me:$LINENO: checking \"bproc version\"" >&5
 echo $ECHO_N "checking \"bproc version\"... $ECHO_C" >&6; }
 bproc_ver=`./testlink`
+if test x$bproc_ver = x
+then
+test_result 0 "bproc version" "ERROR" ""
+test_finish 1
+else
 test_result 0 "bproc version" "$bproc_ver" ""
+fi
 bproc_ver=`echo $bproc_ver | cut -d'.' -f1`
 
 cat >>confdefs.h <<_ACEOF
