@@ -74,7 +74,7 @@
 
 #define CMK_COMPILEMODE_ANSI				   1
 
-/*#define CMK_PCQUEUE_LOCK                                   1 */
+#define CMK_PCQUEUE_LOCK                                   1
 
 #endif
 
