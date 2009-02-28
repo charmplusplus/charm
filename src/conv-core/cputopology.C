@@ -240,6 +240,8 @@ extern "C" void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num)
 extern "C" int getXTNodeID(int mype, int numpes);
 #endif
 
+static int _noip = 0;
+
 extern "C" void CmiInitCPUTopology(char **argv)
 {
   static skt_ip_t myip;
@@ -304,15 +306,17 @@ extern "C" void CmiInitCPUTopology(char **argv)
     memcpy(&myip, &ret, sizeof(int));
 #elif CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
+#elif CMK_BPROC
+    myip = skt_innode_my_ip();
 #else
     if (!CmiMyPe())
     CmiPrintf("CmiInitCPUTopology Warning: Can not get unique name for the compute nodes. \n");
-    CmiNodeAllBarrier();
-    return;    /* abort */
+    _noip = 1; 
 #endif
   }
 
   CmiNodeAllBarrier();
+  if (_noip) return; 
 
     /* prepare a msg to send */
   msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg));
