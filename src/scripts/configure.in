@@ -1027,7 +1027,13 @@ if test $pass -eq 1
 then 
 AC_MSG_CHECKING("bproc version")
 bproc_ver=`./testlink`
+if test x$bproc_ver = x
+then
+test_result 0 "bproc version" "ERROR" ""
+test_finish 1
+else
 test_result 0 "bproc version" "$bproc_ver" ""
+fi
 bproc_ver=`echo $bproc_ver | cut -d'.' -f1`
 AC_DEFINE_UNQUOTED(CMK_BPROC_VERSION, $bproc_ver, [bproc version])
 fi
