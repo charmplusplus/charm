@@ -150,6 +150,7 @@ void BgEmulatorInit(int argc, char **argv)
   BgSetNumCommThread(atoi(argv[4]));
   BgSetNumWorkThread(atoi(argv[5]));
 
+  if (CmiMyRank() == 0)
   g_epsilon = atof(argv[6]);
 
     switch (argc) {
@@ -176,11 +177,12 @@ void BgEmulatorInit(int argc, char **argv)
     g_y_blocksize = g_dataYsize/numBgY;
     g_z_blocksize = g_dataZsize/numBgZ;
 
+    if (CmiMyPe() == 0) {
     CmiPrintf("Bluegene size: %d %d %d\n",
 	     numBgX, numBgY, numBgZ);
-    CmiPrintf("Parameters: %d %d %d, Epsilon: %f\n",
+    CmiPrintf("Parameters: %d %d %d, Epsilon: %e\n",
 	     g_dataXsize, g_dataYsize, g_dataZsize, g_epsilon);
-
+    }
 }
 
 void BgNodeStart(int argc, char **argv) 
