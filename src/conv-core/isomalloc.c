@@ -1865,6 +1865,39 @@ static int find_largest_free_region(memRegion_t *destRegion) {
     }
 }
 
+#if CMK_MMAP_PROBE
+static int try_largest_mmap_region(memRegion_t *destRegion)
+{
+  void *bad_alloc=(void*)(-1); /* mmap error return address */
+  void *range;
+  size_t size=((unsigned long)(-1l))>>2; /* 25% of machine address space! */
+  while (1) { /* test out an allocation of this size */
+	range=mmap(NULL,size,PROT_READ|PROT_WRITE,
+ 	             MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE,-1,0);
+	if (range==bad_alloc) { /* mmap failed */
+		size=(double)size/1.5; /* shrink request */
+		if (size<=0) return 0; /* mmap doesn't work */
+	}
+	else { /* this allocation size is available */
+		munmap(range,size); /* needed/wanted? */
+		break;
+	}
+  }
+  destRegion->start=range; 
+  destRegion->len=size;
+#if CMK_THREADS_DEBUG
+pid_t pid = getpid();
+{
+char s[128];
+sprintf(s, "cat /proc/%d/maps", pid);
+system(s);
+}
+  CmiPrintf("[%d] try_largest_mmap_region: %p, %lld\n", CmiMyPe(), range, size);
+#endif
+  return 1;
+}
+#endif
+
 #ifndef CMK_CPV_IS_SMP
 #define CMK_CPV_IS_SMP
 #endif
@@ -1890,6 +1923,10 @@ static void init_ranges(char **argv)
       freeRegion.start=CMK_MMAP_START_ADDRESS;
       freeRegion.len=CMK_MMAP_LENGTH_MEGS*meg;
 #endif
+#if CMK_MMAP_PROBE
+      if (freeRegion.len==0u) 
+        try_largest_mmap_region(&freeRegion);  /* may require isomalloc_sync */
+#endif
       if (freeRegion.len==0u) find_largest_free_region(&freeRegion);
       
 #if 0
@@ -1909,7 +1946,9 @@ static void init_ranges(char **argv)
 	      freeRegion.len/meg);
 #endif
       }
-  }
+  }             /* end if myrank == 0 */
+
+  CmiNodeAllBarrier();
 
     /*
        on some machines, isomalloc memory regions on different nodes 
@@ -2208,7 +2247,7 @@ void CmiIsomallocInit(char **argv)
   disable_isomalloc("isomalloc disabled by conv-mach");
 #else
   if (CmiGetArgFlagDesc(argv,"+isomalloc_sync","synchronize isomalloc region globaly"))
-  _sync_iso = 1;
+    _sync_iso = 1;
   init_comm(argv);
   if (!init_map(argv)) {
     disable_isomalloc("mmap() does not work");
