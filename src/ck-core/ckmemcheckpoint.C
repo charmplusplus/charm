@@ -43,6 +43,7 @@ TODO:
 #include "ck.h"
 #include "register.h"
 #include "conv-ccs.h"
+#include <signal.h>
 
 #define DEBUGF     // CkPrintf
 
@@ -59,6 +60,17 @@ CkCallback CkMemCheckPT::cpCallback;
 int _memChkptOn = 1;			// checkpoint is on or off
 
 CkGroupID ckCheckPTGroupID;		// readonly
+
+
+/// @todo the following declarations should be moved into a separate file for all 
+// fault tolerant strategies
+
+// name of the kill file that contains processes to be killed 
+char *killFile;                                               
+// flag for the kill file         
+int killFlag=0;
+// variable for storing the killing time
+double killTime=0.0;
 
 /// checkpoint buffer for processor system data
 CpvStaticDeclare(CkProcCheckPTMessage*, procChkptBuf);
@@ -963,6 +975,43 @@ void CkRegisterRestartHandler( )
 #endif
 #endif
 }
+
+/// @todo: the following definitions should be moved to a separate file containing
+// structures and functions about fault tolerance strategies
+
+/**
+ *  * @brief: function for killing a process                                             
+ *   */
+void killLocal(void *_dummy,double curWallTime){
+        printf("[%d] KillLocal called at %.6lf \n",CkMyPe(),CmiWallTimer());          
+        if(CmiWallTimer()<killTime-1){
+                CcdCallFnAfter(killLocal,NULL,(killTime-CmiWallTimer())*1000);        
+        }else{  
+                kill(getpid(),SIGKILL);                                               
+        }                                                                             
+} 
+
+
+/**
+ * @brief: reads the file with the kill information
+ */
+void readKillFile(){
+        FILE *fp=fopen(killFile,"r");
+        if(!fp){
+                return;
+        }
+        int proc;
+        double sec;
+        while(fscanf(fp,"%d %lf",&proc,&sec)==2){
+                if(proc == CkMyPe()){
+                        killTime = CmiWallTimer()+sec;
+                        printf("[%d] To be killed after %.6lf s \n",CkMyPe(),sec);
+                        CcdCallFnAfter(killLocal,NULL,sec*1000);
+                }
+        }
+        fclose(fp);
+}
+
 
 #include "CkMemCheckpoint.def.h"
 
