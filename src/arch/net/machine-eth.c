@@ -872,7 +872,9 @@ int CmiBarrier()
   OtherNode node;
   int numnodes = CmiNumNodes();
 
+#if !CMK_SMP
   if (Cmi_netpoll == 0) return -1;
+#endif
 
   if (CmiMyRank() == 0) {
     /* every one send to pe 0 */
@@ -917,7 +919,9 @@ int CmiBarrierZero()
 {
   int i;
 
+#if !CMK_SMP
   if (Cmi_netpoll == 0) return -1;
+#endif
 
   if (CmiMyRank() == 0) {
     if (CmiMyNode()) {
