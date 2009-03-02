@@ -131,6 +131,14 @@ typedef void (*CkFtFn)(const char *, CkArgMsg *);
 static CkFtFn  faultFunc = NULL;
 static char* _restartDir;
 
+// flag for killing processes 
+extern int killFlag;
+// file specifying the processes to be killed
+extern char *killFile;
+// function for reading the kill file
+void readKillFile();
+
+
 int _defaultObjectQ = 0;            // for obejct queue
 int _ringexit = 0;		    // for charm exit
 int _ringtoken = 8;
@@ -182,7 +190,18 @@ static inline void _parseCommandLineOpts(char **argv)
 # endif
       CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
   }
+  // reading the killFile
+  if(CmiGetArgStringDesc(argv,"+killFile", &killFile,"Generates SIGKILL on specified processors")){
+    if(faultFunc == NULL){
+      //do not read the killfile if this is a restarting processor
+      killFlag = 1;
+      if(CmiMyPe() == 0){
+        printf("[%d] killFlag set to 1 for file %s\n",CkMyPe(),killFile);
+      }
+    }
+  }
 #endif
+
   // shut down program in ring fashion to allow projections output w/o IO error
   if (CmiGetArgIntDesc(argv,"+ringexit",&_ringtoken, "Program exits in a ring fashion")) 
   {
@@ -972,6 +991,13 @@ void _initCharm(int unused_argc, char **argv)
           //CmiPrintf("In Parallel Debugging mode .....\n");
           CpdFreeze();
        }
+#endif
+
+
+#if __FAULT__
+	if(killFlag){                                                  
+                readKillFile();                                        
+        }
 #endif
 
 }
