@@ -598,11 +598,11 @@ XStr Chare::indexList()
   }
   XStr dim = ((Array*)this)->dim();
   if (dim==(const char*)"1D")
-    str << "int *index1";
+    str << "const int *index1";
   else if (dim==(const char*)"2D")
-    str << "int *index1, int *index2";
+    str << "const int *index1, const int *index2";
   else if (dim==(const char*)"3D")
-    str << "int *index1, int *index2, int *index3";
+    str << "const int *index1, const int *index2, const int *index3";
   else {
       cerr << (char *)baseName() << ": only up to 3 dimension chare arrays are currently supported\n";
       exit(1);
