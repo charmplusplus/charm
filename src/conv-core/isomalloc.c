@@ -1870,16 +1870,25 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
 {
   void *bad_alloc=(void*)(-1); /* mmap error return address */
   void *range;
-  size_t size=((unsigned long)(-1l))>>2; /* 25% of machine address space! */
+  double shrink = 1.5;
+  static int count = 0;
+  size_t size=((size_t)(-1l));
+  if (sizeof(size_t) > 8) size = size>>2;  /* 25% of machine address space! */
   while (1) { /* test out an allocation of this size */
 	range=mmap(NULL,size,PROT_READ|PROT_WRITE,
  	             MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE,-1,0);
 	if (range==bad_alloc) { /* mmap failed */
-		size=(double)size/1.5; /* shrink request */
+		size=(double)size/shrink; /* shrink request */
 		if (size<=0) return 0; /* mmap doesn't work */
 	}
 	else { /* this allocation size is available */
 		munmap(range,size); /* needed/wanted? */
+                count++;
+                if (count == 1) {             /* first time we get one */
+                  size=(double)size*shrink;   /* go back once and try again */
+                  shrink=1.1;                 /* refine */
+                  continue;
+                }
 		break;
 	}
   }
@@ -1925,7 +1934,7 @@ static void init_ranges(char **argv)
 #endif
 #if CMK_MMAP_PROBE
       if (freeRegion.len==0u) 
-        try_largest_mmap_region(&freeRegion);  /* may require isomalloc_sync */
+        if (try_largest_mmap_region(&freeRegion)) _sync_iso = 1;
 #endif
       if (freeRegion.len==0u) find_largest_free_region(&freeRegion);
       
