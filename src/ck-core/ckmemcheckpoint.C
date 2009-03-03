@@ -982,14 +982,20 @@ void CkRegisterRestartHandler( )
 /**
  *  * @brief: function for killing a process                                             
  *   */
+#if !defined(_WIN32) || defined(__CYGWIN__)
 void killLocal(void *_dummy,double curWallTime){
         printf("[%d] KillLocal called at %.6lf \n",CkMyPe(),CmiWallTimer());          
         if(CmiWallTimer()<killTime-1){
                 CcdCallFnAfter(killLocal,NULL,(killTime-CmiWallTimer())*1000);        
         }else{  
                 kill(getpid(),SIGKILL);                                               
-        }                                                                             
+        }              
 } 
+#else
+void killLocal(void *_dummy,double curWallTime){
+  CmiAbort("kill() not supported!");
+}
+#endif
 
 
 /**
