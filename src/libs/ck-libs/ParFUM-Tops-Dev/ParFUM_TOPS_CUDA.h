@@ -16,7 +16,7 @@
 
 #ifdef CUDA
 
-#include <cutil.h>
+//#include <cutil.h>
 
 /** A TopModelDevice contains structures for use by CUDA kernels */
 typedef struct {
