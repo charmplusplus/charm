@@ -2005,14 +2005,22 @@ static void init_ranges(char **argv)
 
             for (i=0; i<CmiNumNodes(); i++) {
               CmiUInt8 ss, ee; 
+              int try_count;
               char fname[128];
               if (i==CmiMyNode()) continue;
               sprintf(fname,".isomalloc.%d", i);
-              while ((fd = open(fname, O_RDONLY)) == -1)
+              try_count = 0;
+              while ((fd = open(fname, O_RDONLY)) == -1 && try_count<10000)
+              {
+                try_count++;
 #ifndef __MINGW_H
-              CMK_CPV_IS_SMP
+                CMK_CPV_IS_SMP
 #endif
-              ;
+                ;
+              }
+              if (fd == -1) {
+                CmiAbort("isomalloc_sync failed, make sure you have a shared file system.");
+              }
               read(fd, &ss, sizeof(CmiUInt8));
               read(fd, &ee, sizeof(CmiUInt8));
               close(fd);
