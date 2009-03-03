@@ -634,7 +634,8 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o  \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) \
 	   charmProjections.o
 
-charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs controlPoints_objs
+charm-target: basics
+	$(MAKE) converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs controlPoints_objs OPTS='$(OPTS)'
 
 CHARMLIBS: charm++ CONVLIBS
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
