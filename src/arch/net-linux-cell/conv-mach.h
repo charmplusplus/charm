@@ -10,6 +10,8 @@
 
 #define CMK_CELL                                           1
 
+#define CMK_NETPOLL                                        1
+
 #define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_SIOCSPGRP               0
