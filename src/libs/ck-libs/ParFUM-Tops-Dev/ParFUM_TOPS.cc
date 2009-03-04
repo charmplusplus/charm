@@ -23,6 +23,12 @@
     #include <cuda_runtime.h>
 #endif
 
+int tops_lib_FP_Type_Size()
+{
+    static const int LIB_FP_TYPE_SIZE = sizeof(FP_TYPE);
+    return LIB_FP_TYPE_SIZE;
+}
+
 void setBasicTableReferences(TopModel* model)
 {
   model->ElemConn_T = &((FEM_IndexAttribute*)model->mesh->elem[0].lookup(FEM_CONN,""))->get();

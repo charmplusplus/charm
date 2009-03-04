@@ -19,7 +19,6 @@ typedef double FP_TYPE_SYNC;
 
 
 
-
 /** Tops uses some bit patterns for these, but we just use TopNode as a signed value to represent the corresponding ParFUM node. A non-negative value is a local node, while a negative value is a ghost. */
 typedef long TopNode;
 
