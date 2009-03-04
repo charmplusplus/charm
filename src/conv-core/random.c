@@ -72,9 +72,9 @@ void CrnInit(void)
 
 /* Initialize random number stream */
 
-void CrnInitStream(CrnStream *genptr, int seed, int type)
+void CrnInitStream(CrnStream *genptr, unsigned int seed, int type)
 {
-  int gennum = seed+CpvAccess(nstreams)*CmiNumPes();
+  unsigned int gennum = seed+CpvAccess(nstreams)*CmiNumPes();
   int i;
 
   genptr->prime = _prime_list[gennum%MAX_STREAMS];
@@ -127,7 +127,7 @@ float CrnFloat(CrnStream *genptr)
     return (float) CrnDouble(genptr);
 }
 
-void CrnSrand(int seed)
+void CrnSrand(unsigned int seed)
 {
   CrnInitStream(&CpvAccess(_defaultStream), seed, 0);
 }

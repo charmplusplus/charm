@@ -12,11 +12,11 @@ typedef struct rngen_
 } CrnStream;
 
 /*Type must be 0, 1, or 2.*/
-void   CrnInitStream(CrnStream *dest, int seed, int type);
+void   CrnInitStream(CrnStream *dest, unsigned int seed, int type);
 int    CrnInt(CrnStream *);
 double CrnDouble(CrnStream *);
 float  CrnFloat(CrnStream *);
-void   CrnSrand(int);
+void   CrnSrand(unsigned int);
 int    CrnRand(void);
 double CrnDrand(void);
 
