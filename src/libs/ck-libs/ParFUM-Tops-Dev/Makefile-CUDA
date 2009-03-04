@@ -1,7 +1,7 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc -cc $(CUDAC) -c++ $(CUDAC) $(OPTS) -nobs
 CUDADIR = /usr/local/cuda
-CUDASDK = $(HOME)/NVIDIA_CUDA_SDK
+CUDASDK = $(HOME)/TOPS-Tesla/NVIDIA_CUDA_SDK
 CUDAC = $(CUDADIR)/bin/nvcc 
 CUDAINC = -I$(CUDASDK)/common/inc -I$(CUDADIR)/include
 CCFLAGS = -DCUDA -DFP_TYPE_FLOAT -O3 
