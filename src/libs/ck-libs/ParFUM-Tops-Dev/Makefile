@@ -3,7 +3,7 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 #CUDADIR = /usr/local/cuda
 #CUDASDK = $(HOME)/NVIDIA_CUDA_SDK
 #CUDAC = $(CUDADIR)/bin/nvcc 
-#CUDAINC = -I$(CUDASDK)/common/inc -I$(CUDADIR)/include
+CUDAINC = -I$(CUDASDK)/common/inc -I$(CUDADIR)/include
 
 
 CCFLAGS = -DFP_TYPE_DOUBLE -g
