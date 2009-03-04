@@ -1894,6 +1894,24 @@ fi
 
 # Perform the tests
 
+#### Check if compiler if 64 bit ####
+cat > $t <<EOT
+#include <stdio.h>
+
+int foo()
+{
+int x[sizeof(size_t) - 7];
+return x[0];
+}
+EOT
+test_cxx "whether compiler is 64bit" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_SIZET_64BIT $strictpass
+_ACEOF
+
+
+
 #### Check bool ####
 cat > $t <<EOT
 #include <stdlib.h>
@@ -1939,23 +1957,6 @@ test_cxx "whether long double works" "ok" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_LONG_DOUBLE_DEFINED $strictpass
-_ACEOF
-
-
-#### Check if compiler if 64 bit ####
-cat > $t <<EOT
-#include <stdio.h>
-
-int foo()
-{
-int x[sizeof(size_t) - 7];
-return x0;
-}
-EOT
-test_cxx "whether compiler is 64bit" "yes" "no" ""
-
-cat >>confdefs.h <<_ACEOF
-#define CMK_SIZET_64BIT $strictpass
 _ACEOF
 
 
