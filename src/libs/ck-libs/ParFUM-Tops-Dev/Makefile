@@ -6,7 +6,7 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 CUDAINC = -I$(CUDASDK)/common/inc -I$(CUDADIR)/include
 
 
-CCFLAGS = -DFP_TYPE_DOUBLE -g
+CCFLAGS = -DFP_TYPE_FLOAT -g
 #CCFLAGS = -g
 #CCFLAGS = -O
 
