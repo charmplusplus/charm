@@ -29,7 +29,25 @@ SelfCompute::~SelfCompute() {
 
 
 void SelfCompute::doCalc_callback() {
+
+  // DMK - DEBUG
+  #if ENABLE_USER_EVENTS != 0
+    double __start_time__ = CmiWallTimer();
+  #endif
+
+  // DMK - DEBUG
+  NetworkProgress;
+
   patchArrayProxy(thisIndex.x, thisIndex.y, thisIndex.z).forceCheckIn(numParticles, forceX, forceY, forceZ);
+
+  // DMK - DEBUG
+  NetworkProgress;
+
+  // DMK - DEBUG
+  #if ENABLE_USER_EVENTS != 0
+    double __end_time__ = CmiWallTimer();
+    traceUserBracketEvent(PROJ_USER_EVENT_SELFCOMPUTE_DOCALC_CALLBACK, __start_time__, __end_time__);
+  #endif
 }
 
 

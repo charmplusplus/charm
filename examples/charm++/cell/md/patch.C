@@ -92,22 +92,44 @@ void Patch::startIteration_common(int numIters) {
     fsz[i] = zero_vec;
   }
 
+  // DMK - DEBUG
+  NetworkProgress
+
   // Send particle data to self computes
   selfComputeArrayProxy(thisIndex.x, thisIndex.y, thisIndex.z).doCalc(numParticles, particleX, particleY, particleZ, particleQ);
 
   // Send particle data to pair computes
   const int index = PATCH_XYZ_TO_I(thisIndex.x, thisIndex.y, thisIndex.z);
   for (int i = 0; i < index; i++) {
+
+    // DMK - DEBUG
+    NetworkProgress
+
     pairComputeArrayProxy(i, index).patchData(numParticles, particleX, particleY, particleZ, particleQ, 1);
   }
   const int numPatches = numPatchesX * numPatchesY * numPatchesZ;
   for (int i = index + 1; i < numPatches; i++) {
+
+    // DMK - DEBUG
+    NetworkProgress
+
     pairComputeArrayProxy(index, i).patchData(numParticles, particleX, particleY, particleZ, particleQ, 0);
   }
+
+  // DMK - DEBUG
+  NetworkProgress
 }
 
 
 void Patch::forceCheckIn_callback() {
+
+  // DMK - DEBUG
+  #if ENABLE_USER_EVENTS != 0
+    double __start_time__ = CmiWallTimer();
+  #endif
+
+  // DMK - DEBUG
+  NetworkProgress
 
   // Decrement the counter containing the number of remaining computes that need to report forces
   //   back to this patch.  Once all computes have checked in, send a message to accelerated
@@ -116,9 +138,26 @@ void Patch::forceCheckIn_callback() {
   if (remainingForceCheckIns <= 0) {
     thisProxy(thisIndex.x, thisIndex.y, thisIndex.z).integrate();
   }
+
+  // DMK - DEBUG
+  NetworkProgress
+
+  // DMK - DEBUG
+  #if ENABLE_USER_EVENTS != 0
+    double __end_time__ = CmiWallTimer();
+    traceUserBracketEvent(PROJ_USER_EVENT_PATCH_FORCECHECKIN_CALLBACK, __start_time__, __end_time__);
+  #endif
 }
 
 void Patch::integrate_callback() {
+
+  // DMK - DEBUG
+  #if ENABLE_USER_EVENTS != 0
+    double __start_time__ = CmiWallTimer();
+  #endif
+
+  // DMK - DEBUG
+  NetworkProgress
 
   // Decrement the counter containing the number of remaining iterations.  If there are
   //   more iterations, do another one, otherwise, check in with main
@@ -128,6 +167,15 @@ void Patch::integrate_callback() {
   } else {
     mainProxy.patchCheckIn();
   }
+
+  // DMK - DEBUG
+  NetworkProgress
+
+  // DMK - DEBUG
+  #if ENABLE_USER_EVENTS != 0
+    double __end_time__ = CmiWallTimer();
+    traceUserBracketEvent(PROJ_USER_EVENT_PATCH_INTEGRATE_CALLBACK, __start_time__, __end_time__);
+  #endif
 }
 
 

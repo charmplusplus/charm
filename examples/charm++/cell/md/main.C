@@ -5,7 +5,7 @@
 #include "md_config.h"
 
 
-// Read-Onlys
+// Read-Only Variables
 CProxy_Main mainProxy;
 CProxy_Patch patchArrayProxy;
 CProxy_SelfCompute selfComputeArrayProxy;
@@ -62,6 +62,15 @@ Main::Main(CkArgMsg* msg) {
            numParticlesPerPatch,
            numStepsRemaining
 	  );
+
+  // DMK - DEBUG
+  #if ENABLE_USER_EVENTS != 0
+    traceRegisterUserEvent("Patch::forceCheckIn_callback()", PROJ_USER_EVENT_PATCH_FORCECHECKIN_CALLBACK);
+    traceRegisterUserEvent("Patch::integrate_callback()", PROJ_USER_EVENT_PATCH_INTEGRATE_CALLBACK);
+    traceRegisterUserEvent("SelfCompute::doCalc_callback()", PROJ_USER_EVENT_SELFCOMPUTE_DOCALC_CALLBACK);
+    traceRegisterUserEvent("PairCompute::doCalc_callback()", PROJ_USER_EVENT_PAIRCOMPUTE_DOCALC_CALLBACK);
+    traceRegisterUserEvent("CmiMachineProgressImpl", PROJ_USER_EVENT_MACHINEPROGRESS);
+  #endif
 
   // Spread a proxy to this main chare object to all processors via a read-only
   mainProxy = thisProxy;

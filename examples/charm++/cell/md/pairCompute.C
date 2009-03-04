@@ -70,6 +70,14 @@ void PairCompute::patchData(int numParticles, float* particleX, float* particleY
 
 void PairCompute::doCalc_callback() {
 
+  // DMK - DEBUG
+  #if ENABLE_USER_EVENTS != 0
+    double __start_time__ = CmiWallTimer();
+  #endif
+
+  // DMK - DEBUG
+  NetworkProgress;
+
   // Calculate the index of patch 0 and send force data back to it
   int p0Index = thisIndex.x;
   int p0IndexX = PATCH_I_TO_X(p0Index);
@@ -77,12 +85,24 @@ void PairCompute::doCalc_callback() {
   int p0IndexZ = PATCH_I_TO_Z(p0Index);
   patchArrayProxy(p0IndexX, p0IndexY, p0IndexZ).forceCheckIn(numParticles, forceX[0], forceY[0], forceZ[0]);
 
+  // DMK - DEBUG
+  NetworkProgress;
+
   // Calculate the index of patch 1 and send force data back to it
   int p1Index = thisIndex.y;
   int p1IndexX = PATCH_I_TO_X(p1Index);
   int p1IndexY = PATCH_I_TO_Y(p1Index);
   int p1IndexZ = PATCH_I_TO_Z(p1Index);
   patchArrayProxy(p1IndexX, p1IndexY, p1IndexZ).forceCheckIn(numParticles, forceX[1], forceY[1], forceZ[1]);
+
+  // DMK - DEBUG
+  NetworkProgress;
+
+  // DMK - DEBUG
+  #if ENABLE_USER_EVENTS != 0
+    double __end_time__ = CmiWallTimer();
+    traceUserBracketEvent(PROJ_USER_EVENT_PAIRCOMPUTE_DOCALC_CALLBACK, __start_time__, __end_time__);
+  #endif
 }
 
 
