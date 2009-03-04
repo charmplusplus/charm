@@ -5128,8 +5128,10 @@ int AMPI_Cart_rank(MPI_Comm comm, int *coords, int *rank) {
       if (periods[i] == 1)
 	if (coords[i] > 0)
 	  coords[i] %= dims[i];
-	else
-	  coords[i] += (((-coords[i] / dims[i]) + 1) * dims[i]) % dims[i];
+	else {
+	  //coords[i] += (((-coords[i] / dims[i]) + 1) * dims[i]) % dims[i];
+	  while (coords[i] < 0) coords[i]+=dims[i];
+	}
     r += prod * coords[i];
     prod *= dims[i];
   }
