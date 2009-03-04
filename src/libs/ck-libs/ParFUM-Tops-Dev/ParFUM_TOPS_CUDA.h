@@ -16,7 +16,7 @@
 
 #ifdef CUDA
 
-//#include <cutil.h>
+#include <cutil.h>
 
 /** A TopModelDevice contains structures for use by CUDA kernels */
 typedef struct {
@@ -36,11 +36,11 @@ typedef struct {
 } TopModelDevice;
 
 
-#define topElement_D_GetAttrib(m, e) (((char*)(m)->ElemDataDevice) + (e)*(m)->elem_attr_size)
+#define topElement_D_GetAttrib(m, e) (((char*)(m)->ElemDataDevice) + (e.idx)*(m)->elem_attr_size)
 
-#define topNode_D_GetAttrib(m, e) (((char*)(m)->NodeDataDevice) + (e)*(m)->node_attr_size)
+#define topNode_D_GetAttrib(m, n) (((char*)(m)->NodeDataDevice) + n*(m)->node_attr_size)
 
-#define topElement_D_GetNode(m, e, idx) (((m)->ElemConnDevice)[e*4 + idx])
+#define topElement_D_GetNode(m, e, i) (((m)->ElemConnDevice)[(e.idx) * 4 + i])
 
 #endif
 #endif
