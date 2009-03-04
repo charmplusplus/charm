@@ -159,6 +159,9 @@
 /* whether to use signal-safe system() */
 #undef CMK_SIGSAFE_SYSTEM
 
+/* whether size_t 64bit */
+#undef CMK_SIZET_64BIT
+
 /* including STL <foo> works */
 #undef CMK_STL_DONT_USE_DOT_H
 

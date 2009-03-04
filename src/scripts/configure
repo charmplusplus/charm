@@ -1942,6 +1942,23 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### Check if compiler if 64 bit ####
+cat > $t <<EOT
+#include <stdio.h>
+
+int foo()
+{
+int x[sizeof(size_t) - 7];
+return x0;
+}
+EOT
+test_cxx "whether compiler is 64bit" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_SIZET_64BIT $strictpass
+_ACEOF
+
+
 #### Check ucontext and FPU pointer ####
 cat > $t <<EOT
 #include <ucontext.h>

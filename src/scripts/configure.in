@@ -294,6 +294,19 @@ EOT
 test_cxx "whether long double works" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_LONG_DOUBLE_DEFINED, $strictpass, [whether long double works])
 
+#### Check if compiler if 64 bit ####
+cat > $t <<EOT
+#include <stdio.h>
+
+int foo()
+{
+int x[[sizeof(size_t) - 7]];
+return x[0];
+}
+EOT
+test_cxx "whether compiler is 64bit" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_SIZET_64BIT, $strictpass, [whether size_t 64bit])
+
 #### Check ucontext and FPU pointer ####
 cat > $t <<EOT
 #include <ucontext.h>
