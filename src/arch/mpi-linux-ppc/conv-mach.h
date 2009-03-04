@@ -8,14 +8,11 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_AMD64                                          1
 #define CMK_CONVERSE_MPI                                   1
 
 #define CMK_DEFAULT_MAIN_USES_COMMON_CODE                  1
 
 #define CMK_GETPAGESIZE_AVAILABLE                          1
-
-#define CMK_IS_HETERO                                      0
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
@@ -52,11 +49,8 @@
 #define CMK_TYPEDEF_FLOAT4 float
 #define CMK_TYPEDEF_FLOAT8 double
 
-#define CMK_64BIT    1
-
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
-
 
 #define CMK_WEB_MODE                                       1
 #define CMK_DEBUG_MODE                                     0
