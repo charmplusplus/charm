@@ -1,4 +1,4 @@
-CHARMC=$(HOME)/work/cvs/charm/net-darwin-x86-bigemulator/bin/charmc $(OPTS)
+CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = LB_Test.o
 PROJ= -tracemode projections -tracemode summary
