@@ -1566,18 +1566,26 @@ extern int _immRunning;
 #elif CMK_PPC_ASM
 #define CmiMemoryReadFence()               asm volatile("eieio":::"memory")
 #define CmiMemoryWriteFence()              asm volatile("eieio":::"memory")
-#define CmiMemoryAtomicIncrement(someInt)  asm ( \
-  "loop:  lwarx %1, 0, %0\n\t" \
-  "addi %2, %1, 1\n\t" \
-  "stwcx. %2, 0, %0\n\t" \
-  "bne- loop" \
-  : "=m"(someInt) : "m"(input) : "memory")
-#define CmiMemoryAtomicDecrement(someInt)  asm ( \
-  "loop:  lwarx %1, 0, %0\n\t" \
-  "subi %2, %1, 1\n\t" \
-  "stwcx. %2, 0, %0\n\t" \
-  "bne- loop" \
-  : "=m"(someInt) : "m"(input) : "memory")
+#define CmiMemoryAtomicIncrement(someInt)  asm volatile (      \
+        "loop0:\n\t" /* repeat until this succeeds */    \
+        "lwarx  6,0,%0\n\t" /* reserve the operand */   \
+        "add    6,6,%1\n\t" /* add incr to it */        \
+        "stwcx. 6,0,%0\n\t" /* put the sum back, and release it */      \
+        "bne- loop0" /* start-over on failure */ \
+        :       \
+        : "r" (&someInt), "r" (1)       \
+        : "r6"  \
+     ); 
+#define CmiMemoryAtomicDecrement(someInt)  asm volatile (      \
+        "loop1:\n\t" /* repeat until this succeeds */    \
+        "lwarx  6,0,%0\n\t" /* reserve the operand */   \
+        "sub    6,6,%1\n\t" /* add incr to it */        \
+        "stwcx. 6,0,%0\n\t" /* put the sum back, and release it */      \
+        "bne- loop1" /* start-over on failure */ \
+        :       \
+        : "r" (&someInt), "r" (1)       \
+        : "r6"  \
+     ); 
 #define CmiMemoryAtomicFetchAndInc(input,output) asm ( \
         "loop:  lwarx %1, 0, %0\n\t" \
         "addi %2, %1, 1\n\t" \
