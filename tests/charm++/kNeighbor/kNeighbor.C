@@ -30,6 +30,13 @@ public:
 
 //#define MSGSIZECNT 1
 
+int cmpFunc(const void *a, const void *b){
+   if(*(double *)a < *(double *)b) return -1;
+   if(*(double *)a > *(double *)b) return 1;
+   return 0;
+   
+}
+
 class Main: public CBase_Main {
 public:
     CProxy_Block array;
@@ -69,7 +76,7 @@ public:
 	gMsgSize = currentMsgSize;
 	#endif
 
-        currentStep = 0;
+        currentStep = -1;
 
         totalElems = numElems;
         timeRec = new double[numSteps];
@@ -86,13 +93,14 @@ public:
     }
 
     void beginIteration() {
-        currentStep++;
-        if (currentStep>numSteps) {
+	currentStep++;
+        if (currentStep==numSteps) {
             CkPrintf("kNeighbor program finished!\n");
-            CkCallback *cb = new CkCallback(CkIndex_Main::terminate(NULL), thisProxy);
-            array.ckSetReductionClient(cb);
-
-            array.printSts(numSteps);
+            //CkCallback *cb = new CkCallback(CkIndex_Main::terminate(NULL), thisProxy);
+            //array.ckSetReductionClient(cb);
+            //array.printSts(numSteps);
+	    terminate(NULL);
+	    return;
             //CkExit();
         }
 
@@ -119,8 +127,13 @@ public:
     void terminate(CkReductionMsg  *msg){
         delete msg;
         double total = 0.0;
-        for (int i=1; i<numSteps; i++) total += timeRec[i]*1e6;
-        total /= (numSteps-1);
+        for (int i=0; i<numSteps; i++) timeRec[i] = timeRec[i]*1e6;
+	qsort(timeRec, numSteps, sizeof(double), cmpFunc);
+        printf("Time stats: lowest: %f, median: %f, highest: %f\n", timeRec[0], timeRec[numSteps/2], timeRec[numSteps-1]);
+	int samples = 100;
+	if(numSteps<=samples) samples = numSteps-1;
+        for (int i=0; i<samples; i++) total += timeRec[i];
+        total /= samples;
         CkPrintf("The average time for each %d-kNeighbor iteration with msg size %d is %f (us)\n", STRIDEK, currentMsgSize, total);
         CkExit();
     }
