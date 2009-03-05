@@ -1876,7 +1876,11 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
   if (sizeof(size_t) > 8) size = size>>2;  /* 25% of machine address space! */
   while (1) { /* test out an allocation of this size */
 	range=mmap(NULL,size,PROT_READ|PROT_WRITE,
- 	             MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE,-1,0);
+ 	             MAP_PRIVATE|MAP_ANONYMOUS
+#if CMK_HAS_MMAP_NORESERVE
+                     |MAP_NORESERVE
+#endif
+                     ,-1,0);
 	if (range==bad_alloc) { /* mmap failed */
 		size=(double)size/shrink; /* shrink request */
 		if (size<=0) return 0; /* mmap doesn't work */
