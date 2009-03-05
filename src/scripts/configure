@@ -2597,6 +2597,23 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### check if mmap accepts MAP_NORESERVE ####
+cat > $t <<EOT
+#include <sys/types.h>
+#include <sys/mman.h>
+
+void *foo(void *a,int l) {
+	return mmap((caddr_t)a,l,PROT_READ+PROT_WRITE,
+                MAP_FIXED+MAP_PRIVATE+MAP_NORESERVE,-1,0);
+}
+EOT
+test_cxx "whether mmap() accepts MAP_NORESERVE" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_MMAP_NORESERVE $pass
+_ACEOF
+
+
 #### check if get_myaddress exists ####
 cat > $t <<EOT
 #include <rpc/rpc.h>

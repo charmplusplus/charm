@@ -87,6 +87,9 @@
 /* whether mmap() accepts MAP_ANON */
 #undef CMK_HAS_MMAP_ANON
 
+/* whether mmap() accepts MAP_NORESERVE */
+#undef CMK_HAS_MMAP_NORESERVE
+
 /* whether has Multiprocessing.h */
 #undef CMK_HAS_MULTIPROCESSING_H
 
