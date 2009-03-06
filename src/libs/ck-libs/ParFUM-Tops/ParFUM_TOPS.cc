@@ -35,7 +35,11 @@
 int tetFaces[] = {0,1,3,  0,2,1,  1,2,3,   0,3,2};
 int cohFaces[] = {0,1,2,  3,4,5};  
 
-
+int tops_lib_FP_Type_Size()
+{
+    static const int LIB_FP_TYPE_SIZE = sizeof(FP_TYPE);
+    return LIB_FP_TYPE_SIZE;
+}
 
 void setBasicTableReferences(TopModel* model)
 {

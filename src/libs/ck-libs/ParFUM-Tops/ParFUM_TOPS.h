@@ -106,7 +106,11 @@ public:
 	int whichFacet; // Will go from 0 to 3
 };
 
-
+/**
+ * Return the size of the FP Type the PTops
+ * library was compiled with, in bytes.
+ */
+int tops_lib_FP_Type_Size();
  
 /**
 Create and access a Tops model. Only call from Init
