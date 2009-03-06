@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 #define STRIDEK 3
-#define CALCPERSTEP 6
+#define CALCPERSTEP 100
 #define WRAPROUND 1
 #define BLOCKMAPPING 1
 #define USE_ARRAY_REDUCTION 0
