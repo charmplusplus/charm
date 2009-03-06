@@ -19,6 +19,7 @@
 
 #include "ParFUM_TOPS.h"
 #include "ParFUM.decl.h"
+#include "ParFUM.h"
 #include "ParFUM_internals.h"
 #ifdef CUDA
     #include <cuda.h>
@@ -79,7 +80,7 @@ void fillIDHash(TopModel* model)
 }
 
 /** Create a model  before partitioning. Given the number of nodes per element */
-TopModel* topModel_Create_Init(int nelnode){
+TopModel* topModel_Create_Init(){
   TopModel* model = new TopModel;
   memset(model, 0, sizeof(TopModel));
   
@@ -348,6 +349,7 @@ TopNode topModel_InsertNode(TopModel* m, double x, double y, double z){
   (*m->coord_T)(newNode,0)=x;
   (*m->coord_T)(newNode,1)=y;
   (*m->coord_T)(newNode,2)=z;
+  setTableReferences(m);
   return newNode;
 }
 
@@ -356,6 +358,7 @@ TopNode topModel_InsertNode(TopModel* m, float x, float y, float z){
   (*m->coord_T)(newNode,0)=x;
   (*m->coord_T)(newNode,1)=y;
   (*m->coord_T)(newNode,2)=z;
+  setTableReferences(m);
   return newNode;
 }
 
@@ -399,7 +402,8 @@ TopElement topModel_InsertElem(TopModel*m, TopElemType type, TopNode* nodes){
           newEl.id = FEM_add_element_local(m->mesh, conn, 10, type, 0, 0);  
   } 
  
-         return newEl; 
+  setTableReferences(m);
+        return newEl; 
 }
 
 /** Set id of an element

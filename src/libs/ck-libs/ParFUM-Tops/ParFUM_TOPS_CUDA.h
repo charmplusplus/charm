@@ -1,3 +1,4 @@
+
 /**
    @file
    @brief A ParFUM "Tops" compatibility layer API Definition
@@ -16,7 +17,7 @@
 
 #ifdef CUDA
 
-#include <cutil.h>
+/** #include <cutil.h> */
 
 /** A TopModelDevice contains structures for use by CUDA kernels */
 typedef struct {
@@ -38,7 +39,7 @@ typedef struct {
 
 #define topElement_D_GetAttrib(m, e) (((char*)(m)->ElemDataDevice) + (e)*(m)->elem_attr_size)
 
-#define topNode_D_GetAttrib(m, e) (((char*)(m)->NodeDataDevice) + (e)*(m)->node_attr_size)
+#define topNode_D_GetAttrib(m, n) (((char*)(m)->NodeDataDevice) + (n)*(m)->node_attr_size)
 
 #define topElement_D_GetNode(m, e, idx) (((m)->ElemConnDevice)[e*4 + idx])
 

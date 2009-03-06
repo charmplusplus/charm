@@ -186,7 +186,7 @@ TopElement topNodeElemItr_GetCurr (TopNodeElemItr* itr){
 	CkAssert(topNodeElemItr_IsValid(itr));
 	TopElement e;
 	// TODO Make this a const reference
-	FEM_VarIndexAttribute::ID elem = itr->model->mesh->n2e_getElem(itr->node, itr->current_index);
+	ElemID elem = itr->model->mesh->n2e_getElem(itr->node, itr->current_index);
 	e.id = elem.getSignedId();
 	e.type = elem.getUnsignedType();
 	return e;
@@ -223,7 +223,7 @@ void topFacetItr_Begin(TopFacetItr* itr){
 	// If it is not valid, then we go to the next one
 
 	TopElement currElem = topElemItr_GetCurr(itr->elemItr);
-	FEM_VarIndexAttribute::ID e = itr->model->mesh->e2e_getElem(currElem.id, itr->whichFacet, currElem.type);
+	ElemID e = itr->model->mesh->e2e_getElem(currElem.id, itr->whichFacet, currElem.type);
 	if (e < currElem) {
 		// Good, this facet is valid
 	} else {
@@ -255,7 +255,7 @@ void topFacetItr_Next(TopFacetItr* itr){
 		}
 
 		TopElement currElem = topElemItr_GetCurr(itr->elemItr);
-		FEM_VarIndexAttribute::ID e = itr->model->mesh->e2e_getElem(currElem.id, itr->whichFacet, currElem.type);
+		ElemID e = itr->model->mesh->e2e_getElem(currElem.id, itr->whichFacet, currElem.type);
 		
 		if (e < currElem) {
 			found = true;

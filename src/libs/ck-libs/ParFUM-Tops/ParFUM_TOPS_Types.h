@@ -3,6 +3,8 @@
 #define __PARFUM_TOPS_TYPES___H
 
 
+#include <ParFUM_Types.h> // for ElemID
+
 #ifdef FP_TYPE_FLOAT
 //#warning "Using floats for various things"
 typedef float FP_TYPE;
@@ -19,7 +21,6 @@ typedef double FP_TYPE_SYNC;
 
 
 
-
 /** Tops uses some bit patterns for these, but we just use TopNode as a signed value to represent the corresponding ParFUM node. A non-negative value is a local node, while a negative value is a ghost. */
 typedef long TopNode;
 
@@ -27,8 +28,7 @@ typedef long TopNode;
 typedef TopNode TopVertex;
 
 /** A type for an element */
-typedef FEM_VarIndexAttribute::ID TopElement;
-
+typedef ElemID TopElement;
 
 /** A type for a facet */
 class TopFacet{

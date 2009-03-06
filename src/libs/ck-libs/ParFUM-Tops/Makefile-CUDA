@@ -1,5 +1,5 @@
 CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc -cc $(CUDAC) -c++ $(CUDAC) $(OPTS)
+CHARMC=$(CDIR)/bin/charmc -cc $(CUDAC) -c++ $(CUDAC) $(OPTS) -nobs
 CUDADIR = /usr/local/cuda
 CUDASDK = $(HOME)/NVIDIA_CUDA_SDK
 CUDAC = $(CUDADIR)/bin/nvcc 
