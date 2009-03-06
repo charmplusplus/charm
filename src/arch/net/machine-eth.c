@@ -51,7 +51,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
 #if CMK_SHARED_VARS_UNAVAILABLE
   /*No comm. thread-- listen on sockets for incoming messages*/
   MACHSTATE(1,"idle commserver {")
-  CommunicationServer(Cmi_idlepoll?0:10, 0);
+  CommunicationServer(Cmi_idlepoll?0:10, COMM_SERVER_FROM_SMP);
   MACHSTATE(1,"} idle commserver")
 #else
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
@@ -755,11 +755,6 @@ void ReceiveDatagram()
  ***********************************************************************/
 void CmiHandleImmediate();
 
-/*
-0: from smp thread
-1: from interrupt
-2: from worker thread
-*/
 static void CommunicationServer(int sleepTime, int where)
 {
   unsigned int nTimes=0; /* Loop counter */
@@ -777,7 +772,7 @@ static void CommunicationServer(int sleepTime, int where)
 #endif
   CmiCommLock();
   /* in netpoll mode, only perform service to stdout */
-  if (Cmi_netpoll && where == 1) {
+  if (Cmi_netpoll && where == COMM_SERVER_FROM_INTERRUPT) {
     if (CmiStdoutNeedsService()) {CmiStdoutService();}
     CmiCommUnlock();
     return;

@@ -130,7 +130,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
   int sleep = 1;
   MACHSTATE(1,"CmiNotifyStillIdle {");
 #if 0
-  CommunicationServer(0,2);
+  CommunicationServer(0, COMM_SERVER_FROM_WORKER);
 #else
 #if MX_ACTIVE_MESSAGE
   CmiCommLock();
@@ -427,12 +427,12 @@ static void CommunicationServer(int withDelayMs, int where)
 
   MACHSTATE2(2,"CommunicationServer(%d) from %d {",withDelayMs, where)
 
-  if (where == 2 && machine_initiated_shutdown) {
+  if (where == COMM_SERVER_FROM_WORKER && machine_initiated_shutdown) {
       /* Converse exit, wait for pingCharm to quit */
     return;
   }
 
-  if (where == 1) {
+  if (where == COMM_SERVER_FROM_INTERRUPT) {
       /* don't service charmrun if converse exits, this fixed a hang bug */
     if (!machine_initiated_shutdown) ServiceCharmrun_nolock();
     return;
@@ -445,7 +445,7 @@ static void CommunicationServer(int withDelayMs, int where)
   CmiCommUnlock();
 
 #if CMK_IMMEDIATE_MSG
-  if (where == 0)
+  if (where == COMM_SERVER_FROM_SMP)
     CmiHandleImmediate();
 #endif
 

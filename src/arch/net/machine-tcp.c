@@ -69,7 +69,7 @@ static void CmiNotifyBeginIdle(CmiIdleState *s)
 static void CmiNotifyStillIdle(CmiIdleState *s)
 {
 #if CMK_SHARED_VARS_UNAVAILABLE
-  CommunicationServer(10, 0);
+  CommunicationServer(10, COMM_SERVER_FROM_SMP);
 #else
   int nSpins=20; /*Number of times to spin before sleeping*/
   s->nIdles++;
@@ -248,11 +248,6 @@ here-- WSAEINVAL, WSAENOTSOCK-- yet everything is actually OK.
  *
  ***********************************************************************/
 
-/*
-0: from smp thread
-1: from interrupt
-2: from worker thread
-*/
 static void CommunicationServer(int sleepTime, int where)
 {
   unsigned int nTimes=0; /* Loop counter */
@@ -274,7 +269,7 @@ static void CommunicationServer(int sleepTime, int where)
 #endif
   CmiCommLock();
   /* in netpoll mode, only perform service to stdout */
-  if (Cmi_netpoll && where == 1) {
+  if (Cmi_netpoll && where == COMM_SERVER_FROM_INTERRUPT) {
     if (CmiStdoutNeedsService()) {CmiStdoutService();}
     CmiCommUnlock();
     return;
@@ -299,7 +294,7 @@ static void CommunicationServer(int sleepTime, int where)
   CmiCommUnlock();
 
   /* when called by communication thread or in interrupt */
-  if (where == 0 || where == 1)
+  if (where == COMM_SERVER_FROM_SMP || where == COMM_SERVER_FROM_INTERRUPT)
   {
 #if CMK_IMMEDIATE_MSG
   CmiHandleImmediate();

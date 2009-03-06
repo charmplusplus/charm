@@ -294,11 +294,6 @@ int getDestHandler;
 #endif
 #endif
 
-/*
-0: from smp thread
-1: from interrupt
-2: from worker thread
-*/
 static void CommunicationServer(int withDelayMs, int where);
 
 void CmiHandleImmediate();
