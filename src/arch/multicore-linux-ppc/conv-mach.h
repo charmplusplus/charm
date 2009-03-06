@@ -74,7 +74,7 @@
 #define __ONESIDED_IMPL 1
 #define __ONESIDED_NO_HARDWARE  1
 
-#define CMK_MMAP_PROBE                                      1
+/*#define CMK_MMAP_PROBE                                      1 */
 
 /*#define CMK_PCQUEUE_LOCK                                   1  */
 /*#define CMK_USE_TLS_THREAD                                 1 */
