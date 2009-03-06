@@ -83,8 +83,9 @@ CmiIdleLock_checkMessage
 void CmiStateInit(int pe, int rank, CmiState state);
 void CommunicationServerInit();
 
-/************************ Win32 kernel SMP threads **************/
 static struct CmiStateStruct Cmi_default_state; /* State structure to return during startup */
+
+/************************ Win32 kernel SMP threads **************/
 
 #if CMK_SHARED_VARS_NT_THREADS
 
@@ -285,7 +286,7 @@ static CmiState     Cmi_state_vector;
 #else
 CmiState CmiGetState() {
 	CmiState ret=(CmiState)pthread_getspecific(Cmi_state_key);
-	if (ret==NULL) {
+	if (ret==NULL || Cmi_state_key == (pthread_key_t)(-1)) {
 		return &Cmi_default_state;
 	}
 	return ret;
