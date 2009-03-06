@@ -39,6 +39,8 @@ TODO:
 
 */
 
+#include "unistd.h"
+
 #include "charm++.h"
 #include "ck.h"
 #include "register.h"
@@ -982,7 +984,7 @@ void CkRegisterRestartHandler( )
 /**
  *  * @brief: function for killing a process                                             
  *   */
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if CMK_HAS_GETPID
 void killLocal(void *_dummy,double curWallTime){
         printf("[%d] KillLocal called at %.6lf \n",CkMyPe(),CmiWallTimer());          
         if(CmiWallTimer()<killTime-1){
