@@ -1566,22 +1566,25 @@ extern int _immRunning;
 #elif CMK_PPC_ASM
 #define CmiMemoryReadFence()               asm volatile("eieio":::"memory")
 #define CmiMemoryWriteFence()              asm volatile("eieio":::"memory")
-#define CmiMemoryAtomicIncrement(someInt)  asm volatile (      \
-        "loop0:\n\t" /* repeat until this succeeds */    \
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#define AT TOSTRING(__LINE__)
+#define CmiMemoryAtomicIncrement(someInt)   asm volatile (      \
+        "loop%=:\n\t"       /* repeat until this succeeds */    \
         "lwarx  6,0,%0\n\t" /* reserve the operand */   \
         "add    6,6,%1\n\t" /* add incr to it */        \
         "stwcx. 6,0,%0\n\t" /* put the sum back, and release it */      \
-        "bne- loop0" /* start-over on failure */ \
+        "bne- loop%="       /* start-over on failure */ \
         :       \
         : "r" (&someInt), "r" (1)       \
         : "r6"  \
-     ); 
+     );
 #define CmiMemoryAtomicDecrement(someInt)  asm volatile (      \
-        "loop1:\n\t" /* repeat until this succeeds */    \
+        "loop%=:\n\t"       /* repeat until this succeeds */    \
         "lwarx  6,0,%0\n\t" /* reserve the operand */   \
         "sub    6,6,%1\n\t" /* add incr to it */        \
         "stwcx. 6,0,%0\n\t" /* put the sum back, and release it */      \
-        "bne- loop1" /* start-over on failure */ \
+        "bne- loop%="       /* start-over on failure */ \
         :       \
         : "r" (&someInt), "r" (1)       \
         : "r6"  \
