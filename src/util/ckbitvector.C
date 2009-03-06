@@ -1,5 +1,5 @@
 #include <string.h> // for memset
-#include <charm++.h>
+#include "charm++.h"
 #include "ckbitvector.h"
 
 /* ************************************************************************
