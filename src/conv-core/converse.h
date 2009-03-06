@@ -1548,8 +1548,14 @@ extern int _immRunning;
 #if CMK_GCC_X86_ASM
 #define CmiMemoryReadFence()               __asm__ __volatile__("lfence" ::: "memory")
 #define CmiMemoryWriteFence()              __asm__ __volatile__("sfence" ::: "memory")
+#if 1
+#define CmiMemoryAtomicIncrement(someInt)  __asm__ __volatile__("lock incl (%0)" :: "r" (&(someInt)))
+#define CmiMemoryAtomicDecrement(someInt)  __asm__ __volatile__("lock decl (%0)" :: "r" (&(someInt)))
+#else
+/* this might be slightly faster, but does not compile with -O3 on net-darwin-x86_64 */
 #define CmiMemoryAtomicIncrement(someInt)  __asm__ __volatile__("lock incl %0" :: "m" (someInt))
 #define CmiMemoryAtomicDecrement(someInt)  __asm__ __volatile__("lock decl %0" :: "m" (someInt))
+#endif
 #define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__( \
         "movl $1, %1\n\t" \
         "lock\n\t" \
