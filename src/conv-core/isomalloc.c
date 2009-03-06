@@ -1876,7 +1876,10 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
   if (sizeof(size_t) > 8) size = size>>2;  /* 25% of machine address space! */
   while (1) { /* test out an allocation of this size */
 	range=mmap(NULL,size,PROT_READ|PROT_WRITE,
- 	             MAP_PRIVATE|MAP_ANONYMOUS
+ 	             MAP_PRIVATE
+#if CMK_HAS_MMAP_ANON
+		     |MAP_ANON
+#endif
 #if CMK_HAS_MMAP_NORESERVE
                      |MAP_NORESERVE
 #endif
