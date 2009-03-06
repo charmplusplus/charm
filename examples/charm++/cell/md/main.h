@@ -12,8 +12,8 @@
 //   if this is not a net-linux-cell build (for now, in this example program, it
 //   is not important if they do not actually align on non net-linux-cell builds).
 #if ((!(defined(CMK_CELL))) || (CMK_CELL == 0))
-  void* malloc_aligned(int size, int align) { return malloc(size); }
-  void free_aligned(void* ptr) { free(ptr); }
+  inline void* malloc_aligned(int size, int align) { return malloc(size); }
+  inline void free_aligned(void* ptr) { free(ptr); }
 #endif
 
 
