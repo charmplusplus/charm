@@ -72,6 +72,9 @@
 /* whether gethostname() exists */
 #undef CMK_HAS_GETHOSTNAME
 
+/* whether getpid() exists */
+#undef CMK_HAS_GETPID
+
 /* whether get_myaddress() exists */
 #undef CMK_HAS_GET_MYADDRESS
 

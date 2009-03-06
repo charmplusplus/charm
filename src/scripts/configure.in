@@ -633,6 +633,18 @@ EOT
 test_cxx "whether the poll() syscall exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass, [whether the poll() syscall exists])
 
+#### check if getpid exists ####
+cat > $t <<EOT
+#include <sys/types.h>
+#include <unistd.h>
+
+void foo(void *a) {
+    pid_t = getpid();
+}
+EOT
+test_cc "whether getpid() exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_GETPID, $pass, [whether getpid() exists])
+
 #### test for setpriority ###
 cat > $t <<EOT
 #include <sys/time.h>

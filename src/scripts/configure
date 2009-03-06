@@ -2393,6 +2393,22 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### check if getpid exists ####
+cat > $t <<EOT
+#include <sys/types.h>
+#include <unistd.h>
+
+void foo(void *a) {
+    pid_t = getpid();
+}
+EOT
+test_cc "whether getpid() exists" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_GETPID $pass
+_ACEOF
+
+
 #### test for setpriority ###
 cat > $t <<EOT
 #include <sys/time.h>
