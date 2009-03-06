@@ -1546,55 +1546,57 @@ extern int _immRunning;
 
 #if  CMK_SMP
 #if CMK_GCC_X86_ASM
-#define CmiMemoryReadFence()               asm volatile("lfence" ::: "memory")
-#define CmiMemoryWriteFence()              asm volatile("sfence" ::: "memory")
-#define CmiMemoryAtomicIncrement(someInt)  asm("lock incl %0" :: "m" (someInt))
-#define CmiMemoryAtomicDecrement(someInt)  asm("lock decl %0" :: "m" (someInt))
-#define CmiMemoryAtomicFetchAndInc(input,output) asm ( \
+#define CmiMemoryReadFence()               __asm__ __volatile__("lfence" ::: "memory")
+#define CmiMemoryWriteFence()              __asm__ __volatile__("sfence" ::: "memory")
+#define CmiMemoryAtomicIncrement(someInt)  __asm__ __volatile__("lock incl %0" :: "m" (someInt))
+#define CmiMemoryAtomicDecrement(someInt)  __asm__ __volatile__("lock decl %0" :: "m" (someInt))
+#define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__( \
         "movl $1, %1\n\t" \
         "lock\n\t" \
         "xaddl %1, %0" \
         : "=m"(input), "=r"(output) : "m"(input) : "memory")
 #elif CMK_GCC_IA64_ASM
-#define CmiMemoryReadFence()               asm volatile("mf" ::: "memory")
-#define CmiMemoryWriteFence()              asm volatile("mf" ::: "memory")
+#define CmiMemoryReadFence()               __asm__ __volatile__("mf" ::: "memory")
+#define CmiMemoryWriteFence()              __asm__ __volatile__("mf" ::: "memory")
 #define CmiMemoryAtomicIncrement(someInt)  { int someInt_private; \
-  asm volatile("fetchadd4.rel %0=[%1],1": "=r" (someInt_private): "r"(&someInt) :"memory") }
+  __asm__ __volatile__("fetchadd4.rel %0=[%1],1": "=r" (someInt_private): "r"(&someInt) :"memory") }
 #define CmiMemoryAtomicDecrement(someInt)  { int someInt_private; \
-  asm volatile("fetchadd4.rel %0=[%1],-1": "=r" (someInt_private): "r"(&someInt) :"memory") }
-#define CmiMemoryAtomicFetchAndInc(input,output) asm volatile("fetchadd4.rel %0=[%1],1": "=r" (output): "r"(&input) :"memory")
+  __asm__ __volatile__("fetchadd4.rel %0=[%1],-1": "=r" (someInt_private): "r"(&someInt) :"memory") }
+#define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__("fetchadd4.rel %0=[%1],1": "=r" (output): "r"(&input) :"memory")
 #elif CMK_PPC_ASM
-#define CmiMemoryReadFence()               asm volatile("eieio":::"memory")
-#define CmiMemoryWriteFence()              asm volatile("eieio":::"memory")
+#define CmiMemoryReadFence()               __asm__ __volatile__("eieio":::"memory")
+#define CmiMemoryWriteFence()              __asm__ __volatile__("eieio":::"memory")
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 #define AT TOSTRING(__LINE__)
-#define CmiMemoryAtomicIncrement(someInt)   asm volatile (      \
+#define CmiMemoryAtomicIncrement(someInt)   { int someInt_private; \
+     __asm__ __volatile__ (      \
         "loop%=:\n\t"       /* repeat until this succeeds */    \
-        "lwarx  6,0,%0\n\t" /* reserve the operand */   \
-        "add    6,6,%1\n\t" /* add incr to it */        \
-        "stwcx. 6,0,%0\n\t" /* put the sum back, and release it */      \
+        "lwarx  %1,0,%2\n\t" /* reserve the operand */   \
+        "addi   %1,%1,1\n\t" /* add incr to it */        \
+        "stwcx. %1,0,%2\n\t" /* put the sum back, and release it */      \
         "bne- loop%="       /* start-over on failure */ \
-        :       \
-        : "r" (&someInt), "r" (1)       \
-        : "r6"  \
-     );
-#define CmiMemoryAtomicDecrement(someInt)  asm volatile (      \
+        : "=m"(someInt), "=&r"(someInt_private)      \
+        : "r" (&someInt), "m"(someInt)       \
+        : "memory"  \
+     ); }
+#define CmiMemoryAtomicDecrement(someInt)   { int someInt_private; \
+     __asm__ __volatile__ (      \
         "loop%=:\n\t"       /* repeat until this succeeds */    \
-        "lwarx  6,0,%0\n\t" /* reserve the operand */   \
-        "sub    6,6,%1\n\t" /* add incr to it */        \
-        "stwcx. 6,0,%0\n\t" /* put the sum back, and release it */      \
+        "lwarx  %1,0,%2\n\t" /* reserve the operand */   \
+        "subi   %1,%1,1\n\t" /* add incr to it */        \
+        "stwcx. %1,0,%2\n\t" /* put the sum back, and release it */      \
         "bne- loop%="       /* start-over on failure */ \
-        :       \
-        : "r" (&someInt), "r" (1)       \
-        : "r6"  \
-     ); 
-#define CmiMemoryAtomicFetchAndInc(input,output) asm ( \
-        "loop:  lwarx %1, 0, %0\n\t" \
-        "addi %2, %1, 1\n\t" \
-        "stwcx. %2, 0, %0\n\t" \
-        "bne- loop" \
-        : "=m"(input), "=r"(output) : "m"(input) : "memory")
+        : "=m"(someInt), "=&r"(someInt_private)      \
+        : "r" (&someInt), "m"(someInt)       \
+        : "memory"  \
+     ); }
+#define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__ ( \
+        "loop%=:  lwarx %1, 0, %2\n\t" \
+        "addi %1, %1, 1\n\t" \
+        "stwcx. %1, 0, %2\n\t" \
+        "bne- loop%=" \
+        : "=m"(input), "=&r"(output) : "r"(&input), "m"(input) : "memory")
 #else
 #define CMK_NO_ASM_AVAILABLE    1
 extern CmiNodeLock cmiMemoryLock;
