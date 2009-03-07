@@ -10,12 +10,8 @@
    @todo Support multiple models
    @todo Specify element types to be used via input vector in topModel_Create
 
-   @note FEM_DATA+0 holds the elemAttr or nodeAtt data
-   @note FEM_DATA+1 holds the id
-   @note FEM_DATA+2 holds nodal coordinates
-   @note FEM_CONN holds the element connectivity
-
 */
+
 
 #include "ParFUM_TOPS.h"
 #include "ParFUM.decl.h"
@@ -28,6 +24,14 @@
 
 #include <stack>
 
+
+#define ATT_ELEM_ID (FEM_DATA+0)
+#define ATT_ELEM_N2E_CONN (FEM_DATA+1)
+#define ATT_ELEM_DATA (FEM_DATA+2)
+
+#define ATT_NODE_ID (FEM_DATA+0)
+#define ATT_NODE_COORD (FEM_DATA+1)
+#define ATT_NODE_DATA (FEM_DATA+2)
 
 #undef DEBUG
 #define DEBUG 0
@@ -42,31 +46,37 @@ int tops_lib_FP_Type_Size()
     return LIB_FP_TYPE_SIZE;
 }
 
-void setBasicTableReferences(TopModel* model)
-{
-  model->ElemConn_T = &((FEM_IndexAttribute*)model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_CONN,""))->get();
-  model->node_id_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+0,""))->getInt();
-  model->elem_id_T = &((FEM_DataAttribute*)model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_DATA+0,""))->getInt();
-  model->n2eConn_T = &((FEM_DataAttribute*)model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_DATA+1,""))->getInt();
 
-#ifdef FP_TYPE_FLOAT
-  model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+1,""))->getFloat();
-#else
-  model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+1,""))->getDouble();
-#endif
-}
 
+// Set the pointers in the model to point to the data stored by the ParFUM framework.
+// If the number of nodes or elements increases, then this function should be called
+// because the attribute arrays may have been resized, after which the old pointers
+// would be invalid.
 void setTableReferences(TopModel* model)
 {
-    setBasicTableReferences(model);
-    model->ElemData_T = &((FEM_DataAttribute*)model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_DATA+2,""))->getChar();
-    FEM_Entity* ghost = model->mesh->elem[TOP_ELEMENT_TET4].getGhost();
-    if (ghost)
-        model->GhostElemData_T = &((FEM_DataAttribute*)ghost->lookup(FEM_DATA+2,""))->getChar();
-    model->NodeData_T = &((FEM_DataAttribute*)model->mesh->node.lookup(FEM_DATA+2,""))->getChar();
-    ghost = model->mesh->node.getGhost();
-    if (ghost)
-        model->GhostNodeData_T = &((FEM_DataAttribute*)ghost->lookup(FEM_DATA+2,""))->getChar();
+  model->ElemConn_T = &((FEM_IndexAttribute*)model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_CONN,""))->get();
+  model->elem_id_T = &((FEM_DataAttribute*)model->mesh->elem[TOP_ELEMENT_TET4].lookup(ATT_ELEM_ID,""))->getInt();
+  model->n2eConn_T = &((FEM_DataAttribute*)model->mesh->elem[TOP_ELEMENT_TET4].lookup(ATT_ELEM_N2E_CONN, ""))->getInt();
+
+  model->node_id_T = &((FEM_DataAttribute*)model->mesh->node.lookup(ATT_NODE_ID,""))->getInt();
+
+#ifdef FP_TYPE_FLOAT
+  model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(ATT_NODE_COORD, ""))->getFloat();
+#else
+  model->coord_T = &((FEM_DataAttribute*)model->mesh->node.lookup(ATT_NODE_COORD, ""))->getDouble();
+#endif
+
+   
+  model->ElemData_T = &((FEM_DataAttribute*)model->mesh->elem[TOP_ELEMENT_TET4].lookup(ATT_ELEM_DATA,""))->getChar();
+  FEM_Entity* ghost = model->mesh->elem[TOP_ELEMENT_TET4].getGhost();
+  if (ghost)
+    model->GhostElemData_T = &((FEM_DataAttribute*)ghost->lookup(ATT_ELEM_DATA,""))->getChar();
+  
+  model->NodeData_T = &((FEM_DataAttribute*)model->mesh->node.lookup(ATT_NODE_DATA,""))->getChar();
+  ghost = model->mesh->node.getGhost();
+  if (ghost)
+    model->GhostNodeData_T = &((FEM_DataAttribute*)ghost->lookup(ATT_NODE_DATA,""))->getChar();
+
 }
 
 void fillIDHash(TopModel* model)
@@ -79,7 +89,13 @@ void fillIDHash(TopModel* model)
     }
 }
 
-/** Create a model  before partitioning. Given the number of nodes per element */
+/** Create a model  before partitioning. Given the number of nodes per element.
+    
+    After this call, the node data and element data CANNOT be set. They can only
+    be set in the driver. If the user tries to set the attribute values, the 
+    call will be ignored.
+
+ */
 TopModel* topModel_Create_Init(){
   TopModel* model = new TopModel;
   memset(model, 0, sizeof(TopModel));
@@ -98,23 +114,32 @@ TopModel* topModel_Create_Init(){
             and insertNode or insertElement would fail.
  */
   char temp_array[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+
+  // Allocate node id array
+  FEM_Mesh_data(which_mesh,FEM_NODE,ATT_NODE_ID,temp_array, 0, 1, FEM_INT, 1);
+
   // Allocate node coords
 #ifdef FP_TYPE_FLOAT 
-  FEM_Mesh_data(which_mesh,FEM_NODE,FEM_DATA+1,temp_array, 0, 1, FEM_FLOAT, 3);
+  FEM_Mesh_data(which_mesh,FEM_NODE,ATT_NODE_COORD,temp_array, 0, 1, FEM_FLOAT, 3);
 #else
-  FEM_Mesh_data(which_mesh,FEM_NODE,FEM_DATA+1,temp_array, 0, 1, FEM_DOUBLE, 3);
+  FEM_Mesh_data(which_mesh,FEM_NODE,ATT_NODE_COORD,temp_array, 0, 1, FEM_DOUBLE, 3);
 #endif
-  
+
+  // Don't allocate the ATT_NODE_DATA array because it will be large
+
+
+
   // Allocate element connectivity
   FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_TET4,FEM_CONN,temp_array, 0, 1, FEM_INDEX_0, 4);
   FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_COH3T3,FEM_CONN,temp_array, 0, 1, FEM_INDEX_0, 6);
 
   // Allocate element id array
-  FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_TET4,FEM_DATA+0,temp_array, 0, 1, FEM_INT, 1);
-  FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_COH3T3,FEM_DATA+0,temp_array, 0, 1, FEM_INT, 1);
+  FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_TET4,ATT_ELEM_ID,temp_array, 0, 1, FEM_INT, 1);
+  FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_COH3T3,ATT_ELEM_ID,temp_array, 0, 1, FEM_INT, 1);
 
-  // Allocate node id array
-  FEM_Mesh_data(which_mesh,FEM_NODE+0,FEM_DATA+0,temp_array, 0, 1, FEM_INT, 1);
+
+  // Don't allocate the ATT_ELEM_DATA array because it will be large
 
   
   FEM_Mesh_allocate_valid_attr(which_mesh, FEM_NODE);
@@ -127,11 +152,17 @@ TopModel* topModel_Create_Init(){
 
   // Setup the adjacency lists
   
-  setBasicTableReferences(model);
+  setTableReferences(model);
   return model;
 }
 
-/** Get the mesh for use in the driver. It will be partitioned already */
+/** Get the mesh for use in the driver. It will be partitioned already.
+
+    In the driver routine, after getting the model from this function,
+    the input data file should be reread to fill in the node and element 
+    data values which were not done in init.
+
+*/
 TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_attr_sz, void *mAtt){
 
     // This only uses a single mesh, so don't create multiple TopModels of these
@@ -154,17 +185,17 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
     // Allocate user model attributes
     FEM_Mesh_become_set(which_mesh);
     char* temp_array = (char*) malloc(model->num_local_elem * model->elem_attr_size);
-    FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_TET4,FEM_DATA+2,temp_array,0,model->num_local_elem,FEM_BYTE,model->elem_attr_size);
+    FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_TET4,ATT_ELEM_DATA,temp_array,0,model->num_local_elem,FEM_BYTE,model->elem_attr_size);
     free(temp_array);
  
     temp_array = (char*) malloc(model->num_local_node * model->node_attr_size);
-    FEM_Mesh_data(which_mesh,FEM_NODE+0,FEM_DATA+2,temp_array,0,model->num_local_node,FEM_BYTE,model->node_attr_size);
+    FEM_Mesh_data(which_mesh,FEM_NODE,ATT_NODE_DATA,temp_array,0,model->num_local_node,FEM_BYTE,model->node_attr_size);
     free(temp_array);
 
-    
+
     const int connSize = model->mesh->elem[TOP_ELEMENT_TET4].getConn().width();
     temp_array = (char*) malloc(model->num_local_node * connSize);
-    FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_TET4,FEM_DATA+1,temp_array, 0, 1, FEM_INT, connSize);
+    FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_TET4,ATT_ELEM_N2E_CONN,temp_array, 0, 1, FEM_INT, connSize);
     free(temp_array);
 
     setTableReferences(model);
@@ -190,7 +221,7 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
     FEM_Mesh_create_node_elem_adjacency(which_mesh);
     FEM_Mesh* mesh = FEM_Mesh_lookup(which_mesh, "topModel_Create_Driver");
     FEM_DataAttribute * at = (FEM_DataAttribute*) 
-        model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_DATA+1,"topModel_Create_Driver");
+        model->mesh->elem[TOP_ELEMENT_TET4].lookup(ATT_ELEM_N2E_CONN,"topModel_Create_Driver");
     int* n2eTable  = at->getInt().getData();
 
     FEM_IndexAttribute * iat = (FEM_IndexAttribute*) 
@@ -253,7 +284,7 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
 
     /** Copy element Attribute array to device global memory *//*
     {
-        FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->elem[FEM_ELEM+TOP_ELEMENT_TET4].lookup(FEM_DATA+0,"topModel_Create_Driver");
+        FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->elem[FEM_ELEM+TOP_ELEMENT_TET4].lookup(ATT_ELEM_DATA,"topModel_Create_Driver");
         AllocTable2d<unsigned char> &dataTable  = at->getChar();
         unsigned char *ElemData = dataTable.getData();
         int size = dataTable.size()*dataTable.width();
@@ -264,7 +295,7 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
 
     /** Copy node Attribute array to device global memory */
     {
-        FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->node.lookup(FEM_DATA+0,"topModel_Create_Driver");
+        FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->node.lookup(ATT_NODE_DATA,"topModel_Create_Driver");
         AllocTable2d<unsigned char> &dataTable  = at->getChar();
         unsigned char *NodeData = dataTable.getData();
         int size = dataTable.size()*dataTable.width();
@@ -431,39 +462,48 @@ int topModel_GetNElem (TopModel* m){
 
 	The attribute passed in must be a contiguous data structure with size equal to the value node_attr_sz passed into topModel_Create_Driver() and topModel_Create_Init()
 
-	The supplied attribute will be copied into the ParFUM attribute array "FEM_DATA+0". Then ParFUM will own this data. The function topNode_GetAttrib() will return a pointer to the copy owned by ParFUM. If a single material parameter attribute is used for multiple nodes, each node will get a separate copy of the array. Any subsequent modifications to the data will only be reflected at a single node.
+	The supplied attribute will be copied into the ParFUM attribute array "ATT_NODE_DATA. Then ParFUM will own this data. The function topNode_GetAttrib() will return a pointer to the copy owned by ParFUM. If a single material parameter attribute is used for multiple nodes, each node will get a separate copy of the array. Any subsequent modifications to the data will only be reflected at a single node.
 
 	The user is responsible for deallocating parameter d passed into this function.
 
 */
 void topNode_SetAttrib(TopModel* m, TopNode n, void* d)
 {
+  if(m->NodeData_T == NULL){
+    CkPrintf("Ignoring call to topNode_SetAttrib\n");
+    return;
+  } else {
     unsigned char* data;
     if (n < 0) {
-    	assert(m->GhostNodeData_T);
-    	data = m->GhostNodeData_T->getData();
-        n = FEM_From_ghost_index(n);
+      assert(m->GhostNodeData_T);
+      data = m->GhostNodeData_T->getData();
+      n = FEM_From_ghost_index(n);
     } else {
-    	assert(m->NodeData_T);
-        data = m->NodeData_T->getData();
+      assert(m->NodeData_T);
+      data = m->NodeData_T->getData();
     }
     memcpy(data + n*m->node_attr_size, d, m->node_attr_size);
+  }
 }
 
 /** @brief Set attribute of an element
 See topNode_SetAttrib() for description
 */
 void topElement_SetAttrib(TopModel* m, TopElement e, void* d){
-  unsigned char *data;
-  if (e.id < 0) {
-      data = m->GhostElemData_T->getData();
-      e.id = FEM_From_ghost_index(e.id);
-  } else {
-    data = m->ElemData_T->getData();
-  }
-  memcpy(data + e.id*m->elem_attr_size, d, m->elem_attr_size);
+   if(m->ElemData_T == NULL){
+     CkPrintf("Ignoring call to topElement_SetAttrib\n");
+     return;
+   } else {
+     unsigned char *data;
+     if (e.id < 0) {
+       data = m->GhostElemData_T->getData();
+       e.id = FEM_From_ghost_index(e.id);
+     } else {
+       data = m->ElemData_T->getData();
+     }
+     memcpy(data + e.id*m->elem_attr_size, d, m->elem_attr_size);
+   }
 }
-
 
 /** @brief Get elem attribute
 See topNode_SetAttrib() for description
@@ -511,11 +551,13 @@ TopNode topModel_GetNodeAtId(TopModel* m, TopID id)
     if (hashnode != -1) return hashnode;
 
     AllocTable2d<int>* ghostNode_id_T = &((FEM_DataAttribute*)m->mesh->
-            node.getGhost()->lookup(FEM_DATA+0,""))->getInt();
-    for(int i=0; i<ghostNode_id_T->size(); ++i) {
+            node.getGhost()->lookup(ATT_NODE_ID,""))->getInt();
+    if(ghostNode_id_T != NULL){
+      for(int i=0; i<ghostNode_id_T->size(); ++i) {
         if((*ghostNode_id_T)(i,0)==id){
-            return FEM_To_ghost_index(i);
+	  return FEM_To_ghost_index(i);
         }
+      }
     }
     return -1;
 }
@@ -527,22 +569,25 @@ TopNode topModel_GetNodeAtId(TopModel* m, TopID id)
  */
 TopElement topModel_GetElemAtId(TopModel*m,TopID id)
 {
-	TopElement e;
-	e.id = m->elemIDHash->get(id)-1;
-	e.type = TOP_ELEMENT_TET4;
-	
-	if (e.id != -1) return e;
-
-    AllocTable2d<int>* ghostElem_id_T = &((FEM_DataAttribute*)m->mesh->
-            elem[TOP_ELEMENT_TET4].getGhost()->lookup(FEM_DATA+0,""))->getInt();
+  TopElement e;
+  e.id = m->elemIDHash->get(id)-1;
+  e.type = TOP_ELEMENT_TET4;
+  
+  if (e.id != -1) return e;
+  
+  AllocTable2d<int>* ghostElem_id_T = &((FEM_DataAttribute*)m->mesh->
+					elem[TOP_ELEMENT_TET4].getGhost()->lookup(ATT_ELEM_ID,""))->getInt();
+  
+  if(ghostElem_id_T  != NULL) {
     for(int i=0; i<ghostElem_id_T->size(); ++i) {
-        if((*ghostElem_id_T)(i,0)==id){
-            e.id = FEM_To_ghost_index(i);
-            e.type = TOP_ELEMENT_TET4;
-        	return e;
-        }
+      if((*ghostElem_id_T)(i,0)==id){
+	e.id = FEM_To_ghost_index(i);
+	e.type = TOP_ELEMENT_TET4;
+	return e;
+      }
     }
-    
+  }
+  
     e.id = -1;
     e.type = TOP_ELEMENT_TET4;
 
@@ -586,7 +631,7 @@ int topElement_GetNNodes(TopModel* model, TopElement elem){
 void topNode_GetPosition(TopModel*model, TopNode node,double*x,double*y,double*z){
     if (node < 0) {
         AllocTable2d<double>* table = &((FEM_DataAttribute*)model->
-                mesh->node.getGhost()->lookup(FEM_DATA+1,""))->getDouble();
+                mesh->node.getGhost()->lookup(ATT_NODE_COORD,""))->getDouble();
         node = FEM_From_ghost_index(node);
         *x = (*table)(node,0);
         *y = (*table)(node,1);
@@ -602,7 +647,7 @@ void topNode_GetPosition(TopModel*model, TopNode node,double*x,double*y,double*z
 void topNode_GetPosition(TopModel*model, TopNode node,float*x,float*y,float*z){
     if (node < 0) {
         AllocTable2d<float>* table = &((FEM_DataAttribute*)model->
-                mesh->node.getGhost()->lookup(FEM_DATA+1,""))->getFloat();
+                mesh->node.getGhost()->lookup(ATT_NODE_COORD,""))->getFloat();
         node = FEM_From_ghost_index(node);
         *x = (*table)(node,0);
         *y = (*table)(node,1);

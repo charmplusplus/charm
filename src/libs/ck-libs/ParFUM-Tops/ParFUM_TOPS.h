@@ -22,7 +22,8 @@
 
 
 /** A tops model is roughly equivalent to a ParFUM FEM_Mesh object */
-typedef struct{
+class TopModel{
+ public:
     FEM_Mesh *mesh;
     void *mAtt;
     AllocTable2d<unsigned char> *ElemData_T;
@@ -52,7 +53,7 @@ typedef struct{
     TopModelDevice device_model;
 #endif
 
-} TopModel;
+};
 
 
 
@@ -116,7 +117,9 @@ int tops_lib_FP_Type_Size();
 Create and access a Tops model. Only call from Init
 Currently only one model can be created. To extend, each model must just reference a different FEM_Mesh object
 */
+//TopModel* topModel_Create_Init(int ElemAtt_size, int NodeAtt_size, int ModelAtt_size);
 TopModel* topModel_Create_Init();
+
 
 /** Create and access a Tops model. Only call from Driver */
 TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_attr_sz, void* mAtt);
