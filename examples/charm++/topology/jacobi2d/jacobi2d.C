@@ -41,13 +41,13 @@
 #define wrap_x(a)  (((a)+num_chare_x)%num_chare_x)
 #define wrap_y(a)  (((a)+num_chare_y)%num_chare_y)
 
-#define MAX_ITER	100
+#define MAX_ITER	25
 #define LEFT		1
 #define RIGHT		2
 #define TOP		3
 #define BOTTOM		4
 
-#define USE_TOPOMAP	1
+#define USE_TOPOMAP	0
 
 double startTime;
 double endTime;
@@ -104,13 +104,14 @@ class Main : public CBase_Main
 
       //Start the computation
       iterations = 0;
-      startTime = CmiWallTimer();
       array.begin_iteration();
     }
 
     // Each worker reports back to here when it completes an iteration
     void report(CkReductionMsg *msg) {
       iterations++;
+      if(iterations == 5)
+	startTime = CmiWallTimer();
       double error = *((double *)msg->getData());
 
       if (error > 0.001 && iterations < MAX_ITER) {
@@ -118,7 +119,7 @@ class Main : public CBase_Main
       } else {
 	CkPrintf("Completed %d iterations\n", iterations);
         endTime = CmiWallTimer();
-        CkPrintf("Time elapsed: %f\n", endTime - startTime);
+        CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(MAX_ITER-5));
         CkExit();
       }
     }
