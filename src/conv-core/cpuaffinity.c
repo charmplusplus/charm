@@ -48,6 +48,8 @@ long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr
 static int excludecore[8] = {-1};
 static int excludecount = 0;
 
+static int affinity_doneflag = 0;
+
 static int in_exclude(int core)
 {
   int i;
@@ -338,6 +340,14 @@ void CmiInitCPUAffinity(char **argv)
          however it seems to be reportedly slower if it is floating */
     set_myaffinitity(num_cores()-1);
     CmiNodeAllBarrier();
+#if CMK_MACHINE_PROGRESS_DEFINED
+    while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
+#else
+#if CMK_SMP
+    #error "Machine progress call needs to be implemented for cpu affinity!"
+#endif
+#endif
+    CmiNodeAllBarrier();
     return;    /* comm thread return */
   }
 
@@ -383,6 +393,8 @@ void CmiInitCPUAffinity(char **argv)
 
     // receive broadcast from PE 0
   CmiDeliverSpecificMsg(cpuAffinityRecvHandlerIdx);
+  affinity_doneflag++;
+  CmiNodeAllBarrier();
 }
 
 #else           /* not supporting affinity */
