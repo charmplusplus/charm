@@ -1,4 +1,5 @@
-
+#ifndef __SSE_FLOAT_H__
+#define __SSE_FLOAT_H__
 
 #include<emmintrin.h>
 #include<iostream>
@@ -145,4 +146,4 @@ int main()
 
 */
 
-
+#endif // __SSE_FLOAT_H__

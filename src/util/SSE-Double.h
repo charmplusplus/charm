@@ -1,4 +1,5 @@
-
+#ifndef __SSE_DOUBLE_H__
+#define __SSE_DOUBLE_H__
 
 #include<emmintrin.h>
 
@@ -138,3 +139,4 @@ int main()
 
 
 
+#endif //__SSE_DOUBLE_H__
