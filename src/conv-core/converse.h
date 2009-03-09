@@ -1558,8 +1558,7 @@ extern int _immRunning;
 #endif
 #define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__( \
         "movl $1, %1\n\t" \
-        "lock\n\t" \
-        "xaddl %1, %0" \
+        "lock xaddl %1, %0" \
         : "=m"(input), "=r"(output) : "m"(input) : "memory")
 #elif CMK_GCC_IA64_ASM
 #define CmiMemoryReadFence()               __asm__ __volatile__("mf" ::: "memory")
