@@ -2355,7 +2355,7 @@ static void ConverseRunPE(int everReturn)
 #if MEMORYUSAGE_OUTPUT
   memoryusage_counter = 0;
 #endif
-#if CMK_USE_GM || CMK_USE_MX || CMK_MULTICORE
+#if CMK_USE_GM || CMK_USE_MX
   if (Cmi_charmrun_fd != -1)
 #endif
   {
@@ -2575,12 +2575,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 #if CMK_MULTICORE
   if (CmiGetArgFlagDesc(argv,"+commthread","Use communication thread")) {
     Cmi_commthread = 1;
+    _Cmi_noprocforcommthread = 1;   /* worker thread go sleep */
     if (CmiMyPe() == 0) CmiPrintf("Charm++> communication thread is launched in multicore version. \n");
-  }
-  else {      /* run without comm thread */
-#if CMK_SHARED_VARS_POSIX_THREADS_SMP
-    _Cmi_noprocforcommthread = 1;   /* worker thread can't go sleep */
-#endif
   }
 #endif
 
