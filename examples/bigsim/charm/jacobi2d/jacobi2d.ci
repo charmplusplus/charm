@@ -1,0 +1,25 @@
+mainmodule jacobi2d {
+  readonly CProxy_Main mainProxy;
+  readonly int arrayDimX;
+  readonly int arrayDimY;
+  readonly int blockDimX;
+  readonly int blockDimY;
+  readonly int num_chare_x;
+  readonly int num_chare_y;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void report(CkReductionMsg *msg);
+  };
+
+  array [2D] Jacobi {
+    entry Jacobi(void);
+    entry void begin_iteration(void);
+    entry void receiveGhosts(int dir, int size, double gh[size]);
+  };
+
+  group JacobiMap : CkArrayMap {
+    entry JacobiMap(int x, int y);
+  };
+
+};
