@@ -64,50 +64,6 @@ static void add_exclude(int core)
   excludecore[excludecount++] = core;
 }
 
-int num_cores(void) {
-  int a = 1;
-#ifdef _WIN32
-struct _SYSTEM_INFO sysinfo;
-#endif  
-
-  /* Allow the user to override the number of CPUs for use
-     in scalability testing, debugging, etc. */
-  char *forcecount = getenv("VMDFORCECPUCOUNT");
-  if (forcecount != NULL) {
-    if (sscanf(forcecount, "%d", &a) == 1) {
-      return a; /* if we got a valid count, return it */
-    } else {
-      a = 1;      /* otherwise use the real available hardware CPU count */
-    }
-  }
-
-#if defined(__APPLE__) 
-  a = MPProcessorsScheduled(); /* Number of active/running CPUs */
-#endif
-
-#ifdef _WIN32
-  //struct _SYSTEM_INFO sysinfo;  
-  GetSystemInfo(&sysinfo);
-  a = sysinfo.dwNumberOfProcessors; /* total number of CPUs */
-#endif /* _MSC_VER */
-
-
-#ifdef _SC_NPROCESSORS_ONLN
-  a = sysconf(_SC_NPROCESSORS_ONLN); /* number of active/running CPUs */
-#elif defined(_SC_CRAY_NCPU)
-  a = sysconf(_SC_CRAY_NCPU);
-#elif defined(_SC_NPROC_ONLN)
-  a = sysconf(_SC_NPROC_ONLN); /* number of active/running CPUs */
-#endif
-  if (a == -1) a = 1;
-
-#if defined(ARCH_HPUX11) || defined(ARCH_HPUX10)
-  a = mpctl(MPC_GETNUMSPUS, 0, 0); /* total number of CPUs */
-#endif /* HPUX */
-
-  return a;
-}
-
 /* This implementation assumes the default x86 CPU mask size used by Linux */
 /* For a large SMP machine, this code should be changed to use a variable sized   */
 /* CPU affinity mask buffer instead, as the present code will fail beyond 32 CPUs */
@@ -293,7 +249,7 @@ static void cpuAffinityRecvHandler(void *msg)
   m->ranks = (int *)((char*)m + sizeof(rankMsg));
   myrank = m->ranks[CmiMyPe()];
 
-  /* CmiPrintf("[%d %d] rank: %d\n", CmiMyNode(), CmiMyPe(), myrank); */
+  /*CmiPrintf("[%d %d] set to core #: %d\n", CmiMyNode(), CmiMyPe(), myrank);*/
 
   if (-1 != set_myaffinitity(myrank)) {
     DEBUGP(("Processor %d is bound to core #%d\n", CmiMyPe(), myrank));
@@ -319,6 +275,11 @@ void CmiInitCPUAffinity(char **argv)
 
   while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity")) 
     if (CmiMyRank() == 0) add_exclude(exclude);
+  
+  char *coremap = NULL;
+  CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping");
+  if (coremap!=NULL && excludecount>0)
+    CmiAbort("Charm++> +excludecore and +coremap can not be used togetehr!");
 
   cpuAffinityHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityHandler);
@@ -333,12 +294,14 @@ void CmiInitCPUAffinity(char **argv)
        for (i=1; i<excludecount; i++) CmiPrintf(" %d", excludecore[i]);
        CmiPrintf(".\n");
      }
+     if (coremap!=NULL)
+       CmiPrintf("Charm++> cpuaffinity map : %s\n", coremap);
   }
 
-  if (CmiMyPe() >= CmiNumPes()) {
+  if (CmiMyPe() >= CmiNumPes()) {         /* this is comm trhead */
       /* comm thread either can float around, or pin down to the last rank.
          however it seems to be reportedly slower if it is floating */
-    set_myaffinitity(num_cores()-1);
+    set_myaffinitity(CmiNumCores()-1);
     CmiNodeAllBarrier();
 #if CMK_MACHINE_PROGRESS_DEFINED
     while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
@@ -349,6 +312,23 @@ void CmiInitCPUAffinity(char **argv)
 #endif
     CmiNodeAllBarrier();
     return;    /* comm thread return */
+  }
+
+  if (coremap!= NULL) {
+    /* each processor finds its mapping */
+    int i, ct=1, myrank;
+    for (i=0; i<strlen(coremap); i++) if (coremap[i]==',') ct++;
+    ct = CmiMyPe()%ct;
+    i=0;
+    while(ct>0) if (coremap[i++]==',') ct--;
+    myrank = atoi(coremap+i);
+    /* printf("Charm++> set PE%d on core #%d\n", CmiMyPe(), myrank); */
+    CmiNodeAllBarrier();
+    if (myrank >= CmiNumCores()) CmiAbort("Invalid core mapping - set to a invalid core number.");
+    if (set_myaffinitity(myrank) == -1) CmiAbort("set_cpu_affinity abort!");
+    if (CmiMyRank() == 0) affinity_doneflag = CmiMyNodeSize(); /* release comm thread */
+    CmiNodeAllBarrier();
+    return;
   }
 
 #if 0
@@ -376,7 +356,7 @@ void CmiInitCPUAffinity(char **argv)
   CmiSetHandler((char *)msg, cpuAffinityHandlerIdx);
   msg->pe = CmiMyPe();
   msg->ip = myip;
-  msg->ncores = num_cores();
+  msg->ncores = CmiNumCores();
   msg->rank = 0;
   CmiSyncSendAndFree(0, sizeof(hostnameMsg), (void *)msg);
 
