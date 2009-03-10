@@ -269,6 +269,7 @@ void CmiInitCPUAffinity(char **argv)
   static skt_ip_t myip;
   int ret, i, exclude;
   hostnameMsg  *msg;
+  char *coremap = NULL;
  
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
@@ -276,7 +277,6 @@ void CmiInitCPUAffinity(char **argv)
   while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity")) 
     if (CmiMyRank() == 0) add_exclude(exclude);
   
-  char *coremap = NULL;
   CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping");
   if (coremap!=NULL && excludecount>0)
     CmiAbort("Charm++> +excludecore and +coremap can not be used togetehr!");
