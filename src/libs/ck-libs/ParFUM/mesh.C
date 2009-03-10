@@ -2324,6 +2324,38 @@ FORTRAN_AS_C(FEM_COUNT_VALID,
              (int *fem_mesh, int *entity_type),  (*fem_mesh, *entity_type) )
 
 
+CDECL int FEM_is_node_shared(int mesh_id, int idx) {
+    FEM_Mesh* mesh = FEM_Mesh_lookup(mesh_id,"FEM_is_node_shared");
+    const IDXL_Rec *rec = mesh->node.shared.getRec(idx);
+    return (int)(rec != NULL);
+}
+FORTRAN_AS_C(FEM_IS_NODE_SHARED,
+        FEM_is_node_shared,
+        fem_is_node_shared,
+        (int* fem_mesh, int* node_idx), (*fem_mesh, *node_idx))
+
+
+CDECL int FEM_find_node_owner(int mesh_id, int idx) {
+    FEM_Mesh* mesh = FEM_Mesh_lookup(mesh_id,"FEM_find_node_owner");
+    const IDXL_Rec *rec = mesh->node.shared.getRec(idx);
+    int min = FEM_My_partition();
+    if (!rec) {
+        return min;
+    }
+    for (int i=0; i<rec->getShared(); i++) {
+        int chk = rec->getChk(i);
+        if (chk < min) {
+            min = chk;
+        }
+    }
+    return min;
+}
+FORTRAN_AS_C(FEM_FIND_NODE_OWNER,
+        FEM_find_node_owner,
+        fem_find_node_owner,
+        (int* fem_mesh, int* node_idx), (*fem_mesh, *node_idx))
+
+
 // Set coordinates for some entity's item number idx
 void FEM_set_entity_coord2(int mesh, int entityType, int idx, double x, double y){
   FEM_Mesh *m=FEM_Mesh_lookup(mesh,"FEM_Mesh_create_valid_elem");

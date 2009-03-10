@@ -236,7 +236,7 @@ extern "C" {
    */
   void FEM_Make_node_globalno(int fem_mesh,FEM_Comm_t comm_context);
 
-/* Communication: see idxlc.h */
+  /* Communication: see idxlc.h */
   IDXL_Layout_t FEM_Create_simple_field(int base_type,int vec_len);
   IDXL_Layout_t FEM_Create_field(int base_type, int vec_len, int init_offset, 
                        int distance);
@@ -275,6 +275,10 @@ extern "C" {
   void FEM_set_entity_invalid(int mesh, int entityType, int entityIdx);
   int FEM_is_valid(int mesh, int entityType, int entityIdx);
   int FEM_count_valid(int mesh, int entityType);
+
+  /* find shared nodes and determine ownership */
+  int FEM_is_node_shared(int mesh, int idx);
+  int FEM_find_node_owner(int mesh, int idx);
 
   /* Create and modify the Detected Topological and Geometric Mesh Features */
   void FEM_Mesh_detect_features(int fem_mesh);
