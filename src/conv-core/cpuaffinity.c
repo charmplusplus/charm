@@ -303,6 +303,7 @@ void CmiInitCPUAffinity(char **argv)
          however it seems to be reportedly slower if it is floating */
     set_myaffinitity(CmiNumCores()-1);
     CmiNodeAllBarrier();
+    if (coremap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
     while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
 #else
@@ -310,6 +311,7 @@ void CmiInitCPUAffinity(char **argv)
     #error "Machine progress call needs to be implemented for cpu affinity!"
 #endif
 #endif
+    }
     CmiNodeAllBarrier();
     return;    /* comm thread return */
   }
@@ -323,10 +325,12 @@ void CmiInitCPUAffinity(char **argv)
     while(ct>0) if (coremap[i++]==',') ct--;
     myrank = atoi(coremap+i);
     /* printf("Charm++> set PE%d on core #%d\n", CmiMyPe(), myrank); */
-    CmiNodeAllBarrier();
-    if (myrank >= CmiNumCores()) CmiAbort("Invalid core mapping - set to a invalid core number.");
+    if (myrank >= CmiNumCores()) {
+      CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", myrank, CmiNumCores(), CmiNumCores()-1);
+      CmiAbort("Invalid core number");
+    }
     if (set_myaffinitity(myrank) == -1) CmiAbort("set_cpu_affinity abort!");
-    if (CmiMyRank() == 0) affinity_doneflag = CmiMyNodeSize(); /* release comm thread */
+    CmiNodeAllBarrier();
     CmiNodeAllBarrier();
     return;
   }
