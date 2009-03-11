@@ -1304,6 +1304,13 @@ esac
 # DMK - ACCEL SUPPORT - If this is a cell build, add the spe code object to POST_LIBRARIES
 if [ $CMK_CELL -eq 1 ]
 then
+
+  if [ "$LANGUAGE" == "converse++" ]
+  then
+    # Include a "do nothing" register_accel_spe_funcs() function
+    POST_LIBRARIES="$POST_LIBRARIES -lnoAccelStub"
+  fi
+
   if [ "$LANGUAGE" == "charm++" ]
   then
 
