@@ -40,12 +40,24 @@
 int tetFaces[] = {0,1,3,  0,2,1,  1,2,3,   0,3,2};
 int cohFaces[] = {0,1,2,  3,4,5};  
 
+
 int tops_lib_FP_Type_Size()
 {
     static const int LIB_FP_TYPE_SIZE = sizeof(FP_TYPE);
     return LIB_FP_TYPE_SIZE;
 }
 
+
+void top_set_device(TopModel* m, TopDevice d)
+{
+    m->target_device = d;
+}
+
+
+TopDevice top_target_device(TopModel* m)
+{
+    return m->target_device;
+}
 
 
 // Set the pointers in the model to point to the data stored by the ParFUM framework.
@@ -163,7 +175,8 @@ TopModel* topModel_Create_Init(){
     data values which were not done in init.
 
 */
-TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_attr_sz, void *mAtt){
+TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
+        int node_attr_sz, int model_attr_sz, void *mAtt) {
 
     // This only uses a single mesh, so don't create multiple TopModels of these
     CkAssert(elem_attr_sz > 0);
@@ -172,6 +185,7 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
     TopModel *model = new TopModel;
     memset(model, 0, sizeof(TopModel));
 
+    model->target_device = target_device;
     model->elem_attr_size = elem_attr_sz;
     model->node_attr_size = node_attr_sz;
     model->model_attr_size = model_attr_sz;
@@ -217,38 +231,41 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
     
 
 #if CUDA
-    /** Create n2e connectivity array and copy to device global memory */
-    FEM_Mesh_create_node_elem_adjacency(which_mesh);
-    FEM_Mesh* mesh = FEM_Mesh_lookup(which_mesh, "topModel_Create_Driver");
-    FEM_DataAttribute * at = (FEM_DataAttribute*) 
-        model->mesh->elem[TOP_ELEMENT_TET4].lookup(ATT_ELEM_N2E_CONN,"topModel_Create_Driver");
-    int* n2eTable  = at->getInt().getData();
+    int* n2eTable;
+    if (model->target_device == DeviceGPU) {
+        /** Create n2e connectivity array and copy to device global memory */
+        FEM_Mesh_create_node_elem_adjacency(which_mesh);
+        FEM_Mesh* mesh = FEM_Mesh_lookup(which_mesh, "topModel_Create_Driver");
+        FEM_DataAttribute * at = (FEM_DataAttribute*) 
+            model->mesh->elem[TOP_ELEMENT_TET4].lookup(ATT_ELEM_N2E_CONN,"topModel_Create_Driver");
+        n2eTable = at->getInt().getData();
 
-    FEM_IndexAttribute * iat = (FEM_IndexAttribute*) 
-        model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_CONN,"topModel_Create_Driver");
-    int* connTable  = iat->get().getData();
+        FEM_IndexAttribute * iat = (FEM_IndexAttribute*) 
+            model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_CONN,"topModel_Create_Driver");
+        int* connTable  = iat->get().getData();
 
-    int* adjElements;
-    int size;
-    for (int i=0; i<model->num_local_node; ++i) {
-        mesh->n2e_getAll(i, adjElements, size);
-        for (int j=0; j<size; ++j) {
-            for (int k=0; k<connSize+1; ++k) {
-                if (connTable[connSize*adjElements[j]+k] == i) {
-                    n2eTable[connSize*adjElements[j]+k] = j;
-                    break;
-                }
-                if (k == connSize) {
-                    CkPrintf("Element %d cannot find node %d in its conn [%d %d %d]\n",
-                            adjElements[j], i, 
-                            connTable[connSize*adjElements[j]+0], 
-                            connTable[connSize*adjElements[j]+1], 
-                            connTable[connSize*adjElements[j]+2]); 
-                    CkAssert(false);
+        int* adjElements;
+        int size;
+        for (int i=0; i<model->num_local_node; ++i) {
+            mesh->n2e_getAll(i, adjElements, size);
+            for (int j=0; j<size; ++j) {
+                for (int k=0; k<connSize+1; ++k) {
+                    if (connTable[connSize*adjElements[j]+k] == i) {
+                        n2eTable[connSize*adjElements[j]+k] = j;
+                        break;
+                    }
+                    if (k == connSize) {
+                        CkPrintf("Element %d cannot find node %d in its conn [%d %d %d]\n",
+                                adjElements[j], i, 
+                                connTable[connSize*adjElements[j]+0], 
+                                connTable[connSize*adjElements[j]+1], 
+                                connTable[connSize*adjElements[j]+2]); 
+                        CkAssert(false);
+                    }
                 }
             }
+            delete[] adjElements;
         }
-        delete[] adjElements;
     }
 #endif
 
@@ -264,68 +281,71 @@ TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_a
     FEM_Mesh_become_get(which_mesh);
 
 #if CUDA
-    size = model->num_local_elem * connSize *sizeof(int);
-    cudaMalloc((void**)&(model->device_model.n2eConnDevice), size);
-    cudaMemcpy(model->device_model.n2eConnDevice,n2eTable,size,
-            cudaMemcpyHostToDevice);
+    if (model->target_device == DeviceGPU) {
+        int size = model->num_local_elem * connSize *sizeof(int);
+        cudaMalloc((void**)&(model->device_model.n2eConnDevice), size);
+        cudaMemcpy(model->device_model.n2eConnDevice,n2eTable,size,
+                cudaMemcpyHostToDevice);
+    }
 #endif
 
 
 
 #if CUDA
-    /** copy number/sizes of nodes and elements to device structure */
-    model->device_model.elem_attr_size = elem_attr_sz;
-    model->device_model.node_attr_size = node_attr_sz;
-    model->device_model.model_attr_size = model_attr_sz;
-    model->device_model.num_local_node = model->num_local_node;
-    model->device_model.num_local_elem = model->num_local_elem;
+    if (model->target_device == DeviceGPU) {
+        /** copy number/sizes of nodes and elements to device structure */
+        model->device_model.elem_attr_size = elem_attr_sz;
+        model->device_model.node_attr_size = node_attr_sz;
+        model->device_model.model_attr_size = model_attr_sz;
+        model->device_model.num_local_node = model->num_local_node;
+        model->device_model.num_local_elem = model->num_local_elem;
 
 
 
-    /** Copy element Attribute array to device global memory *//*
-    {
-        FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->elem[FEM_ELEM+TOP_ELEMENT_TET4].lookup(ATT_ELEM_DATA,"topModel_Create_Driver");
-        AllocTable2d<unsigned char> &dataTable  = at->getChar();
-        unsigned char *ElemData = dataTable.getData();
-        int size = dataTable.size()*dataTable.width();
-        cudaMalloc((void**)&(model->device_model.ElemDataDevice), size);
-        cudaMemcpy(model->device_model.ElemDataDevice,ElemData,size,
-                cudaMemcpyHostToDevice);
-    }*/
+        /** Copy element Attribute array to device global memory *//*
+        {
+            FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->elem[FEM_ELEM+TOP_ELEMENT_TET4].lookup(ATT_ELEM_DATA,"topModel_Create_Driver");
+            AllocTable2d<unsigned char> &dataTable  = at->getChar();
+            unsigned char *ElemData = dataTable.getData();
+            int size = dataTable.size()*dataTable.width();
+            cudaMalloc((void**)&(model->device_model.ElemDataDevice), size);
+            cudaMemcpy(model->device_model.ElemDataDevice,ElemData,size,
+                    cudaMemcpyHostToDevice);
+        }*/
 
-    /** Copy node Attribute array to device global memory */
-    {
-        FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->node.lookup(ATT_NODE_DATA,"topModel_Create_Driver");
-        AllocTable2d<unsigned char> &dataTable  = at->getChar();
-        unsigned char *NodeData = dataTable.getData();
-        int size = dataTable.size()*dataTable.width();
-        cudaMalloc((void**)&(model->device_model.NodeDataDevice), size);
-        cudaMemcpy(model->device_model.NodeDataDevice,NodeData,size,
-                cudaMemcpyHostToDevice);
+        /** Copy node Attribute array to device global memory */
+        {
+            FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->node.lookup(ATT_NODE_DATA,"topModel_Create_Driver");
+            AllocTable2d<unsigned char> &dataTable  = at->getChar();
+            unsigned char *NodeData = dataTable.getData();
+            int size = dataTable.size()*dataTable.width();
+            cudaMalloc((void**)&(model->device_model.NodeDataDevice), size);
+            cudaMemcpy(model->device_model.NodeDataDevice,NodeData,size,
+                    cudaMemcpyHostToDevice);
+        }
+
+        /** Copy elem connectivity array to device global memory */
+        {
+            FEM_IndexAttribute * at = (FEM_IndexAttribute*) model->mesh->elem[FEM_ELEM+TOP_ELEMENT_TET4].lookup(FEM_CONN,"topModel_Create_Driver");
+            AllocTable2d<int> &dataTable  = at->get();
+            int *data = dataTable.getData();
+            int size = dataTable.size()*dataTable.width()*sizeof(int);
+            cudaMalloc((void**)&(model->device_model.ElemConnDevice), size);
+            cudaMemcpy(model->device_model.ElemConnDevice,data,size,
+                    cudaMemcpyHostToDevice);
+        }
+
+
+
+        /** Copy model Attribute to device global memory */
+        {
+          printf("Copying model attribute of size %d\n", model->model_attr_size);
+            cudaMalloc((void**)&(model->device_model.mAttDevice),
+                    model->model_attr_size);
+            cudaMemcpy(model->device_model.mAttDevice,mAtt,model->model_attr_size,
+                    cudaMemcpyHostToDevice);
+        }
     }
-
-    /** Copy elem connectivity array to device global memory */
-    {
-        FEM_IndexAttribute * at = (FEM_IndexAttribute*) model->mesh->elem[FEM_ELEM+TOP_ELEMENT_TET4].lookup(FEM_CONN,"topModel_Create_Driver");
-        AllocTable2d<int> &dataTable  = at->get();
-        int *data = dataTable.getData();
-        int size = dataTable.size()*dataTable.width()*sizeof(int);
-        cudaMalloc((void**)&(model->device_model.ElemConnDevice), size);
-        cudaMemcpy(model->device_model.ElemConnDevice,data,size,
-                cudaMemcpyHostToDevice);
-    }
-
-
-
-    /** Copy model Attribute to device global memory */
-    {
-      printf("Copying model attribute of size %d\n", model->model_attr_size);
-        cudaMalloc((void**)&(model->device_model.mAttDevice),
-                model->model_attr_size);
-        cudaMemcpy(model->device_model.mAttDevice,mAtt,model->model_attr_size,
-                cudaMemcpyHostToDevice);
-    }
-
 #endif
 
     return model;
@@ -367,9 +387,11 @@ void top_retrieve_elem_data(TopModel* m){
 /** Cleanup a model */
 void topModel_Destroy(TopModel* m){
 #if CUDA
-    cudaFree(m->device_model.mAttDevice);
-    cudaFree(m->device_model.NodeDataDevice);
-    cudaFree(m->device_model.ElemDataDevice);
+    if (m->target_device == DeviceGPU) {
+        cudaFree(m->device_model.mAttDevice);
+        cudaFree(m->device_model.NodeDataDevice);
+        cudaFree(m->device_model.ElemDataDevice);
+    }
 #endif
     delete m;
 }

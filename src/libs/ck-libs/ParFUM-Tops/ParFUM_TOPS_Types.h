@@ -19,7 +19,11 @@ typedef double FP_TYPE_LOW;
 typedef double FP_TYPE_SYNC;
 #endif
 
-
+/** Hardware device identifiers; used to select which device kernels will be run on */
+enum TopDevice {
+    DeviceCPU,
+    DeviceGPU
+};
 
 /** Tops uses some bit patterns for these, but we just use TopNode as a signed value to represent the corresponding ParFUM node. A non-negative value is a local node, while a negative value is a ghost. */
 typedef long TopNode;

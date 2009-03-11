@@ -48,14 +48,14 @@ class TopModel{
     unsigned num_local_elem;
     /** number of local nodes */
     unsigned num_local_node;
+    /** type of device to run on */
+    TopDevice target_device;
 
 #ifdef CUDA
     TopModelDevice device_model;
 #endif
 
 };
-
-
 
 
 /** Node Iterator */
@@ -112,7 +112,19 @@ public:
  * library was compiled with, in bytes.
  */
 int tops_lib_FP_Type_Size();
- 
+
+
+
+/**
+ * Select the device kernels should be run on.
+ */
+void top_set_device(TopModel* m, TopDevice d);
+
+/**
+ * Return the device kernels should be run on.
+ */
+TopDevice top_target_device(TopModel* m);
+
 /**
 Create and access a Tops model. Only call from Init
 Currently only one model can be created. To extend, each model must just reference a different FEM_Mesh object
@@ -122,7 +134,7 @@ TopModel* topModel_Create_Init();
 
 
 /** Create and access a Tops model. Only call from Driver */
-TopModel* topModel_Create_Driver(int elem_attr_sz, int node_attr_sz, int model_attr_sz, void* mAtt);
+TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz, int node_attr_sz, int model_attr_sz, void* mAtt);
 
 /** Cleanup a model. Currently does nothing */
 void topModel_Destroy(TopModel* m);
