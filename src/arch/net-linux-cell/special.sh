@@ -31,4 +31,13 @@ PPU_EMBEDSPU = $CMK_PPU_EMBEDSPU
 SPERT_LIBS = $CMK_SPERT_LIBS
 EOF
 
-cd cell_lib && make install
+# Compile and install the Offload API
+cd cell_lib && make install && cd ..
+
+# Create the empty stub library (i.e. no SPEs)
+../bin/charmc -c -o emptyRegisterAccelSPEFuncs.o emptyRegisterAccelSPEFuncs.c
+$CMK_SPE_CC -I../include -L../lib -o emptySpertMain_spe emptyFuncLookup.c -lcellspu
+$CMK_PPU_EMBEDSPU spert_main emptySpertMain_spe emptySpertMain.o
+../bin/charmc -o libnoAccelStub.a emptyRegisterAccelSPEFuncs.o emptySpertMain.o
+cp libnoAccelStub.a ../lib
+
