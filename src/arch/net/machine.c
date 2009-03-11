@@ -1155,6 +1155,7 @@ static void charmrun_abort(const char *s)
 {
   if (Cmi_charmrun_fd==-1) {/*Standalone*/
   	fprintf(stderr,"Charm++ fatal error:\n%s\n",s);
+CmiPrintStackTrace(0);
   	abort();
   } else {
 	char msgBuf[80];
@@ -1590,7 +1591,8 @@ static void node_addresses_obtain(char **argv)
 	}
 #else
         /* standalone smp version reads ppn */
-        if (CmiGetArgInt(argv, "+ppn", &_Cmi_mynodesize))
+        if (CmiGetArgInt(argv, "+ppn", &_Cmi_mynodesize) || 
+               CmiGetArgInt(argv, "++ppn", &_Cmi_mynodesize) )
           npes = _Cmi_mynodesize;
 #endif
 	/*This is a stupid hack: we expect the *number* of nodes
@@ -1845,6 +1847,9 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
       }
     }
   }
+#if CMK_MULTICORE
+  network = 0;
+#endif
   return network;
 }
 
@@ -2028,7 +2033,7 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 	CommunicationServerPxshm();
 #endif
 #if !CMK_SHARED_VARS_UNAVAILABLE
-  if (sendonnetwork)   /* only call server when we send msg on network in SMP */
+  if (sendonnetwork!=0)   /* only call server when we send msg on network in SMP */
 #endif
   CommunicationServer(0, COMM_SERVER_FROM_WORKER);
   MACHSTATE(1,"}  CmiGeneralSend");
@@ -2491,6 +2496,11 @@ void ConverseExit(void)
 #if CMK_SHARED_VARS_UNAVAILABLE
  	Cmi_check_delay = 1.0;		/* speed up checking of charmrun */
  	while (1) CommunicationServer(500, COMM_SERVER_FROM_WORKER);
+#elif CMK_MULTICORE
+        if (!Cmi_commthread && CmiMyRank()==0) {
+          Cmi_check_delay = 1.0;	/* speed up checking of charmrun */
+          while (1) CommunicationServer(500, COMM_SERVER_FROM_WORKER);
+        }
 #endif
   }
   MACHSTATE(2,"} ConverseExit");
@@ -2643,8 +2653,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 
   skt_set_idle(CmiYield);
   Cmi_check_delay = 1.0+0.25*_Cmi_numnodes;
+
   if (Cmi_charmrun_fd==-1) /*Don't bother with check in standalone mode*/
-	Cmi_check_delay=1.0e30;
+      Cmi_check_delay=1.0e30;
 
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));
