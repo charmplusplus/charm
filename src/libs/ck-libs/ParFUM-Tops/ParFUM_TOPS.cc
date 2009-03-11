@@ -304,7 +304,7 @@ TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
 
         /** Copy element Attribute array to device global memory *//*
         {
-            FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->elem[FEM_ELEM+TOP_ELEMENT_TET4].lookup(ATT_ELEM_DATA,"topModel_Create_Driver");
+            FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->elem[TOP_ELEMENT_TET4].lookup(ATT_ELEM_DATA,"topModel_Create_Driver");
             AllocTable2d<unsigned char> &dataTable  = at->getChar();
             unsigned char *ElemData = dataTable.getData();
             int size = dataTable.size()*dataTable.width();
@@ -326,7 +326,7 @@ TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
 
         /** Copy elem connectivity array to device global memory */
         {
-            FEM_IndexAttribute * at = (FEM_IndexAttribute*) model->mesh->elem[FEM_ELEM+TOP_ELEMENT_TET4].lookup(FEM_CONN,"topModel_Create_Driver");
+            FEM_IndexAttribute * at = (FEM_IndexAttribute*) model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_CONN,"topModel_Create_Driver");
             AllocTable2d<int> &dataTable  = at->get();
             int *data = dataTable.getData();
             int size = dataTable.size()*dataTable.width()*sizeof(int);
