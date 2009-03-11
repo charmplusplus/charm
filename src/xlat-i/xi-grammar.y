@@ -839,8 +839,29 @@ AccelBufferType : READONLY  { $$ = Parameter::ACCEL_BUFFER_TYPE_READONLY; }
                 | WRITEONLY { $$ = Parameter::ACCEL_BUFFER_TYPE_WRITEONLY; }
                 ;
 
-AccelInstName   : Name               { $$ = new XStr($1);                         }
-                | Name '-' '>' Name  { $$ = new XStr(""); *($$) << $1 << "->" << $4; }
+AccelInstName   : Name { $$ = new XStr($1); }
+                | AccelInstName '-' '>' Name { $$ = new XStr(""); *($$) << *($1) << "->" << $4; }
+                | AccelInstName '.' Name { $$ = new XStr(""); *($$) << *($1) << "." << $3; }
+                | AccelInstName '[' AccelInstName ']'
+                {
+                  $$ = new XStr("");
+                  *($$) << *($1) << "[" << *($3) << "]";
+                  delete $1;
+                  delete $3;
+                }
+                | AccelInstName '[' NUMBER ']'
+                {
+                  $$ = new XStr("");
+                  *($$) << *($1) << "[" << $3 << "]";
+                  delete $1;
+                }
+                | AccelInstName '(' AccelInstName ')'
+                {
+                  $$ = new XStr("");
+                  *($$) << *($1) << "(" << *($3) << ")";
+                  delete $1;
+                  delete $3;
+                }
                 ;
 
 AccelArrayParam : ParamBracketStart CCode ']'
