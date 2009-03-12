@@ -518,7 +518,7 @@ static void node_addresses_store(ChMessage *msg)
   if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes)
          !=(unsigned int)msg->len)
     {printf("Node table has inconsistent length!");machine_exit(1);}
-#endif//CMK_USE_IBVERBS
+#endif /*CMK_USE_IBVERBS*/
   nodes = (OtherNode)malloc(_Cmi_numnodes * sizeof(struct OtherNodeStruct));
   nodestart=0;
   for (i=0; i<_Cmi_numnodes; i++) {
@@ -545,15 +545,13 @@ static void node_addresses_store(ChMessage *msg)
     }
 
 #if CMK_USE_IBVERBS 
-		{
-			if(i != _Cmi_mynode){
-				int addr[3];
-				addr[0] =ChMessageInt(remoteInfiAddr[i].lid);
-				addr[1] =ChMessageInt(remoteInfiAddr[i].qpn);
-				addr[2] =ChMessageInt(remoteInfiAddr[i].psn);
-				nodes[i].infiData = initInfiOtherNodeData(i,addr);
-			}
-		}
+    if(i != _Cmi_mynode){
+	int addr[3];
+	addr[0] =ChMessageInt(remoteInfiAddr[i].lid);
+	addr[1] =ChMessageInt(remoteInfiAddr[i].qpn);
+	addr[2] =ChMessageInt(remoteInfiAddr[i].psn);
+	nodes[i].infiData = initInfiOtherNodeData(i,addr);
+    }
 #else
     nodes[i].dataport = ChMessageInt(d[i].dataport);
     nodes[i].addr = skt_build_addr(nodes[i].IP,nodes[i].dataport);
@@ -590,7 +588,7 @@ static void node_addresses_store(ChMessage *msg)
   }
 #endif
 #if CMK_USE_IBVERBS
-	infiPostInitialRecvs();
+  infiPostInitialRecvs();
 #endif
   MACHSTATE(1,"} node_addresses_store");
 }
