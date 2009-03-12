@@ -25,13 +25,7 @@
 #include <stack>
 
 
-#define ATT_ELEM_ID (FEM_DATA+0)
-#define ATT_ELEM_N2E_CONN (FEM_DATA+1)
-#define ATT_ELEM_DATA (FEM_DATA+2)
 
-#define ATT_NODE_ID (FEM_DATA+0)
-#define ATT_NODE_COORD (FEM_DATA+1)
-#define ATT_NODE_DATA (FEM_DATA+2)
 
 #undef DEBUG
 #define DEBUG 0
@@ -60,11 +54,29 @@ TopDevice top_target_device(TopModel* m)
 }
 
 
+void fillIDHash(TopModel* model)
+{
+
+  if(model->nodeIDHash == NULL)
+    model->nodeIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
+  
+  if(model->elemIDHash == NULL)
+    model->elemIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
+  
+  for(int i=0; i<model->node_id_T->size(); ++i){
+    model->nodeIDHash->put((*model->node_id_T)(i,0)) = i+1;
+  }
+  for(int i=0; i<model->elem_id_T->size(); ++i){
+    model->elemIDHash->put((*model->elem_id_T)(i,0)) = i+1;
+  }
+}
+
+
 // Set the pointers in the model to point to the data stored by the ParFUM framework.
 // If the number of nodes or elements increases, then this function should be called
 // because the attribute arrays may have been resized, after which the old pointers
 // would be invalid.
-void setTableReferences(TopModel* model)
+void setTableReferences(TopModel* model, bool recomputeHash=false)
 {
   model->ElemConn_T = &((FEM_IndexAttribute*)model->mesh->elem[TOP_ELEMENT_TET4].lookup(FEM_CONN,""))->get();
   model->elem_id_T = &((FEM_DataAttribute*)model->mesh->elem[TOP_ELEMENT_TET4].lookup(ATT_ELEM_ID,""))->getInt();
@@ -88,18 +100,21 @@ void setTableReferences(TopModel* model)
   ghost = model->mesh->node.getGhost();
   if (ghost)
     model->GhostNodeData_T = &((FEM_DataAttribute*)ghost->lookup(ATT_NODE_DATA,""))->getChar();
+ 
+
+  if(model->nodeIDHash == NULL)
+    model->nodeIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
+  
+  if(model->elemIDHash == NULL)
+    model->elemIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
+
+  if(recomputeHash){
+    fillIDHash(model);
+  }
+
 
 }
 
-void fillIDHash(TopModel* model)
-{
-    for(int i=0; i<model->node_id_T->size(); ++i){
-        model->nodeIDHash->put((*model->node_id_T)(i,0)) = i+1;
-    }
-    for(int i=0; i<model->elem_id_T->size(); ++i){
-        model->elemIDHash->put((*model->elem_id_T)(i,0)) = i+1;
-    }
-}
 
 /** Create a model  before partitioning. Given the number of nodes per element.
     
@@ -132,11 +147,14 @@ TopModel* topModel_Create_Init(){
   FEM_Mesh_data(which_mesh,FEM_NODE,ATT_NODE_ID,temp_array, 0, 1, FEM_INT, 1);
 
   // Allocate node coords
-#ifdef FP_TYPE_FLOAT 
+#ifdef FP_TYPE_FLOAT
   FEM_Mesh_data(which_mesh,FEM_NODE,ATT_NODE_COORD,temp_array, 0, 1, FEM_FLOAT, 3);
 #else
   FEM_Mesh_data(which_mesh,FEM_NODE,ATT_NODE_COORD,temp_array, 0, 1, FEM_DOUBLE, 3);
 #endif
+
+  FEM_Mesh_data(which_mesh,FEM_NODE,FEM_COORD,temp_array, 0, 1, FEM_DOUBLE, 3);  // Needed for shared node regeneration
+
 
   // Don't allocate the ATT_NODE_DATA array because it will be large
 
@@ -178,6 +196,9 @@ TopModel* topModel_Create_Init(){
 TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
         int node_attr_sz, int model_attr_sz, void *mAtt) {
 
+  CkAssert(ATT_NODE_ID != FEM_COORD);
+  CkAssert(ATT_NODE_DATA != FEM_COORD);
+
     // This only uses a single mesh, so don't create multiple TopModels of these
     CkAssert(elem_attr_sz > 0);
     CkAssert(node_attr_sz > 0);
@@ -213,9 +234,6 @@ TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
     free(temp_array);
 
     setTableReferences(model);
-    model->nodeIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
-    model->elemIDHash = new CkHashtableT<CkHashtableAdaptorT<int>, int>;
-    fillIDHash(model);
     
     // Setup the adjacencies
     int nodesPerTuple = 3;
@@ -399,19 +417,19 @@ void topModel_Destroy(TopModel* m){
 
 TopNode topModel_InsertNode(TopModel* m, double x, double y, double z){
   int newNode = FEM_add_node_local(m->mesh,false,false,false);
+  setTableReferences(m);
   (*m->coord_T)(newNode,0)=x;
   (*m->coord_T)(newNode,1)=y;
   (*m->coord_T)(newNode,2)=z;
-  setTableReferences(m);
   return newNode;
 }
 
 TopNode topModel_InsertNode(TopModel* m, float x, float y, float z){
   int newNode = FEM_add_node_local(m->mesh,false,false,false);
+  setTableReferences(m);
   (*m->coord_T)(newNode,0)=x;
   (*m->coord_T)(newNode,1)=y;
   (*m->coord_T)(newNode,2)=z;
-  setTableReferences(m);
   return newNode;
 }
 
@@ -671,6 +689,7 @@ void topNode_GetPosition(TopModel*model, TopNode node,float*x,float*y,float*z){
         AllocTable2d<float>* table = &((FEM_DataAttribute*)model->
                 mesh->node.getGhost()->lookup(ATT_NODE_COORD,""))->getFloat();
         node = FEM_From_ghost_index(node);
+
         *x = (*table)(node,0);
         *y = (*table)(node,1);
         *z = (*table)(node,2);

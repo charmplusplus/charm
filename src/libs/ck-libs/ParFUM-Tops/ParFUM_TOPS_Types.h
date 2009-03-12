@@ -2,7 +2,6 @@
 #ifndef __PARFUM_TOPS_TYPES___H
 #define __PARFUM_TOPS_TYPES___H
 
-
 #include <ParFUM_Types.h> // for ElemID
 
 #ifdef FP_TYPE_FLOAT

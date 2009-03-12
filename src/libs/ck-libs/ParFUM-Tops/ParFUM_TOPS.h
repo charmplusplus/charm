@@ -21,6 +21,17 @@
 #include "ParFUM_TOPS_CUDA.h"
 
 
+
+/** The attributes used within the PTOPS layer */
+#define ATT_ELEM_ID (FEM_DATA+0)
+#define ATT_ELEM_N2E_CONN (FEM_DATA+1)
+#define ATT_ELEM_DATA (FEM_DATA+2)
+
+#define ATT_NODE_ID (FEM_DATA+0)
+#define ATT_NODE_COORD (FEM_DATA+1)
+#define ATT_NODE_DATA (FEM_DATA+2)
+
+
 /** A tops model is roughly equivalent to a ParFUM FEM_Mesh object */
 class TopModel{
  public:
@@ -54,6 +65,13 @@ class TopModel{
 #ifdef CUDA
     TopModelDevice device_model;
 #endif
+
+
+    TopModel(){
+      nodeIDHash = NULL;
+      elemIDHash = NULL;
+    }
+
 
 };
 
