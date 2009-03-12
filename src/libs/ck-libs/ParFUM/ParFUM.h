@@ -1,6 +1,12 @@
-/*Charm++ Finite Element Framework:
- * C interface file
- */
+/** Charm++ ParFUM Framework:
+    C++ interface file
+    
+    \addtogroup ParFUM
+    @{
+    
+*/
+
+
 #ifndef __PARFUM_H
 #define __PARFUM_H
 #include "charm++.h"
@@ -10,12 +16,7 @@
 #include "charm-api.h"
 #include "ckvector3d.h"
 #include "tcharm.h"
-
-/**
- * \addtogroup ParFUM
-*/
-/*@{*/
-
+#include "ParFUM_Types.h" // for ElemID
 
 
 
@@ -208,10 +209,6 @@ extern "C" {
   typedef void (*FEM_Userdata_fn)(pup_er p,void *data);
   void FEM_Mesh_pup(int fem_mesh,int dataTag,FEM_Userdata_fn fn,void *data);
 
-  // ghosts and spatial symmetries
-#define FEM_Is_ghost_index(idx) ((idx)<-1)
-#define FEM_To_ghost_index(idx) (-(idx)-2)
-#define FEM_From_ghost_index(idx) (-(idx)-2)
 
   void FEM_Add_ghost_layer(int nodesPerTuple,int doAddNodes);
   void FEM_Add_ghost_elem(int elType,int tuplesPerElem,const int *elem2tuple);
@@ -512,6 +509,12 @@ void ParFUM_SA_Init(int meshId);
 FDECL void FTN_NAME(PARFUM_SA_INIT,parfum_sa_init)(int *meshId);
 
 }
+
+
+
+
+
+
 #endif
 
 /*@}*/

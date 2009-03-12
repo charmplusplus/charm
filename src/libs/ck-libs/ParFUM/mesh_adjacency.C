@@ -113,9 +113,9 @@ void FEM_Node::allocateNodeAdjacency(){
 void FEM_Node::setElemAdjacency(int type, const FEM_Elem &elem){
 	int nodesPerElem = elem.getNodesPer();
 	FEM_VarIndexAttribute *adjacencyAttr = elemAdjacency;
-	CkVec<CkVec<var_id> > &adjacencyTable = elemAdjacency->get();
+	CkVec<CkVec<ElemID> > &adjacencyTable = elemAdjacency->get();
 	FEM_VarIndexAttribute *ghostAdjacencyAttr = ((FEM_Node *)getGhost())->elemAdjacency;
-	CkVec<CkVec<var_id> > &ghostAdjacencyTable = ghostAdjacencyAttr->get();
+	CkVec<CkVec<ElemID> > &ghostAdjacencyTable = ghostAdjacencyAttr->get();
 
 	// Scan through elements
 	for(int i=0;i<elem.size();i++){
@@ -556,20 +556,20 @@ int FEM_Mesh::e2e_getNbr(int e, short idx, int etype)
 }
 
 
-FEM_VarIndexAttribute::ID FEM_Mesh::e2e_getElem(FEM_VarIndexAttribute::ID elem, int idx){
+ElemID FEM_Mesh::e2e_getElem(ElemID elem, int idx){
 	return e2e_getElem(elem.id, idx, elem.type);
 }
 
-FEM_VarIndexAttribute::ID FEM_Mesh::e2e_getElem(FEM_VarIndexAttribute::ID *elem, int idx){
+ElemID FEM_Mesh::e2e_getElem(ElemID *elem, int idx){
 	return e2e_getElem(elem->id, idx, elem->type);
 }
 
 
 
 /** Get the idx'th element adjacent to element (e,etype) */
-FEM_VarIndexAttribute::ID FEM_Mesh::e2e_getElem(int e, int idx, int etype){
+ElemID FEM_Mesh::e2e_getElem(int e, int idx, int etype){
   if (e == -1){
-    FEM_VarIndexAttribute::ID ele(-1,-1);    
+    ElemID ele(-1,-1);    
     return ele;
   }
   
@@ -585,7 +585,7 @@ FEM_VarIndexAttribute::ID FEM_Mesh::e2e_getElem(int e, int idx, int etype){
 
 	  int t =  eAdjTypes[FEM_To_ghost_index(e)][idx];
 	  int id =  eAdjs[FEM_To_ghost_index(e)][idx];
-	  FEM_VarIndexAttribute::ID ele(t,id);
+	  ElemID ele(t,id);
 
 	  return ele;
   }
@@ -603,7 +603,7 @@ FEM_VarIndexAttribute::ID FEM_Mesh::e2e_getElem(int e, int idx, int etype){
 
 	  int t =  eAdjTypes[e][idx];
 	  int id =  eAdjs[e][idx];
-	  FEM_VarIndexAttribute::ID ele(t,id);
+	  ElemID ele(t,id);
 
 	  return ele;
   }
@@ -716,7 +716,7 @@ void FEM_Mesh::e2e_replace(int e, int oldNbr, int newNbr, int etype)
 
 /** Find element oldNbr in e's adjacent elements and replace with newNbr
  */
-void FEM_Mesh::e2e_replace(FEM_VarIndexAttribute::ID e, FEM_VarIndexAttribute::ID oldNbr, FEM_VarIndexAttribute::ID newNbr) 
+void FEM_Mesh::e2e_replace(ElemID e, ElemID oldNbr, ElemID newNbr) 
 {
   if (e.id == -1) return;
 
@@ -788,7 +788,7 @@ void FEM_Mesh::e2e_removeAll(int e, int etype)
 
 /**  Print all the elements adjacent to the given element.
 */
-void FEM_Mesh::e2e_printAll(FEM_VarIndexAttribute::ID e) 
+void FEM_Mesh::e2e_printAll(ElemID e) 
 {
 	if (e.id == -1) return; // non existent element
 	
@@ -982,8 +982,8 @@ int FEM_Mesh::n2n_getLength(int n) {
   else {
     eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY,"n2n_getLength");
   }
-  CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
-  CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+  CkVec<CkVec<ElemID> > &eVec = eAdj->get();
+  CkVec<ElemID> &nsVec = eVec[n];
   return nsVec.length();
 }
 
@@ -998,8 +998,8 @@ void FEM_Mesh::n2n_getAll(int n, int *&adjnodes, int &sz)
   }
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_NODE_ADJACENCY,"n2n_getAll");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[FEM_To_ghost_index(n)];
+	CkVec<CkVec<ElemID> > &nVec = nAdj->get();
+	CkVec<ElemID> &nsVec = nVec[FEM_To_ghost_index(n)];
 	sz = nsVec.length();
 	if(sz > 0) adjnodes = new int[sz];
 	for (int i=0; i<sz; i++) {
@@ -1008,8 +1008,8 @@ void FEM_Mesh::n2n_getAll(int n, int *&adjnodes, int &sz)
   }
   else{
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY,"n2n_getAll");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
+	CkVec<CkVec<ElemID> > &nVec = nAdj->get();
+	CkVec<ElemID> &nsVec = nVec[n];
 	sz = nsVec.length();
 	if(sz > 0) adjnodes = new int[sz];
 	for (int i=0; i<sz; i++) {
@@ -1025,16 +1025,16 @@ void FEM_Mesh::n2n_add(int n, int newNode)
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_NODE_ADJACENCY,"n2n_add");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
-	FEM_VarIndexAttribute::ID nn(0, newNode);
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[FEM_To_ghost_index(n)];
+	CkVec<CkVec<ElemID> > &nVec = nAdj->get();
+	ElemID nn(0, newNode);
+	CkVec<ElemID> &nsVec = nVec[FEM_To_ghost_index(n)];
 	nsVec.push_back(nn);
   }
   else{
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY,"n2n_add");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
-	FEM_VarIndexAttribute::ID nn(0, newNode);
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
+	CkVec<CkVec<ElemID> > &nVec = nAdj->get();
+	ElemID nn(0, newNode);
+	CkVec<ElemID> &nsVec = nVec[n];
 	nsVec.push_back(nn);
   }
 }
@@ -1049,8 +1049,8 @@ void FEM_Mesh::n2n_remove(int n, int oldNode)
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_NODE_ADJACENCY,"n2n_remove");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[FEM_To_ghost_index(n)];
+	CkVec<CkVec<ElemID> > &nVec = nAdj->get();
+	CkVec<ElemID> &nsVec = nVec[FEM_To_ghost_index(n)];
 	for (int i=0; i<nsVec.length(); i++) {
 	  if (nsVec[i].getSignedId() == oldNode) {
 		nsVec.remove(i);
@@ -1060,8 +1060,8 @@ void FEM_Mesh::n2n_remove(int n, int oldNode)
   }
   else {
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY,"n2n_remove");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
+	CkVec<CkVec<ElemID> > &nVec = nAdj->get();
+	CkVec<ElemID> &nsVec = nVec[n];
 	for (int i=0; i<nsVec.length(); i++) {
 	  if (nsVec[i].getSignedId() == oldNode) {
 		nsVec.remove(i);
@@ -1079,16 +1079,16 @@ int FEM_Mesh::n2n_exists(int n, int queryNode)
   if(FEM_Is_ghost_index(n)){
 	CkAssert(node.getGhost());
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_NODE_ADJACENCY,"n2n_exists");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[FEM_To_ghost_index(n)];
+	CkVec<CkVec<ElemID> > &nVec = nAdj->get();
+	CkVec<ElemID> &nsVec = nVec[FEM_To_ghost_index(n)];
 	for (int i=0; i<nsVec.length(); i++)
 	  if (nsVec[i].getSignedId() == queryNode) 
 		return 1;
   }
   else {
     FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY,"n2n_exists");
-    CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
-    CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
+    CkVec<CkVec<ElemID> > &nVec = nAdj->get();
+    CkVec<ElemID> &nsVec = nVec[n];
     for (int i=0; i<nsVec.length(); i++)
       if (nsVec[i].getSignedId() == queryNode) 
 	return 1;
@@ -1103,22 +1103,22 @@ void FEM_Mesh::n2n_replace(int n, int oldNode, int newNode)
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_NODE_ADJACENCY,"n2n_replace");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[FEM_To_ghost_index(n)];
+	CkVec<CkVec<ElemID> > &nVec = nAdj->get();
+	CkVec<ElemID> &nsVec = nVec[FEM_To_ghost_index(n)];
 	for (int i=0; i<nsVec.length(); i++) {
 	  if (nsVec[i].getSignedId() == oldNode) {
-		nsVec[i] = FEM_VarIndexAttribute::ID(0,newNode);
+		nsVec[i] = ElemID(0,newNode);
 		break;
 	  }
 	}
   }
   else {
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY,"n2n_replace");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
+	CkVec<CkVec<ElemID> > &nVec = nAdj->get();
+	CkVec<ElemID> &nsVec = nVec[n];
 	for (int i=0; i<nsVec.length(); i++) {
 	  if (nsVec[i].getSignedId() == oldNode) {
-		nsVec[i] = FEM_VarIndexAttribute::ID(0,newNode);
+		nsVec[i] = ElemID(0,newNode);
 		break;
 	  }
 	}
@@ -1133,14 +1133,14 @@ void FEM_Mesh::n2n_removeAll(int n)
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_NODE_ADJACENCY,"n2n_removeAll");  
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[FEM_To_ghost_index(n)];
+	CkVec<CkVec<ElemID> > &nVec = nAdj->get();
+	CkVec<ElemID> &nsVec = nVec[FEM_To_ghost_index(n)];
 	nsVec.free();
   }
   else{
 	FEM_VarIndexAttribute *nAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_NODE_ADJACENCY,"n2n_removeAll");  
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &nVec = nAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = nVec[n];
+	CkVec<CkVec<ElemID> > &nVec = nAdj->get();
+	CkVec<ElemID> &nsVec = nVec[n];
 	nsVec.free();
   }
 }
@@ -1158,28 +1158,28 @@ int FEM_Mesh::n2e_getLength(int n) {
   else {
     eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_getLength");
   }
-  CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
-  CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+  CkVec<CkVec<ElemID> > &eVec = eAdj->get();
+  CkVec<ElemID> &nsVec = eVec[n];
   return nsVec.length();
 }
 
 /** Return one of node n's adjacent elements 
 */
 
-FEM_VarIndexAttribute::ID FEM_Mesh::n2e_getElem(int n, int whichIdx){
+ElemID FEM_Mesh::n2e_getElem(int n, int whichIdx){
 
   if(FEM_Is_ghost_index(n)){
     FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_getElem");
-    CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
-    CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[FEM_To_ghost_index(n)];
+    CkVec<CkVec<ElemID> > &eVec = eAdj->get();
+    CkVec<ElemID> &nsVec = eVec[FEM_To_ghost_index(n)];
     assert(whichIdx < nsVec.length());
     return  nsVec[whichIdx];
     
   }
   else {
     FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_getAll");
-    CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
-    CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+    CkVec<CkVec<ElemID> > &eVec = eAdj->get();
+    CkVec<ElemID> &nsVec = eVec[n];
     assert(whichIdx < nsVec.length());
     return  nsVec[whichIdx];
   }
@@ -1200,8 +1200,8 @@ void FEM_Mesh::n2e_getAll(int n, int *&adjelements, int &sz)
   }
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_getAll");  
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[FEM_To_ghost_index(n)];
+	CkVec<CkVec<ElemID> > &eVec = eAdj->get();
+	CkVec<ElemID> &nsVec = eVec[FEM_To_ghost_index(n)];
 	sz = nsVec.length();
 	if(sz > 0) adjelements = new int[sz];
 	for (int i=0; i<sz; i++) {
@@ -1210,8 +1210,8 @@ void FEM_Mesh::n2e_getAll(int n, int *&adjelements, int &sz)
   }
   else {
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_getAll");  
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+	CkVec<CkVec<ElemID> > &eVec = eAdj->get();
+	CkVec<ElemID> &nsVec = eVec[n];
 	int len = nsVec.length();
 	sz = len;
 	if(sz > 0) adjelements = new int[sz];
@@ -1228,18 +1228,18 @@ void FEM_Mesh::n2e_getAll(int n, int *&adjelements, int &sz)
     
     This function returns elements and their associated types.
 */
-const CkVec<FEM_VarIndexAttribute::ID> &  FEM_Mesh::n2e_getAll(int n) 
+const CkVec<ElemID> &  FEM_Mesh::n2e_getAll(int n) 
 {
 	assert(n!=-1); 
 
 	if(FEM_Is_ghost_index(n)){
 		FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_getAll");  
-		CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
+		CkVec<CkVec<ElemID> > &eVec = eAdj->get();
 		return eVec[FEM_To_ghost_index(n)];
 	}
 	else {
 		FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_getAll");  
-		CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
+		CkVec<CkVec<ElemID> > &eVec = eAdj->get();
 		return eVec[n];
 	}
 }
@@ -1253,9 +1253,9 @@ void FEM_Mesh::n2e_add(int n, int newElem)
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_add");     
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[FEM_To_ghost_index(n)];
-	FEM_VarIndexAttribute::ID ne(0, newElem);
+	CkVec<CkVec<ElemID> > &eVec = eAdj->get();
+	CkVec<ElemID> &nsVec = eVec[FEM_To_ghost_index(n)];
+	ElemID ne(0, newElem);
 	nsVec.push_back(ne);
 	int *testn2e, testn2ec;
 	n2e_getAll(n,testn2e,testn2ec);
@@ -1269,9 +1269,9 @@ void FEM_Mesh::n2e_add(int n, int newElem)
   }
   else {
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_add");     
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
-	FEM_VarIndexAttribute::ID ne(0, newElem);
+	CkVec<CkVec<ElemID> > &eVec = eAdj->get();
+	CkVec<ElemID> &nsVec = eVec[n];
+	ElemID ne(0, newElem);
 	nsVec.push_back(ne);
   }
 }
@@ -1283,8 +1283,8 @@ void FEM_Mesh::n2e_remove(int n, int oldElem)
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_remove");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[FEM_To_ghost_index(n)];
+	CkVec<CkVec<ElemID> > &eVec = eAdj->get();
+	CkVec<ElemID> &nsVec = eVec[FEM_To_ghost_index(n)];
 	for (int i=0; i<nsVec.length(); i++) {
 	  if (nsVec[i].getSignedId() == oldElem) {
 		nsVec.remove(i);
@@ -1294,8 +1294,8 @@ void FEM_Mesh::n2e_remove(int n, int oldElem)
   }
   else {
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_remove");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+	CkVec<CkVec<ElemID> > &eVec = eAdj->get();
+	CkVec<ElemID> &nsVec = eVec[n];
 	for (int i=0; i<nsVec.length(); i++) {
 	  if (nsVec[i].getSignedId() == oldElem) {
 		nsVec.remove(i);
@@ -1312,11 +1312,11 @@ void FEM_Mesh::n2e_replace(int n, int oldElem, int newElem)
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_replace");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[FEM_To_ghost_index(n)];
+	CkVec<CkVec<ElemID> > &eVec = eAdj->get();
+	CkVec<ElemID> &nsVec = eVec[FEM_To_ghost_index(n)];
 	for (int i=0; i<nsVec.length(); i++) {
 	  if (nsVec[i].getSignedId() == oldElem) {
-		nsVec[i] = FEM_VarIndexAttribute::ID(0,newElem);
+		nsVec[i] = ElemID(0,newElem);
 		break;
 	  }
 	}
@@ -1332,11 +1332,11 @@ void FEM_Mesh::n2e_replace(int n, int oldElem, int newElem)
   }
   else{
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_replace");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+	CkVec<CkVec<ElemID> > &eVec = eAdj->get();
+	CkVec<ElemID> &nsVec = eVec[n];
 	for (int i=0; i<nsVec.length(); i++) {
 	  if (nsVec[i].getSignedId() == oldElem) {
-		nsVec[i] = FEM_VarIndexAttribute::ID(0,newElem);
+		nsVec[i] = ElemID(0,newElem);
 		break;
 	  }
 	}
@@ -1350,14 +1350,14 @@ void FEM_Mesh::n2e_removeAll(int n)
   if (n == -1) return;
   if(FEM_Is_ghost_index(n)){
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.getGhost()->lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_removeAll");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[FEM_To_ghost_index(n)];
+	CkVec<CkVec<ElemID> > &eVec = eAdj->get();
+	CkVec<ElemID> &nsVec = eVec[FEM_To_ghost_index(n)];
 	nsVec.free();
   }
   else{
 	FEM_VarIndexAttribute *eAdj = (FEM_VarIndexAttribute *)node.lookup(FEM_NODE_ELEM_ADJACENCY,"n2e_removeAll");
-	CkVec<CkVec<FEM_VarIndexAttribute::ID> > &eVec = eAdj->get();
-	CkVec<FEM_VarIndexAttribute::ID> &nsVec = eVec[n];
+	CkVec<CkVec<ElemID> > &eVec = eAdj->get();
+	CkVec<ElemID> &nsVec = eVec[n];
 	nsVec.free();
   }
 }

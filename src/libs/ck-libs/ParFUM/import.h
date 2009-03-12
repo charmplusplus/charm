@@ -19,6 +19,8 @@ extern int getFloatFormat(void);
  * -1 if key1 < key2
  */
 inline int coordCompare(const double *key1, const double *key2, int dim) {
+#if TERRY_BIT_COMPARE
+  // This version contains some bit operations that confused Isaac, so he wrote the other implementation below.
   static const int endian = getFloatFormat();
   int maxUlps=100;
   for(int ii=0; ii<dim; ii++) {
@@ -38,6 +40,22 @@ inline int coordCompare(const double *key1, const double *key2, int dim) {
     }
   }
   return 0;
+#else
+  CkAssert(dim==3);
+  const double threshold = 0.001;
+  for(int i=0; i<dim; i++) {
+    const double a = key1[i];
+    const double b = key2[i];
+    const double diff = a-b;
+    if (diff < -1.0*threshold){
+      return 1;
+    }
+    else if (diff > threshold){
+      return -1;
+    }
+  }
+  return 0;
+#endif
 } 
 
 inline int coordEqual(const double *key1, const double *key2, int dim) {

@@ -382,11 +382,11 @@ void update_new_element_e2e(FEM_Mesh *m, int newEl, int elemType) {
 	int *adjnodes = new int[nodesPerElem];
 
 	/// A list of all elements adjacent to one of the nodes
-	CkVec<FEM_VarIndexAttribute::ID> nodeAdjacentElements;
+	CkVec<ElemID> nodeAdjacentElements;
 
 	m->e2n_getAll(newEl, adjnodes, elemType);
 	for(int i=0;i<nodesPerElem;i++){
-		CkVec<FEM_VarIndexAttribute::ID> adjElements = m->n2e_getAll(adjnodes[i]);
+		CkVec<ElemID> adjElements = m->n2e_getAll(adjnodes[i]);
 		for(int j=0;j<adjElements.size();j++){
 			int found=0;
 			// only insert if it is not already in the list

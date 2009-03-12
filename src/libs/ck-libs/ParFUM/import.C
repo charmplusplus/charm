@@ -14,9 +14,15 @@ void ParFUM_deghosting(int meshid){
 	mesh->clearGhostElems();
 }
 
+
+
+/// Recreate the shared nodes. An alternate incorrect version can be enabled by undefining CORRECT_COORD_COMPARISON
 void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
+#define CORRECT_COORD_COMPARISON
   MPI_Comm comm = newComm;
   int rank, nParts;
+  int send_count=0; // sanity check
+  int recv_count=0; // sanity check
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &nParts);
   // Shared data will be temporarily stored in the following structure
@@ -39,36 +45,39 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
   FEM_Mesh_become_get(meshid);
 
   FEM_Mesh_data(meshid,FEM_NODE,FEM_COORD, nodeCoords, 0, numNodes,FEM_DOUBLE, dim);
-  /*
-  printf("Node Coords for rank %d \n",rank);
-  for(int n=0;n<numNodes;n++){
-    printf("%d -> ", n);
-    for (int m-0; m<dim; m++) 
-      printf("%.5lf %.5lf \n", nodeCoords[dim*n+m]);
-  }
-  */
+  
   //MPI_Barrier(MPI_COMM_WORLD);
   if (rank==0) CkPrintf("Extracted node data...\n");
 
   // Begin exchange of node coordinates to determine shared nodes
   // FIX ME: compute bounding box, only exchange when bounding boxes collide
-  for (int i=rank+1; i<nParts; i++) { //send nodeCoords to rank i
-    //printf("[%d] Sending %d doubles to rank %d \n",rank,dim*numNodes,i);
-    MPI_Send(nodeCoords, dim*numNodes, MPI_DOUBLE, i, coord_msg_tag, comm);
+
+  /// The highest partition # to which I send my coordinates(wraps around)
+  int sendUpperBound;   if(nParts %2==0){
+    sendUpperBound = rank + (nParts/2)  - (rank%2);
+  } else {
+    sendUpperBound = rank + (nParts/2) ;
   }
-  // Handle node coordinate-matching requests from other ranks
 
-  //MPI_Barrier(MPI_COMM_WORLD);
-  if (rank==0) CkPrintf("Exchanged node coords...\n");
+  /// The lowest partition # to which I send my coordinates(wraps around)
+  int sendLowerBound;
+    if(nParts %2==0){
+    sendLowerBound = rank - (nParts/2) + ((rank+1)%2);
+  } else {
+    sendLowerBound = rank - (nParts/2);
+  }
 
-  int *sorted_local_idxs = (int *)malloc(numNodes*sizeof(int));
-  double *sorted_nodeCoords = (double *)malloc(dim*numNodes*sizeof(double));
-  sortNodes(nodeCoords, sorted_nodeCoords, sorted_local_idxs, numNodes, dim);
 
-  //MPI_Barrier(MPI_COMM_WORLD);
-  if (rank==0) CkPrintf("Sorted node coords...\n");
+  for (int i=rank+1; i<=sendUpperBound; i++) { //send nodeCoords to rank i
+    MPI_Send(nodeCoords, dim*numNodes, MPI_DOUBLE, i%nParts, coord_msg_tag, comm);
+    send_count ++;
+    //    printf("[%d] Sending %d doubles  to rank %d \n",rank,dim*numNodes,i%nParts);
+  }
 
-  for (int i=0; i<rank; i++) {
+
+  // Receive coordinates from the appropriate number of other partitions
+  // These can be received in any order
+  for (int i=sendLowerBound; i<rank; i++) {
     std::vector<int> remoteSharedNodes, localSharedNodes;
     double *recvNodeCoords;
     MPI_Status status;
@@ -77,7 +86,8 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
     MPI_Probe(MPI_ANY_SOURCE, coord_msg_tag, comm, &status);
     source = status.MPI_SOURCE;
     length = status.MPI_LENGTH/sizeof(double);
-    //printf("[%d] Receiving %d doubles from rank %d \n",rank,length,i);
+    // printf("[%d] Receiving %d doubles from rank %d \n",rank,length,source);
+    recv_count ++;
     // Receive whatever data was available according to probe
     recvNodeCoords = (double *)malloc(length*sizeof(double));
     MPI_Recv((void*)recvNodeCoords, length, MPI_DOUBLE, source, 
@@ -85,11 +95,7 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
     // Match coords between local nodes and received coords
     int recvNodeCount = length/dim;
 
-    int *sorted_remote_idxs = (int *)malloc(recvNodeCount*sizeof(int));
-    double *sorted_recvNodeCoords = (double *)malloc(length*sizeof(double));
-    sortNodes(recvNodeCoords, sorted_recvNodeCoords, sorted_remote_idxs, recvNodeCount, dim);
-
-    /* OLD SLOW WAY
+    //    CkPrintf("Comparing %d nodes with %d received nodes\n", numNodes, recvNodeCount);
     for (int j=0; j<numNodes; j++) {
       for (int k=0; k<recvNodeCount; k++) {
 	if (coordEqual(&nodeCoords[j*dim], &recvNodeCoords[k*dim], dim)) {
@@ -100,31 +106,6 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
 	}
       }
     }
-    */
-
-    int j = 0; 
-    int k = 0;
-    while ((j<numNodes) && (k < recvNodeCount)) {
-      if ((coordCompare(&sorted_nodeCoords[j*dim], &sorted_recvNodeCoords[k*dim], dim)) == 0) {
-	localSharedNodes.push_back(sorted_local_idxs[j]); 
-	remoteSharedNodes.push_back(sorted_remote_idxs[k]);
-	j++; k++;
-      }
-      else if (coord_leq(&sorted_nodeCoords[j*dim], &sorted_recvNodeCoords[k*dim], dim)) {
-	// local is less than remote
-	j++;
-      }
-      else if (!coord_leq(&sorted_nodeCoords[j*dim], &sorted_recvNodeCoords[k*dim], dim)) { 
-	// remote is less than local; remote is not present
-	k++;
-      }
-    }
-    
-    /*
-    if (localSharedNodes.size() > 0) {
-      printf("%d has %d nodes shared with %d.\n", rank, localSharedNodes.size(), source);
-    }
-    */
 
     // Copy local nodes that were shared with source into the data structure
     int *localSharedNodeList = (int *)malloc(localSharedNodes.size()*sizeof(int));
@@ -140,10 +121,8 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
     free(recvNodeCoords);
   }
 
-  //MPI_Barrier(MPI_COMM_WORLD);
-  if (rank==0) CkPrintf("Received node coords, send shared...\n");
 
-  for (int i=rank+1; i<nParts; i++) {  // recv shared node lists
+  for (int i=rank+1; i<=sendUpperBound; i++) {  // recv shared node lists (from the partitions in any order)
     int *sharedNodes;
     MPI_Status status;
     int source, length;
@@ -160,8 +139,7 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
     // don't delete sharedNodes! we kept a pointer to it!
   }
 
-  //MPI_Barrier(MPI_COMM_WORLD);
-  if (rank==0) CkPrintf("Received shared...\n");
+  if (rank==0) CkPrintf("Received new shared node lists...\n");
 
   // IMPLEMENT ME: use sharedNodeLists and sharedNodeCounts to move shared node data 
   // to IDXL
@@ -178,13 +156,17 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
       }
     }
   }
+  
+  
+  MPI_Barrier(MPI_COMM_WORLD);
 
-  //MPI_Barrier(MPI_COMM_WORLD);
   if (rank==0) CkPrintf("Recreation of shared nodes complete...\n");
 
   //printf("After recreating shared nodes %d \n",rank);
   //shared.print();
 	
+  CkAssert(send_count + recv_count == nParts-1);
+
   // Clean up
   free(nodeCoords);
   free(sharedNodeCounts);
@@ -193,8 +175,6 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
       free(sharedNodeLists[i]);
   }
   free(sharedNodeLists);
-  //MPI_Barrier(MPI_COMM_WORLD);
-  if (rank==0) CkPrintf("All cleaned up.\n");
 }
 
 void ParFUM_createComm(int meshid, int dim, MPI_Comm comm)

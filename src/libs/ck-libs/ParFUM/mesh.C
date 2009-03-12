@@ -6,7 +6,6 @@ Orion Sky Lawlor, olawlor@acm.org, 12/20/2002
 FEM Implementation file: mesh creation and user-data manipulation.
 */
 
-#include "ParFUM.h"
 #include "ParFUM_internals.h"
 
 extern int femVersion;
@@ -1039,8 +1038,8 @@ void FEM_VarIndexAttribute::get(void *dest, int firstItem,int length,
 
 void FEM_VarIndexAttribute::copyEntity(int dstEntity,const FEM_Attribute &_src,int srcEntity){
 	FEM_VarIndexAttribute &src = (FEM_VarIndexAttribute &)_src;
-	const CkVec<CkVec<ID> > &srcTable = src.get();
-        CkVec<ID> temp = srcTable[srcEntity];
+	const CkVec<CkVec<ElemID> > &srcTable = src.get();
+        CkVec<ElemID> temp = srcTable[srcEntity];
 	idx.insert(dstEntity, temp);
 }
 
@@ -1048,17 +1047,17 @@ void FEM_VarIndexAttribute::print(){
 	for(int i=0;i<idx.size();i++){
 		printf("%d -> ",i);
 		for(int j=0;j<idx[i].size();j++){
-			printf("(%d %d) ",((idx[i])[j]).type,((idx[i])[j]).id);
+			printf("(%d) ",((idx[i])[j]).id);
 		}
 		printf("\n");
 	}
 };
 
-int FEM_VarIndexAttribute::findInRow(int row,const ID &data){
+int FEM_VarIndexAttribute::findInRow(int row, const ElemID &data){
 	if(row >= idx.length()){
 		return -1;
 	}
-	CkVec<ID> &rowVec = idx[row];
+	CkVec<ElemID> &rowVec = idx[row];
 	for(int i=0;i<rowVec.length();i++){
 		if(data == rowVec[i]){
 			return i;

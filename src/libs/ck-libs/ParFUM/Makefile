@@ -7,7 +7,7 @@ MPICC=$(CDIR)/bin/mpiCC $(OPTS)
 INTERNALHEADERS= ParFUM_internals.h ParFUM_locking.h ParFUM_Mesh_Modify.h ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUM_Interpolate.h ParFUM_SA.h import.h adapt_adj.h bulk_adapt_ops.h bulk_adapt.h
 
 #Headers to be copied to include directory so application users can see them
-HEADERS= ParFUM.h ParFUMf.h  $(INTERNALHEADERS)
+HEADERS= ParFUM.h ParFUMf.h ParFUM_Types.h $(INTERNALHEADERS)
 
 #Headers generated from .ci files
 GENHEADERS= ParFUM.def.h ParFUM.decl.h ParFUM_Adapt.decl.h ParFUM_Adapt.def.h ParFUM_SA.def.h ParFUM_SA.decl.h

@@ -43,6 +43,9 @@
 #include "cklists.h"
 #include "pup.h"
 
+#include "ParFUM.h"
+
+
 #if CMK_STL_USE_DOT_H /* Pre-standard C++ */
 #  include <iostream.h>
 #else /* ISO C++ */
@@ -245,7 +248,7 @@ class BasicTable2d : public CkNoncopyable {
 /** A heap-allocatable, resizable BasicTable2d.
  * To be stored here, T must not require a copy constructor.
  */
-template <class T>
+template <class BasicTable2dT>
 class AllocTable2d : public BasicTable2d<T> {
   ///Maximum number of rows that can be used without reallocation
   int max;
@@ -601,82 +604,57 @@ PUPmarshall(FEM_IndexAttribute);
   is mapped to a list of element indices of unknown length.
 */
 class FEM_VarIndexAttribute : public FEM_Attribute{
- public:
-	 
-/** A reference to an element(contains both type and index). Ghost indices are handled correctly here */
-  class ID{
-  public:
-    ///type is negative for ghost elements
-    int type;
-    ///id refers to the index in the entity list
-    int id;
 
-    ///default constructor
-    ID(){
-      type=-1;
-      id = -1;
-    };
-    ///constructor - initializer
-    ID(int _type,int _id){
-      if(_id < 0) {
-    	  type = -(_type+1);
-    	  id = FEM_To_ghost_index(_id);
-      }
-      else {
-    	  type = _type;
-    	  id = _id;
-      }
-    };
-    bool operator ==(const ID &rhs)const {
-      return (type == rhs.type) && (id == rhs.id);
-    }
-    bool operator < (const ID &rhs)const {
-       return (type < rhs.type) || ( type == rhs.type && id < rhs.id);
-     }
-    const ID& operator =(const ID &rhs) {
-      type = rhs.type;
-      id = rhs.id;
-      return *this;
-    }
-    virtual void pup(PUP::er &p){
-      p | type;
-      p | id;
-    };
-
-    static ID createNodeID(int type,int node){
-      ID temp(type, node);
-      return temp;
-    }
-    int getSignedId() {
-      if(type<0){
-    	  return FEM_From_ghost_index(id);
-      }
-      else return id;
-    }
-    int getSignedType(){
-    	return type;
-    }
-    /** Return the element's type. This is necessary because the type member itself is negative for ghosts(for some stupid reason) */
-    int getUnsignedType(){
-    	if(type>=0)
-    		return type;
-    	else 
-    		return -(type+1);
-    }
-        
-    void println(){
-    	if(type<0){
-    		CkPrintf("ghost element with type=%d, id=%d\n", getUnsignedType(), id);    		
-    	} else    {
-    		CkPrintf("element with type=%d, id=%d\n", getUnsignedType(), id);    		
-    	}
-
-    }
+/* /\**  */
+/*     A reference to an an entity. Internally this stores a signed  */
+/*     integer that can be interpreted a number of different ways. */
+/* *\/ */
+/*   class ID{ */
+/*   public: */
+/*     ///id refers to the index in the entity list */
+/*     int id; */
     
-  };
+/*     ///default constructor */
+/*     ID(){ */
+/*       id = -1; */
+/*     }; */
+/*     ///constructor - initializer */
+/*     ID(int _id){ */
+/*       id = _id; */
+/*     }; */
+/*     bool operator ==(const ID &rhs)const { */
+/*       return (id == rhs.id); */
+/*     } */
+/*     bool operator < (const ID &rhs)const { */
+/*       return (id < rhs.id); */
+/*     } */
+
+/*     const ID& operator =(const ID &rhs) { */
+/*       id = rhs.id; */
+/*       return *this; */
+/*     } */
+    
+/*     static ID createNodeID(int node){ */
+/*       ID temp(node); */
+/*       return temp; */
+/*     } */
+
+/*     int getSignedId() { */
+/*       return id; */
+/*     } */
+
+/*     void pup(PUP::er &p) { */
+/*       p|id; */
+/*     } */
+
+   
+/*   }; */
+  
+  
+  
  private:
   typedef FEM_Attribute super;
-  CkVec<CkVec<ID> > idx;
+  CkVec<CkVec<ElemID> > idx;
   int oldlength;
  protected:
   virtual void allocate(int _length,int _width,int _datatype){
@@ -685,7 +663,7 @@ class FEM_VarIndexAttribute : public FEM_Attribute{
       oldlength = _length*2;
       idx.reserve(oldlength);
       for(int i=idx.size();i<oldlength;i++){
-	CkVec<ID> tempVec;
+	CkVec<ElemID> tempVec;
 	idx.insert(i,tempVec);
       }
     }
@@ -695,8 +673,8 @@ class FEM_VarIndexAttribute : public FEM_Attribute{
   ~FEM_VarIndexAttribute(){};
   virtual void pup(PUP::er &p);
   virtual void pupSingle(PUP::er &p, int pupindx);
-  CkVec<CkVec<ID> > &get(){return idx;};
-  const CkVec<CkVec<ID> > &get() const {return idx;};
+  CkVec<CkVec<ElemID> > &get(){return idx;};
+  const CkVec<CkVec<ElemID> > &get() const {return idx;};
 
   virtual void set(const void *src,int firstItem,int length,
 		   const IDXL_Layout &layout,const char *caller);
@@ -706,7 +684,7 @@ class FEM_VarIndexAttribute : public FEM_Attribute{
 
   virtual void copyEntity(int dstEntity,const FEM_Attribute &src,int srcEntity);
 
-  int findInRow(int row,const ID &data);
+  int findInRow(int row,const ElemID &data);
 
   void print();
 };
@@ -1006,7 +984,7 @@ class FEM_Node : public FEM_Entity {
   
   FEM_VarIndexAttribute *nodeAdjacency; ///< stores the node to node adjacency vector
 
-  typedef FEM_VarIndexAttribute::ID var_id;
+  typedef ElemID var_id;
  protected:
   virtual void create(int attr,const char *caller);
  public:
@@ -1396,11 +1374,11 @@ class FEM_Mesh : public CkNoncopyable {
   /// nbr is the i-th element adjacent to e
   int e2e_getIndex(int e, int nbr, int etype=0);
   /// Same as previous but also returning the element type
-  FEM_VarIndexAttribute::ID e2e_getElem(int idx, int nbr, int etype=0);
+  ElemID e2e_getElem(int idx, int nbr, int etype=0);
   /// Get an element adjacent to elem across its nbr'th face
-  FEM_VarIndexAttribute::ID e2e_getElem(FEM_VarIndexAttribute::ID elem, int nbr);
+  ElemID e2e_getElem(ElemID elem, int nbr);
   /// Same as above
-  FEM_VarIndexAttribute::ID e2e_getElem(FEM_VarIndexAttribute::ID *elem, int nbr);
+  ElemID e2e_getElem(ElemID *elem, int nbr);
   /// Set the element adjacencies of element e to neighbors; assumes neighbors
   /// has the correct size
   void e2e_setAll(int e, int *neighbors, int etype=0);
@@ -1409,12 +1387,12 @@ class FEM_Mesh : public CkNoncopyable {
   /// Find element oldNbr in e's adjacent elements and replace with newNbr
   void e2e_replace(int e, int oldNbr, int newNbr, int etype=0);
   /// Find element oldNbr in e's adjacent elements and replace with newNbr
-  void e2e_replace(FEM_VarIndexAttribute::ID e, FEM_VarIndexAttribute::ID oldNbr, FEM_VarIndexAttribute::ID newNbr); 
+  void e2e_replace(ElemID e, ElemID oldNbr, ElemID newNbr); 
   
   /// Remove all neighboring elements in adjacency
   void e2e_removeAll(int e, int etype=0);
 
-  void e2e_printAll(FEM_VarIndexAttribute::ID e); 
+  void e2e_printAll(ElemID e); 
 
   
 
@@ -1463,10 +1441,10 @@ class FEM_Mesh : public CkNoncopyable {
   void n2e_getAll(int n, int *&adjelements, int &sz);
  
   /// Return a reference to the structure holding all the elements adjacent to a node
-  const CkVec<FEM_VarIndexAttribute::ID> & n2e_getAll(int n); 
+  const CkVec<ElemID> & n2e_getAll(int n); 
   
   /// Get one of node n's adjacent elements
-  FEM_VarIndexAttribute::ID  n2e_getElem(int n, int whichAdjElem);
+  ElemID  n2e_getElem(int n, int whichAdjElem);
   /// Adds newElem to node n's element adjacency list
   void n2e_add(int n, int newElem);
   /// Removes oldElem from n's element adjacency list
