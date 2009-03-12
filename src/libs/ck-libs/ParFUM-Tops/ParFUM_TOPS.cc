@@ -182,7 +182,7 @@ TopModel* topModel_Create_Init(){
 
   // Setup the adjacency lists
   
-  setTableReferences(model);
+  setTableReferences(model, true);
   return model;
 }
 
@@ -233,7 +233,7 @@ TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
     FEM_Mesh_data(which_mesh,FEM_ELEM+TOP_ELEMENT_TET4,ATT_ELEM_N2E_CONN,temp_array, 0, 1, FEM_INT, connSize);
     free(temp_array);
 
-    setTableReferences(model);
+    setTableReferences(model, true);
     
     // Setup the adjacencies
     int nodesPerTuple = 3;
