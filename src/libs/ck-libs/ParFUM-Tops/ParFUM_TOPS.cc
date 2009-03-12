@@ -360,7 +360,7 @@ TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
           printf("Copying model attribute of size %d\n", model->model_attr_size);
             cudaMalloc((void**)&(model->device_model.mAttDevice),
                     model->model_attr_size);
-            cudaMemcpy(model->device_model.mAttDevice,mAtt,model->model_attr_size,
+            cudaMemcpy(model->device_model.mAttDevice,model->mAtt,model->model_attr_size,
                     cudaMemcpyHostToDevice);
         }
     }
@@ -400,6 +400,38 @@ void top_retrieve_elem_data(TopModel* m){
 #endif
 }
 
+
+/** Copy elem attribute array to CUDA device from the ParFUM attribute */
+void top_put_elem_data(TopModel* m) {
+#if CUDA
+  cudaMemcpy(m->device_model.ElemDataDevice,
+	     m->ElemData_T->getData(),
+	     m->num_local_elem * m->elem_attr_size,
+	     cudaMemcpyHostToDevice);
+#endif
+}
+
+
+/** Copy node and elem attribute arrays to CUDA device from the ParFUM attribute */
+void top_put_data(TopModel* m) {
+#if CUDA
+    top_put_node_data(m);
+    top_put_elem_data(m);
+    cudaMemcpy(m->device_model.mAttDevice,m->mAtt,m->model_attr_size,
+            cudaMemcpyHostToDevice);
+#endif
+}
+
+
+/** Copy node and elem attribute arrays from CUDA device to the ParFUM attribute */
+void top_retrieve_data(TopModel* m) {
+#if CUDA
+    top_retrieve_node_data(m);
+    top_retrieve_elem_data(m);
+    cudaMemcpy(m->mAtt,m->device_model.mAttDevice,m->model_attr_size,
+            cudaMemcpyDeviceToHost);
+#endif
+}
 
 
 /** Cleanup a model */

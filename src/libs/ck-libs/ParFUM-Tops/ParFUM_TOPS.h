@@ -252,8 +252,11 @@ void topModel_TestIterators(TopModel*m);
 
 void top_retrieve_elem_data(TopModel* m);
 void top_retrieve_node_data(TopModel* m);
+void top_put_elem_data(TopModel* m);
 void top_put_node_data(TopModel* m);
 
+void top_retrieve_data(TopModel* m);
+void top_put_data(TopModel* m);
 
 //==============================================================
 //   New functions that have been implemented
