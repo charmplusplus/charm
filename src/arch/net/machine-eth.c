@@ -831,10 +831,12 @@ static void sendBarrierMessage(int pe)
   char buf[32];
   OtherNode  node = nodes + pe;
   int retval = -1;
+  if (dataskt!=-1) {
   while (retval == -1) {
      retval = sendto(dataskt, (char *)buf, 32, 0,
 	 (struct sockaddr *)&(node->addr),
 	 sizeof(struct sockaddr_in));
+  }
   }
 }
 
