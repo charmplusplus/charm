@@ -14,7 +14,7 @@ mainmodule main {
 
   mainchare Main {
     entry Main(CkArgMsg *msg);
-    entry void proxyCheckIn();
+    entry void initCheckIn();
     entry void patchCheckIn();
   };
 

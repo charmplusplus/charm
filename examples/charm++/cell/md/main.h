@@ -2,8 +2,8 @@
 #define __MAIN_H__
 
 
-#include "main.decl.h"
 #include "md_config.h"
+#include "main.decl.h"
 
 
 // DMK - DEBUG - Until a general Charm++ API for aligned memory buffers is defined,
@@ -48,7 +48,7 @@ class Main : public CBase_Main {
     ~Main();
 
     /// Entry Methods ///
-    void proxyCheckIn();
+    void initCheckIn();
     void patchCheckIn();
 
 };

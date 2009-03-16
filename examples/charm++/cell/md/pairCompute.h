@@ -2,7 +2,9 @@
 #define __PAIR_COMPUTE_H__
 
 
+#include "md_config.h"
 #include "pairCompute.decl.h"
+#include "patch.decl.h"
 
 
 class PairCompute : public CBase_PairCompute {
@@ -27,14 +29,20 @@ class PairCompute : public CBase_PairCompute {
     float* forceY[2];
     float* forceZ[2];
 
+    #if USE_PROXY_PATCHES != 0
+      CProxy_ProxyPatch proxyPatchProxy[2];
+    #endif
+
   public:
 
     /// Constructor(s) \ Destructor ///
-    PairCompute(int numParticlesPerPatch);
+    PairCompute();
     PairCompute(CkMigrateMessage *msg);
     ~PairCompute();
 
     /// Entry Methods ///
+    void init(int numParticlesPerPatch);
+    void patchData(int numParticles, float* particleX, float* particleY, float* particleZ, float* particleQ, int fromPatch, CProxy_ProxyPatch proxyPatchProxy);
     void patchData(int numParticles, float* particleX, float* particleY, float* particleZ, float* particleQ, int fromPatch);
     void doCalc_callback();
 

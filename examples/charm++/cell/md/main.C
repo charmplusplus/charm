@@ -57,10 +57,18 @@ Main::Main(CkArgMsg* msg) {
   CkPrintf("MD Simulation\n"
            "  Patch Grid: x:%d by y:%d by z:%d\n"
            "  NumParticlesPerPatch: %d\n"
-           "  Simulation Steps: %d\n",
+           "  Simulation Steps: %d\n"
+           #if USE_PROXY_PATCHES != 0
+           "  Proxy Patches Enabled\n"
+           #endif
+           #if USE_ARRAY_SECTIONS != 0
+           "  Array Sections Enabled\n"
+           #endif
+           "  StepPerPrint: %d\n",
            numPatchesX, numPatchesY, numPatchesZ,
            numParticlesPerPatch,
-           numStepsRemaining
+           numStepsRemaining,
+           STEPS_PER_PRINT
 	  );
 
   // DMK - DEBUG
@@ -76,20 +84,25 @@ Main::Main(CkArgMsg* msg) {
   mainProxy = thisProxy;
 
   // Create the patch array
-  patchArrayProxy = CProxy_Patch::ckNew(numParticlesPerPatch, numPatchesX, numPatchesY, numPatchesZ);
+  patchArrayProxy = CProxy_Patch::ckNew(numPatchesX, numPatchesY, numPatchesZ);
 
   // Create the self compute array
-  selfComputeArrayProxy = CProxy_SelfCompute::ckNew(numParticlesPerPatch, numPatchesX, numPatchesY, numPatchesZ);
+  selfComputeArrayProxy = CProxy_SelfCompute::ckNew(numPatchesX, numPatchesY, numPatchesZ);
 
   // Create the pair compute array
   pairComputeArrayProxy = CProxy_PairCompute::ckNew();
   const int numPatches = numPatchesX * numPatchesY * numPatchesZ;
   for (int p0 = 0; p0 < numPatches; p0++) {
     for (int p1 = p0 + 1; p1 < numPatches; p1++) {
-      pairComputeArrayProxy(p0, p1).insert(numParticlesPerPatch);
+      pairComputeArrayProxy(p0, p1).insert();
     }
   }
   pairComputeArrayProxy.doneInserting();
+
+  // Start initialization (NOTE: Patch will initiate proxy patches directly if proxy patches are being used)
+  patchArrayProxy.init(numParticlesPerPatch);
+  selfComputeArrayProxy.init(numParticlesPerPatch);
+  pairComputeArrayProxy.init(numParticlesPerPatch);
 }
 
 
@@ -97,11 +110,14 @@ Main::~Main() {
 }
 
 
-void Main::proxyCheckIn() {
+void Main::initCheckIn() {
 
   static int numCheckedIn = 0;
   const int numPatches = numPatchesX * numPatchesY * numPatchesZ;
-  const int numToCheckIn = (2 * numPatches) + ((numPatches * (numPatches - 1)) / 2);
+  int numToCheckIn = (2 * numPatches) + ((numPatches * (numPatches - 1)) / 2);
+  #if USE_PROXY_PATCHES != 0
+    numToCheckIn += (numPatches * CkNumPes());
+  #endif
 
   // Count this caller and check to see if everyone has called
   numCheckedIn++;
@@ -115,7 +131,7 @@ void Main::proxyCheckIn() {
     const int numStepsToDo = (numStepsRemaining > STEPS_PER_PRINT) ? (STEPS_PER_PRINT) : (numStepsRemaining);
     patchArrayProxy.startIterations(numStepsToDo);
     CkPrintf("Main::patchCheckIn() - Starting Simulation (%d steps remaining)...\n", numStepsRemaining);
-    numStepsRemaining -= numStepsToDo - 1;
+    numStepsRemaining -= numStepsToDo - 1;    
   }
 }
 

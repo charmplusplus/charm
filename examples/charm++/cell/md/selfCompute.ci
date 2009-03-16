@@ -5,20 +5,29 @@ module selfCompute {
 
   array[3D] SelfCompute {
 
-    entry SelfCompute(int numParticlesPerPatch);
+    entry SelfCompute();
 
-    entry [accel] void doCalc(int numParticles,
-                              float particleX[numParticles],
-                              float particleY[numParticles],
-                              float particleZ[numParticles],
-                              float particleQ[numParticles]
-                             )[
-                               readonly : int thisIndex_x <impl_obj->thisIndex.x>,
-                               readonly : int thisIndex_y <impl_obj->thisIndex.y>,
-                              writeonly : float f0_x[numParticles] <impl_obj->forceX>,
-                              writeonly : float f0_y[numParticles] <impl_obj->forceY>,
-                              writeonly : float f0_z[numParticles] <impl_obj->forceZ>
-                             ] {
+    entry void init(int numParticlesPerPatch);
+
+    entry void patchData(int numParticles,
+                         float particleX[numParticles],
+                         float particleY[numParticles],
+                         float particleZ[numParticles],
+                         float particleQ[numParticles]
+                        );
+
+    entry [accel] void doCalc()[
+                                 readonly : int numParticles <impl_obj->numParticles>,
+                                 readonly : int thisIndex_x <impl_obj->thisIndex.x>,
+                                 readonly : int thisIndex_y <impl_obj->thisIndex.y>,
+                                 readonly : float particleX[numParticles] <impl_obj->particleX>,
+                                 readonly : float particleY[numParticles] <impl_obj->particleY>,
+                                 readonly : float particleZ[numParticles] <impl_obj->particleZ>,
+                                 readonly : float particleQ[numParticles] <impl_obj->particleQ>,
+                                writeonly : float f0_x[numParticles] <impl_obj->forceX>,
+                                writeonly : float f0_y[numParticles] <impl_obj->forceY>,
+                                writeonly : float f0_z[numParticles] <impl_obj->forceZ>
+                               ] {
 
       // Calculate the electrostatic force (coulumb's law) between the particles
       //   F = (k_e * (q_0 * q_1)) / (r^2)

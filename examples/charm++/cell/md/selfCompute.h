@@ -2,8 +2,9 @@
 #define __SELF_COMPUTE_H__
 
 
-#include "selfCompute.decl.h"
 #include "md_config.h"
+#include "selfCompute.decl.h"
+#include "patch.h"
 
 
 class SelfCompute : public CBase_SelfCompute {
@@ -14,20 +15,29 @@ class SelfCompute : public CBase_SelfCompute {
 
   private:
 
-    /// Force Buffers ///
+    /// Member Variables ///
     int numParticles;
+    float* particleX;
+    float* particleY;
+    float* particleZ;
+    float* particleQ;
     float* forceX;
     float* forceY;
     float* forceZ;
 
+    CProxy_ProxyPatch proxyPatchProxy;
+
   public:
 
     /// Constructor(s) \ Destructor ///
-    SelfCompute(int numParticlesPerPatch);
+    SelfCompute();
     SelfCompute(CkMigrateMessage* msg);
     ~SelfCompute();
 
     /// Entry Methods ///
+    void init(int numParticlesPerPatch);
+    void patchData(int numParticles, float* particleX, float* particleY, float* particleZ, float* particleQ, CProxy_ProxyPatch proxyPatchProxy);
+    void patchData(int numParticles, float* particleX, float* particleY, float* particleZ, float* particleQ);
     void doCalc_callback();
 
 };

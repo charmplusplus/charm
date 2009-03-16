@@ -5,7 +5,7 @@ CHARMC = $(CHARM_BIN_DIR)/charmc $(OPTS)
 PGM = md
 
 default: all
-all: $(PGM)
+all: $(PGM) $(PGM)_proj
 
 OBJS = main.o patch.o selfCompute.o pairCompute.o
 SPE_LIBS = -spu-lib m
@@ -40,7 +40,7 @@ main.o: main.h main.C main.decl.h patch.decl.h selfCompute.decl.h pairCompute.de
 patch.decl.h patch.def.h: patch.ci
 	$(CHARMC) patch.ci
 
-patch.o: patch.h main.h patch.C patch.decl.h main.decl.h patch.def.h
+patch.o: patch.h main.h patch.C patch.decl.h main.decl.h pairCompute.decl.h patch.def.h
 	$(CHARMC) -c patch.C
 
 

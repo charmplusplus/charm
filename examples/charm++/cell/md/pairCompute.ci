@@ -5,7 +5,9 @@ module pairCompute {
 
   array[2D] PairCompute {
 
-    entry PairCompute(int numParticlesPerPatch);
+    entry PairCompute();
+
+    entry void init(int numParticlesPerPatch);
 
     entry void patchData(int numParticles,
                          float particleX[numParticles],

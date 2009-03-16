@@ -12,7 +12,11 @@
 #define DEFAULT_NUM_PATCHES_Z              (2)
 
 #define DEFAULT_NUM_STEPS                 (16)
-#define STEPS_PER_PRINT                    (4)
+#define STEPS_PER_PRINT                   (16)
+
+#define USE_ARRAY_SECTIONS                 (1)
+
+#define USE_PROXY_PATCHES                  (1)
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -38,7 +42,7 @@
 // Misc. Macros for Performance Testing
 
 // DMK - DEBUG
-#define ENABLE_USER_EVENTS        (0)
+#define ENABLE_USER_EVENTS               (1)
 #define PROJ_USER_EVENT_PATCH_FORCECHECKIN_CALLBACK  (1120)
 #define PROJ_USER_EVENT_PATCH_INTEGRATE_CALLBACK     (1121)
 #define PROJ_USER_EVENT_SELFCOMPUTE_DOCALC_CALLBACK  (1130)
@@ -46,7 +50,7 @@
 #define PROJ_USER_EVENT_MACHINEPROGRESS              (1150)
 
 // DMK - DEBUG
-#define ENABLE_NETWORK_PROGRESS   (0)
+#define ENABLE_NETWORK_PROGRESS          (0)
 #if ENABLE_NETWORK_PROGRESS != 0
   #if ENABLE_USER_EVENTS != 0
     #define NetworkProgress  \
