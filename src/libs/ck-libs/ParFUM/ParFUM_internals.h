@@ -248,7 +248,7 @@ class BasicTable2d : public CkNoncopyable {
 /** A heap-allocatable, resizable BasicTable2d.
  * To be stored here, T must not require a copy constructor.
  */
-template <class BasicTable2dT>
+template <class T>
 class AllocTable2d : public BasicTable2d<T> {
   ///Maximum number of rows that can be used without reallocation
   int max;
