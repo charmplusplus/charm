@@ -114,7 +114,7 @@ net-hp               HP-UX          UDP           GNU compiler
 mpi-linux            PC Linux       MPI           GNU compiler
 mpi-ppc-darwin       MacOS X        MPI           GNU C++ compiler
 mpi-linux-ia64       IA64 Linux     MPI           GNU compiler
-mpi-linux-amd64      Opteron Linux  MPI           GNU compiler
+mpi-linux-x86_64     Opteron Linux  MPI           GNU compiler
 mpi-axp              Alpha          MPI           GNU compiler
 mpi-linux-axp        Alpha Linux    MPI           GNU compiler
 origin2000           Origin2000  shared-mem       SGI C++ compiler
