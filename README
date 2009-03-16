@@ -104,7 +104,6 @@ net-win32            Win32          UDP           MS Visual C++
 net-cygwin           Win32/cygwin   UDP           GNU compiler
 mpi-sp               IBM A/IX       MPI           A/IX xlC Compiler 
 mpi-origin           Origin2000     MPI           SGI C++ compiler
-
 net-ppc-darwin       MacOS X        UDP           GNU C++ compiler
 net-linux-ia64       IA64 Linux     UDP/Myrinet   GNU compiler
 net-linux-amd64      Opteron Linux  UDP           GNU compiler
