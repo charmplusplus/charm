@@ -3417,7 +3417,7 @@ void Entry::genAccelIndexWrapperDef_spe(XStr& str) {
 
   ///// Generate callback function /////
 
-  str << "void _accelCall_spe_callback_" << epStr() << "(void* userPtr) {\n"
+  str << "void _accelCall_spe_callback_" << container->baseName() << "_" << epStr() << "(void* userPtr) {\n"
       << "  " << container->indexName() << "::_accelCall_spe_callback_" << epStr() << "(userPtr);\n"
       << "}\n";
 
@@ -3730,7 +3730,7 @@ void Entry::genAccelIndexWrapperDef_spe(XStr& str) {
       << "                                            " << accel_dmaList_numWriteOnly << ",\n"
       << "                                            cbStruct,\n"
       << "                                            WORK_REQUEST_FLAGS_NONE,\n"
-      << "                                            _accelCall_spe_callback_" << epStr() << "\n"
+      << "                                            _accelCall_spe_callback_" << container->baseName() << "_" << epStr() << "\n"
       << "                                           );\n";
 
   str << "}\n\n";
