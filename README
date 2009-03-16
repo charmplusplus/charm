@@ -159,7 +159,7 @@ threads; "sim-" switches between processors and counts communications.
 	"-x86"     For Solaris, use PC hardware (instead of Sun).
 	"-axp"     For Linux, use Alpha hardware (instead of PC).
         "-ia64"    Use Itanium(tm) instructions (instead of x86).
-        "-amd64"   Use AMD Opteron instructions (instead of x86).
+        "-x86_64"  Use AMD Opteron instructions (instead of x86).
 
 Your Charm++ version is made by concatenating the options, e.g.:
 
