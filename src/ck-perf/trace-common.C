@@ -475,6 +475,16 @@ void traceCharmClose(void)
 #endif
 }
 
+/* **CW** This is the API called from user code to support CCS operations 
+   if supported by the underlying trace module.
+ */
+extern "C"
+void traceEnableCCS(void)
+{
+  OPTIMIZE_WARNING
+  CkpvAccess(_traces)->traceEnableCCS();  
+}
+
 /* **CW** Support for thread listeners. This makes a call to each
    trace module which must support the call.
 */

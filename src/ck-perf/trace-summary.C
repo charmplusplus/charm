@@ -16,7 +16,7 @@
 
 #define DEBUGF(x)  // CmiPrintf x
 
-#define VER   7.0
+#define VER   7.1
 
 #define INVALIDEP     -2
 #define TRACEON_EP     -3
@@ -31,7 +31,7 @@ CkpvDeclare(double, binSize);
 CkpvDeclare(double, version);
 
 // Global Readonly
-CProxy_TraceSummaryInit initProxy;
+CkGroupID traceSummaryGID;
 bool summaryCcsStreaming;
 
 int sumonly = 0;
@@ -283,6 +283,28 @@ void SumLogPool::write(void)
   {
     phaseTab.write(fp);
   }
+  // write idle time
+  if (CkpvAccess(version)>=7.1) {
+    fprintf(fp, "IdlePercent: ");
+    int last=pool[0].getUIdle();
+    writeU(fp, last);
+    int count=1;
+    for(j=1; j<numBins; j++) {
+      int u = pool[j].getUIdle();
+      if (last == u) {
+	count++;
+      }
+      else {
+	if (count > 1) fprintf(fp, "+%d", count);
+	writeU(fp, u);
+	last = u;
+	count = 1;
+      }
+    }
+    if (count > 1) fprintf(fp, "+%d", count);
+    fprintf(fp, "\n");
+  }
+
 
   // write summary details
   if (sumDetail) {
@@ -363,9 +385,9 @@ void SumLogPool::writeSts(void)
 }
 
 // Called once per interval
-void SumLogPool::add(double time, int pe) 
+void SumLogPool::add(double time, double idleTime, int pe) 
 {
-  new (&pool[numBins++]) BinEntry(time);
+  new (&pool[numBins++]) BinEntry(time, idleTime);
   if (poolSize==numBins) {
     shrink();
   }
@@ -454,42 +476,17 @@ int  BinEntry::getU()
   return (int)(_time * 100.0 / CkpvAccess(binSize)); 
 }
 
+int BinEntry::getUIdle() {
+  return (int)(_idleTime * 100.0 / CkpvAccess(binSize));
+}
+
 void BinEntry::write(FILE* fp)
 {
   writeU(fp, getU());
 }
 
-void TraceSummaryInit::ccsClientRequest(CkCcsRequestMsg *m) {
-  char *sendBuffer;
-
-  CkPrintf("[%d] Request from Client detected. Data reads as:\n", CkMyPe());
-  CkPrintf("%s\n",m->data);
-  CkPrintf("\n");
-
-  CkPrintf("Responding ...\n");
-  sendBuffer = (char *)ccsBufferedData->getVec();
-  CcsSendDelayedReply(m->reply, ccsBufferedData->length()*sizeof(double), 
-		      sendBuffer);
-  // clear the buffer
-  ccsBufferedData->removeAll();
-  CkPrintf("Response Sent. Proceeding with computation.\n");
-}
-
-void TraceSummaryInit::dataCollected(CkReductionMsg *msg) {
-  // **CWL** No memory management for the ccs buffer for now.
-
-  // CkPrintf("[%d] Reduction completed and received\n", CkMyPe());
-  double *recvData = (double *)msg->getData();
-  int numBins = msg->getSize()/sizeof(double);
-
-  // if there's an easier way to append a data block to a CkVec, I'll take it
-  for (int i=0; i<numBins; i++) {
-    ccsBufferedData->insertAtEnd(recvData[i]);
-  }
-  delete msg;
-}
-
-TraceSummary::TraceSummary(char **argv):binStart(0.0),bin(0.0),msgNum(0)
+TraceSummary::TraceSummary(char **argv):binStart(0.0),
+					binTime(0.0),binIdle(0.0),msgNum(0)
 {
   if (CkpvAccess(traceOnPe) == 0) return;
 
@@ -577,15 +574,26 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
   double ts = binStart;
   // fill gaps
   while ((ts = ts + CkpvAccess(binSize)) < t) {
-     _logPool->add(bin, CkMyPe());
-     bin=0.0;
+    /* Keep as a template for error checking. The current form of this check
+       is vulnerable to round-off errors (eg. 0.001 vs 0.001 the first time
+       I used it). Perhaps an improved form could be used in case vastly
+       incompatible EP vs idle times are reported (binSize*2?).
+
+       This check will have to be duplicated before each call to add()
+
+    CkPrintf("[%d] %f vs %f\n", CkMyPe(),
+	     binTime + binIdle, CkpvAccess(binSize));
+    CkAssert(binTime + binIdle <= CkpvAccess(binSize));
+    */
+     _logPool->add(binTime, binIdle, CkMyPe()); // add leftovers of last bin
+     binTime=0.0;                 // fill all other bins with 0 up till start
+     binIdle = 0.0;
      binStart = ts;
   }
 }
 
 void TraceSummary::endExecute(void)
 {
-//  if (!flag) return;
   double t = TraceTimer();
   double ts = start;
   double nts = binStart;
@@ -608,18 +616,60 @@ void TraceSummary::endExecute(void)
 
   while ((nts = nts + CkpvAccess(binSize)) < t)
   {
-     bin += nts-ts;
+    // fill the bins with time for this entry method
+     binTime += nts-ts;
      binStart  = nts;
-     _logPool->add(bin, CkMyPe()); // This calls shrink() if needed
-     bin = 0;
+     // This calls shrink() if needed
+     _logPool->add(binTime, binIdle, CkMyPe()); 
+     binTime = 0.0;
+     binIdle = 0.0;
      ts = nts;
   }
-  bin += t - ts;
+  binTime += t - ts;
 
   if (sumDetail)
       _logPool->updateSummaryDetail(execEp, start, t);
 
   execEp = INVALIDEP;
+}
+
+void TraceSummary::beginIdle(double currT)
+{
+  // for consistency with current framework behavior, currT is ignored and
+  // independent timing taken by trace-summary.
+  double t = TraceTimer();
+  
+  // mark the time of this idle period. Only the next endIdle should see
+  // this value
+  idleStart = t; 
+  double ts = binStart;
+  // fill gaps
+  while ((ts = ts + CkpvAccess(binSize)) < t) {
+    _logPool->add(binTime, binIdle, CkMyPe()); // add leftovers of last bin
+    binTime=0.0;                 // fill all other bins with 0 up till start
+    binIdle = 0.0;
+    binStart = ts;
+  }
+}
+
+void TraceSummary::endIdle(double currT)
+{
+  // again, we ignore the reported currT (see beginIdle)
+  double t = TraceTimer();
+  double t_idleStart = idleStart;
+  double t_binStart = binStart;
+
+  while ((t_binStart = t_binStart + CkpvAccess(binSize)) < t)
+  {
+    // fill the bins with time for idle
+    binIdle += t_binStart - t_idleStart;
+    binStart = t_binStart;
+    _logPool->add(binTime, binIdle, CkMyPe()); // This calls shrink() if needed
+    binTime = 0.0;
+    binIdle = 0.0;
+    t_idleStart = t_binStart;
+  }
+  binIdle += t - t_idleStart;
 }
 
 void TraceSummary::beginPack(void)
@@ -659,8 +709,9 @@ void TraceSummary::endComputation(void)
   done = 1;
   if (msgNum==0) {
 //CmiPrintf("Add at last: %d pe:%d time:%f msg:%d\n", index, CkMyPe(), bin, msgNum);
-     _logPool->add(bin, CkMyPe());
-     bin = 0.0;
+     _logPool->add(binTime, binIdle, CkMyPe());
+     binTime = 0.0;
+     binIdle = 0.0;
      msgNum ++;
 
      binStart  += CkpvAccess(binSize);
@@ -668,8 +719,9 @@ void TraceSummary::endComputation(void)
      double ts = binStart;
      while (ts < t)
      {
-       _logPool->add(bin, CkMyPe());
-       bin=0.0;
+       _logPool->add(binTime, binIdle, CkMyPe());
+       binTime=0.0;
+       binIdle = 0.0;
        ts += CkpvAccess(binSize);
      }
 
@@ -685,6 +737,12 @@ void TraceSummary::startPhase(int phase)
 {
    _logPool->startPhase(phase);
 }
+
+void TraceSummary::traceEnableCCS() {
+  CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
+  sumProxy.initCCS();
+}
+
 
 void TraceSummary::fillData(double *buffer, double reqStartTime, 
 			    double reqBinSize, int reqNumBins) {
@@ -712,7 +770,114 @@ void TraceSummary::fillData(double *buffer, double reqStartTime,
 
 /// for TraceSummaryBOC
 
-CkGroupID traceSummaryGID;
+void TraceSummaryBOC::initCCS() {
+  // initializing CCS-based parameters on all processors
+  lastRequestedIndexBlock = 0;
+  indicesPerBlock = 1000;
+  collectionGranularity = 0.001; // time in seconds
+  nBufferedBins = 0;
+    
+  // initialize buffer, register CCS handler and start the collection
+  // pulse only on pe 0.
+  if (CkMyPe() == 0) { 
+    ccsBufferedData = new CkVec<double>();
+    
+    CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
+    CkPrintf("Trace Summary now listening in for CCS Client\n");
+    CcsRegisterHandler("CkPerfSummaryCcsClientCB", 
+		       CkCallback(CkIndex_TraceSummaryBOC::ccsClientRequest(NULL), sumProxy[0]));
+    CcdCallOnConditionKeep(CcdPERIODIC_1second, startCollectData,
+			   (void *)this);
+    summaryCcsStreaming = CmiTrue;
+  }
+}
+
+void TraceSummaryBOC::ccsClientRequest(CkCcsRequestMsg *m) {
+  double *sendBuffer;
+
+  CkPrintf("[%d] Request from Client detected. Data reads as:\n", CkMyPe());
+  CkPrintf("%s\n",m->data);
+  CkPrintf("\n");
+
+  CkPrintf("Responding ...\n");
+  int datalength = 0;
+  // if we have no data to send, send an acknowledgement code of -13.37
+  // instead.
+  if (ccsBufferedData->length() == 0) {
+    sendBuffer = new double[1];
+    sendBuffer[0] = -13.37;
+    datalength = sizeof(double);
+    CcsSendDelayedReply(m->reply, datalength, (void *)sendBuffer);
+    delete [] sendBuffer;
+  } else {
+    sendBuffer = ccsBufferedData->getVec();
+    datalength = ccsBufferedData->length()*sizeof(double);
+    CcsSendDelayedReply(m->reply, datalength, (void *)sendBuffer);
+    ccsBufferedData->free();
+  }
+  CkPrintf("Response Sent. Proceeding with computation.\n");
+  delete m;
+}
+
+void startCollectData(void *data, double currT) {
+  CkAssert(CkMyPe() == 0);
+  TraceSummaryBOC *sumObj = (TraceSummaryBOC *)data;
+  int lastRequestedIndexBlock = sumObj->lastRequestedIndexBlock;
+  double collectionGranularity = sumObj->collectionGranularity;
+  int indicesPerBlock = sumObj->indicesPerBlock;
+  
+  double startTime = lastRequestedIndexBlock*
+    collectionGranularity * indicesPerBlock;
+  int numIndicesToGet = (int)floor((currT - startTime)/
+				   collectionGranularity);
+  int numBlocksToGet = numIndicesToGet/indicesPerBlock;
+  // **TODO** consider limiting the total number of blocks each collection
+  //   request will pick up. This is to limit the amount of perturbation
+  //   if it proves to be a problem.
+  CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
+  sumProxy.collectData(startTime, 
+		       collectionGranularity,
+		       numBlocksToGet*indicesPerBlock);
+  // assume success
+  sumObj->lastRequestedIndexBlock += numBlocksToGet; 
+}
+
+void TraceSummaryBOC::collectData(double startTime, double binSize,
+				  int numBins) {
+  // CkPrintf("[%d] asked to contribute performance data\n", CkMyPe());
+
+  double *contribution = new double[numBins];
+  for (int i=0; i<numBins; i++) {
+    contribution[i] = 0.0;
+  }
+  CkpvAccess(_trace)->fillData(contribution, startTime, binSize, numBins);
+
+  /*
+  for (int i=0; i<numBins; i++) {
+    CkPrintf("[%d] %f\n", i, contribution[i]);
+  }
+  */
+
+  CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
+  CkCallback cb(CkIndex_TraceSummaryBOC::dataCollected(NULL), sumProxy[0]);
+  contribute(sizeof(double)*numBins, contribution, CkReduction::sum_double, 
+	     cb);
+}
+
+void TraceSummaryBOC::dataCollected(CkReductionMsg *msg) {
+  CkAssert(CkMyPe() == 0);
+  // **CWL** No memory management for the ccs buffer for now.
+
+  // CkPrintf("[%d] Reduction completed and received\n", CkMyPe());
+  double *recvData = (double *)msg->getData();
+  int numBins = msg->getSize()/sizeof(double);
+
+  // if there's an easier way to append a data block to a CkVec, I'll take it
+  for (int i=0; i<numBins; i++) {
+    ccsBufferedData->insertAtEnd(recvData[i]);
+  }
+  delete msg;
+}
 
 void TraceSummaryBOC::startSumOnly()
 {
@@ -729,25 +894,19 @@ void TraceSummaryBOC::askSummary(int size)
 
   int traced = CkpvAccess(_trace)->traceOnPE();
 
-  BinEntry *bins = new BinEntry[size+1];
-  bins[size] = traced;		// last element is the traced pe count
+  double *reductionBuffer = new double[size+1];
+  reductionBuffer[size] = traced;  // last element is the traced pe count
   if (traced) {
     CkpvAccess(_trace)->endComputation();
     int n = CkpvAccess(_trace)->pool()->getNumEntries();
     BinEntry *localBins = CkpvAccess(_trace)->pool()->bins();
-#if 0
-  CmiPrintf("askSummary on [%d] numEntried=%d\n", CkMyPe(), n);
-#if 1
-  for (int i=0; i<n; i++) CmiPrintf("%4d", localBins[i].getU());
-  CmiPrintf("\n");
-#endif
-#endif
     if (n>size) n=size;
-    for (int i=0; i<n; i++) bins[i] = localBins[i];
+    for (int i=0; i<n; i++) reductionBuffer[i] = localBins[i].time();
   }
 
-  contribute(sizeof(BinEntry)*(size+1), bins, CkReduction::sum_double);
-  delete [] bins;
+  contribute(sizeof(double)*(size+1), reductionBuffer, 
+	     CkReduction::sum_double);
+  delete [] reductionBuffer;
 }
 
 extern "C" void _CkExit();
@@ -815,28 +974,6 @@ void TraceSummaryBOC::write(void)
   fprintf(sumfp, "\n");
   fclose(sumfp);
 
-}
-
-void TraceSummaryBOC::collectData(double startTime, double binSize,
-				  int numBins) {
-  // CkPrintf("[%d] asked to contribute performance data\n", CkMyPe());
-
-  double *contribution = new double[numBins];
-  for (int i=0; i<numBins; i++) {
-    contribution[i] = 0.0;
-  }
-
-  CkpvAccess(_trace)->fillData(contribution, startTime, binSize, numBins);
-
-  // DEBUG - print out pe 0's contribution.
-  /*
-  for (int i=0; i<numBins; i++) {
-    CkPrintf("[%d] %f\n", i, contribution[i]);
-  }
-  */
-  CkCallback cb(CkIndex_TraceSummaryInit::dataCollected(NULL), initProxy);
-  contribute(sizeof(double)*numBins, contribution, CkReduction::sum_double, 
-	     cb);
 }
 
 extern "C" void CombineSummary()

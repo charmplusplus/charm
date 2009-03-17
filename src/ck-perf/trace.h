@@ -26,6 +26,10 @@ class envelope;
 
 // An additional interface for summary data
 extern "C" void traceClearEps();
+
+// **CW** may not be necessary
+extern "C" void traceEnableCCS();
+
 extern double CmiTraceTimer();
 
 extern int _dummyMsg, _dummyChare, _dummyEP;
@@ -129,6 +133,8 @@ class Trace {
     virtual void endComputation(void) {}
     // clear all data collected for entry points
     virtual void traceClearEps() {}
+    // enable CCS operations if supported on the trace module
+    virtual void traceEnableCCS() {}
     // write the summary sts file for this trace
     virtual void traceWriteSts() {}
     // do any clean-up necessary for tracing
@@ -228,6 +234,7 @@ public:
 	  return eno;
     }  
     inline void traceClearEps() {ALLDO(traceClearEps());}
+    inline void traceEnableCCS() {ALLDO(traceEnableCCS());}
     inline void traceWriteSts() {ALLDO(traceWriteSts());}
     inline void traceClose() {ALLDO(traceClose()); clearTrace();}
     inline void traceFlushLog() {ALLDO(traceFlushLog());}

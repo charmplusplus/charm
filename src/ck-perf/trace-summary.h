@@ -37,13 +37,16 @@ class BinEntry {
 #if defined(WIN32) || CMK_MULTIPLE_DELETE
     void operator delete(void *, void *) { }
 #endif
-    BinEntry(): _time(0.) {}
-    BinEntry(double t): _time(t) {}
+    BinEntry(): _time(0.), _idleTime(0.) {}
+    BinEntry(double t, double idleT): _time(t), _idleTime(idleT) {}
     double &time() { return _time; }
+    double &getIdleTime() { return _idleTime; }
     void write(FILE *fp);
     int  getU();
+    int getUIdle();
   private:
     double _time;
+    double _idleTime;
 };
 
 /// a phase entry for trace summary
@@ -211,7 +214,7 @@ class SumLogPool {
     void initMem();
     void write(void) ;
     void writeSts(void);
-    void add(double time, int pe);
+    void add(double time, double idleTime, int pe);
     void setEp(int epidx, double time);
     void clearEps() {
       for(int i=0; i < epInfoSize; i++) {
@@ -242,10 +245,11 @@ class TraceSummary : public Trace {
     int execEp;
     int execPe;
 
-    double binStart;
-    double start, packstart, unpackstart;
-    double bin;
-    int msgNum;
+    /* per-log metadata maintained to derive cross-event information */
+    double binStart; /* time of last filled bin? */
+    double start, packstart, unpackstart, idleStart;
+    double binTime, binIdle;
+    int msgNum; /* used to handle multiple endComputation calls?? */
   public:
     TraceSummary(char **argv);
     void creation(envelope *e, int epIdx, int num=1) {}
@@ -254,6 +258,8 @@ class TraceSummary : public Trace {
     void beginExecute(CmiObjId  *tid);
     void beginExecute(int event,int msgType,int ep,int srcPe, int mlen=0, CmiObjId *idx=NULL);
     void endExecute(void);
+    void beginIdle(double currT);
+    void endIdle(double currT);
     void beginPack(void);
     void endPack(void);
     void beginUnpack(void);
@@ -278,6 +284,11 @@ class TraceSummary : public Trace {
        query utilities
     */
     SumLogPool *pool() { return _logPool; }
+
+    /**
+     *  Supporting methods for CCS queries
+     */
+    void traceEnableCCS();
     void fillData(double *buffer, double reqStartTime, 
 		  double reqBinSize, int reqNumBins);
 };
