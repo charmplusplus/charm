@@ -47,7 +47,7 @@
 #define TOP		3
 #define BOTTOM		4
 
-#define USE_TOPOMAP	0
+#define USE_TOPOMAP	1
 
 double startTime;
 double endTime;
@@ -302,24 +302,35 @@ class JacobiMap : public CkArrayMap {
       TopoManager tmgr;
       // we are assuming that the no. of chares in each dimension is a 
       // multiple of the torus dimension
-      int dimX = tmgr.getDimNX();
-      int dimY = tmgr.getDimNY();
-      int dimZ = tmgr.getDimNZ();
-      int dimT = tmgr.getDimNT();
+      int dimNX = tmgr.getDimNX();
+      int dimNY = tmgr.getDimNY();
+      int dimNZ = tmgr.getDimNZ();
+      int dimNT = tmgr.getDimNT();
 
-      int numCharesPerZ = y/dimZ;
-      int numCharesPerPeX = x / dimX;
-      int numCharesPerPeY = numCharesPerZ / dimY;
+      int numCharesPerPeX = x / dimNX;
+      int numCharesPerPeY = numCharesPerPeX / dimNY;
+      int numCharesPerPeZ = y / dimNZ;
+      int numCharesPerPeT = numCharesPerPeZ / dimNT;
 
-      if(dimT < 2) {    // one core per node
-      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimX, dimY, dimZ, dimT, numCharesPerPeX, numCharesPerPeY, numCharesPerZ);
-      for(int i=0; i<dimX; i++)
-        for(int j=0; j<dimY; j++)
-          for(int k=0; k<dimZ; k++)
-	    for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
-	      for(int cj=j*numCharesPerPeY+k*numCharesPerZ; cj<(j+1)*numCharesPerPeY+k*numCharesPerZ; cj++)
-		mapping[ci][cj] = tmgr.coordinatesToRank(i, j, k);
-      }
+      if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d %d\n", dimNX, dimNY, dimNZ, dimNT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ, numCharesPerPeT);
+
+      for(int i=0; i<dimNX; i++)
+	for(int j=0; j<dimNY; j++)
+	  for(int k=0; k<dimNZ; k++)
+	    for(int l=0; l<dimNT; l++)
+	      for(int ci = i*numCharesPerPeX+j*numCharesPerPeY; ci < i*numCharesPerPeX+(j+1)*numCharesPerPeY; ci++)
+		for(int cj = k*numCharesPerPeZ+l*numCharesPerPeT; cj < k*numCharesPerPeZ+(l+1)*numCharesPerPeT; cj++)
+		  mapping[ci][cj] = tmgr.coordinatesToRank(i, j, k, l);
+
+      /*if(CkMyPe() == 0) {
+	for(int ci=0; ci<x; ci++) {
+	  for(int cj=0; cj<y; cj++) {
+	    CkPrintf("%d ", mapping[ci][cj]);
+	  }
+	  CkPrintf("\n");
+	}
+      }*/
+
     }
 
     ~JacobiMap() {
