@@ -118,8 +118,9 @@ syntax() {
   echo '  ./build Tau --tau-makefile=/usr/local/packages/TAU/x86_64/lib/Makefile.tau-mpi'
   echo ''
   echo 'Note: This script:'
-  echo ' 1. Creates directories <destination> and <destination>/tmp';
-  echo ' 2. Copies src/scripts/Makefile into <destination>/tmp';
+  echo ' 1. Creates directories <destination> and <destination>/tmp'
+  echo ' 2. Copies src/scripts/Makefile into <destination>/tmp'
+  echo ' 3. Does a "make basics" in <destination>/tmp.'
   echo ' 3. Does a "make <target> <version> OPTS=<charmc-options>" in <destination>/tmp.'
   echo "That's all build does.  The rest is handled by the Makefile."
   echo ''
