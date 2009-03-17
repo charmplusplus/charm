@@ -38,6 +38,11 @@ module CkLocation {
     entry CldMap(void);
   };
 
+ group [migratable] ConfigurableRRMap : RRMap {
+    entry ConfigurableRRMap(void);
+  };
+
+
   initnode void _propMapInit(void);
   initproc void _CkMigratable_initInfoInit(void);
 

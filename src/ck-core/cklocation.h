@@ -704,6 +704,16 @@ private:
 	void initLB(CkGroupID lbdbID);
 };
 
+
+
+
+
+/// check the command line arguments to determine if we can use ConfigurableRRMap
+bool haveConfigurableRRMap();
+
+
+
+
 /*@}*/
 
 #endif /*def(thisHeader)*/

@@ -13,6 +13,8 @@ Orion Sky Lawlor, olawlor@acm.org 9/29/2001
 #include "ck.h"
 #include "trace.h"
 
+#include<sstream>
+
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
 #endif // CMK_LBDB_ON
@@ -419,6 +421,142 @@ public:
   }
 
 };
+
+
+/// A class responsible for parsing the command line arguments for the PE
+/// to extract the format string passed in with +ConfigurableRRMap
+class ConfigurableRRMapLoader {
+public:
+  
+  int *locations;
+  int objs_per_block;
+  int PE_per_block;
+
+  /// labels for states used when parsing the ConfigurableRRMap from ARGV
+  enum ConfigurableRRMapLoadStatus{
+    not_loaded,
+    loaded_found,
+    loaded_not_found
+  };
+  
+  enum ConfigurableRRMapLoadStatus state;
+  
+  ConfigurableRRMapLoader(){
+    state = not_loaded;
+    locations = NULL;
+    objs_per_block = 0;
+    PE_per_block = 0;
+  }
+  
+  /// load configuration if possible, and return whether a valid configuration exists
+  bool haveConfiguration() {
+    CkPrintf("[%d] haveConfiguration()\n", CkMyPe());
+    if(state == not_loaded) {
+      CkPrintf("[%d] loading ConfigurableRRMap configuration\n", CkMyPe());
+      char **argv=CkGetArgv();
+      char *configuration = NULL;
+      bool found = CmiGetArgString(argv, "+ConfigurableRRMap", &configuration);
+      if(!found){
+	CkPrintf("Couldn't find +ConfigurableRRMap command line argument\n");
+	state = loaded_not_found;
+	return false;
+      } else {
+	CkPrintf("Found +ConfigurableRRMap command line argument in %p=\"%s\"\n", configuration, configuration);
+	
+	std::istringstream instream(configuration);
+	CkAssert(instream.good());
+	 
+	// Example line:
+	// 10 8 0 1 2 3 4 5 6 7 7 7 7
+	// Map 10 objects to 8 PEs, with each object's index among the 8 PEs.
+	
+	// extract first integer
+	instream >> objs_per_block >> PE_per_block;
+	CkAssert(instream.good());
+	CkAssert(objs_per_block > 0);
+	CkAssert(PE_per_block > 0);
+	locations = new int[objs_per_block];
+	for(int i=0;i<objs_per_block;i++){
+	  locations[i] = 0;
+	  CkAssert(instream.good());
+	  instream >> locations[i];
+	  CkAssert(locations[i] < PE_per_block);
+	}
+	state = loaded_found;
+	return true;
+      }
+
+    } else {
+      CkPrintf("[%d] ConfigurableRRMap has already been loaded\n", CkMyPe());
+      return state == loaded_found;
+    }      
+     
+  }
+  
+};
+
+CkpvDeclare(ConfigurableRRMapLoader, myConfigRRMapState);
+
+/// Try to load the command line arguments for ConfigurableRRMap
+bool haveConfigurableRRMap(){
+  CkPrintf("haveConfigurableRRMap()\n");
+  ConfigurableRRMapLoader &loader =  CkpvAccess(myConfigRRMapState);
+  return loader.haveConfiguration();
+}
+
+class ConfigurableRRMap : public RRMap
+{
+public:
+  ConfigurableRRMap(void){
+	DEBC((AA"Creating ConfigurableRRMap\n"AB));
+  }
+  ConfigurableRRMap(CkMigrateMessage *m):RRMap(m){ }
+
+
+  void populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void *ctorMsg,CkArrMgr *mgr){
+    // Try to load the configuration from command line argument
+    CkAssert(haveConfigurableRRMap());
+    ConfigurableRRMapLoader &loader =  CkpvAccess(myConfigRRMapState);
+    if (numElements.nInts==0) {
+      CkFreeMsg(ctorMsg);
+      return;
+    }
+    int thisPe=CkMyPe();
+    int numPes=CkNumPes();
+    int maxIndex = numElements.data()[0];
+    CkPrintf("[%d] ConfigurableRRMap: index=%d,%d,%d\n", CkMyPe(),(int)numElements.data()[0], (int)numElements.data()[1], (int)numElements.data()[2]);
+
+    if (numElements.nInts != 1) {
+      CkAbort("ConfigurableRRMap only supports dimension 1!");
+    }
+	
+    for (int index=0; index<maxIndex; index++) {	
+      CkArrayIndex1D idx(index);		
+      
+      int cyclic_block = index / loader.objs_per_block;
+      int cyclic_local = index % loader.objs_per_block;
+      int l = loader.locations[ cyclic_local ];
+      int PE = (cyclic_block*loader.PE_per_block + l) % CkNumPes();
+      
+      CkPrintf("[%d] ConfigurableRRMap: index=%d is located on PE %d l=%d\n", CkMyPe(), (int)index, (int)PE, l);
+	  
+      if(PE == thisPe)
+	mgr->insertInitial(idx,CkCopyMsg(&ctorMsg));	
+
+    }
+    //        CKARRAYMAP_POPULATE_INITIAL(PE == thisPe);
+	
+    mgr->doneInserting();
+    CkFreeMsg(ctorMsg);
+  }
+};
+
+
+
+
+
+
+
 
 CkpvStaticDeclare(double*, rem);
 

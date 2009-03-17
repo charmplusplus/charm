@@ -704,17 +704,25 @@ CkGroupID CkCreatePropMap(void);
 
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
 {
+  char *tmp;
+  char **argv=CkGetArgv();
   CkArrayOptions opts(msg->numElements);
   CkAssert(CkpvAccess(mapCreated)==1);
-  if(mapping==NULL){
+
+  if(haveConfigurableRRMap()){
+    CkPrintf("USING ConfigurableRRMap\n");
+    mapID=CProxy_ConfigurableRRMap::ckNew();
+  } else if(mapping==NULL){
 #if CMK_BLUEGENE_CHARM
     mapID=CProxy_BlockMap::ckNew();
 #else
     mapID=CkCreatePropMap();
 #endif
   }else if(0==strcmp(mapping,"BLOCK_MAP")){
+    CkPrintf("USING BLOCK_MAP\n");
     mapID=CProxy_BlockMap::ckNew();
   }else if(0==strcmp(mapping,"RR_MAP")){
+    CkPrintf("USING RR_MAP\n");
     mapID=CProxy_RRMap::ckNew();
   }else{  // "PROP_MAP" or anything else
     mapID=CkCreatePropMap();
