@@ -1519,8 +1519,8 @@ int controlPoint2Pow(const char *name, int fine_granularity, int coarse_granular
   } 
   else {
 
-    int l1 = CmiLog2(fine_granularity);
-    int l2 = CmiLog2(coarse_granularity);
+    int l1 = (int)CmiLog2(fine_granularity);
+    int l2 = (int)CmiLog2(coarse_granularity);
   
     if (l1 > l2){
       int tmp;

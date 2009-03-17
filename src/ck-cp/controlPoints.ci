@@ -4,9 +4,7 @@ module ControlPoints {
   readonly int random_seed;
 
 
-
-  initcall void registerIdleTimeReduction(void);	
-
+  initproc void registerIdleTimeReduction(void);	
 
 
   mainchare controlPointMain {
