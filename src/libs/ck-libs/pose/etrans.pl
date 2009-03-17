@@ -41,7 +41,7 @@ my $incihandle= new FileHandle();
 if(defined($opts{'D'}))
 {
 
-    $incihandle->open(" cpp -D $opts{'D'} $inci| grep -v '^#'|") or die "cannot open $inci";
+    $incihandle->open(" cpp -D$opts{'D'} $inci| grep -v '^#'|") or die "cannot open $inci";
 }
 else
 {
