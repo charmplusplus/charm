@@ -450,19 +450,25 @@ public:
   
   /// load configuration if possible, and return whether a valid configuration exists
   bool haveConfiguration() {
-    CkPrintf("[%d] haveConfiguration()\n", CkMyPe());
     if(state == not_loaded) {
+#if DEBUG
       CkPrintf("[%d] loading ConfigurableRRMap configuration\n", CkMyPe());
+#endif
       char **argv=CkGetArgv();
       char *configuration = NULL;
       bool found = CmiGetArgString(argv, "+ConfigurableRRMap", &configuration);
       if(!found){
+#if DEBUG
 	CkPrintf("Couldn't find +ConfigurableRRMap command line argument\n");
+#endif
 	state = loaded_not_found;
 	return false;
       } else {
+
+#if DEBUG
 	CkPrintf("Found +ConfigurableRRMap command line argument in %p=\"%s\"\n", configuration, configuration);
-	
+#endif
+
 	std::istringstream instream(configuration);
 	CkAssert(instream.good());
 	 
@@ -487,7 +493,9 @@ public:
       }
 
     } else {
+#if DEBUG
       CkPrintf("[%d] ConfigurableRRMap has already been loaded\n", CkMyPe());
+#endif
       return state == loaded_found;
     }      
      
@@ -499,7 +507,9 @@ CkpvDeclare(ConfigurableRRMapLoader, myConfigRRMapState);
 
 /// Try to load the command line arguments for ConfigurableRRMap
 bool haveConfigurableRRMap(){
+#if DEBUG
   CkPrintf("haveConfigurableRRMap()\n");
+#endif
   ConfigurableRRMapLoader &loader =  CkpvAccess(myConfigRRMapState);
   return loader.haveConfiguration();
 }
@@ -524,7 +534,9 @@ public:
     int thisPe=CkMyPe();
     int numPes=CkNumPes();
     int maxIndex = numElements.data()[0];
+#if DEBUG
     CkPrintf("[%d] ConfigurableRRMap: index=%d,%d,%d\n", CkMyPe(),(int)numElements.data()[0], (int)numElements.data()[1], (int)numElements.data()[2]);
+#endif
 
     if (numElements.nInts != 1) {
       CkAbort("ConfigurableRRMap only supports dimension 1!");
@@ -537,11 +549,13 @@ public:
       int cyclic_local = index % loader.objs_per_block;
       int l = loader.locations[ cyclic_local ];
       int PE = (cyclic_block*loader.PE_per_block + l) % CkNumPes();
-      
+
+#if DEBUG      
       CkPrintf("[%d] ConfigurableRRMap: index=%d is located on PE %d l=%d\n", CkMyPe(), (int)index, (int)PE, l);
-	  
+#endif
+
       if(PE == thisPe)
-	mgr->insertInitial(idx,CkCopyMsg(&ctorMsg));	
+	mgr->insertInitial(idx,CkCopyMsg(&ctorMsg));
 
     }
     //        CKARRAYMAP_POPULATE_INITIAL(PE == thisPe);
