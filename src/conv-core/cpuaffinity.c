@@ -84,7 +84,6 @@ int set_cpu_affinity(int cpuid) {
   }
 
 #ifdef _WIN32
-  //HANDLE hProcess = GetCurrentProcess();
   hProcess = GetCurrentProcess();
   if (SetProcessAffinityMask(hProcess, mask) == 0) {
     return -1;
@@ -118,7 +117,6 @@ int set_thread_affinity(int cpuid) {
   }
 
 #ifdef _WIN32
-  //HANDLE hThread = GetCurrentThread();
   hThread = GetCurrentThread();
   if (SetThreadAffinityMask(hThread, mask) == 0) {
     return -1;
@@ -163,7 +161,21 @@ int print_cpu_affinity() {
     return -1;
   }
 
-  printf("CPU affinity mask is: %08lx\n", mask);
+  printf("[%d] CPU affinity mask is: %08lx\n", CmiMyPe(), mask);
+#endif
+  return 0;
+}
+
+int print_thread_affinity() {
+  unsigned long mask;
+  size_t len = sizeof(mask);
+
+#if  CMK_HAS_PTHREAD_SETAFFINITY
+  if (pthread_getaffinity_np(pthread_self(), len, &mask) < 0) {
+    perror("pthread_setaffinity");
+    return -1;
+  }
+  printf("[%d] pthread affinity mask is: %08lx\n", CmiMyPe(), mask);
 #endif
   return 0;
 }
@@ -221,8 +233,7 @@ static void cpuAffinityHandler(void *m)
   rec->rank ++;
   count ++;
   if (count == CmiNumPes()) {
-    CmiPrintf("Cpuaffinity> %d unique compute nodes detected! \n", CmmEntries(hostTable));
-    //hostnameMsg *tmpm;
+    /* CmiPrintf("Cpuaffinity> %d unique compute nodes detected! \n", CmmEntries(hostTable)); */
     tag = CmmWildCard;
     while (tmpm = CmmGet(hostTable, 1, &tag, &tag1)) CmiFree(tmpm);
     CmmFree(hostTable);
@@ -301,8 +312,8 @@ void CmiInitCPUAffinity(char **argv)
   if (CmiMyPe() >= CmiNumPes()) {         /* this is comm trhead */
       /* comm thread either can float around, or pin down to the last rank.
          however it seems to be reportedly slower if it is floating */
-    set_myaffinitity(CmiNumCores()-1);
     CmiNodeAllBarrier();
+    if (set_myaffinitity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!");
     if (coremap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
     while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
@@ -319,12 +330,12 @@ void CmiInitCPUAffinity(char **argv)
   if (coremap!= NULL) {
     /* each processor finds its mapping */
     int i, ct=1, myrank;
-    for (i=0; i<strlen(coremap); i++) if (coremap[i]==',') ct++;
-    ct = CmiMyPe()%ct;
+    for (i=0; i<strlen(coremap); i++) if (coremap[i]==',' && i<strlen(coremap)-1) ct++;
+    ct = CmiMyRank()%ct;
     i=0;
     while(ct>0) if (coremap[i++]==',') ct--;
     myrank = atoi(coremap+i);
-    /* printf("Charm++> set PE%d on core #%d\n", CmiMyPe(), myrank); */
+     printf("Charm++> set PE%d on node #%d core #%d\n", CmiMyPe(), CmiMyNode(), myrank); 
     if (myrank >= CmiNumCores()) {
       CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", myrank, CmiNumCores(), CmiNumCores()-1);
       CmiAbort("Invalid core number");
@@ -334,12 +345,6 @@ void CmiInitCPUAffinity(char **argv)
     CmiNodeAllBarrier();
     return;
   }
-
-#if 0
-  if (gethostname(hostname, 999)!=0) {
-      strcpy(hostname, "");
-  }
-#endif
 
     /* get my ip address */
   if (CmiMyRank() == 0)
@@ -375,7 +380,7 @@ void CmiInitCPUAffinity(char **argv)
     for (i=0; i<CmiNumPes(); i++) CmiDeliverSpecificMsg(cpuAffinityHandlerIdx);
   }
 
-    // receive broadcast from PE 0
+    /* receive broadcast from PE 0 */
   CmiDeliverSpecificMsg(cpuAffinityRecvHandlerIdx);
   affinity_doneflag++;
   CmiNodeAllBarrier();
