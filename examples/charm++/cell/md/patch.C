@@ -32,11 +32,6 @@ Patch::Patch() {
   forceSumX = forceSumY = forceSumZ = NULL;
   velocityX = velocityY = velocityZ = NULL;
   numParticles = -1;
-
-  #if USE_PROXY_PATCHES != 0
-    const int patchIndex = PATCH_XYZ_TO_I(thisIndex.x, thisIndex.y, thisIndex.z);
-    proxyPatchProxy = CProxy_ProxyPatch::ckNew(patchIndex);
-  #endif
 }
 
 
@@ -65,7 +60,11 @@ void Patch::init(int numParticles) {
 
   // Also tell the proxy patches to initialize
   #if USE_PROXY_PATCHES != 0
+  {
+    const int patchIndex = PATCH_XYZ_TO_I(thisIndex.x, thisIndex.y, thisIndex.z);
+    proxyPatchProxy = CProxy_ProxyPatch::ckNew(patchIndex);
     proxyPatchProxy.init(numParticles);
+  }
   #endif
 
   // Allocate memory for the particles
