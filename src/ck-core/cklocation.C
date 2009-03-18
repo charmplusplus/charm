@@ -505,6 +505,11 @@ public:
 
 CkpvDeclare(ConfigurableRRMapLoader, myConfigRRMapState);
 
+void _initConfigurableRRMap(){
+  CkpvInitialize(ConfigurableRRMapLoader, myConfigRRMapState);
+}
+
+
 /// Try to load the command line arguments for ConfigurableRRMap
 bool haveConfigurableRRMap(){
 #if DEBUG

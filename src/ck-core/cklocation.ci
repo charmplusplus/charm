@@ -42,6 +42,7 @@ module CkLocation {
     entry ConfigurableRRMap(void);
   };
 
+  initproc void _initConfigurableRRMap(void);
 
   initnode void _propMapInit(void);
   initproc void _CkMigratable_initInfoInit(void);
