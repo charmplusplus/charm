@@ -295,4 +295,10 @@ TopElement topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f
 // TODO: fix everything to work with multiple element types
 
 
+bool haveConfigurableCPUGPUMap();
+bool isPartitionCPU(int partition);
+bool isPartitionGPU(int partition);
+
+
+
 #endif

@@ -23,7 +23,7 @@
 #endif
 
 #include <stack>
-
+#include <sstream>
 
 
 
@@ -195,9 +195,18 @@ TopModel* topModel_Create_Init(){
 */
 TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
         int node_attr_sz, int model_attr_sz, void *mAtt) {
-
+  
   CkAssert(ATT_NODE_ID != FEM_COORD);
   CkAssert(ATT_NODE_DATA != FEM_COORD);
+  
+  int partition = FEM_My_partition();
+  if(haveConfigurableCPUGPUMap()){
+    if(isPartitionCPU(partition))
+      CkPrintf("partition %d is on CPU\n", partition);
+    else
+      CkPrintf("partition %d is on GPU\n", partition);
+  }
+
 
     // This only uses a single mesh, so don't create multiple TopModels of these
     CkAssert(elem_attr_sz > 0);
@@ -1070,6 +1079,118 @@ TopElement topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f
 #endif
 	return newCohesiveElement;
 }
+
+
+
+
+#define DEBUG1
+
+
+/// A class responsible for parsing the command line arguments for the PE
+/// to extract the format string passed in with +ConfigurableRRMap
+class ConfigurableCPUGPUMapLoader {
+public:
+  
+  char *locations;
+  int objs_per_block;
+
+  /// labels for states used when parsing the ConfigurableRRMap from ARGV
+  enum loadStatus{
+    not_loaded,
+    loaded_found,
+    loaded_not_found
+  };
+  
+  enum loadStatus state;
+  
+  ConfigurableCPUGPUMapLoader(){
+    state = not_loaded;
+    locations = NULL;
+    objs_per_block = 0;
+  }
+  
+  /// load configuration if possible, and return whether a valid configuration exists
+  bool haveConfiguration() {
+    if(state == not_loaded) {
+#ifdef DEBUG1
+      CkPrintf("[%d] loading ConfigurableCPUGPUMap configuration\n", CkMyPe());
+#endif
+      char **argv=CkGetArgv();
+      char *configuration = NULL;
+      bool found = CmiGetArgString(argv, "+ConfigurableCPUGPUMap", &configuration);
+      if(!found){
+#ifdef DEBUG1
+	CkPrintf("Couldn't find +ConfigurableCPUGPUMap command line argument\n");
+#endif
+	state = loaded_not_found;
+	return false;
+      } else {
+
+#ifdef DEBUG1
+	CkPrintf("Found +ConfigurableCPUGPUMap command line argument in %p=\"%s\"\n", configuration, configuration);
+#endif
+
+	std::istringstream instream(configuration);
+	CkAssert(instream.good());
+	 
+	// Example line:
+	// 5 C G G G C
+	// Modulo 5; The first and fifth VPs are on CPU, the second, third, and forth are on GPUs. 
+
+	// extract first integer
+	instream >> objs_per_block;
+	CkAssert(instream.good());
+	CkAssert(objs_per_block > 0);
+	locations = new char[objs_per_block];
+	for(int i=0;i<objs_per_block;i++){
+	  CkAssert(instream.good());
+	  instream >> locations[i];
+	  CkPrintf("location[%d] = '%c'\n", i, locations[i]);
+	  CkAssert(locations[i] == 'G' || locations[i] == 'C');
+	}
+	state = loaded_found;
+	return true;
+      }
+
+    } else {
+#ifdef DEBUG1
+      CkPrintf("[%d] ConfigurableRRMap has already been loaded\n", CkMyPe());
+#endif
+      return state == loaded_found;
+    }      
+     
+  }
+  
+};
+
+CkpvDeclare(ConfigurableCPUGPUMapLoader, myConfigGPUCPUMapLoader);
+
+void _initConfigurableCPUGPUMap(){
+  CkPrintf("Initializing CPUGPU Map!\n");
+  CkpvInitialize(ConfigurableCPUGPUMapLoader, myConfigGPUCPUMapLoader);
+}
+
+
+/// Try to load the command line arguments for ConfigurableRRMap
+bool haveConfigurableCPUGPUMap(){
+  ConfigurableCPUGPUMapLoader &loader =  CkpvAccess(myConfigGPUCPUMapLoader);
+  return loader.haveConfiguration();
+}
+
+
+bool isPartitionCPU(int partition){
+  ConfigurableCPUGPUMapLoader &loader =  CkpvAccess(myConfigGPUCPUMapLoader);
+  int l = partition % loader.objs_per_block;
+  return loader.locations[l] == 'C';
+}
+
+bool isPartitionGPU(int partition){ 
+  return ! isPartitionCPU(partition);
+}
+
+
+
+
 
 
 
