@@ -123,7 +123,6 @@ class Main : public CBase_Main
     // Each worker reports back to here when it completes an iteration
     void report(CkReductionMsg *msg) {
       iterations++;
-      CkPrintf("Completed %d iterations\n", iterations);
       if(iterations == 5)
 	startTime = CmiWallTimer();
       double error = *((double *)msg->getData());
@@ -131,7 +130,7 @@ class Main : public CBase_Main
       if((noBarrier == 0 && iterations < MAX_ITER) || (noBarrier==1 && iterations <= 5)) {
 	array.begin_iteration();
       } else {
-	CkPrintf("Completed %d iterations\n", iterations);
+	CkPrintf("Completed %d iterations\n", MAX_ITER);
         endTime = CmiWallTimer();
         CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(MAX_ITER-5));
         CkExit();
@@ -219,7 +218,7 @@ class Jacobi: public CBase_Jacobi {
 
     void receiveGhosts(int dir, int size, double gh[]) {
       int i, j;
-      // _TRACE_BG_TLINE_END(&storeLogs[msgs]);
+      _TRACE_BG_TLINE_END(&storeLogs[dir-1]);
 
       switch(dir) {
 	case LEFT:
@@ -242,6 +241,8 @@ class Jacobi: public CBase_Jacobi {
 	  for(j=0; j<size; j++)
             temperature[blockDimX+1][j+1] = gh[j];
           break;
+	default:
+	  CkAbort("ERROR\n");
       }
       check_and_compute();
     }
@@ -256,10 +257,10 @@ class Jacobi: public CBase_Jacobi {
 	arrived_top--;
 	arrived_bottom--;
 
-	/* _TRACE_BG_END_EXECUTE(1);
+	_TRACE_BG_END_EXECUTE(1);
 	_TRACE_BG_BEGIN_EXECUTE_NOMSG("start computation", &curLog);
 	for(int i=0; i<4; i++)
-	  _TRACE_BG_ADD_BACKWARD_DEP(storeLogs[i]); */
+	  _TRACE_BG_ADD_BACKWARD_DEP(storeLogs[i]);
 
 	compute_kernel();	
 
@@ -279,14 +280,11 @@ class Jacobi: public CBase_Jacobi {
 
 	constrainBC();
 
-	// if(thisIndex.x == 0 && thisIndex.y == 0) CkPrintf("Iteration %f %f %f\n", max_error, temperature[1][1], temperature[1][2]);
 	if(noBarrier == 0 || (noBarrier==1 && (iterations <= 5 || iterations >= MAX_ITER))) {
-	  if(thisIndex.x == 0 && thisIndex.y == 0) CkPrintf("Barrier iterations %d\n", iterations);
 	  contribute(sizeof(double), &max_error, CkReduction::max_double,
 	      CkCallback(CkIndex_Main::report(NULL), mainProxy));
 	} else {	
-	  if(thisIndex.x == 0 && thisIndex.y == 0) CkPrintf("No barrier iterations %d\n", iterations);
-	  thisProxy(thisIndex.x, thisIndex.y).begin_iteration();
+	  begin_iteration();
 	}
       }
     }
