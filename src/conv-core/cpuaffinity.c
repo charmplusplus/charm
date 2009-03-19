@@ -167,6 +167,7 @@ int print_cpu_affinity() {
 }
 
 int print_thread_affinity() {
+#if CMK_SMP
   unsigned long mask;
   size_t len = sizeof(mask);
 
@@ -176,6 +177,7 @@ int print_thread_affinity() {
     return -1;
   }
   printf("[%d] pthread affinity mask is: %08lx\n", CmiMyPe(), mask);
+#endif
 #endif
   return 0;
 }
