@@ -6,6 +6,7 @@ mainmodule jacobi2d {
   readonly int blockDimY;
   readonly int num_chare_x;
   readonly int num_chare_y;
+  readonly int noBarrier;
 
   mainchare Main {
     entry Main(CkArgMsg *m);
