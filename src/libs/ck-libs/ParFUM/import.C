@@ -61,12 +61,19 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
 
   /// The lowest partition # to which I send my coordinates(wraps around)
   int sendLowerBound;
-    if(nParts %2==0){
+  if(nParts %2==0){
     sendLowerBound = rank - (nParts/2) + ((rank+1)%2);
   } else {
     sendLowerBound = rank - (nParts/2);
   }
-
+  
+  // Special case optimization for when the mesh is generated in such a way that only neighboring partitions share nodes
+  // look for command line argument
+#ifdef SHARED_NODES_ONLY_NEIGHBOR
+#warning "ParFUM_recreateSharedNodes only allows adjacent partitions(rank +/- 1) to have shared nodes"
+  sendUpperBound = rank + 1;
+  sendLowerBound = rank - 1;
+#endif
 
   for (int i=rank+1; i<=sendUpperBound; i++) { //send nodeCoords to rank i
     MPI_Send(nodeCoords, dim*numNodes, MPI_DOUBLE, i%nParts, coord_msg_tag, comm);
@@ -164,8 +171,11 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
 
   //printf("After recreating shared nodes %d \n",rank);
   //shared.print();
-	
+#ifdef SHARED_NODES_ONLY_NEIGHBOR
+  CkAssert(send_count + recv_count == 2);
+#else
   CkAssert(send_count + recv_count == nParts-1);
+#endif
 
   // Clean up
   free(nodeCoords);
