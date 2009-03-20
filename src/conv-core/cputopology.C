@@ -268,7 +268,9 @@ extern "C" void CmiInitCPUTopology(char **argv)
      CmiPrintf("Charm++> cpu topology info is being gathered! \n");
   }
 
+#if CMK_USE_GM
   CmiBarrier();
+#endif
 
   if (CmiMyPe() >= CmiNumPes()) {
       /* comm thread either can float around, or pin down to the last rank.
