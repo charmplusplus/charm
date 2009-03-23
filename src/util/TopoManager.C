@@ -44,6 +44,20 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
     z = 0;
   }
 #endif
+
+#if CMK_BLUEGENE_CHARM
+  if(dimY > 1){
+    // Assumed TXYZ
+    x = pe % dimX;
+    y = (pe % (dimX * dimY)) / dimX;
+    z = pe / (dimX * dimY);
+  }
+  else {
+    x = pe; 
+    y = 0; 
+    z = 0;
+  }
+#endif
 }
 
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
@@ -68,9 +82,30 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
     z = 0;
   }
 #endif
+
+#if CMK_BLUEGENE_CHARM
+  if(dimNY > 1) {
+    t = pe % dimNT;
+    x = (pe % (dimNT*dimNX)) / dimNT;
+    y = (pe % (dimNT*dimNX*dimNY)) / (dimNT*dimNX);
+    z = pe / (dimNT*dimNX*dimNY);
+  } else {
+    t = pe % dimNT;
+    x = (pe % (dimNT*dimNX)) / dimNT;
+    y = 0;
+    z = 0;
+  }
+#endif
 }
 
 int TopoManager::coordinatesToRank(int x, int y, int z) {
+#if CMK_BLUEGENE_CHARM
+  if(dimY > 1)
+    return x + y*dimX + z*dimX*dimY;
+  else
+    return x;
+#endif
+
 #if CMK_BLUEGENEL
   return bgltm.coordinatesToRank(x, y, z);
 #elif CMK_BLUEGENEP
@@ -86,6 +121,13 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
 }
 
 int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
+#if CMK_BLUEGENE_CHARM
+  if(dimNY > 1)
+    return t + (x + (y + z*dimNY) * dimNX) * dimNT;
+  else
+    return t + x * dimNT;
+#endif
+
 #if CMK_BLUEGENEL
   return bgltm.coordinatesToRank(x, y, z, t);
 #elif CMK_BLUEGENEP
@@ -186,3 +228,4 @@ int TopoManager::partition(int pe, int *pes, int *idx, int left, int right) {
       return rm;
   }
 }
+
