@@ -2,6 +2,10 @@
 #define __SIMD_H__
 
 
+#if defined(__SSE2__)
+  #include "emmintrin.h"
+#endif
+
 #if CMK_CELL_SPE != 0
   #include "spu_intrinsics.h"
 #else
@@ -13,6 +17,10 @@
 #if !CMK_HAS_SQRTF
   #define sqrtf(a) ((float)(sqrt((double)(a))))
 #endif
+
+
+// DMK - DEBUG - Flag to force SSE not to be used
+#define FORCE_NO_SSE   (0)
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -27,7 +35,19 @@ typedef struct __vec_4_ui {   unsigned int v0, v1, v2, v3; } __vec4ui;
 typedef struct __vec_4_f  {          float v0, v1, v2, v3; } __vec4f;
 typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 
-#if CMK_CELL_SPE != 0    // Cell - SPE
+#if defined(__SSE2__) && !(FORCE_NO_SSE)   // SSE2
+
+  typedef  __vec16c  vec16c;
+  typedef __vec16uc vec16uc;
+  typedef   __vec8s   vec8s;
+  typedef  __vec8us  vec8us;
+  typedef  __vec4ui  vec4ui;
+
+  typedef __m128i  vec4i;
+  typedef  __m128  vec4f;
+  typedef __m128d vec2lf;
+
+#elif CMK_CELL_SPE != 0    // Cell - SPE
 
   typedef vector signed char vec16c;
   typedef vector unsigned char vec16uc;
@@ -57,7 +77,11 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 
 ///// Extract /////
 // Desc: Returns element 'i' from vector 'a'
-#if CMK_CELL_SPE != 0    // Cell - SPE
+#if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
+
+  inline float vextract4f(const vec4f &a, const int i) { return ((float*)(&a))[i]; }
+
+#elif CMK_CELL_SPE != 0    // Cell - SPE
 
   #define  vextract16c(a, i) (spu_extract((a), (i)))
   #define vextract16uc(a, i) (spu_extract((a), (i)))
@@ -84,7 +108,10 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 
 ///// Insert /////
 // Desc: Returns a vector that has scalar 's' inserted into vector 'v' at index 'i'
-#if CMK_CELL_SPE != 0    // Cell - SPE
+#if defined(__SSE2__)      // SSE2
+
+
+#elif CMK_CELL_SPE != 0    // Cell - SPE
 
   #define  vinsert16c(v, s, i) (spu_insert((s), (v), (i)))
   #define vinsert16uc(v, s, i) (spu_insert((s), (v), (i)))
@@ -111,7 +138,11 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 
 ///// Spread /////
 // Desc: Returns a vector that has the scalar value 's' in all elements
-#if CMK_CELL_SPE != 0    // Cell - SPE
+#if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
+
+  inline vec4f vspread4f(const float s) { vec4f a; __vec_4_f* aPtr = (__vec_4_f*)(&a); aPtr->v0 = aPtr->v1 = aPtr->v2 = aPtr->v3 = s; return a; }
+
+#elif CMK_CELL_SPE != 0    // Cell - SPE
 
   #define  vspread16c(s) (spu_splats(s))
   #define vspread16uc(s) (spu_splats(s))
@@ -143,7 +174,10 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 // Desc: Returns the vector 'a' rotated (towards high or low) by 's' elements
 // NOTE: 'roth' => rotate towards higher element indexes
 //       'rotl' => rotate towards lower element indexes
-#if CMK_CELL_SPE != 0
+#if defined(__SSE2__)      // SSE2
+
+
+#elif CMK_CELL_SPE != 0
 
   #define  vroth16c(a, s) (spu_rlqwbyte((a), (0x10- ((s)&0xf)    ) ))
   #define vroth16uc(a, s) (spu_rlqwbyte((a), (0x10- ((s)&0xf)    ) ))
@@ -192,7 +226,11 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 
 ///// Addition /////
 // Desc: Returns a vector that has the corresponding elements of 'a' and 'b' added together
-#if CMK_CELL_SPE != 0    // Cell - SPE
+#if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
+
+  #define vadd4f(a, b)  (_mm_add_ps((a), (b)))
+
+#elif CMK_CELL_SPE != 0    // Cell - SPE
 
   #define  vadd16c(a, b) (spu_add((a), (b)))
   #define vadd16uc(a, b) (spu_add((a), (b)))
@@ -251,7 +289,10 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 ///// Subtraction /////
 // Desc: Returns a vector that where the correspinding elements of vector 'b' have been
 //   subtracted from vector 'a'
-#if CMK_CELL_SPE != 0    // Cell - SPE
+#if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
+
+
+#elif CMK_CELL_SPE != 0    // Cell - SPE
 
   #define  vsub16c(a, b) (spu_sub((a), (b)))
   #define vsub16uc(a, b) (spu_sub((a), (b)))
@@ -308,7 +349,10 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 
 
 ///// Multiply & Multiply-Add /////
-#if CMK_CELL_SPE != 0    // Cell - SPE
+#if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
+
+
+#elif CMK_CELL_SPE != 0    // Cell - SPE
 
   #define  vmul4s(a, b) (spu_mul((a), (b)))
   #define  vmul4f(a, b) (spu_mul((a), (b)))
@@ -360,7 +404,10 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 
 // DMK - TODO : FIXME - Figure out the SPE version of these functions (for now, just use general C++)
 //   SPE version of the functions to use the "frest" and "fi" 
-#if CMK_CELL_SPE != 0
+#if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
+
+
+#elif CMK_CELL_SPE != 0
 
   inline vec4i vdiv4i(const vec4i a, const vec4i b) { vec4i c; __vec4i* __c = (__vec4i*)(&c); __vec4i* __a = (__vec4i*)(&a); __vec4i* __b = (__vec4i*)(&b); __c->v0 = __a->v0 / __b->v0; __c->v1 = __a->v1 / __b->v1; return c; }
   #define vdiv4f(a, b) (spu_mul((a), spu_re(b)))
@@ -385,7 +432,24 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 
 
 ///// Misc : TODO : Organize later /////
-#if CMK_CELL_SPE != 0
+#if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
+
+  // DMK - DEBUG - Disable this single sqrt function to see how much of an impact it has
+  #if 1
+    #define vsqrt4f(a)  (_mm_sqrt_ps(a))
+  #else
+    inline vec4f vsqrt4f(const vec4f &a) {
+      vec4f b;
+      float *a_f = (float*)(&a), *b_f = (float*)(&b);
+      b_f[0] = sqrtf(a_f[0]);
+      b_f[1] = sqrtf(a_f[1]);
+      b_f[2] = sqrtf(a_f[2]);
+      b_f[3] = sqrtf(a_f[3]);
+      return b;
+    }
+  #endif
+
+#elif CMK_CELL_SPE != 0
 
   #define vrecip4f(a) (spu_re(a))
   #define vsqrt4f(a) (spu_re(spu_rsqrte(a)))
