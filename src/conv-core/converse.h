@@ -626,6 +626,11 @@ void CmiResetMaxMemory();
 CMK_TYPEDEF_UINT8 CmiMinMemoryUsage();
 void CmiResetMinMemory();
 
+/* General functions for malloc'ing aligned buffers */
+#define CmiRoundUpToPow2(s, p2)  (s + ((p2 - (s & (p2 - 1))) & (p2 - 1)))
+void* CmiMallocAligned(const size_t size, const unsigned int alignment);
+void CmiFreeAligned(void* ptr);
+
 #define CMI_MEMORY_IS_ISOMALLOC (1<<1)
 #define CMI_MEMORY_IS_PARANOID  (1<<2)
 #define CMI_MEMORY_IS_GNU       (1<<3)
