@@ -1,0 +1,23 @@
+mainmodule barnes {
+	
+	readonly CProxy_Main mainChare;
+        readonly CProxy_TreePiece pieces;
+        readonly CProxy_ParticleChunk chunks;
+
+        message ParticleMsg{
+          body *particles;
+        };
+        
+	mainchare [migratable] Main {
+	  entry Main();
+	};
+	
+	array [1D] TreePiece {
+          entry TreePiece(int numTreePieces); 
+          entry void recvParticles(ParticleMsg *msg);
+	};
+
+        array [1D] ParticleChunk {
+          entry ParticleChunk(int numTreePieces);
+        };
+};
