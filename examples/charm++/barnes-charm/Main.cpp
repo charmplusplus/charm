@@ -1,8 +1,13 @@
-#include "Main.h"
+#include "barnes.h"
 
 CProxy_Main mainChare;
 CProxy_TreePiece pieces;
 CProxy_ParticleChunk chunks;
+
+int numTreePieces;
+int numParticleChunks;
+
+#include "barnes.decl.h"
 
 int log8floor(int arg){
   int ret = -1;
@@ -34,24 +39,27 @@ Main::Main(CkArgMsg *m){
   initoutput();
   tab_init();
 
-  // FIXME - get value (from command line?)
-  int numTreePieces;
   // create top portion of global tree
   int depth = log8floor(numTreePieces);
   nodeptr = createTopLevelTree(depth);
 
+  // create holders, treepieces
   CProxy_BlockMap myMap=CProxy_BlockMap::ckNew(); 
   CkArrayOptions opts(numTreePieces); 
 
   opts.setMap(myMap);
-  CProxy_TreePiece pieces = CProxy_TreePiece::ckNew(numTreePieces,opts);
-  treeProxy = pieces;
+  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew(numTreePieces,opts);
+  pieces = treeProxy;
 
-  // create holders, treepieces
-  // slavestart for holders
+  myMap=CProxy_BlockMap::ckNew(); 
+  CkArrayOptions optss(numParticleChunks); 
 
+  optss.setMap(myMap);
+  CProxy_TreePiece chunkProxy = CProxy_TreePiece::ckNew(numParticleChunks,optss);
+  chunks = chunkProxy;
 
-  SlaveStart();
+  // slavestart for chunks
+  chunks.SlaveStart(bodystart, cellstart, leafstart);
 
 }
 

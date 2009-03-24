@@ -3,6 +3,8 @@
 extern CProxy_Main mainChare;
 extern CProxy_TreePiece pieces;
 extern CProxy_ParticleChunk chunks;
+extern int numTreePieces;
+extern int numParticleChunks;
 
 class Main : public CBase_Main {
 

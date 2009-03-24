@@ -325,7 +325,6 @@ void SlaveStart()
    }
 }
 
-
 /*
  * STARTRUN: startup hierarchical N-body code.
  */
@@ -368,7 +367,6 @@ startrun()
    setbound();
    Local[0].tout = Local[0].tnow + dtout;
 }
-
 /*
  * TESTDATA: generate Plummer model initial conditions for test runs,
  * scaled to units such that M = -4E = G = 1 (Henon, Hegge, etc).
@@ -474,7 +472,6 @@ pickshell(vec, rad)
    MULVS(vec, vec, rsc);
 }
 
-
 
 int intpow(i,j)
   int i,j;
@@ -627,7 +624,6 @@ stepsystem (ProcessId)
     Local[ProcessId].tnow = Local[ProcessId].tnow + dtime;
 }
 
-
 
 void
 ComputeForces (ProcessId)
