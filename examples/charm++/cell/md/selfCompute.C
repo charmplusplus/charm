@@ -21,14 +21,14 @@ SelfCompute::SelfCompute(CkMigrateMessage* msg) {
 
 SelfCompute::~SelfCompute() {
   #if USE_PROXY_PATCHES == 0
-    if (particleX != NULL) { free_aligned(particleX); particleX = NULL; }
-    if (particleY != NULL) { free_aligned(particleY); particleY = NULL; }
-    if (particleZ != NULL) { free_aligned(particleZ); particleZ = NULL; }
-    if (particleQ != NULL) { free_aligned(particleQ); particleQ = NULL; }
+    if (particleX != NULL) { CmiFreeAligned(particleX); particleX = NULL; }
+    if (particleY != NULL) { CmiFreeAligned(particleY); particleY = NULL; }
+    if (particleZ != NULL) { CmiFreeAligned(particleZ); particleZ = NULL; }
+    if (particleQ != NULL) { CmiFreeAligned(particleQ); particleQ = NULL; }
   #endif
-  if (forceX != NULL) { free_aligned(forceX); forceX = NULL; }
-  if (forceY != NULL) { free_aligned(forceY); forceY = NULL; }
-  if (forceZ != NULL) { free_aligned(forceZ); forceZ = NULL; }
+  if (forceX != NULL) { CmiFreeAligned(forceX); forceX = NULL; }
+  if (forceY != NULL) { CmiFreeAligned(forceY); forceY = NULL; }
+  if (forceZ != NULL) { CmiFreeAligned(forceZ); forceZ = NULL; }
   numParticles = -1;
 }
 
@@ -38,14 +38,14 @@ void SelfCompute::init(int numParticlesPerPatch) {
   // Allocate buffers for force data
   numParticles = numParticlesPerPatch;
   #if USE_PROXY_PATCHES == 0
-    particleX = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-    particleY = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-    particleZ = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-    particleQ = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
+    particleX = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+    particleY = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+    particleZ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+    particleQ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
   #endif
-  forceX = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  forceY = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  forceZ = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
+  forceX = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceY = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceZ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
 
   // Check in with the main chare
   mainProxy.initCheckIn();

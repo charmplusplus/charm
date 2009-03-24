@@ -41,17 +41,17 @@ Patch::Patch(CkMigrateMessage* msg) {
 
 
 Patch::~Patch() {
-  if (particleX != NULL) { free_aligned(particleX); particleX = NULL; }
-  if (particleY != NULL) { free_aligned(particleY); particleY = NULL; }
-  if (particleZ != NULL) { free_aligned(particleZ); particleZ = NULL; }
-  if (particleQ != NULL) { free_aligned(particleQ); particleQ = NULL; }
-  if (particleM != NULL) { free_aligned(particleM); particleM = NULL; }
-  if (forceSumX != NULL) { free_aligned(forceSumX); forceSumX = NULL; }
-  if (forceSumY != NULL) { free_aligned(forceSumY); forceSumY = NULL; }
-  if (forceSumZ != NULL) { free_aligned(forceSumZ); forceSumZ = NULL; }
-  if (velocityX != NULL) { free_aligned(velocityX); velocityX = NULL; }
-  if (velocityY != NULL) { free_aligned(velocityY); velocityY = NULL; }
-  if (velocityZ != NULL) { free_aligned(velocityZ); velocityZ = NULL; }
+  if (particleX != NULL) { CmiFreeAligned(particleX); particleX = NULL; }
+  if (particleY != NULL) { CmiFreeAligned(particleY); particleY = NULL; }
+  if (particleZ != NULL) { CmiFreeAligned(particleZ); particleZ = NULL; }
+  if (particleQ != NULL) { CmiFreeAligned(particleQ); particleQ = NULL; }
+  if (particleM != NULL) { CmiFreeAligned(particleM); particleM = NULL; }
+  if (forceSumX != NULL) { CmiFreeAligned(forceSumX); forceSumX = NULL; }
+  if (forceSumY != NULL) { CmiFreeAligned(forceSumY); forceSumY = NULL; }
+  if (forceSumZ != NULL) { CmiFreeAligned(forceSumZ); forceSumZ = NULL; }
+  if (velocityX != NULL) { CmiFreeAligned(velocityX); velocityX = NULL; }
+  if (velocityY != NULL) { CmiFreeAligned(velocityY); velocityY = NULL; }
+  if (velocityZ != NULL) { CmiFreeAligned(velocityZ); velocityZ = NULL; }
   numParticles = 0;
 }
 
@@ -69,17 +69,17 @@ void Patch::init(int numParticles) {
 
   // Allocate memory for the particles
   this->numParticles = numParticles;
-  particleX = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  particleY = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  particleZ = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  particleQ = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  particleM = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  forceSumX = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  forceSumY = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  forceSumZ = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  velocityX = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  velocityY = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  velocityZ = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
+  particleX = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  particleY = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  particleZ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  particleQ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  particleM = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceSumX = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceSumY = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceSumZ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  velocityX = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  velocityY = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  velocityZ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
 
   // Initialize the particles
   randomizeParticles();
@@ -187,19 +187,27 @@ void Patch::forceCheckIn(int numParticles, float* forceX, float* forceY, float* 
 void Patch::forceCheckIn(int numParticles, float* forceX, float* forceY, float* forceZ, int numForceCheckIns) {
 
   // Accumulate the force data
-  register vec4f* fsx = (vec4f*)forceSumX;
-  register vec4f* fsy = (vec4f*)forceSumY;
-  register vec4f* fsz = (vec4f*)forceSumZ;
-  register vec4f* fx = (vec4f*)forceX;
-  register vec4f* fy = (vec4f*)forceY;
-  register vec4f* fz = (vec4f*)forceZ;
-  register const int numParticles_vec = numParticles / (sizeof(vec4f) * sizeof(float));
-  register int i;
-  for (i = 0; i < numParticles_vec; i++) {
-    fsx[i] = vadd4f(fsx[i], fx[i]);
-    fsy[i] = vadd4f(fsy[i], fy[i]);
-    fsz[i] = vadd4f(fsz[i], fz[i]);
-  }
+  #if 0
+    register vec4f* fsx = (vec4f*)forceSumX;
+    register vec4f* fsy = (vec4f*)forceSumY;
+    register vec4f* fsz = (vec4f*)forceSumZ;
+    register vec4f* fx = (vec4f*)forceX;
+    register vec4f* fy = (vec4f*)forceY;
+    register vec4f* fz = (vec4f*)forceZ;
+    register const int numParticles_vec = numParticles / (sizeof(vec4f) * sizeof(float));
+    register int i;
+    for (i = 0; i < numParticles_vec; i++) {
+      fsx[i] = vadd4f(fsx[i], fx[i]);
+      fsy[i] = vadd4f(fsy[i], fy[i]);
+      fsz[i] = vadd4f(fsz[i], fz[i]);
+    }
+  #else
+    for (int i = 0; i < numParticles; i++) {
+      forceSumX[i] += forceX[i];
+      forceSumY[i] += forceY[i];
+      forceSumZ[i] += forceZ[i];
+    }
+  #endif
 
   // Count the incoming forced data and integrate if all force data has arrived
   remainingForceCheckIns -= numForceCheckIns;
@@ -253,13 +261,13 @@ ProxyPatch::ProxyPatch(CkMigrateMessage *msg) {
 
 
 ProxyPatch::~ProxyPatch() {
-  if (particleX != NULL) { free_aligned(particleX); particleX = NULL; }
-  if (particleY != NULL) { free_aligned(particleY); particleY = NULL; }
-  if (particleZ != NULL) { free_aligned(particleZ); particleZ = NULL; }
-  if (particleQ != NULL) { free_aligned(particleQ); particleQ = NULL; }
-  if (forceSumX != NULL) { free_aligned(forceSumX); forceSumX = NULL; }
-  if (forceSumY != NULL) { free_aligned(forceSumY); forceSumY = NULL; }
-  if (forceSumZ != NULL) { free_aligned(forceSumZ); forceSumZ = NULL; }
+  if (particleX != NULL) { CmiFreeAligned(particleX); particleX = NULL; }
+  if (particleY != NULL) { CmiFreeAligned(particleY); particleY = NULL; }
+  if (particleZ != NULL) { CmiFreeAligned(particleZ); particleZ = NULL; }
+  if (particleQ != NULL) { CmiFreeAligned(particleQ); particleQ = NULL; }
+  if (forceSumX != NULL) { CmiFreeAligned(forceSumX); forceSumX = NULL; }
+  if (forceSumY != NULL) { CmiFreeAligned(forceSumY); forceSumY = NULL; }
+  if (forceSumZ != NULL) { CmiFreeAligned(forceSumZ); forceSumZ = NULL; }
   numParticles = -1;
 }
 
@@ -268,13 +276,13 @@ void ProxyPatch::init(int numParticles) {
 
   // Allocate memory for the particles
   this->numParticles = numParticles;
-  particleX = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  particleY = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  particleZ = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  particleQ = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  forceSumX = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  forceSumY = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  forceSumZ = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
+  particleX = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  particleY = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  particleZ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  particleQ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceSumX = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceSumY = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceSumZ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
 
   // Check in with the main proxy
   mainProxy.initCheckIn();
@@ -332,18 +340,26 @@ void ProxyPatch::patchData(int numParticles, float* particleX, float* particleY,
 void ProxyPatch::forceCheckIn(int numParticles, float* forceX, float* forceY, float* forceZ) {
 
   // Accumulate the force data
-  register vec4f* forceX_vec = (vec4f*)forceX;
-  register vec4f* forceY_vec = (vec4f*)forceY;
-  register vec4f* forceZ_vec = (vec4f*)forceZ;
-  register vec4f* forceSumX_vec = (vec4f*)forceSumX;
-  register vec4f* forceSumY_vec = (vec4f*)forceSumY;
-  register vec4f* forceSumZ_vec = (vec4f*)forceSumZ;
-  const int numParticles_vec = numParticles / (sizeof(vec4f) / sizeof(float));
-  for (int i = 0; i < numParticles_vec; i++) {
-    forceSumX_vec[i] += forceX_vec[i];
-    forceSumY_vec[i] += forceY_vec[i];
-    forceSumZ_vec[i] += forceZ_vec[i];
-  }
+  #if 0
+    register vec4f* forceX_vec = (vec4f*)forceX;
+    register vec4f* forceY_vec = (vec4f*)forceY;
+    register vec4f* forceZ_vec = (vec4f*)forceZ;
+    register vec4f* forceSumX_vec = (vec4f*)forceSumX;
+    register vec4f* forceSumY_vec = (vec4f*)forceSumY;
+    register vec4f* forceSumZ_vec = (vec4f*)forceSumZ;
+    const int numParticles_vec = numParticles / (sizeof(vec4f) / sizeof(float));
+    for (int i = 0; i < numParticles_vec; i++) {
+      forceSumX_vec[i] += forceX_vec[i];
+      forceSumY_vec[i] += forceY_vec[i];
+      forceSumZ_vec[i] += forceZ_vec[i];
+    }
+  #else
+    for (int i = 0; i < numParticles; i++) {
+      forceSumX[i] += forceX[i];
+      forceSumY[i] += forceY[i];
+      forceSumZ[i] += forceZ[i];
+    }
+  #endif
 
   // Once all computes this proxy called have contributed forces, send the data back to the patch itself
   checkInCount--;

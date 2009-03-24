@@ -23,21 +23,21 @@ PairCompute::PairCompute(CkMigrateMessage* msg) {
 PairCompute::~PairCompute() {
 
   #if USE_PROXY_PATCHES == 0
-    if (particleX[0] != NULL) { free_aligned(particleX[0]); particleX[0] = NULL; }
-    if (particleX[1] != NULL) { free_aligned(particleX[1]); particleX[1] = NULL; }
-    if (particleY[0] != NULL) { free_aligned(particleY[0]); particleY[0] = NULL; }
-    if (particleY[1] != NULL) { free_aligned(particleY[1]); particleY[1] = NULL; }
-    if (particleZ[0] != NULL) { free_aligned(particleZ[0]); particleZ[0] = NULL; }
-    if (particleZ[1] != NULL) { free_aligned(particleZ[1]); particleZ[1] = NULL; }
-    if (particleQ[0] != NULL) { free_aligned(particleQ[0]); particleQ[0] = NULL; }
-    if (particleQ[1] != NULL) { free_aligned(particleQ[1]); particleQ[1] = NULL; }
+    if (particleX[0] != NULL) { CmiFreeAligned(particleX[0]); particleX[0] = NULL; }
+    if (particleX[1] != NULL) { CmiFreeAligned(particleX[1]); particleX[1] = NULL; }
+    if (particleY[0] != NULL) { CmiFreeAligned(particleY[0]); particleY[0] = NULL; }
+    if (particleY[1] != NULL) { CmiFreeAligned(particleY[1]); particleY[1] = NULL; }
+    if (particleZ[0] != NULL) { CmiFreeAligned(particleZ[0]); particleZ[0] = NULL; }
+    if (particleZ[1] != NULL) { CmiFreeAligned(particleZ[1]); particleZ[1] = NULL; }
+    if (particleQ[0] != NULL) { CmiFreeAligned(particleQ[0]); particleQ[0] = NULL; }
+    if (particleQ[1] != NULL) { CmiFreeAligned(particleQ[1]); particleQ[1] = NULL; }
   #endif
-  if (forceX[0] != NULL) { free_aligned(forceX[0]); forceX[0] = NULL; }
-  if (forceX[1] != NULL) { free_aligned(forceX[1]); forceX[1] = NULL; }
-  if (forceY[0] != NULL) { free_aligned(forceY[0]); forceY[0] = NULL; }
-  if (forceY[1] != NULL) { free_aligned(forceY[1]); forceY[1] = NULL; }
-  if (forceZ[0] != NULL) { free_aligned(forceZ[0]); forceZ[0] = NULL; }
-  if (forceZ[1] != NULL) { free_aligned(forceZ[1]); forceZ[1] = NULL; }
+  if (forceX[0] != NULL) { CmiFreeAligned(forceX[0]); forceX[0] = NULL; }
+  if (forceX[1] != NULL) { CmiFreeAligned(forceX[1]); forceX[1] = NULL; }
+  if (forceY[0] != NULL) { CmiFreeAligned(forceY[0]); forceY[0] = NULL; }
+  if (forceY[1] != NULL) { CmiFreeAligned(forceY[1]); forceY[1] = NULL; }
+  if (forceZ[0] != NULL) { CmiFreeAligned(forceZ[0]); forceZ[0] = NULL; }
+  if (forceZ[1] != NULL) { CmiFreeAligned(forceZ[1]); forceZ[1] = NULL; }
   numParticles = -1;
 }
 
@@ -47,21 +47,21 @@ void PairCompute::init(int numParticlesPerPatch) {
   // Initialize the arrays
   numParticles = numParticlesPerPatch;
   #if USE_PROXY_PATCHES == 0
-    particleX[0] = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-    particleX[1] = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-    particleY[0] = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-    particleY[1] = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-    particleZ[0] = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-    particleZ[1] = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-    particleQ[0] = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-    particleQ[1] = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
+    particleX[0] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+    particleX[1] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+    particleY[0] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+    particleY[1] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+    particleZ[0] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+    particleZ[1] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+    particleQ[0] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+    particleQ[1] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
   #endif
-  forceX[0] = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  forceX[1] = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  forceY[0] = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  forceY[1] = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  forceZ[0] = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
-  forceZ[1] = (float*)(malloc_aligned(numParticles * sizeof(float), 128));
+  forceX[0] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceX[1] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceY[0] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceY[1] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceZ[0] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceZ[1] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
   patchDataCount = 0;
 
   // Check in with the main chare
