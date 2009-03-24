@@ -73,6 +73,145 @@ module pairCompute {
         vec4f f0_y_i_vec = vspread4f(0.0f);
         vec4f f0_z_i_vec = vspread4f(0.0f);
 
+        #if 1
+
+        // Multi-stage software pipe
+        //   1) Load particle data
+        //   2) Calculate radius
+        //   3) Caluclate force vectors
+        //   4) Apply force vector
+
+        /// Loop Preamble ///
+
+        const int loopUpper = numParticlesByVecSize - 3;
+
+        // Setup Input for Stage 2 - Initially for j+2
+        const int jPlus2 = 2;
+        vec4f p1_x_j_vec = p1_x_vec[jPlus2];
+        vec4f p1_y_j_vec = p1_y_vec[jPlus2];
+        vec4f p1_z_j_vec = p1_z_vec[jPlus2];
+        vec4f p1_q_j_vec = p1_q_vec[jPlus2];
+
+        // Setup Input for Stage 3 - Initial for j+1
+        const int jPlus1 = 1;
+        vec4f p_x_diff_vec = p0_x_i_vec - p1_x_vec[jPlus1];
+        vec4f p_y_diff_vec = p0_y_i_vec - p1_y_vec[jPlus1];
+        vec4f p_z_diff_vec = p0_z_i_vec - p1_z_vec[jPlus1];
+        vec4f p1_q_j_vec_s2 = p1_q_vec[jPlus1];
+        vec4f r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
+        vec4f r_vec = vsqrt4f(r_2_vec);
+
+        // Setup Input for Stage 4 - Initially for j+0
+        const int jPlus0 = 0;
+        vec4f f_x_vec;
+        vec4f f_y_vec;
+        vec4f f_z_vec;
+        {
+          vec4f p_x_diff_vec = p0_x_i_vec - p1_x_vec[jPlus0];
+          vec4f p_y_diff_vec = p0_y_i_vec - p1_y_vec[jPlus0];
+          vec4f p_z_diff_vec = p0_z_i_vec - p1_z_vec[jPlus0];
+          vec4f r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
+          vec4f r_vec = vsqrt4f(r_2_vec);
+          vec4f p_x_diff_norm_vec = p_x_diff_vec / r_vec;
+          vec4f p_y_diff_norm_vec = p_y_diff_vec / r_vec;
+          vec4f p_z_diff_norm_vec = p_z_diff_vec / r_vec;
+          vec4f p1_q_j_vec = p1_q_vec[jPlus0];
+          vec4f f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec) / r_2_vec);  // Calc force magnitude
+          f_x_vec = p_x_diff_norm_vec * f_mag_vec;
+          f_y_vec = p_y_diff_norm_vec * f_mag_vec;
+          f_z_vec = p_z_diff_norm_vec * f_mag_vec;
+        }
+
+        /// Main Loop ///
+
+        for (j = 0; j < loopUpper; j++) {
+
+          // Stage 4 - Apply force vector
+          f0_x_i_vec += f_x_vec;
+          f0_y_i_vec += f_y_vec;
+          f0_z_i_vec += f_z_vec;
+          f1_x_vec[j] -= f_x_vec;
+          f1_y_vec[j] -= f_y_vec;
+          f1_z_vec[j] -= f_z_vec;
+
+          // Stage 3 - Calculate force vector
+          vec4f p_x_diff_norm_vec = p_x_diff_vec / r_vec;  // Normalize the vector between the particles
+          vec4f p_y_diff_norm_vec = p_y_diff_vec / r_vec;
+          vec4f p_z_diff_norm_vec = p_z_diff_vec / r_vec;
+          vec4f f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec_s2) / r_2_vec);  // Calc force magnitude
+          vec4f f_x_vec = p_x_diff_norm_vec * f_mag_vec;  // Multiply normalized vector by force magnitude
+          vec4f f_y_vec = p_y_diff_norm_vec * f_mag_vec;
+          vec4f f_z_vec = p_z_diff_norm_vec * f_mag_vec;
+
+          // Stage 2 - Calculate radius
+          p1_q_j_vec_s2 = p1_q_j_vec;
+          p_x_diff_vec = p0_x_i_vec - p1_x_j_vec;
+          p_y_diff_vec = p0_y_i_vec - p1_y_j_vec;
+          p_z_diff_vec = p0_z_i_vec - p1_z_j_vec;
+          r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
+          r_vec = vsqrt4f(r_2_vec);
+
+          // Stage 1 - Load particle data
+          const int jIndexToLoad = j + 3;
+          p1_x_j_vec = p1_x_vec[jIndexToLoad];
+          p1_y_j_vec = p1_y_vec[jIndexToLoad];
+          p1_z_j_vec = p1_z_vec[jIndexToLoad];
+          p1_q_j_vec = p1_q_vec[jIndexToLoad];
+        }
+
+        /// Loop Cleanup ///
+
+        // Complete Calc for Stage 3 Data - Apply Force Vector
+        {
+          f0_x_i_vec += f_x_vec;
+          f0_y_i_vec += f_y_vec;
+          f0_z_i_vec += f_z_vec;
+          f1_x_vec[loopUpper] -= f_x_vec;
+          f1_y_vec[loopUpper] -= f_y_vec;
+          f1_z_vec[loopUpper] -= f_z_vec;
+        }
+
+        // Complete Calc for Stage 2 Data - Calculate Force Vector, Apply Force Vector
+        {
+          vec4f p_x_diff_norm_vec = p_x_diff_vec / r_vec;
+          vec4f p_y_diff_norm_vec = p_y_diff_vec / r_vec;
+          vec4f p_z_diff_norm_vec = p_z_diff_vec / r_vec;
+          vec4f f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec_s2) / r_2_vec);
+          vec4f f_x_vec = p_x_diff_norm_vec * f_mag_vec;
+          vec4f f_y_vec = p_y_diff_norm_vec * f_mag_vec;
+          vec4f f_z_vec = p_z_diff_norm_vec * f_mag_vec;
+          f0_x_i_vec += f_x_vec;
+          f0_y_i_vec += f_y_vec;
+          f0_z_i_vec += f_z_vec;
+          f1_x_vec[loopUpper + 1] -= f_x_vec;
+          f1_y_vec[loopUpper + 1] -= f_y_vec;
+          f1_z_vec[loopUpper + 1] -= f_z_vec;
+        }
+
+        // Complete Calc for Stage 1 Data - Calculate Radius, Calculate Force Vector, Apply Force Vector
+        {
+          vec4f p_x_diff_vec = p0_x_i_vec - p1_x_j_vec;
+          vec4f p_y_diff_vec = p0_y_i_vec - p1_y_j_vec;
+          vec4f p_z_diff_vec = p0_z_i_vec - p1_z_j_vec;
+          vec4f r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
+          vec4f r_vec = vsqrt4f(r_2_vec);
+          vec4f p_x_diff_norm_vec = p_x_diff_vec / r_vec;
+          vec4f p_y_diff_norm_vec = p_y_diff_vec / r_vec;
+          vec4f p_z_diff_norm_vec = p_z_diff_vec / r_vec;
+          vec4f f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec) / r_2_vec);
+          vec4f f_x_vec = p_x_diff_norm_vec * f_mag_vec;
+          vec4f f_y_vec = p_y_diff_norm_vec * f_mag_vec;
+          vec4f f_z_vec = p_z_diff_norm_vec * f_mag_vec;
+          f0_x_i_vec += f_x_vec;
+          f0_y_i_vec += f_y_vec;
+          f0_z_i_vec += f_z_vec;
+          f1_x_vec[loopUpper + 2] -= f_x_vec;
+          f1_y_vec[loopUpper + 2] -= f_y_vec;
+          f1_z_vec[loopUpper + 2] -= f_z_vec;
+        }
+
+        #else
+
         // Inner-loop (p1)
         for (j = 0; j < numParticlesByVecSize; j++) {
 
@@ -116,6 +255,8 @@ module pairCompute {
           f1_y_vec[j] -= f_y_vec;
           f1_z_vec[j] -= f_z_vec;
         }
+
+        #endif
 
         // Write force values for the outer-loop particle back to memory
         f0_x[i] += vextract4f(f0_x_i_vec, 0) + vextract4f(f0_x_i_vec, 1) + vextract4f(f0_x_i_vec, 2) + vextract4f(f0_x_i_vec, 3);

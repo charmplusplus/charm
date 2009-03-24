@@ -1,5 +1,7 @@
 CHARM_BASE_DIR = ../../../..
 CHARM_BIN_DIR = $(CHARM_BASE_DIR)/bin
+CHARM_INC_DIR = $(CHARM_BASE_DIR)/include
+CHARM_LIB_DIR = $(CHARM_BASE_DIR)/lib
 CHARMC = $(CHARM_BIN_DIR)/charmc $(OPTS)
 
 PGM = md
@@ -22,6 +24,14 @@ $(PGM): $(OBJS)
 # Projections Build
 $(PGM)_proj: $(OBJS)
 	$(CHARMC) -language charm++ -o $(PGM)_proj $(OBJS) $(ACCEL_LIBS) -tracemode summary -tracemode projections
+
+
+################################################################################
+## Debug: SPE Timing (Cell specific)
+
+speCode.s.timing : $(PGM)
+	spu-gcc $(OPTS) -I$(CHARM_INC_DIR) -S -c main__funcLookup__.genSPECode.c -o speCode.s -DCMK_CELL_SPE=1
+	/opt/cell/sdk/usr/bin/spu_timing speCode.s
 
 
 ################################################################################
@@ -64,4 +74,4 @@ pairCompute.o: pairCompute.h main.h pairCompute.C pairCompute.decl.h patch.decl.
 ## Binary File, Object Files, etc. Cleanup
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o $(PGM) charmrun *genSPECode*
+	rm -f *.decl.h *.def.h conv-host *.o $(PGM) charmrun *genSPECode* speCode.s speCode.s.timing
