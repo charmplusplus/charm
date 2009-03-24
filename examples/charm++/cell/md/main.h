@@ -6,17 +6,6 @@
 #include "main.decl.h"
 
 
-// DMK - DEBUG - Until a general Charm++ API for aligned memory buffers is defined,
-//   simply use malloc_aligned and free_align.  These functions are defined for
-//   net-linux-cell builds, but not general net-linux builds.  Declare them here
-//   if this is not a net-linux-cell build (for now, in this example program, it
-//   is not important if they do not actually align on non net-linux-cell builds).
-//#if ((!(defined(CMK_CELL))) || (CMK_CELL == 0))
-//  inline void* malloc_aligned(int size, int align) { return malloc(size); }
-//  inline void free_aligned(void* ptr) { free(ptr); }
-//#endif
-
-
 // Read-Only Variables
 extern CProxy_Main mainProxy;
 extern CProxy_Patch patchArrayProxy;
