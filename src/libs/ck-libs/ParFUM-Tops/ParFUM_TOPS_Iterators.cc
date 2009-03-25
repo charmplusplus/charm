@@ -1,7 +1,7 @@
 #include "ParFUM_TOPS.h"
 
 
-
+#ifndef INLINE_ITERATORS
 
 /**************************************************************************
  *     Iterator for nodes
@@ -318,3 +318,4 @@ void topFacetItr_Destroy (TopFacetItr* itr){
 }
 
 
+#endif
