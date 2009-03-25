@@ -65,9 +65,9 @@ void **devBuffers = NULL;
    specifies an invalid bufferID */
 unsigned int nextBuffer; 
 
-#ifdef GPU_PROFILE
-
 unsigned int timerHandle; 
+
+#ifdef GPU_PROFILE
 
 /* event types */
 #define DATA_SETUP          1            
