@@ -617,32 +617,33 @@ void* CmiMallocAligned(const size_t size, const unsigned int alignment) {
   int tailPadding;
   unsigned short offset = 0;
 
-  // Verify the pararmeters
+  /* Verify the pararmeters */
   if (size <= 0 || alignment <= 0) return NULL;
 
-  // Malloc memory of size equal to size + alignment + (alignment - (size % alignment)).  The
-  //   last term 'alignment - (size % alignment)' ensures that there is enough tail padding
-  //   so a DMA can be performed based on the alignment.  (I.e. - Start and end the memory
-  //   region retured on an alignment boundry specified.)
-  // NOTE: Since we need a byte long header, even if we "get lucky" and the malloc
-  //   returns a pointer with the given alignment, we need to put in a byte
-  //   preamble anyway.
+  /* Malloc memory of size equal to size + alignment + (alignment - (size % alignment)).  The
+   *   last term 'alignment - (size % alignment)' ensures that there is enough tail padding
+   *   so a DMA can be performed based on the alignment.  (I.e. - Start and end the memory
+   *   region retured on an alignment boundry specified.)
+   * NOTE: Since we need a byte long header, even if we "get lucky" and the malloc
+   *   returns a pointer with the given alignment, we need to put in a byte
+   *   preamble anyway.
+   */
   tailPadding = alignment - (size % alignment);
   if (tailPadding == alignment)
     tailPadding = 0;
 
-  // Allocate the memory
+  /* Allocate the memory */
   rtn = malloc(size + alignment + tailPadding);
 
-  // Calculate the offset into the returned memory chunk that has the required alignment
+  /* Calculate the offset into the returned memory chunk that has the required alignment */
   offset = (char)(((size_t)rtn) % alignment);
   offset = alignment - offset;
   if (offset == 0) offset = alignment;
 
-  // Write the offset into the byte before the address to be returned
+  /* Write the offset into the byte before the address to be returned */
   *((char*)rtn + offset - 1) = offset;
 
-  // Return the address with offset
+  /* Return the address with offset */
   return (void*)((char*)rtn + offset);
 }
 
@@ -650,12 +651,12 @@ void CmiFreeAligned(void* ptr) {
 
   char offset;
 
-  // Verify the parameter
+  /* Verify the parameter */
   if (ptr == NULL) return;
 
-  // Read the offset (byte before ptr)
+  /* Read the offset (byte before ptr) */
   offset = *((char*)ptr - 1);
 
-  // Free the memory
+  /* Free the memory */
   free ((void*)((char*)ptr - offset));
 }
