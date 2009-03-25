@@ -205,8 +205,8 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
       CpvAccess(CldRelocatedMessages)++;
   }
   if (node == BgMyNode()) {
-/*
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+/*
     CsdNodeEnqueueGeneral(msg, queueing, priobits, prioptr);
 */
     BGSENDNODE(node, msg, len);
