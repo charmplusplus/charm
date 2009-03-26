@@ -1,6 +1,15 @@
 #include "barnes.h"
 
 #include "barnes.decl.h"
+void ParticleChunk::ParticleChunk(int maxleaf, int maxcell, int numchunks){
+
+  /*allocate leaf/cell space */
+  int NPROC = numchunks;
+  ctab = (cellptr) G_MALLOC((maxcell / NPROC) * sizeof(cell));
+  ltab = (leafptr) G_MALLOC((maxleaf / NPROC) * sizeof(leaf));
+
+};
+
 void ParticleChunk::SlaveStart(bodyptr *bodystart, cellptr *cellstart, leafptr *leafstart){
   unsigned int ProcessId;
 
@@ -53,3 +62,36 @@ void ParticleChunk::SlaveStart(bodyptr *bodystart, cellptr *cellstart, leafptr *
     stepsystem(ProcessId);
   }
 }
+
+/* 
+ * FIND_MY_INITIAL_BODIES: puts into mybodytab the initial list of bodies 
+ * assigned to the processor.  
+ */
+
+void ParticleChunk::find_my_initial_bodies(btab, nbody, ProcessId)
+bodyptr btab;
+int nbody;
+unsigned int ProcessId;
+{
+  int Myindex;
+  int intpow();
+  int equalbodies;
+  int extra,offset,i;
+
+  mynbody = nbody / NPROC;
+  extra = nbody % NPROC;
+  if (ProcessId < extra) {
+    Local[ProcessId].mynbody++;    
+    offset = Local[ProcessId].mynbody * ProcessId;
+  }
+  if (ProcessId >= extra) {
+    offset = (Local[ProcessId].mynbody+1) * extra + (ProcessId - extra) 
+       * Local[ProcessId].mynbody; 
+  }
+  for (i=0; i < Local[ProcessId].mynbody; i++) {
+     Local[ProcessId].mybodytab[i] = &(btab[offset+i]);
+  }
+  BARRIER(Global->Barstart,NPROC);
+}
+
+

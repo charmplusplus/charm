@@ -39,6 +39,9 @@ Main::Main(CkArgMsg *m){
   initoutput();
   tab_init();
 
+  maxleaf = (int) ((double) fleaves * nbody);
+  maxcell = fcells * maxleaf;
+
   // create top portion of global tree
   int depth = log8floor(numTreePieces);
   nodeptr = createTopLevelTree(depth);
@@ -55,11 +58,33 @@ Main::Main(CkArgMsg *m){
   CkArrayOptions optss(numParticleChunks); 
 
   optss.setMap(myMap);
-  CProxy_TreePiece chunkProxy = CProxy_TreePiece::ckNew(numParticleChunks,optss);
+  CProxy_TreePiece chunkProxy = CProxy_TreePiece::ckNew(maxleaf, maxcell, numParticleChunks, optss);
   chunks = chunkProxy;
 
   // slavestart for chunks
   chunks.SlaveStart(bodystart, cellstart, leafstart);
+
+}
+
+/*
+ * TAB_INIT : allocate body and cell data space
+ */
+void 
+Main::tab_init()
+{
+
+  /*allocate space for personal lists of body pointers */
+  maxmybody = (nbody+maxleaf*MAX_BODIES_PER_LEAF)/NPROC; 
+  mybodytab = (bodyptr*) G_MALLOC(NPROC*maxmybody*sizeof(bodyptr));
+  /* space is allocated so that every */
+  /* process can have a maximum of maxmybody pointers to bodies */ 
+  /* then there is an array of bodies called bodytab which is  */
+  /* allocated in the distribution generation or when the distr. */
+  /* file is read */
+  maxmycell = maxcell / NPROC;
+  maxmyleaf = maxleaf / NPROC;
+  mycelltab = (cellptr*) G_MALLOC(NPROC*maxmycell*sizeof(cellptr));
+  myleaftab = (leafptr*) G_MALLOC(NPROC*maxmyleaf*sizeof(leafptr));
 
 }
 

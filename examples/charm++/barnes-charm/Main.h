@@ -5,6 +5,7 @@ extern CProxy_TreePiece pieces;
 extern CProxy_ParticleChunk chunks;
 extern int numTreePieces;
 extern int numParticleChunks;
+extern in nbody;
 
 class Main : public CBase_Main {
 
@@ -30,13 +31,27 @@ class Main : public CBase_Main {
     "NPROC=1",                    /* number of processors                  */
   };
 
-  Help();
+  void Help();
+  void tab_init();
+
+  int maxleaf;
+  int maxcell;
+  int maxmybody;
+  int maxmycell;
+  int maxmyleaf;
+  
+  // these are used instead of proc. 0's data structures
+  bodyptr *globalbodytab;
+  cellptr *globalcelltab;
+  leafptr *globalleaftab;
+  
   public:
   Main(CkArgMsg *m);
   Main(CkMigrateMessage *m);
 };
 
 class ParticleChunk : public CBase_ParticleChunk {
+
   public:
   ParticleChunk(CkArgMsg *m);
   ParticleChunk(CkMigrateMessage *m);
