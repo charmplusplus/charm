@@ -21,6 +21,14 @@
 extern "C" {
 #endif
 
+#ifdef GPU_TRACE
+int traceRegisterUserEvent(const char*x, int e);
+void traceUserBracketEvent(int e, double beginT, double endT);
+
+#define GPU_TRACE_EXEC 8800
+#endif
+
+
 /* initHybridAPI
    initializes the work request queue
 */

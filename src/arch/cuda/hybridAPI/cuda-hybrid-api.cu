@@ -49,7 +49,6 @@ unsigned int pinnedMemQueueIndex;
 pinnedMemReq pinnedMemQueue[MAX_PINNED_REQ];
 
 
-
 /* The runtime system keeps track of all allocated buffers on the GPU.
  * The following arrays contain pointers to host (CPU) data and the
  * corresponding data on the device (GPU). 
@@ -213,10 +212,15 @@ void allocateBuffers(workRequest *wr) {
       
       // allocate if the buffer for the corresponding index is NULL 
       if (devBuffers[index] == NULL) {
-	CUDA_SAFE_CALL_NO_SYNC(cudaMalloc((void **) &devBuffers[index], size));
+#ifdef GPU_PRINT_BUFFER_ALLOCATE
+        double mil = 1e6;
+        printf("*** ALLOCATE buffer 0x%x size %f mb\n", devBuffers[index], 1.0*size/mil);
+#endif
+
+        CUDA_SAFE_CALL_NO_SYNC(cudaMalloc((void **) &devBuffers[index], size));
 #ifdef GPU_DEBUG
-	printf("buffer %d allocated %.2f\n", index, 
-	       cutGetTimerValue(timerHandle)); 
+        printf("buffer %d allocated %.2f\n", index, 
+            cutGetTimerValue(timerHandle)); 
 #endif
       }
     }
@@ -306,11 +310,15 @@ void freeMemory(workRequest *wr) {
     for (int i=0; i<nBuffers; i++) {    
       int index = bufferInfo[i].bufferID; 
       if (bufferInfo[i].freeBuffer) {
+#ifdef GPU_PRINT_BUFFER_ALLOCATE
+        printf("*** FREE buffer 0x%x\n", devBuffers[index]);
+#endif
+
 #ifdef GPU_DEBUG
-	printf("buffer %d freed %.2f\n", index, cutGetTimerValue(timerHandle));
+        printf("buffer %d freed %.2f\n", index, cutGetTimerValue(timerHandle));
 #endif 
-	CUDA_SAFE_CALL_NO_SYNC(cudaFree(devBuffers[index])); 
-	devBuffers[index] = NULL; 
+        CUDA_SAFE_CALL_NO_SYNC(cudaFree(devBuffers[index])); 
+        devBuffers[index] = NULL; 
       }
     }
     free(bufferInfo); 
@@ -350,6 +358,10 @@ void initHybridAPI() {
 #endif
 
   nextBuffer = NUM_BUFFERS;  
+
+#ifdef GPU_TRACE
+  traceRegisterUserEvent("GPU Execution Stage", GPU_TRACE_EXEC);
+#endif
 }
 
 /* gpuProgressFn
