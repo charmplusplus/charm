@@ -64,13 +64,15 @@ class TopModel{
 #ifdef CUDA
     TopModelDevice device_model;
 #endif
+<<<<<<< ParFUM_TOPS.h
+
+=======
     
+>>>>>>> 1.37
     TopModel(){
       nodeIDHash = NULL;
       elemIDHash = NULL;
     }
-
-
 };
 
 
