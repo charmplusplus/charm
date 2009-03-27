@@ -64,7 +64,6 @@ class TopModel{
 #ifdef CUDA
     TopModelDevice device_model;
 #endif
-
     TopModel(){
       nodeIDHash = NULL;
       elemIDHash = NULL;
