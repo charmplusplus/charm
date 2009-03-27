@@ -20,6 +20,7 @@ typedef double FP_TYPE_SYNC;
 
 /** Hardware device identifiers; used to select which device kernels will be run on */
 enum TopDevice {
+    DeviceNone,
     DeviceCPU,
     DeviceGPU
 };
