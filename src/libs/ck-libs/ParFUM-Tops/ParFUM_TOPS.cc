@@ -1166,7 +1166,7 @@ CkpvDeclare(ConfigurableCPUGPUMapLoader, myConfigGPUCPUMapLoader);
 void _initConfigurableCPUGPUMap(){
   CkPrintf("Initializing CPUGPU Map!\n");
   CkpvInitialize(ConfigurableCPUGPUMapLoader, myConfigGPUCPUMapLoader);
-  haveConfiguration();
+  haveConfigurableCPUGPUMap();
 }
 
 
