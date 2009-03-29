@@ -30,16 +30,16 @@ extern void CUDACallbackManager(void * fn);
  * will be equivalant in size.  
  */ 
 #define NUM_BUFFERS 128
-
-// #define GPU_DEBUG
-
 #define MAX_PINNED_REQ 64  
 
 /* a flag which tells the system to record the time for invocation and
  *  completion of GPU events: memory allocation, transfer and
  *  kernel execution
  */  
-//#define GPU_PROFILE
+// #define GPU_PROFILE
+
+// #define GPU_DEBUG
+// #define GPU_TRACE
 
 /* work request queue */
 workRequestQueue *wrQueue = NULL; 
@@ -88,6 +88,15 @@ unsigned int timeIndex = 0;
 unsigned int runningKernelIndex = 0; 
 unsigned int dataSetupIndex = 0; 
 unsigned int dataCleanupIndex = 0; 
+
+#ifdef GPU_TRACE
+int traceRegisterUserEvent(const char*x, int e);
+void traceUserBracketEvent(int e, double beginT, double endT);
+
+#define GPU_TRACE_EXEC_1 8800
+#define GPU_TRACE_EXEC_2 8801
+#define GPU_TRACE_EXEC_3 8802
+#endif
 
 #endif
 
@@ -363,7 +372,9 @@ void initHybridAPI() {
   nextBuffer = NUM_BUFFERS;  
 
 #ifdef GPU_TRACE
-  traceRegisterUserEvent("GPU Execution Stage", GPU_TRACE_EXEC);
+  traceRegisterUserEvent("GPU Execution Stage", GPU_TRACE_EXEC_1);
+  traceRegisterUserEvent("GPU Execution Stage", GPU_TRACE_EXEC_2);
+  traceRegisterUserEvent("GPU Execution Stage", GPU_TRACE_EXEC_3);
 #endif
 }
 
