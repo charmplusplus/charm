@@ -1,11 +1,19 @@
 
 #include "barnes.decl.h"
+#define LOCK(x) /* empty */
+
+typedef double real;
+
 extern CProxy_Main mainChare;
 extern CProxy_TreePiece pieces;
 extern CProxy_ParticleChunk chunks;
+
 extern int numTreePieces;
 extern int numParticleChunks;
-extern in nbody;
+extern int nbody;
+extern int NPROC;
+
+extern real tstop;
 
 class Main : public CBase_Main {
 
@@ -41,18 +49,46 @@ class Main : public CBase_Main {
   int maxmyleaf;
   
   // these are used instead of proc. 0's data structures
-  bodyptr *globalbodytab;
-  cellptr *globalcelltab;
-  leafptr *globalleaftab;
+  bodyptr *mybodytab;
+  cellptr *mycelltab;
+  leafptr *myleaftab;
+
   
   public:
   Main(CkArgMsg *m);
   Main(CkMigrateMessage *m);
+  void startSimulation();
 };
 
 class ParticleChunk : public CBase_ParticleChunk {
 
+  int mynbody;
+  int mynumcell;
+  int mynumleaf;
+
+  bodyptr *mybodytab;
+  cellptr G_root; // obtained from 0th member of array,
+                  // after it has finished creating the
+                  // top level tree
+  nodeptr Current_Root;
+   int Root_Coords[NDIM];
+
+  real tnow;
+  real tstop;
+  int nstep;
+
+  CkCallback mainCb;
+
   public:
   ParticleChunk(CkArgMsg *m);
   ParticleChunk(CkMigrateMessage *m);
+  void init_root(unsigned int ProcessId);
+  void createTopLevelTree(cellptr node, int depth);
+  cellptr makecell(unsigned int ProcessId);
+
+  void SlaveStart(bodyptr *, cellptr *, leafptr *, CkCallback &cb);
+  void startIteration(CkCallback &cb);
+  void acceptRoot(cellptr);
+  void stepsystemPartII(CkReductionMsg *msg);
+  void stepsystemPartIII(CkReductionMsg *msg);
 };

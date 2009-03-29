@@ -3,8 +3,13 @@ mainmodule barnes {
   readonly CProxy_Main mainChare;
   readonly CProxy_TreePiece pieces;
   readonly CProxy_ParticleChunk chunks;
-  readonly int numTreePieces;
+  readonly int numInitTreePieces;
   readonly int numParticleChunks;
+  readonly int NUMPROC;
+
+  readonly bodyptr bodytab;
+
+  readonly real tstop;
 
   message ParticleMsg{
     body *particles;
@@ -12,6 +17,7 @@ mainmodule barnes {
 
   mainchare [migratable] Main {
     entry Main();
+    entry [threaded] void startSimulation();
   };
 
   array [1D] TreePiece {
@@ -21,5 +27,10 @@ mainmodule barnes {
 
   array [1D] ParticleChunk {
     entry ParticleChunk();
+    entry void SlaveStart(bodyptr *, cellptr *, leafptr *, CkCallback &cb);
+    entry void startIteration(CkCallback &cb);
+    entry void acceptRoot(cellptr);
+    entry void stepsystemPartII(CkReductionMsg *msg);
+    entry void stepsystemPartIII(CkReductionMsg *msg);
   };
 };
