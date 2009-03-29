@@ -78,6 +78,9 @@ typedef struct gpuEventTimer {
   float endTime; 
   int eventType;
   int ID; 
+#ifdef GPU_TRACE
+  int stage; 
+#endif
 } gpuEventTimer; 
 
 gpuEventTimer gpuEvents[QUEUE_SIZE_INIT * 3]; 
@@ -369,18 +372,15 @@ void initHybridAPI() {
  *  the prefetch of data for a subsequent work request
  */
 void gpuProgressFn() {
-
   if (wrQueue == NULL) {
     printf("Error: work request queue not initialized\n"); 
     return; 
   }
-
   while (!isEmpty(wrQueue)) {
     int returnVal; 
     workRequest *head = firstElement(wrQueue); 
     workRequest *second = secondElement(wrQueue);
     workRequest *third = thirdElement(wrQueue); 
-    
     if (head->state == QUEUED) {
 #ifdef GPU_PROFILE
       gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
@@ -388,62 +388,70 @@ void gpuProgressFn() {
       gpuEvents[timeIndex].ID = head->id; 
       dataSetupIndex = timeIndex; 
       timeIndex++; 
+#ifdef GPU_TRACE
+      gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_1; 
+#endif
 #endif
       allocateBuffers(head); 
       setupData(head); 
       head->state = TRANSFERRING_IN; 
     }  
-
     if (head->state == TRANSFERRING_IN) {
-
       if ((returnVal = cudaStreamQuery(data_in_stream)) == cudaSuccess) {
 #ifdef GPU_PROFILE
-	gpuEvents[dataSetupIndex].endTime = cutGetTimerValue(timerHandle); 
+	gpuEvents[dataSetupIndex].endTime = cutGetTimerValue(timerHandle);
+#ifdef GPU_TRACE
+	traceUserBracketEvent(gpuEvents[dataSetupIndex].stage, 
+			      gpuEvents[dataSetupIndex].startTime, 
+			      gpuEvents[dataSetupIndex].endTime); 
+#endif 
 #endif
-	
 	if (second != NULL /*&& (second->state == QUEUED)*/) {
 	  allocateBuffers(second); 
 	}
-	
 #ifdef GPU_PROFILE
 	gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
 	gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
 	gpuEvents[timeIndex].ID = head->id; 
 	runningKernelIndex = timeIndex; 
 	timeIndex++; 
+#ifdef GPU_TRACE
+	gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_1; 
+#endif
 #endif
 	flushPinnedMemQueue();
 	kernelSelect(head); 
 	head->state = EXECUTING; 
-
 	if (second != NULL) {
-
 #ifdef GPU_PROFILE
 	  gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
 	  gpuEvents[timeIndex].eventType = DATA_SETUP; 
 	  gpuEvents[timeIndex].ID = second->id; 
 	  dataSetupIndex = timeIndex; 
 	  timeIndex++; 
+#ifdef GPU_TRACE
+	  gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_2; 
+#endif
 #endif
 	  setupData(second); 
 	  second->state = TRANSFERRING_IN;
-
 	}
-
       }
 #ifdef GPU_DEBUG
       printf("Querying memory stream returned: %d %.2f\n", returnVal, 
 	     cutGetTimerValue(timerHandle));
 #endif  
-
     }
-
     if (head->state == EXECUTING) {
       if ((returnVal = cudaStreamQuery(kernel_stream)) == cudaSuccess) {
 #ifdef GPU_PROFILE
 	gpuEvents[runningKernelIndex].endTime = cutGetTimerValue(timerHandle); 
+#ifdef GPU_TRACE
+	traceUserBracketEvent(gpuEvents[runningKernelIndex].stage, 
+			      gpuEvents[runningKernelIndex].startTime, 
+			      gpuEvents[runningKernelIndex].endTime); 
 #endif
-
+#endif
 	if (second != NULL && second->state == QUEUED) {
 #ifdef GPU_PROFILE
 	  gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
@@ -451,67 +459,73 @@ void gpuProgressFn() {
 	  gpuEvents[timeIndex].ID = second->id; 
 	  dataSetupIndex = timeIndex; 
 	  timeIndex++; 
+#ifdef GPU_TRACE
+	  gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_2; 
+#endif
 #endif
 	  allocateBuffers(second); 
 	  setupData(second); 
 	  second->state = TRANSFERRING_IN; 	
 	} 
-
 	if (second != NULL && second->state == TRANSFERRING_IN) {
 	  if (cudaStreamQuery(data_in_stream) == cudaSuccess) {
 #ifdef GPU_PROFILE
 	    gpuEvents[dataSetupIndex].endTime = cutGetTimerValue(timerHandle); 
+#ifdef GPU_TRACE
+	    traceUserBracketEvent(gpuEvents[dataSetupIndex].stage, 
+				  gpuEvents[dataSetupIndex].startTime, 
+				  gpuEvents[dataSetupIndex].endTime); 
 #endif
-
+#endif
 	    if (third != NULL /*&& (third->state == QUEUED)*/) {
 	      allocateBuffers(third); 
 	    }
-
 #ifdef GPU_PROFILE
 	    gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
 	    gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
 	    gpuEvents[timeIndex].ID = second->id; 
 	    runningKernelIndex = timeIndex; 
 	    timeIndex++; 
+#ifdef GPU_TRACE
+	    gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_2; 
+#endif
 #endif
 	    flushPinnedMemQueue();	    
 	    kernelSelect(second); 
 	    second->state = EXECUTING; 
-
 	    if (third != NULL) {
-
 #ifdef GPU_PROFILE
 	      gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
 	      gpuEvents[timeIndex].eventType = DATA_SETUP; 
 	      gpuEvents[timeIndex].ID = third->id; 
 	      dataSetupIndex = timeIndex; 
 	      timeIndex++; 
+#ifdef GPU_TRACE
+	      gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_3; 
+#endif
 #endif
 	      setupData(third); 
 	      third->state = TRANSFERRING_IN; 	
-
 	    }
-
 	  }
 	}
-
 #ifdef GPU_PROFILE
 	gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
 	gpuEvents[timeIndex].eventType = DATA_CLEANUP; 
 	gpuEvents[timeIndex].ID = head->id; 
 	dataCleanupIndex = timeIndex; 
 	timeIndex++; 
+#ifdef GPU_TRACE
+	gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_1; 
 #endif
-
+#endif
         copybackData(head);
 	head->state = TRANSFERRING_OUT;
-
       }
 #ifdef GPU_DEBUG
       printf("Querying kernel completion returned: %d %.2f\n", returnVal,
 	     cutGetTimerValue(timerHandle));
 #endif  
-      
     }
 
     if (head->state == TRANSFERRING_OUT) {
@@ -519,6 +533,11 @@ void gpuProgressFn() {
 	freeMemory(head); 
 #ifdef GPU_PROFILE
 	gpuEvents[dataCleanupIndex].endTime = cutGetTimerValue(timerHandle);
+#ifdef GPU_TRACE
+	traceUserBracketEvent(gpuEvents[dataCleanupIndex].stage, 
+			      gpuEvents[dataCleanupIndex].startTime, 
+			      gpuEvents[dataCleanupIndex].endTime); 
+#endif
 #endif
 	dequeue(wrQueue);
 	CUDACallbackManager(head->callbackFn);

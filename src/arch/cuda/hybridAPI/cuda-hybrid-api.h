@@ -25,7 +25,9 @@ extern "C" {
 int traceRegisterUserEvent(const char*x, int e);
 void traceUserBracketEvent(int e, double beginT, double endT);
 
-#define GPU_TRACE_EXEC 8800
+#define GPU_TRACE_EXEC_1 8800
+#define GPU_TRACE_EXEC_2 8801
+#define GPU_TRACE_EXEC_3 8802
 #endif
 
 
