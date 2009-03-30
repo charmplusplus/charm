@@ -1780,6 +1780,7 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
   int network = 1;
   
   dst = ogm->dst;
+
   switch (dst) {
   case PE_BROADCAST_ALL:
     CmiCommLock();
@@ -2355,8 +2356,17 @@ static void ConverseRunPE(int everReturn)
   CpvAccess(networkProgressCount) = 0;
 
   /* better to show the status here */
-  if (Cmi_netpoll == 1 && CmiMyPe() == 0)
-    CmiPrintf("Charm++: scheduler running in netpoll mode.\n");
+  if (CmiMyPe() == 0) {
+    if (Cmi_netpoll == 1) {
+      CmiPrintf("Charm++: scheduler running in netpoll mode.\n");
+    }
+#if CMK_SHARED_VARS_UNAVAILABLE
+    else {
+      if (CmiMemoryIs(CMI_MEMORY_IS_OS))
+        CmiAbort("Charm++ Fatal Error: interrupt mode does not work with default system memory allocator. Run with +netpoll to disable the interrupt.");
+    }
+#endif
+  }
 #if MEMORYUSAGE_OUTPUT
   memoryusage_counter = 0;
 #endif
