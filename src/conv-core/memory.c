@@ -269,6 +269,7 @@ void *valloc(size_t size) { return meta_valloc(size); }
 void CmiMemoryInit(argv)
   char **argv;
 {
+  CmiMemoryIs_flag |= CMI_MEMORY_IS_OS;
 #if CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS
   meta_init(argv);
 #endif

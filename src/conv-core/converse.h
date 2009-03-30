@@ -635,6 +635,7 @@ void CmiFreeAligned(void* ptr);
 #define CMI_MEMORY_IS_PARANOID  (1<<2)
 #define CMI_MEMORY_IS_GNU       (1<<3)
 #define CMI_MEMORY_IS_GNUOLD    (1<<4)
+#define CMI_MEMORY_IS_OS        (1<<5)
 int CmiMemoryIs(int flag); /* return state of this flag */
 
 #define CMI_THREAD_IS_QT         (1<<1)
