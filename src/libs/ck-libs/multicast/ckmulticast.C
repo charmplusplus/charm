@@ -73,52 +73,77 @@ public:
   inline void clear() { entry = NULL; pe = -1; }
 };
 
-/// cookie for an array section 
-class mCastEntry {
-public:
-  CkArrayID     aid;		/**< array ID */
-  CkSectionInfo parentGrp;	/**< spanning tree parent */
-  sectionIdList children;       /**< children section list */
-  int numChild;
-  arrayIndexList allElem;	// only useful on root
-  ObjKeyList     allObjKeys;    // only useful on root for LB
-  arrayIndexList localElem;
-  int pe;			/**< should always be mype */
-  CkSectionInfo rootSid;      /**< section ID of the root */
-  multicastGrpMsgBuf msgBuf;
-  multicastGrpPacketBuf packetBuf;   /**< pending packets */
-  char *asm_msg;		/**< for multicast packetization */
-  int   asm_fill;
-  mCastEntry *oldc, *newc;    /**< link list of entries on same processor */
-  SectionLocation   oldtree;    /**< old spanning tree */
-  // for reduction
-  reductionInfo red;
-  char needRebuild;
 
-private:
-  char flag;
-public:
-  mCastEntry(CkArrayID _aid): aid(_aid), numChild(0), 
-                    asm_msg(NULL), asm_fill(0),
-                    oldc(NULL), newc(NULL),
-                    needRebuild(0), flag(COOKIE_NOTREADY) {}
-  mCastEntry(mCastEntry *);
-  inline int hasParent() { return parentGrp.get_val()?1:0; }
-  inline int isObsolete() { return (flag == COOKIE_OLD); }
-  inline void setObsolete() { flag=COOKIE_OLD; }
-  inline int notReady() { return (flag == COOKIE_NOTREADY); }
-  inline void setReady() { flag=COOKIE_READY; }
-  inline void incReduceNo() {
-                red.redNo ++;
-                for (mCastEntry *next = newc; next; next=next->newc) 
-                   next->red.redNo++;
-              }
-  inline CkArrayID getAid() { return aid; }
-  inline int hasOldtree() { return oldtree.entry != NULL; }
-  inline void print() {
-    CmiPrintf("[%d] mCastEntry: %p, numChild: %d pe: %d flag: %d asm_msg:%p asm_fill:%d\n", CkMyPe(), this, numChild, pe, flag, asm_msg, asm_fill);
-  }
+
+
+/// Cookie for an array section 
+class mCastEntry 
+{
+    public:
+        /// Array ID 
+        CkArrayID     aid;
+        /// Spanning tree parent
+        CkSectionInfo parentGrp;
+        /// List of direct children
+        sectionIdList children;
+        /// Number of direct children
+        int numChild;
+        /// List of all tree member array indices (Only useful on the tree root)
+        arrayIndexList allElem;
+        /// Only useful on root for LB
+        ObjKeyList     allObjKeys;
+        /// List of array elements on local PE
+        arrayIndexList localElem;
+        /// Should always be myPE
+        int pe;
+        /// Section ID of the root
+        CkSectionInfo rootSid;
+        multicastGrpMsgBuf msgBuf;
+        /// Buffer storing the pending packets
+        multicastGrpPacketBuf packetBuf;
+        /// For multicast packetization
+        char *asm_msg;
+        int   asm_fill;
+        /// Linked list of entries on the same processor
+        mCastEntry *oldc, *newc;
+        /// Old spanning tree
+        SectionLocation   oldtree;
+        // for reduction
+        reductionInfo red;
+        //
+        char needRebuild;
+    private:
+        char flag;
+    public:
+        mCastEntry(CkArrayID _aid): aid(_aid), numChild(0), asm_msg(NULL), asm_fill(0),
+                    oldc(NULL), newc(NULL), needRebuild(0), flag(COOKIE_NOTREADY) {}
+        mCastEntry(mCastEntry *);
+        /// Check if this tree is only a branch and has a parent
+        inline int hasParent() { return parentGrp.get_val()?1:0; }
+        /// Is this tree obsolete?
+        inline int isObsolete() { return (flag == COOKIE_OLD); }
+        /// Make the current tree obsolete
+        inline void setObsolete() { flag=COOKIE_OLD; }
+        /// Check if this (branch of the) tree is ready for use
+        inline int notReady() { return (flag == COOKIE_NOTREADY); }
+        /// Mark this (branch of the) tree as ready for use
+        inline void setReady() { flag=COOKIE_READY; }
+        /// Increment the reduction number for all the section members on this PE
+        inline void incReduceNo() {
+            red.redNo ++;
+            for (mCastEntry *next = newc; next; next=next->newc) 
+                next->red.redNo++;
+        }
+        /// Get a handle on the array ID this tree is a member of
+        inline CkArrayID getAid() { return aid; }
+        inline int hasOldtree() { return oldtree.entry != NULL; }
+        inline void print() {
+            CmiPrintf("[%d] mCastEntry: %p, numChild: %d pe: %d flag: %d asm_msg:%p asm_fill:%d\n", CkMyPe(), this, numChild, pe, flag, asm_msg, asm_fill);
+        }
 };
+
+
+
 
 class cookieMsg: public CMessage_cookieMsg {
 public:
@@ -127,6 +152,8 @@ public:
   cookieMsg() {};
   cookieMsg(CkSectionInfo m): cookie(m) {};
 };
+
+
 
 
 /// multicast tree setup message
@@ -140,12 +167,18 @@ public:
   int redNo;
 };
 
+
+
+
 /// message send in spanning tree
 class multicastGrpMsg: public CkMcastBaseMsg, public CMessage_multicastGrpMsg {
 };
 
+
 extern void CkPackMessage(envelope **pEnv);
 extern void CkUnpackMessage(envelope **pEnv);
+
+
 
 void _ckMulticastInit(void)
 {
@@ -154,6 +187,7 @@ void _ckMulticastInit(void)
   CkDisableTracing(CkIndex_CkMulticastMgr::recvRedMsg(0));
 */
 }
+
 
 mCastEntry::mCastEntry (mCastEntry *old): 
   numChild(0), oldc(NULL), newc(NULL), flag(COOKIE_NOTREADY)
@@ -180,29 +214,40 @@ mCastEntry::mCastEntry (mCastEntry *old):
 
 extern LDObjid idx2LDObjid(const CkArrayIndex &idx);    // cklocation.C
 
-// call setup to return a sectionid.
+
+
+
 void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndexMax *al, int n)
 {
-  mCastEntry *entry = new mCastEntry(aid);
-  for (int i=0; i<n; i++) {
-    entry->allElem.push_back(al[i]);
+    // Create a multicast entry
+    mCastEntry *entry = new mCastEntry(aid);
+    // Push all the section member indices into the entry
+    for (int i=0; i<n; i++) {
+        entry->allElem.push_back(al[i]);
 #if CMK_LBDB_ON
-    const LDObjid key = idx2LDObjid(al[i]);
-    entry->allObjKeys.push_back(key);
+        const LDObjid key = idx2LDObjid(al[i]);
+        entry->allObjKeys.push_back(key);
 #endif
-  }
-//  entry->aid = aid;
-  _id.aid = aid;
-  _id.get_val() = entry;		// allocate table for this section
-  initCookie(_id);
+    }
+    //  entry->aid = aid;
+    _id.aid = aid;
+    _id.get_val() = entry;		// allocate table for this section
+    // 
+    initCookie(_id);
 }
+
+
+
 
 void CkMulticastMgr::setSection(CkSectionInfo &id)
 {
   initCookie(id);
 }
 
-// this is deprecated
+
+
+
+/// @warning: This is deprecated
 void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
 {
   CkArrayID aid = proxy.ckGetArrayID();
@@ -224,8 +269,9 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
   initCookie(_id);
 }
 
-// to recreate section
-// when root migrate
+
+
+
 void CkMulticastMgr::resetSection(CProxySection_ArrayElement &proxy)
 {
   CkSectionInfo &info = proxy.ckGetSectionInfo();
@@ -256,6 +302,9 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayElement &proxy)
   mCastGrp[oldpe].retrieveCookie(CkSectionInfo(oldpe, oldentry, 0, aid), info);
 }
 
+
+
+
 // prepare a mCastEntry entry and set up in CkSectionID
 void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndexMax *al, int count, CkArrayID aid)
 {
@@ -272,6 +321,9 @@ void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const Ck
   sid._cookie.get_pe() = CkMyPe();
 }
 
+
+
+
 // this is used
 void CkMulticastMgr::initDelegateMgr(CProxy *cproxy)
 {
@@ -285,6 +337,9 @@ void CkMulticastMgr::initDelegateMgr(CProxy *cproxy)
   prepareCookie(entry, sid, al, proxy->ckGetNumElements(), aid);
   initCookie(sid._cookie);
 }
+
+
+
 
 void CkMulticastMgr::retrieveCookie(CkSectionInfo s, CkSectionInfo srcInfo)
 {
@@ -305,185 +360,224 @@ void CkMulticastMgr::recvCookieInfo(CkSectionInfo s, int red)
   // TODO delete old tree
 }
 
+
+
+
 void CkMulticastMgr::initCookie(CkSectionInfo s)
 {
-  mCastEntry *entry = (mCastEntry *)s.get_val();
-  int n = entry->allElem.length();
-  DEBUGF(("init: %d elems %p\n", n, s.get_val()));
-  multicastSetupMsg *msg = new (n, n, 0) multicastSetupMsg;
-  msg->nIdx = n;
-  msg->parent = CkSectionInfo(entry->getAid());
-  msg->rootSid = s;
-  msg->redNo = entry->red.redNo;
-  CkArray *array = CProxy_ArrayBase(s.aid).ckLocalBranch();
-  for (int i=0; i<n; i++) {
-    msg->arrIdx[i] = entry->allElem[i];
-    int ape = array->lastKnown(entry->allElem[i]);
-    CmiAssert(ape >=0 && ape < CkNumPes());
-    msg->lastKnown[i] = ape;
-  }
-  CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-  mCastGrp[CkMyPe()].setup(msg);
+    mCastEntry *entry = (mCastEntry *)s.get_val();
+    int n = entry->allElem.length();
+    DEBUGF(("init: %d elems %p\n", n, s.get_val()));
+    // Create and initialize a setup message
+    multicastSetupMsg *msg = new (n, n, 0) multicastSetupMsg;
+    msg->nIdx = n;
+    msg->parent = CkSectionInfo(entry->getAid());
+    msg->rootSid = s;
+    msg->redNo = entry->red.redNo;
+    // Fill the message with the section member indices and their last known locations
+    CkArray *array = CProxy_ArrayBase(s.aid).ckLocalBranch();
+    for (int i=0; i<n; i++) {
+      msg->arrIdx[i] = entry->allElem[i];
+      int ape = array->lastKnown(entry->allElem[i]);
+      CmiAssert(ape >=0 && ape < CkNumPes());
+      msg->lastKnown[i] = ape;
+    }
+    // Trigger the spanning tree build
+    CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+    mCastGrp[CkMyPe()].setup(msg);
 }
 
-// mark obsolete, release buffered messages
+
+
+
 void CkMulticastMgr::teardown(CkSectionInfo cookie)
 {
-  int i;
-  mCastEntry *sect = (mCastEntry *)cookie.get_val();
-
-  sect->setObsolete();
-
-  releaseBufferedReduceMsgs(sect);
-
-  CProxy_CkMulticastMgr mp(thisgroup);
-  for (i=0; i<sect->children.length(); i++) {
-    mp[sect->children[i].get_pe()].teardown(sect->children[i]);
-  }
-
+    int i;
+    mCastEntry *sect = (mCastEntry *)cookie.get_val();
+    // Mark this section as obsolete
+    sect->setObsolete();
+    // Release the buffered messages 
+    releaseBufferedReduceMsgs(sect);
+    // Propagate the teardown to each of your children
+    CProxy_CkMulticastMgr mp(thisgroup);
+    for (i=0; i<sect->children.length(); i++)
+        mp[sect->children[i].get_pe()].teardown(sect->children[i]);
 }
 
-// mark obsolete, reset root section info and release buffered messages
+
+
+
 void CkMulticastMgr::retire(CkSectionInfo cookie, CkSectionInfo newroot)
 {
-  int i;
-  mCastEntry *sect = (mCastEntry *)cookie.get_val();
-  sect->rootSid = newroot;
-
-  sect->setObsolete();
-
-  releaseBufferedReduceMsgs(sect);
-
-  CProxy_CkMulticastMgr mp(thisgroup);
-  for (i=0; i<sect->children.length(); i++) {
-    mp[sect->children[i].get_pe()].teardown(sect->children[i]);
-  }
-
+    int i;
+    mCastEntry *sect = (mCastEntry *)cookie.get_val();
+    // Reset the root section info
+    sect->rootSid = newroot;
+    // Mark this section as obsolete
+    sect->setObsolete();
+    // Release the buffered messages 
+    releaseBufferedReduceMsgs(sect);
+    // Propagate the teardown to each of your children
+    CProxy_CkMulticastMgr mp(thisgroup);
+    for (i=0; i<sect->children.length(); i++)
+        mp[sect->children[i].get_pe()].teardown(sect->children[i]);
 }
+
+
+
 
 void CkMulticastMgr::freeup(CkSectionInfo cookie)
 {
   mCastEntry *sect = (mCastEntry *)cookie.get_val();
-
   CProxy_CkMulticastMgr mp(thisgroup);
-  while (sect) {
-    for (int i=0; i<sect->children.length(); i++) {
-      CkSectionInfo &s = sect->children[i];
-      mp[s.get_pe()].freeup(s);
-    }
-    // free cookie itself
-    DEBUGF(("[%d] Free up on %p\n", CkMyPe(), sect));
-    mCastEntry *oldc= sect->oldc;
-    delete sect;
-    sect = oldc;
+  // Parse through all the section members on this PE and...
+  while (sect) 
+  {
+      // Free their children
+      for (int i=0; i<sect->children.length(); i++)
+          mp[ sect->children[i].get_pe() ].freeup(sect->children[1]);
+      // Free the cookie itself
+      DEBUGF(("[%d] Free up on %p\n", CkMyPe(), sect));
+      mCastEntry *oldc= sect->oldc;
+      delete sect;
+      sect = oldc;
   }
 }
+
+
+
 
 void CkMulticastMgr::setup(multicastSetupMsg *msg)
 {
-  int i,j;
-  mCastEntry *entry;
-  CkArrayID aid = msg->rootSid.aid;
-  if (msg->parent.get_pe() == CkMyPe()) 
-	entry = (mCastEntry *)msg->rootSid.get_val(); //sid.val;
-  else 
-	entry = new mCastEntry(aid);
-  entry->aid = aid;
-  entry->pe = CkMyPe();
-  entry->rootSid = msg->rootSid;
-  entry->parentGrp = msg->parent;
-  DEBUGF(("[%d] setup: %p redNo: %d => %d with %d elems\n", CkMyPe(), entry, entry->red.redNo, msg->redNo, msg->nIdx));
-  entry->red.redNo = msg->redNo;
+    int i,j;
+    mCastEntry *entry;
+    CkArrayID aid = msg->rootSid.aid;
+    if (msg->parent.get_pe() == CkMyPe()) 
+      entry = (mCastEntry *)msg->rootSid.get_val(); //sid.val;
+    else 
+      entry = new mCastEntry(aid);
+    entry->aid = aid;
+    entry->pe = CkMyPe();
+    entry->rootSid = msg->rootSid;
+    entry->parentGrp = msg->parent;
+    DEBUGF(("[%d] setup: %p redNo: %d => %d with %d elems\n", CkMyPe(), entry, entry->red.redNo, msg->redNo, msg->nIdx));
+    entry->red.redNo = msg->redNo;
 
-  int numpes = CkNumPes();
-  arrayIndexPosList *lists = new arrayIndexPosList[numpes];
-  for (i=0; i<msg->nIdx; i++) {
-    // msg->arrIdx[i] is local ?
-    int lastKnown = msg->lastKnown[i];
-    if (lastKnown == CkMyPe()) {
-      entry->localElem.insertAtEnd(msg->arrIdx[i]);
+    // Create a numPE sized array of vectors to hold the array elements in each PE
+    int numpes = CkNumPes();
+    arrayIndexPosList *lists = new arrayIndexPosList[numpes];
+    // Sort each array index in the setup message based on last known location
+    for (i=0; i<msg->nIdx; i++) 
+    {
+      int lastKnown = msg->lastKnown[i];
+      // If msg->arrIdx[i] local, add it to a special local element list
+      if (lastKnown == CkMyPe())
+          entry->localElem.insertAtEnd(msg->arrIdx[i]);
+      // else, add it to the list corresponding to its PE
+      else
+          lists[lastKnown].push_back(IndexPos(msg->arrIdx[i], lastKnown));
     }
-    else {
-      lists[lastKnown].push_back(IndexPos(msg->arrIdx[i], lastKnown));
-    }
-  }
-  // divide into MAXMCASTCHILDREN slots
-  int numchild = 0;
-  int num = 0;
-  for (i=0; i<numpes; i++) {
-    if (i==CkMyPe()) continue;
-    if (lists[i].length()) num++;
-  }
-  if (factor <= 0) numchild = num;
-  else numchild = num<factor?num:factor;
 
-  entry->numChild = numchild;
-
-  if (numchild) {
-    arrayIndexPosList *slots = new arrayIndexPosList[numchild];
-    num = 0;
-    for (i=0; i<numpes; i++) {
+    // Determine the number of children in the multicast tree
+    // (divide into MAXMCASTCHILDREN slots)
+    int numchild = 0;
+    int num = 0;
+    // Count the number of PEs with section members on them
+    for (i=0; i<numpes; i++) 
+    {
       if (i==CkMyPe()) continue;
-      if (lists[i].length() == 0) continue;
-      for (j=0; j<lists[i].length(); j++)
-	slots[num].push_back(lists[i][j]);
-      num = (num+1) % numchild;
+      if (lists[i].length()) num++;
     }
+    // The number of multicast children can be limited by the spanning tree factor 
+    if (factor <= 0) numchild = num;
+    else numchild = num<factor?num:factor;
+  
+    entry->numChild = numchild;
 
-    // send messages
-    CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-    for (i=0; i<numchild; i++) {
-      int n = slots[i].length();
-      multicastSetupMsg *m = new (n, n, 0) multicastSetupMsg;
-      m->parent = CkSectionInfo(aid, entry);
-      m->nIdx = slots[i].length();
-      m->rootSid = msg->rootSid;
-      m->redNo = msg->redNo;
-      for (j=0; j<slots[i].length(); j++) {
-        m->arrIdx[j] = slots[i][j].idx;
-        m->lastKnown[j] = slots[i][j].pe;
-      }
-      int childroot = slots[i][0].pe;
-      DEBUGF(("[%d] call set up %d numelem:%d\n", CkMyPe(), childroot, n));
-      mCastGrp[childroot].setup(m);
+    // If there are any children, go about building a spanning tree
+    if (numchild) 
+    {
+        // Distribute the section members across the number of direct children (branches)
+        // Direct children are simply the first section member in each of the branch lists
+        arrayIndexPosList *slots = new arrayIndexPosList[numchild];
+        num = 0;
+        for (i=0; i<numpes; i++) 
+        {
+            if (i==CkMyPe()) continue;
+            if (lists[i].length() == 0) continue;
+            for (j=0; j<lists[i].length(); j++)
+                slots[num].push_back(lists[i][j]);
+            num = (num+1) % numchild;
+        }
+
+        // Ask each of your direct children to setup their branches
+        CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+        for (i=0; i<numchild; i++) 
+        {
+            // Give each child info about the number, indices and location of its children
+            int n = slots[i].length();
+            multicastSetupMsg *m = new (n, n, 0) multicastSetupMsg;
+            m->parent = CkSectionInfo(aid, entry);
+            m->nIdx = slots[i].length();
+            m->rootSid = msg->rootSid;
+            m->redNo = msg->redNo;
+            for (j=0; j<slots[i].length(); j++) 
+            {
+                m->arrIdx[j] = slots[i][j].idx;
+                m->lastKnown[j] = slots[i][j].pe;
+            }
+            int childroot = slots[i][0].pe;
+            DEBUGF(("[%d] call set up %d numelem:%d\n", CkMyPe(), childroot, n));
+            // Send the message to the child
+            mCastGrp[childroot].setup(m);
+        }
+        delete [] slots;
     }
-    delete [] slots;
-  }
-  else {
-    childrenReady(entry);
-  }
-  delete [] lists;
+    // else, tell yourself that your children are ready
+    else 
+    {
+        childrenReady(entry);
+    }
+    delete [] lists;
 }
+
+
+
 
 void CkMulticastMgr::childrenReady(mCastEntry *entry)
 {
-  entry->setReady();
-  CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-  DEBUGF(("[%d] entry %p childrenReady with %d elems.\n", CkMyPe(), entry, entry->allElem.length()));
-  if (entry->hasParent()) {
-    mCastGrp[entry->parentGrp.get_pe()].recvCookie(entry->parentGrp, CkSectionInfo(entry->getAid(), entry));
-  }
+    // Mark this entry as ready
+    entry->setReady();
+    CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+    DEBUGF(("[%d] entry %p childrenReady with %d elems.\n", CkMyPe(), entry, entry->allElem.length()));
+    if (entry->hasParent()) 
+        mCastGrp[entry->parentGrp.get_pe()].recvCookie(entry->parentGrp, CkSectionInfo(entry->getAid(), entry));
 #if SPLIT_MULTICAST
-  // clear packet buffer
-  while (!entry->packetBuf.isEmpty()) {
-    mCastPacket *packet = entry->packetBuf.deq();
-    packet->cookie.get_val() = entry;
-    mCastGrp[CkMyPe()].recvPacket(packet->cookie, packet->n, packet->data, packet->seqno, packet->count, packet->totalsize, 1);
-    delete [] packet->data;
-    delete packet;
-  }
+    // clear packet buffer
+    while (!entry->packetBuf.isEmpty()) 
+    {
+        mCastPacket *packet = entry->packetBuf.deq();
+        packet->cookie.get_val() = entry;
+        mCastGrp[CkMyPe()].recvPacket(packet->cookie, packet->n, packet->data, packet->seqno, packet->count, packet->totalsize, 1);
+        delete [] packet->data;
+        delete packet;
+    }
 #else
-  // clear msg buffer
-  while (!entry->msgBuf.isEmpty()) {
-    multicastGrpMsg *newmsg = entry->msgBuf.deq();
-    DEBUGF(("[%d] release buffer %p %d\n", CkMyPe(), newmsg, newmsg->ep));
-    newmsg->_cookie.get_val() = entry;
-    mCastGrp[CkMyPe()].recvMsg(newmsg);
-  }
+    // clear msg buffer
+    while (!entry->msgBuf.isEmpty()) 
+    {
+        multicastGrpMsg *newmsg = entry->msgBuf.deq();
+        DEBUGF(("[%d] release buffer %p %d\n", CkMyPe(), newmsg, newmsg->ep));
+        newmsg->_cookie.get_val() = entry;
+        mCastGrp[CkMyPe()].recvMsg(newmsg);
+    }
 #endif
-  // release reduction msgs
-  releaseFutureReduceMsgs(entry);
+    // release reduction msgs
+    releaseFutureReduceMsgs(entry);
 }
+
+
+
 
 void CkMulticastMgr::recvCookie(CkSectionInfo sid, CkSectionInfo child)
 {
@@ -493,6 +587,9 @@ void CkMulticastMgr::recvCookie(CkSectionInfo sid, CkSectionInfo child)
     childrenReady(entry);
   }
 }
+
+
+
 
 // rebuild is called when root not migrated
 // when rebuilding, all multicast msgs will be buffered.
