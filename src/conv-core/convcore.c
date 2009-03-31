@@ -2917,7 +2917,7 @@ void ConverseCommonInit(char **argv)
 #endif
 
 #ifdef CMK_CUDA
-  initHybridAPI(); 
+  initHybridAPI(CmiMyPe()); 
 #endif
 
   /* main thread is suspendable */
