@@ -24,7 +24,7 @@ extern "C" {
 /* initHybridAPI
    initializes the work request queue
 */
-void initHybridAPI(); 
+void initHybridAPI(int myPe); 
 
 /* gpuProgressFn
    called periodically to check if the current kernel has completed,

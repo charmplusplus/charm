@@ -36,10 +36,10 @@ extern void CUDACallbackManager(void * fn);
  *  completion of GPU events: memory allocation, transfer and
  *  kernel execution
  */  
-// #define GPU_PROFILE
-
-// #define GPU_DEBUG
-// #define GPU_TRACE
+//#define GPU_PROFILE
+//#define GPU_DEBUG
+//#define GPU_TRACE
+//#define _DEBUG
 
 /* work request queue */
 workRequestQueue *wrQueue = NULL; 
@@ -347,7 +347,13 @@ void kernelSelect(workRequest *wr);
  *   initializes the work request queue, host/device buffer pointer
  *   arrays, and CUDA streams
  */
-void initHybridAPI() {
+void initHybridAPI(int myPe) {
+
+  int deviceCount;
+  cudaGetDeviceCount(&deviceCount);
+
+  cudaSetDevice(myPe % deviceCount); 
+
   initWRqueue(&wrQueue);
 
   /* allocate host/device buffers array (both user and
