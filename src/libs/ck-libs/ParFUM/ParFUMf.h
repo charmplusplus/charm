@@ -332,7 +332,15 @@
 
        integer function FEM_count_valid(fem_mesh,entityType,entityIdx)
          integer, intent(in)  :: fem_mesh, entityType, entityIdx
-       end function    
+       end function   
+
+     integer function FEM_is_node_shared(fem_mesh, idx)
+         integer, intent(in) :: fem_mesh, idx
+     end function
+
+     integer function FEM_find_node_owner(fem_mesh, idx)
+         integer, intent(in) :: fem_mesh, idx
+     end function
 
 	 subroutine FEM_traceBegin()
 	 end subroutine
