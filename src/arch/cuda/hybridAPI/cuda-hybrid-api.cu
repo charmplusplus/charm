@@ -36,9 +36,9 @@ extern void CUDACallbackManager(void * fn);
  *  completion of GPU events: memory allocation, transfer and
  *  kernel execution
  */  
-//#define GPU_PROFILE
+#define GPU_PROFILE
 //#define GPU_DEBUG
-//#define GPU_TRACE
+#define GPU_TRACE
 //#define _DEBUG
 
 /* work request queue */
@@ -96,9 +96,10 @@ extern "C" int traceRegisterUserEvent(const char*x, int e);
 extern "C" void traceUserBracketEvent(int e, double beginT, double endT);
 extern "C" double CmiWallTimer(); 
 
-#define GPU_TRACE_EXEC_1 8800
-#define GPU_TRACE_EXEC_2 8801
-#define GPU_TRACE_EXEC_3 8802
+#define GPU_MEM_SETUP 8800
+#define GPU_KERNEL_EXEC 8801
+#define GPU_MEM_CLEANUP 8802
+
 #endif
 
 #endif
@@ -381,9 +382,9 @@ void initHybridAPI(int myPe) {
   nextBuffer = NUM_BUFFERS;  
 
 #ifdef GPU_TRACE
-  traceRegisterUserEvent("GPU Execution Stage 1", GPU_TRACE_EXEC_1);
-  traceRegisterUserEvent("GPU Execution Stage 2", GPU_TRACE_EXEC_2);
-  traceRegisterUserEvent("GPU Execution Stage 3", GPU_TRACE_EXEC_3);
+  traceRegisterUserEvent("GPU Memory Setup", GPU_MEM_SETUP);
+  traceRegisterUserEvent("GPU Kernel Execution", GPU_KERNEL_EXEC);
+  traceRegisterUserEvent("GPU Memory Cleanup", GPU_MEM_CLEANUP);
 #endif
 }
 
@@ -408,7 +409,7 @@ void gpuProgressFn() {
       gpuEvents[timeIndex].ID = head->id; 
       dataSetupIndex = timeIndex; 
 #ifdef GPU_TRACE
-      gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_1; 
+      gpuEvents[timeIndex].stage = GPU_MEM_SETUP; 
       gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
       timeIndex++; 
@@ -437,7 +438,7 @@ void gpuProgressFn() {
 	gpuEvents[timeIndex].ID = head->id; 
 	runningKernelIndex = timeIndex; 
 #ifdef GPU_TRACE
-	gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_1; 
+	gpuEvents[timeIndex].stage = GPU_KERNEL_EXEC; 
 	gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
 	timeIndex++; 
@@ -452,7 +453,7 @@ void gpuProgressFn() {
 	  gpuEvents[timeIndex].ID = second->id; 
 	  dataSetupIndex = timeIndex; 
 #ifdef GPU_TRACE
-	  gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_2; 
+	  gpuEvents[timeIndex].stage = GPU_MEM_SETUP; 
 	  gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
 	  timeIndex++; 
@@ -471,7 +472,7 @@ void gpuProgressFn() {
 #ifdef GPU_PROFILE
 	gpuEvents[runningKernelIndex].endTime = cutGetTimerValue(timerHandle); 
 #ifdef GPU_TRACE
-	gpuEvents[runningKernelIndex].cmiEndTime = CmiWallTimer();
+	gpuEvents[runningKernelIndex].cmiendTime = CmiWallTimer();
 	traceUserBracketEvent(gpuEvents[runningKernelIndex].stage, 
 			      gpuEvents[runningKernelIndex].cmistartTime, 
 			      gpuEvents[runningKernelIndex].cmiendTime); 
@@ -484,7 +485,7 @@ void gpuProgressFn() {
 	  gpuEvents[timeIndex].ID = second->id; 
 	  dataSetupIndex = timeIndex; 
 #ifdef GPU_TRACE
-	  gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_2; 
+	  gpuEvents[timeIndex].stage = GPU_MEM_SETUP; 
 	  gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
 	  timeIndex++; 
@@ -513,7 +514,7 @@ void gpuProgressFn() {
 	    gpuEvents[timeIndex].ID = second->id; 
 	    runningKernelIndex = timeIndex; 
 #ifdef GPU_TRACE
-	    gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_2; 
+	    gpuEvents[timeIndex].stage = GPU_KERNEL_EXEC; 
 	    gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
 	    timeIndex++; 
@@ -528,7 +529,7 @@ void gpuProgressFn() {
 	      gpuEvents[timeIndex].ID = third->id; 
 	      dataSetupIndex = timeIndex; 
 #ifdef GPU_TRACE
-	      gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_3; 
+	      gpuEvents[timeIndex].stage = GPU_MEM_SETUP; 
 	      gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
 	      timeIndex++; 
@@ -544,7 +545,7 @@ void gpuProgressFn() {
 	gpuEvents[timeIndex].ID = head->id; 
 	dataCleanupIndex = timeIndex; 	
 #ifdef GPU_TRACE
-	gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_1; 
+	gpuEvents[timeIndex].stage = GPU_MEM_CLEANUP; 
 	gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
 	timeIndex++; 
