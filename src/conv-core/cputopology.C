@@ -184,7 +184,7 @@ static void cpuTopoHandler(void *m)
   rec->rank ++;
   count ++;
   if (count == CmiNumPes()) {
-    CmiPrintf("Charm++> %d unique compute nodes detected! \n", CmmEntries(hostTable));
+    CmiPrintf("Charm++> %d unique compute nodes detected. \n", CmmEntries(hostTable));
     //hostnameMsg *tmpm;
     tag = CmmWildCard;
     while (tmpm = (hostnameMsg *)CmmGet(hostTable, 1, &tag, &tag1)) CmiFree(tmpm);
@@ -254,7 +254,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
 
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
 						"obtain cpu topology info");
-#ifndef _WIN32
+#if !defined(_WIN32) && !__BLUEGENE__
   obtain_flag = 1;
 #endif
 
@@ -265,7 +265,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
 
   if (!obtain_flag) return;
   else if (CmiMyPe() == 0) {
-     CmiPrintf("Charm++> cpu topology info is being gathered! \n");
+     CmiPrintf("Charm++> cpu topology info is being gathered. \n");
   }
 
 #if CMK_USE_GM
