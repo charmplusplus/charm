@@ -397,7 +397,7 @@ void gpuProgressFn() {
     printf("Error: work request queue not initialized\n"); 
     return; 
   }
-  while (!isEmpty(wrQueue)) {
+  // while (!isEmpty(wrQueue)) {
     int returnVal; 
     workRequest *head = firstElement(wrQueue); 
     workRequest *second = secondElement(wrQueue);
@@ -575,7 +575,7 @@ void gpuProgressFn() {
 	CUDACallbackManager(head->callbackFn);
       }
     }
-  }
+    // }
 }
 
 /* exitHybridAPI
