@@ -381,9 +381,9 @@ void initHybridAPI(int myPe) {
   nextBuffer = NUM_BUFFERS;  
 
 #ifdef GPU_TRACE
-  traceRegisterUserEvent("GPU Execution Stage", GPU_TRACE_EXEC_1);
-  traceRegisterUserEvent("GPU Execution Stage", GPU_TRACE_EXEC_2);
-  traceRegisterUserEvent("GPU Execution Stage", GPU_TRACE_EXEC_3);
+  traceRegisterUserEvent("GPU Execution Stage 1", GPU_TRACE_EXEC_1);
+  traceRegisterUserEvent("GPU Execution Stage 2", GPU_TRACE_EXEC_2);
+  traceRegisterUserEvent("GPU Execution Stage 3", GPU_TRACE_EXEC_3);
 #endif
 }
 
