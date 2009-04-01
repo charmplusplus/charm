@@ -435,7 +435,7 @@ void CkMulticastMgr::freeup(CkSectionInfo cookie)
   {
       // Free their children
       for (int i=0; i<sect->children.length(); i++)
-          mp[ sect->children[i].get_pe() ].freeup(sect->children[1]);
+          mp[ sect->children[i].get_pe() ].freeup(sect->children[i]);
       // Free the cookie itself
       DEBUGF(("[%d] Free up on %p\n", CkMyPe(), sect));
       mCastEntry *oldc= sect->oldc;
