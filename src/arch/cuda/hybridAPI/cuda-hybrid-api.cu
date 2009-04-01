@@ -36,7 +36,7 @@ extern void CUDACallbackManager(void * fn);
  *  completion of GPU events: memory allocation, transfer and
  *  kernel execution
  */  
-//#define GPU_PROFILE
+#define GPU_PROFILE
 //#define GPU_DEBUG
 //#define GPU_TRACE
 //#define _DEBUG
@@ -80,6 +80,8 @@ typedef struct gpuEventTimer {
   int ID; 
 #ifdef GPU_TRACE
   int stage; 
+  double cmistartTime; 
+  double cmiendTime; 
 #endif
 } gpuEventTimer; 
 
@@ -90,8 +92,9 @@ unsigned int dataSetupIndex = 0;
 unsigned int dataCleanupIndex = 0; 
 
 #ifdef GPU_TRACE
-int traceRegisterUserEvent(const char*x, int e);
-void traceUserBracketEvent(int e, double beginT, double endT);
+extern "C" int traceRegisterUserEvent(const char*x, int e);
+extern "C" void traceUserBracketEvent(int e, double beginT, double endT);
+extern "C" double CmiWallTimer(); 
 
 #define GPU_TRACE_EXEC_1 8800
 #define GPU_TRACE_EXEC_2 8801
@@ -404,10 +407,11 @@ void gpuProgressFn() {
       gpuEvents[timeIndex].eventType = DATA_SETUP; 
       gpuEvents[timeIndex].ID = head->id; 
       dataSetupIndex = timeIndex; 
-      timeIndex++; 
 #ifdef GPU_TRACE
       gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_1; 
+      gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
+      timeIndex++; 
 #endif
       allocateBuffers(head); 
       setupData(head); 
@@ -418,9 +422,10 @@ void gpuProgressFn() {
 #ifdef GPU_PROFILE
 	gpuEvents[dataSetupIndex].endTime = cutGetTimerValue(timerHandle);
 #ifdef GPU_TRACE
+	gpuEvents[dataSetupIndex].cmiendTime = CmiWallTimer();
 	traceUserBracketEvent(gpuEvents[dataSetupIndex].stage, 
-			      gpuEvents[dataSetupIndex].startTime, 
-			      gpuEvents[dataSetupIndex].endTime); 
+			      gpuEvents[dataSetupIndex].cmistartTime, 
+			      gpuEvents[dataSetupIndex].cmiendTime); 
 #endif 
 #endif
 	if (second != NULL /*&& (second->state == QUEUED)*/) {
@@ -431,10 +436,11 @@ void gpuProgressFn() {
 	gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
 	gpuEvents[timeIndex].ID = head->id; 
 	runningKernelIndex = timeIndex; 
-	timeIndex++; 
 #ifdef GPU_TRACE
 	gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_1; 
+	gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
+	timeIndex++; 
 #endif
 	flushPinnedMemQueue();
 	kernelSelect(head); 
@@ -445,10 +451,11 @@ void gpuProgressFn() {
 	  gpuEvents[timeIndex].eventType = DATA_SETUP; 
 	  gpuEvents[timeIndex].ID = second->id; 
 	  dataSetupIndex = timeIndex; 
-	  timeIndex++; 
 #ifdef GPU_TRACE
 	  gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_2; 
+	  gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
+	  timeIndex++; 
 #endif
 	  setupData(second); 
 	  second->state = TRANSFERRING_IN;
@@ -464,9 +471,10 @@ void gpuProgressFn() {
 #ifdef GPU_PROFILE
 	gpuEvents[runningKernelIndex].endTime = cutGetTimerValue(timerHandle); 
 #ifdef GPU_TRACE
+	gpuEvents[runningKernelIndex].cmiEndTime = CmiWallTimer();
 	traceUserBracketEvent(gpuEvents[runningKernelIndex].stage, 
-			      gpuEvents[runningKernelIndex].startTime, 
-			      gpuEvents[runningKernelIndex].endTime); 
+			      gpuEvents[runningKernelIndex].cmistartTime, 
+			      gpuEvents[runningKernelIndex].cmiendTime); 
 #endif
 #endif
 	if (second != NULL && second->state == QUEUED) {
@@ -475,10 +483,11 @@ void gpuProgressFn() {
 	  gpuEvents[timeIndex].eventType = DATA_SETUP; 
 	  gpuEvents[timeIndex].ID = second->id; 
 	  dataSetupIndex = timeIndex; 
-	  timeIndex++; 
 #ifdef GPU_TRACE
 	  gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_2; 
+	  gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
+	  timeIndex++; 
 #endif
 	  allocateBuffers(second); 
 	  setupData(second); 
@@ -489,9 +498,10 @@ void gpuProgressFn() {
 #ifdef GPU_PROFILE
 	    gpuEvents[dataSetupIndex].endTime = cutGetTimerValue(timerHandle); 
 #ifdef GPU_TRACE
+	    gpuEvents[dataSetupIndex].cmiendTime = CmiWallTimer();
 	    traceUserBracketEvent(gpuEvents[dataSetupIndex].stage, 
-				  gpuEvents[dataSetupIndex].startTime, 
-				  gpuEvents[dataSetupIndex].endTime); 
+				  gpuEvents[dataSetupIndex].cmistartTime, 
+				  gpuEvents[dataSetupIndex].cmiendTime); 
 #endif
 #endif
 	    if (third != NULL /*&& (third->state == QUEUED)*/) {
@@ -502,10 +512,11 @@ void gpuProgressFn() {
 	    gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
 	    gpuEvents[timeIndex].ID = second->id; 
 	    runningKernelIndex = timeIndex; 
-	    timeIndex++; 
 #ifdef GPU_TRACE
 	    gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_2; 
+	    gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
+	    timeIndex++; 
 #endif
 	    flushPinnedMemQueue();	    
 	    kernelSelect(second); 
@@ -516,10 +527,11 @@ void gpuProgressFn() {
 	      gpuEvents[timeIndex].eventType = DATA_SETUP; 
 	      gpuEvents[timeIndex].ID = third->id; 
 	      dataSetupIndex = timeIndex; 
-	      timeIndex++; 
 #ifdef GPU_TRACE
 	      gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_3; 
+	      gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
+	      timeIndex++; 
 #endif
 	      setupData(third); 
 	      third->state = TRANSFERRING_IN; 	
@@ -530,11 +542,12 @@ void gpuProgressFn() {
 	gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
 	gpuEvents[timeIndex].eventType = DATA_CLEANUP; 
 	gpuEvents[timeIndex].ID = head->id; 
-	dataCleanupIndex = timeIndex; 
-	timeIndex++; 
+	dataCleanupIndex = timeIndex; 	
 #ifdef GPU_TRACE
 	gpuEvents[timeIndex].stage = GPU_TRACE_EXEC_1; 
+	gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
+	timeIndex++; 
 #endif
         copybackData(head);
 	head->state = TRANSFERRING_OUT;
@@ -551,9 +564,10 @@ void gpuProgressFn() {
 #ifdef GPU_PROFILE
 	gpuEvents[dataCleanupIndex].endTime = cutGetTimerValue(timerHandle);
 #ifdef GPU_TRACE
+	gpuEvents[dataCleanupIndex].cmiendTime = CmiWallTimer();
 	traceUserBracketEvent(gpuEvents[dataCleanupIndex].stage, 
-			      gpuEvents[dataCleanupIndex].startTime, 
-			      gpuEvents[dataCleanupIndex].endTime); 
+			      gpuEvents[dataCleanupIndex].cmistartTime, 
+			      gpuEvents[dataCleanupIndex].cmiendTime); 
 #endif
 #endif
 	dequeue(wrQueue);
