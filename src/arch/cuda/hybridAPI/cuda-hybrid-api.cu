@@ -397,6 +397,11 @@ void gpuProgressFn() {
     printf("Error: work request queue not initialized\n"); 
     return; 
   }
+  
+  if (isEmpty(wrQueue)) {
+    return;
+  } 
+
   // while (!isEmpty(wrQueue)) {
     int returnVal; 
     workRequest *head = firstElement(wrQueue); 
