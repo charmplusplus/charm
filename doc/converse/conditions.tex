@@ -64,6 +64,7 @@ Returns an index that may be used to cancel the association later.
 Delete the given index from the list of callbacks for
 the given condition. The corresponding function will no longer be 
 called when the condition is raised.
+Note that it is illegal to call these two functions to cancel callbacks from within ccd callbacks.
 
 \function{void CcdRaiseCondition(condNum)}
 \args{int condNum;}
