@@ -232,7 +232,7 @@ extern "C" int CmiNumPesOnPhysicalNode(int pe)
 extern "C" void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num)
 {
   CmiAssert(pe >=0 && pe < CmiNumPes());
-  *num = cpuTopo.numUniqNodes();
+  *num = cpuTopo.bynodes[cpuTopo.nodenum[pe]].size();
   if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[cpuTopo.nodenum[pe]].getVec();
 }
 
@@ -254,7 +254,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
 
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
 						"obtain cpu topology info");
-#ifndef _WIN32
+#if !defined(_WIN32) && !__BLUEGENE__
   obtain_flag = 1;
 #endif
 
