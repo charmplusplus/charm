@@ -440,6 +440,12 @@ CDECL long ampiCurrentStackUsage(){
  
 }
 
+FDECL void FTN_NAME(AMPICURRENTSTACKUSAGE, ampicurrentstackusage)(void){
+  long usage = ampiCurrentStackUsage();
+  CkPrintf("[%d] Stack usage is currently %ld\n", CkMyPe(), usage);
+}
+
+
 CDECL void AMPI_threadstart(void *data);
 static int AMPI_threadstart_idx = -1;
 
