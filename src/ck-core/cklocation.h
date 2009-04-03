@@ -60,6 +60,9 @@ public:
 	CkArrayIndexMax idx; // Array index that is migrating
 	int ignoreArrival;   // if to inform LB of arrival
 	int length;//Size in bytes of the packed data
+#ifdef _FAULT_MLOG_
+        CkGroupID gid; //gid of location manager
+#endif
 	CmiBool bounced;
 	double* packData;
 };
@@ -218,6 +221,9 @@ public:
   int  isReadyMigrate()	{ return readyMigrate; }
   CmiBool checkBufferedMigration();	// check and execute pending migration
   int   MigrateToPe();
+#ifdef _FAULT_MLOG_
+        void Migrated();
+#endif
   inline void setMeasure(CmiBool status) { enable_measure = status; }
 private:
   LBDatabase *the_lbdb;

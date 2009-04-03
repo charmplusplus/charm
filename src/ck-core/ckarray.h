@@ -516,6 +516,9 @@ private:
 #endif
 public:
   void inmem_checkpoint(CkArrayCheckPTReqMessage *m);
+#ifdef _FAULT_MLOG_
+void recvBroadcast(CkMessage *);
+#endif
 #if CMK_GRID_QUEUE_AVAILABLE
 public:
   int grid_queue_interval;
@@ -535,7 +538,11 @@ template <class T>
 class ArrayElementT : public ArrayElement
 {
 public:
-  ArrayElementT(void): thisIndex(*(const T *)thisIndexMax.data()) {}
+  ArrayElementT(void): thisIndex(*(const T *)thisIndexMax.data()) {
+#ifdef _FAULT_MLOG_     
+        mlogData->objID.data.array.idx.asMax()=thisIndexMax;
+#endif
+}
   ArrayElementT(CkMigrateMessage *msg)
 	:ArrayElement(msg),
 	thisIndex(*(const T *)thisIndexMax.data()) {}
@@ -757,6 +764,10 @@ private:
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 public:
   void flushStates() { CkReductionMgr::flushStates(); CK_ARRAYLISTENER_LOOP(listeners, l->flushState()); }
+#ifdef _FAULT_MLOG_
+    virtual int numberReductionMessages(){CkAssert(CkMyPe() == 0);return numInitial;}
+#endif
+
 };
 /*@}*/
 

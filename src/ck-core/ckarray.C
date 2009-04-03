@@ -211,6 +211,10 @@ void ArrayElement::initBasics(void)
     CK_ARRAYLISTENER_LOOP(thisArray->listeners,
 			  l->ckElementCreating(this));
   }
+#ifdef _FAULT_MLOG_
+        mlogData->objID.type = TypeArray;
+        mlogData->objID.data.array.id = (CkGroupID)thisArrayID;
+#endif
 }
 
 ArrayElement::ArrayElement(void) 
@@ -322,6 +326,15 @@ void ArrayElement::CkAbort(const char *str) const
 		CkMyPe(), idx2str(thisIndexMax));
 	CkMigratable::CkAbort(str);
 }
+
+#ifdef _FAULT_MLOG_
+void ArrayElement::recvBroadcast(CkMessage *m){
+        CkArrayMessage *bcast = (CkArrayMessage *)m;
+        envelope *env = UsrToEnv(m);
+  int epIdx= env->piggyBcastIdx;
+        ckInvokeEntry(epIdx,bcast,CmiTrue);
+};
+#endif
 
 /*********************** Spring Cleaning *****************
 Periodically (every minute or so) remove expired broadcasts
@@ -854,7 +867,13 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
   elBcastNo++;
   DEBB((AA"Delivering broadcast %d to element %s\n"AB,elBcastNo,idx2str(el)));
   int epIdx=bcast->array_ep_bcast();
+
+#ifdef _FAULT_MLOG_     
+        DEBUG(printf("[%d] elBcastNo %d bcastNo %d \n",CmiMyPe(),bcastNo));
+        return true;
+#else
   return el->ckInvokeEntry(epIdx,bcast,CmiFalse);
+#endif
 }
 
 /// Deliver all needed broadcasts to the given local element
@@ -922,6 +941,12 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 	  _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
  	  int skipsched = opts & CK_MSG_EXPEDITED; 
 	  //int serializer=0;//1623802937%CkNumPes();
+#ifdef _FAULT_MLOG_
+                CProxy_CkArray ap(_aid);
+                ap[CpvAccess(serializer)].sendBroadcast(msg);
+                CkGroupID _id = _aid;
+//              printf("[%d] At ckBroadcast in CProxy_ArrayBase id %d epidx %d \n",CkMyPe(),_id.idx,ep);
+#else
 	  if (CkMyPe()==CpvAccess(serializer))
 	  {
 		DEBB((AA"Sending array broadcast\n"AB));
@@ -937,6 +962,7 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 		else
 			ap[CpvAccess(serializer)].sendBroadcast(msg);
 	  }
+#endif
 	}
 }
 
@@ -964,6 +990,11 @@ void CkArray::recvBroadcast(CkMessage *m)
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	broadcaster->incoming(msg);
+#ifdef _FAULT_MLOG_
+        _tempBroadcastCount=0;
+        locMgr->callForAllRecords(CkArray::staticBroadcastHomeElements,this,(void *)msg);
+#else
+
 	//Run through the list of local elements
 	int idx=0;
 	ArrayElement *el;
@@ -973,6 +1004,8 @@ void CkArray::recvBroadcast(CkMessage *m)
 #endif
 		broadcaster->deliver(msg,el);
 	}
+#endif
+
 #if CMK_BLUEGENE_CHARM
                 BgEntrySplit("end-broadcast");
 #endif

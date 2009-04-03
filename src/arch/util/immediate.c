@@ -71,6 +71,9 @@ SMP: This routine must be called holding immRecvLock
  */
 void CmiHandleImmediateMessage(void *msg) {
 /*  int handlerNo=CmiGetXHandler(msg); */
+#ifdef _FAULT_MLOG_
+        CmiAssert(0);
+#endif
   int handlerNo=CmiImmediateHandler(msg);
   MACHSTATE2(4,"immediate message handler %d %d", CmiGetHandler(msg), handlerNo)
 /*  CmiHandlerInfo *h=&CpvAccessOther(CmiHandlerTable,0)[handlerNo]; */

@@ -37,7 +37,9 @@ void CmmFree(t)
 CmmTable t;
 {
   if (t==NULL) return;
+#ifndef _FAULT_MLOG_    
   if (t->first!=NULL) CmiAbort("Cannot free a non-empty message table!");
+#endif
   CmiFree(t);
 }
 

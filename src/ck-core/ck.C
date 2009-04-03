@@ -121,6 +121,11 @@ extern int _defaultObjectQ;
 Chare::Chare(void) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
+#ifdef _FAULT_MLOG_
+        mlogData = new ChareMlogData();
+        mlogData->objID.type = TypeChare;
+        mlogData->objID.data.chare.id = thishandle;
+#endif
 #if CMK_OBJECT_QUEUE_AVAILABLE
   if (_defaultObjectQ)  CkEnableObjQ();
 #endif
@@ -129,6 +134,7 @@ Chare::Chare(void) {
 Chare::Chare(CkMigrateMessage* m) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
+
 #if CMK_OBJECT_QUEUE_AVAILABLE
   if (_defaultObjectQ)  CkEnableObjQ();
 #endif
@@ -147,6 +153,12 @@ void Chare::pup(PUP::er &p)
 {
   p(thishandle.onPE);
   thishandle.objPtr=(void *)this;
+#ifdef _FAULT_MLOG_
+        if(p.isUnpacking()){
+                mlogData = new ChareMlogData();
+        }
+        mlogData->pup(p);
+#endif
 }
 
 int Chare::ckGetChareType() const {
@@ -183,6 +195,11 @@ void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
 
 IrrGroup::IrrGroup(void) {
   thisgroup = CkpvAccess(_currentGroup);
+#ifdef _FAULT_MLOG_
+        mlogData->objID.type = TypeGroup;
+        mlogData->objID.data.group.id = thisgroup;
+        mlogData->objID.data.group.onPE = CkMyPe();
+#endif
 }
 
 IrrGroup::~IrrGroup() {
@@ -484,6 +501,10 @@ extern "C" int CkGetArgc(void) {
 /******************** Basic support *****************/
 extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
+#ifdef _FAULT_MLOG_
+        CpvAccess(_currentObj) = (Chare *)obj;
+//      printf("[%d] CurrentObj set to %p\n",CkMyPe(),obj);
+#endif
   //BIGSIM_OOC DEBUGGING
   //CkPrintf("CkDeliverMessageFree: name of entry fn: %s\n", _entryTable[epIdx]->name);
   //fflush(stdout);
@@ -506,6 +527,9 @@ extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
   //fflush(stdout);
 
   void *deliverMsg;
+#ifdef _FAULT_MLOG_
+        CpvAccess(_currentObj) = (Chare *)obj;
+#endif
   if (_entryTable[epIdx]->noKeep)
   { /* Deliver a read-only copy of the message */
     deliverMsg=(void *)msg;
@@ -974,7 +998,21 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
     if (!ck->watcher->processMessage(env,ck)) return;
   }
 //#endif
-
+#ifdef _FAULT_MLOG_
+        Chare *obj=NULL;
+        CkObjID sender;
+        MCount SN;
+        MlogEntry *entry=NULL;
+        if(env->getMsgtype() == ForBocMsg || env->getMsgtype() == ForNodeBocMsg ||
+        env->getMsgtype() == ForArrayEltMsg){
+                sender = env->sender;
+                SN = env->SN;
+                int result = preProcessReceivedMessage(env,&obj,&entry);
+                if(result == 0){
+                        return;
+                }
+        }
+#endif
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   bracketStartCriticalPathMethod(env);
@@ -1053,6 +1091,12 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
     default:
       CmiAbort("Fatal Charm++ Error> Unknown msg-type in _processHandler.\n");
   }
+#ifdef _FAULT_MLOG_
+        if(obj != NULL){
+                postProcessReceivedMessage(obj,sender,SN,entry);
+        }
+#endif
+
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   bracketEndCriticalPathMethod(env);
@@ -1163,10 +1207,29 @@ static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     CmiSetHandler(env,index_skipCldHandler);
 #endif
     CmiSetInfo(env,infoFn);
-    if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
-    else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, (char *)env); }
+    if (pe==CLD_BROADCAST) {
+#ifdef _FAULT_MLOG_             
+                        CmiSyncBroadcast(len, (char *)env);
+#else
+ 			CmiSyncBroadcastAndFree(len, (char *)env); 
+#endif
+
+}
+    else if (pe==CLD_BROADCAST_ALL) { 
+#ifdef _FAULT_MLOG_             
+                        CmiSyncBroadcastAll(len, (char *)env);
+#else
+                        CmiSyncBroadcastAllAndFree(len, (char *)env);
+#endif
+
+}
     else{
-			CmiSyncSendAndFree(pe, len, (char *)env);
+#ifdef _FAULT_MLOG_             
+                        CmiSyncSend(pe, len, (char *)env);
+#else
+                        CmiSyncSendAndFree(pe, len, (char *)env);
+#endif
+
 		}
   }
 }
@@ -1206,9 +1269,28 @@ static void _noCldNodeEnqueue(int node, envelope *env)
 */
   CkPackMessage(&env);
   int len=env->getTotalsize();
-  if (node==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)env); }
-  else if (node==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
-  else CmiSyncNodeSendAndFree(node, len, (char *)env);
+  if (node==CLD_BROADCAST) { 
+#ifdef _FAULT_MLOG_
+        CmiSyncNodeBroadcast(len, (char *)env);
+#else
+	CmiSyncNodeBroadcastAndFree(len, (char *)env); 
+#endif
+}
+  else if (node==CLD_BROADCAST_ALL) { 
+#ifdef _FAULT_MLOG_
+                CmiSyncNodeBroadcastAll(len, (char *)env);
+#else
+		CmiSyncNodeBroadcastAllAndFree(len, (char *)env); 
+#endif
+
+}
+  else {
+#ifdef _FAULT_MLOG_
+        CmiSyncNodeSend(node, len, (char *)env);
+#else
+	CmiSyncNodeSendAndFree(node, len, (char *)env);
+#endif
+  }
 }
 
 static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
@@ -1340,6 +1422,9 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
 {
   int numPes;
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+#ifdef _FAULT_MLOG_
+        sendTicketGroupRequest(env,pe,_infoIdx);
+#else
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
   _TRACE_CREATION_N(env, numPes);
   if (opts & CK_MSG_SKIP_OR_IMM)
@@ -1347,6 +1432,7 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
   else
     _skipCldEnqueue(pe, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
+#endif
 }
 
 static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
@@ -1465,6 +1551,9 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
 {
   int numPes;
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
+#ifdef _FAULT_MLOG_
+        sendTicketNodeGroupRequest(env,node,_infoIdx);
+#else
   _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
   _TRACE_CREATION_N(env, numPes);
   if (opts & CK_MSG_SKIP_OR_IMM) {
@@ -1476,6 +1565,7 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
   else
     CldNodeEnqueue(node, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
+#endif
 }
 
 extern "C"
@@ -1600,12 +1690,16 @@ extern "C"
 void CkArrayManagerDeliver(int pe,void *msg, int opts) {
   register envelope *env = UsrToEnv(msg);
   _prepareOutgoingArrayMsg(env,ForArrayEltMsg);
+#ifdef _FAULT_MLOG_
+        sendTicketArrayRequest(env,pe,_infoIdx);
+#else
   if (opts & CK_MSG_IMMEDIATE)
     CmiBecomeImmediate(env);
   if (opts & CK_MSG_SKIP_OR_IMM)
     _noCldEnqueue(pe, env);
   else
     _skipCldEnqueue(pe, env, _infoIdx);
+#endif
 }
 
 class ElementDestroyer : public CkLocIterator {

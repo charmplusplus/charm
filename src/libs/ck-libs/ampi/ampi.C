@@ -1123,6 +1123,16 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
   
   seqEntries=parent->numElements;
   oorder.init (seqEntries);
+#ifdef _FAULT_MLOG_
+    if(thisIndex == 0){
+/*      CkAssert(CkMyPe() == 0);
+ *              CkGroupID _myManagerGID = thisProxy.ckGetArrayID();     
+ *                      CkAssert(numElements);
+ *                              printf("ampi::ampi setting numInitial to %d on manager at gid %d \n",numElements,_myManagerGID.idx);
+ *                                      CkArray *_myManager = thisProxy.ckLocalBranch();
+ *                                              _myManager->setNumInitial(numElements);*/
+    }
+#endif
 }
 
 ampi::ampi(CkArrayID parent_,const ampiCommStruct &s, ComlibInstanceHandle ciStreaming_,
@@ -1881,6 +1891,10 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 
   resumeOnRecv=true;
   ampi *dis = getAmpiInstance(disComm);
+#ifdef _FAULT_MLOG_
+//  dis->yield();
+//  processRemoteMlogMessages();
+#endif
   while(1) {
       //This is done to take into account the case in which an ampi 
       // thread has migrated while waiting for a message
@@ -1890,6 +1904,12 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
     dis->thread->suspend();
     dis = getAmpiInstance(disComm);
   }
+
+#ifdef _FAULT_MLOG_
+        CpvAccess(_currentObj) = dis;
+        MSG_ORDER_DEBUG( printf("[%d] AMPI thread rescheduled  to Index %d buf %p src %d\n",CkMyPe(),dis->thisIndex,buf,s); )
+#endif
+
   dis->resumeOnRecv=false;
 
   if(sts)
@@ -2187,6 +2207,12 @@ CDECL void AMPI_Migrate(void)
 #endif
 #endif
   TCHARM_Migrate();
+
+#ifdef _FAULT_MLOG_
+    ampi *currentAmpi = getAmpiInstance(MPI_COMM_WORLD);
+    CpvAccess(_currentObj) = currentAmpi;
+#endif
+
 #if CMK_BLUEGENE_CHARM
 //  TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATE")
   TRACE_BG_ADD_TAG("AMPI_MIGRATE");
@@ -2421,6 +2447,10 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
 #if AMPI_COUNTER
   getAmpiParent()->counters.send++;
 #endif
+#ifdef _FAULT_MLOG_
+//  ptr->yield();
+//  //  processRemoteMlogMessages();
+#endif
   return 0;
 }
 
@@ -2556,6 +2586,10 @@ int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
     (*(pptr->toPUPer))|(pptr->pupBytes);
     PUParray(*(pptr->toPUPer), (char *)buf, (pptr->pupBytes));
   }
+#endif
+#ifdef _FAULT_MLOG_
+//  ptr->yield();
+//  //  processRemoteMlogMessages();
 #endif
 
   return 0;
@@ -3179,10 +3213,15 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 #endif
     
 #if 1
+#ifndef _FAULT_MLOG_
+            //for fault evacuation
       if(oldPe != CkMyPe()){
+#endif
 			reqs = getReqs();
 			reqvec  = vecIndex(count,request);
-      }
+#ifndef _FAULT_MLOG_
+            }
+#endif
 #endif
     }
   }

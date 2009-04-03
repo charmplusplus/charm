@@ -180,6 +180,18 @@ CkReductionMgr::CkReductionMgr()//Constructor
   gcount=lcount=0;
   nContrib=nRemote=0;
   maxStartRequest=0;
+#ifdef _FAULT_MLOG_
+    if(CkMyPe() != 0){
+        perProcessorCounts = NULL;
+    }else{
+        perProcessorCounts = new int[CmiNumPes()];
+        for(int i=0;i<CmiNumPes();i++){
+            perProcessorCounts[i] = -1;
+        }
+    }
+    totalCount = 0;
+    processorCount = 0;
+#endif
   DEBR((AA"In reductionMgr constructor at %d \n"AB,this));
 }
 
@@ -362,7 +374,21 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
   m->redNo=ci->redNo++;
   m->sourceFlag=-1;//A single contribution
   m->gcount=0;
+
+#ifdef _FAULT_MLOG_
+    if(lcount == 0){
+        m->sourceProcessorCount = 1;
+    }else{
+        m->sourceProcessorCount = lcount;
+    }
+    m->fromPE = CmiMyPe();
+    Chare *oldObj =CpvAccess(_currentObj);
+    char currentObjName[100];
+    DEBR(("[%d] contribute called with currentObj %s redNo %d lcount %d\n",CkMyPe(),oldObj->mlogData->objID.toString(currentObjName),m->redNo,lcount));
+    thisProxy[0].contributeViaMessage(m);
+#else
   addContribution(m);
+#endif
 }
 
 //////////// Reduction Manager Remote Entry Points /////////////
@@ -376,6 +402,7 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
  }
  DEBR((AA" Group ReductionStarting called for redNo %d\n"AB,m->num));
  int srcPE = (UsrToEnv(m))->getSrcPe();
+#ifndef _FAULT_MLOG_ 
   if (isPresent(m->num) && !inProgress)
   {
     DEBR((AA"Starting reduction #%d at parent's request\n"AB,m->num));
@@ -393,6 +420,18 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
   else //is Past
     DEBR((AA"Ignoring parent's late request to start #%d\n"AB,m->num));
   delete m;
+#else
+    if(redNo == 0){
+        if(lcount == 0){
+            DEBR(("[%d] Group %d Sending dummy contribute to get totalCount\n",CmiMyPe(),thisgroup.idx));
+            CkReductionMsg *dummy = CkReductionMsg::buildNew(0,NULL);
+            dummy->fromPE = CmiMyPe();
+            dummy->sourceProcessorCount = 0;
+            dummy->redNo = 0;
+            thisProxy[0].contributeViaMessage(dummy);
+        }
+    }
+#endif
 }
 
 //Sent to root of reduction tree with reduction contribution
@@ -448,8 +487,30 @@ void CkReductionMgr::startReduction(int number,int srcPE)
   if(!CmiNodeAlive(CkMyPe())){
 	return;
   }
+
+#ifdef _FAULT_MLOG_ 
+  if(CmiMyPe() == 0 && redNo == 0){
+            for(int j=0;j<CkNumPes();j++){
+                if(j != CkMyPe() && j != srcPE){
+                        thisProxy[j].ReductionStarting(new CkReductionNumberMsg(number));
+                }
+            }
+            if(lcount == 0){
+                CkReductionMsg *dummy = CkReductionMsg::buildNew(0,NULL);
+                dummy->fromPE = CmiMyPe();
+                dummy->sourceProcessorCount = 0;
+                dummy->redNo = 0;
+                thisProxy[0].contributeViaMessage(dummy);
+            }
+    }   else{
+        thisProxy[0].ReductionStarting(new CkReductionNumberMsg(number));
+    }
+
+
+#else
+	nodeProxy[CkMyNode()].ckLocalBranch()->startNodeGroupReduction(number,thisgroup);
+#endif
 	
-  nodeProxy[CkMyNode()].ckLocalBranch()->startNodeGroupReduction(number,thisgroup);
   int temp;
 	/*
   //making it a broadcast done only by PE 0
@@ -478,6 +539,9 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 	  // kick-start your parent too ...
 			if(treeParent() != srcPE){
 				if(CmiNodeAlive(treeParent())||allowMessagesOnly !=-1){
+#ifdef _FAULT_MLOG_
+    CpvAccess(_currentObj) = oldObj;
+#endif
 		  		thisProxy[treeParent()].ReductionStarting(new CkReductionNumberMsg(i));
 				}	
 			}	
@@ -499,11 +563,16 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 void CkReductionMgr::addContribution(CkReductionMsg *m)
 {
   if (isPast(m->redNo))
-  {//We've moved on-- forward late contribution straight to root
+  {
+#ifdef _FAULT_MLOG_
+        CmiAbort("this version should not have late migrations");
+#else
+	//We've moved on-- forward late contribution straight to root
     DEBR((AA"Migrant %p gives late contribution for #%d!\n"AB,m->ci,m->redNo));
-   // if (!hasParent()) //Root moved on too soon-- should never happen
-   //   CkAbort("Late reduction contribution received at root!\n");
+   	// if (!hasParent()) //Root moved on too soon-- should never happen
+   	//   CkAbort("Late reduction contribution received at root!\n");
     thisProxy[0].LateMigrantMsg(m);
+#endif
   }
   else if (isFuture(m->redNo)) {//An early contribution-- add to future Q
     DEBR((AA"Contributor %p gives early contribution-- for #%d\n"AB,m->ci,m->redNo));
@@ -530,13 +599,44 @@ void CkReductionMgr::finishReduction(void)
   	return;
   }
   //CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d at %.6f\n",CkMyPe(),redNo, nContrib,CmiWallTimer());
+#ifndef _FAULT_MLOG_   
+
   if (nContrib<(lcount+adj(redNo).lcount)){
 	DEBR((AA"Need more local messages %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
 	 return;//Need more local messages
   }
+ 
+#else
+
+    if(CkMyPe() != 0){
+        if(redNo != 0){
+            return;
+        }else{
+            CmiAssert(lcount == 0);
+            CkReductionMsg *dummy = reduceMessages();
+            dummy->fromPE = CmiMyPe();
+            dummy->sourceProcessorCount = 0;
+            thisProxy[0].contributeViaMessage(dummy);
+            return;
+        }
+    }
+
+    if (CkMyPe() == 0 && nContrib<numberReductionMessages()){
+        DEBR((AA"Need more messages %d %d\n"AB,nContrib,numberReductionMessages()));
+         return;//Need more local messages
+  }else{
+        DEBR(("[%d] Group %d nContrib %d numberReductionMessages() %d totalCount %d\n",CmiMyPe(),thisgroup.idx,nContrib,numberReductionMessages(),totalCount));
+    }
+
+
+#endif
+
+
   DEBR((AA"Reducing data... %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
   CkReductionMsg *result=reduceMessages();
   result->redNo=redNo;
+#ifndef _FAULT_MLOG_
+
   result->gcount+=gcount+adj(redNo).gcount;
   result->secondaryCallback = result->callback;
   result->callback = CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(NULL),0,thisProxy);
@@ -551,13 +651,36 @@ void CkReductionMgr::finishReduction(void)
   // Find our node reduction manager, and pass reduction to him:
   CkArrayReductionMgr *nodeMgr=nodeProxy[CkMyNode()].ckLocalBranch();
   nodeMgr->contributeArrayReduction(result);
+#else
+#if DEBUGRED
+    CkPrintf("~~~~~~~~~~~~~~~~~ About to call callback from end of SIMPLIFIED GROUP REDUCTION %d at %.6f\n",redNo,CmiWallTimer());
+#endif
+    if (!result->callback.isInvalid())
+        result->callback.send(result);
+    else if (!storedCallback.isInvalid())
+        storedCallback.send(result);
+    else{
+#if DEBUGRED
+        CkPrintf("No reduction client for group %d \n",thisgroup.idx);
+#endif
+        CkAbort("No reduction client!\n"
+            "You must register a client with either SetReductionClient or during contribute.\n");
+    }
+#if DEBUGRED
+       CkPrintf("[%d,%d]------------END OF SIMPLIFIED GROUP REDUCTION %d for group %d at %.6f\n",CkMyNode(),CkMyPe(),redNo,thisgroup.idx,CkWallTimer());
+#endif
+
+#endif
 
   //House Keeping Operations will have to check later what needs to be changed
   redNo++;
   //Shift the count adjustment vector down one slot (to match new redNo)
   int i;
-
-  if(CkMyPe()!=0){
+#ifndef _FAULT_MLOG_
+	if(CkMyPe()!=0){
+#else
+    {
+#endif
 	int i;
 	completedRedNo++;
   	for (i=1;i<adjVec.length();i++)
@@ -576,10 +699,14 @@ void CkReductionMgr::finishReduction(void)
     if (m!=NULL) //One of these addContributions may have finished us.
       addContribution(m);//<- if *still* early, puts it back in the queue
   }
+#ifndef _FAULT_MLOG_   
+
   if(maxStartRequest >= redNo){
 	  startReduction(redNo,CkMyPe());
 	  finishReduction();
   }
+ 
+#endif
 }
 
 //////////// Reduction Manager Utilities /////////////
@@ -729,7 +856,11 @@ void CkReductionMgr::pup(PUP::er &p)
   // we can not pup because inserting array elems will add the counters again
 //  p|lcount;
 //  p|gcount;
-
+#ifdef _FAULT_MLOG_ 
+//  p|lcount;
+//  //  p|gcount;
+//  //  printf("[%d] nodeProxy nodeGroup %d pupped in group %d \n",CkMyPe(),(nodeProxy.ckGetGroupID()).idx,thisgroup.idx);
+#endif
   if(p.isUnpacking()){
     thisProxy = thisgroup;
     maxStartRequest=0;
@@ -1238,7 +1369,10 @@ CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
 /**nodegroup reduction manager . Most of it is similar to the guy above***/
 NodeGroup::NodeGroup(void) {
   __nodelock=CmiCreateLock();
-
+#ifdef _FAULT_MLOG_
+    mlogData->objID.type = TypeNodeGroup;
+    mlogData->objID.data.group.onPE = CkMyNode();
+#endif
 
 }
 NodeGroup::~NodeGroup() {
@@ -1345,6 +1479,10 @@ void CkNodeReductionMgr::ckSetReductionClient(CkCallback *cb)
 
 void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
+#ifdef _FAULT_MLOG_
+    Chare *oldObj =CpvAccess(_currentObj);
+    CpvAccess(_currentObj) = this;
+#endif
 
   m->ci=ci;
   m->redNo=ci->redNo++;
@@ -1355,11 +1493,18 @@ void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 #endif
   addContribution(m);
 
+#ifdef _FAULT_MLOG_
+    CpvAccess(_currentObj) = oldObj;
+#endif
 }
 
 
 void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMsg *m,int count)
 {
+#ifdef _FAULT_MLOG_
+    Chare *oldObj =CpvAccess(_currentObj);
+    CpvAccess(_currentObj) = this;
+#endif
   m->ci=ci;
   m->redNo=ci->redNo++;
   m->gcount=count;
@@ -1371,6 +1516,9 @@ void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMs
   CkPrintf("[%d,%d] }}}contributewithCounter finished for %d at %0.6f\n",CkMyNode(),CkMyPe(),m->redNo,CmiWallTimer());
 #endif
 
+#ifdef _FAULT_MLOG_
+    CpvAccess(_currentObj) = oldObj;
+#endif
 }
 
 

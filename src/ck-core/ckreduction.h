@@ -209,6 +209,18 @@ private:
 
 //Checkpointing utilities
 public:
+#ifdef _FAULT_MLOG_
+    int *perProcessorCounts;
+    int processorCount;
+    int totalCount;
+    int numberReductionMessages(){
+            if(totalCount != 0){
+                return totalCount;
+            }else{
+                return MAX_INT;
+            }
+    }
+#endif
 	virtual void pup(PUP::er &p);
 	static int isIrreducible(){ return 0;}
 };
@@ -275,6 +287,10 @@ private:
   		>0 indicates this is a reduced contribution.
   	*/
   	int nSources(void) {return sourceFlag<0?-sourceFlag:sourceFlag;}
+#ifdef _FAULT_MLOG_ 
+    int sourceProcessorCount;
+    int fromPE;
+#endif
 private:
 	CkReduction::reducerType reducer;
 	contributorInfo *ci;//Source contributor, or NULL if none

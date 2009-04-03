@@ -399,6 +399,12 @@ PUPmarshall(CkArrayID)
 // for object message queue
 #include "ckobjQ.h"
 
+
+#ifdef _FAULT_MLOG_
+class ChareMlogData;
+#endif
+
+
 /**
   The base class of all parallel objects in Charm++,
   including Array Elements, Groups, and NodeGroups.
@@ -410,6 +416,9 @@ class Chare {
     CkObjectMsgQ objQ;                // object message queue
 #endif
   public:
+#ifdef _FAULT_MLOG_
+                ChareMlogData *mlogData;
+#endif
     Chare(CkMigrateMessage *m);
     Chare();
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
@@ -988,7 +997,9 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #endif
 
 
-
+#ifdef _FAULT_MLOG_
+#include "ckmessagelogging.h"
+#endif
 #include "ckmemcheckpoint.h"
 #include "readonly.h"
 #include "ckarray.h"

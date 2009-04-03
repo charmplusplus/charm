@@ -275,6 +275,9 @@ typedef unsigned short UShort;
 typedef unsigned char  UChar;
 
 #include "charm.h" // for CkGroupID
+#ifdef _FAULT_MLOG_
+#include "ckobjid.h" //for the ckobjId
+#endif
 
 /**
 The "envelope" sits at the start of every Charm++
@@ -364,6 +367,13 @@ public:
     	UChar isPacked:1; ///< If true, message must be unpacked before use
     	UChar isUsed:1; ///< Marker bit to prevent message re-send.
     };
+#ifdef _FAULT_MLOG_
+        CkObjID sender;
+        CkObjID recver;
+        MCount SN;
+        MCount TN;
+        MlogEntry *localMlogEntry;
+#endif
 private:
     u_type type; ///< Depends on message type (attribs.mtype)
     UShort ref; ///< Used by futures
@@ -378,6 +388,9 @@ private:
     UInt   totalsize; ///< Byte count from envelope start to end of priobits
     
   public:
+#ifdef _FAULT_MLOG_
+        UInt piggyBcastIdx;
+#endif
     void pup(PUP::er &p);
     UInt   getEvent(void) const { return event; }
     void   setEvent(const UInt e) { event = e; }
@@ -421,6 +434,13 @@ private:
       _SET_USED(env, 0);
       //for record-replay
       env->setEvent(0);
+#ifdef _FAULT_MLOG_
+            env->sender.type = TypeInvalid;
+            env->recver.type = TypeInvalid;
+            env->SN = 0;
+            env->TN = 0;
+            env->localMlogEntry = NULL;
+#endif
       return env;
     }
     UShort getEpIdx(void) const { return epIdx; }
@@ -565,6 +585,13 @@ private:
     }
 public:
     MsgPool():SafePool<void*>(_alloc, CkFreeMsg) {}
+#ifdef _FAULT_MLOG_
+        void *get(void){
+            return allocfn();
+        }
+        void put(void *m){
+        }
+#endif
 };
 
 CkpvExtern(MsgPool*, _msgPool);

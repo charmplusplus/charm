@@ -75,7 +75,11 @@ private:
 public:
   CkMarshalledCLBStatsMessage bufMsg;
   SpanningTree st;
-  CentralLB(const CkLBOptions & opt):BaseLB(opt) { initLB(opt); } 
+  CentralLB(const CkLBOptions & opt):BaseLB(opt) { initLB(opt); 
+#ifdef _FAULT_MLOG_
+        lbDecisionCount= resumeCount=0;
+#endif
+} 
   CentralLB(CkMigrateMessage *m):BaseLB(m) {}
   virtual ~CentralLB();
 
@@ -246,7 +250,16 @@ private:
 
 public:
   int useMem();
+#ifdef _FAULT_MLOG_
+    int savedBalancing;
+    void endMigrationDone(int balancing);
+    int lbDecisionCount ,resumeCount;
+#endif
 };
+
+#ifdef _FAULT_MLOG_ 
+    void resumeCentralLbAfterChkpt(void *lb);
+#endif
 
 // CLBStatsMsg is not directly sent in the entry function
 // CkMarshalledCLBStatsMessage is used instead to use the pup defined here.

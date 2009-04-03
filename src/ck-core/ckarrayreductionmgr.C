@@ -176,6 +176,10 @@ void CkArrayReductionMgr::setAttachedGroup(CkGroupID groupID){
 
 
 void CkArrayReductionMgr::startNodeGroupReduction(int number,CkGroupID groupID){
+#ifdef _FAULT_MLOG_
+    Chare *oldObj =CpvAccess(_currentObj);
+    CpvAccess(_currentObj) = this;
+#endif
 	ARPRINT("[%d] startNodeGroupReductions for red No %d my group %d attached group %d on %p \n",CkMyNode(),number,thisgroup.idx, attachedGroup.idx,this);
 	if(attachedGroup.isZero()){
 		setAttachedGroup(groupID);
@@ -184,6 +188,9 @@ void CkArrayReductionMgr::startNodeGroupReduction(int number,CkGroupID groupID){
 	CkReductionNumberMsg *msg = new CkReductionNumberMsg(number);
 	envelope::setSrcPe((char *)UsrToEnv(msg),CkMyNode());
 	((CkNodeReductionMgr *)this)->ReductionStarting(msg);
+#ifdef _FAULT_MLOG_
+    CpvAccess(_currentObj) = oldObj;
+#endif
 }
 
 int CkArrayReductionMgr::startLocalGroupReductions(int number){	

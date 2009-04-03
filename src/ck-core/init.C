@@ -188,6 +188,9 @@ static inline void _parseCommandLineOpts(char **argv)
 # if CMK_MEM_CHECKPOINT
       faultFunc = CkMemRestart;
 # endif
+#ifdef _FAULT_MLOG_
+            faultFunc = CkMlogRestart;
+#endif
       CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
   }
   // reading the killFile
@@ -218,7 +221,32 @@ static inline void _parseCommandLineOpts(char **argv)
 	if(CmiGetArgStringDesc(argv,"+raiseevac", &_raiseEvacFile,"Generates processor evacuation on random processors")){
 		_raiseEvac = 1;
 	}
-	
+#ifdef _FAULT_MLOG_
+    if(!CmiGetArgIntDesc(argv,"+chkptPeriod",&chkptPeriod,"Set the checkpoint period for the message logging fault tolerance algorithm in seconds")){
+        chkptPeriod = 100;
+    }
+    if(CmiGetArgFlagDesc(argv,"+Parallelrestart", "Parallel Restart with message logging protocol")){
+        parallelRestart = true;
+    }
+    if(CmiGetArgStringDesc(argv,"+killFile", &killFile,"Generates SIGKILL on specified processors")){
+        if(faultFunc == NULL){
+            killFlag = 1;
+            if(CmiMyPe() == 0){
+                printf("[%d] killFlag set to 1 for file %s\n",CkMyPe(),killFile);
+            }
+        }
+    }
+    if(!CmiGetArgIntDesc(argv,"+mlog_local_buffer",&_maxBufferedMessages,"# of local messages buffered in the message logging protoocl")){
+        _maxBufferedMessages = 2;
+    }
+    if(!CmiGetArgIntDesc(argv,"+mlog_remote_buffer",&_maxBufferedTicketRequests,"# of remote ticket requests buffered in the message logging protoocl")){
+        _maxBufferedTicketRequests = 2;
+    }
+    if(!CmiGetArgIntDesc(argv,"+mlog_buffer_time",&BUFFER_TIME,"# Time spent waiting for messages to be buffered in the message logging protoocl")){
+        BUFFER_TIME = 2;
+    }
+
+#endif	
 	/* Anytime migration flag */
 	isAnytimeMigration = CmiTrue;
 	if (CmiGetArgFlagDesc(argv,"+noAnytimeMigration","The program does not require support for anytime migration")) {
@@ -299,6 +327,10 @@ static inline void _sendStats(void)
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 }
 
+#ifdef _FAULT_MLOG_
+extern void _messageLoggingExit();
+#endif
+
 static void _exitHandler(envelope *env)
 {
   DEBUGF(("exitHandler called on %d msgtype: %d\n", CkMyPe(), env->getMsgtype()));
@@ -330,6 +362,9 @@ static void _exitHandler(envelope *env)
       }	
       break;
     case ReqStatMsg:
+#ifdef _FAULT_MLOG_
+        _messageLoggingExit();
+#endif
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
@@ -867,6 +902,11 @@ void _initCharm(int unused_argc, char **argv)
  	if (!inCommThread) {
 	  _TRACE_BEGIN_COMPUTATION();
 	}
+
+#ifdef _FAULT_MLOG_
+    _messageLoggingInit();
+#endif
+
 #ifndef __BLUEGENE__
 	/*
 		FAULT_EVAC
@@ -883,6 +923,10 @@ void _initCharm(int unused_argc, char **argv)
 
 	evacuate = 0;
 	CcdCallOnCondition(CcdSIGUSR1,(CcdVoidFn)CkDecideEvacPe,0);
+#ifdef _FAULT_MLOG_ 
+    CcdCallOnCondition(CcdSIGUSR2,(CcdVoidFn)CkMlogRestart,0);
+#endif
+
 	if(_raiseEvac){
 		processRaiseEvacFile(_raiseEvacFile);
 		/*
@@ -927,6 +971,9 @@ void _initCharm(int unused_argc, char **argv)
 			msg->argc = CmiGetArgc(argv);
 			msg->argv = argv;
 			_entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
+#ifdef _FAULT_MLOG_
+            CpvAccess(_currentObj) = (Chare *)obj;
+#endif
 		}
                 _mainDone = 1;
 
