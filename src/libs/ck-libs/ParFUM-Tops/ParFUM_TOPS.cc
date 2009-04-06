@@ -448,9 +448,11 @@ void top_retrieve_data(TopModel* m) {
 void topModel_Destroy(TopModel* m){
 #if CUDA
     if (m->target_device == DeviceGPU) {
+        CkAssert(cudaFree(m->device_model.n2eConnDevice) == cudaSuccess);
         CkAssert(cudaFree(m->device_model.mAttDevice) == cudaSuccess);
         CkAssert(cudaFree(m->device_model.NodeDataDevice) == cudaSuccess);
         CkAssert(cudaFree(m->device_model.ElemDataDevice) == cudaSuccess);
+        CkAssert(cudaFree(m->device_model.ElemConnDevice) == cudaSuccess);
     }
 #endif
     delete m;
