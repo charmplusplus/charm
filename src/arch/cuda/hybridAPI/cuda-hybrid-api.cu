@@ -235,8 +235,9 @@ void allocateBuffers(workRequest *wr) {
 
         CUDA_SAFE_CALL_NO_SYNC(cudaMalloc((void **) &devBuffers[index], size));
 #ifdef GPU_DEBUG
-        printf("buffer %d allocated %.2f\n", index, 
-            cutGetTimerValue(timerHandle)); 
+        printf("buffer %d allocated at time %.2f size: %d error string: %s\n", 
+	       index, cutGetTimerValue(timerHandle), size, 
+	       cudaGetErrorString( cudaGetLastError() ) );
 #endif
       }
     }
@@ -271,8 +272,9 @@ void setupData(workRequest *wr) {
 	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpyAsync(devBuffers[index], 
           hostBuffers[index], size, cudaMemcpyHostToDevice, data_in_stream));
 #ifdef GPU_DEBUG
-	printf("transferToDevice bufId: %d %.2f\n", index,
-	       cutGetTimerValue(timerHandle)); 
+	printf("transferToDevice bufId: %d at time %.2f size: %d " 
+	       "error string: %s\n", index, cutGetTimerValue(timerHandle), 
+	       size, cudaGetErrorString( cudaGetLastError() )); 
 #endif	
 	/*
 	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpy(devBuffers[index], 
@@ -299,8 +301,9 @@ void copybackData(workRequest *wr) {
       
       if (bufferInfo[i].transferFromDevice) {
 #ifdef GPU_DEBUG
-	printf("transferFromDevice: %d %.2f\n", index, 
-	       cutGetTimerValue(timerHandle)); 
+	printf("transferFromDevice: %d at time %.2f size: %d "
+	       "error string: %s\n", index, cutGetTimerValue(timerHandle), 
+	       size, cudaGetErrorString( cudaGetLastError() )); 
 #endif
 	
 	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpyAsync(hostBuffers[index], 
@@ -331,7 +334,9 @@ void freeMemory(workRequest *wr) {
 #endif
 
 #ifdef GPU_DEBUG
-        printf("buffer %d freed %.2f\n", index, cutGetTimerValue(timerHandle));
+        printf("buffer %d freed at time %.2f error string: %s\n", 
+	       index, cutGetTimerValue(timerHandle),  
+	       cudaGetErrorString( cudaGetLastError() ));
 #endif 
         CUDA_SAFE_CALL_NO_SYNC(cudaFree(devBuffers[index])); 
         devBuffers[index] = NULL; 
@@ -467,10 +472,12 @@ void gpuProgressFn() {
 	  second->state = TRANSFERRING_IN;
 	}
       }
+      /*
 #ifdef GPU_DEBUG
       printf("Querying memory stream returned: %d %.2f\n", returnVal, 
 	     cutGetTimerValue(timerHandle));
 #endif  
+      */
     }
     if (head->state == EXECUTING) {
       if ((returnVal = cudaStreamQuery(kernel_stream)) == cudaSuccess) {
@@ -558,10 +565,12 @@ void gpuProgressFn() {
         copybackData(head);
 	head->state = TRANSFERRING_OUT;
       }
+      /*
 #ifdef GPU_DEBUG
       printf("Querying kernel completion returned: %d %.2f\n", returnVal,
 	     cutGetTimerValue(timerHandle));
 #endif  
+      */
     }
 
     if (head->state == TRANSFERRING_OUT) {
