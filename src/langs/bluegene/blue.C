@@ -1445,7 +1445,8 @@ CmiStartFn bgMain(int argc, char **argv)
   CpvInitialize(int, numNodes);
   cva(numNodes) = nodeInfo::numLocalNodes();
 
-  initLock = CmiCreateLock();     // used for BnvInitialize
+  if (CmiMyRank() == 0)
+    initLock = CmiCreateLock();     // used for BnvInitialize
 
   bgstreaming.init(cva(numNodes));
 
