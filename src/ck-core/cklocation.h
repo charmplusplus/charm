@@ -502,6 +502,12 @@ public:
 		int onPe,int ctor,CkDeliver_t type) =0;
 };
 
+
+#ifdef _FAULT_MLOG_
+typedef void (*CkLocFn)(CkArray *,void *,CkLocRec *,CkArrayIndex *);
+#endif
+
+
 /**
  * A group which manages the location of an indexed set of
  * migratable objects.  Knows about insertions, deletions,
@@ -708,6 +714,13 @@ private:
 	LDOMHandle myLBHandle;
 #endif
 	void initLB(CkGroupID lbdbID);
+
+#ifdef _FAULT_MLOG_
+public:
+	void callForAllRecords(CkLocFn,CkArray *,void *);
+	int homeElementCount;
+#endif
+
 };
 
 

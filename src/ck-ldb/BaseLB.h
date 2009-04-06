@@ -154,6 +154,9 @@ public:
   double * expectedLoad;	// expected load for future
 
 public:
+#ifdef _FAULT_MLOG_
+	int lbDecisionCount;
+#endif
   LBMigrateMsg(): level(0), n_moves(0), next_lb(0) {}
 };
 

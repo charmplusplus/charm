@@ -26,6 +26,7 @@ module CkReduction {
 
 	//call back for using NodeGroup Reductions added by sayantan
 	entry void ArrayReductionHandler(CkReductionMsg *m);
+	entry void contributeViaMessage(CkReductionMsg *m);
   };
 
   nodegroup CkNodeReductionMgr : IrrGroup {

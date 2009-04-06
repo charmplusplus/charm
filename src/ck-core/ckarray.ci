@@ -30,6 +30,7 @@ module CkArray {
     entry void ckDestroy(void);
     // CMK_MEM_CHECKPOINT
     entry void inmem_checkpoint(CkArrayCheckPTReqMessage *);
+	entry void recvBroadcast(CkMessage *);
   };
 
 

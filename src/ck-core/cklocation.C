@@ -55,6 +55,7 @@ static const char *idx2str(const CkArrayMessage *m)
 #   define DEBB(x) CkPrintf x  //Broadcast debug messages
 #   define AA "LocMgr on %d: "
 #   define AB ,CkMyPe()
+#   define DEBUG(x) x
 #else
 #   define DEB(X) /*CkPrintf x*/
 #   define DEBI(X) /*CkPrintf x*/
@@ -65,6 +66,7 @@ static const char *idx2str(const CkArrayMessage *m)
 #   define DEBK(x) /*CkPrintf x*/
 #   define DEBB(x) /*CkPrintf x*/
 #   define str(x) /**/
+#   define DEBUG(x)
 #endif
 
 
@@ -1684,6 +1686,20 @@ void CkLocMgr::flushAllRecs(void)
   delete it;
   CmiImmediateUnlock(hashImmLock);
 }
+
+#ifdef _FAULT_MLOG_
+void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
+    void *objp;
+    void *keyp;
+
+    CkHashtableIterator *it = hash.iterator();
+  while (NULL!=(objp=it->next(&keyp))) {
+    CkLocRec *rec=*(CkLocRec **)objp;
+    CkArrayIndex &idx=*(CkArrayIndex *)keyp;
+        fnPointer(arr,data,rec,&idx);
+    }
+}
+#endif
 
 /*************************** LocMgr: CREATION *****************************/
 CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkArrayIndexMax& numInitial)

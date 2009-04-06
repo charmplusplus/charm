@@ -1178,7 +1178,9 @@ static void _skipCldHandler(void *converseMsg)
 }
 
 
-static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
+//static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
+// Made non-static to be used by ckmessagelogging
+void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {
   if(pe == CkMyPe() ){
     if(!CmiNodeAlive(CkMyPe())){
@@ -1260,7 +1262,9 @@ static void _noCldEnqueue(int pe, envelope *env)
   else CmiSyncSendAndFree(pe, len, (char *)env);
 }
 
-static void _noCldNodeEnqueue(int node, envelope *env)
+//static void _noCldNodeEnqueue(int node, envelope *env)
+//Made non-static to be used by ckmessagelogging
+void _noCldNodeEnqueue(int node, envelope *env)
 {
 /*
   if (node == CkMyNode()) {

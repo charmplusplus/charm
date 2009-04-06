@@ -17,6 +17,7 @@
 #include "LBSimulation.h"
 
 #define  DEBUGF(x)        //CmiPrintf x;
+#define  DEBUG(x)      // x;
 
 #if CMK_MEM_CHECKPOINT
    /* can not handle reduction in inmem FT */
@@ -722,6 +723,12 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
   }
   migrates_expected = 0;
   future_migrates_expected = 0;
+#ifdef _FAULT_MLOG_
+	int sending=0;
+    int dummy=0;
+	int *dummyCounts;
+	LBDB *_myLBDB = theLbdb->getLBDB();
+#endif
   for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
     const int me = CkMyPe();

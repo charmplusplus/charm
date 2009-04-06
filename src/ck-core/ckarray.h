@@ -515,10 +515,9 @@ private:
   void init_checkpt();
 #endif
 public:
-  void inmem_checkpoint(CkArrayCheckPTReqMessage *m);
-#ifdef _FAULT_MLOG_
-void recvBroadcast(CkMessage *);
-#endif
+	void inmem_checkpoint(CkArrayCheckPTReqMessage *m);
+	void recvBroadcast(CkMessage *);
+
 #if CMK_GRID_QUEUE_AVAILABLE
 public:
   int grid_queue_interval;
@@ -765,7 +764,10 @@ private:
 public:
   void flushStates() { CkReductionMgr::flushStates(); CK_ARRAYLISTENER_LOOP(listeners, l->flushState()); }
 #ifdef _FAULT_MLOG_
-    virtual int numberReductionMessages(){CkAssert(CkMyPe() == 0);return numInitial;}
+	// the mlogft only support 1D arrays, then returning the number of elements in the first dimension
+	virtual int numberReductionMessages(){CkAssert(CkMyPe() == 0);return numInitial.data()[0];}
+	void broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index);
+	static void staticBroadcastHomeElements(CkArray *arr,void *data,CkLocRec *rec,CkArrayIndex *index);
 #endif
 
 };

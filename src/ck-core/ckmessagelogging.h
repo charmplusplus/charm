@@ -497,7 +497,7 @@ extern int _removeProcessedLogHandlerIdx;
 
 
 //methods for restart
-void CkMlogRestart(const char * dummy);
+void CkMlogRestart(const char * dummy, CkArgMsg * dummyMsg);
 void CkMlogRestartDouble(void *,double);
 void processReceivedTN(Chare *obj,int vecsize,MCount *listTNs);
 void initializeRestart(void *data,ChareMlogData *mlogData);

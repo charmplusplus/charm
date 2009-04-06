@@ -71,6 +71,10 @@ public:
   CkReductionNumberMsg(int n) {num=n;}
 };
 
+#ifdef _FAULT_MLOG_
+#define MAX_INT 5000000
+#endif
+
 
 /**
  * One CkReductionMgr runs a non-overlapping set of reductions.
@@ -223,6 +227,7 @@ public:
 #endif
 	virtual void pup(PUP::er &p);
 	static int isIrreducible(){ return 0;}
+	void contributeViaMessage(CkReductionMsg *m);
 };
 
 

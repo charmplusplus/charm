@@ -391,6 +391,42 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 #endif
 }
 
+#ifdef _FAULT_MLOG_
+void CkReductionMgr::contributeViaMessage(CkReductionMsg *m){
+    CmiAssert(CmiMyPe() == 0);
+    DEBR(("[%d] contributeViaMessage fromPE %d\n",CmiMyPe(),m->fromPE));
+    if(redNo == 0){
+        if(perProcessorCounts[m->fromPE] == -1){
+            processorCount++;
+            perProcessorCounts[m->fromPE] = m->sourceProcessorCount;
+            DEBR(("[%d] Group %d processorCount %d fromPE %d sourceProcessorCount %d\n",CmiMyPe(),thisgroup.idx,processorCount,m->fromPE,m->sourceProcessorCount));
+        }else{
+            if(perProcessorCounts[m->fromPE] < m->sourceProcessorCount){
+                DEBR(("[%d] Group %d processorCount %d fromPE %d sourceProcessorCount %d\n",CmiMyPe(),thisgroup.idx,processorCount,m->fromPE,m->sourceProcessorCount));
+                perProcessorCounts[m->fromPE] = m->sourceProcessorCount;
+            }
+        }
+        if(processorCount == CmiNumPes()){
+            totalCount = 0;
+            for(int i=0;i<CmiNumPes();i++){
+                CmiAssert(perProcessorCounts[i] != -1);
+                totalCount += perProcessorCounts[i];
+            }
+            DEBR(("[%d] Group %d totalCount %d\n",CmiMyPe(),thisgroup.idx,totalCount));
+        }
+        if(m->sourceProcessorCount == 0){
+            if(processorCount == CmiNumPes()){
+                finishReduction();
+            }
+            return;
+        }
+    }
+    addContribution(m);
+}
+#else
+void CkReductionMgr::contributeViaMessage(CkReductionMsg *m){}
+#endif
+
 //////////// Reduction Manager Remote Entry Points /////////////
 //Sent down the reduction tree (used by barren PEs)
 void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)

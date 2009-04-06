@@ -1,5 +1,3 @@
-
-//ERASE this line
 #ifdef _FAULT_MLOG_
 
 #include "ck.h"
@@ -1758,7 +1756,7 @@ void clearUpMigratedRetainedLists(int PE){
 /**
  * Function for restarting an object with message logging
  */
-void CkMlogRestart(const char * dummy){
+void CkMlogRestart(const char * dummy, CkArgMsg *dummyMsg){
 	printf("[%d] Restart started at %.6lf \n",CkMyPe(),CmiWallTimer());
 	fprintf(stderr,"[%d] Restart started at %.6lf \n",CkMyPe(),CmiWallTimer());
 	_restartFlag = 1;
@@ -3542,5 +3540,4 @@ envelope *copyEnvelope(envelope *env){
 	return newEnv;
 }
 
-//ERASE this line
 #endif

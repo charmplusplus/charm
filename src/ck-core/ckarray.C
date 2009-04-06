@@ -91,6 +91,7 @@ static const char *idx2str(const ArrayElement *el)
 #   define DEBB(x) CkPrintf x  //Broadcast debug messages
 #   define AA "ArrayBOC on %d: "
 #   define AB ,CkMyPe()
+#   define DEBUG(x) x
 #else
 #   define DEB(X) /*CkPrintf x*/
 #   define DEBI(X) /*CkPrintf x*/
@@ -101,6 +102,7 @@ static const char *idx2str(const ArrayElement *el)
 #   define DEBK(x) /*CkPrintf x*/
 #   define DEBB(x) /*CkPrintf x*/
 #   define str(x) /**/
+#   define DEBUG(x)
 #endif
 
 inline CkArrayIndexMax &CkArrayMessage::array_index(void)
@@ -329,11 +331,13 @@ void ArrayElement::CkAbort(const char *str) const
 
 #ifdef _FAULT_MLOG_
 void ArrayElement::recvBroadcast(CkMessage *m){
-        CkArrayMessage *bcast = (CkArrayMessage *)m;
-        envelope *env = UsrToEnv(m);
-  int epIdx= env->piggyBcastIdx;
-        ckInvokeEntry(epIdx,bcast,CmiTrue);
+	CkArrayMessage *bcast = (CkArrayMessage *)m;
+    envelope *env = UsrToEnv(m);
+	int epIdx= env->piggyBcastIdx;
+    ckInvokeEntry(epIdx,bcast,CmiTrue);
 };
+#else
+void ArrayElement::recvBroadcast(CkMessage *m){}
 #endif
 
 /*********************** Spring Cleaning *****************
@@ -983,6 +987,39 @@ void CkArray::sendExpeditedBroadcast(CkMessage *msg)
 	//Broadcast the message to all processors
 	thisProxy.recvExpeditedBroadcast(msg);
 }
+
+#ifdef _FAULT_MLOG_
+int _tempBroadcastCount=0;
+
+void CkArray::broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index){
+    if(homePe(*index)==CmiMyPe()){
+        CkArrayMessage *bcast = (CkArrayMessage *)data;
+    int epIdx=bcast->array_ep_bcast();
+        DEBUG(CmiPrintf("[%d] gid %d broadcastHomeElements to index %s entry name %s\n",CmiMyPe(),thisgroup.idx,idx2str(*index),_entryTable[bcast->array_ep_bcast()]->name));
+        CkArrayMessage *copy = (CkArrayMessage *)   CkCopyMsg((void **)&bcast);
+        envelope *env = UsrToEnv(copy);
+        env->sender.data.group.onPE = CkMyPe();
+        env->TN  = env->SN=0;
+        env->piggyBcastIdx = epIdx;
+        env->setEpIdx(CkIndex_ArrayElement::recvBroadcast(0));
+        env->getsetArrayMgr() = thisgroup;
+        env->getsetArrayIndex() = *index;
+    env->getsetArrayEp() = CkIndex_ArrayElement::recvBroadcast(0);
+        env->setSrcPe(CkMyPe());
+        rec->deliver(copy,CkDeliver_queue);
+        _tempBroadcastCount++;
+    }else{
+        if(locMgr->homeElementCount != -1){
+            DEBUG(CmiPrintf("[%d] gid %d skipping broadcast to index %s \n",CmiMyPe(),thisgroup.idx,idx2str(*index)));
+        }
+    }
+}
+
+void CkArray::staticBroadcastHomeElements(CkArray *arr,void *data,CkLocRec *rec,CkArrayIndex *index){
+    arr->broadcastHomeElements(data,rec,index);
+}
+#endif
+
 
 /// Increment broadcast count; deliver to all local elements
 void CkArray::recvBroadcast(CkMessage *m)

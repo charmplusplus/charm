@@ -131,6 +131,12 @@ typedef void (*CkFtFn)(const char *, CkArgMsg *);
 static CkFtFn  faultFunc = NULL;
 static char* _restartDir;
 
+#ifdef _FAULT_MLOG_
+int chkptPeriod=1000;
+bool parallelRestart=false;
+extern int BUFFER_TIME; //time spent waiting for buffered messages
+#endif
+
 // flag for killing processes 
 extern int killFlag;
 // file specifying the processes to be killed
