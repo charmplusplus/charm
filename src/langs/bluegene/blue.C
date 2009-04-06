@@ -683,6 +683,7 @@ void sendPacket_(nodeInfo *myNode, int x, int y, int z, int threadID, int handle
   //CmiPrintStackTrace(0);
 
   double latency;
+  CmiAssert(numbytes >=0 );
   CmiSetHandler(sendmsg, cva(simState).msgHandler);
   CmiBgMsgNodeID(sendmsg) = nodeInfo::XYZ2Global(x,y,z);
   CmiBgMsgThreadID(sendmsg) = threadID;
@@ -1445,7 +1446,8 @@ CmiStartFn bgMain(int argc, char **argv)
   CpvInitialize(int, numNodes);
   cva(numNodes) = nodeInfo::numLocalNodes();
 
-  initLock = CmiCreateLock();     // used for BnvInitialize
+  if (CmiMyRank() == 0)
+    initLock = CmiCreateLock();     // used for BnvInitialize
 
   bgstreaming.init(cva(numNodes));
 
