@@ -154,7 +154,8 @@ void flushPinnedMemQueue() {
   for (int i=0; i<pinnedMemQueueIndex; i++) {
     pinnedMemReq *req = &pinnedMemQueue[pinnedMemQueueIndex]; 
     for (int j=0; j<req->nBuffers; j++) {
-      CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost(req->hostPtrs[j], req->sizes[j])); 
+      CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **) req->hostPtrs[j], 
+					    req->sizes[j])); 
     }
     free(req->hostPtrs);
     free(req->sizes);
@@ -404,6 +405,7 @@ void gpuProgressFn() {
   }
   
   if (isEmpty(wrQueue)) {
+    flushPinnedMemQueue();    
     return;
   } 
 
