@@ -308,9 +308,12 @@ TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
 #if CUDA
     if (model->target_device == DeviceGPU) {
         int size = model->num_local_elem * connSize *sizeof(int);
-        cudaMalloc((void**)&(model->device_model.n2eConnDevice), size);
-        cudaMemcpy(model->device_model.n2eConnDevice,n2eTable,size,
-                cudaMemcpyHostToDevice);
+        cudaError_t err = cudaMalloc((void**)&(model->device_model.n2eConnDevice), size);
+	if(err != cudaSuccess){
+	  CkPrintf("[%d] cudaMalloc FAILED model->device_model.n2eConnDevice in ParFUM_TOPS.cc size=%d: %s\n", CkMyPe(), size, cudaGetErrorString(err));
+	  CkAbort("cudaMalloc FAILED");
+	}
+        CkAssert(cudaMemcpy(model->device_model.n2eConnDevice,n2eTable,size, cudaMemcpyHostToDevice) == cudaSuccess);
     }
 #endif
 
@@ -334,9 +337,9 @@ TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
             unsigned char *ElemData = dataTable.getData();
             int size = dataTable.size()*dataTable.width();
             assert(size == model->num_local_elem * model->elem_attr_size);
-            cudaMalloc((void**)&(model->device_model.ElemDataDevice), size);
-            cudaMemcpy(model->device_model.ElemDataDevice,ElemData,size,
-                    cudaMemcpyHostToDevice);
+            CkAssert(cudaMalloc((void**)&(model->device_model.ElemDataDevice), size) == cudaSuccess);
+            CkAssert(cudaMemcpy(model->device_model.ElemDataDevice,ElemData,size,
+                    cudaMemcpyHostToDevice) == cudaSuccess);
         }
 
         /** Copy node Attribute array to device global memory */
@@ -346,9 +349,9 @@ TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
             unsigned char *NodeData = dataTable.getData();
             int size = dataTable.size()*dataTable.width();
             assert(size == model->num_local_node * model->node_attr_size);
-            cudaMalloc((void**)&(model->device_model.NodeDataDevice), size);
-            cudaMemcpy(model->device_model.NodeDataDevice,NodeData,size,
-                    cudaMemcpyHostToDevice);
+             CkAssert(cudaMalloc((void**)&(model->device_model.NodeDataDevice), size) == cudaSuccess);
+             CkAssert(cudaMemcpy(model->device_model.NodeDataDevice,NodeData,size,
+                    cudaMemcpyHostToDevice) == cudaSuccess);
         }
 
         /** Copy elem connectivity array to device global memory */
@@ -357,18 +360,18 @@ TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
             AllocTable2d<int> &dataTable  = at->get();
             int *data = dataTable.getData();
             int size = dataTable.size()*dataTable.width()*sizeof(int);
-            cudaMalloc((void**)&(model->device_model.ElemConnDevice), size);
-            cudaMemcpy(model->device_model.ElemConnDevice,data,size,
-                    cudaMemcpyHostToDevice);
+            CkAssert(cudaMalloc((void**)&(model->device_model.ElemConnDevice), size) == cudaSuccess);
+            CkAssert(cudaMemcpy(model->device_model.ElemConnDevice,data,size,
+                    cudaMemcpyHostToDevice) == cudaSuccess);
         }
 
         /** Copy model Attribute to device global memory */
         {
           printf("Copying model attribute of size %d\n", model->model_attr_size);
-            cudaMalloc((void**)&(model->device_model.mAttDevice),
-                    model->model_attr_size);
-            cudaMemcpy(model->device_model.mAttDevice,model->mAtt,model->model_attr_size,
-                    cudaMemcpyHostToDevice);
+            CkAssert(cudaMalloc((void**)&(model->device_model.mAttDevice),
+                    model->model_attr_size) == cudaSuccess);
+            CkAssert(cudaMemcpy(model->device_model.mAttDevice,model->mAtt,model->model_attr_size,
+                    cudaMemcpyHostToDevice) == cudaSuccess);
         }
     }
 #endif
@@ -379,20 +382,20 @@ TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
 /** Copy node attribute array from CUDA device back to the ParFUM attribute */
 void top_retrieve_node_data(TopModel* m){ 
 #if CUDA
-  cudaMemcpy(m->NodeData_T->getData(),
+  CkAssert(cudaMemcpy(m->NodeData_T->getData(),
             m->device_model.NodeDataDevice,
             m->num_local_node * m->node_attr_size,
-            cudaMemcpyDeviceToHost);
+            cudaMemcpyDeviceToHost) == cudaSuccess);
 #endif
 }
 
 /** Copy node attribute array to CUDA device from the ParFUM attribute */
 void top_put_node_data(TopModel* m){
 #if CUDA
-  cudaMemcpy(m->device_model.NodeDataDevice,
+  CkAssert(cudaMemcpy(m->device_model.NodeDataDevice,
 	     m->NodeData_T->getData(),
 	     m->num_local_node * m->node_attr_size,
-	     cudaMemcpyHostToDevice);
+	     cudaMemcpyHostToDevice) == cudaSuccess);
 #endif
 }
 
@@ -400,10 +403,10 @@ void top_put_node_data(TopModel* m){
 /** Copy element attribute array from CUDA device back to the ParFUM attribute */
 void top_retrieve_elem_data(TopModel* m){
 #if CUDA
-  cudaMemcpy(m->ElemData_T->getData(),
+  CkAssert(cudaMemcpy(m->ElemData_T->getData(),
             m->device_model.ElemDataDevice,
             m->num_local_elem * m->elem_attr_size,
-            cudaMemcpyDeviceToHost);
+            cudaMemcpyDeviceToHost) == cudaSuccess);
 #endif
 }
 
@@ -411,10 +414,10 @@ void top_retrieve_elem_data(TopModel* m){
 /** Copy elem attribute array to CUDA device from the ParFUM attribute */
 void top_put_elem_data(TopModel* m) {
 #if CUDA
-  cudaMemcpy(m->device_model.ElemDataDevice,
+  CkAssert(cudaMemcpy(m->device_model.ElemDataDevice,
 	     m->ElemData_T->getData(),
 	     m->num_local_elem * m->elem_attr_size,
-	     cudaMemcpyHostToDevice);
+	     cudaMemcpyHostToDevice) == cudaSuccess);
 #endif
 }
 
@@ -424,8 +427,8 @@ void top_put_data(TopModel* m) {
 #if CUDA
     top_put_node_data(m);
     top_put_elem_data(m);
-    cudaMemcpy(m->device_model.mAttDevice,m->mAtt,m->model_attr_size,
-            cudaMemcpyHostToDevice);
+    CkAssert(cudaMemcpy(m->device_model.mAttDevice,m->mAtt,m->model_attr_size,
+            cudaMemcpyHostToDevice) == cudaSuccess);
 #endif
 }
 
@@ -435,8 +438,8 @@ void top_retrieve_data(TopModel* m) {
 #if CUDA
     top_retrieve_node_data(m);
     top_retrieve_elem_data(m);
-    cudaMemcpy(m->mAtt,m->device_model.mAttDevice,m->model_attr_size,
-            cudaMemcpyDeviceToHost);
+    CkAssert(cudaMemcpy(m->mAtt,m->device_model.mAttDevice,m->model_attr_size,
+            cudaMemcpyDeviceToHost) == cudaSuccess);
 #endif
 }
 
@@ -445,9 +448,9 @@ void top_retrieve_data(TopModel* m) {
 void topModel_Destroy(TopModel* m){
 #if CUDA
     if (m->target_device == DeviceGPU) {
-        cudaFree(m->device_model.mAttDevice);
-        cudaFree(m->device_model.NodeDataDevice);
-        cudaFree(m->device_model.ElemDataDevice);
+        CkAssert(cudaFree(m->device_model.mAttDevice) == cudaSuccess);
+        CkAssert(cudaFree(m->device_model.NodeDataDevice) == cudaSuccess);
+        CkAssert(cudaFree(m->device_model.ElemDataDevice) == cudaSuccess);
     }
 #endif
     delete m;
@@ -646,6 +649,7 @@ TopNode topModel_GetNodeAtId(TopModel* m, TopID id)
 	Get elem via id
 	Note: this will currently only work with TET4 elements
  */
+#ifndef INLINE_GETELEMATID
 TopElement topModel_GetElemAtId(TopModel*m,TopID id)
 {
   TopElement e;
@@ -672,7 +676,7 @@ TopElement topModel_GetElemAtId(TopModel*m,TopID id)
 
     return e;
 }
-
+#endif
 
 TopNode topElement_GetNode(TopModel* m,TopElement e,int idx){
     int node = -1;
@@ -1081,7 +1085,7 @@ TopElement topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f
 
 
 
-#define DEBUG1
+// #define DEBUG1
 
 
 /// A class responsible for parsing the command line arguments for the PE
@@ -1143,7 +1147,7 @@ public:
 	for(int i=0;i<objs_per_block;i++){
 	  CkAssert(instream.good());
 	  instream >> locations[i];
-	  CkPrintf("location[%d] = '%c'\n", i, locations[i]);
+	  //	  CkPrintf("location[%d] = '%c'\n", i, locations[i]);
 	  CkAssert(locations[i] == 'G' || locations[i] == 'C');
 	}
 	state = loaded_found;
@@ -1152,7 +1156,7 @@ public:
 
     } else {
 #ifdef DEBUG1
-      CkPrintf("[%d] ConfigurableRRMap has already been loaded\n", CkMyPe());
+      CkPrintf("[%d] ConfigurableCPUGPUMap has already been loaded\n", CkMyPe());
 #endif
       return state == loaded_found;
     }      
@@ -1164,7 +1168,7 @@ public:
 CkpvDeclare(ConfigurableCPUGPUMapLoader, myConfigGPUCPUMapLoader);
 
 void _initConfigurableCPUGPUMap(){
-  CkPrintf("Initializing CPUGPU Map!\n");
+  //  CkPrintf("Initializing CPUGPU Map!\n");
   CkpvInitialize(ConfigurableCPUGPUMapLoader, myConfigGPUCPUMapLoader);
 }
 

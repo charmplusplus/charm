@@ -4,7 +4,8 @@ CUDADIR = /usr/local/cuda
 CUDASDK = $(HOME)/TOPS-Tesla/NVIDIA_CUDA_SDK
 CUDAC = $(CUDADIR)/bin/nvcc 
 CUDAINC = -I$(CUDASDK)/common/inc -I$(CUDADIR)/include
-CCFLAGS = -DCUDA -DFP_TYPE_FLOAT  -O2 -DSHARED_NODES_ONLY_NEIGHBOR
+CCFLAGS = -DCUDA -DFP_TYPE_FLOAT  -g -DSHARED_NODES_ONLY_NEIGHBOR 
+
 
 #Headers to be copied to include directory so application users can see them
 HEADERS= ParFUM_TOPS.h ParFUM_TOPS_CUDA.h ParFUM_TOPS_Types.h $(INTERNALHEADERS)

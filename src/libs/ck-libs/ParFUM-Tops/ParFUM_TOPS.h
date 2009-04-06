@@ -190,7 +190,45 @@ void* topElement_GetAttrib(TopModel*, TopElement);
 TopNode topElement_GetNode(TopModel*,TopElement,int idx);
 
 /** Get element via id */
+//#define INLINE_GETELEMATID
+#ifdef INLINE_GETELEMATID
+inline TopElement topModel_GetElemAtId(TopModel*m,TopID id)
+{
+  TopElement e;
+  e.id = m->elemIDHash->get(id)-1;
+  e.type = TOP_ELEMENT_TET4;
+  
+  if (e.id != -1) return e;
+  
+  AllocTable2d<int>* ghostElem_id_T = &((FEM_DataAttribute*)m->mesh->
+					elem[TOP_ELEMENT_TET4].getGhost()->lookup(ATT_ELEM_ID,""))->getInt();
+  
+  if(ghostElem_id_T  != NULL) {
+    for(int i=0; i<ghostElem_id_T->size(); ++i) {
+      if((*ghostElem_id_T)(i,0)==id){
+	e.id = FEM_To_ghost_index(i);
+	e.type = TOP_ELEMENT_TET4;
+	return e;
+      }
+    }
+  }
+  
+    e.id = -1;
+    e.type = TOP_ELEMENT_TET4;
+
+    return e;
+}
+
+#else 
 TopElement topModel_GetElemAtId(TopModel*,TopID);
+#endif
+
+
+
+
+
+
+
 
 int topNode_GetId(TopModel* m, TopNode n);
 
