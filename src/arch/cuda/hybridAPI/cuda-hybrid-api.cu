@@ -152,14 +152,14 @@ void pinnedMallocHost(pinnedMemReq *reqs) {
  */
 void flushPinnedMemQueue() {
   for (int i=0; i<pinnedMemQueueIndex; i++) {
-    pinnedMemReq *req = &pinnedMemQueue[pinnedMemQueueIndex]; 
+    pinnedMemReq *req = &pinnedMemQueue[i]; 
     for (int j=0; j<req->nBuffers; j++) {
       CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **) req->hostPtrs[j], 
 					    req->sizes[j])); 
     }
     free(req->hostPtrs);
     free(req->sizes);
-    CUDACallbackManager(pinnedMemQueue[pinnedMemQueueIndex].callbackFn);    
+    CUDACallbackManager(pinnedMemQueue[i].callbackFn);    
   }
   pinnedMemQueueIndex = 0; 
 }
