@@ -12,6 +12,10 @@
   #include "math.h"
 #endif
 
+#if defined(__VEC__)
+  #include "altivec.h"
+#endif
+
 
 // Solaris does not support sqrtf (float), so just map it to sqrt (double) instead
 #if !CMK_HAS_SQRTF
@@ -58,6 +62,18 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   typedef vector float vec4f;
   typedef vector double vec2lf;
 
+#elif defined(__VEC__)   // AltiVec
+
+  typedef vector signed char vec16c;
+  typedef vector unsigned char vec16uc;
+  typedef vector signed short vec8s;
+  typedef vector unsigned short vec8us;
+  typedef vector signed int vec4i;
+  typedef vector unsigned int vec4ui;
+  typedef vector float vec4f;
+
+  typedef  __vec2lf  vec2lf;
+
 #else                    // General C
 
   typedef  __vec16c  vec16c;
@@ -92,6 +108,10 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   #define   vextract4f(a, i) (spu_extract((a), (i)))
   #define  vextract2lf(a, i) (spu_extract((a), (i)))
 
+#elif defined(__VEC__)   // AltiVec
+
+  inline float vextract4f(const vec4f &a, const int i) { return ((float*)(&a))[i]; }
+
 #else                    // General C
 
   inline           char  vextract16c(const  vec16c &a, const int i) { return *(((          char*)(&a))+i); }
@@ -121,6 +141,9 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   #define  vinsert4ui(v, s, i) (spu_insert((s), (v), (i)))
   #define   vinsert4f(v, s, i) (spu_insert((s), (v), (i)))
   #define  vinsert2lf(v, s, i) (spu_insert((s), (v), (i)))
+
+#elif defined(__VEC__)   // AltiVec
+
 
 #else                    // General C
 
@@ -153,7 +176,11 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   #define   vspread4f(s) (spu_splats(s))
   #define  vspread2lf(s) (spu_splats(s))
 
-#else
+#elif defined(__VEC__)   // AltiVec
+
+  inline vec4f vspread4f(const float s) { vec4f a; __vec_4_f* aPtr = (__vec_4_f*)(&a); aPtr->v0 = aPtr->v1 = aPtr->v2 = aPtr->v3 = s; return a; }
+
+#else                    // General C
 
   inline  vec16c  vspread16c(const           char s) {  vec16c a; a.v0 = a.v1 = a.v2 = a.v3 = a.v4 = a.v5 = a.v6 = a.v7 = a.v8 = a.v9 = a.v10 = a.v11 = a.v12 = a.v13 = a.v14 = a.v15 = s; return a; }
   inline vec16uc vspread16uc(const unsigned  char s) { vec16uc a; a.v0 = a.v1 = a.v2 = a.v3 = a.v4 = a.v5 = a.v6 = a.v7 = a.v8 = a.v9 = a.v10 = a.v11 = a.v12 = a.v13 = a.v14 = a.v15 = s; return a; }
@@ -177,7 +204,7 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 #if defined(__SSE2__)      // SSE2
 
 
-#elif CMK_CELL_SPE != 0
+#elif CMK_CELL_SPE != 0    // Cell - SPE
 
   #define  vroth16c(a, s) (spu_rlqwbyte((a), (0x10- ((s)&0xf)    ) ))
   #define vroth16uc(a, s) (spu_rlqwbyte((a), (0x10- ((s)&0xf)    ) ))
@@ -197,7 +224,10 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   #define   vrotl4f(a, s) (spu_rlqwbyte((a), ((s)&0x3)<<2))
   #define  vrotl2lf(a, s) (spu_rlqwbyte((a), ((s)&0x1)<<3))
 
-#else
+#elif defined(__VEC__)   // AltiVec
+
+
+#else                    // General C
 
   inline  vec16c  vroth16c(const  vec16c &a, int s) {  vec16c b;           char* a_ptr = (          char*)(&a);           char* b_ptr = (          char*)(&b); s &= 0xf; b_ptr[0] = a_ptr[(0-s)&0xf]; b_ptr[1] = a_ptr[(1-s)&0xf]; b_ptr[2] = a_ptr[(2-s)&0xf]; b_ptr[3] = a_ptr[(3-s)&0xf]; b_ptr[4] = a_ptr[(4-s)&0xf]; b_ptr[5] = a_ptr[(5-s)&0xf]; b_ptr[6] = a_ptr[(6-s)&0xf]; b_ptr[7] = a_ptr[(7-s)&0xf]; b_ptr[8] = a_ptr[(8-s)&0xf]; b_ptr[9] = a_ptr[(9-s)&0xf]; b_ptr[10] = a_ptr[(10-s)&0xf]; b_ptr[11] = a_ptr[(11-s)&0xf]; b_ptr[12] = a_ptr[(12-s)&0xf]; b_ptr[13] = a_ptr[(13-s)&0xf]; b_ptr[14] = a_ptr[(14-s)&0xf]; b_ptr[15] = a_ptr[(15-s)&0xf]; return b; }
   inline vec16uc vroth16uc(const vec16uc &a, int s) { vec16uc b; unsigned  char* a_ptr = (unsigned  char*)(&a); unsigned  char* b_ptr = (unsigned  char*)(&b); s &= 0xf; b_ptr[0] = a_ptr[(0-s)&0xf]; b_ptr[1] = a_ptr[(1-s)&0xf]; b_ptr[2] = a_ptr[(2-s)&0xf]; b_ptr[3] = a_ptr[(3-s)&0xf]; b_ptr[4] = a_ptr[(4-s)&0xf]; b_ptr[5] = a_ptr[(5-s)&0xf]; b_ptr[6] = a_ptr[(6-s)&0xf]; b_ptr[7] = a_ptr[(7-s)&0xf]; b_ptr[8] = a_ptr[(8-s)&0xf]; b_ptr[9] = a_ptr[(9-s)&0xf]; b_ptr[10] = a_ptr[(10-s)&0xf]; b_ptr[11] = a_ptr[(11-s)&0xf]; b_ptr[12] = a_ptr[(12-s)&0xf]; b_ptr[13] = a_ptr[(13-s)&0xf]; b_ptr[14] = a_ptr[(14-s)&0xf]; b_ptr[15] = a_ptr[(15-s)&0xf]; return b; }
@@ -249,6 +279,10 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   #define  vadd4uis(a, s) (spu_add((a),  vspread4ui(s)))
   #define   vadd4fs(a, s) (spu_add((a),   vspread4f(s)))
   #define  vadd2lfs(a, s) (spu_add((a),  vspread2lf(s)))
+
+#elif defined(__VEC__)   // AltiVec
+
+  #define vadd4f(a, b)   (vec_add((a), (b)))
 
 #else                    // General C
 
@@ -312,6 +346,9 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   #define   vsub4fs(a, s) (spu_sub((a),   vspread4f(s)))
   #define  vsub2lfs(a, s) (spu_sub((a),  vspread2lf(s)))
 
+#elif defined(__VEC__)   // AltiVec
+
+
 #else                    // General C
 
   inline  vec16c  vsub16c(const  vec16c &a, const  vec16c &b) {  vec16c c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; c.v2 = a.v2 - b.v2; c.v3 = a.v3 - b.v3; c.v4 = a.v4 - b.v4; c.v5 = a.v5 - b.v5; c.v6 = a.v6 - b.v6; c.v7 = a.v7 - b.v7; c.v8 = a.v8 - b.v8; c.v9 = a.v9 - b.v9; c.v10 = a.v10 - b.v10; c.v11 = a.v11 - b.v11; c.v12 = a.v12 - b.v12; c.v13 = a.v13 - b.v13; c.v14 = a.v14 - b.v14; c.v15 = a.v15 - b.v15; return c; }
@@ -370,7 +407,10 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   #define  vmadd4fs(a, b, s) (spu_madd((a), (b),  vspread4f(s)))
   #define vmadd2lfs(a, b, s) (spu_madd((a), (b), vspread2lf(s)))
 
-#else
+#elif defined(__VEC__)   // AltiVec
+
+
+#else                    // General C
 
   inline  vec4i  vmul4s(const  vec8s &a, const  vec8s &b) {  vec4i c; c.v0 = ((int)a.v1) * ((int)b.v1); c.v1 = ((int)a.v3) * ((int)b.v3); c.v2 = ((int)a.v5) * ((int)b.v5); c.v3 = ((int)a.v7) * ((int)b.v7); return c; }
   inline  vec4f  vmul4f(const  vec4f &a, const  vec4f &b) {  vec4f c; c.v0 = a.v0 * b.v0; c.v1 = a.v1 * b.v1; c.v2 = a.v2 * b.v2; c.v3 = a.v3 * b.v3; return c; }
@@ -413,7 +453,10 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   #define vdiv4f(a, b) (spu_mul((a), spu_re(b)))
   inline vec2lf vdiv2lf(const vec2lf a, const vec2lf b) { vec2lf c; __vec2lf* __c = (__vec2lf*)(&c); __vec2lf* __a = (__vec2lf*)(&a); __vec2lf* __b = (__vec2lf*)(&b); __c->v0 = __a->v0 / __b->v0; __c->v1 = __a->v1 / __b->v1; return c; }
 
-#else
+#elif defined(__VEC__)   // AltiVec
+
+
+#else                    // General C
 
   inline vec4i vdiv4i(const vec4i &a, const vec4i &b) { vec4i c; c.v0 = a.v0 / b.v0; c.v1 = a.v1 / b.v1; c.v2 = a.v2 / b.v2; c.v3 = a.v3 / b.v3; return c; }
   inline vec4f vdiv4f(const vec4f &a, const vec4f &b) { vec4f c; c.v0 = a.v0 / b.v0; c.v1 = a.v1 / b.v1; c.v2 = a.v2 / b.v2; c.v3 = a.v3 / b.v3; return c; }
@@ -433,6 +476,8 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 
 ///// Misc : TODO : Organize later /////
 #if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
+
+  #define vrecip4f(a)  (_mm_rcp_ps(a))
 
   // DMK - DEBUG - Disable this single sqrt function to see how much of an impact it has
   #if 1
@@ -455,7 +500,13 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
   #define vsqrt4f(a) (spu_re(spu_rsqrte(a)))
   #define vrsqrt4f(a) (spu_rsqrte(a))
 
-#else
+#elif defined(__VEC__)   // AltiVec
+
+  #define vrecip4f(a)   (vec_re(a))
+  #define vsqrt4f(a)    (vec_re(vec_rsqrte(a)))
+  #define vrsqrt4f(a)   (vec_rsqrte(a))
+
+#else                    // General C
 
   inline vec4f vrecip4f(const vec4f &a) { vec4f b; b.v0 = 1.0f / a.v0; b.v1 = 1.0f / a.v1; b.v2 = 1.0f / a.v2; b.v3 = 1.0f / a.v3; return b; }
   inline vec4f vsqrt4f(const vec4f &a) { vec4f b; b.v0 = sqrtf(a.v0); b.v1 = sqrtf(a.v1); b.v2 = sqrtf(a.v2); b.v3 = sqrtf(a.v3); return b; }
