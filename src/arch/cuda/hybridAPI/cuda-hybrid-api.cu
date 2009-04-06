@@ -120,10 +120,11 @@ cudaStream_t data_out_stream;
  *
  */
 void pinnedMallocHost(pinnedMemReq *reqs) {
+  /*
   if ( (cudaStreamQuery(kernel_stream) == cudaSuccess) &&
        (cudaStreamQuery(data_in_stream) == cudaSuccess) &&
        (cudaStreamQuery(data_out_stream) == cudaSuccess) ) {    
-
+  */
     for (int i=0; i<reqs->nBuffers; i++) {
       CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **) reqs->hostPtrs[i], 
 					    reqs->sizes[i])); 
@@ -133,6 +134,7 @@ void pinnedMallocHost(pinnedMemReq *reqs) {
     free(reqs->sizes);
 
     CUDACallbackManager(reqs->callbackFn);
+    /*
   }
   else {
     pinnedMemQueue[pinnedMemQueueIndex].hostPtrs = reqs->hostPtrs;
@@ -142,7 +144,8 @@ void pinnedMallocHost(pinnedMemReq *reqs) {
     if (pinnedMemQueueIndex == MAX_PINNED_REQ) {
       printf("Error: pinned memory request buffer is overflowing\n"); 
     }
-  }  
+  }
+    */  
 }
 
 /* flushPinnedMemQueue
