@@ -1,6 +1,6 @@
 XLC_PRE=/opt/ibmcmp
 XLC_POST=bin/bg
-XLC_F=$XLC_PRE/xlf/11.1
+XLC_F=$XLC_PRE/xlf/bg/11.1
 CMK_CC="$XLC_PRE/vac/bg/9.0/${XLC_POST}xlc -qcpluscmt $BGP_INC"
 CMK_CXX="$XLC_PRE/vacpp/bg/9.0/${XLC_POST}xlC $BGP_INC"
 CMK_LD="$CMK_CC $BGP_LIB "
