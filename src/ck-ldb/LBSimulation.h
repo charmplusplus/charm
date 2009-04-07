@@ -29,7 +29,7 @@ public:
   void reset();
   void SetProcessorLoad(int pe, double load, double bgload);
   void PrintSimulationResults();
-  void PrintDecisions(LBMigrateMsg *m);
+  void PrintDecisions(LBMigrateMsg *m, char *simFileName, int peCount);
   void PrintDifferences(LBSimulation *realSim, BaseLB::LDStats *stats);
 private:
   LBInfo  lbinfo;

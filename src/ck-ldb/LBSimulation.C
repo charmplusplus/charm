@@ -260,14 +260,20 @@ void LBSimulation::PrintSimulationResults()
   lbinfo.print();
 }
 
-void LBSimulation::PrintDecisions(LBMigrateMsg *m)
+void LBSimulation::PrintDecisions(LBMigrateMsg *m, char *simFileName,
+				  int peCount)
 {
+  char *resultFile = (char *)malloc((strlen(simFileName) +
+				     strlen("results") + 2)*sizeof(char));
+  sprintf(resultFile,"%s.results", simFileName);
+  FILE *f = fopen(resultFile, "w");
+  fprintf(f, "%d %d\n", peCount, m->n_moves); // header
   for (int i=0; i<m->n_moves; i++) {
-    CkPrintf("%d ", m->moves[i].obj.id.id[0]);
-    CkPrintf("%d ", m->moves[i].obj.id.id[1]);
-    CkPrintf("%d ", m->moves[i].obj.id.id[2]);
-    CkPrintf("%d ", m->moves[i].obj.id.id[3]);
-    CkPrintf("%d\n",m->moves[i].to_pe);
+    fprintf(f, "%d ", m->moves[i].obj.id.id[0]);
+    fprintf(f, "%d ", m->moves[i].obj.id.id[1]);
+    fprintf(f, "%d ", m->moves[i].obj.id.id[2]);
+    fprintf(f, "%d ", m->moves[i].obj.id.id[3]);
+    fprintf(f, "%d\n",m->moves[i].to_pe);
   }
 }
 

@@ -1022,7 +1022,6 @@ void CentralLB::simulationRead() {
       simFileName = (char *)malloc(simFileSize);
     }
     readStatsMsgs(simFileName);
-    free(simFileName);
 
     // allocate simResults (only the first step)
     if (simResults == NULL) {
@@ -1059,11 +1058,13 @@ void CentralLB::simulationRead() {
     CmiPrintf("Charm++> LBSim: Simulation of load balancing step %d done.\n",LBSimulation::simStep);
     // **CWL** Officially recording my disdain here for using ints for bool
     if (LBSimulation::showDecisionsOnly) {
-      simResults->PrintDecisions(migrateMsg);
+      simResults->PrintDecisions(migrateMsg, simFileName, 
+				 LBSimulation::simProcs);
     } else {
       simResults->PrintSimulationResults();
     }
 
+    free(simFileName);
     delete migrateMsg;
     CmiPrintf("Charm++> LBSim: Passing to the next step\n");
   }

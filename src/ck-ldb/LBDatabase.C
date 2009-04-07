@@ -231,8 +231,7 @@ void _loadbalancerInit()
 
   LBSimulation::showDecisionsOnly = 
     CmiGetArgFlagDesc(argv, "+LBShowDecisions",
-		      "Display only Load Balancing Object to Processor Map decisions during LB Simulation");
-		    
+		      "Write to File: Load Balancing Object to Processor Map decisions during LB Simulation");
 
   // force a global barrier after migration done
   _lb_args.syncResume() = CmiGetArgFlagDesc(argv, "+LBSyncResume", 
