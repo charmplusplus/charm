@@ -45,7 +45,7 @@ extern void CUDACallbackManager(void * fn);
 workRequestQueue *wrQueue = NULL; 
 
 /* pending page-locked memory allocation requests */
-unsigned int pinnedMemQueueIndex; 
+unsigned int pinnedMemQueueIndex = 0; 
 pinnedMemReq pinnedMemQueue[MAX_PINNED_REQ];
 
 
@@ -125,6 +125,8 @@ void pinnedMallocHost(pinnedMemReq *reqs) {
        (cudaStreamQuery(data_in_stream) == cudaSuccess) &&
        (cudaStreamQuery(data_out_stream) == cudaSuccess) ) {    
   */
+
+  /*
     for (int i=0; i<reqs->nBuffers; i++) {
       CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **) reqs->hostPtrs[i], 
 					    reqs->sizes[i])); 
@@ -134,6 +136,9 @@ void pinnedMallocHost(pinnedMemReq *reqs) {
     free(reqs->sizes);
 
     CUDACallbackManager(reqs->callbackFn);
+
+  */
+
     /*
   }
   else {
@@ -154,6 +159,7 @@ void pinnedMallocHost(pinnedMemReq *reqs) {
  *
  */
 void flushPinnedMemQueue() {
+  /*
   for (int i=0; i<pinnedMemQueueIndex; i++) {
     pinnedMemReq *req = &pinnedMemQueue[i]; 
     for (int j=0; j<req->nBuffers; j++) {
@@ -165,6 +171,7 @@ void flushPinnedMemQueue() {
     CUDACallbackManager(pinnedMemQueue[i].callbackFn);    
   }
   pinnedMemQueueIndex = 0; 
+  */
 }
 
 /* allocateBuffers
@@ -408,7 +415,7 @@ void gpuProgressFn() {
   }
   
   if (isEmpty(wrQueue)) {
-    flushPinnedMemQueue();    
+    //    flushPinnedMemQueue();    
     return;
   } 
 
@@ -458,7 +465,7 @@ void gpuProgressFn() {
 #endif
 	timeIndex++; 
 #endif
-	flushPinnedMemQueue();
+	//flushPinnedMemQueue();
 	kernelSelect(head); 
 	head->state = EXECUTING; 
 	if (second != NULL) {
@@ -536,7 +543,7 @@ void gpuProgressFn() {
 #endif
 	    timeIndex++; 
 #endif
-	    flushPinnedMemQueue();	    
+	    //	    flushPinnedMemQueue();	    
 	    kernelSelect(second); 
 	    second->state = EXECUTING; 
 	    if (third != NULL) {
