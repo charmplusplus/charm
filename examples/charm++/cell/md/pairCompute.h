@@ -33,6 +33,9 @@ class PairCompute : public CBase_PairCompute {
       CProxy_ProxyPatch proxyPatchProxy[2];
     #endif
 
+    // DMK - DEBUG
+    unsigned int localFlopCount;
+
   public:
 
     /// Constructor(s) \ Destructor ///

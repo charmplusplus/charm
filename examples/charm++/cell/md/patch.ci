@@ -58,8 +58,14 @@ module patch {
                                     readonly : float f_z[numParticles] <impl_obj->forceSumZ>,
                                    readwrite : float v_x[numParticles] <impl_obj->velocityX>,
                                    readwrite : float v_y[numParticles] <impl_obj->velocityY>,
-                                   readwrite : float v_z[numParticles] <impl_obj->velocityZ>
+                                   readwrite : float v_z[numParticles] <impl_obj->velocityZ>,
+                                   writeonly : unsigned int localFlopCount <impl_obj->localFlopCount>
                                   ] {
+
+      // DMK - DEBUG
+      #if COUNT_FLOPS != 0
+        localFlopCount = 0;
+      #endif
 
       register vec4f* p_x_vec = (vec4f*)p_x;
       register vec4f* p_y_vec = (vec4f*)p_y;
@@ -91,6 +97,11 @@ module patch {
         p_x_vec[i] += delta_time_vec * new_v_x_vec;
         p_y_vec[i] += delta_time_vec * new_v_y_vec;
         p_z_vec[i] += delta_time_vec * new_v_z_vec;
+
+        // DMK - DEBUG
+        #if COUNT_FLOPS != 0
+          localFlopCount += (15 * 4);
+        #endif
       }
 
     } integrate_callback;

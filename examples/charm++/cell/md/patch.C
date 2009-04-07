@@ -124,16 +124,22 @@ void Patch::startIteration_common(int numIters) {
   remainingForceCheckIns = numPatchesX * numPatchesY * numPatchesZ;
 
   // Clear the force sum arrays
-  register vec4f* fsx = (vec4f*)forceSumX;
-  register vec4f* fsy = (vec4f*)forceSumY;
-  register vec4f* fsz = (vec4f*)forceSumZ;
-  const vec4f zero_vec = vspread4f(0.0f);
-  register const int numParticles_vec = numParticles / (sizeof(vec4f) * sizeof(float));
-  for (int i = 0; i < numParticles_vec; i++) {
-    fsx[i] = zero_vec;
-    fsy[i] = zero_vec;
-    fsz[i] = zero_vec;
-  }
+  #if 1
+    memset(forceSumX, 0, sizeof(float) * numParticles);
+    memset(forceSumY, 0, sizeof(float) * numParticles);
+    memset(forceSumZ, 0, sizeof(float) * numParticles);
+  #else
+    register vec4f* fsx = (vec4f*)forceSumX;
+    register vec4f* fsy = (vec4f*)forceSumY;
+    register vec4f* fsz = (vec4f*)forceSumZ;
+    const vec4f zero_vec = vspread4f(0.0f);
+    register const int numParticles_vec = numParticles / (sizeof(vec4f) * sizeof(float));
+    for (int i = 0; i < numParticles_vec; i++) {
+      fsx[i] = zero_vec;
+      fsy[i] = zero_vec;
+      fsz[i] = zero_vec;
+    }
+  #endif
 
   // DMK - DEBUG
   NetworkProgress
@@ -222,6 +228,11 @@ void Patch::integrate_callback() {
   // DMK - DEBUG
   #if ENABLE_USER_EVENTS != 0
     double __start_time__ = CmiWallTimer();
+  #endif
+
+  // DMK - DEBUG
+  #if COUNT_FLOPS != 0
+    globalFlopCount += localFlopCount;
   #endif
 
   // DMK - DEBUG
@@ -340,7 +351,7 @@ void ProxyPatch::patchData(int numParticles, float* particleX, float* particleY,
 void ProxyPatch::forceCheckIn(int numParticles, float* forceX, float* forceY, float* forceZ) {
 
   // Accumulate the force data
-  #if 0
+  #if USE_PROXY_PATCHES != 0  // Calls will be local and pointers will be aligned, so take advantage and vectorize the code
     register vec4f* forceX_vec = (vec4f*)forceX;
     register vec4f* forceY_vec = (vec4f*)forceY;
     register vec4f* forceZ_vec = (vec4f*)forceZ;

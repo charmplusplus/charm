@@ -27,6 +27,11 @@ class SelfCompute : public CBase_SelfCompute {
 
     CProxy_ProxyPatch proxyPatchProxy;
 
+
+    // DMK - DEBUG
+    unsigned int localFlopCount;
+
+
   public:
 
     /// Constructor(s) \ Destructor ///

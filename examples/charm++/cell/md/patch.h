@@ -42,6 +42,11 @@ class Patch : public CBase_Patch {
       int* proxyPatchPresentFlags;
     #endif
 
+
+    // DMK - DEBUG
+    unsigned int localFlopCount;
+
+
     /// Member Functions ///
     void randomizeParticles();
     float randf();

@@ -95,7 +95,25 @@ void PairCompute::patchData(int numParticles, float* particleX, float* particleY
   //   sent their data to this compute
   patchDataCount++;
   if (patchDataCount >= 2) {
-    thisProxy(thisIndex.x, thisIndex.y).doCalc();  // Send message to self to do calculation
+
+    // DMK - DEBUG - Call doCalc function locally instead of sending a message
+    #if CMK_CELL != 0 && 0
+      CkIndex_PairCompute::_accelCall_spe_doCalc_void(this->numParticles,
+                                                      this->thisIndex.x, this->thisIndex.y,
+                                                      this->particleX[0], this->particleX[1],
+                                                      this->particleY[0], this->particleY[1],
+                                                      this->particleZ[0], this->particleZ[1],
+                                                      this->particleQ[0], this->particleQ[1],
+                                                      this->forceX[0], this->forceX[0],
+                                                      this->forceY[0], this->forceY[0],
+                                                      this->forceZ[0], this->forceZ[0],
+                                                      this->localFlopCount,
+                                                      this
+                                                     );
+    #else
+      thisProxy(thisIndex.x, thisIndex.y).doCalc();  // Send message to self to do calculation
+    #endif
+
     patchDataCount = 0;
   }
 }
@@ -106,6 +124,11 @@ void PairCompute::doCalc_callback() {
   // DMK - DEBUG
   #if ENABLE_USER_EVENTS != 0
     double __start_time__ = CmiWallTimer();
+  #endif
+
+  // DMK - DEBUG
+  #if COUNT_FLOPS != 0
+    globalFlopCount += localFlopCount;
   #endif
 
   #if USE_PROXY_PATCHES != 0

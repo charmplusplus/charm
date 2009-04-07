@@ -33,11 +33,17 @@ module pairCompute {
                                  writeonly : float f0_y[numParticles] <impl_obj->forceY[0]>,
                                  writeonly : float f1_y[numParticles] <impl_obj->forceY[1]>,
                                  writeonly : float f0_z[numParticles] <impl_obj->forceZ[0]>,
-                                 writeonly : float f1_z[numParticles] <impl_obj->forceZ[1]>
+                                 writeonly : float f1_z[numParticles] <impl_obj->forceZ[1]>,
+                                 writeonly : unsigned int localFlopCount <impl_obj->localFlopCount>
                                ] {
 
       // Calculate the electrostatic force (coulumb's law) between the particles
       //   F = (k_e * (q_0 * q_1)) / (r^2)
+
+      // DMK - DEBUG
+      #if COUNT_FLOPS != 0
+        localFlopCount = 0;
+      #endif
 
       register vec4f* p1_x_vec = (vec4f*)p1_x;
       register vec4f* p1_y_vec = (vec4f*)p1_y;
@@ -101,6 +107,11 @@ module pairCompute {
         vec4f r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
         vec4f r_vec = vsqrt4f(r_2_vec);
 
+        // DMK - DEBUG
+        #if COUNT_FLOPS != 0
+          localFlopCount += (9 * 4);
+        #endif
+
         // Setup Input for Stage 4 - Initially for j+0
         const int jPlus0 = 0;
         vec4f f_x_vec;
@@ -112,14 +123,20 @@ module pairCompute {
           vec4f p_z_diff_vec = p0_z_i_vec - p1_z_vec[jPlus0];
           vec4f r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
           vec4f r_vec = vsqrt4f(r_2_vec);
-          vec4f p_x_diff_norm_vec = p_x_diff_vec / r_vec;
-          vec4f p_y_diff_norm_vec = p_y_diff_vec / r_vec;
-          vec4f p_z_diff_norm_vec = p_z_diff_vec / r_vec;
-          vec4f p1_q_j_vec = p1_q_vec[jPlus0];
-          vec4f f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec) / r_2_vec);  // Calc force magnitude
+          vec4f r_recip_vec = vrecip4f(r_vec);
+          vec4f r_2_recip_vec = vrecip4f(r_2_vec);
+          vec4f p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
+          vec4f p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
+          vec4f p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
+          vec4f f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_vec[jPlus0]) * r_2_recip_vec);
           f_x_vec = p_x_diff_norm_vec * f_mag_vec;
           f_y_vec = p_y_diff_norm_vec * f_mag_vec;
           f_z_vec = p_z_diff_norm_vec * f_mag_vec;
+
+          // DMK - DEBUG
+          #if COUNT_FLOPS != 0
+            localFlopCount += (23 * 4);
+          #endif
         }
 
         /// Main Loop ///
@@ -135,13 +152,15 @@ module pairCompute {
           f1_z_vec[j] -= f_z_vec;
 
           // Stage 3 - Calculate force vector
-          vec4f p_x_diff_norm_vec = p_x_diff_vec / r_vec;  // Normalize the vector between the particles
-          vec4f p_y_diff_norm_vec = p_y_diff_vec / r_vec;
-          vec4f p_z_diff_norm_vec = p_z_diff_vec / r_vec;
-          vec4f f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec_s2) / r_2_vec);  // Calc force magnitude
-          vec4f f_x_vec = p_x_diff_norm_vec * f_mag_vec;  // Multiply normalized vector by force magnitude
-          vec4f f_y_vec = p_y_diff_norm_vec * f_mag_vec;
-          vec4f f_z_vec = p_z_diff_norm_vec * f_mag_vec;
+          vec4f r_recip_vec = vrecip4f(r_vec);
+          vec4f r_2_recip_vec = vrecip4f(r_2_vec);
+          vec4f p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
+          vec4f p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
+          vec4f p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
+          vec4f f_mag_vec = coulomb_vec * p0_q_i_vec * p1_q_j_vec_s2 * r_2_recip_vec;  // Calc force magnitude
+          f_x_vec = p_x_diff_norm_vec * f_mag_vec;  // Multiply normalized vector by force magnitude
+          f_y_vec = p_y_diff_norm_vec * f_mag_vec;
+          f_z_vec = p_z_diff_norm_vec * f_mag_vec;
 
           // Stage 2 - Calculate radius
           p1_q_j_vec_s2 = p1_q_j_vec;
@@ -157,6 +176,12 @@ module pairCompute {
           p1_y_j_vec = p1_y_vec[jIndexToLoad];
           p1_z_j_vec = p1_z_vec[jIndexToLoad];
           p1_q_j_vec = p1_q_vec[jIndexToLoad];
+
+
+          // DMK - DEBUG
+          #if COUNT_FLOPS != 0
+            localFlopCount += (31 * 4);
+          #endif
         }
 
         /// Loop Cleanup ///
@@ -169,14 +194,21 @@ module pairCompute {
           f1_x_vec[loopUpper] -= f_x_vec;
           f1_y_vec[loopUpper] -= f_y_vec;
           f1_z_vec[loopUpper] -= f_z_vec;
+
+          // DMK - DEBUG
+          #if COUNT_FLOPS != 0
+            localFlopCount += (6 * 4);
+          #endif
         }
 
         // Complete Calc for Stage 2 Data - Calculate Force Vector, Apply Force Vector
         {
-          vec4f p_x_diff_norm_vec = p_x_diff_vec / r_vec;
-          vec4f p_y_diff_norm_vec = p_y_diff_vec / r_vec;
-          vec4f p_z_diff_norm_vec = p_z_diff_vec / r_vec;
-          vec4f f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec_s2) / r_2_vec);
+          vec4f r_recip_vec = vrecip4f(r_vec);
+          vec4f r_2_recip_vec = vrecip4f(r_2_vec);
+          vec4f p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
+          vec4f p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
+          vec4f p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
+          vec4f f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec_s2) * r_2_recip_vec);
           vec4f f_x_vec = p_x_diff_norm_vec * f_mag_vec;
           vec4f f_y_vec = p_y_diff_norm_vec * f_mag_vec;
           vec4f f_z_vec = p_z_diff_norm_vec * f_mag_vec;
@@ -186,6 +218,11 @@ module pairCompute {
           f1_x_vec[loopUpper + 1] -= f_x_vec;
           f1_y_vec[loopUpper + 1] -= f_y_vec;
           f1_z_vec[loopUpper + 1] -= f_z_vec;
+
+          // DMK - DEBUG
+          #if COUNT_FLOPS != 0
+            localFlopCount += (19 * 4);
+          #endif
         }
 
         // Complete Calc for Stage 1 Data - Calculate Radius, Calculate Force Vector, Apply Force Vector
@@ -195,10 +232,12 @@ module pairCompute {
           vec4f p_z_diff_vec = p0_z_i_vec - p1_z_j_vec;
           vec4f r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
           vec4f r_vec = vsqrt4f(r_2_vec);
-          vec4f p_x_diff_norm_vec = p_x_diff_vec / r_vec;
-          vec4f p_y_diff_norm_vec = p_y_diff_vec / r_vec;
-          vec4f p_z_diff_norm_vec = p_z_diff_vec / r_vec;
-          vec4f f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec) / r_2_vec);
+          vec4f r_recip_vec = vrecip4f(r_vec);
+          vec4f r_2_recip_vec = vrecip4f(r_2_vec);
+          vec4f p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
+          vec4f p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
+          vec4f p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
+          vec4f f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec) * r_2_recip_vec);
           vec4f f_x_vec = p_x_diff_norm_vec * f_mag_vec;
           vec4f f_y_vec = p_y_diff_norm_vec * f_mag_vec;
           vec4f f_z_vec = p_z_diff_norm_vec * f_mag_vec;
@@ -208,6 +247,11 @@ module pairCompute {
           f1_x_vec[loopUpper + 2] -= f_x_vec;
           f1_y_vec[loopUpper + 2] -= f_y_vec;
           f1_z_vec[loopUpper + 2] -= f_z_vec;
+
+          // DMK - DEBUG
+          #if COUNT_FLOPS != 0
+            localFlopCount += (27 * 4);
+          #endif
         }
 
         #else
@@ -254,6 +298,12 @@ module pairCompute {
           f1_x_vec[j] -= f_x_vec;
           f1_y_vec[j] -= f_y_vec;
           f1_z_vec[j] -= f_z_vec;
+
+
+          // DMK - DEBUG
+          #if COUNT_FLOPS != 0
+            localFlopCount += (24 * 4);
+          #endif
         }
 
         #endif

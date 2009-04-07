@@ -15,6 +15,12 @@ int numPatchesY;
 int numPatchesZ;
 
 
+// DMK - DEBUG
+#if COUNT_FLOPS != 0
+  unsigned long long int globalFlopCount;
+#endif
+
+
 void Main::parseCommandLine(int argc, char** argv) {
 
   // Verify the parameters
@@ -78,6 +84,15 @@ Main::Main(CkArgMsg* msg) {
     traceRegisterUserEvent("SelfCompute::doCalc_callback()", PROJ_USER_EVENT_SELFCOMPUTE_DOCALC_CALLBACK);
     traceRegisterUserEvent("PairCompute::doCalc_callback()", PROJ_USER_EVENT_PAIRCOMPUTE_DOCALC_CALLBACK);
     traceRegisterUserEvent("CmiMachineProgressImpl", PROJ_USER_EVENT_MACHINEPROGRESS);
+  #endif
+
+  // DMK - DEBUG
+  #if COUNT_FLOPS != 0
+    globalFlopCount = 0;
+    if (CkNumPes() != 1) {
+      CkPrintf("ERROR: When COUNT_FLOPS is enabled, only a single processor should be used... Exiting...\n");
+      CkExit();
+    }
   #endif
 
   // Spread a proxy to this main chare object to all processors via a read-only
@@ -154,6 +169,11 @@ void Main::patchCheckIn() {
       // Stop timing and display elapsed time
       double simStopTime = CkWallTimer();
       CkPrintf("Elapsed Time: %lf sec\n", simStopTime - simStartTime);
+
+      // DMK - DEBUG
+      #if COUNT_FLOPS != 0
+        CkPrintf("Global Flop Count: %llu flops (%llu GFlops)\n", globalFlopCount, globalFlopCount / 1000000000);
+      #endif
 
       // The simulation has completed, so exit
       CkExit();

@@ -26,11 +26,17 @@ module selfCompute {
                                  readonly : float particleQ[numParticles] <impl_obj->particleQ>,
                                 writeonly : float f0_x[numParticles] <impl_obj->forceX>,
                                 writeonly : float f0_y[numParticles] <impl_obj->forceY>,
-                                writeonly : float f0_z[numParticles] <impl_obj->forceZ>
+                                writeonly : float f0_z[numParticles] <impl_obj->forceZ>,
+                                writeonly : unsigned int localFlopCount <impl_obj->localFlopCount>
                                ] {
 
       // Calculate the electrostatic force (coulumb's law) between the particles
       //   F = (k_e * (q_0 * q_1)) / (r^2)
+
+      // DMK - DEBUG
+      #if COUNT_FLOPS != 0
+        localFlopCount = 0;
+      #endif
 
       register vec4f* p0_x_vec = (vec4f*)particleX;
       register vec4f* p0_y_vec = (vec4f*)particleY;
@@ -82,6 +88,11 @@ module selfCompute {
           f0_x[j] -= f_x;
           f0_y[j] -= f_y;
           f0_z[j] -= f_z;
+
+          // DMK - DEBUG
+          #if COUNT_FLOPS != 0
+            localFlopCount += 26;
+          #endif
         }
 
         // Spread this particle's (p0[i]) values out over vectors
@@ -108,19 +119,16 @@ module selfCompute {
           vec4f p_z_diff_vec = p0_z_i_vec - p0_z_j_vec;
 
           // Calculate r and r^2 between the particles
-          vec4f p_x_diff_2_vec = p_x_diff_vec * p_x_diff_vec;
-          vec4f p_y_diff_2_vec = p_y_diff_vec * p_y_diff_vec;
-          vec4f p_z_diff_2_vec = p_z_diff_vec * p_z_diff_vec;
-          vec4f r_2_vec = p_x_diff_2_vec + p_y_diff_2_vec + p_z_diff_2_vec;
+          vec4f r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
           vec4f r_vec = vsqrt4f(r_2_vec);
 
           // Normalize the vector between the particles
-          vec4f p_x_diff_norm_vec = p_x_diff_vec / r_vec;
-          vec4f p_y_diff_norm_vec = p_y_diff_vec / r_vec;
-          vec4f p_z_diff_norm_vec = p_z_diff_vec / r_vec;
-
-          // Calculate the magnitude of the electrostatic force between the particles
-          vec4f f_mag_vec = coulomb_vec * ((p0_q_i_vec * p0_q_j_vec) / r_2_vec);
+          vec4f r_recip_vec = vrecip4f(r_vec);
+          vec4f r_2_recip_vec = vrecip4f(r_2_vec);
+          vec4f p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
+          vec4f p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
+          vec4f p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
+          vec4f f_mag_vec = coulomb_vec * p0_q_i_vec * p0_q_j_vec * r_2_recip_vec;  // Calc force magnitude
 
           // Multiply the magnitude by the normalized postition difference vector to
           //   create the force vector
@@ -135,6 +143,11 @@ module selfCompute {
           f0_x_vec[j] -= f_x_vec;
           f0_y_vec[j] -= f_y_vec;
           f0_z_vec[j] -= f_z_vec;
+
+          // DMK - DEBUG
+          #if COUNT_FLOPS != 0
+            localFlopCount += (31 * 4);
+          #endif
         }
 
         // Add force values for p0[i] into f0

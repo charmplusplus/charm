@@ -42,6 +42,9 @@
 // Misc. Macros for Performance Testing
 
 // DMK - DEBUG
+#define COUNT_FLOPS                      (0)
+
+// DMK - DEBUG
 #define ENABLE_USER_EVENTS               (1)
 #define PROJ_USER_EVENT_PATCH_FORCECHECKIN_CALLBACK  (1120)
 #define PROJ_USER_EVENT_PATCH_INTEGRATE_CALLBACK     (1121)

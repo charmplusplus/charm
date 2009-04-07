@@ -16,6 +16,12 @@ extern int numPatchesY;
 extern int numPatchesZ;
 
 
+// DMK - DEBUG
+#if COUNT_FLOPS != 0
+  extern unsigned long long int globalFlopCount;
+#endif
+
+
 class Main : public CBase_Main {
 
   private:

@@ -87,6 +87,11 @@ void SelfCompute::doCalc_callback() {
   #endif
 
   // DMK - DEBUG
+  #if COUNT_FLOPS != 0
+    globalFlopCount += localFlopCount;
+  #endif
+
+  // DMK - DEBUG
   NetworkProgress;
 
   #if USE_PROXY_PATCHES != 0
