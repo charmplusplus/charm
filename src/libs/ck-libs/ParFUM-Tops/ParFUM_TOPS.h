@@ -274,7 +274,7 @@ TopElement topModel_InsertCohesiveAtFacet (TopModel* m, int ElemType, TopFacet f
 bool haveConfigurableCPUGPUMap();
 bool isPartitionCPU(int partition);
 bool isPartitionGPU(int partition);
-
+int configurableCPUGPUMapNumNodes();
 
 
 

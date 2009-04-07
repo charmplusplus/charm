@@ -18,6 +18,7 @@ void ParFUM_deghosting(int meshid){
 
 /// Recreate the shared nodes. An alternate incorrect version can be enabled by undefining CORRECT_COORD_COMPARISON
 void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
+
 #define CORRECT_COORD_COMPARISON
   MPI_Comm comm = newComm;
   int rank, nParts;
@@ -25,6 +26,43 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
   int recv_count=0; // sanity check
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &nParts);
+
+
+#if SUPER_FAST_SPECIFIC_TORUS
+
+#define TORUSY 15
+#define TORUSZ 15
+
+  CkPrintf("rank %d is manually configuring the IDXL lists to make the shared node generation fast\n");
+  
+  FEM_Mesh *mesh = (FEM_chunk::get("ParFUM_recreateSharedNodes"))->lookup(meshid,"ParFUM_recreateSharedNodes");
+  IDXL_Side &shared = mesh->node.shared;
+  
+  int low = (rank-1+nParts) % nParts;
+  int high = (rank+1) % nParts;
+  
+  IDXL_List &list1 = shared.addList(low);
+  IDXL_List &list2 = shared.addList(high);
+  
+  int nodesInPlane = TORUSY * TORUSZ;
+  int numNodes = FEM_Mesh_get_length(meshid,FEM_NODE);
+  
+  // vp - 1
+  for(int j=0;j<nodesInPlane;j++){
+    list1.push_back(j);
+  }
+  
+  // vp + 1
+  for(int j=0;j<nodesInPlane;j++){
+    list2.push_back(numNodes - nodesInPlane +j);
+  }
+  
+  return;
+#else
+
+
+
+
   // Shared data will be temporarily stored in the following structure
   int *sharedNodeCounts; // sharedCounts[i] = number of nodes shared with rank i
   int **sharedNodeLists; // sharedNodes[i] is the list of nodes shared with rank i
@@ -102,6 +140,86 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
     // Match coords between local nodes and received coords
     int recvNodeCount = length/dim;
 
+
+    // PERFORM THE NODE COMPARISONS
+
+#ifdef SHARED_NODES_ONLY_NEIGHBOR
+
+    int borderNodes = BORDERNODES;
+
+#warning "Only the first and last BORDERNODES nodes on each partition are candidates for being shared nodes"
+
+    // indices are inclusive
+    int myBottomLow = 0;
+    int myBottomHigh = borderNodes;
+    int myTopLow = numNodes - borderNodes;
+    int myTopHigh = numNodes-1;
+
+    int recvBottomLow = 0;
+    int recvBottomHigh = borderNodes;
+    int recvTopLow = recvNodeCount - borderNodes;
+    int recvTopHigh = recvNodeCount-1;
+
+    CkPrintf("[%d] rank=%d myBottomLow=%d myBottomHigh=%d myTopLow=%d myTopHigh=%d   recvBottomLow=%d recvBottomHigh=%d recvTopLow=%d recvTopHigh=%d\n", CkMyPe(), rank, myBottomLow, myBottomHigh, myTopLow, myTopHigh, recvBottomLow, recvBottomHigh, recvTopLow, recvTopHigh);    
+
+    // make sure the top region is non-negative
+    if(myTopLow < 0)
+      myTopLow = 0;
+      
+    if(recvTopLow < 0)
+      recvTopLow = 0;
+
+    // make the two regions be non-overlapping
+    if(myBottomHigh >= myTopLow)
+      myTopLow = myTopLow-1;
+    
+    if(recvBottomHigh >= recvTopLow)
+      recvTopLow = recvTopLow-1;
+    
+    for (int j=myBottomLow; j<=myBottomHigh; j++) {
+      for (int k=recvBottomLow; k<=recvBottomHigh; k++) {
+	if (coordEqual(&nodeCoords[j*dim], &recvNodeCoords[k*dim], dim)) {
+	  localSharedNodes.push_back(j); 
+	  remoteSharedNodes.push_back(k);
+	  break;
+	}
+      }
+    }
+
+    for (int j=myTopLow; j<=myBottomHigh; j++) {
+      for (int k=recvTopLow; k<=recvTopHigh; k++) {
+	if (coordEqual(&nodeCoords[j*dim], &recvNodeCoords[k*dim], dim)) {
+	  localSharedNodes.push_back(j); 
+	  remoteSharedNodes.push_back(k);
+	  break;
+	}
+      }
+    }
+
+
+    for (int j=myTopLow; j<=myTopHigh; j++) {
+      for (int k=recvBottomLow; k<=recvBottomHigh; k++) {
+	if (coordEqual(&nodeCoords[j*dim], &recvNodeCoords[k*dim], dim)) {
+	  localSharedNodes.push_back(j); 
+	  remoteSharedNodes.push_back(k);
+	  break;
+	}
+      }
+    }
+
+    for (int j=myBottomLow; j<=myTopHigh; j++) {
+      for (int k=recvTopLow; k<=recvTopHigh; k++) {
+	if (coordEqual(&nodeCoords[j*dim], &recvNodeCoords[k*dim], dim)) {
+	  localSharedNodes.push_back(j); 
+	  remoteSharedNodes.push_back(k);
+	  break;
+	}
+      }
+    }
+
+#else 
+
+
     //    CkPrintf("Comparing %d nodes with %d received nodes\n", numNodes, recvNodeCount);
     for (int j=0; j<numNodes; j++) {
       for (int k=0; k<recvNodeCount; k++) {
@@ -113,6 +231,8 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
 	}
       }
     }
+
+#endif
 
     // Copy local nodes that were shared with source into the data structure
     int *localSharedNodeList = (int *)malloc(localSharedNodes.size()*sizeof(int));
@@ -185,6 +305,8 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
       free(sharedNodeLists[i]);
   }
   free(sharedNodeLists);
+
+#endif // normal mode, not super fast mesh specific one
 }
 
 void ParFUM_createComm(int meshid, int dim, MPI_Comm comm)

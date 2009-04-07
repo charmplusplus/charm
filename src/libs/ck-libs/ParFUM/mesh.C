@@ -1220,6 +1220,19 @@ void FEM_Entity::setLength(int newlen, bool f)
     }
 }
 
+/// Attempt to resize all the attributes owned by ParFUM so they don't need to be resized later. 
+/// This function is not guaranteed to resize all buffers. The usual resize methods should be used 
+/// later on, but they should be cheaper at that point.
+void FEM_Entity::reserveLength(int newlen)
+{
+  if (newlen > max) {
+    max = newlen;
+    for (int a=0;a<attributes.size();a++){
+      attributes[a]->reallocate();
+    }
+  }
+}
+
 void FEM_Entity::allocateValid(void) {
   if (!valid){
     valid=new FEM_DataAttribute(this,FEM_IS_VALID_ATTR);

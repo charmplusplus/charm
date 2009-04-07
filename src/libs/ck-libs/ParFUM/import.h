@@ -42,7 +42,7 @@ inline int coordCompare(const double *key1, const double *key2, int dim) {
   return 0;
 #else
   CkAssert(dim==3);
-  const double threshold = 0.001;
+  const double threshold = 0.0001;
   for(int i=0; i<dim; i++) {
     const double a = key1[i];
     const double b = key2[i];

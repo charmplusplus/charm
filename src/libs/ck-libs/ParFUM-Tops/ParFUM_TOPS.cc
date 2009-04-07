@@ -309,7 +309,9 @@ TopModel* topModel_Create_Driver(TopDevice target_device, int elem_attr_sz,
     if (model->target_device == DeviceGPU) {
         int size = model->num_local_elem * connSize *sizeof(int);
         cudaError_t err = cudaMalloc((void**)&(model->device_model.n2eConnDevice), size);
-	if(err != cudaSuccess){
+	if(err == cudaErrorMemoryAllocation){
+	  	  CkPrintf("[%d] cudaMalloc FAILED with error cudaErrorMemoryAllocation model->device_model.n2eConnDevice in ParFUM_TOPS.cc size=%d: %s\n", CkMyPe(), size, cudaGetErrorString(err));
+	}else if(err != cudaSuccess){
 	  CkPrintf("[%d] cudaMalloc FAILED model->device_model.n2eConnDevice in ParFUM_TOPS.cc size=%d: %s\n", CkMyPe(), size, cudaGetErrorString(err));
 	  CkAbort("cudaMalloc FAILED");
 	}
@@ -1097,6 +1099,7 @@ public:
   
   char *locations;
   int objs_per_block;
+  int numNodes;
 
   /// labels for states used when parsing the ConfigurableRRMap from ARGV
   enum loadStatus{
@@ -1137,12 +1140,10 @@ public:
 	std::istringstream instream(configuration);
 	CkAssert(instream.good());
 	 
-	// Example line:
-	// 5 C G G G C
-	// Modulo 5; The first and fifth VPs are on CPU, the second, third, and forth are on GPUs. 
 
 	// extract first integer
 	instream >> objs_per_block;
+	instream >> numNodes;
 	CkAssert(instream.good());
 	CkAssert(objs_per_block > 0);
 	locations = new char[objs_per_block];
@@ -1179,6 +1180,11 @@ void _initConfigurableCPUGPUMap(){
 bool haveConfigurableCPUGPUMap(){
   ConfigurableCPUGPUMapLoader &loader =  CkpvAccess(myConfigGPUCPUMapLoader);
   return loader.haveConfiguration();
+}
+
+int configurableCPUGPUMapNumNodes(){
+  ConfigurableCPUGPUMapLoader &loader =  CkpvAccess(myConfigGPUCPUMapLoader);
+  return loader.numNodes;
 }
 
 

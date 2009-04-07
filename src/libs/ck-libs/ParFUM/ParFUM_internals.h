@@ -839,6 +839,9 @@ class FEM_Entity {
    */
   void setLength(int newlen, bool f=false);
 
+  /// Attempt to set max and resize all associated attributes
+  void reserveLength(int newlen);
+
   /** Support for registration API
    *  Set the current length and maximum length for this entity.
    *  If the current length exceeds the maximum length a resize
