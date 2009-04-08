@@ -536,6 +536,7 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
       //if (ptraceback) CkPrintf("   %d %d %d %d\n",PyType_Check(ptraceback),PyString_Check(ptraceback),PyList_Check(ptraceback),PyTuple_Check(ptraceback));
     }
   } else {
+    resultNotNone = false;
     //static PyObject *savedItem = NULL;
     CkPythonDebugf("userCode: |%s|",pyMsg->code);
     CkPythonDebugf("method: |%s|",pyMsg->methodName.methodName);
@@ -619,12 +620,12 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
     // iterate over all the provided iterators from the user class
     PyObject *result;
 
-        CkPythonDebugf("Errors: %p %p %p %p %p\n%p %p %p %p %p\n%p %p %p %p %p\n%p %p %p %p %p\n%p %p %p %p %p\n",
-                 PyExc_Exception, PyExc_StandardError, PyExc_ArithmeticError, PyExc_LookupError, PyExc_AssertionError,
-                 PyExc_AttributeError, PyExc_EOFError, PyExc_EnvironmentError, PyExc_FloatingPointError, PyExc_IOError,
-                 PyExc_ImportError, PyExc_IndexError, PyExc_KeyError, PyExc_NameError, PyExc_NotImplementedError,
-                 PyExc_OSError, PyExc_OverflowError, PyExc_ReferenceError, PyExc_RuntimeError, PyExc_SyntaxError,
-                 PyExc_SystemError, PyExc_SystemExit, PyExc_TypeError, PyExc_ValueError, PyExc_ZeroDivisionError);
+    CkPythonDebugf("Errors: %p %p %p %p %p\n%p %p %p %p %p\n%p %p %p %p %p\n%p %p %p %p %p\n%p %p %p %p %p\n",
+        PyExc_Exception, PyExc_StandardError, PyExc_ArithmeticError, PyExc_LookupError, PyExc_AssertionError,
+        PyExc_AttributeError, PyExc_EOFError, PyExc_EnvironmentError, PyExc_FloatingPointError, PyExc_IOError,
+        PyExc_ImportError, PyExc_IndexError, PyExc_KeyError, PyExc_NameError, PyExc_NotImplementedError,
+        PyExc_OSError, PyExc_OverflowError, PyExc_ReferenceError, PyExc_RuntimeError, PyExc_SyntaxError,
+        PyExc_SystemError, PyExc_SystemExit, PyExc_TypeError, PyExc_ValueError, PyExc_ZeroDivisionError);
 
     while (more) {
       CkPythonDebugf("Status in 0 %p\n",PyErr_Occurred());
@@ -644,9 +645,15 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
         CkPrintf("%s\n",PyString_AsString(PyObject_Str(traceback)));
       }
       if (!result) {
-	CkPrintf("Python Call error\n");
+        CkPrintf("Python Call error\n");
         //PyErr_Print();
-	break;
+        break;
+      }
+      if (result != Py_None) {
+        // freeze the application
+        CkPrintf("Freezing the application!\n");
+        resultNotNone = true;
+        break;
       }
       oldArg = part;
       more = nextIteratorUpdate(part, result, userIterator);
@@ -667,7 +674,7 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
     //Py_DECREF(code);
 
   } // end decision if it is iterate or not
-  CkPythonDebugf("Status 3 %d\n",PyErr_Occurred());
+  CkPythonDebugf("Status 3 %p\n",PyErr_Occurred());
 
   cleanup(pyMsg, mine, pyReference);
 

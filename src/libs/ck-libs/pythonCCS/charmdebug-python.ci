@@ -10,6 +10,7 @@ module charmdebug_python {
     entry [python] void getValue(int);
     entry [python] void getCast(int);
     entry [python] void getStatic(int);
+    entry [python] void getMessage(int);
     entry void registerPersistent(CkCcsRequestMsg*);
   };
 };

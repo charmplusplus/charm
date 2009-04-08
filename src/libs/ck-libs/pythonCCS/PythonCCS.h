@@ -58,6 +58,7 @@ class PythonObject {
  public:
   CmiUInt4 pyNumber;
   PythonTable pyWorkers;
+  bool resultNotNone;
 
   void pyRequest(CkCcsRequestMsg *msg);
   void execute(CkCcsRequestMsg *msg, CcsDelayedReply *reply);

@@ -45,6 +45,8 @@ public:
   void getValue(int handle);
   void getCast(int handle);
   void getStatic(int handle);
+  
+  void getMessage(int handle);
 
   void cpdCheck(void*);
   void registerPersistent(CkCcsRequestMsg*);
@@ -52,22 +54,28 @@ public:
 
 int CpdPythonGroup::buildIterator(PyObject *&data, void *iter) {
   int group = ntohl(*(int*)iter);
-  CkGroupID id;
-  id.idx = group;
-  IrrGroup *ptr = _localBranch(id);
-  if (ptr->isArrMgr()) {
-    arriter.arr = (CkArray*)ptr;
-    arriter.arr->getLocMgr()->iterate(arriter);
-    if (arriter.elems.size() > 0) {
-      data = PyLong_FromVoidPtr(arriter.elems[0]);
-      nextElement = 1;
+  if (group > 0) {
+    CkGroupID id;
+    id.idx = group;
+    IrrGroup *ptr = _localBranch(id);
+    if (ptr->isArrMgr()) {
+      arriter.arr = (CkArray*)ptr;
+      arriter.arr->getLocMgr()->iterate(arriter);
+      if (arriter.elems.size() > 0) {
+        data = PyLong_FromVoidPtr(arriter.elems[0]);
+        nextElement = 1;
+      } else {
+        return 0;
+      }
     } else {
-      return 0;
+      nextElement = 0;
+      data = PyLong_FromVoidPtr(ptr);
+      //CkPrintf("[%d] Building iterator for %i: %p\n", CkMyPe(), group, ptr);
+      return 1;
     }
   } else {
     nextElement = 0;
-    data = PyLong_FromVoidPtr(ptr);
-    //CkPrintf("[%d] Building iterator for %i: %p\n", CkMyPe(), group, ptr);
+    data = PyLong_FromVoidPtr(CpdGetCurrentObject());
     return 1;
   }
 }
@@ -187,6 +195,10 @@ void CpdPythonGroup::getStatic(int handle) {
   pythonReturn(handle, result);
 }
 
+void CpdPythonGroup::getMessage(int handle) {
+  pythonReturn(handle, PyLong_FromVoidPtr(CpdGetCurrentMsg()));
+}
+
 void CpdPythonGroup::cpdCheck(void *m) {
   CkCcsRequestMsg *msg = (CkCcsRequestMsg *)m;
   //CkPrintf("[%d] CpdPythonGroup::cpdCheck reached\n",CkMyPe());
@@ -198,6 +210,7 @@ void CpdPythonGroup::cpdCheck(void *m) {
   pyWorkers[pyReference].inUse = true;
   CmiReference(UsrToEnv(msg));
   CthResume(CthCreate((CthVoidFn)_callthr_executeThread, new CkThrCallArg(msg,(PythonObject*)this), 0));
+  if (resultNotNone) CpdFreeze();
 }
 
 void CpdPythonGroup::registerPersistent(CkCcsRequestMsg *msg) {
@@ -215,8 +228,10 @@ void CpdPythonGroup::registerPersistent(CkCcsRequestMsg *msg) {
   int n = ntohl(((int*)iter)[1]);
   DebugPersistentCheck dpc(this, msg);
   for (int i=0; i<n; ++i) {
-    CkPrintf("registering method for EP %d\n",ntohl(((int*)iter)[i+2]));
-    _debugEntryTable[ntohl(((int*)iter)[i+2])].postProcess.push_back(dpc);
+    int ep = ntohl(((int*)iter)[i+2]);
+    CkPrintf("registering method for EP %d\n",ep);
+    if (ep > 0) _debugEntryTable[ep].postProcess.push_back(dpc);
+    else _debugEntryTable[-ep].preProcess.push_back(dpc);
   }
   CkPrintf("[%d] Registering Persistent method (reference=%d)\n",CkMyPe(),pyReference);
 
