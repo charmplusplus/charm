@@ -41,6 +41,8 @@ Filippo Gioachin   03/23/05
 #define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
 #define CMI_DEST_RANK(msg)               ((CmiMsgHeaderBasic *)msg)->rank
 
+CpvDeclare(unsigned , networkProgressCount);
+int networkProgressPeriod;
 
 static int lapiDebugMode=0;
 /* static int lapiInterruptMode=0; */
