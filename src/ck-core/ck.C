@@ -509,7 +509,7 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   //CkPrintf("CkDeliverMessageFree: name of entry fn: %s\n", _entryTable[epIdx]->name);
   //fflush(stdout);
 #ifndef CMK_OPTIMIZE
-  CpdBeforeEp(epIdx, obj);
+  CpdBeforeEp(epIdx, obj, msg);
 #endif
   _entryTable[epIdx]->call(msg, obj);
 #ifndef CMK_OPTIMIZE
@@ -543,7 +543,7 @@ extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 #endif
   }
 #ifndef CMK_OPTIMIZE
-  CpdBeforeEp(epIdx, obj);
+  CpdBeforeEp(epIdx, obj, (void*)msg);
 #endif
   _entryTable[epIdx]->call(deliverMsg, obj);
 #ifndef CMK_OPTIMIZE

@@ -28,7 +28,7 @@ CpdPersistentChecker persistentCheckerUselessClass;
 
 void CpdFinishInitialization() {
 #ifndef CMK_OPTIMIZE
-  _debugEntryTable.reserve(_entryTable.size());
+  _debugEntryTable.resize(_entryTable.size());
 #endif
 }
 
@@ -39,24 +39,36 @@ typedef struct DebugRecursiveEntry {
   int previousChareID;
   int alreadyUserCode;
   char *memoryBackup;
+  void *obj;
+  void *msg;
 } DebugRecursiveEntry;
 
 CkQ<DebugRecursiveEntry> _debugData;
 
+void *CpdGetCurrentObject() { return _debugData.peek().obj; }
+void *CpdGetCurrentMsg() { return _debugData.peek().msg; }
+
 // Function called right before an entry method
-void CpdBeforeEp(int ep, void *obj) {
+void CpdBeforeEp(int ep, void *obj, void *msg) {
 #ifndef CMK_OPTIMIZE
   if (CpvAccess(cmiArgDebugFlag)) {
     DebugRecursiveEntry entry;
     entry.previousChareID = setMemoryChareIDFromPtr(obj);
     entry.alreadyUserCode = _entryTable[ep]->inCharm ? 0 : 1;
     entry.memoryBackup = NULL;
+    entry.obj = obj;
+    entry.msg = UsrToEnv(msg);
+    CmiReference(entry.msg);
     _debugData.push(entry);
     setMemoryStatus(entry.alreadyUserCode);
     //if (_debugEntryTable[ep].isBreakpoint) printf("CpdBeforeEp breakpointed %d\n",ep);
     memoryBackup = &_debugData.peek().memoryBackup;
     if (!_entryTable[ep]->inCharm) {
       CpdResetMemory();
+    }
+    CkVec<DebugPersistentCheck> &preExecutes = _debugEntryTable[ep].preProcess;
+    for (int i=0; i<preExecutes.size(); ++i) {
+      preExecutes[i].object->cpdCheck(preExecutes[i].msg);
     }
   }
 #endif
@@ -75,6 +87,7 @@ void CpdAfterEp(int ep) {
     if (!_entryTable[ep]->inCharm) {
       CpdCheckMemory();
     }
+    CmiFree(entry.msg);
     setMemoryChareID(entry.previousChareID);
     setMemoryStatus(entry.alreadyUserCode);
     _debugData.deq();
@@ -436,6 +449,23 @@ public:
   }
 };
 
+class CpdList_msgStack : public CpdListAccessor {
+  virtual const char * getPath(void) const {return "charm/messageStack";}
+  virtual size_t getLength(void) const {
+    return _debugData.length();
+  }
+  virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
+    for (int i=0; i<_debugData.length(); ++i) {
+      beginItem(p, i);
+      void *obj = _debugData[i].obj;
+      p.comment("obj");
+      pup_pointer(&p, &obj);
+      void *msg = _debugData[i].msg;
+      p.comment("msg");
+      pup_pointer(&p, &msg);
+    }
+  }
+};
 
 /****************** Breakpoints and other debug support **************/
 
@@ -527,8 +557,12 @@ void CpdContinueFromBreakPoint ()
     if ( (CpvAccess(lastBreakPointMsg) != NULL) && (CpvAccess(lastBreakPointObject) != NULL) )
     {
         EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CpvAccess(lastBreakPointIndex));
-        if (breakPointEntryInfo != NULL)
+        if (breakPointEntryInfo != NULL) {
            breakPointEntryInfo->call(CpvAccess(lastBreakPointMsg), CpvAccess(lastBreakPointObject));
+        } else {
+          // This means that the breakpoint got deleted in the meanwhile
+          
+        }
     }
     CpvAccess(lastBreakPointMsg) = NULL;
     CpvAccess(lastBreakPointObject) = NULL;
@@ -554,13 +588,15 @@ void CpdSetBreakPoint (char *msg)
       CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName);
       return;
     }
-            EntryInfo * breakPointEntryInfo = new EntryInfo(_entryTable[tableIdx]->name, _entryTable[tableIdx]->call, _entryTable[tableIdx]->msgIdx, _entryTable[tableIdx]->chareIdx );
+           EntryInfo * breakPointEntryInfo = (EntryInfo *)CpvAccess(breakPointEntryTable)->get(tableIdx);
+           delete breakPointEntryInfo;
+           breakPointEntryInfo = new EntryInfo(_entryTable[tableIdx]->name, _entryTable[tableIdx]->call, _entryTable[tableIdx]->msgIdx, _entryTable[tableIdx]->chareIdx );
            CmiPrintf("Breakpoint is set for function %s with an epIdx = %ld\n", _entryTable[tableIdx]->name, tableIdx);
            CpvAccess(breakPointEntryTable)->put(tableIdx) = breakPointEntryInfo;
            _entryTable[tableIdx]->name = "debug_breakpoint_ep";
            _entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
-           _entryTable[tableIdx]->msgIdx = CpvAccess(_debugMsg);
-           _entryTable[tableIdx]->chareIdx = CpvAccess(_debugChare);
+           //_entryTable[tableIdx]->msgIdx = CpvAccess(_debugMsg);
+           //_entryTable[tableIdx]->chareIdx = CpvAccess(_debugChare);
            //_debugEntryTable[tableIdx].isBreakpoint = CmiTrue;
            //break;
        //}
@@ -605,7 +641,7 @@ void CpdRemoveBreakPoint (char *msg)
       _entryTable[idx]->chareIdx = breakPointEntryInfo->chareIdx;
       //_debugEntryTable[idx].isBreakpoint = CmiFalse;
       CmiPrintf("Breakpoint is removed for function %s with epIdx %ld\n", _entryTable[idx]->name, idx);
-      CpvAccess(breakPointEntryTable)->remove(idx);
+      //CpvAccess(breakPointEntryTable)->remove(idx);
     }
   }
 }
@@ -712,22 +748,20 @@ void CpdCharmInit()
   CpdListRegister(new CpdList_arrayElements());
   CpdListRegister(new CpdList_objectNames());
   CpdListRegister(new CpdList_object());
+  CpdListRegister(new CpdList_msgStack());
   CpdIsDebugMessage = CpdIsCharmDebugMessage;
 }
 
 #else
 
-void CpdCharmInit()
-{
-}
+void CpdCharmInit() {}
 
-void CpdFinishInitialization() {
-}
+void CpdFinishInitialization() {}
 
-void CpdBeforeEp(int ep, void *obj) {
-}
+void *CpdGetCurrentObject() {return null;}
+void *CpdGetCurrentMsg() {return null;}
 
-void CpdAfterEp(int ep) {
-}
+void CpdBeforeEp(int ep, void *obj, void *msg) {}
+void CpdAfterEp(int ep) {}
 
 #endif /*CMK_CCS_AVAILABLE*/

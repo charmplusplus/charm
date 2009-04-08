@@ -14,8 +14,11 @@
 #include "pup.h"
 #include "cklists.h"
 
+void *CpdGetCurrentObject();
+void *CpdGetCurrentMsg();
+
 //Hooks inside the debugger before and after an entry method is invoked
-extern void CpdBeforeEp(int, void*);
+extern void CpdBeforeEp(int, void*, void*);
 extern void CpdAfterEp(int);
 extern void CpdFinishInitialization();
 
@@ -39,6 +42,7 @@ class DebugEntryInfo {
 public:
   // true if this entry method has a breakpoint set
   CmiBool isBreakpoint;
+  CkVec<DebugPersistentCheck> preProcess;
   CkVec<DebugPersistentCheck> postProcess;
 
   DebugEntryInfo() : isBreakpoint(CmiFalse) { }
