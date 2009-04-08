@@ -30,6 +30,7 @@ class SSEDouble
            
 
            /* Arithmetic Operators*/ 
+           friend inline SSEDouble operator -(const SSEDouble &a) {SSEDouble c;c.val=_mm_sub_pd(_mm_setzero_pd(),a.val);return c;}
 
            friend inline SSEDouble operator +(const SSEDouble &a, const SSEDouble &b) {SSEDouble c;c.val= _mm_add_pd(a.val,b.val);return c;}
                 
@@ -50,7 +51,16 @@ class SSEDouble
           friend inline SSEDouble operator *(double a, const SSEDouble &b) {SSEDouble c;c.val= _mm_mul_pd(_mm_set1_pd(a),b.val);return c;}   
        
           friend inline SSEDouble operator /(double a, const SSEDouble &b) {SSEDouble c;c.val= _mm_div_pd(_mm_set1_pd(a),b.val);return c;}
-          /*Logical Operators*/
+
+           inline SSEDouble& operator +=(const SSEDouble &a) {val= _mm_add_pd(val,a.val);return *this;}
+                
+           inline SSEDouble& operator -=(const SSEDouble &a) {val= _mm_sub_pd(val,a.val);return *this;}
+
+           inline SSEDouble& operator *=(const SSEDouble &a) {val= _mm_mul_pd(val,a.val);return *this;}
+
+           inline SSEDouble& operator /=(const SSEDouble &a) {val= _mm_div_pd(val,a.val);return *this;}
+
+           /*Logical Operators*/
 
            friend inline SSEDouble operator &(const SSEDouble &a, const SSEDouble &b) {SSEDouble c;c.val= _mm_and_pd(a.val,b.val);return c;}
 
