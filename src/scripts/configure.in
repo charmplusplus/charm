@@ -709,6 +709,28 @@ EOT
 test_linkc "whether pthread_setaffinity_np call exists" "yes" "no" "-lpthread"
 AC_DEFINE_UNQUOTED(CMK_HAS_PTHREAD_SETAFFINITY, $pass, [whether the pthread_setaffinity_np() exists])
 
+#### check bindprocessors on AIX ####
+cat > $tc <<EOT
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+
+#include <sys/processor.h>
+
+int main()
+{
+  int retValue = 0;
+  int pid;
+  pid = getpid();
+  if (bindprocessor(BINDPROCESS, pid, 0) == -1) return -1;
+  return 0;
+}
+EOT
+test_linkc "whether bindprocessor call exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_BINDPROCESSOR, $pass, [whether the bindprocessor()
+exists])
+
+
 #### check if dlopen works ####
 skip_dl=0
 # for bproc, ignore -ldl
