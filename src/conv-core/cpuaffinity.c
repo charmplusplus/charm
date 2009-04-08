@@ -17,7 +17,7 @@ cpu affinity.
  when CMK_NO_SOCKETS, which is typically on cray xt3 and bluegene/L.
  There is no hostname for the compute nodes.
 */
-#if CMK_HAS_SETAFFINITY || defined (_WIN32) || CMK_AIX
+#if CMK_HAS_SETAFFINITY || defined (_WIN32) || CMK_HAS_BINDPROCESSOR
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -64,7 +64,7 @@ static void add_exclude(int core)
   excludecore[excludecount++] = core;
 }
 
-#if CMK_AIX
+#if CMK_HAS_BINDPROCESSOR
 #include <sys/processor.h>
 #endif
 
@@ -94,7 +94,7 @@ int set_cpu_affinity(int cpuid) {
   if (SetProcessAffinityMask(hProcess, mask) == 0) {
     return -1;
   }
-#elif CMK_AIX
+#elif CMK_HAS_BINDPROCESSOR
   pid = getpid();
   if (bindprocessor(BINDPROCESS, pid, cpuid) == -1) return -1;
 #else
@@ -136,7 +136,7 @@ int set_thread_affinity(int cpuid) {
     perror("pthread_setaffinity");
     return -1;
   }
-#elif CMK_AIX
+#elif CMK_HAS_BINDPROCESSOR
   if (bindprocessor(BINDTHREAD, thread_self(), cpuid) != 0)
     return -1;
 #else
@@ -163,7 +163,7 @@ int print_cpu_affinity() {
   
   printf("CPU affinity mask is: %08lx\n", pMask);
   
-#elif CMK_AIX
+#elif CMK_HAS_BINDPROCESSOR
   printf("[%d] CPU affinity mask is unknown for AIX. \n", CmiMyPe());
 #else
   unsigned long mask;
