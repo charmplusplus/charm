@@ -14,5 +14,5 @@
 /*#define CMK_MALLOC_USE_GNUOLD_MALLOC                          1 */
 #define CMK_MALLOC_USE_OS_BUILTIN                           1
 
-#define CMK_PCQUEUE_LOCK                                   1
+/*#define CMK_PCQUEUE_LOCK                                   1 */
 
