@@ -55,7 +55,7 @@ static const char *idx2str(const CkArrayMessage *m)
 #   define DEBB(x) CkPrintf x  //Broadcast debug messages
 #   define AA "LocMgr on %d: "
 #   define AB ,CkMyPe()
-#   define DEBUG(x) x
+#   define DEBUG(x) CkPrintf x
 #else
 #   define DEB(X) /*CkPrintf x*/
 #   define DEBI(X) /*CkPrintf x*/
@@ -66,7 +66,7 @@ static const char *idx2str(const CkArrayMessage *m)
 #   define DEBK(x) /*CkPrintf x*/
 #   define DEBB(x) /*CkPrintf x*/
 #   define str(x) /**/
-#   define DEBUG(x)
+#   define DEBUG(x)   /**/
 #endif
 
 
@@ -453,23 +453,17 @@ public:
   /// load configuration if possible, and return whether a valid configuration exists
   bool haveConfiguration() {
     if(state == not_loaded) {
-#if DEBUG
-      CkPrintf("[%d] loading ConfigurableRRMap configuration\n", CkMyPe());
-#endif
+      DEBUG(("[%d] loading ConfigurableRRMap configuration\n", CkMyPe()));
       char **argv=CkGetArgv();
       char *configuration = NULL;
       bool found = CmiGetArgString(argv, "+ConfigurableRRMap", &configuration);
       if(!found){
-#if DEBUG
-	CkPrintf("Couldn't find +ConfigurableRRMap command line argument\n");
-#endif
+	DEBUG(("Couldn't find +ConfigurableRRMap command line argument\n"));
 	state = loaded_not_found;
 	return false;
       } else {
 
-#if DEBUG
-	CkPrintf("Found +ConfigurableRRMap command line argument in %p=\"%s\"\n", configuration, configuration);
-#endif
+	DEBUG(("Found +ConfigurableRRMap command line argument in %p=\"%s\"\n", configuration, configuration));
 
 	std::istringstream instream(configuration);
 	CkAssert(instream.good());
@@ -495,9 +489,7 @@ public:
       }
 
     } else {
-#if DEBUG
-      CkPrintf("[%d] ConfigurableRRMap has already been loaded\n", CkMyPe());
-#endif
+      DEBUG(("[%d] ConfigurableRRMap has already been loaded\n", CkMyPe()));
       return state == loaded_found;
     }      
      
@@ -514,9 +506,7 @@ void _initConfigurableRRMap(){
 
 /// Try to load the command line arguments for ConfigurableRRMap
 bool haveConfigurableRRMap(){
-#if DEBUG
-  CkPrintf("haveConfigurableRRMap()\n");
-#endif
+  DEBUG(("haveConfigurableRRMap()\n"));
   ConfigurableRRMapLoader &loader =  CkpvAccess(myConfigRRMapState);
   return loader.haveConfiguration();
 }
@@ -541,9 +531,7 @@ public:
     int thisPe=CkMyPe();
     int numPes=CkNumPes();
     int maxIndex = numElements.data()[0];
-#if DEBUG
-    CkPrintf("[%d] ConfigurableRRMap: index=%d,%d,%d\n", CkMyPe(),(int)numElements.data()[0], (int)numElements.data()[1], (int)numElements.data()[2]);
-#endif
+    DEBUG(("[%d] ConfigurableRRMap: index=%d,%d,%d\n", CkMyPe(),(int)numElements.data()[0], (int)numElements.data()[1], (int)numElements.data()[2]));
 
     if (numElements.nInts != 1) {
       CkAbort("ConfigurableRRMap only supports dimension 1!");
@@ -557,9 +545,7 @@ public:
       int l = loader.locations[ cyclic_local ];
       int PE = (cyclic_block*loader.PE_per_block + l) % CkNumPes();
 
-#if DEBUG      
-      CkPrintf("[%d] ConfigurableRRMap: index=%d is located on PE %d l=%d\n", CkMyPe(), (int)index, (int)PE, l);
-#endif
+      DEBUG(("[%d] ConfigurableRRMap: index=%d is located on PE %d l=%d\n", CkMyPe(), (int)index, (int)PE, l));
 
       if(PE == thisPe)
 	mgr->insertInitial(idx,CkCopyMsg(&ctorMsg));
