@@ -63,6 +63,9 @@
 /* whether has alloca.h */
 #undef CMK_HAS_ALLOCA_H
 
+/* whether the bindprocessor() exists */
+#undef CMK_HAS_BINDPROCESSOR
+
 /* whether PAPI exists */
 #undef CMK_HAS_COUNTER_PAPI
 

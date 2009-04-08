@@ -2489,6 +2489,31 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### check bindprocessors on AIX ####
+cat > $tc <<EOT
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+
+#include <sys/processor.h>
+
+int main()
+{
+  int retValue = 0;
+  int pid;
+  pid = getpid();
+  if (bindprocessor(BINDPROCESS, pid, 0) == -1) return -1;
+  return 0;
+}
+EOT
+test_linkc "whether bindprocessor call exists" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_BINDPROCESSOR $pass
+_ACEOF
+
+
+
 #### check if dlopen works ####
 skip_dl=0
 # for bproc, ignore -ldl
