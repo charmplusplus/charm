@@ -17,7 +17,7 @@ cpu affinity.
  when CMK_NO_SOCKETS, which is typically on cray xt3 and bluegene/L.
  There is no hostname for the compute nodes.
 */
-#if (CMK_HAS_SETAFFINITY || defined (_WIN32)) 
+#if CMK_HAS_SETAFFINITY || defined (_WIN32) || CMK_AIX
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -64,12 +64,18 @@ static void add_exclude(int core)
   excludecore[excludecount++] = core;
 }
 
+#if CMK_AIX
+#include <sys/processor.h>
+#endif
+
 /* This implementation assumes the default x86 CPU mask size used by Linux */
 /* For a large SMP machine, this code should be changed to use a variable sized   */
 /* CPU affinity mask buffer instead, as the present code will fail beyond 32 CPUs */
 int set_cpu_affinity(int cpuid) {
   unsigned long mask = 0xffffffff;
   unsigned int len = sizeof(mask);
+  int retValue = 0;
+  int pid;
 
  #ifdef _WIN32
    HANDLE hProcess;
@@ -88,6 +94,9 @@ int set_cpu_affinity(int cpuid) {
   if (SetProcessAffinityMask(hProcess, mask) == 0) {
     return -1;
   }
+#elif CMK_AIX
+  pid = getpid();
+  if (bindprocessor(BINDPROCESS, pid, cpuid) == -1) return -1;
 #else
   /* PID 0 refers to the current process */
   if (sched_setaffinity(0, len, &mask) < 0) {
@@ -127,6 +136,9 @@ int set_thread_affinity(int cpuid) {
     perror("pthread_setaffinity");
     return -1;
   }
+#elif CMK_AIX
+  if (bindprocessor(BINDTHREAD, thread_self(), cpuid) != 0)
+    return -1;
 #else
   return set_cpu_affinity(cpuid);
 #endif
@@ -151,6 +163,8 @@ int print_cpu_affinity() {
   
   printf("CPU affinity mask is: %08lx\n", pMask);
   
+#elif CMK_AIX
+  printf("[%d] CPU affinity mask is unknown for AIX. \n", CmiMyPe());
 #else
   unsigned long mask;
   unsigned int len = sizeof(mask);
@@ -301,7 +315,7 @@ void CmiInitCPUAffinity(char **argv)
 
   if (!affinity_flag) return;
   else if (CmiMyPe() == 0) {
-     CmiPrintf("Charm++> cpu affinity enabled! \n");
+     CmiPrintf("Charm++> cpu affinity enabled. \n");
      if (excludecount > 0) {
        CmiPrintf("Charm++> cpuaffinity excludes core: %d", excludecore[0]);
        for (i=1; i<excludecount; i++) CmiPrintf(" %d", excludecore[i]);
@@ -333,11 +347,15 @@ void CmiInitCPUAffinity(char **argv)
     /* each processor finds its mapping */
     int i, ct=1, myrank;
     for (i=0; i<strlen(coremap); i++) if (coremap[i]==',' && i<strlen(coremap)-1) ct++;
+#if CMK_SMP
     ct = CmiMyRank()%ct;
+#else
+    ct = CmiMyPe()%ct;
+#endif
     i=0;
     while(ct>0) if (coremap[i++]==',') ct--;
     myrank = atoi(coremap+i);
-     printf("Charm++> set PE%d on node #%d core #%d\n", CmiMyPe(), CmiMyNode(), myrank); 
+    printf("Charm++> set PE%d on node #%d core #%d\n", CmiMyPe(), CmiMyNode(), myrank); 
     if (myrank >= CmiNumCores()) {
       CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", myrank, CmiNumCores(), CmiNumCores()-1);
       CmiAbort("Invalid core number");
@@ -368,6 +386,7 @@ void CmiInitCPUAffinity(char **argv)
   msg->pe = CmiMyPe();
   msg->ip = myip;
   msg->ncores = CmiNumCores();
+  DEBUGP(("PE %d's node has %d number of cores. \n", CmiMyPe(), msg->ncores));
   msg->rank = 0;
   CmiSyncSendAndFree(0, sizeof(hostnameMsg), (void *)msg);
 
@@ -397,8 +416,8 @@ void CmiInitCPUAffinity(char **argv)
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
   while (CmiGetArgIntDesc(argv,"+excludecore",&excludecore, "avoid core when setting cpuaffinity"));
-  if (affinity_flag)
-    CmiPrintf("sched_setaffinity() is not supported, +affinity_flag disabled.\n");
+  if (affinity_flag && CmiMyPe()==0)
+    CmiPrintf("sched_setaffinity() is not supported, +setcpuaffinity disabled.\n");
 }
 
 #endif
