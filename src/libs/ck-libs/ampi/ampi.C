@@ -1744,7 +1744,10 @@ MSG_ORDER_DEBUG(
     //CkPrintf("[%d] ampi::inorder, ireq=%p\n", thisIndex, ireq);
     if (ireq) {	// receive posted
       ireq->receive(this, msg);
-      ireq->tag = sts[0];
+      // Isaac changed this so that the IReq stores the tag when receiving the message, 
+      // instead of using this user supplied tag which could be MPI_ANY_TAG
+      // Formerly the following line was not commented out:
+      //  ireq->tag = sts[0];         
       ireq->src = sts[1];
       ireq->comm = sts[2];
     } else {
@@ -3024,7 +3027,6 @@ int PersReq::wait(MPI_Status *sts){
 int IReq::wait(MPI_Status *sts){
   if (CpvAccess(CmiPICMethod) != 2) 
   {
-
 	//Copy "this" to a local variable in the case that "this" pointer
 	//is updated during the out-of-core emulation.
 
@@ -3051,7 +3053,6 @@ int IReq::wait(MPI_Status *sts){
 		//CmiPrintf("IReq's this pointer: %p\n", this);
 		//print();
 
-
 	    #if CMK_BLUEGENE_CHARM
 		//Because of the out-of-core emulation, this pointer is changed after in-out
 		//memory operation. So we need to return from this function and do the while loop
@@ -3061,7 +3062,11 @@ int IReq::wait(MPI_Status *sts){
 	    #endif	
 	}
 	ptr->resumeOnRecv=false;
+
+	AMPI_DEBUG("IReq::wait has resumed\n");
+
         if(sts) {
+	  AMPI_DEBUG("Setting sts->MPI_TAG to this->tag=%d in IReq::wait  this=%p\n", (int)this->tag, this);
           sts->MPI_TAG = tag;
           sts->MPI_SOURCE = src;
           sts->MPI_COMM = comm;
@@ -3069,6 +3074,7 @@ int IReq::wait(MPI_Status *sts){
         }
   }
   else {
+    AMPI_DEBUG("In else clause of IReq::wait\n");
 	if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
 		CkAbort("AMPI> Error in non-blocking request wait");
   }
@@ -3101,6 +3107,8 @@ int ATAReq::wait(MPI_Status *sts){
 CDECL
 int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
 {
+
+
   AMPIAPI("AMPI_Wait");
   if(*request == MPI_REQUEST_NULL){
     stsempty(*sts);
@@ -3118,7 +3126,8 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
     return 0;
   }
 #endif
-  
+
+  AMPI_DEBUG("AMPI_Wait request=%d (*reqs)[*request]=%p (*reqs)[*request]->tag=%d\n", *request, (*reqs)[*request], (int)((*reqs)[*request]->tag) );
   AMPI_DEBUG("MPI_Wait: request=%d, reqs.size=%d, &reqs=%d\n",*request,reqs->size(),reqs);
   //(*reqs)[*request]->wait(sts);
   int waitResult = -1;
@@ -3129,7 +3138,10 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
 	reqs = getReqs();
     }
   }while(waitResult==-1);
-  
+
+
+  AMPI_DEBUG("AMPI_Wait after calling wait, request=%d (*reqs)[*request]=%p (*reqs)[*request]->tag=%d\n", *request, (*reqs)[*request], (int)((*reqs)[*request]->tag) );
+
 
 #ifdef AMPIMSGLOG
   if(msgLogWrite && pptr->thisIndex == msgLogRank){
@@ -3144,6 +3156,8 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
     reqs->free(*request);
     *request = MPI_REQUEST_NULL;
   }
+
+    AMPI_DEBUG("End of AMPI_Wait\n");
 
   return 0;
 }
@@ -3343,6 +3357,8 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
     int sts = ptr->processMessage(msg, tag, src, buf, count, type);
     statusIreq = (sts == 0);
     length = msg->length;
+    this->tag = msg->tag; // Although not required, we also extract tag from msg
+    AMPI_DEBUG("Setting this->tag to %d in IReq::receive this=%p\n", (int)this->tag, this);
     delete msg;
     
     //BIGSIM_OOC DEBUGGING
