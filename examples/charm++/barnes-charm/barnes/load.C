@@ -296,13 +296,15 @@ bool intcoord(xp, rp)
 {
    int k;
    bool inb;
-   double xsc, floor();
+   double xsc;
+   double tmp;
     
    inb = TRUE;
    for (k = 0; k < NDIM; k++) {
       xsc = (rp[k] - Global->rmin[k]) / Global->rsize; 
       if (0.0 <= xsc && xsc < 1.0) {
-	 xp[k] = floor(IMAX * xsc);
+        tmp = IMAX * xsc;
+	 xp[k] = (int)tmp;
       }
       else {
 	 inb = FALSE;

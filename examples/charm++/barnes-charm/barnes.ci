@@ -1,5 +1,4 @@
 mainmodule barnes {
-
   readonly CProxy_Main mainChare;
   readonly CProxy_TreePiece pieces;
   readonly CProxy_ParticleChunk chunks;
@@ -12,7 +11,7 @@ mainmodule barnes {
   readonly real tstop;
 
   message ParticleMsg{
-    body *particles;
+    body particles[];
   };
 
   mainchare [migratable] Main {
@@ -33,4 +32,6 @@ mainmodule barnes {
     entry void stepsystemPartII(CkReductionMsg *msg);
     entry void stepsystemPartIII(CkReductionMsg *msg);
   };
+
+  initproc void registerChunksToPiecesReducer(); 
 };

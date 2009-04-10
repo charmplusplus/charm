@@ -1,12 +1,16 @@
 #include "barnes.h"
 
+CkReduction::reducerType chunksToPiecesReducerType;
+
 #include "barnes.decl.h"
-void ParticleChunk::ParticleChunk(int maxleaf, int maxcell, int numchunks){
+ParticleChunk::ParticleChunk(int maxleaf, int maxcell, int numchunks){
 
   /*allocate leaf/cell space */
   int NPROC = numchunks;
   ctab = (cellptr) G_MALLOC((maxcell / NPROC) * sizeof(cell));
   ltab = (leafptr) G_MALLOC((maxleaf / NPROC) * sizeof(leaf));
+
+  numMsgsToEachTp = new int[numTreePieces];
 
 };
 
@@ -106,15 +110,17 @@ unsigned int ProcessId;
 void ParticleChunk::stepsystem (ProcessId)
    unsigned int ProcessId;
 {
+  /*
     int i;
     real Cavg;
     bodyptr p,*pp;
     vector acc1, dacc, dvel, vel1, dpos;
-    //unsigned int time;
-    //unsigned int trackstart, trackend;
-    //unsigned int partitionstart, partitionend;
-    //unsigned int treebuildstart, treebuildend;
-    //unsigned int forcecalcstart, forcecalcend;
+    unsigned int time;
+    unsigned int trackstart, trackend;
+    unsigned int partitionstart, partitionend;
+    unsigned int treebuildstart, treebuildend;
+    unsigned int forcecalcstart, forcecalcend;
+    */
 
     if (nstep == 2) {
 /* POSSIBLE ENHANCEMENT:  Here is where one might reset the
@@ -149,6 +155,7 @@ void ParticleChunk::stepsystemPartII(CkReductionMsg *msg){
 
     /* load bodies into tree   */
     maketree(ProcessId);
+    doneSendingParticles();
 
     if ((ProcessId == 0) && (nstep >= 2)) {
         //CLOCK(treebuildend);
@@ -156,7 +163,8 @@ void ParticleChunk::stepsystemPartII(CkReductionMsg *msg){
     }
     
     // instead of barrier inside maketree:
-    CkCallback cb(CkIndex_ParticleChunk::stepsystemPartIIb(), thisProxy);
+    CkCallback cb(CkIndex_TreePiece::stepsystemPartIIb(), thisProxy);
+    // stepsystemPartIIb
     contribute(0,0,CkReduction::concat,cb);
 
 }
@@ -168,6 +176,7 @@ void ParticleChunk::stepsystemPartII(CkReductionMsg *msg){
 void ParticleChunk::maketree(ProcessId)
    unsigned ProcessId;
 {
+  // FIXME - keep track of numMsgsToEachTp[] here 
    bodyptr p, *pp;
 
    myncell = 0;
@@ -185,10 +194,8 @@ void ParticleChunk::maketree(ProcessId)
 				           ProcessId);
       }
       else {
-	 LOCK(Global->io_lock);
 	 fprintf(stderr, "Process %d found body %d to have zero mass\n",
 		 ProcessId, (int) p);	
-	 UNLOCK(Global->io_lock);
       }
    }
    //BARRIER(Global->Bartree,NPROC);
@@ -311,6 +318,11 @@ ParticleChunk::loadtree(p, root, ProcessId)
    return Parent((leafptr) *qptr);
 }
 
+void ParticleChunk::doneSendingParticles(){
+  CkCallback cb(CkIndex_TreePiece::recvTotalMsgCountsFromChunks(0), pieces);
+  contribute(numTreePieces*sizeof(int), numMsgsToEachTp, CkReduction::sum_int, cb);   
+}
+
 void ParticleChunk::stepSystemPartIII(CkReductionMsg *msg){
 
     delete msg;
@@ -407,7 +419,7 @@ void ParticleChunk::stepSystemPartIII(CkReductionMsg *msg){
 /*
  * INIT_ROOT: Processor 0 reinitialize the global root at each time step
  */
-init_root (ProcessId)
+void ParticleChunk::init_root (ProcessId)
    unsigned int ProcessId;
 {
 
@@ -477,4 +489,11 @@ void ParticleChunk::acceptRoot(cellptr root_){
   G_root = root_;
   CkCallback cb(CkIndex_ParticleChunk::stepsystemPartII(0), thisProxy);
   contribute(0,0,CkReduction::concat,cb);
+}
+
+void registerChunksToPiecesReducer(){
+  chunksToPiecesReducerType = CkReduction::addReducer(chunksToPiecesReducer);
+}
+
+CkReductionMsg *chunksToPiecesReducer (int nmsg, CkReductionMsg **msgs){
 }

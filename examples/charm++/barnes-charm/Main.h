@@ -2,6 +2,8 @@
 #include "barnes.decl.h"
 #define LOCK(x) /* empty */
 
+#define MAX_PARTS_PER_TP 1000
+
 typedef double real;
 
 extern CProxy_Main mainChare;
@@ -71,13 +73,15 @@ class ParticleChunk : public CBase_ParticleChunk {
                   // after it has finished creating the
                   // top level tree
   nodeptr Current_Root;
-   int Root_Coords[NDIM];
+  int Root_Coords[NDIM];
 
   real tnow;
   real tstop;
   int nstep;
 
   CkCallback mainCb;
+
+  int *numMsgsToEachTp;
 
   public:
   ParticleChunk(CkArgMsg *m);
@@ -91,4 +95,39 @@ class ParticleChunk : public CBase_ParticleChunk {
   void acceptRoot(cellptr);
   void stepsystemPartII(CkReductionMsg *msg);
   void stepsystemPartIII(CkReductionMsg *msg);
+
+};
+
+class TreePiece : public CBase_TreePiece {
+  
+  bool isTopLevel;
+  int numTotalMsgs;
+  int numRecvdMsgs;
+  bool haveChildren;
+  int sentTo[NSUB]; // one counter for each child
+  CkVec<body> myParticles;
+  int myNumParticles;
+
+  nodeptr myRoot;
+  nodeptr parent;
+  int whichChildAmI;
+  int childrenTreePieces[NSUB];
+
+  void checkCompletion();
+
+  public:
+  TreePiece(nodeptr parent, int whichChild, bool isTopLevel);
+  // used to convey message counts from chunks to top-level
+  // treepieces
+  void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
+  // used to convey message counts from treepieces to their
+  // children
+  void recvTotalMsgCountsFromPieces(CkReductionMsg *msg);
+
+};
+
+class ParticleMsg : public CMessage_ParticleMsg {
+  public:
+  bodyptr particles;
+  int numParticles;
 };

@@ -59,17 +59,17 @@ Main::Main(CkArgMsg *m){
   CkArrayOptions opts(numTreePieces); 
 
   opts.setMap(myMap);
-  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew(numTreePieces,opts);
+  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew(0,-1,true,numTreePieces,opts);
   pieces = treeProxy;
 
   myMap=CProxy_BlockMap::ckNew(); 
   CkArrayOptions optss(numParticleChunks); 
 
   optss.setMap(myMap);
-  CProxy_TreePiece chunkProxy = CProxy_TreePiece::ckNew(maxleaf, maxcell, numParticleChunks, optss);
+  CProxy_ParticleChunk chunkProxy = CProxy_ParticleChunk::ckNew(maxleaf, maxcell, numParticleChunks, optss);
   chunks = chunkProxy;
 
-  // startup split into two so that global readonly's
+  // startup split into two so that global readonlys
   // are initialized before we send start signal to 
   // particle chunks
   thisProxy.startSimulation();
