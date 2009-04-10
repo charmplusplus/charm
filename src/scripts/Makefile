@@ -389,9 +389,9 @@ fmain-ok: fmain.f90
 	-@touch fmain-ok
 
 QUICK_THREADS: $(CVHEADERS)
-	-cd QuickThreads && make clean
-	cd QuickThreads;./configure
-	cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS)'
+	-( cd QuickThreads && make clean )
+	( cd QuickThreads;./configure )
+	( cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS)' )
 	cp -f QuickThreads/libqt.a ../lib/libckqt.a
 	-(CHARMINC=.; . ./conv-config.sh; \
 	  test -d ../lib_so && \
@@ -472,7 +472,7 @@ CrayNid.o: CrayNid.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -c -o CrayNid.o CrayNid.c
 
 ckbitvector.o: ckbitvector.C ckbitvector.h $(CVHEADERS)
-	$(CHARMC) -o ckbitvector.o ckbitvector.C
+	$(CHARMC) -I. -o ckbitvector.o ckbitvector.C
 
 ckdll.o: ckdll.C ckdll.h $(CVHEADERS)
 	$(CHARMC) -o ckdll.o ckdll.C
