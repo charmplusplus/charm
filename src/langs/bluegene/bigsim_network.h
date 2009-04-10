@@ -209,11 +209,14 @@ public:
     return permsg + bytes/bandwidth;
   }
   inline double intraNodeLatency(int srcPE, int destPE, int numBytes) {
+    return 0.0;
+/*
     if (srcPE == destPE) {
       return 0;
     } else {
       return (intraNodeLat + (numBytes / intraNodeBW));  // check this
     }
+*/
   }
   void print() {
     CmiPrintf("alpha: %e	bandwidth :%e.\n", alpha, bandwidth);
