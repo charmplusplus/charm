@@ -57,8 +57,11 @@ void CpdBeforeEp(int ep, void *obj, void *msg) {
     entry.alreadyUserCode = _entryTable[ep]->inCharm ? 0 : 1;
     entry.memoryBackup = NULL;
     entry.obj = obj;
-    entry.msg = UsrToEnv(msg);
-    CmiReference(entry.msg);
+    if (msg != NULL) {
+      entry.msg = UsrToEnv(msg);
+      CmiReference(entry.msg);
+    }
+    else entry.msg = NULL;
     _debugData.push(entry);
     setMemoryStatus(entry.alreadyUserCode);
     //if (_debugEntryTable[ep].isBreakpoint) printf("CpdBeforeEp breakpointed %d\n",ep);
@@ -87,7 +90,7 @@ void CpdAfterEp(int ep) {
     if (!_entryTable[ep]->inCharm) {
       CpdCheckMemory();
     }
-    CmiFree(entry.msg);
+    if (entry.msg != NULL) CmiFree(entry.msg);
     setMemoryChareID(entry.previousChareID);
     setMemoryStatus(entry.alreadyUserCode);
     _debugData.deq();

@@ -41,6 +41,7 @@ public:
   int buildIterator(PyObject*&, void*);
   int nextIteratorUpdate(PyObject*&, PyObject*, void*);
 
+  PyObject *getResultFromType(char, void*);
   void getArray(int handle);
   void getValue(int handle);
   void getCast(int handle);
@@ -98,28 +99,14 @@ int CpdPythonGroup::nextIteratorUpdate(PyObject *&data, PyObject *result, void *
   return 0;
 }
 
-void CpdPythonGroup::getArray(int handle) {
-  PyObject *arg = pythonGetArg(handle);
-  PyObject *obj;
-  int num, size;
-  if (PyArg_ParseTuple(arg, "Oii", &obj, &size, &num) == 0) return;
-  char *ptr = (char*)PyLong_AsVoidPtr(obj);
-  ptr += num * size;
-  pythonReturn(handle, PyLong_FromVoidPtr(ptr));
-}
-
-void CpdPythonGroup::getValue(int handle) {
-  PyObject *arg = pythonGetArg(handle);
-  PyObject *obj;
-  int offset;
-  char restype;
-  if (PyArg_ParseTuple(arg, "Oic", &obj, &offset, &restype) == 0) return;
-  char *ptr = (char*)PyLong_AsVoidPtr(obj);
-  ptr += offset;
+PyObject *CpdPythonGroup::getResultFromType(char restype, void* ptr) {
   PyObject *result = NULL;
   switch (restype) {
-  case 'p':
+  case 'c':
     result = PyLong_FromVoidPtr(ptr);
+    break;
+  case 'p':
+    result = PyLong_FromVoidPtr(*(void**)ptr);
     break;
   case 'b':
     result = Py_BuildValue("b", *(char*)ptr);
@@ -143,6 +130,30 @@ void CpdPythonGroup::getValue(int handle) {
     result = Py_BuildValue("s", *(char**)ptr);
     break;
   }
+  return result;
+}
+
+void CpdPythonGroup::getArray(int handle) {
+  PyObject *arg = pythonGetArg(handle);
+  PyObject *obj;
+  int num, size;
+  char restype;
+  if (PyArg_ParseTuple(arg, "Oici", &obj, &size, &restype, &num) == 0) return;
+  char *ptr = (char*)PyLong_AsVoidPtr(obj);
+  ptr += num * size;
+  PyObject *result = getResultFromType(restype, ptr);
+  pythonReturn(handle, result);
+}
+
+void CpdPythonGroup::getValue(int handle) {
+  PyObject *arg = pythonGetArg(handle);
+  PyObject *obj;
+  int offset;
+  char restype;
+  if (PyArg_ParseTuple(arg, "Oic", &obj, &offset, &restype) == 0) return;
+  char *ptr = (char*)PyLong_AsVoidPtr(obj);
+  ptr += offset;
+  PyObject *result = getResultFromType(restype, ptr);
   pythonReturn(handle, result);
 }
 
@@ -165,38 +176,13 @@ void CpdPythonGroup::getStatic(int handle) {
   CkPrintf("Arguments parsed\n");
   char *ptr = (char*)PyLong_AsVoidPtr(location);
   CkPrintf("Pointer: %p",ptr);
-  PyObject *result = NULL;
-  switch (restype) {
-  case 'p':
-    result = PyLong_FromVoidPtr(ptr);
-    break;
-  case 'b':
-    result = Py_BuildValue("b", *(char*)ptr);
-    break;
-  case 'h':
-    result = Py_BuildValue("h", *(short*)ptr);
-    break;
-  case 'i':
-    result = Py_BuildValue("i", *(int*)ptr);
-    break;
-  case 'l':
-    result = Py_BuildValue("l", *(long*)ptr);
-    break;
-  case 'f':
-    result = Py_BuildValue("f", *(float*)ptr);
-    break;
-  case 'd':
-    result = Py_BuildValue("d", *(double*)ptr);
-    break;
-  case 's':
-    result = Py_BuildValue("s", *(char**)ptr);
-    break;
-  }
+  PyObject *result = getResultFromType(restype, ptr);
   pythonReturn(handle, result);
 }
 
 void CpdPythonGroup::getMessage(int handle) {
-  pythonReturn(handle, PyLong_FromVoidPtr(CpdGetCurrentMsg()));
+  void *msg = CpdGetCurrentMsg();
+  if (msg != NULL) pythonReturn(handle, PyLong_FromVoidPtr(msg));
 }
 
 void CpdPythonGroup::cpdCheck(void *m) {
