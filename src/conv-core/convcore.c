@@ -1160,6 +1160,67 @@ double CmiTimer()
 
 #endif
 
+#if CMK_TIMER_USE_AIX_READ_TIME
+
+#include <sys/time.h>
+
+static timebasestruct_t inittime_wallclock;
+static double clocktick;
+CpvStaticDeclare(double, inittime_virtual);
+
+void CmiTimerInit()
+{
+  struct rusage ru;
+
+  if (CmiMyRank() == 0) {
+    read_wall_time(&inittime_wallclock, TIMEBASE_SZ);
+    time_base_to_time(&inittime_wallclock, TIMEBASE_SZ);
+  }
+
+  CpvInitialize(double, inittime_virtual);
+  getrusage(0, &ru);
+  CpvAccess(inittime_virtual) =
+    (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
+    (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+}
+
+double CmiWallTimer()
+{
+  int secs, n_secs;
+  double curt;
+  timebasestruct_t now;
+  read_wall_time(&now, TIMEBASE_SZ);
+  time_base_to_time(&now, TIMEBASE_SZ);
+
+  secs = now.tb_high - inittime_wallclock.tb_high;
+  n_secs = now.tb_low - inittime_wallclock.tb_low;
+  if (n_secs < 0)  {
+    secs--;
+    n_secs += 1000000000;
+  }
+  curt = secs*1.0 + n_secs*1e-9;
+  return curt;
+}
+
+double CmiCpuTimer()
+{
+  struct rusage ru;
+  double currenttime;
+
+  getrusage(0, &ru);
+  currenttime =
+    (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
+    (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+  return currenttime - CpvAccess(inittime_virtual);
+}
+
+double CmiTimer()
+{
+  return CmiWallTimer();
+}
+
+#endif
+
 #ifndef CMK_USE_SPECIAL_MESSAGE_QUEUE_CHECK
 /** Return 1 if our outgoing message queue 
    for this node is longer than this many bytes. */
