@@ -665,7 +665,7 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
       Py_DECREF(result);
       CkPythonDebugf("Status in 3 %p\n",PyErr_Occurred());
     }
-    ckout<<"Python iterative execution time "<<CmiWallTimer()-_startTime<<endl;
+    CkPythonDebugf("Python iterative execution time %lf\n",CmiWallTimer()-_startTime);
 
     Py_DECREF(part);
     Py_DECREF(arg);

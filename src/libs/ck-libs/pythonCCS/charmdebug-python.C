@@ -171,11 +171,8 @@ void CpdPythonGroup::getStatic(int handle) {
   PyObject *arg = pythonGetArg(handle);
   PyObject *location;
   char restype;
-  CkPrintf("Parsing arguments\n");
   if (PyArg_ParseTuple(arg, "Oc", &location, &restype) == 0) return;
-  CkPrintf("Arguments parsed\n");
   char *ptr = (char*)PyLong_AsVoidPtr(location);
-  CkPrintf("Pointer: %p",ptr);
   PyObject *result = getResultFromType(restype, ptr);
   pythonReturn(handle, result);
 }
