@@ -2940,7 +2940,7 @@ void Entry::genArrayDefs(XStr& str)
       if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,"<<epIdx()<<",CkMyPe(),0,((CkArrayIndexMax&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
       str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
       str << "#ifndef CMK_OPTIMIZE\n"
-      "  CpdBeforeEp("<<epIdx()<<", obj, impl_msg);\n"
+      "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
       "#endif\n   ";
       if (!retType->isVoid()) str << retType<< " retValue = ";
       str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
@@ -3128,7 +3128,7 @@ void Entry::genGroupDefs(XStr& str)
 "  }\n"
 "#endif\n";
       str << "#ifndef CMK_OPTIMIZE\n"
-      "  CpdBeforeEp("<<epIdx()<<", obj);\n"
+      "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
       "#endif\n  ";
       if (!retType->isVoid()) str << retType << " retValue = ";
       str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
