@@ -11,6 +11,10 @@ ParticleChunk::ParticleChunk(int maxleaf, int maxcell, int numchunks){
   ltab = (leafptr) G_MALLOC((maxleaf / NPROC) * sizeof(leaf));
 
   numMsgsToEachTp = new int[numTreePieces];
+  particlesToTps.resize(numTreePieces);
+  for(int i = 0; i < numTreePieces; i++){
+    particlesToTps[i].reserve(PARTICLES_PER_MSG);
+  }
 
 };
 
@@ -155,6 +159,7 @@ void ParticleChunk::stepsystemPartII(CkReductionMsg *msg){
 
     /* load bodies into tree   */
     maketree(ProcessId);
+    flushParticles();
     doneSendingParticles();
 
     if ((ProcessId == 0) && (nstep >= 2)) {
@@ -198,6 +203,7 @@ void ParticleChunk::maketree(ProcessId)
 		 ProcessId, (int) p);	
       }
    }
+
    //BARRIER(Global->Bartree,NPROC);
    hackcofm( 0, ProcessId );
    //BARRIER(Global->Barcom,NPROC);
@@ -213,7 +219,7 @@ ParticleChunk::loadtree(p, root, ProcessId)
    cellptr root;
    unsigned ProcessId;
 {
-   int l, xq[NDIM], xp[NDIM], xor[NDIM], subindex(), flag;
+   int l, xq[NDIM], xp[NDIM], xor[NDIM], flag;
    int i, j, root_level;
    bool valid_root;
    int kidIndex;
@@ -222,6 +228,7 @@ ParticleChunk::loadtree(p, root, ProcessId)
    leafptr le;
 
    intcoord(xp, Pos(p));
+   /*
    valid_root = TRUE;
    for (i = 0; i < NDIM; i++) {
       xor[i] = xp[i] ^ Root_Coords[i];
@@ -258,20 +265,40 @@ ParticleChunk::loadtree(p, root, ProcessId)
 	 }
       }
    }
-   root = Global->G_root;
+   */
+   root = G_root;
    mynode = (nodeptr) root;
    kidIndex = subindex(xp, Level(mynode));
    qptr = &Subp(mynode)[kidIndex];
 
    l = Level(mynode) >> 1;
 
+   int depth = log8floor(numTreePieces);
+   int lowestLevel = Level(mynode) >> depth;
+   int fact = NSUB/2;
+   int whichTp = 0;
+   int d = depth;
+
+   for(int level = Level(mynode); level >= lowestLevel; level >>= 1){
+     kidIndex = subindex(xp, Level(mynode));
+     mynode = &Subp(mynode)[kidIndex];
+     whichTp += kidIndex*(1<<(fact*(d-1)));
+     d--;     
+   }
+
+   int howMany = particlesToTps[whichTp].push_back_v(p); 
+   if(howMany == MAX_PARTICLES_PER_MSG-1){ // enough particles to send 
+     sendParticlesToTp(whichTp);
+   }
+
+   // this part should be done by the treepieces themselves
+   /*
    flag = TRUE;
-   while (flag) {                           /* loop descending tree     */
+   while (flag) {                          
       if (l == 0) {
 	 error("not enough levels in tree\n");
       }
       if (*qptr == NULL) { 
-	 /* lock the parent cell */
 	 ALOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
 	 if (*qptr == NULL) {
 	    le = InitLeaf((cellptr) mynode, ProcessId);
@@ -284,13 +311,10 @@ ParticleChunk::loadtree(p, root, ProcessId)
 	    flag = FALSE;
 	 }
 	 AULOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
-	 /* unlock the parent cell */
       }
       if (flag && *qptr && (Type(*qptr) == LEAF)) {
-	 /*   reached a "leaf"?      */
 	 ALOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
-	 /* lock the parent cell */
-	 if (Type(*qptr) == LEAF) {             /* still a "leaf"?      */
+	 if (Type(*qptr) == LEAF) {             
 	    le = (leafptr) *qptr;
 	    if (le->num_bodies == MAX_BODIES_PER_LEAF) {
 	       *qptr = (nodeptr) SubdivideLeaf(le, (cellptr) mynode, l,
@@ -305,23 +329,57 @@ ParticleChunk::loadtree(p, root, ProcessId)
 	    }
 	 }
 	 AULOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
-	 /* unlock the node           */
       }
       if (flag) {
 	 mynode = *qptr;
          kidIndex = subindex(xp, l);
-	 qptr = &Subp(*qptr)[kidIndex];  /* move down one level  */
-	 l = l >> 1;                            /* and test next bit    */
+	 qptr = &Subp(*qptr)[kidIndex];  
+	 l = l >> 1;                            
       }
    }
    SETV(Local[ProcessId].Root_Coords, xp);
    return Parent((leafptr) *qptr);
+   */
+}
+
+void ParticleChunk::flushParticles(){
+  // send any remaining particles to their 
+  // intended host treepieces
+  for(int tp = 0; tp < numTreePieces; tp++){
+    sendParticlesToTp(tp); 
+  }
+}
+
+void ParticleChunk::sendParticlesToTp(int tp){
+  int len = particlesToTps[tp].length();
+  if(len > 0){
+    ParticleMsg *msg = new (len) ParticleMsg(); 
+    for(int i = 0; i < len; i++){
+      bodyptr tmp =  particlesToTps[tp][i];
+      msg->particles[i] = *tmp;
+    }
+    msg->num = len; 
+    numMsgsToEachTp[tp]++;
+    particlesToTps[tp].length() = 0;
+    pieces[tp].recvParticles(msg);
+  }
 }
 
 void ParticleChunk::doneSendingParticles(){
-  CkCallback cb(CkIndex_TreePiece::recvTotalMsgCountsFromChunks(0), pieces);
+  // send counts to chunk 0
+  CkCallback cb(CkIndex_ParticleChunk::recvTotalMsgCountsFromChunks(0), pieces);
   contribute(numTreePieces*sizeof(int), numMsgsToEachTp, CkReduction::sum_int, cb);   
 }
+
+/*
+void ParticleChunk::recvTotalMsgCounts(CkReductionMsg *msg){
+  int *counts = (int *)msg->getData();
+  for(int i = 0; i < numTreePieces; i++){
+    pieces[i].recvTotalMsgCountsFromChunks(counts[i]);
+  }
+  delete msg;
+}
+*/
 
 void ParticleChunk::stepSystemPartIII(CkReductionMsg *msg){
 

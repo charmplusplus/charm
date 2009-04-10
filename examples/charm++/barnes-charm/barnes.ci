@@ -22,6 +22,7 @@ mainmodule barnes {
   array [1D] TreePiece {
     entry TreePiece(); 
     entry void recvParticles(ParticleMsg *msg);
+    entry void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
   };
 
   array [1D] ParticleChunk {
