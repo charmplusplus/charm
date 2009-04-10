@@ -2795,6 +2795,9 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   fprintf(f,"MX_MONOTHREAD=1; export MX_MONOTHREAD\n");
   /*fprintf(f,"MX_RCACHE=1; export MX_RCACHE\n");*/
 #endif
+#if CMK_AIX && CMK_SMP
+  fprintf(f,"MALLOCMULTIHEAP=1; export MALLOCMULTIHEAP\n");
+#endif
   
   if (arg_verbose) {
     printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, rank0no);
@@ -3183,13 +3186,22 @@ void start_nodes_local(char ** env)
 {
   char **envp;
   int envc, rank0no, i;
+  int extra = 0;
+
+#if CMK_AIX && CMK_SMP
+  extra = 1;
+#endif
 
   /* copy environ and expanded to hold NETSTART */ 
   for (envc=0; env[envc]; envc++);
-  envp = (char **)malloc((envc+2)*sizeof(void *));
+  envp = (char **)malloc((envc+2+extra)*sizeof(void *));
   for (i=0; i<envc; i++) envp[i] = env[i];
   envp[envc] = (char *)malloc(256);
-  envp[envc+1] = 0;
+#if CMK_AIX && CMK_SMP
+  envp[envc+1] = (char *)malloc(256);
+  sprintf(envp[envc+1], "MALLOCMULTIHEAP=1");
+#endif
+  envp[envc+1+extra] = 0;
 
   for (rank0no=0;rank0no<nodetab_rank0_size;rank0no++)
   {
