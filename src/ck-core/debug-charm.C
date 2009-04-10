@@ -58,8 +58,8 @@ void CpdBeforeEp(int ep, void *obj, void *msg) {
     entry.memoryBackup = NULL;
     entry.obj = obj;
     if (msg != NULL) {
-      entry.msg = UsrToEnv(msg);
-      CmiReference(entry.msg);
+      entry.msg = msg;
+      CmiReference(UsrToEnv(msg));
     }
     else entry.msg = NULL;
     _debugData.push(entry);
@@ -90,7 +90,7 @@ void CpdAfterEp(int ep) {
     if (!_entryTable[ep]->inCharm) {
       CpdCheckMemory();
     }
-    if (entry.msg != NULL) CmiFree(entry.msg);
+    if (entry.msg != NULL) CmiFree(UsrToEnv(entry.msg));
     setMemoryChareID(entry.previousChareID);
     setMemoryStatus(entry.alreadyUserCode);
     _debugData.deq();
