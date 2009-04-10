@@ -761,8 +761,8 @@ void CpdCharmInit() {}
 
 void CpdFinishInitialization() {}
 
-void *CpdGetCurrentObject() {return null;}
-void *CpdGetCurrentMsg() {return null;}
+void *CpdGetCurrentObject() {return NULL;}
+void *CpdGetCurrentMsg() {return NULL;}
 
 void CpdBeforeEp(int ep, void *obj, void *msg) {}
 void CpdAfterEp(int ep) {}
