@@ -116,6 +116,7 @@ class ParticleChunk : public CBase_ParticleChunk {
 class TreePiece : public CBase_TreePiece {
   
   bool isTopLevel;
+  int myLevel;
   int numTotalMsgs;
   int numRecvdMsgs;
   bool haveChildren;

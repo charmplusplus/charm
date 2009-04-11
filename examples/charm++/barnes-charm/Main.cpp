@@ -59,7 +59,9 @@ Main::Main(CkArgMsg *m){
   CkArrayOptions opts(numTreePieces); 
 
   opts.setMap(myMap);
-  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew(0,-1,true,numTreePieces,opts);
+  // FIXME - level of top-level trees
+  int depth = log8floor(numTreePieces);
+  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew(0,-1,true,(IMAX >> (depth+1)),numTreePieces,opts);
   pieces = treeProxy;
 
   myMap=CProxy_BlockMap::ckNew(); 
