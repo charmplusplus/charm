@@ -163,7 +163,10 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 // Desc: Returns a vector that has the scalar value 's' in all elements
 #if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
 
-  inline vec4f vspread4f(const float s) { vec4f a; __vec_4_f* aPtr = (__vec_4_f*)(&a); aPtr->v0 = aPtr->v1 = aPtr->v2 = aPtr->v3 = s; return a; }
+  #define  vspread4f(a)  (_mm_set1_ps(a))
+  #define vspread2lf(a)  (_mm_set1_pd(a))
+
+  //inline vec4f vspread4f(const float s) { vec4f a; __vec_4_f* aPtr = (__vec_4_f*)(&a); aPtr->v0 = aPtr->v1 = aPtr->v2 = aPtr->v3 = s; return a; }
 
 #elif CMK_CELL_SPE != 0    // Cell - SPE
 
@@ -258,7 +261,8 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 // Desc: Returns a vector that has the corresponding elements of 'a' and 'b' added together
 #if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
 
-  #define vadd4f(a, b)  (_mm_add_ps((a), (b)))
+  #define  vadd4f(a, b)  (_mm_add_ps((a), (b)))
+  #define vadd2lf(a, b)  (_mm_add_pd((a), (b)))
 
 #elif CMK_CELL_SPE != 0    // Cell - SPE
 
@@ -388,6 +392,8 @@ typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 ///// Multiply & Multiply-Add /////
 #if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
 
+  #define  vmul4f(a, b) (_mm_mul_ps((a), (b)))
+  #define vmul2lf(a, b) (_mm_mul_pd((a), (b)))
 
 #elif CMK_CELL_SPE != 0    // Cell - SPE
 
