@@ -18,8 +18,6 @@
 
 #define CMK_GETPAGESIZE_AVAILABLE                          1
 
-#define CMK_IS_HETERO                                      1
-
 #define CMK_MALLOC_USE_GNUOLD_MALLOC                       0
 #define CMK_MALLOC_USE_GNU_MALLOC                          1
 #define CMK_MALLOC_USE_OS_BUILTIN                          0
@@ -61,15 +59,13 @@
 #define CMK_TYPEDEF_FLOAT4 float
 #define CMK_TYPEDEF_FLOAT8 double
 
-#define CMK_64BIT    1
-
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   0
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
 
 #define CMK_LBDB_ON					   1
 
 #define CMK_DEBUG_MODE                                     0
-#define CMK_WEB_MODE                                       0  
+#define CMK_WEB_MODE                                       1  
 
 #define CMK_ISATTY_DECL                                    1
 
