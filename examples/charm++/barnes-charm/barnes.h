@@ -105,7 +105,7 @@ class ParticleChunk : public CBase_ParticleChunk {
   void flushParticles();
   void sendParticlesToTp(int tp);
 
-  void SlaveStart(bodyptr *, cellptr *, leafptr *, CkCallback &cb);
+  void SlaveStart(bodyptr *b, cellptr *c, leafptr *l, CkCallback &cb);
   void startIteration(CkCallback &cb);
   void acceptRoot(cellptr);
   void stepsystemPartII(CkReductionMsg *msg);

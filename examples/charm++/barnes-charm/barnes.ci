@@ -27,7 +27,7 @@ mainmodule barnes {
 
   array [1D] ParticleChunk {
     entry ParticleChunk();
-    entry void SlaveStart(bodyptr *, cellptr *, leafptr *, CkCallback &cb);
+    entry void SlaveStart(bodyptr *bodies, cellptr *cells, leafptr *leaves, CkCallback &cb);
     entry void startIteration(CkCallback &cb);
     entry void acceptRoot(cellptr);
     entry void stepsystemPartII(CkReductionMsg *msg);
