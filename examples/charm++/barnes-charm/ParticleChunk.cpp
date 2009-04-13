@@ -270,6 +270,7 @@ ParticleChunk::loadtree(p, root, ProcessId)
    mynode = (nodeptr) root;
    kidIndex = subindex(xp, Level(mynode));
    qptr = &Subp(mynode)[kidIndex];
+   int depth = log8floor(numTreePieces);
 
    l = Level(mynode) >> 1;
 

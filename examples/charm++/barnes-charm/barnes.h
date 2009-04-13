@@ -1,12 +1,12 @@
 #ifndef _BARNES_H_
 #define _BARNES_H_
 
+#include "defs.h"
 #include "barnes.decl.h"
 #define LOCK(x) /* empty */
 
 #define MAX_PARTS_PER_TP 1000
 
-typedef double real;
 
 extern CProxy_Main mainChare;
 extern CProxy_TreePiece pieces;
@@ -21,7 +21,7 @@ extern real tstop;
 
 class ParticleMsg : public CMessage_ParticleMsg {
   public:
-  body *particles;
+  bodyptr *particles;
   int num;
 };
 
@@ -122,10 +122,10 @@ class TreePiece : public CBase_TreePiece {
   bool haveChildren;
   bool haveCounts;
   int sentTo[NSUB]; // one counter for each child
-  CkVec<body> myParticles;
+  CkVec<bodyptr> myParticles;
   int myNumParticles;
 
-  nodeptr myRoot;
+  cellptr myRoot;
   nodeptr parent;
   int whichChildAmI;
   int childrenTreePieces[NSUB];
@@ -141,12 +141,6 @@ class TreePiece : public CBase_TreePiece {
   // children
   void recvTotalMsgCountsFromPieces(CkReductionMsg *msg);
 
-};
-
-class ParticleMsg : public CMessage_ParticleMsg {
-  public:
-  bodyptr particles;
-  int num;
 };
 
 int subindex(int *xp, int level);

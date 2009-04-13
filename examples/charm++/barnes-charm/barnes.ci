@@ -11,7 +11,7 @@ mainmodule barnes {
   readonly real tstop;
 
   message ParticleMsg{
-    body particles[];
+    bodyptr particles[];
   };
 
   mainchare [migratable] Main {

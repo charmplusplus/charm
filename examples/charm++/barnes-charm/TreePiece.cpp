@@ -1,9 +1,15 @@
+#include "barnes.h"
+
+
 TreePiece::TreePiece(nodeptr p, int which, bool isTopLevel_, int level_){
   isTopLevel = isTopLevel_;
   myLevel = level_;
   if(!isTopLevel_){
     // FIXME - myRoot should be set here.
-    Parent(myRoot) = p;
+    myRoot = makecell(thisIndex);
+    Parent(myRoot) = p; // this is my parent
+    Subp(p)[which] = (nodeptr) myRoot; // i am my parent's 'which' child
+    ChildNum(myRoot) = which;
     whichChildAmI = which;
   }
   numTotalMsgs = -1
@@ -68,7 +74,6 @@ void TreePiece::recvParticles(ParticleMsg *msg){
       pieces[child].insert(myRoot, i, false, myLevel >> 1);
       childrenTreePieces[i] = child;
     }
-    // FIXME - send own particles to children
     haveChildren = true;
     myNumParticles = 0;
   }
@@ -116,6 +121,19 @@ void TreePiece::recvParticles(ParticleMsg *msg){
 }
 
 void TreePiece::buildTree(){
+  bodyptr p, *pp;
+  int ProcessId = thisIndex;
+  nodeptr Current_Root;
+
+  Current_root = myRoot;
+  for(int i = 0; i < myParticles.length(); i++){
+    Current_Root = (nodeptr) loadtree(myParticles[i], 
+                                      Current_Root, 
+                                      ProcessId);
+  }
+}
+
+void TreePiece::loadtree(bodyptr p, cellptr root, unsigned int ProcessId){
   // FIXME - build local tree here myParticles
   int l, xq[NDIM], xp[NDIM], xor[NDIM], subindex(), flag;
   int i, j, root_level;
@@ -164,7 +182,6 @@ void TreePiece::buildTree(){
     }
   }
   */
-  root = Global->G_root;
   mynode = (nodeptr) root;
   kidIndex = subindex(xp, Level(mynode));
   qptr = &Subp(mynode)[kidIndex];
@@ -178,8 +195,8 @@ void TreePiece::buildTree(){
     }
     if (*qptr == NULL) { 
       /* lock the parent cell */
-      ALOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
-      if (*qptr == NULL) {
+      //ALOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
+      //if (*qptr == NULL) {
         le = InitLeaf((cellptr) mynode, ProcessId);
         Parent(p) = (nodeptr) le;
         Level(p) = l;
@@ -188,15 +205,15 @@ void TreePiece::buildTree(){
         Bodyp(le)[le->num_bodies++] = p;
         *qptr = (nodeptr) le;
         flag = FALSE;
-      }
-      AULOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
+      //}
+      //AULOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
       /* unlock the parent cell */
     }
     if (flag && *qptr && (Type(*qptr) == LEAF)) {
       /*   reached a "leaf"?      */
-      ALOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
+      //ALOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
       /* lock the parent cell */
-      if (Type(*qptr) == LEAF) {             /* still a "leaf"?      */
+      //if (Type(*qptr) == LEAF) {             /* still a "leaf"?      */
         le = (leafptr) *qptr;
         if (le->num_bodies == MAX_BODIES_PER_LEAF) {
           *qptr = (nodeptr) SubdivideLeaf(le, (cellptr) mynode, l,
@@ -209,8 +226,8 @@ void TreePiece::buildTree(){
           Bodyp(le)[le->num_bodies++] = p;
           flag = FALSE;
         }
-      }
-      AULOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
+      //}
+      //AULOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
       /* unlock the node           */
     }
     if (flag) {
