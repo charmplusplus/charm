@@ -76,7 +76,7 @@ void startEntryEvent(int id)
 {
   dprintf("---------> starting Entry Event with id: %d\n", id);
 
-  if (events[id] == NULL)
+  if ((id == -1) || (events[id] == NULL))
     {
       dprintf("-------> create event with id: %d\n", id);
       //sprintf(name, "Event %d", id);
