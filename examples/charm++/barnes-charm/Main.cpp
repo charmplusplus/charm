@@ -9,9 +9,19 @@ int numParticleChunks;
 
 // number of particle chunks 
 int NPROC;
+real fcells;
+real fleaves;
+real tstop;
+int nbody;
+real dtime;
+real eps;
+real tol;
+real dtout;
+real dthf;
+vector rmin;
+real rsize;
 
 
-#include "barnes.decl.h"
 
 int log8floor(int arg){
   int ret = -1;
@@ -20,6 +30,31 @@ int log8floor(int arg){
   }
   return (ret);
 }
+
+/*
+ * INITPARAM: ignore arg vector, remember defaults.
+ */
+
+void Main::initparam(string *argv, const string *defvs)
+{
+   defaults = defvs;
+}
+
+/*
+ * INITOUTPUT: initialize output routines.
+ */
+
+
+void Main::initoutput()
+{
+   printf("\n\t\t%s\n\n", headline);
+   printf("%10s%10s%10s%10s%10s%10s%10s%10s\n",
+	  "nbody", "dtime", "eps", "tol", "dtout", "tstop","fcells","NPROC");
+   printf("%10d%10.5f%10.4f%10.2f%10.3f%10.3f%10.2f%10d\n\n",
+	  nbody, dtime, eps, tol, dtout, tstop, fcells, NPROC);
+}
+
+
 
 Main::Main(CkArgMsg *m){
   int c;
@@ -57,18 +92,16 @@ Main::Main(CkArgMsg *m){
   // create chunks, treepieces
   CProxy_BlockMap myMap=CProxy_BlockMap::ckNew(); 
   CkArrayOptions opts(numTreePieces); 
-
   opts.setMap(myMap);
   // FIXME - level of top-level trees
   int depth = log8floor(numTreePieces);
-  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew(0,-1,true,(IMAX >> (depth+1)),numTreePieces,opts);
+  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew((cellptr)0,-1,true,(IMAX >> (depth+1)),opts);
   pieces = treeProxy;
 
   myMap=CProxy_BlockMap::ckNew(); 
   CkArrayOptions optss(numParticleChunks); 
-
   optss.setMap(myMap);
-  CProxy_ParticleChunk chunkProxy = CProxy_ParticleChunk::ckNew(maxleaf, maxcell, numParticleChunks, optss);
+  CProxy_ParticleChunk chunkProxy = CProxy_ParticleChunk::ckNew(maxleaf, maxcell, optss);
   chunks = chunkProxy;
 
   // startup split into two so that global readonlys
@@ -80,7 +113,8 @@ Main::Main(CkArgMsg *m){
 void Main::startSimulation(){
   // slavestart for chunks
 
-  chunks.SlaveStart(mybodytab, mycelltab, myleaftab, CkCallbackResumeThread());
+  chunks.SlaveStart(mybodytab, bodytab, CkCallbackResumeThread());
+  //chunks.SlaveStart(mybodytab, mycelltab, myleaftab, CkCallbackResumeThread());
 
   /* main loop */
   while (tnow < tstop + 0.1 * dtime) {
@@ -97,7 +131,8 @@ Main::tab_init()
 
   /*allocate space for personal lists of body pointers */
   maxmybody = (nbody+maxleaf*MAX_BODIES_PER_LEAF)/NPROC; 
-  mybodytab = (bodyptr*) G_MALLOC(NPROC*maxmybody*sizeof(bodyptr));
+  // FIXME - this should be a member of ParticleChunk
+  bodyptr *mybodytab = (bodyptr*) G_MALLOC(NPROC*maxmybody*sizeof(bodyptr));
   /* space is allocated so that every */
   /* process can have a maximum of maxmybody pointers to bodies */ 
   /* then there is an array of bodies called bodytab which is  */
@@ -105,8 +140,8 @@ Main::tab_init()
   /* file is read */
   maxmycell = maxcell / NPROC;
   maxmyleaf = maxleaf / NPROC;
-  mycelltab = (cellptr*) G_MALLOC(NPROC*maxmycell*sizeof(cellptr));
-  myleaftab = (leafptr*) G_MALLOC(NPROC*maxmyleaf*sizeof(leafptr));
+  //mycelltab = (cellptr*) G_MALLOC(NPROC*maxmycell*sizeof(cellptr));
+  //myleaftab = (leafptr*) G_MALLOC(NPROC*maxmyleaf*sizeof(leafptr));
 
 }
 
@@ -173,20 +208,17 @@ Main::Help ()
 
 void Main::startrun()
 {
-   string getparam();
-   int getiparam();
-   bool getbparam();
-   double getdparam();
    int seed;
 
    infile = getparam("in");
-   if (*infile != NULL) {
-      inputdata();
+   if (*infile != 0) {
+     // FIXME - enable
+      //inputdata();
    }
    else {
       nbody = getiparam("nbody");
       if (nbody < 1) {
-	 error("startrun: absurd nbody\n");
+	 ckerr << "startrun: absurd nbody\n";
       }
       seed = getiparam("seed");
    }
@@ -195,19 +227,48 @@ void Main::startrun()
    dtime = getdparam("dtime");
    dthf = 0.5 * dtime;
    eps = getdparam("eps");
-   epssq = eps*eps;
+   real epssq = eps*eps;
    tol = getdparam("tol");
-   tolsq = tol*tol;
+   real tolsq = tol*tol;
    fcells = getdparam("fcells");
    fleaves = getdparam("fleaves");
    tstop = getdparam("tstop");
    dtout = getdparam("dtout");
    NPROC = getiparam("NPROC");
-   nstep = 0;
-   pranset(seed);
+   srand(seed);
    testdata();
    setbound();
    tout = tnow + dtout;
+}
+
+/*
+ * SETBOUND: Compute the initial size of the root of the tree; only done
+ * before first time step, and only processor 0 does it
+ */
+void Main::setbound()
+{
+   int i;
+   real side ;
+   bodyptr p;
+   vector min, max;
+
+   SETVS(min,1E99);
+   SETVS(max,-1E99);
+   side=0;
+
+   for (p = bodytab; p < bodytab+nbody; p++) {
+      for (i=0; i<NDIM;i++) {
+	 if (Pos(p)[i]<min[i]) min[i]=Pos(p)[i] ;
+	 if (Pos(p)[i]>max[i])  max[i]=Pos(p)[i] ;
+      }
+   }
+    
+   SUBV(max,max,min);
+   for (i=0; i<NDIM;i++) if (side<max[i]) side=max[i];
+   ADDVS(rmin,min,-side/100000.0);
+   rsize = 1.00002*side;
+   SETVS(max,-1E99);
+   SETVS(min,1E99);
 }
 
 /*
@@ -220,7 +281,7 @@ void Main::startrun()
 
 void Main::testdata()
 {
-   real rsc, vsc, sqrt(), xrand(), pow(), rsq, r, v, x, y;
+   real rsc, vsc, rsq, r, v, x, y;
    vector cmr, cmv;
    register bodyptr p;
    int rejects = 0;
@@ -234,7 +295,7 @@ void Main::testdata()
    tnow = 0.0;
    bodytab = (bodyptr) G_MALLOC(nbody * sizeof(body));
    if (bodytab == NULL) {
-      error("testdata: not enuf memory\n");
+      ckerr << "testdata: not enuf memory\n";
    }
    rsc = 9 * PI / 16;
    vsc = sqrt(1.0 / rsc);
@@ -297,9 +358,9 @@ void Main::testdata()
  * PICKSHELL: pick a random point on a sphere of specified radius.
  */
 
-pickshell(vec, rad)
-   real vec[];                     /* coordinate vector chosen */
-   real rad;                       /* radius of chosen point */
+void Main::pickshell(real vec[], real rad)
+//   real vec[];                     /* coordinate vector chosen */
+//   real rad;                       /* radius of chosen point */
 {
    register int k;
    double rsq, xrand(), sqrt(), rsc;
@@ -313,6 +374,127 @@ pickshell(vec, rad)
 
    rsc = rad / sqrt(rsq);
    MULVS(vec, vec, rsc);
+}
+
+/*
+ * GETPARAM: export version prompts user for value.
+ */
+
+string Main::getparam(string name)
+{
+   int i, leng;
+   string def;
+   char buf[128];
+   char* temp;
+
+   if (defaults == NULL)
+      ckerr << "getparam: called before initparam\n";
+   i = scanbind(defaults, name);
+   if (i < 0)
+      ckerr << "getparam: %s unknown\n", name;
+   def = extrvalue(defaults[i]);
+   gets(buf);
+   leng = strlen(buf) + 1;
+   if (leng > 1) {
+      return (strcpy(malloc(leng), buf));
+   }
+   else {
+      return (def);
+   }
+}
+
+/*
+ * GETIPARAM, ..., GETDPARAM: get int, long, bool, or double parameters.
+ */
+
+int Main::getiparam(string name)
+{
+   string val;
+
+   for (val = ""; *val == NULL;) {
+      val = getparam(name);
+   }
+   return (atoi(val));
+}
+
+long Main::getlparam(string name)
+{
+   string val;
+
+   for (val = ""; *val == NULL; )
+      val = getparam(name);
+   return (atol(val));
+}
+
+bool Main::getbparam(string name)
+{
+   string val;
+    
+   for (val = ""; *val == NULL; )
+      val = getparam(name);
+   if (strchr("tTyY1", *val) != NULL) {
+      return (TRUE);
+   }
+   if (strchr("fFnN0", *val) != NULL) {
+      return (FALSE);
+   }
+   CkPrintf("getbparam: %s=%s not bool\n", name, val);
+}
+
+double Main::getdparam(string name)
+{
+   string val;
+
+   for (val = ""; *val == NULL; ) {
+      val = getparam(name);
+   }
+   return (atof(val));
+}
+
+/*
+ * SCANBIND: scan binding vector for name, return index.
+ */
+
+int Main::scanbind(string *bvec, string name)
+{
+   int i;
+
+   for (i = 0; bvec[i] != NULL; i++)
+      if (matchname(bvec[i], name))
+	 return (i);
+   return (-1);
+}
+
+/*
+ * MATCHNAME: determine if "name=value" matches "name".
+ */
+
+bool Main::matchname(string bind, string name)
+{
+   char *bp, *np;
+
+   bp = bind;
+   np = name;
+   while (*bp == *np) {
+      bp++;
+      np++;
+   }
+   return (*bp == '=' && *np == NULL);
+}
+
+/*
+ * EXTRVALUE: extract value from name=value string.
+ */
+
+string Main::extrvalue(string arg)
+{
+   char *ap;
+
+   ap = (char *) arg;
+   while (*ap != NULL)
+      if (*ap++ == '=')
+	 return ((string) ap);
+   return (NULL);
 }
 
 

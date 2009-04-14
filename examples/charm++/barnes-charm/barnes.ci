@@ -4,11 +4,21 @@ mainmodule barnes {
   readonly CProxy_ParticleChunk chunks;
   readonly int numInitTreePieces;
   readonly int numParticleChunks;
-  readonly int NUMPROC;
-
-  readonly bodyptr bodytab;
-
+  
+  readonly int NPROC;
+  readonly int maxmybody;
+  readonly real fcells;
+  readonly real fleaves;
   readonly real tstop;
+  readonly int nbody;
+  readonly real dtime;
+  readonly real eps;
+  readonly real tol;
+  readonly real dtout;
+  readonly real dthf;
+  readonly vector rmin;
+  readonly real rsize;
+
 
   message ParticleMsg{
     bodyptr particles[];
@@ -21,18 +31,21 @@ mainmodule barnes {
 
   array [1D] TreePiece {
     entry TreePiece(); 
+    entry TreePiece(cellptr p, int which, bool isTopLevel, int level); 
     entry void recvParticles(ParticleMsg *msg);
     entry void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
+    entry void recvTotalMsgCountsFromPieces(int totalNumFromParent);
   };
 
   array [1D] ParticleChunk {
-    entry ParticleChunk();
-    entry void SlaveStart(bodyptr *bodies, cellptr *cells, leafptr *leaves, CkCallback &cb);
+    entry ParticleChunk(int, int);
+    entry void SlaveStart(bodyptr *mybodytab, bodyptr bodytab, CkCallback &cb);
     entry void startIteration(CkCallback &cb);
     entry void acceptRoot(cellptr);
     entry void stepsystemPartII(CkReductionMsg *msg);
     entry void stepsystemPartIII(CkReductionMsg *msg);
+    entry void doneTreeBuild();
   };
 
-  initproc void registerChunksToPiecesReducer(); 
+  // initproc void registerChunksToPiecesReducer(); 
 };

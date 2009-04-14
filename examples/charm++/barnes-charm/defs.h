@@ -216,9 +216,8 @@ typedef node* nodeptr;
 #define Pos(x)  (((nodeptr) (x))->pos)
 #define Cost(x) (((nodeptr) (x))->cost)
 #define Level(x) (((nodeptr) (x))->level)
-#define Parent(x) (((nodeptr) (x))->parent)
+#define ParentOf(x) (((nodeptr) (x))->parent)
 #define ChildNum(x) (((nodeptr) (x))->child_num)
-
 /*
  * BODY: data structure used to represent particles.
  */
@@ -260,7 +259,7 @@ typedef struct _cell {
    int level;
    cellptr parent;		
    int child_num;              /* Index [0..8] that this node should be put */
-   int processor;		/* Used by partition code */
+   //int processor;		/* Used by partition code */
    struct _cell *next, *prev;    /* Used in the partition array */
    unsigned long seqnum;
 #ifdef QUADPOLE
@@ -286,7 +285,7 @@ typedef struct _leaf {
    int level;
    cellptr parent;		
    int child_num;              /* Index [0..8] that this node should be put */
-   int processor;		/* Used by partition code */
+   //int processor;		/* Used by partition code */
    struct _leaf *next, *prev;    /* Used in the partition array */
    unsigned long seqnum;
 #ifdef QUADPOLE

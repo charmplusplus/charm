@@ -1,24 +1,26 @@
 #include "barnes.h"
 
-CkReduction::reducerType chunksToPiecesReducerType;
+//CkReduction::reducerType chunksToPiecesReducerType;
 
 #include "barnes.decl.h"
-ParticleChunk::ParticleChunk(int maxleaf, int maxcell, int numchunks){
+ParticleChunk::ParticleChunk(int mleaf, int mcell){
 
   /*allocate leaf/cell space */
-  int NPROC = numchunks;
-  ctab = (cellptr) G_MALLOC((maxcell / NPROC) * sizeof(cell));
-  ltab = (leafptr) G_MALLOC((maxleaf / NPROC) * sizeof(leaf));
+  //int NPROC = numchunks;
+  // j: don't need these data structures
+  //ctab = (cellptr) G_MALLOC((maxcell / NPROC) * sizeof(cell));
+  //ltab = (leafptr) G_MALLOC((maxleaf / NPROC) * sizeof(leaf));
 
+  nstep = 0;
   numMsgsToEachTp = new int[numTreePieces];
   particlesToTps.resize(numTreePieces);
   for(int i = 0; i < numTreePieces; i++){
-    particlesToTps[i].reserve(PARTICLES_PER_MSG);
+    particlesToTps[i].reserve(MAX_PARTICLES_PER_MSG);
   }
 
 };
 
-void ParticleChunk::SlaveStart(bodyptr *bodystart, cellptr *cellstart, leafptr *leafstart, CkCallback &cb_){
+void ParticleChunk::SlaveStart(bodyptr *bodyptrstart, bodyptr bodystart, CkCallback &cb_){
   unsigned int ProcessId;
 
   /* Get unique ProcessId */
@@ -28,13 +30,15 @@ void ParticleChunk::SlaveStart(bodyptr *bodystart, cellptr *cellstart, leafptr *
      processors to avoid migration */
 
   /* initialize mybodytabs */
-  mybodytab = bodystart + (maxmybody * ProcessId);
+  mybodytab = bodyptrstart + (maxmybody * ProcessId);
+  bodytab = bodystart;
   /* note that every process has its own copy   */
   /* of mybodytab, which was initialized to the */
   /* beginning of the whole array by proc. 0    */
   /* before create                              */
-  mycelltab = cellstart + (maxmycell * ProcessId);
-  myleaftab = leafstart + (maxmyleaf * ProcessId);
+  // j: we don't need these data structures
+  //mycelltab = cellstart + (maxmycell * ProcessId);
+  //myleaftab = leafstart + (maxmyleaf * ProcessId);
   /* POSSIBLE ENHANCEMENT:  Here is where one might distribute the
      data across physically distributed memories as desired. 
 
@@ -80,17 +84,18 @@ void ParticleChunk::startIteration(CkCallback &cb_){
  * assigned to the processor.  
  */
 
-void ParticleChunk::find_my_initial_bodies(btab, nbody, ProcessId)
+void ParticleChunk::find_my_initial_bodies(bodyptr btab, int nbody, unsigned int ProcessId)
+/*
 bodyptr btab;
 int nbody;
 unsigned int ProcessId;
+*/
 {
   int Myindex;
   int equalbodies;
   int extra,offset,i;
 
   int NPROC = numParticleChunks;
-  int ProcessId = thisIndex;
 
   mynbody = nbody / NPROC;
   extra = nbody % NPROC;
@@ -111,8 +116,7 @@ unsigned int ProcessId;
  * STEPSYSTEM: advance N-body system one time-step.
  */
 
-void ParticleChunk::stepsystem (ProcessId)
-   unsigned int ProcessId;
+void ParticleChunk::stepsystem (unsigned int ProcessId)
 {
   /*
     int i;
@@ -142,8 +146,8 @@ void ParticleChunk::stepsystem (ProcessId)
        init_root(ProcessId);
     }
     else {
-       mynumcell = 0;
-       mynumleaf = 0;
+       //mynumcell = 0;
+       //mynumleaf = 0;
     }
 }
 
@@ -167,10 +171,19 @@ void ParticleChunk::stepsystemPartII(CkReductionMsg *msg){
         //Global->treebuildtime += treebuildend - treebuildstart;
     }
     
+    /* 
+     * FIXME - do something here. this was supposed to begin
+     * hackcofm, but since we have already decided that that
+     * should happen when the trees have completed their build
+     * process, perhaps this doesn't serve any purpose after all
+     */
+
+    /*
     // instead of barrier inside maketree:
     CkCallback cb(CkIndex_TreePiece::stepsystemPartIIb(), thisProxy);
     // stepsystemPartIIb
     contribute(0,0,CkReduction::concat,cb);
+    */
 
 }
 
@@ -178,16 +191,15 @@ void ParticleChunk::stepsystemPartII(CkReductionMsg *msg){
  * MAKETREE: initialize tree structure for hack force calculation.
  */
 
-void ParticleChunk::maketree(ProcessId)
-   unsigned ProcessId;
+void ParticleChunk::maketree(unsigned int ProcessId)
 {
-  // FIXME - keep track of numMsgsToEachTp[] here 
    bodyptr p, *pp;
 
-   myncell = 0;
-   mynleaf = 0;
+   // j: don't need these 
+   //myncell = 0;
+   //mynleaf = 0;
    if (ProcessId == 0) {
-      mycelltab[myncell++] = G_root; 
+      //mycelltab[myncell++] = G_root; 
    }
    Current_Root = (nodeptr) G_root;
    for (pp = mybodytab; 
@@ -199,13 +211,16 @@ void ParticleChunk::maketree(ProcessId)
 				           ProcessId);
       }
       else {
-	 fprintf(stderr, "Process %d found body %d to have zero mass\n",
-		 ProcessId, (int) p);	
+	 fprintf(stderr, "Process %d found body 0x%x to have zero mass\n",
+		 ProcessId, p);	
       }
    }
 
+    /**
+     * FIXME - initiate hackcofm somewhere
+     */
    //BARRIER(Global->Bartree,NPROC);
-   hackcofm( 0, ProcessId );
+   // hackcofm( 0, ProcessId );
    //BARRIER(Global->Barcom,NPROC);
 }
 
@@ -214,16 +229,16 @@ void ParticleChunk::maketree(ProcessId)
  */
 
 nodeptr
-ParticleChunk::loadtree(p, root, ProcessId)
-   bodyptr p;                        /* body to load into tree */
-   cellptr root;
-   unsigned ProcessId;
+ParticleChunk::loadtree(bodyptr p, cellptr root, unsigned ProcessId)
+   //bodyptr p;                        /* body to load into tree */
+   //cellptr root;
+   //unsigned ProcessId;
 {
-   int l, xq[NDIM], xp[NDIM], xor[NDIM], flag;
+   int l, xq[NDIM], xp[NDIM], flag;
    int i, j, root_level;
    bool valid_root;
    int kidIndex;
-   volatile nodeptr *volatile qptr, mynode;
+   nodeptr *qptr, mynode;
    cellptr c;
    leafptr le;
 
@@ -269,8 +284,7 @@ ParticleChunk::loadtree(p, root, ProcessId)
    root = G_root;
    mynode = (nodeptr) root;
    kidIndex = subindex(xp, Level(mynode));
-   qptr = &Subp(mynode)[kidIndex];
-   int depth = log8floor(numTreePieces);
+   //qptr = &Subp(mynode)[kidIndex];
 
    l = Level(mynode) >> 1;
 
@@ -282,7 +296,7 @@ ParticleChunk::loadtree(p, root, ProcessId)
 
    for(int level = Level(mynode); level >= lowestLevel; level >>= 1){
      kidIndex = subindex(xp, Level(mynode));
-     mynode = &Subp(mynode)[kidIndex];
+     mynode = Subp(mynode)[kidIndex];
      whichTp += kidIndex*(1<<(fact*(d-1)));
      d--;     
    }
@@ -355,10 +369,12 @@ void ParticleChunk::sendParticlesToTp(int tp){
   int len = particlesToTps[tp].length();
   if(len > 0){
     ParticleMsg *msg = new (len) ParticleMsg(); 
+    memcpy(msg->particles, particlesToTps[tp].getVec(), len*sizeof(bodyptr));
+    /*
     for(int i = 0; i < len; i++){
-      bodyptr tmp =  particlesToTps[tp][i];
-      msg->particles[i] = *tmp;
+      msg->particles[i] = (particlesToTps[tp])[i];
     }
+    */
     msg->num = len; 
     numMsgsToEachTp[tp]++;
     particlesToTps[tp].length() = 0;
@@ -368,8 +384,12 @@ void ParticleChunk::sendParticlesToTp(int tp){
 
 void ParticleChunk::doneSendingParticles(){
   // send counts to chunk 0
-  CkCallback cb(CkIndex_ParticleChunk::recvTotalMsgCountsFromChunks(0), pieces);
+  CkCallback cb(CkIndex_TreePiece::recvTotalMsgCountsFromChunks(0), pieces);
   contribute(numTreePieces*sizeof(int), numMsgsToEachTp, CkReduction::sum_int, cb);   
+}
+
+void ParticleChunk::doneTreeBuild(){
+  mainCb.send();
 }
 
 /*
@@ -382,9 +402,11 @@ void ParticleChunk::recvTotalMsgCounts(CkReductionMsg *msg){
 }
 */
 
-void ParticleChunk::stepSystemPartIII(CkReductionMsg *msg){
+void ParticleChunk::stepsystemPartIII(CkReductionMsg *msg){
 
     delete msg;
+    
+    /*
     unsigned int ProcessId = thisIndex;
     unsigned int NPROC = numParticleChunks;
 
@@ -402,7 +424,7 @@ void ParticleChunk::stepSystemPartIII(CkReductionMsg *msg){
     Local[ProcessId].mynbody = 0;
     find_my_bodies(Global->G_root, 0, BRC_FUC, ProcessId );
 
-/*     B*RRIER(Global->Barcom,NPROC); */
+//     B*RRIER(Global->Barcom,NPROC);
     if ((ProcessId == 0) && (Local[ProcessId].nstep >= 2)) {
         CLOCK(partitionend);
         Global->partitiontime += partitionend - partitionstart;
@@ -419,7 +441,7 @@ void ParticleChunk::stepSystemPartIII(CkReductionMsg *msg){
         Global->forcecalctime += forcecalcend - forcecalcstart;
     }
 
-    /* advance my bodies */
+    // advance my bodies 
     for (pp = Local[ProcessId].mybodytab;
 	 pp < Local[ProcessId].mybodytab+Local[ProcessId].mynbody; pp++) {
        p = *pp;
@@ -449,9 +471,9 @@ void ParticleChunk::stepSystemPartIII(CkReductionMsg *msg){
     }
     UNLOCK(Global->CountLock);
 
-    /* bar needed to make sure that every process has computed its min */
-    /* and max coordinates, and has accumulated them into the global   */
-    /* min and max, before the new dimensions are computed	       */
+    // bar needed to make sure that every process has computed its min 
+    // and max coordinates, and has accumulated them into the global   
+    // min and max, before the new dimensions are computed	       
     BARRIER(Global->Barpos,NPROC);
 
     if ((ProcessId == 0) && (Local[ProcessId].nstep >= 2)) {
@@ -473,20 +495,20 @@ void ParticleChunk::stepSystemPartIII(CkReductionMsg *msg){
     }
     Local[ProcessId].nstep++;
     Local[ProcessId].tnow = Local[ProcessId].tnow + dtime;
+    */
 }
 
 /*
  * INIT_ROOT: Processor 0 reinitialize the global root at each time step
  */
-void ParticleChunk::init_root (ProcessId)
-   unsigned int ProcessId;
+void ParticleChunk::init_root (unsigned int ProcessId)
 {
 
   // create top portion of global tree
   int depth = log8floor(numTreePieces);
   //Global->G_root=Local[0].ctab;
-  G_root = ctab[0];
-  mynumcell=1;
+  G_root = new cell;
+  //mynumcell=1;
 
   Type(G_root) = CELL;
   Done(G_root) = FALSE;
@@ -509,39 +531,12 @@ void ParticleChunk::createTopLevelTree(cellptr node, int depth){
   
   for (int i = 0; i < NSUB; i++){
     cellptr child = makecell(thisIndex);
-    // all code to initialize nodes goes here
+    // FIXME all code to initialize nodes goes here
     Subp(node)[i] = (nodeptr) child;
-    Parent(child) = node;
+    ParentOf(child) = (nodeptr) node;
     ChildNum(child) = i;
-    createTopLevelTree(&children[i], depth-1);
+    createTopLevelTree((cellptr) Subp(node)[i], depth-1);
   }
-}
-
-/*
- *  * MAKECELL: allocation routine for cells.
- */
-
-cellptr ParticleChunk::makecell(ProcessId)
-   unsigned ProcessId;
-{
-  cellptr c;
-  int i, Mycell;
-
-  if (mynumcell == maxmycell) {
-    error("makecell: Proc %d needs more than %d cells; increase fcells\n", 
-        ProcessId,maxmycell);
-  }
-  Mycell = mynumcell++;
-  c = ctab + Mycell;
-  c->seqnum = ProcessId*maxmycell+Mycell;
-  Type(c) = CELL;
-  Done(c) = FALSE;
-  Mass(c) = 0.0;
-  for (i = 0; i < NSUB; i++) {
-    Subp(c)[i] = NULL;
-  }
-  mycelltab[myncell++] = c;
-  return (c);
 }
 
 void ParticleChunk::acceptRoot(cellptr root_){
@@ -550,9 +545,10 @@ void ParticleChunk::acceptRoot(cellptr root_){
   contribute(0,0,CkReduction::concat,cb);
 }
 
+/*
+CkReductionMsg *chunksToPiecesReducer (int nmsg, CkReductionMsg **msgs){
+}
 void registerChunksToPiecesReducer(){
   chunksToPiecesReducerType = CkReduction::addReducer(chunksToPiecesReducer);
 }
-
-CkReductionMsg *chunksToPiecesReducer (int nmsg, CkReductionMsg **msgs){
-}
+*/
