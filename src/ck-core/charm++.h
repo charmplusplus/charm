@@ -1021,6 +1021,21 @@ inline T *CkAllocateMarshallMsgT(int size,const CkEntryOptions *opts)
     return m;
 }
 
+class CkConditional {
+  int refcount;
+public:
+  CkConditional() : refcount(1) { }
+  void* operator new(size_t s) {
+    return malloc(s);
+  }
+  void operator delete(void *p) {
+    if (--((CkConditional*)p)->refcount == 0) free(p);
+  }
+  void copyreference(void) {
+    ++refcount;
+  }
+};
+
 
 #endif
 
