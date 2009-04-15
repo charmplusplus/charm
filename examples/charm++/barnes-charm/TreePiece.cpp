@@ -71,7 +71,7 @@ void TreePiece::recvParticles(ParticleMsg *msg){
     // insert children into pieces array
     for(int i = 0; i < NSUB; i++){
       int child = NSUB*thisIndex+numTreePieces+i;
-      pieces[child].insert(myRoot, i, false, myLevel >> 1);
+      pieces[child].insert((nodeptr)myRoot, i, false, myLevel >> 1);
       childrenTreePieces[i] = child;
     }
     haveChildren = true;

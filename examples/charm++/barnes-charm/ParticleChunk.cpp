@@ -20,11 +20,15 @@ ParticleChunk::ParticleChunk(int mleaf, int mcell){
 
 };
 
-void ParticleChunk::SlaveStart(bodyptr *bodyptrstart, bodyptr bodystart, CkCallback &cb_){
+void ParticleChunk::SlaveStart(CmiUInt8 bodyptrstart_, CmiUInt8 bodystart_, CkCallback &cb_){
   unsigned int ProcessId;
 
   /* Get unique ProcessId */
   ProcessId = thisIndex;
+
+  bodyptr *bodyptrstart = (bodyptr *)bodyptrstart_;
+  bodyptr bodystart = (bodyptr)bodystart_;
+
 
   /* POSSIBLE ENHANCEMENT:  Here is where one might pin processes to
      processors to avoid migration */

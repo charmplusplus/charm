@@ -1,4 +1,5 @@
 #include "barnes.h"
+#include "defs.h"
 
 CProxy_Main mainChare;
 CProxy_TreePiece pieces;
@@ -95,7 +96,7 @@ Main::Main(CkArgMsg *m){
   opts.setMap(myMap);
   // FIXME - level of top-level trees
   int depth = log8floor(numTreePieces);
-  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew((cellptr)0,-1,true,(IMAX >> (depth+1)),opts);
+  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew((nodeptr)0,-1,true,(IMAX >> (depth+1)),opts);
   pieces = treeProxy;
 
   myMap=CProxy_BlockMap::ckNew(); 
@@ -113,7 +114,7 @@ Main::Main(CkArgMsg *m){
 void Main::startSimulation(){
   // slavestart for chunks
 
-  chunks.SlaveStart(mybodytab, bodytab, CkCallbackResumeThread());
+  chunks.SlaveStart((CmiUInt8)mybodytab, (CmiUInt8)bodytab, CkCallbackResumeThread());
   //chunks.SlaveStart(mybodytab, mycelltab, myleaftab, CkCallbackResumeThread());
 
   /* main loop */
@@ -291,7 +292,7 @@ void Main::testdata()
    register bodyptr cp;
    double tmp;
 
-   headline = "Hack code: Plummer model";
+   //headline = "Hack code: Plummer model";
    tnow = 0.0;
    bodytab = (bodyptr) G_MALLOC(nbody * sizeof(body));
    if (bodytab == NULL) {
@@ -363,7 +364,7 @@ void Main::pickshell(real vec[], real rad)
 //   real rad;                       /* radius of chosen point */
 {
    register int k;
-   double rsq, xrand(), sqrt(), rsc;
+   double rsq, rsc;
 
    do {
       for (k = 0; k < NDIM; k++) {
@@ -396,7 +397,7 @@ string Main::getparam(string name)
    gets(buf);
    leng = strlen(buf) + 1;
    if (leng > 1) {
-      return (strcpy(malloc(leng), buf));
+      return (strcpy((char *)malloc(leng), buf));
    }
    else {
       return (def);
@@ -411,7 +412,7 @@ int Main::getiparam(string name)
 {
    string val;
 
-   for (val = ""; *val == NULL;) {
+   for (val = ""; *val == 0;) {
       val = getparam(name);
    }
    return (atoi(val));
@@ -421,7 +422,7 @@ long Main::getlparam(string name)
 {
    string val;
 
-   for (val = ""; *val == NULL; )
+   for (val = ""; *val == 0; )
       val = getparam(name);
    return (atol(val));
 }
@@ -430,12 +431,12 @@ bool Main::getbparam(string name)
 {
    string val;
     
-   for (val = ""; *val == NULL; )
+   for (val = ""; *val == 0; )
       val = getparam(name);
-   if (strchr("tTyY1", *val) != NULL) {
+   if (strchr("tTyY1", *val) != 0) {
       return (TRUE);
    }
-   if (strchr("fFnN0", *val) != NULL) {
+   if (strchr("fFnN0", *val) != 0) {
       return (FALSE);
    }
    CkPrintf("getbparam: %s=%s not bool\n", name, val);
@@ -445,7 +446,7 @@ double Main::getdparam(string name)
 {
    string val;
 
-   for (val = ""; *val == NULL; ) {
+   for (val = ""; *val == 0; ) {
       val = getparam(name);
    }
    return (atof(val));
@@ -459,7 +460,7 @@ int Main::scanbind(string *bvec, string name)
 {
    int i;
 
-   for (i = 0; bvec[i] != NULL; i++)
+   for (i = 0; bvec[i] != 0; i++)
       if (matchname(bvec[i], name))
 	 return (i);
    return (-1);
@@ -479,7 +480,7 @@ bool Main::matchname(string bind, string name)
       bp++;
       np++;
    }
-   return (*bp == '=' && *np == NULL);
+   return (*bp == '=' && *np == 0);
 }
 
 /*
@@ -491,10 +492,10 @@ string Main::extrvalue(string arg)
    char *ap;
 
    ap = (char *) arg;
-   while (*ap != NULL)
+   while (*ap != 0)
       if (*ap++ == '=')
 	 return ((string) ap);
-   return (NULL);
+   return (0);
 }
 
 

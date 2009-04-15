@@ -23,6 +23,8 @@
 typedef double real;
 
 #include "vectmath.h"
+#include "barnes.h"
+#include "pup.h"
 
 #define MAX_PROC 128
 #define MAX_BODIES_PER_LEAF 10
@@ -228,6 +230,13 @@ typedef struct _cell* cellptr;
 
 #define BODY 01                 /* type code for bodies */
 
+PUPbytes(leafptr);
+PUPbytes(cellptr);
+PUPbytes(nodeptr);
+PUPbytes(bodyptr);
+PUPbytes(vector);
+PUPbytes(bodyptr *);
+
 typedef struct _body {
    short type;
    real mass;                  /* mass of body */
@@ -239,6 +248,17 @@ typedef struct _body {
    vector vel;                 /* velocity of body */
    vector acc;                 /* acceleration of body */
    real phi;                   /* potential at body */
+
+   void pup(PUP::er &p){
+     p | type;
+     p | mass;
+     p | cost;
+     p | level;
+     p | parent;
+     p | child_num;
+     p | phi;
+     // FIXME vectors: pos, vel, acc
+   }
 } body;
 
 #define Vel(x)  (((bodyptr) (x))->vel)
@@ -265,8 +285,23 @@ typedef struct _cell {
 #ifdef QUADPOLE
    matrix quad;                /* quad. moment of cell */
 #endif
-   volatile short int done;    /* flag to tell when the c.of.m is ready */
+   short int done;    /* flag to tell when the c.of.m is ready */
    nodeptr subp[NSUB];         /* descendents of cell */
+
+   void pup(PUP::er &p){
+     p | type;
+     p | mass;
+     p | cost;
+     p | level;
+     p | parent;
+     p | child_num;
+     p | next;
+     p | prev;
+     p | done;
+     PUParray(p,subp,NSUB);
+     // FIXME matrix: quad
+     // FIXME vectors: pos
+   }
 } cell;
 
 #define Subp(x) (((cellptr) (x))->subp)
@@ -291,10 +326,28 @@ typedef struct _leaf {
 #ifdef QUADPOLE
    matrix quad;                /* quad. moment of leaf */
 #endif
-   volatile short int done;    /* flag to tell when the c.of.m is ready */
+   short int done;    /* flag to tell when the c.of.m is ready */
    unsigned int num_bodies;
    bodyptr bodyp[MAX_BODIES_PER_LEAF];         /* bodies of leaf */
+   
+   void pup(PUP::er &p){
+     p | type;
+     p | mass;
+     p | cost;
+     p | level;
+     p | parent;
+     p | child_num;
+     p | next;
+     p | prev;
+     p | done;
+     p | num_bodies;
+     PUParray(p,bodyp,num_bodies);
+     // FIXME matrix: quad
+     // FIXME vectors: pos
+   }
 } leaf;
+
+
 
 #define Bodyp(x)  (((leafptr) (x))->bodyp)
 

@@ -102,7 +102,7 @@ class Main : public CBase_Main {
   
   public:
   Main(CkArgMsg *m);
-  Main(CkMigrateMessage *m);
+  Main(CkMigrateMessage *m){}
   void startSimulation();
   void pickshell(real vec[], real rad);
   void testdata();
@@ -143,7 +143,7 @@ class ParticleChunk : public CBase_ParticleChunk {
   public:
   ParticleChunk(int maxleaf, int maxcell);
   ParticleChunk(CkArgMsg *m);
-  ParticleChunk(CkMigrateMessage *m);
+  ParticleChunk(CkMigrateMessage *m){}
   void init_root(unsigned int ProcessId);
   void find_my_initial_bodies(bodyptr btab, int nb, unsigned ProcessId);
 
@@ -152,7 +152,8 @@ class ParticleChunk : public CBase_ParticleChunk {
   void flushParticles();
   void sendParticlesToTp(int tp);
 
-  void SlaveStart(bodyptr *bb, bodyptr b, CkCallback &cb);
+  //void SlaveStart(bodyptr *bb, bodyptr b, CkCallback &cb);
+  void SlaveStart(CmiUInt8 bb, CmiUInt8 b, CkCallback &cb);
   void startIteration(CkCallback &cb);
   void acceptRoot(cellptr);
   void stepsystem(unsigned ProcessId);
@@ -192,6 +193,7 @@ class TreePiece : public CBase_TreePiece {
   public:
   TreePiece();
   TreePiece(nodeptr parent, int whichChild, bool isTopLevel, int level);
+  TreePiece(CkMigrateMessage *m){}
   // used to convey message counts from chunks to top-level
   // treepieces
   void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
