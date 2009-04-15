@@ -371,7 +371,7 @@ extern int BgOutOfCoreFlag;
 //issue. When compiling the bigsim emulator with out-of-core support for
 //normal charm++ or AMPI programs, this macro should be turned to 1.
 //-Chao Mei
-#define REUSE_CHECKPOINT_FUNCS 0
+#define BIGSIM_OUT_OF_CORE 0
 
 void threadInfo::broughtIntoMem(){
     DEBUGM(5, ("=====[N%d] work thread T[%d] into mem=====.\n", BgMyNode(), id));
@@ -393,7 +393,7 @@ void threadInfo::broughtIntoMem(){
     BgOutOfCoreFlag=2;
     PUP::fromDisk p(fp);
     //out-of-core is not a real migration, so turn off the notifyListener option
-    #if REUSE_CHECKPOINT_FUNCS
+    #if BIGSIM_OUT_OF_CORE
     CkPupArrayElementsData(p, 0);
     #endif
     fclose(fp);
@@ -425,7 +425,7 @@ void threadInfo::takenOutofMem(){
     //out-of-core is not a real migration, so turn off the notifyListener option
     p.becomeDeleting();
 
-    #if REUSE_CHECKPOINT_FUNCS
+    #if BIGSIM_OUT_OF_CORE
     CkPupArrayElementsData(p, 0);
     #endif 
 
@@ -441,7 +441,7 @@ void threadInfo::takenOutofMem(){
 
     DEBUGM(6,("Before removing array elements on proc[%d]\n", globalId));   
  
-    #if REUSE_CHECKPOINT_FUNCS
+    #if BIGSIM_OUT_OF_CORE
     CkRemoveArrayElements();
     #endif
 
