@@ -29,8 +29,6 @@
 
 //#define  DEBUGF(x)      //CmiPrintf x;
 
-#define BIGSIM_OUT_OF_CORE 0
-
 #undef DEBUGLEVEL
 #define DEBUGLEVEL 10
 
