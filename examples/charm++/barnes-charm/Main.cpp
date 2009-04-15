@@ -4,6 +4,7 @@
 CProxy_Main mainChare;
 CProxy_TreePiece pieces;
 CProxy_ParticleChunk chunks;
+int maxmybody;
 
 int numTreePieces;
 int numParticleChunks;
@@ -498,5 +499,9 @@ string Main::extrvalue(string arg)
    return (0);
 }
 
+real xrand(real lo, real hi){
+  real ran = lo+hi*drand48();
+  return ran;
+}
 
 #include "barnes.def.h"

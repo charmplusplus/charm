@@ -148,7 +148,6 @@ class ParticleChunk : public CBase_ParticleChunk {
   void find_my_initial_bodies(bodyptr btab, int nb, unsigned ProcessId);
 
   void createTopLevelTree(cellptr node, int depth);
-  cellptr makecell(unsigned int ProcessId);
   void flushParticles();
   void sendParticlesToTp(int tp);
 
@@ -191,7 +190,6 @@ class TreePiece : public CBase_TreePiece {
   void checkCompletion();
 
   public:
-  TreePiece();
   TreePiece(nodeptr parent, int whichChild, bool isTopLevel, int level);
   TreePiece(CkMigrateMessage *m){}
   // used to convey message counts from chunks to top-level
@@ -203,15 +201,15 @@ class TreePiece : public CBase_TreePiece {
   void buildTree();
   void recvParticles(ParticleMsg *msg);
   nodeptr loadtree(bodyptr p, cellptr root, unsigned int ProcessId);
+  cellptr SubdivideLeaf (leafptr le, cellptr parent, unsigned int l, unsigned int ProcessId);
 
 };
 
 int subindex(int *xp, int level);
-int intcoord(int *xp, vector p);
+bool intcoord(int *xp, vector p);
 cellptr makecell(unsigned ProcessId);
 leafptr makeleaf(unsigned ProcessId);
 leafptr InitLeaf(cellptr parent, unsigned ProcessId);
-cellptr SubdivideLeaf (leafptr le, cellptr parent, unsigned int l, unsigned int ProcessId);
 cellptr InitCell(cellptr parent, unsigned ProcessId);
 int log8floor(int arg);
 

@@ -142,7 +142,7 @@ nodeptr TreePiece::loadtree(bodyptr p, cellptr root, unsigned int ProcessId){
   int i, j, root_level;
   bool valid_root;
   int kidIndex;
-  volatile nodeptr *volatile qptr, mynode;
+  nodeptr *qptr, mynode;
   cellptr c;
   leafptr le;
 
@@ -324,7 +324,7 @@ leafptr makeleaf(unsigned ProcessId)
 }
 
 cellptr
-SubdivideLeaf (leafptr le, cellptr parent, unsigned int l, unsigned int ProcessId)
+TreePiece::SubdivideLeaf (leafptr le, cellptr parent, unsigned int l, unsigned int ProcessId)
 /*
    leafptr le;
    cellptr parent;
@@ -406,5 +406,53 @@ cellptr InitCell(cellptr parent, unsigned ProcessId)
   return (c);
 }
 
+/*
+ * SUBINDEX: determine which subcell to select.
+ */
 
+int subindex(int x[NDIM], int l)
+{
+   int i, k;
+   int yes;
+    
+   i = 0;
+   yes = FALSE;
+   if (x[0] & l) {
+      i += NSUB >> 1;
+      yes = TRUE;
+   }
+   for (k = 1; k < NDIM; k++) {
+      if (((x[k] & l) && !yes) || (!(x[k] & l) && yes)) { 
+	 i += NSUB >> (k + 1);
+	 yes = TRUE;
+      }
+      else yes = FALSE;
+   }
+
+   return (i);
+}
+
+/* * INTCOORD: compute integerized coordinates.  * Returns: TRUE
+unless rp was out of bounds.  */
+
+bool intcoord(int *xp, vector rp)
+{
+   int k;
+   bool inb;
+   double xsc;
+   double tmp;
+    
+   inb = TRUE;
+   for (k = 0; k < NDIM; k++) {
+      xsc = (rp[k] - rmin[k]) / rsize; 
+      if (0.0 <= xsc && xsc < 1.0) {
+        tmp = IMAX * xsc;
+	 xp[k] = (int)tmp;
+      }
+      else {
+	 inb = FALSE;
+      }
+   }
+   return (inb);
+}
 

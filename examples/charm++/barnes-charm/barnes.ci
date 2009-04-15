@@ -2,7 +2,7 @@ mainmodule barnes {
   readonly CProxy_Main mainChare;
   readonly CProxy_TreePiece pieces;
   readonly CProxy_ParticleChunk chunks;
-  readonly int numInitTreePieces;
+  readonly int numTreePieces;
   readonly int numParticleChunks;
   
   readonly int NPROC;
@@ -30,7 +30,6 @@ mainmodule barnes {
   };
 
   array [1D] TreePiece {
-    entry TreePiece(); 
     entry TreePiece(nodeptr p, int which, bool isTopLevel, int level); 
     entry void recvParticles(ParticleMsg *msg);
     entry void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
