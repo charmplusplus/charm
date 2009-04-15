@@ -87,7 +87,7 @@ class Main : public CBase_Main {
   //cellptr *mycelltab;
   //leafptr *myleaftab;
 
-  void initparam (string *argv, const string *defv);
+  void initparam (string *argv, const char **defv);
   void initoutput();
 
   string extrvalue(string arg);

@@ -36,9 +36,9 @@ int log8floor(int arg){
  * INITPARAM: ignore arg vector, remember defaults.
  */
 
-void Main::initparam(string *argv, const string *defvs)
+void Main::initparam(string *argv, const char **)
 {
-   defaults = defvs;
+   //defaults = defvs;
 }
 
 /*
