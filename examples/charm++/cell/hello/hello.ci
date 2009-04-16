@@ -3,74 +3,22 @@ mainmodule hello {
   readonly CProxy_Main mainProxy;
   readonly int nElements;
 
+  accelblock {
+    void sayMessage(char* msg, int thisIndex, int fromIndex) {
+      printf("%d told %d to say \"%s\"\n", fromIndex, thisIndex, msg);
+    }
+  };
 
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void done(void);
   };
 
-  accelblock {
-
-    // Function that reverses an array if ints
-    void reverseIntArray(int* a, int n) {
-      int i;
-      for (i = 0; i < (n/2); i++) {
-        int v = a[i];
-        a[i] = a[n - 1 - i];
-        a[n - 1 - i] = v;
-      }
-    }
-
-  };
-
   array [1D] Hello {
     entry Hello(void);
-
-    entry [accel] void testAccelEntry(int fromIndex)
-                                     [ readwrite : int s <impl_obj->s>,
-                                       readwrite : int a[4] <impl_obj->a>
-                                     ] {
-
-      // Display the original contents
-      #if CMK_CELL_SPE != 0
-      printf("SPE --- Hello[%d]::testAccelEntry() - Called by Hello[%d]... s:%d, a[0-3]:{ %d %d %d %d }...\n",
-      #elif CMK_CELL != 0
-      printf("PPE --- Hello[%d]::testAccelEntry() - Called by Hello[%d]... s:%d, a[0-3]:{ %d %d %d %d }...\n",
-      #else
-      printf("GEN --- Hello[%d]::testAccelEntry() - Called by Hello[%d]... s:%d, a[0-3]:{ %d %d %d %d }...\n",
-      #endif
-             s, fromIndex, s, a[0], a[1], a[2], a[3]
-            );
-
-
-      // DMK - DEBUG
-      vec4f v0 = { 1.0f, 0.0f, 1.0f, 0.0f };
-      vec4f v1 = { 1.0f, 2.0f, 3.0f, 4.0f };
-      v1 = vmul4f(v1, v1);
-      vec4f v2 = vadd4f(v0, v1);
-      printf("v2 = { %.1f, %.1f, %.1f, %.1f }...\n",
-             vextract4f(v2, 0), vextract4f(v2, 1), vextract4f(v2, 2), vextract4f(v2, 3)
-            );
-
-
-      // Update the contents
-      s++;
-      reverseIntArray(a, 4);
-
-      // DMK - DEBUG
-      vec4i* a_ptr = (vec4i*)a;
-      *a_ptr = vrotl4i(*a_ptr, 1);
-      vec4f v3 = { 1.0f, 2.0f, 3.0f, 4.0f };
-      vec4f v4 = vmul4fs(v3, 3.0f);
-      v4 = vinsert4f(v4, -1.0f, 1);
-      ((int*)a_ptr)[0] = (int)(vextract4f(v4, 0));
-      ((int*)a_ptr)[1] = (int)(vextract4f(v4, 1));
-      ((int*)a_ptr)[2] = (int)(vextract4f(v4, 2));
-      ((int*)a_ptr)[3] = (int)(vextract4f(v4, 3));
-
-    } testAccelEntry_callback;
-
-    entry void testAccelEntry_callback();
+    entry [accel] void saySomething(int msgLen, char msg[msgLen], int fromIndex)
+                                   [ readonly : int thisIndex <impl_obj->thisIndex> ] {
+      sayMessage(msg, thisIndex, fromIndex);
+    } saySomething_callback;
   };
-
 };
