@@ -356,10 +356,12 @@ class ParamList {
     ParamList(ParamList *pl) :param(pl->param), next(pl->next) {}
     ParamList(Parameter *Nparam,ParamList *Nnext=NULL)
     	:param(Nparam), next(Nnext) { 
+/*
           if(next != NULL && (param->isMessage() || next->isMessage())){
             die("You may pass only a single pointer to an entry method. It should point to a message.", param->line);
             abort();
           }
+*/
     }
     void print(XStr &str,int withDefaultValues=0,int useConst=1);
     void printAddress(XStr &str);
