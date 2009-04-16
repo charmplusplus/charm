@@ -638,14 +638,30 @@ public:
 	virtual const PUP_ID &get_PUP_ID(void) const=0;
 };
 
-//Declarations to include in a PUP::able's body.
-//  Convenient, but only usable if class is not inside a namespace.
-#define PUPable_decl(className) \
-    PUPable_decl_inside(className) \
+//Declarations which create routines implemeting the | operator.
+//  Macros to be used inside a class body.
+#define PUPable_operator_inside(className)\
     friend inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
     friend inline void operator|(PUP::er &p,className* &a) {\
 	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
     }
+
+//  Macros to be used outside a class body.
+#define PUPable_operator_outside(className)\
+    inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
+    inline void operator|(PUP::er &p,className* &a) {\
+	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
+    }
+
+//Declarations to include in a PUP::able's body.
+//  Convenient, but only usable if class is not inside a namespace.
+#define PUPable_decl(className) \
+    PUPable_decl_inside(className) \
+    PUPable_operator_inside(className)
+
+#define PUPable_decl_template(className) \
+    PUPable_decl_inside_template(className) \
+    PUPable_operator_inside(className)
 
 //PUPable_decl for classes inside a namespace: inside body
 #define PUPable_decl_inside(className) \
@@ -654,14 +670,34 @@ private: \
     static PUP::able::PUP_ID my_PUP_ID;\
 public:\
     virtual const PUP::able::PUP_ID &get_PUP_ID(void) const; \
-    static void register_PUP_ID(void);
+    static void register_PUP_ID(const char* name);
+
+#define PUPable_decl_inside_template(className)	\
+private: \
+    static PUP::able* call_PUP_constructor(void) { \
+        return new className((CkMigrateMessage *)0);}			\
+    static PUP::able::PUP_ID my_PUP_ID;\
+public: \
+    virtual const PUP::able::PUP_ID &get_PUP_ID(void) const { \
+        return my_PUP_ID; }					\
+    static void register_PUP_ID(const char* name) { \
+        my_PUP_ID=register_constructor(name,call_PUP_constructor);}
 
 //PUPable_decl for classes inside a namespace: in header at file scope
 #define PUPable_decl_outside(className) \
-    inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
-    inline void operator|(PUP::er &p,className* &a) {\
-	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
-    }
+     PUPable_operator_outside(className)
+
+//PUPable_decl for classes inside a namespace: in header at file scope
+#define PUPable_decl_outside_template(templateParameters,className)	\
+     template<templateParameters> inline void operator|(PUP::er &p,className &a) {a.pup(p);} \
+     template<templateParameters> inline void operator|(PUP::er &p,className* &a) { \
+         PUP::able *pa=a;  p(&pa);  a=(className *)pa; } \
+     template<templateParameters> PUP::able *className::call_PUP_constructor(void) { \
+         return new className((CkMigrateMessage *)0);}			\
+     template<templateParameters> const PUP::able::PUP_ID &className::get_PUP_ID(void) const { \
+         return className::my_PUP_ID; }					\
+     template<templateParameters> void className::register_PUP_ID(const char* name) { \
+         my_PUP_ID=register_constructor(name,className::call_PUP_constructor);}
 
 
 //Declarations to include in an abstract PUP::able's body.
@@ -669,10 +705,7 @@ public:\
 #define PUPable_abstract(className) \
 public:\
     virtual const PUP::able::PUP_ID &get_PUP_ID(void) const =0; \
-    friend inline void operator|(PUP::er &p,className &a) {a.pup(p);}\
-    friend inline void operator|(PUP::er &p,className* &a) {\
-	PUP::able *pa=a;  p(&pa);  a=(className *)pa;\
-    }
+    PUPable_operator_inside(className)
 
 //Definitions to include exactly once at file scope
 #define PUPable_def(className) \
@@ -681,13 +714,19 @@ public:\
 	const PUP::able::PUP_ID &className::get_PUP_ID(void) const\
 		{ return className::my_PUP_ID; }\
 	PUP::able::PUP_ID className::my_PUP_ID;\
-	void className::register_PUP_ID(void)\
-		{my_PUP_ID=register_constructor(#className,\
-		              className::call_PUP_constructor);}\
+	void className::register_PUP_ID(const char* name)\
+		{my_PUP_ID=register_constructor(name,\
+		              className::call_PUP_constructor);}
+
+//Definitions to include exactly once at file scope
+#define PUPable_def_template(className) \
+	template<> PUP::able::PUP_ID className::my_PUP_ID = 0;
 
 //Code to execute exactly once at program start time
-#define PUPable_reg(className) \
-    className::register_PUP_ID();
+#define PUPable_reg(className)	\
+    className::register_PUP_ID(#className);
+#define PUPable_reg2(classIdentifier,className)	\
+    classIdentifier::register_PUP_ID(className);
 
 
 };//<- End namespace PUP
