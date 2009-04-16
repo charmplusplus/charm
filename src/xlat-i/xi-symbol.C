@@ -4865,7 +4865,9 @@ void PUPableClass::genDefs(XStr& str)
 {
         if (type->isTemplated()) {
                 str << "#ifdef CK_TEMPLATES_ONLY\n";
-                str << "  PUPable_def_template(" << type << ");\n";
+                str << "  #define _CHARMXI_CLASS_NAME " << type << "\n";
+                str << "  PUPable_def_template(_CHARMXI_CLASS_NAME);\n";
+                str << "  #undef _CHARMXI_CLASS_NAME\n";
                 str << "#endif\n";
         } else {
                 str<<"  PUPable_def(" << type << ");\n";
@@ -4874,7 +4876,13 @@ void PUPableClass::genDefs(XStr& str)
 }
 void PUPableClass::genReg(XStr& str)
 {
-	str<<"      PUPable_reg(" << type << ");\n";
+        if (type->isTemplated()) {
+                str<<"      #define _CHARMXI_CLASS_NAME " << type << "\n";
+                str<<"      PUPable_reg2(_CHARMXI_CLASS_NAME,\"" << type << "\");\n";
+                str<<"      #undef _CHARMXI_CLASS_NAME\n";
+        } else {
+                str<<"      PUPable_reg(" << type << ");\n";
+        }
 	if (next) next->genReg(str);
 }
 
