@@ -1787,7 +1787,7 @@ Message::genDefs(XStr& str)
         if (mv->isConditional()) {
           if (mv->type->isPointer()) die("conditional variable cannot be a pointer", line);
           str << "  CkConditional *cond_" << mv->name << " = static_cast<CkConditional*>(msg->" << mv->name << ");\n";
-          str << "  if (msg->" << mv->name << "!=NULL) delete msg->" << mv->name << ";\n";
+          str << "  if (cond_" << mv->name << "!=NULL) delete cond_" << mv->name << ";\n";
         }
       }
     }
