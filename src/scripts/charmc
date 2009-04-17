@@ -83,7 +83,7 @@ CHARM_SHARED="0"
 BUILD_SHARE="1"
 SWAPGLOBALS="0"
 
-TAU_MAKEFILE=Make.tau
+TAU_MAKEFILE=/expand/home/cheelee/work/special/tau-charm/tau-2.17.3b2/x86_64/lib/Makefile.tau-phase-mpi
 TAU_TRACE_MPI=1
 
 CMK_CELL=0
@@ -938,9 +938,22 @@ then
     CMK_XIOPTS="$CMK_XIOPTS -intrinsic"
 fi
 
+if test "$CMK_WITH_TAU" = "true"
+then
+  echo "include $TAU_MAKEFILE" > _make.tau.tmp
+  echo "print-%:; @echo \$(\$*)" >> _make.tau.tmp
+  TAU_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_LIBS`
+  TAU_MPI_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_LIBS` 
+  TAU_MPI_FLIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_FLIBS`
+  TAU_DEFS=`make --no-print-directory -f _make.tau.tmp print-TAU_DEFS`
+  TAU_INCLUDE=`make --no-print-directory -f _make.tau.tmp print-TAU_INCLUDE`
+
+  rm -f _make.tau.tmp
+fi
+
 #Add generic options to the compiler- and linker-options
-OPTS_CC="$OPTS $OPTS_CC"
-OPTS_CXX="$OPTS $OPTS_CXX"
+OPTS_CC="$OPTS $TAU_DEFS $TAU_INCLUDE $OPTS_CC"
+OPTS_CXX="$OPTS $TAU_DEFS $TAU_INCLUDE $OPTS_CXX"
 OPTS_F90="$OPTS $OPTS_F90"
 OPTS_LD="$OPTS $OPTS_LD"
 # OPTS_LDXX gets OPTS from OPTS_LD
@@ -1604,6 +1617,9 @@ then
   TAU_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_LIBS`
   TAU_MPI_LIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_LIBS` 
   TAU_MPI_FLIBS=`make --no-print-directory -f _make.tau.tmp print-TAU_MPI_FLIBS`
+  TAU_DEFS=`make --no-print-directory -f _make.tau.tmp print-TAU_DEFS`
+  TAU_INCLUDE=`make --no-print-directory -f _make.tau.tmp print-TAU_INCLUDE`
+
   rm -f _make.tau.tmp
 fi
 # done getting TAU variables
