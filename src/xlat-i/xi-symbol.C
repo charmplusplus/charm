@@ -2657,6 +2657,12 @@ SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr
 
 ///////////////////////////// ENTRY ////////////////////////////
 
+void ParamList::checkParamList(){
+  if(manyPointers){ 
+    die("You may pass only a single pointer to a non-local entry method. It should point to a message.", param->line);
+    abort();
+  }
+}
 
 Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, char *e, int connect, ParamList *connectPList) :
       attribs(a), retType(r), name((char *)n), param(p), stacksize(sz), sdagCon(sc), intExpr(e), isConnect(connect), connectParam(connectPList)
@@ -2670,6 +2676,10 @@ Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, Sdag
   if(retType && !isSync() && !isIget() && !isLocal() && !retType->isVoid())
     die("A remote method normally returns void.  To return non-void, you need to declare the method as [sync], which means it has blocking semantics.",line);
   if (isPython()) pythonDoc = python_doc;
+  if(!isLocal() && p){
+    p->checkParamList();
+  }
+
 }
 void Entry::setChare(Chare *c) {
 	Member::setChare(c);

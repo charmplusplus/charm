@@ -350,18 +350,17 @@ class ParamList {
     int orEach(pred_t f);
     typedef void (Parameter::*fn_t)(XStr &str);
     void callEach(fn_t f,XStr &str);
+    bool manyPointers;
   public:
     Parameter *param;
     ParamList *next;
-    ParamList(ParamList *pl) :param(pl->param), next(pl->next) {}
+    ParamList(ParamList *pl) :param(pl->param), next(pl->next), manyPointers(false) {}
     ParamList(Parameter *Nparam,ParamList *Nnext=NULL)
     	:param(Nparam), next(Nnext) { 
-/*
+          manyPointers = false;
           if(next != NULL && (param->isMessage() || next->isMessage())){
-            die("You may pass only a single pointer to an entry method. It should point to a message.", param->line);
-            abort();
+            manyPointers = true;
           }
-*/
     }
     void print(XStr &str,int withDefaultValues=0,int useConst=1);
     void printAddress(XStr &str);
@@ -420,6 +419,7 @@ class ParamList {
       if (!next || !plist.next) return 0;
       return *next ==  *plist.next;
     }
+    void checkParamList();
 };
 
 class FuncType : public Type {
