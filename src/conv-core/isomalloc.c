@@ -59,6 +59,7 @@ static int read_randomflag(void)
   else {
     random_flag = -1;
   }
+  fclose(fp);
   CmiUnlock(smp_mutex);
   return random_flag;
 }
