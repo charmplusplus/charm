@@ -55,6 +55,7 @@ static int read_randomflag(void)
   fp = fopen("/proc/sys/kernel/randomize_va_space", "r");
   if (fp != NULL) {
     fscanf(fp, "%d", &random_flag);
+    fclose(fp);
   }
   else {
     random_flag = -1;
