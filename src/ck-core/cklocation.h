@@ -198,7 +198,8 @@ public:
   /// Control the load balancer:
   void startTiming(void);
   void stopTiming(void);
-  void setObjTiming(double cputime);
+  void setObjTime(double cputime);
+  double getObjTime();
 #else
   inline void startTiming(void) {  }
   inline void stopTiming(void) { }
@@ -325,7 +326,8 @@ protected:
 public:
   virtual void ResumeFromSync(void);
   virtual void UserSetLBLoad(void);  /// user define this when setLBLoad is true
-  void setObjTiming(double cputime);
+  void setObjTime(double cputime);
+  double getObjTime();
 
 #if CMK_LBDB_ON  //For load balancing:
   void AtSync(int waitForMigration=1);

@@ -946,8 +946,11 @@ void CkMigratable::UserSetLBLoad() {
 
 #if CMK_LBDB_ON  //For load balancing:
 // user can call this helper function to set obj load (for model-based lb)
-void CkMigratable::setObjTiming(double cputime) {
-	myRec->setObjTiming(cputime);
+void CkMigratable::setObjTime(double cputime) {
+	myRec->setObjTime(cputime);
+}
+double CkMigratable::getObjTime() {
+	return myRec->getObjTime();
 }
 
 void CkMigratable::ckFinishConstruction(void)
@@ -1049,7 +1052,8 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
 	CthAddListener(tid,(struct CthThreadListener *)a);
 }
 #else
-void CkMigratable::setObjTiming(double cputime) {}
+void CkMigratable::setObjTime(double cputime) {}
+double CkMigratable::getObjTime() {return 0.0;}
 
 /* no load balancer: need dummy implementations to prevent link error */
 void CkMigratable::CkAddThreadListeners(CthThread tid, void *msg)
@@ -1154,8 +1158,13 @@ void CkLocRec_local::stopTiming(void) {
   	if (running && enable_measure) the_lbdb->ObjectStop(ldHandle);
   	running=CmiFalse;
 }
-void CkLocRec_local::setObjTiming(double cputime) {
+void CkLocRec_local::setObjTime(double cputime) {
 	the_lbdb->EstObjLoad(ldHandle, cputime);
+}
+double CkLocRec_local::getObjTime() {
+        double walltime, cputime;
+        the_lbdb->ObjTime(ldHandle, walltime, cputime);
+        return walltime;
 }
 #endif
 
