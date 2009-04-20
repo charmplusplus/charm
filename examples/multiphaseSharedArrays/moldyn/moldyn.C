@@ -20,7 +20,7 @@ PUPbytes(XYZ);
 class AtomInfo {
 public:
     double mass, charge;
-    AtomInfo() { mass = charge = 0.0; }
+  AtomInfo() : mass(0.0), charge(0.0) { }
     AtomInfo(const int rhs) { mass = charge = (double)rhs; } // identity value
     AtomInfo& operator+= (const AtomInfo& rhs) { } // we're not calling accumulate on this
 };
@@ -159,7 +159,9 @@ private:
 
 protected:
     XyzMSA coords;
+  XyzMSA::Handle *hCoords;
     XyzMSA forces;
+  XyzMSA::Handle *hForces;
     AtomInfoMSA atominfo;
     NeighborMSA nbrList;
 
@@ -173,6 +175,7 @@ protected:
         nbrList.enroll(numWorkers);
     }
 
+#if 0
     void SyncArrays()
     {
         coords.sync();
@@ -180,6 +183,7 @@ protected:
         atominfo.sync();
         nbrList.sync();
     }
+#endif
 
     void FillArrays()
     {
@@ -217,8 +221,6 @@ protected:
         return 0;
     }
 
-    // ================================================================
-
     void DoWork()
     {
         unsigned int i_start, i_end, j_start, j_end;
@@ -228,6 +230,7 @@ protected:
         for (unsigned int timestep = 0; timestep < NUM_TIMESTEPS; timestep++) {
             /**************** Phase I ****************/
             // for a section of the interaction matrix
+			XyzMSA::Accum aForces = forces.syncToAccum(*hForces);
             for (unsigned int i = i_start; i< i_end; i++)
                 for (unsigned int j = j_start; j< j_end; j++)
                     if (nbrList.get(i,j)) { // nbrlist enters ReadOnly mode
@@ -235,15 +238,15 @@ protected:
                                                    atominfo[i],
                                                    coords[j],
                                                    atominfo[j]);
-                        forces.accumulate(i,  force); // Accumulate mode
-                        forces.accumulate(j, force.negate());
+                        aForces.accumulate(i,  force); // Accumulate mode
+                        aForces.accumulate(j, force.negate());
                     }
-            forces.sync();
+			XyzMSA::Read rForces = forces.syncToRead(aForces);
 
             /**************** Phase II ****************/
             unsigned int myAtomsBegin, myAtomsEnd;
             for (unsigned int k = myAtomsBegin; k<myAtomsEnd; k++)
-                coords.set(k) = integrate(atominfo[k], forces[k]); // WriteOnly mode
+                coords.set(k) = integrate(atominfo[k], rForces[k]); // WriteOnly mode
             coords.sync();
 
             /**************** Phase III ****************/
@@ -350,7 +353,7 @@ public:
         description.push_back("  fill");
 
         if(verbose) ckout << thisIndex << ": syncing" << endl;
-        SyncArrays();
+        //SyncArrays();
         times.push_back(CkWallTimer()); // 4
         description.push_back("    sync");
 
