@@ -3,8 +3,35 @@
 
 \label{advancedlb}
 
-\subsubsection{Write a Measurement-based Object Migration Strategy}
+\subsubsection{Control CPU Load Statistics}
 
+Charm++ programmers can control CPU load data in the load balancing database
+before a load balancing phase is started (which is the time when load balancing
+database is collected and used by load balancing strategies).
+
+In an array element, the following function can be invoked to overwrite the 
+CPU load that is measured by load balancing framework.
+
+\begin{alltt}
+   double newTiming;
+   setObjTime(newTiming);
+\end{alltt}
+
+{\em setObjTime()} is defined as a method of class {\em CkMigratable}, which is
+the superclass of all array elements.
+
+The users can also retrieve the current timing that the load balancing runtime
+has measured for the current array element. 
+ 
+\begin{alltt} 
+   double measuredTiming; 
+   measuredTiming = getObjTime(); 
+\end{alltt}
+
+This is useful when the users want to derive a new CPU load based on the 
+existing one.
+
+\subsubsection{Write a Measurement-based Object Migration Strategy}
 \label{writelb}
 
 Charm++ programmers can pick load balancing strategy from Charm++'s built-in
@@ -29,7 +56,7 @@ and output the new mapping of objects to processors in {\em stats->to\_proc} arr
 
 \item To compile the strategy files, first add {\em fooLB} into the load 
 balancer list in charm/tmp/Makefile\_lb.sh. Run the script in charm/tmp, 
-which creates the new Makefile namded ``Make.lb''.
+which creates the new Makefile named ``Make.lb''.
 
 \item Run ``make depends'' to update dependence rule of Charm++ files.
    And run ``make charm++'' to compile Charm++ which includes the new 
