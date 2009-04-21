@@ -4974,7 +4974,7 @@ void AMPI_Set_load(double load)
 {
   AMPIAPI("AMPI_Set_load");
   ampiParent *ptr = getAmpiParent();
-  ptr->setObjTiming(load);
+  ptr->setObjTime(load);
 }
 
 CDECL
