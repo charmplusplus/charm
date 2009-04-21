@@ -31,6 +31,33 @@ has measured for the current array element.
 This is useful when the users want to derive a new CPU load based on the 
 existing one.
 
+\subsubsection{Model-based Load Balancing}
+
+Charm++ programmers can also choose to feed load balancer with their own CPU
+timing of each Chare based on certain computational model of the applications.
+
+To do so, first turn off automatic CPU load measurement completely
+by setting:
+
+\begin{alltt}
+   usesAutoMeasure = CmiFalse;
+\end{alltt}
+
+in array element's constructor.
+
+Then the users need to implement the following function to the chare array
+classes:
+
+\begin{alltt}
+   virtual void CkMigratable::UserSetLBLoad();      // defined in base class
+\end{alltt}
+
+This function served as a callback that is called on each chare object when
+{\em AtSync()} is called and ready to do load balancing. The implementation of
+{\em UserSetLBLoad()} is simply to set the current chare object's CPU load to
+load balancer framework. {\em setObjTime()} described above can be used for
+this.
+
 \subsubsection{Write a Measurement-based Object Migration Strategy}
 \label{writelb}
 
