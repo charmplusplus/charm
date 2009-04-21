@@ -55,6 +55,8 @@ test -z "$OPTS_PIC" && OPTS_PIC='-fpic'
 CHARMDEBUG=""
 LINK_PYTHON=""
 OBJECT=""
+EXPLICIT_OBJECT="no"
+EXPLICIT_COMPILATION="no"
 POST_LANGUAGE=""
 POST_LIBRARIES=""    
 PRE_LIBRARIES=""  
@@ -611,11 +613,22 @@ do
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
 		;;
+	"-default-to-aout")
+		if [ "$EXPLICIT_OBJECT $EXPLICIT_COMPILATION" == "no no" ]
+		    then
+		      OBJECT="a.out"
+		fi
+		;;
 	"-c")
-# This is ignored.
+		if [ "$EXPLICIT_OBJECT" == "no" ]
+		    then
+		      OBJECT=""
+		fi
+		EXPLICIT_COMPILATION="yes"
 		;;
 
 	"-o")
+		EXPLICIT_OBJECT="yes"
 		OBJECT=$1
 		shift
 		;;
