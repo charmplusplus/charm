@@ -17,508 +17,585 @@
 #endif
 
 
-// Solaris does not support sqrtf (float), so just map it to sqrt (double) instead
+/* Solaris does not support sqrtf (float), so just map it to sqrt (double) instead */
 #if !CMK_HAS_SQRTF
   #define sqrtf(a) ((float)(sqrt((double)(a))))
 #endif
 
 
-// DMK - DEBUG - Flag to force SSE not to be used
-#define FORCE_NO_SSE   (0)
+/* Flags to force architecture specific SIMD instructions off */
+#define FORCE_NO_SSE       (0)
+#define FORCE_NO_ALTIVEC   (0)
+#define FORCE_NO_SPE_SIMD  (0)
 
 
-////////////////////////////////////////////////////////////////////////////////
-// Vector Types
+/***** Math Constants *****/
+#define __SIMD__CONSTANT_PI      (3.141592653589793)
+#define __SIMD__CONSTANT_E       (2.718281828459045)
+#define __SIMD__CONSTANT_SQRT_2  (1.414213562373095)
+/* TODO | FIXME - Added intrinsics below for loading/creating vectors with these values */
 
-typedef struct __vec_8_c  {           char v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15; } __vec16c;
-typedef struct __vec_8_uc {  unsigned char v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15; } __vec16uc;
-typedef struct __vec_8_s  {          short v0, v1, v2, v3, v4, v5, v6, v7; } __vec8s;
-typedef struct __vec_8_us { unsigned short v0, v1, v2, v3, v4, v5, v6, v7; } __vec8us;
-typedef struct __vec_4_i  {            int v0, v1, v2, v3; } __vec4i;
-typedef struct __vec_4_ui {   unsigned int v0, v1, v2, v3; } __vec4ui;
-typedef struct __vec_4_f  {          float v0, v1, v2, v3; } __vec4f;
-typedef struct __vec_2_lf {         double v0, v1; } __vec2lf;
 
-#if defined(__SSE2__) && !(FORCE_NO_SSE)   // SSE2
+/*******************************************************************************
+ *******************************************************************************
+ ***** Generic C Implementation
+ *******************************************************************************
+ *******************************************************************************/
 
-  typedef  __vec16c  vec16c;
-  typedef __vec16uc vec16uc;
-  typedef   __vec8s   vec8s;
-  typedef  __vec8us  vec8us;
-  typedef  __vec4ui  vec4ui;
+/* NOTE: This is declared first so any architecture specific implementations
+ *   can simply use the generic functions for specific data types or operations
+ *   that they do not implement.
+ */
+ 
+/***** Data Types *****/
+/*
+ * typedef struct __vec_16_c  {           char v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15; } __vec16c;
+ * typedef struct __vec_16_uc {  unsigned char v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15; } __vec16uc;
+ * typedef struct __vec_8_s  {          short v0, v1, v2, v3, v4, v5, v6, v7; } __vec8s;
+ * typedef struct __vec_8_us { unsigned short v0, v1, v2, v3, v4, v5, v6, v7; } __vec8us;
+ * typedef struct __vec_4_ui {   unsigned int v0, v1, v2, v3; } __vec4ui;
+ */
+typedef struct __vec_4_i  {    int v0, v1, v2, v3; }  __vec4i;
+typedef struct __vec_4_f  {  float v0, v1, v2, v3; }  __vec4f;
+typedef struct __vec_2_lf { double v0, v1;         } __vec2lf;
 
+
+/***** Insert *****/
+inline  __vec4i  __vinsert4i( __vec4i v, const    int s, const int i) {  __vec4i r = v;    int* rPtr = (   int*)(&r); rPtr[i] = s; return r; }
+inline  __vec4f  __vinsert4f( __vec4f v, const  float s, const int i) {  __vec4f r = v;  float* rPtr = ( float*)(&r); rPtr[i] = s; return r; }
+inline __vec2lf __vinsert2lf(__vec2lf v, const double s, const int i) { __vec2lf r = v; double* rPtr = (double*)(&r); rPtr[i] = s; return r; }
+
+/***** Extract *****/
+inline    int  __vextract4i( __vec4i v, const int i) {    int* vPtr = (   int*)(&v); return vPtr[i]; }
+inline  float  __vextract4f( __vec4f v, const int i) {  float* vPtr = ( float*)(&v); return vPtr[i]; }
+inline double __vextract2lf(__vec2lf v, const int i) { double* vPtr = (double*)(&v); return vPtr[i]; }
+
+/***** Set *****/
+inline  __vec4i  __vset4i(const    int a) {  __vec4i r; r.v0 = r.v1 = r.v2 = r.v3 = a; return r; }
+inline  __vec4f  __vset4f(const  float a) {  __vec4f r; r.v0 = r.v1 = r.v2 = r.v3 = a; return r; }
+inline __vec2lf __vset2lf(const double a) { __vec2lf r; r.v0 = r.v1 =               a; return r; }
+
+/* NOTE: Would it be better to generate the constants instead of read them from memory in the generic version? */
+
+/***** Constant Zero *****/
+const  __vec4i  __const_vzero4i __attribute__((aligned(16))) = {   0 ,   0 ,   0 ,   0  };
+const  __vec4f  __const_vzero4f __attribute__((aligned(16))) = { 0.0f, 0.0f, 0.0f, 0.0f };
+const __vec2lf __const_vzero2lf __attribute__((aligned(16))) = { 0.0 , 0.0              };
+
+/***** Constant One *****/
+const  __vec4i  __const_vone4i __attribute__((aligned(16))) = {   1 ,   1 ,   1 ,   1  };
+const  __vec4f  __const_vone4f __attribute__((aligned(16))) = { 1.0f, 1.0f, 1.0f, 1.0f };
+const __vec2lf __const_vone2lf __attribute__((aligned(16))) = { 1.0 , 1.0              };
+
+/***** Constant Two *****/
+const  __vec4i  __const_vtwo4i __attribute__((aligned(16))) = {   2 ,   2 ,   2 ,   2  };
+const  __vec4f  __const_vtwo4f __attribute__((aligned(16))) = { 2.0f, 2.0f, 2.0f, 2.0f };
+const __vec2lf __const_vtwo2lf __attribute__((aligned(16))) = { 2.0 , 2.0              };
+
+/***** Constant Negative One *****/
+const  __vec4i  __const_vnegone4i __attribute__((aligned(16))) = {   -1 ,   -1 ,   -1 ,   -1  };
+const  __vec4f  __const_vnegone4f __attribute__((aligned(16))) = { -1.0f, -0.0f, -1.0f, -1.0f };
+const __vec2lf __const_vnegone2lf __attribute__((aligned(16))) = { -1.0 , -1.0                };
+
+/* TODO | FIXME - Try to create constants such that it does not require a
+ * memory operations to access the constants (like the SSE constants).
+ */
+
+/***** Rotate *****/
+inline  __vec4i  __vroth4i(const  __vec4i a, int s) {  __vec4i b;    int* a_ptr = (   int*)(&a);    int* b_ptr = (   int*)(&b); s &= 0x3; b_ptr[0] = a_ptr[(0-s)&0x3]; b_ptr[1] = a_ptr[(1-s)&0x3]; b_ptr[2] = a_ptr[(2-s)&0x3]; b_ptr[3] = a_ptr[(3-s)&0x3]; return b; }
+inline  __vec4f  __vroth4f(const  __vec4f a, int s) {  __vec4f b;  float* a_ptr = ( float*)(&a);  float* b_ptr = ( float*)(&b); s &= 0x3; b_ptr[0] = a_ptr[(0-s)&0x3]; b_ptr[1] = a_ptr[(1-s)&0x3]; b_ptr[2] = a_ptr[(2-s)&0x3]; b_ptr[3] = a_ptr[(3-s)&0x3]; return b; }
+inline __vec2lf __vroth2lf(const __vec2lf a, int s) { __vec2lf b; double* a_ptr = (double*)(&a); double* b_ptr = (double*)(&b); s &= 0x1; b_ptr[0] = a_ptr[(0-s)&0x1]; b_ptr[1] = a_ptr[(1-s)&0x1]; return b; }
+inline  __vec4i  __vrotl4i(const  __vec4i a, int s) {  __vec4i b;    int* a_ptr = (   int*)(&a);    int* b_ptr = (   int*)(&b); s &= 0x3; b_ptr[0] = a_ptr[(0+s)&0x3]; b_ptr[1] = a_ptr[(1+s)&0x3]; b_ptr[2] = a_ptr[(2+s)&0x3]; b_ptr[3] = a_ptr[(3+s)&0x3]; return b; }
+inline  __vec4f  __vrotl4f(const  __vec4f a, int s) {  __vec4f b;  float* a_ptr = ( float*)(&a);  float* b_ptr = ( float*)(&b); s &= 0x3; b_ptr[0] = a_ptr[(0+s)&0x3]; b_ptr[1] = a_ptr[(1+s)&0x3]; b_ptr[2] = a_ptr[(2+s)&0x3]; b_ptr[3] = a_ptr[(3+s)&0x3]; return b; }
+inline __vec2lf __vrotl2lf(const __vec2lf a, int s) { __vec2lf b; double* a_ptr = (double*)(&a); double* b_ptr = (double*)(&b); s &= 0x1; b_ptr[0] = a_ptr[(0+s)&0x1]; b_ptr[1] = a_ptr[(1+s)&0x1]; return b; }
+
+/***** Addition *****/
+inline  __vec4i  __vadd4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; r.v0 = a.v0 + b.v0; r.v1 = a.v1 + b.v1; r.v2 = a.v2 + b.v2; r.v3 = a.v3 + b.v3; return r; }
+inline  __vec4f  __vadd4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; r.v0 = a.v0 + b.v0; r.v1 = a.v1 + b.v1; r.v2 = a.v2 + b.v2; r.v3 = a.v3 + b.v3; return r; }
+inline __vec2lf __vadd2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; r.v0 = a.v0 + b.v0; r.v1 = a.v1 + b.v1;                                         return r; }
+
+/***** Subtraction *****/
+inline  __vec4i  __vsub4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; r.v0 = a.v0 - b.v0; r.v1 = a.v1 - b.v1; r.v2 = a.v2 - b.v2; r.v3 = a.v3 - b.v3; return r; }
+inline  __vec4f  __vsub4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; r.v0 = a.v0 - b.v0; r.v1 = a.v1 - b.v1; r.v2 = a.v2 - b.v2; r.v3 = a.v3 - b.v3; return r; }
+inline __vec2lf __vsub2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; r.v0 = a.v0 - b.v0; r.v1 = a.v1 - b.v1;                                         return r; }
+
+/***** Multiplication *****/
+inline  __vec4i  __vmul4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; r.v0 = a.v0 * b.v0; r.v1 = a.v1 * b.v1; r.v2 = a.v2 * b.v2; r.v3 = a.v3 * b.v3; return r; }
+inline  __vec4f  __vmul4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; r.v0 = a.v0 * b.v0; r.v1 = a.v1 * b.v1; r.v2 = a.v2 * b.v2; r.v3 = a.v3 * b.v3; return r; }
+inline __vec2lf __vmul2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; r.v0 = a.v0 * b.v0; r.v1 = a.v1 * b.v1;                                         return r; }
+
+/***** Division *****/
+inline  __vec4i  __vdiv4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; r.v0 = a.v0 / b.v0; r.v1 = a.v1 / b.v1; r.v2 = a.v2 / b.v2; r.v3 = a.v3 / b.v3; return r; }
+inline  __vec4f  __vdiv4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; r.v0 = a.v0 / b.v0; r.v1 = a.v1 / b.v1; r.v2 = a.v2 / b.v2; r.v3 = a.v3 / b.v3; return r; }
+inline __vec2lf __vdiv2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; r.v0 = a.v0 / b.v0; r.v1 = a.v1 / b.v1;                                         return r; }
+
+/***** Fused Multiply Add *****/
+inline  __vec4i  __vmadd4i(const  __vec4i a, const  __vec4i b, const  __vec4i c) {  __vec4i r; r.v0 = a.v0 * b.v0 + c.v0; r.v1 = a.v1 * b.v1 + c.v1; r.v2 = a.v2 * b.v2 + c.v2; r.v3 = a.v3 * b.v3 + c.v3; return r; }
+inline  __vec4f  __vmadd4f(const  __vec4f a, const  __vec4f b, const  __vec4f c) {  __vec4f r; r.v0 = a.v0 * b.v0 + c.v0; r.v1 = a.v1 * b.v1 + c.v1; r.v2 = a.v2 * b.v2 + c.v2; r.v3 = a.v3 * b.v3 + c.v3; return r; }
+inline __vec2lf __vmadd2lf(const __vec2lf a, const __vec2lf b, const __vec2lf c) { __vec2lf r; r.v0 = a.v0 * b.v0 + c.v0; r.v1 = a.v1 * b.v1 + c.v1;                                                       return r; }
+
+/***** Reciprocal *****/
+/* TODO | FIXME  - See if there is a better way to do this (few cycles and avoid the memory load) */
+inline  __vec4f  __vrecip4f(const  __vec4f a) {  __vec4f r; r.v0 = 1.0f / a.v0; r.v1 = 1.0f / a.v1; r.v2 = 1.0f / a.v2; r.v3 = 1.0f / a.v3; return r; }
+inline __vec2lf __vrecip2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / a.v0; r.v1 = 1.0 / a.v1; return r; }
+
+/***** Square Root *****/
+inline  __vec4f  __vsqrt4f(const  __vec4f a) {  __vec4f r; r.v0 = sqrtf(a.v0); r.v1 = sqrtf(a.v1); r.v2 = sqrtf(a.v2); r.v3 = sqrtf(a.v3); return r; }
+inline __vec2lf __vsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = sqrt(a.v0); r.v1 = sqrt(a.v1); return r; }
+
+/***** Reciprocal Square Root *****/
+inline  __vec4f  __vrsqrt4f(const  __vec4f a) {  __vec4f r; r.v0 = 1.0f / sqrtf(a.v0); r.v1 = 1.0f / sqrtf(a.v1); r.v2 = 1.0f / sqrtf(a.v2); r.v3 = 1.0f / sqrtf(a.v3); return r; }
+inline __vec2lf __vrsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / sqrt(a.v0); r.v1 = 1.0 / sqrt(a.v1); return r; }
+
+
+/*******************************************************************************
+ ***** C++ Operators for Generic Implementation
+ *******************************************************************************/
+#if defined(__cplusplus)
+
+  /***** Addition *****/
+  inline  __vec4i operator+(const  __vec4i &a, const  __vec4i &b) { return  __vadd4i(a, b); }
+  inline  __vec4f operator+(const  __vec4f &a, const  __vec4f &b) { return  __vadd4f(a, b); }
+  inline __vec2lf operator+(const __vec2lf &a, const __vec2lf &b) { return __vadd2lf(a, b); }
+  inline  __vec4i operator+=( __vec4i &a, const  __vec4i &b) { a =  __vadd4i(a, b); return a; }
+  inline  __vec4f operator+=( __vec4f &a, const  __vec4f &b) { a =  __vadd4f(a, b); return a; }
+  inline __vec2lf operator+=(__vec2lf &a, const __vec2lf &b) { a = __vadd2lf(a, b); return a; }
+
+  /***** Subtraction *****/
+  inline  __vec4i operator-(const  __vec4i &a, const  __vec4i &b) { return  __vsub4i(a, b); }
+  inline  __vec4f operator-(const  __vec4f &a, const  __vec4f &b) { return  __vsub4f(a, b); }
+  inline __vec2lf operator-(const __vec2lf &a, const __vec2lf &b) { return __vsub2lf(a, b); }
+  inline  __vec4i operator-=( __vec4i &a, const  __vec4i &b) { a =  __vsub4i(a, b); return a; }
+  inline  __vec4f operator-=( __vec4f &a, const  __vec4f &b) { a =  __vsub4f(a, b); return a; }
+  inline __vec2lf operator-=(__vec2lf &a, const __vec2lf &b) { a = __vsub2lf(a, b); return a; }
+
+  /***** Multiplication *****/
+  inline  __vec4f operator*(const  __vec4f &a, const  __vec4f &b) { return  __vmul4f(a, b); }
+  inline __vec2lf operator*(const __vec2lf &a, const __vec2lf &b) { return __vmul2lf(a, b); }
+  inline  __vec4f operator*=( __vec4f &a, const  __vec4f &b) { a =  __vmul4f(a, b); return a; }
+  inline __vec2lf operator*=(__vec2lf &a, const __vec2lf &b) { a = __vmul2lf(a, b); return a; }
+
+  /***** Division *****/
+  inline  __vec4f operator/(const  __vec4f &a, const  __vec4f &b) { return  __vdiv4f(a, b); }
+  inline __vec2lf operator/(const __vec2lf &a, const __vec2lf &b) { return __vdiv2lf(a, b); }
+  inline  __vec4f operator/=( __vec4f &a, const  __vec4f &b) { a =  __vdiv4f(a, b); return a; }
+  inline __vec2lf operator/=(__vec2lf &a, const __vec2lf &b) { a = __vdiv2lf(a, b); return a; }
+
+#endif /* defined(__cplusplus) */
+
+
+/*******************************************************************************
+ *******************************************************************************
+ ***** SSE Support
+ *******************************************************************************
+ *******************************************************************************/
+#if defined(__SSE2__) && (!(FORCE_NO_SSE))
+
+  /* NOTE | TODO | FIXME : Add checks for various version of SSE.  For now, only
+   *   support and assume that minimum level SSE2.
+   */
+
+  /***** Data Types *****/
   typedef __m128i  vec4i;
   typedef  __m128  vec4f;
   typedef __m128d vec2lf;
 
-#elif CMK_CELL_SPE != 0    // Cell - SPE
+  /***** Insert *****/
+  /* TODO | FIXME - Try to make these functions not reference memory so values stay in registers */
+  inline  vec4i  vinsert4i( vec4i v, const    int s, const int i) {  vec4i r = v;    int* rPtr = (   int*)(&r); rPtr[i] = s; return r; }
+  inline  vec4f  vinsert4f( vec4f v, const  float s, const int i) {  vec4f r = v;  float* rPtr = ( float*)(&r); rPtr[i] = s; return r; }
+  inline vec2lf vinsert2lf(vec2lf v, const double s, const int i) { vec2lf r = v; double* rPtr = (double*)(&r); rPtr[i] = s; return r; }
 
-  typedef vector signed char vec16c;
-  typedef vector unsigned char vec16uc;
-  typedef vector signed short vec8s;
-  typedef vector unsigned short vec8us;
-  typedef vector signed int vec4i;
-  typedef vector unsigned int vec4ui;
-  typedef vector float vec4f;
-  typedef vector double vec2lf;
+  /***** Extract *****/
+  /* TODO | FIXME - Try to make these functions not reference memory so values stay in registers */
+  inline    int  vextract4i( vec4i v, const int i) { return ((   int*)(&v))[i]; }
+  inline  float  vextract4f( vec4f v, const int i) { return (( float*)(&v))[i]; }
+  inline double vextract2lf(vec2lf v, const int i) { return ((double*)(&v))[i]; }
 
-#elif defined(__VEC__)   // AltiVec
+  /***** Set *****/
+  #define  vset4i(a)  (_mm_set1_epi32((int)(a)))
+  #define  vset4f(a)  (_mm_set1_ps((float)(a)))
+  #define vset2lf(a)  (_mm_set1_pd((double)(a)))
 
-  typedef vector signed char vec16c;
-  typedef vector unsigned char vec16uc;
-  typedef vector signed short vec8s;
-  typedef vector unsigned short vec8us;
-  typedef vector signed int vec4i;
-  typedef vector unsigned int vec4ui;
-  typedef vector float vec4f;
+  /***** Constant Zero *****/
+  #define  const_vzero4i  (_mm_setzero_si128())
+  #define  const_vzero4f  (_mm_setzero_ps())
+  #define const_vzero2lf  (_mm_setzero_pd())
 
-  typedef  __vec2lf  vec2lf;
+  /***** Constant One *****/
+  #define  const_vone4i  (vset4i(1))
+  #define  const_vone4f  (vset4f(1.0f))
+  #define const_vone2lf  (vset2lf(1.0))
 
-#else                    // General C
+  /***** Constant Two *****/
+  #define  const_vtwo4i  (vset4i(2))
+  #define  const_vtwo4f  (vset4f(2.0f))
+  #define const_vtwo2lf  (vset2lf(2.0))
 
-  typedef  __vec16c  vec16c;
-  typedef __vec16uc vec16uc;
-  typedef   __vec8s   vec8s;
-  typedef  __vec8us  vec8us;
-  typedef   __vec4i   vec4i;
-  typedef  __vec4ui  vec4ui;
-  typedef   __vec4f   vec4f;
-  typedef  __vec2lf  vec2lf;
+  /***** Constant Negative One *****/
+  #define  const_vnegone4i  (vset4i(-1))
+  #define  const_vnegone4f  (vset4f(-1.0f))
+  #define const_vnegone2lf  (vset2lf(-1.0))
 
-#endif
+  /***** Rotate *****/
+  /* TODO : FIXME - Find a better way to do Rotate in SSE */
+  inline  vec4i  vroth4i(const  vec4i &a, int s) {  vec4i b;    int* a_ptr = (   int*)(&a);    int* b_ptr = (   int*)(&b); s &= 0x3; b_ptr[0] = a_ptr[(0-s)&0x3]; b_ptr[1] = a_ptr[(1-s)&0x3]; b_ptr[2] = a_ptr[(2-s)&0x3]; b_ptr[3] = a_ptr[(3-s)&0x3]; return b; }
+  inline  vec4f  vroth4f(const  vec4f &a, int s) {  vec4f b;  float* a_ptr = ( float*)(&a);  float* b_ptr = ( float*)(&b); s &= 0x3; b_ptr[0] = a_ptr[(0-s)&0x3]; b_ptr[1] = a_ptr[(1-s)&0x3]; b_ptr[2] = a_ptr[(2-s)&0x3]; b_ptr[3] = a_ptr[(3-s)&0x3]; return b; }
+  inline vec2lf vroth2lf(const vec2lf &a, int s) { vec2lf b; double* a_ptr = (double*)(&a); double* b_ptr = (double*)(&b); s &= 0x1; b_ptr[0] = a_ptr[(0-s)&0x1]; b_ptr[1] = a_ptr[(1-s)&0x1]; return b; }
+  inline  vec4i  vrotl4i(const  vec4i &a, int s) {  vec4i b;    int* a_ptr = (   int*)(&a);    int* b_ptr = (   int*)(&b); s &= 0x3; b_ptr[0] = a_ptr[(0+s)&0x3]; b_ptr[1] = a_ptr[(1+s)&0x3]; b_ptr[2] = a_ptr[(2+s)&0x3]; b_ptr[3] = a_ptr[(3+s)&0x3]; return b; }
+  inline  vec4f  vrotl4f(const  vec4f &a, int s) {  vec4f b;  float* a_ptr = ( float*)(&a);  float* b_ptr = ( float*)(&b); s &= 0x3; b_ptr[0] = a_ptr[(0+s)&0x3]; b_ptr[1] = a_ptr[(1+s)&0x3]; b_ptr[2] = a_ptr[(2+s)&0x3]; b_ptr[3] = a_ptr[(3+s)&0x3]; return b; }
+  inline vec2lf vrotl2lf(const vec2lf &a, int s) { vec2lf b; double* a_ptr = (double*)(&a); double* b_ptr = (double*)(&b); s &= 0x1; b_ptr[0] = a_ptr[(0+s)&0x1]; b_ptr[1] = a_ptr[(1+s)&0x1]; return b; }
 
-
-////////////////////////////////////////////////////////////////////////////////
-// Functions for modifying elements
-
-///// Extract /////
-// Desc: Returns element 'i' from vector 'a'
-#if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
-
-  inline float vextract4f(const vec4f &a, const int i) { return ((float*)(&a))[i]; }
-
-#elif CMK_CELL_SPE != 0    // Cell - SPE
-
-  #define  vextract16c(a, i) (spu_extract((a), (i)))
-  #define vextract16uc(a, i) (spu_extract((a), (i)))
-  #define   vextract8s(a, i) (spu_extract((a), (i)))
-  #define  vextract8us(a, i) (spu_extract((a), (i)))
-  #define   vextract4i(a, i) (spu_extract((a), (i)))
-  #define  vextract4ui(a, i) (spu_extract((a), (i)))
-  #define   vextract4f(a, i) (spu_extract((a), (i)))
-  #define  vextract2lf(a, i) (spu_extract((a), (i)))
-
-#elif defined(__VEC__)   // AltiVec
-
-  inline float vextract4f(const vec4f &a, const int i) { return ((float*)(&a))[i]; }
-
-#else                    // General C
-
-  inline           char  vextract16c(const  vec16c &a, const int i) { return *(((          char*)(&a))+i); }
-  inline  unsigned char vextract16uc(const vec16uc &a, const int i) { return *((( unsigned char*)(&a))+i); }
-  inline          short   vextract8s(const   vec8s &a, const int i) { return *(((         short*)(&a))+i); }
-  inline unsigned short  vextract8us(const  vec8us &a, const int i) { return *(((unsigned short*)(&a))+i); }
-  inline            int   vextract4i(const   vec4i &a, const int i) { return *(((           int*)(&a))+i); }
-  inline   unsigned int  vextract4ui(const  vec4ui &a, const int i) { return *(((  unsigned int*)(&a))+i); }
-  inline          float   vextract4f(const   vec4f &a, const int i) { return *(((         float*)(&a))+i); }
-  inline         double  vextract2lf(const  vec2lf &a, const int i) { return *(((        double*)(&a))+i); }
-
-#endif
-
-
-///// Insert /////
-// Desc: Returns a vector that has scalar 's' inserted into vector 'v' at index 'i'
-#if defined(__SSE2__)      // SSE2
-
-
-#elif CMK_CELL_SPE != 0    // Cell - SPE
-
-  #define  vinsert16c(v, s, i) (spu_insert((s), (v), (i)))
-  #define vinsert16uc(v, s, i) (spu_insert((s), (v), (i)))
-  #define   vinsert8s(v, s, i) (spu_insert((s), (v), (i)))
-  #define  vinsert8us(v, s, i) (spu_insert((s), (v), (i)))
-  #define   vinsert4i(v, s, i) (spu_insert((s), (v), (i)))
-  #define  vinsert4ui(v, s, i) (spu_insert((s), (v), (i)))
-  #define   vinsert4f(v, s, i) (spu_insert((s), (v), (i)))
-  #define  vinsert2lf(v, s, i) (spu_insert((s), (v), (i)))
-
-#elif defined(__VEC__)   // AltiVec
-
-
-#else                    // General C
-
-  inline  vec16c  vinsert16c( vec16c v, const           char s, const int i) { ((          char*)&v)[i] = s; return v; }
-  inline vec16uc vinsert16uc(vec16uc v, const unsigned  char s, const int i) { ((unsigned  char*)&v)[i] = s; return v; }
-  inline   vec8s   vinsert8s(  vec8s v, const          short s, const int i) { ((         short*)&v)[i] = s; return v; }
-  inline  vec8us  vinsert8us( vec8us v, const unsigned short s, const int i) { ((unsigned short*)&v)[i] = s; return v; }
-  inline   vec4i   vinsert4i(  vec4i v, const            int s, const int i) { ((           int*)&v)[i] = s; return v; }
-  inline  vec4ui  vinsert4ui( vec4ui v, const unsigned   int s, const int i) { ((unsigned   int*)&v)[i] = s; return v; }
-  inline   vec4f   vinsert4f(  vec4f v, const          float s, const int i) { ((         float*)&v)[i] = s; return v; }
-  inline  vec2lf  vinsert2lf( vec2lf v, const         double s, const int i) { ((        double*)&v)[i] = s; return v; }
-
-#endif
-
-
-///// Spread /////
-// Desc: Returns a vector that has the scalar value 's' in all elements
-#if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
-
-  #define  vspread4f(a)  (_mm_set1_ps(a))
-  #define vspread2lf(a)  (_mm_set1_pd(a))
-
-  //inline vec4f vspread4f(const float s) { vec4f a; __vec_4_f* aPtr = (__vec_4_f*)(&a); aPtr->v0 = aPtr->v1 = aPtr->v2 = aPtr->v3 = s; return a; }
-
-#elif CMK_CELL_SPE != 0    // Cell - SPE
-
-  #define  vspread16c(s) (spu_splats(s))
-  #define vspread16uc(s) (spu_splats(s))
-  #define   vspread8s(s) (spu_splats(s))
-  #define  vspread8us(s) (spu_splats(s))
-  #define   vspread4i(s) (spu_splats(s))
-  #define  vspread4ui(s) (spu_splats(s))
-  #define   vspread4f(s) (spu_splats(s))
-  #define  vspread2lf(s) (spu_splats(s))
-
-#elif defined(__VEC__)   // AltiVec
-
-  inline vec4f vspread4f(const float s) { vec4f a; __vec_4_f* aPtr = (__vec_4_f*)(&a); aPtr->v0 = aPtr->v1 = aPtr->v2 = aPtr->v3 = s; return a; }
-
-#else                    // General C
-
-  inline  vec16c  vspread16c(const           char s) {  vec16c a; a.v0 = a.v1 = a.v2 = a.v3 = a.v4 = a.v5 = a.v6 = a.v7 = a.v8 = a.v9 = a.v10 = a.v11 = a.v12 = a.v13 = a.v14 = a.v15 = s; return a; }
-  inline vec16uc vspread16uc(const unsigned  char s) { vec16uc a; a.v0 = a.v1 = a.v2 = a.v3 = a.v4 = a.v5 = a.v6 = a.v7 = a.v8 = a.v9 = a.v10 = a.v11 = a.v12 = a.v13 = a.v14 = a.v15 = s; return a; }
-  inline   vec8s   vspread8s(const          short s) {   vec8s a; a.v0 = a.v1 = a.v2 = a.v3 = a.v4 = a.v5 = a.v6 = a.v7 = s; return a; }
-  inline  vec8us  vspread8us(const unsigned short s) {  vec8us a; a.v0 = a.v1 = a.v2 = a.v3 = a.v4 = a.v5 = a.v6 = a.v7 = s; return a; }
-  inline   vec4i   vspread4i(const            int s) {   vec4i a; a.v0 = a.v1 = a.v2 = a.v3 = s; return a; }
-  inline  vec4ui  vspread4ui(const unsigned   int s) {  vec4ui a; a.v0 = a.v1 = a.v2 = a.v3 = s; return a; }
-  inline   vec4f   vspread4f(const          float s) {   vec4f a; a.v0 = a.v1 = a.v2 = a.v3 = s; return a; }
-  inline  vec2lf  vspread2lf(const         double s) {  vec2lf a; a.v0 = a.v1 = s; return a; }
-
-#endif
-
-
-////////////////////////////////////////////////////////////////////////////////
-// Shift Operations
-
-///// Rotate /////
-// Desc: Returns the vector 'a' rotated (towards high or low) by 's' elements
-// NOTE: 'roth' => rotate towards higher element indexes
-//       'rotl' => rotate towards lower element indexes
-#if defined(__SSE2__)      // SSE2
-
-
-#elif CMK_CELL_SPE != 0    // Cell - SPE
-
-  #define  vroth16c(a, s) (spu_rlqwbyte((a), (0x10- ((s)&0xf)    ) ))
-  #define vroth16uc(a, s) (spu_rlqwbyte((a), (0x10- ((s)&0xf)    ) ))
-  #define   vroth8s(a, s) (spu_rlqwbyte((a), (0x10-(((s)&0x7)<<1)) ))
-  #define  vroth8us(a, s) (spu_rlqwbyte((a), (0x10-(((s)&0x7)<<1)) ))
-  #define   vroth4i(a, s) (spu_rlqwbyte((a), (0x10-(((s)&0x3)<<2)) ))
-  #define  vroth4ui(a, s) (spu_rlqwbyte((a), (0x10-(((s)&0x3)<<2)) ))
-  #define   vroth4f(a, s) (spu_rlqwbyte((a), (0x10-(((s)&0x3)<<2)) ))
-  #define  vroth2lf(a, s) (spu_rlqwbyte((a),       (((s)&0x1)<<3)  ))
-
-  #define  vrotl16c(a, s) (spu_rlqwbyte((a),  (s)&0xf    ))
-  #define vrotl16uc(a, s) (spu_rlqwbyte((a),  (s)&0xf    ))
-  #define   vrotl8s(a, s) (spu_rlqwbyte((a), ((s)&0x7)<<1))
-  #define  vrotl8us(a, s) (spu_rlqwbyte((a), ((s)&0x7)<<1))
-  #define   vrotl4i(a, s) (spu_rlqwbyte((a), ((s)&0x3)<<2))
-  #define  vrotl4ui(a, s) (spu_rlqwbyte((a), ((s)&0x3)<<2))
-  #define   vrotl4f(a, s) (spu_rlqwbyte((a), ((s)&0x3)<<2))
-  #define  vrotl2lf(a, s) (spu_rlqwbyte((a), ((s)&0x1)<<3))
-
-#elif defined(__VEC__)   // AltiVec
-
-
-#else                    // General C
-
-  inline  vec16c  vroth16c(const  vec16c &a, int s) {  vec16c b;           char* a_ptr = (          char*)(&a);           char* b_ptr = (          char*)(&b); s &= 0xf; b_ptr[0] = a_ptr[(0-s)&0xf]; b_ptr[1] = a_ptr[(1-s)&0xf]; b_ptr[2] = a_ptr[(2-s)&0xf]; b_ptr[3] = a_ptr[(3-s)&0xf]; b_ptr[4] = a_ptr[(4-s)&0xf]; b_ptr[5] = a_ptr[(5-s)&0xf]; b_ptr[6] = a_ptr[(6-s)&0xf]; b_ptr[7] = a_ptr[(7-s)&0xf]; b_ptr[8] = a_ptr[(8-s)&0xf]; b_ptr[9] = a_ptr[(9-s)&0xf]; b_ptr[10] = a_ptr[(10-s)&0xf]; b_ptr[11] = a_ptr[(11-s)&0xf]; b_ptr[12] = a_ptr[(12-s)&0xf]; b_ptr[13] = a_ptr[(13-s)&0xf]; b_ptr[14] = a_ptr[(14-s)&0xf]; b_ptr[15] = a_ptr[(15-s)&0xf]; return b; }
-  inline vec16uc vroth16uc(const vec16uc &a, int s) { vec16uc b; unsigned  char* a_ptr = (unsigned  char*)(&a); unsigned  char* b_ptr = (unsigned  char*)(&b); s &= 0xf; b_ptr[0] = a_ptr[(0-s)&0xf]; b_ptr[1] = a_ptr[(1-s)&0xf]; b_ptr[2] = a_ptr[(2-s)&0xf]; b_ptr[3] = a_ptr[(3-s)&0xf]; b_ptr[4] = a_ptr[(4-s)&0xf]; b_ptr[5] = a_ptr[(5-s)&0xf]; b_ptr[6] = a_ptr[(6-s)&0xf]; b_ptr[7] = a_ptr[(7-s)&0xf]; b_ptr[8] = a_ptr[(8-s)&0xf]; b_ptr[9] = a_ptr[(9-s)&0xf]; b_ptr[10] = a_ptr[(10-s)&0xf]; b_ptr[11] = a_ptr[(11-s)&0xf]; b_ptr[12] = a_ptr[(12-s)&0xf]; b_ptr[13] = a_ptr[(13-s)&0xf]; b_ptr[14] = a_ptr[(14-s)&0xf]; b_ptr[15] = a_ptr[(15-s)&0xf]; return b; }
-  inline   vec8s   vroth8s(const   vec8s &a, int s) {   vec8s b;          short* a_ptr = (         short*)(&a);          short* b_ptr = (         short*)(&b); s &= 0x7; b_ptr[0] = a_ptr[(0-s)&0x7]; b_ptr[1] = a_ptr[(1-s)&0x7]; b_ptr[2] = a_ptr[(2-s)&0x7]; b_ptr[3] = a_ptr[(3-s)&0x7]; b_ptr[4] = a_ptr[(4-s)&0x7]; b_ptr[5] = a_ptr[(5-s)&0x7]; b_ptr[6] = a_ptr[(6-s)&0x7]; b_ptr[7] = a_ptr[(7-s)&0x7]; return b; }
-  inline  vec8us  vroth8us(const  vec8us &a, int s) {  vec8us b; unsigned short* a_ptr = (unsigned short*)(&a); unsigned short* b_ptr = (unsigned short*)(&b); s &= 0x7; b_ptr[0] = a_ptr[(0-s)&0x7]; b_ptr[1] = a_ptr[(1-s)&0x7]; b_ptr[2] = a_ptr[(2-s)&0x7]; b_ptr[3] = a_ptr[(3-s)&0x7]; b_ptr[4] = a_ptr[(4-s)&0x7]; b_ptr[5] = a_ptr[(5-s)&0x7]; b_ptr[6] = a_ptr[(6-s)&0x7]; b_ptr[7] = a_ptr[(7-s)&0x7]; return b; }
-  inline   vec4i   vroth4i(const   vec4i &a, int s) {   vec4i b;            int* a_ptr = (           int*)(&a);            int* b_ptr = (           int*)(&b); s &= 0x3; b_ptr[0] = a_ptr[(0-s)&0x3]; b_ptr[1] = a_ptr[(1-s)&0x3]; b_ptr[2] = a_ptr[(2-s)&0x3]; b_ptr[3] = a_ptr[(3-s)&0x3]; return b; }
-  inline  vec4ui  vroth4ui(const  vec4ui &a, int s) {  vec4ui b; unsigned   int* a_ptr = (unsigned   int*)(&a); unsigned   int* b_ptr = (unsigned   int*)(&b); s &= 0x3; b_ptr[0] = a_ptr[(0-s)&0x3]; b_ptr[1] = a_ptr[(1-s)&0x3]; b_ptr[2] = a_ptr[(2-s)&0x3]; b_ptr[3] = a_ptr[(3-s)&0x3]; return b; }
-  inline   vec4f   vroth4f(const   vec4f &a, int s) {   vec4f b;          float* a_ptr = (         float*)(&a);          float* b_ptr = (         float*)(&b); s &= 0x3; b_ptr[0] = a_ptr[(0-s)&0x3]; b_ptr[1] = a_ptr[(1-s)&0x3]; b_ptr[2] = a_ptr[(2-s)&0x3]; b_ptr[3] = a_ptr[(3-s)&0x3]; return b; }
-  inline  vec2lf  vroth2lf(const  vec2lf &a, int s) {  vec2lf b;         double* a_ptr = (        double*)(&a);         double* b_ptr = (        double*)(&b); s &= 0x1; b_ptr[0] = a_ptr[(0-s)&0x1]; b_ptr[1] = a_ptr[(1-s)&0x1]; return b; }
-
-  inline  vec16c  vrotl16c(const  vec16c &a, int s) {  vec16c b;           char* a_ptr = (          char*)(&a);           char* b_ptr = (          char*)(&b); s &= 0xf; b_ptr[0] = a_ptr[(0+s)&0xf]; b_ptr[1] = a_ptr[(1+s)&0xf]; b_ptr[2] = a_ptr[(2+s)&0xf]; b_ptr[3] = a_ptr[(3+s)&0xf]; b_ptr[4] = a_ptr[(4+s)&0xf]; b_ptr[5] = a_ptr[(5+s)&0xf]; b_ptr[6] = a_ptr[(6+s)&0xf]; b_ptr[7] = a_ptr[(7+s)&0xf]; b_ptr[8] = a_ptr[(8+s)&0xf]; b_ptr[9] = a_ptr[(9+s)&0xf]; b_ptr[10] = a_ptr[(10+s)&0xf]; b_ptr[11] = a_ptr[(11+s)&0xf]; b_ptr[12] = a_ptr[(12+s)&0xf]; b_ptr[13] = a_ptr[(13+s)&0xf]; b_ptr[14] = a_ptr[(14+s)&0xf]; b_ptr[15] = a_ptr[(15+s)&0xf]; return b; }
-  inline vec16uc vrotl16uc(const vec16uc &a, int s) { vec16uc b; unsigned  char* a_ptr = (unsigned  char*)(&a); unsigned  char* b_ptr = (unsigned  char*)(&b); s &= 0xf; b_ptr[0] = a_ptr[(0+s)&0xf]; b_ptr[1] = a_ptr[(1+s)&0xf]; b_ptr[2] = a_ptr[(2+s)&0xf]; b_ptr[3] = a_ptr[(3+s)&0xf]; b_ptr[4] = a_ptr[(4+s)&0xf]; b_ptr[5] = a_ptr[(5+s)&0xf]; b_ptr[6] = a_ptr[(6+s)&0xf]; b_ptr[7] = a_ptr[(7+s)&0xf]; b_ptr[8] = a_ptr[(8+s)&0xf]; b_ptr[9] = a_ptr[(9+s)&0xf]; b_ptr[10] = a_ptr[(10+s)&0xf]; b_ptr[11] = a_ptr[(11+s)&0xf]; b_ptr[12] = a_ptr[(12+s)&0xf]; b_ptr[13] = a_ptr[(13+s)&0xf]; b_ptr[14] = a_ptr[(14+s)&0xf]; b_ptr[15] = a_ptr[(15+s)&0xf]; return b; }
-  inline   vec8s   vrotl8s(const   vec8s &a, int s) {   vec8s b;          short* a_ptr = (         short*)(&a);          short* b_ptr = (         short*)(&b); s &= 0x7; b_ptr[0] = a_ptr[(0+s)&0x7]; b_ptr[1] = a_ptr[(1+s)&0x7]; b_ptr[2] = a_ptr[(2+s)&0x7]; b_ptr[3] = a_ptr[(3+s)&0x7]; b_ptr[4] = a_ptr[(4+s)&0x7]; b_ptr[5] = a_ptr[(5+s)&0x7]; b_ptr[6] = a_ptr[(6+s)&0x7]; b_ptr[7] = a_ptr[(7+s)&0x7]; return b; }
-  inline  vec8us  vrotl8us(const  vec8us &a, int s) {  vec8us b; unsigned short* a_ptr = (unsigned short*)(&a); unsigned short* b_ptr = (unsigned short*)(&b); s &= 0x7; b_ptr[0] = a_ptr[(0+s)&0x7]; b_ptr[1] = a_ptr[(1+s)&0x7]; b_ptr[2] = a_ptr[(2+s)&0x7]; b_ptr[3] = a_ptr[(3+s)&0x7]; b_ptr[4] = a_ptr[(4+s)&0x7]; b_ptr[5] = a_ptr[(5+s)&0x7]; b_ptr[6] = a_ptr[(6+s)&0x7]; b_ptr[7] = a_ptr[(7+s)&0x7]; return b; }
-  inline   vec4i   vrotl4i(const   vec4i &a, int s) {   vec4i b;            int* a_ptr = (           int*)(&a);            int* b_ptr = (           int*)(&b); s &= 0x3; b_ptr[0] = a_ptr[(0+s)&0x3]; b_ptr[1] = a_ptr[(1+s)&0x3]; b_ptr[2] = a_ptr[(2+s)&0x3]; b_ptr[3] = a_ptr[(3+s)&0x3]; return b; }
-  inline  vec4ui  vrotl4ui(const  vec4ui &a, int s) {  vec4ui b; unsigned   int* a_ptr = (unsigned   int*)(&a); unsigned   int* b_ptr = (unsigned   int*)(&b); s &= 0x3; b_ptr[0] = a_ptr[(0+s)&0x3]; b_ptr[1] = a_ptr[(1+s)&0x3]; b_ptr[2] = a_ptr[(2+s)&0x3]; b_ptr[3] = a_ptr[(3+s)&0x3]; return b; }
-  inline   vec4f   vrotl4f(const   vec4f &a, int s) {   vec4f b;          float* a_ptr = (         float*)(&a);          float* b_ptr = (         float*)(&b); s &= 0x3; b_ptr[0] = a_ptr[(0+s)&0x3]; b_ptr[1] = a_ptr[(1+s)&0x3]; b_ptr[2] = a_ptr[(2+s)&0x3]; b_ptr[3] = a_ptr[(3+s)&0x3]; return b; }
-  inline  vec2lf  vrotl2lf(const  vec2lf &a, int s) {  vec2lf b;         double* a_ptr = (        double*)(&a);         double* b_ptr = (        double*)(&b); s &= 0x1; b_ptr[0] = a_ptr[(0+s)&0x1]; b_ptr[1] = a_ptr[(1+s)&0x1]; return b; }
-
-#endif
-
-
-////////////////////////////////////////////////////////////////////////////////
-// Arithmetic Functions
-
-
-///// Addition /////
-// Desc: Returns a vector that has the corresponding elements of 'a' and 'b' added together
-#if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
-
+  /***** Addition *****/
+  #define  vadd4i(a, b)  (_mm_add_epi32((a), (b)))
   #define  vadd4f(a, b)  (_mm_add_ps((a), (b)))
   #define vadd2lf(a, b)  (_mm_add_pd((a), (b)))
 
-#elif CMK_CELL_SPE != 0    // Cell - SPE
-
-  #define  vadd16c(a, b) (spu_add((a), (b)))
-  #define vadd16uc(a, b) (spu_add((a), (b)))
-  #define   vadd8s(a, b) (spu_add((a), (b)))
-  #define  vadd8us(a, b) (spu_add((a), (b)))
-  #define   vadd4i(a, b) (spu_add((a), (b)))
-  #define  vadd4ui(a, b) (spu_add((a), (b)))
-  #define   vadd4f(a, b) (spu_add((a), (b)))
-  #define  vadd2lf(a, b) (spu_add((a), (b)))
-
-  #define  vadd16cs(a, s) (spu_add((a),  vspread16c(s)))
-  #define vadd16ucs(a, s) (spu_add((a), vspread16uc(s)))
-  #define   vadd8ss(a, s) (spu_add((a),   vspread8s(s)))
-  #define  vadd8uss(a, s) (spu_add((a),  vspread8us(s)))
-  #define   vadd4is(a, s) (spu_add((a),   vspread4i(s)))
-  #define  vadd4uis(a, s) (spu_add((a),  vspread4ui(s)))
-  #define   vadd4fs(a, s) (spu_add((a),   vspread4f(s)))
-  #define  vadd2lfs(a, s) (spu_add((a),  vspread2lf(s)))
-
-#elif defined(__VEC__)   // AltiVec
-
-  #define vadd4f(a, b)   (vec_add((a), (b)))
-
-#else                    // General C
-
-  inline  vec16c  vadd16c(const  vec16c &a, const  vec16c &b) {  vec16c c; c.v0 = a.v0 + b.v0; c.v1 = a.v1 + b.v1; c.v2 = a.v2 + b.v2; c.v3 = a.v3 + b.v3; c.v4 = a.v4 + b.v4; c.v5 = a.v5 + b.v5; c.v6 = a.v6 + b.v6; c.v7 = a.v7 + b.v7; c.v8 = a.v8 + b.v8; c.v9 = a.v9 + b.v9; c.v10 = a.v10 + b.v10; c.v11 = a.v11 + b.v11; c.v12 = a.v12 + b.v12; c.v13 = a.v13 + b.v13; c.v14 = a.v14 + b.v14; c.v15 = a.v15 + b.v15; return c; }
-  inline vec16uc vadd16uc(const vec16uc &a, const vec16uc &b) { vec16uc c; c.v0 = a.v0 + b.v0; c.v1 = a.v1 + b.v1; c.v2 = a.v2 + b.v2; c.v3 = a.v3 + b.v3; c.v4 = a.v4 + b.v4; c.v5 = a.v5 + b.v5; c.v6 = a.v6 + b.v6; c.v7 = a.v7 + b.v7; c.v8 = a.v8 + b.v8; c.v9 = a.v9 + b.v9; c.v10 = a.v10 + b.v10; c.v11 = a.v11 + b.v11; c.v12 = a.v12 + b.v12; c.v13 = a.v13 + b.v13; c.v14 = a.v14 + b.v14; c.v15 = a.v15 + b.v15; return c; }
-  inline   vec8s   vadd8s(const   vec8s &a, const   vec8s &b) {   vec8s c; c.v0 = a.v0 + b.v0; c.v1 = a.v1 + b.v1; c.v2 = a.v2 + b.v2; c.v3 = a.v3 + b.v3; c.v4 = a.v4 + b.v4; c.v5 = a.v5 + b.v5; c.v6 = a.v6 + b.v6; c.v7 = a.v7 + b.v7; return c; }
-  inline  vec8us  vadd8us(const  vec8us &a, const  vec8us &b) {  vec8us c; c.v0 = a.v0 + b.v0; c.v1 = a.v1 + b.v1; c.v2 = a.v2 + b.v2; c.v3 = a.v3 + b.v3; c.v4 = a.v4 + b.v4; c.v5 = a.v5 + b.v5; c.v6 = a.v6 + b.v6; c.v7 = a.v7 + b.v7; return c; }
-  inline   vec4i   vadd4i(const   vec4i &a, const   vec4i &b) {   vec4i c; c.v0 = a.v0 + b.v0; c.v1 = a.v1 + b.v1; c.v2 = a.v2 + b.v2; c.v3 = a.v3 + b.v3; return c; }
-  inline  vec4ui  vadd4ui(const  vec4ui &a, const  vec4ui &b) {  vec4ui c; c.v0 = a.v0 + b.v0; c.v1 = a.v1 + b.v1; c.v2 = a.v2 + b.v2; c.v3 = a.v3 + b.v3; return c; }
-  inline   vec4f   vadd4f(const   vec4f &a, const   vec4f &b) {   vec4f c; c.v0 = a.v0 + b.v0; c.v1 = a.v1 + b.v1; c.v2 = a.v2 + b.v2; c.v3 = a.v3 + b.v3; return c; }
-  inline  vec2lf  vadd2lf(const  vec2lf &a, const  vec2lf &b) {  vec2lf c; c.v0 = a.v0 + b.v0; c.v1 = a.v1 + b.v1; return c; }
-
-  inline  vec16c  vadd16cs(const  vec16c &a, const           char &s) {  vec16c c; c.v0 = a.v0 + s; c.v1 = a.v1 + s; c.v2 = a.v2 + s; c.v3 = a.v3 + s; c.v4 = a.v4 + s; c.v5 = a.v5 + s; c.v6 = a.v6 + s; c.v7 = a.v7 + s; c.v8 = a.v8 + s; c.v9 = a.v9 + s; c.v10 = a.v10 + s; c.v11 = a.v11 + s; c.v12 = a.v12 + s; c.v13 = a.v13 + s; c.v14 = a.v14 + s; c.v15 = a.v15 + s; return c; }
-  inline vec16uc vadd16ucs(const vec16uc &a, const unsigned  char &s) { vec16uc c; c.v0 = a.v0 + s; c.v1 = a.v1 + s; c.v2 = a.v2 + s; c.v3 = a.v3 + s; c.v4 = a.v4 + s; c.v5 = a.v5 + s; c.v6 = a.v6 + s; c.v7 = a.v7 + s; c.v8 = a.v8 + s; c.v9 = a.v9 + s; c.v10 = a.v10 + s; c.v11 = a.v11 + s; c.v12 = a.v12 + s; c.v13 = a.v13 + s; c.v14 = a.v14 + s; c.v15 = a.v15 + s; return c; }
-  inline   vec8s   vadd8ss(const   vec8s &a, const          short &s) {   vec8s c; c.v0 = a.v0 + s; c.v1 = a.v1 + s; c.v2 = a.v2 + s; c.v3 = a.v3 + s; c.v4 = a.v4 + s; c.v5 = a.v5 + s; c.v6 = a.v6 + s; c.v7 = a.v7 + s; return c; }
-  inline  vec8us  vadd8uss(const  vec8us &a, const unsigned short &s) {  vec8us c; c.v0 = a.v0 + s; c.v1 = a.v1 + s; c.v2 = a.v2 + s; c.v3 = a.v3 + s; c.v4 = a.v4 + s; c.v5 = a.v5 + s; c.v6 = a.v6 + s; c.v7 = a.v7 + s; return c; }
-  inline   vec4i   vadd4is(const   vec4i &a, const            int &s) {   vec4i c; c.v0 = a.v0 + s; c.v1 = a.v1 + s; c.v2 = a.v2 + s; c.v3 = a.v3 + s; return c; }
-  inline  vec4ui  vadd4uis(const  vec4ui &a, const unsigned   int &s) {  vec4ui c; c.v0 = a.v0 + s; c.v1 = a.v1 + s; c.v2 = a.v2 + s; c.v3 = a.v3 + s; return c; }
-  inline   vec4f   vadd4fs(const   vec4f &a, const          float &s) {   vec4f c; c.v0 = a.v0 + s; c.v1 = a.v1 + s; c.v2 = a.v2 + s; c.v3 = a.v3 + s; return c; }
-  inline  vec2lf  vadd2lfs(const  vec2lf &a, const         double &s) {  vec2lf c; c.v0 = a.v0 + s; c.v1 = a.v1 + s; return c; }
-
-  // Overide C++ operators
-  #if defined(__cplusplus)
-
-    inline  vec4i operator+(const  vec4i& a, const  vec4i& b) { return  vadd4i(a,b); }
-    inline  vec4f operator+(const  vec4f& a, const  vec4f& b) { return  vadd4f(a,b); }
-    inline vec2lf operator+(const vec2lf& a, const vec2lf& b) { return vadd2lf(a,b); }
-
-    inline  vec4i operator+=( vec4i& a, const  vec4i& b) { return (a =  vadd4i(a,b)); }
-    inline  vec4f operator+=( vec4f& a, const  vec4f& b) { return (a =  vadd4f(a,b)); }
-    inline vec2lf operator+=(vec2lf& a, const vec2lf& b) { return (a = vadd2lf(a,b)); }
-
-  #endif
-
-#endif
-
-
-///// Subtraction /////
-// Desc: Returns a vector that where the correspinding elements of vector 'b' have been
-//   subtracted from vector 'a'
-#if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
-
-
-#elif CMK_CELL_SPE != 0    // Cell - SPE
-
-  #define  vsub16c(a, b) (spu_sub((a), (b)))
-  #define vsub16uc(a, b) (spu_sub((a), (b)))
-  #define   vsub8s(a, b) (spu_sub((a), (b)))
-  #define  vsub8us(a, b) (spu_sub((a), (b)))
-  #define   vsub4i(a, b) (spu_sub((a), (b)))
-  #define  vsub4ui(a, b) (spu_sub((a), (b)))
-  #define   vsub4f(a, b) (spu_sub((a), (b)))
-  #define  vsub2lf(a, b) (spu_sub((a), (b)))
-
-  #define  vsub16cs(a, s) (spu_sub((a),  vspread16c(s)))
-  #define vsub16ucs(a, s) (spu_sub((a), vspread16uc(s)))
-  #define   vsub8ss(a, s) (spu_sub((a),   vspread8s(s)))
-  #define  vsub8uss(a, s) (spu_sub((a),  vspread8us(s)))
-  #define   vsub4is(a, s) (spu_sub((a),   vspread4i(s)))
-  #define  vsub4uis(a, s) (spu_sub((a),  vspread4ui(s)))
-  #define   vsub4fs(a, s) (spu_sub((a),   vspread4f(s)))
-  #define  vsub2lfs(a, s) (spu_sub((a),  vspread2lf(s)))
-
-#elif defined(__VEC__)   // AltiVec
-
-
-#else                    // General C
-
-  inline  vec16c  vsub16c(const  vec16c &a, const  vec16c &b) {  vec16c c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; c.v2 = a.v2 - b.v2; c.v3 = a.v3 - b.v3; c.v4 = a.v4 - b.v4; c.v5 = a.v5 - b.v5; c.v6 = a.v6 - b.v6; c.v7 = a.v7 - b.v7; c.v8 = a.v8 - b.v8; c.v9 = a.v9 - b.v9; c.v10 = a.v10 - b.v10; c.v11 = a.v11 - b.v11; c.v12 = a.v12 - b.v12; c.v13 = a.v13 - b.v13; c.v14 = a.v14 - b.v14; c.v15 = a.v15 - b.v15; return c; }
-  inline vec16uc vsub16uc(const vec16uc &a, const vec16uc &b) { vec16uc c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; c.v2 = a.v2 - b.v2; c.v3 = a.v3 - b.v3; c.v4 = a.v4 - b.v4; c.v5 = a.v5 - b.v5; c.v6 = a.v6 - b.v6; c.v7 = a.v7 - b.v7; c.v8 = a.v8 - b.v8; c.v9 = a.v9 - b.v9; c.v10 = a.v10 - b.v10; c.v11 = a.v11 - b.v11; c.v12 = a.v12 - b.v12; c.v13 = a.v13 - b.v13; c.v14 = a.v14 - b.v14; c.v15 = a.v15 - b.v15; return c; }
-  inline   vec8s   vsub8s(const   vec8s &a, const   vec8s &b) {   vec8s c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; c.v2 = a.v2 - b.v2; c.v3 = a.v3 - b.v3; c.v4 = a.v4 - b.v4; c.v5 = a.v5 - b.v5; c.v6 = a.v6 - b.v6; c.v7 = a.v7 - b.v7; return c; }
-  inline  vec8us  vsub8us(const  vec8us &a, const  vec8us &b) {  vec8us c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; c.v2 = a.v2 - b.v2; c.v3 = a.v3 - b.v3; c.v4 = a.v4 - b.v4; c.v5 = a.v5 - b.v5; c.v6 = a.v6 - b.v6; c.v7 = a.v7 - b.v7; return c; }
-  inline   vec4i   vsub4i(const   vec4i &a, const   vec4i &b) {   vec4i c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; c.v2 = a.v2 - b.v2; c.v3 = a.v3 - b.v3; return c; }
-  inline  vec4ui  vsub4ui(const  vec4ui &a, const  vec4ui &b) {  vec4ui c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; c.v2 = a.v2 - b.v2; c.v3 = a.v3 - b.v3; return c; }
-  inline   vec4f   vsub4f(const   vec4f &a, const   vec4f &b) {   vec4f c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; c.v2 = a.v2 - b.v2; c.v3 = a.v3 - b.v3; return c; }
-  inline  vec2lf  vsub2lf(const  vec2lf &a, const  vec2lf &b) {  vec2lf c; c.v0 = a.v0 - b.v0; c.v1 = a.v1 - b.v1; return c; }
-
-  inline  vec16c  vsub16c(const  vec16c &a, const           char &s) {  vec16c c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; c.v2 = a.v2 - s; c.v3 = a.v3 - s; c.v4 = a.v4 - s; c.v5 = a.v5 - s; c.v6 = a.v6 - s; c.v7 = a.v7 - s; c.v8 = a.v8 - s; c.v9 = a.v9 - s; c.v10 = a.v10 - s; c.v11 = a.v11 - s; c.v12 = a.v12 - s; c.v13 = a.v13 - s; c.v14 = a.v14 - s; c.v15 = a.v15 - s; return c; }
-  inline vec16uc vsub16uc(const vec16uc &a, const unsigned  char &s) { vec16uc c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; c.v2 = a.v2 - s; c.v3 = a.v3 - s; c.v4 = a.v4 - s; c.v5 = a.v5 - s; c.v6 = a.v6 - s; c.v7 = a.v7 - s; c.v8 = a.v8 - s; c.v9 = a.v9 - s; c.v10 = a.v10 - s; c.v11 = a.v11 - s; c.v12 = a.v12 - s; c.v13 = a.v13 - s; c.v14 = a.v14 - s; c.v15 = a.v15 - s; return c; }
-  inline   vec8s   vsub8s(const   vec8s &a, const          short &s) {   vec8s c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; c.v2 = a.v2 - s; c.v3 = a.v3 - s; c.v4 = a.v4 - s; c.v5 = a.v5 - s; c.v6 = a.v6 - s; c.v7 = a.v7 - s; return c; }
-  inline  vec8us  vsub8us(const  vec8us &a, const unsigned short &s) {  vec8us c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; c.v2 = a.v2 - s; c.v3 = a.v3 - s; c.v4 = a.v4 - s; c.v5 = a.v5 - s; c.v6 = a.v6 - s; c.v7 = a.v7 - s; return c; }
-  inline   vec4i   vsub4i(const   vec4i &a, const            int &s) {   vec4i c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; c.v2 = a.v2 - s; c.v3 = a.v3 - s; return c; }
-  inline  vec4ui  vsub4ui(const  vec4ui &a, const unsigned   int &s) {  vec4ui c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; c.v2 = a.v2 - s; c.v3 = a.v3 - s; return c; }
-  inline   vec4f   vsub4f(const   vec4f &a, const          float &s) {   vec4f c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; c.v2 = a.v2 - s; c.v3 = a.v3 - s; return c; }
-  inline  vec2lf  vsub2lf(const  vec2lf &a, const         double &s) {  vec2lf c; c.v0 = a.v0 - s; c.v1 = a.v1 - s; return c; }
-
-  // Overide C++ operators
-  #if defined(__cplusplus)
-
-    inline  vec4i operator-(const  vec4i& a, const  vec4i& b) { return  vsub4i(a,b); }
-    inline  vec4f operator-(const  vec4f& a, const  vec4f& b) { return  vsub4f(a,b); }
-    inline vec2lf operator-(const vec2lf& a, const vec2lf& b) { return vsub2lf(a,b); }
-
-    inline  vec4i operator-=( vec4i& a, const  vec4i& b) { return (a =  vsub4i(a,b)); }
-    inline  vec4f operator-=( vec4f& a, const  vec4f& b) { return (a =  vsub4f(a,b)); }
-    inline vec2lf operator-=(vec2lf& a, const vec2lf& b) { return (a = vsub2lf(a,b)); }
-
-  #endif
-
-#endif
-
-
-///// Multiply & Multiply-Add /////
-#if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
-
-  #define  vmul4f(a, b) (_mm_mul_ps((a), (b)))
-  #define vmul2lf(a, b) (_mm_mul_pd((a), (b)))
-
-#elif CMK_CELL_SPE != 0    // Cell - SPE
-
-  #define  vmul4s(a, b) (spu_mul((a), (b)))
-  #define  vmul4f(a, b) (spu_mul((a), (b)))
-  #define vmul2lf(a, b) (spu_mul((a), (b)))
-
-  #define  vmul4ss(a, s) (spu_mul((a),  vspread8s(s)))
-  #define  vmul4fs(a, s) (spu_mul((a),  vspread4f(s)))
-  #define vmul2lfs(a, s) (spu_mul((a), vspread2lf(s)))
-
-  #define  vmadd4s(a, b, c) (spu_madd((a), (b), (c)))
-  #define  vmadd4f(a, b, c) (spu_madd((a), (b), (c)))
-  #define vmadd2lf(a, b, c) (spu_madd((a), (b), (c)))
-
-  #define  vmadd4ss(a, b, s) (spu_madd((a), (b),  vspread4i(s)))
-  #define  vmadd4fs(a, b, s) (spu_madd((a), (b),  vspread4f(s)))
-  #define vmadd2lfs(a, b, s) (spu_madd((a), (b), vspread2lf(s)))
-
-#elif defined(__VEC__)   // AltiVec
-
-
-#else                    // General C
-
-  inline  vec4i  vmul4s(const  vec8s &a, const  vec8s &b) {  vec4i c; c.v0 = ((int)a.v1) * ((int)b.v1); c.v1 = ((int)a.v3) * ((int)b.v3); c.v2 = ((int)a.v5) * ((int)b.v5); c.v3 = ((int)a.v7) * ((int)b.v7); return c; }
-  inline  vec4f  vmul4f(const  vec4f &a, const  vec4f &b) {  vec4f c; c.v0 = a.v0 * b.v0; c.v1 = a.v1 * b.v1; c.v2 = a.v2 * b.v2; c.v3 = a.v3 * b.v3; return c; }
-  inline vec2lf vmul2lf(const vec2lf &a, const vec2lf &b) { vec2lf c; c.v0 = a.v0 * b.v0; c.v1 = a.v1 * b.v1; return c; }
-
-  inline  vec4i  vmul4ss(const  vec8s &a, const  short &s) {  vec4i c; c.v0 = ((int)a.v1) * ((int)s); c.v1 = ((int)a.v3) * ((int)s); c.v2 = ((int)a.v5) * ((int)s); c.v3 = ((int)a.v7) * ((int)s); return c; }
-  inline  vec4f  vmul4fs(const  vec4f &a, const  float &s) {  vec4f c; c.v0 = a.v0 * s; c.v1 = a.v1 * s; c.v2 = a.v2 * s; c.v3 = a.v3 * s; return c; }
-  inline vec2lf vmul2lfs(const vec2lf &a, const double &s) { vec2lf c; c.v0 = a.v0 * s; c.v1 = a.v1 * s; return c; }
-
-  inline  vec4i  vmadd4s(const  vec8s &a, const  vec8s &b, const  vec4i &d) {  vec4i c; c.v0 = ((int)a.v1) * ((int)b.v1) + d.v0; c.v1 = ((int)a.v3) * ((int)b.v3) + d.v1; c.v2 = ((int)a.v5) * ((int)b.v5) + d.v2; c.v3 = ((int)a.v7) * ((int)b.v7) + d.v3; return c; }
-  inline  vec4f  vmadd4f(const  vec4f &a, const  vec4f &b, const  vec4f &d) {  vec4f c; c.v0 = a.v0 * b.v0 + d.v0; c.v1 = a.v1 * b.v1 + d.v1; c.v2 = a.v2 * b.v2 + d.v2; c.v3 = a.v3 * b.v3 + d.v3; return c; }
-  inline vec2lf vmadd2lf(const vec2lf &a, const vec2lf &b, const vec2lf &d) { vec2lf c; c.v0 = a.v0 * b.v0 + d.v0; c.v1 = a.v1 * b.v1 + d.v1; return c; }
-
-  inline  vec4i  vmadd4ss(const  vec8s &a, const  vec8s &b, const  short &s) {  vec4i c; c.v0 = ((int)a.v1) * ((int)b.v1) + s; c.v1 = ((int)a.v3) * ((int)b.v3) + s; c.v2 = ((int)a.v5) * ((int)b.v5) + s; c.v3 = ((int)a.v7) * ((int)b.v7) + s; return c; }
-  inline  vec4f  vmadd4fs(const  vec4f &a, const  vec4f &b, const  float &s) {  vec4f c; c.v0 = a.v0 * b.v0 + s; c.v1 = a.v1 * b.v1 + s; c.v2 = a.v2 * b.v2 + s; c.v3 = a.v3 * b.v3 + s; return c; }
-  inline vec2lf vmadd2lfs(const vec2lf &a, const vec2lf &b, const double &s) { vec2lf c; c.v0 = a.v0 * b.v0 + s; c.v1 = a.v1 * b.v1 + s; return c; }
-
-  // Overide C++ operators
-  #if defined(__cplusplus)
-
-    //inline  vec4i operator*(const  vec4i& a, const  vec4i& b) { return  vmul4i(a,b); }
-    inline  vec4f operator*(const  vec4f& a, const  vec4f& b) { return  vmul4f(a,b); }
-    inline vec2lf operator*(const vec2lf& a, const vec2lf& b) { return vmul2lf(a,b); }
-
-  #endif
-
-#endif
-
-
-///// Divide /////
-
-// DMK - TODO : FIXME - Figure out the SPE version of these functions (for now, just use general C++)
-//   SPE version of the functions to use the "frest" and "fi" 
-#if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
-
-
-#elif CMK_CELL_SPE != 0
-
-  inline vec4i vdiv4i(const vec4i a, const vec4i b) { vec4i c; __vec4i* __c = (__vec4i*)(&c); __vec4i* __a = (__vec4i*)(&a); __vec4i* __b = (__vec4i*)(&b); __c->v0 = __a->v0 / __b->v0; __c->v1 = __a->v1 / __b->v1; return c; }
-  #define vdiv4f(a, b) (spu_mul((a), spu_re(b)))
-  inline vec2lf vdiv2lf(const vec2lf a, const vec2lf b) { vec2lf c; __vec2lf* __c = (__vec2lf*)(&c); __vec2lf* __a = (__vec2lf*)(&a); __vec2lf* __b = (__vec2lf*)(&b); __c->v0 = __a->v0 / __b->v0; __c->v1 = __a->v1 / __b->v1; return c; }
-
-#elif defined(__VEC__)   // AltiVec
-
-
-#else                    // General C
-
-  inline vec4i vdiv4i(const vec4i &a, const vec4i &b) { vec4i c; c.v0 = a.v0 / b.v0; c.v1 = a.v1 / b.v1; c.v2 = a.v2 / b.v2; c.v3 = a.v3 / b.v3; return c; }
-  inline vec4f vdiv4f(const vec4f &a, const vec4f &b) { vec4f c; c.v0 = a.v0 / b.v0; c.v1 = a.v1 / b.v1; c.v2 = a.v2 / b.v2; c.v3 = a.v3 / b.v3; return c; }
-  inline vec2lf vdiv2lf(const vec2lf &a, const vec2lf &b) { vec2lf c; c.v0 = a.v0 / b.v0; c.v1 = a.v1 / b.v1; return c; }
-
-  // Overide C++ operators
-  #if defined(__cplusplus)
-
-    //inline  vec4i operator*(const  vec4i& a, const  vec4i& b) { return  vmul4i(a,b); }
-    inline  vec4f operator/(const  vec4f& a, const  vec4f& b) { return  vdiv4f(a,b); }
-    inline vec2lf operator/(const vec2lf& a, const vec2lf& b) { return vdiv2lf(a,b); }
-
-  #endif
-
-#endif
-
-
-///// Misc : TODO : Organize later /////
-#if defined(__SSE2__) && !(FORCE_NO_SSE)     // SSE2
-
-  #define vrecip4f(a)  (_mm_rcp_ps(a))
-
-  // DMK - DEBUG - Disable this single sqrt function to see how much of an impact it has
-  #if 1
-    #define vsqrt4f(a)  (_mm_sqrt_ps(a))
-  #else
-    inline vec4f vsqrt4f(const vec4f &a) {
-      vec4f b;
-      float *a_f = (float*)(&a), *b_f = (float*)(&b);
-      b_f[0] = sqrtf(a_f[0]);
-      b_f[1] = sqrtf(a_f[1]);
-      b_f[2] = sqrtf(a_f[2]);
-      b_f[3] = sqrtf(a_f[3]);
-      return b;
-    }
-  #endif
-
-#elif CMK_CELL_SPE != 0
-
-  #define vrecip4f(a) (spu_re(a))
+  /***** Subtraction *****/
+  #define  vsub4i(a, b)  (_mm_sub_epi32((a), (b)))
+  #define  vsub4f(a, b)  (_mm_sub_ps((a), (b)))
+  #define vsub2lf(a, b)  (_mm_sub_pd((a), (b)))
+
+  /***** Multiplication *****/
+  #define    vmul4f(a, b)  (_mm_mul_ps((a), (b)))
+  #define   vmul2lf(a, b)  (_mm_mul_pd((a), (b)))
+
+  /***** Division *****/
+  #define   vdiv4f(a, b)  (_mm_div_ps((a), (b)))
+  #define  vdiv2lf(a, b)  (_mm_div_pd((a), (b)))
+
+  /***** Fused Multiply Add *****/
+  #define  vmadd4f(a, b, c)  ( vadd4f( vmul4f((a), (b)), (c)))
+  #define vmadd2lf(a, b, c)  (vadd2lf(vmul2lf((a), (b)), (c)))
+
+  /***** Reciprocal *****/
+  #define  vrecip4f(a)  (_mm_rcp_ps(a))
+  #define vrecip2lf(a)  (_mm_rcp_pd(a))
+
+  /***** Square Root *****/
+  #define  vsqrt4f(a)  (_mm_sqrt_ps(a))
+  #define vsqrt2lf(a)  (_mm_sqrt_pd(a))
+
+  /***** Reciprocal Square Root *****/
+  #define  vrsqrt4f(a)  (_mm_rsqrt_ps(a))
+  #define vrsqrt2lf(a)  (vrecip2lf(vsqrt2lf(a)))
+
+
+/*******************************************************************************
+ *******************************************************************************
+ ***** SPE SIMD Instructions
+ *******************************************************************************
+ *******************************************************************************/
+/* TODO | FIXME : Find a more general check for this (this is Charm++ specific) */
+#elif (CMK_CELL_SPE != 0) && (!(FORCE_NO_SPE_SIMD))
+
+  /***** Data Types *****/
+  typedef vector signed int vec4i;
+  typedef vector float vec4f;
+  typedef vector double vec2lf;
+
+  /***** Insert *****/
+  #define  vinsert4i(v, s, i)  (spu_insert((s), (v), (i)))
+  #define  vinsert4f(v, s, i)  (spu_insert((s), (v), (i)))
+  #define vinsert2lf(v, s, i)  (spu_insert((s), (v), (i)))
+
+  /***** Extract *****/
+  #define  vextract4i(v, i)  (spu_extract((v), (i)))
+  #define  vextract4f(v, i)  (spu_extract((v), (i)))
+  #define vextract2lf(v, i)  (spu_extract((v), (i)))
+
+  /***** Set *****/
+  #define  vset4i(a)  (spu_splats((int)(a)))
+  #define  vset4f(a)  (spu_splats((float)(a)))
+  #define vset2lf(a)  (spu_splats((double)(a)))
+
+  /***** Constant Zero *****/
+  #define  const_vzero4i  (vset4i(0))
+  #define  const_vzero4f  (vset4f(0.0f))
+  #define const_vzero2lf  (vset2lf(0.0))
+
+  /***** Constant One *****/
+  #define  const_vone4i  (vset4i(1))
+  #define  const_vone4f  (vset4f(1.0f))
+  #define const_vone2lf  (vset2lf(1.0))
+
+  /***** Constant Two *****/
+  #define  const_vtwo4i  (vset4i(2))
+  #define  const_vtwo4f  (vset4f(2.0f))
+  #define const_vtwo2lf  (vset2lf(2.0))
+
+  /***** Constant Negative One *****/
+  #define  const_vnegone4i  (vset4i(-1))
+  #define  const_vnegone4f  (vset4f(-1.0f))
+  #define const_vnegone2lf  (vset2lf(-1.0))
+
+  /***** Rotate *****/
+  #define   vroth4i(a, s) (spu_rlqwbyte((a), (0x10-(((s)&0x3)<<2)) ))
+  #define   vroth4f(a, s) (spu_rlqwbyte((a), (0x10-(((s)&0x3)<<2)) ))
+  #define  vroth2lf(a, s) (spu_rlqwbyte((a),       (((s)&0x1)<<3)  ))
+  #define   vrotl4i(a, s) (spu_rlqwbyte((a), ((s)&0x3)<<2))
+  #define   vrotl4f(a, s) (spu_rlqwbyte((a), ((s)&0x3)<<2))
+  #define  vrotl2lf(a, s) (spu_rlqwbyte((a), ((s)&0x1)<<3))
+
+  /***** Addition *****/
+  #define  vadd4i(a, b)  (spu_add((a), (b)))
+  #define  vadd4f(a, b)  (spu_add((a), (b)))
+  #define vadd2lf(a, b)  (spu_add((a), (b)))
+
+  /***** Subtraction *****/
+  #define  vsub4i(a, b)  (spu_sub((a), (b)))
+  #define  vsub4f(a, b)  (spu_sub((a), (b)))
+  #define vsub2lf(a, b)  (spu_sub((a), (b)))
+
+  /***** Multiplication *****/
+  #define   vmul4f(a, b)  (spu_mul((a), (b)))
+  #define  vmul2lf(a, b)  (spu_mul((a), (b)))
+
+  /***** Division *****/
+  #define vdiv4f(a, b)  (spu_mul((a), spu_re(b)))
+  inline vec2lf vdiv2lf(const vec2lf a, const vec2lf b) { vec2lf r = { 0.0, 0.0 }; spu_insert((spu_extract(a, 0) / spu_extract(b, 0)), r, 0); spu_insert((spu_extract(a, 1) / spu_extract(b, 1)), r, 1); return r; }
+
+  /***** Fused Multiply Add *****/
+  #define  vmadd4f(a, b, c)  (spu_madd((a), (b), (c)))
+  #define vmadd2lf(a, b, c)  (spu_madd((a), (b), (c)))
+
+  /***** Reciprocal *****/
+  #define  vrecip4f(a)  (spu_re(a))
+  inline vec2lf vrecip2lf(const vec2lf a, const vec2lf b) { vec2lf r = { 0.0, 0.0 }; spu_insert((1.0f / spu_extract(a, 0)), r, 0); spu_insert((1.0f / spu_extract(a, 1)), r, 1); return r; }
+
+  /***** Square Root *****/
   #define vsqrt4f(a) (spu_re(spu_rsqrte(a)))
+  inline vec2lf vsqrt2lf(const vec2lf a, const vec2lf b) { vec2lf r = { 0.0, 0.0 }; spu_insert(sqrt(spu_extract(a, 0)), r, 0); spu_insert(sqrt(spu_extract(a, 1)), r, 1); return r; }
+
+  /***** Reciprocal Square Root *****/
   #define vrsqrt4f(a) (spu_rsqrte(a))
+  inline vec2lf vrsqrt2lf(const vec2lf a, const vec2lf b) { vec2lf r = { 0.0, 0.0 }; spu_insert((1.0f / sqrt(spu_extract(a, 0))), r, 0); spu_insert((1.0f / sqrt(spu_extract(a, 1))), r, 1); return r; }
 
-#elif defined(__VEC__)   // AltiVec
 
-  #define vrecip4f(a)   (vec_re(a))
-  #define vsqrt4f(a)    (vec_re(vec_rsqrte(a)))
-  #define vrsqrt4f(a)   (vec_rsqrte(a))
+/*******************************************************************************
+ *******************************************************************************
+ ***** AltiVec
+ *******************************************************************************
+ *******************************************************************************/
+#elif defined(__VEC__) && (!(FORCE_NO_ALTIVEC))
 
-#else                    // General C
+  /***** Data Types *****/
+  typedef vector signed int vec4i;
+  typedef vector float vec4f;
+  typedef __vec2lf vec2lf;
 
-  inline vec4f vrecip4f(const vec4f &a) { vec4f b; b.v0 = 1.0f / a.v0; b.v1 = 1.0f / a.v1; b.v2 = 1.0f / a.v2; b.v3 = 1.0f / a.v3; return b; }
-  inline vec4f vsqrt4f(const vec4f &a) { vec4f b; b.v0 = sqrtf(a.v0); b.v1 = sqrtf(a.v1); b.v2 = sqrtf(a.v2); b.v3 = sqrtf(a.v3); return b; }
-  inline vec4f vrsqrt4f(const vec4f &a) { vec4f b; b.v0 = 1.0f / sqrtf(a.v0); b.v1 = 1.0f / sqrtf(a.v1); b.v2 = 1.0f / sqrtf(a.v2); b.v3 = 1.0f / sqrtf(a.v3); return b; }
+  /***** Insert *****/
+  /* TODO | FIXME - Try to make these functions not reference memory so values stay in registers */
+  inline  vec4i  vinsert4i( vec4i v, const    int s, const int i) {  vec4i r = v;    int* rPtr = (   int*)(&r); rPtr[i] = s; return r; }
+  inline  vec4f  vinsert4f( vec4f v, const  float s, const int i) {  vec4f r = v;  float* rPtr = ( float*)(&r); rPtr[i] = s; return r; }
+  inline vec2lf vinsert2lf(vec2lf v, const double s, const int i) { vec2lf r = v; double* rPtr = (double*)(&r); rPtr[i] = s; return r; }
+
+  /***** Extract *****/
+  /* TODO | FIXME - Try to make these functions not reference memory so values stay in registers */
+  inline    int  vextract4i( vec4i v, const int i) {    int* vPtr = (   int*)(&v); return vPtr[i]; }
+  inline  float  vextract4f( vec4f v, const int i) {  float* vPtr = ( float*)(&v); return vPtr[i]; }
+  inline double vextract2lf(vec2lf v, const int i) { double* vPtr = (double*)(&v); return vPtr[i]; }
+
+  /***** Set *****/
+  /* TODO : FIXME - There must be a better way to do this, but it seems the
+   *   only way to convert scalar to vector is to go through memory instructions.
+   */
+  inline vec4i vset4i(const   int a) { __vec4i r __attribute__((aligned(16))); r.v0 = a; return vec_splat(*((vec4i*)(&r)), 0); }
+  inline vec4f vset4f(const float a) { __vec4f r __attribute__((aligned(16))); r.v0 = a; return vec_splat(*((vec4f*)(&r)), 0); }
+  #define vset2lf __vset2lf
+
+  /* NOTE: Declare one for unsigned char vector also (required by rotate functions) */
+  inline vector unsigned char vset16uc(const unsigned char c) { vector unsigned char r __attribute__((aligned(16))); ((unsigned char*)(&r))[0] = c; return vec_splat(r, 0); }
+
+  /***** Constant Zero *****/
+  #define  const_vec4i  (vec_splat_s32(0))
+  #define  const_vec4f  (vec_ctf(vec_splat_s32(0), 0))
+  #define const_vec2lf  (__const_vzero2lf)
+
+  /***** Constant One *****/
+  #define  const_vec4i  (vec_splat_s32(1))
+  #define  const_vec4f  (vec_ctf(vec_splat_s32(1), 0))
+  #define const_vec2lf  (__const_vone2lf)
+
+  /***** Constant Two *****/
+  #define  const_vec4i  (vec_splat_s32(2))
+  #define  const_vec4f  (vec_ctf(vec_splat_s32(2), 0))
+  #define const_vec2lf  (__const_vtwo2lf)
+
+  /***** Constant Negative One *****/
+  #define  const_vec4i  (vec_splat_s32(-1))
+  #define  const_vec4f  (vec_ctf(vec_splat_s32(-1), 0))
+  #define const_vec2lf  (__const_vec2lf)
+
+  /***** Rotate *****/
+  #define __vrotlbytes(a, s)  (vec_or(vec_slo((a), vset16uc(((s) & 0xf) << 3)), vec_sro((a), set16uc((16 - ((s) & 0xf)) << 3))))
+  #define __vrotrbytes(a, s)  (vec_or(vec_sro((a), vset16uc(((s) & 0xf) << 3)), vec_slo((a), set16uc((16 - ((s) & 0xf)) << 3))))
+  #define  vrotl4i(a, s)  __vrotlbytes((a), ((s) << 2))
+  #define  vrotl4f(a, s)  __vrotlbytes((a), ((s) << 2))
+  #define vrotl2lf(a, s)  __vrotlbytes((a), ((s) << 3))
+  #define  vroth4i(a, s)  __vrotrbytes((a), ((s) << 2))
+  #define  vroth4f(a, s)  __vrotrbytes((a), ((s) << 2))
+  #define vroth2lf(a, s)  __vrotrbytes((a), ((s) << 3))
+
+  /***** Addition *****/
+  #define  vadd4i(a, b)  (vec_add((a), (b)))
+  #define  vadd4f(a, b)  (vec_add((a), (b)))
+  #define vadd2lf __vadd2lf
+
+  /***** Subtraction *****/
+  #define  vsub4i(a, b)  (vec_sub((a), (b)))
+  #define  vsub4f(a, b)  (vec_sub((a), (b)))
+  #define vsub2lf __vsub2lf
+
+  /***** Multiplication *****/
+  #define  vmul4f(a, b)  (vec_madd((a), (b), vec_xor((a))))
+  #define vmul2lf __vmul2lf
+
+  /***** Division *****/
+  #define vdiv4f(a, b)  (vmul4f((a), vec_re(b)))
+  #define vdiv2lf __vdiv2lf
+
+  /***** Fused Multiply Add *****/
+  #define vmadd4f(a, b, c)  (vec_madd((a), (b), (c)))
+  #define vmadd2lf __vmadd2lf
+
+  /***** Reciprocal *****/
+  #define vrecip4f(a)  (vec_re(a))
+  #define vrecip2lf __vrecip2lf
+
+  /***** Square Root *****/
+  #define vsqrt4f(a)  (vec_re(vec_rsqrte(a)))
+  #define vsqrt2lf __vsqrt2lf
+
+  /***** Reciprocal Square Root *****/
+  #define vrsqrt4f(a)  (vec_rsqrte(a))
+  #define vrsqrt2lf __vrsqrt2lf
+
+
+/*******************************************************************************
+ *******************************************************************************
+ ***** Mapping to Generic C Implementation
+ *******************************************************************************
+ *******************************************************************************/
+#else
+
+  /***** Data Types *****/
+  typedef   __vec4i   vec4i;
+  typedef   __vec4f   vec4f;
+  typedef  __vec2lf  vec2lf;
+
+  /***** Insert *****/
+  #define  vinsert4i  __vinsert4i
+  #define  vinsert4f  __vinsert4f
+  #define vinsert2lf __vinsert2lf
+
+  /***** Extract *****/
+  #define  vextract4i  __vextract4i
+  #define  vextract4f  __vextract4f
+  #define vextract2lf __vextract2lf
+
+  /***** Set *****/
+  #define  vset4i  __vset4i
+  #define  vset4f  __vset4f
+  #define vset2lf __vset2lf
+
+  /***** Constant Zero *****/
+  #define  const_vzero4i  __const_vzero4i
+  #define  const_vzero4f  __const_vzero4f
+  #define const_vzero2lf __const_vzero2lf
+
+  /***** Constant One *****/
+  #define  const_vone4i  __const_vone4i
+  #define  const_vone4f  __const_vone4f
+  #define const_vone2lf __const_vone2lf
+
+  /***** Constant Two *****/
+  #define  const_vtwo4i  __const_vtwo4i
+  #define  const_vtwo4f  __const_vtwo4f
+  #define const_vtwo2lf __const_vtwo2lf
+
+  /***** Constant Negative One *****/
+  #define  const_vnegone4i  __const_vnegone4i
+  #define  const_vnegone4f  __const_vnegone4f
+  #define const_vnegone2lf __const_vnegone2lf
+
+  /***** Rotate *****/
+  #define  vroth4i  __vroth4i
+  #define  vroth4f  __vroth4f
+  #define vroth2lf __vroth2lf
+  #define  vrotl4i  __vrotl4i
+  #define  vrotl4f  __vrotl4f
+  #define vrotl2lf __vrotl2lf
+  
+  /***** Addition *****/
+  #define  vadd4i  __vadd4i
+  #define  vadd4f  __vadd4f
+  #define vadd2lf __vadd2lf
+
+  /***** Subtraction *****/
+  #define  vsub4i  __vsub4i
+  #define  vsub4f  __vsub4f
+  #define vsub2lf __vsub2lf
+
+  /***** Multiplication *****/
+  #define  vmul4f   __vmul4f
+  #define vmul2lf  __vmul2lf
+
+  /***** Division *****/
+  #define  vdiv4f   __vdiv4f
+  #define vdiv2lf  __vdiv2lf
+
+  /***** Fused Multiply Add *****/
+  #define  vmadd4f  __vmadd4f
+  #define vmadd2lf __vmadd2lf
+
+  /***** Reciprocal *****/
+  #define  vrecip4f  __vrecip4f
+  #define vrecip2lf __vrecip2lf
+
+  /***** Square Root *****/
+  #define  vsqrt4f  __vsqrt4f
+  #define vsqrt2lf __vsqrt2lf
+
+  /***** Reciprocal Square Root *****/
+  #define  vrsqrt4f  __vrsqrt4f
+  #define vrsqrt2lf __vrsqrt2lf
 
 #endif
+
+
+/*******************************************************************************
+ *******************************************************************************
+ ***** Shared Combinations
+ *******************************************************************************
+ *******************************************************************************/
+
+/* NOTE: If any architecture specific implementation can do any of these
+ *   operations faster, then move them up to the architecture specific areas and
+ *   make individual definitions.  This area is just meant to declare commonly
+ *   use combinations so that they don't have to be repeated many times over.
+ */
+
+/***** Spread (Duplicate functionality of 'Set' by another another name) *****/
+#define  vspread4i(a)  ( vset4i(a))
+#define  vspread4f(a)  ( vset4f(a))
+#define vspread2lf(a)  (vset2lf(a))
+
+/***** Multiply by Scalar *****/
+#define   vmul4fs(a, b)  ( vmul4f((a),  vset4f(b)))
+#define  vmul2lfs(a, b)  (vmul2lf((a), vset2lf(b)))
+
+/***** Divide by Scalar *****/
+#define  vdiv4fs(a, b)  ( vdiv4f((a),  vset4f(b)))
+#define vdiv2lfs(a, b)  (vdiv2lf((a), vset2lf(b)))
+
+/***** Fused Multiply(Vector) Add(Scalar) *****/
+#define  vmadd4fs(a, b, c)  ( vmadd4f((a), (b),  vset4f(c)))
+#define vmadd2lfs(a, b, c)  (vmadd2lf((a), (b), vset2lf(c)))
+
+/***** Fused Multiply(Scalar) Add(Scalar) *****/
+#define  vmadd4fss(a, b, c)  ( vmadd4f((a),  vset4f(b),  vset4f(c)))
+#define vmadd2lfss(a, b, c)  (vmadd2lf((a), vset2lf(b), vset2lf(c)))
 
 
 #endif //__SIMD_H__
