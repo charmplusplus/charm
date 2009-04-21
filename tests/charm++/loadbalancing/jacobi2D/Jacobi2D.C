@@ -164,7 +164,7 @@
 
   // a callback function to set object load
   void JacobiChunk::UserSetLBLoad() {
-    setObjTiming(1.0);
+    setObjTime(1.0);
   }
 
   void JacobiChunk::stepping(CkReductionMsg *m) {   // on PE 0
