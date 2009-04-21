@@ -127,7 +127,7 @@ syntax() {
   echo ''
   echo 'Thank you for using Charm++, please send questions or comments to '
   echo 'Parallel Programming Lab at University of Illinois at Urbana-Champaign'
-  echo '(email: ppl@cs.uiuc.edu).'
+  echo '(email: charm@cs.uiuc.edu).'
 
   else
   echo ''
