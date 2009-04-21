@@ -557,7 +557,7 @@ printError()
 	echo "Charm++ NOT BUILT. Either cd into $DESTINATION/tmp and try"
 	echo "to resolve the problems yourself, visit"
 	echo "    http://charm.cs.uiuc.edu/"
-	echo "for more information. Otherwise, email the developers at ppl@cs.uiuc.edu"
+	echo "for more information. Otherwise, email the developers at charm@cs.uiuc.edu"
 	exit $MAKEEXIT
 }
 
