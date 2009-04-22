@@ -12,6 +12,11 @@ Orion Sky Lawlor, olawlor@acm.org, 1/27/2003
 #include "netfem.h"
 #include "ifemc.h"
 
+#if CMK_CC_PGCC
+#undef offsetof
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#endif
+
 //Number of time steps to simulate
 int tsteps=10;
 int dim=10;//Elements per side of the FEM mesh
