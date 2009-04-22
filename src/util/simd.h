@@ -36,6 +36,17 @@
 /* TODO | FIXME - Added intrinsics below for loading/creating vectors with these values */
 
 
+/* TODO | FIXME - Find platform independent way of ensuring alignment
+ * (using __attribute__((aligned(XXX))) doesn't seem to work in net-win and
+ * net-sol builds).  Just to be safe since compilers should do this anyway.
+ */
+
+/* TODO | FIXME - Add a function that will test the functionality of the
+ * various operations defined by these abstractions and somehow tie this test
+ * into the nightly build to ensure these operations give correct results.
+ */
+
+
 /*******************************************************************************
  *******************************************************************************
  ***** Generic C Implementation
@@ -78,24 +89,24 @@ inline __vec2lf __vset2lf(const double a) { __vec2lf r; r.v0 = r.v1 =           
 /* NOTE: Would it be better to generate the constants instead of read them from memory in the generic version? */
 
 /***** Constant Zero *****/
-const  __vec4i  __const_vzero4i __attribute__((aligned(16))) = {   0 ,   0 ,   0 ,   0  };
-const  __vec4f  __const_vzero4f __attribute__((aligned(16))) = { 0.0f, 0.0f, 0.0f, 0.0f };
-const __vec2lf __const_vzero2lf __attribute__((aligned(16))) = { 0.0 , 0.0              };
+const  __vec4i  __const_vzero4i = {   0 ,   0 ,   0 ,   0  };
+const  __vec4f  __const_vzero4f = { 0.0f, 0.0f, 0.0f, 0.0f };
+const __vec2lf __const_vzero2lf = { 0.0 , 0.0              };
 
 /***** Constant One *****/
-const  __vec4i  __const_vone4i __attribute__((aligned(16))) = {   1 ,   1 ,   1 ,   1  };
-const  __vec4f  __const_vone4f __attribute__((aligned(16))) = { 1.0f, 1.0f, 1.0f, 1.0f };
-const __vec2lf __const_vone2lf __attribute__((aligned(16))) = { 1.0 , 1.0              };
+const  __vec4i  __const_vone4i = {   1 ,   1 ,   1 ,   1  };
+const  __vec4f  __const_vone4f = { 1.0f, 1.0f, 1.0f, 1.0f };
+const __vec2lf __const_vone2lf = { 1.0 , 1.0              };
 
 /***** Constant Two *****/
-const  __vec4i  __const_vtwo4i __attribute__((aligned(16))) = {   2 ,   2 ,   2 ,   2  };
-const  __vec4f  __const_vtwo4f __attribute__((aligned(16))) = { 2.0f, 2.0f, 2.0f, 2.0f };
-const __vec2lf __const_vtwo2lf __attribute__((aligned(16))) = { 2.0 , 2.0              };
+const  __vec4i  __const_vtwo4i = {   2 ,   2 ,   2 ,   2  };
+const  __vec4f  __const_vtwo4f = { 2.0f, 2.0f, 2.0f, 2.0f };
+const __vec2lf __const_vtwo2lf = { 2.0 , 2.0              };
 
 /***** Constant Negative One *****/
-const  __vec4i  __const_vnegone4i __attribute__((aligned(16))) = {   -1 ,   -1 ,   -1 ,   -1  };
-const  __vec4f  __const_vnegone4f __attribute__((aligned(16))) = { -1.0f, -0.0f, -1.0f, -1.0f };
-const __vec2lf __const_vnegone2lf __attribute__((aligned(16))) = { -1.0 , -1.0                };
+const  __vec4i  __const_vnegone4i = {   -1 ,   -1 ,   -1 ,   -1  };
+const  __vec4f  __const_vnegone4f = { -1.0f, -1.0f, -1.0f, -1.0f };
+const __vec2lf __const_vnegone2lf = { -1.0 , -1.0                };
 
 /* TODO | FIXME - Try to create constants such that it does not require a
  * memory operations to access the constants (like the SSE constants).
@@ -400,8 +411,8 @@ inline __vec2lf __vrsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / sqrt(a.
   /* TODO : FIXME - There must be a better way to do this, but it seems the
    *   only way to convert scalar to vector is to go through memory instructions.
    */
-  inline vec4i vset4i(const   int a) { __vec4i r __attribute__((aligned(16))); r.v0 = a; return vec_splat(*((vec4i*)(&r)), 0); }
-  inline vec4f vset4f(const float a) { __vec4f r __attribute__((aligned(16))); r.v0 = a; return vec_splat(*((vec4f*)(&r)), 0); }
+  inline vec4i vset4i(const   int a) { __vec4i r; r.v0 = a; return vec_splat(*((vec4i*)(&r)), 0); }
+  inline vec4f vset4f(const float a) { __vec4f r; r.v0 = a; return vec_splat(*((vec4f*)(&r)), 0); }
   #define vset2lf __vset2lf
 
   /* NOTE: Declare one for unsigned char vector also (required by rotate functions) */
