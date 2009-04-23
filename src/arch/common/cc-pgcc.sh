@@ -16,9 +16,9 @@ CMK_LDXX="$CMK_CXX "
 
 # compiler for compiling sequential programs
 # pgcc can not handle QT right for generic64, so always use gcc
-CMK_SEQ_CC="gcc "
-CMK_SEQ_LD="gcc "
-CMK_SEQ_CXX="pgCC "
+CMK_SEQ_CC="gcc -fPIC "
+CMK_SEQ_LD="$CMK_SEQ_CC "
+CMK_SEQ_CXX="pgCC -fPIC "
 CMK_SEQ_LDXX="$CMK_SEQ_CXX"
 CMK_SEQ_LIBS=""
 
