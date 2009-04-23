@@ -53,6 +53,8 @@
  *******************************************************************************
  *******************************************************************************/
 
+/*@{*/
+
 /* NOTE: This is declared first so any architecture specific implementations
  *   can simply use the generic functions for specific data types or operations
  *   that they do not implement.
@@ -66,6 +68,8 @@
  * typedef struct __vec_8_us { unsigned short v0, v1, v2, v3, v4, v5, v6, v7; } __vec8us;
  * typedef struct __vec_4_ui {   unsigned int v0, v1, v2, v3; } __vec4ui;
  */
+
+
 typedef struct __vec_4_i  {    int v0, v1, v2, v3; }  __vec4i;
 typedef struct __vec_4_f  {  float v0, v1, v2, v3; }  __vec4f;
 typedef struct __vec_2_lf { double v0, v1;         } __vec2lf;
@@ -158,6 +162,68 @@ inline __vec2lf __vsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = sqrt(a.v0); r.
 inline  __vec4f  __vrsqrt4f(const  __vec4f a) {  __vec4f r; r.v0 = 1.0f / sqrtf(a.v0); r.v1 = 1.0f / sqrtf(a.v1); r.v2 = 1.0f / sqrtf(a.v2); r.v3 = 1.0f / sqrtf(a.v3); return r; }
 inline __vec2lf __vrsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / sqrt(a.v0); r.v1 = 1.0 / sqrt(a.v1); return r; }
 
+/***** Not *****/
+inline  __vec4i  __vnot4i(const  __vec4i a) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); rPtr[0] = aPtr[0] ^ 0x0; rPtr[1] = aPtr[1] ^ 0x0; rPtr[2] = aPtr[2] ^ 0x0; rPtr[3] = aPtr[3] ^ 0x0; return r; }
+inline  __vec4f  __vnot4f(const  __vec4f a) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); rPtr[0] = aPtr[0] ^ 0x0; rPtr[1] = aPtr[1] ^ 0x0; rPtr[2] = aPtr[2] ^ 0x0; rPtr[3] = aPtr[3] ^ 0x0; return r; }
+inline __vec2lf __vnot2lf(const __vec2lf a) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); rPtr[0] = aPtr[0] ^ 0x0; rPtr[1] = aPtr[1] ^ 0x0; rPtr[2] = aPtr[2] ^ 0x0; rPtr[3] = aPtr[3] ^ 0x0; return r; }
+
+/***** Or *****/
+inline  __vec4i  __vor4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] | bPtr[0]; rPtr[1] = aPtr[1] | bPtr[1]; rPtr[2] = aPtr[2] | bPtr[2]; rPtr[3] = aPtr[3] | bPtr[3]; return r; }
+inline  __vec4f  __vor4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] | bPtr[0]; rPtr[1] = aPtr[1] | bPtr[1]; rPtr[2] = aPtr[2] | bPtr[2]; rPtr[3] = aPtr[3] | bPtr[3]; return r; }
+inline __vec2lf __vor2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] | bPtr[0]; rPtr[1] = aPtr[1] | bPtr[1]; rPtr[2] = aPtr[2] | bPtr[2]; rPtr[3] = aPtr[3] | bPtr[3]; return r; }
+
+/***** Nor *****/
+inline  __vec4i  __vnor4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] | bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] | bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] | bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] | bPtr[3]) ^ 0x0; return r; }
+inline  __vec4f  __vnor4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] | bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] | bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] | bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] | bPtr[3]) ^ 0x0; return r; }
+inline __vec2lf __vnor2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] | bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] | bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] | bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] | bPtr[3]) ^ 0x0; return r; }
+
+/***** And *****/
+inline  __vec4i  __vand4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] & bPtr[0]; rPtr[1] = aPtr[1] & bPtr[1]; rPtr[2] = aPtr[2] & bPtr[2]; rPtr[3] = aPtr[3] & bPtr[3]; return r; }
+inline  __vec4f  __vand4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] & bPtr[0]; rPtr[1] = aPtr[1] & bPtr[1]; rPtr[2] = aPtr[2] & bPtr[2]; rPtr[3] = aPtr[3] & bPtr[3]; return r; }
+inline __vec2lf __vand2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] & bPtr[0]; rPtr[1] = aPtr[1] & bPtr[1]; rPtr[2] = aPtr[2] & bPtr[2]; rPtr[3] = aPtr[3] & bPtr[3]; return r; }
+
+/***** Nand *****/
+inline  __vec4i  __vnand4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] & bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] & bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] & bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] & bPtr[3]) ^ 0x0; return r; }
+inline  __vec4f  __vnand4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] & bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] & bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] & bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] & bPtr[3]) ^ 0x0; return r; }
+inline __vec2lf __vnand2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] & bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] & bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] & bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] & bPtr[3]) ^ 0x0; return r; }
+
+/***** Xor *****/
+inline  __vec4i  __vxor4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] ^ bPtr[0]; rPtr[1] = aPtr[1] ^ bPtr[1]; rPtr[2] = aPtr[2] ^ bPtr[2]; rPtr[3] = aPtr[3] ^ bPtr[3]; return r; }
+inline  __vec4f  __vxor4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] ^ bPtr[0]; rPtr[1] = aPtr[1] ^ bPtr[1]; rPtr[2] = aPtr[2] ^ bPtr[2]; rPtr[3] = aPtr[3] ^ bPtr[3]; return r; }
+inline __vec2lf __vxor2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] ^ bPtr[0]; rPtr[1] = aPtr[1] ^ bPtr[1]; rPtr[2] = aPtr[2] ^ bPtr[2]; rPtr[3] = aPtr[3] ^ bPtr[3]; return r; }
+
+/***** Nxor *****/
+inline  __vec4i  __vnxor4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] ^ bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] ^ bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] ^ bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] ^ bPtr[3]) ^ 0x0; return r; }
+inline  __vec4f  __vnxor4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] ^ bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] ^ bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] ^ bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] ^ bPtr[3]) ^ 0x0; return r; }
+inline __vec2lf __vnxor2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] ^ bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] ^ bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] ^ bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] ^ bPtr[3]) ^ 0x0; return r; }
+
+/* TODO | FIXME - Try to do the comparisons in a branchless way */
+
+/***** Equal To *****/
+inline __vec4i  __vcmpeq4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; r.v0 = ((a.v0 == b.v0) ? (0xFFFFFFFF) : (0x0)); r.v1 = ((a.v1 == b.v1) ? (0xFFFFFFFF) : (0x0)); r.v2 = ((a.v2 == b.v2) ? (0xFFFFFFFF) : (0x0)); r.v3 = ((a.v3 == b.v3) ? (0xFFFFFFFF) : (0x0)); return r; }
+inline __vec4i  __vcmpeq4f(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v0 = ((a.v0 == b.v0) ? (0xFFFFFFFF) : (0x0)); r.v1 = ((a.v1 == b.v1) ? (0xFFFFFFFF) : (0x0)); r.v2 = ((a.v2 == b.v2) ? (0xFFFFFFFF) : (0x0)); r.v3 = ((a.v3 == b.v3) ? (0xFFFFFFFF) : (0x0)); return r; }
+inline __vec4i __vcmpeq2lf(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v0 = r.v1 = ((a.v0 == b.v0) ? (0xFFFFFFFF) : (0x0)); r.v2 = r.v3 = ((a.v1 == b.v1) ? (0xFFFFFFFF) : (0x0)); return r; }
+
+/***** Greater Than *****/
+inline __vec4i  __vcmpgt4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; r.v0 = ((a.v0 > b.v0) ? (0xFFFFFFFF) : (0x0)); r.v1 = ((a.v1 > b.v1) ? (0xFFFFFFFF) : (0x0)); r.v2 = ((a.v2 > b.v2) ? (0xFFFFFFFF) : (0x0)); r.v3 = ((a.v3 > b.v3) ? (0xFFFFFFFF) : (0x0)); return r; }
+inline __vec4i  __vcmpgt4f(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v0 = ((a.v0 > b.v0) ? (0xFFFFFFFF) : (0x0)); r.v1 = ((a.v1 > b.v1) ? (0xFFFFFFFF) : (0x0)); r.v2 = ((a.v2 > b.v2) ? (0xFFFFFFFF) : (0x0)); r.v3 = ((a.v3 > b.v3) ? (0xFFFFFFFF) : (0x0)); return r; }
+inline __vec4i __vcmpgt2lf(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v0 = r.v1 = ((a.v0 > b.v0) ? (0xFFFFFFFF) : (0x0)); r.v2 = r.v3 = ((a.v1 > b.v1) ? (0xFFFFFFFF) : (0x0)); return r; }
+
+/***** Greater Than Or Equal To *****/
+inline __vec4i  __vcmpge4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; r.v0 = ((a.v0 >= b.v0) ? (0xFFFFFFFF) : (0x0)); r.v1 = ((a.v1 >= b.v1) ? (0xFFFFFFFF) : (0x0)); r.v2 = ((a.v2 >= b.v2) ? (0xFFFFFFFF) : (0x0)); r.v3 = ((a.v3 >= b.v3) ? (0xFFFFFFFF) : (0x0)); return r; }
+inline __vec4i  __vcmpge4f(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v0 = ((a.v0 >= b.v0) ? (0xFFFFFFFF) : (0x0)); r.v1 = ((a.v1 >= b.v1) ? (0xFFFFFFFF) : (0x0)); r.v2 = ((a.v2 >= b.v2) ? (0xFFFFFFFF) : (0x0)); r.v3 = ((a.v3 >= b.v3) ? (0xFFFFFFFF) : (0x0)); return r; }
+inline __vec4i __vcmpge2lf(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v0 = r.v1 = ((a.v0 >= b.v0) ? (0xFFFFFFFF) : (0x0)); r.v2 = r.v3 = ((a.v1 >= b.v1) ? (0xFFFFFFFF) : (0x0)); return r; }
+
+/***** Less Than *****/
+inline __vec4i  __vcmplt4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; r.v0 = ((a.v0 < b.v0) ? (0xFFFFFFFF) : (0x0)); r.v1 = ((a.v1 < b.v1) ? (0xFFFFFFFF) : (0x0)); r.v2 = ((a.v2 < b.v2) ? (0xFFFFFFFF) : (0x0)); r.v3 = ((a.v3 < b.v3) ? (0xFFFFFFFF) : (0x0)); return r; }
+inline __vec4i  __vcmplt4f(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v0 = ((a.v0 < b.v0) ? (0xFFFFFFFF) : (0x0)); r.v1 = ((a.v1 < b.v1) ? (0xFFFFFFFF) : (0x0)); r.v2 = ((a.v2 < b.v2) ? (0xFFFFFFFF) : (0x0)); r.v3 = ((a.v3 < b.v3) ? (0xFFFFFFFF) : (0x0)); return r; }
+inline __vec4i __vcmplt2lf(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v0 = r.v1 = ((a.v0 < b.v0) ? (0xFFFFFFFF) : (0x0)); r.v2 = r.v3 = ((a.v1 < b.v1) ? (0xFFFFFFFF) : (0x0)); return r; }
+
+/***** Less Than Or Equal To *****/
+inline __vec4i  __vcmple4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; r.v0 = ((a.v0 <= b.v0) ? (0xFFFFFFFF) : (0x0)); r.v1 = ((a.v1 <= b.v1) ? (0xFFFFFFFF) : (0x0)); r.v2 = ((a.v2 <= b.v2) ? (0xFFFFFFFF) : (0x0)); r.v3 = ((a.v3 <= b.v3) ? (0xFFFFFFFF) : (0x0)); return r; }
+inline __vec4i  __vcmple4f(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v0 = ((a.v0 <= b.v0) ? (0xFFFFFFFF) : (0x0)); r.v1 = ((a.v1 <= b.v1) ? (0xFFFFFFFF) : (0x0)); r.v2 = ((a.v2 <= b.v2) ? (0xFFFFFFFF) : (0x0)); r.v3 = ((a.v3 <= b.v3) ? (0xFFFFFFFF) : (0x0)); return r; }
+inline __vec4i __vcmple2lf(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v0 = r.v1 = ((a.v0 <= b.v0) ? (0xFFFFFFFF) : (0x0)); r.v2 = r.v3 = ((a.v1 <= b.v1) ? (0xFFFFFFFF) : (0x0)); return r; }
+
 
 /*******************************************************************************
  ***** C++ Operators for Generic Implementation
@@ -172,6 +238,13 @@ inline __vec2lf __vrsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / sqrt(a.
   inline  __vec4f operator+=( __vec4f &a, const  __vec4f &b) { a =  __vadd4f(a, b); return a; }
   inline __vec2lf operator+=(__vec2lf &a, const __vec2lf &b) { a = __vadd2lf(a, b); return a; }
 
+  inline  __vec4i operator+(const  __vec4i &a, const    int &b) { return  __vadd4i(a,  __vset4i(b)); }
+  inline  __vec4f operator+(const  __vec4f &a, const  float &b) { return  __vadd4f(a,  __vset4f(b)); }
+  inline __vec2lf operator+(const __vec2lf &a, const double &b) { return __vadd2lf(a, __vset2lf(b)); }
+  inline  __vec4i operator+=( __vec4i &a, const    int &b) { a =  __vadd4i(a,  __vset4i(b)); return a; }
+  inline  __vec4f operator+=( __vec4f &a, const  float &b) { a =  __vadd4f(a,  __vset4f(b)); return a; }
+  inline __vec2lf operator+=(__vec2lf &a, const double &b) { a = __vadd2lf(a, __vset2lf(b)); return a; }
+
   /***** Subtraction *****/
   inline  __vec4i operator-(const  __vec4i &a, const  __vec4i &b) { return  __vsub4i(a, b); }
   inline  __vec4f operator-(const  __vec4f &a, const  __vec4f &b) { return  __vsub4f(a, b); }
@@ -180,11 +253,23 @@ inline __vec2lf __vrsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / sqrt(a.
   inline  __vec4f operator-=( __vec4f &a, const  __vec4f &b) { a =  __vsub4f(a, b); return a; }
   inline __vec2lf operator-=(__vec2lf &a, const __vec2lf &b) { a = __vsub2lf(a, b); return a; }
 
+  inline  __vec4i operator-(const  __vec4i &a, const    int &b) { return  __vsub4i(a,  __vset4i(b)); }
+  inline  __vec4f operator-(const  __vec4f &a, const  float &b) { return  __vsub4f(a,  __vset4f(b)); }
+  inline __vec2lf operator-(const __vec2lf &a, const double &b) { return __vsub2lf(a, __vset2lf(b)); }
+  inline  __vec4i operator-=( __vec4i &a, const    int &b) { a =  __vsub4i(a,  __vset4i(b)); return a; }
+  inline  __vec4f operator-=( __vec4f &a, const  float &b) { a =  __vsub4f(a,  __vset4f(b)); return a; }
+  inline __vec2lf operator-=(__vec2lf &a, const double &b) { a = __vsub2lf(a, __vset2lf(b)); return a; }
+
   /***** Multiplication *****/
   inline  __vec4f operator*(const  __vec4f &a, const  __vec4f &b) { return  __vmul4f(a, b); }
   inline __vec2lf operator*(const __vec2lf &a, const __vec2lf &b) { return __vmul2lf(a, b); }
   inline  __vec4f operator*=( __vec4f &a, const  __vec4f &b) { a =  __vmul4f(a, b); return a; }
   inline __vec2lf operator*=(__vec2lf &a, const __vec2lf &b) { a = __vmul2lf(a, b); return a; }
+
+  inline  __vec4f operator*(const  __vec4f &a, const  float &b) { return  __vmul4f(a,  __vset4f(b)); }
+  inline __vec2lf operator*(const __vec2lf &a, const double &b) { return __vmul2lf(a, __vset2lf(b)); }
+  inline  __vec4f operator*=( __vec4f &a, const  float &b) { a =  __vmul4f(a,  __vset4f(b)); return a; }
+  inline __vec2lf operator*=(__vec2lf &a, const double &b) { a = __vmul2lf(a, __vset2lf(b)); return a; }
 
   /***** Division *****/
   inline  __vec4f operator/(const  __vec4f &a, const  __vec4f &b) { return  __vdiv4f(a, b); }
@@ -192,7 +277,65 @@ inline __vec2lf __vrsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / sqrt(a.
   inline  __vec4f operator/=( __vec4f &a, const  __vec4f &b) { a =  __vdiv4f(a, b); return a; }
   inline __vec2lf operator/=(__vec2lf &a, const __vec2lf &b) { a = __vdiv2lf(a, b); return a; }
 
+  inline  __vec4f operator/(const  __vec4f &a, const  float &b) { return  __vdiv4f(a,  __vset4f(b)); }
+  inline __vec2lf operator/(const __vec2lf &a, const double &b) { return __vdiv2lf(a, __vset2lf(b)); }
+  inline  __vec4f operator/=( __vec4f &a, const  float &b) { a =  __vdiv4f(a,  __vset4f(b)); return a; }
+  inline __vec2lf operator/=(__vec2lf &a, const double &b) { a = __vdiv2lf(a, __vset2lf(b)); return a; }
+
+  /***** Or *****/
+  inline  __vec4i operator|(const  __vec4i &a, const  __vec4i &b) { return  __vor4i(a, b); }
+  inline  __vec4f operator|(const  __vec4f &a, const  __vec4f &b) { return  __vor4f(a, b); }
+  inline __vec2lf operator|(const __vec2lf &a, const __vec2lf &b) { return __vor2lf(a, b); }
+  inline  __vec4i operator|=( __vec4i &a, const  __vec4i &b) { a =  __vor4i(a, b); return a; }
+  inline  __vec4f operator|=( __vec4f &a, const  __vec4f &b) { a =  __vor4f(a, b); return a; }
+  inline __vec2lf operator|=(__vec2lf &a, const __vec2lf &b) { a = __vor2lf(a, b); return a; }
+
+  inline  __vec4i operator|(const  __vec4i &a, const    int &b) { return  __vor4i(a,  __vset4i(b)); }
+  inline  __vec4f operator|(const  __vec4f &a, const  float &b) { return  __vor4f(a,  __vset4f(b)); }
+  inline __vec2lf operator|(const __vec2lf &a, const double &b) { return __vor2lf(a, __vset2lf(b)); }
+  inline  __vec4i operator|=( __vec4i &a, const    int &b) { a =  __vor4i(a,  __vset4i(b)); return a; }
+  inline  __vec4f operator|=( __vec4f &a, const  float &b) { a =  __vor4f(a,  __vset4f(b)); return a; }
+  inline __vec2lf operator|=(__vec2lf &a, const double &b) { a = __vor2lf(a, __vset2lf(b)); return a; }
+
+  /***** And *****/
+  inline  __vec4i operator&(const  __vec4i &a, const  __vec4i &b) { return  __vand4i(a, b); }
+  inline  __vec4f operator&(const  __vec4f &a, const  __vec4f &b) { return  __vand4f(a, b); }
+  inline __vec2lf operator&(const __vec2lf &a, const __vec2lf &b) { return __vand2lf(a, b); }
+  inline  __vec4i operator&=( __vec4i &a, const  __vec4i &b) { a =  __vand4i(a, b); return a; }
+  inline  __vec4f operator&=( __vec4f &a, const  __vec4f &b) { a =  __vand4f(a, b); return a; }
+  inline __vec2lf operator&=(__vec2lf &a, const __vec2lf &b) { a = __vand2lf(a, b); return a; }
+
+  inline  __vec4i operator&(const  __vec4i &a, const    int &b) { return  __vand4i(a,  __vset4i(b)); }
+  inline  __vec4f operator&(const  __vec4f &a, const  float &b) { return  __vand4f(a,  __vset4f(b)); }
+  inline __vec2lf operator&(const __vec2lf &a, const double &b) { return __vand2lf(a, __vset2lf(b)); }
+  inline  __vec4i operator&=( __vec4i &a, const    int &b) { a =  __vand4i(a,  __vset4i(b)); return a; }
+  inline  __vec4f operator&=( __vec4f &a, const  float &b) { a =  __vand4f(a,  __vset4f(b)); return a; }
+  inline __vec2lf operator&=(__vec2lf &a, const double &b) { a = __vand2lf(a, __vset2lf(b)); return a; }
+
+  /***** Xor *****/
+  inline  __vec4i operator^(const  __vec4i &a, const  __vec4i &b) { return  __vxor4i(a, b); }
+  inline  __vec4f operator^(const  __vec4f &a, const  __vec4f &b) { return  __vxor4f(a, b); }
+  inline __vec2lf operator^(const __vec2lf &a, const __vec2lf &b) { return __vxor2lf(a, b); }
+  inline  __vec4i operator^=( __vec4i &a, const  __vec4i &b) { a =  __vxor4i(a, b); return a; }
+  inline  __vec4f operator^=( __vec4f &a, const  __vec4f &b) { a =  __vxor4f(a, b); return a; }
+  inline __vec2lf operator^=(__vec2lf &a, const __vec2lf &b) { a = __vxor2lf(a, b); return a; }
+
+  inline  __vec4i operator^(const  __vec4i &a, const    int &b) { return  __vxor4i(a,  __vset4i(b)); }
+  inline  __vec4f operator^(const  __vec4f &a, const  float &b) { return  __vxor4f(a,  __vset4f(b)); }
+  inline __vec2lf operator^(const __vec2lf &a, const double &b) { return __vxor2lf(a, __vset2lf(b)); }
+  inline  __vec4i operator^=( __vec4i &a, const    int &b) { a =  __vxor4i(a,  __vset4i(b)); return a; }
+  inline  __vec4f operator^=( __vec4f &a, const  float &b) { a =  __vxor4f(a,  __vset4f(b)); return a; }
+  inline __vec2lf operator^=(__vec2lf &a, const double &b) { a = __vxor2lf(a, __vset2lf(b)); return a; }
+
 #endif /* defined(__cplusplus) */
+
+/*@}*/
+
+
+// NOTE: Wrap the rest of the file in an 'else' portion of a '#if' so doxygen
+// ignores it (this is a complete hack, but works for now until a better
+// solution can be found).
+#if defined(__DOXYGEN_IGNORE_ALL_THIS__)
 
 
 /*******************************************************************************
@@ -200,7 +343,7 @@ inline __vec2lf __vrsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / sqrt(a.
  ***** SSE Support
  *******************************************************************************
  *******************************************************************************/
-#if defined(__SSE2__) && (!(FORCE_NO_SSE))
+#elif defined(__SSE2__) && (!(FORCE_NO_SSE))
 
   /* NOTE | TODO | FIXME : Add checks for various version of SSE.  For now, only
    *   support and assume that minimum level SSE2.
@@ -290,6 +433,66 @@ inline __vec2lf __vrsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / sqrt(a.
   /***** Reciprocal Square Root *****/
   #define  vrsqrt4f(a)  (_mm_rsqrt_ps(a))
   #define vrsqrt2lf(a)  (vrecip2lf(vsqrt2lf(a)))
+
+  /***** Not *****/
+  #define  vnot4i(a)  (_mm_xor_si128((a), const_vzero4i))
+  #define  vnot4f(a)  (_mm_xor_ps((a), const_vzero4f))
+  #define vnot2lf(a)  (_mm_xor_pd((a), const_vzero2lf))
+
+  /***** Or *****/
+  #define  vor4i(a, b)  (_mm_or_si128((a), (b)))
+  #define  vor4f(a, b)  (_mm_or_ps((a), (b)))
+  #define vor2lf(a, b)  (_mm_or_pd((a), (b)))
+
+  /***** Nor *****/
+  #define  vnor4i(a, b)  ( vnot4i( vor4i((a), (b))))
+  #define  vnor4f(a, b)  ( vnot4f( vor4f((a), (b))))
+  #define vnor2lf(a, b)  (vnot2lf(vor2lf((a), (b))))
+
+  /***** And *****/
+  #define  vand4i(a, b)  (_mm_and_si128((a), (b)))
+  #define  vand4f(a, b)  (_mm_and_ps((a), (b)))
+  #define vand2lf(a, b)  (_mm_and_pd((a), (b)))
+
+  /***** Nand *****/
+  #define  vnand4i(a, b)  ( vnot4i( vand4i((a), (b))))
+  #define  vnand4f(a, b)  ( vnot4f( vand4f((a), (b))))
+  #define vnand2lf(a, b)  (vnot2lf(vand2lf((a), (b))))
+
+  /***** Xor *****/
+  #define  vxor4i(a, b)  (_mm_xor_si128((a), (b)))
+  #define  vxor4f(a, b)  (_mm_xor_ps((a), (b)))
+  #define vxor2lf(a, b)  (_mm_xor_pd((a), (b)))
+
+  /***** Nxor *****/
+  #define  vnxor4i(a, b)  ( vnot4i( vxor4i((a), (b))))
+  #define  vnxor4f(a, b)  ( vnot4f( vxor4f((a), (b))))
+  #define vnxor2lf(a, b)  (vnot2lf(vxor2lf((a), (b))))
+
+  /***** Equal To *****/
+  #define  vcmpeq4i(a, b)  ((_m128i)(_mm_cmpeq_epi32((a), (b))))
+  #define  vcmpeq4f(a, b)  ((_m128i)(_mm_cmpeq_ps((a), (b))))
+  #define vcmpeq2lf(a, b)  ((_m128i)(_mm_cmpeq_pd((a), (b))))
+
+  /***** Greater Than *****/
+  #define  vcmpgt4i(a, b)  ((_m128i)(_mm_cmpgt_epi32((a), (b))))
+  #define  vcmpgt4f(a, b)  ((_m128i)(_mm_cmpgt_ps((a), (b))))
+  #define vcmpgt2lf(a, b)  ((_m128i)(_mm_cmpgt_pd((a), (b))))
+
+  /***** Greater Than Or Equal To *****/
+  #define  vcmpge4i(a, b)  ((_m128i)(_mm_cmpge_epi32((a), (b))))
+  #define  vcmpge4f(a, b)  ((_m128i)(_mm_cmpge_ps((a), (b))))
+  #define vcmpge2lf(a, b)  ((_m128i)(_mm_cmpge_pd((a), (b))))
+
+  /***** Less Than *****/
+  #define  vcmplt4i(a, b)  ((_m128i)(_mm_cmplt_epi32((a), (b))))
+  #define  vcmplt4f(a, b)  ((_m128i)(_mm_cmplt_ps((a), (b))))
+  #define vcmplt2lf(a, b)  ((_m128i)(_mm_cmplt_pd((a), (b))))
+
+  /***** Less Than Or Equal To *****/
+  #define  vcmple4i(a, b)  ((_m128i)(_mm_cmple_epi32((a), (b))))
+  #define  vcmple4f(a, b)  ((_m128i)(_mm_cmple_ps((a), (b))))
+  #define vcmple2lf(a, b)  ((_m128i)(_mm_cmple_pd((a), (b))))
 
 
 /*******************************************************************************
@@ -381,6 +584,66 @@ inline __vec2lf __vrsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / sqrt(a.
   /***** Reciprocal Square Root *****/
   #define vrsqrt4f(a) (spu_rsqrte(a))
   inline vec2lf vrsqrt2lf(const vec2lf a, const vec2lf b) { vec2lf r = { 0.0, 0.0 }; spu_insert((1.0f / sqrt(spu_extract(a, 0))), r, 0); spu_insert((1.0f / sqrt(spu_extract(a, 1))), r, 1); return r; }
+
+  /***** Not *****/
+  #define  vnot4i(a)  (spu_nor((a), (a)))
+  #define  vnot4f(a)  (spu_nor((a), (a)))
+  #define vnot2lf(a)  (spu_nor((a), (a)))
+
+  /***** Or *****/
+  #define  vor4i(a, b)  (spu_or((a), (b)))
+  #define  vor4f(a, b)  (spu_or((a), (b)))
+  #define vor2lf(a, b)  (spu_or((a), (b)))
+
+  /***** Nor *****/
+  #define  vnor4i(a, b)  (spu_nor((a), (b)))
+  #define  vnor4f(a, b)  (spu_nor((a), (b)))
+  #define vnor2lf(a, b)  (spu_nor((a), (b)))
+
+  /***** And *****/
+  #define  vand4i(a, b)  (spu_and((a), (b)))
+  #define  vand4f(a, b)  (spu_and((a), (b)))
+  #define vand2lf(a, b)  (spu_and((a), (b)))
+
+  /***** Nand *****/
+  #define  vnand4i(a, b)  (spu_nand((a), (b)))
+  #define  vnand4f(a, b)  (spu_nand((a), (b)))
+  #define vnand2lf(a, b)  (spu_nand((a), (b)))
+
+  /***** Xor *****/
+  #define  vxor4i(a, b)  (spu_xor((a), (b)))
+  #define  vxor4f(a, b)  (spu_xor((a), (b)))
+  #define vxor2lf(a, b)  (spu_xor((a), (b)))
+
+  /***** Nxor *****/
+  #define  vnxor4i(a, b)  ( vnot4i( vxor4i((a), (b))))
+  #define  vnxor4f(a, b)  ( vnot4f( vxor4f((a), (b))))
+  #define vnxor2lf(a, b)  (vnot2lf(vxor2lf((a), (b))))
+
+  /***** Equal To *****/
+  #define  vcmpeq4i(a, b)  ((vec4i)(spu_cmpeq((a), (b))))
+  #define  vcmpeq4f(a, b)  ((vec4i)(spu_cmpeq((a), (b))))
+  #define vcmpeq2lf(a, b)  ((vec4i)(spu_cmpeq((a), (b))))
+
+  /***** Greater Than *****/
+  #define  vcmpgt4i(a, b)  ((vec4i)(spu_cmpgt((a), (b))))
+  #define  vcmpgt4f(a, b)  ((vec4i)(spu_cmpgt((a), (b))))
+  #define vcmpgt2lf(a, b)  ((vec4i)(spu_cmpgt((a), (b))))
+
+  /***** Greater Than or Equal To *****/
+  #define  vcmpge4i(a, b)  (spu_or( vcmpeq4i((a), (b)),  vcmpgt4i((a), (b))))
+  #define  vcmpge4f(a, b)  (spu_or( vcmpeq4f((a), (b)),  vcmpgt4f((a), (b))))
+  #define vcmpge2lf(a, b)  (spu_or(vcmpeq2lf((a), (b)), vcmpgt2lf((a), (b))))
+
+  /***** Less Than *****/
+  #define  vcmplt4i(a, b)  (spu_nor( vcmpgt4i((a), (b)),  vcmpeq4i((a), (b))))
+  #define  vcmplt4f(a, b)  (spu_nor( vcmpgt4f((a), (b)),  vcmpeq4f((a), (b))))
+  #define vcmplt2lf(a, b)  (spu_nor(vcmpgt2lf((a), (b)), vcmpeq2lf((a), (b))))
+
+  /***** Less Than or Equal To *****/
+  #define  vcmple4i(a, b)  (spu_nor( vcmpgt4i((a), (b)),  vxor4i((a), (a))))
+  #define  vcmple4f(a, b)  (spu_nor( vcmpgt4f((a), (b)),  vxor4f((a), (a))))
+  #define vcmple2lf(a, b)  (spu_nor(vcmpgt2lf((a), (b)), vxor2lf((a), (b))))
 
 
 /*******************************************************************************
@@ -482,6 +745,66 @@ inline __vec2lf __vrsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / sqrt(a.
   #define vrsqrt4f(a)  (vec_rsqrte(a))
   #define vrsqrt2lf __vrsqrt2lf
 
+  /***** Not *****/
+  #define vnot4i(a)  (vec_xor((a), (a)))
+  #define vnot4f(a)  (vec_xor((a), (a))) 
+  #define vnot2lf __vnot2lf
+
+  /***** Or *****/
+  #define vor4i(a, b)  (vec_or((a), (b)))
+  #define vor4f(a, b)  (vec_or((a), (b)))
+  #define vor2lf __vor2lf
+
+  /***** Nor *****/
+  #define vnor4i(a, b)  (vec_nor((a), (b)))
+  #define vnor4f(a, b)  (vec_nor((a), (b)))
+  #define vnor2lf __vnor2lf
+
+  /***** And *****/
+  #define vand4i(a, b)  (vec_and((a), (b)))
+  #define vand4f(a, b)  (vec_and((a), (b)))
+  #define vand2lf __vand2lf
+
+  /***** Nand *****/
+  #define vnand4i(a, b)  (vnot4i(vand4i((a), (b))))
+  #define vnand4f(a, b)  (vnot4f(vand4f((a), (b))))
+  #define vnand2lf __vnand2lf
+
+  /***** Xor *****/
+  #define vxor4i(a, b)  (vec_xor((a), (b)))
+  #define vxor4f(a, b)  (vec_xor((a), (b)))
+  #define vxor2lf __vxor2lf
+
+  /***** Nxor *****/
+  #define vnxor4i(a, b)  (vnot4i(vxor4i((a), (b))))
+  #define vnxor4f(a, b)  (vnot4f(vxor4f((a), (b))))
+  #define vnxor2lf __vnxor2lf
+
+  /***** Equal To *****/
+  #define  vcmpeq4i(a, b)  ((vec4i)(vec_cmpeq((a), (b))))
+  #define  vcmpeq4f(a, b)  ((vec4i)(vec_cmpeq((a), (b))))
+  #define vcmpeq2lf __vcmpeq2lf
+
+  /***** Greater Than *****/
+  #define  vcmpgt4i(a, b)  ((vec4i)(vec_cmpgt((a), (b))))
+  #define  vcmpgt4f(a, b)  ((vec4i)(vec_cmpgt((a), (b))))
+  #define vcmpgt2lf __vcmpgt2lf
+
+  /***** Greater Than Or Equal To *****/
+  #define  vcmpge4i(a, b)  ((vec4i)(vec_cmpge((a), (b))))
+  #define  vcmpge4f(a, b)  ((vec4i)(vec_cmpge((a), (b))))
+  #define vcmpge2lf __vcmpge2lf
+
+  /***** Less Than *****/
+  #define  vcmplt4i(a, b)  ((vec4i)(vec_cmplt((a), (b))))
+  #define  vcmplt4f(a, b)  ((vec4i)(vec_cmplt((a), (b))))
+  #define vcmplt2lf __vcmplt2lf
+
+  /***** Less Than Or Equal To *****/
+  #define  vcmple4i(a, b)  ((vec4i)(vec_cmple((a), (b))))
+  #define  vcmple4f(a, b)  ((vec4i)(vec_cmple((a), (b))))
+  #define vcmple2lf __vcmple2lf
+
 
 /*******************************************************************************
  *******************************************************************************
@@ -572,6 +895,67 @@ inline __vec2lf __vrsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / sqrt(a.
   #define  vrsqrt4f  __vrsqrt4f
   #define vrsqrt2lf __vrsqrt2lf
 
+  /***** Not *****/
+  #define  vnot4i  __vnot4i
+  #define  vnot4f  __vnot4f
+  #define vnot2lf __vnot2lf
+
+  /***** Or *****/
+  #define  vor4i  __vor4i
+  #define  vor4f  __vor4f
+  #define vor2lf __vor2lf
+
+  /***** Nor *****/
+  #define  vnor4i  __vnor4i
+  #define  vnor4f  __vnor4f
+  #define vnor2lf __vnor2lf
+
+  /***** And *****/
+  #define  vand4i  __vand4i
+  #define  vand4f  __vand4f
+  #define vand2lf __vand2lf
+
+  /***** Nand *****/
+  #define  vnand4i  __vnand4i
+  #define  vnand4f  __vnand4f
+  #define vnand2lf __vnand2lf
+
+  /***** Xor *****/
+  #define  vxor4i  __vxor4i
+  #define  vxor4f  __vxor4f
+  #define vxor2lf __vxor2lf
+
+  /***** Nxor *****/
+  #define  vnxor4i  __vnxor4i
+  #define  vnxor4f  __vnxor4f
+  #define vnxor2lf __vnxor2lf
+
+  /***** Equal To *****/
+  #define  vcmpeq4i  __vcmpeq4i
+  #define  vcmpeq4f  __vcmpeq4f
+  #define vcmpeq2lf __vcmpeq2lf
+
+  /***** Greater Than *****/
+  #define  vcmpgt4i  __vcmpgt4i
+  #define  vcmpgt4f  __vcmpgt4f
+  #define vcmpgt2lf __vcmpgt2lf
+
+  /***** Greater Than Or Equal To *****/
+  #define  vcmpge4i  __vcmpge4i
+  #define  vcmpge4f  __vcmpge4f
+  #define vcmpge2lf __vcmpge2lf
+
+  /***** Less Than *****/
+  #define  vcmplt4i  __vcmplt4i
+  #define  vcmplt4f  __vcmplt4f
+  #define vcmplt2lf __vcmplt2lf
+
+  /***** Less Than Or Equal To *****/
+  #define  vcmple4i  __vcmple4i
+  #define  vcmple4f  __vcmple4f
+  #define vcmple2lf __vcmple2lf
+
+
 #endif
 
 
@@ -592,6 +976,16 @@ inline __vec2lf __vrsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / sqrt(a.
 #define  vspread4f(a)  ( vset4f(a))
 #define vspread2lf(a)  (vset2lf(a))
 
+/***** Add to Scalar *****/
+#define   vadd4is(a, b)  ( vadd4i((a),  vset4i(b)))
+#define   vadd4fs(a, b)  ( vadd4f((a),  vset4f(b)))
+#define  vadd2lfs(a, b)  (vadd2lf((a), vset2lf(b)))
+
+/***** Subtract a Scalar *****/
+#define   vsub4is(a, b)  ( vsub4i((a),  vset4i(b)))
+#define   vsub4fs(a, b)  ( vsub4f((a),  vset4f(b)))
+#define  vsub2lfs(a, b)  (vsub2lf((a), vset2lf(b)))
+
 /***** Multiply by Scalar *****/
 #define   vmul4fs(a, b)  ( vmul4f((a),  vset4f(b)))
 #define  vmul2lfs(a, b)  (vmul2lf((a), vset2lf(b)))
@@ -607,6 +1001,9 @@ inline __vec2lf __vrsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / sqrt(a.
 /***** Fused Multiply(Scalar) Add(Scalar) *****/
 #define  vmadd4fss(a, b, c)  ( vmadd4f((a),  vset4f(b),  vset4f(c)))
 #define vmadd2lfss(a, b, c)  (vmadd2lf((a), vset2lf(b), vset2lf(c)))
+
+
+
 
 
 #endif //__SIMD_H__
