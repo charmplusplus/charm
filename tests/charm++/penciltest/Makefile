@@ -1,4 +1,7 @@
-FFTW_HOME=/bgl/local/fftw-2.1.5/
+#Set FFTW_HOME home to the fftw-2.1.5 local installation
+
+#FFTW_HOME=/bgl/local/fftw-2.1.5/
+FFTW_HOME=$(HOME)/fftw
 OPTS=-g -O3 
 
 CHARMC=../../../bin/charmc $(OPTS)
