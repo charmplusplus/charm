@@ -1,4 +1,4 @@
-FFTW_HOME=/home/bohm/fftw64
+FFTW_HOME=$(HOME)/fftw
 CHARMC=$(CDIR)/bin/charmc $(OPTS) $(FLAGS)
 
 CDIR=../../../..
@@ -25,7 +25,7 @@ all: $(LIBDEST) $(HEADERS)
 
 $(LIBDEST): $(LIBOBJ)
 	$(CHARMC) -o $(LIBDEST) $(LIBOBJ)
-	/bin/cp libmodulePencilFFT.dep $(LIBDIR)
+	/bin/cp libmodulepencilFFT.dep $(LIBDIR)
 
 $(HEADERS): pencilfft.h PencilFFT.decl.h
 	test ! -d $(INCDIR) && mkdir $(INCDIR) || true
