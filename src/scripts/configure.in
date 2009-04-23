@@ -184,10 +184,15 @@ test_linkso() {
 # add_flag $1 $2
 # $2 is description
 add_flag() {
-	if grep "$1" conv-mach-opt.sh  > /dev/null 2>&1
+        key=`echo $1 | cut -d'=' -f1`
+        last=`grep $key ../include/conv-mach-opt.sh 2>/dev/null | tail -1`
+        skip=0
+	if test -n "$last" -a  "$last" = "$1" 
 	then
-	  true
-	else
+	  skip=1
+        fi
+	if test $skip = 0
+        then
 	  cat >> ../include/conv-mach-opt.sh << EOT
 
 # Option added by configure script's $2 section
@@ -1068,6 +1073,8 @@ test_linkso "whether it can build shared library" "yes" "no" ""
 if test $pass -eq 0
 then 
 	add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
+else
+	add_flag 'CMK_NO_BUILD_SHARED="false"' "build-shared"
 fi
 
 #### test the version number of bproc ####
