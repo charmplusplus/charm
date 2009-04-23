@@ -108,6 +108,11 @@ Main::Main(CkArgMsg *m){
   tab_init();
 
   numParticleChunks = NPROC;
+  numTreePieces = getiparam("pieces");
+  if(numTreePieces < 0){
+    numTreePieces = 8*numParticleChunks; 
+  }
+  ckout << "pieces: " << numTreePieces << endl;
   // various maximum count parameters are:
   // nbody, maxmybody, maxcell, maxmycell, maxleaf, maxmyleaf
   // nbody has already been set
@@ -240,7 +245,7 @@ void Main::startrun()
    int seed;
 
    infile = getparam("in");
-   if (infile.empty()) {
+   if (!infile.empty()) {
      // FIXME - enable
       //inputdata();
    }
