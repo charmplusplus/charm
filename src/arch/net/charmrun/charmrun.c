@@ -619,6 +619,10 @@ int   arg_help;		/* print help message */
 int   arg_ppn;		/* pes per node */
 int   arg_usehostname;
 
+#ifdef _FAULT_MLOG_
+int     arg_read_pes=0;
+#endif
+
 #if CMK_USE_RSH
 int   arg_maxrsh;
 char *arg_shell;
@@ -660,6 +664,9 @@ void arg_init(int argc, char **argv)
   pparam_flag(&arg_verbose,      0, "verbose",       "Print diagnostic messages");
   pparam_str(&arg_nodelist,      0, "nodelist",      "file containing list of nodes");
   pparam_str(&arg_nodegroup,"main", "nodegroup",     "which group of nodes to use");
+#ifdef _FAULT_MLOG_
+	pparam_int(&arg_read_pes, 0, "readpe",             "number of host names to read into the host table");
+#endif
 
 #if CMK_CCS_AVAILABLE
   pparam_flag(&arg_server,       0, "server",        "Enable client-server (CCS) mode");
@@ -914,6 +921,10 @@ int           nodetab_size;
 int          *nodetab_rank0_table;
 int           nodetab_rank0_size;
 
+#ifdef _FAULT_MLOG_
+int                     loaded_max_pe;
+#endif
+
 void nodetab_reset(nodetab_host *h)
 {
   h->name="SET_H->NAME";
@@ -1062,17 +1073,32 @@ void nodetab_init()
     fprintf(stderr,"ERROR> Cannot read %s: %s\n",nodesfile,strerror(errno));
     exit(1);
   }
-  
-  nodetab_table=(nodetab_host**)malloc(arg_requested_pes*sizeof(nodetab_host*));
-  nodetab_rank0_table=(int*)malloc(arg_requested_pes*sizeof(int));
-  nodetab_max=arg_requested_pes;
+ 
+#ifdef _FAULT_MLOG_
+	if(arg_read_pes == 0){
+        arg_read_pes = arg_requested_pes;
+    }
+	nodetab_table=(nodetab_host**)malloc(arg_read_pes*sizeof(nodetab_host*));
+	nodetab_rank0_table=(int*)malloc(arg_read_pes*sizeof(int));
+	nodetab_max=arg_read_pes;
+    fprintf(stderr,"arg_read_pes %d arg_requested_pes %d\n",arg_read_pes,arg_requested_pes);
+#else
+	nodetab_table=(nodetab_host**)malloc(arg_requested_pes*sizeof(nodetab_host*));
+	nodetab_rank0_table=(int*)malloc(arg_requested_pes*sizeof(int));
+	nodetab_max=arg_requested_pes;
+#endif
+ 
   
   nodetab_reset(&global);
   group=global;
   rightgroup = (strcmp(arg_nodegroup,"main")==0);
   
   while(fgets(input_line,sizeof(input_line)-1,f)!=0) {
+#ifdef _FAULT_MLOG_
+	if (nodetab_size == arg_read_pes) break;
+#else
     if (nodetab_size == arg_requested_pes) break;
+#endif
     if (input_line[0]=='#') continue;
     zap_newline(input_line);
 	if (!nodetab_args(input_line,&global)) {
@@ -1121,6 +1147,11 @@ fin:
     if (nodetab_table[i]->cpus > remain)
       nodetab_table[i]->cpus = remain;
   }
+
+#ifdef _FAULT_MLOG_
+	loaded_max_pe = arg_requested_pes-1;
+#endif
+
 }
 
 /* Given a processor number, look up the nodetab info: */
@@ -1606,8 +1637,12 @@ int req_handle_ending(ChMessage *msg,SOCKET fd)
 {  
   int i;
   req_ending++;
-    
-  if (req_ending == nodetab_size)
+
+#ifndef _FAULT_MLOG_    
+	if (req_ending == nodetab_size)
+#else
+	if(req_ending == arg_requested_pes)
+#endif
   {
     for (i=0;i<req_nClients;i++)
       skt_close(req_clients[i]);
@@ -1649,6 +1684,11 @@ void anounce_crash(int socket_index,int crashed_node);
 static int _last_crash = 0;			/* last crashed pe number */
 static int _crash_socket_index = 0;		/* last restart socket */
 
+#ifdef _FAULT_MLOG_
+static int numCrashes=0;  /*number of crashes*/
+static SOCKET last_crashed_fd=-1;
+#endif
+
 int req_handle_crashack(ChMessage *msg,SOCKET fd)
 {
   static int count = 0;
@@ -1660,6 +1700,9 @@ int req_handle_crashack(ChMessage *msg,SOCKET fd)
     req_handle_initnodetab(NULL,req_clients[_crash_socket_index]);
     _last_crash = 0;
     count = 0;
+#ifdef _FAULT_MLOG_
+	last_crashed_fd=-1;
+#endif
   }
 }
 #endif
@@ -1676,7 +1719,9 @@ void error_in_req_serve_client(SOCKET fd){
 		}
 	}
 	fflush(stdout);
+#ifndef _FAULT_MLOG_
 	skt_close(fd);
+#endif
 	crashed_pe = i;
 	node_index = i-nodetab_rank(crashed_pe);
 	for(i=0;i<nodetab_rank0_size;i++){
@@ -1701,6 +1746,9 @@ void error_in_req_serve_client(SOCKET fd){
 	}	
 	socket_index = i;
 	reconnect_crashed_client(socket_index,crashed_node);
+#ifdef _FAULT_MLOG_
+	skt_close(fd);
+#endif
 }
 #endif
 
@@ -1715,8 +1763,18 @@ int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
 
   /* grab request data */
   recv_status = ChMessageData_recv(replyFd,msg);
-#ifdef __FAULT__	
+#ifdef __FAULT__
+#ifdef _FAULT_MLOG_
+ if(recv_status < 0){
+        if(replyFd == last_crashed_fd){
+            return REQ_OK;
+        }
+        DEBUGF(("recv_status %d on socket %d \n",recv_status,replyFd));
+        error_in_req_serve_client(replyFd);
+    }
+#else	
   if(recv_status < 0)  error_in_req_serve_client(replyFd);
+#endif
 #endif
 
        if (strcmp(cmd,"ping")==0)       return REQ_OK;
@@ -3294,8 +3352,24 @@ void refill_nodetab_entry(int crashed_node){
 	int pe =  nodetab_rank0_table[crashed_node];
 	nodetab_host *h = nodetab_table[pe];
 	*h = *(replacement_host(pe));
+#ifdef _FAULT_MLOG_
+fprintf(stderr,"Charmrun>>> New pe %d is on host %s \n",pe,nodetab_name(pe));
+#endif
 }
 
+#ifdef _FAULT_MLOG_
+nodetab_host *replacement_host(int pe){
+    int x=loaded_max_pe+1;
+
+    x = x%arg_read_pes;
+    loaded_max_pe +=1;
+/*  while(x == pe){
+ *       x = rand()%nodetab_size;    
+ *           }*/
+    fprintf(stderr,"Charmrun>>> replacing pe %d with %d host %s with %s \n",pe,x,nodetab_name(pe),nodetab_name(x));
+    return nodetab_table[x];
+}
+#else
 nodetab_host *replacement_host(int pe){
 	int x=pe;
 	while(x == pe){
@@ -3303,6 +3377,7 @@ nodetab_host *replacement_host(int pe){
 	}
 	return nodetab_table[x];
 }
+#endif
 
 void reconnect_crashed_client(int socket_index,int crashed_node){
 	int i;
@@ -3325,6 +3400,7 @@ void reconnect_crashed_client(int socket_index,int crashed_node){
  	  	fprintf(stderr,"Charmrun: Bad initnode data length. Aborting\n");
   	  	fprintf(stderr,"Charmrun: possibly because: %s.\n", msg.data);
 		}
+fprintf(stdout,"socket_index %d crashed_node %d reconnected fd %d  \n",socket_index,crashed_node,req_clients[socket_index]);
 		/** update the nodetab entry corresponding to
 		this node, skip the restarted one */
 		in = (ChSingleNodeinfo *)msg.data;

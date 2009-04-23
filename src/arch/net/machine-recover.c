@@ -4,6 +4,6 @@ static void crash_node_handle(ChMessage *m){
 	crashed_node = ChMessageInt(d[0]);
 	/* tell charmrun we knew */
 	ctrl_sendone_nolock("crash_ack",NULL,0,NULL,0);
-	fprintf(stdout,"[%d] got crash mesg for %d \n",CmiMyPe(),crashed_node);
+	// fprintf(stdout,"[%d] got crash mesg for %d \n",CmiMyPe(),crashed_node);
 }
 

@@ -68,7 +68,10 @@ waits for the migrant contributions to straggle in.
 #else
 //No debugging info-- empty defines
 #define DEBUGRED 0
-#define DEBR(x) //CkPrintf x
+#define DEBR(x) // CkPrintf x
+#define DEBRMLOG(x) CkPrintf x
+#define AA
+#define AB
 #define DEBN(x) //CkPrintf x
 #define RED_DEB(x) //CkPrintf x
 #define DEBREVAC(x) //CkPrintf x
@@ -656,7 +659,6 @@ void CkReductionMgr::finishReduction(void)
             return;
         }
     }
-
     if (CkMyPe() == 0 && nContrib<numberReductionMessages()){
         DEBR((AA"Need more messages %d %d\n"AB,nContrib,numberReductionMessages()));
          return;//Need more local messages
@@ -667,13 +669,13 @@ void CkReductionMgr::finishReduction(void)
 
 #endif
 
-
   DEBR((AA"Reducing data... %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
   CkReductionMsg *result=reduceMessages();
   result->redNo=redNo;
 #ifndef _FAULT_MLOG_
 
   result->gcount+=gcount+adj(redNo).gcount;
+
   result->secondaryCallback = result->callback;
   result->callback = CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(NULL),0,thisProxy);
 	DEBR((AA"Reduced mesg gcount %d localgcount %d\n"AB,result->gcount,gcount));
@@ -717,12 +719,14 @@ void CkReductionMgr::finishReduction(void)
 #else
     {
 #endif
-	int i;
+//	int i;
 	completedRedNo++;
-  	for (i=1;i<adjVec.length();i++)
+  	for (i=1;i<(int)(adjVec.length());i++){
 	   adjVec[i-1]=adjVec[i];
+	}
 	adjVec.length()--;  
   }
+
   inProgress=CmiFalse;
   startRequested=CmiFalse;
   nRemote=nContrib=0;
@@ -754,7 +758,7 @@ countAdjustment &CkReductionMgr::adj(int number)
   number--;
   if (number<0) CkAbort("Requested adjustment to prior reduction!\n");
   //Pad the adjustment vector with zeros until it's at least number long
-  while (adjVec.length()<=number)
+  while ((int)(adjVec.length())<=number)
     adjVec.push_back(countAdjustment());
   return adjVec[number];
 }
@@ -1049,7 +1053,7 @@ void CkReductionMgr :: endArrayReduction(){
 #if DEBUGRED
        CkPrintf("[%d,%d]------------END OF GROUP REDUCTION %d for group %d at %.6f\n",CkMyNode(),CkMyPe(),completedRedNo,thisgroup.idx,CkWallTimer());
 #endif
-	for (i=1;i<adjVec.length();i++)
+	for (i=1;i<(int)(adjVec.length());i++)
     		adjVec[i-1]=adjVec[i];
 	adjVec.length()--;
 	endArrayReduction();
@@ -2106,6 +2110,7 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   p | blocked;
   p | maxModificationRedNo;
 
+#ifndef _FAULT_MLOG_
   int isnull = (storedCallback == NULL);
   p | isnull;
   if (!isnull) {
@@ -2114,6 +2119,8 @@ void CkNodeReductionMgr::pup(PUP::er &p)
     }
     p|*storedCallback;
   }
+#endif
+
 }
 
 /*
@@ -2314,7 +2321,7 @@ void CkNodeReductionMgr::updateTree(){
 		readyDeletion = true;
 		additionalGCount = newAdditionalGCount;
 		DEBREVAC(("[%d]%d> Updating Tree numKids %d -> ",CkMyNode(),thisgroup.idx,numKids));
-		for(int i=0;i<newKids.size();i++){
+		for(int i=0;i<(int)(newKids.size());i++){
 			DEBREVAC(("%d ",newKids[i]));
 		}
 		DEBREVAC(("\n"));
@@ -2377,14 +2384,14 @@ void CkNodeReductionMgr::DeleteChild(int deletedChild){
 }
 
 void CkNodeReductionMgr::DeleteNewChild(int deletedChild){
-	for(int i=0;i<newKids.length();i++){
+	for(int i=0;i<(int)(newKids.length());i++){
 		if(newKids[i] == deletedChild){
 			newKids.remove(i);
 			break;
 		}
 	}
 	DEBREVAC(("[%d]%d> Deleting  new child %d readyDeletion %d newKids %d -> ",CkMyNode(),thisgroup.idx,deletedChild,readyDeletion,newKids.size()));
-	for(int i=0;i<newKids.size();i++){
+	for(int i=0;i<(int)(newKids.size());i++){
 		DEBREVAC(("%d ",newKids[i]));
 	}
 	DEBREVAC(("\n"));

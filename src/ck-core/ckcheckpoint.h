@@ -68,6 +68,9 @@ void CkRemoveArrayElements();
 
 void CkStartCheckpoint(char* dirname,const CkCallback& cb);
 void CkRestartMain(const char* dirname, CkArgMsg *args);
+#ifdef _FAULT_MLOG_
+int  CkCountArrayElements();
+#endif
 
 
 #endif //_CKCHECKPOINT_H

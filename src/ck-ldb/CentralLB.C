@@ -16,8 +16,8 @@
 #include "LBDBManager.h"
 #include "LBSimulation.h"
 
-#define  DEBUGF(x)        //CmiPrintf x;
-#define  DEBUG(x)      // x;
+#define  DEBUGF(x)      //  CmiPrintf x;
+#define  DEBUG(x)       // x;
 
 #if CMK_MEM_CHECKPOINT
    /* can not handle reduction in inmem FT */
@@ -201,6 +201,10 @@ void CentralLB::ProcessAtSync()
     start_lb_time = CkWallTimer();
   }
 
+#ifdef _FAULT_MLOG_
+	initMlogLBStep(thisgroup);
+#endif
+
   // build message
   BuildStatsMsg();
 
@@ -251,6 +255,9 @@ void CentralLB::BuildStatsMsg()
   int npes = CkNumPes();
   CLBStatsMsg* msg = new CLBStatsMsg(osz, csz);
   msg->from_pe = CkMyPe();
+#ifdef _FAULT_MLOG_
+	msg->step = step();
+#endif
   //msg->serial = CrnRand();
 
 /*
@@ -297,6 +304,7 @@ void CentralLB::SendStats()
   }
   else
 #endif
+	DEBUGF(("[%d] calling ReceiveStats on step %d \n",CmiMyPe(),step()));
   thisProxy[cur_ld_balancer].ReceiveStats(statsMsg);
 
   statsMsg = NULL;
@@ -433,7 +441,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
   {
     CLBStatsMsg *m = (CLBStatsMsg *)msg.getMessage(num);
     const int pe = m->from_pe;
-    DEBUGF(("Stats msg received, %d %d %d %p\n", pe,stats_msg_count,m->n_objs,m));
+	DEBUGF(("Stats msg received, %d %d %d %p step %d\n", pe,stats_msg_count,m->n_objs,m,step()));
 #ifdef _FAULT_MLOG_     
 /*      
  *              if(m->step < step()){
@@ -483,6 +491,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
   const int clients = CkNumValidPes();
  
   if (stats_msg_count == clients) {
+	DEBUGF(("[%d] All stats messages received \n",CmiMyPe()));
     statsData->count = stats_msg_count;
     thisProxy[CkMyPe()].LoadBalance();
   }
@@ -558,6 +567,9 @@ void CentralLB::LoadBalance()
 
   double strat_start_time = CkWallTimer();
   LBMigrateMsg* migrateMsg = Strategy(statsData, clients);
+#ifdef _FAULT_MLOG_
+	migrateMsg->step = step();
+#endif
   if (_lb_args.debug()) {
     CkPrintf("Strategy took %f seconds.\n", CkWallTimer()-strat_start_time);
     double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
@@ -593,6 +605,7 @@ void CentralLB::LoadBalance()
     lbDecisionCount++;
     migrateMsg->lbDecisionCount = lbDecisionCount;
 #endif
+ CkPrintf("ReceiveMigration called at %.6lf \n",CmiWallTimer());
   thisProxy.ReceiveMigration(migrateMsg);
 
   // Zero out data structures for next cycle
@@ -713,7 +726,22 @@ extern int restarted;
 void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
 #if CMK_LBDB_ON
-  int i;
+	int i;
+
+#ifdef _FAULT_MLOG_
+	int *dummyCounts;
+
+	DEBUGF(("[%d] Starting ReceiveMigration WITH step %d m->step %d\n",CkMyPe(),step(),m->step));
+	// CmiPrintf("[%d] Starting ReceiveMigration step %d m->step %d\n",CkMyPe(),step(),m->step);
+	if(step() > m->step){
+		char str[100];
+		envelope *env = UsrToEnv(m);
+		CmiPrintf("[%d] Object %s tProcessed %d m->TN %d\n",CmiMyPe(),mlogData->objID.toString(str),mlogData->tProcessed,env->TN);
+		return;
+	}
+	lbDecisionCount = m->lbDecisionCount;
+#endif
+
   for (i=0; i<CkNumPes(); i++) theLbdb->lastLBInfo.expectedLoad[i] = m->expectedLoad[i];
   CmiAssert(migrates_expected <= 0 || migrates_completed == migrates_expected);
 /*FAULT_EVAC*/
@@ -726,8 +754,11 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 #ifdef _FAULT_MLOG_
 	int sending=0;
     int dummy=0;
-	int *dummyCounts;
 	LBDB *_myLBDB = theLbdb->getLBDB();
+	if(_restartFlag){
+        dummyCounts = new int[CmiNumPes()];
+        bzero(dummyCounts,sizeof(int)*CmiNumPes());
+    }
 #endif
   for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
@@ -763,6 +794,16 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
   }
   DEBUGF(("[%d] in ReceiveMigration %d moves expected: %d future expected: %d\n",CkMyPe(),m->n_moves, migrates_expected, future_migrates_expected));
   // if (_lb_debug) CkPrintf("[%d] expecting %d objects migrating.\n", CkMyPe(), migrates_expected);
+
+#ifdef _FAULT_MLOG_
+	if(_restartFlag){
+		sendDummyMigrationCounts(dummyCounts);
+		_restartFlag  =0;
+    	delete []dummyCounts;
+	}
+#endif
+
+
 #if 0
   if (m->n_moves ==0) {
     theLbdb->SetLBPeriod(theLbdb->GetLBPeriod()*2);
@@ -785,6 +826,16 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 #endif
 }
 
+#ifdef _FAULT_MLOG_
+void CentralLB::ReceiveDummyMigration(int globalDecisionCount){
+    DEBUGF(("[%d] ReceiveDummyMigration called for step %d with globalDecisionCount %d\n",CkMyPe(),step(),globalDecisionCount));
+    //TODO: this is gonna be important when a crash happens during checkpoint
+    //the globalDecisionCount would have to be saved and compared against
+    //a future recvMigration
+                
+	thisProxy[CkMyPe()].ResumeClients(1);
+}
+#endif
 
 void CentralLB::MigrationDone(int balancing)
 {
@@ -846,6 +897,7 @@ void CentralLB::endMigrationDone(int balancing){
 
 #ifdef _FAULT_MLOG_
 void resumeCentralLbAfterChkpt(void *_lb){
+	DEBUGF(("[%d] HERE\n"));
     CentralLB *lb= (CentralLB *)_lb;
     CpvAccess(_currentObj)=lb;
     lb->endMigrationDone(lb->savedBalancing);

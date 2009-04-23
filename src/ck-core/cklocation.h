@@ -605,13 +605,22 @@ public:
 	/// Return true if this array element lives on another processor
 	bool isRemote(const CkArrayIndex &idx,int *onPe) const;
 
+#ifdef _FAULT_MLOG_
+	//mark the duringMigration variable .. used for parallel restart
+	void setDuringMigration(CmiBool _duringMigration);
+#endif
+
 	/// Pass each of our locations (each separate array index) to this destination.
 	void iterate(CkLocIterator &dest);
 
 	/// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup), skip listeners
 	void restore(const CkArrayIndex &idx, PUP::er &p);
 	/// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
+#ifdef _FAULT_MLOG_
+	void resume(const CkArrayIndex &idx, PUP::er &p,int dummy=0);
+#else
 	void resume(const CkArrayIndex &idx, PUP::er &p);
+#endif
 
 //Communication:
 	void immigrate(CkArrayElementMigrateMessage *msg);
@@ -625,6 +634,11 @@ public:
 	void flushAllRecs(void);
 	void pup(PUP::er &p);
 	
+	//Look up array element in hash table.  Index out-of-bounds if not found.
+	CkLocRec *elementRec(const CkArrayIndex &idx);
+	//Look up array element in hash table.  Return NULL if not there.
+	CkLocRec *elementNrec(const CkArrayIndex &idx);
+
 private:
 //Internal interface:
 	//Add given element array record at idx, replacing the existing record
@@ -634,17 +648,18 @@ private:
 	//Insert a remote record at the given index
 	CkLocRec_remote *insertRemote(const CkArrayIndex &idx,int nowOnPe);
 
-	//Look up array element in hash table.  Index out-of-bounds if not found.
-	CkLocRec *elementRec(const CkArrayIndex &idx);
-	//Look up array element in hash table.  Return NULL if not there.
-	CkLocRec *elementNrec(const CkArrayIndex &idx);
 	//Remove this entry from the table (does not delete record)
 	void removeFromTable(const CkArrayIndex &idx);
 
 	friend class CkLocation; //so it can call pupElementsFor
 	friend class ArrayElement;
+#ifdef _FAULT_MLOG_
+ void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
+        CkElementCreation_t type,int dummy=0);
+#else
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 		CkElementCreation_t type);
+#endif
 
 	/// Call this member function on each element of this location:
 	typedef void (CkMigratable::* CkMigratable_voidfn_t)(void);
@@ -653,9 +668,15 @@ private:
 	CmiBool deliverUnknown(CkArrayMessage *msg,CkDeliver_t type,int opts);
 
 	/// Create a new local record at this array index.
+#ifdef _FAULT_MLOG_
+CkLocRec_local *createLocal(const CkArrayIndex &idx,
+        CmiBool forMigration, CmiBool ignoreArrival,
+        CmiBool notifyHome,int dummy=0);
+#else
 	CkLocRec_local *createLocal(const CkArrayIndex &idx, 
 		CmiBool forMigration, CmiBool ignoreArrival,
 		CmiBool notifyHome);
+#endif
 
 //Data Members:
 	//Map array ID to manager and elements

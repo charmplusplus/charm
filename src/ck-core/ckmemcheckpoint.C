@@ -67,12 +67,14 @@ CkGroupID ckCheckPTGroupID;		// readonly
 /// @todo the following declarations should be moved into a separate file for all 
 // fault tolerant strategies
 
+#ifdef CMK_MEM_CHECKPOINT
 // name of the kill file that contains processes to be killed 
 char *killFile;                                               
 // flag for the kill file         
 int killFlag=0;
 // variable for storing the killing time
 double killTime=0.0;
+#endif
 
 /// checkpoint buffer for processor system data
 CpvStaticDeclare(CkProcCheckPTMessage*, procChkptBuf);
@@ -984,6 +986,7 @@ void CkRegisterRestartHandler( )
 /**
  *  * @brief: function for killing a process                                             
  *   */
+#ifdef CMK_MEM_CHECKPOINT
 #if CMK_HAS_GETPID
 void killLocal(void *_dummy,double curWallTime){
         printf("[%d] KillLocal called at %.6lf \n",CkMyPe(),CmiWallTimer());          
@@ -998,8 +1001,9 @@ void killLocal(void *_dummy,double curWallTime){
   CmiAbort("kill() not supported!");
 }
 #endif
+#endif
 
-
+#ifdef CMK_MEM_CHECKPOINT
 /**
  * @brief: reads the file with the kill information
  */
@@ -1013,13 +1017,13 @@ void readKillFile(){
         while(fscanf(fp,"%d %lf",&proc,&sec)==2){
                 if(proc == CkMyPe()){
                         killTime = CmiWallTimer()+sec;
-                        printf("[%d] To be killed after %.6lf s \n",CkMyPe(),sec);
+                        printf("[%d] To be killed after %.6lf s (MEMCKPT) \n",CkMyPe(),sec);
                         CcdCallFnAfter(killLocal,NULL,sec*1000);
                 }
         }
         fclose(fp);
 }
-
+#endif
 
 #include "CkMemCheckpoint.def.h"
 

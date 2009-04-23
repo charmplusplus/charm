@@ -327,7 +327,6 @@ void LBDatabase::initnodeFn()
 void LBDatabase::init(void) 
 {
   myLDHandle = LDCreate();
-
   mystep = 0;
   nloadbalancers = 0;
   new_ld_balancer = 0;
@@ -438,6 +437,7 @@ void LBDatabase::pup(PUP::er& p)
   int np;
   if (!p.isUnpacking()) np = CkNumPes();
   p|np;
+	CmiAssert(avail_vector);
   // in case number of processors changes
   if (p.isUnpacking() && np > CkNumPes()) {
     CmiLock(avail_vector_lock);
@@ -447,6 +447,7 @@ void LBDatabase::pup(PUP::er& p)
     CmiUnlock(avail_vector_lock);
   }
   p(avail_vector, np);
+	p|mystep;
 }
 
 

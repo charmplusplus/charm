@@ -104,6 +104,9 @@ public:
 	                                        // to be resumed via message
   void ResumeClients(CkReductionMsg *);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
+#ifdef _FAULT_MLOG_
+	void ReceiveDummyMigration(int _step);
+#endif
   void MissMigrate(int waitForBarrier);
 
   // manual predictor start/stop
@@ -280,6 +283,10 @@ public:
 
   char * avail_vector;
   int next_lb;
+#ifdef _FAULT_MLOG_
+	int step;
+#endif
+
 public:
   CLBStatsMsg(int osz, int csz);
   CLBStatsMsg(): from_pe(0), pe_speed(0), 

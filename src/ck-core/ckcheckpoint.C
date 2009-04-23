@@ -350,6 +350,17 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 	}
 }
 
+#ifdef _FAULT_MLOG_
+int  CkCountArrayElements(){
+    int numGroups = CkpvAccess(_groupIDTable)->size();
+    int i;
+    ElementCounter  counter;
+    CKLOCMGR_LOOP(mgr->iterate(counter););
+  int numElements = counter.getCount();
+    return numElements;
+}
+#endif
+
 void CkPupProcessorData(PUP::er &p)
 {
     // save readonlys, and callback BTW

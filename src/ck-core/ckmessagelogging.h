@@ -309,7 +309,7 @@ typedef struct{
 	int PE;
 } RestartRequest;
 
-typedef RestartRequest PingMsg;
+typedef RestartRequest CkPingMsg;
 typedef RestartRequest CheckpointRequest;
 
 typedef struct{
@@ -455,7 +455,7 @@ void _ticketRequestHandler(TicketRequest *);
 void _ticketHandler(TicketReply *);
 void _localMessageCopyHandler(LocalMessageLog *);
 void _localMessageAckHandler(LocalMessageLogAck *);
-void _pingHandler(PingMsg *msg);
+void _pingHandler(CkPingMsg *msg);
 void _bufferedLocalMessageCopyHandler(BufferedLocalLogHeader *recvdHeader,int freeHeader=1);
 void _bufferedLocalMessageAckHandler(BufferedLocalLogHeader *recvdHeader);
 void _bufferedTicketRequestHandler(BufferedTicketRequestHeader *recvdHeader);

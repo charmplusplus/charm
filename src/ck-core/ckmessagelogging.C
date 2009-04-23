@@ -1,5 +1,4 @@
-#ifdef _FAULT_MLOG_
-
+#include "charm.h"
 #include "ck.h"
 #include "ckmessagelogging.h"
 #include "queueing.h"
@@ -7,10 +6,12 @@
 #include <signal.h>
 #include "CentralLB.h"
 
+#ifdef _FAULT_MLOG_
+
 //#define DEBUG(x)  if(_restartFlag) {x;}
 #define DEBUG(x)  //x
 #define DEBUGRESTART(x)  //x
-#define DEBUGLB(x) //x
+#define DEBUGLB(x) // x
 
 #define BUFFERED_LOCAL
 #define BUFFERED_REMOTE
@@ -290,9 +291,9 @@ void _messageLoggingInit(){
 //	CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,checkBufferedLocalMessageCopy,NULL);
 	CcdCallFnAfter( checkBufferedLocalMessageCopy ,NULL , BUFFER_TIME);
 //	printf("[%d] killFlag %d\n",CkMyPe(),killFlag);
-	if(killFlag){
-		readKillFile();
-	}
+//	if(killFlag){
+//		readKillFile();
+//	}
 }
 
 void killLocal(void *_dummy,double curWallTime);	
@@ -307,7 +308,7 @@ void readKillFile(){
 	while(fscanf(fp,"%d %lf",&proc,&sec)==2){
 		if(proc == CkMyPe()){
 			killTime = CmiWallTimer()+sec;
-			printf("[%d] To be killed after %.6lf s \n",CkMyPe(),sec);
+			printf("[%d] To be killed after %.6lf s (MLOG) \n",CkMyPe(),sec);
 			CcdCallFnAfter(killLocal,NULL,sec*1000);	
 		}
 	}
@@ -1340,7 +1341,7 @@ void retryTicketRequest(void *_dummy,double curWallTime){
 	DEBUG(CmiMemoryCheck());
 }
 
-void _pingHandler(PingMsg *msg){
+void _pingHandler(CkPingMsg *msg){
 	printf("[%d] Received Ping from %d\n",CkMyPe(),msg->PE);
 	CmiFree(msg);
 }
@@ -1482,7 +1483,9 @@ void pupArrayElementsSkip(PUP::er &p, MigrationRecord *listToSkip,int listsize){
 				listToSkip[j].idx.print();
 			}
 		}
-			
+		
+ printf("numElements = %d\n",numElements);
+	
 	  for (int i=0; i<numElements; i++) {
 			CkGroupID gID;
 			CkArrayIndexMax idx;
@@ -1623,7 +1626,8 @@ void sendRemoveLogRequests(){
 void _checkpointAckHandler(CheckPointAck *ackMsg){
 	DEBUG(CmiMemoryCheck());
 	unAckedCheckpoint=0;
-	DEBUG(printf("[%d] CheckPoint Acked from PE %d with size %d onGoingLoadBalancing %d \n",CkMyPe(),ackMsg->PE,ackMsg->dataSize,onGoingLoadBalancing));	
+	DEBUG(printf("[%d] CheckPoint Acked from PE %d with size %d onGoingLoadBalancing %d \n",CkMyPe(),ackMsg->PE,ackMsg->dataSize,onGoingLoadBalancing));
+	DEBUGLB(CkPrintf("[%d] ACK HANDLER with %d\n",CkMyPe(),onGoingLoadBalancing));	
 	if(onGoingLoadBalancing){
 		onGoingLoadBalancing = 0;
 		finishedCheckpointLoadBalancing();
@@ -1756,7 +1760,7 @@ void clearUpMigratedRetainedLists(int PE){
 /**
  * Function for restarting an object with message logging
  */
-void CkMlogRestart(const char * dummy, CkArgMsg *dummyMsg){
+void CkMlogRestart(const char * dummy, CkArgMsg * dummyMsg){
 	printf("[%d] Restart started at %.6lf \n",CkMyPe(),CmiWallTimer());
 	fprintf(stderr,"[%d] Restart started at %.6lf \n",CkMyPe(),CmiWallTimer());
 	_restartFlag = 1;
@@ -1767,7 +1771,7 @@ void CkMlogRestart(const char * dummy, CkArgMsg *dummyMsg){
 };
 
 void CkMlogRestartDouble(void *,double){
-	CkMlogRestart(NULL);
+	CkMlogRestart(NULL,NULL);
 };
 
 
@@ -2744,6 +2748,7 @@ void forAllCharesDo(MlogFn fnPointer,void *data){
 ******************************************************************/
 
 void initMlogLBStep(CkGroupID gid){
+	DEBUGLB(CkPrintf("[%d] INIT MLOG STEP\n",CkMyPe()));
 	countLBMigratedAway = 0;
 	countLBToMigrate=0;
 	onGoingLoadBalancing=1;
@@ -2914,6 +2919,7 @@ void _checkpointBarrierHandler(CheckpointBarrierMsg *msg){
 
 void _checkpointBarrierAckHandler(CheckpointBarrierMsg *msg){
 	DEBUG(CmiPrintf("[%d] _checkpointBarrierAckHandler \n",CmiMyPe()));
+	DEBUGLB(CkPrintf("[%d] Reaching this point\n",CkMyPe()));
 	sendRemoveLogRequests();
 	(*resumeLbFnPtr)(centralLb);
 	CmiFree(msg);

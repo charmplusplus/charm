@@ -234,14 +234,6 @@ static inline void _parseCommandLineOpts(char **argv)
     if(CmiGetArgFlagDesc(argv,"+Parallelrestart", "Parallel Restart with message logging protocol")){
         parallelRestart = true;
     }
-    if(CmiGetArgStringDesc(argv,"+killFile", &killFile,"Generates SIGKILL on specified processors")){
-        if(faultFunc == NULL){
-            killFlag = 1;
-            if(CmiMyPe() == 0){
-                printf("[%d] killFlag set to 1 for file %s\n",CkMyPe(),killFile);
-            }
-        }
-    }
     if(!CmiGetArgIntDesc(argv,"+mlog_local_buffer",&_maxBufferedMessages,"# of local messages buffered in the message logging protoocl")){
         _maxBufferedMessages = 2;
     }

@@ -155,6 +155,7 @@ public:
 
 public:
 #ifdef _FAULT_MLOG_
+	int step;
 	int lbDecisionCount;
 #endif
   LBMigrateMsg(): level(0), n_moves(0), next_lb(0) {}

@@ -116,6 +116,11 @@ inline int CkHashCompare_int(const void *k1,const void *k2,size_t /*len*/)
 inline int CkHashCompare_pointer(const void *k1,const void *k2,size_t /*len*/)
 	{return *(char **)k1 == *(char **)k2;}
 
+#ifdef _FAULT_MLOG_
+extern int countHashRefs;
+extern int countHashCollisions;
+#endif
+
 ///////////////////////// Hashtable //////////////////////
 
 class CkHashtableIterator;
@@ -367,6 +372,27 @@ public:
 			this->inc(i);
 		};
 	}
+
+#ifdef _FAULT_MLOG_
+	OBJ *getPointer(const KEY &key) {
+        countHashRefs++;
+        int i=key.hash()%this->len;
+        while(1) {//Assumes key or empty slot will be found
+            char *cur=this->entry(i);
+			//An empty slot indicates the key is not here
+            if (this->layout.isEmpty(cur)){
+                return NULL;
+            }
+			//Is this the key?
+            if (key.compare(*(KEY *)this->layout.getKey(cur)))
+                return (OBJ *)this->layout.getObject(cur);
+            this->inc(i);
+            countHashCollisions++;
+        };
+        return NULL;
+    }
+#endif
+
 	//Use this version when you're sure the entry exists--
 	// avoids the test for an empty entry
 	OBJ &getRef(const KEY &key) {

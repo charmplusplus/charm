@@ -1211,7 +1211,7 @@ static void ctrl_getone(void)
 	/** A processor crashed and got recreated. So charmrun sent 
 	  across the whole nodetable data to update this processor*/
 	node_addresses_store(&msg);
-	fprintf(stdout,"nodetable added %d\n",CmiMyPe());
+	// fprintf(stdout,"nodetable added %d\n",CmiMyPe());
   }
 #endif
   else {
