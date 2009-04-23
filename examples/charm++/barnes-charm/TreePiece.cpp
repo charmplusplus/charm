@@ -4,7 +4,6 @@ TreePiece::TreePiece(nodeptr p, int which, bool isTopLevel_, int level_){
   isTopLevel = isTopLevel_;
   myLevel = level_;
   if(!isTopLevel_){
-    // FIXME - myRoot should be set here.
     myRoot = makecell(thisIndex);
     ParentOf(myRoot) = p; // this is my parent
     Subp(p)[which] = (nodeptr) myRoot; // i am my parent's 'which' child

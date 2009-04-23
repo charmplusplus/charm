@@ -520,7 +520,7 @@ void ParticleChunk::init_root (unsigned int ProcessId)
   
   createTopLevelTree(G_root, depth);
   // send root to everyone
-  chunks.acceptRoot(G_root);
+  chunks.acceptRoot((CmiUInt8) G_root);
   /*
   for (i = 0; i < NSUB; i++) {
     Subp(Global->G_root)[i] = NULL;
@@ -543,8 +543,8 @@ void ParticleChunk::createTopLevelTree(cellptr node, int depth){
   }
 }
 
-void ParticleChunk::acceptRoot(cellptr root_){
-  G_root = root_;
+void ParticleChunk::acceptRoot(CmiUInt8 root_){
+  G_root = (cellptr) root_;
   CkCallback cb(CkIndex_ParticleChunk::stepsystemPartII(0), thisProxy);
   contribute(0,0,CkReduction::concat,cb);
 }

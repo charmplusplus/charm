@@ -40,7 +40,7 @@ mainmodule barnes {
     entry ParticleChunk(int n1, int n2);
     entry void SlaveStart(CmiUInt8 mybodytab, CmiUInt8 bodytab, CkCallback &cb);
     entry void startIteration(CkCallback &cb);
-    entry void acceptRoot(cellptr);
+    entry void acceptRoot(CmiUInt8);
     entry void stepsystemPartII(CkReductionMsg *msg);
     entry void stepsystemPartIII(CkReductionMsg *msg);
     entry void doneTreeBuild();

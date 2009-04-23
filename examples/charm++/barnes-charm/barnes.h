@@ -1,8 +1,11 @@
 #ifndef _BARNES_H_
 #define _BARNES_H_
 
+#include <string>
 #include "defs.h"
 #include "stdinc.h"
+
+using namespace std;
 
 #include "barnes.decl.h"
 
@@ -40,6 +43,7 @@ class ParticleMsg : public CMessage_ParticleMsg {
   int num;
 };
 
+/*
 const char *defv[] = {                 
     "in=",                        
     "out=",                       
@@ -58,6 +62,7 @@ const char *defv[] = {
 
     "NPROC=1"                    
 };
+*/
 
 static string headline = "Hack code: Plummer model";
 
@@ -81,18 +86,18 @@ class Main : public CBase_Main {
   bodyptr *mybodytab;
   bodyptr bodytab;
 
-  string *defaults;
+  CkVec<string> defaults; 
 
   // j: don't need these data structures
   //cellptr *mycelltab;
   //leafptr *myleaftab;
 
-  void initparam (string *argv, const char **defv);
+  //void initparam (string *argv, const char **defv);
   void initoutput();
 
-  string extrvalue(string arg);
-  bool matchname(string bind, string name);
-  int scanbind(string *bvec, string name);
+  string extrvalue(string &arg);
+  //bool matchname(string &bind, string &name);
+  //int scanbind(CkVec<string> &bvec, string &name);
   double getdparam(string name);
   bool getbparam(string name);
   long getlparam(string name);
@@ -154,7 +159,7 @@ class ParticleChunk : public CBase_ParticleChunk {
   //void SlaveStart(bodyptr *bb, bodyptr b, CkCallback &cb);
   void SlaveStart(CmiUInt8 bb, CmiUInt8 b, CkCallback &cb);
   void startIteration(CkCallback &cb);
-  void acceptRoot(cellptr);
+  void acceptRoot(CmiUInt8 root);
   void stepsystem(unsigned ProcessId);
   void stepsystemPartII(CkReductionMsg *msg);
   void stepsystemPartIII(CkReductionMsg *msg);

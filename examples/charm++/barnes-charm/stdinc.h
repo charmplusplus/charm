@@ -64,7 +64,7 @@ typedef unsigned char byte;
  * STRING: for null-terminated strings which are not taken apart.
  */
 
-typedef char *string;
+// typedef char *string;
 
 /*
  * REAL: default type is double; 

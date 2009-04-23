@@ -1,4 +1,4 @@
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../../net-linux-amd64/bin/charmc $(OPTS)
 
 OBJS = TreePiece.o ParticleChunk.o Main.o 
 PROJ= -tracemode projections -tracemode summary

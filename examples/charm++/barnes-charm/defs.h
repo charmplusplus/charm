@@ -257,7 +257,9 @@ typedef struct _body {
      p | parent;
      p | child_num;
      p | phi;
-     // FIXME vectors: pos, vel, acc
+     PUParray(p,pos,NDIM);
+     PUParray(p,vel,NDIM);
+     PUParray(p,acc,NDIM);
    }
 } body;
 
@@ -299,8 +301,11 @@ typedef struct _cell {
      p | prev;
      p | done;
      PUParray(p,subp,NSUB);
+#ifdef QUADPOLE
      // FIXME matrix: quad
-     // FIXME vectors: pos
+     CkAbort("Must implement pup for matrix first\n");
+#endif
+     PUParray(p,pos,NDIM);
    }
 } cell;
 
@@ -342,8 +347,11 @@ typedef struct _leaf {
      p | done;
      p | num_bodies;
      PUParray(p,bodyp,num_bodies);
+#ifdef QUADPOLE
      // FIXME matrix: quad
-     // FIXME vectors: pos
+     CkAbort("Must implement pup for matrix first\n");
+#endif
+     PUParray(p,pos,NDIM);
    }
 } leaf;
 

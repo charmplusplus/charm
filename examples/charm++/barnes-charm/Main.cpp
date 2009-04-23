@@ -37,10 +37,12 @@ int log8floor(int arg){
  * INITPARAM: ignore arg vector, remember defaults.
  */
 
-void Main::initparam(string *argv, const char **)
+/*
+void Main::initparam(string *argv, const char **defvs)
 {
-   //defaults = defvs;
+   defaults = defvs;
 }
+*/
 
 /*
  * INITOUTPUT: initialize output routines.
@@ -49,7 +51,7 @@ void Main::initparam(string *argv, const char **)
 
 void Main::initoutput()
 {
-   printf("\n\t\t%s\n\n", headline);
+   printf("\n\t\t%s\n\n", headline.c_str());
    printf("%10s%10s%10s%10s%10s%10s%10s%10s\n",
 	  "nbody", "dtime", "eps", "tol", "dtout", "tstop","fcells","NPROC");
    printf("%10d%10.5f%10.4f%10.2f%10.3f%10.3f%10.2f%10d\n\n",
@@ -61,21 +63,46 @@ void Main::initoutput()
 Main::Main(CkArgMsg *m){
   int c;
 
+/*
   while ((c = getopt(m->argc, m->argv, "h")) != -1) {
     switch(c) {
       case 'h': 
         Help(); 
         exit(-1); 
         break;
+      case 't':
+        numTreePieces = c;
+        break;
+        
       default:
-        fprintf(stderr, "Only valid option is \"-h\".\n");
+        fprintf(stderr, "Only valid options are \"-h\" and \"-t\"\n");
         exit(-1);
         break;
     }
   }
+  */
+
+  defaults.reserve(32);
+  for(int i = 0; i < m->argc; i++){
+    defaults.push_back(m->argv[i]);
+  }
+  /*
+  defaults.push_back("in=");
+  defaults.push_back("out=");
+  defaults.push_back("nbody=16384");
+  defaults.push_back("seed=123");
+  defaults.push_back("dtime=0.025");
+  defaults.push_back("eps=0.05");
+  defaults.push_back("tol=1.0");
+  defaults.push_back("fcells=2.0");
+  defaults.push_back("fleaves=0.5");
+  defaults.push_back("tstop=0.075");
+  defaults.push_back("dtout=0.25");
+  defaults.push_back("NPROC=1");
+  */
 
   // parameters
-  initparam(m->argv, defv);
+  //initparam(m->argv, defv);
   startrun();
   initoutput();
   tab_init();
@@ -213,7 +240,7 @@ void Main::startrun()
    int seed;
 
    infile = getparam("in");
-   if (*infile != 0) {
+   if (infile.empty()) {
      // FIXME - enable
       //inputdata();
    }
@@ -221,22 +248,49 @@ void Main::startrun()
       nbody = getiparam("nbody");
       if (nbody < 1) {
 	 ckerr << "startrun: absurd nbody\n";
+         nbody = 16384;
       }
       seed = getiparam("seed");
+      if(seed < 0)
+        seed = 123;
    }
 
    outfile = getparam("out");
    dtime = getdparam("dtime");
+   if(isnan(dtime))
+     dtime = 0.025;
+
    dthf = 0.5 * dtime;
    eps = getdparam("eps");
+   if(isnan(eps))
+     eps = 0.05;
+
    real epssq = eps*eps;
    tol = getdparam("tol");
+   if(isnan(tol))
+     tol = 1.0;
+
    real tolsq = tol*tol;
    fcells = getdparam("fcells");
+   if(isnan(fcells))
+     fcells = 2.0;
+
    fleaves = getdparam("fleaves");
+   if(isnan(fleaves))
+     fleaves = 0.5;
+
    tstop = getdparam("tstop");
+   if(isnan(tstop))
+     tstop = 0.075;
+
    dtout = getdparam("dtout");
+   if(isnan(dtout))
+     dtout = 0.25;
+
    NPROC = getiparam("NPROC");
+   if(NPROC < 0)
+     NPROC = 1;
+
    srand(seed);
    testdata();
    setbound();
@@ -386,11 +440,23 @@ string Main::getparam(string name)
 {
    int i, leng;
    string def;
-   char buf[128];
+   //char buf[128];
    char* temp;
 
+  /*
    if (defaults == NULL)
       ckerr << "getparam: called before initparam\n";
+    */
+  for(int i = 0; i < defaults.length(); i++){
+    if(defaults[i].find(name) != string::npos){
+      int pos = defaults[i].find("=");
+      string value = defaults[i].substr(pos+1,defaults[i].length()-pos-1);
+      return value;
+    }
+  }
+  ckerr << "getparam: " << name.c_str() << "unknown\n";
+  return string();
+  /*
    i = scanbind(defaults, name);
    if (i < 0)
       ckerr << "getparam: %s unknown\n", name;
@@ -403,6 +469,7 @@ string Main::getparam(string name)
    else {
       return (def);
    }
+   */
 }
 
 /*
@@ -411,92 +478,101 @@ string Main::getparam(string name)
 
 int Main::getiparam(string name)
 {
-   string val;
+  string val;
 
-   for (val = ""; *val == 0;) {
-      val = getparam(name);
-   }
-   return (atoi(val));
+  val = getparam(name);
+  if(val.empty())
+    return -1;
+  else
+    return (atoi(val.c_str()));
 }
 
 long Main::getlparam(string name)
 {
-   string val;
+  string val;
 
-   for (val = ""; *val == 0; )
-      val = getparam(name);
-   return (atol(val));
+  val = getparam(name);
+  if(val.empty())
+    return -1;
+  else 
+    return (atol(val.c_str()));
 }
 
 bool Main::getbparam(string name)
 {
-   string val;
-    
-   for (val = ""; *val == 0; )
-      val = getparam(name);
-   if (strchr("tTyY1", *val) != 0) {
-      return (TRUE);
-   }
-   if (strchr("fFnN0", *val) != 0) {
-      return (FALSE);
-   }
-   CkPrintf("getbparam: %s=%s not bool\n", name, val);
+  string val;
+
+  val = getparam(name);
+  if (strchr("tTyY1", *(val.c_str())) != 0) {
+    return (true);
+  }
+  if (strchr("fFnN0", *(val.c_str())) != 0) {
+    return (false);
+  }
+  CkPrintf("getbparam: %s=%s not bool\n", name.c_str(), val.c_str());
 }
 
 double Main::getdparam(string name)
 {
-   string val;
+  string val;
 
-   for (val = ""; *val == 0; ) {
-      val = getparam(name);
-   }
-   return (atof(val));
+  val = getparam(name);
+  if(val.empty())
+    return NAN;
+  else 
+    return (atof(val.c_str()));
 }
 
 /*
  * SCANBIND: scan binding vector for name, return index.
  */
 
-int Main::scanbind(string *bvec, string name)
+/*
+int Main::scanbind(CkVec<string> &bvec, string &name)
 {
    int i;
 
-   for (i = 0; bvec[i] != 0; i++)
-      if (matchname(bvec[i], name))
-	 return (i);
+   for(i = 0; i < bvec.length(); i++){
+     if(matchname(bvec[i], name)){
+       return i;
+     }
+   }
    return (-1);
 }
+*/
 
 /*
  * MATCHNAME: determine if "name=value" matches "name".
  */
 
-bool Main::matchname(string bind, string name)
+/*
+bool Main::matchname(string &bind, string &name)
 {
    char *bp, *np;
 
-   bp = bind;
-   np = name;
+   bp = bind.c_str();
+   np = name.c_str();
    while (*bp == *np) {
       bp++;
       np++;
    }
    return (*bp == '=' && *np == 0);
 }
+*/
 
 /*
  * EXTRVALUE: extract value from name=value string.
  */
 
-string Main::extrvalue(string arg)
+string Main::extrvalue(string &arg)
 {
    char *ap;
 
-   ap = (char *) arg;
+   ap = (char *) arg.c_str();
    while (*ap != 0)
       if (*ap++ == '=')
-	 return ((string) ap);
-   return (0);
+	 return (string(ap));
+   return (string());
 }
 
 real xrand(real lo, real hi){
