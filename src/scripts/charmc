@@ -1263,6 +1263,7 @@ case "$OBJECT" in
 	# if no build share is set, exit normally.
 	if [ "$BUILD_SHARE" = 0 ]
 	then
+		echo "Warning: building shared library is skipped, possibly due to not supported, check configuration files."
 		End 0
 	elif [ "$CHARM_SHARED" = "0" ]
 	then
