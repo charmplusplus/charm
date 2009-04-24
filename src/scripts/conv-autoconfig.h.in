@@ -123,6 +123,9 @@
 /* whether has stdint.h */
 #undef CMK_HAS_STDINT_H
 
+/* whether has strings.h */
+#undef CMK_HAS_STRINGS_H
+
 /* sync program */
 #undef CMK_HAS_SYNC
 
