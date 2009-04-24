@@ -490,10 +490,10 @@ To handle more complicated structures like Dictionaries, Lists or Tuples, please
 
 \label{pythonHighLevel}
 
-When other than defining the \charmpp{} object as \kw{python}, an entry method
-is also defined python, it can be accessed directly by a Python script through the
-{\em charm} module. For example, the following definition will be accessible
-with the python call:
+When in addition to the definition of the \charmpp{} object as \kw{python}, an
+entry method is also defined as \kw{python}, this entry method can be accessed
+directly by a Python script through the {\em charm} module. For example, the
+following definition will be accessible with the python call:
 \function{result = charm.highMethod(var1, var2, var3)}
 It can accept any number of parameters (even complex like tuples or
 dictionaries), and it can return an object as complex as needed.
@@ -504,43 +504,59 @@ The method must have the following signature:
 entry [python] void highMethod(int handle);
 \end{alltt}
 
-The parameter is a handle that is passed by the system and has to be used in
-subsequent calls to return the control to the Python code. Thus, if the method
-does not return immediately but it sends out messages to other \charmpp{}
-objects, the handle must be saved somewhere. \textbf{Note:} if another Python
-script is sent to the server, this second one could also call the same function.
-If this is possible, the handle should be saved in a non-scalar variable.
+The parameter is a handle that is passed by the system, and can be used in
+subsequent calls to return values to the Python code. %Thus, if the method
+%does not return immediately but it sends out messages to other \charmpp{}
+%objects, the handle must be saved somewhere. \textbf{Note:} if another Python
+%script is sent to the server, this second one could also call the same function.
+%If this is possible, the handle should be saved in a non-scalar variable.
 
 The arguments passed by the Python caller can be retrieved using the function:
 
 \function{PyObject *pythonGetArg(int handle);}
 
-which will return a PyObject. This object is a Tuple containing a vector of all
+which returns a PyObject. This object is a Tuple containing a vector of all
 parameters. It can be parsed using \texttt{PyArg\_ParseTuple} to extract the
 single parameters.
 
-At the end of the computation, when the control flow must be retuned to the
-Python script, a special returning function needs to be called:
+When the \charmpp's entry method terminates (by means of \texttt{return} or
+termination of the function), control is returned to the waiting Python script.
+Since the \kw{python} entry methods execute within an user-level thread, it is
+possible to suspend the entry method while some computation is carried on in
+\charmpp. To start parallel computation, the entry method can send regular messages,
+as every other threaded entry method (see~\ref{libraryInterface} for more
+information on how this can be done using CkCallbackResumeThread callbacks). The
+only difference with other threaded entry methods is that here the callback
+\texttt{CkCallbackPython} must be used instead of CkCallbackResumeThread. The
+more specialized CkCallbackPython callback works exactly like the other one,
+except that it handles correctly Python internal locks.
+
+At the end of the computation, if a value needs to be returned to the Python script,
+the following special returning function has to be used:
 
 \function{void pythonReturn(int handle, PyObject* result);}
 
-where the second parameter is optional, and needs to be present only if a result
-is returned to Python. The function \texttt{Py\_BuildValue} can be used to create
-this value.
+where the second parameter is the Python object representing the returned value.
+The function \texttt{Py\_BuildValue} can be used to create this value. This
+function in itself does not terminate the entry method, but only sets the
+returning value for Python to read when the entry method terminates.
 
 A characteristic of Python is that in a multithreaded environment (like the one
 provided in \charmpp{}), the running thread needs to keep a lock to prevent
 other threads to access any variable. When using high level scripting, and the
-Python script is suspended for long times waiting for the \charmpp{} application
-to perform the required task, it may be useful to release the lock to allow
-other threads to run. This can be done using the two functions:
+Python script is suspended for long periods of time while waiting for the
+\charmpp{} application to perform the required task, the Python internal locks
+are automatically released and re-acquired by the \texttt{CkCallbackPython}
+class when it suspends.
 
-\begin{alltt}
-void pythonAwake(int handle);   // to acquire the lock
-void pythonSleep(int handle);   // to release the lock
-\end{alltt}
+% This can be done using the two functions:
 
-Important to remember is that before any Python value is accessed, the Python
-interpreter must be awake. This include the functions \texttt{Py\_BuildValue} and
-\texttt{PyArg\_ParseTuple}. \textbf{Note:} it is an error to call these functions
-more than once before the other one is called.
+%\begin{alltt}
+%void pythonAwake(int handle);   // to acquire the lock
+%void pythonSleep(int handle);   // to release the lock
+%\end{alltt}
+
+%Important to remember is that before any Python value is accessed, the Python
+%interpreter must be awake. This include the functions \texttt{Py\_BuildValue} and
+%\texttt{PyArg\_ParseTuple}. \textbf{Note:} it is an error to call these functions
+%more than once before the other one is called.
