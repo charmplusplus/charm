@@ -1,10 +1,12 @@
 #include "barnes.h"
 
-TreePiece::TreePiece(nodeptr p, int which, bool isTopLevel_, int level_){
+TreePiece::TreePiece(CmiUInt8 p_, int which, bool isTopLevel_, int level_){
   isTopLevel = isTopLevel_;
+  nodeptr p;
   myLevel = level_;
   if(!isTopLevel_){
     myRoot = makecell(thisIndex);
+    p = (nodeptr) p_;
     ParentOf(myRoot) = p; // this is my parent
     Subp(p)[which] = (nodeptr) myRoot; // i am my parent's 'which' child
     ChildNum(myRoot) = which;
@@ -44,18 +46,21 @@ void TreePiece::recvTotalMsgCountsFromChunks(CkReductionMsg *msg){
 
 void TreePiece::checkCompletion(){
   if(numRecvdMsgs == numTotalMsgs){
+    CkPrintf("piece %d has all particles\n", thisIndex);
     // the parent will not send any more messages
     if(haveChildren){
       // tell children that they will not receive any more messages 
       for(int i = 0; i < NSUB; i++){
-        pieces[childrenTreePieces[i]].recvTotalMsgCountsFromPieces(sentTo[i]);
+        int child = childrenTreePieces[i];
+        CkPrintf("piece %d -> child %d, total messages sentTo: %d\n", thisIndex, child, sentTo[i]);
+        pieces[child].recvTotalMsgCountsFromPieces(sentTo[i]);
       }
     }
     else{
       // don't have children, build own tree
+      CkPrintf("piece %d doesn't have children, building tree\n", thisIndex);
       buildTree();
     }
-    // FIXME - contribute to reduction. need callback 
     // maincb to main
     CkCallback cb(CkIndex_ParticleChunk::doneTreeBuild(), CkArrayIndex1D(0), chunks);
     contribute(0,0,CkReduction::concat,cb);
@@ -66,11 +71,15 @@ void TreePiece::recvParticles(ParticleMsg *msg){
   bodyptr *particles = msg->particles;
   numRecvdMsgs++;
 
-  if(myNumParticles+msg->num > MAX_PARTS_PER_TP && !haveChildren){
+  CkPrintf("piece %d recvd %d particles, numRecvdMsgs: %d\n", thisIndex, msg->num, numRecvdMsgs);
+
+  if(myNumParticles+msg->num > maxPartsPerTp && !haveChildren){
     // insert children into pieces array
+    CkPrintf("piece %d has too many (%d+%d) particles; creating children\n", thisIndex, myNumParticles, msg->num);
     for(int i = 0; i < NSUB; i++){
       int child = NSUB*thisIndex+numTreePieces+i;
-      pieces[child].insert((nodeptr)myRoot, i, false, myLevel >> 1);
+      CkPrintf("piece %d inserting child %d\n", thisIndex, child);
+      pieces[child].insert((CmiUInt8)myRoot, i, false, myLevel >> 1);
       childrenTreePieces[i] = child;
     }
     haveChildren = true;
@@ -78,8 +87,10 @@ void TreePiece::recvParticles(ParticleMsg *msg){
   }
 
   if(haveChildren){
+    CkPrintf("piece %d already has children\n", thisIndex);
     CkVec<CkVec<bodyptr> > partsToChild;
     partsToChild.resize(NSUB);
+    partsToChild.length() = 0;
 
     int num = msg->num;
     int xp[NDIM];
@@ -98,20 +109,23 @@ void TreePiece::recvParticles(ParticleMsg *msg){
       int len = partsToChild[c].length();
       if(len > 0){
         // create msg from partsToChild[c], send
-        ParticleMsg *msg = new (len) ParticleMsg;
-        msg->num = len;
-        memcpy(msg->particles, partsToChild[c].getVec(), len*sizeof(bodyptr));
+        ParticleMsg *amsg = new (len) ParticleMsg;
+        amsg->num = len;
+        memcpy(amsg->particles, partsToChild[c].getVec(), len*sizeof(bodyptr));
         /*
         for(int i = 0; i < len; i++){
           msg->particles[i] = (partsToChild[c])[i]; 
         }
         */
         sentTo[c]++;
-        pieces[childrenTreePieces[c]].recvParticles(msg);
+        int tochild = childrenTreePieces[c];
+        pieces[tochild].recvParticles(amsg);
+        CkPrintf("piece %d sent %d particles to child %d. sentTo[%d] = %d\n", thisIndex, len, tochild, tochild, sentTo[c]);
       }
     }
   }
   else{
+    CkPrintf("piece %d adding %d particles to self (%d), total: %d\n", thisIndex, msg->num, myNumParticles, myNumParticles+msg->num);
     myNumParticles += msg->num;
     // FIXME - add msg->particles to own particles
   }

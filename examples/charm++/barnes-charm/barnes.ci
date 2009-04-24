@@ -30,7 +30,7 @@ mainmodule barnes {
   };
 
   array [1D] TreePiece {
-    entry TreePiece(nodeptr p, int which, bool isTopLevel, int level); 
+    entry TreePiece(CmiUInt8 p, int which, bool isTopLevel, int level); 
     entry void recvParticles(ParticleMsg *msg);
     entry void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
     entry void recvTotalMsgCountsFromPieces(int totalNumFromParent);

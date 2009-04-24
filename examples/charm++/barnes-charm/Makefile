@@ -1,12 +1,12 @@
-CHARMC=../../../net-linux-amd64/bin/charmc $(OPTS)
+CHARMC=../../../multicore-linux64/bin/charmc $(OPTS)
 
 OBJS = TreePiece.o ParticleChunk.o Main.o 
-PROJ= -tracemode projections -tracemode summary
+#PROJ= -tracemode projections -tracemode summary
 
 all: barnes 
 
 barnes: $(OBJS)
-	$(CHARMC) -language charm++ -o barnes $(OBJS)
+	$(CHARMC) -language charm++ -o barnes $(OBJS) $(PROJ)
 
 ParticleChunk.o: ParticleChunk.cpp barnes.decl.h
 	$(CHARMC) -c ParticleChunk.cpp

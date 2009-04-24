@@ -21,6 +21,7 @@ extern CProxy_ParticleChunk chunks;
 
 extern int numTreePieces;
 extern int numParticleChunks;
+extern int maxPartsPerTp;
 extern int nbody;
 extern int NPROC;
 extern int maxmybody;
@@ -152,7 +153,7 @@ class ParticleChunk : public CBase_ParticleChunk {
   void init_root(unsigned int ProcessId);
   void find_my_initial_bodies(bodyptr btab, int nb, unsigned ProcessId);
 
-  void createTopLevelTree(cellptr node, int depth);
+  int createTopLevelTree(cellptr node, int depth);
   void flushParticles();
   void sendParticlesToTp(int tp);
 
@@ -195,7 +196,7 @@ class TreePiece : public CBase_TreePiece {
   void checkCompletion();
 
   public:
-  TreePiece(nodeptr parent, int whichChild, bool isTopLevel, int level);
+  TreePiece(CmiUInt8 parent, int whichChild, bool isTopLevel, int level);
   TreePiece(CkMigrateMessage *m){}
   // used to convey message counts from chunks to top-level
   // treepieces

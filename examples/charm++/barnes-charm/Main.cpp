@@ -7,6 +7,7 @@ CProxy_ParticleChunk chunks;
 int maxmybody;
 
 int numTreePieces;
+int maxPartsPerTp;
 int numParticleChunks;
 
 // number of particle chunks 
@@ -107,6 +108,11 @@ Main::Main(CkArgMsg *m){
   initoutput();
   tab_init();
 
+  maxPartsPerTp = getiparam("fat"); 
+  if(maxPartsPerTp < 0){
+    maxPartsPerTp = MAX_PARTS_PER_TP;
+  }
+
   numParticleChunks = NPROC;
   numTreePieces = getiparam("pieces");
   if(numTreePieces < 0){
@@ -129,7 +135,8 @@ Main::Main(CkArgMsg *m){
   opts.setMap(myMap);
   // FIXME - level of top-level trees
   int depth = log8floor(numTreePieces);
-  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew((nodeptr)0,-1,true,(IMAX >> (depth+1)),opts);
+  ckout << "top-level pieces depth: " << (depth+1) << ", " << (IMAX >> (depth+1)) << endl;
+  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew((CmiUInt8)0,-1,true,(IMAX >> (depth+1)),opts);
   pieces = treeProxy;
 
   myMap=CProxy_BlockMap::ckNew(); 
@@ -141,6 +148,7 @@ Main::Main(CkArgMsg *m){
   // startup split into two so that global readonlys
   // are initialized before we send start signal to 
   // particle chunks
+  ckout << "Starting simulation" << endl;
   thisProxy.startSimulation();
 }
 
@@ -153,6 +161,7 @@ void Main::startSimulation(){
   /* main loop */
   while (tnow < tstop + 0.1 * dtime) {
     chunks.startIteration(CkCallbackResumeThread());
+    CkExit();
   }
 }
 
@@ -166,7 +175,7 @@ Main::tab_init()
   /*allocate space for personal lists of body pointers */
   maxmybody = (nbody+maxleaf*MAX_BODIES_PER_LEAF)/NPROC; 
   // FIXME - this should be a member of ParticleChunk
-  bodyptr *mybodytab = (bodyptr*) G_MALLOC(NPROC*maxmybody*sizeof(bodyptr));
+  mybodytab = (bodyptr*) G_MALLOC(NPROC*maxmybody*sizeof(bodyptr));
   /* space is allocated so that every */
   /* process can have a maximum of maxmybody pointers to bodies */ 
   /* then there is an array of bodies called bodytab which is  */

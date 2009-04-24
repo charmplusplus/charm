@@ -206,13 +206,10 @@ void ParticleChunk::maketree(unsigned int ProcessId)
       //mycelltab[myncell++] = G_root; 
    }
    Current_Root = (nodeptr) G_root;
-   for (pp = mybodytab; 
-	pp < mybodytab+mynbody; pp++) {
+   for (pp = mybodytab; pp < mybodytab+mynbody; pp++) {
       p = *pp;
       if (Mass(p) != 0.0) {
-	 Current_Root = (nodeptr) loadtree(p, 
-                                           (cellptr) Current_Root, 
-				           ProcessId);
+	 Current_Root = (nodeptr) loadtree(p, (cellptr) Current_Root, ProcessId);
       }
       else {
 	 fprintf(stderr, "Process %d found body 0x%x to have zero mass\n",
@@ -298,12 +295,14 @@ ParticleChunk::loadtree(bodyptr p, cellptr root, unsigned ProcessId)
    int whichTp = 0;
    int d = depth;
 
-   for(int level = Level(mynode); level >= lowestLevel; level >>= 1){
+   for(int level = Level(mynode); level > lowestLevel; level >>= 1){
      kidIndex = subindex(xp, Level(mynode));
      mynode = Subp(mynode)[kidIndex];
      whichTp += kidIndex*(1<<(fact*(d-1)));
+     //CkPrintf("Particle (%f,%f,%f) -> (%d,%d,%d) : %d\n", Pos(p)[0], Pos(p)[1], Pos(p)[2], xp[0], xp[1], xp[2], kidIndex);
      d--;     
    }
+   //ckout << "which TP: " << whichTp << endl;
 
    int howMany = particlesToTps[whichTp].push_back_v(p); 
    if(howMany == MAX_PARTICLES_PER_MSG-1){ // enough particles to send 
@@ -382,6 +381,7 @@ void ParticleChunk::sendParticlesToTp(int tp){
     msg->num = len; 
     numMsgsToEachTp[tp]++;
     particlesToTps[tp].length() = 0;
+    CkPrintf("[%d] sending %d particles to piece %d\n", thisIndex, len, tp);
     pieces[tp].recvParticles(msg);
   }
 }
@@ -393,6 +393,7 @@ void ParticleChunk::doneSendingParticles(){
 }
 
 void ParticleChunk::doneTreeBuild(){
+  CkPrintf("[%d] all pieces have completed buildTree()\n", thisIndex);
   mainCb.send();
 }
 
@@ -518,7 +519,9 @@ void ParticleChunk::init_root (unsigned int ProcessId)
   Done(G_root) = FALSE;
   Level(G_root) = IMAX >> 1;
   
-  createTopLevelTree(G_root, depth);
+  ckout << "[" << thisIndex << "] Creating top-level tree, depth: " << depth << endl;
+  int totalNumCellsMade = createTopLevelTree(G_root, depth);
+  ckout << "totalNumCellsMade: " << totalNumCellsMade+1 << endl;
   // send root to everyone
   chunks.acceptRoot((CmiUInt8) G_root);
   /*
@@ -528,19 +531,23 @@ void ParticleChunk::init_root (unsigned int ProcessId)
   */
 }
 
-void ParticleChunk::createTopLevelTree(cellptr node, int depth){
-  if(depth == 1){
-    return;
+int ParticleChunk::createTopLevelTree(cellptr node, int depth){
+  if(depth == 0){
+    return 0;
   }
   
+  int numCellsMade = 0;
   for (int i = 0; i < NSUB; i++){
     cellptr child = makecell(thisIndex);
+    numCellsMade++;
     // FIXME all code to initialize nodes goes here
     Subp(node)[i] = (nodeptr) child;
     ParentOf(child) = (nodeptr) node;
     ChildNum(child) = i;
-    createTopLevelTree((cellptr) Subp(node)[i], depth-1);
+    numCellsMade += createTopLevelTree((cellptr) Subp(node)[i], depth-1);
   }
+
+  return numCellsMade;
 }
 
 void ParticleChunk::acceptRoot(CmiUInt8 root_){
