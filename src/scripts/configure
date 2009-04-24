@@ -1962,6 +1962,36 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test if has malloc.h ####
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  return 0;
+}
+EOT
+test_cxx "whether has malloc.h " "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_MALLOC_H $pass
+_ACEOF
+
+
+#### test if has alloca.h ####
+cat > $t <<EOT
+#include <alloca.h>
+int main() {
+  double *s=(double *)alloca(sizeof(double));
+  *s=1.0;
+  return 0;
+}
+EOT
+test_cxx "whether has alloca.h " "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_ALLOCA_H $pass
+_ACEOF
+
+
 #### Check bool ####
 cat > $t <<EOT
 #include <stdlib.h>
@@ -2772,36 +2802,6 @@ then
 fi
 
 fi
-
-#### test if has alloca.h ####
-cat > $t <<EOT
-#include <alloca.h>
-int main() {
-  double *s=(double *)alloca(sizeof(double));
-  *s=1.0;
-  return 0;
-}
-EOT
-test_cxx "whether has alloca.h " "yes" "no" ""
-
-cat >>confdefs.h <<_ACEOF
-#define CMK_HAS_ALLOCA_H $pass
-_ACEOF
-
-
-#### test if has malloc.h ####
-cat > $t <<EOT
-#include <malloc.h>
-int main() {
-  return 0;
-}
-EOT
-test_cxx "whether has malloc.h " "yes" "no" ""
-
-cat >>confdefs.h <<_ACEOF
-#define CMK_HAS_MALLOC_H $pass
-_ACEOF
-
 
 #### test if has elf.h ####
 cat > $t <<EOT
