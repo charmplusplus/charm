@@ -3,6 +3,10 @@
 
 #include "ckobjid.h"
 
+#if CMK_HAS_STRINGS_H
+#include <strings.h>            /* defines bzero */
+#endif
+
 CpvExtern(Chare *,_currentObj);
 
 //states of a ticket sent as a reply to a request
