@@ -87,6 +87,7 @@ class Main : public CBase_Main {
   bodyptr *mybodytab;
   bodyptr bodytab;
 
+
   CkVec<string> defaults; 
 
   // j: don't need these data structures
@@ -105,6 +106,10 @@ class Main : public CBase_Main {
   int getiparam(string name);
   string getparam(string name);
 
+  void init_root(unsigned int ProcessId);
+  int createTopLevelTree(cellptr node, int depth);
+  cellptr G_root; 
+  CkVec<nodeptr> topLevelRoots;
   
   public:
   Main(CkArgMsg *m);
@@ -150,18 +155,16 @@ class ParticleChunk : public CBase_ParticleChunk {
   ParticleChunk(int maxleaf, int maxcell);
   ParticleChunk(CkArgMsg *m);
   ParticleChunk(CkMigrateMessage *m){}
-  void init_root(unsigned int ProcessId);
   void find_my_initial_bodies(bodyptr btab, int nb, unsigned ProcessId);
 
-  int createTopLevelTree(cellptr node, int depth);
   void flushParticles();
   void sendParticlesToTp(int tp);
 
   //void SlaveStart(bodyptr *bb, bodyptr b, CkCallback &cb);
   void SlaveStart(CmiUInt8 bb, CmiUInt8 b, CkCallback &cb);
-  void startIteration(CkCallback &cb);
-  void acceptRoot(CmiUInt8 root);
-  void stepsystem(unsigned ProcessId);
+  //void startIteration(CkCallback &cb);
+  void acceptRoot(CmiUInt8 root, CkCallback &cb);
+  //void stepsystem(unsigned ProcessId);
   void stepsystemPartII(CkReductionMsg *msg);
   void stepsystemPartIII(CkReductionMsg *msg);
 
@@ -187,6 +190,8 @@ class TreePiece : public CBase_TreePiece {
   int sentTo[NSUB]; // one counter for each child
   CkVec<bodyptr> myParticles;
   int myNumParticles;
+  CkArrayIndex1D parentIndex;
+  int pendingChildren;
 
   cellptr myRoot;
   nodeptr parent;
@@ -196,10 +201,11 @@ class TreePiece : public CBase_TreePiece {
   void checkCompletion();
 
   public:
-  TreePiece(CmiUInt8 parent, int whichChild, bool isTopLevel, int level);
+  TreePiece(CmiUInt8 parent, int whichChild, bool isTopLevel, int level, CkArrayIndex1D parent);
   TreePiece(CkMigrateMessage *m){}
   // used to convey message counts from chunks to top-level
   // treepieces
+  void acceptRoots(CmiUInt8 root, CkCallback &cb);
   void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
   // used to convey message counts from treepieces to their
   // children
@@ -208,6 +214,7 @@ class TreePiece : public CBase_TreePiece {
   void recvParticles(ParticleMsg *msg);
   nodeptr loadtree(bodyptr p, cellptr root, unsigned int ProcessId);
   cellptr SubdivideLeaf (leafptr le, cellptr parent, unsigned int l, unsigned int ProcessId);
+  void childDone(int which);
 
 };
 

@@ -30,17 +30,19 @@ mainmodule barnes {
   };
 
   array [1D] TreePiece {
-    entry TreePiece(CmiUInt8 p, int which, bool isTopLevel, int level); 
+    entry TreePiece(CmiUInt8 p, int which, bool isTopLevel, int level, CkArrayIndex1D parent); 
+    entry void acceptRoots(CmiUInt8 root, CkCallback &cb);
     entry void recvParticles(ParticleMsg *msg);
     entry void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
     entry void recvTotalMsgCountsFromPieces(int totalNumFromParent);
+    entry void childDone(int which);
   };
 
   array [1D] ParticleChunk {
     entry ParticleChunk(int n1, int n2);
     entry void SlaveStart(CmiUInt8 mybodytab, CmiUInt8 bodytab, CkCallback &cb);
-    entry void startIteration(CkCallback &cb);
-    entry void acceptRoot(CmiUInt8);
+    // entry void startIteration(CkCallback &cb);
+    entry void acceptRoot(CmiUInt8, CkCallback &cb);
     entry void stepsystemPartII(CkReductionMsg *msg);
     entry void stepsystemPartIII(CkReductionMsg *msg);
     entry void doneTreeBuild();

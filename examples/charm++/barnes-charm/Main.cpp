@@ -136,7 +136,7 @@ Main::Main(CkArgMsg *m){
   // FIXME - level of top-level trees
   int depth = log8floor(numTreePieces);
   ckout << "top-level pieces depth: " << (depth+1) << ", " << (IMAX >> (depth+1)) << endl;
-  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew((CmiUInt8)0,-1,true,(IMAX >> (depth+1)),opts);
+  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew((CmiUInt8)0,-1,true,(IMAX >> (depth+1)), CkArrayIndex1D(0), opts);
   pieces = treeProxy;
 
   myMap=CProxy_BlockMap::ckNew(); 
@@ -145,12 +145,66 @@ Main::Main(CkArgMsg *m){
   CProxy_ParticleChunk chunkProxy = CProxy_ParticleChunk::ckNew(maxleaf, maxcell, optss);
   chunks = chunkProxy;
 
+  topLevelRoots.reserve(numTreePieces);
   // startup split into two so that global readonlys
   // are initialized before we send start signal to 
   // particle chunks
   ckout << "Starting simulation" << endl;
   thisProxy.startSimulation();
 }
+
+/*
+ * INIT_ROOT: Processor 0 reinitialize the global root at each time step
+ */
+void Main::init_root (unsigned int ProcessId)
+{
+
+  // create top portion of global tree
+  int depth = log8floor(numTreePieces);
+  //Global->G_root=Local[0].ctab;
+  G_root = makecell(ProcessId);
+  //mynumcell=1;
+
+  /*
+  Type(G_root) = CELL;
+  Done(G_root) = FALSE;
+  */
+  Level(G_root) = IMAX >> 1;
+  
+  ckout << "[main] Creating top-level tree, depth: " << depth << " root: " << G_root << endl;
+  int totalNumCellsMade = createTopLevelTree(G_root, depth);
+  ckout << "totalNumCellsMade: " << totalNumCellsMade+1 << endl;
+  //chunks.acceptRoot((CmiUInt8) G_root);
+  /*
+  for (i = 0; i < NSUB; i++) {
+    Subp(Global->G_root)[i] = NULL;
+  }
+  */
+}
+
+int Main::createTopLevelTree(cellptr node, int depth){
+  if(depth == 0){
+    // lowest level, no more children will be created - save self
+    int index = topLevelRoots.push_back_v((nodeptr) node);
+    CkPrintf("saving root %d 0x%x\n", index, node);
+    return 0;
+  }
+  
+  int numCellsMade = 0;
+  for (int i = 0; i < NSUB; i++){
+    cellptr child = makecell(-1);
+    Subp(node)[i] = (nodeptr) child;
+    ParentOf(child) = (nodeptr) node;
+    ChildNum(child) = i;
+    Level(child) = Level(node) >> 1;
+    numCellsMade++;
+    numCellsMade += createTopLevelTree((cellptr) Subp(node)[i], depth-1);
+  }
+
+  return numCellsMade;
+}
+
+
 
 void Main::startSimulation(){
   // slavestart for chunks
@@ -160,7 +214,13 @@ void Main::startSimulation(){
 
   /* main loop */
   while (tnow < tstop + 0.1 * dtime) {
-    chunks.startIteration(CkCallbackResumeThread());
+    // create top-level tree
+    init_root(-1);
+    // send roots to pieces
+    pieces.acceptRoots((CmiUInt8)topLevelRoots.getVec(), CkCallbackResumeThread());
+    // send root to chunk
+    chunks.acceptRoot((CmiUInt8)G_root, CkCallbackResumeThread());
+    // chunks.startIteration(CkCallbackResumeThread());
     CkExit();
   }
 }

@@ -76,13 +76,6 @@ void ParticleChunk::SlaveStart(CmiUInt8 bodyptrstart_, CmiUInt8 bodystart_, CkCa
   contribute(0,0,CkReduction::concat,cb_);
 }
 
-void ParticleChunk::startIteration(CkCallback &cb_){
-
-  mainCb = cb_; 
-  int ProcessId = thisIndex;
-  stepsystem(ProcessId);
-}
-
 /* 
  * FIND_MY_INITIAL_BODIES: puts into mybodytab the initial list of bodies 
  * assigned to the processor.  
@@ -112,31 +105,29 @@ unsigned int ProcessId;
   }
   for (i=0; i < mynbody; i++) {
      mybodytab[i] = &(btab[offset+i]);
+     CkPrintf("[%d] particle %d: 0x%x\n", thisIndex, i, mybodytab[i]);
   }
   //BARRIER(Global->Barstart,NPROC);
 }
 
 /*
+void ParticleChunk::startIteration(CkCallback &cb_){
+  mainCb = cb_; 
+  int ProcessId = thisIndex;
+  stepsystem(ProcessId);
+}
+*/
+
+
+/*
  * STEPSYSTEM: advance N-body system one time-step.
  */
 
+/*
 void ParticleChunk::stepsystem (unsigned int ProcessId)
 {
-  /*
-    int i;
-    real Cavg;
-    bodyptr p,*pp;
-    vector acc1, dacc, dvel, vel1, dpos;
-    unsigned int time;
-    unsigned int trackstart, trackend;
-    unsigned int partitionstart, partitionend;
-    unsigned int treebuildstart, treebuildend;
-    unsigned int forcecalcstart, forcecalcend;
-    */
 
     if (nstep == 2) {
-/* POSSIBLE ENHANCEMENT:  Here is where one might reset the
-   statistics that one is measuring about the parallel execution */
     }
 
     if ((ProcessId == 0) && (nstep >= 2)) {
@@ -147,13 +138,14 @@ void ParticleChunk::stepsystem (unsigned int ProcessId)
       // init_root bcasts root to all chunks
       // in the associated entry method, 
       // chunks contribute to continue with stepsystemPartII
-       init_root(ProcessId);
+      // init_root(ProcessId);
     }
     else {
        //mynumcell = 0;
        //mynumleaf = 0;
     }
 }
+*/
 
 void ParticleChunk::stepsystemPartII(CkReductionMsg *msg){
 
@@ -243,7 +235,7 @@ ParticleChunk::loadtree(bodyptr p, cellptr root, unsigned ProcessId)
    cellptr c;
    leafptr le;
 
-   intcoord(xp, Pos(p));
+   CkAssert(intcoord(xp, Pos(p)));
    /*
    valid_root = TRUE;
    for (i = 0; i < NDIM; i++) {
@@ -371,17 +363,15 @@ void ParticleChunk::flushParticles(){
 void ParticleChunk::sendParticlesToTp(int tp){
   int len = particlesToTps[tp].length();
   if(len > 0){
+    CkPrintf("[%d] sending %d particles to piece %d\n", thisIndex, len, tp);
     ParticleMsg *msg = new (len) ParticleMsg(); 
     memcpy(msg->particles, particlesToTps[tp].getVec(), len*sizeof(bodyptr));
-    /*
     for(int i = 0; i < len; i++){
-      msg->particles[i] = (particlesToTps[tp])[i];
+      CkPrintf("[%d] 0x%x\n", thisIndex, msg->particles[i]);
     }
-    */
     msg->num = len; 
     numMsgsToEachTp[tp]++;
     particlesToTps[tp].length() = 0;
-    CkPrintf("[%d] sending %d particles to piece %d\n", thisIndex, len, tp);
     pieces[tp].recvParticles(msg);
   }
 }
@@ -503,55 +493,10 @@ void ParticleChunk::stepsystemPartIII(CkReductionMsg *msg){
     */
 }
 
-/*
- * INIT_ROOT: Processor 0 reinitialize the global root at each time step
- */
-void ParticleChunk::init_root (unsigned int ProcessId)
-{
-
-  // create top portion of global tree
-  int depth = log8floor(numTreePieces);
-  //Global->G_root=Local[0].ctab;
-  G_root = new cell;
-  //mynumcell=1;
-
-  Type(G_root) = CELL;
-  Done(G_root) = FALSE;
-  Level(G_root) = IMAX >> 1;
-  
-  ckout << "[" << thisIndex << "] Creating top-level tree, depth: " << depth << endl;
-  int totalNumCellsMade = createTopLevelTree(G_root, depth);
-  ckout << "totalNumCellsMade: " << totalNumCellsMade+1 << endl;
-  // send root to everyone
-  chunks.acceptRoot((CmiUInt8) G_root);
-  /*
-  for (i = 0; i < NSUB; i++) {
-    Subp(Global->G_root)[i] = NULL;
-  }
-  */
-}
-
-int ParticleChunk::createTopLevelTree(cellptr node, int depth){
-  if(depth == 0){
-    return 0;
-  }
-  
-  int numCellsMade = 0;
-  for (int i = 0; i < NSUB; i++){
-    cellptr child = makecell(thisIndex);
-    numCellsMade++;
-    // FIXME all code to initialize nodes goes here
-    Subp(node)[i] = (nodeptr) child;
-    ParentOf(child) = (nodeptr) node;
-    ChildNum(child) = i;
-    numCellsMade += createTopLevelTree((cellptr) Subp(node)[i], depth-1);
-  }
-
-  return numCellsMade;
-}
-
-void ParticleChunk::acceptRoot(CmiUInt8 root_){
+void ParticleChunk::acceptRoot(CmiUInt8 root_, CkCallback &mainCb_){
+  mainCb = mainCb_;
   G_root = (cellptr) root_;
+  CkPrintf("[%d] acceptRoot 0x%x\n", thisIndex, G_root);
   CkCallback cb(CkIndex_ParticleChunk::stepsystemPartII(0), thisProxy);
   contribute(0,0,CkReduction::concat,cb);
 }
