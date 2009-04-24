@@ -120,13 +120,23 @@ then
 		ppn='#PBS -l nodes='$nodes':ppn='$ppns
 		extra='-machinefile $PBS_NODEFILE'
 		;;
+        kraken*)
+                ncores=`expr \( $pes + 7 \) / 8 \* 8`
+		ncpus="#PBS -l size=$ncores"
+		;;
 	*)
 		ncpus="#PBS -l ncpus=$pes"
 		;;
 	esac
 	if test $USE_LSF -eq 0
 	then
-	  mpirun=`which mpirun`
+	  mpirun=`which mpirun 2>/dev/null`
+          npcmd="-np "
+          if test -z "$mpirun"
+          then
+            mpirun=`which aprun 2>/dev/null`
+            npcmd="-n "
+          fi
           cat > $script << EOF
 #!/bin/sh
 # This is a charmrun-generated PBS batch job script.
@@ -151,7 +161,8 @@ $mem
 cd $indir
 
 cat \$PBS_NODEFILE
-$mpirun -np $pes $extra $args
+echo $mpirun $npcmd $pes $extra $args
+$mpirun $npcmd $pes $extra $args
 
 # Save mpirun exit status
 status=\$?
