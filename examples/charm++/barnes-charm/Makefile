@@ -6,7 +6,7 @@ OBJS = TreePiece.o ParticleChunk.o Main.o
 all: barnes 
 
 barnes: $(OBJS)
-	$(CHARMC) -language charm++ -o barnes $(OBJS) $(PROJ)
+	$(CHARMC) -language charm++ -o barnes $(OBJS) $(PROJ) 
 
 ParticleChunk.o: ParticleChunk.cpp barnes.decl.h
 	$(CHARMC) -c ParticleChunk.cpp

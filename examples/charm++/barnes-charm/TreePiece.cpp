@@ -24,13 +24,25 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, bool isTopLevel_, int level_, CkArr
   for(int i = 0; i < NSUB; i++){
     sentTo[i] = 0;
   }
+#ifdef MEMCHECK
+  CkPrintf("piece %d after construction\n", thisIndex);
+  CmiMemoryCheck();
+#endif
 }
 
 void TreePiece::acceptRoots(CmiUInt8 roots_, CkCallback &cb){
   if(isTopLevel){
+#ifdef MEMCHECK
+  CkPrintf("piece %d before acceptRoots \n", thisIndex);
+  CmiMemoryCheck();
+#endif
     nodeptr *pp = (nodeptr *)roots_;
     nodeptr p = pp[thisIndex];
     myRoot = (cellptr) p;
+#ifdef MEMCHECK
+  CkPrintf("piece %d after acceptRoots\n", thisIndex);
+  CmiMemoryCheck();
+#endif
 
     CkPrintf("piece [%d] acceptRoot 0x%x\n", thisIndex, myRoot);
   }
@@ -38,26 +50,46 @@ void TreePiece::acceptRoots(CmiUInt8 roots_, CkCallback &cb){
 }
 
 void TreePiece::recvTotalMsgCountsFromPieces(int totalNumFromParent){
+#ifdef MEMCHECK
+  CkPrintf("piece %d before recvTotalMsgCountsFromPieces\n", thisIndex);
+  CmiMemoryCheck();
+#endif
   CkAssert(!isTopLevel);
   numTotalMsgs = totalNumFromParent;
   haveCounts = true;
   checkCompletion();
+#ifdef MEMCHECK
+  CkPrintf("piece %d after recvTotalMsgCountsFromPieces\n", thisIndex);
+  CmiMemoryCheck();
+#endif
 }
 
 
 void TreePiece::recvTotalMsgCountsFromChunks(CkReductionMsg *msg){
   if(isTopLevel){
+#ifdef MEMCHECK
+  CkPrintf("piece %d before recvTotalMsgCountsFromChunks\n", thisIndex);
+  CmiMemoryCheck();
+#endif
     int *data = (int *)msg->getData();
     numTotalMsgs = data[thisIndex]; /* between 0 and numTreePieces, 
                                        which is the number of 
                                        top-level treepieces */
     haveCounts = true;
     checkCompletion();
+#ifdef MEMCHECK
+  CkPrintf("piece %d after recvTotalMsgCountsFromChunks\n", thisIndex);
+  CmiMemoryCheck();
+#endif
   }
   delete msg;
 }
 
 void TreePiece::checkCompletion(){
+#ifdef MEMCHECK
+  CkPrintf("piece %d before checkCompletion \n", thisIndex);
+  CmiMemoryCheck();
+#endif
   CkPrintf("piece %d checkcompletion, recvd %d, total %d\n", thisIndex, numRecvdMsgs, numTotalMsgs);
   if(numRecvdMsgs == numTotalMsgs){
     CkPrintf("piece %d has all particles\n", thisIndex);
@@ -85,17 +117,29 @@ void TreePiece::checkCompletion(){
       }
     }
   }
+#ifdef MEMCHECK
+  CkPrintf("piece %d after checkCompletion\n", thisIndex);
+  CmiMemoryCheck();
+#endif
 }
 
 void TreePiece::childDone(int which){
   pendingChildren--;
   if(pendingChildren == 0){
+#ifdef MEMCHECK
+  CkPrintf("piece %d before childDone \n", thisIndex);
+  CmiMemoryCheck();
+#endif
     if(!isTopLevel){
       // talk to parent
       pieces[parentIndex].childDone(whichChildAmI);
     }
     CkCallback cb(CkIndex_ParticleChunk::doneTreeBuild(), CkArrayIndex1D(0), chunks);
     contribute(0,0,CkReduction::concat,cb);
+#ifdef MEMCHECK
+  CkPrintf("piece %d after childDone\n", thisIndex);
+  CmiMemoryCheck();
+#endif
   }
 }
 
@@ -103,10 +147,16 @@ void TreePiece::recvParticles(ParticleMsg *msg){
   bodyptr *particles = msg->particles;
   numRecvdMsgs++;
 
+#ifdef MEMCHECK
+  CkPrintf("piece %d before recvParticles \n", thisIndex);
+  CmiMemoryCheck();
+#endif
   CkPrintf("piece %d recvd %d particles, numRecvdMsgs: %d\n", thisIndex, msg->num, numRecvdMsgs);
+  /*
   for(int i = 0; i < msg->num; i++){
     CkPrintf("piece %d 0x%x\n", thisIndex, msg->particles[i]);
   }
+  */
 
   if(myNumParticles+msg->num > maxPartsPerTp && !haveChildren){
     // insert children into pieces array
@@ -160,9 +210,11 @@ void TreePiece::recvParticles(ParticleMsg *msg){
         pieces[tochild].recvParticles(amsg);
         CkPrintf("piece %d sent %d particles to child %d. sentTo[%d] = %d\n", thisIndex, len, tochild, tochild, sentTo[c]);
 
+        /*
         for(int i = 0; i < amsg->num; i++){
           CkPrintf("piece %d 0x%x\n", thisIndex, amsg->particles[i]);
         }
+        */
       }
     }
   }
@@ -191,6 +243,10 @@ void TreePiece::recvParticles(ParticleMsg *msg){
     checkCompletion();
   }
   delete msg;
+#ifdef MEMCHECK
+  CkPrintf("piece %d after recvParticles\n", thisIndex);
+  CmiMemoryCheck();
+#endif
 }
 
 void TreePiece::buildTree(){
@@ -198,11 +254,19 @@ void TreePiece::buildTree(){
   int ProcessId = thisIndex;
   nodeptr Current_Root;
 
+#ifdef MEMCHECK
+  CkPrintf("piece %d before buildTree\n", thisIndex);
+  CmiMemoryCheck();
+#endif
   Current_Root = (nodeptr) myRoot;
   for(int i = 0; i < myParticles.length(); i++){
-    CkPrintf("piece %d inserting particle %d 0x%x\n", thisIndex, i, myParticles[i]);
+    //CkPrintf("piece %d inserting particle %d 0x%x\n", thisIndex, i, myParticles[i]);
     Current_Root = (nodeptr) loadtree(myParticles[i], (cellptr) Current_Root, ProcessId);
   }
+#ifdef MEMCHECK
+  CkPrintf("piece %d after buildTree\n", thisIndex);
+  CmiMemoryCheck();
+#endif
 }
 
 nodeptr TreePiece::loadtree(bodyptr p, cellptr root, unsigned int ProcessId){
@@ -214,6 +278,10 @@ nodeptr TreePiece::loadtree(bodyptr p, cellptr root, unsigned int ProcessId){
   cellptr c;
   leafptr le;
 
+#ifdef MEMCHECK
+  CkPrintf("piece %d before loadtree\n", thisIndex);
+  CmiMemoryCheck();
+#endif
   CkAssert(intcoord(xp, Pos(p)));
   valid_root = TRUE;
   /*
@@ -309,6 +377,10 @@ nodeptr TreePiece::loadtree(bodyptr p, cellptr root, unsigned int ProcessId){
     }
   }
   //SETV(Root_Coords, xp);
+#ifdef MEMCHECK
+  CkPrintf("piece %d after loadtree\n", thisIndex);
+  CmiMemoryCheck();
+#endif
   return ParentOf((leafptr) *qptr);
 
 }
@@ -380,6 +452,7 @@ leafptr makeleaf(unsigned ProcessId)
    le = ltab + Myleaf;
    le->seqnum = ProcessId * maxmyleaf + Myleaf;
    */
+   le = new leaf; 
    Type(le) = LEAF;
    Done(le) = FALSE;
    Mass(le) = 0.0;

@@ -105,7 +105,7 @@ unsigned int ProcessId;
   }
   for (i=0; i < mynbody; i++) {
      mybodytab[i] = &(btab[offset+i]);
-     CkPrintf("[%d] particle %d: 0x%x\n", thisIndex, i, mybodytab[i]);
+     //CkPrintf("[%d] particle %d: 0x%x\n", thisIndex, i, mybodytab[i]);
   }
   //BARRIER(Global->Barstart,NPROC);
 }
@@ -366,9 +366,11 @@ void ParticleChunk::sendParticlesToTp(int tp){
     CkPrintf("[%d] sending %d particles to piece %d\n", thisIndex, len, tp);
     ParticleMsg *msg = new (len) ParticleMsg(); 
     memcpy(msg->particles, particlesToTps[tp].getVec(), len*sizeof(bodyptr));
+    /*
     for(int i = 0; i < len; i++){
       CkPrintf("[%d] 0x%x\n", thisIndex, msg->particles[i]);
     }
+    */
     msg->num = len; 
     numMsgsToEachTp[tp]++;
     particlesToTps[tp].length() = 0;
