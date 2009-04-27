@@ -49,8 +49,6 @@
 #define TOP		3
 #define BOTTOM		4
 
-#define USE_TOPOMAP	0
-
 double startTime;
 double endTime;
 
@@ -106,8 +104,8 @@ class Main : public CBase_Main
 
       // Create new array of worker chares
 #if USE_TOPOMAP
-      CkPrintf("Topology Mapping is being done ... \n");
       CProxy_JacobiMap map = CProxy_JacobiMap::ckNew(num_chare_x, num_chare_y);
+      CkPrintf("Topology Mapping is being done ... \n");
       CkArrayOptions opts(num_chare_x, num_chare_y);
       opts.setMap(map);
       array = CProxy_Jacobi::ckNew(opts);

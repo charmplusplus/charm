@@ -1,4 +1,4 @@
-OPTS	= -O3
+OPTS	= -g -DUSE_TOPOMAP=1
 CHARMC	= ../../../../bin/charmc $(OPTS)
 
 OBJS = jacobi2d.o
