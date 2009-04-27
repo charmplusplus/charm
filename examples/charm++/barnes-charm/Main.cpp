@@ -221,6 +221,9 @@ void Main::startSimulation(){
     // send root to chunk
     chunks.acceptRoot((CmiUInt8)G_root, CkCallbackResumeThread());
     // chunks.startIteration(CkCallbackResumeThread());
+#ifdef PRINT_TREE
+    graph();
+#endif
     CkExit();
   }
 }
@@ -653,5 +656,35 @@ real xrand(real lo, real hi){
   real ran = lo+hi*drand48();
   return ran;
 }
+
+#ifdef PRINT_TREE
+void Main::graph(){
+  ofstream myfile;
+  ostringstream ostr;
+
+  ostr << "tree." << maxPartsPerTp << ".dot";
+  myfile.open(ostr.str().c_str());
+  myfile << "digraph tree" << maxPartsPerTp << " {" << endl;
+  CkQ<nodeptr> nodes(4096);
+  //CkPrintf("enq 0x%x\n", G_root);
+  nodes.enq((nodeptr)G_root);
+  while(!nodes.isEmpty()){
+    nodeptr curnode = nodes.deq();
+    //CkPrintf("deq 0x%x\n", curnode);
+    if(Type(curnode) == CELL){
+      for(int i = 0; i < NSUB; i++){
+        nodeptr childnode = Subp(curnode)[i];
+        if(childnode != NULL){
+          myfile << (CmiUInt8)curnode << "->" << (CmiUInt8)childnode << endl;
+          //CkPrintf("enq 0x%x\n", childnode);
+          nodes.enq(childnode);
+        }
+      }
+    }
+  }
+  myfile << "}" << endl;
+  myfile.close();
+}
+#endif
 
 #include "barnes.def.h"

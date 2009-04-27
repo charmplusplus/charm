@@ -2,6 +2,9 @@
 #define _BARNES_H_
 
 #include <string>
+#include <iostream>
+#include <fstream>
+#include <sstream>
 #include "defs.h"
 #include "stdinc.h"
 
@@ -110,6 +113,10 @@ class Main : public CBase_Main {
   int createTopLevelTree(cellptr node, int depth);
   cellptr G_root; 
   CkVec<nodeptr> topLevelRoots;
+
+#ifdef PRINT_TREE
+  void graph();
+#endif
   
   public:
   Main(CkArgMsg *m);

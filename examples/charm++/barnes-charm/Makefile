@@ -1,3 +1,4 @@
+OPTS=-g
 CHARMC=../../../multicore-linux64/bin/charmc $(OPTS)
 
 OBJS = TreePiece.o ParticleChunk.o Main.o 

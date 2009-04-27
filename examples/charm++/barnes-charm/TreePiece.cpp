@@ -6,8 +6,10 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, bool isTopLevel_, int level_, CkArr
   myLevel = level_;
   if(!isTopLevel_){
     myRoot = makecell(thisIndex);
+    Level(myRoot) = myLevel;
     p = (nodeptr) p_;
     ParentOf(myRoot) = p; // this is my parent
+    //CkPrintf("piece %d setting Subp(0x%x)[%d] = 0x%x, level: %d\n", thisIndex, p, which, myRoot, myLevel);
     Subp(p)[which] = (nodeptr) myRoot; // i am my parent's 'which' child
     ChildNum(myRoot) = which;
     whichChildAmI = which;
@@ -101,6 +103,7 @@ void TreePiece::checkCompletion(){
         CkPrintf("piece %d -> child %d, total messages sentTo: %d\n", thisIndex, child, sentTo[i]);
         pieces[child].recvTotalMsgCountsFromPieces(sentTo[i]);
       }
+      CkPrintf("piece %d fake doneTreeBuild()\n", thisIndex);
     }
     else{
       // don't have children, build own tree
@@ -110,11 +113,14 @@ void TreePiece::checkCompletion(){
         // once you've built your own tree, 
         // you must notify your parent that you're done
 
-        CkPrintf("piece %d doneTreeBuild()\n", thisIndex);
+        CkPrintf("piece %d real !topLevel doneTreeBuild()\n", thisIndex);
         pieces[parentIndex].childDone(whichChildAmI);
-        CkCallback cb(CkIndex_ParticleChunk::doneTreeBuild(), CkArrayIndex1D(0), chunks);
-        contribute(0,0,CkReduction::concat,cb);
       }
+      else{
+        CkPrintf("piece %d real topLevel doneTreeBuild()\n", thisIndex);
+      }
+      CkCallback cb(CkIndex_ParticleChunk::doneTreeBuild(), CkArrayIndex1D(0), chunks);
+      contribute(0,0,CkReduction::concat,cb);
     }
   }
 #ifdef MEMCHECK
@@ -170,6 +176,7 @@ void TreePiece::recvParticles(ParticleMsg *msg){
     haveChildren = true;
     pendingChildren = NSUB;
     myNumParticles = 0;
+    myParticles.free();
   }
 
   if(haveChildren){
@@ -260,7 +267,9 @@ void TreePiece::buildTree(){
 #endif
   Current_Root = (nodeptr) myRoot;
   for(int i = 0; i < myParticles.length(); i++){
-    //CkPrintf("piece %d inserting particle %d 0x%x\n", thisIndex, i, myParticles[i]);
+    if(thisIndex == 5){
+      CkPrintf("piece %d inserting particle %d level: %d\n", thisIndex, i, Level(Current_Root));
+    }
     Current_Root = (nodeptr) loadtree(myParticles[i], (cellptr) Current_Root, ProcessId);
   }
 #ifdef MEMCHECK
@@ -330,7 +339,7 @@ nodeptr TreePiece::loadtree(bodyptr p, cellptr root, unsigned int ProcessId){
   flag = TRUE;
   while (flag) {                           /* loop descending tree     */
     if (l == 0) {
-      ckerr << "not enough levels in tree\n";
+      CkAbort("not enough levels in tree\n");
     }
     if (*qptr == NULL) { 
       /* lock the parent cell */
