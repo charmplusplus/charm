@@ -5,16 +5,24 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, bool isTopLevel_, int level_, CkArr
   nodeptr p;
   myLevel = level_;
   if(!isTopLevel_){
-    myRoot = makecell(thisIndex);
-    Level(myRoot) = myLevel;
-    p = (nodeptr) p_;
-    ParentOf(myRoot) = p; // this is my parent
+    //myRoot = makecell(thisIndex);
+    //Level(myRoot) = myLevel;
+    //p = (nodeptr) p_;
+    //ParentOf(myRoot) = p; // this is my parent
     //CkPrintf("piece %d setting Subp(0x%x)[%d] = 0x%x, level: %d\n", thisIndex, p, which, myRoot, myLevel);
-    Subp(p)[which] = (nodeptr) myRoot; // i am my parent's 'which' child
-    ChildNum(myRoot) = which;
+    //Subp(p)[which] = (nodeptr) myRoot; // i am my parent's 'which' child
+    //ChildNum(myRoot) = which;
     whichChildAmI = which;
     parentIndex = parentIdx;
+    // save parent
+    parent = (nodeptr)p_;
   }
+  else{
+    // don't save parent if top-level tp. parent will be set by
+    // acceptroots
+    whichChildAmI = thisIndex;
+  }
+
 
   numTotalMsgs = -1;
   numRecvdMsgs = 0;
@@ -39,14 +47,15 @@ void TreePiece::acceptRoots(CmiUInt8 roots_, CkCallback &cb){
   CmiMemoryCheck();
 #endif
     nodeptr *pp = (nodeptr *)roots_;
-    nodeptr p = pp[thisIndex];
-    myRoot = (cellptr) p;
+    nodeptr p = pp[thisIndex/NSUB];
+    //myRoot = (cellptr) p;
+    parent = p;
 #ifdef MEMCHECK
   CkPrintf("piece %d after acceptRoots\n", thisIndex);
   CmiMemoryCheck();
 #endif
 
-    CkPrintf("piece [%d] acceptRoot 0x%x\n", thisIndex, myRoot);
+    CkPrintf("piece [%d] acceptRoot parent 0x%x\n", thisIndex, parent);
   }
   contribute(0,0,CkReduction::concat,cb);
 }
@@ -112,7 +121,6 @@ void TreePiece::checkCompletion(){
       if(!isTopLevel){
         // once you've built your own tree, 
         // you must notify your parent that you're done
-
         CkPrintf("piece %d real !topLevel doneTreeBuild()\n", thisIndex);
         pieces[parentIndex].childDone(whichChildAmI);
       }
@@ -164,9 +172,16 @@ void TreePiece::recvParticles(ParticleMsg *msg){
   }
   */
 
-  if(myNumParticles+msg->num > maxPartsPerTp && !haveChildren){
+  int newtotal = myNumParticles+msg->num;
+
+  if(newtotal > maxPartsPerTp && newtotal > MAX_BODIES_PER_LEAF && !haveChildren){
     // insert children into pieces array
     CkPrintf("piece %d has too many (%d+%d) particles; creating children\n", thisIndex, myNumParticles, msg->num);
+    // first create own root
+    myRoot = InitCell((cellptr)parent, thisIndex);
+    //CkPrintf("piece %d myRoot: 0x%x\n", thisIndex, myRoot);
+    Subp(parent)[whichChildAmI] = (nodeptr) myRoot;
+
     for(int i = 0; i < NSUB; i++){
       int child = NSUB*thisIndex+numTreePieces+i;
       CkPrintf("piece %d inserting child %d\n", thisIndex, child);
@@ -265,11 +280,16 @@ void TreePiece::buildTree(){
   CkPrintf("piece %d before buildTree\n", thisIndex);
   CmiMemoryCheck();
 #endif
-  Current_Root = (nodeptr) myRoot;
+  // start from parent 
+  // this way, particles can be added to myRoot until it
+  // needs to be split.
+  Current_Root = (nodeptr) parent;
   for(int i = 0; i < myParticles.length(); i++){
+    /*
     if(thisIndex == 5){
       CkPrintf("piece %d inserting particle %d level: %d\n", thisIndex, i, Level(Current_Root));
     }
+    */
     Current_Root = (nodeptr) loadtree(myParticles[i], (cellptr) Current_Root, ProcessId);
   }
 #ifdef MEMCHECK
@@ -474,7 +494,7 @@ leafptr makeleaf(unsigned ProcessId)
 }
 
 cellptr
-TreePiece::SubdivideLeaf (leafptr le, cellptr parent, unsigned int l, unsigned int ProcessId)
+TreePiece::SubdivideLeaf (leafptr le, cellptr parent_, unsigned int l, unsigned int ProcessId)
 /*
    leafptr le;
    cellptr parent;
@@ -497,7 +517,7 @@ TreePiece::SubdivideLeaf (leafptr le, cellptr parent, unsigned int l, unsigned i
    }
    le->num_bodies = 0;
    /* create the parent cell for this subtree */
-   c = InitCell(parent, ProcessId);
+   c = InitCell(parent_, ProcessId);
    ChildNum(c) = ChildNum(le);
    /* do first particle separately, so we can reuse le */
    p = bodies[0];

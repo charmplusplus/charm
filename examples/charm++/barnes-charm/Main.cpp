@@ -163,6 +163,7 @@ void Main::init_root (unsigned int ProcessId)
   int depth = log8floor(numTreePieces);
   //Global->G_root=Local[0].ctab;
   G_root = makecell(ProcessId);
+  ParentOf(G_root) = NULL;
   //mynumcell=1;
 
   /*
@@ -183,7 +184,7 @@ void Main::init_root (unsigned int ProcessId)
 }
 
 int Main::createTopLevelTree(cellptr node, int depth){
-  if(depth == 0){
+  if(depth == 1){
     // lowest level, no more children will be created - save self
     int index = topLevelRoots.push_back_v((nodeptr) node);
     CkPrintf("saving root %d 0x%x\n", index, node);
@@ -191,6 +192,12 @@ int Main::createTopLevelTree(cellptr node, int depth){
   }
   
   int numCellsMade = 0;
+  // here, ancestors of treepieces' roots are created,
+  // not the roots themselves.
+  // these are all cells. the roots will start out as NULL pointers,
+  // but if bodies are sent to them, they are modified to become
+  // leaves.
+
   for (int i = 0; i < NSUB; i++){
     cellptr child = makecell(-1);
     Subp(node)[i] = (nodeptr) child;
@@ -662,23 +669,30 @@ void Main::graph(){
   ofstream myfile;
   ostringstream ostr;
 
-  ostr << "tree." << maxPartsPerTp << ".dot";
+  ostr << "tree." << nbody << "." << maxPartsPerTp << ".dot";
   myfile.open(ostr.str().c_str());
-  myfile << "digraph tree" << maxPartsPerTp << " {" << endl;
+  myfile << "digraph tree_" << nbody << "_" << maxPartsPerTp <<" {" << endl;
   CkQ<nodeptr> nodes(4096);
   //CkPrintf("enq 0x%x\n", G_root);
   nodes.enq((nodeptr)G_root);
   while(!nodes.isEmpty()){
     nodeptr curnode = nodes.deq();
     //CkPrintf("deq 0x%x\n", curnode);
-    if(Type(curnode) == CELL){
-      for(int i = 0; i < NSUB; i++){
-        nodeptr childnode = Subp(curnode)[i];
-        if(childnode != NULL){
-          myfile << (CmiUInt8)curnode << "->" << (CmiUInt8)childnode << endl;
-          //CkPrintf("enq 0x%x\n", childnode);
+    for(int i = 0; i < NSUB; i++){
+      nodeptr childnode = Subp(curnode)[i];
+      if(childnode != NULL){
+        if(Type(childnode) == CELL){
           nodes.enq(childnode);
+          myfile << (CmiUInt8)curnode << "->" << (CmiUInt8)childnode << endl;
         }
+        else if(Type(childnode) == LEAF){
+          myfile << (CmiUInt8)curnode << "->" << (CmiUInt8)childnode << endl;
+          myfile << (CmiUInt8)childnode << " [label=\"" << "("<< ((leafptr)childnode)->num_bodies << ")" << "\"];"<< endl;
+        }
+        //CkPrintf("enq 0x%x\n", childnode);
+      }
+      else {
+        myfile << (CmiUInt8)curnode << "-> NULL_" << (CmiUInt8)curnode << "_" << i << endl;
       }
     }
   }
