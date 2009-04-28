@@ -23,3 +23,6 @@ barnes.decl.h: barnes.ci
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o barnes charmrun *~ *.core 
+
+realclean: clean
+	rm -f out.* *.dot *.ps
