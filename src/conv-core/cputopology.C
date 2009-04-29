@@ -253,10 +253,13 @@ extern "C" void CmiInitCPUTopology(char **argv)
   }
 
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
-						"obtain cpu topology info");
+					   "obtain cpu topology info");
 #if !defined(_WIN32) && !__BLUEGENE__
   obtain_flag = 1;
 #endif
+  if (CmiGetArgFlagDesc(argv,"+skip_cpu_topology",
+                               "skip the processof getting cpu topology info"))
+    obtain_flag = 0;
 
   cpuTopoHandlerIdx =
      CmiRegisterHandler((CmiHandler)cpuTopoHandler);
