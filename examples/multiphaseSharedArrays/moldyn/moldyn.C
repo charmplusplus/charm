@@ -159,10 +159,9 @@ private:
 
 protected:
     XyzMSA coords;
-  XyzMSA::Handle *hCoords;
     XyzMSA forces;
-  XyzMSA::Handle *hForces;
     AtomInfoMSA atominfo;
+	AtomInfoMSA::Read rAtominfo;
     NeighborMSA nbrList;
 
     unsigned int numAtoms, numWorkers;
@@ -174,16 +173,6 @@ protected:
         atominfo.enroll(numWorkers);
         nbrList.enroll(numWorkers);
     }
-
-#if 0
-    void SyncArrays()
-    {
-        coords.sync();
-        forces.sync();
-        atominfo.sync();
-        nbrList.sync();
-    }
-#endif
 
     void FillArrays()
     {
@@ -221,49 +210,64 @@ protected:
         return 0;
     }
 
-    void DoWork()
-    {
-        unsigned int i_start, i_end, j_start, j_end;
-        GetMyIndices(NUM_ATOMS-1, toX(), numWorkers2D(), i_start, i_end);
-        GetMyIndices(NUM_ATOMS-1, toY(), numWorkers2D(), j_start, j_end);
+  double distance(const XYZ &a, const XYZ &b)
+  {
+	double dx = a.x - b.x,
+	  dy = a.y - b.y,
+	  dz = a.z - b.z;
+	return sqrt(dx*dx + dy*dy + dz*dz);
+  }
 
-        for (unsigned int timestep = 0; timestep < NUM_TIMESTEPS; timestep++) {
-            /**************** Phase I ****************/
-            // for a section of the interaction matrix
-			XyzMSA::Accum aForces = forces.syncToAccum(*hForces);
-            for (unsigned int i = i_start; i< i_end; i++)
-                for (unsigned int j = j_start; j< j_end; j++)
-                    if (nbrList.get(i,j)) { // nbrlist enters ReadOnly mode
-                        XYZ force = calculateForce(coords[i],
-                                                   atominfo[i],
-                                                   coords[j],
-                                                   atominfo[j]);
-                        aForces.accumulate(i,  force); // Accumulate mode
-                        aForces.accumulate(j, force.negate());
-                    }
-			XyzMSA::Read rForces = forces.syncToRead(aForces);
+  void PlimptonMD(XyzMSA::Handle &hCoords, XyzMSA::Handle &hForces, 
+				  NeighborMSA::Handle &hNbr, AtomInfoMSA::Read &rAtominfo)
+  {
+	unsigned int i_start, i_end, j_start, j_end;
+	GetMyIndices(NUM_ATOMS-1, toX(), numWorkers2D(), i_start, i_end);
+	GetMyIndices(NUM_ATOMS-1, toY(), numWorkers2D(), j_start, j_end);
 
-            /**************** Phase II ****************/
-            unsigned int myAtomsBegin, myAtomsEnd;
-            for (unsigned int k = myAtomsBegin; k<myAtomsEnd; k++)
-                coords.set(k) = integrate(atominfo[k], rForces[k]); // WriteOnly mode
-            coords.sync();
+	XyzMSA::Read rCoords = coords.syncToRead(hCoords);
+	NeighborMSA::Read rNbr = nbrList.syncToRead(hNbr);
 
-            /**************** Phase III ****************/
-            if  (timestep %8 == 0) { // update neighbor list every 8 steps
-                for (unsigned int i = i_start; i< i_end; i++)
-                    for (unsigned int j = j_start; j< j_end; j++)
-                        if (distance(i, j) < CUTOFF_DISTANCE) {
-                            nbrList.set(i,j) = true;
-                            nbrList.set(j,i) = true;
-                        } else {
-                            nbrList.set(i,j) = false;
-                            nbrList.set(j,i) = false;
-                        }
-                nbrList.sync();
-            }
-        }
-    }
+	for (unsigned int timestep = 0; timestep < NUM_TIMESTEPS; timestep++) {
+	  // Force calculation for a section of the interaction matrix
+	  XyzMSA::Accum aForces = forces.syncToAccum(hForces);
+	  for (unsigned int i = i_start; i< i_end; i++)
+		for (unsigned int j = j_start; j< j_end; j++)
+		  if (rNbr(i,j)) {
+			XYZ force = calculateForce(rCoords(i),
+									   rAtominfo(i),
+									   rCoords(j),
+									   rAtominfo(j));
+			aForces(i) += force;
+			aForces(j) += force.negate();
+		  }
+
+	  // Movement Integration for our subset of atoms
+	  unsigned int myAtomsBegin, myAtomsEnd;
+	  XyzMSA::Read rForces = forces.syncToRead(aForces);
+	  XyzMSA::Write wCoords = coords.syncToWrite(rCoords);
+	  for (unsigned int k = myAtomsBegin; k<myAtomsEnd; k++)
+		wCoords(k) = integrate(rAtominfo(k), rForces(k));
+
+	  // Neighbor list recalculation for our section of the interaction matrix
+	  rCoords = coords.syncToRead(wCoords);
+	  if  (timestep % 8 == 0) { // update neighbor list every 8 steps
+		NeighborMSA::Write wNbr = nbrList.syncToWrite(rNbr);
+		for (unsigned int i = i_start; i< i_end; i++)
+		  for (unsigned int j = j_start; j< j_end; j++)
+			if (distance(rCoords(i), rCoords(j)) < CUTOFF_DISTANCE) {
+			  wNbr.set(i,j) = true;
+			  wNbr.set(j,i) = true;
+			} else {
+			  wNbr.set(i,j) = false;
+			  wNbr.set(j,i) = false;
+			}
+		rNbr = nbrList.syncToRead(wNbr);
+	  }
+
+	  hForces = rForces;
+	}
+  }
 
     void TestResults(bool prod_test=true)
     {
@@ -360,7 +364,8 @@ public:
         if (do_test) TestResults(0);
 
         if(verbose) ckout << thisIndex << ": product" << endl;
-        DoWork();
+
+        PlimptonMD(coords.getInitialWrite(), forces.getInitialWrite(), nbrList.getInitialWrite(), rAtominfo);
         times.push_back(CkWallTimer()); // 5
         description.push_back("    work");
 
