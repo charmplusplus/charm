@@ -34,7 +34,9 @@ extern real tstop;
 extern int nbody;
 extern real dtime;
 extern real eps;
+extern real epssq;
 extern real tol;
+extern real tolsq;
 extern real dtout;
 extern real dthf;
 extern vector rmin;
@@ -79,7 +81,6 @@ class Main : public CBase_Main {
   
   int maxleaf;
   int maxcell;
-  int maxmybody;
 
   string infile;
   string outfile;
@@ -162,6 +163,32 @@ class ParticleChunk : public CBase_ParticleChunk {
   // which of my particles are to be sent to which top-level 
   // treepieces
   CkVec<CkVec<bodyptr> >particlesToTps;
+  void HouseKeep();
+  void find_my_bodies(nodeptr mycell, int work, int direction, unsigned int ProcessId);
+
+   int myn2bcalc; 	/* body-body force calculations for each processor */
+   int mynbccalc; 	/* body-cell force calculations for each processor */
+   int myselfint; 	/* count self-interactions for each processor */
+   int myn2bterm; 	/* count body-body terms for a body */
+   int mynbcterm; 	/* count body-cell terms for a body */
+   bool skipself; 	/* true if self-interaction skipped OK */
+   bodyptr pskip;       /* body to skip in force evaluation */
+   vector pos0;         /* point at which to evaluate field */
+   real phi0;           /* computed potential at pos0 */
+   vector acc0;         /* computed acceleration at pos0 */
+   vector dr;  		/* data to be shared */
+   real drsq;      	/* between gravsub and subdivp */
+   nodeptr pmem;	/* remember particle data */
+
+  real workMin;
+  real workMax;
+
+  
+  void hackgrav(bodyptr p, unsigned ProcessId);
+  void gravsub(nodeptr p, unsigned ProcessId);
+  void hackwalk(unsigned ProcessId);
+  void walksub(nodeptr n, real dsq, unsigned ProcessId);
+  bool subdivp(nodeptr p, real dsq, unsigned ProcessId);
 
   public:
   ParticleChunk(int maxleaf, int maxcell);
@@ -177,9 +204,7 @@ class ParticleChunk : public CBase_ParticleChunk {
   //void SlaveStart(CmiUInt8 bb, CmiUInt8 b, CmiUInt8 mct, CmiUInt8 mlt, CkCallback &cb);
   //void startIteration(CkCallback &cb);
   void acceptRoot(CmiUInt8 root, CkCallback &cb);
-  //void stepsystem(unsigned ProcessId);
   void stepsystemPartII(CkReductionMsg *msg);
-  void stepsystemPartIII(CkReductionMsg *msg);
 
   void maketree(unsigned int ProcessId);
   nodeptr loadtree(bodyptr p, cellptr root, unsigned ProcessId);
@@ -187,6 +212,9 @@ class ParticleChunk : public CBase_ParticleChunk {
 
   void doneTreeBuild();
 
+  void partition(CkCallback &cb);
+  void ComputeForces(CkCallback &cb);
+  void advance(CkCallback &cb);
 };
 
 class TreePiece : public CBase_TreePiece {
@@ -211,8 +239,8 @@ class TreePiece : public CBase_TreePiece {
   int whichChildAmI;
   int childrenTreePieces[NSUB];
 
-  cellptr *mycelltab;
-  leafptr *myleaftab;
+  CkVec<cellptr> mycelltab;
+  CkVec<leafptr> myleaftab;
   int mynleaf;
   int myncell;
 
@@ -237,7 +265,7 @@ class TreePiece : public CBase_TreePiece {
   void recvParticles(ParticleMsg *msg);
   nodeptr loadtree(bodyptr p, cellptr root, unsigned int ProcessId);
   cellptr SubdivideLeaf (leafptr le, cellptr parent, unsigned int l, unsigned int ProcessId);
-  void childDone(int which, bool childRootValid);
+  void childDone(int which);
 
 };
 

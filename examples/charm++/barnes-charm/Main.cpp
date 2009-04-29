@@ -18,7 +18,9 @@ real tstop;
 int nbody;
 real dtime;
 real eps;
+real epssq;
 real tol;
+real tolsq;
 real dtout;
 real dthf;
 vector rmin;
@@ -166,6 +168,10 @@ void Main::init_root (unsigned int ProcessId)
   //Global->G_root=Local[0].ctab;
   G_root = makecell(ProcessId);
   ParentOf(G_root) = NULL;
+  Mass(G_root) = 0.0;
+  Cost(G_root) = 0;
+  CLRV(Pos(G_root));
+
   //mynumcell=1;
 
   /*
@@ -244,6 +250,15 @@ void Main::startSimulation(){
 #ifdef PRINT_TREE
     graph();
 #endif
+#ifdef PARTITION
+    chunks.partition(CkCallbackResumeThread());
+#endif
+#ifdef FORCES
+    chunks.ComputeForces(CkCallbackResumeThread());
+#endif
+#ifdef ADVANCE
+    chunks.advance(CkCallbackResumeThread());
+#endif
     CkExit();
   }
 }
@@ -258,7 +273,8 @@ Main::tab_init()
 {
 
   /*allocate space for personal lists of body pointers */
-  maxmybody = (nbody+maxleaf*MAX_BODIES_PER_LEAF)/NPROC; 
+  maxmybody = (real)(nbody+maxleaf*MAX_BODIES_PER_LEAF)/(real) NPROC; 
+  CkPrintf("[main] maxmybody: %d\n", maxmybody);
   mybodytab = (bodyptr*) G_MALLOC(NPROC*maxmybody*sizeof(bodyptr));
   /* space is allocated so that every */
   /* process can have a maximum of maxmybody pointers to bodies */ 
@@ -364,13 +380,14 @@ void Main::startrun()
    eps = getdparam("eps");
    if(isnan(eps))
      eps = 0.05;
+   epssq = eps * eps;
 
    real epssq = eps*eps;
    tol = getdparam("tol");
    if(isnan(tol))
      tol = 1.0;
-
-   real tolsq = tol*tol;
+   tolsq = tol*tol;
+   
    fcells = getdparam("fcells");
    if(isnan(fcells))
      fcells = 2.0;
@@ -404,7 +421,7 @@ void Main::startrun()
 void Main::setbound()
 {
    int i;
-   real side ;
+   real side;
    bodyptr p;
    vector min, max;
 
@@ -423,8 +440,8 @@ void Main::setbound()
    for (i=0; i<NDIM;i++) if (side<max[i]) side=max[i];
    ADDVS(rmin,min,-side/100000.0);
    rsize = 1.00002*side;
-   SETVS(max,-1E99);
-   SETVS(min,1E99);
+   //SETVS(max,-1E99);
+   //SETVS(min,1E99);
 }
 
 /*
@@ -682,6 +699,7 @@ real xrand(real lo, real hi){
 
 void Main::updateTopLevelMoments(){
   int depth = log8floor(numTreePieces);
+  CkPrintf("[main]: updateTopLevelMoments(%d)\n", depth);
   moments((nodeptr)G_root, depth);
 }
 
@@ -694,14 +712,18 @@ nodeptr Main::moments(nodeptr node, int depth){
     nodeptr child = Subp(node)[i];
     if(child != NULL){
       nodeptr mom = moments(child, depth-1);
+      CkPrintf("node 0x%x with node 0x%x (%d) (%f,%f,%f)\n", node, mom, i, Pos(mom)[0], Pos(mom)[1], Pos(mom)[2]);
       Mass(node) += Mass(mom);
       Cost(node) += Cost(mom);
       MULVS(tmpv, Pos(mom), Mass(mom));
+      //CkPrintf("tmpv: (%f,%f,%f)\n", tmpv[0], tmpv[1], tmpv[2]);
       ADDV(Pos(node), Pos(node), tmpv);
-      DIVVS(Pos(node), Pos(node), Mass(node));
+      //CkPrintf("add Pos(node): (%f,%f,%f)\n", Pos(node)[0], Pos(node)[1], Pos(node)[2]);
     }
   }
-  Done(node) = TRUE;
+  DIVVS(Pos(node), Pos(node), Mass(node));
+  //CkPrintf("div Pos(node): (%f,%f,%f)\n", Pos(node)[0], Pos(node)[1], Pos(node)[2]);
+  //Done(node) = TRUE;
 }
 
 #ifdef PRINT_TREE
@@ -718,7 +740,7 @@ void Main::graph(){
   while(!nodes.isEmpty()){
     nodeptr curnode = nodes.deq();
     
-    myfile << (CmiUInt8)curnode << " [label=\"" << "("<< (CmiUInt8)curnode << ", " << Mass(curnode) << ")" << "\"];"<< endl;
+    myfile << (CmiUInt8)curnode << " [label=\"" << "("<< (CmiUInt8)curnode << ", " << Mass(curnode) << ")" << "\\n (" << Pos(curnode)[0] << "," << Pos(curnode)[1] << "," << Pos(curnode)[2] << ") " << "\"];"<< endl;
     //CkPrintf("deq 0x%x\n", curnode);
     for(int i = 0; i < NSUB; i++){
       nodeptr childnode = Subp(curnode)[i];
@@ -729,7 +751,7 @@ void Main::graph(){
         }
         else if(Type(childnode) == LEAF){
           myfile << (CmiUInt8)curnode << "->" << (CmiUInt8)childnode << endl;
-          myfile << (CmiUInt8)childnode << " [label=\"" << "("<< ((leafptr)childnode)->num_bodies << ", " << Mass(childnode) << ")" << "\"];"<< endl;
+          myfile << (CmiUInt8)childnode << " [label=\"" << "("<< ((leafptr)childnode)->num_bodies << ", " << Mass(childnode) << ")" << "\\n (" << Pos(childnode)[0] << "," << Pos(childnode)[1] << "," << Pos(childnode)[2] << ") " << "\"];"<< endl;
         }
         //CkPrintf("enq 0x%x\n", childnode);
       }

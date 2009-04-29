@@ -1,7 +1,7 @@
-OPTS=-g -DPRINT_TREE
+OPTS=-g -DPRINT_TREE -DPARTITION -DFORCES
 CHARMC=../../../multicore-linux64/bin/charmc $(OPTS)
 
-OBJS = TreePiece.o ParticleChunk.o Main.o 
+OBJS = TreePiece.o ParticleChunk.o Main.o grav.o 
 #PROJ= -tracemode projections -tracemode summary
 
 all: barnes 
@@ -9,13 +9,16 @@ all: barnes
 barnes: $(OBJS)
 	$(CHARMC) -language charm++ -o barnes $(OBJS) $(PROJ) 
 
-ParticleChunk.o: ParticleChunk.cpp barnes.decl.h
+grav.o: grav.C barnes.h
+	$(CHARMC) -c grav.C
+
+ParticleChunk.o: ParticleChunk.cpp barnes.decl.h barnes.h
 	$(CHARMC) -c ParticleChunk.cpp
 
-TreePiece.o: TreePiece.cpp barnes.decl.h
+TreePiece.o: TreePiece.cpp barnes.decl.h barnes.h
 	$(CHARMC) -c TreePiece.cpp
 
-Main.o: Main.cpp barnes.decl.h
+Main.o: Main.cpp barnes.decl.h barnes.h
 	$(CHARMC) -c Main.cpp
 
 barnes.decl.h: barnes.ci

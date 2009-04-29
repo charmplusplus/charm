@@ -118,42 +118,92 @@ unsigned int ProcessId;
   //BARRIER(Global->Barstart,NPROC);
 }
 
-/*
-void ParticleChunk::startIteration(CkCallback &cb_){
-  mainCb = cb_; 
+void ParticleChunk::acceptRoot(CmiUInt8 root_, CkCallback &mainCb_){
+  mainCb = mainCb_;
+  G_root = (cellptr) root_;
+  CkPrintf("[%d] acceptRoot 0x%x\n", thisIndex, G_root);
+  CkCallback cb(CkIndex_ParticleChunk::stepsystemPartII(0), thisProxy);
+  contribute(0,0,CkReduction::concat,cb);
+}
+
+void ParticleChunk::partition(CkCallback &cb){
   int ProcessId = thisIndex;
-  stepsystem(ProcessId);
+  HouseKeep(); 
+  real Cavg = (real) Cost(G_root) / (real)NPROC ;
+  workMin = (int) (Cavg * ProcessId);
+  workMax = (int) (Cavg * (ProcessId + 1) + (ProcessId == (NPROC - 1)));
+  CkPrintf("[%d] cost(root) = %f, workMin: %f, workMax: %f\n", ProcessId, Cavg, workMin, workMax);
+
+  mynbody = 0;
+  // find_my_bodies(Global->G_root, 0, BRC_FUC, ProcessId );
+  find_my_bodies((nodeptr)G_root, 0, BRC_FUC, ProcessId);
+  contribute(0,0,CkReduction::concat,cb);
 }
-*/
 
+void ParticleChunk::HouseKeep(){
+  myn2bcalc = mynbccalc = myselfint = 0;
+}
 
-/*
- * STEPSYSTEM: advance N-body system one time-step.
- */
+void ParticleChunk::find_my_bodies(nodeptr mycell, int work, int direction, unsigned ProcessId){
+  int i;
+  leafptr l;
+  nodeptr qptr;
 
-/*
-void ParticleChunk::stepsystem (unsigned int ProcessId)
+  if (Type(mycell) == LEAF) {
+    l = (leafptr) mycell;      
+    for (i = 0; i < l->num_bodies; i++) {                                                            
+      if (work >= workMin-.1) {                                                  
+        if((mynbody) > maxmybody) {                                             
+          CkPrintf("[%d] find_my_bodies: needs more than %d bodies; increase fleaves. mynbody: %d\n",ProcessId, maxmybody, mynbody); 
+        }    
+        mybodytab[mynbody++] = Bodyp(l)[i];
+      }                                                                                             
+      work += Cost(Bodyp(l)[i]);                                                                    
+      if (work >= workMax-.1) {                                                    
+        break;
+      }                                                                                             
+    }                                                                                                
+  }
+  else {
+    for(i = 0; (i < NSUB) && (work < (workMax - .1)); i++){                         
+      qptr = Subp(mycell)[Child_Sequence[direction][i]];                                            
+      if (qptr!=NULL) {                                                                             
+        if ((work+Cost(qptr)) >= (workMin -.1)) {                                 
+          find_my_bodies(qptr,work, Direction_Sequence[direction][i],                             
+              ProcessId);                                                              
+        }
+        work += Cost(qptr);                                                                        
+      } 
+    }
+  }  
+}
+
+void ParticleChunk::ComputeForces (CkCallback &cb)
 {
+   bodyptr p,*pp;
+   vector acc1, dacc, dvel, vel1, dpos;
+   unsigned ProcessId = thisIndex;
 
-    if (nstep == 2) {
-    }
+   for (pp = mybodytab; pp < mybodytab+mynbody; pp++) {  
+      p = *pp;
+      SETV(acc1, Acc(p));
+      Cost(p)=0;
+      hackgrav(p,ProcessId);
+      myn2bcalc += myn2bterm; 
+      mynbccalc += mynbcterm;
+      if (skipself) {       /*   did we miss self-int?  */
+	 myselfint++;        /*   count another goofup   */
+      }
+      if (nstep > 0) {
+	 /*   use change in accel to make 2nd order correction to vel      */
+	 SUBV(dacc, Acc(p), acc1);
+	 MULVS(dvel, dacc, dthf);
+	 ADDV(Vel(p), Vel(p), dvel);
+      }
+   }
 
-    if ((ProcessId == 0) && (nstep >= 2)) {
-        //CLOCK(trackstart);
-    }
-
-    if (ProcessId == 0) {
-      // init_root bcasts root to all chunks
-      // in the associated entry method, 
-      // chunks contribute to continue with stepsystemPartII
-      // init_root(ProcessId);
-    }
-    else {
-       //mynumcell = 0;
-       //mynumleaf = 0;
-    }
+   contribute(0,0,CkReduction::concat,cb);
 }
-*/
 
 void ParticleChunk::stepsystemPartII(CkReductionMsg *msg){
 
@@ -174,21 +224,6 @@ void ParticleChunk::stepsystemPartII(CkReductionMsg *msg){
         //CLOCK(treebuildend);
         //Global->treebuildtime += treebuildend - treebuildstart;
     }
-    
-    /* 
-     * FIXME - do something here. this was supposed to begin
-     * hackcofm, but since we have already decided that that
-     * should happen when the trees have completed their build
-     * process, perhaps this doesn't serve any purpose after all
-     */
-
-    /*
-    // instead of barrier inside maketree:
-    CkCallback cb(CkIndex_TreePiece::stepsystemPartIIb(), thisProxy);
-    // stepsystemPartIIb
-    contribute(0,0,CkReduction::concat,cb);
-    */
-
 }
 
 /*
@@ -216,13 +251,6 @@ void ParticleChunk::maketree(unsigned int ProcessId)
 		 ProcessId, p);	
       }
    }
-
-    /**
-     * FIXME - initiate hackcofm somewhere
-     */
-   //BARRIER(Global->Bartree,NPROC);
-   // hackcofm( 0, ProcessId );
-   //BARRIER(Global->Barcom,NPROC);
 }
 
 /*
@@ -244,44 +272,6 @@ ParticleChunk::loadtree(bodyptr p, cellptr root, unsigned ProcessId)
    leafptr le;
 
    CkAssert(intcoord(xp, Pos(p)));
-   /*
-   valid_root = TRUE;
-   for (i = 0; i < NDIM; i++) {
-      xor[i] = xp[i] ^ Root_Coords[i];
-   }
-   for (i = IMAX >> 1; i > Level(root); i >>= 1) {
-      for (j = 0; j < NDIM; j++) {
-	 if (xor[j] & i) {
-	    valid_root = FALSE;
-	    break;
-	 }
-      }
-      if (!valid_root) {
-	 break;
-      }
-   }
-   if (!valid_root) {
-      if (root != Global->G_root) {
-	 root_level = Level(root);
-	 for (j = i; j > root_level; j >>= 1) {
-	    root = (cellptr) Parent(root);
-	 }
-	 valid_root = TRUE;
-	 for (i = IMAX >> 1; i > Level(root); i >>= 1) {
-	    for (j = 0; j < NDIM; j++) {
-	       if (xor[j] & i) {
-		  valid_root = FALSE;
-		  break;
-	       }
-	    }
-	    if (!valid_root) {
-	       printf("P%d body %d\n", ProcessId, p - bodytab);
-	       root = Global->G_root;
-	    }
-	 }
-      }
-   }
-   */
    root = G_root;
    mynode = (nodeptr) root;
    kidIndex = subindex(xp, Level(mynode));
@@ -308,56 +298,6 @@ ParticleChunk::loadtree(bodyptr p, cellptr root, unsigned ProcessId)
    if(howMany == MAX_PARTICLES_PER_MSG-1){ // enough particles to send 
      sendParticlesToTp(whichTp);
    }
-
-   // this part should be done by the treepieces themselves
-   /*
-   flag = TRUE;
-   while (flag) {                          
-      if (l == 0) {
-	 error("not enough levels in tree\n");
-      }
-      if (*qptr == NULL) { 
-	 ALOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
-	 if (*qptr == NULL) {
-	    le = InitLeaf((cellptr) mynode, ProcessId);
-	    Parent(p) = (nodeptr) le;
-	    Level(p) = l;
-	    ChildNum(p) = le->num_bodies;
-	    ChildNum(le) = kidIndex;
-	    Bodyp(le)[le->num_bodies++] = p;
-	    *qptr = (nodeptr) le;
-	    flag = FALSE;
-	 }
-	 AULOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
-      }
-      if (flag && *qptr && (Type(*qptr) == LEAF)) {
-	 ALOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
-	 if (Type(*qptr) == LEAF) {             
-	    le = (leafptr) *qptr;
-	    if (le->num_bodies == MAX_BODIES_PER_LEAF) {
-	       *qptr = (nodeptr) SubdivideLeaf(le, (cellptr) mynode, l,
-						  ProcessId);
-	    }
-	    else {
-	       Parent(p) = (nodeptr) le;
-	       Level(p) = l;
-	       ChildNum(p) = le->num_bodies;
-	       Bodyp(le)[le->num_bodies++] = p;
-	       flag = FALSE;
-	    }
-	 }
-	 AULOCK(CellLock->CL, ((cellptr) mynode)->seqnum % MAXLOCK);
-      }
-      if (flag) {
-	 mynode = *qptr;
-         kidIndex = subindex(xp, l);
-	 qptr = &Subp(*qptr)[kidIndex];  
-	 l = l >> 1;                            
-      }
-   }
-   SETV(Local[ProcessId].Root_Coords, xp);
-   return Parent((leafptr) *qptr);
-   */
 }
 
 void ParticleChunk::flushParticles(){
@@ -397,124 +337,69 @@ void ParticleChunk::doneTreeBuild(){
   mainCb.send();
 }
 
-/*
-void ParticleChunk::recvTotalMsgCounts(CkReductionMsg *msg){
-  int *counts = (int *)msg->getData();
-  for(int i = 0; i < numTreePieces; i++){
-    pieces[i].recvTotalMsgCountsFromChunks(counts[i]);
-  }
-  delete msg;
-}
-*/
+void ParticleChunk::advance(){
+  /* advance my bodies */
+  vector max, min;
+  SETVS(min,1E99);
+  SETVS(max,-1E99);
 
-void ParticleChunk::stepsystemPartIII(CkReductionMsg *msg){
+  for (pp = mybodytab; pp < mybodytab+mynbody; pp++) {
+    p = *pp;
+    MULVS(dvel, Acc(p), dthf);
+    ADDV(vel1, Vel(p), dvel);
+    MULVS(dpos, vel1, dtime);
+    ADDV(Pos(p), Pos(p), dpos);
+    ADDV(Vel(p), vel1, dvel);
 
-    delete msg;
-    
-    /*
-    unsigned int ProcessId = thisIndex;
-    unsigned int NPROC = numParticleChunks;
-
-    Housekeep(ProcessId);
-
-    Cavg = (real) Cost(G_root) / (real)NPROC ;
-    Local[ProcessId].workMin = (int) (Cavg * ProcessId);
-    Local[ProcessId].workMax = (int) (Cavg * (ProcessId + 1)
-				      + (ProcessId == (NPROC - 1)));
-
-    if ((ProcessId == 0) && (Local[ProcessId].nstep >= 2)) {
-        CLOCK(partitionstart);
-    }
-
-    Local[ProcessId].mynbody = 0;
-    find_my_bodies(Global->G_root, 0, BRC_FUC, ProcessId );
-
-//     B*RRIER(Global->Barcom,NPROC);
-    if ((ProcessId == 0) && (Local[ProcessId].nstep >= 2)) {
-        CLOCK(partitionend);
-        Global->partitiontime += partitionend - partitionstart;
-    }
-
-    if ((ProcessId == 0) && (Local[ProcessId].nstep >= 2)) {
-        CLOCK(forcecalcstart);
-    }
-
-    ComputeForces(ProcessId);
-
-    if ((ProcessId == 0) && (Local[ProcessId].nstep >= 2)) {
-        CLOCK(forcecalcend);
-        Global->forcecalctime += forcecalcend - forcecalcstart;
-    }
-
-    // advance my bodies 
-    for (pp = Local[ProcessId].mybodytab;
-	 pp < Local[ProcessId].mybodytab+Local[ProcessId].mynbody; pp++) {
-       p = *pp;
-       MULVS(dvel, Acc(p), dthf);              
-       ADDV(vel1, Vel(p), dvel);               
-       MULVS(dpos, vel1, dtime);               
-       ADDV(Pos(p), Pos(p), dpos);             
-       ADDV(Vel(p), vel1, dvel);               
-        
-       for (i = 0; i < NDIM; i++) {
-          if (Pos(p)[i]<Local[ProcessId].min[i]) {
-	     Local[ProcessId].min[i]=Pos(p)[i];
-	  }
-          if (Pos(p)[i]>Local[ProcessId].max[i]) {
-	     Local[ProcessId].max[i]=Pos(p)[i] ;
-	  }
-       }
-    }
-    LOCK(Global->CountLock);
     for (i = 0; i < NDIM; i++) {
-       if (Global->min[i] > Local[ProcessId].min[i]) {
-	  Global->min[i] = Local[ProcessId].min[i];
-       }
-       if (Global->max[i] < Local[ProcessId].max[i]) {
-	  Global->max[i] = Local[ProcessId].max[i];
-       }
-    }
-    UNLOCK(Global->CountLock);
-
-    // bar needed to make sure that every process has computed its min 
-    // and max coordinates, and has accumulated them into the global   
-    // min and max, before the new dimensions are computed	       
-    BARRIER(Global->Barpos,NPROC);
-
-    if ((ProcessId == 0) && (Local[ProcessId].nstep >= 2)) {
-        CLOCK(trackend);
-        Global->tracktime += trackend - trackstart;
-    }
-    if (ProcessId==0) {
-      Global->rsize=0;
-      SUBV(Global->max,Global->max,Global->min);
-      for (i = 0; i < NDIM; i++) {
-	if (Global->rsize < Global->max[i]) {
-	   Global->rsize = Global->max[i];
-	}
+      if (Pos(p)[i]<min[i]) {
+        min[i]=Pos(p)[i];
       }
-      ADDVS(Global->rmin,Global->min,-Global->rsize/100000.0);
-      Global->rsize = 1.00002*Global->rsize;
-      SETVS(Global->min,1E99);
-      SETVS(Global->max,-1E99);
+      if (Pos(p)[i]>max[i]) {
+        max[i]=Pos(p)[i] ;
+      }
     }
-    Local[ProcessId].nstep++;
-    Local[ProcessId].tnow = Local[ProcessId].tnow + dtime;
-    */
-}
+  }
 
-void ParticleChunk::acceptRoot(CmiUInt8 root_, CkCallback &mainCb_){
-  mainCb = mainCb_;
-  G_root = (cellptr) root_;
-  CkPrintf("[%d] acceptRoot 0x%x\n", thisIndex, G_root);
-  CkCallback cb(CkIndex_ParticleChunk::stepsystemPartII(0), thisProxy);
-  contribute(0,0,CkReduction::concat,cb);
-}
+  /*
+  LOCK(Global->CountLock);
+  for (i = 0; i < NDIM; i++) {
+    if (Global->min[i] > min[i]) {
+      Global->min[i] = min[i];
+    }
+    if (Global->max[i] < max[i]) {
+      Global->max[i] = max[i];
+    }
+  }
+  UNLOCK(Global->CountLock);
+  */
 
-/*
-CkReductionMsg *chunksToPiecesReducer (int nmsg, CkReductionMsg **msgs){
+  // FIXME - start here; contribute max,min to global max and min
+
+  /* bar needed to make sure that every process has computed its min */
+  /* and max coordinates, and has accumulated them into the global   */
+  /* min and max, before the new dimensions are computed             */
+  BARRIER(Global->Barpos,NPROC);
+
+  /*
+  if ((ProcessId == 0) && (nstep >= 2)) {
+    CLOCK(trackend);
+    Global->tracktime += trackend - trackstart;
+  }
+  */
+  if (ProcessId==0) {
+    Global->rsize=0;
+    SUBV(Global->max,Global->max,Global->min);
+    for (i = 0; i < NDIM; i++) {
+      if (Global->rsize < Global->max[i]) {
+        Global->rsize = Global->max[i];
+      }
+    }
+    ADDVS(Global->rmin,Global->min,-Global->rsize/100000.0);
+    Global->rsize = 1.00002*Global->rsize;
+    SETVS(Global->min,1E99);
+    SETVS(Global->max,-1E99);
+  }
+  nstep++;
+  tnow = tnow + dtime;
 }
-void registerChunksToPiecesReducer(){
-  chunksToPiecesReducerType = CkReduction::addReducer(chunksToPiecesReducer);
-}
-*/
