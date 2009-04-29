@@ -24,6 +24,8 @@ real dthf;
 vector rmin;
 real rsize;
 
+int maxmycell;
+int maxmyleaf;
 
 
 int log8floor(int arg){
@@ -204,12 +206,19 @@ int Main::createTopLevelTree(cellptr node, int depth){
     ParentOf(child) = (nodeptr) node;
     ChildNum(child) = i;
     Level(child) = Level(node) >> 1;
+
+    Mass(child) = 0.0;
+    Cost(child) = 0;
+    CLRV(Pos(child));
+
     numCellsMade++;
     numCellsMade += createTopLevelTree((cellptr) Subp(node)[i], depth-1);
   }
 
   return numCellsMade;
 }
+
+
 
 
 
@@ -228,12 +237,18 @@ void Main::startSimulation(){
     // send root to chunk
     chunks.acceptRoot((CmiUInt8)G_root, CkCallbackResumeThread());
     // chunks.startIteration(CkCallbackResumeThread());
+    
+    // update top-level nodes' moments here, since all treepieces have 
+    // completed calculating theirs
+    updateTopLevelMoments();
 #ifdef PRINT_TREE
     graph();
 #endif
     CkExit();
   }
 }
+
+
 
 /*
  * TAB_INIT : allocate body and cell data space
@@ -244,7 +259,6 @@ Main::tab_init()
 
   /*allocate space for personal lists of body pointers */
   maxmybody = (nbody+maxleaf*MAX_BODIES_PER_LEAF)/NPROC; 
-  // FIXME - this should be a member of ParticleChunk
   mybodytab = (bodyptr*) G_MALLOC(NPROC*maxmybody*sizeof(bodyptr));
   /* space is allocated so that every */
   /* process can have a maximum of maxmybody pointers to bodies */ 
@@ -253,8 +267,10 @@ Main::tab_init()
   /* file is read */
   maxmycell = maxcell / NPROC;
   maxmyleaf = maxleaf / NPROC;
-  //mycelltab = (cellptr*) G_MALLOC(NPROC*maxmycell*sizeof(cellptr));
-  //myleaftab = (leafptr*) G_MALLOC(NPROC*maxmyleaf*sizeof(leafptr));
+  /*
+  mycelltab = (cellptr*) G_MALLOC(NPROC*maxmycell*sizeof(cellptr));
+  myleaftab = (leafptr*) G_MALLOC(NPROC*maxmyleaf*sizeof(leafptr));
+  */
 
 }
 
@@ -664,6 +680,30 @@ real xrand(real lo, real hi){
   return ran;
 }
 
+void Main::updateTopLevelMoments(){
+  int depth = log8floor(numTreePieces);
+  moments((nodeptr)G_root, depth);
+}
+
+nodeptr Main::moments(nodeptr node, int depth){
+  vector tmpv;
+  if(depth == 0){
+    return node;
+  }
+  for(int i = 0; i < NSUB; i++){
+    nodeptr child = Subp(node)[i];
+    if(child != NULL){
+      nodeptr mom = moments(child, depth-1);
+      Mass(node) += Mass(mom);
+      Cost(node) += Cost(mom);
+      MULVS(tmpv, Pos(mom), Mass(mom));
+      ADDV(Pos(node), Pos(node), tmpv);
+      DIVVS(Pos(node), Pos(node), Mass(node));
+    }
+  }
+  Done(node) = TRUE;
+}
+
 #ifdef PRINT_TREE
 void Main::graph(){
   ofstream myfile;
@@ -677,6 +717,8 @@ void Main::graph(){
   nodes.enq((nodeptr)G_root);
   while(!nodes.isEmpty()){
     nodeptr curnode = nodes.deq();
+    
+    myfile << (CmiUInt8)curnode << " [label=\"" << "("<< (CmiUInt8)curnode << ", " << Mass(curnode) << ")" << "\"];"<< endl;
     //CkPrintf("deq 0x%x\n", curnode);
     for(int i = 0; i < NSUB; i++){
       nodeptr childnode = Subp(curnode)[i];
@@ -687,7 +729,7 @@ void Main::graph(){
         }
         else if(Type(childnode) == LEAF){
           myfile << (CmiUInt8)curnode << "->" << (CmiUInt8)childnode << endl;
-          myfile << (CmiUInt8)childnode << " [label=\"" << "("<< ((leafptr)childnode)->num_bodies << ")" << "\"];"<< endl;
+          myfile << (CmiUInt8)childnode << " [label=\"" << "("<< ((leafptr)childnode)->num_bodies << ", " << Mass(childnode) << ")" << "\"];"<< endl;
         }
         //CkPrintf("enq 0x%x\n", childnode);
       }

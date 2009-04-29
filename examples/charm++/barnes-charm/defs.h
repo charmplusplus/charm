@@ -303,6 +303,8 @@ typedef struct _cell {
      PUParray(p,subp,NSUB);
 #ifdef QUADPOLE
      // FIXME matrix: quad
+#error "Must implement pup for matrix first"
+
      CkAbort("Must implement pup for matrix first\n");
 #endif
      PUParray(p,pos,NDIM);

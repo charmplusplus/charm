@@ -15,12 +15,14 @@ ParticleChunk::ParticleChunk(int mleaf, int mcell){
   numMsgsToEachTp = new int[numTreePieces];
   particlesToTps.resize(numTreePieces);
   for(int i = 0; i < numTreePieces; i++){
+    numMsgsToEachTp[i] = 0;
     particlesToTps[i].reserve(MAX_PARTICLES_PER_MSG);
   }
 
 };
 
 void ParticleChunk::SlaveStart(CmiUInt8 bodyptrstart_, CmiUInt8 bodystart_, CkCallback &cb_){
+//void ParticleChunk::SlaveStart(CmiUInt8 bodyptrstart_, CmiUInt8 bodystart_, CmiUInt8 mct_, CmiUInt8 mlt_, CkCallback &cb_){
   unsigned int ProcessId;
 
   /* Get unique ProcessId */
@@ -28,6 +30,10 @@ void ParticleChunk::SlaveStart(CmiUInt8 bodyptrstart_, CmiUInt8 bodystart_, CkCa
 
   bodyptr *bodyptrstart = (bodyptr *)bodyptrstart_;
   bodyptr bodystart = (bodyptr)bodystart_;
+  /*
+  cellptr *cellptrstart = (cellptr *)mct_;
+  leafptr *leafptrstart = (leafptr *)mlt_;
+  */
 
 
   /* POSSIBLE ENHANCEMENT:  Here is where one might pin processes to
@@ -36,13 +42,15 @@ void ParticleChunk::SlaveStart(CmiUInt8 bodyptrstart_, CmiUInt8 bodystart_, CkCa
   /* initialize mybodytabs */
   mybodytab = bodyptrstart + (maxmybody * ProcessId);
   bodytab = bodystart;
+
+  /*
+  mycelltab = cellstart + (maxmycell * ProcessId);
+  myleaftab = leafstart + (maxmyleaf * ProcessId);
+  */
   /* note that every process has its own copy   */
   /* of mybodytab, which was initialized to the */
   /* beginning of the whole array by proc. 0    */
   /* before create                              */
-  // j: we don't need these data structures
-  //mycelltab = cellstart + (maxmycell * ProcessId);
-  //myleaftab = leafstart + (maxmyleaf * ProcessId);
   /* POSSIBLE ENHANCEMENT:  Here is where one might distribute the
      data across physically distributed memories as desired. 
 

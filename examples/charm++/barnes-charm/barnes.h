@@ -40,6 +40,10 @@ extern real dthf;
 extern vector rmin;
 extern real rsize;
 
+extern int maxmycell;
+extern int maxmyleaf;
+
+
 
 class ParticleMsg : public CMessage_ParticleMsg {
   public:
@@ -76,8 +80,6 @@ class Main : public CBase_Main {
   int maxleaf;
   int maxcell;
   int maxmybody;
-  int maxmycell;
-  int maxmyleaf;
 
   string infile;
   string outfile;
@@ -113,6 +115,9 @@ class Main : public CBase_Main {
   int createTopLevelTree(cellptr node, int depth);
   cellptr G_root; 
   CkVec<nodeptr> topLevelRoots;
+
+  void updateTopLevelMoments();
+  nodeptr moments(nodeptr node, int depth);
 
 #ifdef PRINT_TREE
   void graph();
@@ -169,6 +174,7 @@ class ParticleChunk : public CBase_ParticleChunk {
 
   //void SlaveStart(bodyptr *bb, bodyptr b, CkCallback &cb);
   void SlaveStart(CmiUInt8 bb, CmiUInt8 b, CkCallback &cb);
+  //void SlaveStart(CmiUInt8 bb, CmiUInt8 b, CmiUInt8 mct, CmiUInt8 mlt, CkCallback &cb);
   //void startIteration(CkCallback &cb);
   void acceptRoot(CmiUInt8 root, CkCallback &cb);
   //void stepsystem(unsigned ProcessId);
@@ -200,12 +206,22 @@ class TreePiece : public CBase_TreePiece {
   CkArrayIndex1D parentIndex;
   int pendingChildren;
 
-  cellptr myRoot;
+  nodeptr myRoot;
   nodeptr parent;
   int whichChildAmI;
   int childrenTreePieces[NSUB];
 
+  cellptr *mycelltab;
+  leafptr *myleaftab;
+  int mynleaf;
+  int myncell;
+
+
   void checkCompletion();
+  leafptr InitLeaf(cellptr parent, unsigned ProcessId);
+  cellptr InitCell(cellptr parent, unsigned ProcessId);
+  void hackcofm(int nc, unsigned ProcessId);
+  void updateMoments(int which);
 
   public:
   TreePiece(CmiUInt8 parent, int whichChild, bool isTopLevel, int level, CkArrayIndex1D parent);
@@ -221,7 +237,7 @@ class TreePiece : public CBase_TreePiece {
   void recvParticles(ParticleMsg *msg);
   nodeptr loadtree(bodyptr p, cellptr root, unsigned int ProcessId);
   cellptr SubdivideLeaf (leafptr le, cellptr parent, unsigned int l, unsigned int ProcessId);
-  void childDone(int which);
+  void childDone(int which, bool childRootValid);
 
 };
 
@@ -229,8 +245,6 @@ int subindex(int *xp, int level);
 bool intcoord(int *xp, vector p);
 cellptr makecell(unsigned ProcessId);
 leafptr makeleaf(unsigned ProcessId);
-leafptr InitLeaf(cellptr parent, unsigned ProcessId);
-cellptr InitCell(cellptr parent, unsigned ProcessId);
 int log8floor(int arg);
 
 real xrand(real lo, real hi);

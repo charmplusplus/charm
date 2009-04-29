@@ -35,12 +35,13 @@ mainmodule barnes {
     entry void recvParticles(ParticleMsg *msg);
     entry void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
     entry void recvTotalMsgCountsFromPieces(int totalNumFromParent);
-    entry void childDone(int which);
+    entry void childDone(int which, bool childRootValid);
   };
 
   array [1D] ParticleChunk {
     entry ParticleChunk(int n1, int n2);
-    entry void SlaveStart(CmiUInt8 mybodytab, CmiUInt8 bodytab, CkCallback &cb);
+    entry void SlaveStart(CmiUInt8 bb, CmiUInt8 b, CkCallback &cb);
+    //entry void SlaveStart(CmiUInt8 bb, CmiUInt8 b, CmiUInt8 mct, CmiUInt8 mlt, CkCallback &cb);
     // entry void startIteration(CkCallback &cb);
     entry void acceptRoot(CmiUInt8, CkCallback &cb);
     entry void stepsystemPartII(CkReductionMsg *msg);
