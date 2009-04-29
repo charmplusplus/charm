@@ -444,13 +444,14 @@ void HybridBaseLB::Loadbalancing(int atlevel)
     // send to children 
     //CmiPrintf("[%d] level: %d nclients:%d children: %d %d\n", CkMyPe(), atlevel, nclients, lData->children[0], lData->children[1]);
     thisProxy.ReceiveMigration(migrateMsg, nclients, lData->children);
-    CkPrintf("[%d] ReceiveMigration takes %f \n", CkMyPe(), CkWallTimer()-strat_end_time);
+    // CkPrintf("[%d] ReceiveMigration takes %f \n", CkMyPe(), CkWallTimer()-strat_end_time);
   }
 
   if (atlevel == tree->numLevels()-1) {
-    if (_lb_args.debug()>0)
+    if (_lb_args.debug()>0){
         CkPrintf("[%d] Level %d Strat elapsed time %f\n", CkMyPe(), atlevel, strat_end_time-start_lb_time);
-    CkPrintf("[%d] %s memUsage: %.2fKB\n", CkMyPe(), lbName(), (1.0*useMem())/1024);
+    	CkPrintf("[%d] %s memUsage: %.2fKB\n", CkMyPe(), lbName(), (1.0*useMem())/1024);
+    }
   }
 
   // inform new objects that are from outside group
