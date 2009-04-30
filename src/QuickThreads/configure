@@ -3,6 +3,8 @@
 CHARMINC=".."
 . ../conv-config.sh
 
+echo "Running configure on $CMK_QT"
+
 if [ ! -r mkfiles/$CMK_QT ] ; then
     echo "Usage: configure <version>"
     echo ""
