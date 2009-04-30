@@ -1322,7 +1322,7 @@ char *input_scanf_chars(fmt)
     char *tmp=tmpnam(NULL);/*This was once /tmp/fnord*/
 #endif
     unlink(tmp);
-    fd = open(tmp,O_RDWR | O_CREAT | O_TRUNC, 0666);
+    fd = open(tmp,O_RDWR | O_CREAT | O_TRUNC, 0664);
     if (fd<0) { 
       fprintf(stderr,"cannot open temp file /tmp/fnord");
       exit(1);
