@@ -389,7 +389,7 @@ fmain-ok: fmain.f90
 	-@touch fmain-ok
 
 QUICK_THREADS: $(CVHEADERS)
-	-( cd QuickThreads && make clean )
+	-( cd QuickThreads && $(MAKE) clean )
 	( cd QuickThreads;./configure )
 	( cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS)' )
 	cp -f QuickThreads/libqt.a ../lib/libckqt.a
