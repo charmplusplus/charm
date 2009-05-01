@@ -23,12 +23,15 @@ real tol;
 real tolsq;
 real dtout;
 real dthf;
+/*
 vector rmin;
 real rsize;
+*/
 
 int maxmycell;
 int maxmyleaf;
 
+CkReduction::reducerType minmax_RealVectorType;
 
 int log8floor(int arg){
   int ret = -1;
@@ -67,6 +70,8 @@ void Main::initoutput()
 
 Main::Main(CkArgMsg *m){
   int c;
+
+  mainChare = thisProxy;
 
 /*
   while ((c = getopt(m->argc, m->argv, "h")) != -1) {
@@ -132,15 +137,13 @@ Main::Main(CkArgMsg *m){
   maxmycell = maxcell/NPROC;
 
 
-  // FIXME - get numTreePieces from arguments
   // create chunks, treepieces
   CProxy_BlockMap myMap=CProxy_BlockMap::ckNew(); 
   CkArrayOptions opts(numTreePieces); 
   opts.setMap(myMap);
-  // FIXME - level of top-level trees
   int depth = log8floor(numTreePieces);
   ckout << "top-level pieces depth: " << (depth+1) << ", " << (IMAX >> (depth+1)) << endl;
-  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew((CmiUInt8)0,-1,true,(IMAX >> (depth+1)), CkArrayIndex1D(0), opts);
+  CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew((CmiUInt8)0,-1,(IMAX >> (depth+1)), CkArrayIndex1D(0), opts);
   pieces = treeProxy;
 
   myMap=CProxy_BlockMap::ckNew(); 
@@ -195,7 +198,9 @@ int Main::createTopLevelTree(cellptr node, int depth){
   if(depth == 1){
     // lowest level, no more children will be created - save self
     int index = topLevelRoots.push_back_v((nodeptr) node);
+#ifdef VERBOSE_MAIN
     CkPrintf("saving root %d 0x%x\n", index, node);
+#endif
     return 0;
   }
   
@@ -234,30 +239,46 @@ void Main::startSimulation(){
   chunks.SlaveStart((CmiUInt8)mybodytab, (CmiUInt8)bodytab, CkCallbackResumeThread());
   //chunks.SlaveStart(mybodytab, mycelltab, myleaftab, CkCallbackResumeThread());
 
+  double start;
+  double end;
+
   /* main loop */
   while (tnow < tstop + 0.1 * dtime) {
     // create top-level tree
+    CkPrintf("[main] rmin: (%f,%f,%f), rsize: %f\n", rmin[0], rmin[1], rmin[2], rsize);
+    start = CmiWallTimer();
     init_root(-1);
     // send roots to pieces
-    pieces.acceptRoots((CmiUInt8)topLevelRoots.getVec(), CkCallbackResumeThread());
+    pieces.acceptRoots((CmiUInt8)topLevelRoots.getVec(), rsize, rmin[0], rmin[1], rmin[2], CkCallbackResumeThread());
     // send root to chunk
-    chunks.acceptRoot((CmiUInt8)G_root, CkCallbackResumeThread());
+    chunks.acceptRoot((CmiUInt8)G_root, rmin[0], rmin[1], rmin[2], rsize, CkCallbackResumeThread());
     // chunks.startIteration(CkCallbackResumeThread());
     
     // update top-level nodes' moments here, since all treepieces have 
     // completed calculating theirs
     updateTopLevelMoments();
+    end = CmiWallTimer();
+    CkPrintf("[main] tnow: %f Tree building ...  %f\n", tnow, (end-start)/1e6);
 #ifdef PRINT_TREE
     graph();
 #endif
 #ifdef PARTITION
+    start = CmiWallTimer();
     chunks.partition(CkCallbackResumeThread());
+    end = CmiWallTimer();
+    CkPrintf("[main] Partitioning ...  %f\n", (end-start)/1e6);
 #endif
 #ifdef FORCES
+    start = CmiWallTimer();
     chunks.ComputeForces(CkCallbackResumeThread());
+    end = CmiWallTimer();
+    CkPrintf("[main] Forces ...  %f\n", (end-start)/1e6);
 #endif
 #ifdef ADVANCE
+    start = CmiWallTimer();
     chunks.advance(CkCallbackResumeThread());
+    end = CmiWallTimer();
+    CkPrintf("[main] Advance ... %f\n", (end-start)/1e6);
 #endif
     CkExit();
   }
@@ -699,7 +720,9 @@ real xrand(real lo, real hi){
 
 void Main::updateTopLevelMoments(){
   int depth = log8floor(numTreePieces);
+#ifdef VERBOSE_MAIN
   CkPrintf("[main]: updateTopLevelMoments(%d)\n", depth);
+#endif
   moments((nodeptr)G_root, depth);
 }
 
@@ -712,7 +735,9 @@ nodeptr Main::moments(nodeptr node, int depth){
     nodeptr child = Subp(node)[i];
     if(child != NULL){
       nodeptr mom = moments(child, depth-1);
+#ifdef VERBOSE_MAIN
       CkPrintf("node 0x%x with node 0x%x (%d) (%f,%f,%f)\n", node, mom, i, Pos(mom)[0], Pos(mom)[1], Pos(mom)[2]);
+#endif
       Mass(node) += Mass(mom);
       Cost(node) += Cost(mom);
       MULVS(tmpv, Pos(mom), Mass(mom));
@@ -765,4 +790,53 @@ void Main::graph(){
 }
 #endif
 
+CkReductionMsg *minmax_RealVector(int nmsg, CkReductionMsg **msgs){
+  real minmax[NDIM*2];
+
+  SETVS(minmax,1E99);
+  SETVS((minmax+NDIM),-1E99);
+
+  for(int j = 0; j < nmsg; j++){
+    CkAssert(msgs[j]->getSize() == NDIM*2*sizeof(real));
+    real *tmp = (real *) msgs[j]->getData();
+    real *min = tmp;
+    real *max = tmp+NDIM;
+    for (int i = 0; i < NDIM; i++) {
+      if (minmax[i] > min[i]) {
+        minmax[i] = min[i];
+      }
+      if (minmax[NDIM+i] < max[i]) {
+        minmax[NDIM+i] = max[i];
+      }
+    }
+  }
+
+  return CkReductionMsg::buildNew(NDIM*2*sizeof(real), minmax);
+}
+
+void register_minmax_RealVector(){
+  // CkPrintf("REGISTERING reducer\n");
+  minmax_RealVectorType = CkReduction::addReducer(minmax_RealVector); 
+}
+
+void Main::recvGlobalSizes(CkReductionMsg *msg){
+  real *tmp = (real *)msg->getData();
+  real *min = tmp;
+  real *max = tmp+NDIM;
+
+  rsize=0;
+  SUBV(max,max,min);
+  for (int i = 0; i < NDIM; i++) {
+    if (rsize < max[i]) {
+      rsize = max[i];
+    }
+  }
+  ADDVS(rmin,min,-rsize/100000.0);
+  rsize = 1.00002*rsize;
+  //SETVS(min,1E99);
+  //SETVS(max,-1E99);
+  chunks.cleanup();
+
+  delete msg;
+}
 #include "barnes.def.h"

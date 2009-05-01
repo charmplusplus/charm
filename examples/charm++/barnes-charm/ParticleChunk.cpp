@@ -118,10 +118,17 @@ unsigned int ProcessId;
   //BARRIER(Global->Barstart,NPROC);
 }
 
-void ParticleChunk::acceptRoot(CmiUInt8 root_, CkCallback &mainCb_){
+void ParticleChunk::acceptRoot(CmiUInt8 root_, real rminx, real rminy, real rminz, real rs, CkCallback &mainCb_){
   mainCb = mainCb_;
   G_root = (cellptr) root_;
+  rsize = rs;
+  rmin[0] = rminx;
+  rmin[1] = rminy;
+  rmin[2] = rminz;
+
+#ifdef VERBOSE_CHUNKS
   CkPrintf("[%d] acceptRoot 0x%x\n", thisIndex, G_root);
+#endif
   CkCallback cb(CkIndex_ParticleChunk::stepsystemPartII(0), thisProxy);
   contribute(0,0,CkReduction::concat,cb);
 }
@@ -132,7 +139,9 @@ void ParticleChunk::partition(CkCallback &cb){
   real Cavg = (real) Cost(G_root) / (real)NPROC ;
   workMin = (int) (Cavg * ProcessId);
   workMax = (int) (Cavg * (ProcessId + 1) + (ProcessId == (NPROC - 1)));
+#ifdef VERBOSE_CHUNKS
   CkPrintf("[%d] cost(root) = %f, workMin: %f, workMax: %f\n", ProcessId, Cavg, workMin, workMax);
+#endif
 
   mynbody = 0;
   // find_my_bodies(Global->G_root, 0, BRC_FUC, ProcessId );
@@ -271,7 +280,7 @@ ParticleChunk::loadtree(bodyptr p, cellptr root, unsigned ProcessId)
    cellptr c;
    leafptr le;
 
-   CkAssert(intcoord(xp, Pos(p)));
+   CkAssert(intcoord(xp, Pos(p), rmin, rsize));
    root = G_root;
    mynode = (nodeptr) root;
    kidIndex = subindex(xp, Level(mynode));
@@ -311,7 +320,9 @@ void ParticleChunk::flushParticles(){
 void ParticleChunk::sendParticlesToTp(int tp){
   int len = particlesToTps[tp].length();
   if(len > 0){
+#ifdef VERBOSE_CHUNKS
     CkPrintf("[%d] sending %d particles to piece %d\n", thisIndex, len, tp);
+#endif
     ParticleMsg *msg = new (len) ParticleMsg(); 
     memcpy(msg->particles, particlesToTps[tp].getVec(), len*sizeof(bodyptr));
     /*
@@ -333,15 +344,24 @@ void ParticleChunk::doneSendingParticles(){
 }
 
 void ParticleChunk::doneTreeBuild(){
+#ifdef VERBOSE_CHUNKS
   CkPrintf("[%d] all pieces have completed buildTree()\n", thisIndex);
+#endif
   mainCb.send();
 }
 
-void ParticleChunk::advance(){
+void ParticleChunk::advance(CkCallback &cb_){
   /* advance my bodies */
-  vector max, min;
-  SETVS(min,1E99);
-  SETVS(max,-1E99);
+  //vector max, min;
+
+  real minmax[NDIM*2];
+  int i;                                      
+  bodyptr p,*pp;                                                          
+  vector acc1, dacc, dvel, vel1, dpos;
+
+  mainCb = cb_;
+  SETVS(minmax,1E99);
+  SETVS((minmax+NDIM),-1E99);
 
   for (pp = mybodytab; pp < mybodytab+mynbody; pp++) {
     p = *pp;
@@ -352,54 +372,35 @@ void ParticleChunk::advance(){
     ADDV(Vel(p), vel1, dvel);
 
     for (i = 0; i < NDIM; i++) {
-      if (Pos(p)[i]<min[i]) {
-        min[i]=Pos(p)[i];
+      if (Pos(p)[i]<minmax[i]) {
+        minmax[i]=Pos(p)[i];
       }
-      if (Pos(p)[i]>max[i]) {
-        max[i]=Pos(p)[i] ;
+      if (Pos(p)[i]>minmax[NDIM+i]) {
+        minmax[NDIM+i]=Pos(p)[i] ;
       }
     }
   }
 
   /*
-  LOCK(Global->CountLock);
-  for (i = 0; i < NDIM; i++) {
-    if (Global->min[i] > min[i]) {
-      Global->min[i] = min[i];
-    }
-    if (Global->max[i] < max[i]) {
-      Global->max[i] = max[i];
-    }
-  }
-  UNLOCK(Global->CountLock);
-  */
+     LOCK(Global->CountLock);
+     for (i = 0; i < NDIM; i++) {
+     if (Global->min[i] > min[i]) {
+     Global->min[i] = min[i];
+     }
+     if (Global->max[i] < max[i]) {
+     Global->max[i] = max[i];
+     }
+     }
+     UNLOCK(Global->CountLock);
+     */
 
-  // FIXME - start here; contribute max,min to global max and min
+  CkCallback cb(CkIndex_Main::recvGlobalSizes(NULL), mainChare);
+  contribute(NDIM*2*sizeof(real), minmax, minmax_RealVectorType, cb);
+}
 
-  /* bar needed to make sure that every process has computed its min */
-  /* and max coordinates, and has accumulated them into the global   */
-  /* min and max, before the new dimensions are computed             */
-  BARRIER(Global->Barpos,NPROC);
-
-  /*
-  if ((ProcessId == 0) && (nstep >= 2)) {
-    CLOCK(trackend);
-    Global->tracktime += trackend - trackstart;
-  }
-  */
-  if (ProcessId==0) {
-    Global->rsize=0;
-    SUBV(Global->max,Global->max,Global->min);
-    for (i = 0; i < NDIM; i++) {
-      if (Global->rsize < Global->max[i]) {
-        Global->rsize = Global->max[i];
-      }
-    }
-    ADDVS(Global->rmin,Global->min,-Global->rsize/100000.0);
-    Global->rsize = 1.00002*Global->rsize;
-    SETVS(Global->min,1E99);
-    SETVS(Global->max,-1E99);
-  }
+void ParticleChunk::cleanup(){
   nstep++;
   tnow = tnow + dtime;
+  contribute(0,0,CkReduction::concat,mainCb);
 }
+

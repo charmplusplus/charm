@@ -39,12 +39,15 @@ extern real tol;
 extern real tolsq;
 extern real dtout;
 extern real dthf;
+/*
 extern vector rmin;
 extern real rsize;
+*/
 
 extern int maxmycell;
 extern int maxmyleaf;
 
+extern CkReduction::reducerType minmax_RealVectorType;
 
 
 class ParticleMsg : public CMessage_ParticleMsg {
@@ -88,6 +91,9 @@ class Main : public CBase_Main {
   real tnow;
   real tout;
   real mymtot;
+
+  vector rmin;
+  real rsize;
   
   // these are used instead of proc. 0's data structures
   bodyptr *mybodytab;
@@ -134,6 +140,8 @@ class Main : public CBase_Main {
   void Help();
   void tab_init();
   void setbound();
+
+  void recvGlobalSizes(CkReductionMsg *msg);
 
 };
 
@@ -183,6 +191,9 @@ class ParticleChunk : public CBase_ParticleChunk {
   real workMin;
   real workMax;
 
+  real rsize;
+  vector rmin;
+
   
   void hackgrav(bodyptr p, unsigned ProcessId);
   void gravsub(nodeptr p, unsigned ProcessId);
@@ -203,7 +214,7 @@ class ParticleChunk : public CBase_ParticleChunk {
   void SlaveStart(CmiUInt8 bb, CmiUInt8 b, CkCallback &cb);
   //void SlaveStart(CmiUInt8 bb, CmiUInt8 b, CmiUInt8 mct, CmiUInt8 mlt, CkCallback &cb);
   //void startIteration(CkCallback &cb);
-  void acceptRoot(CmiUInt8 root, CkCallback &cb);
+  void acceptRoot(CmiUInt8 root, real rx, real ry, real rz, real rs, CkCallback &cb);
   void stepsystemPartII(CkReductionMsg *msg);
 
   void maketree(unsigned int ProcessId);
@@ -215,6 +226,7 @@ class ParticleChunk : public CBase_ParticleChunk {
   void partition(CkCallback &cb);
   void ComputeForces(CkCallback &cb);
   void advance(CkCallback &cb);
+  void cleanup();
 };
 
 class TreePiece : public CBase_TreePiece {
@@ -251,12 +263,16 @@ class TreePiece : public CBase_TreePiece {
   void hackcofm(int nc, unsigned ProcessId);
   void updateMoments(int which);
 
+  real rsize;
+  vector rmin;
+
   public:
-  TreePiece(CmiUInt8 parent, int whichChild, bool isTopLevel, int level, CkArrayIndex1D parent);
+  TreePiece(CmiUInt8 parent, int whichChild, int level, CkArrayIndex1D parent);
+  TreePiece(CmiUInt8 p, int which, int level, real rx, real ry, real rz, real rs, CkArrayIndex1D parent); 
   TreePiece(CkMigrateMessage *m){}
   // used to convey message counts from chunks to top-level
   // treepieces
-  void acceptRoots(CmiUInt8 root, CkCallback &cb);
+  void acceptRoots(CmiUInt8 root, real rsize, real rminx, real rminy, real rminz, CkCallback &cb);
   void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
   // used to convey message counts from treepieces to their
   // children
@@ -270,7 +286,7 @@ class TreePiece : public CBase_TreePiece {
 };
 
 int subindex(int *xp, int level);
-bool intcoord(int *xp, vector p);
+bool intcoord(int *xp, vector p, vector rmin, real rsize);
 cellptr makecell(unsigned ProcessId);
 leafptr makeleaf(unsigned ProcessId);
 int log8floor(int arg);

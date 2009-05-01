@@ -1,20 +1,20 @@
 #include "barnes.h"
 
-TreePiece::TreePiece(CmiUInt8 p_, int which, bool isTopLevel_, int level_, CkArrayIndex1D parentIdx){
-  isTopLevel = isTopLevel_;
+TreePiece::TreePiece(CmiUInt8 p_, int which, int level_,  real rx, real ry, real rz, real rs, CkArrayIndex1D parentIdx){
   nodeptr p;
+  isTopLevel = false;
+  
+  rmin[0] = rx;
+  rmin[1] = ry;
+  rmin[2] = rz;
+
+  rsize = rs;
+
   myLevel = level_;
-  if(!isTopLevel_){
-    whichChildAmI = which;
-    parentIndex = parentIdx;
-    // save parent
-    parent = (nodeptr)p_;
-  }
-  else{
-    // don't save parent if top-level tp. parent will be set by
-    // acceptroots
-    whichChildAmI = thisIndex;
-  }
+  whichChildAmI = which;
+  parentIndex = parentIdx;
+  // save parent
+  parent = (nodeptr)p_;
 
   mycelltab.reserve(maxmycell);
   myleaftab.reserve(maxmyleaf);
@@ -25,7 +25,7 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, bool isTopLevel_, int level_, CkArr
   numRecvdMsgs = 0;
   haveChildren = false;
   myNumParticles = 0;
-  
+
   myncell = 0;
   mynleaf = 0;
 
@@ -41,7 +41,49 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, bool isTopLevel_, int level_, CkArr
 #endif
 }
 
-void TreePiece::acceptRoots(CmiUInt8 roots_, CkCallback &cb){
+TreePiece::TreePiece(CmiUInt8 p_, int which, int level_, CkArrayIndex1D parentIdx){
+  isTopLevel = true;
+  nodeptr p;
+  myLevel = level_;
+  // don't save parent if top-level tp. parent will be set by
+  // acceptroots
+  whichChildAmI = thisIndex;
+
+  mycelltab.reserve(maxmycell);
+  myleaftab.reserve(maxmyleaf);
+
+  myRoot = NULL;
+
+  numTotalMsgs = -1;
+  numRecvdMsgs = 0;
+  haveChildren = false;
+  myNumParticles = 0;
+
+  myncell = 0;
+  mynleaf = 0;
+
+  haveCounts = false;
+
+  for(int i = 0; i < NSUB; i++){
+    sentTo[i] = 0;
+  }
+
+#ifdef MEMCHECK
+  CkPrintf("piece %d after construction\n", thisIndex);
+  CmiMemoryCheck();
+#endif
+}
+
+void TreePiece::acceptRoots(CmiUInt8 roots_, real rsize_, real rmx, real rmy, real rmz, CkCallback &cb){
+  rsize = rsize_;
+  rmin[0] = rmx;
+  rmin[1] = rmy;
+  rmin[2] = rmz;
+
+#ifdef VERBOSE_PIECES
+  CkPrintf("piece %d acceptRoot rmin: (%f,%f,%f) rsize: %f\n", thisIndex, rmin[0], rmin[1], rmin[2], rsize);
+#endif
+
   if(isTopLevel){
 #ifdef MEMCHECK
   CkPrintf("piece %d before acceptRoots \n", thisIndex);
@@ -55,7 +97,9 @@ void TreePiece::acceptRoots(CmiUInt8 roots_, CkCallback &cb){
   CmiMemoryCheck();
 #endif
 
+#ifdef VERBOSE_PIECES
     CkPrintf("piece [%d] acceptRoot parent 0x%x\n", thisIndex, parent);
+#endif
   }
   contribute(0,0,CkReduction::concat,cb);
 }
@@ -67,7 +111,9 @@ void TreePiece::recvTotalMsgCountsFromPieces(int totalNumFromParent){
 #endif
   CkAssert(!isTopLevel);
   numTotalMsgs = totalNumFromParent;
+#ifdef VERBOSE_PIECES
   CkPrintf("piece %d got count from PARENT: %d\n", thisIndex, numTotalMsgs);
+#endif
   haveCounts = true;
   checkCompletion();
 #ifdef MEMCHECK
@@ -89,7 +135,9 @@ void TreePiece::recvTotalMsgCountsFromChunks(CkReductionMsg *msg){
     numTotalMsgs = data[thisIndex]; /* between 0 and numTreePieces, 
                                        which is the number of 
                                        top-level treepieces */
+#ifdef VERBOSE_PIECES
     CkPrintf("piece %d got count from CHUNKS: %d (%d)\n", thisIndex, numTotalMsgs, nelts);
+#endif
     haveCounts = true;
     checkCompletion();
 #ifdef MEMCHECK
@@ -105,32 +153,46 @@ void TreePiece::checkCompletion(){
   CkPrintf("piece %d before checkCompletion \n", thisIndex);
   CmiMemoryCheck();
 #endif
+#ifdef VERBOSE_PIECES
   CkPrintf("piece %d checkcompletion, recvd %d, total %d\n", thisIndex, numRecvdMsgs, numTotalMsgs);
+#endif
   if(numRecvdMsgs == numTotalMsgs){
+#ifdef VERBOSE_PIECES
     CkPrintf("piece %d has all particles\n", thisIndex);
+#endif
     // the parent will not send any more messages
     if(haveChildren){
       // tell children that they will not receive any more messages 
       for(int i = 0; i < NSUB; i++){
         int child = childrenTreePieces[i];
+#ifdef VERBOSE_PIECES
         CkPrintf("piece %d -> child %d, total messages sentTo: %d\n", thisIndex, child, sentTo[i]);
+#endif
         pieces[child].recvTotalMsgCountsFromPieces(sentTo[i]);
       }
+#ifdef VERBOSE_PIECES
       CkPrintf("piece %d fake doneTreeBuild()\n", thisIndex);
+#endif
     }
     else{
       // don't have children, build own tree
+#ifdef VERBOSE_PIECES
       CkPrintf("piece %d doesn't have children, building tree\n", thisIndex);
+#endif
       buildTree();
       hackcofm(0,thisIndex);
       if(!isTopLevel){
         // once you've built your own tree, 
         // you must notify your parent that you're done
+#ifdef VERBOSE_PIECES
         CkPrintf("piece %d real !topLevel doneTreeBuild()\n", thisIndex);
+#endif
         pieces[parentIndex].childDone(whichChildAmI);
       }
       else{
+#ifdef VERBOSE_PIECES
         CkPrintf("piece %d real topLevel doneTreeBuild()\n", thisIndex);
+#endif
       }
       CkCallback cb(CkIndex_ParticleChunk::doneTreeBuild(), CkArrayIndex1D(0), chunks);
       contribute(0,0,CkReduction::concat,cb);
@@ -147,7 +209,9 @@ void TreePiece::childDone(int which){
   
   // 'which' child just finished building its tree (and hence calculating
   // moments. add these to your own. 
+#ifdef VERBOSE_PIECES
   CkPrintf("piece %d child %d done, updateMoments\n", thisIndex, which);
+#endif
   updateMoments(which);
 
   if(pendingChildren == 0){
@@ -156,10 +220,14 @@ void TreePiece::childDone(int which){
     CkPrintf("piece %d before childDone \n", thisIndex);
     CmiMemoryCheck();
 #endif
+#ifdef VERBOSE_PIECES
     CkPrintf("piece %d all children done\n", thisIndex);
+#endif
     if(!isTopLevel){
       // talk to parent
+#ifdef VERBOSE_PIECES
       CkPrintf("piece %d (whichChildAmI: %d) -> parent %d, i'm done\n", thisIndex, whichChildAmI, parentIndex.index);
+#endif
       pieces[parentIndex].childDone(whichChildAmI);
     }
     CkCallback cb(CkIndex_ParticleChunk::doneTreeBuild(), CkArrayIndex1D(0), chunks);
@@ -179,7 +247,9 @@ void TreePiece::recvParticles(ParticleMsg *msg){
   CkPrintf("piece %d before recvParticles \n", thisIndex);
   CmiMemoryCheck();
 #endif
+#ifdef VERBOSE_PIECES
   CkPrintf("piece %d recvd %d particles, numRecvdMsgs: %d\n", thisIndex, msg->num, numRecvdMsgs);
+#endif
   /*
   for(int i = 0; i < msg->num; i++){
     CkPrintf("piece %d 0x%x\n", thisIndex, msg->particles[i]);
@@ -190,7 +260,9 @@ void TreePiece::recvParticles(ParticleMsg *msg){
 
   if(newtotal > maxPartsPerTp && newtotal > MAX_BODIES_PER_LEAF && !haveChildren){
     // insert children into pieces array
+#ifdef VERBOSE_PIECES
     CkPrintf("piece %d has too many (%d+%d) particles; creating children\n", thisIndex, myNumParticles, msg->num);
+#endif
     // first create own root
     myRoot = (nodeptr) InitCell((cellptr)parent, thisIndex);
     Subp(parent)[whichChildAmI] = myRoot;
@@ -200,8 +272,10 @@ void TreePiece::recvParticles(ParticleMsg *msg){
 
     for(int i = 0; i < NSUB; i++){
       int child = NSUB*thisIndex+numTreePieces+i;
+#ifdef VERBOSE_PIECES
       CkPrintf("piece %d inserting child %d\n", thisIndex, child);
-      pieces[child].insert((CmiUInt8)myRoot, i, false, myLevel >> 1, thisIndex);
+#endif
+      pieces[child].insert((CmiUInt8)myRoot, i, myLevel >> 1, rmin[0], rmin[1], rmin[2], rsize, thisIndex);
       childrenTreePieces[i] = child;
     }
     haveChildren = true;
@@ -213,7 +287,9 @@ void TreePiece::recvParticles(ParticleMsg *msg){
   }
 
   if(haveChildren){
+#ifdef VERBOSE_PIECES
     CkPrintf("piece %d has children\n", thisIndex);
+#endif
     CkVec<CkVec<bodyptr> > partsToChild;
     partsToChild.resize(NSUB);
     //partsToChild.length() = 0;
@@ -226,7 +302,7 @@ void TreePiece::recvParticles(ParticleMsg *msg){
       int c; // part i goes to child c
       int relc; // index of child relative to this node (0..NSUB)
       p = myParticles[i]; 
-      CkAssert(intcoord(xp,Pos(p)));
+      CkAssert(intcoord(xp,Pos(p),rmin,rsize));
       relc = subindex(xp,Level(myRoot));
       //c = NSUB*thisIndex + numTreePieces + relc;
       partsToChild[relc].push_back(myParticles[i]);
@@ -239,7 +315,7 @@ void TreePiece::recvParticles(ParticleMsg *msg){
       int c; // part i goes to child c
       int relc; // index of child relative to this node (0..NSUB)
       p = particles[i]; 
-      CkAssert(intcoord(xp,Pos(p)));
+      CkAssert(intcoord(xp,Pos(p),rmin,rsize));
       relc = subindex(xp,Level(myRoot));
       //c = NSUB*thisIndex + numTreePieces + relc;
       partsToChild[relc].push_back(particles[i]);
@@ -262,7 +338,9 @@ void TreePiece::recvParticles(ParticleMsg *msg){
         sentTo[c]++;
         int tochild = childrenTreePieces[c];
         pieces[tochild].recvParticles(amsg);
+#ifdef VERBOSE_PIECES
         CkPrintf("piece %d sent %d particles to child %d. sentTo[%d] = %d\n", thisIndex, len, tochild, c, sentTo[c]);
+#endif
 
         /*
         for(int i = 0; i < amsg->num; i++){
@@ -273,7 +351,9 @@ void TreePiece::recvParticles(ParticleMsg *msg){
     }
   }
   else{
+#ifdef VERBOSE_PIECES
     CkPrintf("piece %d adding %d particles to self (%d), total: %d\n", thisIndex, msg->num, myNumParticles, myNumParticles+msg->num);
+#endif
     
     // this is how many particles we had before expanding
     int savedpos = myNumParticles;
@@ -363,7 +443,7 @@ nodeptr TreePiece::loadtree(bodyptr p, cellptr root, unsigned int ProcessId){
   CkPrintf("piece %d before loadtree\n", thisIndex);
   CmiMemoryCheck();
 #endif
-  CkAssert(intcoord(xp, Pos(p)));
+  CkAssert(intcoord(xp, Pos(p),rmin,rsize));
   valid_root = TRUE;
   /*
   for (i = 0; i < NDIM; i++) {
@@ -597,7 +677,7 @@ TreePiece::SubdivideLeaf (leafptr le, cellptr parent_, unsigned int l, unsigned 
    ChildNum(c) = ChildNum(le);
    /* do first particle separately, so we can reuse le */
    p = bodies[0];
-   CkAssert(intcoord(xp, Pos(p)));
+   CkAssert(intcoord(xp, Pos(p),rmin,rsize));
    index = subindex(xp, l);
    Subp(c)[index] = (nodeptr) le;
    ChildNum(le) = index;
@@ -612,7 +692,7 @@ TreePiece::SubdivideLeaf (leafptr le, cellptr parent_, unsigned int l, unsigned 
    /* now handle the rest */
    for (i = 1; i < num_bodies; i++) {
       p = bodies[i];
-      CkAssert(intcoord(xp, Pos(p)));
+      CkAssert(intcoord(xp, Pos(p),rmin,rsize));
       index = subindex(xp, l);
       if (!Subp(c)[index]) {
 	 le = InitLeaf(c, ProcessId);
@@ -687,7 +767,7 @@ int subindex(int x[NDIM], int l)
 /* * INTCOORD: compute integerized coordinates.  * Returns: TRUE
 unless rp was out of bounds.  */
 
-bool intcoord(int *xp, vector rp)
+bool intcoord(int *xp, vector rp, vector rmin, real rsize)
 {
    int k;
    bool inb;
