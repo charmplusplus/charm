@@ -141,3 +141,13 @@ void BgWriteTimelines(int seqno, BgTimeLineRec *tlinerecs, int nlocalProcs, char
 }
 
 
+void * BgSplitEntry(const char* name, void **parentlogs, int n)
+{
+  void *curLog = NULL;
+  stopVTimer();
+  if (genTimeLog) curLog = tTIMELINEREC.logSplit(name, (BgTimeLog **)parentlogs, n);
+  startVTimer();
+  return curLog;
+}
+
+

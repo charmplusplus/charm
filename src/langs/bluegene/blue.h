@@ -253,6 +253,7 @@ void BgStartCorrection();
 
 void *BgCreateEvent(int eidx);
 void BgEntrySplit(const char *name);
+void * BgSplitEntry(const char* name, void **parentlogs, int n);
 void bgAddProjEvent(void *data, int idx, double t, 
 		    bgEventCallBackFn fn, void *uptr, int eType);
 void bgUpdateProj(int eType);

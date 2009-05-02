@@ -591,6 +591,30 @@ void BgTimeLineRec::logEntrySplit(const char *name)
   bgCurLog = newLog;
 }
 
+// split log, insert backdeps in array parentlogs, size of n
+BgTimeLog * BgTimeLineRec::logSplit(const char *name, BgTimeLog **parentlogs, int n)
+{
+  CmiAssert(genTimeLog);
+  if (!genTimeLog) return NULL;
+  BgTimeLog *curLog;
+  if (n == 0)  {
+    curLog = timeline.length()?timeline[timeline.length()-1]:NULL;
+    if (curLog != NULL) {
+      parentlogs = &curLog;
+      n = 1;
+    }
+  }
+  logEntryClose();
+
+  // make up a new bglog to start, setting up dependencies.
+  BgTimeLog *newLog = new BgTimeLog(-1, (char*)name, timerFunc());
+  for (int i=0; i<n; i++)
+    newLog->addBackwardDep(parentlogs[i]);
+  logEntryInsert(newLog);
+  bgCurLog = newLog;
+  return newLog;
+}
+
 BgTimeLog *
 BgTimeLineRec::getTimeLogOnThread(const BgMsgID &msgId, int *index)
 {

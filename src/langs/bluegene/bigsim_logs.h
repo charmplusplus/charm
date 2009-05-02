@@ -307,6 +307,7 @@ public:
   void logEntryStart(BgTimeLog* log);
   void logEntryClose();
   void logEntrySplit(const char *name = "split-broadcast");
+  BgTimeLog *logSplit(const char *name, BgTimeLog **parentlogs, int n);
   BgTimeLog *getTimeLogOnThread(const BgMsgID &msgId, int *index);
 
   void pup(PUP::er &p);
