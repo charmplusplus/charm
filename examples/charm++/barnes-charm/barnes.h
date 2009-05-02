@@ -129,6 +129,8 @@ class Main : public CBase_Main {
 #ifdef PRINT_TREE
   void graph();
 #endif
+
+  void inputdata();
   
   public:
   Main(CkArgMsg *m);
@@ -233,6 +235,9 @@ class TreePiece : public CBase_TreePiece {
 
   int mynumcell;
   int mynumleaf;
+
+  // for debugging purposes
+  int done;
  
   bool isTopLevel;
   int myLevel;
@@ -292,5 +297,7 @@ leafptr makeleaf(unsigned ProcessId);
 int log8floor(int arg);
 
 real xrand(real lo, real hi);
+void pranset(int seed);
+double prand();
 
 #endif

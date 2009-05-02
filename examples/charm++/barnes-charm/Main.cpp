@@ -121,6 +121,9 @@ Main::Main(CkArgMsg *m){
   if(maxPartsPerTp < 0){
     maxPartsPerTp = MAX_PARTS_PER_TP;
   }
+  else if(maxPartsPerTp < MAX_BODIES_PER_LEAF){
+    maxPartsPerTp = MAX_BODIES_PER_LEAF;
+  }
 
   numParticleChunks = NPROC;
   numTreePieces = getiparam("pieces");
@@ -183,9 +186,9 @@ void Main::init_root (unsigned int ProcessId)
   */
   Level(G_root) = IMAX >> 1;
   
-  ckout << "[main] Creating top-level tree, depth: " << depth << " root: " << G_root << endl;
+  CkPrintf("[main] Creating top-level tree, depth: %d, root: 0x%x\n", depth, G_root);
   int totalNumCellsMade = createTopLevelTree(G_root, depth);
-  ckout << "totalNumCellsMade: " << totalNumCellsMade+1 << endl;
+  CkPrintf("totalNumCellsMade: %d\n", totalNumCellsMade+1);
   //chunks.acceptRoot((CmiUInt8) G_root);
   /*
   for (i = 0; i < NSUB; i++) {
@@ -258,7 +261,7 @@ void Main::startSimulation(){
     // completed calculating theirs
     updateTopLevelMoments();
     end = CmiWallTimer();
-    CkPrintf("[main] tnow: %f Tree building ...  %f\n", tnow, (end-start)/1e6);
+    CkPrintf("[main] tnow: %f Tree building ...  %f s\n", tnow, (end-start));
 #ifdef PRINT_TREE
     graph();
 #endif
@@ -266,19 +269,19 @@ void Main::startSimulation(){
     start = CmiWallTimer();
     chunks.partition(CkCallbackResumeThread());
     end = CmiWallTimer();
-    CkPrintf("[main] Partitioning ...  %f\n", (end-start)/1e6);
+    CkPrintf("[main] Partitioning ...  %f s\n", (end-start));
 #endif
 #ifdef FORCES
     start = CmiWallTimer();
     chunks.ComputeForces(CkCallbackResumeThread());
     end = CmiWallTimer();
-    CkPrintf("[main] Forces ...  %f\n", (end-start)/1e6);
+    CkPrintf("[main] Forces ...  %f s\n", (end-start));
 #endif
 #ifdef ADVANCE
     start = CmiWallTimer();
     chunks.advance(CkCallbackResumeThread());
     end = CmiWallTimer();
-    CkPrintf("[main] Advance ... %f\n", (end-start)/1e6);
+    CkPrintf("[main] Advance ... %f s\n", (end-start));
 #endif
     CkExit();
   }
@@ -297,6 +300,7 @@ Main::tab_init()
   maxmybody = (real)(nbody+maxleaf*MAX_BODIES_PER_LEAF)/(real) NPROC; 
   CkPrintf("[main] maxmybody: %d\n", maxmybody);
   mybodytab = (bodyptr*) G_MALLOC(NPROC*maxmybody*sizeof(bodyptr));
+  CkAssert(mybodytab);
   /* space is allocated so that every */
   /* process can have a maximum of maxmybody pointers to bodies */ 
   /* then there is an array of bodies called bodytab which is  */
@@ -378,8 +382,8 @@ void Main::startrun()
 
    infile = getparam("in");
    if (!infile.empty()) {
-     // FIXME - enable
-      //inputdata();
+     CkPrintf("[main] input file: %s\n", infile.c_str());
+     inputdata();
    }
    else {
       nbody = getiparam("nbody");
@@ -429,8 +433,11 @@ void Main::startrun()
    if(NPROC < 0)
      NPROC = 1;
 
-   srand(seed);
-   testdata();
+   pranset(seed);
+
+   if(infile.empty()){
+    testdata();
+   }
    setbound();
    tout = tnow + dtout;
 }
@@ -488,6 +495,7 @@ void Main::testdata()
    //headline = "Hack code: Plummer model";
    tnow = 0.0;
    bodytab = (bodyptr) G_MALLOC(nbody * sizeof(body));
+   CkAssert(bodytab);
    if (bodytab == NULL) {
       ckerr << "testdata: not enuf memory\n";
    }
@@ -713,11 +721,6 @@ string Main::extrvalue(string &arg)
    return (string());
 }
 
-real xrand(real lo, real hi){
-  real ran = lo+hi*drand48();
-  return ran;
-}
-
 void Main::updateTopLevelMoments(){
   int depth = log8floor(numTreePieces);
 #ifdef VERBOSE_MAIN
@@ -757,6 +760,7 @@ void Main::graph(){
   ostringstream ostr;
 
   ostr << "tree." << nbody << "." << maxPartsPerTp << ".dot";
+  CkPrintf("[main] output file name: %s\n", ostr.str().c_str());
   myfile.open(ostr.str().c_str());
   myfile << "digraph tree_" << nbody << "_" << maxPartsPerTp <<" {" << endl;
   CkQ<nodeptr> nodes(4096);
