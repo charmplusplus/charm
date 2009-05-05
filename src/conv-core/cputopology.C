@@ -27,6 +27,10 @@
 #include "TopoManager.h"
 #endif
 
+#if CMK_CRAYXT
+extern "C" int getXTNodeID(int mype, int numpes);
+#endif
+
 #if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
 #include <Carbon/Carbon.h>
 #include <Multiprocessing.h>
@@ -236,10 +240,6 @@ extern "C" void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num)
   if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].getVec();
 }
 
-#if CMK_CRAYXT
-extern "C" int getXTNodeID(int mype, int numpes);
-#endif
-
 static int _noip = 0;
 
 extern "C" void CmiInitCPUTopology(char **argv)
@@ -301,7 +301,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
     cpuTopo.nodeIDs[i] = nid;
   }
   cpuTopo.sort();
-#elif
+#else
   /* get my ip address */
   if (CmiMyRank() == 0)
   {
