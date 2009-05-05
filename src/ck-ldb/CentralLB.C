@@ -23,7 +23,7 @@
    /* can not handle reduction in inmem FT */
 #define USE_REDUCTION         0
 #define USE_LDB_SPANNING_TREE 0
-#elif defind(_FAULT_MLOG_)
+#elif defined(_FAULT_MLOG_)
 /* can not handle reduction in inmem FT */
 #define USE_REDUCTION         0
 #define USE_LDB_SPANNING_TREE 0
