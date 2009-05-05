@@ -186,6 +186,10 @@ public:
 #if BLOCKMAPPING
         int blkSize = totalElems/CkNumPes();
         penum = (elem/blkSize)%CkNumPes();
+#elif NODECYCLICMAPPING
+	int nid = (elem/CkMyNodeSize())%CkNumNodes();
+	int cid = elem % CkMyNodeSize();
+	penum = CkNodeFirst(nid)+cid; 
 #else
         //Default is RoundRobin Mapping
         penum = elem%CkNumPes();
