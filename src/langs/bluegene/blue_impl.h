@@ -201,15 +201,25 @@ public:
 
     /* map global serial number to (x,y,z) ++++ */
   inline static void Global2XYZ(int seq, int *x, int *y, int *z) {
+    /** OLD SCHEME:
     *x = seq / (cva(bgMach).y * cva(bgMach).z);
     *y = (seq - *x * cva(bgMach).y * cva(bgMach).z) / cva(bgMach).z;
-    *z = (seq - *x * cva(bgMach).y * cva(bgMach).z) % cva(bgMach).z;
+    *z = (seq - *x * cva(bgMach).y * cva(bgMach).z) % cva(bgMach).z; */
+
+    /* assumed TXYZ */
+    *x = seq % cva(bgMach).x;
+    *y = (seq % (cva(bgMach).x * cva(bgMach).y)) / cva(bgMach).x;
+    *z = seq / (cva(bgMach).x * cva(bgMach).y);
   }
 
 
     /* calculate global serial number of (x,y,z) ++++ */
   inline static int XYZ2Global(int x, int y, int z) {
-    return x*(cva(bgMach).y * cva(bgMach).z) + y*cva(bgMach).z + z;
+    /** OLD SCHEME:
+    return x*(cva(bgMach).y * cva(bgMach).z) + y*cva(bgMach).z + z; */
+
+    /* assumed TXYZ */
+    return x + y*cva(bgMach).x + z*(cva(bgMach).x * cva(bgMach).y);
   }
 
     /* map (x,y,z) to emulator PE ++++ */
@@ -326,15 +336,25 @@ public:
 
     /* map global serial node number to (x,y,z) ++++ */
   inline static void Global2XYZ(int seq, int *x, int *y, int *z) {
+    /** OLD SCHEME:
     *x = seq / (cva(bgMach).y * cva(bgMach).z);
     *y = (seq - *x * cva(bgMach).y * cva(bgMach).z) / cva(bgMach).z;
-    *z = (seq - *x * cva(bgMach).y * cva(bgMach).z) % cva(bgMach).z;
+    *z = (seq - *x * cva(bgMach).y * cva(bgMach).z) % cva(bgMach).z; */
+
+    /* assumed TXYZ */
+    *x = seq % cva(bgMach).x;
+    *y = (seq % (cva(bgMach).x * cva(bgMach).y)) / cva(bgMach).x;
+    *z = seq / (cva(bgMach).x * cva(bgMach).y);
   }
 
 
     /* calculate global serial number of (x,y,z) ++++ */
   inline static int XYZ2Global(int x, int y, int z) {
-    return x*(cva(bgMach).y * cva(bgMach).z) + y*cva(bgMach).z + z;
+    /** OLD SCHEME:
+    return x*(cva(bgMach).y * cva(bgMach).z) + y*cva(bgMach).z + z; */
+
+    /* assumed TXYZ */
+    return x + y*cva(bgMach).x + z*(cva(bgMach).x * cva(bgMach).y);
   }
 
     /* map (x,y,z) to emulator PE ++++ */
