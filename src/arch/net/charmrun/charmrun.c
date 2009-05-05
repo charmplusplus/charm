@@ -1734,7 +1734,7 @@ void error_in_req_serve_client(SOCKET fd){
 	/*anounce_crash(socket_index,crashed_node);*/
 	restart_node(crashed_node);
 	
-	fprintf(stdout,"charmrun says Processor %d failed Node %d\n",crashed_pe,crashed_node);
+	fprintf(stdout,"charmrun says Processor %d failed on Node %d\n",crashed_pe,crashed_node);
 	/** after the crashed processor has been recreated 
 	 it connects to charmrun. That data must now be filled 
 	 into the req_nClients array and the nodetab_table*/
@@ -2783,7 +2783,7 @@ void rsh_Find(FILE *f,const char *program,const char *dest)
     fprintf(f,"Find %s\n",program);
     fprintf(f,"%s=$loc\n",dest);
 }
-void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
+void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
 {
   char *netstart;
   char *arg_nodeprog_r,*arg_currdir_r;
@@ -2835,7 +2835,10 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv)
   fprintf(f,"NETSTART='%s';export NETSTART\n",netstart);
   fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",rank0no);
   fprintf(f,"CmiMyNodeSize='%d'; export CmiMyNodeSize\n",nodetab_getnodeinfo(rank0no)->cpus);
-  fprintf(f,"CmiMyForks='%d'; export CmiMyForks\n",nodetab_getnodeinfo(rank0no)->forks);
+  if (restart)    /* skip fork */
+    fprintf(f,"CmiMyForks='%d'; export CmiMyForks\n",0);
+  else
+    fprintf(f,"CmiMyForks='%d'; export CmiMyForks\n",nodetab_getnodeinfo(rank0no)->forks);
   fprintf(f,"CmiNumNodes='%d'; export CmiNumNodes\n",nodetab_rank0_size);
 #if CONVERSE_VERSION_VMI
   /* VMI environment variable */
@@ -3144,7 +3147,7 @@ void start_one_node_rsh(int rank0no)
      	 exit(1);
        }
      }
-     rsh_script(f,pe,rank0no,arg_argv);
+     rsh_script(f,pe,rank0no,arg_argv,0);
      fclose(f);
      if (!rsh_pids)
        rsh_pids=(int *)malloc(sizeof(int)*nodetab_rank0_size);
@@ -3323,7 +3326,7 @@ void restart_node(int crashed_node){
 	restart_argv[i] = "+restartaftercrash";
 	restart_argv[i+1]=NULL;
 
-  	rsh_script(f,pe,crashed_node,restart_argv);
+  	rsh_script(f,pe,crashed_node,restart_argv,1);
   	fclose(f);
 	/** change the nodetable entry of the crashed
 	processor to connect it to a new one**/
@@ -3397,8 +3400,8 @@ void reconnect_crashed_client(int socket_index,int crashed_node){
 		}
 		ChMessage_recv(req_clients[socket_index],&msg);
 		if(msg.len != sizeof(ChSingleNodeinfo)){
- 	  	fprintf(stderr,"Charmrun: Bad initnode data length. Aborting\n");
-  	  	fprintf(stderr,"Charmrun: possibly because: %s.\n", msg.data);
+ 	  	  fprintf(stderr,"Charmrun: Bad initnode data length. Aborting\n");
+  	  	  fprintf(stderr,"Charmrun: possibly because: %s.\n", msg.data);
 		}
 fprintf(stdout,"socket_index %d crashed_node %d reconnected fd %d  \n",socket_index,crashed_node,req_clients[socket_index]);
 		/** update the nodetab entry corresponding to
