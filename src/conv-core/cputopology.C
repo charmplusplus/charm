@@ -9,13 +9,11 @@
 #include "sockRoutines.h"
 #include "cklists.h"
 
-#define DEBUGP(x)  /* CmiPrintf x;  */
+#define DEBUGP(x)  /** CmiPrintf x; */
 
-/*
- This scheme relies on using IP address to identify physical nodes 
-
-  written by Gengbin Zheng  9/2008
-*/
+/** This scheme relies on using IP address to identify physical nodes 
+ * written by Gengbin Zheng  9/2008
+ */
 #if 1
 
 #include <stdlib.h>
@@ -25,12 +23,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#if CMK_BLUEGENEP
-#include <dcmf.h>
-#endif
-
-#if CMK_BLUEGENEL
-#include <rts.h>
+#if CMK_BLUEGENEL || CMK_BLUEGENEP || CMK_CRAYXT
+#include "TopoManager.h"
 #endif
 
 #if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
@@ -91,7 +85,7 @@ typedef struct _hostnameMsg {
   int pe;
   int ncores;
   int rank;
-  int nodenum;
+  int nodeID;
 } hostnameMsg;
 
 typedef struct _nodeTopoMsg {
@@ -102,42 +96,48 @@ typedef struct _nodeTopoMsg {
 static nodeTopoMsg *topomsg = NULL;
 static CmmTable hostTable;
 
-// nodenum[pe] is the node number of processor pe
+// nodeIDs[pe] is the node number of processor pe
 class CpuTopology {
 public:
-static int *nodenum;
-static int numNodes;
-static CkVec<int> *bynodes;
+  static int *nodeIDs;
+  static int numNodes;
+  static CkVec<int> *bynodes;
 
-int numUniqNodes() {
-               if (numNodes != 0) return numNodes;
-               int n = 0;
-               for (int i=0; i<CmiNumPes(); i++) 
-                 if (nodenum[i] > n) n = nodenum[i];
-               numNodes = n+1;
-               return numNodes;
-             }
-void sort() {
-               int i;
-               numUniqNodes();
-               bynodes = new CkVec<int>[numNodes];
-               for (i=0; i<CmiNumPes(); i++) 
-                 bynodes[nodenum[i]].push_back(i);
-             }
-void print() {
-               int i;
-               CmiPrintf("Charm++> Cpu topology info:\n");
-               for (i=0; i<CmiNumPes(); i++) CmiPrintf("%d ", nodenum[i]);
-               CmiPrintf("\n");
-               for (i=0; i<numNodes; i++) {
-                 CmiPrintf("Chip #%d: ", i);
-                 for (int j=0; j<bynodes[i].size(); j++) CmiPrintf("%d ", bynodes[i][j]);
-                 CmiPrintf("\n");
-               }
-             }
+  int numUniqNodes() {
+    if (numNodes != 0) return numNodes;
+    int n = 0;
+    for (int i=0; i<CmiNumPes(); i++) 
+      if (nodeIDs[i] > n)
+	n = nodeIDs[i];
+    numNodes = n+1;
+    return numNodes;
+  }
+
+  void sort() {
+    int i;
+    numUniqNodes();
+    bynodes = new CkVec<int>[numNodes];
+    for (i=0; i<CmiNumPes(); i++) 
+      bynodes[nodeIDs[i]].push_back(i);
+  }
+
+  void print() {
+    int i;
+    CmiPrintf("Charm++> Cpu topology info:\n");
+    for (i=0; i<CmiNumPes(); i++)
+      CmiPrintf("%d ", nodeIDs[i]);
+    CmiPrintf("\n");
+    for (i=0; i<numNodes; i++) {
+      CmiPrintf("Chip #%d: ", i);
+      for (int j=0; j<bynodes[i].size(); j++)
+	CmiPrintf("%d ", bynodes[i][j]);
+      CmiPrintf("\n");
+    }
+  }
+
 };
 
-int *CpuTopology::nodenum = NULL;
+int *CpuTopology::nodeIDs = NULL;
 int CpuTopology::numNodes = 0;
 CkVec<int> *CpuTopology::bynodes = NULL;
 
@@ -175,12 +175,12 @@ static void cpuTopoHandler(void *m)
     CmiFree(msg);
   }
   else {
-    msg->nodenum = nodecount++;
+    msg->nodeID = nodecount++;
     rec = msg;
     CmmPut(hostTable, 1, &tag, msg);
   }
   myrank = rec->rank%rec->ncores;
-  topomsg->nodes[pe] = rec->nodenum;
+  topomsg->nodes[pe] = rec->nodeID;
   rec->rank ++;
   count ++;
   if (count == CmiNumPes()) {
@@ -201,8 +201,8 @@ static void cpuTopoRecvHandler(void *msg)
   m->nodes = (int *)((char*)m + sizeof(nodeTopoMsg));
 
   CmiLock(topoLock);
-  if (cpuTopo.nodenum == NULL) {
-    cpuTopo.nodenum = m->nodes;
+  if (cpuTopo.nodeIDs == NULL) {
+    cpuTopo.nodeIDs = m->nodes;
     cpuTopo.sort();
   }
   else
@@ -215,8 +215,8 @@ static void cpuTopoRecvHandler(void *msg)
 
 extern "C" int CmiOnSamePhysicalNode(int pe1, int pe2)
 {
-  int *nodenum = cpuTopo.nodenum;
-  return nodenum==NULL?-1:nodenum[pe1] == nodenum[pe2];
+  int *nodeIDs = cpuTopo.nodeIDs;
+  return nodeIDs==NULL?-1:nodeIDs[pe1] == nodeIDs[pe2];
 }
 
 extern "C" int CmiNumPhysicalNodes()
@@ -226,14 +226,14 @@ extern "C" int CmiNumPhysicalNodes()
 
 extern "C" int CmiNumPesOnPhysicalNode(int pe)
 {
-  return cpuTopo.bynodes==NULL?-1:(int)cpuTopo.bynodes[cpuTopo.nodenum[pe]].size();
+  return cpuTopo.bynodes==NULL?-1:(int)cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].size();
 }
 
 extern "C" void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num)
 {
   CmiAssert(pe >=0 && pe < CmiNumPes());
-  *num = cpuTopo.bynodes[cpuTopo.nodenum[pe]].size();
-  if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[cpuTopo.nodenum[pe]].getVec();
+  *num = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].size();
+  if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].getVec();
 }
 
 #if CMK_CRAYXT
@@ -287,29 +287,25 @@ extern "C" void CmiInitCPUTopology(char **argv)
       strcpy(hostname, "");
   }
 #endif
+#if CMK_BLUEGENEL || CMK_BLUEGENEP || CMK_CRAYXT
+  TopoManager tmgr;
+  int x, y, z, t;
 
-    /* get my ip address */
+  cpuTopo.numNodes = CkNumPes();
+  cpuTopo.nodeIDs = new int[cpuTopo.numNodes];
+  int nid;
+
+  for(int i=0; i<cpuTopo.numNodes; i++) {
+    tmgr.rankToCoordinates(i, x, y, z, t);
+    int nid = tmgr.coordinatesToRank(x, y, z, 0);
+    cpuTopo.nodeIDs[i] = nid;
+  }
+  cpuTopo.sort();
+#elif
+  /* get my ip address */
   if (CmiMyRank() == 0)
   {
-#if CMK_BLUEGENEL
-    unsigned rank = CmiMyPe();    
-    unsigned x,y,z,t;
-    unsigned npes;
-    rts_coordinatesForRank (rank, &x, &y, &z, &t);
-    rts_rankForCoordinates (x,y,z,0, (unsigned *)&ret, &npes);
-
-#elif CMK_BLUEGENEP
-    //CmiAbort("Can not get unique name for the compute nodes. \n");
-    unsigned rank = DCMF_Messager_rank();    
-    unsigned x,y,z,t;
-    DCMF_Messager_rank2torus (rank, &x, &y, &z, &t);
-    DCMF_Messager_torus2rank (x,y,z,0, (unsigned *)&ret);
-
-    memcpy(&myip, &ret, sizeof(int));
-#elif CMK_CRAYXT
-    ret = getXTNodeID(CmiMyPe(), CmiNumPes());
-    memcpy(&myip, &ret, sizeof(int));
-#elif CMK_HAS_GETHOSTNAME
+#if CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
 #elif CMK_BPROC
     myip = skt_innode_my_ip();
@@ -334,12 +330,13 @@ extern "C" void CmiInitCPUTopology(char **argv)
 
   if (CmiMyPe() == 0) {
     for (i=0; i<CmiNumPes(); i++) CmiDeliverSpecificMsg(cpuTopoHandlerIdx);
-    //CsdScheduleCount(CmiNumPes());   // collecting node IP from every processor
+    // CsdScheduleCount(CmiNumPes());   // collecting node IP from every processor
   }
 
-    // receive broadcast from PE 0
+  // receive broadcast from PE 0
   CmiDeliverSpecificMsg(cpuTopoRecvHandlerIdx);
-  //CsdScheduleCount(1);
+  // CsdScheduleCount(1);
+#endif
 
   // now every one should have the node info
 }
