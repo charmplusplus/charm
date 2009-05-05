@@ -641,7 +641,7 @@ void CkReductionMgr::finishReduction(void)
 #ifndef _FAULT_MLOG_   
 
   if (nContrib<(lcount+adj(redNo).lcount)){
-	DEBR((AA"Need more local messages %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
+         DEBR((AA"Need more local messages %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
 	 return;//Need more local messages
   }
  
@@ -887,6 +887,17 @@ void CkReductionMgr::pup(PUP::er &p)
   p|adjVec;
   p|nodeProxy;
   p|storedCallback;
+    // handle CkReductionClientBundle
+  if (storedCallback.type == CkCallback::callCFn && storedCallback.d.cfn.fn == CkReductionClientBundle::callbackCfn) 
+  {
+    CkReductionClientBundle *bd;
+    if (p.isUnpacking()) 
+      bd = new CkReductionClientBundle;
+    else
+      bd = (CkReductionClientBundle *)storedCallback.d.cfn.param;
+    p|*bd;
+    if (p.isUnpacking()) storedCallback.d.cfn.param = bd;
+  }
 
   // subtle --- Gengbin
   // Group : CkReductionMgr

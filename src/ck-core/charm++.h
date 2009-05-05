@@ -761,10 +761,12 @@ typedef void (*CkReductionClientFn)(void *param,int dataSize,void *data);
 class CkReductionClientBundle : public CkCallback {
 	CkReductionClientFn fn;
 	void *param;
-	static void callbackCfn(void *thisPtr,void *reductionMsg);
  public:
+	static void callbackCfn(void *thisPtr,void *reductionMsg);
+        CkReductionClientBundle(): fn(NULL), param(NULL) {}
 	CkReductionClientBundle(CkReductionClientFn fn_,void *param_);
 };
+PUPbytes(CkReductionClientBundle);
 
 #define CK_REDUCTION_CLIENT_DECL \
 	void setReductionClient(CkReductionClientFn fn,void *param=NULL) const\
