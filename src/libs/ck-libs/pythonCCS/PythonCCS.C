@@ -536,7 +536,6 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
       //if (ptraceback) CkPrintf("   %d %d %d %d\n",PyType_Check(ptraceback),PyString_Check(ptraceback),PyList_Check(ptraceback),PyTuple_Check(ptraceback));
     }
   } else {
-    resultNotNone = false;
     //static PyObject *savedItem = NULL;
     CkPythonDebugf("userCode: |%s|",pyMsg->code);
     CkPythonDebugf("method: |%s|",pyMsg->methodName.methodName);
@@ -647,12 +646,6 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
       if (!result) {
         CkPrintf("Python Call error\n");
         //PyErr_Print();
-        break;
-      }
-      if (result != Py_None) {
-        // freeze the application
-        CkPrintf("Freezing the application!\n");
-        resultNotNone = true;
         break;
       }
       oldArg = part;

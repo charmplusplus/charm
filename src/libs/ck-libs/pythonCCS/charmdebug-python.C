@@ -33,6 +33,7 @@ public:
 class CpdPythonGroup : public CBase_CpdPythonGroup, public CpdPersistentChecker {
   CpdPythonArrayIterator arriter;
   int nextElement;
+  bool resultNotNone;
 public:
   CpdPythonGroup() {
     //CkPrintf("[%d] CpdPythonGroup::constructor\n",CkMyPe());
@@ -54,6 +55,7 @@ public:
 };
 
 int CpdPythonGroup::buildIterator(PyObject *&data, void *iter) {
+  resultNotNone = false;
   int group = ntohl(*(int*)iter);
   if (group > 0) {
     CkGroupID id;
@@ -83,6 +85,13 @@ int CpdPythonGroup::buildIterator(PyObject *&data, void *iter) {
 
 int CpdPythonGroup::nextIteratorUpdate(PyObject *&data, PyObject *result, void *iter) {
   //CkPrintf("[%d] Asked for next iterator\n",CkMyPe());
+  if (result != Py_None) {
+    PyObject *str = PyObject_Str(result);
+    CkPrintf("Freezing the application: %s\n",PyString_AsString(str));
+    Py_DECREF(str);
+    resultNotNone = true;
+    return 0;
+  }
   if (nextElement > 0) {
     if (nextElement == arriter.elems.size()) {
       nextElement = 0;
