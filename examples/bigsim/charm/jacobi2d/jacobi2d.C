@@ -187,6 +187,9 @@ class Jacobi: public CBase_Jacobi {
 
     // Perform one iteration of work
     void begin_iteration(void) {
+      if(thisIndex.x == 0 && thisIndex.y == 0)
+	BgPrintf("Start of iteration at %f\n");
+
       iterations++;
 
       // Copy left column and right column into temporary arrays
