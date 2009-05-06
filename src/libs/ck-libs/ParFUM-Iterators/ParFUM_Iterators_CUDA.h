@@ -37,9 +37,9 @@ typedef struct {
 } MeshModelDevice;
 
 
-#define element_D_GetAttrib(m, e) (((char*)(m)->ElemDataDevice) + (e)*(m)->elem_attr_size)
-#define node_D_GetAttrib(m, n) (((char*)(m)->NodeDataDevice) + (n)*(m)->node_attr_size)
-#define element_D_GetNode(m, e, idx) (((m)->ElemConnDevice)[e*4 + idx])
+#define meshElement_D_GetAttrib(m, e) (((char*)(m)->ElemDataDevice) + (e)*(m)->elem_attr_size)
+#define meshNode_D_GetAttrib(m, n) (((char*)(m)->NodeDataDevice) + (n)*(m)->node_attr_size)
+#define meshElement_D_GetNode(m, e, idx) (((m)->ElemConnDevice)[e*4 + idx])
 
 #endif
 #endif
