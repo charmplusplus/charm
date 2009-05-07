@@ -14,6 +14,7 @@ using namespace std;
 
 #define MAX_PARTS_PER_TP 1000
 #define MAX_PARTICLES_PER_MSG 500
+#define INIT_PARTS_PER_CHILD 1000
 
 #define G_MALLOC malloc
 
@@ -91,6 +92,7 @@ class Main : public CBase_Main {
   real tnow;
   real tout;
   real mymtot;
+  int iterations;
 
   vector rmin;
   real rsize;
@@ -250,6 +252,7 @@ class TreePiece : public CBase_TreePiece {
   int myNumParticles;
   CkArrayIndex1D parentIndex;
   int pendingChildren;
+  CkVec<CkVec<bodyptr> >partsToChild;
 
   nodeptr myRoot;
   nodeptr parent;
@@ -261,6 +264,8 @@ class TreePiece : public CBase_TreePiece {
   int mynleaf;
   int myncell;
 
+  CkVec<ParticleMsg *> bufferedMsgs;
+  bool haveParent;
 
   void checkCompletion();
   leafptr InitLeaf(cellptr parent, unsigned ProcessId);
@@ -275,6 +280,7 @@ class TreePiece : public CBase_TreePiece {
   TreePiece(CmiUInt8 parent, int whichChild, int level, CkArrayIndex1D parent);
   TreePiece(CmiUInt8 p, int which, int level, real rx, real ry, real rz, real rs, CkArrayIndex1D parent); 
   TreePiece(CkMigrateMessage *m){}
+  void recvRootFromParent(CmiUInt8 r, real rx, real ry, real rz, real rs);
   // used to convey message counts from chunks to top-level
   // treepieces
   void acceptRoots(CmiUInt8 root, real rsize, real rminx, real rminy, real rminz, CkCallback &cb);
@@ -287,6 +293,7 @@ class TreePiece : public CBase_TreePiece {
   nodeptr loadtree(bodyptr p, cellptr root, unsigned int ProcessId);
   cellptr SubdivideLeaf (leafptr le, cellptr parent, unsigned int l, unsigned int ProcessId);
   void childDone(int which);
+  void cleanup(CkCallback &cb);
 
 };
 

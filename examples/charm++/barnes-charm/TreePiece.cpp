@@ -15,6 +15,7 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, int level_,  real rx, real ry, real
   parentIndex = parentIdx;
   // save parent
   parent = (nodeptr)p_;
+  haveParent = true;
 
   mycelltab.reserve(maxmycell);
   myleaftab.reserve(maxmyleaf);
@@ -37,6 +38,10 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, int level_,  real rx, real ry, real
   }
   
   pendingChildren = 0;
+  partsToChild.resize(NSUB);
+  for(int i = 0; i < NSUB; i++){
+    partsToChild[i].reserve(INIT_PARTS_PER_CHILD);
+  }
 
 #ifdef MEMCHECK
   CkPrintf("piece %d after construction\n", thisIndex);
@@ -73,10 +78,87 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, int level_, CkArrayIndex1D parentId
   }
 
   pendingChildren = 0;
+  partsToChild.resize(NSUB);
+  for(int i = 0; i < NSUB; i++){
+    partsToChild[i].reserve(INIT_PARTS_PER_CHILD);
+  }
 #ifdef MEMCHECK
   CkPrintf("piece %d after construction\n", thisIndex);
   CmiMemoryCheck();
 #endif
+}
+
+void TreePiece::processMessage(ParticleMsg *msg){
+  // get contents of this message
+  for(int i = 0; i < msg->num; i++){
+    int c; // part i goes to child c
+    int relc; // index of child relative to this node (0..NSUB)
+    p = particles[i]; 
+    CkAssert(intcoord(xp,Pos(p),rmin,rsize));
+    relc = subindex(xp,Level(myRoot));
+    //c = NSUB*thisIndex + numTreePieces + relc;
+    partsToChild[relc].push_back(particles[i]);
+  }
+
+  delete msg;
+}
+
+void TreePiece::sendParticlesToChildren(){
+  for(int i = 0; i < NSUB; i++){
+    int len = partsToChild[i].length();
+    if(childrenTreePieces[i] < 0 && len > 0){
+      int child = NSUB*thisIndex+numTreePieces+i;
+#ifdef VERBOSE_PIECES
+      CkPrintf("piece %d inserting child %d\n", thisIndex, child);
+#endif
+      pieces[child].insert((CmiUInt8)myRoot, i, myLevel >> 1, rmin[0], rmin[1], rmin[2], rsize, thisIndex);
+      childrenTreePieces[i] = child;
+      pendingChildren++;
+      // create msg from partsToChild[i], send
+      ParticleMsg *amsg = new (len) ParticleMsg;
+      amsg->num = len;
+      memcpy(amsg->particles, partsToChild[i].getVec(), len*sizeof(bodyptr));
+      sentTo[i]++;
+      pieces[child].recvParticles(amsg);
+#ifdef VERBOSE_PIECES
+      CkPrintf("piece %d sent %d particles to child %d. sentTo[%d] = %d\n", thisIndex, len, child, i, sentTo[i]);
+#endif
+    }
+    else if(len > 0){
+      int child = childrenTreePieces[i];
+      pendingChildren++;
+      pieces[child].recvRootFromParent((CmiUInt8)myRoot, rmin[0], rmin[1], rmin[2], rsize);
+      // create msg from partsToChild[i], send
+      ParticleMsg *amsg = new (len) ParticleMsg;
+      amsg->num = len;
+      memcpy(amsg->particles, partsToChild[i].getVec(), len*sizeof(bodyptr));
+      sentTo[i]++;
+      pieces[child].recvParticles(amsg);
+    }
+  }
+}
+
+void TreePiece::recvRootFromParent(CmiUInt8 r, real rx, real ry, real rz, real rs){
+  parent = (nodeptr)r;
+  haveParent = true;
+  rmin[0] = rx;
+  rmin[1] = ry;
+  rmin[2] = rz;
+  rsize = rs;
+
+  for(int i = 0; i < bufferedMsgs.length(); i++){
+    processMessage(bufferedMsgs[i]);
+  }
+  sendParticlesToChildren();
+  if(haveCounts){
+    checkCompletion();
+  }
+  //delete msg;
+#ifdef MEMCHECK
+  CkPrintf("piece %d after recvParticles (recvRootFromParent)\n", thisIndex);
+  CmiMemoryCheck();
+#endif
+
 }
 
 void TreePiece::acceptRoots(CmiUInt8 roots_, real rsize_, real rmx, real rmy, real rmz, CkCallback &cb){
@@ -97,6 +179,7 @@ void TreePiece::acceptRoots(CmiUInt8 roots_, real rsize_, real rmx, real rmy, re
     nodeptr *pp = (nodeptr *)roots_;
     nodeptr p = pp[thisIndex/NSUB];
     parent = p;
+    haveParent = true;
 #ifdef MEMCHECK
   CkPrintf("piece %d after acceptRoots\n", thisIndex);
   CmiMemoryCheck();
@@ -259,8 +342,6 @@ void TreePiece::recvParticles(ParticleMsg *msg){
 #endif
 
   int newtotal = myNumParticles+msg->num;
-  CkVec<CkVec<bodyptr> > partsToChild;
-  partsToChild.resize(NSUB);
 
   if(newtotal > maxPartsPerTp && !haveChildren){
     // insert children into pieces array
@@ -269,41 +350,112 @@ void TreePiece::recvParticles(ParticleMsg *msg){
 #ifdef VERBOSE_PIECES
     CkPrintf("piece %d has too many (%d+%d) particles; creating children\n", thisIndex, myNumParticles, msg->num);
 #endif
-    // first create own root
-    myRoot = (nodeptr) InitCell((cellptr)parent, thisIndex);
-    Subp(parent)[whichChildAmI] = myRoot;
-    Mass(myRoot) = 0.0;
-    Cost(myRoot) = 0;
-    CLRV(Pos(myRoot));
+    if(haveParent){
+      // first create own root
+      // then process message and own particles, to see where they should go
+      myRoot = (nodeptr) InitCell((cellptr)parent, thisIndex);
+      Subp(parent)[whichChildAmI] = myRoot;
+      Mass(myRoot) = 0.0;
+      Cost(myRoot) = 0;
+      CLRV(Pos(myRoot));
+
+      // process own particles
+      // get particles that i already have
+      for(int i = 0; i < myNumParticles; i++){
+        int c; // part i goes to child c
+        int relc; // index of child relative to this node (0..NSUB)
+        p = myParticles[i]; 
+        CkAssert(intcoord(xp,Pos(p),rmin,rsize));
+        relc = subindex(xp,Level(myRoot));
+        //c = NSUB*thisIndex + numTreePieces + relc;
+        partsToChild[relc].push_back(myParticles[i]);
+      }
+      myNumParticles = 0;
+      myParticles.length() = 0; 
+
+      // process message 
+      processMessage(msg);
+      haveChildren = true;
+      sendParticlesToChildren();
+    }
+    else{
+      // buffer message and return
+      bufferedMsgs.push_back(msg);
+      return;
+    }
+  }
+  else if(!haveChildren){
+    // stuff msg into own parts
+#ifdef VERBOSE_PIECES
+    CkPrintf("piece %d adding %d particles to self (%d), total: %d\n", thisIndex, msg->num, myNumParticles, myNumParticles+msg->num);
+#endif
+
+    // this is how many particles we had before expanding
+    int savedpos = myNumParticles;
+    // we now have msg->num additional particles
+    myNumParticles += msg->num;
+    // expand array of particles to include new ones
+    myParticles.resize(myNumParticles);
+    // this is where we start copying new particles to 
+    bodyptr *savedstart = myParticles.getVec()+savedpos;
+
+    memcpy(savedstart, msg->particles, (msg->num)*sizeof(bodyptr));
+  }
+  else{
+    // have no particles of own, send to children
+#ifdef VERBOSE_PIECES
+    CkPrintf("piece %d has children\n", thisIndex);
+#endif
+    //partsToChild.length() = 0;
+
+    int num = msg->num;
+    bodyptr p;
+    int xp[NDIM];
     
-    // get particles that i already have
-    for(int i = 0; i < myNumParticles; i++){
+    // get contents of this message
+    for(int i = 0; i < num; i++){
       int c; // part i goes to child c
       int relc; // index of child relative to this node (0..NSUB)
-      p = myParticles[i]; 
+      p = particles[i]; 
       CkAssert(intcoord(xp,Pos(p),rmin,rsize));
       relc = subindex(xp,Level(myRoot));
       //c = NSUB*thisIndex + numTreePieces + relc;
-      partsToChild[relc].push_back(myParticles[i]);
+      partsToChild[relc].push_back(particles[i]);
     }
-    myNumParticles = 0;
-    myParticles.length() = 0; 
 
-    for(int i = 0; i < NSUB; i++){
-      int len = partsToChild[i].length();
+    // at this point, we have a list of particles 
+    // destined for each child
+    for(int c = 0; c < NSUB; c++){
+      int len = partsToChild[c].length();
       if(len > 0){
-        int child = NSUB*thisIndex+numTreePieces+i;
+        if(childrenTreePieces[c] < 0){
+          // child doesn't exist 
+          int child = NSUB*thisIndex+numTreePieces+c;
 #ifdef VERBOSE_PIECES
-        CkPrintf("piece %d inserting child %d\n", thisIndex, child);
+          CkPrintf("piece %d inserting child %d\n", thisIndex, child);
 #endif
-        pieces[child].insert((CmiUInt8)myRoot, i, myLevel >> 1, rmin[0], rmin[1], rmin[2], rsize, thisIndex);
-        childrenTreePieces[i] = child;
-        pendingChildren++;
+          pieces[child].insert((CmiUInt8)myRoot, c, myLevel >> 1, rmin[0], rmin[1], rmin[2], rsize, thisIndex);
+          childrenTreePieces[c] = child;
+          pendingChildren++;
+        }
+        else{
+          pieces[child].recvRootFromParent((CmiUInt8)myRoot, rmin[0], rmin[1], rmin[2], rsize);
+        }
+        // create msg from partsToChild[c], send
+        ParticleMsg *amsg = new (len) ParticleMsg;
+        amsg->num = len;
+        memcpy(amsg->particles, partsToChild[c].getVec(), len*sizeof(bodyptr));
+        sentTo[c]++;
+        int tochild = childrenTreePieces[c];
+        pieces[tochild].recvParticles(amsg);
+#ifdef VERBOSE_PIECES
+        CkPrintf("piece %d sent %d particles to child %d. sentTo[%d] = %d\n", thisIndex, len, tochild, c, sentTo[c]);
+#endif
       }
     }
-    haveChildren = true;
   }
 
+  /*
   if(haveChildren){
 #ifdef VERBOSE_PIECES
     CkPrintf("piece %d has children\n", thisIndex);
@@ -370,11 +522,12 @@ void TreePiece::recvParticles(ParticleMsg *msg){
 
     memcpy(savedstart, msg->particles, (msg->num)*sizeof(bodyptr));
   }
+  */
 
   if(haveCounts){
     checkCompletion();
   }
-  delete msg;
+  //delete msg;
 #ifdef MEMCHECK
   CkPrintf("piece %d after recvParticles\n", thisIndex);
   CmiMemoryCheck();
@@ -711,7 +864,7 @@ TreePiece::SubdivideLeaf (leafptr le, cellptr parent_, unsigned int l, unsigned 
    return c;
 }
 
-cellptr TreePiece::InitCell(cellptr parent, unsigned ProcessId)
+cellptr TreePiece::InitCell(cellptr parent_, unsigned ProcessId)
 {
   cellptr c;
   int i, Mycell;
@@ -720,11 +873,11 @@ cellptr TreePiece::InitCell(cellptr parent, unsigned ProcessId)
   //c->processor = ProcessId;
   c->next = NULL;
   c->prev = NULL;
-  if (parent == NULL)
+  if (parent_ == NULL)
     Level(c) = IMAX >> 1;
   else
-    Level(c) = Level(parent) >> 1;
-  ParentOf(c) = (nodeptr) parent;
+    Level(c) = Level(parent_) >> 1;
+  ParentOf(c) = (nodeptr) parent_;
   ChildNum(c) = 0;
    
    /*
@@ -924,5 +1077,36 @@ void TreePiece::updateMoments(int which){
 
     //Done(q)=TRUE;
   }
+}
+
+void TreePiece::cleanup(CkCallback &cb_){
+  for(int i = 0; i < mycelltab.length(); i++){
+    delete mycelltab[i];
+  }
+
+  for(int i = 0; i < myleaftab.length(); i++){
+    delete myleaftab[i];
+  }
+
+  numTotalMsgs = -1;
+  numRecvdMsgs = 0;
+  haveChildren = false;
+  haveCounts = false;
+  for(int i = 0; i < NSUB; i++){
+    sentTo[i] = 0;
+    partsToChild[i].length() = 0;
+  }
+  myParticles.length() = 0;
+  myNumParticles = 0;
+  pendingChildren = 0;
+  mycelltab.length() = 0;
+  myleaftab.length() = 0;
+  myncell = 0;
+  mynleaf = 0;
+  haveParent = false;
+  bufferedMsgs.length() = 0;
+
+  contribute(0,0,CkReduction::concat,cb_);
+
 }
 

@@ -125,7 +125,9 @@ Main::Main(CkArgMsg *m){
     maxPartsPerTp = MAX_BODIES_PER_LEAF;
   }
 
+  
   numParticleChunks = NPROC;
+  iterations = getiparam("it");
   numTreePieces = getiparam("pieces");
   if(numTreePieces < 0){
     numTreePieces = 8*numParticleChunks; 
@@ -246,9 +248,13 @@ void Main::startSimulation(){
   double end;
 
   /* main loop */
-  while (tnow < tstop + 0.1 * dtime) {
+  int i = 0;
+  while (tnow < tstop + 0.1 * dtime && i < iterations) {
     // create top-level tree
+    CkPrintf("**********************************\n");
+    CkPrintf("[main] iteration: %d, tnow: %f\n", i, tnow);
     CkPrintf("[main] rmin: (%f,%f,%f), rsize: %f\n", rmin[0], rmin[1], rmin[2], rsize);
+    CkPrintf("**********************************\n");
     start = CmiWallTimer();
     init_root(-1);
     // send roots to pieces
@@ -261,30 +267,42 @@ void Main::startSimulation(){
     // completed calculating theirs
     updateTopLevelMoments();
     end = CmiWallTimer();
-    CkPrintf("[main] tnow: %f Tree building ...  %f s\n", tnow, (end-start));
+    CkPrintf("[main] Tree building ... %f s\n", (end-start));
 #ifdef PRINT_TREE
     graph();
 #endif
-#ifdef PARTITION
+#ifndef NO_PARTITION
     start = CmiWallTimer();
     chunks.partition(CkCallbackResumeThread());
     end = CmiWallTimer();
     CkPrintf("[main] Partitioning ...  %f s\n", (end-start));
 #endif
-#ifdef FORCES
+#ifndef NO_FORCES
     start = CmiWallTimer();
     chunks.ComputeForces(CkCallbackResumeThread());
     end = CmiWallTimer();
     CkPrintf("[main] Forces ...  %f s\n", (end-start));
 #endif
-#ifdef ADVANCE
+#ifndef NO_ADVANCE
     start = CmiWallTimer();
     chunks.advance(CkCallbackResumeThread());
     end = CmiWallTimer();
     CkPrintf("[main] Advance ... %f s\n", (end-start));
 #endif
-    CkExit();
+#ifndef NO_CLEANUP
+    start = CmiWallTimer();
+    pieces.cleanup(CkCallbackResumeThread());
+    end = CmiWallTimer();
+    CkPrintf("[main] Clean up ... %f s\n", (end-start));
+#endif
+    i++;
   }
+
+  CkPrintf("[main] Completed simulation\n");
+#ifdef OUTPUT_ACC
+  // FIXME - accel. output code here.
+#endif
+  CkExit();
 }
 
 
@@ -739,7 +757,7 @@ nodeptr Main::moments(nodeptr node, int depth){
     if(child != NULL){
       nodeptr mom = moments(child, depth-1);
 #ifdef VERBOSE_MAIN
-      CkPrintf("node 0x%x with node 0x%x (%d) (%f,%f,%f)\n", node, mom, i, Pos(mom)[0], Pos(mom)[1], Pos(mom)[2]);
+      CkPrintf("node 0x%x (%f,%f,%f) with node 0x%x (%d) (%f,%f,%f) mass: %f\n", node, Pos(node)[0], Pos(node)[1], Pos(node)[2], mom, i, Pos(mom)[0], Pos(mom)[1], Pos(mom)[2], Mass(mom));
 #endif
       Mass(node) += Mass(mom);
       Cost(node) += Cost(mom);
@@ -750,7 +768,9 @@ nodeptr Main::moments(nodeptr node, int depth){
     }
   }
   DIVVS(Pos(node), Pos(node), Mass(node));
-  //CkPrintf("div Pos(node): (%f,%f,%f)\n", Pos(node)[0], Pos(node)[1], Pos(node)[2]);
+#ifdef VERBOSE_MAIN
+  CkPrintf("Pos(node): (%f,%f,%f)\n", Pos(node)[0], Pos(node)[1], Pos(node)[2]);
+#endif
   //Done(node) = TRUE;
 }
 

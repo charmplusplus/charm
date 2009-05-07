@@ -1,8 +1,7 @@
-# to enable various parts of the computation:
-# -DPRINT_TREE
-# -DPARTITION
-# -DFORCES
-# -DADVANCE
+# to disable various parts of the computation:
+# -DNO_PARTITION
+# -DNO_FORCES
+# -DNO_ADVANCE
 #
 # to control verbosity of program:
 # -DVERBOSE_MAIN 
@@ -11,7 +10,7 @@
 #
 # to print out a graphical representation of the constructed tree:
 # -DPRINT_TREE
-OPTS=-g -DPRINT_TREE -DPARTITION -DFORCES -DADVANCE #-DVERBOSE_CHUNKS -DVERBOSE_PIECES
+OPTS=-g -DVERBOSE_CHUNKS -DVERBOSE_PIECES -DVERBOSE_MAIN
 CHARMC=../../../multicore-linux64/bin/charmc $(OPTS)
 
 OBJS = TreePiece.o ParticleChunk.o Main.o grav.o util.o code_io.o 
@@ -40,7 +39,7 @@ barnes.decl.h: barnes.ci
 util.o: util.C
 	$(CHARMC) -c util.C
 
-code_io.o: code_io.C
+code_io.o: code_io.C barnes.decl.h
 	$(CHARMC) -c code_io.C
 
 clean:
