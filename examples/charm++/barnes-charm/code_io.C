@@ -69,7 +69,8 @@ void Main::inputdata ()
    }
    */
 
-   bodytab = (bodyptr) malloc(nbody * sizeof(body));
+   bodytab = new body [nbody]; 
+   //bodytab = (bodyptr) malloc(nbody * sizeof(body));
    //bodytab = (bodyptr) our_malloc(nbody * sizeof(body),__FILE__,__LINE__);
    if (bodytab == NULL){
       CkPrintf("inputdata: not enuf memory\n");

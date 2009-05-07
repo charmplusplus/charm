@@ -15,6 +15,7 @@ using namespace std;
 #define MAX_PARTS_PER_TP 1000
 #define MAX_PARTICLES_PER_MSG 500
 #define INIT_PARTS_PER_CHILD 1000
+#define DEFAULT_NUM_ITERATIONS 3
 
 #define G_MALLOC malloc
 
@@ -127,6 +128,7 @@ class Main : public CBase_Main {
 
   void updateTopLevelMoments();
   nodeptr moments(nodeptr node, int depth);
+  cellptr makecell(unsigned ProcessId);
 
 #ifdef PRINT_TREE
   void graph();
@@ -235,9 +237,6 @@ class ParticleChunk : public CBase_ParticleChunk {
 
 class TreePiece : public CBase_TreePiece {
 
-  int mynumcell;
-  int mynumleaf;
-
   // for debugging purposes
   int done;
  
@@ -253,6 +252,8 @@ class TreePiece : public CBase_TreePiece {
   CkArrayIndex1D parentIndex;
   int pendingChildren;
   CkVec<CkVec<bodyptr> >partsToChild;
+  bool isPending[NSUB];
+  bool wantToSplit;
 
   nodeptr myRoot;
   nodeptr parent;
@@ -261,6 +262,8 @@ class TreePiece : public CBase_TreePiece {
 
   CkVec<cellptr> mycelltab;
   CkVec<leafptr> myleaftab;
+  cellptr ctab;
+  leafptr ltab;
   int mynleaf;
   int myncell;
 
@@ -271,8 +274,13 @@ class TreePiece : public CBase_TreePiece {
   void processParticles(bodyptr *particles, int num);
   leafptr InitLeaf(cellptr parent, unsigned ProcessId);
   cellptr InitCell(cellptr parent, unsigned ProcessId);
+  void buildTree();
   void hackcofm(int nc, unsigned ProcessId);
   void updateMoments(int which);
+  void resetPartsToChild();
+  void sendParticlesToChildren();
+  cellptr makecell(unsigned ProcessId);
+  leafptr makeleaf(unsigned ProcessId);
 
   real rsize;
   vector rmin;
@@ -285,11 +293,11 @@ class TreePiece : public CBase_TreePiece {
   // used to convey message counts from chunks to top-level
   // treepieces
   void acceptRoots(CmiUInt8 root, real rsize, real rminx, real rminy, real rminz, CkCallback &cb);
-  void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
+  //void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
   // used to convey message counts from treepieces to their
   // children
-  void recvTotalMsgCountsFromPieces(int num);
-  void buildTree();
+  //void recvTotalMsgCountsFromPieces(int num);
+  void doBuildTree();
   void recvParticles(ParticleMsg *msg);
   nodeptr loadtree(bodyptr p, cellptr root, unsigned int ProcessId);
   cellptr SubdivideLeaf (leafptr le, cellptr parent, unsigned int l, unsigned int ProcessId);
@@ -300,8 +308,6 @@ class TreePiece : public CBase_TreePiece {
 
 int subindex(int *xp, int level);
 bool intcoord(int *xp, vector p, vector rmin, real rsize);
-cellptr makecell(unsigned ProcessId);
-leafptr makeleaf(unsigned ProcessId);
 int log8floor(int arg);
 
 real xrand(real lo, real hi);

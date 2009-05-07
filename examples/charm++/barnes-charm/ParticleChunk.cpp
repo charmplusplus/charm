@@ -146,6 +146,9 @@ void ParticleChunk::partition(CkCallback &cb){
   mynbody = 0;
   // find_my_bodies(Global->G_root, 0, BRC_FUC, ProcessId );
   find_my_bodies((nodeptr)G_root, 0, BRC_FUC, ProcessId);
+#ifdef VERBOSE_CHUNKS
+  CkPrintf("[%d] mynbody: %d\n", thisIndex, mynbody);
+#endif
   contribute(0,0,CkReduction::concat,cb);
 }
 
@@ -163,7 +166,8 @@ void ParticleChunk::find_my_bodies(nodeptr mycell, int work, int direction, unsi
     for (i = 0; i < l->num_bodies; i++) {                                                            
       if (work >= workMin-.1) {                                                  
         if((mynbody) > maxmybody) {                                             
-          CkPrintf("[%d] find_my_bodies: needs more than %d bodies; increase fleaves. mynbody: %d\n",ProcessId, maxmybody, mynbody); 
+          CkPrintf("[%d] find_my_bodies: needs more than %d bodies; increase fleaves (%f) . mynbody: %d\n",ProcessId, maxmybody, fleaves, mynbody); 
+          CkAbort("fleaves\n");
         }    
         mybodytab[mynbody++] = Bodyp(l)[i];
       }                                                                                             
@@ -331,7 +335,7 @@ void ParticleChunk::sendParticlesToTp(int tp){
     }
     */
     msg->num = len; 
-    numMsgsToEachTp[tp]++;
+    //numMsgsToEachTp[tp]++;
     particlesToTps[tp].length() = 0;
     pieces[tp].recvParticles(msg);
   }
@@ -348,6 +352,7 @@ void ParticleChunk::doneSendingParticles(){
     particlesToTps[i].length() = 0;
   }
   */
+  CkPrintf("[%d] done sending particles\n", thisIndex);
 }
 
 void ParticleChunk::doneTreeBuild(){

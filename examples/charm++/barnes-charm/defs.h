@@ -302,7 +302,7 @@ typedef struct _cell {
      p | done;
      PUParray(p,subp,NSUB);
 #ifdef QUADPOLE
-     // FIXME matrix: quad
+     // TODO matrix: quad
 #error "Must implement pup for matrix first"
 
      CkAbort("Must implement pup for matrix first\n");
@@ -350,7 +350,7 @@ typedef struct _leaf {
      p | num_bodies;
      PUParray(p,bodyp,num_bodies);
 #ifdef QUADPOLE
-     // FIXME matrix: quad
+     // TODO matrix: quad
      CkAbort("Must implement pup for matrix first\n");
 #endif
      PUParray(p,pos,NDIM);

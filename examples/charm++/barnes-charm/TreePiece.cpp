@@ -19,6 +19,8 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, int level_,  real rx, real ry, real
 
   mycelltab.reserve(maxmycell);
   myleaftab.reserve(maxmyleaf);
+  ctab = new cell [maxmycell];
+  ltab = new leaf [maxmyleaf];
 
   myRoot = NULL;
 
@@ -31,18 +33,16 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, int level_,  real rx, real ry, real
   mynleaf = 0;
 
   haveCounts = false;
+  pendingChildren = 0;
+  partsToChild.resize(NSUB);
 
   for(int i = 0; i < NSUB; i++){
     sentTo[i] = 0;
     childrenTreePieces[i] = -1;
-  }
-  
-  pendingChildren = 0;
-  partsToChild.resize(NSUB);
-  for(int i = 0; i < NSUB; i++){
+    isPending[i] = false;
     partsToChild[i].reserve(INIT_PARTS_PER_CHILD);
   }
-
+  
   wantToSplit = false;
 
 #ifdef MEMCHECK
@@ -61,6 +61,8 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, int level_, CkArrayIndex1D parentId
 
   mycelltab.reserve(maxmycell);
   myleaftab.reserve(maxmyleaf);
+  ctab = new cell [maxmycell];
+  ltab = new leaf [maxmyleaf];
 
   myRoot = NULL;
 
@@ -73,15 +75,13 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, int level_, CkArrayIndex1D parentId
   mynleaf = 0;
 
   haveCounts = false;
+  pendingChildren = 0;
+  partsToChild.resize(NSUB);
 
   for(int i = 0; i < NSUB; i++){
     sentTo[i] = 0;
     childrenTreePieces[i] = -1;
-  }
-
-  pendingChildren = 0;
-  partsToChild.resize(NSUB);
-  for(int i = 0; i < NSUB; i++){
+    isPending[i] = false;
     partsToChild[i].reserve(INIT_PARTS_PER_CHILD);
   }
   
@@ -96,6 +96,8 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, int level_, CkArrayIndex1D parentId
 void TreePiece::processParticles(bodyptr *particles, int num){
   // get contents of this message
   int xp[NDIM];
+  bodyptr p;
+
   for(int i = 0; i < num; i++){
     int c; // part i goes to child c
     int relc; // index of child relative to this node (0..NSUB)
@@ -111,13 +113,15 @@ void TreePiece::sendParticlesToChildren(){
   for(int i = 0; i < NSUB; i++){
     int len = partsToChild[i].length();
     if(childrenTreePieces[i] < 0 && len > 0){
+      CkAssert(!isPending[i]);
       int child = NSUB*thisIndex+numTreePieces+i;
-#ifdef VERBOSE_PIECES
-      CkPrintf("piece %d inserting child %d\n", thisIndex, child);
-#endif
       pieces[child].insert((CmiUInt8)myRoot, i, myLevel >> 1, rmin[0], rmin[1], rmin[2], rsize, thisIndex);
       childrenTreePieces[i] = child;
       pendingChildren++;
+      isPending[i] = true;
+#ifdef VERBOSE_PIECES
+      CkPrintf("piece %d inserting child %d, pending children: %d\n", thisIndex, child, pendingChildren);
+#endif
       // create msg from partsToChild[i], send
       ParticleMsg *amsg = new (len) ParticleMsg;
       amsg->num = len;
@@ -127,10 +131,17 @@ void TreePiece::sendParticlesToChildren(){
 #ifdef VERBOSE_PIECES
       CkPrintf("piece %d sent %d particles to child %d. sentTo[%d] = %d\n", thisIndex, len, child, i, sentTo[i]);
 #endif
+      partsToChild[i].length() = 0;
     }
     else if(len > 0){
       int child = childrenTreePieces[i];
-      pendingChildren++;
+      if(!isPending[i]){
+        pendingChildren++;
+#ifdef VERBOSE_PIECES
+        CkPrintf("piece %d has child %d, pending children: %d\n", thisIndex, child, pendingChildren);
+#endif
+        isPending[i] = true;
+      }
       pieces[child].recvRootFromParent((CmiUInt8)myRoot, rmin[0], rmin[1], rmin[2], rsize);
       // create msg from partsToChild[i], send
       ParticleMsg *amsg = new (len) ParticleMsg;
@@ -141,7 +152,14 @@ void TreePiece::sendParticlesToChildren(){
 #ifdef VERBOSE_PIECES
       CkPrintf("piece %d sent %d particles to child %d. sentTo[%d] = %d\n", thisIndex, len, child, i, sentTo[i]);
 #endif
+      partsToChild[i].length() = 0;
     }
+  }
+}
+
+void TreePiece::resetPartsToChild(){
+  for(int i = 0; i < NSUB; i++){
+    partsToChild[i].length() = 0;
   }
 }
 
@@ -153,7 +171,14 @@ void TreePiece::recvRootFromParent(CmiUInt8 r, real rx, real ry, real rz, real r
   rmin[2] = rz;
   rsize = rs;
 
+#ifdef VERBOSE_PIECES
+      CkPrintf("piece %d recvd root from parent\n", thisIndex);
+#endif
+
   if(wantToSplit){
+#ifdef VERBOSE_PIECES
+      CkPrintf("piece %d wanted to split\n", thisIndex);
+#endif
     // create own root
     myRoot = (nodeptr) InitCell((cellptr)parent, thisIndex);
     Subp(parent)[whichChildAmI] = myRoot;
@@ -168,7 +193,7 @@ void TreePiece::recvRootFromParent(CmiUInt8 r, real rx, real ry, real rz, real r
 
     // process messages
     for(int i = 0; i < bufferedMsgs.length(); i++){
-      processMessage(bufferedMsgs[i]->particles, bufferedMsgs[i]->num);
+      processParticles(bufferedMsgs[i]->particles, bufferedMsgs[i]->num);
       delete bufferedMsgs[i];
     }
 
@@ -212,6 +237,7 @@ void TreePiece::acceptRoots(CmiUInt8 roots_, real rsize_, real rmx, real rmy, re
   contribute(0,0,CkReduction::concat,cb);
 }
 
+/*
 void TreePiece::recvTotalMsgCountsFromPieces(int totalNumFromParent){
 #ifdef MEMCHECK
   CkPrintf("piece %d before recvTotalMsgCountsFromPieces\n", thisIndex);
@@ -229,8 +255,9 @@ void TreePiece::recvTotalMsgCountsFromPieces(int totalNumFromParent){
   CmiMemoryCheck();
 #endif
 }
+*/
 
-
+/*
 void TreePiece::recvTotalMsgCountsFromChunks(CkReductionMsg *msg){
   if(isTopLevel){
 #ifdef MEMCHECK
@@ -240,9 +267,10 @@ void TreePiece::recvTotalMsgCountsFromChunks(CkReductionMsg *msg){
     int *data = (int *)msg->getData();
     int nelts = msg->getSize()/sizeof(int);
 
-    numTotalMsgs = data[thisIndex]; /* between 0 and numTreePieces, 
-                                       which is the number of 
-                                       top-level treepieces */
+    numTotalMsgs = data[thisIndex]; 
+                                      // between 0 and numTreePiece
+                                      // which is the number of 
+                                      //  top-level treepieces
 #ifdef VERBOSE_PIECES
     CkPrintf("piece %d got count from CHUNKS: %d (%d)\n", thisIndex, numTotalMsgs, nelts);
 #endif
@@ -255,6 +283,7 @@ void TreePiece::recvTotalMsgCountsFromChunks(CkReductionMsg *msg){
   }
   delete msg;
 }
+*/
 
 /*
 void TreePiece::checkCompletion(){
@@ -349,6 +378,9 @@ void TreePiece::childDone(int which){
     CmiMemoryCheck();
 #endif
   }
+  else if(pendingChildren < 0){
+    CkAbort("pendingChildren < 0\n");
+  }
 }
 
 void TreePiece::recvParticles(ParticleMsg *msg){ 
@@ -360,7 +392,7 @@ void TreePiece::recvParticles(ParticleMsg *msg){
   CmiMemoryCheck();
 #endif
 #ifdef VERBOSE_PIECES
-  CkPrintf("piece %d recvd %d particles, numRecvdMsgs: %d\n", thisIndex, msg->num, numRecvdMsgs);
+  //CkPrintf("piece %d recvd %d particles, numRecvdMsgs: %d\n", thisIndex, msg->num, numRecvdMsgs);
 #endif
 
   int newtotal = myNumParticles+msg->num;
@@ -371,6 +403,9 @@ void TreePiece::recvParticles(ParticleMsg *msg){
     CkPrintf("piece %d has too many (%d+%d) particles; creating children\n", thisIndex, myNumParticles, msg->num);
 #endif
     if(haveParent){
+#ifdef VERBOSE_PIECES
+      CkPrintf("piece %d has parent, process\n", thisIndex);
+#endif
       // first create own root
       // then process message and own particles, to see where they should go
       myRoot = (nodeptr) InitCell((cellptr)parent, thisIndex);
@@ -392,6 +427,9 @@ void TreePiece::recvParticles(ParticleMsg *msg){
       sendParticlesToChildren();
     }
     else{
+#ifdef VERBOSE_PIECES
+      CkPrintf("piece %d doesn't have parent, buffer msg\n", thisIndex);
+#endif
       // buffer message and return
       bufferedMsgs.push_back(msg);
       wantToSplit = true;
@@ -420,7 +458,6 @@ void TreePiece::recvParticles(ParticleMsg *msg){
 #ifdef VERBOSE_PIECES
     CkPrintf("piece %d has children\n", thisIndex);
 #endif
-    //partsToChild.length() = 0;
     // at this point, we have a list of particles 
     // destined for each child
 
@@ -437,7 +474,7 @@ void TreePiece::recvParticles(ParticleMsg *msg){
 }
 
 void TreePiece::doBuildTree(){
-  // the parent will not send any more messages
+  //CkPrintf("piece %d in doBuildTree\n", thisIndex);
   if(haveChildren){
 #ifdef VERBOSE_PIECES
     CkPrintf("piece %d fake doneTreeBuild()\n", thisIndex);
@@ -450,19 +487,19 @@ void TreePiece::doBuildTree(){
 #endif
     buildTree();
     hackcofm(0,thisIndex);
-    if(!isTopLevel){
+    if(!isTopLevel && haveParent){
       // once you've built your own tree, 
       // you must notify your parent that you're done
 #ifdef VERBOSE_PIECES
-      CkPrintf("piece %d real !topLevel doneTreeBuild()\n", thisIndex);
+      CkPrintf("piece %d real !topLevel doneTreeBuild(), haveParent: %d\n", thisIndex, haveParent);
 #endif
       pieces[parentIndex].childDone(whichChildAmI);
     }
-    else{
 #ifdef VERBOSE_PIECES
+    else{
       CkPrintf("piece %d real topLevel doneTreeBuild()\n", thisIndex);
-#endif
     }
+#endif
     CkCallback cb(CkIndex_ParticleChunk::doneTreeBuild(), CkArrayIndex1D(0), chunks);
     contribute(0,0,CkReduction::concat,cb);
   }
@@ -676,9 +713,6 @@ leafptr TreePiece::InitLeaf(cellptr parent, unsigned ProcessId)
    }
    */
    
-   myleaftab.push_back(l);
-   mynleaf++;
-
    return (l);
 }
 
@@ -686,21 +720,20 @@ leafptr TreePiece::InitLeaf(cellptr parent, unsigned ProcessId)
  * MAKECELL: allocation routine for cells.
  */
 
-cellptr makecell(unsigned ProcessId)
+cellptr TreePiece::makecell(unsigned ProcessId)
 {
    cellptr c;
    int i, Mycell;
     
-   /*
-   if (mynumcell == maxmycell) {
-      error("makecell: Proc %d needs more than %d cells; increase fcells\n", 
+   if (myncell == maxmycell) {
+      CkPrintf("makecell: Proc %d needs more than %d cells; increase fcells\n", 
 	    ProcessId,maxmycell);
+      CkAbort("makecell\n");
    }
-   Mycell = mynumcell++;
+   Mycell = myncell++;
    c = ctab + Mycell;
-   c->seqnum = ProcessId*maxmycell+Mycell;
-   */
-   c = new cell;
+   //c->seqnum = ProcessId*maxmycell+Mycell;
+   // c = new cell;
    Type(c) = CELL;
    Done(c) = FALSE;
    Mass(c) = 0.0;
@@ -708,6 +741,7 @@ cellptr makecell(unsigned ProcessId)
       Subp(c)[i] = NULL;
    }
    //mycelltab[myncell++] = c;
+   mycelltab.push_back(c);
    return (c);
 }
 
@@ -715,21 +749,20 @@ cellptr makecell(unsigned ProcessId)
  * MAKELEAF: allocation routine for leaves.
  */
 
-leafptr makeleaf(unsigned ProcessId)
+leafptr TreePiece::makeleaf(unsigned ProcessId)
 {
    leafptr le;
    int i, Myleaf;
     
-   /*
-   if (mynumleaf == maxmyleaf) {
-      error("makeleaf: Proc %d needs more than %d leaves; increase fleaves\n",
+   if (mynleaf == maxmyleaf) {
+      CkPrintf("makeleaf: Proc %d needs more than %d leaves; increase fleaves\n",
 	    ProcessId,maxmyleaf);
+      CkAbort("makeleaf\n");
    }
-   Myleaf = mynumleaf++;
+   Myleaf = mynleaf++;
    le = ltab + Myleaf;
    le->seqnum = ProcessId * maxmyleaf + Myleaf;
-   */
-   le = new leaf; 
+   // le = new leaf; 
    Type(le) = LEAF;
    Done(le) = FALSE;
    Mass(le) = 0.0;
@@ -738,6 +771,7 @@ leafptr makeleaf(unsigned ProcessId)
       Bodyp(le)[i] = NULL;
    }
    //myleaftab[mynleaf++] = le;
+   myleaftab.push_back(le);
    return (le);
 }
 
@@ -823,10 +857,6 @@ cellptr TreePiece::InitCell(cellptr parent_, unsigned ProcessId)
       CkPrintf("makecell: piece %d needs more than %d cells; increase fcells\n", ProcessId,maxmycell);
    }
    */
-   
-   mycelltab.push_back(c);
-   myncell++;
-
   return (c);
 }
 
@@ -974,6 +1004,8 @@ void TreePiece::hackcofm(int nc, unsigned ProcessId)
    }
 }
 
+// called only treepiece has children, so that myRoot will
+// be valid.
 void TreePiece::updateMoments(int which){
 
   int i,Myindex;
@@ -1018,6 +1050,7 @@ void TreePiece::updateMoments(int which){
 }
 
 void TreePiece::cleanup(CkCallback &cb_){
+  /*
   for(int i = 0; i < mycelltab.length(); i++){
     delete mycelltab[i];
   }
@@ -1025,6 +1058,12 @@ void TreePiece::cleanup(CkCallback &cb_){
   for(int i = 0; i < myleaftab.length(); i++){
     delete myleaftab[i];
   }
+  */
+
+  // reset your parent's pointer to your topmost 
+  // cell/leaf. every treepiece has a parent node
+
+  Subp(parent)[whichChildAmI] = NULL;
 
   numTotalMsgs = -1;
   numRecvdMsgs = 0;
@@ -1033,6 +1072,19 @@ void TreePiece::cleanup(CkCallback &cb_){
   for(int i = 0; i < NSUB; i++){
     sentTo[i] = 0;
     partsToChild[i].length() = 0;
+    isPending[i] = false;
+  }
+  // treepieces need not have myRoots
+  // since we begin inserting particles as 
+  // children of the parent node. therefore,
+  // unless more than one bucket was created 
+  // during the treebuild process, or the node
+  // was split because it was too fat, myRoot
+  // will be NULL
+  if(myRoot != NULL){
+    for(int i = 0; i < NSUB; i++){
+      Subp(myRoot)[i] = NULL;
+    }
   }
   myParticles.length() = 0;
   myNumParticles = 0;

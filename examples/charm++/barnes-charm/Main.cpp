@@ -60,10 +60,10 @@ void Main::initparam(string *argv, const char **defvs)
 void Main::initoutput()
 {
    printf("\n\t\t%s\n\n", headline.c_str());
-   printf("%10s%10s%10s%10s%10s%10s%10s%10s\n",
-	  "nbody", "dtime", "eps", "tol", "dtout", "tstop","fcells","NPROC");
-   printf("%10d%10.5f%10.4f%10.2f%10.3f%10.3f%10.2f%10d\n\n",
-	  nbody, dtime, eps, tol, dtout, tstop, fcells, NPROC);
+   printf("%10s%10s%10s%10s%10s%10s%10s%10s%10s\n",
+	  "nbody", "dtime", "eps", "tol", "dtout", "tstop","fcells","fleaves","NPROC");
+   printf("%10d%10.5f%10.4f%10.2f%10.3f%10.3f%10.2f%10.2f%10d\n\n",
+	  nbody, dtime, eps, tol, dtout, tstop, fcells, fleaves, NPROC);
 }
 
 
@@ -128,6 +128,10 @@ Main::Main(CkArgMsg *m){
   
   numParticleChunks = NPROC;
   iterations = getiparam("it");
+  if(iterations < 0){
+    iterations = DEFAULT_NUM_ITERATIONS;
+  }
+
   numTreePieces = getiparam("pieces");
   if(numTreePieces < 0){
     numTreePieces = 8*numParticleChunks; 
@@ -163,6 +167,35 @@ Main::Main(CkArgMsg *m){
   // particle chunks
   ckout << "Starting simulation" << endl;
   thisProxy.startSimulation();
+}
+
+/*
+ * MAKECELL: allocation routine for cells.
+ */
+
+cellptr Main::makecell(unsigned ProcessId)
+{
+   cellptr c;
+   int i, Mycell;
+    
+   /*
+   if (mynumcell == maxmycell) {
+      error("makecell: Proc %d needs more than %d cells; increase fcells\n", 
+	    ProcessId,maxmycell);
+   }
+   Mycell = mynumcell++;
+   c = ctab + Mycell;
+   c->seqnum = ProcessId*maxmycell+Mycell;
+   */
+   c = new cell;
+   Type(c) = CELL;
+   Done(c) = FALSE;
+   Mass(c) = 0.0;
+   for (i = 0; i < NSUB; i++) {
+      Subp(c)[i] = NULL;
+   }
+   //mycelltab[myncell++] = c;
+   return (c);
 }
 
 /*
@@ -240,7 +273,6 @@ int Main::createTopLevelTree(cellptr node, int depth){
 
 void Main::startSimulation(){
   // slavestart for chunks
-
   chunks.SlaveStart((CmiUInt8)mybodytab, (CmiUInt8)bodytab, CkCallbackResumeThread());
   //chunks.SlaveStart(mybodytab, mycelltab, myleaftab, CkCallbackResumeThread());
 
@@ -256,12 +288,13 @@ void Main::startSimulation(){
     CkPrintf("[main] rmin: (%f,%f,%f), rsize: %f\n", rmin[0], rmin[1], rmin[2], rsize);
     CkPrintf("**********************************\n");
     start = CmiWallTimer();
+    CkCallback cb(CkIndex_TreePiece::doBuildTree(), pieces);
+    CkStartQD(cb);
     init_root(-1);
     // send roots to pieces
     pieces.acceptRoots((CmiUInt8)topLevelRoots.getVec(), rsize, rmin[0], rmin[1], rmin[2], CkCallbackResumeThread());
     // send root to chunk
     chunks.acceptRoot((CmiUInt8)G_root, rmin[0], rmin[1], rmin[2], rsize, CkCallbackResumeThread());
-    // chunks.startIteration(CkCallbackResumeThread());
     
     // update top-level nodes' moments here, since all treepieces have 
     // completed calculating theirs
@@ -296,11 +329,16 @@ void Main::startSimulation(){
     CkPrintf("[main] Clean up ... %f s\n", (end-start));
 #endif
     i++;
+
+    // must reset the vector of top level roots so that the same
+    // root isn't used over and over again by the treepieces:
+    topLevelRoots.length() = 0;
+    tnow = tnow + dtime;
   }
 
   CkPrintf("[main] Completed simulation\n");
 #ifdef OUTPUT_ACC
-  // FIXME - accel. output code here.
+  // TODO - accel. output code here.
 #endif
   CkExit();
 }
@@ -316,9 +354,11 @@ Main::tab_init()
 
   /*allocate space for personal lists of body pointers */
   maxmybody = (real)(nbody+maxleaf*MAX_BODIES_PER_LEAF)/(real) NPROC; 
+  //maxmybody = (1.0+fleaves*MAX_BODIES_PER_LEAF)*nbody/(real) NPROC;
   CkPrintf("[main] maxmybody: %d\n", maxmybody);
-  mybodytab = (bodyptr*) G_MALLOC(NPROC*maxmybody*sizeof(bodyptr));
-  CkAssert(mybodytab);
+  mybodytab = new bodyptr [NPROC*maxmybody]; 
+  //mybodytab = (bodyptr*) G_MALLOC(NPROC*maxmybody*sizeof(bodyptr));
+  CkAssert(mybodytab != NULL);
   /* space is allocated so that every */
   /* process can have a maximum of maxmybody pointers to bodies */ 
   /* then there is an array of bodies called bodytab which is  */
@@ -512,7 +552,8 @@ void Main::testdata()
 
    //headline = "Hack code: Plummer model";
    tnow = 0.0;
-   bodytab = (bodyptr) G_MALLOC(nbody * sizeof(body));
+   bodytab = new body [nbody];
+   //bodytab = (bodyptr) G_MALLOC(nbody * sizeof(body));
    CkAssert(bodytab);
    if (bodytab == NULL) {
       ckerr << "testdata: not enuf memory\n";

@@ -10,7 +10,7 @@
 #
 # to print out a graphical representation of the constructed tree:
 # -DPRINT_TREE
-OPTS=-g -DVERBOSE_CHUNKS -DVERBOSE_PIECES -DVERBOSE_MAIN
+OPTS=-O3 #-DVERBOSE_CHUNKS -DVERBOSE_PIECES -DVERBOSE_MAIN
 CHARMC=../../../multicore-linux64/bin/charmc $(OPTS)
 
 OBJS = TreePiece.o ParticleChunk.o Main.o grav.o util.o code_io.o 

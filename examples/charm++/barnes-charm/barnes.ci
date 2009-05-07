@@ -36,10 +36,11 @@ mainmodule barnes {
     entry void acceptRoots(CmiUInt8 root, real rsize, real rminx, real rminy, real rminz, CkCallback &cb);
     entry void recvRootFromParent(CmiUInt8 r, real rx, real ry, real rz, real rs);
     entry void recvParticles(ParticleMsg *msg);
-    entry void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
-    entry void recvTotalMsgCountsFromPieces(int totalNumFromParent);
+    // entry void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
+    // entry void recvTotalMsgCountsFromPieces(int totalNumFromParent);
     entry void childDone(int which);
     entry void cleanup(CkCallback &cb);
+    entry void doBuildTree();
   };
 
   array [1D] ParticleChunk {
