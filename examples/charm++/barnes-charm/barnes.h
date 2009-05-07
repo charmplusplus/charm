@@ -267,7 +267,8 @@ class TreePiece : public CBase_TreePiece {
   CkVec<ParticleMsg *> bufferedMsgs;
   bool haveParent;
 
-  void checkCompletion();
+  //void checkCompletion();
+  void processParticles(bodyptr *particles, int num);
   leafptr InitLeaf(cellptr parent, unsigned ProcessId);
   cellptr InitCell(cellptr parent, unsigned ProcessId);
   void hackcofm(int nc, unsigned ProcessId);

@@ -339,6 +339,7 @@ void ParticleChunk::sendParticlesToTp(int tp){
 
 void ParticleChunk::doneSendingParticles(){
   // send counts to chunk 0
+  /*
   CkCallback cb(CkIndex_TreePiece::recvTotalMsgCountsFromChunks(0), pieces);
   contribute(numTreePieces*sizeof(int), numMsgsToEachTp, CkReduction::sum_int, cb);   
 
@@ -346,6 +347,7 @@ void ParticleChunk::doneSendingParticles(){
     numMsgsToEachTp[i] = 0;
     particlesToTps[i].length() = 0;
   }
+  */
 }
 
 void ParticleChunk::doneTreeBuild(){
