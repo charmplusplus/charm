@@ -1038,11 +1038,18 @@ class CkConditional {
   int refcount;
 public:
   CkConditional() : refcount(1) { }
+  virtual ~CkConditional() { }
+    /*
   void* operator new(size_t s) {
     return malloc(s);
   }
-  void operator delete(void *p) {
-    if (--((CkConditional*)p)->refcount == 0) free(p);
+    */
+  void deallocate() {
+    CkPrintf("CkConditional::delete %d\n",refcount);
+    if (--refcount == 0) {
+      //((CkConditional*)p)->~CkConditional();
+      delete this;
+    }
   }
   void copyreference(void) {
     ++refcount;
