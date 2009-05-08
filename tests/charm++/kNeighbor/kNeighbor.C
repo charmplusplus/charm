@@ -5,6 +5,7 @@
 #define STRIDEK 3
 #define CALCPERSTEP 100
 #define WRAPROUND 1
+#define ALLCROSSNODE 0
 #define BLOCKMAPPING 1
 #define USE_ARRAY_REDUCTION 0
 
@@ -247,6 +248,20 @@ public:
             while (tmpnei>=totalElems) tmpnei -= totalElems;
             neighbors[nidx] = tmpnei;
         }
+#elif ALLCROSSNODE
+	if(CkNumNodes()==1){
+	    if(thisIndex==0){
+		CkPrintf("This version has to run with more than 2 nodes!\n");
+		CkExit();
+	    }
+	    return;
+	}
+	numNeighbors = CkNumNodes()-1;
+	neighbors = new int[numNeighbors];
+	recvTimes = new double[numNeighbors];
+	for(int i=0; i<numNeighbors; i++){
+	    neighbors[i] = (thisIndex+(i+1)*CmiMyNodeSize())%CkNumPes();
+	}
 #else
         //calculate the neighbors this element has
         numNeighbors = 0;
@@ -275,6 +290,7 @@ public:
         CkPrintf("\n");
 #endif
 
+	//CkPrintf("Elem [%d] on proc %d (node=%d, rank=%d)\n", thisIndex, CkMyPe(), CkMyNode(), CkMyRank());
         random = thisIndex*31+73;
     }
 
