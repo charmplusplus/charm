@@ -1384,30 +1384,7 @@ void req_ccs_connect(void)
 	h.hdr.pe=ChMessageInt_new(pe);
   }
 
-  if (strncmp(REDIRECT_STDIO, h.hdr.handler, strlen(REDIRECT_STDIO))==0) {
-    /*This is a request to make a duplicate to stdio*/
-    if (stdio_alloc == 0) {
-      stdio_alloc = 4096;
-      stdio_buffer = malloc(stdio_alloc);
-    }
-    CcsServer_sendReply(&h.hdr,0,0);
-  }
-  else if (strncmp(FETCH_STDIO, h.hdr.handler, strlen(FETCH_STDIO))==0) {
-    /*Reply with the data loaded until now*/
-    if (stdio_size > 0) {
-      h.hdr.len = ChMessageInt_new(1); /* fake len to prevent socket closed without reply! */
-      CcsServer_sendReply(&h.hdr,stdio_size,stdio_buffer);
-      stdio_size = 0;
-    } else {
-      if (stdio_waiting) {
-        CcsServer_sendReply(&stdio_waiting_hdr,0,0);
-      }
-      stdio_waiting = 1;
-      stdio_waiting_hdr = h.hdr;
-      stdio_waiting_hdr.len = ChMessageInt_new(1); /* fake len to prevent socket closed without reply! */
-    }
-  }
-  else {
+  if (! check_stdio_header(&h.hdr)) {
 
 #define LOOPBACK 0
 #if LOOPBACK /*Immediately reply "there's nothing!" (for performance testing)*/
@@ -1574,29 +1551,6 @@ static void checkPrintfError(int err) {
   }
 }
 
-void write_stdio_duplicate(char* data) {
-  if (stdio_alloc > 0) {
-    int size = strlen(data);
-    
-    if (stdio_waiting) {
-      stdio_waiting = 0;
-      CcsServer_sendReply(&stdio_waiting_hdr,size+1,data);
-    }
-    else {
-      if (size+stdio_size >= stdio_alloc) {
-        char *newbuf;
-        stdio_alloc += (size>4096 ? size : 4096);
-        newbuf = malloc(stdio_alloc);
-        memcpy(newbuf, stdio_buffer, stdio_size);
-        free(stdio_buffer);
-        stdio_buffer = newbuf;
-      }
-      strcpy(&stdio_buffer[stdio_size], data);
-      stdio_size += size;
-    }
-  }
-}
-
 int req_handle_print(ChMessage *msg,SOCKET fd)
 {
   checkPrintfError(printf("%s",msg->data));
@@ -1610,6 +1564,7 @@ int req_handle_printerr(ChMessage *msg,SOCKET fd)
 {
   fprintf(stderr,"%s",msg->data);
   fflush(stderr);
+  write_stdio_duplicate(msg->data);
   return REQ_OK;
 }
 
@@ -1628,6 +1583,7 @@ int req_handle_printerrsyn(ChMessage *msg,SOCKET fd)
 {
   fprintf(stderr,"%s",msg->data);
   fflush(stderr);
+  write_stdio_duplicate(msg->data);
   req_reply(fd, "printdone", "", 1);
   return REQ_OK;
 }

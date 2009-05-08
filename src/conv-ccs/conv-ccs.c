@@ -321,7 +321,9 @@ void CcsServerCheck(void)
     if (CcsServer_recvRequest(&hdr,&data))
     {/*We got a network request*/
       /* printf("Got CCS request...\n"); */
-      CcsImpl_netRequest(&hdr,data);
+      if (! check_stdio_header(&hdr)) {
+        CcsImpl_netRequest(&hdr,data);
+      }
       free(data);
     }
   }
@@ -358,6 +360,9 @@ void CcsInit(char **argv)
 
 #if NODE_0_IS_CONVHOST
   rep_fw_handler_idx = CmiRegisterHandler((CmiHandler)rep_fw_handler);
+#if ! CMK_CMIPRINTF_IS_A_BUILTIN
+  print_fw_handler_idx = CmiRegisterHandler((CmiHandler)print_fw_handler);
+#endif
   {
    int ccs_serverPort=0;
    char *ccs_serverAuth=NULL;

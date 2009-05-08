@@ -462,6 +462,98 @@ void CcsServer_sendReply(CcsImplHeader *hdr,int repBytes,const void *repData)
   skt_set_abort(old);
 }
 
+/***************************************************************************
+ * Routines to handle standard out/err forwarding from application to remote
+ * program connecting through CCS (used by CharmDebug)
+ ***************************************************************************/
+
+#define REDIRECT_STDIO  "redirect stdio"
+#define FETCH_STDIO "fetch stdio"
+char *stdio_buffer = NULL;
+int stdio_size = 0;
+int stdio_alloc = 0;
+int stdio_waiting = 0;
+CcsImplHeader stdio_waiting_hdr;
+
+void write_stdio_duplicate(char* data) {
+  if (stdio_alloc > 0) {
+    int size = strlen(data);
+    
+    if (stdio_waiting) {
+      stdio_waiting = 0;
+      CcsServer_sendReply(&stdio_waiting_hdr,size+1,data);
+    }
+    else {
+      if (size+stdio_size >= stdio_alloc) {
+        char *newbuf;
+        stdio_alloc += (size>4096 ? size : 4096);
+        newbuf = malloc(stdio_alloc);
+        memcpy(newbuf, stdio_buffer, stdio_size);
+        free(stdio_buffer);
+        stdio_buffer = newbuf;
+      }
+      strcpy(&stdio_buffer[stdio_size], data);
+      stdio_size += size;
+    }
+  }
+}
+
+int check_stdio_header(CcsImplHeader *hdr) {
+  if (strncmp(REDIRECT_STDIO, hdr->handler, strlen(REDIRECT_STDIO))==0) {
+    /*This is a request to make a duplicate to stdio*/
+    if (stdio_alloc == 0) {
+      stdio_alloc = 4096;
+      stdio_buffer = malloc(stdio_alloc);
+    }
+    CcsServer_sendReply(hdr,0,0);
+  }
+  else if (strncmp(FETCH_STDIO, hdr->handler, strlen(FETCH_STDIO))==0) {
+    /*Reply with the data loaded until now*/
+    if (stdio_size > 0) {
+      hdr->len = ChMessageInt_new(1); /* fake len to prevent socket closed without reply! */
+      CcsServer_sendReply(hdr,stdio_size,stdio_buffer);
+      stdio_size = 0;
+    } else {
+      if (stdio_waiting) {
+        CcsServer_sendReply(&stdio_waiting_hdr,0,0);
+      }
+      stdio_waiting = 1;
+      stdio_waiting_hdr = *hdr;
+      stdio_waiting_hdr.len = ChMessageInt_new(1); /* fake len to prevent socket closed without reply! */
+    }
+  } else {
+    return 0;
+  }
+  return 1;
+}
+
+int print_fw_handler_idx;
+
+/* Receives messages passed to processor 0 by all other processors as a
+ * consequence of prints in debug mode.
+ */
+void print_fw_handler(char *msg) {
+  write_stdio_duplicate(msg+CmiMsgHeaderSizeBytes);
+}
+
+/* Forward prints to node0 to be buffered and delivered through CCS */
+void print_node0(const char *format, va_list args) {
+  char buffer[16384];
+  int len;
+  if ((len=vsnprintf(buffer, 16384, format, args)) >= 16384) CmiAbort("CmiPrintf: printing buffer too long\n");
+  if (CmiMyPe() == 0) {
+    /* We are the print server, just concatenate the printed string */
+    write_stdio_duplicate(buffer);
+  } else {
+    /* Need to forward the string to processor 0 */
+    char* msg = CmiAlloc(CmiMsgHeaderSizeBytes+len+1);
+    memcpy(msg+CmiMsgHeaderSizeBytes, buffer, len+1);
+    CmiSetHandler(msg,print_fw_handler_idx);
+    CmiSyncSendAndFree(0,CmiMsgHeaderSizeBytes+len+1,msg);
+  }
+}
+
+
 #endif /*CMK_CCS_AVAILABLE*/
 
 
