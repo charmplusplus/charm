@@ -57,8 +57,8 @@ void BgWriteThreadTimeLine(char *pgm, int x, int y, int z, int th, BgTimeLine &t
   free(fname);
 }
 
-// write bgTrace file
-void BgWriteTraceSummary(int numPes, int x, int y, int z, int numWth, int numCth, char *traceroot)
+// write bgTrace file:
+void BgWriteTraceSummary(int numEmulatingPes, int x, int y, int z, int numWth, int numCth, char *traceroot)
 {
   char* d = new char[512];
   BGMach bgMach;
@@ -82,10 +82,12 @@ void BgWriteTraceSummary(int numPes, int x, int y, int z, int numWth, int numCth
   bgMach.numWth = numWth;
   bgMach.numCth = numCth;
   p|(BGMach &)bgMach;
-  p|numPes;
+  p|numEmulatingPes;
   p|bglog_version;
+  int threadEP = BgLogGetThreadEP();
+  if (threadEP!= -1) p|threadEP;
 
-  printf("BgWriteTraceSummary> Number is numX:%d numY:%d numZ:%d numCth:%d numWth:%d numPes:%d totalProcs:%d bglog_ver:%d\n",bgMach.x,bgMach.y,bgMach.z,bgMach.numCth,bgMach.numWth,numPes,nlocalProcs,bglog_version);
+  printf("BgWriteTraceSummary> Number is numX:%d numY:%d numZ:%d numCth:%d numWth:%d numPes:%d totalProcs:%d bglog_ver:%d\n",bgMach.x,bgMach.y,bgMach.z,bgMach.numCth,bgMach.numWth,numEmulatingPes,nlocalProcs,bglog_version);
 
   fclose(f);
 }
@@ -104,6 +106,7 @@ void BgWriteTimelines(int seqno, BgTimeLineRec **tlinerecs, int nlocalProcs, cha
   char *d = new char[512];
   sprintf(d, "%sbgTrace%d", traceroot?traceroot:"", seqno); 
   FILE *f = fopen(d,"wb");
+  CmiAssert(f!=NULL);
   PUP::toDisk p(f);
   const PUP::machineInfo &machInfo = PUP::machineInfo::current();
 
@@ -127,6 +130,7 @@ void BgWriteTimelines(int seqno, BgTimeLineRec **tlinerecs, int nlocalProcs, cha
   fclose(f);
 
   CmiPrintf("BgWriteTimelines> Wrote to disk for %d simulated nodes. \n", nlocalProcs);
+  delete [] procOffsets;
   delete [] d;
 }
 

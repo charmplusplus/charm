@@ -157,13 +157,14 @@ int BgLoadTraceSummary(const char *fname, int &totalWorkerProcs, int &numX, int 
   bglog_version = 0;
   if (!feof(f)) p|bglog_version;
 
-  if (!feof(f)) p|thread_ep;
+  if (!feof(f)) p|thread_ep;    // EP (CthResumeBigSimThreadIdx) to identify thread resume events
 
   fclose(f);
   return 0;
 }
 
 
+// return CthResumeBigSimThreadIdx, the thread resume event EP number
 int BgLogGetThreadEP()
 {
   return thread_ep;
