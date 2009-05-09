@@ -527,6 +527,7 @@ int check_stdio_header(CcsImplHeader *hdr) {
   return 1;
 }
 
+#if NODE_0_IS_CONVHOST
 int print_fw_handler_idx;
 
 /* Receives messages passed to processor 0 by all other processors as a
@@ -552,7 +553,7 @@ void print_node0(const char *format, va_list args) {
     CmiSyncSendAndFree(0,CmiMsgHeaderSizeBytes+len+1,msg);
   }
 }
-
+#endif
 
 #endif /*CMK_CCS_AVAILABLE*/
 

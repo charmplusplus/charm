@@ -1353,14 +1353,6 @@ sockets.
 
 #if CMK_CCS_AVAILABLE
 
-#define REDIRECT_STDIO  "redirect stdio"
-#define FETCH_STDIO "fetch stdio"
-char *stdio_buffer = NULL;
-int stdio_size = 0;
-int stdio_alloc = 0;
-int stdio_waiting = 0;
-CcsImplHeader stdio_waiting_hdr;
-
 /*The Ccs Server socket became active-- 
 rec'v the message and respond to the request,
 by forwarding the request to the appropriate node.
