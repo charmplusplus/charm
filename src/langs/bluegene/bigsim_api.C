@@ -94,6 +94,8 @@ void BgWriteTraceSummary(int numEmulatingPes, int x, int y, int z, int numWth, i
 
 // write bgTrace<seqno> file with an array of timelines
 //
+// seqno:   the sequence number of the emulating processor that is responsible 
+//          for generating this bgTarce?? file.
 // note that target processors are mapped to bgTrace* files in round-robin 
 // fashion
 // that is "tlinerecs" should contains timelines of target processors of 
