@@ -21,7 +21,8 @@
 #define INVALIDEP     -2
 #define TRACEON_EP     -3
 
-#define DefaultBinCount      10000
+// 5 minutes of run before it'll fill up:
+#define DefaultBinCount      (1000*60*5) 
 
 CkpvStaticDeclare(TraceSummary*, _trace);
 static int _numEvents = 0;
@@ -786,6 +787,13 @@ void TraceSummaryBOC::initCCS() {
     CkPrintf("Trace Summary now listening in for CCS Client\n");
     CcsRegisterHandler("CkPerfSummaryCcsClientCB", 
 		       CkCallback(CkIndex_TraceSummaryBOC::ccsClientRequest(NULL), sumProxy[0]));
+    CcsRegisterHandler("CkPerfSummaryCcsClientCB uchar", 
+		       CkCallback(CkIndex_TraceSummaryBOC::ccsClientRequestUnsignedChar(NULL), sumProxy[0])); 
+    CcsRegisterHandler("CkPerfSumDetail uchar", 
+		       CkCallback(CkIndex_TraceSummaryBOC::ccsClientRequestSumDetailUnsignedChar(NULL), sumProxy[0])); 
+    CcsRegisterHandler("CkPerfSumDetail compressed", 
+		       CkCallback(CkIndex_TraceSummaryBOC::ccsClientRequestSumDetailCompressed(NULL), sumProxy[0])); 
+
     CcdCallOnConditionKeep(CcdPERIODIC_1second, startCollectData,
 			   (void *)this);
     summaryCcsStreaming = CmiTrue;
@@ -795,9 +803,7 @@ void TraceSummaryBOC::initCCS() {
 void TraceSummaryBOC::ccsClientRequest(CkCcsRequestMsg *m) {
   double *sendBuffer;
 
-  CkPrintf("[%d] Request from Client detected. Data reads as:\n", CkMyPe());
-  CkPrintf("%s\n",m->data);
-  CkPrintf("\n");
+  CkPrintf("[%d] Request from Client detected. Client message: %s\n", CkMyPe(), m->data);
 
   CkPrintf("Responding ...\n");
   int datalength = 0;
@@ -815,6 +821,150 @@ void TraceSummaryBOC::ccsClientRequest(CkCcsRequestMsg *m) {
     CcsSendDelayedReply(m->reply, datalength, (void *)sendBuffer);
     ccsBufferedData->free();
   }
+  CkPrintf("Response Sent. Proceeding with computation.\n");
+  delete m;
+}
+
+
+void TraceSummaryBOC::ccsClientRequestUnsignedChar(CkCcsRequestMsg *m) {
+  unsigned char *sendBuffer;
+
+  CkPrintf("[%d] Request from Client detected. Client message: %s\n", CkMyPe(), m->data);
+
+  CkPrintf("Responding ...\n");
+  int datalength = 0;
+
+  if (ccsBufferedData->length() == 0) {
+    sendBuffer = new unsigned char[1];
+    sendBuffer[0] = 255;
+    datalength = sizeof(unsigned char);
+    CcsSendDelayedReply(m->reply, datalength, (void *)sendBuffer);
+    delete [] sendBuffer;
+  } else {
+    double * doubleData = ccsBufferedData->getVec();
+    int numData = ccsBufferedData->length();
+    
+    // pack data into unsigned char array
+    sendBuffer = new unsigned char[numData];
+    
+    for(int i=0;i<numData;i++){
+      sendBuffer[i] = 1000.0 * doubleData[i] / (double)CkNumPes() * 200.0; // max = 200 is the same as 100% utilization
+      int v = sendBuffer[i];
+    }    
+
+    datalength = sizeof(unsigned char) * numData;
+    
+    CcsSendDelayedReply(m->reply, datalength, (void *)sendBuffer);
+    ccsBufferedData->free();
+    delete [] sendBuffer;
+  }
+  CkPrintf("Response Sent. Proceeding with computation.\n");
+  delete m;
+}
+
+
+
+void TraceSummaryBOC::ccsClientRequestSumDetailUnsignedChar(CkCcsRequestMsg *m) {
+  unsigned char *sendBuffer;
+
+  CkPrintf("[%d] Request from Client for sum detail data as unsigned chars. Client message: %s\n", CkMyPe(), m->data);
+
+  CkAssert(sumDetail);
+
+  int _numEntries=_entryTable.size();
+
+  static int previouslySentBins = 0;
+  SumLogPool * p = CkpvAccess(_trace)->pool();
+  int numBinsAvailable = p->getNumEntries();
+  int binsToSend = numBinsAvailable - previouslySentBins;
+  CkPrintf("_numEntries=%d, binsToSend=%d\n", _numEntries, binsToSend);
+
+  if (binsToSend < 1) {
+    sendBuffer = new unsigned char[1];
+    sendBuffer[0] = 255;
+    int datalength = sizeof(unsigned char);
+    CcsSendDelayedReply(m->reply, datalength, (void *)sendBuffer);
+    delete [] sendBuffer;
+  } else {
+    
+    sendBuffer = new unsigned char[_numEntries * binsToSend + 1];
+    sendBuffer[0] = _numEntries;
+
+    for(int i=0; i<binsToSend; i++) {
+      for(int e=0; e<_numEntries; e++) {
+	unsigned char u= p->getUtilization(i,e) * 2.0;
+   	sendBuffer[2+i*_numEntries+e] = u;
+      }
+    }
+
+    previouslySentBins += binsToSend;
+
+    int datalength = sizeof(unsigned char) * (_numEntries * binsToSend + 1);
+    CcsSendDelayedReply(m->reply, datalength, (void *)sendBuffer);
+    delete [] sendBuffer;
+  }
+
+  CkPrintf("Response Sent. Proceeding with computation.\n");
+  delete m;
+}
+
+/**
+
+The data format sent by this handler is a bunch of records(one for each bin) of the following format:
+#samples (EP,utilization)* 
+
+
+ */
+void TraceSummaryBOC::ccsClientRequestSumDetailCompressed(CkCcsRequestMsg *m) {
+  unsigned char *sendBuffer;
+
+  CkPrintf("[%d] Request from Client for sum detail data as unsigned chars. Client message: %s\n", CkMyPe(), m->data);
+
+  CkAssert(sumDetail);
+
+  int _numEntries=_entryTable.size();
+
+  static int previouslySentBins = 0;
+  SumLogPool * p = CkpvAccess(_trace)->pool();
+  int numBinsAvailable = p->getNumEntries();
+  int binsToSend = numBinsAvailable - previouslySentBins;
+  CkPrintf("_numEntries=%d, binsToSend=%d\n", _numEntries, binsToSend);
+
+  if (binsToSend < 1) {
+    sendBuffer = new unsigned char[1];
+    sendBuffer[0] = 255;
+    int datalength = sizeof(unsigned char);
+    CcsSendDelayedReply(m->reply, datalength, (void *)sendBuffer);
+    delete [] sendBuffer;
+  } else {
+    
+    sendBuffer = new unsigned char[3*_numEntries * binsToSend];
+    int nextPos;
+    int startOfCurrentRecord = 0;
+
+    for(int i=0; i<binsToSend; i++) {
+      // Create a record for bin i
+      sendBuffer[startOfCurrentRecord] = 0; // The number of entries in this record
+      nextPos = startOfCurrentRecord+1;
+      for(int e=0; e<_numEntries; e++) {
+	unsigned char u= p->getUtilization(i,e) * 2.0;
+	if(u > 0) {
+	  sendBuffer[nextPos] = e;
+	  sendBuffer[nextPos+1] = u;
+	  nextPos += 2;
+	  sendBuffer[startOfCurrentRecord] ++;
+	}
+      }
+      startOfCurrentRecord = nextPos;
+    }
+
+    previouslySentBins += binsToSend;
+
+    int datalength = sizeof(unsigned char) * nextPos;
+    CcsSendDelayedReply(m->reply, datalength, (void *)sendBuffer);
+    delete [] sendBuffer;
+  }
+
   CkPrintf("Response Sent. Proceeding with computation.\n");
   delete m;
 }

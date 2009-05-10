@@ -17,7 +17,13 @@ module TraceSummary {
     entry void sendSummaryBOC(CkReductionMsg *);
 
     entry void initCCS();
+
+    // The ccs handlers:
     entry void ccsClientRequest(CkCcsRequestMsg *m);
+    entry void ccsClientRequestUnsignedChar(CkCcsRequestMsg *m);
+    entry void ccsClientRequestSumDetailUnsignedChar(CkCcsRequestMsg *m);
+    entry void ccsClientRequestSumDetailCompressed(CkCcsRequestMsg *m);
+
     entry void collectData(double startTime, double binSize, int numBins);
     entry void dataCollected(CkReductionMsg *);
   };

@@ -46,6 +46,10 @@ public:
   /* CCS support methods/entry methods */
   void initCCS();
   void ccsClientRequest(CkCcsRequestMsg *m);
+  void ccsClientRequestUnsignedChar(CkCcsRequestMsg *m);
+  void ccsClientRequestSumDetailUnsignedChar(CkCcsRequestMsg *m);
+  void ccsClientRequestSumDetailCompressed(CkCcsRequestMsg *m);
+
   void collectData(double startTime, double binSize, int numBins);
   void dataCollected(CkReductionMsg *);
 private:
