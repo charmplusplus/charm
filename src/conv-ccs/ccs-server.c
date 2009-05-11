@@ -527,7 +527,7 @@ int check_stdio_header(CcsImplHeader *hdr) {
   return 1;
 }
 
-#if NODE_0_IS_CONVHOST
+#if ! CMK_CMIPRINTF_IS_A_BUILTIN
 int print_fw_handler_idx;
 
 /* Receives messages passed to processor 0 by all other processors as a
