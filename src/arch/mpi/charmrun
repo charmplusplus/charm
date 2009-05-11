@@ -44,30 +44,32 @@ printf "\nRunning on $pes processors: $args\n"
 if [ -n "$PBS_NODEFILE" ]
 then
 # we are in a job shell
-  mpirun_cmd=`which mpirun 2>/dev/null`
-  if test -n "$mpirun_cmd"
+  aprun=`which aprun 2>/dev/null`
+  if test -n "$aprun"
   then
-  if echo $mpirun_cmd | grep 'mvapich2'  > /dev/null 2>/dev/null
-  then
-    # if daemon not started, start it
-    if ! mpdtrace > /dev/null 2>/dev/null
-    then
-      mvapich2-start-mpd
-    fi
-    mpirun -np $pes $args
-#    mpdallexit
-  else   # normal case
-    test -z "$machinefile" && args=-machinefile" "$PBS_NODEFILE" "$args
-    echo mpirun -np $pes $args
-    mpirun -np $pes $args
-  fi
+    echo aprun -n $pes $args
+    $aprun -n $pes $args
   else
-# try aprun
-    aprun=`which aprun 2>/dev/null`
-    if test -n "$aprun"
+    mpirun_cmd=`which mpirun 2>/dev/null`
+    if test -n "$mpirun_cmd"
     then
-      echo aprun -n $pes $args
-      $aprun -n $pes $args
+      if echo $mpirun_cmd | grep 'mvapich2'  > /dev/null 2>/dev/null
+      then
+        # if daemon not started, start it
+        if ! mpdtrace > /dev/null 2>/dev/null
+        then
+          mvapich2-start-mpd
+        fi
+        mpirun -np $pes $args
+        #    mpdallexit
+      else   # normal case
+        test -z "$machinefile" && args=-machinefile" "$PBS_NODEFILE" "$args
+        echo mpirun -np $pes $args
+        mpirun -np $pes $args
+      fi
+    else
+      echo "Charmrun> can not locate mpirun in order to run the program."
+      exit 1
     fi
   fi
 elif [ -n "$LSB_HOSTS" ]
