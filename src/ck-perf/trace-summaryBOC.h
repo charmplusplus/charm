@@ -1,5 +1,6 @@
 #include "ckcallback-ccs.h"
 #include "TraceSummary.decl.h"
+#include <deque>
 
 extern CkGroupID traceSummaryGID;
 extern bool summaryCcsStreaming;
@@ -26,6 +27,7 @@ private:
   int  nBins;
   int nTracedPEs;
 
+
 public:
   /* CCS support variables */
   int lastRequestedIndexBlock;
@@ -34,6 +36,8 @@ public:
   int nBufferedBins;
   CkVec<double> *ccsBufferedData;
   int nextBinIndexCcs;
+  std::deque<CkReductionMsg *> storedSumDetailResults;
+
 
 public:
   TraceSummaryBOC(void): count(0), bins(NULL), nBins(0), 
@@ -45,13 +49,17 @@ public:
 
   /* CCS support methods/entry methods */
   void initCCS();
-  void ccsClientRequest(CkCcsRequestMsg *m);
-  void ccsClientRequestUnsignedChar(CkCcsRequestMsg *m);
-  void ccsClientRequestSumDetailUnsignedChar(CkCcsRequestMsg *m);
-  void ccsClientRequestSumDetailCompressed(CkCcsRequestMsg *m);
+  void ccsRequestSummaryDouble(CkCcsRequestMsg *m);
+  void ccsRequestSummaryUnsignedChar(CkCcsRequestMsg *m);
+  void ccsRequestSumDetailUnsignedChar(CkCcsRequestMsg *m);
+  void ccsRequestSumDetailCompressed(CkCcsRequestMsg *m);
+  void ccsRequestSumDetailCompressedPE0(CkCcsRequestMsg *m);
 
-  void collectData(double startTime, double binSize, int numBins);
-  void dataCollected(CkReductionMsg *);
+  void collectSummaryData(double startTime, double binSize, int numBins);
+  void summaryDataCollected(CkReductionMsg *);
+  void collectSumDetailData(double startTime, double binSize, int numBins);
+  void sumDetailDataCollected(CkReductionMsg *);
+
 private:
   void write();
 };

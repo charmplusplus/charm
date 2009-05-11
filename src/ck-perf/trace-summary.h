@@ -209,7 +209,7 @@ class SumLogPool {
     void addEventType(int eventType, double time);
     void startPhase(int phase) { phaseTab.startPhase(phase); }
     BinEntry *bins() { return pool; }
-    int getNumEntries() { return numBins; }
+    int getNumEntries() const { return numBins; }
     void updateSummaryDetail(int epIdx, double startTime, double endTime);
 
     // accessors to normal summary data
