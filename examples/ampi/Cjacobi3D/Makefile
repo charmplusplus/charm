@@ -18,8 +18,8 @@ jacobi: jacobi.C
 	$(CHARMC) -o jacobi jacobi.o -language ampi -module EveryLB -lm
 
 jacobi.iso: jacobi.C
-	$(CHARMC) -c -DNO_PUP jacobi.C
-	-$(CHARMC) -o jacobi.iso jacobi.o -language ampi -module EveryLB -memory isomalloc
+	$(CHARMC) -c -DNO_PUP jacobi.C -o jacobi.iso.o
+	-$(CHARMC) -o jacobi.iso jacobi.iso.o -language ampi -module EveryLB -memory isomalloc
 
 jacobi-get: jacobi-get.C
 	$(CHARMC) -c jacobi-get.C
