@@ -211,12 +211,14 @@ class CkArrayIndex
 {
 public:
         ///Length of index in *integers*
-	int nInts;
+	short int nInts;
+	///Number of dimensions in this index, not valid for user-defined indices
+	short int dimension; 
 	
 	//Index data immediately follows...
 	
-	int *data(void) {return (&nInts)+1;}
-	const int *data(void) const {return (&nInts)+1;}
+	int *data(void) {return (int*)((&nInts)+2);}
+	const int *data(void) const {return (int*)((&nInts)+2);}
 
         int getCombinedCount(void) const {
           if (nInts == 1) return data()[0];
@@ -271,12 +273,13 @@ class CkArrayIndexMax : public CkArrayIndex {
 	void copyFrom(const CkArrayIndex &that)
 	{
 		nInts=that.nInts;
+		dimension=that.dimension;
 		index=((const CkArrayIndexMax *)&that)->index;
 		//for (int i=0;i<nInts;i++) index.data[i]=that.data()[i];
 	}
 public:
-	CkArrayIndexMax(void) { nInts=0; }
-	CkArrayIndexMax(int i) { nInts=0; }   // used for CkVec
+	CkArrayIndexMax(void) { nInts=0; dimension=0; }
+	CkArrayIndexMax(int i) { nInts=0; dimension=0; }   // used for CkVec
 	CkArrayIndexMax(const CkArrayIndex &that) 
 		{copyFrom(that);}
 	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
@@ -284,6 +287,7 @@ public:
         void print() { CmiPrintf("%d: %d %d %d\n", nInts,index.data[0], index.data[1], index.data[2]); }
 	void pup(PUP::er &p) {
 		p|nInts;
+		p|dimension;
 		for (int i=0;i<nInts;i++) p|index.data[i];
 	}
 	/*
@@ -346,7 +350,8 @@ PUPmarshall(CkArrayIndexMax)
 //  Needed, e.g., for use in unions where a constructor is forbidden.
 class CkArrayIndexStruct {
 public:
-	int nInts;
+	short int nInts;
+	short int dimension;
 	int index[CK_ARRAYINDEX_MAXLEN];
 	CkArrayIndexMax &asMax(void) 
 		{return *(CkArrayIndexMax *)this;}
@@ -354,6 +359,7 @@ public:
 		{return *(const CkArrayIndexMax *)this;}
 	void pup(PUP::er &p) {
 		p|nInts;
+		p|dimension;
 		for (int i=0;i<nInts;i++) p|index[i];
 	}
 };
@@ -1015,6 +1021,31 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #include "ckevacuation.h"
 #include "ckarrayreductionmgr.h"
 #include "trace.h"
+
+/************************** Debugging Utilities **************/
+
+//For debugging: convert given index to a string (NOT threadsafe)
+static const char *idx2str(const CkArrayIndex &ind) {
+  static char retBuf[80];
+  retBuf[0]=0;
+  if (ind.dimension <= 3) {
+    for (int i=0;i<ind.nInts;i++) {
+      if (i>0) strcat(retBuf,";");
+      sprintf(&retBuf[strlen(retBuf)],"%d",ind.data()[i]);
+    }
+  } else {
+    const short int *idx = (const short int*)ind.data();
+    for (int i=0;i<ind.dimension;i++) {
+      if (i>0) strcat(retBuf,";");
+      sprintf(&retBuf[strlen(retBuf)],"%hd",idx[i]);
+    }
+  }
+  return retBuf;
+}
+
+static const char *idx2str(const ArrayElement *el) {
+  return idx2str(el->thisIndexMax);
+}
 
 template <typename T>
 inline T *CkAllocateMarshallMsgT(int size,const CkEntryOptions *opts)

@@ -281,14 +281,17 @@ class CkArrayIndexCharisma: public CkArrayIndex
     CkArrayIndexCharisma(int _i) {
       i = _i; j = 0; k = 0;
       nInts = 1;
+      dimension = 1;
     }
     CkArrayIndexCharisma(int _i, int _j) {
       i = _i; j= _j; k= 0;
       nInts = 2;
+      dimension = 2;
     }
     CkArrayIndexCharisma(int _i, int _j, int _k) {
       i = _i; j = _j; k= _k;
       nInts = 3;
+      dimension = 3;
     }
 };
 

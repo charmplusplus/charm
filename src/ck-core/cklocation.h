@@ -13,7 +13,7 @@ array proxies, or the details of element creation (see ckarray.h).
 class CkArrayMessage : public CkMessage {
 public:
   //These routines are implementation utilities
-  inline CkArrayIndexMax &array_index(void);
+  CkArrayIndexMax &array_index(void);
   unsigned short &array_ep(void);
   unsigned short &array_ep_bcast(void);
   unsigned char &array_hops(void);

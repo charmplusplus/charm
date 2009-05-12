@@ -50,78 +50,90 @@ All these classes are defined in ckarray.C.
 /// Simple ArrayIndex classes: the key is just integer indices.
 class CkArrayIndex1D : public CkArrayIndex {
 public: int index;
-	CkArrayIndex1D() { nInts=1; }
+	CkArrayIndex1D() { nInts=1; dimension=1; }
 	CkArrayIndex1D(int i0) {
-		index=i0;nInts=1;
+		index=i0;nInts=1;dimension=1;
 	}
 	CkArrayIndex1D &operator=(const CkArrayIndex1D &that)  {
 		CmiAssert(that.nInts == 1);
+		CmiAssert(that.dimension == 1);
 		nInts = that.nInts;
+		dimension = that.dimension;
 		index = that.index;
 		return *this;
 	}
 };
 class CkArrayIndex2D : public CkArrayIndex {
 public: int index[2];
-	CkArrayIndex2D() { nInts=2; }
+	CkArrayIndex2D() { nInts=2; dimension=2; }
 	CkArrayIndex2D(int i0,int i1) {
-		index[0]=i0;index[1]=i1;nInts=2;
+		index[0]=i0;index[1]=i1;nInts=2;dimension=2;
 	}
 	CkArrayIndex2D &operator=(const CkArrayIndex2D &that)  {
 		CmiAssert(that.nInts == 2);
+		CmiAssert(that.dimension == 2);
 		nInts = that.nInts;
+		dimension = that.dimension;
 		memcpy(index, that.index, sizeof(int)*2);
 		return *this;
 	}
 };
 class CkArrayIndex3D : public CkArrayIndex {
 public: int index[3];
-	CkArrayIndex3D() { nInts=3; }
+	CkArrayIndex3D() { nInts=3; dimension=3; }
 	CkArrayIndex3D(int i0,int i1,int i2) {
-		index[0]=i0;index[1]=i1;index[2]=i2;nInts=3;
+		index[0]=i0;index[1]=i1;index[2]=i2;nInts=3;dimension=3;
 	}
 	CkArrayIndex3D &operator=(const CkArrayIndex3D &that)  {
 		CmiAssert(that.nInts == 3);
+		CmiAssert(that.dimension == 3);
 		nInts = that.nInts;
+		dimension = that.dimension;
 		memcpy(index, that.index, sizeof(int)*3);
 		return *this;
 	}
 };
 class CkArrayIndex4D : public CkArrayIndex {
 public: short int index[4];
-	CkArrayIndex4D(){ nInts=2; }
+	CkArrayIndex4D(){ nInts=2; dimension=4; }
 	CkArrayIndex4D(short int i0,short int i1,short int i2,short int i3) {
-		index[0]=i0;index[1]=i1;index[2]=i2;index[3]=i3;nInts=2;
+		index[0]=i0;index[1]=i1;index[2]=i2;index[3]=i3;nInts=2;dimension=4;
 	}
 	CkArrayIndex4D &operator=(const CkArrayIndex4D &that)  {
 		CmiAssert(that.nInts == 2);
+		CmiAssert(that.dimension == 4);
 		nInts = that.nInts;
+		dimension = that.dimension;
 		memcpy(index, that.index, sizeof(short int)*4);
 		return *this;
 	}
 };
 class CkArrayIndex5D : public CkArrayIndex {
 public: short int index[5];
-	CkArrayIndex5D(){ nInts=3; }
+	CkArrayIndex5D(){ nInts=3; dimension=5; }
 	CkArrayIndex5D(short int i0,short int i1,short int i2,short int i3,short int i4) {
-		index[0]=i0;index[1]=i1;index[2]=i2;index[3]=i3;index[4]=i4;nInts=3;
+		index[0]=i0;index[1]=i1;index[2]=i2;index[3]=i3;index[4]=i4;nInts=3;dimension=5;
         }
 	CkArrayIndex5D &operator=(const CkArrayIndex5D &that)  {
 		CmiAssert(that.nInts == 3);
+		CmiAssert(that.dimension == 5);
 		nInts = that.nInts;
+		dimension = that.dimension;
 		memcpy(index, that.index, sizeof(short int)*5);;
 		return *this;
 	}
 };
 class CkArrayIndex6D : public CkArrayIndex {
 public: short int index[6];
-	CkArrayIndex6D(){ nInts=3; }
+	CkArrayIndex6D(){ nInts=3; dimension=6; }
 	CkArrayIndex6D(short int i0,short int i1,short int i2,short int i3,short int i4,short int i5) {
-		index[0]=i0;index[1]=i1;index[2]=i2;index[3]=i3;index[4]=i4;index[5]=i5;nInts=3;
+		index[0]=i0;index[1]=i1;index[2]=i2;index[3]=i3;index[4]=i4;index[5]=i5;nInts=3;dimension=6;
 	}
 	CkArrayIndex6D &operator=(const CkArrayIndex6D &that)  {
 		CmiAssert(that.nInts == 3);
+		CmiAssert(that.dimension == 6);
 		nInts = that.nInts;
+		dimension = that.dimension;
 		memcpy(index, that.index, sizeof(short int)*6);;
 		return *this;
 	}
@@ -135,7 +147,8 @@ class CkArrayIndexT : public CkArrayIndex {
 public:
 	object obj;
 	CkArrayIndexT(const object &srcObj) {obj=srcObj;
-		nInts=sizeof(obj)/sizeof(int);}
+		nInts=sizeof(obj)/sizeof(int);
+		dimension=0; }
 };
 
 /********************* CkArrayListener ****************/

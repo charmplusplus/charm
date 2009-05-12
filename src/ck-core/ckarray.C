@@ -61,23 +61,6 @@ CpvDeclare(int ,serializer);
 
 CmiBool isAnytimeMigration;
 
-/************************** Debugging Utilities **************/
-
-//For debugging: convert given index to a string (NOT threadsafe)
-static const char *idx2str(const CkArrayIndex &ind)
-{
-  static char retBuf[80];
-  retBuf[0]=0;
-  for (int i=0;i<ind.nInts;i++)
-  {
-  	if (i>0) strcat(retBuf,";");
-  	sprintf(&retBuf[strlen(retBuf)],"%d",ind.data()[i]);
-  }
-  return retBuf;
-}
-static const char *idx2str(const ArrayElement *el)
-  {return idx2str(el->thisIndexMax);}
-
 #define ARRAY_DEBUG_OUTPUT 0
 
 #if ARRAY_DEBUG_OUTPUT 
@@ -104,11 +87,6 @@ static const char *idx2str(const ArrayElement *el)
 #   define str(x) /**/
 #   define DEBUG(x)
 #endif
-
-inline CkArrayIndexMax &CkArrayMessage::array_index(void)
-{
-	return UsrToEnv((void *)this)->getsetArrayIndex();
-}
 
 /*
 void 
@@ -303,11 +281,15 @@ char *ArrayElement::ckDebugChareName(void) {
 	char buf[200];
 	const char *className=_chareTable[ckGetChareType()]->name;
 	const int *d=thisIndexMax.data();
-	switch (thisIndexMax.nInts) {
+	const short int *s=(const short int*)d;
+	switch (thisIndexMax.dimension) {
 	case 0:	sprintf(buf,"%s",className); break;
 	case 1: sprintf(buf,"%s[%d]",className,d[0]); break;
 	case 2: sprintf(buf,"%s(%d,%d)",className,d[0],d[1]); break;
 	case 3: sprintf(buf,"%s(%d,%d,%d)",className,d[0],d[1],d[2]); break;
+    case 4: sprintf(buf,"%s(%hd,%hd,%hd,%hd)",className,s[0],s[1],s[2],s[3]); break;
+    case 5: sprintf(buf,"%s(%hd,%hd,%hd,%hd,%hd)",className,s[0],s[1],s[2],s[3],s[4]); break;
+    case 6: sprintf(buf,"%s(%hd,%hd,%hd,%hd,%hd,%hd)",className,s[0],s[1],s[2],s[3],s[4],s[5]); break;
 	default: sprintf(buf,"%s(%d,%d,%d,%d..)",className,d[0],d[1],d[2],d[3]); break;
 	};
 	return strdup(buf);
@@ -495,6 +477,7 @@ void CProxyElement_ArrayBase::pup(PUP::er &p)
 {
   CProxy_ArrayBase::pup(p);
   p|_idx.nInts;
+  p|_idx.dimension;
   p(_idx.data(),_idx.nInts);
 }
 

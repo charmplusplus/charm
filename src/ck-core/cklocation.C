@@ -23,23 +23,8 @@ Orion Sky Lawlor, olawlor@acm.org 9/29/2001
 CpvExtern(void *, CkGridObject);
 #endif
 
-/************************** Debugging Utilities **************/
-//For debugging: convert given index to a string
-const char *idx2str(const CkArrayIndex &ind)
-{
-	static char retBuf[80];
-	retBuf[0]=0;
-	for (int i=0;i<ind.nInts;i++)
-	{
-		if (i>0) strcat(retBuf,";");
-		sprintf(&retBuf[strlen(retBuf)],"%d",ind.data()[i]);
-	}
-	return retBuf;
-}
-
-const char *idx2str(const CkArrayMessage *m)
-{
-	return idx2str(((CkArrayMessage *)m)->array_index());
+static const char *idx2str(const CkArrayMessage *m) {
+  return idx2str(((CkArrayMessage *)m)->array_index());
 }
 
 #define ARRAY_DEBUG_OUTPUT 0
@@ -117,13 +102,14 @@ int CkArrayIndex::staticCompare(const void *k1,const void *k2,size_t /*len*/)
 void CkArrayIndex::pup(PUP::er &p) 
 {
 	p(nInts);
+	p(dimension);
 	p(data(),nInts);
 }
 
 /*********************** Array Messages ************************/
-inline CkArrayIndexMax &CkArrayMessage::array_index(void)
+CkArrayIndexMax &CkArrayMessage::array_index(void)
 {
-	return UsrToEnv((void *)this)->getsetArrayIndex();
+    return UsrToEnv((void *)this)->getsetArrayIndex();
 }
 unsigned short &CkArrayMessage::array_ep(void)
 {
@@ -165,7 +151,7 @@ int CkArrayMap::registerArray(CkArrayIndexMax& numElements,CkArrayID aid)
 #define CKARRAYMAP_POPULATE_INITIAL(POPULATE_CONDITION) \
         int i; \
 	for (int i1=0; i1<numElements.data()[0]; i1++) { \
-          if (numElements.nInts == 1) { \
+          if (numElements.dimension == 1) { \
             /* Make 1D indices */ \
             i = i1; \
             CkArrayIndex1D idx(i1); \
@@ -174,7 +160,7 @@ int CkArrayMap::registerArray(CkArrayIndexMax& numElements,CkArrayID aid)
           } else { \
             /* higher dimensionality */ \
             for (int i2=0; i2<numElements.data()[1]; i2++) { \
-              if (numElements.nInts == 2) { \
+              if (numElements.dimension == 2) { \
                 /* Make 2D indices */ \
                 i = i1 * numElements.data()[1] + i2; \
                 CkArrayIndex2D idx(i1, i2); \
@@ -182,7 +168,7 @@ int CkArrayMap::registerArray(CkArrayIndexMax& numElements,CkArrayID aid)
                   mgr->insertInitial(idx,CkCopyMsg(&ctorMsg)); \
               } else { \
                 /* higher dimensionality */ \
-                CkAssert(numElements.nInts == 3); \
+                CkAssert(numElements.dimension == 3); \
                 for (int i3=0; i3<numElements.data()[2]; i3++) { \
                   /* Make 3D indices */ \
                   i = (i1 * numElements.data()[1] + i2) * numElements.data()[2] + i3; \
@@ -324,7 +310,7 @@ public:
     } else if (i.nInts == 3) {
       flati = (i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1]) * arrs[arrayHdl]->_nelems.data()[2] + i.data()[2];
     } else {
-      CkAbort("CkArrayIndex has dimension greater than 3!");
+      CkAbort("CkArrayIndex has more than 3 integers!");
     }
 
     return (flati/arrs[arrayHdl]->_binSize);
@@ -358,7 +344,7 @@ public:
         } else if (numElements.nInts == 3) {
           binSize = (int)ceil((double)(numElements.data()[0]*numElements.data()[1]*numElements.data()[2])/(double)numPes);
         } else {
-          CkAbort("CkArrayIndex has dimension greater than 3!");
+          CkAbort("CkArrayIndex has more than 3 integers!");
         }
         CKARRAYMAP_POPULATE_INITIAL(i/binSize==thisPe);
 
@@ -927,7 +913,8 @@ CkMigratable::~CkMigratable() {
 	}
 #endif
 	//To detect use-after-delete
-	thisIndexMax.nInts=-123456;
+	thisIndexMax.nInts=-12345;
+	thisIndexMax.dimension=-12345;
 }
 
 void CkMigratable::CkAbort(const char *why) const {
@@ -1883,7 +1870,7 @@ void CkLocMgr::inform(const CkArrayIndex &idx,int nowOnPe)
 	CkLocRec *rec=elementNrec(idx);
 	if (rec!=NULL && rec->type()==CkLocRec::local){
 #ifdef _FAULT_MLOG_
-        CmiPrintf("[%d]WARNING!!! Element %d:%s is local but is being told it exists on %d\n",CkMyPe(),idx.nInts,idx2str(idx), nowOnPe);
+        CmiPrintf("[%d]WARNING!!! Element %d:%s is local but is being told it exists on %d\n",CkMyPe(),idx.dimension,idx2str(idx), nowOnPe);
 #endif
 		return; //Never replace a local element's record!
 	}
@@ -2463,7 +2450,7 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 		p(nManagers);
 		pupElementsFor(p,rec,CkElementCreation_migrate);
 		if (p.size()!=bufSize) {
-			CkError("ERROR! Array element claimed it was %d bytes to a"
+			CkError("ERROR! Array element claimed it was %d bytes to a "
 				"sizing PUP::er, but copied %d bytes into the packing PUP::er!\n",
 				bufSize,p.size());
 			CkAbort("Array element's pup routine has a direction mismatch.\n");
