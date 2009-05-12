@@ -3099,7 +3099,7 @@ void CmiIOInit(char **argv) {
 
 void CmiPrintf(const char *format, ...)
 {
-  //CpdSystemEnter();
+  /*CpdSystemEnter();*/
   va_list args;
   va_start(args,format);
   vfprintf(stdout,format, args);
@@ -3114,12 +3114,12 @@ void CmiPrintf(const char *format, ...)
     va_end(args);
   }
 #endif
-  //CpdSystemExit();
+  /*CpdSystemExit();*/
 }
 
 void CmiError(const char *format, ...)
 {
-  //CpdSystemEnter();
+  /*CpdSystemEnter();*/
   va_list args;
   va_start(args,format);
   vfprintf(stderr,format, args);
@@ -3132,7 +3132,7 @@ void CmiError(const char *format, ...)
     va_end(args);
   }
 #endif
-  //CpdSystemExit();
+  /*CpdSystemExit();*/
 }
 
 #endif
