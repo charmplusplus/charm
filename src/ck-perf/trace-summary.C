@@ -945,19 +945,19 @@ void TraceSummaryBOC::ccsRequestSumDetailCompressed(CkCcsRequestMsg *m) {
   int datalength;
 
   if (storedSumDetailResults.size()  == 0) {
-    unsigned char *sendBuffer = new unsigned char[1];
-    sendBuffer[0] = 255;
-    datalength = sizeof(unsigned char);
+    int *sendBuffer = new int[1];
+    sendBuffer[0] = -1;
+    datalength = sizeof(int);
     CcsSendDelayedReply(m->reply, datalength, (void *)sendBuffer);
     delete [] sendBuffer;
   } else {
     CkReductionMsg * msg = storedSumDetailResults.front();
     storedSumDetailResults.pop_front();
-
-    unsigned char *sendBuffer = (unsigned char *)msg->getData();
+    
+    void *sendBuffer = (void *)msg->getData();
     datalength = msg->getSize();
-    CcsSendDelayedReply(m->reply, datalength, (void *)sendBuffer);
-
+    CcsSendDelayedReply(m->reply, datalength, sendBuffer);
+    
     delete msg;
   }
 
@@ -1009,6 +1009,101 @@ unsigned char * compressNRecentSumDetail(int &datalength, int binsToSend){
   }
 
     return sendBuffer;
+}
+
+
+
+/** print out the compressed buffer */
+void printCompressedBuf(float *buf){
+  int pos = 0;
+  int *bufInt = (int *) buf;
+  int numEntries = bufInt[pos++];
+  CkPrintf("Buffer contains %d records\n", numEntries);
+  for(int i=0;i<numEntries;i++){
+    int recordLength = bufInt[pos++];
+    CkPrintf("    Record %d is of length %d : ", i, recordLength);
+    
+    for(int j=0;j<recordLength;j++){
+      int ep = bufInt[pos++];
+      float v = buf[pos++];
+      CkPrintf("(%d,%f) ", ep, v);
+    }
+
+    CkPrintf("\n");
+
+  }
+}
+
+
+
+/** print out the compressed buffer */
+void printCompressedRecord(float *buf){
+  int *bufInt = (int *) buf;
+  int pos = 0;
+  int recordLength = bufInt[pos++];
+  CkPrintf("    Record is of length %d : ", recordLength);
+  for(int j=0;j<recordLength;j++){
+    int ep = bufInt[pos++];
+    float v = buf[pos++];
+    CkPrintf("(%d,%f)", ep, v);
+  }
+  CkPrintf("\n");
+}
+
+
+/// Create a compressed buffer of the n most recent sum detail samples as floating point values
+float * compressNRecentSumDetailFloat(int &datalength, int desiredBinsToSend){
+  float * sendBuffer;
+  CkPrintf("compressNRecentSumDetailFloat(desiredBinsToSend=%d)\n", desiredBinsToSend);
+  int _numEntries=_entryTable.size();
+
+  SumLogPool * p = CkpvAccess(_trace)->pool();
+  int numBinsAvailable = p->getNumEntries();
+
+  int binsToSend = desiredBinsToSend;
+
+  if(binsToSend > numBinsAvailable)
+    binsToSend = numBinsAvailable;
+  
+  if (binsToSend < 1) {
+    sendBuffer = new float[1];
+    int * sendBufferInt = (int *) sendBuffer;
+    sendBufferInt[0] = -1;
+    CkAssert( ((int *)sendBuffer)[0] ==-1);
+    datalength = sizeof(float);
+  } else {
+    sendBuffer = new float[3*_numEntries * binsToSend+100];
+    CkAssert(sizeof(int) == sizeof(float));
+    int *sendBufferInt =  (int *)sendBuffer;
+    int pos = 0;
+    
+    sendBufferInt[pos++] = binsToSend;
+    CkAssert( ((int *)sendBuffer)[0] == binsToSend );
+
+    int startingEntry = numBinsAvailable - binsToSend;
+    for(int i=0; i<binsToSend; i++) {
+      // Create a record for bin i
+      int startOfCurrentRecord = pos++;
+      sendBufferInt[startOfCurrentRecord] = 0; // The number of entries in this record
+      for(int e=0; e<_numEntries; e++) {
+	float u= p->getUtilization(i+startingEntry,e);
+	if(u > 0) {
+	  sendBufferInt[pos++] = e;
+	  sendBuffer[pos++] = u;
+	  sendBufferInt[startOfCurrentRecord]++;
+	}
+      }
+    }
+    
+    datalength = sizeof(float) * pos;
+  }
+
+  CkAssert( ((int *)sendBuffer)[0] == binsToSend || ((int *)sendBuffer)[0] ==-1);
+
+  //  CkPrintf("Created a new buffer in compressNRecentSumDetailFloat binsToSend=%d\n", binsToSend);
+  //  printCompressedBuf(sendBuffer);
+
+  return sendBuffer;
 }
 
 /// Create a compressed buffer of the sum detail samples that occured since the previous call to this function (default max of 10000 bins).
@@ -1080,7 +1175,7 @@ void startCollectData(void *data, double currT) {
 
   sumProxy.collectSumDetailData(startTime, 
 		       collectionGranularity,
-		       numBlocksToGet*indicesPerBlock);
+		       1000);
 
   // assume success
   sumObj->lastRequestedIndexBlock += numBlocksToGet; 
@@ -1124,53 +1219,149 @@ void TraceSummaryBOC::summaryDataCollected(CkReductionMsg *msg) {
 }
 
 
+
+
 /** Merge the compressed entries from the first bin in each of the srcBuf buffers.
     Return a pointer to the byte just after all the data I filled in.
     The pointers in srcBuf will be updated to point to their next available bin.
 */
-unsigned char * mergeCompressedBin(unsigned char ** &srcBuf, unsigned char ** endBuf, int numSrcBuf, unsigned char * destBuf){
-  unsigned char *pos = destBuf;
+void mergeCompressedBin(float ** &srcBuf, int numSrcBuf, float * &destBuf){
+  // put a counter at the beginning of destBuf
+  ((int*)destBuf)[0] = 0;
 
-  // hack for now, just copy first buffer to destination
-  int c = 0;
-  for(c=0; c < (endBuf[0]-srcBuf[0]); c++){
-    destBuf[c] = (srcBuf[0])[c];
+
+  float *pos = destBuf+1;
+  
+  //  CkPrintf("[%d] mergeCompressedBin(numSrcBuf=%d)\n",CkMyPe(), numSrcBuf);
+
+  for(int i=0;i<numSrcBuf;i++){
+    for(int j=i+1;j<numSrcBuf;j++){
+      if(srcBuf[i] == srcBuf[j]){
+	CkPrintf("[%d] ERROR: srcBuf[%d]  == srcBuf[%d]    numSrcBuf=%d\n", CkMyPe(), i, j, numSrcBuf);
+	CkAbort("srcBuf[i] == srcBuf[j])");
+      }
+    }
   }
 
-  srcBuf[0] += c;
-  return pos + c;
+
+  // Print incoming buffers
+  for(int i=0;i<numSrcBuf;i++){
+    //    CkPrintf("MERGING ------------------------------------------------------------------\n");
+    //   printCompressedRecord(srcBuf[i]);
+  }
+
+
+  // Read off the number of entries for each buffer
+  int *remainingEntriesToRead = new int[numSrcBuf];
+  for(int i=0;i<numSrcBuf;i++){
+    remainingEntriesToRead[i] = ((int*)srcBuf[i])[0];
+    (srcBuf[i])++;
+    //  CkPrintf("Merging %d EP entries from srcBuf[%d]\n", remainingEntriesToRead[i], i);
+  }
+
+  // srcBuf[i] now points to the first record
+
+  int count = 0;
+  // Count remaining entries to process
+  for(int i=0;i<numSrcBuf;i++){
+    count += remainingEntriesToRead[i];
+  }
+  
+  while (count>0) {
+    // find first EP from all buffers (these are sorted by EP already)
+    int minEp = 10000;
+    for(int i=0;i<numSrcBuf;i++){
+      if(remainingEntriesToRead[i]>0){
+	int ep = ((int*)srcBuf[i])[0];
+	if(ep < minEp){
+	  minEp = ep;
+	}
+      }
+    }
+    
+    ((int*)destBuf)[0] ++;
+
+    //   CkPrintf("Merging:  minEp=%d \n", minEp);
+
+    // create a new entry in the output for this EP.
+    ((int*)pos)[0] = minEp;
+    pos[1] = 0.0f;
+
+    // Merge contributions from all buffers that list the EP
+    for(int i=0;i<numSrcBuf;i++){
+      if(remainingEntriesToRead[i]>0){
+	int ep = ((int*)srcBuf[i])[0];
+	float v = (srcBuf[i])[1];
+	if(ep == minEp){
+	  pos[1] += v;
+	  (srcBuf[i])+=2;
+	  remainingEntriesToRead[i]--;
+	  //	  CkPrintf("[%d] After ep=%d srcBuf[%d]=%p\n", CkMyPe(), ep, i, srcBuf[i]);
+	}
+      }
+    }
+
+    pos += 2;
+
+
+    // Count remaining entries to process
+    count = 0;
+    for(int i=0;i<numSrcBuf;i++){
+      count += remainingEntriesToRead[i];
+    }
+    
+  }
+
+
+  delete [] remainingEntriesToRead;
+  //  CkPrintf("End of mergeCompressedBin\n");
+
+
+  //  CkPrintf("MERGE RESULT: ------------------------------------------------------------------\n");
+  //  printCompressedRecord(destBuf);
+
+  destBuf = pos;
+
 }
 
 
 /// A reducer for merging compressed sum detail data
 CkReductionMsg *sumDetailCompressedReduction(int nMsg,CkReductionMsg **msgs){
   CkPrintf("[%d] sumDetailCompressedReduction(nMsgs=%d)\n", CkMyPe(), nMsg);
-
+  CkAssert(sizeof(float)==sizeof(int));
   // start with a pointer to the beginning of all the compressed buffers
-  unsigned char **posPtr = new unsigned char*[nMsg];
-  unsigned char **endBuf = new unsigned char*[nMsg];
-  for (int i=0;i<nMsg;i++) {
-    posPtr[i]=(unsigned char *)msgs[0]->getData();
-    endBuf[i]=posPtr[i] + msgs[0]->getSize();
-  }  
+  float **posPtr = new float*[nMsg];
 
-  unsigned char * newBuf = new unsigned char[1000000];
-  unsigned char * dest = newBuf;
+  int numBins = 0;
+  for (int i=0;i<nMsg;i++) {
+    posPtr[i]=((float *)msgs[i]->getData());
+
+    //  CkPrintf("BEGIN MERGE MESSAGE=========================================================\n");
+    //   printCompressedBuf(posPtr[i]);
+
+    if(i==0)
+      numBins = ((int*)posPtr[i])[0];
+    else 
+      CkAssert( numBins == ((int*)posPtr[i])[0] );
+
+    posPtr[i] ++; // first entry is the total number of bins
+  }
+
+  float * newBuf = new float[100000];
+  float * dest = newBuf;
 
   // build a compressed representation of each merged bin
-  bool haveMoreBins;
-  do {
-    dest = mergeCompressedBin(posPtr, endBuf, nMsg, dest);
-    
-    haveMoreBins = true;
-    for(int i=0;i<nMsg;i++){
-      if(posPtr[i] >= endBuf[i])
-	haveMoreBins = false;
-    }
-  } while (haveMoreBins);
-
-
-  return CkReductionMsg::buildNew((dest-newBuf)*sizeof(unsigned char),newBuf);   
+  
+  ((int*)dest)[0] = numBins;
+  dest++;
+  for(int i=0; i<numBins; i++){
+    mergeCompressedBin(posPtr, nMsg, dest);
+  }
+  
+  // CkPrintf("END MERGE RESULT=========================================================\n");
+  // printCompressedBuf(newBuf);
+   
+  return CkReductionMsg::buildNew((dest-newBuf) * sizeof(float),newBuf);   
 }
 
 /// A reduction type for merging compressed sum detail data
@@ -1187,7 +1378,7 @@ void registerIdleTimeReduction(void) {
 void TraceSummaryBOC::collectSumDetailData(double startTime, double binSize, int numBins) {
 
   int datalength;
-  unsigned char *buffer = compressNRecentSumDetail(datalength, numBins);
+  float *buffer = compressNRecentSumDetailFloat(datalength, numBins);
 
   CkPrintf("[%d] contributing %d bytes worth of SumDetail data\n", CkMyPe(), datalength);
 
@@ -1201,7 +1392,7 @@ void TraceSummaryBOC::collectSumDetailData(double startTime, double binSize, int
 
 void TraceSummaryBOC::sumDetailDataCollected(CkReductionMsg *msg) {
   CkAssert(CkMyPe() == 0);
-  CkPrintf("[%d] Reduction of SumDetail stored in storedSumDetailResults deque\n", CkMyPe());
+  CkPrintf("[%d] Reduction of SumDetail completed. Result stored in storedSumDetailResults deque(sizes=%d)\n", CkMyPe(), storedSumDetailResults.size() );
   storedSumDetailResults.push_back(msg); 
 }
 
