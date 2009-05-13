@@ -254,7 +254,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
 
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
 					   "obtain cpu topology info");
-#if !defined(_WIN32) && !__BLUEGENE__
+#if !defined(_WIN32) && !defined(__BLUEGENE__)
   obtain_flag = 1;
 #endif
   if (CmiGetArgFlagDesc(argv,"+skip_cpu_topology",
