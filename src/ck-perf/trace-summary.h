@@ -219,7 +219,12 @@ class SumLogPool {
 
 
     inline double getCPUtime(unsigned int interval, unsigned int ep){
-        return cpuTime[interval*epInfoSize+ep]; }
+      if(cpuTime != NULL)
+        return cpuTime[interval*epInfoSize+ep]; 
+      else 
+	return 0.0;
+    }
+    
     inline void setCPUtime(unsigned int interval, unsigned int ep, double val){
         cpuTime[interval*epInfoSize+ep] = val; }
     inline double addToCPUtime(unsigned int interval, unsigned int ep, double val){
