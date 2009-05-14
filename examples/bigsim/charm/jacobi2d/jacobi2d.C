@@ -126,6 +126,7 @@ class Main : public CBase_Main
       double error = *((double *)msg->getData());
 
       if((noBarrier == 0 && iterations < MAX_ITER) || (noBarrier==1 && iterations <= 5)) {
+	BgPrintf("Start of iteration at %f\n");
 	array.begin_iteration();
       } else {
 	CkPrintf("Completed %d iterations\n", MAX_ITER);
@@ -187,9 +188,8 @@ class Jacobi: public CBase_Jacobi {
 
     // Perform one iteration of work
     void begin_iteration(void) {
-      if(thisIndex.x == 0 && thisIndex.y == 0)
+      if(thisIndex.x == 0 && thisIndex.y == 0  && (noBarrier == 1 && iterations > 5))
 	BgPrintf("Start of iteration at %f\n");
-
       iterations++;
 
       // Copy left column and right column into temporary arrays
