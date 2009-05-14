@@ -36,7 +36,8 @@
 /*readonly*/ int num_chare_x;
 /*readonly*/ int num_chare_y;
 
-/*readonly*/ int noBarrier;
+/*readonly*/ int globalBarrier;
+/*readonly*/ int localBarrier;
 
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
@@ -59,31 +60,44 @@ class Main : public CBase_Main
     int iterations;
 
     Main(CkArgMsg* m) {
-      if ( (m->argc != 4) && (m->argc != 6) ) {
-        CkPrintf("%s [array_size] [block_size] +[no]barrier\n", m->argv[0]);
-        CkPrintf("%s [array_size_X] [array_size_Y] [block_size_X] [block_size_Y] +[no]barrier\n", m->argv[0]);
+      if ( (m->argc < 4) || (m->argc > 7) ) {
+        CkPrintf("%s [array_size] [block_size] +[no]barrier [+[no]local]\n", m->argv[0]);
+        CkPrintf("%s [array_size_X] [array_size_Y] [block_size_X] [block_size_Y] +[no]barrier [+[no]local]\n", m->argv[0]);
         CkAbort("Abort");
       }
 
-      if(m->argc == 4) {
+      if(m->argc < 6) {
         arrayDimY = arrayDimX = atoi(m->argv[1]);
         blockDimY = blockDimX = atoi(m->argv[2]);
-	if(strcasecmp(m->argv[3], "+nobarrier") == 0)
-	  noBarrier = 1;
+	if(strcasecmp(m->argv[3], "+nobarrier") == 0) {
+	  globalBarrier = 0;
+	  if(strcasecmp(m->argv[4], "+nolocal") == 0)
+	    localBarrier = 0;
+	  else
+	    localBarrier = 1;
+	}
 	else
-	  noBarrier = 0;
-	if(noBarrier) CkPrintf("\nSTENCIL COMPUTATION WITH NO BARRIERS\n");
+	  globalBarrier = 1;
+	if(globalBarrier == 0) CkPrintf("\nSTENCIL COMPUTATION WITH NO BARRIERS\n");
       }
       else {
         arrayDimX = atoi(m->argv[1]);
         arrayDimY = atoi(m->argv[2]);
         blockDimX = atoi(m->argv[3]);
         blockDimY = atoi(m->argv[4]);
-	if(strcasecmp(m->argv[5], "+nobarrier") == 0)
-	  noBarrier = 1;
+	if(strcasecmp(m->argv[5], "+nobarrier") == 0) {
+	  globalBarrier = 0;
+	  if(strcasecmp(m->argv[6], "+nolocal") == 0)
+	    localBarrier = 0;
+	  else
+	    localBarrier = 1;
+	}
 	else
-	  noBarrier = 0;
-	if(noBarrier) CkPrintf("\nSTENCIL COMPUTATION WITH NO BARRIERS\n");
+	  globalBarrier = 1;
+	if(globalBarrier == 0 && localBarrier == 0)
+	  CkPrintf("\nSTENCIL COMPUTATION WITH NO BARRIERS\n");
+	else
+	  CkPrintf("\nSTENCIL COMPUTATION WITH LOCAL BARRIERS\n");
       }
 
       if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
@@ -125,7 +139,7 @@ class Main : public CBase_Main
 	startTime = CmiWallTimer();
       double error = *((double *)msg->getData());
 
-      if((noBarrier == 0 && iterations < MAX_ITER) || (noBarrier==1 && iterations <= 5)) {
+      if((globalBarrier == 1 && iterations < MAX_ITER) || (globalBarrier == 0 && iterations <= 5)) {
 	BgPrintf("Start of iteration at %f\n");
 	array.begin_iteration();
       } else {
@@ -144,10 +158,12 @@ class Jacobi: public CBase_Jacobi {
     int arrived_right;
     int arrived_top;
     int arrived_bottom;
+    int readyToSend;
 
     double **temperature;
     double **new_temperature;
-    void *storeLogs[4];
+    void *sendLogs[4];
+    void *ackLogs[5];
     int iterations;
 
     // Constructor, initialize values
@@ -171,6 +187,7 @@ class Jacobi: public CBase_Jacobi {
       arrived_right = 0;
       arrived_top = 0;
       arrived_bottom = 0;
+      readyToSend = 4;
       iterations = 0;
       constrainBC();
     }
@@ -188,38 +205,56 @@ class Jacobi: public CBase_Jacobi {
 
     // Perform one iteration of work
     void begin_iteration(void) {
-      if(thisIndex.x == 0 && thisIndex.y == 0  && (noBarrier == 1 && iterations > 5))
+      if(localBarrier == 1)
+	readyToSend++;
+      else
+	readyToSend = 5;
+
+      if(readyToSend == 5 && thisIndex.x == 0 && thisIndex.y == 0  && (globalBarrier == 0 && iterations > 5))
 	BgPrintf("Start of iteration at %f\n");
-      iterations++;
 
-      // Copy left column and right column into temporary arrays
-      double *left_edge = new double[blockDimX];
-      double *right_edge = new double[blockDimX];
+      if(readyToSend == 5) {
+	iterations++;
+	if(localBarrier == 1) {
+	  void *curLog = NULL;
 
-      for(int i=0; i<blockDimX; i++){
-	  left_edge[i] = temperature[i+1][1];
-	  right_edge[i] = temperature[i+1][blockDimY];
+	  _TRACE_BG_END_EXECUTE(1);
+	  _TRACE_BG_BEGIN_EXECUTE_NOMSG("start next iteration", &curLog);
+	  for(int i=0; i<5; i++)
+	    _TRACE_BG_ADD_BACKWARD_DEP(ackLogs[i]);
+	  readyToSend = 0;
+	}
+
+	// Copy left column and right column into temporary arrays
+	double *left_edge = new double[blockDimX];
+	double *right_edge = new double[blockDimX];
+
+	for(int i=0; i<blockDimX; i++){
+	    left_edge[i] = temperature[i+1][1];
+	    right_edge[i] = temperature[i+1][blockDimY];
+	}
+
+	int x = thisIndex.x;
+	int y = thisIndex.y;
+
+	// Send my left edge
+	thisProxy(x, wrap_y(y-1)).receiveGhosts(RIGHT, blockDimX, left_edge);
+	// Send my right edge
+	thisProxy(x, wrap_y(y+1)).receiveGhosts(LEFT, blockDimX, right_edge);
+	// Send my top edge
+	thisProxy(wrap_x(x-1), y).receiveGhosts(BOTTOM, blockDimY, &temperature[1][1]);
+	// Send my bottom edge
+	thisProxy(wrap_x(x+1), y).receiveGhosts(TOP, blockDimY, &temperature[blockDimX][1]);
+
+	delete [] right_edge;
+	delete [] left_edge;
+
       }
-
-      int x = thisIndex.x;
-      int y = thisIndex.y;
-
-      // Send my left edge
-      thisProxy(x, wrap_y(y-1)).receiveGhosts(RIGHT, blockDimX, left_edge);
-      // Send my right edge
-      thisProxy(x, wrap_y(y+1)).receiveGhosts(LEFT, blockDimX, right_edge);
-      // Send my top edge
-      thisProxy(wrap_x(x-1), y).receiveGhosts(BOTTOM, blockDimY, &temperature[1][1]);
-      // Send my bottom edge
-      thisProxy(wrap_x(x+1), y).receiveGhosts(TOP, blockDimY, &temperature[blockDimX][1]);
-
-      delete [] right_edge;
-      delete [] left_edge;
     }
 
     void receiveGhosts(int dir, int size, double gh[]) {
       int i, j;
-      _TRACE_BG_TLINE_END(&storeLogs[dir-1]);
+      _TRACE_BG_TLINE_END(&sendLogs[dir-1]);
 
       switch(dir) {
 	case LEFT:
@@ -261,7 +296,19 @@ class Jacobi: public CBase_Jacobi {
 	_TRACE_BG_END_EXECUTE(1);
 	_TRACE_BG_BEGIN_EXECUTE_NOMSG("start computation", &curLog);
 	for(int i=0; i<4; i++)
-	  _TRACE_BG_ADD_BACKWARD_DEP(storeLogs[i]);
+	  _TRACE_BG_ADD_BACKWARD_DEP(sendLogs[i]);
+
+	if(localBarrier == 1) {
+	  for(int i=0; i<4; i++)
+	    _TRACE_BG_TLINE_END(&ackLogs[i]);
+
+	  int x = thisIndex.x;
+	  int y = thisIndex.y;
+	  thisProxy(x, wrap_y(y-1)).begin_iteration();
+	  thisProxy(x, wrap_y(y+1)).begin_iteration();
+	  thisProxy(wrap_x(x-1), y).begin_iteration();
+	  thisProxy(wrap_x(x+1), y).begin_iteration();
+	}
 
 	compute_kernel();	
 
@@ -281,10 +328,12 @@ class Jacobi: public CBase_Jacobi {
 
 	constrainBC();
 
-	if(noBarrier == 0 || (noBarrier==1 && (iterations <= 5 || iterations >= MAX_ITER))) {
+	if(globalBarrier == 1 || (globalBarrier==0 && (iterations <= 5 || iterations >= MAX_ITER))) {
 	  contribute(sizeof(double), &max_error, CkReduction::max_double,
 	      CkCallback(CkIndex_Main::report(NULL), mainProxy));
-	} else {	
+	} else {
+	  if(localBarrier == 1)
+	    _TRACE_BG_TLINE_END(&ackLogs[4]);
 	  begin_iteration();
 	}
       }
