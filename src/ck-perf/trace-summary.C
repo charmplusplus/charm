@@ -57,7 +57,6 @@ public:
 
   compressedBuffer(int bytes){
     buf = (char*)malloc(bytes);
-    bzero(buf, bytes);
     pos = 0;
   }
 
