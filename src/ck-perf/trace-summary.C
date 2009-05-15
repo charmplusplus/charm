@@ -36,6 +36,8 @@ CkpvDeclare(int, previouslySentBins);
 
 
 
+
+
 /** 
     A class that reads/writes a buffer out of different types of data.
 
@@ -83,8 +85,9 @@ public:
     
   template <typename T>
   void write(T v, int offset){
+    T v2 = v; // on stack
     // to resolve unaligned writes causing bus errors, need memcpy
-    memcpy(buf+offset, &v, sizeof(T));
+    memcpy(buf+offset, &v2, sizeof(T));
   }
     
   template <typename T>
@@ -120,7 +123,8 @@ public:
 
   template <typename T>
   T peek(){
-    return *((T*)currentPtr());
+    T temp = read<T>(pos);
+    return temp;
   }
 
   template <typename T0, typename T>
@@ -143,10 +147,18 @@ public:
   }
 
   ~compressedBuffer(){
-    // don't free the buf because the user my have supplied the buffer in the 
+    // don't free the buf because the user my have supplied the buffer
   }
     
-  };
+};
+
+
+/** Define the types used in the gathering of sum detail statistics for use with CCS */
+#define numBins_T int
+#define numProcs_T int
+#define entriesInBin_T short
+#define ep_T short
+#define utilization_T unsigned char
 
 
 // Predeclarations of the functions at the bottom of this file
@@ -156,12 +168,17 @@ compressedBuffer compressNRecentSumDetail(int desiredBinsToSend);
 CkReductionMsg *sumDetailCompressedReduction(int nMsg,CkReductionMsg **msgs);
 void printCompressedBuf(compressedBuffer b);
 compressedBuffer fakeCompressedMessage();
+compressedBuffer emptyCompressedBuffer();
+void sanityCheckCompressedBuf(compressedBuffer b);
+bool isCompressedBufferSane(compressedBuffer b);
+
 
 
 /// A reduction type for merging compressed sum detail data
 CkReduction::reducerType sumDetailCompressedReducer;
 /// An initnode registration function for the reducer
 void registerIdleTimeReduction(void) {
+  CkAssert(sizeof(short) == 2);
   sumDetailCompressedReducer=CkReduction::addReducer(sumDetailCompressedReduction);
 }
 
@@ -1039,14 +1056,13 @@ void TraceSummaryBOC::ccsRequestSumDetailCompressed(CkCcsRequestMsg *m) {
 #else
 
   if (storedSumDetailResults.size()  == 0) {
-    int *sendBuffer = new int[1];
-    sendBuffer[0] = -1;
-    datalength = sizeof(int);
-    CcsSendDelayedReply(m->reply, datalength, (void *)sendBuffer);
-    delete [] sendBuffer;
+    compressedBuffer b = emptyCompressedBuffer();
+    CcsSendDelayedReply(m->reply, b.datalength(), b.buffer()); 
+    b.freeBuf();
   } else {
     CkReductionMsg * msg = storedSumDetailResults.front();
     storedSumDetailResults.pop_front();
+
     
     void *sendBuffer = (void *)msg->getData();
     datalength = msg->getSize();
@@ -1054,6 +1070,8 @@ void TraceSummaryBOC::ccsRequestSumDetailCompressed(CkCcsRequestMsg *m) {
     
     delete msg;
   }
+    
+  
 #endif
 
   CkPrintf("CCS response of %d bytes sent.\n", datalength);
@@ -1157,8 +1175,11 @@ void TraceSummaryBOC::sumDetailDataCollected(CkReductionMsg *msg) {
   CkPrintf("[%d] Reduction of SumDetail completed. Result stored in storedSumDetailResults deque(sizes=%d)\n", CkMyPe(), storedSumDetailResults.size() );
   
   //  printCompressedBuf(msg->getData());
-
-  storedSumDetailResults.push_back(msg); 
+  CkPrintf("Sanity Checking buffer before putting in storedSumDetailResults\n");
+  compressedBuffer b(msg->getData());
+  if(isCompressedBufferSane(b)){
+    storedSumDetailResults.push_back(msg); 
+  }
 }
 
 
@@ -1319,20 +1340,20 @@ CkReductionMsg *sumDetailCompressedReduction(int nMsg,CkReductionMsg **msgs){
     // Read first value from message. 
     // Make sure all messages have the same number of bins
     if(i==0)
-      numBins = incomingMsgs[i].pop<int>();
+      numBins = incomingMsgs[i].pop<numBins_T>();
     else 
-      CkAssert( numBins ==  incomingMsgs[i].pop<int>() );
+      CkAssert( numBins ==  incomingMsgs[i].pop<numBins_T>() );
     
-    numProcsRepresentedInMessage[i] = incomingMsgs[i].pop<int>();
+    numProcsRepresentedInMessage[i] = incomingMsgs[i].pop<numProcs_T>();
     totalProcsAcrossAllMessages += numProcsRepresentedInMessage[i];
-    CkPrintf("Number of procs in message[%d] is %d\n", i,  numProcsRepresentedInMessage[i]);
+    CkPrintf("Number of procs in message[%d] is %d\n", i,  (int)numProcsRepresentedInMessage[i]);
   }
   
-  compressedBuffer dest(totalsize);
+  compressedBuffer dest(totalsize + 1000000); 
   
   // build a compressed representation of each merged bin
-  dest.push<int>(numBins);
-  dest.push<int>(totalProcsAcrossAllMessages);
+  dest.push<numBins_T>(numBins);
+  dest.push<numProcs_T>(totalProcsAcrossAllMessages);
   
   for(int i=0; i<numBins; i++){
     mergeCompressedBin(incomingMsgs, nMsg, numProcsRepresentedInMessage, totalProcsAcrossAllMessages, dest);
@@ -1353,7 +1374,7 @@ CkReductionMsg *sumDetailCompressedReduction(int nMsg,CkReductionMsg **msgs){
 
 
 
-/// A reducer for merging compressed sum detail data
+/// Create fake sum detail data in the compressed format (for debugging)
  compressedBuffer fakeCompressedMessage(){
    CkPrintf("[%d] fakeCompressedMessage\n", CkMyPe());
    
@@ -1364,25 +1385,32 @@ CkReductionMsg *sumDetailCompressedReduction(int nMsg,CkReductionMsg **msgs){
    int numProcs = 1000;
 
    // build a compressed representation of each merged bin
-   fakeBuf.push<int>(numBins);
-   fakeBuf.push<int>(numProcs);
+   fakeBuf.push<numBins_T>(numBins);
+   fakeBuf.push<numProcs_T>(numProcs);
    for(int i=0; i<numBins; i++){
      int numRecords = 3;
-     fakeBuf.push<int>(numRecords);
+     fakeBuf.push<entriesInBin_T>(numRecords);
      for(int j=0;j<numRecords;j++){
-       fakeBuf.push<int>(j*10+2);
-       fakeBuf.push<float>(j+100.0);
+       fakeBuf.push<ep_T>(j*10+2);
+       fakeBuf.push<utilization_T>(120.00);
      }  
    }
    
    //CkPrintf("Fake Compressed Message:=========================================================\n");
    //   printCompressedBuf(fakeBuf);
 
+   CkAssert(isCompressedBufferSane(fakeBuf));
+
    return fakeBuf;
  }
 
 
-
+ /// Create an empty message
+ compressedBuffer emptyCompressedBuffer(){
+   compressedBuffer result(sizeof(numBins_T));
+   result.push<numBins_T>(0);
+   return result;
+ }
 
 
 
@@ -1399,20 +1427,26 @@ compressedBuffer compressAvailableNewSumDetail(int max){
 }
 
 
+
+
+
 /** print out the compressed buffer starting from its begining*/
 void printCompressedBuf(compressedBuffer b){
   // b should be passed in by value, and hence we can modify it
   b.pos = 0;
-  int numEntries = b.pop<int>();
+  int numEntries = b.pop<numBins_T>();
   CkPrintf("Buffer contains %d records\n", numEntries);
+  int numProcs = b.pop<numProcs_T>();
+  CkPrintf("Buffer represents an average over %d PEs\n", numProcs);
+
   for(int i=0;i<numEntries;i++){
-    int recordLength = b.pop<int>();
+    entriesInBin_T recordLength = b.pop<entriesInBin_T>();
     if(recordLength > 0){
       CkPrintf("    Record %d is of length %d : ", i, recordLength);
       
       for(int j=0;j<recordLength;j++){
-	int ep = b.pop<int>();
-	float v = b.pop<float>();
+	ep_T ep = b.pop<ep_T>();
+	utilization_T v = b.pop<utilization_T>();
 	CkPrintf("(%d,%f) ", ep, v);
       }
     
@@ -1423,18 +1457,48 @@ void printCompressedBuf(compressedBuffer b){
 
 
 
-// /** print out the compressed buffer */
-// void printCompressedRecord(compressedBuffer b){
-//   int recordLength = b.pop<int>();
-//   CkPrintf("    Record is of length %d : ", recordLength);
-//   for(int j=0;j<recordLength;j++){
-//     int ep = b.pop<int>();
-//     float v = b.pop<float>();
-//     CkPrintf("(%d,%f)", ep, v);
-//   }
-//   CkPrintf("\n");
-// }
+ bool isCompressedBufferSane(compressedBuffer b){
+   // b should be passed in by value, and hence we can modify it  
+   b.pos = 0;  
+   numBins_T numEntries = b.pop<numBins_T>();  
+   numProcs_T numProcs = b.pop<numProcs_T>();  
+   
+   if(numEntries > 2000){
+     ckout << "WARNING: numEntries=" << numEntries << endl;
+     return false;
+   }
+   
+   for(int i=0;i<numEntries;i++){  
+     entriesInBin_T recordLength = b.pop<entriesInBin_T>();  
+     if(recordLength > 200){
+       ckout << "WARNING: recordLength=" << recordLength << endl;
+       return false;
+     }
+     
+     if(recordLength > 0){  
+       
+       for(int j=0;j<recordLength;j++){  
+         ep_T ep = b.pop<ep_T>();  
+         utilization_T v = b.pop<utilization_T>();  
+         //      CkPrintf("(%d,%f) ", ep, v);  
+	 if(ep>800 || ep < 0 || v < 0.0 || v > 251.0){
+	   ckout << "WARNING: ep=" << ep << " v=" << v << endl;
+	   return false;
+	 }
+       }  
+       
+     }  
+   }  
+   
+   return true;
+ }
 
+
+
+ void sanityCheckCompressedBuf(compressedBuffer b){  
+   CkAssert(isCompressedBufferSane(b)); 
+ }  
+ 
 
 
 
@@ -1455,19 +1519,17 @@ void printCompressedBuf(compressedBuffer b){
    CkPrintf("compressNRecentSumDetail binsToSend=%d\n", binsToSend);
 
    if (binsToSend < 1) {
-     compressedBuffer b(sizeof(int));
-     b.push<int>(0);
-     return b;
+     return emptyCompressedBuffer();
    } else {
      compressedBuffer b(8*(2+_numEntries) * (2+binsToSend)+100);
 
-     b.push<int>(binsToSend);
-     b.push<int>(1); // number of processors in reduction subtree. I am just one processor.
+     b.push<numBins_T>(binsToSend);
+     b.push<numProcs_T>(1); // number of processors in reduction subtree. I am just one processor.
 
      for(int i=0; i<binsToSend; i++) {
        // Create a record for bin i
        //  CkPrintf("Adding record for bin %d\n", i);
-       int numEntriesInRecordOffset = b.push<int>(0); // The number of entries in this record
+       int numEntriesInRecordOffset = b.push<entriesInBin_T>(0); // The number of entries in this record
        
        for(int e=0; e<_numEntries; e++) {
 	 double scaledUtilization = p->getUtilization(i+startBin,e) * 2.5; // use range of 0 to 250 for the utilization, so it can fit in an unsigned char
@@ -1475,10 +1537,10 @@ void printCompressedBuf(compressedBuffer b){
 	   scaledUtilization = 250.0;
 	 
 	 if(scaledUtilization > 0.0) {
-	   CkPrintf("Adding non-zero entry (%d,%lf) to bin %d\n", e, scaledUtilization, i);
-	   b.push<int>(e);
-	   b.push<float>(scaledUtilization);
-	   b.increment<int>(numEntriesInRecordOffset);
+	   //	   CkPrintf("Adding non-zero entry (%d,%lf) to bin %d\n", e, scaledUtilization, i);
+	   b.push<ep_T>(e);
+	   b.push<utilization_T>(scaledUtilization);
+	   b.increment<entriesInBin_T>(numEntriesInRecordOffset);
 	 } else{
 	   
 	 }
@@ -1497,8 +1559,8 @@ void printCompressedBuf(compressedBuffer b){
 */
  void mergeCompressedBin(compressedBuffer *srcBufferArray, int numSrcBuf, int *numProcsRepresentedInMessage, int totalProcsAcrossAllMessages, compressedBuffer &destBuf){
   // put a counter at the beginning of destBuf
-  int numEntriesInDestRecordOffset = destBuf.push<int>(0); // get reference to the item we just pushed into the buffer
-  
+  int numEntriesInDestRecordOffset = destBuf.push<entriesInBin_T>(0); // get reference to the item we just pushed into the buffer
+ 
   for(int i=0;i<numSrcBuf;i++){
     for(int j=i+1;j<numSrcBuf;j++){
       if(srcBufferArray[i].buffer() == srcBufferArray[j].buffer()){
@@ -1516,10 +1578,11 @@ void printCompressedBuf(compressedBuffer b){
   }
 
 
-  // Read off the number of entries for each buffer
+  // Read off the number of bins in each buffer
   int *remainingEntriesToRead = new int[numSrcBuf];
   for(int i=0;i<numSrcBuf;i++){
-    remainingEntriesToRead[i] = srcBufferArray[i].pop<int>();
+    remainingEntriesToRead[i] = srcBufferArray[i].pop<entriesInBin_T>();
+    CkAssert(remainingEntriesToRead[i] < 100);
     //   CkPrintf("Merging %d EP entries from srcBuf[%d]\n", remainingEntriesToRead[i], i);
   }
 
@@ -1535,39 +1598,35 @@ void printCompressedBuf(compressedBuffer b){
     int minEp = 10000;
     for(int i=0;i<numSrcBuf;i++){
       if(remainingEntriesToRead[i]>0){
-	int ep = srcBufferArray[i].peek<int>();
+	int ep = srcBufferArray[i].peek<ep_T>();
 	if(ep < minEp){
 	  minEp = ep;
 	}
       }
     }
     
-    destBuf.increment<int>(numEntriesInDestRecordOffset);
-    
-    //   CkPrintf("Merging:  minEp=%d \n", minEp);
+    destBuf.increment<entriesInBin_T>(numEntriesInDestRecordOffset);
 
     // create a new entry in the output for this EP.
-    destBuf.push<int>(minEp);
-    int destVOffset = destBuf.push<float>(0.0);
+    destBuf.push<ep_T>(minEp);
+    int destVOffset = destBuf.push<utilization_T>(0.0);
     double v = 0.0;
 
     // Merge contributions from all buffers that list the EP
     for(int i=0;i<numSrcBuf;i++){
       if(remainingEntriesToRead[i]>0){
-	int ep = srcBufferArray[i].peek<int>(); 
-	//srcBufferArray[i].peekSecond<int, float>();
+	int ep = srcBufferArray[i].peek<ep_T>(); 
 	if(ep == minEp){
-	  srcBufferArray[i].pop<int>();  // pop ep
-	  double util = srcBufferArray[i].pop<float>();
+	  srcBufferArray[i].pop<ep_T>();  // pop ep
+	  double util = srcBufferArray[i].pop<utilization_T>();
 	  v += util * numProcsRepresentedInMessage[i];
 	  remainingEntriesToRead[i]--;
-	  //	  CkPrintf("[%d] After ep=%d srcBuf[%d]=%p\n", CkMyPe(), ep, i, srcBuf[i]);
 	}
       }
     }
 
     v /= (double)totalProcsAcrossAllMessages;
-    destBuf.write<float>(v, destVOffset); 
+    destBuf.write<utilization_T>(v, destVOffset); 
 
 
     // Count remaining entries to process
