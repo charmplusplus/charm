@@ -45,6 +45,7 @@
 #define wrap_y(a)  (((a)+num_chare_y)%num_chare_y)
 
 #define MAX_ITER	25
+#define WARM_ITER	5
 #define LEFT		1
 #define RIGHT		2
 #define TOP		3
@@ -135,17 +136,18 @@ class Main : public CBase_Main
     // Each worker reports back to here when it completes an iteration
     void report(CkReductionMsg *msg) {
       iterations++;
-      if(iterations == 5)
+      if(iterations == WARM_ITER)
 	startTime = CmiWallTimer();
       double error = *((double *)msg->getData());
 
-      if((globalBarrier == 1 && iterations < MAX_ITER) || (globalBarrier == 0 && iterations <= 5)) {
-	BgPrintf("Start of iteration at %f\n");
+      if((globalBarrier == 1 && iterations < MAX_ITER) || (globalBarrier == 0 && iterations <= WARM_ITER)) {
+	if(iterations > WARM_ITER) CkPrintf("Start of iteration %d\n", iterations);
+	BgPrintf("BgPrint> Start of iteration at %f\n");
 	array.begin_iteration();
       } else {
 	CkPrintf("Completed %d iterations\n", MAX_ITER);
         endTime = CmiWallTimer();
-        CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(MAX_ITER-5));
+        CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(MAX_ITER-WARM_ITER));
         CkExit();
       }
     }
@@ -187,7 +189,7 @@ class Jacobi: public CBase_Jacobi {
       arrived_right = 0;
       arrived_top = 0;
       arrived_bottom = 0;
-      readyToSend = 4;
+      readyToSend = 5;
       iterations = 0;
       constrainBC();
     }
@@ -205,25 +207,26 @@ class Jacobi: public CBase_Jacobi {
 
     // Perform one iteration of work
     void begin_iteration(void) {
-      if(localBarrier == 1)
+      if(localBarrier == 1 && iterations > WARM_ITER) {
+	_TRACE_BG_TLINE_END(&ackLogs[readyToSend]);
 	readyToSend++;
-      else
-	readyToSend = 5;
-
-      if(readyToSend == 5 && thisIndex.x == 0 && thisIndex.y == 0  && (globalBarrier == 0 && iterations > 5))
-	BgPrintf("Start of iteration at %f\n");
+      }
 
       if(readyToSend == 5) {
-	iterations++;
-	if(localBarrier == 1) {
-	  void *curLog = NULL;
+	if(thisIndex.x == 0 && thisIndex.y == 0  && (globalBarrier == 0 && iterations > WARM_ITER)) {
+	  CkPrintf("Start of iteration %d\n", iterations);
+	  BgPrintf("BgPrint> Start of iteration at %f\n");
+	}
 
+	if(localBarrier == 1 && iterations > WARM_ITER) {
+	  void *curLog = NULL;
 	  _TRACE_BG_END_EXECUTE(1);
 	  _TRACE_BG_BEGIN_EXECUTE_NOMSG("start next iteration", &curLog);
 	  for(int i=0; i<5; i++)
 	    _TRACE_BG_ADD_BACKWARD_DEP(ackLogs[i]);
-	  readyToSend = 0;
 	}
+	if(localBarrier == 1 && iterations >= WARM_ITER)  readyToSend = 0;
+	iterations++;
 
 	// Copy left column and right column into temporary arrays
 	double *left_edge = new double[blockDimX];
@@ -298,10 +301,7 @@ class Jacobi: public CBase_Jacobi {
 	for(int i=0; i<4; i++)
 	  _TRACE_BG_ADD_BACKWARD_DEP(sendLogs[i]);
 
-	if(localBarrier == 1) {
-	  for(int i=0; i<4; i++)
-	    _TRACE_BG_TLINE_END(&ackLogs[i]);
-
+	if(localBarrier == 1 && iterations > WARM_ITER) {
 	  int x = thisIndex.x;
 	  int y = thisIndex.y;
 	  thisProxy(x, wrap_y(y-1)).begin_iteration();
@@ -328,12 +328,10 @@ class Jacobi: public CBase_Jacobi {
 
 	constrainBC();
 
-	if(globalBarrier == 1 || (globalBarrier==0 && (iterations <= 5 || iterations >= MAX_ITER))) {
+	if(globalBarrier == 1 || (globalBarrier==0 && (iterations <= WARM_ITER || iterations >= MAX_ITER))) {
 	  contribute(sizeof(double), &max_error, CkReduction::max_double,
 	      CkCallback(CkIndex_Main::report(NULL), mainProxy));
 	} else {
-	  if(localBarrier == 1)
-	    _TRACE_BG_TLINE_END(&ackLogs[4]);
 	  begin_iteration();
 	}
       }
