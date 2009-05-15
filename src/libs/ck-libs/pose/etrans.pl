@@ -1194,6 +1194,7 @@ sub posefuncmap
     if (($type=posefunctest($line))>0) {
       #do stuff
       my($preline,@segments)=posefuncparse($line);
+      
       if ($type==1)		#create
 	{
 	  my($sim,$msg);
@@ -1204,6 +1205,9 @@ sub posefuncmap
 	    $output.="int _POSE_handle = ".$segments[3].";\n";
 	    $output.="POSE_TimeType _POSE_atTime = ".$segments[4].";\n" if ($#segments>=4);
 	    $output.=$msg."->Timestamp(_POSE_handle);\n";
+	    $output.="#ifdef DEBUG_POSE_INVOKE\n";
+	    $output.='CkError("invoking (*(CProxy_'.$sim.' *)&parent->thisProxy)['.$segments[2].'].insert('.$msg.')at line %d\n",__LINE__);'."\n";
+	    $output.="#endif\n";
 	    $output.="(*(CProxy_".$sim." *)&parent->thisProxy)[".$segments[2]."].insert(".$msg;
 	    if ($#segments>=4) {
 	      $output.=",_POSE_atTime";
@@ -1250,6 +1254,10 @@ sub posefuncmap
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
+		  $output.="#ifdef DEBUG_POSE_INVOKE\n";
+		  $output.='CkError("invoking (*(CProxy_'.$segments[2].' *)&parent->thisProxy)[%d].'.$segments[1].'at line %d\n",_POSE_handle,__LINE__);'."\n";
+		  $output.="#endif\n";
+
 		  $output.="(* (CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
 		  $output.="#ifndef CMK_OPTIMIZE\n";
 		  $output.="  if(pose_config.stats)\n";
@@ -1278,6 +1286,10 @@ sub posefuncmap
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
+		  $output.="#ifdef DEBUG_POSE_INVOKE\n";
+		  $output.='CkError("invoking (*(CProxy_'.$segments[2].' *)&parent->thisProxy)[%d].'.$segments[1].'at line %d\n",_POSE_handle,__LINE__);'."\n";
+		  $output.="#endif\n";
+
 		  $output.="(* (CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
 		  $output.="#ifndef CMK_OPTIMIZE\n";
 		  $output.="  if(pose_config.stats)\n";
@@ -1317,6 +1329,9 @@ sub posefuncmap
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="   parent->localStats->SwitchTimer(COMM_TIMER);\n";
 		  $output.="#endif\n";
+		  $output.="#ifdef DEBUG_POSE_INVOKE\n";
+		  $output.='CkError("invoking (*(CProxy_'.$segments[2].' *)&parent->thisProxy)[%d].insert('.$segments[1].'at line %d\n",_POSE_handle,__LINE__);'."\n";
+		  $output.="#endif\n";
 
 		    $output.="(*(CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
 		  $output.="#ifndef CMK_OPTIMIZE\n";
@@ -1347,6 +1362,9 @@ sub posefuncmap
 		  $output.="#ifndef CMK_OPTIMIZE\n";
 		  $output.="  if(pose_config.stats)\n";
 		  $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
+		  $output.="#endif\n";
+		  $output.="#ifdef DEBUG_POSE_INVOKE\n";
+		  $output.='CkError("invoking (*(CProxy_'.$segments[2].' *)&parent->thisProxy)[%d].insert('.$segments[1].'at line %d\n",_POSE_handle,__LINE__);'."\n";
 		  $output.="#endif\n";
 		    $output.="(* (CProxy_".$segments[2]." *)&parent->thisProxy)[_POSE_handle].".$segments[1].";\n";
 		  $output.="#ifndef CMK_OPTIMIZE\n";
@@ -1406,10 +1424,14 @@ sub posefuncmap
 		      $output.="#ifndef CMK_OPTIMIZE\n";
 		      $output.="$msg->sanitize();\n";
 		      $output.="#endif\n";
-		  $output.="#ifndef CMK_OPTIMIZE\n";
-		  $output.="  if(pose_config.stats)\n";
-		  $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
-		  $output.="#endif\n";
+		      $output.="#ifndef CMK_OPTIMIZE\n";
+		      $output.="  if(pose_config.stats)\n";
+		      $output.="    parent->localStats->SwitchTimer(COMM_TIMER);\n";
+		      $output.="#endif\n";
+		      $output.="#ifdef DEBUG_POSE_INVOKE\n";
+		      $output.='CkError("invoking (*(CProxy_'.$simobjtype.' *)&parent->thisProxy)[%d].'.$segments[1].'at line %d\n",parent->thisIndex,__LINE__);'."\n";
+		      $output.="#endif\n";
+
 		      $output.="(* (CProxy_".$simobjtype." *)&parent->thisProxy)[parent->thisIndex].".$segments[1].";\n";
 		  $output.="#ifndef CMK_OPTIMIZE\n";
 		  $output.="  if(pose_config.stats)\n";
