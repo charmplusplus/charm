@@ -44,7 +44,7 @@
 #define wrap_x(a)  (((a)+num_chare_x)%num_chare_x)
 #define wrap_y(a)  (((a)+num_chare_y)%num_chare_y)
 
-#define MAX_ITER	25
+#define MAX_ITER	26
 #define WARM_ITER	5
 #define LEFT		1
 #define RIGHT		2
@@ -145,9 +145,9 @@ class Main : public CBase_Main
 	BgPrintf("BgPrint> Start of iteration at %f\n");
 	array.begin_iteration();
       } else {
-	CkPrintf("Completed %d iterations\n", MAX_ITER);
+	CkPrintf("Completed %d iterations\n", MAX_ITER-1);
         endTime = CmiWallTimer();
-        CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(MAX_ITER-WARM_ITER));
+        CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(MAX_ITER-1-WARM_ITER));
         CkExit();
       }
     }
