@@ -14,8 +14,10 @@
 #
 # to disable timing 
 # -DNO_TIME
+
 OPTS=-O3 #-DNO_LB #-DVERBOSE_CHUNKS -DVERBOSE_PIECES -DVERBOSE_MAIN
-CHARMC=../../../bin/charmc $(OPTS)
+CHARM_DIR=../../..
+CHARMC=$(CHARM_DIR)/bin/charmc $(OPTS)
 
 OBJS = TreePiece.o ParticleChunk.o Main.o grav.o util.o code_io.o 
 #PROJ= -tracemode projections #-tracemode summary
@@ -52,7 +54,7 @@ code_io.o: code_io.C barnes.decl.h
 	$(CHARMC) -c code_io.C
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o barnes charmrun *~ *.core 
+	rm -f *.decl.h *.def.h conv-host *.o BARNES charmrun *~ *.core 
 
 realclean: clean
 	rm -f out.* *.dot *.ps
