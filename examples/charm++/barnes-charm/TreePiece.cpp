@@ -3,6 +3,9 @@
 TreePiece::TreePiece(CmiUInt8 p_, int which, int level_,  real rx, real ry, real rz, real rs, CkArrayIndex1D parentIdx){
   nodeptr p;
   isTopLevel = false;
+
+  usesAtSync = CmiFalse;
+  setMigratable(false);
   
   rmin[0] = rx;
   rmin[1] = ry;
@@ -59,6 +62,9 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, int level_, CkArrayIndex1D parentId
   // acceptroots
   whichChildAmI = thisIndex;
 
+  usesAtSync = CmiFalse;
+  setMigratable(false);
+
   mycelltab.reserve(maxmycell);
   myleaftab.reserve(maxmyleaf);
   ctab = new cell [maxmycell];
@@ -102,7 +108,8 @@ void TreePiece::processParticles(bodyptr *particles, int num){
     int c; // part i goes to child c
     int relc; // index of child relative to this node (0..NSUB)
     p = particles[i]; 
-    CkAssert(intcoord(xp,Pos(p),rmin,rsize));
+    intcoord(xp,Pos(p),rmin,rsize);
+    //CkAssert(intcoord(xp,Pos(p),rmin,rsize));
     relc = subindex(xp,Level(myRoot));
     //c = NSUB*thisIndex + numTreePieces + relc;
     partsToChild[relc].push_back(particles[i]);
@@ -571,7 +578,8 @@ nodeptr TreePiece::loadtree(bodyptr p, cellptr root, unsigned int ProcessId){
   CkPrintf("piece %d before loadtree\n", thisIndex);
   CmiMemoryCheck();
 #endif
-  CkAssert(intcoord(xp, Pos(p),rmin,rsize));
+  intcoord(xp, Pos(p),rmin,rsize);
+  //CkAssert(intcoord(xp, Pos(p),rmin,rsize));
   valid_root = TRUE;
   /*
   for (i = 0; i < NDIM; i++) {
@@ -803,7 +811,8 @@ TreePiece::SubdivideLeaf (leafptr le, cellptr parent_, unsigned int l, unsigned 
    ChildNum(c) = ChildNum(le);
    /* do first particle separately, so we can reuse le */
    p = bodies[0];
-   CkAssert(intcoord(xp, Pos(p),rmin,rsize));
+   intcoord(xp, Pos(p),rmin,rsize);
+   //CkAssert(intcoord(xp, Pos(p),rmin,rsize));
    index = subindex(xp, l);
    Subp(c)[index] = (nodeptr) le;
    ChildNum(le) = index;
@@ -818,7 +827,8 @@ TreePiece::SubdivideLeaf (leafptr le, cellptr parent_, unsigned int l, unsigned 
    /* now handle the rest */
    for (i = 1; i < num_bodies; i++) {
       p = bodies[i];
-      CkAssert(intcoord(xp, Pos(p),rmin,rsize));
+      intcoord(xp, Pos(p),rmin,rsize);
+      //CkAssert(intcoord(xp, Pos(p),rmin,rsize));
       index = subindex(xp, l);
       if (!Subp(c)[index]) {
 	 le = InitLeaf(c, ProcessId);

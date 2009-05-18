@@ -159,9 +159,8 @@ class ParticleChunk : public CBase_ParticleChunk {
   // pointer to array of particles (required for find_my_initial_bodies)
   bodyptr bodytab;
 
-  cellptr G_root; // obtained from 0th member of array,
-                  // after it has finished creating the
-                  // top level tree
+  cellptr G_root; 
+                  
   nodeptr Current_Root;
   int Root_Coords[NDIM];
 
@@ -210,7 +209,9 @@ class ParticleChunk : public CBase_ParticleChunk {
   public:
   ParticleChunk(int maxleaf, int maxcell);
   ParticleChunk(CkArgMsg *m);
-  ParticleChunk(CkMigrateMessage *m){}
+  ParticleChunk(CkMigrateMessage *m){
+    //CkPrintf("[%d] migrate constructor\n", thisIndex);
+  }
   void find_my_initial_bodies(bodyptr btab, int nb, unsigned ProcessId);
 
   void flushParticles();
@@ -233,6 +234,11 @@ class ParticleChunk : public CBase_ParticleChunk {
   void ComputeForces(CkCallback &cb);
   void advance(CkCallback &cb);
   void cleanup();
+
+  void pup(PUP::er &p);
+  ~ParticleChunk();
+  void doAtSync(CkCallback &cb);
+  void ResumeFromSync();
 };
 
 class TreePiece : public CBase_TreePiece {
@@ -288,7 +294,9 @@ class TreePiece : public CBase_TreePiece {
   public:
   TreePiece(CmiUInt8 parent, int whichChild, int level, CkArrayIndex1D parent);
   TreePiece(CmiUInt8 p, int which, int level, real rx, real ry, real rz, real rs, CkArrayIndex1D parent); 
-  TreePiece(CkMigrateMessage *m){}
+  TreePiece(CkMigrateMessage *m){
+    //CkPrintf("piece %d migrate constructor\n", thisIndex);
+  }
   void recvRootFromParent(CmiUInt8 r, real rx, real ry, real rz, real rs);
   // used to convey message counts from chunks to top-level
   // treepieces

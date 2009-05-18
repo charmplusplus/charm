@@ -236,6 +236,7 @@ PUPbytes(nodeptr);
 PUPbytes(bodyptr);
 PUPbytes(vector);
 PUPbytes(bodyptr *);
+PUPbytes(int *);
 
 typedef struct _body {
    short type;

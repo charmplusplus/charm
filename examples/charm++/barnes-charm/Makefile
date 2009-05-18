@@ -1,7 +1,8 @@
-# to disable various parts of the computation:
+# to disable various phases of the simulation:
 # -DNO_PARTITION
 # -DNO_FORCES
 # -DNO_ADVANCE
+# -DNO_LB
 #
 # to control verbosity of program:
 # -DVERBOSE_MAIN 
@@ -10,16 +11,24 @@
 #
 # to print out a graphical representation of the constructed tree:
 # -DPRINT_TREE
-OPTS=-O3 #-DVERBOSE_CHUNKS -DVERBOSE_PIECES -DVERBOSE_MAIN
-CHARMC=../../../multicore-linux64/bin/charmc $(OPTS)
+#
+# to disable timing 
+# -DNO_TIME
+OPTS=-O3 #-DNO_LB #-DVERBOSE_CHUNKS -DVERBOSE_PIECES -DVERBOSE_MAIN
+CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = TreePiece.o ParticleChunk.o Main.o grav.o util.o code_io.o 
-#PROJ= -tracemode projections -tracemode summary
+#PROJ= -tracemode projections #-tracemode summary
 
-all: barnes 
+TARGET = BARNES
+all: $(TARGET) 
 
-barnes: $(OBJS)
-	$(CHARMC) -language charm++ -o barnes $(OBJS) $(PROJ) -memory os
+$(TARGET): $(OBJS)
+	$(CHARMC) -language charm++ -module GreedyLB -module RotateLB -module GreedyCommLB -o $(TARGET) $(OBJS) $(PROJ) -memory os
+
+$(TARGET).%: $(TARGET)
+	mv $(TARGET) $@
+	mv charmrun charmrun.$*
 
 grav.o: grav.C barnes.decl.h
 	$(CHARMC) -c grav.C

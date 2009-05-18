@@ -55,6 +55,8 @@ mainmodule barnes {
     entry void advance(CkCallback &cb);
     entry void partition(CkCallback &cb);
     entry void cleanup();
+    entry void doAtSync(CkCallback &cb);
+    entry void ResumeFromSync();
   };
 
   initproc void register_minmax_RealVector(); 

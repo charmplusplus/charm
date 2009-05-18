@@ -115,6 +115,8 @@ Main::Main(CkArgMsg *m){
   //initparam(m->argv, defv);
   startrun();
   initoutput();
+  maxleaf = (int) ((double) fleaves * nbody);
+  CkPrintf("[main] maxleaf: %d, fleaves: %f, nbody: %d\n", maxleaf, fleaves, nbody);
   tab_init();
 
   maxPartsPerTp = getiparam("fat"); 
@@ -140,7 +142,6 @@ Main::Main(CkArgMsg *m){
   // various maximum count parameters are:
   // nbody, maxmybody, maxcell, maxmycell, maxleaf, maxmyleaf
   // nbody has already been set
-  maxleaf = (int) ((double) fleaves * nbody);
   maxmyleaf = maxleaf/NPROC;
   maxcell = fcells * maxleaf;
   maxmycell = maxcell/NPROC;
@@ -278,16 +279,24 @@ void Main::startSimulation(){
 
   double start;
   double end;
+  double totalStart;
+  double totalEnd;
 
   /* main loop */
   int i = 0;
+#ifndef NO_TIME
+  totalStart = CmiWallTimer();
+#endif
   while (tnow < tstop + 0.1 * dtime && i < iterations) {
     // create top-level tree
     CkPrintf("**********************************\n");
     CkPrintf("[main] iteration: %d, tnow: %f\n", i, tnow);
     CkPrintf("[main] rmin: (%f,%f,%f), rsize: %f\n", rmin[0], rmin[1], rmin[2], rsize);
     CkPrintf("**********************************\n");
+#ifndef NO_TIME
     start = CmiWallTimer();
+    totalStart = CmiWallTimer();
+#endif
     CkCallback cb(CkIndex_TreePiece::doBuildTree(), pieces);
     CkStartQD(cb);
     init_root(-1);
@@ -299,44 +308,73 @@ void Main::startSimulation(){
     // update top-level nodes' moments here, since all treepieces have 
     // completed calculating theirs
     updateTopLevelMoments();
+#ifndef NO_TIME
     end = CmiWallTimer();
+#endif
     CkPrintf("[main] Tree building ... %f s\n", (end-start));
 #ifdef PRINT_TREE
     graph();
 #endif
 #ifndef NO_PARTITION
+#ifndef NO_TIME
     start = CmiWallTimer();
+#endif
     chunks.partition(CkCallbackResumeThread());
+#ifndef NO_TIME
     end = CmiWallTimer();
+#endif
     CkPrintf("[main] Partitioning ...  %f s\n", (end-start));
 #endif
 #ifndef NO_FORCES
+#ifndef NO_TIME
     start = CmiWallTimer();
+#endif
     chunks.ComputeForces(CkCallbackResumeThread());
+#ifndef NO_TIME
     end = CmiWallTimer();
+#endif
     CkPrintf("[main] Forces ...  %f s\n", (end-start));
 #endif
 #ifndef NO_ADVANCE
+#ifndef NO_TIME
     start = CmiWallTimer();
+#endif
     chunks.advance(CkCallbackResumeThread());
+#ifndef NO_TIME
     end = CmiWallTimer();
+#endif
     CkPrintf("[main] Advance ... %f s\n", (end-start));
 #endif
 #ifndef NO_CLEANUP
+#ifndef NO_TIME
     start = CmiWallTimer();
+#endif
     pieces.cleanup(CkCallbackResumeThread());
+#ifndef NO_TIME
     end = CmiWallTimer();
+#endif
     CkPrintf("[main] Clean up ... %f s\n", (end-start));
 #endif
     i++;
+#ifndef NO_TIME
+    totalEnd = CmiWallTimer();
+#endif
+    CkPrintf("[main] Total ... %f s\n", (totalEnd-totalStart));
+#ifndef NO_LB
+    CkPrintf("[main] starting LB\n");
+    chunks.doAtSync(CkCallbackResumeThread());
+#endif
 
     // must reset the vector of top level roots so that the same
     // root isn't used over and over again by the treepieces:
     topLevelRoots.length() = 0;
     tnow = tnow + dtime;
   }
+#ifndef NO_TIME
+  totalEnd = CmiWallTimer();
+#endif
 
-  CkPrintf("[main] Completed simulation\n");
+  CkPrintf("[main] Completed simulation: %f s\n", (totalEnd-totalStart));
 #ifdef OUTPUT_ACC
   // TODO - accel. output code here.
 #endif
@@ -355,7 +393,7 @@ Main::tab_init()
   /*allocate space for personal lists of body pointers */
   maxmybody = (real)(nbody+maxleaf*MAX_BODIES_PER_LEAF)/(real) NPROC; 
   //maxmybody = (1.0+fleaves*MAX_BODIES_PER_LEAF)*nbody/(real) NPROC;
-  CkPrintf("[main] maxmybody: %d\n", maxmybody);
+  CkPrintf("[main] maxmybody: %d, nbody: %d, maxleaf: %d, MBPL: %d, fleaves: %f\n", maxmybody, nbody, maxleaf, MAX_BODIES_PER_LEAF, fleaves);
   mybodytab = new bodyptr [NPROC*maxmybody]; 
   //mybodytab = (bodyptr*) G_MALLOC(NPROC*maxmybody*sizeof(bodyptr));
   CkAssert(mybodytab != NULL);
