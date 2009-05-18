@@ -20,7 +20,7 @@ CHARM_DIR=../../..
 CHARMC=$(CHARM_DIR)/bin/charmc $(OPTS)
 
 OBJS = TreePiece.o ParticleChunk.o Main.o grav.o util.o code_io.o 
-#PROJ= -tracemode projections #-tracemode summary
+PROJ= #-tracemode projections #-tracemode summary
 
 TARGET = BARNES
 all: $(TARGET) 
