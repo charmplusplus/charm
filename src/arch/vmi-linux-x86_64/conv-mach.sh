@@ -1,5 +1,6 @@
 VMI_DIR="/usr/local/vmi-2.1.0-1-gcc"
 VMI_DIR="/opt/vmi-2.2.0-2-gcc"
+VMI_DIR="/opt/vmi-2.2.0-4-gcc-ofed-1.2"
 #
 VMI_INCDIR="-I$VMI_DIR/include" 
 VMI_LIBDIR="-L$VMI_DIR/lib"
