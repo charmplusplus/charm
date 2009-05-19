@@ -280,12 +280,13 @@ void Main::startSimulation(){
   double start;
   double end;
   double totalStart;
+  double iterationStart;
   double totalEnd;
 
   /* main loop */
   int i = 0;
 #ifndef NO_TIME
-  totalStart = CmiWallTimer();
+  //totalStart = CmiWallTimer();
 #endif
   while (tnow < tstop + 0.1 * dtime && i < iterations) {
     // create top-level tree
@@ -295,7 +296,10 @@ void Main::startSimulation(){
     CkPrintf("**********************************\n");
 #ifndef NO_TIME
     start = CmiWallTimer();
-    totalStart = CmiWallTimer();
+    iterationStart = CmiWallTimer();
+    if(i == 2){
+      totalStart = CmiWallTimer();
+    }
 #endif
     CkCallback cb(CkIndex_TreePiece::doBuildTree(), pieces);
     CkStartQD(cb);
@@ -359,7 +363,7 @@ void Main::startSimulation(){
 #ifndef NO_TIME
     totalEnd = CmiWallTimer();
 #endif
-    CkPrintf("[main] Total ... %f s\n", (totalEnd-totalStart));
+    CkPrintf("[main] Total ... %f s\n", (totalEnd-iterationStart));
 #ifndef NO_LB
     CkPrintf("[main] starting LB\n");
     chunks.doAtSync(CkCallbackResumeThread());

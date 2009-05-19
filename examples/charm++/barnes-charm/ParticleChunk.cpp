@@ -83,7 +83,7 @@ void ParticleChunk::SlaveStart(CmiUInt8 bodyptrstart_, CmiUInt8 bodystart_, CkCa
   /* initialize mybodytabs */
   mybodytab = bodyptrstart + (maxmybody * ProcessId);
   bodytab = bodystart;
-  CkPrintf("[%d] mybodytab: 0x%x, bodytab: 0x%x\n", thisIndex, mybodytab, bodytab);
+  //CkPrintf("[%d] mybodytab: 0x%x, bodytab: 0x%x\n", thisIndex, mybodytab, bodytab);
 
   /*
   mycelltab = cellstart + (maxmycell * ProcessId);
