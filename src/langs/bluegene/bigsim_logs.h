@@ -57,8 +57,8 @@ public:
 #endif
   CmiInt2 tID;		// destination worker thread ID
   int msgsize;		// message size
-  int group;		// number of messages in this group
 private:
+  int group;		// number of messages in this group
   BgMsgEntry() {}
 public:
   BgMsgEntry(int seqno, int _msgSize, double _sendTime, double _recvTime, int dstNode, int destrank);
@@ -152,8 +152,8 @@ public:
   BgTimeLog(): ep(-1), charm_ep(-1), recvTime(.0), startTime(.0), endTime(.0), execTime(.0), 
 	       effRecvTime(INVALIDTIME), seqno(0), doCorrect(1), flag(0) 
     {strcpy(name,"dummyname");}
-  BgTimeLog(int epc, char* name, double sTime, double eTime);
-  BgTimeLog(int epc, char* name, double sTime);
+  BgTimeLog(int epc, const char* name, double sTime, double eTime);
+  BgTimeLog(int epc, const char* name, double sTime);
   ~BgTimeLog();
 
   inline void setName(const char *_name) { CmiAssert(strlen(_name)<20); strcpy(name, _name); }
@@ -318,7 +318,7 @@ public:
 int BgIsInALog(BgTimeLineRec &tlinerec);
 BgTimeLog *BgLastLog(BgTimeLineRec &tlinerec);
 void BgAddBackwardDep(BgTimeLog *curlog, BgTimeLog* deplog);
-BgTimeLog *BgStartLogByName(BgTimeLineRec &tlinerec, int ep, char *name, double starttime, BgTimeLog *prevLog);
+BgTimeLog *BgStartLogByName(BgTimeLineRec &tlinerec, int ep, const char *name, double starttime, BgTimeLog *prevLog);
 void BgEndLastLog(BgTimeLineRec &tlinerec);
 
 int BgLogGetThreadEP();

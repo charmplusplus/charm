@@ -23,7 +23,7 @@ void BgAddBackwardDep(BgTimeLog *curlog, BgTimeLog* deplog)
   curlog->addBackwardDep(deplog);
 }
 
-BgTimeLog *BgStartLogByName(BgTimeLineRec &tlinerec, int ep, char *name, double starttime, BgTimeLog *prevLog)
+BgTimeLog *BgStartLogByName(BgTimeLineRec &tlinerec, int ep, const char *name, double starttime, BgTimeLog *prevLog)
 {
   BgTimeLog* newLog = new BgTimeLog(ep, name, starttime);
   if (prevLog) {

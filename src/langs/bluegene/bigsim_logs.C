@@ -42,8 +42,9 @@ BgMsgEntry::BgMsgEntry(char *msg, int _dstNode, int tid, double sendT, int local
   dstNode = _dstNode;
   tID = tid;                   // CmiBgMsgThreadID(msg);
   msgsize = CmiBgMsgLength(msg);
-  group = g;
   CmiAssert(msgsize > 0);
+  group = g;
+  CmiAssert(group!=0);
 #if DELAY_SEND
   sendMsg = NULL;
   if (!local && correctTimeLog) sendMsg = msg;
@@ -59,6 +60,7 @@ BgMsgEntry::BgMsgEntry(int seqno, int _msgSize, double _sendTime, double _recvTi
   tID = rank;                   // CmiBgMsgThreadID(msg);
   msgsize = _msgSize;
   CmiAssert(msgsize > 0);
+  group = 1;
 }
 
 /*
@@ -182,7 +184,7 @@ BgTimeLog::BgTimeLog(int _ep, int srcpe, int msgid, double _startTime, double _e
 }
 */
 
-BgTimeLog::BgTimeLog(int epc, char* namestr,double sTime)
+BgTimeLog::BgTimeLog(int epc, const char* namestr,double sTime)
 { 
   if(namestr == NULL)
     namestr = (char*)"dummyname1";
@@ -201,7 +203,7 @@ BgTimeLog::BgTimeLog(int epc, char* namestr,double sTime)
 }
 
 // for SDAG, somewhere else will set the effective recv time.
-BgTimeLog::BgTimeLog(int epc, char* namestr, double sTime, double eTime)
+BgTimeLog::BgTimeLog(int epc, const char* namestr, double sTime, double eTime)
 {
   if(namestr == NULL)
     namestr = (char*)"dummyname2";
