@@ -10,9 +10,17 @@
  *  Date Created: March 19th, 2007
  *
  *  This would be the top level interface for all topology managers we
- *  will write for different machines (cray, bg/l ... for tori, meshes ...)
- *  Current plan is to have functionality for Blue Gene/L, Cray XT3,
- *  BigSim and non-topo machines.
+ *  will write for different machines (Cray, IBM ... for tori, meshes ...)
+ *  Current we have functionality for Blue Gene, Cray XT, BigSim and 
+ *  non-topo machines.
+ *
+ *  Any published work which utilizes this API should include the following
+ *  reference:
+ *
+ *  "A. Bhatele and L. V. Kale, Benefits of Topology Aware Mapping for Mesh 
+ *  Interconnects, Parallel Processing Letters (Special issue on Large-Scale
+ *  Parallel Processing), Vol: 18 Issue: 4 Pages: 549-566, 2008"
+ *
  */
 
 #ifndef _TOPO_MANAGER_H_
