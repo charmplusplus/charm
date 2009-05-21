@@ -30,7 +30,7 @@ class TraceBluegene : public Trace {
     void getForwardDepForAll(void** logs1, void** logs2, int logsize,void* fDepPtr);
     void tlineEnd(void** parentLogPtr);
     void bgAddTag(const char *str);
-    void bgDummyBeginExec(char* name,void** parentLogPtr);
+    void bgDummyBeginExec(const char* name,void** parentLogPtr);
     void bgBeginExec(char* msg, char *str);
     void bgAmpiBeginExec(char *msg, char *str, void **logs, int count);
     void bgSetInfo(char *msg, char *str, void **logs, int count);
@@ -40,7 +40,7 @@ class TraceBluegene : public Trace {
     virtual void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx);
     void addBackwardDep(void *log);
     void userBracketEvent(int eventID, double bt, double et) {}	// from trace.h
-    void userBracketEvent(char* name, double bt, double et, void** parentLogPtr);
+    void userBracketEvent(const char* name, double bt, double et, void** parentLogPtr);
     void userBracketEvent(char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList);
     void bgPrint(const char* str);
     void bgMark(char* str);

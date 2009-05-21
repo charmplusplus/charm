@@ -86,10 +86,11 @@ void TraceBluegene::bgAddTag(const char* str){
   log->setName(str);
 }
 
-void TraceBluegene::bgDummyBeginExec(char* name,void** parentLogPtr)
+void TraceBluegene::bgDummyBeginExec(const char* name,void** parentLogPtr)
 {
   startVTimer();
   if (!genTimeLog) return;
+  CmiAssert(parentLogPtr!=NULL);
   double startTime = BgGetCurTime();
   BgTimeLog* newLog = BgStartLogByName(tTIMELINEREC, _threadEP, name, startTime, *(BgTimeLog**)parentLogPtr);
   // if event's mesgID is (-1:-1) and there is no backward dependence
@@ -175,6 +176,7 @@ void TraceBluegene::getForwardDep(void* log, void** fDepPtr){
 void TraceBluegene::getForwardDepForAll(void** logs1, void** logs2, int logsize,void* fDepPtr){
   if(!genTimeLog) return;
 
+  CmiAssert(logsize>0);
   BgTimeLog* cLog = (BgTimeLog*)fDepPtr;
 
   int i=0;
@@ -189,8 +191,11 @@ void TraceBluegene::getForwardDepForAll(void** logs1, void** logs2, int logsize,
   }
   // CmiAssert(i<logsize+1);
   
-  for(int j=0;j<logsize;j++)   
+  cLog->objId = ((BgTimeLog*)logs1[0])->objId;    // sdag objID
+  for(int j=0;j<logsize;j++)  {
       cLog->addBackwardDep((BgTimeLog*)(logs1[j]));
+      CmiAssert(cLog->objId == ((BgTimeLog*)logs1[j])->objId);
+  }
 }
 
 void TraceBluegene::addBackwardDep(void *log)
@@ -201,13 +206,15 @@ void TraceBluegene::addBackwardDep(void *log)
   BgAddBackwardDep(parentLogPtr, (BgTimeLog*)log);
 }
 
-void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** parentLogPtr){
+void TraceBluegene::userBracketEvent(const char* name, double bt, double et, void** parentLogPtr){
 
   if (!genTimeLog) return;
 
   BgTimeLog* newLog = new BgTimeLog(_threadEP,name,bt,et);
-  if(*parentLogPtr)
+  if(*parentLogPtr) {
     newLog->addBackwardDep(*(BgTimeLog**)parentLogPtr);
+    newLog->objId = (*(BgTimeLog**)parentLogPtr)->objId;        // sdag objID
+  }
   *parentLogPtr = newLog;
   CmiAssert(*parentLogPtr != NULL);
   tTIMELINEREC.logEntryInsert(newLog);
@@ -220,6 +227,8 @@ void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** pa
 
   BgTimeLog* newLog = new BgTimeLog(_threadEP,name,bt,et);
   newLog->addBackwardDeps(bgLogList);
+  CmiAssert(bgLogList.size()>0);
+  newLog->objId = ((BgTimeLog*)bgLogList[0])->objId;   // for sdag
   *parentLogPtr = newLog;
   tTIMELINEREC.logEntryInsert(newLog);
 }
