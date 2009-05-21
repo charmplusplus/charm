@@ -5,10 +5,6 @@
 #include "jacobi_config.h"
 
 
-// DMK - DEBUG
-#include "main.h"  // Include temp for malloc_aligned and malloc_free calls
-
-
 #define SWAP(a, b, t) { register t __tmp__ = a; a = b; b = __tmp__; }
 
 

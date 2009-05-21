@@ -94,8 +94,10 @@ void Main::maxErrorReductionClient(CkReductionMsg *msg) {
   float maxError = *((float*)(msg->getData()));
 
   #if DISPLAY_MAX_ERROR_FREQ > 0
-    if (iterationCount == 0 || (iterationCount % DISPLAY_MAX_ERROR_FREQ) == 0)
+    if (iterationCount == 0 || (iterationCount % DISPLAY_MAX_ERROR_FREQ) == 0) {
       CkPrintf("Iteration %d Finished... maxError = %f...\n", iterationCount, maxError);
+      fflush(NULL);
+    }
   #endif
 
   if (maxError <= MAX_ERROR) {

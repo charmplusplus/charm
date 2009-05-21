@@ -25,8 +25,8 @@ Jacobi::Jacobi() {
 
   // Allocate memory for the buffers
   // NOTE: Each buffer will have enough room for all the data (local data + ghost data from bordering chares)
-  matrix = (float*)malloc_aligned(sizeof(float) * DATA_BUFFER_SIZE, 128);
-  matrixTmp = (float*)malloc_aligned(sizeof(float) * DATA_BUFFER_SIZE, 128);
+  matrix = (float*)(CmiMallocAligned(sizeof(float) * DATA_BUFFER_SIZE, 128));
+  matrixTmp = (float*)(CmiMallocAligned(sizeof(float) * DATA_BUFFER_SIZE, 128));
 
   // Initialize the data
   memset((float*)matrix, 0, sizeof(float) * DATA_BUFFER_SIZE);
@@ -68,8 +68,8 @@ Jacobi::Jacobi(CkMigrateMessage *msg) {
 Jacobi::~Jacobi() {
 
   // Clean up the matrix data
-  if (matrix != NULL) { free_aligned((void*)matrix); matrix = NULL; }
-  if (matrixTmp != NULL) { free_aligned((void*)matrixTmp); matrixTmp = NULL; }
+  if (matrix != NULL) { CmiFreeAligned((void*)matrix); matrix = NULL; }
+  if (matrixTmp != NULL) { CmiFreeAligned((void*)matrixTmp); matrixTmp = NULL; }
 
   // Clean up any saved messages
   #if USE_MESSAGES != 0
