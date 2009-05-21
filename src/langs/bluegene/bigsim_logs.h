@@ -57,8 +57,8 @@ public:
 #endif
   CmiInt2 tID;		// destination worker thread ID
   int msgsize;		// message size
-private:
   int group;		// number of messages in this group
+private:
   BgMsgEntry() {}
 public:
   BgMsgEntry(int seqno, int _msgSize, double _sendTime, double _recvTime, int dstNode, int destrank);
