@@ -22,7 +22,7 @@
 #define TRACEON_EP     -3
 
 // 5 minutes of run before it'll fill up:
-#define DefaultBinCount      (1000*60*5) 
+#define DefaultBinCount      (1000*60*1) 
 
 CkpvStaticDeclare(TraceSummary*, _trace);
 static int _numEvents = 0;
@@ -930,30 +930,34 @@ void TraceSummary::fillData(double *buffer, double reqStartTime,
 /// for TraceSummaryBOC
 
 void TraceSummaryBOC::initCCS() {
-  // initializing CCS-based parameters on all processors
-  lastRequestedIndexBlock = 0;
-  indicesPerBlock = 1000;
-  collectionGranularity = 0.001; // time in seconds
-  nBufferedBins = 0;
+  if(firstTime){
+    CkPrintf("[%d] initCCS() called for first time\n", CkMyPe());
+    // initializing CCS-based parameters on all processors
+    lastRequestedIndexBlock = 0;
+    indicesPerBlock = 1000;
+    collectionGranularity = 0.001; // time in seconds
+    nBufferedBins = 0;
     
-  // initialize buffer, register CCS handler and start the collection
-  // pulse only on pe 0.
-  if (CkMyPe() == 0) { 
-    ccsBufferedData = new CkVec<double>();
+    // initialize buffer, register CCS handler and start the collection
+    // pulse only on pe 0.
+    if (CkMyPe() == 0) { 
+      ccsBufferedData = new CkVec<double>();
     
-    CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
-    CkPrintf("Trace Summary now listening in for CCS Client\n");
-    CcsRegisterHandler("CkPerfSummaryCcsClientCB", 
-		       CkCallback(CkIndex_TraceSummaryBOC::ccsRequestSummaryDouble(NULL), sumProxy[0]));
-    CcsRegisterHandler("CkPerfSummaryCcsClientCB uchar", 
-		       CkCallback(CkIndex_TraceSummaryBOC::ccsRequestSummaryUnsignedChar(NULL), sumProxy[0])); 
-    CcsRegisterHandler("CkPerfSumDetail compressed", 
-		       CkCallback(CkIndex_TraceSummaryBOC::ccsRequestSumDetailCompressed(NULL), sumProxy[0])); 
+      CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
+      CkPrintf("Trace Summary now listening in for CCS Client\n");
+      CcsRegisterHandler("CkPerfSummaryCcsClientCB", 
+			 CkCallback(CkIndex_TraceSummaryBOC::ccsRequestSummaryDouble(NULL), sumProxy[0]));
+      CcsRegisterHandler("CkPerfSummaryCcsClientCB uchar", 
+			 CkCallback(CkIndex_TraceSummaryBOC::ccsRequestSummaryUnsignedChar(NULL), sumProxy[0])); 
+      CcsRegisterHandler("CkPerfSumDetail compressed", 
+			 CkCallback(CkIndex_TraceSummaryBOC::ccsRequestSumDetailCompressed(NULL), sumProxy[0])); 
 
-    CkPrintf("[%d] Setting up periodic startCollectData callback\n", CkMyPe());
-    CcdCallOnConditionKeep(CcdPERIODIC_1second, startCollectData,
-			   (void *)this);
-    summaryCcsStreaming = CmiTrue;
+      CkPrintf("[%d] Setting up periodic startCollectData callback\n", CkMyPe());
+      CcdCallOnConditionKeep(CcdPERIODIC_1second, startCollectData,
+			     (void *)this);
+      summaryCcsStreaming = CmiTrue;
+    }
+    firstTime = false;
   }
 }
 
@@ -1178,7 +1182,8 @@ void TraceSummaryBOC::collectSumDetailData(double startTime, double binSize, int
 void TraceSummaryBOC::sumDetailDataCollected(CkReductionMsg *msg) {
   CkAssert(CkMyPe() == 0);
   CkPrintf("[%d] Reduction of SumDetail completed. Result stored in storedSumDetailResults deque(sizes=%d)\n", CkMyPe(), storedSumDetailResults.size() );
-  
+  fflush(stdout);
+
   //  printCompressedBuf(msg->getData());
   //  CkPrintf("Sanity Checking buffer before putting in storedSumDetailResults\n");
   compressedBuffer b(msg->getData());

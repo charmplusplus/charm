@@ -27,6 +27,7 @@ private:
   int  nBins;
   int nTracedPEs;
 
+  bool firstTime; // used to make sure traceEnableCCS only has an effect the first time.
 
 public:
   /* CCS support variables */
@@ -41,7 +42,7 @@ public:
 
 public:
   TraceSummaryBOC(void): count(0), bins(NULL), nBins(0), 
-    nTracedPEs(0), nextBinIndexCcs(0) {};
+    nTracedPEs(0), nextBinIndexCcs(0), firstTime(true) {};
   TraceSummaryBOC(CkMigrateMessage *m):CBase_TraceSummaryBOC(m) {};
   void startSumOnly();
   void askSummary(int size);
