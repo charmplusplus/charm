@@ -609,6 +609,7 @@ char *arg_vmispecfile;
 
 int   arg_debug;
 int   arg_debug_no_pause;
+int   arg_debug_no_xrdb;
 int   arg_charmdebug;
 
 int   arg_local;	/* start node programs directly by exec on localhost */
@@ -681,6 +682,7 @@ void arg_init(int argc, char **argv)
 #if CMK_USE_RSH
   pparam_flag(&arg_debug,         0, "debug",         "Run each node under gdb in an xterm window");
   pparam_flag(&arg_debug_no_pause,0, "debug-no-pause","Like debug, except doesn't pause at beginning");
+  pparam_flag(&arg_debug_no_xrdb,0, "no-xrdb","Don't check xrdb");
 
   /* When the ++charmdebug flag is used, charmrun listens from its stdin for
      commands, and forwards them to the gdb info program (a child), or to the
@@ -2826,7 +2828,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
 
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
     rsh_Find(f,nodetab_xterm(nodeno),"F_XTERM");
-    if(!arg_ssh_display)
+    if(!arg_ssh_display && !arg_debug_no_xrdb)
       rsh_Find(f,"xrdb","F_XRDB");
     if(arg_verbose) fprintf(f,"Echo 'using xterm' $F_XTERM\n");
   }
@@ -2837,8 +2839,8 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
     if (arg_verbose) fprintf(f,"Echo 'using debugger' $F_DBG\n");
   }
 
-   if (!arg_ssh_display && (arg_debug || arg_debug_no_pause ||
-      arg_in_xterm)) {
+   if (!arg_ssh_display && !arg_debug_no_xrdb && 
+       (arg_debug || arg_debug_no_pause || arg_in_xterm)) {
      /*    if (arg_debug || arg_debug_no_pause || arg_in_xterm) {*/
     fprintf(f,"$F_XRDB -query > /dev/null\n");
     fprintf(f,"if test $? != 0\nthen\n");
