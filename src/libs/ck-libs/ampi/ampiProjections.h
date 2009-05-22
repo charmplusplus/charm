@@ -6,8 +6,8 @@ extern "C" {
 #endif
 void initAmpiProjections();
 void closeAmpiProjections();
-void ampi_beginProcessing(int tag,int src,int count);
-void ampi_endProcessing(int tag);
+void ampi_beginProcessing(int rank, int src, int count);
+void ampi_endProcessing(int rank);
 void ampi_msgSend(int tag,int dest,int count,int size);
 int ampi_registerFunc(char *funcName);
 void ampi_beginFunc(int funcNo,MPI_Comm comm);
