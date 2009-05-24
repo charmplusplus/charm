@@ -239,6 +239,7 @@ class ParticleChunk : public CBase_ParticleChunk {
   ~ParticleChunk();
   void doAtSync(CkCallback &cb);
   void ResumeFromSync();
+  void outputAccelerations(CkCallback &cb);
 };
 
 class TreePiece : public CBase_TreePiece {

@@ -458,3 +458,17 @@ void ParticleChunk::cleanup(){
   contribute(0,0,CkReduction::concat,mainCb);
 }
 
+void ParticleChunk::outputAccelerations(CkCallback &cb_){
+  bodyptr *pp;
+  bodyptr p; 
+  int i;
+  for (i = 0, pp = mybodytab; pp < mybodytab+mynbody; pp++, i++) {  
+    p = *pp;
+    real *xp = Pos(p);
+    real *ap = Acc(p);
+    CkPrintf("[%d] %d: pos: (%f,%f,%f), acc: (%f,%f,%f)\n", thisIndex, p->num, xp[0], xp[1], xp[2], ap[0], ap[1], ap[2]);
+
+  }
+  contribute(0,0,CkReduction::concat,cb_);
+}
+

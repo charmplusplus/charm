@@ -249,6 +249,9 @@ typedef struct _body {
    vector vel;                 /* velocity of body */
    vector acc;                 /* acceleration of body */
    real phi;                   /* potential at body */
+#ifdef OUTPUT_ACC
+   int num;
+#endif
 
    void pup(PUP::er &p){
      p | type;

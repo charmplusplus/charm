@@ -380,7 +380,7 @@ void Main::startSimulation(){
 
   CkPrintf("[main] Completed simulation: %f s\n", (totalEnd-totalStart));
 #ifdef OUTPUT_ACC
-  // TODO - accel. output code here.
+  chunks.outputAccelerations(CkCallbackResumeThread());
 #endif
   CkExit();
 }

@@ -82,9 +82,17 @@ void Main::inputdata ()
       Cost(p) = 1;
       Phi(p) = 0.0;
       CLRV(Acc(p));
-   } 
-   for (p = bodytab; p < bodytab+nbody; p++)
+   }
+#ifdef OUTPUT_ACC
+   int seq = 0;
+#endif
+   for (p = bodytab; p < bodytab+nbody; p++){
       instr >> Mass(p);
+#ifdef OUTPUT_ACC
+      p->num = seq;
+      seq++;
+#endif
+   }
    for (p = bodytab; p < bodytab+nbody; p++){
       instr >> Pos(p)[0];
       instr >> Pos(p)[1];
