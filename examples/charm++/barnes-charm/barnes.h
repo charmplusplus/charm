@@ -41,10 +41,6 @@ extern real tol;
 extern real tolsq;
 extern real dtout;
 extern real dthf;
-/*
-extern vector rmin;
-extern real rsize;
-*/
 
 extern int maxmycell;
 extern int maxmyleaf;
@@ -58,26 +54,6 @@ class ParticleMsg : public CMessage_ParticleMsg {
   int num;
 };
 
-/*
-const char *defv[] = {                 
-    "in=",                        
-    "out=",                       
-
-    "nbody=16384",                
-    "seed=123",                   
-
-    "dtime=0.025",                
-    "eps=0.05",                   
-    "tol=1.0",                    
-    "fcells=2.0",                 
-    "fleaves=0.5",                
-
-    "tstop=0.075",                
-    "dtout=0.25",                 
-
-    "NPROC=1"                    
-};
-*/
 
 static string headline = "Hack code: Plummer model";
 
@@ -105,16 +81,10 @@ class Main : public CBase_Main {
 
   CkVec<string> defaults; 
 
-  // j: don't need these data structures
-  //cellptr *mycelltab;
-  //leafptr *myleaftab;
-
   //void initparam (string *argv, const char **defv);
   void initoutput();
 
   string extrvalue(string &arg);
-  //bool matchname(string &bind, string &name);
-  //int scanbind(CkVec<string> &bvec, string &name);
   double getdparam(string name);
   bool getbparam(string name);
   long getlparam(string name);
@@ -210,17 +180,13 @@ class ParticleChunk : public CBase_ParticleChunk {
   ParticleChunk(int maxleaf, int maxcell);
   ParticleChunk(CkArgMsg *m);
   ParticleChunk(CkMigrateMessage *m){
-    //CkPrintf("[%d] migrate constructor\n", thisIndex);
   }
   void find_my_initial_bodies(bodyptr btab, int nb, unsigned ProcessId);
 
   void flushParticles();
   void sendParticlesToTp(int tp);
 
-  //void SlaveStart(bodyptr *bb, bodyptr b, CkCallback &cb);
   void SlaveStart(CmiUInt8 bb, CmiUInt8 b, CkCallback &cb);
-  //void SlaveStart(CmiUInt8 bb, CmiUInt8 b, CmiUInt8 mct, CmiUInt8 mlt, CkCallback &cb);
-  //void startIteration(CkCallback &cb);
   void acceptRoot(CmiUInt8 root, real rx, real ry, real rz, real rs, CkCallback &cb);
   void stepsystemPartII(CkReductionMsg *msg);
 
@@ -244,7 +210,6 @@ class ParticleChunk : public CBase_ParticleChunk {
 
 class TreePiece : public CBase_TreePiece {
 
-  // for debugging purposes
   int done;
  
   bool isTopLevel;
@@ -277,7 +242,6 @@ class TreePiece : public CBase_TreePiece {
   CkVec<ParticleMsg *> bufferedMsgs;
   bool haveParent;
 
-  //void checkCompletion();
   void processParticles(bodyptr *particles, int num);
   leafptr InitLeaf(cellptr parent, unsigned ProcessId);
   cellptr InitCell(cellptr parent, unsigned ProcessId);
@@ -296,16 +260,11 @@ class TreePiece : public CBase_TreePiece {
   TreePiece(CmiUInt8 parent, int whichChild, int level, CkArrayIndex1D parent);
   TreePiece(CmiUInt8 p, int which, int level, real rx, real ry, real rz, real rs, CkArrayIndex1D parent); 
   TreePiece(CkMigrateMessage *m){
-    //CkPrintf("piece %d migrate constructor\n", thisIndex);
   }
   void recvRootFromParent(CmiUInt8 r, real rx, real ry, real rz, real rs);
   // used to convey message counts from chunks to top-level
   // treepieces
   void acceptRoots(CmiUInt8 root, real rsize, real rminx, real rminy, real rminz, CkCallback &cb);
-  //void recvTotalMsgCountsFromChunks(CkReductionMsg *msg);
-  // used to convey message counts from treepieces to their
-  // children
-  //void recvTotalMsgCountsFromPieces(int num);
   void doBuildTree();
   void recvParticles(ParticleMsg *msg);
   nodeptr loadtree(bodyptr p, cellptr root, unsigned int ProcessId);

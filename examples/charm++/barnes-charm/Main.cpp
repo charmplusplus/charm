@@ -23,10 +23,6 @@ real tol;
 real tolsq;
 real dtout;
 real dthf;
-/*
-vector rmin;
-real rsize;
-*/
 
 int maxmycell;
 int maxmyleaf;
@@ -40,17 +36,6 @@ int log8floor(int arg){
   }
   return (ret);
 }
-
-/*
- * INITPARAM: ignore arg vector, remember defaults.
- */
-
-/*
-void Main::initparam(string *argv, const char **defvs)
-{
-   defaults = defvs;
-}
-*/
 
 /*
  * INITOUTPUT: initialize output routines.
@@ -73,46 +58,10 @@ Main::Main(CkArgMsg *m){
 
   mainChare = thisProxy;
 
-/*
-  while ((c = getopt(m->argc, m->argv, "h")) != -1) {
-    switch(c) {
-      case 'h': 
-        Help(); 
-        exit(-1); 
-        break;
-      case 't':
-        numTreePieces = c;
-        break;
-        
-      default:
-        fprintf(stderr, "Only valid options are \"-h\" and \"-t\"\n");
-        exit(-1);
-        break;
-    }
-  }
-  */
-
   defaults.reserve(32);
   for(int i = 0; i < m->argc; i++){
     defaults.push_back(m->argv[i]);
   }
-  /*
-  defaults.push_back("in=");
-  defaults.push_back("out=");
-  defaults.push_back("nbody=16384");
-  defaults.push_back("seed=123");
-  defaults.push_back("dtime=0.025");
-  defaults.push_back("eps=0.05");
-  defaults.push_back("tol=1.0");
-  defaults.push_back("fcells=2.0");
-  defaults.push_back("fleaves=0.5");
-  defaults.push_back("tstop=0.075");
-  defaults.push_back("dtout=0.25");
-  defaults.push_back("NPROC=1");
-  */
-
-  // parameters
-  //initparam(m->argv, defv);
   startrun();
   initoutput();
   maxleaf = (int) ((double) fleaves * nbody);
@@ -179,15 +128,6 @@ cellptr Main::makecell(unsigned ProcessId)
    cellptr c;
    int i, Mycell;
     
-   /*
-   if (mynumcell == maxmycell) {
-      error("makecell: Proc %d needs more than %d cells; increase fcells\n", 
-	    ProcessId,maxmycell);
-   }
-   Mycell = mynumcell++;
-   c = ctab + Mycell;
-   c->seqnum = ProcessId*maxmycell+Mycell;
-   */
    c = new cell;
    Type(c) = CELL;
    Done(c) = FALSE;
@@ -195,7 +135,6 @@ cellptr Main::makecell(unsigned ProcessId)
    for (i = 0; i < NSUB; i++) {
       Subp(c)[i] = NULL;
    }
-   //mycelltab[myncell++] = c;
    return (c);
 }
 
@@ -207,30 +146,17 @@ void Main::init_root (unsigned int ProcessId)
 
   // create top portion of global tree
   int depth = log8floor(numTreePieces);
-  //Global->G_root=Local[0].ctab;
   G_root = makecell(ProcessId);
   ParentOf(G_root) = NULL;
   Mass(G_root) = 0.0;
   Cost(G_root) = 0;
   CLRV(Pos(G_root));
 
-  //mynumcell=1;
-
-  /*
-  Type(G_root) = CELL;
-  Done(G_root) = FALSE;
-  */
   Level(G_root) = IMAX >> 1;
   
   CkPrintf("[main] Creating top-level tree, depth: %d, root: 0x%x\n", depth, G_root);
   int totalNumCellsMade = createTopLevelTree(G_root, depth);
   CkPrintf("totalNumCellsMade: %d\n", totalNumCellsMade+1);
-  //chunks.acceptRoot((CmiUInt8) G_root);
-  /*
-  for (i = 0; i < NSUB; i++) {
-    Subp(Global->G_root)[i] = NULL;
-  }
-  */
 }
 
 int Main::createTopLevelTree(cellptr node, int depth){
@@ -268,14 +194,9 @@ int Main::createTopLevelTree(cellptr node, int depth){
   return numCellsMade;
 }
 
-
-
-
-
 void Main::startSimulation(){
   // slavestart for chunks
   chunks.SlaveStart((CmiUInt8)mybodytab, (CmiUInt8)bodytab, CkCallbackResumeThread());
-  //chunks.SlaveStart(mybodytab, mycelltab, myleaftab, CkCallbackResumeThread());
 
   double start;
   double end;
@@ -396,10 +317,8 @@ Main::tab_init()
 
   /*allocate space for personal lists of body pointers */
   maxmybody = (real)(nbody+maxleaf*MAX_BODIES_PER_LEAF)/(real) NPROC; 
-  //maxmybody = (1.0+fleaves*MAX_BODIES_PER_LEAF)*nbody/(real) NPROC;
   CkPrintf("[main] maxmybody: %d, nbody: %d, maxleaf: %d, MBPL: %d, fleaves: %f\n", maxmybody, nbody, maxleaf, MAX_BODIES_PER_LEAF, fleaves);
   mybodytab = new bodyptr [NPROC*maxmybody]; 
-  //mybodytab = (bodyptr*) G_MALLOC(NPROC*maxmybody*sizeof(bodyptr));
   CkAssert(mybodytab != NULL);
   /* space is allocated so that every */
   /* process can have a maximum of maxmybody pointers to bodies */ 
@@ -408,10 +327,6 @@ Main::tab_init()
   /* file is read */
   maxmycell = maxcell / NPROC;
   maxmyleaf = maxleaf / NPROC;
-  /*
-  mycelltab = (cellptr*) G_MALLOC(NPROC*maxmycell*sizeof(cellptr));
-  myleaftab = (leafptr*) G_MALLOC(NPROC*maxmyleaf*sizeof(leafptr));
-  */
 
 }
 
@@ -568,8 +483,6 @@ void Main::setbound()
    for (i=0; i<NDIM;i++) if (side<max[i]) side=max[i];
    ADDVS(rmin,min,-side/100000.0);
    rsize = 1.00002*side;
-   //SETVS(max,-1E99);
-   //SETVS(min,1E99);
 }
 
 /*
@@ -592,10 +505,8 @@ void Main::testdata()
    register bodyptr cp;
    double tmp;
 
-   //headline = "Hack code: Plummer model";
    tnow = 0.0;
    bodytab = new body [nbody];
-   //bodytab = (bodyptr) G_MALLOC(nbody * sizeof(body));
    CkAssert(bodytab);
    if (bodytab == NULL) {
       ckerr << "testdata: not enuf memory\n";
@@ -662,8 +573,6 @@ void Main::testdata()
  */
 
 void Main::pickshell(real vec[], real rad)
-//   real vec[];                     /* coordinate vector chosen */
-//   real rad;                       /* radius of chosen point */
 {
    register int k;
    double rsq, rsc;
@@ -687,13 +596,8 @@ string Main::getparam(string name)
 {
    int i, leng;
    string def;
-   //char buf[128];
    char* temp;
 
-  /*
-   if (defaults == NULL)
-      ckerr << "getparam: called before initparam\n";
-    */
   for(int i = 0; i < defaults.length(); i++){
     if(defaults[i].find(name) != string::npos){
       int pos = defaults[i].find("=");
@@ -703,20 +607,6 @@ string Main::getparam(string name)
   }
   ckerr << "getparam: " << name.c_str() << "unknown\n";
   return string();
-  /*
-   i = scanbind(defaults, name);
-   if (i < 0)
-      ckerr << "getparam: %s unknown\n", name;
-   def = extrvalue(defaults[i]);
-   gets(buf);
-   leng = strlen(buf) + 1;
-   if (leng > 1) {
-      return (strcpy((char *)malloc(leng), buf));
-   }
-   else {
-      return (def);
-   }
-   */
 }
 
 /*
@@ -771,43 +661,6 @@ double Main::getdparam(string name)
 }
 
 /*
- * SCANBIND: scan binding vector for name, return index.
- */
-
-/*
-int Main::scanbind(CkVec<string> &bvec, string &name)
-{
-   int i;
-
-   for(i = 0; i < bvec.length(); i++){
-     if(matchname(bvec[i], name)){
-       return i;
-     }
-   }
-   return (-1);
-}
-*/
-
-/*
- * MATCHNAME: determine if "name=value" matches "name".
- */
-
-/*
-bool Main::matchname(string &bind, string &name)
-{
-   char *bp, *np;
-
-   bp = bind.c_str();
-   np = name.c_str();
-   while (*bp == *np) {
-      bp++;
-      np++;
-   }
-   return (*bp == '=' && *np == 0);
-}
-*/
-
-/*
  * EXTRVALUE: extract value from name=value string.
  */
 
@@ -845,16 +698,13 @@ nodeptr Main::moments(nodeptr node, int depth){
       Mass(node) += Mass(mom);
       Cost(node) += Cost(mom);
       MULVS(tmpv, Pos(mom), Mass(mom));
-      //CkPrintf("tmpv: (%f,%f,%f)\n", tmpv[0], tmpv[1], tmpv[2]);
       ADDV(Pos(node), Pos(node), tmpv);
-      //CkPrintf("add Pos(node): (%f,%f,%f)\n", Pos(node)[0], Pos(node)[1], Pos(node)[2]);
     }
   }
   DIVVS(Pos(node), Pos(node), Mass(node));
 #ifdef VERBOSE_MAIN
   CkPrintf("Pos(node): (%f,%f,%f)\n", Pos(node)[0], Pos(node)[1], Pos(node)[2]);
 #endif
-  //Done(node) = TRUE;
 }
 
 #ifdef PRINT_TREE
@@ -867,13 +717,11 @@ void Main::graph(){
   myfile.open(ostr.str().c_str());
   myfile << "digraph tree_" << nbody << "_" << maxPartsPerTp <<" {" << endl;
   CkQ<nodeptr> nodes(4096);
-  //CkPrintf("enq 0x%x\n", G_root);
   nodes.enq((nodeptr)G_root);
   while(!nodes.isEmpty()){
     nodeptr curnode = nodes.deq();
     
     myfile << (CmiUInt8)curnode << " [label=\"" << "("<< (CmiUInt8)curnode << ", " << Mass(curnode) << ")" << "\\n (" << Pos(curnode)[0] << "," << Pos(curnode)[1] << "," << Pos(curnode)[2] << ") " << "\"];"<< endl;
-    //CkPrintf("deq 0x%x\n", curnode);
     for(int i = 0; i < NSUB; i++){
       nodeptr childnode = Subp(curnode)[i];
       if(childnode != NULL){
@@ -885,7 +733,6 @@ void Main::graph(){
           myfile << (CmiUInt8)curnode << "->" << (CmiUInt8)childnode << endl;
           myfile << (CmiUInt8)childnode << " [label=\"" << "("<< ((leafptr)childnode)->num_bodies << ", " << Mass(childnode) << ")" << "\\n (" << Pos(childnode)[0] << "," << Pos(childnode)[1] << "," << Pos(childnode)[2] << ") " << "\"];"<< endl;
         }
-        //CkPrintf("enq 0x%x\n", childnode);
       }
       else {
         myfile << (CmiUInt8)curnode << "-> NULL_" << (CmiUInt8)curnode << "_" << i << endl;
@@ -922,7 +769,6 @@ CkReductionMsg *minmax_RealVector(int nmsg, CkReductionMsg **msgs){
 }
 
 void register_minmax_RealVector(){
-  // CkPrintf("REGISTERING reducer\n");
   minmax_RealVectorType = CkReduction::addReducer(minmax_RealVector); 
 }
 
@@ -940,8 +786,6 @@ void Main::recvGlobalSizes(CkReductionMsg *msg){
   }
   ADDVS(rmin,min,-rsize/100000.0);
   rsize = 1.00002*rsize;
-  //SETVS(min,1E99);
-  //SETVS(max,-1E99);
   chunks.cleanup();
 
   delete msg;
