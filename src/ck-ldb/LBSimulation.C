@@ -26,7 +26,7 @@ int _lb_version = LB_FORMAT_VERSION;	     /// data file version
 		LBInfo: evaluation information for LBStats  
 *****************************************************************************/
 
-LBInfo::LBInfo(int count): minObjLoad(0.0), maxObjLoad(0.0), numPes(count)
+LBInfo::LBInfo(int count): numPes(count), minObjLoad(0.0), maxObjLoad(0.0)
 {
   peLoads = new double[numPes]; 
   objLoads = new double[numPes]; 
@@ -235,7 +235,7 @@ void LBInfo::getSummary(double &maxLoad, double &maxCpuLoad, double &totalLoad)
 
 ////////////////////////////////////////////////////////////////////////////
 
-LBSimulation::LBSimulation(int numPes_) : numPes(numPes_), lbinfo(numPes_)
+LBSimulation::LBSimulation(int numPes_) : lbinfo(numPes_), numPes(numPes_)
 {
 }
 

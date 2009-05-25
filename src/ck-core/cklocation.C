@@ -297,7 +297,6 @@ public:
   }
  
   int procNum(int arrayHdl, const CkArrayIndex &i) {
-    int numPes=CkNumPes();
     int flati;
     if (arrs[arrayHdl]->_nelems.nInts == 0) {
       return RRMap::procNum(arrayHdl, i);
@@ -515,7 +514,6 @@ public:
       return;
     }
     int thisPe=CkMyPe();
-    int numPes=CkNumPes();
     int maxIndex = numElements.data()[0];
     DEBUG(("[%d] ConfigurableRRMap: index=%d,%d,%d\n", CkMyPe(),(int)numElements.data()[0], (int)numElements.data()[1], (int)numElements.data()[2]));
 
@@ -2404,10 +2402,10 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 		return;
 	}
 
-	int localIdx=rec->getLocalIndex();
 	CkArrayIndexMax idx=rec->getIndex();
 
 #if CMK_OUT_OF_CORE
+	int localIdx=rec->getLocalIndex();
 	/* Load in any elements that are out-of-core */
 	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
 		CkMigratable *el=m->element(localIdx);
@@ -2484,7 +2482,6 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 */
 void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 {
-	CkArrayMessage *amsg=(CkArrayMessage *)msg;
 	const CkArrayIndex &idx=msg->idx;
 		
 	PUP::fromMem p(msg->packData); 

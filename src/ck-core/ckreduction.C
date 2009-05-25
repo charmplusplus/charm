@@ -550,8 +550,8 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 	nodeProxy[CkMyNode()].ckLocalBranch()->startNodeGroupReduction(number,thisgroup);
 #endif
 	
-  int temp;
 	/*
+  int temp;
   //making it a broadcast done only by PE 0
   if(!hasParent()){
 		temp = completedRedNo+1;
