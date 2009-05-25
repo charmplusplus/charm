@@ -673,7 +673,6 @@ void _createGroup(CkGroupID groupID, envelope *env)
   _CHECK_USED(env);
   _SET_USED(env, 1);
   register int epIdx = env->getEpIdx();
-  register int msgIdx = env->getMsgIdx();
   int gIdx = _entryTable[epIdx]->chareIdx;
   CkNodeGroupID rednMgr;
   if(_chareTable[gIdx]->isIrr == 0){
@@ -705,11 +704,9 @@ void _createNodeGroup(CkGroupID groupID, envelope *env)
   _CHECK_USED(env);
   _SET_USED(env, 1);
   register int epIdx = env->getEpIdx();
-  register int msgIdx = env->getMsgIdx();
   env->setGroupNum(groupID);
   env->setSrcPe(CkMyPe());
   env->setGroupEpoch(CkpvAccess(_charmEpoch));
-  register void *msg =  EnvToUsr(env);
   if(CkNumNodes()>1) {
     CkPackMessage(&env);
     CmiSetHandler(env, _bocHandlerIdx);
