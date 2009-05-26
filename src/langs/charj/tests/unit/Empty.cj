@@ -1,6 +1,6 @@
 package tests.unit;
 
-public class Empty {
+class Empty { }
     void test() {
     }
 }
