@@ -1,7 +1,7 @@
 
 test modifiers for both fields and local vars
-    public/private need to be separated out from volatile, static, etc
-    fields need to be separated from local vars & formal args
+fix codegen for 'entry' modifier
+fix colon placement for access modifiers in field definitions
 
 thorough expression/primary statment tests
 method chaining
