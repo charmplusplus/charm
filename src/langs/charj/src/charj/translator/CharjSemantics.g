@@ -251,7 +251,8 @@ interfaceTopLevelScope
     ;
     
 interfaceScopeDeclarations
-    :   ^(FUNCTION_METHOD_DECL modifierList genericTypeParameterList? type IDENT formalParameterList arrayDeclaratorList? throwsClause?)
+    :   ^(FUNCTION_METHOD_DECL modifierList genericTypeParameterList? 
+            type IDENT formalParameterList arrayDeclaratorList? throwsClause?)
     |   ^(VOID_METHOD_DECL modifierList genericTypeParameterList? IDENT formalParameterList throwsClause?)
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that

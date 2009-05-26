@@ -373,7 +373,7 @@ genericTypeListClosing  // This 'trick' is fairly dirty - if there's some time a
     :   GREATER_THAN
     |   SHIFT_RIGHT
     |   BIT_SHIFT_RIGHT
-    |   // nothing
+    |
     ;
 
 genericTypeParameter
@@ -433,8 +433,10 @@ interfaceBody
     ;
 
 classScopeDeclarations
-    :   block           ->  ^(CLASS_INSTANCE_INITIALIZER block)
-    |   STATIC block    ->  ^(CLASS_STATIC_INITIALIZER[$STATIC, "CLASS_STATIC_INITIALIZER"] block)
+    :   block
+        ->  ^(CLASS_INSTANCE_INITIALIZER block)
+    |   STATIC block
+        ->  ^(CLASS_STATIC_INITIALIZER[$STATIC, "CLASS_STATIC_INITIALIZER"] block)
     |   modifierList
         (   genericTypeParameterList?
             (   type IDENT formalParameterList arrayDeclaratorList? throwsClause? (block | SEMI)
@@ -443,7 +445,6 @@ classScopeDeclarations
                 ->  ^(VOID_METHOD_DECL modifierList genericTypeParameterList? IDENT formalParameterList throwsClause? block?)
             |   ident=IDENT formalParameterList throwsClause? block
                 ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList genericTypeParameterList? IDENT formalParameterList throwsClause? block)
-                //->  ^(CONSTRUCTOR_DECL[$ident, $ident.text] modifierList genericTypeParameterList? formalParameterList throwsClause? block)
             )
         |   simpleType classFieldDeclaratorList SEMI
             ->  ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType classFieldDeclaratorList)
@@ -651,9 +652,11 @@ formalParameterVarArgDecl
     ;
     
 qualifiedIdentifier
-    :   (   IDENT               ->  IDENT
+    :   (   IDENT
+            ->  IDENT
         )
-        (   DOT ident=IDENT     ->  ^(DOT $qualifiedIdentifier $ident)
+        (   DOT ident=IDENT
+            ->  ^(DOT $qualifiedIdentifier $ident)
         )*
     ;
     
@@ -679,29 +682,45 @@ localVariableDeclaration
 statement
     :   block
     |   ASSERT expr1=expression 
-        (   COLON expr2=expression SEMI                                     ->  ^(ASSERT $expr1 $expr2)
-        |   SEMI                                                            ->  ^(ASSERT $expr1)
+        (   COLON expr2=expression SEMI
+            ->  ^(ASSERT $expr1 $expr2)
+        |   SEMI
+            ->  ^(ASSERT $expr1)
         )
     |   IF parenthesizedExpression ifStat=statement 
-        (   ELSE elseStat=statement                                         ->  ^(IF parenthesizedExpression $ifStat $elseStat)
-        |                                                                   ->  ^(IF parenthesizedExpression $ifStat)
+        (   ELSE elseStat=statement
+            ->  ^(IF parenthesizedExpression $ifStat $elseStat)
+        |
+            ->  ^(IF parenthesizedExpression $ifStat)
         )   
     |   FOR LPAREN 
-        (   forInit SEMI forCondition SEMI forUpdater RPAREN statement      ->  ^(FOR forInit forCondition forUpdater statement) 
+        (   forInit SEMI forCondition SEMI forUpdater RPAREN statement
+            ->  ^(FOR forInit forCondition forUpdater statement) 
         |   localModifierList type IDENT COLON expression RPAREN statement
-                                                                            ->  ^(FOR_EACH[$FOR, "FOR_EACH"] localModifierList type IDENT expression statement)
+            ->  ^(FOR_EACH[$FOR, "FOR_EACH"] localModifierList type IDENT expression statement)
         ) 
-    |   WHILE parenthesizedExpression statement                             ->  ^(WHILE parenthesizedExpression statement)
-    |   DO statement WHILE parenthesizedExpression SEMI                     ->  ^(DO statement parenthesizedExpression)
-    |   TRY block (catches finallyClause? | finallyClause)                  ->  ^(TRY block catches? finallyClause?)
-    |   SWITCH parenthesizedExpression LCURLY switchBlockLabels RCURLY      ->  ^(SWITCH parenthesizedExpression switchBlockLabels)
-    |   SYNCHRONIZED parenthesizedExpression block                          ->  ^(SYNCHRONIZED parenthesizedExpression block)
-    |   RETURN expression? SEMI                                             ->  ^(RETURN expression?)
-    |   THROW expression SEMI                                               ->  ^(THROW expression)
-    |   BREAK IDENT? SEMI                                                   ->  ^(BREAK IDENT?)
-    |   CONTINUE IDENT? SEMI                                                ->  ^(CONTINUE IDENT?)
-    |   IDENT COLON statement                                               ->  ^(LABELED_STATEMENT IDENT statement)
-    |   EMBED STRING_LITERAL EMBED_BLOCK                                    ->  ^(EMBED STRING_LITERAL EMBED_BLOCK)
+    |   WHILE parenthesizedExpression statement
+        ->  ^(WHILE parenthesizedExpression statement)
+    |   DO statement WHILE parenthesizedExpression SEMI
+        ->  ^(DO statement parenthesizedExpression)
+    |   TRY block (catches finallyClause? | finallyClause)
+        ->  ^(TRY block catches? finallyClause?)
+    |   SWITCH parenthesizedExpression LCURLY switchBlockLabels RCURLY
+        ->  ^(SWITCH parenthesizedExpression switchBlockLabels)
+    |   SYNCHRONIZED parenthesizedExpression block
+        ->  ^(SYNCHRONIZED parenthesizedExpression block)
+    |   RETURN expression? SEMI
+        ->  ^(RETURN expression?)
+    |   THROW expression SEMI
+        ->  ^(THROW expression)
+    |   BREAK IDENT? SEMI
+        ->  ^(BREAK IDENT?)
+    |   CONTINUE IDENT? SEMI
+        ->  ^(CONTINUE IDENT?)
+    |   IDENT COLON statement
+        ->  ^(LABELED_STATEMENT IDENT statement)
+    |   EMBED STRING_LITERAL EMBED_BLOCK
+        ->  ^(EMBED STRING_LITERAL EMBED_BLOCK)
     |   expression SEMI!
     |   SEMI // Preserve empty statements.
     ;           
@@ -738,9 +757,12 @@ switchDefaultLabel
     ;
     
 forInit
-    :   localVariableDeclaration    ->  ^(FOR_INIT localVariableDeclaration)
-    |   expressionList              ->  ^(FOR_INIT expressionList)
-    |                               ->  ^(FOR_INIT)
+    :   localVariableDeclaration
+        ->  ^(FOR_INIT localVariableDeclaration)
+    |   expressionList
+        ->  ^(FOR_INIT expressionList)
+    |
+        ->  ^(FOR_INIT)
     ;
     
 forCondition
@@ -865,41 +887,59 @@ multiplicativeExpression
     ;
     
 unaryExpression
-    :   PLUS unaryExpression        ->  ^(UNARY_PLUS[$PLUS, "UNARY_PLUS"] unaryExpression)
-    |   MINUS unaryExpression       ->  ^(UNARY_MINUS[$MINUS, "UNARY_MINUS"] unaryExpression)
-    |   INC postfixedExpression     ->  ^(PRE_INC[$INC, "PRE_INC"] postfixedExpression)
-    |   DEC postfixedExpression     ->  ^(PRE_DEC[$DEC, "PRE_DEC"] postfixedExpression)
+    :   PLUS unaryExpression
+        ->  ^(UNARY_PLUS[$PLUS, "UNARY_PLUS"] unaryExpression)
+    |   MINUS unaryExpression
+        ->  ^(UNARY_MINUS[$MINUS, "UNARY_MINUS"] unaryExpression)
+    |   INC postfixedExpression
+        ->  ^(PRE_INC[$INC, "PRE_INC"] postfixedExpression)
+    |   DEC postfixedExpression
+        ->  ^(PRE_DEC[$DEC, "PRE_DEC"] postfixedExpression)
     |   unaryExpressionNotPlusMinus
     ;
 
 unaryExpressionNotPlusMinus
-    :   NOT unaryExpression                             ->  ^(NOT unaryExpression)
-    |   LOGICAL_NOT unaryExpression                     ->  ^(LOGICAL_NOT unaryExpression)
-    |   LPAREN type RPAREN unaryExpression              ->  ^(CAST_EXPR[$LPAREN, "CAST_EXPR"] type unaryExpression)
+    :   NOT unaryExpression
+        ->  ^(NOT unaryExpression)
+    |   LOGICAL_NOT unaryExpression
+        ->  ^(LOGICAL_NOT unaryExpression)
+    |   LPAREN type RPAREN unaryExpression
+        ->  ^(CAST_EXPR[$LPAREN, "CAST_EXPR"] type unaryExpression)
     |   postfixedExpression
     ;
     
 postfixedExpression
         // At first resolve the primary expression ...
-    :   (   primaryExpression                       ->  primaryExpression
+    :   (   primaryExpression
+            ->  primaryExpression
         )
-        // ... and than the optional things that may follow a primary expression 0 or more times.
+        // ... and than the optional things that may follow a primary
+        // expression 0 or more times.
         (   outerDot=DOT                            
-            (   (   genericTypeArgumentListSimplified?  // Note: generic type arguments are only valid for method calls, i.e. if there
-                                                        //       is an argument list.
-                    IDENT                           ->  ^(DOT $postfixedExpression IDENT)
+            // Note: generic type arguments are only valid for method calls,
+            // i.e. if there is an argument list
+            (   (   genericTypeArgumentListSimplified?  
+                    IDENT
+                    ->  ^(DOT $postfixedExpression IDENT)
                 ) 
-                (   arguments                       ->  ^(METHOD_CALL $postfixedExpression genericTypeArgumentListSimplified? arguments)
+                (   arguments
+                    ->  ^(METHOD_CALL $postfixedExpression genericTypeArgumentListSimplified? arguments)
                 )?
-            |   THIS                                ->  ^(DOT $postfixedExpression THIS)
-            |   Super=SUPER arguments                   ->  ^(SUPER_CONSTRUCTOR_CALL[$Super, "SUPER_CONSTRUCTOR_CALL"] $postfixedExpression arguments)
-            |   (   SUPER innerDot=DOT IDENT        ->  ^($innerDot ^($outerDot $postfixedExpression SUPER) IDENT)
+            |   THIS
+                ->  ^(DOT $postfixedExpression THIS)
+            |   Super=SUPER arguments
+                ->  ^(SUPER_CONSTRUCTOR_CALL[$Super, "SUPER_CONSTRUCTOR_CALL"] $postfixedExpression arguments)
+            |   (   SUPER innerDot=DOT IDENT
+                    ->  ^($innerDot ^($outerDot $postfixedExpression SUPER) IDENT)
                 )
-                (   arguments                       ->  ^(METHOD_CALL $postfixedExpression arguments)
+                (   arguments
+                    ->  ^(METHOD_CALL $postfixedExpression arguments)
                 )?
-            |   innerNewExpression                  ->  ^(DOT $postfixedExpression innerNewExpression)
+            |   innerNewExpression
+                ->  ^(DOT $postfixedExpression innerNewExpression)
             )
-        |   LBRACK expression RBRACK                ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression expression)
+        |   LBRACK expression RBRACK
+            ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression expression)
         )*
         // At the end there may follow a post increment/decrement.
         (   INC -> ^(POST_INC[$INC, "POST_INC"] $postfixedExpression)
@@ -914,50 +954,75 @@ primaryExpression
     |   qualifiedIdentExpression
     |   genericTypeArgumentListSimplified 
         (   SUPER
-            (   arguments                               ->  ^(SUPER_CONSTRUCTOR_CALL[$SUPER, "SUPER_CONSTRUCTOR_CALL"] genericTypeArgumentListSimplified arguments)
-            |   DOT IDENT arguments                     ->  ^(METHOD_CALL ^(DOT SUPER IDENT) genericTypeArgumentListSimplified arguments)
+            (   arguments
+                ->  ^(SUPER_CONSTRUCTOR_CALL[$SUPER, "SUPER_CONSTRUCTOR_CALL"] genericTypeArgumentListSimplified arguments)
+            |   DOT IDENT arguments
+                ->  ^(METHOD_CALL ^(DOT SUPER IDENT) genericTypeArgumentListSimplified arguments)
             )
-        |   IDENT arguments                             ->  ^(METHOD_CALL IDENT genericTypeArgumentListSimplified arguments)
-        |   THIS arguments                              ->  ^(THIS_CONSTRUCTOR_CALL[$THIS, "THIS_CONSTRUCTOR_CALL"] genericTypeArgumentListSimplified arguments)
+        |   IDENT arguments
+            ->  ^(METHOD_CALL IDENT genericTypeArgumentListSimplified arguments)
+        |   THIS arguments
+            ->  ^(THIS_CONSTRUCTOR_CALL[$THIS, "THIS_CONSTRUCTOR_CALL"] genericTypeArgumentListSimplified arguments)
         )
-    |   (   THIS                                        ->  THIS
+    |   (   THIS
+            ->  THIS
         )
-        (   arguments                                   ->  ^(THIS_CONSTRUCTOR_CALL[$THIS, "THIS_CONSTRUCTOR_CALL"] arguments)
+        (   arguments
+            ->  ^(THIS_CONSTRUCTOR_CALL[$THIS, "THIS_CONSTRUCTOR_CALL"] arguments)
         )?
-    |   SUPER arguments                                 ->  ^(SUPER_CONSTRUCTOR_CALL[$SUPER, "SUPER_CONSTRUCTOR_CALL"] arguments)
+    |   SUPER arguments
+        ->  ^(SUPER_CONSTRUCTOR_CALL[$SUPER, "SUPER_CONSTRUCTOR_CALL"] arguments)
     |   (   SUPER DOT IDENT
         )
-        (   arguments                                   ->  ^(METHOD_CALL ^(DOT SUPER IDENT) arguments)
-        |                                               ->  ^(DOT SUPER IDENT)
+        (   arguments
+            ->  ^(METHOD_CALL ^(DOT SUPER IDENT) arguments)
+        |   ->  ^(DOT SUPER IDENT)
         )
-    |   (   primitiveType                               ->  primitiveType
+    |   (   primitiveType
+            ->  primitiveType
         )
-        (   arrayDeclarator                             ->  ^(arrayDeclarator $primaryExpression)   
+        (   arrayDeclarator
+            ->  ^(arrayDeclarator $primaryExpression)   
         )* 
-        DOT CLASS                                       ->  ^(DOT $primaryExpression CLASS)
-    |   VOID DOT CLASS                                  ->  ^(DOT VOID CLASS)
+        DOT CLASS
+        ->  ^(DOT $primaryExpression CLASS)
+    |   VOID DOT CLASS
+        ->  ^(DOT VOID CLASS)
     ;
     
 qualifiedIdentExpression
         // The qualified identifier itself is the starting point for this rule.
-    :   (   qualifiedIdentifier                             ->  qualifiedIdentifier
+    :   (   qualifiedIdentifier
+            ->  qualifiedIdentifier
         )
         // And now comes the stuff that may follow the qualified identifier.
-        (   (   arrayDeclarator                         ->  ^(arrayDeclarator $qualifiedIdentExpression)
+        (   (   arrayDeclarator
+                ->  ^(arrayDeclarator $qualifiedIdentExpression)
             )+ 
-            (   DOT CLASS                               ->  ^(DOT $qualifiedIdentExpression CLASS)
+            (   DOT CLASS
+                ->  ^(DOT $qualifiedIdentExpression CLASS)
             )
-        |   arguments                                   ->  ^(METHOD_CALL qualifiedIdentifier arguments)
+        |   arguments
+            ->  ^(METHOD_CALL qualifiedIdentifier arguments)
         |   outerDot=DOT
-            (   CLASS                                   ->  ^(DOT qualifiedIdentifier CLASS)
+            (   CLASS
+                ->  ^(DOT qualifiedIdentifier CLASS)
             |   genericTypeArgumentListSimplified 
-                (   Super=SUPER arguments               ->  ^(SUPER_CONSTRUCTOR_CALL[$Super, "SUPER_CONSTRUCTOR_CALL"] qualifiedIdentifier genericTypeArgumentListSimplified arguments)
-                |   SUPER innerDot=DOT IDENT arguments  ->  ^(METHOD_CALL ^($innerDot ^($outerDot qualifiedIdentifier SUPER) IDENT) genericTypeArgumentListSimplified arguments)
-                |   IDENT arguments                     ->  ^(METHOD_CALL ^(DOT qualifiedIdentifier IDENT) genericTypeArgumentListSimplified arguments)
+                (   Super=SUPER arguments
+                    ->  ^(SUPER_CONSTRUCTOR_CALL[$Super, "SUPER_CONSTRUCTOR_CALL"]
+                            qualifiedIdentifier genericTypeArgumentListSimplified arguments)
+                |   SUPER innerDot=DOT IDENT arguments
+                    ->  ^(METHOD_CALL ^($innerDot ^($outerDot qualifiedIdentifier SUPER) IDENT)
+                            genericTypeArgumentListSimplified arguments)
+                |   IDENT arguments
+                    ->  ^(METHOD_CALL ^(DOT qualifiedIdentifier IDENT) genericTypeArgumentListSimplified arguments)
                 )
-            |   THIS                                    ->  ^(DOT qualifiedIdentifier THIS)
-            |   Super=SUPER arguments                   ->  ^(SUPER_CONSTRUCTOR_CALL[$Super, "SUPER_CONSTRUCTOR_CALL"] qualifiedIdentifier arguments)
-            |   innerNewExpression                      ->  ^(DOT qualifiedIdentifier innerNewExpression)
+            |   THIS
+                ->  ^(DOT qualifiedIdentifier THIS)
+            |   Super=SUPER arguments
+                ->  ^(SUPER_CONSTRUCTOR_CALL[$Super, "SUPER_CONSTRUCTOR_CALL"] qualifiedIdentifier arguments)
+            |   innerNewExpression
+                ->  ^(DOT qualifiedIdentifier innerNewExpression)
             )
         )?
     ;
