@@ -22,8 +22,11 @@ public class Conditional {
             c = false;
         }
 
+        c ? a : b || c;
+
         if (c) {
             a = false;
+            b = false;
         } else a = true;
     }
 }
