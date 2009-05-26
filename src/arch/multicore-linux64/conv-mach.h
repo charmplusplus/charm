@@ -75,6 +75,9 @@
 /*#define CMK_PCQUEUE_LOCK                                   1 */
 #define CMK_USE_TLS_THREAD                                 1
 
+#undef NODE_0_IS_CONVHOST
+#define NODE_0_IS_CONVHOST                                 1
+
 #endif
 
 
