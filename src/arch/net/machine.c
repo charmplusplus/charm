@@ -1226,7 +1226,7 @@ static void ctrl_getone(void)
   ChMessage_free(&msg);
 }
 
-#if CMK_CCS_AVAILABLE
+#if CMK_CCS_AVAILABLE && !NODE_0_IS_CONVHOST
 /*Deliver this reply data to this reply socket.
   The data is forwarded to CCS server via charmrun.*/
 void CcsImpl_reply(CcsImplHeader *hdr,int repLen,const void *repData)
