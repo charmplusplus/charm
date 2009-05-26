@@ -119,7 +119,7 @@ public class Main
             m_usrlibs = null;
         }
 
-        String[] files = config.getStringArray("files");
+        String[] files = config.getStringArray("file");
         return files;
     }
 }

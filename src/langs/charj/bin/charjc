@@ -1,6 +1,5 @@
 #!/bin/bash
 
-ECHO="true"                        # should we echo the our command to stdout?
 CHARJCHOME=${0%${0##*/}}            # location of charjc
 ANTLRHOME=$CHARJCHOME/../lib        # location of antlr jars
 ANTLR_VERSION="3.1"
@@ -76,14 +75,16 @@ processArgs() {
             # unrecognized options are passed through to charmc
             CHARMC_ARGS="$CHARMC_ARGS $arg"
             ;;
+        *)
+            echo "discarding unrecognized argument: $arg"
+            ;;
         esac
     done
     CHARMC="$CHARMC $CHARMC_ARGS"
 }
 
 processArgs "$@"
-if test "$ECHO" = "true"
-then
+if $VERBOSE; then
     echo "java $CHARJ_JFLAGS charj.Main --charmc \"$CHARMC\" \
     --stdlib $STDLIB $ARGS $FILES"
 fi
