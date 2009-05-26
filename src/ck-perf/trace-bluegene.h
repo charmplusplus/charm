@@ -30,7 +30,7 @@ class TraceBluegene : public Trace {
     void getForwardDepForAll(void** logs1, void** logs2, int logsize,void* fDepPtr);
     void tlineEnd(void** parentLogPtr);
     void bgAddTag(const char *str);
-    void bgDummyBeginExec(const char* name,void** parentLogPtr);
+    void bgDummyBeginExec(const char* name,void** parentLogPtr, int split);
     void bgBeginExec(char* msg, char *str);
     void bgAmpiBeginExec(char *msg, char *str, void **logs, int count);
     void bgSetInfo(char *msg, char *str, void **logs, int count);
@@ -41,7 +41,7 @@ class TraceBluegene : public Trace {
     void addBackwardDep(void *log);
     void userBracketEvent(int eventID, double bt, double et) {}	// from trace.h
     void userBracketEvent(const char* name, double bt, double et, void** parentLogPtr);
-    void userBracketEvent(char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList);
+    void userBracketEvent(const char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList);
     void bgPrint(const char* str);
     void bgMark(char* str);
     void creatFiles();
@@ -64,7 +64,7 @@ extern int traceBluegeneLinked;
 // fixme - think of better api for tracing sdag code
 #define BgPrint(x)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgPrint(x))
 #define BgMark_(x)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgMark(x))
-#define _TRACE_BG_BEGIN_EXECUTE_NOMSG(x,pLogPtr)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgDummyBeginExec(x,pLogPtr))
+#define _TRACE_BG_BEGIN_EXECUTE_NOMSG(x,pLogPtr,split)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgDummyBeginExec(x,pLogPtr,split))
 #define _TRACE_BG_BEGIN_EXECUTE(msg, str)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgBeginExec(msg, str))
 #define _TRACE_BG_SET_INFO(msg, str, logs, count)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgSetInfo(msg, str, logs, count))
 #define _TRACE_BG_AMPI_BEGIN_EXECUTE(msg, str, logs, count)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgAmpiBeginExec(msg, str, logs, count))
@@ -83,7 +83,7 @@ extern int traceBluegeneLinked;
 # define TRACE_BG_AMPI_START(t, str)  { \
         void* _bgParentLog = NULL;      \
         /*_TRACE_BG_TLINE_END(&_bgParentLog);*/ \
-        _TRACE_BG_BEGIN_EXECUTE_NOMSG(str, &_bgParentLog);      \
+        _TRACE_BG_BEGIN_EXECUTE_NOMSG(str, &_bgParentLog, 1);      \
         if(CpvAccess(traceOn) && t) CthTraceResume(t);  \
         }
 
@@ -117,7 +117,7 @@ extern "C" void BgSetStartEvent();
 # define BgPrint(x)  
 # define BgMark_(x)  
 # define _TRACE_BG_TLINE_END(x)
-#define _TRACE_BG_BEGIN_EXECUTE_NOMSG(x,pLogPtr)
+#define _TRACE_BG_BEGIN_EXECUTE_NOMSG(x,pLogPtr,split)
 #define _TRACE_BG_USER_EVENT_BRACKET(x,bt,et,pLogPtr)
 #define _TRACE_BGLIST_USER_EVENT_BRACKET(x,bt,et,pLogPtr,bgLogList)
 #define _TRACE_BG_END_EXECUTE(commit)

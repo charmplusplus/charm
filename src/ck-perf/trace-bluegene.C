@@ -86,7 +86,7 @@ void TraceBluegene::bgAddTag(const char* str){
   log->setName(str);
 }
 
-void TraceBluegene::bgDummyBeginExec(const char* name,void** parentLogPtr)
+void TraceBluegene::bgDummyBeginExec(const char* name,void** parentLogPtr, int split)
 {
   startVTimer();
   if (!genTimeLog) return;
@@ -95,7 +95,10 @@ void TraceBluegene::bgDummyBeginExec(const char* name,void** parentLogPtr)
   BgTimeLog* newLog = BgStartLogByName(tTIMELINEREC, _threadEP, name, startTime, *(BgTimeLog**)parentLogPtr);
   // if event's mesgID is (-1:-1) and there is no backward dependence
   // to avoid timestamp correction, set a fake recv time so that it stays here
-  if (*parentLogPtr == NULL) newLog->recvTime = startTime;
+  if (*parentLogPtr == NULL)
+    newLog->recvTime = startTime;
+  else
+    if (split) newLog->objId = (*(BgTimeLog**)parentLogPtr)->objId;
   *parentLogPtr = newLog;
 }
 
@@ -221,7 +224,7 @@ void TraceBluegene::userBracketEvent(const char* name, double bt, double et, voi
 }
 
 
-void TraceBluegene::userBracketEvent(char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList){
+void TraceBluegene::userBracketEvent(const char* name, double bt, double et, void** parentLogPtr, CkVec<void*> bgLogList){
    
   if (!genTimeLog) return;
 
