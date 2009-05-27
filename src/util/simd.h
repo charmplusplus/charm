@@ -163,9 +163,9 @@ inline  __vec4f  __vrsqrt4f(const  __vec4f a) {  __vec4f r; r.v0 = 1.0f / sqrtf(
 inline __vec2lf __vrsqrt2lf(const __vec2lf a) { __vec2lf r; r.v0 = 1.0 / sqrt(a.v0); r.v1 = 1.0 / sqrt(a.v1); return r; }
 
 /***** Not *****/
-inline  __vec4i  __vnot4i(const  __vec4i a) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); rPtr[0] = aPtr[0] ^ 0x0; rPtr[1] = aPtr[1] ^ 0x0; rPtr[2] = aPtr[2] ^ 0x0; rPtr[3] = aPtr[3] ^ 0x0; return r; }
-inline  __vec4f  __vnot4f(const  __vec4f a) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); rPtr[0] = aPtr[0] ^ 0x0; rPtr[1] = aPtr[1] ^ 0x0; rPtr[2] = aPtr[2] ^ 0x0; rPtr[3] = aPtr[3] ^ 0x0; return r; }
-inline __vec2lf __vnot2lf(const __vec2lf a) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); rPtr[0] = aPtr[0] ^ 0x0; rPtr[1] = aPtr[1] ^ 0x0; rPtr[2] = aPtr[2] ^ 0x0; rPtr[3] = aPtr[3] ^ 0x0; return r; }
+inline  __vec4i  __vnot4i(const  __vec4i a) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); rPtr[0] = aPtr[0] ^ -1; rPtr[1] = aPtr[1] ^ -1; rPtr[2] = aPtr[2] ^ -1; rPtr[3] = aPtr[3] ^ -1; return r; }
+inline  __vec4f  __vnot4f(const  __vec4f a) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); rPtr[0] = aPtr[0] ^ -1; rPtr[1] = aPtr[1] ^ -1; rPtr[2] = aPtr[2] ^ -1; rPtr[3] = aPtr[3] ^ -1; return r; }
+inline __vec2lf __vnot2lf(const __vec2lf a) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); rPtr[0] = aPtr[0] ^ -1; rPtr[1] = aPtr[1] ^ -1; rPtr[2] = aPtr[2] ^ -1; rPtr[3] = aPtr[3] ^ -1; return r; }
 
 /***** Or *****/
 inline  __vec4i  __vor4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] | bPtr[0]; rPtr[1] = aPtr[1] | bPtr[1]; rPtr[2] = aPtr[2] | bPtr[2]; rPtr[3] = aPtr[3] | bPtr[3]; return r; }
@@ -435,9 +435,9 @@ inline __vec4i __vcmple2lf(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v
   #define vrsqrt2lf(a)  (vrecip2lf(vsqrt2lf(a)))
 
   /***** Not *****/
-  #define  vnot4i(a)  (_mm_xor_si128((a), const_vzero4i))
-  #define  vnot4f(a)  (_mm_xor_ps((a), const_vzero4f))
-  #define vnot2lf(a)  (_mm_xor_pd((a), const_vzero2lf))
+  #define  vnot4i(a)  (_mm_xor_si128((a), const_vnegone4i))
+  #define  vnot4f(a)  (_mm_xor_ps((a), const_vnegone4i))
+  #define vnot2lf(a)  (_mm_xor_pd((a), const_vnegone4i))
 
   /***** Or *****/
   #define  vor4i(a, b)  (_mm_or_si128((a), (b)))
@@ -586,9 +586,9 @@ inline __vec4i __vcmple2lf(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v
   inline vec2lf vrsqrt2lf(const vec2lf a, const vec2lf b) { vec2lf r = { 0.0, 0.0 }; spu_insert((1.0f / sqrt(spu_extract(a, 0))), r, 0); spu_insert((1.0f / sqrt(spu_extract(a, 1))), r, 1); return r; }
 
   /***** Not *****/
-  #define  vnot4i(a)  (spu_nor((a), (a)))
-  #define  vnot4f(a)  (spu_nor((a), (a)))
-  #define vnot2lf(a)  (spu_nor((a), (a)))
+  #define  vnot4i(a)  (spu_nor((a), const_vzero4i))
+  #define  vnot4f(a)  (spu_nor((a), const_vzero4f))
+  #define vnot2lf(a)  (spu_nor((a), const_vzero2lf))
 
   /***** Or *****/
   #define  vor4i(a, b)  (spu_or((a), (b)))
@@ -630,6 +630,8 @@ inline __vec4i __vcmple2lf(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v
   #define  vcmpgt4f(a, b)  ((vec4i)(spu_cmpgt((a), (b))))
   #define vcmpgt2lf(a, b)  ((vec4i)(spu_cmpgt((a), (b))))
 
+  // NOTE : Try to create versions of >= and < that do not double evaluate their inputs
+
   /***** Greater Than or Equal To *****/
   #define  vcmpge4i(a, b)  (spu_or( vcmpeq4i((a), (b)),  vcmpgt4i((a), (b))))
   #define  vcmpge4f(a, b)  (spu_or( vcmpeq4f((a), (b)),  vcmpgt4f((a), (b))))
@@ -641,9 +643,9 @@ inline __vec4i __vcmple2lf(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v
   #define vcmplt2lf(a, b)  (spu_nor(vcmpgt2lf((a), (b)), vcmpeq2lf((a), (b))))
 
   /***** Less Than or Equal To *****/
-  #define  vcmple4i(a, b)  (spu_nor( vcmpgt4i((a), (b)),  vxor4i((a), (a))))
-  #define  vcmple4f(a, b)  (spu_nor( vcmpgt4f((a), (b)),  vxor4f((a), (a))))
-  #define vcmple2lf(a, b)  (spu_nor(vcmpgt2lf((a), (b)), vxor2lf((a), (b))))
+  #define  vcmple4i(a, b)  (spu_nor( vcmpgt4i((a), (b)),  const_vzero4i))
+  #define  vcmple4f(a, b)  (spu_nor( vcmpgt4f((a), (b)),  const_vzero4f))
+  #define vcmple2lf(a, b)  (spu_nor(vcmpgt2lf((a), (b)), const_vzero2lf))
 
 
 /*******************************************************************************
@@ -746,8 +748,8 @@ inline __vec4i __vcmple2lf(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v
   #define vrsqrt2lf __vrsqrt2lf
 
   /***** Not *****/
-  #define vnot4i(a)  (vec_xor((a), (a)))
-  #define vnot4f(a)  (vec_xor((a), (a))) 
+  #define vnot4i(a)  (vec_xor((a), const_vzero4i))
+  #define vnot4f(a)  (vec_xor((a), const_vzero4f)) 
   #define vnot2lf __vnot2lf
 
   /***** Or *****/
