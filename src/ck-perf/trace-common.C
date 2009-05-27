@@ -187,19 +187,19 @@ static void traceCommonInit(char **argv)
 extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "MACHINE %s\n",CMK_MACHINE_NAME);
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
-  fprintf(stsfp, "TOTAL_CHARES %lu\n", _chareTable.size());
-  fprintf(stsfp, "TOTAL_EPS %lu\n", _entryTable.size());
-  fprintf(stsfp, "TOTAL_MSGS %lu\n", _msgTable.size());
+  fprintf(stsfp, "TOTAL_CHARES %d\n", _chareTable.size());
+  fprintf(stsfp, "TOTAL_EPS %d\n", _entryTable.size());
+  fprintf(stsfp, "TOTAL_MSGS %d\n", _msgTable.size());
   fprintf(stsfp, "TOTAL_PSEUDOS %d\n", 0);
   fprintf(stsfp, "TOTAL_EVENTS %d\n", nUserEvents);
   size_t i;
   for(i=0;i<_chareTable.size();i++)
-    fprintf(stsfp, "CHARE %zu %s\n", i, _chareTable[i]->name);
+    fprintf(stsfp, "CHARE %d %s\n", i, _chareTable[i]->name);
   for(i=0;i<_entryTable.size();i++)
-    fprintf(stsfp, "ENTRY CHARE %zu %s %d %d\n", i, _entryTable[i]->name,
+    fprintf(stsfp, "ENTRY CHARE %d %s %d %d\n", i, _entryTable[i]->name,
                  _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
   for(i=0;i<_msgTable.size();i++)
-    fprintf(stsfp, "MESSAGE %zu %zu\n", i, _msgTable[i]->size);
+    fprintf(stsfp, "MESSAGE %d %u\n", i, _msgTable[i]->size);
 }
 
 extern "C"
