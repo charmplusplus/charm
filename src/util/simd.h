@@ -684,24 +684,24 @@ inline __vec4i __vcmple2lf(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v
   inline vector unsigned char vset16uc(const unsigned char c) { vector unsigned char r __attribute__((aligned(16))); ((unsigned char*)(&r))[0] = c; return vec_splat(r, 0); }
 
   /***** Constant Zero *****/
-  #define  const_vec4i  (vec_splat_s32(0))
-  #define  const_vec4f  (vec_ctf(vec_splat_s32(0), 0))
-  #define const_vec2lf  (__const_vzero2lf)
+  #define  const_vzero4i  (vec_splat_s32(0))
+  #define  const_vzero4f  (vec_ctf(vec_splat_s32(0), 0))
+  #define const_vzero2lf  (__const_vzero2lf)
 
   /***** Constant One *****/
-  #define  const_vec4i  (vec_splat_s32(1))
-  #define  const_vec4f  (vec_ctf(vec_splat_s32(1), 0))
-  #define const_vec2lf  (__const_vone2lf)
+  #define  const_vone4i  (vec_splat_s32(1))
+  #define  const_vone4f  (vec_ctf(vec_splat_s32(1), 0))
+  #define const_vone2lf  (__const_vone2lf)
 
   /***** Constant Two *****/
-  #define  const_vec4i  (vec_splat_s32(2))
-  #define  const_vec4f  (vec_ctf(vec_splat_s32(2), 0))
-  #define const_vec2lf  (__const_vtwo2lf)
+  #define  const_vtwo4i  (vec_splat_s32(2))
+  #define  const_vtwo4f  (vec_ctf(vec_splat_s32(2), 0))
+  #define const_vtwo2lf  (__const_vtwo2lf)
 
   /***** Constant Negative One *****/
-  #define  const_vec4i  (vec_splat_s32(-1))
-  #define  const_vec4f  (vec_ctf(vec_splat_s32(-1), 0))
-  #define const_vec2lf  (__const_vec2lf)
+  #define  const_vnegone4i  (vec_splat_s32(-1))
+  #define  const_vnegone4f  (vec_ctf(vec_splat_s32(-1), 0))
+  #define const_vnegone2lf  (__const_vec2lf)
 
   /***** Rotate *****/
   #define __vrotlbytes(a, s)  (vec_or(vec_slo((a), vset16uc(((s) & 0xf) << 3)), vec_sro((a), set16uc((16 - ((s) & 0xf)) << 3))))
@@ -723,8 +723,10 @@ inline __vec4i __vcmple2lf(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v
   #define  vsub4f(a, b)  (vec_sub((a), (b)))
   #define vsub2lf __vsub2lf
 
+
   /***** Multiplication *****/
-  #define  vmul4f(a, b)  (vec_madd((a), (b), vec_xor((a))))
+  // NOTE: Try to find a way to do this without double evaluating a
+  #define  vmul4f(a, b)  (vec_madd((a), (b), vec_xor((a), (a))))
   #define vmul2lf __vmul2lf
 
   /***** Division *****/
