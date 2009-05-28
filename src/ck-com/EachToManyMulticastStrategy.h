@@ -1,53 +1,82 @@
+/**
+   @addtogroup ComlibCharmStrategy
+   @{
+   @file 
+   @brief Optimized all-to-all communication that can combine messages and send them along virtual topologies.
+*/
+
 #ifndef EACH_TO_MANY_MULTICAST_STRATEGY
 #define EACH_TO_MANY_MULTICAST_STRATEGY
 
 #include "ComlibManager.h"
 #include "routerstrategy.h"
 
-class EachToManyMulticastStrategy: public CharmStrategy {
+/**
+   The EachToManyMulticast Strategy optimizes all-to-all
+   communication. It combines messages and sends them along
+   virtual topologies 2d mesh, 3d mesh and hypercube using
+   the RouterStrategy as underlying strategy.
+
+   For large messages send them directly.
+
+   This is the object level strategy. For processor level
+   optimizations the underlying RouterStrategy is called.
+
+   @author Sameer Kumar, Filippo, and Isaac
+
+*/
+class EachToManyMulticastStrategy : public RouterStrategy, public CharmStrategy {
  protected:
-    int routerID;      //Which topology
-    int npes, *pelist; //Domain of the topology
-    int MyPe;          //My id in that domain
-
-    int ndestpes, *destpelist; //Destination processors
-    int handlerId;
-    
-    //Executes common code just after array and group constructors
-    virtual void commonInit();
-
-    RouterStrategy *rstrat;
-    int useLearner;
+ 
+    /// Executes common code just after array and group constructors
+    virtual void commonInit(int*);
 
  public:
-    //Group constructor
-    EachToManyMulticastStrategy(int strategyId, int nsrcpes=0, 
-                                int *srcpelist=0, 
-                                int ndestpes =0, int *destpelist =0);
-    
-    //Array constructor
+    /// Group constructor
+    /// If only the first three parameters are provided, the whole group will be used for the multicast(0 to CkNumPes)
+    /// TODO verify that the 0 parameter 
+    EachToManyMulticastStrategy(int strategyId, CkGroupID src, CkGroupID dest, 
+    		int nsrcpes=0, int *srcpelist=0, 
+    		int ndestpes =0, int *destpelist =0);
+
+    /// Array constructor
+    /// TODO: Fix this to allow for the same parameters as would be given to an array section creation(ranges of indices).
     EachToManyMulticastStrategy(int substrategy, CkArrayID src, 
                                 CkArrayID dest, int nsrc=0, 
                                 CkArrayIndexMax *srcelements=0, int ndest=0, 
                                 CkArrayIndexMax *destelements=0);
     
-    EachToManyMulticastStrategy(CkMigrateMessage *m) : CharmStrategy(m){};
+    EachToManyMulticastStrategy(CkMigrateMessage *m) : RouterStrategy(m), CharmStrategy(m) {
+      ComlibPrintf("[%d] EachToManyMulticast migration constructor\n",CkMyPe());
+    };
     
     ~EachToManyMulticastStrategy();
 
+    void insertMessage(MessageHolder *msg) {
+      ((CharmMessageHolder*)msg) -> checkme();
+      insertMessage((CharmMessageHolder*)msg);
+    }
+
     //Basic function, subclasses should not have to change it
     virtual void insertMessage(CharmMessageHolder *msg);
-    //More specielized function
-    virtual void doneInserting();
 
     virtual void pup(PUP::er &p);    
-    virtual void beginProcessing(int nelements);
-    virtual void finalizeProcessing();
     virtual void localMulticast(void *msg);
+
+    virtual void notifyDone();
+    virtual void deliver(char *, int);
+
+    /// this method can be called when the strategy is in DIRECT mode, so the
+    /// message will go the comlib_handler and then arrive here.
+    virtual void handleMessage(void *msg) {
+      envelope *env = (envelope*)msg;
+      
+      deliver((char*)msg, env->getTotalsize());
+    }
     
     PUPable_decl(EachToManyMulticastStrategy);
-    
-    inline void enableLearning() {useLearner = 1;}
+
 };
 #endif
 
+/*@}*/

@@ -24,7 +24,7 @@ PVT::PVT()
   rdone=0;
   SRs=NULL;
 #ifdef POSE_COMM_ON
-  //comm_debug = 1;
+  //com_debug = 1;
 #endif
 #ifndef CMK_OPTIMIZE
   localStats = (localStat *)CkLocalBranch(theLocalStats);

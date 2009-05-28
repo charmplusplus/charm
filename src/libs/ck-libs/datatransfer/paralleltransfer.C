@@ -10,7 +10,7 @@
 #include "charm++.h" /* for CmiAbort */
 #include "GenericElement.h"
 
-#define OSL_COMM_DEBUG 0
+#define OSL_com_debug 0
 #define COORD_PER_POINT 3 /* coordinates per point (e.g., 3d) */
 #define POINT_PER_TET 4 /* points per element (e.g., 4 for tets) */
 
@@ -358,7 +358,7 @@ public:
   void isend(MPI_Comm comm,int src,int dest) {
     if (nSend==0) return; /* nothing to do */
     
-#if OSL_COMM_DEBUG 
+#if OSL_com_debug 
     CkPrintf("%d sending %d records to %d\n", src,n,dest);
 #endif
     MPI_Isend(ck.messageBuf(),ck.messageSizeXfer(),
@@ -489,7 +489,7 @@ void parallelTransfer_c::transfer(progress_t &progress) {
     else /* collides our source cell, so send it */ 
       send[cr[1]].countTet(ss,cr[0]);
   }
-#if OSL_COMM_DEBUG /* print out the communication table */
+#if OSL_com_debug /* print out the communication table */
   printf("Rank %d: %d collisions, ",myRank,nColl);
   for (p=0;p<commSize;p++) 
     if (send[p].getCount() || recv[p].getCount())

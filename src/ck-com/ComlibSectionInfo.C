@@ -1,35 +1,60 @@
-#include "charm++.h" // for CMK_HAS_ALLOCA_H
+/**
+   @addtogroup CharmComlib
+   @{ 
+   @file
+  
+   Implementations of classes defined in ComlibSectionInfo.h
+*/
+
+#include "ComlibManager.h"
+#include "ComlibSectionInfo.h"
+#ifdef __MINGW_H 
+#include <malloc.h> 
+#endif
+
+
+#define USE_CONTROL_POINTS 0
+
+#if USE_CONTROL_POINTS
+#include "controlPoints.h"
+#endif
 
 #if CMK_HAS_ALLOCA_H
 #include <alloca.h>
 #endif
 
-#ifdef __MINGW_H
-#include <malloc.h>
-#endif
 
-#include "ComlibManager.h"
-#include "ComlibSectionInfo.h"
 
-ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolder *cmsg, int needSort){
+/// Create a new multicast message
+ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolder *cmsg, int needSort, int instanceID){
     
+  cmsg->checkme();
+
     if(cmsg->sec_id == NULL || cmsg->sec_id->_nElems == 0)
         return NULL;
 
     void *m = cmsg->getCharmMessage();
     envelope *env = UsrToEnv(m);
         
-    if(cmsg->sec_id->_cookie.sInfo.cInfo.id != 0) 
-        CmiAbort("In correct section\n");
-
+    // Crate a unique identifier for section id in cmsg->sec_id
     initSectionID(cmsg->sec_id);   
 
     CkPackMessage(&env);
+
+    const CkArrayID destArrayID(env->getsetArrayMgr());
     int nRemotePes, nRemoteIndices;
     ComlibMulticastIndexCount *indicesCount;
     int *belongingList;
-    getPeCount(cmsg->sec_id->_nElems, cmsg->sec_id->_elems, nRemotePes, nRemoteIndices, indicesCount, belongingList);
-    if (nRemotePes == 0) return NULL;
+    getPeCount(cmsg->sec_id->_nElems, cmsg->sec_id->_elems, destArrayID, nRemotePes, nRemoteIndices, indicesCount, belongingList);
+
+    //     if (nRemotePes == 0) return NULL;
+
+#if 0
+    CkPrintf("nRemotePes=%d\n", nRemotePes);
+    CkPrintf("nRemoteIndices=%d\n",nRemoteIndices);
+    CkPrintf("env->getTotalsize()=%d\n", env->getTotalsize());
+    CkPrintf("cmsg->sec_id->_nElems=%d\n", cmsg->sec_id->_nElems);
+ #endif
 
     int sizes[3];
     sizes[0] = nRemotePes;
@@ -53,30 +78,30 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolde
     CkArrayIndexMax **indicesPe = (CkArrayIndexMax**)alloca(nRemotePes * sizeof(CkArrayIndexMax*));
 
     if (needSort) {
-      // if we are sorting the array, then we need to fix the problem that belongingList
-      // refers to the original ordering! This is done by mapping indicesPe in a way coherent
-      // with the original ordering.
-      int previous, i, j;
-      qsort(msg->indicesCount, sizes[0], sizeof(ComlibMulticastIndexCount), indexCountCompare);
+    	// if we are sorting the array, then we need to fix the problem that belongingList
+    	// refers to the original ordering! This is done by mapping indicesPe in a way coherent
+    	// with the original ordering.
+    	int previous, i, j;
+    	qsort(msg->indicesCount, sizes[0], sizeof(ComlibMulticastIndexCount), indexCountCompare);
 
-      for (j=0; j<nRemotePes; ++j) if (indicesCount[j].pe == msg->indicesCount[0].pe) break;
-      indicesPe[j] = msg->indices;
-      previous = j;
-      for (i=1; i<nRemotePes; ++i) {
-	for (j=0; j<nRemotePes; ++j) if (indicesCount[j].pe == msg->indicesCount[i].pe) break;
-	indicesPe[j] = indicesPe[previous] + indicesCount[previous].count;
-        previous = j;
-      }
+    	for (j=0; j<nRemotePes; ++j) if (indicesCount[j].pe == msg->indicesCount[0].pe) break;
+    	indicesPe[j] = msg->indices;
+    	previous = j;
+    	for (i=1; i<nRemotePes; ++i) {
+    		for (j=0; j<nRemotePes; ++j) if (indicesCount[j].pe == msg->indicesCount[i].pe) break;
+    		indicesPe[j] = indicesPe[previous] + indicesCount[previous].count;
+    		previous = j;
+    	}
     } else {
-      indicesPe[0] = msg->indices;
-      for (int i=1; i<nRemotePes; ++i) indicesPe[i] = indicesPe[i-1] + indicesCount[i-1].count;
+    	indicesPe[0] = msg->indices;
+    	for (int i=1; i<nRemotePes; ++i) indicesPe[i] = indicesPe[i-1] + indicesCount[i-1].count;
     }
 
     for (int i=0; i<cmsg->sec_id->_nElems; ++i) {
-      if (belongingList[i] >= 0) {
-	*indicesPe[belongingList[i]] = cmsg->sec_id->_elems[i];
-	indicesPe[belongingList[i]]++;
-      }
+    	if (belongingList[i] >= 0) {
+    		*indicesPe[belongingList[i]] = cmsg->sec_id->_elems[i];
+    		indicesPe[belongingList[i]]++;
+    	}
     }
     memcpy(msg->usrMsg, env, sizes[2] * sizeof(char));
     envelope *newenv = UsrToEnv(msg);
@@ -93,7 +118,6 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolde
     newenv->setEvent(env->getEvent());
     newenv->setSrcPe(env->getSrcPe());
     
-    CkPackMessage(&newenv);        
     return (ComlibMulticastMsg *)EnvToUsr(newenv);
 }
 
@@ -131,26 +155,26 @@ void ComlibSectionInfo::unpack(envelope *cb_env,
       }
     else
       {
-	nLocalElems = ccmsg->indicesCount[i].count;
+    nLocalElems = ccmsg->indicesCount[i].count;
 
-	/*
-	  CkPrintf("Unpacking: %d local elements:",nLocalElems);
-	  for (int j=0; j<nLocalElems; ++j) CkPrintf(" %d",((int*)&dest_indices[j])[1]);
-	  CkPrintf("\n");
-	*/
-	/*
-	  for(int count = 0; count < ccmsg->nIndices; count++){
-	  CkArrayIndexMax idx = ccmsg->indices[count];
+    /*
+    ComlibPrintf("Unpacking: %d local elements:",nLocalElems);
+    for (int j=0; j<nLocalElems; ++j) ComlibPrintf(" %d",((int*)&dest_indices[j])[1]);
+    ComlibPrintf("\n");
+    */
+    /*
+    for(int count = 0; count < ccmsg->nIndices; count++){
+        CkArrayIndexMax idx = ccmsg->indices[count];
         
-	  //This will work because. lastknown always knows if I have the
-	  //element of not
-	  int dest_proc = ComlibGetLastKnown(destArrayID, idx);
-	  //CkArrayID::CkLocalBranch(destArrayID)->lastKnown(idx);
+        //This will work because. lastknown always knows if I have the
+        //element of not
+        int dest_proc = ComlibGetLastKnown(destArrayID, idx);
+        //CkArrayID::CkLocalBranch(destArrayID)->lastKnown(idx);
         
-	  //        if(dest_proc == CkMyPe())
-	  dest_indices.insertAtEnd(idx);                        
-	  }
-	*/
+        //        if(dest_proc == CkMyPe())
+        dest_indices.insertAtEnd(idx);                        
+    }
+    */
       }
     envelope *usrenv = (envelope *) ccmsg->usrMsg;
     env = (envelope *)CmiAlloc(usrenv->getTotalsize());
@@ -159,10 +183,11 @@ void ComlibSectionInfo::unpack(envelope *cb_env,
 
 
 void ComlibSectionInfo::processOldSectionMessage(CharmMessageHolder *cmsg) {
+  cmsg->checkme();
 
     ComlibPrintf("Process Old Section Message \n");
 
-    int cur_sec_id = ComlibSectionInfo::getSectionID(*cmsg->sec_id);
+    int cur_sec_id = cmsg->sec_id->getSectionID();
 
     //Old section id, send the id with the message
     CkMcastBaseMsg *cbmsg = (CkMcastBaseMsg *)cmsg->getCharmMessage();
@@ -170,10 +195,18 @@ void ComlibSectionInfo::processOldSectionMessage(CharmMessageHolder *cmsg) {
     cbmsg->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_OLD_SECTION;
 }
 
+CkMcastBaseMsg *ComlibSectionInfo::getNewDeliveryErrorMsg(CkMcastBaseMsg *base) {
+  CkMcastBaseMsg *dest= (CkMcastBaseMsg*)CkAllocMsg(0, sizeof(CkMcastBaseMsg), 0);
+  memcpy(dest, base, sizeof(CkMcastBaseMsg));
+  dest->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_SECTION_ERROR;
+  return dest;
+}
+
 void ComlibSectionInfo::getPeList(int _nElems, 
-                                  CkArrayIndexMax *_elems, 
+                                  CkArrayIndexMax *_elems,
+				  CkArrayID &destArrayID,
                                   int &npes, int *&pelist){
-    
+
     int length = CkNumPes();
     if(length > _nElems)    //There will not be more processors than
                             //number of elements. This is wastage of
@@ -186,9 +219,11 @@ void ComlibSectionInfo::getPeList(int _nElems,
     
     int count = 0, acount = 0;
     
+    CkArray *a = (CkArray *)_localBranch(destArrayID);
     for(acount = 0; acount < _nElems; acount++){
         
-        int p = ComlibGetLastKnown(destArrayID, _elems[acount]);
+      //int p = ComlibGetLastKnown(destArrayID, _elems[acount]);
+	int p = a->lastKnown(_elems[acount]);
         
         if(p == -1) CkAbort("Invalid Section\n");        
         for(count = 0; count < npes; count ++)
@@ -196,20 +231,58 @@ void ComlibSectionInfo::getPeList(int _nElems,
                 break;
         
         if(count == npes) {
-            pelist[npes ++] = p;
+	  pelist[npes ++] = p;
         }
     }   
-
+    
     if(npes == 0) {
-        delete [] pelist;
-        pelist = NULL;
+      delete [] pelist;
+      pelist = NULL;
     }
 }
 
 
+
+inline int getPErepresentingNodeContainingPE(int pe){
+
+#if 1
+    return pe;
+
+#else
+
+#if USE_CONTROL_POINTS
+  std::vector<int> v;
+  v.push_back(1);
+  if(CkNumPes() >= 2)
+    v.push_back(2);
+  if(CkNumPes() >= 4)
+    v.push_back(4);
+  if(CkNumPes() >= 8)
+    v.push_back(8);
+  int pes_per_node = controlPoint("Number of PEs per Node", v);
+#else
+  int pes_per_node = 1;
+#endif
+
+
+    if(getenv("PE_PER_NODES") != NULL)
+    	pes_per_node = CkNumPes()/atoi(getenv("PE_PER_NODES"));
+	    
+    if( pes_per_node > 1 && pes_per_node <= CkNumPes() ){
+        ComlibPrintf("NODE AWARE Sending a message to a representative of the node instead of its real owner\n");
+        int newpe = pe - (pe % pes_per_node);
+        return newpe;
+    } else {
+    	return pe;
+    }
+#endif    
+}
+
+
 void ComlibSectionInfo::getPeCount(int nindices, CkArrayIndexMax *idxlist, 
-		      int &npes, int &nidx,
+		      const CkArrayID &destArrayID, int &npes, int &nidx,
 		      ComlibMulticastIndexCount *&counts, int *&belongs) {
+
   int count = 0;
   int i;
     
@@ -222,10 +295,28 @@ void ComlibSectionInfo::getPeCount(int nindices, CkArrayIndexMax *idxlist,
   npes = 0;
   nidx = 0;
 
+  CkArray *a = (CkArray *)_localBranch(destArrayID);
   for(i=0; i<nindices; ++i){
-    int p = ComlibGetLastKnown(destArrayID, idxlist[i]);
+    //int p = ComlibGetLastKnown(destArrayID, idxlist[i]);
+    int p = a->lastKnown(idxlist[i]);
+
+
+#define USE_NODE_AWARE 1
+#if USE_NODE_AWARE
+#warning "USING NODE AWARE SECTION INFOs"
+    ComlibPrintf("NODE AWARE old p=%d\n", p);
+  
+    // p = getPErepresentingNodeContainingPE(p);
+    
+    ComlibPrintf("NODE AWARE new p=%d\n", p);
+#endif
     
     if(p == -1) CkAbort("Invalid Section\n");        
+
+    if(p == CkMyPe()) {
+      belongs[i] = -1;
+      continue;
+    }
 
     //Collect processors
     for(count = 0; count < npes; count ++)
@@ -238,30 +329,28 @@ void ComlibSectionInfo::getPeCount(int nindices, CkArrayIndexMax *idxlist,
       ++npes;
     }
 
-    if(p == CkMyPe()) {
-      belongs[i] = -1;
-      continue;
-    }
-
     ++nidx;
     counts[count].count++;
     belongs[i] = count;
   }
-  //CkPrintf("section has %d procs\n",npes);
+  //ComlibPrintf("section has %d procs\n",npes);
 
-  if(npes == 0) {
-    delete [] counts;
-    delete [] belongs;
-    counts = NULL;
-    belongs = NULL;
-  }
+//   if(npes == 0) {
+//     delete [] counts;
+//     delete [] belongs;
+//     counts = NULL;
+//     belongs = NULL;
+//   }
 }
 
 
 void ComlibSectionInfo::getRemotePelist(int nindices, 
-                                        CkArrayIndexMax *idxlist, 
+                                        CkArrayIndexMax *idxlist,
+					CkArrayID &destArrayID,
                                         int &npes, int *&pelist) {
 
+	ComlibPrintf("ComlibSectionInfo::getRemotePelist()\n");
+	
     int count = 0, acount = 0;
     
     int length = CkNumPes();
@@ -283,10 +372,12 @@ void ComlibSectionInfo::getRemotePelist(int nindices,
     pelist = new int[length+1];
     npes = 0;
 
+    CkArray *a = (CkArray *)_localBranch(destArrayID);
     for(acount = 0; acount < nindices; acount++){
         
-        int p = ComlibGetLastKnown(destArrayID, idxlist[acount]);
-        if(p == CkMyPe())
+      //int p = ComlibGetLastKnown(destArrayID, idxlist[acount]);
+      int p = a->lastKnown(idxlist[acount]);
+      if(p == CkMyPe())
             continue;
         
         if(p == -1) CkAbort("Invalid Section\n");        
@@ -308,20 +399,40 @@ void ComlibSectionInfo::getRemotePelist(int nindices,
 }
 
 
-void ComlibSectionInfo::getLocalIndices(int nindices, 
-                                        CkArrayIndexMax *idxlist, 
+void ComlibSectionInfo::getLocalIndices(int nindices,
+                                        CkArrayIndexMax *idxlist,
+					CkArrayID &destArrayID,
                                         CkVec<CkArrayIndexMax> &idx_vec){    
-    int count = 0, acount = 0;
+	ComlibPrintf("ComlibSectionInfo::getLocalIndices()\n");
+	
+	int count = 0, acount = 0;
     idx_vec.resize(0);
     
+    CkArray *a = (CkArray *)_localBranch(destArrayID);
     for(acount = 0; acount < nindices; acount++){
-        int p = ComlibGetLastKnown(destArrayID, idxlist[acount]);
+        //int p = ComlibGetLastKnown(destArrayID, idxlist[acount]);
+        int p = a->lastKnown(idxlist[acount]);
         if(p == CkMyPe()) 
             idx_vec.insertAtEnd(idxlist[acount]);
     }
 }
 
 
-void ComlibSectionInfo::localMulticast(envelope *env){
-    ComlibArrayInfo::localMulticast(&localDestIndexVec, env);
+
+void ComlibSectionInfo::getNodeLocalIndices(int nindices,
+                                        CkArrayIndexMax *idxlist,
+					CkArrayID &destArrayID,
+                                        CkVec<CkArrayIndexMax> &idx_vec){    
+    int count = 0, acount = 0;
+    idx_vec.resize(0);
+    
+    CkArray *a = (CkArray *)_localBranch(destArrayID);
+    for(acount = 0; acount < nindices; acount++){
+        //int p = ComlibGetLastKnown(destArrayID, idxlist[acount]);
+        int p = a->lastKnown(idxlist[acount]);
+        if(p == CkMyPe()) 
+            idx_vec.insertAtEnd(idxlist[acount]);
+    }
 }
+
+

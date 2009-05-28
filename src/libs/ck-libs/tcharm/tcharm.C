@@ -5,6 +5,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
  */
 #include "tcharm_impl.h"
 #include "tcharm.h"
+#include "ckevacuation.h"
 #include <ctype.h>
 
 #if 0 
@@ -495,6 +496,7 @@ void TCharm::migrate(void)
   DBG("skipping sync, because there is no load balancer");
 #endif
 }
+
 
 
 void TCharm::evacuate(){

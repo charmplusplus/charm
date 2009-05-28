@@ -106,7 +106,7 @@ void POSE_busy_wait(double n);
 CpvExtern(int, stateRecovery);
 
 #ifdef POSE_COMM_ON
-extern int comm_debug;
+extern int com_debug;
 #endif
 
 /// Class for user-specified callback

@@ -1,3 +1,9 @@
+/**
+   @addtogroup CharmComlib
+   @{
+*/
+
+
 
 #ifndef AAMLEARNER_H
 #define AAMLEARNER_H
@@ -33,3 +39,4 @@ class AAMLearner : public ComlibLearner {
 
 
 #endif
+/*@}*/

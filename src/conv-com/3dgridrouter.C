@@ -1,11 +1,15 @@
-/************************************************************
- * File : D3Gridrouter.C
- *
- * Author : Sameer Kumar
- *
- * Grid (3d grid) based router
- ***********************************************************/
-#include <math.h>
+/**
+   @addtogroup ConvComlibRouter
+   @{
+   @file 
+   @brief Grid (3d grid) based router
+   @Author Sameer Kumar
+*/
+
+
+
+
+
 #include "3dgridrouter.h"
 //#define NULL 0
 
@@ -13,7 +17,7 @@
 
 /**The only communication op used. Modify this to use
  ** vector send */
-#if CMK_COMMLIB_USE_VECTORIZE
+#if CMK_COMLIB_USE_VECTORIZE
 #define GRIDSENDFN(kid, u1, u2, knpe, kpelist, khndl, knextpe)  \
   	{int len;\
 	PTvectorlist newmsg;\
@@ -114,7 +118,7 @@ inline int LPMsgExpect(int gpe, int gnpes)
 /****************************************************
  * Preallocated memory=P ints + MAXNUMMSGS msgstructs
  *****************************************************/
-D3GridRouter::D3GridRouter(int n, int me)
+D3GridRouter::D3GridRouter(int n, int me, Strategy *parent) : Router(parent)
 {
     ComlibPrintf("PE=%d me=%d NUMPES=%d\n", CkMyPe(), me, n);
     
@@ -263,7 +267,7 @@ void D3GridRouter::EachToManyMulticast(comID id, int size, void *msg, int numpes
         
         gmap(nextpe);
         ComlibPrintf("sending to column %d and dest %d in %d\n", i, nextpe, CkMyPe());
-        GRIDSENDFN(id, 0, 0, psize[i], oneplane[i],CkpvAccess(RecvHandle), nextpe); 
+        GRIDSENDFN(id, 0, 0, psize[i], oneplane[i],CkpvAccess(RouterRecvHandle), nextpe); 
     }
 }
 
@@ -317,7 +321,7 @@ void D3GridRouter::RecvManyMsg(comID id, char *msg)
             
             //ComlibPrintf("After gmap %d\n", nextpe);
             ComlibPrintf("%d:sending recv message %d %d\n", MyPe, nextpe, myrep);
-            GRIDSENDFN(id, 1, 1, k, pelist, CkpvAccess(RecvHandle), nextpe);
+            GRIDSENDFN(id, 1, 1, k, pelist, CkpvAccess(RouterRecvHandle), nextpe);
         }
     }
     
@@ -338,7 +342,7 @@ void D3GridRouter::RecvManyMsg(comID id, char *msg)
             //ComlibPrintf("After gmap %d\n", nextpe);
             
             ComlibPrintf("%d:sending proc message %d %d\n", MyPe, nextpe, nplanes);
-            GRIDSENDFN(id, 2, 2, 1, pelist, CkpvAccess(ProcHandle), nextpe);
+            GRIDSENDFN(id, 2, 2, 1, pelist, CkpvAccess(RouterProcHandle), nextpe);
         }
         LocalProcMsg(id);
     }
@@ -369,7 +373,7 @@ void D3GridRouter:: LocalProcMsg(comID id)
     ComlibPrintf("%d local procmsg called\n", MyPe);
     
     LPMsgCount++;
-    PeGrid->ExtractAndDeliverLocalMsgs(MyPe);
+    PeGrid->ExtractAndDeliverLocalMsgs(MyPe, container);
     
     if (LPMsgCount==LPMsgExpected) {
 	PeGrid->Purge();
@@ -385,3 +389,4 @@ void D3GridRouter :: SetMap(int *pes)
     gpes=pes;
 }
 
+/*@}*/

@@ -5,10 +5,15 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+   @addtogroup ConvComlibRouter
+   @{
+   @file
+*/
+
+
 #ifndef TREEROUTER_H
 #define TREEROUTER_H
-#include <converse.h>
-#include "convcomlib.h"
 #include "petable.h"
 
 class TreeRouter : public Router
@@ -21,7 +26,7 @@ class TreeRouter : public Router
 	void InitVars();
 	void DownStreamMsg(comID id);
 	void LocalProcMsg(comID);
-#if CMK_COMMLIB_USE_VECTORIZE
+#if CMK_COMLIB_USE_VECTORIZE
 	PTvectorlist SortBufferUp(comID, int);
 	PTvectorlist SortBufferDown(comID, int, int);
 #else
@@ -29,7 +34,7 @@ class TreeRouter : public Router
 	char * SortBufferDown(comID, int, int *, int);
 #endif
   public:
-	TreeRouter(int, int);
+	TreeRouter(int, int, Strategy*);
 	~TreeRouter();
 	void NumDeposits(comID, int);
 	void EachToAllMulticast(comID, int , void *, int);
@@ -42,3 +47,4 @@ class TreeRouter : public Router
 
 #endif
 	
+/*@}*/

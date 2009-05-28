@@ -7,7 +7,7 @@ CpvDeclare(eventID, theEventID);
 
 void POSEreadCmdLine();
 #ifdef POSE_COMM_ON
-extern int comm_debug;
+extern int com_debug;
 #endif
 double busyWait;
 double sim_timer;
@@ -62,7 +62,7 @@ void POSE_init(int IDflag, int ET) // can specify both
   //PrioStreaming *strategy = new PrioStreaming(COMM_TIMEOUT,COMM_MAXMSG);
   //Register the strategy
   POSE_commlib_insthndl.setStrategy(strategy);
-  //comm_debug=1;
+  //com_debug=1;
   //CkPrintf("Simulation run with PrioStreaming(%d,%d) for communication optimization...\n", COMM_TIMEOUT, COMM_MAXMSG);
   CkPrintf("Simulation run with StreamingStrategy(%d,%d) for communication optimization...\n", COMM_TIMEOUT, COMM_MAXMSG);
   //CkPrintf("Simulation run with MeshStreaming(%d,%d) for communication optimization...\n", COMM_TIMEOUT, COMM_MAXMSG);

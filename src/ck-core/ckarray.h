@@ -27,12 +27,14 @@ Orion Sky Lawlor, olawlor@acm.org
 #define __CKARRAY_H
 
 #include "cklocation.h"
+#include "ckmemcheckpoint.h" // for CkArrayCheckPTReqMessage
 
 /***********************************************************
 	Utility defines, includes, etc.
 */
 extern void _registerCkArray(void);
 CpvExtern (int ,serializer);
+
 
 /** This flag is true when in the system there is anytime migration, false when
  *  the user code guarantees that no migration happens except during load balancing
@@ -671,7 +673,7 @@ public:
 
 void _ckArrayInit(void);
 
-#include "ComlibArrayListener.h"
+//#include "ComlibArrayListener.h"  FILE DELETED!
 
 class CkArray : public CkReductionMgr, public CkArrMgr {
   friend class ArrayElement;
@@ -703,8 +705,8 @@ public:
 	  {return locMgr->lastKnown(idx);}
   /// Deliver message to this element (directly if local)
   /// doFree if is local
-  inline void deliver(CkMessage *m,CkDeliver_t type,int opts=0)
-	  {locMgr->deliver(m,type,opts);}
+  inline int deliver(CkMessage *m,CkDeliver_t type,int opts=0)
+	  {return locMgr->deliver(m,type,opts);}
   /// Fetch a local element via its index (return NULL if not local)
   inline ArrayElement *lookup(const CkArrayIndex &index)
 	  {return (ArrayElement *)locMgr->lookup(index,thisgroup);}
@@ -738,8 +740,11 @@ public:
   void pup(PUP::er &p);
   void ckJustMigrated(void){ doneInserting(); }
 
-  ComlibArrayListener * calistener;
-  ComlibArrayListener * getComlibArrayListener() {return calistener;}
+  // COMLIB HACK
+  // Ok, this has gone very far... getting rid of it!
+  //ComlibArrayListener * calistener;
+  //ComlibArrayListener * getComlibArrayListener() {return calistener;}
+
   virtual CmiBool isArrMgr(void) {return CmiTrue;}
 
 private:
@@ -766,11 +771,18 @@ private:
   } while(0)
 
   CkPupAblePtrVec<CkArrayListener> listeners;
-  void addListener(CkArrayListener *l,int &dataOffset) {
-    l->ckRegister(this,dataOffset);
-    dataOffset+=l->ckGetLen();
+  int listenerDataOffset;
+ public:
+  void addListener(CkArrayListener *l) {
+    l->ckRegister(this,listenerDataOffset);
+    listenerDataOffset+=l->ckGetLen();
     listeners.push_back(l);
+    if (listenerDataOffset>CK_ARRAYLISTENER_MAXLEN)
+      CkAbort("Too much array listener data!\n"
+	      "You'll have to either use fewer array listeners, or increase the compile-time\n"
+	      "constant CK_ARRAYLISTENER_MAXLEN!\n");
   }
+ private:
 
   CkArrayReducer *reducer; //Read-only copy of default reducer
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
@@ -784,6 +796,9 @@ public:
 #endif
 
 };
+
+
+
 /*@}*/
 
 #endif

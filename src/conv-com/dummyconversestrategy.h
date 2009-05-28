@@ -1,5 +1,8 @@
-
-/* Class that calls Krishnan's routers from the new Comlib.
+/**
+   @addtogroup ComlibConverseStrategy
+   @{
+   @file   
+   Class that calls Krishnan's routers from the new Comlib.
    Developed to be called from Converse
    Sameer Kumar 05/14/04
 */
@@ -21,3 +24,4 @@ class RouterStrategy : public Strategy {
     PUPable_decl(RouterStrategy);
 };
 #endif
+/*@}*/

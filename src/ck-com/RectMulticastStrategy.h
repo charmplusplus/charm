@@ -1,6 +1,15 @@
 #ifndef RECT_MULTICAST_STRATEGY
 #define RECT_MULTICAST_STRATEGY
 
+
+/**
+   @addtogroup ComlibCharmStrategy
+   @{
+   @file
+   @brief RectMulticastStrategy for BG/L native layer
+*/
+
+
 // only works on BG/L Native Layer
 
 #include "ComlibManager.h"
@@ -32,7 +41,7 @@ void *DMHandler(void *msg);
  */
 #ifdef CMK_RECT_API
 #include "bgml.h"
-class RectMulticastStrategy: public CharmStrategy {
+class RectMulticastStrategy: public Strategy, public CharmStrategy {
  protected:
     int handlerId;    
     ComlibSectionInfo sinfo;
@@ -100,7 +109,7 @@ class RectMulticastStrategy: public CharmStrategy {
 
 
 
-    RectMulticastStrategy(CkMigrateMessage *m): CharmStrategy(m){}
+    RectMulticastStrategy(CkMigrateMessage *m): Strategy(m), CharmStrategy(m){}
                 
     ///Array constructor
     RectMulticastStrategy(CkArrayID aid, int isPersistent = 0);
@@ -122,12 +131,18 @@ class RectMulticastStrategy: public CharmStrategy {
     PUPable_decl(RectMulticastStrategy);
 };
 #else
-class RectMulticastStrategy : public CharmStrategy {   
-  RectMulticastStrategy(CkMigrateMessage *m): CharmStrategy(m){}
+class RectMulticastStrategy : public Strategy, public CharmStrategy {   
+  RectMulticastStrategy(CkMigrateMessage *m): Strategy(m), CharmStrategy(m){}
   //    RectMulticastStrategy(CkArrayID aid, int isPersistent = 0){}
   ~RectMulticastStrategy(){}
+  void insertMessage(MessageHolder*) {}
+  void handleMessage(void*) {}
+  void pup(PUP::er &p) {}
   PUPable_decl(RectMulticastStrategy);   
 };
 #endif
-#endif
 
+
+/*@}*/
+
+#endif

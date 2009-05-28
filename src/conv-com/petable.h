@@ -4,15 +4,33 @@
  * $Date$
  * $Revision$
  *****************************************************************************/
+/**
+   @addtogroup ConvComlib
+   @{
+   @file 
+   @brief Stores lists of messages and sizes from multiple PEs
+
+   This header is meant for usage with ExtractAndVectorize and
+   ExtractAndVectorizeAll. It will contain a list of messages with its sizes.
+   The parent class will later call a CmiFree to sizes and msgs. This will
+   delete this two arrays, and also the containint ptvectorlist struct. This is
+   done (in the two functions) by allocating a single message containing both
+   the ptvectorlist struct, and the two arrays. Throught CmiReference
+   (incremented only once), when both the arrays are deleted, the struct will
+   also dirappear.
+   
+*/
 
 #ifndef PETABLE_H
 #define PETABLE_H
+
+#include "router.h"
 
 #ifndef NULL
 #define NULL 0
 #endif
 
-#define CMK_COMMLIB_USE_VECTORIZE 0
+#define CMK_COMLIB_USE_VECTORIZE 0
 
 #define MSGQLEN 32
 
@@ -26,48 +44,13 @@ typedef struct ptinfo {
   struct ptinfo * next;
 } PTinfo;
 
-/*
- * This header is meant for usage with ExtractAndVectorize and
- * ExtractAndVectorizeAll. It will contain a list of messages with its sizes.
- * The parent class will later call a CmiFree to sizes and msgs. This will
- * delete this two arrays, and also the containint ptvectorlist struct. This is
- * done (in the two functions) by allocating a single message containing both
- * the ptvectorlist struct, and the two arrays. Throught CmiReference
- * (incremented only once), when both the arrays are deleted, the struct will
- * also dirappear.
- */
-
 typedef struct ptvectorlist {
   int count;
   int *sizes;
   char **msgs;
 }* PTvectorlist;
 
-/*
-typedef struct {
-  int refCount;
-  int flag;
-  void * ptr;
-} InNode;
 
-class GList {
- private:
-	InNode *InList;
-	int InListIndex;
- public:
-	GList();
-	~GList();
-	int AddWholeMsg(void *);
-	void setRefcount(int, int);
-	void DeleteWholeMsg(int);
-	void DeleteWholeMsg(int, int);
-	void GarbageCollect();
-	void Add(void *);
-	void Delete();
-};
-*/
-
-/*#define ALIGN8(x)       (int)((~7)&((x)+7)) */
 
 /* Reduce the no. of mallocs by allocating from
  * a free list. By allocating 21 at a time, it allocates
@@ -180,7 +163,7 @@ class PeTable {
             InsertMsgs(npe, pelist, m[i]->msgsize, m[i]->msg);
     }
         
-    void ExtractAndDeliverLocalMsgs(int pe);
+    void ExtractAndDeliverLocalMsgs(int pe, Strategy *myStrat);
     
     int UnpackAndInsert(void *in);
     int UnpackAndInsertAll(void *in, int npes, int *pelist);
@@ -196,3 +179,5 @@ class PeTable {
 };
 
 #endif
+
+/*@}*/

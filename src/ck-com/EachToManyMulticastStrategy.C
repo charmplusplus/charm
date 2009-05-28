@@ -1,38 +1,29 @@
-
-/*********************************************************
-            The EachToManyMulticast Strategy optimizes all-to-all
-            communication. It combines messages and sends them along
-            virtual topologies 2d mesh, 3d mesh and hypercube.
-
-            For large messages send them directly.
-
-            This is the object level strategy. For processor level
-            optimizations routers are called.
-
-  - Sameer Kumar.
-
-**********************************************************/
-
+/**
+   @addtogroup ComlibCharmStrategy
+   @{
+   @file 
+*/
 
 #include "EachToManyMulticastStrategy.h"
 #include "string.h"
-#include "routerstrategy.h"
+//#include "routerstrategy.h"
 
 #include "AAPLearner.h"
 #include "AAMLearner.h"
 
 //EachToManyMulticastStrategy CODE
-CkpvExtern(int, RecvdummyHandle);
-CkpvExtern(CkGroupID, cmgrID);
+//CkpvExtern(int, RecvdummyHandle);
+//CkpvExtern(CkGroupID, cmgrID);
 
+/*
 void *itrDoneHandler(void *msg){
 
     EachToManyMulticastStrategy *nm_mgr;
-    
+
     DummyMsg *dmsg = (DummyMsg *)msg;
     comID id = dmsg->id;
     int instid = id.instanceID;
-    
+
     CmiFree(msg);
     ComlibPrintf("[%d] Iteration finished %d\n", CkMyPe(), instid);
 
@@ -40,81 +31,85 @@ void *itrDoneHandler(void *msg){
         CProxy_ComlibManager(CkpvAccess(cmgrID)).ckLocalBranch()
         ->getStrategyTableEntry(instid);
     int nexpected = sentry->numElements;
-    
+
     if(nexpected == 0) {             
-        ComlibPrintf("[%d] Calling Dummy Done Inserting, %d, %d\n", 
-                     CkMyPe(), instid, nexpected);
+        ComlibPrintf("[%d] Calling Dummy Done Inserting, %d, %d\n", CkMyPe(), instid, nexpected);
         nm_mgr = (EachToManyMulticastStrategy *)sentry->strategy;    
         nm_mgr->doneInserting();
-	
+
 	if (!nm_mgr->getOnFinish().isInvalid()) nm_mgr->getOnFinish().send(0);
-    
+
     }
 
     return NULL;
 }
-
+ */
+/*
 void *E2MHandler(void *msg){
     //CkPrintf("[%d]:In EachtoMany CallbackHandler\n", CkMyPe());
     EachToManyMulticastStrategy *nm_mgr;    
-    
+
     CmiMsgHeaderExt *conv_header = (CmiMsgHeaderExt *) msg;
     int instid = conv_header->stratid;
 
     envelope *env = (envelope *)msg;
-    
+
     nm_mgr = (EachToManyMulticastStrategy *) 
         CProxy_ComlibManager(CkpvAccess(cmgrID)).
         ckLocalBranch()->getStrategy(instid);
-    
+
     RECORD_RECV_STATS(instid, env->getTotalsize(), env->getSrcPe());
-    
+
     nm_mgr->localMulticast(msg);
     return NULL;
 }
+ */
 
 //Group Constructor
-EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy, 
-                                                         int n_srcpes, 
-                                                         int *src_pelist,
-                                                         int n_destpes, 
-                                                         int *dest_pelist) 
-    : routerID(substrategy), CharmStrategy() {
-    
-    setType(GROUP_STRATEGY);
+EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy,
+		CkGroupID src,
+		CkGroupID dest,
+		int n_srcpes, 
+		int *src_pelist,
+		int n_destpes, 
+		int *dest_pelist) 
+: RouterStrategy(substrategy), CharmStrategy() {
+	ComlibPrintf("[%d] EachToManyMulticast group constructor\n",CkMyPe());
 
-    CkGroupID gid;
-    gid.setZero();
-    ginfo.setSourceGroup(gid, src_pelist, n_srcpes);    
-    ginfo.setDestinationGroup(gid, dest_pelist, n_destpes);
+	setType(GROUP_STRATEGY);
 
-    //Written in this funny way to be symmetric with the array case.
-    ginfo.getDestinationGroup(gid, destpelist, ndestpes);
-    ginfo.getCombinedPeList(pelist, npes);
+	//CkGroupID gid;
+	//gid.setZero();
+	ginfo.setSourceGroup(src, src_pelist, n_srcpes);    
+	ginfo.setDestinationGroup(dest, dest_pelist, n_destpes);
 
-    commonInit();
+	//Written in this funny way to be symmetric with the array case.
+	//ginfo.getDestinationGroup(gid, destpelist, ndestpes);
+	//ginfo.getCombinedPeList(pelist, npes);
+
+	commonInit(ginfo.getCombinedCountList());
 }
 
 //Array Constructor
 EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy, 
-                                                         CkArrayID src, 
-                                                         CkArrayID dest, 
-                                                         int nsrc, 
-                                                         CkArrayIndexMax 
-                                                         *srcelements, 
-                                                         int ndest, 
-                                                         CkArrayIndexMax 
-                                                         *destelements)
-    :routerID(substrategy), CharmStrategy() {
+		CkArrayID src, 
+		CkArrayID dest, 
+		int nsrc, 
+		CkArrayIndexMax *srcelements, 
+		int ndest, 
+		CkArrayIndexMax *destelements)
+: RouterStrategy(substrategy), CharmStrategy() {
+	ComlibPrintf("[%d] EachToManyMulticast array constructor. nsrc=%d ndest=%d\n",CkMyPe(), nsrc, ndest);
 
-    setType(ARRAY_STRATEGY);
-    ainfo.setSourceArray(src, srcelements, nsrc);
-    ainfo.setDestinationArray(dest, destelements, ndest);
+	setType(ARRAY_STRATEGY);
+	ainfo.setSourceArray(src, srcelements, nsrc);
+	ainfo.setDestinationArray(dest, destelements, ndest);
 
-    ainfo.getDestinationPeList(destpelist, ndestpes);
-    ainfo.getCombinedPeList(pelist, npes);
-    
-    /*
+	int *count = ainfo.getCombinedCountList();
+	//ainfo.getSourcePeList(nsrcPe, srcPe);
+	//ainfo.getDestinationPeList(ndestPe, destPe);
+
+	/*
       char dump[1000];
       char sdump[100];
       sprintf(dump, "%d: Each To MANY PELIST :\n", CkMyPe());
@@ -123,39 +118,41 @@ EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy,
       strcat(dump, sdump);           
       }    
       ComlibPrintf("%s\n", dump);
-    */
+	 */
 
-    commonInit();
+	commonInit(count);
 }
 
-extern char *router;
+extern char *routerName;
 //Common initialization for both group and array constructors
-void EachToManyMulticastStrategy::commonInit() {
+void EachToManyMulticastStrategy::commonInit(int *count) {
 
-    setBracketed();
-    setForwardOnMigration(1);
+	setBracketed();
+	//setForwardOnMigration(1);
 
-    if(CkMyPe() == 0 && router != NULL){
-        if(strcmp(router, "USE_MESH") == 0)
-            routerID = USE_MESH;
-        else if(strcmp(router, "USE_GRID") == 0)
-            routerID = USE_GRID;
-        else  if(strcmp(router, "USE_HYPERCUBE") == 0)
-            routerID = USE_HYPERCUBE;
-        else  if(strcmp(router, "USE_DIRECT") == 0)
-            routerID = USE_DIRECT;        
-        else  if(strcmp(router, "USE_PREFIX") == 0)
-            routerID = USE_PREFIX;        
+	if(CkMyPe() == 0 && routerName != NULL){
+		if(strcmp(routerName, "USE_MESH") == 0)
+			routerIDsaved = USE_MESH;
+		else if(strcmp(routerName, "USE_GRID") == 0)
+			routerIDsaved = USE_GRID;
+		else  if(strcmp(routerName, "USE_HYPERCUBE") == 0)
+			routerIDsaved = USE_HYPERCUBE;
+		else  if(strcmp(routerName, "USE_DIRECT") == 0)
+			routerIDsaved = USE_DIRECT;        
+		else  if(strcmp(routerName, "USE_PREFIX") == 0)
+			routerIDsaved = USE_PREFIX;        
 
-        //Just for the first step. After learning the learned
-        //strategies will be chosen
-        router = NULL;
-    }
-    
-    ComlibPrintf("Creating Strategy %d\n", routerID);
+		//Just for the first step. After learning the learned
+		//strategies will be chosen
+		//router = NULL;
+	}
 
-    useLearner = 0;
-    rstrat = NULL;
+	//ComlibPrintf("Creating Strategy %d\n", routerID);
+
+	// finish the creation of the RouterStrategy superclass
+	bracketedUpdatePeKnowledge(count);
+	delete [] count;
+	//rstrat = NULL;
 }
 
 EachToManyMulticastStrategy::~EachToManyMulticastStrategy() {
@@ -164,154 +161,135 @@ EachToManyMulticastStrategy::~EachToManyMulticastStrategy() {
 
 void EachToManyMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
 
-    ComlibPrintf("[%d] EachToManyMulticast: insertMessage \n", 
-                 CkMyPe());   
+  cmsg -> checkme();
 
-    envelope *env = UsrToEnv(cmsg->getCharmMessage());
+	ComlibPrintf("[%d] EachToManyMulticast: insertMessage\n", CkMyPe());
 
-    if(cmsg->dest_proc == IS_BROADCAST) {
-        //All to all multicast
-        
-        cmsg->npes = ndestpes;
-        cmsg->pelist = destpelist;
-        
-        //Use Multicast Learner (Foobar will not work for combinations
-        //of personalized and multicast messages
-        
-        CmiSetHandler(env, handlerId);
+	envelope *env = UsrToEnv(cmsg->getCharmMessage());
 
-        //Collect Multicast Statistics
-        RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), 
-                           cmsg->pelist, cmsg->npes);
-    }
-    else {
-        //All to all personalized
+	if(cmsg->dest_proc == IS_BROADCAST) {
+		//All to all multicast
 
-        //Collect Statistics
-        RECORD_SEND_STATS(getInstance(), env->getTotalsize(), 
-                          cmsg->dest_proc);
-    }        
+		// not necessary to set cmsg since the superclass will take care
+		//cmsg->npes = ndestPes;
+		//cmsg->pelist = destPes;
 
-    rstrat->insertMessage(cmsg);
+		//Use Multicast Learner (Foobar will not work for combinations
+		//of personalized and multicast messages
+
+		// this handler will ensure that handleMessage is called if direcly
+		// sent, or deliver is called if normal routing path is taken
+		CmiSetHandler(env, CkpvAccess(comlib_handler));
+
+		//Collect Multicast Statistics
+		RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), 
+				cmsg->pelist, cmsg->npes);
+	}
+	else {
+		//All to all personalized
+
+		//Collect Statistics
+		RECORD_SEND_STATS(getInstance(), env->getTotalsize(), 
+				cmsg->dest_proc);
+	}
+
+	RouterStrategy::insertMessage(cmsg);
 }
 
+/*
 void EachToManyMulticastStrategy::doneInserting(){
 
     StrategyTableEntry *sentry = 
         CProxy_ComlibManager(CkpvAccess(cmgrID)).ckLocalBranch()
         ->getStrategyTableEntry(getInstance());
     int nexpected = sentry->numElements;
-    
+
     if(routerID == USE_DIRECT && nexpected == 0)
         return;
-    
+
     if(MyPe < 0)
         return;
 
     //ComlibPrintf("%d: DoneInserting \n", CkMyPe());    
     rstrat->doneInserting();
 }
+ */
 
 void EachToManyMulticastStrategy::pup(PUP::er &p){
 
-    int count = 0;
-    ComlibPrintf("[%d] Each To many::pup %s\n", CkMyPe(), 
-                 ((!p.isUnpacking() == 0)?("UnPacking"):("Packing")));
+	ComlibPrintf("[%d] EachToManyMulticastStrategy::pup called for %s\n", CkMyPe(), 
+			p.isPacking()?"packing":(p.isUnpacking()?"unpacking":"sizing"));
 
-    CharmStrategy::pup(p);
+	RouterStrategy::pup(p);
+	CharmStrategy::pup(p);
 
-    p | routerID; 
-    p | npes; p | ndestpes;     
-    p | useLearner;
-
-    if(p.isUnpacking() && npes > 0) {
-        pelist = new int[npes];    
-    }
-
-    if(npes > 0)
-        p(pelist, npes);
-
-    if(p.isUnpacking() && ndestpes > 0) {
-        destpelist = new int[ndestpes];    
-    }    
-
-    if(ndestpes > 0)
-        p(destpelist, ndestpes);
-
-    if(p.isUnpacking()){
-	handlerId = CkRegisterHandler((CmiHandler)E2MHandler);
-        int handler = CkRegisterHandler((CmiHandler)itrDoneHandler);        
-        
-        if(npes > 0) {
-            rstrat = new RouterStrategy(routerID, handler, npes, pelist);
-            setConverseStrategy(rstrat);
-            MyPe = rstrat->getProcMap()[CkMyPe()];
-        }
-        else MyPe = -1;
-    }
-    
-    ComlibPrintf("[%d] End of pup\n", CkMyPe());
 }
 
-void EachToManyMulticastStrategy::beginProcessing(int numElements){
-    
-    ComlibPrintf("[%d] Begin processing %d\n", CkMyPe(), numElements);
-    /*
-    char dump[1000];
-    char sdump[100];
-    sprintf(dump, "%d: Each To MANY PELIST :\n", CkMyPe());
-    for(int count = 0; count < npes; count ++){
-        sprintf(sdump, "%d, ", pelist[count]);
-        strcat(dump, sdump);           
-    }    
-    ComlibPrintf("%s\n", dump);
-    */
-
-    int expectedDeposits = 0;
-
-    rstrat->setInstance(getInstance());
-
-    if(ainfo.isSourceArray()) 
-        expectedDeposits = numElements;
-    
-    if(getType() == GROUP_STRATEGY) {
-        
-        CkGroupID gid;
-        int *srcpelist;
-        int nsrcpes;
-        
-        ginfo.getSourceGroup(gid, srcpelist, nsrcpes);
-        
-        for(int count = 0; count < nsrcpes; count ++)
-            if(srcpelist[count] == CkMyPe()){
-                expectedDeposits = 1;
-                break;
-            }
-        
-        StrategyTableEntry *sentry = 
-            CProxy_ComlibManager(CkpvAccess(cmgrID)).ckLocalBranch()
-            ->getStrategyTableEntry(myInstanceID);
-        sentry->numElements = expectedDeposits;
-    }
-    
-    if(useLearner) {
-        if(!mflag) 
-            setLearner(new AAPLearner());    
-        else 
-            setLearner(new AAMLearner());                
-    }
-    
-    if(expectedDeposits > 0)
-        return;
-    
-    if(expectedDeposits == 0 && MyPe >= 0)
-        ConvComlibScheduleDoneInserting(myInstanceID);
+/* NOT NEEDED
+void EachToManyMulticastStrategy::finalizeCreation() {
+  ainfo.purge();
 }
+ */
 
+// void EachToManyMulticastStrategy::beginProcessing(int numElements){
+
+//     ComlibPrintf("[%d] Begin processing %d\n", CkMyPe(), numElements);
+//     /*
+//     char dump[1000];
+//     char sdump[100];
+//     sprintf(dump, "%d: Each To MANY PELIST :\n", CkMyPe());
+//     for(int count = 0; count < npes; count ++){
+//         sprintf(sdump, "%d, ", pelist[count]);
+//         strcat(dump, sdump);           
+//     }    
+//     ComlibPrintf("%s\n", dump);
+//     */
+
+//     int expectedDeposits = 0;
+
+//     rstrat->setInstance(getInstance());
+
+//     if(ainfo.isSourceArray()) 
+//         expectedDeposits = numElements;
+
+//     if(getType() == GROUP_STRATEGY) {
+
+//         CkGroupID gid;
+//         int *srcpelist;
+//         int nsrcpes;
+
+//         ginfo.getSourceGroup(gid, srcpelist, nsrcpes);
+
+//         for(int count = 0; count < nsrcpes; count ++)
+//             if(srcpelist[count] == CkMyPe()){
+//                 expectedDeposits = 1;
+//                 break;
+//             }
+
+//         StrategyTableEntry *sentry = 
+//             CProxy_ComlibManager(CkpvAccess(cmgrID)).ckLocalBranch()
+//             ->getStrategyTableEntry(myInstanceID);
+//         sentry->numElements = expectedDeposits;
+//     }
+//     /*
+//     if(useLearner) 
+//         setLearner(new AAPLearner());    
+//     else 
+//         setLearner(new AAMLearner());                
+//     */
+
+//     if(expectedDeposits > 0)
+//         return;
+
+//     if(expectedDeposits == 0 && MyPe >= 0)
+//         ConvComlibScheduleDoneInserting(myInstanceID);
+// }
+
+/*
 void EachToManyMulticastStrategy::finalizeProcessing() {
     if(npes > 0)
         delete [] pelist;
-    
+
     if(ndestpes > 0)
         delete [] destpelist;
 
@@ -321,11 +299,47 @@ void EachToManyMulticastStrategy::finalizeProcessing() {
     if(useLearner && getLearner() != NULL)
         delete getLearner();
 }
+ */
 
-void EachToManyMulticastStrategy::localMulticast(void *msg){
-    register envelope *env = (envelope *)msg;
-    CkUnpackMessage(&env);
-    
-    ainfo.localBroadcast(env);
+void EachToManyMulticastStrategy::deliver(char *msg, int size) {
+	ComlibPrintf("[%d] EachToManyMulticastStrategy::deliver for %s\n",
+			CkMyPe(), isAllToAll()?"multicast":"personalized");
+	
+	envelope *env = (envelope *)msg;
+	RECORD_RECV_STATS(myHandle, env->getTotalsize(), env->getSrcPe());
+
+	if (isAllToAll()){
+		ComlibPrintf("Delivering via localMulticast()\n");
+		localMulticast(msg);
+	}
+	else { 
+		if (getType() == GROUP_STRATEGY) {
+			ComlibPrintf("Delivering via personalized CkSendMsgBranchInline\n");
+			CkUnpackMessage(&env);
+			CkSendMsgBranchInline(env->getEpIdx(), EnvToUsr(env), CkMyPe(), env->getGroupNum());
+		}
+		else if (getType() == ARRAY_STRATEGY) {
+			//    	  CkPrintf("[%d] Delivering via ComlibArrayInfo::deliver()\n", CkMyPe());
+			//      ComlibArrayInfo::deliver(env);
+
+			// call ainfo's localBroadcast(env);
+			ComlibPrintf("[%d] Delivering via ComlibArrayInfo::localBroadcast()\n", CkMyPe());
+			ainfo.localBroadcast(env);
+
+		}
+	}
 }
 
+void EachToManyMulticastStrategy::localMulticast(void *msg){
+	register envelope *env = (envelope *)msg;
+	CkUnpackMessage(&env);
+	CkPrintf("localMulticast calls ainfo.localBroadcast()\n");
+	ainfo.localBroadcast(env);
+}
+
+void EachToManyMulticastStrategy::notifyDone() {
+	if (!getOnFinish().isInvalid()) getOnFinish().send(0);
+	RouterStrategy::notifyDone();
+}
+
+/*@}*/

@@ -5,19 +5,19 @@
  * $Revision$
  *****************************************************************************/
 
-/*********************************************
- * File : petable.C
- *
- * Author: Krishnan V
- *
- * The message buffer
- *********************************************/
+/**
+   @addtogroup ConvComlib
+   @{
+   @file 
+   @brief Tables of messages for PEs 
+*/
+
 #include <string.h>
 #include <stdlib.h>
-#include <converse.h>
-#include "convcomlib.h"
+//#include <converse.h>
+//#include "convcomlib.h"
 #include "petable.h"
-#include "converse.h"
+//#include "converse.h"
 
 #define BIGBUFFERSIZE 65536
 #define PTPREALLOC    100
@@ -87,7 +87,7 @@ void PeTable:: Purge() {
   //combcount = 0;
 }
 
-void PeTable :: ExtractAndDeliverLocalMsgs(int index) {
+void PeTable :: ExtractAndDeliverLocalMsgs(int index, Strategy *myStrat) {
   int j;
   msgstruct m;
 
@@ -98,11 +98,15 @@ void PeTable :: ExtractAndDeliverLocalMsgs(int index) {
     m.msg=PeList[index][j]->msg;
 
     if (--(PeList[index][j]->refCount) <=0) {
-      CmiSyncSendAndFree(CkMyPe()/*index*/, m.msgsize, (char*)m.msg);
+      //CmiSyncSendAndFree(CkMyPe()/*index*/, m.msgsize, (char*)m.msg);
+      myStrat->deliver((char*)m.msg, m.msgsize);
       PTFREE(PeList[index][j]);
     }
     else {
-      CmiSyncSend(CkMyPe()/*index*/, m.msgsize, (char*)m.msg);
+      char *dupmsg = (char*)CmiAlloc(m.msgsize);
+      memcpy(dupmsg, m.msg, m.msgsize);
+      myStrat->deliver(dupmsg, m.msgsize);
+      //CmiSyncSend(CkMyPe()/*index*/, m.msgsize, (char*)m.msg);
     }
     PeList[index][j]=NULL;
   }
@@ -823,3 +827,4 @@ PTvectorlist PeTable :: ExtractAndVectorizeAll(comID id, int ufield) {
 void PeTable :: GarbageCollect() {
 }
 
+/*@}*/

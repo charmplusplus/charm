@@ -1,3 +1,8 @@
+/**
+   @addtogroup CharmComlib
+   @{
+   @file
+*/
 
 #include "ComlibStats.h"
 #include "ComlibManager.h"
@@ -36,3 +41,5 @@ void ComlibGlobalStats::getAverageStats(int sid, double &avMsgSize,
     }
 }
 
+
+/*@}*/

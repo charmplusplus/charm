@@ -515,21 +515,18 @@ CkArray::CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID no
   isInserting=CmiTrue;
 
   //Find, register, and initialize the arrayListeners
-  int dataOffset=0;
+  listenerDataOffset=0;
   broadcaster=new CkArrayBroadcaster();
-  addListener(broadcaster,dataOffset);
+  addListener(broadcaster);
   reducer=new CkArrayReducer(thisgroup);
-  addListener(reducer,dataOffset);
+  addListener(reducer);
 
-  calistener = new ComlibArrayListener();
-  addListener(calistener,dataOffset);
+  // COMLIB HACK
+  //calistener = new ComlibArrayListener();
+  //addListener(calistener,dataOffset);
 
   int lNo,nL=c.getListeners(); //User-added listeners
-  for (lNo=0;lNo<nL;lNo++) addListener(c.getListener(lNo),dataOffset);
-  if (dataOffset>CK_ARRAYLISTENER_MAXLEN)
-    CkAbort("Too much array listener data!\n"
-"You'll have to either use fewer array listeners, or increase the compile-time\n"
-"constant CK_ARRAYLISTENER_MAXLEN!\n");
+  for (lNo=0;lNo<nL;lNo++) addListener(c.getListener(lNo));
 
   for (int l=0;l<listeners.size();l++) listeners[l]->ckBeginInserting();
 
@@ -566,6 +563,7 @@ void CkArray::pup(PUP::er &p){
 	p|numInitial;
 	p|locMgrID;
 	p|listeners;
+	p|listenerDataOffset;
 	testPup(p,1234);
 	if(p.isUnpacking()){
 		thisProxy=thisgroup;
@@ -727,6 +725,16 @@ inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
 	criticalPath_send(env);
 #endif
 }
+
+void msg_prepareSend_noinline(CkArrayMessage *msg, int ep,CkArrayID aid)
+{
+	envelope *env=UsrToEnv((void *)msg);
+	env->getsetArrayMgr()=aid;
+	env->getsetArraySrcPe()=CkMyPe();
+	env->setEpIdx(ep);
+	env->getsetArrayHops()=0;
+}
+
 void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) const
 {
 #ifndef CMK_OPTIMIZE

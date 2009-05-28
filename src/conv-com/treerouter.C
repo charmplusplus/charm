@@ -5,21 +5,20 @@
  * $Revision$
  *****************************************************************************/
 
-/**************************************
- * File: treerouter.C
- *
- * Author: Krishnan V
- *
- * Tree based router
- *********************************************/
+/**
+   @addtogroup ConvComlibRouter
+   @{
+   @file 
+   @brief  Tree based converse level routing strategy 
+*/
+
 #include "treerouter.h"
 #define DEGREE 4
 #define gmap(pe) (gpes ? gpes[pe] : pe)
 
 
-/**The only communication op used. Modify this to use
- ** vector send */
-#if CMK_COMMLIB_USE_VECTORIZE
+/**The only communication op used. Modify this to use vector send. */
+#if CMK_COMLIB_USE_VECTORIZE
 #define TREESENDFN(kid, u, knewmsg, khndl, knextpe)  \
 	{if (knewmsg) {\
 	  CmiSetHandler(knewmsg->msgs[0], khndl);\
@@ -41,9 +40,10 @@
 }
 #endif
 
-/************************************************
- ************************************************/
-TreeRouter :: TreeRouter(int n, int me)
+
+
+
+TreeRouter :: TreeRouter(int n, int me, Strategy *parent) : Router(parent)
 {
   int i;
   MyPe=me;
@@ -109,12 +109,12 @@ void TreeRouter :: RecvManyMsg(comID id, char *msg)
 		int len;
 		int parent=(MyPe-1)/DEGREE;
 		parent=gmap(parent);
-#if CMK_COMMLIB_USE_VECTORIZE
+#if CMK_COMLIB_USE_VECTORIZE
 		PTvectorlist newmsg=SortBufferUp(id, 0);
-		TREESENDFN(id, 0, newmsg, CkpvAccess(RecvHandle), parent);
+		TREESENDFN(id, 0, newmsg, CkpvAccess(RouterRecvHandle), parent);
 #else
 		char *newmsg=SortBufferUp(id, 0, &len);
-		TREESENDFN(id, 0, newmsg, len, CkpvAccess(RecvHandle), parent);
+		TREESENDFN(id, 0, newmsg, len, CkpvAccess(RouterRecvHandle), parent);
 #endif
 	}
 	else {
@@ -124,7 +124,7 @@ void TreeRouter :: RecvManyMsg(comID id, char *msg)
   if (recvCount > recvExpected) DownStreamMsg(id);
 }
 
-#if CMK_COMMLIB_USE_VECTORIZE
+#if CMK_COMLIB_USE_VECTORIZE
 PTvectorlist TreeRouter :: SortBufferUp(comID id, int ufield)
 #else
 char * TreeRouter :: SortBufferUp(comID id, int ufield, int *len)
@@ -142,7 +142,7 @@ char * TreeRouter :: SortBufferUp(comID id, int ufield, int *len)
 
 	pelst[np++]=i;
   }
-#if CMK_COMMLIB_USE_VECTORIZE
+#if CMK_COMLIB_USE_VECTORIZE
   PTvectorlist newmsg=PeTree->ExtractAndVectorize(id, ufield, np, pelst); 
 #else
   char *newmsg=PeTree->ExtractAndPack(id, ufield, np, pelst, len); 
@@ -151,7 +151,7 @@ char * TreeRouter :: SortBufferUp(comID id, int ufield, int *len)
   return(newmsg);
 }
   
-#if CMK_COMMLIB_USE_VECTORIZE
+#if CMK_COMLIB_USE_VECTORIZE
 PTvectorlist TreeRouter :: SortBufferDown(comID id, int ufield, int s)
 #else
 char * TreeRouter :: SortBufferDown(comID id, int ufield, int *len, int s)
@@ -168,7 +168,7 @@ char * TreeRouter :: SortBufferDown(comID id, int ufield, int *len, int s)
 	if (pe == rep) plist[np++]=i;
   }
 
-#if CMK_COMMLIB_USE_VECTORIZE
+#if CMK_COMLIB_USE_VECTORIZE
   PTvectorlist newmsg=PeTree->ExtractAndVectorize(id, ufield, np, plist); 
 #else
   char * newmsg=PeTree->ExtractAndPack(id, ufield, np, plist, len); 
@@ -184,7 +184,7 @@ void TreeRouter :: DownStreamMsg(comID id)
 
   for (int i=0;i<deg;i++) {
     int len;
-#if CMK_COMMLIB_USE_VECTORIZE
+#if CMK_COMLIB_USE_VECTORIZE
     PTvectorlist newmsg=SortBufferDown(id, 0, i+1);
 #else
     char *newmsg=SortBufferDown(id, 0, &len, i+1);
@@ -192,10 +192,10 @@ void TreeRouter :: DownStreamMsg(comID id)
     int child=MyPe*DEGREE+i+1;
     if (child >=NumPes || child==MyPe) break;
     child=gmap(child);
-#if CMK_COMMLIB_USE_VECTORIZE
-    TREESENDFN(id, 0, newmsg, CkpvAccess(RecvHandle), child);
+#if CMK_COMLIB_USE_VECTORIZE
+    TREESENDFN(id, 0, newmsg, CkpvAccess(RouterRecvHandle), child);
 #else
-    TREESENDFN(id, 0, newmsg, len, CkpvAccess(RecvHandle), child);
+    TREESENDFN(id, 0, newmsg, len, CkpvAccess(RouterRecvHandle), child);
 #endif
   }
 
@@ -210,7 +210,7 @@ void TreeRouter :: ProcManyMsg(comID id, char *m)
 
 void TreeRouter:: LocalProcMsg(comID id)
 {
-  PeTree->ExtractAndDeliverLocalMsgs(MyPe);
+  PeTree->ExtractAndDeliverLocalMsgs(MyPe, container);
   PeTree->Purge();
   InitVars();
   Done(id);
@@ -221,9 +221,9 @@ void TreeRouter :: DummyEP(comID id, int)
   RecvManyMsg(id, NULL);
 }
 
-Router * newtreeobject(int n, int me)
+Router * newtreeobject(int n, int me, Strategy *strat)
 {
-  Router * obj=new TreeRouter(n, me);
+  Router * obj=new TreeRouter(n, me, strat);
   return(obj);
 }
 
@@ -231,3 +231,6 @@ void TreeRouter :: SetMap(int *pes)
 {
   gpes=pes;
 }
+
+
+/*@}*/

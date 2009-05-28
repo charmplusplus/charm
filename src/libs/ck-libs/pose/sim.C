@@ -11,7 +11,7 @@ CkChareID POSE_Coordinator_ID;
 #ifdef POSE_COMM_ON
 /// Used with the CommLib
 extern CkGroupID dmid;
-//extern int comm_debug;
+//extern int com_debug;
 #endif
 
 /// Basic Constructor

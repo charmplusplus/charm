@@ -1,3 +1,11 @@
+/**
+   @addtogroup ConvComlibRouter
+   @{
+   @file 
+*/
+
+
+
 #include "prefixrouter.h"
 
 #if 0
@@ -32,7 +40,7 @@ void PrefixRouter::sendMulticast(CkQ<MessageHolder *> &msgq) {
             }
         }
         else {
-            CkAbort("Implement later");
+            CmiAbort("Implement later");
         }
     }
 }
@@ -47,7 +55,7 @@ void PrefixRouter::sendPointToPoint(CkQ<MessageHolder *> &msgq) {
         for(i = 0; i < len; i++) {
             MessageHolder *mhdl = msgq[i];
             
-            CkAssert(mhdl->dest_proc >= 0);
+            CmiAssert(mhdl->dest_proc >= 0);
             if(mhdl->dest_proc == curDest) {
                 char *msg = mhdl->getMessage();
                 CmiSyncSendAndFree(curDest, mhdl->size, msg);
@@ -60,3 +68,4 @@ void PrefixRouter::sendPointToPoint(CkQ<MessageHolder *> &msgq) {
         delete mhdl;
     }
 }
+/*@}*/

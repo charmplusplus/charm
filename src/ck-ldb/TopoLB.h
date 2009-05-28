@@ -8,6 +8,40 @@
 #define INFTY 999999999
 #endif
 
+
+
+
+
+extern "C" void METIS_PartGraphRecursive (int*, int*, int*, int*, int*, int*,
+					  int*, int*, int*, int*, int*);
+
+extern "C" void METIS_PartGraphKway (int*, int*, int*, int*, int*, int*,
+				     int*, int*, int*, int*, int*);
+
+extern "C" void METIS_PartGraphVKway (int*, int*, int*, int*, int*, int*,
+				      int*, int*, int*, int*, int*);
+
+extern "C" void METIS_WPartGraphRecursive (int*, int*, int*, int*,
+					   int*, int*, int*, int*,
+					   float*, int*, int*, int*);
+
+extern "C" void METIS_WPartGraphKway (int*, int*, int*, int*,
+				      int*, int*, int*, int*,
+				      float*, int*, int*, int*);
+
+extern "C" void METIS_mCPartGraphRecursive (int*, int*, int*, int*,
+					    int*, int*, int*, int*,
+					    int*, int*, int*, int*);
+
+extern "C" void METIS_mCPartGraphKway (int*, int*, int*, int*, int*,
+				       int*, int*, int*, int*, int*,
+				       int*, int*, int*);
+
+
+
+
+
+
 void CreateTopoLB ();
 
 class TopoLB : public CentralLB

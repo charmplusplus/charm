@@ -1,3 +1,10 @@
+/**
+   @addtogroup ConvComlib
+   @{
+   @file 
+   @brief Header for Hypercube topology discriptor 
+*/
+
 #ifndef __HYPERCUBE_TOPOLOGY_H
 #define __HYPERCUBE_TOPOLOGY_H
 
@@ -22,3 +29,5 @@ class HypercubeTopology: public TopologyDescriptor {
 };
 
 #endif
+
+/*@}*/

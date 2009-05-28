@@ -1,3 +1,9 @@
+/**
+   @addtogroup ComlibConverseStrategy
+   @{
+   @file 
+   @brief Hypercube topology
+*/
 
 #include "hypercubetopology.h"
 
@@ -109,3 +115,4 @@ void HypercubeTopology::CreateStageTable(int numpes, int *destpes)
     delete dir;
     return;
 }
+/*@}*/

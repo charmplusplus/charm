@@ -490,7 +490,7 @@ CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage()
 }
 
 void CmiResetMaxMemory() {
-  memory_allocated_max=0;
+  memory_allocated_max=memory_allocated;
 }
 
 CMK_TYPEDEF_UINT8 CmiMinMemoryUsage()
@@ -499,7 +499,7 @@ CMK_TYPEDEF_UINT8 CmiMinMemoryUsage()
 }
 
 void CmiResetMinMemory() {
-  memory_allocated_min=0xFFFFFFFF;
+  memory_allocated_min=memory_allocated;
 }
 
 #endif /* ! CMK_MEMORY_BUILD_BUILTIN*/

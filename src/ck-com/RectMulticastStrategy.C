@@ -1,4 +1,13 @@
-//#define COMMLIB_RECT_DEBUG
+/**
+   @addtogroup ComlibCharmStrategy
+*/
+/*@{*/
+
+/** @file */
+
+
+
+//#define COMLIB_RECT_DEBUG
 //#define LOCAL_MULTI_OFF
 /********************************************************
         Section multicast strategy sgetRectGeometryuite. DirectMulticast and its
@@ -35,10 +44,10 @@
  *   If the root is inside the rectangle do this on the root
  *   else forward to (preferably a corner) something in the rectangle.
  *
- *   This latter case is the only use of a forwarding commlib
+ *   This latter case is the only use of a forwarding comlib
  *   object in this strategy.  Remote delivery is otherwise handled by
  *   the converse machine level and BG/L.  There is no other use of
- *   commlib forwarding schemes.
+ *   comlib forwarding schemes.
  *
  *   The all cases the rectangle sender will not receive a copy from the
  *   interface so it will need to do its own local multicast.
@@ -95,7 +104,7 @@ void *sourceOffRectstrategyHandler(void *msg) {
 
 void * rectRequest (int comm) {
   //  fprintf(stderr,"[%d] rectRequest for %d gives %p\n",CkMyPe(),comm,CkpvAccess(com_rect_ptr)->get(comm));
-#ifdef COMMLIB_RECT_DEBUG
+#ifdef COMLIB_RECT_DEBUG
   CkAssert(CkpvAccess(com_rect_ptr)->get(comm)!=NULL);
   isSane(CkpvAccess(com_rect_ptr)->get(comm),comm);
 #endif
@@ -104,7 +113,7 @@ void * rectRequest (int comm) {
 
 RectMulticastStrategy::RectMulticastStrategy(CkArrayID aid, 
 						 int isPersistent)
-    :  CharmStrategy() {
+    : Strategy(), CharmStrategy() {
 
     ainfo.setDestinationArray(aid);
     setType(ARRAY_STRATEGY);
@@ -133,13 +142,15 @@ RectMulticastStrategy::~RectMulticastStrategy() {
 }
 
 void RectMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
-    
+  cmsg->checkme();
+
+  
   //    ComlibPrintf("[%d] Comlib Rect Section Multicast: insertMessage \n", 
 
 
     if(cmsg->dest_proc == IS_SECTION_MULTICAST && cmsg->sec_id != NULL) { 
         CkSectionID *sid = cmsg->sec_id;
-        int cur_sec_id = ComlibSectionInfo::getSectionID(*sid);
+        int cur_sec_id = sid->getSectionID();
 	ComlibPrintf("[%d] Comlib Rect Section Multicast: insertMessage section id %d\n", CkMyPe(), cur_sec_id);           
         if(cur_sec_id > 0) {        
             sinfo.processOldSectionMessage(cmsg);            
@@ -301,14 +312,14 @@ RectMulticastStrategy::createObjectOnSrcPe(int nindices, CkArrayIndexMax *idxlis
 	    request=bgl_machine_RectBcastInit(comm, geometry);
 	    ComlibPrintf("[%d] csrc init comm %d section %d srcpe %d request %p\n",CkMyPe(), comm, thisSectionID, rootpe, request);
 	    CkpvAccess(com_rect_ptr)->put(comm)= request;
-#ifdef COMMLIB_RECT_DEBUG
+#ifdef COMLIB_RECT_DEBUG
 	    isSane(request,comm);
 #endif
 	  }
 	else{
 	  ComlibPrintf("[%d] csrc already init comm %d section %d srcpe %d\n",CkMyPe(), comm, thisSectionID, rootpe);
 	}
-#ifdef COMMLIB_RECT_DEBUG
+#ifdef COMLIB_RECT_DEBUG
 	void *getrequest =     CkpvAccess(com_rect_ptr)->get(comm);
 	CkAssert(*((char *) request)==*((char *)getrequest));
 	isSane(getrequest,comm);
@@ -545,7 +556,7 @@ RectMulticastStrategy::createObjectOnIntermediatePe(int nindices,
     // we don't actually need the request on a typical intermediate
     // only the forwarding case cares.
     CkpvAccess(com_rect_ptr)->put(comm)= request;
-#ifdef COMMLIB_RECT_DEBUG
+#ifdef COMLIB_RECT_DEBUG
     void *getrequest =     CkpvAccess(com_rect_ptr)->get(comm);
     CkAssert(*((char *) request)==*((char *)getrequest));
     isSane(getrequest,comm);
@@ -630,7 +641,7 @@ void RectMulticastStrategy::remoteMulticast(envelope *env,
     // per multicast
     int comm=computeKey(sectionID, srcpe, destid);
     ComlibPrintf("[%d] rectbcast using comm %d section %d srcpe %d request %p\n",CkMyPe(), comm, sectionID, srcpe, CkpvAccess(com_rect_ptr)->get(comm));
-#ifdef COMMLIB_RECT_DEBUG
+#ifdef COMLIB_RECT_DEBUG
     isSane(CkpvAccess(com_rect_ptr)->get(comm),comm);
 #endif
     bgl_machine_RectBcast(comm  , (char*)env, env->getTotalsize());
@@ -819,3 +830,6 @@ void RectMulticastStrategy::handleNewMulticastMessage(envelope *env) {
     CmiFree(newenv);  //NEED this
 }
 #endif
+
+
+/*@}*/

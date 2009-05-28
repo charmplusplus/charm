@@ -20,7 +20,9 @@ module CkArray {
   PUPable CkVerboseListener;
   PUPable CkArrayBroadcaster;
   PUPable CkArrayReducer;
-  PUPable ComlibArrayListener;
+
+  // COMLIB HACK
+  //PUPable ComlibArrayListener;
 
   initproc void _ckArrayInit(void);
 

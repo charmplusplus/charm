@@ -368,7 +368,7 @@ public:
   void isend(MPI_Comm comm,int src,int dest) {
     if (nSend==0) return; /* nothing to do */
     
-#if OSL_COMM_DEBUG 
+#if OSL_com_debug 
     CkPrintf("%d sending %d records to %d\n", src,n,dest);
 #endif
     MPI_Isend(ck.messageBuf(),ck.messageSizeXfer(),
@@ -497,7 +497,7 @@ void parallelSurfaceTransfer_c::transfer(surfProgress_t &surfProgress) {
     else /* collides our source face, so send it */ 
       send[cr[1]].countFace(ss,cr[0]);
   }
-#if OSL_COMM_DEBUG /* print out the communication table */
+#if OSL_com_debug /* print out the communication table */
   printf("Rank %d: %d collisions, ",myRank,nColl);
   for (p=0;p<commSize;p++) 
     if (send[p].getCount() || recv[p].getCount())

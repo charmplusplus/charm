@@ -104,7 +104,7 @@ jadeall: jade
 	cd ../java/charm/jade && $(MAKE)
 
 #include TAU defs
-TAU_MAKEFILE=
+TAU_MAKEFILE=Make.tau
 include	$(TAU_MAKEFILE) #stub-makefile
 
 #builds TAU's trace library
@@ -174,8 +174,8 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh \
       blue.h blue-conv.h bgconverse.h \
-	convcomlibstrategy.h 3dgridrouter.h de.h hypercubetopology.h	\
-	routerstrategy.h convcomlib.h dummyconversestrategy.h  treerouter.h \
+	3dgridrouter.h hypercuberouter.h hypercubetopology.h	\
+	routerstrategy.h convcomlibstrategy.h  convcomlib.h dummyconversestrategy.h  treerouter.h \
 	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h \
 	prefixrouter.h pipebroadcastconverse.h pipelinestrategy.h cmipool.h \
       comlib.h cmidirect.h cmidirectmanytomany.h \
@@ -189,7 +189,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	sockRoutines.h sockRoutines.c ckpool.h BGLTorus.h BGPTorus.h \
 	TopoManager.h XT3Torus.h XT4Torus.h cmimemcpy.h simd.h SSE-Double.h SSE-Float.h
 
-CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
+CKHEADERS=ck.h ckstream.h envelope-path.h envelope.h envelope-path.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  ckarrayreductionmgr.h cknodegroupreduction.h cksection.h \
@@ -228,7 +228,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
           TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
 	  BlueGene.decl.h \
 	  comlib.decl.h ComlibManager.h DummyStrategy.h	\
-	  DirectMulticastStrategy.h RingMulticastStrategy.h	\
+	  MulticastStrategy.h DirectMulticastStrategy.h RingMulticastStrategy.h	\
 	  MultiRingMulticast.h \
 	  EachToManyMulticastStrategy.h MsgPacker.h StreamingStrategy.h \
 	  NodeMulticast.h PipeBroadcastStrategy.h MeshStreamingStrategy.h \
@@ -359,21 +359,14 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o
 
 #############################################
-#
-#Comlib Core objects
-#
-#############################################
-#These go into libconv-util.a and are always linked
-CONVERSE_COM_CORE_OBJS = convcomlibstrategy.o
-
-#These go into libck.a
-COMLIB_CORE_OBJS = ComlibStrategy.o ComlibArrayListener.o
+#Comlib Core objects that go into libck.a
+COMLIB_CORE_OBJS = ComlibModuleInterface.o 
 ##############################################
 
 LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	pup_xlater.o pup_c.o pup_paged.o pup_cmialloc.o			\
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
-	conv-lists.o RTH.o persist-comm.o $(CONVERSE_COM_CORE_OBJS) \
+	conv-lists.o RTH.o persist-comm.o \
 	ckbitvector.o TopoManager.o CrayNid.o
 
 LIBCONV_UTILF=pup_f.o
@@ -802,7 +795,7 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   cklocation.h LBDatabase.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
   LBMachineUtil.h lbdb++.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h \
   CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h envelope-path.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h trace-simple.h \
@@ -894,8 +887,6 @@ $(L)/libmoduleControlPoints.a: $(CONTROLPOINTS_OBJS)
 include Make.lb
 
 loadbalancers: $(LOADBALANCERS) $(L)/libmoduleEveryLB.a
-
-
 ######################################################################
 #
 #Communication Optimization Library
@@ -906,22 +897,24 @@ STRATEGY_OBJS = MPIStrategy.o StreamingStrategy.o \
                 DummyStrategy.o NodeMulticast.o \
 		EachToManyMulticastStrategy.o ComlibSectionInfo.o \
                 AAPLearner.o ComlibStats.o AAMLearner.o \
-                MsgPacker.o DirectMulticastStrategy.o \
+                MsgPacker.o MulticastStrategy.o DirectMulticastStrategy.o \
 		RingMulticastStrategy.o MultiRingMulticast.o\
                 PipeBroadcastStrategy.o MeshStreamingStrategy.o \
-                PrioStreaming.o BroadcastStrategy.o RectMulticastStrategy.o
+                PrioStreaming.o BroadcastStrategy.o RectMulticastStrategy.o \
+		convcomlibstrategy.o ComlibManager.o ComlibStrategy.o 
 
-CONVERSE_COM_OBJS = gridrouter.o de.o treerouter.o petable.o \
-	3dgridrouter.o graphrouter.o hypercubetopology.o \
-	routerstrategy.o convcomlibmanager.o pipebroadcastconverse.o \
-	pipelinestrategy.o prefixrouter.o
+CONVERSE_COM_OBJS = gridrouter.o hypercuberouter.o treerouter.o petable.o \
+		3dgridrouter.o graphrouter.o hypercubetopology.o \
+		routerstrategy.o convcomlibmanager.o pipebroadcastconverse.o \
+		pipelinestrategy.o prefixrouter.o
+
 
 comlib.def.h: comlib.decl.h
 
 comlib.decl.h : ComlibManager.ci charmxi
 	$(CHARMXI) ComlibManager.ci
 
-COMLIB_OBJS = ComlibManager.o $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
+COMLIB_OBJS = $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 
 comlib_objs: $(L)/libmodulecomlib.a $(L)/libconvcom.a
 
@@ -932,6 +925,7 @@ $(L)/libconvcom.a: $(COMLIB_OBJS)
 $(L)/libmodulecomlib.a: $(COMLIB_OBJS)
 	$(CHARMC) -o $(L)/libmodulecomlib.a $(COMLIB_OBJS)
 	$(CHARMC) -o $(L)/libmodulecommlib.a $(COMLIB_OBJS)
+
 
 ###############################################################################
 #
@@ -1130,7 +1124,7 @@ depends: basics
         fi; \
 	echo '#generated by make depends' > $(DEPENDFILE); \
 	processFiles=''; 	\
-        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(LB_OBJ) $(LIBBLUE_OBJS) $(CONVERSE_COM_CORE_OBJS) $(COMLIB_OBJS) $(CONTROLPOINTS_OBJS); do \
+        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(LB_OBJ) $(LIBBLUE_OBJS) $(COMLIB_OBJS) $(CONTROLPOINTS_OBJS); do \
 	      processed='false';	\
 	      for f in $$processFiles; do 	\
 		if test $$i = $$f ; then	\
@@ -1154,7 +1148,7 @@ dependsCaseSensitive: basics
         fi; \
 	echo '#generated by make depends' > $(DEPENDFILE); \
 	processFiles=''; 	\
-        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(LB_OBJ) $(LIBBLUE_OBJS) $(CONVERSE_COM_CORE_OBJS) $(COMLIB_OBJS) $(CONTROLPOINTS_OBJS); do \
+        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(LB_OBJ) $(LIBBLUE_OBJS) $(COMLIB_OBJS) $(CONTROLPOINTS_OBJS); do \
 	      processed='false';	\
 	      for f in $$processFiles; do 	\
 		if test $$i = $$f ; then	\

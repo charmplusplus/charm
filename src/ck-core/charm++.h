@@ -29,6 +29,7 @@ public: static int __idx;
 PUPbytes(CkChareID)
 PUPbytes(CkGroupID)
 
+  
 /**
  * CkMessage is the superclass of all Charm++ messages.
  * Typically, a message foo inherits from CMessage_foo, which
@@ -1047,23 +1048,7 @@ static const char *idx2str(const ArrayElement *el) {
   return idx2str(el->thisIndexMax);
 }
 
-template <typename T>
-inline T *CkAllocateMarshallMsgT(int size,const CkEntryOptions *opts)
-{
-    int priobits = 0;
-    if (opts!=NULL) priobits = opts->getPriorityBits();
-    //Allocate the message
-    T *m=new (size,priobits)T;
-    //Copy the user's priority data into the message
-    envelope *env=UsrToEnv(m);
-    setMemoryTypeMessage(env);
-    if (opts!=NULL) {
-      CmiMemcpy(env->getPrioPtr(),opts->getPriorityPtr(),env->getPrioBytes());
-      //Set the message's queueing type
-      env->setQueueing((unsigned char)opts->getQueueing());
-    }
-    return m;
-}
+
 
 class CkConditional {
   int refcount;

@@ -5,8 +5,10 @@
  * $Revision$
  *****************************************************************************/
 
-/*
-  These classes implement array sections which is a subset of ckarray.
+/**
+@file 
+ 
+ These classes implement array sections which is a subset of ckarray.
   Supported operation includes section multicast and reduction.
   It is currently implemented using delegation.
 
@@ -23,9 +25,10 @@
 #define  MulticastMsg          1
 #define  COMLIB_MULTICAST_MESSAGE    2
 
-#define COMLIB_MULTICAST_ALL 0
+//#define COMLIB_MULTICAST_ALL 0
 #define COMLIB_MULTICAST_OLD_SECTION 1
 #define COMLIB_MULTICAST_NEW_SECTION 2
+#define COMLIB_MULTICAST_SECTION_ERROR 3
 
 class CkSectionInfo {
  public:
@@ -42,10 +45,11 @@ class CkSectionInfo {
             short  instId;	//the instance of the comm. lib.
             
             // This field indicates local array indices to multicast to:
-            // COMLIB_MULTICAST_ALL for all local elements, 
+            // (Deprecated) COMLIB_MULTICAST_ALL for all local elements, 
             // COMLIB_MULTICAST_NEW_SECTION, elements are attached 
             // to this message
             // COMLIB_MULTICAST_OLD_SECTION use previously created section
+            // COMLIB_MULTICAST_SECTION_ERROR mark the section as old
             short status;      
             int id;      //Used to compare section ID's
         } 
@@ -63,39 +67,59 @@ class CkSectionInfo {
     }
 
     CkSectionInfo(int t) {
-	type = t; pe = -1;
-	switch (type) {
-	case MulticastMsg:
-            sInfo.sCookie.val=NULL; 
-            sInfo.sCookie.redNo=0;
-            break;
-        case COMLIB_MULTICAST_MESSAGE:
-            sInfo.cInfo.instId=0;
-            sInfo.cInfo.status=0;
-            sInfo.cInfo.id=0;
-            break;
-	default:
-            CmiAssert(0);
-	}
+      type = t; pe = -1;
+      switch (type) {
+      case MulticastMsg:
+        sInfo.sCookie.val=NULL; 
+        sInfo.sCookie.redNo=0;
+        break;
+      case COMLIB_MULTICAST_MESSAGE:
+        sInfo.cInfo.instId=0;
+        sInfo.cInfo.status=0;
+        sInfo.cInfo.id=0;
+        break;
+      default:
+        CmiAssert(0);
+      }
     }
     CkSectionInfo(CkArrayID _aid, void *p = NULL): pe(CkMyPe()),
-                                                   type(MulticastMsg) {
-	aid = _aid;
-	sInfo.sCookie.val=p;
-	sInfo.sCookie.redNo=0;
+    type(MulticastMsg) {
+      aid = _aid;
+      sInfo.sCookie.val=p;
+      sInfo.sCookie.redNo=0;
     }
     CkSectionInfo(int e, void *p, int r, CkArrayID _aid) {
-	type = MulticastMsg;
-	pe = e; 
-	aid = _aid;
-	sInfo.sCookie.val=p;
-	sInfo.sCookie.redNo=r;
+      type = MulticastMsg;
+      pe = e; 
+      aid = _aid;
+      sInfo.sCookie.val=p;
+      sInfo.sCookie.redNo=r;
     }
     inline int &get_pe() { return pe; }
     inline int &get_redNo() { CmiAssert(type==MulticastMsg); 
                               return sInfo.sCookie.redNo; }
     inline void * &get_val() { CmiAssert(type==MulticastMsg); 
                                return sInfo.sCookie.val; }
+
+
+    /*
+    void pup(PUP::er &p) {
+      p | aid;
+      p | pe;
+      p | type;
+      switch (type) {
+      case MulticastMsg:
+        p | sInfo.sCookie.redNo;
+        p | sInfo.sCookie.val;
+        break;
+      case COMLIB_MULTICAST_MESSAGE:
+        p | sInfo.cInfo.instId;
+        p | sInfo.cInfo.status;
+        p | sInfo.cInfo.id = 0;
+        break;
+      }
+    }
+    */
 };
 
 PUPbytes(CkSectionInfo) //FIXME: write a real pup routine
@@ -141,7 +165,7 @@ public:
   //Two reasons, (i) potentially extend sections to groups. (ii) For
   //array sections these point to the processors (ranks in the
   //commlib) the destinations array elements are on.
-  int *pelist;   // Currently not saped when pupped across processors 
+  int *pelist;   // Currently not saved when pupped across processors 
   int npes;
   
 public:
@@ -154,9 +178,17 @@ public:
   CKSECTIONID_CONSTRUCTOR(5D)
   CKSECTIONID_CONSTRUCTOR(6D)
   CKSECTIONID_CONSTRUCTOR(Max)
+
+  inline int getSectionID(){
+    return _cookie.sInfo.cInfo.id;
+  }
+
   void operator=(const CkSectionID &);
+
   ~CkSectionID();
+
   void pup(PUP::er &p);
+
 };
 PUPmarshall(CkSectionID)
 

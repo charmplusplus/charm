@@ -4,13 +4,20 @@
  * $Date$
  * $Revision$
  *****************************************************************************/
+/**
+   @addtogroup ConvComlibRouter
+   @{
+   @file This file although built, has no usage in the entire system!!!
+*/
 
 #include "graphrouter.h"
 #include "hypercubetopology.h"
 
+#define PERSISTENT_BUFSIZE 65536
+
 #define gmap(pe) {if (gpes) pe=gpes[pe];}
 
-GraphRouter::GraphRouter(int n, int me){
+GraphRouter::GraphRouter(int n, int me, Strategy *parent) : Router(parent) {
     init(n, me, new HypercubeTopology(n, me));
 }
 
@@ -74,7 +81,7 @@ void GraphRouter::sendMessages(comID id, int cur_stage){
         ComlibPrintf("%d:sending to %d for %d pes in stage %d\n", MyPe, nextpe, npestosend, cur_stage);
 
         int len;
-#if CMK_COMMLIB_USE_VECTORIZE
+#if CMK_COMLIB_USE_VECTORIZE
 	PTvectorlist newmsg;
         newmsg=PeGraph->ExtractAndVectorize(id, cur_stage + 1, npestosend, 
                                        pesToSend);
@@ -83,7 +90,7 @@ void GraphRouter::sendMessages(comID id, int cur_stage){
         newmsg=PeGraph->ExtractAndPack(id, cur_stage + 1, npestosend, 
                                        pesToSend, &len);
 #endif
-#if CMK_PERSISTENT_COMM
+#if CMK_PERSISTENT_COM
         if(len < PERSISTENT_BUFSIZE)
             if(currentIteration % 2)
                 CmiUsePersistentHandle(&handlerArrayOdd[cur_stage], 1);
@@ -93,10 +100,10 @@ void GraphRouter::sendMessages(comID id, int cur_stage){
         
 	if (newmsg) {
             if(cur_stage < nstages - 2)
-                CmiSetHandler(newmsg, CkpvAccess(RecvHandle));
+                CmiSetHandler(newmsg, CkpvAccess(RouterRecvHandle));
             else
-                CmiSetHandler(newmsg, CkpvAccess(ProcHandle));
-#if CMK_COMMLIB_USE_VECTORIZE
+                CmiSetHandler(newmsg, CkpvAccess(RouterProcHandle));
+#if CMK_COMLIB_USE_VECTORIZE
             CmiSyncVectorSendAndFree(nextpe, -newmsg->count, newmsg->sizes, newmsg->msgs);
 #else
             CmiSyncSendAndFree(nextpe, len, newmsg);
@@ -106,7 +113,7 @@ void GraphRouter::sendMessages(comID id, int cur_stage){
             SendDummyMsg(id, nextpe, cur_stage + 1);
 	}
         
-#if CMK_PERSISTENT_COMM
+#if CMK_PERSISTENT_COM
         if(len < PERSISTENT_BUFSIZE)
             CmiUsePersistentHandle(NULL, 0);
 #endif          
@@ -136,7 +143,7 @@ void GraphRouter::EachToManyMulticast(comID id, int size, void *msg,
     if(curStage == nstages - 1)
         ProcManyMsg(id, NULL);
     else 
-        PeGraph->ExtractAndDeliverLocalMsgs(MyPe);
+        PeGraph->ExtractAndDeliverLocalMsgs(MyPe, container);
 }
 
 void GraphRouter::RecvManyMsg(comID id, char *msg)
@@ -164,7 +171,7 @@ void GraphRouter::RecvManyMsg(comID id, char *msg)
     if(curStage == nstages - 1)
         ProcManyMsg(id, NULL);
     else 
-        PeGraph->ExtractAndDeliverLocalMsgs(MyPe);
+        PeGraph->ExtractAndDeliverLocalMsgs(MyPe, container);
 }
 
 void GraphRouter::DummyEP(comID id, int stage)
@@ -189,7 +196,7 @@ void GraphRouter::DummyEP(comID id, int stage)
         if(curStage == nstages - 1)
             ProcManyMsg(id, NULL);
         else 
-            PeGraph->ExtractAndDeliverLocalMsgs(MyPe);
+            PeGraph->ExtractAndDeliverLocalMsgs(MyPe, container);
     }
     else 
         ProcManyMsg(id, NULL);
@@ -215,17 +222,17 @@ void GraphRouter:: ProcManyMsg(comID id, char *m)
 
     currentIteration ++;
     recvCount[stage] = 0;
-    PeGraph->ExtractAndDeliverLocalMsgs(MyPe);
+    PeGraph->ExtractAndDeliverLocalMsgs(MyPe, container);
     
     PeGraph->Purge();
     curStage = 0;
     Done(id);
 }
 
-Router * newgraphobject(int n, int me)
+Router * newgraphobject(int n, int me, Strategy *strat)
 {
     ComlibPrintf("In create graph router \n");
-    Router *obj = new GraphRouter(n, me);
+    Router *obj = new GraphRouter(n, me, strat);
     return(obj);
 }
 
@@ -233,7 +240,7 @@ void GraphRouter :: SetMap(int *pes)
 {
     gpes=pes;
 
-#if CMK_PERSISTENT_COMM
+#if CMK_PERSISTENT_COM
     numNeighbors=0;
     neighborPeList = new int[NumPes];
 
@@ -257,3 +264,5 @@ void GraphRouter :: SetMap(int *pes)
     }
 #endif
 }
+
+/*@}*/

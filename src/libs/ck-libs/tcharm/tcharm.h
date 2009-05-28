@@ -9,6 +9,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/17/2002
 #ifndef __CHARM_TCHARMLIB_H
 #define __CHARM_TCHARMLIB_H
 
+#include "ckcheckpoint.h" /* for CkStartCheckpoint */
 
 /*
 Library "fallback setup" routine.

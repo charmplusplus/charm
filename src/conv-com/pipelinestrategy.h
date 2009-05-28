@@ -1,3 +1,11 @@
+/**
+   @addtogroup ComlibConverseStrategy
+   @{
+   @file 
+   @brief A pipeline router strategy. 
+*/
+
+
 #ifndef PIPELINE_CONVERSE
 #define PIPELINE_CONVERSE
 #include "ckhashtable.h"
@@ -88,3 +96,4 @@ class PipelineStrategy : public Strategy {
 };
 
 #endif
+/*@}*/

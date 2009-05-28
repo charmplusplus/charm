@@ -5,12 +5,19 @@
  * $Revision$
  *****************************************************************************/
 
+/**
+   @addtogroup ConvComlibRouter
+   @{
+   @file 
+   @brief Class for grid based routing 
+*/
+
+
 #ifndef _GRIDROUTER_H
 #define _GRIDROUTER_H
 
 #include <math.h>
-#include <converse.h>
-#include "convcomlib.h"
+//#include <converse.h>
 #include "petable.h"
 
 #define ROWLEN COLLEN
@@ -57,7 +64,7 @@ class GridRouter : public Router
     void sendRow(comID id);
     
  public:
-    GridRouter(int, int);
+    GridRouter(int, int, Strategy*);
     ~GridRouter();
     void NumDeposits(comID, int);
     
@@ -73,3 +80,5 @@ class GridRouter : public Router
 };
 
 #endif
+
+/*@}*/

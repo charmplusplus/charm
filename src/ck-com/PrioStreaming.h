@@ -1,3 +1,8 @@
+/**
+   @addtogroup ComlibCharmStrategy
+   *@{
+   @file 
+*/
 
 #ifndef PRIO_STREAMING
 #define PRIO_STREAMING
@@ -5,8 +10,23 @@
 #include "ComlibManager.h"
 #include "StreamingStrategy.h"
 
+/**
+ * Class that streams messages the same way as StreamingStrategy, but adding a
+ * bypass for high priority messages to be flushed immediately.
 
-class PrioStreaming : public StreamingStrategy {
+ These are the criteria for flushing all pending messages: 
+ <ul>
+ <li> it's been at least period (in ms) since the last flush, or 
+ <li> the processor just went idle.
+ </ul>
+
+ These criteria flush a single E's pending messages: 
+ <ul>
+ <li> more than bufferMax messages to buffered for one PE.
+ <li>Current message is a high priority message
+ </ul>
+ */
+class PrioStreaming : public StreamingStrategy, public CharmStrategy {
  protected:
     int basePriority;
     CkVec<int> minPrioVec;
@@ -32,8 +52,9 @@ class PrioStreaming : public StreamingStrategy {
 		  int prio=0,
 		  int msgSizeMax=MAX_STREAMING_MESSAGE_SIZE,
 		  int bufSizeMAX=MAX_STREAMING_MESSAGE_SIZE*MAX_NUM_STREAMING_MESSAGES);
-    PrioStreaming(CkMigrateMessage *m) : StreamingStrategy(m) {}
-    
+    PrioStreaming(CkMigrateMessage *m) : StreamingStrategy(m), CharmStrategy(m) {}
+
+    void insertMessage(MessageHolder *msg) {insertMessage((CharmMessageHolder*)msg);}
     virtual void insertMessage(CharmMessageHolder *msg);
 
     //If new priority is greater than current priority, 
@@ -51,3 +72,5 @@ class PrioStreaming : public StreamingStrategy {
     PUPable_decl(PrioStreaming);
 };
 #endif
+
+/*@}*/

@@ -1,9 +1,15 @@
+/**
+   @addtogroup ComlibCharmStrategy
+   @{
+   @file 
+*/
+
 #include "PrioStreaming.h"
-#include "MsgPacker.h"
+//#include "MsgPacker.h"
 
 PrioStreaming::PrioStreaming(int periodMs,int bufferMax_, int prio, 
 			     int msgSizeMax_, int bufSizeMax_)
-    : StreamingStrategy(periodMs, bufferMax_, msgSizeMax_, bufSizeMax_), basePriority(prio)
+    : StreamingStrategy(periodMs, bufferMax_, msgSizeMax_, bufSizeMax_), CharmStrategy(), basePriority(prio)
 {
 }
 
@@ -36,8 +42,11 @@ void PrioStreaming::insertMessage(CharmMessageHolder *cmsg) {
 void PrioStreaming::pup(PUP::er &p){
 
     StreamingStrategy::pup(p);
+    CharmStrategy::pup(p);
     p | basePriority;
 
-    if(p.isUnpacking())
+    if(p.isPacking() || p.isUnpacking())
         minPrioVec.resize(CkNumPes());
 }
+
+/*@}*/

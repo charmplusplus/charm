@@ -1,3 +1,10 @@
+/**
+   @addtogroup CharmComlib
+   @{
+   @file 
+   @brief Header for use in user program. It includes all the Charm++ strategy headers.
+*/
+
 #include "ComlibManager.h"
 #include "StreamingStrategy.h"
 #include "MeshStreamingStrategy.h"
@@ -5,9 +12,12 @@
 #include "BroadcastStrategy.h"
 #include "PipeBroadcastStrategy.h"
 #include "EachToManyMulticastStrategy.h"
-#include "MPIStrategy.h"
 #include "DirectMulticastStrategy.h"
 #include "RingMulticastStrategy.h"
 #include "MultiRingMulticast.h"
-#include "NodeMulticast.h"
+#include "RectMulticastStrategy.h"
+//#include "MPIStrategy.h"
 
+
+
+/** @} */

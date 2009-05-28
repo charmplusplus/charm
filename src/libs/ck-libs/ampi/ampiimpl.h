@@ -14,6 +14,7 @@
 #include "charm++.h"
 
 #if AMPI_COMLIB
+#warning COMPILING IN UNTESTED AMPI COMLIB SUPPORT
 #include "StreamingStrategy.h"
 #include "EachToManyMulticastStrategy.h" /* for ComlibManager Strategy*/
 #include "BroadcastStrategy.h"
@@ -25,10 +26,6 @@
 #define AMPI_DEBUG CkPrintf
 #else
 #define AMPI_DEBUG /* empty */
-#endif
-
-#ifndef AMPI_COMLIB
-#  define AMPI_COMLIB 0
 #endif
 
 #ifdef AMPIMSGLOG
@@ -1375,11 +1372,15 @@ friend class IReq;
     groupStruct tmpVec; // stores temp group info
     CProxy_ampi remoteProxy; // valid only for intercommunicator
 
+    /// A proxy used when delegating message sends to comlib
     CProxy_ampi comlibProxy;
+    
+    /// References to the comlib instance handles(currently just integers)
     ComlibInstanceHandle ciStreaming;
     ComlibInstanceHandle ciBcast;
     ComlibInstanceHandle ciAllgather;
     ComlibInstanceHandle ciAlltoall;
+
     
     int seqEntries; //Number of elements in below arrays
     AmpiSeqQ oorder;
@@ -1469,6 +1470,13 @@ friend class IReq;
     inline ComlibInstanceHandle getAllgather(void) { return ciAllgather; }
     inline ComlibInstanceHandle getAlltoall(void) { return ciAlltoall; }
 
+#if AMPI_COMLIB
+    inline Strategy* getStreamingStrategy(void) { return CkpvAccess(conv_com_object).getStrategy(ciStreaming); }
+    inline Strategy* getBcastStrategy(void) { return CkpvAccess(conv_com_object).getStrategy(ciBcast); }
+    inline Strategy* getAllgatherStrategy(void) { return CkpvAccess(conv_com_object).getStrategy(ciAllgather); }
+    inline Strategy* getAlltoallStrategy(void) { return CkpvAccess(conv_com_object).getStrategy(ciAlltoall); }
+#endif
+    
     CkDDT *getDDT(void) {return parent->myDDT;}
     CthThread getThread() { return thread->getThread(); }
 #if CMK_LBDB_ON

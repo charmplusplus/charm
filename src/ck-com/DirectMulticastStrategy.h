@@ -1,35 +1,32 @@
+/**
+   @addtogroup ComlibCharmStrategy
+   @{
+   @file 
+   @brief Send a multicast by sending once directly to each processor owning destination elements.
+
+*/
+
 #ifndef DIRECT_MULTICAST_STRATEGY
 #define DIRECT_MULTICAST_STRATEGY
 
-#include "ComlibManager.h"
-#include "ComlibSectionInfo.h"
+#include "MulticastStrategy.h"
 
-void *DMHandler(void *msg);
-/**
- * Main class for multicast strategies. It defaults to sending a direct message
- * to all the processors involved in the multicast.
 
- * The definition of the section, as well as the location of all the elements in
- * the processors is determined by the sending processor. The other will obey to
- * it, even some elements have already migrated elsewhere.
- */
-class DirectMulticastStrategy: public CharmStrategy {
+/** 
+  Send the multicast by sending once directly to each processor owning destination elements.
+
+  The definition of the section, as well as the location of all the elements in
+  the processors is determined by the sending processor. The other will obey to
+  it, even some elements have already migrated elsewhere.
+
+*/
+class DirectMulticastStrategy: public MulticastStrategy {
  protected:
-    //   int handlerId;    
-    ComlibSectionInfo sinfo;
-
-    int isPersistent; 
-    
-    ///Array section support.
-    CkHashtableT<ComlibSectionHashKey, ComlibSectionHashObject *> sec_ht; 
-    
-    ///Add this section to the hash table locally.
-    void insertSectionID(CkSectionID *sid);
-
+ 
     ///Called when a new section multicast is called by the user locally.
     ///The strategy should then create a topology for it and return a hash
     ///object to store that topology.
-    virtual ComlibSectionHashObject *createObjectOnSrcPe(int nindices, CkArrayIndexMax *idx_list);
+  virtual void createObjectOnSrcPe(ComlibSectionHashObject *obj, int npes, ComlibMulticastIndexCount *pelist);
 
     /**   
      * Similar to createHashObjectOnSrcPe, but that this call is made on the
@@ -44,42 +41,19 @@ class DirectMulticastStrategy: public CharmStrategy {
      * @param srcpe processor which started the multicast
      * @return a hash object describing the section
      */
-    virtual ComlibSectionHashObject *createObjectOnIntermediatePe(int nindices, CkArrayIndexMax *idxlist, int npes, ComlibMulticastIndexCount *counts, int srcpe);
-        
-    ///Needed for getNewMulticastMessage, to specify if the list of processors need to be ordered
-    virtual int needSorting() { return 0; }
-
-    ///Called to multicast the message to local array elements.
-    void localMulticast(envelope *env, ComlibSectionHashObject *obj);
-    
-    ///Called to send to message out to the remote destinations.
-    ///This method can be overridden to call converse level strategies.
-    virtual void remoteMulticast(envelope *env, ComlibSectionHashObject *obj);
-
-    ///Process a new message by extracting the array elements from it and
-    ///creating a new hash object by calling createObjectOnIntermediatePe().
-    void handleNewMulticastMessage(envelope *env);
-
+    virtual void createObjectOnIntermediatePe(ComlibSectionHashObject *obj, int npes, ComlibMulticastIndexCount *counts, int srcpe);
+   
  public:
-
-    DirectMulticastStrategy(CkMigrateMessage *m): CharmStrategy(m){}
+    DirectMulticastStrategy(CkMigrateMessage *m): MulticastStrategy(m){}
                 
     ///Array constructor
-    DirectMulticastStrategy(CkArrayID aid, int isPersistent = 0);
-        
-    //Destuctor
-    ~DirectMulticastStrategy();
-        
-    virtual void insertMessage(CharmMessageHolder *msg);
-    virtual void doneInserting();
+    DirectMulticastStrategy(int isPersistent = 0): MulticastStrategy(isPersistent) {}
 
-    ///Called by the converse handler function
-    virtual void handleMessage(void *msg);    
-
-    virtual void pup(PUP::er &p);    
-    virtual void beginProcessing(int nelements);
-    
     PUPable_decl(DirectMulticastStrategy);
+
+    virtual void pup(PUP::er &p){ MulticastStrategy::pup(p);}   
+    
 };
 #endif
 
+/*@}*/

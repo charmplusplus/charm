@@ -546,7 +546,7 @@ public:
 	///Deliver message to this element:
 	inline void deliverViaQueue(CkMessage *m) {deliver(m,CkDeliver_queue);}
 	inline void deliverInline(CkMessage *m) {deliver(m,CkDeliver_inline);}
-	void deliver(CkMessage *m, CkDeliver_t type, int opts=0);
+	int deliver(CkMessage *m, CkDeliver_t type, int opts=0);
 
 	///Done inserting elements for now
 	void doneInserting(void);

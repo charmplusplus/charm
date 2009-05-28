@@ -1,6 +1,14 @@
 #ifndef COMLIB_STATS_H
 #define COMLIB_STATS_H
 
+/**
+   @addtogroup CharmComlib
+   @{
+   @file
+   
+   @brief Classes for storing simple statistics about messages send and received.
+*/
+
 #include "charm++.h"
 #include "convcomlibmanager.h"
 
@@ -275,4 +283,5 @@ class ComlibGlobalStats {
   void getAverageStats(int sid, double &, double &, double &, double &);
 };
 
+/*@}*/
 #endif

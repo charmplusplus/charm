@@ -1,41 +1,24 @@
+/**
+   @addtogroup CharmComlib
+   @{
+   @file
+   Implementations of ComlibStrategy.h
+*/
 
-#include "charm++.h"
-#include "envelope.h"
+#include "ComlibStrategy.h"
 
-//calls ComlibNotifyMigrationDone(). Even compiles when -module comlib
-//is not included. Hack to make loadbalancer work without comlib
-//currently.
-CkpvDeclare(int, migrationDoneHandlerID);
 
-//Class that defines the entry methods that a Charm level strategy
-//must define.  To write a new strategy inherit from this class and
-//define the virtual methods.  Every strategy can also define its own
-//constructor and have any number of arguments. Also call the parent
-//class methods in those methods.
-
-void CharmStrategy::insertMessage(MessageHolder *mh){
-    insertMessage((CharmMessageHolder *)mh);
-}
 
 void CharmStrategy::pup(PUP::er &p) {
-    Strategy::pup(p);
+  //Strategy::pup(p);
     p | nginfo;
     p | ginfo;
     p | ainfo;
-    p | forwardOnMigration;
+    //p | forwardOnMigration;
     p | mflag;
     p | onFinish;
 }
 
-CharmMessageHolder::CharmMessageHolder(char * msg, int proc) 
-    : MessageHolder((char *)UsrToEnv(msg), proc, 
-                    UsrToEnv(msg)->getTotalsize()){
-    
-    sec_id = NULL;    
-}
-
-CharmMessageHolder::~CharmMessageHolder() { 
-}
 
 void CharmMessageHolder::pup(PUP::er &p) {
 
@@ -48,7 +31,7 @@ void CharmMessageHolder::pup(PUP::er &p) {
     sec_id = NULL;
 }
 
-PUPable_def(CharmStrategy);
+//PUPable_def(CharmStrategy);
 PUPable_def(CharmMessageHolder);
 
 ComlibNodeGroupInfo::ComlibNodeGroupInfo() {
@@ -150,7 +133,7 @@ void ComlibGroupInfo::setDestinationGroup(CkGroupID gid, int *pelist,
 }
 
 void ComlibGroupInfo::getDestinationGroup(CkGroupID &gid, int *&pelist, 
-                                         int &npes){
+                                         int &npes) {
     gid = this->dgid;
     npes = ndestpes;
 
@@ -158,10 +141,28 @@ void ComlibGroupInfo::getDestinationGroup(CkGroupID &gid, int *&pelist,
     memcpy(pelist, destpelist, npes * sizeof(int));
 }
 
-void ComlibGroupInfo::getDestinationGroup(CkGroupID &gid){
+void ComlibGroupInfo::getDestinationGroup(CkGroupID &gid) {
     gid = this->dgid;
 }
 
+int *ComlibGroupInfo::getCombinedCountList() {
+  int *result = new int[CkNumPes()];
+  int i;
+  for (i=0; i<CkNumPes(); ++i) result[i] = 0;
+  if (nsrcpes != 0) {
+    for (i=0; i<nsrcpes; ++i) result[srcpelist[i]] |= 1;
+  } else {
+    for (i=0; i<CkNumPes(); ++i) result[i] |= 1;
+  }
+  if (ndestpes != 0) {
+    for (i=0; i<ndestpes; ++i) result[destpelist[i]] |= 2;
+  } else {
+    for (i=0; i<CkNumPes(); ++i) result[i] |= 2;
+  }
+  return result;
+}
+
+/*
 void ComlibGroupInfo::getCombinedPeList(int *&pelist, int &npes) {
     int count = 0;        
     pelist = 0;
@@ -191,20 +192,26 @@ void ComlibGroupInfo::getCombinedPeList(int *&pelist, int &npes) {
         }                        
     }
 }
+*/
 
 ComlibArrayInfo::ComlibArrayInfo() {
-
+	
     src_aid.setZero();
-    nSrcIndices = -1;
-    src_elements = NULL;
+    //nSrcIndices = -1;
+    //src_elements = NULL;
+    isAllSrc = 0;
+    totalSrc = 0;
     isSrcArray = 0;
 
     dest_aid.setZero();
-    nDestIndices = -1;
-    dest_elements = NULL;
+    //nDestIndices = -1;
+    //dest_elements = NULL;
+    isAllDest = 0;
+    totalDest = 0;
     isDestArray = 0;
 };
 
+/*
 ComlibArrayInfo::~ComlibArrayInfo() {
     //CkPrintf("in comlibarrayinfo destructor\n");
 
@@ -214,57 +221,100 @@ ComlibArrayInfo::~ComlibArrayInfo() {
     if(nDestIndices > 0)
         delete [] dest_elements;
 }
+*/
 
+/// Set the  source array used for this strategy. 
+/// The list of array indices should be the whole portion of the array involved in the strategy.
+/// The non-local array elements will be cleaned up inside purge() at migration of the strategy
 void ComlibArrayInfo::setSourceArray(CkArrayID aid, 
                                          CkArrayIndexMax *e, int nind){
     src_aid = aid;
-    isSrcArray = 1;    
+    isSrcArray = 1;
+    /*
     nSrcIndices = nind;
     if(nind > 0) {
         src_elements = new CkArrayIndexMax[nind];
         memcpy(src_elements, e, sizeof(CkArrayIndexMax) * nind);
     }
+    */
+    src_elements.removeAll();
+    
+    for (int i=0; i<nind; ++i) src_elements.push_back(e[i]);
+    
+    if (src_elements.size() == 0) 
+    	isAllSrc = 1;
+    else 
+    	isAllSrc = 0;
+    
+    totalSrc = src_elements.size();
+    
 }
 
 
 void ComlibArrayInfo::getSourceArray(CkArrayID &aid, 
                                          CkArrayIndexMax *&e, int &nind){
     aid = src_aid;
-    nind = nSrcIndices;
-    e = src_elements;
+    nind = src_elements.length();//nSrcIndices;
+    e = src_elements.getVec();//src_elements;
 }
 
 
 void ComlibArrayInfo::setDestinationArray(CkArrayID aid, 
                                           CkArrayIndexMax *e, int nind){
     dest_aid = aid;
-    isDestArray = 1;    
+    isDestArray = 1;
+    /*
     nDestIndices = nind;
     if(nind > 0) {
         dest_elements = new CkArrayIndexMax[nind];
         memcpy(dest_elements, e, sizeof(CkArrayIndexMax) * nind);
     }
+    */
+    dest_elements.removeAll();
+    for (int i=0; i<nind; ++i) dest_elements.push_back(e[i]);
+
+    if (dest_elements.size() == 0) 
+    	isAllDest = 1;
+    else 
+    	isAllDest = 0;
+    
+    totalDest = dest_elements.size();
+    
 }
 
 
 void ComlibArrayInfo::getDestinationArray(CkArrayID &aid, 
                                           CkArrayIndexMax *&e, int &nind){
     aid = dest_aid;
-    nind = nDestIndices;
-    e = dest_elements;
+    nind = dest_elements.length();
+    e = dest_elements.getVec();
 }
 
-
+/// @TODO fix the pup!
 //Each strategy must define his own Pup interface.
 void ComlibArrayInfo::pup(PUP::er &p){ 
     p | src_aid;
-    p | nSrcIndices;
+    //p | nSrcIndices;
     p | isSrcArray;
+    p | isAllSrc;
+    p | totalSrc;
+    p | src_elements;
     
     p | dest_aid;
-    p | nDestIndices;
+    //p | nDestIndices;
     p | isDestArray;
-    
+    p | isAllDest;
+    p | totalDest;
+    p | dest_elements;
+
+    if (p.isPacking() || p.isUnpacking()) {
+      // calling purge both during packing (at the end) and during unpacking
+      // allows this code to be executed both on processor 0 (where the object
+      // is created) and on every other processor where it arrives through PUP.
+      purge();
+    }
+
+    /*    
     if(p.isUnpacking() && nSrcIndices > 0) 
         src_elements = new CkArrayIndexMax[nSrcIndices];
     
@@ -282,8 +332,81 @@ void ComlibArrayInfo::pup(PUP::er &p){
         dest_elements = NULL;
 
     localDestIndexVec.resize(0);
+    */
+    
 }
 
+void ComlibArrayInfo::newElement(CkArrayID &id, const CkArrayIndex &idx) {
+  ComlibPrintf("ComlibArrayInfo::newElement\n");
+  if (isAllSrc && id==src_aid) src_elements.push_back(idx);
+  if (isAllDest && id==dest_aid) dest_elements.push_back(idx);
+}
+
+void ComlibArrayInfo::purge() {
+	int i;
+	CkArray *a;
+//	ComlibPrintf("[%d] ComlibArrayInfo::purge srcArray=%d (%d), destArray=%d (%d)\n",CkMyPe(),isSrcArray,isAllSrc,isDestArray,isAllDest);
+	if (isSrcArray) {
+		a = (CkArray *)_localBranch(src_aid);
+		if (isAllSrc) {
+			// gather the information of all the elements that are currenly present here
+			ComlibElementIterator iter(&src_elements);
+			a->getLocMgr()->iterate(iter);
+
+			// register to ComlibArrayListener for this array id
+//			ComlibManagerRegisterArrayListener(src_aid, this);
+		} else {
+			// delete all the elements of which we are not homePe
+			for (i=src_elements.size()-1; i>=0; --i) {
+				if (a->homePe(src_elements[i]) != CkMyPe()) { 
+					
+//					ComlibPrintf("[%d] removing home=%d src element %d  i=%d\n", CkMyPe(),a->homePe(src_elements[i]), src_elements[i].data()[0], i);
+					src_elements.remove(i); 
+				}
+			}
+		}
+	}
+	if (isDestArray) {
+		a = (CkArray *)_localBranch(dest_aid);
+		if (isAllDest) {
+			// gather the information of all the elements that are currenly present here
+			ComlibElementIterator iter(&dest_elements);
+			a->getLocMgr()->iterate(iter);
+
+			// register to ComlibArrayListener for this array id
+//			ComlibManagerRegisterArrayListener(dest_aid, this);
+		} else {
+			// delete all the elements of which we are not homePe
+			for (i=dest_elements.size()-1; i>=0; --i) {
+				if (a->homePe(dest_elements[i]) != CkMyPe()) {
+//					ComlibPrintf("[%d] removing home=%d dest element %d  i=%d\n", CkMyPe(), a->homePe(dest_elements[i]), dest_elements[i].data()[0], i);
+					dest_elements.remove(i); 
+				}
+			}
+		}
+	}
+}
+
+int *ComlibArrayInfo::getCombinedCountList() {
+  int *result = new int[CkNumPes()];
+  int i;
+  for (i=0; i<CkNumPes(); ++i) result[i] = 0;
+  CkArray *a = (CkArray *)_localBranch(src_aid);
+  if (src_elements.size() != 0) {
+    for (i=0; i<src_elements.size(); ++i) result[a->homePe(src_elements[i])] |= 1;
+  } else {
+    for (i=0; i<CkNumPes(); ++i) result[i] |= 1;
+  }
+  a = (CkArray *)_localBranch(dest_aid);
+  if (dest_elements.size() != 0) {
+    for (i=0; i<dest_elements.size(); ++i) result[a->homePe(dest_elements[i])] |= 2;
+  } else {
+    for (i=0; i<CkNumPes(); ++i) result[i] |= 2;
+  }
+  return result;
+}
+
+/*
 //Get the list of destination processors
 void ComlibArrayInfo::getDestinationPeList(int *&destpelist, int &ndestpes) {
     
@@ -310,11 +433,13 @@ void ComlibArrayInfo::getDestinationPeList(int *&destpelist, int &ndestpes) {
     }
 
     ndestpes = 0;
+    CkArray *amgr = CkArrayID::CkLocalBranch(dest_aid);
 
     //Find the last known processors of the array elements
     for(acount = 0; acount < nDestIndices; acount++) {
 
-        int p = ComlibGetLastKnown(dest_aid, dest_elements[acount]); 
+      //int p = ComlibGetLastKnown(dest_aid, dest_elements[acount]); 
+        int p = amgr->lastKnown(dest_elements[acount]);
         
         for(count = 0; count < ndestpes; count ++)
             if(destpelist[count] == p)
@@ -348,9 +473,12 @@ void ComlibArrayInfo::getSourcePeList(int *&srcpelist, int &nsrcpes) {
     }
 
     nsrcpes = 0;
+    CkArray *amgr = CkArrayID::CkLocalBranch(src_aid);
+
     for(acount = 0; acount < nSrcIndices; acount++) {
         
-        int p = ComlibGetLastKnown(src_aid, src_elements[acount]); 
+      //int p = ComlibGetLastKnown(src_aid, src_elements[acount]); 
+        int p = amgr->lastKnown(src_elements[acount]);
         
         for(count = 0; count < nsrcpes; count ++)
             if(srcpelist[count] == p)
@@ -394,10 +522,13 @@ void ComlibArrayInfo::getCombinedPeList(int *&pelist, int &npes) {
         if(npes == 0)
             pelist = new int[CkNumPes()];
         
+	CkArray *amgr = CkArrayID::CkLocalBranch(src_aid);
+
         //Add source processors to the destination processors
         //already obtained
         for(int acount = 0; acount < nSrcIndices; acount++) {
-            int p = ComlibGetLastKnown(src_aid, src_elements[acount]);
+	  //int p = ComlibGetLastKnown(src_aid, src_elements[acount]);
+	    int p = amgr->lastKnown(src_elements[acount]);
 
             for(count = 0; count < npes; count ++)
                 if(pelist[count] == p)
@@ -407,157 +538,107 @@ void ComlibArrayInfo::getCombinedPeList(int *&pelist, int &npes) {
         }                        
     }
 }
+*/
 
+/// Broadcast the message to all local elements
 void ComlibArrayInfo::localBroadcast(envelope *env) {
-    //Insert all local elements into a vector
-    if(localDestIndexVec.size()==0 && !dest_aid.isZero()) {
-        CkArray *dest_array = CkArrayID::CkLocalBranch(dest_aid);
-        
-        if(nDestIndices == 0){            
-            dest_array->getComlibArrayListener()->getLocalIndices
-                (localDestIndexVec);
-        }
-        else {
-            for(int count = 0; count < nDestIndices; count++) {
-                if(ComlibGetLastKnown(dest_aid, dest_elements[count])
-                   == CkMyPe())
-                    localDestIndexVec.insertAtEnd(dest_elements[count]);
-            }
-        }
-    }
+  int count = localMulticast(&dest_elements, env);
+  ComlibPrintf("[%d] ComlibArrayInfo::localBroadcast to %d elements (%d non local)\n",CmiMyPe(),dest_elements.size(),count);
 
-    ComlibArrayInfo::localMulticast(&localDestIndexVec, env);
+//  char buf[100000];
+//  buf[0] = '\0';
+//  for(int i=0;i<dest_elements.size();i++){
+//	  sprintf(buf+strlen(buf), " %d", dest_elements[i].data()[0]);
+//  }
+//  ComlibPrintf("dest_elements = %s\n", buf);
+
 }
 
-/*
+/**
   This method multicasts the message to all the indices in vec.  It
-  also takes care to check if the entry method is readonly or not? If
+  also takes care to check if the entry method is readonly or not. If
   readonly (nokeep) the message is not copied.
 
   It also makes sure that the entry methods are logged in projections
   and that the array manager is notified about array element
   migrations.  Hence this function should be used extensively in the
-  communication library strategies */
+  communication library strategies
+
+  This method is more general than just ComlibArrayInfo dest_aid since it takes
+  the destination array id directly form the message envelope.
+
+  @return the number of destination objects which were not local (information
+  retrieved from the array/location manager)
+*/
 
 #include "register.h"
-void ComlibArrayInfo::localMulticast(CkVec<CkArrayIndexMax>*vec,
+int ComlibArrayInfo::localMulticast(CkVec<CkArrayIndexMax>*vec,
                                      envelope *env){
-
+  int count = 0;
     //Multicast the messages to all elements in vec
     int nelements = vec->size();
     if(nelements == 0) {
         CmiFree(env);
-        return;
+        return 0;
     }
 
     void *msg = EnvToUsr(env);
     int ep = env->getsetArrayEp();
     CkUnpackMessage(&env);
 
-    CkArrayID dest_aid = env->getsetArrayMgr();
+    CkArrayID destination_aid = env->getsetArrayMgr();
     env->setPacked(0);
     env->getsetArrayHops()=1;
     env->setUsed(0);
 
     CkArrayIndexMax idx;
-    
-    for(int count = 0; count < nelements-1; count ++){
-        idx = (*vec)[count];
-        //if(comm_debug) idx.print();
+
+    //ComlibPrintf("sending to %d elements\n",nelements);
+    for(int i = 0; i < nelements-1; i ++){
+        idx = (*vec)[i];
+        //if(com_debug) idx.print();
 
         env->getsetArrayIndex() = idx;
+        //ComlibPrintf("sending to: "); idx.print();
         
-        CkArray *a=(CkArray *)_localBranch(dest_aid);
+        CkArray *a=(CkArray *)_localBranch(destination_aid);
         if(_entryTable[ep]->noKeep)
-            a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CK_MSG_KEEP);
+            count += a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CK_MSG_KEEP);
         else {
             void *newmsg = CkCopyMsg(&msg);
-            a->deliver((CkArrayMessage *)newmsg, CkDeliver_queue);
+            count += a->deliver((CkArrayMessage *)newmsg, CkDeliver_queue);
         }
 
     }
 
     idx = (*vec)[nelements-1];
-    //if(comm_debug) idx.print();
+    //if(com_debug) idx.print();
     env->getsetArrayIndex() = idx;
+    //ComlibPrintf("sending to: "); idx.print();
     
-    CkArray *a=(CkArray *)_localBranch(dest_aid);
+    CkArray *a=(CkArray *)_localBranch(destination_aid);
     if(_entryTable[ep]->noKeep) {
-        a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CK_MSG_KEEP);
+        count += a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CK_MSG_KEEP);
         CmiFree(env);
     }
     else
-        a->deliver((CkArrayMessage *)msg, CkDeliver_queue);
+        count += a->deliver((CkArrayMessage *)msg, CkDeliver_queue);
+
+    return count;
 }
 
-/* Delivers a message to an array element, making sure that
-   projections is notified */
+/** Delivers a message to an array element, making sure that
+    projections is notified */
 void ComlibArrayInfo::deliver(envelope *env){
-    
+    ComlibPrintf("In ComlibArrayInfo::deliver()\n");
+		
     env->setUsed(0);
     env->getsetArrayHops()=1;
     CkUnpackMessage(&env);
     
     CkArray *a=(CkArray *)_localBranch(env->getsetArrayMgr());
-    a->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_queue);    
-}
-
-void ComlibNotifyMigrationDone() {
-    if(CkpvInitialized(migrationDoneHandlerID)) 
-        if(CkpvAccess(migrationDoneHandlerID) > 0) {
-            char *msg = (char *)CmiAlloc(CmiReservedHeaderSize);
-            CmiSetHandler(msg, CkpvAccess(migrationDoneHandlerID));
-#if CMK_BLUEGENE_CHARM
-	    // bluegene charm should avoid directly calling converse
-            CmiSyncSendAndFree(CkMyPe(), CmiReservedHeaderSize, msg);
-#else
-            CmiHandleMessage(msg);
-#endif
-        }
+    a->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_queue);
 }
 
 
-//Stores the location of many array elements used by the
-//strategies.  Since hash table returns a reference to the object
-//and for an int that will be 0, the actual value stored is pe +
-//CkNumPes so 0 would mean processor -CkNumPes which is invalid.
-CkpvDeclare(ClibLocationTableType *, locationTable);
-
-CkpvDeclare(CkArrayIndexMax, cache_index);
-CkpvDeclare(int, cache_pe);
-CkpvDeclare(CkArrayID, cache_aid);
-
-int ComlibGetLastKnown(CkArrayID aid, CkArrayIndexMax idx) {
-    //CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-    //return (cgproxy.ckLocalBranch())->getLastKnown(aid, idx);
-
-    if(!CkpvInitialized(locationTable)) {
-        CkAbort("Uninitialized table\n");
-    }
-    CkAssert(CkpvAccess(locationTable) != NULL);
-
-    
-    if(CkpvAccess(cache_index) == idx && CkpvAccess(cache_aid) == aid)
-        return CkpvAccess(cache_pe);
-    
-    ClibGlobalArrayIndex cidx;
-    cidx.aid = aid;
-    cidx.idx = idx;
-    int pe = CkpvAccess(locationTable)->get(cidx);
-    
-    if(pe == 0) {
-        //Array element does not exist in the table
-        
-        CkArray *array = CkArrayID::CkLocalBranch(aid);
-        pe = array->lastKnown(idx) + CkNumPes();
-        CkpvAccess(locationTable)->put(cidx) = pe;
-	//CkPrintf("LAST KNOWN %d: (%d %d %d %d) -> %d\n",CkMyPe(),((short*)&idx)[2],((short*)&idx)[3],((short*)&idx)[4],((short*)&idx)[5],pe);
-    }
-    //CkPrintf("last pe = %d \n", pe - CkNumPes());
-    
-    CkpvAccess(cache_index) = idx;
-    CkpvAccess(cache_aid) = aid;
-    CkpvAccess(cache_pe) = pe - CkNumPes();
-
-    return pe - CkNumPes();
-}
+/*@}*/

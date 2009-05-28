@@ -8,6 +8,7 @@
 //#include "TreeNode.h"
 //#include "GenericTreeNode.h"
 #include "charm++.h"
+#include "envelope.h"
 
 #if COSMO_STATS > 0
 #include <fstream>

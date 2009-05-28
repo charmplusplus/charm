@@ -1,539 +1,934 @@
 /**
-   @addtogroup Comlib
+   @addtogroup CharmComlib
+   @{
+   @file
+   Implementation of the functions in ComlibManager.h and handler for message
+   transportation.
 */
-/*@{*/
+
 #include "ComlibManager.h"
-#include "EachToManyMulticastStrategy.h"
-#include "DirectMulticastStrategy.h"
-#include "StreamingStrategy.h"
-#include "DummyStrategy.h"
-#include "MPIStrategy.h"
-#include "NodeMulticast.h"
-#include "MsgPacker.h"
-#include "RingMulticastStrategy.h"
-#include "MultiRingMulticast.h"
-#include "PipeBroadcastStrategy.h"
-#include "BroadcastStrategy.h"
-#include "MeshStreamingStrategy.h"
-#include "RectMulticastStrategy.h"
-#include "PrioStreaming.h"
+#include "comlib.h"
+#include "ck.h"
+#include "envelope.h"
+
+
+// We only want to print debug information for a single strategy. Otherwise we'll get incredibly confused
+#undef ComlibManagerPrintf
+//#define ComlibManagerPrintf  if(instid==1)ComlibPrintf
+#define ComlibManagerPrintf  ComlibPrintf
+
+#define getmax(a,b) ((a)>(b)?(a):(b))
 
 CkpvExtern(int, RecvdummyHandle);
-
-CkpvDeclare(int, RecvmsgHandle);
-CkpvDeclare(int, RecvCombinedShortMsgHdlrIdx);
+ 
 CkpvDeclare(CkGroupID, cmgrID);
-CkpvExtern(ConvComlibManager *, conv_com_ptr);
+
+/***************************************************************************
+ * Handlers section:
+ *
+ * all the handlers used by the ComlibManager to coordinate the work, and
+ * propagate the messages from one processor to another
+ ***************************************************************************/
 
 //Handler to receive array messages
+CkpvDeclare(int, RecvmsgHandle);
+
 void recv_array_msg(void *msg){
 
-    ComlibPrintf("%d:In recv_msg\n", CkMyPe());
+  //	ComlibPrintf("%d:In recv_msg\n", CkMyPe());
 
-    if(msg == NULL)
-        return;
-    
-    register envelope* env = (envelope *)msg;
-    env->setUsed(0);
-    env->getsetArrayHops()=1;
-    CkUnpackMessage(&env);
+	if(msg == NULL)
+		return;
 
-    int srcPe = env->getSrcPe();
-    int sid = ((CmiMsgHeaderExt *) env)->stratid;
+	register envelope* env = (envelope *)msg;
+	env->setUsed(0);
+	env->getsetArrayHops()=1; 
+	CkUnpackMessage(&env);
 
-    ComlibPrintf("%d: Recording receive %d, %d, %d\n", CkMyPe(), 
-             sid, env->getTotalsize(), srcPe);
+	int srcPe = env->getSrcPe();
+	int sid = ((CmiMsgHeaderExt *) env)->stratid;
 
-    RECORD_RECV_STATS(sid, env->getTotalsize(), srcPe);
-    
-    CkArray *a=(CkArray *)_localBranch(env->getsetArrayMgr());
-    //if(!comm_debug)
-    a->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_queue);
+	//	ComlibPrintf("%d: Recording receive %d, %d, %d\n", CkMyPe(), sid, env->getTotalsize(), srcPe);
 
-    ComlibPrintf("%d:Out of recv_msg\n", CkMyPe());
-    return;
+	RECORD_RECV_STATS(sid, env->getTotalsize(), srcPe);
+
+	CkArray *a=(CkArray *)_localBranch(env->getsetArrayMgr());
+	
+	a->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_queue);
+
+	//	ComlibPrintf("%d:Out of recv_msg\n", CkMyPe());
+	return;
 }
 
-void recv_combined_array_msg(void *msg){
-    if(msg == NULL)
-        return;
-    
-    ComlibPrintf("%d:In recv_combined_array_msg\n", CkMyPe());
 
-    MsgPacker::deliver((CombinedMessage *)msg);
-}
+
+/**
+   A debugging routine that will periodically print out the status of the message queues. 
+   The Definition is at bottom of this file.
+ */
+static void periodicDebugPrintStatus(void* ptr, double currWallTime);
+
+
+
+
+
+/***************************************************************************
+ * Initialization section:
+ *
+ * Routines used by Comlib to initialize itself and all the strategies on all
+ * the processors. Used only at the beginning of the program.
+ ***************************************************************************/
 
 ComlibManager::ComlibManager(){
-    init();
-    ComlibPrintf("In comlibmanager constructor\n");
+	init();
 }
 
 void ComlibManager::init(){
-    
-    initComlibManager();
 
-    if (CkMyRank() == 0) {
-    PUPable_reg(CharmStrategy);
-    PUPable_reg(CharmMessageHolder);
-    }
-    
-    //    comm_debug = 1;
-    
-    numStatsReceived = 0;
-    curComlibController = 0;
-    clibIteration = 0;
-    
-    strategyCreated = CmiFalse;
+  CcdCallFnAfterOnPE((CcdVoidFn)periodicDebugPrintStatus, (void*)this, 4000, CkMyPe());
 
-    CkpvInitialize(comRectHashType *, com_rect_ptr); 
-    CkpvAccess(com_rect_ptr)= new comRectHashType;
+  if(CkNumPes() == 1 ){
+    ComlibPrintf("Doing nothing in ComlibManager::init() because we are running on 1 pe.\n");
+  } else {
 
-    CkpvInitialize(ClibLocationTableType*, locationTable);
-    CkpvAccess(locationTable) = new CkHashtableT <ClibGlobalArrayIndex, int>;
+	initComlibManager();
 
-    CkpvInitialize(CkArrayIndexMax, cache_index);
-    CkpvInitialize(int, cache_pe);
-    CkpvInitialize(CkArrayID, cache_aid);
+	if (CkMyRank() == 0) {
+		PUPable_reg(CharmMessageHolder);
+	}
 
-    CkpvAccess(cache_index).nInts = -1;
-    CkpvAccess(cache_aid).setZero();
+	numStatsReceived = 0;
+	curComlibController = 0;
+	clibIteration = 0;
 
-    CkpvInitialize(int, RecvmsgHandle);
-    CkpvAccess(RecvmsgHandle) =CkRegisterHandler((CmiHandler)recv_array_msg);
+	CkpvInitialize(comRectHashType *, com_rect_ptr); 
+	CkpvAccess(com_rect_ptr)= new comRectHashType;
 
-    bcast_pelist = new int [CkNumPes()];
-    for(int brcount = 0; brcount < CkNumPes(); brcount++)
-        bcast_pelist[brcount] = brcount;
+	CkpvInitialize(int, RecvmsgHandle);
+	CkpvAccess(RecvmsgHandle) =CkRegisterHandler((CmiHandler)recv_array_msg);
 
-    CkpvInitialize(int, RecvCombinedShortMsgHdlrIdx);
-    CkpvAccess(RecvCombinedShortMsgHdlrIdx) = 
-        CkRegisterHandler((CmiHandler)recv_combined_array_msg);
-    
-    section_send_event = traceRegisterUserEvent("ArraySectionMulticast");
-    
-    npes = CkNumPes();
-    pelist = NULL;
+	bcast_pelist = new int [CkNumPes()];
+	for(int brcount = 0; brcount < CkNumPes(); brcount++)
+		bcast_pelist[brcount] = brcount;
 
-    CkpvInitialize(CkGroupID, cmgrID);
-    CkpvAccess(cmgrID) = thisgroup;
+	section_send_event = traceRegisterUserEvent("ArraySectionMulticast");
 
-    dummyArrayIndex.nInts = 0;
+	CkpvInitialize(CkGroupID, cmgrID);
+	CkpvAccess(cmgrID) = thisgroup;
 
-    curStratID = 0;
-    prevStratID = -1;
-    //prioEndIterationFlag = 1;
+	dummyArrayIndex.nInts = 0;
+	converseManager = CkpvAccess(conv_com_ptr);
 
-    strategyTable = CkpvAccess(conv_com_ptr)->getStrategyTable();
-    
-    receivedTable = 0;
-    setupComplete = 0;
+	setupComplete = 0;
 
-    barrierReached = 0;
-    barrier2Reached = 0;
+	CkpvInitialize(int, migrationDoneHandlerID);
+	CkpvAccess(migrationDoneHandlerID) = 
+		CkRegisterHandler((CmiHandler) ComlibNotifyMigrationDoneHandler);
 
-    bcount = b2count = 0;
-    lbUpdateReceived = CmiFalse;
-
-    isRemote = 0;
-    remotePe = -1;
-
-    CkpvInitialize(int, migrationDoneHandlerID);
-    CkpvAccess(migrationDoneHandlerID) = 
-        CkRegisterHandler((CmiHandler) ComlibNotifyMigrationDoneHandler);
-    
-    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-    cgproxy[curComlibController].barrier();
+	CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
+	cgproxy[curComlibController].barrier();
+  }
 }
 
 //First barrier makes sure that the communication library group 
 //has been created on all processors
 void ComlibManager::barrier(){
-    ComlibPrintf("In barrier %d\n", bcount);
-    if(CkMyPe() == 0) {
-        bcount ++;
-        if(bcount == CkNumPes()){
-            bcount = 0;
-            barrierReached = 1;
-            barrier2Reached = 0;
+	static int bcount = 0;
+	ComlibPrintf("barrier %d\n", bcount);
+	if(CkMyPe() == 0) {
+		bcount ++;
+		if(bcount == CkNumPes()){
+			bcount = 0;
+			//barrierReached = 1;
+			//barrier2Reached = 0;
 
-            if(strategyCreated)
-                broadcastStrategies();
-        }
-    }
+			CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
+			cgproxy.resumeFromSetupBarrier();
+		}
+	}
 }
 
-//Has finished passing the strategy list to all the processors
-void ComlibManager::barrier2(){
-    if(CkMyPe() == 0) {
-        b2count ++;
-        ComlibPrintf("In barrier2 %d\n", bcount);
-        if(b2count == CkNumPes()) {
-            b2count = 0; 
-            CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-            cgproxy.resumeFromBarrier2();
-        }
-    }
+
+
+/**
+   Due to the possibility of race conditions in the initialization of charm, this
+   barrier prevents comlib from being activated before all group branches are created.
+   This function completes the initialization of the charm layer of comlib.
+
+   In this function we also call ComlibDoneCreating for the user (basically
+   triggering the broadcast of the strategies created in Main::Main. Here the
+   Main::Main has for sure executed, otherwise we will not have received
+   confirmation by all other processors.
+ */
+void ComlibManager::resumeFromSetupBarrier(){
+	ComlibPrintf("[%d] resumeFromSetupBarrier Charm group ComlibManager setup finished\n", CkMyPe());
+
+	setupComplete = 1;
+	ComlibDoneCreating();
+	sendBufferedMessagesAllStrategies();
 }
 
-//Registers a set of strategies with the communication library
-ComlibInstanceHandle ComlibManager::createInstance() {
-  
-    CkpvAccess(conv_com_ptr)->nstrats++;    
-    ComlibInstanceHandle cinst(CkpvAccess(conv_com_ptr)->nstrats -1,
-                               CkpvAccess(cmgrID));  
-    return cinst;
+
+/***************************************************************************
+ Determine whether the delegated messages should be buffered until the 
+ strategy has recovered from any error conditions and startup. Once the 
+ buffers can be flushed, ComlibManager::sendBufferedMessages() will be called
+***************************************************************************/
+bool ComlibManager::shouldBufferMessagesNow(int instid){
+  StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+  return (!setupComplete) || myEntry->errorMode == ERROR_MODE || myEntry->errorMode == CONFIRM_MODE || myEntry->bufferOutgoing;
 }
 
-void ComlibManager::registerStrategy(int pos, CharmStrategy *strat) {
-    
-    strategyCreated = true;
 
-    ListOfStrategies.enq(strat);
-    strat->setInstance(pos);
+/***************************************************************************
+ Calls ComlibManager::sendBufferedMessages for each strategy.
+***************************************************************************/
+void ComlibManager::sendBufferedMessagesAllStrategies(){
+  int nstrats = converseManager->getNumStrats();
+  for(int i=0;i<nstrats;i++){
+    sendBufferedMessages(i);
+  }
 }
 
-//End of registering function, if barriers have been reached send them over
-void ComlibManager::broadcastStrategies() {
-    if(!barrierReached)
-      return;    
 
-    lbUpdateReceived = CmiFalse;
-    barrierReached = 0;
+/***************************************************************************
+   Send all the buffered messages once startup has completed, and we have 
+   recovered from any errors have recovered.
+***************************************************************************/
+void ComlibManager::sendBufferedMessages(int instid){
+  StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
 
-    ComlibPrintf("Sending Strategies %d, %d\n", 
-                 CkpvAccess(conv_com_ptr)->nstrats, 
-                 ListOfStrategies.length());
+  if(! shouldBufferMessagesNow(instid) && delayMessageSendBuffer[instid].size() > 0){
+    ComlibManagerPrintf("[%d] sendBufferedMessages Sending %d buffered messages for instid=%d\n", CkMyPe(), delayMessageSendBuffer[instid].size(), instid);
 
-    StrategyWrapper sw;
-    sw.total_nstrats = CkpvAccess(conv_com_ptr)->nstrats;
 
-    if(ListOfStrategies.length() > 0) {
-        int len = ListOfStrategies.length();
-        sw.s_table = new Strategy* [len];
-        sw.nstrats = len;
-        
-        for (int count=0; count < len; count++)
-            sw.s_table[count] = ListOfStrategies.deq();
-    }
-    else {
-        sw.nstrats = 0;
-        sw.s_table = 0;
-    }
-
-    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-    cgproxy.receiveTable(sw, *CkpvAccess(locationTable));
-}
-
-//Called when the array/group element starts sending messages
-void ComlibManager::beginIteration(){
-    //right now does not do anything might need later
-    ComlibPrintf("[%d]:In Begin Iteration %d\n", CkMyPe(), (* strategyTable)[0].elementCount);
-    //prioEndIterationFlag = 0;
-}
-
-void ComlibManager::setInstance(int instID){
-
-    curStratID = instID;
-    ComlibPrintf("[%d]:In setInstance\n", CkMyPe(), (* strategyTable)[instID].elementCount);
-}
-
-//called when the array elements has finished sending messages
-void ComlibManager::endIteration(){
-    //    prioEndIterationFlag = 1;
-    prevStratID = -1;
-    
-    ComlibPrintf("[%d]:In End Iteration(%d) %d, %d\n", CkMyPe(), 
-                 curStratID, 
-                 (* strategyTable)[curStratID].elementCount, 
-                 (* strategyTable)[curStratID].numElements);
-
-    if(isRemote) {
-        isRemote = 0;
-        sendRemote();
-        return;
+    for (std::set<CharmMessageHolder*>::iterator iter = delayMessageSendBuffer[instid].begin(); iter != delayMessageSendBuffer[instid].end(); ++iter) {
+      CharmMessageHolder* cmsg = *iter;
+	  
+      switch(cmsg->type){
+	    
+      case CMH_ARRAYSEND:
+	//	    CkAbort("CMH_ARRAYSEND unimplemented");
+	CkpvAccess(conv_com_ptr)->insertMessage(cmsg, instid);
+	CkpvAccess(conv_com_ptr)->doneInserting(instid);
+	break;
+	    
+      case CMH_GROUPSEND:
+	CkAbort("CMH_GROUPSEND unimplemented");
+	break;
+	    
+      case CMH_ARRAYBROADCAST:
+      case CMH_ARRAYSECTIONSEND: 
+      case CMH_GROUPBROADCAST:
+	// Multicast/broadcast to an array or a section:
+	cmsg->sec_id = cmsg->copy_of_sec_id;
+	CkpvAccess(conv_com_ptr)->insertMessage(cmsg, instid);
+	CkpvAccess(conv_com_ptr)->doneInserting(instid);
+	break;
+	    
+      default:
+	CkAbort("Unknown cmsg->type was found in buffer of delayed messages\n");
+      }
+	  
     }
 
-    if(!receivedTable) {
-        (* strategyTable)[curStratID].nEndItr++;
-        return;
-    }        
-    
-    (* strategyTable)[curStratID].elementCount++;
-    int count = 0;
-    
-    if((* strategyTable)[curStratID].elementCount == (* strategyTable)[curStratID].numElements) {
-        
-        ComlibPrintf("[%d]:In End Iteration %d\n", CkMyPe(), (* strategyTable)[curStratID].elementCount);
-        
-        if(barrier2Reached) {	    
-	    (* strategyTable)[curStratID].strategy->doneInserting();
-        }
-	else (* strategyTable)[curStratID].call_doneInserting = 1;
+    delayMessageSendBuffer[instid].clear();
+  } 
+  else {
+    ComlibManagerPrintf("sendBufferedMessages is not flushing buffered messages for strategy %d because myEntry->errorMode=%d && setupComplete = %d && myEntry->discoveryMode = %d && myEntry->bufferOutgoing = %d\n", instid, (int)myEntry->errorMode, (int)setupComplete, (int)myEntry->discoveryMode, (int)myEntry->bufferOutgoing);  
+  }
+
+
+
+}
+
+
+
+/***************************************************************************
+ * Bracketed section:
+ *
+ * Routines for bracketed strategies, to call the brackets begin and end, and to
+ * restore count errors after some objects migrate.
+ * 
+ * This function must only be called after all messages from the previous 
+ * iteration have been delivered. This is the application's responsibility to 
+ * ensure. The iteration values provided must increase monotonically.
+ ***************************************************************************/
+
+/// Called when the array/group element starts sending messages
+void ComlibManager::beginIteration(int instid, int iteration){
+	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+			    
+	ComlibManagerPrintf("[%d] beginIteration iter=%d lastKnownIteration=%d  %s %s %s\n", CkMyPe(), iteration, myEntry->lastKnownIteration, myEntry->errorModeString(),  myEntry->errorModeServerString(),  myEntry->discoveryModeString() );
+
+
+	if(iteration > myEntry->lastKnownIteration){
+	      // Verify & update errorModeServer:
+	      if(CkMyPe()==0){
+		CkAssert(myEntry->errorModeServer == NORMAL_MODE_SERVER || 
+			 myEntry->errorModeServer == STARTUP_MODE_SERVER ||  
+			 myEntry->errorModeServer == ERROR_FIXED_MODE_SERVER);
+		myEntry->errorModeServer = NORMAL_MODE_SERVER;
+	      } else {
+		CkAssert(myEntry->errorModeServer == NON_SERVER_MODE_SERVER || 
+			 myEntry->errorModeServer == STARTUP_MODE_SERVER);
+		myEntry->errorModeServer = NON_SERVER_MODE_SERVER;
+	      }
+	      // Verify & update errorMode:
+	      CkAssert(myEntry->errorMode == ERROR_FIXED_MODE || myEntry->errorMode == NORMAL_MODE  );
+	      myEntry->errorMode = NORMAL_MODE;   
+
+	      myEntry->lastKnownIteration = iteration;
+	      myEntry->nBeginItr = 1; // we are the first time to be called this iteration
+	      myEntry->nEndItr = 0;
+	      myEntry->nProcSync = 0;
+	      myEntry->totalEndCounted = 0;
+	      myEntry->discoveryMode = NORMAL_DISCOVERY_MODE;
+	      myEntry->nEndSaved = 0;
+	      
+	      
+	      ComlibManagerPrintf("[%d] beginIteration Starting Next Iteration ( # %d )\n", CkMyPe(), iteration);
+	} else {
+		myEntry->nBeginItr++;
+		ComlibManagerPrintf("[%d] beginIteration continuing iteration # %d\n", CkMyPe(), iteration);
+	}
 	
-        (* strategyTable)[curStratID].elementCount = 0;
-    }
-    ComlibPrintf("After EndIteration\n");
+	
+	// We need to check for error conditions here as well as EndIteration.
+	// This will ensure that if we are the processor that detects this error, 
+	// we won't deliver at least this message until the strategy is fixed
+	if (myEntry->nBeginItr > myEntry->numElements) {
+	  ComlibManagerPrintf("[%d] beginIteration BUFFERING OUTGOING\n",CkMyPe());			
+	  myEntry->bufferOutgoing = 1;
+	}
+	
 }
 
-//receive the list of strategies
-//Insert the strategies into the strategy table in converse comm lib.
-//CkpvAccess(conv_com_ptr) points to the converse commlib instance
-void ComlibManager::receiveTable(StrategyWrapper &sw, 
-                                 CkHashtableT<ClibGlobalArrayIndex, int> 
-                                 &htable)
-{
 
-    ComlibPrintf("[%d] In receiveTable %d, ite=%d\n", CkMyPe(), sw.nstrats, 
-                 clibIteration);
+/** Called by user program when each element has finished sending its messages.
 
-    receivedTable = 1;
+    If no errors are detected, ConvComlibManager::doneInserting() is called on the 
+    underlying converse strategy. If an error is detected, then ConvComlibManager::doneInserting
+    is NOT called. This likely causes the the underlying converse strategy to buffer the 
+    messages until we recover from the error mode, although we have buffered at least some of
+    the messages, so the user program cannot run ahead and start the next iteration.
 
-    delete CkpvAccess(locationTable);
-    //Delete all records in it too !!!!!!!!!!
+*/
 
-    CkpvAccess(locationTable) =  NULL;
+void ComlibManager::endIteration(int instid, int step){ 
+	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+	
+	// migration is not allowed between begin and end of iteration, 
+	// so each element must call end iteration on the same processor 
+	// as it called begin iteration
+	CkAssert(myEntry->nEndItr <= myEntry->nBeginItr);
+	CkAssert(step == myEntry->lastKnownIteration);
 
-    CkpvAccess(locationTable) = new 
-        CkHashtableT<ClibGlobalArrayIndex, int>;
 
-    CkHashtableIterator *ht_iterator = htable.iterator();
-    ht_iterator->seekStart();
-    while(ht_iterator->hasNext()){
-        ClibGlobalArrayIndex *idx;
-        int *pe;
-        pe = (int *)ht_iterator->next((void **)&idx);
-        
-        ComlibPrintf("[%d] HASH idx %d on %d\n", CkMyPe(), 
-                     idx->idx.data()[0], *pe);
-
-        CkpvAccess(locationTable)->put(*idx) = *pe;       
-    }
-    
-    //Reset cached array element index. Location table may have changed
-    CkpvAccess(cache_index).nInts = -1;
-    CkpvAccess(cache_aid).setZero();
-
-    CkArrayID st_aid;
-    int st_nelements;
-    CkArrayIndexMax *st_elem;
-    int temp_curstratid = curStratID;
-
-    CkpvAccess(conv_com_ptr)->nstrats = sw.total_nstrats;
-    clib_stats.setNstrats(sw.total_nstrats);
-
-    //First recreate strategies
-    int count = 0;
-    for(count = 0; count < sw.nstrats; count ++) {
-        CharmStrategy *cur_strategy = (CharmStrategy *)sw.s_table[count];
-        
-        //set the instance to the current count
-        //currently all strategies are being copied to all processors
-        //later strategies will be selectively copied
-        
-        //location of this strategy table entry in the strategy table
-        int loc = cur_strategy->getInstance();
-        
-        if(loc >= MAX_NUM_STRATS)
-            CkAbort("Strategy table is full \n");
-
-        CharmStrategy *old_strategy;
-
-        //If this is a learning decision and the old strategy has to
-        //be gotten rid of, finalize it here.
-        if((old_strategy = 
-            (CharmStrategy *)CkpvAccess(conv_com_ptr)->getStrategy(loc)) 
-           != NULL) {
-            old_strategy->finalizeProcessing();
-            
-            //Unregister from array listener if array strategy
-            if(old_strategy->getType() == ARRAY_STRATEGY) {
-                ComlibArrayInfo &as = ((CharmStrategy *)cur_strategy)->ainfo;
-                as.getSourceArray(st_aid, st_elem, st_nelements);
-
-                (* strategyTable)[loc].numElements = 0;
-                if(!st_aid.isZero()) {
-                    ComlibArrayListener *calistener = CkArrayID::
-                        CkLocalBranch(st_aid)->getComlibArrayListener();
-                    
-                    calistener->unregisterStrategy(&((*strategyTable)[loc]));
-                }
-            }
-        }
-        
-        //Insert strategy, frees an old strategy and sets the
-        //strategy_table entry to point to the new one
-        CkpvAccess(conv_com_ptr)->insertStrategy(cur_strategy, loc);
-        
-        ComlibPrintf("[%d] Inserting_strategy \n", CkMyPe());       
-
-        if(cur_strategy->getType() == ARRAY_STRATEGY &&
-           cur_strategy->isBracketed()){ 
-
-            ComlibPrintf("Inserting Array Listener\n");
-            
-            ComlibArrayInfo &as = ((CharmStrategy *)cur_strategy)->ainfo;
-            as.getSourceArray(st_aid, st_elem, st_nelements);
-            
-            (* strategyTable)[loc].numElements = 0;
-            if(!st_aid.isZero()) {            
-                ComlibArrayListener *calistener = 
-                    CkArrayID::CkLocalBranch(st_aid)->getComlibArrayListener();
-                
-                calistener->registerStrategy(&((* strategyTable)[loc]));
-            }
-        }                      
-        else { //if(cur_strategy->getType() == GROUP_STRATEGY){
-	  (* strategyTable)[loc].numElements = 1;
-        }
-        
-        (* strategyTable)[loc].elementCount = 0;
-        cur_strategy->beginProcessing((* strategyTable)[loc].numElements); 
-    }
-
-    //Resume all end iterarions. Newer strategies may have more 
-    //or fewer elements to expect for!!
-    for(count = 0; count < CkpvAccess(conv_com_ptr)->nstrats; count++) {
-        ComlibPrintf("[%d] endIteration from receiveTable %d, %d\n", 
-                     CkMyPe(), count,
-                     (* strategyTable)[count].nEndItr);
-                         
-        curStratID = count;
-        for(int itr = 0; itr < (* strategyTable)[count].nEndItr; itr++) 
-            endIteration();  
-        
-        (* strategyTable)[count].nEndItr = 0;        
-    }           
-    
-    curStratID = temp_curstratid;
-    ComlibPrintf("receivedTable %d\n", sw.nstrats);
-    
-    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-    cgproxy[curComlibController].barrier2();
+	myEntry->nEndItr++;
+	
+	ComlibManagerPrintf("[%d] endIteration called\n",CkMyPe());
+	
+	
+	if (myEntry->bufferOutgoing) {
+	  // If migration was detected in ComlibManager::beginIteration and hence messages have been buffered:
+	  CkAssert(delayMessageSendBuffer[instid].size() > 0);
+	  CProxy_ComlibManager myProxy(thisgroup);
+	  myProxy[CkMyPe()].bracketedStartErrorRecoveryProcess(instid, step);
+	} 
+	else if(myEntry->nEndItr == myEntry->numElements) {
+	  // If all the objects have called beginIteration and endIteration and no errors were detected
+	  CkAssert(converseManager->isReady(instid));
+	  converseManager->doneInserting(instid);
+	}
+	
 }
 
-void ComlibManager::resumeFromBarrier2(){
 
-    if(!receivedTable) 
-        //Application called atsync inbetween, receiveTable 
-        //and resumeFromBarrier2. This will only happen when there
-        //is no element on this processor and an element arrived, 
-        //leading to a resumeFromSync and hence an AtSync in comlib.
-        return; //A new resumeFromBarrier2 is on its way
+/** Start recovery of errors. 
+    This entry method calls itself repeatedly if the underlying 
+    converse strategy is not yet ready.
+
+    If the PE is already in error mode, then only the difference 
+    in the counts will be contributed.
+*/
+void ComlibManager::bracketedStartErrorRecoveryProcess(int instid, int step){  
+  CProxy_ComlibManager myProxy(thisgroup);
+  StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);     
+
+  
+
+  if(converseManager->isReady(instid)){
+    ComlibManagerPrintf("[%d] bracketedStartErrorRecoveryProcess() %s %s %s\n", CkMyPe(), myEntry->errorModeString(),  myEntry->errorModeServerString(),  myEntry->discoveryModeString() );
+
+    CkAssert(myEntry->strategy != NULL);
+    CkAssert(myEntry->errorMode == NORMAL_MODE || myEntry->errorMode == ERROR_MODE);
+	  
+    if (!myEntry->strategy->isBracketed()) {
+      CkPrintf("[%d] endIteration called unecessarily for a non-bracketed strategy\n", CkMyPe());
+      return;
+    }
+       
+    if (myEntry->errorMode == NORMAL_MODE) {
+      ComlibManagerPrintf("[%d] bracketedStartErrorRecoveryProcess()\n", CkMyPe());
+      myEntry->nEndSaved = myEntry->nEndItr;
+      myProxy[0].bracketedReceiveCount(instid, CkMyPe(), myEntry->nEndSaved, 1, step);
+      myEntry->errorMode = ERROR_MODE;
+      bracketedStartDiscovery(instid);
+    } else {
+      // Send the updated count
+      int update = myEntry->nEndItr - myEntry->nEndSaved;
+      if (update > 0) {
+	//	ComlibManagerPrintf("bracketedStartErrorRecoveryProcess sending update to bracketedReceiveCount\n");
+	CProxy_ComlibManager(thisgroup)[0].bracketedReceiveCount(instid, CkMyPe(), update, 0, step);
+	myEntry->nEndSaved = myEntry->nEndItr;
+      }
+      
+    }
+  } else {
+    ComlibManagerPrintf("[%d] bracketedStartErrorRecoveryProcess() REENQUEUE\n", CkMyPe() );
+    // Re-enqueue myself because we can't start error recovery process until converse strategy is ready
+    myProxy[CkMyPe()].bracketedStartErrorRecoveryProcess(instid, step);
+  }
+}
+
+
+/// Invoked on all processors to inform that an error has been detected.
+void ComlibManager::bracketedErrorDetected(int instid, int step) {
+	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+	
+	bracketedCatchUpPE(instid,step);
+	CkAssert(step == myEntry->lastKnownIteration);
+	CkAssert(myEntry->errorMode == NORMAL_MODE || myEntry->errorMode == ERROR_MODE);
+
+	ComlibManagerPrintf("[%d] bracketedErrorDetected()\n", CkMyPe());
+
+	if (myEntry->errorMode == NORMAL_MODE) {
+	  // save the value we are sending to bracketedReceiveCount
+	  myEntry->nEndSaved = myEntry->nEndItr; // save the value we are sending to bracketedReceiveCount
+	  CProxy_ComlibManager(thisgroup)[0].bracketedReceiveCount(instid, CkMyPe(), myEntry->nEndSaved, 1, step);
+	  bracketedStartDiscovery(instid);
+	  myEntry->errorMode = ERROR_MODE;
+
+	} else { // ERROR_MODE
+	  // If we have an update count, send it
+	  int update = myEntry->nEndItr - myEntry->nEndSaved;
+	  ComlibManagerPrintf("bracketedErrorDetected update=%d\n", update);
+	  if (update > 0) {
+	    ComlibManagerPrintf("bracketedErrorDetected sending update to bracketedReceiveCount\n");
+	    CProxy_ComlibManager(thisgroup)[0].bracketedReceiveCount(instid, CkMyPe(), update, 0, step);
+	    myEntry->nEndSaved = myEntry->nEndItr;
+	  }
+	}
+	
+}
+
+/// Invoked on all processors. After processor 0 has a count match, it sends out
+/// a broadcast on this entry method to get a confirmation from all others.
+void ComlibManager::bracketedConfirmCount(int instid) {
+        StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+	CkAssert(myEntry->errorMode == ERROR_MODE);
+	myEntry->errorMode = CONFIRM_MODE;
+	CProxy_ComlibManager myProxy(thisgroup);
+	ComlibManagerPrintf("[%d] bracketedConfirmCount\n", CkMyPe());
+	myProxy[0].bracketedCountConfirmed(instid, myEntry->nEndSaved, myEntry->lastKnownIteration);
+}
+
+/// Invoked on processor 0 upon a request to confirm the count. If the count is
+/// correct a "NewPeList" is sent out, otherwise the error mode is returned with
+/// "ErrorDetected"
+void ComlibManager::bracketedCountConfirmed(int instid, int count, int step) {
+	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+	CkAssert(CkMyPe() == 0);
+	// Advance PE0 to current step if we had no local objects
+	bracketedCatchUpPE(instid, step);
+	CkAssert(myEntry->errorModeServer == CONFIRM_MODE_SERVER);
+	CkAssert(step == myEntry->lastKnownIteration);
+
+	myEntry->total += count;
+	
+	ComlibManagerPrintf("[%d] bracketedCountConfirmed\n", CkMyPe());
+	
+	if (++myEntry->peConfirmCounter == CkNumPes()) {
+		myEntry->peConfirmCounter = 0;
+
+		CkAssert(myEntry->total == myEntry->totalEndCounted);
+		  
+		CProxy_ComlibManager(thisgroup).bracketedReceiveNewCount(instid);
+		myEntry->errorModeServer = ERROR_FIXED_MODE_SERVER;
+		  
+		myEntry->total = 0;	
+	}
+
+}
+
+
+
+/** Update the state for a PE that was likely lacking any local objects.
+    If no local objects exist, noone will call begin iteration, and hence,
+    the lastKnownIteration value will be old. We need to advance to the 
+    current iteration before we can proceed.
+*/
+void ComlibManager::bracketedCatchUpPE(int instid, int step){
+  StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+  CkAssert(step >= myEntry->lastKnownIteration);
+  if(step > myEntry->lastKnownIteration){
     
-    setupComplete = 1;
+    myEntry->total = 0;
+    myEntry->lastKnownIteration = step;
+    myEntry->nBeginItr = 0;
+    myEntry->nEndItr = 0;
+    myEntry->nProcSync = 0;
+    myEntry->totalEndCounted = 0;
+    myEntry->nEndSaved = 0;
+    myEntry->errorMode = NORMAL_MODE;
+    myEntry->discoveryMode = NORMAL_DISCOVERY_MODE;
 
-    barrier2Reached = 1;
-    barrierReached = 0;
-
-    clibIteration ++;
-
-    ComlibPrintf("[%d] Barrier 2 reached nstrats = %d, ite = %d\n", 
-                 CkMyPe(), CkpvAccess(conv_com_ptr)->nstrats, clibIteration);
-
-    for (int count = 0; count < CkpvAccess(conv_com_ptr)->nstrats; 
-         count ++) {
-        if (!(* strategyTable)[count].tmplist.isEmpty()) {
-            
-            while (!(* strategyTable)[count].tmplist.isEmpty()) {
-                CharmMessageHolder *cmsg = (CharmMessageHolder *) 
-                    (* strategyTable)[count].tmplist.deq();
-                
-                if((*strategyTable)[count].strategy->getType() == 
-                   ARRAY_STRATEGY) {
-                    if(cmsg->dest_proc >= 0) {
-                        envelope *env  = UsrToEnv(cmsg->getCharmMessage());
-                        cmsg->dest_proc = getLastKnown
-                            (env->getsetArrayMgr(),
-                             env->getsetArrayIndex());
-                    }
-                    //else multicast
-                }                                
-                
-                if(cmsg->dest_proc == CkMyPe()) {
-                    CmiSyncSendAndFree(CkMyPe(), cmsg->size,
-                                       (char *)
-                                       UsrToEnv(cmsg->getCharmMessage()));
-                    delete cmsg;
-                }
-                else
-                    (* strategyTable)[count].strategy->insertMessage(cmsg);
-            }
-        }
-        
-        if ((* strategyTable)[count].call_doneInserting) {
-            (* strategyTable)[count].call_doneInserting = 0;
-            ComlibPrintf("[%d] Calling done inserting \n", CkMyPe());
-            (* strategyTable)[count].strategy->doneInserting();
-        }
+    if(CkMyPe()==0){
+      CkAssert(myEntry->errorModeServer == NORMAL_MODE_SERVER || myEntry->errorModeServer == ERROR_FIXED_MODE_SERVER);
+      ComlibManagerPrintf("[%d] NORMAL_MODE_SERVER *******************AAAAAAAAAAAA**********************\n", CkMyPe());
+      myEntry->errorModeServer = NORMAL_MODE_SERVER;
+    } else {
+      CkAssert(myEntry->errorModeServer == NON_SERVER_MODE_SERVER || myEntry->errorModeServer == STARTUP_MODE_SERVER);
+      myEntry->errorModeServer == NON_SERVER_MODE_SERVER;
     }
     
-    ComlibPrintf("[%d] After Barrier2\n", CkMyPe());
+    
+  }
 }
+
+/// Invoked on processor 0 when a processor sends a count of how many elements
+/// have already deposited. This number is incremental, and it refers to the
+/// previous one sent by that processor. Processor 0 stores temporarily all the
+/// numbers it receives. When a match happens, processor 0 switches to "confirm"
+/// mode and send out a request for confirmation to all other processors.
+/// The final parameter, "step", is used so that if  no objects exist on a processor,
+/// then the counts sent by the processor will be tagged with an old timestep, and can 
+/// safely be ignored. If no objects are on a PE, then beginIteration will never
+/// be called there.
+void ComlibManager::bracketedReceiveCount(int instid, int pe, int count, int isFirst, int step) {
+	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+	CkAssert(CkMyPe() == 0);
+	CkAssert(myEntry->errorModeServer == NORMAL_MODE_SERVER || myEntry->errorModeServer == ERROR_MODE_SERVER );
+
+	ComlibManagerPrintf("[%d] bracketedReceiveCount step=%d \n", CkMyPe(), step);
+
+	
+	// Advance PE0 to current step if we had no local objects
+	bracketedCatchUpPE(instid, step);
+
+	// Encountering a message from an old step
+	CkAssert(step == myEntry->lastKnownIteration);
+
+	myEntry->totalEndCounted += count;
+
+	ComlibManagerPrintf("[%d] bracketedReceiveCount step=%d totalEndCounted=%d count=%d\n", CkMyPe(), step, myEntry->totalEndCounted, count);
+
+	
+	myEntry->nProcSync += isFirst; // isFirst is 1 the first time a processor send a message,
+	CkAssert(myEntry->nProcSync <= CkNumPes());
+	
+	if (myEntry->errorModeServer == NORMAL_MODE_SERVER) { 
+	        // first time this is called
+	        CkAssert(myEntry->nProcSync == 1);
+	        CProxy_ComlibManager(thisgroup).bracketedErrorDetected(instid, step);
+		myEntry->errorModeServer = ERROR_MODE_SERVER;
+		ComlibManagerPrintf("[%d] bracketedReceiveCount first time\n", CkMyPe());
+	} else { // ERROR_MODE
+	
+	  CharmStrategy* s = dynamic_cast<CharmStrategy*>(myEntry->strategy);
+	  ComlibArrayInfo ainfo = s->ainfo;
+	  int totalsrc =  ainfo.getTotalSrc() ;
+	  
+	  if(myEntry->nProcSync == CkNumPes() && myEntry->totalEndCounted == totalsrc) {
+	    // ok, we received notifications from all PEs and all objects have called endIteration
+	    myEntry->errorModeServer = CONFIRM_MODE_SERVER; 
+	    ComlibManagerPrintf("[%d] bracketedReceiveCount errorModeServer is now CONFIRM_MODE calling bracketedConfirmCount totalsrc=%d\n", CkMyPe(), (int)totalsrc);
+	    CProxy_ComlibManager(thisgroup).bracketedConfirmCount(instid);
+			
+	  }
+	}
+		
+}
+
+
+/// Invoked on all processors. After the count has been checked and it matches
+/// the number of emements involved in the bracketed operation, processor 0
+/// sends a broadcast to acknowledge the success. 
+/// The strategy is disabled until a new Pe list is received.
+void ComlibManager::bracketedReceiveNewCount(int instid) {
+	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+	CkAssert(myEntry->errorMode == CONFIRM_MODE);
+
+	myEntry->errorMode = ERROR_FIXED_MODE;
+	
+	myEntry->nEndItr -= myEntry->nEndSaved;
+	myEntry->nBeginItr -= myEntry->nEndSaved;
+
+	myEntry->nEndSaved = 0;
+
+	bracketedFinalBarrier(instid);
+}
+
+
+
+
+/// Invoked on all processors. When all processors have discovered all elements
+/// involved in the operation, processor 0 uses this method to broadcast the
+/// entire processor list to all. Currently the discovery process HAS to go
+/// together with the counting process, otherwise the strategy is updated at an
+/// undetermined state. In future it may be useful to implement the discovery
+/// process alone.
+void ComlibManager::bracketedReceiveNewPeList(int instid, int *count) {
+	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+	CkAssert(myEntry->discoveryMode == STARTED_DISCOVERY_MODE);
+	myEntry->discoveryMode = FINISHED_DISCOVERY_MODE;
+
+	myEntry->strategy->bracketedUpdatePeKnowledge(count);
+	
+	ComlibManagerPrintf("[%d] bracketedReceiveNewPeList Updating numElements\n", CkMyPe());
+	ComlibArrayInfo *myInfo = &dynamic_cast<CharmStrategy*>(myEntry->strategy)->ainfo;
+	CkAssert((unsigned long)myInfo > 0x1000);
+	myEntry->numElements = myInfo->getLocalSrc();
+	
+	ComlibManagerPrintf("[%d] delayMessageSendBuffer[%d].size()=%d\n",CkMyPe(), instid, delayMessageSendBuffer[instid].size() );
+	ComlibManagerPrintf("[%d] delayMessageSendBuffer[%d].size()=%d\n", CkMyPe(), instid, delayMessageSendBuffer[instid].size());
+		
+	bracketedFinalBarrier(instid);
+}
+
+
+/** Start a barrier phase where all processes will enter it once both 
+    the counting and discovery processes complete.
+
+    ComlibManager::bracketedReceiveNewPeList calls this method. 
+    ComlibManager::bracketedReceiveNewPeList is called as an array broadcast to thisProxy, 
+    so every PE will call this method.
+ */
+void ComlibManager::bracketedFinalBarrier(int instid) {
+  StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+  ComlibManagerPrintf("[%d] ComlibManager::bracketedFinalBarrier %s %s %s\n", CkMyPe(), myEntry->errorModeString(),  myEntry->errorModeServerString(),  myEntry->discoveryModeString() );
+
+
+  if (myEntry->discoveryMode == FINISHED_DISCOVERY_MODE &&  myEntry->errorMode == ERROR_FIXED_MODE) {    
+    CProxy_ComlibManager(thisgroup)[0].bracketedReleaseCount(instid);
+  }
+}
+
+
+/** 
+    Once all PEs report here, we will allow them to release the buffered messages from this iteration
+ */
+void ComlibManager::bracketedReleaseCount(int instid) {
+    ComlibManagerPrintf("[%d] ComlibManager::bracketedReleaseCount\n", CkMyPe());
+
+    StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+    CkAssert(CkMyPe() == 0);
+    CkAssert(myEntry->errorModeServer == ERROR_FIXED_MODE_SERVER);
+    
+    myEntry->numBufferReleaseReady++;
+    if(myEntry->numBufferReleaseReady == CkNumPes()) {
+      myEntry->errorModeServer = NORMAL_MODE_SERVER;
+      CProxy_ComlibManager(thisgroup).bracketedReleaseBufferedMessages(instid);
+      myEntry->numBufferReleaseReady = 0;
+    }
+}
+
+/** 
+    Release any buffered messages.
+ */
+void ComlibManager::bracketedReleaseBufferedMessages(int instid) {
+  ComlibManagerPrintf("[%d] ComlibManager::bracketedReleaseBufferedMessages\n", CkMyPe());
+
+  StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+  
+  myEntry->bufferOutgoing = 0;
+  sendBufferedMessages(instid);
+  
+  converseManager->doneInserting(instid);
+}
+
+
+
+
+
+
+/** Called when an error is discovered. Such errors occur when it is observed
+    that an array element has migrated to a new PE. Specifically if a strategy
+    on some PE determines that it has received messages for more array elements
+    than the strategy knew were local, then some array element must have 
+    migrated to the PE. The strategy instance detecting the error will call this
+    method to initiate a global update operation that determines the locations
+    of all array elements.
+
+    This is called on each PE by the bracketedErrorDetected() method. 
+
+    Each array element previously located on this PE is examined to determine if
+    it is still here. If the array element has migrated away, then the
+    bracketedDiscover() method is called on the new PE.
+
+*/
+void ComlibManager::bracketedStartDiscovery(int instid) {
+	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+	CkAssert(myEntry->discoveryMode == NORMAL_DISCOVERY_MODE);
+	myEntry->discoveryMode = STARTED_DISCOVERY_MODE;
+	ComlibArrayInfo *myInfo = &dynamic_cast<CharmStrategy*>(myEntry->strategy)->ainfo;
+				
+	ComlibManagerPrintf("[%d] bracketedStartDiscovery\n", CkMyPe());
+
+	int countSrc = 0;
+	int countDest = 0;
+	CkArrayID aid;
+	CkArrayIndexMax *idx;
+	int nelem;
+	CkArray *a;
+	CProxy_ComlibManager myProxy(thisgroup);
+
+	if (myInfo->isSourceArray()) {
+		myInfo->getSourceArray(aid, idx, nelem);
+		myInfo->resetSource();
+		a = (CkArray*)_localBranch(aid);
+		for (int i=0; i<nelem; ++i) {
+			int pe = a->lastKnown(idx[i]);
+//			ComlibManagerPrintf("[%d] bracketedStartDiscovery src Index %d was lastKnown at pe %d\n", CkMyPe(), idx[i].data()[0], pe);
+			if (pe == CkMyPe()) {
+				countSrc++;
+				myInfo->addSource(idx[i]);
+			}
+			else {
+				myProxy[pe].bracketedDiscover(instid, aid, idx[i], true);
+			}
+		}
+		delete[] idx;
+	}
+
+	if (myInfo->isDestinationArray()) {
+		myInfo->getDestinationArray(aid, idx, nelem);
+		myInfo->resetDestination();
+		a = (CkArray*)_localBranch(aid);
+		for (int i=0; i<nelem; ++i) {
+			int pe = a->lastKnown(idx[i]);
+//			ComlibManagerPrintf("[%d] bracketedStartDiscovery dest Index %d was lastKnown at pe %d\n", CkMyPe(), idx[i].data()[0], pe);
+			if (pe == CkMyPe()) {
+				countDest++;
+				myInfo->addDestination(idx[i]);
+			}
+			else {
+				myProxy[pe].bracketedDiscover(instid, aid, idx[i], false);
+			}
+		}
+		delete[] idx;
+	}
+
+	if (countSrc > 0 || countDest > 0) {
+		// contribute only if we have something
+		myProxy[0].bracketedContributeDiscovery(instid, CkMyPe(), countSrc, countDest, myEntry->lastKnownIteration);
+	}
+
+}
+
+
+
+/** Determine the PE of a given array index. This will be called for any 
+    array element by the previous owner PE.
+
+    If the index is local to the processor, then record this in the local 
+    strategy. Also send a message to PE 0 informing PE 0 that the array
+    element was located.
+
+    If the array element is not found locally, call this method on the last 
+    known location for the element.
+
+*/
+void ComlibManager::bracketedDiscover(int instid, CkArrayID aid, CkArrayIndexMax &idx, int isSrc) {
+	ComlibManagerPrintf("[%d] bracketedDiscover\n", CkMyPe());
+	CkArray *a = (CkArray *)_localBranch(aid);
+	int pe = a->lastKnown(idx);
+	CProxy_ComlibManager myProxy(thisgroup);
+	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+
+	if (pe == CkMyPe()) {
+	        // Object was found locally
+	 
+	        // notify PE 0
+	        myProxy[0].bracketedContributeDiscovery(instid, pe, isSrc?1:0, isSrc?0:1, myEntry->lastKnownIteration);
+	  
+
+		// Find local strategy instance
+
+		// ComlibArrayInfo *myInfo = &(dynamic_cast<CharmStrategy*>(getStrategy(instid))->ainfo);
+		CkAssert((unsigned long)myEntry->strategy > 0x1000);
+		ComlibArrayInfo *myInfo = &dynamic_cast<CharmStrategy*>(myEntry->strategy)->ainfo;
+		CkAssert((unsigned long)myInfo > 0x1000);
+
+		if (isSrc) {
+		        // Add the element as a source element for the strategy
+			ComlibManagerPrintf("[%d] bracketedDiscover addSource\n", CkMyPe());
+			CkAssert((unsigned long)myInfo > 0x1000);
+			myInfo->addSource(idx);
+
+			ComlibManagerPrintf("[%d] bracketedDiscover updating numElements\n", CkMyPe());
+			myEntry->numElements = myInfo->getLocalSrc();		
+		}
+		else {
+		        // Add the element as a Destination element for the strategy
+			ComlibManagerPrintf("[%d] bracketedDiscover addDestination\n", CkMyPe());
+			myInfo->addDestination(idx);
+		}
+	} else {
+		ComlibManagerPrintf("Keep On Forwarding*********************\n");
+		// forward to next potential processor
+		myProxy[pe].bracketedDiscover(instid, aid, idx, isSrc);
+	}
+}
+
+
+
+/** On PE 0, record the notifications from all PEs about the actual locations of each
+    array element. Count the number of elements discovered. Once the new location of 
+    every elements has been discovered, broadcast the new locations to all PEs by 
+    invoking bracketedReceiveNewPeList.
+*/
+void ComlibManager::bracketedContributeDiscovery(int instid, int pe, int nsrc, int ndest, int step) {
+	CkAssert(CkMyPe() == 0);
+	ComlibManagerPrintf("[%d] bracketedContributeDiscovery pe=%d nsrc=%d ndest=%d step=%d\n", CkMyPe(), pe, nsrc, ndest, step);
+	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+	if (myEntry->peList == 0) {
+		myEntry->peList = new int[CkNumPes()+2];
+		// peList[CkNumPes()] keeps the sum of all source objects discovered
+		// peList[CkNumPes()+1] keeps the sum of all destination objects discovered
+		for (int i=0; i<CkNumPes()+2; ++i) myEntry->peList[i]=0;
+		ComlibManagerPrintf("[%d] bracketedContributeDiscovery zeroing new peList\n", CkMyPe());
+	}
+	myEntry->peList[CkNumPes()] += nsrc;
+	myEntry->peList[CkNumPes()+1] += ndest;
+	// update the count for the sender processor. peList[i] is:
+	// 0 if proc "i" has no objects,
+	// 1 if proc "i" has only source objects,
+	// 2 if proc "i" has only destination objects,
+	// 3 if proc "i" has both source and destination objects
+	// the following code maintains the property of peList!
+	if (nsrc > 0) myEntry->peList[pe] |= 1;
+	if (ndest > 0) myEntry->peList[pe] |= 2;
+
+	ComlibArrayInfo *myInfo = &dynamic_cast<CharmStrategy*>(myEntry->strategy)->ainfo;
+	CkAssert((unsigned long)myInfo > 0x1000);
+
+	
+//	ComlibManagerPrintf("[%d] bracketedContributeDiscovery myEntry->peList[CkNumPes()]=%d  myInfo->getTotalSrc()=%d\n", CkMyPe(), myEntry->peList[CkNumPes()], myInfo->getTotalSrc());
+//	ComlibManagerPrintf("[%d] bracketedContributeDiscovery myEntry->peList[CkNumPes()+1]=%d  myInfo->getTotalDest()=%d\n", CkMyPe(), myEntry->peList[CkNumPes()+1], myInfo->getTotalDest());
+//		
+	if (myEntry->peList[CkNumPes()] == myInfo->getTotalSrc() &&
+			myEntry->peList[CkNumPes()+1] == myInfo->getTotalDest()) {
+		// discovery process finished, broadcast the new pe list
+
+		CProxy_ComlibManager myProxy(thisgroup);
+		
+		ComlibManagerPrintf("[%d] bracketedContributeDiscovery calling bracketedReceiveNewPeList %d/%d, %d/%d\n", 	
+				CkMyPe(), 
+				myEntry->peList[CkNumPes()], myInfo->getTotalSrc(), 
+				myEntry->peList[CkNumPes()+1], myInfo->getTotalDest() );
+		
+		printPeList("bracketedContributeDiscovery peList=", myEntry->peList);
+		myProxy.bracketedReceiveNewPeList(instid, myEntry->peList);
+		delete myEntry->peList;
+		myEntry->peList = NULL;
+	} else {
+		ComlibManagerPrintf("[%d] bracketedContributeDiscovery NOT calling bracketedReceiveNewPeList %d/%d, %d/%d\n", 
+				CkMyPe(), 
+				myEntry->peList[CkNumPes()], myInfo->getTotalSrc(), 
+				myEntry->peList[CkNumPes()+1], myInfo->getTotalDest() );
+	}
+
+}
+
+
+void ComlibManager::printPeList(char* note, int *count){
+	
+	char *buf = (char*)malloc(1024*64);
+	sprintf(buf, "[%d] %s ", CkMyPe(), note);
+	for(int i=0;i<CkNumPes();i++){
+		switch (count[i]){
+		case 0:
+			sprintf(buf+strlen(buf), " %d:no ", i, count[i]);
+			break;
+		case 1:
+			sprintf(buf+strlen(buf), " %d:source ", i, count[i]);
+			break;
+		case 2:
+			sprintf(buf+strlen(buf), " %d:dest ", i, count[i]);
+			break;
+		case 3:
+			sprintf(buf+strlen(buf), " %d:both ", i, count[i]);
+			break;
+		}
+	}
+	
+	sprintf(buf+strlen(buf), ", all source objects discovered =  %d, all destination objects discovered = %d",  count[CkNumPes()] ,  count[CkNumPes()+1] );
+		
+	ComlibPrintf("%s\n", buf);
+}
+
+/***************************************************************************
+ * Delegation framework section:
+ *
+ * Reimplementation of the main routines needed for the delegation framework:
+ * this routines will be called when a message is sent through a proxy which has
+ * been associated with comlib.
+ ***************************************************************************/
 
 extern int _charmHandlerIdx;
+void msg_prepareSend_noinline(CkArrayMessage *msg, int ep,CkArrayID aid);
 
+
+/** 
+    Handle messages sent via ArraySend. These are single point to point messages 
+    to array elements.
+
+    This method should not optimize direct sends in the case where buffering occurs
+
+ */
 void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg, 
-                              const CkArrayIndexMax &idx, CkArrayID a){
-    
-    if(pd != NULL) {
-        ComlibInstanceHandle *ci = (ComlibInstanceHandle *)pd;
-        setInstance(ci->_instid);
-    }
-    
-    ComlibPrintf("[%d] In Array Send\n", CkMyPe());
-    
-    CkArrayIndexMax myidx = idx;
-    int dest_proc = getLastKnown(a, myidx); 
-    
-    //Reading from two hash tables is a big overhead
-    //int amgr_destpe = CkArrayID::CkLocalBranch(a)->lastKnown(myidx);
-    
-    register envelope * env = UsrToEnv(msg);
-    
-    env->getsetArrayMgr()=a;
-    env->getsetArraySrcPe()=CkMyPe();
-    env->getsetArrayEp()=ep;
-    env->getsetArrayHops()=0;
-    env->getsetArrayIndex()=idx;
-    env->setUsed(0);
-    ((CmiMsgHeaderExt *)env)->stratid = curStratID;
+		const CkArrayIndexMax &idx, CkArrayID a){
 
-    //RECORD_SEND_STATS(curStratID, env->getTotalsize(), dest_proc);
+	CkAssert(pd != NULL);
+	ComlibDelegateData *ci = static_cast<ComlibDelegateData *>(pd);
+	int instid = ci->getID();
+	CkAssert(instid != 0);
 
-    if(isRemote) {
-        CkPackMessage(&env);        
-        CharmMessageHolder *cmsg = new 
-            CharmMessageHolder((char *)msg, dest_proc);
-        
-        remoteQ.enq(cmsg);
-        return;
-    }
-    
-    //With migration some array messages may be directly sent Also no
-    //message processing should happen before the comlib barriers have
-    //gone through
-    if(dest_proc == CkMyPe() && setupComplete){  
-        CkArray *amgr = (CkArray *)_localBranch(a);
-        amgr->deliver((CkArrayMessage *)msg, CkDeliver_queue);
-        
-        return;
-    }
+	// Reading from two hash tables is a big overhead
+	CkArray *amgr = CkArrayID::CkLocalBranch(a);
+	int dest_proc = amgr->lastKnown(idx);
 
-    CkPackMessage(&env);
-    CmiSetHandler(env, CkpvAccess(RecvmsgHandle));        
-    
-    //get rid of the new.
-    CharmMessageHolder *cmsg = new 
-        CharmMessageHolder((char *)msg, dest_proc);
-    
-    ComlibPrintf("[%d] Before Insert on strat %d received = %d\n", CkMyPe(), curStratID, setupComplete);
-    
-    if (setupComplete)        
-        (* strategyTable)[curStratID].strategy->insertMessage(cmsg);
-    else 
-        (* strategyTable)[curStratID].tmplist.enq(cmsg);
-    
-    //CmiPrintf("After Insert\n");
+	register envelope * env = UsrToEnv(msg);
+	msg_prepareSend_noinline((CkArrayMessage*)msg, ep, a);
+
+	env->getsetArrayIndex()=idx;
+	env->setUsed(0);
+	((CmiMsgHeaderExt *)env)->stratid = instid;
+
+	CkPackMessage(&env);
+	CmiSetHandler(env, CkpvAccess(RecvmsgHandle));        
+	
+	CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg, dest_proc, CMH_ARRAYSEND);
+	
+	if(shouldBufferMessagesNow(instid)){
+	  delayMessageSendBuffer[instid].insert(cmsg);
+	  ComlibManagerPrintf("[%d] ComlibManager::ArraySend BUFFERED OUTGOING: now buffer contains %d messages\n",CkMyPe(), delayMessageSendBuffer[instid].size() );
+	} else {
+	  ComlibPrintf("ComlibManager::ArraySend NOT BUFFERING inserting message into strategy %d\n",instid);
+	  
+	  if(dest_proc == CkMyPe()){  
+	    // Directly send if object is local
+	    amgr->deliver((CkArrayMessage *)msg, CkDeliver_queue);
+	    return;
+	  } else {
+	    // Send through converse level strategy if non-local
+	    converseManager->insertMessage(cmsg, instid);
+	  }
+	  
+	}
+
 }
 
 
@@ -541,643 +936,392 @@ void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg,
 //CkpvExtern(QdState*, _qd);
 
 void ComlibManager::GroupSend(CkDelegateData *pd,int ep, void *msg, int onPE, CkGroupID gid){
-    
 
-    if(pd != NULL) {
-        ComlibInstanceHandle *ci = (ComlibInstanceHandle *)pd;
-        setInstance(ci->_instid);
-    }
+	CkAssert(pd != NULL);
+	ComlibDelegateData *ci = static_cast<ComlibDelegateData *>(pd);
+	int instid = ci->getID();
 
-    int dest_proc = onPE;
+	int dest_proc = onPE;
 
-    ComlibPrintf("Send Data %d %d %d\n", CkMyPe(), dest_proc, 
-                 UsrToEnv(msg)->getTotalsize());
+	ComlibPrintf("Send Data %d %d %d\n", CkMyPe(), dest_proc, 
+			UsrToEnv(msg)->getTotalsize());
 
-    register envelope * env = UsrToEnv(msg);
-    if(dest_proc == CkMyPe() && setupComplete){
-        _SET_USED(env, 0);
-        CkSendMsgBranch(ep, msg, dest_proc, gid);
-        return;
-    }
-    
-    ((CmiMsgHeaderExt *)env)->stratid = curStratID;
-    CpvAccess(_qd)->create(1);
+	register envelope * env = UsrToEnv(msg);
+	if(dest_proc == CkMyPe()){
+		_SET_USED(env, 0);
+		CkSendMsgBranch(ep, msg, dest_proc, gid);
+		return;
+	}
 
-    env->setMsgtype(ForBocMsg);
-    env->setEpIdx(ep);
-    env->setGroupNum(gid);
-    env->setSrcPe(CkMyPe());
-    env->setUsed(0);
+	((CmiMsgHeaderExt *)env)->stratid = instid;
+	CpvAccess(_qd)->create(1);
 
-    CkPackMessage(&env);
-    CmiSetHandler(env, _charmHandlerIdx);
+	env->setMsgtype(ForBocMsg);
+	env->setEpIdx(ep);
+	env->setGroupNum(gid);
+	env->setSrcPe(CkMyPe());
+	env->setUsed(0);
 
-    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg, dest_proc); 
-    //get rid of the new.
-    
-    if(setupComplete)
-        (* strategyTable)[curStratID].strategy->insertMessage(cmsg);
-    else {
-        (* strategyTable)[curStratID].tmplist.enq(cmsg);
-    }
+	CkPackMessage(&env);
+	CmiSetHandler(env, _charmHandlerIdx);
+
+	CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg, dest_proc, CMH_GROUPSEND); 
+
+	if(shouldBufferMessagesNow(instid)){
+	  ComlibPrintf("ComlibManager::GroupSend Buffering message for %d\n",instid);
+	  delayMessageSendBuffer[instid].insert(cmsg);
+	} else {
+	  ComlibPrintf("ComlibManager::GroupSend inserting message into strategy %d\n",instid);
+	  converseManager->insertMessage(cmsg, instid);
+	}
+
+
 }
 
 void ComlibManager::ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a){
-    ComlibPrintf("[%d] Array Broadcast \n", CkMyPe());
+	ComlibPrintf("[%d] Array Broadcast \n", CkMyPe());
 
-    if(pd != NULL) {
-        ComlibInstanceHandle *ci = (ComlibInstanceHandle *)pd;
-        setInstance(ci->_instid);
-    }
-    
-    //Broken, add the processor list here.
+	CkAssert(pd != NULL);
+	ComlibDelegateData *ci = static_cast<ComlibDelegateData *>(pd);
+	int instid = ci->getID();
 
-    register envelope * env = UsrToEnv(m);
-    env->getsetArrayMgr()=a;
-    env->getsetArraySrcPe()=CkMyPe();
-    env->getsetArrayEp()=ep;
-    env->getsetArrayHops()=0;
-    env->getsetArrayIndex()= dummyArrayIndex;
-    ((CmiMsgHeaderExt *)env)->stratid = curStratID;
+	register envelope * env = UsrToEnv(m);
+	msg_prepareSend_noinline((CkArrayMessage*)m, ep, a);
 
-    CmiSetHandler(env, CkpvAccess(RecvmsgHandle));
-    
-    //RECORD_SENDM_STATS(curStratID, env->getTotalsize(), dest_proc);
+	env->getsetArrayIndex()= dummyArrayIndex;
+	((CmiMsgHeaderExt *)env)->stratid = instid;
 
-    CharmMessageHolder *cmsg = new 
-        CharmMessageHolder((char *)m, IS_BROADCAST);
-    cmsg->npes = 0;
-    cmsg->pelist = NULL;
-    cmsg->sec_id = NULL;
+	CmiSetHandler(env, CkpvAccess(RecvmsgHandle));
 
-    multicast(cmsg);
+	CharmMessageHolder *cmsg = new CharmMessageHolder((char *)m, IS_BROADCAST, CMH_ARRAYBROADCAST);
+	cmsg->npes = 0;
+	cmsg->sec_id = NULL;
+	cmsg->array_id = a;
+
+	multicast(cmsg, instid);
 }
 
 void ComlibManager::ArraySectionSend(CkDelegateData *pd,int ep, void *m, 
-                                     CkArrayID a, CkSectionID &s, int opts) {
+		CkArrayID a, CkSectionID &s, int opts) {
 
-#ifndef CMK_OPTIMIZE
-    traceUserEvent(section_send_event);
-#endif
+	CkAssert(pd != NULL);
+	ComlibDelegateData *ci = static_cast<ComlibDelegateData *>(pd);
+	int instid = ci->getID();
 
-    if(pd != NULL) {
-        ComlibInstanceHandle *ci = (ComlibInstanceHandle *)pd;
-        setInstance(ci->_instid);
-    }
-    
-    ComlibPrintf("[%d] Array Section Send \n", CkMyPe());
+	ComlibPrintf("[%d] Array Section Send \n", CkMyPe());
 
-    register envelope * env = UsrToEnv(m);
-    env->getsetArrayMgr()=a;
-    env->getsetArraySrcPe()=CkMyPe();
-    env->getsetArrayEp()=ep;
-    env->getsetArrayHops()=0;
-    env->getsetArrayIndex()= dummyArrayIndex;
-    ((CmiMsgHeaderExt *)env)->stratid = curStratID;
 
-    CmiSetHandler(env, CkpvAccess(RecvmsgHandle));
-    
-    env->setUsed(0);    
-    CkPackMessage(&env);
-    
-    //Provide a dummy dest proc as it does not matter for mulitcast 
-    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)m,
-                                                      IS_SECTION_MULTICAST);
-    cmsg->npes = 0;
-    cmsg->sec_id = &s;
+	//Provide a dummy dest proc as it does not matter for mulitcast 
+	CharmMessageHolder *cmsg = new CharmMessageHolder((char *)m, IS_SECTION_MULTICAST, CMH_ARRAYSECTIONSEND);
+	cmsg->npes = 0;
+	cmsg->sec_id = &s;
+	cmsg->array_id = a;
+	
 
-    CkSectionInfo minfo;
-    minfo.type = COMLIB_MULTICAST_MESSAGE;
-    minfo.sInfo.cInfo.instId = curStratID;
-    minfo.sInfo.cInfo.status = COMLIB_MULTICAST_ALL;  
-    minfo.sInfo.cInfo.id = 0; 
-    minfo.pe = CkMyPe();
-    ((CkMcastBaseMsg *)m)->_cookie = minfo;    
-    //    s.npes = 0;
-    //s.pelist = NULL;
-
-    multicast(cmsg);
+	msg_prepareSend_noinline((CkArrayMessage*)m, ep, a);
+	
+	register envelope * env = UsrToEnv(m);
+	env->getsetArrayIndex()= dummyArrayIndex;
+	((CmiMsgHeaderExt *)env)->stratid = instid;
+	
+	CmiSetHandler(env, CkpvAccess(RecvmsgHandle));
+	
+	env->setUsed(0);
+	CkPackMessage(&env);
+	
+	
+	/// @TODO why are CkSectionInfo needed since it doesn't seem to have
+	/// useful information?
+	CkSectionInfo minfo;
+	minfo.type = COMLIB_MULTICAST_MESSAGE;
+	minfo.sInfo.cInfo.instId = ci->getID();
+	//minfo.sInfo.cInfo.status = COMLIB_MULTICAST_ALL;  
+	minfo.sInfo.cInfo.id = 0; 
+	minfo.pe = CkMyPe();
+	((CkMcastBaseMsg *)env)->_cookie = minfo;    
+	
+	multicast(cmsg, instid);
 }
 
 void ComlibManager::GroupBroadcast(CkDelegateData *pd,int ep,void *m,CkGroupID g) {
-    
-    if(pd != NULL) {
-        ComlibInstanceHandle *ci = (ComlibInstanceHandle *)pd;
-        setInstance(ci->_instid);
-    }
-    
-    register envelope * env = UsrToEnv(m);
-    
-    CpvAccess(_qd)->create(1);
 
-    env->setMsgtype(ForBocMsg);
-    env->setEpIdx(ep);
-    env->setGroupNum(g);
-    env->setSrcPe(CkMyPe());
-    env->setUsed(0);
-    ((CmiMsgHeaderExt *)env)->stratid = curStratID;
+	CkAssert(pd != NULL);
+	ComlibDelegateData *ci = static_cast<ComlibDelegateData *>(pd);
+	int instid = ci->getID();
+	CkAssert(instid!=0);
 
-    CkPackMessage(&env);
-    CmiSetHandler(env, _charmHandlerIdx);
-    
-    //Provide a dummy dest proc as it does not matter for mulitcast 
-    CharmMessageHolder *cmsg = new CharmMessageHolder((char *)m,IS_BROADCAST);
-    
-    cmsg->npes = 0;
-    cmsg->pelist = NULL;
+	register envelope * env = UsrToEnv(m);
 
-    multicast(cmsg);
+	CpvAccess(_qd)->create(1);
+
+	env->setMsgtype(ForBocMsg);
+	env->setEpIdx(ep);
+	env->setGroupNum(g);
+	env->setSrcPe(CkMyPe());
+	env->setUsed(0);
+	((CmiMsgHeaderExt *)env)->stratid = instid;
+
+	CkPackMessage(&env);
+	CmiSetHandler(env, _charmHandlerIdx);
+
+	//Provide a dummy dest proc as it does not matter for mulitcast 
+	CharmMessageHolder *cmsg = new CharmMessageHolder((char *)m,IS_BROADCAST, CMH_GROUPBROADCAST);
+
+	cmsg->npes = 0;
+	//cmsg->pelist = NULL;
+
+	multicast(cmsg, instid);
 }
 
-void ComlibManager::multicast(CharmMessageHolder *cmsg) {
 
-    register envelope * env = UsrToEnv(cmsg->getCharmMessage());    
-    ComlibPrintf("[%d]: In multicast\n", CkMyPe());
+/** 
+    Multicast the message with the specified strategy(instid).
+    This method is used in: ArrayBroadcast, ArraySectionSend, and GroupBroadcast
+ */
+void ComlibManager::multicast(CharmMessageHolder *cmsg, int instid) {
+        CkAssert(instid != 0);
+	register envelope * env = UsrToEnv(cmsg->getCharmMessage());
 
-    env->setUsed(0);    
-    CkPackMessage(&env);
-
-    //Will be used to detect multicast message for learning
-    
-    if (setupComplete)
-	(* strategyTable)[curStratID].strategy->insertMessage(cmsg);
-    else {
-	ComlibPrintf("Enqueuing message in tmplist at %d\n", curStratID);
-        (* strategyTable)[curStratID].tmplist.enq(cmsg);
-    }
-
-    ComlibPrintf("After multicast\n");
+#if DEBUG
+	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+	ComlibPrintf("[%d] multicast setupComplete=%d errorMode=%d errorModeServer=%d\n", CkMyPe(), setupComplete, myEntry->errorMode, myEntry->errorModeServer);
+#endif
+ 
+	env->setUsed(0);
+	CkPackMessage(&env);
+	
+	if(shouldBufferMessagesNow(instid)){
+	  cmsg->saveCopyOf_sec_id();
+	  delayMessageSendBuffer[instid].insert(cmsg);
+	} else {
+	  converseManager->insertMessage(cmsg, instid);
+	}
+	
 }
+
+
+void ComlibManager::printDiagnostics(int instid){
+	ComlibManagerPrintf("[%d]     delayMessageSendBuffer.size()=%d\n", CkMyPe(), delayMessageSendBuffer[instid].size());
+}
+
+
+void ComlibManager::printDiagnostics(){
+  
+
+  std::map<ComlibInstanceHandle, std::set<CharmMessageHolder*> >::iterator iter;
+  for(iter = delayMessageSendBuffer.begin(); iter != delayMessageSendBuffer.end(); ++iter){
+    int instid = iter->first;
+    int size = iter->second.size();
+    
+    if(size>0){
+      CkPrintf("[%d] delayMessageSendBuffer[instid=%d] contains %d messages\n", CkMyPe(), instid, size);
+      
+      if(! shouldBufferMessagesNow(instid)){
+	CkPrintf("[%d] printDiagnostics: No messages should be still in delayMessageSendBuffer[instid=%d]\n", CkMyPe(), instid);
+      } else {
+	CkPrintf("[%d] printDiagnostics: Messages still ought to be delayed in delayMessageSendBuffer[instid=%d]\n", CkMyPe(), instid);
+      }
+      
+      StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+      CkPrintf("[%d] printDiagnostics[instid=%d] setupComplete=%d errorMode=%d errorModeServer=%d discoveryMode=%d bufferOutgoing=%d\n", (int)CkMyPe(), (int)instid, (int)setupComplete, (int)myEntry->errorMode, (int)myEntry->errorModeServer, (int)myEntry->discoveryMode, (int)myEntry->bufferOutgoing);
+    }
+  }
+  
+  ConvComlibManager * conv_mgr = CkpvAccess(conv_com_ptr);
+  
+  conv_mgr->printDiagnostics();
+  
+}
+
+
+
+CkDelegateData* ComlibManager::ckCopyDelegateData(CkDelegateData *data) {
+	//ComlibDelegateData *inst = static_cast<ComlibDelegateData *>(data);
+	data->ref();
+	return data;
+	//return (new ComlibDelegateData(inst->getID()));
+}
+
+CkDelegateData* ComlibManager::DelegatePointerPup(PUP::er &p,
+		CkDelegateData *pd) {
+	if (!p.isUnpacking() && pd == NULL) CkAbort("Tryed to pup a null ComlibDelegateData!\n");
+	//CmiBool isNotNull = pd!=NULL ? CmiTrue : CmiFalse;
+	ComlibDelegateData *inst = static_cast<ComlibDelegateData *>(pd);
+
+	// call a migration constructor
+	if (p.isUnpacking()) inst = new ComlibDelegateData((CkMigrateMessage*)0);
+	inst->pup(p);
+	/*
+  p | isNotNull;
+  if (isNotNull) {
+    if (p.isUnpacking()) inst = new ComlibInstanceHandle();
+    inst->pup(p);
+  }
+	 */
+	return inst;
+}
+
 
 //Collect statistics from all the processors, also gets the list of
 //array elements on each processor.
-void ComlibManager::collectStats(ComlibLocalStats &stat, int pe, 
-                                 CkVec<ClibGlobalArrayIndex> &idx_vec) {
-    
-    ComlibPrintf("%d: Collecting stats %d\n", CkMyPe(), numStatsReceived);
-
-    numStatsReceived ++;
-    clib_gstats.updateStats(stat, pe);
-    
-    for(int count = 0; count < idx_vec.length(); count++) {
-        int old_pe = CkpvAccess(locationTable)->get(idx_vec[count]);
-        
-        ComlibPrintf("Adding idx %d to %d\n", idx_vec[count].idx.data()[0], 
-                     pe);
-        
-        CkpvAccess(locationTable)->put(idx_vec[count]) = pe + CkNumPes();
-    }        
-
-    //Reset cached array element index. Location table may have changed
-    CkpvAccess(cache_index).nInts = -1;
-    CkpvAccess(cache_aid).setZero();
-
-    if(numStatsReceived == CkNumPes()) {
-        numStatsReceived = 0;
-
-        for(int count = 0; count < CkpvAccess(conv_com_ptr)->nstrats; 
-            count++ ){
-            Strategy* strat = CkpvAccess(conv_com_ptr)->getStrategy(count);
-            if(strat->getType() > CONVERSE_STRATEGY) {
-                CharmStrategy *cstrat = (CharmStrategy *)strat;
-                ComlibLearner *learner = cstrat->getLearner();
-                CharmStrategy *newstrat = NULL;
-                                
-                if(learner != NULL) {
-                    ComlibPrintf("Calling Learner\n");
-                    newstrat = (CharmStrategy *)learner->optimizePattern
-                        (strat, clib_gstats);
-                    
-                    if(newstrat != NULL)
-                        ListOfStrategies.enq(newstrat);
-                    else
-                        ListOfStrategies.enq(cstrat);
-                }
-            }
-        }
-        barrierReached = 1;
-        
-        //if(lbUpdateReceived) {
-        //lbUpdateReceived = CmiFalse;
-        broadcastStrategies();
-        //}
-    }
-}
-
-void ComlibManager::setRemote(int remote_pe){
-
-    ComlibPrintf("Setting remote flag on\n");
-
-    remotePe = remote_pe;
-    isRemote = 1;
+void ComlibManager::collectStats(ComlibLocalStats &stat, int pe) {
 }
 
 
-void ComlibManager::receiveRemoteSend(CkQ<CharmMessageHolder *> &rq, 
-                                      int strat_id) {
-    setInstance(strat_id);
-    
-    int nmsgs = rq.length();
-
-    ComlibPrintf("%d: Receiving remote message\n", CkMyPe());
-
-    for(int count = 0; count < nmsgs; count++) {
-        char *msg = rq.deq()->getCharmMessage();
-        envelope *env = UsrToEnv(msg);
-        
-        ArraySend(NULL, env->getsetArrayEp(), msg, env->getsetArrayIndex(), 
-                  env->getsetArrayMgr());
-    }
-
-    endIteration();
-}
-
-void ComlibManager::sendRemote(){
-    
-    int nmsgs = remoteQ.length();
-
-    //if(nmsgs == 0)
-    //  return;
-
-    ComlibPrintf("%d: Sending remote message \n", CkMyPe());
-
-    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID)); 
-    cgproxy[remotePe].receiveRemoteSend(remoteQ, curStratID);
-    
-    for(int count = 0; count < nmsgs; count++) {
-        CharmMessageHolder *cmsg = remoteQ.deq();
-        CkFreeMsg(cmsg->getCharmMessage());
-        delete cmsg;
-    }
-}
-
-
+/// @TODO: eliminate AtSync and move toward anytime migration!
 void ComlibManager::AtSync() {
 
-    //comm_debug = 1;
-    ComlibPrintf("[%d] In ComlibManager::Atsync, controller %d, ite %d\n", CkMyPe(), curComlibController, clibIteration);
-
-    barrier2Reached = 0;
-    receivedTable = 0;
-    setupComplete = 0;
-    barrierReached = 0;
-    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-
-    int pos = 0;
-
-    CkVec<ClibGlobalArrayIndex> gidx_vec;
-
-    CkVec<CkArrayID> tmp_vec;
-    for(int count = 0; count < CkpvAccess(conv_com_ptr)->nstrats; 
-        count ++) {
-        if((* strategyTable)[count].strategy->getType() 
-           == ARRAY_STRATEGY) {
-            CharmStrategy *cstrat = (CharmStrategy*)
-                ((* strategyTable)[count].strategy);
-            
-            CkArrayID src, dest;
-            CkArrayIndexMax *elements;
-            int nelem;
-            
-            cstrat->ainfo.getSourceArray(src, elements, nelem);
-            cstrat->ainfo.getDestinationArray(dest, elements, nelem);
-
-            CmiBool srcflag = CmiFalse;
-            CmiBool destflag = CmiFalse;
-            
-            if(src == dest || dest.isZero())
-                destflag = CmiTrue;
-
-            if(src.isZero())
-                srcflag = CmiTrue;                        
-
-            for(pos = 0; pos < tmp_vec.size(); pos++) {
-                if(tmp_vec[pos] == src)
-                    srcflag = CmiTrue;
-
-                if(tmp_vec[pos] == dest)
-                    destflag = CmiTrue;
-
-                if(srcflag && destflag)
-                    break;
-            }
-
-            if(!srcflag)
-                tmp_vec.insertAtEnd(src);
-
-            if(!destflag)
-                tmp_vec.insertAtEnd(dest);
-        }
-        
-        //cant do it here, done in receiveTable
-        //if((* strategyTable)[count].strategy->getType() > CONVERSE_STRATEGY)
-        //  (* strategyTable)[count].reset();
-    }
-
-    for(pos = 0; pos < tmp_vec.size(); pos++) {
-        CkArrayID aid = tmp_vec[pos];
-
-        ComlibArrayListener *calistener = 
-            CkArrayID::CkLocalBranch(aid)->getComlibArrayListener();
-
-        CkVec<CkArrayIndexMax> idx_vec;
-        calistener->getLocalIndices(idx_vec);
-
-        for(int idx_count = 0; idx_count < idx_vec.size(); idx_count++) {
-            ClibGlobalArrayIndex gindex;
-            gindex.aid = aid;
-            gindex.idx = idx_vec[idx_count];
-
-            gidx_vec.insertAtEnd(gindex);
-        }
-    }
-
-    cgproxy[curComlibController].collectStats(clib_stats, CkMyPe(), gidx_vec);
-    clib_stats.reset();
-}
-
-#include "lbdb.h"
-#include "CentralLB.h"
-
-/******** FOO BAR : NEEDS to be consistent with array manager *******/
-void LDObjID2IdxMax (LDObjid ld_id, CkArrayIndexMax &idx) {
-    if(OBJ_ID_SZ < CK_ARRAYINDEX_MAXLEN)
-        CkAbort("LDB OBJ ID smaller than array index\n");
-    
-    //values higher than CkArrayIndexMax should be 0
-    for(int count = 0; count < CK_ARRAYINDEX_MAXLEN; count ++) {
-        idx.data()[count] = ld_id.id[count];
-    }
-    idx.nInts = 1;
-}
-
-void ComlibManager::lbUpdate(LBMigrateMsg *msg) {
-    for(int count = 0; count < msg->n_moves; count ++) {
-        MigrateInfo m = msg->moves[count];
-
-        CkArrayID aid; CkArrayIndexMax idx;
-        aid = CkArrayID(m.obj.omhandle.id.id);
-        LDObjID2IdxMax(m.obj.id, idx);
-
-        ClibGlobalArrayIndex cid; 
-        cid.aid = aid;
-        cid.idx = idx;
-        
-        int pe = CkpvAccess(locationTable)->get(cid);
-
-        //Value exists in the table, so update it
-        if(pe != 0) {
-            pe = m.to_pe + CkNumPes();
-            CkpvAccess(locationTable)->getRef(cid) = pe;
-        }
-        //otherwise we dont care about these objects
-    }   
-
-    lbUpdateReceived = CmiTrue;
-    if(barrierReached) {
-        broadcastStrategies();
-        barrierReached = 0;
-    }
-
-    CkFreeMsg(msg);
-}
-
-CkDelegateData* ComlibManager::ckCopyDelegateData(CkDelegateData *data) {
-    ComlibInstanceHandle *inst = new ComlibInstanceHandle
-        (*((ComlibInstanceHandle *)data));
-    return inst;
 }
 
 
-CkDelegateData * ComlibManager::DelegatePointerPup(PUP::er &p,
-                                                   CkDelegateData *pd) {
+/***************************************************************************
+ * User section:
+ *
+ * Interface available to the user to interact with the ComlibManager
+ ***************************************************************************/
 
-    if(pd == NULL)
-        return NULL;
-
-    CmiBool to_pup = CmiFalse;
-
-    ComlibInstanceHandle *inst; 
-    if(!p.isUnpacking()) {
-        inst = (ComlibInstanceHandle *) pd;       
-        if(pd != NULL)
-            to_pup = CmiTrue;
-    }
-    else 
-        //Call migrate constructor
-        inst = new ComlibInstanceHandle();
-
-    p | to_pup;
-
-    if(to_pup)
-        inst->pup(p);
-    return inst;
-}    
-
-void ComlibDelegateProxy(CProxy *proxy){
-    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-    proxy->ckDelegate(cgproxy.ckLocalBranch(), NULL);
+/** Permanently associate the given proxy with comlib, to use the instance
+    represented by cinst. All messages sent through the proxy will be forwarded
+    by comlib. */
+void ComlibAssociateProxy(ComlibInstanceHandle cinst, CProxy &proxy) {
+  if(CkNumPes() > 1){
+	CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
+	proxy.ckDelegate(cgproxy.ckLocalBranch(), new ComlibDelegateData(cinst));
+  } else {
+    ComlibPrintf("Doing nothing in ComlibAssociateProxy because we have only 1 pe\n"); 
+  }
 }
 
-void ComlibAssociateProxy(ComlibInstanceHandle *cinst, CProxy &proxy) {
-    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-    proxy.ckDelegate(cgproxy.ckLocalBranch(), cinst);
+/** Permanently assiciate the given proxy with comlib, to use the strategy
+    represented by strat. All messages sent through the proxy will be forwarded
+    by comlib. */
+void ComlibAssociateProxy(Strategy *strat, CProxy &proxy) {
+	ComlibAssociateProxy(strat->getHandle(), proxy);
+}  
+
+/* OLD DESCRIPTION! Register a strategy to the comlib framework, and return a
+    handle to be used in the future with ComlibAssociateProxy to associate the
+    strategy with a proxy. If one strategy is registered more than once, the
+    handles will be different, but they has to be considered as aliases. */
+
+/** Provided only for backward compatibility. A strategy is registered at the
+    converse level as soon as it is created (see Strategy constructor). This
+    function just retrieve a handle from the strategy itself. */
+ComlibInstanceHandle ComlibRegister(Strategy *strat) {
+	return strat->getHandle();
 }
 
-void ComlibAssociateProxy(CharmStrategy *strat, CProxy &proxy) {
-    ComlibInstanceHandle *cinst = new ComlibInstanceHandle
-        (CkGetComlibInstance());
-
-    cinst->setStrategy(strat);
-    
-    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-    proxy.ckDelegate(cgproxy.ckLocalBranch(), cinst);
-} 
-
-ComlibInstanceHandle ComlibRegister(CharmStrategy *strat) {
-    ComlibInstanceHandle cinst(CkGetComlibInstance());
-    cinst.setStrategy(strat);
-    return cinst;
+/** Call beginIteration on the ComlibManager with the instance handle for the strategy associated with the proxy. 
+ *   If no strategy has been associated with the proxy, nothing is done in this function.
+ */
+void ComlibBegin(CProxy &proxy, int iteration) {
+  if(CkNumPes() > 1){
+	ComlibDelegateData *cinst = static_cast<ComlibDelegateData *>(proxy.ckDelegatedPtr());
+	if(cinst==NULL)
+		return;
+	CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
+	(cgproxy.ckLocalBranch())->beginIteration(cinst->getID(), iteration);
+  } else {
+    ComlibPrintf("Doing nothing in ComlibBegin because we have only 1 pe");  
+  }
 }
 
-void ComlibBegin(CProxy &proxy) {
-    ComlibInstanceHandle *cinst = (ComlibInstanceHandle *)proxy.ckDelegatedPtr();
-    cinst->beginIteration();
-} 
-
-void ComlibEnd(CProxy &proxy) {
-    ComlibInstanceHandle *cinst = (ComlibInstanceHandle *)proxy.ckDelegatedPtr();
-    cinst->endIteration();
+/** Call endIteration on the ComlibManager with the instance handle for the strategy associated with the proxy. 
+ *   If no strategy has been associated with the proxy, nothing is done in this function.
+ */
+void ComlibEnd(CProxy &proxy, int iteration) {
+  if(CkNumPes() > 1){
+	ComlibDelegateData *cinst = static_cast<ComlibDelegateData *>(proxy.ckDelegatedPtr());
+	if(cinst==NULL)
+		return;
+	CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
+	(cgproxy.ckLocalBranch())->endIteration(cinst->getID(), iteration);
+  } else {
+    ComlibPrintf("Doing nothing in ComlibEnd because we have only 1 pe");  
+  }
 }
 
-ComlibInstanceHandle CkCreateComlibInstance(){
-    return CkGetComlibInstance();
-}
-
-ComlibInstanceHandle CkGetComlibInstance() {
-    if(CkMyPe() != 0)
-        CkAbort("Comlib Instance can only be created on Processor 0");
-    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));    
-    return (cgproxy.ckLocalBranch())->createInstance();
-}
-
-ComlibInstanceHandle CkGetComlibInstance(int id) {
-    ComlibInstanceHandle cinst(id, CkpvAccess(cmgrID));
-    return cinst;
-}
-
-void ComlibDoneCreating(){
-    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-    (cgproxy.ckLocalBranch())->broadcastStrategies();
-}
-
-char *router;
+char *routerName;
 int sfactor=0;
 
-class ComlibManagerMain: public Chare {
-public:
-    ComlibManagerMain(CkArgMsg *msg) {
-        
-        if(CkMyPe() == 0 && msg !=  NULL)
-            CmiGetArgString(msg->argv, "+strategy", &router);         
 
-        if(CkMyPe() == 0 && msg !=  NULL)
-            CmiGetArgInt(msg->argv, "+spanning_factor", &sfactor);
-        
-        CProxy_ComlibManager::ckNew();
-    }
+/** A mainchare, used to initialize the comlib framework at the program startup.
+    Its main purpose is to create the ComlibManager group. */
+class ComlibManagerMain {
+public:
+	ComlibManagerMain(CkArgMsg *msg) {
+
+		if(CkMyPe() == 0 && msg !=  NULL)
+			CmiGetArgString(msg->argv, "+strategy", &routerName);         
+
+		if(CkMyPe() == 0 && msg !=  NULL)
+			CmiGetArgInt(msg->argv, "+spanning_factor", &sfactor);
+
+		CProxy_ComlibManager::ckNew();
+	}
 };
 
-//Called by user code
-ComlibInstanceHandle::ComlibInstanceHandle() : CkDelegateData() {
-    _instid = -1;
-    _dmid.setZero();
-    _srcPe = -1;
-    toForward = 0;
+/***************************************************************************
+ * ComlibInstanceHandle section:
+ *
+ * Implementation of the functions defined in the ComlibInstanceHandle class.
+ ***************************************************************************/
+
+ComlibDelegateData::ComlibDelegateData(int instid) : CkDelegateData(), _instid(instid) {
+	ComlibManagerPrintf("[%d] Constructing ComlibDelegateData\n", CkMyPe());
+	ref();
 }
 
-//Called by user code
-ComlibInstanceHandle::ComlibInstanceHandle(const ComlibInstanceHandle &h) 
-    : CkDelegateData() {
-    _instid = h._instid;
-    _dmid = h._dmid;
-    toForward = h.toForward;        
-
-    ComlibPrintf("In Copy Constructor\n");
-    _srcPe = h._srcPe;
-
-    reset();
-    ref();
-}
-
-ComlibInstanceHandle& ComlibInstanceHandle::operator=(const ComlibInstanceHandle &h) {
-    _instid = h._instid;
-    _dmid = h._dmid;
-    toForward = h.toForward;
-    _srcPe = h._srcPe;
-    
-    reset();
-    ref();
-    return *this;
-}
-
-//Called by the communication library
-ComlibInstanceHandle::ComlibInstanceHandle(int instid, CkGroupID dmid){
-    _instid = instid;
-    _dmid   = dmid;
-    _srcPe  = -1;
-    toForward = 0;
-}
-
-void ComlibInstanceHandle::beginIteration() { 
-    CProxy_ComlibManager cgproxy(_dmid);
-
-    ComlibPrintf("Instance Handle beginIteration %d, %d, %d\n", CkMyPe(), _srcPe, _instid);
-
-    //User forgot to make the instance handle a readonly or pass it
-    //into the constructor of an array and is using it directly from
-    //Main :: main
-    if(_srcPe == -1) {
-        //ComlibPrintf("Warning:Instance Handle needs to be a readonly or a private variable of an array element\n");
-        _srcPe = CkMyPe();
-    }
-
-    if(_srcPe != CkMyPe() && toForward) {
-        (cgproxy.ckLocalBranch())->setRemote(_srcPe);
-    }
-
-    (cgproxy.ckLocalBranch())->setInstance(_instid);
-    (cgproxy.ckLocalBranch())->beginIteration();   
-}
-
-void ComlibInstanceHandle::endIteration() {
-    CProxy_ComlibManager cgproxy(_dmid);
-    (cgproxy.ckLocalBranch())->endIteration();
-}
-
-void ComlibInstanceHandle::setStrategy(CharmStrategy *s) {
-    toForward = s->getForwardOnMigration();
-    CProxy_ComlibManager cgproxy(_dmid);
-    (cgproxy.ckLocalBranch())->registerStrategy(_instid, s);
-}
-
-CharmStrategy *ComlibInstanceHandle::getStrategy() {
-    if(_instid < 0) 
-        return NULL;    
-    
-    CProxy_ComlibManager cgproxy(_dmid);
-    return (cgproxy.ckLocalBranch())->getStrategy(_instid);
-}
-
-CkGroupID ComlibInstanceHandle::getComlibManagerID() {return _dmid;}    
 
 void ComlibInitSectionID(CkSectionID &sid){
-    
-    sid._cookie.type = COMLIB_MULTICAST_MESSAGE;
-    sid._cookie.pe = CkMyPe();
-    
-    sid._cookie.sInfo.cInfo.id = 0;    
-    sid.npes = 0;
-    sid.pelist = NULL;
+
+	sid._cookie.type = COMLIB_MULTICAST_MESSAGE;
+	sid._cookie.pe = CkMyPe();
+
+	sid._cookie.sInfo.cInfo.id = 0;    
+	sid.npes = 0;
+	sid.pelist = NULL;
 }
 
-void ComlibResetSectionProxy(CProxySection_ArrayBase *sproxy) {
-    CkSectionID &sid = sproxy->ckGetSectionID();
-    ComlibInitSectionID(sid);
-    sid._cookie.sInfo.cInfo.status = 0;
-}
 
-// for backward compatibility - for old name commlib
+/** For backward compatibility - for old name commlib. The function
+    _registercomlib() is generated by the translator. */
 void _registercommlib(void)
 {
-  static int _done = 0; 
-  if(_done) 
-      return; 
-  _done = 1;
-  _registercomlib();
+	static int _done = 0; 
+	if(_done) 
+		return; 
+	_done = 1;
+	_registercomlib();
 }
 
-void ComlibAtSyncHandler(void *msg) {
-    CmiFree(msg);
-    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-    ComlibManager *cmgr_ptr = cgproxy.ckLocalBranch();
-    if(cmgr_ptr)
-        cmgr_ptr->AtSync();    
-}
 
 void ComlibNotifyMigrationDoneHandler(void *msg) {
-    CmiFree(msg);
-    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-    ComlibManager *cmgr_ptr = cgproxy.ckLocalBranch();
-    if(cmgr_ptr)
-        cmgr_ptr->AtSync();    
+	CmiFree(msg);
+	CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
+	ComlibManager *cmgr_ptr = cgproxy.ckLocalBranch();
+	if(cmgr_ptr)
+		cmgr_ptr->AtSync();    
 }
 
 
-void ComlibLBMigrationUpdate(LBMigrateMsg *msg) {
-    CProxy_ComlibManager cgproxy(CkpvAccess(cmgrID));
-    (cgproxy.ckLocalBranch())->lbUpdate(msg);
+
+
+
+
+static void periodicDebugPrintStatus(void* ptr, double currWallTime){
+  CkPrintf("[%d] periodicDebugPrintStatus()\n", CkMyPe());
+
+  ComlibManager *mgr = (ComlibManager*)ptr;
+  mgr->printDiagnostics();
+
+  CcdCallFnAfterOnPE((CcdVoidFn)periodicDebugPrintStatus, ptr, 4000, CkMyPe());
+
 }
+
+
+
+
 
 #include "comlib.def.h"
 

@@ -4,13 +4,18 @@
  * $Date$
  * $Revision$
  *****************************************************************************/
+/**
+   @addtogroup ConvComlibRouter
+   @{
+   @file 
+   @brief 3D Grid routing strategy 
+*/
+
 
 #ifndef _D3GRIDROUTER_H
 #define _D3GRIDROUTER_H
 
 #include <math.h>
-#include <converse.h>
-#include "convcomlib.h"
 #include "petable.h"
 
 //3DGrid based router
@@ -28,7 +33,7 @@ class D3GridRouter : public Router
         int nplanes;
 
   public:
-	D3GridRouter(int, int);
+	D3GridRouter(int, int, Strategy*);
 	~D3GridRouter();
 	void NumDeposits(comID, int);
 	void EachToAllMulticast(comID , int , void *, int);
@@ -41,3 +46,5 @@ class D3GridRouter : public Router
 };
 
 #endif
+
+/*@}*/

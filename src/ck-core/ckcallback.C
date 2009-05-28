@@ -12,6 +12,7 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #include "charm++.h"
 #include "ckcallback-ccs.h"
 #include "CkCallback.decl.h"
+#include "envelope.h"
 
 /*readonly*/ CProxy_ckcallback_group _ckcallbackgroup;
 

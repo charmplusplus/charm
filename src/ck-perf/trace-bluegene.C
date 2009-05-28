@@ -13,6 +13,7 @@
 
 
 #include "charm++.h"
+#include "envelope.h"
 #include "trace-common.h"
 #include "trace-bluegene.h"
 #include "blue.h"

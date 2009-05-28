@@ -1,21 +1,25 @@
-#include "DummyStrategy.h"
+// #ifdef filippo
 
-DummyStrategy::DummyStrategy() : CharmStrategy(){
-}
+// #include "DummyStrategy.h"
 
-void DummyStrategy::insertMessage(CharmMessageHolder *cmsg){
-    ComlibPrintf("Sending Directly\n");
-    char *msg = cmsg->getCharmMessage();
-    CmiSyncSendAndFree(cmsg->dest_proc, UsrToEnv(msg)->getTotalsize(), 
-                       (char *)UsrToEnv(msg));
-    delete cmsg;
-}
+// DummyStrategy::DummyStrategy() : CharmStrategy(){
+// }
 
-void DummyStrategy::doneInserting(){
-}
+// void DummyStrategy::insertMessage(CharmMessageHolder *cmsg){
+//     ComlibPrintf("Sending Directly\n");
+//     char *msg = cmsg->getCharmMessage();
+//     CmiSyncSendAndFree(cmsg->dest_proc, UsrToEnv(msg)->getTotalsize(), 
+//                        (char *)UsrToEnv(msg));
+//     delete cmsg;
+// }
 
-void DummyStrategy::pup(PUP::er &p){
-   CharmStrategy::pup(p);
-}
+// void DummyStrategy::doneInserting(){
+// }
 
-//PUPable_def(DummyStrategy);
+// void DummyStrategy::pup(PUP::er &p){
+//    CharmStrategy::pup(p);
+// }
+
+// //PUPable_def(DummyStrategy);
+
+// #endif

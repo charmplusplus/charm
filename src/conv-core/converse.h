@@ -559,10 +559,12 @@ extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 #define CmiGetHandler(m)  (((CmiMsgHeaderExt*)m)->hdl)
 #define CmiGetXHandler(m) (((CmiMsgHeaderExt*)m)->xhdl)
 #define CmiGetInfo(m)     (((CmiMsgHeaderExt*)m)->info)
+#define CmiGetStrategy(m) (((CmiMsgHeaderExt*)m)->stratid)
 
 #define CmiSetHandler(m,v)  do {((((CmiMsgHeaderExt*)m)->hdl)=(v));} while(0)
 #define CmiSetXHandler(m,v) do {((((CmiMsgHeaderExt*)m)->xhdl)=(v));} while(0)
 #define CmiSetInfo(m,v)     do {((((CmiMsgHeaderExt*)m)->info)=(v));} while(0)
+#define CmiSetStrategy(m,v) do {((((CmiMsgHeaderExt*)m)->stratid)=(v);} while(0)
 
 #define CmiHandlerToInfo(n) (CpvAccess(CmiHandlerTable)[n])
 #define CmiHandlerToFunction(n) (CmiHandlerToInfo(n).hdlr)
@@ -1729,6 +1731,13 @@ extern int CmiGridQueueLookupMsg (char *msg);
 #endif
 
 #include "debug-conv.h"
+
+typedef struct {
+  CmiUInt4 msgSize;
+  CmiUInt2 senderPe;
+  CmiUInt2 destination;
+} CmiFragmentHeader;
+
 
 #if CMK_HAS_LOG2
 #define CmiLog2  log2

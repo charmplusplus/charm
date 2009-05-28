@@ -1,51 +1,44 @@
+/**
+   @addtogroup ComlibCharmStrategy
+   @{
+   @file 
+   @brief Section multicast strategy that sends data along two rings
+
+*/
+
 #ifndef MULTIRING_MULTICAST_STRATEGY
 #define MULTIRING_MULTICAST_STRATEGY
 
-#include "DirectMulticastStrategy.h"
-
-/***************************************************************
-              Section multicast strategy that sends data along a ring 
-              with multiple start points on the ring
-
-      Sameer - 04/19/05
-*************************************************************/
+#include "MulticastStrategy.h"
 
 /**
- * Multicast strategy that sends the data using two rings. It divides the total
- * number of processors involved in the multicast in two (after ordering them).
- * Then two rings are created, one starting with the source processor and its
- * half, the other starting at (CkMyPe()+CkNumPes()/2)%CkNumPes().
- */
-class MultiRingMulticast: public DirectMulticastStrategy {
+ Multicast strategy that sends the data using two rings. It divides the total
+ number of processors involved in the multicast in two (after ordering them).
+ Then two rings are created, one starting with the source processor and its
+ half, the other starting at (CkMyPe()+CkNumPes()/2)%CkNumPes().
+*/
+class MultiRingMulticastStrategy: public MulticastStrategy {
     
  protected:
     
-    int isEndOfRing(int next_pe, int src_pe);
-    
     ///Defines the two entries of the section multicast interface
-    virtual ComlibSectionHashObject *createObjectOnSrcPe(int nelements, 
-                                                         CkArrayIndexMax *elements);
+  virtual void createObjectOnSrcPe(ComlibSectionHashObject *obj, int npes, ComlibMulticastIndexCount *pelist);
 
     ///Creates the propagation across the half ring
-    virtual ComlibSectionHashObject *createObjectOnIntermediatePe(int nindices, CkArrayIndexMax *idxlist, int npes, ComlibMulticastIndexCount *counts, int srcpe);
+    virtual void createObjectOnIntermediatePe(ComlibSectionHashObject *obj, int npes, ComlibMulticastIndexCount *counts, int srcpe);
 
     ///Specifies that the multicast messages need the processor list to be ordered
     virtual int needSorting() { return 1; }
     
  public:
-    
     //Array constructor
-    MultiRingMulticast(CkArrayID dest_id, int flag = 0);    
-    MultiRingMulticast(CkMigrateMessage *m) : DirectMulticastStrategy(m){}
+    MultiRingMulticastStrategy(int flag = 0): MulticastStrategy(flag) {}
+    MultiRingMulticastStrategy(CkMigrateMessage *m): MulticastStrategy(m) {}
 
-    //Destructor
-    ~MultiRingMulticast() {}
-    
-    void pup(PUP::er &p);
-    void beginProcessing(int nelements);
-    
-    PUPable_decl(MultiRingMulticast);
+   
+    PUPable_decl(MultiRingMulticastStrategy);
 };
 
 #endif
 
+/*@}*/

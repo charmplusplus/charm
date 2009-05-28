@@ -1,6 +1,16 @@
 #ifndef MESSAGE_PACKER_H
 #define MESSAGE_PACKER_H
 
+/**
+   @addtogroup CharmComlib
+   *@{
+
+   @file
+   
+   @brief An envelope for packing multiple messages into a single message.
+*/
+
+
 #include "charm++.h"
 #include "envelope.h"
 #include "ComlibManager.h"
@@ -171,5 +181,6 @@ inline void MsgPacker::deliver(CombinedMessage *cmb_msg){
     CmiFree(cmb_msg);
 }
 
-
+/*@}*/
 #endif
+

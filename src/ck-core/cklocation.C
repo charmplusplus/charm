@@ -2031,7 +2031,8 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
 
 /************************** LocMgr: MESSAGING *************************/
 /// Deliver message to this element, going via the scheduler if local
-void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
+/// @return 0 if object local, 1 if not
+int CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 	DEBS((AA"deliver \n"AB));
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
@@ -2138,19 +2139,25 @@ void CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 	/**FAULT_EVAC*/
 	if (rec!=NULL){
 		CmiBool result = rec->deliver(msg,type,opts);
-		if(!result){
-		/*	//DEBS((AA"deliver %s failed type %d \n"AB,idx2str(idx),rec->type()));
+		// if result is CmiFalse, than rec is not valid anymore, as the object
+		// the message was just delivered to has died or migrated out.
+		// Therefore rec->type() cannot be invoked!
+		if (result==CmiTrue && rec->type()==CkLocRec::local) return 0;
+		else return 1;
+		/*if(!result){
+			//DEBS((AA"deliver %s failed type %d \n"AB,idx2str(idx),rec->type()));
 			DEBS((AA"deliver %s failed \n"AB,idx2str(idx)));
 			if(rec->type() == CkLocRec::remote){
 				if (opts & CK_MSG_KEEP)
 					msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
 				deliverUnknown(msg,type);
-			}*/
-		}
+			}
+		}*/
 	}else /* rec==NULL*/ {
 		if (opts & CK_MSG_KEEP)
 			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
 		deliverUnknown(msg,type,opts);
+		return 1;
 	}
 
 }

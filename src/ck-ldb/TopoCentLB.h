@@ -4,6 +4,34 @@
 #include "CentralLB.h"
 #include "topology.h"
 
+
+extern "C" void METIS_PartGraphRecursive (int*, int*, int*, int*, int*, int*,
+					  int*, int*, int*, int*, int*);
+
+extern "C" void METIS_PartGraphKway (int*, int*, int*, int*, int*, int*,
+				     int*, int*, int*, int*, int*);
+
+extern "C" void METIS_PartGraphVKway (int*, int*, int*, int*, int*, int*,
+				      int*, int*, int*, int*, int*);
+
+extern "C" void METIS_WPartGraphRecursive (int*, int*, int*, int*,
+					   int*, int*, int*, int*,
+					   float*, int*, int*, int*);
+
+extern "C" void METIS_WPartGraphKway (int*, int*, int*, int*,
+				      int*, int*, int*, int*,
+				      float*, int*, int*, int*);
+
+extern "C" void METIS_mCPartGraphRecursive (int*, int*, int*, int*,
+					    int*, int*, int*, int*,
+					    int*, int*, int*, int*);
+
+extern "C" void METIS_mCPartGraphKway (int*, int*, int*, int*, int*,
+				       int*, int*, int*, int*, int*,
+				       int*, int*, int*);
+
+
+
 void CreateTopoCentLB ();
 
 class TopoCentLB : public CentralLB
