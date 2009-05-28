@@ -173,9 +173,9 @@ inline  __vec4f  __vor4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int* 
 inline __vec2lf __vor2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] | bPtr[0]; rPtr[1] = aPtr[1] | bPtr[1]; rPtr[2] = aPtr[2] | bPtr[2]; rPtr[3] = aPtr[3] | bPtr[3]; return r; }
 
 /***** Nor *****/
-inline  __vec4i  __vnor4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] | bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] | bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] | bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] | bPtr[3]) ^ 0x0; return r; }
-inline  __vec4f  __vnor4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] | bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] | bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] | bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] | bPtr[3]) ^ 0x0; return r; }
-inline __vec2lf __vnor2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] | bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] | bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] | bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] | bPtr[3]) ^ 0x0; return r; }
+inline  __vec4i  __vnor4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] | bPtr[0]) ^ -1; rPtr[1] = (aPtr[1] | bPtr[1]) ^ -1; rPtr[2] = (aPtr[2] | bPtr[2]) ^ -1; rPtr[3] = (aPtr[3] | bPtr[3]) ^ -1; return r; }
+inline  __vec4f  __vnor4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] | bPtr[0]) ^ -1; rPtr[1] = (aPtr[1] | bPtr[1]) ^ -1; rPtr[2] = (aPtr[2] | bPtr[2]) ^ -1; rPtr[3] = (aPtr[3] | bPtr[3]) ^ -1; return r; }
+inline __vec2lf __vnor2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] | bPtr[0]) ^ -1; rPtr[1] = (aPtr[1] | bPtr[1]) ^ -1; rPtr[2] = (aPtr[2] | bPtr[2]) ^ -1; rPtr[3] = (aPtr[3] | bPtr[3]) ^ -1; return r; }
 
 /***** And *****/
 inline  __vec4i  __vand4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] & bPtr[0]; rPtr[1] = aPtr[1] & bPtr[1]; rPtr[2] = aPtr[2] & bPtr[2]; rPtr[3] = aPtr[3] & bPtr[3]; return r; }
@@ -183,9 +183,9 @@ inline  __vec4f  __vand4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int*
 inline __vec2lf __vand2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] & bPtr[0]; rPtr[1] = aPtr[1] & bPtr[1]; rPtr[2] = aPtr[2] & bPtr[2]; rPtr[3] = aPtr[3] & bPtr[3]; return r; }
 
 /***** Nand *****/
-inline  __vec4i  __vnand4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] & bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] & bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] & bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] & bPtr[3]) ^ 0x0; return r; }
-inline  __vec4f  __vnand4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] & bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] & bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] & bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] & bPtr[3]) ^ 0x0; return r; }
-inline __vec2lf __vnand2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] & bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] & bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] & bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] & bPtr[3]) ^ 0x0; return r; }
+inline  __vec4i  __vnand4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] & bPtr[0]) ^ -1; rPtr[1] = (aPtr[1] & bPtr[1]) ^ -1; rPtr[2] = (aPtr[2] & bPtr[2]) ^ -1; rPtr[3] = (aPtr[3] & bPtr[3]) ^ -1; return r; }
+inline  __vec4f  __vnand4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] & bPtr[0]) ^ -1; rPtr[1] = (aPtr[1] & bPtr[1]) ^ -1; rPtr[2] = (aPtr[2] & bPtr[2]) ^ -1; rPtr[3] = (aPtr[3] & bPtr[3]) ^ -1; return r; }
+inline __vec2lf __vnand2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] & bPtr[0]) ^ -1; rPtr[1] = (aPtr[1] & bPtr[1]) ^ -1; rPtr[2] = (aPtr[2] & bPtr[2]) ^ -1; rPtr[3] = (aPtr[3] & bPtr[3]) ^ -1; return r; }
 
 /***** Xor *****/
 inline  __vec4i  __vxor4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] ^ bPtr[0]; rPtr[1] = aPtr[1] ^ bPtr[1]; rPtr[2] = aPtr[2] ^ bPtr[2]; rPtr[3] = aPtr[3] ^ bPtr[3]; return r; }
@@ -193,9 +193,9 @@ inline  __vec4f  __vxor4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int*
 inline __vec2lf __vxor2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = aPtr[0] ^ bPtr[0]; rPtr[1] = aPtr[1] ^ bPtr[1]; rPtr[2] = aPtr[2] ^ bPtr[2]; rPtr[3] = aPtr[3] ^ bPtr[3]; return r; }
 
 /***** Nxor *****/
-inline  __vec4i  __vnxor4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] ^ bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] ^ bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] ^ bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] ^ bPtr[3]) ^ 0x0; return r; }
-inline  __vec4f  __vnxor4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] ^ bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] ^ bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] ^ bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] ^ bPtr[3]) ^ 0x0; return r; }
-inline __vec2lf __vnxor2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] ^ bPtr[0]) ^ 0x0; rPtr[1] = (aPtr[1] ^ bPtr[1]) ^ 0x0; rPtr[2] = (aPtr[2] ^ bPtr[2]) ^ 0x0; rPtr[3] = (aPtr[3] ^ bPtr[3]) ^ 0x0; return r; }
+inline  __vec4i  __vnxor4i(const  __vec4i a, const  __vec4i b) {  __vec4i r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] ^ bPtr[0]) ^ -1; rPtr[1] = (aPtr[1] ^ bPtr[1]) ^ -1; rPtr[2] = (aPtr[2] ^ bPtr[2]) ^ -1; rPtr[3] = (aPtr[3] ^ bPtr[3]) ^ -1; return r; }
+inline  __vec4f  __vnxor4f(const  __vec4f a, const  __vec4f b) {  __vec4f r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] ^ bPtr[0]) ^ -1; rPtr[1] = (aPtr[1] ^ bPtr[1]) ^ -1; rPtr[2] = (aPtr[2] ^ bPtr[2]) ^ -1; rPtr[3] = (aPtr[3] ^ bPtr[3]) ^ -1; return r; }
+inline __vec2lf __vnxor2lf(const __vec2lf a, const __vec2lf b) { __vec2lf r; int* rPtr = (int*)(&r); int* aPtr = (int*)(&a); int* bPtr = (int*)(&b); rPtr[0] = (aPtr[0] ^ bPtr[0]) ^ -1; rPtr[1] = (aPtr[1] ^ bPtr[1]) ^ -1; rPtr[2] = (aPtr[2] ^ bPtr[2]) ^ -1; rPtr[3] = (aPtr[3] ^ bPtr[3]) ^ -1; return r; }
 
 /* TODO | FIXME - Try to do the comparisons in a branchless way */
 
@@ -750,8 +750,8 @@ inline __vec4i __vcmple2lf(const  __vec4f a, const  __vec4f b) {  __vec4i r; r.v
   #define vrsqrt2lf __vrsqrt2lf
 
   /***** Not *****/
-  #define vnot4i(a)  (vec_xor((a), const_vzero4i))
-  #define vnot4f(a)  (vec_xor((a), const_vzero4f)) 
+  #define vnot4i(a)  (vec_xor((a), const_vnegone4i))
+  #define vnot4f(a)  (vec_xor((a), const_vnegone4i))
   #define vnot2lf __vnot2lf
 
   /***** Or *****/
