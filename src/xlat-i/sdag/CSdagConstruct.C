@@ -766,6 +766,12 @@ void SdagConstruct::generateWhen(XStr& op)
      }
      el = el->next;
   }
+
+  // max(current,merge) --> current, then reset the mergepath
+  op << "       " << label->charstar()  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
+  op << "       currentlyExecutingPath = " << label->charstar()  << "_PathMergePoint; /* Critical Path Detection */ \n";
+  op << "       " << label->charstar()  << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
+
   if (constructs != 0) {
     if (!constructs->empty() ) {
        op << "       " << constructs->front()->label->charstar() << "(";
@@ -900,7 +906,7 @@ void SdagConstruct::generateWhen(XStr& op)
         }  
      }
   op << "       tr->args[" <<paramIndex <<"] = (size_t) impl_msg;\n";
-  }   
+  }
   int iRef=0, iAny=0;
 
   el = elist;
@@ -917,6 +923,11 @@ void SdagConstruct::generateWhen(XStr& op)
     }
     el = el->next;
   }
+
+  // max(current,merge) --> current
+  op << "       " << label->charstar()  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
+  op << "       currentlyExecutingPath = " << label->charstar()  << "_PathMergePoint; /* Critical Path Detection */ \n";
+
   op << "       __cDep->Register(tr);\n";
   op << "       return 0;\n";
   op << "    }\n";
@@ -1177,7 +1188,7 @@ void SdagConstruct::generateForall(XStr& op)
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
   // actual code here 
-  op << "    " << counter->charstar() << "->decrement();\n";
+  op << "    " << counter->charstar() << "->decrement(); /* DECREMENT 1 */ \n";
   op << "    if (" << counter->charstar() << "->isDone()) {\n";
   op << "      delete " << counter->charstar() << ";\n";
   if(nextBeginOrEnd == 1)
@@ -1226,7 +1237,14 @@ void SdagConstruct::generateOlist(XStr& op)
   // actual code here 
   //Accumulate all the bgParent pointers that the calling when_end functions give
   op << "    " << counter->charstar() << "->decrement();\n";
+ 
+ op << "    olist_" << counter->charstar() << "_PathMergePoint.updateMax(currentlyExecutingPath);  /* Critical Path Detection FIXME: is the currently executing path the right thing for this? The duration ought to have been added somewhere. */ \n";
+
   op << "    if (" << counter->charstar() << "->isDone()) {\n";
+  op << "      currentlyExecutingPath = olist_" << counter->charstar() << "_PathMergePoint; /* Critical Path Detection */ \n";
+
+  op << "      olist_" << counter->charstar() << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
+
   op << "      delete " << counter->charstar() << ";\n";
 
 #if CMK_BLUEGENE_CHARM
@@ -1650,6 +1668,7 @@ void SdagConstruct::generateTraceEpDef(XStr& op)          // for trace
     cn->generateTraceEpDef(op);
   }
 }
+
 
 void RemoveSdagComments(char *str)
 {

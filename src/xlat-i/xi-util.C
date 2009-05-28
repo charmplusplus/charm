@@ -67,6 +67,34 @@ void XStr::line_append(const char c)
   initTo(xs.charstar());
 }
 
+void XStr::line_append_padding(const char c, int lineWidth)
+{
+  XStr xs;
+  int count = 0;
+
+  for(int i=0; i<len; i++) {
+    if(s[i] == '\n'){
+      // found line ending
+      while(count++ < lineWidth-1)
+	xs << " ";
+      xs << c << "\n";
+      count=0;
+    } else if(s[i] == '\t') {
+      // found tab, convert to 2 spaces
+      xs << "  ";
+      count+=2;
+    } else {
+      // found non-line ending
+      xs << s[i];
+      count++;
+    }
+  }
+  delete[] s;
+  initTo(xs.charstar());
+}
+
+
+
 void 
 XStr::spew(const char*b, const char *a1, const char *a2, const char *a3, 
            const char *a4, const char *a5)

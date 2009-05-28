@@ -47,6 +47,17 @@ public:
 };
 CkpvStaticDeclare(CkVec<UsrEvent *>*, usrEvents);
 
+
+
+/// Disable the outputting of the trace logs
+void disableTraceLogOutput()
+{ 
+  CkpvAccess(_trace)->setWriteData(false);
+}
+
+
+
+
 #ifdef CMK_OPTIMIZE
 static int warned=0;
 #define OPTIMIZED_VERSION 	\

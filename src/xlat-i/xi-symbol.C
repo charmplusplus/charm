@@ -2553,6 +2553,27 @@ void CParsedFile::generateInitFunction(XStr& op)
   op << "  }\n";
 }
 
+
+/// Create a merging point for each of the places where multiple dependencies lead into some future task.
+/// For Isaac's Critical Path Detection
+void CParsedFile::generateDependencyMergePoints(XStr& op) 
+{
+
+  op << " \n";
+
+  // Each when statement will have a set of message dependencies, and also the dependencies from completion of previous task
+  for(int i=0;i<numWhens;i++){
+    op << "  MergeablePathHistory _when_" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
+  }
+  
+  // The end of each overlap block will have multiple paths that merge before the subsequent task is executed
+  for(int i=0;i<numOlists;i++){
+    op << "  MergeablePathHistory olist__co" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
+  }
+
+}
+
+
 void CParsedFile::generatePupFunction(XStr& op)
 {
   op << "public:\n";

@@ -23,11 +23,8 @@
 
 #include<pup_stl.h>
 
-#define DEBUG 0
 
-
-
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+void initializeCriticalPath(void);
 
 
 /**
@@ -45,8 +42,7 @@
    This can be constructed from an envelope.
 */
 
-void initializeCriticalPath(void);
-
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
 
 //#warning "Usinge MergeablePathHistory in pathHistory.h"
 class MergeablePathHistory {
@@ -126,7 +122,7 @@ class MergeablePathHistory {
 
 };
 
-
+#endif
 
 
 /** 
@@ -135,7 +131,7 @@ class MergeablePathHistory {
 
     These can be constructed from a MergeablePathHistory, and are assumed to refer to the local PE.
 */
-
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
 class PathHistoryTableEntry {
   
  public:
@@ -216,6 +212,10 @@ class PathHistoryTableEntry {
   double get_preceding_path_time() const {return preceding_path_time;}
 
 };
+#else 
+class PathHistoryTableEntry{
+};
+#endif
 
 
 /// A debugging routine that outputs critical path info as Projections user events.
@@ -245,16 +245,18 @@ class pathInformationMsg : public CMessage_pathInformationMsg {
   int table_idx;
 
   void printme(){
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
     CkPrintf("Path contains %d entries\n", historySize);
     for(int i=historySize-1;i>=0;i--){
       CkPrintf("\tPath Step %d: local_path_time=%lf arr=%d ep=%d starttime=%lf preceding path time=%lf pe=%d\n",i, history[i].get_local_path_time(),  history[i].local_arr, history[i].local_ep, history[i].get_start_time(), history[i].get_preceding_path_time(), history[i].local_pe);
     }
-    
+#endif    
   }
   
 };
-#endif
 
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
 CkpvExtern(MergeablePathHistory, currentlyExecutingPath);
 CkpvExtern(double, timeEntryMethodStarted);
 
@@ -296,6 +298,9 @@ extern void criticalPath_split();
 
 /// Take the maximal path from the stored merge_path variable and the currently executing path. Put the result in currently executing path.
 #define MERGE_PATH_MAX_D(x,n) merge_path_D_##x[n].updateMax(CkpvAccess(currentlyExecutingPath)); CkpvAccess(currentlyExecutingPath) = merge_path_D_##x[n]; 
+
+
+#endif
 
 
 /** @} */

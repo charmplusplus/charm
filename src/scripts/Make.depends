@@ -14,29 +14,30 @@ conv-conds.o: conv-conds.c converse.h conv-config.h conv-autoconfig.h \
   persistent.h debug-conv.h
 	$(CHARMC) -c -I. conv-conds.c
 
-queueing.o: queueing.c ./converse.h ./conv-config.h ./conv-autoconfig.h \
-  ./conv-common.h ./conv-mach.h ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h \
-  ./converse.h ./conv-cpath.h ./conv-qd.h ./conv-random.h ./conv-lists.h \
-  ./conv-trace.h ./persistent.h ./debug-conv.h queueing.h
+queueing.o: queueing.c converse.h conv-config.h conv-autoconfig.h \
+  conv-common.h conv-mach.h conv-mach-opt.h pup_c.h conv-config.h \
+  conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h conv-random.h \
+  conv-lists.h conv-trace.h converse.h persistent.h debug-conv.h pup_c.h \
+  queueing.h
 	$(CHARMC) -c -I. queueing.c
 
-msgmgr.o: msgmgr.c ./converse.h ./conv-config.h ./conv-autoconfig.h \
-  ./conv-common.h ./conv-mach.h ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h \
-  ./converse.h ./conv-cpath.h ./conv-qd.h ./conv-random.h ./conv-lists.h \
-  ./conv-trace.h ./persistent.h ./debug-conv.h
+msgmgr.o: msgmgr.c converse.h conv-config.h conv-autoconfig.h \
+  conv-common.h conv-mach.h conv-mach-opt.h pup_c.h conv-config.h \
+  conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h conv-random.h \
+  conv-lists.h conv-trace.h converse.h persistent.h debug-conv.h pup_c.h
 	$(CHARMC) -c -I. msgmgr.c
 
-cpm.o: cpm.c queueing.h ./converse.h ./conv-config.h ./conv-autoconfig.h \
-  ./conv-common.h ./conv-mach.h ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h \
-  ./converse.h ./conv-cpath.h ./conv-qd.h ./conv-random.h ./conv-lists.h \
-  ./conv-trace.h ./persistent.h ./debug-conv.h
+cpm.o: cpm.c queueing.h converse.h conv-config.h conv-autoconfig.h \
+  conv-common.h conv-mach.h conv-mach-opt.h pup_c.h conv-config.h \
+  conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h conv-random.h \
+  conv-lists.h conv-trace.h converse.h persistent.h debug-conv.h pup_c.h
 	$(CHARMC) -c -I. cpm.c
 
-cpthreads.o: cpthreads.c cpthreads.h ./converse.h ./conv-config.h \
-  ./conv-autoconfig.h ./conv-common.h ./conv-mach.h ./conv-mach-opt.h \
-  ./pup_c.h ./conv-cpm.h ./converse.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h
+cpthreads.o: cpthreads.c cpthreads.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h
 	$(CHARMC) -c -I. cpthreads.c
 
 futures.o: futures.c converse.h conv-config.h conv-autoconfig.h \
@@ -382,24 +383,35 @@ trace-common.o: trace-common.C charm.h converse.h conv-config.h \
   register.h
 	$(CHARMC) -c -I. trace-common.C
 
-tracef.o: tracef.C ./charm++.h ./charm.h ./converse.h ./conv-config.h \
-  ./conv-autoconfig.h ./conv-common.h ./conv-mach.h ./conv-mach-opt.h \
-  ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h ./conv-random.h \
-  ./conv-lists.h ./conv-trace.h ./persistent.h ./debug-conv.h ./pup.h \
-  ./middle.h ./middle-conv.h ./cklists.h ./ckbitvector.h ./ckstream.h \
-  ./init.h ./ckhashtable.h ./debug-charm.h ./simd.h ./CkMarshall.decl.h \
-  ./charm++.h ./cksection.h ./ckcallback.h ./conv-ccs.h ./sockRoutines.h \
-  ./ccs-server.h ./ckobjQ.h ./ckreduction.h ./CkReduction.decl.h \
-  ./cknodegroupreduction.h ./CkArrayReductionMgr.decl.h \
-  ./ckmemcheckpoint.h ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h \
-  ./cklocation.h ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h \
-  ./LBOM.h ./LBComm.h ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h \
-  ./NullLB.decl.h ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h ./charm-api.h
+tracef.o: tracef.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  charm-api.h conv-config.h
 	$(CHARMC) -c -I. tracef.C
 
 init.o: init.C ck.h charm++.h charm.h converse.h conv-config.h \
@@ -475,7 +487,8 @@ ck.o: ck.C ck.h charm++.h charm.h converse.h conv-config.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h qd.h register.h stats.h \
-  ckfutures.h ckIgetControl.h queueing.h CkMarshall.def.h
+  ckfutures.h ckIgetControl.h queueing.h pathHistory.h \
+  ControlPoints.decl.h pup_stl.h pup.h CkMarshall.def.h
 	$(CHARMC) -c -I. ck.C
 
 main.o: main.C ck.h charm++.h charm.h converse.h conv-config.h \
@@ -553,27 +566,37 @@ ckIgetControl.o: ckIgetControl.C charm++.h charm.h converse.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h ckIgetControl.h
 	$(CHARMC) -c -I. ckIgetControl.C
 
-debug-message.o: debug-message.C ./ck.h ./charm++.h ./charm.h \
-  ./converse.h ./conv-config.h ./conv-autoconfig.h ./conv-common.h \
-  ./conv-mach.h ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h \
-  ./conv-qd.h ./conv-random.h ./conv-lists.h ./conv-trace.h \
-  ./persistent.h ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h \
-  ./cklists.h ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h \
-  ./debug-charm.h ./simd.h ./CkMarshall.decl.h ./cksection.h \
-  ./ckcallback.h ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h \
-  ./ckreduction.h ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h ./qd.h \
-  ./register.h ./stats.h ./ckfutures.h ./ckIgetControl.h envelope.h \
-  queueing.h
+debug-message.o: debug-message.C ck.h charm++.h charm.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h pup.h \
+  middle.h middle-conv.h converse.h pup.h cklists.h pup.h ckbitvector.h \
+  ckstream.h init.h charm.h ckhashtable.h pup.h debug-charm.h converse.h \
+  debug-conv.h pup.h cklists.h simd.h CkMarshall.decl.h charm++.h \
+  ckhashtable.h pup.h cksection.h ckcallback.h conv-ccs.h converse.h \
+  sockRoutines.h conv-config.h ccs-server.h sockRoutines.h ckobjQ.h \
+  cklists.h ckreduction.h CkReduction.decl.h charm++.h \
+  cknodegroupreduction.h CkArrayReductionMgr.decl.h charm++.h \
+  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h \
+  readonly.h charm.h ckarray.h cklocation.h LBDatabase.h lbdb.h \
+  converse.h charm.h middle.h LBDBManager.h converse.h lbdb.h cklists.h \
+  LBObj.h lbdb.h LBOM.h lbdb.h LBObj.h LBComm.h converse.h lbdb.h \
+  LBMachineUtil.h lbdb++.h LBDBManager.h LBDatabase.decl.h charm++.h \
+  NullLB.decl.h charm++.h LBDatabase.decl.h BaseLB.decl.h charm++.h \
+  LBDatabase.decl.h CkLocation.decl.h charm++.h CkMarshall.decl.h \
+  CkArray.decl.h charm++.h CkReduction.decl.h CkLocation.decl.h \
+  CkArrayReductionMgr.decl.h CkArrayReductionMgr.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h charm++.h ckhashtable.h pup.h \
+  convcomlibstrategy.h converse.h pup.h cklists.h ComlibLearner.h \
+  convcomlibstrategy.h envelope.h charm.h ckhashtable.h pup.h ckstream.h \
+  CkFutures.decl.h charm++.h charisma.h charisma.decl.h charm++.h tempo.h \
+  charm++.h tempo.decl.h charm++.h waitqd.h charm++.h waitqd.decl.h \
+  charm++.h CkFutures.decl.h sdag.h charm++.h ckcheckpoint.h \
+  CkCheckpoint.decl.h charm++.h ckevacuation.h ckarrayreductionmgr.h \
+  trace.h conv-trace.h trace-bluegene.h trace.h envelope.h qd.h \
+  register.h stats.h ckfutures.h CkFutures.decl.h ckIgetControl.h \
+  charisma.h envelope.h queueing.h
 	$(CHARMC) -c -I. debug-message.C
 
 debug-charm.o: debug-charm.C converse.h conv-config.h conv-autoconfig.h \
@@ -649,7 +672,8 @@ ckarray.o: ckarray.C charm++.h charm.h converse.h conv-config.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h register.h ck.h qd.h \
-  stats.h ckfutures.h ckIgetControl.h CkArray.def.h
+  stats.h ckfutures.h ckIgetControl.h pathHistory.h ControlPoints.decl.h \
+  pup_stl.h pup.h CkArray.def.h
 	$(CHARMC) -c -I. ckarray.C
 
 ckreduction.o: ckreduction.C charm++.h charm.h converse.h conv-config.h \
@@ -668,7 +692,8 @@ ckreduction.o: ckreduction.C charm++.h charm.h converse.h conv-config.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h ck.h qd.h register.h \
-  stats.h ckfutures.h ckIgetControl.h CkReduction.def.h
+  stats.h ckfutures.h ckIgetControl.h pathHistory.h ControlPoints.decl.h \
+  pup_stl.h pup.h CkReduction.def.h
 	$(CHARMC) -c -I. ckreduction.C
 
 ckarrayreductionmgr.o: ckarrayreductionmgr.C charm++.h charm.h converse.h \
@@ -741,28 +766,29 @@ LBDatabase.o: LBDatabase.C converse.h conv-config.h conv-autoconfig.h \
   ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
   tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h NullLB.decl.h BaseLB.decl.h LBSimulation.h ./charm++.h \
+  trace-bluegene.h NullLB.decl.h BaseLB.decl.h LBSimulation.h charm++.h \
   CentralLB.h BaseLB.h CentralLB.decl.h CentralLBMsg.h topology.h \
-  NullLB.h ./BaseLB.h LBDatabase.def.h
+  NullLB.h BaseLB.h LBDatabase.def.h
 	$(CHARMC) -c -I. LBDatabase.C
 
-lbdb.o: lbdb.C ./converse.h ./conv-config.h ./conv-autoconfig.h \
-  ./conv-common.h ./conv-mach.h ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h \
-  ./converse.h ./conv-cpath.h ./conv-qd.h ./conv-random.h ./conv-lists.h \
-  ./conv-trace.h ./persistent.h ./debug-conv.h lbdb.h converse.h charm.h \
-  pup.h middle.h middle-conv.h LBObj.h LBOM.h LBDatabase.h LBDBManager.h \
-  cklists.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h charm++.h \
-  ckbitvector.h ckstream.h init.h ckhashtable.h debug-charm.h \
-  debug-conv.h simd.h CkMarshall.decl.h cksection.h ckcallback.h \
-  conv-ccs.h sockRoutines.h conv-config.h ccs-server.h ckobjQ.h \
-  ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
-  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
-  readonly.h ckarray.h cklocation.h CkLocation.decl.h CkArray.decl.h \
-  ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
-  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
-  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
-  CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
-  conv-trace.h trace-bluegene.h NullLB.decl.h BaseLB.decl.h
+lbdb.o: lbdb.C converse.h conv-config.h conv-autoconfig.h conv-common.h \
+  conv-mach.h conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h lbdb.h \
+  converse.h charm.h pup.h middle.h middle-conv.h LBObj.h LBOM.h \
+  LBDatabase.h LBDBManager.h cklists.h LBComm.h LBMachineUtil.h lbdb++.h \
+  LBDatabase.decl.h charm++.h ckbitvector.h ckstream.h init.h \
+  ckhashtable.h debug-charm.h debug-conv.h simd.h CkMarshall.decl.h \
+  cksection.h ckcallback.h conv-ccs.h sockRoutines.h conv-config.h \
+  ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
+  cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
+  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h \
+  CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
+  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h \
+  NullLB.decl.h BaseLB.decl.h
 	$(CHARMC) -c -I. lbdb.C
 
 lbdbf.o: lbdbf.C charm++.h charm.h converse.h conv-config.h \
@@ -914,72 +940,93 @@ ckevacuation.o: ckevacuation.C charm++.h charm.h converse.h conv-config.h \
   stats.h ckfutures.h ckIgetControl.h
 	$(CHARMC) -c -I. ckevacuation.C
 
-ckmessagelogging.o: ckmessagelogging.C ck.h charm++.h charm.h converse.h \
-  conv-config.h conv-common.h conv-mach.h conv-autoconfig.h \
-  conv-mach-opt.h pup_c.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
-  conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h middle.h \
+ckmessagelogging.o: ckmessagelogging.C charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h persistent.h debug-conv.h pup.h ck.h charm++.h middle.h \
   middle-conv.h cklists.h ckbitvector.h ckstream.h init.h ckhashtable.h \
-  debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h conv-ccs.h \
-  sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
-  cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
-  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
-  lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h \
-  LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
-  CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  debug-charm.h simd.h CkMarshall.decl.h cksection.h ckcallback.h \
+  conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
+  CkReduction.decl.h cknodegroupreduction.h CkArrayReductionMgr.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
+  cklocation.h LBDatabase.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
+  LBMachineUtil.h lbdb++.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h \
+  CkLocation.decl.h CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h qd.h register.h stats.h \
-  ckfutures.h ckmessagelogging.h ckobjid.h
+  ckfutures.h ckIgetControl.h ckmessagelogging.h ckobjid.h queueing.h \
+  CentralLB.h BaseLB.h CentralLB.decl.h CentralLBMsg.h
 	$(CHARMC) -c -I. ckmessagelogging.C
 
-LBDBManager.o: LBDBManager.C ./charm++.h ./charm.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h ./cklists.h \
-  ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h ./debug-charm.h \
-  ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h ./ckcallback.h \
-  ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h ./ckreduction.h \
-  ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h LBDBManager.h
+LBDBManager.o: LBDBManager.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  LBDBManager.h
 	$(CHARMC) -c -I. LBDBManager.C
 
-LBComm.o: LBComm.C ./converse.h ./conv-config.h ./conv-autoconfig.h \
-  ./conv-common.h ./conv-mach.h ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h \
-  ./converse.h ./conv-cpath.h ./conv-qd.h ./conv-random.h ./conv-lists.h \
-  ./conv-trace.h ./persistent.h ./debug-conv.h LBComm.h converse.h lbdb.h \
-  charm.h pup.h middle.h middle-conv.h
+LBComm.o: LBComm.C converse.h conv-config.h conv-autoconfig.h \
+  conv-common.h conv-mach.h conv-mach-opt.h pup_c.h conv-config.h \
+  conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h conv-random.h \
+  conv-lists.h conv-trace.h converse.h persistent.h debug-conv.h pup_c.h \
+  LBComm.h converse.h lbdb.h charm.h pup.h middle.h middle-conv.h
 	$(CHARMC) -c -I. LBComm.C
 
-LBObj.o: LBObj.C ./charm++.h ./charm.h ./converse.h ./conv-config.h \
-  ./conv-autoconfig.h ./conv-common.h ./conv-mach.h ./conv-mach-opt.h \
-  ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h ./conv-random.h \
-  ./conv-lists.h ./conv-trace.h ./persistent.h ./debug-conv.h ./pup.h \
-  ./middle.h ./middle-conv.h ./cklists.h ./ckbitvector.h ./ckstream.h \
-  ./init.h ./ckhashtable.h ./debug-charm.h ./simd.h ./CkMarshall.decl.h \
-  ./charm++.h ./cksection.h ./ckcallback.h ./conv-ccs.h ./sockRoutines.h \
-  ./ccs-server.h ./ckobjQ.h ./ckreduction.h ./CkReduction.decl.h \
-  ./cknodegroupreduction.h ./CkArrayReductionMgr.decl.h \
-  ./ckmemcheckpoint.h ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h \
-  ./cklocation.h ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h \
-  ./LBOM.h ./LBComm.h ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h \
-  ./NullLB.decl.h ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h LBObj.h LBOM.h \
-  LBDBManager.h
+LBObj.o: LBObj.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  LBObj.h LBOM.h LBDBManager.h
 	$(CHARMC) -c -I. LBObj.C
 
 LBMachineUtil.o: LBMachineUtil.C LBDatabase.h lbdb.h converse.h \
@@ -1000,27 +1047,37 @@ LBMachineUtil.o: LBMachineUtil.C LBDatabase.h lbdb.h converse.h \
   trace-bluegene.h NullLB.decl.h BaseLB.decl.h
 	$(CHARMC) -c -I. LBMachineUtil.C
 
-CentralPredictor.o: CentralPredictor.C ./charm++.h ./charm.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h ./cklists.h \
-  ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h ./debug-charm.h \
-  ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h ./ckcallback.h \
-  ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h ./ckreduction.h \
-  ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h CentralLB.h \
-  BaseLB.h LBDatabase.h CentralLB.decl.h charm++.h BaseLB.decl.h \
-  LBDatabase.decl.h CentralLBMsg.h
+CentralPredictor.o: CentralPredictor.C charm++.h charm.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h pup.h \
+  middle.h middle-conv.h converse.h pup.h cklists.h pup.h ckbitvector.h \
+  ckstream.h init.h charm.h ckhashtable.h pup.h debug-charm.h converse.h \
+  debug-conv.h pup.h cklists.h simd.h CkMarshall.decl.h charm++.h \
+  ckhashtable.h pup.h cksection.h ckcallback.h conv-ccs.h converse.h \
+  sockRoutines.h conv-config.h ccs-server.h sockRoutines.h ckobjQ.h \
+  cklists.h ckreduction.h CkReduction.decl.h charm++.h \
+  cknodegroupreduction.h CkArrayReductionMgr.decl.h charm++.h \
+  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h \
+  readonly.h charm.h ckarray.h cklocation.h LBDatabase.h lbdb.h \
+  converse.h charm.h middle.h LBDBManager.h converse.h lbdb.h cklists.h \
+  LBObj.h lbdb.h LBOM.h lbdb.h LBObj.h LBComm.h converse.h lbdb.h \
+  LBMachineUtil.h lbdb++.h LBDBManager.h LBDatabase.decl.h charm++.h \
+  NullLB.decl.h charm++.h LBDatabase.decl.h BaseLB.decl.h charm++.h \
+  LBDatabase.decl.h CkLocation.decl.h charm++.h CkMarshall.decl.h \
+  CkArray.decl.h charm++.h CkReduction.decl.h CkLocation.decl.h \
+  CkArrayReductionMgr.decl.h CkArrayReductionMgr.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h charm++.h ckhashtable.h pup.h \
+  convcomlibstrategy.h converse.h pup.h cklists.h ComlibLearner.h \
+  convcomlibstrategy.h envelope.h charm.h ckhashtable.h pup.h ckstream.h \
+  CkFutures.decl.h charm++.h charisma.h charisma.decl.h charm++.h tempo.h \
+  charm++.h tempo.decl.h charm++.h waitqd.h charm++.h waitqd.decl.h \
+  charm++.h CkFutures.decl.h sdag.h charm++.h ckcheckpoint.h \
+  CkCheckpoint.decl.h charm++.h ckevacuation.h ckarrayreductionmgr.h \
+  trace.h conv-trace.h trace-bluegene.h trace.h CentralLB.h BaseLB.h \
+  LBDatabase.h CentralLB.decl.h charm++.h BaseLB.decl.h LBDatabase.decl.h \
+  CentralLBMsg.h
 	$(CHARMC) -c -I. CentralPredictor.C
 
 BaseLB.o: BaseLB.C charm++.h charm.h converse.h conv-config.h \
@@ -1039,29 +1096,38 @@ BaseLB.o: BaseLB.C charm++.h charm.h converse.h conv-config.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h BaseLB.h LBSimulation.h \
-  ./charm++.h CentralLB.h CentralLB.decl.h CentralLBMsg.h BaseLB.def.h
+  charm++.h CentralLB.h CentralLB.decl.h CentralLBMsg.h BaseLB.def.h
 	$(CHARMC) -c -I. BaseLB.C
 
-CentralLB.o: CentralLB.C ./charm++.h ./charm.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h ./cklists.h \
-  ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h ./debug-charm.h \
-  ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h ./ckcallback.h \
-  ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h ./ckreduction.h \
-  ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h envelope.h \
-  CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h charm++.h \
+CentralLB.o: CentralLB.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  envelope.h CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h charm++.h \
   BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h LBDBManager.h \
   LBSimulation.h ComlibStrategy.h CentralLB.def.h
 	$(CHARMC) -c -I. CentralLB.C
@@ -1123,9 +1189,9 @@ WSLB.o: WSLB.C charm++.h charm.h converse.h conv-config.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h ./BaseLB.h \
-  ./LBDatabase.h ./cklists.h heap.h elements.h Set.h WSLB.h BaseLB.h \
-  WSLB.decl.h topology.h WSLB.def.h
+  ckarrayreductionmgr.h trace.h trace-bluegene.h BaseLB.h LBDatabase.h \
+  cklists.h heap.h elements.h Set.h WSLB.h BaseLB.h WSLB.decl.h \
+  topology.h WSLB.def.h
 	$(CHARMC) -c -I. WSLB.C
 
 ObjGraph.o: ObjGraph.C ObjGraph.h lbdb.h converse.h conv-config.h \
@@ -1266,50 +1332,70 @@ CommLBHeap.o: CommLBHeap.C CommLBHeap.h charm++.h charm.h converse.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h
 	$(CHARMC) -c -I. CommLBHeap.C
 
-NullLB.o: NullLB.C ./charm++.h ./charm.h ./converse.h ./conv-config.h \
-  ./conv-autoconfig.h ./conv-common.h ./conv-mach.h ./conv-mach-opt.h \
-  ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h ./conv-random.h \
-  ./conv-lists.h ./conv-trace.h ./persistent.h ./debug-conv.h ./pup.h \
-  ./middle.h ./middle-conv.h ./cklists.h ./ckbitvector.h ./ckstream.h \
-  ./init.h ./ckhashtable.h ./debug-charm.h ./simd.h ./CkMarshall.decl.h \
-  ./charm++.h ./cksection.h ./ckcallback.h ./conv-ccs.h ./sockRoutines.h \
-  ./ccs-server.h ./ckobjQ.h ./ckreduction.h ./CkReduction.decl.h \
-  ./cknodegroupreduction.h ./CkArrayReductionMgr.decl.h \
-  ./ckmemcheckpoint.h ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h \
-  ./cklocation.h ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h \
-  ./LBOM.h ./LBComm.h ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h \
-  ./NullLB.decl.h ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h ./BaseLB.h \
-  NullLB.h NullLB.decl.h ck.h charm++.h envelope.h qd.h register.h \
-  stats.h ckfutures.h CkFutures.decl.h ckIgetControl.h charisma.h \
-  NullLB.def.h
+NullLB.o: NullLB.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  BaseLB.h LBDatabase.h NullLB.h NullLB.decl.h ck.h charm++.h envelope.h \
+  qd.h register.h stats.h ckfutures.h CkFutures.decl.h ckIgetControl.h \
+  charisma.h NullLB.def.h
 	$(CHARMC) -c -I. NullLB.C
 
-LBSimulation.o: LBSimulation.C LBSimulation.h ./charm++.h ./charm.h \
-  ./converse.h ./conv-config.h ./conv-autoconfig.h ./conv-common.h \
-  ./conv-mach.h ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h \
-  ./conv-qd.h ./conv-random.h ./conv-lists.h ./conv-trace.h \
-  ./persistent.h ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h \
-  ./cklists.h ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h \
-  ./debug-charm.h ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h \
-  ./ckcallback.h ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h \
-  ./ckreduction.h ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h CentralLB.h \
-  BaseLB.h LBDatabase.h CentralLB.decl.h charm++.h BaseLB.decl.h \
-  LBDatabase.decl.h CentralLBMsg.h
+LBSimulation.o: LBSimulation.C LBSimulation.h charm++.h charm.h \
+  converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h pup.h \
+  middle.h middle-conv.h converse.h pup.h cklists.h pup.h ckbitvector.h \
+  ckstream.h init.h charm.h ckhashtable.h pup.h debug-charm.h converse.h \
+  debug-conv.h pup.h cklists.h simd.h CkMarshall.decl.h charm++.h \
+  ckhashtable.h pup.h cksection.h ckcallback.h conv-ccs.h converse.h \
+  sockRoutines.h conv-config.h ccs-server.h sockRoutines.h ckobjQ.h \
+  cklists.h ckreduction.h CkReduction.decl.h charm++.h \
+  cknodegroupreduction.h CkArrayReductionMgr.decl.h charm++.h \
+  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h \
+  readonly.h charm.h ckarray.h cklocation.h LBDatabase.h lbdb.h \
+  converse.h charm.h middle.h LBDBManager.h converse.h lbdb.h cklists.h \
+  LBObj.h lbdb.h LBOM.h lbdb.h LBObj.h LBComm.h converse.h lbdb.h \
+  LBMachineUtil.h lbdb++.h LBDBManager.h LBDatabase.decl.h charm++.h \
+  NullLB.decl.h charm++.h LBDatabase.decl.h BaseLB.decl.h charm++.h \
+  LBDatabase.decl.h CkLocation.decl.h charm++.h CkMarshall.decl.h \
+  CkArray.decl.h charm++.h CkReduction.decl.h CkLocation.decl.h \
+  CkArrayReductionMgr.decl.h CkArrayReductionMgr.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h charm++.h ckhashtable.h pup.h \
+  convcomlibstrategy.h converse.h pup.h cklists.h ComlibLearner.h \
+  convcomlibstrategy.h envelope.h charm.h ckhashtable.h pup.h ckstream.h \
+  CkFutures.decl.h charm++.h charisma.h charisma.decl.h charm++.h tempo.h \
+  charm++.h tempo.decl.h charm++.h waitqd.h charm++.h waitqd.decl.h \
+  charm++.h CkFutures.decl.h sdag.h charm++.h ckcheckpoint.h \
+  CkCheckpoint.decl.h charm++.h ckevacuation.h ckarrayreductionmgr.h \
+  trace.h conv-trace.h trace-bluegene.h trace.h CentralLB.h BaseLB.h \
+  LBDatabase.h CentralLB.decl.h charm++.h BaseLB.decl.h LBDatabase.decl.h \
+  CentralLBMsg.h
 	$(CHARMC) -c -I. LBSimulation.C
 
 ComlibStrategy.o: ComlibStrategy.C charm++.h charm.h converse.h \
@@ -1369,24 +1455,34 @@ charmProjections.o: charmProjections.C converse.h conv-config.h \
   trace-common.h
 	$(CHARMC) -c -I. charmProjections.C
 
-EveryLB.o: EveryLB.C ./charm++.h ./charm.h ./converse.h ./conv-config.h \
-  ./conv-autoconfig.h ./conv-common.h ./conv-mach.h ./conv-mach-opt.h \
-  ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h ./conv-random.h \
-  ./conv-lists.h ./conv-trace.h ./persistent.h ./debug-conv.h ./pup.h \
-  ./middle.h ./middle-conv.h ./cklists.h ./ckbitvector.h ./ckstream.h \
-  ./init.h ./ckhashtable.h ./debug-charm.h ./simd.h ./CkMarshall.decl.h \
-  ./charm++.h ./cksection.h ./ckcallback.h ./conv-ccs.h ./sockRoutines.h \
-  ./ccs-server.h ./ckobjQ.h ./ckreduction.h ./CkReduction.decl.h \
-  ./cknodegroupreduction.h ./CkArrayReductionMgr.decl.h \
-  ./ckmemcheckpoint.h ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h \
-  ./cklocation.h ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h \
-  ./LBOM.h ./LBComm.h ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h \
-  ./NullLB.decl.h ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h ./LBDatabase.h \
+EveryLB.o: EveryLB.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
   EveryLB.decl.h charm++.h DummyLB.decl.h CentralLB.decl.h BaseLB.decl.h \
   LBDatabase.decl.h CentralLBMsg.h ComboCentLB.decl.h RandCentLB.decl.h \
   RefineLB.decl.h RefineKLB.decl.h RefineCommLB.decl.h GreedyLB.decl.h \
@@ -1400,148 +1496,206 @@ EveryLB.o: EveryLB.C ./charm++.h ./charm.h ./converse.h ./conv-config.h \
   HbmLB.decl.h BlockLB.decl.h EveryLB.def.h
 	$(CHARMC) -c -I. EveryLB.C
 
-DummyLB.o: DummyLB.C ./charm++.h ./charm.h ./converse.h ./conv-config.h \
-  ./conv-autoconfig.h ./conv-common.h ./conv-mach.h ./conv-mach-opt.h \
-  ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h ./conv-random.h \
-  ./conv-lists.h ./conv-trace.h ./persistent.h ./debug-conv.h ./pup.h \
-  ./middle.h ./middle-conv.h ./cklists.h ./ckbitvector.h ./ckstream.h \
-  ./init.h ./ckhashtable.h ./debug-charm.h ./simd.h ./CkMarshall.decl.h \
-  ./charm++.h ./cksection.h ./ckcallback.h ./conv-ccs.h ./sockRoutines.h \
-  ./ccs-server.h ./ckobjQ.h ./ckreduction.h ./CkReduction.decl.h \
-  ./cknodegroupreduction.h ./CkArrayReductionMgr.decl.h \
-  ./ckmemcheckpoint.h ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h \
-  ./cklocation.h ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h \
-  ./LBOM.h ./LBComm.h ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h \
-  ./NullLB.decl.h ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h DummyLB.h \
-  CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h charm++.h \
+DummyLB.o: DummyLB.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  DummyLB.h CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h charm++.h \
   BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h DummyLB.decl.h \
   DummyLB.def.h
 	$(CHARMC) -c -I. DummyLB.C
 
-ComboCentLB.o: ComboCentLB.C ./charm++.h ./charm.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h ./cklists.h \
-  ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h ./debug-charm.h \
-  ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h ./ckcallback.h \
-  ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h ./ckreduction.h \
-  ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h ComboCentLB.h \
-  CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h charm++.h \
-  BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h ComboCentLB.decl.h \
-  ComboCentLB.def.h
+ComboCentLB.o: ComboCentLB.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  ComboCentLB.h CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h \
+  charm++.h BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h \
+  ComboCentLB.decl.h ComboCentLB.def.h
 	$(CHARMC) -c -I. ComboCentLB.C
 
-RandCentLB.o: RandCentLB.C ./charm++.h ./charm.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h ./cklists.h \
-  ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h ./debug-charm.h \
-  ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h ./ckcallback.h \
-  ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h ./ckreduction.h \
-  ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h cklists.h \
-  RandCentLB.h CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h \
-  charm++.h BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h \
-  RandCentLB.decl.h RandCentLB.def.h
+RandCentLB.o: RandCentLB.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  cklists.h RandCentLB.h CentralLB.h BaseLB.h LBDatabase.h \
+  CentralLB.decl.h charm++.h BaseLB.decl.h LBDatabase.decl.h \
+  CentralLBMsg.h RandCentLB.decl.h RandCentLB.def.h
 	$(CHARMC) -c -I. RandCentLB.C
 
-RefineLB.o: RefineLB.C ./charm++.h ./charm.h ./converse.h ./conv-config.h \
-  ./conv-autoconfig.h ./conv-common.h ./conv-mach.h ./conv-mach-opt.h \
-  ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h ./conv-random.h \
-  ./conv-lists.h ./conv-trace.h ./persistent.h ./debug-conv.h ./pup.h \
-  ./middle.h ./middle-conv.h ./cklists.h ./ckbitvector.h ./ckstream.h \
-  ./init.h ./ckhashtable.h ./debug-charm.h ./simd.h ./CkMarshall.decl.h \
-  ./charm++.h ./cksection.h ./ckcallback.h ./conv-ccs.h ./sockRoutines.h \
-  ./ccs-server.h ./ckobjQ.h ./ckreduction.h ./CkReduction.decl.h \
-  ./cknodegroupreduction.h ./CkArrayReductionMgr.decl.h \
-  ./ckmemcheckpoint.h ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h \
-  ./cklocation.h ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h \
-  ./LBOM.h ./LBComm.h ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h \
-  ./NullLB.decl.h ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h cklists.h \
-  RefineLB.h CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h charm++.h \
-  BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h Refiner.h elements.h \
-  converse.h lbdb.h Set.h heap.h RefineLB.decl.h RefineLB.def.h
+RefineLB.o: RefineLB.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  cklists.h RefineLB.h CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h \
+  charm++.h BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h Refiner.h \
+  elements.h converse.h lbdb.h Set.h heap.h RefineLB.decl.h \
+  RefineLB.def.h
 	$(CHARMC) -c -I. RefineLB.C
 
-RefineKLB.o: RefineKLB.C ./charm++.h ./charm.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h ./cklists.h \
-  ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h ./debug-charm.h \
-  ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h ./ckcallback.h \
-  ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h ./ckreduction.h \
-  ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h cklists.h \
-  RefineKLB.h CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h \
-  charm++.h BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h \
-  RefinerApprox.h Refiner.h elements.h converse.h lbdb.h Set.h heap.h \
-  RefineKLB.decl.h RefineKLB.def.h
+RefineKLB.o: RefineKLB.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  cklists.h RefineKLB.h CentralLB.h BaseLB.h LBDatabase.h \
+  CentralLB.decl.h charm++.h BaseLB.decl.h LBDatabase.decl.h \
+  CentralLBMsg.h RefinerApprox.h Refiner.h elements.h converse.h lbdb.h \
+  Set.h heap.h RefineKLB.decl.h RefineKLB.def.h
 	$(CHARMC) -c -I. RefineKLB.C
 
-RefineCommLB.o: RefineCommLB.C ./charm++.h ./charm.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h ./cklists.h \
-  ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h ./debug-charm.h \
-  ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h ./ckcallback.h \
-  ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h ./ckreduction.h \
-  ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h cklists.h \
-  RefineCommLB.h CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h \
-  charm++.h BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h RefinerComm.h \
-  elements.h converse.h lbdb.h Set.h heap.h Refiner.h RefineLB.h \
-  RefineLB.decl.h RefineCommLB.decl.h RefineCommLB.def.h
+RefineCommLB.o: RefineCommLB.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  cklists.h RefineCommLB.h CentralLB.h BaseLB.h LBDatabase.h \
+  CentralLB.decl.h charm++.h BaseLB.decl.h LBDatabase.decl.h \
+  CentralLBMsg.h RefinerComm.h elements.h converse.h lbdb.h Set.h heap.h \
+  Refiner.h RefineLB.h RefineLB.decl.h RefineCommLB.decl.h \
+  RefineCommLB.def.h
 	$(CHARMC) -c -I. RefineCommLB.C
 
 GreedyLB.o: GreedyLB.C charm++.h charm.h converse.h conv-config.h \
@@ -1563,51 +1717,71 @@ GreedyLB.o: GreedyLB.C charm++.h charm.h converse.h conv-config.h \
   BaseLB.h CentralLB.decl.h CentralLBMsg.h GreedyLB.decl.h GreedyLB.def.h
 	$(CHARMC) -c -I. GreedyLB.C
 
-GreedyCommLB.o: GreedyCommLB.C ./charm++.h ./charm.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h ./cklists.h \
-  ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h ./debug-charm.h \
-  ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h ./ckcallback.h \
-  ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h ./ckreduction.h \
-  ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h cklists.h \
-  GreedyCommLB.h CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h \
-  charm++.h BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h \
-  GreedyCommLB.decl.h elements.h converse.h lbdb.h Set.h heap.h \
-  CommLBHeap.h manager.h GreedyCommLB.def.h
+GreedyCommLB.o: GreedyCommLB.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  cklists.h GreedyCommLB.h CentralLB.h BaseLB.h LBDatabase.h \
+  CentralLB.decl.h charm++.h BaseLB.decl.h LBDatabase.decl.h \
+  CentralLBMsg.h GreedyCommLB.decl.h elements.h converse.h lbdb.h Set.h \
+  heap.h CommLBHeap.h manager.h GreedyCommLB.def.h
 	$(CHARMC) -c -I. GreedyCommLB.C
 
-GreedyAgentLB.o: GreedyAgentLB.C ./charm++.h ./charm.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h ./cklists.h \
-  ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h ./debug-charm.h \
-  ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h ./ckcallback.h \
-  ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h ./ckreduction.h \
-  ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h ./LBSimulation.h \
-  ./CentralLB.h ./BaseLB.h ./CentralLB.decl.h ./CentralLBMsg.h cklists.h \
+GreedyAgentLB.o: GreedyAgentLB.C charm++.h charm.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h pup.h \
+  middle.h middle-conv.h converse.h pup.h cklists.h pup.h ckbitvector.h \
+  ckstream.h init.h charm.h ckhashtable.h pup.h debug-charm.h converse.h \
+  debug-conv.h pup.h cklists.h simd.h CkMarshall.decl.h charm++.h \
+  ckhashtable.h pup.h cksection.h ckcallback.h conv-ccs.h converse.h \
+  sockRoutines.h conv-config.h ccs-server.h sockRoutines.h ckobjQ.h \
+  cklists.h ckreduction.h CkReduction.decl.h charm++.h \
+  cknodegroupreduction.h CkArrayReductionMgr.decl.h charm++.h \
+  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h \
+  readonly.h charm.h ckarray.h cklocation.h LBDatabase.h lbdb.h \
+  converse.h charm.h middle.h LBDBManager.h converse.h lbdb.h cklists.h \
+  LBObj.h lbdb.h LBOM.h lbdb.h LBObj.h LBComm.h converse.h lbdb.h \
+  LBMachineUtil.h lbdb++.h LBDBManager.h LBDatabase.decl.h charm++.h \
+  NullLB.decl.h charm++.h LBDatabase.decl.h BaseLB.decl.h charm++.h \
+  LBDatabase.decl.h CkLocation.decl.h charm++.h CkMarshall.decl.h \
+  CkArray.decl.h charm++.h CkReduction.decl.h CkLocation.decl.h \
+  CkArrayReductionMgr.decl.h CkArrayReductionMgr.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h charm++.h ckhashtable.h pup.h \
+  convcomlibstrategy.h converse.h pup.h cklists.h ComlibLearner.h \
+  convcomlibstrategy.h envelope.h charm.h ckhashtable.h pup.h ckstream.h \
+  CkFutures.decl.h charm++.h charisma.h charisma.decl.h charm++.h tempo.h \
+  charm++.h tempo.decl.h charm++.h waitqd.h charm++.h waitqd.decl.h \
+  charm++.h CkFutures.decl.h sdag.h charm++.h ckcheckpoint.h \
+  CkCheckpoint.decl.h charm++.h ckevacuation.h ckarrayreductionmgr.h \
+  trace.h conv-trace.h trace-bluegene.h trace.h LBSimulation.h \
+  CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h charm++.h \
+  BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h cklists.h \
   GreedyAgentLB.h CentralLB.h GreedyAgentLB.decl.h charm++.h \
   CentralLB.decl.h LBAgent.h topology.h GreedyAgentLB.def.h
 	$(CHARMC) -c -I. GreedyAgentLB.C
@@ -1712,118 +1886,170 @@ GridHybridSeedLB.o: GridHybridSeedLB.C GridHybridSeedLB.decl.h charm++.h \
   CentralLB.h BaseLB.h manager.h GridHybridSeedLB.def.h
 	$(CHARMC) -c -I. GridHybridSeedLB.C
 
-Comm1LB.o: Comm1LB.C ./charm++.h ./charm.h ./converse.h ./conv-config.h \
-  ./conv-autoconfig.h ./conv-common.h ./conv-mach.h ./conv-mach-opt.h \
-  ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h ./conv-random.h \
-  ./conv-lists.h ./conv-trace.h ./persistent.h ./debug-conv.h ./pup.h \
-  ./middle.h ./middle-conv.h ./cklists.h ./ckbitvector.h ./ckstream.h \
-  ./init.h ./ckhashtable.h ./debug-charm.h ./simd.h ./CkMarshall.decl.h \
-  ./charm++.h ./cksection.h ./ckcallback.h ./conv-ccs.h ./sockRoutines.h \
-  ./ccs-server.h ./ckobjQ.h ./ckreduction.h ./CkReduction.decl.h \
-  ./cknodegroupreduction.h ./CkArrayReductionMgr.decl.h \
-  ./ckmemcheckpoint.h ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h \
-  ./cklocation.h ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h \
-  ./LBOM.h ./LBComm.h ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h \
-  ./NullLB.decl.h ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h cklists.h \
-  Comm1LB.h ./CentralLB.h ./BaseLB.h ./CentralLB.decl.h ./CentralLBMsg.h \
-  Comm1LB.decl.h charm++.h CentralLB.decl.h CommLBHeap.h GreedyCommLB.h \
-  CentralLB.h GreedyCommLB.decl.h elements.h converse.h lbdb.h Set.h \
-  heap.h Comm1LB.def.h
+Comm1LB.o: Comm1LB.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  cklists.h Comm1LB.h CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h \
+  charm++.h BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h Comm1LB.decl.h \
+  charm++.h CentralLB.decl.h CommLBHeap.h GreedyCommLB.h CentralLB.h \
+  GreedyCommLB.decl.h elements.h converse.h lbdb.h Set.h heap.h \
+  Comm1LB.def.h
 	$(CHARMC) -c -I. Comm1LB.C
 
-OrbLB.o: OrbLB.C ./charm++.h ./charm.h ./converse.h ./conv-config.h \
-  ./conv-autoconfig.h ./conv-common.h ./conv-mach.h ./conv-mach-opt.h \
-  ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h ./conv-random.h \
-  ./conv-lists.h ./conv-trace.h ./persistent.h ./debug-conv.h ./pup.h \
-  ./middle.h ./middle-conv.h ./cklists.h ./ckbitvector.h ./ckstream.h \
-  ./init.h ./ckhashtable.h ./debug-charm.h ./simd.h ./CkMarshall.decl.h \
-  ./charm++.h ./cksection.h ./ckcallback.h ./conv-ccs.h ./sockRoutines.h \
-  ./ccs-server.h ./ckobjQ.h ./ckreduction.h ./CkReduction.decl.h \
-  ./cknodegroupreduction.h ./CkArrayReductionMgr.decl.h \
-  ./ckmemcheckpoint.h ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h \
-  ./cklocation.h ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h \
-  ./LBOM.h ./LBComm.h ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h \
-  ./NullLB.decl.h ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h cklists.h OrbLB.h \
-  CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h charm++.h \
-  BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h OrbLB.decl.h OrbLB.def.h
+OrbLB.o: OrbLB.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  cklists.h OrbLB.h CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h \
+  charm++.h BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h OrbLB.decl.h \
+  OrbLB.def.h
 	$(CHARMC) -c -I. OrbLB.C
 
-RecBisectBfLB.o: RecBisectBfLB.C ./charm++.h ./charm.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h ./cklists.h \
-  ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h ./debug-charm.h \
-  ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h ./ckcallback.h \
-  ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h ./ckreduction.h \
-  ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h RecBisectBfLB.h \
+RecBisectBfLB.o: RecBisectBfLB.C charm++.h charm.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h pup.h \
+  middle.h middle-conv.h converse.h pup.h cklists.h pup.h ckbitvector.h \
+  ckstream.h init.h charm.h ckhashtable.h pup.h debug-charm.h converse.h \
+  debug-conv.h pup.h cklists.h simd.h CkMarshall.decl.h charm++.h \
+  ckhashtable.h pup.h cksection.h ckcallback.h conv-ccs.h converse.h \
+  sockRoutines.h conv-config.h ccs-server.h sockRoutines.h ckobjQ.h \
+  cklists.h ckreduction.h CkReduction.decl.h charm++.h \
+  cknodegroupreduction.h CkArrayReductionMgr.decl.h charm++.h \
+  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h \
+  readonly.h charm.h ckarray.h cklocation.h LBDatabase.h lbdb.h \
+  converse.h charm.h middle.h LBDBManager.h converse.h lbdb.h cklists.h \
+  LBObj.h lbdb.h LBOM.h lbdb.h LBObj.h LBComm.h converse.h lbdb.h \
+  LBMachineUtil.h lbdb++.h LBDBManager.h LBDatabase.decl.h charm++.h \
+  NullLB.decl.h charm++.h LBDatabase.decl.h BaseLB.decl.h charm++.h \
+  LBDatabase.decl.h CkLocation.decl.h charm++.h CkMarshall.decl.h \
+  CkArray.decl.h charm++.h CkReduction.decl.h CkLocation.decl.h \
+  CkArrayReductionMgr.decl.h CkArrayReductionMgr.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h charm++.h ckhashtable.h pup.h \
+  convcomlibstrategy.h converse.h pup.h cklists.h ComlibLearner.h \
+  convcomlibstrategy.h envelope.h charm.h ckhashtable.h pup.h ckstream.h \
+  CkFutures.decl.h charm++.h charisma.h charisma.decl.h charm++.h tempo.h \
+  charm++.h tempo.decl.h charm++.h waitqd.h charm++.h waitqd.decl.h \
+  charm++.h CkFutures.decl.h sdag.h charm++.h ckcheckpoint.h \
+  CkCheckpoint.decl.h charm++.h ckevacuation.h ckarrayreductionmgr.h \
+  trace.h conv-trace.h trace-bluegene.h trace.h RecBisectBfLB.h \
   CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h charm++.h \
   BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h RecBisectBfLB.decl.h \
   ObjGraph.h lbdb.h graph.h bitvecset.h cklists.h RecBisectBfLB.def.h
 	$(CHARMC) -c -I. RecBisectBfLB.C
 
-MetisLB.o: MetisLB.C ./charm++.h ./charm.h ./converse.h ./conv-config.h \
-  ./conv-autoconfig.h ./conv-common.h ./conv-mach.h ./conv-mach-opt.h \
-  ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h ./conv-random.h \
-  ./conv-lists.h ./conv-trace.h ./persistent.h ./debug-conv.h ./pup.h \
-  ./middle.h ./middle-conv.h ./cklists.h ./ckbitvector.h ./ckstream.h \
-  ./init.h ./ckhashtable.h ./debug-charm.h ./simd.h ./CkMarshall.decl.h \
-  ./charm++.h ./cksection.h ./ckcallback.h ./conv-ccs.h ./sockRoutines.h \
-  ./ccs-server.h ./ckobjQ.h ./ckreduction.h ./CkReduction.decl.h \
-  ./cknodegroupreduction.h ./CkArrayReductionMgr.decl.h \
-  ./ckmemcheckpoint.h ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h \
-  ./cklocation.h ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h \
-  ./LBOM.h ./LBComm.h ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h \
-  ./NullLB.decl.h ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h cklists.h \
-  MetisLB.h CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h charm++.h \
-  BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h MetisLB.decl.h \
+MetisLB.o: MetisLB.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  cklists.h MetisLB.h CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h \
+  charm++.h BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h MetisLB.decl.h \
   MetisLB.def.h
 	$(CHARMC) -c -I. MetisLB.C
 
-PhasebyArrayLB.o: PhasebyArrayLB.C ./charm++.h ./charm.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h ./cklists.h \
-  ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h ./debug-charm.h \
-  ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h ./ckcallback.h \
-  ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h ./ckreduction.h \
-  ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h PhasebyArrayLB.h \
+PhasebyArrayLB.o: PhasebyArrayLB.C charm++.h charm.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h pup.h \
+  middle.h middle-conv.h converse.h pup.h cklists.h pup.h ckbitvector.h \
+  ckstream.h init.h charm.h ckhashtable.h pup.h debug-charm.h converse.h \
+  debug-conv.h pup.h cklists.h simd.h CkMarshall.decl.h charm++.h \
+  ckhashtable.h pup.h cksection.h ckcallback.h conv-ccs.h converse.h \
+  sockRoutines.h conv-config.h ccs-server.h sockRoutines.h ckobjQ.h \
+  cklists.h ckreduction.h CkReduction.decl.h charm++.h \
+  cknodegroupreduction.h CkArrayReductionMgr.decl.h charm++.h \
+  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h \
+  readonly.h charm.h ckarray.h cklocation.h LBDatabase.h lbdb.h \
+  converse.h charm.h middle.h LBDBManager.h converse.h lbdb.h cklists.h \
+  LBObj.h lbdb.h LBOM.h lbdb.h LBObj.h LBComm.h converse.h lbdb.h \
+  LBMachineUtil.h lbdb++.h LBDBManager.h LBDatabase.decl.h charm++.h \
+  NullLB.decl.h charm++.h LBDatabase.decl.h BaseLB.decl.h charm++.h \
+  LBDatabase.decl.h CkLocation.decl.h charm++.h CkMarshall.decl.h \
+  CkArray.decl.h charm++.h CkReduction.decl.h CkLocation.decl.h \
+  CkArrayReductionMgr.decl.h CkArrayReductionMgr.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h charm++.h ckhashtable.h pup.h \
+  convcomlibstrategy.h converse.h pup.h cklists.h ComlibLearner.h \
+  convcomlibstrategy.h envelope.h charm.h ckhashtable.h pup.h ckstream.h \
+  CkFutures.decl.h charm++.h charisma.h charisma.decl.h charm++.h tempo.h \
+  charm++.h tempo.decl.h charm++.h waitqd.h charm++.h waitqd.decl.h \
+  charm++.h CkFutures.decl.h sdag.h charm++.h ckcheckpoint.h \
+  CkCheckpoint.decl.h charm++.h ckevacuation.h ckarrayreductionmgr.h \
+  trace.h conv-trace.h trace-bluegene.h trace.h PhasebyArrayLB.h \
   CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h charm++.h \
   BaseLB.decl.h LBDatabase.decl.h CentralLBMsg.h PhasebyArrayLB.decl.h \
   PhasebyArrayLB.def.h
@@ -1849,50 +2075,69 @@ RotateLB.o: RotateLB.C charm++.h charm.h converse.h conv-config.h \
   RotateLB.def.h
 	$(CHARMC) -c -I. RotateLB.C
 
-NeighborLB.o: NeighborLB.C ./charm++.h ./charm.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h ./cklists.h \
-  ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h ./debug-charm.h \
-  ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h ./ckcallback.h \
-  ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h ./ckreduction.h \
-  ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h cklists.h heap.h \
-  elements.h converse.h lbdb.h Set.h NeighborLB.h NborBaseLB.h BaseLB.h \
-  LBDatabase.h NborBaseLB.decl.h charm++.h LBDatabase.decl.h \
-  BaseLB.decl.h NeighborLBMsg.h topology.h NeighborLB.decl.h \
-  NeighborLB.def.h
+NeighborLB.o: NeighborLB.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  cklists.h heap.h elements.h converse.h lbdb.h Set.h NeighborLB.h \
+  NborBaseLB.h BaseLB.h LBDatabase.h NborBaseLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h NeighborLBMsg.h topology.h \
+  NeighborLB.decl.h NeighborLB.def.h
 	$(CHARMC) -c -I. NeighborLB.C
 
-NeighborCommLB.o: NeighborCommLB.C ./charm++.h ./charm.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h ./cklists.h \
-  ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h ./debug-charm.h \
-  ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h ./ckcallback.h \
-  ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h ./ckreduction.h \
-  ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h cklists.h heap.h \
+NeighborCommLB.o: NeighborCommLB.C charm++.h charm.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h pup.h \
+  middle.h middle-conv.h converse.h pup.h cklists.h pup.h ckbitvector.h \
+  ckstream.h init.h charm.h ckhashtable.h pup.h debug-charm.h converse.h \
+  debug-conv.h pup.h cklists.h simd.h CkMarshall.decl.h charm++.h \
+  ckhashtable.h pup.h cksection.h ckcallback.h conv-ccs.h converse.h \
+  sockRoutines.h conv-config.h ccs-server.h sockRoutines.h ckobjQ.h \
+  cklists.h ckreduction.h CkReduction.decl.h charm++.h \
+  cknodegroupreduction.h CkArrayReductionMgr.decl.h charm++.h \
+  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h \
+  readonly.h charm.h ckarray.h cklocation.h LBDatabase.h lbdb.h \
+  converse.h charm.h middle.h LBDBManager.h converse.h lbdb.h cklists.h \
+  LBObj.h lbdb.h LBOM.h lbdb.h LBObj.h LBComm.h converse.h lbdb.h \
+  LBMachineUtil.h lbdb++.h LBDBManager.h LBDatabase.decl.h charm++.h \
+  NullLB.decl.h charm++.h LBDatabase.decl.h BaseLB.decl.h charm++.h \
+  LBDatabase.decl.h CkLocation.decl.h charm++.h CkMarshall.decl.h \
+  CkArray.decl.h charm++.h CkReduction.decl.h CkLocation.decl.h \
+  CkArrayReductionMgr.decl.h CkArrayReductionMgr.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h charm++.h ckhashtable.h pup.h \
+  convcomlibstrategy.h converse.h pup.h cklists.h ComlibLearner.h \
+  convcomlibstrategy.h envelope.h charm.h ckhashtable.h pup.h ckstream.h \
+  CkFutures.decl.h charm++.h charisma.h charisma.decl.h charm++.h tempo.h \
+  charm++.h tempo.decl.h charm++.h waitqd.h charm++.h waitqd.decl.h \
+  charm++.h CkFutures.decl.h sdag.h charm++.h ckcheckpoint.h \
+  CkCheckpoint.decl.h charm++.h ckevacuation.h ckarrayreductionmgr.h \
+  trace.h conv-trace.h trace-bluegene.h trace.h cklists.h heap.h \
   elements.h converse.h lbdb.h Set.h NeighborCommLB.h NborBaseLB.h \
   BaseLB.h LBDatabase.h NborBaseLB.decl.h charm++.h LBDatabase.decl.h \
   BaseLB.decl.h NeighborLBMsg.h topology.h NeighborCommLB.decl.h \
@@ -2162,11 +2407,11 @@ blue_stub.o: blue_stub.C charm++.h charm.h converse.h conv-config.h \
 blue_standalone.o: blue_standalone.C
 	$(CHARMC) -c -I. blue_standalone.C
 
-convcomlibstrategy.o: convcomlibstrategy.C ./converse.h ./conv-config.h \
-  ./conv-autoconfig.h ./conv-common.h ./conv-mach.h ./conv-mach-opt.h \
-  ./pup_c.h ./conv-cpm.h ./converse.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h convcomlibstrategy.h converse.h pup.h cklists.h
+convcomlibstrategy.o: convcomlibstrategy.C converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h convcomlibstrategy.h converse.h pup.h cklists.h
 	$(CHARMC) -c -I. convcomlibstrategy.C
 
 ComlibManager.o: ComlibManager.C ComlibManager.h charm++.h charm.h \
@@ -2184,17 +2429,17 @@ ComlibManager.o: ComlibManager.C ComlibManager.h charm++.h charm.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h \
-  ./converse.h router.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h EachToManyMulticastStrategy.h \
-  routerstrategy.h gridrouter.h petable.h graphrouter.h de.h treerouter.h \
-  3dgridrouter.h prefixrouter.h DirectMulticastStrategy.h \
-  ComlibSectionInfo.h StreamingStrategy.h DummyStrategy.h MPIStrategy.h \
-  NodeMulticast.h MsgPacker.h register.h pup_cmialloc.h \
-  RingMulticastStrategy.h MultiRingMulticast.h PipeBroadcastStrategy.h \
-  pipebroadcastconverse.h BroadcastStrategy.h MeshStreamingStrategy.h \
-  RectMulticastStrategy.h PrioStreaming.h qd.h CentralLB.h BaseLB.h \
-  CentralLB.decl.h CentralLBMsg.h comlib.def.h
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h converse.h \
+  router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h EachToManyMulticastStrategy.h routerstrategy.h \
+  gridrouter.h petable.h graphrouter.h de.h treerouter.h 3dgridrouter.h \
+  prefixrouter.h DirectMulticastStrategy.h ComlibSectionInfo.h \
+  StreamingStrategy.h DummyStrategy.h MPIStrategy.h NodeMulticast.h \
+  MsgPacker.h register.h pup_cmialloc.h RingMulticastStrategy.h \
+  MultiRingMulticast.h PipeBroadcastStrategy.h pipebroadcastconverse.h \
+  BroadcastStrategy.h MeshStreamingStrategy.h RectMulticastStrategy.h \
+  PrioStreaming.h qd.h CentralLB.h BaseLB.h CentralLB.decl.h \
+  CentralLBMsg.h comlib.def.h
 	$(CHARMC) -c -I. ComlibManager.C
 
 MPIStrategy.o: MPIStrategy.C MPIStrategy.h ComlibManager.h charm++.h \
@@ -2213,8 +2458,8 @@ MPIStrategy.o: MPIStrategy.C MPIStrategy.h ComlibManager.h charm++.h \
   ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
   tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h convcomlib.h ./converse.h router.h convcomlibmanager.h \
-  ./convcomlibstrategy.h ComlibStats.h comlib.decl.h
+  trace-bluegene.h convcomlib.h converse.h router.h convcomlibmanager.h \
+  convcomlibstrategy.h ComlibStats.h comlib.decl.h
 	$(CHARMC) -c -I. MPIStrategy.C
 
 StreamingStrategy.o: StreamingStrategy.C StreamingStrategy.h \
@@ -2233,9 +2478,9 @@ StreamingStrategy.o: StreamingStrategy.C StreamingStrategy.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h \
-  ./converse.h router.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h MsgPacker.h register.h pup_cmialloc.h
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h converse.h \
+  router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h MsgPacker.h register.h pup_cmialloc.h
 	$(CHARMC) -c -I. StreamingStrategy.C
 
 DummyStrategy.o: DummyStrategy.C DummyStrategy.h ComlibManager.h \
@@ -2254,9 +2499,9 @@ DummyStrategy.o: DummyStrategy.C DummyStrategy.h ComlibManager.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h \
-  ./converse.h router.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h converse.h \
+  router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h
 	$(CHARMC) -c -I. DummyStrategy.C
 
 NodeMulticast.o: NodeMulticast.C NodeMulticast.h ComlibManager.h \
@@ -2275,9 +2520,9 @@ NodeMulticast.o: NodeMulticast.C NodeMulticast.h ComlibManager.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h \
-  ./converse.h router.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h converse.h \
+  router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h
 	$(CHARMC) -c -I. NodeMulticast.C
 
 EachToManyMulticastStrategy.o: EachToManyMulticastStrategy.C \
@@ -2296,11 +2541,11 @@ EachToManyMulticastStrategy.o: EachToManyMulticastStrategy.C \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h \
-  ./converse.h router.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h routerstrategy.h gridrouter.h petable.h \
-  graphrouter.h de.h treerouter.h 3dgridrouter.h prefixrouter.h \
-  AAPLearner.h AAMLearner.h
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h converse.h \
+  router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h routerstrategy.h gridrouter.h petable.h graphrouter.h \
+  de.h treerouter.h 3dgridrouter.h prefixrouter.h AAPLearner.h \
+  AAMLearner.h
 	$(CHARMC) -c -I. EachToManyMulticastStrategy.C
 
 ComlibSectionInfo.o: ComlibSectionInfo.C charm++.h charm.h converse.h \
@@ -2319,19 +2564,19 @@ ComlibSectionInfo.o: ComlibSectionInfo.C charm++.h charm.h converse.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h ComlibManager.h \
-  convcomlib.h ./converse.h router.h convcomlibmanager.h \
-  ./convcomlibstrategy.h ComlibStats.h comlib.decl.h ComlibSectionInfo.h
+  convcomlib.h converse.h router.h convcomlibmanager.h \
+  convcomlibstrategy.h ComlibStats.h comlib.decl.h ComlibSectionInfo.h
 	$(CHARMC) -c -I. ComlibSectionInfo.C
 
-AAPLearner.o: AAPLearner.C AAPLearner.h convcomlib.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./converse.h ./conv-cpath.h \
-  ./conv-qd.h ./conv-random.h ./conv-lists.h ./conv-trace.h \
-  ./persistent.h ./debug-conv.h charm++.h charm.h converse.h pup.h \
-  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
-  ckhashtable.h debug-charm.h debug-conv.h simd.h CkMarshall.decl.h \
-  cksection.h ckcallback.h conv-ccs.h sockRoutines.h conv-config.h \
-  ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
+AAPLearner.o: AAPLearner.C AAPLearner.h convcomlib.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h charm++.h \
+  charm.h converse.h pup.h middle.h middle-conv.h cklists.h ckbitvector.h \
+  ckstream.h init.h ckhashtable.h debug-charm.h debug-conv.h simd.h \
+  CkMarshall.decl.h cksection.h ckcallback.h conv-ccs.h sockRoutines.h \
+  conv-config.h ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
   cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h \
@@ -2341,10 +2586,10 @@ AAPLearner.o: AAPLearner.C AAPLearner.h convcomlib.h ./converse.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h router.h \
-  ComlibManager.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h EachToManyMulticastStrategy.h \
-  routerstrategy.h gridrouter.h petable.h persistent.h graphrouter.h de.h \
-  treerouter.h 3dgridrouter.h prefixrouter.h
+  ComlibManager.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h EachToManyMulticastStrategy.h routerstrategy.h \
+  gridrouter.h petable.h persistent.h graphrouter.h de.h treerouter.h \
+  3dgridrouter.h prefixrouter.h
 	$(CHARMC) -c -I. AAPLearner.C
 
 ComlibStats.o: ComlibStats.C ComlibStats.h charm++.h charm.h converse.h \
@@ -2363,8 +2608,8 @@ ComlibStats.o: ComlibStats.C ComlibStats.h charm++.h charm.h converse.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlibmanager.h \
-  ./converse.h convcomlib.h router.h ./convcomlibstrategy.h \
-  ComlibManager.h comlib.decl.h
+  converse.h convcomlib.h router.h convcomlibstrategy.h ComlibManager.h \
+  comlib.decl.h
 	$(CHARMC) -c -I. ComlibStats.C
 
 AAMLearner.o: AAMLearner.C AAMLearner.h ComlibManager.h charm++.h charm.h \
@@ -2382,9 +2627,9 @@ AAMLearner.o: AAMLearner.C AAMLearner.h ComlibManager.h charm++.h charm.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h \
-  ./converse.h router.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h AAPLearner.h EachToManyMulticastStrategy.h \
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h converse.h \
+  router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h AAPLearner.h EachToManyMulticastStrategy.h \
   routerstrategy.h gridrouter.h petable.h graphrouter.h de.h treerouter.h \
   3dgridrouter.h prefixrouter.h
 	$(CHARMC) -c -I. AAMLearner.C
@@ -2405,8 +2650,8 @@ MsgPacker.o: MsgPacker.C MsgPacker.h charm++.h charm.h converse.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h ComlibManager.h \
-  convcomlib.h ./converse.h router.h convcomlibmanager.h \
-  ./convcomlibstrategy.h ComlibStats.h comlib.decl.h register.h \
+  convcomlib.h converse.h router.h convcomlibmanager.h \
+  convcomlibstrategy.h ComlibStats.h comlib.decl.h register.h \
   pup_cmialloc.h
 	$(CHARMC) -c -I. MsgPacker.C
 
@@ -2426,9 +2671,9 @@ DirectMulticastStrategy.o: DirectMulticastStrategy.C \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h \
-  ./converse.h router.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h ComlibSectionInfo.h
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h converse.h \
+  router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h ComlibSectionInfo.h
 	$(CHARMC) -c -I. DirectMulticastStrategy.C
 
 RingMulticastStrategy.o: RingMulticastStrategy.C RingMulticastStrategy.h \
@@ -2447,9 +2692,9 @@ RingMulticastStrategy.o: RingMulticastStrategy.C RingMulticastStrategy.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h \
-  ./converse.h router.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h ComlibSectionInfo.h
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h converse.h \
+  router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h ComlibSectionInfo.h
 	$(CHARMC) -c -I. RingMulticastStrategy.C
 
 MultiRingMulticast.o: MultiRingMulticast.C MultiRingMulticast.h \
@@ -2468,9 +2713,9 @@ MultiRingMulticast.o: MultiRingMulticast.C MultiRingMulticast.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h \
-  ./converse.h router.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h ComlibSectionInfo.h
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h converse.h \
+  router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h ComlibSectionInfo.h
 	$(CHARMC) -c -I. MultiRingMulticast.C
 
 PipeBroadcastStrategy.o: PipeBroadcastStrategy.C PipeBroadcastStrategy.h \
@@ -2489,9 +2734,9 @@ PipeBroadcastStrategy.o: PipeBroadcastStrategy.C PipeBroadcastStrategy.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h \
-  ./converse.h router.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h pipebroadcastconverse.h
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h converse.h \
+  router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h pipebroadcastconverse.h
 	$(CHARMC) -c -I. PipeBroadcastStrategy.C
 
 MeshStreamingStrategy.o: MeshStreamingStrategy.C MeshStreamingStrategy.h \
@@ -2510,9 +2755,9 @@ MeshStreamingStrategy.o: MeshStreamingStrategy.C MeshStreamingStrategy.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h \
-  ./converse.h router.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h pup_cmialloc.h MsgPacker.h register.h
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h converse.h \
+  router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h pup_cmialloc.h MsgPacker.h register.h
 	$(CHARMC) -c -I. MeshStreamingStrategy.C
 
 PrioStreaming.o: PrioStreaming.C PrioStreaming.h ComlibManager.h \
@@ -2531,10 +2776,9 @@ PrioStreaming.o: PrioStreaming.C PrioStreaming.h ComlibManager.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h \
-  ./converse.h router.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h StreamingStrategy.h MsgPacker.h register.h \
-  pup_cmialloc.h
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h converse.h \
+  router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h StreamingStrategy.h MsgPacker.h register.h pup_cmialloc.h
 	$(CHARMC) -c -I. PrioStreaming.C
 
 BroadcastStrategy.o: BroadcastStrategy.C BroadcastStrategy.h \
@@ -2553,9 +2797,9 @@ BroadcastStrategy.o: BroadcastStrategy.C BroadcastStrategy.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h \
-  ./converse.h router.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h converse.h \
+  router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h
 	$(CHARMC) -c -I. BroadcastStrategy.C
 
 RectMulticastStrategy.o: RectMulticastStrategy.C RectMulticastStrategy.h \
@@ -2574,39 +2818,20 @@ RectMulticastStrategy.o: RectMulticastStrategy.C RectMulticastStrategy.h \
   convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h \
-  ./converse.h router.h convcomlibmanager.h ./convcomlibstrategy.h \
-  ComlibStats.h comlib.decl.h ComlibSectionInfo.h
+  ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlib.h converse.h \
+  router.h convcomlibmanager.h convcomlibstrategy.h ComlibStats.h \
+  comlib.decl.h ComlibSectionInfo.h
 	$(CHARMC) -c -I. RectMulticastStrategy.C
 
-gridrouter.o: gridrouter.C gridrouter.h ./converse.h ./conv-config.h \
-  ./conv-autoconfig.h ./conv-common.h ./conv-mach.h ./conv-mach-opt.h \
-  ./pup_c.h ./conv-cpm.h ./converse.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h convcomlib.h charm++.h charm.h converse.h pup.h middle.h \
-  middle-conv.h cklists.h ckbitvector.h ckstream.h init.h ckhashtable.h \
-  debug-charm.h debug-conv.h simd.h CkMarshall.decl.h cksection.h \
-  ckcallback.h conv-ccs.h sockRoutines.h conv-config.h ccs-server.h \
-  ckobjQ.h ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
-  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
-  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
-  LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
-  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
-  ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
-  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
-  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
-  CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
-  conv-trace.h trace-bluegene.h router.h petable.h persistent.h
-	$(CHARMC) -c -I. gridrouter.C
-
-de.o: de.C de.h ./converse.h ./conv-config.h ./conv-autoconfig.h \
-  ./conv-common.h ./conv-mach.h ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h \
-  ./converse.h ./conv-cpath.h ./conv-qd.h ./conv-random.h ./conv-lists.h \
-  ./conv-trace.h ./persistent.h ./debug-conv.h convcomlib.h charm++.h \
-  charm.h converse.h pup.h middle.h middle-conv.h cklists.h ckbitvector.h \
-  ckstream.h init.h ckhashtable.h debug-charm.h debug-conv.h simd.h \
-  CkMarshall.decl.h cksection.h ckcallback.h conv-ccs.h sockRoutines.h \
-  conv-config.h ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
+gridrouter.o: gridrouter.C gridrouter.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h convcomlib.h charm++.h charm.h converse.h pup.h \
+  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
+  ckhashtable.h debug-charm.h debug-conv.h simd.h CkMarshall.decl.h \
+  cksection.h ckcallback.h conv-ccs.h sockRoutines.h conv-config.h \
+  ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
   cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h \
@@ -2616,18 +2841,18 @@ de.o: de.C de.h ./converse.h ./conv-config.h ./conv-autoconfig.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h router.h \
-  petable.h
-	$(CHARMC) -c -I. de.C
+  petable.h persistent.h
+	$(CHARMC) -c -I. gridrouter.C
 
-treerouter.o: treerouter.C treerouter.h ./converse.h ./conv-config.h \
-  ./conv-autoconfig.h ./conv-common.h ./conv-mach.h ./conv-mach-opt.h \
-  ./pup_c.h ./conv-cpm.h ./converse.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h convcomlib.h charm++.h charm.h converse.h pup.h middle.h \
-  middle-conv.h cklists.h ckbitvector.h ckstream.h init.h ckhashtable.h \
-  debug-charm.h debug-conv.h simd.h CkMarshall.decl.h cksection.h \
-  ckcallback.h conv-ccs.h sockRoutines.h conv-config.h ccs-server.h \
-  ckobjQ.h ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
+de.o: de.C de.h converse.h conv-config.h conv-autoconfig.h conv-common.h \
+  conv-mach.h conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h convcomlib.h \
+  charm++.h charm.h converse.h pup.h middle.h middle-conv.h cklists.h \
+  ckbitvector.h ckstream.h init.h ckhashtable.h debug-charm.h \
+  debug-conv.h simd.h CkMarshall.decl.h cksection.h ckcallback.h \
+  conv-ccs.h sockRoutines.h conv-config.h ccs-server.h ckobjQ.h \
+  ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
   CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
   readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
   LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
@@ -2637,16 +2862,17 @@ treerouter.o: treerouter.C treerouter.h ./converse.h ./conv-config.h \
   tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
   conv-trace.h trace-bluegene.h router.h petable.h
-	$(CHARMC) -c -I. treerouter.C
+	$(CHARMC) -c -I. de.C
 
-petable.o: petable.C ./converse.h ./conv-config.h ./conv-autoconfig.h \
-  ./conv-common.h ./conv-mach.h ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h \
-  ./converse.h ./conv-cpath.h ./conv-qd.h ./conv-random.h ./conv-lists.h \
-  ./conv-trace.h ./persistent.h ./debug-conv.h convcomlib.h charm++.h \
-  charm.h converse.h pup.h middle.h middle-conv.h cklists.h ckbitvector.h \
-  ckstream.h init.h ckhashtable.h debug-charm.h debug-conv.h simd.h \
-  CkMarshall.decl.h cksection.h ckcallback.h conv-ccs.h sockRoutines.h \
-  conv-config.h ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
+treerouter.o: treerouter.C treerouter.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h convcomlib.h charm++.h charm.h converse.h pup.h \
+  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
+  ckhashtable.h debug-charm.h debug-conv.h simd.h CkMarshall.decl.h \
+  cksection.h ckcallback.h conv-ccs.h sockRoutines.h conv-config.h \
+  ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
   cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
   CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
   lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h \
@@ -2657,14 +2883,34 @@ petable.o: petable.C ./converse.h ./conv-config.h ./conv-autoconfig.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h router.h \
   petable.h
+	$(CHARMC) -c -I. treerouter.C
+
+petable.o: petable.C converse.h conv-config.h conv-autoconfig.h \
+  conv-common.h conv-mach.h conv-mach-opt.h pup_c.h conv-config.h \
+  conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h conv-random.h \
+  conv-lists.h conv-trace.h converse.h persistent.h debug-conv.h pup_c.h \
+  convcomlib.h charm++.h charm.h converse.h pup.h middle.h middle-conv.h \
+  cklists.h ckbitvector.h ckstream.h init.h ckhashtable.h debug-charm.h \
+  debug-conv.h simd.h CkMarshall.decl.h cksection.h ckcallback.h \
+  conv-ccs.h sockRoutines.h conv-config.h ccs-server.h ckobjQ.h \
+  ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
+  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
+  LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
+  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
+  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
+  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+  CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
+  conv-trace.h trace-bluegene.h router.h petable.h
 	$(CHARMC) -c -I. petable.C
 
-3dgridrouter.o: 3dgridrouter.C 3dgridrouter.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./converse.h ./conv-cpath.h \
-  ./conv-qd.h ./conv-random.h ./conv-lists.h ./conv-trace.h \
-  ./persistent.h ./debug-conv.h convcomlib.h charm++.h charm.h converse.h \
-  pup.h middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
+3dgridrouter.o: 3dgridrouter.C 3dgridrouter.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h convcomlib.h charm++.h charm.h converse.h pup.h \
+  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
   ckhashtable.h debug-charm.h debug-conv.h simd.h CkMarshall.decl.h \
   cksection.h ckcallback.h conv-ccs.h sockRoutines.h conv-config.h \
   ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
@@ -2680,76 +2926,12 @@ petable.o: petable.C ./converse.h ./conv-config.h ./conv-autoconfig.h \
   petable.h
 	$(CHARMC) -c -I. 3dgridrouter.C
 
-graphrouter.o: graphrouter.C graphrouter.h ./converse.h ./conv-config.h \
-  ./conv-autoconfig.h ./conv-common.h ./conv-mach.h ./conv-mach-opt.h \
-  ./pup_c.h ./conv-cpm.h ./converse.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h convcomlib.h charm++.h charm.h converse.h pup.h middle.h \
-  middle-conv.h cklists.h ckbitvector.h ckstream.h init.h ckhashtable.h \
-  debug-charm.h debug-conv.h simd.h CkMarshall.decl.h cksection.h \
-  ckcallback.h conv-ccs.h sockRoutines.h conv-config.h ccs-server.h \
-  ckobjQ.h ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
-  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
-  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
-  LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
-  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
-  ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
-  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
-  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
-  CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
-  conv-trace.h trace-bluegene.h router.h petable.h persistent.h \
-  hypercubetopology.h
-	$(CHARMC) -c -I. graphrouter.C
-
-hypercubetopology.o: hypercubetopology.C hypercubetopology.h \
-  graphrouter.h ./converse.h ./conv-config.h ./conv-autoconfig.h \
-  ./conv-common.h ./conv-mach.h ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h \
-  ./converse.h ./conv-cpath.h ./conv-qd.h ./conv-random.h ./conv-lists.h \
-  ./conv-trace.h ./persistent.h ./debug-conv.h convcomlib.h charm++.h \
-  charm.h converse.h pup.h middle.h middle-conv.h cklists.h ckbitvector.h \
-  ckstream.h init.h ckhashtable.h debug-charm.h debug-conv.h simd.h \
-  CkMarshall.decl.h cksection.h ckcallback.h conv-ccs.h sockRoutines.h \
-  conv-config.h ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
-  cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
-  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
-  lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h \
-  LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
-  CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
-  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h router.h \
-  petable.h persistent.h
-	$(CHARMC) -c -I. hypercubetopology.C
-
-routerstrategy.o: routerstrategy.C routerstrategy.h convcomlibmanager.h \
-  ./converse.h ./conv-config.h ./conv-autoconfig.h ./conv-common.h \
-  ./conv-mach.h ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./converse.h \
-  ./conv-cpath.h ./conv-qd.h ./conv-random.h ./conv-lists.h \
-  ./conv-trace.h ./persistent.h ./debug-conv.h convcomlib.h charm++.h \
-  charm.h converse.h pup.h middle.h middle-conv.h cklists.h ckbitvector.h \
-  ckstream.h init.h ckhashtable.h debug-charm.h debug-conv.h simd.h \
-  CkMarshall.decl.h cksection.h ckcallback.h conv-ccs.h sockRoutines.h \
-  conv-config.h ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
-  cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
-  CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h LBDatabase.h \
-  lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h \
-  LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h CkLocation.decl.h \
-  CkArray.decl.h ComlibArrayListener.h ComlibStrategy.h \
-  convcomlibstrategy.h ComlibLearner.h envelope.h CkFutures.decl.h \
-  charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
-  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h router.h \
-  ./convcomlibstrategy.h gridrouter.h petable.h persistent.h \
-  graphrouter.h de.h treerouter.h 3dgridrouter.h prefixrouter.h
-	$(CHARMC) -c -I. routerstrategy.C
-
-convcomlibmanager.o: convcomlibmanager.C convcomlibmanager.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./converse.h ./conv-cpath.h \
-  ./conv-qd.h ./conv-random.h ./conv-lists.h ./conv-trace.h \
-  ./persistent.h ./debug-conv.h convcomlib.h charm++.h charm.h converse.h \
-  pup.h middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
+graphrouter.o: graphrouter.C graphrouter.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h convcomlib.h charm++.h charm.h converse.h pup.h \
+  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
   ckhashtable.h debug-charm.h debug-conv.h simd.h CkMarshall.decl.h \
   cksection.h ckcallback.h conv-ccs.h sockRoutines.h conv-config.h \
   ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
@@ -2762,9 +2944,74 @@ convcomlibmanager.o: convcomlibmanager.C convcomlibmanager.h ./converse.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h router.h \
-  ./convcomlibstrategy.h routerstrategy.h gridrouter.h petable.h \
-  persistent.h graphrouter.h de.h treerouter.h 3dgridrouter.h \
-  prefixrouter.h
+  petable.h persistent.h hypercubetopology.h
+	$(CHARMC) -c -I. graphrouter.C
+
+hypercubetopology.o: hypercubetopology.C hypercubetopology.h \
+  graphrouter.h converse.h conv-config.h conv-autoconfig.h conv-common.h \
+  conv-mach.h conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h convcomlib.h \
+  charm++.h charm.h converse.h pup.h middle.h middle-conv.h cklists.h \
+  ckbitvector.h ckstream.h init.h ckhashtable.h debug-charm.h \
+  debug-conv.h simd.h CkMarshall.decl.h cksection.h ckcallback.h \
+  conv-ccs.h sockRoutines.h conv-config.h ccs-server.h ckobjQ.h \
+  ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
+  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
+  LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
+  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
+  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
+  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+  CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
+  conv-trace.h trace-bluegene.h router.h petable.h persistent.h
+	$(CHARMC) -c -I. hypercubetopology.C
+
+routerstrategy.o: routerstrategy.C routerstrategy.h convcomlibmanager.h \
+  converse.h conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h convcomlib.h \
+  charm++.h charm.h converse.h pup.h middle.h middle-conv.h cklists.h \
+  ckbitvector.h ckstream.h init.h ckhashtable.h debug-charm.h \
+  debug-conv.h simd.h CkMarshall.decl.h cksection.h ckcallback.h \
+  conv-ccs.h sockRoutines.h conv-config.h ccs-server.h ckobjQ.h \
+  ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
+  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
+  LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
+  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
+  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
+  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+  CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
+  conv-trace.h trace-bluegene.h router.h convcomlibstrategy.h \
+  gridrouter.h petable.h persistent.h graphrouter.h de.h treerouter.h \
+  3dgridrouter.h prefixrouter.h
+	$(CHARMC) -c -I. routerstrategy.C
+
+convcomlibmanager.o: convcomlibmanager.C convcomlibmanager.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h convcomlib.h \
+  charm++.h charm.h converse.h pup.h middle.h middle-conv.h cklists.h \
+  ckbitvector.h ckstream.h init.h ckhashtable.h debug-charm.h \
+  debug-conv.h simd.h CkMarshall.decl.h cksection.h ckcallback.h \
+  conv-ccs.h sockRoutines.h conv-config.h ccs-server.h ckobjQ.h \
+  ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
+  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
+  LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
+  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h convcomlibstrategy.h \
+  ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
+  tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
+  CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
+  conv-trace.h trace-bluegene.h router.h convcomlibstrategy.h \
+  routerstrategy.h gridrouter.h petable.h persistent.h graphrouter.h de.h \
+  treerouter.h 3dgridrouter.h prefixrouter.h
 	$(CHARMC) -c -I. convcomlibmanager.C
 
 pipebroadcastconverse.o: pipebroadcastconverse.C pipebroadcastconverse.h \
@@ -2784,7 +3031,7 @@ pipebroadcastconverse.o: pipebroadcastconverse.C pipebroadcastconverse.h \
   charisma.h charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h \
   sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h trace-bluegene.h convcomlibmanager.h \
-  ./converse.h convcomlib.h router.h ./convcomlibstrategy.h
+  converse.h convcomlib.h router.h convcomlibstrategy.h
 	$(CHARMC) -c -I. pipebroadcastconverse.C
 
 pipelinestrategy.o: pipelinestrategy.C pipelinestrategy.h ckhashtable.h \
@@ -2803,16 +3050,16 @@ pipelinestrategy.o: pipelinestrategy.C pipelinestrategy.h ckhashtable.h \
   ComlibLearner.h envelope.h CkFutures.decl.h charisma.h charisma.decl.h \
   tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h convcomlibmanager.h ./converse.h convcomlib.h router.h \
-  ./convcomlibstrategy.h
+  trace-bluegene.h convcomlibmanager.h converse.h convcomlib.h router.h \
+  convcomlibstrategy.h
 	$(CHARMC) -c -I. pipelinestrategy.C
 
-prefixrouter.o: prefixrouter.C prefixrouter.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./converse.h ./conv-cpath.h \
-  ./conv-qd.h ./conv-random.h ./conv-lists.h ./conv-trace.h \
-  ./persistent.h ./debug-conv.h convcomlib.h charm++.h charm.h converse.h \
-  pup.h middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
+prefixrouter.o: prefixrouter.C prefixrouter.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h convcomlib.h charm++.h charm.h converse.h pup.h \
+  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
   ckhashtable.h debug-charm.h debug-conv.h simd.h CkMarshall.decl.h \
   cksection.h ckcallback.h conv-ccs.h sockRoutines.h conv-config.h \
   ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
@@ -2827,27 +3074,105 @@ prefixrouter.o: prefixrouter.C prefixrouter.h ./converse.h \
   ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h router.h
 	$(CHARMC) -c -I. prefixrouter.C
 
-controlPoints.o: controlPoints.C ./charm++.h ./charm.h ./converse.h \
-  ./conv-config.h ./conv-autoconfig.h ./conv-common.h ./conv-mach.h \
-  ./conv-mach-opt.h ./pup_c.h ./conv-cpm.h ./conv-cpath.h ./conv-qd.h \
-  ./conv-random.h ./conv-lists.h ./conv-trace.h ./persistent.h \
-  ./debug-conv.h ./pup.h ./middle.h ./middle-conv.h ./cklists.h \
-  ./ckbitvector.h ./ckstream.h ./init.h ./ckhashtable.h ./debug-charm.h \
-  ./simd.h ./CkMarshall.decl.h ./charm++.h ./cksection.h ./ckcallback.h \
-  ./conv-ccs.h ./sockRoutines.h ./ccs-server.h ./ckobjQ.h ./ckreduction.h \
-  ./CkReduction.decl.h ./cknodegroupreduction.h \
-  ./CkArrayReductionMgr.decl.h ./ckmemcheckpoint.h \
-  ./CkMemCheckpoint.decl.h ./readonly.h ./ckarray.h ./cklocation.h \
-  ./LBDatabase.h ./lbdb.h ./LBDBManager.h ./LBObj.h ./LBOM.h ./LBComm.h \
-  ./LBMachineUtil.h ./lbdb++.h ./LBDatabase.decl.h ./NullLB.decl.h \
-  ./BaseLB.decl.h ./CkLocation.decl.h ./CkArray.decl.h \
-  ./ComlibArrayListener.h ./ComlibStrategy.h ./convcomlibstrategy.h \
-  ./ComlibLearner.h ./envelope.h ./CkFutures.decl.h ./charisma.h \
-  ./charisma.decl.h ./tempo.h ./tempo.decl.h ./waitqd.h ./waitqd.decl.h \
-  ./sdag.h ./ckcheckpoint.h ./CkCheckpoint.decl.h ./ckevacuation.h \
-  ./ckarrayreductionmgr.h ./trace.h ./trace-bluegene.h \
-  ControlPoints.decl.h charm++.h trace-controlPoints.h trace.h envelope.h \
-  register.h trace-common.h LBDatabase.h controlPoints.h ./pup_stl.h \
-  ControlPoints.def.h
+controlPoints.o: controlPoints.C charm++.h charm.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h pup.h \
+  middle.h middle-conv.h converse.h pup.h cklists.h pup.h ckbitvector.h \
+  ckstream.h init.h charm.h ckhashtable.h pup.h debug-charm.h converse.h \
+  debug-conv.h pup.h cklists.h simd.h CkMarshall.decl.h charm++.h \
+  ckhashtable.h pup.h cksection.h ckcallback.h conv-ccs.h converse.h \
+  sockRoutines.h conv-config.h ccs-server.h sockRoutines.h ckobjQ.h \
+  cklists.h ckreduction.h CkReduction.decl.h charm++.h \
+  cknodegroupreduction.h CkArrayReductionMgr.decl.h charm++.h \
+  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h \
+  readonly.h charm.h ckarray.h cklocation.h LBDatabase.h lbdb.h \
+  converse.h charm.h middle.h LBDBManager.h converse.h lbdb.h cklists.h \
+  LBObj.h lbdb.h LBOM.h lbdb.h LBObj.h LBComm.h converse.h lbdb.h \
+  LBMachineUtil.h lbdb++.h LBDBManager.h LBDatabase.decl.h charm++.h \
+  NullLB.decl.h charm++.h LBDatabase.decl.h BaseLB.decl.h charm++.h \
+  LBDatabase.decl.h CkLocation.decl.h charm++.h CkMarshall.decl.h \
+  CkArray.decl.h charm++.h CkReduction.decl.h CkLocation.decl.h \
+  CkArrayReductionMgr.decl.h CkArrayReductionMgr.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h charm++.h ckhashtable.h pup.h \
+  convcomlibstrategy.h converse.h pup.h cklists.h ComlibLearner.h \
+  convcomlibstrategy.h envelope.h charm.h ckhashtable.h pup.h ckstream.h \
+  CkFutures.decl.h charm++.h charisma.h charisma.decl.h charm++.h tempo.h \
+  charm++.h tempo.decl.h charm++.h waitqd.h charm++.h waitqd.decl.h \
+  charm++.h CkFutures.decl.h sdag.h charm++.h ckcheckpoint.h \
+  CkCheckpoint.decl.h charm++.h ckevacuation.h ckarrayreductionmgr.h \
+  trace.h conv-trace.h trace-bluegene.h trace.h ControlPoints.decl.h \
+  charm++.h trace-controlPoints.h trace.h envelope.h register.h \
+  trace-common.h controlPoints.h pup_stl.h pup.h LBDatabase.h \
+  pathHistory.h arrayRedistributor.h trace-projections.h ckhashtable.h \
+  pup.h ControlPoints.def.h
 	$(CHARMC) -c -I. controlPoints.C
+
+arrayRedistributor.o: arrayRedistributor.C charm++.h charm.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h conv-config.h conv-cpm.h converse.h \
+  conv-cpath.h converse.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h converse.h persistent.h debug-conv.h pup_c.h pup.h \
+  middle.h middle-conv.h converse.h pup.h cklists.h pup.h ckbitvector.h \
+  ckstream.h init.h charm.h ckhashtable.h pup.h debug-charm.h converse.h \
+  debug-conv.h pup.h cklists.h simd.h CkMarshall.decl.h charm++.h \
+  ckhashtable.h pup.h cksection.h ckcallback.h conv-ccs.h converse.h \
+  sockRoutines.h conv-config.h ccs-server.h sockRoutines.h ckobjQ.h \
+  cklists.h ckreduction.h CkReduction.decl.h charm++.h \
+  cknodegroupreduction.h CkArrayReductionMgr.decl.h charm++.h \
+  CkReduction.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h \
+  readonly.h charm.h ckarray.h cklocation.h LBDatabase.h lbdb.h \
+  converse.h charm.h middle.h LBDBManager.h converse.h lbdb.h cklists.h \
+  LBObj.h lbdb.h LBOM.h lbdb.h LBObj.h LBComm.h converse.h lbdb.h \
+  LBMachineUtil.h lbdb++.h LBDBManager.h LBDatabase.decl.h charm++.h \
+  NullLB.decl.h charm++.h LBDatabase.decl.h BaseLB.decl.h charm++.h \
+  LBDatabase.decl.h CkLocation.decl.h charm++.h CkMarshall.decl.h \
+  CkArray.decl.h charm++.h CkReduction.decl.h CkLocation.decl.h \
+  CkArrayReductionMgr.decl.h CkArrayReductionMgr.decl.h \
+  ComlibArrayListener.h ComlibStrategy.h charm++.h ckhashtable.h pup.h \
+  convcomlibstrategy.h converse.h pup.h cklists.h ComlibLearner.h \
+  convcomlibstrategy.h envelope.h charm.h ckhashtable.h pup.h ckstream.h \
+  CkFutures.decl.h charm++.h charisma.h charisma.decl.h charm++.h tempo.h \
+  charm++.h tempo.decl.h charm++.h waitqd.h charm++.h waitqd.decl.h \
+  charm++.h CkFutures.decl.h sdag.h charm++.h ckcheckpoint.h \
+  CkCheckpoint.decl.h charm++.h ckevacuation.h ckarrayreductionmgr.h \
+  trace.h conv-trace.h trace-bluegene.h trace.h ControlPoints.decl.h \
+  charm++.h trace-controlPoints.h trace.h envelope.h register.h \
+  trace-common.h LBDatabase.h controlPoints.h pup_stl.h pup.h \
+  pathHistory.h arrayRedistributor.h
+	$(CHARMC) -c -I. arrayRedistributor.C
+
+pathHistory.o: pathHistory.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h CkArray.decl.h charm++.h \
+  CkReduction.decl.h CkLocation.decl.h CkArrayReductionMgr.decl.h \
+  CkArrayReductionMgr.decl.h ComlibArrayListener.h ComlibStrategy.h \
+  charm++.h ckhashtable.h pup.h convcomlibstrategy.h converse.h pup.h \
+  cklists.h ComlibLearner.h convcomlibstrategy.h envelope.h charm.h \
+  ckhashtable.h pup.h ckstream.h CkFutures.decl.h charm++.h charisma.h \
+  charisma.decl.h charm++.h tempo.h charm++.h tempo.decl.h charm++.h \
+  waitqd.h charm++.h waitqd.decl.h charm++.h CkFutures.decl.h sdag.h \
+  charm++.h ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
+  ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
+  ControlPoints.decl.h charm++.h trace-controlPoints.h trace.h envelope.h \
+  register.h trace-common.h LBDatabase.h controlPoints.h pup_stl.h pup.h \
+  pathHistory.h arrayRedistributor.h register.h
+	$(CHARMC) -c -I. pathHistory.C
 

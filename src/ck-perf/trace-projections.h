@@ -229,6 +229,8 @@ class TraceProjections;
 class LogPool {
   friend class TraceProjections;
   friend class TraceProjectionsBOC;
+  friend class controlPointManager;
+
   private:
     bool writeData;
     unsigned int poolSize;
@@ -300,6 +302,11 @@ class LogPool {
     void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int numPe=0, int *pelist=NULL);
     void flushLogBuffer();
     void postProcessLog();
+
+    void setWriteData(bool b){
+      writeData = b;
+    }
+
 };
 
 /*
@@ -431,6 +438,10 @@ class TraceProjections : public Trace {
     /* This is for moving projections to being a charm++ module */
     void closeTrace(void);
 
+    void setWriteData(bool b){
+      _logPool->setWriteData(b);
+    }
+
     /* for overiding basic thread listener support in Trace class */
     virtual void traceAddThreadListeners(CthThread tid, envelope *e);
 };
@@ -462,6 +473,14 @@ class toProjectionsGZFile : public PUP::er {
   toProjectionsGZFile(gzFile f_) :er(IS_PACKING), f(f_) {}
 };
 #endif
+
+
+
+
+
+/// Disable the outputting of the trace logs
+void disableTraceLogOutput();
+
 
 
 #endif

@@ -47,9 +47,10 @@ class XStr {
       for (int i=0; i<indent; i++) cout << "  ";
       cout << get_string();
     }
-    // MAB: this method appends character c to every line
-    // basically substitutes every \n with a "c\n"
+    /// Appends character c to every line
     void line_append(const char c);
+    /// pads with spaces and appends character c to every line. Also converts tabs to spaces.
+    void line_append_padding(const char c, int lineWidth=80);
     // Replace all occurences of character "a" in string with character "b"
     void replace (const char a, const char b);
   public:

@@ -52,6 +52,7 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "charm++.h"
 #include "register.h"
 #include "ck.h"
+#include "pathHistory.h"
 
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
@@ -722,6 +723,9 @@ inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
 	env->getsetArraySrcPe()=CkMyPe();
 	env->setEpIdx(ep);
 	env->getsetArrayHops()=0;
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+	criticalPath_send(env);
+#endif
 }
 void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) const
 {

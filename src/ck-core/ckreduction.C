@@ -50,6 +50,10 @@ waits for the migrant contributions to straggle in.
 #include "charm++.h"
 #include "ck.h"
 
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#include "pathHistory.h"
+#endif
+
 #if 0
 //Debugging messages:
 // Reduction mananger internal information:
@@ -820,34 +824,30 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
 
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+
+#if CRITICAL_PATH_DEBUG > 3
   CkPrintf("combining critical path information from messages in CkReductionMgr::reduceMessages\n");
-  PathHistory &path = UsrToEnv(ret)->pathHistory;
-  // Combine the critical paths from all the reduction messages into the header for the new result
+#endif
+
+  MergeablePathHistory path(CkpvAccess(currentlyExecutingPath));
+  path.updateMax(UsrToEnv(ret));
+  // Combine the critical paths from all the reduction messages
   for (i=0;i<nMsgs;i++){
     if (msgArr[i]!=ret){
-      CkPrintf("[%d] other path = %lf\n", CkMyPe(), UsrToEnv(msgArr[i])->pathHistory.getTime() );
-      path.updateMax(UsrToEnv(msgArr[i])->pathHistory);
+      //      CkPrintf("[%d] other path = %lf\n", CkMyPe(), UsrToEnv(msgArr[i])->pathHistory.getTime() );
+      path.updateMax(UsrToEnv(msgArr[i]));
     }
   }
   
-  // Also consider the path which got us into this entry method
-  CkPrintf("[%d] this path = %lf\n", CkMyPe(), currentlyExecutingMsg->pathHistory.getTime() );
-  path.updateMax(currentlyExecutingMsg->pathHistory);
+
+#if CRITICAL_PATH_DEBUG > 3
   CkPrintf("[%d] result path = %lf\n", CkMyPe(), path.getTime() );
+#endif
+  
+  PathHistoryTableEntry tableEntry(path);
+  tableEntry.addToTableAndEnvelope(UsrToEnv(ret));
   
 #endif
-
-
-
-
-
-
-
-
-
-
-  
-
 
 	//Go back through the vector, deleting old messages
   for (i=0;i<nMsgs;i++) if (msgArr[i]!=ret) delete msgArr[i];
@@ -1010,21 +1010,27 @@ void CkReductionMgr :: endArrayReduction(){
 
 	
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+
+#if CRITICAL_PATH_DEBUG > 3
 	CkPrintf("[%d] combining critical path information from messages in CkReductionMgr::endArrayReduction(). numMsgs=%d\n", CkMyPe(), numMsgs);
-	PathHistory &path = UsrToEnv(ret)->pathHistory;
+#endif
+
+	MergeablePathHistory path(CkpvAccess(currentlyExecutingPath));
+	path.updateMax(UsrToEnv(ret));
 	// Combine the critical paths from all the reduction messages into the header for the new result
 	for (i=0;i<numMsgs;i++){
 	  if (tempMsgs[i]!=ret){
-	    CkPrintf("[%d] other path = %lf\n", CkMyPe(), UsrToEnv(tempMsgs[i])->pathHistory.getTime() );
-	    path.updateMax(UsrToEnv(tempMsgs[i])->pathHistory);
+	    //	    CkPrintf("[%d] other path = %lf\n", CkMyPe(), UsrToEnv(tempMsgs[i])->pathHistory.getTime() );
+	    path.updateMax(UsrToEnv(tempMsgs[i]));
 	  } else {
-	    CkPrintf("[%d] other path is ret = %lf\n", CkMyPe(), UsrToEnv(tempMsgs[i])->pathHistory.getTime() );
+	    //  CkPrintf("[%d] other path is ret = %lf\n", CkMyPe(), UsrToEnv(tempMsgs[i])->pathHistory.getTime() );
 	  }
 	}
 	// Also consider the path which got us into this entry method
-	CkPrintf("[%d] this path = %lf\n", CkMyPe(), currentlyExecutingMsg->pathHistory.getTime() );
-	path.updateMax(currentlyExecutingMsg->pathHistory);
+
+#if CRITICAL_PATH_DEBUG > 3
 	CkPrintf("[%d] result path = %lf\n", CkMyPe(), path.getTime() );
+#endif
 
 #endif
   
@@ -2056,21 +2062,24 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
 
 	
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#if CRITICAL_PATH_DEBUG > 3
 	CkPrintf("[%d] combining critical path information from messages in CkNodeReductionMgr::reduceMessages(). numMsgs=%d\n", CkMyPe(), nMsgs);
-	PathHistory &path = UsrToEnv(ret)->pathHistory;
+#endif
+	MergeablePathHistory path(CkpvAccess(currentlyExecutingPath));
+	path.updateMax(UsrToEnv(ret));
 	// Combine the critical paths from all the reduction messages into the header for the new result
 	for (i=0;i<nMsgs;i++){
 	  if (msgArr[i]!=ret){
-	    CkPrintf("[%d] other path = %lf\n", CkMyPe(), UsrToEnv(msgArr[i])->pathHistory.getTime() );
-	    path.updateMax(UsrToEnv(msgArr[i])->pathHistory);
+	    //	    CkPrintf("[%d] other path = %lf\n", CkMyPe(), UsrToEnv(msgArr[i])->pathHistory.getTime() );
+	    path.updateMax(UsrToEnv(msgArr[i]));
 	  } else {
-	    CkPrintf("[%d] other path is ret = %lf\n", CkMyPe(), UsrToEnv(msgArr[i])->pathHistory.getTime() );
+	    //	    CkPrintf("[%d] other path is ret = %lf\n", CkMyPe(), UsrToEnv(msgArr[i])->pathHistory.getTime() );
 	  }
 	}
-	// Also consider the path which got us into this entry method
-	CkPrintf("[%d] this path = %lf\n", CkMyPe(), currentlyExecutingMsg->pathHistory.getTime() );
-	path.updateMax(currentlyExecutingMsg->pathHistory);
+#if CRITICAL_PATH_DEBUG > 3
 	CkPrintf("[%d] result path = %lf\n", CkMyPe(), path.getTime() );
+#endif
+
 #endif
 
 

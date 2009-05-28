@@ -24,6 +24,7 @@ class CParsedFile {
     void generateRegisterEp(XStr& output);
     void generateTraceEpDecl(XStr& output);
     void generateTraceEpDef(XStr& output);
+    void generateDependencyMergePoints(XStr& output);
     void generateTrace();
   public:
     Chare *container;
@@ -37,6 +38,8 @@ class CParsedFile {
     void doProcess(XStr& classname, XStr& output) {
       className = &classname;
       output << "#define " << classname << "_SDAG_CODE \n";
+      
+
       numberNodes();
       labelNodes();
       propagateState();
@@ -50,7 +53,10 @@ class CParsedFile {
       generatePupFunction(output);
       generateRegisterEp(output);		// for tracing Gengbin
       generateTraceEpDecl(output);		// for tracing Gengbin
-      output.line_append('\\');
+
+      generateDependencyMergePoints(output); // for Isaac's Critical Path Detection
+
+      output.line_append_padding('\\');
       output << "\n";
       output << "#define " << classname << "_SDAG_CODE_DEF \\\n";
       generateTraceEpDef(output);

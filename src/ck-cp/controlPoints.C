@@ -23,8 +23,8 @@ using namespace std;
 
 #define WRITEDATAFILE 0
 
-//#undef DEBUG
-//#define DEBUG 4
+//#undef DEBUGPRINT
+//#define DEBUGPRINT 4
 
 static void periodicProcessControlPoints(void* ptr, double currWallTime);
 
@@ -98,7 +98,10 @@ unsigned int randInt(unsigned int num, const char* name, int seed=0){
 
 
 controlPointManager::controlPointManager(){
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
     pathHistoryTableLastIdx = 0;
+#endif
+
     newControlPointsAvailable = false;
     alreadyRequestedMemoryUsage = false;   
     alreadyRequestedIdleTime = false;
@@ -198,7 +201,7 @@ controlPointManager::controlPointManager(){
 
       while(iss >> time){
 	ips.times.push_back(time);
-#if DEBUG > 5
+#if DEBUGPRINT > 5
 	CkPrintf("read time %lf from file\n", time);
 #endif
       }
@@ -260,7 +263,7 @@ controlPointManager::controlPointManager(){
 
     const int s = allData.phases.size();
 
-#if DEBUG
+#if DEBUGPRINT
     CkPrintf("\n\nExamining critical paths and priorities and idle times (num phases=%d)\n", s );
     for(int p=0;p<s;++p){
       const instrumentedPhase &phase = allData.phases[p];
@@ -367,7 +370,7 @@ controlPointManager::controlPointManager(){
 	    }
 	    
 	    if(haveGranularityCallback){ 
-#if DEBUG
+#if DEBUGPRINT
 	      CkPrintf("Calling granularity change callback\n");
 #endif
 	      controlPointMsg *msg = new(0) controlPointMsg;
@@ -428,7 +431,7 @@ controlPointManager::controlPointManager(){
       }
       
       if(haveGranularityCallback){ 
-#if DEBUG
+#if DEBUGPRINT
 	CkPrintf("Calling granularity change callback\n");
 #endif
 	controlPointMsg *msg = new(0) controlPointMsg;
@@ -615,8 +618,9 @@ controlPointManager::controlPointManager(){
       been traversed to its origin.  
   */
  void controlPointManager::traceCriticalPathBack(pathInformationMsg *msg){
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
    int count = pathHistoryTable.count(msg->table_idx);
-#if DEBUG > 2
+#if DEBUGPRINT > 2
    CkPrintf("Table entry %d on pe %d occurs %d times in table\n", msg->table_idx, CkMyPe(), count);
 #endif
    CkAssert(count==0 || count==1);
@@ -626,7 +630,7 @@ controlPointManager::controlPointManager(){
       int idx = path.sender_history_table_idx;
       int pe = path.sender_pe;
 
-#if DEBUG > 2
+#if DEBUGPRINT > 2
       CkPrintf("Table entry %d on pe %d points to pe=%d idx=%d\n", msg->table_idx, CkMyPe(), pe, idx);
 #endif
 
@@ -664,10 +668,15 @@ controlPointManager::controlPointManager(){
     }
 
     delete msg;
+#else
+    CkAbort("Shouldn't call controlPointManager::traceCriticalPathBack when critical path detection is not enabled");
+#endif
   }
 
 
 void controlPointManager::broadcastCriticalPathResult(pathInformationMsg *msg){
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   CkPrintf("[%d] Received broadcast of critical path\n", CkMyPe());
   int me = CkMyPe();
   int intersectsLocalPE = false;
@@ -708,12 +717,17 @@ void controlPointManager::broadcastCriticalPathResult(pathInformationMsg *msg){
   int data=1;
   CkCallback cb(CkIndex_controlPointManager::criticalPathDone(NULL),thisProxy[0]); 
   contribute(sizeof(int), &data, CkReduction::sum_int, cb);
+
+#endif
+
 }
 
 void controlPointManager::criticalPathDone(CkReductionMsg *msg){
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   CkPrintf("[%d] All PEs have received the critical path information. Sending critical path to user supplied callback.\n", CkMyPe());
   pathForUser->cb.send(pathForUser);
   pathForUser = NULL;
+#endif
 }
 
 
@@ -730,7 +744,7 @@ void controlPointManager::criticalPathDone(CkReductionMsg *msg){
       affectsPrioritiesArray[std::string(name)] = s;
     }
     
-#if DEBUG   
+#if DEBUGPRINT   
     std::map<string, std::set<int> >::iterator f;
     for(f=affectsPrioritiesArray.begin(); f!=affectsPrioritiesArray.end();++f){
       std::string name = f->first;
@@ -758,7 +772,7 @@ void controlPointManager::criticalPathDone(CkReductionMsg *msg){
       affectsPrioritiesEP[std::string(name)] = s;
     }
     
-#if DEBUG
+#if DEBUGPRINT
     std::map<string, std::set<int> >::iterator f;
     for(f=affectsPrioritiesEP.begin(); f!=affectsPrioritiesEP.end();++f){
       std::string name = f->first;
@@ -823,7 +837,7 @@ void registerGranularityChangeCallback(CkCallback cb, bool frameworkShouldAdvanc
 /// An interface callable by the application.
 void registerControlPointTiming(double time){
   CkAssert(CkMyPe() == 0);
-#if DEBUG>0
+#if DEBUGPRINT>0
   CkPrintf("Program registering its own timing with registerControlPointTiming(time=%lf)\n", time);
 #endif
   controlPointManagerProxy.ckLocalBranch()->setTiming(time);
@@ -845,7 +859,7 @@ void controlPointInitNode(){
 
 /// Called periodically to allow control point framework to do things periodically
 static void periodicProcessControlPoints(void* ptr, double currWallTime){
-#ifdef DEBUG
+#ifdef DEBUGPRINT
   CkPrintf("[%d] periodicProcessControlPoints()\n", CkMyPe());
 #endif
   controlPointManagerProxy.ckLocalBranch()->processControlPoints();
@@ -1006,7 +1020,7 @@ int valueProvidedByOptimizer(const char * name){
   for(iter = controlPointSpace.begin(); iter != controlPointSpace.end(); iter++){
     //    CkPrintf("Examining dimension %d\n", d);
 
-#if DEBUG
+#if DEBUGPRINT
     string name = iter->first;
     if(staticControlPoints.count(name) >0 ){
       cout << " control point " << name << " is static " << endl;

@@ -16,96 +16,15 @@ clients, including the rest of Charm++, are actually C++.
 #include "trace.h"
 #include "queueing.h"
 
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+#include "pathHistory.h"
+#endif
+
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
 #endif // CMK_LBDB_ON
 
 #define CK_MSG_SKIP_OR_IMM    (CK_MSG_EXPEDITED | CK_MSG_IMMEDIATE)
-
-
-
-
-
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-// store the pointer to the currently executing msg
-// see envelope.h
-// TODO: convert to CkPv
-envelope * currentlyExecutingMsg = NULL;
-bool thisMethodSentAMessage = false;
-double timeEntryMethodStarted = 0.0;
-
-void resetCricitalPathDetection(){
-  CkAbort("shouldn't be called anymore. Deprecated");
-  
-  // First we should register this currently executing message as a path, because it is likely an important one to consider.
-  registerTerminalEntryMethod();
-
-  // Print the Critical path known to this PE
-  if(CkMyPe() == 0){
-    CkPrintf("[pe=%d] Critical paths discovered on this pe (in resetCriticalPathCounts() ):\n", CkMyPe());
-    printPECriticalPath();
-  }
-  
-  // Reset the counts for the critical path on this PE
-  resetPECriticalPath();
-  
-  // Reset the counts for the currently executing message
-  resetThisEntryPath();
-  
-}
-
-void resetThisEntryPath(){
-  // Reset the counts for the currently executing message
-  if(currentlyExecutingMsg != NULL){
-    currentlyExecutingMsg->resetEpIdxHistory();
-  }
-}
-
-
-void  saveCriticalPathAsUserEvent(void);
-
-void bracketStartCriticalPathMethod(envelope * env){ 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  // store the pointer to the currently executing msg
-  currentlyExecutingMsg = env; 
-  thisMethodSentAMessage = false;
-
-  // Increase the counts for the entry that we are about to execute
-  env->updateCounts();
-  
-  // Increase the reference count for the message so the user won't delete it
-  CmiReference(env);
-  
-  saveCriticalPathAsUserEvent();
-
-  timeEntryMethodStarted = CmiWallTimer();
-
-#endif
-}
-
-
-void bracketEndCriticalPathMethod(envelope * env){ 
-
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  double timeEntryMethodEnded = CmiWallTimer();
-  env->pathHistory.incrementTotalTime(timeEntryMethodEnded-timeEntryMethodStarted);
-  if(!thisMethodSentAMessage){
-    registerTerminalEntryMethod();
-  }
-
-  CmiFree(env); // free the message, because we incremented its reference count above
-
-  // set to NULL the pointer to the currently executing msg
-  currentlyExecutingMsg = NULL; 
-  //  CkPrintf("This entry method is %s\n", (int)thisMethodSentAMessage?"non-terminal":"terminal");
-
-#endif
-
-}
-
-
-#endif
-
 
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
 
@@ -979,13 +898,14 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
   }
 }
 
-/**
- * This is the main converse-level handler used by all of Charm++.
- */
-
 //BIGSIM_OOC DEBUGGING
 #define TELLMSGTYPE(x) //x
 
+/**
+ * This is the main converse-level handler used by all of Charm++.
+ *
+ * \addtogroup CriticalPathFramework
+ */
 void _processHandler(void *converseMsg,CkCoreState *ck)
 {
   register envelope *env = (envelope *) converseMsg;
@@ -1012,7 +932,8 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 #endif
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  bracketStartCriticalPathMethod(env);
+  //  CkPrintf("START\n");
+  criticalPath_start(env);
 #endif
 
 
@@ -1096,7 +1017,8 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  bracketEndCriticalPathMethod(env);
+  criticalPath_end();
+  //  CkPrintf("STOP\n");
 #endif
 
 
@@ -1297,6 +1219,9 @@ void _noCldNodeEnqueue(int node, envelope *env)
 static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
 {
   register envelope *env = UsrToEnv(msg);
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  criticalPath_send(env);
+#endif
   _CHECK_USED(env);
   _SET_USED(env, 1);
   env->setMsgtype(ForChareMsg);
@@ -1341,6 +1266,9 @@ static inline int _prepareImmediateMsg(int eIdx,void *msg,const CkChareID *pCid)
   int destPE = _prepareMsg(eIdx, msg, pCid);
   if (destPE != -1) {
     register envelope *env = UsrToEnv(msg);
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+    criticalPath_send(env);
+#endif
     CmiBecomeImmediate(env);
   }
   return destPE;
@@ -1398,6 +1326,9 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
 {
   register envelope *env = UsrToEnv(msg);
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  criticalPath_send(env);
+#endif
   _CHECK_USED(env);
   _SET_USED(env, 1);
   env->setMsgtype(type);
@@ -1414,6 +1345,9 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
 static inline envelope *_prepareImmediateMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
 {
   envelope *env = _prepareMsgBranch(eIdx, msg, gID, type);
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  criticalPath_send(env);
+#endif
   CmiBecomeImmediate(env);
   return env;
 }

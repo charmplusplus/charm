@@ -34,47 +34,13 @@
 
 
 
-// #define USE_CRITICAL_PATH_HEADER_ARRAY
+//#define USE_CRITICAL_PATH_HEADER_ARRAY
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-// This critical path detection is still experimental
-// Added by Isaac (Dec 2008)
+/**
+    \addtogroup CriticalPathFramework 
+    @{
+*/
 
-// stores the pointer to the currently executing msg
-// used in cklocation.C, ck.C
-// TODO: convert to CkPv
-
-extern envelope * currentlyExecutingMsg;
-extern bool thisMethodSentAMessage;
-extern double timeEntryMethodStarted;
-
-// The methods provided by the control point framework to access 
-// the most Critical path seen by this PE. 
-// These ought not to be called by the user program.
-// (defined in controlPoints.C)
-extern void resetPECriticalPath();
-extern void printPECriticalPath();
-extern void registerTerminalEntryMethod();
-
-// Reset the counts for the currently executing message, 
-// and also reset the PE's critical path detection
-// To be called by the user program
-extern void resetCricitalPathDetection();
-
-// Reset the counts for the currently executing message
-extern void resetThisEntryPath();
-
-
-extern void bracketStartCriticalPathMethod(envelope * env);
-extern void bracketEndCriticalPathMethod(envelope * env);
-
-
-#endif
-
-
-/** static sizes for arrays in PathHistory objects */
-#define numEpIdxs 150
-#define numArrayIds 20
 
 /** A class that is used to track the entry points and other information 
     about a critical path as a charm++ program executes.
@@ -82,164 +48,76 @@ extern void bracketEndCriticalPathMethod(envelope * env);
     This class won't do useful things unless USE_CRITICAL_PATH_HEADER_ARRAY is defined
 
 */
-class PathHistory {
- private:
-  int epIdxCount[numEpIdxs];
-  int arrayIdxCount[numArrayIds];
+class PathHistoryEnvelope {
+ protected:
+
+  // When passing paths forward, store information on PEs, in backward pass, lookup necessary information
+  int sender_history_table_idx;
   double totalTime;
 
  public:
   
-  const int* getEpIdxCount(){
-    return epIdxCount;
-  }
-  
-  const int* getArrayIdxCount(){
-    return arrayIdxCount;
-  }
-
-  int getEpIdxCount(int i) const {
-    return epIdxCount[i];
-  }
-  
-  int getArrayIdxCount(int i) const {
-    return arrayIdxCount[i];
-  }
-
-
   double getTotalTime() const{
     return totalTime;
   }
-
   
-  PathHistory(){
+  int get_sender_history_table_idx() const{
+    return sender_history_table_idx;
+  }
+
+  void set_sender_history_table_idx(int i) {
+    sender_history_table_idx = i;
+  }
+
+
+  PathHistoryEnvelope(){
     reset();
   }
 
   void pup(PUP::er &p) {
-    for(int i=0;i<numEpIdxs;i++)
-      p|epIdxCount[i];
-    for(int i=0;i<numArrayIds;i++)
-      p|arrayIdxCount[i];
+    p | sender_history_table_idx;
     p | totalTime;
   } 
   
-  double getTime(){
+  double getTime() const{
     return totalTime;
   }
-  
-  void reset(){
-    // CkPrintf("reset() currentlyExecutingMsg=%p\n", currentlyExecutingMsg);
-    
-    totalTime = 0.0;
-    
-    for(int i=0;i<numEpIdxs;i++){
-      epIdxCount[i] = 0;
-    }
-    for(int i=0;i<numArrayIds;i++){
-      arrayIdxCount[i]=0;
-    }
+
+  void setTime(double t){
+    totalTime = t;
   }
   
-  int updateMax(const PathHistory & other){
-    if(other.totalTime > totalTime){
-      //	  CkPrintf("[%d] Found a longer terminal path:\n", CkMyPe());
-      //	  other.print();
-      
-      totalTime = other.totalTime;
-      for(int i=0;i<numEpIdxs;i++){
-	epIdxCount[i] = other.epIdxCount[i];
-      }
-      for(int i=0;i<numArrayIds;i++){
-	arrayIdxCount[i]=other.arrayIdxCount[i];
-      }
-      return 1;
-    }
-    return 0;
-  }
+  void reset();
   
   
-  void print() const {
-    CkPrintf("Critical Path Time=%lf : ", (double)totalTime);
-    for(int i=0;i<numEpIdxs;i++){
-      if(epIdxCount[i]>0){
-	CkPrintf("EP %d count=%d : ", i, (int)epIdxCount[i]);
-      }
-    }
-    for(int i=0;i<numArrayIds;i++){
-      if(arrayIdxCount[i]>0){
-	CkPrintf("Array %d count=%d : ", i, (int)arrayIdxCount[i]);
-      }
-    }
-    CkPrintf("\n");
-  }
+  void print() const;
 
   /// Write a description of the path into the beginning of the provided buffer. The buffer ought to be large enough.
-  void printHTMLToString(char* buf) const {
+  void printHTMLToString(char* buf) const{
     buf[0] = '\0';
+    sprintf(buf+strlen(buf), "Path Time=%lf<br> Sender idx=%d", (double)totalTime, (int)sender_history_table_idx);
+ }
 
-    sprintf(buf+strlen(buf), "Path Time=%lf<br>", (double)totalTime);
-    for(int i=0;i<numEpIdxs;i++){
-      if(epIdxCount[i]>0){
-	sprintf(buf+strlen(buf),"EP %d count=%d<br>", i, (int)epIdxCount[i]);
-      }
-    }
-    for(int i=0;i<numArrayIds;i++){
-      if(arrayIdxCount[i]>0){
-	sprintf(buf+strlen(buf), "Array %d count=%d<br>", i, (int)arrayIdxCount[i]);
-      }
-    }
-  }
+  /// The number of available EP counts 
+  int getNumUsed() const;
+
+  /// Return the count value for the idx'th available EP  
+  int getUsedCount(int idx) const;
+ 
+  /// Return the idx'th available EP 
+  int getUsedEp(int idx) const;
+
+  int getEpCount(int ep) const;
   
-  void incrementTotalTime(double time){
-    totalTime += time;
-  }
   
+  void incrementTotalTime(double time);
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  void createPath(PathHistory *parentPath){
-    // Note that we are likely sending a message
-    // FIXME: (this should be moved to the actual send point)
-    thisMethodSentAMessage = true;
-    double timeNow = CmiWallTimer();
-    
-    if(parentPath != NULL){
-      //	  CkPrintf("createPath() totalTime = %lf + %lf\n",(double)currentlyExecutingMsg->pathHistory.totalTime, (double)timeNow-timeEntryMethodStarted);
-      totalTime = parentPath->totalTime + (timeNow-timeEntryMethodStarted);
-      
-      for(int i=0;i<numEpIdxs;i++){
-	epIdxCount[i] = parentPath->epIdxCount[i];
-      }
-      for(int i=0;i<numArrayIds;i++){
-	arrayIdxCount[i] = parentPath->arrayIdxCount[i];
-      }
-      
-    }
-    else {
-      totalTime = 0.0;
-      
-      for(int i=0;i<numEpIdxs;i++){
-	epIdxCount[i] = 0;
-      } 
-      for(int i=0;i<numArrayIds;i++){
-	arrayIdxCount[i]=0;
-      }
-    }
-	
-  }
-#endif
-      
-  void incrementEpIdxCount(int ep){
-    epIdxCount[ep]++;
-  }
+  void createPath(envelope *originatingMsg);
 
-  void incrementArrayIdxCount(int arr){
-    arrayIdxCount[arr]++;
-  }
+  void setDebug100();
       
 };
-
-
+/** @} */
 
 
 /**
@@ -434,6 +312,11 @@ private:
       _SET_USED(env, 0);
       //for record-replay
       env->setEvent(0);
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+      env->pathHistory.reset();
+#endif
+
 #ifdef _FAULT_MLOG_
             env->sender.type = TypeInvalid;
             env->recver.type = TypeInvalid;
@@ -441,6 +324,7 @@ private:
             env->TN = 0;
             env->localMlogEntry = NULL;
 #endif
+
       return env;
     }
     UShort getEpIdx(void) const { return epIdx; }
@@ -507,6 +391,7 @@ private:
 
 // Array-specific fields
     CkGroupID &getsetArrayMgr(void) {return type.array.arr;}
+    int getArrayMgrIdx(void) const {return type.array.arr.idx;}
     UShort &getsetArrayEp(void) {return epIdx;}
     UShort &getsetArrayBcastEp(void) {return type.group.arrayEp;}
     UInt &getsetArraySrcPe(void) {return pe;}
@@ -519,39 +404,14 @@ private:
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
  public:
-
-    /// The information regarding the entry methods that executed along the path to this one.
-    PathHistory pathHistory;
-
-    void resetEpIdxHistory(){
-      pathHistory.reset();
-    }
-
-    /** Fill in the values for the path When creating a message in an entry method, 
-	deriving the values from the entry method's creation message */
-    void setEpIdxHistory(){
-      if(currentlyExecutingMsg){
-	pathHistory.createPath(& currentlyExecutingMsg->pathHistory);
-      } else {
-	pathHistory.createPath(NULL);
-      }
-    }
-
-    void printEpIdxHistory(){
-      pathHistory.print();
-    }
-      
-    /// Called when beginning to execute an entry method 
-    void updateCounts(){
-      pathHistory.incrementEpIdxCount(getEpIdx());
-      if(attribs.mtype==ForArrayEltMsg){
-	CkGroupID &a = type.array.arr;
-	pathHistory.incrementArrayIdxCount(a.idx);
-      }
-    }
+    /** The information regarding the entry methods that executed along the path to this one.
+	\addtogroup CriticalPathFramework
+    */
+    PathHistoryEnvelope pathHistory;
 #endif
 
 };
+
 
 inline envelope *UsrToEnv(const void *const msg) {
   return (((envelope *) msg)-1);
@@ -595,6 +455,9 @@ public:
 };
 
 CkpvExtern(MsgPool*, _msgPool);
+
+
+
 
 
 

@@ -30,10 +30,6 @@ void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits)
   env->setQueueing(_defaultQueueing);
   env->setMsgIdx(msgIdx);
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  env->setEpIdxHistory();
-#endif
-
   return EnvToUsr(env);
 }
 
@@ -51,10 +47,6 @@ void* CkAllocBuffer(void *msg, int bufsize)
   packbuf->setTotalsize(size);
   packbuf->setPacked(!env->isPacked());
   CmiMemcpy(packbuf->getPrioPtr(), env->getPrioPtr(), packbuf->getPrioBytes());
-
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  env->setEpIdxHistory();
-#endif
 
   return EnvToUsr(packbuf);;
 }
@@ -118,9 +110,6 @@ CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opt
 	CmiMemcpy(env->getPrioPtr(),opts->getPriorityPtr(),env->getPrioBytes());
 	//Set the message's queueing type
 	env->setQueueing((unsigned char)opts->getQueueing());
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-	env->setEpIdxHistory();
-#endif
 	return m;
 }
 

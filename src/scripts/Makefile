@@ -104,7 +104,7 @@ jadeall: jade
 	cd ../java/charm/jade && $(MAKE)
 
 #include TAU defs
-TAU_MAKEFILE=Make.tau
+TAU_MAKEFILE=
 include	$(TAU_MAKEFILE) #stub-makefile
 
 #builds TAU's trace library
@@ -178,7 +178,8 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 	routerstrategy.h convcomlib.h dummyconversestrategy.h  treerouter.h \
 	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h \
 	prefixrouter.h pipebroadcastconverse.h pipelinestrategy.h cmipool.h \
-	comlib.h cmidirect.h controlPoints.h cmidirectmanytomany.h
+      comlib.h cmidirect.h cmidirectmanytomany.h \
+      controlPoints.h arrayRedistributor.h controlPoints.h pathHistory.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -869,7 +870,7 @@ TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
 ######################################################################
 
 
-CONTROLPOINTS_OBJS = controlPoints.o
+CONTROLPOINTS_OBJS = controlPoints.o arrayRedistributor.o pathHistory.o
 
 ControlPoints.def.h: ControlPoints.decl.h
 
