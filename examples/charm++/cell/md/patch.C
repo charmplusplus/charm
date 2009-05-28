@@ -16,17 +16,27 @@ void Patch::randomizeParticles() {
     velocityX[i] = 0.0f;
     velocityY[i] = 0.0f;
     velocityZ[i] = 0.0f;
+
+    // DMK - DEBUG
+    #if DUMP_INITIAL_PARTICLE_DATA != 0
+      CkPrintf("[INFO] :: Patch[%02d,%02d,%02d]::randomizeParticles() - particle[%04d] = { "
+               "px:%+6e, py:%+6e, pz:%+6e, q:%+6e, m:%+6e, vx:%+6e, vy:%+6e, vz:%+6e }\n",
+               thisIndex.x, thisIndex.y, thisIndex.z, i,
+               particleX[i], particleY[i], particleZ[i], particleQ[i], particleM[i],
+               velocityX[i], velocityY[i], velocityZ[i]
+              );
+    #endif
   }
 }
 
 
 float Patch::randf() {
-  return (((float)(rand() % 1483727)) / (1483727.0f));
+  const int mask = 0x7FFFFFFF;
+  return (((float)(rand() % mask)) / ((float)(mask)));
 }
 
 
 Patch::Patch() {
-
   particleX = particleY = particleZ = NULL;
   particleQ = particleM = NULL;
   forceSumX = forceSumY = forceSumZ = NULL;
@@ -57,15 +67,17 @@ Patch::~Patch() {
 
 
 void Patch::init(int numParticles) {
+  init_common(numParticles);
+}
 
-  // Also tell the proxy patches to initialize
+void Patch::init(int numParticles, CProxy_ProxyPatch proxyPatchProxy) {
   #if USE_PROXY_PATCHES != 0
-  {
-    const int patchIndex = PATCH_XYZ_TO_I(thisIndex.x, thisIndex.y, thisIndex.z);
-    proxyPatchProxy = CProxy_ProxyPatch::ckNew(patchIndex);
-    proxyPatchProxy.init(numParticles);
-  }
+    this->proxyPatchProxy = proxyPatchProxy;
   #endif
+  init_common(numParticles);
+}
+
+void Patch::init_common(int numParticles) {
 
   // Allocate memory for the particles
   this->numParticles = numParticles;
@@ -98,6 +110,7 @@ void Patch::init(int numParticles) {
     }
     pairComputeArraySection_lower = CProxySection_PairCompute::ckNew(pairComputeArrayProxy, pairIndexes_lower.getVec(), pairIndexes_lower.size());
 
+    // Upper section
     CkVec<CkArrayIndex2D> pairIndexes_upper;
     for (int i = patchIndex + 1; i < numPatches; i++) {
       pairIndexes_upper.push_back(CkArrayIndex2D(patchIndex, i));
@@ -129,11 +142,11 @@ void Patch::startIteration_common(int numIters) {
     memset(forceSumY, 0, sizeof(float) * numParticles);
     memset(forceSumZ, 0, sizeof(float) * numParticles);
   #else
-    register vec4f* fsx = (vec4f*)forceSumX;
-    register vec4f* fsy = (vec4f*)forceSumY;
-    register vec4f* fsz = (vec4f*)forceSumZ;
-    const vec4f zero_vec = vspread4f(0.0f);
-    register const int numParticles_vec = numParticles / (sizeof(vec4f) * sizeof(float));
+    register vecf* fsx = (vecf*)forceSumX;
+    register vecf* fsy = (vecf*)forceSumY;
+    register vecf* fsz = (vecf*)forceSumZ;
+    const vecf zero_vec = vspreadf(0.0f);
+    register const int numParticles_vec = numParticles / vecf_numElems;
     for (int i = 0; i < numParticles_vec; i++) {
       fsx[i] = zero_vec;
       fsy[i] = zero_vec;
@@ -194,18 +207,18 @@ void Patch::forceCheckIn(int numParticles, float* forceX, float* forceY, float* 
 
   // Accumulate the force data
   #if 0
-    register vec4f* fsx = (vec4f*)forceSumX;
-    register vec4f* fsy = (vec4f*)forceSumY;
-    register vec4f* fsz = (vec4f*)forceSumZ;
-    register vec4f* fx = (vec4f*)forceX;
-    register vec4f* fy = (vec4f*)forceY;
-    register vec4f* fz = (vec4f*)forceZ;
-    register const int numParticles_vec = numParticles / (sizeof(vec4f) * sizeof(float));
+    register vecf* fsx = (vecf*)forceSumX;
+    register vecf* fsy = (vecf*)forceSumY;
+    register vecf* fsz = (vecf*)forceSumZ;
+    register vecf* fx = (vecf*)forceX;
+    register vecf* fy = (vecf*)forceY;
+    register vecf* fz = (vecf*)forceZ;
+    register const int numParticles_vec = numParticles / vecf_numElems;
     register int i;
     for (i = 0; i < numParticles_vec; i++) {
-      fsx[i] = vadd4f(fsx[i], fx[i]);
-      fsy[i] = vadd4f(fsy[i], fy[i]);
-      fsz[i] = vadd4f(fsz[i], fz[i]);
+      fsx[i] = vaddf(fsx[i], fx[i]);
+      fsy[i] = vaddf(fsy[i], fy[i]);
+      fsz[i] = vaddf(fsz[i], fz[i]);
     }
   #else
     for (int i = 0; i < numParticles; i++) {
@@ -352,13 +365,13 @@ void ProxyPatch::forceCheckIn(int numParticles, float* forceX, float* forceY, fl
 
   // Accumulate the force data
   #if USE_PROXY_PATCHES != 0  // Calls will be local and pointers will be aligned, so take advantage and vectorize the code
-    register vec4f* forceX_vec = (vec4f*)forceX;
-    register vec4f* forceY_vec = (vec4f*)forceY;
-    register vec4f* forceZ_vec = (vec4f*)forceZ;
-    register vec4f* forceSumX_vec = (vec4f*)forceSumX;
-    register vec4f* forceSumY_vec = (vec4f*)forceSumY;
-    register vec4f* forceSumZ_vec = (vec4f*)forceSumZ;
-    const int numParticles_vec = numParticles / (sizeof(vec4f) / sizeof(float));
+    register vecf* forceX_vec = (vecf*)forceX;
+    register vecf* forceY_vec = (vecf*)forceY;
+    register vecf* forceZ_vec = (vecf*)forceZ;
+    register vecf* forceSumX_vec = (vecf*)forceSumX;
+    register vecf* forceSumY_vec = (vecf*)forceSumY;
+    register vecf* forceSumZ_vec = (vecf*)forceSumZ;
+    const int numParticles_vec = numParticles / vecf_numElems;
     for (int i = 0; i < numParticles_vec; i++) {
       forceSumX_vec[i] += forceX_vec[i];
       forceSumY_vec[i] += forceY_vec[i];

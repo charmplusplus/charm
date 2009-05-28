@@ -8,20 +8,40 @@ module patch {
                     float* forceSumX, float* forceSumY, float* forceSumZ,
                     float* forceX, float* forceY, float* forceZ
                    ) {
-      register vec4f* fsx = (vec4f*)forceSumX;
-      register vec4f* fsy = (vec4f*)forceSumY;
-      register vec4f* fsz = (vec4f*)forceSumZ;
-      register vec4f* fx = (vec4f*)forceX;
-      register vec4f* fy = (vec4f*)forceY;
-      register vec4f* fz = (vec4f*)forceZ;
-      register const int numParticles_vec = numParticles / (sizeof(vec4f) * sizeof(float));
+      register vecf* fsx = (vecf*)forceSumX;
+      register vecf* fsy = (vecf*)forceSumY;
+      register vecf* fsz = (vecf*)forceSumZ;
+      register vecf* fx = (vecf*)forceX;
+      register vecf* fy = (vecf*)forceY;
+      register vecf* fz = (vecf*)forceZ;
+      register const int numParticles_vec = numParticles / vecf_numElems;
       register int i;
       for (i = 0; i < numParticles_vec; i++) {
-        fsx[i] = vadd4f(fsx[i], fx[i]);
-        fsy[i] = vadd4f(fsy[i], fy[i]);
-        fsz[i] = vadd4f(fsz[i], fz[i]);
+        fsx[i] = vaddf(fsx[i], fx[i]);
+        fsy[i] = vaddf(fsy[i], fy[i]);
+        fsz[i] = vaddf(fsz[i], fz[i]);
       }
     }
+  };
+
+  group ProxyPatch {
+
+    entry ProxyPatch(int patchIndex);
+
+    entry void init(int numParticles);
+
+    entry void patchData(int numParticles,
+                         float particleX[numParticles],
+                         float particleY[numParticles],
+                         float particleZ[numParticles],
+                         float particleQ[numParticles]
+                        );
+
+    entry void forceCheckIn(int numParticles,
+                            float forceX[numParticles],
+                            float forceY[numParticles],
+                            float forceZ[numParticles]
+                           );
   };
 
   array[3D] Patch {
@@ -29,6 +49,7 @@ module patch {
     entry Patch();
 
     entry void init(int numParticles);
+    entry void init(int numParticles, CProxy_ProxyPatch proxyPatchProxy);
 
     entry void startIteration();
     entry void startIterations(int numIters);
@@ -67,28 +88,28 @@ module patch {
         localFlopCount = 0;
       #endif
 
-      register vec4f* p_x_vec = (vec4f*)p_x;
-      register vec4f* p_y_vec = (vec4f*)p_y;
-      register vec4f* p_z_vec = (vec4f*)p_z;
-      register vec4f* p_m_vec = (vec4f*)p_m;
-      register vec4f* f_x_vec = (vec4f*)f_x;
-      register vec4f* f_y_vec = (vec4f*)f_y;
-      register vec4f* f_z_vec = (vec4f*)f_z;
-      register vec4f* v_x_vec = (vec4f*)v_x;
-      register vec4f* v_y_vec = (vec4f*)v_y;
-      register vec4f* v_z_vec = (vec4f*)v_z;
+      register vecf* p_x_vec = (vecf*)p_x;
+      register vecf* p_y_vec = (vecf*)p_y;
+      register vecf* p_z_vec = (vecf*)p_z;
+      register vecf* p_m_vec = (vecf*)p_m;
+      register vecf* f_x_vec = (vecf*)f_x;
+      register vecf* f_y_vec = (vecf*)f_y;
+      register vecf* f_z_vec = (vecf*)f_z;
+      register vecf* v_x_vec = (vecf*)v_x;
+      register vecf* v_y_vec = (vecf*)v_y;
+      register vecf* v_z_vec = (vecf*)v_z;
       register int i;
-      register const int numParticles_vec = numParticles / (sizeof(vec4f) / sizeof(float));
+      register const int numParticles_vec = numParticles / vecf_numElems;
 
-      vec4f delta_time_vec = vspread4f(TIME_PER_STEP);
+      vecf delta_time_vec = vspreadf(TIME_PER_STEP);
 
       // Add the acceleration to the velocity and add the update velocity to the position
       for (i = 0; i < numParticles_vec; i++) {
 
-        // Update the velocity : v_new = v_old + (F/m)
-        vec4f new_v_x_vec = v_x_vec[i] + (delta_time_vec * (f_x_vec[i] / p_m_vec[i]));
-        vec4f new_v_y_vec = v_y_vec[i] + (delta_time_vec * (f_y_vec[i] / p_m_vec[i]));
-        vec4f new_v_z_vec = v_z_vec[i] + (delta_time_vec * (f_z_vec[i] / p_m_vec[i]));
+        // Update the velocity : v_new = v_old + (F/m)dt
+        vecf new_v_x_vec = v_x_vec[i] + (delta_time_vec * (f_x_vec[i] / p_m_vec[i]));
+        vecf new_v_y_vec = v_y_vec[i] + (delta_time_vec * (f_y_vec[i] / p_m_vec[i]));
+        vecf new_v_z_vec = v_z_vec[i] + (delta_time_vec * (f_z_vec[i] / p_m_vec[i]));
         v_x_vec[i] = new_v_x_vec;
         v_y_vec[i] = new_v_y_vec;
         v_z_vec[i] = new_v_z_vec;
@@ -106,27 +127,6 @@ module patch {
 
     } integrate_callback;
 
-  };
-
-
-  group ProxyPatch {
-
-    entry ProxyPatch(int patchIndex);
-
-    entry void init(int numParticles);
-
-    entry void patchData(int numParticles,
-                         float particleX[numParticles],
-                         float particleY[numParticles],
-                         float particleZ[numParticles],
-                         float particleQ[numParticles]
-                        );
-
-    entry void forceCheckIn(int numParticles,
-                            float forceX[numParticles],
-                            float forceY[numParticles],
-                            float forceZ[numParticles]
-                           );
   };
 
 };

@@ -30,6 +30,11 @@ module selfCompute {
                                 writeonly : unsigned int localFlopCount <impl_obj->localFlopCount>
                                ] {
 
+      // DMK - DEBUG
+      #if (ENABLE_USER_EVENTS != 0) && defined(CMK_CELL) && (CMK_CELL == 0)
+        double __start_time__ = CmiWallTimer();
+      #endif
+
       // Calculate the electrostatic force (coulumb's law) between the particles
       //   F = (k_e * (q_0 * q_1)) / (r^2)
 
@@ -38,26 +43,27 @@ module selfCompute {
         localFlopCount = 0;
       #endif
 
-      register vec4f* p0_x_vec = (vec4f*)particleX;
-      register vec4f* p0_y_vec = (vec4f*)particleY;
-      register vec4f* p0_z_vec = (vec4f*)particleZ;
-      register vec4f* p0_q_vec = (vec4f*)particleQ;
-      register vec4f* f0_x_vec = (vec4f*)f0_x;
-      register vec4f* f0_y_vec = (vec4f*)f0_y;
-      register vec4f* f0_z_vec = (vec4f*)f0_z;
+      register vecf* p0_x_vec = (vecf*)particleX;
+      register vecf* p0_y_vec = (vecf*)particleY;
+      register vecf* p0_z_vec = (vecf*)particleZ;
+      register vecf* p0_q_vec = (vecf*)particleQ;
+      register vecf* f0_x_vec = (vecf*)f0_x;
+      register vecf* f0_y_vec = (vecf*)f0_y;
+      register vecf* f0_z_vec = (vecf*)f0_z;
       register int i;
       register int j;
-      register const int numParticlesByVecSize = numParticles / (sizeof(vec4f) / sizeof(float));
+      register const int numParticlesByVecSize = numParticles / vecf_numElems;
 
       // Zero out the force output
+      vecf zero_vec = vspreadf(0.0f);
       for (j = 0; j < numParticlesByVecSize; j++) {
-        f0_x_vec[j] = vspread4f(0.0f);
-        f0_y_vec[j] = vspread4f(0.0f);
-        f0_z_vec[j] = vspread4f(0.0f);
+        f0_x_vec[j] = zero_vec;
+        f0_y_vec[j] = zero_vec;
+        f0_z_vec[j] = zero_vec;
       }
 
       // Spread coulumb's constant across a vector
-      vec4f coulomb_vec = vspread4f(COULOMBS_CONSTANT);
+      vecf coulomb_vec = vspreadf(COULOMBS_CONSTANT);
 
       // Outer-loop
       for (i = 0; i < numParticles; i++) {
@@ -96,45 +102,45 @@ module selfCompute {
         }
 
         // Spread this particle's (p0[i]) values out over vectors
-        vec4f p0_x_i_vec = vspread4f(particleX[i]);
-        vec4f p0_y_i_vec = vspread4f(particleY[i]);
-        vec4f p0_z_i_vec = vspread4f(particleZ[i]);
-        vec4f p0_q_i_vec = vspread4f(particleQ[i]);
-        vec4f f0_x_i_vec = vspread4f(0.0f);
-        vec4f f0_y_i_vec = vspread4f(0.0f);
-        vec4f f0_z_i_vec = vspread4f(0.0f);
+        vecf p0_x_i_vec = vspreadf(particleX[i]);
+        vecf p0_y_i_vec = vspreadf(particleY[i]);
+        vecf p0_z_i_vec = vspreadf(particleZ[i]);
+        vecf p0_q_i_vec = vspreadf(particleQ[i]);
+        vecf f0_x_i_vec = vspreadf(0.0f);
+        vecf f0_y_i_vec = vspreadf(0.0f);
+        vecf f0_z_i_vec = vspreadf(0.0f);
 
         // Switch to vectorized loop for the remaining elements in the particle array
         for (j = j >> 2; j < numParticlesByVecSize; j++) {
 
           // Load the particles' data
-          vec4f p0_x_j_vec = p0_x_vec[j];
-          vec4f p0_y_j_vec = p0_y_vec[j];
-          vec4f p0_z_j_vec = p0_z_vec[j];
-          vec4f p0_q_j_vec = p0_q_vec[j];
+          vecf p0_x_j_vec = p0_x_vec[j];
+          vecf p0_y_j_vec = p0_y_vec[j];
+          vecf p0_z_j_vec = p0_z_vec[j];
+          vecf p0_q_j_vec = p0_q_vec[j];
 
           // Calculate the vector between the particles
-          vec4f p_x_diff_vec = p0_x_i_vec - p0_x_j_vec;
-          vec4f p_y_diff_vec = p0_y_i_vec - p0_y_j_vec;
-          vec4f p_z_diff_vec = p0_z_i_vec - p0_z_j_vec;
+          vecf p_x_diff_vec = p0_x_i_vec - p0_x_j_vec;
+          vecf p_y_diff_vec = p0_y_i_vec - p0_y_j_vec;
+          vecf p_z_diff_vec = p0_z_i_vec - p0_z_j_vec;
 
           // Calculate r and r^2 between the particles
-          vec4f r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
-          vec4f r_vec = vsqrt4f(r_2_vec);
+          vecf r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
+          vecf r_vec = vsqrtf(r_2_vec);
 
           // Normalize the vector between the particles
-          vec4f r_recip_vec = vrecip4f(r_vec);
-          vec4f r_2_recip_vec = vrecip4f(r_2_vec);
-          vec4f p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
-          vec4f p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
-          vec4f p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
-          vec4f f_mag_vec = coulomb_vec * p0_q_i_vec * p0_q_j_vec * r_2_recip_vec;  // Calc force magnitude
+          vecf r_recip_vec = vrecipf(r_vec);
+          vecf r_2_recip_vec = vrecipf(r_2_vec);
+          vecf p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
+          vecf p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
+          vecf p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
+          vecf f_mag_vec = coulomb_vec * p0_q_i_vec * p0_q_j_vec * r_2_recip_vec;  // Calc force magnitude
 
           // Multiply the magnitude by the normalized postition difference vector to
           //   create the force vector
-          vec4f f_x_vec = p_x_diff_norm_vec * f_mag_vec;
-          vec4f f_y_vec = p_y_diff_norm_vec * f_mag_vec;
-          vec4f f_z_vec = p_z_diff_norm_vec * f_mag_vec;
+          vecf f_x_vec = p_x_diff_norm_vec * f_mag_vec;
+          vecf f_y_vec = p_y_diff_norm_vec * f_mag_vec;
+          vecf f_z_vec = p_z_diff_norm_vec * f_mag_vec;
 
           // Add the force to the outer-loop particle and subtract it from the inner-loop particles
           f0_x_i_vec += f_x_vec;
@@ -151,10 +157,16 @@ module selfCompute {
         }
 
         // Add force values for p0[i] into f0
-        f0_x[i] += vextract4f(f0_x_i_vec, 0) + vextract4f(f0_x_i_vec, 1) + vextract4f(f0_x_i_vec, 2) + vextract4f(f0_x_i_vec, 3);
-        f0_y[i] += vextract4f(f0_y_i_vec, 0) + vextract4f(f0_y_i_vec, 1) + vextract4f(f0_y_i_vec, 2) + vextract4f(f0_y_i_vec, 3);
-        f0_z[i] += vextract4f(f0_z_i_vec, 0) + vextract4f(f0_z_i_vec, 1) + vextract4f(f0_z_i_vec, 2) + vextract4f(f0_z_i_vec, 3);
+        f0_x[i] += vextractf(f0_x_i_vec, 0) + vextractf(f0_x_i_vec, 1) + vextractf(f0_x_i_vec, 2) + vextractf(f0_x_i_vec, 3);
+        f0_y[i] += vextractf(f0_y_i_vec, 0) + vextractf(f0_y_i_vec, 1) + vextractf(f0_y_i_vec, 2) + vextractf(f0_y_i_vec, 3);
+        f0_z[i] += vextractf(f0_z_i_vec, 0) + vextractf(f0_z_i_vec, 1) + vextractf(f0_z_i_vec, 2) + vextractf(f0_z_i_vec, 3);
       }
+
+      // DMK - DEBUG
+      #if (ENABLE_USER_EVENTS != 0) && defined(CMK_CELL) && (CMK_CELL == 0)
+        double __end_time__ = CmiWallTimer();
+        traceUserBracketEvent(PROJ_USER_EVENT_SELFCOMPUTE_DOCALC_WORK, __start_time__, __end_time__);
+      #endif
 
     } doCalc_callback;
 

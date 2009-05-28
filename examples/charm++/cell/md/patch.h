@@ -61,6 +61,8 @@ class Patch : public CBase_Patch {
 
     /// Entry Methods ///
     void init(int numParticles);
+    void init(int numParticles, CProxy_ProxyPatch proxyPatchProxy);
+    void init_common(int numParticles);
     void startIteration();
     void startIterations(int numIters);
     void forceCheckIn(int numParticles, float* forceX, float* forceY, float* forceZ);

@@ -32,6 +32,7 @@ class Main : public CBase_Main {
     /// Member Variables ///
     int numStepsRemaining;
     double simStartTime;
+    double simPrevTime;
 
     /// Member Functions ///
     void parseCommandLine(int argc, char** argv);

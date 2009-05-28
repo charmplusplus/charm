@@ -83,6 +83,8 @@ Main::Main(CkArgMsg* msg) {
     traceRegisterUserEvent("Patch::integrate_callback()", PROJ_USER_EVENT_PATCH_INTEGRATE_CALLBACK);
     traceRegisterUserEvent("SelfCompute::doCalc_callback()", PROJ_USER_EVENT_SELFCOMPUTE_DOCALC_CALLBACK);
     traceRegisterUserEvent("PairCompute::doCalc_callback()", PROJ_USER_EVENT_PAIRCOMPUTE_DOCALC_CALLBACK);
+    traceRegisterUserEvent("SelfCompute::doCalc() - Work", PROJ_USER_EVENT_SELFCOMPUTE_DOCALC_WORK);
+    traceRegisterUserEvent("PairCompute::doCalc() - Work", PROJ_USER_EVENT_PAIRCOMPUTE_DOCALC_WORK);
     traceRegisterUserEvent("CmiMachineProgressImpl", PROJ_USER_EVENT_MACHINEPROGRESS);
   #endif
 
@@ -105,19 +107,65 @@ Main::Main(CkArgMsg* msg) {
   selfComputeArrayProxy = CProxy_SelfCompute::ckNew(numPatchesX, numPatchesY, numPatchesZ);
 
   // Create the pair compute array
+  #if ENABLE_STATIC_LOAD_BALANCING != 0
+    // NOTE : For now, this code has to be manually changed to match the nodelist file since there is no way to
+    //   pass this information into the program at runtime.  In the future, this is something the runtime system
+    //   take care of in the ideal case.
+    int numPEs = CkNumPes();
+    #define W_X86    ( 10)  //  10
+    #define W_BLADE  (125)  // 100
+    #define W_PS3    ( 96)  //  75
+    // NOTE: The peWeights should match the hetero nodelist file being used
+    //int peWeights[13] = { W_X86, W_BLADE, W_PS3, W_BLADE, W_PS3, W_BLADE, W_PS3, W_BLADE, W_PS3, W_BLADE, W_BLADE, W_BLADE, W_BLADE };
+    int peWeights[13] = { W_BLADE, W_PS3, W_BLADE, W_PS3, W_BLADE, W_PS3, W_BLADE, W_PS3, W_BLADE, W_BLADE, W_BLADE, W_BLADE, W_BLADE };
+    //int peWeights[14] = { W_X86, W_X86, W_BLADE, W_PS3, W_BLADE, W_PS3, W_BLADE, W_PS3, W_BLADE, W_PS3, W_BLADE, W_BLADE, W_BLADE, W_BLADE };
+    int peStats[13] = { 0 };
+    CkAssert(numPEs <= 13);
+    int rValLimit  = 0;
+    for (int i = 0; i < numPEs; i++) { rValLimit += peWeights[i]; }
+  #endif
   pairComputeArrayProxy = CProxy_PairCompute::ckNew();
   const int numPatches = numPatchesX * numPatchesY * numPatchesZ;
   for (int p0 = 0; p0 < numPatches; p0++) {
     for (int p1 = p0 + 1; p1 < numPatches; p1++) {
-      pairComputeArrayProxy(p0, p1).insert();
+      #if ENABLE_STATIC_LOAD_BALANCING != 0
+        int pe = 0;
+        int rVal = rand() % rValLimit;
+        for (int i = 0; i < numPEs; i++) { if (rVal < peWeights[i]) { pe = i; break; } rVal -= peWeights[i]; }
+        pairComputeArrayProxy(p0, p1).insert(pe);
+        peStats[pe]++;
+      #else
+        pairComputeArrayProxy(p0, p1).insert();
+      #endif
     }
   }
   pairComputeArrayProxy.doneInserting();
+  #if ENABLE_STATIC_LOAD_BALANCING != 0
+    int numPairComputes = 0;
+    for (int i = 0; i < numPEs; i++) { numPairComputes += peStats[i]; }
+    for (int i = 0; i < numPEs; i++) {
+      CkPrintf("[STATS] :: peStats[%d] = %6d (%5.2f%%)\n", i, peStats[i], ((float)peStats[i]) / ((float)numPairComputes) * 100.0f);
+    }
+  #endif
 
   // Start initialization (NOTE: Patch will initiate proxy patches directly if proxy patches are being used)
-  patchArrayProxy.init(numParticlesPerPatch);
   selfComputeArrayProxy.init(numParticlesPerPatch);
   pairComputeArrayProxy.init(numParticlesPerPatch);
+
+  #if USE_PROXY_PATCHES != 0
+    for (int x = 0; x < numPatchesX; x++) {
+      for (int y = 0; y < numPatchesY; y++) {
+        for (int z = 0; z < numPatchesZ; z++) {
+          int patchIndex = PATCH_XYZ_TO_I(x, y, z);
+          CProxy_ProxyPatch proxyPatchProxy = CProxy_ProxyPatch::ckNew(patchIndex);
+          proxyPatchProxy.init(numParticlesPerPatch);
+          patchArrayProxy(x, y, z).init(numParticlesPerPatch, proxyPatchProxy);
+	}
+      }
+    }
+  #else
+    patchArrayProxy.init(numParticlesPerPatch);
+  #endif
 }
 
 
@@ -140,7 +188,7 @@ void Main::initCheckIn() {
     numCheckedIn = 0;
 
     // Start timing
-    simStartTime = CkWallTimer();
+    simPrevTime = simStartTime = CkWallTimer();
 
     // One step for main (patches do many steps)
     const int numStepsToDo = (numStepsRemaining > STEPS_PER_PRINT) ? (STEPS_PER_PRINT) : (numStepsRemaining);
@@ -163,11 +211,15 @@ void Main::patchCheckIn() {
 
     // Check to see if there is another step, if so start it, otherwise exit
     numStepsRemaining--;
-    CkPrintf("Main::patchCheckIn() - Simulation (%d steps remaining)...\n", numStepsRemaining);
+    double curTime = CkWallTimer();
+    CkPrintf("Main::patchCheckIn() - Simulation (%d steps remaining)... (deltaTime: %lf sec)...\n",
+             numStepsRemaining, curTime - simPrevTime
+            );
+    simPrevTime = curTime;
     if (numStepsRemaining <= 0) {
 
       // Stop timing and display elapsed time
-      double simStopTime = CkWallTimer();
+      double simStopTime = curTime;
       CkPrintf("Elapsed Time: %lf sec\n", simStopTime - simStartTime);
 
       // DMK - DEBUG
