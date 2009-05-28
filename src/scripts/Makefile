@@ -226,7 +226,7 @@ CKHEADERS=ck.h ckstream.h envelope-path.h envelope.h envelope-path.h init.h qd.h
           HybridBaseLB.decl.h HybridLB.decl.h WSLB.decl.h EveryLB.decl.h \
           charisma.decl.h TraceSummary.decl.h TraceProjections.decl.h \
           TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
-	  BlueGene.decl.h \
+	  TraceUtilization.decl.h BlueGene.decl.h \
 	  comlib.decl.h ComlibManager.h DummyStrategy.h	\
 	  MulticastStrategy.h DirectMulticastStrategy.h RingMulticastStrategy.h	\
 	  MultiRingMulticast.h \
