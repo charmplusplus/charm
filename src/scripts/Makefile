@@ -318,10 +318,10 @@ dirs+sources:
 ###############################################################################
 #
 # Converse Libraries
-#
+# 
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-neighbor.o $(L)/libldb-none.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
-TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a \
+TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a   $(L)/libtrace-utilization.a \
 	  $(L)/libtrace-simple.a $(L)/libtrace-controlPoints.a\
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a \
@@ -677,6 +677,12 @@ TraceSummary.def.h: TraceSummary.decl.h
 TraceSummary.decl.h: trace-summary.ci charmxi
 	$(CHARMXI) trace-summary.ci
 
+ 
+TraceUtilization.def.h: TraceUtilization.decl.h
+
+TraceUtilization.decl.h: trace-utilization.ci charmxi
+	$(CHARMXI) trace-utilization.ci 
+
 TraceSimple.def.h: TraceSimple.decl.h
 
 TraceSimple.decl.h: trace-simple.ci charmxi
@@ -778,6 +784,10 @@ $(L)/libtrace-projections.a: $(LIBTRACE_PROJ)
 LIBTRACE_SUMM=trace-summary.o
 $(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
 	$(CHARMC) -o $@ $(LIBTRACE_SUMM)
+ 
+LIBTRACE_UTIL=trace-utilization.o
+$(L)/libtrace-utilization.a: $(LIBTRACE_UTIL)
+	$(CHARMC) -o $@ $(LIBTRACE_UTIL)           
 
 LIBTRACE_SIMPLE=trace-simple.o
 $(L)/libtrace-simple.a: $(LIBTRACE_SIMPLE)
@@ -830,7 +840,7 @@ $(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)
 	$(CHARMC) -o $@ $(LIBTRACE_MEMORY)
 
 LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-simple.o \
-$(TAU_TRACE_OBJ) trace-recordreplay.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-controlPoints.o
+$(TAU_TRACE_OBJ) trace-recordreplay.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-controlPoints.o trace-utilization.o
 
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
@@ -852,7 +862,7 @@ tracef_f.o: tracef_f.f90
 
 # used for make depends
 TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
-	      trace-counter.o trace-controlPoints.o	\
+	      trace-counter.o trace-controlPoints.o trace-utilization.o	\
 	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
               trace-recordreplay.o trace-memory.o
 

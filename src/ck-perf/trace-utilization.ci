@@ -1,0 +1,23 @@
+
+module TraceUtilization {
+
+  mainchare TraceUtilizationInit {
+    entry TraceUtilizationInit(CkArgMsg *m);
+  };
+
+
+  group [migratable] TraceUtilizationBOC {
+    entry TraceUtilizationBOC(void);
+
+    // The ccs handlers:
+    entry void ccsRequestSumDetailCompressed(CkCcsRequestMsg *m);
+
+    entry void collectSumDetailData();
+    entry void sumDetailDataCollected(CkReductionMsg *);
+
+  };
+
+  readonly CProxy_TraceUtilizationBOC traceUtilizationGroupProxy;
+
+};
+
