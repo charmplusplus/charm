@@ -611,6 +611,7 @@ int   arg_debug;
 int   arg_debug_no_pause;
 int   arg_debug_no_xrdb;
 int   arg_charmdebug;
+char *arg_debug_commands; /* commands that are provided by a ++debug-commands flag. These are passed into gdb. */
 
 int   arg_local;	/* start node programs directly by exec on localhost */
 int   arg_batch_spawn;  /* control starting node programs, several at a time */
@@ -682,6 +683,7 @@ void arg_init(int argc, char **argv)
 #if CMK_USE_RSH
   pparam_flag(&arg_debug,         0, "debug",         "Run each node under gdb in an xterm window");
   pparam_flag(&arg_debug_no_pause,0, "debug-no-pause","Like debug, except doesn't pause at beginning");
+  pparam_str(&arg_debug_commands,   0, "debug-commands",   "Commands to be run inside gdb at startup");
   pparam_flag(&arg_debug_no_xrdb,0, "no-xrdb","Don't check xrdb");
 
   /* When the ++charmdebug flag is used, charmrun listens from its stdin for
@@ -2885,10 +2887,12 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
 	   if ( strcmp(dbg, "idb") == 0 ) {
              fprintf(f,"set \\$cmdset=\"gdb\"\n");
 	   }
-           fprintf(f,"shell /bin/rm -f /tmp/charmrun_gdb.$$\n");
+	   fprintf(f,"shell /bin/rm -f /tmp/charmrun_gdb.$$\n");
            fprintf(f,"handle SIGPIPE nostop noprint\n");
            fprintf(f,"handle SIGWINCH nostop noprint\n");
            fprintf(f,"handle SIGWAITING nostop noprint\n");
+	   if(arg_debug_commands)
+	     fprintf(f,"%s\n", arg_debug_commands);
            fprintf(f,"set args");
            fprint_arg(f,argv);
            fprintf(f,"\n");
@@ -2910,6 +2914,8 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
            fprintf(f,"ignore SIGPIPE\n");
            fprintf(f,"ignore SIGWINCH\n");
            fprintf(f,"ignore SIGWAITING\n");
+	   if(arg_debug_commands)
+	     fprintf(f,"%s\n", arg_debug_commands);
            fprintf(f,"END_OF_SCRIPT\n");
 	   if (arg_runscript)
 	     fprintf(f,"\"%s\" ",arg_runscript);
