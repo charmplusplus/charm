@@ -60,8 +60,13 @@ class bar {
 #error "Use pup_c.h for C programs-- pup.h is for C++ programs"
 #endif
 
+#ifdef STANDALONE_PUP
+#define CmiAbort(x) { printf(x); abort(); }
+#else
 #ifndef CHARM_H
 #  include "converse.h" // <- for CmiBool, CMK_* defines
+#endif
+extern "C" void CmiAbort(const char *msg);
 #endif
 
 //We need CkMigrateMessage only to distinguish the migration
@@ -739,7 +744,6 @@ inline void operator|(PUP::er &p,PUP::able* &a) {p(&a);}
 //  This is used by parameter marshalling, which doesn't work well 
 //  with bare pointers.
 //   CkPointer<T> t   is the parameter-marshalling equivalent of   T *t
-extern "C" void CmiAbort(const char *msg);
 template <class T>
 class CkPointer {
 	T *allocated; //Pointer that PUP dynamically allocated for us (recv only)
