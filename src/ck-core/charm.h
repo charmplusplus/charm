@@ -19,6 +19,7 @@
 extern "C" {
 #endif
 
+
 /******************************************************************************
  *
  * Converse Concepts, renamed to CK
@@ -200,6 +201,42 @@ extern CkGroupID CkCreateGroup(int chareIdx, int constructorIdx, void *msg);
 extern CkGroupID CkCreateNodeGroup(int chareIdx, int constructorIdx, void *msg);
 extern void CkCreateLocalGroup(CkGroupID groupID, int constructorIdx, envelope *env);
 extern void CkCreateLocalNodeGroup(CkGroupID groupID, int constructorIdx, envelope *env);
+
+
+
+/******************************************************************************
+
+ This set of message type (mtype) constants
+ defines the basic class of charm++ message.
+ 
+ It is very questionable whether bizarre stuff like
+ "ExitMsg", "StatMsg", "ROMsgMsg" should actually
+ share the envelope with regular user messages;
+ but it doesn't waste any space so it's probably OK.
+
+ These were formerly in envelope.h
+
+ *****************************************************************************/
+typedef enum {
+  NewChareMsg    =1,
+  NewVChareMsg   =2,
+  BocInitMsg     =3,
+  ForChareMsg    =4,
+  ForBocMsg      =5,
+  ForVidMsg      =6,
+  FillVidMsg     =7,
+  RODataMsg      =8,
+  ROMsgMsg       =9,
+  ExitMsg        =10,
+  ReqStatMsg     =11,
+  StatMsg        =12,
+  NodeBocInitMsg =13,
+  ForNodeBocMsg  =14,
+  ArrayEltInitMsg =15,
+  ForArrayEltMsg  =16
+} CkEnvelopeType;
+
+
 
 /******************************************************************************
  *

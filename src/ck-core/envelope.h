@@ -120,39 +120,12 @@ class PathHistoryEnvelope {
 /** @} */
 
 
-/**
- This set of message type (mtype) constants
- defines the basic class of charm++ message.
- 
- It is very questionable whether bizarre stuff like
- "ExitMsg", "StatMsg", "ROMsgMsg" should actually
- share the envelope with regular user messages;
- but it doesn't waste any space so it's probably OK.
-*/
-typedef enum {
-  NewChareMsg    =1,
-  NewVChareMsg   =2,
-  BocInitMsg     =3,
-  ForChareMsg    =4,
-  ForBocMsg      =5,
-  ForVidMsg      =6,
-  FillVidMsg     =7,
-  RODataMsg      =8,
-  ROMsgMsg       =9,
-  ExitMsg        =10,
-  ReqStatMsg     =11,
-  StatMsg        =12,
-  NodeBocInitMsg =13,
-  ForNodeBocMsg  =14,
-  ArrayEltInitMsg =15,
-  ForArrayEltMsg  =16
-} CkEnvelopeType;
 
 typedef unsigned int   UInt;
 typedef unsigned short UShort;
 typedef unsigned char  UChar;
 
-#include "charm.h" // for CkGroupID
+#include "charm.h" // for CkGroupID, and CkEnvelopeType
 #ifdef _FAULT_MLOG_
 #include "ckobjid.h" //for the ckobjId
 #endif
