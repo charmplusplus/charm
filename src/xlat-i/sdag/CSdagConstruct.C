@@ -768,9 +768,11 @@ void SdagConstruct::generateWhen(XStr& op)
   }
 
   // max(current,merge) --> current, then reset the mergepath
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   op << "       " << label->charstar()  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
   op << "       currentlyExecutingPath = " << label->charstar()  << "_PathMergePoint; /* Critical Path Detection */ \n";
   op << "       " << label->charstar()  << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
+#endif
 
   if (constructs != 0) {
     if (!constructs->empty() ) {
@@ -924,9 +926,11 @@ void SdagConstruct::generateWhen(XStr& op)
     el = el->next;
   }
 
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   // max(current,merge) --> current
   op << "       " << label->charstar()  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
   op << "       currentlyExecutingPath = " << label->charstar()  << "_PathMergePoint; /* Critical Path Detection */ \n";
+#endif
 
   op << "       __cDep->Register(tr);\n";
   op << "       return 0;\n";
@@ -1238,12 +1242,16 @@ void SdagConstruct::generateOlist(XStr& op)
   //Accumulate all the bgParent pointers that the calling when_end functions give
   op << "    " << counter->charstar() << "->decrement();\n";
  
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
  op << "    olist_" << counter->charstar() << "_PathMergePoint.updateMax(currentlyExecutingPath);  /* Critical Path Detection FIXME: is the currently executing path the right thing for this? The duration ought to have been added somewhere. */ \n";
+#endif
 
   op << "    if (" << counter->charstar() << "->isDone()) {\n";
-  op << "      currentlyExecutingPath = olist_" << counter->charstar() << "_PathMergePoint; /* Critical Path Detection */ \n";
 
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  op << "      currentlyExecutingPath = olist_" << counter->charstar() << "_PathMergePoint; /* Critical Path Detection */ \n";
   op << "      olist_" << counter->charstar() << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
+#endif
 
   op << "      delete " << counter->charstar() << ";\n";
 

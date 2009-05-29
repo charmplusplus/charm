@@ -54,7 +54,9 @@ class CParsedFile {
       generateRegisterEp(output);		// for tracing Gengbin
       generateTraceEpDecl(output);		// for tracing Gengbin
 
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
       generateDependencyMergePoints(output); // for Isaac's Critical Path Detection
+#endif
 
       output.line_append_padding('\\');
       output << "\n";
