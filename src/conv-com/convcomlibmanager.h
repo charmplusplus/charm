@@ -69,7 +69,7 @@ class ConvComlibManager {
   void tableReady();
   void enableStrategy(int loc);
 
- private:
+  // private:  //Why do we need private here?? XLC breaks with this private decl
   inline void setStrategy(int loc, Strategy *s) {
 #ifndef CMK_OPTIMIZE
     if (loc == 0) CmiAbort("Trying to set strategy zero, not valid!\n");
