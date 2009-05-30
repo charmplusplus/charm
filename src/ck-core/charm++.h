@@ -160,20 +160,6 @@ public:
 	char *msgBuf;
 };
 
-/* forword declaration */
-class envelope;
-extern envelope *UsrToEnv(const void *const msg);
-
-CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opts);
-inline CkMarshallMsg *CkAllocateMarshallMsg(int size,const CkEntryOptions *opts=NULL)
-{
-	if (opts==NULL) {
-	  CkMarshallMsg *newMemory = new (size,0)CkMarshallMsg;
-	  setMemoryTypeMessage(UsrToEnv(newMemory));
-	  return newMemory;
-	}
-	else return CkAllocateMarshallMsgNoninline(size,opts);
-}
 
 
 //A queue-of-messages, like CkMsgQ<CkReductionMsg>
@@ -1022,6 +1008,51 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #include "ckevacuation.h"
 #include "ckarrayreductionmgr.h"
 #include "trace.h"
+#include "envelope.h"
+
+
+
+
+
+
+CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opts);
+inline CkMarshallMsg *CkAllocateMarshallMsg(int size,const CkEntryOptions *opts=NULL)
+{
+	if (opts==NULL) {
+	  CkMarshallMsg *newMemory = new (size,0)CkMarshallMsg;
+	  setMemoryTypeMessage(UsrToEnv(newMemory));
+	  return newMemory;
+	}
+	else return CkAllocateMarshallMsgNoninline(size,opts);
+}
+
+
+
+
+
+
+
+template <typename T> 
+inline T *CkAllocateMarshallMsgT(int size,const CkEntryOptions *opts) 
+{ 
+  int priobits = 0; 
+  if (opts!=NULL) priobits = opts->getPriorityBits(); 
+  //Allocate the message 
+  T *m=new (size,priobits)T; 
+  //Copy the user's priority data into the message 
+  envelope *env=UsrToEnv(m); 
+  setMemoryTypeMessage(env); 
+  if (opts!=NULL) { 
+    CmiMemcpy(env->getPrioPtr(),opts->getPriorityPtr(),env->getPrioBytes()); 
+    //Set the message's queueing type 
+    env->setQueueing((unsigned char)opts->getQueueing()); 
+  } 
+  return m; 
+} 
+
+
+
+
 
 /************************** Debugging Utilities **************/
 
