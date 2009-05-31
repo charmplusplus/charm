@@ -301,9 +301,9 @@ void ComlibSectionInfo::getPeCount(int nindices, CkArrayIndexMax *idxlist,
     int p = a->lastKnown(idxlist[i]);
 
 
-#define USE_NODE_AWARE 1
+#define USE_NODE_AWARE 0
 #if USE_NODE_AWARE
-#warning "USING NODE AWARE SECTION INFOs"
+    //#warning "USING NODE AWARE SECTION INFOs"
     ComlibPrintf("NODE AWARE old p=%d\n", p);
   
     // p = getPErepresentingNodeContainingPE(p);
