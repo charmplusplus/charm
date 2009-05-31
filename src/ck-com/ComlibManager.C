@@ -380,7 +380,8 @@ void ComlibManager::bracketedStartErrorRecoveryProcess(int instid, int step){
       int update = myEntry->nEndItr - myEntry->nEndSaved;
       if (update > 0) {
 	//	ComlibManagerPrintf("bracketedStartErrorRecoveryProcess sending update to bracketedReceiveCount\n");
-	CProxy_ComlibManager(thisgroup)[0].bracketedReceiveCount(instid, CkMyPe(), update, 0, step);
+	CProxy_ComlibManager myProxy(thisgroup);
+	myProxy[0].bracketedReceiveCount(instid, CkMyPe(), update, 0, step);
 	myEntry->nEndSaved = myEntry->nEndItr;
       }
       
@@ -406,7 +407,8 @@ void ComlibManager::bracketedErrorDetected(int instid, int step) {
 	if (myEntry->errorMode == NORMAL_MODE) {
 	  // save the value we are sending to bracketedReceiveCount
 	  myEntry->nEndSaved = myEntry->nEndItr; // save the value we are sending to bracketedReceiveCount
-	  CProxy_ComlibManager(thisgroup)[0].bracketedReceiveCount(instid, CkMyPe(), myEntry->nEndSaved, 1, step);
+	  CProxy_ComlibManager myProxy(thisgroup);
+	  myProxy[0].bracketedReceiveCount(instid, CkMyPe(), myEntry->nEndSaved, 1, step);
 	  bracketedStartDiscovery(instid);
 	  myEntry->errorMode = ERROR_MODE;
 
@@ -416,7 +418,8 @@ void ComlibManager::bracketedErrorDetected(int instid, int step) {
 	  ComlibManagerPrintf("bracketedErrorDetected update=%d\n", update);
 	  if (update > 0) {
 	    ComlibManagerPrintf("bracketedErrorDetected sending update to bracketedReceiveCount\n");
-	    CProxy_ComlibManager(thisgroup)[0].bracketedReceiveCount(instid, CkMyPe(), update, 0, step);
+	    CProxy_ComlibManager myProxy(thisgroup);
+	    myProxy[0].bracketedReceiveCount(instid, CkMyPe(), update, 0, step);
 	    myEntry->nEndSaved = myEntry->nEndItr;
 	  }
 	}
@@ -611,7 +614,8 @@ void ComlibManager::bracketedFinalBarrier(int instid) {
 
 
   if (myEntry->discoveryMode == FINISHED_DISCOVERY_MODE &&  myEntry->errorMode == ERROR_FIXED_MODE) {    
-    CProxy_ComlibManager(thisgroup)[0].bracketedReleaseCount(instid);
+    CProxy_ComlibManager myProxy(thisgroup);
+    myProxy[0].bracketedReleaseCount(instid);
   }
 }
 
