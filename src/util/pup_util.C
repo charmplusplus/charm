@@ -315,16 +315,19 @@ public:
 
 typedef CkHashtableTslow<PUP::able::PUP_ID,PUP_regEntry> PUP_registry;
 
+CpvStaticDeclare(PUP_registry *, reg);
+
+extern "C" void pupInit()
+{
+  CpvInitialize(PUP_registry *, reg);
+  CpvAccess(reg)=NULL;
+}
+
 // FIXME: not SMP safe!    // gzheng
 static PUP_registry *PUP_getRegistry(void) {
-        static 
-#if CMK_TLS_THREAD && CMK_USE_TLS_THREAD
-           __thread
-#endif
-               PUP_registry *reg=NULL;
-	if (reg==NULL)
-		reg=new PUP_registry();
-	return reg;
+	if (CpvAccess(reg)==NULL)
+		CpvAccess(reg)=new PUP_registry();
+	return CpvAccess(reg);
 }
 
 const PUP_regEntry *PUP_getRegEntry(const PUP::able::PUP_ID &id)

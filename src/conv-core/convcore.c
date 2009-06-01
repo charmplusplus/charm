@@ -2907,6 +2907,8 @@ int CmiEndianness()
   return  _cmi_endianness;
 }
 
+void pupInit();
+
 /**
   Main Converse initialization routine.  This routine is 
   called by the machine file (machine.c) to set up Converse.
@@ -2945,6 +2947,8 @@ void ConverseCommonInit(char **argv)
   CmiTmpInit(argv);
   CmiTimerInit();
   CstatsInit(argv);
+
+  pupInit();           /* pup_util */
 
   CcdModuleInit(argv);
   CmiHandlerInit();
