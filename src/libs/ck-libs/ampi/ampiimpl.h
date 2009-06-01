@@ -14,7 +14,7 @@
 #include "charm++.h"
 
 #if AMPI_COMLIB
-#warning COMPILING IN UNTESTED AMPI COMLIB SUPPORT
+//#warning COMPILING IN UNTESTED AMPI COMLIB SUPPORT
 #include "StreamingStrategy.h"
 #include "EachToManyMulticastStrategy.h" /* for ComlibManager Strategy*/
 #include "BroadcastStrategy.h"

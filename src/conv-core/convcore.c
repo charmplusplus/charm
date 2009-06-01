@@ -1426,14 +1426,14 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
             return msg;
         }
 #if CMK_GRID_QUEUE_AVAILABLE
-#warning "CsdNextMessage: CMK_GRID_QUEUE_AVAILABLE"
+	//#warning "CsdNextMessage: CMK_GRID_QUEUE_AVAILABLE"
 	CqsDequeue (s->gridQ, (void **) &msg);
 	if (msg != NULL) {
 	  return (msg);
 	}
 #endif
 #if CMK_NODE_QUEUE_AVAILABLE
-#warning "CsdNextMessage: CMK_NODE_QUEUE_AVAILABLE" 
+	//#warning "CsdNextMessage: CMK_NODE_QUEUE_AVAILABLE" 
 	if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;
 	if (!CqsEmpty(s->nodeQ)
 	 && !CqsPrioGT(CqsGetPriority(s->nodeQ),
@@ -1445,7 +1445,7 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	}
 #endif
 #if CMK_OBJECT_QUEUE_AVAILABLE
-#warning "CsdNextMessage: CMK_OBJECT_QUEUE_AVAILABLE"  
+	//#warning "CsdNextMessage: CMK_OBJECT_QUEUE_AVAILABLE"  
 	if (NULL!=(msg=CdsFifo_Dequeue(s->objQ))) {
           return msg;
         }

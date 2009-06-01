@@ -108,7 +108,7 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
   // Special case optimization for when the mesh is generated in such a way that only neighboring partitions share nodes
   // look for command line argument
 #ifdef SHARED_NODES_ONLY_NEIGHBOR
-#warning "ParFUM_recreateSharedNodes only allows adjacent partitions(rank +/- 1) to have shared nodes"
+  //#warning "ParFUM_recreateSharedNodes only allows adjacent partitions(rank +/- 1) to have shared nodes"
   sendUpperBound = rank + 1;
   sendLowerBound = rank - 1;
 #endif
@@ -147,7 +147,7 @@ void ParFUM_recreateSharedNodes(int meshid, int dim, MPI_Comm newComm) {
 
     int borderNodes = BORDERNODES;
 
-#warning "Only the first and last BORDERNODES nodes on each partition are candidates for being shared nodes"
+    //#warning "Only the first and last BORDERNODES nodes on each partition are candidates for being shared nodes"
 
     // indices are inclusive
     int myBottomLow = 0;
