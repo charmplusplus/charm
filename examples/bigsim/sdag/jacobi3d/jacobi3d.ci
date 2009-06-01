@@ -1,0 +1,55 @@
+mainmodule jacobi3d {
+
+  readonly CProxy_Main mainProxy;
+  readonly int arrayDimX;
+  readonly int arrayDimY;
+  readonly int arrayDimZ;
+  readonly int blockDimX;
+  readonly int blockDimY;
+  readonly int blockDimZ;
+  readonly int torusDimX;
+  readonly int torusDimY;
+  readonly int torusDimZ;
+
+  readonly int num_chare_x;
+  readonly int num_chare_y;
+  readonly int num_chare_z;
+
+  readonly int globalBarrier;
+  readonly int localBarrier;
+
+  message ghostMsg {
+    double gh[];
+  };
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void report();
+  };
+
+  array [3D] Jacobi {
+    // Normal Charm++ entry methods
+    entry Jacobi(void);
+    entry void begin_iteration(void);
+    entry void receiveGhosts(ghostMsg *gmsg);
+    entry void processGhosts(ghostMsg *gmsg);
+
+    entry void doStep() {
+      atomic "begin_iteration" {
+	begin_iteration();
+      }
+      for(imsg = 0; imsg < 6; imsg++) {
+	when receiveGhosts(ghostMsg *gmsg)
+	  atomic "process ghosts" { processGhosts(gmsg); }
+      }
+      atomic "doWork" {
+	check_and_compute();
+      }
+    };
+  };
+
+  group JacobiMap : CkArrayMap {
+    entry JacobiMap(int x, int y, int z, int tx, int ty, int tz);
+  };
+
+};
