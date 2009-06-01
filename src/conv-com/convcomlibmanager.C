@@ -99,6 +99,7 @@ void *comlibReadyHandler(void *msg) {
     }
   }
   CmiFree(msg);
+  return NULL;
 }
 
 /** Handler to count and accept the acknowledgements of table received. On
@@ -124,6 +125,7 @@ void *comlibTableReceivedHandler(void *msg) {
     CmiSetHandler(msg, CkpvAccess(comlib_ready));
     CmiSyncSendAndFree(0, CmiReservedHeaderSize, (char*)msg);
   }  
+  return NULL;
 }
 
 /** Handler to broadcast all the strategies to all the processors. This is
@@ -161,6 +163,7 @@ void *comlibReceiveTableHandler(void *msg) {
   // cheat about the size of the message
   CmiSetHandler(msg, CkpvAccess(comlib_table_received));
   CmiSyncSendAndFree(0, CmiReservedHeaderSize, (char*)msg);
+  return NULL;
 }
 
 /***************************************************************************
