@@ -317,11 +317,7 @@ typedef CkHashtableTslow<PUP::able::PUP_ID,PUP_regEntry> PUP_registry;
 
 // FIXME: not SMP safe!    // gzheng
 static PUP_registry *PUP_getRegistry(void) {
-        static
-#if CMK_SMP && CMK_TLS_THREAD && CMK_USE_TLS_THREAD
-          __thread
-#endif
-              PUP_registry * reg = NULL;
+        static PUP_registry *reg = NULL;
 	if (reg==NULL)
 		reg=new PUP_registry();
 	return reg;
