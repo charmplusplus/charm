@@ -1426,14 +1426,14 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
             return msg;
         }
 #if CMK_GRID_QUEUE_AVAILABLE
-	//#warning "CsdNextMessage: CMK_GRID_QUEUE_AVAILABLE"
+	/*#warning "CsdNextMessage: CMK_GRID_QUEUE_AVAILABLE" */
 	CqsDequeue (s->gridQ, (void **) &msg);
 	if (msg != NULL) {
 	  return (msg);
 	}
 #endif
 #if CMK_NODE_QUEUE_AVAILABLE
-	//#warning "CsdNextMessage: CMK_NODE_QUEUE_AVAILABLE" 
+	/*#warning "CsdNextMessage: CMK_NODE_QUEUE_AVAILABLE" */
 	if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;
 	if (!CqsEmpty(s->nodeQ)
 	 && !CqsPrioGT(CqsGetPriority(s->nodeQ),
@@ -1445,7 +1445,7 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	}
 #endif
 #if CMK_OBJECT_QUEUE_AVAILABLE
-	//#warning "CsdNextMessage: CMK_OBJECT_QUEUE_AVAILABLE"  
+	/*#warning "CsdNextMessage: CMK_OBJECT_QUEUE_AVAILABLE"   */
 	if (NULL!=(msg=CdsFifo_Dequeue(s->objQ))) {
           return msg;
         }
@@ -1521,7 +1521,7 @@ void CsdScheduleForever(void)
 
       #if CMK_CELL
         if (progressCount <= 0) {
-          //OffloadAPIProgress();
+          /*OffloadAPIProgress();*/
           machine_OffloadAPIProgress();
           progressCount = CMK_CELL_PROGRESS_FREQ;
 	}
@@ -1540,7 +1540,7 @@ void CsdScheduleForever(void)
       SCHEDULE_IDLE
 
       #if CMK_CELL
-        //OffloadAPIProgress();
+        /*OffloadAPIProgress();*/
         machine_OffloadAPIProgress();
         progressCount = CMK_CELL_PROGRESS_FREQ;
       #endif
@@ -2008,19 +2008,20 @@ void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int), in
   CpvAccess(_reduce_num_children) = CmiNumNodeSpanTreeChildren(CmiMyNode());
   if (CpvAccess(_reduce_received) == CpvAccess(_reduce_num_children)) CmiSendReduce();
 }
-/*
-//void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int), int redID) {
-//  CmiNodeReduce(data, size, mergeFn, redID, CmiNumNodeSpanTreeChildren(CmiMyNode()),
-//      CmiNodeFirst(CmiNodeSpanTreeParent(CmiMyNode())));
-//}
-//void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int), int numChildren, int parent) {
-//  CmiNodeReduce(data, size, mergeFn, CmiReduceNextID(), numChildren, parent);
-//}
-//void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int)) {
-//  CmiNodeReduce(data, size, mergeFn, CmiReduceNextID(), CmiNumNodeSpanTreeChildren(CmiMyNode()),
-//      CmiNodeFirst(CmiNodeSpanTreeParent(CmiMyNode())));
-//}
-*/
+
+#if 0
+void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int), int redID) {
+ CmiNodeReduce(data, size, mergeFn, redID, CmiNumNodeSpanTreeChildren(CmiMyNode()),
+     CmiNodeFirst(CmiNodeSpanTreeParent(CmiMyNode())));
+}
+void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int), int numChildren, int parent) {
+ CmiNodeReduce(data, size, mergeFn, CmiReduceNextID(), numChildren, parent);
+}
+void CmiNodeReduce(void *data, int size, void * (*mergeFn)(void*,void**,int)) {
+ CmiNodeReduce(data, size, mergeFn, CmiReduceNextID(), CmiNumNodeSpanTreeChildren(CmiMyNode()),
+     CmiNodeFirst(CmiNodeSpanTreeParent(CmiMyNode())));
+}
+#endif
 
 void CmiNodeReduceStruct(void *data, void (*pupFn)(void*,void*),
                          void * (*mergeFn)(void*,void**,int), CmiHandler dest,
