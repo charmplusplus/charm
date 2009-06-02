@@ -5,7 +5,7 @@ CMK_CXX="mpiCC $CMK_INCDIR"
 CMK_CXXPP="$CMK_CXX -E "
 CMK_XIOPTS=''
 CMK_RANLIB='ranlib'
-CMK_LIBS='-lckqt -lpmpich -lmpich'
+CMK_LIBS='-lckqt '
 
 CMK_NATIVE_CC="gcc "
 CMK_NATIVE_LD="gcc "
