@@ -1,6 +1,6 @@
 CHARMC=../../../../bin/charmc -module comlib -module RefineLB $(OPTS)
 
-all: hello bench benchmulti benchsectionmulti
+all: 
 
 hello: hello.o
 	$(CHARMC) -language charm++ -o hello hello.o
@@ -40,14 +40,15 @@ test_bench: all
 	./charmrun bench +p4 10
 
 test: all
-	./charmrun hello +p1 1 $(TESTOPTS)
-	./charmrun hello +p1 2 $(TESTOPTS)
-	./charmrun hello +p2 2 $(TESTOPTS)
-	./charmrun hello +p4 10 2 $(TESTOPTS)
-	./charmrun hello +p4 10 3 $(TESTOPTS)
-	./charmrun hello +p4 10 4 $(TESTOPTS)
-	./charmrun hello +p4 10 5 $(TESTOPTS)
-	./charmrun hello +p2 1 $(TESTOPTS)
+	echo "Skipping commtest"
+#	./charmrun hello +p1 1 $(TESTOPTS)
+#	./charmrun hello +p1 2 $(TESTOPTS)
+#	./charmrun hello +p2 2 $(TESTOPTS)
+#	./charmrun hello +p4 10 2 $(TESTOPTS)
+#	./charmrun hello +p4 10 3 $(TESTOPTS)
+#	./charmrun hello +p4 10 4 $(TESTOPTS)
+#	./charmrun hello +p4 10 5 $(TESTOPTS)
+#	./charmrun hello +p2 1 $(TESTOPTS)
 #	./charmrun bench +p2 100 1 +balancer RefineLB $(TESTOPTS)
 #	./charmrun bench +p2 100 2 +balancer RefineLB $(TESTOPTS)
 #	./charmrun bench +p2 100 4 +balancer RefineLB $(TESTOPTS)
@@ -59,29 +60,30 @@ test: all
 #	./charmrun bench +p2 100 1 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
 #	./charmrun bench +p2 100 2 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
 #	./charmrun bench +p2 100 4 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
-	./charmrun benchmulti +p2 100 1 +balancer RefineLB $(TESTOPTS)
-	./charmrun benchmulti +p2 100 2 +balancer RefineLB $(TESTOPTS)
-	./charmrun benchmulti +p2 100 4 +balancer RefineLB $(TESTOPTS)
-	./charmrun benchmulti +p4 100 2 +balancer RefineLB $(TESTOPTS)
-	./charmrun benchmulti +p4 100 4 +balancer RefineLB $(TESTOPTS)
-	./charmrun benchmulti +p2 100 1 +strategy USE_GRID +balancer RefineLB  $(TESTOPTS)
-	./charmrun benchmulti +p2 100 2 +strategy USE_GRID +balancer RefineLB $(TESTOPTS)
-	./charmrun benchmulti +p2 100 4 +strategy USE_GRID +balancer RefineLB $(TESTOPTS)
-	./charmrun benchmulti +p2 100 1 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
-	./charmrun benchmulti +p2 100 2 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
-	./charmrun benchmulti +p2 100 4 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
-	./charmrun benchsectionmulti +p2 100 1 +balancer RefineLB $(TESTOPTS)
-	./charmrun benchsectionmulti +p2 100 2 +balancer RefineLB $(TESTOPTS)
-	./charmrun benchsectionmulti +p2 100 4 +balancer RefineLB $(TESTOPTS)
-	./charmrun benchsectionmulti +p4 100 4 +balancer RefineLB $(TESTOPTS)
+#	./charmrun benchmulti +p2 100 1 +balancer RefineLB $(TESTOPTS)
+#	./charmrun benchmulti +p2 100 2 +balancer RefineLB $(TESTOPTS)
+#	./charmrun benchmulti +p2 100 4 +balancer RefineLB $(TESTOPTS)
+#	./charmrun benchmulti +p4 100 2 +balancer RefineLB $(TESTOPTS)
+#	./charmrun benchmulti +p4 100 4 +balancer RefineLB $(TESTOPTS)
+#	./charmrun benchmulti +p2 100 1 +strategy USE_GRID +balancer RefineLB  $(TESTOPTS)
+#	./charmrun benchmulti +p2 100 2 +strategy USE_GRID +balancer RefineLB $(TESTOPTS)
+#	./charmrun benchmulti +p2 100 4 +strategy USE_GRID +balancer RefineLB $(TESTOPTS)
+#	./charmrun benchmulti +p2 100 1 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
+#	./charmrun benchmulti +p2 100 2 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
+#	./charmrun benchmulti +p2 100 4 +strategy USE_DIRECT +balancer RefineLB $(TESTOPTS)
+#	./charmrun benchsectionmulti +p2 100 1 +balancer RefineLB $(TESTOPTS)
+#	./charmrun benchsectionmulti +p2 100 2 +balancer RefineLB $(TESTOPTS)
+#	./charmrun benchsectionmulti +p2 100 4 +balancer RefineLB $(TESTOPTS)
+#	./charmrun benchsectionmulti +p4 100 4 +balancer RefineLB $(TESTOPTS)
 
 bgtest: all
-	./charmrun hello +p1 1  +x1 +y1 +z1
-	./charmrun hello +p1 2  +x1 +y1 +z1
-	./charmrun hello +p2 2  +x2 +y1 +z1
-	./charmrun hello +p4 10 2  +x2 +y2 +z1
-	./charmrun hello +p4 10 3  +x2 +y2 +z1
-	./charmrun hello +p4 10 4  +x2 +y2 +z1
-	./charmrun hello +p4 10 5  +x2 +y2 +z1
-	./charmrun hello +p2 1  +x2 +y1 +z1
+	echo "Skipping commtest bgtest"
+#	./charmrun hello +p1 1  +x1 +y1 +z1
+#	./charmrun hello +p1 2  +x1 +y1 +z1
+#	./charmrun hello +p2 2  +x2 +y1 +z1
+#	./charmrun hello +p4 10 2  +x2 +y2 +z1
+#	./charmrun hello +p4 10 3  +x2 +y2 +z1
+#	./charmrun hello +p4 10 4  +x2 +y2 +z1
+#	./charmrun hello +p4 10 5  +x2 +y2 +z1
+#	./charmrun hello +p2 1  +x2 +y1 +z1
 
