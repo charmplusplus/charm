@@ -651,22 +651,20 @@ static ampi *ampiInit(char **argv)
 	  //Make a new ampi array
 	  CkArrayID empty;
 
+	ampiCommStruct worldComm(new_world,empty,_nchunks);
+	CProxy_ampi arr;
 
-	  CkVec<int> _indices;
-	  for(int i=0;i<_nchunks;i++) _indices.push_back(i);
-	  ampiCommStruct worldComm(new_world,empty,_nchunks,_indices);
-    	
-   	CkAssert(CkMyPe()==0);
-    	
+
+#if AMPI_COMLIB
+
 	ComlibInstanceHandle ciStreaming = 1;
 	ComlibInstanceHandle ciBcast = 2;
 	ComlibInstanceHandle ciAllgather = 3;
 	ComlibInstanceHandle ciAlltoall = 4;
 
-	CProxy_ampi arr=CProxy_ampi::ckNew(parent, worldComm, ciStreaming, ciBcast, ciAllgather, ciAlltoall, opts);
+	arr=CProxy_ampi::ckNew(parent, worldComm, ciStreaming, ciBcast, ciAllgather, ciAlltoall, opts);
 	
 
-#if AMPI_COMLIB
 	CkPrintf("Using untested comlib code in ampi.C\n");
 
 	Strategy *sStreaming = new StreamingStrategy(1,10);
@@ -685,6 +683,9 @@ static ampi *ampiInit(char **argv)
 
 	// FIXME: Propogate the comlib table here
 	CkpvAccess(conv_com_object).doneCreating();
+#else
+	arr=CProxy_ampi::ckNew(parent,worldComm,opts);
+
 #endif
 
 	//Broadcast info. to the mpi_worlds array
