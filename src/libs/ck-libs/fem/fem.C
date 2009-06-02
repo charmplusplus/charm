@@ -12,6 +12,8 @@ int femVersion = 1;
 /* TCharm semaphore ID, used for mesh startup */
 #define FEM_TCHARM_SEMAID 0x00FE300 /* __FEM__ */
 
+static CmiNodeLock femLock = NULL;     // PUP_regEntry table in pup_util.C is not SMP safe, use lock to protect race condition under SMP
+
 void FEM_Abort(const char *msg) {
 	CkAbort(msg);
 }
@@ -51,6 +53,7 @@ FEMchunk *FEMchunk::get(const char *caller) {
 CDECL void FEM_Init(FEM_Comm_t defaultComm)
 {
 	IDXL_Init(defaultComm);
+	if (femLock == NULL) femLock = CmiCreateLock();
 	if (!TCHARM_Get_global(FEM_globalID)) {
 		FEMchunk *c=new FEMchunk(defaultComm);
 		TCHARM_Set_global(FEM_globalID,c,pupFEM_Chunk);
@@ -449,7 +452,9 @@ PUPable_def(FEM_Sym_Linear);
 //Update fields after creation/migration
 void FEMchunk::initFields(void)
 {
+  CmiLock(femLock);
   PUPable_reg(FEM_Sym_Linear);
+  CmiUnlock(femLock);
 }
 
 FEMchunk::~FEMchunk()
