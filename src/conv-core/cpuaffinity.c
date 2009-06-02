@@ -214,7 +214,7 @@ typedef struct _rankMsg {
 
 static rankMsg *rankmsg = NULL;
 static CmmTable hostTable;
-
+static CmiNodeLock affLock = NULL;
 
 /* called on PE 0 */
 static void cpuAffinityHandler(void *m)
@@ -313,6 +313,10 @@ void CmiInitCPUAffinity(char **argv)
   cpuAffinityRecvHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler);
 
+  if (CmiMyRank() ==0) {
+     affLock = CmiCreateLock();
+  }
+
   if (!affinity_flag) return;
   else if (CmiMyPe() == 0) {
      CmiPrintf("Charm++> cpu affinity enabled. \n");
@@ -403,7 +407,9 @@ void CmiInitCPUAffinity(char **argv)
 
     /* receive broadcast from PE 0 */
   CmiDeliverSpecificMsg(cpuAffinityRecvHandlerIdx);
+  CmiLock(affLock);
   affinity_doneflag++;
+  CmiUnlock(affLock);
   CmiNodeAllBarrier();
 }
 
