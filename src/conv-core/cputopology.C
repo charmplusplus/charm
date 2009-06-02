@@ -146,7 +146,8 @@ int CpuTopology::numNodes = 0;
 CkVec<int> *CpuTopology::bynodes = NULL;
 
 static CpuTopology cpuTopo;
-static CmiNodeLock topoLock;
+static CmiNodeLock topoLock = NULL;
+static int done = 0;
 
 /* called on PE 0 */
 static void cpuTopoHandler(void *m)
@@ -276,9 +277,10 @@ extern "C" void CmiInitCPUTopology(char **argv)
 #endif
 
   if (CmiMyPe() >= CmiNumPes()) {
-      /* comm thread either can float around, or pin down to the last rank.
-         however it seems to be reportedly slower if it is floating */
-    CmiNodeAllBarrier();
+    CmiNodeAllBarrier();         // comm thread waiting
+#if CMK_MACHINE_PROGRESS_DEFINED
+    while (done < CmiMyNodeSize()) CmiNetworkProgress();
+#endif
     return;    /* comm thread return */
   }
 
@@ -288,19 +290,22 @@ extern "C" void CmiInitCPUTopology(char **argv)
   }
 #endif
 #if CMK_BLUEGENEL || CMK_BLUEGENEP || CMK_CRAYXT
-  TopoManager tmgr;
-  int x, y, z, t;
+  if (CmiMyRank() == 0) {
+    TopoManager tmgr;
 
-  cpuTopo.numNodes = CkNumPes();
-  cpuTopo.nodeIDs = new int[cpuTopo.numNodes];
-  int nid;
+    cpuTopo.numNodes = CkNumPes();
+    cpuTopo.nodeIDs = new int[cpuTopo.numNodes];
 
-  for(int i=0; i<cpuTopo.numNodes; i++) {
-    tmgr.rankToCoordinates(i, x, y, z, t);
-    int nid = tmgr.coordinatesToRank(x, y, z, 0);
-    cpuTopo.nodeIDs[i] = nid;
+    for(int i=0; i<cpuTopo.numNodes; i++) {
+      int x, y, z, t;
+      tmgr.rankToCoordinates(i, x, y, z, t);
+      int nid = tmgr.coordinatesToRank(x, y, z, 0);
+      cpuTopo.nodeIDs[i] = nid;
+    }
+    cpuTopo.sort();
   }
-  cpuTopo.sort();
+  CmiNodeAllBarrier();
+  return;
 #else
   /* get my ip address */
   if (CmiMyRank() == 0)
@@ -336,12 +341,15 @@ extern "C" void CmiInitCPUTopology(char **argv)
   // receive broadcast from PE 0
   CmiDeliverSpecificMsg(cpuTopoRecvHandlerIdx);
   // CsdScheduleCount(1);
+  CmiLock(topoLock);
+  done++;
+  CmiUnlock(topoLock);
 #endif
 
   // now every one should have the node info
 }
 
-#else           /* not supporting affinity */
+#else           /* not supporting cpu topology */
 
 
 extern "C" void CmiInitCPUTopology(char **argv)
@@ -349,6 +357,8 @@ extern "C" void CmiInitCPUTopology(char **argv)
   /* do nothing */
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
 						"obtain cpu topology info");
+  CmiGetArgFlagDesc(argv,"+skip_cpu_topology",
+                               "skip the processof getting cpu topology info");
 }
 
 #endif
