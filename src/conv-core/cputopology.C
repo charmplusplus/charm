@@ -108,6 +108,7 @@ public:
   static CkVec<int> *bynodes;
 
   int numUniqNodes() {
+#if 0
     if (numNodes != 0) return numNodes;
     int n = 0;
     for (int i=0; i<CmiNumPes(); i++) 
@@ -115,6 +116,19 @@ public:
 	n = nodeIDs[i];
     numNodes = n+1;
     return numNodes;
+#else
+    CkVec<int> unodes;
+    int i;
+    for (i=0; i<CmiNumPes(); i++)  unodes.push_back(nodeIDs[i]);
+    //unodes.bubbleSort(0, CmiNumPes()-1);
+    unodes.quickSort();
+    int last = -1;
+    for (i=0; i<CmiNumPes(); i++)  { 
+        if (unodes[i] != last) numNodes++; 
+        last=unodes[i];
+    }
+    return numNodes;
+#endif
   }
 
   void sort() {
