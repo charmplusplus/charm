@@ -1,7 +1,7 @@
 
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
-MPICC=$(CDIR)/bin/mpiCC $(OPTS)
+MPICC=$(CDIR)/bin/ampiCC $(OPTS)
 
 #Headers internal to ParFUM
 INTERNALHEADERS= ParFUM_internals.h ParFUM_locking.h ParFUM_Mesh_Modify.h ParFUM_Adapt_Algs.h ParFUM_Adapt.h ParFUM_Interpolate.h ParFUM_SA.h import.h adapt_adj.h bulk_adapt_ops.h bulk_adapt.h
