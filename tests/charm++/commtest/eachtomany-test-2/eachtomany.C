@@ -93,8 +93,8 @@ public:
 	  
 	  const int nTotal = nElements*nElements;
 	  if (nDone == nTotal){
-		  int printIteration = 1;
-		  int maxprints = 25;
+		  int printIteration = 10;
+		  int maxprints = 5;
 		  while( (totalIterations / printIteration) > maxprints)
 			  printIteration *= 2;
 		  if(iter % printIteration == 0)
@@ -156,13 +156,17 @@ public:
 	  if(p.isUnpacking()){
 		  localProxy = thisProxy;
 		  ComlibAssociateProxy(stratEachToManyArray, localProxy);
+#if DEBUG
 		  CkPrintf("pup() associating proxy with comlib strategy instance\n");
+#endif
 	  }
   }
   
   
   EachToManyArray(CkMigrateMessage *m) {
+#if DEBUG
 	  CkPrintf("Object %d has migrated to %d\n", thisIndex, CkMyPe());
+#endif
 	  localProxy = thisProxy;
 	  ComlibAssociateProxy(stratEachToManyArray, localProxy); 
   }
