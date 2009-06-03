@@ -28,7 +28,7 @@ section-multicast-test-6:
 	$(MAKE) -C $@ test OPTS='$(OPTS)'    
 
 bgtest:
-	echo "skipping bgtest
+	echo "skipping bgtest"
 #	for d in $(DIRS); do \
 #		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 #	done
