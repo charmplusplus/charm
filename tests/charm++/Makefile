@@ -1,5 +1,5 @@
 #DIRS=megatest pingpong simplearrayhello loadbalancing chkpt commtest delegation
-DIRS=megatest pingpong simplearrayhello loadbalancing chkpt delegation
+DIRS=megatest pingpong simplearrayhello loadbalancing chkpt commtest delegation
 
 all:
 	for d in $(DIRS); do \
