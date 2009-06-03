@@ -17,7 +17,7 @@ ComlibInstanceHandle cinst_multiring;
 #define BLKSIZE 10
 #define NumElem 40
 #define COOKIE 777777
-#define NUM_ITER 30
+#define NUM_ITER 10
 
 #define DEBUG 0
 
@@ -65,7 +65,7 @@ public:
 
 
   void iterationCompleted(CkReductionMsg *msg) {
-    CkPrintf("iteration %d completed\n", iteration);
+    //    CkPrintf("iteration %d completed\n", iteration);
     iteration ++;
     if(iteration == NUM_ITER){
       done(); 
