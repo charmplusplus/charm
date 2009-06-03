@@ -49,7 +49,7 @@ mainmodule jacobi3d {
   };
 
   group JacobiMap : CkArrayMap {
-    entry JacobiMap(int x, int y, int z, int tx, int ty, int tz);
+    entry JacobiMap(int x, int y, int z);
   };
 
 };
