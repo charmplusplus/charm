@@ -4,7 +4,7 @@ LIBDIR=$(CDIR)/lib
 
 # Which compiler to use
 CC = ../../../../../bin/charmc
-MPICC = ../../../../../bin/mpicc
+MPICC = ../../../../../bin/ampicc
 
 
 # What optimization level to use
