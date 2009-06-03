@@ -58,6 +58,11 @@ headers: $(HEADERS)
 	cp ampi.h $(CDIR)/include/mpi.h
 	cp ampif.h $(CDIR)/include/mpif.h
 	cp mpiCC mpicc mpicxx mpif77 mpif90 ampirun $(CDIR)/bin
+	cp mpiCC $(CDIR)/bin/ampiCC
+	cp mpicc $(CDIR)/bin/ampicc
+	cp mpicxx $(CDIR)/bin/ampicxx
+	cp mpif77 $(CDIR)/bin/ampif77
+	cp mpif90 $(CDIR)/bin/ampif90
 	touch headers
 
 compat_ampius.o: compat_ampius.C
