@@ -1,15 +1,13 @@
 #DIRS=comlib commlib_stream pipeBroadcast
-DIRS=commlib_stream pipeBroadcast
+DIRS=section-multicast-test section-multicast-test-6
 
 .PHONY: test $(DIRS)
 
 all:
-	echo "skipping comlib tests"
-#	for d in $(DIRS); do \
-#                (cd $$d; $(MAKE) all OPTS='$(OPTS)' || exit 1) || exit 1; \
-#        done
+	for d in $(DIRS); do \
+                (cd $$d; $(MAKE) all OPTS='$(OPTS)' || exit 1) || exit 1; \
+        done
 
-#test: comlib commlib_stream pipeBroadcast
 test: $(DIRS)
 
 comlib: 
@@ -23,6 +21,11 @@ commlib_stream:
 pipeBroadcast: 
 	echo "skipping comlib test"
 #	$(MAKE) -C $@ test OPTS='$(OPTS)'
+
+section-multicast-test:
+	$(MAKE) -C $@ test OPTS='$(OPTS)'                                                                                                                               
+section-multicast-test-6:
+	$(MAKE) -C $@ test OPTS='$(OPTS)'    
 
 bgtest:
 	echo "skipping bgtest
