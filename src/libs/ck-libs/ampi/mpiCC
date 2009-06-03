@@ -9,9 +9,12 @@ do
      echo "charmc"
      exit 0
      ;;
+  *) break
+     ;;
   esac
   shift
 done
+
 
 ln $CHARMBIN/../include/mpi.h .
 $CHARMBIN/charmc -language ampi $@
