@@ -9,6 +9,8 @@ do
      echo "charmc"
      exit 0
      ;;
+  *) break
+     ;;
   esac
   shift
 done
