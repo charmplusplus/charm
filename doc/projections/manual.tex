@@ -456,11 +456,13 @@ To rebuild \projections{} (optional) from the source:
 
 \begin{enumerate}
 \item[1)]
-   Make sure the JDK commands ``java'', ``javac'' and ``jar''
-   are in your path
+   Make sure the JDK commands ``java'', ``javac'', ``ant'',  and ``jar''
+   are in your path  
 \item[2)]
-   From {\tt PROJECTIONS\_LOCATION/}, type ``make''
+   Make sure that your versions of java and javac are at least 1.5. Do this by running ``java -version'' and ``javac -version''. Also, make sure the environment variable JAVA_HOME is not pointing at an old version of java.
 \item[3)]
+   From {\tt PROJECTIONS\_LOCATION/}, type ``ant clean'' then ``ant''
+\item[4)]
    The following files are placed in `bin':
 
       {\tt projections}           : Starts projections, for UNIX machines
