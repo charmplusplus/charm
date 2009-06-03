@@ -274,20 +274,6 @@ class Jacobi: public CBase_Jacobi {
       constrainBC();
     }
 
-    // Enforce some boundary conditions
-    void constrainBC() {
-        // Heat left, top and front faces of each chare's block
-	for(int i=1; i<blockDimX+1; ++i)
-	  for(int k=1; k<blockDimZ+1; ++k)
-            temperature[index(i, 1, k)] = 255.0;
-        for(int j=1; j<blockDimY+1; ++j)
-	  for(int k=1; k<blockDimZ+1; ++k)
-            temperature[index(1, j, k)] = 255.0;
-	for(int i=1; i<blockDimX+1; ++i)
-          for(int j=1; j<blockDimY+1; ++j)
-            temperature[index(i, j, 1)] = 255.0;
-    }
-
     // a necessary function which we ignore now
     // if we were to use load balancing and migration
     // this function might become useful
@@ -318,6 +304,7 @@ class Jacobi: public CBase_Jacobi {
           CkPrintf("Start of iteration %d\n", iterations);
           BgPrintf("BgPrint> Start of iteration at %f\n");
       }
+      iterations++;
 
       // Copy different faces into messages
       ghostMsg *leftMsg = new (blockDimY*blockDimZ) ghostMsg(RIGHT, blockDimY, blockDimZ);
@@ -421,8 +408,23 @@ class Jacobi: public CBase_Jacobi {
 	arrived_bottom--;
 	arrived_front--;
 	arrived_back--;
+
 	compute_kernel();
-	iterations++;
+
+	// calculate error
+	// not being done right now since we are doing a fixed no. of iterations
+
+#if USE_3D_ARRAYS
+	double ***tmp;
+#else
+	double *tmp;
+#endif
+	tmp = temperature;
+        temperature = new_temperature;
+        new_temperature = tmp;
+
+	constrainBC();
+
 	if (iterations <= WARM_ITER || iterations >= MAX_ITER)
 	  contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
 	else
@@ -433,12 +435,6 @@ class Jacobi: public CBase_Jacobi {
     // Check to see if we have received all neighbor values yet
     // If all neighbor values have been received, we update our values and proceed
     void compute_kernel() {
-      // We must create a new array for these values because we don't want to 
-      // update any of the values in temperature[][] array until using them first.
-      // Other schemes could be used to accomplish this same problem. We just put
-      // the new values in a temporary array and write them to temperature[][] 
-      // after all of the new values are computed.
-
 #pragma unroll    
       for(int i=1; i<blockDimX+1; ++i) {
 	for(int j=1; j<blockDimY+1; ++j) {
@@ -454,15 +450,20 @@ class Jacobi: public CBase_Jacobi {
 	  }
 	}
       }
+    }
 
-#pragma unroll
-      for(int i=0;i<blockDimX+2;++i)
-	for(int j=0;j<blockDimY+2;++j)
-	  for(int k=1; k<blockDimZ+1; ++k)
-	      temperature[index(i, j, k)] = new_temperature[index(i, j, k)];
-
-      // Enforce the boundary conditions again
-      constrainBC();
+    // Enforce some boundary conditions
+    void constrainBC() {
+      // Heat left, top and front faces of each chare's block
+      for(int i=1; i<blockDimX+1; ++i)
+	for(int k=1; k<blockDimZ+1; ++k)
+	  temperature[index(i, 1, k)] = 255.0;
+      for(int j=1; j<blockDimY+1; ++j)
+	for(int k=1; k<blockDimZ+1; ++k)
+	  temperature[index(1, j, k)] = 255.0;
+      for(int i=1; i<blockDimX+1; ++i)
+	for(int j=1; j<blockDimY+1; ++j)
+	  temperature[index(i, j, 1)] = 255.0;
     }
 
 };
