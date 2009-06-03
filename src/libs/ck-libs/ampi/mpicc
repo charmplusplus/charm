@@ -1,6 +1,18 @@
 #!/bin/sh
 CHARMBIN=`dirname $0`
 
+while [ ! $# -eq 0 ]
+do
+  arg="$1"
+  case "$arg" in
+  -show)
+     echo "charmc"
+     exit 0
+     ;;
+  esac
+  shift
+done
+
 ln $CHARMBIN/../include/mpi.h .
 $CHARMBIN/charmc -language ampi $@
 /bin/rm -f mpi.h
