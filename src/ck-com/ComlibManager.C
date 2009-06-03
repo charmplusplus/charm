@@ -79,19 +79,27 @@ static void periodicDebugPrintStatus(void* ptr, double currWallTime);
  * the processors. Used only at the beginning of the program.
  ***************************************************************************/
 
+// // initialized at startup before the main chare main methods are called:
+// void initCharmComlibManager(){
+//   CkPrintf("[%d] initCharmComlibManager()\n", CkMyPe());
+//   fflush(stdout);
+// }
+
+
+
 ComlibManager::ComlibManager(){
 	init();
 }
 
 void ComlibManager::init(){
 
+
   CcdCallFnAfterOnPE((CcdVoidFn)periodicDebugPrintStatus, (void*)this, 4000, CkMyPe());
+
 
   if(CkNumPes() == 1 ){
     ComlibPrintf("Doing nothing in ComlibManager::init() because we are running on 1 pe.\n");
   } else {
-
-	initComlibManager();
 
 	if (CkMyRank() == 0) {
 		PUPable_reg(CharmMessageHolder);
@@ -117,7 +125,9 @@ void ComlibManager::init(){
 	CkpvAccess(cmgrID) = thisgroup;
 
 	dummyArrayIndex.nInts = 0;
-	converseManager = CkpvAccess(conv_com_ptr);
+
+	CkAssert(CkpvInitialized(conv_com_object));
+	converseManager = &CkpvAccess(conv_com_object);
 
 	setupComplete = 0;
 
@@ -209,8 +219,8 @@ void ComlibManager::sendBufferedMessages(int instid){
 	    
       case CMH_ARRAYSEND:
 	//	    CkAbort("CMH_ARRAYSEND unimplemented");
-	CkpvAccess(conv_com_ptr)->insertMessage(cmsg, instid);
-	CkpvAccess(conv_com_ptr)->doneInserting(instid);
+	CkpvAccess(conv_com_object).insertMessage(cmsg, instid);
+	CkpvAccess(conv_com_object).doneInserting(instid);
 	break;
 	    
       case CMH_GROUPSEND:
@@ -222,8 +232,8 @@ void ComlibManager::sendBufferedMessages(int instid){
       case CMH_GROUPBROADCAST:
 	// Multicast/broadcast to an array or a section:
 	cmsg->sec_id = cmsg->copy_of_sec_id;
-	CkpvAccess(conv_com_ptr)->insertMessage(cmsg, instid);
-	CkpvAccess(conv_com_ptr)->doneInserting(instid);
+	CkpvAccess(conv_com_object).insertMessage(cmsg, instid);
+	CkpvAccess(conv_com_object).doneInserting(instid);
 	break;
 	    
       default:
@@ -1131,9 +1141,7 @@ void ComlibManager::printDiagnostics(){
     }
   }
   
-  ConvComlibManager * conv_mgr = CkpvAccess(conv_com_ptr);
-  
-  conv_mgr->printDiagnostics();
+  CkpvAccess(conv_com_object).printDiagnostics();
   
 }
 

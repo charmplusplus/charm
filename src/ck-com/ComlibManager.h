@@ -29,7 +29,11 @@ Strategies should be created in a MainChare's Main method (hence on PE 0). Proxi
   
 <h2>Startup</h2>
 
-   The startup of Comlib happens asynchronously. The <i>module comlib</i> does not currently use any initproc routine. The <i>mainchare ComlibManagerMain</i> has a constructor that runs along with all other mainchares while charm++ messages are not activated at startup. This constructor simply sets a few variables from command line arguments, and then creates the <i>ComlibManager group </i>. After all mainchares have run (in no determinable order), then the charm++ system will release all charm++ messages. 
+  The initilization of Comlib is done both asynchronously for parts and at startup for other parts. There is an initproc routine 
+  initConvComlibManager() that instantiates the Ckpv processor local conv_com_object. This needs to be created before the ComlibManagerMain method is called. Because we cannot guarantee the order for which the mainchares execute, we must do this in an initproc routine.
+
+
+   The startup of Comlib happens asynchronously. The <i>mainchare ComlibManagerMain</i> has a constructor that runs along with all other mainchares while charm++ messages are not activated at startup. This constructor simply sets a few variables from command line arguments, and then creates the <i>ComlibManager group </i>. After all mainchares have run (in no determinable order), then the charm++ system will release all charm++ messages. 
 
    At this point the user program will continue asynchronously with the comlib startup.
   

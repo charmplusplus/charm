@@ -108,13 +108,12 @@ class ConvComlibManager {
 
 };
 
-/// The location in the global table where the converse Comlib manager is located.
+/// This processor's converse Comlib manager
 CkpvExtern(ConvComlibManager, conv_com_object);
-/// A pointer to the location of the converse Comlib manager.
-CkpvExtern(ConvComlibManager *, conv_com_ptr);
 
 
-void initComlibManager();
+void initConvComlibManager();
+
 
 /***************************************************************************
  * User section:
@@ -124,17 +123,6 @@ void initComlibManager();
 
 Strategy *ConvComlibGetStrategy(int loc);
 
-/* Routine to register a Strategy to the system. It accept both Converse
-    strategies and higher level strategies. Strategies can be registered in all
-    the processors or only on processor 0. ComlibDoneCreating will take care of
-    the synchronization. Strategies are not active until they are synchronized.
-    If different processors register different strategies, or in different
-    order, the behaviour is undefined. */
-/*  DELETED SINCE NOT ANYMORE USEFUL
-inline ConvComlibInstanceHandle ConvComlibRegister(Strategy *s) {
-  return (CkpvAccess(conv_com_ptr))->insertStrategy(s);
-}
-*/
 
 /** Iterate over all the inserted strategies and broadcast all those that are
     marked as new. This has some effect only on processor 0, for all the other
@@ -167,7 +155,7 @@ inline void ComlibBegin(ComlibInstanceHandle cinst, int iteration) {
 
 inline void ComlibEnd(ComlibInstanceHandle cinst, int iteration) {
   // flush strategy???
-  CkpvAccess(conv_com_ptr)->doneInserting(cinst);
+  CkpvAccess(conv_com_object).doneInserting(cinst);
 }
 
 CkpvExtern(int, comlib_handler);

@@ -1,25 +1,21 @@
 module comlib {
-  //  initproc void initComlibManager();
+  initproc void initConvComlibManager();
+//  initproc void initCharmComlibManager();
 
   message ComlibDummyMsg;
-  //  message PrioMsg;
   message ComlibMulticastMsg {
     ComlibMulticastIndexCount indicesCount[];
     CkArrayIndexMax indices[];
     char usrMsg[];
   };
+  //  message PrioMsg;
 
   group [migratable] ComlibManager {
     entry ComlibManager();
 
     entry void barrier(void);
     entry void resumeFromSetupBarrier();
-    //entry void barrier2(void);
-    //entry void resumeFromBarrier2(void);
-    //entry void receiveTable(StrategyWrapper sw, 
-    //			    CkHashtableT<ClibGlobalArrayIndex, int>);
 
-//    entry void bracketedFinishSetup(int instid);
     entry void bracketedReceiveCount(int instid, int pe, int count, int isFirst, int step);
     entry void bracketedStartErrorRecoveryProcess(int instid, int step);	 
     entry void bracketedErrorDetected(int instid, int step);
@@ -32,21 +28,12 @@ module comlib {
     entry void bracketedReleaseCount(int instid);
     entry void bracketedReleaseBufferedMessages(int instid);
 
-
-
-    //entry void receiveRemoteSend(CkQ<CharmMessageHolder *> &remoteQ, int id);
     entry void collectStats(ComlibLocalStats s, int src);
-    //			    CkVec<ClibGlobalArrayIndex>);
   }
 
   mainchare ComlibManagerMain {
     entry ComlibManagerMain();	
   }
-
-  //PUPable CharmStrategy;
-  //PUPable MessageHolder;
-  //PUPable CharmMessageHolder;
- //  PUPable ComlibArrayListener;
 
   PUPable EachToManyMulticastStrategy;	
   PUPable DirectMulticastStrategy;
@@ -58,12 +45,15 @@ module comlib {
   PUPable PipeBroadcastStrategy;
  
 
+  //PUPable CharmStrategy;
+  //PUPable MessageHolder;
+  //PUPable CharmMessageHolder;
+ //  PUPable ComlibArrayListener;
+
 // PUPable DummyStrategy;
 //  PUPable NodeMulticast;
 //  PUPable StreamingStrategy;
 //  PUPable MPIStrategy;
 //  PUPable MeshStreamingStrategy;
   
-  //Strategy pupable defined in the array manager code, along with the
-  //array listener code
 };

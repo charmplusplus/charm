@@ -23,8 +23,6 @@ int com_debug=0;
 
 /// The location in the global table where the converse Comlib manager is located.
 CkpvDeclare(ConvComlibManager, conv_com_object);
-/// A pointer to the location of the converse Comlib manager.
-CkpvDeclare(ConvComlibManager *, conv_com_ptr);
 
 /***************************************************************************
  * Handlers section:
@@ -315,22 +313,22 @@ void recv_dummy(void *msg){
 //extern void propagate_handler(void *);
 extern void propagate_handler_frag(void *);
 
-/// An initialization routine which does preliminary initialization of the 
-/// Converse commlib manager. 
-void initComlibManager(){ 
+
+/** At startup on each processor, this method is called. 
+    This sets up the converse level comlib strategies.
+
+    This is called before any mainchare main functions.
+ */
+void initConvComlibManager(){ 
 
     if(!CkpvInitialized(conv_com_object))
       CkpvInitialize(ConvComlibManager, conv_com_object);
     
-    if(!CkpvInitialized(conv_com_ptr))
-      CkpvInitialize(ConvComlibManager *, conv_com_ptr);
     
     if(CkpvAccess(conv_com_object).getInitialized()) {
       CmiPrintf("Comlib initialized more than once!\n");
       return;
     }
-    
-    CkpvAccess(conv_com_ptr) = &(CkpvAccess(conv_com_object));
     
     CkpvInitialize(int, RecvdummyHandle);
     CkpvAccess(RecvdummyHandle) = CkRegisterHandler((CmiHandler)recv_dummy);
@@ -382,13 +380,13 @@ void initComlibManager(){
     CkpvAccess(conv_com_object).setInitialized();
 }
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-  void ComlibInit() {initComlibManager();}
-#ifdef __cplusplus
-}
-#endif
+// #ifdef __cplusplus
+// extern "C" {
+// #endif
+//   void ComlibInit() {initComlibManager();}
+// #ifdef __cplusplus
+// }
+// #endif
 
 
 /***************************************************************************
@@ -400,12 +398,12 @@ extern "C" {
 Strategy *ConvComlibGetStrategy(int loc) {
     //Calling converse strategy lets Charm++ strategies one strategy
     //table entry but multiple layers of strategies (Charm on top of Converse).
-    return (CkpvAccess(conv_com_ptr))->getStrategy(loc);
+    return CkpvAccess(conv_com_object).getStrategy(loc);
 }
 
 // Why is this here for? Guess it is for the routers...
 void ConvComlibScheduleDoneInserting(int loc) {
-  CkpvAccess(conv_com_ptr)->getStrategyTable(loc)->call_doneInserting++;
+  CkpvAccess(conv_com_object).getStrategyTable(loc)->call_doneInserting++;
 }
 
 
