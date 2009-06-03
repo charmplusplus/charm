@@ -1,5 +1,5 @@
 #DIRS=comlib commlib_stream pipeBroadcast
-DIRS=section-multicast-test section-multicast-test-6
+DIRS=section-multicast-test section-multicast-test-6 eachtomany-test-2
 
 .PHONY: test $(DIRS)
 
@@ -27,8 +27,11 @@ section-multicast-test:
 section-multicast-test-6:
 	$(MAKE) -C $@ test OPTS='$(OPTS)'    
 
-bgtest:
-	echo "skipping bgtest"
+eachtomany-test-2:
+	$(MAKE) -C $@ test OPTS='$(OPTS)'   
+
+bgtest: test
+	echo "testing target test instead of bgtest""
 #	for d in $(DIRS); do \
 #		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 #	done
