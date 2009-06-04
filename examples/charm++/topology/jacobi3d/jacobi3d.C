@@ -348,7 +348,7 @@ class Jacobi: public CBase_Jacobi {
         // Send my front face
         thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z-1)).ghostsFromFront(blockDimX, blockDimY, back_face);
         // Send my back face
-        thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z-1)).ghostsFromBack(blockDimX, blockDimY, front_face);
+        thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z+1)).ghostsFromBack(blockDimX, blockDimY, front_face);
 
         delete [] back_face;
 	delete [] front_face;
