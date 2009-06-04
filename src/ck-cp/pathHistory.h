@@ -300,6 +300,24 @@ extern void criticalPath_split();
 #define MERGE_PATH_MAX_D(x,n) merge_path_D_##x[n].updateMax(CkpvAccess(currentlyExecutingPath)); CkpvAccess(currentlyExecutingPath) = merge_path_D_##x[n]; 
 
 
+
+#else
+
+
+/// Empty no-op version for when critical path history is not compiled in
+class MergeablePathHistory{
+}
+
+#define MERGE_PATH_DECLARE(x) ;
+#define MERGE_PATH_RESET(x) ;
+#define MERGE_PATH_MAX(x) ;
+#define MERGE_PATH_DECLARE_D(x) ;
+#define MERGE_PATH_RESET_D(x,n) ;
+#define MERGE_PATH_DELETE_D(x,n) ;
+#define MERGE_PATH_DELETE_ALL_D(x) ;
+#define MERGE_PATH_MAX_D(x,n) ;
+
+
 #endif
 
 

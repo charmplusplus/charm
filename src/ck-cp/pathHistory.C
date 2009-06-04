@@ -264,6 +264,22 @@ void criticalPath_split(){
 
 
 
+
+
+#else
+// Versions that are used when compiled without critical path detection:
+
+void initializeCriticalPath(void){ }
+void traceCriticalPathBack(CkCallback cb){
+  pathInformationMsg * pathForUser = new(0) pathInformationMsg;  
+  pathForUser->historySize = 0;                                                                                        
+  pathForUser->cb = NULL;                                                                                                      
+  pathForUser->table_idx = -1;      
+  cb.send(pathForUser);                                   
+}
+
+
+
 #endif
 
 
