@@ -1322,7 +1322,7 @@ void ComlibNotifyMigrationDoneHandler(void *msg) {
 
 
 static void periodicDebugPrintStatus(void* ptr, double currWallTime){
-  CkPrintf("[%d] periodicDebugPrintStatus()\n", CkMyPe());
+  // CkPrintf("[%d] periodicDebugPrintStatus()\n", CkMyPe());
 
   ComlibManager *mgr = (ComlibManager*)ptr;
   mgr->printDiagnostics();
