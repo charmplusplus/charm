@@ -967,8 +967,9 @@ void CmiMachineProgressImpl()
 #endif
 #else
     /*Not implemented yet. Communication server does not seem to be
-      thread safe */
-    /* CommunicationServerThread(0); */
+      thread safe, so only communication thread call it */
+    if (CmiMyRank() == CmiMyNodeSize())
+        CommunicationServerThread(0);
 #endif
 }
 #endif
