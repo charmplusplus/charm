@@ -330,7 +330,7 @@ class Jacobi: public CBase_Jacobi {
       // Send my front face
       thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z-1)).receiveGhosts(frontMsg);
       // Send my back face
-      thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z-1)).receiveGhosts(backMsg);
+      thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z+1)).receiveGhosts(backMsg);
     }
 
     void processGhosts(ghostMsg *gmsg) {
