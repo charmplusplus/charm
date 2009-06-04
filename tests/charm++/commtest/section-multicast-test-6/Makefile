@@ -4,10 +4,10 @@ all: pgm
 
 
 test: pgm
-	./charmrun pgm +p1 2 2
-	./charmrun pgm +p2 5 5 
-	./charmrun pgm +p4 5 5
-	./charmrun pgm +p8 5 5
+	./charmrun pgm +p1 2 2 $(TESTOPTS)
+	./charmrun pgm +p2 5 5 $(TESTOPTS)
+	./charmrun pgm +p4 5 5 $(TESTOPTS)
+	./charmrun pgm +p8 5 5 $(TESTOPTS)
 
 pgm: test.o
 	$(CHARMC) -language charm++ -o pgm test.o $(COMLIB)
