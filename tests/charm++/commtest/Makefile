@@ -1,5 +1,5 @@
 #DIRS=comlib commlib_stream pipeBroadcast
-DIRS=section-multicast-test section-multicast-test-6 eachtomany-test-2
+DIRS=section-multicast-test section-multicast-test-6 
 
 .PHONY: test $(DIRS)
 
