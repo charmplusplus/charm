@@ -305,8 +305,6 @@ extern void criticalPath_split();
 
 
 /// Empty no-op version for when critical path history is not compiled in
-class MergeablePathHistory{
-}
 
 #define MERGE_PATH_DECLARE(x) ;
 #define MERGE_PATH_RESET(x) ;
