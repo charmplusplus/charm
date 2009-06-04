@@ -58,11 +58,11 @@ headers: $(HEADERS)
 	cp ampi.h $(CDIR)/include/mpi.h
 	cp ampif.h $(CDIR)/include/mpif.h
 #	cp mpiCC mpicc mpicxx mpif77 mpif90 ampirun $(CDIR)/bin
-	cp mpiCC $(CDIR)/bin/ampicc
-	cp mpiCC $(CDIR)/bin/ampiCC
-	cp mpicxx $(CDIR)/bin/ampicxx
-	cp mpif77 $(CDIR)/bin/ampif77
-	cp mpif90 $(CDIR)/bin/ampif90
+	cp ampiCC $(CDIR)/bin/ampicc
+	cp ampiCC $(CDIR)/bin/ampiCC
+	cp ampiCC $(CDIR)/bin/ampicxx
+	cp ampif77 $(CDIR)/bin/ampif77
+	cp ampif90 $(CDIR)/bin/ampif90
 	cp ampirun $(CDIR)/bin/ampirun
 	touch headers
 
