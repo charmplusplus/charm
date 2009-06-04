@@ -1,4 +1,3 @@
-#DIRS=megatest pingpong simplearrayhello loadbalancing chkpt commtest delegation
 DIRS=megatest pingpong simplearrayhello loadbalancing chkpt commtest delegation
 
 all:
@@ -11,9 +10,9 @@ test:
 		(cd $$d; $(MAKE) test OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
 	done
 
-# skip megatest
+# skip megatest and commtest
 bgtest:
-	for d in pingpong simplearrayhello loadbalancing chkpt commtest delegation; do \
+	for d in pingpong simplearrayhello loadbalancing chkpt delegation; do \
 		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
