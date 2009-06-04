@@ -7,7 +7,7 @@
 
 /** \file jacobi3d.C
  *  Author: Abhinav S Bhatele
- *  Date Created: October 24th, 2007
+ *  Date Created: June 01st, 2009
  *
  *  This does a topological placement for a 3d jacobi.
  *
@@ -42,9 +42,6 @@
 /*readonly*/ int blockDimX;
 /*readonly*/ int blockDimY;
 /*readonly*/ int blockDimZ;
-/*readonly*/ int torusDimX;
-/*readonly*/ int torusDimY;
-/*readonly*/ int torusDimZ;
 
 // specify the number of worker chares in each dimension
 /*readonly*/ int num_chare_x;
@@ -52,7 +49,6 @@
 /*readonly*/ int num_chare_z;
 
 /*readonly*/ int globalBarrier;
-/*readonly*/ int localBarrier;
 
 static unsigned long next = 1;
 
@@ -216,12 +212,6 @@ class Jacobi: public CBase_Jacobi {
   Jacobi_SDAG_CODE
 
   public:
-    int arrived_left;
-    int arrived_right;
-    int arrived_top;
-    int arrived_bottom;
-    int arrived_front;
-    int arrived_back;
     int iterations;
     int imsg;
 
@@ -264,19 +254,10 @@ class Jacobi: public CBase_Jacobi {
       }
 
       iterations = 0;
-      arrived_left = 0;
-      arrived_right = 0;
-      arrived_top = 0;
-      arrived_bottom = 0;
-      arrived_front = 0;
-      arrived_back = 0;
       imsg = 0;
       constrainBC();
     }
 
-    // a necessary function which we ignore now
-    // if we were to use load balancing and migration
-    // this function might become useful
     Jacobi(CkMigrateMessage* m) {}
 
     ~Jacobi() { 
@@ -297,8 +278,7 @@ class Jacobi: public CBase_Jacobi {
 #endif
     }
 
-    // Perform one iteration of work
-    // The first step is to send the local state to the neighbors
+    // Send ghost faces to the six neighbors
     void begin_iteration(void) {
       if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
           CkPrintf("Start of iteration %d\n", iterations);
@@ -314,6 +294,12 @@ class Jacobi: public CBase_Jacobi {
       ghostMsg *frontMsg = new (blockDimX*blockDimY) ghostMsg(BACK, blockDimX, blockDimY);
       ghostMsg *backMsg = new (blockDimX*blockDimY) ghostMsg(FRONT, blockDimX, blockDimY);
 
+      CkSetRefNum(leftMsg, iterations);
+      CkSetRefNum(rightMsg, iterations);
+      CkSetRefNum(topMsg, iterations);
+      CkSetRefNum(bottomMsg, iterations);
+      CkSetRefNum(frontMsg, iterations);
+      CkSetRefNum(backMsg, iterations);
 
       for(int j=0; j<blockDimY; ++j) 
 	for(int k=0; k<blockDimZ; ++k) {
@@ -353,42 +339,36 @@ class Jacobi: public CBase_Jacobi {
 
       switch(gmsg->dir) {
 	case LEFT:
-	  arrived_left++;
 	  for(int j=0; j<height; ++j) 
 	    for(int k=0; k<width; ++k) {
 	      temperature[index(0, j+1, k+1)] = gmsg->gh[k*height+j];
 	  }
 	  break;
 	case RIGHT:
-	  arrived_right++;
 	  for(int j=0; j<height; ++j) 
 	    for(int k=0; k<width; ++k) {
 	      temperature[index(blockDimX+1, j+1, k+1)] = gmsg->gh[k*height+j];
 	  }
 	  break;
 	case TOP:
-	  arrived_top++;
 	  for(int i=0; i<height; ++i) 
 	    for(int k=0; k<width; ++k) {
 	      temperature[index(i+1, 0, k+1)] = gmsg->gh[k*height+i];
 	  }
 	  break;
 	case BOTTOM:
-	  arrived_bottom++;
 	  for(int i=0; i<height; ++i) 
 	    for(int k=0; k<width; ++k) {
 	      temperature[index(i+1, blockDimY+1, k+1)] = gmsg->gh[k*height+i];
 	  }
 	  break;
 	case FRONT:
-	  arrived_front++;
 	  for(int i=0; i<height; ++i) 
 	    for(int j=0; j<width; ++j) {
 	      temperature[index(i+1, j+1, blockDimZ+1)] = gmsg->gh[j*height+i];
 	  }
 	  break;
 	case BACK:
-	  arrived_back++;
 	  for(int i=0; i<height; ++i) 
 	    for(int j=0; j<width; ++j) {
 	      temperature[index(i+1, j+1, 0)] = gmsg->gh[j*height+i];
@@ -397,39 +377,32 @@ class Jacobi: public CBase_Jacobi {
 	default:
           CkAbort("ERROR\n");
       }
+
+      delete gmsg;
     }
 
 
     void check_and_compute() {
-      if (arrived_left >=1 && arrived_right >=1 && arrived_top >=1 && arrived_bottom >=1 && arrived_front >= 1 && arrived_back >= 1) {
-	arrived_left--;
-	arrived_right--;
-	arrived_top--;
-	arrived_bottom--;
-	arrived_front--;
-	arrived_back--;
+      compute_kernel();
 
-	compute_kernel();
-
-	// calculate error
-	// not being done right now since we are doing a fixed no. of iterations
+      // calculate error
+      // not being done right now since we are doing a fixed no. of iterations
 
 #if USE_3D_ARRAYS
-	double ***tmp;
+      double ***tmp;
 #else
-	double *tmp;
+      double *tmp;
 #endif
-	tmp = temperature;
-        temperature = new_temperature;
-        new_temperature = tmp;
+      tmp = temperature;
+      temperature = new_temperature;
+      new_temperature = tmp;
 
-	constrainBC();
+      constrainBC();
 
-	if (iterations <= WARM_ITER || iterations >= MAX_ITER)
-	  contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
-	else
-	  doStep();
-      }
+      if (iterations <= WARM_ITER || iterations >= MAX_ITER)
+	contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
+      else
+	doStep();
     }
 
     // Check to see if we have received all neighbor values yet

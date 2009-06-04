@@ -7,16 +7,12 @@ mainmodule jacobi3d {
   readonly int blockDimX;
   readonly int blockDimY;
   readonly int blockDimZ;
-  readonly int torusDimX;
-  readonly int torusDimY;
-  readonly int torusDimZ;
 
   readonly int num_chare_x;
   readonly int num_chare_y;
   readonly int num_chare_z;
 
   readonly int globalBarrier;
-  readonly int localBarrier;
 
   message ghostMsg {
     double gh[];
@@ -39,7 +35,8 @@ mainmodule jacobi3d {
 	begin_iteration();
       }
       for(imsg = 0; imsg < 6; imsg++) {
-	when receiveGhosts(ghostMsg *gmsg)
+	// "iterations" keeps track of messages across steps
+	when receiveGhosts[iterations] (ghostMsg *gmsg)
 	  atomic "process ghosts" { processGhosts(gmsg); }
       }
       atomic "doWork" {
