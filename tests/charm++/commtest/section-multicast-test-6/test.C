@@ -134,7 +134,7 @@ public:
       if(thisIndex < NumElem-1) {
 	CProxySection_LUBlk sect = CProxySection_LUBlk::ckNew(thisArrayID, thisIndex+1, NumElem-1, 1);
 
-	switch(random() % 3){
+	switch(rand() % 3){
 	case 0:
 	  ComlibAssociateProxy(cinst_direct, sect); 
 	  break;
