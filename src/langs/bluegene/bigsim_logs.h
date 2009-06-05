@@ -328,7 +328,7 @@ int BgReadProcWindow(int procNum, int numWth, int numPes, int totalProcs, int* a
 		     int& fileLoc, int& totalTlineLength, int firstLog, int numLogs);
 int* BgLoadOffsets(int totalProcs, int numPes);
 void BgWriteThreadTimeLine(char *fname, int x, int y, int z, int th, BgTimeLine &tline);
-void BgWriteTraceSummary(int numEmulatingPes, int x, int y=1, int z=1, int numWth=1, int numCth=1, char *traceroot=NULL);
+void BgWriteTraceSummary(int numEmulatingPes, int x, int y=1, int z=1, int numWth=1, int numCth=1, const char *fname=NULL, char *traceroot=NULL);
 void BgWriteTimelines(int seqno, BgTimeLineRec **tlinerecs, int nlocalNodes, char *traceroot=NULL);
 void BgWriteTimelines(int seqno, BgTimeLineRec *tlinerecs, int nlocalNodes, char *traceroot=NULL);
 extern "C" void BgGenerateLogs();

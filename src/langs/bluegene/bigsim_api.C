@@ -58,7 +58,7 @@ void BgWriteThreadTimeLine(char *pgm, int x, int y, int z, int th, BgTimeLine &t
 }
 
 // write bgTrace file:
-void BgWriteTraceSummary(int numEmulatingPes, int x, int y, int z, int numWth, int numCth, char *traceroot)
+void BgWriteTraceSummary(int numEmulatingPes, int x, int y, int z, int numWth, int numCth, const char *fname, char *traceroot)
 {
   char* d = new char[512];
   BGMach bgMach;
@@ -66,7 +66,8 @@ void BgWriteTraceSummary(int numEmulatingPes, int x, int y, int z, int numWth, i
   const PUP::machineInfo &machInfo = PUP::machineInfo::current();
 
   if (!traceroot) traceroot=(char*)"";
-  sprintf(d, "%sbgTrace", traceroot);
+  if (fname==NULL) fname = "bgTrace";
+  sprintf(d, "%s%s", traceroot,fname);
   FILE *f = fopen(d,"wb");
   if(f==NULL) {
       CmiPrintf("Creating trace file %s  failed\n", d);
