@@ -615,7 +615,7 @@ public:
 };
 
 class PersReq : public AmpiRequest {
-	int sndrcv; // 1 if send , 2 if recv
+	int sndrcv; // 1 if send , 2 if recv, 3 if ssend
 public:
 	PersReq(void *buf_, int count_, int type_, int src_, int tag_, 
 		MPI_Comm comm_, int sndrcv_) 
@@ -1435,14 +1435,14 @@ friend class IReq;
     }
 
     AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
-                         int type,MPI_Comm destcomm);
+                         int type,MPI_Comm destcomm, int sync=0);
 
     inline void comlibsend(int t, int s, const void* buf, int count, int type, int rank, MPI_Comm destcomm);
-    inline void send(int t, int s, const void* buf, int count, int type, int rank, MPI_Comm destcomm);
+    inline void send(int t, int s, const void* buf, int count, int type, int rank, MPI_Comm destcomm, int sync=0);
     static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,
                         int idx);
     void delesend(int t, int s, const void* buf, int count, int type,  
-                  int rank, MPI_Comm destcomm, CProxy_ampi arrproxy);
+                  int rank, MPI_Comm destcomm, CProxy_ampi arrproxy, int sync=0);
     inline int processMessage(AmpiMsg *msg, int t, int s, void* buf, int count, int type);
     inline AmpiMsg * getMessage(int t, int s, int comm, int *sts);
     int recv(int t,int s,void* buf,int count,int type,int comm,int *sts=0);

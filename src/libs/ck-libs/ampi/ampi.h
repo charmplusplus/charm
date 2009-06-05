@@ -259,6 +259,9 @@ typedef void (*MPI_PupFn)(pup_er, void*);
 #define MPI_Send AMPI_Send
 int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
              int tag, MPI_Comm comm);
+#define MPI_Ssend AMPI_Ssend
+int AMPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
+             int tag, MPI_Comm comm);
 #define MPI_Recv AMPI_Recv
 int AMPI_Recv(void *msg, int count, int type, int src, int tag,
              MPI_Comm comm, MPI_Status *status);
@@ -266,10 +269,8 @@ int AMPI_Recv(void *msg, int count, int type, int src, int tag,
 int AMPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count);
 #define AMPI_Bsend AMPI_Send
 #define AMPI_Rsend AMPI_Send
-#define AMPI_Ssend AMPI_Send
 #define MPI_Bsend AMPI_Bsend
 #define MPI_Rsend AMPI_Rsend   /* FIXME: MPI_Rsend can be posted only after recv */
-#define MPI_Ssend AMPI_Ssend   /* FIXME: MPI_Ssend blocks until recv has been posted */
 #define MPI_Buffer_attach(buf,len) /*LIE: emtpy*/ /*Silly: default send is buffering in Charm++*/
 #define MPI_Buffer_detach(buf,len) /*LIE: emtpy*/
 #define MPI_Isend AMPI_Isend
@@ -311,8 +312,10 @@ int AMPI_Probe(int source, int tag, MPI_Comm comm, MPI_Status *sts);
 #define MPI_Send_init AMPI_Send_init
 int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
                   MPI_Comm comm, MPI_Request *req);
+#define MPI_Ssend_init AMPI_Ssend_init
+int AMPI_Ssend_init(void *buf, int count, int type, int dest, int tag,
+                  MPI_Comm comm, MPI_Request *req);
 #define MPI_Bsend_init AMPI_Send_init
-#define MPI_Ssend_init AMPI_Send_init  /* FIXME: see MPI_Ssend */
 #define MPI_Rsend_init AMPI_Send_init  /* FIXME: see MPI_Rsend */
 #define MPI_Recv_init AMPI_Recv_init
 int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,

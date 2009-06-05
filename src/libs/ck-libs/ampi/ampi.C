@@ -1710,6 +1710,11 @@ MSG_ORDER_DEBUG(
     //CkPrintf("Calling TCharm::resume at ampi::generic!\n");
     thread->resume();
   }
+
+  if (UsrToEnv(msg)->getRef()==1) {
+    CProxy_ampi pa(thisArrayID);
+    pa[msg->srcIdx].unblock();
+  }
 }
 
 inline static AmpiRequestList *getReqs(void); 
@@ -1766,7 +1771,7 @@ AmpiMsg *ampi::getMessage(int t, int s, int comm, int *sts)
 }
 
 AmpiMsg *ampi::makeAmpiMsg(int destIdx,
-	int t,int sRank,const void *buf,int count,int type,MPI_Comm destcomm)
+	int t,int sRank,const void *buf,int count,int type,MPI_Comm destcomm, int sync)
 {
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int len = ddt->getSize(count);
@@ -1775,6 +1780,7 @@ AmpiMsg *ampi::makeAmpiMsg(int destIdx,
   if (destIdx>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_TAG_UB_VALUE) //Not cross-module: set seqno
   seq = oorder.nextOutgoing(destIdx);
   AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sIdx, sRank, len, destcomm);
+  if (sync) UsrToEnv(msg)->setRef(sync);
   TCharm::activateVariable(buf);
   ddt->serialize((char*)buf, (char*)msg->data, count, 1);
   TCharm::deactivateVariable(buf);
@@ -1788,10 +1794,15 @@ ampi::comlibsend(int t, int sRank, const void* buf, int count, int type,  int ra
 }
 
 void
-ampi::send(int t, int sRank, const void* buf, int count, int type,  int rank, MPI_Comm destcomm)
+ampi::send(int t, int sRank, const void* buf, int count, int type,  int rank, MPI_Comm destcomm, int sync)
 {
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
-  delesend(t,sRank,buf,count,type,rank,destcomm,dest.getProxy());
+  delesend(t,sRank,buf,count,type,rank,destcomm,dest.getProxy(),sync);
+
+  if (sync) {
+    // waiting for receiver side
+    block();
+  }
 }
 
 void
@@ -1804,7 +1815,7 @@ ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
 }
 
 void
-ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank, MPI_Comm destcomm, CProxy_ampi arrproxy)
+ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank, MPI_Comm destcomm, CProxy_ampi arrproxy, int sync)
 {
   if(rank==MPI_PROC_NULL) return;
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
@@ -1819,7 +1830,7 @@ ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank
   CkPrintf("AMPI vp %d send: tag=%d, src=%d, comm=%d (to %d)\n",thisIndex,t,sRank,destcomm,destIdx);
  )
 
-  arrproxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm));
+  arrproxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm,sync));
 
 #ifndef CMK_OPTIMIZE
   int size=0;
@@ -2457,6 +2468,32 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
 }
 
 CDECL
+int AMPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
+                        int tag, MPI_Comm comm)
+{
+  AMPIAPI("AMPI_Ssend");
+#ifdef AMPIMSGLOG
+  if(msgLogRead){
+    return 0;
+  }
+#endif
+
+  ampi *ptr = getAmpiInstance(comm);
+#if AMPI_COMLIB
+  if(enableStreaming){
+    ptr->getStreaming().beginIteration();
+    ptr->comlibsend(tag,ptr->getRank(comm),msg,count,type,dest,comm);
+  } else
+#endif
+    ptr->send(tag, ptr->getRank(comm), msg, count, type, dest, comm, 1);
+#if AMPI_COUNTER
+  getAmpiParent()->counters.send++;
+#endif
+
+  return 0;
+}
+
+CDECL
 int AMPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
               MPI_Comm comm, MPI_Status *status)
 {
@@ -2902,9 +2939,9 @@ double AMPI_Wtick(void){
 }
 
 int PersReq::start(){
-  if(sndrcv == 1) { // send request
+  if(sndrcv == 1 || sndrcv == 3) { // send or ssend request
     ampi *ptr=getAmpiInstance(comm);
-    ptr->send(tag, ptr->getRank(comm), buf, count, type, src, comm);
+    ptr->send(tag, ptr->getRank(comm), buf, count, type, src, comm, sndrcv==3?1:0);
   }
   return 0;
 }
@@ -3512,6 +3549,17 @@ int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
   AMPIAPI("AMPI_Send_init");
   AmpiRequestList* reqs = getReqs();
   PersReq *newreq = new PersReq(buf,count,type,dest,tag,comm,1);
+  *req = reqs->insert(newreq);
+  return 0;
+}
+
+CDECL
+int AMPI_Ssend_init(void *buf, int count, int type, int dest, int tag,
+                   MPI_Comm comm, MPI_Request *req)
+{
+  AMPIAPI("AMPI_Send_init");
+  AmpiRequestList* reqs = getReqs();
+  PersReq *newreq = new PersReq(buf,count,type,dest,tag,comm,3);
   *req = reqs->insert(newreq);
   return 0;
 }
