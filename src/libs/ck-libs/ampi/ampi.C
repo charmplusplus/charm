@@ -1690,6 +1690,8 @@ MSG_ORDER_DEBUG(
   	thisIndex,msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq,resumeOnRecv);
 )
 
+  int sync = UsrToEnv(msg)->getRef();
+
 //	AmpiMsg *msgcopy = msg;
   if(msg->seq != -1) {
     int srcIdx=msg->srcIdx;
@@ -1706,14 +1708,14 @@ MSG_ORDER_DEBUG(
     inorder(msg);
   }
   
+  if (sync==1) {         // send an ack to sender
+    CProxy_ampi pa(thisArrayID);
+    pa[msg->srcIdx].unblock();
+  }
+
   if(resumeOnRecv){
     //CkPrintf("Calling TCharm::resume at ampi::generic!\n");
     thread->resume();
-  }
-
-  if (UsrToEnv(msg)->getRef()==1) {
-    CProxy_ampi pa(thisArrayID);
-    pa[msg->srcIdx].unblock();
   }
 }
 
