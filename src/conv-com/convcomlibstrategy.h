@@ -18,8 +18,14 @@
 #ifndef CONVCOMLIBSTRATEGY_H
 #define CONVCOMLIBSTRATEGY_H
 
+#if 0
 // FILIPPO: TEMPORARY HACK
 #ifndef COMLIBSTRATEGY_H
+#undef CkpvDeclare
+#undef CkpvAccess
+#undef CkpvExtern
+#undef CkpvInitialize
+#undef CkpvInitialized
 #define CkpvDeclare CpvDeclare
 #define CkpvAccess CpvAccess
 #define CkpvExtern CpvExtern
@@ -30,7 +36,7 @@
 #undef CkRegisterHandler
 #define CkRegisterHandler(x) CmiRegisterHandler(x)
 #endif
-
+#endif
 
 
 

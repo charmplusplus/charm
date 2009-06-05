@@ -13,7 +13,7 @@
 #define MAX_NUM_STREAMING_MESSAGES 1000
 #define DEFAULT_TIMEOUT 10
 
-CkpvExtern(int, streaming_handler_id);
+CpvExtern(int, streaming_handler_id);
 extern void StreamingHandlerFn(void *msg);
 
 /**

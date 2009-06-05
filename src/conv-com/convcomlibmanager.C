@@ -351,8 +351,8 @@ void initConvComlibManager(){
     CkpvAccess(RouterDummyHandle) = CkRegisterHandler((CmiHandler)routerDummyMsg);    
 
     // streaming strategy
-    CkpvInitialize(int, streaming_handler_id);
-    CkpvAccess(streaming_handler_id) = CkRegisterHandler(StreamingHandlerFn);
+    CpvInitialize(int, streaming_handler_id);
+    CpvAccess(streaming_handler_id) = CmiRegisterHandler(StreamingHandlerFn);
 
     // mesh streaming strategy
     CkpvInitialize(int, streaming_column_handler_id);
