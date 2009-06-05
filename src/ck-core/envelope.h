@@ -285,6 +285,7 @@ private:
       _SET_USED(env, 0);
       //for record-replay
       env->setEvent(0);
+      env->setRef(0);
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
       env->pathHistory.reset();
