@@ -273,7 +273,7 @@ void initializeCriticalPath(void){ }
 void traceCriticalPathBack(CkCallback cb){
   pathInformationMsg * pathForUser = new(0) pathInformationMsg;  
   pathForUser->historySize = 0;                                                                                        
-  pathForUser->cb = NULL;                                                                                                      
+  pathForUser->cb = CkCallback();                                                                                                      
   pathForUser->table_idx = -1;      
   cb.send(pathForUser);                                   
 }
