@@ -602,6 +602,12 @@ public:
 		p(tag);
 		p(comm);
 		p(isvalid);
+#if CMK_BLUEGENE_CHARM
+		//needed for bigsim out-of-core emulation
+		//as the "log" is not moved from memory, this pointer is safe
+		//to be reused
+		p((char *)&event, sizeof(void *));
+#endif
 	}
 	
 	//added due to BIGSIM_OOC DEBUGGING
@@ -674,6 +680,12 @@ class ATAReq : public AmpiRequest {
 			p(count);
 			p(type);
 			p(src);p(tag);p(comm);
+#if CMK_BLUEGENE_CHARM
+		//needed for bigsim out-of-core emulation
+		//as the "log" is not moved from memory, this pointer is safe
+		//to be reused
+			p((char *)&event, sizeof(void *));
+#endif
 		}
 	friend class ATAReq;
 	};
@@ -774,12 +786,12 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
       //search for invalidated slot
       // disabled to make requests monotonously ascending 
       // for multiple completion calls like MPI_Waitany
-      /* for(int i=0;i<len;i++){
+       for(int i=0;i<len;i++){
         if(block[i]==NULL){
 	  block[i] = elt;
 	  return i;
 	}
-      } */
+      } 
       push_back(elt);
       return len-1;
     }
