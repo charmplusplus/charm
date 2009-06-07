@@ -41,11 +41,17 @@ int main()
                i, idx, bglog->startTime, bglog->endTime, bglog->execTime);
 #endif
       int bDepLen = bglog->backwardDeps.length();
+#if 0
       if (bDepLen>0 && bglog->msgId.pe()!=-1) {
         if (bglog->msgId.pe() != i) {
           printf("Error: [%d] Invalid log entry --- bDepLen:%d from PE %d\n", i, bDepLen, bglog->msgId.pe());
         }
       }
+#else
+      if (bDepLen>0 && bglog->msgId.pe()!=-1 && bglog->msgId.msgID()!=-1) {
+          printf("Error: [%d] Invalid log entry (event with both incoming message and backward deps )--- bDepLen:%d from msg (PE:%d, id:%d)\n", i, bDepLen, bglog->msgId.pe(), bglog->msgId.msgID());
+      }
+#endif
       for(int midx=0; midx < bglog->msgs.length(); midx++){
         BgMsgEntry *msg = bglog->msgs[midx];
         if (msg->sendTime < bglog->startTime || msg->sendTime > bglog->endTime)
