@@ -1220,7 +1220,7 @@ static void cmm_pup_posted_ireq(pup_er p,void **msg) {
 	pup_int(p, (int *)msg);
 
 /*	if(pup_isUnpacking(p)){
-	    //*msg = new IReq;
+	    // *msg = new IReq;
 	    //when unpacking, nothing is needed to do since *msg is an index
 	    //(of type integer) to the ampiParent::ampiReqs (the AmpiRequestList)
 	}
@@ -2590,7 +2590,8 @@ int AMPI_Barrier(MPI_Comm comm)
   //CkPrintf("%d: in AMPI_Barrier, after AMPI_Allreduce\n", getAmpiParent()->thisIndex);
 #if CMK_BLUEGENE_CHARM
   //TRACE_BG_AMPI_BARRIER_END(barrierLog);
-  _TRACE_BG_SET_INFO(NULL, "AMPI_Barrier_END",  &barrierLog, 1);
+  //_TRACE_BG_SET_INFO(NULL, "AMPI_Barrier_END",  &barrierLog, 1);
+  TRACE_BG_AMPI_BREAK(NULL, "AMPI_Barrier_END", &barrierLog, 1);
 #endif
 #if AMPI_COUNTER
   getAmpiParent()->counters.barrier++;
