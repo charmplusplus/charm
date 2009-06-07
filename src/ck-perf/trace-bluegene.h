@@ -94,7 +94,7 @@ extern int traceBluegeneLinked;
 	TRACE_BG_AMPI_SUSPEND();        \
         TRACE_BG_AMPI_START(t, str);    \
         for(int i=0;i<count;i++) {      \
-                _TRACE_BG_ADD_BACKWARD_DEP(event);      \
+                _TRACE_BG_ADD_BACKWARD_DEP(((void**)event)[i]);      \
         }	\
         _TRACE_BG_ADD_BACKWARD_DEP(curLog);      \
 	}
