@@ -10,7 +10,7 @@ module CkMulticast {
 //    char data[];
 //  };
   
-  group CkMulticastMgr {
+  group [migratable] CkMulticastMgr {
     entry CkMulticastMgr();
     entry CkMulticastMgr(int factor);
     // set up

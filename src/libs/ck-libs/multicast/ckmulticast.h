@@ -70,6 +70,7 @@ class CkMulticastMgr: public CkDelegateMgr
     public:
         // ------------------------- Cons/Des-tructors ------------------------
         CkMulticastMgr()  { factor = MAXMCASTCHILDREN; }
+        CkMulticastMgr(CkMigrateMessage *m)  { delete m; }
         CkMulticastMgr(int f)  { factor = f; }
         int useDefCtor(void){ return 1; }
 
