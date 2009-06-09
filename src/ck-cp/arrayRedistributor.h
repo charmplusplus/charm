@@ -260,8 +260,10 @@ class redistributor2D: public CBase_redistributor2D {
 
 
   
-  // Convert a local column,row id (0 to mywidth-1, 0 to data_width-1) to the index in the padded array
+  // Convert a local column,row id (0 to mywidth()-1, 0 to myheight()-1) to the index in the padded array
   int local_to_padded(int x, int y){
+    CkAssert(thisElemActive);
+    CkAssert(x < (mywidth()+data_x_ghost) && x >= (0-data_x_ghost) && y < (myheight()+data_y_ghost) && y >= (0-data_y_ghost) );
     return (mywidth()+2*data_x_ghost)*(y+data_y_ghost)+x+data_x_ghost;
   }
 

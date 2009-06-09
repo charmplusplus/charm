@@ -66,15 +66,21 @@ int redistributor2D::right_neighbor(){
 } 
   
   
-/// the width of the non-ghost part of the local partition 
+/// the width (X dimension) of the non-ghost part of the local partition 
 int redistributor2D::mywidth(){ 
-  return right_data_idx() - left_data_idx() + 1; 
+  if(thisElemActive)
+    return right_data_idx() - left_data_idx() + 1; 
+  else
+    return 0;
 } 
    
    
-/// the height of the non-ghost part of the local partition 
+/// the height (Y dimension) of the non-ghost part of the local partition 
 int redistributor2D::myheight(){ 
-  return bottom_data_idx() - top_data_idx() + 1; 
+  if(thisElemActive)
+    return bottom_data_idx() - top_data_idx() + 1; 
+  else
+    return 0;
 } 
 
 
