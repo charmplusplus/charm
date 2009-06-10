@@ -3118,7 +3118,7 @@ void CmiPrintf(const char *format, ...)
   }
   va_end(args);
 #if CMK_CCS_AVAILABLE
-  if (CpvAccess(cmiArgDebugFlag)) {
+  if (CpvInitialized(cmiArgDebugFlag) && CpvAccess(cmiArgDebugFlag)) {
     va_start(args,format);
     print_node0(format, args);
     va_end(args);
