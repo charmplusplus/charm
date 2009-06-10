@@ -13,6 +13,7 @@ CMK_LD_SHARED="-shared"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_LIBS="-lckqt"
 CMK_RANLIB="ranlib"
+CMK_CC64=true
 
 # native compiler for compiling charmxi, etc
 CMK_NATIVE_CC="$CMK_CC $CMK_AMD64 -fPIC $CMK_DEFS "
