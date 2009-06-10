@@ -96,6 +96,10 @@ int    BgGetArgc() { return arg_argc; }
 ****************************************************************************/
 
 #if CMK_HAS_COUNTER_PAPI
+CmiUInt8 total_fps = 0;
+CmiUInt8 total_l1_dcm = 0;
+CmiUInt8 total_mem_rcy = 0;
+
 int init_counters()
 {
     numPapiEvents = 0;
@@ -108,6 +112,12 @@ int init_counters()
       if (CmiMyPe()== 0) printf("PAPI_TOT_INS used\n");
       papiEvents[numPapiEvents++] = PAPI_TOT_INS;
     }
+    if (PAPI_query_event(PAPI_L1_DCM) == PAPI_OK || 1) {
+      if (CmiMyPe()== 0) printf("PAPI_L1_DCM used\n");
+      papiEvents[numPapiEvents++] = PAPI_L1_DCM;   // L1 cache miss
+    }
+    //papiEvents[numPapiEvents++] = PAPI_MEM_RCY;  // idle cycle waiting for reads
+
     int status = PAPI_start_counters(papiEvents, numPapiEvents);
     if (status != PAPI_OK) {
       CmiPrintf("PAPI_start_counters error code: %d\n", status);
@@ -125,6 +135,9 @@ int read_counters(long_long *papiValues, int n)
     CmiPrintf("PAPI_read_counters error: %d\n", status);
     CmiAbort("Failed to read PAPI counters!\n");
   }
+  total_fps += papiValues[1];
+  total_l1_dcm += papiValues[2];
+  total_mem_rcy += papiValues[3];
   return 0;
 }
 
@@ -1227,6 +1240,14 @@ static CmiHandler exitHandlerFunc(char *msg)
   delete [] cva(msgBuffer);
 #endif
 
+#if CMK_HAS_COUNTER_PAPI
+  if (cva(bgMach).timingMethod == BG_COUNTER) {
+  CmiPrintf("BG[PE %d]> floating point instructions: %lld\n", CmiMyPe(), total_fps);
+  CmiPrintf("BG[PE %d]> L1 cache misses: %lld\n", CmiMyPe(), total_l1_dcm);
+  //CmiPrintf("BG[PE %d]> cycles stalled waiting for memory access: %lld\n", CmiMyPe(), total_mem_rcy);
+  }
+#endif
+
   //ConverseExit();
   if (genTimeLog)
     { if (CmiMyPe() != 0) CsdExitScheduler(); }
@@ -1327,6 +1348,8 @@ CmiStartFn bgMain(int argc, char **argv)
     init_counters();
   }
 #endif
+  CmiGetArgDoubleDesc(argv,"+bgfpfactor", &cva(bgMach).fpfactor, 
+		      "floating point to time factor");
   CmiGetArgDoubleDesc(argv,"+bgcpufactor", &cva(bgMach).cpufactor, 
 		      "scale factor for wallclock time measured");
   
