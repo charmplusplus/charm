@@ -96,12 +96,18 @@ int    BgGetArgc() { return arg_argc; }
 ****************************************************************************/
 
 #if CMK_HAS_COUNTER_PAPI
+CmiUInt8 total_ins = 0;
 CmiUInt8 total_fps = 0;
 CmiUInt8 total_l1_dcm = 0;
 CmiUInt8 total_mem_rcy = 0;
 
 int init_counters()
 {
+
+    int retval = PAPI_library_init(PAPI_VER_CURRENT);
+
+    if (retval != PAPI_VER_CURRENT) { CmiAbort("PAPI library init error!"); } 
+
     numPapiEvents = 0;
     // PAPI high level API does not require explicit library intialization
     papiEvents[numPapiEvents++] = PAPI_TOT_CYC;
@@ -112,15 +118,22 @@ int init_counters()
       if (CmiMyPe()== 0) printf("PAPI_TOT_INS used\n");
       papiEvents[numPapiEvents++] = PAPI_TOT_INS;
     }
-    if (PAPI_query_event(PAPI_L1_DCM) == PAPI_OK || 1) {
+    if (PAPI_query_event(PAPI_L1_DCM) == PAPI_OK) {
       if (CmiMyPe()== 0) printf("PAPI_L1_DCM used\n");
       papiEvents[numPapiEvents++] = PAPI_L1_DCM;   // L1 cache miss
     }
-    //papiEvents[numPapiEvents++] = PAPI_MEM_RCY;  // idle cycle waiting for reads
+    if (PAPI_query_event(PAPI_MEM_RCY) == PAPI_OK) {
+      if (CmiMyPe()== 0) printf("PAPI_MEM_RCY used\n");
+      papiEvents[numPapiEvents++] = PAPI_MEM_RCY;  // idle cycle waiting for reads
+    }
 
     int status = PAPI_start_counters(papiEvents, numPapiEvents);
     if (status != PAPI_OK) {
       CmiPrintf("PAPI_start_counters error code: %d\n", status);
+      switch (status) {
+      case PAPI_ENOEVNT:  CmiPrintf("PAPI Error> Hardware Event does not exist\n"); break;
+      case PAPI_ECNFLCT:  CmiPrintf("PAPI Error> Hardware Event exists, but cannot be counted due to counter resource limitations\n"); break;
+      }
       CmiAbort("Unable to start PAPI counters!\n");
     }
 }
@@ -135,6 +148,7 @@ int read_counters(long_long *papiValues, int n)
     CmiPrintf("PAPI_read_counters error: %d\n", status);
     CmiAbort("Failed to read PAPI counters!\n");
   }
+  total_ins += papiValues[0];
   total_fps += papiValues[1];
   total_l1_dcm += papiValues[2];
   total_mem_rcy += papiValues[3];
@@ -1242,6 +1256,7 @@ static CmiHandler exitHandlerFunc(char *msg)
 
 #if CMK_HAS_COUNTER_PAPI
   if (cva(bgMach).timingMethod == BG_COUNTER) {
+  CmiPrintf("BG[PE %d]> cycles: %lld\n", CmiMyPe(), total_ins);
   CmiPrintf("BG[PE %d]> floating point instructions: %lld\n", CmiMyPe(), total_fps);
   CmiPrintf("BG[PE %d]> L1 cache misses: %lld\n", CmiMyPe(), total_l1_dcm);
   //CmiPrintf("BG[PE %d]> cycles stalled waiting for memory access: %lld\n", CmiMyPe(), total_mem_rcy);
