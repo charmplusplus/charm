@@ -126,7 +126,7 @@ public:
 		{d.array.ep=ep; d.array.id=id;}
 	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,CmiBool doInline=CmiFalse)
 		:type(doInline?isendArray:sendArray) 
-		{d.array.ep=ep; d.array.id=id; d.array.idx.asMax()=idx;}
+		{d.array.ep=ep; d.array.id=id; d.array.idx.asMax()=*(CkArrayIndexMax*)&idx;}
 	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline=CmiFalse);
 
 	CkCallback(Chare *p, int ep, CmiBool doInline=CmiFalse);
