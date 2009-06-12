@@ -16,8 +16,8 @@
 #include "LBDBManager.h"
 #include "LBSimulation.h"
 
-#define  DEBUGF(x)       CmiPrintf x;
-#define  DEBUG(x)        x;
+#define  DEBUGF(x)      // CmiPrintf x;
+#define  DEBUG(x)       // x;
 
 #if CMK_MEM_CHECKPOINT
    /* can not handle reduction in inmem FT */
@@ -189,7 +189,6 @@ void CentralLB::AtSync()
 
 void CentralLB::ProcessAtSync()
 {
-	CkPrintf("[%d] .................... TRACE\n",CkMyPe());
 
 #if CMK_LBDB_ON
   CmiAssert(CmiNodeAlive(CkMyPe()));
@@ -252,7 +251,6 @@ void CentralLB::BuildStatsMsg()
   int npes = CkNumPes();
   CLBStatsMsg* msg = new CLBStatsMsg(osz, csz);
   msg->from_pe = CkMyPe();
-	CkPrintf("[%d] the step is %d\n",CkMyPe(),step());
 #ifdef _FAULT_MLOG_
 	msg->step = step();
 #endif
@@ -604,7 +602,6 @@ void CentralLB::LoadBalance()
     lbDecisionCount++;
     migrateMsg->lbDecisionCount = lbDecisionCount;
 #endif
- CkPrintf("ReceiveMigration called at %.6lf \n",CmiWallTimer());
   thisProxy.ReceiveMigration(migrateMsg);
 
   // Zero out data structures for next cycle
@@ -896,7 +893,6 @@ void CentralLB::endMigrationDone(int balancing){
 
 #ifdef _FAULT_MLOG_
 void resumeCentralLbAfterChkpt(void *_lb){
-	DEBUGF(("[%d] HERE\n"));
     CentralLB *lb= (CentralLB *)_lb;
     CpvAccess(_currentObj)=lb;
     lb->endMigrationDone(lb->savedBalancing);
@@ -915,14 +911,11 @@ void CentralLB::ResumeClients(int balancing)
 #if CMK_LBDB_ON
 #ifdef _FAULT_MLOG_
     resumeCount++;
-	CkPrintf("[%d] \n\n\n INCREMENTING THIS to %d  \n\n\n",CkMyPe(),resumeCount);
     globalResumeCount = resumeCount;
 #endif
   DEBUGF(("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing));
   if (balancing && _lb_args.debug() && CkMyPe() == cur_ld_balancer) {
     double end_lb_time = CkWallTimer();
-    CkPrintf("[%s] Load balancing step %d finished at %f (duration %fs) Mem:%fMB\n",
-  	      lbName(), step()-1,end_lb_time, end_lb_time - start_lb_time, CmiMemoryUsage()/1024.0/1024.0);
   }
 
 #ifndef _FAULT_MLOG_
@@ -930,7 +923,6 @@ void CentralLB::ResumeClients(int balancing)
 #endif
 
   theLbdb->ResumeClients();
-CkPrintf("[%d] RIGHT HERE\n",CkMyPe());
   if (balancing)  {
     CheckMigrationComplete();
     if (future_migrates_expected == 0 || 
