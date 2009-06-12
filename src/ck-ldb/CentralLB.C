@@ -16,8 +16,8 @@
 #include "LBDBManager.h"
 #include "LBSimulation.h"
 
-#define  DEBUGF(x)      //  CmiPrintf x;
-#define  DEBUG(x)       // x;
+#define  DEBUGF(x)       CmiPrintf x;
+#define  DEBUG(x)        x;
 
 #if CMK_MEM_CHECKPOINT
    /* can not handle reduction in inmem FT */
@@ -171,6 +171,7 @@ void CentralLB::AtSync()
   DEBUGF(("[%d] CentralLB AtSync step %d!!!!!\n",CkMyPe(),step()));
 
 #ifdef _FAULT_MLOG_
+	CpvAccess(_currentObj)=this;
 #endif
 
   // if num of processor is only 1, nothing should happen
@@ -188,11 +189,14 @@ void CentralLB::AtSync()
 
 void CentralLB::ProcessAtSync()
 {
+	CkPrintf("[%d] .................... TRACE\n",CkMyPe());
+
 #if CMK_LBDB_ON
   CmiAssert(CmiNodeAlive(CkMyPe()));
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CkWallTimer();
   }
+
 
 #ifdef _FAULT_MLOG_
 	initMlogLBStep(thisgroup);
@@ -248,6 +252,7 @@ void CentralLB::BuildStatsMsg()
   int npes = CkNumPes();
   CLBStatsMsg* msg = new CLBStatsMsg(osz, csz);
   msg->from_pe = CkMyPe();
+	CkPrintf("[%d] the step is %d\n",CkMyPe(),step());
 #ifdef _FAULT_MLOG_
 	msg->step = step();
 #endif
@@ -482,6 +487,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
   }    // end of for
 
   const int clients = CkNumValidPes();
+  DEBUGF(("THIS POINT count = %d, clients = %d\n",stats_msg_count,clients));
  
   if (stats_msg_count == clients) {
 	DEBUGF(("[%d] All stats messages received \n",CmiMyPe()));
@@ -909,6 +915,7 @@ void CentralLB::ResumeClients(int balancing)
 #if CMK_LBDB_ON
 #ifdef _FAULT_MLOG_
     resumeCount++;
+	CkPrintf("[%d] \n\n\n INCREMENTING THIS to %d  \n\n\n",CkMyPe(),resumeCount);
     globalResumeCount = resumeCount;
 #endif
   DEBUGF(("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing));
@@ -923,6 +930,7 @@ void CentralLB::ResumeClients(int balancing)
 #endif
 
   theLbdb->ResumeClients();
+CkPrintf("[%d] RIGHT HERE\n",CkMyPe());
   if (balancing)  {
     CheckMigrationComplete();
     if (future_migrates_expected == 0 || 
@@ -1227,6 +1235,11 @@ void CentralLB::pup(PUP::er &p) {
   if (p.isUnpacking())  {
     initLB(CkLBOptions(seqno)); 
   }
+#ifdef _FAULT_MLOG_
+	p | lbDecisionCount;
+    p | resumeCount;
+#endif
+	
 }
 
 int CentralLB::useMem() { 
