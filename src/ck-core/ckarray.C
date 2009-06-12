@@ -860,18 +860,12 @@ void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 /// Deliver a copy of the given broadcast to the given local element
 CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
 {
-	CkPrintf("[%d] OK 1\n",CkMyPe());
   int &elBcastNo=getData(el);
-	CkPrintf("[%d] OK 2\n",CkMyPe());
   // if this array element already received this message, skip it
   if (elBcastNo >= bcastNo) return CmiFalse;
   elBcastNo++;
   DEBB((AA"Delivering broadcast %d to element %s\n"AB,elBcastNo,idx2str(el)));
-	CkPrintf("[%d] OK 3\n",CkMyPe());
-	if(bcast == NULL) 
-	CkPrintf("[%d] OK 33\n",CkMyPe());
   int epIdx=bcast->array_ep_bcast();
-	CkPrintf("[%d] OK 4\n",CkMyPe());
 
 #ifdef _FAULT_MLOG_     
         DEBUG(printf("[%d] elBcastNo %d bcastNo %d \n",CmiMyPe(),bcastNo));
