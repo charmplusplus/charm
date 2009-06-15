@@ -77,14 +77,14 @@ extern int traceBluegeneLinked;
 #define TRACE_BG_ADD_TAG(str)	_TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgAddTag(str))
 
 # define TRACE_BG_AMPI_SUSPEND()     \
-        if(CpvAccess(traceOn)) traceSuspend();  \
-	_TRACE_BG_END_EXECUTE(1);
+	_TRACE_BG_END_EXECUTE(1); \
+        if(CpvAccess(traceOn)) traceSuspend();
 
 # define TRACE_BG_AMPI_START(t, str)  { \
         void* _bgParentLog = NULL;      \
         /*_TRACE_BG_TLINE_END(&_bgParentLog);*/ \
-        _TRACE_BG_BEGIN_EXECUTE_NOMSG(str, &_bgParentLog, 1);      \
         if(CpvAccess(traceOn) && t) CthTraceResume(t);  \
+        _TRACE_BG_BEGIN_EXECUTE_NOMSG(str, &_bgParentLog, 1);      \
         }
 
 # define TRACE_BG_AMPI_BREAK(t, str, event, count)  	\
