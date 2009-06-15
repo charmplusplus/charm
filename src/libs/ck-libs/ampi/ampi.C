@@ -1737,6 +1737,9 @@ MSG_ORDER_DEBUG(
     //IReq *ireq = (IReq *)CmmGet(posted_ireqs, 3, tags, sts);
     ireq = (IReq *)CmmGet(posted_ireqs, 3, tags, sts);
 #else
+#if CMK_BLUEGENE_CHARM
+    _TRACE_BG_TLINE_END(&msg->event);    // store current log
+#endif
     //in case ampi has not initialized and posted_ireqs are only inserted 
     //at AMPI_Irecv (MPI_Irecv)
     AmpiRequestList *reqL = &(parent->ampiReqs);
@@ -1910,6 +1913,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 //  dis->yield();
 //  processRemoteMlogMessages();
 #endif
+  int dosuspend = 0;
   while(1) {
       //This is done to take into account the case in which an ampi 
       // thread has migrated while waiting for a message
@@ -1917,6 +1921,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
     msg = (AmpiMsg *) CmmGet(dis->msgs, 3, tags, sts);
     if (msg) break;
     dis->thread->suspend();
+    dosuspend = 1;
     dis = getAmpiInstance(disComm);
   }
 
@@ -1944,7 +1949,14 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   //TRACE_BG_AMPI_RESUME(thread->getThread(), msg, "RECV_RESUME", &curLog, 1);
   //TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0);
   //_TRACE_BG_SET_INFO((char *)msg, "RECV_RESUME",  &curLog, 1);
-  TRACE_BG_ADD_TAG("RECV_RESUME");
+#if 0
+  if (!dosuspend) {
+    TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0);
+    _TRACE_BG_ADD_BACKWARD_DEP(msg->event);
+  }
+  else
+#endif
+  TRACE_BG_ADD_TAG("RECV_RESUME_THREAD");
 #endif
 
   delete msg;
@@ -3099,7 +3111,7 @@ int IReq::wait(MPI_Status *sts){
 		if(BgInOutOfCoreMode)
 		    return -1;
 	    #endif	
-	}
+	}   // end of while
 	ptr->resumeOnRecv=false;
 
 	AMPI_DEBUG("IReq::wait has resumed\n");
@@ -3117,9 +3129,6 @@ int IReq::wait(MPI_Status *sts){
 	if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
 		CkAbort("AMPI> Error in non-blocking request wait");
   }
-#if CMK_BLUEGENE_CHARM
-  	_TRACE_BG_TLINE_END(&event);
-#endif
 	return 0;
 }
 
@@ -3398,6 +3407,9 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
     length = msg->length;
     this->tag = msg->tag; // Although not required, we also extract tag from msg
     AMPI_DEBUG("Setting this->tag to %d in IReq::receive this=%p\n", (int)this->tag, this);
+#if CMK_BLUEGENE_CHARM
+    event = msg->event; 
+#endif
     delete msg;
     
     //BIGSIM_OOC DEBUGGING
