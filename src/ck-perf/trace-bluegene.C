@@ -89,8 +89,7 @@ void TraceBluegene::bgAddTag(const char* str){
 
 void TraceBluegene::bgDummyBeginExec(const char* name,void** parentLogPtr, int split)
 {
-  startVTimer();
-  if (!genTimeLog) return;
+  if (genTimeLog) {
   CmiAssert(parentLogPtr!=NULL);
   double startTime = BgGetCurTime();
   BgTimeLog* newLog = BgStartLogByName(tTIMELINEREC, _threadEP, name, startTime, *(BgTimeLog**)parentLogPtr);
@@ -101,6 +100,8 @@ void TraceBluegene::bgDummyBeginExec(const char* name,void** parentLogPtr, int s
   else
     if (split) newLog->objId = (*(BgTimeLog**)parentLogPtr)->objId;
   *parentLogPtr = newLog;
+  }
+  startVTimer();
 }
 
 void TraceBluegene::bgBeginExec(char* msg, char *name)
@@ -205,9 +206,11 @@ void TraceBluegene::getForwardDepForAll(void** logs1, void** logs2, int logsize,
 void TraceBluegene::addBackwardDep(void *log)
 {
   if(!genTimeLog || log==NULL) return;
+  double curT = BgGetTime();
   BgTimeLog  *parentLogPtr = BgLastLog(tTIMELINEREC);
   CmiAssert(parentLogPtr);
   BgAddBackwardDep(parentLogPtr, (BgTimeLog*)log);
+  resetVTime();     // bypass this time
 }
 
 void TraceBluegene::userBracketEvent(const char* name, double bt, double et, void** parentLogPtr){
