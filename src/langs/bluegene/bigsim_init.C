@@ -5,11 +5,9 @@
  * $Revision$
  *****************************************************************************/
 
-
-/*
-  File: Blue_init.C -- Converse BlueGene Emulator Code
-  Emulator written by Gengbin Zheng, gzheng@uiuc.edu on 5/16/2003
-*/ 
+/** \file: bigsim_init.C -- Converse BlueGene Emulator Code
+ *  Emulator written by Gengbin Zheng, gzheng@uiuc.edu on 5/16/2003
+ */
 
 #include <stdio.h>
 #include <string.h>
@@ -146,8 +144,8 @@ void BGMach::setNetworkModel(char *model)
         network = new DummyNetwork;
   else if (!strcmp(model, "lemieux"))
         network = new LemieuxNetwork;
-  else if (!strcmp(model, "bluegenel"))
-        network = new BlueGeneLNetwork;
+  else if (!strcmp(model, "bluegenep"))
+        network = new BlueGenePNetwork;
   else if (!strcmp(model, "bluegene"))
         network = new BlueGeneNetwork;
   else if (!strcmp(model, "redstorm"))

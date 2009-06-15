@@ -1,23 +1,22 @@
+/*****************************************************************************
+ * $Source$
+ * $Author$
+ * $Date$
+ * $Revision$
+ *****************************************************************************/
+
 #ifndef __BLUE_NETWORK_H
 #define __BLUE_NETWORK_H
-
-const double CHARM_OVERHEAD = 0.5E-6;    // time to enqueue a msg - 0.5 us
 
 class BigSimNetwork
 {
 protected:
   double alpha;
   const char *myname;
-  double intraNodeLat;
-  double intraNodeBW;
 public:
   inline double alphacost() { return alpha; }
-  inline double charmcost() { return CHARM_OVERHEAD; }
   inline const char *name() { return myname; }
-  inline void setIntraNodeLat(double lat) { intraNodeLat = lat; }
-  inline void setIntraNodeBW(double bw) { intraNodeBW = bw; }
   virtual double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) = 0;
-  virtual double intraNodeLatency(int srcPE, int destPE, int numBytes) = 0;
   virtual void print() = 0;
 };
 
@@ -27,13 +26,8 @@ public:
   DummyNetwork() { 
     myname = "dummy";
     alpha = 0.0;
-    intraNodeLat = 0.0;
-    intraNodeBW = 0.0;
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
-    return 0;
-  }
-  inline double intraNodeLatency(int srcPE, int destPE, int numBytes) {
     return 0;
   }
   void print() {
@@ -51,19 +45,10 @@ public:
   LemieuxNetwork() { 
     myname = "lemieux";
     bandwidth = BANDWIDTH; alpha = 8E-6; 
-    intraNodeLat = 0.0;
-    intraNodeBW = 0.0;
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
     if (ox == nx && oy == ny && oz == nz) return 0.0;    // same PE
     return bytes/bandwidth;
-  }
-  inline double intraNodeLatency(int srcPE, int destPE, int numBytes) {
-    if (srcPE == destPE) {
-      return 0;
-    } else {
-      return 0;  // check this
-    }
   }
   void print() {
     CmiPrintf("bandwidth: %e; alpha: %e.\n", bandwidth, alpha);
@@ -84,8 +69,6 @@ public:
     myname = "bluegene";
     alpha = 0.1E-6;    // 2E-6; 
     packetsize = PACKETSIZE;
-    intraNodeLat = 0.0;
-    intraNodeBW = 0.0;
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
     int numpackets;
@@ -98,33 +81,24 @@ public:
     if (bytes%packetsize) numpackets++;
     return  packetcost * numpackets;
   }
-  inline double intraNodeLatency(int srcPE, int destPE, int numBytes) {
-    if (srcPE == destPE) {
-      return 0;
-    } else {
-      return 0;  // check this
-    }
-  }
   void print() {
     CmiPrintf("alpha: %e	packetsize: %d	CYCLE_TIME_FACTOR:%e.\n", alpha, packetsize, CYCLE_TIME_FACTOR);
     CmiPrintf("CYCLES_PER_HOP: %d	CYCLES_PER_CORNER: %d.\n", CYCLES_PER_HOP, CYCLES_PER_CORNER);
   }
 };
 
-class BlueGeneLNetwork: public BigSimNetwork
+class BlueGenePNetwork: public BigSimNetwork
 {
 private:
   double bandwidth;
   int packetsize;
   double linkcost;
 public:
-  BlueGeneLNetwork() { 
-    myname = "bluegenel";
+  BlueGenePNetwork() { 
+    myname = "bluegenep";
     packetsize = 256;
-    bandwidth = 175E6; alpha = 2E-6; 
+    bandwidth = 425E6; alpha = 2E-6;
     linkcost = packetsize/bandwidth;
-    intraNodeLat = 0.0;
-    intraNodeBW = 0.0;
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
     int sx, sy, sz;
@@ -138,13 +112,6 @@ public:
     int numpackets = bytes/packetsize;
     if (bytes%packetsize) numpackets++;
     return  linkcost * hops * numpackets;
-  }
-  inline double intraNodeLatency(int srcPE, int destPE, int numBytes) {
-    if (srcPE == destPE) {
-      return 0;
-    } else {
-      return 0;  // check this
-    }
   }
   void print() {
     CmiPrintf("bandwidth: %e; alpha: %e.\n", bandwidth, alpha);
@@ -164,8 +131,6 @@ public:
     packetsize = PACKETSIZE;
     neighborlatency = 2e-6;
     hoplatency = 44.8e-9;
-    intraNodeLat = 0.0;
-    intraNodeBW = 0.0;
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
     if (ox == nx && oy == ny && oz == nz) return 0.0;    // same PE
@@ -174,13 +139,6 @@ public:
     int hops = xd+yd+zd;
     double packetcost = neighborlatency + hoplatency * hops + bytes * 1e-9;
     return packetcost;
-  }
-  inline double intraNodeLatency(int srcPE, int destPE, int numBytes) {
-    if (srcPE == destPE) {
-      return 0;
-    } else {
-      return 0;  // check this
-    }
   }
   void print() {
     CmiPrintf("alpha: %e	latency: %es	hop latency:%es.\n", alpha, neighborlatency, hoplatency);
@@ -197,26 +155,14 @@ public:
   IBMPowerNetwork() { 
     myname = "ibmpower";
     alpha = 1*1e-6;
-//    permsg = 2.5*1e-6;
+    // permsg = 2.5*1e-6;
     permsg = 2.5*(1e-6)*20;
-    //bandwidth = 12*1e9; 
+    // bandwidth = 12*1e9; 
     bandwidth = 1.7*1e9; 
-    intraNodeLat = 0.0;
-    intraNodeBW = 0.0;
   }
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
     if (ox == nx && oy == ny && oz == nz) return 0.0;    // same PE
     return permsg + bytes/bandwidth;
-  }
-  inline double intraNodeLatency(int srcPE, int destPE, int numBytes) {
-    return 0.0;
-/*
-    if (srcPE == destPE) {
-      return 0;
-    } else {
-      return (intraNodeLat + (numBytes / intraNodeBW));  // check this
-    }
-*/
   }
   void print() {
     CmiPrintf("alpha: %e	bandwidth :%e.\n", alpha, bandwidth);
@@ -238,8 +184,6 @@ public:
     bandwidth = 0.0;
     cost_per_packet = 0.0;
     packet_size = 0;
-    intraNodeLat = 0.0;
-    intraNodeBW = 0.0;
   }
   inline void set_latency(double lat) {alpha = lat;}
   inline void set_bandwidth(double bw) {bandwidth = bw;}
@@ -256,30 +200,6 @@ public:
       return (alpha + (bytes / bandwidth) + (cost_per_packet * num_packets));
     }
     return (alpha + (bytes / bandwidth));
-  }
-  inline double intraNodeLatency(int srcPE, int destPE, int numBytes) {
-    if (srcPE == destPE) {
-      return 0;
-    } else {
-/*
-      intra-node latency and bandwidth are already set correctly in
-      the SimpleLatency pgm.C file, so there's no need to do this
-      stuff here
-
-      double lat, bw;
-      if (intraNodeLat == 0.0) {
-	lat = CHARM_OVERHEAD;
-      } else {
-	lat = intraNodeLat;
-      }
-      if (intraNodeBW == 0.0) {
-	bw = bandwidth;
-      } else {
-	bw = intraNodeBW;
-      }
-*/
-      return (intraNodeLat + (numBytes / intraNodeBW));
-    }
   }
   void print() {
     CmiPrintf("alpha: %e, bandwidth: %e, cost per packet: %e, packet size: %d\n", 

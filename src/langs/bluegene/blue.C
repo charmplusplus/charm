@@ -5,11 +5,10 @@
  * $Revision$
  *****************************************************************************/
 
-
-/*
-  File: Blue.C -- Converse BlueGene Emulator Code
-  Emulator written by Gengbin Zheng, gzheng@uiuc.edu on 2/20/2001
-*/ 
+/** \file: blue.C -- Converse BlueGene Emulator Code
+ *  Emulator written by Gengbin Zheng, gzheng@uiuc.edu on 2/20/2001
+ */
+ 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -31,6 +30,8 @@
 
 #undef DEBUGLEVEL
 #define DEBUGLEVEL 10
+
+const double CHARM_OVERHEAD = 0.5E-6;
 
 /* node level variables */
 CpvDeclare(nodeInfo*, nodeinfo);		/* represent a bluegene node */
@@ -717,7 +718,7 @@ void sendPacket_(nodeInfo *myNode, int x, int y, int z, int threadID, int handle
   CmiBgMsgFlag(sendmsg) = 0;
   CmiBgMsgRefCount(sendmsg) = 0;
   if (local) {
-    if (correctTimeLog) BgAdvance(cva(bgMach).network->charmcost());
+    if (correctTimeLog) BgAdvance(CHARM_OVERHEAD);
     latency = 0.0;
   }
   else {
