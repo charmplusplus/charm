@@ -854,6 +854,9 @@ class AmpiMsg : public CMessage_AmpiMsg {
   int srcRank; //Communicator rank for source
   MPI_Comm comm; //Communicator for source
   int length; //Number of bytes in this message 
+#if CMK_BLUEGENE_CHARM
+  void *event;
+#endif
   char *data;
 
   AmpiMsg(void) { data = NULL; }
