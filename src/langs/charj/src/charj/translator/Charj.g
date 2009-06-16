@@ -690,13 +690,8 @@ newExpression
         (   primitiveType newArrayConstruction          // new static array of primitive type elements
             ->  ^(STATIC_ARRAY_CREATOR[$n, "STATIC_ARRAY_CREATOR"] primitiveType newArrayConstruction)
         |   genericTypeArgumentList? qualifiedTypeIdent
-                (   newArrayConstruction                // new static array of object type reference elements
-                    ->  ^(STATIC_ARRAY_CREATOR[$n, "STATIC_ARRAY_CREATOR"] 
-                        genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction)
-        |   arguments classBody?                        // new object type via constructor invocation
-                    ->  ^(CLASS_CONSTRUCTOR_CALL[$n, "STATIC_ARRAY_CREATOR"] genericTypeArgumentList? 
-                        qualifiedTypeIdent arguments classBody?)
-                )
+                newArrayConstruction                // new static array of object type reference elements
+            ->  ^(STATIC_ARRAY_CREATOR[$n, "STATIC_ARRAY_CREATOR"] genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction)
         )
     ;
     
