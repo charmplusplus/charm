@@ -87,7 +87,6 @@ scope ScopeStack; // default scope
         (packageDeclaration)? 
         (importDeclarations) 
         (typeDeclaration[$importDeclarations.packageNames]))
-        //(typeDeclaration)*)
         { $cs = $typeDeclaration.sym; }
     ;
 
@@ -96,7 +95,7 @@ packageDeclaration
 @init { 
     List<String> names = null; 
 }
-    :   ^(PACKAGE qualifiedIdentifier)  {
+    :   ^('package' qualifiedIdentifier)  {
             String packageName = $qualifiedIdentifier.text;
             PackageScope ps = symtab.resolvePackage(packageName);
             if (ps == null) {
@@ -113,15 +112,14 @@ importDeclarations returns [List<CharjAST> packageNames]
 @init {
 	packageNames = new ArrayList<CharjAST>();
 }
-    :   (^(IMPORT STATIC? qualifiedIdentifier DOTSTAR?)
+    :   (^('import' 'static'? qualifiedIdentifier './*'?)
 		{ packageNames.add($qualifiedIdentifier.start); })*
     ;
 
 
 typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
 scope ScopeStack; // top-level type scope
-    :   ^(CLASS m=modifierList IDENT g=genericTypeParameterList? 
-                e=classExtendsClause? i=implementsClause? c=classTopLevelScope) 
+    :   ^('class' IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
         {
             Scope outerScope = $ScopeStack[-1]::current;
             $sym = new ClassSymbol(symtab, $IDENT.text, null, outerScope);
@@ -133,72 +131,30 @@ scope ScopeStack; // top-level type scope
             $ScopeStack::current = $sym;
             importPackages($sym, $imports);
         }
-    |   ^(INTERFACE modifierList IDENT genericTypeParameterList? 
-                interfaceExtendsClause? interfaceTopLevelScope)
-    |   ^(ENUM modifierList IDENT implementsClause? enumTopLevelScope)
+    |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
+    |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;
 
-
-classExtendsClause
-    :   ^(EXTENDS_CLAUSE t=type) 
-    ;   
-
-interfaceExtendsClause 
-    :   ^(EXTENDS_CLAUSE (type)+) 
-    ;   
-    
-implementsClause
-    :   ^(IMPLEMENTS_CLAUSE type+)
-    ;
-        
-genericTypeParameterList
-    :   ^(GENERIC_TYPE_PARAM_LIST genericTypeParameter+)
-    ;
-
-genericTypeParameter
-    :   ^(IDENT bound?)
-    ;
-        
-bound
-    :   ^(EXTENDS_BOUND_LIST type+)
-    ;
-
-enumTopLevelScope
-    :   ^(ENUM_TOP_LEVEL_SCOPE enumConstant+ classTopLevelScope?)
-    ;
-    
 enumConstant
-    :   ^(IDENT arguments? classTopLevelScope?)
+    :   ^(IDENT arguments?)
     ;
     
-    
-classTopLevelScope
-    :   ^(CLASS_TOP_LEVEL_SCOPE (classScopeDeclarations)*) 
-    ;
-    
-classScopeDeclarations
-    :   ^(CLASS_INSTANCE_INITIALIZER block)
-    |   ^(CLASS_STATIC_INITIALIZER block)
-    |   ^(FUNCTION_METHOD_DECL m=modifierList g=genericTypeParameterList? 
+classScopeDeclaration
+    :   ^(FUNCTION_METHOD_DECL m=modifierList g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
-            tc=throwsClause? b=block?)
+            b=block?)
     |   ^(VOID_METHOD_DECL m=modifierList g=genericTypeParameterList? IDENT 
-            f=formalParameterList t=throwsClause? b=block?)
+            f=formalParameterList b=block?)
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
     |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
     |   ^(CONSTRUCTOR_DECL m=modifierList g=genericTypeParameterList? IDENT f=formalParameterList 
-            t=throwsClause? b=block)
-    |   d=typeDeclaration[null]
+            b=block)
     ;
     
-interfaceTopLevelScope
-    :   ^(INTERFACE_TOP_LEVEL_SCOPE interfaceScopeDeclarations*)
-    ;
-    
-interfaceScopeDeclarations
+interfaceScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL modifierList genericTypeParameterList? 
-            type IDENT formalParameterList arrayDeclaratorList? throwsClause?)
-    |   ^(VOID_METHOD_DECL modifierList genericTypeParameterList? IDENT formalParameterList throwsClause?)
+            type IDENT formalParameterList arrayDeclaratorList?)
+    |   ^(VOID_METHOD_DECL modifierList genericTypeParameterList? IDENT formalParameterList)
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
@@ -224,10 +180,6 @@ variableInitializer
     |   expression
     ;
 
-arrayDeclarator
-    :   LBRACK RBRACK
-    ;
-
 arrayDeclaratorList
     :   ^(ARRAY_DECLARATOR_LIST ARRAY_DECLARATOR*)  
     ;
@@ -236,8 +188,16 @@ arrayInitializer
     :   ^(ARRAY_INITIALIZER variableInitializer*)
     ;
 
-throwsClause
-    :   ^(THROWS_CLAUSE qualifiedIdentifier+)
+genericTypeParameterList
+    :   ^(GENERIC_TYPE_PARAM_LIST genericTypeParameter+)
+    ;
+
+genericTypeParameter
+    :   ^(IDENT bound?)
+    ;
+        
+bound
+    :   ^(EXTENDS_BOUND_LIST type+)
     ;
 
 modifierList
@@ -245,14 +205,12 @@ modifierList
     ;
 
 modifier
-    :   PUBLIC
-    |   PROTECTED
-    |   PRIVATE
-    |   ENTRY
-    |   ABSTRACT
-    |   NATIVE
-    |   SYNCHRONIZED
-    |   TRANSIENT
+    :   'public'
+    |   'protected'
+    |   'private'
+    |   'entry'
+    |   'abstract'
+    |   'native'
     |   localModifier
     ;
 
@@ -261,9 +219,9 @@ localModifierList
     ;
 
 localModifier
-    :   FINAL
-    |   STATIC
-    |   VOLATILE
+    :   'final'
+    |   'static'
+    |   'volatile'
     ;
 
 type
@@ -288,14 +246,14 @@ typeIdent
     ;
 
 primitiveType
-    :   BOOLEAN     { $start.symbol = new Symbol(symtab, "bool_primitive", symtab.resolveBuiltinType("bool")); }
-    |   CHAR        { $start.symbol = new Symbol(symtab, "char_primitive", symtab.resolveBuiltinType("char")); }
-    |   BYTE        { $start.symbol = new Symbol(symtab, "byte_primitive", symtab.resolveBuiltinType("char")); }
-    |   SHORT       { $start.symbol = new Symbol(symtab, "short_primitive", symtab.resolveBuiltinType("short")); }
-    |   INT         { $start.symbol = new Symbol(symtab, "int_primitive", symtab.resolveBuiltinType("int")); }
-    |   LONG        { $start.symbol = new Symbol(symtab, "long_primitive", symtab.resolveBuiltinType("long")); }
-    |   FLOAT       { $start.symbol = new Symbol(symtab, "float_primitive", symtab.resolveBuiltinType("float")); }
-    |   DOUBLE      { $start.symbol = new Symbol(symtab, "double_primitive", symtab.resolveBuiltinType("double")); }
+    :   'boolean'     { $start.symbol = new Symbol(symtab, "bool_primitive", symtab.resolveBuiltinType("bool")); }
+    |   'char'        { $start.symbol = new Symbol(symtab, "char_primitive", symtab.resolveBuiltinType("char")); }
+    |   'byte'        { $start.symbol = new Symbol(symtab, "byte_primitive", symtab.resolveBuiltinType("char")); }
+    |   'short'       { $start.symbol = new Symbol(symtab, "short_primitive", symtab.resolveBuiltinType("short")); }
+    |   'int'         { $start.symbol = new Symbol(symtab, "int_primitive", symtab.resolveBuiltinType("int")); }
+    |   'long'        { $start.symbol = new Symbol(symtab, "long_primitive", symtab.resolveBuiltinType("long")); }
+    |   'float'       { $start.symbol = new Symbol(symtab, "float_primitive", symtab.resolveBuiltinType("float")); }
+    |   'double'      { $start.symbol = new Symbol(symtab, "double_primitive", symtab.resolveBuiltinType("double")); }
     ;
 
 genericTypeArgumentList
@@ -304,12 +262,7 @@ genericTypeArgumentList
     
 genericTypeArgument
     :   type
-    |   ^(QUESTION genericWildcardBoundType?)
-    ;
-
-genericWildcardBoundType                                                                                                                      
-    :   ^(EXTENDS type)
-    |   ^(SUPER type)
+    |   '?'
     ;
 
 formalParameterList
@@ -324,9 +277,11 @@ formalParameterVarargDecl
     :   ^(FORMAL_PARAM_VARARG_DECL localModifierList type variableDeclaratorId)
     ;
     
+// FIXME: is this rule right? Verify that this is ok, I expected something like:
+// IDENT (^('.' qualifiedIdentifier IDENT))*
 qualifiedIdentifier
     :   IDENT
-    |   ^(DOT qualifiedIdentifier IDENT)
+    |   ^('.' qualifiedIdentifier IDENT)
     ;
     
 block
@@ -335,7 +290,6 @@ block
     
 blockStatement
     :   localVariableDeclaration
-    |   typeDeclaration[null]
     |   statement
     ;
     
@@ -344,47 +298,41 @@ localVariableDeclaration
     |   ^(OBJECT_VAR_DECLARATION localModifierList objectType variableDeclaratorList)
     ;
 
-
 statement
     :   block
-    |   ^(ASSERT expression expression?)
-    |   ^(IF parenthesizedExpression statement statement?)
-    |   ^(FOR forInit forCondition forUpdater statement)
+    |   ^('assert' expression expression?)
+    |   ^('if' parenthesizedExpression statement statement?)
+    |   ^('for' forInit expression? expression* statement)
     |   ^(FOR_EACH localModifierList type IDENT expression statement) 
-    |   ^(WHILE parenthesizedExpression statement)
-    |   ^(DO statement parenthesizedExpression)
-    |   ^(TRY block catches? block?)  // The second optional block is the optional finally block.
-    |   ^(SWITCH parenthesizedExpression switchBlockLabels)
-    |   ^(SYNCHRONIZED parenthesizedExpression block)
-    |   ^(RETURN expression?)
-    |   ^(THROW expression)
-    |   ^(BREAK IDENT?) {
+    |   ^('while' parenthesizedExpression statement)
+    |   ^('do' statement parenthesizedExpression)
+    |   ^('switch' parenthesizedExpression switchCaseLabel*)
+    |   ^('return' expression?)
+    |   ^('throw' expression)
+    |   ^('break' IDENT?) {
             if ($IDENT != null) {
                 translator.error(this, "Labeled break not supported yet, ignoring.", $IDENT);
             }
         }
-    |   ^(CONTINUE IDENT?) {
+    |   ^('continue' IDENT?) {
             if ($IDENT != null) {
                 translator.error(this, "Labeled continue not supported yet, ignoring.", $IDENT);
             }
         }
     |   ^(LABELED_STATEMENT IDENT statement)
     |   expression
-    |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
-    |   SEMI // Empty statement.
+    |   ^('embed' STRING_LITERAL EMBED_BLOCK)
+    |   ';' // Empty statement.
     ;
         
-catches
-    :   ^(CATCH_CLAUSE_LIST catchClause+)
+switchCaseLabel
+    :   ^('case' expression blockStatement*)
+    |   ^('default' blockStatement*)
     ;
     
-catchClause
-    :   ^(CATCH formalParameterStandardDecl block)
-    ;
-
-switchCaseLabel
-    :   ^(CASE expression blockStatement*)
-    |   ^(DEFAULT blockStatement*)
+forInit
+    :   localVariableDeclaration 
+    |   expression+
     ;
     
 // EXPRESSIONS
@@ -398,63 +346,58 @@ expression
     ;
 
 expr
-    :   ^(ASSIGN expr expr)
-    |   ^(PLUS_ASSIGN expr expr)
-    |   ^(MINUS_ASSIGN expr expr)
-    |   ^(STAR_ASSIGN expr expr)
-    |   ^(DIV_ASSIGN expr expr)
-    |   ^(AND_ASSIGN expr expr)
-    |   ^(OR_ASSIGN expr expr)
-    |   ^(XOR_ASSIGN expr expr)
-    |   ^(MOD_ASSIGN expr expr)
-    |   ^(BIT_SHIFT_RIGHT_ASSIGN expr expr)
-    |   ^(SHIFT_RIGHT_ASSIGN expr expr)
-    |   ^(SHIFT_LEFT_ASSIGN expr expr)
-    |   ^(QUESTION expr expr expr)
-    |   ^(LOGICAL_OR expr expr)
-    |   ^(LOGICAL_AND expr expr)
-    |   ^(OR expr expr)
-    |   ^(XOR expr expr)
-    |   ^(AND expr expr)
-    |   ^(EQUAL expr expr)
-    |   ^(NOT_EQUAL expr expr)
-    |   ^(INSTANCEOF expr type)
-    |   ^(LESS_OR_EQUAL expr expr)
-    |   ^(GREATER_OR_EQUAL expr expr)
-    |   ^(BIT_SHIFT_RIGHT expr expr)
-    |   ^(SHIFT_RIGHT expr expr)
-    |   ^(GREATER_THAN expr expr)
-    |   ^(SHIFT_LEFT expr expr)
-    |   ^(LESS_THAN expr expr)
-    |   ^(PLUS expr expr)
-    |   ^(MINUS expr expr)
-    |   ^(STAR expr expr)
-    |   ^(DIV expr expr)
-    |   ^(MOD expr expr)
+    :   ^('=' expr expr)
+    |   ^('+=' expr expr)
+    |   ^('-=' expr expr)
+    |   ^('*=' expr expr)
+    |   ^('/=' expr expr)
+    |   ^('&=' expr expr)
+    |   ^('|=' expr expr)
+    |   ^('^=' expr expr)
+    |   ^('%=' expr expr)
+    |   ^('>>>=' expr expr)
+    |   ^('>>=' expr expr)
+    |   ^('<<=' expr expr)
+    |   ^('?' expr expr expr)
+    |   ^('||' expr expr)
+    |   ^('&&' expr expr)
+    |   ^('|' expr expr)
+    |   ^('^' expr expr)
+    |   ^('&' expr expr)
+    |   ^('==' expr expr)
+    |   ^('!=' expr expr)
+    |   ^('instanceof' expr type)
+    |   ^('<=' expr expr)
+    |   ^('>=' expr expr)
+    |   ^('>>>' expr expr)
+    |   ^('>>' expr expr)
+    |   ^('>' expr expr)
+    |   ^('<<' expr expr)
+    |   ^('<' expr expr)
+    |   ^('+' expr expr)
+    |   ^('-' expr expr)
+    |   ^('*' expr expr)
+    |   ^('/' expr expr)
+    |   ^('%' expr expr)
     |   ^(UNARY_PLUS expr)
     |   ^(UNARY_MINUS expr)
     |   ^(PRE_INC expr)
     |   ^(PRE_DEC expr)
     |   ^(POST_INC expr)
     |   ^(POST_DEC expr)
-    |   ^(NOT expr)
-    |   ^(LOGICAL_NOT expr)
+    |   ^('~' expr)
+    |   ^('!' expr)
     |   ^(CAST_EXPR type expr)
     |   primaryExpression
     ;
     
 primaryExpression
-    :   ^(  DOT
-            (   primaryExpression
+    :   ^(  '.' primaryExpression
                 (   IDENT
-                |   THIS
-                |   SUPER
-                |   innerNewExpression
-                |   CLASS
+                |   'this'
+                |   'super'
+                |   'class'
                 )
-            |   primitiveType CLASS
-            |   VOID CLASS
-            )
         )
     |   parenthesizedExpression
     |   IDENT
@@ -463,9 +406,9 @@ primaryExpression
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
     |   literal
     |   newExpression
-    |   THIS
+    |   'this'
     |   arrayTypeDeclarator
-    |   SUPER
+    |   'super'
     ;
     
 explicitConstructorCall
@@ -483,13 +426,8 @@ newExpression
             |   genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction
             )
         )
-    |   ^(CLASS_CONSTRUCTOR_CALL genericTypeArgumentList? qualifiedTypeIdent arguments classTopLevelScope?)
     ;
 
-innerNewExpression // something like 'InnerType innerType = outer.new InnerType();'
-    :   ^(CLASS_CONSTRUCTOR_CALL genericTypeArgumentList? IDENT arguments classTopLevelScope?)
-    ;
-    
 newArrayConstruction
     :   arrayDeclaratorList arrayInitializer
     |   expression+ arrayDeclaratorList?
