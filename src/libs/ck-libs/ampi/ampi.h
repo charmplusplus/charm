@@ -210,7 +210,7 @@ extern MPI_Comm MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS];
 struct AmpiMsg;
 typedef int MPI_Request;
 typedef struct {
-  int MPI_TAG, MPI_SOURCE, MPI_COMM, MPI_LENGTH;
+  int MPI_TAG, MPI_SOURCE, MPI_COMM, MPI_LENGTH, MPI_ERROR; /* FIXME: MPI_ERROR is never used */
   struct AmpiMsg *msg;
 } MPI_Status;
 
@@ -218,6 +218,7 @@ typedef struct {
 #define MPI_STATUS_IGNORE (MPI_Status *)0
 
 typedef int MPI_Errhandler;
+#define MPI_ERRHANDLER_NULL     0
 #define MPI_ERRORS_RETURN	1
 #define MPI_ERRORS_ARE_FATAL	2
 
@@ -256,6 +257,7 @@ typedef void (*MPI_PupFn)(pup_er, void*);
 
 /********************** MPI-1.1 Functions ***************************/
 /***pt2pt***/
+#define MPI_BSEND_OVERHEAD 0
 #define MPI_Send AMPI_Send
 int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
              int tag, MPI_Comm comm);
@@ -278,6 +280,7 @@ int AMPI_Isend(void *buf, int count, MPI_Datatype datatype, int dest,
               int tag, MPI_Comm comm, MPI_Request *request);
 #define MPI_Ibsend AMPI_Isend
 #define MPI_Issend AMPI_Isend	/* FIXME: see MPI_Ssend */
+#define MPI_Irsend AMPI_Isend   /* FIXME: see MPI_Rsend */
 #define MPI_Irecv AMPI_Irecv
 int AMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int src,
               int tag, MPI_Comm comm, MPI_Request *request);
@@ -303,8 +306,8 @@ int AMPI_Testsome(int incount, MPI_Request *array_of_requests, int *outcount,
 int AMPI_Request_free(MPI_Request *request);
 #define MPI_Cancel AMPI_Cancel
 int AMPI_Cancel(MPI_Request *request);
-/* #define MPI_Test_cancelled AMPI_Test_cancelled
-int AMPI_Test_cancelled(MPI_Status *status, int *flag); */
+#define MPI_Test_cancelled AMPI_Test_cancelled
+int AMPI_Test_cancelled(MPI_Status *status, int *flag);  /* FIXME: always returns success */
 #define MPI_Iprobe AMPI_Iprobe
 int AMPI_Iprobe(int src, int tag, MPI_Comm comm, int *flag, MPI_Status *sts);
 #define MPI_Probe AMPI_Probe

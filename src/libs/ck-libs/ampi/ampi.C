@@ -3547,6 +3547,13 @@ int AMPI_Cancel(MPI_Request *request){
 }
 
 CDECL
+int AMPI_Test_cancelled(MPI_Status* status, int* flag) {
+    /* FIXME: always returns success */
+    *flag = 1;
+    return 0;
+}
+
+CDECL
 int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
                    MPI_Comm comm, MPI_Request *req)
 {
@@ -4695,7 +4702,11 @@ int AMPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count){
   AMPIAPI("AMPI_Get_count");
   CkDDT_DataType* dttype = getDDT()->getType(dtype);
   int itemsize = dttype->getSize() ;
-  *count = sts->MPI_LENGTH/itemsize;
+  if (itemsize == 0) {
+      *count = 0;
+  } else {
+      *count = sts->MPI_LENGTH/itemsize;
+  }
   return 0;
 }
 
