@@ -17,10 +17,6 @@ options {
 
 tokens {
 
-    // Charj-specific keywords
-    EMBED                   = 'embed'           ;
-    ENTRY                   = 'entry'           ;
-
     // C++ keywords that aren't used in charj. 
     // We don't use these ourselves, but they're still reserved
     ASM                     = 'asm'             ;
@@ -232,29 +228,6 @@ interfaceFieldDeclarator
         ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer)
     ;
 
-genericTypeParameterList
-    :   lt='<' genericTypeParameter (',' genericTypeParameter)* genericTypeListClosing
-        ->  ^(GENERIC_TYPE_PARAM_LIST[$lt, "GENERIC_TYPE_PARAM_LIST"] genericTypeParameter+)
-    ;
-
-// This hack is fairly dirty - we just bite off some angle brackets and don't
-// actually match up opening and closing brackets.
-genericTypeListClosing  
-    :   '>'
-    |   '>>'
-    |   '>>>'
-    |
-    ;
-
-genericTypeParameter
-    :   IDENT bound?
-        ->  ^(IDENT bound?)
-    ;
-
-bound
-    :   e='extends' type ('&' type)*
-        ->  ^(EXTENDS_BOUND_LIST[$e, "EXTENDS_BOUND_LIST"] type+)
-    ;
 
 variableDeclaratorId
     :   IDENT^ arrayDeclaratorList?
@@ -278,6 +251,30 @@ arrayDeclaratorList
 arrayInitializer
     :   lc='{' (variableInitializer (',' variableInitializer)* ','?)? '}'
         ->  ^(ARRAY_INITIALIZER[$lc, "ARRAY_INITIALIZER"] variableInitializer*)
+    ;
+
+genericTypeParameterList
+    :   lt='<' genericTypeParameter (',' genericTypeParameter)* genericTypeListClosing
+        ->  ^(GENERIC_TYPE_PARAM_LIST[$lt, "GENERIC_TYPE_PARAM_LIST"] genericTypeParameter+)
+    ;
+
+// This hack is fairly dirty - we just bite off some angle brackets and don't
+// actually match up opening and closing brackets.
+genericTypeListClosing  
+    :   '>'
+    |   '>>'
+    |   '>>>'
+    |
+    ;
+
+genericTypeParameter
+    :   IDENT bound?
+        ->  ^(IDENT bound?)
+    ;
+
+bound
+    :   e='extends' type ('&' type)*
+        ->  ^(EXTENDS_BOUND_LIST[$e, "EXTENDS_BOUND_LIST"] type+)
     ;
 
 modifierList
@@ -420,7 +417,7 @@ statement
             ->  ^('if' parenthesizedExpression $ifStat)
         )   
     |   f='for' '('
-        (   forInit? ';' expression? ';' expressionList ')' statement
+        (   forInit? ';' expression? ';' expressionList? ')' statement
             -> ^($f forInit expression? expressionList statement)
         |   localModifierList type IDENT ':' expression ')' statement
             -> ^(FOR_EACH[$f, "FOR_EACH"] localModifierList type IDENT expression statement)
@@ -441,8 +438,8 @@ statement
         ->  ^('continue' IDENT?)
     |   IDENT ':' statement
         ->  ^(LABELED_STATEMENT IDENT statement)
-    |   EMBED STRING_LITERAL EMBED_BLOCK
-        ->  ^(EMBED STRING_LITERAL EMBED_BLOCK)
+    |   'embed' STRING_LITERAL EMBED_BLOCK
+        ->  ^('embed' STRING_LITERAL EMBED_BLOCK)
     |   expression ';'!
     |   ';' // Preserve empty statements.
     ;           
