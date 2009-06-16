@@ -23,76 +23,11 @@ package charj.translator;
 
 @members {
     SymbolTable symtab = null;
-
     PackageScope currentPackage = null;
     ClassSymbol currentClass = null;
     MethodSymbol currentMethod = null;
     LocalScope currentLocalScope = null;
-
     Translator translator;
-
-    boolean m_messageCollectionEnabled = false;
-    private boolean m_hasErrors = false;
-    List<String> m_messages;
-
-    /**
-     *  Switches error message collection on or off.
-     *
-     *  The standard destination for parser error messages is 
-     *  <code>System.err</code>.
-     *  However, if <code>true</code> gets passed to this method this default
-     *  behaviour will be switched off and all error messages will be collected
-     *  instead of written to anywhere.
-     *
-     *  The default value is <code>false</code>.
-     *
-     *  @param newState  <code>true</code> if error messages should be collected.
-     */
-    public void enableErrorMessageCollection(boolean newState) {
-        m_messageCollectionEnabled = newState;
-        if (m_messages == null && m_messageCollectionEnabled) {
-            m_messages = new ArrayList<String>();
-        }
-    }
-    
-    /**
-     *  Collects an error message or passes the error message to <code>
-     *  super.emitErrorMessage(...)</code>.
-     *
-     *  The actual behaviour depends on whether collecting error messages
-     *  has been enabled or not.
-     *
-     *  @param message  The error message.
-     */
-     @Override
-    public void emitErrorMessage(String message) {
-        if (m_messageCollectionEnabled) {
-            m_messages.add(message);
-        } else {
-            super.emitErrorMessage(message);
-        }
-    }
-    
-    /**
-     *  Returns collected error messages.
-     *
-     *  @return  A list holding collected error messages or <code>null</code> if
-     *           collecting error messages hasn't been enabled. Of course, this
-     *           list may be empty if no error message has been emited.
-     */
-    public List<String> getMessages() {
-        return m_messages;
-    }
-    
-    /**
-     *  Tells if parsing a Charj source has caused any error messages.
-     *
-     *  @return  <code>true</code> if parsing a Charj source has caused at 
-     *           least one error message.
-     */
-    public boolean hasErrors() {
-        return m_hasErrors;
-    }
 
     /**
      *  Test a list of CharjAST nodes to see if any of them has the given token
@@ -126,8 +61,17 @@ package charj.translator;
             }
         }
     }
-
 }
+
+
+// Replace default ANTLR generated catch clauses with this action, allowing early failure.
+@rulecatch {
+    catch (RecognitionException re) {
+        reportError(re);
+        throw re;
+    }
+}
+
 
 // Starting point for parsing a Charj file.
 charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
@@ -186,7 +130,7 @@ scope ScopeStack; // top-level type scope
             $sym.definitionTokenStream = input.getTokenStream();
             $IDENT.symbol = $sym;
             $ScopeStack::current = $sym;
-			importPackages($sym, $imports);
+            importPackages($sym, $imports);
         }
     |   ^(INTERFACE modifierList IDENT genericTypeParameterList? 
                 interfaceExtendsClause? interfaceTopLevelScope)
@@ -576,3 +520,4 @@ literal
     |   FALSE
     |   NULL
     ;
+

@@ -27,8 +27,8 @@ charjSource_h(pd, ids, tds, cb) ::=
 
 charjSource_cc(pd, ids, tds, cb) ::= 
 <<
-<pd>
 <ids>
+<pd>
 <tds>
 <cb>
 
@@ -42,7 +42,7 @@ namespace <ids; separator=" { namespace "> {
 importDeclaration_cc_h(inc_id, use_id) ::= 
 <<
 #include \<<inc_id>\>
-//using <use_id>;
+using <use_id>;
 >>
 
 classExtends_ci(type) ::= "<type>"

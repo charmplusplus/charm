@@ -17,6 +17,7 @@ options {
 package charj.translator;
 }
 
+
 @members {
     SymbolTable symtab_ = null;
 
@@ -26,78 +27,37 @@ package charj.translator;
     LocalScope currentLocalScope_ = null;
 
     Translator translator_;
-
     OutputMode mode_;
-    boolean messageCollectionEnabled_ = false;
-    private boolean hasErrors_ = false;
-    List<String> messages_;
 
     private boolean emitCC() { return mode_ == OutputMode.cc; }
     private boolean emitCI() { return mode_ == OutputMode.ci; }
     private boolean emitH() { return mode_ == OutputMode.h; }
 
     /**
-     *  Switches error message collection on or off.
-     *
-     *  The standard destination for parser error messages is 
-     *  <code>System.err</code>.
-     *  However, if <code>true</code> gets passed to this method this default
-     *  behaviour will be switched off and all error messages will be collected
-     *  instead of written to anywhere.
-     *
-     *  The default value is <code>false</code>.
-     *
-     *  @param newState  <code>true</code> if error messages should be collected.
+     *  Override ANTLR's token mismatch behavior so we throw exceptions early.
      */
-    public void enableErrorMessageCollection(boolean newState) {
-        messageCollectionEnabled_ = newState;
-        if (messages_ == null && messageCollectionEnabled_) {
-            messages_ = new ArrayList<String>();
-        }
+    protected void mismatch(IntStream input, int ttype, BitSet follow)
+        throws RecognitionException {
+        throw new MismatchedTokenException(ttype, input);
     }
-    
+
     /**
-     *  Collects an error message or passes the error message to <code>
-     *  super.emitErrorMessage(...)</code>.
-     *
-     *  The actual behaviour depends on whether collecting error messages
-     *  has been enabled or not.
-     *
-     *  @param message  The error message.
+     *  Override ANTLR's set mismatch behavior so we throw exceptions early.
      */
-     @Override
-    public void emitErrorMessage(String message) {
-        if (messageCollectionEnabled_) {
-            messages_.add(message);
-        } else {
-            super.emitErrorMessage(message);
-        }
-    }
-    
-    /**
-     *  Returns collected error messages.
-     *
-     *  @return  A list holding collected error messages or <code>null</code> if
-     *           collecting error messages hasn't been enabled. Of course, this
-     *           list may be empty if no error message has been emited.
-     */
-    public List<String> getMessages() {
-        return messages_;
-    }
-    
-    /**
-     *  Tells if parsing a Charj source has caused any error messages.
-     *
-     *  @return  <code>true</code> if parsing a Charj source has caused at 
-     *           least one error message.
-     */
-    public boolean hasErrors() {
-        return hasErrors_;
+    public Object recoverFromMismatchedSet(IntStream input, RecognitionException e, BitSet follow)
+        throws RecognitionException {
+        throw e;
     }
 
     /**
      *  Test a list of CharjAST nodes to see if any of them has the given token
-     *  type.
+     *  t// Replace default ANTLR generated catch clauses with this action, allowing early failure.
+@rulecatch {
+    catch (RecognitionException re) {
+        reportError(re);
+        throw re;
+    }
+}ype.
      */
     public boolean listContainsToken(List<CharjAST> list, int tokenType) {
         for (CharjAST node : list) {
@@ -107,8 +67,17 @@ package charj.translator;
         }
         return false;
     }
-
 }
+
+
+// Replace default ANTLR generated catch clauses with this action, allowing early failure.
+@rulecatch {
+    catch (RecognitionException re) {
+        reportError(re);
+        throw re;
+    }
+}
+
 
 // Starting point for parsing a Charj file.
 charjSource[SymbolTable symtab, OutputMode m]
@@ -154,10 +123,19 @@ packageDeclaration
     ;
     
 importDeclaration
+@init {
+    String importID = null;
+}
     :   ^(IMPORT STATIC? qualifiedIdentifier DOTSTAR?)
+        {
+            importID = $qualifiedIdentifier.text;
+            if ($DOTSTAR != null) {
+            }
+        }
+        {$DOTSTAR == null}? // TODO: add support for importing x.*
         -> {(emitCC() || emitH())}? importDeclaration_cc_h(
-            inc_id={$qualifiedIdentifier.text.replace(".","/")},
-            use_id={$qualifiedIdentifier.text.replace(".","::")})
+            inc_id={importID.replace(".","/")},
+            use_id={importID.replace(".","::")})
         ->
     ;
     

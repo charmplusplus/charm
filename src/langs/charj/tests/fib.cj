@@ -1,5 +1,5 @@
 package tests;
-import charj.lang.*;
+import charj.lang.Chare;
 
 public class Fib extends Chare {
     Fib parent_;

@@ -216,7 +216,7 @@ tokens {
     TYPE;
     UNARY_MINUS;
     UNARY_PLUS;
-    PRIMITIVE_VAR_DECLARATION;
+    PRIMITIVE_VAR_DECLARATIO$ScopeStack::current = ps;N;
     OBJECT_VAR_DECLARATION;
     VAR_DECLARATOR;
     VAR_DECLARATOR_LIST;
@@ -228,68 +228,6 @@ package charj.translator;
 }
 
 @members {
-    
-    private boolean mMessageCollectionEnabled = false;
-    private boolean mHasErrors = false;
-    private List<String> mMessages;
-
-    /**
-     *  Switches error message collection on or of.
-     *
-     *  The standard destination for parser error messages is <code>System.err</code>.
-     *  However, if <code>true</code> gets passed to this method this default
-     *  behaviour will be switched off and all error messages will be collected
-     *  instead of written to anywhere.
-     *
-     *  The default value is <code>false</code>.
-     *
-     *  @param pNewState  <code>true</code> if error messages should be collected.
-     */
-    public void enableErrorMessageCollection(boolean pNewState) {
-        mMessageCollectionEnabled = pNewState;
-        if (mMessages == null && mMessageCollectionEnabled) {
-            mMessages = new ArrayList<String>();
-        }
-    }
-    
-    /**
-     *  Collects an error message or passes the error message to <code>
-     *  super.emitErrorMessage(...)</code>.
-     *
-     *  The actual behaviour depends on whether collecting error messages
-     *  has been enabled or not.
-     *
-     *  @param pMessage  The error message.
-     */
-     @Override
-    public void emitErrorMessage(String pMessage) {
-        if (mMessageCollectionEnabled) {
-            mMessages.add(pMessage);
-        } else {
-            super.emitErrorMessage(pMessage);
-        }
-    }
-    
-    /**
-     *  Returns collected error messages.
-     *
-     *  @return  A list holding collected error messages or <code>null</code> if
-     *           collecting error messages hasn't been enabled. Of course, this
-     *           list may be empty if no error message has been emited.
-     */
-    public List<String> getMessages() {
-        return mMessages;
-    }
-    
-    /**
-     *  Tells if parsing a Charj source has caused any error messages.
-     *
-     *  @return  <code>true</code> if parsing a Charj source has caused at least
-     *           one error message.
-     */
-    public boolean hasErrors() {
-        return mHasErrors;
-    }
 }
 
 @lexer::header {
@@ -297,14 +235,6 @@ package charj.translator;
 }
 
 @lexer::members {
-/** 
- *  Determines if whitespaces and comments should be preserved or thrown away.
- *
- *  If <code>true</code> whitespaces and comments will be preserved within the
- *  hidden channel, otherwise the appropriate tokens will be skiped. This is
- *  a 'little bit' expensive.
- */
-public boolean preserveWhitespacesAndComments = true;
 }
 
 // Starting point for parsing a Charj file.
@@ -1157,11 +1087,7 @@ CHARJ_ID_PART
 
 WS  :  (' '|'\r'|'\t'|'\u000C'|'\n') 
     {   
-        if (!preserveWhitespacesAndComments) {
-            skip();
-        } else {
-            $channel = HIDDEN;
-        }
+        $channel = HIDDEN;
     }
     ;
 
@@ -1174,21 +1100,13 @@ EMBED_BLOCK
 COMMENT
     :   '/*' ( options {greedy=false;} : . )* '*/'
     {   
-        if (!preserveWhitespacesAndComments) {
-            skip();
-        } else {
-            $channel = HIDDEN;
-        }
+        $channel = HIDDEN;
     }
     ;
 
 LINE_COMMENT
     : '//' ~('\n'|'\r')* '\r'? '\n'
     {   
-        if (!preserveWhitespacesAndComments) {
-            skip();
-        } else {
-            $channel = HIDDEN;
-        }
+        $channel = HIDDEN;
     }
     ;
