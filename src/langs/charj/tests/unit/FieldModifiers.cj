@@ -1,6 +1,7 @@
 package tests.unit;
 
 public class FieldModifiers {
+    int z;
     public int i;
     private int j;
     static int k;
