@@ -82,8 +82,8 @@ public class SymbolTable {
         String outerPackageName = packageNames[0];
         PackageScope outerPackage = (PackageScope)defaultPkg.resolve(
                 outerPackageName);
-        if ( outerPackage == null ) {
-            if ( debug() ) {
+        if (outerPackage == null) {
+            if (debug()) {
                 System.out.println(
                         " SymbolTable.definePackage(" + packageName + 
                         "): defining outer pkg: " + outerPackageName);
@@ -118,7 +118,7 @@ public class SymbolTable {
      *  not in sym tab, return null.
      */
     public PackageScope resolvePackage(String packageName) {
-        if ( debug() ) System.out.println(
+        if (debug()) System.out.println(
                 " SymbolTable.resolvePackage(" + packageName + 
                 "): examine: " + topLevelPackageScopes.keySet());
         String[] packageNames = packageName.split("[.]");
@@ -126,8 +126,8 @@ public class SymbolTable {
         PackageScope enclosingPackage = topLevelPackageScopes.get(
                 outerPackageName);
 
-        if ( enclosingPackage==null ) {
-            if ( debug() ) System.out.println(
+        if (enclosingPackage == null) {
+            if (debug()) System.out.println(
                     " SymbolTable.resolvePackage(" + packageName + 
                     "): outer package " +
                     outerPackageName + " not found in top level " +
@@ -135,7 +135,7 @@ public class SymbolTable {
             return null;
         }
 
-        if ( packageNames.length==1 ) {
+        if (packageNames.length==1) {
             return enclosingPackage; // top-level package
         }
 
@@ -143,8 +143,8 @@ public class SymbolTable {
         for (int i=1; i<packageNames.length; i++) {
             String pname = packageNames[i];
             p = (PackageScope)enclosingPackage.resolve(pname);
-            if ( p==null ) {
-                if ( debug() ) System.out.println(
+            if (p == null) {
+                if (debug()) System.out.println(
                         " SymbolTable.resolvePackage(" + packageName +
                         "): not found in " + topLevelPackageScopes.keySet());
                 return null;
@@ -152,7 +152,7 @@ public class SymbolTable {
             enclosingPackage = p;
         }
 
-        if ( p!=null && debug() ) System.out.println(
+        if (p!=null && debug()) System.out.println(
                 " SymbolTable.resolvePackage(" + packageName + "): found in " +
                 topLevelPackageScopes.keySet());
         return p;
@@ -168,7 +168,7 @@ public class SymbolTable {
 
     // TODO:  shouldn't we include the arguments and do all mangling here?
     public static String mangle(String methodName) {
-        if ( METHOD_NAMES_TO_MANGLE.contains(methodName) ) {
+        if (METHOD_NAMES_TO_MANGLE.contains(methodName)) {
             return "cj" + methodName;
         }
         return methodName;
@@ -178,14 +178,14 @@ public class SymbolTable {
         // this is not perfect because perhaps someone makes a method called
         // mtoString() etc.
         String unmangled = methodName.substring(2, methodName.length());
-        if ( METHOD_NAMES_TO_MANGLE.contains(unmangled) ) {
+        if (METHOD_NAMES_TO_MANGLE.contains(unmangled)) {
             return unmangled;
         }
         return methodName;
     }
 
     public static String getCharjTypeName(String className) {
-        if ( SymbolTable.TYPE_NAMES_TO_MANGLE.contains(className) ) {
+        if (SymbolTable.TYPE_NAMES_TO_MANGLE.contains(className)) {
             return "cj"+className;
         }
         return className;
@@ -195,3 +195,4 @@ public class SymbolTable {
         return scopes.toString();
     }
 }
+
