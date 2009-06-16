@@ -133,6 +133,14 @@ scope ScopeStack; // top-level type scope
         }
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
+    |   ^(chareType IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
+    |   ^('chare_array' ARRAY_DIMENSION IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
+    ;
+
+chareType
+    :   'chare'
+    |   'group'
+    |   'nodegroup'
     ;
 
 enumConstant

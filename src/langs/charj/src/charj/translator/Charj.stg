@@ -81,24 +81,6 @@ interfaceExtends(ts) ::=
 >>
 
 
-classDeclaration_ci(ident, ext, csds) ::=
-<<
-<if(debug)>/* \<typeDeclaration> */<endif>
-module <ident> {
-<if(ext)>
-    extern module <ext>;
-    chare <ident>: <ext> {
-<else>
-    chare <ident> {
-<endif>
-        <csds; separator="\n">
-    }
-}
-<if(debug)>/* \</typeDeclaration> */<endif>
-
->>
-
-
 classDeclaration_h(ident, ext, csds) ::=
 <<
 <if(debug)>/* \<typeDeclaration> */<endif>
@@ -109,7 +91,6 @@ class <ident>: public CBase_<ident> {
     <csds; separator="\n">
 };
 <if(debug)>/* \</typeDeclaration> */<endif>
-
 
 >>
 
@@ -126,6 +107,24 @@ class <ident>: public CBase_<ident> {
 #include "<ident>.def.h"
 <if(debug)>/* \</typeDeclaration> */<endif>
 
+>>
+
+
+charedeclaration_ci(chareType, arrayDim, ident, ext, csds) ::=
+<<
+<if(debug)>/* \<typeDeclaration> */<endif>
+module <ident> {
+<if(ext)>
+    extern module <ext>;
+    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident>: <ext> {
+<else>
+    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident> {
+<endif>
+        <csds; separator="\n">
+    }
+}
+
+<if(debug)>/* \</typeDeclaration> */<endif>
 
 >>
 

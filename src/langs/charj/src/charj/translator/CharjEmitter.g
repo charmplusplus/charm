@@ -141,10 +141,6 @@ typeDeclaration
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})
-        -> {emitCI()}? classDeclaration_ci(
-                ident={$IDENT.text}, 
-                ext={$su.st}, 
-                csds={$csds})
         -> {emitH()}? classDeclaration_h(
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
@@ -154,6 +150,39 @@ typeDeclaration
         -> template(t={$text}) "/*INTERFACE-not implemented*/ <t>"
     |   ^('enum' IDENT (^('implements' type+))? classScopeDeclaration*)
         -> template(t={$text}) "/*ENUM-not implemented*/ <t>"
+    |   ^(chareType IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
+        -> {emitCC()}? classDeclaration_cc(
+                ident={$IDENT.text}, 
+                ext={$su.st}, 
+                csds={$csds})
+        -> {emitCI()}? charedeclaration_ci(
+                chareType={$chareType.st},
+                arrayDim={null},
+                ident={$IDENT.text}, 
+                ext={$su.st}, 
+                csds={$csds})
+        -> {emitH()}? classDeclaration_h(
+                ident={$IDENT.text}, 
+                ext={$su.st}, 
+                csds={$csds})
+        ->
+    |   ^('chare_array' ARRAY_DIMENSION IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
+        -> {emitCI()}? charedeclaration_ci(
+                chareType={"array"},
+                arrayDim={$ARRAY_DIMENSION.text.toUpperCase()},
+                ident={$IDENT.text}, 
+                ext={$su.st}, 
+                csds={$csds})
+        ->
+    ;
+
+chareType
+@init {
+$st = %{$start.getText()};
+}
+    :   'chare'
+    |   'group'
+    |   'nodegroup'
     ;
 
 enumConstant

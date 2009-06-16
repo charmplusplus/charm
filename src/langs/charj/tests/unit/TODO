@@ -2,6 +2,7 @@
 test modifiers for both fields and local vars
 fix codegen for 'entry' modifier
 fix colon placement for access modifiers in field definitions
+make sure entry methods appear in .ci files, and have entry modifier stripped off in .h/.cc
 
 thorough expression/primary statment tests
 method chaining

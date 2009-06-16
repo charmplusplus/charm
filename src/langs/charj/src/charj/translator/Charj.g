@@ -139,6 +139,8 @@ typeDeclaration
     :   classDefinition
     |   interfaceDefinition
     |   enumDefinition
+    |   chareDefinition
+    |   chareArrayDefinition
     ;
 
 classDefinition
@@ -146,6 +148,26 @@ classDefinition
             classScopeDeclaration*
         '}' ';'?
         -> ^('class' IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
+    ;
+
+chareType
+    :   'chare'
+    |   'group'
+    |   'nodegroup'
+    ;
+
+chareDefinition
+    :   'public'? chareType IDENT ('extends' type)? ('implements' typeList)? '{'
+            classScopeDeclaration*
+        '}' ';'?
+        -> ^(chareType IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
+    ;
+
+chareArrayDefinition
+    :   'public'? 'chare_array' '[' ARRAY_DIMENSION ']' IDENT ('extends' type)? ('implements' typeList)? '{'
+            classScopeDeclaration*
+        '}' ';'?
+        -> ^('chare_array' ARRAY_DIMENSION IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
     ;
 
 interfaceDefinition
@@ -725,6 +747,9 @@ HEX_LITERAL : '0' ('x'|'X') HEX_DIGIT+ INTEGER_TYPE_SUFFIX? ;
 DECIMAL_LITERAL : ('0' | '1'..'9' '0'..'9'*) INTEGER_TYPE_SUFFIX? ;
 
 OCTAL_LITERAL : '0' ('0'..'7')+ INTEGER_TYPE_SUFFIX? ;
+
+//fragment
+ARRAY_DIMENSION :  '1'..'6' ('d'|'D') ;
 
 fragment
 HEX_DIGIT : ('0'..'9'|'a'..'f'|'A'..'F') ;
