@@ -235,6 +235,18 @@ var_id_decl(id, adl) ::=
 >>
 
 
+mod_list(mods) ::=
+<<
+<if(mods)><mods; separator=" "><endif>
+>>
+
+
+local_mod_list(mods) ::=
+<<
+<if(mods)><mods; separator=" "><endif>
+>>
+ 
+
 primitive_var_decl(modList, type, declList) ::=
 <<
 <if(modList)>
@@ -285,7 +297,7 @@ formal_param_list(sdecl, vdecl) ::=
 
 formal_param_decl(modList, type, declID) ::=
 <<
-    <modList> <type> <declID>
+<if(modList)><modList> <endif><type> <declID>
 >>
 
 
@@ -360,6 +372,20 @@ for_cond(expr) ::=
 >>
 
 for_update(exprs) ::=
+<<
+<exprs; separator=", ">
+>>
+
+method_call(primary, generic_types, args) ::=
+<<
+<if(generic_types)>
+<primary>\<<generic_types>\>(<args>)
+<else>
+<primary>(<args>)
+<endif>
+>>
+
+arguments(exprs) ::=
 <<
 <exprs; separator=", ">
 >>

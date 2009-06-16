@@ -448,7 +448,7 @@ throwsClause
     ;
 
 modifierList
-    :   modifier*   
+    :   modifier*
         ->  ^(MODIFIER_LIST modifier*)
     ;
 
@@ -457,12 +457,10 @@ modifier
     |   PROTECTED
     |   ENTRY
     |   PRIVATE
-    |   STATIC
     |   ABSTRACT
     |   NATIVE
     |   SYNCHRONIZED
     |   TRANSIENT
-    |   VOLATILE
     |   localModifier
     ;
 
@@ -473,6 +471,8 @@ localModifierList
     
 localModifier
     :   FINAL
+    |   STATIC
+    |   VOLATILE
     ;
 
 type

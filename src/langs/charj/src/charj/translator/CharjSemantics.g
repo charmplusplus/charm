@@ -249,12 +249,10 @@ modifier
     |   PROTECTED
     |   PRIVATE
     |   ENTRY
-    |   STATIC
     |   ABSTRACT
     |   NATIVE
     |   SYNCHRONIZED
     |   TRANSIENT
-    |   VOLATILE
     |   localModifier
     ;
 
@@ -264,6 +262,8 @@ localModifierList
 
 localModifier
     :   FINAL
+    |   STATIC
+    |   VOLATILE
     ;
 
 type

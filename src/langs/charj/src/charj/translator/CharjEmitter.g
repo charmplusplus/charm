@@ -395,7 +395,7 @@ throwsClause
 
 modifierList
     :   ^(MODIFIER_LIST (m+=modifier)*)
-        -> template(mod={$m}) "<mod; separator=\" \">"
+        -> mod_list(mods={$m})
     ;
 
 modifier
@@ -406,24 +406,26 @@ $st = %{$start.getText()};
     |   PROTECTED
     |   PRIVATE
     |   ENTRY
-    |   STATIC
     |   ABSTRACT
     |   NATIVE
     |   SYNCHRONIZED
     |   TRANSIENT
-    |   VOLATILE
     |   localModifier
         -> {$localModifier.st}
     ;
 
 localModifierList
     :   ^(LOCAL_MODIFIER_LIST (m+=localModifier)*)
-        -> template(mod={$m}) "<mod; separator=\" \">"
+        -> local_mod_list(mods={$m})
     ;
 
 localModifier
+@init {
+$st = %{$start.getText()};
+}
     :   FINAL
-        -> {%{$start.getText()}}
+    |   STATIC
+    |   VOLATILE
     ;
 
     
@@ -570,11 +572,11 @@ statement
     |   ^(BREAK IDENT?)
         -> template() "break;" // TODO: support labeling
     |   ^(CONTINUE IDENT?)
-        -> template() "continue" // TODO: support labeling
+        -> template() "continue;" // TODO: support labeling
     |   ^(LABELED_STATEMENT i=IDENT s=statement)
         -> label(text={$i.text}, stmt={$s.st})
     |   expression
-        -> {$expression.st}
+        -> template(expr={$expression.st}) "<expr>;"
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
         ->  embed_cc(str={$STRING_LITERAL.text}, blk={$EMBED_BLOCK.text})
     |   SEMI // Empty statement.
@@ -736,17 +738,17 @@ primaryExpression
             |   VOID CLASS
             )
         )
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/* AKB: not sure what's up with this primaryExpression yet */ <t>"
     |   parenthesizedExpression
         -> {$parenthesizedExpression.st}
     |   IDENT
         -> {%{$start.getText()}}
-    |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
-        -> template(t={$text}) "<t>"
+    |   ^(METHOD_CALL pe=primaryExpression gtal=genericTypeArgumentList? args=arguments)
+        -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
     |   explicitConstructorCall
         -> {$explicitConstructorCall.st}
-    |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
-        -> template(t={$text}) "<t>"
+    |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expression)
+        -> template(pe={$pe.st}, ex={$ex.st}) "<pe>[<ex>]"
     |   literal
         -> {$literal.st}
     |   newExpression
@@ -795,8 +797,8 @@ newArrayConstruction
     ;
 
 arguments
-    :   ^(ARGUMENT_LIST expression*)
-        -> template(t={$text}) "<t>"
+    :   ^(ARGUMENT_LIST (ex+=expression)*)
+        -> arguments(exprs={$ex})
     ;
 
 literal
