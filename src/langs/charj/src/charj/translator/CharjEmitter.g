@@ -604,25 +604,29 @@ switchCaseLabel
     ;
     
 forInit
-    :   ^(FOR_INIT (localVariableDeclaration | expression*)?)
-        -> template(t={$text}) "<t>"
+    :   ^(FOR_INIT lvd=localVariableDeclaration?)
+        -> template(lvd={$lvd.st}) "<lvd>"
+    |   ^(FOR_INIT (ex+=expression)*)
+        -> template(ex={$ex}) "<ex; separator=\", \">;"
+    |   FOR_INIT
+        -> template() ";"
     ;
     
 forCondition
-    :   ^(FOR_CONDITION expression?)
-        -> template(t={$text}) "<t>"
+    :   ^(FOR_CONDITION (ex=expression)?)
+        -> for_cond(expr={$ex.st})
     ;
     
 forUpdater
-    :   ^(FOR_UPDATE expression*)
-        -> template(t={$text}) "<t>"
+    :   ^(FOR_UPDATE (exs+=expression)*)
+        -> for_update(exprs={$exs})
     ;
     
 // EXPRESSIONS
 
 parenthesizedExpression
-    :   ^(PARENTESIZED_EXPR expression)
-        -> template(t={$text}) "<t>"
+    :   ^(PARENTESIZED_EXPR exp=expression)
+        -> template(expr={$exp.st}) "(<expr>)"
     ;
     
 expression
@@ -631,90 +635,90 @@ expression
     ;
 
 expr
-    :   ^(ASSIGN expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(PLUS_ASSIGN expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(MINUS_ASSIGN expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(STAR_ASSIGN expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(DIV_ASSIGN expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(AND_ASSIGN expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(OR_ASSIGN expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(XOR_ASSIGN expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(MOD_ASSIGN expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(BIT_SHIFT_RIGHT_ASSIGN expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(SHIFT_RIGHT_ASSIGN expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(SHIFT_LEFT_ASSIGN expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(QUESTION expr expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(LOGICAL_OR expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(LOGICAL_AND expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(OR expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(XOR expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(AND expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(EQUAL expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(NOT_EQUAL expr expr)
-        -> template(t={$text}) "<t>"
+    :   ^(ASSIGN e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> = <e2>"
+    |   ^(PLUS_ASSIGN e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> += <e2>"
+    |   ^(MINUS_ASSIGN e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> -= <e2>"
+    |   ^(STAR_ASSIGN e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> *= <e2>"
+    |   ^(DIV_ASSIGN e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> /= <e2>"
+    |   ^(AND_ASSIGN e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> &= <e2>"
+    |   ^(OR_ASSIGN e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> |= <e2>"
+    |   ^(XOR_ASSIGN e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> ^= <e2>"
+    |   ^(MOD_ASSIGN e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> %= <e2>"
+    |   ^(BIT_SHIFT_RIGHT_ASSIGN e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> >>>= <e2>"
+    |   ^(SHIFT_RIGHT_ASSIGN e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> >>= <e2>"
+    |   ^(SHIFT_LEFT_ASSIGN e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> <<= <e2>"
+    |   ^(QUESTION e1=expr e2=expr e3=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}, e3={$e3.st}) "<e1> ? <e2> : <e3>"
+    |   ^(LOGICAL_OR e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> || <e2>"
+    |   ^(LOGICAL_AND e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> && <e2>"
+    |   ^(OR e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> | <e2>"
+    |   ^(XOR e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> ^ <e2>"
+    |   ^(AND e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> & <e2>"
+    |   ^(EQUAL e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> == <e2>"
+    |   ^(NOT_EQUAL e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> != <e2>"
     |   ^(INSTANCEOF expr type)
-        -> template(t={$text}) "<t>"
-    |   ^(LESS_OR_EQUAL expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(GREATER_OR_EQUAL expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(BIT_SHIFT_RIGHT expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(SHIFT_RIGHT expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(GREATER_THAN expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(SHIFT_LEFT expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(LESS_THAN expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(PLUS expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(MINUS expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(STAR expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(DIV expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(MOD expr expr)
-        -> template(t={$text}) "<t>"
-    |   ^(UNARY_PLUS expr)
-        -> template(t={$text}) "<t>"
-    |   ^(UNARY_MINUS expr)
-        -> template(t={$text}) "<t>"
-    |   ^(PRE_INC expr)
-        -> template(t={$text}) "<t>"
-    |   ^(PRE_DEC expr)
-        -> template(t={$text}) "<t>"
-    |   ^(POST_INC expr)
-        -> template(t={$text}) "<t>"
-    |   ^(POST_DEC expr)
-        -> template(t={$text}) "<t>"
-    |   ^(NOT expr)
-        -> template(t={$text}) "<t>"
-    |   ^(LOGICAL_NOT expr)
-        -> template(t={$text}) "<t>"
-    |   ^(CAST_EXPR type expr)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/* instanceof not implemented */ <t>"
+    |   ^(LESS_OR_EQUAL e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> <= <e2>"
+    |   ^(GREATER_OR_EQUAL e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> >= <e2>"
+    |   ^(BIT_SHIFT_RIGHT e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> >>> <e2>"
+    |   ^(SHIFT_RIGHT e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> >> <e2>"
+    |   ^(GREATER_THAN e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> > <e2>"
+    |   ^(SHIFT_LEFT e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> << <e2>"
+    |   ^(LESS_THAN e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> < <e2>"
+    |   ^(PLUS e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> + <e2>"
+    |   ^(MINUS e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> - <e2>"
+    |   ^(STAR e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> * <e2>"
+    |   ^(DIV e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> / <e2>"
+    |   ^(MOD e1=expr e2=expr)
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> % <e2>"
+    |   ^(UNARY_PLUS e1=expr)
+        -> template(e1={$e1.st}) "+<e1>"
+    |   ^(UNARY_MINUS e1=expr)
+        -> template(e1={$e1.st}) "-<e1>"
+    |   ^(PRE_INC e1=expr)
+        -> template(e1={$e1.st}) "++<e1>"
+    |   ^(PRE_DEC e1=expr)
+        -> template(e1={$e1.st}) "--<e1>"
+    |   ^(POST_INC e1=expr)
+        -> template(e1={$e1.st}) "<e1>++"
+    |   ^(POST_DEC e1=expr)
+        -> template(e1={$e1.st}) "<e1>--"
+    |   ^(NOT e1=expr)
+        -> template(e1={$e1.st}) "~<e1>"
+    |   ^(LOGICAL_NOT e1=expr)
+        -> template(e1={$e1.st}) "!<e1>"
+    |   ^(CAST_EXPR ty=type e1=expr)
+        -> template(ty={$ty.st}, e1={$e1.st}) "(<ty>)<e1>"
     |   primaryExpression
         -> {$primaryExpression.st}
     ;

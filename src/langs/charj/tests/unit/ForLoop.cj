@@ -7,5 +7,6 @@ public class ForLoop {
         }
         for (;;) {}
         for (int i=0;;++i) break;
+        for (int i=0, j=1;;++i, ++j) break;
     }
 }

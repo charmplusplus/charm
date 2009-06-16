@@ -201,9 +201,6 @@ block_cc(bsl) ::=
 <<
 <bsl:{s| <s><\n>}>
 >>
-/*{
-    <bsl; separator="\n">
-}*/
 
 
 embed_cc(str, blk) ::=
@@ -222,19 +219,19 @@ var_decl_list(var_decls) ::=
 
 var_decl(id, initializer) ::=
 <<
-<id> <initializer>
+<id><if(initializer)> = <initializer><endif>
 >>
 
 
 var_decl_id(id, array_decl_list) ::=
 <<
-<id> <array_decl_list>
+<id><if(array_decl_list)> <array_decl_list><endif>
 >>
 
 
 var_id_decl(id, adl) ::=
 <<
-<id> <adl>
+<id><if(adl)> <adl><endif>
 >>
 
 
@@ -251,9 +248,9 @@ primitive_var_decl(modList, type, declList) ::=
 object_var_decl(modList, type, declList) ::=
 <<
 <if(modList)>
-<modList>: <type>* <declList>;
+<modList>: <type> <declList>;
 <else>
-<type>* <declList>;
+<type> <declList>;
 <endif>
 >>
 
@@ -312,9 +309,10 @@ if (<cond>) {
 >>
 
 
+// note: initializer carries its own semicolon
 for(initializer, cond, update, body) ::=
 <<
-for (<initializer>; <cond>; <update>) {
+for (<initializer> <cond>; <update>) {
     <body>
 }
 >>
@@ -355,3 +353,14 @@ case(expr, block) ::=
 <<
 case <expr>: <block>
 >>
+
+for_cond(expr) ::=
+<<
+<expr>
+>>
+
+for_update(exprs) ::=
+<<
+<exprs; separator=", ">
+>>
+
