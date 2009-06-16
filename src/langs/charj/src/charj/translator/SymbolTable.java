@@ -96,8 +96,8 @@ public class SymbolTable {
         PackageScope enclosingPackage = defaultPkg;
         for (String pname : packageNames) {
             PackageScope p = (PackageScope)enclosingPackage.resolve(pname);
-            if ( p==null ) {
-                if ( debug() ) System.out.println(
+            if (p==null) {
+                if (debug()) System.out.println(
                         " SymbolTable.definePackage(" + packageName + 
                         "): defining inner pkg: " + pname +
                         " in "+enclosingPackage.toString());
@@ -156,11 +156,6 @@ public class SymbolTable {
                 " SymbolTable.resolvePackage(" + packageName + "): found in " +
                 topLevelPackageScopes.keySet());
         return p;
-    }
-
-    public ClassSymbol resolveType(String typeName) {
-        assert false;
-        return null;
     }
 
     public ClassSymbol getObjectRoot() {
