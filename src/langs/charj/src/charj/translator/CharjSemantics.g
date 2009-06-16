@@ -330,7 +330,7 @@ qualifiedIdentifier
     ;
     
 block
-    :   ^(BLOCK_SCOPE (blockStatement)*)
+    :   ^(BLOCK (blockStatement)*)
     ;
     
 blockStatement
@@ -382,31 +382,15 @@ catchClause
     :   ^(CATCH formalParameterStandardDecl block)
     ;
 
-switchBlockLabels
-    :   ^(SWITCH_BLOCK_LABEL_LIST switchCaseLabel*)
-    ;
-        
 switchCaseLabel
     :   ^(CASE expression blockStatement*)
     |   ^(DEFAULT blockStatement*)
     ;
     
-forInit
-    :   ^(FOR_INIT (localVariableDeclaration | expression*)?)
-    ;
-    
-forCondition
-    :   ^(FOR_CONDITION expression?)
-    ;
-    
-forUpdater
-    :   ^(FOR_UPDATE expression*)
-    ;
-    
 // EXPRESSIONS
 
 parenthesizedExpression
-    :   ^(PARENTESIZED_EXPR expression)
+    :   ^(PAREN_EXPR expression)
     ;
     
 expression

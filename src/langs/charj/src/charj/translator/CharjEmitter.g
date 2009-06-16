@@ -513,7 +513,7 @@ qualifiedIdentifier
     
 block
 @init { boolean emptyBlock = true; }
-    :   ^(BLOCK_SCOPE (b+=blockStatement)*)
+    :   ^(BLOCK (b+=blockStatement)*)
         { emptyBlock = ($b == null || $b.size() == 0); }
         -> {emitCC() && emptyBlock}? template(bsl={$b}) "{ }"
         -> {emitCC()}? block_cc(bsl={$b})
@@ -593,11 +593,6 @@ catchClause
         -> template(t={$text}) "/* catchClause not implemented */ <t>"
     ;
 
-switchBlockLabels
-    :   ^(SWITCH_BLOCK_LABEL_LIST (l+=switchCaseLabel)*)
-        -> template(labels={$l}) "<labels; separator=\"\n\">"
-    ;
-        
 switchCaseLabel
     :   ^(CASE expression (b+=blockStatement)*)
         -> case(expr={$expression.st}, block={$b})
@@ -605,29 +600,29 @@ switchCaseLabel
         -> template(block={$b}) "default: <block>"
     ;
     
-forInit
-    :   ^(FOR_INIT lvd=localVariableDeclaration?)
-        -> template(lvd={$lvd.st}) "<lvd>"
-    |   ^(FOR_INIT (ex+=expression)*)
-        -> template(ex={$ex}) "<ex; separator=\", \">;"
-    |   FOR_INIT
-        -> template() ";"
-    ;
-    
-forCondition
-    :   ^(FOR_CONDITION (ex=expression)?)
-        -> for_cond(expr={$ex.st})
-    ;
-    
-forUpdater
-    :   ^(FOR_UPDATE (exs+=expression)*)
-        -> for_update(exprs={$exs})
-    ;
+//forInit
+//    :   ^(FOR_INIT lvd=localVariableDeclaration?)
+//        -> template(lvd={$lvd.st}) "<lvd>"
+//    |   ^(FOR_INIT (ex+=expression)*)
+//        -> template(ex={$ex}) "<ex; separator=\", \">;"
+//    |   FOR_INIT
+//        -> template() ";"
+//    ;
+//    
+//forCondition
+//    :   ^(FOR_CONDITION (ex=expression)?)
+//        -> for_cond(expr={$ex.st})
+//    ;
+//    
+//forUpdater
+//    :   ^(FOR_UPDATE (exs+=expression)*)
+//        -> for_update(exprs={$exs})
+//    ;
     
 // EXPRESSIONS
 
 parenthesizedExpression
-    :   ^(PARENTESIZED_EXPR exp=expression)
+    :   ^(PAREN_EXPR exp=expression)
         -> template(expr={$exp.st}) "(<expr>)"
     ;
     
