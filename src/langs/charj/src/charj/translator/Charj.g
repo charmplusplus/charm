@@ -142,7 +142,7 @@ typeDeclaration
     ;
 
 classDefinition
-    :   'class' IDENT ('extends' type)? ('implements' typeList)? '{'
+    :   'public'? 'class' IDENT ('extends' type)? ('implements' typeList)? '{'
             classScopeDeclaration*
         '}' ';'?
         -> ^('class' IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
@@ -808,8 +808,9 @@ WS  :  (' '|'\r'|'\t'|'\u000C'|'\n')
     }
     ;
 
+fragment
 EMBED_BLOCK
-    :   '{' ( options {greedy=false;} : . )* '}'
+    :   '{' ( options {greedy=false;} : EMBED_BLOCK | . )* '}'
     ;
 
 COMMENT
