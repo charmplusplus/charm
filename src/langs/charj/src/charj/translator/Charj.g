@@ -175,37 +175,37 @@ typeList
     ;
 
 classScopeDeclaration
-    :   modifierList
+    :   modifierList?
         (   genericTypeParameterList?
             (   type IDENT formalParameterList arrayDeclaratorList? (block | ';')
-                ->  ^(FUNCTION_METHOD_DECL modifierList genericTypeParameterList? type IDENT
+                ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT
                     formalParameterList arrayDeclaratorList? block?)
             |   'void' IDENT formalParameterList (block | ';')
-                ->  ^(VOID_METHOD_DECL modifierList genericTypeParameterList? IDENT formalParameterList block?)
+                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList block?)
             |   ident=IDENT formalParameterList block
-                ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList genericTypeParameterList? IDENT
+                ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList? genericTypeParameterList? IDENT
                         formalParameterList block)
             )
         |   simpleType classFieldDeclaratorList ';'
-            ->  ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType classFieldDeclaratorList)
+            ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType classFieldDeclaratorList)
         |   objectType classFieldDeclaratorList ';'
-            ->  ^(OBJECT_VAR_DECLARATION modifierList objectType classFieldDeclaratorList)
+            ->  ^(OBJECT_VAR_DECLARATION modifierList? objectType classFieldDeclaratorList)
         )
     ;
 
 interfaceScopeDeclaration
-    :   modifierList
+    :   modifierList?
         (   genericTypeParameterList?
             (   type IDENT formalParameterList arrayDeclaratorList? ';'
-                ->  ^(FUNCTION_METHOD_DECL modifierList genericTypeParameterList?
+                ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
                         type IDENT formalParameterList arrayDeclaratorList?)
             |   'void' IDENT formalParameterList ';'
-                ->  ^(VOID_METHOD_DECL modifierList genericTypeParameterList? IDENT formalParameterList)
+                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)
             )
         |   simpleType interfaceFieldDeclaratorList ';'
-            ->  ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType interfaceFieldDeclaratorList)
+            ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType interfaceFieldDeclaratorList)
         |   objectType interfaceFieldDeclaratorList ';'
-            ->  ^(OBJECT_VAR_DECLARATION modifierList objectType interfaceFieldDeclaratorList)        
+            ->  ^(OBJECT_VAR_DECLARATION modifierList? objectType interfaceFieldDeclaratorList)        
         )
     ;
 
@@ -279,8 +279,8 @@ bound
     ;
 
 modifierList
-    :   modifier*
-        ->  ^(MODIFIER_LIST modifier*)
+    :   modifier+
+        ->  ^(MODIFIER_LIST modifier+)
     ;
 
 modifier
@@ -294,8 +294,8 @@ modifier
     ;
 
 localModifierList
-    :   localModifier*
-        -> ^(LOCAL_MODIFIER_LIST localModifier*)
+    :   localModifier+
+        -> ^(LOCAL_MODIFIER_LIST localModifier+)
     ;
 
 localModifier
@@ -368,13 +368,13 @@ formalParameterList
     ;
 
 formalParameterStandardDecl
-    :   localModifierList type variableDeclaratorId
-        ->  ^(FORMAL_PARAM_STD_DECL localModifierList type variableDeclaratorId)
+    :   localModifierList? type variableDeclaratorId
+        ->  ^(FORMAL_PARAM_STD_DECL localModifierList? type variableDeclaratorId)
     ;
 
 formalParameterVarArgDecl
-    :   localModifierList type '...' variableDeclaratorId
-        ->  ^(FORMAL_PARAM_VARARG_DECL localModifierList type variableDeclaratorId)
+    :   localModifierList? type '...' variableDeclaratorId
+        ->  ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
     ;
 
 qualifiedIdentifier
@@ -397,10 +397,10 @@ blockStatement
     ;
 
 localVariableDeclaration
-    :   localModifierList simpleType classFieldDeclaratorList
-        ->  ^(PRIMITIVE_VAR_DECLARATION localModifierList simpleType classFieldDeclaratorList)
-    |   localModifierList objectType classFieldDeclaratorList
-        ->  ^(OBJECT_VAR_DECLARATION localModifierList objectType classFieldDeclaratorList)
+    :   localModifierList? simpleType classFieldDeclaratorList
+        ->  ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType classFieldDeclaratorList)
+    |   localModifierList? objectType classFieldDeclaratorList
+        ->  ^(OBJECT_VAR_DECLARATION localModifierList? objectType classFieldDeclaratorList)
     ;
         
 statement
@@ -420,8 +420,8 @@ statement
     |   f='for' '('
         (   forInit? ';' expression? ';' expressionList? ')' statement
             -> ^($f forInit expression? expressionList statement)
-        |   localModifierList type IDENT ':' expression ')' statement
-            -> ^(FOR_EACH[$f, "FOR_EACH"] localModifierList type IDENT expression statement)
+        |   localModifierList? type IDENT ':' expression ')' statement
+            -> ^(FOR_EACH[$f, "FOR_EACH"] localModifierList? type IDENT expression statement)
         )
     |   'while' parenthesizedExpression statement
         ->  ^('while' parenthesizedExpression statement)

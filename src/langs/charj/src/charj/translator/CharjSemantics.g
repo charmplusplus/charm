@@ -140,26 +140,26 @@ enumConstant
     ;
     
 classScopeDeclaration
-    :   ^(FUNCTION_METHOD_DECL m=modifierList g=genericTypeParameterList? 
+    :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
-    |   ^(VOID_METHOD_DECL m=modifierList g=genericTypeParameterList? IDENT 
+    |   ^(VOID_METHOD_DECL m=modifierList? g=genericTypeParameterList? IDENT 
             f=formalParameterList b=block?)
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
-    |   ^(CONSTRUCTOR_DECL m=modifierList g=genericTypeParameterList? IDENT f=formalParameterList 
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+    |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
     ;
     
 interfaceScopeDeclaration
-    :   ^(FUNCTION_METHOD_DECL modifierList genericTypeParameterList? 
+    :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
             type IDENT formalParameterList arrayDeclaratorList?)
-    |   ^(VOID_METHOD_DECL modifierList genericTypeParameterList? IDENT formalParameterList)
+    |   ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
     ;
 
 variableDeclaratorList
@@ -200,7 +200,7 @@ bound
     ;
 
 modifierList
-    :   ^(MODIFIER_LIST (modifier)*)
+    :   ^(MODIFIER_LIST modifier+)
     ;
 
 modifier
@@ -214,7 +214,7 @@ modifier
     ;
 
 localModifierList
-    :   ^(LOCAL_MODIFIER_LIST localModifier*)
+    :   ^(LOCAL_MODIFIER_LIST localModifier+)
     ;
 
 localModifier
@@ -269,11 +269,11 @@ formalParameterList
     ;
     
 formalParameterStandardDecl
-    :   ^(FORMAL_PARAM_STD_DECL localModifierList type variableDeclaratorId)
+    :   ^(FORMAL_PARAM_STD_DECL localModifierList? type variableDeclaratorId)
     ;
     
 formalParameterVarargDecl
-    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList type variableDeclaratorId)
+    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
     ;
     
 // FIXME: is this rule right? Verify that this is ok, I expected something like:
@@ -293,8 +293,8 @@ blockStatement
     ;
     
 localVariableDeclaration
-    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION localModifierList objectType variableDeclaratorList)
+    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList)
+    |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList)
     ;
 
 statement
@@ -302,7 +302,7 @@ statement
     |   ^('assert' expression expression?)
     |   ^('if' parenthesizedExpression statement statement?)
     |   ^('for' forInit expression? expression* statement)
-    |   ^(FOR_EACH localModifierList type IDENT expression statement) 
+    |   ^(FOR_EACH localModifierList? type IDENT expression statement) 
     |   ^('while' parenthesizedExpression statement)
     |   ^('do' statement parenthesizedExpression)
     |   ^('switch' parenthesizedExpression switchCaseLabel*)
@@ -443,8 +443,8 @@ literal
     |   FLOATING_POINT_LITERAL
     |   CHARACTER_LITERAL
     |   STRING_LITERAL          
-    |   TRUE
-    |   FALSE
-    |   NULL
+    |   'true'
+    |   'false'
+    |   'null'
     ;
 

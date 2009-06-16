@@ -163,12 +163,14 @@ enumConstant
 
 classScopeDeclaration
 @init { boolean entry = false; }
-    :   ^(FUNCTION_METHOD_DECL m=modifierList g=genericTypeParameterList? 
+    :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
         { 
-            // determine whether this is an entry method
-            entry = listContainsToken($m.start.getChildren(), ENTRY);
+            if ($m.st != null) {
+                // determine whether this is an entry method
+                entry = listContainsToken($m.start.getChildren(), ENTRY);
+            }
         }
         -> {emitCC()}? funcMethodDecl_cc(
                 modl={$m.st}, 
@@ -195,11 +197,13 @@ classScopeDeclaration
                 adl={$a.st},
                 block={$b.st})
         ->
-    |   ^(VOID_METHOD_DECL m=modifierList g=genericTypeParameterList? IDENT 
+    |   ^(VOID_METHOD_DECL m=modifierList? g=genericTypeParameterList? IDENT 
             f=formalParameterList b=block?)
         { 
             // determine whether this is an entry method
-            entry = listContainsToken($m.start.getChildren(), ENTRY);
+            if ($m.st != null) {
+                entry = listContainsToken($m.start.getChildren(), ENTRY);
+            }
         }
         -> {emitCC()}? voidMethodDecl_cc(
                 modl={$m.st}, 
@@ -220,22 +224,24 @@ classScopeDeclaration
                 fpl={$f.st}, 
                 block={$b.st})
         ->
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
-        -> {emitCC() || emitH()}? primitive_var_decl(
-            modList={$modifierList.st},
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
+        -> {emitCC() || emitH()}? class_var_decl(
+            modl={$modifierList.st},
             type={$simpleType.st},
             declList={$variableDeclaratorList.st})
         ->
-    |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
-        -> {emitCC() || emitH()}? object_var_decl(
-            modList={$modifierList.st},
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+        -> {emitCC() || emitH()}? class_var_decl(
+            modl={$modifierList.st},
             type={$objectType.st},
             declList={$variableDeclaratorList.st})
         ->
-    |   ^(CONSTRUCTOR_DECL m=modifierList g=genericTypeParameterList? IDENT f=formalParameterList b=block)
+    |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList b=block)
         { 
             // determine whether this is an entry method
-            entry = listContainsToken($m.start.getChildren(), ENTRY);
+            if ($m.st != null) {
+                entry = listContainsToken($m.start.getChildren(), ENTRY);
+            }
         }
         -> {emitCC()}? ctorDecl_cc(
                 modl={$m.st}, 
@@ -259,13 +265,13 @@ classScopeDeclaration
     ;
     
 interfaceScopeDeclaration
-    :   ^(FUNCTION_METHOD_DECL modifierList genericTypeParameterList? type IDENT formalParameterList arrayDeclaratorList?)
+    :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT formalParameterList arrayDeclaratorList?)
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    |   ^(VOID_METHOD_DECL modifierList genericTypeParameterList? IDENT formalParameterList)
+    |   ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
     ;
 
@@ -322,7 +328,7 @@ throwsClause
     ;
 
 modifierList
-    :   ^(MODIFIER_LIST (m+=modifier)*)
+    :   ^(MODIFIER_LIST (m+=modifier)+)
         -> mod_list(mods={$m})
     ;
 
@@ -341,7 +347,7 @@ $st = %{$start.getText()};
     ;
 
 localModifierList
-    :   ^(LOCAL_MODIFIER_LIST (m+=localModifier)*)
+    :   ^(LOCAL_MODIFIER_LIST (m+=localModifier)+)
         -> local_mod_list(mods={$m})
     ;
 
@@ -414,12 +420,12 @@ formalParameterList
     ;
     
 formalParameterStandardDecl
-    :   ^(FORMAL_PARAM_STD_DECL lms=localModifierList t=type vdid=variableDeclaratorId)
+    :   ^(FORMAL_PARAM_STD_DECL lms=localModifierList? t=type vdid=variableDeclaratorId)
         -> formal_param_decl(modList={$lms.st}, type={$t.st}, declID={$vdid.st})
     ;
     
 formalParameterVarargDecl
-    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList type variableDeclaratorId)
+    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
         -> template(t={$text}) "/*formal parameter varargs not implemented*/ <t>"
     ;
     
@@ -448,13 +454,13 @@ blockStatement
 
 
 localVariableDeclaration
-    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList simpleType variableDeclaratorList)
-        -> primitive_var_decl(
+    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList)
+        -> local_var_decl(
             modList={null},
             type={$simpleType.st},
             declList={$variableDeclaratorList.st})
-    |   ^(OBJECT_VAR_DECLARATION localModifierList objectType variableDeclaratorList)
-        -> object_var_decl(
+    |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList)
+        -> local_var_decl(
             modList={null},
             type={$objectType.st},
             declList={$variableDeclaratorList.st})
@@ -470,7 +476,7 @@ statement
         -> if(cond={$parenthesizedExpression.st}, then={$then.st}, else_={$else_.st})
     |   ^('for' forInit cond=expression? (update+=expression)* s=statement)
         -> for(initializer={$forInit.st}, cond={$cond.st}, update={$update}, body={$s.st})
-    |   ^(FOR_EACH localModifierList type IDENT expression statement) 
+    |   ^(FOR_EACH localModifierList? type IDENT expression statement) 
         -> template(t={$text}) "/* foreach not implemented */ <t>"
     |   ^('while' pe=parenthesizedExpression s=statement)
         -> while(cond={$pe.st}, body={$s.st})

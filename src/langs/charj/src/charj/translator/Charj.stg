@@ -91,7 +91,7 @@ module <ident> {
 <else>
     chare <ident> {
 <endif>
-        <csds>
+        <csds; separator="\n">
     }
 }
 <if(debug)>/* \</typeDeclaration> */<endif>
@@ -106,7 +106,7 @@ classDeclaration_h(ident, ext, csds) ::=
 #include "<ident>.decl.h"
 /* superclass: <ext> */
 class <ident>: public CBase_<ident> {
-    <csds>
+    <csds; separator="\n">
 };
 <if(debug)>/* \</typeDeclaration> */<endif>
 
@@ -121,7 +121,7 @@ classDeclaration_cc(ident, ext, csds) ::=
 #include "<ident>.decl.h"
 /* superclass: <ext> */
 class <ident>: public CBase_<ident> {
-    <csds>
+    <csds; separator="\n">
 };
 #include "<ident>.def.h"
 <if(debug)>/* \</typeDeclaration> */<endif>
@@ -132,7 +132,7 @@ class <ident>: public CBase_<ident> {
 
 funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<modl>: <ty> <gtpl> <id><fpl> <adl>;
+<if(modl)><modl>: <endif><ty> <gtpl> <id><fpl> <adl>;
 >>
 
 
@@ -144,7 +144,7 @@ entry <ty> <gtpl> <id><fpl> <adl>;
 
 funcMethodDecl_cc(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<modl>: <ty> <gtpl> <id><fpl> <adl> {
+<if(modl)><modl>: <endif><ty> <gtpl> <id><fpl> <adl> {
     <block>
 }
 >>
@@ -158,13 +158,13 @@ entry void<gtpl> <id><fpl>;
 
 voidMethodDecl_h(modl, gtpl, id, fpl, block) ::=
 <<
-<modl>: void<gtpl> <id><fpl>;
+<if(modl)><modl>: <endif>void<gtpl> <id><fpl>;
 >>
 
 
 voidMethodDecl_cc(modl, gtpl, id, fpl, block) ::=
 <<
-<modl>: void<gtpl> <id><fpl> {
+<if(modl)><modl>: <endif>void<gtpl> <id><fpl> {
     <block>
 }
 >>
@@ -178,13 +178,13 @@ entry void<gtpl> <id><fpl>;
 
 ctorDecl_h(modl, gtpl, id, fpl, block) ::=
 <<
-<modl>:<gtpl> <id><fpl>;
+<if(modl)><modl>:<endif><gtpl> <id><fpl>;
 >>
 
 
 ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
 <<
-<modl>:<gtpl> <id><fpl> {
+<if(modl)><modl>:<endif><gtpl> <id><fpl> {
     <block>
 }
 >>
@@ -201,6 +201,12 @@ embed_cc(str, blk) ::=
 // begin embedded block: <str>
 <blk>
 // end embedded block: <str>
+>>
+
+
+class_var_decl(modl, type, declList) ::=
+<<
+<if(modl)><modl>:<else>public:<endif> <type> <declList>;
 >>
 
 
@@ -240,17 +246,7 @@ local_mod_list(mods) ::=
 >>
  
 
-primitive_var_decl(modList, type, declList) ::=
-<<
-<if(modList)>
-<modList>: <type> <declList>;
-<else>
-<type> <declList>;
-<endif>
->>
-
-
-object_var_decl(modList, type, declList) ::=
+local_var_decl(modList, type, declList) ::=
 <<
 <if(modList)>
 <modList>: <type> <declList>;
@@ -306,7 +302,7 @@ CkAssert(<cond>);
 
 if(cond, then, else_) ::=
 <<
-if (<cond>) {
+if <cond> {
     <then>
 }<if(else_)> else {
     <else_>
@@ -323,7 +319,7 @@ for (<initializer> <cond> <update>) {
 
 while(cond, body) ::=
 <<
-while (<cond>) {
+while <cond> {
     <body>
 } 
 >>
@@ -332,13 +328,13 @@ dowhile(cond, body) ::=
 <<
 do {
     <body>
-} while (<cond>);
+} while <cond>;
 >>
 
 
 switch(expr, labels) ::=
 <<
-switch (<expr>) {
+switch <expr> {
     <labels>
 }
 >>
