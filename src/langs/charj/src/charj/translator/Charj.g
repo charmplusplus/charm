@@ -292,10 +292,9 @@ genericTypeParameterList
         ->  ^(GENERIC_TYPE_PARAM_LIST[$LESS_THAN, "GENERIC_TYPE_PARAM_LIST"] genericTypeParameter+)
     ;
 
-genericTypeListClosing  // This 'trick' is fairly dirty - if there's some time a better solution should 
-                        // be found to resolve the problem with nested generic type parameter lists 
-                        // (i.e. <T1 extends AnyType<T2>> for generic type parameters or <T1<T2>> for 
-                        // generic type arguments etc). 
+// This hack is fairly dirty - we just bite off some angle brackets and don't
+// actually match up opening and closing brackets.
+genericTypeListClosing  
     :   GREATER_THAN
     |   SHIFT_RIGHT
     |   BIT_SHIFT_RIGHT
@@ -480,19 +479,14 @@ type
     |   objectType
     ;
 
-simpleType // including static arrays of simple type elements
+simpleType
     :   primitiveType arrayDeclaratorList?
         ->  ^(TYPE primitiveType arrayDeclaratorList?)  
     ;
 
-objectType // including static arrays of object type reference elements
+objectType
     :   qualifiedTypeIdent arrayDeclaratorList?
         ->  ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    ;
-
-objectTypeSimplified
-    :   qualifiedTypeIdentSimplified arrayDeclaratorList?
-        ->  ^(TYPE qualifiedTypeIdentSimplified arrayDeclaratorList?)
     ;
 
 qualifiedTypeIdent
@@ -500,17 +494,8 @@ qualifiedTypeIdent
         ->  ^(QUALIFIED_TYPE_IDENT typeIdent+) 
     ;
 
-qualifiedTypeIdentSimplified
-    :   typeIdentSimplified (DOT typeIdentSimplified)*
-        ->  ^(QUALIFIED_TYPE_IDENT typeIdentSimplified+) 
-    ;
-
 typeIdent
     :   IDENT^ genericTypeArgumentList?
-    ;
-
-typeIdentSimplified
-    :   IDENT^ genericTypeArgumentListSimplified?
     ;
 
 primitiveType
@@ -530,21 +515,6 @@ genericTypeArgumentList
     ;
 
 genericTypeArgument
-    :   type
-    |   QUESTION genericWildcardBoundType?
-        ->  ^(QUESTION genericWildcardBoundType?)
-    ;
-
-genericWildcardBoundType
-    :   (EXTENDS | SUPER)^ type
-    ;
-
-genericTypeArgumentListSimplified
-    :   LESS_THAN genericTypeArgumentSimplified (COMMA genericTypeArgumentSimplified)* genericTypeListClosing
-        ->  ^(GENERIC_TYPE_ARG_LIST[$LESS_THAN, "GENERIC_TYPE_ARG_LIST"] genericTypeArgumentSimplified+)
-    ;
-
-genericTypeArgumentSimplified
     :   type
     |   QUESTION
     ;
@@ -841,12 +811,12 @@ postfixedExpression
         (   outerDot=DOT                            
             // Note: generic type arguments are only valid for method calls,
             // i.e. if there is an argument list
-            (   (   genericTypeArgumentListSimplified?  
+            (   (   genericTypeArgumentList?  
                     IDENT
                     ->  ^(DOT $postfixedExpression IDENT)
                 ) 
                 (   arguments
-                    ->  ^(METHOD_CALL $postfixedExpression genericTypeArgumentListSimplified? arguments)
+                    ->  ^(METHOD_CALL $postfixedExpression genericTypeArgumentList? arguments)
                 )?
             |   THIS
                 ->  ^(DOT $postfixedExpression THIS)
@@ -875,17 +845,17 @@ primaryExpression
     |   literal
     |   newExpression
     |   qualifiedIdentExpression
-    |   genericTypeArgumentListSimplified 
+    |   genericTypeArgumentList 
         (   SUPER
             (   arguments
-                ->  ^(SUPER_CONSTRUCTOR_CALL[$SUPER, "SUPER_CONSTRUCTOR_CALL"] genericTypeArgumentListSimplified arguments)
+                ->  ^(SUPER_CONSTRUCTOR_CALL[$SUPER, "SUPER_CONSTRUCTOR_CALL"] genericTypeArgumentList arguments)
             |   DOT IDENT arguments
-                ->  ^(METHOD_CALL ^(DOT SUPER IDENT) genericTypeArgumentListSimplified arguments)
+                ->  ^(METHOD_CALL ^(DOT SUPER IDENT) genericTypeArgumentList arguments)
             )
         |   IDENT arguments
-            ->  ^(METHOD_CALL IDENT genericTypeArgumentListSimplified arguments)
+            ->  ^(METHOD_CALL IDENT genericTypeArgumentList arguments)
         |   THIS arguments
-            ->  ^(THIS_CONSTRUCTOR_CALL[$THIS, "THIS_CONSTRUCTOR_CALL"] genericTypeArgumentListSimplified arguments)
+            ->  ^(THIS_CONSTRUCTOR_CALL[$THIS, "THIS_CONSTRUCTOR_CALL"] genericTypeArgumentList arguments)
         )
     |   (   THIS
             ->  THIS
@@ -930,15 +900,15 @@ qualifiedIdentExpression
         |   outerDot=DOT
             (   CLASS
                 ->  ^(DOT qualifiedIdentifier CLASS)
-            |   genericTypeArgumentListSimplified 
+            |   genericTypeArgumentList 
                 (   Super=SUPER arguments
                     ->  ^(SUPER_CONSTRUCTOR_CALL[$Super, "SUPER_CONSTRUCTOR_CALL"]
-                            qualifiedIdentifier genericTypeArgumentListSimplified arguments)
+                            qualifiedIdentifier genericTypeArgumentList arguments)
                 |   SUPER innerDot=DOT IDENT arguments
                     ->  ^(METHOD_CALL ^($innerDot ^($outerDot qualifiedIdentifier SUPER) IDENT)
-                            genericTypeArgumentListSimplified arguments)
+                            genericTypeArgumentList arguments)
                 |   IDENT arguments
-                    ->  ^(METHOD_CALL ^(DOT qualifiedIdentifier IDENT) genericTypeArgumentListSimplified arguments)
+                    ->  ^(METHOD_CALL ^(DOT qualifiedIdentifier IDENT) genericTypeArgumentList arguments)
                 )
             |   THIS
                 ->  ^(DOT qualifiedIdentifier THIS)
@@ -955,21 +925,21 @@ newExpression
             (   primitiveType newArrayConstruction      // new static array of primitive type elements
                 ->  ^(STATIC_ARRAY_CREATOR[$NEW, "STATIC_ARRAY_CREATOR"] primitiveType newArrayConstruction
             )
-    |   genericTypeArgumentListSimplified? qualifiedTypeIdentSimplified
+    |   genericTypeArgumentList? qualifiedTypeIdent
             (   newArrayConstruction                // new static array of object type reference elements
                 ->  ^(STATIC_ARRAY_CREATOR[$NEW, "STATIC_ARRAY_CREATOR"] 
-                    genericTypeArgumentListSimplified? qualifiedTypeIdentSimplified newArrayConstruction
+                    genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction
             )
     |   arguments classBody?                // new object type via constructor invocation
-                ->  ^(CLASS_CONSTRUCTOR_CALL[$NEW, "STATIC_ARRAY_CREATOR"] genericTypeArgumentListSimplified? 
-                    qualifiedTypeIdentSimplified arguments classBody?)
+                ->  ^(CLASS_CONSTRUCTOR_CALL[$NEW, "STATIC_ARRAY_CREATOR"] genericTypeArgumentList? 
+                    qualifiedTypeIdent arguments classBody?)
             )
         )
     ;
     
 innerNewExpression // something like 'InnerType innerType = outer.new InnerType();'
-    :   NEW genericTypeArgumentListSimplified? IDENT arguments classBody?
-        ->  ^(CLASS_CONSTRUCTOR_CALL[$NEW, "STATIC_ARRAY_CREATOR"] genericTypeArgumentListSimplified? IDENT arguments classBody?)
+    :   NEW genericTypeArgumentList? IDENT arguments classBody?
+        ->  ^(CLASS_CONSTRUCTOR_CALL[$NEW, "STATIC_ARRAY_CREATOR"] genericTypeArgumentList? IDENT arguments classBody?)
     ;
 
 newArrayConstruction
