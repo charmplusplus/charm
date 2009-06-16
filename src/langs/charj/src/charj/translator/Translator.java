@@ -88,10 +88,12 @@ public class Translator {
         m_nodes.setTokenStream(tokens);
         m_nodes.setTreeAdaptor(m_adaptor);
 
-        printAST("Before Semantic Pass");
+        // do AST rewriting in semantic phase
+        if (m_printAST) printAST("Before Semantic Pass", "before.html");
         semanticPass();
-        printAST("After Semantic Pass");
+        if (m_printAST) printAST("After Semantic Pass", "after.html");
 
+        // emit code for .ci, .h, and .cc based on rewritten AST
         m_nodes.reset();
         String ciOutput = translationPass(OutputMode.ci);
         writeTempFile(filename, ciOutput, OutputMode.ci);
@@ -225,9 +227,9 @@ public class Translator {
     }
 
     /**
-     * Utility function to write a generated .ci or .cc
-     * file to disk. Takes a .cj filename and writes a .cc
-     * or .ci file to the .charj directory depending on
+     * Utility function to write a generated .ci, .cc, or .h
+     * file to disk. Takes a .cj filename and writes a .cc,
+     * .ci, or .h file to the .charj directory depending on
      * the OutputMode.
      */
     private void writeTempFile(
@@ -237,10 +239,22 @@ public class Translator {
         IOException
     {
         int lastDot = filename.lastIndexOf(".");
-        int lastSlash = filename.lastIndexOf("/");
-        String tempFile = filename.substring(0, lastSlash + 1) + ".charj/";
+        filename = filename.substring(0, lastDot) + m.extension();
+        writeTempFile(filename, output);
+        return;
+    }
+
+    private void writeTempFile(
+            String filename,
+            String output) throws
+        IOException
+    {
+        int lastDot = filename.lastIndexOf(".");
+        int lastSlash = filename.lastIndexOf(java.io.File.separator);
+        String tempFile = filename.substring(0, lastSlash + 1) +
+            ".charj" + java.io.File.separator;
         new File(tempFile).mkdir();
-        tempFile += filename.substring(lastSlash + 1, lastDot) + m.extension();
+        tempFile += filename.substring(lastSlash + 1, filename.length());
         if (m_verbose) System.out.println(" [charjc] create: " + tempFile);
         FileWriter fw = new FileWriter(tempFile);
         fw.write(output);
@@ -326,17 +340,31 @@ public class Translator {
         return retVal;
     }
 
-    public void printAST(String message)
+    /**
+     * Print a representation of the Charj AST. If message is not null,
+     * it is printed, along with an ASCII representation of the tree,
+     * to stdout. If filename is not null, an html temp file containin
+     * the representation is printed to .charj/filename.
+     */
+    public void printAST(String message, String filename) throws IOException
     {
-        String header = "----------\n" + "AST: " + message + "\n----------\n";
-        String footer = "\n----------\n";
-        String body = null;
-        if (m_printAST && m_ast != null) {
-            body = m_ast.toStringTree();
-        } else if (m_printAST) {
-            body = "Null tree, no AST available";
+        if (filename != null) {
+            ASTHTMLPrinter htmlPrinter = new ASTHTMLPrinter();
+            TreeTraverser.visit((CharjAST)m_ast, htmlPrinter);
+            writeTempFile(filename, htmlPrinter.output());
         }
-        System.out.println(header + body + footer);
+
+        if (message != null) {
+            String header = "----------\n" + "AST: " + message + "\n----------\n";
+            String footer = "\n----------\n";
+            String body = null;
+            if (m_ast != null) {
+                body = m_ast.toStringTree();
+            } else {
+                body = "Null tree, no AST available";
+            }
+            System.out.println(header + body + footer);
+        }
     }
     
     public void error(
