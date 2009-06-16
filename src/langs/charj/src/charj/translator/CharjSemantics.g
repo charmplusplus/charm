@@ -34,6 +34,7 @@ package charj.translator;
      *  type.
      */
     public boolean listContainsToken(List<CharjAST> list, int tokenType) {
+        if (list == null) return false;
         for (CharjAST node : list) {
             if (node.token.getType() == tokenType) {
                 return true;
@@ -357,8 +358,16 @@ statement
     |   ^(SYNCHRONIZED parenthesizedExpression block)
     |   ^(RETURN expression?)
     |   ^(THROW expression)
-    |   ^(BREAK IDENT?)
-    |   ^(CONTINUE IDENT?)
+    |   ^(BREAK IDENT?) {
+            if ($IDENT != null) {
+                translator.error(this, "Labeled break not supported yet, ignoring.", $ID);
+            }
+        }
+    |   ^(CONTINUE IDENT?) {
+            if ($IDENT != null) {
+                translator.error(this, "Labeled continue not supported yet, ignoring.", $ID);
+            }
+        }
     |   ^(LABELED_STATEMENT IDENT statement)
     |   expression
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
@@ -374,15 +383,12 @@ catchClause
     ;
 
 switchBlockLabels
-    :   ^(SWITCH_BLOCK_LABEL_LIST switchCaseLabel* switchDefaultLabel? switchCaseLabel*)
+    :   ^(SWITCH_BLOCK_LABEL_LIST switchCaseLabel*)
     ;
         
 switchCaseLabel
     :   ^(CASE expression blockStatement*)
-    ;
-    
-switchDefaultLabel
-    :   ^(DEFAULT blockStatement*)
+    |   ^(DEFAULT blockStatement*)
     ;
     
 forInit

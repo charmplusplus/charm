@@ -19,6 +19,7 @@ charjSource_ci(pd, ids, tds, debug) ::=
 
 <tds>
 <if(debug)>/* \</charjSource_ci> */<endif>
+
 >>
 
 
@@ -38,6 +39,7 @@ charjSource_h(pd, ids, tds, cb, debug) ::=
 <cb>
 
 <if(debug)>/* \</CHARJ_SOURCE> */<endif>
+
 >>
 
 
@@ -149,7 +151,9 @@ entry <ty> <gtpl> <id><fpl> <adl> <tc>;
 
 funcMethodDecl_cc(modl, gtpl, ty, id, fpl, adl, tc, block) ::=
 <<
-<modl>: <ty> <gtpl> <id><fpl> <adl> <tc> <block>
+<modl>: <ty> <gtpl> <id><fpl> <adl> <tc> {
+    <block>
+}
 >>
 
 
@@ -167,7 +171,9 @@ voidMethodDecl_h(modl, gtpl, id, fpl, tc, block) ::=
 
 voidMethodDecl_cc(modl, gtpl, id, fpl, tc, block) ::=
 <<
-<modl>: void<gtpl> <id><fpl> <tc> <block>
+<modl>: void<gtpl> <id><fpl> <tc> {
+    <block>
+}
 >>
 
 
@@ -185,16 +191,19 @@ ctorDecl_h(modl, gtpl, id, fpl, tc, block) ::=
 
 ctorDecl_cc(modl, gtpl, id, fpl, tc, block) ::=
 <<
-<modl>:<gtpl> <id><fpl> <tc> <block>
+<modl>:<gtpl> <id><fpl> <tc> {
+    <block>
+}
 >>
 
 
 block_cc(bsl) ::=
 <<
-{
-    <bsl; separator="\n">
-}
+<bsl:{s| <s><\n>}>
 >>
+/*{
+    <bsl; separator="\n">
+}*/
 
 
 embed_cc(str, blk) ::=
@@ -202,6 +211,30 @@ embed_cc(str, blk) ::=
 // begin embedded block: <str>
 <blk>
 // end embedded block: <str>
+>>
+
+
+var_decl_list(var_decls) ::=
+<<
+<var_decls; separator=", ">
+>>
+
+
+var_decl(id, initializer) ::=
+<<
+<id> <initializer>
+>>
+
+
+var_decl_id(id, array_decl_list) ::=
+<<
+<id> <array_decl_list>
+>>
+
+
+var_id_decl(id, adl) ::=
+<<
+<id> <adl>
 >>
 
 
@@ -231,6 +264,18 @@ type(typeID, arrDeclList) ::=
 >>
 
 
+typeIdent(typeID, generics) ::=
+<<
+<typeID><generics>
+>>
+
+
+generic_arg_list(types) ::=
+<<
+\<<types>\>
+>>
+
+
 formal_param_list(sdecl, vdecl) ::=
 <<
 <if(vdecl)>
@@ -246,4 +291,58 @@ formal_param_decl(modList, type, declID) ::=
     <modList> <type> <declID>
 >>
 
+
+assert(cond, msg) ::=
+<<
+<if(msg)>
+CkAssert(<cond> && <msg>);
+<else>
+CkAssert(<cond>);
+<endif>
+>>
+
+
+if(cond, then, else_) ::=
+<<
+if (<cond>) {
+    <then>
+}<if(else_)> else {
+    <else_>
+}<endif>
+>>
+
+
+for(initializer, cond, update, body) ::=
+<<
+for (<initializer>; <cond>; <update>) {
+    <body>
+}
+>>
+
+while(cond, body) ::=
+<<
+while (<cond>) {
+    <body>
+} 
+>>
+
+dowhile(cond, body) ::=
+<<
+do {
+    <body>
+} while (<cond>);
+>>
+
+
+switch(expr, labels) ::=
+<<
+switch (<expr>) {
+    <labels>
+}
+>>
+
+return(val) ::=
+<<
+return<if(val)> <val><endif>;
+>>
 

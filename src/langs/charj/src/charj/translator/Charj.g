@@ -666,8 +666,8 @@ finallyClause
     ;
 
 switchBlockLabels
-    :   switchCaseLabels switchDefaultLabel? switchCaseLabels
-        ->  ^(SWITCH_BLOCK_LABEL_LIST switchCaseLabels switchDefaultLabel? switchCaseLabels)
+    :   switchCaseLabels
+        ->  ^(SWITCH_BLOCK_LABEL_LIST switchCaseLabels)
     ;
     
 switchCaseLabels
@@ -676,10 +676,7 @@ switchCaseLabels
         
 switchCaseLabel
     :   CASE^ expression COLON! blockStatement*
-    ;
-    
-switchDefaultLabel
-    :   DEFAULT^ COLON! blockStatement*
+    |   DEFAULT^ COLON! blockStatement*
     ;
     
 forInit

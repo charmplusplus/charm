@@ -55,6 +55,7 @@ package charj.translator;
      *  type.
      */
     public boolean listContainsToken(List<CharjAST> list, int tokenType) {
+        if (list == null) return false;
         for (CharjAST node : list) {
             if (node.token.getType() == tokenType) {
                 return true;
@@ -331,38 +332,38 @@ classScopeDeclarations
     
 interfaceTopLevelScope
     :   ^(INTERFACE_TOP_LEVEL_SCOPE interfaceScopeDeclarations*)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*interfaceTopLevelScope-not implemented */ <t>"
     ;
     
 interfaceScopeDeclarations
     :   ^(FUNCTION_METHOD_DECL modifierList genericTypeParameterList? type IDENT formalParameterList arrayDeclaratorList? throwsClause?)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
     |   ^(VOID_METHOD_DECL modifierList genericTypeParameterList? IDENT formalParameterList throwsClause?)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
     |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
     |   typeDeclaration
         -> {$typeDeclaration.st}
     ;
 
 variableDeclaratorList
-    :   ^(VAR_DECLARATOR_LIST variableDeclarator+)
-        -> template(t={$text}) "/*variableDeclaratorList*/ <t>"
+    :   ^(VAR_DECLARATOR_LIST (var_decls+=variableDeclarator)+)
+        -> var_decl_list(var_decls={$var_decls})
     ;
 
 variableDeclarator
-    :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
-        -> template(t={$text}) "/*variableDeclarator*/ <t>"
+    :   ^(VAR_DECLARATOR id=variableDeclaratorId initializer=variableInitializer?)
+        -> var_decl(id={$id.st}, initializer={$initializer.st})
     ;
     
 variableDeclaratorId
-    :   ^(IDENT arrayDeclaratorList?)
-        -> template(t={$text}) "/*variableDeclaratorId*/ <t>"
+    :   ^(IDENT adl=arrayDeclaratorList?)
+        -> var_decl_id(id={$IDENT.text}, arrayDeclList={$adl.st})
     ;
 
 variableInitializer
@@ -384,12 +385,12 @@ arrayDeclaratorList
     
 arrayInitializer
     :   ^(ARRAY_INITIALIZER variableInitializer*)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/* arrayInitializer-not implemented */ <t>"
     ;
 
 throwsClause
     :   ^(THROWS_CLAUSE qualifiedIdentifier+)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/* throwsClause-not implemented */ <t>"
     ;
 
 modifierList
@@ -416,8 +417,8 @@ $st = %{$start.getText()};
     ;
 
 localModifierList
-    :   ^(LOCAL_MODIFIER_LIST localModifier*)
-        -> template(t={$text}) "<t>"
+    :   ^(LOCAL_MODIFIER_LIST (m+=localModifier)*)
+        -> template(mod={$m}) "<mod; separator=\" \">"
     ;
 
 localModifier
@@ -444,13 +445,13 @@ objectType
     ;
 
 qualifiedTypeIdent
-    :   ^(QUALIFIED_TYPE_IDENT typeIdent+) 
-        -> template(t={$text}) "<t>"
+    :   ^(QUALIFIED_TYPE_IDENT (t+=typeIdent)+) 
+        -> template(types={$t}) "<types; separator=\".\">"
     ;
 
 typeIdent
     :   ^(IDENT genericTypeArgumentList?)
-        -> template(t={$text}) "<t>"
+        -> typeIdent(typeID={$IDENT.text}, generics={$genericTypeArgumentList.st})
     ;
 
 primitiveType
@@ -468,22 +469,22 @@ $st = %{$start.getText()};
     ;
 
 genericTypeArgumentList
-    :   ^(GENERIC_TYPE_ARG_LIST genericTypeArgument+)
-        -> template(t={$text}) "<t>"
+    :   ^(GENERIC_TYPE_ARG_LIST (gta+=genericTypeArgument)+)
+        -> template(gtal={$gta}) "\<<gtal; separator=\", \">\>"
     ;
     
 genericTypeArgument
     :   type
         -> {$type.st}
     |   ^(QUESTION genericWildcardBoundType?)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/* genericTypeArgument: wildcard bound types not implemented */ <t>"
     ;
 
 genericWildcardBoundType                                                                                                                      
     :   ^(EXTENDS type)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/* genericWildcardBoundType not implemented */ <t>"
     |   ^(SUPER type)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/* genericWildcardBoundType not implemented */ <t>"
     ;
 
 formalParameterList
@@ -498,7 +499,7 @@ formalParameterStandardDecl
     
 formalParameterVarargDecl
     :   ^(FORMAL_PARAM_VARARG_DECL localModifierList type variableDeclaratorId)
-        -> template(t={$text}) "/*fpvd*/ <t>"
+        -> template(t={$text}) "/*formal parameter varargs not implemented*/ <t>"
     ;
     
 qualifiedIdentifier
@@ -544,32 +545,32 @@ localVariableDeclaration
 statement
     :   block
         -> {$block.st}
-    |   ^(ASSERT expression expression?)
-        -> template(t={$text}) "<t>"
-    |   ^(IF parenthesizedExpression statement statement?)
-        -> template(t={$text}) "<t>"
-    |   ^(FOR forInit forCondition forUpdater statement)
-        -> template(t={$text}) "<t>"
+    |   ^(ASSERT cond=expression msg=expression?)
+        -> assert(cond={$cond.st}, msg={$msg.st})
+    |   ^(IF parenthesizedExpression then=statement else_=statement?)
+        -> if(cond={$parenthesizedExpression.st}, then={$then.st}, else_={$else_.st})
+    |   ^(FOR forInit forCondition forUpdater s=statement)
+        -> for(initializer={$forInit.st}, cond={$forCondition.st}, update={$forUpdater.st}, body={$s.st})
     |   ^(FOR_EACH localModifierList type IDENT expression statement) 
-        -> template(t={$text}) "<t>"
-    |   ^(WHILE parenthesizedExpression statement)
-        -> template(t={$text}) "<t>"
-    |   ^(DO statement parenthesizedExpression)
-        -> template(t={$text}) "<t>"
-    |   ^(TRY block catches? block?)  // The second optional block is the optional finally block.
-        -> template(t={$text}) "<t>"
-    |   ^(SWITCH parenthesizedExpression switchBlockLabels)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/* foreach not implemented */ <t>"
+    |   ^(WHILE pe=parenthesizedExpression s=statement)
+        -> while(cond={$pe.st}, body={$s.st})
+    |   ^(DO s=statement pe=parenthesizedExpression)
+        -> dowhile(cond={$pe.st}, block={$s.st})
+    |   ^(TRY block catches? block?)  // The second optional block is the finally block.
+        -> template(t={$text}) "/* try/catch not implemented */ <t>"
+    |   ^(SWITCH pe=parenthesizedExpression sbls=switchBlockLabels)
+        -> switch(expr={$pe.st}, labels={$sbls.st})
     |   ^(SYNCHRONIZED parenthesizedExpression block)
-        -> template(t={$text}) "<t>"
-    |   ^(RETURN expression?)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/* synchronized not implemented */ <t>"
+    |   ^(RETURN e=expression?)
+        -> return(val={$e.st})
     |   ^(THROW expression)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/* throw not implemented */ <t>"
     |   ^(BREAK IDENT?)
-        -> template(t={$text}) "<t>"
+        -> template() "break;" // TODO: support labeling
     |   ^(CONTINUE IDENT?)
-        -> template(t={$text}) "<t>"
+        -> template() "continue" // TODO: support labeling
     |   ^(LABELED_STATEMENT IDENT statement)
         -> template(t={$text}) "<t>"
     |   expression
@@ -582,26 +583,23 @@ statement
         
 catches
     :   ^(CATCH_CLAUSE_LIST catchClause+)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/* catch not implemented */ <t>"
     ;
     
 catchClause
     :   ^(CATCH formalParameterStandardDecl block)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) "/* catchClause not implemented */ <t>"
     ;
 
 switchBlockLabels
-    :   ^(SWITCH_BLOCK_LABEL_LIST switchCaseLabel* switchDefaultLabel? switchCaseLabel*)
+    :   ^(SWITCH_BLOCK_LABEL_LIST switchCaseLabel*)
         -> template(t={$text}) "<t>"
     ;
         
 switchCaseLabel
     :   ^(CASE expression blockStatement*)
         -> template(t={$text}) "<t>"
-    ;
-    
-switchDefaultLabel
-    :   ^(DEFAULT blockStatement*)
+    |   ^(DEFAULT blockStatement*)
         -> template(t={$text}) "<t>"
     ;
     
