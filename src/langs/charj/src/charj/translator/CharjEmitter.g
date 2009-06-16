@@ -32,6 +32,7 @@ package charj.translator;
     private boolean emitCC() { return mode_ == OutputMode.cc; }
     private boolean emitCI() { return mode_ == OutputMode.ci; }
     private boolean emitH() { return mode_ == OutputMode.h; }
+    private boolean debug() { return translator_.debug(); }
 
     /**
      *  Override ANTLR's token mismatch behavior so we throw exceptions early.
@@ -51,13 +52,7 @@ package charj.translator;
 
     /**
      *  Test a list of CharjAST nodes to see if any of them has the given token
-     *  t// Replace default ANTLR generated catch clauses with this action, allowing early failure.
-@rulecatch {
-    catch (RecognitionException re) {
-        reportError(re);
-        throw re;
-    }
-}ype.
+     *  type.
      */
     public boolean listContainsToken(List<CharjAST> list, int tokenType) {
         for (CharjAST node : list) {
@@ -83,6 +78,7 @@ package charj.translator;
 charjSource[SymbolTable symtab, OutputMode m]
 @init {
     this.symtab_ = symtab;
+    this.translator_ = symtab.translator;
     this.mode_ = m;
     String closingBraces = "";
 }
@@ -102,10 +98,10 @@ charjSource[SymbolTable symtab, OutputMode m]
             }
         }
         -> {emitCC()}? charjSource_cc(
-            pd={$p.st}, ids={$i}, tds={$t.st}, cb={closingBraces})
-        -> {emitCI()}? charjSource_ci(pd={$p.st}, ids={$i}, tds={$t.st})
+            pd={$p.st}, ids={$i}, tds={$t.st}, cb={closingBraces}, debug={debug()})
+        -> {emitCI()}? charjSource_ci(pd={$p.st}, ids={$i}, tds={$t.st}, debug={debug()})
         -> {emitH()}? charjSource_h(
-            pd={$p.st}, ids={$i}, tds={$t.st}, cb={closingBraces})
+            pd={$p.st}, ids={$i}, tds={$t.st}, cb={closingBraces}, debug={debug()})
         ->
     ;
 
@@ -166,9 +162,9 @@ typeDeclaration
         ->
     |   ^(INTERFACE modifierList IDENT genericTypeParameterList? 
                 interfaceExtendsClause? interfaceTopLevelScope)
-        -> template(t={$text}) "/*INTERFACE*/ <t>"
+        -> template(t={$text}) "/*INTERFACE-not implemented*/ <t>"
     |   ^(ENUM modifierList IDENT implementsClause? enumTopLevelScope)
-        -> template(t={$text}) "/*ENUM*/ <t>"
+        -> template(t={$text}) "/*ENUM-not implemented*/ <t>"
     ;
 
 
@@ -186,32 +182,32 @@ interfaceExtendsClause
     
 implementsClause
     :   ^(IMPLEMENTS_CLAUSE type+)
-        -> template(t={$text}) "/*IMPLEMENTS_CLAUSE*/ <t>"
+        -> template(t={$text}) "/*IMPLEMENTS_CLAUSE-not implemented*/ <t>"
     ;
         
 genericTypeParameterList
     :   ^(GENERIC_TYPE_PARAM_LIST genericTypeParameter+)
-        -> template(t={$text}) "/*GENERIC_TYPE_PARAM_LIST*/ <t>"
+        -> template(t={$text}) "/*GENERIC_TYPE_PARAM_LIST-not implemented*/ <t>"
     ;
 
 genericTypeParameter
     :   ^(IDENT bound?)
-        -> template(t={$text}) "/*genericTypeParameter*/ <t>"
+        -> template(t={$text}) "/*genericTypeParameter-not implemented*/ <t>"
     ;
         
 bound
     :   ^(EXTENDS_BOUND_LIST type+)
-        -> template(t={$text}) "/*EXTENDS_BOUND_LIST*/ <t>"
+        -> template(t={$text}) "/*EXTENDS_BOUND_LIST-not implemented*/ <t>"
     ;
 
 enumTopLevelScope
     :   ^(ENUM_TOP_LEVEL_SCOPE enumConstant+ classTopLevelScope?)
-        -> template(t={$text}) "/*enumTopLevelScope*/ <t>"
+        -> template(t={$text}) "/*enumTopLevelScope-not implemented*/ <t>"
     ;
     
 enumConstant
     :   ^(IDENT arguments? classTopLevelScope?)
-        -> template(t={$text}) "/*enumConstant*/ <t>"
+        -> template(t={$text}) "/*enumConstant-not implemented*/ <t>"
     ;
     
     
@@ -223,9 +219,9 @@ classTopLevelScope
 classScopeDeclarations
 @init { boolean entry = false; }
     :   ^(CLASS_INSTANCE_INITIALIZER block)
-        -> template(t={$text}) "/*cii*/ <t>"
+        -> {$block.st}
     |   ^(CLASS_STATIC_INITIALIZER block)
-        -> template(t={$text}) "/*csi*/ <t>"
+        -> {$block.st}
     |   ^(FUNCTION_METHOD_DECL m=modifierList g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             tc=throwsClause? b=block?)
@@ -329,8 +325,8 @@ classScopeDeclarations
                 tc={$t.st}, 
                 block={$b.st})
         ->
-    |   d=typeDeclaration
-        -> template(t={$d.st}) "/*typeDeclaration*/ <t>"
+    |   typeDeclaration
+        -> {$typeDeclaration.st}
     ;
     
 interfaceTopLevelScope
@@ -351,7 +347,7 @@ interfaceScopeDeclarations
     |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
         -> template(t={$text}) "<t>"
     |   typeDeclaration
-        -> template(t={$text}) "<t>"
+        -> {$typeDeclaration.st}
     ;
 
 variableDeclaratorList
@@ -371,9 +367,9 @@ variableDeclaratorId
 
 variableInitializer
     :   arrayInitializer
-        -> template(t={$text}) "<t>"
+        -> {$arrayInitializer.st}
     |   expression
-        -> template(t={$text}) "<t>"
+        -> {$expression.st}
     ;
 
 arrayDeclarator
@@ -402,28 +398,21 @@ modifierList
     ;
 
 modifier
+@init {
+$st = %{$start.getText()};
+}
     :   PUBLIC
-        -> template(t={$text}) "<t>"
     |   PROTECTED
-        -> template(t={$text}) "<t>"
     |   PRIVATE
-        -> template(t={$text}) "<t>"
     |   ENTRY
-        -> template() "public"
     |   STATIC
-        -> template(t={$text}) "<t>"
     |   ABSTRACT
-        -> template(t={$text}) "<t>"
     |   NATIVE
-        -> template(t={$text}) "<t>"
     |   SYNCHRONIZED
-        -> template(t={$text}) "<t>"
     |   TRANSIENT
-        -> template(t={$text}) "<t>"
     |   VOLATILE
-        -> template(t={$text}) "<t>"
     |   localModifier
-        -> template(t={$text}) "<t>"
+        -> {$localModifier.st}
     ;
 
 localModifierList
@@ -433,15 +422,15 @@ localModifierList
 
 localModifier
     :   FINAL
-        -> template(t={$text}) "<t>"
+        -> {%{$start.getText()}}
     ;
 
     
 type
     :   simpleType
-        -> template(type={$simpleType.st}) "<type>"
+        -> {$simpleType.st}
     |   objectType 
-        -> template(type={$objectType.st}) "<type>"
+        -> {$objectType.st}
     ;
 
 simpleType
@@ -465,22 +454,17 @@ typeIdent
     ;
 
 primitiveType
+@init {
+$st = %{$start.getText()};
+}
     :   BOOLEAN
-        -> template() "bool"
     |   CHAR
-        -> template(t={$text}) "<t>"
     |   BYTE
-        -> template(t={$text}) "<t>"
     |   SHORT
-        -> template(t={$text}) "<t>"
     |   INT
-        -> template(t={$text}) "<t>"
     |   LONG
-        -> template(t={$text}) "<t>"
     |   FLOAT
-        -> template(t={$text}) "<t>"
     |   DOUBLE
-        -> template(t={$text}) "<t>"
     ;
 
 genericTypeArgumentList
@@ -490,7 +474,7 @@ genericTypeArgumentList
     
 genericTypeArgument
     :   type
-        -> template(t={$text}) "<t>"
+        -> {$type.st}
     |   ^(QUESTION genericWildcardBoundType?)
         -> template(t={$text}) "<t>"
     ;
@@ -510,7 +494,6 @@ formalParameterList
 formalParameterStandardDecl
     :   ^(FORMAL_PARAM_STD_DECL lms=localModifierList t=type vdid=variableDeclaratorId)
         -> formal_param_decl(modList={$lms.st}, type={$t.st}, declID={$vdid.st})
-        //-> template(t={$text}) "/*fpsd*/ <t>"
     ;
     
 formalParameterVarargDecl
@@ -590,11 +573,11 @@ statement
     |   ^(LABELED_STATEMENT IDENT statement)
         -> template(t={$text}) "<t>"
     |   expression
-        -> template(t={$text}) "<t>"
+        -> {$expression.st}
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
         ->  embed_cc(str={$STRING_LITERAL.text}, blk={$EMBED_BLOCK.text})
     |   SEMI // Empty statement.
-        -> template(t={$text}) "<t>"
+        -> {%{$start.getText()}}
     ;
         
 catches
@@ -646,7 +629,7 @@ parenthesizedExpression
     
 expression
     :   ^(EXPR expr)
-        -> template(t={$text}) "<t>"
+        -> {$expr.st}
     ;
 
 expr
@@ -735,7 +718,7 @@ expr
     |   ^(CAST_EXPR type expr)
         -> template(t={$text}) "<t>"
     |   primaryExpression
-        -> template(t={$text}) "<t>"
+        -> {$primaryExpression.st}
     ;
     
 primaryExpression
@@ -753,25 +736,25 @@ primaryExpression
         )
         -> template(t={$text}) "<t>"
     |   parenthesizedExpression
-        -> template(t={$text}) "<t>"
+        -> {$parenthesizedExpression.st}
     |   IDENT
-        -> template(t={$text}) "<t>"
+        -> {%{$start.getText()}}
     |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
         -> template(t={$text}) "<t>"
     |   explicitConstructorCall
-        -> template(t={$text}) "<t>"
+        -> {$explicitConstructorCall.st}
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
         -> template(t={$text}) "<t>"
     |   literal
-        -> template(t={$text}) "<t>"
+        -> {$literal.st}
     |   newExpression
-        -> template(t={$text}) "<t>"
+        -> {$newExpression.st}
     |   THIS
-        -> template(t={$text}) "<t>"
+        -> {%{$start.getText()}}
     |   arrayTypeDeclarator
-        -> template(t={$text}) "<t>"
+        -> {$arrayTypeDeclarator.st}
     |   SUPER
-        -> template(t={$text}) "<t>"
+        -> {%{$start.getText()}}
     ;
     
 explicitConstructorCall
@@ -814,23 +797,18 @@ arguments
         -> template(t={$text}) "<t>"
     ;
 
-literal 
+literal
+@init {
+$st = %{$start.getText()};
+}
     :   HEX_LITERAL
-        -> template(t={$text}) "<t>"
     |   OCTAL_LITERAL
-        -> template(t={$text}) "<t>"
     |   DECIMAL_LITERAL
-        -> template(t={$text}) "<t>"
     |   FLOATING_POINT_LITERAL
-        -> template(t={$text}) "<t>"
     |   CHARACTER_LITERAL
-        -> template(t={$text}) "<t>"
     |   STRING_LITERAL
-        -> template(t={$text}) "<t>"
     |   TRUE
-        -> template(t={$text}) "<t>"
     |   FALSE
-        -> template(t={$text}) "<t>"
     |   NULL
-        -> template(t={$text}) "<t>"
     ;
+

@@ -1,15 +1,30 @@
 group Charj;
 
-charjSource_ci(pd, ids, tds) ::= 
+charjSource_ci(pd, ids, tds, debug) ::= 
 //<pd>
 //<ids>
 <<
+<if(debug)>/* \<charjSource_ci> */<endif>
+/*
+ * packageDeclaration disabled...
+<pd>
+ * end packageDeclaration
+ */
+
+/*
+ * importDeclarations disabled...
+<ids>
+ * end importDeclarations
+ */
+
 <tds>
+<if(debug)>/* \</charjSource_ci> */<endif>
 >>
 
 
-charjSource_h(pd, ids, tds, cb) ::= 
+charjSource_h(pd, ids, tds, cb, debug) ::= 
 <<
+<if(debug)>/* \<CHARJ_SOURCE> */<endif>
 /**************************************************************************
  * WARNING                                                                *
  **************************************************************************
@@ -22,27 +37,34 @@ charjSource_h(pd, ids, tds, cb) ::=
 <tds>
 <cb>
 
+<if(debug)>/* \</CHARJ_SOURCE> */<endif>
 >>
 
 
-charjSource_cc(pd, ids, tds, cb) ::= 
+charjSource_cc(pd, ids, tds, cb, debug) ::= 
 <<
+<if(debug)>/* \<CHARJ_SOURCE> */<endif>
 <ids>
 <pd>
 <tds>
 <cb>
+<if(debug)>/* \</CHARJ_SOURCE> */<endif>
 
 >>
 
 packageDeclaration_cc_h(ids) ::= 
 <<
+<if(debug)>/* \<packageDeclaration> */<endif>
 namespace <ids; separator=" { namespace "> {
+<if(debug)>/* \</packageDeclaration> */<endif>
 >>
 
 importDeclaration_cc_h(inc_id, use_id) ::= 
 <<
+<if(debug)>/* \<importDeclaration> */<endif>
 #include \<<inc_id>\>
 using <use_id>;
+<if(debug)>/* \</importDeclaration> */<endif>
 >>
 
 classExtends_ci(type) ::= "<type>"
@@ -59,6 +81,7 @@ interfaceExtends(ts) ::=
 
 classDeclaration_ci(mod, ident, gen, ext, impl, ctls) ::=
 <<
+<if(debug)>/* \<typeDeclaration> */<endif>
 module <ident> {
 <if(ext)>
     extern module <ext>;
@@ -70,24 +93,28 @@ module <ident> {
         <ctls>
     }
 }
+<if(debug)>/* \</typeDeclaration> */<endif>
 
 >>
 
 
 classDeclaration_h(mod, ident, gen, ext, impl, ctls) ::=
 <<
+<if(debug)>/* \<typeDeclaration> */<endif>
 
 #include "<ident>.decl.h"
 <ext>
 class <ident> <gen>: public CBase_<ident> <impl> {
     <ctls>
 };
+<if(debug)>/* \</typeDeclaration> */<endif>
 
 
 >>
 
 classDeclaration_cc(mod, ident, gen, ext, impl, ctls) ::=
 <<
+<if(debug)>/* \<typeDeclaration> */<endif>
 
 
 #include "<ident>.decl.h"
@@ -96,6 +123,7 @@ class <ident> <gen>: public CBase_<ident> <impl> {
     <ctls>
 };
 #include "<ident>.def.h"
+<if(debug)>/* \</typeDeclaration> */<endif>
 
 
 >>
@@ -202,18 +230,6 @@ type(typeID, arrDeclList) ::=
 <typeID><arrDeclList>
 >>
 
-/*
-object_type(typeID, arrDeclList) ::=
-<<
-<typeID>*<arrDeclList>
->>
-
-
-chare_type(typeID, arrDeclList) ::=
-<<
-CProxy_<typeID><arrDeclList>
->>*/
-
 
 formal_param_list(sdecl, vdecl) ::=
 <<
@@ -229,3 +245,5 @@ formal_param_decl(modList, type, declID) ::=
 <<
     <modList> <type> <declID>
 >>
+
+
