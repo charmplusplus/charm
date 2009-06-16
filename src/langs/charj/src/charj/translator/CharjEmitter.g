@@ -647,14 +647,12 @@ expr
     ;
     
 primaryExpression
-    :   ^(  '.' primaryExpression
-            (   IDENT
-            |   'this'
-            |   'super'
-            |   'class'
-            )
-        )
-        -> template(t={$text}) "/* AKB: not sure what's up with this primaryExpression yet */ <t>"
+    :   ^('.' prim=primaryExpression IDENT)
+        -> template(id={$IDENT}, prim={$prim.st}) "<prim>.<id>"
+    |   ^('.' prim=primaryExpression 'this')
+        -> template(prim={$prim.st}) "<prim>.this"
+    |   ^('.' prim=primaryExpression 'super')
+        -> template(prim={$prim.st}) "<prim>.super"
     |   parenthesizedExpression
         -> {$parenthesizedExpression.st}
     |   IDENT

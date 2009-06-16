@@ -403,7 +403,6 @@ primaryExpression
                 (   IDENT
                 |   'this'
                 |   'super'
-                |   'class'
                 )
         )
     |   parenthesizedExpression
