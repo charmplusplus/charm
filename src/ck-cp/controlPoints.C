@@ -22,7 +22,7 @@ using namespace std;
 #define NUM_SAMPLES_BEFORE_TRANSISTION 5
 #define OPTIMIZER_TRANSITION 5
 
-#define WRITEDATAFILE 0
+#define WRITEDATAFILE 1
 
 //#undef DEBUGPRINT
 //#define DEBUGPRINT 4
@@ -921,7 +921,7 @@ int valueProvidedByOptimizer(const char * name){
   const int effective_phase = controlPointManagerProxy.ckLocalBranch()->allData.phases.size();
 
 
-#define OPTIMIZER_ADAPT_CRITICAL_PATHS 1
+#define OPTIMIZER_ADAPT_CRITICAL_PATHS 0
   
   // -----------------------------------------------------------
 #if OPTIMIZER_ADAPT_CRITICAL_PATHS
