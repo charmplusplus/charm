@@ -64,6 +64,9 @@ processArgs() {
             ARGS="$ARGS $arg $1"
             shift
             ;;
+        "--translate-only")
+            ARGS="$ARGS $arg"
+            ;;
         "--charmc")
             CHARMC="$1"
             shift

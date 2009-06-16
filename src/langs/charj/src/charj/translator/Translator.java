@@ -25,6 +25,7 @@ public class Translator {
     private boolean m_verbose;
     private boolean m_errorCondition;
     private boolean m_printAST;
+    private boolean m_translate_only;
 
     // library locations to search for classes
     private String m_stdlib;
@@ -39,16 +40,18 @@ public class Translator {
             boolean _debug,
             boolean _verbose,
             boolean _printAST,
+            boolean _translate_only,
             String _stdlib,
             List<String> _usrlibs)
     {
-        m_charmc    = _charmc;
-        m_debug     = _debug;
-        m_verbose   = _verbose;
-        m_printAST  = _printAST;
-        m_stdlib    = _stdlib;
-        m_usrlibs   = _usrlibs;
-        m_symtab    = new SymbolTable(this);
+        m_charmc = _charmc;
+        m_debug = _debug;
+        m_verbose = _verbose;
+        m_printAST = _printAST;
+        m_translate_only = _translate_only;
+        m_stdlib = _stdlib;
+        m_usrlibs = _usrlibs;
+        m_symtab = new SymbolTable(this);
         m_errorCondition = false;
     }
 
@@ -68,8 +71,7 @@ public class Translator {
         }
     };
 
-    public String translate(String filename) throws Exception 
-    {
+    public String translate(String filename) throws Exception {
         ANTLRFileStream input = new ANTLRFileStream(filename);
             
         CharjLexer lexer = new CharjLexer(input);
@@ -101,7 +103,7 @@ public class Translator {
         m_nodes.reset();
         String ccOutput = translationPass(OutputMode.cc);
         writeTempFile(filename, ccOutput, OutputMode.cc);
-        compileTempFiles(filename, m_charmc);
+        if (!m_translate_only) compileTempFiles(filename, m_charmc);
 
         // Build a string representing all emitted code. This will be printed
         // by the main driver if requested via command-line argument. 
@@ -131,8 +133,7 @@ public class Translator {
         return st.toString();
     }
 
-    private StringTemplateGroup getTemplates(String templateFile)
-    {
+    private StringTemplateGroup getTemplates(String templateFile) {
         StringTemplateGroup templates = null;
         try {
             ClassLoader loader = Thread.currentThread().getContextClassLoader();
@@ -147,8 +148,7 @@ public class Translator {
         return templates;
     }
 
-    public File findPackage(String packageName)
-    {
+    public File findPackage(String packageName) {
         String packageDir = packageName.replace(".", "/");
         File p = new File(packageDir);
         if ( debug() ) System.out.println(
@@ -188,8 +188,7 @@ public class Translator {
      *  load unknown types from disk. packageName comes from the output
      *  of PackageScope.getFullyQualifiedName
      */
-    public ClassSymbol loadType(String packageName, String typeName)
-    {
+    public ClassSymbol loadType(String packageName, String typeName) {
         if (debug()) System.out.println(
                 " [charj] loadType(" + typeName + ") from " + packageName);
         

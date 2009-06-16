@@ -14,6 +14,7 @@ public class Main
     public static boolean m_verbose;
     public static boolean m_printAST;
     public static boolean m_stdout;
+    public static boolean m_translate_only;
 
     public static void main(String[] args) throws Exception
     {
@@ -23,6 +24,7 @@ public class Main
                 m_debug, 
                 m_verbose,
                 m_printAST,
+                m_translate_only,
                 m_stdlib,
                 m_usrlibs);
         for (String filename : files) { 
@@ -87,7 +89,13 @@ public class Main
         _stdout.setHelp("echo generated code to stdout");
         processor.registerParameter(_stdout);
 
-        UnflaggedOption fileList = new UnflaggedOption("files")
+        Switch _translate_only = new Switch("translate-only")
+            .setShortFlag(JSAP.NO_SHORTFLAG)
+            .setLongFlag("translate-only");
+        _translate_only.setHelp("translate to C++, but do not compile");
+        processor.registerParameter(_translate_only);
+
+        UnflaggedOption fileList = new UnflaggedOption("file")
             .setStringParser(JSAP.STRING_PARSER)
             .setRequired(true)
             .setGreedy(true);
@@ -111,6 +119,7 @@ public class Main
         m_verbose = config.getBoolean("verbose", false);
         m_printAST = config.getBoolean("printAST", false);
         m_stdout = config.getBoolean("stdout", false);
+        m_translate_only = config.getBoolean("translate-only", false);
         
         String usrlib = config.getString("usrlib");
         if (usrlib != null) {
