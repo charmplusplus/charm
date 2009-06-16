@@ -17,6 +17,12 @@ Originally written by Karthik Mahesh, September 2000.
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
 
+enum MetisGraphType {
+    NodeNeighborMode,
+    FaceNeighborMode
+};
+MetisGraphType FEM_Partition_Graph_Type = FaceNeighborMode;
+
 class NList
 {
   int nn; // number of current elements
@@ -196,6 +202,92 @@ void mesh2graph(const FEM_Mesh *m, Graph *g)
 }
 
 
+/**
+ * Given an FEM_Mesh, determine all pairs of elements which share a
+ * common face, and add them as edges to the provided graph. We guess
+ * at what the element faces look like based on the number of nodes
+ * per element, so for quad meshes we'll incorrectly guess tets.
+ * Note that this function will only work for properly oriented graphs,
+ * whereas mesh2graph will always work, at the cost of much larger,
+ * lower-quality graphs.
+ */
+void mesh2graph_face(const FEM_Mesh* m, Graph* g)
+{
+    const int faceMap2d_tri[3][2] = {{0,1},{1,2},{2,0}};
+    const int faceMap3d_tet[4][3] = {{0,1,2},{0,3,1},{0,2,3},{1,3,2}};
+    const int faceMap3d_hex[6][4] = {{0,1,2,3},{1,5,6,2},{2,6,7,3},
+                                     {3,7,4,0},{0,4,5,1},{5,4,6,7}};
+
+    // For each node, assemble the set of all adjacent elements.
+    std::map<int, std::set<int> > nodeNeighbors;
+    int elementCount=0;
+    for (int type=0; type<m->elem.size(); ++type) {
+        if (!m->elem.has(type)) continue;
+        const FEM_Elem& elems = m->elem[type];
+        const int nodesPerElem = elems.getNodesPer();
+        for (int elem=0; elem<elems.size(); ++elem,++elementCount) {
+            for (int node=0; node<nodesPerElem; ++node) {
+                nodeNeighbors[elems.getConn(elem, node)].insert(elementCount);
+            }
+        }
+    }
+
+    // For each element, add all its face neighbors to the graph.
+    for (int type=0; type<m->elem.size(); ++type) {
+        if (!m->elem.has(type)) continue;
+        const FEM_Elem& elems = m->elem[type];
+        const int nodesPerElem = elems.getNodesPer();
+        int* faces;
+        int faceSize;
+        // Determine what kind of faces we're looking for. Beware, this fails
+        // for quad meshes--they look just like tets to us.
+        switch (nodesPerElem) {
+            case 3: // triangle
+                faces = (int*)faceMap2d_tri;
+                faceSize = 2;
+                break;
+            case 4: // tet
+                faces = (int*)faceMap3d_tet;
+                faceSize = 3;
+                break;
+            case 6: // hex
+                faces = (int*)faceMap3d_hex;
+                faceSize = 4;
+                break;
+            default:
+                CkPrintf("Cannot determine face neighbors for elements with %d nodes\n", nodesPerElem);
+                CkAbort("Confused by element type during initial partitioning, aborting.");
+        }
+
+        for (int elem=0; elem<elems.size(); ++elem,++elementCount) {
+            // For each face on the element, intersect the element lists of
+            // all nodes on the face to obtain the face neighbor.
+            for (int face=0; face<nodesPerElem; ++face) {
+                std::set<int> elemNeighbors =
+                    nodeNeighbors[elems.getConn(elem, faces[face*faceSize])];
+                std::set<int> tempSet;
+                for (int nodeNum=1; nodeNum<faceSize; ++nodeNum,tempSet.clear()) {
+                    std::set<int>& nn =
+                        nodeNeighbors[elems.getConn(elem, faces[face*faceSize+nodeNum])];
+                    std::set_intersection(elemNeighbors.begin(),
+                            elemNeighbors.end(),
+                            nn.begin(),
+                            nn.end(),
+                            std::inserter(tempSet, tempSet.begin()));
+                    elemNeighbors = tempSet;
+                }
+                CkAssert(elemNeighbors.size() <= 2);
+                for (std::set<int>::iterator i = elemNeighbors.begin();
+                        i != elemNeighbors.end();
+                        ++i) {
+                    if (*i != elem) g->add(elem, *i);
+                }
+            }
+        }
+    }
+}
+
+
 //FIXME: Shouldn't these prototypes come from some METIS header file?
 typedef int idxtype;
 extern "C" void 
@@ -213,6 +305,11 @@ METIS_PartGraphKway (int* nv, int* xadj, int* adjncy, int* vwgt, int* adjwgt,
 */
 void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
 {
+	char **argv = CkGetArgv();
+        if (CmiGetArgFlagDesc(argv, "+Parfum_node_neighbor_graph",
+                    "Specify partitioning based on node neighbors instead of face neighbors")) {
+            FEM_Partition_Graph_Type = NodeNeighborMode;
+        }
 	CkThresholdTimer time("FEM Split> Building graph for metis partitioner",1.0);
 	int nelems=mesh->nElems();
 	if (nchunks==1) {//Metis can't handle this case (!)
@@ -220,11 +317,16 @@ void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
 		return;
 	}
 	Graph g(nelems);
-	mesh2graph(mesh,&g);
+        if (FEM_Partition_Graph_Type == NodeNeighborMode) {
+	    mesh2graph(mesh,&g);
+        } else {
+            mesh2graph_face(mesh,&g);
+        }
 	
 	int *adjStart; /*Maps elem # -> start index in adjacency list*/
 	int *adjList; /*Lists adjacent vertices for each element*/
 	g.toAdjList(adjStart,adjList);
+
 	int ecut,numflag=0;
 	int wgtflag = 0; // no weights associated with elements or edges
 	int opts[5];
