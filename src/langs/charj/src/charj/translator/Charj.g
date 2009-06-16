@@ -131,7 +131,6 @@ tokens {
     EMBED                   = 'embed'           ;
     ENTRY                   = 'entry'           ;
 
-
     // C++ keywords that aren't used in charj. 
     // We don't use these ourselves, but they're still reserved
     ASM                     = 'asm'             ;
@@ -164,10 +163,7 @@ tokens {
     VIRTUAL                 = 'virtual'         ;
     WCHAR_T                 = 'wchar_t'         ;
     
-    
-    
     // tokens for imaginary nodes
-    
     ARGUMENT_LIST;
     ARRAY_DECLARATOR;
     ARRAY_DECLARATOR_LIST;
