@@ -78,7 +78,7 @@ extern unsigned char computeCheckSum(unsigned char *data, int len);
         if (checksum_flag)      \
           if (computeCheckSum((unsigned char*)msg, len) != 0)  { \
             printf("\n\n------------------------------\n\nReceiver %d size %d:", CmiMyPe(), len); \
-            for(int count = 0; count < len; count++) { \
+            for(count = 0; count < len; count++) { \
                 printf("%2x", msg[count]);                 \
             }                                             \
             printf("------------------------------\n\n"); \
