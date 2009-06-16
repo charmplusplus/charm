@@ -10,8 +10,7 @@ public class InterfaceSymbol extends ClassSymbol {
             SymbolTable symtab, 
             String name, 
             ClassSymbol superClass, 
-            Scope scope) 
-    {
+            Scope scope) {
         super(symtab, name, superClass, scope);
     }
 }
