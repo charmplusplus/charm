@@ -140,8 +140,8 @@ importDeclaration
 
 typeDeclaration
     :   classDefinition
-        interfaceDefinition
-        enumDefinition
+    |   interfaceDefinition
+    |   enumDefinition
     ;
 
 classDefinition
@@ -149,27 +149,20 @@ classDefinition
             classScopeDeclaration*
         '}' ';'?
         -> ^('class' IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
+    ;
 
 interfaceDefinition
     :   'interface' IDENT ('extends' typeList)?  '{'
             interfaceScopeDeclaration*
         '}' ';'?
         -> ^('interface' IDENT ^('extends' typeList)? interfaceScopeDeclaration*)
+    ;
 
 enumDefinition
     :   'enum' IDENT ('implements' typeList)? '{'
-            enumScopeDeclaration*
+            enumConstants ','? ';' classScopeDeclaration*
         '}' ';'?
-        -> ^('enum' IDENT ^('implements' typeList)? enumScopeDeclaration*)
-
-
-enumScopeDeclaration
-    :   enumConstants (','!)? enumClassScopeDeclarations?
-    ;
-
-enumClassScopeDeclarations
-    :   s=';' classScopeDeclarations*
-        ->  ^(CLASS_TOP_LEVEL_SCOPE[$s, "CLASS_TOP_LEVEL_SCOPE"] classScopeDeclarations*)
+        -> ^('enum' IDENT ^('implements' typeList)? enumConstants classScopeDeclaration*)
     ;
 
 enumConstants
@@ -177,9 +170,8 @@ enumConstants
     ;
 
 enumConstant
-    :   IDENT^ arguments? classBody?
+    :   IDENT^ arguments?
     ;
-
 
 typeList
     :   type (','! type)*
