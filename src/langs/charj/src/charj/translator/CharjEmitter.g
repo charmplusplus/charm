@@ -571,8 +571,8 @@ statement
         -> template() "break;" // TODO: support labeling
     |   ^(CONTINUE IDENT?)
         -> template() "continue" // TODO: support labeling
-    |   ^(LABELED_STATEMENT IDENT statement)
-        -> template(t={$text}) "<t>"
+    |   ^(LABELED_STATEMENT i=IDENT s=statement)
+        -> label(text={$i.text}, stmt={$s.st})
     |   expression
         -> {$expression.st}
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
@@ -592,15 +592,15 @@ catchClause
     ;
 
 switchBlockLabels
-    :   ^(SWITCH_BLOCK_LABEL_LIST switchCaseLabel*)
-        -> template(t={$text}) "<t>"
+    :   ^(SWITCH_BLOCK_LABEL_LIST (l+=switchCaseLabel)*)
+        -> template(labels={$l}) "<labels; separator=\"\n\">"
     ;
         
 switchCaseLabel
-    :   ^(CASE expression blockStatement*)
-        -> template(t={$text}) "<t>"
-    |   ^(DEFAULT blockStatement*)
-        -> template(t={$text}) "<t>"
+    :   ^(CASE expression (b+=blockStatement)*)
+        -> case(expr={$expression.st}, block={$b})
+    |   ^(DEFAULT (b+=blockStatement)*)
+        -> template(block={$b}) "default: <block>"
     ;
     
 forInit

@@ -346,3 +346,12 @@ return(val) ::=
 return<if(val)> <val><endif>;
 >>
 
+label(text, stmt) ::=
+<<
+<text>: <stmt>
+>>
+
+case(expr, block) ::=
+<<
+case <expr>: <block>
+>>
