@@ -21,7 +21,7 @@ enum MetisGraphType {
     NodeNeighborMode,
     FaceNeighborMode
 };
-MetisGraphType FEM_Partition_Graph_Type = FaceNeighborMode;
+MetisGraphType FEM_Partition_Graph_Type = NodeNeighborMode;
 
 class NList
 {
@@ -306,13 +306,13 @@ METIS_PartGraphKway (int* nv, int* xadj, int* adjncy, int* vwgt, int* adjwgt,
 void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
 {
 	char **argv = CkGetArgv();
-        if (CmiGetArgFlagDesc(argv, "+Parfum_node_neighbor_graph",
-                    "Specify partitioning based on node neighbors instead of face neighbors")) {
-            FEM_Partition_Graph_Type = NodeNeighborMode;
+        if (CmiGetArgFlagDesc(argv, "+Parfum_face_neighbor_graph",
+                    "Specify partitioning based on face neighbors instead of node neighbors")) {
+            FEM_Partition_Graph_Type = FaceNeighborMode;
         }
 	CkThresholdTimer time("FEM Split> Building graph for metis partitioner",1.0);
 	int nelems=mesh->nElems();
-	if (nchunks==1) {//Metis can't handle this case (!)
+	if (nchunks==1) { //Metis doesn't handle this case (!)
 		for (int i=0;i<nelems;i++) elem2chunk[i]=0;
 		return;
 	}
