@@ -7,7 +7,7 @@ import java.util.Map;
 public class PackageScope extends SymbolWithScope {
 
     /** List of packages and classes in this package */
-    Map<String, Symbol> members = new HashMap();
+    Map<String, Symbol> members = new HashMap(); // union of types and subpackages
     Scope enclosingScope;
 
     public PackageScope(
@@ -18,8 +18,7 @@ public class PackageScope extends SymbolWithScope {
         this.enclosingScope = enclosingScope;
     }
 
-    public Scope getEnclosingScope() 
-    {
+    public Scope getEnclosingScope() {
         return enclosingScope;
     }
 
@@ -34,21 +33,17 @@ public class PackageScope extends SymbolWithScope {
                 " PackageScope.resolveType(" + type + 
                 "): examine " + toString());
 
-        // look for type in this package's members (other packages, classes)
-        if ( getMembers()!=null ) {
-            Symbol s = getMembers().get(type);
-            if ( s!=null && s instanceof ClassSymbol ) {
-                if (debug()) System.out.println(
-                        " PackageScope.resolveType(" + type + "): found in " + 
-                        toString());
-                return (ClassSymbol)s;
-            }
+        // break off leading package names and look them up,
+        // then look up the base class name within the appropriate package scope.
+        String[] nameParts = type.split("[.]", 2);
+        if (nameParts.length == 1) return (ClassSymbol)members.get(type);
+        PackageScope innerPackage = (PackageScope)members.get(nameParts[0]);
+        if (innerPackage == null) {
+            if (debug()) System.out.println("Package lookup for " +
+                    nameParts[0] + "failed.\n");
+            return null;
         }
-        return null;
-    }
-
-    public Map<String, Symbol> getMembers() {
-        return members;
+        return innerPackage.resolveType(nameParts[1]);
     }
 
     public String getFullyQualifiedName() {
@@ -56,6 +51,10 @@ public class PackageScope extends SymbolWithScope {
             return null;
         }
         return super.getFullyQualifiedName();
+    }
+
+    public Map<String, Symbol> getMembers() {
+        return members;
     }
 
     public String toString() {

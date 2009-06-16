@@ -77,8 +77,7 @@ public class SymbolTable {
      *  looking up the packages to left of last id.  Add last id to that 
      *  package.
      */
-    public PackageScope definePackage(String packageName) 
-    {
+    public PackageScope definePackage(String packageName) {
         String[] packageNames = packageName.split("[.]");
         String outerPackageName = packageNames[0];
         PackageScope outerPackage = (PackageScope)defaultPkg.resolve(
@@ -118,8 +117,7 @@ public class SymbolTable {
     /** Find package starting with it's outermost package name.  If
      *  not in sym tab, return null.
      */
-    public PackageScope resolvePackage(String packageName) 
-    {
+    public PackageScope resolvePackage(String packageName) {
         if ( debug() ) System.out.println(
                 " SymbolTable.resolvePackage(" + packageName + 
                 "): examine: " + topLevelPackageScopes.keySet());
@@ -158,6 +156,11 @@ public class SymbolTable {
                 " SymbolTable.resolvePackage(" + packageName + "): found in " +
                 topLevelPackageScopes.keySet());
         return p;
+    }
+
+    public ClassSymbol resolveType(String typeName) {
+        assert false;
+        return null;
     }
 
     public ClassSymbol getObjectRoot() {

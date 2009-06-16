@@ -57,7 +57,7 @@ int macroDefined(char *str, int istrue)
 
 // input: name
 // output: basename (pointer somewhere inside name)
-//         scope (null if name is unscoped, newly allocated string otherwise
+//         scope (null if name is unscoped, newly allocated string otherwise)
 void splitScopedName(char* name, char** scope, char** basename) {
     char* scopeEnd = strrchr(name, ':');
     if (!scopeEnd) {
@@ -66,10 +66,10 @@ void splitScopedName(char* name, char** scope, char** basename) {
         return;
     }
     *basename = scopeEnd+1;
-    int len=scopeEnd-name+1; /* valid characters to copy */
+    int len = scopeEnd-name+1; /* valid characters to copy */
     *scope = new char[len+1];
     strncpy(*scope, name, len);
-    (*scope)[len]=0; /* gotta nul-terminate C string! */
+    (*scope)[len]=0; /* gotta null-terminate C string */
 }
 
 FILE *openFile(char *interfacefile)

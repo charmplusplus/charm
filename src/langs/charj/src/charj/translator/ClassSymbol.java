@@ -30,8 +30,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
 
     public ClassSymbol(
             SymbolTable symtab, 
-            String name) 
-    {
+            String name) {
         super(symtab, name);
         type = this;
         for (String pkg : SymbolTable.AUTO_IMPORTS) {
@@ -43,8 +42,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
             SymbolTable symtab, 
             String name,
             ClassSymbol superClass,
-            Scope scope)
-    {
+            Scope scope) {
         this(symtab, name);
         this.superClass = superClass;
         this.scope = scope;
@@ -52,8 +50,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         // manually add automatic class methods and symbols here
     }
 
-    public Scope getEnclosingScope() 
-    {
+    public Scope getEnclosingScope() {
         // at root?  Then use enclosing scope
         if ( superClass==null ) { 
             return scope;
@@ -73,8 +70,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
      *
      *  Return null if this class is not in sym tab and was not found in path.
      */
-    public PackageScope importPackage(String packageName) 
-    {
+    public PackageScope importPackage(String packageName) {
         if (debug()) System.out.println(
                 "ClassSymbol.importPackage(" + packageName +
                 "): add to " + toString());
@@ -100,8 +96,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
 
     public void alias(
             CharjAST aliasAST, 
-            CharjAST methodNameAST) 
-    {
+            CharjAST methodNameAST) {
         String op = aliasAST.getToken().getText();
         op = op.substring(1,op.length()-1);
         String method = methodNameAST.getToken().getText();
@@ -111,13 +106,11 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
 
     public void alias(
             String alias, 
-            String methodName) 
-    {
+            String methodName) {
         aliases.put(alias, methodName);
     }
 
-    public String getMethodNameForOperator(String op) 
-    {
+    public String getMethodNameForOperator(String op) {
         String name = aliases.get(op);
         if ( name==null ) {
             symtab.translator.error(
@@ -144,8 +137,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
      *  packges, walk through imported packages again, trying to load from 
      *  disk.
      */
-    public ClassSymbol resolveType(String type) 
-    {
+    public ClassSymbol resolveType(String type) {
         if (debug()) System.out.println(
                 "ClassSymbol.resolveType(" + type + "): context is " + name +
                 ":" + members.keySet());
@@ -197,8 +189,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
 
     public MethodSymbol resolveMethodLocally(
             String name, 
-            int numargs) 
-    {
+            int numargs) {
         if ( numargs>0 ) {
             name += numargs;
         }
@@ -211,8 +202,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         return null;
     }
 
-    public boolean isMethod(String name) 
-    {
+    public boolean isMethod(String name) {
         if ( methodNames.contains(name) ) {
             return true;
         }
@@ -224,8 +214,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
 
     public Symbol define(
             String name, 
-            Symbol sym) 
-    {
+            Symbol sym) {
         if ( sym instanceof MethodSymbol ) {
             methodNames.add(sym.name);
         }
@@ -236,8 +225,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         return "ClassSymbol[" + name + "]: " + members;
     }
 
-    public String getFullyQualifiedName() 
-    {
+    public String getFullyQualifiedName() {
         String parent = null;
         if ( scope!=null ) { // in a package?
             parent = scope.getFullyQualifiedName();
@@ -248,8 +236,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         return name;
     }
 
-    public String getMangledName() 
-    {
+    public String getMangledName() {
         if ( SymbolTable.TYPE_NAMES_TO_MANGLE.contains(name) ) {
             return "m"+name;
         }
