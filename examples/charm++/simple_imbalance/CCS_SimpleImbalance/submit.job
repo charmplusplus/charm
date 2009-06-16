@@ -1,0 +1,20 @@
+#!/bin/bash
+#PBS -A TG-ASC050039N
+#PBS -N CCS_test
+#PBS -q batch
+#PBS -j oe
+#PBS -l walltime=0:20:00,size=4096
+
+cd /lustre/scratch/cheelee/development/CCS_SimpleImbalance
+
+echo PURE_BASELINE
+aprun -n 4095 ./Baseline 1 40
+
+echo BASELINE_SUMMARY_RUN
+aprun -n 4095 ./SummaryNonBlocking 1 40 ++server-port 11337 +bincount 1000000 +traceroot /lustre/scratch/cheelee/development/CCS_SimpleImbalance/baseline_logs
+
+echo START_CLIENT
+/lustre/scratch/cheelee/development/SimpleCcsClient/simpleCcsClient `grep "Server IP" *.OU | cut -d" " -f5 | cut -d"," -f1` 11337 > client-output.txt &
+
+echo START_SERVER
+aprun -n 4095 ./LB_Test_Sum 1 40 ++server-port 11337 +traceoff +bincount 1000000 +traceroot /lustre/scratch/cheelee/development/CCS_SimpleImbalance/server_logs
