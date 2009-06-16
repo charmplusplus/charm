@@ -26,4 +26,4 @@ debug-emitter:
 
 # For any unrecognized rules, try to compile a test program with that name
 %:
-	./bin/charjc --debug --verbose --AST --stdout tests/$@.cj
+	./bin/charjc --debug --verbose --AST --stdout tests/$@/$@.cj
