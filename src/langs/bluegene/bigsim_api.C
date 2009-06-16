@@ -28,7 +28,6 @@ BgTimeLog *BgStartLogByName(BgTimeLineRec &tlinerec, int ep, const char *name, d
   BgTimeLog* newLog = new BgTimeLog(ep, name, starttime);
   if (prevLog) {
     newLog->addBackwardDep(prevLog);
-    newLog->objId = prevLog->objId;
   }
   tlinerec.logEntryStart(newLog);
   return newLog;
