@@ -385,8 +385,22 @@ method_call(primary, generic_types, args) ::=
 <endif>
 >>
 
+
+array_construction_with_init(array_decls, initializer) ::=
+<<
+<array_decls> = {<initializer>};
+>>
+
+
+array_construction(exprs, array_decls) ::=
+<<
+[<exprs; separator="][">]<array_decls>
+>> 
+
+
 arguments(exprs) ::=
 <<
 <exprs; separator=", ">
 >>
+
 

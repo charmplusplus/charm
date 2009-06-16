@@ -786,14 +786,16 @@ newExpression
 
 innerNewExpression // something like 'InnerType innerType = outer.new InnerType();'
     :   ^(CLASS_CONSTRUCTOR_CALL genericTypeArgumentList? IDENT arguments classTopLevelScope?)
-        -> template(t={$text}) "<t>"
+        -> template(t={$text}) " /* AKB: innerNewExpression not supported */ <t>"
     ;
     
 newArrayConstruction
     :   arrayDeclaratorList arrayInitializer
-        -> template(t={$text}) "<t>"
-    |   expression+ arrayDeclaratorList?
-        -> template(t={$text}) "<t>"
+        -> array_construction_with_init(
+                array_decls={$arrayDeclaratorList.st},
+                initializer={$arrayInitializer.st})
+    |   (ex+=expression)+ adl=arrayDeclaratorList?
+        -> array_construction(exprs={$ex}, array_decls={$adl.st})
     ;
 
 arguments
