@@ -422,8 +422,10 @@ primitiveType
 $st = %{$start.getText()};
 }
     :   'boolean'
+        -> template() "bool"
     |   'char'
     |   'byte'
+        -> template() "char"
     |   'short'
     |   'int'
     |   'long'
