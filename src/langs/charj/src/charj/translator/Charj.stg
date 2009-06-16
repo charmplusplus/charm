@@ -249,7 +249,7 @@ local_mod_list(mods) ::=
 local_var_decl(modList, type, declList) ::=
 <<
 <if(modList)>
-<modList>: <type> <declList>;
+<modList> <type> <declList>;
 <else>
 <type> <declList>;
 <endif>
