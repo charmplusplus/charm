@@ -141,12 +141,13 @@ int BGMach::traceProejctions(int pe)
 void BGMach::setNetworkModel(char *model)
 {
   if (!strcmp(model, "dummy"))
-        network = new DummyNetwork;
+    network = new DummyNetwork;
   else if (!strcmp(model, "lemieux"))
-        network = new LemieuxNetwork;
-  else if (!strcmp(model, "bluegenep"))
-        network = new BlueGenePNetwork;
-  else if (!strcmp(model, "bluegene"))
+    network = new LemieuxNetwork;
+  else if (!strcmp(model, "bluegenep")) {
+    network = new BlueGenePNetwork;
+    network->setDimensions(x, y, z, numWth);
+  } else if (!strcmp(model, "bluegene"))
         network = new BlueGeneNetwork;
   else if (!strcmp(model, "redstorm"))
         network = new RedStormNetwork;
