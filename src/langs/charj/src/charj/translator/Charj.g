@@ -16,6 +16,7 @@ options {
 }
 
 tokens {
+    ENTRY                   = 'entry'           ;
 
     // C++ keywords that aren't used in charj. 
     // We don't use these ourselves, but they're still reserved
@@ -240,7 +241,7 @@ variableInitializer
 
 arrayDeclarator
     :   '[' ']'
-        ->  ^(ARRAY_DECLARATOR)
+        ->  ARRAY_DECLARATOR
     ;
 
 arrayDeclaratorList

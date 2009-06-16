@@ -81,18 +81,17 @@ interfaceExtends(ts) ::=
 >>
 
 
-classDeclaration_ci(mod, ident, gen, ext, impl, ctls) ::=
+classDeclaration_ci(ident, ext, csds) ::=
 <<
 <if(debug)>/* \<typeDeclaration> */<endif>
 module <ident> {
 <if(ext)>
     extern module <ext>;
-    chare <ident> <gen>: <ext> {
+    chare <ident>: <ext> {
 <else>
-    chare <ident> <gen> {
+    chare <ident> {
 <endif>
-        
-        <ctls>
+        <csds>
     }
 }
 <if(debug)>/* \</typeDeclaration> */<endif>
@@ -100,29 +99,29 @@ module <ident> {
 >>
 
 
-classDeclaration_h(mod, ident, gen, ext, impl, ctls) ::=
+classDeclaration_h(ident, ext, csds) ::=
 <<
 <if(debug)>/* \<typeDeclaration> */<endif>
 
 #include "<ident>.decl.h"
-<ext>
-class <ident> <gen>: public CBase_<ident> <impl> {
-    <ctls>
+/* superclass: <ext> */
+class <ident>: public CBase_<ident> {
+    <csds>
 };
 <if(debug)>/* \</typeDeclaration> */<endif>
 
 
 >>
 
-classDeclaration_cc(mod, ident, gen, ext, impl, ctls) ::=
+classDeclaration_cc(ident, ext, csds) ::=
 <<
 <if(debug)>/* \<typeDeclaration> */<endif>
 
 
 #include "<ident>.decl.h"
-<ext>
-class <ident> <gen>: public CBase_<ident> <impl> {
-    <ctls>
+/* superclass: <ext> */
+class <ident>: public CBase_<ident> {
+    <csds>
 };
 #include "<ident>.def.h"
 <if(debug)>/* \</typeDeclaration> */<endif>
@@ -131,67 +130,61 @@ class <ident> <gen>: public CBase_<ident> <impl> {
 >>
 
 
-classTopLevelScope(classScopeDeclarations) ::= 
+funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<classScopeDeclarations; separator="\n">
+<modl>: <ty> <gtpl> <id><fpl> <adl>;
 >>
 
 
-funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, tc, block) ::=
+funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<modl>: <ty> <gtpl> <id><fpl> <adl> <tc>;
+entry <ty> <gtpl> <id><fpl> <adl>;
 >>
 
 
-funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, tc, block) ::=
+funcMethodDecl_cc(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-entry <ty> <gtpl> <id><fpl> <adl> <tc>;
->>
-
-
-funcMethodDecl_cc(modl, gtpl, ty, id, fpl, adl, tc, block) ::=
-<<
-<modl>: <ty> <gtpl> <id><fpl> <adl> <tc> {
+<modl>: <ty> <gtpl> <id><fpl> <adl> {
     <block>
 }
 >>
 
 
-voidMethodDecl_ci(modl, gtpl, id, fpl, tc, block) ::=
+voidMethodDecl_ci(modl, gtpl, id, fpl, block) ::=
 <<
-entry void<gtpl> <id><fpl> <tc>;
+entry void<gtpl> <id><fpl>;
 >>
 
 
-voidMethodDecl_h(modl, gtpl, id, fpl, tc, block) ::=
+voidMethodDecl_h(modl, gtpl, id, fpl, block) ::=
 <<
-<modl>: void<gtpl> <id><fpl> <tc>;
+<modl>: void<gtpl> <id><fpl>;
 >>
 
 
-voidMethodDecl_cc(modl, gtpl, id, fpl, tc, block) ::=
+voidMethodDecl_cc(modl, gtpl, id, fpl, block) ::=
 <<
-<modl>: void<gtpl> <id><fpl> <tc> {
+<modl>: void<gtpl> <id><fpl> {
     <block>
 }
 >>
 
 
-ctorDecl_ci(modl, gtpl, id, fpl, tc, block) ::=
+ctorDecl_ci(modl, gtpl, id, fpl, block) ::=
 <<
-entry void<gtpl> <id><fpl> <tc>;
+entry void<gtpl> <id><fpl>;
 >>
 
 
-ctorDecl_h(modl, gtpl, id, fpl, tc, block) ::=
+ctorDecl_h(modl, gtpl, id, fpl, block) ::=
 <<
-<modl>:<gtpl> <id><fpl> <tc>;
+<modl>:<gtpl> <id><fpl>;
 >>
 
 
-ctorDecl_cc(modl, gtpl, id, fpl, tc, block) ::=
+ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
 <<
-<modl>:<gtpl> <id><fpl> <tc> {
+<modl>:<gtpl> <id><fpl> {
     <block>
 }
 >>
@@ -321,10 +314,9 @@ if (<cond>) {
 >>
 
 
-// note: initializer carries its own semicolon
 for(initializer, cond, update, body) ::=
 <<
-for (<initializer> <cond>; <update>) {
+for (<initializer> <cond> <update>) {
     <body>
 }
 >>

@@ -112,7 +112,7 @@ importDeclarations returns [List<CharjAST> packageNames]
 @init {
 	packageNames = new ArrayList<CharjAST>();
 }
-    :   (^('import' 'static'? qualifiedIdentifier './*'?)
+    :   (^('import' qualifiedIdentifier './*'?)
 		{ packageNames.add($qualifiedIdentifier.start); })*
     ;
 
@@ -160,7 +160,6 @@ interfaceScopeDeclaration
         // there's an obligatory initializer.
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList simpleType variableDeclaratorList)
     |   ^(OBJECT_VAR_DECLARATION modifierList objectType variableDeclaratorList)
-    |   typeDeclaration[null]
     ;
 
 variableDeclaratorList
