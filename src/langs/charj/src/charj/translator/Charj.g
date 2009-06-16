@@ -254,11 +254,11 @@ typeDecls
 packageDeclaration
     :   PACKAGE^ qualifiedIdentifier SEMI!  
     ;
-    
+
 importDeclaration
     :   IMPORT^ STATIC? qualifiedIdentifier DOTSTAR? SEMI!
     ;
-    
+
 typeDeclaration
     :   modifierList!
         (   classTypeDeclaration[$modifierList.tree]
@@ -266,27 +266,27 @@ typeDeclaration
         |   enumTypeDeclaration[$modifierList.tree]
         )
     ;
-    
+
 classTypeDeclaration[CharjAST modifiers]
     :   CLASS IDENT genericTypeParameterList? classExtendsClause? implementsClause? classBody
         ->  ^(CLASS {$modifiers} IDENT genericTypeParameterList? classExtendsClause? implementsClause? classBody)
     ;
-    
+
 classExtendsClause
     :   EXTENDS type
         ->  ^(EXTENDS_CLAUSE[$EXTENDS, "EXTENDS_CLAUSE"] type)
     ;   
-    
+
 interfaceExtendsClause
     :   EXTENDS typeList
         ->  ^(EXTENDS_CLAUSE[$EXTENDS, "EXTENDS_CLAUSE"] typeList)
     ;   
-    
+
 implementsClause
     :   IMPLEMENTS typeList
         ->  ^(IMPLEMENTS_CLAUSE[$IMPLEMENTS, "IMPLEMENTS_CLAUSE"] typeList)
     ;
-        
+
 genericTypeParameterList
     :   LESS_THAN genericTypeParameter (COMMA genericTypeParameter)* genericTypeListClosing
         ->  ^(GENERIC_TYPE_PARAM_LIST[$LESS_THAN, "GENERIC_TYPE_PARAM_LIST"] genericTypeParameter+)
@@ -306,7 +306,7 @@ genericTypeParameter
     :   IDENT bound?
         ->  ^(IDENT bound?)
     ;
-        
+
 bound
     :   EXTENDS type (AND type)*
         ->  ^(EXTENDS_BOUND_LIST[$EXTENDS, "EXTENDS_BOUND_LIST"] type+)
@@ -316,7 +316,7 @@ enumTypeDeclaration[CharjAST modifiers]
     :   ENUM IDENT implementsClause? enumBody
         ->  ^(ENUM {$modifiers} IDENT implementsClause? enumBody)
     ;
-    
+
 enumBody
     :   LCURLY enumScopeDeclarations RCURLY
         ->  ^(ENUM_TOP_LEVEL_SCOPE[$LCURLY, "ENUM_TOP_LEVEL_SCOPE"] enumScopeDeclarations)
@@ -334,25 +334,25 @@ enumClassScopeDeclarations
 enumConstants
     :   enumConstant (COMMA! enumConstant)*
     ;
-    
+
 enumConstant
     :   IDENT^ arguments? classBody?
     ;
-    
+
 interfaceTypeDeclaration[CharjAST modifiers]
     :   INTERFACE IDENT genericTypeParameterList? interfaceExtendsClause? interfaceBody
         ->  ^(INTERFACE {$modifiers} IDENT genericTypeParameterList? interfaceExtendsClause? interfaceBody)
     ;
-    
+
 typeList
     :   type (COMMA! type)*
     ;
-    
+
 classBody
     :   LCURLY classScopeDeclarations* RCURLY
         ->  ^(CLASS_TOP_LEVEL_SCOPE[$LCURLY, "CLASS_TOP_LEVEL_SCOPE"] classScopeDeclarations*)
     ;
-    
+
 interfaceBody
     :   LCURLY interfaceScopeDeclarations* RCURLY
         ->  ^(INTERFACE_TOP_LEVEL_SCOPE[$LCURLY, "CLASS_TOP_LEVEL_SCOPE"] interfaceScopeDeclarations*)
@@ -380,7 +380,7 @@ classScopeDeclarations
     |   typeDeclaration
     |   SEMI!
     ;
-            
+
 interfaceScopeDeclarations
     :   modifierList
         (   genericTypeParameterList?
@@ -407,7 +407,7 @@ classFieldDeclarator
     :   variableDeclaratorId (ASSIGN variableInitializer)?
         ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
     ;
-    
+
 interfaceFieldDeclaratorList
     :   interfaceFieldDeclarator (COMMA interfaceFieldDeclarator)*
         ->  ^(VAR_DECLARATOR_LIST interfaceFieldDeclarator+)
@@ -417,7 +417,7 @@ interfaceFieldDeclarator
     :   variableDeclaratorId ASSIGN variableInitializer
         ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer)
     ;
-    
+
 variableDeclaratorId
     :   IDENT^ arrayDeclaratorList?
     ;
@@ -436,7 +436,7 @@ arrayDeclaratorList
     :   arrayDeclarator+
         ->  ^(ARRAY_DECLARATOR_LIST arrayDeclarator+)   
     ;
-    
+
 arrayInitializer
     :   LCURLY (variableInitializer (COMMA variableInitializer)* COMMA?)? RCURLY
         ->  ^(ARRAY_INITIALIZER[$LCURLY, "ARRAY_INITIALIZER"] variableInitializer*)
@@ -468,7 +468,7 @@ localModifierList
     :   localModifier*
         -> ^(LOCAL_MODIFIER_LIST localModifier*)
     ;
-    
+
 localModifier
     :   FINAL
     |   STATIC
@@ -484,7 +484,7 @@ simpleType // including static arrays of simple type elements
     :   primitiveType arrayDeclaratorList?
         ->  ^(TYPE primitiveType arrayDeclaratorList?)  
     ;
-    
+
 objectType // including static arrays of object type reference elements
     :   qualifiedTypeIdent arrayDeclaratorList?
         ->  ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
@@ -534,7 +534,7 @@ genericTypeArgument
     |   QUESTION genericWildcardBoundType?
         ->  ^(QUESTION genericWildcardBoundType?)
     ;
-    
+
 genericWildcardBoundType
     :   (EXTENDS | SUPER)^ type
     ;
@@ -543,16 +543,16 @@ genericTypeArgumentListSimplified
     :   LESS_THAN genericTypeArgumentSimplified (COMMA genericTypeArgumentSimplified)* genericTypeListClosing
         ->  ^(GENERIC_TYPE_ARG_LIST[$LESS_THAN, "GENERIC_TYPE_ARG_LIST"] genericTypeArgumentSimplified+)
     ;
-    
+
 genericTypeArgumentSimplified
     :   type
     |   QUESTION
     ;
-    
+
 qualifiedIdentList
     :   qualifiedIdentifier (COMMA! qualifiedIdentifier)*
     ;
-    
+
 formalParameterList
     :   LPAREN 
         (   // Contains at least one standard argument declaration and optionally a variable argument declaration.
@@ -566,17 +566,17 @@ formalParameterList
         )
         RPAREN
     ;
-    
+
 formalParameterStandardDecl
     :   localModifierList type variableDeclaratorId
         ->  ^(FORMAL_PARAM_STD_DECL localModifierList type variableDeclaratorId)
     ;
-    
+
 formalParameterVarArgDecl
     :   localModifierList type ELLIPSIS variableDeclaratorId
         ->  ^(FORMAL_PARAM_VARARG_DECL localModifierList type variableDeclaratorId)
     ;
-    
+
 qualifiedIdentifier
     :   (   IDENT
             ->  IDENT
@@ -585,7 +585,7 @@ qualifiedIdentifier
             ->  ^(DOT $qualifiedIdentifier $ident)
         )*
     ;
-    
+
 block
     :   LCURLY blockStatement* RCURLY
         ->  ^(BLOCK_SCOPE[$LCURLY, "BLOCK_SCOPE"] blockStatement*)
@@ -596,7 +596,7 @@ blockStatement
     |   typeDeclaration
     |   statement
     ;
-    
+
 localVariableDeclaration
     :   localModifierList simpleType classFieldDeclaratorList
         ->  ^(PRIMITIVE_VAR_DECLARATION localModifierList simpleType classFieldDeclaratorList)

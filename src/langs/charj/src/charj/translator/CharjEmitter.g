@@ -656,11 +656,11 @@ expr
     |   ^(MOD_ASSIGN e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> %= <e2>"
     |   ^(BIT_SHIFT_RIGHT_ASSIGN e1=expr e2=expr)
-        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> >>>= <e2>"
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> \>\>\>= <e2>"
     |   ^(SHIFT_RIGHT_ASSIGN e1=expr e2=expr)
-        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> >>= <e2>"
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> \>\>= <e2>"
     |   ^(SHIFT_LEFT_ASSIGN e1=expr e2=expr)
-        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> <<= <e2>"
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> \<\<= <e2>"
     |   ^(QUESTION e1=expr e2=expr e3=expr)
         -> template(e1={$e1.st}, e2={$e2.st}, e3={$e3.st}) "<e1> ? <e2> : <e3>"
     |   ^(LOGICAL_OR e1=expr e2=expr)
@@ -680,19 +680,19 @@ expr
     |   ^(INSTANCEOF expr type)
         -> template(t={$text}) "/* instanceof not implemented */ <t>"
     |   ^(LESS_OR_EQUAL e1=expr e2=expr)
-        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> <= <e2>"
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> \<= <e2>"
     |   ^(GREATER_OR_EQUAL e1=expr e2=expr)
-        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> >= <e2>"
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> \>= <e2>"
     |   ^(BIT_SHIFT_RIGHT e1=expr e2=expr)
-        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> >>> <e2>"
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> \>\>\> <e2>"
     |   ^(SHIFT_RIGHT e1=expr e2=expr)
-        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> >> <e2>"
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> \>\> <e2>"
     |   ^(GREATER_THAN e1=expr e2=expr)
-        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> > <e2>"
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> \> <e2>"
     |   ^(SHIFT_LEFT e1=expr e2=expr)
-        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> << <e2>"
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> \<\< <e2>"
     |   ^(LESS_THAN e1=expr e2=expr)
-        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> < <e2>"
+        -> template(e1={$e1.st}, e2={$e2.st}) "<e1> \< <e2>"
     |   ^(PLUS e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> + <e2>"
     |   ^(MINUS e1=expr e2=expr)
