@@ -360,12 +360,12 @@ statement
     |   ^(THROW expression)
     |   ^(BREAK IDENT?) {
             if ($IDENT != null) {
-                translator.error(this, "Labeled break not supported yet, ignoring.", $ID);
+                translator.error(this, "Labeled break not supported yet, ignoring.", $IDENT);
             }
         }
     |   ^(CONTINUE IDENT?) {
             if ($IDENT != null) {
-                translator.error(this, "Labeled continue not supported yet, ignoring.", $ID);
+                translator.error(this, "Labeled continue not supported yet, ignoring.", $IDENT);
             }
         }
     |   ^(LABELED_STATEMENT IDENT statement)
