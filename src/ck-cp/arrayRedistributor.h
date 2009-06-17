@@ -116,9 +116,6 @@ class redistributor2D: public CBase_redistributor2D {
     p | data_x_ghost;
     p | data_y_ghost;
 
-
-    CkAssert(bufferedMsgs.size() == 0);
-
     if(p.isPacking() && fakeMemoryUsage!=NULL)
       free(fakeMemoryUsage);
 
@@ -171,7 +168,6 @@ class redistributor2D: public CBase_redistributor2D {
     }
 
     //    CkPrintf("pup redistributor2D\n");
-
   } 
 
 
@@ -349,6 +345,7 @@ class redistributor2D: public CBase_redistributor2D {
     data_y_ghost = y_ghosts;
     
     setDimensions(x_chares_, y_chares_);
+
   }
   
 
@@ -382,6 +379,7 @@ class redistributor2D: public CBase_redistributor2D {
 #if DEBUG > 3 
    CkPrintf("redistributor 2D startup %03d,%03d\n", thisIndex.x, thisIndex.y);
 #endif
+
     contribute();
   }
   
@@ -400,7 +398,6 @@ class redistributor2D: public CBase_redistributor2D {
   
   // Called on all elements involved with the new granularity or containing part of the old data
   void resizeGranules(int new_active_chare_cols, int new_active_chare_rows){
-
 #if DEBUG>1
     CkPrintf("Resize Granules called for elem %d,%d\n", thisIndex.x, thisIndex.y);  	
 #endif
@@ -509,27 +506,25 @@ class redistributor2D: public CBase_redistributor2D {
       
     }
 
-    int newPe = (thisIndex.y * new_active_chare_cols + thisIndex.x) % CkNumPes();
-    
-    if(newPe == CkMyPe()){
-      //      CkPrintf("Keeping %02d , %02d on PE %d\n", thisIndex.x, thisIndex.y, newPe);
-    }
-    else{
-      // CkPrintf("Migrating %02d , %02d to PE %d\n", thisIndex.x, thisIndex.y, newPe);
-      //    migrateMe(newPe);
-    }
-    
 
     // Call receiveTransposeData for any buffered messages.
     int size = bufferedMsgs.size();
     for(int i=0;i<size;i++){
       redistributor2DMsg *msg = bufferedMsgs[i];
-      //      CkPrintf("Delivering buffered receiveTransposeData(msg=%p)\n", msg);
+      //     CkPrintf("Delivering buffered receiveTransposeData(msg=%p) i=%d\n", msg, i);
       receiveTransposeData(msg); // this will delete the message
     }
     bufferedMsgs.removeAll();
 
-    
+    int newPe = (thisIndex.y * new_active_chare_cols + thisIndex.x) % CkNumPes();
+    if(newPe == CkMyPe()){
+      //      CkPrintf("Keeping %02d , %02d on PE %d\n", thisIndex.x, thisIndex.y, newPe);
+    }
+    else{
+      // CkPrintf("Migrating %02d , %02d to PE %d\n", thisIndex.x, thisIndex.y, newPe);
+      migrateMe(newPe);
+    }
+    // CANNOT CALL ANYTHING AFTER MIGRATE ME
   }
   
   
