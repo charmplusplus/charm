@@ -116,14 +116,18 @@ extern "C" void BgSetStartEvent();
 #else
 # define BgPrint(x)  
 # define BgMark_(x)  
-# define _TRACE_BG_TLINE_END(x)
 #define _TRACE_BG_BEGIN_EXECUTE_NOMSG(x,pLogPtr,split)
+#define _TRACE_BG_BEGIN_EXECUTE(msg, str)
+#define _TRACE_BG_SET_INFO(msg, str, logs, count) 
+#define _TRACE_BG_AMPI_BEGIN_EXECUTE(msg, str, logs, count)
+#define _TRACE_BG_END_EXECUTE(commit)
+#define _TRACE_BG_TLINE_END(x)	
+#define _TRACE_BG_FORWARD_DEP(logs1,logs2,size,fDep)
+#define _TRACE_BG_BACKWARD_DEP(log)	
 #define _TRACE_BG_USER_EVENT_BRACKET(x,bt,et,pLogPtr)
 #define _TRACE_BGLIST_USER_EVENT_BRACKET(x,bt,et,pLogPtr,bgLogList)
-#define _TRACE_BG_END_EXECUTE(commit)
-#define _TRACE_BG_FORWARD_DEPS(logs1,logs2,size,fDep)
-#define _TRACE_BG_SET_INFO(msg, str, logs, count) 
-
+#define _TRACE_BG_ADD_TAG(str)
+	
 # define TRACE_BG_AMPI_SUSPEND()
 # define TRACE_BG_AMPI_RESUME(t, msg, str, log)
 # define TRACE_BG_AMPI_START(t, str)
