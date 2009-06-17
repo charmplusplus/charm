@@ -8,6 +8,7 @@
 #define __ARRAYREDISTRIBUTOR_H__
 
 #include <vector>
+#include <list>
 #include <map>
 #include <cmath>
 #include "ControlPoints.decl.h"
@@ -71,6 +72,10 @@ class redistributor2D: public CBase_redistributor2D {
   /// Is this array element active
   bool thisElemActive;
 
+  bool resizeGranulesHasBeenCalled;
+
+  CkVec<redistributor2DMsg *> bufferedMsgs;
+
  private:
 
 
@@ -102,12 +107,17 @@ class redistributor2D: public CBase_redistributor2D {
 
     p | dataRedistributedCallback;
 
+    p | resizeGranulesHasBeenCalled;
+
     p | x_chares;
     p | y_chares;
     p | data_width;
     p | data_height;
     p | data_x_ghost;
     p | data_y_ghost;
+
+
+    CkAssert(bufferedMsgs.size() == 0);
 
     if(p.isPacking() && fakeMemoryUsage!=NULL)
       free(fakeMemoryUsage);
@@ -359,10 +369,12 @@ class redistributor2D: public CBase_redistributor2D {
   redistributor2D(){
     incoming_count = 0;
     fakeMemoryUsage = NULL;
+    CkAssert(bufferedMsgs.size() == 0);
   }
 
 
   redistributor2D(CkMigrateMessage*){
+    CkAssert(bufferedMsgs.size() == 0);
   }
 
 
@@ -393,6 +405,8 @@ class redistributor2D: public CBase_redistributor2D {
     CkPrintf("Resize Granules called for elem %d,%d\n", thisIndex.x, thisIndex.y);  	
 #endif
 
+    resizeGranulesHasBeenCalled = true;
+
     const bool previouslyActive = thisElemActive;
     const int old_top = top_data_idx();
     const int old_left = left_data_idx();
@@ -401,7 +415,7 @@ class redistributor2D: public CBase_redistributor2D {
     const int old_myheight = myheight();
     const int old_mywidth = mywidth();
 
-    setDimensions(new_active_chare_cols, new_active_chare_rows);
+    setDimensions(new_active_chare_cols, new_active_chare_rows); // update dimensions & thisElemActive
     
     const int new_mywidth = mywidth();
     const int new_myheight = myheight();
@@ -502,23 +516,42 @@ class redistributor2D: public CBase_redistributor2D {
     }
     else{
       // CkPrintf("Migrating %02d , %02d to PE %d\n", thisIndex.x, thisIndex.y, newPe);
-      migrateMe(newPe);
+      //    migrateMe(newPe);
     }
+    
+
+    // Call receiveTransposeData for any buffered messages.
+    int size = bufferedMsgs.size();
+    for(int i=0;i<size;i++){
+      redistributor2DMsg *msg = bufferedMsgs[i];
+      //      CkPrintf("Delivering buffered receiveTransposeData(msg=%p)\n", msg);
+      receiveTransposeData(msg); // this will delete the message
+    }
+    bufferedMsgs.removeAll();
+
     
   }
   
-
+  
   void continueToNextStep(){
 #if DEBUG > 2
     CkPrintf("Elem %d,%d is ready to continue\n", thisIndex.x, thisIndex.y);
 #endif
+
+    resizeGranulesHasBeenCalled = false;
+
     for(std::map<int,double*>::iterator diter =data_arrays.begin(); diter != data_arrays.end(); diter++){
       int which_array = diter->first;
       double *data = diter->second;
-      CkAssert( (data==NULL && !thisElemActive) || (data!=NULL && thisElemActive) );
+      if( ! ((data==NULL && !thisElemActive) || (data!=NULL && thisElemActive) )){
+	CkPrintf("[%d] ERROR: ! ((data==NULL && !thisElemActive) || (data!=NULL && thisElemActive) )",CkMyPe());
+	CkPrintf("[%d] ERROR: data=%p thisElemActive=%d  (perhaps continueToNextStep was called too soon)\n",CkMyPe(), data, (int)thisElemActive );
+
+	CkAbort("ERROR");	
+      }
     }
-
-
+    
+    
 #if USE_EXTRAMEMORY
 #error NO USE_EXTRAMEMORY ALLOWED YET
     if(thisElemActive){
@@ -546,7 +579,19 @@ class redistributor2D: public CBase_redistributor2D {
 
 
 
+
+  
   void receiveTransposeData(redistributor2DMsg *msg){
+    
+    // buffer this message until resizeGranules Has Been Called
+    if(!resizeGranulesHasBeenCalled){
+      bufferedMsgs.push_back(msg);
+      //      CkPrintf("Buffering receiveTransposeData(msg=%p)\n", msg);
+      return;
+    }
+    
+    CkAssert(resizeGranulesHasBeenCalled);
+    
     int top_new = top_data_idx(thisIndex.y, msg->new_chare_rows);
     int bottom_new = bottom_data_idx(thisIndex.y, msg->new_chare_rows);
     int left_new = left_data_idx(thisIndex.x, msg->new_chare_cols);

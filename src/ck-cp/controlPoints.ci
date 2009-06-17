@@ -55,9 +55,8 @@ module ControlPoints {
    entry redistributor2D(void);
 
    entry void startup();	
-
+   
     entry void resizeGranules(int, int);
-//    entry void receiveTransposeData(int top, int left, int height, int width, int new_chare_cols, int  new_chare_rows, int which_array, double d[width*height]);
     entry void receiveTransposeData(redistributor2DMsg *msg);
 
   } 
