@@ -1876,6 +1876,13 @@ static void writeToDisk()
 
   for (int j=0; j<cva(numNodes); j++){
     for(int i=0;i<cva(bgMach).numWth;i++){
+    #if BIGSIM_OUT_OF_CORE
+	//When isomalloc is used, some events inside BgTimeLineRec are allocated
+	//through isomalloc. Therefore, the memory containing those events needs
+	//to be brought back into memory from disk. --Chao Mei		
+	if(CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+	    bgOutOfCoreSchedule(cva(nodeinfo)[j].threadinfo[i]);
+     #endif	
       BgTimeLineRec &t = cva(nodeinfo)[j].timelines[i];
       procOffsets[j*cva(bgMach).numWth + i] = ftell(f);
       t.pup(p);

@@ -5,6 +5,8 @@
 #include "blue_impl.h"
 //#include "blue_timing.h"
 
+#include "bigsim_ooc.h"
+
 #define INTEGRITY_CHECK		1
 
 typedef minHeap<BgTimeLog *>  BgTimelogHeap;
@@ -727,6 +729,15 @@ void bgAddProjEvent(void *data, int idx, double t, bgEventCallBackFn fn, void *u
 // timing correction
 void bgUpdateProj(int eType)
 {
+#if BIGSIM_OUT_OF_CORE
+  //if isomalloc is used, some events inside the BgTimeLine are
+  //allocated through isomalloc. Therefore, the memory containing
+  //those events needs to be brought back into memory from disk.
+  //--Chao Mei
+  if(CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+    bgOutOfCoreSchedule(tMYNODE->threadinfo[tMYID]);
+#endif
+
   BgTimeLine &tline = tTIMELINE;
   for (int i=0; i< tline.length(); i++) {
       tline[i]->updateEvents(eType);
