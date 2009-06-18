@@ -1949,9 +1949,9 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   //TRACE_BG_AMPI_RESUME(thread->getThread(), msg, "RECV_RESUME", &curLog, 1);
   //TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0);
   //_TRACE_BG_SET_INFO((char *)msg, "RECV_RESUME",  &curLog, 1);
-#if 0
+#if 1
   if (!dosuspend) {
-    TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0);
+    TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0, 1);
     _TRACE_BG_ADD_BACKWARD_DEP(msg->event);
   }
   else
@@ -2592,7 +2592,7 @@ int AMPI_Barrier(MPI_Comm comm)
 #if CMK_BLUEGENE_CHARM
   void *barrierLog;		// store current log in timeline
   //TRACE_BG_AMPI_BARRIER_START(barrierLog);
-  TRACE_BG_AMPI_BREAK(NULL, "AMPI_Barrier", NULL, 0);
+  TRACE_BG_AMPI_BREAK(NULL, "AMPI_Barrier", NULL, 0, 1);
   _TRACE_BG_TLINE_END(&barrierLog); 
 #endif
   //HACK: Use collective operation as a barrier.
@@ -2603,7 +2603,7 @@ int AMPI_Barrier(MPI_Comm comm)
 #if CMK_BLUEGENE_CHARM
   //TRACE_BG_AMPI_BARRIER_END(barrierLog);
   //_TRACE_BG_SET_INFO(NULL, "AMPI_Barrier_END",  &barrierLog, 1);
-  TRACE_BG_AMPI_BREAK(NULL, "AMPI_Barrier_END", &barrierLog, 1);
+  TRACE_BG_AMPI_BREAK(NULL, "AMPI_Barrier_END", &barrierLog, 1, 1);
 #endif
 #if AMPI_COUNTER
   getAmpiParent()->counters.barrier++;
@@ -3144,7 +3144,7 @@ int ATAReq::wait(MPI_Status *sts){
 	}
 #if CMK_BLUEGENE_CHARM
         //TRACE_BG_AMPI_NEWSTART(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "ATAReq", NULL, 0);
-        TRACE_BG_AMPI_BREAK(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "ATAReq_wait", NULL, 0);
+        TRACE_BG_AMPI_BREAK(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "ATAReq_wait", NULL, 0, 1);
         for (i=0; i<count; i++)
           _TRACE_BG_ADD_BACKWARD_DEP(myreqs[i].event);
   	_TRACE_BG_TLINE_END(&event);
