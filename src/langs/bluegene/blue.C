@@ -1880,7 +1880,7 @@ static void writeToDisk()
 	//When isomalloc is used, some events inside BgTimeLineRec are allocated
 	//through isomalloc. Therefore, the memory containing those events needs
 	//to be brought back into memory from disk. --Chao Mei		
-	if(CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+	if(bgUseOutOfCore && CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
 	    bgOutOfCoreSchedule(cva(nodeinfo)[j].threadinfo[i]);
      #endif	
       BgTimeLineRec &t = cva(nodeinfo)[j].timelines[i];

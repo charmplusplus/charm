@@ -734,7 +734,7 @@ void bgUpdateProj(int eType)
   //allocated through isomalloc. Therefore, the memory containing
   //those events needs to be brought back into memory from disk.
   //--Chao Mei
-  if(CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+  if(bgUseOutOfCore && CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
     bgOutOfCoreSchedule(tMYNODE->threadinfo[tMYID]);
 #endif
 
