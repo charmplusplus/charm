@@ -371,7 +371,8 @@ extern int BgOutOfCoreFlag;
 //issue. When compiling the bigsim emulator with out-of-core support for
 //normal charm++ or AMPI programs, this macro should be turned to 1.
 //-Chao Mei
-#define BIGSIM_OUT_OF_CORE 0
+//#undef BIGSIM_OUT_OF_CORE
+//#define BIGSIM_OUT_OF_CORE 1
 
 void threadInfo::broughtIntoMem(){
     DEBUGM(5, ("=====[N%d] work thread T[%d] into mem=====.\n", BgMyNode(), id));
