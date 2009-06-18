@@ -210,7 +210,6 @@ class SumLogPool {
     void startPhase(int phase) { phaseTab.startPhase(phase); }
     BinEntry *bins() { return pool; }
     int getNumEntries() const { return numBins; }
-    void updateSummaryDetail(int epIdx, double startTime, double endTime);
 
     // accessors to normal summary data
     inline double getTime(unsigned int interval) {
@@ -238,6 +237,9 @@ class SumLogPool {
         ++numExecutions[interval*epInfoSize+ep];
         return numExecutions[interval*epInfoSize+ep]; }
     inline int getUtilization(int interval, int ep);
+
+
+    void updateSummaryDetail(int epIdx, double startTime, double endTime);
 
 
 };

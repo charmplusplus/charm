@@ -37,8 +37,6 @@ public:
   int nBufferedBins;
   CkVec<double> *ccsBufferedData;
   int nextBinIndexCcs;
-  std::deque<CkReductionMsg *> storedSumDetailResults;
-
 
 public:
   TraceSummaryBOC(void): count(0), bins(NULL), nBins(0), 
@@ -52,14 +50,9 @@ public:
   void initCCS();
   void ccsRequestSummaryDouble(CkCcsRequestMsg *m);
   void ccsRequestSummaryUnsignedChar(CkCcsRequestMsg *m);
-  void ccsRequestSumDetailUnsignedChar(CkCcsRequestMsg *m);
-  void ccsRequestSumDetailCompressed(CkCcsRequestMsg *m);
-  void ccsRequestSumDetailCompressedPE0(CkCcsRequestMsg *m);
 
   void collectSummaryData(double startTime, double binSize, int numBins);
   void summaryDataCollected(CkReductionMsg *);
-  void collectSumDetailData(double startTime, double binSize, int numBins);
-  void sumDetailDataCollected(CkReductionMsg *);
 
 private:
   void write();

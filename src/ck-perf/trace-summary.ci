@@ -9,7 +9,6 @@ module TraceSummary {
   };
 
   initnode void initTraceSummaryBOC();
-  initnode void registerIdleTimeReduction();
 
   group [migratable] TraceSummaryBOC {
     entry TraceSummaryBOC(void);
@@ -22,13 +21,9 @@ module TraceSummary {
     // The ccs handlers:
     entry void ccsRequestSummaryDouble(CkCcsRequestMsg *m);
     entry void ccsRequestSummaryUnsignedChar(CkCcsRequestMsg *m);
-    entry void ccsRequestSumDetailCompressed(CkCcsRequestMsg *m);
 
     entry void collectSummaryData(double startTime, double binSize, int numBins);
     entry void summaryDataCollected(CkReductionMsg *);
-
-    entry void collectSumDetailData(double startTime, double binSize, int numBins);
-    entry void sumDetailDataCollected(CkReductionMsg *);
 
   };
 
