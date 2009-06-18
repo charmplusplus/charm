@@ -87,7 +87,7 @@ extern int traceBluegeneLinked;
         _TRACE_BG_BEGIN_EXECUTE_NOMSG(str, &_bgParentLog, 1);      \
         }
 
-# define TRACE_BG_AMPI_BREAK(t, str, event, count)  	\
+# define TRACE_BG_AMPI_BREAK(t, str, event, count, connect)  	\
 	{	\
 	void *curLog;    /* store current log in timeline */	\
   	_TRACE_BG_TLINE_END(&curLog);	\
@@ -96,7 +96,7 @@ extern int traceBluegeneLinked;
         for(int i=0;i<count;i++) {      \
                 _TRACE_BG_ADD_BACKWARD_DEP(((void**)event)[i]);      \
         }	\
-        _TRACE_BG_ADD_BACKWARD_DEP(curLog);      \
+        if (connect) _TRACE_BG_ADD_BACKWARD_DEP(curLog);      \
 	}
 	
 
@@ -104,7 +104,7 @@ extern int traceBluegeneLinked;
         {	\
 	/* TRACE_BG_AMPI_SUSPEND(); */	\
 	CthThread th = getAmpiInstance(MPI_COMM_WORLD)->getThread();	\
- 	TRACE_BG_AMPI_BREAK(th, "AMPI_WAITALL", NULL, 0);	\
+ 	TRACE_BG_AMPI_BREAK(th, "AMPI_WAITALL", NULL, 0, 0);	\
     	_TRACE_BG_ADD_BACKWARD_DEP(curLog);	\
   	for(int i=0;i<count;i++) {	\
 	  if (request[i] == MPI_REQUEST_NULL) continue;	\
