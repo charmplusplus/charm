@@ -586,7 +586,7 @@ void TCharm::barrier(void) {
 #if CMK_BLUEGENE_CHARM
         void *curLog;		// store current log in timeline
         _TRACE_BG_TLINE_END(&curLog);
-	TRACE_BG_AMPI_BREAK(NULL, "TCharm_Barrier_START", NULL, 0);
+	TRACE_BG_AMPI_BREAK(NULL, "TCharm_Barrier_START", NULL, 0, 1);
 #endif
 	stop();
 #if CMK_BLUEGENE_CHARM
