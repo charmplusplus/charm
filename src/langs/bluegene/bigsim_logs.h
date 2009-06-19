@@ -68,11 +68,11 @@ public:
   }
   void write(FILE *fp) {
     if(dstNode >= 0)
-      fprintf(fp, "msgID:%d sent:%f recvtime:%f dstNode:%d tid:%d size:%d group:%d\n", msgID, sendTime, recvTime, dstNode, tID, msgsize, group);
+      fprintf(fp, "-msgID:%d sent:%f recvtime:%f dstNode:%d tid:%d size:%d group:%d\n", msgID, sendTime, recvTime, dstNode, tID, msgsize, group);
     if(dstNode == -1)
-      fprintf(fp, "msgID:%d sent:%f recvtime:%f dstNode:BG_BROADCASTALL tid:%d size:%d group:%d\n", msgID, sendTime, recvTime, tID, msgsize, group);
+      fprintf(fp, "-msgID:%d sent:%f recvtime:%f dstNode:BG_BROADCASTALL tid:%d size:%d group:%d\n", msgID, sendTime, recvTime, tID, msgsize, group);
     if(dstNode <= -100)
-      fprintf(fp, "msgID:%d sent:%f recvtime:%f dstNode:BG_BROADCASTALL except %d tid:%d size:%d group:%d\n", msgID, sendTime, recvTime, -100-dstNode, tID, msgsize, group);
+      fprintf(fp, "-msgID:%d sent:%f recvtime:%f dstNode:BG_BROADCASTALL except %d tid:%d size:%d group:%d\n", msgID, sendTime, recvTime, -100-dstNode, tID, msgsize, group);
     
   }
 #if DELAY_SEND
