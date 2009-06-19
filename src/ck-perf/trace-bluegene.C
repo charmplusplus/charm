@@ -115,7 +115,7 @@ void TraceBluegene::bgBeginExec(char* msg, char *name)
 }
 
 // mark a new log, which depends on log
-void TraceBluegene::bgSetInfo(char *msg, char *name, void **logs, int count)
+void TraceBluegene::bgSetInfo(char *msg, const char *name, void **logs, int count)
 {
   if (!genTimeLog) return;
   BgTimeLog * curlog = BgLastLog(tTIMELINEREC);

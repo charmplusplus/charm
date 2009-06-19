@@ -33,7 +33,7 @@ class TraceBluegene : public Trace {
     void bgDummyBeginExec(const char* name,void** parentLogPtr, int split);
     void bgBeginExec(char* msg, char *str);
     void bgAmpiBeginExec(char *msg, char *str, void **logs, int count);
-    void bgSetInfo(char *msg, char *str, void **logs, int count);
+    void bgSetInfo(char *msg, const char *str, void **logs, int count);
     void bgEndExec(int);
     virtual void beginExecute(envelope *);
     virtual void beginExecute(CmiObjId *tid) {}
