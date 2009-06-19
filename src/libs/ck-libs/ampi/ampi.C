@@ -1801,8 +1801,16 @@ ampi::comlibsend(int t, int sRank, const void* buf, int count, int type,  int ra
 void
 ampi::send(int t, int sRank, const void* buf, int count, int type,  int rank, MPI_Comm destcomm, int sync)
 {
+#if CMK_TRACE_IN_CHARM
+   TRACE_BG_AMPI_BREAK(thread->getThread(), "AMPI_SEND", NULL, 0, 1);
+#endif
+
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
   delesend(t,sRank,buf,count,type,rank,destcomm,dest.getProxy(),sync);
+
+#if CMK_TRACE_IN_CHARM
+   TRACE_BG_AMPI_BREAK(thread->getThread(), "AMPI_SEND_END", NULL, 0, 1);
+#endif
 
   if (sync) {
     // waiting for receiver side
