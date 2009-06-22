@@ -47,7 +47,7 @@ class DirectMulticastStrategy: public MulticastStrategy {
     DirectMulticastStrategy(CkMigrateMessage *m): MulticastStrategy(m){}
                 
     ///Array constructor
-    DirectMulticastStrategy(int isPersistent = 0): MulticastStrategy(isPersistent) {}
+    DirectMulticastStrategy(): MulticastStrategy() {}
 
     PUPable_decl(DirectMulticastStrategy);
 

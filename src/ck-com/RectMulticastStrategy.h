@@ -46,8 +46,6 @@ class RectMulticastStrategy: public Strategy, public CharmStrategy {
     int handlerId;    
     ComlibSectionInfo sinfo;
 
-    int isPersistent; 
-    
     ///Array section support.
     CkHashtableT<ComlibSectionHashKey, ComlibRectSectionHashObject *> sec_ht; 
 
@@ -112,7 +110,7 @@ class RectMulticastStrategy: public Strategy, public CharmStrategy {
     RectMulticastStrategy(CkMigrateMessage *m): Strategy(m), CharmStrategy(m){}
                 
     ///Array constructor
-    RectMulticastStrategy(CkArrayID aid, int isPersistent = 0);
+    RectMulticastStrategy(CkArrayID aid);
         
         
     //Destuctor
@@ -133,7 +131,7 @@ class RectMulticastStrategy: public Strategy, public CharmStrategy {
 #else
 class RectMulticastStrategy : public Strategy, public CharmStrategy {   
   RectMulticastStrategy(CkMigrateMessage *m): Strategy(m), CharmStrategy(m){}
-  //    RectMulticastStrategy(CkArrayID aid, int isPersistent = 0){}
+  //    RectMulticastStrategy(CkArrayID aid){}
   ~RectMulticastStrategy(){}
   void insertMessage(MessageHolder*) {}
   void handleMessage(void*) {}

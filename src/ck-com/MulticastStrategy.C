@@ -24,14 +24,12 @@
 CkpvExtern(CkGroupID, cmgrID);
 
 
-MulticastStrategy::MulticastStrategy(int isPersistent)
+MulticastStrategy::MulticastStrategy()
   : Strategy(), CharmStrategy() {
 
   ComlibPrintf("MulticastStrategy constructor\n");
   //ainfo.setDestinationArray(aid);
   setType(ARRAY_STRATEGY);
-
-  this->isPersistent = isPersistent;
 }
 
 //Destroy all old built routes
@@ -212,11 +210,6 @@ ComlibSectionHashObject * MulticastStrategy::insertSectionID(CkSectionID *sid, i
 }
 
 
-
-void MulticastStrategy::doneInserting(){
-  //Do nothing! It is not a bracketed strategy
-}
-
 extern void CmiReference(void *);
 
 //Send the multicast message the local array elements. The message is 
@@ -228,11 +221,6 @@ void MulticastStrategy::localMulticast(envelope *env,
   //	double StartTime = CmiWallTimer();
 	
   int nIndices = obj->indices.size();
-
-  //If the library is set to persistent. 
-  //The message is stored in the library. The applications should 
-  //use the message as a readonly and it exists till the next one 
-  //comes along
 
   if(obj->msg != NULL) {
     CmiFree(obj->msg);
@@ -247,10 +235,8 @@ void MulticastStrategy::localMulticast(envelope *env,
 
     msg1 = CkCopyMsg(&msg);
 
-    if(isPersistent) {
-      CmiReference(UsrToEnv(msg1));
-      obj->msg = (void *)UsrToEnv(msg1);
-    }
+    CmiReference(UsrToEnv(msg1));
+    obj->msg = (void *)UsrToEnv(msg1);
 
     int reply = ComlibArrayInfo::localMulticast(&(obj->indices), UsrToEnv(msg1));
     if (reply > 0) {
@@ -310,7 +296,6 @@ void MulticastStrategy::remoteMulticast(envelope *env,
 void MulticastStrategy::pup(PUP::er &p){
   Strategy::pup(p);
   CharmStrategy::pup(p);
-  p | isPersistent; 
 }
 
 

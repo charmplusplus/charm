@@ -35,6 +35,7 @@ module comlib {
     entry ComlibManagerMain();	
   }
 
+  PUPable OneTimeMulticastStrategy;	
   PUPable EachToManyMulticastStrategy;	
   PUPable DirectMulticastStrategy;
   PUPable RingMulticastStrategy;	

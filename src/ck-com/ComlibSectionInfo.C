@@ -25,7 +25,9 @@
 
 
 
-/// Create a new multicast message
+/**
+   Create a new multicast message based upon the section info stored inside cmsg.
+*/
 ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolder *cmsg, int needSort, int instanceID){
     
   cmsg->checkme();
@@ -42,9 +44,12 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolde
     CkPackMessage(&env);
 
     const CkArrayID destArrayID(env->getsetArrayMgr());
-    int nRemotePes, nRemoteIndices;
+    int nRemotePes=-1, nRemoteIndices=-1;
     ComlibMulticastIndexCount *indicesCount;
     int *belongingList;
+
+
+    //  Determine the last known locations of all the destination objects.
     getPeCount(cmsg->sec_id->_nElems, cmsg->sec_id->_elems, destArrayID, nRemotePes, nRemoteIndices, indicesCount, belongingList);
 
     //     if (nRemotePes == 0) return NULL;
@@ -99,6 +104,7 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolde
 
     for (int i=0; i<cmsg->sec_id->_nElems; ++i) {
     	if (belongingList[i] >= 0) {
+    		// If the object is located on a remote PE (-1 is local)
     		*indicesPe[belongingList[i]] = cmsg->sec_id->_elems[i];
     		indicesPe[belongingList[i]]++;
     	}
@@ -278,12 +284,18 @@ inline int getPErepresentingNodeContainingPE(int pe){
 #endif    
 }
 
+/** 
+    Determine the last known locations of all the destination objects.
 
+    Create two resulting arrays:
+        1) counts -- contains pairs of (pe,count) that describe how many objects were found for each of the pe's
+	2) belongs -- belongs[i] points to the owning pe's entry in the "counts" array.
+	
+*/
 void ComlibSectionInfo::getPeCount(int nindices, CkArrayIndexMax *idxlist, 
 		      const CkArrayID &destArrayID, int &npes, int &nidx,
 		      ComlibMulticastIndexCount *&counts, int *&belongs) {
 
-  int count = 0;
   int i;
     
   int length = CkNumPes();
@@ -297,9 +309,7 @@ void ComlibSectionInfo::getPeCount(int nindices, CkArrayIndexMax *idxlist,
 
   CkArray *a = (CkArray *)_localBranch(destArrayID);
   for(i=0; i<nindices; ++i){
-    //int p = ComlibGetLastKnown(destArrayID, idxlist[i]);
     int p = a->lastKnown(idxlist[i]);
-
 
 #define USE_NODE_AWARE 0
 #if USE_NODE_AWARE
@@ -319,6 +329,7 @@ void ComlibSectionInfo::getPeCount(int nindices, CkArrayIndexMax *idxlist,
     }
 
     //Collect processors
+    int count = 0;
     for(count = 0; count < npes; count ++)
       if(counts[count].pe == p)
 	break;

@@ -6,7 +6,7 @@
 */
 
 #include "ComlibStrategy.h"
-
+#include "register.h"
 
 
 void CharmStrategy::pup(PUP::er &p) {
@@ -18,6 +18,56 @@ void CharmStrategy::pup(PUP::er &p) {
     p | mflag;
     p | onFinish;
 }
+
+
+
+
+
+/** Deliver a message to a set of indices using the array manager. Indices can be local or remote. */
+void CharmStrategy::deliverToIndices(void *msg, int numDestIdxs, const CkArrayIndexMax* indices ){
+  
+  envelope *env = UsrToEnv(msg);
+  
+  CkArrayID destination_aid = env->getsetArrayMgr();
+  CkArray *a=(CkArray *)_localBranch(destination_aid);
+  int ep = env->getsetArrayEp();
+
+  //  CkPrintf("Delivering to %d objects\n", numDestIdxs);
+
+  if(numDestIdxs > 0){
+        
+    // SEND to all destination objects except the last one
+    for(int i=0; i<numDestIdxs-1;i++){
+      env->getsetArrayIndex() = indices[i];
+      
+      if(_entryTable[ep]->noKeep)
+	// don't make a copy for [nokeep] entry methods
+	a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CK_MSG_KEEP);
+      else {
+	void *newmsg = CkCopyMsg(&msg);
+	a->deliver((CkArrayMessage *)newmsg, CkDeliver_queue);
+      }
+    }
+    
+    // SEND to the final destination object
+    env->getsetArrayIndex() = indices[numDestIdxs-1];
+    
+    if(_entryTable[ep]->noKeep){
+      a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CK_MSG_KEEP);
+      CmiFree(env); // runtime frees the [nokeep] messages
+    }
+    else {
+      a->deliver((CkArrayMessage *)msg, CkDeliver_queue);
+    }
+    
+  }
+}
+
+
+
+
+
+
 
 
 void CharmMessageHolder::pup(PUP::er &p) {

@@ -32,7 +32,7 @@ class MultiRingMulticastStrategy: public MulticastStrategy {
     
  public:
     //Array constructor
-    MultiRingMulticastStrategy(int flag = 0): MulticastStrategy(flag) {}
+    MultiRingMulticastStrategy(): MulticastStrategy() {}
     MultiRingMulticastStrategy(CkMigrateMessage *m): MulticastStrategy(m) {}
 
    

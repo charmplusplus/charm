@@ -229,7 +229,7 @@ CKHEADERS=ck.h ckstream.h envelope-path.h envelope.h envelope-path.h init.h qd.h
 	  TraceUtilization.decl.h BlueGene.decl.h \
 	  comlib.decl.h ComlibManager.h DummyStrategy.h	\
 	  MulticastStrategy.h DirectMulticastStrategy.h RingMulticastStrategy.h	\
-	  MultiRingMulticast.h \
+	  OneTimeMulticastStrategy.h MultiRingMulticast.h \
 	  EachToManyMulticastStrategy.h MsgPacker.h StreamingStrategy.h \
 	  NodeMulticast.h PipeBroadcastStrategy.h MeshStreamingStrategy.h \
           PrioStreaming.h MPIStrategy.h MsgPacker.h StreamingStrategy.h \
@@ -904,7 +904,7 @@ loadbalancers: $(LOADBALANCERS) $(L)/libmoduleEveryLB.a
 ######################################################################
 
 STRATEGY_OBJS = MPIStrategy.o StreamingStrategy.o \
-                DummyStrategy.o NodeMulticast.o \
+                DummyStrategy.o NodeMulticast.o OneTimeMulticastStrategy.o \
 		EachToManyMulticastStrategy.o ComlibSectionInfo.o \
                 AAPLearner.o ComlibStats.o AAMLearner.o \
                 MsgPacker.o MulticastStrategy.o DirectMulticastStrategy.o \

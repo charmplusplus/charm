@@ -307,6 +307,16 @@ class CharmStrategy {
     CmiBool mflag;    //Does this strategy handle point-to-point or 
     CkCallback onFinish;
 
+
+    /** Deliver a message to a set of indices using the array manager. Indices can be local or remote. */
+    void deliverToIndices(void *msg, int numDestIdxs, const CkArrayIndexMax* indices );
+    
+    /** Deliver a message to a set of indices using the array manager. Indices can be local or remote. */
+    inline void deliverToIndices(void *msg, const CkVec< CkArrayIndexMax > &indices ){
+      deliverToIndices(msg, indices.size(), indices.getVec() );
+    }
+    
+    
  public:
     //int iterationNumber;
     ComlibGroupInfo ginfo;

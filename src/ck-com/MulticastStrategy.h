@@ -28,10 +28,6 @@ class MulticastStrategy: public Strategy, public CharmStrategy {
  protected:
     /// Helper that generates unique ids for successive uses of the strategy.
     ComlibSectionInfo sinfo;
-
-    /// Are the array sections used repeatedly? 
-    /// If so, the strategies could opitimize behavior by storing persistent information in sec_ht
-    int isPersistent; 
     
     /// A container to hold persistent information about the previously used array sections. 
     /// The strategy could refer to information here instead of decoding the section info
@@ -85,14 +81,15 @@ class MulticastStrategy: public Strategy, public CharmStrategy {
     MulticastStrategy(CkMigrateMessage *m): Strategy(m), CharmStrategy(m){}
     
     ///Array constructor
-    MulticastStrategy(int isPersistent = 0);
+    MulticastStrategy();
     
     //Destuctor
     ~MulticastStrategy();
 
     void insertMessage(MessageHolder *msg) {insertMessage((CharmMessageHolder*)msg);}
     void insertMessage(CharmMessageHolder *msg);
-    void doneInserting();
+
+    //    void doneInserting();        // Not needed because this is not a bracketed strategy
 
     ///Called by the converse handler function
     void handleMessage(void *msg);    

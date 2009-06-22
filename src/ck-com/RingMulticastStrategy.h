@@ -27,7 +27,7 @@ class RingMulticastStrategy: public MulticastStrategy {
     
  public:
     //Array constructor
-    RingMulticastStrategy(int flag = 0): MulticastStrategy(flag) {}
+    RingMulticastStrategy(): MulticastStrategy() {}
     RingMulticastStrategy(CkMigrateMessage *m) : MulticastStrategy(m){}
 
     PUPable_decl(RingMulticastStrategy);

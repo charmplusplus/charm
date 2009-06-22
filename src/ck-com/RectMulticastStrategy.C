@@ -111,15 +111,11 @@ void * rectRequest (int comm) {
   return CkpvAccess(com_rect_ptr)->get(comm);
 }
 
-RectMulticastStrategy::RectMulticastStrategy(CkArrayID aid, 
-						 int isPersistent)
+RectMulticastStrategy::RectMulticastStrategy(CkArrayID aid)
     : Strategy(), CharmStrategy() {
 
     ainfo.setDestinationArray(aid);
     setType(ARRAY_STRATEGY);
-
-    //    this->isPersistent = isPersistent;
-    this->isPersistent = 0;  //force off for now
 }
 
 //Destroy all old built routes
@@ -578,11 +574,6 @@ void RectMulticastStrategy::localMulticast(envelope *env,
 					   ComlibRectSectionHashObject *obj) {
     int nIndices = obj->indices.size();
     
-    //If the library is set to persistent. 
-    //The message is stored in the library. The applications should 
-    //use the message as a readonly and it exists till the next one 
-    //comes along
-    
     if(obj->msg != NULL) {
         CmiFree(obj->msg);
 	obj->msg = NULL;
@@ -593,12 +584,6 @@ void RectMulticastStrategy::localMulticast(envelope *env,
 	void *msg1 = msg;
         
         msg1 = CkCopyMsg(&msg);
-	
-	if(isPersistent) {
-	  CkAbort("persistent not supported in Rectangle yet");
-	    CmiReference(UsrToEnv(msg1));
-	    obj->msg = (void *)UsrToEnv(msg1);
-	}
 	
         ComlibArrayInfo::localMulticast(&(obj->indices), UsrToEnv(msg1));
     }    
@@ -683,7 +668,6 @@ void RectMulticastStrategy::forwardMulticast(envelope *env,
 void RectMulticastStrategy::pup(PUP::er &p){
 
     CharmStrategy::pup(p);
-    p | isPersistent; 
 }
 
 void RectMulticastStrategy::beginProcessing(int numElements){
