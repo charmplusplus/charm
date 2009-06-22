@@ -31,9 +31,9 @@
 #define CMK_RSH_NOT_NEEDED                                 0
 #define CMK_RSH_USE_REMSH                                  0
 
-#define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
+#define CMK_SHARED_VARS_EXEMPLAR                           0
 
 #define CMK_THREADS_USE_CONTEXT                            0
 
@@ -68,6 +68,7 @@
 #define CMK_WEB_MODE                                       1  
 
 #define CMK_ISATTY_DECL                                    1
+#define CMK_NETPOLL                                        1
 
 #endif
 
