@@ -600,7 +600,6 @@ void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
 
 
 
-
 void LogPool::addUserSupplied(int data){
 	// add an event
 	add(USER_SUPPLIED, 0, 0, TraceTimer(), -1, -1, 0, 0, 0, 0, 0 );
@@ -618,6 +617,16 @@ void LogPool::addUserSuppliedNote(char *note){
 	pool[numEntries-1].setUserSuppliedNote(note);
   }
 
+void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et){
+  CkPrintf("LogPool::addUserSuppliedBracketedNote eventID=%d\n", eventID);
+#ifndef CMK_BLUEGENE_CHARM
+  new (&pool[numEntries++])
+	LogEntry(bt, et, USER_SUPPLIED_BRACKETED_NOTE, note, eventID);
+  if(poolSize == numEntries){
+    flushLogBuffer();
+  }
+#endif	
+}
 
 
 /* **CW** Not sure if this is the right thing to do. Feels more like
@@ -688,11 +697,13 @@ void LogEntry::addPapi(int numPapiEvts, int *papi_ids, LONG_LONG_PAPI *papiVals)
 void LogEntry::pup(PUP::er &p)
 {
   int i;
-  CMK_TYPEDEF_UINT8 itime, irecvtime, icputime;
+  CMK_TYPEDEF_UINT8 itime, iEndTime, irecvtime, icputime;
   char ret = '\n';
 
   p|type;
   if (p.isPacking()) itime = (CMK_TYPEDEF_UINT8)(1.0e6*time);
+  if (p.isPacking()) iEndTime = (CMK_TYPEDEF_UINT8)(1.0e6*endTime);
+
   switch (type) {
     case USER_EVENT:
     case USER_EVENT_PAIR:
@@ -763,6 +774,23 @@ void LogEntry::pup(PUP::er &p)
 	    userSuppliedNote[length] = '\0';
 	  }
    	  PUParray(p,userSuppliedNote, length);
+	  break;
+    case USER_SUPPLIED_BRACKETED_NOTE:
+      CkPrintf("Writting out a USER_SUPPLIED_BRACKETED_NOTE\n");
+	  p|itime;
+	  p|iEndTime;
+	  p|event;
+	  int length2;
+	  if (p.isPacking()) length2 = strlen(userSuppliedNote);
+          p | length2;
+	  char space2;
+	  space2 = ' ';
+          p | space2;
+	  if (p.isUnpacking()) {
+	    userSuppliedNote = new char[length+1];
+	    userSuppliedNote[length] = '\0';
+	  }
+   	  PUParray(p,userSuppliedNote, length2);
 	  break;
     case MEMORY_USAGE_CURRENT:
       p | memUsage;
@@ -1036,6 +1064,13 @@ void TraceProjections::userSuppliedNote(char *note)
 {
   if (!computationStarted) return;
   _logPool->addUserSuppliedNote(note);
+}
+
+
+void TraceProjections::userSuppliedBracketedNote(char *note, int eventID, double bt, double et)
+{
+  if (!computationStarted) return;
+  _logPool->addUserSuppliedBracketedNote(note,  eventID,  bt, et);
 }
 
 void TraceProjections::memoryUsage(double m)

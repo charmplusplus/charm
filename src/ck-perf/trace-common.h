@@ -52,6 +52,8 @@
 /* Trace user supplied note (text string)  */
 #define USER_SUPPLIED_NOTE       28
 
+/* Trace user supplied note (text string, with start, end times, and user event id)  */
+#define USER_SUPPLIED_BRACKETED_NOTE       29
 
 
 

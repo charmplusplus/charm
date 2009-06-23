@@ -48,6 +48,7 @@
 class LogEntry {
   public:
     double time;
+    double endTime; // Should be used for all bracketed events. Currently only used for bracketed user supplied note
     double cputime;
     double recvTime;
     int event;
@@ -134,6 +135,20 @@ class LogEntry {
       if(note != NULL)
 	setUserSuppliedNote(note);
     }
+
+
+   // Constructor for bracketed user supplied note
+    LogEntry(double bt, double et, unsigned char _type, char *note, int eventID){
+      time = bt;
+      endTime = et;
+      type = _type;
+      pes=NULL;
+      numpes=0;
+      event = eventID;
+      if(note != NULL)
+	setUserSuppliedNote(note);
+    }
+
 
     // Constructor for multicast data
     LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
@@ -295,10 +310,11 @@ class LogPool {
 	void addUserSuppliedNote(char *note);
 
 
-    void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
+	void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
   
   	void addMemoryUsage(unsigned char type,double time,double memUsage);
-   
+	void addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et);
+
     void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int numPe=0, int *pelist=NULL);
     void flushLogBuffer();
     void postProcessLog();
@@ -396,6 +412,8 @@ class TraceProjections : public Trace {
     TraceProjections(char **argv);
     void userEvent(int e);
     void userBracketEvent(int e, double bt, double et);
+    void userSuppliedBracketedNote(char*, int, double, double);
+
     void userSuppliedData(int e);
     void userSuppliedNote(char* note);
     void memoryUsage(double m);
