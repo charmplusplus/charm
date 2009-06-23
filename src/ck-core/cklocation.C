@@ -720,7 +720,11 @@ class CkMapsInit : public Chare
 {
 public:
   CkMapsInit(CkArgMsg *msg) {
+#ifdef __FAULT__
+    _defaultArrayMapID = CProxy_RRMap::ckNew();
+#else
     _defaultArrayMapID = CProxy_DefaultArrayMap::ckNew();
+#endif
     delete msg;
   }
   CkMapsInit(CkMigrateMessage *m) {}
