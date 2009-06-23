@@ -120,12 +120,12 @@ Prevents the runtime from tracing events (including all user events) on the loca
 \label{sec::user events}
 
 \projections{} has the ability to visualize traceable user
-specified events. User events are usually displayed in the Timeline view as short vertical bars above the entry methods. Alternatively the user event can be displayed as a vertical bar that vertically spans all timelines. Follow these following basic steps for creating user events in a charm++ program:
+specified events. User events are usually displayed in the Timeline view as vertical bars above the entry methods. Alternatively the user event can be displayed as a vertical bar that vertically spans the timelines for all processors. Follow these following basic steps for creating user events in a charm++ program:
 
 \begin{enumerate}
 \item
 Register an event with an identifying string and either specify or acquire
-a globally unique event identifier.
+a globally unique event identifier. All user events that are not registered will be displayed in white.
 
 \item
 Use the event identifier to specify trace points in your code of interest to you.
@@ -162,7 +162,9 @@ Eg. {\tt eventID = traceRegisterUserEvent(``Time Step Begin'');}
 
 
 
-There are two types of user events, differentiated by the call used to generate each:
+There are two main types of user events, bracketed and non bracketed. Non-bracketed user events mark a specific point in time. Bracketed user events span an arbitrary contiguous time range. Additionally, the user can supply a short user supplied text string that is recorded with the event in the log file. These strings should not contain newline characters, but they may contain simple html formatting tags such as \texttt{<br>}, \texttt{<b>}, \texttt{<i>}, \texttt{<font color=#ff00ff>}, etc.
+
+The calls for recording user events are the following:
 
 \begin{itemize}
 
@@ -170,7 +172,7 @@ There are two types of user events, differentiated by the call used to generate 
 \item
 {\tt void traceUserEvent(int EventNum) }
 
-This function creates a user event that marks a specific point in time, .
+This function creates a user event that marks a specific point in time.
 
 Eg. {\tt traceUserEvent(10);}
 
@@ -186,6 +188,25 @@ Eg.
    // do the critical code
    traceUserBracketEvent(20, critStart,CmiWallTimer());
 \end{verbatim}
+
+
+
+
+
+\item
+{\tt void traceUserSuppliedNote(char * note) }
+
+This function records a user specified text string at the current time.
+
+
+
+
+\item
+{\tt void traceUserSuppliedBracketedNote(char *note, int EventNum, double StartTime, double EndTime)}
+
+This function records a user event spanning a time interval from {\tt StartTime} to {\tt EndTime}. Both {\tt StartTime} and {\tt EndTime} should be obtained from a call to {\tt CmiWallTimer()} at the appropriate point in the program.
+
+Additionally, a user supplied text string is recorded, and the  {\tt EventNum} is recorded. These events are therefore displayed with colors determined by the {\tt EventNum}, just as those generated with {\tt traceUserBracketEvent} are.
 
 \end{itemize}
 
