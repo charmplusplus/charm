@@ -16,8 +16,8 @@
 #include "LBDBManager.h"
 #include "LBSimulation.h"
 
-#define  DEBUGF(x)      // CmiPrintf x;
-#define  DEBUG(x)       // x;
+#define  DEBUGF(x)       // CmiPrintf x;
+#define  DEBUG(x)        // x;
 
 #if CMK_MEM_CHECKPOINT
    /* can not handle reduction in inmem FT */
@@ -1268,6 +1268,9 @@ void CLBStatsMsg::pup(PUP::er &p) {
   p|idletime;
   p|bg_walltime;   p|bg_cputime;
   p|n_objs;
+#ifdef _FAULT_MLOG_
+  p | step;
+#endif
   if (p.isUnpacking()) objData = new LDObjData[n_objs];
   for (i=0; i<n_objs; i++) p|objData[i];
   p|n_comm;
