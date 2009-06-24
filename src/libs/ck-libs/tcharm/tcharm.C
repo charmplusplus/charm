@@ -736,7 +736,11 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
 #if CMK_BLUEGENE_CHARM
     mapID=CProxy_BlockMap::ckNew();
 #else
+#if __FAULT__
+	mapID=CProxy_RRMap::ckNew();
+#else
     mapID=CkCreatePropMap();
+#endif
 #endif
   }else if(0==strcmp(mapping,"BLOCK_MAP")){
     CkPrintf("USING BLOCK_MAP\n");
