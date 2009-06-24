@@ -21,6 +21,17 @@
 
    The local messages are delivered through the array manager using the CharmStrategy::deliverToIndices methods. If a destination chare is remote, the array manager will forward it on to the pe that contains the chare.
    
+   To create a new strategy:
+   <ul>
+   <li>Add a class declaration similar to the ones below, making sure they inherit from OneTimeMulticastStrategy. 
+   <li>Add a PUPable entry in ComlibManager.ci 
+   <li>Implement determineNextHopPEs in OneTimeMulticastStrategy.C. See information for OneTimeMulticastStrategy::determineNextHopPEs .
+   </ul>
+
+@todo  Buffer messages until strategy is fully enabled. The current version might have some startup issues if the multicast is used too early.
+
+@todo  Implement topology aware subclasses. 
+
 */
 class OneTimeMulticastStrategy: public Strategy, public CharmStrategy {
  private:
@@ -32,9 +43,21 @@ class OneTimeMulticastStrategy: public Strategy, public CharmStrategy {
   
  public:
 
-  virtual void determineNextHopPEs(ComlibMulticastMsg * multMsg, int myIndex, int * &pelist, int &npes );
-  
- OneTimeMulticastStrategy(CkMigrateMessage *m): Strategy(m), CharmStrategy(m){}
+  /** 
+      Determine the set of PEs to which the message should be forwarded from this PE.
+      Fill in pelist and npes to which the multicast message will be forwarded from this PE.
+
+      @param [in] totalDestPEs The number of destination PEs to whom the message needs to be sent. 
+      @param [in] destPEs The list of PEs that eventually will be sent the message.
+      @param [in] myIndex The index into destPEs for this PE.
+
+      @param [out] pelist A list of PEs to which the message will be sent after this function returns. This function allocates the array with new. The caller will free it with delete[] if npes>0.
+      @param [out] npes The size of pelist
+
+  */
+  virtual void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes );
+
+    OneTimeMulticastStrategy(CkMigrateMessage *m): Strategy(m), CharmStrategy(m){}
   
   OneTimeMulticastStrategy();
   ~OneTimeMulticastStrategy();
@@ -56,12 +79,12 @@ class OneTimeMulticastStrategy: public Strategy, public CharmStrategy {
 
 
 /**
-   A OneTimeMulticastStrategy that sends along a ring
+   A strategy that sends along a ring through the destination processors.
 */
 class OneTimeRingMulticastStrategy: public OneTimeMulticastStrategy {
   
  public:
-  void determineNextHopPEs(ComlibMulticastMsg * multMsg, int myIndex, int * &pelist, int &npes );
+  void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes );
 
  OneTimeRingMulticastStrategy(CkMigrateMessage *m): OneTimeMulticastStrategy(m) {}
  OneTimeRingMulticastStrategy(): OneTimeMulticastStrategy() {}
@@ -76,7 +99,7 @@ class OneTimeRingMulticastStrategy: public OneTimeMulticastStrategy {
 
 
 /**
-   A OneTimeMulticastStrategy that sends along a tree of arbitrary degree
+   A strategy that sends along a tree with user specified branching factor.
 */
 class OneTimeTreeMulticastStrategy: public OneTimeMulticastStrategy {
  private:
@@ -84,10 +107,13 @@ class OneTimeTreeMulticastStrategy: public OneTimeMulticastStrategy {
   
  public:
   
-  void determineNextHopPEs(ComlibMulticastMsg * multMsg, int myIndex, int * &pelist, int &npes );
+  void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes );
   
  OneTimeTreeMulticastStrategy(CkMigrateMessage *m): OneTimeMulticastStrategy(m) {}
+
+  /** Create a strategy with specified branching factor(which defaults to 4) */
  OneTimeTreeMulticastStrategy(int treeDegree=4): OneTimeMulticastStrategy(), degree(treeDegree) {}
+
   ~OneTimeTreeMulticastStrategy() {}
   
   void pup(PUP::er &p){ 
@@ -96,7 +122,6 @@ class OneTimeTreeMulticastStrategy: public OneTimeMulticastStrategy {
   }
   
   PUPable_decl(OneTimeTreeMulticastStrategy);
-  
 };
 
 

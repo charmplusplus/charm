@@ -88,8 +88,8 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
   }
   
   CkAssert(myIndex != -10000); // Sanity check
-    
-  determineNextHopPEs(multMsg, myIndex, pelist, npes );
+  
+  determineNextHopPEs(totalDestPEs, multMsg->indicesCount, myIndex, pelist, npes );
   
   if(npes == 0) {
     CmiFree(env);
@@ -115,29 +115,6 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
   
   delete[] pelist;
 }
-
-
-/** 
-    Fill in pelist and npes to which the multicast message will be forwarded from this PE.
-    Caller should delete pelist if npes>0.
-*/
-void OneTimeMulticastStrategy::determineNextHopPEs(ComlibMulticastMsg * multMsg, int myIndex, int * &pelist, int &npes ) {
-  if(myIndex==-1){
-    // We are at a root node of the spanning tree. 
-    // We will forward the message to all other PEs in the destination list.
-    npes = multMsg->nPes;
-    
-    pelist = new int[npes];
-    for (int i=0; i<npes; ++i) {
-      pelist[i] = multMsg->indicesCount[i].pe;
-    }
-  } else {
-    // We are at a leaf node of the spanning tree. 
-    npes = 0;
-  }
-  
-}
-
 
 
 
@@ -171,13 +148,25 @@ void OneTimeMulticastStrategy::handleMessage(void *msg){
 
 
 
+void OneTimeMulticastStrategy::determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes) {
+  if(myIndex==-1){
+    // We are at a root node of the spanning tree. 
+    // We will forward the message to all other PEs in the destination list.
+    npes = totalDestPEs;
+    
+    pelist = new int[npes];
+    for (int i=0; i<npes; ++i) {
+      pelist[i] = destPEs[i].pe;
+    }
+  } else {
+    // We are at a leaf node of the spanning tree. 
+    npes = 0;
+  }
+  
+}
 
-/** 
-    Fill in pelist and npes to which the multicast message will be forwarded from this PE.
-    Caller should delete pelist if npes>0.
-*/
-void OneTimeRingMulticastStrategy::determineNextHopPEs(ComlibMulticastMsg * multMsg, int myIndex, int * &pelist, int &npes ) {
-  const int totalDestPEs = multMsg->nPes;
+
+void OneTimeRingMulticastStrategy::determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes) {
   const int myPe = CkMyPe();
 
   if(myIndex == totalDestPEs-1){
@@ -188,20 +177,13 @@ void OneTimeRingMulticastStrategy::determineNextHopPEs(ComlibMulticastMsg * mult
     // All non-final PEs will send to next PE in list
     npes = 1;
     pelist = new int[1];
-    pelist[0] = multMsg->indicesCount[myIndex+1].pe;
+    pelist[0] = destPEs[myIndex+1].pe;
   }
 
 }
 
 
-
-
-/** 
-    Fill in pelist and npes to which the multicast message will be forwarded from this PE.
-    Caller should delete pelist if npes>0.
-*/
-void OneTimeTreeMulticastStrategy::determineNextHopPEs(ComlibMulticastMsg * multMsg, int myIndex, int * &pelist, int &npes ) {
-  const int totalDestPEs = multMsg->nPes;
+void OneTimeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes){
   const int myPe = CkMyPe();
   
   // The logical indices start at 0 = root node. Logical index i corresponds to the entry i+1 in the array of PEs in the message
@@ -219,8 +201,7 @@ void OneTimeTreeMulticastStrategy::determineNextHopPEs(ComlibMulticastMsg * mult
     npes = 0;
     return;
   }
-  
-
+ 
 #if DEBUG
   if(numSend > 0)
     CkPrintf("Tree logical index %d sending to logical %d to %d (totalDestPEs excluding root=%d)  numSend=%d\n",
@@ -232,7 +213,7 @@ void OneTimeTreeMulticastStrategy::determineNextHopPEs(ComlibMulticastMsg * mult
   
   for(int i=0;i<numSend;i++){
     CkAssert(sendLogicalIndexStart-1+i < totalDestPEs);
-    pelist[i] = multMsg->indicesCount[sendLogicalIndexStart-1+i].pe;
+    pelist[i] = destPEs[sendLogicalIndexStart-1+i].pe;
 #if DEBUG
     CkPrintf("Tree logical index %d sending to PE %d\n", myIndex+1, pelist[i]);
 #endif
