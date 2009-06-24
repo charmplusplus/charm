@@ -2157,7 +2157,7 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
   for(i=0;i<npes-1;i++) {
     CmiSyncSend(pes[i], len, msg);
   }
-  if (npes)
+  if (npes>0)
     CmiSyncSendAndFree(pes[npes-1], len, msg);
   else 
     CmiFree(msg);
