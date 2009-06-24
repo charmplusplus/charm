@@ -398,7 +398,7 @@ void traceUserSuppliedNote(char * note)
 extern "C"
 void traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double et)
 {
-  CkPrintf("traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double et)\n");
+  //CkPrintf("traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double et)\n");
 #ifndef CMK_OPTIMIZE
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
     CkpvAccess(_traces)->userSuppliedBracketedNote(note, eventID, bt, et);

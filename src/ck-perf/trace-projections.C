@@ -618,7 +618,7 @@ void LogPool::addUserSuppliedNote(char *note){
   }
 
 void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et){
-  CkPrintf("LogPool::addUserSuppliedBracketedNote eventID=%d\n", eventID);
+  //CkPrintf("LogPool::addUserSuppliedBracketedNote eventID=%d\n", eventID);
 #ifndef CMK_BLUEGENE_CHARM
   new (&pool[numEntries++])
 	LogEntry(bt, et, USER_SUPPLIED_BRACKETED_NOTE, note, eventID);
@@ -776,7 +776,7 @@ void LogEntry::pup(PUP::er &p)
    	  PUParray(p,userSuppliedNote, length);
 	  break;
     case USER_SUPPLIED_BRACKETED_NOTE:
-      CkPrintf("Writting out a USER_SUPPLIED_BRACKETED_NOTE\n");
+      //CkPrintf("Writting out a USER_SUPPLIED_BRACKETED_NOTE\n");
 	  p|itime;
 	  p|iEndTime;
 	  p|event;
