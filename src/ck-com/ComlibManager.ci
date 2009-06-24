@@ -35,7 +35,6 @@ module comlib {
     entry ComlibManagerMain();	
   }
 
-  PUPable OneTimeMulticastStrategy;	
   PUPable EachToManyMulticastStrategy;	
   PUPable DirectMulticastStrategy;
   PUPable RingMulticastStrategy;	
@@ -45,6 +44,9 @@ module comlib {
   PUPable PrioStreaming;
   PUPable PipeBroadcastStrategy;
  
+  PUPable OneTimeMulticastStrategy;	
+  PUPable OneTimeTreeMulticastStrategy;
+  PUPable OneTimeRingMulticastStrategy;
 
   //PUPable CharmStrategy;
   //PUPable MessageHolder;
