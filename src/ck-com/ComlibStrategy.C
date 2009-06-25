@@ -23,14 +23,27 @@ void CharmStrategy::pup(PUP::er &p) {
 
 
 
-/** Deliver a message to a set of indices using the array manager. Indices can be local or remote. */
+/** 
+    Deliver a message to a set of indices using the array manager. Indices can be local or remote. 
+    
+    An optimization for [nokeep] methods is applied: the message is not copied for each invocation.
+   
+    @return the number of destination objects which were not local (information
+    retrieved from the array/location manager)
+*/
 void CharmStrategy::deliverToIndices(void *msg, int numDestIdxs, const CkArrayIndexMax* indices ){
+  int count = 0;
   
   envelope *env = UsrToEnv(msg);
-  
+  int ep = env->getsetArrayEp();
+  CkUnpackMessage(&env);
+
   CkArrayID destination_aid = env->getsetArrayMgr();
   CkArray *a=(CkArray *)_localBranch(destination_aid);
-  int ep = env->getsetArrayEp();
+
+  env->setPacked(0);
+  env->getsetArrayHops()=1;
+  env->setUsed(0);
 
   //  CkPrintf("Delivering to %d objects\n", numDestIdxs);
 
@@ -42,10 +55,10 @@ void CharmStrategy::deliverToIndices(void *msg, int numDestIdxs, const CkArrayIn
       
       if(_entryTable[ep]->noKeep)
 	// don't make a copy for [nokeep] entry methods
-	a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CK_MSG_KEEP);
+	count += a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CK_MSG_KEEP);
       else {
 	void *newmsg = CkCopyMsg(&msg);
-	a->deliver((CkArrayMessage *)newmsg, CkDeliver_queue);
+	count += a->deliver((CkArrayMessage *)newmsg, CkDeliver_queue);
       }
     }
     
@@ -53,14 +66,16 @@ void CharmStrategy::deliverToIndices(void *msg, int numDestIdxs, const CkArrayIn
     env->getsetArrayIndex() = indices[numDestIdxs-1];
     
     if(_entryTable[ep]->noKeep){
-      a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CK_MSG_KEEP);
+      count += a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CK_MSG_KEEP);
       CmiFree(env); // runtime frees the [nokeep] messages
     }
     else {
-      a->deliver((CkArrayMessage *)msg, CkDeliver_queue);
+      count += a->deliver((CkArrayMessage *)msg, CkDeliver_queue);
     }
     
   }
+
+  return count;
 }
 
 
@@ -619,6 +634,9 @@ void ComlibArrayInfo::localBroadcast(envelope *env) {
 
   @return the number of destination objects which were not local (information
   retrieved from the array/location manager)
+
+  @todo Replace this method with calls to CharmStrategy::deliverToIndices, possibly making it a function that is not part of any class
+
 */
 
 #include "register.h"
