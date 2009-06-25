@@ -49,10 +49,12 @@ void OneTimeMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
 
 /** Deliver the message to the local elements. */
 void OneTimeMulticastStrategy::localMulticast(CharmMessageHolder *cmsg) {
+  double start = CmiWallTimer();
   CkSectionID *sec_id = cmsg->sec_id;
   CkVec< CkArrayIndexMax > localIndices;
   sinfo.getLocalIndices(sec_id->_nElems, sec_id->_elems, sec_id->_cookie.aid, localIndices);
   deliverToIndices(cmsg->getCharmMessage(), localIndices );
+  traceUserBracketEvent(10000, start, CmiWallTimer());
 }
 
 
@@ -64,6 +66,7 @@ void OneTimeMulticastStrategy::localMulticast(CharmMessageHolder *cmsg) {
     Uses CmiSyncListSendAndFree for delivery to this strategy's OneTimeMulticastStrategy::handleMessage method.
 */
 void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, bool rootPE) {
+  double start = CmiWallTimer();
 
   envelope *env = UsrToEnv(multMsg);
     
@@ -92,6 +95,7 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
   determineNextHopPEs(totalDestPEs, multMsg->indicesCount, myIndex, pelist, npes );
   
   if(npes == 0) {
+    traceUserBracketEvent(10001, start, CmiWallTimer());
     CmiFree(env);
     return;
   }
@@ -114,6 +118,8 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
   CmiSyncListSendAndFree(npes, pelist, env->getTotalsize(), (char*)env);
   
   delete[] pelist;
+  traceUserBracketEvent(10001, start, CmiWallTimer());
+
 }
 
 
