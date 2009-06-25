@@ -1689,6 +1689,9 @@ MSG_ORDER_DEBUG(
 	CkPrintf("AMPI vp %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d) resumeOnRecv %d\n",
   	thisIndex,msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq,resumeOnRecv);
 )
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_ADD_TAG("AMPI_generic");
+#endif
 
   int sync = UsrToEnv(msg)->getRef();
 
@@ -1957,6 +1960,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   //TRACE_BG_AMPI_RESUME(thread->getThread(), msg, "RECV_RESUME", &curLog, 1);
   //TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0);
   //_TRACE_BG_SET_INFO((char *)msg, "RECV_RESUME",  &curLog, 1);
+#if 0
 #if 1
   if (!dosuspend) {
     TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0, 1);
@@ -1965,6 +1969,10 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   else
 #endif
   TRACE_BG_ADD_TAG("RECV_RESUME_THREAD");
+#endif
+#else
+    TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0, 0);
+    _TRACE_BG_ADD_BACKWARD_DEP(msg->event);
 #endif
 
   delete msg;
