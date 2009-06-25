@@ -1969,10 +1969,10 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   else
 #endif
   TRACE_BG_ADD_TAG("RECV_RESUME_THREAD");
-#endif
 #else
     TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0, 0);
     _TRACE_BG_ADD_BACKWARD_DEP(msg->event);
+#endif
 #endif
 
   delete msg;
