@@ -31,7 +31,7 @@ void CharmStrategy::pup(PUP::er &p) {
     @return the number of destination objects which were not local (information
     retrieved from the array/location manager)
 */
-void CharmStrategy::deliverToIndices(void *msg, int numDestIdxs, const CkArrayIndexMax* indices ){
+int CharmStrategy::deliverToIndices(void *msg, int numDestIdxs, const CkArrayIndexMax* indices ){
   int count = 0;
   
   envelope *env = UsrToEnv(msg);

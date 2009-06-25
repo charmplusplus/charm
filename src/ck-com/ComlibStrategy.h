@@ -309,7 +309,7 @@ class CharmStrategy {
 
 
     /** Deliver a message to a set of indices using the array manager. Indices can be local or remote. */
-    void deliverToIndices(void *msg, int numDestIdxs, const CkArrayIndexMax* indices );
+    int deliverToIndices(void *msg, int numDestIdxs, const CkArrayIndexMax* indices );
     
     /** Deliver a message to a set of indices using the array manager. Indices can be local or remote. */
     inline void deliverToIndices(void *msg, const CkVec< CkArrayIndexMax > &indices ){
