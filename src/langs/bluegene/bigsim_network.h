@@ -97,24 +97,26 @@ class BlueGenePNetwork: public BigSimNetwork
 private:
   double bandwidth;
   int packetsize;
-  double linkcost;
 public:
   BlueGenePNetwork() { 
     myname = "bluegenep";
     packetsize = 256;
-    bandwidth = 425E6; alpha = 2E-6;
-    linkcost = packetsize/bandwidth;
+    bandwidth = 0.18E9; alpha = 6E-6;
   }
+  inline void set_latency(double lat) {alpha = lat;}
+  inline void set_bandwidth(double bw) {bandwidth = bw;}
   inline double latency(int ox, int oy, int oz, int nx, int ny, int nz, int bytes) {
-    int xd=BG_ABS(ox-nx), yd=BG_ABS(oy-ny), zd=BG_ABS(oz-nz);
+    /* (int xd=BG_ABS(ox-nx), yd=BG_ABS(oy-ny), zd=BG_ABS(oz-nz);
     if (xd > dimNX/2) xd = dimNX - xd;
     if (yd > dimNY/2) yd = dimNY - yd;
     if (zd > dimNZ/2) zd = dimNZ - zd;
     CmiAssert(xd>=0 && yd>=0 && zd>=0);
-    int hops = xd + yd + zd;
+    int hops = xd + yd + zd; 
+
     int numpackets = bytes/packetsize;
     if (bytes%packetsize) numpackets++;
-    return  linkcost * hops * numpackets;
+    return  alpha + (numpackets * packetsize)/bandwidth; */
+    return alpha + (bytes/bandwidth);
   }
   void print() {
     CmiPrintf("bandwidth: %e; alpha: %e.\n", bandwidth, alpha);
