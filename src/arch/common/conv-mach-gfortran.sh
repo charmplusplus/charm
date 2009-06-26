@@ -37,10 +37,10 @@ then
 else
   f95target=`gfortran -v 2>&1 | grep Target | cut -f2 -d' '`
   f95version=`gfortran -v 2>&1 | grep 'gcc version' | cut -d' ' -f3`
-  F90LIBDIR=`cd $F90DIR/../lib/gcc/$f95target/$f95version/; pwd`
+  F90LIBDIR=`cd $F90DIR/../lib/gcc/$f95target/$f95version/ 2>/dev/null && pwd`
   #F90LIBDIR=`cd $F90DIR/../lib/gcc/ia64-unknown-linux-gnu/4.1.0; pwd`
 fi
-CMK_F90LIBS="-L$F90LIBDIR -lgfortran -lgcc_eh"
+test -n "$F90LIBDIR" && CMK_F90LIBS="-L$F90LIBDIR -lgfortran -lgcc_eh"
 
 CMK_MOD_NAME_ALLCAPS=
 CMK_MOD_EXT="mod"
