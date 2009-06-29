@@ -42,7 +42,7 @@ class ConvComlibManager {
   /// the number of strategies currently present in the system
   int nstrats;
 
-  friend Strategy::Strategy();
+  friend class Strategy;
   int insertStrategy(Strategy *s);
  public:
   // a few variables used in the process of strategy synchronization
