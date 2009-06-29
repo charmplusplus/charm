@@ -892,7 +892,7 @@ TraceProjections::TraceProjections(char **argv):
   // consume the flag so there's no confusing
   CmiGetArgFlagDesc(argv,"+gz-trace",
 		    "Write log files pre-compressed with gzip");
-  CkPrintf("Warning: gz-trace is not supported on this machine!\n");
+  if(CkMyPe() == 0) CkPrintf("Warning> gz-trace is not supported on this machine!\n");
 #endif
 
   // **CW** default to non delta log encoding. The user may choose to do
