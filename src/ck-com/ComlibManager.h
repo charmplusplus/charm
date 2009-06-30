@@ -283,7 +283,7 @@ class ComlibManager: public CkDelegateMgr {
     ///bracket.
     void endIteration(int instid, int iteration);
     
-    void printPeList(char* note, int *peList);
+    void printPeList(const char* note, int *peList);
 
     
     bool shouldBufferMessagesNow(int instid);

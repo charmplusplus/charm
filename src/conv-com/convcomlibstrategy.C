@@ -133,7 +133,7 @@ void StrategyTableEntry::reset() {
 }
 
 
-char *StrategyTableEntry::errorModeString(){
+const char *StrategyTableEntry::errorModeString(){
   switch(errorMode) {
   case NORMAL_MODE:
     return "NORMAL_MODE       ";
@@ -149,7 +149,7 @@ char *StrategyTableEntry::errorModeString(){
 }
 
 
-char *StrategyTableEntry::errorModeServerString(){
+const char *StrategyTableEntry::errorModeServerString(){
   switch(errorModeServer) {
   case STARTUP_MODE_SERVER:
     return "STARTUP_MODE_SERVER    ";
@@ -168,7 +168,7 @@ char *StrategyTableEntry::errorModeServerString(){
   }
 }
 
-char *StrategyTableEntry::discoveryModeString(){
+const char *StrategyTableEntry::discoveryModeString(){
   switch(discoveryMode) {
   case NORMAL_DISCOVERY_MODE:
     return "NORMAL_DISCOVERY_MODE  ";

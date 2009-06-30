@@ -417,9 +417,9 @@ public:
   void reset();
   
 
-  char *errorModeString();
-  char *errorModeServerString();
-  char *discoveryModeString();
+  const char *errorModeString();
+  const char *errorModeServerString();
+  const char *discoveryModeString();
 
 
   StrategyTableEntry();

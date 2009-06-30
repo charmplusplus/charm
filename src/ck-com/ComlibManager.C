@@ -857,8 +857,8 @@ void ComlibManager::bracketedContributeDiscovery(int instid, int pe, int nsrc, i
 }
 
 
-void ComlibManager::printPeList(char* note, int *count){
-	
+void ComlibManager::printPeList(const char* note, int *count)
+{
 	char *buf = (char*)malloc(1024*64);
 	sprintf(buf, "[%d] %s ", CkMyPe(), note);
 	for(int i=0;i<CkNumPes();i++){
