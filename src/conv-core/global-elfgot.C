@@ -314,7 +314,11 @@ public:
     }
     ~CtgGlobalStruct() {
       if (data_seg) {
-        free(data_seg);
+        if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+          CmiIsomallocFree(data_seg);
+        else
+          free(data_seg);
+        data_seg = NULL;
       }
     }
     
