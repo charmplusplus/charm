@@ -47,7 +47,7 @@ TODO:
 #include "conv-ccs.h"
 #include <signal.h>
 
-#define DEBUGF     // CkPrintf
+#define DEBUGF      // CkPrintf
 
 // assume NO extra processors--1
 // assume extra processors--0
@@ -272,7 +272,7 @@ void CkMemCheckPT::pup(PUP::er& p)
 void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m) 
 {
 #if CMK_MEM_CHECKPOINT
-  DEBUGF("[%d] inmem_restore restore: mgr: %d ", CmiMyPe(), m->locMgr);  
+  DEBUGF("[%d] inmem_restore restore: mgr: %d \n", CmiMyPe(), m->locMgr);  
   // m->index.print();
   PUP::fromMem p(m->packData);
   CkLocMgr *mgr = CProxy_CkLocMgr(m->locMgr).ckLocalBranch();
