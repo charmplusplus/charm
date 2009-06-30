@@ -5009,8 +5009,8 @@ int AMPI_Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm* newcomm)
 CDECL
 void AMPI_Checkpoint(char *dname)
 {
-  AMPIAPI("AMPI_Checkpoint");
   AMPI_Barrier(MPI_COMM_WORLD);
+  AMPIAPI("AMPI_Checkpoint");
   getAmpiParent()->startCheckpoint(dname);
 }
 
@@ -5018,8 +5018,8 @@ CDECL
 void AMPI_MemCheckpoint()
 {
 #if CMK_MEM_CHECKPOINT
-  AMPIAPI("AMPI_Checkpoint");
   AMPI_Barrier(MPI_COMM_WORLD);
+  AMPIAPI("AMPI_Checkpoint");
   getAmpiParent()->startCheckpoint("");
 #else
   CmiPrintf("Error: In memory checkpoint/restart is not on! \n");
