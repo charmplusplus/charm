@@ -65,7 +65,16 @@ class BGPTorusManager {
         unsigned int tmp_t, tmp_x, tmp_y, tmp_z;
                      
         for(int c = 0; c < numPes/thdsPerProc; c++) {
+#if (DCMF_VERSION_MAJOR >= 3)
+	  DCMF_NetworkCoord_t  nc;
+	  DCMF_Messager_rank2network (c, DCMF_DEFAULT_NETWORK, &nc);
+	  tmp_x = nc.torus.x;
+	  tmp_y = nc.torus.y;
+	  tmp_z = nc.torus.z;
+	  tmp_t = nc.torus.t;
+#else
       	  DCMF_Messager_rank2torus(c, &tmp_x, &tmp_y, &tmp_z, &tmp_t);
+#endif
  	  //if(CmiMyPe()==0){
 	    //printf("Adjusting proc %d, runtime x/y/z/t=[%d, %d, %d, %d]\n", c, tmp_x, tmp_y, tmp_z, tmp_t);
           //}     	  

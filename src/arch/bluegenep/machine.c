@@ -47,7 +47,7 @@ CsvDeclare(CmiNodeLock, node_bcastLock);
 #define CMK_BROADCAST_HYPERCUBE        0
 #endif /* CMK_SMP */
 
-#define BROADCAST_SPANNING_FACTOR     4
+#define BROADCAST_SPANNING_FACTOR     2
 
 //The root of the message infers the type of the message
 // 1. root is 0, then it is a normal point-to-point message
@@ -78,7 +78,7 @@ extern unsigned char computeCheckSum(unsigned char *data, int len);
         if (checksum_flag)      \
           if (computeCheckSum((unsigned char*)msg, len) != 0)  { \
             printf("\n\n------------------------------\n\nReceiver %d size %d:", CmiMyPe(), len); \
-            for(int count = 0; count < len; count++) { \
+            for(count = 0; count < len; count++) { \
                 printf("%2x", msg[count]);                 \
             }                                             \
             printf("------------------------------\n\n"); \
@@ -752,14 +752,19 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     short_config.protocol      = DCMF_DEFAULT_SEND_PROTOCOL;
     short_config.cb_recv_short = short_pkt_recv;
     short_config.cb_recv       = first_pkt_recv_done;
-#if (DCMF_VERSION_MAJOR >= 2)
+
+#if (DCMF_VERSION_MAJOR >= 3)
+    short_config.network  = DCMF_DEFAULT_NETWORK;
+#elif (DCMF_VERSION_MAJOR == 2)
     short_config.network  = DCMF_DefaultNetwork;
 #endif
 
     eager_config.protocol      = DCMF_DEFAULT_SEND_PROTOCOL;
     eager_config.cb_recv_short = short_pkt_recv;
     eager_config.cb_recv       = first_pkt_recv_done;
-#if (DCMF_VERSION_MAJOR >= 2)
+#if (DCMF_VERSION_MAJOR >= 3)
+    eager_config.network  = DCMF_DEFAULT_NETWORK;
+#elif (DCMF_VERSION_MAJOR == 2)
     eager_config.network  = DCMF_DefaultNetwork;
 #endif
 
@@ -771,7 +776,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
     rzv_config.cb_recv_short   = short_pkt_recv;
     rzv_config.cb_recv         = first_pkt_recv_done;
-#if (DCMF_VERSION_MAJOR >= 2)
+#if (DCMF_VERSION_MAJOR >= 3)
+    rzv_config.network  = DCMF_DEFAULT_NETWORK;
+#elif (DCMF_VERSION_MAJOR == 2)
     rzv_config.network  = DCMF_DefaultNetwork;
 #endif
 
@@ -1390,6 +1397,11 @@ void SendSpanningChildren(int size, char *msg) {
     //Step2: send to other cores (i.e. excluding myself cs->pe) on the same nodes (just a flat send)
     CmiSendChildrenPeers(thisRid, size, msg);
 
+#if !CMK_SMP
+#if ENABLE_BROADCAST_THROTTLE
+    SendMsgsUntil (0);
+#endif
+#endif
 }
 #else
 /* send msg to its spanning children in broadcast. G. Zheng */
@@ -1412,7 +1424,7 @@ void SendSpanningChildren(int size, char *msg) {
 
         //printf ("%d [%d]: Sending Spanning Tree Msg to %d\n",  CmiMyPe(), CmiMyNode(), p);
         CmiSyncSendFn1(p, size, msg);
-    }
+    }    
 }
 #endif
 
@@ -1561,7 +1573,17 @@ void AdvanceCommunications() {
 static void SendMsgsUntil(int targetm) {
 
     while (msgQueueLen>targetm) {
-        AdvanceCommunications ();
+      //AdvanceCommunications ();
+#if CMK_SMP
+      DCMF_CriticalSection_enter (0);
+#endif
+      
+      while(DCMF_Messager_advance()>0);
+      //DCMF_Messager_advance();
+      
+#if CMK_SMP
+      DCMF_CriticalSection_exit (0);
+#endif
     }
 }
 
