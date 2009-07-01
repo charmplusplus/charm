@@ -318,7 +318,7 @@ public:
 
 	int getSize(void) const {return size;}
 
-	inline const int isinter(void) const { return isInter; }
+	inline int isinter(void) const { return isInter; }
 	inline const CkVec<int> &getindices() const {
 		if (isWorld && indices.size()!=size) makeWorldIndices();
 		return indices;
@@ -1478,8 +1478,8 @@ friend class IReq;
     inline const CProxy_ampi &getComlibProxy(void) const { return comlibProxy; }
     inline const CProxy_ampi &getRemoteProxy(void) const {return remoteProxy;}
     inline void setRemoteProxy(CProxy_ampi rproxy) { remoteProxy = rproxy; thread->resume(); }
-    inline const int getIndexForRank(int r) const {return myComm.getIndexForRank(r);}
-    inline const int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
+    inline int getIndexForRank(int r) const {return myComm.getIndexForRank(r);}
+    inline int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
     inline ComlibInstanceHandle getStreaming(void) { return ciStreaming; }
     inline ComlibInstanceHandle getBcast(void) { return ciBcast; }
     inline ComlibInstanceHandle getAllgather(void) { return ciAllgather; }
