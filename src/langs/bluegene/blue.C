@@ -123,6 +123,10 @@ int init_counters()
       if (CmiMyPe()== 0) printf("PAPI_L1_DCM used\n");
       papiEvents[numPapiEvents++] = PAPI_L1_DCM;   // L1 cache miss
     }
+    if (PAPI_query_event(PAPI_TLB_DM) == PAPI_OK) {
+      if (CmiMyPe()== 0) printf("PAPI_TLB_DM used\n");
+      papiEvents[numPapiEvents++] = PAPI_TLB_DM;   // data TLB misses
+    }
     if (PAPI_query_event(PAPI_MEM_RCY) == PAPI_OK) {
       if (CmiMyPe()== 0) printf("PAPI_MEM_RCY used\n");
       papiEvents[numPapiEvents++] = PAPI_MEM_RCY;  // idle cycle waiting for reads
@@ -1292,7 +1296,7 @@ static void sanityCheck()
     BgShutdown(); 
 #endif
   }
-  else if (cva(bgMach).getNodeSize()<CmiNumPes()) {
+  if (cva(bgMach).getNodeSize()<CmiNumPes()) {
     CmiAbort("\nToo few BlueGene nodes!\n");
   }
 }
