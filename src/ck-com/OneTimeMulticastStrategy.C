@@ -9,6 +9,9 @@
 #include "OneTimeMulticastStrategy.h"
 #include <string>
 #include <set>
+#include <vector>
+
+#define DEBUG 1
 
 CkpvExtern(CkGroupID, cmgrID);
 
@@ -29,6 +32,9 @@ void OneTimeMulticastStrategy::pup(PUP::er &p){
 
 /** Called when the user invokes the entry method on the delegated proxy. */
 void OneTimeMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
+  CkPrintf("[%d] OneTimeMulticastStrategy::insertMessage\n", CkMyPe());
+  fflush(stdout);
+  
   if(cmsg->dest_proc != IS_SECTION_MULTICAST && cmsg->sec_id == NULL) { 
     CkAbort("OneTimeMulticastStrategy can only be used with an array section proxy");
   }
@@ -71,8 +77,6 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
 
   envelope *env = UsrToEnv(multMsg);
     
-  int npes;
-  int *pelist;   
   
   /// The index into the PE list in the message
   int myIndex = -10000; 
@@ -91,11 +95,22 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
     }
   }
   
-  CkAssert(myIndex != -10000); // Sanity check
+  if(myIndex == -10000)
+    CkAbort("My PE was not found in the list of destination PEs in the ComlibMulticastMsg");
   
-  determineNextHopPEs(totalDestPEs, multMsg->indicesCount, myIndex, pelist, npes );
-  
+  int npes;
+  int *pelist = NULL;
+
+  if(totalDestPEs > 0)
+    determineNextHopPEs(totalDestPEs, multMsg->indicesCount, myIndex, pelist, npes );
+  else
+    npes = 0;
+    
+
   if(npes == 0) {
+#if DEBUG
+    CkPrintf("[%d] OneTimeMulticastStrategy::remoteMulticast is not forwarding to any other PEs\n", CkMyPe());
+#endif
     traceUserBracketEvent(10001, start, CmiWallTimer());
     CmiFree(env);
     return;
@@ -108,14 +123,7 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
   //Collect Multicast Statistics
   RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), pelist, npes);
   
-
-#if DEBUG
-  for(int i=0;i<npes;i++){
-    CkPrintf("[%d] Multicast to %d  rootPE=%d\n", CkMyPe(), pelist[i], (int)rootPE);
-  }
-#endif
-
-  //  if(npes > 0)
+  CkAssert(npes > 0);
   CmiSyncListSendAndFree(npes, pelist, env->getTotalsize(), (char*)env);
   
   delete[] pelist;
@@ -130,6 +138,9 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
     Deliver the message to all local elements 
 */
 void OneTimeMulticastStrategy::handleMessage(void *msg){
+#if DEBUG
+  //  CkPrintf("[%d] OneTimeMulticastStrategy::handleMessage\n", CkMyPe());
+#endif
   envelope *env = (envelope *)msg;
   CkUnpackMessage(&env);
   
@@ -148,7 +159,7 @@ void OneTimeMulticastStrategy::handleMessage(void *msg){
   deliverToIndices(newmsg, localElems, local_idx_list );
   
   // Forward on to other processors if necessary
-  remoteMulticast( multMsg, false);
+  remoteMulticast(multMsg, false);
 
 }
 
@@ -229,6 +240,55 @@ void OneTimeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPEs, c
 }
 
 
+/** Find a unique representative PE for a node containing pe, with the restriction that the returned PE is in the list destPEs. */
+int getFirstPeOnPhysicalNodeFromList(int pe, const int totalDestPEs, const ComlibMulticastIndexCount* destPEs){
+  int num;
+  int *nodePeList;
+  CmiGetPesOnPhysicalNode(pe, &nodePeList, &num);
+  
+  for(int i=0;i<num;i++){
+    // Scan destPEs for the pe
+    int p = nodePeList[i];
+    
+    for(int j=0;j<totalDestPEs;j++){
+      if(p == destPEs[j].pe){
+	// found the representative PE for the node that is in the destPEs list
+	return p;
+      }
+    }
+  }
+  
+  CkAbort("ERROR: Could not find an entry for pe in destPEs list.\n");
+  return -1;
+}
+
+
+
+/** List all the other PEs from the list that share the physical node */
+std::vector<int> getOtherPesOnPhysicalNodeFromList(int pe, const int totalDestPEs, const ComlibMulticastIndexCount* destPEs){
+  
+  std::vector<int> result;
+
+  int num;
+  int *nodePeList;
+  CmiGetPesOnPhysicalNode(pe, &nodePeList, &num);
+  
+  for(int i=0;i<num;i++){
+    // Scan destPEs for the pe
+    int p = nodePeList[i];
+    if(p != pe){
+      for(int j=0;j<totalDestPEs;j++){
+	if(p == destPEs[j].pe){
+	  // found the representative PE for the node that is in the destPEs list
+	  result.push_back(p);
+	  break;
+	}
+      }
+    }
+  }
+  
+  return result;
+}
 
 
 void OneTimeNodeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes){
@@ -239,20 +299,24 @@ void OneTimeNodeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPE
   // create a list of PEs, with one for each node to which the message must be sent
   for(int i=0; i<totalDestPEs; i++){
     int pe = destPEs[i].pe;
-    int representative = CmiGetFirstPeOnPhysicalNode(pe);
+    int representative = getFirstPeOnPhysicalNodeFromList(pe, totalDestPEs, destPEs);
     nodePERepresentatives.insert(representative);    
   }
   
   int numRepresentativePEs = nodePERepresentatives.size();
-
-  CkPrintf("Multicasting to %d PEs on %d physical nodes\n", totalDestPEs, numRepresentativePEs );
-  fflush(stdout);
-
-  int repForMyPe = CmiGetFirstPeOnPhysicalNode(CkMyPe());
   
-  if(CkMyPe() == repForMyPe){
-    // This representative PE for the node should forward on this message along the tree, and deliver to local PEs
-    
+  int repForMyPe=-1;
+  if(myIndex != -1)
+    repForMyPe = getFirstPeOnPhysicalNodeFromList(CkMyPe(), totalDestPEs, destPEs);
+  
+#if DEBUG
+  CkPrintf("[%d] Multicasting to %d PEs on %d physical nodes  repForMyPe=%d\n", CkMyPe(), totalDestPEs, numRepresentativePEs, repForMyPe);
+  fflush(stdout);
+#endif
+  
+  // If this PE is part of the multicast tree, then it should forward the message along
+  if(CkMyPe() == repForMyPe || myIndex == -1){
+    // I am an internal node in the multicast tree
     
     // flatten the data structure for nodePERepresentatives
     int *repPeList = new int[numRepresentativePEs];
@@ -265,23 +329,33 @@ void OneTimeNodeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPE
 	myRepIndex = p;
       p++;
     }
-    CkAssert(myRepIndex >=0);
-    
-    
-       
+    CkAssert(myRepIndex >=0 || myIndex==-1);
+      
     // The logical indices start at 0 = root node. Logical index i corresponds to the entry i+1 in the array of PEs in the message
     int sendLogicalIndexStart = degree*(myRepIndex+1) + 1;       // inclusive
     int sendLogicalIndexEnd = sendLogicalIndexStart + degree - 1;   // inclusive
     
-    if(sendLogicalIndexEnd-1 >= totalDestPEs){
-      sendLogicalIndexEnd = totalDestPEs;
+    if(sendLogicalIndexEnd-1 >= numRepresentativePEs){
+      sendLogicalIndexEnd = numRepresentativePEs;
     }
     
     int numSendTree = sendLogicalIndexEnd - sendLogicalIndexStart + 1;
-    int numSendLocal = CmiNumPesOnPhysicalNode(CkMyPe())-1;
+    if(numSendTree < 0)
+      numSendTree = 0;
     
-    CkPrintf("[%d] numSendTree=%d numSendLocal=%d\n", CkMyPe(), numSendTree, numSendLocal);
+    std::vector<int> otherLocalPes = getOtherPesOnPhysicalNodeFromList(CkMyPe(), totalDestPEs, destPEs);
+    int numSendLocal;
+    if(myIndex == -1)
+      numSendLocal = 0;
+    else 
+      numSendLocal = otherLocalPes.size();
+    
+    
+
+#if DEBUG
+    CkPrintf("[%d] numSendTree=%d numSendLocal=%d sendLogicalIndexStart=%d sendLogicalIndexEnd=%d\n", CkMyPe(), numSendTree, numSendLocal,  sendLogicalIndexStart, sendLogicalIndexEnd);
     fflush(stdout);
+#endif
 
     int numSend = numSendTree + numSendLocal;
     if(numSend <= 0){
@@ -293,27 +367,29 @@ void OneTimeNodeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPE
     pelist = new int[npes];
   
     for(int i=0;i<numSendTree;i++){
-      CkAssert(sendLogicalIndexStart-1+i < totalDestPEs);
+      CkAssert(sendLogicalIndexStart-1+i < numRepresentativePEs);
       pelist[i] = repPeList[sendLogicalIndexStart-1+i];
-      CkAssert(pelist[i] < CkNumPes());
+      CkAssert(pelist[i] < CkNumPes() && pelist[i] >= 0);
     }
     
-    int num;
-    int *pelist;
-    CmiGetPesOnPhysicalNode(CkMyPe(), &pelist, &num);
-    for(int i=0;i<numSendLocal;i++){
-      pelist[i+numSendTree] = pelist[1+i];
-    }
+    delete[] repPeList;
+    repPeList = NULL;
 
+    for(int i=0;i<numSendLocal;i++){
+      pelist[i+numSendTree] = otherLocalPes[i];
+      CkAssert(pelist[i] < CkNumPes() && pelist[i] >= 0);
+    }
     
+    
+#if 1
     char buf[1024];
     sprintf(buf, "PE %d is sending to PEs: ", CkMyPe() );
-    
     for(int i=0;i<numSend;i++){
       sprintf(buf+strlen(buf), "%d ", pelist[i]);
-    }
-    
+    }    
     CkPrintf("%s\n", buf);
+    fflush(stdout);
+#endif
         
   } else {
     // We are a leaf PE

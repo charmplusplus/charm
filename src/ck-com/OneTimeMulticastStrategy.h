@@ -47,7 +47,7 @@ class OneTimeMulticastStrategy: public Strategy, public CharmStrategy {
       Determine the set of PEs to which the message should be forwarded from this PE.
       Fill in pelist and npes to which the multicast message will be forwarded from this PE.
 
-      @param [in] totalDestPEs The number of destination PEs to whom the message needs to be sent. 
+      @param [in] totalDestPEs The number of destination PEs to whom the message needs to be sent. This will always be > 0.
       @param [in] destPEs The list of PEs that eventually will be sent the message.
       @param [in] myIndex The index into destPEs for this PE.
 
