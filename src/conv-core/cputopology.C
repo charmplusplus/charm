@@ -255,6 +255,14 @@ extern "C" void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num)
   if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].getVec();
 }
 
+extern "C"  int CmiGetFirstPeOnPhysicalNode(int pe)
+{
+  CmiAssert(pe >=0 && pe < CmiNumPes());
+  const CkVec<int> &v = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]];
+  return v[0];
+}
+
+
 static int _noip = 0;
 
 extern "C" void CmiInitCPUTopology(char **argv)
