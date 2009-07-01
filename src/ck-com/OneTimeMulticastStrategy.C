@@ -8,6 +8,7 @@
 
 #include "OneTimeMulticastStrategy.h"
 #include <string>
+#include <set>
 
 CkpvExtern(CkGroupID, cmgrID);
 
@@ -194,7 +195,6 @@ void OneTimeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPEs, c
   
   // The logical indices start at 0 = root node. Logical index i corresponds to the entry i+1 in the array of PEs in the message
   
-  // All non-final PEs will send to next PE in list
   int sendLogicalIndexStart = degree*(myIndex+1) + 1;       // inclusive
   int sendLogicalIndexEnd = sendLogicalIndexStart + degree - 1;   // inclusive
   
@@ -225,6 +225,103 @@ void OneTimeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPEs, c
 #endif
     CkAssert(pelist[i] < CkNumPes());
   }
+  
+}
+
+
+
+
+void OneTimeNodeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes){
+  const int myPe = CkMyPe();
+
+  std::set<int> nodePERepresentatives;
+  
+  // create a list of PEs, with one for each node to which the message must be sent
+  for(int i=0; i<totalDestPEs; i++){
+    int pe = destPEs[i].pe;
+    int representative = CmiGetFirstPeOnPhysicalNode(pe);
+    nodePERepresentatives.insert(representative);    
+  }
+  
+  int numRepresentativePEs = nodePERepresentatives.size();
+
+  CkPrintf("Multicasting to %d PEs on %d physical nodes\n", totalDestPEs, numRepresentativePEs );
+  fflush(stdout);
+
+  int repForMyPe = CmiGetFirstPeOnPhysicalNode(CkMyPe());
+  
+  if(CkMyPe() == repForMyPe){
+    // This representative PE for the node should forward on this message along the tree, and deliver to local PEs
+    
+    
+    // flatten the data structure for nodePERepresentatives
+    int *repPeList = new int[numRepresentativePEs];
+    int myRepIndex = -1;
+    std::set<int>::iterator iter;
+    int p=0;
+    for(iter=nodePERepresentatives.begin(); iter != nodePERepresentatives.end(); iter++){
+      repPeList[p] = *iter;
+      if(*iter == repForMyPe)
+	myRepIndex = p;
+      p++;
+    }
+    CkAssert(myRepIndex >=0);
+    
+    
+       
+    // The logical indices start at 0 = root node. Logical index i corresponds to the entry i+1 in the array of PEs in the message
+    int sendLogicalIndexStart = degree*(myRepIndex+1) + 1;       // inclusive
+    int sendLogicalIndexEnd = sendLogicalIndexStart + degree - 1;   // inclusive
+    
+    if(sendLogicalIndexEnd-1 >= totalDestPEs){
+      sendLogicalIndexEnd = totalDestPEs;
+    }
+    
+    int numSendTree = sendLogicalIndexEnd - sendLogicalIndexStart + 1;
+    int numSendLocal = CmiNumPesOnPhysicalNode(CkMyPe())-1;
+    
+    CkPrintf("[%d] numSendTree=%d numSendLocal=%d\n", CkMyPe(), numSendTree, numSendLocal);
+    fflush(stdout);
+
+    int numSend = numSendTree + numSendLocal;
+    if(numSend <= 0){
+      npes = 0;
+      return;
+    }
+    
+    npes = numSend;
+    pelist = new int[npes];
+  
+    for(int i=0;i<numSendTree;i++){
+      CkAssert(sendLogicalIndexStart-1+i < totalDestPEs);
+      pelist[i] = repPeList[sendLogicalIndexStart-1+i];
+      CkAssert(pelist[i] < CkNumPes());
+    }
+    
+    int num;
+    int *pelist;
+    CmiGetPesOnPhysicalNode(CkMyPe(), &pelist, &num);
+    for(int i=0;i<numSendLocal;i++){
+      pelist[i+numSendTree] = pelist[1+i];
+    }
+
+    
+    char buf[1024];
+    sprintf(buf, "PE %d is sending to PEs: ", CkMyPe() );
+    
+    for(int i=0;i<numSend;i++){
+      sprintf(buf+strlen(buf), "%d ", pelist[i]);
+    }
+    
+    CkPrintf("%s\n", buf);
+        
+  } else {
+    // We are a leaf PE
+    npes = 0;
+    return;
+  }
+
+  
   
 }
 

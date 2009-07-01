@@ -126,6 +126,38 @@ class OneTimeTreeMulticastStrategy: public OneTimeMulticastStrategy {
 
 
 
+
+
+
+/**
+   A node-aware strategy that sends along a node-based tree with user specified branching factor.
+*/
+class OneTimeNodeTreeMulticastStrategy: public OneTimeMulticastStrategy {
+ private:
+  int degree;
+  
+ public:
+  
+  void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes );
+  
+ OneTimeNodeTreeMulticastStrategy(CkMigrateMessage *m): OneTimeMulticastStrategy(m) {}
+  
+  /** Create a strategy with specified branching factor(which defaults to 4) */
+ OneTimeNodeTreeMulticastStrategy(int treeDegree=4): OneTimeMulticastStrategy(), degree(treeDegree) {}
+  
+  ~OneTimeNodeTreeMulticastStrategy() {}
+  
+  void pup(PUP::er &p){ 
+    OneTimeMulticastStrategy::pup(p); 
+    p | degree;
+  }
+  
+  PUPable_decl(OneTimeNodeTreeMulticastStrategy);
+};
+
+
+
+
 #endif
 
 /*@}*/

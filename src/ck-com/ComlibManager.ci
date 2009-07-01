@@ -47,6 +47,7 @@ module comlib {
   PUPable OneTimeMulticastStrategy;	
   PUPable OneTimeTreeMulticastStrategy;
   PUPable OneTimeRingMulticastStrategy;
+  PUPable OneTimeNodeTreeMulticastStrategy;
 
   //PUPable CharmStrategy;
   //PUPable MessageHolder;
