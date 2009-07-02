@@ -825,7 +825,7 @@ Debugf "----------- Module dependency search complete ------------"
 
 if [ "$BUILD_SHARE" = "1" ]
 then
-	if [ -n "$CMK_NO_BUILD_SHARED" -o -z "$CHARMLIBSO" ]
+	if [ x"$CMK_NO_BUILD_SHARED" = "xtrue" -o -z "$CHARMLIBSO" ]
 	then
 		BUILD_SHARE="0"
 	fi
