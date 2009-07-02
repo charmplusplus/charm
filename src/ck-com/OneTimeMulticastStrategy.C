@@ -303,6 +303,32 @@ int getNthPeOnPhysicalNodeFromList(int n, int pe, const int totalDestPEs, const 
 }
 
 
+/** List all the PEs from the list that share the physical node */ 
+std::vector<int> getPesOnPhysicalNodeFromList(int pe, const int totalDestPEs, const ComlibMulticastIndexCount* destPEs){ 
+   
+  std::vector<int> result; 
+ 
+  int num; 
+  int *nodePeList; 
+  CmiGetPesOnPhysicalNode(pe, &nodePeList, &num); 
+  
+  for(int i=0;i<num;i++){ 
+    // Scan destPEs for the pe 
+    int p = nodePeList[i]; 
+    for(int j=0;j<totalDestPEs;j++){ 
+      if(p == destPEs[j].pe){ 
+	// found the representative PE for the node that is in the
+	// destPEs list 
+	result.push_back(p); 
+	break; 
+      } 
+    } 
+  } 
+  
+  return result; 
+}
+
+
 
 /** List all the other PEs from the list that share the physical node */
 std::vector<int> getOtherPesOnPhysicalNodeFromList(int pe, const int totalDestPEs, const ComlibMulticastIndexCount* destPEs){
@@ -555,12 +581,15 @@ void OneTimeNodeTreeRingMulticastStrategy::determineNextHopPEs(const int totalDe
         
   } else {
     // We are a leaf PE, so forward in a ring to the PEs on this node
-    const std::vector<int> otherLocalPes = getOtherPesOnPhysicalNodeFromList(CkMyPe(), totalDestPEs, destPEs);
+    const std::vector<int> otherLocalPes = getPesOnPhysicalNodeFromList(CkMyPe(), totalDestPEs, destPEs);
     
     npes = 0;
     pelist = new int[1];
     
-    for(int i=0;i<otherLocalPes.size();i++){
+    //    CkPrintf("[%d] otherLocalPes.size=%d\n", CkMyPe(), otherLocalPes.size() ); 
+    const int numOthers = otherLocalPes.size() ;
+    
+    for(int i=0;i<numOthers;i++){
       if(otherLocalPes[i] == CkMyPe()){
 	// found me in the PE list for this node
 	if(i+1<otherLocalPes.size()){
@@ -570,20 +599,20 @@ void OneTimeNodeTreeRingMulticastStrategy::determineNextHopPEs(const int totalDe
 	}
       }
     }
-     
-
-#if 1
+    
+    
+#if DEBUG
     if(npes==0)
-      CkPrintf("[%d] At end of ring", CkMyPe() );
+      CkPrintf("[%d] At end of ring\n", CkMyPe() );
     else
       CkPrintf("[%d] sending along ring to %d\n", CkMyPe(), pelist[0] );
     
     fflush(stdout);
 #endif
-
-
+    
+    
   }
-
+  
   
   
 }
