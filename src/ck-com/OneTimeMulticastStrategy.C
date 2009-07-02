@@ -44,7 +44,7 @@ void OneTimeMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
   // Create a multicast message containing all information about remote destination objects 
   int needSort = 0;
   ComlibMulticastMsg * multMsg = sinfo.getNewMulticastMessage(cmsg, needSort, getInstance());
-  
+    
   // local multicast will re-extract a list of local destination objects (FIXME to make this more efficient)
   localMulticast(cmsg);
   
@@ -122,6 +122,9 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
   ((CmiMsgHeaderBasic *) env)->stratid = getInstance();  
   CkPackMessage(&env);
 
+  double middle = CmiWallTimer();
+
+
   //Collect Multicast Statistics
   RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), pelist, npes);
   
@@ -129,8 +132,11 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
   CmiSyncListSendAndFree(npes, pelist, env->getTotalsize(), (char*)env);
   
   delete[] pelist;
-  traceUserBracketEvent(10001, start, CmiWallTimer());
 
+  double end = CmiWallTimer();
+  traceUserBracketEvent(10001, start, middle);
+  traceUserBracketEvent(10002, middle, end);
+  
 }
 
 
@@ -260,6 +266,38 @@ int getFirstPeOnPhysicalNodeFromList(int pe, const int totalDestPEs, const Comli
     }
   }
   
+  CkAbort("ERROR: Could not find an entry for pe in destPEs list.\n");
+  return -1;
+}
+
+
+/** Find a unique representative PE for a node containing pe, with the restriction that the returned PE is in the list destPEs. */
+int getNthPeOnPhysicalNodeFromList(int n, int pe, const int totalDestPEs, const ComlibMulticastIndexCount* destPEs){
+  int num;
+  int *nodePeList;
+  CmiGetPesOnPhysicalNode(pe, &nodePeList, &num);
+  
+  int count = 0;
+  int lastFound = -1;
+  
+  // Foreach PE on this physical node
+  for(int i=0;i<num;i++){
+    int p = nodePeList[i];
+    
+    // Scan destPEs for the pe
+    for(int j=0;j<totalDestPEs;j++){
+      if(p == destPEs[j].pe){
+	lastFound = p;
+	if(count==n)
+	  return p;
+	count++;
+      }
+    }
+  }
+  
+  if(lastFound != -1)
+    return lastFound;
+
   CkAbort("ERROR: Could not find an entry for pe in destPEs list.\n");
   return -1;
 }
@@ -407,5 +445,147 @@ void OneTimeNodeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPE
 }
 
 
+void OneTimeNodeTreeRingMulticastStrategy::determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes){
+  const int myPe = CkMyPe();
+
+  std::set<int> nodePERepresentatives;
+  
+  // create a list of PEs, with one for each node to which the message must be sent
+  for(int i=0; i<totalDestPEs; i++){
+    int pe = destPEs[i].pe;
+    int representative = getFirstPeOnPhysicalNodeFromList(pe, totalDestPEs, destPEs);
+    nodePERepresentatives.insert(representative);    
+  }
+  
+  int numRepresentativePEs = nodePERepresentatives.size();
+  
+  int repForMyPe=-1;
+  if(myIndex != -1)
+    repForMyPe = getFirstPeOnPhysicalNodeFromList(CkMyPe(), totalDestPEs, destPEs);
+  
+#if DEBUG
+  CkPrintf("[%d] Multicasting to %d PEs on %d physical nodes  repForMyPe=%d\n", CkMyPe(), totalDestPEs, numRepresentativePEs, repForMyPe);
+  fflush(stdout);
+#endif
+  
+  // If this PE is part of the multicast tree, then it should forward the message along
+  if(CkMyPe() == repForMyPe || myIndex == -1){
+    // I am an internal node in the multicast tree
+    
+    // flatten the data structure for nodePERepresentatives
+    int *repPeList = new int[numRepresentativePEs];
+    int myRepIndex = -1;
+    std::set<int>::iterator iter;
+    int p=0;
+    for(iter=nodePERepresentatives.begin(); iter != nodePERepresentatives.end(); iter++){
+      repPeList[p] = *iter;
+      if(*iter == repForMyPe)
+	myRepIndex = p;
+      p++;
+    }
+    CkAssert(myRepIndex >=0 || myIndex==-1);
+      
+    // The logical indices start at 0 = root node. Logical index i corresponds to the entry i+1 in the array of PEs in the message
+    int sendLogicalIndexStart = degree*(myRepIndex+1) + 1;       // inclusive
+    int sendLogicalIndexEnd = sendLogicalIndexStart + degree - 1;   // inclusive
+    
+    if(sendLogicalIndexEnd-1 >= numRepresentativePEs){
+      sendLogicalIndexEnd = numRepresentativePEs;
+    }
+    
+    int numSendTree = sendLogicalIndexEnd - sendLogicalIndexStart + 1;
+    if(numSendTree < 0)
+      numSendTree = 0;
+
+
+    // Send in a ring to the PEs on this node
+    std::vector<int> otherLocalPes = getOtherPesOnPhysicalNodeFromList(CkMyPe(), totalDestPEs, destPEs);
+    int numSendLocal = 0;
+    if(myIndex == -1)
+      numSendLocal = 0;
+    else {
+      if(otherLocalPes.size() > 0)
+	numSendLocal = 1;
+      else
+	numSendLocal = 0;
+    }
+    
+
+#if DEBUG
+    CkPrintf("[%d] numSendTree=%d numSendLocal=%d sendLogicalIndexStart=%d sendLogicalIndexEnd=%d\n", CkMyPe(), numSendTree, numSendLocal,  sendLogicalIndexStart, sendLogicalIndexEnd);
+    fflush(stdout);
+#endif
+
+    int numSend = numSendTree + numSendLocal;
+    if(numSend <= 0){
+      npes = 0;
+      return;
+    }
+    
+    npes = numSend;
+    pelist = new int[npes];
+  
+    for(int i=0;i<numSendTree;i++){
+      CkAssert(sendLogicalIndexStart-1+i < numRepresentativePEs);
+      pelist[i] = repPeList[sendLogicalIndexStart-1+i];
+      CkAssert(pelist[i] < CkNumPes() && pelist[i] >= 0);
+    }
+    
+    delete[] repPeList;
+    repPeList = NULL;
+
+    for(int i=0;i<numSendLocal;i++){
+      pelist[i+numSendTree] = otherLocalPes[i];
+      CkAssert(pelist[i] < CkNumPes() && pelist[i] >= 0);
+    }
+    
+    
+#if DEBUG
+    char buf[1024];
+    sprintf(buf, "PE %d is sending to Remote Node PEs: ", CkMyPe() );
+    for(int i=0;i<numSend;i++){
+      if(i==numSendTree)
+	sprintf(buf+strlen(buf), " and Local To Node PEs: ", pelist[i]);
+
+      sprintf(buf+strlen(buf), "%d ", pelist[i]);
+    }    
+    CkPrintf("%s\n", buf);
+    fflush(stdout);
+#endif
+        
+  } else {
+    // We are a leaf PE, so forward in a ring to the PEs on this node
+    const std::vector<int> otherLocalPes = getOtherPesOnPhysicalNodeFromList(CkMyPe(), totalDestPEs, destPEs);
+    
+    npes = 0;
+    pelist = new int[1];
+    
+    for(int i=0;i<otherLocalPes.size();i++){
+      if(otherLocalPes[i] == CkMyPe()){
+	// found me in the PE list for this node
+	if(i+1<otherLocalPes.size()){
+	  // If we have a successor in the ring
+	  pelist[0] = otherLocalPes[i+1];
+	  npes = 1;
+	}
+      }
+    }
+     
+
+#if 1
+    if(npes==0)
+      CkPrintf("[%d] At end of ring", CkMyPe() );
+    else
+      CkPrintf("[%d] sending along ring to %d\n", CkMyPe(), pelist[0] );
+    
+    fflush(stdout);
+#endif
+
+
+  }
+
+  
+  
+}
 
 /*@}*/

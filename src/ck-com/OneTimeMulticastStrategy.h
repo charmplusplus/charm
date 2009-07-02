@@ -130,7 +130,7 @@ class OneTimeTreeMulticastStrategy: public OneTimeMulticastStrategy {
 
 
 /**
-   A node-aware strategy that sends along a node-based tree with user specified branching factor.
+   A node-aware strategy that sends along a node-based tree with user specified branching factor. Once the message reaches the PE representative for each node, it is forwarded from the PE to all other destination PEs on the node. This strategy can result in imbalanced loads. The PEs along the tree have higher load than the other PEs.
 */
 class OneTimeNodeTreeMulticastStrategy: public OneTimeMulticastStrategy {
  private:
@@ -154,6 +154,35 @@ class OneTimeNodeTreeMulticastStrategy: public OneTimeMulticastStrategy {
   
   PUPable_decl(OneTimeNodeTreeMulticastStrategy);
 };
+
+
+
+/**
+   A node-aware strategy that sends along a node-based tree with user specified branching factor. Once the message arrives at the first PE on the node, it is forwarded to the other PEs on the node through a ring.
+*/
+class OneTimeNodeTreeRingMulticastStrategy: public OneTimeMulticastStrategy {
+ private:
+  int degree;
+  
+ public:
+  
+  void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes );
+  
+ OneTimeNodeTreeRingMulticastStrategy(CkMigrateMessage *m): OneTimeMulticastStrategy(m) {}
+  
+  /** Create a strategy with specified branching factor(which defaults to 4) */
+ OneTimeNodeTreeRingMulticastStrategy(int treeDegree=4): OneTimeMulticastStrategy(), degree(treeDegree) {}
+  
+  ~OneTimeNodeTreeRingMulticastStrategy() {}
+  
+  void pup(PUP::er &p){ 
+    OneTimeMulticastStrategy::pup(p); 
+    p | degree;
+  }
+  
+  PUPable_decl(OneTimeNodeTreeRingMulticastStrategy);
+};
+
 
 
 
