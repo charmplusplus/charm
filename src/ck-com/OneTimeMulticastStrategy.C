@@ -385,8 +385,11 @@ void OneTimeNodeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPE
     
 #if DEBUG
     char buf[1024];
-    sprintf(buf, "PE %d is sending to PEs: ", CkMyPe() );
+    sprintf(buf, "PE %d is sending to Remote Node PEs: ", CkMyPe() );
     for(int i=0;i<numSend;i++){
+      if(i==numSendTree)
+	sprintf(buf+strlen(buf), " and Local To Node PEs: ", pelist[i]);
+
       sprintf(buf+strlen(buf), "%d ", pelist[i]);
     }    
     CkPrintf("%s\n", buf);
