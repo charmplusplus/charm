@@ -1,9 +1,11 @@
 mainmodule test {
   readonly CProxy_Main mainProxy;
   readonly CProxy_LUBlk luArrProxy;
-  readonly ComlibInstanceHandle cinst_direct;
-  readonly ComlibInstanceHandle cinst_ring;
-  readonly ComlibInstanceHandle cinst_multiring;
+
+readonly ComlibInstanceHandle cinst_direct;
+readonly ComlibInstanceHandle cinst_ring;
+readonly ComlibInstanceHandle cinst_multiring;
+readonly ComlibInstanceHandle cinst_onetime;
 
   message blkMsg {
     double data[];
@@ -12,6 +14,8 @@ mainmodule test {
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void iterationCompleted(CkReductionMsg *);
+   entry void startIteration();			 
+
   };
 
   array [1D] LUBlk {

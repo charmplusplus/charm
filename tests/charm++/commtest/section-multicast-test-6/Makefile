@@ -1,4 +1,4 @@
-CHARMC=../../../../bin/charmc -module comlib  $(OPTS)
+CHARMC=../../../../bin/charmc -module comlib  $(OPTS) -g
 
 all: pgm
 

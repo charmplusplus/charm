@@ -12,12 +12,12 @@ CProxy_LUBlk luArrProxy;
 ComlibInstanceHandle cinst_direct;
 ComlibInstanceHandle cinst_ring;
 ComlibInstanceHandle cinst_multiring;
-
+ComlibInstanceHandle cinst_onetime;
 
 #define BLKSIZE 10
-#define NumElem 40
+#define NumElem 200
 #define COOKIE 777777
-#define NUM_ITER 10
+#define NUM_ITER 40
 
 #define DEBUG 0
 
@@ -53,6 +53,9 @@ public:
 
     Strategy *strategy_multiring = new MultiRingMulticastStrategy();
     cinst_multiring = ComlibRegister(strategy_multiring);
+  
+    Strategy *strategy_onetime = new OneTimeNodeTreeMulticastStrategy();
+    cinst_onetime = ComlibRegister(strategy_onetime);
 
     
 
@@ -60,7 +63,9 @@ public:
     luArrProxy.ckSetReductionClient(cb);
     startTime = CmiWallTimer();
 
-    startIteration();
+    CkCallback *cbstart = new CkCallback(CkIndex_Main::startIteration(), thisProxy);
+    CkStartQD(*cbstart);
+
   }
 
 
@@ -134,7 +139,7 @@ public:
       if(thisIndex < NumElem-1) {
 	CProxySection_LUBlk sect = CProxySection_LUBlk::ckNew(thisArrayID, thisIndex+1, NumElem-1, 1);
 
-	switch(rand() % 3){
+	switch(rand() % 4){
 	case 0:
 	  ComlibAssociateProxy(cinst_direct, sect); 
 	  break;
@@ -144,7 +149,11 @@ public:
 	case 2:
 	  ComlibAssociateProxy(cinst_multiring, sect); 
 	  break;
+	case 3:
+	  ComlibAssociateProxy(cinst_onetime, sect); 
+	  break;
 	}
+
 
 	blkMsg *msg = new (BLKSIZE) blkMsg;
 	msg->data[1] = COOKIE;
