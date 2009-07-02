@@ -11,7 +11,7 @@
 #include <set>
 #include <vector>
 
-#define DEBUG 1
+//#define DEBUG 1
 
 CkpvExtern(CkGroupID, cmgrID);
 
@@ -32,9 +32,11 @@ void OneTimeMulticastStrategy::pup(PUP::er &p){
 
 /** Called when the user invokes the entry method on the delegated proxy. */
 void OneTimeMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
+#if DEBUG
   CkPrintf("[%d] OneTimeMulticastStrategy::insertMessage\n", CkMyPe());
   fflush(stdout);
-  
+#endif 
+
   if(cmsg->dest_proc != IS_SECTION_MULTICAST && cmsg->sec_id == NULL) { 
     CkAbort("OneTimeMulticastStrategy can only be used with an array section proxy");
   }
@@ -103,9 +105,9 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
 
   if(totalDestPEs > 0)
     determineNextHopPEs(totalDestPEs, multMsg->indicesCount, myIndex, pelist, npes );
-  else
+  else {
     npes = 0;
-    
+  }
 
   if(npes == 0) {
 #if DEBUG
@@ -381,7 +383,7 @@ void OneTimeNodeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPE
     }
     
     
-#if 1
+#if DEBUG
     char buf[1024];
     sprintf(buf, "PE %d is sending to PEs: ", CkMyPe() );
     for(int i=0;i<numSend;i++){
