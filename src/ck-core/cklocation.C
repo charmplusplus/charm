@@ -1208,14 +1208,14 @@ LDObjHandle CkMigratable::timingBeforeCall(int* objstopped){
 #if CMK_LBDB_ON
 	if (getLBDB()->RunningObject(&objHandle)) {
 		*objstopped = 1;
-		getLBDB()->ObjectStop(objHandle);
+		// getLBDB()->ObjectStop(objHandle);
+		myRec->startTiming();
   }
 #endif
 
   //DEBS((AA"   Invoking entry %d on element %s\n"AB,epIdx,idx2str(idx)));
 	//CmiBool isDeleted=CmiFalse; //Enables us to detect deletion during processing
 	//deletedMarker=&isDeleted;
-	myRec->startTiming();
 /*#ifndef CMK_OPTIMIZE
 	if (msg) {  Tracing: 
 		envelope *env=UsrToEnv(msg);
@@ -1242,10 +1242,12 @@ void CkMigratable::timingAfterCall(LDObjHandle objHandle,int *objstopped){
 //#endif
 //	if (isDeleted) return CmiFalse;//We were deleted
 //	deletedMarker=NULL;
-	ckStopTiming();
 //	return CmiTrue;
 #if CMK_LBDB_ON
-	if (*objstopped) getLBDB()->ObjectStart(objHandle);
+	if (*objstopped) {
+		// getLBDB()->ObjectStart(objHandle);
+		ckStopTiming();
+	}
 #endif
 
  return;
