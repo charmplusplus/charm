@@ -25,6 +25,12 @@ enum PartitionMode {
 };
 PartitionMode FEM_Partition_Mode = SerialPartitionMode;
 
+enum MetisGraphType {
+    NodeNeighborMode,
+    FaceNeighborMode
+};
+MetisGraphType FEM_Partition_Graph_Type = NodeNeighborMode;
+
 /* TCharm semaphore ID, used for mesh startup */
 #define FEM_TCHARM_SEMAID 0x00FE300 /* __FEM__ */
 
@@ -77,6 +83,11 @@ CDECL void FEM_Init(FEM_Comm_t defaultComm)
 	}
         if (CmiGetArgFlagDesc(argv, "+Parfum_manual_partition", "Specify manual mesh partitioning")) {
             FEM_Partition_Mode = ManualPartitionMode;
+        }
+        if (CmiGetArgFlagDesc(argv,
+                    "+Parfum_face_neighbor_graph",
+                    "Specify partitioning based on face neighbors instead of node neighbors")) {
+            FEM_Partition_Graph_Type = FaceNeighborMode;
         }
 }
 FORTRAN_AS_C(FEM_INIT,FEM_Init,fem_init, (int *comm), (*comm))
@@ -210,7 +221,7 @@ void FEM_Partition::setPartition(const int *e, int nElem, int idxBase) {
 const int *FEM_Partition::getPartition(FEM_Mesh *src,int nChunks) const {
 	if (!elem2chunk) { /* Create elem2chunk based on Metis partitioning: */
 		int *e=new int[src->nElems()];
-		FEM_Mesh_partition(src,nChunks,e);
+		FEM_Mesh_partition(src,nChunks,e,FEM_Partition_Graph_Type == FaceNeighborMode);
 		((FEM_Partition *)this)->elem2chunk=e;
 	}
 	return elem2chunk;

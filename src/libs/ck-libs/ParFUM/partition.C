@@ -17,11 +17,6 @@ Originally written by Karthik Mahesh, September 2000.
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
 
-enum MetisGraphType {
-    NodeNeighborMode,
-    FaceNeighborMode
-};
-MetisGraphType FEM_Partition_Graph_Type = NodeNeighborMode;
 
 class NList
 {
@@ -303,13 +298,8 @@ METIS_PartGraphKway (int* nv, int* xadj, int* adjncy, int* vwgt, int* adjwgt,
 /*Partition this mesh's elements into n chunks,
  writing each element's 0-based chunk number to elem2chunk.
 */
-void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
+void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk, bool faceGraph)
 {
-	char **argv = CkGetArgv();
-        if (CmiGetArgFlagDesc(argv, "+Parfum_face_neighbor_graph",
-                    "Specify partitioning based on face neighbors instead of node neighbors")) {
-            FEM_Partition_Graph_Type = FaceNeighborMode;
-        }
 	CkThresholdTimer time("FEM Split> Building graph for metis partitioner",1.0);
 	int nelems=mesh->nElems();
 	if (nchunks==1) { //Metis doesn't handle this case (!)
@@ -317,7 +307,7 @@ void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk)
 		return;
 	}
 	Graph g(nelems);
-        if (FEM_Partition_Graph_Type == NodeNeighborMode) {
+        if (!faceGraph) {
 	    mesh2graph(mesh,&g);
         } else {
             mesh2graph_face(mesh,&g);

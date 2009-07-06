@@ -1932,8 +1932,10 @@ FEM_Partition &FEM_curPartition(void);
 
 /*Partition this mesh's elements into n chunks,
   writing each element's 0-based chunk number to elem2chunk.
+  If |faceGraph|, use construct a face-neighbor graph for
+  Metis to partition. Otherwise, use a node-neighbor graph.
 */
-void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk);
+void FEM_Mesh_partition(const FEM_Mesh *mesh,int nchunks,int *elem2chunk, bool faceGraph=false);
 
 /*A way to stream out partitioned chunks of a mesh.
   By streaming, we can send the chunks as they are built,
