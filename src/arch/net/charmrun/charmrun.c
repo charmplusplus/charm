@@ -1031,6 +1031,12 @@ void nodetab_init_for_local()
   int tablesize, i, done=0;
   nodetab_host group;
 
+#ifdef _FAULT_MLOG_
+    if(arg_read_pes == 0){
+        arg_read_pes = arg_requested_pes;
+    }
+#endif
+
   tablesize = arg_requested_pes;
   nodetab_table=(nodetab_host**)malloc(tablesize*sizeof(nodetab_host*));
   nodetab_rank0_table=(int*)malloc(tablesize*sizeof(int));
