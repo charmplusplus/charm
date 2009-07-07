@@ -1137,15 +1137,15 @@ void CkLocRec_local::migrateMe(int toPe) //Leaving this processor
 }
 
 #if CMK_LBDB_ON
-void CkLocRec_local::startTiming(void) {
-  	running=CmiTrue;
+void CkLocRec_local::startTiming(int ignore_running) {
+  	if (!ignore_running) running=CmiTrue;
 	DEBL((AA"Start timing for %s at %.3fs {\n"AB,idx2str(idx),CkWallTimer()));
   	if (enable_measure) the_lbdb->ObjectStart(ldHandle);
 }
-void CkLocRec_local::stopTiming(void) {
+void CkLocRec_local::stopTiming(int ignore_running) {
 	DEBL((AA"} Stop timing for %s at %.3fs\n"AB,idx2str(idx),CkWallTimer()));
-  	if (running && enable_measure) the_lbdb->ObjectStop(ldHandle);
-  	running=CmiFalse;
+  	if ((ignore_running || running) && enable_measure) the_lbdb->ObjectStop(ldHandle);
+  	if (!ignore_running) running=CmiFalse;
 }
 void CkLocRec_local::setObjTime(double cputime) {
 	the_lbdb->EstObjLoad(ldHandle, cputime);
@@ -1208,9 +1208,9 @@ LDObjHandle CkMigratable::timingBeforeCall(int* objstopped){
 #if CMK_LBDB_ON
 	if (getLBDB()->RunningObject(&objHandle)) {
 		*objstopped = 1;
-		// getLBDB()->ObjectStop(objHandle);
-		myRec->startTiming();
-  }
+		getLBDB()->ObjectStop(objHandle);
+	}
+	myRec->startTiming(1);
 #endif
 
   //DEBS((AA"   Invoking entry %d on element %s\n"AB,epIdx,idx2str(idx)));
@@ -1243,10 +1243,10 @@ void CkMigratable::timingAfterCall(LDObjHandle objHandle,int *objstopped){
 //	if (isDeleted) return CmiFalse;//We were deleted
 //	deletedMarker=NULL;
 //	return CmiTrue;
+	myRec->stopTiming(1);
 #if CMK_LBDB_ON
 	if (*objstopped) {
-		// getLBDB()->ObjectStart(objHandle);
-		ckStopTiming();
+		 getLBDB()->ObjectStart(objHandle);
 	}
 #endif
 

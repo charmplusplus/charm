@@ -196,13 +196,13 @@ public:
 
 #if CMK_LBDB_ON  //For load balancing:
   /// Control the load balancer:
-  void startTiming(void);
-  void stopTiming(void);
+  void startTiming(int ignore_running=0);
+  void stopTiming(int ignore_running=0);
   void setObjTime(double cputime);
   double getObjTime();
 #else
-  inline void startTiming(void) {  }
-  inline void stopTiming(void) { }
+  inline void startTiming(int ignore_running=0) {  }
+  inline void stopTiming(int ignore_running=0) { }
 #endif
   inline int getLocalIndex(void) const {return localIdx;}
   inline const CkArrayIndex &getIndex(void) const {return idx;}
