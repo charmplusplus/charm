@@ -162,7 +162,7 @@ Eg. {\tt eventID = traceRegisterUserEvent(``Time Step Begin'');}
 
 
 
-There are two main types of user events, bracketed and non bracketed. Non-bracketed user events mark a specific point in time. Bracketed user events span an arbitrary contiguous time range. Additionally, the user can supply a short user supplied text string that is recorded with the event in the log file. These strings should not contain newline characters, but they may contain simple html formatting tags such as \texttt{<br>}, \texttt{<b>}, \texttt{<i>}, \texttt{<font color=#ff00ff>}, etc.
+There are two main types of user events, bracketed and non bracketed. Non-bracketed user events mark a specific point in time. Bracketed user events span an arbitrary contiguous time range. Additionally, the user can supply a short user supplied text string that is recorded with the event in the log file. These strings should not contain newline characters, but they may contain simple html formatting tags such as \texttt{<br>}, \texttt{<b>}, \texttt{<i>}, \texttt{<font color=\#ff00ff>}, etc.
 
 The calls for recording user events are the following:
 
@@ -480,7 +480,7 @@ To rebuild \projections{} (optional) from the source:
    Make sure the JDK commands ``java'', ``javac'', ``ant'',  and ``jar''
    are in your path  
 \item[2)]
-   Make sure that your versions of java and javac are at least 1.5. Do this by running ``java -version'' and ``javac -version''. Also, make sure the environment variable JAVA_HOME is not pointing at an old version of java.
+   Make sure that your versions of java and javac are at least 1.5. Do this by running ``java -version'' and ``javac -version''. Also, make sure the environment variable JAVA\_HOME is not pointing at an old version of java.
 \item[3)]
    From {\tt PROJECTIONS\_LOCATION/}, type ``ant clean'' then ``ant''
 \item[4)]
