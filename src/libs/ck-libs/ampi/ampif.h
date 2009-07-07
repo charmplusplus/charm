@@ -54,6 +54,9 @@
        integer, parameter :: MPI_ERR_WIN                 =53
        integer, parameter :: MPI_ERR_LASTCODE            =53
 
+       integer, parameter :: MPI_ERRORS_ARE_FATAL        =119
+       integer, parameter :: MPI_ERRORS_RETURN           =120
+
        integer, parameter :: MPI_MAX_PROCESSOR_NAME = 256
        integer, parameter :: MPI_MAX_ERROR_STRING = 256
 
@@ -76,13 +79,13 @@
        integer, parameter :: MPI_DOUBLE_COMPLEX = 26
        
 
+       integer, parameter :: MPI_PROC_NULL = -2
        integer, parameter :: MPI_ANY_SOURCE = -1
        integer, parameter :: MPI_ANY_TAG = -1
        integer, parameter :: MPI_REQUEST_NULL = -1
        integer, parameter :: MPI_GROUP_NULL = -1
        integer, parameter :: MPI_COMM_NULL = -1
        integer, parameter :: MPI_TYPE_NULL = -1
-       integer, parameter :: MPI_PROC_NULL = -1
        integer, parameter :: MPI_KEYVAL_INVALID = -1
        integer, parameter :: MPI_INFO_NULL = -1
 
