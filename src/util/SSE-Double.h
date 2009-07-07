@@ -17,17 +17,9 @@ class SSEDouble
     
            SSEDouble() {} 
   
-           SSEDouble(double d) { if (d==0.0) val = _mm_setzero_pd(); else val= _mm_set1_pd(d);}
+           SSEDouble(double d) { val= _mm_set1_pd(d);}
 
-           SSEDouble(double d0, double d1) {val = _mm_setr_pd(d0,d1);}
-
-           //SSEDouble(double d=0.0) { val = _mm_setzero_pd();} 
-
-           
-
-          // operator __m128d() const  {return val;}   
-
-           
+           SSEDouble(double d0, double d1) {val = _mm_setr_pd(d0,d1);}           
 
            /* Arithmetic Operators*/ 
            friend inline SSEDouble operator -(const SSEDouble &a) {SSEDouble c;c.val=_mm_sub_pd(_mm_setzero_pd(),a.val);return c;}

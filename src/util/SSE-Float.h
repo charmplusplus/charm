@@ -16,17 +16,9 @@ class SSEFloat
     
            SSEFloat() {} 
   
-           SSEFloat(float f) { if (f==0.0) val = _mm_setzero_ps(); else val= _mm_set1_ps(f);}
+           SSEFloat(float f) { val= _mm_set1_ps(f);}
 
-           SSEFloat(float f0, float f1,float f2, float f3) {val = _mm_setr_ps(f0,f1,f2,f3);}
-
-           //Double(double d=0.0) { val = _mm_setzero_pd();} 
-
-           
-
-          // operator __m128d() const  {return val;}   
-
-           
+           SSEFloat(float f0, float f1,float f2, float f3) {val = _mm_setr_ps(f0,f1,f2,f3);}                     
 
            /* Arithmetic Operators*/ 
 
