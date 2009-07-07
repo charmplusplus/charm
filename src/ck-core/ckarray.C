@@ -312,16 +312,14 @@ void ArrayElement::CkAbort(const char *str) const
 	CkMigratable::CkAbort(str);
 }
 
-#ifdef _FAULT_MLOG_
 void ArrayElement::recvBroadcast(CkMessage *m){
+#ifdef _FAULT_MLOG_
 	CkArrayMessage *bcast = (CkArrayMessage *)m;
     envelope *env = UsrToEnv(m);
 	int epIdx= env->piggyBcastIdx;
     ckInvokeEntry(epIdx,bcast,CmiTrue);
-};
-#else
-void ArrayElement::recvBroadcast(CkMessage *m){}
 #endif
+};
 
 /*********************** Spring Cleaning *****************
 Periodically (every minute or so) remove expired broadcasts
