@@ -269,7 +269,7 @@ public:
 CkpvExtern(TraceArray*, _traces);
 
 #ifndef CMK_OPTIMIZE
-#  define _TRACE_ONLY(code) do{if(CpvAccess(traceOn)){ code; }} while(0)
+#  define _TRACE_ONLY(code) do{if(CpvAccess(traceOn) && CkpvAccess(_traces)->length()>0) { code; }} while(0)
 #  define _TRACE_ALWAYS(code) do{ code; } while(0)
 #else
 #  define _TRACE_ONLY(code) /*empty*/
@@ -290,10 +290,7 @@ extern "C" {
 #define _TRACE_BEGIN_SDAG(env) _TRACE_ONLY(CkpvAccess(_traces)->beginSDAGBlock(env))
 #define _TRACE_END_SDAG(env) _TRACE_ONLY(CkpvAccess(_traces)->endSDAGBlock(env))
 #define _TRACE_BEGIN_EXECUTE(env) _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(env))
-#define _TRACE_BEGIN_EXECUTE_DETAILED(evt,typ,ep,src,mlen,idx) \
-      do{ if (CkpvAccess(_traces)->length()) \
-          { _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(evt,typ,ep,src,mlen,idx)); } \
-        } while(0)
+#define _TRACE_BEGIN_EXECUTE_DETAILED(evt,typ,ep,src,mlen,idx) _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(evt,typ,ep,src,mlen,idx))
 #define _TRACE_END_EXECUTE() _TRACE_ONLY(CkpvAccess(_traces)->endExecute())
 #define _TRACE_MESSAGE_RECV(env, pe) _TRACE_ONLY(CkpvAccess(_traces)->messageRecv(env, pe))
 #define _TRACE_BEGIN_PACK() _TRACE_ONLY(CkpvAccess(_traces)->beginPack())
