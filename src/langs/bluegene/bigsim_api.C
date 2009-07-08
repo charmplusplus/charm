@@ -43,7 +43,7 @@ void BgEndLastLog(BgTimeLineRec &tlinerec)
 //
 
 //  dump timeline into ASCII format
-void BgWriteThreadTimeLine(char *pgm, int x, int y, int z, int th, BgTimeLine &tline)
+void BgWriteThreadTimeLine(const char *pgm, int x, int y, int z, int th, BgTimeLine &tline)
 {
   char *fname = (char *)malloc(strlen(pgm)+100);
   sprintf(fname, "%s-%d-%d-%d.%d.log", pgm, x,y,z,th);
