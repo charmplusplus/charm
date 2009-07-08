@@ -107,17 +107,8 @@ routine, to turn off isomalloc'd heaps before jumping
 into regular Charm.  The string routineName is
 used for debugging printouts, with "+tcharm_trace myLibName".
 */
-#ifndef CMK_OPTIMIZE
-#  define TCHARM_API_TRACE(routineName,libraryName) \
-	TCharmAPIRoutine apiRoutineSentry;\
-	TCHARM_Api_trace(routineName,libraryName)
-#else
-#  define TCHARM_API_TRACE(routineName,libraryName) \
-	TCharmAPIRoutine apiRoutineSentry
-#endif
-void TCHARM_Api_trace(const char *routineName,const char *libraryName);
-
-
+#define TCHARM_API_TRACE(routineName,libraryName) \
+  TCharmAPIRoutine apiRoutineSentry(routineName, libraryName)
 
 
 #else /* FEM_ALONE */

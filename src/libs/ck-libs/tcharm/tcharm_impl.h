@@ -271,14 +271,32 @@ class TCharm: public CBase_TCharm
 	inline CthThread getTid() { return tid; }
 };
 
+void TCHARM_Api_trace(const char *routineName, const char *libraryName);
 
-//Created in all API routines: disables/enables migratable malloc
+
+// Created in all API routines:
+// - Disables/enables migratable malloc
+// - Traces library code entry/exit with appropriate build flags
 class TCharmAPIRoutine {
 	int state; //stores if the isomallocblockactivate and ctginstall need to be skipped during activation
 	CmiIsomallocBlockList *oldHeapBlock; 
 	CtgGlobals oldGlobals;	// this is actually a pointer
+	#ifdef CMK_BLUEGENE_CHARM
+	void *callEvent; // The BigSim-level event that called into the library
+	#endif
+
  public:
-	TCharmAPIRoutine() { //Entering Charm++ from user code
+	// Entering Charm++ from user code
+	TCharmAPIRoutine(const char *routineName, const char *libraryName)
+	{
+		#ifdef CMK_BLUEGENE_CHARM
+		// Start a new event, so we can distinguish between client 
+		// execution and library execution
+		_TRACE_BG_TLINE_END(&callEvent);
+		_TRACE_BG_END_EXECUTE(0);
+		_TRACE_BG_BEGIN_EXECUTE_NOMSG(routineName, &callEvent, 0);
+		#endif
+
 		state = 0;
 		//TCharm *tc=CtvAccess(_curTCharm);
 		// if memory is not isomalloc (swap global not installed) 
@@ -291,8 +309,14 @@ class TCharmAPIRoutine {
 		}
 		//Disable migratable memory allocation while in Charm++:
 		TCharm::deactivateThread();
+
+		#ifndef CMK_OPTIMIZE
+		TCHARM_Api_trace(routineName,libraryName);
+		#endif
 	}
-	~TCharmAPIRoutine() { //Returning to user code from Charm++:
+
+	// Returning to user code from Charm++
+	~TCharmAPIRoutine() {
 		TCharm *tc=CtvAccess(_curTCharm);
 		if(tc != NULL){
 			if(state & 0x1){
@@ -304,6 +328,7 @@ class TCharmAPIRoutine {
 				tc->threadGlobals = NULL;
 			}	
 		}
+
 		//Reenable migratable memory allocation
 		TCharm::activateThread();
 		if(tc != NULL){
@@ -313,7 +338,15 @@ class TCharmAPIRoutine {
 			if(state & 0x10){
 				tc->threadGlobals = oldGlobals;
 			}
-		}	
+		}
+
+		#ifdef CMK_BLUEGENE_CHARM
+		void *log;
+		_TRACE_BG_TLINE_END(&log);
+		_TRACE_BG_END_EXECUTE(0);
+		_TRACE_BG_BEGIN_EXECUTE_NOMSG("user_code", &log, 0);
+		_TRACE_BG_ADD_BACKWARD_DEP(callEvent);
+		#endif
 	}
 };
 
