@@ -1759,9 +1759,9 @@ MSG_ORDER_DEBUG(
       // Isaac changed this so that the IReq stores the tag when receiving the message, 
       // instead of using this user supplied tag which could be MPI_ANY_TAG
       // Formerly the following line was not commented out:
-      //  ireq->tag = sts[0];         
-      ireq->src = sts[1];
-      ireq->comm = sts[2];
+      //ireq->tag = sts[0];         
+      //ireq->src = sts[1];
+      //ireq->comm = sts[2];
     } else {
       CmmPut(msgs, 3, tags, msg);
     }
@@ -3422,6 +3422,8 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
     statusIreq = (sts == 0);
     length = msg->length;
     this->tag = msg->tag; // Although not required, we also extract tag from msg
+    src = msg->srcRank; // Although not required, we also extract src from msg
+    comm = msg->comm;
     AMPI_DEBUG("Setting this->tag to %d in IReq::receive this=%p\n", (int)this->tag, this);
 #if CMK_BLUEGENE_CHARM
     event = msg->event; 
