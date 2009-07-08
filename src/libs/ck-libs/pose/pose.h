@@ -73,6 +73,22 @@ void POSE_prepExit(void *param, void *msg);
 /// Exit simulation program
 void POSE_exit(); 
 
+/// Whether or not pose is in sequential mode
+extern int _POSE_SEQUENTIAL;
+
+/// For invoking pose entry methods when you aren't a sim object (don't use unless absolutely necessary!)
+#define _POSE_external_invoke(_POSE_proxy, _POSE_handle, _POSE_objectType, _POSE_atTime, _POSE_method, _POSE_msg) \
+   { \
+       CkAssert(_POSE_atTime >= 0); \
+       _POSE_msg->Timestamp(_POSE_atTime); \
+       if (! _POSE_SEQUENTIAL) { \
+         PVT *pvt = (PVT *)CkLocalBranch(ThePVT); \
+         pvt->objUpdate(_POSE_atTime, SEND); \
+       } \
+       (*(CProxy_ ## _POSE_objectType*)&_POSE_proxy)[_POSE_handle]._POSE_method(_POSE_msg); \
+   }
+
+
 /// User specified busy wait time (for grainsize testing)
 extern double busyWait;
 

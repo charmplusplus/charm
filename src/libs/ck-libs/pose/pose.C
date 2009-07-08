@@ -17,7 +17,7 @@ POSE_TimeType POSE_GlobalClock;
 POSE_TimeType POSE_GlobalTS;
 POSE_Config pose_config;
 ComlibInstanceHandle POSE_commlib_insthndl;
-
+int _POSE_SEQUENTIAL;
 
 const eventID& GetEventID() {
   //CpvStaticDeclare(eventID, theEventID);  // initializes to [0.pe]
@@ -44,6 +44,11 @@ void POSE_init(int IDflag, int ET) // can specify both
   POSEreadCmdLine();
   POSE_inactDetect = IDflag;
   POSE_endtime = ET;
+#ifdef SEQUENTIAL_POSE
+  _POSE_SEQUENTIAL = 1;
+#else
+  _POSE_SEQUENTIAL = 0;
+#endif
 #ifndef CMK_OPTIMIZE
   traceRegisterUserEvent("Forward Execution", 10);
   traceRegisterUserEvent("Cancellation", 20);
