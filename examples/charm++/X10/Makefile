@@ -1,4 +1,4 @@
-CHARMC=$(HOME)/src/charm/bin/charmc -g
+CHARMC=../../../bin/charmc $(OPTS)
 
 all : X10_lib.o X10_test2
 

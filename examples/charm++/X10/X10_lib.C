@@ -56,7 +56,8 @@ void asyncCall(void *ffl, int place, int whichFunction, void *packedParams){
   CkFutureID ftHandle = CkCreateAttachedFuture((void*)msg);
   FinishFutureList->push_back(ftHandle);
   //  CkPrintf("MainThread: Created Future with handle %d\n", ftHandle);
-  (*FinishFutureList)[FinishFutureList->length()]=ftHandle;
+  //(*FinishFutureList)[FinishFutureList->length()]=ftHandle;
+  FinishFutureList->push_back(ftHandle);
   placesProxy[place].startAsync(whichFunction,ftHandle,CkMyPe());
   // CkPrintf("MainThread: Created Async call with handle %d\n", ftHandle);
 }
