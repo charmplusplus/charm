@@ -184,7 +184,8 @@ void ComlibSectionInfo::unpack(envelope *cb_env,
       }
     envelope *usrenv = (envelope *) ccmsg->usrMsg;
     env = (envelope *)CmiAlloc(usrenv->getTotalsize());
-    memcpy(env, ccmsg->usrMsg, usrenv->getTotalsize());
+    memcpy(env, usrenv, usrenv->getTotalsize());
+    env->setEvent(cb_env->getEvent());
 }
 
 

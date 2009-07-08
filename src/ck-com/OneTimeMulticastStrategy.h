@@ -13,7 +13,11 @@
 #include "ComlibSectionInfo.h"
 
 /**
-   The simplest multicast strategy. This strategy extracts the array section information, and packs the section information and the user message into a single message. The original message is delivered locally, and the new message is sent using CmiSyncListSendAndFree to all other processors containing destination objects. 
+   The simplest multicast strategy. This strategy extracts the array section information, and packs the section information and the user message into a single message. The original message is delivered locally, and the new message is sent using CmiSyncListSendAndFree to all other processors containing destination objects. If the destination entry method is [nokeep], then the multicast is delivered inline without extra copies to the local destination elements. If the destination is not [nokeep], then the message is delivered through the scheduler queue.  
+
+   Projections can trace the messages for the [nokeep] destinations, but the sending entry method will end prematurely because inline calling of local entry methods is not fully supported by Projections. Messages multicast to non [nokeep] methods are displayed incorrectly, probably because the call to deliver overwrites the source pe & event.
+
+@fixme Fix projections logging for the non [nokeep] version
 
    This strategy is simpler than those which are derived from the MulticastStrategy class because those maintain a persistant record of previous array section information extracted from the messages, and those provide multiple implementations of the multicast tree (such as ring or multiring or all to all). Those strategies ought to be used when multiple multicasts are sent to the same array section. If an array section is not reused, then this strategy ought to be used.
 

@@ -13,6 +13,10 @@
 #include "convcomlibmanager.h"
 
 class ComlibLocalStats;
+
+/**
+   Old class that is no longer used.
+*/
 class ComlibComRec {
     int nmessages_sent;
     int totalbytes_sent;
@@ -182,6 +186,10 @@ class ComlibComRec {
     }
 };
 
+
+/**
+   Old class that is no longer used.
+*/
 class ComlibLocalStats {
  public:
     CkVec<ComlibComRec> cdata;

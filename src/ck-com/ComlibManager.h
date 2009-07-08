@@ -190,11 +190,12 @@ inline int indexCountCompare(const void *a, const void *b) {
   return 0;
 }
 
-/** Used to setup a multicast tree in SectionInfo and MulticastStrategies */
-// TO BE MOVED TO MULTICAST SPECIFIC
+
+/** A class for multicast messages that contains the user message 
+    as well as a list of all destination indices and corresponding PEs 
+*/
 class ComlibMulticastMsg : public CkMcastBaseMsg, 
                public CMessage_ComlibMulticastMsg {
-    
   public:
     int nPes;
     ComlibMulticastIndexCount *indicesCount;

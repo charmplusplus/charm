@@ -41,16 +41,30 @@ void OneTimeMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
     CkAbort("OneTimeMulticastStrategy can only be used with an array section proxy");
   }
     
-  // Create a multicast message containing all information about remote destination objects 
-  int needSort = 0;
-  ComlibMulticastMsg * multMsg = sinfo.getNewMulticastMessage(cmsg, needSort, getInstance());
-    
-  // local multicast will re-extract a list of local destination objects (FIXME to make this more efficient)
-  localMulticast(cmsg);
+
+  envelope *env = UsrToEnv(cmsg->getCharmMessage());
+  int npes = 1;
+  int pes[1] = {0};
+  _TRACE_CREATION_MULTICAST(env, npes, pes);
+
+#if DEBUG
+  CkPrintf("[%d] after TRACE_CREATION_MULTICAST menv->event=%d\n", CkMyPe(), (int)env->getEvent());  
+#endif
   
+  // Create a multicast message containing all information about remote destination objects 
+  ComlibMulticastMsg * multMsg = sinfo.getNewMulticastMessage(cmsg, 0, getInstance());
+
+
+#if DEBUG
+    CkPrintf("[%d] after TRACE_CREATION_MULTICAST multMsg->event=%d\n", CkMyPe(), (int)( UsrToEnv(multMsg)->getEvent() ) );  
+#endif
+
   // The remote multicast method will send the message to the remote PEs, as specified in multMsg
   remoteMulticast(multMsg, true);
-   
+
+  // local multicast will re-extract a list of local destination objects (FIXME to make this more efficient)
+  localMulticast(cmsg);
+
   delete cmsg;    
 }
 
@@ -118,16 +132,20 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
     return;
   }
   
+  //Collect Multicast Statistics
+  RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), pelist, npes);
+  
+
   CmiSetHandler(env, CkpvAccess(comlib_handler));
   ((CmiMsgHeaderBasic *) env)->stratid = getInstance();  
   CkPackMessage(&env);
 
   double middle = CmiWallTimer();
 
-
-  //Collect Multicast Statistics
-  RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), pelist, npes);
   
+  // CkPrintf("[%d] before CmiSyncListSendAndFree env->event=%d\n", CkMyPe(), (int)env->getEvent());
+
+
   CkAssert(npes > 0);
   CmiSyncListSendAndFree(npes, pelist, env->getTotalsize(), (char*)env);
   
@@ -150,13 +168,19 @@ void OneTimeMulticastStrategy::handleMessage(void *msg){
   //  CkPrintf("[%d] OneTimeMulticastStrategy::handleMessage\n", CkMyPe());
 #endif
   envelope *env = (envelope *)msg;
+  // CkPrintf("[%d] in OneTimeMulticastStrategy::handleMessage env->event=%d\n", CkMyPe(), (int)env->getEvent());
+  
   CkUnpackMessage(&env);
   
+  // CkPrintf("[%d] in OneTimeMulticastStrategy::handleMessage after CkUnpackMessage env->event=%d\n", CkMyPe(), (int)env->getEvent());
+  
+
+
   ComlibMulticastMsg* multMsg = (ComlibMulticastMsg*)EnvToUsr(env);
   
   // Don't use msg after this point. Instead use the unpacked env
   
-  RECORD_RECV_STATS(getInstance(), env->getTotalsize(), env->getSrcPe());
+  RECORD_RECV_STATS(getInstance(), env->getTotalsize(), env->getSrcPe()); // DOESN'T DO ANYTHING IN NEW COMLIB
   
   // Deliver to objects marked as local in the message
   int localElems;
@@ -164,6 +188,9 @@ void OneTimeMulticastStrategy::handleMessage(void *msg){
   CkArrayIndexMax *local_idx_list;  
   sinfo.unpack(env, localElems, local_idx_list, newenv);
   ComlibMulticastMsg *newmsg = (ComlibMulticastMsg *)EnvToUsr(newenv);  
+
+  //  CkPrintf("[%d] in OneTimeMulticastStrategy::handleMessage before  deliverToIndices newenv->event=%d\n", CkMyPe(), (int)newenv->getEvent());
+
   deliverToIndices(newmsg, localElems, local_idx_list );
   
   // Forward on to other processors if necessary

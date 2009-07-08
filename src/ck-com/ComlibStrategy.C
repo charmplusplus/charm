@@ -53,6 +53,8 @@ int CharmStrategy::deliverToIndices(void *msg, int numDestIdxs, const CkArrayInd
     for(int i=0; i<numDestIdxs-1;i++){
       env->getsetArrayIndex() = indices[i];
       
+      //      CkPrintf("[%d] in deliverToIndices env->event=%d pe=%d\n", CkMyPe(), (int)env->getEvent(), (int)env->getSrcPe());
+
       if(_entryTable[ep]->noKeep)
 	// don't make a copy for [nokeep] entry methods
 	count += a->deliver((CkArrayMessage *)msg, CkDeliver_inline, CK_MSG_KEEP);
