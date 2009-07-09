@@ -136,6 +136,7 @@ public:
     numUniqNodes();
     bynodes = new CkVec<int>[numNodes];
     for (i=0; i<CmiNumPes(); i++) 
+      CkAssert(nodeIDs[i] >=0 && nodeIDs[i] <= numNodes); // Sanity check for bug that occurs on mpi-crayxt
       bynodes[nodeIDs[i]].push_back(i);
   }
 
