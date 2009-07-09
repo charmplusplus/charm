@@ -1808,6 +1808,12 @@ ampi::send(int t, int sRank, const void* buf, int count, int type,  int rank, MP
    TRACE_BG_AMPI_BREAK(thread->getThread(), "AMPI_SEND", NULL, 0, 1);
 #endif
 
+#ifdef _FAULT_MLOG_
+  MPI_Comm disComm = myComm.getComm();
+  ampi *dis = getAmpiInstance(disComm);
+  CpvAccess(_currentObj) = dis;
+#endif
+
   const ampiCommStruct &dest=comm2CommStruct(destcomm);
   delesend(t,sRank,buf,count,type,rank,destcomm,dest.getProxy(),sync);
 
@@ -2043,6 +2049,9 @@ ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
     ciBcast.beginIteration();
     comlibProxy.generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
 #else
+#ifdef _FAULT_MLOG_
+	CpvAccess(_currentObj) = this;
+#endif
     thisProxy.generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
 #endif
   }
