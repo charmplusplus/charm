@@ -9,6 +9,7 @@
 #include "sockRoutines.h"
 #include "cklists.h"
 
+
 #define DEBUGP(x)  /** CmiPrintf x; */
 
 /** This scheme relies on using IP address to identify physical nodes 
@@ -135,9 +136,10 @@ public:
     int i;
     numUniqNodes();
     bynodes = new CkVec<int>[numNodes];
-    for (i=0; i<CmiNumPes(); i++) 
-      CkAssert(nodeIDs[i] >=0 && nodeIDs[i] <= numNodes); // Sanity check for bug that occurs on mpi-crayxt
+    for (i=0; i<CmiNumPes(); i++){
+      CmiAssert(nodeIDs[i] >=0 && nodeIDs[i] <= numNodes); // Sanity check for bug that occurs on mpi-crayxt
       bynodes[nodeIDs[i]].push_back(i);
+    }
   }
 
   void print() {
