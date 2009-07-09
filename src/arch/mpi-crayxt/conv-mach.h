@@ -10,7 +10,9 @@
 
 #define CMK_CRAYXT                                         1
 
-#define XT4_TOPOLOGY					   1
+#define XT4_TOPOLOGY					   0
+
+#define XT5_TOPOLOGY					   0
 
 #define CMK_CONVERSE_MPI                                   1
 
