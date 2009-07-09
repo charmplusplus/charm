@@ -275,6 +275,12 @@ class CkVec : private CkSTLHelper<T> {
     void removeAll() {
       len = 0;
     }
+
+    void clear()
+    {
+	freeBlock();
+    }
+
     void insertAtEnd(const T &elt) {insert(length(),elt);}
 
 //STL-compatability:
