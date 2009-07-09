@@ -16,7 +16,7 @@
 
 #include "converse.h"
 
-#if XT3_TOPOLOGY || XT4_TOPOLOGY
+#if XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY
 
 #include <rca_lib.h>
 
@@ -27,8 +27,13 @@
 
 #elif XT4_TOPOLOGY
 #include <pmi.h>
-#define MAXNID 9000
+#define MAXNID 14000
 #define TDIM 4
+
+#elif XT5_TOPOLOGY
+#include <pmi.h>
+#define MAXNID 17000
+#define TDIM 8
 
 #endif
 
@@ -62,7 +67,7 @@ int getXTNodeID(int mype, int numpes) {
   nid = nidpid[mype].nid;
   /* free(nidpid); */
 
-#elif XT4_TOPOLOGY
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY
   PMI_Portals_get_nid(mype, &nid);
 #endif
 
@@ -112,7 +117,7 @@ void pidtonid(int numpes) {
     }
   }
   
-#elif XT4_TOPOLOGY
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY
   int i, j, nid;
   pid2nid = (int *)malloc(sizeof(int) * numpes);
 
@@ -129,8 +134,21 @@ void pidtonid(int numpes) {
       nid2pid[nid][1] = i;
     else if (nid2pid[nid][2] == -1)
       nid2pid[nid][2] = i;
-    else
+    else 
+  #if XT4_TOPOLOGY
       nid2pid[nid][3] = i;
+  #elif XT5_TOPOLOGY
+    if (nid2pid[nid][3] == -1)
+      nid2pid[nid][3] = i;
+    else if (nid2pid[nid][4] == -1)
+      nid2pid[nid][4] = i;
+    else if (nid2pid[nid][5] == -1)
+      nid2pid[nid][5] = i;
+    else if (nid2pid[nid][6] == -1)
+      nid2pid[nid][6] = i;
+    else
+      nid2pid[nid][7] = i;
+  #endif
   }
 #endif
 }

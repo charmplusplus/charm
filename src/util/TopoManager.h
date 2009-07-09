@@ -34,7 +34,7 @@
 #include "BGPTorus.h"
 #elif XT3_TOPOLOGY
 #include "XT3Torus.h"
-#elif XT4_TOPOLOGY
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY
 #include "XT4Torus.h"
 #endif
 
@@ -60,7 +60,7 @@ class TopoManager {
     BGPTorusManager bgptm;
 #elif XT3_TOPOLOGY
     XT3TorusManager xt3tm;
-#elif XT4_TOPOLOGY
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY
     XT4TorusManager xt4tm;
 #endif
 
@@ -121,7 +121,7 @@ class TopoManager {
       torusZ = torus[2];
       torusT = torus[3];
 
-#elif XT4_TOPOLOGY
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY
       dimX = xt4tm.getDimX();
       dimY = xt4tm.getDimY();
       dimZ = xt4tm.getDimZ();

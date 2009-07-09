@@ -18,13 +18,25 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#if XT4_TOPOLOGY
+#if XT4_TOPOLOGY || XT5_TOPOLOGY
+
+// XDIM, YDIM, ZDIM and MAXNID depend on a specific Cray installation.
+// Please do NOT expect things to work if you use this code on a new
+// Cray machine.
 
 #define XDIM 21
 #define YDIM 16
 #define ZDIM 24
+
+#if XT4_TOPOLOGY
+#define MAXNID 14000
 #define TDIM 4
-#define MAXNID 9000
+
+#elif XT5_TOPOLOGY
+#define MAXNID 17000
+#define TDIM 8
+
+#endif
 
 extern "C" int *pid2nid;
 extern "C" int nid2pid[MAXNID][4];
@@ -162,5 +174,5 @@ class XT4TorusManager {
     }
 };
 
-#endif // XT4_TOPOLOGY
+#endif // XT4_TOPOLOGY || XT5_TOPOLOGY
 #endif //_XT4_TORUS_H_
