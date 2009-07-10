@@ -327,7 +327,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
       nid = tmgr.coordinatesToRank(x, y, z, 0);
       cpuTopo.nodeIDs[i] = nid;
     }
-    // cpuTopo.sort();
+    cpuTopo.sort();
   }
   CmiNodeAllBarrier();
   return;
@@ -353,6 +353,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
       else
 	cpuTopo.nodeIDs[i] = nid;
     }
+    cpuTopo.sort();
   }
   CmiNodeAllBarrier();
   return;
