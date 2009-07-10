@@ -446,6 +446,7 @@ void BgTimeLog::pup(PUP::er &p) {
       }
       else{
 	p|backwardDeps[i]->seqno;
+        CmiAssert(backwardDeps[i]->seqno < seqno);
       }
     }
  
@@ -644,13 +645,17 @@ void BgTimeLineRec::pup(PUP::er &p)
     else{
       //Timeline is empty when unpacking pup is called
       //timeline.removeFrom(0);
+        // create all logs, so that back/forward dep can be linked correctly
+      for (int i=0;i<l;i++) {
+        BgTimeLog* t = new BgTimeLog();
+        timeline.enq(t);
+      }
     }
 
     for (int i=0;i<l;i++) {
         if (p.isUnpacking()) {
-                BgTimeLog* t = new BgTimeLog();
+                BgTimeLog* t = timeline[i];
                 t->pup(p);
-                timeline.enq(t);
         }
         else {
           timeline[i]->pup(p);
