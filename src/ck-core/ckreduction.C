@@ -2064,7 +2064,6 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
 
 	isMigratableContributor= m->isMigratableContributor();
 #if CMK_BLUEGENE_CHARM
-printf("add backward %d %p\n", CkMyPe(), _bgParentLog);
       _TRACE_BG_ADD_BACKWARD_DEP(m->log);
 #endif
 				
