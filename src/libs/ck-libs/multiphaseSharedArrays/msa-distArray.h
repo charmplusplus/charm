@@ -2,6 +2,8 @@
 #ifndef MSA_DISTARRAY_H
 #define MSA_DISTARRAY_H
 
+#include <utility>
+#include <algorithm>
 #include "msa-DistPageMgr.h"
 
 
@@ -657,4 +659,472 @@ protected:
     }
 };
 
+namespace MSA
+{
+    using std::min;
+    using std::max;
+
+
+/**
+   The MSA3D class is a handle to a distributed shared array of items
+   of data type ENTRY. There are nEntries total numer of ENTRY's, with
+   ENTRIES_PER_PAGE data items per "page".  It is implemented as a
+   Chare Array of pages, and a Group representing the local cache.
+
+   The requirements for the templates are:
+     ENTRY: User data class stored in the array, with at least:
+        - A default constructor and destructor
+        - A working assignment operator
+        - A working pup routine
+     ENTRY_OPS_CLASS: Used to combine values for "accumulate":
+        - A method named "getIdentity", taking no arguments and
+          returning an ENTRY to use before any accumulation.
+        - A method named "accumulate", taking a source/dest ENTRY by reference
+          and an ENTRY to add to it by value or const reference.
+     ENTRIES_PER_PAGE: Optional integer number of ENTRY objects
+        to store and communicate at once.  For good performance,
+        make sure this value is a power of two.
+ */
+template<class ENTRY, class ENTRY_OPS_CLASS, unsigned int ENTRIES_PER_PAGE>
+class MSA3D
+{
+    unsigned dim_x, dim_y, dim_z;
+
+
+public:
+    typedef MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CacheGroup_t;
+    typedef CProxy_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_CacheGroup_t;
+
+    // Sun's C++ compiler doesn't understand that nested classes are
+    // members for the sake of access to private data. (2008-10-23)
+    class Read; class Write; class Accum;
+    friend class Read; friend class Write; friend class Accum;
+
+	class Handle
+	{
+    public:
+        inline unsigned int length() const { return msa.length(); }
+
+	protected:
+        MSA3D &msa;
+        bool valid;
+
+        friend class MSA3D;
+
+        void inline checkInvalidate(MSA3D *m) 
+        {
+            if (m != &msa || !valid)
+                throw MSA_InvalidHandle();
+            valid = false;
+        }
+
+        Handle(MSA3D &msa_) 
+            : msa(msa_), valid(true) 
+        { }
+        void checkValid()
+        {
+            if (!valid)
+                throw MSA_InvalidHandle();
+        }
+
+    private:
+        // Disallow copy construction
+        Handle(Handle &);
+    };
+
+    class Read : public Handle
+    {
+    protected:
+        friend class MSA3D;
+        Read(MSA3D &msa_)
+            :  Handle(msa_) { }
+        using Handle::checkValid;
+        using Handle::checkInvalidate;
+
+    public:
+        inline const ENTRY& get(unsigned x, unsigned y, unsigned z)
+        {
+            checkValid();
+            return Handle::msa.get(x, y, z); 
+        }
+        inline const ENTRY& operator()(unsigned x, unsigned y, unsigned z) { return get(x, y, z); }
+        inline const ENTRY& get2(unsigned x, unsigned y, unsigned z)
+        {
+            checkValid();
+            return Handle::msa.get2(x, y, z);
+        }
+
+        // Reads the specified range into the provided buffer in row-major order
+        void read(ENTRY *buf, unsigned x1, unsigned y1, unsigned z1, unsigned x2, unsigned y2, unsigned z2)
+        {
+            checkValid();
+
+            unsigned ix = min(x1, x2), mx = max(x1, x2);
+            unsigned iy = min(y1, y2), my = max(y1, y2);
+            unsigned iz = min(z1, z2), mz = max(z1, z2);
+            unsigned i = 0;
+
+            for (; ix < mx; ++ix)
+                for (; iy < my; ++iy)
+                    for (; iz < mz; ++iz)
+                        buf[i++] = Handle::msa.get(ix, iy, iz);
+        }
+    };
+
+    class Write : public Handle
+    {
+    protected:
+        friend class MSA3D;
+        Write(MSA3D &msa_)
+            : Handle(msa_) { }
+
+    public:
+        inline Writable<ENTRY> set(unsigned x, unsigned y, unsigned z)
+        {
+            Handle::checkValid();
+            return Writable<ENTRY>(Handle::msa.set(x,y,z));
+        }
+        inline Writable<ENTRY> operator()(unsigned x, unsigned y, unsigned z)
+        {
+            return set(x,y,z);
+        }
+
+        void write(unsigned x1, unsigned y1, unsigned z1, unsigned x2, unsigned y2, unsigned z2, const ENTRY *buf)
+        {
+            Handle::checkValid();
+
+            unsigned ix = min(x1, x2), mx = max(x1, x2);
+            unsigned iy = min(y1, y2), my = max(y1, y2);
+            unsigned iz = min(z1, z2), mz = max(z1, z2);
+            unsigned i = 0;
+
+            for (; ix < mx; ++ix)
+                for (; iy < my; ++iy)
+                    for (; iz < mz; ++iz)
+                        Handle::msa.set(ix, iy, iz) = buf[i++];
+        }
+    };
+
+    class Accum : public Handle
+    {
+    protected:
+        friend class MSA3D;
+        Accum(MSA3D &msa_)
+            : Handle(msa_) { }
+        using Handle::checkInvalidate;
+    public:
+        inline Accumulable<ENTRY, ENTRY_OPS_CLASS> accumulate(unsigned int idx)
+        { 
+            Handle::checkValid();
+            return Accumulable<ENTRY, ENTRY_OPS_CLASS>(Handle::msa.accumulate(idx));
+        }
+        inline void accumulate(unsigned int idx, const ENTRY& ent)
+        {
+            Handle::checkValid();
+            Handle::msa.accumulate(idx, ent);
+        }
+
+        void accumulate(unsigned x1, unsigned y1, unsigned z1, unsigned x2, unsigned y2, unsigned z2, const ENTRY *buf)
+        {
+            Handle::checkValid();
+
+            unsigned ix = min(x1, x2), mx = max(x1, x2);
+            unsigned iy = min(y1, y2), my = max(y1, y2);
+            unsigned iz = min(z1, z2), mz = max(z1, z2);
+            unsigned i = 0;
+
+            for (; ix < mx; ++ix)
+                for (; iy < my; ++iy)
+                    for (; iz < mz; ++iz)
+                        Handle::msa.accumulate(ix, iy, iz, buf[i++]);
+        }
+
+        inline Accumulable<ENTRY, ENTRY_OPS_CLASS> operator() (unsigned int idx)
+            { return accumulate(idx); }
+    };
+
+protected:
+    /// Total number of ENTRY's in the whole array.
+    unsigned int nEntries;
+    bool initHandleGiven;
+
+    /// Handle to owner of cache.
+    CacheGroup_t* cache;
+    CProxy_CacheGroup_t cg;
+
+    inline const ENTRY* readablePage(unsigned int page)
+    {
+        return (const ENTRY*)(cache->readablePage(page));
+    }
+
+    // known local page.
+    inline const ENTRY* readablePage2(unsigned int page)
+    {
+        return (const ENTRY*)(cache->readablePage2(page));
+    }
+
+    // Returns a pointer to the start of the local copy in the cache of the writeable page.
+    // @@ what if begin - end span across two or more pages?
+    inline ENTRY* writeablePage(unsigned int page, unsigned int offset)
+    {
+        return (ENTRY*)(cache->writeablePage(page, offset));
+    }
+
+public:
+    // @@ Needed for Jade
+    inline MSA3D() 
+        :initHandleGiven(false) 
+    {}
+
+    virtual void pup(PUP::er &p){
+        p|dim_x;
+        p|dim_y;
+        p|dim_z;
+        p|cg;
+        if (p.isUnpacking()) cache=cg.ckLocalBranch();
+    }
+
+    /**
+      Create a completely new MSA array.  This call creates the
+      corresponding groups, so only call it once per array.
+    */
+    inline MSA3D(unsigned x, unsigned y, unsigned z, unsigned int num_wrkrs, 
+                 unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES)
+        : dim_x(x), dim_y(y), dim_z(z), initHandleGiven(false)
+    {
+        unsigned nEntries = x*y*z;
+        unsigned int nPages = (nEntries + ENTRIES_PER_PAGE - 1)/ENTRIES_PER_PAGE;
+        cg = CProxy_CacheGroup_t::ckNew(nPages, maxBytes, nEntries, num_wrkrs);
+        cache = cg.ckLocalBranch();
+    }
+
+    inline ~MSA3D()
+    {
+        // TODO: how to get rid of the cache group and the page array
+        //(cache->getArray()).destroy();
+        //cg.destroy();
+        // TODO: calling FreeMem does not seem to work. Need to debug it.
+        cache->unroll();
+        //cache->FreeMem();
+    }
+
+    /**
+     * this function is supposed to be called when the thread/object using this array
+     * migrates to another PE.
+     */
+    inline void changePE()
+    {
+        cache = cg.ckLocalBranch();
+
+        /* don't need to update the number of entries, as that does not change */
+    }
+
+    // ================ Accessor/Utility functions ================
+
+    inline const CProxy_CacheGroup_t &getCacheGroup() const { return cg; }
+
+    // Avoid using the term "page size" because it is confusing: does
+    // it mean in bytes or number of entries?
+    inline unsigned int getNumEntriesPerPage() const { return ENTRIES_PER_PAGE; }
+
+    inline unsigned int index(unsigned x, unsigned y, unsigned z)
+    {
+        return ((x*dim_x) + y) * dim_y + z;
+    }
+    
+    /// Return the page this entry is stored at.
+    inline unsigned int getPageIndex(unsigned int idx)
+    {
+        return idx / ENTRIES_PER_PAGE;
+    }
+
+    /// Return the offset, in entries, that this entry is stored at within a page.
+    inline unsigned int getOffsetWithinPage(unsigned int idx)
+    {
+        return idx % ENTRIES_PER_PAGE;
+    }
+
+    // ================ MSA API ================
+
+    // We need to know the total number of workers across all
+    // processors, and we also calculate the number of worker threads
+    // running on this processor.
+    //
+    // Blocking method, basically does a barrier until all workers
+    // enroll.
+    inline void enroll(int num_workers)
+    {
+        // @@ This is a hack to identify the number of MSA3D
+        // threads on this processor.  This number is needed for sync.
+        //
+        // @@ What if a MSA3D thread migrates?
+        cache->enroll(num_workers);
+    }
+
+    // idx is the element to be read/written
+    //
+    // This function returns a reference to the first element on the
+    // page that contains idx.
+    inline ENTRY& getPageBottom(unsigned int idx, MSA_Page_Fault_t accessMode)
+    {
+        if (accessMode==Read_Fault) {
+            unsigned int page = idx / ENTRIES_PER_PAGE;
+            return const_cast<ENTRY&>(readablePage(page)[0]);
+        } else {
+            CkAssert(accessMode==Write_Fault || accessMode==Accumulate_Fault);
+            unsigned int page = idx / ENTRIES_PER_PAGE;
+            unsigned int offset = idx % ENTRIES_PER_PAGE;
+            ENTRY* e=writeablePage(page, offset);
+            return e[0];
+        }
+    }
+
+    inline void FreeMem()
+    {
+        cache->FreeMem();
+    }
+
+    /// Non-blocking prefetch of entries from start to end, inclusive.
+    /// Prefetch'd pages are locked into the cache, so you must call
+    ///   unlock afterwards.
+    inline void Prefetch(unsigned int start, unsigned int end)
+    {
+        unsigned int page1 = start / ENTRIES_PER_PAGE;
+        unsigned int page2 = end / ENTRIES_PER_PAGE;
+        cache->Prefetch(page1, page2);
+    }
+
+    /// Block until all prefetched pages arrive.
+    inline int WaitAll()    { return cache->WaitAll(); }
+
+    /// Unlock all locked pages
+    inline void Unlock()    { return cache->UnlockPages(); }
+
+    /// start and end are element indexes.
+    /// Unlocks completely spanned pages given a range of elements
+    /// index'd from "start" to "end", inclusive.  If start/end does not span a
+    /// page completely, i.e. start/end is in the middle of a page,
+    /// the entire page is still unlocked--in particular, this means
+    /// you should not have several adjacent ranges locked.
+    inline void Unlock(unsigned int start, unsigned int end)
+    {
+        unsigned int page1 = start / ENTRIES_PER_PAGE;
+        unsigned int page2 = end / ENTRIES_PER_PAGE;
+        cache->UnlockPages(page1, page2);
+    }
+
+    static const int DEFAULT_SYNC_SINGLE = 0;
+
+    inline Read &syncToRead(Handle &m, int single = DEFAULT_SYNC_SINGLE)
+    {
+        m.checkInvalidate(this);
+        delete &m;
+        sync(single);
+        return *(new Read(*this));
+    }
+
+    inline Write &syncToWrite(Handle &m, int single = DEFAULT_SYNC_SINGLE)
+    {
+        m.checkInvalidate(this);
+        delete &m;
+        sync(single);
+        return *(new Write(*this));
+    }
+
+    inline Accum &syncToAccum(Handle &m, int single = DEFAULT_SYNC_SINGLE)
+    {
+        m.checkInvalidate(this);
+        delete &m;
+        sync(single);
+        return *(new Accum(*this));
+    }
+
+    inline Write &getInitialWrite()
+    {
+        if (initHandleGiven)
+            CmiAbort("Trying to get an MSA's initial handle a second time");
+
+        Write *w = new Write(*this);
+        sync();
+        initHandleGiven = true;
+        return *w;
+    }
+
+    inline Accum &getInitialAccum()
+    {
+        if (initHandleGiven)
+            CmiAbort("Trying to get an MSA's initial handle a second time");
+
+        Accum *a = new Accum(*this);
+        sync();
+        initHandleGiven = true;
+        return *a;
+    }
+
+  // These are the meat of the MSA API, but they are only accessible
+  // through appropriate handles (defined in the public section above).
+protected:
+    /// Return a read-only copy of the element at idx.
+    ///   May block if the element is not already in the cache.
+    inline const ENTRY& get(unsigned x, unsigned y, unsigned z)
+    {
+        unsigned int idx = index(x,y,z);
+        unsigned int page = idx / ENTRIES_PER_PAGE;
+        unsigned int offset = idx % ENTRIES_PER_PAGE;
+        return readablePage(page)[offset];
+    }
+
+    /// Return a read-only copy of the element at idx;
+    ///   ONLY WORKS WHEN ELEMENT IS ALREADY IN THE CACHE--
+    ///   WILL SEGFAULT IF ELEMENT NOT ALREADY PRESENT.
+    ///    Never blocks; may crash if element not already present.
+    inline const ENTRY& get2(unsigned x, unsigned y, unsigned z)
+    {
+        unsigned int idx = index(x,y,z);
+        unsigned int page = idx / ENTRIES_PER_PAGE;
+        unsigned int offset = idx % ENTRIES_PER_PAGE;
+        return readablePage2(page)[offset];
+    }
+
+    /// Return a writeable copy of the element at idx.
+    ///    Never blocks; will create a new blank element if none exists locally.
+    ///    UNDEFINED if two threads set the same element.
+    inline ENTRY& set(unsigned x, unsigned y, unsigned z)
+    {
+        unsigned int idx = index(x,y,z);
+        unsigned int page = idx / ENTRIES_PER_PAGE;
+        unsigned int offset = idx % ENTRIES_PER_PAGE;
+        ENTRY* e=writeablePage(page, offset);
+        return e[offset];
+    }
+
+    /// Fetch the ENTRY at idx to be accumulated.
+    ///   You must perform the accumulation on 
+    ///     the return value before calling "sync".
+    ///   Never blocks.
+    inline ENTRY& accumulate(unsigned x, unsigned y, unsigned z)
+    {
+        unsigned int idx = index(x,y,z);
+        unsigned int page = idx / ENTRIES_PER_PAGE;
+        unsigned int offset = idx % ENTRIES_PER_PAGE;
+        return cache->accumulate(page, offset);
+    }
+    
+    /// Add ent to the element at idx.
+    ///   Never blocks.
+    ///   Merges together accumulates from different threads.
+    inline void accumulate(unsigned x, unsigned y, unsigned z, const ENTRY& ent)
+    {
+        unsigned int idx = index(x,y,z);
+        ENTRY_OPS_CLASS::accumulate(accumulate(idx),ent);
+    }
+
+    /// Synchronize reads and writes across the entire array.
+    inline void sync(int single=0)
+    {
+        cache->SyncReq(single); 
+    }
+};
+
+}
 #endif
