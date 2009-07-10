@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#if CMK_BLUEGENEL || CMK_BLUEGENEP || CMK_CRAYXT
+#if CMK_BLUEGENEL || CMK_BLUEGENEP
 #include "TopoManager.h"
 #endif
 
@@ -314,20 +314,45 @@ extern "C" void CmiInitCPUTopology(char **argv)
       strcpy(hostname, "");
   }
 #endif
-#if CMK_BLUEGENEL || CMK_BLUEGENEP || CMK_CRAYXT
+#if CMK_BLUEGENEL || CMK_BLUEGENEP
   if (CmiMyRank() == 0) {
     TopoManager tmgr;
 
-    cpuTopo.numNodes = CkNumPes();
+    cpuTopo.numNodes = CmiNumPes();
     cpuTopo.nodeIDs = new int[cpuTopo.numNodes];
 
+    int x, y, z, t, nid;
     for(int i=0; i<cpuTopo.numNodes; i++) {
-      int x, y, z, t;
       tmgr.rankToCoordinates(i, x, y, z, t);
-      int nid = tmgr.coordinatesToRank(x, y, z, 0);
+      nid = tmgr.coordinatesToRank(x, y, z, 0);
       cpuTopo.nodeIDs[i] = nid;
     }
-    cpuTopo.sort();
+    // cpuTopo.sort();
+  }
+  CmiNodeAllBarrier();
+  return;
+#elif CMK_CRAYXT
+  if(CmiMyRank() == 0) {
+    cpuTopo.numNodes = CmiNumPes();
+    cpuTopo.nodeIDs = new int[cpuTopo.numNodes];
+
+    int nid;
+    for(int i=0; i<cpuTopo.numNodes; i++) {
+      nid = getXTNodeID(i, cpuTopo.numNodes);
+      cpuTopo.nodeIDs[i] = nid;
+    }
+    int prev = -1;
+    nid = -1;
+
+    // this assumes TXYZ mapping and changes nodeIDs
+    for(int i=0; i<cpuTopo.numNodes; i++) {
+      if(cpuTopo.nodeIDs[i] != prev) {
+	prev = cpuTopo.nodeIDs[i];
+	cpuTopo.nodeIDs[i] = ++nid;
+      }
+      else
+	cpuTopo.nodeIDs[i] = nid;
+    }
   }
   CmiNodeAllBarrier();
   return;
@@ -335,15 +360,15 @@ extern "C" void CmiInitCPUTopology(char **argv)
   /* get my ip address */
   if (CmiMyRank() == 0)
   {
-#if CMK_HAS_GETHOSTNAME
+  #if CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
-#elif CMK_BPROC
+  #elif CMK_BPROC
     myip = skt_innode_my_ip();
-#else
+  #else
     if (!CmiMyPe())
     CmiPrintf("CmiInitCPUTopology Warning: Can not get unique name for the compute nodes. \n");
     _noip = 1; 
-#endif
+  #endif
   }
 
   CmiNodeAllBarrier();
