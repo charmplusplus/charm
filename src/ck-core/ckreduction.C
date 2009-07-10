@@ -605,6 +605,9 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 /*Handle a message from one element for the reduction*/
 void CkReductionMgr::addContribution(CkReductionMsg *m)
 {
+#if CMK_BLUEGENE_CHARM
+  _TRACE_BG_TLINE_END(&(m->log));
+#endif
   if (isPast(m->redNo))
   {
 #ifdef _FAULT_MLOG_
@@ -770,6 +773,11 @@ countAdjustment &CkReductionMgr::adj(int number)
 //Combine (& free) the current message vector msgs.
 CkReductionMsg *CkReductionMgr::reduceMessages(void)
 {
+#if CMK_BLUEGENE_CHARM
+  _TRACE_BG_END_EXECUTE(1);
+  void* _bgParentLog = NULL;
+  _TRACE_BG_BEGIN_EXECUTE_NOMSG("GroupReduce", &_bgParentLog, 0);
+#endif
   CkReductionMsg *ret=NULL;
 
   //Look through the vector for a valid reducer, swapping out placeholder messages
@@ -782,7 +790,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   int nMsgs=0;
   CkReductionMsg **msgArr=new CkReductionMsg*[msgs.length()];
   CkReductionMsg *m;
-	bool isMigratableContributor;
+  bool isMigratableContributor;
 
   // Copy message queue into msgArr, skipping placeholders:
   while (NULL!=(m=msgs.deq()))
@@ -798,7 +806,10 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
       if (m->userFlag!=-1)
         msgs_userFlag=m->userFlag;
 			
-			isMigratableContributor=m->isMigratableContributor();
+	isMigratableContributor=m->isMigratableContributor();
+#if CMK_BLUEGENE_CHARM
+	_TRACE_BG_ADD_BACKWARD_DEP(m->log);
+#endif
     }
     else
     { //This is just a placeholder message-- forget it
@@ -812,12 +823,12 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
   else
   {//Use the reducer to reduce the messages
 		//if there is only one msg to be reduced just return that message
-		if(nMsgs == 1){
-			ret = msgArr[0];	
-		}else{
-	    CkReduction::reducerFn f=CkReduction::reducerTable[r];
-  	  ret=(*f)(nMsgs,msgArr);
-		}
+    if(nMsgs == 1){
+	ret = msgArr[0];	
+    }else{
+        CkReduction::reducerFn f=CkReduction::reducerTable[r];
+        ret=(*f)(nMsgs,msgArr);
+    }
     ret->reducer=r;
   }
 
@@ -1108,6 +1119,9 @@ CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
   ret->sourceFlag=-1000;
   ret->gcount=0;
   ret->migratableContributor = true;
+#if CMK_BLUEGENE_CHARM
+  ret->log = NULL;
+#endif
   return ret;
 }
 
@@ -1558,6 +1572,9 @@ void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 
 void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMsg *m,int count)
 {
+#if CMK_BLUEGENE_CHARM
+  _TRACE_BG_TLINE_END(&m->log);
+#endif
 #ifdef _FAULT_MLOG_
     Chare *oldObj =CpvAccess(_currentObj);
     CpvAccess(_currentObj) = this;
@@ -1644,6 +1661,9 @@ void CkNodeReductionMgr::doRecvMsg(CkReductionMsg *m){
 //Sent up the reduction tree with reduced data
 void CkNodeReductionMgr::RecvMsg(CkReductionMsg *m)
 {
+#if CMK_BLUEGENE_CHARM
+  _TRACE_BG_TLINE_END(&m->log);
+#endif
 #ifndef CMK_CPV_IS_SMP
 #if CMK_IMMEDIATE_MSG
 	if(interrupt == 1){
@@ -2004,6 +2024,11 @@ int CkNodeReductionMgr::treeKids(void)//Number of children in tree
 //Combine (& free) the current message vector msgs.
 CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
 {
+#if CMK_BLUEGENE_CHARM
+  _TRACE_BG_END_EXECUTE(1);
+  void* _bgParentLog = NULL;
+  _TRACE_BG_BEGIN_EXECUTE_NOMSG("NodeReduce", &_bgParentLog, 0);
+#endif
   CkReductionMsg *ret=NULL;
 
   //Look through the vector for a valid reducer, swapping out placeholder messages
@@ -2017,7 +2042,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   int nMsgs=0;
   CkReductionMsg *m;
   CkReductionMsg **msgArr=new CkReductionMsg*[msgs.length()];
-	bool isMigratableContributor;
+  bool isMigratableContributor;
 	
 
   while(NULL!=(m=msgs.deq()))
@@ -2037,7 +2062,11 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
       if (m->userFlag!=-1)
         msgs_userFlag=m->userFlag;
 
-			isMigratableContributor= m->isMigratableContributor();
+	isMigratableContributor= m->isMigratableContributor();
+#if CMK_BLUEGENE_CHARM
+printf("add backward %d %p\n", CkMyPe(), _bgParentLog);
+      _TRACE_BG_ADD_BACKWARD_DEP(m->log);
+#endif
 				
     }
     else
@@ -2051,12 +2080,12 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
     ret=CkReductionMsg::buildNew(0,NULL);
   else
   {//Use the reducer to reduce the messages
-		if(nMsgs == 1){
-			ret = msgArr[0];
-		}else{
-	    CkReduction::reducerFn f=CkReduction::reducerTable[r];
-  	  ret=(*f)(nMsgs,msgArr);
-		}
+    if(nMsgs == 1){
+	ret = msgArr[0];
+    }else{
+        CkReduction::reducerFn f=CkReduction::reducerTable[r];
+        ret=(*f)(nMsgs,msgArr);
+    }
     ret->reducer=r;
   }
 
@@ -2083,7 +2112,6 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
 #endif
 
 
-
 	//Go back through the vector, deleting old messages
   for (i=0;i<nMsgs;i++) if (msgArr[i]!=ret) delete msgArr[i];
   delete [] msgArr;
@@ -2094,8 +2122,11 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   ret->callback=msgs_callback;
   ret->secondaryCallback = msgs_secondaryCallback;
   ret->sourceFlag=msgs_nSources;
-	ret->setMigratableContributor(isMigratableContributor);
+  ret->setMigratableContributor(isMigratableContributor);
   DEBR((AA"Node Reduced gcount=%d; sourceFlag=%d\n"AB,ret->gcount,ret->sourceFlag));
+#if CMK_BLUEGENE_CHARM
+  _TRACE_BG_TLINE_END(&ret->log);
+#endif
 
   return ret;
 }

@@ -69,6 +69,9 @@ void CkArrayReductionMgr::contributeArrayReduction(CkReductionMsg *m){
 	ARPRINT("[%d]Contribute Array Reduction called for RedNo %d group %d \n",CkMyNode(),m->getRedNo(),thisgroup.idx);
 	/** store the contribution untill all procs have contributed. At that point reduce and
 	carry out a reduction among nodegroups*/
+#if CMK_BLUEGENE_CHARM
+	 _TRACE_BG_TLINE_END(&(m->log));
+#endif
 	CmiLock(lockCount);
 	if(m->getRedNo() == redNo){
 		my_msgs.enq(m);
@@ -82,6 +85,11 @@ void CkArrayReductionMgr::contributeArrayReduction(CkReductionMsg *m){
 };
 
 CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
+#if CMK_BLUEGENE_CHARM
+        _TRACE_BG_END_EXECUTE(1);
+	void* _bgParentLog = NULL;
+	_TRACE_BG_BEGIN_EXECUTE_NOMSG("ArrayReduce", &_bgParentLog, 0);
+#endif
 	CkReductionMsg *ret=NULL;
 
 	//Look through the vector for a valid reducer, swapping out placeholder messages
@@ -114,6 +122,9 @@ CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
 				msgs_userFlag=m->userFlag;
 
 			isMigratableContributor=m->isMigratableContributor();
+#if CMK_BLUEGENE_CHARM
+			_TRACE_BG_ADD_BACKWARD_DEP(m->log);
+#endif
 				
 		}
 		else

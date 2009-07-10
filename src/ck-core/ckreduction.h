@@ -297,6 +297,9 @@ private:
     int fromPE;
 #endif
 private:
+#if CMK_BLUEGENE_CHARM
+        void *log;
+#endif
 	CkReduction::reducerType reducer;
 	contributorInfo *ci;//Source contributor, or NULL if none
 	int redNo;//The serial number of this reduction
@@ -310,7 +313,7 @@ private:
 	double dataStorage;//Start of data array (so it's double-aligned)
 
 	int no;
-        
+
 	//Default constructor is private so you must use "buildNew", above
 	CkReductionMsg();
 };
