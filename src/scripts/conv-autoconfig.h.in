@@ -30,6 +30,9 @@
 /* whether C inline works in C */
 #undef CMK_C_INLINE
 
+/* whether C++ allows declaration of variable sized array */
+#undef CMK_DECLARE_VARSIZE_ARRAY
+
 /* dlopen */
 #undef CMK_DLL_USE_DLOPEN
 

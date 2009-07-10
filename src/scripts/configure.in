@@ -449,6 +449,20 @@ AC_DEFINE_UNQUOTED(CMK_CPP_CAST_LEGAL, $pass, [C++ *_casts<> work])
 AC_DEFINE_UNQUOTED(CMK_CPP_CAST_ILLEGAL, $fail, [C++ *_casts<> does not work])
 
 
+### check if varsize array on stack ####
+cat > $t <<EOT
+#include <stdio.h>
+void foo()
+{
+  int size=10;
+  char arr[size];
+}
+
+EOT
+test_cxx "whether C++ allows declaration of varsize array" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_DECLARE_VARSIZE_ARRAY, $pass, [whether C++ allows declaration of variable sized array])
+
+
 #### check if templated members work ####
 cat > $t <<EOT
 typedef void (*func_t)(void);

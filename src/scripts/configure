@@ -2153,6 +2153,24 @@ _ACEOF
 
 
 
+### check if varsize array on stack ####
+cat > $t <<EOT
+#include <stdio.h>
+void foo()
+{
+  int size=10;
+  char arrsize;
+}
+
+EOT
+test_cxx "whether C++ allows declaration of varsize array" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_DECLARE_VARSIZE_ARRAY $pass
+_ACEOF
+
+
+
 #### check if templated members work ####
 cat > $t <<EOT
 typedef void (*func_t)(void);
