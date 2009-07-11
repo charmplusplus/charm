@@ -313,16 +313,11 @@ RouterStrategy::~RouterStrategy() {
 }
 
 /// Receive a message from the upper layer and buffer it in the msgQ until
-/// doneInserting is called. If the strategy is USE_DIRECT then just send it.
+/// doneInserting is called. If the strategy is USE_DIRECT then just send it to the handleMessage method for the Strategy.
 void RouterStrategy::insertMessage(MessageHolder *cmsg){
 	ComlibPrintf("[%d] RouterStrategy::insertMessage\n", CkMyPe());
 
-	
-	for(int i = 0; i < ndestPes; i++){
-		int destPe = destPelist[i];
-		ComlibPrintf("[%d] RouterStrategy::insertMessage destPelist[%d]=%d\n", CkMyPe(), i, destPe );
-	}
-	
+       
   //if(myPe < 0)
   //    CmiAbort("insertMessage: mype < 0\n");
 
@@ -350,18 +345,24 @@ void RouterStrategy::insertMessage(MessageHolder *cmsg){
 #else
     	if(cmsg->dest_proc == IS_BROADCAST) {
     		ComlibPrintf("[%d] RouterStrategy::insertMessage Broadcasting to all PEs\n", CkMyPe());
-           	for(int destPe = 0; destPe < CkNumPes()-1; destPe++){
-           		ComlibPrintf("[%d] RouterStrategy::insertMessage Broadcasting to all, PE %d\n", CkMyPe(), destPe );
-           		CmiSyncSend(destPe, cmsg->size, cmsg->getMessage());
-        	}
-           	if(CkNumPes()>0){
-           		CmiSyncSendAndFree(CkNumPes()-1, cmsg->size, cmsg->getMessage());
-        		ComlibPrintf("[%d] RouterStrategy::insertMessage Broadcasting to all, PE %d\n", CkMyPe(), CkNumPes()-1 );
-           	}
+	
+#if 0
+		CmiSyncBroadcastAndFree(cmsg->size, cmsg->getMessage() ); // This ought to be the same as the following alternative
+#else
+            	for(int destPe = 0; destPe < CkNumPes()-1; destPe++){
+            		ComlibPrintf("[%d] RouterStrategy::insertMessage Broadcasting to all, PE %d\n", CkMyPe(), destPe );
+            		CmiSyncSend(destPe, cmsg->size, cmsg->getMessage());
+         	}
+            	if(CkNumPes()>0){
+            		CmiSyncSendAndFree(CkNumPes()-1, cmsg->size, cmsg->getMessage());
+         		ComlibPrintf("[%d] RouterStrategy::insertMessage Broadcasting to all, PE %d\n", CkMyPe(), CkNumPes()-1 );
+            	}
+#endif
+
     	}	
-        else
-            CmiSyncSendAndFree(cmsg->dest_proc, cmsg->size, 
-                               cmsg->getMessage());
+        else {
+	  CmiSyncSendAndFree(cmsg->dest_proc, cmsg->size, cmsg->getMessage());
+	}
     	delete cmsg;
     
 #endif
@@ -392,15 +393,15 @@ void RouterStrategy::insertMessage(MessageHolder *cmsg){
 }
 
 void RouterStrategy::doneInserting(){
-	ComlibPrintf("[%d] RouterStrategy::doneInserting", CkMyPe());
-	
+  ComlibPrintf("[%d] RouterStrategy::doneInserting msgQ.length()=%d \n", CkMyPe(), msgQ.length());
+  
+  
   if(myPe < 0) return; // nothing to do if I have not objects in my processor
       //CmiAbort("insertMessage: mype < 0\n");
 
     id.instanceID = getInstance();
 
     //ComlibPrintf("Instance ID = %d\n", getInstance());
-    ComlibPrintf("[%d] RouterStrategy::doneInserting %d \n", CkMyPe(), msgQ.length());
     
     if(doneFlag == 0) {
         ComlibPrintf("[%d] Waiting for previous iteration to Finish\n", 
@@ -411,6 +412,7 @@ void RouterStrategy::doneInserting(){
     }
     
     if(routerID == USE_DIRECT) {
+      CkAssert(msgQ.length() == 0);
       //DummyMsg *m = (DummyMsg *)CmiAlloc(sizeof(DummyMsg));
       //memset((char *)m, 0, sizeof(DummyMsg)); 
       //m->id.instanceID = getInstance();
@@ -438,26 +440,9 @@ void RouterStrategy::doneInserting(){
         msgQ.push(cmsg);
     }
 
+    ComlibPrintf("Calling router->EachToManyMulticastQ??????????????????????????\n");
     router->EachToManyMulticastQ(id, msgQ);
 
-    /* These were needed in the case of more than one iteration executing at the same time.
-       For the moment this is not the case.
-    while(!recvQ.isEmpty()) {
-        char *msg = recvQ.deq();
-        RecvManyMsg(msg);
-    }
-
-    while(!procQ.isEmpty()) {
-        char *msg = procQ.deq();
-        ProcManyMsg(msg);
-    }
-
-    while(!dummyQ.isEmpty() > 0) {
-        DummyMsg *m = dummyQ.deq();
-        router->DummyEP(m->id, m->magic);
-        CmiFree(m);
-    }
-    */
 }
 
 void RouterStrategy::deliver(char *msg, int size) {

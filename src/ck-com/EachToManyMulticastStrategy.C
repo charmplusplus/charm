@@ -6,64 +6,10 @@
 
 #include "EachToManyMulticastStrategy.h"
 #include "string.h"
-//#include "routerstrategy.h"
 
 #include "AAPLearner.h"
 #include "AAMLearner.h"
 
-//EachToManyMulticastStrategy CODE
-//CkpvExtern(int, RecvdummyHandle);
-//CkpvExtern(CkGroupID, cmgrID);
-
-/*
-void *itrDoneHandler(void *msg){
-
-    EachToManyMulticastStrategy *nm_mgr;
-
-    DummyMsg *dmsg = (DummyMsg *)msg;
-    comID id = dmsg->id;
-    int instid = id.instanceID;
-
-    CmiFree(msg);
-    ComlibPrintf("[%d] Iteration finished %d\n", CkMyPe(), instid);
-
-    StrategyTableEntry *sentry = 
-        CProxy_ComlibManager(CkpvAccess(cmgrID)).ckLocalBranch()
-        ->getStrategyTableEntry(instid);
-    int nexpected = sentry->numElements;
-
-    if(nexpected == 0) {             
-        ComlibPrintf("[%d] Calling Dummy Done Inserting, %d, %d\n", CkMyPe(), instid, nexpected);
-        nm_mgr = (EachToManyMulticastStrategy *)sentry->strategy;    
-        nm_mgr->doneInserting();
-
-	if (!nm_mgr->getOnFinish().isInvalid()) nm_mgr->getOnFinish().send(0);
-
-    }
-
-    return NULL;
-}
- */
-/*
-void *E2MHandler(void *msg){
-    //CkPrintf("[%d]:In EachtoMany CallbackHandler\n", CkMyPe());
-    EachToManyMulticastStrategy *nm_mgr;    
-
-    CmiMsgHeaderExt *conv_header = (CmiMsgHeaderExt *) msg;
-    int instid = conv_header->stratid;
-
-    envelope *env = (envelope *)msg;
-
-    nm_mgr = (EachToManyMulticastStrategy *) 
-        CProxy_ComlibManager(CkpvAccess(cmgrID)).
-        ckLocalBranch()->getStrategy(instid);
-
-    RECORD_RECV_STATS(instid, env->getTotalsize(), env->getSrcPe());
-
-    nm_mgr->localMulticast(msg);
-    return NULL;
-}
- */
 
 //Group Constructor
 EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy,
@@ -108,17 +54,6 @@ EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy,
 	int *count = ainfo.getCombinedCountList();
 	//ainfo.getSourcePeList(nsrcPe, srcPe);
 	//ainfo.getDestinationPeList(ndestPe, destPe);
-
-	/*
-      char dump[1000];
-      char sdump[100];
-      sprintf(dump, "%d: Each To MANY PELIST :\n", CkMyPe());
-      for(int count = 0; count < npes; count ++){
-      sprintf(sdump, "%d, ", pelist[count]);
-      strcat(dump, sdump);           
-      }    
-      ComlibPrintf("%s\n", dump);
-	 */
 
 	commonInit(count);
 }
@@ -196,24 +131,6 @@ void EachToManyMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
 	RouterStrategy::insertMessage(cmsg);
 }
 
-/*
-void EachToManyMulticastStrategy::doneInserting(){
-
-    StrategyTableEntry *sentry = 
-        CProxy_ComlibManager(CkpvAccess(cmgrID)).ckLocalBranch()
-        ->getStrategyTableEntry(getInstance());
-    int nexpected = sentry->numElements;
-
-    if(routerID == USE_DIRECT && nexpected == 0)
-        return;
-
-    if(MyPe < 0)
-        return;
-
-    //ComlibPrintf("%d: DoneInserting \n", CkMyPe());    
-    rstrat->doneInserting();
-}
- */
 
 void EachToManyMulticastStrategy::pup(PUP::er &p){
 
@@ -225,81 +142,7 @@ void EachToManyMulticastStrategy::pup(PUP::er &p){
 
 }
 
-/* NOT NEEDED
-void EachToManyMulticastStrategy::finalizeCreation() {
-  ainfo.purge();
-}
- */
 
-// void EachToManyMulticastStrategy::beginProcessing(int numElements){
-
-//     ComlibPrintf("[%d] Begin processing %d\n", CkMyPe(), numElements);
-//     /*
-//     char dump[1000];
-//     char sdump[100];
-//     sprintf(dump, "%d: Each To MANY PELIST :\n", CkMyPe());
-//     for(int count = 0; count < npes; count ++){
-//         sprintf(sdump, "%d, ", pelist[count]);
-//         strcat(dump, sdump);           
-//     }    
-//     ComlibPrintf("%s\n", dump);
-//     */
-
-//     int expectedDeposits = 0;
-
-//     rstrat->setInstance(getInstance());
-
-//     if(ainfo.isSourceArray()) 
-//         expectedDeposits = numElements;
-
-//     if(getType() == GROUP_STRATEGY) {
-
-//         CkGroupID gid;
-//         int *srcpelist;
-//         int nsrcpes;
-
-//         ginfo.getSourceGroup(gid, srcpelist, nsrcpes);
-
-//         for(int count = 0; count < nsrcpes; count ++)
-//             if(srcpelist[count] == CkMyPe()){
-//                 expectedDeposits = 1;
-//                 break;
-//             }
-
-//         StrategyTableEntry *sentry = 
-//             CProxy_ComlibManager(CkpvAccess(cmgrID)).ckLocalBranch()
-//             ->getStrategyTableEntry(myInstanceID);
-//         sentry->numElements = expectedDeposits;
-//     }
-//     /*
-//     if(useLearner) 
-//         setLearner(new AAPLearner());    
-//     else 
-//         setLearner(new AAMLearner());                
-//     */
-
-//     if(expectedDeposits > 0)
-//         return;
-
-//     if(expectedDeposits == 0 && MyPe >= 0)
-//         ConvComlibScheduleDoneInserting(myInstanceID);
-// }
-
-/*
-void EachToManyMulticastStrategy::finalizeProcessing() {
-    if(npes > 0)
-        delete [] pelist;
-
-    if(ndestpes > 0)
-        delete [] destpelist;
-
-    if(rstrat)
-        delete rstrat;
-
-    if(useLearner && getLearner() != NULL)
-        delete getLearner();
-}
- */
 
 void EachToManyMulticastStrategy::deliver(char *msg, int size) {
 	ComlibPrintf("[%d] EachToManyMulticastStrategy::deliver for %s\n",
@@ -319,10 +162,9 @@ void EachToManyMulticastStrategy::deliver(char *msg, int size) {
 			CkSendMsgBranchInline(env->getEpIdx(), EnvToUsr(env), CkMyPe(), env->getGroupNum());
 		}
 		else if (getType() == ARRAY_STRATEGY) {
-			//    	  CkPrintf("[%d] Delivering via ComlibArrayInfo::deliver()\n", CkMyPe());
+			//    	  ComlibPrintf("[%d] Delivering via ComlibArrayInfo::deliver()\n", CkMyPe());
 			//      ComlibArrayInfo::deliver(env);
 
-			// call ainfo's localBroadcast(env);
 			ComlibPrintf("[%d] Delivering via ComlibArrayInfo::localBroadcast()\n", CkMyPe());
 			ainfo.localBroadcast(env);
 
@@ -333,7 +175,7 @@ void EachToManyMulticastStrategy::deliver(char *msg, int size) {
 void EachToManyMulticastStrategy::localMulticast(void *msg){
 	register envelope *env = (envelope *)msg;
 	CkUnpackMessage(&env);
-	CkPrintf("localMulticast calls ainfo.localBroadcast()\n");
+	ComlibPrintf("localMulticast calls ainfo.localBroadcast()\n");
 	ainfo.localBroadcast(env);
 }
 

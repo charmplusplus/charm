@@ -91,13 +91,13 @@ class CharmMessageHolder : public MessageHolder{
     
     /// Store a local copy of the sec_id, so I can use it later.
     inline void saveCopyOf_sec_id(){
-      ComlibPrintf("[%d] saveCopyOf_sec_id sec_id=%p NULL=%d\n", CkMyPe(), sec_id, NULL);
+      //      ComlibPrintf("[%d] saveCopyOf_sec_id sec_id=%p NULL=%d\n", CkMyPe(), sec_id, NULL);
 
       checkme();
 
       if(sec_id!=NULL){
 
-	ComlibPrintf("Original has values: _nElems=%d, npes=%d\n", sec_id->_nElems, sec_id->npes );
+	//ComlibPrintf("Original has values: _nElems=%d, npes=%d\n", sec_id->_nElems, sec_id->npes );
 	CkAssert(sec_id->_nElems>=0);
 	CkAssert(sec_id->npes>=0);
 
@@ -111,7 +111,7 @@ class CharmMessageHolder : public MessageHolder{
 	copy_of_sec_id->_cookie = sec_id->_cookie;
 	copy_of_sec_id->_nElems = sec_id->_nElems;
 	copy_of_sec_id->npes = sec_id->npes;
-	ComlibPrintf("Copy has values: _nElems=%d, npes=%d\n", copy_of_sec_id->_nElems, copy_of_sec_id->npes );
+	//	ComlibPrintf("Copy has values: _nElems=%d, npes=%d\n", copy_of_sec_id->_nElems, copy_of_sec_id->npes );
 	for(int i=0; i<sec_id->_nElems; i++){
 	  copy_of_sec_id->_elems[i] = sec_id->_elems[i];
 	}
@@ -120,7 +120,7 @@ class CharmMessageHolder : public MessageHolder{
 	}
 
 	// change local pointer to the new copy of the CkSectionID
-	ComlibPrintf("saving copy of sec_id into %p\n", copy_of_sec_id);
+	//	ComlibPrintf("saving copy of sec_id into %p\n", copy_of_sec_id);
       }
 
       checkme();
@@ -210,46 +210,98 @@ class ComlibMulticastMsg;
    communication library.
 */
 class ComlibArrayInfo {
- protected:
-    CkArrayID src_aid; 	///< Source Array ID
-    CkVec<CkArrayIndexMax> src_elements;     ///< local source array elements
-    int isSrcArray;
-    int isAllSrc; ///< if true then all the array is involved in the operation
-    int totalSrc; ///< The total number of src elements involved in the strategy
+ private:
 
-    CkArrayID dest_aid;
-    CkVec<CkArrayIndexMax> dest_elements; ///< destination indices
+    CkArrayID src_aid; 	///< Source Array ID
+    CkArrayID dest_aid; ///< Destination Array ID
+    
+    /**  Destination indices that are local to this PE 
+	 (as determined by the bracketed counting scheme from a previous iteration)  
+    */
+    CkVec<CkArrayIndexMax> src_elements; 
+
+    /**  Destination indices that are currently being updated. 
+	 At the beginning of the next iteration these will be 
+	 moved into dest_elements by useNewDestinationList()
+    */
+    CkVec<CkArrayIndexMax> new_src_elements;
+
+    /**  Destination indices that are local to this PE 
+	 (as determined by the bracketed counting scheme from a previous iteration)  
+    */
+    CkVec<CkArrayIndexMax> dest_elements; 
+
+    /**  Destination indices that are currently being updated. 
+	 At the beginning of the next iteration these will be 
+	 moved into dest_elements by useNewDestinationList()
+    */
+    CkVec<CkArrayIndexMax> new_dest_elements;
+
+    int isSrcArray;
     int isDestArray;
-    int isAllDest; ///< if true then all the array is involved in the operation
+
+    bool isAllSrc; ///< if true then all the array is involved in the operation
+    int totalSrc; ///< The total number of src elements involved in the strategy
+    bool isAllDest; ///< if true then all the array is involved in the operation
     int totalDest; ///< The total number of array elements involved in the strategy
     
  public:
     ComlibArrayInfo();
     //~ComlibArrayInfo();
 
+    /** Set the  source array used for this strategy. 
+	The list of array indices should be the whole portion of the array involved in the strategy.
+	The non-local array elements will be cleaned up inside purge() at migration of the strategy
+    */
     void setSourceArray(CkArrayID aid, CkArrayIndexMax *e=0, int nind=0);
     int isSourceArray(){return isSrcArray;}
-    void getSourceArray(CkArrayID &aid, CkArrayIndexMax *&e, int &nind);
-    /// This operation leaks memory is the index vector is not retrieved before!
-    void resetSource() {new (&src_elements) CkVec<CkArrayIndexMax>();};
-    void addSource(CkArrayIndexMax &e) {
-    	src_elements.push_back(e);
-//    	ComlibPrintf("[%d] src_elements.push_back(%d)  now contains %d\n", CkMyPe(), e.data()[0], src_elements.size());
-    }
+    CkArrayID getSourceArrayID() {return src_aid;}
+    const CkVec<CkArrayIndexMax> & getSourceElements() {return src_elements;}
+
+    /** Set the destination array used for this strategy. 
+	The list of array indices should be the whole portion of the array involved in the strategy.
+	The non-local array elements will be cleaned up inside purge() at migration of the strategy
+    */
+    void setDestinationArray(CkArrayID aid, CkArrayIndexMax *e=0, int nind=0);
+    int isDestinationArray(){return isDestArray;}
+    CkArrayID getDestinationArrayID() {return dest_aid;}
+    const CkVec<CkArrayIndexMax> & getDestinationElements() {return dest_elements;}
 
     /// Get the number of source array elements
     int getTotalSrc() {return totalSrc;}
     int getLocalSrc() {return src_elements.size();}
 
-    void setDestinationArray(CkArrayID aid, CkArrayIndexMax *e=0, int nind=0);
-    int isDestinationArray(){return isDestArray;}
-    void getDestinationArray(CkArrayID &aid, CkArrayIndexMax *&e, int &nind);
-    /// This operation leaks memory is the index vector is not retrieved before!
-    void resetDestination() {new (&dest_elements) CkVec<CkArrayIndexMax>();};
-    void addDestination(CkArrayIndexMax &e) {
-    	dest_elements.push_back(e);
-    	ComlibPrintf("[%d] dest_elements.push_back(%d)  now contains %d\n", CkMyPe(), e.data()[0], dest_elements.size());	
+    /** Add a destination object that is local to this PE to list used in future iterations */
+    void addNewLocalDestination(const CkArrayIndexMax &e) {
+        CkAssert(e.nInts > 0);
+	new_dest_elements.push_back(e);
     }
+
+    /** Add a source object that is local to this PE to list used in future iterations */
+    void addNewLocalSource(const CkArrayIndexMax &e) {
+        CkAssert(e.nInts > 0);
+	new_src_elements.push_back(e);
+    }
+  
+    /// Switch to using the new destination and source lists if the previous iteration found an error and constructed the new list
+    void useNewSourceAndDestinations() {
+      if(new_dest_elements.size() > 0) {
+	dest_elements.removeAll();
+	dest_elements = new_dest_elements;
+	CkAssert(dest_elements.size() == new_dest_elements.size());
+	new_dest_elements.removeAll();
+      }
+      if(new_src_elements.size() > 0) {
+	src_elements.removeAll();
+	src_elements = new_src_elements;
+	CkAssert(src_elements.size() == new_src_elements.size());
+	new_src_elements.removeAll();
+      }
+    }
+
+    int newDestinationListSize(){ return new_dest_elements.size(); }
+    int newSourceListSize(){ return new_src_elements.size(); }
+
     int getTotalDest() {return totalDest;}
     int getLocalDest() {return dest_elements.size();}
 
@@ -267,10 +319,10 @@ class ComlibArrayInfo {
     /// This routine returnes an array of size CkNumPes() where each element
     /// follow the convention for bracketed strategies counts.
     int *getCombinedCountList();
-    //void getSourcePeList(int *&pelist, int &npes);
-    //void getDestinationPeList(int *&pelist, int &npes);
-    //void getCombinedPeList(int *&pelist, int &npes);
-    
+
+    void printDestElementList();
+
+
     void pup(PUP::er &p);
 };
 

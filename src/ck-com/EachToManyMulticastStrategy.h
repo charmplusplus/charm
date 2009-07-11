@@ -64,6 +64,8 @@ class EachToManyMulticastStrategy : public RouterStrategy, public CharmStrategy 
     virtual void localMulticast(void *msg);
 
     virtual void notifyDone();
+
+    /** Called by handleMessage at the destinations for the broadcast if in DIRECT mode. */
     virtual void deliver(char *, int);
 
     /// this method can be called when the strategy is in DIRECT mode, so the

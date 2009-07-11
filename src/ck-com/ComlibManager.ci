@@ -16,9 +16,9 @@ module comlib {
     entry void barrier(void);
     entry void resumeFromSetupBarrier();
 
-    entry void bracketedReceiveCount(int instid, int pe, int count, int isFirst, int step);
     entry void bracketedStartErrorRecoveryProcess(int instid, int step);	 
     entry void bracketedErrorDetected(int instid, int step);
+    entry void bracketedReceiveCount(int instid, int pe, int count, int isFirst, int step);
     entry void bracketedConfirmCount(int instid);
     entry void bracketedCountConfirmed(int instid, int count, int step);
     entry void bracketedReceiveNewCount(int instid);

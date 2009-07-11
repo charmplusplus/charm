@@ -30,6 +30,9 @@
 #define MAX_NUM_STRATS 32
 
 
+#define STARTUP_ITERATION -10000
+
+
 /** Converse interface to handle all the Comlib strategies registered in the
     Converse of Charm++ program. Being in Converse, this is a pure class
     allocated into a global variable. */

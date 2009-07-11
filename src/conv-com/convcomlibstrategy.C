@@ -92,7 +92,7 @@ void StrategyWrapper::pup (PUP::er &p) {
 
 
 StrategyTableEntry::StrategyTableEntry() {
-    lastKnownIteration = -1000;
+    lastKnownIteration = STARTUP_ITERATION;
     strategy = NULL;
     isNew = 0;
     isReady = 0;
