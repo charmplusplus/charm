@@ -785,16 +785,15 @@ public:
     // 
     //
     // MSA_CacheGroup::
-	inline MSA_CacheGroup(unsigned int nPages_,
-						  unsigned int max_bytes_,
-						  unsigned int nEntries_,
+	inline MSA_CacheGroup(unsigned int nPages_, CkArrayID pageArrayID,
+						  unsigned int max_bytes_, unsigned int nEntries_, 
 						  unsigned int numberOfWorkerThreads_)
 		: numberOfWorkerThreads(numberOfWorkerThreads_),
 		  nPages(nPages_),
 		  nEntries(nEntries_), 
 		  pageTable(nPages, NULL),
 		  pageStateStorage(nPages, NULL),
-		  pageArray(CProxy_PageArray_t::ckNew(nPages_)),
+		  pageArray(pageArrayID),
 		  thisProxy(thisgroup),
 		  max_resident_pages(max_bytes_/(sizeof(ENTRY_TYPE)*ENTRIES_PER_PAGE)),
 		  entryOpsObject(new ENTRY_OPS_CLASS),
@@ -802,9 +801,6 @@ public:
 		  outOfBufferInPrefetch(0), syncAckCount(0),syncThreadCount(0),
 		  resident_pages(0),numberLocalWorkerThreads(0), enrollDoneq(0)
 		{
-			pageArray.setCacheProxy(thisProxy);
-			pageArray.ckSetReductionClient(new CkCallback(CkIndex_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(), thisProxy));
-
 			MSADEBPRINT(printf("MSA_CacheGroup nEntries %d \n",nEntries););
 		}
 

@@ -57,6 +57,7 @@ class MSA1D
 public:
     typedef MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CacheGroup_t;
     typedef CProxy_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_CacheGroup_t;
+    typedef CProxy_MSA_PageArray<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_PageArray_t;
 
     // Sun's C++ compiler doesn't understand that nested classes are
     // members for the sake of access to private data. (2008-10-23)
@@ -215,8 +216,12 @@ public:
                  unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES) 
         : nEntries(nEntries_), initHandleGiven(false)
     {
+        // first create the Page Array and the Page Group
         unsigned int nPages = (nEntries + ENTRIES_PER_PAGE - 1)/ENTRIES_PER_PAGE;
-        cg = CProxy_CacheGroup_t::ckNew(nPages, maxBytes, nEntries, num_wrkrs);
+        CProxy_PageArray_t pageArray = CProxy_PageArray_t::ckNew(nPages);
+        cg = CProxy_CacheGroup_t::ckNew(nPages, pageArray, maxBytes, nEntries, num_wrkrs);
+        pageArray.setCacheProxy(cg);
+        pageArray.ckSetReductionClient(new CkCallback(CkIndex_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(), cg));
         cache = cg.ckLocalBranch();
     }
 
