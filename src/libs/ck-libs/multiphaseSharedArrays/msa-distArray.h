@@ -803,6 +803,9 @@ public:
                     for (; iz < mz; ++iz)
                         Handle::msa.set(ix, iy, iz) = buf[i++];
         }
+
+    private:
+        Write(Write &);
     };
 
     class Accum : public Handle
@@ -1014,6 +1017,13 @@ public:
     }
 
     static const int DEFAULT_SYNC_SINGLE = 0;
+
+    inline void syncRelease(Handle &m)
+    {
+        m.checkInvalidate(this);
+        delete &m;
+        cache->SyncRelease();
+    }
 
     inline Read &syncToRead(Handle &m, int single = DEFAULT_SYNC_SINGLE)
     {

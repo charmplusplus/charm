@@ -1004,6 +1004,20 @@ public:
 			FlushCache();
 		}
 
+	void SyncRelease()
+		{
+			syncThreadCount++;
+
+			MSADEBPRINT(printf("Sync syncThreadCount %d \n",syncThreadCount););
+			if(syncThreadCount < numberLocalWorkerThreads)
+			{
+				return;
+			}
+
+			FlushCache();
+			EmptyCache();
+		}
+
     // MSA_CacheGroup::
     inline void Sync()
 		{
@@ -1068,6 +1082,7 @@ public:
     inline CProxy_PageArray_t getArray() { return pageArray; }
 
     // TODO: Can this SyncAck and other simple Acks be made efficient?
+// Yes - Replace calls to this with contributes to a reduction that calls pageArray.Sync()
     inline void SyncAck()
 		{
 			CkAssert(CkMyPe() == 0);  // SyncAck is only called on PE 0
