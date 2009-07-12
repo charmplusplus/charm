@@ -7,9 +7,9 @@ rather than one chare per processor.  So, each node contains a branch of the
 node group, each containing one set of data members.  When an entry method of a
 node group is executed, it runs on only one processor within each node.
 
-Node groups have a definition syntax that is very similar to groups.  Rather
-than inheriting from the system defined class, \kw{Group}, node groups inherit
-from \kw{NodeGroup}.  For example, in the interface file, we declare:
+Node groups have a definition syntax that is very similar to groups.  
+\footnote{As with groups, an older syntax has node groups inherit from \kw{NodeGroup} instead of a specific generated class.}
+For example, in the interface file, we declare:
 
 \begin{alltt}
  nodegroup NodeGroupType \{
@@ -20,7 +20,7 @@ from \kw{NodeGroup}.  For example, in the interface file, we declare:
 In the {\tt .h} file, we define \uw{NodeGroupType} as follows:
 
 \begin{alltt}
- class NodeGroupType : public NodeGroup [,other superclasses ] \{
+ class NodeGroupType : public CBase_NodeGroupType [,other superclasses ] \{
   // Data and member functions as in \CC{}
   // Entry functions as for normal chares
  \};
