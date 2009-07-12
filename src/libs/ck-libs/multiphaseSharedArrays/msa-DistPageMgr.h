@@ -794,7 +794,7 @@ public:
 		  nEntries(nEntries_), 
 		  pageTable(nPages, NULL),
 		  pageStateStorage(nPages, NULL),
-		  pageArray(CProxy_PageArray_t::ckNew(thisProxy, nPages_)),
+		  pageArray(CProxy_PageArray_t::ckNew(nPages_)),
 		  thisProxy(thisgroup),
 		  max_resident_pages(max_bytes_/(sizeof(ENTRY_TYPE)*ENTRIES_PER_PAGE)),
 		  entryOpsObject(new ENTRY_OPS_CLASS),
@@ -802,6 +802,7 @@ public:
 		  outOfBufferInPrefetch(0), syncAckCount(0),syncThreadCount(0),
 		  resident_pages(0),numberLocalWorkerThreads(0), enrollDoneq(0)
 		{
+			pageArray.setCacheProxy(thisProxy);
 			pageArray.ckSetReductionClient(new CkCallback(CkIndex_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(), thisProxy));
 
 			MSADEBPRINT(printf("MSA_CacheGroup nEntries %d \n",nEntries););
@@ -1295,8 +1296,13 @@ protected:
 		}
 
 public:
-    inline MSA_PageArray(CProxy_CacheGroup_t &cache_) : epage(NULL), cache(cache_) { }
+    inline MSA_PageArray() : epage(NULL) { }
     inline MSA_PageArray(CkMigrateMessage* m) { delete m; }
+    
+    void setCacheProxy(CProxy_CacheGroup_t &cache_)
+		{
+			cache=cache_;
+		}
     
     virtual void pup(PUP::er& p)
 		{

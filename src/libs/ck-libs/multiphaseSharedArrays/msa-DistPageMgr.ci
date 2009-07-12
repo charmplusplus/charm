@@ -27,7 +27,8 @@ module msa
     // virtualizes the storage for the pages
     template<class ENTRY_TYPE, class ENTRY_OPS_CLASS,unsigned int ENTRIES_PER_PAGE> array[1D] MSA_PageArray
     {
-        entry MSA_PageArray(CProxy_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> cache);
+        entry MSA_PageArray(void);
+	entry void setCacheProxy(CProxy_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> cache);
 	
         entry void GetPage(int pe);
         entry void PAReceivePage(ENTRY_TYPE page[ENTRIES_PER_PAGE], int pe, MSA_Page_Fault_t pageState);
