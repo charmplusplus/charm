@@ -1694,6 +1694,8 @@ MSG_ORDER_DEBUG(
 #endif
 
   int sync = UsrToEnv(msg)->getRef();
+  int srcIdx;
+  if (sync)  srcIdx = msg->srcIdx;
 
 //	AmpiMsg *msgcopy = msg;
   if(msg->seq != -1) {
@@ -1711,9 +1713,10 @@ MSG_ORDER_DEBUG(
     inorder(msg);
   }
   
+    // msg may be free'ed from calling inorder()
   if (sync==1) {         // send an ack to sender
     CProxy_ampi pa(thisArrayID);
-    pa[msg->srcIdx].unblock();
+    pa[srcIdx].unblock();
   }
 
   if(resumeOnRecv){
@@ -1823,6 +1826,7 @@ ampi::send(int t, int sRank, const void* buf, int count, int type,  int rank, MP
 
   if (sync) {
     // waiting for receiver side
+    resumeOnRecv = false;            // so no one else awakes it
     block();
   }
 }
