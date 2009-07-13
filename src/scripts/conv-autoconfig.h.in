@@ -84,7 +84,7 @@
 /* whether get_myaddress() exists */
 #undef CMK_HAS_GET_MYADDRESS
 
-/* whether it has log2 */
+/* whether has log2 */
 #undef CMK_HAS_LOG2
 
 /* whether has malloc.h */
@@ -117,10 +117,10 @@
 /* whether the setpriority() exists */
 #undef CMK_HAS_SETPRIORITY
 
-/* whether it has socklen_t */
+/* whether has socklen_t */
 #undef CMK_HAS_SOCKLEN
 
-/* whether it has sqrtf */
+/* whether has sqrtf */
 #undef CMK_HAS_SQRTF
 
 /* whether has stdint.h */
@@ -132,7 +132,7 @@
 /* sync program */
 #undef CMK_HAS_SYNC
 
-/* whether it has system */
+/* whether has system */
 #undef CMK_HAS_SYSTEM
 
 /* whether typeinfo/typeid works */
@@ -162,7 +162,7 @@
 /* Allows PPC assembly. */
 #undef CMK_PPC_ASM
 
-/* whether it has zlib */
+/* whether has zlib */
 #undef CMK_PROJECTIONS_USE_ZLIB
 
 /* Python version */
@@ -192,10 +192,10 @@
 /* whether glibc backtrace works */
 #undef CMK_USE_BACKTRACE
 
-/* whether it has libjpeg */
+/* whether has libjpeg */
 #undef CMK_USE_LIBJPEG
 
-/* whether it has mkstemp */
+/* whether has mkstemp */
 #undef CMK_USE_MKSTEMP
 
 /* whether the poll() syscall exists */

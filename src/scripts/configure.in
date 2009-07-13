@@ -56,6 +56,7 @@ test_result() {
 #  additional arguments to c++ compiler are passed as $4
 test_cc() {
         AC_MSG_CHECKING("$1")
+	echo "### $1" >> $charmout
 	cat $tc >> $charmout
 	echo $CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $tc -o test.o $4 >> $charmout
 	$CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $tc -o test.o $4 > out 2>&1
@@ -79,6 +80,7 @@ test_cc() {
 #  additional arguments to c++ compiler are passed as $4
 test_cxx() {
         AC_MSG_CHECKING("$1")
+	echo "### $1" >> $charmout
 	cat $t >> $charmout
 	echo $CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CXX $OPTS_LD -c $t -o test.o $4 >> $charmout
 	$CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CXX $OPTS_LD -c $t -o test.o $4 > out 2>&1
@@ -102,6 +104,7 @@ test_cxx() {
 #  additional arguments to c++ compiler are passed as $4
 test_link() {
         AC_MSG_CHECKING("$1")
+	echo "### $1" >> $charmout
 	cat $t >> $charmout
 	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 >> $charmout
 	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 > out 2>&1
@@ -134,6 +137,7 @@ test_link() {
 #  additional arguments to c++ compiler are passed as $4
 test_linkc() {
         AC_MSG_CHECKING("$1")
+	echo "### $1" >> $charmout
 	cat $tc >> $charmout
 	echo $CMK_CC -I../include -I. $CMK_INCDIR $OPTS_CC -c $tc -o test.o $4 >> $charmout
 	$CMK_CC -I../include -I. $CMK_INCDIR $OPTS_CC -c $tc -o test.o $4 > out 2>&1
@@ -165,6 +169,7 @@ test_linkc() {
 # $4: extra link option
 test_linkso() {
         AC_MSG_CHECKING("$1")
+	echo $1 >> $charmout
 	cat $t >> $charmout
 	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 >> $charmout
 	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 > out 2>&1
@@ -657,8 +662,8 @@ int main() {
   return 0;
 }
 EOT
-test_link "whether it has log2" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_LOG2, $pass, [whether it has log2])
+test_link "whether has log2" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_LOG2, $pass, [whether has log2])
 
 #### test for sqrtf ###
 cat > $t <<EOT
@@ -668,8 +673,8 @@ int main() {
   return 0;
 }
 EOT
-test_link "whether it has sqrtf" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_SQRTF, $pass, [whether it has sqrtf])
+test_link "whether has sqrtf" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_SQRTF, $pass, [whether has sqrtf])
 
 #### test for mkstemp ###
 cat > $t <<EOT
@@ -682,8 +687,8 @@ int main() {
   return 0;
 }
 EOT
-test_link "whether it has mkstemp" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_USE_MKSTEMP, $pass, [whether it has mkstemp])
+test_link "whether has mkstemp" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_USE_MKSTEMP, $pass, [whether has mkstemp])
 
 #### test for system ###
 cat > $t <<EOT
@@ -693,8 +698,8 @@ int main() {
   return 0;
 }
 EOT
-test_link "whether it has system" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_SYSTEM, $pass, [whether it has system])
+test_link "whether has system" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_SYSTEM, $pass, [whether has system])
 
 #### test for poll ###
 cat > $t <<EOT
@@ -876,8 +881,8 @@ void foo(void) {
 	socklen_t s=sizeof(i);
 }
 EOT
-test_cxx "whether it has socklen_t" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_SOCKLEN, $pass, [whether it has socklen_t])
+test_cxx "whether has socklen_t" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_SOCKLEN, $pass, [whether has socklen_t])
 
 #### check if mmap exists ####
 cat > $t <<EOT
@@ -965,8 +970,8 @@ int main() {
   return 0;
 }
 EOT
-test_link "whether it has zlib" "yes" "no" "-lz"
-AC_DEFINE_UNQUOTED(CMK_PROJECTIONS_USE_ZLIB, $pass, [whether it has zlib])
+test_link "whether has zlib" "yes" "no" "-lz"
+AC_DEFINE_UNQUOTED(CMK_PROJECTIONS_USE_ZLIB, $pass, [whether has zlib])
 if test $pass -eq 1
 then 
 	add_flag 'CMK_LIBZ="-lz"' "zlib"
@@ -1026,8 +1031,8 @@ int main()
   return 0;
 }
 EOT
-test_link "whether it has libjpeg" "yes" "no" "-ljpeg"
-AC_DEFINE_UNQUOTED(CMK_USE_LIBJPEG, $pass, [whether it has libjpeg])
+test_link "whether has libjpeg" "yes" "no" "-ljpeg"
+AC_DEFINE_UNQUOTED(CMK_USE_LIBJPEG, $pass, [whether has libjpeg])
 if test $pass -eq 1
 then
         add_flag 'CMK_LIBJPEG="-ljpeg"' "libjpeg"
@@ -1079,13 +1084,15 @@ fi
 
 #### test if it can build shared library ####
 cat > $t <<EOT
+#include "stdlib.h"
 extern int foo();
 int foo1() { 
+  void * t= malloc(2);
   foo();
   return 0;
 }
 EOT
-test_linkso "whether it can build shared library" "yes" "no" ""
+test_linkso "whether can build shared library" "yes" "no" ""
 if test $pass -eq 0
 then 
 	add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"

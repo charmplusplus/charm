@@ -1680,6 +1680,7 @@ echo "${ECHO_T}\"$4\"" >&6; }
 test_cc() {
         { echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
+	echo "### $1" >> $charmout
 	cat $tc >> $charmout
 	echo $CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $tc -o test.o $4 >> $charmout
 	$CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $tc -o test.o $4 > out 2>&1
@@ -1704,6 +1705,7 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
 test_cxx() {
         { echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
+	echo "### $1" >> $charmout
 	cat $t >> $charmout
 	echo $CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CXX $OPTS_LD -c $t -o test.o $4 >> $charmout
 	$CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CXX $OPTS_LD -c $t -o test.o $4 > out 2>&1
@@ -1728,6 +1730,7 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
 test_link() {
         { echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
+	echo "### $1" >> $charmout
 	cat $t >> $charmout
 	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 >> $charmout
 	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 > out 2>&1
@@ -1761,6 +1764,7 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
 test_linkc() {
         { echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
+	echo "### $1" >> $charmout
 	cat $tc >> $charmout
 	echo $CMK_CC -I../include -I. $CMK_INCDIR $OPTS_CC -c $tc -o test.o $4 >> $charmout
 	$CMK_CC -I../include -I. $CMK_INCDIR $OPTS_CC -c $tc -o test.o $4 > out 2>&1
@@ -1793,6 +1797,7 @@ echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
 test_linkso() {
         { echo "$as_me:$LINENO: checking \"$1\"" >&5
 echo $ECHO_N "checking \"$1\"... $ECHO_C" >&6; }
+	echo $1 >> $charmout
 	cat $t >> $charmout
 	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 >> $charmout
 	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 > out 2>&1
@@ -2421,7 +2426,7 @@ int main() {
   return 0;
 }
 EOT
-test_link "whether it has log2" "yes" "no" ""
+test_link "whether has log2" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_LOG2 $pass
@@ -2436,7 +2441,7 @@ int main() {
   return 0;
 }
 EOT
-test_link "whether it has sqrtf" "yes" "no" ""
+test_link "whether has sqrtf" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_SQRTF $pass
@@ -2454,7 +2459,7 @@ int main() {
   return 0;
 }
 EOT
-test_link "whether it has mkstemp" "yes" "no" ""
+test_link "whether has mkstemp" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_USE_MKSTEMP $pass
@@ -2469,7 +2474,7 @@ int main() {
   return 0;
 }
 EOT
-test_link "whether it has system" "yes" "no" ""
+test_link "whether has system" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_SYSTEM $pass
@@ -2695,7 +2700,7 @@ void foo(void) {
 	socklen_t s=sizeof(i);
 }
 EOT
-test_cxx "whether it has socklen_t" "yes" "no" ""
+test_cxx "whether has socklen_t" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_SOCKLEN $pass
@@ -2808,7 +2813,7 @@ int main() {
   return 0;
 }
 EOT
-test_link "whether it has zlib" "yes" "no" "-lz"
+test_link "whether has zlib" "yes" "no" "-lz"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_PROJECTIONS_USE_ZLIB $pass
@@ -2885,7 +2890,7 @@ int main()
   return 0;
 }
 EOT
-test_link "whether it has libjpeg" "yes" "no" "-ljpeg"
+test_link "whether has libjpeg" "yes" "no" "-ljpeg"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_USE_LIBJPEG $pass
@@ -2954,13 +2959,15 @@ fi
 
 #### test if it can build shared library ####
 cat > $t <<EOT
+#include "stdlib.h"
 extern int foo();
 int foo1() {
+  void * t= malloc(2);
   foo();
   return 0;
 }
 EOT
-test_linkso "whether it can build shared library" "yes" "no" ""
+test_linkso "whether can build shared library" "yes" "no" ""
 if test $pass -eq 0
 then
 	add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
