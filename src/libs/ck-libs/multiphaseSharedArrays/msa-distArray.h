@@ -699,6 +699,7 @@ class MSA3D
 public:
     typedef MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CacheGroup_t;
     typedef CProxy_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_CacheGroup_t;
+    typedef CProxy_MSA_PageArray<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_PageArray_t;
 
     // Sun's C++ compiler doesn't understand that nested classes are
     // members for the sake of access to private data. (2008-10-23)
@@ -902,7 +903,10 @@ public:
     {
         unsigned nEntries = x*y*z;
         unsigned int nPages = (nEntries + ENTRIES_PER_PAGE - 1)/ENTRIES_PER_PAGE;
-        cg = CProxy_CacheGroup_t::ckNew(nPages, maxBytes, nEntries, num_wrkrs);
+        CProxy_PageArray_t pageArray = CProxy_PageArray_t::ckNew(nPages);
+        cg = CProxy_CacheGroup_t::ckNew(nPages, pageArray, maxBytes, nEntries, num_wrkrs);
+        pageArray.setCacheProxy(cg);
+        pageArray.ckSetReductionClient(new CkCallback(CkIndex_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(), cg));
         cache = cg.ckLocalBranch();
     }
 
@@ -912,7 +916,7 @@ public:
         //(cache->getArray()).destroy();
         //cg.destroy();
         // TODO: calling FreeMem does not seem to work. Need to debug it.
-        cache->unroll();
+        //cache->unroll();
         //cache->FreeMem();
     }
 
@@ -937,7 +941,10 @@ public:
 
     inline unsigned int index(unsigned x, unsigned y, unsigned z)
     {
-        return ((x*dim_x) + y) * dim_y + z;
+        CkAssert(x < dim_x);
+        CkAssert(y < dim_y);
+        CkAssert(z < dim_z);
+        return ((x*dim_y) + y) * dim_z + z;
     }
     
     /// Return the page this entry is stored at.
