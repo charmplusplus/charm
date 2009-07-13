@@ -269,7 +269,7 @@ protected:
 private:
   int thisChareType;//My chare type
   void commonInit(void);
-	bool asyncEvacuate;
+  CmiBool asyncEvacuate;
 public:
   CkArrayIndexMax thisIndexMax;
 
@@ -359,9 +359,9 @@ private:
 	/*
 		FAULT_EVAC
 	*/
-	void AsyncEvacuate(CmiBool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
-	public:
-	bool isAsyncEvacuate(){return asyncEvacuate;};
+  void AsyncEvacuate(CmiBool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
+public:
+  bool isAsyncEvacuate(){return asyncEvacuate;};
 };
 
 /** 
