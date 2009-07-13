@@ -493,6 +493,7 @@ protected:
     unsigned int numberOfWorkerThreads;      // number of worker threads across all processors for this shared array
     // @@ migration?
     unsigned int numberLocalWorkerThreads;   // number of worker threads on THIS processor for this shared array
+	unsigned int numberLocalWorkerThreadsActive;
     unsigned int enrollDoneq;                 // has enroll() been done on this processor?
     MSA_Listeners enrollWaiters;
     MSA_Listeners syncWaiters;
@@ -799,7 +800,8 @@ public:
 		  entryOpsObject(new ENTRY_OPS_CLASS),
 		  replacementPolicy(new vmPageReplacementPolicy(nPages, pageTable, pageStateStorage)),
 		  outOfBufferInPrefetch(0), syncAckCount(0),syncThreadCount(0),
-		  resident_pages(0),numberLocalWorkerThreads(0), enrollDoneq(0)
+		  resident_pages(0), numberLocalWorkerThreads(0), 
+		  numberLocalWorkerThreadsActive(0), enrollDoneq(0)
 		{
 			MSADEBPRINT(printf("MSA_CacheGroup nEntries %d \n",nEntries););
 		}
@@ -951,6 +953,7 @@ public:
 			CkAssert(num_workers == numberOfWorkerThreads); // just to verify
 			CkAssert(enrollDoneq == 0);
 			numberLocalWorkerThreads++;
+			numberLocalWorkerThreadsActive++;
 			// @@ how to ensure that enroll is called only once?
 
 			//ckout << "[" << CkMyPe() << "] sending sync ack to PE 0" << endl;
@@ -1003,38 +1006,33 @@ public:
 
 	void SyncRelease()
 		{
-			syncThreadCount++;
+			numberLocalWorkerThreadsActive--;
 
-			MSADEBPRINT(printf("Sync syncThreadCount %d \n",syncThreadCount););
-			if(syncThreadCount < numberLocalWorkerThreads)
+			syncDebug();
+			
+			if(syncThreadCount < numberLocalWorkerThreadsActive)
 			{
 				return;
 			}
 
-			FlushCache();
-			EmptyCache();
+			thisProxy[CkMyPe()].FinishSync();
 		}
 
-    // MSA_CacheGroup::
-    inline void Sync()
+	void syncDebug()
 		{
-			syncThreadCount++;
-			//ckout << "[" << CkMyPe() << "] syncThreadCount = " << syncThreadCount << " " << numberLocalWorkerThreads << endl;
-			//ckout << "[" << CkMyPe() << "] syncThreadCount = " << syncThreadCount << ", registered threads = " << getNumRegisteredThreads()
-			//  << ", number of suspended threads = " << getNumSuspendedThreads() << endl;
+			MSADEBPRINT(printf("Sync  (Total threads: %d, Active: %d, Synced: %d)\n", 
+							   numberLocalWorkerThreads, numberLocalWorkerThreadsActive, syncThreadCount));
+		}
 
-			// First, all threads on this processor need to reach the sync
-			// call; only then can we proceed with merging the data.  Only
-			// the last thread on this processor needs to do the FlushCache,
-			// etc.  Others just suspend until the sync is over.
-			MSADEBPRINT(printf("Sync syncThreadCount %d \n",syncThreadCount););
-			if(syncThreadCount < numberLocalWorkerThreads)
-			{
-				MSADEBPRINT(printf("Sync addAndSuspend \n"););
-				addAndSuspend(syncWaiters);
-				return;
-			}
-		
+	void activate()
+		{
+			numberLocalWorkerThreadsActive++;
+			
+			CkAssert(numberLocalWorkerThreadsActive <= numberLocalWorkerThreads);
+		}
+
+	void FinishSync()
+		{
 			//ckout << "[" << CkMyPe() << "] Sync started" << endl;
 
 			// flush the cache asynchronously and also empty it
@@ -1072,7 +1070,33 @@ public:
 			addAndSuspend(syncWaiters);
 				
 			MSADEBPRINT(printf("Sync all local threads done waking up after addAndSuspend\n"););
-			//ckout << "[" << CkMyPe() << "] Sync finished" << endl;	
+			//ckout << "[" << CkMyPe() << "] Sync finished" << endl;			
+		}
+
+    // MSA_CacheGroup::
+    inline void Sync()
+		{
+			syncThreadCount++;
+			//ckout << "[" << CkMyPe() << "] syncThreadCount = " << syncThreadCount << " " << numberLocalWorkerThreads << endl;
+			//ckout << "[" << CkMyPe() << "] syncThreadCount = " << syncThreadCount << ", registered threads = " << getNumRegisteredThreads()
+			//  << ", number of suspended threads = " << getNumSuspendedThreads() << endl;
+
+			syncDebug();
+
+			// First, all threads on this processor need to reach the sync
+			// call; only then can we proceed with merging the data.  Only
+			// the last thread on this processor needs to do the FlushCache,
+			// etc.  Others just suspend until the sync is over.
+			MSADEBPRINT(printf("Sync  (Total threads: %d, Active: %d, Synced: %d)\n", 
+							   numberLocalWorkerThreads, numberLocalWorkerThreadsActive, syncThreadCount));
+			if(syncThreadCount < numberLocalWorkerThreadsActive)
+			{
+				MSADEBPRINT(printf("Sync addAndSuspend\n"));
+				addAndSuspend(syncWaiters);
+				return;
+			}
+
+			FinishSync();
 		}
 
     inline unsigned int getNumEntries() { return nEntries; }

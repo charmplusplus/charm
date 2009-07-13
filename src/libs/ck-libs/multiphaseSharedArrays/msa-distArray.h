@@ -899,7 +899,7 @@ public:
     */
     inline MSA3D(unsigned x, unsigned y, unsigned z, unsigned int num_wrkrs, 
                  unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES)
-        : dim_x(x), dim_y(y), dim_z(z), initHandleGiven(false)
+        : dim_x(x), dim_y(y), dim_z(z), initHandleGiven(false), active(false)
     {
         unsigned nEntries = x*y*z;
         unsigned int nPages = (nEntries + ENTRIES_PER_PAGE - 1)/ENTRIES_PER_PAGE;
@@ -974,6 +974,7 @@ public:
         //
         // @@ What if a MSA3D thread migrates?
         cache->enroll(num_workers);
+        active = true;
     }
 
     // idx is the element to be read/written
@@ -1030,11 +1031,17 @@ public:
 
     static const int DEFAULT_SYNC_SINGLE = 0;
 
+    bool active;
+    
     inline void syncRelease(Handle &m)
     {
         m.checkInvalidate(this);
         delete &m;
-        cache->SyncRelease();
+        if (active)
+            cache->SyncRelease();
+        else
+            CmiAbort("sync from an inactive thread!\n");
+        active = false;
     }
 
     inline Read &syncToRead(Handle &m, int single = DEFAULT_SYNC_SINGLE)
@@ -1144,6 +1151,9 @@ protected:
     /// Synchronize reads and writes across the entire array.
     inline void sync(int single=0)
     {
+        if (!active)
+            cache->activate();
+        active = true;
         cache->SyncReq(single); 
     }
 };
