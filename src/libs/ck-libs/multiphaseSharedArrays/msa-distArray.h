@@ -822,15 +822,15 @@ public:
             : Handle(msa_) { }
         using Handle::checkInvalidate;
     public:
-        inline Accumulable<ENTRY, ENTRY_OPS_CLASS> accumulate(unsigned int idx)
-        { 
-            Handle::checkValid();
-            return Accumulable<ENTRY, ENTRY_OPS_CLASS>(Handle::msa.accumulate(idx));
-        }
-        inline void accumulate(unsigned int idx, const ENTRY& ent)
+        inline Accumulable<ENTRY, ENTRY_OPS_CLASS> accumulate(unsigned int x, unsigned int y, unsigned int z)
         {
             Handle::checkValid();
-            Handle::msa.accumulate(idx, ent);
+            return Accumulable<ENTRY, ENTRY_OPS_CLASS>(Handle::msa.accumulate(x,y,z));
+        }
+        inline void accumulate(unsigned int x, unsigned int y, unsigned int z, const ENTRY& ent)
+        {
+            Handle::checkValid();
+            Handle::msa.accumulate(x,y,z, ent);
         }
 
         void accumulate(unsigned x1, unsigned y1, unsigned z1, unsigned x2, unsigned y2, unsigned z2, const ENTRY *buf)
@@ -848,8 +848,8 @@ public:
                         Handle::msa.accumulate(ix, iy, iz, buf[i++]);
         }
 
-        inline Accumulable<ENTRY, ENTRY_OPS_CLASS> operator() (unsigned int idx)
-            { return accumulate(idx); }
+        inline Accumulable<ENTRY, ENTRY_OPS_CLASS> operator() (unsigned int x, unsigned int y, unsigned int z)
+            { return accumulate(x,y,z); }
     };
 
 protected:
