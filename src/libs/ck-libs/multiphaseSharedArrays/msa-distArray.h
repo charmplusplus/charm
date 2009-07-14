@@ -837,14 +837,14 @@ public:
         {
             Handle::checkValid();
 
-            unsigned ix = min(x1, x2), mx = max(x1, x2);
-            unsigned iy = min(y1, y2), my = max(y1, y2);
-            unsigned iz = min(z1, z2), mz = max(z1, z2);
+            unsigned mx = max(x1, x2);
+            unsigned my = max(y1, y2);
+            unsigned mz = max(z1, z2);
             unsigned i = 0;
 
-            for (; ix < mx; ++ix)
-                for (; iy < my; ++iy)
-                    for (; iz < mz; ++iz)
+            for (unsigned ix = min(x1, x2); ix <= mx; ++ix)
+                for (unsigned iy = min(y1, y2); iy <= my; ++iy)
+                    for (unsigned iz = min(z1, z2); iz <= mz; ++iz)
                         Handle::msa.accumulate(ix, iy, iz, buf[i++]);
         }
 
@@ -1144,8 +1144,7 @@ protected:
     ///   Merges together accumulates from different threads.
     inline void accumulate(unsigned x, unsigned y, unsigned z, const ENTRY& ent)
     {
-        unsigned int idx = index(x,y,z);
-        ENTRY_OPS_CLASS::accumulate(accumulate(idx),ent);
+        ENTRY_OPS_CLASS::accumulate(accumulate(x,y,z),ent);
     }
 
     /// Synchronize reads and writes across the entire array.
