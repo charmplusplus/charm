@@ -836,15 +836,15 @@ public:
         void accumulate(unsigned x1, unsigned y1, unsigned z1, unsigned x2, unsigned y2, unsigned z2, const ENTRY *buf)
         {
             Handle::checkValid();
+            CkAssert(x1 <= x2);
+            CkAssert(y1 <= y2);
+            CkAssert(z1 <= z2);
 
-            unsigned mx = max(x1, x2);
-            unsigned my = max(y1, y2);
-            unsigned mz = max(z1, z2);
             unsigned i = 0;
 
-            for (unsigned ix = min(x1, x2); ix <= mx; ++ix)
-                for (unsigned iy = min(y1, y2); iy <= my; ++iy)
-                    for (unsigned iz = min(z1, z2); iz <= mz; ++iz)
+            for (unsigned ix = x1; ix <= x2; ++ix)
+                for (unsigned iy = y1; iy <= y2; ++iy)
+                    for (unsigned iz = z1; iz <= z2; ++iz)
                         Handle::msa.accumulate(ix, iy, iz, buf[i++]);
         }
 
