@@ -361,7 +361,7 @@ private:
 	*/
   void AsyncEvacuate(CmiBool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
 public:
-  bool isAsyncEvacuate(){return asyncEvacuate;};
+  CmiBool isAsyncEvacuate(){return asyncEvacuate;};
 };
 
 /** 
