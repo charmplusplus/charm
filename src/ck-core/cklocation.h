@@ -552,6 +552,11 @@ public:
 	void doneInserting(void);
 	void startInserting(void);
 
+	// How many elements of each associated array are local to this PE?
+	// If this returns n, and there are k associated arrays, that
+	// means k*n elements are living here
+	unsigned int numLocalElements();
+
 //Advisories:
 	///This index now lives on the given processor-- update local records
 	void inform(const CkArrayIndex &idx,int nowOnPe);

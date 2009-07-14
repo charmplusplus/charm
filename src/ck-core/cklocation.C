@@ -2725,6 +2725,22 @@ CkLocRec *CkLocMgr::elementNrec(const CkArrayIndex &idx) {
 	return hash.get(*(CkArrayIndexMax *)&idx);
 }
 
+struct LocalElementCounter :  public CkLocIterator
+{
+    unsigned int count;
+    LocalElementCounter() : count(0) {}
+    void addLocation(CkLocation &loc)
+	{ ++count; }
+};
+
+unsigned int CkLocMgr::numLocalElements()
+{
+    LocalElementCounter c;
+    iterate(c);
+    return c.count;
+}
+
+
 /********************* LocMgr: LOAD BALANCE ****************/
 
 #if !CMK_LBDB_ON

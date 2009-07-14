@@ -351,6 +351,7 @@ public:
 	CkArray *ckLocalBranch(void) const { return _aid.ckLocalBranch(); }
 	CkLocMgr *ckLocMgr(void) const;
 	inline operator CkArrayID () const {return ckGetArrayID();}
+	unsigned int numLocalElements() const { return ckLocMgr()->numLocalElements(); }
 
 	void doneInserting(void);
 
