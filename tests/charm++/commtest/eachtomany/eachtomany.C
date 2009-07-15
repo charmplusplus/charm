@@ -162,7 +162,7 @@ public:
     testProxy1.test1(iter1); CkPrintf("Running test 1\n"); numtests++;
     testProxy2src.test2(iter2); CkPrintf("Running test 2\n"); numtests++;
     testProxy3.test3(iter3);  CkPrintf("Running test 3\n"); numtests++;
-    //testProxy4src.test4(iter4); CkPrintf("Running test 4\n"); numtests++;
+    testProxy4src.test4(iter4); CkPrintf("Running test 4\n"); numtests++;
   }
 
   

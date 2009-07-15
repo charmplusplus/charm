@@ -6,6 +6,6 @@ $i = 0;
 while(1){
   $i++;
   print "starting run $i\n";
-  `./charmrun  ./eachtomany +p5 > log`;
-  
+  `time ./charmrun  ./eachtomany +p5 > log`;
+  print "\n";
 }
