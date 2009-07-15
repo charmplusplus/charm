@@ -1257,7 +1257,7 @@ CLBStatsMsg::CLBStatsMsg(int osz, int csz) {
 CLBStatsMsg::~CLBStatsMsg() {
   delete [] objData;
   delete [] commData;
-  if (avail_vector) delete [] avail_vector;
+  if (avail_vector!=NULL) delete [] avail_vector;
 }
 
 void CLBStatsMsg::pup(PUP::er &p) {
