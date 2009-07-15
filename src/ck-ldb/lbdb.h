@@ -44,7 +44,6 @@ typedef int LDHandle;
 
 typedef struct _LDOMid {
   CkGroupID id;
-#ifdef __cplusplus
   CmiBool operator==(const struct _LDOMid& omId) const {
     return id == omId.id?CmiTrue:CmiFalse;
   }
@@ -52,7 +51,6 @@ typedef struct _LDOMid {
     return id == omId.id?CmiFalse:CmiTrue;
   }
   inline void pup(PUP::er &p);
-#endif
 } LDOMid;
 
 typedef struct {
@@ -60,20 +58,16 @@ typedef struct {
 //  void *user_ptr;
   LDOMid id;
   int handle;		// index to LBOM
-#ifdef __cplusplus
   inline void pup(PUP::er &p);
-#endif
 } LDOMHandle;
 
 typedef struct _LDObjid {
   int id[OBJ_ID_SZ];
-#ifdef __cplusplus
   CmiBool operator==(const struct _LDObjid& objid) const {
     for (int i=0; i<OBJ_ID_SZ; i++) if (id[i] != objid.id[i]) return CmiFalse;
     return CmiTrue;
   }
   inline void pup(PUP::er &p);
-#endif
 } LDObjid;
 
 /* LDObjKey uniquely identify one object */
@@ -81,7 +75,6 @@ typedef struct _LDObjKey {
   LDOMid omId;
   LDObjid objId;
 public:
-#ifdef __cplusplus
   CmiBool operator==(const _LDObjKey& obj) const {
     return (CmiBool)(omId == obj.omId && objId == obj.objId);
   }
@@ -90,7 +83,6 @@ public:
   inline const LDOMid &omID() const { return omId; }
   inline const LDObjid &objID() const { return objId; }
   inline void pup(PUP::er &p);
-#endif
 } LDObjKey;
 
 typedef int LDObjIndex;
@@ -100,11 +92,9 @@ typedef struct {
   LDOMHandle omhandle;
   LDObjid id;
   LDObjIndex  handle;
-#ifdef __cplusplus
   inline const LDOMid &omID() const { return omhandle.id; }
   inline const LDObjid &objID() const { return id; }
   inline void pup(PUP::er &p);
-#endif
 } LDObjHandle;
 
 typedef struct {
@@ -116,13 +106,11 @@ typedef struct {
 #endif
   CmiBool migratable;
   CmiBool asyncArrival;
-#ifdef __cplusplus
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
   inline const LDOMid &omID() const { return handle.omhandle.id; }
   inline const LDObjid &objID() const { return handle.id; }
   inline const LDObjid &id() const { return handle.id; }
   inline void pup(PUP::er &p);
-#endif
 } LDObjData;
 
 /* used by load balancer */
@@ -131,9 +119,7 @@ typedef struct {
   LDObjData data;
   int from_proc;
   int to_proc;
-#ifdef __cplusplus
   inline void pup(PUP::er &p);
-#endif
 } LDObjStats;
 
 #define LD_PROC_MSG      1
@@ -153,7 +139,6 @@ typedef struct _LDCommDesc {
       int len;
     } destObjs;			/* 3:   one to many message     */
   } dest;
-#ifdef __cplusplus
   char &get_type() { return type; }
   char get_type() const { return type; }
   int proc() const { return type==LD_PROC_MSG?dest.destProc:-1; }
@@ -187,7 +172,6 @@ typedef struct _LDCommDesc {
   inline CmiBool operator==(const _LDCommDesc &obj) const;
   inline _LDCommDesc &operator=(const _LDCommDesc &c);
   inline void pup(PUP::er &p);
-#endif
 } LDCommDesc;
 
 typedef struct {
@@ -197,12 +181,10 @@ typedef struct {
   int  sendHash, recvHash;
   int messages;
   int bytes;
-#ifdef __cplusplus
   inline int from_proc() const { return (src_proc != -1); }
   inline int recv_type() const { return receiver.get_type(); }
   inline void pup(PUP::er &p);
   inline void clearHash() { sendHash = recvHash = -1; }
-#endif
 } LDCommData;
 
 /*
@@ -346,8 +328,6 @@ int LDMemusage(LDHandle _db);
 }
 #endif /* _cplusplus */
 
-#ifdef __cplusplus
-
 #if CMK_LBDB_ON
 PUPbytes(LDHandle)
 #endif
@@ -468,7 +448,6 @@ inline void LDCommData::pup(PUP::er &p) {
     }
 }
 PUPmarshall(LDCommData)
-#endif
 
 #endif /* LBDBH_H */
 
