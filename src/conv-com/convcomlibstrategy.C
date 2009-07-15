@@ -98,7 +98,7 @@ StrategyTableEntry::StrategyTableEntry() {
     isReady = 0;
     // WARNING: This constructor is called before CkMyPe() returns the correct results
     errorMode = NORMAL_MODE;
-    errorModeServer = STARTUP_MODE_SERVER; 
+    errorModeServer = NORMAL_MODE_SERVER; 
     discoveryMode = NORMAL_DISCOVERY_MODE;
     bracketedSetupFinished = 0;
 
@@ -150,21 +150,23 @@ const char *StrategyTableEntry::errorModeString(){
 
 
 const char *StrategyTableEntry::errorModeServerString(){
-  switch(errorModeServer) {
-  case STARTUP_MODE_SERVER:
-    return "STARTUP_MODE_SERVER    ";
-  case NORMAL_MODE_SERVER:
-    return "NORMAL_MODE_SERVER     ";
-  case ERROR_MODE_SERVER:
-    return "ERROR_MODE_SERVER      ";
-  case CONFIRM_MODE_SERVER:
-    return "CONFIRM_MODE_SERVER    ";
-  case ERROR_FIXED_MODE_SERVER:
-    return "ERROR_FIXED_MODE_SERVER";
-  case NON_SERVER_MODE_SERVER:
-    return "NON_SERVER_MODE_SERVER ";
-  default:
-    return "Unknown Server Error Mode";
+  if(CkMyPe() == 0){
+    switch(errorModeServer) {
+    case NORMAL_MODE_SERVER:
+      return "NORMAL_MODE_SERVER     ";
+    case ERROR_MODE_SERVER:
+      return "ERROR_MODE_SERVER      ";
+    case CONFIRM_MODE_SERVER:
+      return "CONFIRM_MODE_SERVER    ";
+    case ERROR_FIXED_MODE_SERVER:
+      return "ERROR_FIXED_MODE_SERVER";
+    case NON_SERVER_MODE_SERVER:
+      return "NON_SERVER_MODE_SERVER ";
+    default:
+      return "Unknown Server Error Mode";
+    }
+  } else {
+    return "";
   }
 }
 

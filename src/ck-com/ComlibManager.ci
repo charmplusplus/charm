@@ -19,14 +19,14 @@ module comlib {
     entry void bracketedStartErrorRecoveryProcess(int instid, int step);	 
     entry void bracketedErrorDetected(int instid, int step);
     entry void bracketedReceiveCount(int instid, int pe, int count, int isFirst, int step);
-    entry void bracketedConfirmCount(int instid);
+    entry void bracketedConfirmCount(int instid, int step);
     entry void bracketedCountConfirmed(int instid, int count, int step);
-    entry void bracketedReceiveNewCount(int instid);
+    entry void bracketedReceiveNewCount(int instid, int step);
     entry void bracketedDiscover(int instid, CkArrayID aid, CkArrayIndexMax &idx, int isSrc);
     entry void bracketedContributeDiscovery(int instid, int pe, int nsrc, int ndest, int step);
-    entry void bracketedReceiveNewPeList(int instid, int count[CkNumPes()]);
-    entry void bracketedReleaseCount(int instid);
-    entry void bracketedReleaseBufferedMessages(int instid);
+    entry void bracketedReceiveNewPeList(int instid, int step, int count[CkNumPes()]);
+    entry void bracketedReleaseCount(int instid, int step);
+    entry void bracketedReleaseBufferedMessages(int instid, int step);
 
     entry void collectStats(ComlibLocalStats s, int src);
   }

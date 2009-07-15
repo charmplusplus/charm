@@ -285,18 +285,17 @@ class ComlibArrayInfo {
   
     /// Switch to using the new destination and source lists if the previous iteration found an error and constructed the new list
     void useNewSourceAndDestinations() {
-      if(new_dest_elements.size() > 0) {
-	dest_elements.removeAll();
-	dest_elements = new_dest_elements;
-	CkAssert(dest_elements.size() == new_dest_elements.size());
-	new_dest_elements.removeAll();
-      }
-      if(new_src_elements.size() > 0) {
-	src_elements.removeAll();
-	src_elements = new_src_elements;
-	CkAssert(src_elements.size() == new_src_elements.size());
-	new_src_elements.removeAll();
-      }
+      ComlibPrintf("[%d] useNewSourceAndDestinations previously had %d elements, now have %d elements\n", CkMyPe(), dest_elements.size(), new_src_elements.size() );
+      dest_elements.removeAll();
+      dest_elements = new_dest_elements;
+      CkAssert(dest_elements.size() == new_dest_elements.size());
+      new_dest_elements.removeAll();
+      src_elements.removeAll();
+      src_elements = new_src_elements;
+      CkAssert(src_elements.size() == new_src_elements.size());
+      new_src_elements.removeAll();
+      if(com_debug)
+	printDestElementList();
     }
 
     int newDestinationListSize(){ return new_dest_elements.size(); }

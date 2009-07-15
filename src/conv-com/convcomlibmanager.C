@@ -55,7 +55,9 @@ void *strategyHandler(void *msg) {
     return NULL;
 }
 
-/* Strategies synchronization process:
+/** @file
+ * 
+ *  Strategies synchronization process:
  *
  * 1) the strategies are inserted on processor 0 (and possibly in other
  *    processors with the same order. The strategies are marked as "new"

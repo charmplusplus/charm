@@ -33,7 +33,7 @@ EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy,
 	//ginfo.getDestinationGroup(gid, destpelist, ndestpes);
 	//ginfo.getCombinedPeList(pelist, npes);
 
-	commonInit(ginfo.getCombinedCountList());
+	commonInit(ginfo.getCombinedCountList()); // The array returned by getCombinedCountList is deleted inside commonInit
 }
 
 //Array Constructor

@@ -185,7 +185,7 @@ void ComlibManager::resumeFromSetupBarrier(){
 ***************************************************************************/
 bool ComlibManager::shouldBufferMessagesNow(int instid){
   StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
-  return (!setupComplete) || myEntry->errorMode == ERROR_MODE || myEntry->errorMode == CONFIRM_MODE || myEntry->bufferOutgoing;
+  return (!setupComplete) || myEntry->getErrorMode() == ERROR_MODE || myEntry->getErrorMode() == CONFIRM_MODE || myEntry->bufferOutgoing;
 }
 
 
@@ -204,16 +204,16 @@ void ComlibManager::sendBufferedMessagesAllStrategies(){
    Send all the buffered messages once startup has completed, and we have 
    recovered from all errors.
 ***************************************************************************/
-void ComlibManager::sendBufferedMessages(int instid){
+void ComlibManager::sendBufferedMessages(int instid, int step){
   StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
   
   if(shouldBufferMessagesNow(instid)){
-    ComlibManagerPrintf("[%d] sendBufferedMessages is not flushing buffered messages for strategy %d because shouldBufferMessagesNow()==true\n", CkMyPe(), instid);  
+    ComlibPrintf("[%d] sendBufferedMessages is not flushing buffered messages for strategy %d because shouldBufferMessagesNow()==true step %d\n", CkMyPe(), instid, step);  
   } else if(delayMessageSendBuffer[instid].size() == 0){
-    ComlibManagerPrintf("[%d] sendBufferedMessages: no bufferedmessages to send for strategy %d\n", CkMyPe(), instid);  
+    ComlibPrintf("[%d] sendBufferedMessages: no bufferedmessages to send for strategy %d step %d\n", CkMyPe(), instid, step);  
   } else{
-    ComlibManagerPrintf("[%d] sendBufferedMessages Sending %d buffered messages for instid=%d\n", CkMyPe(), delayMessageSendBuffer[instid].size(), instid);
-
+    ComlibPrintf("[%d] sendBufferedMessages Sending %d buffered messages for instid=%d step %d\n", CkMyPe(), delayMessageSendBuffer[instid].size(), instid, step);
+ 
     for (std::set<CharmMessageHolder*>::iterator iter = delayMessageSendBuffer[instid].begin(); iter != delayMessageSendBuffer[instid].end(); ++iter) {
       CharmMessageHolder* cmsg = *iter;
 	  
@@ -266,52 +266,26 @@ void ComlibManager::beginIteration(int instid, int iteration){
 			    
 	ComlibManagerPrintf("[%d] beginIteration iter=%d lastKnownIteration=%d  %s %s %s\n", CkMyPe(), iteration, myEntry->lastKnownIteration, myEntry->errorModeString(),  myEntry->errorModeServerString(),  myEntry->discoveryModeString() );
 
-
+	CkAssert(myEntry->getErrorMode() == NORMAL_MODE || myEntry->getErrorMode() == ERROR_MODE);
+	if(CkMyPe()==0)
+	  CkAssert(myEntry->getErrorModeServer() == NORMAL_MODE_SERVER ||  myEntry->getErrorModeServer() == ERROR_MODE_SERVER);
 
 	if(iteration > myEntry->lastKnownIteration){
 	      ComlibManagerPrintf("[%d] beginIteration Starting Next Iteration ( # %d )\n", CkMyPe(), iteration);
-
-	      // Verify & update errorModeServer:
-	      if(CkMyPe()==0){
-		CkAssert(myEntry->errorModeServer == NORMAL_MODE_SERVER || 
-			 myEntry->errorModeServer == STARTUP_MODE_SERVER ||  
-			 myEntry->errorModeServer == ERROR_FIXED_MODE_SERVER);
-		myEntry->errorModeServer = NORMAL_MODE_SERVER;
-	      } else {
-		CkAssert(myEntry->errorModeServer == NON_SERVER_MODE_SERVER || 
-			 myEntry->errorModeServer == STARTUP_MODE_SERVER);
-		myEntry->errorModeServer = NON_SERVER_MODE_SERVER;
-	      }
-	      // Verify & update errorMode:
-	      CkAssert(myEntry->errorMode == ERROR_FIXED_MODE || myEntry->errorMode == NORMAL_MODE  );
-	      myEntry->errorMode = NORMAL_MODE;   
-	      
-	      ComlibArrayInfo *myInfo = &dynamic_cast<CharmStrategy*>(myEntry->strategy)->ainfo;
-
-	      if(myEntry->lastKnownIteration == STARTUP_ITERATION){
-		// At this point, myEntry->numElements == 0
-		// An error will be detected below, so messages will be buffered.
-		// Since this is startup, bracketedStartErrorRecoveryProcess 
-		// will wait until the comlib layer is setup before continuing
-	      } else {
-		// switch to using the newly updated source and destination lists (describing which objects are local to a PE)
-		// This must be done here because the list can only be updated once all sends 
-		// have completed from the iteration during which the error was detected.
-		myInfo->useNewSourceAndDestinations();	
-	      }
-
 
 	      myEntry->lastKnownIteration = iteration;
 	      myEntry->nBeginItr = 1; // we are the first time to be called this iteration
 	      myEntry->nEndItr = 0;
 	      myEntry->nProcSync = 0;
 	      myEntry->totalEndCounted = 0;
-	      myEntry->discoveryMode = NORMAL_DISCOVERY_MODE;
 	      myEntry->nEndSaved = 0;
 	      	      
-	} else {
+	} else if(iteration == myEntry->lastKnownIteration){
 		ComlibManagerPrintf("[%d] beginIteration continuing iteration # %d\n", CkMyPe(), iteration);
 		myEntry->nBeginItr++;
+	} else {
+	  CkPrintf("[%d] ERROR: ComlibManager::beginIteration iteration=%d < myEntry->lastKnownIteration=%d", iteration, myEntry->lastKnownIteration);
+	  CkAbort("[%d] ERROR: ComlibManager::beginIteration iteration < myEntry->lastKnownIteration");
 	}
 	
 	
@@ -345,6 +319,9 @@ void ComlibManager::endIteration(int instid, int step){
 	CkAssert(myEntry->nEndItr <= myEntry->nBeginItr);
 	CkAssert(step == myEntry->lastKnownIteration);
 
+	CkAssert(myEntry->getErrorMode() == NORMAL_MODE || myEntry->getErrorMode() == ERROR_MODE);
+	if(CkMyPe()==0)
+	  CkAssert(myEntry->getErrorModeServer() == NORMAL_MODE_SERVER ||  myEntry->getErrorModeServer() == ERROR_MODE_SERVER);
 
 	myEntry->nEndItr++;
 	
@@ -376,25 +353,25 @@ void ComlibManager::endIteration(int instid, int step){
 void ComlibManager::bracketedStartErrorRecoveryProcess(int instid, int step){  
   CProxy_ComlibManager myProxy(thisgroup);
   StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);     
+  CkAssert(step >= myEntry->lastKnownIteration);
 
-  
 
   if(converseManager->isReady(instid)){
     ComlibManagerPrintf("[%d] bracketedStartErrorRecoveryProcess(instid=%d step=%d) %s %s %s\n", CkMyPe(), instid, step, myEntry->errorModeString(),  myEntry->errorModeServerString(),  myEntry->discoveryModeString() );
 
     CkAssert(myEntry->strategy != NULL);
-    CkAssert(myEntry->errorMode == NORMAL_MODE || myEntry->errorMode == ERROR_MODE);
+    CkAssert(myEntry->getErrorMode() == NORMAL_MODE || myEntry->getErrorMode() == ERROR_MODE);
 	  
     if (!myEntry->strategy->isBracketed()) {
       CkPrintf("[%d] endIteration called unecessarily for a non-bracketed strategy\n", CkMyPe());
       return;
     }
        
-    if (myEntry->errorMode == NORMAL_MODE) {
+    if (myEntry->getErrorMode() == NORMAL_MODE) {
       ComlibManagerPrintf("[%d] bracketedStartErrorRecoveryProcess()\n", CkMyPe());
       myEntry->nEndSaved = myEntry->nEndItr;
       myProxy[0].bracketedReceiveCount(instid, CkMyPe(), myEntry->nEndSaved, 1, step);
-      myEntry->errorMode = ERROR_MODE;
+      myEntry->setErrorMode(ERROR_MODE);
       bracketedStartDiscovery(instid);
     } else {
       // Send the updated count
@@ -421,17 +398,17 @@ void ComlibManager::bracketedErrorDetected(int instid, int step) {
 	
 	bracketedCatchUpPE(instid,step);
 	CkAssert(step == myEntry->lastKnownIteration);
-	CkAssert(myEntry->errorMode == NORMAL_MODE || myEntry->errorMode == ERROR_MODE);
+	CkAssert(myEntry->getErrorMode() == NORMAL_MODE || myEntry->getErrorMode() == ERROR_MODE);
 
 	ComlibManagerPrintf("[%d] bracketedErrorDetected()\n", CkMyPe());
 
-	if (myEntry->errorMode == NORMAL_MODE) {
+	if (myEntry->getErrorMode() == NORMAL_MODE) {
 	  // save the value we are sending to bracketedReceiveCount
 	  myEntry->nEndSaved = myEntry->nEndItr; // save the value we are sending to bracketedReceiveCount
 	  CProxy_ComlibManager myProxy(thisgroup);
 	  myProxy[0].bracketedReceiveCount(instid, CkMyPe(), myEntry->nEndSaved, 1, step);
 	  bracketedStartDiscovery(instid);
-	  myEntry->errorMode = ERROR_MODE;
+	  myEntry->setErrorMode(ERROR_MODE);
 
 	} else { // ERROR_MODE
 	  // If we have an update count, send it
@@ -449,13 +426,13 @@ void ComlibManager::bracketedErrorDetected(int instid, int step) {
 
 /// Invoked on all processors. After processor 0 has a count match, it sends out
 /// a broadcast on this entry method to get a confirmation from all others.
-void ComlibManager::bracketedConfirmCount(int instid) {
+void ComlibManager::bracketedConfirmCount(int instid, int step) {
         StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
-	CkAssert(myEntry->errorMode == ERROR_MODE);
-	myEntry->errorMode = CONFIRM_MODE;
+	CkAssert(myEntry->getErrorMode() == ERROR_MODE);
+	myEntry->setErrorMode(CONFIRM_MODE);
 	CProxy_ComlibManager myProxy(thisgroup);
 	ComlibManagerPrintf("[%d] bracketedConfirmCount\n", CkMyPe());
-	myProxy[0].bracketedCountConfirmed(instid, myEntry->nEndSaved, myEntry->lastKnownIteration);
+	myProxy[0].bracketedCountConfirmed(instid, myEntry->nEndSaved, step);
 }
 
 /// Invoked on processor 0 upon a request to confirm the count. If the count is
@@ -466,7 +443,7 @@ void ComlibManager::bracketedCountConfirmed(int instid, int count, int step) {
 	CkAssert(CkMyPe() == 0);
 	// Advance PE0 to current step if we had no local objects
 	bracketedCatchUpPE(instid, step);
-	CkAssert(myEntry->errorModeServer == CONFIRM_MODE_SERVER);
+	CkAssert(myEntry->getErrorModeServer() == CONFIRM_MODE_SERVER);
 	CkAssert(step == myEntry->lastKnownIteration);
 
 	myEntry->total += count;
@@ -478,10 +455,10 @@ void ComlibManager::bracketedCountConfirmed(int instid, int count, int step) {
 
 		CkAssert(myEntry->total == myEntry->totalEndCounted);
 		  
-		CProxy_ComlibManager(thisgroup).bracketedReceiveNewCount(instid);
-		myEntry->errorModeServer = ERROR_FIXED_MODE_SERVER;
+		CProxy_ComlibManager(thisgroup).bracketedReceiveNewCount(instid, step);
+		myEntry->setErrorModeServer(ERROR_FIXED_MODE_SERVER);
 		  
-		myEntry->total = 0;	
+		myEntry->total = 0;
 	}
 
 }
@@ -505,18 +482,13 @@ void ComlibManager::bracketedCatchUpPE(int instid, int step){
     myEntry->nProcSync = 0;
     myEntry->totalEndCounted = 0;
     myEntry->nEndSaved = 0;
-    myEntry->errorMode = NORMAL_MODE;
-    myEntry->discoveryMode = NORMAL_DISCOVERY_MODE;
+    myEntry->setErrorMode(NORMAL_MODE);
+    myEntry->setDiscoveryMode(NORMAL_DISCOVERY_MODE);
 
     if(CkMyPe()==0){
-      CkAssert(myEntry->errorModeServer == NORMAL_MODE_SERVER || myEntry->errorModeServer == ERROR_FIXED_MODE_SERVER);
-      ComlibManagerPrintf("[%d] NORMAL_MODE_SERVER *******************AAAAAAAAAAAA**********************\n", CkMyPe());
-      myEntry->errorModeServer = NORMAL_MODE_SERVER;
-    } else {
-      CkAssert(myEntry->errorModeServer == NON_SERVER_MODE_SERVER || myEntry->errorModeServer == STARTUP_MODE_SERVER);
-      myEntry->errorModeServer == NON_SERVER_MODE_SERVER;
-    }
-    
+      CkAssert(myEntry->getErrorModeServer() == NORMAL_MODE_SERVER || myEntry->getErrorModeServer() == ERROR_FIXED_MODE_SERVER);
+      myEntry->setErrorModeServer(NORMAL_MODE_SERVER);
+    }    
     
   }
 }
@@ -532,11 +504,12 @@ void ComlibManager::bracketedCatchUpPE(int instid, int step){
 /// be called there.
 void ComlibManager::bracketedReceiveCount(int instid, int pe, int count, int isFirst, int step) {
 	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+	ComlibPrintf("[%d] bracketedReceiveCount begins step=%d lastKnownIteration=%d totalEndCounted=%d count=%d\n", CkMyPe(), step, myEntry->lastKnownIteration, myEntry->totalEndCounted, count);
+	CkAssert(step >= myEntry->lastKnownIteration);
+
 	CkAssert(CkMyPe() == 0);
-	CkAssert(myEntry->errorModeServer == NORMAL_MODE_SERVER || myEntry->errorModeServer == ERROR_MODE_SERVER );
-
-	ComlibManagerPrintf("[%d] bracketedReceiveCount step=%d \n", CkMyPe(), step);
-
+	CkAssert(myEntry->getErrorModeServer() == NORMAL_MODE_SERVER || myEntry->getErrorModeServer() == ERROR_MODE_SERVER );
+	
 	
 	// Advance PE0 to current step if we had no local objects
 	bracketedCatchUpPE(instid, step);
@@ -546,31 +519,31 @@ void ComlibManager::bracketedReceiveCount(int instid, int pe, int count, int isF
 
 	myEntry->totalEndCounted += count;
 
-	ComlibManagerPrintf("[%d] bracketedReceiveCount step=%d totalEndCounted=%d count=%d\n", CkMyPe(), step, myEntry->totalEndCounted, count);
 
 	
 	myEntry->nProcSync += isFirst; // isFirst is 1 the first time a processor send a message,
 	CkAssert(myEntry->nProcSync <= CkNumPes());
 	
-	if (myEntry->errorModeServer == NORMAL_MODE_SERVER) { 
+	if (myEntry->getErrorModeServer() == NORMAL_MODE_SERVER) { 
 	        // first time this is called
 	        CkAssert(myEntry->nProcSync == 1);
 	        CProxy_ComlibManager(thisgroup).bracketedErrorDetected(instid, step);
-		myEntry->errorModeServer = ERROR_MODE_SERVER;
+		myEntry->setErrorModeServer(ERROR_MODE_SERVER);
 		ComlibManagerPrintf("[%d] bracketedReceiveCount first time\n", CkMyPe());
-	} else { // ERROR_MODE
-	
-	  CharmStrategy* s = dynamic_cast<CharmStrategy*>(myEntry->strategy);
-	  ComlibArrayInfo ainfo = s->ainfo;
-	  int totalsrc =  ainfo.getTotalSrc() ;
+	}
+
+
+
+	CharmStrategy* s = dynamic_cast<CharmStrategy*>(myEntry->strategy);
+	ComlibArrayInfo ainfo = s->ainfo;
+	int totalsrc =  ainfo.getTotalSrc() ;
 	  
-	  if(myEntry->nProcSync == CkNumPes() && myEntry->totalEndCounted == totalsrc) {
-	    // ok, we received notifications from all PEs and all objects have called endIteration
-	    myEntry->errorModeServer = CONFIRM_MODE_SERVER; 
-	    ComlibManagerPrintf("[%d] bracketedReceiveCount errorModeServer is now CONFIRM_MODE calling bracketedConfirmCount totalsrc=%d\n", CkMyPe(), (int)totalsrc);
-	    CProxy_ComlibManager(thisgroup).bracketedConfirmCount(instid);
+	if(myEntry->nProcSync == CkNumPes() && myEntry->totalEndCounted == totalsrc) {
+	  // ok, we received notifications from all PEs and all objects have called endIteration
+	  myEntry->setErrorModeServer(CONFIRM_MODE_SERVER); 
+	  ComlibManagerPrintf("[%d] bracketedReceiveCount errorModeServer is now CONFIRM_MODE calling bracketedConfirmCount totalsrc=%d\n", CkMyPe(), (int)totalsrc);
+	  CProxy_ComlibManager(thisgroup).bracketedConfirmCount(instid, step);
 			
-	  }
 	}
 		
 }
@@ -580,18 +553,18 @@ void ComlibManager::bracketedReceiveCount(int instid, int pe, int count, int isF
 /// the number of emements involved in the bracketed operation, processor 0
 /// sends a broadcast to acknowledge the success. 
 /// The strategy is disabled until a new Pe list is received.
-void ComlibManager::bracketedReceiveNewCount(int instid) {
+void ComlibManager::bracketedReceiveNewCount(int instid, int step) {
 	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
-	CkAssert(myEntry->errorMode == CONFIRM_MODE);
+	CkAssert(myEntry->getErrorMode() == CONFIRM_MODE);
 
-	myEntry->errorMode = ERROR_FIXED_MODE;
+	myEntry->setErrorMode(ERROR_FIXED_MODE);
 	
 	myEntry->nEndItr -= myEntry->nEndSaved;
 	myEntry->nBeginItr -= myEntry->nEndSaved;
 
 	myEntry->nEndSaved = 0;
 
-	bracketedFinalBarrier(instid);
+	bracketedFinalBarrier(instid, step);
 }
 
 
@@ -603,10 +576,10 @@ void ComlibManager::bracketedReceiveNewCount(int instid) {
 /// together with the counting process, otherwise the strategy is updated at an
 /// undetermined state. In future it may be useful to implement the discovery
 /// process alone.
-void ComlibManager::bracketedReceiveNewPeList(int instid, int *count) {
+void ComlibManager::bracketedReceiveNewPeList(int instid, int step, int *count) {
 	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
-	CkAssert(myEntry->discoveryMode == STARTED_DISCOVERY_MODE);
-	myEntry->discoveryMode = FINISHED_DISCOVERY_MODE;
+	CkAssert(myEntry->getDiscoveryMode() == STARTED_DISCOVERY_MODE);
+	myEntry->setDiscoveryMode(FINISHED_DISCOVERY_MODE);
 
 	myEntry->strategy->bracketedUpdatePeKnowledge(count);
 	
@@ -618,7 +591,7 @@ void ComlibManager::bracketedReceiveNewPeList(int instid, int *count) {
 	ComlibManagerPrintf("[%d] delayMessageSendBuffer[%d].size()=%d\n",CkMyPe(), instid, delayMessageSendBuffer[instid].size() );
 	ComlibManagerPrintf("[%d] delayMessageSendBuffer[%d].size()=%d\n", CkMyPe(), instid, delayMessageSendBuffer[instid].size());
 		
-	bracketedFinalBarrier(instid);
+	bracketedFinalBarrier(instid, step);
 }
 
 
@@ -629,14 +602,21 @@ void ComlibManager::bracketedReceiveNewPeList(int instid, int *count) {
     ComlibManager::bracketedReceiveNewPeList is called as an array broadcast to thisProxy, 
     so every PE will call this method.
  */
-void ComlibManager::bracketedFinalBarrier(int instid) {
+void ComlibManager::bracketedFinalBarrier(int instid, int step) {
   StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
   ComlibManagerPrintf("[%d] ComlibManager::bracketedFinalBarrier %s %s %s\n", CkMyPe(), myEntry->errorModeString(),  myEntry->errorModeServerString(),  myEntry->discoveryModeString() );
 
+  
+  if (myEntry->getDiscoveryMode() == FINISHED_DISCOVERY_MODE &&  myEntry->getErrorMode() == ERROR_FIXED_MODE) {       
+    myEntry->setDiscoveryMode(NORMAL_DISCOVERY_MODE);
+    myEntry->setErrorMode(NORMAL_MODE);
 
-  if (myEntry->discoveryMode == FINISHED_DISCOVERY_MODE &&  myEntry->errorMode == ERROR_FIXED_MODE) {    
+    // Update destination and source element lists for use in the next step
+    ComlibArrayInfo *myInfo = &dynamic_cast<CharmStrategy*>(myEntry->strategy)->ainfo;
+    myInfo->useNewSourceAndDestinations();	
+    
     CProxy_ComlibManager myProxy(thisgroup);
-    myProxy[0].bracketedReleaseCount(instid);
+    myProxy[0].bracketedReleaseCount(instid, step);
   }
 }
 
@@ -644,17 +624,18 @@ void ComlibManager::bracketedFinalBarrier(int instid) {
 /** 
     Once all PEs report here, we will allow them to release the buffered messages from this iteration
  */
-void ComlibManager::bracketedReleaseCount(int instid) {
-    ComlibManagerPrintf("[%d] ComlibManager::bracketedReleaseCount\n", CkMyPe());
+void ComlibManager::bracketedReleaseCount(int instid, int step) {
 
     StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+    ComlibPrintf("[%d] ComlibManager::bracketedReleaseCount myEntry->numBufferReleaseReady was %d\n", CkMyPe(), myEntry->numBufferReleaseReady);
+
     CkAssert(CkMyPe() == 0);
-    CkAssert(myEntry->errorModeServer == ERROR_FIXED_MODE_SERVER);
+    CkAssert(myEntry->getErrorModeServer() == ERROR_FIXED_MODE_SERVER);
     
     myEntry->numBufferReleaseReady++;
     if(myEntry->numBufferReleaseReady == CkNumPes()) {
-      myEntry->errorModeServer = NORMAL_MODE_SERVER;
-      CProxy_ComlibManager(thisgroup).bracketedReleaseBufferedMessages(instid);
+      myEntry->setErrorModeServer(NORMAL_MODE_SERVER);
+      CProxy_ComlibManager(thisgroup).bracketedReleaseBufferedMessages(instid, step);
       myEntry->numBufferReleaseReady = 0;
     }
 }
@@ -662,13 +643,16 @@ void ComlibManager::bracketedReleaseCount(int instid) {
 /** 
     Release any buffered messages.
  */
-void ComlibManager::bracketedReleaseBufferedMessages(int instid) {
-  ComlibManagerPrintf("[%d] ComlibManager::bracketedReleaseBufferedMessages\n", CkMyPe());
-
+void ComlibManager::bracketedReleaseBufferedMessages(int instid, int step) {
+  ComlibManagerPrintf("[%d] ComlibManager::bracketedReleaseBufferedMessages step=%d\n", CkMyPe(), step);
   StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+
+  CkAssert(myEntry->getErrorModeServer() == NORMAL_MODE_SERVER);
+  CkAssert(myEntry->getErrorMode() == NORMAL_MODE);
+  CkAssert(myEntry->getDiscoveryMode() == NORMAL_DISCOVERY_MODE);
   
   myEntry->bufferOutgoing = 0;
-  sendBufferedMessages(instid);
+  sendBufferedMessages(instid, step);
   
   converseManager->doneInserting(instid);
 }
@@ -692,15 +676,11 @@ void ComlibManager::bracketedReleaseBufferedMessages(int instid) {
     it is still here. If the array element has migrated away, then the
     bracketedDiscover() method is called on the new PE.
 
-    the new source and destination element arrays will be empty at this point,
-    so myInfo->addNewDestinationList(e); will add a new record that
-    will be used for future iterations.
-
 */
 void ComlibManager::bracketedStartDiscovery(int instid) {
 	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
-	CkAssert(myEntry->discoveryMode == NORMAL_DISCOVERY_MODE);
-	myEntry->discoveryMode = STARTED_DISCOVERY_MODE;
+	CkAssert(myEntry->getDiscoveryMode() == NORMAL_DISCOVERY_MODE);
+	myEntry->setDiscoveryMode(STARTED_DISCOVERY_MODE);
 	ComlibArrayInfo *myInfo = &dynamic_cast<CharmStrategy*>(myEntry->strategy)->ainfo;
 	const CProxy_ComlibManager myProxy(thisgroup);
 
@@ -710,7 +690,6 @@ void ComlibManager::bracketedStartDiscovery(int instid) {
 	int countDest = 0;
 
 	if (myInfo->isSourceArray()) {
-	  CkAssert(myInfo->newSourceListSize() == 0);
 
 	  const CkVec<CkArrayIndexMax> & srcElements = myInfo->getSourceElements();
 	  const int nelem = srcElements.size();
@@ -731,7 +710,7 @@ void ComlibManager::bracketedStartDiscovery(int instid) {
 	}
 
 	if (myInfo->isDestinationArray()) {
-	  CkAssert(myInfo->newDestinationListSize() == 0);
+// 	  CkAssert(myInfo->newDestinationListSize() == 0);
 
 	  const CkVec<CkArrayIndexMax> & destElements = myInfo->getDestinationElements();
 	  const int nelem = destElements.size();
@@ -745,6 +724,7 @@ void ComlibManager::bracketedStartDiscovery(int instid) {
 	      myInfo->addNewLocalDestination(destElements[i]);
 	    }
 	    else {
+	      ComlibPrintf("[%d] destination element %d is no longer local\n", CkMyPe(), (int)destElements[i].data()[0]);
 	      myProxy[pe].bracketedDiscover(instid, aid, destElements[i], false);
 	    }
 	  }
@@ -861,7 +841,7 @@ void ComlibManager::bracketedContributeDiscovery(int instid, int pe, int nsrc, i
 				myEntry->peList[CkNumPes()+1], myInfo->getTotalDest() );
 		
 		printPeList("bracketedContributeDiscovery peList=", myEntry->peList);
-		myProxy.bracketedReceiveNewPeList(instid, myEntry->peList);
+		myProxy.bracketedReceiveNewPeList(instid, step, myEntry->peList);
 		delete myEntry->peList;
 		myEntry->peList = NULL;
 	} else {
@@ -945,7 +925,9 @@ void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg,
 	
 	if(shouldBufferMessagesNow(instid)){
 	  delayMessageSendBuffer[instid].insert(cmsg);
-	  ComlibManagerPrintf("[%d] ComlibManager::ArraySend BUFFERED OUTGOING: now buffer contains %d messages\n",CkMyPe(), delayMessageSendBuffer[instid].size() );
+	  StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+	  int step = myEntry->lastKnownIteration;
+	  ComlibManagerPrintf("[%d] ComlibManager::ArraySend BUFFERED OUTGOING: now buffer contains %d messages step=%d\n",CkMyPe(), delayMessageSendBuffer[instid].size(), step);
 	} else {
 	  ComlibPrintf("ComlibManager::ArraySend NOT BUFFERING inserting message into strategy %d\n",instid);
 	  
@@ -999,7 +981,9 @@ void ComlibManager::GroupSend(CkDelegateData *pd,int ep, void *msg, int onPE, Ck
 	CharmMessageHolder *cmsg = new CharmMessageHolder((char *)msg, dest_proc, CMH_GROUPSEND); 
 
 	if(shouldBufferMessagesNow(instid)){
-	  ComlibPrintf("ComlibManager::GroupSend Buffering message for %d\n",instid);
+	  StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+	  int step = myEntry->lastKnownIteration;
+	  ComlibPrintf("ComlibManager::GroupSend Buffering message for %d step=%d\n",instid, step);
 	  delayMessageSendBuffer[instid].insert(cmsg);
 	} else {
 	  ComlibPrintf("ComlibManager::GroupSend inserting message into strategy %d\n",instid);
@@ -1113,7 +1097,7 @@ void ComlibManager::multicast(CharmMessageHolder *cmsg, int instid) {
 
 #if DEBUG
 	StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
-	ComlibPrintf("[%d] multicast setupComplete=%d errorMode=%d errorModeServer=%d\n", CkMyPe(), setupComplete, myEntry->errorMode, myEntry->errorModeServer);
+	ComlibPrintf("[%d] multicast setupComplete=%d %s %s\n", CkMyPe(), setupComplete, myEntry->getErrorModeString(), myEntry->getErrorModeServerString());
 #endif
  
 	env->setUsed(0);
@@ -1121,6 +1105,9 @@ void ComlibManager::multicast(CharmMessageHolder *cmsg, int instid) {
 	
 	if(shouldBufferMessagesNow(instid)){
 	  cmsg->saveCopyOf_sec_id();
+	  StrategyTableEntry *myEntry = converseManager->getStrategyTable(instid);
+	  int step = myEntry->lastKnownIteration;
+	  ComlibPrintf("[%d] ComlibManager::multicast Buffering message for %d lastKnownIteration=%d\n", CkMyPe(),instid, step);
 	  delayMessageSendBuffer[instid].insert(cmsg);
 	} else {
 	  converseManager->insertMessage(cmsg, instid);

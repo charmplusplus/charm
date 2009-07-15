@@ -288,7 +288,7 @@ class ComlibManager: public CkDelegateMgr {
 
     
     bool shouldBufferMessagesNow(int instid);
-    void sendBufferedMessages(int instid);
+    void sendBufferedMessages(int instid, int step=-1);
     void sendBufferedMessagesAllStrategies();
 
  public:
@@ -338,14 +338,14 @@ class ComlibManager: public CkDelegateMgr {
     void bracketedReceiveCount(int instid, int pe, int count, int isFirst, int step);
     void bracketedStartErrorRecoveryProcess(int instid, int step);
     void bracketedErrorDetected(int instid, int step);
-    void bracketedConfirmCount(int instid);
+    void bracketedConfirmCount(int instid, int step);
     void bracketedCountConfirmed(int instid, int count, int step);
-    void bracketedReceiveNewCount(int instid);
-    void bracketedReceiveNewPeList(int instid, int *count);
+    void bracketedReceiveNewCount(int instid, int step);
+    void bracketedReceiveNewPeList(int instid, int step, int *count);
 
-    void bracketedFinalBarrier(int instid);
-    void bracketedReleaseCount(int instid);
-    void bracketedReleaseBufferedMessages(int instid);
+    void bracketedFinalBarrier(int instid, int step);
+    void bracketedReleaseCount(int instid, int step);
+    void bracketedReleaseBufferedMessages(int instid, int step);
 
     void bracketedStartDiscovery(int instid);
     void bracketedDiscover(int instid, CkArrayID aid, CkArrayIndexMax &idx, int isSrc);

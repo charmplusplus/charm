@@ -90,7 +90,7 @@ class ConvComlibManager {
     strategyTable[loc].isNew = 0;
     strategyTable[loc].isInSync = 1;
   }
-  inline int getErrorMode(int loc) {return strategyTable[loc].errorMode;}
+/*   inline int getErrorMode(int loc) {return strategyTable[loc].errorMode;} */
   inline CkQ<MessageHolder*> *getTmpList(int loc) {return &strategyTable[loc].tmplist;}
 
   

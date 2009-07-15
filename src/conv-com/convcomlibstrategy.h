@@ -291,8 +291,8 @@ enum CountingErrorMode { NORMAL_MODE = 0,
 			 CONFIRM_MODE = 2,   
 			 ERROR_FIXED_MODE = 3  };
 
-enum CountingServerErrorMode { STARTUP_MODE_SERVER = 100,
-			       NORMAL_MODE_SERVER, 
+
+enum CountingServerErrorMode { NORMAL_MODE_SERVER, 
 			       ERROR_MODE_SERVER,
 			       CONFIRM_MODE_SERVER,  
 			       ERROR_FIXED_MODE_SERVER,
@@ -345,34 +345,6 @@ public:
   int bufferOutgoing;
   
   
-  /** 
-   A flag to specify that this bracketed strategy is in an error mode,
-   due to an object migration causing more objects to call BeginIteration 
-   on one of the PEs than was expected. The detecting PE immediately enter the error
-   mode state, while other PEs will be notified of the error, and they will then 
-   enter the error state.
-   
-   This flag represents the state of the DFA followed by all processors. See the
-   hand drawn document describing these states and their transitions.
-      
-   There are three stated:
-     0) Normal mode: everything is fine
-     1) Error mode: miscount detected, trying to fix it
-     2) Confirm mode: a count has matched, trying to confirm it
-  
-  */
-  CountingErrorMode errorMode;
-  
-  /** 
-   The state of the coordinator (PE 0 of the a chare group).
-  */
-  CountingServerErrorMode errorModeServer;
-  
-  
-  /// A flag to specify what stage of Discovery process is underway for the PE
-  DiscoveryErrorMode discoveryMode;
-  
-
   /// A flag to specify that the bracketed strategy is fully setup, and it can operate normally.
   /// A value of 0 means strategy is fully setup
   int bracketedSetupFinished;
@@ -417,13 +389,58 @@ public:
   void reset();
   
 
-  const char *errorModeString();
-  const char *errorModeServerString();
-  const char *discoveryModeString();
-
 
   StrategyTableEntry();
+
+
+
+ private:
+  /** 
+   A flag to specify that this bracketed strategy is in an error mode,
+   due to an object migration causing more objects to call BeginIteration 
+   on one of the PEs than was expected. The detecting PE immediately enter the error
+   mode state, while other PEs will be notified of the error, and they will then 
+   enter the error state.
+  */
+  CountingErrorMode errorMode;
   
+  /** 
+   The state of the coordinator (PE 0 of the chare group).
+  */
+  CountingServerErrorMode errorModeServer;
+  
+  
+  /** 
+      A flag to specify what stage of Discovery process is underway for the PE 
+  */
+  DiscoveryErrorMode discoveryMode;
+
+
+ public:
+
+  CountingErrorMode getErrorMode(){return errorMode;}
+  CountingServerErrorMode getErrorModeServer(){return errorModeServer;}
+  DiscoveryErrorMode getDiscoveryMode(){return discoveryMode;}
+   
+  void setErrorMode(CountingErrorMode mode){
+    errorMode=mode;
+    ComlibPrintf("[%d] %s\n", CmiMyPe(), errorModeString());
+  }
+ 
+  void setErrorModeServer(CountingServerErrorMode mode){
+    errorModeServer=mode;
+    ComlibPrintf("[%d] %s lastKnownIteration=%d\n", CmiMyPe(), errorModeServerString(), lastKnownIteration);
+  }
+ 
+  void setDiscoveryMode(DiscoveryErrorMode mode){
+    discoveryMode=mode;
+    ComlibPrintf("[%d] %s\n", CmiMyPe(), discoveryModeString());
+  }
+
+  const char *errorModeString();
+  const char *errorModeServerString();
+  const char *discoveryModeString();  
+
 };
 
 typedef CkVec<StrategyTableEntry> StrategyTable;
