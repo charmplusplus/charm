@@ -1285,8 +1285,7 @@ protected:
 			if(epage == NULL)
 			{
 				epage = new ENTRY_TYPE[ENTRIES_PER_PAGE];
-				if (access==Accumulate_Fault)
-					writeIdentity();
+				writeIdentity();
 			}
 		}
 
