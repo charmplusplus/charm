@@ -93,7 +93,7 @@ ComlibManager::ComlibManager(){
 
 void ComlibManager::init(){
 
-   CcdCallFnAfterOnPE((CcdVoidFn)periodicDebugPrintStatus, (void*)this, 4000, CkMyPe());
+  //   CcdCallFnAfterOnPE((CcdVoidFn)periodicDebugPrintStatus, (void*)this, 4000, CkMyPe());
 
 
   if(CkNumPes() == 1 ){
