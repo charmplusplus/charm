@@ -379,32 +379,6 @@ public:
 //================================================================
 
 /**
-   UNUSED
-
-   Holds the untyped data for one MSA page.
-   This is the interface MSA_CacheGroup uses to access a cached page.
-   MSA_CacheGroup asks the templated code to create a MSA_Page
-   for each new page, then talks to the page directly.
-*/
-class MSA_Page {
-public:
-	virtual ~MSA_Page();
-
-	/**
-	   Pack or unpack the data in this page.
-	   Used to send and receive pages from the network
-	   (or even disk, if somebody needs it.)
-	*/
-	virtual void pup(PUP::er &p) =0;
-
-	/**
-	   Merge this page's data into our own.
-	   Only parts of this page may have been set.
-	*/
-	virtual void merge(MSA_Page &otherPage) =0;
-};
-
-/**
    Holds the typed data for one MSA page.
    Implementation of puppedPage used by the templated code.
 */
