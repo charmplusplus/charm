@@ -922,12 +922,17 @@ size_t CthStackOffset(CthThread t, char *p)
 
 char * CthPointer(CthThread t, size_t pos)
 {
+  char *stackbase;
   CmiAssert(t);
   CthProcInfo proc = CthCpvAccess(CthProc);
+  if (CthCpvAccess(CthCurrent) == t)    /* current thread uses current stack */
+    stackbase = (char *)proc->stackbase;
+  else                                  /* sleep thread uses its saved stack */
+    stackbase = (char *)t->savedstack;
 #ifdef QT_GROW_DOWN
-  char *p = (char *)t->savedstack + t->savedsize + pos;
+  char *p = stackbase + t->savedsize + pos;
 #else
-  char *p = (char *)t->savedstack + pos;
+  char *p = stackbase + pos;
 #endif
   return p;
 }
