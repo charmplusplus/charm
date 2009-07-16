@@ -708,23 +708,20 @@ public:
 
 	class Handle
 	{
-    public:
-        inline unsigned int length() const { return msa.length(); }
-
 	protected:
-        MSA3D &msa;
+        MSA3D *msa;
         bool valid;
 
         friend class MSA3D;
 
-        void inline checkInvalidate(MSA3D *m) 
+        void inline checkInvalidate() 
         {
-            if (m != &msa || !valid)
+            if (!valid)
                 throw MSA_InvalidHandle();
             valid = false;
         }
 
-        Handle(MSA3D &msa_) 
+        Handle(MSA3D *msa_) 
             : msa(msa_), valid(true) 
         { }
         void checkValid()
@@ -732,32 +729,85 @@ public:
             if (!valid)
                 throw MSA_InvalidHandle();
         }
+        
+    public:
+        inline void syncRelease()
+            {
+                checkInvalidate();
+                if (msa->active)
+                    msa->cache->SyncRelease();
+                else
+                    CmiAbort("sync from an inactive thread!\n");
+                msa->active = false;
+            }
 
-    private:
-        // Disallow copy construction
-        Handle(Handle &);
+        inline void syncDone()
+            {
+                checkInvalidate();
+                msa->sync(DEFAULT_SYNC_SINGLE);
+            }
+
+        inline Read syncToRead()
+            {
+                checkInvalidate();
+                msa->sync(DEFAULT_SYNC_SINGLE);
+                return Read(msa);
+            }
+
+        inline Write syncToWrite()
+            {
+                checkInvalidate();
+                msa->sync(DEFAULT_SYNC_SINGLE);
+                return Write(msa);
+            }
+
+        inline Accum syncToAccum()
+            {
+                checkInvalidate();
+                msa->sync(DEFAULT_SYNC_SINGLE);
+                return Accum(msa);
+            }
+
+        void pup(PUP::er &p)
+            {
+                bool real;
+                if(!p.isUnpacking())
+                    real = msa != NULL;
+                p|real;
+                if(real)
+                {
+                    if(p.isUnpacking())
+                        msa = new MSA3D;
+                    p|(*msa);
+                    p|valid;
+                }
+            }
+
+        Handle() : msa(NULL), valid(false) {}
     };
 
     class Read : public Handle
     {
     protected:
         friend class MSA3D;
-        Read(MSA3D &msa_)
+        Read(MSA3D *msa_)
             :  Handle(msa_) { }
         using Handle::checkValid;
         using Handle::checkInvalidate;
 
     public:
+        Read() {}
+
         inline const ENTRY& get(unsigned x, unsigned y, unsigned z)
         {
             checkValid();
-            return Handle::msa.get(x, y, z); 
+            return Handle::msa->get(x, y, z); 
         }
         inline const ENTRY& operator()(unsigned x, unsigned y, unsigned z) { return get(x, y, z); }
         inline const ENTRY& get2(unsigned x, unsigned y, unsigned z)
         {
             checkValid();
-            return Handle::msa.get2(x, y, z);
+            return Handle::msa->get2(x, y, z);
         }
 
         // Reads the specified range into the provided buffer in row-major order
@@ -765,15 +815,24 @@ public:
         {
             checkValid();
 
-            unsigned ix = min(x1, x2), mx = max(x1, x2);
-            unsigned iy = min(y1, y2), my = max(y1, y2);
-            unsigned iz = min(z1, z2), mz = max(z1, z2);
+            CkAssert(x1 <= x2);
+            CkAssert(y1 <= y2);
+            CkAssert(z1 <= z2);
+
+            CkAssert(x1 >= 0);
+            CkAssert(y1 >= 0);
+            CkAssert(z1 >= 0);
+
+            CkAssert(x2 < Handle::msa->dim_x);
+            CkAssert(y2 < Handle::msa->dim_y);
+            CkAssert(z2 < Handle::msa->dim_z);
+
             unsigned i = 0;
 
-            for (; ix < mx; ++ix)
-                for (; iy < my; ++iy)
-                    for (; iz < mz; ++iz)
-                        buf[i++] = Handle::msa.get(ix, iy, iz);
+            for (unsigned ix = x1; ix <= x2; ++ix)
+                for (unsigned iy = y1; iy <= y2; ++iy)
+                    for (unsigned iz = z1; iz <= z2; ++iz)
+                        buf[i++] = Handle::msa->get(ix, iy, iz);
         }
     };
 
@@ -781,14 +840,16 @@ public:
     {
     protected:
         friend class MSA3D;
-        Write(MSA3D &msa_)
+        Write(MSA3D *msa_)
             : Handle(msa_) { }
 
     public:
+        Write() {}
+
         inline Writable<ENTRY> set(unsigned x, unsigned y, unsigned z)
         {
             Handle::checkValid();
-            return Writable<ENTRY>(Handle::msa.set(x,y,z));
+            return Writable<ENTRY>(Handle::msa->set(x,y,z));
         }
         inline Writable<ENTRY> operator()(unsigned x, unsigned y, unsigned z)
         {
@@ -799,38 +860,54 @@ public:
         {
             Handle::checkValid();
 
-            unsigned ix = min(x1, x2), mx = max(x1, x2);
-            unsigned iy = min(y1, y2), my = max(y1, y2);
-            unsigned iz = min(z1, z2), mz = max(z1, z2);
+            CkAssert(x1 <= x2);
+            CkAssert(y1 <= y2);
+            CkAssert(z1 <= z2);
+
+            CkAssert(x1 >= 0);
+            CkAssert(y1 >= 0);
+            CkAssert(z1 >= 0);
+
+            CkAssert(x2 < Handle::msa->dim_x);
+            CkAssert(y2 < Handle::msa->dim_y);
+            CkAssert(z2 < Handle::msa->dim_z);
+
             unsigned i = 0;
 
-            for (; ix < mx; ++ix)
-                for (; iy < my; ++iy)
-                    for (; iz < mz; ++iz)
-                        Handle::msa.set(ix, iy, iz) = buf[i++];
+            for (unsigned ix = x1; ix <= x2; ++ix)
+                for (unsigned iy = y1; iy <= y2; ++iy)
+                    for (unsigned iz = z1; iz <= z2; ++iz)
+                    {
+                        if (isnan(buf[i]))
+                            CmiAbort("Tried to write a NaN!");
+                        Handle::msa->set(ix, iy, iz) = buf[i++];
+                    }
         }
-
+#if 0
     private:
         Write(Write &);
+#endif
     };
 
     class Accum : public Handle
     {
     protected:
         friend class MSA3D;
-        Accum(MSA3D &msa_)
+        Accum(MSA3D *msa_)
             : Handle(msa_) { }
         using Handle::checkInvalidate;
     public:
+        Accum() {}
+
         inline Accumulable<ENTRY, ENTRY_OPS_CLASS> accumulate(unsigned int x, unsigned int y, unsigned int z)
         {
             Handle::checkValid();
-            return Accumulable<ENTRY, ENTRY_OPS_CLASS>(Handle::msa.accumulate(x,y,z));
+            return Accumulable<ENTRY, ENTRY_OPS_CLASS>(Handle::msa->accumulate(x,y,z));
         }
         inline void accumulate(unsigned int x, unsigned int y, unsigned int z, const ENTRY& ent)
         {
             Handle::checkValid();
-            Handle::msa.accumulate(x,y,z, ent);
+            Handle::msa->accumulate(x,y,z, ent);
         }
 
         void accumulate(unsigned x1, unsigned y1, unsigned z1, unsigned x2, unsigned y2, unsigned z2, const ENTRY *buf)
@@ -840,12 +917,20 @@ public:
             CkAssert(y1 <= y2);
             CkAssert(z1 <= z2);
 
+            CkAssert(x1 >= 0);
+            CkAssert(y1 >= 0);
+            CkAssert(z1 >= 0);
+
+            CkAssert(x2 < Handle::msa->dim_x);
+            CkAssert(y2 < Handle::msa->dim_y);
+            CkAssert(z2 < Handle::msa->dim_z);
+
             unsigned i = 0;
 
             for (unsigned ix = x1; ix <= x2; ++ix)
                 for (unsigned iy = y1; iy <= y2; ++iy)
                     for (unsigned iz = z1; iz <= z2; ++iz)
-                        Handle::msa.accumulate(ix, iy, iz, buf[i++]);
+                        Handle::msa->accumulate(ix, iy, iz, buf[i++]);
         }
 
         inline Accumulable<ENTRY, ENTRY_OPS_CLASS> operator() (unsigned int x, unsigned int y, unsigned int z)
@@ -889,6 +974,7 @@ public:
         p|dim_x;
         p|dim_y;
         p|dim_z;
+        p|nEntries;
         p|cg;
         if (p.isUnpacking()) cache=cg.ckLocalBranch();
     }
@@ -899,7 +985,7 @@ public:
     */
     inline MSA3D(unsigned x, unsigned y, unsigned z, unsigned int num_wrkrs, 
                  unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES)
-        : dim_x(x), dim_y(y), dim_z(z), initHandleGiven(false), active(false)
+        : dim_x(x), dim_y(y), dim_z(z), initHandleGiven(false)
     {
         unsigned nEntries = x*y*z;
         unsigned int nPages = (nEntries + ENTRIES_PER_PAGE - 1)/ENTRIES_PER_PAGE;
@@ -974,7 +1060,6 @@ public:
         //
         // @@ What if a MSA3D thread migrates?
         cache->enroll(num_workers);
-        active = true;
     }
 
     // idx is the element to be read/written
@@ -1031,63 +1116,26 @@ public:
 
     static const int DEFAULT_SYNC_SINGLE = 0;
 
-    bool active;
-    
-    inline void syncRelease(Handle &m)
-    {
-        m.checkInvalidate(this);
-        delete &m;
-        if (active)
-            cache->SyncRelease();
-        else
-            CmiAbort("sync from an inactive thread!\n");
-        active = false;
-    }
-
-    inline Read &syncToRead(Handle &m, int single = DEFAULT_SYNC_SINGLE)
-    {
-        m.checkInvalidate(this);
-        delete &m;
-        sync(single);
-        return *(new Read(*this));
-    }
-
-    inline Write &syncToWrite(Handle &m, int single = DEFAULT_SYNC_SINGLE)
-    {
-        m.checkInvalidate(this);
-        delete &m;
-        sync(single);
-        return *(new Write(*this));
-    }
-
-    inline Accum &syncToAccum(Handle &m, int single = DEFAULT_SYNC_SINGLE)
-    {
-        m.checkInvalidate(this);
-        delete &m;
-        sync(single);
-        return *(new Accum(*this));
-    }
-
-    inline Write &getInitialWrite()
+    inline Write getInitialWrite()
     {
         if (initHandleGiven)
             CmiAbort("Trying to get an MSA's initial handle a second time");
 
-        Write *w = new Write(*this);
-        sync();
+        //Write *w = new Write(*this);
+        //sync();
         initHandleGiven = true;
-        return *w;
+        return Write(this);
     }
 
-    inline Accum &getInitialAccum()
+    inline Accum getInitialAccum()
     {
         if (initHandleGiven)
             CmiAbort("Trying to get an MSA's initial handle a second time");
 
-        Accum *a = new Accum(*this);
-        sync();
+        //Accum *a = new Accum(*this);
+        //sync();
         initHandleGiven = true;
-        return *a;
+        return Accum(this);
     }
 
   // These are the meat of the MSA API, but they are only accessible
@@ -1150,9 +1198,6 @@ protected:
     /// Synchronize reads and writes across the entire array.
     inline void sync(int single=0)
     {
-        if (!active)
-            cache->activate();
-        active = true;
         cache->SyncReq(single); 
     }
 };
