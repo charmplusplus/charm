@@ -572,6 +572,7 @@ protected:
 			if(!pagePool.empty())
 			{
 				nu = pagePool.top();
+				CkAssert(nu != NULL);
 				pagePool.pop();
 			}
 
