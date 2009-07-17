@@ -1093,8 +1093,9 @@ public:
 			}		
 		}
 
-    inline void SyncDone()
+    inline void SyncDone(CkReductionMsg *m)
 		{
+			delete m;
 			//ckout << "[" << CkMyPe() << "] Sync Done indication" << endl;
 			//ckout << "[" << CkMyPe() << "] Sync Done indication" << endl;
 			/* Reset for next sync */
@@ -1387,8 +1388,9 @@ public:
     // MSA_PageArray::
     inline void Sync()
 		{
-			MSADEBPRINT(printf("MSA_PageArray::Sync about to call contribute \n");); 
-			contribute(0, NULL, CkReduction::concat);
+			MSADEBPRINT(printf("MSA_PageArray::Sync about to call contribute \n"););
+			CkCallback cb(CkIndex_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(NULL), cache);
+			contribute(0, NULL, CkReduction::concat, cb);
 		}
 
     inline void emit(int ID, int index)

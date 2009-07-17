@@ -15,7 +15,7 @@ module msa
         entry void enrollAck(int originator);  // internal method
         entry void enrollDone();  // internal method
         entry void SyncAck();
-        entry void SyncDone();
+        entry void SyncDone(CkReductionMsg *);
 
         // Push data to its home and wait for notice that everyone else has caught up
 		entry [threaded] void FinishSync();
