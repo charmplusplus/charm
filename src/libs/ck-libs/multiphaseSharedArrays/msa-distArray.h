@@ -770,17 +770,15 @@ public:
 
         void pup(PUP::er &p)
             {
-                bool real;
-                if(!p.isUnpacking())
-                    real = msa != NULL;
-                p|real;
-                if(real)
+                p|valid;
+                if (valid)
                 {
-                    if(p.isUnpacking())
+                    if (p.isUnpacking())
                         msa = new MSA3D;
                     p|(*msa);
-                    p|valid;
                 }
+                else if (p.isUnpacking())
+                    msa = NULL;
             }
 
         Handle() : msa(NULL), valid(false) {}
