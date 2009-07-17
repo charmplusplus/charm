@@ -51,8 +51,9 @@ void *CkHashtableGet(CkHashtable_c h,const void *fromKey);
 /*Return the key associated with this object (previously returned with one of the above functions) */
 void *CkHashtableKeyFromObject(CkHashtable_c h,const void *object);
 
-/*Remove this key, rehashing as needed */
-void CkHashtableRemove(CkHashtable_c h,const void *doomedKey);
+/* Remove this key, rehashing as needed.
+   Returns the number of keys removed (always 0 or 1) */
+int CkHashtableRemove(CkHashtable_c h,const void *doomedKey);
 
 /*Number of elements stored in the hashtable */
 int CkHashtableSize(CkHashtable_c h);
@@ -60,8 +61,13 @@ int CkHashtableSize(CkHashtable_c h);
 /*C Version of Hashtable iterator */
 typedef void *CkHashtableIterator_c;
 
-/*Return the iterator for the given hashtable. It is reset to the beginning */
+/*Return the iterator for the given hashtable. It is reset to the beginning
+ ** WARNING!!! ** This is a newly allocated memory that must be freed by the
+ user with CkHashtableDestroyIterator */
 CkHashtableIterator_c CkHashtableGetIterator(CkHashtable_c h);
+
+/* Destroy the iterator allocated with CkHashtableGetIterator */
+void CkHashtableDestroyIterator(CkHashtableIterator_c it);
 
 /* Return the next element in the hash table given the iterator (NULL if not found) */
 void *CkHashtableIteratorNext(CkHashtableIterator_c it, void **retKey);
@@ -241,15 +247,18 @@ public:
 		else return layout.getObject(ent);
 	}
 	
-	//Remove this object from the hashtable (re-hashing if needed)
-	void remove(const void *key);
+	/* Remove this object from the hashtable (re-hashing if needed)
+       Returns the number of keys removed (always 0 or 1) */
+	int remove(const void *key);
 
 	//Remove all objects and keys
 	void empty(void);
 	
 	int numObjects(void) const { return nObj; } 
 	
-	//Return an iterator for the objects in this hash table
+	/* Return an iterator for the objects in this hash table.
+	   ** WARNING!!! ** This is a newly allocated memory that must be freed by the
+	   user with "delete" */
 	CkHashtableIterator *iterator(void);
 };
 

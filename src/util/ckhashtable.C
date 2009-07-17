@@ -196,12 +196,13 @@ void *CkHashtable::put(const void *key)
 	return layout.getObject(ent);
 }
 
-//Remove this object from the hashtable (re-hashing if needed)
-void CkHashtable::remove(const void *key)
+/* Remove this object from the hashtable (re-hashing if needed)
+   Returns the number of keys removed (always 0 or 1) */
+int CkHashtable::remove(const void *key)
 {
 	DEBUGF(("Asked to remove key\n"))
 	char *doomedKey=findKey(key);
-	if (doomedKey==NULL) return; //It's already gone!
+	if (doomedKey==NULL) return 0; //It's already gone!
 	nObj--;
 	char *doomed=layout.entryFromKey(doomedKey);
 	layout.empty(doomed);
@@ -215,7 +216,7 @@ void CkHashtable::remove(const void *key)
 		if (layout.isEmpty(src))
 		{//Stop once we find an empty key
 			DEBUGF(("Remove-rehash complete\n"))
-			return;
+			return 1;
 		}
 		//This was a valid entry-- figure out where it goes now
 		char *dest=findEntry(layout.getKey(src));
@@ -229,7 +230,9 @@ void CkHashtable::remove(const void *key)
 	}
 }
 
-//Return an iterator for the objects in this hash table
+/* Return an iterator for the objects in this hash table
+ ** WARNING!!! ** This is a newly allocated memory that must be freed by the
+ user with "delete" */
 CkHashtableIterator *CkHashtable::iterator(void)
 {
 	DEBUGF(("Building iterator\n"))
@@ -403,10 +406,11 @@ CDECL void *CkHashtableGet(CkHashtable_c h,const void *fromKey)
 {
 	return ((CkHashtable *)h)->get(fromKey);
 }
-/*Remove this key, rehashing as needed */
-CDECL void CkHashtableRemove(CkHashtable_c h,const void *doomedKey)
+/* Remove this key, rehashing as needed
+   Returns the number of keys removed (always 0 or 1) */
+CDECL int CkHashtableRemove(CkHashtable_c h,const void *doomedKey)
 {
-	((CkHashtable *)h)->remove(doomedKey);
+	return ((CkHashtable *)h)->remove(doomedKey);
 }
 /*Number of elements stored in the hashtable */
 CDECL int CkHashtableSize(CkHashtable_c h)
@@ -414,11 +418,17 @@ CDECL int CkHashtableSize(CkHashtable_c h)
     return ((CkHashtable *)h)->numObjects();
 }
 
-/*Return the iterator for the given hashtable. It is reset to the beginning */
+/*Return the iterator for the given hashtable. It is reset to the beginning.
+ ** WARNING!!! ** This is a newly allocated memory that must be freed by the
+ user with CkHashtableDestroyIterator */
 CDECL CkHashtableIterator_c CkHashtableGetIterator(CkHashtable_c h) {
     CkHashtableIterator *it = ((CkHashtable *)h)->iterator();
     it->seekStart();
     return it;
+}
+/* Destroy the iterator allocated with CkHashtableGetIterator */
+CDECL void CkHashtableDestroyIterator(CkHashtableIterator_c it) {
+    delete ((CkHashtableIterator *)it);
 }
 /* Return the next element in the hash table given the iterator (NULL if not found) */
 CDECL void *CkHashtableIteratorNext(CkHashtableIterator_c it, void **keyRet) {
