@@ -180,6 +180,16 @@ int memory_chare_id=0;
 #if CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS
 
 #if CMK_MEMORY_BUILD_GNU_HOOKS
+
+static void *meta_malloc(size_t);
+static void *meta_realloc(void*,size_t);
+static void *meta_memalign(size_t,size_t);
+static void meta_free(void*);
+static void *meta_malloc_hook(size_t s, const void* c) {return meta_malloc(s);}
+static void *meta_realloc_hook(void* p,size_t s, const void* c) {return meta_realloc(p,s);}
+static void *meta_memalign_hook(size_t s1,size_t s2, const void* c) {return meta_memalign(s1,s2);}
+static void meta_free_hook(void* p, const void* c) {meta_free(p);}
+
 #define BEFORE_MALLOC_CALL \
   __malloc_hook = old_malloc_hook; \
   __realloc_hook = old_realloc_hook; \
@@ -190,22 +200,18 @@ int memory_chare_id=0;
   old_realloc_hook = __realloc_hook; \
   old_memalign_hook = __memalign_hook; \
   old_free_hook = __free_hook; \
-  __malloc_hook = meta_malloc; \
-  __realloc_hook = meta_realloc; \
-  __memalign_hook = meta_memalign; \
-  __free_hook = meta_free;
+  __malloc_hook = meta_malloc_hook; \
+  __realloc_hook = meta_realloc_hook; \
+  __memalign_hook = meta_memalign_hook; \
+  __free_hook = meta_free_hook;
 
 #include <malloc.h>
-static void *(*old_malloc_hook) (size_t);
-static void *(*old_realloc_hook) (void*,size_t);
-static void *(*old_memalign_hook) (size_t,size_t);
-static void (*old_free_hook) (void*);
+static void *(*old_malloc_hook) (size_t, const void*);
+static void *(*old_realloc_hook) (void*,size_t, const void*);
+static void *(*old_memalign_hook) (size_t,size_t, const void*);
+static void (*old_free_hook) (void*, const void*);
 
-static void *meta_malloc(size_t);
-static void *meta_realloc(void*,size_t);
-static void *meta_memalign(size_t,size_t);
-static void meta_free(void*);
-#else
+#else /* CMK_MEMORY_BUILD_GNU_HOOKS */
 #define BEFORE_MALLOC_CALL   /*empty*/
 #define AFTER_MALLOC_CALL    /*empty*/
 #endif
@@ -247,10 +253,10 @@ my_init_hook (void)
   old_realloc_hook = __realloc_hook;
   old_memalign_hook = __memalign_hook;
   old_free_hook = __free_hook;
-  __malloc_hook = meta_malloc;
-  __realloc_hook = meta_realloc;
-  __memalign_hook = meta_memalign;
-  __free_hook = meta_free;
+  __malloc_hook = meta_malloc_hook;
+  __realloc_hook = meta_realloc_hook;
+  __memalign_hook = meta_memalign_hook;
+  __free_hook = meta_free_hook;
 }
 /* Override initializing hook from the C library. */
 void (*__malloc_initialize_hook) (void) = my_init_hook;
