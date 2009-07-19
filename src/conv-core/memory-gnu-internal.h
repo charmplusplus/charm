@@ -66,6 +66,11 @@
 /* GCC can always grok prototypes.  For C++ programs we add throw()
    to help it optimize the function calls.  But this works only with
    gcc 2.8.x and egcs.  */
+/* Addition 20090718: Most compilers already define __THROW, so avoid complains
+   by undefining it before redefining it. */
+# ifdef __THROW
+#  undef __THROW
+# endif
 # if defined __cplusplus && (__GNUC__ >= 3 || __GNUC_MINOR__ >= 8)
 #  define __THROW	throw ()
 # else
