@@ -99,9 +99,6 @@ unsigned int randInt(unsigned int num, const char* name, int seed=0){
 
 
 controlPointManager::controlPointManager(){
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-    pathHistoryTableLastIdx = 0;
-#endif
 
     newControlPointsAvailable = false;
     alreadyRequestedMemoryUsage = false;   
@@ -115,8 +112,6 @@ controlPointManager::controlPointManager(){
     CkPrintf("[%d] controlPointManager() Constructor Initializing control points, and loading data file\n", CkMyPe());
     
     phase_id = 0;
-    
-    controlPointManagerProxy = thisProxy;
     
     loadDataFile();
     
@@ -610,126 +605,6 @@ controlPointManager::controlPointManager(){
     alreadyRequestedMemoryUsage = false;
     delete msg;
   }
-
-
-  /** Trace perform a traversal backwards over the critical path specified as a 
-      table index for the processor upon which this is called.
-      
-      The callback cb will be called with the resulting msg after the path has 
-      been traversed to its origin.  
-  */
- void controlPointManager::traceCriticalPathBack(pathInformationMsg *msg){
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-   int count = pathHistoryTable.count(msg->table_idx);
-#if DEBUGPRINT > 2
-   CkPrintf("Table entry %d on pe %d occurs %d times in table\n", msg->table_idx, CkMyPe(), count);
-#endif
-   CkAssert(count==0 || count==1);
-
-    if(count > 0){ 
-      PathHistoryTableEntry & path = pathHistoryTable[msg->table_idx];
-      int idx = path.sender_history_table_idx;
-      int pe = path.sender_pe;
-
-#if DEBUGPRINT > 2
-      CkPrintf("Table entry %d on pe %d points to pe=%d idx=%d\n", msg->table_idx, CkMyPe(), pe, idx);
-#endif
-
-      // Make a copy of the message for broadcasting to all PEs
-      pathInformationMsg *newmsg = new(msg->historySize+1) pathInformationMsg;
-      for(int i=0;i<msg->historySize;i++){
-	newmsg->history[i] = msg->history[i];
-      }
-      newmsg->history[msg->historySize] = path;
-      newmsg->historySize = msg->historySize+1;
-      newmsg->cb = msg->cb;
-      newmsg->table_idx = idx;
-      
-      // Keep a message for returning to the user's callback
-      pathForUser = new(msg->historySize+1) pathInformationMsg;
-      for(int i=0;i<msg->historySize;i++){
-	pathForUser->history[i] = msg->history[i];
-      }
-      pathForUser->history[msg->historySize] = path;
-      pathForUser->historySize = msg->historySize+1;
-      pathForUser->cb = msg->cb;
-      pathForUser->table_idx = idx;
-      
-      
-      if(idx > -1 && pe > -1){
-	CkAssert(pe < CkNumPes() && pe >= 0);
-	thisProxy[pe].traceCriticalPathBack(newmsg);
-      } else {
-	CkPrintf("Traced critical path back to its origin.\n");
-	CkPrintf("Broadcasting it to all PE\n");
-	thisProxy.broadcastCriticalPathResult(newmsg);
-      }
-    } else {
-      CkAbort("ERROR: Traced critical path back to a nonexistent table entry.\n");
-    }
-
-    delete msg;
-#else
-    CkAbort("Shouldn't call controlPointManager::traceCriticalPathBack when critical path detection is not enabled");
-#endif
-  }
-
-
-void controlPointManager::broadcastCriticalPathResult(pathInformationMsg *msg){
-
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  CkPrintf("[%d] Received broadcast of critical path\n", CkMyPe());
-  int me = CkMyPe();
-  int intersectsLocalPE = false;
-
-  // Create user events for critical path
-
-  for(int i=msg->historySize-1;i>=0;i--){
-    if(CkMyPe() == msg->history[i].local_pe){
-      // Part of critical path is local
-      // Create user event for it
-
-      //      CkPrintf("\t[%d] Path Step %d: local_path_time=%lf arr=%d ep=%d starttime=%lf preceding path time=%lf pe=%d\n",CkMyPe(), i, msg->history[i].get_local_path_time(), msg-> history[i].local_arr, msg->history[i].local_ep, msg->history[i].get_start_time(), msg->history[i].get_preceding_path_time(), msg->history[i].local_pe);
-      traceUserBracketEvent(5900, msg->history[i].get_start_time(), msg->history[i].get_start_time() + msg->history[i].get_local_path_time());
-      intersectsLocalPE = true;
-    }
-
-  }
-  
-
-#if PRUNE_CRITICAL_PATH_LOGS
-  // Tell projections tracing to only output log entries if I contain part of the critical path
-  if(! intersectsLocalPE){
-    disableTraceLogOutput();
-    CkPrintf("PE %d doesn't intersect the critical path, so its log files won't be created\n", CkMyPe() );
-  }
-#endif  
-  
-#if TRACE_ALL_PATH_TABLE_ENTRIES
-  // Create user events for all table entries
-  std::map< int, PathHistoryTableEntry >::iterator iter;
-  for(iter=pathHistoryTable.begin(); iter != pathHistoryTable.end(); iter++){
-    double startTime = iter->second.get_start_time();
-    double endTime = iter->second.get_start_time() + iter->second.get_local_path_time();
-    traceUserBracketEvent(5901, startTime, endTime);
-  }
-#endif
-
-  int data=1;
-  CkCallback cb(CkIndex_controlPointManager::criticalPathDone(NULL),thisProxy[0]); 
-  contribute(sizeof(int), &data, CkReduction::sum_int, cb);
-
-#endif
-
-}
-
-void controlPointManager::criticalPathDone(CkReductionMsg *msg){
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  CkPrintf("[%d] All PEs have received the critical path information. Sending critical path to user supplied callback.\n", CkMyPe());
-  pathForUser->cb.send(pathForUser);
-  pathForUser = NULL;
-#endif
-}
 
 
  

@@ -1,0 +1,27 @@
+module PathHistory {
+
+  readonly CProxy_pathHistoryManager pathHistoryManagerProxy;
+
+  initproc void initializeCriticalPath(void);	
+
+
+  mainchare pathHistoryMain {
+    entry pathHistoryMain(CkArgMsg*);
+  };
+
+
+  message pathInformationMsg { 
+   	 PathHistoryTableEntry history[];
+  };
+
+
+ group pathHistoryManager {
+     entry pathHistoryManager();
+
+     entry void traceCriticalPathBack(pathInformationMsg *msg);
+     entry void broadcastCriticalPathResult(pathInformationMsg *msg);
+     entry void criticalPathDone(CkReductionMsg *msg);
+ }   
+
+
+};

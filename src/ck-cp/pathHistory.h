@@ -18,13 +18,45 @@
 #include <vector>
 #include <map>
 #include <cmath>
-#include "ControlPoints.decl.h"
+#include "PathHistory.decl.h"
 #include "envelope.h"
 
 #include<pup_stl.h>
 
 
+
+
+
 void initializeCriticalPath(void);
+
+
+class pathHistoryManager : public CBase_pathHistoryManager {
+ public:
+  
+  pathInformationMsg *pathForUser; // A place to store the path for the user while we go about doing other things.
+  
+  pathHistoryManager();
+
+  pathHistoryManager(CkMigrateMessage *m){
+    CkAbort("pathHistoryManager does not have a working migration constructor."); 
+  }
+  
+  void pup(PUP::er &p) { 
+    CkAbort("pathHistoryManager cannot be pupped.");
+  } 
+
+  /** Trace perform a traversal backwards over the critical path specified as a 
+      table index for the processor upon which this is called.
+      
+      The callback cb will be called with the resulting msg after the path has 
+      been traversed to its origin.
+  */
+ void traceCriticalPathBack(pathInformationMsg *msg);
+ void broadcastCriticalPathResult(pathInformationMsg *msg);
+ void criticalPathDone(CkReductionMsg *msg);
+
+};
+
 
 
 /**
@@ -42,9 +74,6 @@ void initializeCriticalPath(void);
    This can be constructed from an envelope.
 */
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-
-//#warning "Usinge MergeablePathHistory in pathHistory.h"
 class MergeablePathHistory {
  public:
   double timeEntryMethodStarted;
@@ -57,6 +86,7 @@ class MergeablePathHistory {
   int local_ep;  // The locally executing EP
   int local_arr; // The locally executing array
 
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
  MergeablePathHistory(const envelope *env) 
    : sender_pe(env->getSrcPe()), 
     sender_history_table_idx(env->pathHistory.get_sender_history_table_idx()), 
@@ -67,7 +97,16 @@ class MergeablePathHistory {
       {
 	// No body
       }
-
+#else
+ MergeablePathHistory(const envelope *env) 
+   : sender_pe(env->getSrcPe()), 
+    local_ep(env->getEpIdx()),
+    local_arr(env->getArrayMgrIdx()),
+    timeEntryMethodStarted(0.0)
+      {
+	// No body
+      }
+#endif
 
   MergeablePathHistory() {
     reset();
@@ -110,8 +149,10 @@ class MergeablePathHistory {
 
   /// Write a description of the path into the beginning of the provided buffer. The buffer ought to be large enough.
   void printHTMLToString(char* buf) const{
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
     buf[0] = '\0';
     sprintf(buf+strlen(buf), "MergeablePathHistory time=%lf send pe=%d idx=%d timeEntryStarted=%lf", (double)preceding_path_time, (int)sender_pe, (int)sender_history_table_idx, (double)timeEntryMethodStarted);
+#endif
   }
 
   void setDebug100(){
@@ -119,10 +160,7 @@ class MergeablePathHistory {
     CkPrintf("Setting path length to 100\n");
   }
 
-
 };
-
-#endif
 
 
 /** 
@@ -256,9 +294,19 @@ class pathInformationMsg : public CMessage_pathInformationMsg {
 };
 
 
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-CkpvExtern(MergeablePathHistory, currentlyExecutingPath);
+CkpvExtern(MergeablePathHistory, currentlyExecutingPath); // The maximal incoming path for the node
 CkpvExtern(double, timeEntryMethodStarted);
+
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+/** A table to store all the local nodes in the parallel dependency graph */
+typedef std::map<int, PathHistoryTableEntry> PathHistoryTableType;
+CkpvExtern(PathHistoryTableType, pathHistoryTable);
+/** A counter that defines the new keys for the entries in the pathHistoryTable */
+CkpvExtern(int, pathHistoryTableLastIdx);
+
+
+
 
 // Reset the counts for the currently executing message. Cut the incoming path
 extern void resetThisEntryPath();
@@ -317,6 +365,8 @@ extern void criticalPath_split();
 
 
 #endif
+
+
 
 
 /** @} */

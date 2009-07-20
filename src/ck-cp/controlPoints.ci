@@ -7,12 +7,6 @@ module ControlPoints {
 
 
   initproc void registerIdleTimeReduction(void);	
-  initproc void initializeCriticalPath(void);	
-
-
-  message pathInformationMsg { 
-   	 PathHistoryTableEntry history[];
-  };
 
 
  message controlPointMsg { 
@@ -39,13 +33,6 @@ module ControlPoints {
 
     entry void requestIdleTime(CkCallback cb);
     entry void gatherIdleTime(CkReductionMsg *msg);
-
-//    entry void registerTerminalPath(PathHistory &path);
-
-
-     entry void traceCriticalPathBack(pathInformationMsg *msg);
-     entry void broadcastCriticalPathResult(pathInformationMsg *msg);
-     entry void criticalPathDone(CkReductionMsg *msg);
 
  }   
 

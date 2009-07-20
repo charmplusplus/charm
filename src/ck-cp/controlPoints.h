@@ -29,8 +29,8 @@
 #include <float.h>
 
 #include "LBDatabase.h"
-#include "pathHistory.h"
 #include "arrayRedistributor.h"
+#include "pathHistory.h" 
 
 using namespace std;
 
@@ -517,8 +517,6 @@ public:
   instrumentedPhase thisPhaseData;
   instrumentedPhase best_phase;
   
-  pathInformationMsg *pathForUser; // A place to store the path for the user while we go about doing other things.
-
   /// The lower and upper bounds for each named control point
   std::map<string, pair<int,int> > controlPointSpace;
 
@@ -545,13 +543,6 @@ public:
 
   bool alreadyRequestedMemoryUsage;
   bool alreadyRequestedIdleTime;
-
-
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  // A table of information about all the paths leading to executions of local entry methods.
-  std::map<int, PathHistoryTableEntry> pathHistoryTable;
-  int pathHistoryTableLastIdx;
-#endif
 
   controlPointManager();
      
@@ -602,16 +593,7 @@ public:
   void gatherMemoryUsage(CkReductionMsg *msg);
 
 
-  /** Trace perform a traversal backwards over the critical path specified as a 
-      table index for the processor upon which this is called.
-      
-      The callback cb will be called with the resulting msg after the path has 
-      been traversed to its origin.  
-  */
- void traceCriticalPathBack(pathInformationMsg *msg);
- void broadcastCriticalPathResult(pathInformationMsg *msg);
- void criticalPathDone(CkReductionMsg *msg);
-  
+
 
 
   /// Inform the control point framework that a named control point affects the priorities of some array  

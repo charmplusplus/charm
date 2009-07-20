@@ -179,7 +179,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h \
 	prefixrouter.h pipebroadcastconverse.h pipelinestrategy.h cmipool.h \
       comlib.h cmidirect.h cmidirectmanytomany.h \
-      controlPoints.h arrayRedistributor.h controlPoints.h pathHistory.h
+      controlPoints.h arrayRedistributor.h controlPoints.h 
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -189,7 +189,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	sockRoutines.h sockRoutines.c ckpool.h BGLTorus.h BGPTorus.h \
 	TopoManager.h XT3Torus.h XT4Torus.h cmimemcpy.h simd.h SSE-Double.h SSE-Float.h
 
-CKHEADERS=ck.h ckstream.h envelope-path.h envelope.h envelope-path.h init.h qd.h charm.h charm++.h \
+CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  ckarrayreductionmgr.h cknodegroupreduction.h cksection.h \
@@ -212,7 +212,6 @@ CKHEADERS=ck.h ckstream.h envelope-path.h envelope.h envelope-path.h init.h qd.h
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h 	\
           CkReduction.decl.h CkArrayReductionMgr.decl.h\
           tempo.decl.h waitqd.decl.h \
-	  ControlPoints.decl.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkMemCheckpoint.decl.h \
           LBDatabase.decl.h CentralLB.decl.h ComboCentLB.decl.h NullLB.decl.h \
           RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h MetisLB.decl.h \
@@ -236,6 +235,8 @@ CKHEADERS=ck.h ckstream.h envelope-path.h envelope.h envelope-path.h init.h qd.h
 	  BroadcastStrategy.h ComlibSectionInfo.h AAPLearner.h \
 	  AAMLearner.h ComlibStats.h \
 	  RectMulticastStrategy.h ckdirect.h \
+	  ControlPoints.decl.h PathHistory.decl.h \
+	  pathHistory.h envelope-path.h \
 	  $(CVHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
@@ -627,7 +628,7 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o  \
            ObjGraph.o graph.o LButil.o Refiner.o RefinerApprox.o  \
            RefinerComm.o bitvecset.o Set.o heap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) \
-	   charmProjections.o
+	   charmProjections.o pathHistory.o
 
 charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs controlPoints_objs 
 
@@ -873,7 +874,7 @@ TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
 ######################################################################
 
 
-CONTROLPOINTS_OBJS = controlPoints.o arrayRedistributor.o pathHistory.o
+CONTROLPOINTS_OBJS = controlPoints.o arrayRedistributor.o
 
 ControlPoints.def.h: ControlPoints.decl.h
 
@@ -884,6 +885,20 @@ controlPoints_objs: $(L)/libmoduleControlPoints.a
 
 $(L)/libmoduleControlPoints.a: $(CONTROLPOINTS_OBJS)
 	$(CHARMC) -o $(L)/libmoduleControlPoints.a $(CONTROLPOINTS_OBJS)
+
+
+######################################################################
+#
+# Critical Path Library
+#
+######################################################################
+
+
+PathHistory.def.h: PathHistory.decl.h
+
+PathHistory.decl.h : pathHistory.ci charmxi
+	$(CHARMXI) pathHistory.ci
+
 
 
 ###############################################################################

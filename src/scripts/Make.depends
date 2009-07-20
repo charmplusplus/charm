@@ -489,7 +489,8 @@ ck.o: ck.C ck.h charm++.h charm.h converse.h conv-config.h \
   tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h envelope.h qd.h register.h stats.h ckfutures.h \
-  ckIgetControl.h queueing.h CkMarshall.def.h
+  ckIgetControl.h queueing.h pathHistory.h PathHistory.decl.h pup_stl.h \
+  pup.h CkMarshall.def.h
 	$(CHARMC) -c -I. ck.C
 
 main.o: main.C ck.h charm++.h charm.h converse.h conv-config.h \
@@ -662,7 +663,7 @@ ckarray.o: ckarray.C charm++.h charm.h converse.h conv-config.h \
   tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h envelope.h register.h ck.h qd.h stats.h ckfutures.h \
-  ckIgetControl.h pathHistory.h ControlPoints.decl.h pup_stl.h pup.h \
+  ckIgetControl.h pathHistory.h PathHistory.decl.h pup_stl.h pup.h \
   CkArray.def.h
 	$(CHARMC) -c -I. ckarray.C
 
@@ -681,7 +682,8 @@ ckreduction.o: ckreduction.C charm++.h charm.h converse.h conv-config.h \
   tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h envelope.h ck.h qd.h register.h stats.h ckfutures.h \
-  ckIgetControl.h CkReduction.def.h
+  ckIgetControl.h pathHistory.h PathHistory.decl.h pup_stl.h pup.h \
+  CkReduction.def.h
 	$(CHARMC) -c -I. ckreduction.C
 
 ckarrayreductionmgr.o: ckarrayreductionmgr.C charm++.h charm.h converse.h \
@@ -1383,6 +1385,37 @@ charmProjections.o: charmProjections.C converse.h conv-config.h \
   envelope.h qd.h register.h stats.h ckfutures.h ckIgetControl.h \
   trace-common.h
 	$(CHARMC) -c -I. charmProjections.C
+
+pathHistory.o: pathHistory.C charm++.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
+  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
+  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
+  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
+  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
+  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
+  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
+  CkReduction.decl.h charm++.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
+  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
+  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
+  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
+  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
+  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
+  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
+  CkLocation.decl.h charm++.h CkMarshall.decl.h ckmemcheckpoint.h \
+  CkArray.decl.h charm++.h CkReduction.decl.h CkLocation.decl.h \
+  CkArrayReductionMgr.decl.h CkArrayReductionMgr.decl.h ckstream.h \
+  CkFutures.decl.h charm++.h charisma.h charisma.decl.h charm++.h tempo.h \
+  charm++.h tempo.decl.h charm++.h waitqd.h charm++.h waitqd.decl.h \
+  charm++.h CkFutures.decl.h sdag.h charm++.h ckcheckpoint.h \
+  CkCheckpoint.decl.h charm++.h ckevacuation.h ckarrayreductionmgr.h \
+  trace.h conv-trace.h trace-bluegene.h trace.h envelope.h charm.h \
+  PathHistory.decl.h charm++.h LBDatabase.h pathHistory.h envelope.h \
+  pup_stl.h pup.h arrayRedistributor.h ControlPoints.decl.h register.h \
+  PathHistory.def.h
+	$(CHARMC) -c -I. pathHistory.C
 
 EveryLB.o: EveryLB.C charm++.h charm.h converse.h conv-config.h \
   conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
@@ -2915,8 +2948,8 @@ controlPoints.o: controlPoints.C charm++.h charm.h converse.h \
   ckcheckpoint.h CkCheckpoint.decl.h charm++.h ckevacuation.h \
   ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
   envelope.h charm.h controlPoints.h ControlPoints.decl.h charm++.h \
-  pup_stl.h pup.h LBDatabase.h pathHistory.h envelope.h \
-  arrayRedistributor.h trace-controlPoints.h trace.h register.h \
+  pup_stl.h pup.h LBDatabase.h arrayRedistributor.h pathHistory.h \
+  PathHistory.decl.h envelope.h trace-controlPoints.h trace.h register.h \
   trace-common.h trace-projections.h ckhashtable.h pup.h \
   ControlPoints.def.h
 	$(CHARMC) -c -I. controlPoints.C
@@ -2949,37 +2982,7 @@ arrayRedistributor.o: arrayRedistributor.C charm++.h charm.h converse.h \
   ckarrayreductionmgr.h trace.h conv-trace.h trace-bluegene.h trace.h \
   envelope.h charm.h ControlPoints.decl.h charm++.h trace-controlPoints.h \
   trace.h envelope.h register.h trace-common.h LBDatabase.h \
-  controlPoints.h pup_stl.h pup.h pathHistory.h arrayRedistributor.h
+  controlPoints.h pup_stl.h pup.h arrayRedistributor.h pathHistory.h \
+  PathHistory.decl.h
 	$(CHARMC) -c -I. arrayRedistributor.C
-
-pathHistory.o: pathHistory.C charm++.h charm.h converse.h conv-config.h \
-  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
-  conv-config.h conv-cpm.h converse.h conv-cpath.h converse.h conv-qd.h \
-  conv-random.h conv-lists.h conv-trace.h converse.h persistent.h \
-  debug-conv.h pup_c.h pup.h middle.h middle-conv.h converse.h pup.h \
-  cklists.h pup.h ckbitvector.h ckstream.h init.h charm.h ckhashtable.h \
-  pup.h debug-charm.h converse.h debug-conv.h pup.h cklists.h simd.h \
-  CkMarshall.decl.h charm++.h ckhashtable.h pup.h cksection.h \
-  ckcallback.h conv-ccs.h converse.h sockRoutines.h conv-config.h \
-  ccs-server.h sockRoutines.h ckobjQ.h cklists.h ckreduction.h \
-  CkReduction.decl.h charm++.h cknodegroupreduction.h \
-  CkArrayReductionMgr.decl.h charm++.h CkReduction.decl.h \
-  ckmemcheckpoint.h CkMemCheckpoint.decl.h charm++.h readonly.h charm.h \
-  ckarray.h cklocation.h LBDatabase.h lbdb.h converse.h charm.h middle.h \
-  LBDBManager.h converse.h lbdb.h cklists.h LBObj.h lbdb.h LBOM.h lbdb.h \
-  LBObj.h LBComm.h converse.h lbdb.h LBMachineUtil.h lbdb++.h \
-  LBDBManager.h LBDatabase.decl.h charm++.h NullLB.decl.h charm++.h \
-  LBDatabase.decl.h BaseLB.decl.h charm++.h LBDatabase.decl.h \
-  CkLocation.decl.h charm++.h CkMarshall.decl.h ckmemcheckpoint.h \
-  CkArray.decl.h charm++.h CkReduction.decl.h CkLocation.decl.h \
-  CkArrayReductionMgr.decl.h CkArrayReductionMgr.decl.h ckstream.h \
-  CkFutures.decl.h charm++.h charisma.h charisma.decl.h charm++.h tempo.h \
-  charm++.h tempo.decl.h charm++.h waitqd.h charm++.h waitqd.decl.h \
-  charm++.h CkFutures.decl.h sdag.h charm++.h ckcheckpoint.h \
-  CkCheckpoint.decl.h charm++.h ckevacuation.h ckarrayreductionmgr.h \
-  trace.h conv-trace.h trace-bluegene.h trace.h envelope.h charm.h \
-  ControlPoints.decl.h charm++.h trace-controlPoints.h trace.h envelope.h \
-  register.h trace-common.h LBDatabase.h controlPoints.h pup_stl.h pup.h \
-  pathHistory.h arrayRedistributor.h register.h
-	$(CHARMC) -c -I. pathHistory.C
 
