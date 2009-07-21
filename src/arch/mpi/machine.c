@@ -847,7 +847,7 @@ static void CommunicationServer(int sleepTime)
     }
 #endif
     MACHSTATE(2, "} CommunicationServer EXIT");
-#if ! CMK_MPI_VMI
+#if ! CMK_AUTOBUILD
     MPI_Finalize();
 #endif
     exit(0);
@@ -1490,7 +1490,7 @@ void ConverseExit(void)
 #endif
 }
 #endif
-#if ! CMK_MPI_VMI
+#if ! CMK_AUTOBUILD
   MPI_Finalize();
 #endif
   exit(0);
