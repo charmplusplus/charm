@@ -118,6 +118,7 @@ public:
     numNodes = n+1;
     return numNodes;
 #else
+    if (numNodes > 0) return numNodes;     // already calculated
     CkVec<int> unodes;
     int i;
     for (i=0; i<CmiNumPes(); i++)  unodes.push_back(nodeIDs[i]);
