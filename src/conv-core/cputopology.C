@@ -108,6 +108,7 @@ public:
   static int numNodes;
   static CkVec<int> *bynodes;
 
+    // return -1 when not supported
   int numUniqNodes() {
 #if 0
     if (numNodes != 0) return numNodes;
@@ -129,7 +130,7 @@ public:
         if (unodes[i] != last) numNodes++; 
         last=unodes[i];
     }
-    return numNodes;
+    return numNodes>0?numNodes:-1;
 #endif
   }
 
@@ -236,22 +237,26 @@ static void cpuTopoRecvHandler(void *msg)
 }
 
 
+// return -1 when not supported
 extern "C" int CmiOnSamePhysicalNode(int pe1, int pe2)
 {
   int *nodeIDs = cpuTopo.nodeIDs;
   return nodeIDs==NULL?-1:nodeIDs[pe1] == nodeIDs[pe2];
 }
 
+// return -1 when not supported
 extern "C" int CmiNumPhysicalNodes()
 {
   return cpuTopo.numUniqNodes();
 }
 
+// return -1 when not supported
 extern "C" int CmiNumPesOnPhysicalNode(int pe)
 {
   return cpuTopo.bynodes==NULL?-1:(int)cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].size();
 }
 
+// pelist points to system memory, user should not free it
 extern "C" void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num)
 {
   CmiAssert(pe >=0 && pe < CmiNumPes());
@@ -259,6 +264,7 @@ extern "C" void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num)
   if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].getVec();
 }
 
+// the least number processor on the same physical node
 extern "C"  int CmiGetFirstPeOnPhysicalNode(int pe)
 {
   CmiAssert(pe >=0 && pe < CmiNumPes());
