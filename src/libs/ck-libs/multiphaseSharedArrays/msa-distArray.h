@@ -16,7 +16,7 @@ class Writable
     
 public:
     Writable(ENTRY &e_) : e(e_) {}
-    inline const ENTRY& operator= (const ENTRY& rhs) { e = rhs; }
+    inline const ENTRY& operator= (const ENTRY& rhs) { e = rhs; return rhs; }
 };
 
 template <typename ENTRY, class ENTRY_OPS_CLASS>
