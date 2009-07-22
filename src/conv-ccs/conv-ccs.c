@@ -272,7 +272,7 @@ void CcsImpl_reply(CcsImplHeader *rep,int repLen,const void *repData)
     int len=CmiMsgHeaderSizeBytes+
 	       sizeof(CcsImplHeader)+repLen;
     char *msg=CmiAlloc(len);
-    char *r=msg;
+    char *r=msg+CmiMsgHeaderSizeBytes;
     *(CcsImplHeader *)r=*rep; r+=sizeof(CcsImplHeader);
     memcpy(r,repData,repLen);
     CmiSetHandler(msg,rep_fw_handler_idx);
@@ -284,7 +284,7 @@ converse to node 0.*/
 static void rep_fw_handler(char *msg)
 {
   int len;
-  char *r=msg;
+  char *r=msg+CmiMsgHeaderSizeBytes;
   CcsImplHeader *hdr=(CcsImplHeader *)r; 
   r+=sizeof(CcsImplHeader);
   len=ChMessageInt(hdr->len);
