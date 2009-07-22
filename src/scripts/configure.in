@@ -634,6 +634,7 @@ EOT
 mv -f ../include/mpi.h ../include/mpi.h.bak 2>/dev/null
 test_cxx "whether build on MPI" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_BUILD_ON_MPI, $strictpass, [build MPI.])
+BUILD_MPI=$strictpass
 
 if test $strictpass -eq 1
 then
@@ -709,7 +710,7 @@ void foo(void) {
   poll(pos, 1, 1);
 }
 EOT
-test_cxx "whether the poll() syscall exists" "yes" "no" ""
+test_cxx "whether poll() syscall exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass, [whether the poll() syscall exists])
 
 #### check if getpid exists ####
@@ -732,7 +733,7 @@ void foo(void) {
   setpriority(PRIO_PROCESS, 0, 0);
 }
 EOT
-test_cxx "whether the setpriority() exists" "yes" "no" ""
+test_cxx "whether setpriority() exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_SETPRIORITY, $pass, [whether the setpriority() exists])
 
 #### test for system ###
@@ -1097,7 +1098,29 @@ if test $pass -eq 0
 then 
 	add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
 else
-	add_flag 'CMK_NO_BUILD_SHARED="false"' "build-shared"
+	BUILD_SHARED=1
+        if test $BUILD_MPI -eq 1
+	then
+cat > $t <<EOT
+#include "stdlib.h"
+#include "mpi.h"
+extern int foo();
+int foo(int argc, char ** argv) {
+  void * t= malloc(2);
+  foo();
+  MPI_Init(&argc, &argv);
+  return 0;
+}
+EOT
+		test_linkso "whether can build shared library with MPI" "yes" "no" ""
+		BUILD_SHARED=$pass
+	fi
+	if test $BUILD_SHARED -eq 1
+	then
+		add_flag 'CMK_NO_BUILD_SHARED="false"' "build-shared"
+	else
+		add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
+	fi
 fi
 
 #### test the version number of bproc ####
