@@ -845,6 +845,11 @@ void mpi_migrate(void)
   AMPI_Migrate();
 }
 
+void mpi_setmigratable(int *comm, int *mig)
+{
+  AMPI_Setmigratable(*comm, * mig);
+}
+
 void mpi_migrateto(int *destPE)
 {
   AMPI_Migrateto(*destPE);
@@ -860,9 +865,9 @@ void mpi_stop_measure()
   AMPI_Stop_measure();
 }
 
-void mpi_set_load(double load)
+void mpi_set_load(double *load)
 {
-  AMPI_Set_load(load);
+  AMPI_Set_load(*load);
 }
 
 void mpi_register(void *d, MPI_PupFn f)
