@@ -832,6 +832,7 @@ static void sendBarrierMessage(int pe)
   OtherNode  node = nodes + pe;
   int retval = -1;
   if (dataskt!=-1) {
+  buf[0] = 61; buf[1] = 31;
   while (retval == -1) {
      retval = sendto(dataskt, (char *)buf, 32, 0,
 	 (struct sockaddr *)&(node->addr),
@@ -846,6 +847,7 @@ static void recvBarrierMessage()
   int nreadable, ok, s;
   
   if (dataskt!=-1) {
+    retry:
         do {
         CMK_PIPE_DECL(10);
 	CMK_PIPE_ADDREAD(dataskt);
@@ -856,6 +858,7 @@ static void recvBarrierMessage()
         } while (1);
         ok = recv(dataskt,buf,32,0);
         CmiAssert(ok >= 0);
+        if (buf[0]!=61 || buf[1]!=31) goto retry;
   }
 }
 
