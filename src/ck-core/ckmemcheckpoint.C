@@ -76,8 +76,8 @@ int killFlag=0;
 double killTime=0.0;
 #endif
 
-/// checkpoint buffer for processor system data
-CpvStaticDeclare(CkProcCheckPTMessage*, procChkptBuf);
+/// checkpoint buffer for processor system data, remove static to make icpc 10.1 pass with -O
+CpvDeclare(CkProcCheckPTMessage*, procChkptBuf);
 
 // compute the backup processor
 // FIXME: avoid crashed processors
