@@ -459,7 +459,7 @@ static void CthThreadBaseFree(CthThreadBase *th)
   for(l=th->listener;l!=NULL;l=lnext){
 	lnext=l->next;
 	l->next=0;
-	l->free(l);
+	if (l->free) l->free(l);
   }
   free(th->data);
   if (th->isMigratable) {
@@ -625,7 +625,7 @@ static void CthBaseResume(CthThread t)
 {
   struct CthThreadListener *l;
   for(l=B(t)->listener;l!=NULL;l=l->next){
-	l->resume(l);
+	if (l->resume) l->resume(l);
   }
   CpvAccess(_numSwitches)++;
   CthFixData(t); /*Thread-local storage may have changed in other thread.*/
@@ -658,7 +658,7 @@ void CthSuspend(void)
 	Call the suspend function on listeners
   */
   for(l=cur->listener;l!=NULL;l=l->next){
-	l->suspend(l);
+	if (l->suspend) l->suspend(l);
   }
   if (cur->choosefn == 0) CthNoStrategy();
   next = cur->choosefn();
