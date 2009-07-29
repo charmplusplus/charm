@@ -1870,10 +1870,10 @@ static int find_largest_free_region(memRegion_t *destRegion) {
 static int try_largest_mmap_region(memRegion_t *destRegion)
 {
   void *bad_alloc=(void*)(-1); /* mmap error return address */
-  void *range;
+  void *range, *good_range=NULL;
   double shrink = 1.5;
   static int count = 0;
-  size_t size=((size_t)(-1l));
+  size_t size=((size_t)(-1l)), good_size=0;
   if (sizeof(size_t) > 8) size = size>>2;  /* 25% of machine address space! */
   while (1) { /* test out an allocation of this size */
 	range=mmap(NULL,size,PROT_READ|PROT_WRITE,
@@ -1891,17 +1891,18 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
 	}
 	else { /* this allocation size is available */
 		munmap(range,size); /* needed/wanted? */
-                count++;
-                if (count == 1) {             /* first time we get one */
-                  size=(double)size*shrink;   /* go back once and try again */
-                  shrink=1.1;                 /* refine */
-                  continue;
-                }
+		if (size > good_size) {
+		  good_range = range;
+		  good_size = size;
+		  size=((double)size)*1.1;
+		  continue;
+		}
 		break;
 	}
   }
-  destRegion->start=range; 
-  destRegion->len=size;
+  CmiAssert(good_range!=NULL);
+  destRegion->start=good_range; 
+  destRegion->len=good_size;
 #if CMK_THREADS_DEBUG
 pid_t pid = getpid();
 {
@@ -1909,7 +1910,7 @@ char s[128];
 sprintf(s, "cat /proc/%d/maps", pid);
 system(s);
 }
-  CmiPrintf("[%d] try_largest_mmap_region: %p, %lld\n", CmiMyPe(), range, size);
+  CmiPrintf("[%d] try_largest_mmap_region: %p, %lld\n", CmiMyPe(), good_range, good_size);
 #endif
   return 1;
 }
@@ -1943,8 +1944,9 @@ static void init_ranges(char **argv)
 #if CMK_MMAP_PROBE
       if (freeRegion.len==0u) 
         if (try_largest_mmap_region(&freeRegion)) _sync_iso = 1;
-#endif
+#else
       if (freeRegion.len==0u) find_largest_free_region(&freeRegion);
+#endif
       
 #if 0
       /*Make sure our largest slot number doesn't overflow an int:*/
@@ -1975,7 +1977,7 @@ static void init_ranges(char **argv)
   if (_sync_iso == 1)
   {
         if (CmiMyRank() == 0 && freeRegion.len > 0u) {
-          if (CmiBarrier() == -1) 
+          if (CmiBarrier() == -1 && CmiMyPe()==0) 
             CmiAbort("Charm++ Error> +isomalloc_sync requires CmiBarrier() implemented.\n");
           else {
             CmiUInt8 s = (CmiUInt8)freeRegion.start;
@@ -2044,9 +2046,11 @@ static void init_ranges(char **argv)
 #endif
 
               /* update */
+            if (s > e)  {
+              CmiAbort("isomalloc> failed to find consolidated isomalloc region!");
+            }
             freeRegion.start = (void *)s;
             freeRegion.len = (char *)e -(char *)s;
-            CmiAssert(freeRegion.len >= 0u);
 
             if (CmiMyPe() == 0)
             CmiPrintf("[%d] consolidated Isomalloc memory region: %p - %p (%d megs)\n",CmiMyPe(),
