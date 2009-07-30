@@ -22,6 +22,10 @@ The calls needed to use the reduction manager are:
 
 #include "CkArrayReductionMgr.decl.h"
 
+#if CMK_BLUEGENE_CHARM
+#define GROUP_LEVEL_REDUCTION           1
+#endif
+
 class CkReductionMsg; //See definition below
 
 
@@ -133,6 +137,8 @@ public:
 	//A late migrating contributor will never contribute
 	void MigrantDied(CkReductionNumberMsg *m);
 
+	void RecvMsg(CkReductionMsg *m);
+
 	//Call back for using Node added by Sayantan
 	void ArrayReductionHandler(CkReductionMsg *m);
 	void endArrayReduction();
@@ -186,13 +192,25 @@ private:
 	void addContribution(CkReductionMsg *m);
 	void finishReduction(void);
 
-/*//Reduction tree utilities
+#if GROUP_LEVEL_REDUCTION
+//Reduction tree utilities
+	unsigned upperSize;
+	unsigned label;
+	int parent;
+	int numKids;
+	/*vector storing the children of this node*/
+	CkVec<int> newKids;
+	CkVec<int> kids;
+	void init_BinomialTree();
+
+	void init_BinaryTree();
 	enum {TREE_WID=2};
 	int treeRoot(void);//Root PE
 	CmiBool hasParent(void);
 	int treeParent(void);//My parent PE
 	int firstKid(void);//My first child PE
-	int treeKids(void);//Number of children in tree*/
+	int treeKids(void);//Number of children in tree
+#endif
 
 	//Combine (& free) the current message vector.
 	CkReductionMsg *reduceMessages(void);

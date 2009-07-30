@@ -179,6 +179,13 @@ they're passed to the user's client function.
 CkReductionMgr::CkReductionMgr()//Constructor
   : thisProxy(thisgroup)
 { 
+#if GROUP_LEVEL_REDUCTION
+#ifdef BINOMIAL_TREE
+  init_BinomialTree();
+#else
+  init_BinaryTree();
+#endif
+#endif
   redNo=0;
   completedRedNo = -1;
   inProgress=CmiFalse;
@@ -376,6 +383,9 @@ void CkReductionMgr::contributorArriving(contributorInfo *ci)
 // Each contributor must contribute exactly once to the each reduction.
 void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
+#if CMK_BLUEGENE_CHARM
+  _TRACE_BG_TLINE_END(&(m->log));
+#endif
   DEBR((AA"Contributor %p contributed for %d in grp %d ismigratable %d \n"AB,ci,ci->redNo,thisgroup.idx,m->isMigratableContributor()));
   m->ci=ci;
   m->redNo=ci->redNo++;
@@ -481,7 +491,13 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 // of migrants that missed the main reduction.
 void CkReductionMgr::LateMigrantMsg(CkReductionMsg *m)
 {
-	m->secondaryCallback = m->callback;
+#if GROUP_LEVEL_REDUCTION
+#if CMK_BLUEGENE_CHARM
+  _TRACE_BG_TLINE_END(&(m->log));
+#endif
+  addContribution(m);
+#else
+  m->secondaryCallback = m->callback;
   m->callback = CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(NULL),0,thisProxy);
   CkArrayReductionMgr *nodeMgr=nodeProxy[CkMyNode()].ckLocalBranch();
   nodeMgr->LateMigrantMsg(m);
@@ -489,6 +505,7 @@ void CkReductionMgr::LateMigrantMsg(CkReductionMsg *m)
 	finalMsgs.enq(m);
 //	CkPrintf("[%d]Late Migrant Detected for %d ,  (%d %d )\n",CkMyPe(),m->redNo,len,finalMsgs.length());
 	endArrayReduction();*/
+#endif
 }
 
 //A late migrating contributor will never contribute to this reduction
@@ -521,7 +538,6 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 //If none of these cases, we need to start the reduction--
   DEBR((AA"Starting reduction #%d  %d %d \n"AB,redNo,completedRedNo,number));
   inProgress=CmiTrue;
-  //Sent start requests to our kids (in case they don't already know)
  
 
 	/*
@@ -551,7 +567,16 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 
 
 #else
-	nodeProxy[CkMyNode()].ckLocalBranch()->startNodeGroupReduction(number,thisgroup);
+  //Sent start requests to our kids (in case they don't already know)
+#if GROUP_LEVEL_REDUCTION
+  for (int k=0;k<treeKids();k++)
+  {
+    DEBR((AA"Asking child PE %d to start #%d\n"AB,firstKid()+k,redNo));
+    thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
+  }
+#else
+  nodeProxy[CkMyNode()].ckLocalBranch()->startNodeGroupReduction(number,thisgroup);
+#endif
 #endif
 	
 	/*
@@ -605,9 +630,6 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 /*Handle a message from one element for the reduction*/
 void CkReductionMgr::addContribution(CkReductionMsg *m)
 {
-#if CMK_BLUEGENE_CHARM
-  _TRACE_BG_TLINE_END(&(m->log));
-#endif
   if (isPast(m->redNo))
   {
 #ifdef _FAULT_MLOG_
@@ -651,6 +673,9 @@ void CkReductionMgr::finishReduction(void)
          DEBR((AA"Need more local messages %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
 	 return;//Need more local messages
   }
+#if GROUP_LEVEL_REDUCTION
+  if (nRemote<treeKids()) return;//Need more remote messages
+#endif
  
 #else
 
@@ -681,6 +706,38 @@ void CkReductionMgr::finishReduction(void)
   result->redNo=redNo;
 #ifndef _FAULT_MLOG_
 
+#if GROUP_LEVEL_REDUCTION
+  if (hasParent())
+  {//Pass data up tree to parent
+    DEBR((AA"Passing reduced data up to parent node %d.\n"AB,treeParent()));
+    DEBR((AA"Message gcount is %d+%d+%d.\n"AB,result->gcount,gcount,adj(redNo).gcount));
+    result->gcount+=gcount+adj(redNo).gcount;
+    thisProxy[treeParent()].RecvMsg(result);
+  }
+  else 
+  {//We are root-- pass data to client
+    DEBR((AA"Final gcount is %d+%d+%d.\n"AB,result->gcount,gcount,adj(redNo).gcount));
+    int totalElements=result->gcount+gcount+adj(redNo).gcount;
+    if (totalElements>result->nSources()) 
+    {
+      DEBR((AA"Only got %d of %d contributions (c'mon, migrators!)\n"AB,result->nSources(),totalElements));
+      msgs.enq(result);
+      return; // Wait for migrants to contribute
+    } else if (totalElements<result->nSources()) {
+      DEBR((AA"Got %d of %d contributions\n"AB,result->nSources(),totalElements));
+      CkAbort("ERROR! Too many contributions at root!\n");
+    }
+    DEBR((AA"Passing result to client function\n"AB));
+    if (!result->callback.isInvalid())
+	    result->callback.send(result);
+    else if (!storedCallback.isInvalid())
+	    storedCallback.send(result);
+    else
+	    CkAbort("No reduction client!\n"
+		    "You must register a client with either SetReductionClient or during contribute.\n");
+  }
+
+#else
   result->gcount+=gcount+adj(redNo).gcount;
 
   result->secondaryCallback = result->callback;
@@ -696,7 +753,8 @@ void CkReductionMgr::finishReduction(void)
   // Find our node reduction manager, and pass reduction to him:
   CkArrayReductionMgr *nodeMgr=nodeProxy[CkMyNode()].ckLocalBranch();
   nodeMgr->contributeArrayReduction(result);
-#else
+#endif
+#else                // _FAULT_MLOG_
 #if DEBUGRED
     CkPrintf("~~~~~~~~~~~~~~~~~ About to call callback from end of SIMPLIFIED GROUP REDUCTION %d at %.6f\n",redNo,CmiWallTimer());
 #endif
@@ -715,7 +773,7 @@ void CkReductionMgr::finishReduction(void)
        CkPrintf("[%d,%d]------------END OF SIMPLIFIED GROUP REDUCTION %d for group %d at %.6f\n",CkMyNode(),CkMyPe(),redNo,thisgroup.idx,CkWallTimer());
 #endif
 
-#endif
+#endif               // _FAULT_MLOG_
 
   //House Keeping Operations will have to check later what needs to be changed
   redNo++;
@@ -746,13 +804,45 @@ void CkReductionMgr::finishReduction(void)
     if (m!=NULL) //One of these addContributions may have finished us.
       addContribution(m);//<- if *still* early, puts it back in the queue
   }
-#ifndef _FAULT_MLOG_   
+#if GROUP_LEVEL_REDUCTION
+  n=futureRemoteMsgs.length();
+  for (i=0;i<n;i++)
+  {
+    CkReductionMsg *m=futureRemoteMsgs.deq();
+    if (m!=NULL) {
+      RecvMsg(m);//<- if *still* early, puts it back in the queue
+    }
+  }
+#endif
 
+#ifndef _FAULT_MLOG_   
   if(maxStartRequest >= redNo){
 	  startReduction(redNo,CkMyPe());
 	  finishReduction();
   }
  
+#endif
+}
+
+//Sent up the reduction tree with reduced data
+  void CkReductionMgr::RecvMsg(CkReductionMsg *m)
+{
+#if GROUP_LEVEL_REDUCTION
+#if CMK_BLUEGENE_CHARM
+  _TRACE_BG_TLINE_END(&m->log);
+#endif
+  if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
+    DEBR((AA"Recv'd remote contribution %d for #%d\n"AB,nRemote,m->redNo));
+    startReduction(m->redNo, CkMyPe());
+    msgs.enq(m);
+    nRemote++;
+    finishReduction();
+  }
+  else if (isFuture(m->redNo)) {
+    DEBR((AA"Recv'd early remote contribution %d for #%d\n"AB,nRemote,m->redNo));
+    futureRemoteMsgs.enq(m);
+  } 
+  else CkAbort("Recv'd late remote contribution!\n");
 #endif
 }
 
@@ -926,6 +1016,15 @@ void CkReductionMgr::pup(PUP::er &p)
   if(p.isUnpacking()){
     thisProxy = thisgroup;
     maxStartRequest=0;
+#if GROUP_LEVEL_REDUCTION
+    if(p.isUnpacking()) {
+#ifdef BINOMIAL_TREE
+      init_BinomialTree();
+#else
+      init_BinaryTree();
+#endif
+    }
+#endif
   }
 #if DEBUGRED
   CkPrintf("[%d,%d] pupping _____________  gcount = %d \n",CkMyNode(),CkMyPe(),gcount);
@@ -1087,6 +1186,81 @@ void CkReductionMgr :: endArrayReduction(){
 	endArrayReduction();
 }
 
+#if GROUP_LEVEL_REDUCTION
+
+void CkReductionMgr::init_BinaryTree(){
+	parent = (CkMyPe()-1)/TREE_WID;
+	int firstkid = CkMyPe()*TREE_WID+1;
+	numKids=CkNumPes()-firstkid;
+        if (numKids>TREE_WID) numKids=TREE_WID;
+         if (numKids<0) numKids=0;
+
+	for(int i=0;i<numKids;i++){
+		kids.push_back(firstkid+i);
+		newKids.push_back(firstkid+i);
+	}
+}
+
+void CkReductionMgr::init_BinomialTree(){
+	int depth = (int )ceil((log((double )CkNumPes())/log((double)2)));
+	/*upperSize = (unsigned )pow((double)2,depth);*/
+	upperSize = (unsigned) 1 << depth;
+	label = upperSize-CkMyPe()-1;
+	int p=label;
+	int count=0;
+	while( p > 0){
+		if(p % 2 == 0)
+			break;
+		else{
+			p = p/2;
+			count++;
+		}
+	}
+	/*parent = label + rint(pow((double)2,count));*/
+	parent = label + (1<<count);
+	parent = upperSize -1 -parent;
+	int temp;
+	if(count != 0){
+		numKids = 0;
+		for(int i=0;i<count;i++){
+			/*temp = label - rint(pow((double)2,i));*/
+			temp = label - (1<<i);
+			temp = upperSize-1-temp;
+			if(temp <= CkNumPes()-1){
+				kids.push_back(temp);
+				numKids++;
+			}
+		}
+	}else{
+		numKids = 0;
+	//	kids = NULL;
+	}
+}
+
+
+int CkReductionMgr::treeRoot(void)
+{
+  return 0;
+}
+CmiBool CkReductionMgr::hasParent(void) //Root Node
+{
+  return (CmiBool)(CkMyPe()!=treeRoot());
+}
+int CkReductionMgr::treeParent(void) //My parent Node
+{
+  return parent;
+}
+
+int CkReductionMgr::firstKid(void) //My first child Node
+{
+  return CkMyPe()*TREE_WID+1;
+}
+int CkReductionMgr::treeKids(void)//Number of children in tree
+{
+  return numKids;
+}
+
+#endif
 
 /////////////////////////////////////////////////////////////////////////
 
