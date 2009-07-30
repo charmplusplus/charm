@@ -64,7 +64,6 @@ inline int isEqual(double v1, double v2){
 	if (genTimeLog) BgLogEntryCommit(tTIMELINEREC);
 
 #define BG_ADDMSG(m, node, tid, sendT, local, group)  	\
-        BgGetTime();		\
 	BgMsgSetTiming(m); 	\
         if (genTimeLog)	{ \
 	  if (tTHREADTYPE == WORK_THREAD) {	\
@@ -87,7 +86,6 @@ inline int isEqual(double v1, double v2){
             }						\
 	    /* log[log.length()-1]->print(); */		\
           }	\
-	  resetVTime(); \
 	}
 
 #else

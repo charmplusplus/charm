@@ -88,9 +88,7 @@ void BgEntrySplit(const char* name)
 void * BgSplitEntry(const char* name, void **parentlogs, int n)
 {
   void *curLog = NULL;
-  stopVTimer();
   if (genTimeLog) curLog = tTIMELINEREC.logSplit(name, (BgTimeLog **)parentlogs, n);
-  startVTimer();
   return curLog;
 }
 

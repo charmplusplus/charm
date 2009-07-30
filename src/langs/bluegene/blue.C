@@ -318,24 +318,32 @@ void startVTimer()
 static inline void advanceTime(double inc)
 {
   if (BG_ABS(inc) < 1e-10) inc = 0.0;    // ignore floating point errors
+  if (inc < 0.0) return;
   CmiAssert(inc>=0.0);
   inc *= cva(bgMach).cpufactor;
   tCURRTIME += inc;
+  CmiAssert(tTIMERON==1);
 }
+
+#define TIMER_COST 0.0000007
+//#define TIMER_COST 0.0
 
 void stopVTimer()
 {
   int k;
+#if 0
   if (tTIMERON != 1) {
     CmiAbort("stopVTimer called without startVTimer!\n");
   }
   CmiAssert(tTIMERON == 1);
-  tTIMERON = 0;
+#else
+  if (tTIMERON == 0) return;         // already stopped
+#endif
   const int timingMethod = cva(bgMach).timingMethod;
   if (timingMethod == BG_WALLTIME) {
     const double tp = BG_TIMER();
     double inc = tp-tSTARTTIME;
-    advanceTime(inc);
+    advanceTime(inc-TIMER_COST);
 //    tSTARTTIME = BG_TIMER();	// skip the above time
   }
   else if (timingMethod == BG_ELAPSE) {
@@ -354,6 +362,7 @@ void stopVTimer()
     tCURRTIME += Count2Time(papiValues, numPapiEvents);
 #endif
   }
+  tTIMERON = 0;
 }
 
 double BgGetTime()
@@ -366,7 +375,7 @@ double BgGetTime()
       const double tp2= BG_TIMER();
       double &startTime = tSTARTTIME;
       double inc = tp2 - startTime;
-      advanceTime(inc);
+      advanceTime(inc-TIMER_COST);
       startTime = BG_TIMER();
     }
     return tCURRTIME;
@@ -711,6 +720,7 @@ void CmiSendPacket(int x, int y, int z, int msgSize,char *msg)
 void sendPacket_(nodeInfo *myNode, int x, int y, int z, int threadID, int handlerID, WorkType type, int numbytes, char* sendmsg, int local)
 {
   //CmiPrintStackTrace(0);
+  double sendT = BgGetTime();
 
   double latency;
   CmiSetHandler(sendmsg, cva(simState).msgHandler);
@@ -730,7 +740,6 @@ void sendPacket_(nodeInfo *myNode, int x, int y, int z, int threadID, int handle
     latency = MSGTIME(myNode->x, myNode->y, myNode->z, x,y,z, numbytes);
     CmiAssert(latency >= 0);
   }
-  double sendT = BgGetTime();
   CmiBgMsgRecvTime(sendmsg) = latency + sendT;
   
   // timing
@@ -757,6 +766,8 @@ void sendPacket_(nodeInfo *myNode, int x, int y, int z, int threadID, int handle
 /* broadcast will copy data to msg buffer */
 static inline void nodeBroadcastPacketExcept_(int node, CmiInt2 threadID, int handlerID, WorkType type, int numbytes, char* sendmsg)
 {
+  double sendT = BgGetTime();
+
   nodeInfo *myNode = cta(threadinfo)->myNode;
   CmiSetHandler(sendmsg, cva(simState).nBcastMsgHandler);
   if (node >= 0)
@@ -770,7 +781,6 @@ static inline void nodeBroadcastPacketExcept_(int node, CmiInt2 threadID, int ha
   CmiBgMsgFlag(sendmsg) = 0;
   CmiBgMsgRefCount(sendmsg) = 0;
   /* FIXME */
-  double sendT = BgGetTime();
   CmiBgMsgRecvTime(sendmsg) = MSGTIME(myNode->x, myNode->y, myNode->z, 0,0,0, numbytes) + sendT;
 
   // timing
@@ -1931,12 +1941,30 @@ CthThread CthSuspendBigSimThread()
   return  cta(threadinfo)->me;
 }
 
+static void bigsimThreadListener_suspend(struct CthThreadListener *l)
+{
+   // stop timer
+   stopVTimer();
+}
+
+static void bigsimThreadListener_resume(struct CthThreadListener *l)
+{
+   // start timer by reset it
+   resetVTime();
+}
+
 
 void BgSetStrategyBigSimDefault(CthThread t)
 { 
   CthSetStrategy(t,
                  CthEnqueueBigSimThread,
                  CthSuspendBigSimThread);
+
+  CthThreadListener *a = new CthThreadListener;
+  a->suspend = bigsimThreadListener_suspend;
+  a->resume = bigsimThreadListener_resume;
+  a->free = NULL;
+  CthAddListener(t, a);
 }
 
 
