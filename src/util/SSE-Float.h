@@ -22,6 +22,8 @@ class SSEFloat
 
            /* Arithmetic Operators*/ 
 
+           friend inline SSEFloat operator -(const SSEFloat &a) {SSEFloat c;c.val=_mm_sub_ps(_mm_setzero_ps(),a.val);return c;}
+
            friend inline SSEFloat operator +(const SSEFloat &a, const SSEFloat &b) {SSEFloat c;c.val= _mm_add_ps(a.val,b.val);return c;}
                 
            friend inline SSEFloat operator -(const SSEFloat &a, const SSEFloat &b) {SSEFloat c;c.val= _mm_sub_ps(a.val,b.val);return c;}
@@ -41,6 +43,15 @@ class SSEFloat
           friend inline SSEFloat operator *(float a, const SSEFloat &b) {SSEFloat c;c.val= _mm_mul_ps(_mm_set1_ps(a),b.val);return c;}   
        
           friend inline SSEFloat operator /(float a, const SSEFloat &b) {SSEFloat c;c.val= _mm_div_ps(_mm_set1_ps(a),b.val);return c;}
+
+           inline SSEFloat& operator +=(const SSEFloat &a) {val= _mm_add_ps(val,a.val);return *this;}
+                
+           inline SSEFloat& operator -=(const SSEFloat &a) {val= _mm_sub_ps(val,a.val);return *this;}
+
+           inline SSEFloat& operator *=(const SSEFloat &a) {val= _mm_mul_ps(val,a.val);return *this;}
+
+           inline SSEFloat& operator /=(const SSEFloat &a) {val= _mm_div_ps(val,a.val);return *this;}
+
           /*Logical Operators*/
 
            friend inline SSEFloat operator &(const SSEFloat &a, const SSEFloat &b) {SSEFloat c;c.val= _mm_and_ps(a.val,b.val);return c;}
