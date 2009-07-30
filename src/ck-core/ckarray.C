@@ -431,9 +431,14 @@ CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
   //Create the array manager
   m->array_ep()=ctor;
   CkMarshalledMessage marsh(m);
+#if !GROUP_LEVEL_REDUCTION
   CProxy_CkArrayReductionMgr nodereductionProxy = CProxy_CkArrayReductionMgr::ckNew();
   CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy);
   nodereductionProxy.setAttachedGroup(ag);
+#else
+  CkNodeGroupID dummyid;
+  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,dummyid);
+#endif
   return (CkArrayID)ag;
 }
 CkArrayID CProxy_ArrayBase::ckCreateEmptyArray(void)
@@ -533,9 +538,11 @@ CkArray::CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID no
 
   ///adding code for Reduction using nodegroups
 
+#if !GROUP_LEVEL_REDUCTION
   CProxy_CkArrayReductionMgr  nodetemp(nodereductionID);  
   nodeProxy = nodetemp;
   //nodeProxy = new CProxy_CkArrayReductionMgr (nodereductionID);
+#endif
 }
 
 CkArray::CkArray(CkMigrateMessage *m)

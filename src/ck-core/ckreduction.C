@@ -98,8 +98,10 @@ Group::Group()
 #if DEBUGRED
 	CkPrintf("[%d,%d]Creating nodeProxy with gid %d\n",CkMyNode(),CkMyPe(),CkpvAccess(_currentGroupRednMgr));
 #endif			
+#if !GROUP_LEVEL_REDUCTION
 	CProxy_CkArrayReductionMgr nodetemp(CkpvAccess(_currentGroupRednMgr));
 	nodeProxy = nodetemp;
+#endif
 }
 
 Group::Group(CkMigrateMessage *msg):CkReductionMgr(msg)
@@ -254,8 +256,10 @@ void CkReductionMgr::ckSetReductionClient(CkCallback *cb)
   if (CkMyPe()!=0)
 	  CkError("WARNING: ckSetReductionClient should only be called from processor zero!\n");  
   storedCallback=*cb;
+#if ! GROUP_LEVEL_REDUCTION
   CkCallback *callback =new CkCallback(CkIndex_CkReductionMgr::ArrayReductionHandler(0),thishandle);
   nodeProxy.ckSetReductionClient(callback);
+#endif
 }
 
 ///////////////////////////// Contributor ////////////////////////
@@ -1017,13 +1021,11 @@ void CkReductionMgr::pup(PUP::er &p)
     thisProxy = thisgroup;
     maxStartRequest=0;
 #if GROUP_LEVEL_REDUCTION
-    if(p.isUnpacking()) {
 #ifdef BINOMIAL_TREE
-      init_BinomialTree();
+    init_BinomialTree();
 #else
-      init_BinaryTree();
+   init_BinaryTree();
 #endif
-    }
 #endif
   }
 #if DEBUGRED
@@ -1193,7 +1195,7 @@ void CkReductionMgr::init_BinaryTree(){
 	int firstkid = CkMyPe()*TREE_WID+1;
 	numKids=CkNumPes()-firstkid;
         if (numKids>TREE_WID) numKids=TREE_WID;
-         if (numKids<0) numKids=0;
+        if (numKids<0) numKids=0;
 
 	for(int i=0;i<numKids;i++){
 		kids.push_back(firstkid+i);
