@@ -72,7 +72,7 @@ inline int isEqual(double v1, double v2){
             int n = tlinerec.length();			\
             if (n>0) {					\
               BgTimeLog *tlog = tlinerec[n-1];		\
-	      if (tlog->endTime == 0.0)			\
+	      if (tlog->endTime < 0.0)			\
                 tlog->addMsg(m, node, tid, sendT, local, group);	\
 	      else {	 /* standalone msg */		\
 		  /*CmiAssert(0);*/ 			\

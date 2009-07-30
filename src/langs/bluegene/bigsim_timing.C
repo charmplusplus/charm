@@ -713,7 +713,7 @@ void bgAddProjEvent(void *data, int idx, double t, bgEventCallBackFn fn, void *u
   // make sure this time log entry is not closed
   //if ((tlog->endTime == 0.0) ||(t <= tlog->endTime)) 
   // if the last log is closed, this is a standalone event
-  if (tlog->endTime != 0.0) {
+  if (tlog->endTime >= 0.0) {
     // ignore standalone event
     // return;
     double endT = tlog->endTime;

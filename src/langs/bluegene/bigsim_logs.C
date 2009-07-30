@@ -139,7 +139,7 @@ BgTimeLog::BgTimeLog(BgTimeLog *log)
   charm_ep = -1;
   startTime = log->startTime;
   recvTime = log->recvTime;
-  endTime = 0.0;
+  endTime = -1.0;
   execTime = 0.0;
   msgId = log->msgId;
 
@@ -157,7 +157,7 @@ BgTimeLog::BgTimeLog(const BgMsgID &msgID)
   charm_ep = -1;
   startTime = -1.0;
   recvTime = -1.0;
-  endTime = execTime = 0.0;
+  endTime = execTime = -1.0;
 
   oldStartTime= startTime;
   effRecvTime = -1.0;
@@ -193,7 +193,7 @@ BgTimeLog::BgTimeLog(int epc, const char* namestr,double sTime)
   charm_ep = -1;
   startTime = sTime;
   recvTime = -1.0;//stime;
-  endTime = execTime = 0.0;
+  endTime = execTime = -1.0;
 
   oldStartTime= startTime;
   effRecvTime = -1.0;
@@ -230,7 +230,7 @@ BgTimeLog::BgTimeLog(char *msg, char *str)
   else
     strcpy(name,"msgep");
   startTime = timerFunc();
-  endTime = 0.0;
+  endTime = -1.0;
   execTime = 0.0;
   recvTime = 0.0;
   ep = -1;
@@ -267,6 +267,7 @@ void BgTimeLog::closeLog()
 { 
     endTime = timerFunc();
     setExecTime();
+    CmiAssert(endTime >= 0.0);
     
 //    if (correctTimeLog) BgAdjustTimeLineInsert(tTIMELINEREC);
 }
@@ -373,7 +374,7 @@ void BgTimeLog::pupCommon(PUP::er &p) {
 
   if (p.isPacking()) {           // sanity check
     if (!strcasecmp(name, "BgSchedulerEnd")) {       // exit event
-      if (endTime == 0.0) {
+      if (endTime < 0.0) {
 	endTime = startTime;
 	if (msgs.length() > 0 && msgs[msgs.length()-1]->sendTime > endTime)
 	  endTime = msgs[msgs.length()-1]->sendTime;
@@ -552,8 +553,9 @@ void BgTimeLineRec::logEntryInsert(BgTimeLog* log)
   if (!genTimeLog) return;
 //CmiPrintf("[%d] BgTimeLineRec::logEntryInsert\n", BgGetGlobalWorkerThreadID());
   CmiAssert(bgCurLog == NULL);
-  if(timeline.length() > 0 && timeline[timeline.length()-1]->endTime == 0.0)
+  if(timeline.length() > 0 && timeline[timeline.length()-1]->endTime < 0.0) {
     CmiPrintf("\nERROR tried to insert %s after %s\n",log->name,timeline[timeline.length()-1]->name);
+  }
   enq(log, 1);
   if (bgPrevLog) {
     log->addBackwardDep(bgPrevLog);
