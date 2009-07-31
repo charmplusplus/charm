@@ -3,7 +3,7 @@ FILE=manual
 TEX=$(FILE).tex overview.tex charm.tex arrays.tex groups.tex messages.tex \
 	other.tex install.tex debugging.tex ports.tex converse.tex internals.tex pup.tex
 DEST=faq
-LATEX2HTML=$(L2H) -split 2
+LATEX2HTML=$(L2H) -split 4
 
 include ../Makefile.common
 
