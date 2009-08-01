@@ -21,7 +21,6 @@
 #include <fstream>
 #include <string>
 #include <sstream>
-#include <map>
 #include <set>
 #include <vector>
 #include <utility>
@@ -31,8 +30,6 @@
 #include "LBDatabase.h"
 #include "arrayRedistributor.h"
 #include "pathHistory.h" 
-
-using namespace std;
 
 
 /**
@@ -50,6 +47,9 @@ using namespace std;
 
 void registerGranularityChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase);
 void registerControlPointTiming(double time);
+
+
+
 
 /// The application specifies that it is ready to proceed to a new set of control point values.
 /// This should be called after registerControlPointTiming()
@@ -134,7 +134,7 @@ public:
 /// The critical paths detected, the max memory usage, and the idle time.
 class instrumentedPhase {
 public:
-  std::map<string,int> controlPoints; // The control point values for this phase(don't vary within the phase)
+  std::map<std::string,int> controlPoints; // The control point values for this phase(don't vary within the phase)
   std::vector<double> times;  // A list of times observed for iterations in this phase
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
@@ -157,7 +157,7 @@ public:
 
   // Provide a previously computed value, or a value from a previous run
   bool haveValueForName(const char* name){
-    string n(name);
+    std::string n(name);
     return (controlPoints.count(n)>0);
   }
 
@@ -171,8 +171,8 @@ public:
 
   bool operator<(const instrumentedPhase& p){
     CkAssert(hasSameKeysAs(p)); 
-    std::map<string,int>::iterator iter1 = controlPoints.begin();
-    std::map<string,int>::const_iterator iter2 = p.controlPoints.begin();
+    std::map<std::string,int>::iterator iter1 = controlPoints.begin();
+    std::map<std::string,int>::const_iterator iter2 = p.controlPoints.begin();
     for(;iter1 != controlPoints.end() && iter2 != p.controlPoints.end(); iter1++, iter2++){
       if(iter1->second < iter2->second){
 	return true;
@@ -185,7 +185,7 @@ public:
   // Determines if the control point values and other information exists
   bool hasValidControlPointValues(){
 #if 0
-    std::map<string,int>::iterator iter;
+    std::map<std::string,int>::iterator iter;
     for(iter = controlPoints.begin();iter != controlPoints.end(); iter++){
       if(iter->second == -1){ 
         return false; 
@@ -227,8 +227,8 @@ public:
 
   bool operator==(const instrumentedPhase& p){
     CkAssert(hasSameKeysAs(p));
-    std::map<string,int>::iterator iter1 = controlPoints.begin();
-    std::map<string,int>::const_iterator iter2 = p.controlPoints.begin();
+    std::map<std::string,int>::iterator iter1 = controlPoints.begin();
+    std::map<std::string,int>::const_iterator iter2 = p.controlPoints.begin();
     for(;iter1 != controlPoints.end() && iter2 != p.controlPoints.end(); iter1++, iter2++){ 
       if(iter1->second != iter2->second){ 
         return false; 
@@ -244,8 +244,8 @@ public:
     if(controlPoints.size() != p.controlPoints.size())
       return false;
 
-    std::map<string,int>::iterator iter1 = controlPoints.begin(); 
-    std::map<string,int>::const_iterator iter2 = p.controlPoints.begin(); 
+    std::map<std::string,int>::iterator iter1 = controlPoints.begin(); 
+    std::map<std::string,int>::const_iterator iter2 = p.controlPoints.begin(); 
 
     for(;iter1 != controlPoints.end() && iter2 != p.controlPoints.end(); iter1++, iter2++){  
       if(iter1->first != iter2->first)
@@ -256,9 +256,9 @@ public:
   }
 
 
-  void addAllNames(std::set<string> names_) {
+  void addAllNames(std::set<std::string> names_) {
     
-    std::set<string> names = names_;
+    std::set<std::string> names = names_;
     
     // Remove all the names that we already have
     std::map<std::string,int>::iterator iter;
@@ -270,7 +270,7 @@ public:
     // Add -1 values for each name we didn't find
     std::set<std::string>::iterator iter2;
     for(iter2 = names.begin(); iter2 != names.end(); iter2++){
-      controlPoints.insert(make_pair(*iter2,-1));
+      controlPoints.insert(std::make_pair(*iter2,-1));
       CkPrintf("One of the datasets was missing a value for %s, so -1 was used\n", iter2->c_str());
     }
 
@@ -305,13 +305,13 @@ public:
   std::vector<instrumentedPhase> phases;
 
   /// get control point names for all phases
-  std::set<string> getNames(){
-    std::set<string> names;
+  std::set<std::string> getNames(){
+    std::set<std::string> names;
     
     std::vector<instrumentedPhase>::iterator iter;
     for(iter = phases.begin();iter!=phases.end();iter++) {
       
-      std::map<string,int>::iterator iter2;
+      std::map<std::string,int>::iterator iter2;
       for(iter2 = iter->controlPoints.begin(); iter2 != iter->controlPoints.end(); iter2++){
 	names.insert(iter2->first);
       }
@@ -323,7 +323,7 @@ public:
 
 
   void cleanupNames(){
-    std::set<string> names = getNames();
+    std::set<std::string> names = getNames();
     
     std::vector<instrumentedPhase>::iterator iter;
     for(iter = phases.begin();iter!=phases.end();iter++) {
@@ -359,8 +359,8 @@ public:
   }
 
 
-  string toString(){
-    ostringstream s;
+  std::string toString(){
+    std::ostringstream s;
 
     verify();
 
@@ -369,13 +369,13 @@ public:
     // HEADER:
     s << "# HEADER:\n";
     s << "# Data for use with Isaac Dooley's Control Point Framework\n";
-    s << string("# Number of instrumented timings in this file:\n"); 
+    s << "# Number of instrumented timings in this file:\n"; 
     s << phases.size() << "\n" ;
     
     if(phases.size() > 0){
       
-      std::map<string,int> &ps = phases[0].controlPoints; 
-      std::map<string,int>::iterator cpiter;
+      std::map<std::string,int> &ps = phases[0].controlPoints; 
+      std::map<std::string,int>::iterator cpiter;
 
       // SCHEMA:
       s << "# SCHEMA:\n";
@@ -518,19 +518,19 @@ public:
   instrumentedPhase best_phase;
   
   /// The lower and upper bounds for each named control point
-  std::map<string, pair<int,int> > controlPointSpace;
+  std::map<std::string, std::pair<int,int> > controlPointSpace;
 
   /// A set of named control points whose values cannot change within a single run of an application
-  std::set<string> staticControlPoints;
+  std::set<std::string> staticControlPoints;
 
   /// Sets of entry point ids that are affected by some named control points
-  std::map<string, std::set<int> > affectsPrioritiesEP;
+  std::map<std::string, std::set<int> > affectsPrioritiesEP;
   /// Sets of entry array ids that are affected by some named control points
-  std::map<string, std::set<int> > affectsPrioritiesArray;
+  std::map<std::string, std::set<int> > affectsPrioritiesArray;
 
   
   /// The control points to be used in the next phase. In gotoNextPhase(), these will be used
-  std::map<string,int> newControlPoints;
+  std::map<std::string,int> newControlPoints;
   /// Whether to use newControlPoints in gotoNextPhase()
   bool newControlPointsAvailable;
   
@@ -570,7 +570,6 @@ public:
   
   /// The data from the previous phase
   instrumentedPhase *previousPhaseData();
-  
 
   /// Called by either the application or the Control Point Framework to advance to the next phase  
   void gotoNextPhase();
@@ -593,15 +592,14 @@ public:
   void gatherMemoryUsage(CkReductionMsg *msg);
 
 
-
-
-
   /// Inform the control point framework that a named control point affects the priorities of some array  
   void associatePriorityArray(const char *name, int groupIdx);
   
   /// Inform the control point framework that a named control point affects the priority of some entry method
   void associatePriorityEntry(const char *name, int idx);
   
+
+
 };
 
 

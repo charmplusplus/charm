@@ -18,6 +18,7 @@ clients, including the rest of Charm++, are actually C++.
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
 #include "pathHistory.h"
+void automaticallySetMessagePriority(envelope *env); // in control point framework.
 #endif
 
 #if CMK_LBDB_ON
@@ -1219,14 +1220,15 @@ void _noCldNodeEnqueue(int node, envelope *env)
 static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
 {
   register envelope *env = UsrToEnv(msg);
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  criticalPath_send(env);
-#endif
   _CHECK_USED(env);
   _SET_USED(env, 1);
   env->setMsgtype(ForChareMsg);
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  criticalPath_send(env);
+  automaticallySetMessagePriority(env);
+#endif
 #ifndef CMK_OPTIMIZE
   setMemoryOwnedBy(((char*)env)-sizeof(CmiChunkHeader), 0);
 #endif
@@ -1268,6 +1270,7 @@ static inline int _prepareImmediateMsg(int eIdx,void *msg,const CkChareID *pCid)
     register envelope *env = UsrToEnv(msg);
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
     criticalPath_send(env);
+    automaticallySetMessagePriority(env);
 #endif
     CmiBecomeImmediate(env);
   }
@@ -1326,15 +1329,16 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
 {
   register envelope *env = UsrToEnv(msg);
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  criticalPath_send(env);
-#endif
   _CHECK_USED(env);
   _SET_USED(env, 1);
   env->setMsgtype(type);
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  criticalPath_send(env);
+  automaticallySetMessagePriority(env);
+#endif
 #ifndef CMK_OPTIMIZE
   setMemoryOwnedBy(((char*)env)-sizeof(CmiChunkHeader), 0);
 #endif
@@ -1347,6 +1351,7 @@ static inline envelope *_prepareImmediateMsgBranch(int eIdx,void *msg,CkGroupID 
   envelope *env = _prepareMsgBranch(eIdx, msg, gID, type);
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   criticalPath_send(env);
+  automaticallySetMessagePriority(env);
 #endif
   CmiBecomeImmediate(env);
   return env;

@@ -5,7 +5,7 @@
 #include "controlPoints.h"
 #include "charm++.h"
 #include "trace-projections.h"
-
+#include <pathHistory.h>
 
 /**
  *  \addtogroup ControlPointFramework
@@ -146,8 +146,8 @@ controlPointManager::controlPointManager(){
   /// Loads the previous run data file
   void controlPointManager::loadDataFile(){
     ifstream infile(dataFilename);
-    vector<string> names;
-    string line;
+    vector<std::string> names;
+    std::string line;
   
     while(getline(infile,line)){
       if(line[0] != '#')
@@ -155,7 +155,7 @@ controlPointManager::controlPointManager(){
     }
   
     int numTimings = 0;
-    istringstream n(line);
+    std::istringstream n(line);
     n >> numTimings;
   
     while(getline(infile,line)){ 
@@ -164,7 +164,7 @@ controlPointManager::controlPointManager(){
     }
 
     int numControlPointNames = 0;
-    istringstream n2(line);
+    std::istringstream n2(line);
     n2 >> numControlPointNames;
   
     for(int i=0; i<numControlPointNames; i++){
@@ -179,7 +179,7 @@ controlPointManager::controlPointManager(){
 
       instrumentedPhase ips;
 
-      istringstream iss(line);
+      std::istringstream iss(line);
 
       // Read memory usage for phase
       iss >> ips.memoryUsageMB;
@@ -332,14 +332,14 @@ controlPointManager::controlPointManager(){
 
 	  CkPrintf("Finding control points related to the critical path\n");
 	  int cpcount = 0;
-	  std::set<string> controlPointsAffectingCriticalPath;
+	  std::set<std::string> controlPointsAffectingCriticalPath;
 
 	  
 	  for(int e=0;e<path.getNumUsed();e++){
 	    if(path.getUsedCount(e)>0){
 	      int ep = path.getUsedEp(e);
 
-	      std::map<string, std::set<int> >::iterator iter;
+	      std::map<std::string, std::set<int> >::iterator iter;
 	      for(iter=affectsPrioritiesEP.begin(); iter!= affectsPrioritiesEP.end(); ++iter){
 		if(iter->second.count(ep)>0){
 		  controlPointsAffectingCriticalPath.insert(iter->first);
@@ -379,7 +379,7 @@ controlPointManager::controlPointManager(){
 	    char textDescription[4096*2];
 	    textDescription[0] = '\0';
 
-	    std::map<string,int>::iterator newCP;
+	    std::map<std::string,int>::iterator newCP;
 	    for(newCP = newControlPoints.begin(); newCP != newControlPoints.end(); ++ newCP){
 	      if( controlPointsAffectingCriticalPath.count(newCP->first) > 0 ){
 		// decrease the value (increase priority) if within range
@@ -393,7 +393,7 @@ controlPointManager::controlPointManager(){
 	   
 	    // Create a string for a projections user event
 	    if(1){
-	      std::map<string,int>::iterator newCP;
+	      std::map<std::string,int>::iterator newCP;
 	      for(newCP = newControlPoints.begin(); newCP != newControlPoints.end(); ++ newCP){
 		sprintf(textDescription+strlen(textDescription), "<br>\"%s\"=%d", newCP->first.c_str(), newCP->second);
 	      }
@@ -447,7 +447,7 @@ controlPointManager::controlPointManager(){
   
   /// Determine if any control point is known to affect an entry method
   bool controlPointManager::controlPointAffectsThisEP(int ep){
-    std::map<string, std::set<int> >::iterator iter;
+    std::map<std::string, std::set<int> >::iterator iter;
     for(iter=affectsPrioritiesEP.begin(); iter!= affectsPrioritiesEP.end(); ++iter){
       if(iter->second.count(ep)>0){
 	return true;
@@ -458,7 +458,7 @@ controlPointManager::controlPointManager(){
   
   /// Determine if any control point is known to affect a chare array  
   bool controlPointManager::controlPointAffectsThisArray(int array){
-    std::map<string, std::set<int> >::iterator iter;
+    std::map<std::string, std::set<int> >::iterator iter;
     for(iter=affectsPrioritiesArray.begin(); iter!= affectsPrioritiesArray.end(); ++iter){
       if(iter->second.count(array)>0){
 	return true;
@@ -542,7 +542,7 @@ controlPointManager::controlPointManager(){
     
   }
   
-  /// Entry method called on all PEs to request memory usage
+  /// Entry method called on all PEs to request CPU utilization statistics
   void controlPointManager::requestIdleTime(CkCallback cb){
     double i = localControlPointTracingInstance()->idleRatio();
     double idle[3];
@@ -550,7 +550,7 @@ controlPointManager::controlPointManager(){
     idle[1] = i;
     idle[2] = i;
     
-    localControlPointTracingInstance()->resetTimings();
+    //    localControlPointTracingInstance()->resetTimings();
 
     contribute(3*sizeof(double),idle,idleTimeReductionType, cb);
   }
@@ -607,7 +607,6 @@ controlPointManager::controlPointManager(){
   }
 
 
- 
   /// Inform the control point framework that a named control point affects the priorities of some array  
   void controlPointManager::associatePriorityArray(const char *name, int groupIdx){
     CkPrintf("Associating control point \"%s\" affects priority of array id=%d\n", name, groupIdx );
@@ -621,7 +620,7 @@ controlPointManager::controlPointManager(){
     }
     
 #if DEBUGPRINT   
-    std::map<string, std::set<int> >::iterator f;
+    std::map<std::string, std::set<int> >::iterator f;
     for(f=affectsPrioritiesArray.begin(); f!=affectsPrioritiesArray.end();++f){
       std::string name = f->first;
       std::set<int> &vals = f->second;
@@ -649,7 +648,7 @@ controlPointManager::controlPointManager(){
     }
     
 #if DEBUGPRINT
-    std::map<string, std::set<int> >::iterator f;
+    std::map<std::string, std::set<int> >::iterator f;
     for(f=affectsPrioritiesEP.begin(); f!=affectsPrioritiesEP.end();++f){
       std::string name = f->first;
       std::set<int> &vals = f->second;
@@ -749,13 +748,13 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime){
 // Static point for life of program: randomly chosen, no optimizer
 int staticPoint(const char *name, int lb, int ub){
   instrumentedPhase &thisPhaseData = controlPointManagerProxy.ckLocalBranch()->thisPhaseData;
-  std::set<string> &staticControlPoints = controlPointManagerProxy.ckLocalBranch()->staticControlPoints;  
+  std::set<std::string> &staticControlPoints = controlPointManagerProxy.ckLocalBranch()->staticControlPoints;  
 
   int result = lb + randInt(ub-lb+1, name);
   
-  controlPointManagerProxy.ckLocalBranch()->controlPointSpace.insert(std::make_pair(string(name),std::make_pair(lb,ub))); 
-  thisPhaseData.controlPoints.insert(std::make_pair(string(name),result)); 
-  staticControlPoints.insert(string(name));
+  controlPointManagerProxy.ckLocalBranch()->controlPointSpace.insert(std::make_pair(std::string(name),std::make_pair(lb,ub))); 
+  thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 
+  staticControlPoints.insert(std::string(name));
 
   return result;
 }
@@ -767,10 +766,10 @@ bool valueShouldBeProvidedByOptimizer(){
   const int effective_phase = controlPointManagerProxy.ckLocalBranch()->allData.phases.size();
   const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id; 
   
-  std::map<string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace; 
+  std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace; 
   
   double spaceSize = 1.0;
-  std::map<string, pair<int,int> >::iterator iter;
+  std::map<std::string, pair<int,int> >::iterator iter;
   for(iter = controlPointSpace.begin(); iter != controlPointSpace.end(); iter++){
     spaceSize *= iter->second.second - iter->second.first + 1;
   }
@@ -778,6 +777,8 @@ bool valueShouldBeProvidedByOptimizer(){
   //  CkPrintf("Control Point Space:\n\t\tnumber of control points = %d\n\t\tnumber of possible configurations = %.0lf\n", controlPointSpace.size(), spaceSize);
 
 #if 1
+  return false;
+#elif 0
   return effective_phase > 1 && phase_id > 1;
 #else
   return effective_phase >= OPTIMIZER_TRANSITION && phase_id > 3;
@@ -797,19 +798,22 @@ int valueProvidedByOptimizer(const char * name){
 
 
 #define OPTIMIZER_ADAPT_CRITICAL_PATHS 0
-  
+#define OPTIMIZER_USE_BEST_TIME 0
+#define SIMULATED_ANNEALING 0
+#define EXHAUSTIVE_SEARCH 1
+
   // -----------------------------------------------------------
 #if OPTIMIZER_ADAPT_CRITICAL_PATHS
   // This scheme will return the median value for the range 
   // early on, and then will transition over to the new control points
   // determined by the critical path adapting code
   if(controlPointManagerProxy.ckLocalBranch()->newControlPointsAvailable){
-    int result = controlPointManagerProxy.ckLocalBranch()->newControlPoints[string(name)];
+    int result = controlPointManagerProxy.ckLocalBranch()->newControlPoints[std::string(name)];
     CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d  from \"newControlPoints\" is: %d\n", name, phase_id, result);
     return result;
   } 
   
-  std::map<string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
+  std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
 
   if(controlPointSpace.count(std::string(name))>0){
     int minValue =  controlPointSpace[std::string(name)].first;
@@ -844,7 +848,7 @@ int valueProvidedByOptimizer(const char * name){
   // Find the best search space configuration, and try something
   // nearby it, with a radius decreasing as phases increase
   
-  std::map<string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
+  std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
   
   CkPrintf("Finding best phase\n"); 
   instrumentedPhase p = controlPointManagerProxy.ckLocalBranch()->allData.findBest();  
@@ -879,11 +883,11 @@ int valueProvidedByOptimizer(const char * name){
   return result; 
 
   // -----------------------------------------------------------
-#else
-  // Exhaustive search
+#elif EXHAUSTIVE_SEARCH
+  // Exhaustive search 
 
-  std::map<string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;
-  std::set<string> &staticControlPoints = controlPointManagerProxy.ckLocalBranch()->staticControlPoints;  
+  std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;
+  std::set<std::string> &staticControlPoints = controlPointManagerProxy.ckLocalBranch()->staticControlPoints;  
    
   int numDimensions = controlPointSpace.size();
   CkAssert(numDimensions > 0);
@@ -892,12 +896,12 @@ int valueProvidedByOptimizer(const char * name){
   vector<int> upperBounds(numDimensions); 
   
   int d=0;
-  std::map<string, pair<int,int> >::iterator iter;
+  std::map<std::string, pair<int,int> >::iterator iter;
   for(iter = controlPointSpace.begin(); iter != controlPointSpace.end(); iter++){
     //    CkPrintf("Examining dimension %d\n", d);
 
 #if DEBUGPRINT
-    string name = iter->first;
+    std::string name = iter->first;
     if(staticControlPoints.count(name) >0 ){
       cout << " control point " << name << " is static " << endl;
     } else{
@@ -913,7 +917,7 @@ int valueProvidedByOptimizer(const char * name){
 
   vector<std::string> s(numDimensions);
   d=0;
-  for(std::map<string, pair<int,int> >::iterator niter=controlPointSpace.begin(); niter!=controlPointSpace.end(); niter++){
+  for(std::map<std::string, pair<int,int> >::iterator niter=controlPointSpace.begin(); niter!=controlPointSpace.end(); niter++){
     s[d] = niter->first;
     // cout << "s[" << d << "]=" << s[d] << endl;
     d++;
@@ -988,7 +992,8 @@ int valueProvidedByOptimizer(const char * name){
 
   CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by exhaustive search to be: %d\n", name, phase_id, result); 
   return result; 
-
+#else
+#error You need to enable some scheme in valueProvidedByOptimizer()
 #endif
 
 CkAbort("valueProvidedByOptimizer(): ERROR: could not find a value for a control point.\n");
@@ -1036,7 +1041,7 @@ int controlPoint2Pow(const char *name, int fine_granularity, int coarse_granular
     CkPrintf("Control Point \"%s\" for phase %d chosen randomly to be: %d\n", name, phase_id, result);
   }
 
-  thisPhaseData.controlPoints.insert(std::make_pair(string(name),result));
+  thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result));
 
   return result;
 }
@@ -1046,7 +1051,7 @@ int controlPoint2Pow(const char *name, int fine_granularity, int coarse_granular
 int controlPoint(const char *name, int lb, int ub){
   instrumentedPhase &thisPhaseData = controlPointManagerProxy.ckLocalBranch()->thisPhaseData;
   const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
-  std::map<string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;
+  std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;
 
   int result;
 
@@ -1060,8 +1065,8 @@ int controlPoint(const char *name, int lb, int ub){
   } 
    
   CkAssert(isInRange(result,ub,lb));
-  thisPhaseData.controlPoints.insert(std::make_pair(string(name),result)); 
-  controlPointSpace.insert(std::make_pair(string(name),std::make_pair(lb,ub))); 
+  thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 
+  controlPointSpace.insert(std::make_pair(std::string(name),std::make_pair(lb,ub))); 
   //  CkPrintf("Inserting control point value to thisPhaseData.controlPoints with value %d; thisPhaseData.controlPoints.size=%d\n", result, thisPhaseData.controlPoints.size());
   return result;
 }
@@ -1086,7 +1091,7 @@ int controlPoint(const char *name, std::vector<int>& values){
   }
   CkAssert(found);
 
-  thisPhaseData.controlPoints.insert(std::make_pair(string(name),result)); 
+  thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 
   return result;
 }
 

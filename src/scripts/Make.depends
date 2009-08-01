@@ -489,8 +489,7 @@ ck.o: ck.C ck.h charm++.h charm.h converse.h conv-config.h \
   tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h envelope.h qd.h register.h stats.h ckfutures.h \
-  ckIgetControl.h queueing.h pathHistory.h PathHistory.decl.h pup_stl.h \
-  pup.h CkMarshall.def.h
+  ckIgetControl.h queueing.h CkMarshall.def.h
 	$(CHARMC) -c -I. ck.C
 
 main.o: main.C ck.h charm++.h charm.h converse.h conv-config.h \
@@ -682,8 +681,7 @@ ckreduction.o: ckreduction.C charm++.h charm.h converse.h conv-config.h \
   tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h envelope.h ck.h qd.h register.h stats.h ckfutures.h \
-  ckIgetControl.h pathHistory.h PathHistory.decl.h pup_stl.h pup.h \
-  CkReduction.def.h
+  ckIgetControl.h CkReduction.def.h
 	$(CHARMC) -c -I. ckreduction.C
 
 ckarrayreductionmgr.o: ckarrayreductionmgr.C charm++.h charm.h converse.h \
@@ -1413,8 +1411,7 @@ pathHistory.o: pathHistory.C charm++.h charm.h converse.h conv-config.h \
   CkCheckpoint.decl.h charm++.h ckevacuation.h ckarrayreductionmgr.h \
   trace.h conv-trace.h trace-bluegene.h trace.h envelope.h charm.h \
   PathHistory.decl.h charm++.h LBDatabase.h pathHistory.h envelope.h \
-  pup_stl.h pup.h arrayRedistributor.h ControlPoints.decl.h register.h \
-  PathHistory.def.h
+  pup_stl.h pup.h register.h PathHistory.def.h
 	$(CHARMC) -c -I. pathHistory.C
 
 EveryLB.o: EveryLB.C charm++.h charm.h converse.h conv-config.h \
@@ -2950,7 +2947,7 @@ controlPoints.o: controlPoints.C charm++.h charm.h converse.h \
   envelope.h charm.h controlPoints.h ControlPoints.decl.h charm++.h \
   pup_stl.h pup.h LBDatabase.h arrayRedistributor.h pathHistory.h \
   PathHistory.decl.h envelope.h trace-controlPoints.h trace.h register.h \
-  trace-common.h trace-projections.h ckhashtable.h pup.h \
+  trace-common.h trace-projections.h ckhashtable.h pup.h pathHistory.h \
   ControlPoints.def.h
 	$(CHARMC) -c -I. controlPoints.C
 

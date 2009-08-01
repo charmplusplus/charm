@@ -18,9 +18,13 @@ module PathHistory {
  group pathHistoryManager {
      entry pathHistoryManager();
 
-     entry void traceCriticalPathBack(pathInformationMsg *msg);
-     entry void broadcastCriticalPathResult(pathInformationMsg *msg);
-     entry void criticalPathDone(CkReductionMsg *msg);
+     entry void traceCriticalPathBackStepByStep(pathInformationMsg *msg);
+ 
+     entry void broadcastCriticalPathProjections(pathInformationMsg *msg);
+     entry void criticalPathProjectionsDone(CkReductionMsg *msg);
+
+     entry void saveCriticalPathForPriorities(pathInformationMsg *msg);
+
  }   
 
 

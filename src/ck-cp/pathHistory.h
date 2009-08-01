@@ -17,24 +17,28 @@
 
 #include <vector>
 #include <map>
+#include <utility>
 #include <cmath>
 #include "PathHistory.decl.h"
 #include "envelope.h"
 
-#include<pup_stl.h>
-
-
+#include <pup_stl.h>
 
 
 
 void initializeCriticalPath(void);
 
+void useThisCriticalPathForPriorities();
+
 
 class pathHistoryManager : public CBase_pathHistoryManager {
+ private:
+  std::map< std::pair<int,int>, int> criticalPathForPriorityCounts;
+  
+  pathInformationMsg *pathForUser; // A place to store the path while we perform a broadcast and reduction to save projections user events.
+
  public:
-  
-  pathInformationMsg *pathForUser; // A place to store the path for the user while we go about doing other things.
-  
+
   pathHistoryManager();
 
   pathHistoryManager(CkMigrateMessage *m){
@@ -45,16 +49,37 @@ class pathHistoryManager : public CBase_pathHistoryManager {
     CkAbort("pathHistoryManager cannot be pupped.");
   } 
 
-  /** Trace perform a traversal backwards over the critical path specified as a 
-      table index for the processor upon which this is called.
-      
-      The callback cb will be called with the resulting msg after the path has 
-      been traversed to its origin.
-  */
- void traceCriticalPathBack(pathInformationMsg *msg);
- void broadcastCriticalPathResult(pathInformationMsg *msg);
- void criticalPathDone(CkReductionMsg *msg);
 
+
+ /** Trace perform a traversal backwards over the critical path specified as a 
+      table index for the processor upon which this is called.
+
+      If msg->saveAsProjectionsUserEvents is true then the resulting path will be 
+      broadcast to broadcastCriticalPathProjections() which will then call a 
+      reduction to criticalPathProjectionsDone() which will call the user supplied 
+      callback.
+      
+      Otherwise, the callback cb will be called with the resulting msg after the path has 
+      been traversed to its origin.  
+
+  */
+ void traceCriticalPathBackStepByStep(pathInformationMsg *msg);
+
+
+
+ void broadcastCriticalPathProjections(pathInformationMsg *msg);
+ void criticalPathProjectionsDone(CkReductionMsg *msg);
+
+ void saveCriticalPathForPriorities(pathInformationMsg *msg);
+
+
+ /// Traverse back and aquire the critical path to be used for automatic message prioritization
+ void useCriticalPathForPriories();
+
+ const std::map< std::pair<int,int>, int> & getCriticalPathForPriorityCounts() const { 
+   return criticalPathForPriorityCounts;
+ }
+  
 };
 
 
@@ -169,9 +194,9 @@ class MergeablePathHistory {
 
     These can be constructed from a MergeablePathHistory, and are assumed to refer to the local PE.
 */
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
 class PathHistoryTableEntry {
-  
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+
  public:
   int sender_pe;
   int sender_history_table_idx;
@@ -248,12 +273,10 @@ class PathHistoryTableEntry {
   double get_start_time() const {return start_time;}
   double get_local_path_time() const {return local_path_time;}
   double get_preceding_path_time() const {return preceding_path_time;}
+#endif
 
 };
-#else 
-class PathHistoryTableEntry{
-};
-#endif
+
 
 
 /// A debugging routine that outputs critical path info as Projections user events.
@@ -269,9 +292,8 @@ void  printPathInMsg(void* msg);
 void  printEPInfo();
 
 
-/// A routine for printing out information along the critical path.
-void traceCriticalPathBack(CkCallback cb);
-
+/// Acquire the critical path and deliver it to the user supplied callback
+void traceCriticalPathBack(CkCallback cb, bool saveToProjectionsTraces = false);
 
 
 /// A message containing information about a path of entry method invocations. This contains an array of PathHistoryTableEntry objects
@@ -279,6 +301,7 @@ class pathInformationMsg : public CMessage_pathInformationMsg {
  public:
   PathHistoryTableEntry *history;
   int historySize;
+  int saveAsProjectionsUserEvents;
   CkCallback cb;
   int table_idx;
 

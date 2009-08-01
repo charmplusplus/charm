@@ -9,9 +9,9 @@
 
 #include "PathHistory.decl.h"
 #include "LBDatabase.h"
-//#include "controlPoints.h"
 #include "pathHistory.h"
-#include "arrayRedistributor.h"
+//#include "controlPoints.h"
+//#include "arrayRedistributor.h"
 #include <register.h> // for _entryTable
 
 
@@ -59,7 +59,7 @@ pathHistoryManager::pathHistoryManager(){
       The callback cb will be called with the resulting msg after the path has 
       been traversed to its origin.  
   */
- void pathHistoryManager::traceCriticalPathBack(pathInformationMsg *msg){
+ void pathHistoryManager::traceCriticalPathBackStepByStep(pathInformationMsg *msg){
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
    int count = CkpvAccess(pathHistoryTable).count(msg->table_idx);
 
@@ -77,34 +77,42 @@ pathHistoryManager::pathHistoryManager(){
       CkPrintf("Table entry %d on pe %d points to pe=%d idx=%d\n", msg->table_idx, CkMyPe(), pe, idx);
 #endif
 
-      // Make a copy of the message for broadcasting to all PEs
+      // Make a copy of the message as we forward it along
       pathInformationMsg *newmsg = new(msg->historySize+1) pathInformationMsg;
       for(int i=0;i<msg->historySize;i++){
 	newmsg->history[i] = msg->history[i];
       }
       newmsg->history[msg->historySize] = path;
       newmsg->historySize = msg->historySize+1;
+      newmsg->saveAsProjectionsUserEvents = msg->saveAsProjectionsUserEvents;
       newmsg->cb = msg->cb;
       newmsg->table_idx = idx;
-      
-      // Keep a message for returning to the user's callback
-      pathForUser = new(msg->historySize+1) pathInformationMsg;
-      for(int i=0;i<msg->historySize;i++){
-	pathForUser->history[i] = msg->history[i];
-      }
-      pathForUser->history[msg->historySize] = path;
-      pathForUser->historySize = msg->historySize+1;
-      pathForUser->cb = msg->cb;
-      pathForUser->table_idx = idx;
-      
-      
+        
       if(idx > -1 && pe > -1){
+	// Not yet at origin, keep tracing the path back
 	CkAssert(pe < CkNumPes() && pe >= 0);
-	thisProxy[pe].traceCriticalPathBack(newmsg);
+	thisProxy[pe].traceCriticalPathBackStepByStep(newmsg);
       } else {
 	CkPrintf("Traced critical path back to its origin.\n");
-	CkPrintf("Broadcasting it to all PE\n");
-	thisProxy.broadcastCriticalPathResult(newmsg);
+	if(msg->saveAsProjectionsUserEvents){
+
+	  // Keep a message for returning to the user's callback
+	  pathForUser = new(msg->historySize+1) pathInformationMsg;
+	  for(int i=0;i<msg->historySize;i++){
+	    pathForUser->history[i] = msg->history[i];
+	  }
+	  pathForUser->history[msg->historySize] = path;
+	  pathForUser->historySize = msg->historySize+1;
+	  pathForUser->saveAsProjectionsUserEvents = msg->saveAsProjectionsUserEvents;
+	  pathForUser->cb = msg->cb;
+	  pathForUser->table_idx = idx;
+	  
+	  CkPrintf("Broadcasting it to all PE\n");
+	  thisProxy.broadcastCriticalPathProjections(newmsg);
+	} else {
+	  newmsg->cb.send(newmsg);
+	}
+
       }
     } else {
       CkAbort("ERROR: Traced critical path back to a nonexistent table entry.\n");
@@ -117,7 +125,7 @@ pathHistoryManager::pathHistoryManager(){
   }
 
 
-void pathHistoryManager::broadcastCriticalPathResult(pathInformationMsg *msg){
+void pathHistoryManager::broadcastCriticalPathProjections(pathInformationMsg *msg){
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   CkPrintf("[%d] Received broadcast of critical path\n", CkMyPe());
@@ -132,7 +140,7 @@ void pathHistoryManager::broadcastCriticalPathResult(pathInformationMsg *msg){
       // Create user event for it
 
       //      CkPrintf("\t[%d] Path Step %d: local_path_time=%lf arr=%d ep=%d starttime=%lf preceding path time=%lf pe=%d\n",CkMyPe(), i, msg->history[i].get_local_path_time(), msg-> history[i].local_arr, msg->history[i].local_ep, msg->history[i].get_start_time(), msg->history[i].get_preceding_path_time(), msg->history[i].local_pe);
-      traceUserBracketEvent(5900, msg->history[i].get_start_time(), msg->history[i].get_start_time() + msg->history[i].get_local_path_time());
+      traceUserBracketEvent(32000, msg->history[i].get_start_time(), msg->history[i].get_start_time() + msg->history[i].get_local_path_time());
       intersectsLocalPE = true;
     }
 
@@ -141,11 +149,12 @@ void pathHistoryManager::broadcastCriticalPathResult(pathInformationMsg *msg){
 
 #if PRUNE_CRITICAL_PATH_LOGS
   // Tell projections tracing to only output log entries if I contain part of the critical path
+  enableTraceLogOutput();
   if(! intersectsLocalPE){
     disableTraceLogOutput();
     CkPrintf("PE %d doesn't intersect the critical path, so its log files won't be created\n", CkMyPe() );
   }
-#endif  
+#endif
   
 #if TRACE_ALL_PATH_TABLE_ENTRIES
   // Create user events for all table entries
@@ -153,25 +162,126 @@ void pathHistoryManager::broadcastCriticalPathResult(pathInformationMsg *msg){
   for(iter=pathHistoryTable.begin(); iter != pathHistoryTable.end(); iter++){
     double startTime = iter->second.get_start_time();
     double endTime = iter->second.get_start_time() + iter->second.get_local_path_time();
-    traceUserBracketEvent(5901, startTime, endTime);
+    traceUserBracketEvent(32001, startTime, endTime);
   }
 #endif
 
   int data=1;
-  CkCallback cb(CkIndex_pathHistoryManager::criticalPathDone(NULL),thisProxy[0]); 
+  CkCallback cb(CkIndex_pathHistoryManager::criticalPathProjectionsDone(NULL),thisProxy[0]); 
   contribute(sizeof(int), &data, CkReduction::sum_int, cb);
 
 #endif
 
 }
 
-void pathHistoryManager::criticalPathDone(CkReductionMsg *msg){
+void pathHistoryManager::criticalPathProjectionsDone(CkReductionMsg *msg){
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   CkPrintf("[%d] All PEs have received the critical path information. Sending critical path to user supplied callback.\n", CkMyPe());
   pathForUser->cb.send(pathForUser);
   pathForUser = NULL;
 #endif
 }
+
+
+
+
+/// An interface callable by the application.
+void useThisCriticalPathForPriorities(){
+  pathHistoryManagerProxy.ckLocalBranch()->useCriticalPathForPriories();
+}
+
+
+/// Callable from inside charm++ delivery mechanisms (after envelope contains epIdx):
+void automaticallySetMessagePriority(envelope *env){
+
+  if(env->getPriobits() == 8*sizeof(int)){
+    CkPrintf("[%d] priorities for env=%p are integers\n", CkMyPe(), env);
+  } else if(env->getPriobits() == 0) {
+    CkPrintf("[%d] priorities for env=%p are not allocated in message\n", CkMyPe(), env);
+  } else {
+    CkPrintf("[%d] priorities for env=%p are not integers: %d priobits\n", CkMyPe(), env, env->getPriobits());
+  }
+
+  const int ep(env->getEpIdx());
+  const int arr(env->getArrayMgrIdx());
+
+  const std::pair<int,int> k = std::make_pair(arr, ep);
+
+  const std::map< std::pair<int,int>, int> & criticalPathForPriorityCounts = pathHistoryManagerProxy.ckLocalBranch()->getCriticalPathForPriorityCounts();
+  const int count = criticalPathForPriorityCounts.count(k);
+  CkPrintf("[%d] destination array,ep occurs %d times along stored critical path\n", CkMyPe(), count);
+
+  if(count > 0 && env->getPriobits() == 8*sizeof(int)){
+    // Set the integer priority to high
+    *(int*)(env->getPrioPtr()) = -5;
+  }  else if ( env->getPriobits() == 8*sizeof(int)){
+    // Set the integer priority to low
+    *(int*)(env->getPrioPtr()) = 5;
+  }
+  
+}
+
+
+
+void pathHistoryManager::useCriticalPathForPriories(){
+  // Request a critical path that will be stored everywhere for future use in autotuning message priorities
+ 
+  // The resulting critical path should be broadcast to saveCriticalPathForPriorities() on all PEs
+  CkCallback cb(CkIndex_pathHistoryManager::saveCriticalPathForPriorities(NULL),thisProxy); 
+  traceCriticalPathBack(cb, false);
+  
+}
+
+
+
+void pathHistoryManager::saveCriticalPathForPriorities(pathInformationMsg *msg){
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+
+  CkPrintf("[%d] saveCriticalPathForPriorities() Receiving critical paths\n", CkMyPe());
+  fflush(stdout);
+  
+  criticalPathForPriorityCounts.clear();
+
+  // Save a list of which entries are along the critical path
+  for(int i=msg->historySize-1;i>=0;i--){
+
+    PathHistoryTableEntry &e = msg->history[i];
+
+#if DEBUG
+  if(CkMyPe() == 0){
+    CkPrintf("\t[%d] Path Step %d: local_path_time=%lf arr=%d ep=%d starttime=%lf preceding path time=%lf pe=%d\n",CkMyPe(), i, e.get_local_path_time(), msg-> history[i].local_arr, e.local_ep, e.get_start_time(), e.get_preceding_path_time(), e.local_pe);
+  }
+#endif
+      
+  const std::pair<int,int> k = std::make_pair(e.local_arr, e.local_ep);
+    if(criticalPathForPriorityCounts.count(k) == 1)
+      criticalPathForPriorityCounts[k]++;
+    else
+      criticalPathForPriorityCounts[k] = 1;  
+  }
+
+
+  // print out the list just for debugging purposes
+  if(CkMyPe() == 0){
+    std::map< std::pair<int,int>, int>::iterator iter;
+    for(iter=criticalPathForPriorityCounts.begin();iter!=criticalPathForPriorityCounts.end();++iter){
+      const std::pair<int,int> k = iter->first;
+      const int c = iter->second;
+
+      CkPrintf("[%d] Found on critical path EP %d,%d occuring %d times\n", CkMyPe(), k.first, k.second, c);
+
+    }
+    
+  }
+#endif
+}
+
+
+
+
+
+
+
 
 
 
@@ -224,6 +334,7 @@ void PathHistoryEnvelope::setDebug100(){
 }
 
 
+
 /// Add an entry for this path history into the table, and write the corresponding information into the outgoing envelope
 int PathHistoryTableEntry::addToTableAndEnvelope(envelope *env){
   // Add to table
@@ -252,6 +363,7 @@ int PathHistoryTableEntry::addToTable(){
   return new_idx;
 }
 #endif
+
 
 
   
@@ -283,27 +395,24 @@ void setCurrentlyExecutingPathTo100(void){
 }
 
 
-
-/// A routine for printing out information along the critical path.
-void traceCriticalPathBack(CkCallback cb){
+/// Acquire the critical path and deliver it to the user supplied callback
+void traceCriticalPathBack(CkCallback cb, bool saveToProjectionsTraces){
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-
   pathInformationMsg *newmsg = new(0) pathInformationMsg;
   newmsg->historySize = 0;
   newmsg->cb = cb;
+  newmsg->saveAsProjectionsUserEvents = saveToProjectionsTraces;
   newmsg->table_idx = CkpvAccess(currentlyExecutingPath).sender_history_table_idx;
   int pe = CkpvAccess(currentlyExecutingPath).sender_pe;
   CkPrintf("Starting tracing of critical path from pe=%d table_idx=%d\n", pe,  CkpvAccess(currentlyExecutingPath).sender_history_table_idx);
   CkAssert(pe < CkNumPes() && pe >= 0);
-  pathHistoryManagerProxy[pe].traceCriticalPathBack(newmsg);
+  pathHistoryManagerProxy[pe].traceCriticalPathBackStepByStep(newmsg);
 #else
-
   pathInformationMsg * pathForUser = new(0) pathInformationMsg;  
   pathForUser->historySize = 0;                                                                                        
   pathForUser->cb = CkCallback();                                                                                                      
   pathForUser->table_idx = -1;      
-  cb.send(pathForUser);    
-
+  cb.send(pathForUser);  
 #endif
 }
 
@@ -438,6 +547,9 @@ void criticalPath_split(){
   CkpvAccess(timeEntryMethodStarted) = now;
 #endif
 }
+
+
+
 
 
 #include "PathHistory.def.h"
