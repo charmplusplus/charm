@@ -167,7 +167,7 @@ class TopoManager {
       torusY = true;
       torusZ = true;
       torusT = false;
-#endif 
+#endif
     }
 
     TopoManager(int NX, int NY, int NZ, int NT) : dimNX(NX), dimNY(NY), dimNZ(NZ), dimNT(NT) {
