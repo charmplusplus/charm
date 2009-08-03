@@ -258,6 +258,10 @@ int BGMach::read(char *file)
 //        bgOOCMaxMemSize = atof(parameterValue);
 //        continue;
 //    }           
+    if (!strcmp(parameterName, "timercost")) {
+      timercost = atof(parameterValue);
+      continue;
+    }
 
     if (CmiMyPe() == 0)
       CmiPrintf("skip %s '%s'\n", parameterName, parameterValue);

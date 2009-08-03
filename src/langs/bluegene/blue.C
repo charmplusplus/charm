@@ -325,9 +325,6 @@ static inline void advanceTime(double inc)
   CmiAssert(tTIMERON==1);
 }
 
-#define TIMER_COST 0.0000007
-//#define TIMER_COST 0.0
-
 void stopVTimer()
 {
   int k;
@@ -343,7 +340,7 @@ void stopVTimer()
   if (timingMethod == BG_WALLTIME) {
     const double tp = BG_TIMER();
     double inc = tp-tSTARTTIME;
-    advanceTime(inc-TIMER_COST);
+    advanceTime(inc-cva(bgMach).timercost);
 //    tSTARTTIME = BG_TIMER();	// skip the above time
   }
   else if (timingMethod == BG_ELAPSE) {
@@ -375,7 +372,7 @@ double BgGetTime()
       const double tp2= BG_TIMER();
       double &startTime = tSTARTTIME;
       double inc = tp2 - startTime;
-      advanceTime(inc-TIMER_COST);
+      advanceTime(inc-cva(bgMach).timercost);
       startTime = BG_TIMER();
     }
     return tCURRTIME;
@@ -1382,6 +1379,8 @@ CmiStartFn bgMain(int argc, char **argv)
 		      "floating point to time factor");
   CmiGetArgDoubleDesc(argv,"+bgcpufactor", &cva(bgMach).cpufactor, 
 		      "scale factor for wallclock time measured");
+  CmiGetArgDoubleDesc(argv,"+bgtimercost", &cva(bgMach).timercost, 
+		      "timer cost");
   
   char *networkModel;
   if (CmiGetArgStringDesc(argv, "+bgnetwork", &networkModel, "Network model")) {

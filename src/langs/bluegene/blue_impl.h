@@ -30,6 +30,7 @@ public:
   int timingMethod;	   /* timing method */
   double cpufactor;	   /* cpu factor to multiply to the time for walltime */
   double fpfactor;         /* fp time factor */
+  double timercost;        /* cost of timer */
   int    record, replay;   /* record/replay */
   CkListString recordprocs;
   char *traceroot;	   /* bgTraceFile prefix */
@@ -45,6 +46,7 @@ public:
 	timingMethod = BG_WALLTIME; cpufactor=1.0; fpfactor=0.0;
 	traceroot=NULL; 
 	network=new BlueGeneNetwork;
+        timercost = 0.0;
   }
   void setSize(int xx, int yy, int zz) 
 	{ x=xx; y=yy; z=zz; }
