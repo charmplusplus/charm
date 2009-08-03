@@ -110,8 +110,6 @@ void TraceBluegene::bgBeginExec(char* msg, char *name)
   if (!genTimeLog) return;
   BgTimeLog* newLog = new BgTimeLog(msg, name);
   tTIMELINEREC.logEntryStart(newLog);
-  // bypass
-  resetVTime();
 }
 
 // mark a new log, which depends on log
@@ -206,11 +204,9 @@ void TraceBluegene::getForwardDepForAll(void** logs1, void** logs2, int logsize,
 void TraceBluegene::addBackwardDep(void *log)
 {
   if(!genTimeLog || log==NULL) return;
-  double curT = BgGetTime();
   BgTimeLog  *parentLogPtr = BgLastLog(tTIMELINEREC);
   CmiAssert(parentLogPtr);
   BgAddBackwardDep(parentLogPtr, (BgTimeLog*)log);
-  resetVTime();     // bypass this time
 }
 
 void TraceBluegene::userBracketEvent(const char* name, double bt, double et, void** parentLogPtr){
@@ -249,8 +245,6 @@ void TraceBluegene::bgPrint(const char* str){
   if (genTimeLog)
     bgAddProjEvent(strdup(str), -1, curT, writeData, this, BG_EVENT_PRINT);
   CmiPrintf(str, curT);
-  // bypass
-  resetVTime();
   if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) isomalloc_pop();
 }
 
@@ -263,8 +257,6 @@ void TraceBluegene::bgMark(char* str){
   double curT = BgGetTime();
   if (genTimeLog)
     bgAddProjEvent(strdup(str), -1, curT, writeData, this, BG_EVENT_MARK);
-  // bypass
-  resetVTime();
 }
 
 extern "C" void BgMark(char *str)

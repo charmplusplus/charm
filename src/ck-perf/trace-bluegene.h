@@ -53,7 +53,7 @@ CkpvExtern(TraceBluegene*, _tracebg);
 extern int traceBluegeneLinked;
 
 #ifndef CMK_OPTIMIZE
-#  define _TRACE_BG_ONLY(code) do{if(traceBluegeneLinked && CpvAccess(traceOn)){ code; }} while(0)
+#  define _TRACE_BG_ONLY(code) do{ BgGetTime(); if(traceBluegeneLinked && CpvAccess(traceOn)){ code; } resetVTime(); } while(0)
 #else
 #  define _TRACE_BG_ONLY(code) /*empty*/
 #endif
@@ -78,7 +78,7 @@ extern int traceBluegeneLinked;
 
 # define TRACE_BG_AMPI_SUSPEND()     \
 	_TRACE_BG_END_EXECUTE(1); \
-        if(CpvAccess(traceOn)) traceSuspend();
+        /* if(CpvAccess(traceOn)) traceSuspend(); */
 
 # define TRACE_BG_AMPI_START(t, str)  { \
         void* _bgParentLog = NULL;      \
@@ -92,7 +92,9 @@ extern int traceBluegeneLinked;
 	void *curLog;    /* store current log in timeline */	\
   	_TRACE_BG_TLINE_END(&curLog);	\
 	TRACE_BG_AMPI_SUSPEND();        \
-        TRACE_BG_AMPI_START(t, str);    \
+        /* TRACE_BG_AMPI_START(t, str);  */  \
+	void * _bgParentLog = NULL;      \
+         _TRACE_BG_BEGIN_EXECUTE_NOMSG(str, &_bgParentLog, 1);  \
         for(int i=0;i<count;i++) {      \
                 _TRACE_BG_ADD_BACKWARD_DEP(((void**)event)[i]);      \
         }	\
