@@ -1041,12 +1041,16 @@ void CkArray::recvBroadcast(CkMessage *m)
         void *root;
         _TRACE_BG_TLINE_END(&root);
         CkVec<void *> logs;    // store all logs for each delivery
+	extern void stopVTimer();
+	extern void startVTimer();
 #endif
 	while (NULL!=(el=elements->next(idx))) {
 #if CMK_BLUEGENE_CHARM
 //                BgEntrySplit("split-broadcast");
+  		stopVTimer();
                 void *curlog = BgSplitEntry("split-broadcast", &root, 1);
                 logs.push_back(curlog);
+  		startVTimer();
 #endif
 		broadcaster->deliver(msg,el);
 	}
@@ -1054,7 +1058,9 @@ void CkArray::recvBroadcast(CkMessage *m)
 
 #if CMK_BLUEGENE_CHARM
 //                BgEntrySplit("end-broadcast");
+  		stopVTimer();
                 BgSplitEntry("end-broadcast", logs.getVec(), logs.size());
+  		startVTimer();
 #endif
 	if (! isAnytimeMigration) {
 	  delete msg;
