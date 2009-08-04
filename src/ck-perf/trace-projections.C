@@ -55,6 +55,11 @@ void disableTraceLogOutput()
   CkpvAccess(_trace)->setWriteData(false);
 }
 
+/// Enable the outputting of the trace logs
+void enableTraceLogOutput()
+{
+  CkpvAccess(_trace)->setWriteData(true);
+}
 
 
 

@@ -499,6 +499,8 @@ class toProjectionsGZFile : public PUP::er {
 /// Disable the outputting of the trace logs
 void disableTraceLogOutput();
 
+/// Enable the outputting of the trace logs
+void enableTraceLogOutput();
 
 
 #endif
