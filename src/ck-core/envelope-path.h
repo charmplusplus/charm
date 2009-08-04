@@ -178,8 +178,7 @@ class PathHistory {
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   void createPath(PathHistory *parentPath){
-    // Note that we are likely sending a message
-    // FIXME: (this should be moved to the actual send point)
+    // Note that we are sending a message
     thisMethodSentAMessage = true;
     double timeNow = CmiWallTimer();
     

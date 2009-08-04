@@ -14,6 +14,8 @@
 //#include "arrayRedistributor.h"
 #include <register.h> // for _entryTable
 
+#include "trace-projections.h"
+
 
 /**
  *  \addtogroup CriticalPathFramework
@@ -141,14 +143,20 @@ void pathHistoryManager::broadcastCriticalPathProjections(pathInformationMsg *ms
 
       //      CkPrintf("\t[%d] Path Step %d: local_path_time=%lf arr=%d ep=%d starttime=%lf preceding path time=%lf pe=%d\n",CkMyPe(), i, msg->history[i].get_local_path_time(), msg-> history[i].local_arr, msg->history[i].local_ep, msg->history[i].get_start_time(), msg->history[i].get_preceding_path_time(), msg->history[i].local_pe);
       traceUserBracketEvent(32000, msg->history[i].get_start_time(), msg->history[i].get_start_time() + msg->history[i].get_local_path_time());
+
       intersectsLocalPE = true;
     }
 
   }
+
+  traceRegisterUserEvent("Critical Path", 32000);
   
+  
+#define PRUNE_CRITICAL_PATH_LOGS 0
 
 #if PRUNE_CRITICAL_PATH_LOGS
   // Tell projections tracing to only output log entries if I contain part of the critical path
+
   enableTraceLogOutput();
   if(! intersectsLocalPE){
     disableTraceLogOutput();
@@ -193,7 +201,8 @@ void useThisCriticalPathForPriorities(){
 
 /// Callable from inside charm++ delivery mechanisms (after envelope contains epIdx):
 void automaticallySetMessagePriority(envelope *env){
-
+  
+#if DEBUG
   if(env->getPriobits() == 8*sizeof(int)){
     CkPrintf("[%d] priorities for env=%p are integers\n", CkMyPe(), env);
   } else if(env->getPriobits() == 0) {
@@ -201,31 +210,69 @@ void automaticallySetMessagePriority(envelope *env){
   } else {
     CkPrintf("[%d] priorities for env=%p are not integers: %d priobits\n", CkMyPe(), env, env->getPriobits());
   }
-
-  const int ep(env->getEpIdx());
-  const int arr(env->getArrayMgrIdx());
-
-  const std::pair<int,int> k = std::make_pair(arr, ep);
-
-  const std::map< std::pair<int,int>, int> & criticalPathForPriorityCounts = pathHistoryManagerProxy.ckLocalBranch()->getCriticalPathForPriorityCounts();
-  const int count = criticalPathForPriorityCounts.count(k);
-  CkPrintf("[%d] destination array,ep occurs %d times along stored critical path\n", CkMyPe(), count);
-
-  if(count > 0 && env->getPriobits() == 8*sizeof(int)){
-    // Set the integer priority to high
-    *(int*)(env->getPrioPtr()) = -5;
-  }  else if ( env->getPriobits() == 8*sizeof(int)){
-    // Set the integer priority to low
-    *(int*)(env->getPrioPtr()) = 5;
-  }
+#endif
   
+  
+  const std::map< std::pair<int,int>, int> & criticalPathForPriorityCounts = pathHistoryManagerProxy.ckLocalBranch()->getCriticalPathForPriorityCounts();
+  
+  if(criticalPathForPriorityCounts.size() > 0 && env->getPriobits() == 8*sizeof(int)) {
+    
+    switch(env->getMsgtype()) {
+    case ForArrayEltMsg:
+      {        
+	const int ep = env->getsetArrayEp();
+	const int arr = env->getArrayMgrIdx();
+	
+	const std::pair<int,int> k = std::make_pair(arr, ep);
+	const int count = criticalPathForPriorityCounts.count(k);
+	
+#if DEBUG
+	CkPrintf("[%d] destination array,ep occurs %d times along stored critical path\n", CkMyPe(), count);
+#endif
+      	
+	if(count > 0 && env->getPriobits() == 8*sizeof(int)){
+	  // Set the integer priority to high
+	  CkPrintf("Prio auto high\n");
+	  *(int*)(env->getPrioPtr()) = -5;
+	}  else if ( env->getPriobits() == 8*sizeof(int)){
+	  // Set the integer priority to low
+	  CkPrintf("Prio auto low: %d,%d\n", arr, ep);
+	  *(int*)(env->getPrioPtr()) = 5;
+	}
+	
+      }
+      break;
+      
+    case ForNodeBocMsg:
+      CkPrintf("Can't Critical Path Autoprioritize a ForNodeBocMsg\n");    
+      break;
+      
+    case ForChareMsg:
+      CkPrintf("Can't Critical Path Autoprioritize a ForChareMsg\n");
+      break;
+      
+    case ForBocMsg:
+      CkPrintf("Can't Critical Path Autoprioritize a ForBocMsg\n");
+      break;
+      
+    case ArrayEltInitMsg:
+      // Don't do anything special with these
+      CkPrintf("Can't Critical Path Autoprioritize a ArrayEltInitMsg\n");
+      break;
+      
+    default:
+      CkPrintf("Can't Critical Path Autoprioritize messages of [unknown type]\n");
+      break;
+    }
+      
+  }
 }
 
 
 
 void pathHistoryManager::useCriticalPathForPriories(){
   // Request a critical path that will be stored everywhere for future use in autotuning message priorities
- 
+  
   // The resulting critical path should be broadcast to saveCriticalPathForPriorities() on all PEs
   CkCallback cb(CkIndex_pathHistoryManager::saveCriticalPathForPriorities(NULL),thisProxy); 
   traceCriticalPathBack(cb, false);
@@ -241,24 +288,26 @@ void pathHistoryManager::saveCriticalPathForPriorities(pathInformationMsg *msg){
   fflush(stdout);
   
   criticalPathForPriorityCounts.clear();
-
+  
   // Save a list of which entries are along the critical path
   for(int i=msg->historySize-1;i>=0;i--){
-
+    
     PathHistoryTableEntry &e = msg->history[i];
-
+    
 #if DEBUG
-  if(CkMyPe() == 0){
-    CkPrintf("\t[%d] Path Step %d: local_path_time=%lf arr=%d ep=%d starttime=%lf preceding path time=%lf pe=%d\n",CkMyPe(), i, e.get_local_path_time(), msg-> history[i].local_arr, e.local_ep, e.get_start_time(), e.get_preceding_path_time(), e.local_pe);
-  }
+    if(CkMyPe() == 0){
+      CkPrintf("\t[%d] Path Step %d: local_path_time=%lf arr=%d ep=%d starttime=%lf preceding path time=%lf pe=%d\n",CkMyPe(), i, e.get_local_path_time(), msg-> history[i].local_arr, e.local_ep, e.get_start_time(), e.get_preceding_path_time(), e.local_pe);
+    }
 #endif
-      
-  const std::pair<int,int> k = std::make_pair(e.local_arr, e.local_ep);
+    
+    const std::pair<int,int> k = std::make_pair(e.local_arr, e.local_ep);
     if(criticalPathForPriorityCounts.count(k) == 1)
       criticalPathForPriorityCounts[k]++;
     else
       criticalPathForPriorityCounts[k] = 1;  
   }
+  
+
 
 
   // print out the list just for debugging purposes
@@ -268,11 +317,11 @@ void pathHistoryManager::saveCriticalPathForPriorities(pathInformationMsg *msg){
       const std::pair<int,int> k = iter->first;
       const int c = iter->second;
 
-      CkPrintf("[%d] Found on critical path EP %d,%d occuring %d times\n", CkMyPe(), k.first, k.second, c);
+      CkPrintf("[%d] On critical path EP %d,%d occurrs %d times\n", CkMyPe(), k.first, k.second, c);
 
     }
-    
   }
+
 #endif
 }
 
@@ -345,13 +394,15 @@ int PathHistoryTableEntry::addToTableAndEnvelope(envelope *env){
   env->pathHistory.set_sender_history_table_idx(new_idx);
   env->pathHistory.setTime(local_path_time + preceding_path_time);
 
+#if 0
   // Create a user event for projections
   char *note = new char[4096];
   sprintf(note, "addToTableAndEnvelope<br> ");
   env->pathHistory.printHTMLToString(note+strlen(note));
   traceUserSuppliedNote(note); // stores a copy of the string
   delete[] note;
-  
+#endif  
+
   return new_idx;
 }
   
@@ -377,14 +428,18 @@ void  saveCurrentPathAsUserEvent(char* prefix){
   if(CkpvAccess(currentlyExecutingPath).getTotalTime() > 0.0){
     //traceUserEvent(5020);
 
+#if 0
     char *note = new char[4096];
     sprintf(note, "%s<br> saveCurrentPathAsUserEvent()<br> ", prefix);
     CkpvAccess(currentlyExecutingPath).printHTMLToString(note+strlen(note));
     traceUserSuppliedNote(note); // stores a copy of the string
     delete[] note;
+#endif
 
   } else {
+#if 0
     traceUserEvent(5010);
+#endif
   }
  
 }
