@@ -44,8 +44,11 @@ A more readable summary is at:
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <strings.h>
 #include <errno.h>
+#include <sys/types.h>
+#if CMK_HAS_REGEX_H
+#include <regex.h>
+#endif
 
 #include "converse.h"
 #include "pup.h"
@@ -165,6 +168,29 @@ private:
   int isUserSymbol(const char *name);
 };
 
+int match(const char *string, char *pattern) {
+#if CMK_HAS_REGEX_H
+  int status;
+
+  regex_t re;
+  if (regcomp(&re, pattern, REG_EXTENDED|REG_NOSUB) != 0) {
+    CmiAbort("error compiling regex");
+  }
+  status = regexec(&re, string, (size_t) 0, NULL, 0);
+  regfree(&re);
+  if (status == 0) {
+    return 1;
+  } else if (status == REG_NOMATCH) {
+    return 0;
+  }
+  perror("error in match\n");
+  return 0;
+#else
+  CmiPrinf("Warning: elfgot.C::match() is not implemented!\n");
+  return 0;
+#endif
+}
+
 int CtgGlobalList::isUserSymbol(const char *name) {
     // return 1;
     if((strncmp("_", name, 1) == 0) || (strncmp("Cpv_", name, 4) == 0)
@@ -172,17 +198,21 @@ int CtgGlobalList::isUserSymbol(const char *name) {
        || (strncmp("Bnv_", name, 4) == 0) || (strncmp("Bpv_", name, 4) == 0)
        || (strncmp("ckout", name, 5) == 0) || (strncmp("stdout", name, 6) == 0)
        || (strncmp("environ", name, 7) == 0)
-       || (strncmp("stderr", name, 6) == 0) || (strncmp("stdin", name, 5) == 0))
+       || (strncmp("stderr", name, 6) == 0) || (strncmp("stdin", name, 5) == 0)) {
+#ifdef CMK_GFORTRAN
+        if (match(name, "__.*_MOD_.*")) return 1;
+#endif
         return 0;
+    }
     
-		/**
-			if the name is on the blacklist, it is not a user symbol
-		*/
-		for(int i=0;i<_blacklist.size();i++){
-			if(strlen(name) == strlen(_blacklist[i]) && strncmp(name,_blacklist[i],strlen(name)) == 0){
-				return 0;
-			}
+	/**
+		if the name is on the blacklist, it is not a user symbol
+	*/
+	for(int i=0;i<_blacklist.size();i++){
+		if(strlen(name) == strlen(_blacklist[i]) && strncmp(name,_blacklist[i],strlen(name)) == 0){
+			return 0;
 		}
+	}
 		
     return 1;
 }
