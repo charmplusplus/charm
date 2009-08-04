@@ -111,6 +111,9 @@
 /* whether Python is installed */
 #undef CMK_HAS_PYTHON
 
+/* whether has regex.h */
+#undef CMK_HAS_REGEX_H
+
 /* whether the sched_setaffinity() exists */
 #undef CMK_HAS_SETAFFINITY
 

@@ -341,6 +341,18 @@ EOT
 test_cxx "whether has alloca.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_ALLOCA_H, $pass, [whether has alloca.h])
 
+#### test if has regex.h ####
+cat > $t <<EOT
+#include <regex.h>
+int main() {
+  regex_t re;
+  regcomp(&re, ".*MOD.*", REG_EXTENDED|REG_NOSUB);
+  return 0;
+}
+EOT
+test_cxx "whether has regex.h " "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_REGEX_H, $pass, [whether has regex.h])
+
 #### Check bool ####
 cat > $t <<EOT
 #include <stdlib.h>

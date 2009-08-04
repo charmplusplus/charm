@@ -1997,6 +1997,22 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test if has regex.h ####
+cat > $t <<EOT
+#include <regex.h>
+int main() {
+  regex_t re;
+  regcomp(&re, ".*MOD.*", REG_EXTENDED|REG_NOSUB);
+  return 0;
+}
+EOT
+test_cxx "whether has regex.h " "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_REGEX_H $pass
+_ACEOF
+
+
 #### Check bool ####
 cat > $t <<EOT
 #include <stdlib.h>
