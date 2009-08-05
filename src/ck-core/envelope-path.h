@@ -45,9 +45,6 @@ extern void resetCricitalPathDetection();
 extern void resetThisEntryPath();
 
 
-extern void bracketStartCriticalPathMethod(envelope * env);
-extern void bracketEndCriticalPathMethod(envelope * env);
-
 
 #endif
 

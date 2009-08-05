@@ -195,13 +195,16 @@ void pathHistoryManager::criticalPathProjectionsDone(CkReductionMsg *msg){
 
 /// An interface callable by the application.
 void useThisCriticalPathForPriorities(){
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   pathHistoryManagerProxy.ckLocalBranch()->useCriticalPathForPriories();
+#endif
 }
 
 
 /// Callable from inside charm++ delivery mechanisms (after envelope contains epIdx):
 void automaticallySetMessagePriority(envelope *env){
-  
+  #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+
 #if DEBUG
   if(env->getPriobits() == 8*sizeof(int)){
     CkPrintf("[%d] priorities for env=%p are integers\n", CkMyPe(), env);
@@ -219,6 +222,7 @@ void automaticallySetMessagePriority(envelope *env){
     
     switch(env->getMsgtype()) {
     case ForArrayEltMsg:
+    case ForChareMsg:
       {        
 	const int ep = env->getsetArrayEp();
 	const int arr = env->getArrayMgrIdx();
@@ -230,13 +234,17 @@ void automaticallySetMessagePriority(envelope *env){
 	CkPrintf("[%d] destination array,ep occurs %d times along stored critical path\n", CkMyPe(), count);
 #endif
       	
-	if(count > 0 && env->getPriobits() == 8*sizeof(int)){
+	if(count > 0){
 	  // Set the integer priority to high
+#if DEBUG
 	  CkPrintf("Prio auto high\n");
+#endif
 	  *(int*)(env->getPrioPtr()) = -5;
-	}  else if ( env->getPriobits() == 8*sizeof(int)){
+	} else {
 	  // Set the integer priority to low
+#if DEBUG
 	  CkPrintf("Prio auto low: %d,%d\n", arr, ep);
+#endif
 	  *(int*)(env->getPrioPtr()) = 5;
 	}
 	
@@ -245,10 +253,6 @@ void automaticallySetMessagePriority(envelope *env){
       
     case ForNodeBocMsg:
       CkPrintf("Can't Critical Path Autoprioritize a ForNodeBocMsg\n");    
-      break;
-      
-    case ForChareMsg:
-      CkPrintf("Can't Critical Path Autoprioritize a ForChareMsg\n");
       break;
       
     case ForBocMsg:
@@ -266,17 +270,21 @@ void automaticallySetMessagePriority(envelope *env){
     }
       
   }
+
+#endif
 }
 
 
 
 void pathHistoryManager::useCriticalPathForPriories(){
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+
   // Request a critical path that will be stored everywhere for future use in autotuning message priorities
   
   // The resulting critical path should be broadcast to saveCriticalPathForPriorities() on all PEs
   CkCallback cb(CkIndex_pathHistoryManager::saveCriticalPathForPriorities(NULL),thisProxy); 
   traceCriticalPathBack(cb, false);
-  
+#endif  
 }
 
 
@@ -317,7 +325,7 @@ void pathHistoryManager::saveCriticalPathForPriorities(pathInformationMsg *msg){
       const std::pair<int,int> k = iter->first;
       const int c = iter->second;
 
-      CkPrintf("[%d] On critical path EP %d,%d occurrs %d times\n", CkMyPe(), k.first, k.second, c);
+      CkPrintf("[%d] On critical path EP %d,%d occurs %d times\n", CkMyPe(), k.first, k.second, c);
 
     }
   }

@@ -34,7 +34,7 @@
 
 
 
-//#define USE_CRITICAL_PATH_HEADER_ARRAY
+#define USE_CRITICAL_PATH_HEADER_ARRAY
 
 /**
     \addtogroup CriticalPathFramework 
@@ -112,7 +112,7 @@ class PathHistoryEnvelope {
   
   void incrementTotalTime(double time);
 
-  void createPath(envelope *originatingMsg);
+  //  void createPath(envelope *originatingMsg);
 
   void setDebug100();
       

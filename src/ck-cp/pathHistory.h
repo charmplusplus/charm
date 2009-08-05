@@ -29,6 +29,7 @@
 void initializeCriticalPath(void);
 
 void useThisCriticalPathForPriorities();
+void automaticallySetMessagePriority(envelope *env);
 
 
 class pathHistoryManager : public CBase_pathHistoryManager {

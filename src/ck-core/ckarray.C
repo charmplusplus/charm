@@ -728,9 +728,12 @@ inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
 	env->getsetArrayHops()=0;
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
 	criticalPath_send(env);
+	automaticallySetMessagePriority(env);
 #endif
 }
 
+
+/// Just a non-inlined version of msg_prepareSend()
 void msg_prepareSend_noinline(CkArrayMessage *msg, int ep,CkArrayID aid)
 {
 	envelope *env=UsrToEnv((void *)msg);
@@ -738,6 +741,10 @@ void msg_prepareSend_noinline(CkArrayMessage *msg, int ep,CkArrayID aid)
 	env->getsetArraySrcPe()=CkMyPe();
 	env->setEpIdx(ep);
 	env->getsetArrayHops()=0;
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+	criticalPath_send(env);
+	automaticallySetMessagePriority(env);
+#endif
 }
 
 void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) const
