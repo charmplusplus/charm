@@ -531,7 +531,7 @@ void CentralLB::LoadBalance()
 #endif
 
   if (_lb_args.debug()) 
-      CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d Memory:%dMB\n",
+      CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d Memory:%fMB\n",
                  lbName(), step(),start_lb_time, cur_ld_balancer, CmiMemoryUsage()/(1024.0*1024.0));
  //     CmiPrintf("[%d] n_obj:%d migratable:%d n_comm:%d\n", CkMyPe(), statsData->n_objs, statsData->n_migrateobjs, statsData->n_comm);
 //    double strat_start_time = CkWallTimer();
