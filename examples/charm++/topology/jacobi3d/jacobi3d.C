@@ -78,7 +78,7 @@ int myrand(int numpes) {
 #if USE_3D_ARRAYS
 #define index(a, b, c)	a][b][c	
 #else
-#define index(a, b, c)	(a*(blockDimY+2)*(blockDimZ+2) + b*(blockDimZ+2) + c)
+#define index(a, b, c)	( (a)*(blockDimY+2)*(blockDimZ+2) + (b)*(blockDimZ+2) + (c) )
 #endif
 
 #define MAX_ITER		21
