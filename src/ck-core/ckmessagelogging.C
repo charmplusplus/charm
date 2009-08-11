@@ -3200,7 +3200,11 @@ void ChareMlogData::sortRestoredLocalMsgLog(){
 }
 
 
-
+/**
+ * Pup method for the metadata.
+ * We are preventing the whole message log to be stored (as proposed by Sayantan for dealing with multiple failures).
+ * Then, we only support one failure at a time. Read Sayantan's thesis, sections 4.2 and 4.3 for more details.
+ */
 void ChareMlogData::pup(PUP::er &p){
 	int startSize=0;
 	char nameStr[100];
@@ -3264,17 +3268,38 @@ void ChareMlogData::pup(PUP::er &p){
 	}
 	
 	snTable.pup(p);
-	//pup the message log as well
-	int length;
+
+	// pupping only the unacked local messages in the message log
+	int length = 0;
+	MlogEntry *entry;
+	if(!p.isUnpacking()){
+		for(int i=0; i<mlog.length(); i++){
+			entry = mlog[i];
+			if(entry->unackedLocal)
+				length++;
+		}
+	}
+	p | length;
+	if(p.isUnpacking()){
+		for(int i=0; i<length; i++){
+			entry = new MlogEntry();
+			mlog.enq(entry);
+			entry->pup(p);
+		}
+	}else{
+		for(int i=0; i<mlog.length(); i++){
+			entry = mlog[i];
+			if(entry->unackedLocal){
+				entry->pup(p);
+			}
+		}
+	}
+
+/*	int length;
 	if(!p.isUnpacking()){		
 		length = mlog.length();	
 		if(length > 0)
 			DEBUG(printf("[%d] Mlog length %d \n",CkMyPe(),length));
-	/*	for(int i=0;i<length;i++){
-				if(!fault_aware(mlog[i]->env->sender)){
-					CkAbort("unknown sender in message log");
-				}
-			}*/
 	}
 	p | length;
 	for(int i=0;i<length;i++){
@@ -3285,11 +3310,10 @@ void ChareMlogData::pup(PUP::er &p){
 		}else{
 			entry = mlog[i];
 		}
-//		DEBUG(printf("[%d] entry at %d pointer %p about to be pupped\n",CkMyPe(),i,mlog[i]));
 		entry->pup(p);
-	}
+	}*/
 	
-	p| restoredLocalMsgLog;
+	p | restoredLocalMsgLog;
 	p | resendReplyRecvd;
 	p | restartFlag;
 
