@@ -21,7 +21,7 @@ fi
 
 CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
 case "$CMK_REAL_COMPILER" in
-g++|icpc) CMK_AMD64="-m64 -fPIC" ;;
+g++) CMK_AMD64="-m64 -fPIC" ;;
 charmc)  echo "Error> charmc can not call AMPI's mpiCC wrapper! Please fix your PATH."; exit 1 ;;
 esac
 
