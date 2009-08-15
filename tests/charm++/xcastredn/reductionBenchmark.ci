@@ -1,0 +1,26 @@
+mainmodule reductionBenchmark {
+
+    readonly config cfg;
+
+
+    message DataMsg
+    {
+        double data[];
+    };
+
+
+    array[3D] MyChareArray
+    {
+        entry MyChareArray(CkGroupID grpID);
+        entry void crunchData(DataMsg *msg);
+    };
+
+
+    mainchare Main
+    {
+        entry Main(CkArgMsg *msg);
+        entry void receiveReduction(CkReductionMsg *msg);
+    };
+
+};
+
