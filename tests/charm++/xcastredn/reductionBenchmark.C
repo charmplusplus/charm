@@ -1,6 +1,6 @@
 #include "reductionBenchmark.h"
 #include <iomanip>
-#include <cmath>
+#include <math.h>
 
 MyChareArray::MyChareArray(CkGroupID grpID): msgNum(0), mcastGrpID(grpID)
 {
@@ -106,9 +106,9 @@ void Main::createSection(const bool isSectionContiguous)
     int dX = 1, dY = 1, dZ = 1;
     if (!isSectionContiguous)
     {
-        dX = std::floor( cfg.X/cfg.section.X );
-        dY = std::floor( cfg.Y/cfg.section.Y );
-        dZ = std::floor( cfg.Z/cfg.section.Z );
+        dX = floor( cfg.X/cfg.section.X );
+        dY = floor( cfg.Y/cfg.section.Y );
+        dZ = floor( cfg.Z/cfg.section.Z );
     }
 
     /// Determine the extent of the section along each dimension
