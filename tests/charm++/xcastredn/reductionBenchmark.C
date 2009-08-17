@@ -37,33 +37,35 @@ Main::Main(CkArgMsg *m)
     {
         // just proceed silently for empty args
     }
-    else if ( ((m->argc>=2) && (m->argc<=7)) || (m->argc == 10) )
+    else if ( ((m->argc>=2) && (m->argc<=5)) || (m->argc == 8) || (m->argc == 11) )
     {
         if (m->argc >= 2)
-            cfg.sectionSize      = atoi(m->argv[1]);
+            cfg.numRepeats       = atoi(m->argv[1]);
         if (m->argc >= 3)
-            cfg.sectionDims      = atoi(m->argv[2]);
+            cfg.msgSizeMin       = atoi(m->argv[2]);
         if (m->argc >= 4)
-            cfg.numRepeats       = atoi(m->argv[3]);
+            cfg.msgSizeMax       = atoi(m->argv[3]);
         if (m->argc >= 5)
             cfg.useContiguousSection =(atoi(m->argv[4]) == 0)? false: true;
-        if (m->argc >= 6)
-            cfg.msgSizeMin       = atoi(m->argv[5]);
-        if (m->argc >= 7)
-            cfg.msgSizeMax       = atoi(m->argv[6]);
-        if (m->argc == 10)
+        if (m->argc >= 8)
         {
-            cfg.X                = atoi(m->argv[7]);
-            cfg.Y                = atoi(m->argv[8]);
-            cfg.Z                = atoi(m->argv[9]);
+            cfg.section.X        = atoi(m->argv[5]);
+            cfg.section.Y        = atoi(m->argv[6]);
+            cfg.section.Z        = atoi(m->argv[7]);
+        }
+        if (m->argc == 11)
+        {
+            cfg.X                = atoi(m->argv[8]);
+            cfg.Y                = atoi(m->argv[9]);
+            cfg.Z                = atoi(m->argv[10]);
         }
     }
     else
-        CkPrintf("Wrong number of arguments. Try %s sectionSize sectionDimensionality isSectionContiguous numRepeats msgSizeMin msgSizeMax arrayDimX arrayDimY arrayDimZ",m->argv[0]);
+        CkPrintf("Wrong number of arguments. Try %s numRepeats msgSizeMin msgSizeMax isSectionContiguous sectionDimX sectionDimY sectionDimZ arrayDimX arrayDimY arrayDimZ",m->argv[0]);
 
     delete m;
-    CkPrintf("\nRunning timing tests for multicast/reductions using CkMulticast. Inputs are: \n\tArray size: (%d,%d,%d) \n\tSection size: %d (%d) \n\tMsg sizes (KB): %d to %d \n\tNum repeats: %d",
-             cfg.X,cfg.Y,cfg.Z, cfg.sectionSize, cfg.sectionDims, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats);
+    CkPrintf("\nRunning timing tests for multicast/reductions using CkMulticast. Inputs are: \n\tArray size: (%d,%d,%d) \n\tSection size: (%d,%d,%d) \n\tMsg sizes (KB): %d to %d \n\tNum repeats: %d",
+             cfg.X,cfg.Y,cfg.Z, cfg.section.X, cfg.section.Y, cfg.section.Z, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats);
 
     // Setup the multicast manager stuff
     CkGroupID mcastGrpID  = CProxy_CkMulticastMgr::ckNew();
@@ -104,15 +106,15 @@ void Main::createSection(const bool isSectionContiguous)
     int dX = 1, dY = 1, dZ = 1;
     if (!isSectionContiguous)
     {
-        dX = std::floor( cfg.X/cfg.sectionSize );
-        dY = std::floor( cfg.Y/cfg.sectionSize );
-        dZ = std::floor( cfg.Z/cfg.sectionSize );
+        dX = std::floor( cfg.X/cfg.section.X );
+        dY = std::floor( cfg.Y/cfg.section.Y );
+        dZ = std::floor( cfg.Z/cfg.section.Z );
     }
 
     /// Determine the extent of the section along each dimension
-    int Xu = (cfg.sectionSize-1)*dX;
-    int Yu = (cfg.sectionDims>=2) ? (cfg.sectionSize-1)*dY : 0;
-    int Zu = (cfg.sectionDims>=3) ? (cfg.sectionSize-1)*dZ : 0;
+    int Xu = (cfg.section.X-1)*dX;
+    int Yu = (cfg.section.Y-1)*dY;
+    int Zu = (cfg.section.Z-1)*dZ;
     CkAssert(cfg.X >= Xu && cfg.Y >= Yu && cfg.Z >= Zu);
 
     /// Create the section

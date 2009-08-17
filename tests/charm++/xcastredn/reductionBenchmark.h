@@ -17,22 +17,27 @@
 class config
 {
     public:
-        config(): sectionSize(3), sectionDims(3), numRepeats(3),
+        config(): 
+                  numRepeats(3),
                   msgSizeMin(4), msgSizeMax(64),
                   useContiguousSection(false),
                   X(5), Y(5), Z(5),
-                  fieldWidth(15)                 {}
+                  fieldWidth(15)
+        {
+            section.X= 3; section.Y = 3; section.Z = 3;
+        }
 
         void pup(PUP::er &p)
         {
-            p|sectionSize;  p|sectionDims; p|numRepeats;
+            p|section.X; p|section.Y; p|section.Z;
+            p|numRepeats;
             p|msgSizeMin;   p|msgSizeMax;
             p|useContiguousSection; 
             p|X; p|Y; p|Z;
         }
 
-        /// Array section size and dimensionality
-        int sectionSize, sectionDims;
+        /// Array section dimensions
+        struct dims { int X, Y, Z; } section;
         /// Number of times to repeat the multicast/reduction for a single message size
         int numRepeats;
         /// The range of message sizes for which the benchmark should be run (in KB)

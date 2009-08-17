@@ -5,9 +5,9 @@ OBJ       = $(SRC:.C=.o)
 INTF      = reductionBenchmark.ci   
 
 # Specify the exe name and the arguments to run it with
-TARGET    = testReduction
-ARGS      = 3 2 10 1 4 128  
 NP        = 4
+TARGET    = testReduction
+ARGS      = 10 4 128 1 3 3 3 5 5 5
 
 # Specify the compilers, run script, flags etc.
 CXX       = charmc

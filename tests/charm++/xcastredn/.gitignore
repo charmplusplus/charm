@@ -1,0 +1,6 @@
+# Ignore compilation artifacts
+*.[oa]
+*.decl.h
+*.def.h
+charmrun
+
