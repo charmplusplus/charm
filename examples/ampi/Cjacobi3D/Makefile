@@ -1,5 +1,5 @@
 CHARMBASE=../../../
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../../bin/ampicxx $(OPTS)
 TOKENS=6
 
 all: ampi
@@ -11,19 +11,19 @@ mpi: jacobi.C
 
 jacobi-cpp: jacobi-cpp.C
 	$(CHARMC) -c jacobi-cpp.C 
-	$(CHARMC) -o jacobi-cpp jacobi-cpp.o -language ampi -module EveryLB -lm
+	$(CHARMC) -o jacobi-cpp jacobi-cpp.o -module EveryLB -lm
 
 jacobi: jacobi.C
 	$(CHARMC) -c jacobi.C 
-	$(CHARMC) -o jacobi jacobi.o -language ampi -module EveryLB -lm
+	$(CHARMC) -o jacobi jacobi.o -module EveryLB -lm
 
 jacobi.iso: jacobi.C
 	$(CHARMC) -c -DNO_PUP jacobi.C -o jacobi.iso.o
-	-$(CHARMC) -o jacobi.iso jacobi.iso.o -language ampi -module EveryLB -memory isomalloc
+	-$(CHARMC) -o jacobi.iso jacobi.iso.o -module EveryLB -memory isomalloc
 
 jacobi-get: jacobi-get.C
 	$(CHARMC) -c jacobi-get.C
-	$(CHARMC) -o jacobi-get jacobi-get.o -language ampi -module EveryLB -lm
+	$(CHARMC) -o jacobi-get jacobi-get.o -module EveryLB -lm
 
 jacobi-get-tokens:
 	cd $(CHARMBASE)/tmp; touch machine.c; touch ckfutures.C; make AMPI OPTS="-DIGET_FLOWCONTROL=1 -DIGET_TOKENNUM=$(TOKENS)"; cd -; 
