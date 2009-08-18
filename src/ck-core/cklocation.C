@@ -719,15 +719,12 @@ public:
 class CkMapsInit : public Chare
 {
 public:
-  CkMapsInit(CkArgMsg *msg) {
-#ifdef __FAULT__
-    _defaultArrayMapID = CProxy_RRMap::ckNew();
-#else
-    _defaultArrayMapID = CProxy_DefaultArrayMap::ckNew();
-#endif
-    delete msg;
-  }
-  CkMapsInit(CkMigrateMessage *m) {}
+	CkMapsInit(CkArgMsg *msg) {
+		_defaultArrayMapID = CProxy_DefaultArrayMap::ckNew();
+		delete msg;
+	}
+
+	CkMapsInit(CkMigrateMessage *m) {}
 };
 
 // given an envelope of a Charm msg, find the recipient object pointer
@@ -1732,6 +1729,7 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 void CkLocMgr::pup(PUP::er &p){
 	IrrGroup::pup(p);
 	p|mapID;
+	p|mapHandle;
 	p|lbdbID;
 	mapID = _defaultArrayMapID;
 	if(p.isUnpacking()){
@@ -1742,7 +1740,7 @@ void CkLocMgr::pup(PUP::er &p){
 		map=(CkArrayMap *)CkLocalBranch(mapID);
 		if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
                 CkArrayIndexMax emptyIndex;
-		mapHandle=map->registerArray(emptyIndex,thisgroup);
+		map->registerArray(emptyIndex,thisgroup);
 		// _lbdb is the fixed global groupID
 		initLB(lbdbID);
 
