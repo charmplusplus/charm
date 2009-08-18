@@ -1,5 +1,6 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
+AMPICC=$(CDIR)/bin/ampicxx $(OPTS)
 
 HEADERS=idxlc.h idxlf.h idxl.h idxl_layout.h idxl_comm.h
 HEADDEP=$(HEADERS)
@@ -16,7 +17,7 @@ headers: $(HEADERS)
 	touch headers
 
 idxl.o: idxl.C $(HEADDEP)
-	$(CHARMC) -c idxl.C
+	$(AMPICC) -c idxl.C
 
 idxl_layout.o: idxl_layout.C $(HEADDEP)
 	$(CHARMC) -c idxl_layout.C
