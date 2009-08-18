@@ -106,7 +106,7 @@ fem_comm.o: fem_comm.C $(HEADDEP)
 	$(CHARMC) -c fem_comm.C
 
 $(FEMMAIN): femmain.C $(HEADDEP)
-	$(CHARMC) -c femmain.C -o $(FEMMAIN)
+	$(AMPICC) -c femmain.C -o $(FEMMAIN)
 
 call_init.o: call_init.c
 	$(CHARMC) -c call_init.c
