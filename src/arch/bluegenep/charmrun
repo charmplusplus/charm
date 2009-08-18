@@ -1,8 +1,10 @@
 #!/bin/sh
 #
-# Conv-host for MPI:
+# Conv-host for bluegenep:
 #  Translates +pN-style conv-host options into 
-# mpirun -npN options.
+# qsub options. 
+# The script qsub the job, wait until it finishes, and print the output.
+# good for job less than 30 minutes
 
 args=""
 pes=1
@@ -40,191 +42,49 @@ done
 
 printf "\nRunning on $pes processors: $args\n"
 
+queue_stat=qstat
+queue_kill=qdel
+queue_sub=qsub
 
-if [ -n "$PBS_NODEFILE" ]
-then
-# we are in a job shell
-  mpirun_cmd=`which mpirun`
-  if echo $mpirun_cmd | grep 'mvapich2'  > /dev/null 2>/dev/null
-  then
-    mvapich2-start-mpd
-    mpirun -np $pes $args
-    mpdallexit
-  else   # normal case
-    test -z "$machinefile" && args=-machinefile" "$PBS_NODEFILE" "$args
-    echo mpirun -np $pes $args
-    mpirun -np $pes $args
-  fi
-elif [ -n "$LSB_HOSTS" ]
-then
-# Tungsten
-  echo cmpirun -lsf -poll -no_smp -gm_long 200000 $args 
-  cmpirun -lsf -poll -no_smp -gm_long 200000 $args 
-elif [ -n "$PBS_QUEUE" -o -n "$LSF_QUEUE" ]
-then
-# Interactive mode: create, and submit a batch job
-        script="charmrun_script.$$.sh"
-        indir=`pwd`
-        output="$indir/charmrun_script.$$.stdout"
-        result="$indir/charmrun_script.$$.result"
-	rm -f $result
-# Some machine specific 
-	USE_LSF=0
-# 10 minutes	
-	walllimit=10
-	queue_stat=qstat
-	queue_qsub=qsub
-	queue_kill=qdel
-	hostname=`hostname`
-	case "$hostname" in
-	turing*.turing.uiuc.edu) 
-		ppn='#PBS -l nodes='$pes':ppn=1'
-		extra='-machinefile $PBS_NODEFILE'
-		;;
-	tg-login*|honest*.ncsa.uiuc.edu)
-		# always ppn=2
-		nodes=`expr \( $pes + 1 \) / 2`
- 		test $pes -eq 1 && ppns=1 || ppns=2
-		ppn='#PBS -l nodes='$nodes':ppn='$ppns
-		extra='-machinefile $PBS_NODEFILE'
-		;;
-	co-login*.ncsa.uiuc.edu)
-		mem='#PBS -l mem=500mb'
-		ncpus="#PBS -l ncpus=$pes"
-		;;
-	tun*)
-		USE_LSF=1
-		queue_stat=bjobs
-		queue_qsub=bsub
-		queue_kill=bkill
-		;;
-	abe*)
-		# always ppn=2
-		nodes=`expr \( $pes + 1 \) / 2`
- 		test $pes -eq 1 && ppns=1 || ppns=2
-		ppn='#PBS -l nodes='$nodes':ppn='$ppns
-		extra='-machinefile $PBS_NODEFILE'
-		;;
-	*)
-		ncpus="#PBS -l ncpus=$pes"
-		;;
-	esac
-	if test $USE_LSF -eq 0
-	then
-	  mpirun=`which mpirun`
-          cat > $script << EOF
-#!/bin/sh
-# This is a charmrun-generated PBS batch job script.
-# The lines starting with #PBS are queuing system flags:
-#
-$ppn
-#
-$ncpus
-#
-#PBS -l walltime=$walllimit:00
-#
-$mem
-#
-#PBS -q $PBS_QUEUE
-#
-#PBS -N autobuild
-#
-#PBS -j oe
-#
-#PBS -o $output
+echo "Submitting batch job for> $pes $args"
+echo " using the command> $queue_sub -t 30 -n $pes  $args"
+while [ -z "$jobid" ]
+do
+	  jobid=`$queue_sub -t 30 -n $pes  $args |tail -1`
+done
+echo "Job enqueued under job ID $jobid"
 
-cd $indir
-
-cat \$PBS_NODEFILE
-$mpirun -np $pes $extra $args
-
-# Save mpirun exit status
-status=\$?
-echo \$status > $result
-EOF
-	else
-#  use LSF
-	  mpirun="cmpirun -lsf -poll -no_smp -gm_long 200000"
-          cat > $script << EOF
-#!/bin/sh
-# This is a charmrun-generated PBS batch job script.
-# The lines starting with #PBS are queuing system flags:
-#
-#BSUB -J autobuild
-#BSUB -W 0:$walllimit
-#BSUB -n $pes
-#BSUB -o $output
-
-cd $indir
-echo \$LSB_MCPU_HOSTS
-$mpirun $args
-# Save mpirun exit status
-status=\$?
-echo \$status > $result
-EOF
-	fi
+output=$jobid.output
+err=$jobid.error
 
 End() {
-	echo "Charmrun> $queue_kill $jobid ..."
-	$queue_kill $jobid
-	rm -f $script
-	exit $1
+        echo "Charmrun> $queue_kill $jobid ..."
+        $queue_kill $jobid
+        rm -f $script
+        exit $1
 }
 
-        echo "Submitting batch job for> $mpirun -np $pes $args"
-        echo " using the command> $queue_qsub $script"
-        chmod 755 $script
-	while [ -z "$jobid" ]
-	do
-	  [ $USE_LSF = 0 ] && jobid=`$queue_qsub $script|tail -1`
-	  [ $USE_LSF = 1 ] && jobid=`$queue_qsub < $script|tail -1|sed -e 's/[^0-9]*//g'`
-	done
-	echo "Job enqueued under job ID $jobid"
 # kill job if interrupted
-	trap 'End 1' 2 3
-	retry=0
+trap 'End 1' 2 3
+
 # Wait for the job to complete, by checking its status
-        while [ true ]
-        do
-                $queue_stat $jobid > tmp.$$
-		exitstatus=$?
-                if test -f $output
-                then
-# The job is done-- print its output
-                        rm tmp.$$
-# When job hangs, result file does not exist
-			test -f $result && status=`cat $result` || status=1
-			test $status -eq 0 && status=`grep 'End of program' $output > /dev/null 2>&1`
-			cat $output
-			rm -f $result
-			test -f $status && rm -f $script $output
-			exit $status
-                fi
-# The job is still queued or running-- print status and wait
-                tail -1 tmp.$$
-                rm tmp.$$
-# Job ID may not exist now
-		if test $exitstatus -ne 0
-		then
-# retry a few times when error occurs
-			retry=`expr $retry + 1`
-			if test $retry -gt 6
-			then
-				echo "Charmrun> too many errors, abort!"
-				exit 1
-			else
-				sleep 15
-			fi
-		else
-# job still in queue
-			retry=0
-                	sleep 20
-		fi
-        done
-else
-  [ -n "$MPI_MACHINEFILE" ] && args=" -machinefile $MPI_MACHINEFILE $args"
-  echo "charmrun> mpirun -np $pes $args"
-  mpirun -np $pes $args
-fi
+while [ true ]
+do
+        $queue_stat $jobid > tmp.$$
+	exitstatus=$?
 
+        if test $exitstatus -ne 0
+        then
+            # job not in the queue now
+            status=`tail -1 $err | sed 's/.*Exit status:[ ]*\([0-9\]*\).*/\1/'`
+            if test -n $status
+            then
+                  cat $output
+	          rm -f tmp.$$
+                  exit $status
+            fi
+        fi
+	sleep 20
+done
 
+exit 1
