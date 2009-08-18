@@ -3,7 +3,7 @@ CHARMC=../../../bin/ampicxx $(OPTS)
 all: pgm
 
 pgm: test.o
-	$(CHARMC) -o pgm test.o -language ampi -balancer RandCentLB
+	$(CHARMC) -o pgm test.o -balancer RandCentLB
 
 test.o: test.C
 	$(CHARMC) -c test.C

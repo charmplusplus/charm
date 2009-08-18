@@ -3,7 +3,7 @@ CHARMC=../../../bin/ampicc $(OPTS)
 all: pgm
 
 pgm: test.o
-	$(CHARMC) -o pgm test.o -language ampi
+	$(CHARMC) -o pgm test.o
 
 test.o: test.c
 	$(CHARMC) -c test.c
