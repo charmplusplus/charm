@@ -30,7 +30,7 @@ OPTS_LD="$OPTS_LD"
 
 CMK_CPP_CHARM="$BGP_BIN/powerpc-bgp-linux-cpp -P"
 CMK_CPP_C="$BGP_BIN/powerpc-bgp-linux-cpp -E "
-CMK_CXX="$BGP_BIN/powerpc-bgp-linux-g++ $GCC_OPTS "
+CMK_CXX="$BGP_BIN/powerpc-bgp-linux-g++ $GCC_OPTS -DMPICH_IGNORE_CXX_SEEK "
 CMK_GCXX="$BGP_BIN/powerpc-bgp-linux-g++ $GCC_OPTS "
 CMK_CC="$BGP_BIN/powerpc-bgp-linux-gcc $GCC_OPTS "
 CMK_CXXPP="$BGP_BIN/powerpc-bgp-linux-g++ -E "
