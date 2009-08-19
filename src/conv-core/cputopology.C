@@ -9,6 +9,7 @@
 #include "sockRoutines.h"
 #include "cklists.h"
 
+
 #define DEBUGP(x)  /** CmiPrintf x; */
 
 /** This scheme relies on using IP address to identify physical nodes 
@@ -23,7 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#if CMK_BLUEGENEL || CMK_BLUEGENEP || CMK_CRAYXT
+#if CMK_BLUEGENEL || CMK_BLUEGENEP
 #include "TopoManager.h"
 #endif
 
@@ -107,6 +108,7 @@ public:
   static int numNodes;
   static CkVec<int> *bynodes;
 
+    // return -1 when not supported
   int numUniqNodes() {
 #if 0
     if (numNodes != 0) return numNodes;
@@ -117,6 +119,7 @@ public:
     numNodes = n+1;
     return numNodes;
 #else
+    if (numNodes > 0) return numNodes;     // already calculated
     CkVec<int> unodes;
     int i;
     for (i=0; i<CmiNumPes(); i++)  unodes.push_back(nodeIDs[i]);
@@ -127,7 +130,7 @@ public:
         if (unodes[i] != last) numNodes++; 
         last=unodes[i];
     }
-    return numNodes;
+    return numNodes>0?numNodes:-1;
 #endif
   }
 
@@ -135,8 +138,10 @@ public:
     int i;
     numUniqNodes();
     bynodes = new CkVec<int>[numNodes];
-    for (i=0; i<CmiNumPes(); i++) 
+    for (i=0; i<CmiNumPes(); i++){
+      CmiAssert(nodeIDs[i] >=0 && nodeIDs[i] <= numNodes); // Sanity check for bug that occurs on mpi-crayxt
       bynodes[nodeIDs[i]].push_back(i);
+    }
   }
 
   void print() {
@@ -232,28 +237,41 @@ static void cpuTopoRecvHandler(void *msg)
 }
 
 
+// return -1 when not supported
 extern "C" int CmiOnSamePhysicalNode(int pe1, int pe2)
 {
   int *nodeIDs = cpuTopo.nodeIDs;
   return nodeIDs==NULL?-1:nodeIDs[pe1] == nodeIDs[pe2];
 }
 
+// return -1 when not supported
 extern "C" int CmiNumPhysicalNodes()
 {
   return cpuTopo.numUniqNodes();
 }
 
+// return -1 when not supported
 extern "C" int CmiNumPesOnPhysicalNode(int pe)
 {
   return cpuTopo.bynodes==NULL?-1:(int)cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].size();
 }
 
+// pelist points to system memory, user should not free it
 extern "C" void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num)
 {
   CmiAssert(pe >=0 && pe < CmiNumPes());
   *num = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].size();
   if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].getVec();
 }
+
+// the least number processor on the same physical node
+extern "C"  int CmiGetFirstPeOnPhysicalNode(int pe)
+{
+  CmiAssert(pe >=0 && pe < CmiNumPes());
+  const CkVec<int> &v = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]];
+  return v[0];
+}
+
 
 static int _noip = 0;
 
@@ -303,18 +321,44 @@ extern "C" void CmiInitCPUTopology(char **argv)
       strcpy(hostname, "");
   }
 #endif
-#if CMK_BLUEGENEL || CMK_BLUEGENEP || CMK_CRAYXT
+#if CMK_BLUEGENEL || CMK_BLUEGENEP
   if (CmiMyRank() == 0) {
     TopoManager tmgr;
 
-    cpuTopo.numNodes = CkNumPes();
+    cpuTopo.numNodes = CmiNumPes();
     cpuTopo.nodeIDs = new int[cpuTopo.numNodes];
 
+    int x, y, z, t, nid;
     for(int i=0; i<cpuTopo.numNodes; i++) {
-      int x, y, z, t;
       tmgr.rankToCoordinates(i, x, y, z, t);
-      int nid = tmgr.coordinatesToRank(x, y, z, 0);
+      nid = tmgr.coordinatesToRank(x, y, z, 0);
       cpuTopo.nodeIDs[i] = nid;
+    }
+    cpuTopo.sort();
+  }
+  CmiNodeAllBarrier();
+  return;
+#elif CMK_CRAYXT
+  if(CmiMyRank() == 0) {
+    cpuTopo.numNodes = CmiNumPes();
+    cpuTopo.nodeIDs = new int[cpuTopo.numNodes];
+
+    int nid;
+    for(int i=0; i<cpuTopo.numNodes; i++) {
+      nid = getXTNodeID(i, cpuTopo.numNodes);
+      cpuTopo.nodeIDs[i] = nid;
+    }
+    int prev = -1;
+    nid = -1;
+
+    // this assumes TXYZ mapping and changes nodeIDs
+    for(int i=0; i<cpuTopo.numNodes; i++) {
+      if(cpuTopo.nodeIDs[i] != prev) {
+	prev = cpuTopo.nodeIDs[i];
+	cpuTopo.nodeIDs[i] = ++nid;
+      }
+      else
+	cpuTopo.nodeIDs[i] = nid;
     }
     cpuTopo.sort();
   }
@@ -324,15 +368,15 @@ extern "C" void CmiInitCPUTopology(char **argv)
   /* get my ip address */
   if (CmiMyRank() == 0)
   {
-#if CMK_HAS_GETHOSTNAME
+  #if CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
-#elif CMK_BPROC
+  #elif CMK_BPROC
     myip = skt_innode_my_ip();
-#else
+  #else
     if (!CmiMyPe())
     CmiPrintf("CmiInitCPUTopology Warning: Can not get unique name for the compute nodes. \n");
     _noip = 1; 
-#endif
+  #endif
   }
 
   CmiNodeAllBarrier();
