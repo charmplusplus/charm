@@ -6,7 +6,6 @@ Orion Sky Lawlor, olawlor@acm.org, 1/27/2003
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include <unistd.h>
 #include "charm++.h"
 #include "tcharmc.h"
 #include "fem.h"
@@ -335,7 +334,9 @@ driver(void)
       FEM_Print("Waiting for NetFEM client to connect (hit ctrl-c to exit)");
     int ts=0;
     while(1) {
+#if CMK_HAS_SLEEP
       sleep(1);
+#endif
       mesh.netfem(ts);
       ts++;
       FEM_Barrier();
