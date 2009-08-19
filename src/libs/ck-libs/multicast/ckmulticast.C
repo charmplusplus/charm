@@ -1,3 +1,16 @@
+/*
+ *  Charm++ support for array section multicast and reduction
+ *
+ *  written by Gengbin Zheng,   gzheng@uiuc.edu
+ *  on 12/2001
+ *
+ *  features:
+ *     using a spanning tree (factor defined in ckmulticast.h)
+ *     support pipelining via fragmentatio  (SPLIT_MULTICAST)
+ *     support *any-time* migration, spanning tree will be rebuilt automatically
+ *     SMP node aware     (SMP_AWARE)
+ * */
+
 #include "charm++.h"
 #include "envelope.h"
 #include "register.h"
@@ -13,6 +26,8 @@
 
 // maximum number of fragments into which a message can be broken
 #define MAXFRAGS 5
+
+#define SMP_AWARE                     1
 
 typedef CkQ<multicastGrpMsg *>   multicastGrpMsgBuf;
 typedef CkVec<CkArrayIndexMax>   arrayIndexList;
@@ -501,7 +516,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         // Direct children are simply the first section member in each of the branch lists
         //CkPrintf("[%d] numchild: %d\n", CkMyPe(), numchild);
         arrayIndexPosList *slots = new arrayIndexPosList[numchild];
-#if 0
+#if !SMP_AWARE
         num = 0;
         for (i=0; i<numpes; i++) 
         {
