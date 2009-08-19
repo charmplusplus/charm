@@ -50,7 +50,14 @@ echo "Submitting batch job for> $pes $args"
 echo " using the command> $queue_sub -t 30 -n $pes  $args"
 while [ -z "$jobid" ]
 do
-	  jobid=`$queue_sub -t 30 -n $pes  $args |tail -1`
+  jobid=`$queue_sub -t 30 -n $pes  $args 2>err.$$ |tail -1`
+  if grep 'not found' err.$$ > /dev/null
+  then
+    cat err.$$
+    rm -f err.$$
+    exit 1
+  fi
+  sleep 10
 done
 echo "Job enqueued under job ID $jobid"
 
