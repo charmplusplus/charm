@@ -9,6 +9,7 @@
 
 #include "ck.h"
 
+extern int _qdCommHandlerIdx;
 
 // a fake QD which just wait for several seconds to triger QD callback
 #define CMK_DUMMY_QD             0	/* seconds to wait for */
@@ -200,6 +201,37 @@ void _qdHandler(envelope *env)
 #endif
 }
 
+// when a message is sent from an immediate handler from comm thread or 
+// interrupt handler, the counter is sent to rank 0 of the same node
+void _qdCommHandler(envelope *env)
+{
+  register QdCommMsg *msg = (QdCommMsg*) EnvToUsr(env);
+  DEBUGP(("[%d] _qdCommHandler msg:%p \n", CmiMyPe(), msg));
+  if (msg->flag == 0)
+    CpvAccess(_qd)->create(msg->count);
+  else
+    CpvAccess(_qd)->process(msg->count);
+  CmiFree(env);
+}
+
+void QdState::sendCount(int flag, int count)
+{
+#if ! CMK_DUMMY_QD
+#if CMK_NET_VERSION && ! CMK_SMP && ! defined(CMK_CPV_IS_SMP)
+        if (CmiImmIsRunning())
+#else
+        if (CmiMyRank() == CmiMyNodeSize())
+#endif
+        {
+          register QdCommMsg *msg = (QdCommMsg*) CkAllocMsg(0,sizeof(QdCommMsg),0);
+          msg->flag = flag;
+          msg->count = count;
+          register envelope *env = UsrToEnv((void *)msg);
+          CmiSetHandler(env, _qdCommHandlerIdx);
+          CmiFreeSendFn(CmiNodeFirst(CmiMyNode()), env->getTotalsize(), (char *)env);
+        }
+#endif
+}
 
 void CkStartQD(const CkCallback& cb)
 {

@@ -31,6 +31,12 @@ class QdMsg {
     void setDirty(int d) { CkAssert(phase==2); u.p4.dirty = d; }
 };
 
+class QdCommMsg {
+  public:
+    int flag;     //  0: create   1: process
+    int count;
+};
+
 class QdCallback {
   public:
 	CkCallback cb;
@@ -87,8 +93,16 @@ class QdState {
     int getParent(void) { return parent; }
     QdCallback *deq(void) { return (QdCallback*) callbacks->deq(); }
     void enq(QdCallback *c) { callbacks->enq((void *) c); }
-    void create(int n=1) { mCreated += n; }
-    void process(int n=1) { mProcessed += n; }
+    void create(int n=1) { 
+        mCreated += n; 
+#if CK_MSG_IMMEDIATE
+        sendCount(0, n);
+#endif
+    }
+    void sendCount(int flag, int count);     // send msg to rank 0 for counting
+    void process(int n=1) { 
+         mProcessed += n; 
+    }
     int getCreated(void) { return mCreated; }
     int getProcessed(void) { return mProcessed; }
     int getCCreated(void) { return cCreated; }
@@ -111,6 +125,7 @@ class QdState {
 };
 
 extern void _qdHandler(envelope *);
+extern void _qdCommHandler(envelope *);
 CpvExtern(QdState*, _qd);
 
 #endif

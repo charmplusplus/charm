@@ -66,6 +66,7 @@ int   _roRestartHandlerIdx;
 int   _bocHandlerIdx;
 int   _nodeBocHandlerIdx;
 int   _qdHandlerIdx;
+int   _qdCommHandlerIdx;
 int   _triggerHandlerIdx;
 int   _mainDone = 0;
 static int   _triggersSent = 0;
@@ -657,6 +658,7 @@ extern "C" void initQd()
 #endif
 	}
 	_qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
+	_qdCommHandlerIdx = CmiRegisterHandler((CmiHandler)_qdCommHandler);
 }
 
 /**
