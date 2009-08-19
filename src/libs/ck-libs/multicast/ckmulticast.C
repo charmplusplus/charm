@@ -499,7 +499,9 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     {
         // Distribute the section members across the number of direct children (branches)
         // Direct children are simply the first section member in each of the branch lists
+        //CkPrintf("[%d] numchild: %d\n", CkMyPe(), numchild);
         arrayIndexPosList *slots = new arrayIndexPosList[numchild];
+#if 0
         num = 0;
         for (i=0; i<numpes; i++) 
         {
@@ -509,6 +511,33 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
                 slots[num].push_back(lists[i][j]);
             num = (num+1) % numchild;
         }
+#else
+        num = 0;
+        // SMP node aware, put SMP processors on the direct children
+        // first pass, find SMP processors
+        for (i=0; i<numpes; i++) 
+        {
+            if (i==CkMyPe()) continue;
+            if (lists[i].length() == 0) continue;
+            if (CmiOnSamePhysicalNode(i, CkMyPe())==1) {
+              // CkPrintf("[%d] child: %d\n", CkMyPe(), i);
+              for (j=0; j<lists[i].length(); j++)
+                slots[num].push_back(lists[i][j]);
+              lists[i].length() = 0;
+              num = (num+1) % numchild;
+            }
+        }
+        // second pass, fill the rest
+        for (i=0; i<numpes; i++) 
+        {
+            if (i==CkMyPe()) continue;
+            if (lists[i].length() == 0) continue;
+            // CkPrintf("[%d] child: %d\n", CkMyPe(), i);
+            for (j=0; j<lists[i].length(); j++)
+                slots[num].push_back(lists[i][j]);
+            num = (num+1) % numchild;
+        }
+#endif
 
         // Ask each of your direct children to setup their branches
         CProxy_CkMulticastMgr  mCastGrp(thisgroup);
