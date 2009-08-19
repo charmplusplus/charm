@@ -968,6 +968,17 @@ then
 	add_flag 'CMK_LDXX="$CMK_LDXX '$TRACE_LINK_FLAG'"' "backtrace"
 fi
 
+#### test sleep ####
+cat > $t <<EOT
+#include <unistd.h>
+int main() {
+  sleep(1);
+  return 0;
+}
+EOT
+test_cxx "whether has sleep " "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_SLEEP, $pass, [whether has sleep])
+
 
 #### test if has zlib ####
 # bproc doesnot like -lz in any case

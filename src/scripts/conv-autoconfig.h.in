@@ -120,6 +120,9 @@
 /* whether the setpriority() exists */
 #undef CMK_HAS_SETPRIORITY
 
+/* whether has sleep */
+#undef CMK_HAS_SLEEP
+
 /* whether has socklen_t */
 #undef CMK_HAS_SOCKLEN
 
