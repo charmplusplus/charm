@@ -106,7 +106,7 @@ void Chare::CkAddThreadListeners(CthThread th, void *msg) {
 
 
 void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
-  p.comment("Message has no debug pup routine.  Bytes:");
+  p.comment("Bytes");
   int ts=UsrToEnv(msg)->getTotalsize();
   int msgLen=ts-sizeof(envelope);
   if (msgLen>0)
