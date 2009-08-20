@@ -370,14 +370,43 @@ void CpdPupMessage(PUP::er &p, void *msg)
   PUPn(userSize);
   int msgType = env->getMsgIdx();
   PUPn(msgType);
-  int msgFor = env->getMsgtype();
-  PUPn(msgFor);
+  int envType = env->getMsgtype();
+  PUPn(envType);
 
   //p.synchronize(PUP::sync_last_system);
 
   int ep=CkMessageToEpIdx(msg);
   PUPn(ep);
 
+  // Pup the information specific to this envelope type
+  if (envType == ForArrayEltMsg || envType == ArrayEltInitMsg) {
+    int arrID = env->getsetArrayMgr().idx;
+    PUPn(arrID);
+    CkArrayIndexStruct &idx = *(CkArrayIndexStruct *)&env->getsetArrayIndex();
+    int nInts = idx.nInts;
+    int dimension = idx.dimension;
+    PUPn(nInts);
+    PUPn(dimension);
+    p.comment("index");
+    if (dimension >=4 && dimension <=6) {
+      p((short int *)idx.index, dimension);
+    } else {
+      p(idx.index, nInts);
+    }
+  } else if (envType == BocInitMsg || envType == NodeBocInitMsg ||
+             envType == ForNodeBocMsg || envType == ForBocMsg) {
+    int groupID = env->getGroupNum().idx;
+    PUPn(groupID);
+  } else if (envType == NewVChareMsg || envType == ForVidMsg || envType == FillVidMsg) {
+    p.comment("ptr");
+    void *ptr = env->getVidPtr();
+    pup_pointer(&p, &ptr);
+  } else if (envType == ForChareMsg) {
+    p.comment("ptr");
+    void *ptr = env->getObjPtr();
+    pup_pointer(&p, &ptr);
+  }
+  
   /* user data */
   p.comment("data");
   p.synchronize(PUP::sync_begin_object);
@@ -449,6 +478,26 @@ public:
       }
     delete[] messages;
 
+  }
+};
+
+class CpdList_message : public CpdListAccessor {
+  virtual const char * getPath(void) const {return "converse/message";}
+  virtual size_t getLength(void) const {return 1;}
+  virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
+    envelope *env = (envelope*)(((unsigned int)req.lo) + (((unsigned long)req.hi)<<32)+sizeof(CmiChunkHeader));
+    beginItem(p, 0);
+    const char *type="Converse";
+    p.comment("name");
+    char name[128];
+    if (CmiGetHandler(env)==_charmHandlerIdx) {type="Local Charm";}
+    if (CmiGetXHandler(env)==_charmHandlerIdx) {type="Network Charm";}
+    sprintf(name,"%s 0: %s (%d)","Message",type,CmiGetHandler(env));
+    p(name, strlen(name));
+    p.comment("charmMsg");
+    p.synchronize(PUP::sync_begin_object);
+    CpdPupMessage(p, EnvToUsr(env));
+    p.synchronize(PUP::sync_end_object);
   }
 };
 
@@ -524,7 +573,7 @@ static void _call_freeze_on_break_point(void * msg, void * object)
       CpvAccess(lastBreakPointObject) = object;
       CpvAccess(lastBreakPointIndex) = CkMessageToEpIdx(msg);
       EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CpvAccess(lastBreakPointIndex));
-      CmiPrintf("CPD: Break point reached in proc %d for Function = %s\n",CkMyPe(),breakPointEntryInfo->name);
+      CpdNotify(CPD_BREAKPOINT,breakPointEntryInfo->name);
       CpdFreeze();
   }
 }
@@ -751,6 +800,7 @@ void CpdCharmInit()
   CpdListRegister(new CpdList_arrayElements());
   CpdListRegister(new CpdList_objectNames());
   CpdListRegister(new CpdList_object());
+  CpdListRegister(new CpdList_message());
   CpdListRegister(new CpdList_msgStack());
   CpdIsDebugMessage = CpdIsCharmDebugMessage;
 }
