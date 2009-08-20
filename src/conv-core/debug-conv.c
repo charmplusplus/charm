@@ -85,7 +85,7 @@ void CpdSearchLeaks(char * msg) {
 void * (*CpdDebugGetAllocationTree)(int *);
 void (*CpdDebug_pupAllocationPoint)(pup_er p, void *data);
 void (*CpdDebug_deleteAllocationPoint)(void *ptr);
-void * (*CpdDebug_MergeAllocationTree)(void *data, void **remoteData, int numRemote);
+void * (*CpdDebug_MergeAllocationTree)(int *size, void *data, void **remoteData, int numRemote);
 CpvDeclare(int, CpdDebugCallAllocationTree_Index);
 CpvStaticDeclare(CcsDelayedReply, allocationTreeDelayedReply);
 
@@ -131,7 +131,7 @@ static void CpdDebugCallAllocationTree(char *msg)
 void * (*CpdDebugGetMemStat)(void);
 void (*CpdDebug_pupMemStat)(pup_er p, void *data);
 void (*CpdDebug_deleteMemStat)(void *ptr);
-void * (*CpdDebug_mergeMemStat)(void *data, void **remoteData, int numRemote);
+void * (*CpdDebug_mergeMemStat)(int *size, void *data, void **remoteData, int numRemote);
 CpvDeclare(int, CpdDebugCallMemStat_Index);
 CpvStaticDeclare(CcsDelayedReply, memStatDelayedReply);
 
@@ -179,6 +179,28 @@ static void CpdDebugCallMemStat(char *msg) {
   CmiFree(msg);
 }
 
+static void * CpdDebugMerge(int *size,void *local,void **remote,int n) {
+  CcsImplHeader *hdr;
+  int total = *size;
+  int i;
+  for (i=0; i<n; ++i) {
+    hdr = (CcsImplHeader*)(((char*)remote[i])+CmiMsgHeaderSizeBytes);
+    total += ChMessageInt(hdr->len);
+  }
+  void *reply = CmiAlloc(total);
+  memcpy(reply, local, *size);
+  ((CcsImplHeader*)(((char*)reply)+CmiMsgHeaderSizeBytes))->len = ChMessageInt_new(total-CmiMsgHeaderSizeBytes-sizeof(CcsImplHeader));
+  CmiFree(local);
+  char *ptr = ((char*)reply)+*size;
+  for (i=0; i<n; ++i) {
+    int len = ChMessageInt(((CcsImplHeader*)(((char*)remote[i])+CmiMsgHeaderSizeBytes))->len);
+    memcpy(ptr, ((char*)remote[i])+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader), len);
+    ptr += len;
+  }
+  *size = total;
+  return reply;
+}
+
 static void CpdDebugHandler(char *msg)
 {
     char name[128];
@@ -191,18 +213,20 @@ static void CpdDebugHandler(char *msg)
       CpdUnFreeze();
     }
     else if (strncmp(name, "step", strlen("step")) == 0){
-      CmiPrintf("step received\n");
+      /*CmiPrintf("step received\n");*/
       CpvAccess(stepFlag) = 1;
       CpdUnFreeze();
     }
     else if (strncmp(name, "continue", strlen("continue")) == 0){
-      CmiPrintf("continue received\n");
+      /*CmiPrintf("continue received\n");*/
       CpvAccess(continueFlag) = 1;
       CpdUnFreeze();
     }
     else if (strncmp(name, "status", strlen("status")) == 0) {
-      char reply = CpdIsFrozen() ? 0 : 1;
-      CcsSendReply(1, &reply);
+      ChMessageInt_t reply[2];
+      reply[0] = ChMessageInt_new(CmiMyPe());
+      reply[1] = ChMessageInt_new(CpdIsFrozen() ? 0 : 1);
+      CcsSendReply(2*sizeof(ChMessageInt_t), reply);
     }
 #if 0
     else if (strncmp(name, "setBreakPoint", strlen("setBreakPoint")) == 0){
@@ -215,6 +239,7 @@ static void CpdDebugHandler(char *msg)
     else{
       CmiPrintf("bad debugger command:%s received,len=%ld\n",name,strlen(name));
     }
+    CmiFree(msg);
 }
 
 
@@ -224,7 +249,7 @@ static void CpdDebugHandler(char *msg)
  */
 void CpdFreeze(void)
 {
-  CmiPrintf("CPD: Frozen processor %d\n",CmiMyPe());
+  CpdNotify(CPD_FREEZE,getpid());
   if (CpvAccess(freezeModeFlag)) return; /*Already frozen*/
   CpvAccess(freezeModeFlag) = 1;
   CpdFreezeModeScheduler();
@@ -315,6 +340,7 @@ void CpdInit(void)
   CpvAccess(debugQueue) = CdsFifo_Create();
 
   CcsRegisterHandler("ccs_debug", (CmiHandler)CpdDebugHandler);
+  CcsSetMergeFn("ccs_debug", CpdDebugMerge);
 
   CcsRegisterHandler("ccs_debug_allocationTree", (CmiHandler)CpdDebugCallAllocationTree);
   CpvInitialize(int, CpdDebugCallAllocationTree_Index);
@@ -343,19 +369,22 @@ void CpdInit(void)
 
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+void CpdNotify(int type, ...) {
+  va_list list;
+  va_start(list, type);
+  switch (type) {
+  case CPD_ABORT:
+    CmiPrintf("CPD: %d Abort %s\n",CmiMyPe(), va_arg(list, char*));
+    break;
+  case CPD_SIGNAL:
+    CmiPrintf("CPD: %d Signal %d\n",CmiMyPe(), va_arg(list, int));
+    break;
+  case CPD_FREEZE:
+    CmiPrintf("CPD: %d Freeze %d\n",CmiMyPe(),getpid());
+    break;
+  case CPD_BREAKPOINT:
+    CmiPrintf("CPD: %d BP %s\n",CmiMyPe(), va_arg(list, char*));
+    break;
+  }
+  va_end(list);
+}

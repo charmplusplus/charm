@@ -447,7 +447,7 @@ static void CmiStartThreads(char **argv)
 #endif	/* non smp */
 
 /*Add a message to this processor's receive queue, pe is a rank */
-static void CmiPushPE(int pe,void *msg)
+void CmiPushPE(int pe,void *msg)
 {
   CmiState cs = CmiGetStateN(pe);
   MACHSTATE2(3,"Pushing message into rank %d's queue %p{",pe, cs->recv);
@@ -1580,6 +1580,36 @@ static void CmiNotifyStillIdle(CmiIdleState *s)
 FILE *debugLog = NULL;
 #endif
 
+static int machine_exit_idx;
+static void machine_exit(char *m) {
+  EmergencyExit();
+  /*printf("--> %d: machine_exit\n",CmiMyPe());*/
+  fflush(stdout);
+  CmiNodeBarrier();
+  if (CmiMyRank() == 0) {
+    MPI_Barrier(MPI_COMM_WORLD);
+    /*printf("==> %d: passed barrier\n",CmiMyPe());*/
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  } else {
+    while (1) CmiYield();
+  }
+}
+
+#include <signal.h>
+static void KillOnAllSigs(int sigNo) {
+  static int already_in_signal_handler = 0;
+  if (already_in_signal_handler) MPI_Abort(1);
+  already_in_signal_handler = 1;
+  if (CpvAccess(cmiArgDebugFlag)) {
+    CpdNotify(CPD_SIGNAL, sigNo);
+    CpdFreeze();
+  }
+  char *m = CmiAlloc(CmiMsgHeaderSizeBytes);
+  CmiSetHandler(m, machine_exit_idx);
+  CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, m);
+  machine_exit(m);
+}
+
 static void ConverseRunPE(int everReturn)
 {
   CmiIdleState *s=CmiNotifyGetState();
@@ -1600,6 +1630,7 @@ static void ConverseRunPE(int everReturn)
   CthInit(CmiMyArgv);
 
   ConverseCommonInit(CmiMyArgv);
+  machine_exit_idx = CmiRegisterHandler(machine_exit);
 
 #if CMI_MPI_TRACE_USEREVENTS
 #ifndef CMK_OPTIMIZE
@@ -1723,6 +1754,22 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     printf("Charm++: Running in idle blocking mode.\n");
   }
 
+  /* setup signal handlers */
+  signal(SIGSEGV, KillOnAllSigs);
+  signal(SIGFPE, KillOnAllSigs);
+  signal(SIGILL, KillOnAllSigs);
+  signal(SIGINT, KillOnAllSigs);
+  signal(SIGTERM, KillOnAllSigs);
+  signal(SIGABRT, KillOnAllSigs);
+#   if !defined(_WIN32) || defined(__CYGWIN__) /*UNIX-only signals*/
+  signal(SIGQUIT, KillOnAllSigs);
+  signal(SIGBUS, KillOnAllSigs);
+/*#     if CMK_HANDLE_SIGUSR
+  signal(SIGUSR1, HandleUserSignals);
+  signal(SIGUSR2, HandleUserSignals);
+#     endif*/
+#   endif /*UNIX*/
+  
 #if CMK_NO_OUTSTANDING_SENDS
   no_outstanding_sends=1;
 #endif
@@ -1843,10 +1890,21 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
 void CmiAbort(const char *message)
 {
+  /* if CharmDebug is attached simply try to send a message to it */
+  if (CpvAccess(cmiArgDebugFlag)) {
+    CpdNotify(CPD_ABORT, message);
+    CpdFreeze();
+  }
+  
   CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
         "Reason: %s\n",CmiMyPe(),message);
  /*  CmiError(message); */
   CmiPrintStackTrace(0);
+  char *m = CmiAlloc(CmiMsgHeaderSizeBytes);
+  CmiSetHandler(m, machine_exit_idx);
+  CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, m);
+  machine_exit(m);
+  /* Program never reaches here */
   MPI_Abort(MPI_COMM_WORLD, 1);
 }
 

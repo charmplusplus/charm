@@ -14,12 +14,12 @@ extern "C" {
 extern void * (*CpdDebugGetAllocationTree)(int*);
 extern void (*CpdDebug_pupAllocationPoint)(pup_er p, void *data);
 extern void (*CpdDebug_deleteAllocationPoint)(void *ptr);
-extern void * (*CpdDebug_MergeAllocationTree)(void *data, void **remoteData, int numRemote);
+extern void * (*CpdDebug_MergeAllocationTree)(int *size, void *data, void **remoteData, int numRemote);
 
 extern void * (*CpdDebugGetMemStat)(void);
 extern void (*CpdDebug_pupMemStat)(pup_er p, void *data);
 extern void (*CpdDebug_deleteMemStat)(void *ptr);
-extern void * (*CpdDebug_mergeMemStat)(void *data, void **remoteData, int numRemote);
+extern void * (*CpdDebug_mergeMemStat)(int *size, void *data, void **remoteData, int numRemote);
 
 CpvExtern(int, cmiArgDebugFlag);
 extern char ** memoryBackup;
@@ -35,6 +35,15 @@ void CpdStartGdb(void);
 void Cpd_CmiHandleMessage(void *msg);
 
 extern int (*CpdIsDebugMessage)(void*);
+
+enum {
+  CPD_ERROR = 0,
+  CPD_SIGNAL = 1,
+  CPD_ABORT = 2,
+  CPD_FREEZE = 3,
+  CPD_BREAKPOINT = 4
+};
+extern void CpdNotify(int type, ...);
 
 typedef struct LeakSearchInfo {
   char *begin_data, *end_data;

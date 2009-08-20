@@ -32,6 +32,7 @@ typedef struct CcsHandlerRec {
 	CmiHandler fnOld; /*Old converse-style handler, or NULL if new-style*/
 	CcsHandlerFn fn; /*New-style handler function, or NULL if old-style*/
 	void *userPtr;
+	CmiReduceMergeFn mergeFn; /*Merge function used for bcast requests*/
 	int nCalls; /* Number of times handler has been executed*/
 } CcsHandlerRec;
 
@@ -42,6 +43,7 @@ static void initHandlerRec(CcsHandlerRec *c,const char *name) {
   c->fn=NULL;
   c->fnOld=NULL;
   c->userPtr=NULL;
+  c->mergeFn=NULL;
   c->nCalls=0;
 }
 
@@ -67,20 +69,25 @@ CpvStaticDeclare(CcsHandlerTable, ccsTab);
 
 CpvStaticDeclare(CcsImplHeader*,ccsReq);/*Identifies CCS requestor (client)*/
 
-void CcsRegisterHandler(const char *name, CmiHandler fn)
-{
+void CcsRegisterHandler(const char *name, CmiHandler fn) {
   CcsHandlerRec cp;
   initHandlerRec(&cp,name);
   cp.fnOld=fn;
   *(CcsHandlerRec *)CkHashtablePut(CpvAccess(ccsTab),(void *)&cp.name)=cp;
 }
-void CcsRegisterHandlerFn(const char *name, CcsHandlerFn fn, void *ptr)
-{
+void CcsRegisterHandlerFn(const char *name, CcsHandlerFn fn, void *ptr) {
   CcsHandlerRec cp;
   initHandlerRec(&cp,name);
   cp.fn=fn;
   cp.userPtr=ptr;
   *(CcsHandlerRec *)CkHashtablePut(CpvAccess(ccsTab),(void *)&cp.name)=cp;
+}
+void CcsSetMergeFn(const char *name, CmiReduceMergeFn newMerge) {
+  CcsHandlerRec *rec=(CcsHandlerRec *)CkHashtableGet(CpvAccess(ccsTab),(void *)&name);
+  if (rec==NULL) {
+    CmiAbort("CCS: Unknown CCS handler name.\n");
+  }
+  rec->mergeFn=newMerge;
 }
 
 int CcsEnabled(void)
@@ -99,11 +106,46 @@ void CcsCallerId(skt_ip_t *pip, unsigned int *pport)
   *pport = ChMessageInt(CpvAccess(ccsReq)->attr.port);
 }
 
+static int rep_fw_handler_idx;
+
+/**
+ * Decide if the reply is ready to be forwarded to the waiting client,
+ * or if combination is required (for broadcast/multicast CCS requests.
+ */
+int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
+  int repPE = (int)ChMessageInt(rep->pe);
+  if (repPE <= -1) {
+    /* Reduce the message to get the final reply */
+    int len=CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader)+repLen;
+    char *msg=CmiAlloc(len);
+    char *r=msg+CmiMsgHeaderSizeBytes;
+    rep->len = ChMessageInt_new(repLen);
+    *(CcsImplHeader *)r=*rep; r+=sizeof(CcsImplHeader);
+    memcpy(r,repData,repLen);
+    CmiSetHandler(msg,rep_fw_handler_idx);
+    char *handlerStr=rep->handler;
+    CcsHandlerRec *fn=(CcsHandlerRec *)CkHashtableGet(CpvAccess(ccsTab),(void *)&handlerStr);
+    if (fn->mergeFn == NULL) CmiAbort("Called CCS broadcast with NULL merge function!\n");
+    if (repPE <= -1) {
+      /* CCS Broadcast */
+      CmiReduce(msg, len, fn->mergeFn);
+    } else {
+      /* CCS Multicast */
+      CmiListReduce(-repPE, (int*)(rep+1), msg, len, fn->mergeFn);
+    }
+  } else {
+    CcsImpl_reply(rep, repLen, repData);
+  }
+}
+
 CcsDelayedReply CcsDelayReply(void)
 {
   CcsDelayedReply ret;
-  ret.attr=CpvAccess(ccsReq)->attr;
-  ret.replyFd=CpvAccess(ccsReq)->replyFd;
+  int len = sizeof(CcsImplHeader);
+  if (ChMessageInt(CpvAccess(ccsReq)->pe) < -1)
+    len += ChMessageInt(CpvAccess(ccsReq)->pe) * sizeof(int);
+  ret.hdr = (CcsImplHeader*)malloc(len);
+  memcpy(ret.hdr, CpvAccess(ccsReq), len);
   CpvAccess(ccsReq)=NULL;
   return ret;
 }
@@ -113,34 +155,32 @@ void CcsSendReply(int replyLen, const void *replyData)
   if (CpvAccess(ccsReq)==NULL)
     CmiAbort("CcsSendReply: reply already sent!\n");
   CpvAccess(ccsReq)->len = ChMessageInt_new(1);
-  CcsImpl_reply(CpvAccess(ccsReq),replyLen,replyData);
+  CcsReply(CpvAccess(ccsReq),replyLen,replyData);
   CpvAccess(ccsReq) = NULL;
 }
 
 void CcsSendDelayedReply(CcsDelayedReply d,int replyLen, const void *replyData)
 {
-  CcsImplHeader h;
-  h.attr=d.attr;
-  h.replyFd=d.replyFd;
-  h.len=ChMessageInt_new(1);
-  CcsImpl_reply(&h,replyLen,replyData);
+  CcsImplHeader *h = d.hdr;
+  h->len=ChMessageInt_new(1);
+  CcsReply(h,replyLen,replyData);
+  free(h);
 }
 
 void CcsNoReply()
 {
   if (CpvAccess(ccsReq)==NULL) return;
   CpvAccess(ccsReq)->len = ChMessageInt_new(0);
-  CcsImpl_reply(CpvAccess(ccsReq),0,NULL);
+  CcsReply(CpvAccess(ccsReq),0,NULL);
   CpvAccess(ccsReq) = NULL;
 }
 
 void CcsNoDelayedReply(CcsDelayedReply d)
 {
-  CcsImplHeader h;
-  h.attr=d.attr;
-  h.replyFd=d.replyFd;
-  h.len = ChMessageInt_new(0);
-  CcsImpl_reply(&h,0,NULL);
+  CcsImplHeader *h = d.hdr;
+  h->len = ChMessageInt_new(0);
+  CcsReply(h,0,NULL);
+  free(h);
 }
 
 
@@ -183,9 +223,31 @@ static void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 int _ccsHandlerIdx;/*Converse handler index of below routine*/
 static void req_fw_handler(char *msg)
 {
-  CcsHandleRequest((CcsImplHeader *)(msg+CmiMsgHeaderSizeBytes),
-		   msg+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader));
-  CmiFree(msg);  
+  CcsImplHeader *hdr = (CcsImplHeader *)(msg+CmiMsgHeaderSizeBytes);
+  int destPE = (int)ChMessageInt(hdr->pe);
+  if (CmiMyPe() == 0 && destPE == -1) {
+    /* Broadcast message to all other processors */
+    int len=CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader)+ChMessageInt(hdr->len);
+    CmiSyncBroadcast(len, msg);
+  }
+  else if (destPE < -1) {
+    /* Multicast the message to your children */
+    int len=CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader)+ChMessageInt(hdr->len)-destPE*sizeof(int);
+    int index;
+    int *pes = (int*)(msg+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader));
+    for (index=0; index<-destPE; ++index) {
+      if (pes[index] == CmiMyPe()) break;
+    }
+    int child = (index << 2) + 1;
+    int i;
+    for (i=0; i<4; ++i) {
+      if (child+i < -destPE) {
+        CmiSyncSend(pes[child+i], len, msg);
+      }
+    }
+  }
+  CcsHandleRequest(hdr, msg+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader));
+  CmiFree(msg);
 }
 
 /*Convert CCS header & message data into a converse message 
@@ -193,6 +255,8 @@ static void req_fw_handler(char *msg)
 char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_len)
 {
   int reqLen=ChMessageInt(hdr->len);
+  int destPE = ChMessageInt(hdr->pe);
+  if (destPE < -1) reqLen += destPE*sizeof(int);
   int len=CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader)+reqLen;
   char *msg=(char *)CmiAlloc(len);
   memcpy(msg+CmiMsgHeaderSizeBytes,hdr,sizeof(CcsImplHeader));
@@ -202,21 +266,18 @@ char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_le
   return msg;
 }
 
-/*Forward this request to the appropriate PE*/
-void CcsImpl_netRequest(CcsImplHeader *hdr,const void *reqData)
+/*Receives reply messages passed up from
+converse to node 0.*/
+static void rep_fw_handler(char *msg)
 {
-  int len,repPE=ChMessageInt(hdr->pe);
-  if (repPE<0 && repPE>=CmiNumPes()) {
-	repPE=0;
-	hdr->pe=ChMessageInt_new(repPE);
-  }
-
-  {
-    char *msg=CcsImpl_ccs2converse(hdr,reqData,&len);
-    CmiSyncSendAndFree(repPE,len,msg);
-  }
+  int len;
+  char *r=msg+CmiMsgHeaderSizeBytes;
+  CcsImplHeader *hdr=(CcsImplHeader *)r; 
+  r+=sizeof(CcsImplHeader);
+  len=ChMessageInt(hdr->len);
+  CcsImpl_reply(hdr,len,r);
+  CmiFree(msg);
 }
-
 
 #if NODE_0_IS_CONVHOST
 /************** NODE_0_IS_CONVHOST ***********
@@ -250,7 +311,7 @@ which sends the reply back to the original requestor,
 on the (still-open) request socket.
  */
 
-/*
+/**
 Send a Ccs reply back to the requestor, down the given socket.
 Since there is no conv-host, node 0 does all the CCS 
 communication-- this means all requests come to node 0
@@ -258,8 +319,6 @@ and are forwarded out; all replies are forwarded back to node 0.
 
 Note: on Net- versions, CcsImpl_reply is implemented in machine.c
 */
-static int rep_fw_handler_idx;
-
 void CcsImpl_reply(CcsImplHeader *rep,int repLen,const void *repData)
 {
   const int repPE=0;
@@ -270,7 +329,7 @@ void CcsImpl_reply(CcsImplHeader *rep,int repLen,const void *repData)
   } else {
     /*Forward data & socket # to the replyPE*/
     int len=CmiMsgHeaderSizeBytes+
-	       sizeof(CcsImplHeader)+repLen;
+           sizeof(CcsImplHeader)+repLen;
     char *msg=CmiAlloc(len);
     char *r=msg+CmiMsgHeaderSizeBytes;
     *(CcsImplHeader *)r=*rep; r+=sizeof(CcsImplHeader);
@@ -279,26 +338,41 @@ void CcsImpl_reply(CcsImplHeader *rep,int repLen,const void *repData)
     CmiSyncSendAndFree(repPE,len,msg);
   }
 }
-/*Receives reply messages passed up from
-converse to node 0.*/
-static void rep_fw_handler(char *msg)
-{
-  int len;
-  char *r=msg+CmiMsgHeaderSizeBytes;
-  CcsImplHeader *hdr=(CcsImplHeader *)r; 
-  r+=sizeof(CcsImplHeader);
-  len=ChMessageInt(hdr->len);
-  CcsImpl_reply(hdr,len,r);
-  CmiFree(msg);
-}
 
 /*No request will be sent through this socket.
 Closes it.
 */
-void CcsImpl_noReply(CcsImplHeader *hdr)
+/*void CcsImpl_noReply(CcsImplHeader *hdr)
 {
   int fd=ChMessageInt(hdr->replyFd);
   skt_close(fd);
+}*/
+
+/**
+ * This is the entrance point of a CCS request into the server.
+ * It is executed only on proc 0, and it forwards the request to the appropriate PE.
+ */
+void CcsImpl_netRequest(CcsImplHeader *hdr,const void *reqData)
+{
+  int len,repPE=ChMessageInt(hdr->pe);
+  if (repPE<=-CmiNumPes() || repPE>=CmiNumPes()) {
+    repPE=0;
+    hdr->pe=ChMessageInt_new(repPE);
+  }
+
+  {
+    char *msg=CcsImpl_ccs2converse(hdr,reqData,&len);
+    if (repPE >= 0) {
+      CmiSyncSendAndFree(repPE,len,msg);
+    } else if (repPE == -1) {
+      /* Broadcast to all processors */
+      CmiPushPE(0, msg);
+    } else {
+      /* Multicast to -repPE processors, specified right at the beginning of reqData (as a list of pes) */
+      int firstPE = *(int*)reqData;
+      CmiSyncSendAndFree(firstPE,len,msg);
+    }
+  }
 }
 
 /*
@@ -333,9 +407,7 @@ void CcsServerCheck(void)
 
 int _isCcsHandlerIdx(int hIdx) {
   if (hIdx==_ccsHandlerIdx) return 1;
-#if NODE_0_IS_CONVHOST 
   if (hIdx==rep_fw_handler_idx) return 1;
-#endif
   return 0;
 }
 
@@ -358,8 +430,8 @@ void CcsInit(char **argv)
 
   CcsBuiltinsInit(argv);
 
-#if NODE_0_IS_CONVHOST
   rep_fw_handler_idx = CmiRegisterHandler((CmiHandler)rep_fw_handler);
+#if NODE_0_IS_CONVHOST
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
   print_fw_handler_idx = CmiRegisterHandler((CmiHandler)print_fw_handler);
 #endif

@@ -30,8 +30,7 @@ extern int _ccsHandlerIdx;
 #if CMK_CCS_AVAILABLE
 
 typedef struct CcsDelayedReply_struct {
-	CcsSecAttr     attr; /*Source information*/
-	ChMessageInt_t replyFd;/*Send reply back here*/
+  CcsImplHeader *hdr;
 } CcsDelayedReply;
 
 /**
@@ -47,6 +46,11 @@ void CcsRegisterHandler(const char *ccs_handlername, CmiHandler fn);
  */
 typedef void (*CcsHandlerFn)(void *userPtr,int reqLen,const void *reqData);
 void CcsRegisterHandlerFn(const char *ccs_handlername, CcsHandlerFn fn, void *userPtr);
+
+/**
+ * Set the merging function for this CCS handler to newMerge.
+ */
+void CcsSetMergeFn(const char *name, CmiReduceMergeFn newMerge);
 
 void CcsInit(char **argv);
 int CcsEnabled(void);

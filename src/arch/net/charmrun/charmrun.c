@@ -1381,11 +1381,21 @@ void req_ccs_connect(void)
   pe=ChMessageInt(h.hdr.pe);
   reqBytes=ChMessageInt(h.hdr.len);
 
-  if (pe<0 || pe>=nodetab_size) {
+  if (pe<=-nodetab_size || pe>=nodetab_size) {
+    /*Treat out of bound values as value 0*/
 	pe=0;
 	h.hdr.pe=ChMessageInt_new(pe);
   }
-
+  else if (pe == -1) {
+    /*Treat -1 as broadcast and sent to 0 as root of the spanning tree*/
+    pe = 0;
+  }
+  else if (pe < -1) {
+    /*Treat negative values as multicast to a number of processors specified by -pe.
+      The pes to multicast to follows sits at the beginning of reqData*/
+    pe = *(int*)reqData;
+  }
+  
   if (! check_stdio_header(&h.hdr)) {
 
 #define LOOPBACK 0

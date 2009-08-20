@@ -343,6 +343,7 @@ static void machine_exit(int status)
   machine_initiated_shutdown=1;
 
   CmiDestoryLocks();		/* destory locks to prevent dead locking */
+  EmergencyExit();
 
 #if CMK_USE_GM
   if (gmport) { 
@@ -383,7 +384,7 @@ static void KillOnAllSigs(int sigNo)
   already_in_signal_handler=1;
 
   if (CpvAccess(cmiArgDebugFlag)) {
-    CmiPrintf("CPD: Signal received on processor %d: %d\n",CmiMyPe(),sigNo);
+    CpdNotify(CPD_SIGNAL,sigNo);
     CpdFreeze();
   }
   
@@ -391,7 +392,7 @@ static void KillOnAllSigs(int sigNo)
 
   if (sigNo==SIGSEGV) {
      sig="segmentation violation";
-     suggestion="Try running with '++debug', or linking with '-memory paranoid'.\n";
+     suggestion="Try running with '++debug', or linking with '-memory paranoid' (memory paranoid requires '+netpoll' at runtime).\n";
   }
   if (sigNo==SIGFPE) {
      sig="floating point exception";
@@ -581,7 +582,7 @@ void CmiAbort(const char *message)
 
   /* if CharmDebug is attached simply try to send a message to it */
   if (CpvAccess(cmiArgDebugFlag)) {
-    CmiPrintf("CPD: CmiAbort called on processor %d\n",CmiMyPe());
+    CpdNotify(CPD_ABORT, message);
     CpdFreeze();
   }
   
@@ -1233,7 +1234,7 @@ void CcsImpl_reply(CcsImplHeader *hdr,int repLen,const void *repData)
 {
   MACHSTATE(2,"Outgoing CCS reply");
   ctrl_sendone_locking("reply_fw",(const char *)hdr,sizeof(CcsImplHeader),
-		       repData,repLen);
+      repData,repLen);
   MACHSTATE(1,"Outgoing CCS reply away");
 }
 #endif
@@ -1325,29 +1326,35 @@ static int InternalScanf(char *fmt, va_list l)
 /*New stdarg.h declarations*/
 void CmiPrintf(const char *fmt, ...)
 {
+  CpdSystemEnter();
   va_list p; va_start(p, fmt);
   if (Cmi_charmrun_fd!=-1)
     InternalPrintf(fmt, p);
   else
     vfprintf(stdout,fmt,p);
   va_end(p);
+  CpdSystemExit();
 }
 
 void CmiError(const char *fmt, ...)
 {
+  CpdSystemEnter();
   va_list p; va_start (p, fmt);
   if (Cmi_charmrun_fd!=-1)
     InternalError(fmt, p);
   else
     vfprintf(stderr,fmt,p);
   va_end(p);
+  CpdSystemExit();
 }
 
 int CmiScanf(const char *fmt, ...)
 {
+  CpdSystemEnter();
   va_list p; int i; va_start(p, fmt);
   i = InternalScanf((char *)fmt, p);
   va_end(p);
+  CpdSystemExit();
   return i;
 }
 
