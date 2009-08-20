@@ -640,6 +640,16 @@ void CkExit(void)
     _CkExit();
 }
 
+/* This is a routine called in case the application is closing due to a signal.
+   Tear down structures that must be cleaned up even when unclean exit happens.
+   It is called by the machine layer whenever some problem occurs (it is thus up
+   to the machine layer to call this function). */
+extern "C"
+void EmergencyExit(void) {
+  /* Delete _coreState to force any CkMessageWatcher to close down. */
+  delete CkpvAccess(_coreState);
+}
+
 static void _nullFn(void *, void *)
 {
   CmiAbort("Null-Method Called. Program may have Unregistered Module!!\n");

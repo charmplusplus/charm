@@ -169,6 +169,8 @@ typedef  void  (*CkExitFn) (void);
 extern CkQ<CkExitFn> _CkExitFnVec;
 extern void registerExitFn(CkExitFn);
 
+extern "C" void EmergencyExit(void);
+
 /*@}*/
 
 #endif

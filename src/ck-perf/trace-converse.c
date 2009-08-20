@@ -47,3 +47,6 @@ void traceEndFuncIndexProj(int idx) {}
 void traceBeginFuncProj(char *name,char *file,int line){}
 void traceEndFuncProj(char *name){}
 
+/* This routine, included in Charm++ programs from init.C, needs to be present in converse as well.
+   Here is a place where it gets included only in converse, and not in Charm++ (thus not generating conflicts. */
+void EmergencyExit(void) {}
