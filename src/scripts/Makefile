@@ -331,7 +331,8 @@ MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
           $(L)/libmemory-gnuold.o $(L)/libmemory-verbose.o 	\
 	  $(L)/libmemory-paranoid.o \
 	  $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o \
-	  $(L)/libmemory-charmdebug.o \
+	  $(L)/libmemory-charmdebug.o $(L)/libmemory-charmdebug-mmap.o \
+	  $(L)/libmemory-charmdebug-slot.o $(L)/libmemory-charmdebug-mmap-slot.o \
 	  $(L)/libmemory-os-verbose.o $(L)/libmemory-os-isomalloc.o \
 	  $(L)/libmemory-os-leak.o $(L)/libmemory-os-paranoid.o \
           $(L)/libmemory-os-lock.o \
@@ -560,6 +561,15 @@ $(L)/libmemory-isomalloc.o: memory-isomalloc.c $(MEM_DEPS)
 
 $(L)/libmemory-charmdebug.o: memory-charmdebug.c $(MEM_DEPS)
 	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG memory.c || touch $@
+
+$(L)/libmemory-charmdebug-slot.o: memory-charmdebug.c $(MEM_DEPS)
+	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG -DCMK_SEPARATE_SLOT memory.c || touch $@
+
+$(L)/libmemory-charmdebug-mmap.o: memory-charmdebug.c $(MEM_DEPS)
+	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP memory.c || touch $@
+
+$(L)/libmemory-charmdebug-mmap-slot.o: memory-charmdebug.c $(MEM_DEPS)
+	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP -DCMK_SEPARATE_SLOT memory.c || touch $@
 
 ## Thread libraries (-thread)
 
