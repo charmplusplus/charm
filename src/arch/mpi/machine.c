@@ -1604,6 +1604,11 @@ static void KillOnAllSigs(int sigNo) {
     CpdNotify(CPD_SIGNAL, sigNo);
     CpdFreeze();
   }
+
+  CmiError("------------- Processor %d Exiting: Caught Signal ------------\n"
+      "Signal: %d\n",CmiMyPe(),sigNo);
+  CmiPrintStackTrace(1);
+
   char *m = CmiAlloc(CmiMsgHeaderSizeBytes);
   CmiSetHandler(m, machine_exit_idx);
   CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, m);
