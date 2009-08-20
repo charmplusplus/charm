@@ -1598,7 +1598,7 @@ static void machine_exit(char *m) {
 #include <signal.h>
 static void KillOnAllSigs(int sigNo) {
   static int already_in_signal_handler = 0;
-  if (already_in_signal_handler) MPI_Abort(1);
+  if (already_in_signal_handler) MPI_Abort(MPI_COMM_WORLD,1);
   already_in_signal_handler = 1;
   if (CpvAccess(cmiArgDebugFlag)) {
     CpdNotify(CPD_SIGNAL, sigNo);
@@ -1630,7 +1630,7 @@ static void ConverseRunPE(int everReturn)
   CthInit(CmiMyArgv);
 
   ConverseCommonInit(CmiMyArgv);
-  machine_exit_idx = CmiRegisterHandler(machine_exit);
+  machine_exit_idx = CmiRegisterHandler((CmiHandler)machine_exit);
 
 #if CMI_MPI_TRACE_USEREVENTS
 #ifndef CMK_OPTIMIZE
