@@ -83,6 +83,16 @@ extern "C" void CcsImpl_kill(void)
   }
 }
 
+/**********************************************
+  "ccs_killpe"-- kills the executing processor
+    Used for fault-tolerance testing: terminate the processor.
+*/
+
+#include <signal.h>
+
+static void ccs_killpe(char *msg) {
+  kill(getpid(), 9);
+}
 
 /*************************************************
 List interface:
@@ -260,6 +270,7 @@ void CpdMachineArchitecture(char *msg) {
   // get the size of an "bool"
   reply[5] = sizeof(bool);
   CcsSendReply(6, (void*)reply);
+  CmiFree(msg);
 }
 
 static void CpdList_ccs_list_items_fmt(char *msg)
@@ -672,6 +683,7 @@ extern "C" void CcsBuiltinsInit(char **argv)
 {
   CcsRegisterHandler("ccs_getinfo",(CmiHandler)ccs_getinfo);
   CcsRegisterHandler("ccs_killport",(CmiHandler)ccs_killport);
+  CcsRegisterHandler("ccs_killpe",(CmiHandler)ccs_killpe);
   CWebInit();
   CpdListInit();
 }
