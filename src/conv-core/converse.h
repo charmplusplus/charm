@@ -560,11 +560,13 @@ extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 #define CmiGetHandler(m)  (((CmiMsgHeaderExt*)m)->hdl)
 #define CmiGetXHandler(m) (((CmiMsgHeaderExt*)m)->xhdl)
 #define CmiGetInfo(m)     (((CmiMsgHeaderExt*)m)->info)
+#define CmiGetRoot(m)     (((CmiMsgHeaderExt*)m)->root)
 #define CmiGetStrategy(m) (((CmiMsgHeaderExt*)m)->stratid)
 
 #define CmiSetHandler(m,v)  do {((((CmiMsgHeaderExt*)m)->hdl)=(v));} while(0)
 #define CmiSetXHandler(m,v) do {((((CmiMsgHeaderExt*)m)->xhdl)=(v));} while(0)
 #define CmiSetInfo(m,v)     do {((((CmiMsgHeaderExt*)m)->info)=(v));} while(0)
+#define CmiSetRoot(m,v)     do {((((CmiMsgHeaderExt*)m)->root)=(v));} while(0)
 #define CmiSetStrategy(m,v) do {((((CmiMsgHeaderExt*)m)->stratid)=(v);} while(0)
 
 #define CmiHandlerToInfo(n) (CpvAccess(CmiHandlerTable)[n])
@@ -948,30 +950,46 @@ void          CmiSyncMulticastFn(CmiGroup, int, char*);
 CmiCommHandle CmiAsyncMulticastFn(CmiGroup, int, char*);
 void          CmiFreeMulticastFn(CmiGroup, int, char*);
 
+typedef void * (*CmiReduceMergeFn)(int*,void*,void**,int);
+typedef void (*CmiReducePupFn)(void*,void*);
+typedef void (*CmiReduceDeleteFn)(void*);
+
 typedef struct {
-  void *localMessage;
-  void *remoteMessages;
-  int numRemoteReceived;
-  int numChildren;
+  void *localData;
+  char **remoteData;
+  int localSize;
+  short int numRemoteReceived;
+  short int numChildren;
   int parent;
+  CmiUInt2 seqID;
+  char localContributed;
   struct {
     CmiHandler destination;
-    void * (*mergeFn)(void*,void**,int);
-    void (*pupFn)(void*,void*);
-    void (*deleteFn)(void*);
+    CmiReduceMergeFn mergeFn;
+    CmiReducePupFn pupFn;
+    CmiReduceDeleteFn deleteFn;
   } ops;
 } CmiReduction;
 
-extern void *CmiReduceMergeFn_random(void*,void**,int);
+void * CmiReduceMergeFn_random(int*, void*, void**, int);
 
-void CmiReduce(void *msg, int size, void * (*mergeFn)(void*,void**,int));
-void CmiReduceStruct(void *data, void (*pupFn)(void*,void*),
-                     void * (*mergeFn)(void*,void**,int), CmiHandler dest,
-                     void (*deleteFn)(void*));
-void CmiNodeReduce(void *msg, int size, void * (*mergeFn)(void*,void**,int), int, int, int);
-void CmiNodeReduceStruct(void *data, void (*pupFn)(void*,void*),
-                         void * (*mergeFn)(void*,void**,int), CmiHandler dest,
-                         void (*deleteFn)(void*));
+void CmiReduce(void *msg, int size, CmiReduceMergeFn mergeFn);
+void CmiReduceStruct(void *data, CmiReducePupFn pupFn,
+                     CmiReduceMergeFn mergeFn, CmiHandler dest,
+                     CmiReduceDeleteFn deleteFn);
+void CmiListReduce(int npes, int *pes, void *msg, int size, CmiReduceMergeFn mergeFn);
+void CmiListReduceStruct(int npes, int *pes,
+                     void *data, CmiReducePupFn pupFn,
+                     CmiReduceMergeFn mergeFn, CmiHandler dest,
+                     CmiReduceDeleteFn deleteFn);
+void CmiGroupReduce(CmiGroup grp, void *msg, int size, CmiReduceMergeFn mergeFn);
+void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
+                     CmiReduceMergeFn mergeFn, CmiHandler dest,
+                     CmiReduceDeleteFn deleteFn);
+void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn, int, int, int);
+void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
+                         CmiReduceMergeFn mergeFn, CmiHandler dest,
+                         CmiReduceDeleteFn deleteFn);
 void CmiHandleReductionMessage(void *msg);
 int CmiGetReductionHandler();
 CmiHandler CmiGetReductionDestination();
