@@ -377,6 +377,15 @@ class StrKey {
 	}
 };
 
+class NestedEvent {
+ public:
+  int event, msgType, ep, srcPe, ml;
+  CmiObjId *idx;
+  NestedEvent() {}
+  NestedEvent(int _event, int _msgType, int _ep, int _srcPe, int _ml, CmiObjId *_idx) :
+    event(_event), msgType(_msgType), ep(_ep), srcPe(_srcPe), ml(_ml), idx(_idx) { }
+};
+
 /// class for recording trace projections events 
 /**
   TraceProjections will log Converse/Charm++ events and write into .log files;
@@ -395,6 +404,9 @@ class TraceProjections : public Trace {
 
     int funcCount;
     CkHashtableT<StrKey,int> funcHashtable;
+
+	int traceNestedEvents;
+    CkQ<NestedEvent> nestedEvents;
     
     //as user now can specify the idx, it's possible that user may specify an existing idx
     //so that we need a data structure to track idx. --added by Chao Mei
@@ -423,7 +435,9 @@ class TraceProjections : public Trace {
     void beginExecute(envelope *e);
     void beginExecute(CmiObjId  *tid);
     void beginExecute(int event,int msgType,int ep,int srcPe,int ml,CmiObjId *idx=NULL);
+    void beginExecuteLocal(int event,int msgType,int ep,int srcPe,int ml,CmiObjId *idx=NULL);
     void endExecute(void);
+    void endExecuteLocal(void);
     void messageRecv(char *env, int pe);
     void beginIdle(double curWallTime);
     void endIdle(double curWallTime);

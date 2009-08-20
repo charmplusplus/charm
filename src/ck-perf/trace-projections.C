@@ -866,7 +866,7 @@ void LogEntry::pup(PUP::er &p)
 
 TraceProjections::TraceProjections(char **argv): 
   curevent(0), inEntry(0), computationStarted(0), 
-  converseExit(0), endTime(0.0)
+  converseExit(0), endTime(0.0), traceNestedEvents(0)
 {
   //  CkPrintf("Trace projections dummy constructor called on %d\n",CkMyPe());
 
@@ -888,6 +888,9 @@ TraceProjections::TraceProjections(char **argv):
   checknested = 
     CmiGetArgFlagDesc(argv,"+checknested",
 		      "check projections nest begin end execute events");
+  traceNestedEvents = 
+    CmiGetArgFlagDesc(argv,"+tracenested",
+              "trace projections nest begin/end execute events");
   int binary = 
     CmiGetArgFlagDesc(argv,"+binary-trace",
 		      "Write log files in binary format");
@@ -1191,6 +1194,18 @@ void TraceProjections::beginExecute(envelope *e)
 void TraceProjections::beginExecute(int event, int msgType, int ep, int srcPe,
 				    int mlen, CmiObjId *idx)
 {
+  if (traceNestedEvents) {
+    if (! nestedEvents.isEmpty()) {
+      endExecuteLocal();
+    }
+    nestedEvents.enq(NestedEvent(event, msgType, ep, srcPe, mlen, idx));
+  }
+  beginExecuteLocal(event, msgType, ep, srcPe, mlen, idx);
+}
+
+void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int srcPe,
+				    int mlen, CmiObjId *idx)
+{
 #if CMK_HAS_COUNTER_PAPI
   if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
     CmiAbort("PAPI failed to read at begin execute!\n");
@@ -1209,6 +1224,18 @@ void TraceProjections::beginExecute(int event, int msgType, int ep, int srcPe,
 }
 
 void TraceProjections::endExecute(void)
+{
+  if (traceNestedEvents) nestedEvents.deq();
+  endExecuteLocal();
+  if (traceNestedEvents) {
+    if (! nestedEvents.isEmpty()) {
+      NestedEvent &ne = nestedEvents.peek();
+      beginExecuteLocal(ne.event, ne.msgType, ne.ep, ne.srcPe, ne.ml, ne.idx);
+    }
+  }
+}
+
+void TraceProjections::endExecuteLocal(void)
 {
 #if CMK_HAS_COUNTER_PAPI
   if (PAPI_read(papiEventSet, papiValues) != PAPI_OK) {
