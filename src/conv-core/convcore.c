@@ -2005,7 +2005,7 @@ void CmiSendReduce(CmiReduction *red) {
       if (red->ops.deleteFn != NULL) (red->ops.deleteFn)(red->localData);
     }
     CmiSetHandler(msg, CpvAccess(CmiReductionMessageHandler));
-    CmiSetRoot(msg, red->seqID);
+    CmiSetRedID(msg, red->seqID);
     /*CmiPrintf("CmiSendReduce(%d): sending %d bytes to %d\n",CmiMyPe(),msg_size,CpvAccess(_reduce_parent));*/
     CmiSyncSendAndFree(red->parent, msg_size, msg);
   } else {
@@ -2029,7 +2029,7 @@ void CmiReduce(void *msg, int size, CmiReduceMergeFn mergeFn) {
   red->ops.destination = (CmiHandler)CmiGetHandlerFunction(msg);
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = NULL;
-  //CmiPrintf("[%d] CmiReduce::local parent=%d, numChildren=%d\n",CmiMyPe(),red->parent,red->numChildren);
+  /*CmiPrintf("[%d] CmiReduce::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);*/
   CmiSendReduce(red);
 /*  
   CpvAccess(_reduce_data) = data;
@@ -2057,6 +2057,7 @@ void CmiReduceStruct(void *data, CmiReducePupFn pupFn,
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = pupFn;
   red->ops.deleteFn = deleteFn;
+  /*CmiPrintf("[%d] CmiReduceStruct::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);*/
   CmiSendReduce(red);
   /*
   CpvAccess(_reduce_data) = data;
@@ -2178,10 +2179,10 @@ void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
 }
 
 void CmiHandleReductionMessage(void *msg) {
-  CmiReduction *red = CmiGetReduction(CmiGetRoot(msg));
-  if (red->numRemoteReceived == red->numChildren) red = CmiGetReductionCreate(CmiGetRoot(msg), red->numChildren+4);
+  CmiReduction *red = CmiGetReduction(CmiGetRedID(msg));
+  if (red->numRemoteReceived == red->numChildren) red = CmiGetReductionCreate(CmiGetRedID(msg), red->numChildren+4);
   red->remoteData[red->numRemoteReceived++] = msg;
-  /*CmiPrintf("[%d] CmiReduce::remote\n",CmiMyPe());*/
+  /*CmiPrintf("[%d] CmiReduce::remote %hd\n",CmiMyPe(),red->seqID);*/
   CmiSendReduce(red);
 /*
   CpvAccess(_reduce_msg_list)[CpvAccess(_reduce_received)++] = msg;

@@ -7,7 +7,7 @@
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 /* Type of the message tells whether it is a statically or dynamically allocated message, 0 for dynamic and 1 for static */
-#define CMK_MSG_HEADER_EXT_     CmiUInt4 size; CmiUInt2 rank,root,hdl,xhdl,info,stratid;
+#define CMK_MSG_HEADER_EXT_     CmiUInt4 size; CmiUInt2 rank,root,hdl,xhdl,info,stratid,redID,pad2; CmiUInt4 pad4;
 #define CMK_MSG_HEADER_EXT      {CMK_MSG_HEADER_EXT_}
 #define CMK_MSG_HEADER_BLUEGENE {CMK_MSG_HEADER_EXT_ CMK_BLUEGENE_FIELDS}
 

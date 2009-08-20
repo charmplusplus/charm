@@ -31,7 +31,7 @@
 #define CMK_MEMORY_PROTECTABLE                             1
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
-#define CMK_MSG_HEADER_EXT    { CmiUInt2 hdl,xhdl,info,stratid,root,padding1,padding2,padding3; }
+#define CMK_MSG_HEADER_EXT    { CmiUInt2 hdl,xhdl,info,stratid,root,redID,padding2,padding3; }
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1

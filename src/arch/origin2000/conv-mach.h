@@ -32,7 +32,7 @@
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             0
 
-#define CMK_MSG_HEADER_FIELDS  CmiUInt2 hdl,xhdl,info,stratid,root,pad1,pad2,pad3;
+#define CMK_MSG_HEADER_FIELDS  CmiUInt2 hdl,xhdl,info,stratid,root,redID,pad2,pad3;
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_FIELDS }
 #define CMK_MSG_HEADER_BLUEGENE    { CMK_MSG_HEADER_FIELDS CMK_BLUEGENE_FIELDS }
