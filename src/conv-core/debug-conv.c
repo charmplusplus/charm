@@ -369,6 +369,7 @@ void CpdInit(void)
 
 }
 
+#include <stdarg.h>
 void CpdNotify(int type, ...) {
   va_list list;
   va_start(list, type);
