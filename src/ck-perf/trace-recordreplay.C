@@ -34,18 +34,7 @@ void _createTracerecordreplay(char **argv)
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
 }
 
-typedef void (*sigfunc)(int);
-CkpvStaticDeclare(sigfunc, segfault_sig);
-
-void segfault_signal(int sig) {
-  printf("Segfault handler reached!\n");
-  signal(SIGSEGV, CkpvAccess(segfault_sig));
-}
-
-TraceRecordReplay::TraceRecordReplay(char **argv):curevent(1)
-{
-  //CkpvAccess(segfault_sig) = signal(SIGSEGV, segfault_signal);
-}
+TraceRecordReplay::TraceRecordReplay(char **argv):curevent(1) {}
 
 void TraceRecordReplay::beginExecute(envelope *e)
 {
