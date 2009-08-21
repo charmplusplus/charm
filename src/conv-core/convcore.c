@@ -1895,7 +1895,8 @@ static CmiReduceDeleteFn _reduce_deleteFn;
 */
 
 CpvStaticDeclare(CmiReduction**, _reduce_info);
-CpvStaticDeclare(int, _reduce_info_size); // This is the log2 of the size of the array
+// This is the log2 of the size of the array
+CpvStaticDeclare(int, _reduce_info_size); 
 CpvStaticDeclare(CmiUInt2, _reduce_seqID);
 
 /*
