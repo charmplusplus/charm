@@ -180,6 +180,8 @@ static void CpdDebugCallMemStat(char *msg) {
 }
 
 static void * CpdDebugMerge(int *size,void *local,void **remote,int n) {
+  void *reply;
+#if CMK_CCS_AVAILABLE
   CcsImplHeader *hdr;
   int total = *size;
   int i;
@@ -187,7 +189,7 @@ static void * CpdDebugMerge(int *size,void *local,void **remote,int n) {
     hdr = (CcsImplHeader*)(((char*)remote[i])+CmiMsgHeaderSizeBytes);
     total += ChMessageInt(hdr->len);
   }
-  void *reply = CmiAlloc(total);
+  reply = CmiAlloc(total);
   memcpy(reply, local, *size);
   ((CcsImplHeader*)(((char*)reply)+CmiMsgHeaderSizeBytes))->len = ChMessageInt_new(total-CmiMsgHeaderSizeBytes-sizeof(CcsImplHeader));
   CmiFree(local);
@@ -198,6 +200,7 @@ static void * CpdDebugMerge(int *size,void *local,void **remote,int n) {
     ptr += len;
   }
   *size = total;
+#endif
   return reply;
 }
 
