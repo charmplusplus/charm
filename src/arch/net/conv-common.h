@@ -19,7 +19,7 @@
    Parameters stratid and root are for the communication library.
    Stratid is the stratgy id and root is used in the broadcast.
 */
-#define CMK_MSG_HEADER_BASIC  {CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,stratid,root,redID;}
+#define CMK_MSG_HEADER_BASIC   CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,stratid,root,xhdl,info,redID;
 #define CMK_MSG_HEADER_EXT       { CMK_MSG_HEADER_EXT_ }
 #define CMK_MSG_HEADER_BLUEGENE  { CMK_MSG_HEADER_EXT_ CMK_BLUEGENE_FIELDS }
