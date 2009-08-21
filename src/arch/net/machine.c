@@ -994,7 +994,7 @@ CpvExtern(int,_charmEpoch);
 
 extern double evacTime;
 
-static void CmiPushPE(int pe,void *msg)
+void CmiPushPE(int pe,void *msg)
 {
   CmiState cs=CmiGetStateN(pe);
 	/*
