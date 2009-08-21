@@ -1983,7 +1983,7 @@ void CmiSendReduce(CmiReduction *red) {
   if (red->numChildren > 0) {
     int i, offset=0;
     if (red->ops.pupFn != NULL) {
-      offset = CmiMsgHeaderSizeBytes;
+      offset = CmiReservedHeaderSize;
       for (i=0; i<red->numChildren; ++i) red->remoteData[i] += offset;
     }
     mergedData = (red->ops.mergeFn)(&msg_size, red->localData, (void **)red->remoteData, red->numChildren);
@@ -1996,10 +1996,10 @@ void CmiSendReduce(CmiReduction *red) {
     if (red->ops.pupFn != NULL) {
       pup_er p = pup_new_sizer();
       (red->ops.pupFn)(p, mergedData);
-      msg_size = pup_size(p) + CmiMsgHeaderSizeBytes;
+      msg_size = pup_size(p) + CmiReservedHeaderSize;
       pup_destroy(p);
       msg = CmiAlloc(msg_size);
-      p = pup_new_toMem((void*)(((char*)msg)+CmiMsgHeaderSizeBytes));
+      p = pup_new_toMem((void*)(((char*)msg)+CmiReservedHeaderSize));
       (red->ops.pupFn)(p, mergedData);
       pup_destroy(p);
       if (red->ops.deleteFn != NULL) (red->ops.deleteFn)(red->localData);
