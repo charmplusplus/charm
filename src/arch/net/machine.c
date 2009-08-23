@@ -1327,33 +1327,40 @@ static int InternalScanf(char *fmt, va_list l)
 void CmiPrintf(const char *fmt, ...)
 {
   CpdSystemEnter();
+  {
   va_list p; va_start(p, fmt);
   if (Cmi_charmrun_fd!=-1)
     InternalPrintf(fmt, p);
   else
     vfprintf(stdout,fmt,p);
   va_end(p);
+  }
   CpdSystemExit();
 }
 
 void CmiError(const char *fmt, ...)
 {
   CpdSystemEnter();
+  {
   va_list p; va_start (p, fmt);
   if (Cmi_charmrun_fd!=-1)
     InternalError(fmt, p);
   else
     vfprintf(stderr,fmt,p);
   va_end(p);
+  }
   CpdSystemExit();
 }
 
 int CmiScanf(const char *fmt, ...)
 {
+  int i;
   CpdSystemEnter();
-  va_list p; int i; va_start(p, fmt);
+  {
+  va_list p; va_start(p, fmt);
   i = InternalScanf((char *)fmt, p);
   va_end(p);
+  }
   CpdSystemExit();
   return i;
 }
