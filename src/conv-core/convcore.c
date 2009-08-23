@@ -1944,6 +1944,7 @@ CmiReduction* CmiGetReductionCreate(int id, short int numChildren) {
     if (red != NULL) CmiPrintf("[%d] Reduction structure reallocated\n",CmiMyPe());
     CmiAssert(red == NULL || red->localContributed == 0);
     if (numChildren == 0) numChildren = 4;
+    {
     CmiReduction *newred = (CmiReduction*)malloc(sizeof(CmiReduction)+numChildren*sizeof(void*));
     newred->numRemoteReceived = 0;
     newred->localContributed = 0;
@@ -1956,6 +1957,7 @@ CmiReduction* CmiGetReductionCreate(int id, short int numChildren) {
     red->numChildren = numChildren;
     red->remoteData = (char**)(red+1);
     CpvAccess(_reduce_info)[index] = red;
+    }
   }
   return red;
 }
@@ -1976,10 +1978,11 @@ CmiReduction* CmiGetNextReduction(short int numChildren) {
 }
 
 void CmiSendReduce(CmiReduction *red) {
+  void *mergedData, *msg;
+  int msg_size;
   if (!red->localContributed || red->numChildren != red->numRemoteReceived) return;
-  void *mergedData = red->localData;
-  void *msg;
-  int msg_size = red->localSize;
+  mergedData = red->localData;
+  msg_size = red->localSize;
   if (red->numChildren > 0) {
     int i, offset=0;
     if (red->ops.pupFn != NULL) {
