@@ -123,6 +123,7 @@ int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
     *(CcsImplHeader *)r=*rep; r+=sizeof(CcsImplHeader);
     memcpy(r,repData,repLen);
     CmiSetHandler(msg,rep_fw_handler_idx);
+    {
     char *handlerStr=rep->handler;
     CcsHandlerRec *fn=(CcsHandlerRec *)CkHashtableGet(CpvAccess(ccsTab),(void *)&handlerStr);
     if (fn->mergeFn == NULL) CmiAbort("Called CCS broadcast with NULL merge function!\n");
@@ -132,6 +133,7 @@ int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
     } else {
       /* CCS Multicast */
       CmiListReduce(-repPE, (int*)(rep+1), msg, len, fn->mergeFn);
+    }
     }
   } else {
     CcsImpl_reply(rep, repLen, repData);
@@ -238,12 +240,14 @@ static void req_fw_handler(char *msg)
     for (index=0; index<-destPE; ++index) {
       if (pes[index] == CmiMyPe()) break;
     }
+    {
     int child = (index << 2) + 1;
     int i;
     for (i=0; i<4; ++i) {
       if (child+i < -destPE) {
         CmiSyncSend(pes[child+i], len, msg);
       }
+    }
     }
   }
   CcsHandleRequest(hdr, msg+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader));
@@ -257,6 +261,7 @@ char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_le
   int reqLen=ChMessageInt(hdr->len);
   int destPE = ChMessageInt(hdr->pe);
   if (destPE < -1) reqLen += destPE*sizeof(int);
+  {
   int len=CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader)+reqLen;
   char *msg=(char *)CmiAlloc(len);
   memcpy(msg+CmiMsgHeaderSizeBytes,hdr,sizeof(CcsImplHeader));
@@ -264,6 +269,7 @@ char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_le
   CmiSetHandler(msg, _ccsHandlerIdx);
   if (ret_len!=NULL) *ret_len=len;
   return msg;
+  }
 }
 
 /*Receives reply messages passed up from
