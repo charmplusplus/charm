@@ -91,7 +91,11 @@ extern "C" void CcsImpl_kill(void)
 #include <signal.h>
 
 static void ccs_killpe(char *msg) {
+#if CMK_HAS_GETPID
   kill(getpid(), 9);
+#else
+  CmiAbort("ccs_killpe() not supported!");
+#endif
 }
 
 /*************************************************
