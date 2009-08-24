@@ -981,6 +981,11 @@ void CmiSyncSendFn (int destrank, int msgsize, char *msg)
   }
 }
 
+/* FIXME just here for compilation purpose, it may not work */
+void CmiPushPE(int pe,void *msg)
+{
+  CdsFifo_Enqueue (CpvAccessOther (CmiLocalQueue, pe), msg);
+}
 
 
 /**************************************************************************
