@@ -75,6 +75,7 @@ typedef void *CcsDelayedReply;
 #define CcsSendDelayedReply(d,s,r); 
 #define CcsNoReply() /*empty*/
 #define CcsNoDelayedReply(d) /*empty*/
+#define CcsSetMergeFn(x,y)      /* empty */
 #endif
 
 #ifdef __cplusplus
