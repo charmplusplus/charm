@@ -394,6 +394,7 @@ static int CcsServer_recvRequestData(SOCKET fd,
   hdr->len=req.len;
   hdr->replyFd=ChMessageInt_new(fd);
 
+  {
   /*Is it a multicast?*/
   int numPes = 0;
   int destPE = ChMessageInt(hdr->pe);
@@ -402,6 +403,7 @@ static int CcsServer_recvRequestData(SOCKET fd,
   /*Grab the user data portion of the message*/
   reqBytes=ChMessageInt(req.len) + numPes*sizeof(int);
   *reqData=(char *)malloc(reqBytes);
+  }
   if (-1==skt_recvN(fd,*reqData,reqBytes)) {
     fprintf(stdout,"CCS ERROR> Retrieving %d message bytes\n",reqBytes);
     free(*reqData);
