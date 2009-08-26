@@ -69,6 +69,7 @@ void ParticleChunk::gravsub(nodeptr p, unsigned ProcessId)
     ADDV(acc0, acc0, ai); 
     if(Type(p) != BODY) {                  /* a body-cell/leaf interaction? */
        mynbcterm++;
+       //CkPrintf("interaction with cell %ld\n", p->key);
 #ifdef QUADPOLE
        dr5inv = 1.0/(drsq * drsq * drabs);
        MULMV(quaddr, Quad(p), dr);
@@ -83,6 +84,7 @@ void ParticleChunk::gravsub(nodeptr p, unsigned ProcessId)
 #endif
     }
     else {                                      /* a body-body interaction  */
+       //CkPrintf("interaction with body %ld\n", ((bodyptr)p)->num);
        myn2bterm++;
     }
 }

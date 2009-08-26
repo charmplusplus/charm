@@ -15,7 +15,7 @@ using namespace std;
 #define MAX_PARTS_PER_TP 1000
 #define MAX_PARTICLES_PER_MSG 500
 #define INIT_PARTS_PER_CHILD 1000
-#define DEFAULT_NUM_ITERATIONS 3
+#define DEFAULT_NUM_ITERATIONS 100
 
 #define G_MALLOC malloc
 

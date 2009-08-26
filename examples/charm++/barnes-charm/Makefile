@@ -15,8 +15,8 @@
 # to disable timing 
 # -DNO_TIME
 
-OPTS= -g -O2 -DOUTPUT_ACC #-DNO_LB #-DVERBOSE_CHUNKS -DVERBOSE_PIECES -DVERBOSE_MAIN
-CHARM_DIR=../../..
+OPTS= -O3 -DNO_TIME #-DOUTPUT_ACC #-DPRINT_TREE #-DNO_LB #-DVERBOSE_CHUNKS -DVERBOSE_PIECES -DVERBOSE_MAIN
+CHARM_DIR=../../../multicore-linux64
 CHARMC=$(CHARM_DIR)/bin/charmc $(OPTS)
 
 OBJS = TreePiece.o ParticleChunk.o Main.o grav.o util.o code_io.o 
@@ -31,6 +31,9 @@ $(TARGET): $(OBJS)
 $(TARGET).%: $(TARGET)
 	mv $(TARGET) $@
 	mv charmrun charmrun.$*
+
+run: $(TARGET)
+	./$(TARGET) +LBPeriod 0.0001 +balancer NullLB -in=input_100000 -pieces=8 -fat=100 -tstop=2.450 -NPROC=$(NPROC) +p$(NPROC) ++ppn$(NPROC) 
 
 grav.o: grav.C barnes.decl.h
 	$(CHARMC) -c grav.C

@@ -27,7 +27,8 @@ typedef double real;
 #include "pup.h"
 
 #define MAX_PROC 128
-#define MAX_BODIES_PER_LEAF 10
+#define MAX_BODIES_PER_LEAF 1
+//#define MAX_BODIES_PER_LEAF 10
 #define MAXLOCK 2048            	/* maximum number of locks on DASH */
 #define PAGE_SIZE 4096			/* in bytes */
 
@@ -200,6 +201,7 @@ static int Direction_Sequence[NUM_DIRECTIONS][NSUB] =
  * NODE: data common to BODY and CELL structures.
  */
 
+typedef CmiUInt8 nodekey;
 typedef struct _node {
    short type;                 /* code for node type: body or cell */
    real mass;                  /* total mass of node */
@@ -209,6 +211,8 @@ typedef struct _node {
    struct _node *parent;       /* ptr to parent of this node in tree */
    int child_num;              /* Index that this node should be put
 				  at in parent cell */
+   nodekey key;
+
 } node;
 
 typedef node* nodeptr;
@@ -220,6 +224,7 @@ typedef node* nodeptr;
 #define Level(x) (((nodeptr) (x))->level)
 #define ParentOf(x) (((nodeptr) (x))->parent)
 #define ChildNum(x) (((nodeptr) (x))->child_num)
+#define NodeKey(x) (((nodeptr) (x))->key)
 /*
  * BODY: data structure used to represent particles.
  */
@@ -246,11 +251,15 @@ typedef struct _body {
    int level;
    leafptr parent;		
    int child_num;              /* Index that this node should be put */
+   nodekey key;
+
    vector vel;                 /* velocity of body */
    vector acc;                 /* acceleration of body */
    real phi;                   /* potential at body */
 #ifdef OUTPUT_ACC
    int num;
+   int n2b;
+   int nbc;
 #endif
 
    void pup(PUP::er &p){
@@ -285,6 +294,8 @@ typedef struct _cell {
    int level;
    cellptr parent;		
    int child_num;              /* Index [0..8] that this node should be put */
+   nodekey key;
+
    //int processor;		/* Used by partition code */
    struct _cell *next, *prev;    /* Used in the partition array */
    unsigned long seqnum;
@@ -331,6 +342,8 @@ typedef struct _leaf {
    int level;
    cellptr parent;		
    int child_num;              /* Index [0..8] that this node should be put */
+   nodekey key;
+
    //int processor;		/* Used by partition code */
    struct _leaf *next, *prev;    /* Used in the partition array */
    unsigned long seqnum;

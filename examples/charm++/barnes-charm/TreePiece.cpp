@@ -120,6 +120,10 @@ void TreePiece::sendParticlesToChildren(){
     if(childrenTreePieces[i] < 0 && len > 0){
       CkAssert(!isPending[i]);
       int child = NSUB*thisIndex+numTreePieces+i;
+      // TODO
+      // common code outside
+      // chares or chare arrays?
+      // remote method instead of message sends
       pieces[child].insert((CmiUInt8)myRoot, i, myLevel >> 1, rmin[0], rmin[1], rmin[2], rsize, thisIndex);
       childrenTreePieces[i] = child;
       pendingChildren++;
@@ -188,6 +192,7 @@ void TreePiece::recvRootFromParent(CmiUInt8 r, real rx, real ry, real rz, real r
     Mass(myRoot) = 0.0;
     Cost(myRoot) = 0;
     CLRV(Pos(myRoot));
+    NodeKey(myRoot) = (NodeKey(parent) << NDIM)+whichChildAmI;
 
     // process own particles
     processParticles(myParticles.getVec(), myNumParticles);
@@ -304,6 +309,7 @@ void TreePiece::recvParticles(ParticleMsg *msg){
       Mass(myRoot) = 0.0;
       Cost(myRoot) = 0;
       CLRV(Pos(myRoot));
+      NodeKey(myRoot) = (NodeKey(parent) << NDIM)+whichChildAmI;
 
       // process own particles
       processParticles(myParticles.getVec(), myNumParticles);
@@ -413,7 +419,9 @@ void TreePiece::buildTree(){
   Current_Root = (nodeptr) parent;
   done = 0;
   for(int i = 0; i < myParticles.length(); i++){
-    Current_Root = (nodeptr) loadtree(myParticles[i], (cellptr) Current_Root, ProcessId);
+    //CkPrintf("[%d] inserting particle %d, current_root: %ld\n", thisIndex, myParticles[i]->num, NodeKey(Current_Root));
+    (nodeptr) loadtree(myParticles[i], (cellptr) Current_Root, ProcessId);
+    //Current_Root = (nodeptr) loadtree(myParticles[i], (cellptr) Current_Root, ProcessId);
     done++;
   }
 
@@ -447,7 +455,7 @@ nodeptr TreePiece::loadtree(bodyptr p, cellptr root, unsigned int ProcessId){
   flag = TRUE;
   while (flag) {                           /* loop descending tree     */
     if (l == 0) {
-      CkPrintf("[%d] not enough levels in tree, %d done\n", thisIndex, done);
+      //CkPrintf("[%d] not enough levels in tree, %d done\n", thisIndex, done);
       CkAbort("tree depth\n");
     }
     if (*qptr == NULL) { 
@@ -456,17 +464,23 @@ nodeptr TreePiece::loadtree(bodyptr p, cellptr root, unsigned int ProcessId){
         Level(p) = l;
         ChildNum(p) = le->num_bodies;
         ChildNum(le) = kidIndex;
+        NodeKey(le) = (NodeKey(mynode) << NDIM) + kidIndex;
+        //CkPrintf("[%d] new leaf at kidindex: %d, key: %ld\n", thisIndex, kidIndex, NodeKey(le));
         Bodyp(le)[le->num_bodies++] = p;
+
         *qptr = (nodeptr) le;
         flag = FALSE;
     }
     if (flag && *qptr && (Type(*qptr) == LEAF)) {
       /*   reached a "leaf"?      */
         le = (leafptr) *qptr;
+        //CkPrintf("[%d] reached existing leaf at kidindex %d key: %ld\n", thisIndex, kidIndex, NodeKey(le));
         if (le->num_bodies == MAX_BODIES_PER_LEAF) {
+          //CkPrintf("[%d] too many particles. splitting\n", thisIndex);
           *qptr = (nodeptr) SubdivideLeaf(le, (cellptr) mynode, l, ProcessId);
         }
         else {
+          //CkPrintf("[%d] enough space\n", thisIndex);
           ParentOf(p) = (nodeptr) le;
           Level(p) = l;
           ChildNum(p) = le->num_bodies;
@@ -581,6 +595,8 @@ TreePiece::SubdivideLeaf (leafptr le, cellptr parent_, unsigned int l, unsigned 
    /* create the parent cell for this subtree */
    c = InitCell(parent_, ProcessId);
    ChildNum(c) = ChildNum(le);
+   NodeKey(c) = (NodeKey(parent_) << NDIM)+ChildNum(c);
+   //CkPrintf("new cell key: %ld\n", NodeKey(c));
    /* do first particle separately, so we can reuse le */
    p = bodies[0];
    intcoord(xp, Pos(p),rmin,rsize);
@@ -588,6 +604,9 @@ TreePiece::SubdivideLeaf (leafptr le, cellptr parent_, unsigned int l, unsigned 
    Subp(c)[index] = (nodeptr) le;
    ChildNum(le) = index;
    ParentOf(le) = (nodeptr) c;
+   NodeKey(le) = (NodeKey(c) << NDIM)+index; 
+   //CkPrintf("existing leaf (gets particle %d) key: %ld\n", p->num, NodeKey(le));
+
    Level(le) = l >> 1;
    /* set stuff for body */
    ParentOf(p) = (nodeptr) le;
@@ -604,9 +623,12 @@ TreePiece::SubdivideLeaf (leafptr le, cellptr parent_, unsigned int l, unsigned 
 	 le = InitLeaf(c, ProcessId);
 	 ChildNum(le) = index;
 	 Subp(c)[index] = (nodeptr) le;
+         NodeKey(le) = (NodeKey(c) << NDIM) + index;
+         //CkPrintf("i: %d, created leaf index %d (gets particle %d) key: %ld\n", i, index, p->num, NodeKey(le));
       }
       else {
 	 le = (leafptr) Subp(c)[index];
+         //CkPrintf("i: %d, existing leaf index %d (gets particle %d) key: %ld\n", i, index, p->num, NodeKey(le));
       }
       ParentOf(p) = (nodeptr) le;
       ChildNum(p) = le->num_bodies;

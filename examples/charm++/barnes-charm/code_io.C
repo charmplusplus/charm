@@ -36,11 +36,10 @@ void Main::inputdata ()
    ifstream instr;
    char headbuf[128];
    int ndim,counter=0;
-   real tnow;
    bodyptr p;
    int i;
-   fprintf(stderr,"reading input file : %s\n",infile.c_str());
-   fflush(stderr);
+   fprintf(stdout,"reading input file : %s\n",infile.c_str());
+   fflush(stdout);
    //instr = fopen(infile, "r");
    instr.open(infile.c_str());
    /*
@@ -63,6 +62,7 @@ void Main::inputdata ()
    
    //in_real(instr, &tnow);
    instr >> tnow;
+   CkPrintf("read tnow: %f\n", tnow);
    /*
    for (i = 0; i < MAX_PROC; i++) {
       Local[i].tnow = tnow;

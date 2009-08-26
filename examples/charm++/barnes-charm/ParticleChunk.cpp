@@ -212,6 +212,7 @@ void ParticleChunk::ComputeForces (CkCallback &cb)
       p = *pp;
       SETV(acc1, Acc(p));
       Cost(p)=0;
+      //CkPrintf("forces for particle %d\n", p->num);
       hackgrav(p,ProcessId);
       myn2bcalc += myn2bterm; 
       mynbccalc += mynbcterm;
@@ -224,6 +225,10 @@ void ParticleChunk::ComputeForces (CkCallback &cb)
 	 MULVS(dvel, dacc, dthf);
 	 ADDV(Vel(p), Vel(p), dvel);
       }
+#ifdef OUTPUT_ACC
+      p->n2b = myn2bterm;
+      p->nbc = mynbcterm;
+#endif
    }
 
    contribute(0,0,CkReduction::concat,cb);
@@ -376,13 +381,18 @@ void ParticleChunk::outputAccelerations(CkCallback &cb_){
   bodyptr *pp;
   bodyptr p; 
   int i;
+#ifdef OUTPUT_ACC
   for (i = 0, pp = mybodytab; pp < mybodytab+mynbody; pp++, i++) {  
     p = *pp;
     real *xp = Pos(p);
     real *ap = Acc(p);
-    CkPrintf("[%d] %d: pos: (%f,%f,%f), acc: (%f,%f,%f)\n", thisIndex, p->num, xp[0], xp[1], xp[2], ap[0], ap[1], ap[2]);
+    //CkPrintf("[%d] %d: pos: (%f,%f,%f), acc: (%f,%f,%f), nbc: %d, n2b: %d\n", thisIndex, p->num, xp[0], xp[1], xp[2], ap[0], ap[1], ap[2], p->nbc, p->n2b);
+    ckerr << p->num << ": pos: (" << xp[0] << "," << xp[1] << "," << xp[2] << "), acc: (" << ap[0] << "," << ap[1] << "," << ap[2] << "), nbc: " << p->nbc << ", n2b: " << p->n2b << endl;
+    //CkPrintf("%d: pos: (%f,%f,%f), acc: (%f,%f,%f), nbc: %d, n2b: %d\n", p->num, xp[0], xp[1], xp[2], ap[0], ap[1], ap[2], p->nbc, p->n2b);
 
   }
+#endif
+  //CkPrintf("[%d] bc: %d bb: %d\n", thisIndex, mynbccalc, myn2bcalc);
   contribute(0,0,CkReduction::concat,cb_);
 }
 

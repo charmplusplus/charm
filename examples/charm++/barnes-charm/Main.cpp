@@ -52,7 +52,6 @@ void Main::initoutput()
 }
 
 
-
 Main::Main(CkArgMsg *m){
   int c;
 
@@ -151,6 +150,8 @@ void Main::init_root (unsigned int ProcessId)
   Mass(G_root) = 0.0;
   Cost(G_root) = 0;
   CLRV(Pos(G_root));
+  NodeKey(G_root) = nodekey(1); 
+
 
   Level(G_root) = IMAX >> 1;
   
@@ -182,6 +183,9 @@ int Main::createTopLevelTree(cellptr node, int depth){
     ParentOf(child) = (nodeptr) node;
     ChildNum(child) = i;
     Level(child) = Level(node) >> 1;
+    nodekey k = NodeKey(node) << NDIM;
+    k += i;
+    NodeKey(child) = k;
 
     Mass(child) = 0.0;
     Cost(child) = 0;
@@ -206,9 +210,6 @@ void Main::startSimulation(){
 
   /* main loop */
   int i = 0;
-#ifndef NO_TIME
-  //totalStart = CmiWallTimer();
-#endif
   while (tnow < tstop + 0.1 * dtime && i < iterations) {
     // create top-level tree
     CkPrintf("**********************************\n");
@@ -218,10 +219,10 @@ void Main::startSimulation(){
 #ifndef NO_TIME
     start = CmiWallTimer();
     iterationStart = CmiWallTimer();
+#endif
     if(i == 2){
       totalStart = CmiWallTimer();
     }
-#endif
     CkCallback cb(CkIndex_TreePiece::doBuildTree(), pieces);
     CkStartQD(cb);
     init_root(-1);
@@ -295,9 +296,7 @@ void Main::startSimulation(){
     topLevelRoots.length() = 0;
     tnow = tnow + dtime;
   }
-#ifndef NO_TIME
   totalEnd = CmiWallTimer();
-#endif
 
   CkPrintf("[main] Completed simulation: %f s\n", (totalEnd-totalStart));
 #ifdef OUTPUT_ACC
@@ -434,11 +433,11 @@ void Main::startrun()
 
    fleaves = getdparam("fleaves");
    if(isnan(fleaves))
-     fleaves = 0.5;
+     fleaves = 15;
 
    tstop = getdparam("tstop");
    if(isnan(tstop))
-     tstop = 0.075;
+     tstop = 0.225;
 
    dtout = getdparam("dtout");
    if(isnan(dtout))
@@ -605,7 +604,7 @@ string Main::getparam(string name)
       return value;
     }
   }
-  ckerr << "getparam: " << name.c_str() << "unknown\n";
+  ckout << "getparam: " << name.c_str() << " unknown\n";
   return string();
 }
 
@@ -721,21 +720,21 @@ void Main::graph(){
   while(!nodes.isEmpty()){
     nodeptr curnode = nodes.deq();
     
-    myfile << (CmiUInt8)curnode << " [label=\"" << "("<< (CmiUInt8)curnode << ", " << Mass(curnode) << ")" << "\\n (" << Pos(curnode)[0] << "," << Pos(curnode)[1] << "," << Pos(curnode)[2] << ") " << "\"];"<< endl;
+    myfile << NodeKey(curnode) << " [label=\"" << "("<< NodeKey(curnode) << ", " << Mass(curnode) << ")" << "\\n (" << Pos(curnode)[0] << "," << Pos(curnode)[1] << "," << Pos(curnode)[2] << ") " << "\"];"<< endl;
     for(int i = 0; i < NSUB; i++){
       nodeptr childnode = Subp(curnode)[i];
       if(childnode != NULL){
         if(Type(childnode) == CELL){
           nodes.enq(childnode);
-          myfile << (CmiUInt8)curnode << "->" << (CmiUInt8)childnode << endl;
+          myfile << NodeKey(curnode) << "->" << NodeKey(childnode) << endl;
         }
         else if(Type(childnode) == LEAF){
-          myfile << (CmiUInt8)curnode << "->" << (CmiUInt8)childnode << endl;
-          myfile << (CmiUInt8)childnode << " [label=\"" << "("<< ((leafptr)childnode)->num_bodies << ", " << Mass(childnode) << ")" << "\\n (" << Pos(childnode)[0] << "," << Pos(childnode)[1] << "," << Pos(childnode)[2] << ") " << "\"];"<< endl;
+          myfile << NodeKey(curnode) << "->" << NodeKey(childnode) << endl;
+          myfile << NodeKey(childnode) << " [label=\"" << "("<< NodeKey(childnode) << ", " << Mass(childnode) << ")" << "\\n (" << Pos(childnode)[0] << "," << Pos(childnode)[1] << "," << Pos(childnode)[2] << ") num " << (((leafptr)childnode)->bodyp[0])->num << " \"];"<< endl;
         }
       }
       else {
-        myfile << (CmiUInt8)curnode << "-> NULL_" << (CmiUInt8)curnode << "_" << i << endl;
+        myfile << NodeKey(curnode) << "-> NULL_" << NodeKey(curnode) << "_" << i << endl;
       }
     }
   }
