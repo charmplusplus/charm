@@ -54,12 +54,13 @@ class OneTimeMulticastStrategy: public Strategy, public CharmStrategy {
       @param [in] totalDestPEs The number of destination PEs to whom the message needs to be sent. This will always be > 0.
       @param [in] destPEs The list of PEs that eventually will be sent the message.
       @param [in] myIndex The index into destPEs for this PE.
-
+      @param [in] rootPE The PE that created the multicast (is not listed in destPEs).
+      
       @param [out] pelist A list of PEs to which the message will be sent after this function returns. This function allocates the array with new. The caller will free it with delete[] if npes>0.
       @param [out] npes The size of pelist
 
   */
-  virtual void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes );
+  virtual void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, const int rootPE , int * &pelist, int &npes);
 
     OneTimeMulticastStrategy(CkMigrateMessage *m): Strategy(m), CharmStrategy(m){}
   
@@ -88,7 +89,7 @@ class OneTimeMulticastStrategy: public Strategy, public CharmStrategy {
 class OneTimeRingMulticastStrategy: public OneTimeMulticastStrategy {
   
  public:
-  void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes );
+  void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, const int rootPE , int * &pelist, int &npes);
 
  OneTimeRingMulticastStrategy(CkMigrateMessage *m): OneTimeMulticastStrategy(m) {}
  OneTimeRingMulticastStrategy(): OneTimeMulticastStrategy() {}
@@ -111,7 +112,7 @@ class OneTimeTreeMulticastStrategy: public OneTimeMulticastStrategy {
   
  public:
   
-  void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes );
+  void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, const int rootPE, int * &pelist, int &npes);
   
  OneTimeTreeMulticastStrategy(CkMigrateMessage *m): OneTimeMulticastStrategy(m) {}
 
@@ -130,6 +131,28 @@ class OneTimeTreeMulticastStrategy: public OneTimeMulticastStrategy {
 
 
 
+/**
+   A strategy that does dimension ordered sending of messages. This may result in lower contention for torus networks than a topology oblivious tree.
+*/
+class OneTimeDimensionOrderedMulticastStrategy: public OneTimeMulticastStrategy {
+ public:
+  
+  void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, const int rootPE, int * &pelist, int &npes);
+  
+ OneTimeDimensionOrderedMulticastStrategy(CkMigrateMessage *m): OneTimeMulticastStrategy(m) {}
+
+  /** Create a strategy with specified branching factor(which defaults to 4) */
+ OneTimeDimensionOrderedMulticastStrategy(): OneTimeMulticastStrategy() {}
+
+  ~OneTimeDimensionOrderedMulticastStrategy() {}
+  
+  void pup(PUP::er &p){ 
+    OneTimeMulticastStrategy::pup(p); 
+  }
+  
+  PUPable_decl(OneTimeDimensionOrderedMulticastStrategy);
+};
+
 
 
 
@@ -142,7 +165,7 @@ class OneTimeNodeTreeMulticastStrategy: public OneTimeMulticastStrategy {
   
  public:
   
-  void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes );
+  void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, const int rootPE, int * &pelist, int &npes);
   
  OneTimeNodeTreeMulticastStrategy(CkMigrateMessage *m): OneTimeMulticastStrategy(m) {}
   
@@ -170,7 +193,7 @@ class OneTimeNodeTreeRingMulticastStrategy: public OneTimeMulticastStrategy {
   
  public:
   
-  void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes );
+  void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, const int rootPE, int * &pelist, int &npes);
   
  OneTimeNodeTreeRingMulticastStrategy(CkMigrateMessage *m): OneTimeMulticastStrategy(m) {}
   
