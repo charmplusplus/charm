@@ -29,6 +29,11 @@ bool fault_aware(CkObjID &recver);
 int _restartFlag=0;
 int restarted=0;
 
+//GML: variables for measuring savings with groups in message logging
+float MLOGFT_totalLogSize = 0.0;
+float MLOGFT_totalMessages = 0.0;
+float MLOGFT_totalObjects = 0.0;
+
 //TODO: remove for perf runs
 int countHashRefs=0; //count the number of gets
 int countHashCollisions=0;
@@ -466,7 +471,12 @@ void sendTicketRequest(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *ent
 
 	Chare *obj = (Chare *)entry->env->sender.getObject();
 	if(!resend){
-		obj->mlogData->addLogEntry(entry);
+		//GML: only stores message if either it goes to this processor or to a processor in a different group
+		if(CkMyPe() != destPE && CkMyPe()/GROUP_SIZE_MLOG != destPE/GROUP_SIZE_MLOG){
+			obj->mlogData->addLogEntry(entry);
+			MLOGFT_totalMessages += 1.0;
+			MLOGFT_totalLogSize += entry->env->getTotalsize();
+		}
 	}
 	
 
@@ -1774,6 +1784,11 @@ void CkMlogRestartDouble(void *,double){
 	CkMlogRestart(NULL,NULL);
 };
 
+//GML: restarting from local (group) failure
+void CkMlogRestartLocal(){
+    CkMlogRestart(NULL,NULL);
+};
+
 
 void readCheckpointFromDisk(int size,char *buf){
 	char fName[100];
@@ -2224,6 +2239,27 @@ void resendMessageForChare(void *data,ChareMlogData *mlogData){
 
 void _resendMessagesHandler(char *msg){
 	ResendRequest *resendReq = (ResendRequest *)msg;
+
+	//GML: examines the origin processor to determine if it belongs to the same group
+	if(resendReq->PE != CkMyPe() && resendReq->PE/GROUP_SIZE_MLOG == CkMyPe()/GROUP_SIZE_MLOG){
+		//TODO: change the function call from restart to group-restart to avoid cyclic calls,
+		// for now it will work only with 1 failure
+		if(_restartFlag)
+			return;
+		CmiMemoryCheck();
+		CkPrintf("[%d] RESTART: same group\n",CkMyPe());
+		//HERE _resetNodeBocInitVec();
+/*      int numGroups = CkpvAccess(_groupIDTable)->size();
+		int i;
+		CKLOCMGR_LOOP(mgr->startInserting(););
+		CKLOCMGR_LOOP(mgr->flushAllRecs(););
+*/
+		// rolls back to the previous checkpoint and sends a broadcast to resend messages to this processor
+		CkMlogRestartLocal();
+		return;
+	}
+
+
 	char *listObjects = &msg[sizeof(ResendRequest)];
 	ResendData d;
 	d.numberObjects = resendReq->numberObjects;
@@ -3019,6 +3055,11 @@ void _messageLoggingExit(){
 	}
 	printf("[%d] countHashCollisions %d countHashRefs %d \n",CkMyPe(),countHashCollisions,countHashRefs);*/
 	printf("[%d] _messageLoggingExit \n",CmiMyPe());
+
+	//GML: printing some statistics for group approach
+	if(GROUP_SIZE_MLOG > 1)
+		CkPrintf("[%d] Logged messages = %.0f, log size =  %.2f MB\n",CkMyPe(),MLOGFT_totalMessages,MLOGFT_totalLogSize/(float)MEGABYTE);
+
 }
 /**********************************
 	* The methods of the message logging
@@ -3560,6 +3601,10 @@ void RestoredLocalMap::pup(PUP::er &p){
 /****************
 *****************/
 int getCheckPointPE(){
+	//GML: assigning a group-based buddy
+	if(GROUP_SIZE_MLOG != 1){
+		return (CmiMyPe() + GROUP_SIZE_MLOG) % CmiNumPes();
+	}
 	return (CmiNumPes() -1 - CmiMyPe());
 }
 

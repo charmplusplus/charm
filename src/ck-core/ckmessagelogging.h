@@ -16,6 +16,10 @@ CpvExtern(Chare *,_currentObj);
 #define OLD_TICKET 2
 #define FORWARDED_TICKET 0x8000
 
+//GML: global variable for the size of the group
+#define GROUP_SIZE_MLOG 1
+#define MEGABYTE 1048576
+
 //array on which we print the formatted string representing an object id
 extern char objString[100];
 
@@ -511,6 +515,8 @@ void distributeRestartedObjects();
 void sortRestoredLocalMsgLog(void *_dummy,ChareMlogData *mlogData);
 void sendDummyMigration(int restartPE,CkGroupID lbID,CkGroupID locMgrID,CkArrayIndexMax &idx,int locationPE);
 
+//GML: function for locally calling the restart
+void CkMlogRestartLocal();
 
 //handler functions for restart
 void _getCheckpointHandler(RestartRequest *restartMsg);
@@ -579,6 +585,9 @@ int getCheckPointPE();
 void forAllCharesDo(MlogFn fnPointer,void *data);
 envelope *copyEnvelope(envelope *env);
 extern void _initDone(void);
+
+//GML: needed for group restart
+extern void _resetNodeBocInitVec(void);
 
 //methods for updating location
 void informLocationHome(CkGroupID mgrID,CkArrayIndexMax idx,int homePE,int currentPE);
