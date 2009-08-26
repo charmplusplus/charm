@@ -121,6 +121,7 @@ static void createLoadBalancer(const char *lbname)
     fn();
 }
 
+// mainchare
 LBDBInit::LBDBInit(CkArgMsg *m)
 {
 #if CMK_LBDB_ON

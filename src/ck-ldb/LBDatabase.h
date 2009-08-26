@@ -231,8 +231,8 @@ public:
   inline const LDObjHandle &GetObjHandle(int idx) { return LDGetObjHandle(myLDHandle, idx);}
   inline void ObjectStart(const LDObjHandle &_h) { LDObjectStart(_h); };
   inline void ObjectStop(const LDObjHandle &_h) { LDObjectStop(_h); };
-  inline void Send(const LDOMHandle &_om, const LDObjid _id, unsigned int _b, int _p) {
-    LDSend(_om, _id, _b, _p);
+  inline void Send(const LDOMHandle &_om, const LDObjid _id, unsigned int _b, int _p, int force = 0) {
+    LDSend(_om, _id, _b, _p, force);
   };
   inline void MulticastSend(const LDOMHandle &_om, LDObjid *_ids, int _n, unsigned int _b, int _nMsgs=1) {
     LDMulticastSend(_om, _ids, _n, _b, _nMsgs);
@@ -275,6 +275,7 @@ public:
   inline void CollectStatsOn(void) { LDCollectStatsOn(myLDHandle); };
   inline void CollectStatsOff(void) { LDCollectStatsOff(myLDHandle); };
   inline int  CollectingStats(void) { return LDCollectingStats(myLDHandle); };
+  inline int  CollectingCommStats(void) { return LDCollectingStats(myLDHandle) && _lb_args.traceComm(); };
   inline void QueryEstLoad(void) { LDQueryEstLoad(myLDHandle); };
 
   inline int GetObjDataSz(void) { return LDGetObjDataSz(myLDHandle); };

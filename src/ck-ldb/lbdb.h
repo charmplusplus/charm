@@ -234,7 +234,7 @@ void LDObjTime(LDObjHandle &h, double walltime, double cputime);
 int  CLDRunningObject(LDHandle _h, LDObjHandle* _o );
 void LDObjectStart(const LDObjHandle &_h);
 void LDObjectStop(const LDObjHandle &_h);
-void LDSend(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc);
+void LDSend(const LDOMHandle &destOM, const LDObjid &destid, unsigned int bytes, int destObjProc, int force);
 void LDMulticastSend(const LDOMHandle &destOM, LDObjid *destids, int ndests, unsigned int bytes, int nMsgs);
 
 void LDMessage(LDObjHandle from, 
