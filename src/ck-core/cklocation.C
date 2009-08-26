@@ -2055,9 +2055,9 @@ int CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 #ifndef _FAULT_MLOG_
 #if CMK_LBDB_ON
 	if (type==CkDeliver_queue) {
-		if (!(opts & CK_MSG_LB_NOTRACE)) {
-		if(rec!=NULL) the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(), rec->lookupProcessor());
-		else /*rec==NULL*/ the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(),homePe(msg->array_index()));
+		if (!(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats()) {
+		if(rec!=NULL) the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(), rec->lookupProcessor(), 1);
+		else /*rec==NULL*/ the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(),homePe(msg->array_index()), 1);
 		}
 	}
 #endif
