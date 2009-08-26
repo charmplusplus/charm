@@ -33,7 +33,7 @@ $(TARGET).%: $(TARGET)
 	mv charmrun charmrun.$*
 
 run: $(TARGET)
-	./$(TARGET) +LBPeriod 0.0001 +balancer NullLB -in=input_100000 -pieces=8 -fat=100 -tstop=2.450 -NPROC=$(NPROC) +p$(NPROC) ++ppn$(NPROC) 
+	./$(TARGET) +LBPeriod 0.0001 +balancer NullLB -in=input_100000 -pieces=8 -fat=100 -tstop=0.225 -NPROC=$(NPROC) +p$(NPROC) ++ppn$(NPROC) 
 
 grav.o: grav.C barnes.decl.h
 	$(CHARMC) -c grav.C
