@@ -1890,6 +1890,7 @@ void sendCheckpointData(){
 	int totalSize = sizeof(RestartProcessorData)+storedChkpt->bufSize;
 	
 	DEBUGRESTART(CkPrintf("[%d] Sending out checkpoint for processor %d size %d \n",CkMyPe(),restartMsg->PE,totalSize);)
+	CkPrintf("[%d] Sending out checkpoint for processor %d size %d \n",CkMyPe(),restartMsg->PE,totalSize);
 	
 	CkQ<LocalMessageLog > *localMsgQ = CpvAccess(_localMessageLog);
 	totalSize += localMsgQ->length()*sizeof(LocalMessageLog);
@@ -1959,7 +1960,10 @@ void createObjIDList(void *data,ChareMlogData *mlogData){
 }
 
 
-
+/**
+ * Receives the checkpoint data from its buddy, restores the state of all the objects
+ * and asks everyone else to update its home.
+ */
 void _recvCheckpointHandler(char *_restartData){
 	RestartProcessorData *restartData = (RestartProcessorData *)_restartData;
 	MigrationRecord *migratedAwayElements;
@@ -2036,7 +2040,14 @@ void _recvCheckpointHandler(char *_restartData){
 
 }
 
+/**
+ * Receives the updateHome ACKs from all other processors. Once everybody
+ * has replied, it sends a request to resed the logged messages.
+ */
 void _updateHomeAckHandler(RestartRequest *updateHomeAck){
+
+	CkPrintf("[%d] Updating Home Ack Handler\n",CkMyPe());
+
 	countUpdateHomeAcks++;
 	CmiFree(updateHomeAck);
 	// one is from the recvglobal step handler .. it is a dummy updatehomeackhandler
@@ -2100,7 +2111,9 @@ void initializeRestart(void *data,ChareMlogData *mlogData){
 	mlogData->mapTable.empty();
 };
 
-
+/**
+ * Updates the homePe of chare array elements.
+ */
 void updateHomePE(void *data,ChareMlogData *mlogData){
 	RestartRequest *updateRequest = (RestartRequest *)data;
 	int PE = updateRequest->PE; //restarted PE
@@ -2122,7 +2135,12 @@ void updateHomePE(void *data,ChareMlogData *mlogData){
 };
 
 
+/**
+ * Updates the homePe for all chares in this processor.
+ */
 void _updateHomeRequestHandler(RestartRequest *updateRequest){
+
+	CkPrintf("[%d] ---------------->HERE\n",CkMyPe());
 	
 	int sender = updateRequest->PE;
 	
@@ -2146,7 +2164,6 @@ void _updateHomeRequestHandler(RestartRequest *updateRequest){
 				CmiSyncSend(getCheckPointPE(),sizeof(migMsg),(char *)&migMsg);
 			}
 		}
-
 	}
 }
 
@@ -2237,6 +2254,10 @@ void resendMessageForChare(void *data,ChareMlogData *mlogData){
 	DEBUGRESTART(printf("[%d] Resent  %d/%d (%d) messages  from %s to processor %d \n",CkMyPe(),count,log->length(),ticketRequests,mlogData->objID.toString(nameString),PE);)	
 }
 
+/**
+ * Resends the messages since the last checkpoint to the list of objects included in the 
+ * request.
+ */
 void _resendMessagesHandler(char *msg){
 	ResendRequest *resendReq = (ResendRequest *)msg;
 
@@ -3226,9 +3247,9 @@ void ChareMlogData::sortRestoredLocalMsgLog(){
 		if(map->TNArray == NULL){
 			map->TNArray = new MCount[map->maxSN-map->minSN+1];			
 			//HERE: erase from here
-			printf("map->count:%d\n",map->count);
-			printf("map->maxSN:%d\n",map->maxSN);
-			printf("map->minSN:%d\n",map->minSN);
+			//printf("map->count:%d\n",map->count);
+			//printf("map->maxSN:%d\n",map->maxSN);
+			//printf("map->minSN:%d\n",map->minSN);
 			//HERE: to here
 
 			CkAssert(map->count == map->maxSN-map->minSN+1);
