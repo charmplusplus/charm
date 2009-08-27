@@ -1260,9 +1260,9 @@ CLBStatsMsg::CLBStatsMsg(int osz, int csz) {
 }
 
 CLBStatsMsg::~CLBStatsMsg() {
-  if (objData!=NULL) delete [] objData;
-  if (commData!=NULL) delete [] commData;
-  if (avail_vector!=NULL) delete [] avail_vector;
+  delete [] objData;
+  delete [] commData;
+  delete [] avail_vector;
 }
 
 void CLBStatsMsg::pup(PUP::er &p) {
@@ -1300,8 +1300,10 @@ void CLBStatsMsg::pup(PUP::er &p) {
 // I want the data pointer stored and not to be freed by the Charm++.
 void CkMarshalledCLBStatsMessage::free() { 
   int count = msgs.size();
-  for  (int i=0; i<count; i++) 
-    if (msgs[i]!=NULL) { delete msgs[i]; msgs[i] = NULL; }
+  for  (int i=0; i<count; i++) {
+    delete msgs[i];
+    msgs[i] = NULL;
+  }
   msgs.free();
 }
 
