@@ -73,14 +73,14 @@ Jacobi::~Jacobi() {
 
   // Clean up any saved messages
   #if USE_MESSAGES != 0
-    if (eastMsgSave[0] != NULL) { delete eastMsgSave[0]; }
-    if (eastMsgSave[1] != NULL) { delete eastMsgSave[1]; }
-    if (westMsgSave[0] != NULL) { delete westMsgSave[0]; }
-    if (westMsgSave[1] != NULL) { delete westMsgSave[1]; }
-    if (northMsgSave[0] != NULL) { delete northMsgSave[0]; }
-    if (northMsgSave[1] != NULL) { delete northMsgSave[1]; }
-    if (southMsgSave[0] != NULL) { delete southMsgSave[0]; }
-    if (southMsgSave[1] != NULL) { delete southMsgSave[1]; }
+  delete eastMsgSave[0];
+  delete eastMsgSave[1];
+  delete westMsgSave[0];
+  delete westMsgSave[1];
+  delete northMsgSave[0];
+  delete northMsgSave[1];
+  delete southMsgSave[0];
+  delete southMsgSave[1];
   #endif
 }
 

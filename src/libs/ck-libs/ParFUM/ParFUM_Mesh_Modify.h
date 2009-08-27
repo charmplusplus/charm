@@ -301,7 +301,7 @@ class verifyghostsendMsg : public CMessage_verifyghostsendMsg {
   }
   
   ~verifyghostsendMsg() {
-    //if(chunks!=NULL) delete chunks;
+    //delete chunks;
   }
 };
 

@@ -421,7 +421,7 @@ void CkBitVector::pup(PUP::er &p) {
     data = NULL;
   } else {
     if ( p.isUnpacking() ) {
-      if ( data != NULL ) { delete [] data; }
+      delete [] data;
       data = new prio_t[chunks(usedBits)];
       memset(data, 0, chunks(usedBits)*chunkSize());
     }

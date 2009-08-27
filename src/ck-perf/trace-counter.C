@@ -211,7 +211,7 @@ StatTable::StatTable():
 }
 
 // destructor
-StatTable::~StatTable() { if (stats_ != NULL) { delete [] stats_; } }
+StatTable::~StatTable() { delete [] stats_; }
 
 // initialize the stat table internals
 void StatTable::init(int argc)
@@ -220,7 +220,7 @@ void StatTable::init(int argc)
   char** counterDesc = CpvAccess(_counterDesc);
 
   if (argc > numStats_) {
-    if (stats_ != NULL) { delete [] stats_; }
+    delete [] stats_;
     stats_ = new Statistics[argc];  _MEMCHECK(stats_);
     numStats_ = argc;
   }
@@ -567,7 +567,7 @@ TraceCounter::TraceCounter() :
 
 //! destructor
 TraceCounter::~TraceCounter() { 
-  if (commandLine_ != NULL) { delete [] commandLine_; }
+  delete [] commandLine_;
   traceClose(); 
 }
 

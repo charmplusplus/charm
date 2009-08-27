@@ -118,10 +118,10 @@ void resize_nodes(void *data, int *len, int *max) {
   FEM_Register_array(fem_mesh,FEM_NODE,FEM_DATA+1,(void*)g->ndata1,FEM_INT,2);
   FEM_Register_array(fem_mesh,FEM_NODE,FEM_DATA+2,(void*)g->ndata2,FEM_DOUBLE,3);
 
-//   if(coord!=NULL) delete coord;
-//   if(bounds!=NULL) delete bounds;
-//   if(ndata1!=NULL) delete ndata1;
-//   if(ndata2!=NULL) delete ndata2;
+//   delete coord;
+//   delete bounds;
+//   delete ndata1;
+//   delete ndata2;
 }
 
 void resize_elems(void *data, int *len, int *max) {

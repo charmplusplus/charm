@@ -259,7 +259,7 @@ for (int j=0; j<nNod; j++) CkPrintf("node[%d]: %d\n", 17,adjnodes[j]);
 */	
 
 
-      if (nodes!=NULL) delete[] nodes;
+      delete[] nodes;
       nodes = NULL;
 //      for (int i=0; i<g.nnodes; i++) nodes[i]=i;
       for (int i=0; i<3; i++) { 
@@ -337,10 +337,10 @@ void doNetFEM(int& t, int mesh, myGlobals &g) {
 
 void rebuildArrays (int mesh, myGlobals &g) {
   CkPrintf("Rebuilding arrays. \n");
-  if (g.conn!=NULL) delete [] g.conn;
-  if (g.coord!=NULL) delete [] g.coord;
-  if (g.vCoord!=NULL) delete [] g.vCoord;
-  if (g.vConn!=NULL) delete [] g.vConn;
+  delete [] g.conn;
+  delete [] g.coord;
+  delete [] g.vCoord;
+  delete [] g.vConn;
   g.nelems=FEM_Mesh_get_length(mesh, FEM_ELEM);
   g.nnodes=FEM_Mesh_get_length(mesh, FEM_NODE);
   g.nVnodes = FEM_count_valid(mesh, FEM_NODE);

@@ -1146,14 +1146,14 @@ void FEM_Entity::pup(PUP::er &p) {
 	p|invalidListLen;
 	p|invalidListAllLen;
 	if(p.isUnpacking()) {
-	  if(invalidList!=NULL) delete[] invalidList; //was just created in allocateValid
+	  delete[] invalidList; //was just created in allocateValid
 	  if(invalidListAllLen>0) invalidList = new int[invalidListAllLen];
 	}
 	if(invalidListAllLen>0) {
 	  PUParray(p, (int*)invalidList, invalidListAllLen);
 	}
 	if(p.isDeleting()) {
-	  if(invalidList!=NULL) delete[] invalidList;
+	  delete[] invalidList;
 	}
 
 	if (ghost!=NULL) {

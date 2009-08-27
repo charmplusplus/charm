@@ -1082,7 +1082,7 @@ int FEM_Adapt_Algs::simple_refine(double targetA, double xmin, double ymin, doub
       }
       //if(adapted) break;
     }
-    if(refineElements!=NULL) delete[] refineElements;
+    delete[] refineElements;
     //if(adapted) break;
   }
 
@@ -1183,7 +1183,7 @@ int FEM_Adapt_Algs::simple_coarsen(double targetA, double xmin, double ymin, dou
       }
       //if(adapted) break;
     }
-    if(coarsenElements!=NULL) delete[] coarsenElements;
+    delete[] coarsenElements;
     //if(adapted) break;
   }
   free(shortestEdge);

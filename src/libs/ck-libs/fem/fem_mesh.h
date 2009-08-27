@@ -206,7 +206,7 @@ public:
 	{
 		if (this->rows>0) allocate(this->rows);
 	}
-	~AllocTable2d() {if(allocTable != NULL){delete[] allocTable;}}
+	~AllocTable2d() {delete[] allocTable;}
 	/// Make room for this many rows
 	void allocate(int rows_) { 
 		allocate(this->width(),rows_);

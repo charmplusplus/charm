@@ -281,7 +281,7 @@ public:
 		find=NULL;
 	}
 	~FEM_Initial_Symmetries() {
-		if (find!=NULL) delete find;
+		delete find;
 	}
 };
 

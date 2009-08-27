@@ -304,7 +304,7 @@ RouterStrategy::~RouterStrategy() {
     delete [] srcPelist;
     delete [] destPelist;
 
-    if(bcast_pemap != NULL) delete [] bcast_pemap;
+    delete [] bcast_pemap;
     
     delete [] procMap;
 

@@ -88,7 +88,8 @@ int win_obj::create(char *name, void *base, MPI_Aint size, int disp_unit, MPI_Co
 }
 
 int win_obj::free(){
-  if(winName!=NULL) {delete[] winName; winName = NULL;}
+  delete[] winName;
+  winName = NULL;
   // Assume : memory will be deallocated by user
   initflag = 0;
   return WIN_SUCCESS;

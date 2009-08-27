@@ -1142,7 +1142,7 @@ class AccelBlock : public Construct {
 
   /// Constructor(s)/Destructor ///
   AccelBlock(int l, XStr* c) { line = l; code = c; }
-  ~AccelBlock() { if (code != NULL) { delete code; } }
+  ~AccelBlock() { delete code; }
 
   /// Printable Methods ///
   void print(XStr& str) { }

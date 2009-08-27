@@ -190,7 +190,7 @@ class lockChunksMsg : public CMessage_lockChunksMsg {
   }
 
   ~lockChunksMsg() {
-    ///if(chkList!=NULL) delete chkList;
+    /// delete chkList;
   }
 
   int *getChks() {

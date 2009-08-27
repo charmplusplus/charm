@@ -387,7 +387,7 @@ public:
         f=NULL;
       }
     \}
-    ~keepsNullFoo() \{if (f!=NULL) delete f;\}
+    ~keepsNullFoo() \{delete f;\}
 \};
 \end{alltt}
 
