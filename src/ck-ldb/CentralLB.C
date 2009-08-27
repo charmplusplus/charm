@@ -235,7 +235,7 @@ void CentralLB::ReceiveCounts(CkReductionMsg  *msg)
   statsData->to_proc.resize(n_objs);
   statsData->commData.resize(n_comm);
 
-  DEBUGF(("[%d] ReceiveCounts\n",CkMyPe()));
+  DEBUGF(("[%d] ReceiveCounts: n_objs:%d n_comm:%d\n",CkMyPe(), n_objs, n_comm));
 	
     // broadcast call to let everybody start to send stats
   thisProxy.SendStats();
@@ -250,6 +250,7 @@ void CentralLB::BuildStatsMsg()
 
   int npes = CkNumPes();
   CLBStatsMsg* msg = new CLBStatsMsg(osz, csz);
+  _MEMCHECK(msg);
   msg->from_pe = CkMyPe();
 #ifdef _FAULT_MLOG_
 	msg->step = step();
@@ -271,7 +272,7 @@ void CentralLB::BuildStatsMsg()
   msg->n_comm = csz;
   theLbdb->GetCommData(msg->commData);
 //  theLbdb->ClearLoads();
-  DEBUGF(("PE %d sending stats to ReceiveStats %d objs, %d comm\n",CkMyPe(),msg->n_objs,msg->n_comm));
+  DEBUGF(("PE %d BuildStatsMsg %d objs, %d comm\n",CkMyPe(),msg->n_objs,msg->n_comm));
 
   if(CkMyPe() == cur_ld_balancer) {
     msg->avail_vector = new char[CkNumPes()];
@@ -300,8 +301,10 @@ void CentralLB::SendStats()
   }
   else
 #endif
-	DEBUGF(("[%d] calling ReceiveStats on step %d \n",CmiMyPe(),step()));
-  thisProxy[cur_ld_balancer].ReceiveStats(statsMsg);
+  {
+    DEBUGF(("[%d] calling ReceiveStats on step %d \n",CmiMyPe(),step()));
+    thisProxy[cur_ld_balancer].ReceiveStats(statsMsg);
+  }
 
   statsMsg = NULL;
 
@@ -433,18 +436,20 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 {
 #if CMK_LBDB_ON
     //  loop through all CLBStatsMsg in the incoming msg
-  for (int num = 0; num < msg.getCount(); num++) 
+  int count = msg.getCount();
+  for (int num = 0; num < count; num++) 
   {
-    CLBStatsMsg *m = (CLBStatsMsg *)msg.getMessage(num);
+    CLBStatsMsg *m = msg.getMessage(num);
+    CmiAssert(m!=NULL);
     const int pe = m->from_pe;
-	DEBUGF(("Stats msg received, %d %d %d %p step %d\n", pe,stats_msg_count,m->n_objs,m,step()));
+    DEBUGF(("Stats msg received, %d %d %d %p step %d\n", pe,stats_msg_count,m->n_objs,m,step()));
 #ifdef _FAULT_MLOG_     
 /*      
- *              if(m->step < step()){
- *                          //TODO: if a processor is redoing an old load balance step..
- *                                      //tell it that the step is done and that it should not perform any migrations
- *                                                  thisProxy[pe].ReceiveDummyMigration();
- *                                                          }*/
+ *  if(m->step < step()){
+ *    //TODO: if a processor is redoing an old load balance step..
+ *    //tell it that the step is done and that it should not perform any migrations
+ *      thisProxy[pe].ReceiveDummyMigration();
+ *  }*/
 #endif
 	
     if(!CmiNodeAlive(pe)){
@@ -452,7 +457,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 	continue;
     }
 	
-    if (m->avail_vector) {
+    if (m->avail_vector!=NULL) {
       LBDatabaseObj()->set_avail_vector(m->avail_vector,  m->next_lb);
     }
 
@@ -1255,8 +1260,8 @@ CLBStatsMsg::CLBStatsMsg(int osz, int csz) {
 }
 
 CLBStatsMsg::~CLBStatsMsg() {
-  delete [] objData;
-  delete [] commData;
+  if (objData!=NULL) delete [] objData;
+  if (commData!=NULL) delete [] commData;
   if (avail_vector!=NULL) delete [] avail_vector;
 }
 
@@ -1267,10 +1272,10 @@ void CLBStatsMsg::pup(PUP::er &p) {
   p|total_walltime; p|total_cputime;
   p|idletime;
   p|bg_walltime;   p|bg_cputime;
-  p|n_objs;
 #ifdef _FAULT_MLOG_
   p | step;
 #endif
+  p|n_objs;
   if (p.isUnpacking()) objData = new LDObjData[n_objs];
   for (i=0; i<n_objs; i++) p|objData[i];
   p|n_comm;
@@ -1296,7 +1301,7 @@ void CLBStatsMsg::pup(PUP::er &p) {
 void CkMarshalledCLBStatsMessage::free() { 
   int count = msgs.size();
   for  (int i=0; i<count; i++) 
-    if (msgs[i]) delete msgs[i];
+    if (msgs[i]!=NULL) { delete msgs[i]; msgs[i] = NULL; }
   msgs.free();
 }
 
@@ -1314,7 +1319,7 @@ void CkMarshalledCLBStatsMessage::pup(PUP::er &p)
     CLBStatsMsg *msg;
     if (p.isUnpacking()) msg = new CLBStatsMsg;
     else { 
-      msg = msgs[i]; CmiAssert(msg);
+      msg = msgs[i]; CmiAssert(msg!=NULL);
     }
     msg->pup(p);
     if (p.isUnpacking()) add(msg);
