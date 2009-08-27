@@ -14,9 +14,9 @@ public:
   CkMarshalledCLBStatsMessage(CLBStatsMsg *m) { add(m); } //Takes ownership of message
   CkMarshalledCLBStatsMessage(const CkMarshalledCLBStatsMessage &);
   ~CkMarshalledCLBStatsMessage() { free(); }
-  void add(CLBStatsMsg *m) { msgs.push_back(m); } 
+  void add(CLBStatsMsg *m) { if (m!=NULL) msgs.push_back(m); } 
   void add(CkMarshalledCLBStatsMessage &msg);     // add multiple messages
-  CLBStatsMsg *getMessage(int c=0) {void *ret=msgs[c]; msgs[c]=NULL; return (CLBStatsMsg*)ret;}
+  CLBStatsMsg *getMessage(int c=0) {CLBStatsMsg *ret=msgs[c]; msgs[c]=NULL; return ret;}
   int  getCount() { return msgs.size(); }
   void pup(PUP::er &p);
   void free();
