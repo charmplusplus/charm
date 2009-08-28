@@ -87,6 +87,9 @@
 /* whether has log2 */
 #undef CMK_HAS_LOG2
 
+/* whether has mallinfo */
+#undef CMK_HAS_MALLINFO
+
 /* whether has malloc.h */
 #undef CMK_HAS_MALLOC_H
 

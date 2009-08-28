@@ -726,13 +726,23 @@ AC_DEFINE_UNQUOTED(CMK_HAS_SBRK, $pass, [whether has sbrk])
 
 #### test for mstats ###
 cat > $t <<EOT
-#include <malloc/malloc.h.h>
+#include <malloc.h>
 int main() {
   struct mstats ms = mstats();
 }
 EOT
 test_link "whether has mstats" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MSTATS, $pass, [whether has mstats])
+
+#### test for mallinfo ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  struct mallinfo mi = mallinfo();
+}
+EOT
+test_link "whether has mallinfo" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_MALLINFO, $pass, [whether has mallinfo])
 
 #### test for poll ###
 cat > $t <<EOT
