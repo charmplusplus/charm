@@ -379,8 +379,9 @@ static CMK_TYPEDEF_UINT8 MemusagePS(){
 #else	
     char pscmd[100];
     CMK_TYPEDEF_UINT8 vsz=0;
+    FILE *p;
     sprintf(pscmd, "/bin/ps -o vsz= -p %d", getpid());
-    FILE *p = popen(pscmd, "r");
+    p = popen(pscmd, "r");
     if(p){
 	fscanf(p, "%ld", &vsz);
 	pclose(p);
