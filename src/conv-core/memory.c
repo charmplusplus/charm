@@ -286,21 +286,19 @@ void free_reentrant(void *mem) { free(mem); }
 
 /******Start of a general way to get memory usage information*****/
 /*CMK_TYPEDEF_UINT8 CmiMemoryUsage() { return 0; }*/
-#ifdef WIN32
-#define MEMUSAGE_USE_SBRK
+
+#if ! CMK_HAS_MALLOC_H
+#define NO_MALLINFO
+#endif
+
+#if CMK_HAS_SBRK
+#define NO_MALLINFO
+#define NO_PS
+#else
 int sbrk(int) { return 0; }
 #endif
 
-#ifdef NO_MALLOC_H
-#define NO_MALLINFO
-#endif
-
-#ifdef MEMUSAGE_USE_SBRK
-#define NO_MALLINFO
-#define NO_PS
-#endif
-
-#ifdef MEMUSAGE_USE_MSTATS
+#if CMK_HAS_MSTATS
 #include <malloc/malloc.h>
 #if CMK_C_INLINE
 inline
@@ -341,7 +339,7 @@ static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(){
     
     FILE *f = fopen("/proc/self/stat", "r");
     if(!f) { failed_once = 1; return 0; }
-	int i;
+    int i;
     for(i=0; i<22; i++) fscanf(f, "%*s");
     CMK_TYPEDEF_UINT8 vsz = 0; /* should remain 0 on failure */
     fscanf(f, "%lu", &vsz);
@@ -375,7 +373,7 @@ inline
 #endif
 static CMK_TYPEDEF_UINT8 MemusagePS(){
 #ifdef NO_PS
-	return 0;
+    return 0;
 #else	
     char pscmd[100];
     CMK_TYPEDEF_UINT8 vsz=0;
@@ -391,12 +389,12 @@ static CMK_TYPEDEF_UINT8 MemusagePS(){
 
 CMK_TYPEDEF_UINT8 CmiMemoryUsage(){
     CMK_TYPEDEF_UINT8 memtotal = 0;
-    memtotal = MemusageProcSelfStat();
-	if(!memtotal) memtotal = MemusageMstats();
+    if (!memtotal) memtotal = MemusageProcSelfStat();
+    if(!memtotal) memtotal = MemusageMstats();
     if(!memtotal) memtotal = MemusageMallinfo();
     if(!memtotal) memtotal = MemusageSbrk();
-	if(!memtotal) memtotal = MemusagePS();
-	return memtotal;
+    if(!memtotal) memtotal = MemusagePS();
+    return memtotal;
 }
 /******End of a general way to get memory usage information*****/
 
