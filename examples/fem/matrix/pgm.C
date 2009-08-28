@@ -12,6 +12,10 @@ Orion Sky Lawlor, olawlor@acm.org, 1/27/2003
 #include "netfem.h"
 #include "ifemc.h"
 
+#if CMK_HAS_SLEEP
+#include <unistd.h>
+#endif
+
 #if CMK_CC_PGCC
 #undef offsetof
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
