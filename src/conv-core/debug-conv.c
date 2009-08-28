@@ -226,12 +226,14 @@ static void CpdDebugHandler(char *msg)
       CpvAccess(continueFlag) = 1;
       CpdUnFreeze();
     }
+#if ! CMK_NO_SOCKETS
     else if (strncmp(name, "status", strlen("status")) == 0) {
       ChMessageInt_t reply[2];
       reply[0] = ChMessageInt_new(CmiMyPe());
       reply[1] = ChMessageInt_new(CpdIsFrozen() ? 0 : 1);
       CcsSendReply(2*sizeof(ChMessageInt_t), reply);
     }
+#endif
 #if 0
     else if (strncmp(name, "setBreakPoint", strlen("setBreakPoint")) == 0){
       CmiPrintf("setBreakPoint received\n");
