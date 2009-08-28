@@ -295,7 +295,7 @@ void free_reentrant(void *mem) { free(mem); }
 #define NO_MALLINFO
 #define NO_PS
 #else
-int sbrk(int) { return 0; }
+int sbrk(int s) { return 0; }
 #endif
 
 #if CMK_HAS_MSTATS
@@ -334,21 +334,23 @@ static CMK_TYPEDEF_UINT8 MemusageSbrk(){
 inline
 #endif
 static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(){
+    FILE *f;
+    int i;
     static int failed_once = 0;
+    CMK_TYPEDEF_UINT8 vsz = 0; /* should remain 0 on failure */
+
     if(failed_once) return 0; /* no point in retrying */
     
-    FILE *f = fopen("/proc/self/stat", "r");
+    f = fopen("/proc/self/stat", "r");
     if(!f) { failed_once = 1; return 0; }
-    int i;
     for(i=0; i<22; i++) fscanf(f, "%*s");
-    CMK_TYPEDEF_UINT8 vsz = 0; /* should remain 0 on failure */
     fscanf(f, "%lu", &vsz);
     fclose(f);
     if(!vsz) failed_once=1;
     return vsz;
 }
 
-#ifdef NO_MALLINFO
+#if ! CMK_HAS_MALLINFO
 #if CMK_C_INLINE
 inline
 #endif
