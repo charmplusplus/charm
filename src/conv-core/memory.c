@@ -287,14 +287,7 @@ void free_reentrant(void *mem) { free(mem); }
 /******Start of a general way to get memory usage information*****/
 /*CMK_TYPEDEF_UINT8 CmiMemoryUsage() { return 0; }*/
 
-#if ! CMK_HAS_MALLOC_H
-#define NO_MALLINFO
-#endif
-
-#if CMK_HAS_SBRK
-#define NO_MALLINFO
-#define NO_PS
-#else
+#if ! CMK_HAS_SBRK
 int sbrk(int s) { return 0; }
 #endif
 
@@ -374,7 +367,7 @@ static CMK_TYPEDEF_UINT8 MemusageMallinfo(){
 inline
 #endif
 static CMK_TYPEDEF_UINT8 MemusagePS(){
-#ifdef NO_PS
+#if ! CMK_HAS_POPEN
     return 0;
 #else	
     char pscmd[100];
@@ -392,9 +385,9 @@ static CMK_TYPEDEF_UINT8 MemusagePS(){
 
 CMK_TYPEDEF_UINT8 CmiMemoryUsage(){
     CMK_TYPEDEF_UINT8 memtotal = 0;
-    if (!memtotal) memtotal = MemusageProcSelfStat();
     if(!memtotal) memtotal = MemusageMstats();
     if(!memtotal) memtotal = MemusageMallinfo();
+    if(!memtotal) memtotal = MemusageProcSelfStat();
     if(!memtotal) memtotal = MemusageSbrk();
     if(!memtotal) memtotal = MemusagePS();
     return memtotal;
