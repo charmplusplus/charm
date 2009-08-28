@@ -1381,6 +1381,27 @@ CmiStartFn bgMain(int argc, char **argv)
 		      "scale factor for wallclock time measured");
   CmiGetArgDoubleDesc(argv,"+bgtimercost", &cva(bgMach).timercost, 
 		      "timer cost");
+  #if 0
+  if(cva(bgMach).timingMethod == BG_WALLTIME)
+  {
+      int count = 1e6;
+      double start, stop, diff, cost, dummy;
+
+      dummy = BG_TIMER(); // In case there's an initialization delay somewhere
+
+      start = BG_TIMER();
+      for (int i = 0; i < count; ++i)
+	  dummy = BG_TIMER();
+      stop = BG_TIMER();
+
+      diff = stop - start;
+      cost = diff / count;
+
+      CmiPrintf("Measured timer cost: %g Actual: %g\n", 
+                cost, cva(bgMach).timercost);
+      cva(bgMach).timercost = cost;
+  }
+  #endif
   
   char *networkModel;
   if (CmiGetArgStringDesc(argv, "+bgnetwork", &networkModel, "Network model")) {
