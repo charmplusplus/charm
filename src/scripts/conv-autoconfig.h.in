@@ -111,6 +111,9 @@
 /* whether ntohl is available */
 #undef CMK_HAS_NTOHL
 
+/* whether has popen */
+#undef CMK_HAS_POPEN
+
 /* whether the pthread_setaffinity_np() exists */
 #undef CMK_HAS_PTHREAD_SETAFFINITY
 

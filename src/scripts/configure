@@ -2540,6 +2540,21 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test for popen ###
+cat > $t <<EOT
+#include <stdio.h>
+int main() {
+  FILE *p = popen("/bin/ps", "r");
+  pclose(p);
+}
+EOT
+test_link "whether has popen" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_POPEN $pass
+_ACEOF
+
+
 #### test for poll ###
 cat > $t <<EOT
 #include <poll.h>
