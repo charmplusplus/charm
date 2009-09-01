@@ -19,6 +19,10 @@ using std::set;
 using std::vector;
 
 
+/// @note: There is some bug that is preventing us from using CmiSyncListSend. 
+#define SYNCLISTSENDANDFREE 0
+
+
 CkpvExtern(CkGroupID, cmgrID);
 
 OneTimeMulticastStrategy::OneTimeMulticastStrategy()
@@ -152,11 +156,15 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
   
   // CkPrintf("[%d] before CmiSyncListSendAndFree env->event=%d\n", CkMyPe(), (int)env->getEvent());
 
+#if SYNCLISTSENDANDFREE
+  CmiSyncListSendAndFree(npes, pelist, env->getTotalsize(), (char*)env);
+#else
 
   CkAssert(npes > 0);
   CmiSyncListSend(npes, pelist, env->getTotalsize(), (char*)env);
   
   delete[] pelist;
+#endif
 
   double end = CmiWallTimer();
   traceUserBracketEvent(10001, start, middle);
@@ -191,6 +199,17 @@ void OneTimeMulticastStrategy::handleMessage(void *msg){
 
   //  CkPrintf("[%d] in OneTimeMulticastStrategy::handleMessage before  deliverToIndices newenv->event=%d\n", CkMyPe(), (int)newenv->getEvent());
 
+
+#if SYNCLISTSENDANDFREE
+
+  // Deliver locally
+  deliverToIndices(newmsg, localElems, local_idx_list );
+  
+  // Forward on to other processors if necessary
+  remoteMulticast(multMsg, false);
+ 
+#else
+
   // Forward on to other processors if necessary
   remoteMulticast(multMsg, false);
 
@@ -199,6 +218,8 @@ void OneTimeMulticastStrategy::handleMessage(void *msg){
   
   // Finally delete the reference counted message because remoteMulticast does not do this.
   CmiFree(multMsg);
+
+#endif
   
 }
 
