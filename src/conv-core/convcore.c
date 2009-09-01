@@ -1973,7 +1973,7 @@ void CmiGetDynamicReductionRemote(int handlerIdx, int pe, int dataSize, void *da
   if (CmiMyPe() == 0) {
     CmiReductionHandleDynamicRequest(msg);
   } else {
-    // send the request to processor 0
+      /* send the request to processor 0 */
     CmiSetHandler(msg, CpvAccess(CmiReductionDynamicRequestHandler));
     CmiSyncSendAndFree(0, size, msg);
   }
