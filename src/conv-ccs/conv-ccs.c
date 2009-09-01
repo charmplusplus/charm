@@ -95,16 +95,18 @@ void CcsSetMergeFn(const char *name, CmiReduceMergeFn newMerge) {
 void * CcsMerge_concat(int *size,void *local,void **remote,int n) {
   CcsImplHeader *hdr;
   int total = *size;
+  void *reply;
+  char *ptr;
   int i;
   for (i=0; i<n; ++i) {
     hdr = (CcsImplHeader*)(((char*)remote[i])+CmiMsgHeaderSizeBytes);
     total += ChMessageInt(hdr->len);
   }
-  void *reply = CmiAlloc(total);
+  reply = CmiAlloc(total);
   memcpy(reply, local, *size);
   ((CcsImplHeader*)(((char*)reply)+CmiMsgHeaderSizeBytes))->len = ChMessageInt_new(total-CmiMsgHeaderSizeBytes-sizeof(CcsImplHeader));
   CmiFree(local);
-  char *ptr = ((char*)reply)+*size;
+  ptr = ((char*)reply)+*size;
   for (i=0; i<n; ++i) {
     int len = ChMessageInt(((CcsImplHeader*)(((char*)remote[i])+CmiMsgHeaderSizeBytes))->len);
     memcpy(ptr, ((char*)remote[i])+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader), len);
@@ -123,10 +125,12 @@ void * CcsMerge_##name(int *size,void *local,void **remote,int n) { \
   dataType *ret = (dataType *) (hdrLocal+1); \
   CcsImplHeader *hdr; \
   for (m=0; m<n; ++m) { \
+    int len; \
+    dataType *value; \
     hdr = (CcsImplHeader*)(((char*)remote[m])+CmiMsgHeaderSizeBytes); \
-    int len = ChMessageInt(hdr->len); \
+    len = ChMessageInt(hdr->len); \
+    value = (dataType *)(hdr+1); \
     CmiAssert(lenLocal == len); \
-    dataType *value = (dataType *)(hdr+1); \
     for (i=0; i<nElem; ++i) loop; \
   } \
   return local; \
@@ -177,6 +181,7 @@ int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
   int repPE = (int)ChMessageInt(rep->pe);
   if (repPE <= -1) {
     /* Reduce the message to get the final reply */
+    CcsHandlerRec *fn;
     int len=CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader)+repLen;
     char *msg=CmiAlloc(len);
     char *r=msg+CmiMsgHeaderSizeBytes;
@@ -186,7 +191,7 @@ int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
     memcpy(r,repData,repLen);
     CmiSetHandler(msg,rep_fw_handler_idx);
     handlerStr=rep->handler;
-    CcsHandlerRec *fn=(CcsHandlerRec *)CkHashtableGet(CpvAccess(ccsTab),(void *)&handlerStr);
+    fn=(CcsHandlerRec *)CkHashtableGet(CpvAccess(ccsTab),(void *)&handlerStr);
     if (fn->mergeFn == NULL) CmiAbort("Called CCS broadcast with NULL merge function!\n");
     if (repPE == -1) {
       /* CCS Broadcast */
@@ -296,10 +301,10 @@ static void req_fw_handler(char *msg)
   else if (destPE < -1) {
     /* Multicast the message to your children */
     int len=CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader)+ChMessageInt(hdr->len)-destPE*sizeof(ChMessageInt_t);
-    offset -= destPE * sizeof(ChMessageInt_t);
     int index, child, i;
     int *pes = (int*)(msg+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader));
     ChMessageInt_t *pes_nbo = (ChMessageInt_t *)pes;
+    offset -= destPE * sizeof(ChMessageInt_t);
     if (ChMessageInt(pes_nbo[0]) == CmiMyPe()) {
       for (index=0; index<-destPE; ++index) pes[index] = ChMessageInt(pes_nbo[index]);
     }
