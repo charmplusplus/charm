@@ -398,6 +398,7 @@ message buffer can be reused immediately, thus saving a call to
 freed before the communication is complete.}
 
 \section{Multicasting Messages}
+\label{sec:multicast}
 
 \function{typedef ... CmiGroup;}
 \index{CmiGroup}
@@ -463,54 +464,79 @@ should not be overwritten or freed before the communication is complete.}
 \section{Reducing Messaging}
 \label{reduce}
 
-Reductions currently are implemented only over the entire set of processors. 
-Therefore, one call to one of the forms below must be invoked exacly once from
-each processor. For the ``node'' forms, each node must invoke it once, and in
-particular on its rank zero. The handler function of every reduction is always
-called on processor zero.
+Reductions are operations for which a message (or user data structure) is
+contributed by each partecipant processor. All these contributions are merged
+according to a merge-function provided by the user. A Converse handler is then
+invoked with the resulting message. Reductions can be on the entire set of
+processors, or on a subset of the whole.
+Currently reductions are only implemented on processors sets. No equivalent
+exists for SMP nodes.
 
-\function{void CmiReduce(void *msg, int size, void * (*mergeFn)(void*,void**,int));}
-\index{CmiReduce}
-\desc{Contribute a message \uw{msg} of size \uw{size} previously allocated with
-CmiAlloc. The message will be deallocated by the system by calling CmiFree.
-The destination handler will be taken by the converse header of the message itself.
-The last parameter is a function pointer to a merge function (described below).}
+There are eight functions used to deposit a message into the system, summarized
+in Table~\ref{table:reductions}. Half of them receive as contribution a Converse
+message (with a Converse header at its beginning). This message must have
+already been set for delivery to the desired handler. The other half (ending
+with ``Struct'') receives a pointer to a data structure allocated by the user. 
+This second version may allow the user to write a simpler merging function. For
+instance, the data structure could be a tree that can be easily expanded by
+adding more nodes.
 
-\function{void CmiReduceStruct((void *data, void (*pupFn)(void*,void*),
-                     void * (*mergeFn)(void*,void**,int), CmiHandler dest,
-                     void (*deleteFn)(void*));}
-\index{CmiReduceStruct}
-\desc{Contribute a data structure \uw{data} which is allocated on the heap, possibly
-in a distributed form (like a linked-list or a tree). On processor zero, the
-function specified by \uw{dest} will be invoked with the data structure resulting
-from the reduction (the pointer returned by the last merge function). This handler
-does not need to be registered as a converse handler. The other parameters are
-function pointers whose purpose is described below.}
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l|llll|}
+\hline
+ & {\bf global} & {\bf global with ID} & {\bf processor set} & {\bf CmiGroup} \\
+\hline
+{\bf message} & CmiReduce & CmiReduceID & CmiListReduce & CmiGroupReduce \\
+{\bf data} & CmiReduceStruct & CmiReduceStructID & CmiListReduceStruct & CmiGroupReduceStruct \\
+\hline
+\end{tabular}
+\end{center}
+\caption{Reductions functions in Converse}
+\label{table:reductions}
+\end{table}
 
-\function{void CmiNodeReduce(void *msg, int size, void * (*mergeFn)(void*,void**,int));}
-\index{CmiNodeReduce}
-\desc{Similar to CmiReduce, only that the contribution is at the node level instead
-of the processor level.}
+The signatures for the functions in Table~\ref{table:reductions} are:
 
-\function{void CmiNodeReduceStruct((void *data, void (*pupFn)(void*,void*),
-                     void * (*mergeFn)(void*,void**,int), CmiHandler dest,
-                     void (*deleteFn)(void*));}
-\index{CmiNodeReduceStruct}
-\desc{Similar to CmiNodeReduce, only that the contribution is at the node level instead
-of the processor level.}
+\function{void CmiReduce(void *msg, int size, CmiReduceMergeFn mergeFn)}
+\function{void CmiReduceStruct(void *data, CmiReducePupFn pupFn,
+                     CmiReduceMergeFn mergeFn, CmiHandler dest,
+                     CmiReduceDeleteFn deleteFn)}
+\function{void CmiReduceID(void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id)}
+\function{void CmiReduceStructID(void *data, CmiReducePupFn pupFn,
+                     CmiReduceMergeFn mergeFn, CmiHandler dest,
+                     CmiReduceDeleteFn deleteFn, CmiReductionID id)}
+\function{void CmiListReduce(int npes, int *pes, void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id)}
+\function{void CmiListReduceStruct(int npes, int *pes,
+                     void *data, CmiReducePupFn pupFn,
+                     CmiReduceMergeFn mergeFn, CmiHandler dest,
+                     CmiReduceDeleteFn deleteFn, CmiReductionID id)}
+\function{void CmiGroupReduce(CmiGroup grp, void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id)}
+\function{void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
+                     CmiReduceMergeFn mergeFn, CmiHandler dest,
+                     CmiReduceDeleteFn deleteFn, CmiReductionID id)}
 
-Other than the fuction pointer \uw{dest} used to invoke the final handler on
-processor zero, there are several other function pointers passed in by the user:
+In all the above, \uw{msg} is the Converse message deposited by the local
+processor, \uw{size} is the size of the message \uw{msg}, and \uw{data} is a
+pointer to the user-allocated data structure deposited by the local processor.
+\uw{dest} is the \kw{CmiHandler} where the final message shall be delivered. It
+is explicitly passed in ``Struct'' functions only, since for the message
+versions it is taken from the header of \uw{msg}. Moreover there are several
+other function pointers passed in by the user:
 
-\function{void * (*mergeFn)(void *local, void **remore, int count)}
-\desc{This function is used in all the CmiReduce forms to merge the local
+\function{void * (*mergeFn)(int *size, void *local, void **remore, int count)}
+\desc{Prototype for a \kw{CmiReduceMergeFn} function pointer argument.
+This function is used in all the CmiReduce forms to merge the local
 message/data structure deposited on a processor with all the messages incoming
 from the children processors of the reduction spanning tree. The input parameters
-are in the order: the local data (the exact same pointer passed in as first
+are in the order: the size of the local data for message reductions (always zero
+for struct reductions); the local data itself (the exact same pointer passed in as first
 parameter of CmiReduce and similar); a pointer to an array of incoming messages;
 the number of elements in the second parameter. The function returns a pointer
 to a freshly allocated message (or data structure for the \kw{Struct} forms)
-corresponding to the merge of all the messages. All the messages in the
+corresponding to the merge of all the messages. When performing message
+reductions, this function is also responsible to updating the integer pointed by
+\uw{size} to the new size of the returned message. All the messages in the
 \uw{remote} array are deleted by the system; the data pointed by the first parameter
 should be deleted by this function. If the data can be merged ``in-place'' by
 modifying or augmenting \uw{local}, the function can return the same pointer to
@@ -520,20 +546,72 @@ reductions, and the data as it has been packed by the pup function (without any
 additional header) for struct reductions.}
 
 \function{void (*pupFn)(pup\_er p, void *data)}
-\desc{This function will use the PUP framework to pup the \uw{data} passed in
+\desc{Prototype for a \kw{CmiReducePupFn} function pointer argument.
+This function will use the PUP framework to pup the \uw{data} passed in
 into a message for sending across the network. The data can be either the same
-data passed in as first parameter of CmiReduceStruct of CmiNodeReduceStruct, or
+data passed in as first parameter of any ``Struct'' function, or
 the return of the merge function. It will be called for sizing and packing.
 \note{It will not be called for unpacking.}}
 
 \function{void (*deleteFn)(void *ptr)}
-\desc{This function is used to delete either the data stucture passed in as first
-parameter of CmiReduceStruct and CmiNodeReduceStruct, or the return of the merge
+\desc{Prototype for a \kw{CmiReduceDeleteFn} function pointer argument.
+This function is used to delete either the data stucture passed in as first
+parameter of any ``Struct'' function, or the return of the merge
 function. It can be as simple as ``free'' or as complicated as needed to delete
 complex structures. If this function is NULL, the data structure will not be
 deleted, and the program can continue to use it. Note: even if this function is
-NULL, the input data structure can still be modified by the merge function.}
+NULL, the input data structure may still be modified by the merge function.}
 
+\uw{CmiReduce} and \uw{CmiReduceStruct} are the simplest reduction function, and
+they reduce the deposited message/data across all the processors in the
+system. Each processor must to call this function exactly once.
+Multiple reductions can be invoked without waiting for previous ones to finish,
+but the user is responsible to call CmiReduce/CmiReduceStruct in the same
+order on every processor. \note{CmiReduce and CmiReduceStruct are not
+interchangeable. Either every processor calls CmiReduce or every processor calls
+CmiReduceStruct}.
+
+In situations where it is not possible to guarantee the order of reductions, the
+user may use \uw{CmiReduceID} or \uw{CmiReduceStructID}. These functions have an
+additional parameter of type \kw{CmiReductionID} which will uniquely identify the
+reduction, and match them correctly. \note{No two reductions can be active at
+the same time with the same CmiReductionID. It is up to the user to guarantee
+this.}
+
+A \kw{CmiReductionID} can be obtained by the user in three ways, using one of
+the following functions:
+
+\function{CmiReductionID CmiGetGlobalReduction()}
+\desc{This function must be called on every processor, and in the same order if
+called multiple times. This would generally be inside initialization code, that
+can set aside some CmiReductionIDs for later use.}
+
+\function{CmiReductionID CmiGetDynamicReduction()}
+\desc{This function may be called only on processor zero. It returns a unique
+ID, and it is up to the user to distrubute this ID to any processor that needs
+it.}
+
+\function{void CmiGetDynamicReductionRemote(int handlerIdx, int pe, int dataSize, void *data)}
+\desc{This function may be called on any processor. The produced CmiReductionID
+is returned on the specified \uw{pe} by sending a message to the specified
+\uw{handlerIdx}. If \uw{pe} is -1, then all processors will receive the
+notification message. \uw{data} can be any data structure that the user wants to
+receive on the specified handler (for example to differentiate between
+requests). \uw{dataSize} is the size in bytes of \uw{data}. If \uw{dataSize} is
+zero, \uw{data} is ignored.
+The message received by \uw{handlerIdx} consists of the standard Converse
+header, followed by the requested CmiReductionID (represented as a 4 bytes
+integer the user can cast to a \kw{CmiReductionID}, a 4 byte integer containing
+\uw{dataSize}, and the \uw{data} itself.}
+
+The other four functions (CmiListReduce, CmiListReduceStruct, CmiGroupReduce,
+CmiGroupReduceStruct) are used for reductions over subsets of processors. They
+all require a CmiReductionID that the user must obtain in one of the ways
+described above. The user is also responsible that no two reductions use the
+same CmiReductionID simultaneously. The first two functions receive the subset
+description as processor list (\uw{pes}) of size \uw{npes}. The last two receive
+the subset description as a previously established CmiGroup
+(see~\ref{sec:multicast}).
 
 \section{Scheduling Messages}
 \label{schedqueue}
