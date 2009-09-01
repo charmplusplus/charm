@@ -51,6 +51,23 @@ void CcsRegisterHandlerFn(const char *ccs_handlername, CcsHandlerFn fn, void *us
  * Set the merging function for this CCS handler to newMerge.
  */
 void CcsSetMergeFn(const char *name, CmiReduceMergeFn newMerge);
+/* A few standard functions for merging CCS messages */
+#define SIMPLE_REDUCTION(name) void * CcsMerge_##name(int *size,void *local,void **remote,int n)
+#define SIMPLE_POLYMORPH_REDUCTION(nameBase) \
+  SIMPLE_REDUCTION(nameBase##_int); \
+  SIMPLE_REDUCTION(nameBase##_float); \
+  SIMPLE_REDUCTION(nameBase##_double)
+SIMPLE_REDUCTION(concat);
+SIMPLE_REDUCTION(logical_and);
+SIMPLE_REDUCTION(logical_or);
+SIMPLE_REDUCTION(bitvec_and);
+SIMPLE_REDUCTION(bitvec_and);
+SIMPLE_POLYMORPH_REDUCTION(sum);
+SIMPLE_POLYMORPH_REDUCTION(product);
+SIMPLE_POLYMORPH_REDUCTION(max);
+SIMPLE_POLYMORPH_REDUCTION(min);
+#undef SIMPLE_REDUCTION
+#undef SIMPLE_POLYMORPH_REDUCTION
 
 void CcsInit(char **argv);
 int CcsEnabled(void);
@@ -67,6 +84,7 @@ typedef void *CcsDelayedReply;
 #define CcsInit(argv) /*empty*/
 #define CcsRegisterHandler(x,y) 0
 #define CcsRegisterHandlerFn(x,y,p) 0
+#define CcsSetMergeFn(x,y) 0
 #define CcsEnabled() 0
 #define CcsIsRemoteRequest() 0
 #define CcsCallerId(x,y)  /*empty*/
@@ -75,7 +93,6 @@ typedef void *CcsDelayedReply;
 #define CcsSendDelayedReply(d,s,r); 
 #define CcsNoReply() /*empty*/
 #define CcsNoDelayedReply(d) /*empty*/
-#define CcsSetMergeFn(x,y)      /* empty */
 #endif
 
 #ifdef __cplusplus

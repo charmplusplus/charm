@@ -1382,9 +1382,12 @@ void req_ccs_connect(void)
   reqBytes=ChMessageInt(h.hdr.len);
 
   if (pe<=-nodetab_size || pe>=nodetab_size) {
-    /*Treat out of bound values as value 0*/
-	pe=0;
-	h.hdr.pe=ChMessageInt_new(pe);
+    /*Treat out of bound values as errors. Helps detecting bugs*/
+    if (pe==-nodetab_size) fprintf(stderr,"Invalid processor index in CCS request: are you trying to do a broadcast instead?");
+    else fprintf(stderr,"Invalid processor index in CCS request.");
+    CcsServer_sendReply(&h.hdr,0,0);
+    free(reqData);
+    return;
   }
   else if (pe == -1) {
     /*Treat -1 as broadcast and sent to 0 as root of the spanning tree*/
@@ -1393,21 +1396,22 @@ void req_ccs_connect(void)
   else if (pe < -1) {
     /*Treat negative values as multicast to a number of processors specified by -pe.
       The pes to multicast to follows sits at the beginning of reqData*/
-    pe = *(int*)reqData;
+    reqBytes -= pe * sizeof(ChMessageInt_t);
+    pe = ChMessageInt(*(ChMessageInt_t*)reqData);
   }
   
   if (! check_stdio_header(&h.hdr)) {
 
 #define LOOPBACK 0
 #if LOOPBACK /*Immediately reply "there's nothing!" (for performance testing)*/
-  CcsServer_sendReply(&h.hdr,0,0);
+    CcsServer_sendReply(&h.hdr,0,0);
 #else
-  /*Fill out the charmrun header & forward the CCS request*/
-  ChMessageHeader_new("req_fw",sizeof(h.hdr)+reqBytes,&h.ch);  
-  
-  bufs[0]=&h; lens[0]=sizeof(h);
-  bufs[1]=reqData; lens[1]=reqBytes;
-  skt_sendV(nodetab_ctrlfd(pe),2,bufs,lens);
+    /*Fill out the charmrun header & forward the CCS request*/
+    ChMessageHeader_new("req_fw",sizeof(h.hdr)+reqBytes,&h.ch);  
+
+    bufs[0]=&h; lens[0]=sizeof(h);
+    bufs[1]=reqData; lens[1]=reqBytes;
+    skt_sendV(nodetab_ctrlfd(pe),2,bufs,lens);
 
 #endif
   }

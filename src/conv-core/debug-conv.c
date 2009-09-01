@@ -179,32 +179,6 @@ static void CpdDebugCallMemStat(char *msg) {
   CmiFree(msg);
 }
 
-static void * CpdDebugMerge(int *size,void *local,void **remote,int n) {
-  void *reply;
-#if CMK_CCS_AVAILABLE
-  char *ptr;
-  CcsImplHeader *hdr;
-  int total = *size;
-  int i;
-  for (i=0; i<n; ++i) {
-    hdr = (CcsImplHeader*)(((char*)remote[i])+CmiMsgHeaderSizeBytes);
-    total += ChMessageInt(hdr->len);
-  }
-  reply = CmiAlloc(total);
-  memcpy(reply, local, *size);
-  ((CcsImplHeader*)(((char*)reply)+CmiMsgHeaderSizeBytes))->len = ChMessageInt_new(total-CmiMsgHeaderSizeBytes-sizeof(CcsImplHeader));
-  CmiFree(local);
-  ptr = ((char*)reply)+*size;
-  for (i=0; i<n; ++i) {
-    int len = ChMessageInt(((CcsImplHeader*)(((char*)remote[i])+CmiMsgHeaderSizeBytes))->len);
-    memcpy(ptr, ((char*)remote[i])+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader), len);
-    ptr += len;
-  }
-  *size = total;
-#endif
-  return reply;
-}
-
 static void CpdDebugHandler(char *msg)
 {
     char name[128];
@@ -232,14 +206,6 @@ static void CpdDebugHandler(char *msg)
       reply[0] = ChMessageInt_new(CmiMyPe());
       reply[1] = ChMessageInt_new(CpdIsFrozen() ? 0 : 1);
       CcsSendReply(2*sizeof(ChMessageInt_t), reply);
-    }
-#endif
-#if 0
-    else if (strncmp(name, "setBreakPoint", strlen("setBreakPoint")) == 0){
-      CmiPrintf("setBreakPoint received\n");
-      temp = strstr(name, "#");
-      temp++;
-      setBreakPoints(temp);
     }
 #endif
     else{
@@ -346,7 +312,7 @@ void CpdInit(void)
   CpvAccess(debugQueue) = CdsFifo_Create();
 
   CcsRegisterHandler("ccs_debug", (CmiHandler)CpdDebugHandler);
-  CcsSetMergeFn("ccs_debug", CpdDebugMerge);
+  CcsSetMergeFn("ccs_debug", CcsMerge_concat);
 
   CcsRegisterHandler("ccs_debug_allocationTree", (CmiHandler)CpdDebugCallAllocationTree);
   CpvInitialize(int, CpdDebugCallAllocationTree_Index);

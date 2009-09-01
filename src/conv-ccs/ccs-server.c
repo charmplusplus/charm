@@ -379,7 +379,7 @@ static int CcsServer_recvRequestData(SOCKET fd,
 				     CcsImplHeader *hdr,void **reqData)
 {
   CcsMessageHeader req;/*CCS header, from requestor*/
-  int reqBytes;
+  int reqBytes, numPes, destPE;
   const char *err;
   if (NULL!=(err=CcsServer_readHeader(fd,&ccs_clientlist,security,
 				      &hdr->attr,&req))) 
@@ -394,16 +394,14 @@ static int CcsServer_recvRequestData(SOCKET fd,
   hdr->len=req.len;
   hdr->replyFd=ChMessageInt_new(fd);
 
-  {
   /*Is it a multicast?*/
-  int numPes = 0;
-  int destPE = ChMessageInt(hdr->pe);
+  numPes = 0;
+  destPE = ChMessageInt(hdr->pe);
   if (destPE < -1) numPes = -destPE;
   
   /*Grab the user data portion of the message*/
-  reqBytes=ChMessageInt(req.len) + numPes*sizeof(int);
+  reqBytes=ChMessageInt(req.len) + numPes*sizeof(ChMessageInt_t);
   *reqData=(char *)malloc(reqBytes);
-  }
   if (-1==skt_recvN(fd,*reqData,reqBytes)) {
     fprintf(stdout,"CCS ERROR> Retrieving %d message bytes\n",reqBytes);
     free(*reqData);

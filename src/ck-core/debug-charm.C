@@ -625,6 +625,7 @@ void CpdSetBreakPoint (char *msg)
 {
   char functionName[128];
   int tableSize, tableIdx = 0;
+  int reply = 0;
   sscanf(msg+CmiMsgHeaderSizeBytes, "%s", functionName);
   if (strlen(functionName) > 0)
   {
@@ -636,14 +637,11 @@ void CpdSetBreakPoint (char *msg)
        //if (strstr(_entryTable[tableIdx]->name, functionName) != NULL)
        //{
     tableIdx = atoi(functionName);
-    if (tableIdx < 0 || tableIdx >= tableSize) {
-      CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName);
-      return;
-    }
+    if (tableIdx >= 0 && tableIdx < tableSize) {
            EntryInfo * breakPointEntryInfo = (EntryInfo *)CpvAccess(breakPointEntryTable)->get(tableIdx);
            delete breakPointEntryInfo;
            breakPointEntryInfo = new EntryInfo(_entryTable[tableIdx]->name, _entryTable[tableIdx]->call, _entryTable[tableIdx]->msgIdx, _entryTable[tableIdx]->chareIdx );
-           CmiPrintf("Breakpoint is set for function %s with an epIdx = %ld\n", _entryTable[tableIdx]->name, tableIdx);
+           //CmiPrintf("Breakpoint is set for function %s with an epIdx = %ld\n", _entryTable[tableIdx]->name, tableIdx);
            CpvAccess(breakPointEntryTable)->put(tableIdx) = breakPointEntryInfo;
            _entryTable[tableIdx]->name = "debug_breakpoint_ep";
            _entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
@@ -651,8 +649,9 @@ void CpdSetBreakPoint (char *msg)
            //_entryTable[tableIdx]->chareIdx = CpvAccess(_debugChare);
            //_debugEntryTable[tableIdx].isBreakpoint = CmiTrue;
            //break;
-       //}
-    //}
+           reply = ~0;
+           //}
+    }
     //if (tableIdx == tableSize)
     //{
     //  CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName);
@@ -660,6 +659,7 @@ void CpdSetBreakPoint (char *msg)
     //}
 
   }
+  CcsSendReply(sizeof(int), (void*)&reply);
 
 }
 
@@ -672,30 +672,32 @@ void CpdQuitDebug()
 void CpdRemoveBreakPoint (char *msg)
 {
   char functionName[128];
+  int reply = 0;
   sscanf(msg+CmiMsgHeaderSizeBytes, "%s", functionName);
   if (strlen(functionName) > 0) {
     int idx = atoi(functionName);
-    if (idx < 0 || idx >= _entryTable.size()) {
-      CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName);
-      return;
-    }
-    //void *objPointer;
-    //void *keyPointer;
-    //CkHashtableIterator *it = CpvAccess(breakPointEntryTable)->iterator();
-    //while(NULL!=(objPointer = it->next(&keyPointer)))
-    //{
-    //EntryInfo * breakPointEntryInfo = *(EntryInfo **)objPointer;
-    EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(idx);
-    if (breakPointEntryInfo != NULL) {
-      _entryTable[idx]->name =  breakPointEntryInfo->name;
-      _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
-      _entryTable[idx]->msgIdx = breakPointEntryInfo->msgIdx;
-      _entryTable[idx]->chareIdx = breakPointEntryInfo->chareIdx;
-      //_debugEntryTable[idx].isBreakpoint = CmiFalse;
-      CmiPrintf("Breakpoint is removed for function %s with epIdx %ld\n", _entryTable[idx]->name, idx);
-      //CpvAccess(breakPointEntryTable)->remove(idx);
+    if (idx >= 0 && idx < _entryTable.size()) {
+      //CmiPrintf("[ERROR]Entrypoint was not found for function %s\n", functionName);
+      //void *objPointer;
+      //void *keyPointer;
+      //CkHashtableIterator *it = CpvAccess(breakPointEntryTable)->iterator();
+      //while(NULL!=(objPointer = it->next(&keyPointer)))
+      //{
+      //EntryInfo * breakPointEntryInfo = *(EntryInfo **)objPointer;
+      EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(idx);
+      if (breakPointEntryInfo != NULL) {
+        _entryTable[idx]->name =  breakPointEntryInfo->name;
+        _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+        _entryTable[idx]->msgIdx = breakPointEntryInfo->msgIdx;
+        _entryTable[idx]->chareIdx = breakPointEntryInfo->chareIdx;
+        reply = ~0 ;
+        //_debugEntryTable[idx].isBreakpoint = CmiFalse;
+        //CmiPrintf("Breakpoint is removed for function %s with epIdx %ld\n", _entryTable[idx]->name, idx);
+        //CpvAccess(breakPointEntryTable)->remove(idx);
+      }
     }
   }
+  CcsSendReply(sizeof(int), (void*)&reply);
 }
 
 void CpdRemoveAllBreakPoints ()
@@ -703,6 +705,7 @@ void CpdRemoveAllBreakPoints ()
   //all breakpoints removed
   void *objPointer;
   void *keyPointer;
+  int reply = 1;
   CkHashtableIterator *it = CpvAccess(breakPointEntryTable)->iterator();
   while(NULL!=(objPointer = it->next(&keyPointer)))
   {
@@ -713,6 +716,7 @@ void CpdRemoveAllBreakPoints ()
     _entryTable[idx]->msgIdx = breakPointEntryInfo->msgIdx;
     _entryTable[idx]->chareIdx = breakPointEntryInfo->chareIdx;
   }
+  CcsSendReply(sizeof(int), (void*)&reply);
 }
 
 extern "C" int CpdIsCharmDebugMessage(void *msg) {
@@ -788,8 +792,11 @@ void CpdCharmInit()
 
   CpdBreakPointInit();
   CcsRegisterHandler("ccs_set_break_point",(CmiHandler)CpdSetBreakPoint);
+  CcsSetMergeFn("ccs_set_break_point",CcsMerge_logical_and);
   CcsRegisterHandler("ccs_remove_break_point",(CmiHandler)CpdRemoveBreakPoint);
+  CcsSetMergeFn("ccs_remove_break_point",CcsMerge_logical_and);
   CcsRegisterHandler("ccs_remove_all_break_points",(CmiHandler)CpdRemoveAllBreakPoints);
+  CcsSetMergeFn("ccs_remove_all_break_points",CmiReduceMergeFn_random);
   CcsRegisterHandler("ccs_continue_break_point",(CmiHandler)CpdContinueFromBreakPoint);
   CcsRegisterHandler("ccs_single_step",(CmiHandler)CpdDeliverSingleMessage);
   CcsRegisterHandler("ccs_debug_quit",(CmiHandler)CpdQuitDebug);
