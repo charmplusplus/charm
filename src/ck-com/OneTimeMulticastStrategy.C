@@ -20,7 +20,7 @@ using std::vector;
 
 
 /// @note: There is some bug that is preventing us from using CmiSyncListSend. 
-#define SYNCLISTSENDANDFREE 0
+#define SYNCLISTSENDANDFREE 1
 
 
 CkpvExtern(CkGroupID, cmgrID);
