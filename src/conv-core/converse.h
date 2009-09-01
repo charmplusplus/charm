@@ -973,29 +973,35 @@ typedef struct {
   } ops;
 } CmiReduction;
 
+typedef CmiUInt2 CmiReductionID;
+
 void * CmiReduceMergeFn_random(int*, void*, void**, int);
 
 void CmiReduce(void *msg, int size, CmiReduceMergeFn mergeFn);
 void CmiReduceStruct(void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
                      CmiReduceDeleteFn deleteFn);
-void CmiListReduce(int npes, int *pes, void *msg, int size, CmiReduceMergeFn mergeFn, CmiUInt2 id);
+void CmiReduceID(void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id);
+void CmiReduceStructID(void *data, CmiReducePupFn pupFn,
+                     CmiReduceMergeFn mergeFn, CmiHandler dest,
+                     CmiReduceDeleteFn deleteFn, CmiReductionID id);
+void CmiListReduce(int npes, int *pes, void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id);
 void CmiListReduceStruct(int npes, int *pes,
                      void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
-                     CmiReduceDeleteFn deleteFn, CmiUInt2 id);
-void CmiGroupReduce(CmiGroup grp, void *msg, int size, CmiReduceMergeFn mergeFn, CmiUInt2 id);
+                     CmiReduceDeleteFn deleteFn, CmiReductionID id);
+void CmiGroupReduce(CmiGroup grp, void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id);
 void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
-                     CmiReduceDeleteFn deleteFn, CmiUInt2 id);
+                     CmiReduceDeleteFn deleteFn, CmiReductionID id);
 void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn, int, int, int);
 void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
                          CmiReduceMergeFn mergeFn, CmiHandler dest,
                          CmiReduceDeleteFn deleteFn);
 int CmiGetReductionHandler();
 CmiHandler CmiGetReductionDestination();
-CmiUInt2 CmiGetGlobalReduction();
-CmiUInt2 CmiGetDynamicReduction();
+CmiReductionID CmiGetGlobalReduction();
+CmiReductionID CmiGetDynamicReduction();
 void CmiGetDynamicReductionRemote(int handlerIdx, int pe, int dataSize, void *data);
 
 /* If the second parameter (the number of chunks to send) is negative, then

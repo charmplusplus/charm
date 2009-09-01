@@ -1941,11 +1941,12 @@ CmiReduction* CmiGetNextReduction(short int numChildren) {
   return CmiGetReductionCreate(id, numChildren);
 }
 
-CmiUInt2 CmiGetGlobalReduction() {
+CmiReductionID CmiGetGlobalReduction() {
   return CpvAccess(_reduce_seqID_request)+=CmiReductionID_multiplier;
 }
 
-CmiUInt2 CmiGetDynamicReduction() {
+CmiReductionID CmiGetDynamicReduction() {
+  if (CmiMyPe() != 0) CmiAbort("Cannot call CmiGetDynamicReduction on processors other than zero!\n");
   return CpvAccess(_reduce_seqID_dynamic)+=CmiReductionID_multiplier;
 }
 
@@ -1973,7 +1974,7 @@ void CmiGetDynamicReductionRemote(int handlerIdx, int pe, int dataSize, void *da
   if (CmiMyPe() == 0) {
     CmiReductionHandleDynamicRequest(msg);
   } else {
-      /* send the request to processor 0 */
+    /* send the request to processor 0 */
     CmiSetHandler(msg, CpvAccess(CmiReductionDynamicRequestHandler));
     CmiSyncSendAndFree(0, size, msg);
   }
@@ -2066,19 +2067,19 @@ void CmiReduceStruct(void *data, CmiReducePupFn pupFn,
   CmiGlobalReduceStruct(data, pupFn, mergeFn, dest, deleteFn, red);
 }
 
-void CmiReduceID(void *msg, int size, CmiReduceMergeFn mergeFn, CmiUInt2 id) {
+void CmiReduceID(void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id) {
   CmiReduction *red = CmiGetReductionCreate(id, CmiNumSpanTreeChildren(CmiMyPe()));
   CmiGlobalReduce(msg, size, mergeFn, red);
 }
 
 void CmiReduceStructID(void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
-                     CmiReduceDeleteFn deleteFn, CmiUInt2 id) {
+                     CmiReduceDeleteFn deleteFn, CmiReductionID id) {
   CmiReduction *red = CmiGetReductionCreate(id, CmiNumSpanTreeChildren(CmiMyPe()));
   CmiGlobalReduceStruct(data, pupFn, mergeFn, dest, deleteFn, red);
 }
 
-void CmiListReduce(int npes, int *pes, void *msg, int size, CmiReduceMergeFn mergeFn, CmiUInt2 id) {
+void CmiListReduce(int npes, int *pes, void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id) {
   CmiReduction *red = CmiGetReductionCreate(id, CmiNumSpanTreeChildren(CmiMyPe()));
   int myPos;
   CmiAssert(red->localContributed == 0);
@@ -2104,7 +2105,7 @@ void CmiListReduce(int npes, int *pes, void *msg, int size, CmiReduceMergeFn mer
 void CmiListReduceStruct(int npes, int *pes,
                      void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
-                     CmiReduceDeleteFn deleteFn, CmiUInt2 id) {
+                     CmiReduceDeleteFn deleteFn, CmiReductionID id) {
   CmiReduction *red = CmiGetReductionCreate(id, CmiNumSpanTreeChildren(CmiMyPe()));
   int myPos;
   CmiAssert(red->localContributed == 0);
@@ -2127,7 +2128,7 @@ void CmiListReduceStruct(int npes, int *pes,
   CmiSendReduce(red);
 }
 
-void CmiGroupReduce(CmiGroup grp, void *msg, int size, CmiReduceMergeFn mergeFn, CmiUInt2 id) {
+void CmiGroupReduce(CmiGroup grp, void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id) {
   int npes, *pes;
   CmiLookupGroup(grp, &npes, &pes);
   CmiListReduce(npes, pes, msg, size, mergeFn, id);
@@ -2135,7 +2136,7 @@ void CmiGroupReduce(CmiGroup grp, void *msg, int size, CmiReduceMergeFn mergeFn,
 
 void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
-                     CmiReduceDeleteFn deleteFn, CmiUInt2 id) {
+                     CmiReduceDeleteFn deleteFn, CmiReductionID id) {
   int npes, *pes;
   CmiLookupGroup(grp, &npes, &pes);
   CmiListReduceStruct(npes, pes, data, pupFn, mergeFn, dest, deleteFn, id);
