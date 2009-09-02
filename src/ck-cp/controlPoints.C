@@ -7,6 +7,7 @@
 #include "trace-projections.h"
 #include <pathHistory.h>
 
+
 /**
  *  \addtogroup ControlPointFramework
  *   @{
@@ -59,9 +60,12 @@ CkReductionMsg *idleTimeReduction(int nMsg,CkReductionMsg **msgs){
   return CkReductionMsg::buildNew(3*sizeof(double),ret);   
 }
 /// An initcall that registers the idle time reducer idleTimeReduction()
-/*initcall*/ void registerIdleTimeReduction(void) {
+/*initproc*/ void registerIdleTimeReduction(void) {
   idleTimeReductionType=CkReduction::addReducer(idleTimeReduction);
 }
+
+
+
 
 
 
@@ -1112,6 +1116,7 @@ void controlPointPriorityEntry(const char *name, int idx){
   controlPointManagerProxy.ckLocalBranch()->associatePriorityEntry(name, idx);
   //  CkPrintf("Associating control point \"%s\" with EP id=%d\n", name, idx);
 }
+
 
 
 

@@ -13,7 +13,8 @@
 CkpvStaticDeclare(TraceControlPoints*, _trace);
 
 // This global variable is required for any post-execution 
-// parallel analysis or activities the trace module might wish to perform.
+// parallel analysis or parallel activities the trace module 
+// might wish to perform.
 CkGroupID traceControlPointsGID;
 
 /**
@@ -145,10 +146,25 @@ void TraceControlPoints::free(void *where, int size) {
 
 void TraceControlPoints::traceClose(void)
 {
+  // Print out some performance counters on BG/P
+  CProxy_TraceControlPointsBOC myProxy(traceControlPointsGID);
+  myProxy.ckLocalBranch()->printBGP_UPC_CountersBOC();
+
+    
   CkpvAccess(_trace)->endComputation();
   // remove myself from traceArray so that no tracing will be called.
   CkpvAccess(_traces)->removeTrace(this);
 }
+
+void printBGP_UPC_Counters(void);
+
+void TraceControlPointsBOC::printBGP_UPC_CountersBOC(void) {
+//    if(CkMyPe() == 0){
+	printBGP_UPC_Counters();
+	//   }
+}
+
+
 
 void TraceControlPoints::resetTimings(){
   totalIdleTime = 0.0;
