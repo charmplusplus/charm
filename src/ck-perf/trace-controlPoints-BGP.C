@@ -86,7 +86,6 @@ void printBGP_UPC_Counters(void) {
 }
 #else
 
-#warning "NOT USING BGP UPC"
 
 void printBGP_UPC_Counters(void){
 // do nothing since not on BGP
