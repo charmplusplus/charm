@@ -141,7 +141,7 @@ SIMPLE_REDUCTION(logical_or, int, ret[i]=(ret[i]||value[i])?1:0)
 SIMPLE_REDUCTION(bitvec_and, int, ret[i]&=value[i])
 SIMPLE_REDUCTION(bitvec_or, int, ret[i]|=value[i])
 
-//Use this macro for reductions that have the same type for all inputs
+/*Use this macro for reductions that have the same type for all inputs */
 #define SIMPLE_POLYMORPH_REDUCTION(nameBase,loop) \
   SIMPLE_REDUCTION(nameBase##_int, int, loop) \
   SIMPLE_REDUCTION(nameBase##_float, float, loop) \
