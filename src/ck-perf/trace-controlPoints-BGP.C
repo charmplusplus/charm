@@ -1,4 +1,6 @@
-#if CMK_BLUEGENEP
+#include "conv-mach.h" 
+
+#ifdef CMK_BLUEGENEP
 
 #include <spi/UPC.h>
 #include <spi/UPC_Events.h>
@@ -17,7 +19,7 @@ void initBGP_UPC_Counters(void) {
     // counter_mode = 0, 1, 2, 3 (plus some others … see UPC.h)
     // counter_trigger = BGP_UPC_CFG_LEVEL_HIGH, BGP_UPC_CFG_EDGE_DEFAULT
     
-    BGP_UPC_Mode_t counter_mode = BGP_UPC_MODE_DEFAULT;
+    BGP_UPC_Mode_t counter_mode = BGP_UPC_MODE_0;
     BGP_UPC_Event_Edge_t counter_trigger = BGP_UPC_CFG_LEVEL_HIGH;
     
     BGP_UPC_Initialize_Counter_Config(counter_mode, counter_trigger);
@@ -84,6 +86,7 @@ void printBGP_UPC_Counters(void) {
 }
 #else
 
+#warning "NOT USING BGP UPC"
 
 void printBGP_UPC_Counters(void){
 // do nothing since not on BGP
