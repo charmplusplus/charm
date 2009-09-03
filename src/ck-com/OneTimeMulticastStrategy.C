@@ -7,17 +7,19 @@
 
 
 #include "OneTimeMulticastStrategy.h"
+#include "TopoManager.h"
 #include <string>
 #include <set>
 #include <vector>
 #include <list>
+#include <map>
 
 //#define DEBUG 1
 
 using std::list;
 using std::set;
 using std::vector;
-
+using std::map;
 
 /// @note: There is some bug that is preventing us from using CmiSyncListSend. 
 #define SYNCLISTSENDANDFREE 1
@@ -128,9 +130,10 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
   int npes;
   int *pelist = NULL;
 
-  if(totalDestPEs > 0)
+  if(totalDestPEs > 0) {
+    //CkPrintf("totalDestPEs = %d\n", totalDestPEs);
     determineNextHopPEs(totalDestPEs, multMsg->indicesCount, myIndex, multMsg->_cookie.pe, pelist, npes );
-  else {
+  } else {
     npes = 0;
   }
 
@@ -692,9 +695,229 @@ void OneTimeNodeTreeRingMulticastStrategy::determineNextHopPEs(const int totalDe
   
 }
 
+// If min == 1 then this function finds the min else the max value in the array
+// This function returns the index of the array that it found to be the max or the min
+int OneTimeDimensionOrderedMulticastStrategy::findMinMaxArray(int min, int len, int *array, bool* notincluded, int value) {
+  int k = value;
+  int a = -1;
+  for (int j = 0; j < len; j++) {
+    if (notincluded[j]) continue;
+    if (min && array[j] < k) {
+      k = array[j];
+      a = j;
+    } else if (!min && array[j] > k) {
+      k = array[j];
+      a = j;
+    }
+  }
+  return a;
+}
 
+void OneTimeDimensionOrderedMulticastStrategy::determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, const int rootPe, int * &pelist, int &npes) {
+  const int myPe = CkMyPe();
 
+  set<int> nodePEReps;
+  
+  // create a list of PEs, with one for each node to which the message must be sent
+  for(int i=0; i<totalDestPEs; i++){
+    int pe = destPEs[i].pe;
+    CkAssert(pe != rootPe);
+    if (myPe == 0)
+      CkPrintf("destPE = %d\n", pe);
+    int rep = getFirstPeOnPhysicalNodeFromList(pe, totalDestPEs, destPEs);
+    nodePEReps.insert(rep);
+  }
+  
+  int numRepPEs = nodePEReps.size();
+  
+  int repForMyPe = -1;
+  if(myIndex != -1)
+    repForMyPe = getFirstPeOnPhysicalNodeFromList(CkMyPe(), totalDestPEs, destPEs);
+  
+  map<int, set<int> > spanTree;
 
+  TopoManager tmgr;
+
+  int myX, myY, myZ, myT;
+  tmgr.rankToCoordinates(rootPe, myX, myY, myZ, myT);
+
+  map<int, int> peRef;
+  int *repPeRef = new int[numRepPEs+1];
+  int *repPeX = new int[numRepPEs+1];
+  int *repPeY = new int[numRepPEs+1];
+  int *repPeZ = new int[numRepPEs+1];
+
+  int i = 0, myRepIndex;
+
+  for (set<int>::iterator iter = nodePEReps.begin(); iter != nodePEReps.end(); ++iter) {
+      int pe = *iter;
+      repPeRef[i] = pe;
+      peRef[pe] = i;
+      int t; // ignore the 't' dimension (which PE on the node)
+      tmgr.rankToCoordinates(pe, repPeX[i], repPeY[i], repPeZ[i], t);
+      if (*iter == repForMyPe)
+	  myRepIndex = i;
+      i++;
+  }
+
+  int t;
+  repPeRef[i] = rootPe;
+  peRef[rootPe] = i;
+  tmgr.rankToCoordinates(rootPe, repPeX[i], repPeY[i], repPeZ[i], t);
+
+  CkAssert(myRepIndex >= 0 || myIndex == -1);
+ 
+  bool *destAdded = new bool[numRepPEs];
+
+  for (int i = 0; i < numRepPEs; i++)
+      destAdded[i] = false;
+
+  int mode = 0; // 0 = x-axis, 1 = y-axis, 2 = z-axis
+
+  spanTree[rootPe].insert(rootPe);
+
+  //CkPrintf("Starting to build the tree...\n");
+
+  while (spanTree.size() < numRepPEs+1) {
+      int k = 0;
+      for (int i = 0; i < numRepPEs; i++) {
+	  if (destAdded[i])
+	      k++;
+      }
+
+      //CkPrintf("size of destAdded = %d, numRepPEs = %d, spanTree.size() = %d\n", k, numRepPEs, spanTree.size());
+
+      for(map<int, set<int> >::iterator iter = spanTree.begin(); iter != spanTree.end(); ++iter) {
+	  int pe = iter->first;
+	  int iPe = peRef[pe];
+	  if (mode % 4 == 0) {
+	      // Move in the -x direction
+	      int i1 = findMinMaxArray(1, numRepPEs, repPeX, destAdded, repPeX[iPe]);
+	
+	      if (i1 != -1) {
+		  destAdded[i1] = true;
+		  spanTree[pe].insert(repPeRef[i1]);
+		  spanTree[repPeRef[i1]].insert(repPeRef[i1]);
+		  //CkPrintf("added to -x\n");
+	      }
+
+	      // Move in the +x direction
+	      int i2 = findMinMaxArray(0, numRepPEs, repPeX, destAdded, repPeX[iPe]);
+		
+	      if (i2 != -1) {
+		  destAdded[i2] = true;
+		  spanTree[pe].insert(repPeRef[i2]);
+		  spanTree[repPeRef[i2]].insert(repPeRef[i2]);
+		  //CkPrintf("added to +x\n");
+	      }
+	  } else if (mode % 4 == 1) {
+	      bool* notEqX = new bool[numRepPEs];
+	      for (int i = 0; i < numRepPEs; i++) {
+		  notEqX[i] = destAdded[i];
+		  if (!destAdded[i] && repPeX[iPe] != repPeX[i])
+		      notEqX[i] = true;
+	      }
+
+	      // Move in the -y direction
+	      int i1 = findMinMaxArray(1, numRepPEs, repPeY, notEqX, repPeY[iPe]);
+	
+	      if (i1 != -1) {
+		  destAdded[i1] = true;
+		  spanTree[pe].insert(repPeRef[i1]);
+		  spanTree[repPeRef[i1]].insert(repPeRef[i1]);
+		  //CkPrintf("added to -y\n");
+	      }
+
+	      // Move in the +y direction
+	      int i2 = findMinMaxArray(0, numRepPEs, repPeY, notEqX, repPeY[iPe]);
+		
+	      if (i2 != -1) {
+		  destAdded[i2] = true;
+		  spanTree[pe].insert(repPeRef[i2]);
+		  spanTree[repPeRef[i2]].insert(repPeRef[i2]);
+		  //CkPrintf("added to +y\n");
+	      }
+
+	      delete[] notEqX;
+	  } else if (mode % 4 == 2) {
+	      bool* notEqXY = new bool[numRepPEs];
+	      for (int i = 0; i < numRepPEs; i++) {
+		  notEqXY[i] = destAdded[i];
+		  if (!destAdded[i] && (repPeX[iPe] != repPeX[i] || repPeY[iPe] != repPeY[i]))
+		      notEqXY[i] = true;
+	      }
+
+	      // Move in the -z direction
+	      int i1 = findMinMaxArray(1, numRepPEs, repPeZ, notEqXY, repPeZ[iPe]);
+	
+	      if (i1 != -1) {
+		  destAdded[i1] = true;
+		  spanTree[pe].insert(repPeRef[i1]);
+		  spanTree[repPeRef[i1]].insert(repPeRef[i1]);
+		  //CkPrintf("added to -z\n");
+	      }
+
+	      // Move in the +z direction
+	      int i2 = findMinMaxArray(0, numRepPEs, repPeZ, notEqXY, repPeZ[iPe]);
+		
+	      if (i2 != -1) {
+		  destAdded[i2] = true;
+		  spanTree[pe].insert(repPeRef[i2]);
+		  spanTree[repPeRef[i2]].insert(repPeRef[i2]);
+		  //CkPrintf("added to +z\n");
+	      }
+
+	      delete[] notEqXY;
+	  }
+      }
+      mode++;
+  }
+
+  /*CkPrintf("Finished creating spanning tree\n");*/
+
+  static bool firstTime = true;
+
+  if (myPe == 0 && firstTime) {
+      firstTime = false;
+      for(map<int, set<int> >::iterator iter = spanTree.begin(); iter != spanTree.end(); ++iter) {
+	  CkPrintf("Map %d to: ", iter->first);
+	  for(set<int>::iterator iter2 = iter->second.begin(); iter2 != iter->second.end(); ++iter2) {
+	      CkPrintf("%d, ", *iter2);
+	  }
+	  CkPrintf("\n");
+      }
+  }
+
+  // Send to local PEs
+  vector<int> otherLocalPes = getOtherPesOnPhysicalNodeFromList(CkMyPe(), totalDestPEs, destPEs);
+  int numSendLocal = otherLocalPes.size();
+
+  int numSend = spanTree[myPe].size() > 0 ? spanTree[myPe].size()-1 + numSendLocal : numSendLocal;
+    
+  if(numSend <= 0) {
+      npes = 0;
+      return;
+  }
+    
+  //CkPrintf("Sending to %d processors based on tree + local nodes\n", numSend);
+
+  npes = numSend;
+  pelist = new int[npes];
+  
+  i = 0;
+
+  for (set<int>::iterator iter = spanTree[myPe].begin(); iter != spanTree[myPe].end(); ++iter) {
+      if (*iter != myPe) {
+	  pelist[i] = *iter;
+	  i++;
+      }
+  }
+
+  for(int j = 0; j < numSendLocal; j++){
+      pelist[i] = otherLocalPes[j];
+      i++;
+  }
+}
 
 #include "spanningTreeStrategy.h"
 
@@ -729,212 +952,5 @@ void OneTimeTopoTreeMulticastStrategy::determineNextHopPEs(const int totalDestPE
         }
     }
 }
-
-
-
-void OneTimeDimensionOrderedMulticastStrategy::determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, const int rootPE, int * &pelist, int &npes){
- //  const int myPe = CkMyPe();
-
-//   set<int> nodePERepresentatives;
-  
-//   // create a list of PEs, with one for each node to which the message must be sent
-//   for(int i=0; i<totalDestPEs; i++){
-//     int pe = destPEs[i].pe;
-//     int representative = getFirstPeOnPhysicalNodeFromList(pe, totalDestPEs, destPEs);
-//     nodePERepresentatives.insert(representative);    
-//   }
-  
-//   int numRepresentativePEs = nodePERepresentatives.size();
-  
-//   int repForMyPe=-1;
-//   if(myIndex != -1)
-//     repForMyPe = getFirstPeOnPhysicalNodeFromList(CkMyPe(), totalDestPEs, destPEs);
-  
-// #if DEBUG
-//   CkPrintf("[%d] Multicasting to %d PEs on %d physical nodes  repForMyPe=%d\n", CkMyPe(), totalDestPEs, numRepresentativePEs, repForMyPe);
-//   fflush(stdout);
-// #endif
-  
-//   // If this PE is part of the multicast tree, then it should forward the message along
-//   if(CkMyPe() == repForMyPe || myIndex == -1){
-//     // I am an internal node in the multicast tree
-
-//     TopoManager tmgr;
-    
-//     // flatten the data structure for nodePERepresentatives
-//     int *repPeList = new int[numRepresentativePEs];
-//     bool *inTreeYet = new bool[numRepresentativePEs];
-//     int *repPeTopoX = new int[numRepresentativePEs];
-//     int *repPeTopoY = new int[numRepresentativePEs];
-//     int *repPeTopoZ = new int[numRepresentativePEs];
-
-//     set<int> xcoords;
-
-//     int myX, myY, myZ, myT;
-//     int rootX, rootY, rootZ, rootT;
-//     tmgr->rankToCoordinates(CkMyPe(), myX, myY, myZ, myT);        
-//     tmgr->rankToCoordinates(CkMyPe(), rootX, rootY, rootZ, rootT);        
-
-//     int myRepIndex = -1;
-//     set<int>::iterator iter;
-//     int p=0;
-//     for(iter=nodePERepresentatives.begin(); iter != nodePERepresentatives.end(); iter++){
-//       int pe =  *iter;
-//       repPeList[p] = pe;
-//       inTreeYet[p] = false;
-//       int t; // ignore the 't' dimension (which PE on the node)
-//       tmgr->rankToCoordinates(pe, repPeTopoX[p], repPeTopoY[p], repPeTopoZ[p], t);     
-//       xcoords.insert(repPeTopoX[p]);
-//       if(*iter == repForMyPe)
-// 	myRepIndex = p;
-//       p++;
-//     }
-//     CkAssert(myRepIndex >=0 || myIndex==-1);
-    
-
-//     // Holds the spanning tree as we build it. It maps from index in the repPeList to sets of indices for repPeList
-//     map<int, set<int> > spanningTreeChildren;
-
-//     //---------------------------------------------------------------------------------------------
-//     // Determine the children of the root of the multicast tree
- 
-//     int nearestXp = 100000;
-//     int nearestXpidx = -1;
-//     int nearestXm = -100000;
-//     int nearestXmidx = -1;
-
-//     for(int i=0; i<numRepresentativePEs; i++){
-//       // Find the nearest +x neighbor
-//       if(repPeTopoX[i] > rootX && repPeTopoX[i] < nearestXp){
-// 	nearestXp = repPeTopoX[i] ;
-// 	nearestXpidx = i;
-//       }
-      
-//       // Find the nearest -x neighbor
-//       if(repPeTopoX[i] < rootX && repPeTopoX[i] > nearestXm){
-// 	nearestXm = repPeTopoX[i] ;
-// 	nearestXmidx = i;
-//       }    
-      
-//     //   // send to some destinations with same X coordinate (just one per Y coordinate)
-// //       if(repPeTopoX == rootX){
-// // 	set<int>::iterator iter;
-// // 	bool found = false;
-// // 	for(iter = spanningTreeChildren[-1].begin(); iter != spanningTreeChildren[-1].end(); ++iter){
-// // 	  iterYcoord = repPeTopoY[*iter];
-// // 	  if(iterYcoord == repPeTopoY[i]){
-// // 	    found = true;
-// // 	    break;
-// // 	  } 
-// // 	}
-// // 	if(! found) {
-// // 	  // haven't seen this Y coordinate yet
-// // 	  spanningTreeChildren[-1].insert(i);
-// // 	  inTreeYet[i] = true;
-// // 	}
-// //       }
-//     }
-    
-    
-//     // The root sends to nearest +x neighbor
-//     if(nearestXpidx != -1){
-//       spanningTreeChildren[-1].insert(nearestXpidx);
-//       inTreeYet[nearestXpidx] = true;
-//     }
-    
-    
-//     // The root sends to nearest -x neighbor
-//     if(nearestXpidx != -1){
-//       spanningTreeChildren[-1].insert(nearestXpidx);
-//       inTreeYet[nearestXpidx] = true;
-//     }
-    
-    
-//     //---------------------------------------------------------------------------------------------
-//     // Make sure we span all X coordinates 
-    
-    
-    
-    
-
-
-
-
-
-    
-    
-   
-//     int numSendTree = 1;
-//     if(numSendTree < 0)
-//       numSendTree = 0;
-    
-//     vector<int> otherLocalPes = getOtherPesOnPhysicalNodeFromList(CkMyPe(), totalDestPEs, destPEs);
-//     int numSendLocal;
-//     if(myIndex == -1)
-//       numSendLocal = 0;
-//     else 
-//       numSendLocal = otherLocalPes.size();
-    
-//     int numSend = numSendTree + numSendLocal;
-//     if(numSend <= 0){
-//       npes = 0;
-//       return;
-//     }
-    
-//     npes = numSend;
-//     pelist = new int[npes];
-  
-//     for(int i=0;i<numSendTree;i++){
-//       CkAssert(sendLogicalIndexStart-1+i < numRepresentativePEs);
-//       pelist[i] = repPeList[sendLogicalIndexStart-1+i];
-//       CkAssert(pelist[i] < CkNumPes() && pelist[i] >= 0);
-//     }
-    
-//     delete[] repPeList;
-//     delete[] repPeTopoX;
-//     delete[] repPeTopoY;
-//     delete[] repPeTopoZ;
-//     repPeList = NULL;
-
-//     for(int i=0;i<numSendLocal;i++){
-//       pelist[i+numSendTree] = otherLocalPes[i];
-//       CkAssert(pelist[i] < CkNumPes() && pelist[i] >= 0);
-//     }
-    
-// #if 1
-//     char buf[1024];
-//     sprintf(buf, "PE %d is sending to Remote Node PEs: ", CkMyPe() );
-//     for(int i=0;i<numSend;i++){
-//       if(i==numSendTree)
-// 	sprintf(buf+strlen(buf), " and Local To Node PEs: ", pelist[i]);
-
-//       sprintf(buf+strlen(buf), "%d ", pelist[i]);
-//     }    
-//     CkPrintf("%s\n", buf);
-//     fflush(stdout);
-// #endif
-        
-//   } else {
-//     // We are a leaf PE
-//     npes = 0;
-//     return;
-//   }
-
-  
-  
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /*@}*/

@@ -178,6 +178,8 @@ class OneTimeDimensionOrderedMulticastStrategy: public OneTimeMulticastStrategy 
   }
   
   PUPable_decl(OneTimeDimensionOrderedMulticastStrategy);
+ private:
+  int findMinMaxArray(int min, int len, int *array, bool* notincluded, int notIndex);
 };
 
 
