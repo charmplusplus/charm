@@ -498,23 +498,23 @@ adding more nodes.
 
 The signatures for the functions in Table~\ref{table:reductions} are:
 
-\function{void CmiReduce(void *msg, int size, CmiReduceMergeFn mergeFn)}
+\function{void CmiReduce(void *msg, int size, CmiReduceMergeFn mergeFn);}
 \function{void CmiReduceStruct(void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
-                     CmiReduceDeleteFn deleteFn)}
-\function{void CmiReduceID(void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id)}
+                     CmiReduceDeleteFn deleteFn);}
+\function{void CmiReduceID(void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id);}
 \function{void CmiReduceStructID(void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
-                     CmiReduceDeleteFn deleteFn, CmiReductionID id)}
-\function{void CmiListReduce(int npes, int *pes, void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id)}
+                     CmiReduceDeleteFn deleteFn, CmiReductionID id);}
+\function{void CmiListReduce(int npes, int *pes, void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id);}
 \function{void CmiListReduceStruct(int npes, int *pes,
                      void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
-                     CmiReduceDeleteFn deleteFn, CmiReductionID id)}
-\function{void CmiGroupReduce(CmiGroup grp, void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id)}
+                     CmiReduceDeleteFn deleteFn, CmiReductionID id);}
+\function{void CmiGroupReduce(CmiGroup grp, void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id);}
 \function{void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
-                     CmiReduceDeleteFn deleteFn, CmiReductionID id)}
+                     CmiReduceDeleteFn deleteFn, CmiReductionID id);}
 
 In all the above, \uw{msg} is the Converse message deposited by the local
 processor, \uw{size} is the size of the message \uw{msg}, and \uw{data} is a

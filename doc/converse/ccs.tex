@@ -68,6 +68,15 @@ Ask the server to execute the handler hdlrID on the given processor.
 The handler is passed the given data as a message.  The data may
 be in any desired format (including binary). 
 
+\function{int CcsSendBroadcastRequest(CcsServer *svr, const char *hdlrID,
+            int size, const void *msg);}
+As CcsSendRequest, only that the handler hdlrID is invoked on all processors.
+
+\function{int CcsSendMulticastRequest(CcsServer *svr, const char *hdlrID, int npes, 
+            int *pes, int size, const void *msg);}
+As CcsSendRequest, only that the handler hdlrID is invoked on the processors
+specified in the array \uw{pes} (of size \uw{npes}).
+
 \function{int CcsRecvResponse(CcsServer *svr, 
                     unsigned int maxsize, char *recvBuffer, int timeout);}
 Receive a response to the previous request in-place.
@@ -117,7 +126,13 @@ hdlr is a \converse{} handler index; fn is a function pointer.
 The ID string cannot be more than 32 characters, including the
 terminating NULL.
 
+After a handler has been registered to CCS, the user can also setup a merging
+function. This function will be passed in to CmiReduce to combine replies to
+multicast and broadcast requests.
 
+\function{void CcsSetMergeFn(const char *name, CmiReduceMergeFn newMerge);}
+\desc{Associate the given merge function to the CCS identified by id. This will
+be used for CCS request received as broadcast or multicast.}
 
 These calls can be used from within a CCS handler:
 
@@ -138,6 +153,8 @@ Can only be called from a CCS handler invoked remotely.
 \function{void CcsSendReply(int size, const void *reply);}
 Send the given data back to the client as a reply.
 Can only be called from a CCS handler invoked remotely.
+In case of broadcast or multicast CCS requests, the handlers in
+all processors involved must call this function.
 
 \function{CcsDelayedReply CcsDelayReply(void);}
 Allows a CCS reply to be delayed until after the handler
