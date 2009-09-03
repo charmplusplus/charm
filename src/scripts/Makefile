@@ -830,13 +830,14 @@ tau_selective.o: $(TAUROOT)/utils/tau_selective.cpp
 $(L)/libtrace-Tau.a: $(TAU_TRACE_OBJ) tau_selective.o
 	$(CHARMC) $(TAU_LIBS) -o $@ $(TAU_TRACE_OBJ) tau_selective.o $(TAU_TRACE_OBJ)
 
-# The BGP performance counter library UPC must be compiled with gcc:
-trace-controlPoints-BGP.o : trace-controlPoints-BGP.C
-	g++ -c trace-controlPoints-BGP.C -o trace-controlPoints-BGP.o  -I/bgsys/drivers/ppcfloor/arch/include/ $(OPTS) -g
 
-LIBTRACE_CONTROLPOINTS=trace-controlPoints.o trace-controlPoints-BGP.o
+# Note there is a BG/P specific addition to this target in Makefile.machine
+LIBTRACE_CONTROLPOINTS=trace-controlPoints.o
 $(L)/libtrace-controlPoints.a: $(LIBTRACE_CONTROLPOINTS)
-	$(CHARMC) -o $@ $(LIBTRACE_CONTROLPOINTS)
+	echo "libtrace-controlPoints dependencies : " 
+	echo $^
+	$(CHARMC) -o $@ $^
+
 
 LIBTRACE_RECREP=trace-recordreplay.o
 $(L)/libtrace-recordreplay.a: $(LIBTRACE_RECREP)
