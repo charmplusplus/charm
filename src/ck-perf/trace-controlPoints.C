@@ -159,9 +159,9 @@ void TraceControlPoints::traceClose(void)
 void printBGP_UPC_Counters(void);
 
 void TraceControlPointsBOC::printBGP_UPC_CountersBOC(void) {
-//    if(CkMyPe() == 0){
+#ifdef CMK_BLUEGENEP
 	printBGP_UPC_Counters();
-	//   }
+#endif
 }
 
 

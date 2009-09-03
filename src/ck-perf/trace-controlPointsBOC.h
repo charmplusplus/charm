@@ -2,7 +2,9 @@
 
 extern CkGroupID traceControlPointsGID;
 
+#ifdef CMK_BLUEGENEP
 void initBGP_UPC_Counters(void);
+#endif
 
 // We typically declare parallel object classes here for the purposes of
 // performing parallel operations for the trace module after the main
@@ -29,7 +31,9 @@ class TraceControlPointsInit : public Chare {
 class TraceControlPointsBOC : public CBase_TraceControlPointsBOC {
 public:
   TraceControlPointsBOC(void) {
+#ifdef CMK_BLUEGENEP
       initBGP_UPC_Counters();
+#endif
   };
   TraceControlPointsBOC(CkMigrateMessage *m) {};
 

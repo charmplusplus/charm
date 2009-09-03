@@ -1,7 +1,5 @@
 #include "conv-mach.h" 
 
-#ifdef CMK_BLUEGENEP
-
 #include <spi/UPC.h>
 #include <spi/UPC_Events.h>
 #include <iostream>
@@ -84,19 +82,4 @@ void printBGP_UPC_Counters(void) {
     BGP_UPC_Start(0);
     
 }
-#else
 
-
-void printBGP_UPC_Counters(void){
-// do nothing since not on BGP
-}
-
-
-
-void initBGP_UPC_Counters(void){
-// do nothing since not on BGP
-}
-
-
-
-#endif

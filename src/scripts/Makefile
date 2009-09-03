@@ -834,8 +834,6 @@ $(L)/libtrace-Tau.a: $(TAU_TRACE_OBJ) tau_selective.o
 # Note there is a BG/P specific addition to this target in Makefile.machine
 LIBTRACE_CONTROLPOINTS=trace-controlPoints.o
 $(L)/libtrace-controlPoints.a: $(LIBTRACE_CONTROLPOINTS)
-	echo "libtrace-controlPoints dependencies : " 
-	echo $^
 	$(CHARMC) -o $@ $^
 
 
