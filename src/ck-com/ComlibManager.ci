@@ -46,6 +46,7 @@ module comlib {
  
   PUPable OneTimeMulticastStrategy;	
   PUPable OneTimeTreeMulticastStrategy;
+  PUPable OneTimeTopoTreeMulticastStrategy;
   PUPable OneTimeRingMulticastStrategy;
   PUPable OneTimeNodeTreeMulticastStrategy;
   PUPable OneTimeNodeTreeRingMulticastStrategy;

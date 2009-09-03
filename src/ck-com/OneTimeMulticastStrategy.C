@@ -696,6 +696,39 @@ void OneTimeNodeTreeRingMulticastStrategy::determineNextHopPEs(const int totalDe
 
 
 
+#include "spanningTreeStrategy.h"
+
+void OneTimeTopoTreeMulticastStrategy::determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, const int rootPE, int * &pelist, int &npes)
+{
+    /// Initialize
+    npes = 0; 
+    int myPE = (myIndex<0)? rootPE : destPEs[myIndex].pe;
+
+    /// Create a container of SpanningTreeVertex-es from the input list of PEs (include the root PE too)
+    std::vector<topo::SpanningTreeVertex> tree;
+    tree.push_back( topo::SpanningTreeVertex(rootPE) );
+    for (int i=0; i< totalDestPEs; i++)
+        tree.push_back( topo::SpanningTreeVertex(destPEs[i].pe) );
+
+    /// Build the complete spanning tree
+    topo::buildSpanningTree(tree.begin(),tree.end(),degree);
+
+    /// Identify this PE in the tree and find immediate children
+    int peIdx = -1;
+    bool noMatchFound = true;
+    while ( (++peIdx < tree.size()) && noMatchFound)
+    {
+        if (myPE == tree[peIdx].id)
+        {
+            /// Add immediate children to pelist and set npes accordingly
+            npes   = tree[peIdx].childIndex.size();
+            pelist = new int[npes];
+            for (int i=0; i< npes; i++)
+                pelist[i] = tree[ peIdx + tree[peIdx].childIndex[i] ].id; ///< child indices are relative distances from the parent in the container
+            noMatchFound = false;
+        }
+    }
+}
 
 
 

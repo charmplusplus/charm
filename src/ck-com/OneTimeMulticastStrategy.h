@@ -132,6 +132,33 @@ class OneTimeTreeMulticastStrategy: public OneTimeMulticastStrategy {
 
 
 /**
+ * A strategy that uses the topo-aware spanning tree builder to send msgs down a spanning tree 
+ * that is constructed in a network-topology aware manner if such info is available. Users 
+ * can specify the branching factor for the spanning tree
+ */
+class OneTimeTopoTreeMulticastStrategy: public OneTimeMulticastStrategy 
+{
+    private:
+        int degree;
+        
+    public:
+        OneTimeTopoTreeMulticastStrategy(CkMigrateMessage *m): OneTimeMulticastStrategy(m) {}
+        /** Create a strategy with specified branching factor(which defaults to 4) */
+        OneTimeTopoTreeMulticastStrategy(int treeDegree=4): OneTimeMulticastStrategy(), degree(treeDegree) { }
+        ~OneTimeTopoTreeMulticastStrategy() {}
+        /// Determine the direct children of this PE in the spanning tree
+        void determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, const int rootPE, int * &pelist, int &npes);
+        void pup(PUP::er &p)
+        { 
+            OneTimeMulticastStrategy::pup(p);
+            p | degree;
+        }
+        PUPable_decl(OneTimeTopoTreeMulticastStrategy);
+};
+
+
+
+/**
    A strategy that does dimension ordered sending of messages. This may result in lower contention for torus networks than a topology oblivious tree.
 */
 class OneTimeDimensionOrderedMulticastStrategy: public OneTimeMulticastStrategy {
@@ -209,10 +236,6 @@ class OneTimeNodeTreeRingMulticastStrategy: public OneTimeMulticastStrategy {
   
   PUPable_decl(OneTimeNodeTreeRingMulticastStrategy);
 };
-
-
-
-
 
 #endif
 
