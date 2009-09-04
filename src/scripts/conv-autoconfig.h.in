@@ -84,6 +84,9 @@
 /* whether get_myaddress() exists */
 #undef CMK_HAS_GET_MYADDRESS
 
+/* whether iterator_traits works */
+#undef CMK_HAS_ITERATOR_TRAITS
+
 /* whether has log2 */
 #undef CMK_HAS_LOG2
 

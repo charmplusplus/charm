@@ -547,6 +547,22 @@ EOT
 test_cxx "whether typeinfo/typeid works" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_TYPEINFO, $pass, [whether typeinfo/typeid works])
 
+#### check if iterator_traits is defined #####
+cat > $t <<EOT
+#include <vector>
+#include <iterator>
+
+template <typename Iterator>
+inline void buildSpanningTree(const Iterator firstVtx,
+                              const Iterator beyondLastVtx,
+                              const int maxBranches)
+{
+    typename std::iterator_traits<Iterator>::value_type *tag = 0;
+}
+EOT
+test_cxx "whether std::iterator_traits is defined" "ok" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_ITERATOR_TRAITS, $pass, [whether iterator_traits works])
+
 
 #### test if we can have multiple delete like this ####
 cat > $t <<EOT
@@ -1429,7 +1445,7 @@ esac
 fi
 
 AC_OUTPUT(
-libs/ck-libs/ampi/ampirun,
+libs/ck-libs/ampi/ampiCC libs/ck-libs/ampi/ampirun,
 
-chmod +x libs/ck-libs/ampi/ampirun
+chmod +x libs/ck-libs/ampi/ampiCC libs/ck-libs/ampi/ampirun
 )
