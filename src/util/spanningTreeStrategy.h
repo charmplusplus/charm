@@ -2,8 +2,53 @@
 #include <vector>
 #include <iterator>
 
+#include "conv-config.h"
+
 #ifndef SPANNING_TREE_STRATEGY
 #define SPANNING_TREE_STRATEGY
+
+#if ! CMK_HAS_ITERATOR_TRAITS 
+namespace std {
+
+template <class Iterator>
+  struct iterator_traits {
+    typedef typename Iterator::iterator_category iterator_category;
+    typedef typename Iterator::value_type        value_type;
+    typedef typename Iterator::difference_type   difference_type;
+    typedef typename Iterator::pointer           pointer;
+    typedef typename Iterator::reference         reference;
+  };
+
+  template <class T>
+  struct iterator_traits<T*> {
+    typedef random_access_iterator_tag iterator_category;
+    typedef T                          value_type;
+    typedef ptrdiff_t                  difference_type;
+    typedef T*                         pointer;
+    typedef T&                         reference;
+  };
+
+}
+
+#endif
+
+#if ! CMK_HAS_STD_DISTANCE 
+namespace std {
+
+template <class Iterator>
+int distance(Iterator first, Iterator last)
+{
+  int n=0;
+  while (first!=last)
+  {
+       ++first;
+       ++n;
+  }
+
+  return n;
+}
+}
+#endif
 
 //-------------------------------- Declarations of the main entities in this file --------------------------------
 
