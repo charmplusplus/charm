@@ -147,6 +147,9 @@
 /* whether has stdint.h */
 #undef CMK_HAS_STDINT_H
 
+/* whether std::distance works */
+#undef CMK_HAS_STD_DISTANCE
+
 /* whether has strings.h */
 #undef CMK_HAS_STRINGS_H
 
