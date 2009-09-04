@@ -557,7 +557,7 @@ inline void buildSpanningTree(const Iterator firstVtx,
                               const Iterator beyondLastVtx,
                               const int maxBranches)
 {
-    typename std::iterator_traits<Iterator>::value_type *tag = 0;
+    std::iterator_traits<Iterator> *tag = 0;
 }
 EOT
 test_cxx "whether std::iterator_traits is defined" "ok" "no" ""
