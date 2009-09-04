@@ -921,6 +921,8 @@ void OneTimeDimensionOrderedMulticastStrategy::determineNextHopPEs(const int tot
 
 #include "spanningTreeStrategy.h"
 
+using namespace topo;
+
 void OneTimeTopoTreeMulticastStrategy::determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, const int rootPE, int * &pelist, int &npes)
 {
     /// Initialize
