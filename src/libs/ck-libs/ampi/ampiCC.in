@@ -31,8 +31,7 @@ elif `echo $arch | grep 'net-' > /dev/null 2>&1`
 then     
   charmarch="net"
 else      
-  echo "Unknown Charm architecture: $arch !"
-  exit 1
+  charmarch="other"
 fi
 }            
 
