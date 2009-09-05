@@ -24,7 +24,7 @@ void CharmStrategy::pup(PUP::er &p) {
 
 
 /** 
-    Deliver a message to a set of indices using the array manager. Indices can be local or remote. 
+    deliver a message to a set of indices using the array manager. Indices can be local or remote. 
     
     An optimization for [nokeep] methods is applied: the message is not copied for each invocation.
    
@@ -439,7 +439,6 @@ int ComlibArrayInfo::localMulticast(CkVec<CkArrayIndexMax>*vec,
     //ComlibPrintf("sending to %d elements\n",nelements);
     for(int i = 0; i < nelements-1; i ++){
       idx = (*vec)[i];
-      CkAssert(idx.nInts == 1);
         //if(com_debug) idx.print();
 
         env->getsetArrayIndex() = idx;
