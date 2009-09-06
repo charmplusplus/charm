@@ -1,4 +1,3 @@
-
 CHARMDIR=../../..
 CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
 AMRLIB=$(CHARMDIR)/lib/libamr.a
@@ -13,7 +12,7 @@ $(DEST): $(OBJS)
 	$(CHARMC) -lm -language charm++ -o $(DEST) $(OBJS) $(AMRLIB) $(MODS)
 	chmod 755 $(DEST)
 
-cfdAMR.o: cfdAMR.C cfdAMR.decl.h cfdAMR.def.h
+cfdAMR.o: cfdAMR.C cfdAMR.decl.h cfdAMR.def.h cfdAMR.h cfd.h
 	$(CHARMC) -c cfdAMR.C
 
 cfdAMR.decl.h cfdAMR.def.h: cfdAMR.ci
@@ -21,112 +20,3 @@ cfdAMR.decl.h cfdAMR.def.h: cfdAMR.ci
 
 clean:
 	rm -f *.o *~ *.de*.h $(DEST) conv-host charmrun
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

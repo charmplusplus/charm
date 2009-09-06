@@ -1,9 +1,7 @@
-#include <iostream.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <charm++.h>
-#define PI 3.14
 #define GHOSTWIDTH 2
 
 class Properties {
