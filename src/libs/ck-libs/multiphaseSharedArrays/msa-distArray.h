@@ -221,7 +221,7 @@ public:
         CProxy_PageArray_t pageArray = CProxy_PageArray_t::ckNew(nPages);
         cg = CProxy_CacheGroup_t::ckNew(nPages, pageArray, maxBytes, nEntries, num_wrkrs);
         pageArray.setCacheProxy(cg);
-        pageArray.ckSetReductionClient(new CkCallback(CkIndex_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(), cg));
+        pageArray.ckSetReductionClient(new CkCallback(CkIndex_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(NULL), cg));
         cache = cg.ckLocalBranch();
     }
 
@@ -990,7 +990,7 @@ public:
         CProxy_PageArray_t pageArray = CProxy_PageArray_t::ckNew(nPages);
         cg = CProxy_CacheGroup_t::ckNew(nPages, pageArray, maxBytes, nEntries, num_wrkrs);
         pageArray.setCacheProxy(cg);
-        //pageArray.ckSetReductionClient(new CkCallback(CkIndex_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(), cg));
+        //pageArray.ckSetReductionClient(new CkCallback(CkIndex_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(NULL), cg));
         cache = cg.ckLocalBranch();
     }
 
