@@ -2213,8 +2213,8 @@ void CmiReductionsInit() {
   CpvAccess(_reduce_seqID_dynamic) = CmiReductionID_dynamicOffset;
   CpvInitialize(int, _reduce_info_size);
   CpvAccess(_reduce_info_size) = 4;
-  CpvInitialize(CmiReduction*, _reduce_info);
-  CpvAccess(_reduce_info) = (CmiReduction**)malloc(16*sizeof(CmiReduction*));
+  CpvInitialize(CmiReduction**, _reduce_info);
+  CpvAccess(_reduce_info) = malloc(16*sizeof(CmiReduction*));
   for (i=0; i<16; ++i) CpvAccess(_reduce_info)[i] = NULL;
 }
 
