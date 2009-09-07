@@ -16,6 +16,8 @@ cat > pup_f.f90 << END_OF_HEADER
       external fpup_reals
       external fpup_double
       external fpup_doubles
+      external fpup_logical
+      external fpup_logicals
       interface
         function fpup_issizing(p)
           INTEGER :: p
@@ -74,6 +76,40 @@ cat > pup_f.f90 << END_OF_HEADER
         logical pup_isul
         pup_isul = fpup_isuserlevel(p)
       end function
+
+      subroutine fpup_complex(p,c)
+        INTEGER p
+        complex c
+        call fpup_real(p,REAL(c))
+        call fpup_real(p,AIMAG(c))
+      end subroutine
+
+      subroutine fpup_complexes(p,c,size)
+        INTEGER p
+        complex,pointer,dimension(:) :: c
+        integer size
+        integer i
+        do i = 1, size, 1
+          call fpup_complex(p,c(i))
+        end do
+      end subroutine
+
+      subroutine fpup_doublecomplex(p,c)
+        INTEGER p
+        double complex c
+        call fpup_double(p,DBLE(c))
+        call fpup_double(p,DIMAG(c))
+      end subroutine
+
+      subroutine fpup_doublecomplexes(p,c,size)
+        INTEGER p
+        double complex,pointer,dimension(:) :: c
+        integer size
+        integer i
+        do i = 1, size, 1
+          call fpup_doublecomplex(p,c(i))
+        end do
+      end subroutine
 
 END_OF_HEADER
 

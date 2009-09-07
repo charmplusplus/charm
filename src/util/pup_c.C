@@ -133,6 +133,7 @@ PUP_BASIC_DATATYPEF(SHORT,short,short)
 PUP_BASIC_DATATYPEF(INT,int,int)
 PUP_BASIC_DATATYPEF(REAL,real,float)
 PUP_BASIC_DATATYPEF(DOUBLE,double,double)
+PUP_BASIC_DATATYPEF(LOGICAL,logical,int)
 
 /*Pack/unpack untyped byte array:*/
 CDECL void pup_bytes(pup_er p,void *ptr,int nBytes)
