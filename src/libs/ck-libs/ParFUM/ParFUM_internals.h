@@ -2050,10 +2050,10 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
 template <class T, bool PUP_EVERY_ELEMENT=true >
   class DefaultListEntry {
     public:
-    inline void accumulate(T& a, const T& b) { a += b; }
+    static inline void accumulate(T& a, const T& b) { a += b; }
     // identity for initializing at start of accumulate
-    inline T getIdentity() { return T(); }
-    inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
+    static inline T getIdentity() { return T(); }
+    static inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
   };
 
 extern double elemlistaccTime;
