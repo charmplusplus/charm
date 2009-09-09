@@ -28,6 +28,11 @@ public:
     Accumulable(ENTRY &e_) : e(e_) {}
     void operator+=(const ENTRY &rhs_)
         { ENTRY_OPS_CLASS::accumulate(e, rhs_); }
+    template<typename T>
+    void accumulate(const T& rhs)
+        {
+            ENTRY_OPS_CLASS::accumulate(e, rhs);
+        }
 };
 
 
@@ -547,6 +552,38 @@ public:
         }
     };
 
+    class Accum : public Handle
+    {
+    protected:
+        friend class MSA2D;
+        Accum(MSA2D &msa_)
+            : Handle(msa_) { }
+        using Handle::checkInvalidate;
+    public:
+        inline Accumulable<ENTRY, ENTRY_OPS_CLASS> accumulate(unsigned int idx)
+        {
+            Handle::checkValid();
+            return Accumulable<ENTRY, ENTRY_OPS_CLASS>(Handle::msa.accumulate(idx));
+        }
+        inline void accumulate(unsigned int idx, const ENTRY& ent)
+        {
+            Handle::checkValid();
+            Handle::msa.accumulate(idx, ent);
+        }
+
+        void contribute(unsigned int idx, const ENTRY *begin, const ENTRY *end)
+        {
+            Handle::checkValid();
+            for (const ENTRY *e = begin; e != end; ++e, ++idx)
+                {
+                    Handle::msa.accumulate(idx, *e);
+                }
+        }
+
+        inline Accumulable<ENTRY, ENTRY_OPS_CLASS> operator() (unsigned int idx)
+            { return accumulate(idx); }
+    };
+
     inline MSA2D(unsigned int rows_, unsigned int cols_, unsigned int numwrkrs,
                  unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES)
         :super(rows_*cols_, numwrkrs, maxBytes)
@@ -635,6 +672,14 @@ public:
         return *(new Write(*this));
     }
 
+    inline Accum& syncToAccum(Handle &m, int single = super::DEFAULT_SYNC_SINGLE)
+    {
+        m.checkInvalidate(this);
+        delete &m;
+        super::sync(single);
+        return *(new Accum(*this));
+    }
+
     inline Write& getInitialWrite()
     {
         if (super::initHandleGiven)
@@ -644,6 +689,18 @@ public:
         super::initHandleGiven = true;
         return *w;
     }
+
+    inline Accum &getInitialAccum()
+    {
+        if (super::initHandleGiven)
+            throw MSA_InvalidHandle();
+
+        Accum *a = new Accum(*this);
+        sync();
+        super::initHandleGiven = true;
+        return *a;
+    }
+
 
 protected:
     inline const ENTRY& get(unsigned int row, unsigned int col)
