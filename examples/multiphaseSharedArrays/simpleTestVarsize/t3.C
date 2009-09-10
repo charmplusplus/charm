@@ -7,6 +7,7 @@ typedef MSA2D<Double, DefaultEntry<Double,true>, MSA_DEFAULT_ENTRIES_PER_PAGE, M
 
 #include <assert.h>
 #include <math.h>
+#include <iostream>
 #include "params.h"
 
 #define NO_PREFETCH
@@ -162,7 +163,7 @@ public:
 
 // optional
 // convenience function
-ostream& operator << (ostream& os, const Double& s) {
+std::ostream& operator << (std::ostream& os, const Double& s) {
     os << s.data;
     if (s.next!=0)
         os << *(s.next);
@@ -278,10 +279,11 @@ class TestArray : public CBase_TestArray
 {
 protected:
     MSA2DRM arr1;       // row major
+	MSA2DRM::Read *r2;
 
     unsigned int rows1, cols1, numWorkers;
 
-    void FillArray()
+    void FillArray(MSA2DRM::Write &w)
     {
         // fill in our portion of the array
         unsigned int rowStart, rowEnd;
@@ -290,23 +292,19 @@ protected:
         // fill them in with 1
         for(unsigned int r = rowStart; r <= rowEnd; r++)
             for(unsigned int c = 0; c < cols1; c++)
-                arr1.set(r, c) = 1.0;
+                w.set(r, c) = 1.0;
 
     }
 
-    void SyncArrays()
+    void FindProduct(MSA2DRM::Accum &a)
     {
-        arr1.sync();
-    }
-
-    void FindProduct()
-    {
-        arr1.accumulate(arr1.getIndex(0,0), 2.0 + thisIndex);
-        arr1.accumulate(arr1.getIndex(0,0), 100.0 + thisIndex);
+        a.accumulate(arr1.getIndex(0,0), 2.0 + thisIndex);
+        a.accumulate(arr1.getIndex(0,0), 100.0 + thisIndex);
     }
 
     void TestResults()
     {
+		MSA2DRM::Read &rh = *r2;
         int error1 = 0, error2 = 0, error3=0;
 
         // verify the results
@@ -316,9 +314,9 @@ protected:
         {
             for(unsigned int c = 0; c < cols1; c++)
             {
-                if(msg && notequal(arr1.get(r, c).data, 1.0))
+                if(msg && notequal(rh.get(r, c).data, 1.0))
                 {
-                    ckout << "p" << CkMyPe() << "w" << thisIndex << " arr1 -- Illegal element at (" << r << "," << c << ") " << arr1.get(r,c) << endl;
+                    ckout << "p" << CkMyPe() << "w" << thisIndex << " arr1 -- Illegal element at (" << r << "," << c << ") " << rh.get(r,c) << endl;
                     ckout << "Skipping rest of TestResults." << endl;
                     msg = 0;
                     error1 = 1;
@@ -354,11 +352,15 @@ public:
     {
         arr1.enroll(numWorkers); // barrier
         if(do_message) ckout << "w" << thisIndex << ": filling" << endl;
-        FillArray();
-        if(do_message) ckout << "w" << thisIndex << ":value " << arr1.get(XVAL,YVAL) << "," << arr1.get(XVAL,YVAL+1)  << endl;
+		MSA2DRM::Write &w = arr1.getInitialWrite();
+        FillArray(w);
+		r2 = &arr1.syncToRead(w);
+        if(do_message)
+			ckout << "w" << thisIndex << ":value "
+				  << r2->get(XVAL,YVAL) << "," << r2->get(XVAL,YVAL+1)  << endl;
 //         (arr1.getCacheGroup()).emitBufferValue(6, 0);
-        if(do_message) ckout << "w" << thisIndex << ": syncing" << endl;
-        SyncArrays();
+        if(do_message)
+			ckout << "w" << thisIndex << ": syncing" << endl;
 //         if (thisIndex == 0) (arr1.getCacheGroup()).emit(0);
 //         if(do_message) ckout << "w" << thisIndex << ":value2 " << arr1.get(XVAL,YVAL) << "," << arr1.get(XVAL,YVAL+1)  << endl;
         Contribute();
@@ -369,18 +371,18 @@ public:
 //         if(do_message) ckout << "w" << thisIndex << ":value3 " << arr1.get(XVAL,YVAL) << "," << arr1.get(XVAL,YVAL+1)  << endl;
         if(do_message) ckout << thisIndex << ": testing after fillarray, sync, and redn" << endl;
         TestResults();
-        SyncArrays();
+
+		MSA2DRM::Accum &a = arr1.syncToAccum(*r2);
 
         if(do_message) ckout << thisIndex << ": producting" << endl;
-        FindProduct();
-        SyncArrays();
+        FindProduct(a);
 
+		r2 = &arr1.syncToRead(a);
 //         if(do_message) ckout << thisIndex << ": tetsing after product" << endl;
 //      TestResults();
 
         // Print out the accumulated element.
-        ckout << "p" << CkMyPe() << "w" << thisIndex << ":" << arr1.get(0,0) << endl;
-        SyncArrays();
+        ckout << "p" << CkMyPe() << "w" << thisIndex << ":" << r2->get(0,0) << endl;
 
         Contribute();
     }
