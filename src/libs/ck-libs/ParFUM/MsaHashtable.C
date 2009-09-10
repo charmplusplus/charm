@@ -71,8 +71,7 @@ int MsaHashtable::Add::addTuple(int *tuple,int nodesPerTuple,int chunk,int eleme
 	int index = (int )(sum %(long )slots);
 	Hashnode entry(nodesPerTuple,chunk,elementNo,tuple);
 
-	Hashtuple &list=accumulate(index);
-	list.vec->push_back(entry);
+	accumulate(index) += entry;
 	char str[100];
 	DEBUG(printf("[%d] adding tuple %s element %d to index %d \n",chunk,entry.nodes.toString(nodesPerTuple,str),elementNo,index));
 	return index;

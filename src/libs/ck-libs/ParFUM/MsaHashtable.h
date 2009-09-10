@@ -7,6 +7,11 @@
 typedef UniqElemList<Hashnode> Hashtuple;
 typedef MSA1D<Hashtuple,DefaultListEntry<Hashtuple,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DHASH;
 
+void operator+=(Hashtuple &t, const Hashnode &n)
+{
+    t.vec->push_back(n);
+}
+
 class MsaHashtable : private MSA1DHASH
 {
 public:
