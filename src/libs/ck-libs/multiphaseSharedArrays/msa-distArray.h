@@ -550,6 +550,9 @@ public:
             Handle::checkValid();
             return Writable<ENTRY>(Handle::msa.set(row, col));
         }
+
+        inline Writable<ENTRY> operator()(unsigned int row, unsigned int col)
+            { return set(row, col); }
     };
 
     class Accum : public Handle
@@ -564,6 +567,11 @@ public:
         {
             Handle::checkValid();
             return Accumulable<ENTRY, ENTRY_OPS_CLASS>(Handle::msa.accumulate(idx));
+        }
+        inline Accumulable<ENTRY, ENTRY_OPS_CLASS> accumulate(unsigned int x, unsigned int y)
+        {
+            Handle::checkValid();
+            return Accumulable<ENTRY, ENTRY_OPS_CLASS>(Handle::msa.accumulate(Handle::msa.getIndex(x, y)));
         }
         inline void accumulate(unsigned int idx, const ENTRY& ent)
         {
@@ -582,6 +590,8 @@ public:
 
         inline Accumulable<ENTRY, ENTRY_OPS_CLASS> operator() (unsigned int idx)
             { return accumulate(idx); }
+        inline Accumulable<ENTRY, ENTRY_OPS_CLASS> operator() (unsigned int x, unsigned int y)
+            { return accumulate(x, y); }
     };
 
     inline MSA2D(unsigned int rows_, unsigned int cols_, unsigned int numwrkrs,
