@@ -4,7 +4,6 @@
  * $Date$
  * $Revision$
  *****************************************************************************/
-
 /** @defgroup Converse
  * \brief Converse--a parallel portability layer.
 
@@ -27,9 +26,14 @@
  * converse header (which has few common fields, but is architecture dependent).
 */
 
+/** @defgroup Scheduler 
+    \brief The portion of Converse responsible for scheduling the execution of incoming messages
+*/
+
 /** @file
  * converse main core
  * @ingroup Converse
+ * @ingroup Scheduler
  */
 
 /**
@@ -1267,8 +1271,13 @@ void (*handler)();
 }
 #endif
 
+/** 
+ *  @addtogroup Scheduler
+ *  @{
+ */
+
 /*****************************************************************************
- *
+ * 
  * The following is the CsdScheduler function.  A common
  * implementation is provided below.  The machine layer can provide an
  * alternate implementation if it so desires.
@@ -1401,6 +1410,8 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 #endif
 }
 
+
+/** Dequeue and return the next message from the message queue. */
 void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
 	if((*(s->localCounter))-- >0)
@@ -1795,6 +1806,12 @@ void CsdInit(argv)
 
   CpvAccess(CsdStopFlag)  = 0;
 }
+
+
+
+/** 
+ *  @}
+ */
 
 
 /*****************************************************************************

@@ -5,6 +5,12 @@
 extern "C" {
 #endif
 
+
+
+/** 
+ *  @addtogroup Scheduler
+ *  @{
+ */
 typedef void *CdsFifo;
 
 CdsFifo CdsFifo_Create(void);
@@ -18,6 +24,13 @@ void ** CdsFifo_Enumerate(CdsFifo q);
 int     CdsFifo_Empty(CdsFifo q);
 void *  CdsFifo_Peek(CdsFifo q);
 int     CdsFifo_Length(CdsFifo q);
+
+
+/** 
+ *   @}
+ */
+
+
 
 #ifdef __cplusplus
 }

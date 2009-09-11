@@ -1,6 +1,11 @@
 #include "conv-lists.h"
 #include "cklists.h"
 
+/** 
+ *  @addtogroup Scheduler
+ *  @{
+ */
+
 typedef CkQ<void*> _Fifo;
 
 CdsFifo CdsFifo_Create(void) { return (CdsFifo) new _Fifo(); }
@@ -16,3 +21,8 @@ void *  CdsFifo_Peek(CdsFifo q) {
   return ((_Fifo*)q)->length() ? (*((_Fifo*)q))[0] : 0; 
 }
 int     CdsFifo_Length(CdsFifo q) { return ((_Fifo*)q)->length(); }
+
+
+/** 
+ *   @}
+ */
