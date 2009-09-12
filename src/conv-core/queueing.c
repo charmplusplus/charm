@@ -567,7 +567,9 @@ int CqsEmpty(Queue q)
 }
 
 
-/** Enqueue a message into the queue in a manner consistent with the specified strategy and priority */
+/** Enqueue something (usually an envelope*) into the queue in 
+    a manner consistent with the specified strategy and priority.
+*/
 void CqsEnqueueGeneral(Queue q, void *data, int strategy, 
            int priobits,unsigned int *prioptr)
 {
