@@ -6,7 +6,8 @@
  *****************************************************************************/
 
 /**
-  Main Converse header file.  Everything in Converse is 
+  @file
+  @brief Main Converse header file.  Everything in Converse is 
   either declared here directly, or else included from here.
 
   Routine names in Converse include a short prefix starting with "C".
@@ -29,6 +30,9 @@
   - Ctv, Converse thread-private variable.  One copy per Converse thread. 
   - Csv, Converse node-shared variable.  Global variables 
      shared by all processors of a node (beware of thread safety!)
+
+  @addtogroup CharmScheduler
+
 */
 #ifndef CONVERSE_H
 #define CONVERSE_H
@@ -1097,8 +1101,10 @@ int    CmiDeliverMsgs(int maxmsgs);
 void   CmiDeliverSpecificMsg(int handler);
 void   CmiHandleMessage(void *msg);
 
-/******** CQS: THE QUEUEING SYSTEM ********/
-
+/******** CQS: THE QUEUEING SYSTEM ********
+ * @addtogroup CharmScheduler
+ * @{ 
+ */
 #define CQS_QUEUEING_FIFO 2
 #define CQS_QUEUEING_LIFO 3
 #define CQS_QUEUEING_IFIFO 4
@@ -1107,6 +1113,8 @@ void   CmiHandleMessage(void *msg);
 #define CQS_QUEUEING_BLIFO 7
 #define CQS_QUEUEING_LFIFO 8
 #define CQS_QUEUEING_LLIFO 9
+/** @} */
+
 
 /****** Isomalloc: Migratable Memory Allocation ********/
 /*Simple block-by-block interface:*/

@@ -9,6 +9,29 @@
 #include <string.h>
 #include "queueing.h"
 
+/** @defgroup CharmScheduler 
+    \brief The portion of Charm++ responsible for scheduling the execution 
+    of Charm++ entry methods
+
+    CqsEnqueueGeneral() is the main function that is responsible for enqueueing 
+    messages. It will store the messages in one of three queues based on the 
+    specified priorities or strategies.
+
+    The charm++ messages are only scheduled after the converse message queues
+    have been emptied. After that, a message is pulled from the Charm++ queue
+    through a call to CqsDequeue().
+
+    The Charm++ message queue is really three queues, one for positive 
+    priorities, one for zero priorities, and one for negative priorities.
+    The positive and negative priorty queues are actually heaps.
+
+
+    @addtogroup CharmScheduler
+    @{
+*/
+
+
+/** Initialize a deq */
 static void CqsDeqInit(d)
 deq d;
 {
@@ -18,6 +41,7 @@ deq d;
   d->tail = d->space;
 }
 
+/** Double the size of a deq */
 static void CqsDeqExpand(d)
 deq d;
 {
@@ -36,6 +60,7 @@ deq d;
   if (ovec != d->space) CmiFree(ovec);
 }
 
+/** Insert a data pointer at the tail of a deq */
 void CqsDeqEnqueueFifo(d, data)
 deq d; void *data;
 {
@@ -47,6 +72,7 @@ deq d; void *data;
   if (tail == d->head) CqsDeqExpand(d);
 }
 
+/** Insert a data pointer at the head of a deq */
 void CqsDeqEnqueueLifo(d, data)
 deq d; void *data;
 {
@@ -58,6 +84,7 @@ deq d; void *data;
   if (head == d->tail) CqsDeqExpand(d);
 }
 
+/** Remove a data pointer from the head of a deq */
 void *CqsDeqDequeue(d)
 deq d;
 {
@@ -74,6 +101,7 @@ deq d;
   return data;
 }
 
+/** Initialize a Priority Queue */
 static void CqsPrioqInit(pq)
 prioq pq;
 {
@@ -90,6 +118,7 @@ prioq pq;
 #if CMK_C_INLINE
 inline
 #endif
+/** Double the size of a Priority Queue's heap */
 static void CqsPrioqExpand(prioq pq)
 {
   int oldsize = pq->heapsize;
@@ -102,6 +131,7 @@ static void CqsPrioqExpand(prioq pq)
   CmiFree(oheap);
 }
 #ifndef FASTQ
+/** Double the size of a Priority Queue's hash table */
 void CqsPrioqRehash(pq)
      prioq pq;
 {
@@ -139,16 +169,13 @@ void CqsPrioqRehash(pq)
   CmiFree(ohashtab);
 }
 #endif
-/*
- * This routine compares priorities. It returns:
- * 
- * 1 if prio1 > prio2
- * ? if prio1 == prio2
- * 0 if prio1 < prio2
- *
- * where prios are treated as unsigned
- */
 
+/**
+ * Compare two priorities (treated as unsigned).
+ * @return 1 if prio1 > prio2
+ * @return ? if prio1 == prio2
+ * @return 0 if prio1 < prio2
+ */
 int CqsPrioGT(prio1, prio2)
 prio prio1;
 prio prio2;
@@ -187,6 +214,7 @@ prio prio2;
   }
 }
 
+/** Find or create a bucket in the hash table for the specified priority. */
 deq CqsPrioqGetDeq(pq, priobits, priodata)
 prioq pq;
 unsigned int priobits, *priodata;
@@ -302,6 +330,7 @@ unsigned int priobits, *priodata;
   return &(pe->data);
 }
 
+/** Dequeue an entry */
 void *CqsPrioqDequeue(pq)
 prioq pq;
 {
@@ -499,6 +528,7 @@ prioq pq;
   return data;
 }
 
+/** Initialize a Queue and its three internal queues (for positive, negative, and zero priorities) */
 Queue CqsCreate(void)
 {
   Queue q = (Queue)CmiAlloc(sizeof(struct Queue_struct));
@@ -513,6 +543,7 @@ Queue CqsCreate(void)
   return q;
 }
 
+/** Delete a Queue */
 void CqsDelete(Queue q)
 {
   CmiFree(q->negprioq.heap);
@@ -535,6 +566,8 @@ int CqsEmpty(Queue q)
   return (q->length == 0);
 }
 
+
+/** Enqueue a message into the queue in a manner consistent with the specified strategy and priority */
 void CqsEnqueueGeneral(Queue q, void *data, int strategy, 
            int priobits,unsigned int *prioptr)
 {
@@ -629,6 +662,7 @@ void CqsEnqueue(Queue q, void *data)
   q->length++; if (q->length>q->maxlen) q->maxlen=q->length;
 }
 
+/** Retrieve the highest priority message (one with most negative priority) */
 void CqsDequeue(Queue q, void **resp)
 {
   if (q->length==0) 
@@ -760,3 +794,5 @@ void CqsEnumerateQueue(Queue q, void ***resp){
   CmiFree(result);
 }
 
+
+/** @} */

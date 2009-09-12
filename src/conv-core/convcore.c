@@ -4,42 +4,41 @@
  * $Date$
  * $Revision$
  *****************************************************************************/
-/** @defgroup Converse
- * \brief Converse--a parallel portability layer.
+/** 
+  @defgroup Converse
+  \brief Converse--a parallel portability layer.
 
- * Converse is the lowest level inside the Charm++ hierarchy. It stands on top
- * of the machine layer, and it provides all the common functionality across
- * platforms.
+  Converse is the lowest level inside the Charm++ hierarchy. It stands on top
+  of the machine layer, and it provides all the common functionality across
+  platforms.
 
- * One converse program is running on every processor (or node in the smp
- * version). it manages the message transmission, and the memory allocation.
- * Charm++, which is on top of Converse, uses its functionality for
- * interprocess *communication.
+  One converse program is running on every processor (or node in the smp
+  version). it manages the message transmission, and the memory allocation.
+  Charm++, which is on top of Converse, uses its functionality for
+  interprocess *communication.
 
- * In order to maintain multiple independent objects inside a single user space
- * program, it uses a personalized version of threads, which can be executed,
- * suspended, and migrated across processors.
+  In order to maintain multiple independent objects inside a single user space
+  program, it uses a personalized version of threads, which can be executed,
+  suspended, and migrated across processors.
 
- * It provides a scheduler for message delivery: methods can be registered to
- * the scheduler, and then messages allocated through CmiAlloc can be sent to
- * the correspondent method in a remote processor. This is done through the
- * converse header (which has few common fields, but is architecture dependent).
+  It provides a scheduler for message delivery: methods can be registered to
+  the scheduler, and then messages allocated through CmiAlloc can be sent to
+  the correspondent method in a remote processor. This is done through the
+  converse header (which has few common fields, but is architecture dependent).
+
+  @defgroup Scheduler 
+  \brief The portion of Converse responsible for scheduling the execution of 
+  incoming messages.
+
+  @file
+  converse main core
+  @ingroup Converse
+  @ingroup Scheduler
+ 
+  @addtogroup Converse
+  @{
+
 */
-
-/** @defgroup Scheduler 
-    \brief The portion of Converse responsible for scheduling the execution of incoming messages
-*/
-
-/** @file
- * converse main core
- * @ingroup Converse
- * @ingroup Scheduler
- */
-
-/**
- * @addtogroup Converse
- * @{
- */
 
 #include <stdio.h>
 #include <stdlib.h>
