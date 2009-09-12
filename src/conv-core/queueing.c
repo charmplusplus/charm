@@ -680,7 +680,7 @@ void CqsDequeue(Queue q, void **resp)
 
 static struct prio_struct kprio_zero = { 0, 0, {0} };
 static struct prio_struct kprio_max  = { 32, 1, {((unsigned int)(-1))} };
-
+/** Get the priority of the highest priority message in q */
 prio CqsGetPriority(q)
 Queue q;
 {
@@ -690,11 +690,12 @@ Queue q;
   return &kprio_max;
 }
 
-prio CqsGetSecondPriority(q)
-Queue q;
-{
-  return CqsGetPriority(q);
-}
+
+/* prio CqsGetSecondPriority(q) */
+/* Queue q; */
+/* { */
+/*   return CqsGetPriority(q); */
+/* } */
 
 void** CqsEnumerateDeq(deq q, int *num){
   void **head, **tail;
