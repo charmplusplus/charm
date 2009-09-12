@@ -24,6 +24,7 @@ Charm++:
 <li> <a href="group__CkFutures.shtml">Futures</a>,
 <li> <a href="group__CkInit.shtml">Startup</a>,
 <li> <a href="group__CkEnvelope.shtml">Message Envelope</a>,
+<li> <a href="group__CharmScheduler.shtml">Charm++ Scheduler</a>, 
 <li> Translator
 <li> SDAG
 </ul>
@@ -33,7 +34,7 @@ Charm++:
  Converse:
 <p><ul>
 <li> <a href="group__Converse.shtml">core</a>,
-<li> <a href="group__Scheduler.shtml">scheduler</a>, 
+<li> <a href="group__Scheduler.shtml">Converse Scheduler</a>, 
 <li> threads, 
 <li> memory allocation,
 <li> conditions, 
