@@ -26,7 +26,8 @@ class Accumulable
     
 public:
     Accumulable(ENTRY &e_) : e(e_) {}
-    void operator+=(const ENTRY &rhs_)
+    template<typename T>
+    void operator+=(const T &rhs_)
         { ENTRY_OPS_CLASS::accumulate(e, rhs_); }
     template<typename T>
     void accumulate(const T& rhs)
