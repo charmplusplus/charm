@@ -2,6 +2,11 @@
 #include "ParFUM_internals.h"
 #include "MsaHashtable.h"
 
+void operator+=(Hashtuple &t, const Hashnode &n)
+{
+    t.vec->push_back(n);
+}
+
 MsaHashtable::Add& MsaHashtable::getInitialAdd()
 {
 	if(initHandleGiven)
