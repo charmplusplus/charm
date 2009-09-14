@@ -10,20 +10,19 @@
 #include "queueing.h"
 
 /** @defgroup CharmScheduler 
-    \brief The portion of Charm++ responsible for scheduling the execution 
+    @brief The portion of Charm++ responsible for scheduling the execution 
     of Charm++ entry methods
 
     CqsEnqueueGeneral() is the main function that is responsible for enqueueing 
     messages. It will store the messages in one of three queues based on the 
-    specified priorities or strategies.
+    specified priorities or strategies. The Charm++ message queue is really three 
+    queues, one for positive priorities, one for zero priorities, and one for 
+    negative priorities. The positive and negative priorty queues are actually heaps.
+
 
     The charm++ messages are only scheduled after the converse message queues
     have been emptied. After that, a message is pulled from the Charm++ queue
     through a call to CqsDequeue().
-
-    The Charm++ message queue is really three queues, one for positive 
-    priorities, one for zero priorities, and one for negative priorities.
-    The positive and negative priorty queues are actually heaps.
 
 
     @addtogroup CharmScheduler
@@ -667,6 +666,13 @@ void CqsEnqueue(Queue q, void *data)
 /** Retrieve the highest priority message (one with most negative priority) */
 void CqsDequeue(Queue q, void **resp)
 {
+#if 0
+  /* Added by Isaac for testing purposes: */
+  if(CmiMemoryUsage() > 1000*1024*1024 ){
+    CqsIncreasePriorityForEntryMethod(q, 153);
+  }
+#endif
+
   if (q->length==0) 
     { *resp = 0; return; }
   if (q->negprioq.heapnext>1)
@@ -697,6 +703,12 @@ Queue q;
 /*   return CqsGetPriority(q); */
 /* } */
 
+
+/** Produce an array containing all the entries in a deq
+    @return a newly allocated array filled with copies of the (void*) elements in the deq. 
+    @param [in] q a deq
+    @param [out] num the number of pointers in the returned array
+*/
 void** CqsEnumerateDeq(deq q, int *num){
   void **head, **tail;
   void **result;
@@ -728,6 +740,11 @@ void** CqsEnumerateDeq(deq q, int *num){
   return(result);
 }
 
+/** Produce an array containing all the entries in a prioq
+    @return a newly allocated array filled with copies of the (void*) elements in the prioq. 
+    @param [in] q a deq
+    @param [out] num the number of pointers in the returned array
+*/
 void** CqsEnumeratePrioq(prioq q, int *num){
   void **head, **tail;
   void **result;
@@ -747,7 +764,7 @@ void** CqsEnumeratePrioq(prioq q, int *num){
     }
   }
 
-  result = (void **)CmiAlloc(count * sizeof(void *));
+  result = (void **)CmiAlloc((count) * sizeof(void *));
   *num = count;
   
   j = 0;
@@ -767,6 +784,11 @@ void** CqsEnumeratePrioq(prioq q, int *num){
   return result;
 }
 
+/** Produce an array containing all the entries in a Queue
+    @return a newly allocated array filled with copies of the (void*) elements in the Queue. 
+    @param [in] q a Queue
+    @param [out] resp an array of pointer entries found in the Queue
+*/
 void CqsEnumerateQueue(Queue q, void ***resp){
   void **result;
   int num;
@@ -796,6 +818,79 @@ void CqsEnumerateQueue(Queue q, void ***resp){
   }
   CmiFree(result);
 }
+
+
+
+
+/** Remove first occurence of a specified entry from the deq  by setting the entry to NULL.
+    The size of the deq will not change, it will now just contain an entry for a NULL pointer.
+
+    @return number of entries that were replaced with NULL
+*/
+int CqsRemoveSpecificDeq(deq q, const void *msgPtr){
+  void **head, **tail;
+
+  head = q->head;
+  tail = q->tail;
+
+  while(head != tail){
+    if(*head == msgPtr){
+      //    CmiPrintf("Replacing %p in deq with NULL\n", msgPtr);
+      //     *head = NULL;
+      return 1;
+    }
+    head++;
+    if(head == q->end)
+      head = q->bgn;
+  }
+  return 0;
+}
+
+
+
+/** Remove first occurence of a specified entry from the prioq by setting the entry to NULL.
+    The size of the prioq will not change, it will now just contain an entry for a NULL pointer.
+
+    @return number of entries that were replaced with NULL
+*/
+int CqsRemoveSpecificPrioq(prioq q, const void *msgPtr){
+  void **head, **tail;
+  void **result;
+  int i,j;
+  prioqelt pe;
+
+  for(i = 1; i < q->heapnext; i++){
+    pe = (q->heap)[i];
+    head = pe->data.head;
+    tail = pe->data.tail;
+    while(head != tail){
+      if(*head == msgPtr){
+	//	CmiPrintf("Replacing %p in prioq with NULL\n", msgPtr);
+	*head = NULL;
+	return 1;
+      }     
+      head++;
+      if(head == (pe->data).end)
+	head = (pe->data).bgn;
+    }
+  } 
+  return 0;
+}
+
+
+
+/** Remove an occurence of a specified entry from the Queue by setting its entry to NULL. 
+    The size of the Queue will not change, it will now just contain an entry for a NULL pointer.
+*/
+void CqsRemoveSpecific(Queue q, const void *msgPtr){
+  if( CqsRemoveSpecificPrioq(&(q->negprioq), msgPtr) == 0 )
+    if( CqsRemoveSpecificDeq(&(q->zeroprio), msgPtr) == 0 )  
+      if(CqsRemoveSpecificPrioq(&(q->posprioq), msgPtr) == 0){
+	CmiPrintf("Didn't remove the specified entry because it was not found\n");
+      }  
+}
+
+
 
 
 /** @} */

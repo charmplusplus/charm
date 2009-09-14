@@ -36,7 +36,7 @@ typedef struct prio_struct
 }
 *prio;
 
-/** An untyped double ended queue stored in a circular buffer, with internal space for 4 entries */
+/** A double ended queue of void* pointers stored in a circular buffer, with internal space for 4 entries */
 typedef struct deq_struct
 {
   /* Note: if head==tail, circ is empty */
@@ -49,7 +49,7 @@ typedef struct deq_struct
 *deq;
 
 #ifndef FASTQ
-/** An element in a priority queue, which contains a deque and some other stuff. */
+/** An bucket in a priority queue which contains a deque(storing the void* pointers) and references to other buckets in the hash table. */
 typedef struct prioqelt_struct
 {
   struct deq_struct data;
@@ -79,10 +79,10 @@ typedef struct prioqelt_struct
 /*#endif */
 
 /*#ifndef FASTQ*/
-/** A priority queue, implemented as a heap of prioqelts */
+/** A priority queue, implemented as a heap of prioqelt_struct buckets (each bucket represents a single priority value and contains a deque of void* pointers) */
 typedef struct prioq_struct
 {
-  int heapsize;  /**< An array of prioqelt's */
+  int heapsize; 
   int heapnext;
   prioqelt *heap; /**< An array of prioqelt's */
   prioqelt *hashtab;
@@ -103,7 +103,9 @@ typedef struct prioq1_struct
 */
 
 /*#ifndef FASTQ*/
-/** A set of 3 queues: a positive priority prioq_struct, a negative priority prioq_struct, and a zero priority deq_struct */
+/** A set of 3 queues: a positive priority prioq_struct, a negative priority prioq_struct, and a zero priority deq_struct.
+    If the user modifies the queue, NULL entries may be present, and hence NULL values will be returned by CqsDequeue().
+*/
 typedef struct Queue_struct
 {
   unsigned int length;
@@ -142,6 +144,14 @@ unsigned int CqsMaxLength(Queue);
 int CqsEmpty(Queue);
 int CqsPrioGT(prio, prio);
 prio CqsGetPriority(Queue);
+
+deq CqsPrioqGetDeq(prioq pq, unsigned int priobits, unsigned int *priodata);
+void *CqsPrioqDequeue(prioq pq);
+void CqsDeqEnqueueFifo(deq d, void *data);
+
+void* CqsIncreasePriorityForEntryMethod(Queue q, const int entrymethod);
+void CqsRemoveSpecific(Queue, const void *msgPtr);
+
 
 #ifdef __cplusplus
 };
