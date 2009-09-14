@@ -1234,8 +1234,10 @@ int preProcessReceivedMessage(envelope *env,Chare **objPointer,MlogEntry **logEn
 		while(!CqsEmpty(CpvAccess(_outOfOrderMessageQueue))){
 			void *qMsgPtr;
 			CqsDequeue(CpvAccess(_outOfOrderMessageQueue),&qMsgPtr);
-			envelope *qEnv = (envelope *)qMsgPtr;
-			CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),qEnv,CQS_QUEUEING_FIFO,qEnv->getPriobits(),(unsigned int *)qEnv->getPrioPtr());			
+			if(qMsgPtr != NULL){
+			  envelope *qEnv = (envelope *)qMsgPtr;
+			  CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),qEnv,CQS_QUEUEING_FIFO,qEnv->getPriobits(),(unsigned int *)qEnv->getPrioPtr());		  
+			}
 	DEBUG(CmiMemoryCheck());
 		}
 //		traceUserBracketEvent(25,_startTime,CkWallTimer());
