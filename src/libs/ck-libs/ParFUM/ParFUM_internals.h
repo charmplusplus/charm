@@ -2048,9 +2048,10 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
 #define MAX_SHARED_PER_NODE 20
 
 template <class T, bool PUP_EVERY_ELEMENT=true >
-  class DefaultListEntry {
+class DefaultListEntry {
     public:
-    static inline void accumulate(T& a, const T& b) { a += b; }
+    template<typename U>
+    static inline void accumulate(T& a, const U& b) { a += b; }
     // identity for initializing at start of accumulate
     static inline T getIdentity() { return T(); }
     static inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
