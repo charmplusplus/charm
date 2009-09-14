@@ -2268,6 +2268,31 @@ class MeshElem{
     }
     m->pup(p);
   }
+
+  struct ElemInfo {
+      FEM_Mesh* m;
+      int index;
+      int elemType;
+      ElemInfo(FEM_Mesh* _m, int _index, int _elemType)
+          : m(_m), index(_index), elemType(_elemType) {}
+  };
+
+  MeshElem& operator+=(const ElemInfo& rhs) {
+     m->elem[rhs.elemType].copyShape(rhs.m->elem[rhs.elemType]);
+     m->elem[rhs.elemType].push_back(rhs.m->elem[rhs.elemType], rhs.index);
+  }
+
+  struct NodeInfo {
+      FEM_Mesh* m;
+      int index;
+      NodeInfo(FEM_Mesh* _m, int _index)
+          : m(_m), index(_index) {}
+  };
+
+  MeshElem& operator+=(const NodeInfo& rhs) {
+     m->node.copyShape(rhs.m->node);
+     m->node.push_back(rhs.m->node, rhs.index);
+  }
 };
 
 

@@ -570,10 +570,9 @@ void FEM_write_part2mesh(MSA1DFEMMESH::Accum &part2mesh,
       const FEM_Elem &k=(m)->elem[t];
       for(int e=0;e<k.size();e++){
 	int chunkID = partdata->part[count];
-	MeshElem &myme=part2mesh.accumulate(chunkID);
-	(myme.m->elem[t]).copyShape(m->elem[t]);
-	(myme.m->elem[t]).push_back(m->elem[t],e);
-	count++;
+        MeshElem::ElemInfo ei(m, e, t);
+        part2mesh(chunkID) += ei;
+        count++;
       }
     }
   }
@@ -583,9 +582,8 @@ void FEM_write_part2mesh(MSA1DFEMMESH::Accum &part2mesh,
     IntList chunks = nodepart.get(i+startnode);
 		chunks.uniquify();
     for(int j=0;j<chunks.vec->size();j++){
-      MeshElem &myme = part2mesh.accumulate((*(chunks.vec))[j]);
-      (myme.m->node).copyShape(m->node);
-      (myme.m->node).push_back(m->node,i);
+      MeshElem::NodeInfo ni(m, i);
+      part2mesh((*(chunks.vec))[j]) += ni;
     }
   }
 }
@@ -1006,16 +1004,16 @@ void makeGhost(FEM_Mesh *m,
 
 					
 	  //add an element to the ghost mesh for this chunk
-	  MeshElem &myme = aGhostMeshes.accumulate(destChunk);
-	  myme.m->elem[elType].copyShape(m->elem[elType]);
-	  int index=myme.m->elem[elType].push_back(m->elem[elType],elNo);
+          MeshElem::ElemInfo ei(m, elNo, elType);
+          aGhostMeshes(destChunk) += ei;
 	  int globalelem = m->elem[elType].getGlobalno(elNo);
 	  DEBUG(printf("[%d] For chunk %d ghost element global no %d \n",myChunk,destChunk,globalelem));
 
 					
 	  //go through the connectivity of the ghost element (for destChunk) and check
 	  //if any of the nodes need to be added as ghost nodes on the destination
-	  int *conn = myme.m->elem[elType].connFor(index);
+	  //int *conn = myme.m->elem[elType].connFor(index);
+          int* conn = m->elem[elType].connFor(elNo);
 	  for(int k=0;k<m->elem[elType].getNodesPer();k++){
 	    int lnode = conn[k];
 	    //if a node is a ghost node, we dont send it
@@ -1045,8 +1043,8 @@ void makeGhost(FEM_Mesh *m,
 		FEM_Comm &sendNodeGhostSide = m->node.setGhostSend();
 		FEM_Comm_List &sendNodeGhostList = sendNodeGhostSide.addList((*listTuple.vec)[j].chunk); 
 		if(!listContains(sendNodeGhostList,lnode)){
-		  myme.m->node.copyShape(m->node);
-		  myme.m->node.push_back(m->node,lnode);
+                  MeshElem::NodeInfo ni(m, lnode);
+                  aGhostMeshes(destChunk) += ni;
 		  DEBUG(printf("[%d] Ghost node (send) global no %d \n",myChunk,globalnode));
 		  //add node lnode to the sendGhost list for the destination chunk 
 		  sendNodeGhostList.push_back(lnode);
