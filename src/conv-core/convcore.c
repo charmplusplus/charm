@@ -1519,7 +1519,7 @@ void CsdScheduleForever(void)
   SCHEDULE_TOP
   while (1) {
     msg = CsdNextMessage(&state);
-    if (msg) { /*A message is available-- process it*/
+    if (msg!=NULL) { /*A message is available-- process it*/
       if (isIdle) {isIdle=0;CsdEndIdle();}
       SCHEDULE_MESSAGE
 
@@ -1564,7 +1564,7 @@ int CsdScheduleCount(int maxmsgs)
   SCHEDULE_TOP
   while (1) {
     msg = CsdNextMessage(&state);
-    if (msg) { /*A message is available-- process it*/
+    if (msg!=NULL) { /*A message is available-- process it*/
       if (isIdle) {isIdle=0;CsdEndIdle();}
       maxmsgs--; 
       SCHEDULE_MESSAGE
