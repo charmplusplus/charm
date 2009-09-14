@@ -563,8 +563,8 @@ void FEM_write_part2mesh(MSA1DFEMMESH::Accum &part2mesh,
 			 FEM_Mesh *m)
 {
   int count=0;
-  /// reading my part of the broken mesh and  sending the element data to the mesh 
-  /// that actually should have it according to parmetis
+  // reading my part of the broken mesh and sending the element data to the
+  // mesh that actually should have it according to parmetis
   for(int t=0;t<m->elem.size();t++){
     if(m->elem.has(t)){
       const FEM_Elem &k=(m)->elem[t];
@@ -576,7 +576,7 @@ void FEM_write_part2mesh(MSA1DFEMMESH::Accum &part2mesh,
       }
     }
   }
-  /// send out the nodes that I have the data for to the meshes that have them
+  // send out the nodes that I have the data for to the meshes that have them
   int startnode=(myChunk * data->nnode)/numChunks;
   for(int i=0;i<m->node.size();i++){
     IntList chunks = nodepart.get(i+startnode);
