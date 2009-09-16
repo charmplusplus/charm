@@ -12,38 +12,135 @@
 #include "queueing.h" // For access to scheduler data structures
 #include "conv-trace.h"
 
+
+// Predeclarations:
+int CqsFindRemoveSpecificPrioq(prioq q, void *&msgPtr, const int *entryMethod, const int numEntryMethods );
+int CqsFindRemoveSpecificDeq(deq q, void *&msgPtr, const int *entryMethod, const int numEntryMethods );
+
+
 /** Search Queue for messages associated with a specified entry method */ 
 void CqsIncreasePriorityForEntryMethod(Queue q, const int entrymethod){
-  int i;
-  void **entries;
-  int numMessages = q->length;
-  
-  CqsEnumerateQueue(q, &entries);
-  
-  for(i=0;i<numMessages;i++){
-    envelope *env = (envelope*)entries[i];
-    if(env != NULL){
-      if(env->getMsgtype() == ForArrayEltMsg || env->getMsgtype() == ForChareMsg){
-	const int ep = env->getsetArrayEp();
-	if(ep==entrymethod){
-	  // Remove the entry from the queue	  
-	  CqsRemoveSpecific(q,env);
-	  
-	  int prio = -50000; 
-	  CqsEnqueueGeneral(q, (void*)env, CQS_QUEUEING_IFIFO, 0, (unsigned int*)&prio);
+    void *removedMsgPtr;
+    int numRemoved;
+    
+    int entryMethods[1];
+    entryMethods[0] = entrymethod;
 
-	  char traceStr[64];
-	  sprintf(traceStr, "Replacing %p in prioq with NULL", env);
-	  traceUserSuppliedNote(traceStr);
+    numRemoved = CqsFindRemoveSpecificPrioq(&(q->negprioq), removedMsgPtr, entryMethods, 1 );
+    if(numRemoved == 0)
+	numRemoved = CqsFindRemoveSpecificDeq(&(q->zeroprio), removedMsgPtr, entryMethods, 1 );
+    if(numRemoved == 0)
+	numRemoved = CqsFindRemoveSpecificPrioq(&(q->posprioq), removedMsgPtr, entryMethods, 1 );
+    
+    if(numRemoved > 0){
+	CkAssert(numRemoved==1); // We need to reenqueue all removed messages, but we currently only handle one
+	int prio = -1000000; 
+	CqsEnqueueGeneral(q, removedMsgPtr, CQS_QUEUEING_IFIFO, 0, (unsigned int*)&prio);
 
-	  break;
-	}
-      }  
+#ifndef CMK_OPTIMIZE 
+	char traceStr[64];
+	sprintf(traceStr, "Replacing %p in message queue with NULL", removedMsgPtr);
+	traceUserSuppliedNote(traceStr);
+#endif
     }
-  }
-  
-  CmiFree(entries);
 }
+ 
+
+
+/** Find and remove the first 1 occurences of messages that matches a specified entry method index.
+    The size of the deq will not change, it will just contain an entry for a NULL pointer.
+
+    @return number of entries that were replaced with NULL
+
+    @param [in] q A circular double ended queue
+    @param [out] msgPtr returns the message that was removed from the prioq
+    @param [in] entryMethod An array of entry method ids that should be considered for removal
+    @param [in] numEntryMethods The number of the values in the entryMethod array.
+*/
+int CqsFindRemoveSpecificDeq(deq q, void *&msgPtr, const int *entryMethod, const int numEntryMethods ){
+    void **iter = q->head; ///< An iterator used to iterate through the circular queue
+
+    while(iter != q->tail){
+	// *iter is contains a pointer to a message
+	envelope *env = (envelope*)*iter;
+	if(env != NULL && (env->getMsgtype() == ForArrayEltMsg || env->getMsgtype() == ForChareMsg)){
+	    const int ep = env->getsetArrayEp();
+	    bool foundMatch = false;
+	    // Search for ep by linearly searching through entryMethod
+	    for(int i=0;i<numEntryMethods;++i){
+		if(ep==entryMethod[i]){
+		    foundMatch=true;
+		    break;
+		}
+	    }
+	    if(foundMatch){
+		// Remove the entry from the queue
+		*iter = NULL;
+		msgPtr = env;
+		return 1;
+	    }
+	}
+	// Advance head to the next item in the circular queue
+	iter++;
+	if(iter == q->end)
+	    iter = q->bgn;
+    }
+    return 0;
+}
+
+ 
+
+/** Find and remove the first 1 occurences of messages that matches a specified entry method index.
+    The size of the prioq will not change, it will just contain an entry for a NULL pointer.
+
+    @return number of entries that were replaced with NULL
+
+    @param [in] q A priority queue
+    @param [out] msgPtr returns the message that was removed from the prioq
+    @param [in] entryMethod An array of entry method ids that should be considered for removal
+    @param [in] numEntryMethods The number of the values in the entryMethod array.
+*/
+int CqsFindRemoveSpecificPrioq(prioq q, void *&msgPtr, const int *entryMethod, const int numEntryMethods ){
+
+    // A priority queue is a heap of circular queues
+    for(int i = 1; i < q->heapnext; i++){
+	// For each of the circular queues:
+        prioqelt pe = (q->heap)[i];
+	void **head; ///< An iterator used to iterate through a circular queue
+	void **tail; ///< The end of the circular queue
+	head = pe->data.head;
+        tail = pe->data.tail;
+        while(head != tail){
+	    // *head contains a pointer to a message
+	    envelope *env = (envelope*)*head;
+	    if(env != NULL && (env->getMsgtype() == ForArrayEltMsg || env->getMsgtype() == ForChareMsg)){
+		const int ep = env->getsetArrayEp();
+		bool foundMatch = false;
+		// Search for ep by linearly searching through entryMethod
+		for(int i=0;i<numEntryMethods;++i){
+		    if(ep==entryMethod[i]){
+			foundMatch=true;
+//			break;
+		    }
+		}
+		if(foundMatch){
+		    // Remove the entry from the queue
+		    *head = NULL;
+		    msgPtr = env;
+		    return 1;
+		}
+	    }
+	    // Advance head to the next item in the circular queue
+	    head++;
+            if(head == (pe->data).end)
+                head = (pe->data).bgn;
+        }
+    }
+    return 0;
+}
+
+
+
 
 
 /** @} */

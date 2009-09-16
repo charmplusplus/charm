@@ -667,12 +667,12 @@ void CqsEnqueue(Queue q, void *data)
 void CqsDequeue(Queue q, void **resp)
 {
 #if 0
-  /* Added by Isaac for testing purposes: */
-  if(CmiMemoryUsage() > 1000*1024*1024 ){
-    CqsIncreasePriorityForEntryMethod(q, 153);
-  }
+    /* Added by Isaac for testing purposes: */
+    if(CmiMemoryUsage() > 600*1024*1024 ){
+	CqsIncreasePriorityForEntryMethod(q, 153);
+    }
 #endif
-
+    
   if (q->length==0) 
     { *resp = 0; return; }
   if (q->negprioq.heapnext>1)
@@ -856,7 +856,7 @@ int CqsRemoveSpecificDeq(deq q, const void *msgPtr){
 int CqsRemoveSpecificPrioq(prioq q, const void *msgPtr){
   void **head, **tail;
   void **result;
-  int i,j;
+  int i;
   prioqelt pe;
 
   for(i = 1; i < q->heapnext; i++){
@@ -889,6 +889,12 @@ void CqsRemoveSpecific(Queue q, const void *msgPtr){
 	CmiPrintf("Didn't remove the specified entry because it was not found\n");
       }  
 }
+
+
+
+
+
+
 
 
 
