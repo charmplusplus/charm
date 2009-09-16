@@ -13,7 +13,7 @@
 #include "conv-trace.h"
 
 /** Search Queue for messages associated with a specified entry method */ 
-void* CqsIncreasePriorityForEntryMethod(Queue q, const int entrymethod){
+void CqsIncreasePriorityForEntryMethod(Queue q, const int entrymethod){
   int i;
   void **entries;
   int numMessages = q->length;

@@ -149,7 +149,7 @@ deq CqsPrioqGetDeq(prioq pq, unsigned int priobits, unsigned int *priodata);
 void *CqsPrioqDequeue(prioq pq);
 void CqsDeqEnqueueFifo(deq d, void *data);
 
-void* CqsIncreasePriorityForEntryMethod(Queue q, const int entrymethod);
+void CqsIncreasePriorityForEntryMethod(Queue q, const int entrymethod);
 void CqsRemoveSpecific(Queue, const void *msgPtr);
 
 
