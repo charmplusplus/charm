@@ -1,8 +1,10 @@
-#include "conv-mach.h" 
+//#include "conv-mach.h" 
+#include "converse.h"
 
 #include <spi/UPC.h>
 #include <spi/UPC_Events.h>
 #include <iostream>
+
 
 
 /// An initcall that registers the idle time reducer idleTimeReduction()
@@ -17,8 +19,8 @@ void initBGP_UPC_Counters(void) {
     // counter_mode = 0, 1, 2, 3 (plus some others … see UPC.h)
     // counter_trigger = BGP_UPC_CFG_LEVEL_HIGH, BGP_UPC_CFG_EDGE_DEFAULT
     
-    BGP_UPC_Mode_t counter_mode = BGP_UPC_MODE_0;
-    BGP_UPC_Event_Edge_t counter_trigger = BGP_UPC_CFG_LEVEL_HIGH;
+    BGP_UPC_Mode_t counter_mode = BGP_UPC_MODE_2;
+    BGP_UPC_Event_Edge_t counter_trigger = BGP_UPC_CFG_EDGE_DEFAULT;
     
     BGP_UPC_Initialize_Counter_Config(counter_mode, counter_trigger);
 
@@ -37,8 +39,13 @@ void printBGP_UPC_Counters(void) {
  
     BGP_UPC_Stop();
    
+    CmiMyPe();
+
     // Should look at BGP_TORUS_XP_NO_TOKENS to determine if there is contention
-   
+//    BGP_UPC_Print_Counter_Values(BGP_UPC_READ_EXCLUSIVE);
+
+
+#if 0
     int64_t cxp = BGP_UPC_Read_Counter_Value(BGP_TORUS_XP_PACKETS, BGP_UPC_READ_EXCLUSIVE);
     std::cout << "BGP_UPC_Read_Counter_Value returned torus xp = " << cxp << std::endl;
 
@@ -76,7 +83,37 @@ void printBGP_UPC_Counters(void) {
 
     int64_t czmc = BGP_UPC_Read_Counter_Value(BGP_TORUS_ZM_32BCHUNKS, BGP_UPC_READ_EXCLUSIVE);
     std::cout << "BGP_UPC_Read_Counter_Value returned torus zm chunks = " << czmc << std::endl;
+#else
 
+    int pe = CmiMyPe();
+
+
+std::cout << "[" << pe << "] BGP_TORUS_XP_NO_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_XP_NO_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_XM_NO_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_XM_NO_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_YP_NO_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_YP_NO_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_YM_NO_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_YM_NO_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_ZP_NO_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_ZP_NO_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_ZM_NO_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_ZM_NO_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_XP_NO_VCD0_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_XP_NO_VCD0_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_XM_NO_VCD0_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_XM_NO_VCD0_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_YP_NO_VCD0_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_YP_NO_VCD0_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_YM_NO_VCD0_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_YM_NO_VCD0_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_ZP_NO_VCD0_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_ZP_NO_VCD0_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_ZM_NO_VCD0_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_ZM_NO_VCD0_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_XP_NO_VCBN_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_XP_NO_VCBN_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_XM_NO_VCBN_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_XM_NO_VCBN_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_YP_NO_VCBN_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_YP_NO_VCBN_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_YM_NO_VCBN_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_YM_NO_VCBN_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_ZP_NO_VCBN_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_ZP_NO_VCBN_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+//std::cout << "[" << pe << "] BGP_TORUS_ZM_NO_VCBN_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_ZM_NO_VCBN_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_XP_NO_VCBP_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_XP_NO_VCBP_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_XM_NO_VCBP_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_XM_NO_VCBP_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_YP_NO_VCBP_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_YP_NO_VCBP_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_YM_NO_VCBP_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_YM_NO_VCBP_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+std::cout << "[" << pe << "] BGP_TORUS_ZP_NO_VCBP_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_ZP_NO_VCBP_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+//std::cout << "[" << pe << "] BGP_TORUS_ZM_NO_VCBP_TOKENS=" << BGP_UPC_Read_Counter_Value(BGP_TORUS_ZM_NO_VCBP_TOKENS, BGP_UPC_READ_EXCLUSIVE) << "\n";
+
+#endif
 
     //    Save the counter values from the counter_data structure …
     BGP_UPC_Start(0);
