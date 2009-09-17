@@ -89,7 +89,7 @@ Main::Main(CkArgMsg *m){
   }
   */
   int depth = getiparam("depth");
-  if(depth < 0){
+  if(depth < 1){
     depth = 1;
   }
 
