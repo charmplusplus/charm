@@ -20,6 +20,10 @@
 extern "C" {
 #endif
 
+
+/** A memory limit threshold for adaptively scheduling */
+extern int schedAdaptMemThresholdMB;
+
 #ifndef CINTBITS
 #define CINTBITS ((unsigned int) (sizeof(int)*8))
 #endif

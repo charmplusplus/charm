@@ -30,6 +30,10 @@
 */
 
 
+/** A memory limit threshold for adaptively scheduling */
+int schedAdaptMemThresholdMB;
+
+
 /** Initialize a deq */
 static void CqsDeqInit(d)
 deq d;
@@ -666,9 +670,9 @@ void CqsEnqueue(Queue q, void *data)
 /** Retrieve the highest priority message (one with most negative priority) */
 void CqsDequeue(Queue q, void **resp)
 {
-#if 0
+#ifdef ADAPT_SCHED_MEM
     /* Added by Isaac for testing purposes: */
-    if(CmiMemoryUsage() > 600*1024*1024 ){
+    if((q->length > 1) && (CmiMemoryUsage() > schedAdaptMemThresholdMB*1024*1024) ){
 	CqsIncreasePriorityForEntryMethod(q, 153);
     }
 #endif
