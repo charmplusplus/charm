@@ -86,8 +86,7 @@ void reduction_initialize(const IDXL_Layout& dt, void *lhs, int op,const char *c
  * combine a row of user data (src) into a row of compressed data (dest)
  * using this reduction operation.
  */
-typedef unsigned char byte;
-typedef void (*reduction_combine_fn)(byte *dest,const byte *src,const IDXL_Layout *srcLayout);
+typedef void (*reduction_combine_fn)(unsigned char *dest,const unsigned char *src,const IDXL_Layout *srcLayout);
 reduction_combine_fn reduction_combine(const IDXL_Layout& dt, int op,const char *callingRoutine="");
 
 /// List the prototypes for parameters needed by the DEREF macro.
@@ -97,7 +96,7 @@ reduction_combine_fn reduction_combine(const IDXL_Layout& dt, int op,const char 
 /// Find this record and field, of this type, in this user array.
 /// Requires the paramters listed in IDX_LAYOUT_PARAM.
 #define IDXL_LAYOUT_DEREF(T,src,record,field) \
-	*(T *)(((byte *)src)+offset+(record)*distance+(field)*skew)
+	*(T *)(((unsigned char *)src)+offset+(record)*distance+(field)*skew)
 
 /// Keeps a list of dynamically-allocated IDXL_Layout objects:
 class IDXL_Layout_List {

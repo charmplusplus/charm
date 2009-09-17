@@ -11,6 +11,7 @@ arrays.
 #include <math.h>
 #include <limits.h>
 #include <float.h> /*for FLT_MIN on non-Suns*/
+typedef unsigned char byte;
 
 int IDXL_Layout::type_size(int dataType,const char *callingRoutine)
 {
