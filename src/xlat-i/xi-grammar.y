@@ -1,6 +1,6 @@
-
 %expect 6
 %{
+#include <iostream>
 #include "xi-symbol.h"
 #include "EToken.h"
 extern int yylex (void) ;
@@ -1075,6 +1075,6 @@ HashIFDefComment: HASHIFDEF Name
 %%
 void yyerror(const char *mesg)
 {
-  cout << cur_file<<":"<<lineno<<": Charmxi syntax error> " << mesg << endl;
-  // return 0;
+    std::cout << cur_file<<":"<<lineno<<": Charmxi syntax error> "
+	      << mesg << std::endl;
 }

@@ -8,17 +8,11 @@
 #ifndef _XI_UTIL_H
 #define _XI_UTIL_H
 
+#include <iostream>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include "conv-config.h"
-
-#if CMK_STL_USE_DOT_H /* Pre-standard C++ */
-#  include <iostream.h>
-#else /* ISO C++ */
-#  include <iostream>
-   using namespace std;
-#endif
 
 #if CMK_ISATTY_DECL
 #ifdef __cplusplus
@@ -43,9 +37,9 @@ class XStr {
     void append(char c);
     // MAB: the print method is needed for debugging sdag translator.
     // this too will go away later.
-    void print(int indent) { 
-      for (int i=0; i<indent; i++) cout << "  ";
-      cout << get_string();
+    void print(int indent) {
+      for (int i=0; i<indent; i++) std::cout << "  ";
+      std::cout << get_string();
     }
     /// Appends character c to every line
     void line_append(const char c);

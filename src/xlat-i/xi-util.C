@@ -99,6 +99,7 @@ void
 XStr::spew(const char*b, const char *a1, const char *a2, const char *a3, 
            const char *a4, const char *a5)
 {
+  using std::cout;
   int i,length=strlen(b);
   for(i=0; i<length; i++){
     switch(b[i]){

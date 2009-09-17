@@ -8,6 +8,7 @@
 #ifndef _SYMBOL_H
 #define _SYMBOL_H
 
+#include <iostream>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -72,7 +73,7 @@ class ValueList : public Printable {
         val->print(str);
       }
       if(next) {
-	  cout<<"Unsupported type\n";
+	  std::cout << "Unsupported type\n";
 	  abort();
       }
     }

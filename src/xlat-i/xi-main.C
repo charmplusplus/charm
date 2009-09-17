@@ -5,10 +5,14 @@
  * $Revision$
  *****************************************************************************/
 
+#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include "xi-symbol.h"
 #include "xi-grammar.tab.h"
+
+using std::cout;
+using std::endl;
 
 extern FILE *yyin;
 extern void yyrestart ( FILE *input_file );

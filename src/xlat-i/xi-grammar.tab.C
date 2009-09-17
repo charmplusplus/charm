@@ -212,8 +212,9 @@
 
 
 /* Copy the first part of user declarations.  */
-#line 3 "xi-grammar.y"
+#line 2 "xi-grammar.y"
 
+#include <iostream>
 #include "xi-symbol.h"
 #include "EToken.h"
 extern int yylex (void) ;
@@ -287,7 +288,7 @@ typedef union YYSTYPE
   AccelBlock* accelBlock;
 }
 /* Line 187 of yacc.c.  */
-#line 291 "y.tab.c"
+#line 292 "y.tab.c"
 	YYSTYPE;
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
@@ -300,7 +301,7 @@ typedef union YYSTYPE
 
 
 /* Line 216 of yacc.c.  */
-#line 304 "y.tab.c"
+#line 305 "y.tab.c"
 
 #ifdef short
 # undef short
@@ -3611,7 +3612,7 @@ yyreduce:
 
 
 /* Line 1267 of yacc.c.  */
-#line 3615 "y.tab.c"
+#line 3616 "y.tab.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -3829,7 +3830,7 @@ yyreturn:
 
 void yyerror(const char *mesg)
 {
-  cout << cur_file<<":"<<lineno<<": Charmxi syntax error> " << mesg << endl;
-  // return 0;
+    std::cout << cur_file<<":"<<lineno<<": Charmxi syntax error> "
+	      << mesg << std::endl;
 }
 
