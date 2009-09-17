@@ -82,10 +82,18 @@ Main::Main(CkArgMsg *m){
     iterations = DEFAULT_NUM_ITERATIONS;
   }
 
+  /*
   numTreePieces = getiparam("pieces");
   if(numTreePieces < 0){
     numTreePieces = 8*numParticleChunks; 
   }
+  */
+  int depth = getiparam("depth");
+  if(depth < 0){
+    depth = 1;
+  }
+
+  numTreePieces = 1 << (3*depth);
   ckout << "pieces: " << numTreePieces << endl;
   // various maximum count parameters are:
   // nbody, maxmybody, maxcell, maxmycell, maxleaf, maxmyleaf
@@ -99,7 +107,7 @@ Main::Main(CkArgMsg *m){
   CProxy_BlockMap myMap=CProxy_BlockMap::ckNew(); 
   CkArrayOptions opts(numTreePieces); 
   opts.setMap(myMap);
-  int depth = log8floor(numTreePieces);
+  //int depth = log8floor(numTreePieces);
   ckout << "top-level pieces depth: " << (depth+1) << ", " << (IMAX >> (depth+1)) << endl;
   CProxy_TreePiece treeProxy = CProxy_TreePiece::ckNew((CmiUInt8)0,-1,(IMAX >> (depth+1)), CkArrayIndex1D(0), opts);
   pieces = treeProxy;
@@ -680,6 +688,10 @@ void Main::updateTopLevelMoments(){
   CkPrintf("[main]: updateTopLevelMoments(%d)\n", depth);
 #endif
   moments((nodeptr)G_root, depth);
+#ifdef MEMCHECK
+  CkPrintf("[main] check after moments\n");
+  CmiMemoryCheck();
+#endif
 }
 
 nodeptr Main::moments(nodeptr node, int depth){
@@ -704,6 +716,7 @@ nodeptr Main::moments(nodeptr node, int depth){
 #ifdef VERBOSE_MAIN
   CkPrintf("Pos(node): (%f,%f,%f)\n", Pos(node)[0], Pos(node)[1], Pos(node)[2]);
 #endif
+  return node;
 }
 
 #ifdef PRINT_TREE

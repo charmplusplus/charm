@@ -60,7 +60,7 @@ TreePiece::TreePiece(CmiUInt8 p_, int which, int level_, CkArrayIndex1D parentId
   myLevel = level_;
   // don't save parent if top-level tp. parent will be set by
   // acceptroots
-  whichChildAmI = thisIndex;
+  whichChildAmI = thisIndex%NSUB;
 
   usesAtSync = CmiFalse;
   setMigratable(false);
@@ -239,7 +239,7 @@ void TreePiece::acceptRoots(CmiUInt8 roots_, real rsize_, real rmx, real rmy, re
 #endif
 
 #ifdef VERBOSE_PIECES
-    CkPrintf("piece [%d] acceptRoot parent 0x%x\n", thisIndex, parent);
+    CkPrintf("piece [%d] acceptRoot parent 0x%x (%ld)\n", thisIndex, parent, NodeKey(parent));
 #endif
   }
   contribute(0,0,CkReduction::concat,cb);
@@ -876,5 +876,9 @@ void TreePiece::cleanup(CkCallback &cb_){
   wantToSplit = false;
 
   contribute(0,0,CkReduction::concat,cb_);
+#ifdef MEMCHECK
+  CkPrintf("piece %d after cleanup\n", thisIndex);
+  CmiMemoryCheck();
+#endif
 }
 

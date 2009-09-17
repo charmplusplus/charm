@@ -14,8 +14,11 @@
 #
 # to disable timing 
 # -DNO_TIME
+#
+# to enable heap memory corruption checks
+# -DMEMCHECK
 
-OPTS= -O3 -DNO_TIME #-DOUTPUT_ACC #-DPRINT_TREE #-DNO_LB #-DVERBOSE_CHUNKS -DVERBOSE_PIECES -DVERBOSE_MAIN
+OPTS= -g -O3 #-DVERBOSE_PIECES -DVERBOSE_MAIN -DPRINT_TREE -DOUTPUT_ACC -DMEMCHECK  -DNO_LB #-DVERBOSE_CHUNKS -DVERBOSE_PIECES -DVERBOSE_MAIN
 CHARM_DIR=../../../multicore-linux64
 CHARMC=$(CHARM_DIR)/bin/charmc $(OPTS)
 
@@ -33,7 +36,7 @@ $(TARGET).%: $(TARGET)
 	mv charmrun charmrun.$*
 
 run: $(TARGET)
-	./$(TARGET) +LBPeriod 0.0001 +balancer NullLB -in=input_100000 -pieces=8 -fat=100 -tstop=0.225 -NPROC=$(NPROC) $(BARNES_OPTS) +p$(P) ++ppn$(P) 
+	./$(TARGET) +LBPeriod 0.0001 +balancer NullLB -in=input_100000 -idepth=2 -fat=100 -tstop=0.225 -NPROC=$(NPROC) $(BARNES_OPTS) +p$(P) ++ppn$(P) 
 
 grav.o: grav.C barnes.decl.h
 	$(CHARMC) -c grav.C

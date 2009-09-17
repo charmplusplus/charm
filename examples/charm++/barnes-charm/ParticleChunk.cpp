@@ -161,6 +161,10 @@ void ParticleChunk::partition(CkCallback &cb){
   CkPrintf("[%d] mynbody: %d\n", thisIndex, mynbody);
 #endif
   contribute(0,0,CkReduction::concat,cb);
+#ifdef MEMCHECK
+  CkPrintf("[%d] memcheck after partition\n", thisIndex);
+  CmiMemoryCheck();
+#endif
 }
 
 void ParticleChunk::HouseKeep(){
@@ -232,6 +236,10 @@ void ParticleChunk::ComputeForces (CkCallback &cb)
    }
 
    contribute(0,0,CkReduction::concat,cb);
+#ifdef MEMCHECK
+  CkPrintf("[%d] memcheck after calcforces\n", thisIndex);
+  CmiMemoryCheck();
+#endif
 }
 
 void ParticleChunk::stepsystemPartII(CkReductionMsg *msg){
@@ -291,14 +299,14 @@ ParticleChunk::loadtree(bodyptr p, cellptr root, unsigned ProcessId)
 
    int depth = log8floor(numTreePieces);
    int lowestLevel = Level(mynode) >> depth;
-   int fact = NSUB/2;
+   int fact = NDIM;
    int whichTp = 0;
-   int d = depth;
+   int d = depth-1;
 
    for(int level = Level(mynode); level > lowestLevel; level >>= 1){
      kidIndex = subindex(xp, Level(mynode));
      mynode = Subp(mynode)[kidIndex];
-     whichTp += kidIndex*(1<<(fact*(d-1)));
+     whichTp += kidIndex*(1<<(fact*(d)));
      d--;     
    }
 
@@ -368,8 +376,13 @@ void ParticleChunk::advance(CkCallback &cb_){
     }
   }
 
+  //CkPrintf("chunk %d minmax: (%f,%f,%f) (%f,%f,%f)\n", thisIndex, minmax[0], minmax[1], minmax[2], minmax[3], minmax[4], minmax[5]);
   CkCallback cb(CkIndex_Main::recvGlobalSizes(NULL), mainChare);
   contribute(NDIM*2*sizeof(real), minmax, minmax_RealVectorType, cb);
+#ifdef MEMCHECK
+  CkPrintf("[%d] memcheck after advance\n", thisIndex);
+  CmiMemoryCheck();
+#endif
 }
 
 void ParticleChunk::cleanup(){
