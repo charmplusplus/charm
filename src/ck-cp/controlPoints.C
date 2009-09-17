@@ -113,7 +113,7 @@ controlPointManager::controlPointManager(){
     
     frameworkShouldAdvancePhase = false;
     haveGranularityCallback = false;
-    CkPrintf("[%d] controlPointManager() Constructor Initializing control points, and loading data file\n", CkMyPe());
+//    CkPrintf("[%d] controlPointManager() Constructor Initializing control points, and loading data file\n", CkMyPe());
     
     phase_id = 0;
     
@@ -143,7 +143,7 @@ controlPointManager::controlPointManager(){
   
 
  controlPointManager::~controlPointManager(){
-    CkPrintf("[%d] controlPointManager() Destructor\n", CkMyPe());
+//    CkPrintf("[%d] controlPointManager() Destructor\n", CkMyPe());
   }
 
 
@@ -732,7 +732,7 @@ extern "C" void controlPointShutdown(){
 
 /// A function called at startup on each node to register controlPointShutdown() to be called at CkExit()
 void controlPointInitNode(){
-  CkPrintf("controlPointInitNode()\n");
+//  CkPrintf("controlPointInitNode()\n");
   registerExitFn(controlPointShutdown);
 }
 
