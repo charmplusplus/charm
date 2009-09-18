@@ -5,11 +5,13 @@
 extern "C" {
 #endif
 
-
-
 /** 
- *  @addtogroup Scheduler
- *  @{
+  @file 
+  Definitions of CdsFifo routines.
+  @ingroup ConverseScheduler
+
+  @addtogroup ConverseScheduler
+  @{
  */
 typedef void *CdsFifo;
 
@@ -25,12 +27,7 @@ int     CdsFifo_Empty(CdsFifo q);
 void *  CdsFifo_Peek(CdsFifo q);
 int     CdsFifo_Length(CdsFifo q);
 
-
-/** 
- *   @}
- */
-
-
+/** @} */
 
 #ifdef __cplusplus
 }

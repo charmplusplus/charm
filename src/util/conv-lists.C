@@ -2,7 +2,11 @@
 #include "cklists.h"
 
 /** 
- *  @addtogroup Scheduler
+ * @file 
+ * Declarations of CdsFifo* routines
+ *
+ *  @ingroup ConverseScheduler
+ *  @addtogroup ConverseScheduler
  *  @{
  */
 

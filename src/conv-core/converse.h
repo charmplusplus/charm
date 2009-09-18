@@ -31,7 +31,8 @@
   - Csv, Converse node-shared variable.  Global variables 
      shared by all processors of a node (beware of thread safety!)
 
-  @addtogroup CharmScheduler
+  @ingroup CharmScheduler
+  @ingroup ConverseScheduler
 
 */
 #ifndef CONVERSE_H
@@ -799,8 +800,10 @@ extern void __cmi_assert(const char *, const char *, int);
 
 typedef void (*CmiStartFn)(int argc, char **argv);
 
-/********* CSD - THE SCHEDULER ********/
-
+/********* CSD - THE SCHEDULER ********
+  @addtogroup ConverseScheduler
+  @{
+*/
 CpvExtern(int, _ccd_numchecks);
 extern void  CcdCallBacks();
 #define CsdPeriodic() do{ if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks(); } while(0)
@@ -836,6 +839,7 @@ extern  int CsdScheduleCount(int maxmsgs);
 extern void CsdSchedulePoll(void);
 
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)++)
+/** @} */
 
 #if CMK_SPANTREE_USE_COMMON_CODE
 

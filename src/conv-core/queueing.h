@@ -11,8 +11,12 @@
 
 
 /** 
-   @addtogroup CharmScheduler
-   @{
+    @file 
+    Declarations of queuing data structure functions.
+    @ingroup CharmScheduler   
+
+    @addtogroup CharmScheduler
+    @{
  */
 
 

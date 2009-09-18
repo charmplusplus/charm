@@ -20,11 +20,19 @@
     negative priorities. The positive and negative priorty queues are actually heaps.
 
 
-    The charm++ messages are only scheduled after the converse message queues
-    have been emptied. After that, a message is pulled from the Charm++ queue
-    through a call to CqsDequeue().
+    The charm++ messages are only scheduled after the \ref ConverseScheduler "converse message queues"
+    have been emptied:
+
+    - CsdScheduleForever() is the commonly used Converse scheduler loop
+       - CsdNextMessage()
+          - First processes converse message from a  \ref ConverseScheduler "converse queue" if one exists using CdsFifo_Dequeue() 
+          - Then if no converse message was found, call CqsDequeue() which gets a charm++ message to execute if one exists
 
 
+    @file
+    Implementation of queuing data structure functions.
+    @ingroup CharmScheduler
+    
     @addtogroup CharmScheduler
     @{
 */

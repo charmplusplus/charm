@@ -26,14 +26,28 @@
   the correspondent method in a remote processor. This is done through the
   converse header (which has few common fields, but is architecture dependent).
 
-  @defgroup Scheduler 
+  @defgroup ConverseScheduler 
   \brief The portion of Converse responsible for scheduling the execution of 
   incoming messages.
+  
+  Converse provides a scheduler for message delivery: methods can be registered to 
+  the scheduler, and then messages allocated through CmiAlloc can be sent to 
+  the correspondent method in a remote processor. This is done through the
+  converse header (which has few common fields, but is architecture dependent).
+
+  In converse the CsdScheduleForever() routine will run an infinite while loop that 
+  looks for available messages to processes from the message queue. Messages in the 
+  queue are dequeued by the CsdNextMessage() routine. When a 
+  message is taken from the queue it is then passed into CmiHandleMessage() which
+  calls the handler associated with the message.
+
+  Incoming messages that are destined for Charm++ will be passed to the 
+  \ref CharmScheduler "charm scheduling routines".
 
   @file
   converse main core
   @ingroup Converse
-  @ingroup Scheduler
+  @ingroup ConverseScheduler
  
   @addtogroup Converse
   @{
@@ -1271,7 +1285,7 @@ void (*handler)();
 #endif
 
 /** 
- *  @addtogroup Scheduler
+ *  @addtogroup ConverseScheduler
  *  @{
  */
 
@@ -1348,6 +1362,7 @@ void CsdEndIdle(void)
 
 extern int _exitHandlerIdx;
 
+/** Takes a message and calls its corresponding handler. */
 void CmiHandleMessage(void *msg)
 {
 /* this is wrong because it counts the Charm++ messages in sched queue
@@ -1503,6 +1518,7 @@ extern void CkClearAllArrayElements();
 
 extern void machine_OffloadAPIProgress();
 
+/** The main scheduler loop that repeatedly executes messages from a queue, forever. */
 void CsdScheduleForever(void)
 {
   #if CMK_CELL

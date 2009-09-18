@@ -11,71 +11,62 @@
 
 <tr><td>
 Charm++:
-<p><ul>
-<li> <a href="group__CkArray.shtml">Arrays</a>,
-<li> Load balancer,
-<li> <a href="group__Comlib.shtml">Comlib</a>,
-<li> <a href="group__CkPerf.shtml">Tracing</a>,
-<li>Reductions,
-<li> <a href="group__CkArrayImpl.shtml">Array Implementation</a>
-<li> <a href="group__Ck.shtml">Groups and Chares</a>,  
-<li> <a href="group__CkRegister.shtml">Registration</a>, 
-<li> <a href="group__CkQD.shtml">Quiescence detection</a>, 
-<li> <a href="group__CkFutures.shtml">Futures</a>,
-<li> <a href="group__CkInit.shtml">Startup</a>,
-<li> <a href="group__CkEnvelope.shtml">Message Envelope</a>,
-<li> <a href="group__CharmScheduler.shtml">Charm++ Scheduler</a>, 
-<li> Translator
-<li> SDAG
-</ul>
+ -  \ref CkArray "Arrays"
+ -  Load balancer
+ -  \ref Comlib "Comlib"
+ -  \ref CkPerf "Tracing"
+ -  Reductions
+ -  \ref CkArrayImpl "Array Implementation"
+ -  \ref Ck "Groups and Chares"
+ -  \ref CkRegister "Registration"
+ -  \ref CkQD "Quiescence detection" 
+ -  \ref CkFutures "Futures"
+ -  \ref CkInit "Startup"
+ -  Message Envelopes
+ -  \ref CharmScheduler "Charm++ Scheduler"
+ -  Translator
+ -  SDAG
+
 </td></tr>
  
  <tr><td>
  Converse:
-<p><ul>
-<li> <a href="group__Converse.shtml">core</a>,
-<li> <a href="group__Scheduler.shtml">Converse Scheduler</a>, 
-<li> threads, 
-<li> memory allocation,
-<li> conditions, 
-<li> random numbers, 
-<li> converse client/server (CCS).
-<li> Converse tracing, 
-<li> parameter marshalling (CPM),
-<li> quiescence.
+ -  \ref Converse "Converse Core"
+ -  \ref ConverseScheduler "Converse Scheduler"
+ -  threads
+ -  memory allocation
+ -  conditions
+ -  random numbers
+ -  converse client/server (CCS)
+ -  Converse tracing
+ -  parameter marshalling (CPM)
+ - quiescence
 </ul>
  </td></tr>
  
  
  
  <tr><td>
- <a href="group__Machine.shtml">Converse Machine Layers</a>:
- <p><ul>
- <li><a href="group__NET.shtml">net</a>
- <li> ...
- </ul>
+ \ref Machine "Converse Machine Layers":
+ -  \ref NET "net"
+ -  ...
  </td></tr>
  
  
  <tr><td>
  Converse Configuration Layer:
-<p><ul>
-<li>build system
-<li>charmc
-<li>configure script
-<li>conv-mach.h/.sh
-</ul>
+ - build system
+ - charmc
+ - configure script
+ - conv-mach.h/.sh
  </td></tr>
- 
- 
- 
  
  
 <tr><td>
 <p>Libraries:
 <p>Communication: Barrier, commlib, multicast, sparseReducer, sparseContiguousReducer
 <P>Languages: ARMCI, AMPI, TCharm, taskGraph, search
-<p>Frameworks: <a href="group__ParFUM.shtml">ParFUM</a>, IFEM, IDXL, Collide, MBlock, AMR
+<p>Frameworks: \ref ParFUM "ParFUM", IFEM, IDXL, Collide, MBlock, AMR
 <p>Visualization: liveViz, liveViz3d, netFEM
 </td></tr>
  
