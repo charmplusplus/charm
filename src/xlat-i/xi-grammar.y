@@ -96,6 +96,7 @@ void splitScopedName(char* name, char** scope, char** basename);
 %token READWRITE
 %token WRITEONLY
 %token ACCELBLOCK
+%token MEMCRITICAL
 
 %type <modlist>		ModuleEList File
 %type <module>		Module
@@ -747,6 +748,8 @@ EAttrib		: THREADED
                 { $$ = SLOCAL; }
 		| PYTHON PythonOptions
                 { $$ = SPYTHON; }
+		| MEMCRITICAL
+		{ $$ = SMEM; }
 		;
 
 DefaultParameter: LITERAL

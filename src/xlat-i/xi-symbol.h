@@ -978,6 +978,7 @@ class Message : public TEntity {
 #define SIGET   0x4000 
 #define SLOCAL        0x8000 //<- local message
 #define SACCEL  0x10000
+#define SMEM  0x20000
 
 /* An entry construct */
 class Entry : public Member {
@@ -1095,6 +1096,8 @@ class Entry : public Member {
 
     // DMK - Accel support
     int isAccel(void) { return (attribs & SACCEL); }
+
+    int isMemCritical(void) { return (attribs & SMEM); }
 
     void print(XStr& str);
     void genIndexDecls(XStr& str);

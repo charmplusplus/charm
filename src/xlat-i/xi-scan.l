@@ -142,6 +142,7 @@ struct rwtable rwtable[] = {
   "readwrite",  READWRITE,
   "writeonly",  WRITEONLY,
   "accelblock", ACCELBLOCK,
+  "memcritical", MEMCRITICAL,
   "",		0
 };
 

@@ -4419,6 +4419,10 @@ void Entry::genReg(XStr& str)
   if (attribs & SNOKEEP) str << "+CK_EP_NOKEEP";
   if (attribs & SNOTRACE) str << "+CK_EP_TRACEDISABLE";
   if (attribs & SIMMEDIATE) str << "+CK_EP_TRACEDISABLE";
+
+  /*MEICHAO*/
+  if (attribs & SMEM) str << "+CK_EP_MEMCRITICAL";
+  
   if (internalMode) str << "+CK_EP_INTRINSIC";
   str << ");\n";
   if (isConstructor()) {
