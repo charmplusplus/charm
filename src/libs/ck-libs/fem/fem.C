@@ -468,13 +468,13 @@ FEMchunk::reduce_field(int fid, const void *nodes, void *outbuf, int op)
   check("reduce_field precondition");
   // first reduce over local nodes
   const IDXL_Layout &dt = IDXL_Layout_List::get().get(fid,"FEM_Reduce_field");
-  const byte *src = (const byte *) nodes;
+  const unsigned char *src = (const unsigned char *)nodes;
   reduction_initialize(dt,outbuf,op);
   reduction_combine_fn fn=reduction_combine(dt,op);
   int nNodes=getMesh("reduce_field")->node.size();
   for(int i=0; i<nNodes; i++) {
     if(getPrimary(i)) {
-      fn((byte *)outbuf, src, &dt);
+      fn((unsigned char *)outbuf, src, &dt);
     }
     src += dt.userBytes();
   }
@@ -564,7 +564,7 @@ FEMchunk::readField(int fid, void *nodes, const char *fname)
       CkAbort("Exiting");
     }
     for(j=0;j<width;j++) {
-      sscanf(pos, fmt, &IDXL_LAYOUT_DEREF(byte,nodes,i,j), &numchars);
+      sscanf(pos, fmt, &IDXL_LAYOUT_DEREF(unsigned char,nodes,i,j), &numchars);
       pos += numchars;
     }
   }
