@@ -65,6 +65,10 @@ class EntryInfo {
     /// true if this EP is charm internal functions
     CmiBool inCharm;
     
+#ifdef ADAPT_SCHED_MEM
+   /// true if this EP is used to be rescheduled when adjusting memory usage
+   CmiBool isMemCritical;
+#endif
     /** 
       A "marshall unpack" function:
         1.) Pups method parameters out of the buffer passed in to it.

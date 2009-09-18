@@ -110,6 +110,8 @@ extern int CkRegisterMsg(const char *name, CkPackFnPtr pack,
 #define CK_EP_INTRINSIC     (1<<3) 
 #define CK_EP_TRACEDISABLE  (1<<4) 
 
+#define CK_EP_MEMCRITICAL (1<<5)
+
 /** A "call function" to invoke a method on an object. See EntryInfo */
 typedef void  (*CkCallFnPtr) (void *msg, void *obj);
 /** Register this entry point, with this call function and flags.

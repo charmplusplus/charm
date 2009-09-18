@@ -45,7 +45,31 @@ void CqsIncreasePriorityForEntryMethod(Queue q, const int entrymethod){
     }
 }
  
+#ifdef ADAPT_SCHED_MEM
+/** Search Queue for messages associated with memory-critical entry methods */ 
+void CqsIncreasePriorityForMemCriticalEntries(Queue q){
+    void *removedMsgPtr;
+    int numRemoved;
 
+    numRemoved = CqsFindRemoveSpecificPrioq(&(q->negprioq), removedMsgPtr, memCriticalEntries, numMemCriticalEntries);
+    if(numRemoved == 0)
+	numRemoved = CqsFindRemoveSpecificDeq(&(q->zeroprio), removedMsgPtr, memCriticalEntries, numMemCriticalEntries);
+    if(numRemoved == 0)
+	numRemoved = CqsFindRemoveSpecificPrioq(&(q->posprioq), removedMsgPtr, memCriticalEntries, numMemCriticalEntries);
+    
+    if(numRemoved > 0){
+	CkAssert(numRemoved==1); // We need to reenqueue all removed messages, but we currently only handle one
+	int prio = -1000000; 
+	CqsEnqueueGeneral(q, removedMsgPtr, CQS_QUEUEING_IFIFO, 0, (unsigned int*)&prio);
+
+#ifndef CMK_OPTIMIZE 
+	char traceStr[64];
+	sprintf(traceStr, "Replacing %p in message queue with NULL", removedMsgPtr);
+	traceUserSuppliedNote(traceStr);
+#endif
+    }
+}
+#endif
 
 /** Find and remove the first 1 occurences of messages that matches a specified entry method index.
     The size of the deq will not change, it will just contain an entry for a NULL pointer.

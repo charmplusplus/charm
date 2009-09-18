@@ -160,6 +160,9 @@ void CqsDeqEnqueueFifo(deq d, void *data);
 void CqsIncreasePriorityForEntryMethod(Queue q, const int entrymethod);
 void CqsRemoveSpecific(Queue, const void *msgPtr);
 
+#ifdef ADAPT_SCHED_MEM
+void CqsIncreasePriorityForMemCriticalEntries(Queue q);
+#endif
 
 #ifdef __cplusplus
 };

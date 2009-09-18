@@ -916,6 +916,18 @@ void _initCharm(int unused_argc, char **argv)
 	  _TRACE_BEGIN_COMPUTATION();
 	}
 
+#ifdef ADAPT_SCHED_MEM
+    if(CkMyRank()==0){
+	memCriticalEntries = new int[numMemCriticalEntries];
+	int memcnt=0;
+	for(int i=0; i<_entryTable.size(); i++){
+	    if(_entryTable[i]->isMemCritical){
+		memCriticalEntries[memcnt++] = i;
+	    }
+	}
+    }
+#endif
+
 #ifdef _FAULT_MLOG_
     _messageLoggingInit();
 #endif

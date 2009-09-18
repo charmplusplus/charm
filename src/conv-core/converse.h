@@ -1745,6 +1745,11 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 extern int BgOutOfCoreFlag;
 extern int BgInOutOfCoreMode;
 
+#ifdef ADAPT_SCHED_MEM
+extern int numMemCriticalEntries;
+extern int *memCriticalEntries;
+#endif
+
 #if defined(__cplusplus)
 }
 #endif

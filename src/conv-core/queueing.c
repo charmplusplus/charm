@@ -681,7 +681,8 @@ void CqsDequeue(Queue q, void **resp)
 #ifdef ADAPT_SCHED_MEM
     /* Added by Isaac for testing purposes: */
     if((q->length > 1) && (CmiMemoryUsage() > schedAdaptMemThresholdMB*1024*1024) ){
-	CqsIncreasePriorityForEntryMethod(q, 153);
+	/* CqsIncreasePriorityForEntryMethod(q, 153); */
+	CqsIncreasePriorityForMemCriticalEntries(q); 
     }
 #endif
     
@@ -903,7 +904,10 @@ void CqsRemoveSpecific(Queue q, const void *msgPtr){
 }
 
 
-
+#ifdef ADAPT_SCHED_MEM
+int numMemCriticalEntries=0;
+int *memCriticalEntries=NULL;
+#endif
 
 
 

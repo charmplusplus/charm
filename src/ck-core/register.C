@@ -56,6 +56,13 @@ int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
   if (ck_ep_flags & CK_EP_NOKEEP) e->noKeep=CmiTrue;
   if (ck_ep_flags & CK_EP_INTRINSIC) e->inCharm=CmiTrue;
   if (ck_ep_flags & CK_EP_TRACEDISABLE) e->traceEnabled=CmiFalse;
+#if ADAPT_SCHED_MEM
+  if (ck_ep_flags & CK_EP_MEMCRITICAL){
+     e->isMemCritical=CmiTrue;
+     if (CkMyRank()==0)
+        numMemCriticalEntries++;
+  }
+#endif
   return _entryTable.add(e);
 }
 
