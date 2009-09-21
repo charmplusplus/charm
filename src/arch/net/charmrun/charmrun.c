@@ -635,6 +635,7 @@ char *arg_display;
 int arg_ssh_display;
 char *arg_mylogin;
 #endif
+int   arg_no_va_rand;
 
 char *arg_nodeprog_a;
 char *arg_nodeprog_r;
@@ -721,6 +722,7 @@ void arg_init(int argc, char **argv)
   pparam_str(&arg_runscript,    0, "runscript", "script to run node-program with");
   pparam_flag(&arg_help,	0, "help", "print help messages");
   pparam_int(&arg_ppn,          0, "ppn",             "number of pes per node");
+  pparam_flag(&arg_no_va_rand,   0, "no-va-randomization",   "Disables randomization of the virtual address  space");
 
   if (pparam_parsecmd('+', argv) < 0) {
     fprintf(stderr,"ERROR> syntax: %s\n",pparam_error);
@@ -2977,6 +2979,10 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
   } else {
     if (arg_runscript)
        fprintf(f,"\"%s\" ",arg_runscript);
+    if (arg_no_va_rand) {
+      if(arg_verbose) fprintf(stderr, "Charmrun> setarch -R is used.\n");
+      fprintf(f,"setarch `uname -m` -R ");
+    }
     fprintf(f,"\"%s\" ",arg_nodeprog_r);
     fprint_arg(f,argv);
     if (nodetab_nice(nodeno) != -100) {
