@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "xi-symbol.h"
-#include "xi-grammar.tab.h"
 
 using std::cout;
 using std::endl;
@@ -19,7 +18,11 @@ extern void yyrestart ( FILE *input_file );
 extern int yyparse (void);
 extern int yyerror(char *);
 
-extern ModuleList *modlist;
+extern xi::ModuleList *modlist;
+
+namespace xi {
+
+#include "xi-grammar.tab.h"
 
 /******************* Macro defines ****************/
 class MacroDefinition {
@@ -126,6 +129,10 @@ void abortxi(char *name)
   cout << "Usage : " << name << " [-ansi|-f90|-intrinsic]  module.ci" << endl;
   exit(1) ;
 }
+
+}
+
+using namespace xi;
 
 int main(int argc, char *argv[])
 {

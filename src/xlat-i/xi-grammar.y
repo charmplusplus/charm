@@ -3,6 +3,7 @@
 #include <iostream>
 #include "xi-symbol.h"
 #include "EToken.h"
+using namespace xi;
 extern int yylex (void) ;
 extern unsigned char in_comment;
 void yyerror(const char *);
@@ -10,9 +11,11 @@ extern unsigned int lineno;
 extern int in_bracket,in_braces,in_int_expr;
 extern TList<Entry *> *connectEntries;
 ModuleList *modlist;
+namespace xi {
 extern int macroDefined(char *str, int istrue);
 extern char *python_doc;
 void splitScopedName(char* name, char** scope, char** basename);
+}
 %}
 
 %union {

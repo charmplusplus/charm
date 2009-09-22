@@ -7,6 +7,8 @@
 
 #include "xi-util.h"
 
+namespace xi {
+
 void 
 XStr::append(const char *_s) 
 {
@@ -125,3 +127,4 @@ void XStr::replace (const char a, const char b) {
   }
 }
 
+}

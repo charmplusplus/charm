@@ -1,9 +1,10 @@
 %{
 #include <string.h>
 #include "xi-symbol.h"
-#include "xi-grammar.tab.h"
-#include "CList.h"
 #include <ctype.h>
+#include "CList.h"
+using namespace xi;
+#include "xi-grammar.tab.h"
 
 /* Global Variables and Functions - used in grammar.y */
 unsigned int lineno = 1;

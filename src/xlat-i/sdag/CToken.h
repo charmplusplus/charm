@@ -13,6 +13,8 @@
 #include "xi-util.h"
 #include "sdag-globals.h"
 
+namespace xi {
+
 class CToken {
   public:
     EToken type;
@@ -32,5 +34,7 @@ class CToken {
       printf("Token: %d\tText: \"%s\"\n", type, text->charstar());
     }
 };
+
+}
 
 #endif /* _CToken_H_ */

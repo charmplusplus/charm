@@ -14,6 +14,8 @@
 #include <stdio.h>
 #include "conv-config.h"
 
+namespace xi {
+
 #if CMK_ISATTY_DECL
 #ifdef __cplusplus
 extern "C" int isatty (int );
@@ -87,5 +89,7 @@ class Printable {
     friend XStr & operator << (XStr &str,Printable &p) {p.print(str);return str;}
     friend XStr & operator << (XStr &str,Printable *p) {p->print(str);return str;}
 };
+
+}
 
 #endif

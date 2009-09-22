@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include "sdag-globals.h"
 
+namespace xi {
+
 void Indent(int indent)
 {
   for(int i=0;i<indent;i++)
@@ -48,3 +50,4 @@ void resetNumbers(void)
   numConnects=0;
 }
 
+}

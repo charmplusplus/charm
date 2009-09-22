@@ -8,6 +8,8 @@
 #include "CEntry.h"
 #include "xi-symbol.h"
 
+namespace xi {
+
 void CEntry::generateDeps(XStr& op)
 {
   SdagConstruct *cn;
@@ -345,3 +347,4 @@ void CEntry::generateCode(XStr& op)
   op << "  }\n\n";
 }
 
+}

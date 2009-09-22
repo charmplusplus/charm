@@ -10,6 +10,8 @@
 
 #include "xi-util.h"
 
+namespace xi {
+
 class CStateVar {
   public:
     int isVoid;
@@ -29,5 +31,7 @@ class CStateVar {
 	  else { arrayLength = NULL; }
 	}
 };
+
+}
 
 #endif

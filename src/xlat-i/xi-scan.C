@@ -818,9 +818,10 @@ char *yytext;
 #line 2 "xi-scan.l"
 #include <string.h>
 #include "xi-symbol.h"
-#include "xi-grammar.tab.h"
-#include "CList.h"
 #include <ctype.h>
+#include "CList.h"
+using namespace xi;
+#include "xi-grammar.tab.h"
 
 /* Global Variables and Functions - used in grammar.y */
 unsigned int lineno = 1;
@@ -841,7 +842,7 @@ int search(char *s);
 #undef yywrap
 #endif
 
-#line 845 "lex.yy.c"
+#line 846 "lex.yy.c"
 
 #define INITIAL 0
 
@@ -994,9 +995,9 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 56 "xi-scan.l"
+#line 57 "xi-scan.l"
 
-#line 1000 "lex.yy.c"
+#line 1001 "lex.yy.c"
 
 	if ( !(yy_init) )
 		{
@@ -1091,94 +1092,94 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 57 "xi-scan.l"
+#line 58 "xi-scan.l"
 { if (in_bracket) {Yval;return Token(CPROGRAM);} else REJECT;}
 	YY_BREAK
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
-#line 58 "xi-scan.l"
+#line 59 "xi-scan.l"
 { if (in_braces) {Yval;return Token(CPROGRAM);} else REJECT;}
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
-#line 59 "xi-scan.l"
+#line 60 "xi-scan.l"
 { if (in_int_expr) {Yval;return Token(CPROGRAM);} else REJECT;}
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 60 "xi-scan.l"
+#line 61 "xi-scan.l"
 { /* ignore single line comments */ }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 61 "xi-scan.l"
+#line 62 "xi-scan.l"
 { /* ignore ^M characters for dos-unix compat */ }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 62 "xi-scan.l"
+#line 63 "xi-scan.l"
 { in_comment = 1; /* Single line C-style comments */ }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 63 "xi-scan.l"
+#line 64 "xi-scan.l"
 { in_comment = 0; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 64 "xi-scan.l"
+#line 65 "xi-scan.l"
 { Return Token(HASHIF); }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 65 "xi-scan.l"
+#line 66 "xi-scan.l"
 { Return Token(HASHIFDEF); }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 66 "xi-scan.l"
+#line 67 "xi-scan.l"
 { in_comment = 0; /* comments */ }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 67 "xi-scan.l"
+#line 68 "xi-scan.l"
 { /* ignore white space */ }
 	YY_BREAK
 case 12:
 /* rule 12 can match eol */
 YY_RULE_SETUP
-#line 68 "xi-scan.l"
+#line 69 "xi-scan.l"
 { lineno++;}
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 69 "xi-scan.l"
+#line 70 "xi-scan.l"
 { Yval; Return Token(NUMBER); }
 	YY_BREAK
 case 14:
 /* rule 14 can match eol */
 YY_RULE_SETUP
-#line 70 "xi-scan.l"
+#line 71 "xi-scan.l"
 { Yval; Return Token(LITERAL); }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 71 "xi-scan.l"
+#line 72 "xi-scan.l"
 { Return Token(search(yytext)); }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 72 "xi-scan.l"
+#line 73 "xi-scan.l"
 { Return Token(yytext[0]); }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 73 "xi-scan.l"
+#line 74 "xi-scan.l"
 ECHO;
 	YY_BREAK
-#line 1182 "lex.yy.c"
+#line 1183 "lex.yy.c"
 			case YY_STATE_EOF(INITIAL):
 				yyterminate();
 
@@ -2150,7 +2151,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 73 "xi-scan.l"
+#line 74 "xi-scan.l"
 
 
 

@@ -20,6 +20,8 @@ typedef enum {false = 0, true = 1} bool;
    using namespace std;
 #endif
 
+namespace xi {
+   
 int fortranMode;
 int internalMode;
 const char *cur_file;
@@ -4962,3 +4964,4 @@ void ClassDeclaration::genReg(XStr& str) {}
 
 /****************** Registration *****************/
 
+}

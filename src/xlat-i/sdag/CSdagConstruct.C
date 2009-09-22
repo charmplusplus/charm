@@ -11,6 +11,8 @@
 //#include "CParsedFile.h"
 #include "EToken.h"
 
+namespace xi {
+
 void SdagConstruct::numberNodes(void)
 {
   switch(type) {
@@ -1688,3 +1690,4 @@ void RemoveSdagComments(char *str)
   }
 }
 
+}

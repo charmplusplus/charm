@@ -21,6 +21,8 @@
 #include "CStateVar.h"
 #include "CParsedFile.h"
 
+namespace xi {
+
 /******************* Utilities ****************/
 
 class Prefix {
@@ -1437,5 +1439,7 @@ public:
 };
 
 extern void RemoveSdagComments(char *);
+
+}
 
 #endif

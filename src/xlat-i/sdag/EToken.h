@@ -8,6 +8,8 @@
 #ifndef _EToken_H_
 #define _EToken_H_
 
+namespace xi {
+
 enum EToken {
    DEFAULT=1
 
@@ -77,5 +79,7 @@ enum EToken {
   ,SOLIST=105
   ,SOLIST_END=106
 };
+
+}
 
 #endif /* _EToken_H_ */

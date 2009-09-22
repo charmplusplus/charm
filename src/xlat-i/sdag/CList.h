@@ -8,6 +8,8 @@
 #ifndef _TList_H_
 #define _TList_H_
 
+namespace xi {
+
 // Quick and dirty List for small numbers of items.
 
 template <class T>
@@ -106,5 +108,6 @@ class TList
     }
 };
 
-#endif
+}
 
+#endif

@@ -13,6 +13,8 @@
 #include "CList.h"
 #include "CStateVar.h"
 
+namespace xi {
+
 class Entry;
 class SdagConstruct;
 class ParamList;
@@ -48,4 +50,7 @@ class CEntry{
     void generateCode(XStr& op);
     void generateDeps(XStr& op);
 };
+
+}
+
 #endif

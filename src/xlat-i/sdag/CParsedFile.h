@@ -3,6 +3,8 @@
 #include "sdag-globals.h"
 #include "EToken.h"
 
+namespace xi {
+
 class Chare;
 class Entry;
 
@@ -67,3 +69,4 @@ class CParsedFile {
 
 };
 
+}

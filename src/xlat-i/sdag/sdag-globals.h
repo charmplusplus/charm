@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+namespace xi {
+
 extern void Indent(int indent);
 
 extern int numSdagEntries;
@@ -32,5 +34,7 @@ extern FILE *fh;
 
 extern void pH(int, const char *, ...);
 extern void resetNumbers(void);
+
+}
 
 #endif
