@@ -82,10 +82,10 @@ void CpdSearchLeaks(char * msg) {
   else CmiAbort("Received allocationTree request for another PE!");
 }
 
-void * (*CpdDebugGetAllocationTree)(int *);
-void (*CpdDebug_pupAllocationPoint)(pup_er p, void *data);
-void (*CpdDebug_deleteAllocationPoint)(void *ptr);
-void * (*CpdDebug_MergeAllocationTree)(int *size, void *data, void **remoteData, int numRemote);
+void * (*CpdDebugGetAllocationTree)(int *) = NULL;
+void (*CpdDebug_pupAllocationPoint)(pup_er p, void *data) = NULL;
+void (*CpdDebug_deleteAllocationPoint)(void *ptr) = NULL;
+void * (*CpdDebug_MergeAllocationTree)(int *size, void *data, void **remoteData, int numRemote) = NULL;
 CpvDeclare(int, CpdDebugCallAllocationTree_Index);
 CpvStaticDeclare(CcsDelayedReply, allocationTreeDelayedReply);
 
@@ -112,6 +112,11 @@ static void CpdDebugCallAllocationTree(char *msg)
   int numNodes;
   int forPE;
   void *tree;
+  if (CpdDebugGetAllocationTree == NULL) {
+    CmiPrintf("Error> Invoked CpdDebugCalloAllocationTree but no function initialized.\nDid you forget to link in memory charmdebug?\n");
+    CcsSendReply(0, NULL);
+    return;
+  }
   sscanf(msg+CmiMsgHeaderSizeBytes, "%d", &forPE);
   if (CmiMyPe() == forPE) CpvAccess(allocationTreeDelayedReply) = CcsDelayReply();
   if (forPE == -1 && CmiMyPe()==0) {
@@ -128,10 +133,10 @@ static void CpdDebugCallAllocationTree(char *msg)
   CmiFree(msg);
 }
 
-void * (*CpdDebugGetMemStat)(void);
-void (*CpdDebug_pupMemStat)(pup_er p, void *data);
-void (*CpdDebug_deleteMemStat)(void *ptr);
-void * (*CpdDebug_mergeMemStat)(int *size, void *data, void **remoteData, int numRemote);
+void * (*CpdDebugGetMemStat)(void) = NULL;
+void (*CpdDebug_pupMemStat)(pup_er p, void *data) = NULL;
+void (*CpdDebug_deleteMemStat)(void *ptr) = NULL;
+void * (*CpdDebug_mergeMemStat)(int *size, void *data, void **remoteData, int numRemote) = NULL;
 CpvDeclare(int, CpdDebugCallMemStat_Index);
 CpvStaticDeclare(CcsDelayedReply, memStatDelayedReply);
 
@@ -163,6 +168,11 @@ static void CpdDebugReturnMemStat(void *stat) {
 static void CpdDebugCallMemStat(char *msg) {
   int forPE;
   void *stat;
+  if (CpdDebugGetMemStat == NULL) {
+    CmiPrintf("Error> Invoked CpdDebugCalloMemStat but no function initialized.\nDid you forget to link in memory charmdebug?\n");
+    CcsSendReply(0, NULL);
+    return;
+  }
   sscanf(msg+CmiMsgHeaderSizeBytes, "%d", &forPE);
   if (CmiMyPe() == forPE) CpvAccess(memStatDelayedReply) = CcsDelayReply();
   if (forPE == -1 && CmiMyPe()==0) {
