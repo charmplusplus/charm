@@ -86,7 +86,9 @@ void BgEntrySplit(const char* name)
 }
 
 void BgSetEntryName(const char* name, void **log) {
-  strcpy((*(BgTimeLog **)log)->name, name);
+  stopVTimer();
+  if (genTimeLog) strcpy((*(BgTimeLog **)log)->name, name);
+  startVTimer();
 }
 
 void * BgSplitEntry(const char* name, void **parentlogs, int n)
