@@ -221,13 +221,8 @@ int CcsNodeSize(CcsServer *svr,int node)
   return svr->numProcs[node];
 }
 
-int CcsSendRequest(CcsServer *svr, const char *hdlrID, int pe, int size, const void *msg){
-    return CcsSendRequestWithTimeout(svr, hdlrID, pe, size, msg, 120);
-}
-
-int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, int size, const void *msg, int timeout)
-{
-  const void *bufs[3]; int lens[3]; int nBuffers=0;
+int CcsSendRequestGeneric(CcsServer *svr, const char *hdlrID, int pe, int *pes, int size, const void *msg, int timeout) {
+  const void *bufs[4]; int lens[4]; int nBuffers=0;
   CcsMessageHeader hdr;/*CCS request header*/
     struct { /*CCS Authentication header*/
       unsigned char type[4];
@@ -263,6 +258,14 @@ int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, int si
   /*Send the CCS header*/
   bufs[nBuffers]=&hdr; lens[nBuffers]=sizeof(hdr); nBuffers++;
   
+  /*Send the processors list*/
+  if (pe < -1) {
+    int i;
+    ChMessageInt_t *pes_nbo = (ChMessageInt_t *)pes;
+    for (i=0; i<-pe; ++i) pes_nbo[i] = ChMessageInt_new(pes[i]);
+    bufs[nBuffers]=pes; lens[nBuffers]=-pe*sizeof(ChMessageInt_t); nBuffers++;
+  }
+  
   /*Send the request data*/
   if (size>0) {bufs[nBuffers]=msg; lens[nBuffers]=size; nBuffers++;}
   
@@ -270,6 +273,44 @@ int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, int si
   DEBUGF(("[%.3f] Request sent\n",CmiWallTimer()));
   /*Leave socket open for reply*/
   return 0;
+}
+
+int CcsSendRequest(CcsServer *svr, const char *hdlrID, int pe, int size, const void *msg) {
+    return CcsSendRequestGeneric(svr, hdlrID, pe, NULL, size, msg, 120);
+}
+
+int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, int size, const void *msg, int timeout) {
+  return CcsSendRequestGeneric(svr, hdlrID, pe, NULL, size, msg, 120);
+}
+
+int CcsSendBroadcastRequest(CcsServer *svr, const char *hdlrID,
+            int size, const void *msg) {
+  return CcsSendRequestGeneric(svr, hdlrID, -1, NULL, size, msg, 120);
+}
+
+int CcsSendBroadcastRequestWithTimeout(CcsServer *svr, const char *hdlrID, 
+            int size, const void *msg, int timeout) {
+  return CcsSendRequestGeneric(svr, hdlrID, -1, NULL, size, msg, timeout);
+}
+
+int CcsSendMulticastRequest(CcsServer *svr, const char *hdlrID, int npes, 
+            int *pes, int size, const void *msg) {
+  if (npes < 1) {
+    fprintf(stderr,"CCS multicast: No processor specified\n");
+    return -1;
+  }
+  if (npes == 1) return CcsSendRequestGeneric(svr, hdlrID, pes[0], NULL, size, msg, 120);
+  return CcsSendRequestGeneric(svr, hdlrID, -npes, pes, size, msg, 120);
+}
+
+int CcsSendMulticastRequestWithTimeout(CcsServer *svr, const char *hdlrID, int npes, 
+            int *pes, int size, const void *msg, int timeout) {
+  if (npes < 1) {
+    fprintf(stderr,"CCS multicast: No processor specified\n");
+    return -1;
+  }
+  if (npes == 1) return CcsSendRequestGeneric(svr, hdlrID, pes[0], NULL, size, msg, timeout);
+  return CcsSendRequestGeneric(svr, hdlrID, -npes, pes, size, msg, timeout);
 }
 
 /*Receive and check server reply authentication*/

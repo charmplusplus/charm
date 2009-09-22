@@ -54,6 +54,14 @@ int CcsSendRequest(CcsServer *svr, const char *hdlrID, int pe,
 		    int size, const void *msg);
 int CcsSendRequestWithTimeout(CcsServer *svr, const char *hdlrID, int pe, 
 		    int size, const void *msg, int timeout);
+int CcsSendBroadcastRequest(CcsServer *svr, const char *hdlrID,
+            int size, const void *msg);
+int CcsSendBroadcastRequestWithTimeout(CcsServer *svr, const char *hdlrID, 
+            int size, const void *msg, int timeout);
+int CcsSendMulticastRequest(CcsServer *svr, const char *hdlrID, int npes, 
+            int *pes, int size, const void *msg);
+int CcsSendMulticastRequestWithTimeout(CcsServer *svr, const char *hdlrID, int npes, 
+            int *pes, int size, const void *msg, int timeout);
 
 int CcsNoResponse(CcsServer *svr);
 int CcsRecvResponse(CcsServer *svr, 
