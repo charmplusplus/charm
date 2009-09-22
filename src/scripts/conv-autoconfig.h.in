@@ -63,6 +63,9 @@
 /* Allows gcc x86 assembly for atomic increment. */
 #undef CMK_GCC_X86_ASM_ATOMICINCREMENT
 
+/* whether personality() and ADDR_NO_RANDOMIZE exist */
+#undef CMK_HAS_ADDR_NO_RANDOMIZE
+
 /* whether has alloca.h */
 #undef CMK_HAS_ALLOCA_H
 

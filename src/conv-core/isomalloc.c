@@ -47,6 +47,10 @@ added by Ryan Mokos in July 2008.
 
 static int _sync_iso = 0;
 
+#if CMK_HAS_ADDR_NO_RANDOMIZE
+#include <sys/personality.h>
+#endif
+
 static int read_randomflag(void)
 {
   FILE *fp;
@@ -56,6 +60,14 @@ static int read_randomflag(void)
   if (fp != NULL) {
     fscanf(fp, "%d", &random_flag);
     fclose(fp);
+#if CMK_HAS_ADDR_NO_RANDOMIZE
+    if(random_flag)
+    {
+	int persona = personality(0xffffffff);
+	if(persona & ADDR_NO_RANDOMIZE)
+	    random_flag = 0;
+    }
+#endif
   }
   else {
     random_flag = -1;
