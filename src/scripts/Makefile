@@ -187,7 +187,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	ckstatistics.h ckvector3d.h conv-lists.h RTH.h ckcomplex.h \
 	sockRoutines.h sockRoutines.c ckpool.h BGLTorus.h BGPTorus.h \
-	TopoManager.h XT3Torus.h XT4Torus.h cmimemcpy.h simd.h SSE-Double.h SSE-Float.h
+	TopoManager.h XT3Torus.h XT4Torus.h cmimemcpy.h simd.h SSE-Double.h SSE-Float.h crc32.h
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h \
@@ -369,7 +369,7 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	pup_xlater.o pup_c.o pup_paged.o pup_cmialloc.o			\
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
 	conv-lists.o RTH.o persist-comm.o \
-	ckbitvector.o TopoManager.o CrayNid.o
+	ckbitvector.o TopoManager.o CrayNid.o crc32.o
 
 LIBCONV_UTILF=pup_f.o
 
@@ -484,6 +484,9 @@ persist-comm.o: persist-comm.c persist_impl.h $(CVHEADERS)
 
 conv-lists.o: conv-lists.C $(UTILHEADERS) $(CVHEADERS)
 	$(CHARMC) -o conv-lists.o conv-lists.C
+	
+crc32.o: crc32.c crc32.h
+	$(CHARMC) -o crc32.o crc32.c
 
 ## Converse load balancers (seed balancers, -balance)
 $(L)/libldb-none.o: cldb.none.c $(CVHEADERS)
