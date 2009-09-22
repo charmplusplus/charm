@@ -31,7 +31,7 @@ bool test_empty()
 // Enqueueing an element should show that there is an element
 // present. We should get the same thing back when we dequeue
 //
-// Is the queue allowed to dereference the void* we give it?
+// The queue is not allowed to dereference the void* we give it
 bool test_one()
 {
   Queue q = CqsCreate();
@@ -85,7 +85,7 @@ struct main : public CBase_main
     
     if (fail) {
       char message[100];
-      sprintf(message, "%d tests failed\n", fail);
+      sprintf(message, "%d/%d tests failed\n", fail, tests);
       CkAbort(message);
     }
     else
