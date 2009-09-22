@@ -1047,6 +1047,7 @@ void CkArray::recvBroadcast(CkMessage *m)
 #if CMK_BLUEGENE_CHARM
         void *root;
         _TRACE_BG_TLINE_END(&root);
+	BgSetEntryName("start-broadcast", &root);
         CkVec<void *> logs;    // store all logs for each delivery
 	extern void stopVTimer();
 	extern void startVTimer();
