@@ -59,6 +59,7 @@ CkpvDeclare(double, traceInitCpuTime);
 CpvDeclare(int, traceOn);
 CkpvDeclare(int, traceOnPe);
 CkpvDeclare(char*, traceRoot);
+CkpvDeclare(int, traceRootBaseLength);
 CkpvDeclare(char*, selective);
 CkpvDeclare(bool, verbose);
 
@@ -100,6 +101,7 @@ static void traceCommonInit(char **argv)
   char *temproot;
   char *temproot2;
   CkpvInitialize(char*, traceRoot);
+  CkpvInitialize(int, traceRootBaseLength);
   if (CmiGetArgStringDesc(argv, "+traceroot", &temproot, "Directory to write trace files to")) {
     int i;
     // Trying to decide if the traceroot path is absolute or not. If it is not
@@ -116,6 +118,7 @@ static void traceCommonInit(char **argv)
     }
     for (i=strlen(argv[0])-1; i>=0; i--) if (argv[0][i] == PATHSEP) break;
     i++;
+    CkpvAccess(traceRootBaseLength) = strlen(root)+1;
     CkpvAccess(traceRoot) = (char *)malloc(strlen(argv[0]+i) + strlen(root) + 2);    _MEMCHECK(CkpvAccess(traceRoot));
     strcpy(CkpvAccess(traceRoot), root);
     strcat(CkpvAccess(traceRoot), PATHSEPSTR);
