@@ -56,6 +56,9 @@
     p | numLocMgr;
     if (p.isUnpacking()) locMgr = new CkGroupID[numLocMgr];
     PUParray(p,locMgr,numLocMgr);
+    p | numLocMgrWB;
+    if (p.isUnpacking()) locMgrWB = new CkGroupID[numLocMgrWB];
+    PUParray(p,locMgrWB,numLocMgrWB);
     p | maxSize;
   }
 
