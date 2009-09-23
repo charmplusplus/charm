@@ -146,6 +146,9 @@ CpvDeclare(char*,CmiPostedRecvBuffers);
 #define BARRIER_ZERO_TAG     1375
 #endif
 
+#include <signal.h>
+void (*signal_int)(int);
+
 /*
 static int mpi_tag = TAG;
 #define NEW_MPI_TAG	mpi_tag++; if (mpi_tag == MPI_TAG_UB) mpi_tag=TAG;
@@ -848,6 +851,7 @@ static void CommunicationServer(int sleepTime)
 #endif
     MACHSTATE(2, "} CommunicationServer EXIT");
 #if ! CMK_AUTOBUILD
+    signal(SIGINT, signal_int);
     MPI_Finalize();
 #endif
     exit(0);
@@ -1491,6 +1495,7 @@ void ConverseExit(void)
 }
 #endif
 #if ! CMK_AUTOBUILD
+  signal(SIGINT, signal_int);
   MPI_Finalize();
 #endif
   exit(0);
@@ -1595,7 +1600,6 @@ static void machine_exit(char *m) {
   }
 }
 
-#include <signal.h>
 static void KillOnAllSigs(int sigNo) {
   static int already_in_signal_handler = 0;
   if (already_in_signal_handler) MPI_Abort(MPI_COMM_WORLD,1);
@@ -1763,7 +1767,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   signal(SIGSEGV, KillOnAllSigs);
   signal(SIGFPE, KillOnAllSigs);
   signal(SIGILL, KillOnAllSigs);
-  signal(SIGINT, KillOnAllSigs);
+  signal_int = signal(SIGINT, KillOnAllSigs);
   signal(SIGTERM, KillOnAllSigs);
   signal(SIGABRT, KillOnAllSigs);
 #   if !defined(_WIN32) || defined(__CYGWIN__) /*UNIX-only signals*/
