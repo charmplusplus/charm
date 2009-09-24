@@ -508,6 +508,13 @@ typedef CMK_TYPEDEF_UINT8     CmiUInt8;
 typedef CMK_TYPEDEF_FLOAT4    CmiFloat4;
 typedef CMK_TYPEDEF_FLOAT8    CmiFloat8;
 
+#if CMK_SIZET_64BIT
+typedef CmiUInt8     CmiIntPtr;
+#else
+typedef CmiUInt4     CmiIntPtr;
+#endif
+
+
 typedef void  *CmiCommHandle;
 typedef void (*CmiHandler)(void *msg);
 typedef void (*CmiHandlerEx)(void *msg,void *userPtr);
