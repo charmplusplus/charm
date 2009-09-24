@@ -40,6 +40,8 @@ public:
   }
   int pe() { return _pe; }
   int msgID() { return _msgID; }
+  void setPe(int pe) { _pe = pe; }
+  void setMsgID(int msgID) { _msgID = msgID; }
 };
 
 /**
