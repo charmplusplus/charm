@@ -1709,7 +1709,6 @@ static int good_range(char *start,memRange_t len,int n) {
 static void check_range(char *start,char *end,memRegion_t *max)
 {
   memRange_t len;
-  char *initialStart=start, *initialEnd=end;
   CmiUInt8 tb = (CmiUInt8)gig*1024ul;   /* One terabyte */
   CmiUInt8 vm_limit = tb*256ul;   /* terabyte */
 
@@ -2218,7 +2217,7 @@ static void *_isomallocAlign(size_t align, size_t size, size_t reserved)
 {
         void *ptr;
         CmiIntPtr ptr2align;
-        CmiInt8 s, n, slot;
+        CmiInt8 s;
 
         if (align < MINSIZE) align = MINSIZE;
         /* make sure alignment is power of 2 */
