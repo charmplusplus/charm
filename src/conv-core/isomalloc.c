@@ -2211,10 +2211,14 @@ void *CmiIsomalloc(int size)
 #define MALLOC_ALIGNMENT           (2*sizeof(size_t))
 #define MINSIZE                    (sizeof(CmiIsomallocBlock))
 
-void *CmiIsomallocAlign(size_t align, size_t size)
+/* return an aligned isomalloc memory, the alignment occurs after the
+ * first 'reserved' bytes 
+ * */
+static void *_isomallocAlign(size_t align, size_t size, size_t reserved)
 {
         void *mem, *ptr;
-        CmiInt8 s = size, n, slot;
+        char *ptr2align;
+        CmiInt8 s, n, slot;
 
         if (align < MINSIZE) align = MINSIZE;
         /* make sure alignment is power of 2 */
@@ -2223,18 +2227,26 @@ void *CmiIsomallocAlign(size_t align, size_t size)
           while ((unsigned long)a < (unsigned long)align) a <<= 1;
           align = a;
         }
-        s += align;
+        s = size + align;
         ptr = CmiIsomalloc(s);
-        if ((((CmiUInt8)ptr) % align) != 0) { /* misaligned */
-          CmiIsomallocBlock *blk = pointer2block(ptr);
+        ptr2align = (char*)ptr + reserved;
+        if ((((CmiUInt8)ptr2align) % align) != 0) { /* misaligned */
+          CmiIsomallocBlock *blk = pointer2block(ptr);  /* store block */
           int slot = blk->slot;
           int length = blk->length;
-          ptr = ((CmiUInt8)((char*)ptr + align - 1)) & -((CmiInt8) align);
-          blk = pointer2block(ptr);
+          ptr2align = ((CmiUInt8)((char*)ptr2align + align - 1)) & -((CmiInt8) align);
+          ptr = ptr2align - reserved;
+          blk = pointer2block(ptr);      /* restore block */
+          blk->slot = slot;
+          blk->length = length;
         }
 	return ptr;
 }
 
+void *CmiIsomallocAlign(size_t align, size_t size)
+{
+  return _isomallocAlign(align, size, 0);
+}
 
 int CmiIsomallocEnabled()
 {
