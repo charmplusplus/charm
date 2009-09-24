@@ -2231,14 +2231,12 @@ static void *_isomallocAlign(size_t align, size_t size, size_t reserved)
         ptr = CmiIsomalloc(s);
         ptr2align = (char*)ptr + reserved;
         if ((((CmiUInt8)ptr2align) % align) != 0) { /* misaligned */
-          CmiIsomallocBlock *blk = pointer2block(ptr);  /* store block */
-          int slot = blk->slot;
-          int length = blk->length;
+          CmiIsomallocBlock *blk = pointer2block(ptr);  /* save block */
+          CmiIsomallocBlock savedblk = *blk;
           ptr2align = ((CmiUInt8)((char*)ptr2align + align - 1)) & -((CmiInt8) align);
           ptr = ptr2align - reserved;
           blk = pointer2block(ptr);      /* restore block */
-          blk->slot = slot;
-          blk->length = length;
+          *blk = savedblk;
         }
 	return ptr;
 }
@@ -2432,10 +2430,23 @@ void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l)
 }
 
 /*Allocate a block from this blockList*/
-void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,int nBytes)
+void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes)
 {
 	Slot *n; /*Newly created slot*/
 	n=(Slot *)CmiIsomalloc(sizeof(Slot)+nBytes);
+	/*Link the new block into the circular blocklist*/
+	n->prev=l;
+	n->next=l->next;
+	l->next->prev=n;
+	l->next=n;
+	return Slot_toUser(n);
+}
+
+/*Allocate a block from this blockList with alighment */
+void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,size_t nBytes)
+{
+	Slot *n; /*Newly created slot*/
+	n=(Slot *)_isomallocAlign(align,sizeof(Slot)+nBytes,sizeof(Slot));
 	/*Link the new block into the circular blocklist*/
 	n->prev=l;
 	n->next=l->next;

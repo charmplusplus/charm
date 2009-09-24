@@ -1146,7 +1146,8 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **l);
 void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l);
 
 /*Allocate/free a block from this blockList*/
-void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,int nBytes);
+void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes);
+void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,size_t nBytes);
 void CmiIsomallocBlockListFree(void *doomedMallocedBlock);
 
 /****** CTH: THE LOW-LEVEL THREADS PACKAGE ******/

@@ -117,7 +117,22 @@ static void *meta_realloc(void *oldBuffer, size_t newSize)
 
 static void *meta_memalign(size_t align, size_t size)
 {
-	return meta_malloc(size);
+	void *ret=NULL;
+	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)) 
+	{ /*Isomalloc a new block and link it in*/
+		ISOMALLOC_PUSH /*Disable isomalloc while inside isomalloc*/
+#if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
+		if (CmiIsFortranLibraryCall()==1) {
+		  ret=mm_malloc(size);
+		}
+		else
+#endif
+		  ret=CmiIsomallocBlockListMallocAlign(pushed_blocklist,align,size);
+		ISOMALLOC_POP
+	}
+	else /*Just use regular malloc*/
+		ret=mm_malloc(size);
+	return ret;
 }
 
 static void *meta_valloc(size_t size)
