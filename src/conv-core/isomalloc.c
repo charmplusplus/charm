@@ -2229,7 +2229,7 @@ void *CmiIsomallocAlign(size_t align, size_t size)
           CmiIsomallocBlock *blk = pointer2block(ptr);
           int slot = blk->slot;
           int length = blk->length;
-          ptr = ((CmiUInt8)(ptr + align - 1)) & -((CmiInt8) align);
+          ptr = ((CmiUInt8)((char*)ptr + align - 1)) & -((CmiInt8) align);
           blk = pointer2block(ptr);
         }
 	return ptr;
