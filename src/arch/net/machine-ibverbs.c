@@ -1,5 +1,4 @@
 /** @file
-			size = CmiMsgHeaderGetLength(msg);
  * Ibverbs (infiniband)  implementation of Converse NET version
  * @ingroup NET
  * contains only Ibverbs specific code for:
