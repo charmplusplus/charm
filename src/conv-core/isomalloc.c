@@ -2212,12 +2212,12 @@ void *CmiIsomalloc(int size)
 #define MINSIZE                    (sizeof(CmiIsomallocBlock))
 
 /** return an aligned isomalloc memory, the alignment occurs after the
- *  first 'reserved' bytes
+ *  first 'reserved' bytes.  Total requested size is (size+reserved)
  */
 static void *_isomallocAlign(size_t align, size_t size, size_t reserved)
 {
         void *ptr;
-        intptr_t ptr2align;
+        CmiIntPtr ptr2align;
         CmiInt8 s, n, slot;
 
         if (align < MINSIZE) align = MINSIZE;
@@ -2227,10 +2227,9 @@ static void *_isomallocAlign(size_t align, size_t size, size_t reserved)
           while ((unsigned long)a < (unsigned long)align) a <<= 1;
           align = a;
         }
-        /* s = size + align + reserved; */
-        s = size + align;
+        s = size + reserved + align;
         ptr = CmiIsomalloc(s);
-        ptr2align = (intptr_t)ptr;
+        ptr2align = (CmiIntPtr)ptr;
         ptr2align += reserved;
         if (ptr2align % align != 0) { /* misaligned */
           CmiIsomallocBlock *blk = pointer2block(ptr);  /* save block */
@@ -2449,7 +2448,7 @@ void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes)
 void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,size_t nBytes)
 {
 	Slot *n; /*Newly created slot*/
-	n=(Slot *)_isomallocAlign(align,sizeof(Slot)+nBytes,sizeof(Slot));
+	n=(Slot *)_isomallocAlign(align,nBytes,sizeof(Slot));
 	/*Link the new block into the circular blocklist*/
 	n->prev=l;
 	n->next=l->next;
