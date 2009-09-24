@@ -2208,6 +2208,34 @@ void *CmiIsomalloc(int size)
 	return block2pointer(blk);
 }
 
+#define MALLOC_ALIGNMENT           (2*sizeof(size_t))
+#define MINSIZE                    (sizeof(CmiIsomallocBlock))
+
+void *CmiIsomallocAlign(size_t align, size_t size)
+{
+        void *mem, *ptr;
+        CmiInt8 s = size, n, slot;
+
+        if (align < MINSIZE) align = MINSIZE;
+        /* make sure alignment is power of 2 */
+        if ((align & (align - 1)) != 0) {
+          size_t a = MALLOC_ALIGNMENT * 2;
+          while ((unsigned long)a < (unsigned long)align) a <<= 1;
+          align = a;
+        }
+        s += align;
+        ptr = CmiIsomalloc(s);
+        if ((((CmiUInt8)ptr) % align) != 0) { /* misaligned */
+          CmiIsomallocBlock *blk = pointer2block(ptr);
+          int slot = blk->slot;
+          int length = blk->length;
+          ptr = ((CmiUInt8)(ptr + align - 1)) & -((CmiInt8) align);
+          blk = pointer2block(ptr);
+        }
+	return ptr;
+}
+
+
 int CmiIsomallocEnabled()
 {
   return (isomallocStart!=NULL);

@@ -1123,6 +1123,7 @@ void   CmiHandleMessage(void *msg);
 /****** Isomalloc: Migratable Memory Allocation ********/
 /*Simple block-by-block interface:*/
 void *CmiIsomalloc(int sizeInBytes);
+void *CmiIsomallocAlign(size_t align, size_t size);
 void  CmiIsomallocPup(pup_er p,void **block);
 void  CmiIsomallocFree(void *block);
 int   CmiIsomallocEnabled();
