@@ -123,15 +123,15 @@ static void *meta_memalign(size_t align, size_t size)
 		ISOMALLOC_PUSH /*Disable isomalloc while inside isomalloc*/
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
 		if (CmiIsFortranLibraryCall()==1) {
-		  ret=mm_malloc(size);
+		  ret=mm_memalign(align, size);
 		}
 		else
 #endif
 		  ret=CmiIsomallocBlockListMallocAlign(pushed_blocklist,align,size);
 		ISOMALLOC_POP
 	}
-	else /*Just use regular malloc*/
-		ret=mm_malloc(size);
+	else /*Just use regular memalign*/
+		ret=mm_memalign(align, size);
 	return ret;
 }
 
