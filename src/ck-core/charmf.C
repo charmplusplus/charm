@@ -1,9 +1,7 @@
 /*   define some FORTRAN interface for charm++ kernel functions
      Gengbin Zheng    12/15/2000
-
-TODO:
-   add other fortran name styles like all captial.
 */
+
 #include "charm++.h"
 #include <stdarg.h>
 #include "charmf.h"
@@ -160,3 +158,12 @@ FDECL CmiFloat8 FTN_NAME(CKCPUTIMER, ckcputimer) ()
   return CkCpuTimer();
 }
 
+FDECL void FTN_NAME(CMIDISABLEISOMALLOC, cmidisableisomalloc) ()
+{
+  CmiDisableIsomalloc();
+}
+
+FDECL void FTN_NAME(CMIENABLEISOMALLOC, cmienableisomalloc) ()
+{
+  CmiEnableIsomalloc();
+}
