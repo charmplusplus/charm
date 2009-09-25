@@ -1136,6 +1136,8 @@ void *CmiIsomallocAlign(size_t align, size_t size);
 void  CmiIsomallocPup(pup_er p,void **block);
 void  CmiIsomallocFree(void *block);
 int   CmiIsomallocEnabled();
+void  CmiEnableIsomalloc();
+void  CmiDisableIsomalloc();
 
 CmiInt8   CmiIsomallocLength(void *block);
 int   CmiIsomallocInRange(void *addr);

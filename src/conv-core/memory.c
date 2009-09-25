@@ -633,8 +633,8 @@ CmiIsomallocBlockList *CmiIsomallocBlockListActivate(CmiIsomallocBlockList *l)
 CmiIsomallocBlockList *CmiIsomallocBlockListCurrent(){
 	return NULL;
 }
-void isomalloc_push() {}
-void isomalloc_pop() {}
+void CmiEnableIsomalloc() {}
+void CmiDisableIsomalloc() {}
 #endif
 
 #ifndef CMI_MEMORY_ROUTINES

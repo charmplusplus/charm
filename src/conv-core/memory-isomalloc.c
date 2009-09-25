@@ -29,17 +29,20 @@ CpvStaticDeclare(CmiIsomallocBlockList *,pushed_blocklist);
 	CpvAccess(isomalloc_blocklist)=pushed_blocklist;\
 	rank_holding_CmiMemLock=-1;\
 
-void isomalloc_push()
+/* temporarily disable/enable isomalloc. Note the following two fucntions
+ * must be used in pair, and no suspend of thread is allowed in between
+ * */
+void CmiDisableIsomalloc()
 {
 	CpvAccess(pushed_blocklist)=CpvAccess(isomalloc_blocklist);
 	CpvAccess(isomalloc_blocklist)=NULL;
 	rank_holding_CmiMemLock=CmiMyRank();
 }
 
-void isomalloc_pop()
+void CmiEnableIsomalloc()
 {
 	CpvAccess(isomalloc_blocklist)=CpvAccess(pushed_blocklist);
-	rank_holding_CmiMemLock=-1;\
+	rank_holding_CmiMemLock=-1;
 }
 
 static void meta_init(char **argv)
