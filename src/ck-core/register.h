@@ -165,9 +165,13 @@ class ChareInfo {
     /// true if this EP is charm internal functions
     CmiBool inCharm;
 
+    int mainChareIdx;      
+
     ChareInfo(const char *n, int s) : name(n), size(s) {
       defCtor=migCtor=-1;
       isIrr = numbases = 0;
+      inCharm = CmiFalse;
+      mainChareIdx = -1;
     }
     void setDefaultCtor(int idx) { defCtor = idx; }
     int getDefaultCtor(void) { return defCtor; }
@@ -176,6 +180,8 @@ class ChareInfo {
     void addBase(int idx) { bases[numbases++] = idx; }
     void setInCharm() { inCharm = CmiTrue; }
     CmiBool isInCharm() { return inCharm; }
+    void setMainChareType(int idx) { mainChareIdx = idx; }
+    int mainChareType() { return mainChareIdx; }
 };
 
 /// Describes a mainchare's constructor.  These are all executed at startup.

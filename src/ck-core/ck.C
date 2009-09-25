@@ -754,7 +754,14 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
 static inline void _processForChareMsg(CkCoreState *ck,envelope *env)
 {
   register int epIdx = env->getEpIdx();
-  register void *obj = env->getObjPtr();
+  register int mainIdx = _chareTable[_entryTable[epIdx]->chareIdx]->mainChareType();
+  register void *obj;
+  if (mainIdx != -1)  {
+    CmiAssert(CkMyPe()==0);
+    obj = _mainTable[mainIdx]->getObj();
+  }
+  else
+    obj = env->getObjPtr();
   _invokeEntry(epIdx,env,obj);
 }
 

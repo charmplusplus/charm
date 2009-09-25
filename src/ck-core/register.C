@@ -96,7 +96,9 @@ void CkRegisterMigCtor(int chareIdx, int ctorEpIdx)
 extern "C"
 int CkRegisterMainChare(int chareIdx, int entryIdx)
 {
-  return _mainTable.add(new MainInfo(chareIdx, entryIdx));
+  int mIdx =  _mainTable.add(new MainInfo(chareIdx, entryIdx));
+  _chareTable[chareIdx]->setMainChareType(mIdx);
+  return mIdx;
 }
 
 extern "C"
