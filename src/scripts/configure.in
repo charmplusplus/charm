@@ -797,7 +797,7 @@ test_cxx "whether poll() syscall exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass, [whether the poll() syscall exists])
 
 #### check if getpid exists ####
-cat > $t <<EOT
+cat > $tc <<EOT
 #include <sys/types.h>
 #include <unistd.h>
 
