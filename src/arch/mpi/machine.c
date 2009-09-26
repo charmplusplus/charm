@@ -26,7 +26,15 @@
 #endif
 
 /*Support for ++debug: */
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+#include <windows.h>
+#include <wincon.h>
+#include <sys/types.h>
+#include <sys/timeb.h>
+static void sleep(int secs) {Sleep(1000*secs);}
+#else
 #include <unistd.h> /*For getpid()*/
+#endif
 #include <stdlib.h> /*For sleep()*/
 
 #define MULTI_SENDQUEUE    0
@@ -427,7 +435,7 @@ CsvDeclare(CmiNodeState, NodeState);
 
 #include "immediate.c"
 
-#if ! CMK_SMP
+#if CMK_SHARED_VARS_UNAVAILABLE
 /************ non SMP **************/
 static struct CmiStateStruct Cmi_state;
 int _Cmi_mype;
@@ -1602,6 +1610,7 @@ static void machine_exit(char *m) {
 
 static void KillOnAllSigs(int sigNo) {
   static int already_in_signal_handler = 0;
+  char *m;
   if (already_in_signal_handler) MPI_Abort(MPI_COMM_WORLD,1);
   already_in_signal_handler = 1;
   if (CpvAccess(cmiArgDebugFlag)) {
@@ -1613,7 +1622,7 @@ static void KillOnAllSigs(int sigNo) {
       "Signal: %d\n",CmiMyPe(),sigNo);
   CmiPrintStackTrace(1);
 
-  char *m = CmiAlloc(CmiMsgHeaderSizeBytes);
+  m = CmiAlloc(CmiMsgHeaderSizeBytes);
   CmiSetHandler(m, machine_exit_idx);
   CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, m);
   machine_exit(m);
@@ -1815,10 +1824,14 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   int debug_no_pause = CmiGetArgFlag(argv,"++debug-no-pause");
   if (debug || debug_no_pause)
   {   /*Pause so user has a chance to start and attach debugger*/
+#if CMK_HAS_GETPID
     printf("CHARMDEBUG> Processor %d has PID %d\n",_Cmi_mynode,getpid());
     fflush(stdout);
     if (!debug_no_pause)
       sleep(10);
+#else
+    printf("++debug ignored.\n");
+#endif
   }
   }
 
@@ -1899,6 +1912,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
 void CmiAbort(const char *message)
 {
+  char *m;
   /* if CharmDebug is attached simply try to send a message to it */
   if (CpvAccess(cmiArgDebugFlag)) {
     CpdNotify(CPD_ABORT, message);
@@ -1909,7 +1923,7 @@ void CmiAbort(const char *message)
         "Reason: %s\n",CmiMyPe(),message);
  /*  CmiError(message); */
   CmiPrintStackTrace(0);
-  char *m = CmiAlloc(CmiMsgHeaderSizeBytes);
+  m = CmiAlloc(CmiMsgHeaderSizeBytes);
   CmiSetHandler(m, machine_exit_idx);
   CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, m);
   machine_exit(m);
