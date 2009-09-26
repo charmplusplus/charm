@@ -61,6 +61,8 @@ int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
      e->isMemCritical=CmiTrue;
      if (CkMyRank()==0)
         numMemCriticalEntries++;
+  }else{
+    e->isMemCritical=CmiFalse;
   }
 #endif
   return _entryTable.add(e);
