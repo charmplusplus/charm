@@ -802,7 +802,7 @@ cat > $t <<EOT
 #include <unistd.h>
 
 void foo(void *a) {
-    pid_t = getpid();
+    pid_t pid = getpid();
 }
 EOT
 test_cc "whether getpid() exists" "yes" "no" ""
