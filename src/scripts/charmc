@@ -338,8 +338,9 @@ ORIGDIR=`pwd`
 
 findCharmBin $0
 
+UNAME=`uname -s`
 FIRST_THREE=`uname -s | awk '{print substr($1,1,3)}' `
-if [ "$FIRST_THREE" = "CYG" ]
+if [ "$FIRST_THREE" = "CYG" -o "$UNAME" = "Interix" ]
 then
 # Running on a windows system-- append .exe to file names
 	PROG_EXT=".exe"
