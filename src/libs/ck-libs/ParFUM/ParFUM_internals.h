@@ -55,6 +55,10 @@
 
 #include "ParFUM_Adapt.decl.h"
 
+#if defined(WIN32) && defined(max)
+#undef max
+#endif
+
 /* USE of this extern may be a BUG */
 extern CProxy_femMeshModify meshMod;
 
