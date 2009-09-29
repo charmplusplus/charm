@@ -226,9 +226,7 @@ prio prio2;
 }
 
 /** Find or create a bucket in the hash table for the specified priority. */
-deq CqsPrioqGetDeq(pq, priobits, priodata)
-prioq pq;
-unsigned int priobits, *priodata;
+deq CqsPrioqGetDeq(prioq pq, unsigned int priobits, unsigned int *priodata)
 {
   unsigned int prioints = (priobits+CINTBITS-1)/CINTBITS;
   unsigned int hashval, i;
@@ -800,7 +798,8 @@ void** CqsEnumeratePrioq(prioq q, int *num){
 /** Produce an array containing all the entries in a Queue
     @return a newly allocated array filled with copies of the (void*) elements in the Queue. 
     @param [in] q a Queue
-    @param [out] resp an array of pointer entries found in the Queue
+    @param [out] resp an array of pointer entries found in the Queue,
+    with as many entries as the Queue's length
 */
 void CqsEnumerateQueue(Queue q, void ***resp){
   void **result;
