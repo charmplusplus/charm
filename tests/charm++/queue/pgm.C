@@ -115,6 +115,31 @@ bool test_enqueue_mixed()
   return result;
 }
 
+static bool findEntry(void ** const e, int num, void * const t)
+{
+    for (int i = 0; i < num; ++i)
+    {
+	if (e[i] == t)
+	    return true;
+    }
+    return false;
+}
+
+bool test_enumerate()
+{
+  Queue q = CqsCreate();
+  void *i = (char *)1, *j = (char *)2, *k = (char *)3;
+  void **e;
+  CqsEnqueueFifo(q, i);
+  CqsEnqueueFifo(q, j);
+  CqsEnqueueLifo(q, k);
+  CqsEnumerateQueue(q, &e);
+  int n = CqsLength(q);
+  bool result = findEntry(e, n, i) && findEntry(e, n, j) && findEntry(e, n, k);
+  CqsDelete(q);
+  return result;
+}
+
 #if 0
 // Template for new harness-driven tests
 bool test_foo()
@@ -140,6 +165,7 @@ struct main : public CBase_main
     RUN_TEST(test_fifo);
     RUN_TEST(test_lifo);
     RUN_TEST(test_enqueue_mixed);
+    RUN_TEST(test_enumerate);
 
     if (fail) {
       sprintf(message, "%d/%d tests failed\n", fail, tests);
