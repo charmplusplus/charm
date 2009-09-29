@@ -3,7 +3,7 @@ CXX := $(CHARMC)
 
 all: pgm
 test: pgm
-	./pgm
+	./charmrun ./pgm
 
 pgm.C: main.decl.h
 
