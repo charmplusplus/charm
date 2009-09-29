@@ -1,4 +1,4 @@
-DIRS=megatest pingpong simplearrayhello loadbalancing chkpt delegation
+DIRS=megatest pingpong simplearrayhello loadbalancing chkpt delegation queue
 
 all:
 	for d in $(DIRS); do \

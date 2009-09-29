@@ -2,8 +2,13 @@ CHARMC := ../../../bin/charmc
 CXX := $(CHARMC)
 
 all: pgm
+test: pgm
+	./pgm
 
-pgm.C: test.decl.h
+pgm.C: main.decl.h
 
-test.decl.h: test.ci
+main.decl.h: test.ci
 	$(CHARMC) $<
+
+clean:
+	rm -f pgm *.o *.decl.h *.def.h
