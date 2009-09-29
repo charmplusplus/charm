@@ -133,6 +133,44 @@ bool test_enumerate()
   CqsEnumerateQueue(q, &e);
   int n = CqsLength(q);
   bool result = findEntry(e, n, i) && findEntry(e, n, j) && findEntry(e, n, k);
+  CmiFree(e);
+  CqsDelete(q);
+  return result;
+}
+
+bool test_general_fifo()
+{
+  Queue q = CqsCreate();
+  void *i = (char *)1, *j = (char *)2, *k = (char *)3;
+  void **e;
+  CqsEnqueueGeneral(q, i, CQS_QUEUEING_FIFO, 1, 0);
+  CqsEnqueueGeneral(q, j, CQS_QUEUEING_FIFO, 2, 0);
+  CqsEnqueueGeneral(q, k, CQS_QUEUEING_FIFO, 42, 0);
+  void *r, *s, *t;
+  CqsDequeue(q, &r);
+  CqsDequeue(q, &s);
+  CqsDequeue(q, &t);
+  bool result = (r == i) && (s == j) && (t == k);
+  cerr << "r s t" << r << s << t;
+  CqsDelete(q);
+  return result;
+}
+
+bool test_general_ififo()
+{
+  Queue q = CqsCreate();
+  void *i = (char *)1, *j = (char *)2, *k = (char *)3;
+  void **e;
+  unsigned int a = -1, b = 0, c = 1;
+  CqsEnqueueGeneral(q, i, CQS_QUEUEING_IFIFO, 8*sizeof(int), &c);
+  CqsEnqueueGeneral(q, j, CQS_QUEUEING_IFIFO, 8*sizeof(int), &b);
+  CqsEnqueueGeneral(q, k, CQS_QUEUEING_IFIFO, 8*sizeof(int), &a);
+  void *r, *s, *t;
+  CqsDequeue(q, &r);
+  CqsDequeue(q, &s);
+  CqsDequeue(q, &t);
+  bool result = (r == k) && (s == j) && (t == i);
+  cerr << "r s t" << r << s << t;
   CqsDelete(q);
   return result;
 }
@@ -163,6 +201,8 @@ struct main : public CBase_main
     RUN_TEST(test_lifo);
     RUN_TEST(test_enqueue_mixed);
     RUN_TEST(test_enumerate);
+    RUN_TEST(test_general_fifo);
+    RUN_TEST(test_general_ififo);
 
     if (fail) {
       sprintf(message, "%d/%d tests failed\n", fail, tests);

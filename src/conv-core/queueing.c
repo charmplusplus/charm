@@ -5,9 +5,9 @@
  * $Revision$
  *****************************************************************************/
 
+#include "queueing.h"
 #include <converse.h>
 #include <string.h>
-#include "queueing.h"
 
 /** @defgroup CharmScheduler 
     @brief The portion of Charm++ responsible for scheduling the execution 

@@ -9,7 +9,6 @@
 #define QUEUEING_H
 /*#define FASTQ*/
 
-
 /** 
     @file 
     Declarations of queuing data structure functions.
@@ -18,7 +17,6 @@
     @addtogroup CharmScheduler
     @{
  */
-
 
 #ifdef __cplusplus
 extern "C" {
@@ -173,8 +171,8 @@ void CqsEnqueueLifo(Queue, void *msg);
     Enqueue something (usually an envelope*) into the queue in a
     manner consistent with the specified strategy and priority.
 */
-void CqsEnqueueGeneral(Queue, void *msg,int strategy, 
-	       int priobits, unsigned int *prioPtr);
+void CqsEnqueueGeneral(Queue, void *msg, int strategy, 
+		       int priobits, unsigned int *prioPtr);
 
 /**
     Produce an array containing all the entries in a Queue
@@ -182,7 +180,8 @@ void CqsEnqueueGeneral(Queue, void *msg,int strategy,
     elements in the Queue.
     @param [in] q a Queue
     @param [out] resp an array of pointer entries found in the Queue,
-    with as many entries as the Queue's length
+    with as many entries as the Queue's length. The caller must
+    CmiFree this.
 */
 void CqsEnumerateQueue(Queue q, void ***resp);
 
