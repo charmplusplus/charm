@@ -17,6 +17,8 @@
 #include "charm.h"
 #include "middle.h"
 
+class LBDatabase;//Forward declaration
+
 //typedef float floatType;
 typedef double floatType;
 
