@@ -19,6 +19,9 @@ Orion Sky Lawlor, olawlor@acm.org, 1/3/2003
 #  include "idxl_layout.h" /*for IDXL_Layout */
 #endif
 
+#if defined(WIN32) && defined(max)
+#undef max
+#endif
 
 // Map the IDXL names to the old FEM names (FIXME: change all references, too)
 typedef IDXL_Side FEM_Comm;
@@ -272,14 +275,14 @@ public:
 			supplied data
 			error checks have been performed at FEM_ATTRIB
 	*/
-	void register_data(T *user,int len,int max){
+	void register_data(T *user,int len,int max_){
 		if(allocTable != NULL){
 			delete [] allocTable;
 			allocTable = NULL;
 		}	
 		this->table = user;
 		this->rows = len;
-		max = max;
+		max = max_;
 	}
 };
 

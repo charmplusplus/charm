@@ -19,6 +19,10 @@ Converted from vector3d.h.
 
 #include <math.h>
 
+#if defined(WIN32) && defined(max)
+#undef max
+#endif
+
 typedef double real;
 
 //vector2d is a cartesian vector in 2-space-- an x and y.
