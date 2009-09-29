@@ -383,8 +383,29 @@ static CMK_TYPEDEF_UINT8 MemusagePS(){
 #endif	
 }
 
+#ifdef WIN32
+#include <windows.h>
+#include <psapi.h>
+
+#if CMK_C_INLINE
+inline
+#endif
+static CMK_TYPEDEF_UINT8 MemusageWindows(){
+    PROCESS_MEMORY_COUNTERS pmc;
+    if ( GetProcessMemoryInfo( GetCurrentProcess(), &pmc, sizeof(pmc)) )
+    {
+      /* return pmc.WorkingSetSize; */ 
+      return pmc.PagefileUsage;    /* total vm size, possibly not in memory */
+    }
+    return 0;
+}
+#endif
+
 CMK_TYPEDEF_UINT8 CmiMemoryUsage(){
     CMK_TYPEDEF_UINT8 memtotal = 0;
+#ifdef WIN32
+    if(!memtotal) memtotal = MemusageWindows();
+#endif
     if(!memtotal) memtotal = MemusageMstats();
     if(!memtotal) memtotal = MemusageMallinfo();
     if(!memtotal) memtotal = MemusageProcSelfStat();
@@ -392,6 +413,7 @@ CMK_TYPEDEF_UINT8 CmiMemoryUsage(){
     if(!memtotal) memtotal = MemusagePS();
     return memtotal;
 }
+
 /******End of a general way to get memory usage information*****/
 
 CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage() { return 0; }
