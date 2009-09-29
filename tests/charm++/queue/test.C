@@ -24,6 +24,7 @@ bool test_empty()
 {
   Queue q = CqsCreate();
   bool result = (0 == CqsLength(q)) && (1 == CqsEmpty(q));
+  result &= CqsMaxLength(q) >= 0;
   CqsDelete(q);
   return result;
 }
@@ -39,6 +40,7 @@ bool test_one()
   CqsEnqueue(q, p);
   bool result = (1 == CqsLength(q)) && (0 == CqsEmpty(q));
   void *r;
+  result &= CqsMaxLength(q) >= 1;
   CqsDequeue(q, &r);
   result &= (r == p) 
     && (0 == CqsLength(q)) 
@@ -52,10 +54,11 @@ bool test_two()
 {
   Queue q = CqsCreate();
   void *i = 0, *j = (char *)1;
+  void *r, *s;
   CqsEnqueue(q, i);
   CqsEnqueue(q, j);
   bool result = (2 == CqsLength(q));
-  void *r, *s;
+  result &= CqsMaxLength(q) >= 2;
   CqsDequeue(q, &r);
   CqsDequeue(q, &s);
   result &= (r == i && s == j) || (r == j && s == i);
@@ -63,7 +66,25 @@ bool test_two()
   CqsDelete(q);
   return result;
 }
+
+bool test_fifo()
+{
+  Queue q = CqsCreate();
+  void *i = (char *)1, *j = (char *)2, *k = (char *)3;
+  void *r, *s, *t;
+  CqsEnqueueFifo(q, i);
+  CqsEnqueueFifo(q, j);
+  CqsEnqueueFifo(q, k);
+  CqsDequeue(q, &r);
+  CqsDequeue(q, &s);
+  CqsDequeue(q, &t);
+  bool result = (r == i) && (s == j) && (t == k);
+  CqsDelete(q);
+  return result;
+}
+
 #if 0
+// Template for new harness-driven tests
 bool test_foo()
 {
   Queue q = CqsCreate();
@@ -82,7 +103,8 @@ struct main : public CBase_main
     RUN_TEST(test_empty);
     RUN_TEST(test_one);
     RUN_TEST(test_two);
-    
+    RUN_TEST(test_fifo);
+
     if (fail) {
       char message[100];
       sprintf(message, "%d/%d tests failed\n", fail, tests);
