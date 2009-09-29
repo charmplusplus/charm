@@ -56,9 +56,11 @@
 
 #define CMK_LBDB_ON					   1
 
+/*
 #undef  CMK_IMMEDIATE_MSG
 #define CMK_IMMEDIATE_MSG				   0
 
 #define CMK_PCQUEUE_LOCK                                   1
+*/
 
 #endif
