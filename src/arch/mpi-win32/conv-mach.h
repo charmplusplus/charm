@@ -23,9 +23,9 @@
 #define CMK_NODE_QUEUE_AVAILABLE                           0
 
 #define CMK_SHARED_VARS_EXEMPLAR                           0
-#define CMK_SHARED_VARS_UNAVAILABLE                        0
+#define CMK_SHARED_VARS_UNAVAILABLE                        1
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
-#define CMK_SHARED_VARS_NT_THREADS                         1
+#define CMK_SHARED_VARS_NT_THREADS                         0
 
 #define CMK_SIGNAL_NOT_NEEDED                              1
 #define CMK_SIGNAL_USE_SIGACTION                           0
@@ -51,8 +51,6 @@
 #define CMK_TYPEDEF_UINT8 unsigned __int64
 #define CMK_TYPEDEF_FLOAT4 float
 #define CMK_TYPEDEF_FLOAT8 double
-
-#define CMK_64BIT    0
 
 #define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
 #define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
