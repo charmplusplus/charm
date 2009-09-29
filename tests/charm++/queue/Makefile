@@ -1,9 +1,9 @@
 CHARMC := ../../../bin/charmc
 CXX := $(CHARMC)
 
-all: test
+all: pgm
 
-test.C: test.decl.h
+pgm.C: test.decl.h
 
 test.decl.h: test.ci
 	$(CHARMC) $<
