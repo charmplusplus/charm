@@ -24,7 +24,6 @@ bool test_empty()
 {
   Queue q = CqsCreate();
   bool result = (0 == CqsLength(q)) && (1 == CqsEmpty(q));
-  result &= CqsMaxLength(q) >= 0;
   CqsDelete(q);
   return result;
 }
@@ -40,7 +39,6 @@ bool test_one()
   CqsEnqueue(q, p);
   bool result = (1 == CqsLength(q)) && (0 == CqsEmpty(q));
   void *r;
-  result &= CqsMaxLength(q) >= 1;
   CqsDequeue(q, &r);
   result &= (r == p) 
     && (0 == CqsLength(q)) 
@@ -58,7 +56,6 @@ bool test_two()
   CqsEnqueue(q, i);
   CqsEnqueue(q, j);
   bool result = (2 == CqsLength(q));
-  result &= CqsMaxLength(q) >= 2;
   CqsDequeue(q, &r);
   CqsDequeue(q, &s);
   result &= (r == i && s == j) || (r == j && s == i);

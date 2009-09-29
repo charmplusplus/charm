@@ -20,8 +20,8 @@
     negative priorities. The positive and negative priorty queues are actually heaps.
 
 
-    The charm++ messages are only scheduled after the \ref ConverseScheduler "converse message queues"
-    have been emptied:
+    The charm++ messages are only scheduled after the \ref
+    ConverseScheduler "converse message queues" have been emptied:
 
     - CsdScheduleForever() is the commonly used Converse scheduler loop
        - CsdNextMessage()
@@ -43,8 +43,7 @@ int schedAdaptMemThresholdMB;
 
 
 /** Initialize a deq */
-static void CqsDeqInit(d)
-deq d;
+static void CqsDeqInit(deq d)
 {
   d->bgn  = d->space;
   d->end  = d->space+4;
@@ -53,8 +52,7 @@ deq d;
 }
 
 /** Double the size of a deq */
-static void CqsDeqExpand(d)
-deq d;
+static void CqsDeqExpand(deq d)
 {
   int rsize = (d->end - d->head);
   int lsize = (d->head - d->bgn);
@@ -72,8 +70,7 @@ deq d;
 }
 
 /** Insert a data pointer at the tail of a deq */
-void CqsDeqEnqueueFifo(d, data)
-deq d; void *data;
+void CqsDeqEnqueueFifo(deq d, void *data)
 {
   void **tail = d->tail;
   *tail = data;
@@ -84,8 +81,7 @@ deq d; void *data;
 }
 
 /** Insert a data pointer at the head of a deq */
-void CqsDeqEnqueueLifo(d, data)
-deq d; void *data;
+void CqsDeqEnqueueLifo(deq d, void *data)
 {
   void **head = d->head;
   if (head == d->bgn) head = d->end;
@@ -96,8 +92,7 @@ deq d; void *data;
 }
 
 /** Remove a data pointer from the head of a deq */
-void *CqsDeqDequeue(d)
-deq d;
+void *CqsDeqDequeue(deq d)
 {
   void **head;
   void **tail;
@@ -113,8 +108,7 @@ deq d;
 }
 
 /** Initialize a Priority Queue */
-static void CqsPrioqInit(pq)
-prioq pq;
+static void CqsPrioqInit(prioq pq)
 {
   int i;
   pq->heapsize = 100;
@@ -340,8 +334,7 @@ deq CqsPrioqGetDeq(prioq pq, unsigned int priobits, unsigned int *priodata)
 }
 
 /** Dequeue an entry */
-void *CqsPrioqDequeue(pq)
-prioq pq;
+void *CqsPrioqDequeue(prioq pq)
 {
   prio pri;
   prioqelt pe, old; void *data;
@@ -537,7 +530,6 @@ prioq pq;
   return data;
 }
 
-/** Initialize a Queue and its three internal queues (for positive, negative, and zero priorities) */
 Queue CqsCreate(void)
 {
   Queue q = (Queue)CmiAlloc(sizeof(struct Queue_struct));
@@ -552,7 +544,6 @@ Queue CqsCreate(void)
   return q;
 }
 
-/** Delete a Queue */
 void CqsDelete(Queue q)
 {
   CmiFree(q->negprioq.heap);
@@ -575,10 +566,6 @@ int CqsEmpty(Queue q)
   return (q->length == 0);
 }
 
-
-/** Enqueue something (usually an envelope*) into the queue in 
-    a manner consistent with the specified strategy and priority.
-*/
 void CqsEnqueueGeneral(Queue q, void *data, int strategy, 
            int priobits,unsigned int *prioptr)
 {
@@ -673,7 +660,6 @@ void CqsEnqueue(Queue q, void *data)
   q->length++; if (q->length>q->maxlen) q->maxlen=q->length;
 }
 
-/** Retrieve the highest priority message (one with most negative priority) */
 void CqsDequeue(Queue q, void **resp)
 {
 #ifdef ADAPT_SCHED_MEM
@@ -697,9 +683,8 @@ void CqsDequeue(Queue q, void **resp)
 
 static struct prio_struct kprio_zero = { 0, 0, {0} };
 static struct prio_struct kprio_max  = { 32, 1, {((unsigned int)(-1))} };
-/** Get the priority of the highest priority message in q */
-prio CqsGetPriority(q)
-Queue q;
+
+prio CqsGetPriority(Queue q)
 {
   if (q->negprioq.heapnext>1) return &(q->negprioq.heap[1]->pri);
   if (q->zeroprio.head != q->zeroprio.tail) { return &kprio_zero; }
@@ -795,12 +780,6 @@ void** CqsEnumeratePrioq(prioq q, int *num){
   return result;
 }
 
-/** Produce an array containing all the entries in a Queue
-    @return a newly allocated array filled with copies of the (void*) elements in the Queue. 
-    @param [in] q a Queue
-    @param [out] resp an array of pointer entries found in the Queue,
-    with as many entries as the Queue's length
-*/
 void CqsEnumerateQueue(Queue q, void ***resp){
   void **result;
   int num;
@@ -831,13 +810,14 @@ void CqsEnumerateQueue(Queue q, void ***resp){
   CmiFree(result);
 }
 
+/**
+   Remove first occurence of a specified entry from the deq  by
+   setting the entry to NULL.
 
+   The size of the deq will not change, it will now just contain an
+   entry for a NULL pointer.
 
-
-/** Remove first occurence of a specified entry from the deq  by setting the entry to NULL.
-    The size of the deq will not change, it will now just contain an entry for a NULL pointer.
-
-    @return number of entries that were replaced with NULL
+   @return number of entries that were replaced with NULL
 */
 int CqsRemoveSpecificDeq(deq q, const void *msgPtr){
   void **head, **tail;
@@ -858,12 +838,14 @@ int CqsRemoveSpecificDeq(deq q, const void *msgPtr){
   return 0;
 }
 
+/**
+   Remove first occurence of a specified entry from the prioq by
+   setting the entry to NULL.
 
+   The size of the prioq will not change, it will now just contain an
+   entry for a NULL pointer.
 
-/** Remove first occurence of a specified entry from the prioq by setting the entry to NULL.
-    The size of the prioq will not change, it will now just contain an entry for a NULL pointer.
-
-    @return number of entries that were replaced with NULL
+   @return number of entries that were replaced with NULL
 */
 int CqsRemoveSpecificPrioq(prioq q, const void *msgPtr){
   void **head, **tail;
@@ -889,11 +871,6 @@ int CqsRemoveSpecificPrioq(prioq q, const void *msgPtr){
   return 0;
 }
 
-
-
-/** Remove an occurence of a specified entry from the Queue by setting its entry to NULL. 
-    The size of the Queue will not change, it will now just contain an entry for a NULL pointer.
-*/
 void CqsRemoveSpecific(Queue q, const void *msgPtr){
   if( CqsRemoveSpecificPrioq(&(q->negprioq), msgPtr) == 0 )
     if( CqsRemoveSpecificDeq(&(q->zeroprio), msgPtr) == 0 )  
@@ -902,16 +879,9 @@ void CqsRemoveSpecific(Queue q, const void *msgPtr){
       }  
 }
 
-
 #ifdef ADAPT_SCHED_MEM
 int numMemCriticalEntries=0;
 int *memCriticalEntries=NULL;
 #endif
-
-
-
-
-
-
 
 /** @} */

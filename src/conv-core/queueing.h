@@ -44,7 +44,10 @@ typedef struct prio_struct
 }
 *prio;
 
-/** A double ended queue of void* pointers stored in a circular buffer, with internal space for 4 entries */
+/**
+   A double ended queue of void* pointers stored in a circular buffer,
+   with internal space for 4 entries
+*/
 typedef struct deq_struct
 {
   /* Note: if head==tail, circ is empty */
@@ -57,7 +60,11 @@ typedef struct deq_struct
 *deq;
 
 #ifndef FASTQ
-/** An bucket in a priority queue which contains a deque(storing the void* pointers) and references to other buckets in the hash table. */
+/**
+   A bucket in a priority queue which contains a deque(storing the
+   void* pointers) and references to other buckets in the hash
+   table.
+*/
 typedef struct prioqelt_struct
 {
   struct deq_struct data;
@@ -87,7 +94,11 @@ typedef struct prioqelt_struct
 /*#endif */
 
 /*#ifndef FASTQ*/
-/** A priority queue, implemented as a heap of prioqelt_struct buckets (each bucket represents a single priority value and contains a deque of void* pointers) */
+/**
+   A priority queue, implemented as a heap of prioqelt_struct buckets
+   (each bucket represents a single priority value and contains a
+   deque of void* pointers)
+*/
 typedef struct prioq_struct
 {
   int heapsize; 
@@ -111,8 +122,12 @@ typedef struct prioq1_struct
 */
 
 /*#ifndef FASTQ*/
-/** A set of 3 queues: a positive priority prioq_struct, a negative priority prioq_struct, and a zero priority deq_struct.
-    If the user modifies the queue, NULL entries may be present, and hence NULL values will be returned by CqsDequeue().
+/**
+   A set of 3 queues: a positive priority prioq_struct, a negative
+   priority prioq_struct, and a zero priority deq_struct.
+   
+   If the user modifies the queue, NULL entries may be present, and
+   hence NULL values will be returned by CqsDequeue().
 */
 typedef struct Queue_struct
 {
@@ -136,28 +151,63 @@ typedef struct Queue1_struct
 #endif
 */
 
+/**
+    Initialize a Queue and its three internal queues (for positive,
+    negative, and zero priorities)
+*/
 Queue CqsCreate(void);
+
+/** Delete a Queue */
 void CqsDelete(Queue);
+
+/** Enqueue with priority 0 */
 void CqsEnqueue(Queue, void *msg);
+
+/** Enqueue behind other elements of priority 0 */
 void CqsEnqueueFifo(Queue, void *msg);
+
+/** Enqueue ahead of other elements of priority 0 */
 void CqsEnqueueLifo(Queue, void *msg);
+
+/**
+    Enqueue something (usually an envelope*) into the queue in a
+    manner consistent with the specified strategy and priority.
+*/
 void CqsEnqueueGeneral(Queue, void *msg,int strategy, 
 	       int priobits, unsigned int *prioPtr);
 
+/**
+    Produce an array containing all the entries in a Queue
+    @return a newly allocated array filled with copies of the (void*)
+    elements in the Queue.
+    @param [in] q a Queue
+    @param [out] resp an array of pointer entries found in the Queue,
+    with as many entries as the Queue's length
+*/
 void CqsEnumerateQueue(Queue q, void ***resp);
+
+/**
+   Retrieve the highest priority message (one with most negative
+   priority)
+*/
 void CqsDequeue(Queue, void **msgPtr);
 
 unsigned int CqsLength(Queue);
-unsigned int CqsMaxLength(Queue);
 int CqsEmpty(Queue);
 int CqsPrioGT(prio, prio);
+
+/** Get the priority of the highest priority message in q */
 prio CqsGetPriority(Queue);
 
-deq CqsPrioqGetDeq(prioq pq, unsigned int priobits, unsigned int *priodata);
-void *CqsPrioqDequeue(prioq pq);
-void CqsDeqEnqueueFifo(deq d, void *data);
-
 void CqsIncreasePriorityForEntryMethod(Queue q, const int entrymethod);
+
+/**
+    Remove an occurence of a specified entry from the Queue by setting
+    its entry to NULL.
+
+    The size of the Queue will not change, it will now just contain an
+    entry for a NULL pointer.
+*/
 void CqsRemoveSpecific(Queue, const void *msgPtr);
 
 #ifdef ADAPT_SCHED_MEM
