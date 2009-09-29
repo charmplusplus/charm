@@ -14,7 +14,7 @@ using std::sprintf;
     ++success; \
   } else { \
     ++fail; \
-    cerr << "Test " #f " failed" << endl; \
+    cerr << "Test \"" #f "\" failed" << endl; \
   } \
 } while (0)
 
@@ -83,6 +83,38 @@ bool test_fifo()
   return result;
 }
 
+bool test_lifo()
+{
+  Queue q = CqsCreate();
+  void *i = (char *)1, *j = (char *)2, *k = (char *)3;
+  void *r, *s, *t;
+  CqsEnqueueLifo(q, i);
+  CqsEnqueueLifo(q, j);
+  CqsEnqueueLifo(q, k);
+  CqsDequeue(q, &r);
+  CqsDequeue(q, &s);
+  CqsDequeue(q, &t);
+  bool result = (r == k) && (s == j) && (t == i);
+  CqsDelete(q);
+  return result;
+}
+
+bool test_enqueue_mixed()
+{
+  Queue q = CqsCreate();
+  void *i = (char *)1, *j = (char *)2, *k = (char *)3;
+  void *r, *s, *t;
+  CqsEnqueueFifo(q, i);
+  CqsEnqueueFifo(q, j);
+  CqsEnqueueLifo(q, k);
+  CqsDequeue(q, &r);
+  CqsDequeue(q, &s);
+  CqsDequeue(q, &t);
+  bool result = (r == k) && (s == i) && (t == j);
+  CqsDelete(q);
+  return result;
+}
+
 #if 0
 // Template for new harness-driven tests
 bool test_foo()
@@ -100,18 +132,23 @@ struct main : public CBase_main
   main(CkArgMsg *)
   {
     int tests = 0, success = 0, fail = 0;
+    char message[100];
+
     RUN_TEST(test_empty);
     RUN_TEST(test_one);
     RUN_TEST(test_two);
     RUN_TEST(test_fifo);
+    RUN_TEST(test_lifo);
+    RUN_TEST(test_enqueue_mixed);
 
     if (fail) {
-      char message[100];
       sprintf(message, "%d/%d tests failed\n", fail, tests);
       CkAbort(message);
     }
-    else
+    else {
+      CkPrintf("All %d tests passed\n", tests);
       CkExit();
+    }
   }
 
 };
