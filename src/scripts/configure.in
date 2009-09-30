@@ -7,7 +7,7 @@ CHARMINC="."
 test -r ./conv-config.sh && . ./conv-config.sh
 
 #keep it a decimal
-VERSION=60102
+VERSION=60103
 echo $VERSION > ../include/VERSION
 AC_DEFINE_UNQUOTED([CHARM_VERSION], $VERSION, [Charm++ version number])
 
