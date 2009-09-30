@@ -2394,12 +2394,12 @@ _ACEOF
 
 
 #### check if getpid exists ####
-cat > $t <<EOT
+cat > $tc <<EOT
 #include <sys/types.h>
 #include <unistd.h>
 
 void foo(void *a) {
-    pid_t = getpid();
+    pid_t pid = getpid();
 }
 EOT
 test_cc "whether getpid() exists" "yes" "no" ""
