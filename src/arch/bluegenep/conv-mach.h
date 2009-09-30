@@ -68,5 +68,8 @@
 #define CMK_CCS_AVAILABLE				   0
 
 #define CMK_DIRECT                                         1
+
+#define CMK_NO_ISO_MALLOC                                  1
+
 #endif
 
