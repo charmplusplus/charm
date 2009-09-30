@@ -47,7 +47,7 @@ fi
 
 #CL command-line options for -O and -g mode
 CL_CMD="$VCC_DIR/BIN/CL.EXE"
-CL_COMMON=' /nologo /W3 /EHsc /DWIN32 /D_WINDOWS /FD /Zp4'
+CL_COMMON=' /nologo /W1 /EHsc /DWIN32 /D_WINDOWS /FD /Zp4'
 CL_COMMON="$CL_COMMON /I`cygpath -d \"$SDK_DIR/Include\"`"
 CL_O=$CL_COMMON" /DNDEBUG /MT /Ox"
 CL_DEF=$CL_COMMON" /MT"
@@ -64,7 +64,7 @@ LINK_G="$LINK_COMMON /DEBUG"
 #LINK_POST='ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib 
 #  comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib 
 #  odbc32.lib odbccp32.lib /SUBSYSTEM:CONSOLE /INCREMENTAL:NO /MACHINE:IX86 '
-LINK_POST='ws2_32.lib kernel32.lib user32.lib gdi32.lib winspool.lib
+LINK_POST='ws2_32.lib kernel32.lib user32.lib psapi.lib gdi32.lib winspool.lib
   comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib 
   /MACHINE:X86 /ERRORREPORT:PROMPT '
 
