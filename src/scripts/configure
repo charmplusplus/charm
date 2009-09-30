@@ -2378,6 +2378,63 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test for sbrk ###
+cat > $t <<EOT
+#include <unistd.h>
+int main() {
+  void *ptr  = sbrk(0);
+}
+EOT
+test_link "whether has sbrk" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_SBRK $pass
+_ACEOF
+
+
+#### test for mstats ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  struct mstats ms = mstats();
+}
+EOT
+test_link "whether has mstats" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_MSTATS $pass
+_ACEOF
+
+
+#### test for mallinfo ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  struct mallinfo mi = mallinfo();
+}
+EOT
+test_link "whether has mallinfo" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_MALLINFO $pass
+_ACEOF
+
+
+#### test for popen ###
+cat > $t <<EOT
+#include <stdio.h>
+int main() {
+  FILE *p = popen("/bin/ps", "r");
+  pclose(p);
+}
+EOT
+test_link "whether has popen" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_POPEN $pass
+_ACEOF
+
+
 #### test for poll ###
 cat > $t <<EOT
 #include <poll.h>

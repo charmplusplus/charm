@@ -277,7 +277,142 @@ void CmiMemoryInit(argv)
 void *malloc_reentrant(size_t size) { return malloc(size); }
 void free_reentrant(void *mem) { free(mem); }
 
-CMK_TYPEDEF_UINT8 CmiMemoryUsage() { return 0; }
+/******Start of a general way to get memory usage information*****/
+/*CMK_TYPEDEF_UINT8 CmiMemoryUsage() { return 0; }*/
+
+#if ! CMK_HAS_SBRK
+int sbrk(int s) { return 0; }
+#endif
+
+#if CMK_HAS_MSTATS
+#include <malloc/malloc.h>
+#if CMK_C_INLINE
+inline
+#endif
+static CMK_TYPEDEF_UINT8 MemusageMstats(){
+        struct mstats ms = mstats();
+        CMK_TYPEDEF_UINT8 memtotal = ms.bytes_used;
+        return memtotal;
+}
+#else
+#if CMK_C_INLINE
+inline
+#endif
+static CMK_TYPEDEF_UINT8 MemusageMstats() { return 0; }
+#endif
+
+static int MemusageInited = 0;
+static CMK_TYPEDEF_UINT8 MemusageInitSbrkval = 0;
+#if CMK_C_INLINE
+inline
+#endif
+static CMK_TYPEDEF_UINT8 MemusageSbrk(){
+        CMK_TYPEDEF_UINT8 newval;
+        if(MemusageInited==0){
+                MemusageInitSbrkval = (CMK_TYPEDEF_UINT8)sbrk(0);
+                MemusageInited = 1;
+        }
+        newval = (CMK_TYPEDEF_UINT8)sbrk(0);
+        return (newval - MemusageInitSbrkval);
+}
+
+#if CMK_C_INLINE
+inline
+#endif
+static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(){
+    FILE *f;
+    int i;
+    static int failed_once = 0;
+    CMK_TYPEDEF_UINT8 vsz = 0; /* should remain 0 on failure */
+
+    if(failed_once) return 0; /* no point in retrying */
+
+    f = fopen("/proc/self/stat", "r");
+    if(!f) { failed_once = 1; return 0; }
+    for(i=0; i<22; i++) fscanf(f, "%*s");
+    fscanf(f, "%lu", &vsz);
+    fclose(f);
+    if(!vsz) failed_once=1;
+    return vsz;
+}
+
+#if ! CMK_HAS_MALLINFO
+#if CMK_C_INLINE
+inline
+#endif
+static CMK_TYPEDEF_UINT8 MemusageMallinfo(){ return 0;}
+#else
+#include <malloc.h>
+#if CMK_C_INLINE
+inline
+#endif
+static CMK_TYPEDEF_UINT8 MemusageMallinfo(){
+    struct mallinfo mi = mallinfo();
+    CMK_TYPEDEF_UINT8 memtotal = (CMK_TYPEDEF_UINT8) mi.uordblks;
+    CMK_TYPEDEF_UINT8 memtotal2 = (CMK_TYPEDEF_UINT8) mi.usmblks;
+    memtotal2 += (CMK_TYPEDEF_UINT8) mi.hblkhd;
+    if(memtotal2 > memtotal) memtotal = memtotal2;
+    return memtotal;
+}
+#endif
+
+#if CMK_C_INLINE
+inline
+#endif
+static CMK_TYPEDEF_UINT8 MemusagePS(){
+#if ! CMK_HAS_POPEN
+    return 0;
+#else
+    char pscmd[100];
+    CMK_TYPEDEF_UINT8 vsz=0;
+    FILE *p;
+    sprintf(pscmd, "/bin/ps -o vsz= -p %d", getpid());
+    p = popen(pscmd, "r");
+    if(p){
+        fscanf(p, "%ld", &vsz);
+        pclose(p);
+    }
+    return (vsz * (CMK_TYPEDEF_UINT8)1024);
+#endif
+}
+
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+#include <windows.h>
+#include <psapi.h>
+
+#if CMK_C_INLINE
+inline
+#endif
+static CMK_TYPEDEF_UINT8 MemusageWindows(){
+    PROCESS_MEMORY_COUNTERS pmc;
+    if ( GetProcessMemoryInfo( GetCurrentProcess(), &pmc, sizeof(pmc)) )
+    {
+      /* return pmc.WorkingSetSize; */
+      return pmc.PagefileUsage;    /* total vm size, possibly not in memory */
+    }
+    return 0;
+}
+#else
+static CMK_TYPEDEF_UINT8 MemusageWindows(){
+    return 0;
+}
+#endif
+
+CMK_TYPEDEF_UINT8 CmiMemoryUsage(){
+    CMK_TYPEDEF_UINT8 memtotal = 0;
+#ifdef _WIN32
+    if(!memtotal) memtotal = MemusageWindows();
+#endif
+    if(!memtotal) memtotal = MemusageMstats();
+    if(!memtotal) memtotal = MemusageMallinfo();
+    if(!memtotal) memtotal = MemusageProcSelfStat();
+    if(!memtotal) memtotal = MemusageSbrk();
+    if(!memtotal) memtotal = MemusagePS();
+    return memtotal;
+}
+
+/******End of a general way to get memory usage information*****/
+
 CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage() { return 0; }
 void CmiResetMaxMemory() {}
 CMK_TYPEDEF_UINT8 CmiMinMemoryUsage() { return 0; }

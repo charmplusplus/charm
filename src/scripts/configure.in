@@ -622,6 +622,47 @@ EOT
 test_link "whether it has system" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_SYSTEM, $pass, [whether it has system])
 
+#### test for sbrk ###
+cat > $t <<EOT
+#include <unistd.h>
+int main() {
+  void *ptr  = sbrk(0);
+}
+EOT
+test_link "whether has sbrk" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_SBRK, $pass, [whether has sbrk])
+
+#### test for mstats ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  struct mstats ms = mstats();
+}
+EOT
+test_link "whether has mstats" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_MSTATS, $pass, [whether has mstats])
+
+#### test for mallinfo ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  struct mallinfo mi = mallinfo();
+}
+EOT
+test_link "whether has mallinfo" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_MALLINFO, $pass, [whether has mallinfo])
+
+#### test for popen ###
+cat > $t <<EOT
+#include <stdio.h>
+int main() {
+  FILE *p = popen("/bin/ps", "r");
+  pclose(p);
+}
+EOT
+test_link "whether has popen" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_POPEN, $pass, [whether has popen])
+
 #### test for poll ###
 cat > $t <<EOT
 #include <poll.h>

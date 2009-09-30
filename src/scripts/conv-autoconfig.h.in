@@ -81,6 +81,9 @@
 /* whether it has log2 */
 #undef CMK_HAS_LOG2
 
+/* whether has mallinfo */
+#undef CMK_HAS_MALLINFO
+
 /* whether has malloc.h */
 #undef CMK_HAS_MALLOC_H
 
@@ -93,17 +96,26 @@
 /* whether mmap() accepts MAP_NORESERVE */
 #undef CMK_HAS_MMAP_NORESERVE
 
+/* whether has mstats */
+#undef CMK_HAS_MSTATS
+
 /* whether has Multiprocessing.h */
 #undef CMK_HAS_MULTIPROCESSING_H
 
 /* whether ntohl is available */
 #undef CMK_HAS_NTOHL
 
+/* whether has popen */
+#undef CMK_HAS_POPEN
+
 /* whether the pthread_setaffinity_np() exists */
 #undef CMK_HAS_PTHREAD_SETAFFINITY
 
 /* whether Python is installed */
 #undef CMK_HAS_PYTHON
+
+/* whether has sbrk */
+#undef CMK_HAS_SBRK
 
 /* whether the sched_setaffinity() exists */
 #undef CMK_HAS_SETAFFINITY
