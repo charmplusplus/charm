@@ -169,7 +169,7 @@ do
 	-E)
 		CL="$CL /E"
 		;;
-	-O)
+	-O|-O1|-O2|-O3)
 		CL_OPTS=$CL_O
 		LINK_OPTS=$LINK_O
 		;;
@@ -217,12 +217,14 @@ do
 			[ -r "$L.a" ] && D="$L.a"
 			[ -r "$L.lib" ] && D="$L.lib"
 			[ -r "lib$L.a" ] && D="lib$L.a"
+			[ -r "lib$L.lib" ] && D="lib$L.lib"
 			test -n "$LIBDIRS" &&	\
 			for dir in $LIBDIRS
 			do
 			  [ -r "$dir/lib$L" ] && D="$dir/lib$L"
 			  [ -r "$dir/lib$L.a" ] && D="$dir/lib$L.a"
 			  [ -r "$dir/$L.lib" ] && D="$dir/$L.lib"
+			  [ -r "$dir/lib$L.lib" ] && D="$dir/lib$L.lib"
 			done
 			[ $D = no ] && Abort "Couldn't find library $L in . or $LIBDIRS"
 			LINK="$LINK `cygpath -w $D`"
@@ -235,9 +237,16 @@ do
 		then
 #It's a .o output filename-- tell CL
 			OUTPUT="/Fo`cygpath -w $out`"
+		elif [ "x`getExtention $out`" = "x.obj" ]
+                then
+                        OUTPUT="/Fo`cygpath -w $out`"
 		elif [ "x`getExtention $out`" = "x.so" ]
 		then
 			OUTPUT="/Fo`cygpath -w $out`"
+		elif [ "x`getExtention $out`" = "x.exe" ]
+                then
+                        LINK="$LINK /out:$out"
+                        DOLINK="yes"
 		else
 #It's an exe filename-- tell LINK
 			LINK="$LINK /out:$out.exe"
@@ -246,7 +255,7 @@ do
 		;;
 	
 #Object file or library-- add to link
-	*.o|*.a|*.lib)
+	*.o|*.a|*.lib|*.obj)
 		if [ "$DOCOMPILE" = "yes" ]
 		then
 		  CL="$CL `cygpath -w $arg`"
@@ -260,6 +269,7 @@ do
 		base=`stripExtention $arg`
 		CL="$CL /Tc`cygpath -w $arg`"
 #		OUTPUT="/Fo$base.o"
+		OBJ_OUTPUT="/Fo$base.o"
 		LINK="$LINK $base.o"
 		DOCOMPILE="yes"
 		;;
@@ -283,6 +293,7 @@ done
 if [ $DOCOMPILE = yes ]
 then
 	OPTS="$CL_OPTS $OUTPUT $CL"
+	[ "$DOLINK" = yes -a -z "$OUTPUT" ] && OPTS="$OPTS $OBJ_OUTPUT"
 	[ $VERBOSE = yes ] && echo "unix2nt_cc> $CL_CMD" $OPTS
 	"$CL_CMD" $OPTS
 	if [ $? != 0 ]
