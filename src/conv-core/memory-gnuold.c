@@ -14,6 +14,10 @@
 #define valloc   mm_valloc
 #define MM_LINK static
 
+extern CMK_TYPEDEF_UINT8 memory_allocated;
+extern CMK_TYPEDEF_UINT8 memory_allocated_max;
+extern CMK_TYPEDEF_UINT8 memory_allocated_min;
+
 #undef sun /* I don't care if it's a sun, dangit.  No special treatment. */
 #undef BSD /* I don't care if it's BSD.  Same thing. */
 #if CMK_GETPAGESIZE_AVAILABLE
@@ -921,6 +925,13 @@ MM_LINK Void_t* malloc(bytes) size_t bytes;
   mchunkptr rl = returns;                /* local for speed/simplicity */
   size_t nb = request2size(bytes)    ;   /* padded request size; */
 
+  memory_allocated += nb;
+
+  if(memory_allocated > memory_allocated_max)
+    memory_allocated_max=memory_allocated;
+  if(memory_allocated < memory_allocated_min)
+    memory_allocated_min=memory_allocated;
+
   if (rl != 0)
   {
     mchunkptr snd = rl->fd;
@@ -1156,6 +1167,7 @@ MM_LINK void free(mem) Void_t* mem;
   if (mem != 0)
   {
     mchunkptr p = mem2chunk(mem);
+    memory_allocated -= p->size;
     returnlink(p);
   }
 }
