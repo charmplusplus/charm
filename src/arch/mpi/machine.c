@@ -26,7 +26,15 @@
 #endif
 
 /*Support for ++debug: */
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+#include <windows.h>
+#include <wincon.h>
+#include <sys/types.h>
+#include <sys/timeb.h>
+static void sleep(int secs) {Sleep(1000*secs);}
+#else
 #include <unistd.h> /*For getpid()*/
+#endif
 #include <stdlib.h> /*For sleep()*/
 
 #define MULTI_SENDQUEUE    0
