@@ -1290,7 +1290,7 @@ esac
 fi
 
 AC_OUTPUT(
-libs/ck-libs/ampi/ampirun,
+libs/ck-libs/ampi/ampiCC libs/ck-libs/ampi/ampirun,
 
-chmod +x libs/ck-libs/ampi/ampirun
+chmod +x libs/ck-libs/ampi/ampiCC libs/ck-libs/ampi/ampirun
 )

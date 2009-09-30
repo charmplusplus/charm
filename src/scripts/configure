@@ -3385,7 +3385,7 @@ EOT
 esac
 fi
 
-ac_config_files="$ac_config_files libs/ck-libs/ampi/ampirun"
+ac_config_files="$ac_config_files libs/ck-libs/ampi/ampiCC libs/ck-libs/ampi/ampirun"
 
 ac_config_commands="$ac_config_commands default"
 
@@ -3946,6 +3946,7 @@ for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
     "conv-autoconfig.h") CONFIG_HEADERS="$CONFIG_HEADERS conv-autoconfig.h" ;;
+    "libs/ck-libs/ampi/ampiCC") CONFIG_FILES="$CONFIG_FILES libs/ck-libs/ampi/ampiCC" ;;
     "libs/ck-libs/ampi/ampirun") CONFIG_FILES="$CONFIG_FILES libs/ck-libs/ampi/ampirun" ;;
     "default") CONFIG_COMMANDS="$CONFIG_COMMANDS default" ;;
 
@@ -4455,7 +4456,7 @@ echo "$as_me: executing $ac_file commands" >&6;}
 
 
   case $ac_file$ac_mode in
-    "default":C) chmod +x libs/ck-libs/ampi/ampirun
+    "default":C) chmod +x libs/ck-libs/ampi/ampiCC libs/ck-libs/ampi/ampirun
  ;;
 
   esac
