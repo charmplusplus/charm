@@ -30,7 +30,7 @@ OPTS_LD="$OPTS_LD"
 
 CMK_CPP_CHARM="$BGP_BIN/powerpc-bgp-linux-cpp -P"
 CMK_CPP_C="$BGP_BIN/powerpc-bgp-linux-cpp -E "
-CMK_CXX="$BGP_BIN/powerpc-bgp-linux-g++ $GCC_OPTS "
+CMK_CXX="$BGP_BIN/powerpc-bgp-linux-g++ $GCC_OPTS -DMPICH_IGNORE_CXX_SEEK "
 CMK_GCXX="$BGP_BIN/powerpc-bgp-linux-g++ $GCC_OPTS "
 CMK_CC="$BGP_BIN/powerpc-bgp-linux-gcc $GCC_OPTS "
 CMK_CXXPP="$BGP_BIN/powerpc-bgp-linux-g++ -E "
@@ -55,5 +55,5 @@ CMK_F90LIBS='-L/usr/absoft/lib -L/opt/absoft/lib -lf90math -lfio -lU77 -lf77math
 CMK_MOD_NAME_ALLCAPS=1
 CMK_MOD_EXT="mod"
 CMK_F90_USE_MODDIR=1
-CMK_F90_MODINC="-p"
-CMK_QT="generic"
+CMK_F90_MODINC="-I"
+CMK_QT="generic-light"
