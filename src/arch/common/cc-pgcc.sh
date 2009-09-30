@@ -1,7 +1,15 @@
+
+# machine specific recommendation
+CMK_DEFS=""
+case `hostname` in
+*.ranger.tacc.utexas.edu) CMK_DEFS="-tp barcelona-64 " ;;
+esac
+
 CMK_CPP_C="pgcc -E "
-CMK_CC="pgcc "
+CMK_CC="pgcc -fPIC $CMK_DEFS "
 CMK_CC_RELIABLE="gcc "
-CMK_CXX="pgCC --instantiate=used "
+#CMK_CXX="pgCC --instantiate=used "
+CMK_CXX="pgCC -fPIC $CMK_DEFS "
 CMK_CXXPP="pgCC -E "
 CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
@@ -9,7 +17,7 @@ CMK_LDXX="$CMK_CXX "
 # compiler for compiling sequential programs
 # pgcc can not handle QT right for generic64, so always use gcc
 CMK_SEQ_CC="gcc -fPIC "
-CMK_SEQ_LD=$CMK_SEQ_CC
+CMK_SEQ_LD="$CMK_SEQ_CC "
 CMK_SEQ_CXX="pgCC -fPIC "
 CMK_SEQ_LDXX="$CMK_SEQ_CXX"
 CMK_SEQ_LIBS=""
@@ -25,6 +33,12 @@ CMK_NATIVE_LIBS=""
 CMK_CF77="pgf77 "
 CMK_CF90="pgf90 "
 CMK_CF90_FIXED="$CMK_CF90 -Mfixed "
-CMK_F90LIBS="-L/usr/local/pgi/linux86/lib  -lpgf90 -lpgf90_rpm1 -lpgf902 -lpgf90rtl -lpgftnrtl "
+f90libdir="."
+f90bindir=`which pgf90 2>/dev/null`
+if test -n "$f90bindir"
+then
+  f90libdir="$f90bindir/../lib"
+fi
+CMK_F90LIBS="-L$f90libdir  -lpgf90 -lpgf90_rpm1 -lpgf902 -lpgf90rtl -lpgftnrtl "
 CMK_F90_USE_MODDIR=""
 
