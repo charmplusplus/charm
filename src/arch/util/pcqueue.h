@@ -60,6 +60,14 @@ typedef struct CmiMemorySMPSeparation_t {
         unsigned char padding[128];
 } CmiMemorySMPSeparation_t;
 
+/**
+ * The simple version of pcqueue has dropped the function of being
+ * expanded if the queue is full. On one hand, each operation becomes simpler
+ * and has fewer memory accesses. On the other hand, the simple pcqueue
+ * is only for experimental usage.
+ */
+#if !USE_SIMPLE_PCQUEUE
+
 typedef struct CircQueueStruct
 {
   struct CircQueueStruct * CMK_SMP_volatile next;
@@ -287,6 +295,151 @@ static void PCQueuePush(PCQueue Q, char *data)
 #endif
 }
 
+#else
+
+/**
+ * The beginning of definitions for simple pcqueue
+ */
+typedef struct PCQueueStruct
+{
+  char **head; /*pointing to the first element*/
+#if CMK_SMP
+  CmiMemorySMPSeparation_t pad1;
+#endif
+
+  //char** CMK_SMP_volatile tail; /*pointing to the last element*/
+  char** tail; /*pointing to the last element*/
+#if CMK_SMP
+  CmiMemorySMPSeparation_t pad2;
+#endif
+
+  int  len;
+#if CMK_SMP
+  CmiMemorySMPSeparation_t pad3;
+#endif
+
+  const char **data;
+  const char **bufEnd;
+
+#if CMK_PCQUEUE_LOCK
+  CmiNodeLock  lock;
+#endif
+
+}
+*PCQueue;
+
+static PCQueue PCQueueCreate(void)
+{
+  PCQueue Q;
+
+  Q = (PCQueue)malloc(sizeof(struct PCQueueStruct));
+  Q->data = (const char **)malloc(sizeof(char *)*PCQueueSize);
+  memset(Q->data, 0, sizeof(char *)*PCQueueSize);
+  _MEMCHECK(Q);
+  Q->head = (char **)Q->data;
+  Q->tail = (char **)Q->data;
+  Q->len = 0;
+  Q->bufEnd = Q->data + PCQueueSize;
+
+#if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
+  Q->lock = CmiCreateLock();
+#endif
+
+  return Q;
+}
+
+static void PCQueueDestroy(PCQueue Q)
+{
+  free(Q->data);
+  free(Q);
+}
+
+static int PCQueueEmpty(PCQueue Q)
+{
+  return (*(Q->head) == 0);
+}
+
+//not a thread-safe call
+static int PCQueueLength(PCQueue Q)
+{
+  return Q->len;
+}
+
+static char *PCQueuePop(PCQueue Q)
+{
+
+    char *data;
+
+#ifdef CMK_PCQUEUE_LOCK
+    CmiLock(Q->lock);
+#endif
+
+    data = *(Q->head);
+//    if(data == 0) return 0;
+     
+    PCQueue_CmiMemoryReadFence();    
+
+    if(data){
+      *(Q->head) = 0;
+      Q->head++;
+
+      if (Q->head == (char **)Q->bufEnd ) { 
+	Q->head = (char **)Q->data;
+      }
+      PCQueue_CmiMemoryAtomicDecrement(Q->len);
+
+    }
+
+#ifdef CMK_PCQUEUE_LOCK
+      CmiUnlock(Q->lock);
+#endif
+
+      return data;
+}
+static void PCQueuePush(PCQueue Q, char *data)
+{
+#if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
+  CmiLock(Q->lock);
+#endif
+
+  PCQueue_CmiMemoryWriteFence();
+
+  //CmiAssert(*(Q->tail)==0);
+
+  *(Q->tail) = data;
+   Q->tail++;
+
+  if (Q->tail == (char **)Q->bufEnd) { /* last slot is about to be filled */
+    /* this way, the next buffer is linked in before data is filled in
+       in the last slot of this buffer */
+    Q->tail = (char **)Q->data;
+  }
+
+#if 0
+  if(Q->head == Q->tail && Q->len>0){ /* the whole buffer is fully occupied; len>0 is used to differentiate the case when the queue is empty in which head is also equal to tail*/
+       CmiAbort("Simple PCQueue is full!!\n");
+/*       char **newdata = (char **)malloc(sizeof(char *)*(Q->len << 1));
+       int rsize = Q->data + Q->curSize - Q->head;
+       int lsize = Q->tail - Q->data;
+       memcpy(newdata, Q->head, sizeof(char *)*rsize);
+       memcpy(newdata+rsize, Q->data, sizeof(char *)*lsize);
+       free(Q->data);
+       Q->data = newdata;
+       Q->head = newdata;
+       Q->tail = Q->data + Q->len;
+*/
+  }
+#endif
+
+  PCQueue_CmiMemoryAtomicIncrement(Q->len);
+
+#if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
+  CmiUnlock(Q->lock);
+#endif
+}
+#endif
+
+/* the endif for "ifndef _PCQUEUE_" */
 #endif
 
 /*@}*/
