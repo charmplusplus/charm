@@ -45,6 +45,10 @@ added by Ryan Mokos in July 2008.
 #include <stdlib.h>
 #include <errno.h> /* just so I can find dynamically-linked symbols */
 
+#if CMK_HAS_ADDR_NO_RANDOMIZE
+#include <sys/personality.h>
+#endif
+
 static int _sync_iso = 0;
 
 static int read_randomflag(void)
@@ -56,6 +60,14 @@ static int read_randomflag(void)
   if (fp != NULL) {
     fscanf(fp, "%d", &random_flag);
     fclose(fp);
+#if CMK_HAS_ADDR_NO_RANDOMIZE
+    if(random_flag)
+    {
+        int persona = personality(0xffffffff);
+        if(persona & ADDR_NO_RANDOMIZE)
+            random_flag = 0;
+    }
+#endif
   }
   else {
     random_flag = -1;
