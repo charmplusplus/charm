@@ -1,4 +1,4 @@
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../../bin/ampicc $(OPTS)
 
 all: pgm
 
