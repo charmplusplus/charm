@@ -48,6 +48,22 @@ typedef struct {
 
 #endif
 
+
+/*#define CMK_SMP_MULTIQ 1*/
+#if CMK_SMP_MULTIQ
+/* 
+ * The value is usually equal to the number of cores on
+ * this node for the best possible performance. In such
+ * cases, the CMK_PCQUEUE_PUSHLOCk should be disabled.
+ *
+ * For large fat smp node (say, over 16 cores per node),
+ * then this value could be half or quarter of the #cores.
+ * Then the CMK_PCQUEUE_PUSHLOCK should be enabled.
+ *
+ * */
+#define MULTIQ_GRPSIZE 8
+#endif
+
 /************************************************************
  *
  * Processor state structure
@@ -57,7 +73,14 @@ typedef struct {
 typedef struct CmiStateStruct
 {
   int pe, rank;
+#if !CMK_SMP_MULTIQ
   PCQueue recv; 
+#else
+  PCQueue recv[MULTIQ_GRPSIZE];
+  int myGrpIdx;
+  int curPolledIdx;
+#endif
+
   void *localqueue;
   CmiIdleLock idle;
 }

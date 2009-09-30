@@ -465,6 +465,7 @@ static void CmiStartThreads(char **argv)
 #if ! (CMK_TLS_THREAD && CMK_USE_TLS_THREAD)
   pthread_setspecific(Cmi_state_key, Cmi_state_vector);
 #endif
+
 }
 
 static void CmiDestoryLocks()
@@ -612,11 +613,21 @@ static void CmiIdleLock_checkMessage(CmiIdleLock *l) {
 
 void CmiStateInit(int pe, int rank, CmiState state)
 {
+#if CMK_SMP_MULTIQ
+  int i;
+#endif
+
   MACHSTATE(4,"StateInit")
   state->pe = pe;
   state->rank = rank;
   if (rank==CmiMyNodeSize()) return; /* Communications thread */
+#if !CMK_SMP_MULTIQ
   state->recv = PCQueueCreate();
+#else
+  for(i=0; i<MULTIQ_GRPSIZE; i++) state->recv[i]=PCQueueCreate();
+  state->myGrpIdx = rank % MULTIQ_GRPSIZE;
+  state->curPolledIdx = 0;
+#endif
   state->localqueue = CdsFifo_Create();
   CmiIdleLock_init(&state->idle);
 }
