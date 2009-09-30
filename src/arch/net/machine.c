@@ -1012,7 +1012,12 @@ void CmiPushPE(int pe,void *msg)
     return;
   }
 #endif
+#if !CMK_SMP_MULTIQ
   PCQueuePush(cs->recv,msg);
+#else
+  PCQueuePush(cs->recv[CmiGetState()->myGrpIdx], msg);
+#endif
+
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
   if (_Cmi_noprocforcommthread) 
 #endif
@@ -1037,7 +1042,19 @@ static void CmiPushNode(void *msg)
     return;
   }
 #endif 
+/* 
+ * if CMK_SMP_MULTIQ is enabled, then PCQUEUE's push lock
+ * may be disabled. In this case, the lock for node recv
+ * queue has to be used.
+ * */
+#if CMK_SMP_MULTIQ && !CMK_PCQUEUE_PUSH_LOCK
+  CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
+#endif
   PCQueuePush(CsvAccess(NodeState).NodeRecv,msg);
+#if CMK_SMP_MULTIQ && !CMK_PCQUEUE_PUSH_LOCK
+  CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+#endif
+
   /*Silly: always try to wake up processor 0, so at least *somebody*
     will be awake to handle the message*/
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
@@ -1897,9 +1914,27 @@ char *CmiGetNonLocalNodeQ(void)
 
 void *CmiGetNonLocal(void)
 {
+#if CMK_SMP_MULTIQ
+  int i;
+#endif
+
   CmiState cs = CmiGetState();
   CmiIdleLock_checkMessage(&cs->idle);
+
+#if !CMK_SMP_MULTIQ
   return (void *) PCQueuePop(cs->recv);
+#else
+  void *retVal = NULL;
+  for(i=cs->curPolledIdx; i<MULTIQ_GRPSIZE; i++){
+    retVal = (void *)PCQueuePop(cs->recv[i]);
+    if(retVal!=NULL) {
+	cs->curPolledIdx = i+1;
+	return retVal;
+    }
+  }
+  cs->curPolledIdx=0;
+  return NULL;
+#endif
 }
 
 
