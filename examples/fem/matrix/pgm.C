@@ -12,6 +12,15 @@ Orion Sky Lawlor, olawlor@acm.org, 1/27/2003
 #include "netfem.h"
 #include "ifemc.h"
 
+#if CMK_HAS_SLEEP
+#include <unistd.h>
+#endif
+
+#if CMK_CC_PGCC
+#undef offsetof
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#endif
+
 //Number of time steps to simulate
 int tsteps=10;
 int dim=10;//Elements per side of the FEM mesh
@@ -329,7 +338,9 @@ driver(void)
       FEM_Print("Waiting for NetFEM client to connect (hit ctrl-c to exit)");
     int ts=0;
     while(1) {
+#if CMK_HAS_SLEEP
       sleep(1);
+#endif
       mesh.netfem(ts);
       ts++;
       FEM_Barrier();
