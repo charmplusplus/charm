@@ -1,5 +1,5 @@
 CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc
+CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 DEST= $(CDIR)/lib/libmodulearmci.a
 
