@@ -383,7 +383,7 @@ static CMK_TYPEDEF_UINT8 MemusagePS(){
 #endif	
 }
 
-#ifdef WIN32
+#if defined(_WIN32) && ! defined(__CYGWIN__)
 #include <windows.h>
 #include <psapi.h>
 
@@ -399,11 +399,15 @@ static CMK_TYPEDEF_UINT8 MemusageWindows(){
     }
     return 0;
 }
+#else
+static CMK_TYPEDEF_UINT8 MemusageWindows(){
+    return 0;
+}
 #endif
 
 CMK_TYPEDEF_UINT8 CmiMemoryUsage(){
     CMK_TYPEDEF_UINT8 memtotal = 0;
-#ifdef WIN32
+#ifdef _WIN32
     if(!memtotal) memtotal = MemusageWindows();
 #endif
     if(!memtotal) memtotal = MemusageMstats();
