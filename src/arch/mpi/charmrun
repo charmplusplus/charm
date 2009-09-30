@@ -44,20 +44,33 @@ printf "\nRunning on $pes processors: $args\n"
 if [ -n "$PBS_NODEFILE" ]
 then
 # we are in a job shell
-  mpirun_cmd=`which mpirun`
-  if echo $mpirun_cmd | grep 'mvapich2'  > /dev/null 2>/dev/null
+  aprun=`which aprun 2>/dev/null`
+  if test -n "$aprun"
   then
-    # if daemon not started, start it
-    if ! mpdtrace > /dev/null 2>/dev/null
+    echo aprun -n $pes $args
+    $aprun -n $pes $args
+  else
+    mpirun_cmd=`which mpirun 2>/dev/null`
+    if test -n "$mpirun_cmd"
     then
-      mvapich2-start-mpd
+      if echo $mpirun_cmd | grep 'mvapich2'  > /dev/null 2>/dev/null
+      then
+        # if daemon not started, start it
+        if ! mpdtrace > /dev/null 2>/dev/null
+        then
+          mvapich2-start-mpd
+        fi
+        mpirun -np $pes $args
+        #    mpdallexit
+      else   # normal case
+        test -z "$machinefile" && args=-machinefile" "$PBS_NODEFILE" "$args
+        echo mpirun -np $pes $args
+        mpirun -np $pes $args
+      fi
+    else
+      echo "Charmrun> can not locate mpirun in order to run the program."
+      exit 1
     fi
-    mpirun -np $pes $args
-#    mpdallexit
-  else   # normal case
-    test -z "$machinefile" && args=-machinefile" "$PBS_NODEFILE" "$args
-    echo mpirun -np $pes $args
-    mpirun -np $pes $args
   fi
 elif [ -n "$LSB_HOSTS" ]
 then
@@ -109,13 +122,23 @@ then
 		ppn='#PBS -l nodes='$nodes':ppn='$ppns
 		extra='-machinefile $PBS_NODEFILE'
 		;;
+        kraken*)
+                ncores=`expr \( $pes + 7 \) / 8 \* 8`
+		ncpus="#PBS -l size=$ncores"
+		;;
 	*)
 		ncpus="#PBS -l ncpus=$pes"
 		;;
 	esac
 	if test $USE_LSF -eq 0
 	then
-	  mpirun=`which mpirun`
+	  mpirun=`which mpirun 2>/dev/null`
+          npcmd="-np "
+          if test -z "$mpirun"
+          then
+            mpirun=`which aprun 2>/dev/null`
+            npcmd="-n "
+          fi
           cat > $script << EOF
 #!/bin/sh
 # This is a charmrun-generated PBS batch job script.
@@ -140,7 +163,8 @@ $mem
 cd $indir
 
 cat \$PBS_NODEFILE
-$mpirun -np $pes $extra $args
+echo $mpirun $npcmd $pes $extra $args
+$mpirun $npcmd $pes $extra $args
 
 # Save mpirun exit status
 status=\$?
@@ -226,18 +250,33 @@ End() {
 		fi
         done
 else
-  [ -n "$MPI_MACHINEFILE" ] && args=" -machinefile $MPI_MACHINEFILE $args"
-  setarch_cmd=`which setarch 2>/dev/null`
-  if [ -n "$setarch_cmd" -a -x "$setarch_cmd" ]
+  mpirun_cmd=`which mpirun 2>/dev/null`
+  if test -n "$mpirun_cmd"
   then
-    # Disables randomization of the virtual address  space  (turns  on
-    #          ADDR_NO_RANDOMIZE).
-    cur_arch=`uname -m`
-    echo "charmrun>  $setarch_cmd $cur_arch -R  mpirun -np $pes $args"
-    $setarch_cmd $cur_arch -R  mpirun -np $pes $args
+    [ -n "$MPI_MACHINEFILE" ] && args=" -machinefile $MPI_MACHINEFILE $args"
+    setarch_cmd=`which setarch 2>/dev/null`
+    if [ -n "$setarch_cmd" -a -x "$setarch_cmd" ]
+    then
+      # Disables randomization of the virtual address  space  (turns  on
+      #          ADDR_NO_RANDOMIZE).
+      cur_arch=`uname -m`
+      echo "charmrun>  $setarch_cmd $cur_arch -R  mpirun -np $pes $args"
+      $setarch_cmd $cur_arch -R  mpirun -np $pes $args
+    else
+      echo "charmrun> mpirun -np $pes $args"
+      mpirun -np $pes $args
+    fi
   else
-    echo "charmrun> mpirun -np $pes $args"
-    mpirun -np $pes $args
+    mpiexec_cmd=`which mpiexec 2>/dev/null`
+    if test -n "$mpiexec_cmd"
+    then
+      echo "charmrun> $mpiexec_cmd -n $pes $args"
+      echo
+      "$mpiexec_cmd" -n $pes $args
+    else
+      echo "Don't know how to run MPI program."
+      exit 1
+    fi
   fi
 fi
 
