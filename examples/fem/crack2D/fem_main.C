@@ -2,9 +2,9 @@
  * Main implementation file for FEM version of crack propagation code.
  */
 #include <stddef.h>
+#include "charm++.h" // for CkWallTimer, CkPrintf, etc.
 #include "crack.h"
 #include "netfem.h"
-#include "charm++.h" // for CkWallTimer, CkPrintf, etc.
 
 void crack_abort(const char *why)
 {
