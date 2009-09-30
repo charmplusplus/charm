@@ -60,6 +60,9 @@
 /* Allows gcc x86 assembly for atomic increment. */
 #undef CMK_GCC_X86_ASM_ATOMICINCREMENT
 
+/* whether personality() and ADDR_NO_RANDOMIZE exist */
+#undef CMK_HAS_ADDR_NO_RANDOMIZE
+
 /* whether has alloca.h */
 #undef CMK_HAS_ALLOCA_H
 
@@ -122,6 +125,9 @@
 
 /* whether the setpriority() exists */
 #undef CMK_HAS_SETPRIORITY
+
+/* whether has sleep */
+#undef CMK_HAS_SLEEP
 
 /* whether it has socklen_t */
 #undef CMK_HAS_SOCKLEN

@@ -2727,6 +2727,39 @@ then
 	add_flag 'CMK_LDXX="$CMK_LDXX '$TRACE_LINK_FLAG'"' "backtrace"
 fi
 
+#### test sleep ####
+cat > $t <<EOT
+#include <unistd.h>
+int main() {
+  sleep(1);
+  return 0;
+}
+EOT
+test_cxx "whether has sleep " "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_SLEEP $pass
+_ACEOF
+
+
+
+#### test personality() and ADDR_NO_RANDOMIZE ####
+# Only works on modern Linux systems
+cat > $t <<EOT
+#include <sys/personality.h>
+int main() {
+    int orig_persona = personality(0xffffffff);
+    personality(orig_persona | ADDR_NO_RANDOMIZE);
+    return 0;
+}
+EOT
+test_cxx "whether personality() and ADDR_NO_RANDOMIZE exist" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_ADDR_NO_RANDOMIZE $pass
+_ACEOF
+
+
 
 #### test if has zlib ####
 # bproc doesnot like -lz in any case
