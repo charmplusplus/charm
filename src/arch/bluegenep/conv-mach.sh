@@ -25,13 +25,14 @@ then
 fi
 
 OPTS_CPP="$OPTS_CPP"
-GCC_OPTS="-gdwarf-2 -Wno-deprecated $BGP_INC"
+GCC_OPTS="-gdwarf-2 $BGP_INC"
+GXX_OPTS="$GCC_OPTS -Wno-deprecated"
 OPTS_LD="$OPTS_LD"
 
 CMK_CPP_CHARM="$BGP_BIN/powerpc-bgp-linux-cpp -P"
 CMK_CPP_C="$BGP_BIN/powerpc-bgp-linux-cpp -E "
-CMK_CXX="$BGP_BIN/powerpc-bgp-linux-g++ $GCC_OPTS -DMPICH_IGNORE_CXX_SEEK "
-CMK_GCXX="$BGP_BIN/powerpc-bgp-linux-g++ $GCC_OPTS "
+CMK_CXX="$BGP_BIN/powerpc-bgp-linux-g++ $GXX_OPTS -DMPICH_IGNORE_CXX_SEEK "
+CMK_GCXX="$BGP_BIN/powerpc-bgp-linux-g++ $GXX_OPTS "
 CMK_CC="$BGP_BIN/powerpc-bgp-linux-gcc $GCC_OPTS "
 CMK_CXXPP="$BGP_BIN/powerpc-bgp-linux-g++ -E "
 CMK_CF77="$BGP_BIN/powerpc-bgp-linux-g77 "

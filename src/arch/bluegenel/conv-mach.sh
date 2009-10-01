@@ -32,13 +32,14 @@ then
 fi
 
 OPTS_CPP="$OPTS_CPP"
-GCC_OPTS="-gdwarf-2 -Wno-deprecated $BGL_INC -I$BGL_INSTALL/blrts-gnu/powerpc-bgl-blrts-gnu/sys-include"
+GCC_OPTS="-gdwarf-2 $BGL_INC -I$BGL_INSTALL/blrts-gnu/powerpc-bgl-blrts-gnu/sys-include"
+GXX_OPTS="$GCC_OPTS -Wno-deprecated"
 OPTS_LD="$OPTS_LD"
 
 CMK_CPP_CHARM="$BGL_BIN/powerpc-bgl-blrts-gnu-cpp -P"
 CMK_CPP_C="$BGL_BIN/powerpc-bgl-blrts-gnu-cpp -E "
-CMK_CXX="$BGL_BIN/powerpc-bgl-blrts-gnu-g++ $GCC_OPTS "
-CMK_GCXX="$BGL_BIN/powerpc-bgl-blrts-gnu-g++ $GCC_OPTS "
+CMK_CXX="$BGL_BIN/powerpc-bgl-blrts-gnu-g++ $GXX_OPTS "
+CMK_GCXX="$BGL_BIN/powerpc-bgl-blrts-gnu-g++ $GXX_OPTS "
 CMK_CC="$BGL_BIN/powerpc-bgl-blrts-gnu-gcc $GCC_OPTS "
 CMK_CXXPP="$BGL_BIN/powerpc-bgl-blrts-gnu-g++ -E "
 CMK_CF77="$BGL_BIN/powerpc-bgl-blrts-gnu-g77 "
