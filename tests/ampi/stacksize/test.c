@@ -10,7 +10,7 @@ this program should segfault if run with +tcharm_stacksize=300000.
 Orion Sky Lawlor, olawlor@acm.org, 2003/8/25
 */
 #include <stdio.h>
-#include <mpi.h>
+#include "mpi.h"
 
 /**
  This recursive procedure consumes at least useKB 
