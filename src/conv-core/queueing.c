@@ -605,9 +605,13 @@ void CqsEnqueueGeneral(Queue q, void *data, int strategy,
     CqsDeqEnqueueLifo(d, data);
     break;
 
+    /* The following two cases have a 64bit integer as priority value. Therefore,
+     * we can cast the address of the CmiInt8 lprio to an "unsigned int" pointer
+     * when passing it to CqsPrioqGetDeq. The endianness is taken care explicitly.
+     */
   case CQS_QUEUEING_LFIFO:     
     CmiAssert(priobits == CLONGBITS);
-    lprio0 =((CmiUInt8 *)prioptr)[0];
+    lprio0 =((CmiInt8 *)prioptr)[0];
     lprio0 += (1ULL<<(CLONGBITS-1));
     if (CmiEndianness() == 0) {           /* little-endian */
       lprio =(((CmiUInt4 *)&lprio0)[0]*1LL)<<CINTBITS | ((CmiUInt4 *)&lprio0)[1];
@@ -616,13 +620,13 @@ void CqsEnqueueGeneral(Queue q, void *data, int strategy,
       lprio = lprio0;
     }
     if (lprio0<0)
-        d=CqsPrioqGetDeq(&(q->posprioq), priobits, &lprio);
+        d=CqsPrioqGetDeq(&(q->posprioq), priobits, (unsigned int *)&lprio);
     else
-        d=CqsPrioqGetDeq(&(q->negprioq), priobits, &lprio);
+        d=CqsPrioqGetDeq(&(q->negprioq), priobits, (unsigned int *)&lprio);
     CqsDeqEnqueueFifo(d, data);
     break;
   case CQS_QUEUEING_LLIFO:
-    lprio0 =((CmiUInt8 *)prioptr)[0];
+    lprio0 =((CmiInt8 *)prioptr)[0];
     lprio0 += (1ULL<<(CLONGBITS-1));
     if (CmiEndianness() == 0) {           /* little-endian happen to compare least significant part first */
       lprio =(((CmiUInt4 *)&lprio0)[0]*1LL)<<CINTBITS | ((CmiUInt4 *)&lprio0)[1];
@@ -631,9 +635,9 @@ void CqsEnqueueGeneral(Queue q, void *data, int strategy,
       lprio = lprio0;
     }
     if (lprio0<0)
-        d=CqsPrioqGetDeq(&(q->posprioq), priobits, &lprio);
+        d=CqsPrioqGetDeq(&(q->posprioq), priobits, (unsigned int *)&lprio);
     else
-        d=CqsPrioqGetDeq(&(q->negprioq), priobits, &lprio);
+        d=CqsPrioqGetDeq(&(q->negprioq), priobits, (unsigned int *)&lprio);
     CqsDeqEnqueueLifo(d, data);
     break;
   default:
