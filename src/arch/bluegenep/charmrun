@@ -53,6 +53,9 @@ queue_stat=qstat
 queue_kill=qdel
 queue_sub=qsub
 
+while [ true ]
+do
+
 echo "Submitting batch job for> $pes $args"
 echo " using the command> $queue_sub -t 30 -n $pes  $args"
 while [ -z "$jobid" ]
@@ -93,12 +96,22 @@ do
             status=`tail -1 $err | sed 's/.*Exit status:[ ]*\([0-9\]*\).*/\1/'`
             if test -n $status
             then
+		  if test $status = 1
+                  then
+                    if grep 'Failed to boot the partition' $err > /dev/null 2>/dev/null
+                    then
+                      echo "Failed to boot the partition, retrying."
+                      break
+                    fi
+                  fi
                   cat $output
 	          rm -f tmp.$$
                   exit $status
             fi
         fi
 	sleep 20
+done
+
 done
 
 exit 1
