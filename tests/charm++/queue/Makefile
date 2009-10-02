@@ -1,9 +1,9 @@
 CHARMC := ../../../bin/charmc
-CXX := $(CHARMC)
+CXX := $(CHARMC) $(OPTS)
 
 all: pgm
 test: pgm
-	./charmrun ./pgm
+	./charmrun ./pgm $(TESTOPTS)
 
 pgm.C: main.decl.h
 
