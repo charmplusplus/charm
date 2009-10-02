@@ -58,6 +58,7 @@ do
 
 echo "Submitting batch job for> $pes $args"
 echo " using the command> $queue_sub -t 30 -n $pes  $args"
+jobid=""
 while [ -z "$jobid" ]
 do
   jobid=`$queue_sub -t 30 -n $pes  $args 2>err.$$ |tail -1`
