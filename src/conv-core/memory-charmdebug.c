@@ -1010,11 +1010,14 @@ static void CpdMMAPhandler(int sig, siginfo_t *si, void *unused){
 static void protectMemory() {
 #ifdef CPD_USE_MMAP
   Slot *cur;
+  /*printf("protecting memory (chareid=%d)",memory_chare_id);*/
   SLOT_ITERATE_START(cur)
     if (cur->chareID != memory_chare_id && cur->chareID > 0) {
-      mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
-    }
+      /*printf(" %p",cur->userData);*/
+      mprotect(cur->userData, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
+    } /*else printf(" (%p)",cur->userData);*/
   SLOT_ITERATE_END
+  /*printf("\n");*/
 #endif
 }
 
@@ -1022,8 +1025,9 @@ static void unProtectMemory() {
 #ifdef CPD_USE_MMAP
   Slot *cur;
   SLOT_ITERATE_START(cur)
-    mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+    mprotect(cur->userData, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
   SLOT_ITERATE_END
+  /*printf("unprotecting memory\n");*/
 #endif
 }
 
@@ -1400,6 +1404,11 @@ static void meta_free(void *mem) {
       CmiPrintf("freeing %p\n",mem);
       disableVerbosity = 0;
     }
+
+    /*Overwrite stack trace with the one of the free*/
+    dumpStackFrames();
+    if (s->stackLen > numStackFrames) s->stackLen=numStackFrames;
+    memcpy(s->from, &stackFrames[4], s->stackLen*sizeof(void*));
 
     if ((s->magic&~FLAGS_MASK)==SLOTMAGIC_VALLOC)
     { /*Allocated with special alignment*/
