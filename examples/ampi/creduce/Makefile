@@ -1,4 +1,4 @@
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../../bin/ampicxx $(OPTS)
 
 all: pgm
 
@@ -6,7 +6,7 @@ ampi: clean pgm
 
 pgm: test.C
 	$(CHARMC) -c test.C
-	$(CHARMC) -o pgm test.o -language ampi
+	$(CHARMC) -o pgm test.o 
 
 mpi: test.C
 	mpiCC -o pgm test.C $(OPTS)
