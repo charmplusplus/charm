@@ -14,7 +14,15 @@
 
 /** This scheme relies on using IP address to identify physical nodes 
  * written by Gengbin Zheng  9/2008
+ *
+ * last updated 10/4/2009   Gengbin Zheng
+ * added function CmiCpuTopologyEnabled() which retuens 1 when supported
+ * when not supported return 0
+ * all functions when cputopology not support, now act like a normal non-smp 
+ * case and all PEs are unique.
+ *
  */
+
 #if 1
 
 #include <stdlib.h>
@@ -107,6 +115,7 @@ public:
   static int *nodeIDs;
   static int numNodes;
   static CkVec<int> *bynodes;
+  static int supported;
 
     // return -1 when not supported
   int numUniqNodes() {
@@ -130,7 +139,11 @@ public:
         if (unodes[i] != last) numNodes++; 
         last=unodes[i];
     }
-    return numNodes>0?numNodes:-1;
+    if (numNodes == 0) 
+      numNodes = CmiNumPes();
+    else
+      CpuTopology::supported = 1;
+    return numNodes;
 #endif
   }
 
@@ -138,18 +151,25 @@ public:
     int i;
     numUniqNodes();
     bynodes = new CkVec<int>[numNodes];
-    for (i=0; i<CmiNumPes(); i++){
-      CmiAssert(nodeIDs[i] >=0 && nodeIDs[i] <= numNodes); // Sanity check for bug that occurs on mpi-crayxt
-      bynodes[nodeIDs[i]].push_back(i);
+    if (supported) {
+      for (i=0; i<CmiNumPes(); i++){
+        CmiAssert(nodeIDs[i] >=0 && nodeIDs[i] <= numNodes); // Sanity check for bug that occurs on mpi-crayxt
+        bynodes[nodeIDs[i]].push_back(i);
+      }
+    }
+    else {    /* not supported */
+      for (i=0;i<numNodes;i++)  bynodes[i].push_back(i);
     }
   }
 
   void print() {
     int i;
     CmiPrintf("Charm++> Cpu topology info:\n");
+    CmiPrintf("PE to node map: ");
     for (i=0; i<CmiNumPes(); i++)
       CmiPrintf("%d ", nodeIDs[i]);
     CmiPrintf("\n");
+    CmiPrintf("Node to PE map:\n");
     for (i=0; i<numNodes; i++) {
       CmiPrintf("Chip #%d: ", i);
       for (int j=0; j<bynodes[i].size(); j++)
@@ -163,6 +183,7 @@ public:
 int *CpuTopology::nodeIDs = NULL;
 int CpuTopology::numNodes = 0;
 CkVec<int> *CpuTopology::bynodes = NULL;
+int CpuTopology::supported = 0;
 
 static CpuTopology cpuTopo;
 static CmiNodeLock topoLock = NULL;
@@ -208,7 +229,7 @@ static void cpuTopoHandler(void *m)
   rec->rank ++;
   count ++;
   if (count == CmiNumPes()) {
-    CmiPrintf("Charm++> %d unique compute nodes detected. \n", CmmEntries(hostTable));
+    CmiPrintf("Charm++> %d unique compute nodes detected, with %d cores per node. \n", CmmEntries(hostTable), CmiNumCores());
     //hostnameMsg *tmpm;
     tag = CmmWildCard;
     while (tmpm = (hostnameMsg *)CmmGet(hostTable, 1, &tag, &tag1)) CmiFree(tmpm);
@@ -236,12 +257,18 @@ static void cpuTopoRecvHandler(void *msg)
   // if (CmiMyPe() == 0) cpuTopo.print();
 }
 
+/******************  API implementation **********************/
 
-// return -1 when not supported
+extern "C" int CmiCpuTopologyEnabled()
+{
+  return CpuTopology::supported;
+}
+
 extern "C" int CmiOnSamePhysicalNode(int pe1, int pe2)
 {
   int *nodeIDs = cpuTopo.nodeIDs;
-  return nodeIDs==NULL?-1:nodeIDs[pe1] == nodeIDs[pe2];
+  if (nodeIDs == NULL) return pe1 == pe2;
+  else return nodeIDs[pe1] == nodeIDs[pe2];
 }
 
 // return -1 when not supported
@@ -250,24 +277,30 @@ extern "C" int CmiNumPhysicalNodes()
   return cpuTopo.numUniqNodes();
 }
 
-// return -1 when not supported
 extern "C" int CmiNumPesOnPhysicalNode(int pe)
 {
-  return cpuTopo.bynodes==NULL?-1:(int)cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].size();
+  return !cpuTopo.supported?1:(int)cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].size();
 }
 
 // pelist points to system memory, user should not free it
 extern "C" void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num)
 {
   CmiAssert(pe >=0 && pe < CmiNumPes());
-  *num = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].size();
-  if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].getVec();
+  if (cpuTopo.supported) {
+    *num = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].size();
+    if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].getVec();
+  }
+  else {
+    *num = 1;
+    *pelist = cpuTopo.bynodes[pe].getVec();
+  }
 }
 
 // the least number processor on the same physical node
 extern "C"  int CmiGetFirstPeOnPhysicalNode(int pe)
 {
   CmiAssert(pe >=0 && pe < CmiNumPes());
+  if (!cpuTopo.supported) return pe;
   const CkVec<int> &v = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]];
   return v[0];
 }
@@ -287,7 +320,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
 
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
 					   "obtain cpu topology info");
-#if !defined(_WIN32) && !defined(__BLUEGENE__)
+#if !defined(__BLUEGENE__)
   obtain_flag = 1;
 #endif
   if (CmiGetArgFlagDesc(argv,"+skip_cpu_topology",
