@@ -71,7 +71,6 @@ unsigned int crc32(unsigned char *data, int len)
 {
     unsigned int        result = 0;
     int                 i;
-    unsigned char       octet;
     
     if (len < 4) {
       switch (len) {
@@ -103,7 +102,6 @@ unsigned int crc32(unsigned char *data, int len)
 unsigned int crc32_update(unsigned char *data, int len, unsigned int previous) {
   unsigned int result = ~ previous;
   int i;
-  unsigned char octet;
   
   for (i=0; i<len; i++) {
     result = (result << 8 | *data++) ^ crctab[result >> 24];
