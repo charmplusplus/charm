@@ -188,7 +188,8 @@ Do() {
 # basename, it keeps the directory path.
 # Args: <name to strip>
 stripExtention() {
-	se_base=`echo $1 | awk -F/ '{print $NF}'`
+	se_base=`basename $1`
+#	se_base=`echo $1 | awk -F/ '{print $NF}'`
 	se_strip=`echo $se_base | awk -F. '{ORS="";print $1;for (i=2;i<NF;i++) print "."$i}'`
 	se_ret=`echo $1 | awk -F/ '{ORS="";for (i=1;i<NF;i++) print $i"/"}'`"$se_strip"
 	echo $se_ret
@@ -198,9 +199,16 @@ stripExtention() {
 # or "" if none.  (e.g. "./bob/snack.c" returns ".c")
 # Args: <name to find extention of>
 getExtention() {
-	se_base=`echo $1 | awk -F/ '{print $NF}'`
-        se_ret=`echo $se_base | awk -F. '{if (NF<=1) print ""; else print "."$NF}'`
-	echo $se_ret
+#	se_base=`echo $1 | awk -F/ '{print $NF}'`
+#        se_ret=`echo $se_base | awk -F. '{if (NF<=1) print ""; else print "."$NF}'`
+#	echo $se_ret
+	se_ret=`echo $1 | sed -e 's/.*\././'`
+	if test "$se_ret" = $1
+        then
+          echo ""
+        else
+          echo $se_ret
+        fi
 }
 
 Debugf() {
@@ -1095,6 +1103,7 @@ done
 
 Debug "About to compile..."
 
+numFiles=`echo $FILES | wc -w`
 for FILE in `echo $FILES`
 do
 	BASE=`stripExtention \`basename $FILE\``
@@ -1109,7 +1118,6 @@ do
  	# remove and generate foo.o may be dangerous in parallel make 
 	# for example in the case of compiling several objs from one 
 	# same c file such as memory.c.
-	numFiles=`echo $FILES | wc -w`
 	if [ $numFiles = 1 -a -n "$OBJECT" ]
 	then
 		OBJ_EXT=`getExtention $OBJECT`
