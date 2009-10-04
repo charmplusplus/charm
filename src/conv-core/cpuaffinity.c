@@ -71,7 +71,7 @@ static void add_exclude(int core)
 /* This implementation assumes the default x86 CPU mask size used by Linux */
 /* For a large SMP machine, this code should be changed to use a variable sized   */
 /* CPU affinity mask buffer instead, as the present code will fail beyond 32 CPUs */
-int set_cpu_affinity(int cpuid) {
+int set_cpu_affinity(unsigned int cpuid) {
   unsigned long mask = 0xffffffff;
   unsigned int len = sizeof(mask);
   int retValue = 0;
