@@ -487,6 +487,7 @@ extern int CmiBarrierZero(void);
 
 /* cpu topology */
 extern int CmiNumCores(void);
+extern int CmiCpuTopologyEnabled();
 extern int CmiOnSamePhysicalNode(int pe1, int pe2);
 extern int CmiNumPhysicalNodes();
 extern int CmiNumPesOnPhysicalNode(int pe);
