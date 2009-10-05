@@ -136,8 +136,8 @@ End() {
 	then
         for FILE in `echo $FILES`
         do
-			BASE=`stripExtention $FILE`
-			TMP=`basename $FILE`".TMP"
+            #BASE=`stripExtention $FILE`
+            TMP=`basename $FILE`".TMP"
             $RM $TMP.P.C $TMP.cpp $TMP.space $TMP.xlat $TMP.o
             $RM $TMP.c $TMP.c.0.h $TMP.c.1.h $TMP.c.2.h
             $RM $TMP.i $TMP.$CMK_CPP_SUFFIX
