@@ -1,76 +1,37 @@
 CHARMC=../../bin/charmc $(OPTS)
 CHARMINC=.
-DIRS=   sparseContiguousReducer tcharm ampi idxl parmetis \
-        multiphaseSharedArrays fem ifem ParFUM \
-        armci collide mblock barrier cache \
-	irecv netfem liveViz taskGraph search datatransfer pythonCCS
+
+SIMPLE_DIRS = cache sparseContiguousReducer tcharm ampi idxl \
+              parmetis multiphaseSharedArrays fem ParFUM \
+              ifem armci collide mblock barrier irecv netfem liveViz \
+              taskGraph search datatransfer 
+DIRS = $(SIMPLE_DIRS) pythonCCS
 
 .PHONY: $(DIRS)
 
 all:  $(DIRS)
 
-cache:
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
-sparseContiguousReducer:
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
-tcharm:
+$(SIMPLE_DIRS) ParFUM-Tops:
 	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 ampi:  tcharm
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 idxl:  ampi
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 parmetis: ampi
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 multiphaseSharedArrays:
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 fem:  idxl ampi parmetis
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 ParFUM:	idxl ampi parmetis collide multiphaseSharedArrays
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 ParFUM-Tops: ParFUM
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 ifem: fem
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 armci: ampi
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 collide: tcharm
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 mblock: tcharm
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 barrier:
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 irecv:
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 netfem: tcharm
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 liveViz:
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 taskGraph:
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 search:
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
-
 datatransfer: ampi fem
-	$(MAKE) -C $@ all OPTS='$(OPTS)'
 
 pythonCCS:
 	-(CHARMINC=../../../include;. $$CHARMINC/conv-config.sh; \
