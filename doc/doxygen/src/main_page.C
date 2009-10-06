@@ -22,7 +22,7 @@ Charm++:
  -  \ref CkQD "Quiescence detection" 
  -  \ref CkFutures "Futures"
  -  \ref CkInit "Startup"
- -  Message Envelopes
+ -  \ref CkEnvelope "Message Envelopes"
  -  \ref CharmScheduler "Charm++ Scheduler"
  -  Translator
  -  SDAG
