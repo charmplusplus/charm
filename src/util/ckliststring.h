@@ -34,12 +34,14 @@ public:
       }
       int start, end, stride=1;
       if (hasdash) {
-          if (hascolon)
+          if (hascolon) {
             if (sscanf(str, "%d-%d:%d", &start, &end, &stride) != 3)
                  printf("Warning: Check the format of \"%s\".\n", str);
-          else
+          }
+          else {
             if (sscanf(str, "%d-%d", &start, &end) != 2)
                  printf("Warning: Check the format of \"%s\".\n", str);
+          }
       }
       else {
           sscanf(str, "%d", &start);
