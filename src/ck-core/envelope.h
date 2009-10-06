@@ -5,8 +5,8 @@
  * $Revision$
  *****************************************************************************/
 /**
-\file
-\addtogroup CkEnvelope
+ @defgroup CkEnvelope
+ \brief  Charm++ message header.
 */
 #ifndef _ENVELOPE_H
 #define _ENVELOPE_H
@@ -131,45 +131,38 @@ typedef unsigned char  UChar;
 #endif
 
 /**
-The "envelope" sits at the start of every Charm++
-message. It stores information about the handler and
-destination of the charm++ message that follows, and 
-what to do with it on the receiving side.
+@addtogroup CkEnvelope
+@{
+The class envelope defines a Charm++ message's header. The first
+'CmiReservedHeaderSize' bytes of memory is exclusively reserved for Converse
+header, which is defined in convere.h and platform specific config files.
 
-A Charm++ message's memory layout has the 
-Charm envelope ("envelope" class) first, which includes
-a Converse envelope as its **first** field.  After the 
-Charm envelope is a variable-length amount of user 
-data, and finally the priority data stored as ints.
+After Charm++ envelope comes the payload, i.e. a variable-length amount of user
+data. Following the user data, optionally, a variable number of bits of
+priority data can be stored at the end. Function
+envelope::alloc(msgtype,size,prio) is always used to allocate the whole
+message. Note that this memory layout must be observed.
 
-The converse layers modify the beginning of the envelope
-without referencing the "envelope::core" member. The
-envelope is treated as a void*, and the first 
-CmiReservedHeaderSize bytes are available for the 
-converse functions. Therefore, do not put any members
-at the beginning of the envelope class.
+The following are a few terms that are used often:
 
 <pre>
  Envelope pointer        \
  Converse message pointer -> [ [ Converse envelope ]       ]
                              [       Charm envelope        ] 
- User message pointer     -> [ User data ... ]
+ User message pointer     -> [ User data/payload ... ]
  Priority pointer         -> [ Priority ints ... ]
 </pre>
 
-The "message pointers" passed to and from
-users bypass the envelope and point *directly* to the 
-user data--the routine "EnvToUsr" below adjusts an 
-envelope (or converse message) pointer into this 
-direct-to-user pointer.  There is a corresponding
-routine "UsrToEnv" which takes the user data pointer
-and returns a pointer to the envelope/converse message.
+The "message pointers" passed to and from users bypass the envelope and point
+*directly* to the user data--the routine "EnvToUsr" below adjusts an envelope
+(or converse message) pointer into this user message pointer.  There is a
+corresponding routine "UsrToEnv" which takes the user data pointer and returns
+a pointer to the envelope/converse message.
 
-Unfortunately, in the guts of Charm++ it's not always 
-clear whether you've been given a converse or user
-message pointer, as both tend to be passed as void *.
-Confusing the two will invariably result in data 
-corruption and bizarre crashes.
+Unfortunately, in the guts of Charm++ it's not always clear whether you've been
+given a converse or user message pointer, as both tend to be passed as void *.
+Confusing the two will invariably result in data corruption and bizarre
+crashes.
 
 FIXME: Make CkMessage inherit from envelope,
 which would unify converse, envelope, and 
@@ -182,41 +175,41 @@ class envelope {
 public:
  /**
    This union stores the type-specific message information.
-   Keeing this in a union allows the different kinds of messages 
+   Keeping this in a union allows the different kinds of messages 
    to have different fields/types, in an alignment-safe way, 
    without wasting any storage.
  */
     union u_type {
       struct s_chare { //NewChareMsg, NewVChareMsg, ForChareMsg, ForVidMsg, FillVidMsg
-      	void *ptr;
-      	UInt forAnyPe; ///< Used only by newChare
+      	void *ptr;       ///< object pointer
+      	UInt forAnyPe;   ///< Used only by newChare
       } chare;
       struct s_group {
-	CkGroupID g; ///< GroupID
+	CkGroupID g;           ///< GroupID
 	CkNodeGroupID rednMgr; ///< Reduction manager for this group (constructor only!)
-	int epoch; ///< "epoch" this group was created during (0--mainchare, 1--later)
-	UShort arrayEp; ///< Used only for array broadcasts
+	int epoch;             ///< "epoch" this group was created during (0--mainchare, 1--later)
+	UShort arrayEp;        ///< Used only for array broadcasts
       } group;
-      struct s_array{ ///< For arrays only
-	CkArrayIndexStruct index;///< Array element index
+      struct s_array{               ///< For arrays only
+	CkArrayIndexStruct index;   ///< Array element index
 	int listenerData[CK_ARRAYLISTENER_MAXLEN]; ///< For creation
-	CkGroupID arr; ///< Array manager GID
-	UChar hopCount;///< number of times message has been routed
-    	UChar ifNotThere; ///< what to do if array element is missing
+	CkGroupID arr;              ///< Array manager GID
+	UChar hopCount;             ///< number of times message has been routed
+    	UChar ifNotThere;           ///< what to do if array element is missing
       } array;
-      struct s_roData { ///< RODataMsg
+      struct s_roData {        ///< RODataMsg for readonly data type
       	UInt count;
       } roData;
-      struct s_roMsg { ///< ROMsgMsg
+      struct s_roMsg {         ///< ROMsgMsg for readonlys defined in ci files
       	UInt roIdx;
       } roMsg;
     };
-    struct s_attribs { //Packed bitwise struct
-    	UChar msgIdx; ///< Usertype of message (determines pack routine)
-	UChar mtype; ///< e.g., ForBocMsg
-    	UChar queueing:4; ///< Queueing strategy (FIFO, LIFO, PFIFO, ...)
-    	UChar isPacked:1; ///< If true, message must be unpacked before use
-    	UChar isUsed:1; ///< Marker bit to prevent message re-send.
+    struct s_attribs {        // Packed bitwise struct
+    	UChar msgIdx;         ///< Usertype of message (determines pack routine)
+	UChar mtype;          ///< e.g., ForBocMsg
+    	UChar queueing:4;     ///< Queueing strategy (FIFO, LIFO, PFIFO, ...)
+    	UChar isPacked:1;     ///< If true, message must be unpacked before use
+    	UChar isUsed:1;       ///< Marker bit to prevent message re-send.
     };
 #ifdef _FAULT_MLOG_
         CkObjID sender;
@@ -226,17 +219,17 @@ public:
         MlogEntry *localMlogEntry;
 #endif
 private:
-    u_type type; ///< Depends on message type (attribs.mtype)
-    UShort ref; ///< Used by futures
+    u_type type;           ///< Depends on message type (attribs.mtype)
+    UShort ref;            ///< Used by futures
     s_attribs attribs;
-    UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];
+    UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];     ///< padding to make sure sizeof(void*) alignment
     
     //This struct should now be sizeof(void*) aligned.
-    UShort priobits; ///< Number of bits of priority data after user data
-    UShort epIdx;  ///< Entry point to call
-    UInt   pe;    ///< source processor
-    UInt   event; ///< used by projections
-    UInt   totalsize; ///< Byte count from envelope start to end of priobits
+    UShort priobits;   ///< Number of bits of priority data after user data
+    UShort epIdx;      ///< Entry point to call
+    UInt   pe;         ///< source processor
+    UInt   event;      ///< used by projections
+    UInt   totalsize;  ///< Byte count from envelope start to end of priobits
     
   public:
 #ifdef _FAULT_MLOG_
@@ -403,6 +396,8 @@ inline void *_allocMsg(const int msgtype, const int size, const int prio=0) {
   return EnvToUsr(envelope::alloc(msgtype,size,prio));
 }
 
+/** @} */
+
 extern UChar   _defaultQueueing;
 
 extern void CkPackMessage(envelope **pEnv);
@@ -429,6 +424,5 @@ public:
 };
 
 CkpvExtern(MsgPool*, _msgPool);
-
 
 #endif
