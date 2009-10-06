@@ -41,81 +41,44 @@
     @{
 */
 
-
 /** A class that is used to track the entry points and other information 
     about a critical path as a charm++ program executes.
 
     This class won't do useful things unless USE_CRITICAL_PATH_HEADER_ARRAY is defined
-
 */
 class PathHistoryEnvelope {
  protected:
-
   // When passing paths forward, store information on PEs, in backward pass, lookup necessary information
   int sender_history_table_idx;
   double totalTime;
-
  public:
-  
-  double getTotalTime() const{
-    return totalTime;
-  }
-  
-  int get_sender_history_table_idx() const{
-    return sender_history_table_idx;
-  }
-
-  void set_sender_history_table_idx(int i) {
-    sender_history_table_idx = i;
-  }
-
-
-  PathHistoryEnvelope(){
-    reset();
-  }
-
+  double getTotalTime() const{ return totalTime; }
+  int get_sender_history_table_idx() const{ return sender_history_table_idx; }
+  void set_sender_history_table_idx(int i) { sender_history_table_idx = i; }
+  PathHistoryEnvelope(){ reset(); }
+  double getTime() const{ return totalTime; }
+  void setTime(double t){ totalTime = t; }
   void pup(PUP::er &p) {
     p | sender_history_table_idx;
     p | totalTime;
   } 
-  
-  double getTime() const{
-    return totalTime;
-  }
-
-  void setTime(double t){
-    totalTime = t;
-  }
-  
   void reset();
-  
-  
   void print() const;
-
   /// Write a description of the path into the beginning of the provided buffer. The buffer ought to be large enough.
   void printHTMLToString(char* buf) const{
     buf[0] = '\0';
     sprintf(buf+strlen(buf), "Path Time=%lf<br> Sender idx=%d", (double)totalTime, (int)sender_history_table_idx);
- }
-
+  }
   /// The number of available EP counts 
   int getNumUsed() const;
-
   /// Return the count value for the idx'th available EP  
   int getUsedCount(int idx) const;
- 
   /// Return the idx'th available EP 
   int getUsedEp(int idx) const;
-
   int getEpCount(int ep) const;
-  
-  
   void incrementTotalTime(double time);
-
   //  void createPath(envelope *originatingMsg);
-
   void setDebug100();
-      
 };
 /** @} */
 
