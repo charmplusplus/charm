@@ -311,7 +311,7 @@ void workThreadInfo::run()
     //  register for charm++ applications threads
   CpvAccess(CthResumeBigSimThreadIdx) = BgRegisterHandler((BgHandler)CthResumeNormalThread);
 
-  if (cva(bgMach).record != -1 && cva(bgMach).recordprocs.includes(BgGetGlobalWorkerThreadID()))
+  if (cva(bgMach).record != -1 && (cva(bgMach).recordprocs.isEmpty() || cva(bgMach).recordprocs.includes(BgGetGlobalWorkerThreadID())))
   {
     watcher = new BgMessageRecorder(openBinaryReplayFile(BgGetGlobalWorkerThreadID(), "wb"));
   }
