@@ -35,7 +35,9 @@ NormalSlabArray::doFFT(int src_id, int dst_id)
 
     CProxy_NormalSlabArray destProxy_com;
     ComlibInstanceHandle fftcommInstance = (infoVec[src_id]->fftcommInstance);
-    if (fftuseCommlib) {
+
+    /* 
+   if (fftuseCommlib) {
 	if(fftinfo.isSrcSlab)
 	    destProxy_com = (CProxy_NormalSlabArray)destProxy;
 	else
@@ -44,6 +46,7 @@ NormalSlabArray::doFFT(int src_id, int dst_id)
 	//ComlibBeginIteration(destProxy_com);
 	fftcommInstance.beginIteration();
     }
+    */
 
     int pe, i;
     for(i = 0, pe = 0; i < fftinfo.srcSize[0]; i += fftinfo.destPlanesPerSlab, pe++) {
@@ -56,15 +59,23 @@ NormalSlabArray::doFFT(int src_id, int dst_id)
 		       sizeof(complex) * lineSize);
 		temp += lineSize;
 	    }
+#if FFTLIB_USE_COMLIB
 	if (fftuseCommlib)	
 	((CProxy_NormalSlabArray)destProxy_com)(pe).acceptDataForFFT(lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab, sendData, thisIndex, dst_id);
 	else
 	((CProxy_NormalSlabArray)destProxy)(pe).acceptDataForFFT(lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab, sendData, thisIndex, dst_id);
+#else
+	((CProxy_NormalSlabArray)destProxy)(pe).acceptDataForFFT(lineSize * fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab, sendData, thisIndex, dst_id);
+#endif
+
     }
+
+#if FFTLIB_USE_COMLIB
     if (fftuseCommlib) {
 //	ComlibEndIteration(destProxy_com);
 	fftcommInstance.endIteration();
     }
+#endif
     delete [] sendData;
 }
 
@@ -140,9 +151,10 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
 #endif
     }
     
+ #if FFTLIB_USE_COMLIB
     CProxy_NormalSlabArray srcProxy_com;
     ComlibInstanceHandle fftcommInstance = (infoVec[src_id]->fftcommInstance);
-    if (fftuseCommlib) {
+   if (fftuseCommlib) {
 	if(fftinfo.isSrcSlab)
 	    srcProxy_com = (CProxy_NormalSlabArray)destProxy;
 	else
@@ -151,6 +163,7 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
 	//ComlibBeginIteration(destProxy_com);
 	fftcommInstance.beginIteration();
     }
+#endif
 
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
     complex *temp;
@@ -166,16 +179,24 @@ NormalSlabArray::doIFFT(int src_id, int dst_id)
 		       sizeof(complex) * lineSize);
 		temp += lineSize;
 	    }
-    if (fftuseCommlib)
+#if FFTLIB_USE_COMLIB
+   if (fftuseCommlib)
 	((CProxy_NormalSlabArray)srcProxy_com)(pe).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
     else
 	((CProxy_NormalSlabArray)srcProxy)(pe).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
-
+#else
+	((CProxy_NormalSlabArray)srcProxy)(pe).acceptDataForIFFT(lineSize * fftinfo.destPlanesPerSlab * fftinfo.srcPlanesPerSlab, sendData, thisIndex, dst_id);
+#endif
     }
+
+
+#if FFTLIB_USE_COMLIB
     if (fftuseCommlib) {
 //	ComlibEndIteration(srcProxy_com);
 	fftcommInstance.endIteration();
     }
+#endif
+
     delete [] sendData;
 }
 
@@ -262,8 +283,13 @@ void NormalSlabArray::setup(NormalFFTinfo &info,
     if((info.isSrcSlab && fwd2DPlan==NULL) || (!info.isSrcSlab && bwd2DPlan==NULL))
 	createPlans(info);
 
+    /** Currently Comlib is disabled for this library. 
+	Someone should update the library to use the new API */
+    fftuseCommlib = false;
+
+    /*
     fftuseCommlib = _useCommlib;
-/*    fftcommInstance = ComlibInstanceHandle();
+    fftcommInstance = ComlibInstanceHandle();
     if (fftuseCommlib) {        
 	fftcommInstance = inst;
 	if(info.isSrcSlab)

@@ -60,6 +60,7 @@ NormalRealSlabArray::doFFT(int src_id, int dst_id)
 //    CProxy_NormalSlabArray destProxy = (CProxy_NormalSlabArray)(infoVec[src_id]->destProxy);
 //    CProxy_NormalSlabArray srcProxy = (CProxy_NormalSlabArray)(infoVec[src_id]->srcProxy);
 
+#if FFTLIB_USE_COMLIB
     if (fftuseCommlib) {
 	CProxy_NormalSlabArray destProxy_com;
 	if(fftinfo.isSrcSlab)
@@ -69,6 +70,7 @@ NormalRealSlabArray::doFFT(int src_id, int dst_id)
 	fftcommInstance.beginIteration();
 	ComlibDelegateProxy(&destProxy_com);
     }
+#endif
 
     // allocating the data for sending to destination side
     lineSize = fftinfo.srcSize[1]/2+1;
@@ -171,6 +173,7 @@ NormalRealSlabArray::doIFFT(int src_id, int dst_id)
 //    CProxy_NormalSlabArray destProxy = (CProxy_NormalSlabArray)(infoVec[src_id]->destProxy);
 //    CProxy_NormalSlabArray srcProxy = (CProxy_NormalSlabArray)(infoVec[src_id]->srcProxy);
 
+#if FFTLIB_USE_COMLIB
     if (fftuseCommlib) {
 	CProxy_NormalSlabArray destProxy_com;
 	if(fftinfo.isSrcSlab)
@@ -180,6 +183,7 @@ NormalRealSlabArray::doIFFT(int src_id, int dst_id)
 	fftcommInstance.beginIteration();
 	ComlibDelegateProxy(&destProxy_com);
     }
+#endif
 
     complex *sendData = new complex[fftinfo.srcPlanesPerSlab * fftinfo.destPlanesPerSlab * lineSize];
     complex *temp;
@@ -300,11 +304,16 @@ void NormalRealSlabArray::setup(NormalFFTinfo &info,
 
     createPlans(info);
 
+#if FFTLIB_USE_COMLIB
     fftuseCommlib = useCommlib;
     fftcommInstance = ComlibInstanceHandle();
     if (fftuseCommlib) {        
 	fftcommInstance = inst;
    }
+#else 
+    fftuseCommlib = false;
+#endif
+
 }
 
 NormalRealSlabArray::NormalRealSlabArray(NormalFFTinfo &info,
