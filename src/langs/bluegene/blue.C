@@ -1255,6 +1255,7 @@ static CmiHandler exitHandlerFunc(char *msg)
       if (origPe == -2) origPe = oldPe;
       traceCharmClose();
 //      CmiSwitchToPE(oldPe);
+      delete cva(nodeinfo)[j].threadinfo[i]->watcher;   // force dump watcher
     }
     if (origPe!=-2) CmiSwitchToPE(origPe);
   }
