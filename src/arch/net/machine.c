@@ -2517,16 +2517,17 @@ static void ConverseRunPE(int everReturn)
     if (Cmi_charmrun_fd!=-1)
           while (1) CommunicationServer(5, COMM_SERVER_FROM_SMP);
   }
-  else
-  if (!everReturn) {
-    Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-    /* turn on immediate messages only now
-     node barrier previously should take care of the node synchronization */
-    _immediateReady = 1;
-    if (Cmi_usrsched==0) CsdScheduler(-1);
-    ConverseExit();
-  }else{
-    _immediateReady = 1;
+  else{
+    if (!everReturn) {
+      Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+      /* turn on immediate messages only now
+       node barrier previously should take care of the node synchronization */
+      _immediateReady = 1;
+      if (Cmi_usrsched==0) CsdScheduler(-1);
+      ConverseExit();
+    }else{
+      _immediateReady = 1;
+    }
   }
 }
 
