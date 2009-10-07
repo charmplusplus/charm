@@ -229,7 +229,7 @@ static void cpuTopoHandler(void *m)
   rec->rank ++;
   count ++;
   if (count == CmiNumPes()) {
-    CmiPrintf("Charm++> %d unique compute nodes detected, with %d cores per node. \n", CmmEntries(hostTable), CmiNumCores());
+    CmiPrintf("Charm++> %d unique compute nodes detected, with %d processors per node. \n", CmmEntries(hostTable), CmiNumCores());
     //hostnameMsg *tmpm;
     tag = CmmWildCard;
     while (tmpm = (hostnameMsg *)CmmGet(hostTable, 1, &tag, &tag1)) CmiFree(tmpm);
