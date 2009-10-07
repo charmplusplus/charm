@@ -25,7 +25,7 @@
  * for debugging and testing purpose! it only make sense in smp version
  ****************************************************************************/
 /*#define CMK_PCQUEUE_LOCK  1 */
-#if CMK_SMP && CMK_PCQUEUE_LOCK
+#if CMK_SMP && !CMK_PCQUEUE_LOCK
 /*#define PCQUEUE_MULTIQUEUE  1 */
 
 #if !CMK_SMP_NO_PCQUEUE_PUSH_LOCK
