@@ -1808,13 +1808,17 @@ void DeliverViaNetworkOrPxshm(OutgoingMsg ogm,OtherNode node,int rank,unsigned i
 int DeliverOutgoingMessage(OutgoingMsg ogm)
 {
   int i, rank, dst; OtherNode node;
+	
   int network = 1;
-  
+
+	
   dst = ogm->dst;
 
   switch (dst) {
   case PE_BROADCAST_ALL:
+#if !CMK_SMP_NOT_RELAX_LOCK	  
     CmiCommLock();
+#endif
     for (rank = 0; rank<_Cmi_mynodesize; rank++) {
       CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
     }
@@ -1832,10 +1836,14 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
       }	
 #endif
     GarbageCollectMsg(ogm);
+#if !CMK_SMP_NOT_RELAX_LOCK	  	  
     CmiCommUnlock();
+#endif	  
     break;
   case PE_BROADCAST_OTHERS:
+#if !CMK_SMP_NOT_RELAX_LOCK	  	  
     CmiCommLock();
+#endif  
     for (rank = 0; rank<_Cmi_mynodesize; rank++)
       if (rank + Cmi_nodestart != ogm->src) {
 	CmiPushPE(rank,CopyMsg(ogm->data,ogm->size));
@@ -1854,7 +1862,9 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
       }	
 #endif
     GarbageCollectMsg(ogm);
+#if !CMK_SMP_NOT_RELAX_LOCK	  	  
     CmiCommUnlock();
+#endif	  
     break;
   default:
 #ifndef CMK_OPTIMIZE
@@ -1864,10 +1874,14 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
     node = nodes_by_pe[dst];
     rank = dst - node->nodestart;
     if (node->nodestart != Cmi_nodestart) {
+#if !CMK_SMP_NOT_RELAX_LOCK	  		
         CmiCommLock();
+#endif		
     	DeliverViaNetworkOrPxshm(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
 	GarbageCollectMsg(ogm);
+#if !CMK_SMP_NOT_RELAX_LOCK	  		
         CmiCommUnlock();
+#endif		
     } else {
       network = 0;
       if (ogm->freemode == 'A') {
@@ -2073,9 +2087,17 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 
   CmiMsgHeaderSetLength(data, size);
   ogm=PrepareOutgoing(cs,pe,size,freemode,data);
-  /* CmiCommLock(); */
+
+  #if CMK_SMP_NOT_RELAX_LOCK  
+  CmiCommLock();
+#endif  
+  
   sendonnetwork = DeliverOutgoingMessage(ogm);
-  /* CmiCommUnlock(); */
+  
+#if CMK_SMP_NOT_RELAX_LOCK  
+  CmiCommUnlock();
+#endif  
+  
   /* Check if any packets have arrived recently (preserves kernel network buffers). */
 #if CMK_USE_SYSVSHM
 	CommunicationServerSysvshm();
@@ -2083,7 +2105,9 @@ CmiCommHandle CmiGeneralSend(int pe, int size, int freemode, char *data)
 	CommunicationServerPxshm();
 #endif
 #if !CMK_SHARED_VARS_UNAVAILABLE
+#if !CMK_SMP_NOT_SKIP_COMMSERVER
   if (sendonnetwork!=0)   /* only call server when we send msg on network in SMP */
+#endif
 #endif
   CommunicationServer(0, COMM_SERVER_FROM_WORKER);
   MACHSTATE(1,"}  CmiGeneralSend");
@@ -2721,6 +2745,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));
+ 
 
   /* Network progress function is used to poll the network when for
      messages. This flushes receive buffers on some  implementations*/ 

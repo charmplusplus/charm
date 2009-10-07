@@ -10,4 +10,4 @@
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  1
 
 #define CMK_MULTICORE                                      1
-/*#define CMK_USE_TLS_THREAD                                 1*/
+#define CMK_NOT_USE_TLS_THREAD                             1 

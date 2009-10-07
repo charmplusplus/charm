@@ -413,7 +413,7 @@ for each processor in the node.
 */
 #ifdef CMK_CPV_IS_SMP
 
-#if CMK_TLS_THREAD && CMK_USE_TLS_THREAD
+#if CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD
 #define CMK_MAX_PTHREADS     64
 #define CpvDeclare(t,v) __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         int CMK_TAG(Cpv_inited_,v) = 0;  \

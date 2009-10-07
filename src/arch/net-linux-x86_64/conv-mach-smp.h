@@ -18,4 +18,5 @@
 
 /*#define CMK_PCQUEUE_LOCK				   1 */
 /*#define CMK_USE_MFENCE 					   1 */
-#define CMK_USE_TLS_THREAD                                 1
+/* Replaced by CMK_NOT_USE_TLS_THREAD as default */
+/*#define CMK_USE_TLS_THREAD                                 1*/

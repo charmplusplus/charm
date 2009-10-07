@@ -25,14 +25,18 @@
  * for debugging and testing purpose! it only make sense in smp version
  ****************************************************************************/
 /*#define CMK_PCQUEUE_LOCK  1 */
-#if CMK_SMP && !defined(CMK_PCQUEUE_LOCK)
+#if CMK_SMP && CMK_PCQUEUE_LOCK
 /*#define PCQUEUE_MULTIQUEUE  1 */
-#define CMK_PCQUEUE_PUSH_LOCK 1 
+
+#if !CMK_SMP_NO_PCQUEUE_PUSH_LOCK
+#define CMK_PCQUEUE_PUSH_LOCK 1
+#endif
+
 #endif
 
 /* If we are using locks in PCQueue, we disable any other fence operation,
  * otherwise we use the ones provided by converse.h */
-#ifdef CMK_PCQUEUE_LOCK
+#if CMK_PCQUEUE_LOCK
 #define PCQueue_CmiMemoryReadFence()
 #define PCQueue_CmiMemoryWriteFence()
 #define PCQueue_CmiMemoryAtomicIncrement(someInt)  someInt=someInt+1
@@ -94,7 +98,7 @@ typedef struct PCQueueStruct
   CmiMemorySMPSeparation_t pad2;
 #endif
   int  len;
-#if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
+#if CMK_PCQUEUE_LOCK || CMK_PCQUEUE_PUSH_LOCK
   CmiNodeLock  lock;
 #endif
 }
@@ -163,7 +167,7 @@ static PCQueue PCQueueCreate(void)
   Q->head = circ;
   Q->tail = circ;
   Q->len = 0;
-#if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
+#if CMK_PCQUEUE_LOCK || CMK_PCQUEUE_PUSH_LOCK
   Q->lock = CmiCreateLock();
 #endif
   return Q;
@@ -196,7 +200,7 @@ static char *PCQueuePop(PCQueue Q)
 {
   CircQueue circ; int pull; char *data;
 
-#ifdef CMK_PCQUEUE_LOCK
+#if CMK_PCQUEUE_LOCK
     if (Q->len == 0) return 0;        /* If atomic increment are used, Q->len is always right */
     CmiLock(Q->lock);
 #endif
@@ -227,14 +231,14 @@ static char *PCQueuePop(PCQueue Q)
                                /* in the last slot. See below. */
       }
       PCQueue_CmiMemoryAtomicDecrement(Q->len);
-#ifdef CMK_PCQUEUE_LOCK
+#if CMK_PCQUEUE_LOCK
       CmiUnlock(Q->lock);
 #endif
       return data;
     }
     else { /* queue seems to be empty. The producer may be adding something
               to it, but its ok to report queue is empty. */
-#ifdef CMK_PCQUEUE_LOCK
+#if CMK_PCQUEUE_LOCK
       CmiUnlock(Q->lock);
 #endif
       return 0;
@@ -245,7 +249,7 @@ static void PCQueuePush(PCQueue Q, char *data)
 {
   CircQueue circ, circ1; int push;
 
-#if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
+#if CMK_PCQUEUE_LOCK|| CMK_PCQUEUE_PUSH_LOCK
   CmiLock(Q->lock);
 #endif
   circ1 = Q->tail;
@@ -290,7 +294,7 @@ static void PCQueuePush(PCQueue Q, char *data)
   circ1->data[push] = data;
   PCQueue_CmiMemoryAtomicIncrement(Q->len);
 
-#if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
+#if CMK_PCQUEUE_LOCK || CMK_PCQUEUE_PUSH_LOCK
   CmiUnlock(Q->lock);
 #endif
 }
@@ -341,7 +345,7 @@ static PCQueue PCQueueCreate(void)
   Q->len = 0;
   Q->bufEnd = Q->data + PCQueueSize;
 
-#if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
+#if CMK_PCQUEUE_LOCK || CMK_PCQUEUE_PUSH_LOCK
   Q->lock = CmiCreateLock();
 #endif
 
@@ -370,7 +374,7 @@ static char *PCQueuePop(PCQueue Q)
 
     char *data;
 
-#ifdef CMK_PCQUEUE_LOCK
+#if CMK_PCQUEUE_LOCK
     CmiLock(Q->lock);
 #endif
 
@@ -390,7 +394,7 @@ static char *PCQueuePop(PCQueue Q)
 
     }
 
-#ifdef CMK_PCQUEUE_LOCK
+#if CMK_PCQUEUE_LOCK
       CmiUnlock(Q->lock);
 #endif
 
@@ -398,7 +402,7 @@ static char *PCQueuePop(PCQueue Q)
 }
 static void PCQueuePush(PCQueue Q, char *data)
 {
-#if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
+#if CMK_PCQUEUE_LOCK || CMK_PCQUEUE_PUSH_LOCK
   CmiLock(Q->lock);
 #endif
 
@@ -433,7 +437,7 @@ static void PCQueuePush(PCQueue Q, char *data)
 
   PCQueue_CmiMemoryAtomicIncrement(Q->len);
 
-#if defined(CMK_PCQUEUE_LOCK) || defined(CMK_PCQUEUE_PUSH_LOCK)
+#if CMK_PCQUEUE_LOCK || CMK_PCQUEUE_PUSH_LOCK
   CmiUnlock(Q->lock);
 #endif
 }

@@ -61,7 +61,9 @@ typedef struct {
  * Then the CMK_PCQUEUE_PUSHLOCK should be enabled.
  *
  * */
+#ifndef MULTIQ_GRPSIZE
 #define MULTIQ_GRPSIZE 8
+#endif
 #endif
 
 /************************************************************
