@@ -2513,7 +2513,7 @@ static void ConverseRunPE(int everReturn)
 
   /* communication thread */
   if (CmiMyRank() == CmiMyNodeSize()) {
-    Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+    if(!everReturn) Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
     if (Cmi_charmrun_fd!=-1)
           while (1) CommunicationServer(5, COMM_SERVER_FROM_SMP);
   }
@@ -2525,6 +2525,8 @@ static void ConverseRunPE(int everReturn)
     _immediateReady = 1;
     if (Cmi_usrsched==0) CsdScheduler(-1);
     ConverseExit();
+  }else{
+    _immediateReady = 1;
   }
 }
 
