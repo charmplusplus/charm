@@ -37,7 +37,9 @@ cu*|Cu*)
   # Try to guess the number of nodes and tasks per node to use
   nodes=$pes
   tp=1
-  for i in 4 2 3
+  ppn=`prtconf 2>/dev/null | grep 'Number Of Processors:' | sed -e 's/^[^0-9]*//'`
+  test x$ppn = x && ppn=`expr $pes + 1`
+  for i in $ppn 4 2 3
   do
     if [ `expr $pes / $i '*' $i` -eq $pes ]
     then
@@ -56,3 +58,8 @@ args=`pwd`/"$args"
 
 echo "Running> poe $args $extra"
 poe $args $extra
+status=$?
+
+exit $status
+
+

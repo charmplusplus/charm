@@ -22,6 +22,10 @@ while [ $# -gt 0 ]
       +p[0-9]*)
           pes=`expr substr $1 3 10`
           ;;
+      +n)
+	  nodes=$2
+          shift
+          ;;
       +ln)
 	  logical=$2
 	  shift
@@ -108,7 +112,7 @@ if [ $interactive -gt 1 ]
 fi
 
 if [ $interactive -eq 0 ]
-    then
+then
     node_usage="shared"
 else
     node_usage="not_shared"
@@ -145,6 +149,18 @@ if [ -n "$ppnused" ]
     tasks_per_node="#@ tasks_per_node = "$tasks_per_node
 else
     total_tasks=$pes
+    if test -z "$nodes"
+    then
+      ppn=`prtconf 2>/dev/null | grep 'Number Of Processors:' | sed -e 's/^[^0-9]*//'`
+      test x$ppn = x && ppn=4
+      if [ `expr $pes / $ppn '*' $ppn` -eq $pes ]
+      then
+        nodes=`expr $pes / $ppn`
+      else
+        nodes=`expr $pes / $ppn + 1`
+      fi
+    fi
+    nodes="#@ node = "$nodes
 fi
 
 cat > $filename <<EOF
@@ -152,6 +168,7 @@ cat > $filename <<EOF
 #@ node_usage = $node_usage
 #@ network.LAPI = csss,,US
 #@ total_tasks = $total_tasks
+$nodes
 $tasks_per_node
 
 # User settings
