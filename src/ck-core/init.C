@@ -646,8 +646,10 @@ void CkExit(void)
    to the machine layer to call this function). */
 extern "C"
 void EmergencyExit(void) {
+#ifndef __BLUEGENE__
   /* Delete _coreState to force any CkMessageWatcher to close down. */
   delete CkpvAccess(_coreState);
+#endif
 }
 
 static void _nullFn(void *, void *)
