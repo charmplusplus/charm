@@ -124,27 +124,25 @@ class BgTimeLineRec;
 */
 class BgTimeLog {
 public:
-  int ep;
-  int seqno;
-  BgMsgID  msgId;	// incoming message that generates this log
-  short charm_ep;
-
+  CkVec< BgMsgEntry * > msgs;
+  CkVec< bgEvents * > evts;
+  CkVec< BgTimeLog* > backwardDeps;
+  CkVec< BgTimeLog* > forwardDeps;
   CmiObjId objId;
+  BgMsgID  msgId;	// incoming message that generates this log
 
   double recvTime;	//Time at which the message was received in 'inbuffer'
   double startTime, endTime;
   double oldStartTime, execTime;
   double effRecvTime;
 
-//  int threadNum;	// by guna, for seq load balancing  ???
+  int ep;
+  int seqno;
+  short charm_ep;
 
-  CkVec< BgMsgEntry * > msgs;
-  CkVec< bgEvents * > evts;
-  CkVec< BgTimeLog* > backwardDeps;
-  CkVec< BgTimeLog* > forwardDeps;
+  char name[20];
   char doCorrect;
   char flag;
-  char name[20];
 
   friend class BgTimeLineRec;
 public:
