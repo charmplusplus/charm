@@ -60,4 +60,8 @@
 #define CMK_VERSION_BLUEGENE	1
 #endif
 
+#if CMK_64BIT && !CMK_SIZET_64BIT
+#error "Compiler not generating 64 bit binary, please check compiler flags."
+#endif
+
 #endif
