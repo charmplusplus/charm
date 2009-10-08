@@ -1900,7 +1900,7 @@ cat > $t <<EOT
 
 int foo()
 {
-int x[sizeof(void *) - 7];
+int x[sizeof(void *) - 7]={0};
 return x[0];
 }
 EOT
