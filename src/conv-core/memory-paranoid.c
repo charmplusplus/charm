@@ -31,7 +31,8 @@ static void memAbort(const char *err, void *ptr)
 }
 
 /*This is the largest block we reasonably expect anyone to allocate*/
-#define MAX_BLOCKSIZE (1024*1024*512)
+#define MAX_BLOCKSIZE (1024*1024*512)   /* replaced by max_allocated */
+static size_t max_allocated = 0;
 
 /*
  * Struct Slot contains all of the information about a malloc buffer except
@@ -142,7 +143,7 @@ static void checkSlot(Slot *s) {
 		slotAbort("Corrupted slot magic number",s);
 	if (s->userSize<0)
 		slotAbort("Corrupted (negative) user size field",s);
-	if (s->userSize>=MAX_BLOCKSIZE)
+	if (s->userSize>max_allocated)
 		slotAbort("Corrupted (huge) user size field",s);
 	if (badPointer(s->prev) || (s->prev->next!=s))
 		slotAbort("Corrupted back link",s);
@@ -217,6 +218,7 @@ static void *setSlot(Slot *s,int userSize) {
                 }
 	}
 	s->userSize=userSize;
+	if (userSize > max_allocated) max_allocated = userSize;
 	setPad(s->pad); /*Padding before block*/
 	fill_uninit(user,s->userSize); /*Block*/	
 	setPad(user+s->userSize); /*Padding after block*/
