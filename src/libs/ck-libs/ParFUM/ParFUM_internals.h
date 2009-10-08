@@ -46,12 +46,7 @@
 #include "ParFUM.h"
 
 
-#if CMK_STL_USE_DOT_H /* Pre-standard C++ */
-#  include <iostream.h>
-#else /* ISO C++ */
-#  include <iostream>
-   using std::ostream;
-#endif
+#include <iosfwd>
 
 #include "ParFUM_Adapt.decl.h"
 
@@ -2424,7 +2419,7 @@ public:
 };
 
 template <class T>
-ostream& operator << (ostream& os, const ElemList<T> & s){
+std::ostream& operator << (std::ostream& os, const ElemList<T> & s){
 };
 
 template <class T>
