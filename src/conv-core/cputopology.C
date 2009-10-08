@@ -229,7 +229,13 @@ static void cpuTopoHandler(void *m)
   rec->rank ++;
   count ++;
   if (count == CmiNumPes()) {
-    CmiPrintf("Charm++> %d unique compute nodes detected, with %d cores per node. \n", CmmEntries(hostTable), CmiNumCores());
+    char str[256];
+    int ncores = CmiNumCores();
+    if (ncores > 1)
+    sprintf(str, "Charm++> Running on %d unique compute nodes (%d-way SMP).\n", CmmEntries(hostTable), ncores);
+    else
+    sprintf(str, "Charm++> Running on %d unique compute nodes.\n", CmmEntries(hostTable));
+    CmiPrintf(str);
     //hostnameMsg *tmpm;
     tag = CmmWildCard;
     while (tmpm = (hostnameMsg *)CmmGet(hostTable, 1, &tag, &tag1)) CmiFree(tmpm);
@@ -334,7 +340,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
 
   if (!obtain_flag) return;
   else if (CmiMyPe() == 0) {
-     CmiPrintf("Charm++> cpu topology info is being gathered. \n");
+     CmiPrintf("Charm++> cpu topology info is being gathered.\n");
   }
 
 #if CMK_USE_GM
