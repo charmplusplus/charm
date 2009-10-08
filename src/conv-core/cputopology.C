@@ -232,9 +232,9 @@ static void cpuTopoHandler(void *m)
     char str[256];
     int ncores = CmiNumCores();
     if (ncores > 1)
-    sprintf(str, "Charm++> Run on %d unique compute nodes (%d-way SMP).\n", CmmEntries(hostTable), ncores);
+    sprintf(str, "Charm++> Running on %d unique compute nodes (%d-way SMP).\n", CmmEntries(hostTable), ncores);
     else
-    sprintf(str, "Charm++> Run on %d unique compute nodes.\n", CmmEntries(hostTable));
+    sprintf(str, "Charm++> Running on %d unique compute nodes.\n", CmmEntries(hostTable));
     CmiPrintf(str);
     //hostnameMsg *tmpm;
     tag = CmmWildCard;
