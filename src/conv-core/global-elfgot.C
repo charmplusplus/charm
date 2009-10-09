@@ -49,7 +49,8 @@ A more readable summary is at:
 #if CMK_HAS_REGEX_H
 #include <regex.h>
 #endif
-
+#include <vector>
+#include <algorithm>
 #include "converse.h"
 #include "pup.h"
 
@@ -229,6 +230,12 @@ void CtgGlobalList::read(void *datav) const {
     }
 }
 
+typedef std::pair<ELFXX_TYPE_Addr *, size_t> global_rec;
+static bool compare_globals(const global_rec &l, const global_rec &r)
+{
+    return l.second < r.second;
+}
+
 /**
    Analyze the current set of global variables, determine 
    which are user globals and which are system globals, 
@@ -263,6 +270,8 @@ CtgGlobalList::CtgGlobalList() {
 		break;
 	}
     }
+
+    std::vector<global_rec> globals;
 
     // Figure out which relocation data entries refer to global data:
     for(count = 0; count < relt_size; count ++) {
@@ -300,6 +309,7 @@ CtgGlobalList::CtgGlobalList() {
 	// It's got the right name-- it's a user global
 	int gSize = ALIGN8(symt[symindx].st_size);
 	ELFXX_TYPE_Addr *gGot=(ELFXX_TYPE_Addr *)relt[count].r_offset;
+	globals.push_back(global_rec(gGot, symt[symindx].st_size));
 
 #if DEBUG_GOT_MANAGER
 	printf("   -> %s is a user global, of size %d, at %p\n",
@@ -312,11 +322,20 @@ CtgGlobalList::CtgGlobalList() {
 	datalen+=gSize;
     }
 
+    size_t datalen2 = 0;
+    std::sort(globals.begin(), globals.end(), &compare_globals);
+    for (std::vector<global_rec>::iterator i = globals.begin(); i != globals.end(); ++i) {
+	short align = std::min(i->second, (unsigned long)16);
+	size_t off = (datalen2 + align - 1) % align;
+	datalen2 = off;
+    }
+
     nRec=rec.size();
 
 #if DEBUG_GOT_MANAGER   
     printf("relt has %d entries, %d of which are user globals\n\n", 
 	   relt_size, nRec);
+    printf("Traditional GOT layout takes %d, sorted takes %lu", datalen, (unsigned long) datalen2);
 #endif
 }
 
