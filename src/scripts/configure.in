@@ -801,23 +801,26 @@ cat > $tc <<EOT
 #include <sys/types.h>
 #include <unistd.h>
 
-void foo(void *a) {
+int main(int argc, char **argv) {
     pid_t pid = getpid();
 }
 EOT
-test_cc "whether getpid() exists" "yes" "no" ""
+test_linkc "whether getpid() exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_GETPID, $pass, [whether getpid() exists])
 
 #### check if kill exists ####
 cat > $tc <<EOT
 #include <sys/types.h>
+#include <unistd.h>
 #include <signal.h>
 
-void foo(pid_t pid) {
+int main(int argc, char**argv) 
+{
+    pid_t pid = getpid();
     kill(pid, 9);
 }
 EOT
-test_cc "whether kill() exists" "yes" "no" ""
+test_linkc "whether kill() exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_KILL, $pass, [whether kill() exists])
 
 #### test for setpriority ###
