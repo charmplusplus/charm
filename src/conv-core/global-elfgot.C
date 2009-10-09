@@ -327,7 +327,7 @@ CtgGlobalList::CtgGlobalList() {
     for (std::vector<global_rec>::iterator i = globals.begin(); i != globals.end(); ++i) {
 	short align = std::min(i->second, (unsigned long)16);
 	size_t off = (datalen2 + align - 1) % align;
-	datalen2 = off;
+	datalen2 = off + i->second;
     }
 
     nRec=rec.size();
