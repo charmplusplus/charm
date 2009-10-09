@@ -12,10 +12,10 @@ pgm.o: pgm.C
 
 test: pgm
 	./charmrun ./pgm +p1 $(TESTOPTS)
-	-$(LINKLINE) -thread context && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
-	-$(LINKLINE) -thread pthreads -lpthread && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
-	-$(LINKLINE) -thread qt && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
-	-$(LINKLINE) -thread uJcontext && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
+#	-$(LINKLINE) -thread context && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
+#	-$(LINKLINE) -thread pthreads -lpthread && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
+#	-$(LINKLINE) -thread qt && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
+#	-$(LINKLINE) -thread uJcontext && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
 
 clean:
 	rm -f conv-host *.o pgm *.bak pgm.*.log pgm.sts *~ charmrun
