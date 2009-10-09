@@ -56,6 +56,7 @@ typedef CMK_TYPEDEF_INT8 LONG_LONG_PAPI;
 class Trace {
   protected:
     int _traceOn;
+  
   public:
     Trace(): _traceOn(0) {}
     virtual void setTraceOnPE(int flag) { _traceOn = flag; }
@@ -65,6 +66,11 @@ class Trace {
     // is specified
     virtual void traceBegin() {}
     virtual void traceEnd() {}
+#if CMK_SMP_TRACE_COMMTHREAD		
+    virtual void traceBeginOnCommThread() {}   
+    virtual void traceEndOnCommThread() {}
+#endif 
+		
     // registers user event trace module returns int identifier 
     virtual int traceRegisterUserEvent(const char* eventName, int e) { 
       return 0; 
@@ -246,9 +252,14 @@ public:
     // Tracing module registers *itself* for begin/end idle callbacks:
     inline void beginIdle(double curWallTime) {ALLDO(beginIdle(curWallTime));}
     inline void endIdle(double curWallTime) {ALLDO(endIdle(curWallTime));}
-    void traceBegin();
+    void traceBegin();    
     void traceEnd();
 
+#if CMK_SMP_TRACE_COMMTHREAD
+    void traceBeginOnCommThread();
+    void traceEndOnCommThread();
+#endif
+	
     /*Calls for tracing function begins and ends*/
     inline void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0){ ALLDO(regFunc(name, idx, idxSpecifiedByUser)); }
     inline void beginFunc(char *name,char *file,int line){ ALLDO(beginFunc(name,file,line)); };

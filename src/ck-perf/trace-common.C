@@ -189,7 +189,12 @@ static void traceCommonInit(char **argv)
 /** Write out the common parts of the .sts file. */
 extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "MACHINE %s\n",CMK_MACHINE_NAME);
+#if CMK_SMP_TRACE_COMMTHREAD
+  //considering the extra comm thread per node
+  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes()+CkNumNodes());
+#else	
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
+#endif	
   fprintf(stsfp, "TOTAL_CHARES %d\n", _chareTable.size());
   fprintf(stsfp, "TOTAL_EPS %d\n", _entryTable.size());
   fprintf(stsfp, "TOTAL_MSGS %d\n", _msgTable.size());
@@ -226,6 +231,17 @@ void TraceArray::traceBegin() {
   ALLDO(traceBegin());
 }
 
+#if CMK_SMP_TRACE_COMMTHREAD
+void TraceArray::traceBeginOnCommThread() {
+  if (n==0) return; // No tracing modules registered.
+/*#if ! CMK_TRACE_IN_CHARM	
+  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceCommonBeginIdle,this);
+  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceCommonEndIdle,this);
+#endif*/
+  ALLDO(traceBeginOnCommThread());
+}
+#endif
+
 void TraceArray::traceEnd() {
   if (n==0) return; // No tracing modules registered.
   ALLDO(traceEnd());
@@ -235,10 +251,32 @@ void TraceArray::traceEnd() {
 #endif
 }
 
+#if CMK_SMP_TRACE_COMMTHREAD
+void TraceArray::traceEndOnCommThread() {
+  if (n==0) return; // No tracing modules registered.
+  ALLDO(traceEndOnCommThread());
+/*#if ! CMK_TRACE_IN_CHARM
+  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, cancel_beginIdle);
+  CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY, cancel_endIdle);
+#endif*/
+}
+#endif
+
+
 /*Install the beginIdle/endIdle condition handlers.*/
 extern "C" void traceBegin(void) {
 #ifndef CMK_OPTIMIZE
   DEBUGF(("[%d] traceBegin called with %d at %f\n", CkMyPe(), CpvAccess(traceOn), TraceTimer()));
+  
+#if CMK_SMP_TRACE_COMMTHREAD
+  //the first core of this node controls the condition of comm thread
+  if(CmiMyRank()==0){
+	if(CkpvAccessOther(traceOn, CmiMyNodeSize())!=1){
+		CkpvAccessOther(_traces, CmiMyNodeSize())->traceBeginOnCommThread();		
+		CkpvAccessOther(traceOn, CmiMyNodeSize()) = 1;
+	}
+  }
+#endif
   if (CpvAccess(traceOn)==1) return;
   CkpvAccess(_traces)->traceBegin();
   CpvAccess(traceOn) = 1;
@@ -249,6 +287,18 @@ extern "C" void traceBegin(void) {
 extern "C" void traceEnd(void) {
 #ifndef CMK_OPTIMIZE
   DEBUGF(("[%d] traceEnd called with %d at %f\n", CkMyPe(), CpvAccess(traceOn), TraceTimer()));
+
+#if CMK_SMP_TRACE_COMMTHREAD
+//the first core of this node controls the condition of comm thread
+if(CmiMyRank()==0){
+	if(CkpvAccessOther(traceOn, CmiMyNodeSize())!=0){
+		CkpvAccessOther(_traces, CmiMyNodeSize())->traceEndOnCommThread();
+		CkpvAccessOther(traceOn, CmiMyNodeSize()) = 0;
+	}
+}
+#endif
+	
+	
   if (CpvAccess(traceOn)==0) return;
   if (CkpvAccess(_traces) == NULL) {
     CmiPrintf("Warning: did you mix compilation with and without -DCMK_OPTIMIZE? \n");
@@ -275,8 +325,10 @@ static int checkTraceOnPe(char **argv)
   // must include pe 0, otherwise sts file is not generated
   if (CkMyPe()==0) traceOnPE = 1;
 #if !CMK_TRACE_IN_CHARM
+#if !CMK_SMP_TRACE_COMMTHREAD
   /* skip communication thread */
   traceOnPE = traceOnPE && (CkMyRank() != CkMyNodeSize());
+#endif
 #endif
   return traceOnPE;
 }

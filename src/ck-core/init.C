@@ -913,10 +913,13 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_msgPool) = new MsgPool();
 
 	CmiNodeAllBarrier();
-
+#if CMK_SMP_TRACE_COMMTHREAD
+	_TRACE_BEGIN_COMPUTATION();	
+#else
  	if (!inCommThread) {
 	  _TRACE_BEGIN_COMPUTATION();
 	}
+#endif
 
 #ifdef ADAPT_SCHED_MEM
     if(CkMyRank()==0){

@@ -417,7 +417,7 @@ class TraceProjections : public Trace {
     LONG_LONG_PAPI *papiValues;
 #endif
 
-  public:
+ public:
     int converseExit; // used for exits that bypass CkExit.
     double endTime;
 
@@ -454,8 +454,12 @@ class TraceProjections : public Trace {
     void traceClearEps();
     void traceWriteSts();
     void traceClose();
-    void traceBegin();
+    void traceBegin();    
     void traceEnd();
+ #if CMK_SMP_TRACE_COMMTHREAD		
+    void traceBeginOnCommThread();
+    void traceEndOnCommThread();
+#endif 	
     void traceFlushLog() { _logPool->flushLogBuffer(); }
 
     //functions that perform function tracing
