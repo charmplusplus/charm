@@ -17,6 +17,10 @@
 #include "queueing.h"
 #include "ccs-builtins.h"
 
+#ifdef __MINGW_H
+#include "process.h"
+#endif
+
 #if CMK_CCS_AVAILABLE
 
 /**********************************************
@@ -91,7 +95,7 @@ extern "C" void CcsImpl_kill(void)
 #include <signal.h>
 
 static void ccs_killpe(char *msg) {
-#if CMK_HAS_GETPID
+#if CMK_HAS_KILL
   kill(getpid(), 9);
 #else
   CmiAbort("ccs_killpe() not supported!");
