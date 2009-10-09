@@ -168,7 +168,7 @@ private:
   int isUserSymbol(const char *name);
 };
 
-int match(const char *string, char *pattern) {
+int match(const char *string, const char *pattern) {
 #if CMK_HAS_REGEX_H
   int status;
 
@@ -246,31 +246,29 @@ CtgGlobalList::CtgGlobalList() {
     ELFXX_TYPE_Sym *symt=NULL;       //symbol table
     char *str_tab=NULL;         //String table
 
-/*Find tables and sizes of tables from the dynamic segment table*/
-    count = 0;
-    while(_DYNAMIC[count].d_tag != 0){
-
-        if(_DYNAMIC[count].d_tag == CMK_DT_REL)
-            relt = (ELFXX_TYPE_Rel *) _DYNAMIC[count].d_un.d_ptr;
-
-        else if(_DYNAMIC[count].d_tag == CMK_DT_RELSZ)
-            relt_size = _DYNAMIC[count].d_un.d_val/ sizeof(ELFXX_TYPE_Rel);
-
-        else if(_DYNAMIC[count].d_tag == DT_SYMTAB)
-            symt = (ELFXX_TYPE_Sym *) _DYNAMIC[count].d_un.d_ptr;
-
-        else if(_DYNAMIC[count].d_tag == DT_STRTAB)
-            str_tab = (char *)_DYNAMIC[count].d_un.d_ptr;
-
-        count ++;
+    // Find tables and sizes of tables from the dynamic segment table
+    for(count = 0; _DYNAMIC[count].d_tag != 0; ++count) {
+	switch(_DYNAMIC[count].d_tag) {
+	    case CMK_DT_REL:
+		relt = (ELFXX_TYPE_Rel *) _DYNAMIC[count].d_un.d_ptr;
+		break;
+	    case CMK_DT_RELSZ:
+		relt_size = _DYNAMIC[count].d_un.d_val/ sizeof(ELFXX_TYPE_Rel);
+		break;
+	    case DT_SYMTAB:
+		symt = (ELFXX_TYPE_Sym *) _DYNAMIC[count].d_un.d_ptr;
+		break;
+	    case DT_STRTAB:
+		str_tab = (char *)_DYNAMIC[count].d_un.d_ptr;
+		break;
+	}
     }
 
-/*Figure out which relocation data entries refer to global data:
-*/
+    // Figure out which relocation data entries refer to global data:
     for(count = 0; count < relt_size; count ++) {
         type = ELFXX_R_TYPE(relt[count].r_info);
         symindx = ELFXX_R_SYM(relt[count].r_info);
-        
+ 
         if(!is_elf_global(type))
 	    continue; /* It's not global data */
 
@@ -281,28 +279,28 @@ CtgGlobalList::CtgGlobalList() {
 	       symt[symindx].st_size, (void *)symt[symindx].st_value, type);
 #endif
 
+	if(ELFXX_ST_TYPE(symt[symindx].st_info) != STT_OBJECT &&
+	   ELFXX_ST_TYPE(symt[symindx].st_info) != STT_NOTYPE
+#if 0
+#ifdef __INTEL_COMPILER
+          && ELFXX_ST_TYPE(symt[symindx].st_info) != STT_FUNC
+#endif
+#endif
+                 ) /* ? */
+	    continue;
+
 	if(strcmp(sym_name, "_DYNAMIC") == 0 ||
 	   strcmp(sym_name, "__gmon_start__") == 0 ||
 	   strcmp(sym_name, "_GLOBAL_OFFSET_TABLE_") == 0)
 	    continue; /* It's system data */
 
-	if(ELFXX_ST_TYPE(symt[symindx].st_info) != STT_OBJECT &&
-	   ELFXX_ST_TYPE(symt[symindx].st_info) != STT_NOTYPE
-/*
-#ifdef __INTEL_COMPILER
-          && ELFXX_ST_TYPE(symt[symindx].st_info) != STT_FUNC
-#endif
-*/
-                 ) /* ? */
-	    continue;
-
 	if (!isUserSymbol(sym_name))
 	    continue;
 
-	/* It's got the right name-- it's a user global */
+	// It's got the right name-- it's a user global
 	int gSize = ALIGN8(symt[symindx].st_size);
 	ELFXX_TYPE_Addr *gGot=(ELFXX_TYPE_Addr *)relt[count].r_offset;
-	    
+
 #if DEBUG_GOT_MANAGER
 	printf("   -> %s is a user global, of size %d, at %p\n",
 	       sym_name, symt[symindx].st_size, (void *)*gGot);
@@ -313,9 +311,9 @@ CtgGlobalList::CtgGlobalList() {
 	rec.push_back(CtgRec(gGot,datalen));
 	datalen+=gSize;
     }
-    
+
     nRec=rec.size();
-    
+
 #if DEBUG_GOT_MANAGER   
     printf("relt has %d entries, %d of which are user globals\n\n", 
 	   relt_size, nRec);
