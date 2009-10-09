@@ -90,6 +90,9 @@
 /* whether iterator_traits works */
 #undef CMK_HAS_ITERATOR_TRAITS
 
+/* whether kill() exists */
+#undef CMK_HAS_KILL
+
 /* whether has log2 */
 #undef CMK_HAS_LOG2
 

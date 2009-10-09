@@ -808,6 +808,18 @@ EOT
 test_cc "whether getpid() exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_GETPID, $pass, [whether getpid() exists])
 
+#### check if kill exists ####
+cat > $tc <<EOT
+#include <sys/types.h>
+#include <signal.h>
+
+void foo(pid_t pid) {
+    kill(pid, 9);
+}
+EOT
+test_cc "whether kill() exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_KILL, $pass, [whether kill() exists])
+
 #### test for setpriority ###
 cat > $t <<EOT
 #include <sys/time.h>

@@ -2624,6 +2624,22 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### check if kill exists ####
+cat > $tc <<EOT
+#include <sys/types.h>
+#include <signal.h>
+
+void foo(pid_t pid) {
+    kill(pid, 9);
+}
+EOT
+test_cc "whether kill() exists" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_KILL $pass
+_ACEOF
+
+
 #### test for setpriority ###
 cat > $t <<EOT
 #include <sys/time.h>
