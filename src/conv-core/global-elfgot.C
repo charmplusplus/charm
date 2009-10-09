@@ -267,53 +267,58 @@ CtgGlobalList::CtgGlobalList() {
 
 /*Figure out which relocation data entries refer to global data:
 */
-    for(count = 0; count < relt_size; count ++){
+    for(count = 0; count < relt_size; count ++) {
         type = ELFXX_R_TYPE(relt[count].r_info);
         symindx = ELFXX_R_SYM(relt[count].r_info);
         
-        if(is_elf_global(type)) { /* It's global data */
-            sym_name = str_tab + symt[symindx].st_name;
+        if(!is_elf_global(type))
+	    continue; /* It's not global data */
+
+	sym_name = str_tab + symt[symindx].st_name;
+
 #if DEBUG_GOT_MANAGER
-            printf("relt[%d]= %s: %d bytes, %p sym, R_==%d\n", count, sym_name, 
-              symt[symindx].st_size, (void *)symt[symindx].st_value, type);
+	printf("relt[%d]= %s: %d bytes, %p sym, R_==%d\n", count, sym_name, 
+	       symt[symindx].st_size, (void *)symt[symindx].st_value, type);
 #endif
-	
-            if(!(strcmp(sym_name, "_DYNAMIC") == 0
-	      || strcmp(sym_name, "__gmon_start__") == 0
-	      || strcmp(sym_name, "_GLOBAL_OFFSET_TABLE_") == 0
-	    )) 
-	    { /* It's not system data */
-              if(ELFXX_ST_TYPE(symt[symindx].st_info) == STT_OBJECT || ELFXX_ST_TYPE(symt[symindx].st_info) == STT_NOTYPE
+
+	if(strcmp(sym_name, "_DYNAMIC") == 0 ||
+	   strcmp(sym_name, "__gmon_start__") == 0 ||
+	   strcmp(sym_name, "_GLOBAL_OFFSET_TABLE_") == 0)
+	    continue; /* It's system data */
+
+	if(ELFXX_ST_TYPE(symt[symindx].st_info) != STT_OBJECT &&
+	   ELFXX_ST_TYPE(symt[symindx].st_info) != STT_NOTYPE
 /*
 #ifdef __INTEL_COMPILER
-                  || ELFXX_ST_TYPE(symt[symindx].st_info) == STT_FUNC
+          && ELFXX_ST_TYPE(symt[symindx].st_info) != STT_FUNC
 #endif
 */
                  ) /* ? */
-	        if (isUserSymbol(sym_name))
-		{ /* It's got the right name-- it's a user global */
-                    int gSize = ALIGN8(symt[symindx].st_size);
-		    ELFXX_TYPE_Addr *gGot=(ELFXX_TYPE_Addr *)relt[count].r_offset;
-		    
+	    continue;
+
+	if (!isUserSymbol(sym_name))
+	    continue;
+
+	/* It's got the right name-- it's a user global */
+	int gSize = ALIGN8(symt[symindx].st_size);
+	ELFXX_TYPE_Addr *gGot=(ELFXX_TYPE_Addr *)relt[count].r_offset;
+	    
 #if DEBUG_GOT_MANAGER
-            printf("   -> %s is a user global, of size %d, at %p\n",
-	      sym_name, symt[symindx].st_size, (void *)*gGot);
+	printf("   -> %s is a user global, of size %d, at %p\n",
+	       sym_name, symt[symindx].st_size, (void *)*gGot);
 #endif
-		    if ((void *)*gGot != (void *)symt[symindx].st_value)
-		    	CmiAbort("CtgGlobalList: symbol table and GOT address mismatch!\n");
-		    
-		    rec.push_back(CtgRec(gGot,datalen));
-		    datalen+=gSize;
-                }
-            }
-        }
+	if ((void *)*gGot != (void *)symt[symindx].st_value)
+	    CmiAbort("CtgGlobalList: symbol table and GOT address mismatch!\n");
+
+	rec.push_back(CtgRec(gGot,datalen));
+	datalen+=gSize;
     }
     
     nRec=rec.size();
     
 #if DEBUG_GOT_MANAGER   
     printf("relt has %d entries, %d of which are user globals\n\n", 
-    	relt_size,nRec);
+	   relt_size, nRec);
 #endif
 }
 
