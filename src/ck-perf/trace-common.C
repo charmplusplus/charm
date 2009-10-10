@@ -358,6 +358,19 @@ static inline void _traceInit(char **argv)
   // set trace on/off
   CkpvAccess(_traces)->setTraceOnPE(CkpvAccess(traceOnPe));
 
+#if CMK_SMP_TRACE_COMMTHREAD
+/**
+ * In traceBegin(), CkpvAccessOther will be used which means
+ * this core needs to access to some cpv variable on another 
+ * core in the same memory address space. It's possible the
+ * variable on the other core has not been initialized, which
+ * implies the CpvAcessOther will cause a bad memory access.
+ * Therefore, we need a barrier here for the traceCommonInit to
+ * finish here. -Chao Mei
+ */
+   CmiBarrier();
+#endif
+
   if (CkpvAccess(_traces)->length() && !CmiGetArgFlagDesc(argv,"+traceoff","Disable tracing"))
     traceBegin();
 }
