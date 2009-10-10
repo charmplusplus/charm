@@ -39,8 +39,25 @@ static void sleep(int secs) {Sleep(1000*secs);}
 
 #define MULTI_SENDQUEUE    0
 
+#define CMI_EXERT_SEND_CAP 0
+#define CMI_EXERT_RECV_CAP 0
+
+#if CMI_EXERT_SEND_CAP
+#define SEND_CAP 3
+#endif
+
+#if CMI_EXERT_RECV_CAP
+#define RECV_CAP 2
+#endif
+
 #if defined(CMK_SHARED_VARS_POSIX_THREADS_SMP)
 #define CMK_SMP 1
+#endif
+
+
+#if CMK_SMP_TRACE_COMMTHREAD
+#undef CMI_MPI_TRACE_USEREVENTS
+#define CMI_MPI_TRACE_USEREVENTS 1
 #endif
 
 #include "machine.h"
@@ -57,7 +74,7 @@ static void sleep(int secs) {Sleep(1000*secs);}
 #define MAX_QLEN 200
 #endif
 
-#if CMI_MPI_TRACE_USEREVENTS && !defined(CMK_OPTIMIZE) && ! CMK_TRACE_IN_CHARM
+#if CMI_MPI_TRACE_USEREVENTS && !CMK_OPTIMIZE && ! CMK_TRACE_IN_CHARM
 CpvStaticDeclare(double, projTraceStart);
 # define  START_EVENT()  CpvAccess(projTraceStart) = CmiWallTimer();
 # define  END_EVENT(x)   traceUserBracketEvent(x, CpvAccess(projTraceStart), CmiWallTimer());
@@ -204,6 +221,11 @@ typedef struct msg_list {
      char *msg;
      struct msg_list *next;
      int size, destpe;
+
+#if CMK_SMP_TRACE_COMMTHREAD
+	int srcpe;
+#endif	
+	
      MPI_Request req;
 } SMSG_LIST;
 
@@ -293,10 +315,16 @@ void CmiTimerInit()
   CmiNodeAllBarrier();          /* for smp */
 }
 
+/**
+ * Since the timerLock is never created, and is
+ * always NULL, then all the if-condition inside
+ * the timer functions could be disabled right
+ * now in the case of SMP. --Chao Mei
+ */
 double CmiTimer(void)
 {
   double t;
-#if CMK_SMP
+#if 0 && CMK_SMP
   if (timerLock) CmiLock(timerLock);
 #endif
 #if CMK_TIMER_USE_XT3_DCLOCK
@@ -304,16 +332,18 @@ double CmiTimer(void)
 #else
   t = MPI_Wtime() - starttimer;
 #endif
-#if CMK_SMP
+
+#if 0 && CMK_SMP
   if (timerLock) CmiUnlock(timerLock);
 #endif
+
   return t;
 }
 
 double CmiWallTimer(void)
 {
   double t;
-#if CMK_SMP
+#if 0 && CMK_SMP
   if (timerLock) CmiLock(timerLock);
 #endif
 #if CMK_TIMER_USE_XT3_DCLOCK
@@ -321,7 +351,7 @@ double CmiWallTimer(void)
 #else
   t = MPI_Wtime() - starttimer;
 #endif
-#if CMK_SMP
+#if 0 && CMK_SMP
   if (timerLock) CmiUnlock(timerLock);
 #endif
   return t;
@@ -330,7 +360,7 @@ double CmiWallTimer(void)
 double CmiCpuTimer(void)
 {
   double t;
-#if CMK_SMP
+#if 0 && CMK_SMP
   if (timerLock) CmiLock(timerLock);
 #endif
 #if CMK_TIMER_USE_XT3_DCLOCK
@@ -338,7 +368,7 @@ double CmiCpuTimer(void)
 #else
   t = MPI_Wtime() - starttimer;
 #endif
-#if CMK_SMP
+#if 0 && CMK_SMP
   if (timerLock) CmiUnlock(timerLock);
 #endif
   return t;
@@ -357,12 +387,17 @@ int CmiBarrier()
   if (CmiMyRank() == 0) 
 #endif
   {
-    START_EVENT();
+/**
+ *  The call of CmiBarrier is usually before the initialization
+ *  of trace module of Charm++, therefore, the START_EVENT
+ *  and END_EVENT are disabled here. -Chao Mei
+ */	
+    /*START_EVENT();*/
 
     if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
         CmiAbort("Timernit: MPI_Barrier failed!\n");
 
-    END_EVENT(10);
+    /*END_EVENT(10);*/
   }
   CmiNodeAllBarrier();
   return 0;
@@ -586,7 +621,6 @@ void CmiReleaseSentMessages(void)
   int done;
   MPI_Status sts;
 
-
 #if CMK_BLUEGENEL
   MPID_Progress_test();
 #endif
@@ -594,6 +628,9 @@ void CmiReleaseSentMessages(void)
   MACHSTATE1(2,"CmiReleaseSentMessages begin on %d {", CmiMyPe());
   while(msg_tmp!=0) {
     done =0;
+#if CMK_SMP_TRACE_COMMTHREAD
+    double startT = CmiWallTimer();
+#endif
     if(MPI_Test(&(msg_tmp->req), &done, &sts) != MPI_SUCCESS)
       CmiAbort("CmiReleaseSentMessages: MPI_Test failed!\n");
     if(done) {
@@ -612,6 +649,9 @@ void CmiReleaseSentMessages(void)
       prev = msg_tmp;
       msg_tmp = msg_tmp->next;
     }
+#if CMK_SMP_TRACE_COMMTHREAD
+    traceUserSuppliedBracketedNote("MPI_Test: release a msg", 60, startT, CmiWallTimer());
+#endif
   }
   end_sent = prev;
   MACHSTATE(2,"} CmiReleaseSentMessages end");
@@ -624,13 +664,22 @@ int PumpMsgs(void)
   MPI_Status sts;
   int recd=0;
 
+#if CMI_EXERT_RECV_CAP
+  int recvCnt=0;
+#endif
+	
 #if CMK_BLUEGENEL
   MPID_Progress_test();
 #endif
 
   MACHSTATE(2,"PumpMsgs begin {");
 
+	
   while(1) {
+#if CMI_EXERT_RECV_CAP
+	if(recvCnt==RECV_CAP) break;
+#endif
+	  
     /* First check posted recvs then do  probe unmatched outstanding messages */
 #if MPI_POST_RECV_COUNT > 0 
     int completed_index=-1;
@@ -680,11 +729,18 @@ int PumpMsgs(void)
     }
 #else
     /* Original version */
+#if CMK_SMP_TRACE_COMMTHREAD
+  double startT = CmiWallTimer(); 
+#endif
     res = MPI_Iprobe(MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, &flg, &sts);
     if(res != MPI_SUCCESS)
       CmiAbort("MPI_Iprobe failed\n");
 
     if(!flg) break;
+#if CMK_SMP_TRACE_COMMTHREAD
+    traceUserSuppliedBracketedNote("MPI_Iprobe before a recv call", 70, startT, CmiWallTimer());
+#endif
+
     recd = 1;
     MPI_Get_count(&sts, MPI_BYTE, &nbytes);
     msg = (char *) CmiAlloc(nbytes);
@@ -694,9 +750,20 @@ int PumpMsgs(void)
     if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, MPI_COMM_WORLD,&sts))
       CmiAbort("PumpMsgs: MPI_Recv failed!\n");
 
-    END_EVENT(30);
+    /*END_EVENT(30);*/
+
 #endif
 
+#if CMK_SMP_TRACE_COMMTHREAD
+	char tmp[80];
+	int srcNode = sts.MPI_SOURCE;
+	int srcProc1 = CmiNodeFirst(srcNode);
+	int srcProc2 = srcProc1+CmiMyNodeSize()-1;
+	sprintf(tmp, "MPI_Recv: from node %d(%d-%d) to proc %d", srcNode, srcProc1, srcProc2, CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
+	traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
+#endif
+	
+	
     MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
     CMI_CHECK_CHECKSUM(msg, nbytes);
     if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
@@ -719,10 +786,17 @@ int PumpMsgs(void)
     if (CMI_GET_CYCLE(msg))
       SendHypercube(nbytes, msg);
 #endif
+	
+#if CMI_EXERT_RECV_CAP
+	recvCnt++;
+#endif	
   }
-#if CMK_IMMEDIATE_MSG && !CMK_SMP
+
+  
+  #if CMK_IMMEDIATE_MSG && !CMK_SMP
   CmiHandleImmediate();
 #endif
+  
   MACHSTATE(2,"} PumpMsgs end ");
   return recd;
 }
@@ -762,12 +836,22 @@ CmiAbort("Unsupported use of PumpMsgsBlocking. This call should be extended to c
   if (MPI_SUCCESS != MPI_Recv(buf,maxbytes,MPI_BYTE,MPI_ANY_SOURCE,TAG, MPI_COMM_WORLD,&sts))
       CmiAbort("PumpMsgs: PMP_Recv failed!\n");
 
-  END_EVENT(30);
-
+  /*END_EVENT(30);*/
+    
    MPI_Get_count(&sts, MPI_BYTE, &nbytes);
    msg = (char *) CmiAlloc(nbytes);
    memcpy(msg, buf, nbytes);
 
+#if CMK_SMP_TRACE_COMMTHREAD
+	char tmp[80];
+	int srcNode = sts.MPI_SOURCE;
+	int srcProc1 = CmiNodeFirst(srcNode);
+	int srcProc2 = srcProc1+CmiMyNodeSize()-1;
+	sprintf(tmp, "MPI_Recv: from node %d(%d-%d) to proc %d", srcNode, srcProc1, srcProc2, CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
+	traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
+#endif
+
+  
 #if CMK_NODE_QUEUE_AVAILABLE
    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
       CmiPushNode(msg);
@@ -819,6 +903,14 @@ static int RecvQueueEmpty()
 /**
 CommunicationServer calls MPI to send messages in the queues and probe message from network.
 */
+
+#define REPORT_COMM_METRICS 0
+#if REPORT_COMM_METRICS
+static double pumptime = 0.0;
+static double releasetime = 0.0;
+static double sendtime = 0.0;
+#endif
+
 static void CommunicationServer(int sleepTime)
 {
   int static count=0;
@@ -826,9 +918,25 @@ static void CommunicationServer(int sleepTime)
   count ++;
   if (count % 10000000==0) MACHSTATE(3, "Entering CommunicationServer {");
 */
+#if REPORT_COMM_METRICS
+  double t1, t2, t3, t4;
+  t1 = CmiWallTimer();
+#endif
   PumpMsgs();
+#if REPORT_COMM_METRICS
+  t2 = CmiWallTimer();
+#endif
   CmiReleaseSentMessages();
+#if REPORT_COMM_METRICS
+  t3 = CmiWallTimer();
+#endif
   SendMsgBuf();
+#if REPORT_COMM_METRICS
+  t4 = CmiWallTimer();
+  pumptime += (t2-t1);
+  releasetime += (t3-t2);
+  sendtime += (t4-t3);
+#endif
 /*
   if (count % 10000000==0) MACHSTATE(3, "} Exiting CommunicationServer.");
 */
@@ -858,10 +966,16 @@ static void CommunicationServer(int sleepTime)
     }
 #endif
     MACHSTATE(2, "} CommunicationServer EXIT");
+
+    ConverseCommonExit();   
+#if REPORT_COMM_METRICS
+    CmiPrintf("Report comm metrics from node %d[%d-%d]: pumptime: %f, releasetime: %f, senttime: %f\n", CmiMyNode(), CmiNodeFirst(CmiMyNode()), CmiNodeFirst(CmiMyNode())+CmiMyNodeSize()-1, pumptime, releasetime, sendtime);
+#endif
+
 #if ! CMK_AUTOBUILD
     signal(SIGINT, signal_int);
     MPI_Finalize();
-#endif
+    #endif
     exit(0);
   }
 }
@@ -1030,6 +1144,10 @@ static int SendMsgBuf()
   int i;
   int sent = 0;
 
+#if CMI_EXERT_SEND_CAP
+	int sentCnt = 0;
+#endif	
+	
   MACHSTATE(2,"SendMsgBuf begin {");
 #if MULTI_SENDQUEUE
   for (i=0; i<_Cmi_mynodesize=1; i++)  /* subtle: including comm thread */
@@ -1076,9 +1194,16 @@ static int SendMsgBuf()
         START_EVENT();
         if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
             CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
-        END_EVENT(40);
+        /*END_EVENT(40);*/
 #endif
-
+	
+#if CMK_SMP_TRACE_COMMTHREAD
+		char tmp[60];
+		sprintf(tmp, "MPI_Isend: from proc %d to proc %d", msg_tmp->srcpe, CmiNodeFirst(node)+CMI_DEST_RANK(msg));
+		traceUserSuppliedBracketedNote(tmp, 40, CpvAccess(projTraceStart), CmiWallTimer());
+#endif
+		
+		
       MACHSTATE(3,"}MPI_send end");
       MsgQueueLen++;
       if(sent_msgs==0)
@@ -1087,6 +1212,11 @@ static int SendMsgBuf()
         end_sent->next = msg_tmp;
       end_sent = msg_tmp;
       sent=1;
+	  
+#if CMI_EXERT_SEND_CAP	  
+	  if(++sentCnt == SEND_CAP) break;
+#endif	  
+	  
 #if ! MULTI_SENDQUEUE
       /* CmiLock(sendMsgBufLock); */
       msg_tmp = (SMSG_LIST *)PCQueuePop(sendMsgBuf);
@@ -1107,6 +1237,11 @@ void EnqueueMsg(void *m, int size, int node)
   msg_tmp->msg = m;
   msg_tmp->size = size;
   msg_tmp->destpe = node;
+	
+#if CMK_SMP_TRACE_COMMTHREAD
+	msg_tmp->srcpe = CmiMyPe();
+#endif	
+
 #if MULTI_SENDQUEUE
   PCQueuePush(procState[CmiMyRank()].sendMsgBuf,(char *)msg_tmp);
 #else
@@ -1114,6 +1249,7 @@ void EnqueueMsg(void *m, int size, int node)
   PCQueuePush(sendMsgBuf,(char *)msg_tmp);
   CmiUnlock(sendMsgBufLock);
 #endif
+	
   MACHSTATE3(3,"}} EnqueueMsg to %d finish with queue %p len: %d", node, sendMsgBuf, PCQueueLength(sendMsgBuf));
 }
 
@@ -1520,16 +1656,14 @@ void ConverseExit(void)
 }
 
 static void registerMPITraceEvents() {
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
+#if CMI_MPI_TRACE_USEREVENTS && !CMK_OPTIMIZE && !CMK_TRACE_IN_CHARM
     traceRegisterUserEvent("MPI_Barrier", 10);
     traceRegisterUserEvent("MPI_Send", 20);
     traceRegisterUserEvent("MPI_Recv", 30);
     traceRegisterUserEvent("MPI_Isend", 40);
     traceRegisterUserEvent("MPI_Irecv", 50);
-#endif
-#endif
+    traceRegisterUserEvent("MPI_Test", 60);
+    traceRegisterUserEvent("MPI_Iprobe", 70);
 #endif
 }
 
@@ -1650,16 +1784,12 @@ static void ConverseRunPE(int everReturn)
   ConverseCommonInit(CmiMyArgv);
   machine_exit_idx = CmiRegisterHandler((CmiHandler)machine_exit);
 
-#if CMI_MPI_TRACE_USEREVENTS
-#ifndef CMK_OPTIMIZE
-#if ! CMK_TRACE_IN_CHARM
+#if CMI_MPI_TRACE_USEREVENTS && !CMK_OPTIMIZE && !CMK_TRACE_IN_CHARM
   CpvInitialize(double, projTraceStart);
   /* only PE 0 needs to care about registration (to generate sts file). */
   if (CmiMyPe() == 0) {
     registerMachineUserEventsFunction(&registerMPITraceEvents);
   }
-#endif
-#endif
 #endif
 
   /* initialize the network progress counter*/
