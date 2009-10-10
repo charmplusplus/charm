@@ -53,6 +53,7 @@
   }
 
   void CkCacheManager::pup(PUP::er &p) {
+    CBase_CkCacheManager::pup(p);
     p | numLocMgr;
     if (p.isUnpacking()) locMgr = new CkGroupID[numLocMgr];
     PUParray(p,locMgr,numLocMgr);
