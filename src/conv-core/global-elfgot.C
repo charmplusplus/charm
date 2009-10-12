@@ -230,10 +230,14 @@ void CtgGlobalList::read(void *datav) const {
     }
 }
 
-typedef std::pair<ELFXX_TYPE_Addr *, size_t> global_rec;
+struct global_rec
+{
+    ELFXX_TYPE_Addr * index;
+    size_t size;
+};
 static bool compare_globals(const global_rec &l, const global_rec &r)
 {
-    return l.second < r.second;
+    return l.size < r.size;
 }
 
 /**
@@ -322,12 +326,18 @@ CtgGlobalList::CtgGlobalList() {
 	datalen+=gSize;
     }
 
+    // Lay out swapped globals as a structure in order of descending
+    // member size, to reduce padding.
+    // Potential optimization: pull small elements from the end to
+    // fill in `padding' space where possible.
     size_t datalen2 = 0;
     std::sort(globals.begin(), globals.end(), &compare_globals);
     for (std::vector<global_rec>::iterator i = globals.begin(); i != globals.end(); ++i) {
-	short align = std::min(i->second, (unsigned long)16);
-	size_t off = (datalen2 + align - 1) % align;
-	datalen2 = off + i->second;
+	short alignment = std::min(i->size, (unsigned long)16);
+	size_t padding = (datalen2 + align) % align;
+	size_t offset = datalen2 + padding;
+	//rec.push_back(CtgRec(i->index, offset));
+	datalen2 = offset + i->size;
     }
 
     nRec=rec.size();
