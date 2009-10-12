@@ -234,6 +234,8 @@ struct global_rec
 {
     ELFXX_TYPE_Addr * index;
     size_t size;
+    global_rec(ELFXX_TYPE_Addr *index_, size_t size_)
+  : index(index_), size(size_) {}
 };
 static bool compare_globals(const global_rec &l, const global_rec &r)
 {
@@ -334,7 +336,7 @@ CtgGlobalList::CtgGlobalList() {
     std::sort(globals.begin(), globals.end(), &compare_globals);
     for (std::vector<global_rec>::iterator i = globals.begin(); i != globals.end(); ++i) {
 	short alignment = std::min(i->size, (unsigned long)16);
-	size_t padding = (datalen2 + align) % align;
+	size_t padding = (datalen2 + alignment) % alignment;
 	size_t offset = datalen2 + padding;
 	//rec.push_back(CtgRec(i->index, offset));
 	datalen2 = offset + i->size;
