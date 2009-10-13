@@ -175,17 +175,17 @@ public:
     	UChar isUsed:1;       ///< Marker bit to prevent message re-send.
     };
 #ifdef _FAULT_MLOG_
-        CkObjID sender;
-        CkObjID recver;
-        MCount SN;
-        MCount TN;
-        MlogEntry *localMlogEntry;
+    CkObjID sender;
+    CkObjID recver;
+    MCount SN;
+    MCount TN;
+    MlogEntry *localMlogEntry;
 #endif
 private:
     u_type type;           ///< Depends on message type (attribs.mtype)
     UShort ref;            ///< Used by futures
     s_attribs attribs;
-    UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];     ///< padding to make sure sizeof(void*) alignment
+    UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];    ///< padding to make sure sizeof(double) alignment
     
     //This struct should now be sizeof(void*) aligned.
     UShort priobits;   ///< Number of bits of priority data after user data
@@ -196,7 +196,7 @@ private:
     
   public:
 #ifdef _FAULT_MLOG_
-        UInt piggyBcastIdx;
+    UInt piggyBcastIdx;
 #endif
     void pup(PUP::er &p);
     UInt   getEvent(void) const { return event; }
@@ -248,11 +248,11 @@ private:
 #endif
 
 #ifdef _FAULT_MLOG_
-            env->sender.type = TypeInvalid;
-            env->recver.type = TypeInvalid;
-            env->SN = 0;
-            env->TN = 0;
-            env->localMlogEntry = NULL;
+      env->sender.type = TypeInvalid;
+      env->recver.type = TypeInvalid;
+      env->SN = 0;
+      env->TN = 0;
+      env->localMlogEntry = NULL;
 #endif
 
       return env;
