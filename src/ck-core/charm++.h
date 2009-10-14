@@ -409,8 +409,11 @@ class Chare {
     CkObjectMsgQ objQ;                // object message queue
 #endif
   public:
+#if CMK_FT_CHARE
+    int chareIdx;                  // index in the chare obj table (chare_objs)
+#endif
 #ifdef _FAULT_MLOG_
-                ChareMlogData *mlogData;
+    ChareMlogData *mlogData;
 #endif
     Chare(CkMigrateMessage *m);
     Chare();
@@ -712,8 +715,10 @@ class CProxy_Chare : public CProxy {
     }
 #ifndef CMK_OPTIMIZE
     inline void ckCheck(void) const  {   //Make sure this proxy has a value
+#if !CMK_FT_CHARE
 	if (_ck_cid.objPtr==0)
 		CkAbort("Error! This chare proxy has not been initialized!");
+#endif
     }
 #else
     inline void ckCheck() const {}
