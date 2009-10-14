@@ -160,7 +160,7 @@ class ChareInfo {
     int bases[16];
     
     /// For groups -- 1 if the group is Irreducible 
-    int isIrr;
+    int isIrr, isPlainChare;
     
     /// true if this EP is charm internal functions
     CmiBool inCharm;
@@ -169,7 +169,7 @@ class ChareInfo {
 
     ChareInfo(const char *n, int s) : name(n), size(s) {
       defCtor=migCtor=-1;
-      isIrr = numbases = 0;
+      isIrr = isPlainChare = numbases = 0;
       inCharm = CmiFalse;
       mainChareIdx = -1;
     }
