@@ -2352,11 +2352,9 @@ was realized that a list-of-isomalloc'd-blocks is useful for
 more than just isomalloc heaps.
 */
 
-typedef CmiIsomallocBlockList Slot;
-
 /*Convert a slot to a user address*/
-static char *Slot_toUser(Slot *s) {return (char *)(s+1);}
-static Slot *Slot_fmUser(void *s) {return ((Slot *)s)-1;}
+static char *Slot_toUser(CmiIsomallocBlockList *s) {return (char *)(s+1);}
+static CmiIsomallocBlockList *Slot_fmUser(void *s) {return ((CmiIsomallocBlockList *)s)-1;}
 
 
 /*Build a new blockList.*/
@@ -2383,7 +2381,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
 	/* if(!pup_isUnpacking(p)) print_myslots(); */
 
 	int i,nBlocks=0;
-	Slot *cur=NULL, *start=*lp;
+	CmiIsomallocBlockList *cur=NULL, *start=*lp;
 #if 0 /*#ifndef CMK_OPTIMIZE*/
 	if (CpvAccess(isomalloc_blocklist)!=NULL)
 		CmiAbort("Called CmiIsomallocBlockListPup while a blockList is active!\n"
@@ -2408,7 +2406,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
 		}
 		CmiIsomallocPup(p,&newBlock);
 		if (i==0 && pup_isUnpacking(p))
-			*lp=(Slot *)newBlock;
+			*lp=(CmiIsomallocBlockList *)newBlock;
 	}
 	if (pup_isDeleting(p))
 		*lp=NULL;
@@ -2420,11 +2418,11 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
 /*Delete all the blocks in this list.*/
 void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l)
 {
-	Slot *start=l;
-	Slot *cur=start;
+    CmiIsomallocBlockList *start=l;
+    CmiIsomallocBlockList *cur=start;
 	if (cur==NULL) return; /*Already deleted*/
 	do {
-		Slot *doomed=cur;
+	  CmiIsomallocBlockList *doomed=cur;
 		cur=cur->next; /*Have to stash next before deleting cur*/
 		CmiIsomallocFree(doomed);
 	} while (cur!=start);
@@ -2433,8 +2431,8 @@ void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l)
 /*Allocate a block from this blockList*/
 void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes)
 {
-	Slot *n; /*Newly created slot*/
-	n=(Slot *)CmiIsomalloc(sizeof(Slot)+nBytes);
+    CmiIsomallocBlockList *n; /*Newly created slot*/
+	n=(CmiIsomallocBlockList *)CmiIsomalloc(sizeof(CmiIsomallocBlockList)+nBytes);
 	/*Link the new block into the circular blocklist*/
 	n->prev=l;
 	n->next=l->next;
@@ -2446,8 +2444,8 @@ void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes)
 /*Allocate a block from this blockList with alighment */
 void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,size_t nBytes)
 {
-	Slot *n; /*Newly created slot*/
-	n=(Slot *)_isomallocAlign(align,nBytes,sizeof(Slot));
+    CmiIsomallocBlockList *n; /*Newly created slot*/
+	n=(CmiIsomallocBlockList *)_isomallocAlign(align,nBytes,sizeof(CmiIsomallocBlockList));
 	/*Link the new block into the circular blocklist*/
 	n->prev=l;
 	n->next=l->next;
@@ -2459,7 +2457,7 @@ void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,siz
 /*Remove this block from its list and memory*/
 void CmiIsomallocBlockListFree(void *block)
 {
-	Slot *n=Slot_fmUser(block);
+    CmiIsomallocBlockList *n=Slot_fmUser(block);
 #if DOHEAPCHECK
 	if (n->prev->next!=n || n->next->prev!=n) 
 		CmiAbort("Heap corruption detected in isomalloc block list header!\n"
