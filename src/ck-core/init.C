@@ -105,6 +105,11 @@ CkpvStaticDeclare(int,  _numInitsRecd); /* UInt changed to int */
 CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
+#if CMK_FT_CHARE
+CpvExtern(CkVec<void *>, chare_objs);
+CpvExtern(CkVec<VidBlock *>, vidblocks);
+#endif
+
 /*
 	FAULT_EVAC
 */
@@ -694,7 +699,9 @@ void InitCallTable::enumerateInitCalls()
 CpvCExtern(int, cmiArgDebugFlag);
 extern "C" void CpdFreeze(void);
 
-extern "C" void initQd()
+extern int _dummy_dq;
+
+extern "C" void initQd(char **argv)
 {
 	CpvInitialize(QdState*, _qd);
 	CpvAccess(_qd) = new QdState();
@@ -705,6 +712,10 @@ extern "C" void initQd()
 	}
 	_qdHandlerIdx = CmiRegisterHandler((CmiHandler)_qdHandler);
 	_qdCommHandlerIdx = CmiRegisterHandler((CmiHandler)_qdCommHandler);
+        if (CmiGetArgIntDesc(argv,"+qd",&_dummy_dq, "QD time in seconds")) {
+          if (CmiMyPe()==0)
+            CmiPrintf("Charm++> Fake QD using %d seconds.\n", _dummy_dq);
+        }
 }
 
 /**
@@ -746,6 +757,12 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 	CpvInitialize(int,serializer);
 
+#if CMK_FT_CHARE
+          /* chare and vidblock table */
+        CpvInitialize(CkVec<void *>, chare_objs);
+        CpvInitialize(CkVec<VidBlock *>, vidblocks);
+#endif
+
 	CksvInitialize(UInt, _numNodeGroups);
 	CksvInitialize(GroupTable*, _nodeGroupTable);
 	CksvInitialize(GroupIDTable, _nodeGroupIDTable);
@@ -784,7 +801,7 @@ void _initCharm(int unused_argc, char **argv)
 	CmiNodeAllBarrier();
 
 #if ! CMK_BLUEGENE_CHARM
-	initQd();
+	initQd(argv);         // bigsim calls it in ConverseCommonInit
 #endif
 
 	CkpvAccess(_coreState)=new CkCoreState();
