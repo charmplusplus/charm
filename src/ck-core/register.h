@@ -283,7 +283,7 @@ public:
 	T *operator[](size_t idx) {
 #ifndef CMK_OPTIMIZE
 		/* Bounds-check the index: */
-		if (idx<0 || idx>=vec.size()) outOfBounds(idx);
+		if (idx>=vec.size()) outOfBounds(idx);
 #endif
 		return vec[idx];
 	}
