@@ -5,13 +5,13 @@
 #include <ParFUM_Types.h> // for ElemID
 
 #ifdef FP_TYPE_FLOAT
-//#warning "Using floats for various things"
+#warning "Using floats for various things"
 typedef float FP_TYPE;
 typedef float FP_TYPE_HIGH;
 typedef float FP_TYPE_LOW;
 typedef float FP_TYPE_SYNC;
 #else
-//#warning "Using doubles for various things"
+#warning "Using doubles for various things"
 typedef double FP_TYPE;
 typedef double FP_TYPE_HIGH;
 typedef double FP_TYPE_LOW;

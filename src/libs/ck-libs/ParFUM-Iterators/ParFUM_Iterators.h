@@ -62,13 +62,22 @@ class MeshModel{
         MeshDevice target_device;
 
 #ifdef CUDA
+	bool allocatedForCUDADevice;
         MeshModelDevice device_model;
 #endif
         MeshModel(){
             nodeIDHash = NULL;
             elemIDHash = NULL;
+	    allocatedForCUDADevice = false;
         }
 };
+
+
+
+// 
+void allocateModelForCUDADevice(MeshModel* model);
+void deallocateModelForCUDADevice(MeshModel* model);
+
 
 
 /** Node Iterator */

@@ -283,6 +283,12 @@ class AllocTable2d : public BasicTable2d<T> {
 	max_=rows_;
     }
 
+    if(max_ < 60000)
+      max_ = 60000;
+
+    if(max_ > 60000 && max_ < 290000)
+      max_ = 300000;
+
     int oldRows=this->rows;
     this->cols=cols_;
     this->rows=rows_;

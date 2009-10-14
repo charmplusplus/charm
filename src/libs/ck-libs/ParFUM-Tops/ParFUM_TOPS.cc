@@ -24,7 +24,7 @@
 
 #include <stack>
 #include <sstream>
-
+#include <iostream>
 
 
 #undef DEBUG
@@ -535,7 +535,7 @@ void topElement_SetId(TopModel* m, TopElement e, TopID id){
 int topModel_GetNElem (TopModel* m){
 	const int numBulk = m->mesh->elem[TOP_ELEMENT_TET4].count_valid();
 	const int numCohesive = m->mesh->elem[TOP_ELEMENT_COH3T3].count_valid();
-	cout << " numBulk = " << numBulk << " numCohesive " << numCohesive << endl;
+	std::cout << " numBulk = " << numBulk << " numCohesive " << numCohesive << std::endl;
 	return numBulk + numCohesive;
 }
 

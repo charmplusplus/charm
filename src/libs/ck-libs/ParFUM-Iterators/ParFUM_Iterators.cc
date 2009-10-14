@@ -23,10 +23,12 @@
 
 #include <stack>
 #include <sstream>
-
+#include <iostream>
 
 #undef DEBUG
 #define DEBUG 0
+
+
 
 
 int tetFaces[] = {0,1,3,  0,2,1,  1,2,3,   0,3,2};
@@ -42,7 +44,10 @@ int lib_FP_Type_Size()
 
 void mesh_set_device(MeshModel* m, MeshDevice d)
 {
-    m->target_device = d;
+  m->target_device = d;
+  if(d == DeviceGPU){
+    CkAssert(m->allocatedForCUDADevice);
+  }
 }
 
 
@@ -201,15 +206,15 @@ MeshModel* meshModel_Create_Driver(MeshDevice target_device, int elem_attr_sz,
     int which_mesh=FEM_Mesh_default_read();
     MeshModel *model = new MeshModel;
     memset(model, 0, sizeof(MeshModel));
-
+    
     model->target_device = target_device;
     model->elem_attr_size = elem_attr_sz;
     model->node_attr_size = node_attr_sz;
     model->model_attr_size = model_attr_sz;
-
+    
     model->mesh = FEM_Mesh_lookup(which_mesh,"meshModel_Create_Driver");
     model->mAtt = mAtt;
-
+    
     model->num_local_elem = model->mesh->elem[MESH_ELEMENT_TET4].size();
     model->num_local_node = model->mesh->node.size();
 
@@ -293,6 +298,28 @@ MeshModel* meshModel_Create_Driver(MeshDevice target_device, int elem_attr_sz,
 
 #if CUDA
     if (model->target_device == DeviceGPU) {
+      allocateModelForCUDADevice(model);
+    }
+#endif
+
+    return model;
+}
+
+
+
+//  MeshDevice target_device
+void allocateModelForCUDADevice(MeshModel* model){
+
+  CkPrintf("[%d] allocateModelForCUDADevice\n", CkMyPe() );
+
+  if( ! model->allocatedForCUDADevice ) {
+    model->allocatedForCUDADevice = true;
+
+    const int connSize = model->mesh->elem[MESH_ELEMENT_TET4].getConn().width();
+    const FEM_DataAttribute * at = (FEM_DataAttribute*)  model->mesh->elem[MESH_ELEMENT_TET4].lookup(ATT_ELEM_N2E_CONN,"allocateModelForCUDADevice");
+    const int* n2eTable  = at->getInt().getData();
+    
+    
         int size = model->num_local_elem * connSize *sizeof(int);
         cudaError_t err = cudaMalloc((void**)&(model->device_model.n2eConnDevice), size);
         if(err == cudaErrorMemoryAllocation){
@@ -302,13 +329,12 @@ MeshModel* meshModel_Create_Driver(MeshDevice target_device, int elem_attr_sz,
             CkAbort("cudaMalloc FAILED");
         }
         CkAssert(cudaMemcpy(model->device_model.n2eConnDevice,n2eTable,size, cudaMemcpyHostToDevice) == cudaSuccess);
-    }
     
-    if (model->target_device == DeviceGPU) {
-        /** copy number/sizes of nodes and elements to device structure */
-        model->device_model.elem_attr_size = elem_attr_sz;
-        model->device_model.node_attr_size = node_attr_sz;
-        model->device_model.model_attr_size = model_attr_sz;
+
+	/** copy number/sizes of nodes and elements to device structure */
+        model->device_model.elem_attr_size =  model->elem_attr_size;
+        model->device_model.node_attr_size =  model->node_attr_size;
+        model->device_model.model_attr_size =  model->model_attr_size;
         model->device_model.num_local_node = model->num_local_node;
         model->device_model.num_local_elem = model->num_local_elem;
 
@@ -356,14 +382,79 @@ MeshModel* meshModel_Create_Driver(MeshDevice target_device, int elem_attr_sz,
                         cudaMemcpyHostToDevice) == cudaSuccess);
         }
     }
-#endif
-
-    return model;
 }
+
+
+
+
+
+//  Copy data from GPU and deallocate its memory
+void deallocateModelForCUDADevice(MeshModel* model){
+
+  CkPrintf("[%d] deallocateModelForCUDADevice\n", CkMyPe() );
+
+  if( model->allocatedForCUDADevice ) {
+    model->allocatedForCUDADevice = false;
+
+    const int connSize = model->mesh->elem[MESH_ELEMENT_TET4].getConn().width();
+    FEM_DataAttribute * at = (FEM_DataAttribute*)  model->mesh->elem[MESH_ELEMENT_TET4].lookup(ATT_ELEM_N2E_CONN,"allocateModelForCUDADevice");
+    int* n2eTable  = at->getInt().getData();
+    
+    int size = model->num_local_elem * connSize *sizeof(int);
+    
+    CkAssert(cudaMemcpy(n2eTable,model->device_model.n2eConnDevice,size, cudaMemcpyDeviceToHost) == cudaSuccess);
+    CkAssert(cudaFree(model->device_model.n2eConnDevice) == cudaSuccess);
+    
+    /** Copy element Attribute array from device global memory */
+    {
+      FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->elem[MESH_ELEMENT_TET4].lookup(ATT_ELEM_DATA,"meshModel_Create_Driver");
+      AllocTable2d<unsigned char> &dataTable  = at->getChar();
+      unsigned char *ElemData = dataTable.getData();
+      int size = dataTable.size()*dataTable.width();
+      assert(size == model->num_local_elem * model->elem_attr_size);
+      CkAssert(cudaMemcpy(ElemData,model->device_model.ElemDataDevice,size, cudaMemcpyDeviceToHost) == cudaSuccess);
+      CkAssert(cudaFree(model->device_model.ElemDataDevice) == cudaSuccess);
+    }
+
+    /** Copy node Attribute array from device global memory */
+    {
+      FEM_DataAttribute * at = (FEM_DataAttribute*) model->mesh->node.lookup(ATT_NODE_DATA,"meshModel_Create_Driver");
+      AllocTable2d<unsigned char> &dataTable  = at->getChar();
+      unsigned char *NodeData = dataTable.getData();
+      int size = dataTable.size()*dataTable.width();
+      assert(size == model->num_local_node * model->node_attr_size);
+      CkAssert(cudaMemcpy(NodeData,model->device_model.NodeDataDevice,size, cudaMemcpyDeviceToHost) == cudaSuccess);
+      CkAssert(cudaFree(model->device_model.NodeDataDevice) == cudaSuccess);
+    }
+
+    /** Copy elem connectivity array from device global memory */
+    {
+      FEM_IndexAttribute * at = (FEM_IndexAttribute*) model->mesh->elem[MESH_ELEMENT_TET4].lookup(FEM_CONN,"meshModel_Create_Driver");
+      AllocTable2d<int> &dataTable  = at->get();
+      int *data = dataTable.getData();
+      int size = dataTable.size()*dataTable.width()*sizeof(int);
+      CkAssert(cudaMemcpy(data,model->device_model.ElemConnDevice,size, cudaMemcpyDeviceToHost) == cudaSuccess);
+      CkAssert(cudaFree(model->device_model.ElemConnDevice) == cudaSuccess);
+    }
+
+    /** Copy model Attribute from device global memory */
+    {
+      printf("Copying model attribute of size %d\n", model->model_attr_size);
+      CkAssert(cudaMemcpy(model->mAtt,model->device_model.mAttDevice,model->model_attr_size, cudaMemcpyDeviceToHost) == cudaSuccess);
+      CkAssert(cudaFree(model->device_model.mAttDevice) == cudaSuccess);
+      
+    }
+  }
+}
+
+
+
+
 
 /** Copy node attribute array from CUDA device back to the ParFUM attribute */
 void mesh_retrieve_node_data(MeshModel* m){ 
 #if CUDA
+  CkAssert( m->allocatedForCUDADevice);
     cudaError_t status = cudaMemcpy(m->NodeData_T->getData(),
                 m->device_model.NodeDataDevice,
                 m->num_local_node * m->node_attr_size,
@@ -375,6 +466,7 @@ void mesh_retrieve_node_data(MeshModel* m){
 /** Copy node attribute array to CUDA device from the ParFUM attribute */
 void mesh_put_node_data(MeshModel* m){
 #if CUDA
+  CkAssert( m->allocatedForCUDADevice);
     cudaError_t status = cudaMemcpy(m->device_model.NodeDataDevice,
                 m->NodeData_T->getData(),
                 m->num_local_node * m->node_attr_size,
@@ -387,6 +479,7 @@ void mesh_put_node_data(MeshModel* m){
 /** Copy element attribute array from CUDA device back to the ParFUM attribute */
 void mesh_retrieve_elem_data(MeshModel* m){
 #if CUDA
+  CkAssert( m->allocatedForCUDADevice);
     cudaError_t status = cudaMemcpy(m->ElemData_T->getData(),
                 m->device_model.ElemDataDevice,
                 m->num_local_elem * m->elem_attr_size,
@@ -399,7 +492,8 @@ void mesh_retrieve_elem_data(MeshModel* m){
 /** Copy elem attribute array to CUDA device from the ParFUM attribute */
 void mesh_put_elem_data(MeshModel* m) {
 #if CUDA
-    cudaError_t status = cudaMemcpy(m->device_model.ElemDataDevice,
+  CkAssert( m->allocatedForCUDADevice);
+  cudaError_t status = cudaMemcpy(m->device_model.ElemDataDevice,
                 m->ElemData_T->getData(),
                 m->num_local_elem * m->elem_attr_size,
                 cudaMemcpyHostToDevice);
@@ -411,6 +505,7 @@ void mesh_put_elem_data(MeshModel* m) {
 /** Copy node and elem attribute arrays to CUDA device from the ParFUM attribute */
 void mesh_put_data(MeshModel* m) {
 #if CUDA
+  CkAssert( m->allocatedForCUDADevice);
     mesh_put_node_data(m);
     mesh_put_elem_data(m);
     cudaError_t status = cudaMemcpy(m->device_model.mAttDevice,m->mAtt,m->model_attr_size,
@@ -423,6 +518,7 @@ void mesh_put_data(MeshModel* m) {
 /** Copy node and elem attribute arrays from CUDA device to the ParFUM attribute */
 void mesh_retrieve_data(MeshModel* m) {
 #if CUDA
+  CkAssert( m->allocatedForCUDADevice);
     mesh_retrieve_node_data(m);
     mesh_retrieve_elem_data(m);
     cudaError_t status = cudaMemcpy(m->mAtt,m->device_model.mAttDevice,m->model_attr_size,
@@ -436,9 +532,9 @@ void mesh_retrieve_data(MeshModel* m) {
 void meshModel_Destroy(MeshModel* m){
 #if CUDA
     if (m->target_device == DeviceGPU) {
-        CkAssert(cudaFree(m->device_model.mAttDevice) == cudaSuccess);
-        CkAssert(cudaFree(m->device_model.NodeDataDevice) == cudaSuccess);
-        CkAssert(cudaFree(m->device_model.ElemDataDevice) == cudaSuccess);
+      //        CkAssert(cudaFree(m->device_model.mAttDevice) == cudaSuccess);
+      //        CkAssert(cudaFree(m->device_model.NodeDataDevice) == cudaSuccess);
+      //        CkAssert(cudaFree(m->device_model.ElemDataDevice) == cudaSuccess);
     }
 #endif
     delete m;
@@ -520,7 +616,7 @@ void meshElement_SetId(MeshModel* m, MeshElement e, EntityID id){
 int meshModel_GetNElem (MeshModel* m){
     const int numBulk = m->mesh->elem[MESH_ELEMENT_TET4].count_valid();
     const int numCohesive = m->mesh->elem[MESH_ELEMENT_COH3T3].count_valid();
-    cout << " numBulk = " << numBulk << " numCohesive " << numCohesive << endl;
+    std::cout << " numBulk = " << numBulk << " numCohesive " << numCohesive << std::endl;
     return numBulk + numCohesive;
 }
 
