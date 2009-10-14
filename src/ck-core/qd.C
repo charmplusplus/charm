@@ -12,7 +12,7 @@
 extern int _qdCommHandlerIdx;
 
 // a fake QD which just wait for several seconds to triger QD callback
-#define CMK_DUMMY_QD             0	/* seconds to wait for */
+int _dummy_dq = 0;                      /* seconds to wait for */
 
 #if CMK_BLUEGENE_CHARM
 // this is a hack for bgcharm++, I need to figure out a better
@@ -181,24 +181,21 @@ static void _callWhenIdle(QdMsg *msg)
   }
 }
 
-#if CMK_DUMMY_QD
 static void _invokeQD(QdMsg *msg)
 {
   QdCallback *cb = new QdCallback(msg->getCb());
   cb->send();
   delete cb;
 }
-#endif
 
 void _qdHandler(envelope *env)
 {
   register QdMsg *msg = (QdMsg*) EnvToUsr(env);
   DEBUGP(("[%d] _qdHandler msg:%p \n", CmiMyPe(), msg));
-#if CMK_DUMMY_QD
-  CcdCallFnAfter((CcdVoidFn)_invokeQD,(void *)msg, CMK_DUMMY_QD*1000); // in ms
-#else
-  CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)_callWhenIdle, (void*) msg);
-#endif
+  if (_dummy_dq > 0)
+    CcdCallFnAfter((CcdVoidFn)_invokeQD,(void *)msg, _dummy_dq*1000); // in ms
+  else
+    CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)_callWhenIdle, (void*) msg);
 }
 
 // when a message is sent from an immediate handler from comm thread or 
@@ -216,7 +213,7 @@ void _qdCommHandler(envelope *env)
 
 void QdState::sendCount(int flag, int count)
 {
-#if ! CMK_DUMMY_QD
+  if (_dummy_dq == 0) {
 #if CMK_NET_VERSION && ! CMK_SMP && ! defined(CMK_CPV_IS_SMP)
         if (CmiImmIsRunning())
 #else
@@ -230,7 +227,7 @@ void QdState::sendCount(int flag, int count)
           CmiSetHandler(env, _qdCommHandlerIdx);
           CmiFreeSendFn(CmiNodeFirst(CmiMyNode()), env->getTotalsize(), (char *)env);
         }
-#endif
+  }
 }
 
 void CkStartQD(const CkCallback& cb)
