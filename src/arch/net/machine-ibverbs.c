@@ -363,6 +363,7 @@ static inline infiPacket newPacket(){
 	pkt->keyHeader = METADATAFIELD(pkt)->key;
 	pkt->ogm=NULL;
 	CmiAssert(pkt->keyHeader!=NULL);
+	pkt->buf=NULL;
 	
 	pkt->elemList[0].addr = (uintptr_t)&(pkt->header);
 	pkt->elemList[0].length = sizeof(struct infiPacketHeader);
@@ -381,6 +382,7 @@ static inline infiPacket newPacket(){
 #define FreeInfiPacket(pkt){ \
 	pkt->size = -1;\
 	pkt->ogm=NULL;\
+	pkt->buf=NULL;\
 	pkt->next = context->infiPacketFreeList; \
 	context->infiPacketFreeList = pkt; \
 }
@@ -1723,7 +1725,7 @@ static inline  void processSendWC(struct ibv_wc *sendWC){
 		}
 	}else{
 		if(packet->header.code == INFIRDMA_START || packet->header.code == INFIRDMA_ACK || packet->header.code ==  INFIDUMMYPACKET){
-
+                   if (packet->buf) CmiFree(packet->buf);   // gzheng
 		}
 	}
 
