@@ -106,7 +106,7 @@ void CpdListRegister_c(const char *path,
 	    int checkBoundary);
 
 #ifdef __cplusplus
-};
+}
 #endif
 
 #endif

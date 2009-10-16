@@ -734,7 +734,7 @@ public:\
     classIdentifier::register_PUP_ID(className);
 
 
-};//<- End namespace PUP
+} //<- End namespace PUP
 
 inline void operator|(PUP::er &p,PUP::able &a) {a.pup(p);}
 inline void operator|(PUP::er &p,PUP::able* &a) {p(&a);}
@@ -848,7 +848,7 @@ namespace PUP {
 		public: enum {value=0};
 #endif
 	};
-};
+}
 
 #ifdef CK_DEFAULT_BITWISE_PUP   /* OLD compatability mode*/
 /// Default operator| and PUParray: copy as bytes.
@@ -901,7 +901,7 @@ inline void PUParray(PUP::er &p,T *t,int n) {
   inline void PUParray(PUP::er &p,type *ta,int n) { p((char *)ta,n*sizeof(type)); } \
   namespace PUP { template<> class as_bytes<type> { \
   	public: enum {value=1};  \
-  }; };
+  }; }
 #define PUPmarshallBytes(type) PUPbytes(type)
 
 /// Make PUP work with this function pointer type, copied as raw bytes.
@@ -922,7 +922,7 @@ inline void PUParray(PUP::er &p,T *t,int n) {
   inline void PUParray(PUP::er &p,type *ta,int n) { p(ta,n); } \
   namespace PUP { template<> class as_bytes<type> { \
   	public: enum {value=1};  \
-  }; };
+  }; }
 PUP_BUILTIN_SUPPORT(signed char)
 #if CMK_SIGNEDCHAR_DIFF_CHAR
 PUP_BUILTIN_SUPPORT(char)
