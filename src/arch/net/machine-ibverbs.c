@@ -67,7 +67,7 @@ static int processBufferedCount;
 #define WC_LIST_SIZE 32
 /*#define WC_BUFFER_SIZE 100*/
 
-#ifdef CMK_IBVERBS_STATS
+#if CMK_IBVERBS_STATS
 static int numReg=0;
 static int numUnReg=0;
 static int numCurReg=0;
@@ -403,7 +403,7 @@ void infi_unregAndFreeMeta(void *md)
       int unregstat=ibv_dereg_mr(((infiCmiChunkMetaData*)md)->key);
       CmiAssert(unregstat==0);
       free(((infiCmiChunkMetaData *)md));
-#ifdef CMK_IBVERBS_STATS
+#if CMK_IBVERBS_STATS
       numUnReg++;
       numCurReg--;
       numMultiSendUnreg++;
@@ -866,7 +866,7 @@ struct infiBufferPool * allocateInfiBufferPool(int numRecvs,int sizePerBuffer){
 	bigSize = numBuffers*sizePerBuffer;
 	bigBuf=malloc(bigSize);
 	bigKey = ibv_reg_mr(context->pd,bigBuf,bigSize,IBV_ACCESS_LOCAL_WRITE);
-#ifdef CMK_IBVERBS_STATS
+#if CMK_IBVERBS_STATS
 	numCurReg++;
 	numReg++;
 #endif
@@ -2189,7 +2189,7 @@ infiCmiChunkMetaData *registerMultiSendMesg(char *msg,int size){
 	infiCmiChunkMetaData *metaData = malloc(sizeof(infiCmiChunkMetaData));
 	char *res=msg-sizeof(infiCmiChunkHeader);
 	metaData->key = ibv_reg_mr(context->pd,res,(size+sizeof(infiCmiChunkHeader)),IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
-#ifdef CMK_IBVERBS_STATS
+#if CMK_IBVERBS_STATS
 	numCurReg++;
 	numReg++;
 	numMultiSend++;
@@ -2231,7 +2231,7 @@ static inline void fillBufferPools(){
 			hdr = res;
 			key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 			CmiAssert(key != NULL);
-#ifdef CMK_IBVERBS_STATS
+#if CMK_IBVERBS_STATS
 		numCurReg++;
 		numReg++;
 #endif
@@ -2317,7 +2317,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 		
 		key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 		CmiAssert(key != NULL);
-#ifdef CMK_IBVERBS_STATS
+#if CMK_IBVERBS_STATS
 		numCurReg++;
 		numReg++;
 #endif
@@ -2417,7 +2417,7 @@ static inline void *getInfiCmiChunk(int dataSize){
 
                 key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
                 CmiAssert(key != NULL);
-#ifdef CMK_IBVERBS_STATS
+#if CMK_IBVERBS_STATS
 		numCurReg++;
 		numReg++;
 #endif
@@ -2477,7 +2477,7 @@ static inline void *getInfiCmiChunk(int dataSize){
 
 void * infi_CmiAlloc(int size){
 	void *res;
-#ifdef CMK_IBVERBS_STATS
+#if CMK_IBVERBS_STATS
 	numAlloc++;
 #endif
 #if THREAD_MULTI_POOL
@@ -2511,7 +2511,7 @@ void infi_CmiFreeDirect(void *ptr){
         int size;
         int parentPe;
         void *freePtr = ptr;
-#ifdef CMK_IBVERBS_STATS
+#if CMK_IBVERBS_STATS
 	numFree++;
 #endif
 
@@ -2541,9 +2541,9 @@ void infi_CmiFreeDirect(void *ptr){
                                 if(metaData->owner->metaData->count == 0){
 				  //all the chunks have been freed
 				  int unregstat=ibv_dereg_mr(metaData->key);
-#ifdef CMK_IBVERBS_STATS
-      numUnReg++;
-      numCurReg--;
+#if CMK_IBVERBS_STATS
+                                  numUnReg++;
+                                  numCurReg--;
 #endif
 
 				  CmiAssert(unregstat==0);
@@ -2557,9 +2557,9 @@ void infi_CmiFreeDirect(void *ptr){
                                         //need to free the owner's buffer and metadata
                                         freePtr = metaData->owner;
                                         int unregstat=ibv_dereg_mr(metaData->key);
-#ifdef CMK_IBVERBS_STATS
-      numUnReg++;
-      numCurReg--;
+#if CMK_IBVERBS_STATS
+                                        numUnReg++;
+                                        numCurReg--;
 #endif
 
 					CmiAssert(unregstat==0);
@@ -2598,10 +2598,10 @@ void infi_CmiFree(void *ptr){
         	/** this is a part of a received mult message  
                     it will be freed correctly later
                 **/
-#ifdef CMK_IBVERBS_STATS
-	  numMultiSendFree++
+#if CMK_IBVERBS_STATS
+	  numMultiSendFree++;
 #endif
-		return;
+	  return;
         }
 
 
@@ -2621,7 +2621,7 @@ void infi_CmiFree(void *ptr){
 void infi_CmiFree(void *ptr){
 	int size;
 	void *freePtr = ptr;
-#ifdef CMK_IBVERBS_STATS
+#if CMK_IBVERBS_STATS
 	numFree++;
 #endif
 	
@@ -2641,8 +2641,8 @@ void infi_CmiFree(void *ptr){
 			/** this is a part of a received mult message  
 			it will be freed correctly later
 			**/
-#ifdef CMK_IBVERBS_STATS
-		  numMultiSendFree++;
+#if CMK_IBVERBS_STATS
+		        numMultiSendFree++;
 #endif
 			return;
 		}
@@ -2662,9 +2662,9 @@ void infi_CmiFree(void *ptr){
 				if(metaData->owner->metaData->count == 0){
 					//all the chunks have been freed
 					int unregstat=ibv_dereg_mr(metaData->key);
-#ifdef CMK_IBVERBS_STATS
-      numUnReg++;
-      numCurReg--;
+#if CMK_IBVERBS_STATS
+                                        numUnReg++;
+                                        numCurReg--;
 #endif
 
 					CmiAssert(unregstat==0);
@@ -2678,9 +2678,9 @@ void infi_CmiFree(void *ptr){
 					//need to free the owner's buffer and metadata
 					freePtr = metaData->owner;
 					int unregstat=ibv_dereg_mr(metaData->key);
-#ifdef CMK_IBVERBS_STATS
-      numUnReg++;
-      numCurReg--;
+#if CMK_IBVERBS_STATS
+                                        numUnReg++;
+                                        numCurReg--;
 #endif
 
 					CmiAssert(unregstat==0);
@@ -2857,9 +2857,9 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
 	table->handles[idx].callbackData = callbackData;
 	table->handles[idx].key = ibv_reg_mr(context->pd, recvBuf, recvBufSize,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 	CmiAssert(table->handles[idx].key != NULL);
-#ifdef CMK_IBVERBS_STATS
-		numCurReg++;
-		numReg++;
+#if CMK_IBVERBS_STATS
+	numCurReg++;
+	numReg++;
 #endif
 /*	table->handles[idx].rdmaPacket = CmiAlloc(sizeof(struct infiRdmaPacket));
 	table->handles[idx].rdmaPacket->type = INFI_DIRECT;
@@ -2930,9 +2930,9 @@ void CmiDirect_assocLocalBuffer(struct infiDirectUserHandle *userHandle,void *se
 	table->handles[idx].callbackFnPtr = table->handles[idx].callbackData = NULL;
 	table->handles[idx].key =  ibv_reg_mr(context->pd, sendBuf, sendBufSize,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 	CmiAssert(table->handles[idx].key != NULL);
-#ifdef CMK_IBVERBS_STATS
-		numCurReg++;
-		numReg++;
+#if CMK_IBVERBS_STATS
+	numCurReg++;
+	numReg++;
 #endif
 	table->handles[idx].userHandle = *userHandle;
 	CmiAssert(sendBufSize == table->handles[idx].userHandle.recverBufSize);
