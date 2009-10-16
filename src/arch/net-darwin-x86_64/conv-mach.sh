@@ -2,8 +2,8 @@ CMK_MACOSX=1
 
 CMK_CPP_CHARM="/usr/bin/cpp -P"
 CMK_CPP_C="gcc -arch x86_64 -E"
-CMK_CC="gcc -arch x86_64 -Wno-long-double -fPIC -dynamic -fno-common "
-CMK_CXX="g++ -arch x86_64 -Wno-long-double -fPIC -dynamic -fno-common "
+CMK_CC="gcc -arch x86_64 -fPIC -dynamic -fno-common "
+CMK_CXX="g++ -arch x86_64 -fPIC -dynamic -fno-common "
 CMK_CXXPP="g++ -arch x86_64 -x g++ -E "
 CMK_LDXX="$CMK_CXX -multiply_defined suppress "
 CMK_XIOPTS=""
