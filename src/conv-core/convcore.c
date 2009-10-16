@@ -2066,7 +2066,7 @@ static void CmiGlobalReduce(void *msg, int size, CmiReduceMergeFn mergeFn, CmiRe
   red->ops.destination = (CmiHandler)CmiGetHandlerFunction(msg);
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = NULL;
-  CmiPrintf("[%d] CmiReduce::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);
+  /*CmiPrintf("[%d] CmiReduce::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);*/
   CmiSendReduce(red);
 }
 
@@ -2083,7 +2083,7 @@ static void CmiGlobalReduceStruct(void *data, CmiReducePupFn pupFn,
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = pupFn;
   red->ops.deleteFn = deleteFn;
-  CmiPrintf("[%d] CmiReduceStruct::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);
+  /*CmiPrintf("[%d] CmiReduceStruct::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);*/
   CmiSendReduce(red);
 }
 
@@ -2130,7 +2130,7 @@ void CmiListReduce(int npes, int *pes, void *msg, int size, CmiReduceMergeFn mer
   red->ops.destination = (CmiHandler)CmiGetHandlerFunction(msg);
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = NULL;
-  CmiPrintf("[%d] CmiListReduce::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);
+  /*CmiPrintf("[%d] CmiListReduce::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);*/
   CmiSendReduce(red);
 }
 
