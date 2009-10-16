@@ -451,6 +451,7 @@ public:
         _sid = new CkSectionID[_nsid];
         for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
       } else _sid = NULL;
+      return *this;
     }
     
 	void ckSectionDelegate(CkDelegateMgr *d) 
