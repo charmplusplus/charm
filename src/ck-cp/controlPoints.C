@@ -724,10 +724,13 @@ void registerControlPointTiming(double time){
 
 /// Shutdown the control point framework, writing data to disk if necessary
 extern "C" void controlPointShutdown(){
-  CkAssert(CkMyPe() == 0);
-  CkPrintf("[%d] controlPointShutdown() at CkExit()\n", CkMyPe());
-  controlPointManagerProxy.ckLocalBranch()->writeDataFile();
-  CkExit();
+  if(CkMyPe() == 0){
+#if 0
+    CkPrintf("[%d] controlPointShutdown() at CkExit()\n", CkMyPe());
+    controlPointManagerProxy.ckLocalBranch()->writeDataFile();
+#endif
+    CkExit();
+  }
 }
 
 /// A function called at startup on each node to register controlPointShutdown() to be called at CkExit()
