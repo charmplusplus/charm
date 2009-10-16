@@ -8,7 +8,7 @@
 #include "converse.h"
 #include "sockRoutines.h"
 
-#define DEBUGP(x)  /* CmiPrintf x;  */
+#define DEBUGP(x)   /* CmiPrintf x;  */
 
 /*
  This scheme relies on using IP address to identify nodes and assigning 
@@ -205,11 +205,13 @@ typedef struct _hostnameMsg {
   skt_ip_t ip;
   int ncores;
   int rank;
+  int seq;
 } hostnameMsg;
 
 typedef struct _rankMsg {
   char core[CmiMsgHeaderSizeBytes];
-  int *ranks;
+  int *ranks;                  /* PE => core rank mapping */
+  int *nodes;                  /* PE => node number mapping */
 } rankMsg;
 
 static rankMsg *rankmsg = NULL;
@@ -220,17 +222,19 @@ static CmiNodeLock affLock = NULL;
 static void cpuAffinityHandler(void *m)
 {
   static int count = 0;
+  static int nodecount = 0;
   hostnameMsg *rec;
   hostnameMsg *msg = (hostnameMsg *)m;
   hostnameMsg *tmpm;
-  char str[128];
   int tag, tag1, pe, myrank;
-  CmiAssert(rankmsg != NULL);
+  int npes = CmiNumPes();
 
 /*   for debug
+  char str[128];
   skt_print_ip(str, msg->ip);
   printf("hostname: %d %s\n", msg->pe, str);
 */
+  CmiAssert(CmiMyPe()==0 && rankmsg != NULL);
   tag = *(int*)&msg->ip;
   pe = msg->pe;
   if ((rec = (hostnameMsg *)CmmProbe(hostTable, 1, &tag, &tag1)) != NULL) {
@@ -238,6 +242,8 @@ static void cpuAffinityHandler(void *m)
   }
   else {
     rec = msg;
+    rec->seq = nodecount;
+    nodecount++;                          /* a new node record */
     CmmPut(hostTable, 1, &tag, msg);
   }
   myrank = rec->rank%rec->ncores;
@@ -245,7 +251,8 @@ static void cpuAffinityHandler(void *m)
     myrank = (myrank+1)%rec->ncores;
     rec->rank ++;
   }
-  rankmsg->ranks[pe] = myrank;
+  rankmsg->ranks[pe] = myrank;             /* core rank */
+  rankmsg->nodes[pe] = rec->seq;           /* on which node */
   rec->rank ++;
   count ++;
   if (count == CmiNumPes()) {
@@ -253,7 +260,23 @@ static void cpuAffinityHandler(void *m)
     tag = CmmWildCard;
     while (tmpm = CmmGet(hostTable, 1, &tag, &tag1)) CmiFree(tmpm);
     CmmFree(hostTable);
-    CmiSyncBroadcastAllAndFree(sizeof(rankMsg)+CmiNumPes()*sizeof(int), (void *)rankmsg);
+#if 1
+    /* bubble sort ranks on each node according to the PE number */
+    {
+    int i,j;
+    for (i=0; i<npes-1; i++)
+      for(j=i+1; j<npes; j++) {
+        if (rankmsg->nodes[i] == rankmsg->nodes[j] && 
+              rankmsg->ranks[i] > rankmsg->ranks[j]) 
+        {
+          int tmp = rankmsg->ranks[i];
+          rankmsg->ranks[i] = rankmsg->ranks[j];
+          rankmsg->ranks[j] = tmp;
+        }
+      }
+    }
+#endif
+    CmiSyncBroadcastAllAndFree(sizeof(rankMsg)+CmiNumPes()*sizeof(int)*2, (void *)rankmsg);
   }
 }
 
@@ -271,15 +294,17 @@ static int set_myaffinitity(int myrank)
 /* called on each processor */
 static void cpuAffinityRecvHandler(void *msg)
 {
-  int myrank;
+  int myrank, mynode;
   rankMsg *m = (rankMsg *)msg;
   m->ranks = (int *)((char*)m + sizeof(rankMsg));
+  m->nodes = (int *)((char*)m + sizeof(rankMsg) + CmiNumPes()*sizeof(int));
   myrank = m->ranks[CmiMyPe()];
+  mynode = m->nodes[CmiMyPe()];
 
   /*CmiPrintf("[%d %d] set to core #: %d\n", CmiMyNode(), CmiMyPe(), myrank);*/
 
   if (-1 != set_myaffinitity(myrank)) {
-    DEBUGP(("Processor %d is bound to core #%d\n", CmiMyPe(), myrank));
+    DEBUGP(("Processor %d is bound to core #%d on node #%d\n", CmiMyPe(), myrank, mynode));
   }
   else
     CmiPrintf("Processor %d set affinity failed!\n", CmiMyPe());
@@ -333,7 +358,7 @@ void CmiInitCPUAffinity(char **argv)
       /* comm thread either can float around, or pin down to the last rank.
          however it seems to be reportedly slower if it is floating */
     CmiNodeAllBarrier();
-    if (set_myaffinitity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!");
+    /* if (set_myaffinitity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
     if (coremap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
     while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
@@ -397,10 +422,14 @@ void CmiInitCPUAffinity(char **argv)
   if (CmiMyPe() == 0) {
     int i;
     hostTable = CmmNew();
-    rankmsg = (rankMsg *)CmiAlloc(sizeof(rankMsg)+CmiNumPes()*sizeof(int));
+    rankmsg = (rankMsg *)CmiAlloc(sizeof(rankMsg)+CmiNumPes()*sizeof(int)*2);
     CmiSetHandler((char *)rankmsg, cpuAffinityRecvHandlerIdx);
     rankmsg->ranks = (int *)((char*)rankmsg + sizeof(rankMsg));
-    for (i=0; i<CmiNumPes(); i++) rankmsg->ranks[i] = 0;
+    rankmsg->nodes = (int *)((char*)rankmsg + sizeof(rankMsg) + CmiNumPes()*sizeof(int));
+    for (i=0; i<CmiNumPes(); i++) {
+      rankmsg->ranks[i] = 0;
+      rankmsg->nodes[i] = -1;
+    }
 
     for (i=0; i<CmiNumPes(); i++) CmiDeliverSpecificMsg(cpuAffinityHandlerIdx);
   }
