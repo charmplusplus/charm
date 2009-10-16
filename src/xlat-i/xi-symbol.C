@@ -1010,7 +1010,7 @@ Group::Group(int ln, attrib_t Nattr,
 {
         hasElement=1;
 	forElement=forIndividual;
-	hasSection=0;
+	hasSection=1;
 	bases_CBase=NULL;
 	if (b==NULL) {//Add Group as a base class
 		if (isNodeGroup())
@@ -1061,20 +1061,31 @@ Group::genSubDecls(XStr& str)
     str << "    "<<ptype<<"(CkGroupID _gid,int _onPE,CK_DELCTOR_PARAM) : ";
     genProxyNames(str, "", NULL,"(_gid,_onPE,CK_DELCTOR_ARGS)", ", ");
     str << "{  }\n";
-    str << "    "<<ptype<<"(CkGroupID _gid,int _onPE) : ";
-    genProxyNames(str, "", NULL,"(_gid,_onPE)", ", ");
-    str << "{  }\n";
+    //str << "    "<<ptype<<"(CkGroupID _gid,int _onPE) : ";
+    //genProxyNames(str, "", NULL,"(_gid,_onPE)", ", ");
+    //str << "{  }\n";
 
     str<<"   CK_DISAMBIG_GROUP_ELEMENT("<<super<<")\n";
+  }
+  else if (forElement==forSection)
+  {//For a section of the group
+    str << "    "<<ptype<<"(CkGroupID _gid,int *_pelist,int _npes,CK_DELCTOR_PARAM) : ";
+    genProxyNames(str, "", NULL,"(_gid,_pelist,_npes,CK_DELCTOR_ARGS)", ", ");
+    str << "{  }\n";
+    //str << "    "<<ptype<<"(CkGroupID _gid,int *_pelist,int _npes) : ";
+    //genProxyNames(str, "", NULL,"(_gid,_pelist,_npes)", ", ");
+    //str << "{  }\n";
+    
+    str << "   CK_DISAMBIG_GROUP_SECTION("<<super<<")\n";
   }
   else if (forElement==forAll)
   {//For whole group
     str << "    "<<ptype<<"(CkGroupID _gid,CK_DELCTOR_PARAM) : ";
     genProxyNames(str, "", NULL,"(_gid,CK_DELCTOR_ARGS)", ", ");
     str << "{  }\n";
-    str << "    "<<ptype<<"(CkGroupID _gid) : ";
-    genProxyNames(str, "", NULL,"(_gid)", ", ");
-    str << "{  }\n";
+    //str << "    "<<ptype<<"(CkGroupID _gid) : ";
+    //genProxyNames(str, "", NULL,"(_gid)", ", ");
+    //str << "{  }\n";
 
     //Group proxy can be indexed into an element proxy:
     forElement=forIndividual;//<- for the proxyName below
@@ -1187,9 +1198,9 @@ Array::genSubDecls(XStr& str)
     str <<
          "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx,CK_DELCTOR_PARAM)\n"
          "        :";genProxyNames(str, "",NULL, "(aid,idx,CK_DELCTOR_ARGS)", ", ");str<<" {}\n";
-    str <<
-         "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx)\n"
-         "        :";genProxyNames(str, "",NULL, "(aid,idx)", ", ");str<<" {}\n";
+    //str <<
+    //     "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx)\n"
+    //     "        :";genProxyNames(str, "",NULL, "(aid,idx)", ", ");str<<" {}\n";
   }
   else if (forElement==forAll)
   {/*Collective, indexible version*/
@@ -1240,8 +1251,8 @@ Array::genSubDecls(XStr& str)
     }
     str <<"    "<<ptype<<"(const CkArrayID &aid,CK_DELCTOR_PARAM) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,CK_DELCTOR_ARGS)", ", ");str<<" {}\n";
-    str <<"    "<<ptype<<"(const CkArrayID &aid) \n"
-         "        :";genProxyNames(str, "",NULL, "(aid)", ", ");str<<" {}\n";
+    //str <<"    "<<ptype<<"(const CkArrayID &aid) \n"
+    //     "        :";genProxyNames(str, "",NULL, "(aid)", ", ");str<<" {}\n";
   }
   else if (forElement==forSection)
   { /* for Section, indexible version*/
@@ -1358,8 +1369,8 @@ Array::genSubDecls(XStr& str)
 
     str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems, CK_DELCTOR_PARAM) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems,CK_DELCTOR_ARGS)", ", ");str << " {}\n";
-    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) \n"
-         "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems)", ", ");str<<" {}\n";
+    //str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) \n"
+    //     "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems)", ", ");str<<" {}\n";
     str <<"    "<<ptype<<"(const CkSectionID &sid)"
 	  "       :";genProxyNames(str, "",NULL, "(sid)", ", ");str<< " {}\n";
     str <<
@@ -3111,7 +3122,7 @@ void Entry::genGroupDecl(XStr& str)
     else
       str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<");\n";
     // entry method on multiple PEs declaration
-    if(!container->isForElement() && !isSync() && !isLocal() && !container->isNodeGroup()) {
+    if(!container->isForElement() && !container->isForSection() && !isSync() && !isLocal() && !container->isNodeGroup()) {
       str << "    "<<retType<<" "<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(1)<<");\n";
     }
   }
@@ -3183,8 +3194,18 @@ void Entry::genGroupDefs(XStr& str)
       {// Send
         str << "  if (ckIsDelegated()) {\n";
         str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
-	str << "     ckDelegatedTo()->"<<node<<"GroupSend(ckDelegatedPtr(),"<<parampg<<");\n";
+        str << "     ckDelegatedTo()->"<<node<<"GroupSend(ckDelegatedPtr(),"<<parampg<<");\n";
         str << "  } else CkSendMsg"<<node<<"Branch"<<"("<<parampg<<opts<<");\n";
+      }
+      else if (container->isForSection())
+      {// Multicast
+        str << "  if (ckIsDelegated()) {\n";
+        str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
+        str << "     ckDelegatedTo()->"<<node<<"GroupSectionSend(ckDelegatedPtr(),"<<params<<", ckGetNumSections(), ckGetSectionID());\n";
+        str << "  } else {\n";
+        str << "    for (int i=0; i<ckGetNumSections(); ++i) ";
+        str << "CkSendMsg"<<node<<"BranchMulti("<<params<<", ckGetGroupIDn(i), ckGetNumElements(i), ckGetElements(i)"<<opts<<");\n";
+        str << "  }\n";
       }
       else
       {// Broadcast
@@ -3197,11 +3218,11 @@ void Entry::genGroupDefs(XStr& str)
     str << "}\n";
 
     // entry method on multiple PEs declaration
-    if(!forElement && !isSync() && !isLocal() && !container->isNodeGroup()) {
-      str << "    "<<makeDecl(retStr,1)<<"::"<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(0)<<")\n";
-      str << "    {\n"<<marshallMsg();
-      str << "      CkSendMsg"<<node<<"BranchMulti("<<params<<", npes, pes, ckGetGroupID()"<<opts<<");\n";
-      str << "    }\n";
+    if(!forElement && !container->isForSection() && !isSync() && !isLocal() && !container->isNodeGroup()) {
+      str << ""<<makeDecl(retStr,1)<<"::"<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(0)<<") {\n";
+      str << marshallMsg();
+      str << "  CkSendMsg"<<node<<"BranchMulti("<<paramg<<", npes, pes"<<opts<<");\n";
+      str << "}\n";
     }
   }
 }
@@ -3209,6 +3230,7 @@ void Entry::genGroupDefs(XStr& str)
 void Entry::genGroupStaticConstructorDecl(XStr& str)
 {
   if (container->isForElement()) return;
+  if (container->isForSection()) return;
 
   str << "    static CkGroupID ckNew("<<paramType(1,1)<<");\n";
   if (!param->isVoid()) {
@@ -3219,6 +3241,7 @@ void Entry::genGroupStaticConstructorDecl(XStr& str)
 void Entry::genGroupStaticConstructorDefs(XStr& str)
 {
   if (container->isForElement()) return;
+  if (container->isForSection()) return;
 
   //Selects between NodeGroup and Group
   char *node = (char *)(container->isNodeGroup()?"Node":"");

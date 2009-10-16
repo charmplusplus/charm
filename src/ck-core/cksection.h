@@ -32,6 +32,7 @@
 
 class CkSectionInfo {
  public:
+    // NOTICE: aid is used to store also a CkGroupID for group multicasts
     CkArrayID aid;
     int pe;
     union section_type {
@@ -158,7 +159,7 @@ class CkMcastBaseMsg {
 
 class CkSectionID {
 public:
-  CkSectionInfo   _cookie;		// used by array section multicast
+  CkSectionInfo   _cookie;		// used by array and group section multicast
   CkArrayIndexMax *_elems;
   int _nElems;
   
@@ -171,6 +172,7 @@ public:
 public:
   CkSectionID(): _elems(NULL), _nElems(0), pelist(0), npes(0) {}
   CkSectionID(const CkSectionID &sid);
+  CkSectionID(const CkGroupID &gid, const int *_pelist, const int _npes);
   CKSECTIONID_CONSTRUCTOR(1D)
   CKSECTIONID_CONSTRUCTOR(2D)
   CKSECTIONID_CONSTRUCTOR(3D)

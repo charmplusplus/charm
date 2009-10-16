@@ -179,10 +179,14 @@ void CkDelegateMgr::GroupSend(CkDelegateData *pd,int ep,void *m,int onPE,CkGroup
   { CkSendMsgBranch(ep,m,onPE,g); }
 void CkDelegateMgr::GroupBroadcast(CkDelegateData *pd,int ep,void *m,CkGroupID g)
   { CkBroadcastMsgBranch(ep,m,g); }
+void CkDelegateMgr::GroupSectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s)
+  { CkSendMsgBranchMulti(ep,m,s->_cookie.aid,s->npes,s->pelist); }
 void CkDelegateMgr::NodeGroupSend(CkDelegateData *pd,int ep,void *m,int onNode,CkNodeGroupID g)
   { CkSendMsgNodeBranch(ep,m,onNode,g); }
 void CkDelegateMgr::NodeGroupBroadcast(CkDelegateData *pd,int ep,void *m,CkNodeGroupID g)
   { CkBroadcastMsgNodeBranch(ep,m,g); }
+void CkDelegateMgr::NodeGroupSectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s)
+  { CkSendMsgNodeBranchMulti(ep,m,s->_cookie.aid,s->npes,s->pelist); }
 void CkDelegateMgr::ArrayCreate(CkDelegateData *pd,int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a)
 {
 	CProxyElement_ArrayBase ap(a,idx);
@@ -199,7 +203,7 @@ void CkDelegateMgr::ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a
 	ap.ckBroadcast((CkArrayMessage *)m,ep);
 }
 
-void CkDelegateMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, CkArrayID a,CkSectionID &s, int opts)
+void CkDelegateMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsid,CkSectionID *s, int opts)
 {
 	CmiAbort("ArraySectionSend is not implemented!\n");
 /*
@@ -300,33 +304,58 @@ CKSECTIONID_CONSTRUCTOR_DEF(5D)
 CKSECTIONID_CONSTRUCTOR_DEF(6D)
 CKSECTIONID_CONSTRUCTOR_DEF(Max)
 
+CkSectionID::CkSectionID(const CkGroupID &gid, const int *_pelist, const int _npes): _nElems(0), _elems(NULL), npes(_npes) {
+  pelist = new int[npes];
+  for (int i=0; i<npes; i++) pelist[i] = _pelist[i];
+  _cookie.aid = gid;
+}
+
 CkSectionID::CkSectionID(const CkSectionID &sid) {
+  int i;
   _cookie = sid._cookie;
   _nElems = sid._nElems;
-  _elems = new CkArrayIndexMax[_nElems];
-  for (int i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
-  pelist = NULL;
-  npes = 0;
+  if (_nElems > 0) {
+    _elems = new CkArrayIndexMax[_nElems];
+    for (i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
+  } else _elems = NULL;
+  npes = sid.npes;
+  if (npes > 0) {
+    pelist = new int[npes];
+    for (i=0; i<npes; ++i) pelist[i] = sid.pelist[i];
+  } else pelist = NULL;
 }
 
 void CkSectionID::operator=(const CkSectionID &sid) {
+  int i;
   _cookie = sid._cookie;
   _nElems = sid._nElems;
-  _elems = new CkArrayIndexMax[_nElems];
-  for (int i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
+  if (_nElems > 0) {
+    _elems = new CkArrayIndexMax[_nElems];
+    for (i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
+  } else _elems = NULL;
+  npes = sid.npes;
+  if (npes > 0) {
+    pelist = new int[npes];
+    for (i=0; i<npes; ++i) pelist[i] = sid.pelist[i];
+  } else pelist = NULL;
 }
 
 CkSectionID::~CkSectionID() {
-    delete [] _elems;
-    if(pelist != NULL)
-        delete [] pelist;
+    if (_elems != NULL) delete [] _elems;
+    if (pelist != NULL) delete [] pelist;
 }
 
 void CkSectionID::pup(PUP::er &p) {
     p | _cookie;
     p(_nElems);
-    if (p.isUnpacking()) _elems = new CkArrayIndexMax[_nElems];
-    for (int i=0; i< _nElems; i++) p | _elems[i];
+    if (_nElems > 0) {
+      if (p.isUnpacking()) _elems = new CkArrayIndexMax[_nElems];
+      for (int i=0; i< _nElems; i++) p | _elems[i];
+    } else {
+      // If _nElems is zero, than this section describes processors instead of array elements
+      p(npes);
+      p(pelist, npes);
+    }
 }
 
 /**** Tiny random API routines */
@@ -1457,7 +1486,7 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID, int opts)
 }
 
 extern "C"
-void CkSendMsgBranchMultiImmediate(int eIdx,void *msg,int npes,int *pes,CkGroupID gID)
+void CkSendMsgBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes,int *pes)
 {
 #if CMK_IMMEDIATE_MSG && ! CMK_SMP
   register envelope *env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
@@ -1473,10 +1502,10 @@ void CkSendMsgBranchMultiImmediate(int eIdx,void *msg,int npes,int *pes,CkGroupI
 }
 
 extern "C"
-void CkSendMsgBranchMulti(int eIdx,void *msg,int npes,int *pes,CkGroupID gID, int opts)
+void CkSendMsgBranchMulti(int eIdx,void *msg,CkGroupID gID,int npes,int *pes, int opts)
 {
   if (opts & CK_MSG_IMMEDIATE) {
-    CkSendMsgBranchMultiImmediate(eIdx,msg,npes,pes,gID);
+    CkSendMsgBranchMultiImmediate(eIdx,msg,gID,npes,pes);
     return;
   }
     // normal mesg
@@ -1513,6 +1542,17 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
     CldNodeEnqueue(node, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
 #endif
+}
+
+static inline void _sendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID,
+                           int npes, int *nodes)
+{
+  register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
+  _TRACE_CREATION_N(env, npes);
+  for (int i=0; i<npes; i++) {
+    CldNodeEnqueue(nodes[i], env, _infoIdx);
+  }
+  _TRACE_CREATION_DONE(1);  // since it only creates one creation event.
 }
 
 extern "C"
@@ -1578,6 +1618,33 @@ void CkSendMsgNodeBranch(int eIdx, void *msg, int node, CkGroupID gID, int opts)
   _sendMsgNodeBranch(eIdx, msg, gID, node, opts);
   _STATS_RECORD_SEND_NODE_BRANCH_1();
   CkpvAccess(_coreState)->create();
+}
+
+extern "C"
+void CkSendMsgNodeBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes,int *nodes)
+{
+#if CMK_IMMEDIATE_MSG && ! CMK_SMP
+  register envelope *env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
+  _noCldEnqueueMulti(npes, nodes, env);
+#else
+  _sendMsgNodeBranchMulti(eIdx, msg, gID, npes, pes);
+  CpvAccess(_qd)->create(-npes);
+#endif
+  _STATS_RECORD_SEND_NODE_BRANCH_N(npes);
+  CpvAccess(_qd)->create(npes);
+}
+
+extern "C"
+void CkSendMsgNodeBranchMulti(int eIdx,void *msg,CkGroupID gID,int npes,int *nodes, int opts)
+{
+  if (opts & CK_MSG_IMMEDIATE) {
+    CkSendMsgNodeBranchMultiImmediate(eIdx,msg,gID,npes,nodes);
+    return;
+  }
+    // normal mesg
+  _sendMsgNodeBranchMulti(eIdx, msg, gID, npes, nodes);
+  _STATS_RECORD_SEND_NODE_BRANCH_N(npes);
+  CpvAccess(_qd)->create(npes);
 }
 
 extern "C"

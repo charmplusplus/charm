@@ -1017,8 +1017,9 @@ void ComlibManager::ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a
 }
 
 void ComlibManager::ArraySectionSend(CkDelegateData *pd,int ep, void *m, 
-		CkArrayID a, CkSectionID &s, int opts) {
+		int nsid, CkSectionID *s, int opts) {
 
+    CkAssert(nsid == 1);
 	CkAssert(pd != NULL);
 	ComlibDelegateData *ci = static_cast<ComlibDelegateData *>(pd);
 	int instid = ci->getID();
@@ -1029,11 +1030,11 @@ void ComlibManager::ArraySectionSend(CkDelegateData *pd,int ep, void *m,
 	//Provide a dummy dest proc as it does not matter for mulitcast 
 	CharmMessageHolder *cmsg = new CharmMessageHolder((char *)m, IS_SECTION_MULTICAST, CMH_ARRAYSECTIONSEND);
 	cmsg->npes = 0;
-	cmsg->sec_id = &s;
-	cmsg->array_id = a;
+	cmsg->sec_id = s;
+	cmsg->array_id = s->_cookie.aid;
 	
 
-	msg_prepareSend_noinline((CkArrayMessage*)m, ep, a);
+	msg_prepareSend_noinline((CkArrayMessage*)m, ep, s->_cookie.aid);
 	
 	register envelope * env = UsrToEnv(m);
 	env->getsetArrayIndex()= dummyArrayIndex;

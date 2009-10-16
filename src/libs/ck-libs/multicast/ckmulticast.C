@@ -295,15 +295,15 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayElement &proxy)
   if (oldpe == CkMyPe()) return;	// we don't have to recreate one
 
   CkArrayID aid = proxy.ckGetArrayID();
-  CkSectionID &sid = proxy.ckGetSectionID();
+  CkSectionID *sid = proxy.ckGetSectionID();
   mCastEntry *entry = new mCastEntry(aid);
 
   mCastEntry *oldentry = (mCastEntry *)info.get_val();
   DEBUGF(("[%d] resetSection: old entry:%p new entry:%p\n", CkMyPe(), oldentry, entry));
 
-  const CkArrayIndexMax *al = sid._elems;
+  const CkArrayIndexMax *al = sid->_elems;
   CmiAssert(info.aid == aid);
-  prepareCookie(entry, sid, al, sid._nElems, aid);
+  prepareCookie(entry, *sid, al, sid->_nElems, aid);
 
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
@@ -344,13 +344,13 @@ void CkMulticastMgr::initDelegateMgr(CProxy *cproxy)
 {
   CProxySection_ArrayBase *proxy = (CProxySection_ArrayBase *)cproxy;
   CkArrayID aid = proxy->ckGetArrayID();
-  CkSectionID &sid = proxy->ckGetSectionID();
+  CkSectionID *sid = proxy->ckGetSectionID();
 
   mCastEntry *entry = new mCastEntry(aid);
 
   const CkArrayIndexMax *al = proxy->ckGetArrayElements();
-  prepareCookie(entry, sid, al, proxy->ckGetNumElements(), aid);
-  initCookie(sid._cookie);
+  prepareCookie(entry, *sid, al, proxy->ckGetNumElements(), aid);
+  initCookie(sid->_cookie);
 }
 
 
@@ -695,7 +695,7 @@ void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, i
   }
 }
 
-void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, CkArrayID a, CkSectionID &sid, int opts)
+void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsid, CkSectionID *sid, int opts)
 {
   DEBUGF(("ArraySectionSend\n"));
 
@@ -703,8 +703,8 @@ void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, CkArray
 //  msg->aid = a;
   msg->ep = ep;
 
-  CkSectionInfo &s = sid._cookie;
-  CmiAssert(a == s.aid);
+  CkSectionInfo &s = sid->_cookie;
+  CmiAssert(nsid == 1);
 
   mCastEntry *entry;
   if (s.get_pe() == CkMyPe()) {
@@ -722,14 +722,14 @@ void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, CkArray
 #if CMK_LBDB_ON
     // fixme: running obj?
     envelope *env = UsrToEnv(msg);
-    const LDOMHandle &om = CProxy_ArrayBase(a).ckLocMgr()->getOMHandle();
+    const LDOMHandle &om = CProxy_ArrayBase(s.aid).ckLocMgr()->getOMHandle();
     LBDatabaseObj()->MulticastSend(om,entry->allObjKeys.getVec(),entry->allObjKeys.size(),env->getTotalsize());
 #endif
 
     // first time need to rebuild, we do simple send to refresh lastKnown
     if (entry->needRebuild == 1) {
       msg->_cookie = s;
-      SimpleSend(ep, msg, a, sid, opts);
+      SimpleSend(ep, msg, s.aid, *sid, opts);
       entry->needRebuild = 2;
       return;
     }

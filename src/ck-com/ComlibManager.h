@@ -316,7 +316,7 @@ class ComlibManager: public CkDelegateMgr {
     void ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a);
     void GroupBroadcast(CkDelegateData *pd,int ep,void *m,CkGroupID g);
     void ArraySectionSend(CkDelegateData *pd, int ep ,void *m, 
-                                  CkArrayID a, CkSectionID &s, int opts);
+                                  int nsid, CkSectionID *s, int opts);
     CkDelegateData* ckCopyDelegateData(CkDelegateData *data); 
     CkDelegateData *DelegatePointerPup(PUP::er &p,CkDelegateData *pd);
 

@@ -123,7 +123,7 @@ class CkMulticastMgr: public CkDelegateMgr
         void resetSection(CProxySection_ArrayElement &proxy);  // called by root
         virtual void initDelegateMgr(CProxy *proxy);
         /// override from base class. 
-        void ArraySectionSend(CkDelegateData *pd,int ep,void *m, CkArrayID a, CkSectionID &s, int opts);
+        void ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsid, CkSectionID *s, int opts);
         void SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, int opts);
         // user should be careful while passing non-default value of fragSize
         // fragSize%sizeof(data_type) should be zero
