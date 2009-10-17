@@ -1627,7 +1627,7 @@ void CkSendMsgNodeBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes
   register envelope *env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
   _noCldEnqueueMulti(npes, nodes, env);
 #else
-  _sendMsgNodeBranchMulti(eIdx, msg, gID, npes, pes);
+  _sendMsgNodeBranchMulti(eIdx, msg, gID, npes, nodes);
   CpvAccess(_qd)->create(-npes);
 #endif
   _STATS_RECORD_SEND_NODE_BRANCH_N(npes);
