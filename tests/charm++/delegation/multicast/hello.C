@@ -63,7 +63,7 @@ public:
   {
     static int count = 0;
     count ++;
-//    if (count < SECTIONSIZE*3) return;
+//    if (count < sectionSize*3) return;
     CkPrintf("All done\n");
     CkExit();
   };
@@ -100,9 +100,9 @@ CmiPrintf("start %d elements\n", nElements);
 //      al.push_back(CkArrayIndex1D(i));
 //    mcp = CProxySection_Hello::ckNew(thisArrayID, al.getVec(), al.size());
 #if 0
-    mcast = new CProxySection_Hello(thisArrayID, al, SECTIONSIZE, mCastGrpId);
+    mcast = new CProxySection_Hello(thisArrayID, al, sectionSize, mCastGrpId);
 #endif
-    mcp = CProxySection_Hello::ckNew(thisArrayID, 0, SECTIONSIZE-1, 1);
+    mcp = CProxySection_Hello::ckNew(thisArrayID, 0, sectionSize-1, 1);
     mcp.ckSectionDelegate(mg);
 
 #if 0
@@ -111,9 +111,9 @@ CmiPrintf("start %d elements\n", nElements);
 #endif
 
 #if 0
-    mg->setSection(sid, thisArrayID, al, SECTIONSIZE);
+    mg->setSection(sid, thisArrayID, al, sectionSize);
     sid.create(thisArrayID);
-    for (int i=0; i<SECTIONSIZE; i++) 
+    for (int i=0; i<sectionSize; i++) 
       sid.addMember(CkArrayIndex1D(i));
     mg->setSection(sid);
 #endif
@@ -229,14 +229,14 @@ void client(CkSectionInfo sid, void *param, int dataSize, void *data)
   int result;
   if (c->reductionNo%3 == 0) {
     result = 0;
-    for (int i=0; i<SECTIONSIZE; i++) result+=i;
+    for (int i=0; i<sectionSize; i++) result+=i;
   }
   else if (c->reductionNo%3 == 2) {
     result = 1;
-    for (int i=1; i<SECTIONSIZE+1; i++) result*=i;
+    for (int i=1; i<sectionSize+1; i++) result*=i;
   }
   else {
-    result = SECTIONSIZE+1;
+    result = sectionSize+1;
   }
   if (*(int *)data != result) {
     CmiAbort("wrong!");
