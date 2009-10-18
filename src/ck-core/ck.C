@@ -346,9 +346,13 @@ void CkSectionID::pup(PUP::er &p) {
     if (_nElems > 0) {
       if (p.isUnpacking()) _elems = new CkArrayIndexMax[_nElems];
       for (int i=0; i< _nElems; i++) p | _elems[i];
+      npes = 0;
+      pelist = NULL;
     } else {
       // If _nElems is zero, than this section describes processors instead of array elements
+      _elems = NULL;
       p(npes);
+      if (p.isUnpacking()) pelist = new int[npes];
       p(pelist, npes);
     }
 }

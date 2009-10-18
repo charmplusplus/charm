@@ -415,10 +415,10 @@ PUPmarshall(CProxyElement_ArrayBase);
 
 class CProxySection_ArrayBase:public CProxy_ArrayBase {
 private:
-    int _nsid;
+	int _nsid;
 	CkSectionID *_sid;
 public:
-	CProxySection_ArrayBase() { }
+	CProxySection_ArrayBase(): _nsid(0), _sid(NULL) {}
 	CProxySection_ArrayBase(const CkArrayID &aid,
 		const CkArrayIndexMax *elems, const int nElems, CK_DELCTOR_PARAM)
 		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(aid, elems, nElems); }
