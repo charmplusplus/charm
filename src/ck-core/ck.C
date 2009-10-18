@@ -340,11 +340,6 @@ void CkSectionID::operator=(const CkSectionID &sid) {
   } else pelist = NULL;
 }
 
-CkSectionID::~CkSectionID() {
-    if (_elems != NULL) delete [] _elems;
-    if (pelist != NULL) delete [] pelist;
-}
-
 void CkSectionID::pup(PUP::er &p) {
     p | _cookie;
     p(_nElems);

@@ -187,7 +187,10 @@ public:
 
   void operator=(const CkSectionID &);
 
-  ~CkSectionID();
+  ~CkSectionID() {
+    if (_elems != NULL) delete [] _elems;
+    if (pelist != NULL) delete [] pelist;
+  }
 
   void pup(PUP::er &p);
 
