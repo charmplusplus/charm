@@ -935,7 +935,7 @@ Chare::genSubDecls(XStr& str)
   if(list)
     list->genDecls(str);
   str << CIClassEnd;
-  if (!isTemplated()) str << "PUPmarshall("<<ptype<<");\n";
+  if (!isTemplated()) str << "PUPmarshall("<<ptype<<")\n";
 }
 
 void Chare::genPythonDecls(XStr& str) {
@@ -980,7 +980,7 @@ void Chare::genPythonDecls(XStr& str) {
     list->genPythonDecls(str);
   str << "\n";
 
-  if (!isTemplated()) str << "PUPmarshall("<<ptype<<");\n";
+  if (!isTemplated()) str << "PUPmarshall("<<ptype<<")\n";
 }
 
 void Chare::genPythonDefs(XStr& str) {
@@ -1115,7 +1115,7 @@ Group::genSubDecls(XStr& str)
   if(list)
     list->genDecls(str);
   str << CIClassEnd;
-  if (!isTemplated()) str << "PUPmarshall("<<ptype<<");\n";
+  if (!isTemplated()) str << "PUPmarshall("<<ptype<<")\n";
 
 }
 
@@ -1383,7 +1383,7 @@ Array::genSubDecls(XStr& str)
     list->genDecls(str);
   }
   str << CIClassEnd;
-  if (!isTemplated()) str << "PUPmarshall("<<ptype<<");\n";
+  if (!isTemplated()) str << "PUPmarshall("<<ptype<<")\n";
 }
 
 void
