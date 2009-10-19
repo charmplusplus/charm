@@ -56,8 +56,10 @@ class _CkOStream {
     _OPSHIFTLEFT(unsigned short, "%hu");
     _OPSHIFTLEFT(long, "%ld");
     _OPSHIFTLEFT(unsigned long, "%lu");
+#if CMK_LONG_LONG_DEFINED
     _OPSHIFTLEFT(long long, "%lld");
     _OPSHIFTLEFT(unsigned long long, "%llu");
+#endif
     _OPSHIFTLEFT(char, "%c");
     _OPSHIFTLEFT(unsigned char, "%u");
     _OPSHIFTLEFT(float, "%f");
@@ -94,8 +96,10 @@ class CkOStream {
   SHIFTLEFT(unsigned short);
   SHIFTLEFT(long);
   SHIFTLEFT(unsigned long);
+#if CMK_LONG_LONG_DEFINED
   SHIFTLEFT(long long);
   SHIFTLEFT(unsigned long long);
+#endif
   SHIFTLEFT(char);
   SHIFTLEFT(unsigned char);
   SHIFTLEFT(float);
@@ -121,8 +125,10 @@ class CkOutStream : public CkOStream {
     OUTSHIFTLEFT(unsigned short);
     OUTSHIFTLEFT(long);
     OUTSHIFTLEFT(unsigned long);
+#if CMK_LONG_LONG_DEFINED
     OUTSHIFTLEFT(long long);
     OUTSHIFTLEFT(unsigned long long);
+#endif
     OUTSHIFTLEFT(char);
     OUTSHIFTLEFT(unsigned char);
     OUTSHIFTLEFT(float);
@@ -148,8 +154,10 @@ class CkErrStream : public CkOStream {
     ERRSHIFTLEFT(unsigned short);
     ERRSHIFTLEFT(long);
     ERRSHIFTLEFT(unsigned long);
+#if CMK_LONG_LONG_DEFINED
     ERRSHIFTLEFT(long long);
     ERRSHIFTLEFT(unsigned long long);
+#endif
     ERRSHIFTLEFT(char);
     ERRSHIFTLEFT(unsigned char);
     ERRSHIFTLEFT(float);
@@ -175,8 +183,10 @@ class CkInStream {
     OPSHIFTRIGHT(unsigned short, "%hu");
     OPSHIFTRIGHT(long, "%ld");
     OPSHIFTRIGHT(unsigned long, "%lu");
+#if CMK_LONG_LONG_DEFINED
     OPSHIFTRIGHT(long long, "%lld");
     OPSHIFTRIGHT(unsigned long long, "%llu");
+#endif
     OPSHIFTRIGHT(char, "%c");
     OPSHIFTRIGHT(unsigned char, "%c");
     OPSHIFTRIGHT(float, "%f");
