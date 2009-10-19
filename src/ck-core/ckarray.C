@@ -229,7 +229,7 @@ void ArrayElement::ckJustRestored(void) {
 }
 
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(ArrayElement,thisArray,
-   *(contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()],true);
+   *(contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()],true)
 
 /// Remote method: calls destructor
 void ArrayElement::ckDestroy(void)
@@ -319,7 +319,7 @@ void ArrayElement::recvBroadcast(CkMessage *m){
 	int epIdx= env->piggyBcastIdx;
     ckInvokeEntry(epIdx,bcast,CmiTrue);
 #endif
-};
+}
 
 /*********************** Spring Cleaning *****************
 Periodically (every minute or so) remove expired broadcasts
@@ -348,7 +348,7 @@ CProxyElement_ArrayBase::CProxyElement_ArrayBase(const ArrayElement *e)
 CkLocMgr *CProxy_ArrayBase::ckLocMgr(void) const
 	{return ckLocalBranch()->getLocMgr(); }
 
-CK_REDUCTION_CLIENT_DEF(CProxy_ArrayBase,ckLocalBranch());
+CK_REDUCTION_CLIENT_DEF(CProxy_ArrayBase,ckLocalBranch())
 
 CkArrayOptions::CkArrayOptions(void) //Default: empty array
 	:numInitial(0),map(_defaultArrayMapID)

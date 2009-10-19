@@ -27,7 +27,7 @@ CkRegisteredInfo<MainInfo> _mainTable;
 CkRegisteredInfo<ReadonlyInfo> _readonlyTable;
 CkRegisteredInfo<ReadonlyMsgInfo> _readonlyMsgs;
 
-static int __registerDone = 0;;
+static int __registerDone = 0;
 
 void _registerInit(void)
 {

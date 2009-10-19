@@ -81,7 +81,7 @@ class CkMarshalledMessage {
 	CkMessage *getMessage(void) {void *ret=msg; msg=NULL; return (CkMessage *)ret;}
 	void pup(PUP::er &p) {CkPupMessage(p,&msg,1);}
 };
-PUPmarshall(CkMarshalledMessage);
+PUPmarshall(CkMarshalledMessage)
 
 /**
  * CkEntryOptions describes the options associated
@@ -765,7 +765,7 @@ class CkReductionClientBundle : public CkCallback {
         CkReductionClientBundle(): fn(NULL), param(NULL) {}
 	CkReductionClientBundle(CkReductionClientFn fn_,void *param_);
 };
-PUPbytes(CkReductionClientBundle);
+PUPbytes(CkReductionClientBundle)
 
 #define CK_REDUCTION_CLIENT_DECL \
 	void setReductionClient(CkReductionClientFn fn,void *param=NULL) const\
@@ -932,7 +932,7 @@ public:
     for (int i=0; i<_nsid; ++i) p | _sid[i];
   }
 };
-PUPmarshall(CProxySection_Group);
+PUPmarshall(CProxySection_Group)
 #define CK_DISAMBIG_GROUP_SECTION(super) \
     CK_DISAMBIG_GROUP(super) \
         inline int ckGetNumSections() const \

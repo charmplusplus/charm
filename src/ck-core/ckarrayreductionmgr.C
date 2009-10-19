@@ -23,12 +23,12 @@ void CkArrayReductionMgr::init()
 CkArrayReductionMgr::CkArrayReductionMgr(){
 	init();
 	attachedGroup.setZero();
-};
+}
 
 CkArrayReductionMgr::CkArrayReductionMgr(int dummy, CkGroupID gid){
 	init();
 	attachedGroup = gid;
-};
+}
 
 void CkArrayReductionMgr::flushStates(){
   if(CkMyRank()== 0){
@@ -82,7 +82,7 @@ void CkArrayReductionMgr::contributeArrayReduction(CkReductionMsg *m){
 		my_futureMsgs.enq(m);
 	}
 	CmiUnlock(lockCount);
-};
+}
 
 CkReductionMsg *CkArrayReductionMgr::reduceMessages(void){
 #if CMK_BLUEGENE_CHARM
@@ -216,7 +216,7 @@ int CkArrayReductionMgr::startLocalGroupReductions(int number){
 		reductionMgrProxy[firstPE+i].ReductionStarting(new CkReductionNumberMsg(number));
 	}
 	return 1;
-};
+}
 
 int CkArrayReductionMgr::getTotalGCount(){
 	int firstPE = CkNodeFirst(CkMyNode());
@@ -228,7 +228,7 @@ int CkArrayReductionMgr::getTotalGCount(){
 		totalGCount += mgrPtr->getGCount();
 	}
 	return totalGCount;
-};
+}
 
 
 #include "CkArrayReductionMgr.def.h"

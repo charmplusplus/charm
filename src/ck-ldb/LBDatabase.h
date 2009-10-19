@@ -93,7 +93,7 @@ public:
   CkLBOptions(int s): seqno(s) {}
   int getSeqNo() const { return seqno; }
 };
-PUPbytes(CkLBOptions);
+PUPbytes(CkLBOptions)
                                                                                 
 #include "LBDatabase.decl.h"
 

@@ -337,18 +337,18 @@ PUPbytes(LDHandle)
 inline void LDOMid::pup(PUP::er &p) {
   id.pup(p);
 }
-PUPmarshall(LDOMid);
+PUPmarshall(LDOMid)
 
 inline void LDObjid::pup(PUP::er &p) {
   for (int i=0; i<OBJ_ID_SZ; i++) p|id[i];
 }
-PUPmarshall(LDObjid);
+PUPmarshall(LDObjid)
 
 inline void LDObjKey::pup(PUP::er &p) {
   p|omId;
   p|objId;
 }
-PUPmarshall(LDObjKey);
+PUPmarshall(LDObjKey)
 
 inline void LDObjStats::pup(PUP::er &p) {
   p|index;
@@ -356,7 +356,7 @@ inline void LDObjStats::pup(PUP::er &p) {
   p|from_proc;
   p|to_proc;
 }
-PUPmarshall(LDObjStats);
+PUPmarshall(LDObjStats)
 inline void LDOMHandle::pup(PUP::er &p) {
   // skip ldb since it is a pointer
   int ptrSize = sizeof(void *);
@@ -372,14 +372,14 @@ inline void LDOMHandle::pup(PUP::er &p) {
   p|id;
   p|handle;
 }
-PUPmarshall(LDOMHandle);
+PUPmarshall(LDOMHandle)
 
 inline void LDObjHandle::pup(PUP::er &p) {
   p|omhandle;
   p|id;
   p|handle;
 }
-PUPmarshall(LDObjHandle);
+PUPmarshall(LDObjHandle)
 
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
@@ -392,7 +392,7 @@ inline void LDObjData::pup(PUP::er &p) {
   p|migratable;
   if (_lb_version > -1) p|asyncArrival;
 }
-PUPmarshall(LDObjData);
+PUPmarshall(LDObjData)
 
 inline CmiBool LDCommDesc::operator==(const LDCommDesc &obj) const {
     if (type != obj.type) return CmiFalse;

@@ -223,7 +223,7 @@ void CkClearAllArrayElements(){
 			obj->doneEvacuate();
 		}
 	}	
-};
+}
 
 void CkClearAllArrayElementsCPP(){
 	CkClearAllArrayElements();
@@ -325,7 +325,7 @@ int CkNumValidPes(){
 	}
 	return count;
 #endif
-};
+}
 
 
 void processRaiseEvacFile(char *raiseEvacFile){

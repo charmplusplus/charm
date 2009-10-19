@@ -189,7 +189,7 @@ int skt_recvN(SOCKET hSocket,      void *pBuff,int nBytes);
 int skt_sendV(SOCKET fd,int nBuffers,const void **buffers,int *lengths);
 
 #ifdef __cplusplus
-};
+}
 #endif
 
 #endif /*!CMK_NO_SOCKETS*/
@@ -300,7 +300,7 @@ typedef struct {
 } CcsMessageHeader;
 
 #ifdef __cplusplus
-};
+}
 #endif
 
 #endif /*SOCK_ROUTINES_H*/

@@ -114,8 +114,8 @@ Group::Group(CkMigrateMessage *msg):CkReductionMgr(msg)
 
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(Group,
 				    ((CkReductionMgr *)this),
-				    reductionInfo,false);
-CK_REDUCTION_CLIENT_DEF(CProxy_Group,(CkReductionMgr *)CkLocalBranch(_ck_gid));
+				    reductionInfo,false)
+CK_REDUCTION_CLIENT_DEF(CProxy_Group,(CkReductionMgr *)CkLocalBranch(_ck_gid))
 
 
 
@@ -1641,7 +1641,7 @@ void CProxy_NodeGroup::ckSetReductionClient(CkCallback *cb) const {
 
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(NodeGroup,
 				    ((CkNodeReductionMgr *)this),
-				    reductionInfo,false);
+				    reductionInfo,false)
 
 /* this contribute also adds up the count across all messages it receives.
   Useful for summing up number of array elements who have contributed ****/ 
@@ -1964,7 +1964,7 @@ void CkNodeReductionMgr::LateMigrantMsg(CkReductionMsg *m){
 		msgs.enq(m);
 		finishReduction();
 	}
-};
+}
 
 
 
@@ -2510,7 +2510,7 @@ void CkNodeReductionMgr::collectMaxRedNo(int maxRedNo){
 		updateTree();
 		clearBlockedMsgs();
 	}
-};
+}
 
 void CkNodeReductionMgr::unblockNode(int maxRedNo){
 	maxModificationRedNo = maxRedNo;

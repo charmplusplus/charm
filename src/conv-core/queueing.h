@@ -214,7 +214,7 @@ void CqsIncreasePriorityForMemCriticalEntries(Queue q);
 #endif
 
 #ifdef __cplusplus
-};
+}
 #endif
 
 /** @} */

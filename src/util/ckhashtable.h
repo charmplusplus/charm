@@ -80,7 +80,7 @@ void CkHashtableIteratorSeekStart(CkHashtableIterator_c it);
 
 #endif /*__OSL_HASH_TABLE_C*/
 #ifdef __cplusplus
-};
+}
 
 #ifndef __OSL_HASH_TABLE_CPP
 #define __OSL_HASH_TABLE_CPP

@@ -21,6 +21,6 @@ public:
   void pup(PUP::er &p);
   void free();
 };
-PUPmarshall(CkMarshalledCLBStatsMessage);
+PUPmarshall(CkMarshalledCLBStatsMessage)
 
 #endif

@@ -305,7 +305,7 @@ class CkArrayOptions {
 
 	void pup(PUP::er &p);
 };
-PUPmarshall(CkArrayOptions);
+PUPmarshall(CkArrayOptions)
 
 
 /*********************** Proxy Support ************************/
@@ -357,7 +357,7 @@ public:
 
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxy_ArrayBase);
+PUPmarshall(CProxy_ArrayBase)
 #define CK_DISAMBIG_ARRAY(super) \
 	CK_DISAMBIG_CPROXY(super) \
 	inline void ckCheck(void) const {super::ckCheck();} \
@@ -400,7 +400,7 @@ public:
 	ArrayElement *ckLocal(void) const;
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxyElement_ArrayBase);
+PUPmarshall(CProxyElement_ArrayBase)
 #define CK_DISAMBIG_ARRAY_ELEMENT(super) \
 	CK_DISAMBIG_ARRAY(super) \
 	inline void ckInsert(CkArrayMessage *m,int ctor,int onPe) \
@@ -469,7 +469,7 @@ public:
 	inline int ckGetNumElements(int i) const { return _sid[i]._nElems; }
 	void pup(PUP::er &p);
 };
-PUPmarshall(CProxySection_ArrayBase);
+PUPmarshall(CProxySection_ArrayBase)
 #define CK_DISAMBIG_ARRAY_SECTION(super) \
 	CK_DISAMBIG_ARRAY(super) \
 	inline void ckSend(CkArrayMessage *m, int ep, int opts = 0) \

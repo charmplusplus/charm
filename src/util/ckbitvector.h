@@ -105,6 +105,6 @@ class CkBitVector {
   friend class CkEntryOptions;
 };
 
-PUPmarshall(CkBitVector);
+PUPmarshall(CkBitVector)
 
 #endif /* __UIUC_CS_CHARM_CKBITVECTOR_H */
