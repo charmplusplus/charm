@@ -319,6 +319,10 @@ do
 		TAU_MAKEFILE=`echo $1 | awk -F= '{print $2}'`
 		shift
 		;;
+    --quiet)
+	        MAKEOPTS="$MAKEOPTS --quiet"
+		shift;
+		;;
     -j*)
                 PMAKENUM=`echo $1 | awk -Fj '{print $2}'`
 		MAKEOPTS="$MAKEOPTS -j $PMAKENUM"
