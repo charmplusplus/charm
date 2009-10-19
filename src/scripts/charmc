@@ -608,7 +608,7 @@ do
 		USE_F77_LIBRARIES="1" 
 		;;
 	"-E")
-# Run preprocessor/assembler only
+# Run preprocessor only
 		PREPROCESS="yes"
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
@@ -1121,14 +1121,14 @@ do
 	if [ $numFiles = 1 -a -n "$OBJECT" ]
 	then
 		OBJ_EXT=`getExtention $OBJECT`
-		if [ "$OBJ_EXT" = '.o' ]
+		if [ "$OBJ_EXT" = '.o' -o "$OBJ_EXT" = '.co' ]
           	then
         	    BASEO=$OBJECT
 		    DESTO="-o $OBJECT"
 	  	fi
         fi
 
-	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
+	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".co" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
 	then
 		[ $VERBOSE ] && echo "Compiling $FILE"
 		DoNoErrCheck $RM $BASEO $BASE.f.o
@@ -1175,7 +1175,7 @@ do
 	*.fc|*.FC)
 		Abort "I'm not yet smart enough to compile $FILE"
 		;;
-	*.o|*.so|*.so.*|*.sl|*.a|*.dylib)
+	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
 		[ ! -s $FILE ] && Abort "$FILE: file not recognized: File truncated"
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;

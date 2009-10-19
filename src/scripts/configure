@@ -2045,7 +2045,7 @@ EOT
 test_cxx "whether __int64 works" "ok" "no" ""
 
 cat >>confdefs.h <<_ACEOF
-#define CMK___int64_DEFINED 1
+#define CMK___int64_DEFINED $pass
 _ACEOF
 
 

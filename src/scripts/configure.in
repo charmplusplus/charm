@@ -375,7 +375,7 @@ cat > $t <<EOT
 __int64 foo(void) { return 17; }
 EOT
 test_cxx "whether __int64 works" "ok" "no" ""
-AC_DEFINE_UNQUOTED([CMK___int64_DEFINED], 1, [whether __int64 works])
+AC_DEFINE_UNQUOTED([CMK___int64_DEFINED], $pass, [whether __int64 works])
 
 #### Check long double ####
 cat > $t <<EOT
