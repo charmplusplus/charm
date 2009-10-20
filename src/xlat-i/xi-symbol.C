@@ -1061,9 +1061,9 @@ Group::genSubDecls(XStr& str)
     str << "    "<<ptype<<"(CkGroupID _gid,int _onPE,CK_DELCTOR_PARAM) : ";
     genProxyNames(str, "", NULL,"(_gid,_onPE,CK_DELCTOR_ARGS)", ", ");
     str << "{  }\n";
-    //str << "    "<<ptype<<"(CkGroupID _gid,int _onPE) : ";
-    //genProxyNames(str, "", NULL,"(_gid,_onPE)", ", ");
-    //str << "{  }\n";
+    str << "    "<<ptype<<"(CkGroupID _gid,int _onPE) : ";
+    genProxyNames(str, "", NULL,"(_gid,_onPE)", ", ");
+    str << "{  }\n";
 
     str<<"   CK_DISAMBIG_GROUP_ELEMENT("<<super<<")\n";
   }
@@ -1072,9 +1072,9 @@ Group::genSubDecls(XStr& str)
     str << "    "<<ptype<<"(CkGroupID _gid,int *_pelist,int _npes,CK_DELCTOR_PARAM) : ";
     genProxyNames(str, "", NULL,"(_gid,_pelist,_npes,CK_DELCTOR_ARGS)", ", ");
     str << "{  }\n";
-    //str << "    "<<ptype<<"(CkGroupID _gid,int *_pelist,int _npes) : ";
-    //genProxyNames(str, "", NULL,"(_gid,_pelist,_npes)", ", ");
-    //str << "{  }\n";
+    str << "    "<<ptype<<"(CkGroupID _gid,int *_pelist,int _npes) : ";
+    genProxyNames(str, "", NULL,"(_gid,_pelist,_npes)", ", ");
+    str << "{  }\n";
     
     str << "   CK_DISAMBIG_GROUP_SECTION("<<super<<")\n";
   }
@@ -1083,9 +1083,9 @@ Group::genSubDecls(XStr& str)
     str << "    "<<ptype<<"(CkGroupID _gid,CK_DELCTOR_PARAM) : ";
     genProxyNames(str, "", NULL,"(_gid,CK_DELCTOR_ARGS)", ", ");
     str << "{  }\n";
-    //str << "    "<<ptype<<"(CkGroupID _gid) : ";
-    //genProxyNames(str, "", NULL,"(_gid)", ", ");
-    //str << "{  }\n";
+    str << "    "<<ptype<<"(CkGroupID _gid) : ";
+    genProxyNames(str, "", NULL,"(_gid)", ", ");
+    str << "{  }\n";
 
     //Group proxy can be indexed into an element proxy:
     forElement=forIndividual;//<- for the proxyName below
@@ -1198,9 +1198,9 @@ Array::genSubDecls(XStr& str)
     str <<
          "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx,CK_DELCTOR_PARAM)\n"
          "        :";genProxyNames(str, "",NULL, "(aid,idx,CK_DELCTOR_ARGS)", ", ");str<<" {}\n";
-    //str <<
-    //     "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx)\n"
-    //     "        :";genProxyNames(str, "",NULL, "(aid,idx)", ", ");str<<" {}\n";
+    str <<
+         "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx)\n"
+         "        :";genProxyNames(str, "",NULL, "(aid,idx)", ", ");str<<" {}\n";
   }
   else if (forElement==forAll)
   {/*Collective, indexible version*/
@@ -1251,8 +1251,8 @@ Array::genSubDecls(XStr& str)
     }
     str <<"    "<<ptype<<"(const CkArrayID &aid,CK_DELCTOR_PARAM) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,CK_DELCTOR_ARGS)", ", ");str<<" {}\n";
-    //str <<"    "<<ptype<<"(const CkArrayID &aid) \n"
-    //     "        :";genProxyNames(str, "",NULL, "(aid)", ", ");str<<" {}\n";
+    str <<"    "<<ptype<<"(const CkArrayID &aid) \n"
+         "        :";genProxyNames(str, "",NULL, "(aid)", ", ");str<<" {}\n";
   }
   else if (forElement==forSection)
   { /* for Section, indexible version*/
@@ -1369,8 +1369,8 @@ Array::genSubDecls(XStr& str)
 
     str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems, CK_DELCTOR_PARAM) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems,CK_DELCTOR_ARGS)", ", ");str << " {}\n";
-    //str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) \n"
-    //     "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems)", ", ");str<<" {}\n";
+    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) \n"
+         "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems)", ", ");str<<" {}\n";
     str <<"    "<<ptype<<"(const CkSectionID &sid)"
 	  "       :";genProxyNames(str, "",NULL, "(sid)", ", ");str<< " {}\n";
     str <<

@@ -624,8 +624,9 @@ class CProxy {
     CkDelegateMgr *delegatedMgr; // can be either a group or a nodegroup
     CkDelegateData *delegatedPtr; // private data for use by delegatedMgr.
   protected: //Never allocate CProxy's-- only subclass them.
+    CProxy() :delegatedMgr(0), delegatedPtr(0) { }
 
-#define CK_DELCTOR_PARAM CkDelegateMgr *dTo=NULL,CkDelegateData *dPtr=NULL
+#define CK_DELCTOR_PARAM CkDelegateMgr *dTo,CkDelegateData *dPtr
 #define CK_DELCTOR_ARGS dTo,dPtr
 #define CK_DELCTOR_CALL ckDelegatedTo(),ckDelegatedPtr()
 /// Delegation constructor: used when building 
@@ -799,6 +800,10 @@ class CProxy_Group : public CProxy {
 #endif
 	//CkPrintf(" In CProxy_Group Constructor\n");
     }
+    CProxy_Group(CkGroupID g)
+       :CProxy(),_ck_gid(g) {
+       //CkPrintf(" In CProxy_Group Constructor\n");
+       }
     CProxy_Group(CkGroupID g,CK_DELCTOR_PARAM)
     	:CProxy(CK_DELCTOR_ARGS),_ck_gid(g) {
 	//CkPrintf(" In CProxy_Group Constructor\n");
@@ -851,6 +856,8 @@ class CProxyElement_Group : public CProxy_Group {
     int _onPE;
   public:
     CProxyElement_Group() { }
+    CProxyElement_Group(CkGroupID g,int onPE)
+       : CProxy_Group(g),_onPE(onPE) {}
     CProxyElement_Group(CkGroupID g,int onPE,CK_DELCTOR_PARAM)
 	: CProxy_Group(g,CK_DELCTOR_ARGS),_onPE(onPE) {}
     CProxyElement_Group(const IrrGroup *g)
@@ -877,8 +884,18 @@ private:
   CkSectionID *_sid;
 public:
   CProxySection_Group() { }
+  CProxySection_Group(const CkGroupID &gid, const int *elems, const int nElems)
+      :CProxy_Group(gid), _nsid(1) { _sid = new CkSectionID(gid, elems, nElems); }
   CProxySection_Group(const CkGroupID &gid, const int *elems, const int nElems,CK_DELCTOR_PARAM)
       :CProxy_Group(gid,CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(gid, elems, nElems); }
+  CProxySection_Group(const CProxySection_Group &cs)
+      :CProxy_Group(cs.ckGetGroupID()), _nsid(cs._nsid) {
+    if (_nsid == 1) _sid = new CkSectionID(cs.ckGetGroupID(), cs.ckGetElements(), cs.ckGetNumElements());
+    else if (_nsid > 1) {
+      _sid = new CkSectionID[_nsid];
+      for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
+    } else _sid = NULL;
+  }
   CProxySection_Group(const CProxySection_Group &cs,CK_DELCTOR_PARAM)
       :CProxy_Group(cs.ckGetGroupID(),CK_DELCTOR_ARGS), _nsid(cs._nsid) {
     if (_nsid == 1) _sid = new CkSectionID(cs.ckGetGroupID(), cs.ckGetElements(), cs.ckGetNumElements());
@@ -889,6 +906,11 @@ public:
   }
   CProxySection_Group(const IrrGroup *g)
       :CProxy_Group(g), _nsid(0) {}
+  CProxySection_Group(const int n, const CkGroupID *gid, const int **elems, const int *nElems)
+      :CProxy_Group(gid[0]), _nsid(n) {
+    _sid = new CkSectionID[n];
+    for (int i=0; i<n; ++i) _sid[i] = CkSectionID(gid[i], elems[i], nElems[i]);
+  }
   CProxySection_Group(const int n, const CkGroupID *gid, const int **elems, const int *nElems,CK_DELCTOR_PARAM)
       :CProxy_Group(gid[0],CK_DELCTOR_ARGS), _nsid(n) {
     _sid = new CkSectionID[n];
@@ -981,6 +1003,8 @@ class CProxy_NodeGroup : public CProxy{
 #endif
 	//CkPrintf("In CProxy_NodeGroup0 Constructor %d\n",CkLocalNodeBranch(_ck_gid));
     }
+    CProxy_NodeGroup(CkGroupID g)
+       :CProxy(),_ck_gid(g) {/*CkPrintf("In CProxy_NodeGroup1 Constructor %d\n",CkLocalNodeBranch(_ck_gid));*/}
     CProxy_NodeGroup(CkGroupID g,CK_DELCTOR_PARAM)
     	:CProxy(CK_DELCTOR_ARGS),_ck_gid(g) {/*CkPrintf("In CProxy_NodeGroup2 Constructor %d\n",CkLocalNodeBranch(_ck_gid));*/}
     CProxy_NodeGroup(const IrrGroup *g)
