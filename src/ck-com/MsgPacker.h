@@ -77,7 +77,7 @@ struct CombinedMessage{
     unsigned short nmsgs;
 };
 
-PUPbytes(CombinedMessage);
+PUPbytes(CombinedMessage)
 
 class MsgPacker {        
     CkArrayID aid;

@@ -77,7 +77,7 @@ struct ckcomplex {
 
 typedef ckcomplex complex;
 
-PUPbytes(ckcomplex);
+PUPbytes(ckcomplex)
 
 // Backward compatability:
 // Assume that you only have ckcomplex's definition of complex 

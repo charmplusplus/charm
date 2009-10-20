@@ -44,7 +44,7 @@ struct LineFFTGrid {
 			//finished
 };
 
-PUPbytes (LineFFTGrid);
+PUPbytes (LineFFTGrid)
 
 struct LineFFTInfo;
 
@@ -72,7 +72,7 @@ struct LineFFTInfo {
   bool                    normalize;
 };
 
-PUPbytes (LineFFTInfo);
+PUPbytes (LineFFTInfo)
 
 
 ///////////////////////////////////////////////////////////////

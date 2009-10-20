@@ -174,6 +174,6 @@ class POSE_Config
     {// all handled in initializer
     }
 };
-PUPbytes(POSE_Config);
+PUPbytes(POSE_Config)
 
 #endif

@@ -3,7 +3,7 @@
 
 #include <charm++.h>
 #include "ckcomplex.h"
-#include "drfftw.h"
+#include "rfftw.h"
 #include "EachToManyMulticastStrategy.h"
 #include "StreamingStrategy.h"
 #include "comlib.h"
@@ -168,8 +168,8 @@ class LineFFTinfo {
 
 #include "fftlib.decl.h"
 
-PUPmarshall(NormalFFTinfo);
-PUPmarshall(LineFFTinfo);
+PUPmarshall(NormalFFTinfo)
+PUPmarshall(LineFFTinfo)
 
 
 typedef struct _SlabArrayInfo{
