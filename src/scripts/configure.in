@@ -58,8 +58,8 @@ test_cc() {
         AC_MSG_CHECKING("$1")
 	echo "### $1" >> $charmout
 	cat $tc >> $charmout
-	echo $CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS $OPTS_CC $OPTS_LD -c $tc -o test.o $4 >> $charmout
-	$CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS $OPTS_CC $OPTS_LD -c $tc -o test.o $4 > out 2>&1
+	echo $CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $tc -o test.o $4 >> $charmout
+	$CMK_CC -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CC $OPTS_LD -c $tc -o test.o $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
  	strictpass=$pass
 	strictfail=$fail
@@ -82,8 +82,8 @@ test_cxx() {
         AC_MSG_CHECKING("$1")
 	echo "### $1" >> $charmout
 	cat $t >> $charmout
-	echo $CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS $OPTS_CXX $OPTS_LD -c $t -o test.o $4 >> $charmout
-	$CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS $OPTS_CXX $OPTS_LD -c $t -o test.o $4 > out 2>&1
+	echo $CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CXX $OPTS_LD -c $t -o test.o $4 >> $charmout
+	$CMK_CXX -I../include -I. $CMK_LIBDIR $CMK_INCDIR $OPTS_CXX $OPTS_LD -c $t -o test.o $4 > out 2>&1
 	test_result $? "$1" "$2" "$3"
  	strictpass=$pass
 	strictfail=$fail
