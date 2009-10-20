@@ -306,6 +306,6 @@ public:
     }
 };
 
-MEGATEST_REGISTER_TEST(marshall,"olawlor",1);
+MEGATEST_REGISTER_TEST(marshall,"olawlor",1)
 #include "marshall.def.h"
 

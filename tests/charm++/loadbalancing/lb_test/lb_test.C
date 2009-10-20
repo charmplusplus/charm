@@ -224,7 +224,7 @@ main::main(CkArgMsg *m)
   for (int i=0;i<element_count;i++)
     hproxy[i].ForwardMessages();
 */
-};
+}
 
 void main::arg_error(char* argv0)
 {

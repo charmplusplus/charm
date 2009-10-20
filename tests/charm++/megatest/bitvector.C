@@ -146,5 +146,5 @@ void bitvector_init(void) {
 
 void bitvector_moduleinit(void){}
 
-MEGATEST_REGISTER_TEST(bitvector,"jbooth",0);
+MEGATEST_REGISTER_TEST(bitvector,"jbooth",0)
 #include "bitvector.def.h"

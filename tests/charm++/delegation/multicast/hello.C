@@ -31,7 +31,7 @@ public:
 public:
   myReductionCounter(): reductionNo(0), reductionsRemaining(0) {}
 };
-PUPbytes(myReductionCounter);
+PUPbytes(myReductionCounter)
 
 class main : public Chare
 {

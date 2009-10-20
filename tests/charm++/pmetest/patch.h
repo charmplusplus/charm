@@ -19,7 +19,7 @@ struct PatchInfo {
   int           niterations;
 };
 
-PUPbytes (PatchInfo);
+PUPbytes(PatchInfo)
 
 #include "testpme.decl.h"
 
