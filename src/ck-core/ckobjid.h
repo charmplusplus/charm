@@ -36,22 +36,22 @@ public:
 	inline operator CkHashCode()const{
 		CkHashCode ret=circleShift(type,25);
 		switch(type){
-			case TypeChare:
-				ret += circleShift(data.chare.id.onPE,5);
-				ret += circleShift((long long )data.chare.id.objPtr,3);
-			break;
+		case TypeChare:
+		    ret += circleShift(data.chare.id.onPE,5);
+		    ret += circleShift((CmiInt8)data.chare.id.objPtr,3);
+		    break;
 		case TypeGroup:
 		case TypeNodeGroup:
-			ret += circleShift(data.group.onPE,4);
-			ret += circleShift(data.group.id.idx,6);
-			break;
+		    ret += circleShift(data.group.onPE,4);
+		    ret += circleShift(data.group.id.idx,6);
+		    break;
 		case TypeArray:
-			CkArrayIndex &i1= (CkArrayIndex &)data.array.idx.asMax();
-			CkHashCode temp = i1.hash();
-//			ret = circleShift(ret,13);
-//			ret += circleShift(temp,11);
-			ret += temp;
-			break;
+		    CkArrayIndex &i1= (CkArrayIndex &)data.array.idx.asMax();
+		    CkHashCode temp = i1.hash();
+		    //ret = circleShift(ret,13);
+		    //ret += circleShift(temp,11);
+		    ret += temp;
+		    break;
 		}
 		return ret;
 	}
@@ -100,7 +100,7 @@ public:
 	inline void updatePosition(int PE);
 };
 
-PUPbytes(CkObjID);
+PUPbytes(CkObjID)
 
 typedef unsigned int MCount; //Message Count
 
