@@ -937,7 +937,9 @@ public:
 
   inline int ckGetNumSections() const {return _nsid;}
   inline CkSectionInfo &ckGetSectionInfo() {return _sid[0]._cookie;}
-  inline CkSectionID *ckGetSectionID() {return _sid; }
+  inline CkSectionID *ckGetSectionIDs() {return _sid; }
+  inline CkSectionID &ckGetSectionID() {return _sid[0]; }
+  inline CkSectionID &ckGetSectionID(int i) {return _sid[i]; }
   inline CkGroupID ckGetGroupIDn(int i) const {return (CkGroupID)_sid[i]._cookie.aid;}
   inline int *ckGetElements() const {return _sid[0].pelist;}
   inline int *ckGetElements(int i) const {return _sid[i].pelist;}
@@ -961,8 +963,12 @@ PUPmarshall(CProxySection_Group)
       { return super::ckGetNumSections(); } \
         inline CkSectionInfo &ckGetSectionInfo() \
       { return super::ckGetSectionInfo(); } \
-        inline CkSectionID *ckGetSectionID() \
+        inline CkSectionID *ckGetSectionIDs() \
+      { return super::ckGetSectionIDs(); } \
+        inline CkSectionID &ckGetSectionID() \
       { return super::ckGetSectionID(); } \
+        inline CkSectionID &ckGetSectionID(int i) \
+      { return super::ckGetSectionID(i); } \
         inline CkGroupID ckGetGroupIDn(int i) const \
       { return super::ckGetGroupIDn(i); } \
         inline int *ckGetElements() const \

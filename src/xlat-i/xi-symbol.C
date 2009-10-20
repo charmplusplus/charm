@@ -3201,7 +3201,7 @@ void Entry::genGroupDefs(XStr& str)
       {// Multicast
         str << "  if (ckIsDelegated()) {\n";
         str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
-        str << "     ckDelegatedTo()->"<<node<<"GroupSectionSend(ckDelegatedPtr(),"<<params<<", ckGetNumSections(), ckGetSectionID());\n";
+        str << "     ckDelegatedTo()->"<<node<<"GroupSectionSend(ckDelegatedPtr(),"<<params<<", ckGetNumSections(), ckGetSectionIDs());\n";
         str << "  } else {\n";
         str << "    for (int i=0; i<ckGetNumSections(); ++i) ";
         str << "CkSendMsg"<<node<<"BranchMulti("<<params<<", ckGetGroupIDn(i), ckGetNumElements(i), ckGetElements(i)"<<opts<<");\n";

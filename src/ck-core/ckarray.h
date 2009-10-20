@@ -483,7 +483,9 @@ public:
 
 //	ArrayElement *ckLocal(void) const;
 	inline CkSectionInfo &ckGetSectionInfo() {return _sid->_cookie;}
-	inline CkSectionID *ckGetSectionID() {return _sid;}
+	inline CkSectionID *ckGetSectionIDs() {return _sid;}
+	inline CkSectionID &ckGetSectionID() {return _sid[0];}
+	inline CkSectionID &ckGetSectionID(int i) {return _sid[i];}
 	inline CkArrayID ckGetArrayIDn(int i) const {return _sid[i]._cookie.aid;}
     inline CkArrayIndexMax *ckGetArrayElements() const {return _sid[0]._elems;}
     inline CkArrayIndexMax *ckGetArrayElements(int i) const {return _sid[i]._elems;}
@@ -498,18 +500,22 @@ PUPmarshall(CProxySection_ArrayBase)
 	  { super::ckSend(m,ep,opts); } \
         inline CkSectionInfo &ckGetSectionInfo() \
 	  { return super::ckGetSectionInfo(); } \
-        inline CkSectionID *ckGetSectionID() \
+        inline CkSectionID *ckGetSectionIDs() \
+	  { return super::ckGetSectionIDs(); } \
+        inline CkSectionID &ckGetSectionID() \
 	  { return super::ckGetSectionID(); } \
+        inline CkSectionID &ckGetSectionID(int i) \
+	  { return super::ckGetSectionID(i); } \
         inline CkArrayID ckGetArrayIDn(int i) const \
-      { return super::ckGetArrayIDn(i); }  \
+          { return super::ckGetArrayIDn(i); }  \
         inline CkArrayIndexMax *ckGetArrayElements() const \
 	  { return super::ckGetArrayElements(); } \
         inline CkArrayIndexMax *ckGetArrayElements(int i) const \
-      { return super::ckGetArrayElements(i); } \
+          { return super::ckGetArrayElements(i); } \
         inline int ckGetNumElements() const \
 	  { return super::ckGetNumElements(); }  \
         inline int ckGetNumElements(int i) const \
-      { return super::ckGetNumElements(i); }  \
+          { return super::ckGetNumElements(i); }  \
 
 //Simple C-like API:
 void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts=0);

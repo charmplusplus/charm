@@ -295,7 +295,7 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayElement &proxy)
   if (oldpe == CkMyPe()) return;	// we don't have to recreate one
 
   CkArrayID aid = proxy.ckGetArrayID();
-  CkSectionID *sid = proxy.ckGetSectionID();
+  CkSectionID *sid = proxy.ckGetSectionIDs();
   mCastEntry *entry = new mCastEntry(aid);
 
   mCastEntry *oldentry = (mCastEntry *)info.get_val();
@@ -344,7 +344,7 @@ void CkMulticastMgr::initDelegateMgr(CProxy *cproxy)
 {
   CProxySection_ArrayBase *proxy = (CProxySection_ArrayBase *)cproxy;
   CkArrayID aid = proxy->ckGetArrayID();
-  CkSectionID *sid = proxy->ckGetSectionID();
+  CkSectionID *sid = proxy->ckGetSectionIDs();
 
   mCastEntry *entry = new mCastEntry(aid);
 
