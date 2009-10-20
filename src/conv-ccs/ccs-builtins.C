@@ -273,8 +273,15 @@ void CpdMachineArchitecture(char *msg) {
   reply[2] = sizeof(int);
   // get the size of an "long"
   reply[3] = sizeof(long);
+#if CMK_LONG_LONG_DEFINED
   // get the size of an "long long"
   reply[4] = sizeof(long long);
+#else
+  // Per Filippo, the debugger will be fine with this. It should never
+  // come up, since configure didn't detect support for `long long` on
+  // the machine.
+  reply[4] = 0;
+#endif
   // get the size of an "bool"
   reply[5] = sizeof(bool);
   CcsSendReply(6, (void*)reply);
