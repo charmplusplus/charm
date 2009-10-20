@@ -479,29 +479,6 @@ EOT
 test_cxx "whether C++ allows declaration of varsize array" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_DECLARE_VARSIZE_ARRAY, $pass, [whether C++ allows declaration of variable sized array])
 
-
-#### check if templated members work ####
-cat > $t <<EOT
-typedef void (*func_t)(void);
-class foo_foo {
-protected:
-        int len;
-};
-class foo: public foo_foo {
-public:
-	template<func_t f> //Templated member function
-	void memb(void) {f(); len++;}
-};
-inline void fn() {}
-void myfunc()
-{
-  foo x;
-  x.template memb<fn>();
-}
-EOT
-test_cxx "whether templated member functions work" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_TEMPLATE_MEMBERS_BROKEN, $fail, [whether templated member functions work])
-
 ##### check if the stl headers use .h #####
 cat > $t <<EOT
 #include <iostream>

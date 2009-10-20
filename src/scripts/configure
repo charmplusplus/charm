@@ -2191,33 +2191,6 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
-
-#### check if templated members work ####
-cat > $t <<EOT
-typedef void (*func_t)(void);
-class foo_foo {
-protected:
-        int len;
-};
-class foo: public foo_foo {
-public:
-	template<func_t f> //Templated member function
-	void memb(void) {f(); len++;}
-};
-inline void fn() {}
-void myfunc()
-{
-  foo x;
-  x.template memb<fn>();
-}
-EOT
-test_cxx "whether templated member functions work" "ok" "no" ""
-
-cat >>confdefs.h <<_ACEOF
-#define CMK_TEMPLATE_MEMBERS_BROKEN $fail
-_ACEOF
-
-
 ##### check if the stl headers use .h #####
 cat > $t <<EOT
 #include <iostream>
