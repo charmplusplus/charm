@@ -64,7 +64,7 @@ int MsaHashtable::Add::addTuple(int *tuple,int nodesPerTuple,int chunk,int eleme
 	}
 
 	//find out the index
-	long long sum = 0;
+	CmiUInt8 sum = 0;
 	for(int i=0;i<nodesPerTuple;i++){
 		sum = sum*slots + tuple[i];
 	}
