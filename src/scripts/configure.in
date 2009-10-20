@@ -530,7 +530,7 @@ AC_DEFINE_UNQUOTED(CMK_USE_STL, $pass, [whether the std:: names for STL work])
 cat > $t <<EOT
 namespace foo {
 	int x;
-};
+}
 EOT
 test_cxx "whether namespaces work" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_NAMESPACES_BROKEN, $fail, [whether namespaces work])

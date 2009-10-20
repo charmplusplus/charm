@@ -2258,7 +2258,7 @@ _ACEOF
 cat > $t <<EOT
 namespace foo {
 	int x;
-};
+}
 EOT
 test_cxx "whether namespaces work" "ok" "no" ""
 
