@@ -23,7 +23,7 @@
 
 //#define DEBUG
 
-CreateLBFunc_Def(OrbLB, "partition objects based on coordinates");
+CreateLBFunc_Def(OrbLB, "partition objects based on coordinates")
 
 OrbLB::OrbLB(const CkLBOptions &opt): CentralLB(opt)
 {

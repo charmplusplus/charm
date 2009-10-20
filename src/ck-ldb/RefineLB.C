@@ -16,7 +16,7 @@
 
 #include "RefineLB.h"
 
-CreateLBFunc_Def(RefineLB, "Move objects away from overloaded processor to reach average");
+CreateLBFunc_Def(RefineLB, "Move objects away from overloaded processor to reach average")
 
 RefineLB::RefineLB(const CkLBOptions &opt): CentralLB(opt)
 {
@@ -61,7 +61,7 @@ void RefineLB::work(BaseLB::LDStats* stats, int count)
   // Free the refine buffers
   Refiner::FreeProcs(from_procs);
   Refiner::FreeProcs(to_procs);
-};
+}
 
 #include "RefineLB.def.h"
 

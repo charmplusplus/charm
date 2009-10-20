@@ -22,7 +22,7 @@ Status:
 
 extern LBAllocFn getLBAllocFn(char *lbname);
 
-CreateLBFunc_Def(ComboCentLB, "Allow multiple strategies to work serially");
+CreateLBFunc_Def(ComboCentLB, "Allow multiple strategies to work serially")
 
 ComboCentLB::ComboCentLB(const CkLBOptions &opt): CentralLB(opt)
 {

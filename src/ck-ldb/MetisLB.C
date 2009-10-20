@@ -16,7 +16,7 @@
 
 #include "MetisLB.h"
 
-CreateLBFunc_Def(MetisLB, "Use Metis(tm) to partition object graph");
+CreateLBFunc_Def(MetisLB, "Use Metis(tm) to partition object graph")
 
 MetisLB::MetisLB(const CkLBOptions &opt): CentralLB(opt)
 {

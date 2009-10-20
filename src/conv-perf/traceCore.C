@@ -433,9 +433,9 @@ void TraceLogger::write(void)
 }
 
 //TODO
-void TraceLogger::writeBinary(void) {};
+void TraceLogger::writeBinary(void) {}
 //TODO
-void TraceLogger::writeSts(void) {};
+void TraceLogger::writeSts(void) {}
 
 void TraceLogger::add(int lID, int eID, double timestamp, int iLen, int* iData, int sLen, char* sData)
 {

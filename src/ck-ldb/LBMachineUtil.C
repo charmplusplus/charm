@@ -44,7 +44,7 @@ LBMachineUtil::LBMachineUtil()
   total_idletime = 0;
   start_totalwall = start_totalcpu = -1.;
   total_idletime = 0;
-};
+}
 
 void LBMachineUtil::StatsOn()
 {
@@ -94,7 +94,7 @@ void LBMachineUtil::StatsOff()
     total_cputime += (cur_cpu - start_totalcpu);
   }
   start_totalwall = start_totalcpu = -1.;
-};
+}
 
 void LBMachineUtil::Clear()
 {

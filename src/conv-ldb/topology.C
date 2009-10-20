@@ -169,15 +169,15 @@ typedef LBTopo_smp_n<2> LBTopo_smp_n_2;
 typedef LBTopo_smp_n<3> LBTopo_smp_n_3;
 typedef LBTopo_smp_n<4> LBTopo_smp_n_4;
 
-LBTOPO_MACRO(LBTopo_smp_n_1);
-LBTOPO_MACRO(LBTopo_smp_n_2);
-LBTOPO_MACRO(LBTopo_smp_n_3);
-LBTOPO_MACRO(LBTopo_smp_n_4);
+LBTOPO_MACRO(LBTopo_smp_n_1)
+LBTOPO_MACRO(LBTopo_smp_n_2)
+LBTOPO_MACRO(LBTopo_smp_n_3)
+LBTOPO_MACRO(LBTopo_smp_n_4)
 
 
 // ring
 
-LBTOPO_MACRO(LBTopo_ring);
+LBTOPO_MACRO(LBTopo_ring)
 
 int LBTopo_ring::max_neighbors()
 {
@@ -205,7 +205,7 @@ int LBTopo_ring::get_hop_count(int src,int dest){
 
 //  TORUS 2D
 
-LBTOPO_MACRO(LBTopo_torus2d);
+LBTOPO_MACRO(LBTopo_torus2d)
 
 LBTopo_torus2d::LBTopo_torus2d(int p): LBTopology(p) 
 {
@@ -383,7 +383,7 @@ int LBTopo_torus2d::get_hop_count(int src,int dest){
 
 //  TORUS 3D
 
-LBTOPO_MACRO(LBTopo_torus3d);
+LBTOPO_MACRO(LBTopo_torus3d)
 
 LBTopo_torus3d::LBTopo_torus3d(int p): LBTopology(p) 
 {
@@ -487,7 +487,7 @@ int LBTopo_torus3d::get_hop_count(int src,int dest){
 */
 
 //Mesh3D
-LBTOPO_MACRO(LBTopo_mesh3d);
+LBTOPO_MACRO(LBTopo_mesh3d)
 
 LBTopo_mesh3d::LBTopo_mesh3d(int p): LBTopology(p) 
 {
@@ -682,13 +682,13 @@ typedef LBTopo_torus_nd<5> LBTopo_torus_nd_5;
 typedef LBTopo_torus_nd<6> LBTopo_torus_nd_6;
 typedef LBTopo_torus_nd<7> LBTopo_torus_nd_7;
 
-LBTOPO_MACRO(LBTopo_torus_nd_1);
-LBTOPO_MACRO(LBTopo_torus_nd_2);
-LBTOPO_MACRO(LBTopo_torus_nd_3);
-LBTOPO_MACRO(LBTopo_torus_nd_4);
-LBTOPO_MACRO(LBTopo_torus_nd_5);
-LBTOPO_MACRO(LBTopo_torus_nd_6);
-LBTOPO_MACRO(LBTopo_torus_nd_7);
+LBTOPO_MACRO(LBTopo_torus_nd_1)
+LBTOPO_MACRO(LBTopo_torus_nd_2)
+LBTOPO_MACRO(LBTopo_torus_nd_3)
+LBTOPO_MACRO(LBTopo_torus_nd_4)
+LBTOPO_MACRO(LBTopo_torus_nd_5)
+LBTOPO_MACRO(LBTopo_torus_nd_6)
+LBTOPO_MACRO(LBTopo_torus_nd_7)
 
 
 
@@ -790,13 +790,13 @@ typedef LBTopo_itorus_nd<5> LBTopo_itorus_nd_5;
 typedef LBTopo_itorus_nd<6> LBTopo_itorus_nd_6;
 typedef LBTopo_itorus_nd<7> LBTopo_itorus_nd_7;
 
-LBTOPO_MACRO(LBTopo_itorus_nd_1);
-LBTOPO_MACRO(LBTopo_itorus_nd_2);
-LBTOPO_MACRO(LBTopo_itorus_nd_3);
-LBTOPO_MACRO(LBTopo_itorus_nd_4);
-LBTOPO_MACRO(LBTopo_itorus_nd_5);
-LBTOPO_MACRO(LBTopo_itorus_nd_6);
-LBTOPO_MACRO(LBTopo_itorus_nd_7);
+LBTOPO_MACRO(LBTopo_itorus_nd_1)
+LBTOPO_MACRO(LBTopo_itorus_nd_2)
+LBTOPO_MACRO(LBTopo_itorus_nd_3)
+LBTOPO_MACRO(LBTopo_itorus_nd_4)
+LBTOPO_MACRO(LBTopo_itorus_nd_5)
+LBTOPO_MACRO(LBTopo_itorus_nd_6)
+LBTOPO_MACRO(LBTopo_itorus_nd_7)
 
 
 /******************************************************************/
@@ -908,18 +908,18 @@ typedef LBTopo_imesh_nd<5> LBTopo_imesh_nd_5;
 typedef LBTopo_imesh_nd<6> LBTopo_imesh_nd_6;
 typedef LBTopo_imesh_nd<7> LBTopo_imesh_nd_7;
 
-LBTOPO_MACRO(LBTopo_imesh_nd_1);
-LBTOPO_MACRO(LBTopo_imesh_nd_2);
-LBTOPO_MACRO(LBTopo_imesh_nd_3);
-LBTOPO_MACRO(LBTopo_imesh_nd_4);
-LBTOPO_MACRO(LBTopo_imesh_nd_5);
-LBTOPO_MACRO(LBTopo_imesh_nd_6);
-LBTOPO_MACRO(LBTopo_imesh_nd_7);
+LBTOPO_MACRO(LBTopo_imesh_nd_1)
+LBTOPO_MACRO(LBTopo_imesh_nd_2)
+LBTOPO_MACRO(LBTopo_imesh_nd_3)
+LBTOPO_MACRO(LBTopo_imesh_nd_4)
+LBTOPO_MACRO(LBTopo_imesh_nd_5)
+LBTOPO_MACRO(LBTopo_imesh_nd_6)
+LBTOPO_MACRO(LBTopo_imesh_nd_7)
 
 
 // dense graph
 
-LBTOPO_MACRO(LBTopo_graph);
+LBTOPO_MACRO(LBTopo_graph)
 
 int LBTopo_graph::max_neighbors()
 {
@@ -947,7 +947,7 @@ public:
   }
 };
 
-LBTOPO_MACRO(LBTopo_complete);
+LBTOPO_MACRO(LBTopo_complete)
 
 //   k-ary tree
 
@@ -971,9 +971,9 @@ typedef LBTopo_karytree<2> LBTopo_2_arytree;
 typedef LBTopo_karytree<3> LBTopo_3_arytree;
 typedef LBTopo_karytree<3> LBTopo_4_arytree;
 
-LBTOPO_MACRO(LBTopo_2_arytree);
-LBTOPO_MACRO(LBTopo_3_arytree);
-LBTOPO_MACRO(LBTopo_4_arytree);
+LBTOPO_MACRO(LBTopo_2_arytree)
+LBTOPO_MACRO(LBTopo_3_arytree)
+LBTOPO_MACRO(LBTopo_4_arytree)
 
 //
 

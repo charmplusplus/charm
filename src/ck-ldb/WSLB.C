@@ -28,7 +28,7 @@
 #define VACATE_AFTER 30
 #define UNVACATE_AFTER 15
 
-CreateLBFunc_Def(WSLB, "Workstation load balancer");
+CreateLBFunc_Def(WSLB, "Workstation load balancer")
 
 void WSLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
 {
@@ -585,7 +585,7 @@ LBMigrateMsg* WSLB::Strategy(WSLB::LDStats* stats, int count)
 #else
   return NULL;
 #endif
-};
+}
 
 #include "WSLB.def.h"
 

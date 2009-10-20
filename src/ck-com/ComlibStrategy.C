@@ -99,12 +99,12 @@ void CharmMessageHolder::pup(PUP::er &p) {
 }
 
 //PUPable_def(CharmStrategy);
-PUPable_def(CharmMessageHolder);
+PUPable_def(CharmMessageHolder)
 
 ComlibNodeGroupInfo::ComlibNodeGroupInfo() {
     isNodeGroup = 0;
     ngid.setZero();
-};
+}
 
 void ComlibNodeGroupInfo::pup(PUP::er &p) {
     p | isNodeGroup;
@@ -121,7 +121,7 @@ ComlibGroupInfo::ComlibGroupInfo() {
     destpelist = NULL;
     sgid.setZero();
     dgid.setZero();
-};
+}
 
 ComlibGroupInfo::~ComlibGroupInfo() {
     if(nsrcpes > 0 && srcpelist != NULL)
@@ -241,7 +241,7 @@ ComlibArrayInfo::ComlibArrayInfo() {
     isAllDest = 0;
     totalDest = 0;
     isDestArray = 0;
-};
+}
 
 
 void ComlibArrayInfo::setSourceArray(CkArrayID aid, CkArrayIndexMax *e, int nind){

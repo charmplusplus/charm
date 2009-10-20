@@ -11,7 +11,7 @@
 #include "GridMetisLB.h"
 #include "manager.h"
 
-CreateLBFunc_Def (GridMetisLB, "Grid load balancer that uses Metis to optimize communication graph");
+CreateLBFunc_Def (GridMetisLB, "Grid load balancer that uses Metis to optimize communication graph")
 
 
 

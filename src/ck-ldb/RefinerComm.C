@@ -449,7 +449,7 @@ void RefinerComm::Refine(int count, BaseLB::LDStats* stats,
   delete [] computes;
   delete [] processors;
   delete commTable;
-};
+}
 
 RefinerComm::CommTable::CommTable(int P)
 {

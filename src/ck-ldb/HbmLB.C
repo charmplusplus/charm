@@ -22,7 +22,7 @@
 
 #define  DEBUGF(x)     //  CmiPrintf x;
 
-CreateLBFunc_Def(HbmLB, "HybridBase load balancer");
+CreateLBFunc_Def(HbmLB, "HybridBase load balancer")
 
 void HbmLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
 {

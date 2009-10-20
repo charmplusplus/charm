@@ -254,6 +254,6 @@ void StreamingStrategy::pup(PUP::er &p){
   if (p.isPacking() || p.isUnpacking()) registerFlush();
 }
 
-PUPable_def(StreamingStrategy);
+PUPable_def(StreamingStrategy)
 
 /*@}*/

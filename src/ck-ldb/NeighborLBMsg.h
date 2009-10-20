@@ -17,6 +17,6 @@ public:
   NLBStatsMsg *getMessage(void) {void *ret=msg; msg=NULL; return (NLBStatsMsg*)ret;}
   void pup(PUP::er &p);
 };
-PUPmarshall(CkMarshalledNLBStatsMessage);
+PUPmarshall(CkMarshalledNLBStatsMessage)
 
 #endif

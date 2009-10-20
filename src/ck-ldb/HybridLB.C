@@ -28,7 +28,7 @@
 
 #define  DEBUGF(x)      // CmiPrintf x;
 
-CreateLBFunc_Def(HybridLB, "Hybrid load balancer");
+CreateLBFunc_Def(HybridLB, "Hybrid load balancer")
 
 HybridLB::HybridLB(const CkLBOptions &opt): HybridBaseLB(opt)
 {

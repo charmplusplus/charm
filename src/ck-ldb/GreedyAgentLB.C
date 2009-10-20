@@ -23,7 +23,7 @@
 
 #define LOAD_OFFSET 0.05
 
-CreateLBFunc_Def(GreedyAgentLB,"always assign the heaviest obj onto lightest loaded processor taking into account the topology");
+CreateLBFunc_Def(GreedyAgentLB,"always assign the heaviest obj onto lightest loaded processor taking into account the topology")
 
 /*static void lbinit(void) {
   LBRegisterBalancer("GreedyAgentLB", 

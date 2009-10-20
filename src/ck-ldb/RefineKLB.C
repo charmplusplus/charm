@@ -19,7 +19,7 @@
 #define _USE_RESIDUAL_MOVES_ 1
 //#include "heap.h"
 
-CreateLBFunc_Def(RefineKLB, "Move objects away from overloaded processor to reach average");
+CreateLBFunc_Def(RefineKLB, "Move objects away from overloaded processor to reach average")
 
 RefineKLB::RefineKLB(const CkLBOptions &opt): CentralLB(opt)
 {
@@ -96,7 +96,7 @@ void RefineKLB::work(BaseLB::LDStats* stats, int count)
   // Free the refine buffers
   RefinerApprox::FreeProcs(from_procs);
   RefinerApprox::FreeProcs(to_procs);
-};
+}
 
 void RefineKLB::performGreedyMoves(int count, BaseLB::LDStats* stats,int *from_procs, int *to_procs, int numMoves)
 {

@@ -302,7 +302,7 @@ void SumLogPool::initMem()
 
 int SumLogPool::getUtilization(int interval, int ep) {
     return (int)(getCPUtime(interval, ep) * 100.0 / CkpvAccess(binSize)); 
-};
+}
 
 void SumLogPool::write(void) 
 {
@@ -568,7 +568,7 @@ void SumLogPool::updateSummaryDetail(int epIdx, double startTime, double endTime
         }
 
         incNumExecutions(startingBinIdx, epIdx);
-};
+}
 
 // Shrinks pool[], cpuTime[], and numExecutions[]
 void SumLogPool::shrink(void)

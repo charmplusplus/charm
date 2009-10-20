@@ -11,7 +11,7 @@
 #include "GridHybridSeedLB.h"
 #include "manager.h"
 
-CreateLBFunc_Def (GridHybridSeedLB, "Grid load balancer that uses hybrid seed technique to optimize communication graph");
+CreateLBFunc_Def (GridHybridSeedLB, "Grid load balancer that uses hybrid seed technique to optimize communication graph")
 
 
 

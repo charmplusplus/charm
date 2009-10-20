@@ -24,7 +24,7 @@
 #include "cklists.h"
 #include "GreedyLB.h"
 
-CreateLBFunc_Def(GreedyLB, "always assign the heaviest obj onto lightest loaded processor.");
+CreateLBFunc_Def(GreedyLB, "always assign the heaviest obj onto lightest loaded processor.")
 
 GreedyLB::GreedyLB(const CkLBOptions &opt): CentralLB(opt)
 {

@@ -356,7 +356,7 @@ void Refiner::Refine(int count, BaseLB::LDStats* stats,
     CkPrintf("Refiner: moving %d obejcts. \n", nmoves);
   delete [] computes;
   delete [] processors;
-};
+}
 
 
 /*@}*/

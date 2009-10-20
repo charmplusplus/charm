@@ -11,7 +11,7 @@
 #include "GridHybridLB.h"
 #include "manager.h"
 
-CreateLBFunc_Def (GridHybridLB, "Grid load balancer that uses hybrid technique to optimize communication graph");
+CreateLBFunc_Def (GridHybridLB, "Grid load balancer that uses hybrid technique to optimize communication graph")
 
 
 

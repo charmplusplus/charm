@@ -31,7 +31,7 @@ Date: 04/19/2005
 #define _INIT_FROM_FILE  
 
 
-CreateLBFunc_Def(TopoLB,"TopoLB: Balance objects based on the network topology");
+CreateLBFunc_Def(TopoLB,"TopoLB: Balance objects based on the network topology")
 
 
 TopoLB::TopoLB(const CkLBOptions &opt) : CentralLB (opt)

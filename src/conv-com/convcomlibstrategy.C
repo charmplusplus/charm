@@ -16,7 +16,7 @@ Strategy::Strategy() : PUP::able() {
     //higherLevel = this;
     isStrategyBracketed = 0;
     //destinationHandler = 0;
-};
+}
 
 //Each strategy must define his own Pup interface.
 void Strategy::pup(PUP::er &p){ 
@@ -189,7 +189,7 @@ const char *StrategyTableEntry::discoveryModeString(){
 
 
 //PUPable_def(Strategy);
-PUPable_def(MessageHolder);
+PUPable_def(MessageHolder)
 
 //CsvDeclare(int, pipeBcastPropagateHandle);
 //CsvDeclare(int, pipeBcastPropagateHandle_frag);

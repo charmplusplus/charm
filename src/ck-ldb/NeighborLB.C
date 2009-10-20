@@ -17,7 +17,7 @@
 #include "heap.h"
 #include "NeighborLB.h"
 
-CreateLBFunc_Def(NeighborLB, "The neighborhood load balancer");
+CreateLBFunc_Def(NeighborLB, "The neighborhood load balancer")
 
 NeighborLB::NeighborLB(const CkLBOptions &opt):NborBaseLB(opt)
 {
@@ -168,7 +168,7 @@ LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
 #else
   return NULL;
 #endif
-};
+}
 
 #include "NeighborLB.def.h"
 

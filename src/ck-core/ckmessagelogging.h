@@ -39,7 +39,7 @@ public:
 		state = 0;
 	}
 };
-PUPbytes(Ticket);
+PUPbytes(Ticket)
 class MlogEntry;
 
 //Log entry for local messages, can also be sent as a message
@@ -52,7 +52,7 @@ typedef struct{
 	MlogEntry *entry;
 	int PE;
 } LocalMessageLog;
-PUPbytes(LocalMessageLog);
+PUPbytes(LocalMessageLog)
 
 class MlogEntry;
 class RestoredLocalMap;
@@ -602,6 +602,6 @@ extern int _receiveLocationHandlerIdx;
 extern "C" void CmiDeliverRemoteMsgHandlerRange(int lowerHandler,int higherHandler);
 inline void processRemoteMlogMessages(){
 	CmiDeliverRemoteMsgHandlerRange(_ticketRequestHandlerIdx,_receiveLocationHandlerIdx);
-};
+}
 
 #endif

@@ -22,7 +22,7 @@ Status:
 
 #include "RandCentLB.h"
 
-CreateLBFunc_Def(RandCentLB, "Assign objects to processors randomly");
+CreateLBFunc_Def(RandCentLB, "Assign objects to processors randomly")
 
 RandCentLB::RandCentLB(const CkLBOptions &opt): CentralLB(opt)
 {

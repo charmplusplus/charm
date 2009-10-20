@@ -28,7 +28,7 @@ Status:
 #include "GreedyCommLB.h"
 #include "manager.h"
 
-CreateLBFunc_Def(GreedyCommLB, "Greedy algorithm which takes communication graph into account");
+CreateLBFunc_Def(GreedyCommLB, "Greedy algorithm which takes communication graph into account")
 
 void GreedyCommLB::init()
 {

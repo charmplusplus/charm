@@ -23,7 +23,7 @@
 #define PER_MESSAGE_RECV_OVERHEAD   0.0
 #define PER_BYTE_RECV_OVERHEAD      0.0
 
-CreateLBFunc_Def(NeighborCommLB, "The neighborhood load balancer with communication");
+CreateLBFunc_Def(NeighborCommLB, "The neighborhood load balancer with communication")
 
 NeighborCommLB::NeighborCommLB(const CkLBOptions &opt):NborBaseLB(opt)
 {
@@ -307,7 +307,7 @@ bool _lb_debug2=0;
 #else
   return NULL;
 #endif
-};
+}
 
 #include "NeighborCommLB.def.h"
 

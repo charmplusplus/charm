@@ -688,7 +688,7 @@ void RefinerApprox::Refine(int count, CentralLB::LDStats* stats,
   if (_lb_debug) CkPrintf("RefinerApprox: moving %d objects. \n", nmoves);
   delete [] computes;
   delete [] processors;
-};
+}
 
 
 void  RefinerApprox::printStats(int newStats)

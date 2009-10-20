@@ -49,7 +49,7 @@
 #include "GridCommRefineLB.h"
 #include "manager.h"
 
-CreateLBFunc_Def (GridCommRefineLB, "Grid communication load balancer (refines object mapping within each cluster)");
+CreateLBFunc_Def (GridCommRefineLB, "Grid communication load balancer (refines object mapping within each cluster)")
 
 
 

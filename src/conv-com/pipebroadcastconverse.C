@@ -382,6 +382,6 @@ void PipeBroadcastConverse::pup(PUP::er &p){
   */
 }
 
-PUPable_def(PipeBroadcastConverse);
+PUPable_def(PipeBroadcastConverse)
 
 /*@}*/

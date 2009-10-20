@@ -11,7 +11,7 @@ class CkMcastBaseMsg;
 class reductionInfo;
 
 typedef mCastEntry * mCastEntryPtr;
-PUPbytes(mCastEntryPtr);
+PUPbytes(mCastEntryPtr)
 
 #define MAXMCASTCHILDREN 2
 

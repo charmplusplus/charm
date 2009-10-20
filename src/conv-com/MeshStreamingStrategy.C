@@ -761,6 +761,6 @@ void MeshStreamingStrategy::pup (PUP::er &p)
     }
 }
 
-PUPable_def(MeshStreamingStrategy);
+PUPable_def(MeshStreamingStrategy)
 
 /*@}*/

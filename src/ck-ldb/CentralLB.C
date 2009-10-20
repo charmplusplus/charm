@@ -48,7 +48,7 @@ CkGroupID loadbalancer;
 int * lb_ptr;
 int load_balancer_created;
 
-CreateLBFunc_Def(CentralLB, "CentralLB base class");
+CreateLBFunc_Def(CentralLB, "CentralLB base class")
 
 static void getPredictedLoadWithMsg(BaseLB::LDStats* stats, int count, 
 		             LBMigrateMsg *, LBInfo &info, int considerComm);

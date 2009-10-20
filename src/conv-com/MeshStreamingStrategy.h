@@ -30,7 +30,7 @@ struct MeshStreamingHeader {
     int num_msgs;
 };
 
-PUPbytes(MeshStreamingHeader);
+PUPbytes(MeshStreamingHeader)
 
 /**
  * This is MeshStreamingStrategy, a strategy in the Charm++ communications

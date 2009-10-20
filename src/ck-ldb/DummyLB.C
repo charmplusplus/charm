@@ -14,7 +14,7 @@
 
 #include "DummyLB.h"
 
-CreateLBFunc_Def(DummyLB, "Dummy load balancer, like a normal one but with empty strategy");
+CreateLBFunc_Def(DummyLB, "Dummy load balancer, like a normal one but with empty strategy")
 
 #include "DummyLB.def.h"
 

@@ -26,7 +26,7 @@ struct StreamingMessage {
   CmiUInt4 nmsgs;
 };
 
-PUPbytes(StreamingMessage);
+PUPbytes(StreamingMessage)
 
 /**
  * Strategy that buffers small messages and combines them to send few bigger

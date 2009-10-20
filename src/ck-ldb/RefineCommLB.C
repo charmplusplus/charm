@@ -16,7 +16,7 @@
 
 #include "RefineCommLB.h"
 
-CreateLBFunc_Def(RefineCommLB, "Average load among processors by moving objects away from overloaded processor, communication aware");
+CreateLBFunc_Def(RefineCommLB, "Average load among processors by moving objects away from overloaded processor, communication aware")
 
 RefineCommLB::RefineCommLB(const CkLBOptions &opt): RefineLB(opt)
 {
@@ -66,7 +66,7 @@ void RefineCommLB::work(BaseLB::LDStats* stats, int count)
   RefinerComm::FreeProcs(from_procs);
   RefinerComm::FreeProcs(to_procs);
 #endif
-};
+}
 
 #include "RefineCommLB.def.h"
 

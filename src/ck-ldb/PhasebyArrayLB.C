@@ -16,7 +16,7 @@
 
 extern LBAllocFn getLBAllocFn(char *lbname);
 
-CreateLBFunc_Def(PhasebyArrayLB, "Load balancer which balances many arrays together, specifically for CPAIMD");
+CreateLBFunc_Def(PhasebyArrayLB, "Load balancer which balances many arrays together, specifically for CPAIMD")
 
 #include "PhasebyArrayLB.def.h"
 

@@ -24,7 +24,7 @@
 //#define RAND_COMM
 #define make_mapping 0
 
-CreateLBFunc_Def(TopoCentLB,"Balance objects based on the network topology");
+CreateLBFunc_Def(TopoCentLB,"Balance objects based on the network topology")
 
 
 /*static void lbinit (void)

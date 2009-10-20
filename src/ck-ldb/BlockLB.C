@@ -7,7 +7,7 @@
 #include "BlockLB.h"
 
 
-CreateLBFunc_Def (BlockLB, "Allocate objects in blocks to the remaining valid PE");
+CreateLBFunc_Def (BlockLB, "Allocate objects in blocks to the remaining valid PE")
 
 /**************************************************************************
 **

@@ -46,7 +46,7 @@ extern "C" {
 
 
 
-CreateLBFunc_Def(RecBisectBfLB, "Recursive partitioning with Breadth first enumeration");
+CreateLBFunc_Def(RecBisectBfLB, "Recursive partitioning with Breadth first enumeration")
 
 RecBisectBfLB::RecBisectBfLB(const CkLBOptions &opt): CentralLB(opt)
 {
@@ -116,7 +116,7 @@ void RecBisectBfLB::work(BaseLB::LDStats* stats,
   free(partitions);
 
   CmiPrintf("returning from partitioner strategy\n");
-};
+}
 
 
 Graph *

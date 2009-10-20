@@ -43,7 +43,7 @@
 #include "GridCommLB.h"
 #include "manager.h"
 
-CreateLBFunc_Def (GridCommLB, "Grid communication load balancer (evenly distribute objects across each cluster)");
+CreateLBFunc_Def (GridCommLB, "Grid communication load balancer (evenly distribute objects across each cluster)")
 
 
 

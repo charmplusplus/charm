@@ -567,6 +567,6 @@ void RouterStrategy::pup(PUP::er &p) {
   else newKnowledge = NULL;
 }
 
-PUPable_def(RouterStrategy);
+PUPable_def(RouterStrategy)
 
 /*@}*/
