@@ -83,7 +83,7 @@ void NetFEM_Scalar(NetFEM n,const double *start,int doublePer,
 	const char *name);
 
 #ifdef __cplusplus
-};
+}
 #endif
 
 #endif

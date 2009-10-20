@@ -57,7 +57,7 @@ void ILSI_CG_Solver(ILSI_Param *param, ILSI_Comm *comm,
 
 
 #ifdef __cplusplus
-};
+}
 #endif
 
 #endif

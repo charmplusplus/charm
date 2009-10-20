@@ -62,7 +62,7 @@ inline void MPI_Bcast_pup(T &t, int root,MPI_Comm comm) {
 	pup_checkMPI(MPI_Bcast(buf,len,MPI_BYTE, root,comm));
 	PUP::fromMemBuf(t,buf,len);
 	delete [] buf;
-};
+}
 
 
 #endif

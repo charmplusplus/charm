@@ -195,7 +195,7 @@ void ParFUM_generateGlobalNodeNumbers(int fem_mesh, MPI_Comm comm){
 	delete []primaryChunk;
 	delete [] sendListIndex;
 	delete [] recvListIndex;
-};
+}
 
 //function to add a node to the list for a particular node
 void addToLists(int *listIndex,CkVec<CkVec<int> > &lists,int chunk,int node){

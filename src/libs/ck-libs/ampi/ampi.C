@@ -530,7 +530,7 @@ void AMPI_Uninstall_Idle_Timer(){
 #endif
 }
 
-PUPfunctionpointer(MPI_MainFn);
+PUPfunctionpointer(MPI_MainFn)
 
 class MPI_threadstart_t {
 public:
@@ -556,7 +556,7 @@ public:
 		p|fn;
 	}
 };
-PUPmarshall(MPI_threadstart_t);
+PUPmarshall(MPI_threadstart_t)
 
 CDECL void AMPI_threadstart(void *data)
 {

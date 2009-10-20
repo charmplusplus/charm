@@ -18,7 +18,7 @@ static int armciLibStart_idx = -1;
 void armciNodeInit(void) {
   CmiAssert(armciLibStart_idx == -1);
   armciLibStart_idx = TCHARM_Register_thread_function((TCHARM_Thread_data_start_fn)armciLibStart);
-};
+}
 
 // Default startup routine (can be overridden by user's own)
 // This will be registered with TCharm's startup routine
@@ -37,7 +37,7 @@ void armciProcInit(void) {
 
   // Register the library's default startup routine to TCharm
   TCHARM_Set_fallback_setup(ArmciDefaultSetup);
-};
+}
 
 ArmciVirtualProcessor::ArmciVirtualProcessor(const CProxy_TCharm &_thr_proxy)
   : TCharmClient1D(_thr_proxy) {

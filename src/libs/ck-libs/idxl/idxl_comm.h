@@ -28,7 +28,7 @@ class IDXL_Share {
   IDXL_Share(int c,int i) :chk(c), idx(i) {}
   void pup(PUP::er &p) {p(chk); p(idx);}
 };
-PUPmarshall(IDXL_Share);
+PUPmarshall(IDXL_Share)
 
 /**
  * IDXL_Rec lists all the chunks that share an entity.

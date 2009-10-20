@@ -99,5 +99,5 @@ void LV3D_Universe::render(const CkViewpoint &vp) {
 #endif
 
 
-PUPable_def(LV3D_Universe);
+PUPable_def(LV3D_Universe)
 

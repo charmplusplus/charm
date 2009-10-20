@@ -25,7 +25,7 @@ public:
 	const char *cmd; ///< Shell command to execute.
 	int *ret; ///< Place to store command's return value.
 };
-PUPbytes(callSystemStruct);
+PUPbytes(callSystemStruct)
 
 
 #include "tcharm.decl.h"

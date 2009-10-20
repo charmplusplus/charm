@@ -16,7 +16,7 @@ IDXL_Create(void) {
 	return c->addDynamic();
 }
 FORTRAN_AS_C_RETURN(int, IDXL_CREATE,IDXL_Create,idxl_create,
-	(void), () );
+	(void), () )
 
 
 /** Print the send and recv indices in this communications list: */
@@ -35,7 +35,7 @@ void IDXL_Print(IDXL_t l_t)
 	}
 }
 FORTRAN_AS_C(IDXL_PRINT,IDXL_Print,idxl_print,
-	(int *l), (*l) );
+	(int *l), (*l) )
 
 /** Copy the indices in src into l. */
 CDECL void 
@@ -43,7 +43,7 @@ IDXL_Copy(IDXL_t l,IDXL_t src) {
 	IDXL_Combine(l,src,0,0);
 }
 FORTRAN_AS_C(IDXL_COPY,IDXL_Copy,idxl_copy,
-	(int *l, int *src), (*l,*src));
+	(int *l, int *src), (*l,*src))
 
 
 //Add all of src's entities into dest, shifting by idxShift
@@ -74,7 +74,7 @@ IDXL_Shift(IDXL_t l_t,int startSend,int startRecv) {
 }
 FORTRAN_AS_C(IDXL_SHIFT,IDXL_Shift,idxl_shift,
 	(int *l, int *startSend,int *startRecv), 
-	(*l, *startSend-1, *startRecv-1));
+	(*l, *startSend-1, *startRecv-1))
 
 
 //Add all of src's entities into dest, shifting by idxShift
@@ -120,7 +120,7 @@ IDXL_Combine(IDXL_t dest_t,IDXL_t src_t,int startSend,int startRecv)
 }
 FORTRAN_AS_C(IDXL_COMBINE,IDXL_Combine,idxl_combine,
 	(int *dest, int *src, int *startSend,int *startRecv), 
-	(*dest,*src, *startSend-1, *startRecv-1));
+	(*dest,*src, *startSend-1, *startRecv-1))
 
 
 /** Sort the indices in this list by these 2D coordinates */
@@ -130,7 +130,7 @@ CDECL void IDXL_Sort_2d(IDXL_t l_t,double *coord2d){
 	IDXLAPI(caller); IDXL_Chunk *c=IDXL_Chunk::get(caller);
 	IDXL &l=c->lookup(l_t,caller);
 	l.sort2d(coord2d);
-};
+}
 
 
 /** Sort the indices in this list by these 3D coordinates */
@@ -140,7 +140,7 @@ CDECL void IDXL_Sort_3d(IDXL_t l_t,double *coord3d){
 	IDXLAPI(caller); IDXL_Chunk *c=IDXL_Chunk::get(caller);
 	IDXL &l=c->lookup(l_t,caller);
 	l.sort3d(coord3d);
-};
+}
 
 
 
@@ -207,7 +207,7 @@ CDECL void IDXL_Destroy(IDXL_t l) {
 	IDXLAPI(caller); IDXL_Chunk *c=IDXL_Chunk::get(caller);
 	c->destroy(l);
 }
-FORTRAN_AS_C(IDXL_DESTROY,IDXL_Destroy,idxl_destroy,  (int *l), (*l));
+FORTRAN_AS_C(IDXL_DESTROY,IDXL_Destroy,idxl_destroy,  (int *l), (*l))
 
 /*********************** Lookups **********************
 HACK: rather than do some funky dynamic allocation of IDXL_Side_t's,

@@ -659,7 +659,7 @@ int BulkAdapt::add_element(int elemType,int nodesPerElem,int *conn, double sizin
 void BulkAdapt::update_element_conn(int elemType,int elemID,int nodesPerElem,int *conn){
   FEM_Elem &elem = meshPtr->elem[elemType];
   elem.connIs(elemID,conn);
-};
+}
 
 bool BulkAdapt::isLongest(int elem, int elemType, double len) {
   FEM_Elem &elems = meshPtr->elem[elemType];
@@ -716,7 +716,7 @@ double BulkAdapt::length(double *n1, double *n2, int dim) {
 void BulkAdapt::update_node_coord(int nodeID,int dim,double *coords){
   FEM_DataAttribute *coord = meshPtr->node.getCoord();
   (coord->getDouble()).setRow(nodeID,coords);
-};
+}
 
 void BulkAdapt::make_node_shared(int nodeID,int numSharedChunks,int *sharedChunks){
   for(int i=0;i<numSharedChunks;i++){
@@ -724,7 +724,7 @@ void BulkAdapt::make_node_shared(int nodeID,int numSharedChunks,int *sharedChunk
     sharedList.push_back(nodeID);
   }
   meshPtr->node.shared.flushMap();
-};
+}
 
 int BulkAdapt::get_idxl_for_node(int nodeID, int partID) 
 {

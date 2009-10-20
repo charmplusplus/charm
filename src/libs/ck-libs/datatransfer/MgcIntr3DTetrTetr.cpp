@@ -33,7 +33,7 @@ public:
 	///  side of the plane.
 	virtual void Add(const Tetrahedron& tet);
 };
-};
+}
 
 //----------------------------------------------------------------------------
 void Mgc::PlaneSplitTetrahedronConsumer::Add(const Tetrahedron &kTetraP)

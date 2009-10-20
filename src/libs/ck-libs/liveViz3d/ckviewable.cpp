@@ -119,7 +119,7 @@ void CkImageCompressor::pup(PUP::er &p) {
 
 /***************** CkQuadView *****************/
 
-PUPable_def(CkQuadView);
+PUPable_def(CkQuadView)
 
 static stats::op_t op_render_pixels=stats::count_op("render.pixels","CkQuadView pixels","pixels");
 

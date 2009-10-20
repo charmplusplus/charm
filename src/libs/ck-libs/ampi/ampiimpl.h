@@ -99,7 +99,7 @@ public:
 
 
 void applyOp(MPI_Datatype datatype, MPI_Op op, int count, void* invec, void* inoutvec);
-PUPfunctionpointer(MPI_Op);
+PUPfunctionpointer(MPI_Op)
 class AmpiOpHeader {
 public:
   MPI_User_function* func;
@@ -356,7 +356,7 @@ public:
 		p|edges;
 	}
 };
-PUPmarshall(ampiCommStruct);
+PUPmarshall(ampiCommStruct)
 
 struct mpi_comm_world
 {
@@ -1042,7 +1042,7 @@ public:
      return elements[p].seqOutgoing++;
   }
 };
-PUPmarshall(AmpiSeqQ);
+PUPmarshall(AmpiSeqQ)
 
 
 inline CProxy_ampi ampiCommStruct::getProxy(void) const {return ampiID;}

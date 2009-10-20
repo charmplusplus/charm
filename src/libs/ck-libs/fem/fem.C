@@ -448,7 +448,7 @@ void FEMchunk::pup(PUP::er &p)
   p|thisIndex;
 }
 
-PUPable_def(FEM_Sym_Linear);
+PUPable_def(FEM_Sym_Linear)
 //Update fields after creation/migration
 void FEMchunk::initFields(void)
 {

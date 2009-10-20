@@ -521,7 +521,7 @@ void FEM_chunk::pup(PUP::er &p)
   p|defaultComm;
 }
 
-PUPable_def(FEM_Sym_Linear);
+PUPable_def(FEM_Sym_Linear)
 //Update fields after creation/migration
 void FEM_chunk::initFields(void)
 {

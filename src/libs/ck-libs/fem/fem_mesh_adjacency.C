@@ -162,7 +162,7 @@ void FEM_Node::setElemAdjacency(int type, const FEM_Elem &elem){
 		}
 	  }
 	}
-};
+}
 
 
 //  Populate the entire node to node adjacency table
@@ -272,7 +272,7 @@ void FEM_Node::setNodeAdjacency(const FEM_Elem &elem){
 #endif
 
 
-};
+}
 
 
 

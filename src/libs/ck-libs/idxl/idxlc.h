@@ -135,7 +135,7 @@ void IDXL_Comm_wait(IDXL_Comm_t m);
 
 
 #ifdef __cplusplus
-  };
+  }
 #endif
 
 #endif

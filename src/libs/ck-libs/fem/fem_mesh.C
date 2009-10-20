@@ -981,17 +981,17 @@ FEM_VarIndexAttribute::FEM_VarIndexAttribute(FEM_Entity *e,int myAttr)
   oldlength = 0;
 	allocate(getMax(),getWidth(),getDatatype());
 	setDatatype(FEM_INT);
-};
+}
 
 void FEM_VarIndexAttribute::pup(PUP::er &p){
 	super::pup(p);
 	p | idx;
-};
+}
 
 void FEM_VarIndexAttribute::pupSingle(PUP::er &p, int pupindx){
 	super::pupSingle(p,pupindx);
 	p|idx[pupindx];
-};
+}
 
 void FEM_VarIndexAttribute::set(const void *src,int firstItem,int length,
 		const IDXL_Layout &layout,const char *caller){
@@ -1018,7 +1018,7 @@ void FEM_VarIndexAttribute::print(){
 		}
 		printf("\n");
 	}
-};
+}
 
 int FEM_VarIndexAttribute::findInRow(int row,const ID &data){
 	if(row >= idx.length()){
@@ -1328,7 +1328,7 @@ void FEM_Entity::setMaxLength(int newLen,int newMaxLen,void *pargs,FEM_Mesh_allo
 	resize = fn;
 	args = pargs;
 	setLength(newLen);
-};
+}
 
 
 /// Copy src[srcEntity] into our dstEntity.

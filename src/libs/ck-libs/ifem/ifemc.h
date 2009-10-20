@@ -94,7 +94,7 @@ void IFEM_Solve_shared_bc(ILSI_Solver s,ILSI_Param *p,
 	const double *b, double *x);
 
 #ifdef __cplusplus
-};
+}
 #endif
 
 #endif

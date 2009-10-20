@@ -297,7 +297,7 @@ void ARMCI_Checkpoint(char* dirname);
 void ARMCI_MemCheckpoint(void);
 
 #ifdef __cplusplus
-};
+}
 #endif
 
 #define ARMCI_INIT_HANDLE(hdl) 

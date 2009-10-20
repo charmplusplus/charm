@@ -159,7 +159,7 @@ void readGhostFEM(int m,TetMesh &t);
 /// Write this mesh to the FEM framework's mesh m
 void writeFEM(int m,TetMesh &t);
 
-namespace cg3d { class Planar3dDest; };
+namespace cg3d { class Planar3dDest; }
 
 /**
  * Return the average edge length on this mesh.

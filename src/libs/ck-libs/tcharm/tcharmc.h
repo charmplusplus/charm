@@ -77,7 +77,7 @@ void TCHARM_Init(int *argc,char ***argv);
 void TCHARM_In_user_setup(void);
 
 #ifdef __cplusplus
-};
+}
 #endif
 #endif /*def(thisHeader)*/
 

@@ -231,7 +231,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   printf("[%d] Max Memory usage on vp 0 at end of parallel partition %d \n",CkMyPe(),CmiMaxMemoryUsage());
 		
   return new_mesh;
-};
+}
 
 int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context){
   int myRank;
@@ -793,7 +793,7 @@ void makeGhosts(FEM_Mesh *m, MPI_Comm comm, int masterRank, int numLayers, FEM_G
        sharedSearchTime=0;
     }
   }
-};
+}
 
 /* 
    Does this list contain this entry
@@ -808,7 +808,7 @@ bool listContains(FEM_Comm_List &list,int entry){
   }
 	listSearchTime += (CkWallTimer()-_startTime);
   return false;
-};
+}
 
 void makeGhost(FEM_Mesh *m, 
 	       MPI_Comm comm,

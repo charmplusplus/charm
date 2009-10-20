@@ -349,17 +349,17 @@ dataType *decompressMsg(CkReductionMsg *m, CkDataSegHeader &h, dataType nullVal)
 }
 
 // define decompressor for 'int' data 
-SIMPLE_DECOMPRESSOR(int);
+SIMPLE_DECOMPRESSOR(int)
 
 // define decompressor for 'float' data
-SIMPLE_DECOMPRESSOR(float);
+SIMPLE_DECOMPRESSOR(float)
 
 // define decompressor for 'double' data
-SIMPLE_DECOMPRESSOR(double);
+SIMPLE_DECOMPRESSOR(double)
 
 // define decompressor for 'CkTwoFloats' data
-SIMPLE_DECOMPRESSOR(CkTwoFloats);
+SIMPLE_DECOMPRESSOR(CkTwoFloats)
 
 // define decompressor for 'CkTwoDoubles' data
-SIMPLE_DECOMPRESSOR(CkTwoDoubles);
+SIMPLE_DECOMPRESSOR(CkTwoDoubles)
 #include "CkSparseContiguousReducer.def.h"

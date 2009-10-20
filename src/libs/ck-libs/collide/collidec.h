@@ -69,7 +69,7 @@ Destroy this Collision grid.
 void COLLIDE_Destroy(collide_t c);
 
 #ifdef __cplusplus
-};
+}
 #endif
 
 #endif

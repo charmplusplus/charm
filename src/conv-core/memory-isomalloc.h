@@ -26,7 +26,7 @@ CmiIsomallocBlockList *CmiIsomallocBlockListActivate(CmiIsomallocBlockList *l);
 CmiIsomallocBlockList *CmiIsomallocBlockListCurrent();
 
 #ifdef __cplusplus
-};
+}
 #endif
 
 #endif
