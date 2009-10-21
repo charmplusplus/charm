@@ -2501,7 +2501,7 @@ void *CmiAlloc(int size)
 #elif CONVERSE_VERSION_VMI
   res = (char *) CMI_VMI_CmiAlloc(size+sizeof(CmiChunkHeader));
 #elif CMK_USE_IBVERBS | CMK_USE_IBUD
-	res = (char *) infi_CmiAlloc(size+sizeof(CmiChunkHeader));
+  res = (char *) infi_CmiAlloc(size+sizeof(CmiChunkHeader));
 #elif CONVERSE_POOL
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
 #else
@@ -2744,9 +2744,11 @@ typedef struct {
 void infi_freeMultipleSend(void *msgWhole)
 {
   int len=((CmiMultipleSendHeader *)msgWhole)->nMessages;
+  double pad=((CmiMultipleSendHeader *)msgWhole)->pad;
   int offset=sizeof(CmiMultipleSendHeader);
   int m;
   void *thisMsg=NULL;
+  if (pad != 1234567.89) return;
   for(m=0;m<len;m++)
     {
       /*unreg meta, free meta, move the ptr */
@@ -2768,7 +2770,7 @@ static void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *ms
   int m; /* Outgoing message */
 
 #if CMK_USE_IBVERBS
-	infiCmiChunkHeader *msgHdr;
+  infiCmiChunkHeader *msgHdr;
 #else
   CmiChunkHeader *msgHdr; /* Chunk headers for each message */
 #endif
@@ -2794,6 +2796,7 @@ static void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *ms
   /* Build the header */
   header.nMessages=len;
   CmiSetHandler(&header, CpvAccess(CmiMainHandlerIDP));
+  header.pad = 1234567.89;
 #if CMK_IMMEDIATE_MSG
   if (immed) CmiBecomeImmediate(&header);
 #endif
