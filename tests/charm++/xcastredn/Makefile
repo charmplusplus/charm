@@ -11,8 +11,8 @@ ARGS      = 10 4 128 1 3 3 3 5 5 5
 
 # Specify the compilers, run script, flags etc.
 CXX       = charmc
-CXXFLAGS  = -language charm++
-CPPFLAGS  = -g
+CXXFLAGS  = -language charm++ -O2
+CPPFLAGS  = -DCMK_OPTIMIZE
 LDFLAGS   = -module CkMulticast
 EXEC      = charmrun
 EXECFLAGS = +p$(NP)
@@ -28,7 +28,7 @@ endif
 all: $(TARGET)
 
 $(TARGET): $(OBJ) 
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) -o $@ $^
 
 clean:
 	$(RM) $(wildcard *.decl.h *.def.h *.d *.di *.o) $(TARGET) charmrun 
