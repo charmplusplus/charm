@@ -565,12 +565,13 @@ printError()
 	exit $MAKEEXIT
 }
 
-echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS"' in $VERSION/tmp"
+echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS"' in $VERSION/tmp"
 cd $DESTINATION/tmp 
 $MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED"
 MAKEEXIT=$?
 [ $MAKEEXIT -ne 0 ] && printError
 
+echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS"' in $VERSION/tmp"
 $MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS $BUILD_SHARED"
 MAKEEXIT=$?
 if [ $MAKEEXIT -eq 0 ]

@@ -50,6 +50,7 @@ A more readable summary is at:
 #include <regex.h>
 #endif
 #include <vector>
+#include <list>
 #include <algorithm>
 #include "converse.h"
 #include "pup.h"
@@ -277,7 +278,7 @@ CtgGlobalList::CtgGlobalList() {
 	}
     }
 
-    std::vector<global_rec> globals;
+    std::list<global_rec> globals;
 
     // Figure out which relocation data entries refer to global data:
     for(count = 0; count < relt_size; count ++) {
@@ -333,8 +334,9 @@ CtgGlobalList::CtgGlobalList() {
     // Potential optimization: pull small elements from the end to
     // fill in `padding' space where possible.
     size_t datalen2 = 0;
-    std::sort(globals.begin(), globals.end(), &compare_globals);
-    for (std::vector<global_rec>::iterator i = globals.begin(); i != globals.end(); ++i) {
+    //std::sort(globals.begin(), globals.end(), &compare_globals);
+    globals.sort(&compare_globals);
+    for (std::list<global_rec>::iterator i = globals.begin(); i != globals.end(); ++i) {
 	short alignment = std::min(i->size, (unsigned long)16);
 	size_t padding = (datalen2 + alignment) % alignment;
 	size_t offset = datalen2 + padding;

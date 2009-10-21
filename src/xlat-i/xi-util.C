@@ -54,7 +54,7 @@ XStr& XStr::operator << (int i) {
       sprintf(tmp, "%d", i); 
       append(tmp); 
       return *this;
-};
+}
 
 void XStr::line_append(const char c)
 {

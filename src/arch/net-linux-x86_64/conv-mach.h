@@ -53,10 +53,16 @@
 
 #define CMK_TYPEDEF_INT2 short
 #define CMK_TYPEDEF_INT4 int
+#if CMK_LONG_LONG_DEFINED
 #define CMK_TYPEDEF_INT8 long long
+#define CMK_TYPEDEF_UINT8 unsigned long long
+#else
+#include <stdint.h>
+#define CMK_TYPEDEF_INT8 int64_t
+#define CMK_TYPEDEF_UINT8 uint64_t
+#endif
 #define CMK_TYPEDEF_UINT2 unsigned short
 #define CMK_TYPEDEF_UINT4 unsigned int
-#define CMK_TYPEDEF_UINT8 unsigned long long
 #define CMK_TYPEDEF_FLOAT4 float
 #define CMK_TYPEDEF_FLOAT8 double
 

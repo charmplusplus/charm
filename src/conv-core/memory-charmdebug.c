@@ -422,7 +422,8 @@ void check_memory_leaks(LeakSearchInfo *info) {
     //printf("scanning memory %p of size %d\n",sl,sl->userSize);
     /* scan through this memory and pick all the slots which are still leaking
        and add them to the inProgress list */
-    if (sl->extraStack != NULL && sl->extraStack->protectedMemory != NULL) mprotect(sl->extraStack->protectedMemory, sl->extraStack->protectedMemoryLength, PROT_READ);
+    if (sl->extraStack != NULL && sl->extraStack->protectedMemory != NULL)
+      mprotect(sl->extraStack->protectedMemory, sl->extraStack->protectedMemoryLength, PROT_READ);
     for (scanner = SlotToUser(sl); scanner < SlotToUser(sl)+sl->userSize-sizeof(char*)+1; scanner+=sizeof(char*)) {
       fnd = (Slot**)CkHashtableGet(table, scanner);
       //if (fnd != NULL) printf("scanning heap %p, %d\n",*fnd,isLeakSlot(*fnd));
@@ -435,7 +436,8 @@ void check_memory_leaks(LeakSearchInfo *info) {
         PCQueuePush(inProgress, (char*)found);
       }
     }
-    if (sl->extraStack != NULL && sl->extraStack->protectedMemory != NULL) mprotect(sl->extraStack->protectedMemory, sl->extraStack->protectedMemoryLength, PROT_NONE);
+    if (sl->extraStack != NULL && sl->extraStack->protectedMemory != NULL)
+      mprotect(sl->extraStack->protectedMemory, sl->extraStack->protectedMemoryLength, PROT_NONE);
   }
 
   // Step 4)
@@ -1007,6 +1009,11 @@ static void CpdMMAPhandler(int sig, siginfo_t *si, void *unused){
   CmiPrintStackTrace(0);
 }
 
+static void setMemProtection(Slot *cur, int prot) {
+  mprotect(cur->userData, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*),
+	   prot);
+}
+
 static void protectMemory() {
 #ifdef CPD_USE_MMAP
   Slot *cur;
@@ -1014,7 +1021,9 @@ static void protectMemory() {
   SLOT_ITERATE_START(cur)
     if (cur->chareID != memory_chare_id && cur->chareID > 0) {
       /*printf(" %p",cur->userData);*/
-      mprotect(cur->userData, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
+      setMemProtection(cur, PROT_READ);
+      /*mprotect(cur->userData,
+	cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ); */
     } /*else printf(" (%p)",cur->userData);*/
   SLOT_ITERATE_END
   /*printf("\n");*/
@@ -1025,7 +1034,8 @@ static void unProtectMemory() {
 #ifdef CPD_USE_MMAP
   Slot *cur;
   SLOT_ITERATE_START(cur)
-    mprotect(cur->userData, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+    /*mprotect(cur->userData, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);*/
+    setMemProtection(cur, PROT_READ|PROT_WRITE);
   SLOT_ITERATE_END
   /*printf("unprotecting memory\n");*/
 #endif
@@ -1066,7 +1076,8 @@ void CpdSystemEnter() {
     if (CpdMprotect) {
       SLOT_ITERATE_START(cur)
         if (cur->chareID == 0) {
-          mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+          /*mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);*/
+	  setMemProtection(cur, PROT_READ|PROT_WRITE);
         }
       SLOT_ITERATE_END
     }
@@ -1082,7 +1093,8 @@ void CpdSystemExit() {
     if (CpdMprotect) {
       SLOT_ITERATE_START(cur)
         if (cur->chareID == 0) {
-          mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
+          /*mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);*/
+	  setMemProtection(cur, PROT_READ);
         }
       SLOT_ITERATE_END
       /* unprotect the pages that have been unprotected by a signal SEGV */
