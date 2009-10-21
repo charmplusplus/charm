@@ -2312,7 +2312,7 @@ case 112:
     break;}
 case 113:
 #line 484 "xi-grammar.y"
-{ yyval.chare = new Chare(lineno, yyvsp[-3].cattr, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); ;
+{ yyval.chare = new Chare(lineno, yyvsp[-3].cattr|Chare::CCHARE, yyvsp[-2].ntype, yyvsp[-1].typelist, yyvsp[0].mbrlist); ;
     break;}
 case 114:
 #line 486 "xi-grammar.y"
