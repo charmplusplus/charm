@@ -62,6 +62,16 @@ class VidBlock {
           return actualID.objPtr;
       return NULL;
     }
+    void pup(PUP::er &p) {
+#if CMK_FT_CHARE
+      int s;
+      if (!p.isUnpacking()) s = state-FILLED;
+      p|s;
+      if (p.isUnpacking()) state = (VidState)(FILLED+s);
+      if (p.isUnpacking()) msgQ = NULL;    // fixme
+      p|actualID;
+#endif
+    }
 };
 
 class CkCoreState;
