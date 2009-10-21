@@ -2681,10 +2681,6 @@ void finish_nodes(void) {}
 /****************************************************************************/
 #include <sys/wait.h>
 
-#if CMK_HAS_ADDR_NO_RANDOMIZE
-#include <sys/personality.h>
-#endif
-
 extern char **environ;
 void removeEnv(const char *doomedEnv)
 { /*Remove a value from the environment list*/
@@ -2731,24 +2727,13 @@ int rsh_fork(int nodeno,const char *startScript)
   if (pid < 0) 
   	{ perror("ERROR> starting rsh"); exit(1); }
   if (pid == 0)
-  {
-      /*Child process*/
+  {/*Child process*/
       int i;
       int fdScript=open(startScript,O_RDONLY);
-      unlink(startScript);
-      /*Open script as standard input*/
-      dup2(fdScript,0);
+  /**/  unlink(startScript); /**/
+      dup2(fdScript,0);/*Open script as standard input*/
       //removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
       for(i=3; i<1024; i++) close(i);
-
-#if CMK_HAS_ADDR_NO_RANDOMIZE
-      /* Disable address space randomization where it exists and can
-	 be disabled. */
-      int orig_persona = personality((unsigned long)-1);
-      personality(orig_persona|ADDR_NO_RANDOMIZE);
-      printf("Charmrun> Disabled address space layout randomization\n");
-#endif
-
       execvp(rshargv[0], rshargv);
       fprintf(stderr,"Charmrun> Couldn't find rsh program '%s'!\n",rshargv[0]);
       exit(1);
@@ -3279,15 +3264,6 @@ void start_nodes_local(char ** env)
       if (-1!=(fd = open("/dev/null", O_RDWR))) {
         dup2(fd, 0); dup2(fd, 1); dup2(fd, 2);
       }
-
-#if CMK_HAS_ADDR_NO_RANDOMIZE
-      /* Disable address space randomization where it exists and can
-	 be disabled. */
-      int orig_persona = personality(0xffffffff);
-      personality(orig_persona|ADDR_NO_RANDOMIZE);
-      printf("Charmrun> Disabled address space layout randomization\n");
-#endif
-
       status = execve(pparam_argv[1], pparam_argv+1, envp);
       dup2(fd1, 1);
       printf("execve failed to start process \"%s\" with status: %d\n", pparam_argv[1], status);
