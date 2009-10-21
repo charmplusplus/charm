@@ -400,6 +400,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
 	cpuTopo.nodeIDs[i] = nid;
     }
     cpuTopo.sort();
+    if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes.\n", nid+1);
   }
   CmiNodeAllBarrier();
   return;
