@@ -69,9 +69,9 @@ int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
 }
 
 extern "C"
-int CkRegisterChare(const char *name, size_t dataSz)
+int CkRegisterChare(const char *name, size_t dataSz, ChareType chareType)
 {
-  return _chareTable.add(new ChareInfo(name, dataSz));
+  return _chareTable.add(new ChareInfo(name, dataSz, chareType));
 }
 
 extern "C"
