@@ -1,14 +1,6 @@
 #ifndef _CKOBJID_H_
 #define _CKOBJID_H_
 
-typedef enum{
-	TypeInvalid=0,
-	TypeChare,
-	TypeGroup,
-	TypeNodeGroup,
-	TypeArray
-} _ObjectType;
-
 union _ObjectID {
 	struct {
 		CkChareID id;
@@ -27,7 +19,7 @@ extern int totalCompares;
 
 class CkObjID {
 public:
-	_ObjectType type;
+	ChareType type;
 	_ObjectID data;
 	CkObjID(){
 		type = TypeInvalid;

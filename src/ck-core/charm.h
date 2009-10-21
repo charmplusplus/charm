@@ -112,6 +112,16 @@ extern int CkRegisterMsg(const char *name, CkPackFnPtr pack,
 
 #define CK_EP_MEMCRITICAL (1<<5)
 
+/** type of a chare */
+typedef enum{
+	TypeInvalid=0,
+	TypeChare,
+	TypeMainChare,
+	TypeGroup,
+	TypeNodeGroup,
+	TypeArray
+} ChareType;
+
 /** A "call function" to invoke a method on an object. See EntryInfo */
 typedef void  (*CkCallFnPtr) (void *msg, void *obj);
 /** Register this entry point, with this call function and flags.
@@ -121,7 +131,7 @@ extern int CkRegisterEp(const char *name, CkCallFnPtr call, int msgIdx,
 
 /** Register this type of chare (group, or array), with this size.
     Returns the Chare's index in the _chareTable. */
-extern int CkRegisterChare(const char *name, size_t dataSz);
+extern int CkRegisterChare(const char *name, size_t dataSz, ChareType chareType);
 /** Register this chare as internal to Charm++.*/
 extern void CkRegisterChareInCharm(int chareIndex);
 /** Register this chare as a mainchare, with this entry point as its constructor.*/
