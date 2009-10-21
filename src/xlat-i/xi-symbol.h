@@ -751,6 +751,7 @@ class Chare : public TEntity {
     enum { //Set these attribute bits in "attrib"
     	CMIGRATABLE=1<<2,
 	CPYTHON=1<<3,
+    	CCHARE=1<<9,                 // plain non-migratable chare
     	CMAINCHARE=1<<10,
     	CARRAY=1<<11,
     	CGROUP=1<<12,
@@ -795,6 +796,7 @@ class Chare : public TEntity {
     int  isMigratable(void) { return attrib&CMIGRATABLE; }
     int  isPython(void) { return attrib&CPYTHON; }
     int  isMainChare(void) {return attrib&CMAINCHARE;}
+    int  isChare(void) {return attrib&CCHARE;}     // plain non-migratable chare
     int  isArray(void) {return attrib&CARRAY;}
     int  isGroup(void) {return attrib&CGROUP;}
     int  isNodeGroup(void) {return attrib&CNODEGROUP;}
@@ -1290,7 +1292,7 @@ public:
 
     // DMK - Accel Support
     int genAccels_spe_c_funcBodies(XStr& str) {
-      int rtn;
+      int rtn=0;
       if (next) { rtn += next->genAccels_spe_c_funcBodies(str); }
       return rtn;
     }

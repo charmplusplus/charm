@@ -481,7 +481,7 @@ BaseList	: QualNamedType
 		;
 
 Chare		: CHARE CAttribs NamedType OptBaseList MemberEList
-		{ $$ = new Chare(lineno, $2, $3, $4, $5); }
+		{ $$ = new Chare(lineno, $2|Chare::CCHARE, $3, $4, $5); }
 		| MAINCHARE CAttribs NamedType OptBaseList MemberEList
 		{ $$ = new MainChare(lineno, $2, $3, $4, $5); }
 		;

@@ -741,7 +741,14 @@ Chare::genRegisterMethodDef(XStr& str)
   }
   str <<  tspec() <<
   "void "<<indexName()<<"::__register(const char *s, size_t size) {\n"
-  "  __idx = CkRegisterChare(s, size);\n";
+  "  __idx = CkRegisterChare(s, size,";
+  if (isMainChare()) str << " TypeMainChare";
+  else if (isGroup()) str << " TypeGroup";
+  else if (isNodeGroup()) str << " TypeNodeGroup";
+  else if (isArray()) str << " TypeArray";
+  else if (isChare()) str << " TypeChare";
+  else str << " TypeInvalid";
+  str << ");\n";
   if (internalMode) str << "  CkRegisterChareInCharm(__idx);\n";
   // register all bases
   genIndexNames(str, "  CkRegisterBase(__idx, ",NULL, "::__idx);\n", "");
