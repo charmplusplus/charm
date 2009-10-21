@@ -386,6 +386,11 @@ static inline void _handleProcData(PUP::er &p)
     // save mainchares into MainChares.dat
     if(CkMyPe()==0) CkPupMainChareData(p, (CkArgMsg*)NULL);
 	
+#if CMK_FT_CHARE
+    // save non-migratable chare
+    CkPupChareData(p);
+#endif
+
     // save groups into Groups.dat
     CkPupGroupData(p);
 

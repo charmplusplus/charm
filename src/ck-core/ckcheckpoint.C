@@ -192,6 +192,56 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 		bdcastRO();
 }
 
+#if CMK_FT_CHARE
+
+CpvExtern(CkVec<void *>, chare_objs);
+CpvExtern(CkVec<VidBlock *>, vidblocks);
+
+// handle plain non-migratable chare
+void CkPupChareData(PUP::er &p)
+{
+  int i, n;
+  if (!p.isUnpacking()) n = CpvAccess(chare_objs).size();
+  p|n;
+  for (i=0; i<n; i++) {
+	Chare* obj;
+	int size;
+	if (!p.isUnpacking()) {
+		PUP::sizer ps;
+	 	obj = (Chare*)CpvAccess(chare_objs)[i];
+		obj->pup(ps);
+		size = ps.size();
+	}
+	p | size;
+	if (p.isUnpacking()) {
+		//DEBCHK("Chare PUP'ed: name = %s, idx = %d, size = %d\n", entry->name, i, size);
+		obj = (Chare*)malloc(size);
+		_MEMCHECK(obj);
+		CpvAccess(chare_objs).push_back(obj);
+	}
+	obj->pup(p);
+  }
+
+  if (!p.isUnpacking()) n = CpvAccess(vidblocks).size();
+  p|n;
+  for (i=0; i<n; i++) {
+	VidBlock *v;
+	if (p.isUnpacking()) {
+		v = new VidBlock();
+		CpvAccess(vidblocks).push_back(v);
+	}
+	else
+		v = CpvAccess(vidblocks)[i];
+	v->pup(p);
+  }
+}
+#else
+void CkPupChareData(PUP::er &p)
+{
+   // not implemented
+}
+#endif
+
 // handle GroupTable and data
 void CkPupGroupData(PUP::er &p)
 {
@@ -373,10 +423,13 @@ void CkPupProcessorData(PUP::er &p)
       CkPupMainChareData(p, NULL);
     }
 	
-    // save groups into Groups.dat
+    // save non-migratable chare
+    CkPupChareData(p);
+
+    // save groups 
     CkPupGroupData(p);
 
-    // save nodegroups into NodeGroups.dat
+    // save nodegroups
     if(CkMyRank()==0) {
         CkPupNodeGroupData(p);
     }

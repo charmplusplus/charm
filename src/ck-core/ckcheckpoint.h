@@ -59,6 +59,7 @@ public:
 // utility functions to pup system global tables
 void CkPupROData(PUP::er &p);
 void CkPupMainChareData(PUP::er &p, CkArgMsg *args);
+void CkPupChareData(PUP::er &p);
 void CkPupGroupData(PUP::er &p);
 void CkPupNodeGroupData(PUP::er &p);
 void CkPupArrayElementsData(PUP::er &p, int notifyListeners=1);
