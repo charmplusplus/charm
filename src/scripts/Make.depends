@@ -14,10 +14,10 @@ conv-conds.o: conv-conds.c converse.h conv-config.h conv-autoconfig.h \
   persistent.h debug-conv.h
 	$(CHARMC) -c -I. conv-conds.c
 
-queueing.o: queueing.c converse.h conv-config.h conv-autoconfig.h \
-  conv-common.h conv-mach.h conv-mach-opt.h pup_c.h conv-cpm.h converse.h \
-  conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
-  persistent.h debug-conv.h queueing.h
+queueing.o: queueing.c queueing.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  conv-cpm.h converse.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h persistent.h debug-conv.h
 	$(CHARMC) -c -I. queueing.c
 
 msgmgr.o: msgmgr.c converse.h conv-config.h conv-autoconfig.h \
@@ -153,6 +153,12 @@ isomalloc.o: isomalloc.c converse.h conv-config.h conv-autoconfig.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
   persistent.h debug-conv.h memory-isomalloc.h
 	$(CHARMC) -c -I. isomalloc.c
+
+mem-arena.o: mem-arena.c converse.h conv-config.h conv-autoconfig.h \
+  conv-common.h conv-mach.h conv-mach-opt.h pup_c.h conv-cpm.h \
+  conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
+  persistent.h debug-conv.h mem-arena.h
+	$(CHARMC) -c -I. mem-arena.c
 
 conv-counter.o: conv-counter.c converse.h conv-config.h conv-autoconfig.h \
   conv-common.h conv-mach.h conv-mach-opt.h pup_c.h conv-cpm.h \
