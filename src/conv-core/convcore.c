@@ -133,6 +133,8 @@ int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
 
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
 
+CpvStaticDeclare(int, CmiMainHandlerIDP); /* Main handler for _CmiMultipleSend that is run on every node */
+
 /*****************************************************************************
  *
  * Unix Stub Functions
@@ -2382,7 +2384,6 @@ typedef struct MultiMsg
   int origlen;
 }
 *MultiMsg;
-CpvDeclare(int, CmiMainHandlerIDP); /* Main handler that is run on every node */
 
 
 CpvDeclare(int, CmiMulticastHandlerIndex);
@@ -2469,6 +2470,11 @@ void CmiMulticastInit()
 
 #endif
 
+#if CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
+extern void *arena_malloc(int size);
+extern void arena_free(void *blockPtr);
+#endif
+
 /***************************************************************************
  *
  * Memory Allocation routines 
@@ -2500,6 +2506,8 @@ void *CmiAlloc(int size)
   res = (char *) elan_CmiAlloc(size+sizeof(CmiChunkHeader));
 #elif CONVERSE_VERSION_VMI
   res = (char *) CMI_VMI_CmiAlloc(size+sizeof(CmiChunkHeader));
+#elif CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
+  res = (char*) arena_malloc(size+sizeof(CmiChunkHeader));
 #elif CMK_USE_IBVERBS | CMK_USE_IBUD
   res = (char *) infi_CmiAlloc(size+sizeof(CmiChunkHeader));
 #elif CONVERSE_POOL
@@ -2583,6 +2591,8 @@ void CmiFree(void *blk)
     elan_CmiFree(BLKSTART(parentBlk));
 #elif CONVERSE_VERSION_VMI
     CMI_VMI_CmiFree(BLKSTART(parentBlk));
+#elif CONVERSE_VERSION_SHMEM && CMK_ARENA_MALLOC
+    arena_free(BLKSTART(parentBlk));
 #elif CMK_USE_IBVERBS | CMK_USE_IBUD
     /* is this message the head of a MultipleSend that we received?
        Then the parts with INFIMULTIPOOL have metadata which must be 
