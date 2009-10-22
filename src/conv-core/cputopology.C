@@ -273,7 +273,7 @@ extern "C" int CmiCpuTopologyEnabled()
 extern "C" int CmiOnSamePhysicalNode(int pe1, int pe2)
 {
   int *nodeIDs = cpuTopo.nodeIDs;
-  if (nodeIDs == NULL) return pe1 == pe2;
+  if (!cpuTopo.supported || nodeIDs == NULL) return pe1 == pe2;
   else return nodeIDs[pe1] == nodeIDs[pe2];
 }
 
@@ -366,6 +366,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
 
     cpuTopo.numNodes = CmiNumPes();
     cpuTopo.nodeIDs = new int[cpuTopo.numNodes];
+    CpuTopology::supported = 1;
 
     int x, y, z, t, nid;
     for(int i=0; i<cpuTopo.numNodes; i++) {
@@ -381,6 +382,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
   if(CmiMyRank() == 0) {
     cpuTopo.numNodes = CmiNumPes();
     cpuTopo.nodeIDs = new int[cpuTopo.numNodes];
+    CpuTopology::supported = 1;
 
     int nid;
     for(int i=0; i<cpuTopo.numNodes; i++) {
@@ -400,6 +402,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
 	cpuTopo.nodeIDs[i] = nid;
     }
     cpuTopo.sort();
+    if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes.\n", nid+1);
   }
   CmiNodeAllBarrier();
   return;
