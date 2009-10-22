@@ -27,6 +27,8 @@
 #define globalexit exit
 #endif 
 
+#define USE_SWAP                                             1
+
 /*
  *  We require statically allocated variables for locks.  This defines
  *  the max number of processors available.
@@ -732,10 +734,20 @@ static void McEnqueueRemote(void *msg, int msg_sz, int dst_pe)
   /* First, get current head pointer, and stick it in this 
    * message data area.
    */
+#if !USE_SWAP
   shmem_int_get((int*)msg_link, (int*)&head, sizeof(McDistList)/sizeof(int), dst_pe);
   /* Next, write the new message into the top of the list */
   shmem_int_put((int*)&head, (int*)&tmp_link, sizeof(McDistList)/sizeof(int),dst_pe);
   shmem_quiet();
+#else
+  {
+  int i, n = sizeof(McDistList)/sizeof(int);
+  int *dst = (int*)&head;
+  int *src = (int*)&tmp_link;
+  int *olddst = (int*)msg_link;
+  for (i=0; i<n; i++)  olddst[i] = shmem_int_swap(dst+i, src[i], dst_pe);
+  }
+#endif
 
 #ifdef DEBUG
   printf("[%d] Adding Message to pe %d\n",_Cmi_mype,dst_pe);
