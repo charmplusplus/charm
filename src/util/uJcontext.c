@@ -54,6 +54,9 @@ int getJcontext (uJcontext_t *u)
 	return 0;
 }
 
+/* global variable used to defeat compiler over-optimization which gets rid of alloca */
+char *_dummyAllocaSetJcontext;
+
 /* Set user context from information of variable pointed to by UCP.  */
 int setJcontext (const uJcontext_t *u)
 {
@@ -107,7 +110,8 @@ int setJcontext (const uJcontext_t *u)
 #else /* Portable alloca version */
 			char *old_sp=(char *)&old_sp; /* address of any local variable */
 			register CmiInt8 allocLen=old_sp-new_sp;
-			alloca(allocLen);
+                  
+			_dummyAllocaSetJcontext = alloca(allocLen);  /* defeat the compiler optimization! */
 #endif
 		}
 		VERBOSE( printf("After alloca"); printStack(); )
