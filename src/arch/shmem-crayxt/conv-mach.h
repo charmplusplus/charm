@@ -13,9 +13,14 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
+#define CMK_ARENA_MALLOC                                   1
+
 #define CMK_GETPAGESIZE_AVAILABLE                          1
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             0
+
+#define CMI_IO_BUFFER_EXPLICIT                             1
+#define CMI_IO_FLUSH_USER                                  1
 
 #define CMK_NODE_QUEUE_AVAILABLE                           0
 
