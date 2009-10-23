@@ -526,7 +526,7 @@ public:
     if (_id != -1) {
       globalId = nodeInfo::Local2Global(_node->id)*(cva(bgMach).numWth)+_id;
     }
-#if #if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
     preStsIdx = _node->id * cva(bgMach).numWth + _id;
 #endif
   }
