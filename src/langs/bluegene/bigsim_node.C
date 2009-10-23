@@ -3,6 +3,8 @@
 #include "blue_impl.h"    	// implementation header file
 //#include "blue_timing.h" 	// timing module
 #include "bigsim_debug.h"
+#include "bigsim_ooc.h"
+
 //#define  DEBUGF(x)      //CmiPrintf x;
 
 /**
@@ -44,8 +46,9 @@ void nodeInfo::initThreads(int _id)
   for (i=0; i< numWth; i++)
   {
       threadinfo[i] = new workThreadInfo(i, this);
-      _MEMCHECK(threadinfo[i]);
+      _MEMCHECK(threadinfo[i]);      
   }
+
   for (i=0; i< cva(bgMach).numCth; i++)
   {
       threadinfo[i+numWth] = new commThreadInfo(i+numWth, this);
@@ -130,6 +133,11 @@ void nodeInfo::addBgNodeMessage(char *msgPtr)
       CthAwakenPrio(tid, CQS_QUEUEING_IFIFO, sizeof(int), &prio);
       }
       else {
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+          //thread scheduling point!!
+          if(bgUseOutOfCore)
+             schedWorkThds->push((workThreadInfo *)threadinfo[wID]);
+#endif
       CthAwaken(threadTable[wID]);
        }
       lastW = wID;

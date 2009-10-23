@@ -167,7 +167,16 @@ void workThreadInfo::scheduler(int count)
 //      tCURRTIME += (CmiWallTimer()-tSTARTTIME);
       DEBUGM(4,("N[%d] work thread %d has no msg and go to sleep!\n", BgMyNode(), id));
       if (watcher) watcher->replay();
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+      if(bgUseOutOfCore){
+          //thread scheduling point!!            
+          workThreadInfo *thisThd = schedWorkThds->pop();
+          //CmiPrintf("thisThd=%p, actualThd=%p, equal=%d qsize=%d\n", thisThd, this, thisThd==this, schedWorkThds->size()); 
+          assert(thisThd==this);
+      }
+#endif     
       CthSuspend();
+
       DEBUGM(4, ("N[%d] work thread %d awakened!\n", BgMyNode(), id));      
       continue;
     }
@@ -214,7 +223,6 @@ void workThreadInfo::scheduler(int count)
 
     DEBUGM(4, ("[N%d] W[%d] now has %d msgs from own queue and %d from affinity before processing msg\n", BgMyNode(), id, q1.length(), q2.length()));
 
-    BG_ENTRYSTART(msg);
 
     //CmiMemoryCheck();
 
@@ -247,11 +255,30 @@ void workThreadInfo::scheduler(int count)
     	    BgProcessMessage(this, msg);
     	}
 #else
+        //schedWorkThds->print();
         bgOutOfCoreSchedule(this);
+        BG_ENTRYSTART(msg);
+#if BIGSIM_OOC_PREFETCH 
+#if !BIGSIM_OOC_NOPREFETCH_AIO
+        //do prefetch here for the next different thread in queue (schedWorkThds)
+		assert(schedWorkThds->peek(0)==this);
+        for(int offset=1; offset<schedWorkThds->size(); offset++) {
+            workThreadInfo *nThd = schedWorkThds->peek(offset);
+            //if nThd's core has been dumped to disk, then we could prefetch its core.
+            //otherwise, it is the first time for the thread to process a message, thus
+            //no need to resort to disk to find its core
+            if(nThd!=this && !checkThreadInCore(nThd) 
+               && nThd->isCoreOnDisk && oocPrefetchSpace->occupiedThd==NULL) {
+                oocPrefetchSpace->newPrefetch(nThd);
+            }
+        }
+#endif
+#endif
         BgProcessMessage(this, msg);
 #endif
     }else{
         DEBUGM(4, ("to execute not in ooc mode\n"));
+        BG_ENTRYSTART(msg);
         BgProcessMessage(this, msg);
     }
     
@@ -283,7 +310,18 @@ void workThreadInfo::scheduler(int count)
     DEBUGF(("[N%d] work thread T%d awakened here.\n", BgMyNode(), id));
     }
     else {
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+    //thread scheduling point!!
+    //Suspend and put itself back to the end of the queue
+      if(bgUseOutOfCore){
+          workThreadInfo *thisThd = schedWorkThds->pop();
+          //CmiPrintf("thisThd=%p, actualThd=%p, equal=%d qsize=%d\n", thisThd, this, thisThd==this, schedWorkThds->size()); 
+          assert(thisThd==this);
+          schedWorkThds->push(this);
+      }
+#endif
     CthYield();
+
     }
   }
 
@@ -353,6 +391,10 @@ void workThreadInfo::addAffMessage(char *msgPtr)
   }
   else {
   if (que.length() == 1) {
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+      //thread scheduling point!!
+      if(bgUseOutOfCore) schedWorkThds->push(this);
+#endif
     CthAwaken(me);
   }
   }
@@ -378,26 +420,75 @@ void threadInfo::broughtIntoMem(){
     DEBUGM(5, ("=====[N%d] work thread T[%d] into mem=====.\n", BgMyNode(), id));
     //CmiPrintStackTrace(0);    
 
+    //int idx =( (workThreadInfo *)this)->preStsIdx;
+    //CmiPrintf("pe[%d]: on node[%d] thread[%d] has bufsize %ld\n", CkMyPe(), BgMyNode(), id, thdsOOCPreStatus[idx].bufsize);
+
     assert(isCoreOnDisk==1);
 
-    char *dirname = "/tmp/CORE";
-    //every body make dir in case it is local directory
-    CmiMkdir(dirname);
-    char filename[128];
-    sprintf(filename, "%s/%d.dat", dirname, globalId);
-    FILE* fp = fopen(filename, "r");
-    if(fp==NULL){
-        printf("Error: %s cannot be opened when bringing thread %d to core\n", filename, globalId);
-        return;
-    }
+#if BIGSIM_OOC_PREFETCH
+#if !BIGSIM_OOC_NOPREFETCH_AIO
+   if(oocPrefetchSpace->occupiedThd != this){
+	//in this case, the prefetch is not for this workthread
 
-    BgOutOfCoreFlag=2;
-    PUP::fromDisk p(fp);
-    //out-of-core is not a real migration, so turn off the notifyListener option
-    #if BIGSIM_OUT_OF_CORE
-    CkPupArrayElementsData(p, 0);
-    #endif
-    fclose(fp);
+        BgOutOfCoreFlag=2;
+        char *dirname = "/tmp/CORE";
+        //every body make dir in case it is local directory
+        //CmiMkdir(dirname);
+        char filename[128];
+        sprintf(filename, "%s/%d.dat", dirname, globalId);
+        FILE* fp = fopen(filename, "r");
+        if(fp==NULL){
+            printf("Error: %s cannot be opened when bringing thread %d to core\n", filename, globalId);
+            return;
+        }
+    
+        //BgOutOfCoreFlag=2;
+        PUP::fromDisk p(fp);
+        //out-of-core is not a real migration, so turn off the notifyListener option
+        #if BIGSIM_OUT_OF_CORE
+        CkPupArrayElementsData(p, 0);
+        #endif
+        fclose(fp);
+   }else
+#endif
+{    
+        BgOutOfCoreFlag=2;
+        workThreadInfo *wthd = (workThreadInfo *)this;
+#if BIGSIM_OOC_NOPREFETCH_AIO
+        oocPrefetchSpace->newPrefetch(wthd);
+#endif
+        while(thdsOOCPreStatus[wthd->preStsIdx].isPrefetchFinished==0);
+        
+        PUP::fromMem p(oocPrefetchSpace->bufspace);
+        #if BIGSIM_OUT_OF_CORE
+        CkPupArrayElementsData(p, 0);
+        #endif
+        oocPrefetchSpace->resetPrefetch();        
+	}
+#else
+	//not doing prefetch optimization for ooc emulation
+	BgOutOfCoreFlag=2;
+	char *dirname = "/tmp/CORE";
+	//every body make dir in case it is local directory
+	//CmiMkdir(dirname);
+	char filename[128];
+	sprintf(filename, "%s/%d.dat", dirname, globalId);
+	FILE* fp = fopen(filename, "r");
+	if(fp==NULL){
+		printf("Error: %s cannot be opened when bringing thread %d to core\n", filename, globalId);
+		return;
+	}
+
+	//BgOutOfCoreFlag=2;
+	PUP::fromDisk p(fp);
+	//out-of-core is not a real migration, so turn off the notifyListener option
+	#if BIGSIM_OUT_OF_CORE
+	CkPupArrayElementsData(p, 0);
+	#endif
+	fclose(fp);	
+#endif	
+
+
     BgOutOfCoreFlag=0;
     
     //printf("mem usage after thread %d in: %fMB\n",globalId, CmiMemoryUsage()/1024.0/1024.0);    
@@ -410,6 +501,7 @@ void threadInfo::takenOutofMem(){
 
     assert(isCoreOnDisk==0);
 
+    BgOutOfCoreFlag=1;
     char *dirname = "/tmp/CORE";
     //every body make dir in case it is local directory
     CmiMkdir(dirname);
@@ -421,7 +513,7 @@ void threadInfo::takenOutofMem(){
         return;
     }
 
-    BgOutOfCoreFlag=1;
+    //BgOutOfCoreFlag=1;
     PUP::toDisk p(fp);
     //out-of-core is not a real migration, so turn off the notifyListener option
     p.becomeDeleting();
@@ -430,7 +522,7 @@ void threadInfo::takenOutofMem(){
     CkPupArrayElementsData(p, 0);
     #endif 
 
-    long fsize = 0;
+    CmiUInt8 fsize = 0;
     fseek(fp, 0, SEEK_END);
     fsize = ftell(fp);
     //set this thread's memory usage
@@ -449,6 +541,9 @@ void threadInfo::takenOutofMem(){
     BgOutOfCoreFlag=0;
     isCoreOnDisk=1;
     //printf("mem usage after thread %d out: %fMB\n", globalId, CmiMemoryUsage()/1024.0/1024.0);  
+#if BIGSIM_OOC_PREFETCH
+    thdsOOCPreStatus[preStsIdx].bufsize= fsize;
+#endif	
 }
 
 /*

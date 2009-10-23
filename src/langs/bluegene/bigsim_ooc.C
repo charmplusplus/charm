@@ -13,14 +13,19 @@ int bgUseOutOfCore = 0; //default is off
 
 double bgOOCMaxMemSize = 512.0; //default 512MB
 
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+oocPrefetchStatus *thdsOOCPreStatus = NULL;
+oocPrefetchBufSpace *oocPrefetchSpace = NULL;
+oocWorkThreadQueue *schedWorkThds = NULL;
+#endif
 
 threadInMemEntry *tblThreadInMemHead;
 
-int TBLCAPACITY=2;
+int TBLCAPACITY=1;
 
-#define OOOSIMPLEVER 1 
+#define OOCSIMPLEVER 1 
 
-#if OOOSIMPLEVER
+#if OOCSIMPLEVER
 void initTblThreadInMem(){ 
   
   /* Initialize the table that tracks threads (workThread) in memory:
@@ -436,6 +441,93 @@ threadInMemEntry *getNthThdEntry(int nth){
 }
 #endif
 
+
+
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+//=====functions related with prefetch using AIO=====
+void oocPrefetchBufSpace::newPrefetch(workThreadInfo *wthd){
+
+    //printf("Prefetch thread[%d] \n", wthd->globalId);
+
+    //the (bufsize) of memory needed to bring this workthread into memory
+    CmiUInt8 bufsize = thdsOOCPreStatus[wthd->preStsIdx].bufsize;
+    if(bufsize > PREFETCHSPACESIZE) {
+        PREFETCHSPACESIZE = (CmiUInt8)(bufsize*1.5);
+        delete [] bufspace;
+        bufspace = new char[PREFETCHSPACESIZE];        
+    }
+    usedBufSize = bufsize;
+
+    occupiedThd = wthd;
+    thdsOOCPreStatus[wthd->preStsIdx].isPrefetchFinished = 0;
+    
+    assert(wthd->isCoreOnDisk==1);
+
+    char *dirname = "/tmp/CORE";
+    char filename[128];
+    sprintf(filename, "%s/%d.dat", dirname, wthd->globalId);
+    
+    //struct aiocb prefetchAioCb;    
+    int fd = open(filename, O_RDONLY);
+    if(fd<0) perror("Failed in opening file");
+    
+    bzero((char *)&prefetchAioCb, sizeof(struct aiocb));
+    prefetchAioCb.aio_buf = bufspace;
+    prefetchAioCb.aio_fildes = fd;
+    prefetchAioCb.aio_nbytes = usedBufSize;
+    prefetchAioCb.aio_offset = 0;
+
+#define PTHREAD_CALLBACK 1
+#if PTHREAD_CALLBACK
+    //use pthread to do callback
+    prefetchAioCb.aio_sigevent.sigev_notify = SIGEV_THREAD;
+    prefetchAioCb.aio_sigevent.sigev_notify_function = prefetchFinishedHandler;
+    prefetchAioCb.aio_sigevent.sigev_notify_attributes = NULL;
+    prefetchAioCb.aio_sigevent.sigev_value.sival_ptr = &prefetchAioCb;
+#else
+    //use signal to notify
+    struct sigaction sig_act;
+    sigemptyset(&sig_act.sa_mask);
+    sig_act.sa_flags = SA_SIGINFO;
+    sig_act.sa_sigaction = prefetchFinishedSignalHandler;
+    prefetchAioCb.aio_sigevent.sigev_notify = SIGEV_SIGNAL;
+    prefetchAioCb.aio_sigevent.sigev_signo = SIGUSR1;
+    prefetchAioCb.aio_sigevent.sigev_value.sival_ptr = &prefetchAioCb;
+    sigaction(SIGIO, &sig_act, NULL); 
+    
+#endif
+
+    int ret = aio_read(&prefetchAioCb);
+    if(ret<0) perror("Failed in aio_read");
+}
+
+void prefetchFinishedHandler(sigval_t sigval){
+        struct aiocb *req = (struct aiocb *)sigval.sival_ptr;
+        int ret = aio_return(req);
+        close(req->aio_fildes);
+        if(ret<=0) {
+            perror("Failed in aio operation");
+        }else{
+            int idx = oocPrefetchSpace->occupiedThd->preStsIdx;
+            thdsOOCPreStatus[idx].isPrefetchFinished = 1;
+        }
+}
+
+void prefetchFinishedSignalHandler(int signo, siginfo_t *info, void *context){
+    if(info->si_signo == SIGUSR1){
+    struct aiocb *req = (struct aiocb *)info->si_value.sival_ptr;
+    int ret = aio_return(req);
+    close(req->aio_fildes);
+    if(ret<=0) {
+        perror("Failed in aio operation");
+    }else{
+        int idx = oocPrefetchSpace->occupiedThd->preStsIdx;
+        thdsOOCPreStatus[idx].isPrefetchFinished = 1;
+    }
+    }
+    return;
+}
+#endif
 
 //=====functions related with system memory information=====
 //the unit is MB

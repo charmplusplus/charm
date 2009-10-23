@@ -488,6 +488,12 @@ public:
     int startOutOfCore;
     int startOOCChanged;
 
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+    //the index into the global array (thdsOOCPreStatus) that records
+    //the prefetch status of each worker thread
+    int preStsIdx;
+#endif
+
 #if  CMK_BLUEGENE_THREAD
   HandlerTable   handlerTable;      /* thread level handler table */
 #endif
@@ -520,6 +526,9 @@ public:
     if (_id != -1) {
       globalId = nodeInfo::Local2Global(_node->id)*(cva(bgMach).numWth)+_id;
     }
+#if #if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+    preStsIdx = _node->id * cva(bgMach).numWth + _id;
+#endif
   }
   void addAffMessage(char *msgPtr);        ///  add msg to affinity queue
   void run();

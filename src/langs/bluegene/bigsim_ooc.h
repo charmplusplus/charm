@@ -3,6 +3,16 @@
 
 #include "blue_impl.h"
 
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+//For prefetch using AIO
+#include <stdlib.h>
+#include <stdio.h>
+#include <aio.h>
+#include <strings.h>
+#include <errno.h>
+#include <unistd.h>
+#endif
+
 extern int bgUseOutOfCore;
 
 /* This variable indicates the max memory all cores can occupy in a physical processor */
@@ -91,6 +101,143 @@ void bgOutOfCoreSchedule(threadInfo *thd);
 //The following two functions are now embeded into the class workThreadInfo
 //void bringThdIntoMem(/*int threadID*/threadInfo *thd);
 //void takeThdOutofMem(/*int threadID*/threadInfo *thd);
+
+
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+//Declarations regarding the global thread queues (per emulating processor)
+//and the prefetch optimizations
+
+struct oocPrefetchStatus{
+    volatile char isPrefetchFinished;
+    CmiUInt8 bufsize;    
+
+    oocPrefetchStatus(){
+	isPrefetchFinished = 0;
+	bufsize = 0;    
+    }
+};
+
+class oocPrefetchBufSpace{
+public:
+    struct aiocb prefetchAioCb;
+    workThreadInfo *occupiedThd;
+    CmiUInt8 PREFETCHSPACESIZE;
+    CmiUInt8 usedBufSize;
+    char *bufspace;
+    
+public:
+    oocPrefetchBufSpace(){               
+        occupiedThd = NULL;
+        PREFETCHSPACESIZE = (CmiUInt8)4*1024*1024*1024;
+        usedBufSize = 0;
+        bufspace = new char[PREFETCHSPACESIZE];
+    }
+
+    ~oocPrefetchBufSpace(){
+        delete [] bufspace;
+    }
+
+    bool isOccupied(){
+        return (occupiedThd!=NULL);
+    }
+
+    //the bufsize indicates the prefetch space it requires
+    void newPrefetch(workThreadInfo *wthd);       
+    void resetPrefetch(){
+        occupiedThd = NULL;
+        usedBufSize = 0;
+    }
+};
+
+void prefetchFinishedHandler(sigval_t sigval);
+void prefetchFinishedSignalHandler(int signo, siginfo_t *info, void *context);
+
+extern oocPrefetchStatus *thdsOOCPreStatus;
+extern oocPrefetchBufSpace *oocPrefetchSpace;
+
+//simple circular queue
+#define OOCTHDQSIZE 100
+class oocWorkThreadQueue{
+private:
+    workThreadInfo **wThdQ;
+    int head;
+    int tail;
+    int numWthds;
+    int thdQSize;
+
+public:
+    oocWorkThreadQueue(){
+        wThdQ = new workThreadInfo *[OOCTHDQSIZE];
+        head = 0;
+        tail = 0;
+        numWthds = 0;
+        thdQSize = OOCTHDQSIZE;
+    }
+    ~oocWorkThreadQueue(){
+        delete []wThdQ;
+    }
+
+    workThreadInfo *pop(){
+        if(numWthds==0)  return NULL;
+        workThreadInfo *ret = wThdQ[head];
+        head++;
+        if(head == thdQSize) head = 0;
+        numWthds--;
+        return ret;
+    }
+
+    void push(workThreadInfo *thd){
+        wThdQ[tail] = thd;
+        tail++;
+        if(tail == thdQSize) {
+            tail = 0;
+        }
+        if(tail == head && numWthds>0) {
+            //expand the queue buffer            
+            workThreadInfo **newWthdQ = new workThreadInfo *[thdQSize<<1];
+            memcpy(newWthdQ, wThdQ+head, sizeof(workThreadInfo *)*(thdQSize-head));
+            memcpy(newWthdQ+(thdQSize-head), wThdQ, sizeof(workThreadInfo *)*tail);
+            delete [] wThdQ;
+            wThdQ =  newWthdQ;
+            head = 0;
+            tail = thdQSize;
+            thdQSize <<= 1;
+        }
+        numWthds++;
+    }
+
+    //peek the thread that is "offset" ahead of head
+    workThreadInfo *peek(int offset=0){
+        if(numWthds==0 || offset > numWthds)
+            return NULL;
+        else{
+            int idx = (head+offset)%thdQSize;            
+            return wThdQ[idx];
+        }
+    }
+
+    int size(){
+        return numWthds;
+    }
+
+    void print(){
+	char fname[50];
+	sprintf(fname, "thdsQInfo.%d", CmiMyPe());
+	FILE *ofp = fopen(fname, "a+");
+	fprintf(ofp, "pe[%d]: %d threads in queue: ", CmiMyPe(), numWthds);
+	for(int i=0; i<numWthds; i++){
+	    int idx = (head+i)%thdQSize;
+	    workThreadInfo *thd = wThdQ[idx];
+	    fprintf(ofp, "%d_%p, ", thd->globalId, thd);
+	}
+	fprintf(ofp, "\n");
+	fflush(ofp);
+    }
+};
+
+extern oocWorkThreadQueue *schedWorkThds;
+
+#endif
 
 //functions related with getting memory usage information
 #define MEMINFOFILE "/proc/meminfo"
