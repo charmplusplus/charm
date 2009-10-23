@@ -26,7 +26,6 @@ added by Ryan Mokos in July 2008.
 
 #define _POSIX_SOURCE
 #define _BSD_SOURCE
-#include <features.h>
 #include "converse.h"
 #include "memory-isomalloc.h"
 

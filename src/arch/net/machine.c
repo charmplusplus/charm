@@ -182,8 +182,6 @@
  ****************************************************************************/
 
 #define _GNU_SOURCE 1
-#include <features.h>
-
 #include <stdarg.h> /*<- was <varargs.h>*/
 
 #define CMK_USE_PRINTF_HACK 0
