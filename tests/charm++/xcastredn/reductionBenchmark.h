@@ -13,6 +13,14 @@
 #ifndef REDUCTION_BENCHMARK_H
 #define REDUCTION_BENCHMARK_H
 
+/// Enumerate the different mechanisms for collective comm 
+enum CommMechanism
+{ CharmBcast, CkMulticast, Comlib };
+/// The names of the collective mechanisms
+char commName[][50] = {"Charm-Bcast/Redn","CkMulticast","Comlib"};
+
+
+
 /// Utility structure that has the program settings
 class config
 {
@@ -56,8 +64,9 @@ class config
 class DataMsg: public CkMcastBaseMsg, public CMessage_DataMsg
 {
     public:
-        DataMsg(int numUnits): size(numUnits) {}
+        DataMsg(int numUnits, CommMechanism cType): size(numUnits), commType(cType) {}
         int size;
+        CommMechanism commType;
         double *data;
 };
 
@@ -94,12 +103,14 @@ class Main: public CBase_Main
         /// Create an array section that I will multicast to
         void createSection(const bool isSectionContiguous);
         /// Sends out a multicast to the array section
-        void sendMulticast(const int msgSize);
+        void sendMulticast(const CommMechanism commType, const int msgSize);
 
         /// Chare array that is going to receive the multicasts
         CProxy_MyChareArray chareArray;
         /// Array section proxy
         CProxySection_MyChareArray arraySection;
+        /// Counter for tracking the comm mechanism that is currently being tested
+        CommMechanism curCommType;
         /// Counters for tracking test progress
         int curMsgSize,curRepeatNum;
         /// Stream holding all the results
@@ -109,6 +120,10 @@ class Main: public CBase_Main
         /// A vector (of size numRepeats) of times taken for a multicast/reduction loop
         std::vector<double> loopTimes;
 };
+
+/// An overloaded increment for comfort when handling the enum
+inline CommMechanism operator++(CommMechanism &m)
+{ return m = (CommMechanism)(m + 1); }
 
 #endif // REDUCTION_BENCHMARK_H
 

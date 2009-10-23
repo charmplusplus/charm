@@ -22,8 +22,29 @@ inline void MyChareArray::crunchData(DataMsg *msg)
     /// Prepare some data to be returned
     double *returnData = new double(msg->size);
     /// Contribute to reduction
-    CkGetSectionInfo(sid, msg);
-    mcastMgr->contribute(msg->size*sizeof(double),returnData,CkReduction::sum_double,sid);
+    #ifdef VERBOSE_OPERATION
+        CkPrintf("\n[%d,%d,%d] Going to trigger reduction using mechanism: %s",thisIndex.x,thisIndex.y,thisIndex.z,commName[msg->commType]);
+    #endif
+    switch (msg->commType)
+    {
+        case CharmBcast:
+            contribute(msg->size*sizeof(double),returnData,CkReduction::sum_double);
+            break;
+
+        case CkMulticast:
+            CkGetSectionInfo(sid, msg);
+            mcastMgr->contribute(msg->size*sizeof(double),returnData,CkReduction::sum_double,sid);
+            break;
+
+        case Comlib:
+            CkGetSectionInfo(sid, msg);
+            mcastMgr->contribute(msg->size*sizeof(double),returnData,CkReduction::sum_double,sid);
+            break;
+
+        default:
+            CkAbort("Attempting to use unknown mechanism to handle the reduction");
+            break;
+    }
     delete msg;
 }
 
@@ -78,11 +99,13 @@ Main::Main(CkArgMsg *m)
 
     /// Delegate the section collectives to the multicast manager
     arraySection.ckSectionDelegate(mgr);
-    /// Setup the client at the root of the reduction
+    /// Setup the client at the roots of the reductions
     CkCallback *cb = new CkCallback(CkIndex_Main::receiveReduction(0),thisProxy);
+    chareArray.ckSetReductionClient(cb);
     mgr->setReductionClient(arraySection,cb);
 
-    /// Start off with the smallest message size
+    /// Start off with the first comm type and the smallest message size
+    curCommType    = CharmBcast;
     curMsgSize     = cfg.msgSizeMin;
     curRepeatNum   = 0;
     out<<std::fixed<<std::setprecision(6);
@@ -91,7 +114,7 @@ Main::Main(CkArgMsg *m)
         out<<std::setw(cfg.fieldWidth-3)<<"Trial "<<std::setw(3)<<i;
 
     /// Send out the multicast
-    sendMulticast(curMsgSize);
+    sendMulticast(curCommType,curMsgSize);
 }
 
 
@@ -124,21 +147,39 @@ void Main::createSection(const bool isSectionContiguous)
 
 
 
-void Main::sendMulticast(const int msgSize)
+void Main::sendMulticast(const CommMechanism commType, const int msgSize)
 {
     #ifdef VERBOSE_STATUS
         CkPrintf("\nMsgSize: %d Sending out multicast number %d",curMsgSize,curRepeatNum+1);
     #endif
     /// Create a message of required size
     int numUnits = curMsgSize*1024/sizeof(double);
-    DataMsg *msg = new (numUnits) DataMsg(numUnits);
+    DataMsg *msg = new (numUnits) DataMsg(numUnits,commType);
     /// Fill it with data
     for (int i=0; i<numUnits; i++)
         msg->data[i] = i;
-    /// Start the timer
-    timeStart = CmiWallTimer();
-    /// Trigger the multicast
-    arraySection.crunchData(msg);
+    /// Start the timer and trigger the send to the array / section
+    switch (commType)
+    {
+        case CharmBcast:
+            timeStart = CmiWallTimer();
+            chareArray.crunchData(msg);
+            break;
+
+        case CkMulticast:
+            timeStart = CmiWallTimer();
+            arraySection.crunchData(msg);
+            break;
+
+        case Comlib:
+            timeStart = CmiWallTimer();
+            arraySection.crunchData(msg);
+            break;
+
+        default:
+            CkAbort("Attempting to use unknown mechanism to communicate with chare array");
+            break;
+    }
 }
 
 
@@ -183,15 +224,21 @@ void Main::receiveReduction(CkReductionMsg *msg)
         {
             /// Print the results
             CkPrintf("\n----------------------------------------------------------------");
-            CkPrintf("\nTests complete. Results: \n%s\n",out.str().c_str());
-            CkExit();
+            CkPrintf("\nFinished timing the collectives mechanism: %s. Results: \n%s\n",commName[curCommType],out.str().c_str());
+            /// Clear the output buffer
+            out.str("");
+            /// Reset the counters
+            curMsgSize = cfg.msgSizeMin;
+            /// Exit if done
+            if (++curCommType >= Comlib)
+                CkExit();
         }
     }
 
     /// Delete the reduction message
     delete msg;
     /// If we're here, then simply trigger the next multicast
-    sendMulticast(curMsgSize);
+    sendMulticast(curCommType,curMsgSize);
 }
 
 
