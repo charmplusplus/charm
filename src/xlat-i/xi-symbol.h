@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <list>
 
 #include "xi-util.h"
 #include "EToken.h"
@@ -90,7 +91,7 @@ class Construct : public Printable {
     int line;
     Module *containerModule;
     Construct() {external=0;line=-1;}
-    void setExtern(int e) { external = e; }
+    void setExtern(int &e) { external = e; }
     void setModule(Module *m) { containerModule = m; }
     virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) = 0;
     virtual void genDecls(XStr& str) = 0;
@@ -108,11 +109,9 @@ class Construct : public Printable {
 };
 
 class ConstructList : public Construct {
-    Construct *construct;
-    ConstructList *next;
+    std::list<Construct*> constructs;
   public:
-    ConstructList(int l, Construct *c, ConstructList *n=0) :
-      construct(c), next(n) {line = l;}
+    ConstructList(int l, Construct *c, ConstructList *n=0);
     void setExtern(int e);
     void setModule(Module *m);
     void print(XStr& str);
@@ -123,32 +122,12 @@ class ConstructList : public Construct {
     void preprocess();
 
     // DMK - Accel Support
-    int genAccels_spe_c_funcBodies(XStr& str) {
-      int rtn = 0;
-      if (construct) { rtn += construct->genAccels_spe_c_funcBodies(str); }
-      if (next) { rtn += next->genAccels_spe_c_funcBodies(str); }
-      return rtn;
-    }
-    void genAccels_spe_c_regFuncs(XStr& str) {
-      if (construct) { construct->genAccels_spe_c_regFuncs(str); }
-      if (next) { next->genAccels_spe_c_regFuncs(str); }
-    }
-    void genAccels_spe_c_callInits(XStr& str) {
-      if (construct) { construct->genAccels_spe_c_callInits(str); }
-      if (next) { next->genAccels_spe_c_callInits(str); }
-    }
-    void genAccels_spe_h_includes(XStr& str) {
-      if (construct) { construct->genAccels_spe_h_includes(str); }
-      if (next) { next->genAccels_spe_h_includes(str); }
-    }
-    void genAccels_spe_h_fiCountDefs(XStr& str) {
-      if (construct) { construct->genAccels_spe_h_fiCountDefs(str); }
-      if (next) { next->genAccels_spe_h_fiCountDefs(str); }
-    }
-    void genAccels_ppe_c_regFuncs(XStr& str) {
-      if (construct) { construct->genAccels_ppe_c_regFuncs(str); }
-      if (next) { next->genAccels_ppe_c_regFuncs(str); }
-    }
+    int genAccels_spe_c_funcBodies(XStr& str);
+    void genAccels_spe_c_regFuncs(XStr& str);
+    void genAccels_spe_c_callInits(XStr& str);
+    void genAccels_spe_h_includes(XStr& str);
+    void genAccels_spe_h_fiCountDefs(XStr& str);
+    void genAccels_ppe_c_regFuncs(XStr& str);
 };
 
 /*********************** Type System **********************/
@@ -680,26 +659,10 @@ class Member : public Construct {
 
 /* List of members of a chare or group */
 class MemberList : public Printable {
-    //friend class CParsedFile;
+    std::list<Member*> members;
   public:
-    Member *member;
-    MemberList *next;
-    MemberList(Member *m, MemberList *n=0) : member(m), next(n) {}
-    void appendMember(Member *m) 
-    {
-      MemberList *temp;
-      if (next != 0) {
-        temp = next;
-        while ( temp->next != 0) {
-          temp = temp->next;
-        }
-        temp->next = new MemberList(m, 0);
-      }
-      else
-        next = new MemberList(m, 0);
-     
-
-    }
+    MemberList(Member *m, MemberList *n=0);
+    void appendMember(Member *m);
     void print(XStr& str);
     void setChare(Chare *c);
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
@@ -711,32 +674,12 @@ class MemberList : public Printable {
     void preprocess();
 
     // DMK - Accel Support
-    int genAccels_spe_c_funcBodies(XStr& str) {
-      int rtn = 0;
-      if (member) { rtn += member->genAccels_spe_c_funcBodies(str); }
-      if (next) { rtn += next->genAccels_spe_c_funcBodies(str); }
-      return rtn;
-    }
-    void genAccels_spe_c_regFuncs(XStr& str) {
-      if (member) { member->genAccels_spe_c_regFuncs(str); }
-      if (next) { next->genAccels_spe_c_regFuncs(str); }
-    }
-    void genAccels_spe_c_callInits(XStr& str) {
-      if (member) { member->genAccels_spe_c_callInits(str); }
-      if (next) { next->genAccels_spe_c_callInits(str); }
-    }
-    void genAccels_spe_h_includes(XStr& str) {
-      if (member) { member->genAccels_spe_h_includes(str); }
-      if (next) { next->genAccels_spe_h_includes(str); }
-    }
-    void genAccels_spe_h_fiCountDefs(XStr& str) {
-      if (member) { member->genAccels_spe_h_fiCountDefs(str); }
-      if (next) { next->genAccels_spe_h_fiCountDefs(str); }
-    }
-    void genAccels_ppe_c_regFuncs(XStr& str) {
-      if (member) { member->genAccels_ppe_c_regFuncs(str); }
-      if (next) { next->genAccels_ppe_c_regFuncs(str); }
-    }
+    int genAccels_spe_c_funcBodies(XStr& str);
+    void genAccels_spe_c_regFuncs(XStr& str);
+    void genAccels_spe_c_callInits(XStr& str);
+    void genAccels_spe_h_includes(XStr& str);
+    void genAccels_spe_h_fiCountDefs(XStr& str);
+    void genAccels_ppe_c_regFuncs(XStr& str);
 
     void genPythonDefs(XStr& str);
     void genPythonStaticDefs(XStr& str);
@@ -1206,11 +1149,16 @@ class Module : public Construct {
 };
 
 class ModuleList : public Printable {
-    ModuleList *next;
+    std::list<Module*> modules;
   public:
-    Module *module;
     int line;
-    ModuleList(int l, Module *m, ModuleList *n=0) : line(l),module(m),next(n) {}
+    ModuleList(int l, Module *m, ModuleList *n=0) : line(l)
+	{
+	    modules.push_back(m);
+	    if (n)
+		modules.insert(modules.end(),
+			       n->modules.begin(), n->modules.end());
+	}
     void print(XStr& str);
     void generate();
     void preprocess();

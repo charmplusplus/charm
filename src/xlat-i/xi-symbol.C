@@ -5,6 +5,10 @@
  * $Revision$
  *****************************************************************************/
 
+#include <list>
+using std::list;
+#include <algorithm>
+using std::for_each;
 #include <stdlib.h>
 #include "xi-symbol.h"
 #include <ctype.h> // for tolower()
@@ -98,34 +102,109 @@ Value::getIntVal(void)
   return (atoi((const char *)val)*factor);
 }
 
+
+/**
+   Apply fn_ on each Construct in the list l, passing it arg as
+   the target. If between_ is passed, do that to arg between each
+   element.
+ */
+template<typename T, typename U, typename A>
+class perElemGenC
+{
+    void (U::*fn)(A);
+    void (*between)(A);
+    A arg;
+public:
+    perElemGenC(list<T*> &l,
+	       A arg_,
+	       void (U::*fn_)(A),
+	       void (*between_)(A) = NULL)
+	: fn(fn_), between(between_), arg(arg_)
+	{
+	    for_each(l.begin(), l.end(), *this);
+	}
+    void operator()(T* m)
+	{
+	    if (m)
+	    {
+		(m->*fn)(arg);
+		if (between)
+		    between(arg);
+	    }
+	}
+};
+
+template<typename T, typename U, typename A>
+void perElemGen(list<T*> &l, A& arg_, void (U::*fn_)(A&),
+		void (*between_)(A&) = NULL)
+{
+    perElemGenC<T, U, A&>(l, arg_, fn_, between_);
+}
+
+template<typename T, typename U, typename A>
+void perElemGen(list<T*> &l, A* arg_, void (U::*fn_)(A*),
+		void (*between_)(A*) = NULL)
+{
+    perElemGenC<T, U, A*>(l, arg_, fn_, between_);
+}
+
+void newLine(XStr &str)
+{
+    str << endx;
+}
+
+ConstructList::ConstructList(int l, Construct *c, ConstructList *n)
+{
+    constructs.push_back(c);
+    if (n)
+	constructs.insert(constructs.end(),
+			  n->constructs.begin(), n->constructs.end());
+    line = l;
+}
+
 void
 ConstructList::setExtern(int e)
 {
   Construct::setExtern(e);
-  if(construct)
-    construct->setExtern(e);
-  if(next)
-    next->setExtern(e);
+  perElemGen(constructs, e, &Construct::setExtern);
 }
 
 void
 ConstructList::setModule(Module *m)
 {
   Construct::setModule(m);
-  if(construct)
-    construct->setModule(m);
-  if(next)
-    next->setModule(m);
+  perElemGen(constructs, m, &Construct::setModule);
 }
 
 void
 ConstructList::print(XStr& str)
 {
-  if(construct)
-    construct->print(str);
-  if(next)
-    next->print(str);
+    perElemGen(constructs, str, &Construct::print);
 }
+
+int ConstructList::genAccels_spe_c_funcBodies(XStr& str) {
+    int rtn = 0;
+    for (list<Construct *>::iterator i = constructs.begin();
+	 i != constructs.end(); ++i)
+	if (*i) rtn += (*i)->genAccels_spe_c_funcBodies(str);
+    return rtn;
+}
+void ConstructList::genAccels_spe_c_regFuncs(XStr& str) {
+    perElemGen(constructs, str, &Construct::genAccels_spe_c_regFuncs);
+}
+void ConstructList::genAccels_spe_c_callInits(XStr& str) {
+    perElemGen(constructs, str, &Construct::genAccels_spe_c_callInits);
+}
+void ConstructList::genAccels_spe_h_includes(XStr& str) {
+    perElemGen(constructs, str, &Construct::genAccels_spe_h_includes);
+}
+void ConstructList::genAccels_spe_h_fiCountDefs(XStr& str) {
+    perElemGen(constructs, str, &Construct::genAccels_spe_h_fiCountDefs);
+}
+void ConstructList::genAccels_ppe_c_regFuncs(XStr& str) {
+    perElemGen(constructs, str, &Construct::genAccels_ppe_c_regFuncs);
+}
+
 
 void
 TParamList::print(XStr& str)
@@ -193,18 +272,54 @@ TypeList::print(XStr& str)
     next->print(str);
   }
 }
+
 int TypeList::length(void) const
 {
   if (next) return next->length()+1;
   else return 1;
 }
 
+MemberList::MemberList(Member *m, MemberList *n)
+{
+    members.push_back(m);
+    if (n)
+	members.insert(members.end(), n->members.begin(), n->members.end());
+}
+
+
 void
 MemberList::print(XStr& str)
 {
-  member->print(str);
-  if(next)
-    next->print(str);
+    perElemGen(members, str, &Member::print);
+}
+
+void
+MemberList::appendMember(Member *m)
+{
+    members.push_back(m);
+}
+
+int MemberList::genAccels_spe_c_funcBodies(XStr& str) {
+    int rtn = 0;
+    for (list<Member*>::iterator i = members.begin(); i != members.end(); ++i)
+	if (*i)
+	    rtn += (*i)->genAccels_spe_c_funcBodies(str);
+    return rtn;
+}
+void MemberList::genAccels_spe_c_regFuncs(XStr& str) {
+    perElemGen(members, str, &Member::genAccels_spe_c_regFuncs);
+}
+void MemberList::genAccels_spe_c_callInits(XStr& str) {
+    perElemGen(members, str, &Member::genAccels_spe_c_callInits);
+}
+void MemberList::genAccels_spe_h_includes(XStr& str) {
+    perElemGen(members, str, &Member::genAccels_spe_h_includes);
+}
+void MemberList::genAccels_spe_h_fiCountDefs(XStr& str) {
+    perElemGen(members, str, &Member::genAccels_spe_h_fiCountDefs);
+}
+void MemberList::genAccels_ppe_c_regFuncs(XStr& str) {
+    perElemGen(members, str, &Member::genAccels_ppe_c_regFuncs);
 }
 
 
@@ -472,25 +587,21 @@ Module::preprocess()
 void
 ModuleList::print(XStr& str)
 {
-  module->print(str);
-  if(next)
-    next->print(str);
+    perElemGen(modules, str, &Module::print);
 }
 
 void
 ModuleList::generate()
 {
-  module->generate();
-  if(next)
-    next->generate();
+    for (list<Module*>::iterator i = modules.begin(); i != modules.end(); ++i)
+	(*i)->generate();
 }
 
 void
 ModuleList::preprocess()
 {
-  module->preprocess();
-  if(next)
-    next->preprocess();
+    for (list<Module*>::iterator i = modules.begin(); i != modules.end(); ++i)
+	(*i)->preprocess();
 }
 
 void
@@ -515,63 +626,45 @@ Readonly::print(XStr& str)
 void
 MemberList::setChare(Chare *c)
 {
-  member->setChare(c);
-  if(next)
-    next->setChare(c);
+    perElemGen(members, c, &Member::setChare);
 }
 
 void
 ConstructList::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
 {
-  if(construct) {
-    construct->genPub(declstr, defstr, defconstr, connectPresent);
-    declstr << endx;
-  }
-  if(next)
-    next->genPub(declstr, defstr, defconstr, connectPresent);
+    for (list<Construct*>::iterator i = constructs.begin(); 
+	 i != constructs.end(); ++i)
+	if (*i) {
+	    (*i)->genPub(declstr, defstr, defconstr, connectPresent);
+	    declstr << endx;
+	}
 }
 
 void
 ConstructList::genDecls(XStr& str)
 {
-  if(construct) {
-    construct->genDecls(str);
-    str << endx;
-  }
-  if(next)
-    next->genDecls(str);
+    perElemGen(constructs, str, &Construct::genDecls, newLine);
 }
 
 void
 ConstructList::genDefs(XStr& str)
 {
-  if(construct) {
-    construct->genDefs(str);
-    str << endx;
-  }
-  if(next)
-    next->genDefs(str);
+    perElemGen(constructs, str, &Construct::genDefs, newLine);
 }
 
 void
 ConstructList::genReg(XStr& str)
 {
-  if(construct) {
-    construct->genReg(str);
-    str << endx;
-  }
-  if(next)
-    next->genReg(str);
+    perElemGen(constructs, str, &Construct::genReg, newLine);
 }
 
 void
 ConstructList::preprocess()
 {
-  if(construct) {
-    construct->preprocess();
-  }
-  if(next)
-    next->preprocess();
+    for (list<Construct*>::iterator i = constructs.begin(); 
+	 i != constructs.end(); ++i)
+	if (*i)
+	    (*i)->preprocess();
 }
 
 XStr Chare::proxyName(int withTemplates)
@@ -2340,115 +2433,66 @@ void TParamList::genSpec(XStr& str)
 
 void MemberList::genIndexDecls(XStr& str)
 {
-  if(member)
-    member->genIndexDecls(str);
-  if(next) {
-    str << endx;
-    next->genIndexDecls(str);
-  }
+    perElemGen(members, str, &Member::genIndexDecls, newLine);
 }
+
 void MemberList::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
 {
-  if(member)
-    member->genPub(declstr, defstr, defconstr, connectPresent);
-  if(next) {
-    declstr << endx;
-    next->genPub(declstr, defstr, defconstr, connectPresent);
-  }
+    for (list<Member*>::iterator i = members.begin(); i != members.end(); ++i)
+	if (*i) {
+	    (*i)->genPub(declstr, defstr, defconstr, connectPresent);
+	    declstr << endx;
+	}
 }
 
 void MemberList::genDecls(XStr& str)
 {
-  if(member)
-    member->genDecls(str);
-  if(next) {
-    str << endx;
-    next->genDecls(str);
-  }
+    perElemGen(members, str, &Member::genDecls, newLine);
 }
 
 void MemberList::collectSdagCode(CParsedFile *pf, int& sdagPresent)
 {
-  if(member){
-    member->collectSdagCode(pf, sdagPresent);
-  }
-  if(next) {
-    //str << endx;
-    next->collectSdagCode(pf, sdagPresent);
-  }
+    for (list<Member*>::iterator i = members.begin(); i != members.end(); ++i)
+	if (*i)
+	    (*i)->collectSdagCode(pf, sdagPresent);
 }
 
 void MemberList::genDefs(XStr& str)
 {
-  if(member)
-    member->genDefs(str);
-  if(next) {
-    str << endx;
-    next->genDefs(str);
-  }
+    perElemGen(members, str, &Member::genDefs, newLine);
 }
 
 void MemberList::genReg(XStr& str)
 {
-  if(member)
-    member->genReg(str);
-  if(next) {
-    str << endx;
-    next->genReg(str);
-  }
+    perElemGen(members, str, &Member::genReg, newLine);
 }
 
 void MemberList::preprocess()
 {
-  if(member)
-    member->preprocess();
-  if(next)
-    next->preprocess();
+    for (list<Member*>::iterator i = members.begin(); i != members.end(); ++i)
+	if (*i)
+	    (*i)->preprocess();
 }
 
 void MemberList::lookforCEntry(CEntry *centry)
 {
-  if(member){
-    member->lookforCEntry(centry);
-  }
-  if(next) {
-    //str << endx;
-    next->lookforCEntry(centry);
-  }
+    perElemGen(members, centry, &Member::lookforCEntry);
 }
 
 void MemberList::genPythonDecls(XStr& str) {
-  if(member)
-    member->genPythonDecls(str);
-  if(next) {
-    str << endx;
-    next->genPythonDecls(str);
-  }
+    perElemGen(members, str, &Member::genPythonDecls, newLine);
 }
 
 void MemberList::genPythonDefs(XStr& str) {
-  if(member)
-    member->genPythonDefs(str);
-  if(next) {
-    str << endx;
-    next->genPythonDefs(str);
-  }
+    perElemGen(members, str, &Member::genPythonDefs, newLine);
 }
 
 void MemberList::genPythonStaticDefs(XStr& str) {
-  if(member)
-    member->genPythonStaticDefs(str);
-  if(next) {
-    next->genPythonStaticDefs(str);
-  }
+    perElemGen(members, str, &Member::genPythonStaticDefs);
 }
 
 void MemberList::genPythonStaticDocs(XStr& str) {
-  if(member)
-    member->genPythonStaticDocs(str);
-  if(next) {
-    next->genPythonStaticDocs(str);
-  }
+    perElemGen(members, str, &Member::genPythonStaticDocs);
 }
 
 void Entry::lookforCEntry(CEntry *centry)
@@ -2574,19 +2618,25 @@ void CParsedFile::generateInitFunction(XStr& op)
 }
 
 
-/// Create a merging point for each of the places where multiple dependencies lead into some future task.
-/// For Isaac's Critical Path Detection
+/**
+    Create a merging point for each of the places where multiple
+    dependencies lead into some future task.
+
+    Used by Isaac's critical path detection
+*/
 void CParsedFile::generateDependencyMergePoints(XStr& op) 
 {
 
   op << " \n";
 
-  // Each when statement will have a set of message dependencies, and also the dependencies from completion of previous task
+  // Each when statement will have a set of message dependencies, and
+  // also the dependencies from completion of previous task
   for(int i=0;i<numWhens;i++){
     op << "  MergeablePathHistory _when_" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
   }
   
-  // The end of each overlap block will have multiple paths that merge before the subsequent task is executed
+  // The end of each overlap block will have multiple paths that merge
+  // before the subsequent task is executed
   for(int i=0;i<numOlists;i++){
     op << "  MergeablePathHistory olist__co" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
   }
