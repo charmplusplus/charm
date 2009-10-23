@@ -65,7 +65,7 @@ static void meta_init(char **argv)
    CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
    CpvInitialize(CmiIsomallocBlockList *,isomalloc_blocklist);
    CpvInitialize(CmiIsomallocBlockList *,pushed_blocklist);
-#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH && CMK_TLS_THREAD
    isomalloc_thread = 1;
 #endif
 }
@@ -73,11 +73,11 @@ static void meta_init(char **argv)
 static void *meta_malloc(size_t size)
 {
 	void *ret=NULL;
-#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
-	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)&&isomalloc_thread) 
+	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH && CMK_TLS_THREAD
+             && isomalloc_thread
 #else
-	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)) 
-#endif
+           )
 	{ /*Isomalloc a new block and link it in*/
 		ISOMALLOC_PUSH /*Disable isomalloc while inside isomalloc*/
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
