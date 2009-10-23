@@ -71,9 +71,12 @@ extern "C" int read_counters(int e0, long long *c0, int e1, long long *c1);
 inline double Count2Time(long long c) { return c*5.e-7; }
 #elif CMK_HAS_COUNTER_PAPI
 #include <papi.h>
-int papiEvents[4];
+int *papiEvents = NULL;
 int numPapiEvents;
-long_long papiValues[4];
+long_long *papiValues = NULL;
+CmiUInt8 *total_papi_counters = NULL;
+char **papi_counters_desc = NULL;
+#define MAX_TOTAL_EVENTS 10
 #endif
 
 
@@ -97,28 +100,76 @@ int    BgGetArgc() { return arg_argc; }
 ****************************************************************************/
 
 #if CMK_HAS_COUNTER_PAPI
+/*
 CmiUInt8 total_ins = 0;
 CmiUInt8 total_fps = 0;
 CmiUInt8 total_l1_dcm = 0;
 CmiUInt8 total_mem_rcy = 0;
-
+*/
 int init_counters()
 {
-
     int retval = PAPI_library_init(PAPI_VER_CURRENT);
 
     if (retval != PAPI_VER_CURRENT) { CmiAbort("PAPI library init error!"); } 
 
+	//a temporary
+	const char *eventDesc[MAX_TOTAL_EVENTS];
+	int lpapiEvents[MAX_TOTAL_EVENTS];
+	
     numPapiEvents = 0;
+	
+#define ADD_LOW_LEVEL_EVENT(e, edesc) \
+		if(PAPI_query_event(e) == PAPI_OK){ \
+			if(CmiMyPe()==0) printf("PAPI Info:> Event for %s added\n", edesc); \
+			eventDesc[numPapiEvents] = edesc;	\
+			lpapiEvents[numPapiEvents++] = e; \
+		}
+		
     // PAPI high level API does not require explicit library intialization
-    papiEvents[numPapiEvents++] = PAPI_TOT_CYC;
-    if (PAPI_query_event(PAPI_FP_INS) == PAPI_OK) {
+	eventDesc[numPapiEvents] ="cycles";
+    lpapiEvents[numPapiEvents++] = PAPI_TOT_CYC;
+	
+	
+    /*if (PAPI_query_event(PAPI_FP_INS) == PAPI_OK) {
       if (CmiMyPe()== 0) printf("PAPI_FP_INS used\n");
-      papiEvents[numPapiEvents++] = PAPI_FP_INS;
+	  eventDesc[numPapiEvents] = "floating point instructions";	
+      lpapiEvents[numPapiEvents++] = PAPI_FP_INS;	  
     } else {
       if (CmiMyPe()== 0) printf("PAPI_TOT_INS used\n");
-      papiEvents[numPapiEvents++] = PAPI_TOT_INS;
+	  eventDesc[numPapiEvents] = "total instructions";	
+      lpapiEvents[numPapiEvents++] = PAPI_TOT_INS;
     }
+    */
+	
+	//ADD_LOW_LEVEL_EVENT(PAPI_FP_INS, "floating point instructions");
+	ADD_LOW_LEVEL_EVENT(PAPI_TOT_INS, "total instructions");
+	//ADD_LOW_LEVEL_EVENT(PAPI_L1_DCM, "L1 cache misses");
+	ADD_LOW_LEVEL_EVENT(PAPI_L2_DCM, "L2 data cache misses");	
+	//ADD_LOW_LEVEL_EVENT(PAPI_MEM_RCY, "idle cycles waiting for memory reads");	
+	//ADD_LOW_LEVEL_EVENT(PAPI_TLB_DM, "Data TLB misses");
+	
+	if(numPapiEvents == 0){
+		CmiAbort("No papi events are defined!\n");
+	}
+	
+	if(numPapiEvents >= MAX_TOTAL_EVENTS){
+		CmiAbort("Exceed the pre-defined max number of papi events allowed!\n");
+	}
+	
+	papiEvents = new int[numPapiEvents];
+	papiValues = new long_long[numPapiEvents];
+	total_papi_counters = new CmiUInt8[numPapiEvents];
+	papi_counters_desc = new char *[numPapiEvents];
+	for(int i=0; i<numPapiEvents; i++){
+		papiEvents[i] = lpapiEvents[i];
+		total_papi_counters[i] = 0;
+		CmiPrintf("%d: %s\n", i, eventDesc[i]);
+		papi_counters_desc[i] = new char[strlen(eventDesc[i])+1];
+		memcpy(papi_counters_desc[i], eventDesc[i], strlen(eventDesc[i]));
+		papi_counters_desc[i][strlen(eventDesc[i])] = 0;
+	}
+	
+/*
     if (PAPI_query_event(PAPI_L1_DCM) == PAPI_OK) {
       if (CmiMyPe()== 0) printf("PAPI_L1_DCM used\n");
       papiEvents[numPapiEvents++] = PAPI_L1_DCM;   // L1 cache miss
@@ -131,6 +182,7 @@ int init_counters()
       if (CmiMyPe()== 0) printf("PAPI_MEM_RCY used\n");
       papiEvents[numPapiEvents++] = PAPI_MEM_RCY;  // idle cycle waiting for reads
     }
+*/
 
     int status = PAPI_start_counters(papiEvents, numPapiEvents);
     if (status != PAPI_OK) {
@@ -153,11 +205,20 @@ int read_counters(long_long *papiValues, int n)
     CmiPrintf("PAPI_read_counters error: %d\n", status);
     CmiAbort("Failed to read PAPI counters!\n");
   }
+  
+  /*
   total_ins += papiValues[0];
   total_fps += papiValues[1];
   total_l1_dcm += papiValues[2];
   total_mem_rcy += papiValues[3];
+  */
+  
   return 0;
+}
+
+inline void CountPapiEvents(){
+  for(int i=0 ;i<numPapiEvents; i++)
+	total_papi_counters[i] += papiValues[i];
 }
 
 inline double Count2Time(long_long *papiValues, int n) { 
@@ -356,6 +417,7 @@ void stopVTimer()
     tCURRTIME += Count2Time(c1);
 #elif CMK_HAS_COUNTER_PAPI
     if (read_counters(papiValues, numPapiEvents) < 0) perror("read_counters");
+    CountPapiEvents();
     tCURRTIME += Count2Time(papiValues, numPapiEvents);
 #endif
   }
@@ -1199,6 +1261,10 @@ void BgNodeInitialize(nodeInfo *ninfo)
     tinfo->setThread(t);
     /* put to thread table */
     tTHREADTABLE[tinfo->id] = t;
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+    //initial scheduling points for workthreads
+    if(bgUseOutOfCore) schedWorkThds->push((workThreadInfo *)tinfo);
+#endif
     CthAwaken(t);
   }
 
@@ -1269,10 +1335,20 @@ static CmiHandler exitHandlerFunc(char *msg)
 
 #if CMK_HAS_COUNTER_PAPI
   if (cva(bgMach).timingMethod == BG_COUNTER) {
+/*	  
   CmiPrintf("BG[PE %d]> cycles: %lld\n", CmiMyPe(), total_ins);
   CmiPrintf("BG[PE %d]> floating point instructions: %lld\n", CmiMyPe(), total_fps);
   CmiPrintf("BG[PE %d]> L1 cache misses: %lld\n", CmiMyPe(), total_l1_dcm);
   //CmiPrintf("BG[PE %d]> cycles stalled waiting for memory access: %lld\n", CmiMyPe(), total_mem_rcy);
+ */
+	for(int i=0; i<numPapiEvents; i++){
+	  CmiPrintf("BG[PE %d]> %s: %lld\n", CmiMyPe(), papi_counters_desc[i], total_papi_counters[i]);
+	   delete papi_counters_desc[i];
+	}
+	delete papiEvents;
+	delete papiValues;
+	delete papi_counters_desc;
+	delete total_papi_counters;
   }
 #endif
 
@@ -1438,6 +1514,10 @@ CmiStartFn bgMain(int argc, char **argv)
 
 
   /* parameters related with out-of-core execution */
+  int tmpcap=0;
+  if (CmiGetArgIntDesc(argv, "+bgooccap", &tmpcap, "Simulate with out-of-core support and the number of target processors allowed in memory")){
+     TBLCAPACITY = tmpcap;
+    }
   if (CmiGetArgDoubleDesc(argv, "+bgooc", &bgOOCMaxMemSize, "Simulate with out-of-core support and the threshhold of memory size")){
       bgUseOutOfCore = 1;
       BgInOutOfCoreMode = 1; //the global (the whole converse layer) out-of-core flag
@@ -1522,6 +1602,26 @@ CmiStartFn bgMain(int argc, char **argv)
 
   bgstreaming.init(cva(numNodes));
 
+  //Must initialize out-of-core related data structures before creating any BG nodes and procs
+if(bgUseOutOfCore){
+      initTblThreadInMem();
+	  #if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+      //init prefetch status      
+      thdsOOCPreStatus = new oocPrefetchStatus[cva(numNodes)*cva(bgMach).numWth];
+      oocPrefetchSpace = new oocPrefetchBufSpace();
+      schedWorkThds = new oocWorkThreadQueue();
+	  #endif
+  }
+
+#if BIGSIM_OUT_OF_CORE
+  //initialize variables related to get precise
+  //physical memory usage info for a process
+  bgMemPageSize = getpagesize();
+  memset(bgMemStsFile, 0, 25); 
+  sprintf(bgMemStsFile, "/proc/%d/statm", getpid());
+#endif
+
+
   /* create BG nodes */
   CpvInitialize(nodeInfo *, nodeinfo);
   cva(nodeinfo) = new nodeInfo[cva(numNodes)];
@@ -1550,19 +1650,7 @@ CmiStartFn bgMain(int argc, char **argv)
 
   CpvInitialize(int, CthResumeBigSimThreadIdx);
 
-  cva(simState).simStartTime = CmiWallTimer();
-
-  if(bgUseOutOfCore)
-      initTblThreadInMem();
-
-#if BIGSIM_OUT_OF_CORE
-  //initialize variables related to get precise
-  //physical memory usage info for a process
-  bgMemPageSize = getpagesize();
-  memset(bgMemStsFile, 0, 25); 
-  sprintf(bgMemStsFile, "/proc/%d/statm", getpid());
-#endif
-    
+  cva(simState).simStartTime = CmiWallTimer();    
   return 0;
 }
 
