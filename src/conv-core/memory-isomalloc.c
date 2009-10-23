@@ -45,17 +45,39 @@ void CmiEnableIsomalloc()
 	rank_holding_CmiMemLock=-1;
 }
 
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+#if CMK_TLS_THREAD
+/**
+ * This thread private variable is used to disable using isomalloc
+ * in system libraries if the system libraries is called in an
+ * automatically created pthread, such as the callback provided
+ * by Asynchronous IO used in the prefetch optimization in BigSim
+ * emulator. --Chao Mei
+ */
+static __thread int isomalloc_thread = 0;
+#else
+#error TLS support is required for bigsim out-of-core prefetch optimization
+#endif
+#endif
+
 static void meta_init(char **argv)
 {
    CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
    CpvInitialize(CmiIsomallocBlockList *,isomalloc_blocklist);
    CpvInitialize(CmiIsomallocBlockList *,pushed_blocklist);
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+   isomalloc_thread = 1;
+#endif
 }
 
 static void *meta_malloc(size_t size)
 {
 	void *ret=NULL;
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
+	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)&&isomalloc_thread) 
+#else
 	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)) 
+#endif
 	{ /*Isomalloc a new block and link it in*/
 		ISOMALLOC_PUSH /*Disable isomalloc while inside isomalloc*/
 #if CMK_ISOMALLOC_EXCLUDE_FORTRAN_CALLS
