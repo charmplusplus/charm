@@ -62,7 +62,7 @@ class _CkOStream {
 #endif
     _OPSHIFTLEFT(char, "%c");
     _OPSHIFTLEFT(unsigned char, "%u");
-    _OPSHIFTLEFT(float, "%f");
+    _OPSHIFTLEFT(float, "%g");
     _OPSHIFTLEFT(double, "%g");  // Floats and doubles are identical for printf
     _OPSHIFTLEFT(const char*, "%s");
     _OPSHIFTLEFT(void*, "%p");
