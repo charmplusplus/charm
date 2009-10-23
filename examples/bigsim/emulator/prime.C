@@ -19,8 +19,8 @@ public:
   void operator delete(void* ptr) { CmiFree(ptr); }
 };
 
-BnvStaticDeclare(int, pc);
-BnvStaticDeclare(int, count);
+BnvStaticDeclare(int, pc)
+BnvStaticDeclare(int, count)
 
 void BgEmulatorInit(int argc, char **argv)
 {

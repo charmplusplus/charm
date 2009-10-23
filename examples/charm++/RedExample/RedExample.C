@@ -33,7 +33,7 @@ main::main(CkArgMsg* m)
     CkCallback *cb = new CkCallback(CkIndex_main::reportIn(NULL),  mainProxy);
     arr.ckSetReductionClient(cb);
     arr.dowork();
-  };
+  }
 
 
 

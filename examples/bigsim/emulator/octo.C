@@ -131,9 +131,9 @@ struct OctoData
  { }
 };
 
-BnvStaticDeclare(int, num_messages);
-BnvStaticDeclare(double, max_time);
-BnvStaticDeclare(int, reduce_count);
+BnvStaticDeclare(int, num_messages)
+BnvStaticDeclare(double, max_time)
+BnvStaticDeclare(int, reduce_count)
 
 void BgEmulatorInit(int argc, char** argv)
 {
