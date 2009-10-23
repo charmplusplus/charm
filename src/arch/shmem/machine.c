@@ -23,17 +23,7 @@
 
 #include CMK_SHMEM_H
 
-#if !CMK_SHMEM_T3E
-#define globalexit exit
-#endif 
-
-#define USE_SWAP                                             1
-
-/*
- *  We require statically allocated variables for locks.  This defines
- *  the max number of processors available.
- */
-#define MAX_PES 4096
+#define USE_SWAP                                       0
 
 /*
  * Some constants
@@ -63,8 +53,8 @@ int _Cmi_myrank;
 typedef struct McDistListS
 {
   int nxt_node;
-  struct McMsgHdrS *nxt_addr;
   int msg_sz;
+  struct McMsgHdrS *nxt_addr;
 } McDistList;
 
 typedef struct McMsgHdrS
@@ -153,11 +143,17 @@ static McQueue *broadcast_tmp_queue;
 static McDistList head;
 
 #if CMK_ARENA_MALLOC
-/* lock can be in symmetric heap */
+/* lock allocated from symmetric heap */
 static long *my_lock;
 static long *head_lock;
 static long *bcast_lock;
 #else
+/*
+ *  We require statically allocated variables for locks.  This defines
+ *  the max number of processors available.
+ */
+#define MAX_PES 2048
+
 /* Static variables are necessary for locks. */
 static long *my_lock;
 static long head_lock[MAX_PES];
@@ -455,7 +451,7 @@ void CmiAbort(const char *message)
 {
   CmiError(message);
   /* *(char*)NULL = 0; */
-  globalexit(1);
+  exit(1);
 }
 
 /**********************************************************************
@@ -489,6 +485,23 @@ static void CommunicationServerThread(int sleepTime)
 #endif
 }
 
+void CmiNotifyIdle(void)
+{
+  /* Use this opportunity to clean up the in_transit_queue */
+  McCleanUpInTransit();
+}
+
+static void CmiNotifyBeginIdle(void *s)
+{
+  /* Use this opportunity to clean up the in_transit_queue */
+  McCleanUpInTransit();
+}
+
+static void CmiNotifyStillIdle(void *s)
+{
+  McRetrieveRemote();
+}
+
 static void ConverseRunPE(int everReturn)
 {
   char** CmiMyArgv;
@@ -502,6 +515,10 @@ static void ConverseRunPE(int everReturn)
 
   ConverseCommonInit(CmiMyArgv);
 
+  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
+      (CcdVoidFn) CmiNotifyBeginIdle, (void *) NULL);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
+      (CcdVoidFn) CmiNotifyStillIdle, (void *) NULL);
 
   /* communication thread */
   if (CmiMyRank() == CmiMyNodeSize()) {
@@ -548,16 +565,6 @@ ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
   /* CmiStartThreads(argv); */
   ConverseRunPE(initret);
-
-/*
-  for(argc=0;argv[argc];argc++);
-  if (initret==0)
-  {
-    fn(argc,argv);
-    if (usched==0) CsdScheduler(-1);
-    ConverseExit();
-  }
-*/
 }
 
 void ConverseExit()
@@ -572,12 +579,6 @@ void ConverseExit()
   shmem_finalize();
 #endif
   exit(0);
-}
-
-void CmiNotifyIdle(void)
-{
-  /* Use this opportunity to clean up the in_transit_queue */
-  McCleanUpInTransit();
 }
 
 /* lock
@@ -628,7 +629,7 @@ void clear_lock(long *lock, int pe)
  * Mc functions are used internally in machine.c only
  */
 
-static void McInit(void)
+static void McInit()
 {
   CMK_SHMEM_INIT;
 
@@ -647,7 +648,7 @@ static void McInit(void)
   McInitList();
 }
 
-static void McInitList(void)
+static void McInitList()
 {
   int i;
 
@@ -811,7 +812,7 @@ static void McRetrieveRemote(void)
     if (cur_msg ==NULL)
     {
       CmiError("%s:%d Cannot Allocate Memory\n",__FILE__,__LINE__);
-      globalexit(1);
+      exit(1);
     }
 
     shmem_get64((long*)cur_msg, (long*)cur_node->nxt_addr,
@@ -1036,7 +1037,7 @@ static void * McQueueRemoveFromFront(McQueue *queue)
 
 static char *arena = NULL;
 static slotset *myss = NULL;
-static int slotsize=1*1024;
+static int slotsize = 1*1024;
 
 typedef struct ArenaBlock {
       CmiInt8 slot;   /* First slot */
@@ -1108,9 +1109,8 @@ void *arena_malloc(int size)
         /*Always satisfy mallocs with local slots:*/
         s=get_slots(myss,n);
         if (s==-1) {
-                CmiError("Not enough address space left in shmem on processor %d for %d bytes!\n", 
-                         CmiMyPe(),size);
-                CmiAbort("Out of symmetric heap space for arena_malloc");
+            CmiError("Not enough address space left in shmem on processor %d for %d bytes!\n", CmiMyPe(),size);
+            CmiAbort("Out of symmetric heap space for arena_malloc");
         }
 	grab_slots(myss,s,n);
 	blk = (ArenaBlock*)(arena + s*slotsize);
