@@ -54,6 +54,7 @@
 
 */
 
+#define _POSIX_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1250,9 +1251,7 @@ int CmiLongSendQueue(int forNode,int longerThanBytes) {
 
 #if CMK_SIGNAL_USE_SIGACTION
 #include <signal.h>
-void CmiSignal(sig1, sig2, sig3, handler)
-int sig1, sig2, sig3;
-void (*handler)();
+void CmiSignal(int sig1, int sig2, int sig3, void (*handler)())
 {
   struct sigaction in, out ;
   in.sa_handler = handler;

@@ -24,6 +24,9 @@ generalized by Orion Lawlor November 2001.  B-tree implementation
 added by Ryan Mokos in July 2008.
 *************************************************************************/
 
+#define _POSIX_SOURCE
+#define _BSD_SOURCE
+#include <features.h>
 #include "converse.h"
 #include "memory-isomalloc.h"
 
@@ -44,6 +47,7 @@ added by Ryan Mokos in July 2008.
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h> /* just so I can find dynamically-linked symbols */
+#include <unistd.h>
 
 static int _sync_iso = 0;
 
