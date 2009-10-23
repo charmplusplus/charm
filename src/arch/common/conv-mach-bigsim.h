@@ -13,3 +13,4 @@
 #define CMK_IMMEDIATE_MSG				   0
 
 #define BIGSIM_OUT_OF_CORE                                 0
+#define BIGSIM_OOC_PREFETCH                                0
