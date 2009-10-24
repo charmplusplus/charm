@@ -27,9 +27,9 @@
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
-#define CMK_SIGNAL_NOT_NEEDED                              0
+#define CMK_SIGNAL_NOT_NEEDED                              1
 #define CMK_SIGNAL_USE_SIGACTION                           0
-#define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              1
+#define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       0
 
@@ -43,6 +43,7 @@
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 #define CMK_TIMER_USE_BLUEGENEP				   1
+#define CMK_TIMER_USE_AIX_READ_TIME                        0
 
 #define CMK_BLUEGENEP                                      1
 
