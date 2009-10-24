@@ -32,6 +32,10 @@ do
 		args=" "$1" "$2" "$args
 		shift
 		;;
+	--mode)
+		args=" "$1" "$2" "$args
+		shift
+		;;
 	*) 
 		args=$args" "$1
 		;;
