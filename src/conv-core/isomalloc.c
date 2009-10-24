@@ -24,11 +24,10 @@ generalized by Orion Lawlor November 2001.  B-tree implementation
 added by Ryan Mokos in July 2008.
 *************************************************************************/
 
-#define _POSIX_SOURCE
-#define _BSD_SOURCE
 #include "converse.h"
 #include "memory-isomalloc.h"
 
+#define CMK_MMAP_PROBE    0
 #define CMK_THREADS_DEBUG 0
 
 /* 0: use the old isomalloc implementation (array)
@@ -48,11 +47,11 @@ added by Ryan Mokos in July 2008.
 #include <errno.h> /* just so I can find dynamically-linked symbols */
 #include <unistd.h>
 
-static int _sync_iso = 0;
-
 #if CMK_HAS_ADDR_NO_RANDOMIZE
 #include <sys/personality.h>
 #endif
+
+static int _sync_iso = 0;
 
 static int read_randomflag(void)
 {
@@ -1900,10 +1899,16 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
 #endif
                      ,-1,0);
 	if (range==bad_alloc) { /* mmap failed */
+#if CMK_THREADS_DEBUG
+                /* CmiPrintf("[%d] test failed at size: %llu\n", CmiMyPe(), size); */
+#endif
 		size=(double)size/shrink; /* shrink request */
 		if (size<=0) return 0; /* mmap doesn't work */
 	}
 	else { /* this allocation size is available */
+#if CMK_THREADS_DEBUG
+               CmiPrintf("[%d] available: %p, %lld\n", CmiMyPe(), range, size);
+#endif
 		munmap(range,size); /* needed/wanted? */
 		if (size > good_size) {
 		  good_range = range;
