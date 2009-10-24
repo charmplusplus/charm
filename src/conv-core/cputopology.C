@@ -5,6 +5,7 @@
  * $Revision$
  *****************************************************************************/
 
+#include <map>
 #include "converse.h"
 #include "sockRoutines.h"
 #include "cklists.h"
@@ -135,14 +136,21 @@ public:
     //unodes.bubbleSort(0, CmiNumPes()-1);
     unodes.quickSort();
     int last = -1;
+    std::map<int, int> nodemap;  // nodeIDs can be out of range of [0,numNodes]
     for (i=0; i<CmiNumPes(); i++)  { 
-        if (unodes[i] != last) numNodes++; 
-        last=unodes[i];
+        if (unodes[i] != last) {
+          last=unodes[i];
+	  nodemap[unodes[i]] = numNodes;
+          numNodes++; 
+        }
     }
     if (numNodes == 0) 
       numNodes = CmiNumPes();
-    else
+    else {
+        // re-number nodeIDs, which may be necessary e.g. on BlueGene/P
+      for (i=0; i<CmiNumPes(); i++) nodeIDs[i] = nodemap[nodeIDs[i]];
       CpuTopology::supported = 1;
+    }
     return numNodes;
 #endif
   }
@@ -364,36 +372,37 @@ extern "C" void CmiInitCPUTopology(char **argv)
   if (CmiMyRank() == 0) {
     TopoManager tmgr;
 
-    cpuTopo.numNodes = CmiNumPes();
-    cpuTopo.nodeIDs = new int[cpuTopo.numNodes];
+    int numNodes = CmiNumPes();
+    cpuTopo.nodeIDs = new int[numNodes];
     CpuTopology::supported = 1;
 
     int x, y, z, t, nid;
-    for(int i=0; i<cpuTopo.numNodes; i++) {
+    for(int i=0; i<numNodes; i++) {
       tmgr.rankToCoordinates(i, x, y, z, t);
       nid = tmgr.coordinatesToRank(x, y, z, 0);
       cpuTopo.nodeIDs[i] = nid;
     }
     cpuTopo.sort();
+    if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
   }
   CmiNodeAllBarrier();
   return;
 #elif CMK_CRAYXT
   if(CmiMyRank() == 0) {
-    cpuTopo.numNodes = CmiNumPes();
-    cpuTopo.nodeIDs = new int[cpuTopo.numNodes];
+    int numNodes = CmiNumPes();
+    cpuTopo.nodeIDs = new int[numNodes];
     CpuTopology::supported = 1;
 
     int nid;
-    for(int i=0; i<cpuTopo.numNodes; i++) {
-      nid = getXTNodeID(i, cpuTopo.numNodes);
+    for(int i=0; i<numNodes; i++) {
+      nid = getXTNodeID(i, numNodes);
       cpuTopo.nodeIDs[i] = nid;
     }
     int prev = -1;
     nid = -1;
 
     // this assumes TXYZ mapping and changes nodeIDs
-    for(int i=0; i<cpuTopo.numNodes; i++) {
+    for(int i=0; i<numNodes; i++) {
       if(cpuTopo.nodeIDs[i] != prev) {
 	prev = cpuTopo.nodeIDs[i];
 	cpuTopo.nodeIDs[i] = ++nid;
@@ -402,7 +411,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
 	cpuTopo.nodeIDs[i] = nid;
     }
     cpuTopo.sort();
-    if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes.\n", nid+1);
+    if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
   }
   CmiNodeAllBarrier();
   return;
