@@ -29,6 +29,7 @@ public:
 		CkHashCode ret=circleShift(type,25);
 		switch(type){
 		case TypeChare:
+		case TypeMainChare:
 		    ret += circleShift(data.chare.id.onPE,5);
 		    ret += circleShift((CmiInt8)data.chare.id.objPtr,3);
 		    break;
