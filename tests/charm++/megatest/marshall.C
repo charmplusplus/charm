@@ -83,8 +83,7 @@ public:
 
 
 const static double basicData[10]={
-	247,'v',
-	-31000,65000,
+	247, 'v', -31000, 65000,
 	-2000000000.0,4000000000.0,
 	-2000000001.0,4000000001.0,
 	12.75,4123.0e23 
@@ -263,11 +262,13 @@ public:
                 float f,double d)
     {
        if (b!=basicData[0] || c!=(char)basicData[1] ||
-           i!=(short)basicData[2] || j!=(unsigned short)basicData[3] ||
+           i!=(short)basicData[2] || j!=(unsigned short)(int)basicData[3] ||
            k!=(int)basicData[4] || l!=(unsigned int)basicData[5] ||
            m!=(long)basicData[6] || n!=(unsigned long)basicData[7] ||
-           f!=(float)basicData[8] || d!=(double)basicData[9])
+           f!=(float)basicData[8] || d!=(double)basicData[9]) {
+		CmiPrintf("b:%c %c c:%c %c i:%d %d j:%d %d, k:%d %d l:%d %d, m:%ld %ld, n:%ld %ld, f:%f %f, d:%f %f\n", b, (unsigned char)basicData[0], c, (char)basicData[1], (short)i, (short)basicData[2], (unsigned short)j, (unsigned short)(int)basicData[3], k, (int)basicData[4], l, (unsigned int)basicData[5], m, (long)basicData[6], n, (unsigned long)basicData[7], f, (float)basicData[8], d, (double)basicData[9]);
                CkAbort("Basic data marshalling test failed\n");
+	}
        next();
     }
     void flatRef(flatStruct &s) {s.check(); next();}
@@ -305,6 +306,6 @@ public:
     }
 };
 
-MEGATEST_REGISTER_TEST(marshall,"olawlor",1);
+MEGATEST_REGISTER_TEST(marshall,"olawlor",1)
 #include "marshall.def.h"
 
