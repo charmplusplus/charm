@@ -1839,6 +1839,10 @@ static char *thread_level_tostring(int thread_level)
       return "MPI_THREAD_SINGLE";
   case MPI_THREAD_FUNNELED:
       return "MPI_THREAD_FUNNELED";
+  case MPI_THREAD_SERIALIZED:
+      return "MPI_THREAD_SERIALIZED";
+  case MPI_THREAD_MULTIPLE :
+      return "MPI_THREAD_MULTIPLE ";
   default: {
       char *str = (char*)malloc(5);
       sprintf(str,"%d", thread_level);
@@ -1958,7 +1962,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     printf("CHARMDEBUG> Processor %d has PID %d\n",_Cmi_mynode,getpid());
     fflush(stdout);
     if (!debug_no_pause)
-      sleep(10);
+      sleep(15);
 #else
     printf("++debug ignored.\n");
 #endif
