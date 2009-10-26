@@ -4,13 +4,11 @@
 \mainpage Charm Source Code Documentation
 <!-- This HTML is generated from charm/doc/doxygen/main_page.C -->
 
-\section layers Major Runtime Layers:
-
-<table border=2>
 
 
-<tr><td>
-Charm++:
+
+
+\section section_charm Charm++
  -  \ref CkArray "Arrays"
  -  Load balancer
  -  \ref Comlib "Comlib"
@@ -24,13 +22,12 @@ Charm++:
  -  \ref CkInit "Startup"
  -  \ref CkEnvelope "Message Envelopes"
  -  \ref CharmScheduler "Charm++ Scheduler"
+ -  Callbacks
  -  Translator
  -  SDAG
 
-</td></tr>
  
- <tr><td>
- Converse:
+\section section_conv Converse:
  -  \ref Converse "Converse Core"
  -  \ref ConverseScheduler "Converse Scheduler"
  -  threads
@@ -41,44 +38,41 @@ Charm++:
  -  Converse tracing
  -  parameter marshalling (CPM)
  - quiescence
-</ul>
- </td></tr>
+ -  Periodic Callbacks
+ -  \ref NET "net Machine Layer"
+
+
+\section section_exp Charm++ Experimental Features
+ -  \ref ControlPointFramework "Control Points Tuning Framework"  
+ -  \ref CriticalPathFramework "Critical Path Detection"
+
  
- 
- 
- <tr><td>
- \ref Machine "Converse Machine Layers":
- -  \ref NET "net"
- -  ...
- </td></tr>
- 
- 
- <tr><td>
- Converse Configuration Layer:
+\section section_convconf Converse Configuration Layer:
  - build system
  - charmc
  - configure script
  - conv-mach.h/.sh
- </td></tr>
- 
- 
-<tr><td>
-<p>Libraries:
-<p>Communication: Barrier, commlib, multicast, sparseReducer, sparseContiguousReducer
-<P>Languages: ARMCI, AMPI, TCharm, taskGraph, search
-<p>Frameworks: \ref ParFUM "ParFUM", IFEM, IDXL, Collide, MBlock, AMR
-<p>Visualization: liveViz, liveViz3d, netFEM
+
+
+\section section_lib Libraries:
+ - Communication: Barrier, commlib, multicast, sparseReducer, sparseContiguousReducer
+ - Languages: ARMCI, AMPI, TCharm, taskGraph, search
+ - Frameworks: \ref ParFUM "ParFUM", IFEM, IDXL, Collide, MBlock, AMR
+ - Visualization: liveViz, liveViz3d, netFEM
 </td></tr>
  
- 
 
- 
- 
- </table>
+\section section_utilities Utility Code
+ - PUP
+ - CkBitVector
+ - CkDll
+ - CkHashtable 
+ - CkImage
+ - CkVec
+ - CkQ
+ - CkStatistics
+ - CkVector3d
+ - sockets
 
-\section utilities Utility Code
-PUP, CkBitVector, CkDll, CkHashtable, 
-CkImage, CkVec, CkQ, CkStatistics, CkVector3d,
-sockets.
 
 */
