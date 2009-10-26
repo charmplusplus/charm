@@ -76,7 +76,7 @@ static void *meta_malloc(size_t size)
 	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)
 #if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH && CMK_TLS_THREAD
              && isomalloc_thread
-#else
+#endif
            )
 	{ /*Isomalloc a new block and link it in*/
 		ISOMALLOC_PUSH /*Disable isomalloc while inside isomalloc*/
