@@ -20,6 +20,12 @@ while($line = <FILE>){
     $funccalls .= "\tControlPoint::EffectDecrease::$cp(\"name\");\n";
     $funccalls .= "\tControlPoint::EffectIncrease::$cp(\"name\", NoControlPointAssociation);\n";
     $funccalls .= "\tControlPoint::EffectDecrease::$cp(\"name\", NoControlPointAssociation);\n";
+    $funccalls .= "\tControlPoint::EffectIncrease::$cp(\"name\", EntryAssociation);\n";
+    $funccalls .= "\tControlPoint::EffectDecrease::$cp(\"name\", EntryAssociation);\n";
+    $funccalls .= "\tControlPoint::EffectIncrease::$cp(\"name\", ArrayAssociation);\n";
+    $funccalls .= "\tControlPoint::EffectDecrease::$cp(\"name\", ArrayAssociation);\n";
+
+
 
     $funcdefs .= "\t  void ControlPoint::EffectDecrease::$cp(std::string s, const ControlPoint::ControlPointAssociation &a){ }\n";
     $funcdefs .= "\t  void ControlPoint::EffectIncrease::$cp(std::string s, const ControlPoint::ControlPointAssociation &a){ }\n";
@@ -34,7 +40,9 @@ while($line = <FILE>){
 print OUT_H <<EOF;
 #include <string>
 #include <set>
-#include <ckarray.h>
+#include "charm++.h"
+#include "ck.h"
+#include "ckarray.h"
 
 namespace ControlPoint {
   class ControlPointAssociation{
@@ -48,6 +56,8 @@ namespace ControlPoint {
   
   class ControlPointAssociatedEntry : public ControlPointAssociation {
     public :
+	ControlPointAssociatedEntry() : ControlPointAssociation(){}
+
 	ControlPointAssociatedEntry(int epid) : ControlPointAssociation() {
 	  EntryID.insert(epid);
 	}    
@@ -55,14 +65,19 @@ namespace ControlPoint {
   
   class ControlPointAssociatedArray : public ControlPointAssociation {
   public:
+    ControlPointAssociatedArray() : ControlPointAssociation() {}
+
     ControlPointAssociatedArray(CProxy_ArrayBase &a) : ControlPointAssociation() {
-      CkGroupID aid = arraybase.ckGetArrayID();
+      CkGroupID aid = a.ckGetArrayID();
       int groupIdx = aid.idx;
       ArrayGroupIdx.insert(groupIdx);
     }    
   };
   
   ControlPointAssociation NoControlPointAssociation;
+  int epid = 2;
+  ControlPointAssociatedEntry EntryAssociation(epid);
+  ControlPointAssociatedArray ArrayAssociation;
 
 EOF
 
