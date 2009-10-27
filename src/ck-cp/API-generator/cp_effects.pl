@@ -21,22 +21,27 @@ while(my $line = <FILE>) {
   if(length($line) > 0) {
     my $cp = $line;
 
-    $funcdecls .= "\tvoid $cp(std::string name, const ControlPoint::ControlPointAssociation &a = NoControlPointAssociation);\n";
+    $funcdecls .= "\tvoid $cp(std::string name, const ControlPoint::ControlPointAssociation &a);\n";
+    $funcdecls .= "\tvoid $cp(std::string name);\n";
 
     $funccalls .= "\tControlPoint::EffectIncrease::$cp(\"name\");\n";
     $funccalls .= "\tControlPoint::EffectDecrease::$cp(\"name\");\n";
-    $funccalls .= "\tControlPoint::EffectIncrease::$cp(\"name\", NoControlPointAssociation);\n";
-    $funccalls .= "\tControlPoint::EffectDecrease::$cp(\"name\", NoControlPointAssociation);\n";
-    $funccalls .= "\tControlPoint::EffectIncrease::$cp(\"name\", EntryAssociation);\n";
-    $funccalls .= "\tControlPoint::EffectDecrease::$cp(\"name\", EntryAssociation);\n";
-    $funccalls .= "\tControlPoint::EffectIncrease::$cp(\"name\", ArrayAssociation);\n";
-    $funccalls .= "\tControlPoint::EffectDecrease::$cp(\"name\", ArrayAssociation);\n";
+    $funccalls .= "\tControlPoint::EffectIncrease::$cp(\"name\", assocWithEntry(0));\n";
+    $funccalls .= "\tControlPoint::EffectDecrease::$cp(\"name\", assocWithEntry(0));\n";
+    #$funccalls .= "\tControlPoint::EffectIncrease::$cp(\"name\", assocWithArray(0));\n";
+    #$funccalls .= "\tControlPoint::EffectDecrease::$cp(\"name\", assocWithArray(0));\n";
 
     $funcdefs .= "void ControlPoint::EffectDecrease::$cp(std::string s, const ControlPoint::ControlPointAssociation &a) {\n" .
 	"\tinsert(\"$cp\", s, a, EFF_DEC);\n" .
 	"}\n";
     $funcdefs .= "void ControlPoint::EffectIncrease::$cp(std::string s, const ControlPoint::ControlPointAssociation &a) {\n" .
 	"\tinsert(\"$cp\", s, a, EFF_INC);\n" .
+	"}\n";
+    $funcdefs .= "void ControlPoint::EffectDecrease::$cp(std::string s) {\n" .
+	"\tinsert(\"$cp\", s, default_assoc, EFF_DEC);\n" .
+	"}\n";
+    $funcdefs .= "void ControlPoint::EffectIncrease::$cp(std::string s) {\n" .
+	"\tinsert(\"$cp\", s, default_assoc, EFF_INC);\n" .
 	"}\n";
   }
 }
@@ -74,19 +79,19 @@ namespace ControlPoint {
   public:
     ControlPointAssociatedArray() : ControlPointAssociation() {}
 
-    ControlPointAssociatedArray(CProxy_ArrayBase &a) : ControlPointAssociation() {
+    ControlPointAssociatedArray(const CProxy_ArrayBase &a) : ControlPointAssociation() {
       CkGroupID aid = a.ckGetArrayID();
       int groupIdx = aid.idx;
       ArrayGroupIdx.insert(groupIdx);
-    }    
+    }
   };
   
-  ControlPointAssociation NoControlPointAssociation;
-  int epid = 2;
-  ControlPointAssociatedEntry EntryAssociation(epid);
-  ControlPointAssociatedArray ArrayAssociation;
-
+  class NoControlPointAssociation : public ControlPointAssociation { };
 EOF
+
+print OUT_H "\tvoid initControlPointEffects();\n";
+print OUT_H "\tControlPointAssociatedEntry assocWithEntry(const int entry);\n";
+print OUT_H "\tControlPointAssociatedArray assocWithArray(const CProxy_ArrayBase &array);\n";
 
 print OUT_H "namespace EffectIncrease {\n";
 print OUT_H $funcdecls;
@@ -114,6 +119,18 @@ typedef map<std::string, vector<pair<int, ControlPoint::ControlPointAssociation>
 
 CkpvDeclare(cp_effect_map, cp_effects);
 CkpvDeclare(cp_name_map, cp_names);
+
+NoControlPointAssociation default_assoc;
+
+ControlPoint::ControlPointAssociatedEntry ControlPoint::assocWithEntry(const int entry) {
+    ControlPointAssociatedEntry e(entry);
+    return e;
+}
+
+ControlPoint::ControlPointAssociatedArray ControlPoint::assocWithArray(const CProxy_ArrayBase &array) {
+    ControlPointAssociatedArray a(array);
+    return a;
+}
 
 void initControlPointEffects() {
 \tCkpvInitialize(cp_effect_map, cp_effects);

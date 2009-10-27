@@ -179,7 +179,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h \
 	prefixrouter.h pipebroadcastconverse.h pipelinestrategy.h cmipool.h \
       comlib.h cmidirect.h cmidirectmanytomany.h \
-      controlPoints.h arrayRedistributor.h controlPoints.h 
+      controlPoints.h arrayRedistributor.h cp_effects.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -890,7 +890,7 @@ TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
 ######################################################################
 
 
-CONTROLPOINTS_OBJS = controlPoints.o arrayRedistributor.o
+CONTROLPOINTS_OBJS = controlPoints.o arrayRedistributor.o cp_effects.o
 
 ControlPoints.def.h: ControlPoints.decl.h
 

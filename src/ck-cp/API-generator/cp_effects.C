@@ -11,6 +11,18 @@ typedef map<std::string, vector<pair<int, ControlPoint::ControlPointAssociation>
 CkpvDeclare(cp_effect_map, cp_effects);
 CkpvDeclare(cp_name_map, cp_names);
 
+NoControlPointAssociation default_assoc;
+
+ControlPoint::ControlPointAssociatedEntry ControlPoint::assocWithEntry(const int entry) {
+    ControlPointAssociatedEntry e(entry);
+    return e;
+}
+
+ControlPoint::ControlPointAssociatedArray ControlPoint::assocWithArray(const CProxy_ArrayBase &array) {
+    ControlPointAssociatedArray a(array);
+    return a;
+}
+
 void initControlPointEffects() {
 	CkpvInitialize(cp_effect_map, cp_effects);
 	CkpvInitialize(cp_name_map, cp_names);
@@ -20,116 +32,60 @@ void testControlPointEffects() {
 
 	ControlPoint::EffectIncrease::Priority("name");
 	ControlPoint::EffectDecrease::Priority("name");
-	ControlPoint::EffectIncrease::Priority("name", NoControlPointAssociation);
-	ControlPoint::EffectDecrease::Priority("name", NoControlPointAssociation);
-	ControlPoint::EffectIncrease::Priority("name", EntryAssociation);
-	ControlPoint::EffectDecrease::Priority("name", EntryAssociation);
-	ControlPoint::EffectIncrease::Priority("name", ArrayAssociation);
-	ControlPoint::EffectDecrease::Priority("name", ArrayAssociation);
+	ControlPoint::EffectIncrease::Priority("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::Priority("name", assocWithEntry(0));
 	ControlPoint::EffectIncrease::MemoryConsumption("name");
 	ControlPoint::EffectDecrease::MemoryConsumption("name");
-	ControlPoint::EffectIncrease::MemoryConsumption("name", NoControlPointAssociation);
-	ControlPoint::EffectDecrease::MemoryConsumption("name", NoControlPointAssociation);
-	ControlPoint::EffectIncrease::MemoryConsumption("name", EntryAssociation);
-	ControlPoint::EffectDecrease::MemoryConsumption("name", EntryAssociation);
-	ControlPoint::EffectIncrease::MemoryConsumption("name", ArrayAssociation);
-	ControlPoint::EffectDecrease::MemoryConsumption("name", ArrayAssociation);
+	ControlPoint::EffectIncrease::MemoryConsumption("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::MemoryConsumption("name", assocWithEntry(0));
 	ControlPoint::EffectIncrease::Granularity("name");
 	ControlPoint::EffectDecrease::Granularity("name");
-	ControlPoint::EffectIncrease::Granularity("name", NoControlPointAssociation);
-	ControlPoint::EffectDecrease::Granularity("name", NoControlPointAssociation);
-	ControlPoint::EffectIncrease::Granularity("name", EntryAssociation);
-	ControlPoint::EffectDecrease::Granularity("name", EntryAssociation);
-	ControlPoint::EffectIncrease::Granularity("name", ArrayAssociation);
-	ControlPoint::EffectDecrease::Granularity("name", ArrayAssociation);
+	ControlPoint::EffectIncrease::Granularity("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::Granularity("name", assocWithEntry(0));
 	ControlPoint::EffectIncrease::ComputeDurations("name");
 	ControlPoint::EffectDecrease::ComputeDurations("name");
-	ControlPoint::EffectIncrease::ComputeDurations("name", NoControlPointAssociation);
-	ControlPoint::EffectDecrease::ComputeDurations("name", NoControlPointAssociation);
-	ControlPoint::EffectIncrease::ComputeDurations("name", EntryAssociation);
-	ControlPoint::EffectDecrease::ComputeDurations("name", EntryAssociation);
-	ControlPoint::EffectIncrease::ComputeDurations("name", ArrayAssociation);
-	ControlPoint::EffectDecrease::ComputeDurations("name", ArrayAssociation);
+	ControlPoint::EffectIncrease::ComputeDurations("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::ComputeDurations("name", assocWithEntry(0));
 	ControlPoint::EffectIncrease::FlopRate("name");
 	ControlPoint::EffectDecrease::FlopRate("name");
-	ControlPoint::EffectIncrease::FlopRate("name", NoControlPointAssociation);
-	ControlPoint::EffectDecrease::FlopRate("name", NoControlPointAssociation);
-	ControlPoint::EffectIncrease::FlopRate("name", EntryAssociation);
-	ControlPoint::EffectDecrease::FlopRate("name", EntryAssociation);
-	ControlPoint::EffectIncrease::FlopRate("name", ArrayAssociation);
-	ControlPoint::EffectDecrease::FlopRate("name", ArrayAssociation);
+	ControlPoint::EffectIncrease::FlopRate("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::FlopRate("name", assocWithEntry(0));
 	ControlPoint::EffectIncrease::NumComputeObjects("name");
 	ControlPoint::EffectDecrease::NumComputeObjects("name");
-	ControlPoint::EffectIncrease::NumComputeObjects("name", NoControlPointAssociation);
-	ControlPoint::EffectDecrease::NumComputeObjects("name", NoControlPointAssociation);
-	ControlPoint::EffectIncrease::NumComputeObjects("name", EntryAssociation);
-	ControlPoint::EffectDecrease::NumComputeObjects("name", EntryAssociation);
-	ControlPoint::EffectIncrease::NumComputeObjects("name", ArrayAssociation);
-	ControlPoint::EffectDecrease::NumComputeObjects("name", ArrayAssociation);
+	ControlPoint::EffectIncrease::NumComputeObjects("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::NumComputeObjects("name", assocWithEntry(0));
 	ControlPoint::EffectIncrease::NumMessages("name");
 	ControlPoint::EffectDecrease::NumMessages("name");
-	ControlPoint::EffectIncrease::NumMessages("name", NoControlPointAssociation);
-	ControlPoint::EffectDecrease::NumMessages("name", NoControlPointAssociation);
-	ControlPoint::EffectIncrease::NumMessages("name", EntryAssociation);
-	ControlPoint::EffectDecrease::NumMessages("name", EntryAssociation);
-	ControlPoint::EffectIncrease::NumMessages("name", ArrayAssociation);
-	ControlPoint::EffectDecrease::NumMessages("name", ArrayAssociation);
+	ControlPoint::EffectIncrease::NumMessages("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::NumMessages("name", assocWithEntry(0));
 	ControlPoint::EffectIncrease::MessageSizes("name");
 	ControlPoint::EffectDecrease::MessageSizes("name");
-	ControlPoint::EffectIncrease::MessageSizes("name", NoControlPointAssociation);
-	ControlPoint::EffectDecrease::MessageSizes("name", NoControlPointAssociation);
-	ControlPoint::EffectIncrease::MessageSizes("name", EntryAssociation);
-	ControlPoint::EffectDecrease::MessageSizes("name", EntryAssociation);
-	ControlPoint::EffectIncrease::MessageSizes("name", ArrayAssociation);
-	ControlPoint::EffectDecrease::MessageSizes("name", ArrayAssociation);
+	ControlPoint::EffectIncrease::MessageSizes("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::MessageSizes("name", assocWithEntry(0));
 	ControlPoint::EffectIncrease::MessageOverhead("name");
 	ControlPoint::EffectDecrease::MessageOverhead("name");
-	ControlPoint::EffectIncrease::MessageOverhead("name", NoControlPointAssociation);
-	ControlPoint::EffectDecrease::MessageOverhead("name", NoControlPointAssociation);
-	ControlPoint::EffectIncrease::MessageOverhead("name", EntryAssociation);
-	ControlPoint::EffectDecrease::MessageOverhead("name", EntryAssociation);
-	ControlPoint::EffectIncrease::MessageOverhead("name", ArrayAssociation);
-	ControlPoint::EffectDecrease::MessageOverhead("name", ArrayAssociation);
+	ControlPoint::EffectIncrease::MessageOverhead("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::MessageOverhead("name", assocWithEntry(0));
 	ControlPoint::EffectIncrease::UnnecessarySyncronization("name");
 	ControlPoint::EffectDecrease::UnnecessarySyncronization("name");
-	ControlPoint::EffectIncrease::UnnecessarySyncronization("name", NoControlPointAssociation);
-	ControlPoint::EffectDecrease::UnnecessarySyncronization("name", NoControlPointAssociation);
-	ControlPoint::EffectIncrease::UnnecessarySyncronization("name", EntryAssociation);
-	ControlPoint::EffectDecrease::UnnecessarySyncronization("name", EntryAssociation);
-	ControlPoint::EffectIncrease::UnnecessarySyncronization("name", ArrayAssociation);
-	ControlPoint::EffectDecrease::UnnecessarySyncronization("name", ArrayAssociation);
+	ControlPoint::EffectIncrease::UnnecessarySyncronization("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::UnnecessarySyncronization("name", assocWithEntry(0));
 	ControlPoint::EffectIncrease::Concurrency("name");
 	ControlPoint::EffectDecrease::Concurrency("name");
-	ControlPoint::EffectIncrease::Concurrency("name", NoControlPointAssociation);
-	ControlPoint::EffectDecrease::Concurrency("name", NoControlPointAssociation);
-	ControlPoint::EffectIncrease::Concurrency("name", EntryAssociation);
-	ControlPoint::EffectDecrease::Concurrency("name", EntryAssociation);
-	ControlPoint::EffectIncrease::Concurrency("name", ArrayAssociation);
-	ControlPoint::EffectDecrease::Concurrency("name", ArrayAssociation);
+	ControlPoint::EffectIncrease::Concurrency("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::Concurrency("name", assocWithEntry(0));
 	ControlPoint::EffectIncrease::PotentialOverlap("name");
 	ControlPoint::EffectDecrease::PotentialOverlap("name");
-	ControlPoint::EffectIncrease::PotentialOverlap("name", NoControlPointAssociation);
-	ControlPoint::EffectDecrease::PotentialOverlap("name", NoControlPointAssociation);
-	ControlPoint::EffectIncrease::PotentialOverlap("name", EntryAssociation);
-	ControlPoint::EffectDecrease::PotentialOverlap("name", EntryAssociation);
-	ControlPoint::EffectIncrease::PotentialOverlap("name", ArrayAssociation);
-	ControlPoint::EffectDecrease::PotentialOverlap("name", ArrayAssociation);
+	ControlPoint::EffectIncrease::PotentialOverlap("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::PotentialOverlap("name", assocWithEntry(0));
 	ControlPoint::EffectIncrease::LoadBalancingPeriod("name");
 	ControlPoint::EffectDecrease::LoadBalancingPeriod("name");
-	ControlPoint::EffectIncrease::LoadBalancingPeriod("name", NoControlPointAssociation);
-	ControlPoint::EffectDecrease::LoadBalancingPeriod("name", NoControlPointAssociation);
-	ControlPoint::EffectIncrease::LoadBalancingPeriod("name", EntryAssociation);
-	ControlPoint::EffectDecrease::LoadBalancingPeriod("name", EntryAssociation);
-	ControlPoint::EffectIncrease::LoadBalancingPeriod("name", ArrayAssociation);
-	ControlPoint::EffectDecrease::LoadBalancingPeriod("name", ArrayAssociation);
+	ControlPoint::EffectIncrease::LoadBalancingPeriod("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::LoadBalancingPeriod("name", assocWithEntry(0));
 	ControlPoint::EffectIncrease::GPUOffloadedWork("name");
 	ControlPoint::EffectDecrease::GPUOffloadedWork("name");
-	ControlPoint::EffectIncrease::GPUOffloadedWork("name", NoControlPointAssociation);
-	ControlPoint::EffectDecrease::GPUOffloadedWork("name", NoControlPointAssociation);
-	ControlPoint::EffectIncrease::GPUOffloadedWork("name", EntryAssociation);
-	ControlPoint::EffectDecrease::GPUOffloadedWork("name", EntryAssociation);
-	ControlPoint::EffectIncrease::GPUOffloadedWork("name", ArrayAssociation);
-	ControlPoint::EffectDecrease::GPUOffloadedWork("name", ArrayAssociation);
+	ControlPoint::EffectIncrease::GPUOffloadedWork("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::GPUOffloadedWork("name", assocWithEntry(0));
 }
 
 void insert(const std::string control_type, const std::string name, const ControlPoint::ControlPointAssociation &a, const int effect) {
@@ -142,11 +98,23 @@ void ControlPoint::EffectDecrease::Priority(std::string s, const ControlPoint::C
 void ControlPoint::EffectIncrease::Priority(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("Priority", s, a, EFF_INC);
 }
+void ControlPoint::EffectDecrease::Priority(std::string s) {
+	insert("Priority", s, default_assoc, EFF_DEC);
+}
+void ControlPoint::EffectIncrease::Priority(std::string s) {
+	insert("Priority", s, default_assoc, EFF_INC);
+}
 void ControlPoint::EffectDecrease::MemoryConsumption(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("MemoryConsumption", s, a, EFF_DEC);
 }
 void ControlPoint::EffectIncrease::MemoryConsumption(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("MemoryConsumption", s, a, EFF_INC);
+}
+void ControlPoint::EffectDecrease::MemoryConsumption(std::string s) {
+	insert("MemoryConsumption", s, default_assoc, EFF_DEC);
+}
+void ControlPoint::EffectIncrease::MemoryConsumption(std::string s) {
+	insert("MemoryConsumption", s, default_assoc, EFF_INC);
 }
 void ControlPoint::EffectDecrease::Granularity(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("Granularity", s, a, EFF_DEC);
@@ -154,11 +122,23 @@ void ControlPoint::EffectDecrease::Granularity(std::string s, const ControlPoint
 void ControlPoint::EffectIncrease::Granularity(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("Granularity", s, a, EFF_INC);
 }
+void ControlPoint::EffectDecrease::Granularity(std::string s) {
+	insert("Granularity", s, default_assoc, EFF_DEC);
+}
+void ControlPoint::EffectIncrease::Granularity(std::string s) {
+	insert("Granularity", s, default_assoc, EFF_INC);
+}
 void ControlPoint::EffectDecrease::ComputeDurations(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("ComputeDurations", s, a, EFF_DEC);
 }
 void ControlPoint::EffectIncrease::ComputeDurations(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("ComputeDurations", s, a, EFF_INC);
+}
+void ControlPoint::EffectDecrease::ComputeDurations(std::string s) {
+	insert("ComputeDurations", s, default_assoc, EFF_DEC);
+}
+void ControlPoint::EffectIncrease::ComputeDurations(std::string s) {
+	insert("ComputeDurations", s, default_assoc, EFF_INC);
 }
 void ControlPoint::EffectDecrease::FlopRate(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("FlopRate", s, a, EFF_DEC);
@@ -166,11 +146,23 @@ void ControlPoint::EffectDecrease::FlopRate(std::string s, const ControlPoint::C
 void ControlPoint::EffectIncrease::FlopRate(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("FlopRate", s, a, EFF_INC);
 }
+void ControlPoint::EffectDecrease::FlopRate(std::string s) {
+	insert("FlopRate", s, default_assoc, EFF_DEC);
+}
+void ControlPoint::EffectIncrease::FlopRate(std::string s) {
+	insert("FlopRate", s, default_assoc, EFF_INC);
+}
 void ControlPoint::EffectDecrease::NumComputeObjects(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("NumComputeObjects", s, a, EFF_DEC);
 }
 void ControlPoint::EffectIncrease::NumComputeObjects(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("NumComputeObjects", s, a, EFF_INC);
+}
+void ControlPoint::EffectDecrease::NumComputeObjects(std::string s) {
+	insert("NumComputeObjects", s, default_assoc, EFF_DEC);
+}
+void ControlPoint::EffectIncrease::NumComputeObjects(std::string s) {
+	insert("NumComputeObjects", s, default_assoc, EFF_INC);
 }
 void ControlPoint::EffectDecrease::NumMessages(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("NumMessages", s, a, EFF_DEC);
@@ -178,11 +170,23 @@ void ControlPoint::EffectDecrease::NumMessages(std::string s, const ControlPoint
 void ControlPoint::EffectIncrease::NumMessages(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("NumMessages", s, a, EFF_INC);
 }
+void ControlPoint::EffectDecrease::NumMessages(std::string s) {
+	insert("NumMessages", s, default_assoc, EFF_DEC);
+}
+void ControlPoint::EffectIncrease::NumMessages(std::string s) {
+	insert("NumMessages", s, default_assoc, EFF_INC);
+}
 void ControlPoint::EffectDecrease::MessageSizes(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("MessageSizes", s, a, EFF_DEC);
 }
 void ControlPoint::EffectIncrease::MessageSizes(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("MessageSizes", s, a, EFF_INC);
+}
+void ControlPoint::EffectDecrease::MessageSizes(std::string s) {
+	insert("MessageSizes", s, default_assoc, EFF_DEC);
+}
+void ControlPoint::EffectIncrease::MessageSizes(std::string s) {
+	insert("MessageSizes", s, default_assoc, EFF_INC);
 }
 void ControlPoint::EffectDecrease::MessageOverhead(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("MessageOverhead", s, a, EFF_DEC);
@@ -190,11 +194,23 @@ void ControlPoint::EffectDecrease::MessageOverhead(std::string s, const ControlP
 void ControlPoint::EffectIncrease::MessageOverhead(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("MessageOverhead", s, a, EFF_INC);
 }
+void ControlPoint::EffectDecrease::MessageOverhead(std::string s) {
+	insert("MessageOverhead", s, default_assoc, EFF_DEC);
+}
+void ControlPoint::EffectIncrease::MessageOverhead(std::string s) {
+	insert("MessageOverhead", s, default_assoc, EFF_INC);
+}
 void ControlPoint::EffectDecrease::UnnecessarySyncronization(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("UnnecessarySyncronization", s, a, EFF_DEC);
 }
 void ControlPoint::EffectIncrease::UnnecessarySyncronization(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("UnnecessarySyncronization", s, a, EFF_INC);
+}
+void ControlPoint::EffectDecrease::UnnecessarySyncronization(std::string s) {
+	insert("UnnecessarySyncronization", s, default_assoc, EFF_DEC);
+}
+void ControlPoint::EffectIncrease::UnnecessarySyncronization(std::string s) {
+	insert("UnnecessarySyncronization", s, default_assoc, EFF_INC);
 }
 void ControlPoint::EffectDecrease::Concurrency(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("Concurrency", s, a, EFF_DEC);
@@ -202,11 +218,23 @@ void ControlPoint::EffectDecrease::Concurrency(std::string s, const ControlPoint
 void ControlPoint::EffectIncrease::Concurrency(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("Concurrency", s, a, EFF_INC);
 }
+void ControlPoint::EffectDecrease::Concurrency(std::string s) {
+	insert("Concurrency", s, default_assoc, EFF_DEC);
+}
+void ControlPoint::EffectIncrease::Concurrency(std::string s) {
+	insert("Concurrency", s, default_assoc, EFF_INC);
+}
 void ControlPoint::EffectDecrease::PotentialOverlap(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("PotentialOverlap", s, a, EFF_DEC);
 }
 void ControlPoint::EffectIncrease::PotentialOverlap(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("PotentialOverlap", s, a, EFF_INC);
+}
+void ControlPoint::EffectDecrease::PotentialOverlap(std::string s) {
+	insert("PotentialOverlap", s, default_assoc, EFF_DEC);
+}
+void ControlPoint::EffectIncrease::PotentialOverlap(std::string s) {
+	insert("PotentialOverlap", s, default_assoc, EFF_INC);
 }
 void ControlPoint::EffectDecrease::LoadBalancingPeriod(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("LoadBalancingPeriod", s, a, EFF_DEC);
@@ -214,9 +242,21 @@ void ControlPoint::EffectDecrease::LoadBalancingPeriod(std::string s, const Cont
 void ControlPoint::EffectIncrease::LoadBalancingPeriod(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("LoadBalancingPeriod", s, a, EFF_INC);
 }
+void ControlPoint::EffectDecrease::LoadBalancingPeriod(std::string s) {
+	insert("LoadBalancingPeriod", s, default_assoc, EFF_DEC);
+}
+void ControlPoint::EffectIncrease::LoadBalancingPeriod(std::string s) {
+	insert("LoadBalancingPeriod", s, default_assoc, EFF_INC);
+}
 void ControlPoint::EffectDecrease::GPUOffloadedWork(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("GPUOffloadedWork", s, a, EFF_DEC);
 }
 void ControlPoint::EffectIncrease::GPUOffloadedWork(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("GPUOffloadedWork", s, a, EFF_INC);
+}
+void ControlPoint::EffectDecrease::GPUOffloadedWork(std::string s) {
+	insert("GPUOffloadedWork", s, default_assoc, EFF_DEC);
+}
+void ControlPoint::EffectIncrease::GPUOffloadedWork(std::string s) {
+	insert("GPUOffloadedWork", s, default_assoc, EFF_INC);
 }
