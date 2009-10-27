@@ -134,18 +134,37 @@ public:
 	}
 };
 
+static void (*nbp)(void*) = NULL;
+static void (*nbi)(int&) = NULL;
+
 template<typename T, typename U, typename A>
 void perElemGen(list<T*> &l, A& arg_, void (U::*fn_)(A&),
-		void (*between_)(A&) = NULL)
+// Sun Studio 7 (C++ compiler version 5.4) can't handle this
+//		void (*between_)(A&) = NULL)
+		void (*between_)(A&))
 {
     perElemGenC<T, U, A&>(l, arg_, fn_, between_);
 }
 
 template<typename T, typename U, typename A>
+void perElemGen(list<T*> &l, A& arg_, void (U::*fn_)(A&))
+{
+    perElemGenC<T, U, A&>(l, arg_, fn_, NULL);
+}
+
+template<typename T, typename U, typename A>
 void perElemGen(list<T*> &l, A* arg_, void (U::*fn_)(A*),
-		void (*between_)(A*) = NULL)
+// See above
+//		void (*between_)(A*) = NULL)
+		void (*between_)(A*))
 {
     perElemGenC<T, U, A*>(l, arg_, fn_, between_);
+}
+
+template<typename T, typename U, typename A>
+void perElemGen(list<T*> &l, A* arg_, void (U::*fn_)(A*))
+{
+    perElemGenC<T, U, A*>(l, arg_, fn_, NULL);
 }
 
 void newLine(XStr &str)
