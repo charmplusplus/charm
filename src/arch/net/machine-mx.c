@@ -101,8 +101,8 @@ static PendingSentMsg sent_handles_end=NULL; /* end of the queue */
      else CmiFree(pm->data); \
      putPool(pm); }
 
-CmiUInt8 MATCH_FILTER = 0x11111111FFFFFFFFL;
-CmiUInt8 MATCH_MASK   = 0xffffffffffffffffL;
+CmiUInt8 MATCH_FILTER = 0x11111111FFFFFFFFLL;
+CmiUInt8 MATCH_MASK   = 0xffffffffffffffffLL;
 
 static int processMessage(char *msg, int len);
 static const char *getErrorMsg(mx_return_t rc);
@@ -403,6 +403,7 @@ static void ReleaseSentMsgs(void) {
 }
  
 static void CommunicationServer_nolock(int withDelayMs) {
+  if (endpoint == NULL) return;
   MACHSTATE(2,"CommunicationServer_nolock start {")
 #if MX_ACTIVE_MESSAGE
   PumpEvents(0);
@@ -436,6 +437,9 @@ static void CommunicationServer(int withDelayMs, int where)
       /* don't service charmrun if converse exits, this fixed a hang bug */
     if (!machine_initiated_shutdown) ServiceCharmrun_nolock();
     return;
+  }
+  else if (where == COMM_SERVER_FROM_SMP || where == COMM_SERVER_FROM_WORKER) {
+    if (machine_initiated_shutdown) ServiceCharmrun_nolock();  /* to exit */
   }
 
   LOG(GetClock(), Cmi_nodestart, 'I', 0, 0);
@@ -856,8 +860,11 @@ void CmiMachineInit(char **argv)
   MACHSTATE(3,"} CmiMachineInit");
 }
 
+void CmiMXMakeConnection();
+
 void CmiCommunicationInit(char **argv)
 {
+  CmiMXMakeConnection();
 }
 
 void CmiMachineExit()
@@ -871,6 +878,7 @@ void CmiMachineExit()
       printf("Can't do mx_close_endpoint\n");   	
       return;	
     }
+    endpoint = NULL;
     rc = mx_finalize();
     if(rc!=MX_SUCCESS){
       MACHSTATE1(3, "mx_finalize returns %d", rc);
