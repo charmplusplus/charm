@@ -353,8 +353,9 @@ static void machine_exit(int status)
   }
 #endif
 #if CMK_USE_SYSVSHM
-	tearDownSharedBuffers();
+  tearDownSharedBuffers();
 #endif
+  CmiMachineExit();
   exit(status);
 }
 
@@ -2417,10 +2418,6 @@ static void ConverseRunPE(int everReturn)
   CmiCheckGmStatus();
 #endif
 
-#if CMK_USE_MX
-  CmiMXMakeConnection();  
-#endif
-
   ConverseCommonInit(CmiMyArgv);
 
   /* initialize the network progress counter*/
@@ -2570,7 +2567,6 @@ void ConverseExit(void)
 #elif CMK_USE_PXSHM
 	CmiExitPxshm();
 #endif
-  CmiMachineExit();
   ConverseCommonExit();               /* should be called by every rank */
   CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
   if (CmiMyRank()==0) CmiStdoutFlush();
