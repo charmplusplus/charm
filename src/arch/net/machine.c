@@ -334,6 +334,8 @@ static int already_in_signal_handler=0;
 
 static void CmiDestoryLocks();
 
+void CmiMachineExit();
+
 #if CMK_USE_SYSVSHM /* define teardown function before use */
 void tearDownSharedBuffers();
 #endif 
