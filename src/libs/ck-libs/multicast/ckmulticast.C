@@ -534,7 +534,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         {
             if (i==CkMyPe()) continue;
             if (lists[i].length() == 0) continue;
-            if (CmiOnSamePhysicalNode(i, CkMyPe())==1) {
+            if (CmiPeOnSamePhysicalNode(i, CkMyPe())==1) {
               // CkPrintf("[%d] child: %d\n", CkMyPe(), i);
               for (j=0; j<lists[i].length(); j++)
                 slots[num].push_back(lists[i][j]);
