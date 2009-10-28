@@ -278,7 +278,7 @@ extern "C" int CmiCpuTopologyEnabled()
   return CpuTopology::supported;
 }
 
-extern "C" int CmiOnSamePhysicalNode(int pe1, int pe2)
+extern "C" int CmiPeOnSamePhysicalNode(int pe1, int pe2)
 {
   int *nodeIDs = cpuTopo.nodeIDs;
   if (!cpuTopo.supported || nodeIDs == NULL) return pe1 == pe2;
@@ -291,32 +291,46 @@ extern "C" int CmiNumPhysicalNodes()
   return cpuTopo.numUniqNodes();
 }
 
-extern "C" int CmiNumPesOnPhysicalNode(int pe)
+extern "C" int CmiNumPesOnPhysicalNode(int node)
 {
-  return !cpuTopo.supported?1:(int)cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].size();
+  return !cpuTopo.supported?1:(int)cpuTopo.bynodes[node].size();
 }
 
 // pelist points to system memory, user should not free it
-extern "C" void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num)
+extern "C" void CmiGetPesOnPhysicalNode(int node, int **pelist, int *num)
 {
-  CmiAssert(pe >=0 && pe < CmiNumPes());
   if (cpuTopo.supported) {
-    *num = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].size();
-    if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]].getVec();
+    *num = cpuTopo.bynodes[node].size();
+    if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[node].getVec();
   }
   else {
     *num = 1;
-    *pelist = cpuTopo.bynodes[pe].getVec();
+    *pelist = cpuTopo.bynodes[node].getVec();
   }
 }
 
-// the least number processor on the same physical node
-extern "C"  int CmiGetFirstPeOnPhysicalNode(int pe)
+extern "C" int CmiPhysicalRank(int pe)
 {
-  CmiAssert(pe >=0 && pe < CmiNumPes());
-  if (!cpuTopo.supported) return pe;
+  if (!cpuTopo.supported) return 0;
   const CkVec<int> &v = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]];
-  return v[0];
+  int rank = 0;  
+  int npes = v.size();
+  while (rank < npes && v[rank] < pe) rank++;       // already sorted
+  CmiAssert(v[rank] == pe);
+  return rank;
+}
+
+extern "C" int CmiPhysicalNodeID(int pe)
+{
+  if (!cpuTopo.supported) return pe;
+  return cpuTopo.nodeIDs[pe];
+}
+
+// the least number processor on the same physical node
+extern "C"  int CmiGetFirstPeOnPhysicalNode(int node)
+{
+  if (!cpuTopo.supported) return node;
+  return cpuTopo.bynodes[node][0];
 }
 
 
