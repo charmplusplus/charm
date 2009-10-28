@@ -60,6 +60,7 @@ public:
   CkMemCheckPT(CkMigrateMessage *m):CBase_CkMemCheckPT(m) {}
   virtual ~CkMemCheckPT();
   void pup(PUP::er& p);
+  inline int BuddyPE(int pe);
   void doItNow(int sp, CkCallback &);
   void restart(int failedPe);
   void removeArrayElements();

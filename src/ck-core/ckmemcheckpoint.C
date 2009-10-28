@@ -47,11 +47,14 @@ TODO:
 #include "conv-ccs.h"
 #include <signal.h>
 
-#define DEBUGF      // CkPrintf
+// pick buddy processor from a different physical node
+#define NODE_CHECKPOINT                        1
 
 // assume NO extra processors--1
 // assume extra processors--0
 #define CK_NO_PROC_POOL				1
+
+#define DEBUGF      // CkPrintf
 
 // static, so that it is accessible from Converse part
 int CkMemCheckPT::inRestarting = 0;
@@ -83,6 +86,32 @@ CpvDeclare(CkProcCheckPTMessage*, procChkptBuf);
 // FIXME: avoid crashed processors
 inline int ChkptOnPe() { return (CkMyPe()+1)%CkNumPes(); }
 
+inline int CkMemCheckPT::BuddyPE(int pe)
+{
+  int budpe;
+#if NODE_CHECKPOINT
+    // buddy is the processor with same rank on next physical node
+  int r1 = CmiPhysicalRank(pe);
+  int budnode = CmiPhysicalNodeID(pe);
+printf("CmiPhysicalNodeID %d rank: %d\n", CmiPhysicalNodeID(pe), CmiPhysicalRank(pe));
+  do {
+    budnode = (budnode+1)%CmiNumPhysicalNodes();
+    budpe = (CmiGetFirstPeOnPhysicalNode(budnode) + r1) % 
+                                   CmiNumPesOnPhysicalNode(budnode);
+printf("CmiGetFirstPeOnPhysicalNode: %d CmiNumPesOnPhysicalNode: %d\n", CmiGetFirstPeOnPhysicalNode(budnode), CmiNumPesOnPhysicalNode(budnode));
+  } while (isFailed(budpe));
+  if (budpe == pe) {
+    CmiPrintf("[%d] Error: failed to find a buddy processor on a different node.\n", pe);
+    CmiAbort("Failed to a buddy processor");
+  }
+#else
+  budpe = pe;
+  while (budpe == pe || isFailed(budPe)) 
+          budPe = (budPe+1)%CkNumPes();
+#endif
+  return budpe;
+}
+
 // called in array element constructor
 // choose and register with 2 buddies for checkpoiting 
 #if CMK_MEM_CHECKPOINT
@@ -92,7 +121,7 @@ void ArrayElement::init_checkpt() {
         if (thisArray->getLocMgr()->firstManager->mgr!=thisArray) return;
 
         budPEs[0] = CkMyPe();
-        budPEs[1] = (CkMyPe()+1)%CkNumPes();
+        budPEs[1] = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->BuddyPE(CkMyPe());
 	CmiAssert(budPEs[0] != budPEs[1]);
         // inform checkPTMgr
         CProxy_CkMemCheckPT checkptMgr(ckCheckPTGroupID);
@@ -587,7 +616,7 @@ void CkMemCheckPT::restart(int diePe)
   double curTime = CmiWallTimer();
   if (CkMyPe() == diePe)
     CkPrintf("[%d] Process data restored in %f seconds\n", CkMyPe(), curTime - startTime);
-  stage = "resetLB";
+  stage = (char*)"resetLB";
   startTime = curTime;
   CkPrintf("[%d] CkMemCheckPT ----- restart.\n",CkMyPe());
 
@@ -616,7 +645,7 @@ void CkMemCheckPT::removeArrayElements()
   int len = ckTable.length();
   double curTime = CmiWallTimer();
   CkPrintf("[%d] CkMemCheckPT ----- %s len:%d in %f seconds.\n",CkMyPe(),stage,len,curTime-startTime);
-  stage = "removeArrayElements";
+  stage = (char*)"removeArrayElements";
   startTime = curTime;
 
   if (cpCallback.isInvalid()) CkAbort("Didn't set restart callback\n");;
