@@ -148,7 +148,7 @@ public:
         }
     }
     if (numNodes == 0) 
-      numNodes = CmiNumPes();
+      numNodes = CmiNumNodes();
     else {
         // re-number nodeIDs, which may be necessary e.g. on BlueGene/P
       for (i=0; i<CmiNumPes(); i++) nodeIDs[i] = nodemap[nodeIDs[i]];
@@ -168,8 +168,8 @@ public:
         bynodes[nodeIDs[i]].push_back(i);
       }
     }
-    else {    /* not supported */
-      for (i=0;i<numNodes;i++)  bynodes[i].push_back(i);
+    else {    /* not supported/enabled */
+      for (i=0;i<CmiNumPes();i++)  bynodes[CmiNodeOf(i)].push_back(i);
     }
   }
 
@@ -284,37 +284,32 @@ extern "C" int CmiCpuTopologyEnabled()
 extern "C" int CmiPeOnSamePhysicalNode(int pe1, int pe2)
 {
   int *nodeIDs = cpuTopo.nodeIDs;
-  if (!cpuTopo.supported || nodeIDs == NULL) return pe1 == pe2;
+  if (!cpuTopo.supported || nodeIDs == NULL) return CmiNodeOf(pe1) == CmiNodeOf(pe2);
   else return nodeIDs[pe1] == nodeIDs[pe2];
 }
 
 // return -1 when not supported
 extern "C" int CmiNumPhysicalNodes()
 {
-  return cpuTopo.numUniqNodes();
+  if (!cpuTopo.supported) return CmiNumNodes();
+  else return cpuTopo.numUniqNodes();
 }
 
 extern "C" int CmiNumPesOnPhysicalNode(int node)
 {
-  return !cpuTopo.supported?1:(int)cpuTopo.bynodes[node].size();
+  return !cpuTopo.supported?CmiNodeSize(node):(int)cpuTopo.bynodes[node].size();
 }
 
 // pelist points to system memory, user should not free it
 extern "C" void CmiGetPesOnPhysicalNode(int node, int **pelist, int *num)
 {
-  if (cpuTopo.supported) {
-    *num = cpuTopo.bynodes[node].size();
-    if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[node].getVec();
-  }
-  else {
-    *num = 1;
-    *pelist = cpuTopo.bynodes[node].getVec();
-  }
+  *num = cpuTopo.bynodes[node].size();
+  if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[node].getVec();
 }
 
 extern "C" int CmiPhysicalRank(int pe)
 {
-  if (!cpuTopo.supported) return 0;
+  if (!cpuTopo.supported) return CmiRankOf(pe);
   const CkVec<int> &v = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]];
   int rank = 0;  
   int npes = v.size();
@@ -325,14 +320,14 @@ extern "C" int CmiPhysicalRank(int pe)
 
 extern "C" int CmiPhysicalNodeID(int pe)
 {
-  if (!cpuTopo.supported) return pe;
+  if (!cpuTopo.supported) return CmiNodeOf(pe);
   return cpuTopo.nodeIDs[pe];
 }
 
 // the least number processor on the same physical node
 extern "C"  int CmiGetFirstPeOnPhysicalNode(int node)
 {
-  if (!cpuTopo.supported) return node;
+  if (!cpuTopo.supported) return CmiNodeFirst(node);
   return cpuTopo.bynodes[node][0];
 }
 
