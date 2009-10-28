@@ -22,6 +22,9 @@
  * all functions when cputopology not support, now act like a normal non-smp 
  * case and all PEs are unique.
  *
+ * major changes 10/28/09   Gengbin Zheng
+ * - parameters changed from pe to node to be consistent with the function name
+ * - two new functions:   CmiPhysicalNodeID and CmiPhysicalRank
  */
 
 #if 1
