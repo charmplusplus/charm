@@ -13,7 +13,7 @@ int main(int argc, char * argv[]) {
   char *local;
   int thisImage;
 
-  int iter = 1000, size;
+  int iter = 100, size;
   double startTime, endTime;
   int i;
 
