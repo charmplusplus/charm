@@ -16,8 +16,10 @@ CpvExtern(Chare *,_currentObj);
 #define OLD_TICKET 2
 #define FORWARDED_TICKET 0x8000
 
-//GML: global variable for the size of the group
-#define GROUP_SIZE_MLOG 1
+//TML: global variable for the size of the team
+#define TEAM_SIZE_MLOG 4
+#define MLOG_RESTARTED 0
+#define MLOG_CRASHED 1
 #define MEGABYTE 1048576
 
 //array on which we print the formatted string representing an object id
@@ -39,10 +41,16 @@ public:
 		state = 0;
 	}
 };
-PUPbytes(Ticket)
+PUPbytes(Ticket);
 class MlogEntry;
 
-//Log entry for local messages, can also be sent as a message
+/**
+ * Log entry for local messages, can also be sent as a message.
+ * A message is local if:
+ * 1) It is sent between objects in the same processor.
+ * 2) It is sent between objects residing in processors of the same group
+ * (whenever group-based message logging is used).
+ */
 typedef struct{
 	char header[CmiMsgHeaderSizeBytes];
 	CkObjID sender;
@@ -50,9 +58,10 @@ typedef struct{
 	MCount SN;
 	MCount TN;
 	MlogEntry *entry;
-	int PE;
+	int senderPE;
+	int recverPE;
 } LocalMessageLog;
-PUPbytes(LocalMessageLog)
+PUPbytes(LocalMessageLog);
 
 class MlogEntry;
 class RestoredLocalMap;
@@ -60,7 +69,8 @@ class RestoredLocalMap;
 #define INITSIZE_SNTOTICKET 100
 
 /**
- * @brief
+ * @brief Class that maps SN (sequence numbers) to TN (ticket numbers)
+ * for a particular object.
  */
 class SNToTicket{
 	private:
@@ -68,15 +78,30 @@ class SNToTicket{
 		Ticket *ticketVec;
 		MCount startSN;
 		int currentSize;
+		MCount finishSN;
 	public:
 		SNToTicket(){
 			currentSize = INITSIZE_SNTOTICKET;
 			ticketVec = &initial[0];
 			bzero(ticketVec,sizeof(Ticket)*currentSize);
 			startSN = 0;
+			finishSN = 0;
+		}
+		/**
+ 		 * Gets the finishSN value.
+ 		 */ 
+		inline MCount getFinishSN(){
+			return finishSN;
+		}
+		/**
+ 		 * Gets the startSN value.
+ 		 */	 
+		inline MCount getStartSN(){
+			return startSN;
 		}
 		//assume indices start from 1.. true for MCounts
 		inline Ticket &put(MCount SN){
+			if(SN > finishSN) finishSN = SN;
 			if(startSN == 0){
 				startSN = SN;				
 			}
@@ -117,19 +142,27 @@ class SNToTicket{
 			for(int i=0;i<currentSize;i++){
 				p | ticketVec[i];
 			}
-		}
-		
+		}	
 };
 
 
 /**
- * @brief This class stores all the message logging related data in a chare
+ * This file includes the definition of the class for storing the meta data
+ * associdated with the message logging protocol.
+ */
+
+
+/**
+ * @brief This class stores all the message logging related data for a chare.
  */
 class ChareMlogData{
 public:
+	// Object unique ID.
 	CkObjID objID;
-	MCount tCount; //count of ticket handed out
-	MCount tProcessed;  // highest ticket number that has been processed
+	// Counts how many tickets have been handed out.
+	MCount tCount; 
+	// Stores the highest ticket that has been processed.
+	MCount tProcessed;
 	
 	//TODO: pup receivedTNs
 	CkVec<MCount> *receivedTNs; //used to store TNs received by senders during a restart
@@ -141,22 +174,29 @@ public:
 	int resendReplyRecvd;// variable that keeps a count of the processors that have replied to a requests to resend messages. 
 	int restartFlag; /*0 -> Normal state .. 1-> just after restart. tickets should not be handed out at this time */
 	CkHashtableT<CkHashtableAdaptorT<CkObjID>,RestoredLocalMap *> mapTable;	
+	//TML: teamTable, stores the SN to TN mapping for messages intra team
+	CkHashtableT<CkHashtableAdaptorT<CkObjID>,SNToTicket *> teamTable;
 
 	int toResumeOrNot;
 	int resumeCount;
 
 private:
 
-	CkHashtableT<CkHashtableAdaptorT<CkObjID>,MCount> snTable; //SN used for messages to different objects
-//	typedef CkHashtableT<CkHashtableAdaptorT<MCount>,Ticket> SNToTicket;
-	CkHashtableT<CkHashtableAdaptorT<CkObjID>,SNToTicket *> ticketTable; //<ObjectID,SN> -> Ticket handed out 
-	CkQ<MlogEntry *> mlog;	//log of messages sent
+	// SNTable, stores the number of messages sent (sequence numbers) to other objects.
+	CkHashtableT<CkHashtableAdaptorT<CkObjID>,MCount> snTable;
+	// TNTable, stores the ticket associated with a particular combination <ObjectID,SN>.
+	CkHashtableT<CkHashtableAdaptorT<CkObjID>,SNToTicket *> ticketTable;
+	// Log of messages sent.
+	CkQ<MlogEntry *> mlog;
 	
-	
+		
 	inline MCount newTN();
 
-public:	
-	ChareMlogData():ticketTable(1000,0.3),snTable(100,0.4){
+public:
+	/**
+ 	 * Default constructor.
+ 	 */ 
+	ChareMlogData():ticketTable(1000,0.3),snTable(100,0.4),teamTable(100,0.4){
 		tCount = 0;
 		tProcessed = 0;
 		numberHoles = 0;
@@ -165,8 +205,7 @@ public:
 		restartFlag=0;
 		receivedTNs = NULL;
 		resendReplyRecvd=0;
-	  maxRestoredLocalTN=0;
-
+		maxRestoredLocalTN=0;
 		toResumeOrNot=0;
 		resumeCount=0;
 	};
@@ -313,7 +352,9 @@ typedef struct{
 	MCount tProcessed;
 } TProcessedLog;
 
-
+/**
+ * Struct to request a particular action during restart.
+ */
 typedef struct{
 	char header[CmiMsgHeaderSizeBytes];
 	int PE;
@@ -515,7 +556,7 @@ void distributeRestartedObjects();
 void sortRestoredLocalMsgLog(void *_dummy,ChareMlogData *mlogData);
 void sendDummyMigration(int restartPE,CkGroupID lbID,CkGroupID locMgrID,CkArrayIndexMax &idx,int locationPE);
 
-//GML: function for locally calling the restart
+//TML: function for locally calling the restart
 void CkMlogRestartLocal();
 
 //handler functions for restart
@@ -531,6 +572,10 @@ void _verifyAckRequestHandler(VerifyAckMsg *verifyRequest);
 void _verifyAckHandler(VerifyAckMsg *verifyReply);
 void _dummyMigrationHandler(DummyMigrationMsg *msg);
 
+//TML: new functions for group-based message logging
+void _restartHandler(RestartRequest *restartMsg);
+void _getRestartCheckpointHandler(RestartRequest *restartMsg);
+void _recvRestartCheckpointHandler(char *_restartData);
 
 
 //handler idxs for restart
@@ -586,7 +631,7 @@ void forAllCharesDo(MlogFn fnPointer,void *data);
 envelope *copyEnvelope(envelope *env);
 extern void _initDone(void);
 
-//GML: needed for group restart
+//TML: needed for group restart
 extern void _resetNodeBocInitVec(void);
 
 //methods for updating location
@@ -602,6 +647,6 @@ extern int _receiveLocationHandlerIdx;
 extern "C" void CmiDeliverRemoteMsgHandlerRange(int lowerHandler,int higherHandler);
 inline void processRemoteMlogMessages(){
 	CmiDeliverRemoteMsgHandlerRange(_ticketRequestHandlerIdx,_receiveLocationHandlerIdx);
-}
+};
 
 #endif
