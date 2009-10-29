@@ -95,9 +95,7 @@ inline int CkMemCheckPT::BuddyPE(int pe)
   int budnode = CmiPhysicalNodeID(pe);
   do {
     budnode = (budnode+1)%CmiNumPhysicalNodes();
-    budpe = (CmiGetFirstPeOnPhysicalNode(budnode) + r1) % 
-                                   CmiNumPesOnPhysicalNode(budnode);
-printf("CmiGetFirstPeOnPhysicalNode: %d CmiNumPesOnPhysicalNode: %d\n", CmiGetFirstPeOnPhysicalNode(budnode), CmiNumPesOnPhysicalNode(budnode));
+    budpe = (CmiGetFirstPeOnPhysicalNode(budnode) + r1 % CmiNumPesOnPhysicalNode(budnode)) % CmiNumPes();
   } while (isFailed(budpe));
   if (budpe == pe) {
     CmiPrintf("[%d] Error: failed to find a buddy processor on a different node.\n", pe);
