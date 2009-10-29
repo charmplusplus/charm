@@ -180,6 +180,7 @@ public:
     MCount SN;
     MCount TN;
     MlogEntry *localMlogEntry;
+	bool freeMsg;
 #endif
 private:
     u_type type;           ///< Depends on message type (attribs.mtype)
