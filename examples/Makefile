@@ -1,4 +1,4 @@
-DIRS=charm++ converse ampi fem bigsim
+DIRS=charm++ converse ampi fem armci bigsim
 
 
 all:
