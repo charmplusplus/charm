@@ -132,7 +132,7 @@ ControlPoint::ControlPointAssociatedArray ControlPoint::assocWithArray(const CPr
     return a;
 }
 
-void initControlPointEffects() {
+void ControlPoint::initControlPointEffects() {
 \tCkpvInitialize(cp_effect_map, cp_effects);
 \tCkpvInitialize(cp_name_map, cp_names);
 }

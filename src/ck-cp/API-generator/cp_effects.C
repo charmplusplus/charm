@@ -23,7 +23,7 @@ ControlPoint::ControlPointAssociatedArray ControlPoint::assocWithArray(const CPr
     return a;
 }
 
-void initControlPointEffects() {
+void ControlPoint::initControlPointEffects() {
 	CkpvInitialize(cp_effect_map, cp_effects);
 	CkpvInitialize(cp_name_map, cp_names);
 }
