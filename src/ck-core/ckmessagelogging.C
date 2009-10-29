@@ -1246,6 +1246,8 @@ bool fault_aware(CkObjID &recver){
 	switch(recver.type){
 		case TypeChare:
 			return false;
+		case TypeMainChare:
+			return false;
 		case TypeGroup:
 		case TypeNodeGroup:
 		case TypeArray:
@@ -3385,8 +3387,9 @@ void _messageLoggingExit(){
 void* CkObjID::getObject(){
 	
 		switch(type){
-			case TypeChare:
-	
+			case TypeChare:	
+				return CkLocalChare(&data.chare.id);
+			case TypeMainChare:
 				return CkLocalChare(&data.chare.id);
 			case TypeGroup:
 	
@@ -3423,6 +3426,7 @@ void* CkObjID::getObject(){
 int CkObjID::guessPE(){
 		switch(type){
 			case TypeChare:
+			case TypeMainChare:
 				return data.chare.id.onPE;
 			case TypeGroup:
 			case TypeNodeGroup:
@@ -3445,6 +3449,9 @@ char *CkObjID::toString(char *buf) const {
 	switch(type){
 		case TypeChare:
 			sprintf(buf,"Chare %p PE %d \0",data.chare.id.objPtr,data.chare.id.onPE);
+			break;
+		case TypeMainChare:
+			sprintf(buf,"Chare %p PE %d \0",data.chare.id.objPtr,data.chare.id.onPE);	
 			break;
 		case TypeGroup:
 			sprintf(buf,"Group %d	PE %d \0",data.group.id.idx,data.group.onPE);
@@ -3493,6 +3500,7 @@ void CkObjID::updatePosition(int PE){
 
 			break;
 		case TypeChare:
+		case TypeMainChare:
 			CkAssert(data.chare.id.onPE == PE);
 			break;
 		case TypeGroup:
