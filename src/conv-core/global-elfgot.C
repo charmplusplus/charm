@@ -336,8 +336,7 @@ CtgGlobalList::CtgGlobalList() {
     std::sort(globals.begin(), globals.end(), &compare_globals);
     for (std::vector<global_rec>::iterator i = globals.begin(); i != globals.end(); ++i) {
 	short alignment = std::min(i->size, (unsigned long)16);
-        if (alignment == 0) alignment = 1;
-	size_t padding = (datalen2 + alignment) % alignment;
+	size_t padding = alignment>0?(datalen2 + alignment) % alignment:0;
 	size_t offset = datalen2 + padding;
 	//rec.push_back(CtgRec(i->index, offset));
 	datalen2 = offset + i->size;
@@ -348,7 +347,7 @@ CtgGlobalList::CtgGlobalList() {
 #if DEBUG_GOT_MANAGER   
     printf("relt has %d entries, %d of which are user globals\n\n", 
 	   relt_size, nRec);
-    printf("Traditional GOT layout takes %d, sorted takes %lu", datalen, (unsigned long) datalen2);
+    printf("Traditional GOT layout takes %d, sorted takes %lu.\n", datalen, (unsigned long) datalen2);
 #endif
 }
 
