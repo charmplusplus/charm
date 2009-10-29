@@ -1,11 +1,11 @@
-CHARMBIN = ../../bin
+CHARMC=../../../bin/charmc $(OPTS)
 
 all: hello
 
 hello: hello.c
-	$(CHARMBIN)/charmc -o hello hello.c -language armci
+	$(CHARMC) -o hello hello.c -language armci
 
-run: hello
+test: hello
 	./charmrun +p2 ./hello
 
 clean:

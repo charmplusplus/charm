@@ -1,11 +1,11 @@
-CHARMBIN = ../../../bin
+CHARMC=../../../bin/charmc $(OPTS)
 
 all: put
 
 put: put.c
-	$(CHARMBIN)/charmc -o put put.c -language armci -memory os
+	$(CHARMC) -o put put.c -language armci 
 
-run: put
+test: put
 	./charmrun +p2 ./put
 
 clean:
