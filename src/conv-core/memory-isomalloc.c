@@ -45,17 +45,17 @@ void CmiEnableIsomalloc()
 	rank_holding_CmiMemLock=-1;
 }
 
-#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
 #if CMK_TLS_THREAD
 /**
- * This thread private variable is used to disable using isomalloc
- * in system libraries if the system libraries is called in an
- * automatically created pthread, such as the callback provided
- * by Asynchronous IO used in the prefetch optimization in BigSim
- * emulator. --Chao Mei
+ * make sure isomalloc is only called in pthreads that is spawned by Charm++.
+ * It is not safe to call isomalloc in system spawned pthreads for example
+ * mpich pthreads, or aio pthreads.
+ * Use the following TLS variable to distinguish those pthreads.
+ * when set to 1, the current pthreads is allowed to call isomalloc.
  */
 static __thread int isomalloc_thread = 0;
 #else
+#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH
 #error TLS support is required for bigsim out-of-core prefetch optimization
 #endif
 #endif
@@ -65,8 +65,8 @@ static void meta_init(char **argv)
    CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
    CpvInitialize(CmiIsomallocBlockList *,isomalloc_blocklist);
    CpvInitialize(CmiIsomallocBlockList *,pushed_blocklist);
-#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH && CMK_TLS_THREAD
-   isomalloc_thread = 1;
+#if CMK_TLS_THREAD
+   isomalloc_thread = 1;         /* isomalloc is allowed in this pthread */
 #endif
 }
 
@@ -74,7 +74,7 @@ static void *meta_malloc(size_t size)
 {
 	void *ret=NULL;
 	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)
-#if BIGSIM_OUT_OF_CORE && BIGSIM_OOC_PREFETCH && CMK_TLS_THREAD
+#if CMK_TLS_THREAD
              && isomalloc_thread
 #endif
            )
