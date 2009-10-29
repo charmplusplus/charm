@@ -19,7 +19,7 @@ struct liveVizRequest {
 	int code; ///< Application-defined request type
 	int wid,ht;///< Size (pixels) of requested image
 	
-	typedef enum {compressionNone=0, compressionJPEG=1} compressionType_t;
+	typedef enum {compressionNone=0, compressionJPEG=1, compressionRunLength=2} compressionType_t;
 	int compressionType; ///< 0: uncompressed; 1: JPEG; 2: zip?
 	int compressionQuality; ///< For jpeg, 0..100 percent quality.
 	

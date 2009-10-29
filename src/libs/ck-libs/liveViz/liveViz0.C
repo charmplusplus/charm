@@ -209,6 +209,23 @@ std::string JPEGcompressImage(int wid,int ht,int bpp, const byte *image_data, in
 
   cinfo.image_width = wid; 	/* image width and height, in pixels */
   cinfo.image_height = ht;
+  
+  while (cinfo.image_height>65000) {
+  /* FUNKY HACK: 
+  	JPEG library can't support images over 64K pixels.
+	But we want tall-skinny images for 3D volume impostors.
+	So we just *lie* to the JPEG library, and it'll interpret
+	the image data as several side-by-side interleaved scanlines.
+	The decompressor doesn't (necessarily!) need to change either...
+  */
+  	if (cinfo.image_height&1) {
+		CkError("liveViz0 JPEGlib WARNING: cannot shrink odd image height %d\n",cinfo.image_height);
+	}
+  	cinfo.image_height/=2;
+	cinfo.image_width*=2;
+  }
+  
+  
   switch (bpp) {
   case 1:
   	cinfo.input_components = 1;		/* # of color components per pixel */
@@ -227,7 +244,7 @@ std::string JPEGcompressImage(int wid,int ht,int bpp, const byte *image_data, in
   jpeg_set_defaults(&cinfo);
   jpeg_set_quality(&cinfo, quality, TRUE /* limit to baseline-JPEG values */);
   jpeg_start_compress(&cinfo, TRUE);
-  row_stride = wid * bpp;	/* JSAMPLEs per row in image_buffer */
+  row_stride = cinfo.image_width * bpp;	/* JSAMPLEs per row in image_buffer */
   while (cinfo.next_scanline < cinfo.image_height) {
     row_pointer[0] = (JSAMPLE *)(& image_data[cinfo.next_scanline * row_stride]);
     (void) jpeg_write_scanlines(&cinfo, row_pointer, 1);
@@ -258,6 +275,20 @@ void liveViz0Deposit(const liveVizRequest &req,byte * imageData)
       break;
     }
 #endif
+    case liveVizRequest::compressionRunLength:
+        {
+            std::string data;
+            for(int i=0; i<req.ht*req.wid;)
+            {
+                int j=i;
+                while(imageData[j]==imageData[i]&&i-j<255&&i<req.ht*req.wid)
+                    i++;
+                data.push_back((char)((i-j)&0xff));
+                data.push_back(imageData[j]);
+            }
+            CcsSendDelayedReply(req.replyToken, data.size(), &data[0]);
+        }
+        break;
     default:
       CkError("liveViz0.C WARNING: Ignoring liveViz client's unrecognized compressionType %d\n",req.compressionType);
       CcsSendDelayedReply(req.replyToken, 0, 0);
