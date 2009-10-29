@@ -93,7 +93,6 @@ inline int CkMemCheckPT::BuddyPE(int pe)
     // buddy is the processor with same rank on next physical node
   int r1 = CmiPhysicalRank(pe);
   int budnode = CmiPhysicalNodeID(pe);
-printf("CmiPhysicalNodeID %d rank: %d\n", CmiPhysicalNodeID(pe), CmiPhysicalRank(pe));
   do {
     budnode = (budnode+1)%CmiNumPhysicalNodes();
     budpe = (CmiGetFirstPeOnPhysicalNode(budnode) + r1) % 
@@ -178,6 +177,7 @@ public:
   }
   inline void updateBuffer(CkArrayCheckPTMessage *data) 
   {
+    CmiAssert(data!=NULL);
     if (ckBuffer) delete ckBuffer;
     ckBuffer = data;
   }    
