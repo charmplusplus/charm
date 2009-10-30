@@ -481,11 +481,13 @@ extern int CmiBarrierZero(void);
 /* cpu topology */
 extern int CmiNumCores(void);
 extern int CmiCpuTopologyEnabled();
-extern int CmiOnSamePhysicalNode(int pe1, int pe2);
+extern int CmiPeOnSamePhysicalNode(int pe1, int pe2);
 extern int CmiNumPhysicalNodes();
-extern int CmiNumPesOnPhysicalNode(int pe);
-extern void CmiGetPesOnPhysicalNode(int pe, int **pelist, int *num);
-extern int CmiGetFirstPeOnPhysicalNode(int pe);
+extern int CmiPhysicalNodeID(int pe);
+extern int CmiNumPesOnPhysicalNode(int node);
+extern void CmiGetPesOnPhysicalNode(int node, int **pelist, int *num);
+extern int CmiGetFirstPeOnPhysicalNode(int node);
+extern int CmiPhysicalRank(int pe);
 
 /** Return 1 if our outgoing message queue 
    for this node is longer than this many bytes. */
