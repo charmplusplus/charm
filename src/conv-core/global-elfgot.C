@@ -57,7 +57,7 @@ A more readable summary is at:
 #if CMK_HAS_ELF_H
 #include <elf.h>
 
-#define DEBUG_GOT_MANAGER 0
+#define DEBUG_GOT_MANAGER 1
 
 #if !CMK_SHARED_VARS_UNAVAILABLE
 #  error "Global-elfgot won't work properly under smp version: -swapglobals disabled"
@@ -278,6 +278,7 @@ CtgGlobalList::CtgGlobalList() {
     }
 
     std::vector<global_rec> globals;
+    int padding_old = 0, padding_new = 0;
 
     // Figure out which relocation data entries refer to global data:
     for(count = 0; count < relt_size; count ++) {
@@ -313,13 +314,15 @@ CtgGlobalList::CtgGlobalList() {
 	    continue;
 
 	// It's got the right name-- it's a user global
-	int gSize = ALIGN8(symt[symindx].st_size);
+	int size = symt[symindx].st_size;
+	int gSize = ALIGN8(size);
+	padding_old += gSize - size;
 	ELFXX_TYPE_Addr *gGot=(ELFXX_TYPE_Addr *)relt[count].r_offset;
-	globals.push_back(global_rec(gGot, symt[symindx].st_size));
+	globals.push_back(global_rec(gGot, size));
 
 #if DEBUG_GOT_MANAGER
 	printf("   -> %s is a user global, of size %d, at %p\n",
-	       sym_name, symt[symindx].st_size, (void *)*gGot);
+	       sym_name, size, (void *)*gGot);
 #endif
 	if ((void *)*gGot != (void *)symt[symindx].st_value)
 	    CmiAbort("CtgGlobalList: symbol table and GOT address mismatch!\n");
@@ -335,9 +338,10 @@ CtgGlobalList::CtgGlobalList() {
     size_t datalen2 = 0;
     std::sort(globals.begin(), globals.end(), &compare_globals);
     for (std::vector<global_rec>::iterator i = globals.begin(); i != globals.end(); ++i) {
-	short alignment = std::min(i->size, (unsigned long)16);
+	short alignment = std::min(i->size, (size_t)16);
 	size_t padding = alignment>0?(datalen2 + alignment) % alignment:0;
 	size_t offset = datalen2 + padding;
+	padding_new += padding;
 	//rec.push_back(CtgRec(i->index, offset));
 	datalen2 = offset + i->size;
     }
@@ -347,7 +351,9 @@ CtgGlobalList::CtgGlobalList() {
 #if DEBUG_GOT_MANAGER   
     printf("relt has %d entries, %d of which are user globals\n\n", 
 	   relt_size, nRec);
-    printf("Traditional GOT layout takes %d, sorted takes %lu.\n", datalen, (unsigned long) datalen2);
+    printf("Traditional GOT layout takes %d (padding: %d), "
+	   "sorted takes %lu (padding: %d).\n", 
+	   datalen, padding_old, (unsigned long) datalen2, padding_new);
 #endif
 }
 
