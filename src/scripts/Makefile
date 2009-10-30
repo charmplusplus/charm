@@ -989,7 +989,7 @@ $(L)/libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
 	$(CHARMC) -o $@ BlueGene.o
 
 # (Converse) Blue Gene emulator
-BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blue_impl.h bigsim_network.h bigsim_record.h bigism_ooc.h bigsim_debug.h shared-alloc.h
+BLUE_HEADERS = blue_types.h bigsim_timing.h blue_defs.h bigsim_logs.h blue.h blue_impl.h bigsim_network.h bigsim_record.h bigsim_ooc.h bigsim_debug.h shared-alloc.h
 BLUE_OBJS = blue.o bigsim_node.o bigsim_proc.o bigsim_init.o bigsim_timing.o bigsim_record.o bigsim_ooc.o shared_alloc.o
 BIGSIM_IO_OBJS = bigsim_read.o bigsim_logs.o bigsim_api.o
 
