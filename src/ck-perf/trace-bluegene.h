@@ -33,6 +33,7 @@ class TraceBluegene : public Trace {
     void bgDummyBeginExec(const char* name,void** parentLogPtr, int split);
     void bgBeginExec(char* msg, char *str);
     void bgAmpiBeginExec(char *msg, char *str, void **logs, int count);
+    void bgAmpiSetSize(int size);
     void bgSetInfo(char *msg, const char *str, void **logs, int count);
     void bgEndExec(int);
     virtual void beginExecute(envelope *);
@@ -75,6 +76,9 @@ extern int traceBluegeneLinked;
 #define _TRACE_BG_USER_EVENT_BRACKET(x,bt,et,pLogPtr) _TRACE_BG_ONLY(CkpvAccess(_tracebg)->userBracketEvent(x,bt,et,pLogPtr))
 #define _TRACE_BGLIST_USER_EVENT_BRACKET(x,bt,et,pLogPtr,bgLogList) _TRACE_BG_ONLY(CkpvAccess(_tracebg)->userBracketEvent(x,bt,et,pLogPtr,bgLogList))
 #define TRACE_BG_ADD_TAG(str)	_TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgAddTag(str))
+
+# define TRACE_BG_AMPI_SET_SIZE(size) \
+    _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgAmpiSetSize(size))
 
 # define TRACE_BG_AMPI_SUSPEND()     \
 	_TRACE_BG_END_EXECUTE(1); \
@@ -136,6 +140,7 @@ extern "C" void BgSetStartEvent();
 # define TRACE_BG_NEWSTART(t, str, events, count)
 # define TRACE_BG_AMPI_BREAK(t, str, event, count)
 # define TRACE_BG_AMPI_WAITALL(reqs)
+# define TRACE_BG_AMPI_SET_SIZE(size)
 #endif   /* CMK_TRACE_IN_CHARM */
 
 extern "C" void BgPrintf(const char *str);

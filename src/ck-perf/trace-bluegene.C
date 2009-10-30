@@ -135,6 +135,13 @@ void TraceBluegene::bgAmpiBeginExec(char *msg, char *name, void **logs, int coun
   if (msg) curlog->addMsgBackwardDep(tTIMELINEREC, msg);
 }
 
+void TraceBluegene::bgAmpiSetSize(int size)
+{
+    if (!genTimeLog) return;
+    BgTimeLog *curlog = BgLastLog(tTIMELINEREC);
+    curlog->setSize(size);
+}
+
 void TraceBluegene::bgEndExec(int commit)
 {
   stopVTimer();

@@ -2773,6 +2773,9 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
                   MPI_Op op, MPI_Comm comm)
 {
   AMPIAPI("AMPI_Allreduce");
+  ampi *ptr = getAmpiInstance(comm);
+  CkDDT_DataType *ddt_type = ptr->getDDT()->getType(type);
+  TRACE_BG_AMPI_SET_SIZE(count * ddt_type->getSize());
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
 
 #ifdef AMPIMSGLOG
@@ -2785,11 +2788,10 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   }
 #endif
 
-  ampi *ptr = getAmpiInstance(comm);
   if(op == MPI_OP_NULL) CkAbort("MPI_Allreduce called with MPI_OP_NULL!!!");
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Allreduce not allowed for Inter-communicator!");
 
-  CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,op);
+  CkReductionMsg *msg=makeRednMsg(ddt_type, inbuf, count, type, op);
   CkCallback allreduceCB(CkIndex_ampi::reduceResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
   ptr->contribute(msg);
@@ -2817,7 +2819,7 @@ CDECL
 int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
                    MPI_Op op, MPI_Comm comm, MPI_Request* request)
 {
-  AMPIAPI("AMPI_Allreduce");
+  AMPIAPI("AMPI_Iallreduce");
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
 
   checkRequest(*request);
