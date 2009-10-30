@@ -90,16 +90,19 @@ inline int CkMemCheckPT::BuddyPE(int pe)
 {
   int budpe;
 #if NODE_CHECKPOINT
-    // buddy is the processor with same rank on next physical node
+    // buddy is the processor with same rank on the next physical node
   int r1 = CmiPhysicalRank(pe);
   int budnode = CmiPhysicalNodeID(pe);
   do {
     budnode = (budnode+1)%CmiNumPhysicalNodes();
-    budpe = (CmiGetFirstPeOnPhysicalNode(budnode) + r1 % CmiNumPesOnPhysicalNode(budnode)) % CmiNumPes();
+    int *pelist;
+    int num;
+    CmiGetPesOnPhysicalNode(budnode, &pelist, &num);
+    budpe = pelist[r1 % num];
   } while (isFailed(budpe));
   if (budpe == pe) {
     CmiPrintf("[%d] Error: failed to find a buddy processor on a different node.\n", pe);
-    CmiAbort("Failed to a buddy processor");
+    CmiAbort("Failed to find a buddy processor");
   }
 #else
   budpe = pe;
