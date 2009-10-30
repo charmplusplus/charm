@@ -12,7 +12,7 @@ test:
 	done
 
 bgtest:
-	for d in charm++ ampi fem; do \
+	for d in charm++ ampi fem armci; do \
 		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
