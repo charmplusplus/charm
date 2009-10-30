@@ -3,6 +3,7 @@ Lowest level of liveViz: Responds to CCS requests, and formats replies.
 
 Orion Sky Lawlor, olawlor@acm.org, 6/2002
  */
+#include <string> /* need std::string below */
 #include <stdio.h>
 #include "charm++.h"
 #include "conv-ccs.h"
