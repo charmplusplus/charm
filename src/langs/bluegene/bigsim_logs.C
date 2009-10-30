@@ -144,6 +144,7 @@ BgTimeLog::BgTimeLog(BgTimeLog *log)
   msgId = log->msgId;
 
   seqno = 0;
+  size = 0;
   effRecvTime = recvTime;
   doCorrect = 1;
   flag = 0;
@@ -162,6 +163,7 @@ BgTimeLog::BgTimeLog(const BgMsgID &msgID)
   oldStartTime= startTime;
   effRecvTime = -1.0;
   seqno = 0;
+  size = 0;
   doCorrect = 1;
   flag = 0;
 }
@@ -198,6 +200,7 @@ BgTimeLog::BgTimeLog(int epc, const char* namestr,double sTime)
   oldStartTime= startTime;
   effRecvTime = -1.0;
   seqno = 0;
+  size = 0;
   doCorrect = 1;
   flag = 0;
 }
@@ -218,6 +221,7 @@ BgTimeLog::BgTimeLog(int epc, const char* namestr, double sTime, double eTime)
   oldStartTime = startTime;
   effRecvTime = -1.0;
   seqno = 0;
+  size = 0;
   doCorrect = 1;
   flag = 0;
 }
@@ -244,6 +248,7 @@ BgTimeLog::BgTimeLog(char *msg, char *str)
   oldStartTime=startTime;
   effRecvTime = recvTime;
   seqno = 0;
+  size = 0;
 //  doCorrect = msg?CkMsgDoCorrect(msg):1;
   doCorrect = 1;
   flag = 0;

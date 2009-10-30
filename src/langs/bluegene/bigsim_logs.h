@@ -138,6 +138,7 @@ public:
 
   int ep;
   int seqno;
+  int size;
   short charm_ep;
 
   char name[20];
@@ -149,8 +150,10 @@ public:
   BgTimeLog(BgTimeLog *);
   BgTimeLog(const BgMsgID &msgID);
   BgTimeLog(char *msg, char *str=NULL);
-  BgTimeLog(): ep(-1), charm_ep(-1), recvTime(.0), startTime(.0), endTime(.0), execTime(.0), 
-	       effRecvTime(INVALIDTIME), seqno(0), doCorrect(1), flag(0) 
+  BgTimeLog()
+    : ep(-1), charm_ep(-1), recvTime(.0), startTime(.0), endTime(.0),
+      execTime(.0), effRecvTime(INVALIDTIME), seqno(0), doCorrect(1), 
+      flag(0), size(0)
     {strcpy(name,"dummyname");}
   BgTimeLog(int epc, const char* name, double sTime, double eTime);
   BgTimeLog(int epc, const char* name, double sTime);
@@ -225,6 +228,7 @@ public:
   void pupCommon(PUP::er &p);
   void pup(PUP::er &p);
   void winPup(PUP::er &p, int& firstLogToRead, int& numLogsToRead);
+  void setSize(int s) { size = s; }
 
 #if DELAY_SEND
   void send() {
