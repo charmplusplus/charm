@@ -190,7 +190,7 @@ void ArmciVirtualProcessor::waitall(){
 void ArmciVirtualProcessor::fence(int proc){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
-    if(hdlList[i]->acked == 0 && (hdlList[i]->op & BLOCKING_MASK == 1) && hdlList[i]->proc == proc)
+    if(hdlList[i]->acked == 0 && (hdlList[i]->op & BLOCKING_MASK) && hdlList[i]->proc == proc)
       procs.push_back(i);
   }
   waitmulti(procs);
@@ -198,7 +198,7 @@ void ArmciVirtualProcessor::fence(int proc){
 void ArmciVirtualProcessor::allfence(){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
-    if(hdlList[i]->acked == 0 && (hdlList[i]->op & BLOCKING_MASK == 1))
+    if(hdlList[i]->acked == 0 && (hdlList[i]->op & BLOCKING_MASK))
       procs.push_back(i);
   }
   waitmulti(procs);
