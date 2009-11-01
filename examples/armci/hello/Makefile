@@ -6,10 +6,10 @@ hello: hello.c
 	$(CHARMC) -o hello hello.c -language armci
 
 test: hello
-	./charmrun +p2 ./hello
+	./charmrun +p2 ./hello $(TESTOPTS)
 
 bgtest: hello
-	./charmrun +p1 ./hello +vp2 +x2 +y1 +z1
+	./charmrun +p1 ./hello +vp2 +x2 +y1 +z1 $(TESTOPTS)
 
 clean:
 	rm -f hello charmrun
