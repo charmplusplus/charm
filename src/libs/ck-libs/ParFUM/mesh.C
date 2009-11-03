@@ -2205,41 +2205,35 @@ static inline void write_version()
     }
 }
 
-FEM_Mesh *FEM_readMesh(const char *prefix,int chunkNo,int nChunks)
+FEM_Mesh *FEM_readMesh(const char *prefix, int chunkNo, int nChunks)
 {
 	// find FEM file version number
 	static int version_checked = 0;
 	if (!version_checked) {
-	    version_checked=1;
+	    version_checked = 1;
 	    read_version();
 	}
 
-	FEM_Mesh *ret=new FEM_Mesh;
+	FEM_Mesh *ret = new FEM_Mesh;
 	ret->becomeGetting();
-        FILE *fp = FEM_openMeshFile(prefix,chunkNo,nChunks,true);
+        FILE *fp = FEM_openMeshFile(prefix, chunkNo, nChunks, true);
 	PUP::fromTextFile p(fp);
 	ret->pup(p);
   	fclose(fp);
 
-
-
 #ifdef PRINT_SHARED_NODE_INFO
-        /** For Abhinav, print out the neighbors for this vp */
+        // For Abhinav, print out the neighbors for this vp
+	// CkPrintf("%d: Finding Neighbors for VP\n", chunkNo);
         
-        CkPrintf("%d: Finding Neighbors for VP\n", chunkNo);
-        
-        FEM_Comm &shared = ret->node.shared; ///<Shared nodes     The type is really an IDXL_Side
-        
+        FEM_Comm &shared = ret->node.shared;	// Shared nodes: The type is really an IDXL_Side
         int numNeighborVPs = shared.size();
+        // CkPrintf("%d: communicates with %d neighbors\n", chunkNo, numNeighborVPs);
         
-        CkPrintf("%d: communicates with %d neighbors\n", chunkNo, numNeighborVPs);
-        
-        for(int i=0;i<numNeighborVPs;i++){
+        for(int i=0; i<numNeighborVPs; i++){
           IDXL_List list = shared.getLocalList(i);
-            CkPrintf("%d: communicates %d shared nodes with chunk %d\n", chunkNo , list.size() , list.getDest()); 
+          CkPrintf("%d communicates with chunk %d through %d shared nodes\n", chunkNo, list.getDest(), list.size()); 
         }
 #endif
-
 
 	return ret;
 }
