@@ -37,6 +37,10 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ CProxy_controlPointManager controlPointManagerProxy;
 /* readonly */ int random_seed;
 /* readonly */ long controlPointSamplePeriod;
+/* readonly */ int whichTuningScheme;
+
+
+typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming}  tuningScheme;
 
 
 /// A reduction type that combines idle time statistics (min/max/avg etc.)
@@ -696,13 +700,31 @@ public:
 
 
     double period;
-    bool found = CmiGetArgDoubleDesc(args->argv,"+CPSamplePeriod", &period,"The time between Control Point Framework samples (in seconds)");
-    if(found){
+    bool haveSamplePeriod = CmiGetArgDoubleDesc(args->argv,"+CPSamplePeriod", &period,"The time between Control Point Framework samples (in seconds)");
+    if(haveSamplePeriod){
       CkPrintf("LBPERIOD = %ld sec\n", period);
-      controlPointSamplePeriod =  period * 1000;
+      controlPointSamplePeriod =  period * 1000; /**< A readonly */
     } else {
       controlPointSamplePeriod =  DEFAULT_CONTROL_POINT_SAMPLE_PERIOD;
     }
+
+
+
+    whichTuningScheme = RandomSelection;
+
+
+    if( CmiGetArgFlagDesc(args->argv,"+CPSchemeRandom","Randomly Select Control Point Values") ){
+      whichTuningScheme = RandomSelection;
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPExhaustiveSearch","Exhaustive Search of Control Point Values") ){
+      whichTuningScheme = ExhaustiveSearch;
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPSimulatedAnnealing","Simulated Annealing Search of Control Point Values") ){
+      whichTuningScheme = SimulatedAnnealing;
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPCriticalPathAutoPrioritization","Use Critical Path to adapt Control Point Values") ){
+      whichTuningScheme = CriticalPathAutoPrioritization;
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPUseBestKnownTiming","Use BestKnown Timing for Control Point Values") ){
+      whichTuningScheme = UseBestKnownTiming;
+    } 
+
 
     controlPointManagerProxy = CProxy_controlPointManager::ckNew();
   }
@@ -754,22 +776,6 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime){
 
 
 
-
-// Static point for life of program: randomly chosen, no optimizer
-int staticPoint(const char *name, int lb, int ub){
-  instrumentedPhase &thisPhaseData = controlPointManagerProxy.ckLocalBranch()->thisPhaseData;
-  std::set<std::string> &staticControlPoints = controlPointManagerProxy.ckLocalBranch()->staticControlPoints;  
-
-  int result = lb + randInt(ub-lb+1, name);
-  
-  controlPointManagerProxy.ckLocalBranch()->controlPointSpace.insert(std::make_pair(std::string(name),std::make_pair(lb,ub))); 
-  thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 
-  staticControlPoints.insert(std::string(name));
-
-  return result;
-}
-
-
 /// Should an optimizer determine the control point values
 bool valueShouldBeProvidedByOptimizer(){
   
@@ -812,203 +818,211 @@ int valueProvidedByOptimizer(const char * name){
 #define SIMULATED_ANNEALING 0
 #define EXHAUSTIVE_SEARCH 1
 
-  // -----------------------------------------------------------
-#if OPTIMIZER_ADAPT_CRITICAL_PATHS
-  // This scheme will return the median value for the range 
-  // early on, and then will transition over to the new control points
-  // determined by the critical path adapting code
-  if(controlPointManagerProxy.ckLocalBranch()->newControlPointsAvailable){
-    int result = controlPointManagerProxy.ckLocalBranch()->newControlPoints[std::string(name)];
-    CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d  from \"newControlPoints\" is: %d\n", name, phase_id, result);
-    return result;
-  } 
-  
-  std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
 
-  if(controlPointSpace.count(std::string(name))>0){
+
+  if( whichTuningScheme == CriticalPathAutoPrioritization){
+
+    // -----------------------------------------------------------
+    //  USE CRITICAL PATH TO ADJUST PRIORITIES
+    //   
+    // This scheme will return the median value for the range 
+    // early on, and then will transition over to the new control points
+    // determined by the critical path adapting code
+    if(controlPointManagerProxy.ckLocalBranch()->newControlPointsAvailable){
+      int result = controlPointManagerProxy.ckLocalBranch()->newControlPoints[std::string(name)];
+      CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d  from \"newControlPoints\" is: %d\n", name, phase_id, result);
+      return result;
+    } 
+  
+    std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
+
+    if(controlPointSpace.count(std::string(name))>0){
+      int minValue =  controlPointSpace[std::string(name)].first;
+      int maxValue =  controlPointSpace[std::string(name)].second;
+      return (minValue+maxValue)/2;
+    }
+  
+  } else if ( whichTuningScheme == UseBestKnownTiming ) {
+
+    // -----------------------------------------------------------
+    //  USE BEST KNOWN TIME  
+    static bool firstTime = true;
+    if(firstTime){
+      firstTime = false;
+      CkPrintf("Finding best phase\n");
+      instrumentedPhase p = controlPointManagerProxy.ckLocalBranch()->allData.findBest(); 
+      CkPrintf("p=:\n");
+      p.print();
+      CkPrintf("\n");
+      controlPointManagerProxy.ckLocalBranch()->best_phase = p;
+    }
+  
+  
+    instrumentedPhase &p = controlPointManagerProxy.ckLocalBranch()->best_phase;
+    int result = p.controlPoints[std::string(name)];
+    CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen out of best previous phase to be: %d\n", name, phase_id, result);
+    return result;
+
+  } else if( whichTuningScheme == SimulatedAnnealing ){
+
+    // -----------------------------------------------------------
+    //  SIMULATED ANNEALING
+    //  Simulated Annealing style hill climbing method
+    //
+    //  Find the best search space configuration, and try something
+    //  nearby it, with a radius decreasing as phases increase
+  
+    std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
+  
+    CkPrintf("Finding best phase\n"); 
+    instrumentedPhase p = controlPointManagerProxy.ckLocalBranch()->allData.findBest();  
+    CkPrintf("best found:\n"); 
+    p.print(); 
+    CkPrintf("\n"); 
+  
+    int before = p.controlPoints[std::string(name)];   
+  
     int minValue =  controlPointSpace[std::string(name)].first;
     int maxValue =  controlPointSpace[std::string(name)].second;
-    return (minValue+maxValue)/2;
-  }
   
-  // -----------------------------------------------------------
-#elif OPTIMIZER_USE_BEST_TIME  
-  static bool firstTime = true;
-  if(firstTime){
-    firstTime = false;
-    CkPrintf("Finding best phase\n");
-    instrumentedPhase p = controlPointManagerProxy.ckLocalBranch()->allData.findBest(); 
-    CkPrintf("p=:\n");
-    p.print();
-    CkPrintf("\n");
-    controlPointManagerProxy.ckLocalBranch()->best_phase = p;
-  }
+    int convergeByPhase = 100;
   
+    // Determine from 0.0 to 1.0 how far along we are
+    double progress = (double) min(effective_phase, convergeByPhase) / (double)convergeByPhase;
   
-  instrumentedPhase &p = controlPointManagerProxy.ckLocalBranch()->best_phase;
-  int result = p.controlPoints[std::string(name)];
-  CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen out of best previous phase to be: %d\n", name, phase_id, result);
-  return result;
+    int range = (maxValue-minValue+1)*(1.0-progress);
 
-  // -----------------------------------------------------------
-#elsif SIMULATED_ANNEALING
-  
-  // Simulated Annealing style hill climbing method
-  //
-  // Find the best search space configuration, and try something
-  // nearby it, with a radius decreasing as phases increase
-  
-  std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
-  
-  CkPrintf("Finding best phase\n"); 
-  instrumentedPhase p = controlPointManagerProxy.ckLocalBranch()->allData.findBest();  
-  CkPrintf("best found:\n"); 
-  p.print(); 
-  CkPrintf("\n"); 
-  
-  int before = p.controlPoints[std::string(name)];   
-  
-  int minValue =  controlPointSpace[std::string(name)].first;
-  int maxValue =  controlPointSpace[std::string(name)].second;
-  
-  int convergeByPhase = 100;
-  
-  // Determine from 0.0 to 1.0 how far along we are
-  double progress = (double) min(effective_phase, convergeByPhase) / (double)convergeByPhase;
-  
-  int range = (maxValue-minValue+1)*(1.0-progress);
+    CkPrintf("========================== Hill climbing progress = %lf  range=%d\n", progress, range); 
 
-  CkPrintf("========================== Hill climbing progress = %lf  range=%d\n", progress, range); 
-
-  int high = min(before+range, maxValue);
-  int low = max(before-range, minValue);
+    int high = min(before+range, maxValue);
+    int low = max(before-range, minValue);
   
-  int result = low;
+    int result = low;
 
-  if(high-low > 0){
-    result += randInt(high-low, name, phase_id); 
-  } 
+    if(high-low > 0){
+      result += randInt(high-low, name, phase_id); 
+    } 
 
-  CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by hill climbing to be: %d\n", name, phase_id, result); 
-  return result; 
+    CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by hill climbing to be: %d\n", name, phase_id, result); 
+    return result; 
 
-  // -----------------------------------------------------------
-#elif EXHAUSTIVE_SEARCH
-  // Exhaustive search 
+  } else if( whichTuningScheme == ExhaustiveSearch ){
 
-  std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;
-  std::set<std::string> &staticControlPoints = controlPointManagerProxy.ckLocalBranch()->staticControlPoints;  
+    // -----------------------------------------------------------
+    // EXHAUSTIVE SEARCH
+
+    std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;
+    std::set<std::string> &staticControlPoints = controlPointManagerProxy.ckLocalBranch()->staticControlPoints;  
    
-  int numDimensions = controlPointSpace.size();
-  CkAssert(numDimensions > 0);
+    int numDimensions = controlPointSpace.size();
+    CkAssert(numDimensions > 0);
   
-  vector<int> lowerBounds(numDimensions);
-  vector<int> upperBounds(numDimensions); 
+    vector<int> lowerBounds(numDimensions);
+    vector<int> upperBounds(numDimensions); 
   
-  int d=0;
-  std::map<std::string, pair<int,int> >::iterator iter;
-  for(iter = controlPointSpace.begin(); iter != controlPointSpace.end(); iter++){
-    //    CkPrintf("Examining dimension %d\n", d);
+    int d=0;
+    std::map<std::string, pair<int,int> >::iterator iter;
+    for(iter = controlPointSpace.begin(); iter != controlPointSpace.end(); iter++){
+      //    CkPrintf("Examining dimension %d\n", d);
 
 #if DEBUGPRINT
-    std::string name = iter->first;
-    if(staticControlPoints.count(name) >0 ){
-      cout << " control point " << name << " is static " << endl;
-    } else{
-      cout << " control point " << name << " is not static " << endl;
-    }
+      std::string name = iter->first;
+      if(staticControlPoints.count(name) >0 ){
+	cout << " control point " << name << " is static " << endl;
+      } else{
+	cout << " control point " << name << " is not static " << endl;
+      }
 #endif
 
-    lowerBounds[d] = iter->second.first;
-    upperBounds[d] = iter->second.second;
-    d++;
-  }
+      lowerBounds[d] = iter->second.first;
+      upperBounds[d] = iter->second.second;
+      d++;
+    }
    
 
-  vector<std::string> s(numDimensions);
-  d=0;
-  for(std::map<std::string, pair<int,int> >::iterator niter=controlPointSpace.begin(); niter!=controlPointSpace.end(); niter++){
-    s[d] = niter->first;
-    // cout << "s[" << d << "]=" << s[d] << endl;
-    d++;
-  }
+    vector<std::string> s(numDimensions);
+    d=0;
+    for(std::map<std::string, pair<int,int> >::iterator niter=controlPointSpace.begin(); niter!=controlPointSpace.end(); niter++){
+      s[d] = niter->first;
+      // cout << "s[" << d << "]=" << s[d] << endl;
+      d++;
+    }
   
   
-  // Create the first possible configuration
-  vector<int> config = lowerBounds;
-  config.push_back(0);
+    // Create the first possible configuration
+    vector<int> config = lowerBounds;
+    config.push_back(0);
   
-  // Increment until finding an unused configuration
-  controlPointManagerProxy.ckLocalBranch()->allData.cleanupNames(); // put -1 values in for any control points missing
-  std::vector<instrumentedPhase> &phases = controlPointManagerProxy.ckLocalBranch()->allData.phases;     
+    // Increment until finding an unused configuration
+    controlPointManagerProxy.ckLocalBranch()->allData.cleanupNames(); // put -1 values in for any control points missing
+    std::vector<instrumentedPhase> &phases = controlPointManagerProxy.ckLocalBranch()->allData.phases;     
 
-  while(true){
+    while(true){
     
-    std::vector<instrumentedPhase>::iterator piter; 
-    bool testedConfiguration = false; 
-    for(piter = phases.begin(); piter != phases.end(); piter++){ 
+      std::vector<instrumentedPhase>::iterator piter; 
+      bool testedConfiguration = false; 
+      for(piter = phases.begin(); piter != phases.end(); piter++){ 
       
-      // Test if the configuration matches this phase
-      bool match = true;
-      for(int j=0;j<numDimensions;j++){
-	match &= piter->controlPoints[s[j]] == config[j];
-      }
+	// Test if the configuration matches this phase
+	bool match = true;
+	for(int j=0;j<numDimensions;j++){
+	  match &= piter->controlPoints[s[j]] == config[j];
+	}
       
-      if(match){
-	testedConfiguration = true; 
+	if(match){
+	  testedConfiguration = true; 
+	  break;
+	} 
+      } 
+    
+      if(testedConfiguration == false){ 
 	break;
       } 
-    } 
     
-    if(testedConfiguration == false){ 
-      break;
-    } 
-    
-    // go to next configuration
-    config[0] ++;
-    // Propagate "carrys"
-    for(int i=0;i<numDimensions;i++){
-      if(config[i] > upperBounds[i]){
-	config[i+1]++;
-	config[i] = lowerBounds[i];
+      // go to next configuration
+      config[0] ++;
+      // Propagate "carrys"
+      for(int i=0;i<numDimensions;i++){
+	if(config[i] > upperBounds[i]){
+	  config[i+1]++;
+	  config[i] = lowerBounds[i];
+	}
+      }
+      // check if we have exhausted all possible values
+      if(config[numDimensions] > 0){
+	break;
+      }
+       
+    }
+  
+    if(config[numDimensions] > 0){
+      for(int i=0;i<numDimensions;i++){ 
+	config[i]= (lowerBounds[i]+upperBounds[i]) / 2;
       }
     }
-    // check if we have exhausted all possible values
-    if(config[numDimensions] > 0){
-      break;
-    }
-       
-  }
-  
-  if(config[numDimensions] > 0){
-    for(int i=0;i<numDimensions;i++){ 
-      config[i]= (lowerBounds[i]+upperBounds[i]) / 2;
-    }
-  }
   
   
-  int result=-1;  
+    int result=-1;  
 
-  std::string name_s(name);
-  for(int i=0;i<numDimensions;i++){
-    //    cout << "Comparing " << name_s <<  " with s[" << i << "]=" << s[i] << endl;
-    if(name_s.compare(s[i]) == 0){
-      result = config[i];
+    std::string name_s(name);
+    for(int i=0;i<numDimensions;i++){
+      //    cout << "Comparing " << name_s <<  " with s[" << i << "]=" << s[i] << endl;
+      if(name_s.compare(s[i]) == 0){
+	result = config[i];
+      }
     }
+
+    CkAssert(result != -1);
+
+
+    CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by exhaustive search to be: %d\n", name, phase_id, result); 
+    return result; 
+
+  } else {
+    CkAbort("Some Control Point tuning strategy must be enabled.\n");
   }
 
-  CkAssert(result != -1);
-
-
-  CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by exhaustive search to be: %d\n", name, phase_id, result); 
-  return result; 
-#else
-#error You need to enable some scheme in valueProvidedByOptimizer()
-#endif
-
-CkAbort("valueProvidedByOptimizer(): ERROR: could not find a value for a control point.\n");
-return 0;
-  
+  return 0;  
 }
 
 
@@ -1065,14 +1079,13 @@ int controlPoint(const char *name, int lb, int ub){
 
   int result;
 
-  // Use best configuration after a certain point
-  if(valueShouldBeProvidedByOptimizer()){
-    result = valueProvidedByOptimizer(name);
-  } 
-  else {
+  if( whichTuningScheme == RandomSelection || ! valueShouldBeProvidedByOptimizer() ){
     result = lb + randInt(ub-lb+1, name, phase_id);
     CkPrintf("Control Point \"%s\" for phase %d chosen randomly to be: %d\n", name, phase_id, result); 
+  } else {
+    result = valueProvidedByOptimizer(name);
   } 
+
    
   CkAssert(isInRange(result,ub,lb));
   thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 

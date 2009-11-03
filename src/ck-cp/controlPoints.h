@@ -42,6 +42,8 @@
 /* readonly */ extern CProxy_controlPointManager controlPointManagerProxy;
 /* readonly */ extern int random_seed;
 /* readonly */ extern long controlPointSamplePeriod;
+/* readonly */ extern int whichTuningScheme;
+
 
 
 
@@ -67,11 +69,6 @@ int controlPoint(const char *name, int lb, int ub);
 /// Return an integer from the provided vector of values
 /// The value returned will likely change between subsequent invocations
 int controlPoint(const char *name, std::vector<int>& values);
-
-/// Return an integer between lb and ub inclusive
-/// The value returned is static throughout the life of the program
-int staticPoint(const char *name, int lb, int ub);
-
 
 /// Associate a control point as affecting priorities for an array
 void controlPointPriorityArray(const char *name, CProxy_ArrayBase &arraybase);

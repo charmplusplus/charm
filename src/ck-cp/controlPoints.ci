@@ -3,7 +3,7 @@ module ControlPoints {
   readonly CProxy_controlPointManager controlPointManagerProxy;
   readonly int random_seed;
   readonly long controlPointSamplePeriod;
-
+  readonly int whichTuningScheme;
 
 
   initproc void registerIdleTimeReduction(void);	
