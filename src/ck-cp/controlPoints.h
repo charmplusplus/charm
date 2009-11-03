@@ -49,8 +49,12 @@
 
 
 void registerGranularityChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase);
+
+
 void registerControlPointTiming(double time);
 
+/// Called once each application step. Can be used instead of registerControlPointTiming()
+void controlPointTimingStamp();
 
 
 
@@ -432,7 +436,7 @@ public:
 
   // Find the fastest time from previous runs
   instrumentedPhase findBest(){
-    CkAssert(phases.size()>0);
+    CkAssert(phases.size()>1);
 
     double total_time = 0.0; // total for all times
     int total_count = 0;

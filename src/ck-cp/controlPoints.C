@@ -754,6 +754,21 @@ void registerControlPointTiming(double time){
   controlPointManagerProxy.ckLocalBranch()->setTiming(time);
 }
 
+/// An interface callable by the application.
+void controlPointTimingStamp() {
+  CkAssert(CkMyPe() == 0);
+#if DEBUGPRINT>0
+  CkPrintf("Program registering its own timing with controlPointTimingStamp()\n", time);
+#endif
+  
+  static double prev_time = 0.0;
+  double t = CmiWallTimer();
+  double duration = t - prev_time;
+  prev_time = t;
+    
+  controlPointManagerProxy.ckLocalBranch()->setTiming(duration);
+}
+
 /// Shutdown the control point framework, writing data to disk if necessary
 extern "C" void controlPointShutdown(){
   if(CkMyPe() == 0){
