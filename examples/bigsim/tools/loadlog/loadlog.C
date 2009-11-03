@@ -1,7 +1,8 @@
-
+#include <stdio.h>
 #include <math.h>
 #include "blue.h"
-#include "blue_impl.h"
+#include "bigsim_timing.h"
+#include "bigsim_logs.h"
 
 extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
@@ -16,7 +17,7 @@ int main()
   if (status == -1) exit(1);
   printf("========= BgLog Version: %d ========= \n", bglog_version);
   printf("Found %d (%dx%dx%d:%dw-%dc) simulated procs on %d real procs.\n", totalProcs, numX, numY, numZ, numWth, numCth, numPes);
-                                                                                
+
   int* allNodeOffsets = BgLoadOffsets(totalProcs,numPes);
 
   // load each individual trace file for each bg proc
@@ -29,8 +30,8 @@ int main()
     int fileNum = BgReadProc(procNum,numWth,numPes,totalProcs,allNodeOffsets,tline);
     CmiAssert(fileNum != -1);
     printf("Loading bglog of proc %d from bgTrace%d succeed. \n", i, fileNum);
-                                                                                
-    // some senity checking
+
+    // some sanity checking
     printf("Proc %d has %d events. \n", i, tline.length());
     for (int idx = 0; idx < tline.length(); idx ++)
     {
