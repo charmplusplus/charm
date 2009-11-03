@@ -125,10 +125,7 @@ controlPointManager::controlPointManager(){
     if(loadDataFileAtStartup){    
       loadDataFile();
     }
-    
-    if(allData.phases.size()>0){
-      allData.findBest();
-    }
+
     
     if(CkMyPe() == 0){
       CcdCallFnAfterOnPE((CcdVoidFn)periodicProcessControlPoints, (void*)NULL, controlPointSamplePeriod, CkMyPe());
@@ -866,16 +863,15 @@ int valueProvidedByOptimizer(const char * name){
       p.print();
       CkPrintf("\n");
       controlPointManagerProxy.ckLocalBranch()->best_phase = p;
-    }
-  
-  
+    } 
+    
     instrumentedPhase &p = controlPointManagerProxy.ckLocalBranch()->best_phase;
     int result = p.controlPoints[std::string(name)];
     CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen out of best previous phase to be: %d\n", name, phase_id, result);
     return result;
-
+    
   } else if( whichTuningScheme == SimulatedAnnealing ){
-
+    
     // -----------------------------------------------------------
     //  SIMULATED ANNEALING
     //  Simulated Annealing style hill climbing method
@@ -885,7 +881,7 @@ int valueProvidedByOptimizer(const char * name){
   
     std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
   
-    CkPrintf("Finding best phase\n"); 
+    CkPrintf("Finding best phase\n");
     instrumentedPhase p = controlPointManagerProxy.ckLocalBranch()->allData.findBest();  
     CkPrintf("best found:\n"); 
     p.print(); 
