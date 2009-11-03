@@ -121,8 +121,10 @@ controlPointManager::controlPointManager(){
     ControlPoint::initControlPointEffects();
 
     phase_id = 0;
-    
-    loadDataFile();
+
+    if(loadDataFileAtStartup){    
+      loadDataFile();
+    }
     
     if(allData.phases.size()>0){
       allData.findBest();
@@ -715,11 +717,11 @@ public:
       whichTuningScheme = RandomSelection;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPExhaustiveSearch","Exhaustive Search of Control Point Values") ){
       whichTuningScheme = ExhaustiveSearch;
-    } else if ( CmiGetArgFlagDesc(args->argv,"+CPSimulatedAnnealing","Simulated Annealing Search of Control Point Values") ){
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPSimulAnneal","Simulated Annealing Search of Control Point Values") ){
       whichTuningScheme = SimulatedAnnealing;
-    } else if ( CmiGetArgFlagDesc(args->argv,"+CPCriticalPathAutoPrioritization","Use Critical Path to adapt Control Point Values") ){
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPCriticalPathPrio","Use Critical Path to adapt Control Point Values") ){
       whichTuningScheme = CriticalPathAutoPrioritization;
-    } else if ( CmiGetArgFlagDesc(args->argv,"+CPUseBestKnownTiming","Use BestKnown Timing for Control Point Values") ){
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPBestKnown","Use BestKnown Timing for Control Point Values") ){
       whichTuningScheme = UseBestKnownTiming;
     } 
 
@@ -733,9 +735,6 @@ public:
     if( CmiGetArgFlagDesc(args->argv,"+CPLoadData","Load Control Point timings & configurations at startup") ){
       loadDataFileAtStartup = true;
     }
-
-
-
 
     controlPointManagerProxy = CProxy_controlPointManager::ckNew();
   }
@@ -1097,7 +1096,6 @@ int controlPoint(const char *name, int lb, int ub){
   } else {
     result = valueProvidedByOptimizer(name);
   } 
-
    
   CkAssert(isInRange(result,ub,lb));
   thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 
@@ -1105,6 +1103,7 @@ int controlPoint(const char *name, int lb, int ub){
   //  CkPrintf("Inserting control point value to thisPhaseData.controlPoints with value %d; thisPhaseData.controlPoints.size=%d\n", result, thisPhaseData.controlPoints.size());
   return result;
 }
+
 
 /// Get control point value from set of provided integers
 int controlPoint(const char *name, std::vector<int>& values){
