@@ -15,9 +15,6 @@
  *
  */
 
-
-
-
 using namespace std;
 
 #define DEFAULT_CONTROL_POINT_SAMPLE_PERIOD  10000000
@@ -32,12 +29,13 @@ using namespace std;
 static void periodicProcessControlPoints(void* ptr, double currWallTime);
 
 
-
 // A pointer to this PE's controlpoint manager Proxy
 /* readonly */ CProxy_controlPointManager controlPointManagerProxy;
 /* readonly */ int random_seed;
 /* readonly */ long controlPointSamplePeriod;
 /* readonly */ int whichTuningScheme;
+/* readonly */ bool writeDataFileAtShutdown;
+/* readonly */ bool loadDataFileAtStartup;
 
 
 typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming}  tuningScheme;
@@ -726,6 +724,19 @@ public:
     } 
 
 
+    writeDataFileAtShutdown = false;   
+    if( CmiGetArgFlagDesc(args->argv,"+CPSaveData","Save Control Point timings & configurations at completion") ){
+      writeDataFileAtShutdown = true;
+    }
+
+   loadDataFileAtStartup = false;   
+    if( CmiGetArgFlagDesc(args->argv,"+CPLoadData","Load Control Point timings & configurations at startup") ){
+      loadDataFileAtStartup = true;
+    }
+
+
+
+
     controlPointManagerProxy = CProxy_controlPointManager::ckNew();
   }
   ~controlPointMain(){}
@@ -750,10 +761,11 @@ void registerControlPointTiming(double time){
 /// Shutdown the control point framework, writing data to disk if necessary
 extern "C" void controlPointShutdown(){
   if(CkMyPe() == 0){
-#if 0
-    CkPrintf("[%d] controlPointShutdown() at CkExit()\n", CkMyPe());
-    controlPointManagerProxy.ckLocalBranch()->writeDataFile();
-#endif
+
+    if(writeDataFileAtShutdown){
+      CkPrintf("[%d] controlPointShutdown() at CkExit()\n", CkMyPe());
+      controlPointManagerProxy.ckLocalBranch()->writeDataFile();
+    }
     CkExit();
   }
 }

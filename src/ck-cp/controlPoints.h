@@ -43,7 +43,8 @@
 /* readonly */ extern int random_seed;
 /* readonly */ extern long controlPointSamplePeriod;
 /* readonly */ extern int whichTuningScheme;
-
+/* readonly */ extern bool writeDataFileAtShutdown;
+/* readonly */ extern bool loadDataFileAtStartup;
 
 
 
