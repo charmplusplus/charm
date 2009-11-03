@@ -216,7 +216,7 @@ static int usageChecked=0; /* set when argv has been searched for a usage reques
 static int printUsage=0; /* if set, print command-line usage information */
 static const char *CLAformatString="%20s %10s %s\n";
 
-/* This little list of CLA's holds the argument descriptions until it's
+/** This little list of CLA's holds the argument descriptions until it's
    safe to print them--it's needed because the net- versions don't have 
    printf until they're pretty well started.
  */
@@ -229,7 +229,7 @@ static int CLAlistLen=0;
 static int CLAlistMax=0;
 static CLA *CLAlist=NULL;
 
-/* Add this CLA */
+/** Add this CLA */
 static void CmiAddCLA(const char *arg,const char *param,const char *desc) {
 	int i;
 	if (CmiMyPe()!=0) return; /*Don't bother if we're not PE 0*/
@@ -252,7 +252,7 @@ static void CmiAddCLA(const char *arg,const char *param,const char *desc) {
 	}
 }
 
-/* Print out the stored list of CLA's */
+/** Print out the stored list of CLA's */
 static void CmiPrintCLAs(void) {
 	int i;
 	if (CmiMyPe()!=0) return; /*Don't bother if we're not PE 0*/
@@ -290,12 +290,12 @@ void CmiArgInit(char **argv) {
 	usageChecked=1;
 }
 
-/* Return 1 if we're currently printing command-line usage information. */
+/** Return 1 if we're currently printing command-line usage information. */
 int CmiArgGivingUsage(void) {
 	return (CmiMyPe()==0) && printUsage;
 }
 
-/* Identifies the module that accepts the following command-line parameters */
+/** Identifies the module that accepts the following command-line parameters */
 void CmiArgGroup(const char *parentName,const char *groupName) {
 	if (CmiArgGivingUsage()) {
 		if (groupName==NULL) groupName=parentName; /* Start of a new group */
@@ -303,7 +303,7 @@ void CmiArgGroup(const char *parentName,const char *groupName) {
 	}
 }
 
-/*Count the number of non-NULL arguments in list*/
+/** Count the number of non-NULL arguments in list*/
 int CmiGetArgc(char **argv)
 {
 	int i=0,argc=0;
@@ -312,7 +312,7 @@ int CmiGetArgc(char **argv)
 	return argc;
 }
 
-/*Return a new, heap-allocated copy of the argv array*/
+/** Return a new, heap-allocated copy of the argv array*/
 char **CmiCopyArgs(char **argv)
 {
 	int argc=CmiGetArgc(argv);
@@ -323,7 +323,7 @@ char **CmiCopyArgs(char **argv)
 	return ret;
 }
 
-/*Delete the first k argument from the given list, shifting
+/** Delete the first k argument from the given list, shifting
 all other arguments down by k spaces.
 e.g., argv=={"a","b","c","d",NULL}, k==3 modifies
 argv={"d",NULL,"c","d",NULL}
@@ -335,7 +335,7 @@ void CmiDeleteArgs(char **argv,int k)
 		i++;
 }
 
-/*Find the given argment and string option in argv.
+/** Find the given argment and string option in argv.
 If the argument is present, set the string option and
 delete both from argv.  If not present, return NULL.
 e.g., arg=="-name" returns "bob" from
@@ -360,7 +360,7 @@ int CmiGetArgString(char **argv,const char *arg,char **optDest) {
 	return CmiGetArgStringDesc(argv,arg,optDest,"");
 }
 
-/*Find the given argument and floating-point option in argv.
+/** Find the given argument and floating-point option in argv.
 Remove it and return 1; or return 0.
 */
 int CmiGetArgDoubleDesc(char **argv,const char *arg,double *optDest,const char *desc) {
@@ -374,7 +374,7 @@ int CmiGetArgDouble(char **argv,const char *arg,double *optDest) {
 	return CmiGetArgDoubleDesc(argv,arg,optDest,"");
 }
 
-/*Find the given argument and integer option in argv.
+/** Find the given argument and integer option in argv.
 If the argument is present, parse and set the numeric option,
 delete both from argv, and return 1. If not present, return 0.
 e.g., arg=="-pack" matches argv=={...,"-pack","27",...},
@@ -420,7 +420,7 @@ int CmiGetArgInt(char **argv,const char *arg,int *optDest) {
 	return CmiGetArgIntDesc(argv,arg,optDest,"");
 }
 
-/*Find the given argument in argv.  If present, delete
+/** Find the given argument in argv.  If present, delete
 it and return 1; if not present, return 0.
 e.g., arg=="-foo" matches argv=={...,"-foo",...} but not
 argv={...,"-foobar",...}.
