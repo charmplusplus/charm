@@ -1558,29 +1558,27 @@ void static inline handoverMessage(char *newmsg,int total_size,int rank,int broo
           || rank == DGRAM_NODEBROADCAST
 #endif
          ){
-					 if(toBuffer){
-						 	insertBufferedBcast(CopyMsg(newmsg,total_size),total_size,broot,rank);
-					 	}else{
+		 if(toBuffer){
+		 	insertBufferedBcast(CopyMsg(newmsg,total_size),total_size,broot,rank);
+	 	}else{
           		SendSpanningChildren(NULL, 0, total_size, newmsg,broot,rank);
-						}
-					}
+		}
+	}
 #elif CMK_BROADCAST_HYPERCUBE
         if (rank == DGRAM_BROADCAST
 #if CMK_NODE_QUEUE_AVAILABLE
           || rank == DGRAM_NODEBROADCAST
 #endif
          ){
-					 if(toBuffer){
-						 	insertBufferedBcast(CopyMsg(newmsg,total_size),total_size,broot,rank);
-					 }else{
+		 if(toBuffer){
+		 	insertBufferedBcast(CopyMsg(newmsg,total_size),total_size,broot,rank);
+		 }else{
           		SendHypercube(NULL, 0, total_size, newmsg,broot,rank);
-						}
-					}
+		}
+	}
 #endif
 
-
-		
-		switch (rank) {
+	switch (rank) {
     	case DGRAM_BROADCAST: {
 				int i;
 				for (i=1; i<_Cmi_mynodesize; i++){
@@ -1725,7 +1723,7 @@ static inline  void processSendWC(struct ibv_wc *sendWC){
 		}
 	}else{
 		if(packet->header.code == INFIRDMA_START || packet->header.code == INFIRDMA_ACK || packet->header.code ==  INFIDUMMYPACKET){
-                   if (packet->buf) CmiFree(packet->buf);   // gzheng
+                   if (packet->buf) CmiFree(packet->buf);  /* gzheng */
 		}
 	}
 
@@ -1984,6 +1982,7 @@ static inline void processBufferedBcast(){
 #endif
          ){
           	SendSpanningChildren(NULL, 0, start->bcastList[i].size,start->bcastList[i].msg, start->bcastList[i].broot,start->bcastList[i].asm_rank);
+		CmiFree(start->bcastList[i].msg);           /* gzheng */
 					}
 #elif CMK_BROADCAST_HYPERCUBE
         if (start->bcastList[i].asm_rank == DGRAM_BROADCAST
@@ -1992,6 +1991,7 @@ static inline void processBufferedBcast(){
 #endif
          ){
           	SendHypercube(NULL, 0,start->bcastList[i].size,start->bcastList[i].msg ,start->bcastList[i].broot,start->bcastList[i].asm_rank);
+		CmiFree(start->bcastList[i].msg);           /* gzheng */
 					}
 #endif
 		}
@@ -2313,6 +2313,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 			count = blockAllocRatio;
 		}
 		res = malloc((allocSize+sizeof(infiCmiChunkHeader))*count);
+		_MEMCHECK(res);
 		hdr = res;
 		
 		key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
@@ -2326,6 +2327,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 
 		for(i=0;i<count;i++){
 			metaData = METADATAFIELD(res) = malloc(sizeof(infiCmiChunkMetaData));
+			_MEMCHECK(metaData);
 			metaData->key = key;
 			metaData->owner = hdr;
 			metaData->poolIdx = poolIdx;
