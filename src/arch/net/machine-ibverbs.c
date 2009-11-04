@@ -1957,6 +1957,7 @@ static inline void processBufferedBcast(){
 #endif
          ){
           	SendSpanningChildren(NULL, 0, start->bcastList[i].size,start->bcastList[i].msg, start->bcastList[i].broot,start->bcastList[i].asm_rank);
+		CmiFree(start->bcastList[i].msg);           /* gzheng */
 					}
 #elif CMK_BROADCAST_HYPERCUBE
         if (start->bcastList[i].asm_rank == DGRAM_BROADCAST
@@ -1965,6 +1966,7 @@ static inline void processBufferedBcast(){
 #endif
          ){
           	SendHypercube(NULL, 0,start->bcastList[i].size,start->bcastList[i].msg ,start->bcastList[i].broot,start->bcastList[i].asm_rank);
+		CmiFree(start->bcastList[i].msg);           /* gzheng */
 					}
 #endif
 		}
