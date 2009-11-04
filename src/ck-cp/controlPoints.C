@@ -801,7 +801,7 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime){
 
 /// Should an optimizer determine the control point values
 bool valueShouldBeProvidedByOptimizer(){
-  
+#if 0  
   const int effective_phase = controlPointManagerProxy.ckLocalBranch()->allData.phases.size();
   const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id; 
   
@@ -815,12 +815,11 @@ bool valueShouldBeProvidedByOptimizer(){
 
   //  CkPrintf("Control Point Space:\n\t\tnumber of control points = %d\n\t\tnumber of possible configurations = %.0lf\n", controlPointSpace.size(), spaceSize);
 
-#if 1
-  return false;
-#elif 0
-  return effective_phase > 1 && phase_id > 1;
+  // return false;
+  //  return effective_phase > 1 && phase_id > 1;
+  //  return effective_phase >= OPTIMIZER_TRANSITION && phase_id > 3;
 #else
-  return effective_phase >= OPTIMIZER_TRANSITION && phase_id > 3;
+  return true;
 #endif
 }
 
@@ -831,19 +830,17 @@ bool valueShouldBeProvidedByOptimizer(){
 /// Determine a control point value using some optimization scheme (use max known, simmulated annealling, 
 /// user observed characteristic to adapt specific control point values.
 /// @note eventually there should be a plugin system where multiple schemes can be plugged in(similar to LB)
-int valueProvidedByOptimizer(const char * name){
+int valueProvidedByOptimizer(const char * name, int lb, int ub){
   const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
   const int effective_phase = controlPointManagerProxy.ckLocalBranch()->allData.phases.size();
 
+  if( whichTuningScheme == RandomSelection ){
 
-#define OPTIMIZER_ADAPT_CRITICAL_PATHS 0
-#define OPTIMIZER_USE_BEST_TIME 0
-#define SIMULATED_ANNEALING 0
-#define EXHAUSTIVE_SEARCH 1
+    int result = lb + randInt(ub-lb+1, name, phase_id);
+    CkPrintf("Control Point \"%s\" for phase %d chosen randomly to be: %d\n", name, phase_id, result); 
+    return result;
 
-
-
-  if( whichTuningScheme == CriticalPathAutoPrioritization){
+  } else if( whichTuningScheme == CriticalPathAutoPrioritization){
 
     // -----------------------------------------------------------
     //  USE CRITICAL PATH TO ADJUST PRIORITIES
@@ -1056,8 +1053,9 @@ int valueProvidedByOptimizer(const char * name){
 
 // Dynamic point varies throughout the life of program
 // The value it returns is based upon phase_id, a counter that changes for each phase of computation
+#if 0
 int controlPoint2Pow(const char *name, int fine_granularity, int coarse_granularity){
-  instrumentedPhase &thisPhaseData = controlPointManagerProxy.ckLocalBranch()->thisPhaseData;
+ instrumentedPhase &thisPhaseData = controlPointManagerProxy.ckLocalBranch()->thisPhaseData;
   const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
 
   int result;
@@ -1091,7 +1089,7 @@ int controlPoint2Pow(const char *name, int fine_granularity, int coarse_granular
 
   return result;
 }
-
+#endif
 
 /// Get control point value from range of integers [lb,ub]
 int controlPoint(const char *name, int lb, int ub){
@@ -1099,35 +1097,29 @@ int controlPoint(const char *name, int lb, int ub){
   const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
   std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;
 
-  int result;
+  // if we already have control point values for phase, return them
+  if( thisPhaseData.controlPoints.count(std::string(name))>0 ){
+    return thisPhaseData.controlPoints[std::string(name)];
+  }
 
-  if( whichTuningScheme == RandomSelection || ! valueShouldBeProvidedByOptimizer() ){
-    result = lb + randInt(ub-lb+1, name, phase_id);
-    CkPrintf("Control Point \"%s\" for phase %d chosen randomly to be: %d\n", name, phase_id, result); 
-  } else {
-    result = valueProvidedByOptimizer(name);
-  } 
-   
+  // otherwise, get new values from optimizer
+  int result = valueProvidedByOptimizer(name, lb, ub);
+
   CkAssert(isInRange(result,ub,lb));
   thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 
   controlPointSpace.insert(std::make_pair(std::string(name),std::make_pair(lb,ub))); 
-  //  CkPrintf("Inserting control point value to thisPhaseData.controlPoints with value %d; thisPhaseData.controlPoints.size=%d\n", result, thisPhaseData.controlPoints.size());
+
   return result;
 }
 
 
 /// Get control point value from set of provided integers
+#if 0
 int controlPoint(const char *name, std::vector<int>& values){
   instrumentedPhase &thisPhaseData = controlPointManagerProxy.ckLocalBranch()->thisPhaseData;
   const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
 
-  int result;
-  if(valueShouldBeProvidedByOptimizer()){
-    result = valueProvidedByOptimizer(name);
-  } 
-  else { 
-    result = values[randInt(values.size(), name, phase_id)];
-  }
+  int result = valueProvidedByOptimizer(name, 0, values.size() );
 
   bool found = false;
   for(int i=0;i<values.size();i++){
@@ -1139,7 +1131,7 @@ int controlPoint(const char *name, std::vector<int>& values){
   thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 
   return result;
 }
-
+#endif
 
 
 
