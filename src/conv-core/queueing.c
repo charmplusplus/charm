@@ -37,6 +37,12 @@
     @{
 */
 
+#if CMK_USE_IBVERBS
+/* I don't see why we need CmiAlloc here, allocated from pinned memory
+ * can be expensive */
+#define CmiAlloc   malloc
+#define CmiFree    free
+#endif
 
 /** A memory limit threshold for adaptively scheduling */
 int schedAdaptMemThresholdMB;
