@@ -59,7 +59,15 @@ void disableTraceLogOutput()
 void enableTraceLogOutput()
 {
   CkpvAccess(_trace)->setWriteData(true);
+
 }
+
+/// Force the log files to be flushed
+void flushTraceLog()
+{
+  CkpvAccess(_trace)->traceFlushLog();
+}
+
 
 
 

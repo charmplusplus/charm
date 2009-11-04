@@ -520,6 +520,9 @@ void disableTraceLogOutput();
 /// Enable the outputting of the trace logs
 void enableTraceLogOutput();
 
+/// Force the log file to be flushed
+void flushTraceLog();
+
 
 #endif
 
