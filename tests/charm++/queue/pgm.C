@@ -8,6 +8,8 @@ using std::sprintf;
 #include "queueing.h"
 #include "main.decl.h"
 
+#define CmiFree free
+
 #define RUN_TEST(f) do { \
   ++tests; \
   if (f()) { \
