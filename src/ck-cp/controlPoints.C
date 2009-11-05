@@ -246,7 +246,7 @@ controlPointManager::controlPointManager(){
 
     CkPrintf("[%d] processControlPoints() haveGranularityCallback=%d frameworkShouldAdvancePhase=%d\n", CkMyPe(), (int)haveGranularityCallback, (int)frameworkShouldAdvancePhase);
 
-        
+#if 0       
     if(CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
       alreadyRequestedMemoryUsage = true;
       CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
@@ -260,7 +260,8 @@ controlPointManager::controlPointManager(){
       thisProxy.requestIdleTime(*cb);
       delete cb;
     }
-    
+#endif
+
 
     //==========================================================================================
     // Print the data for each phase
@@ -427,20 +428,6 @@ controlPointManager::controlPointManager(){
       }
       
     } else {
-      // This is a phase during which we should just advance to the
-      // next phase
-
-      if(frameworkShouldAdvancePhase){
-	gotoNextPhase();	
-      }
-      
-      if(haveGranularityCallback){ 
-#if DEBUGPRINT
-	CkPrintf("Calling granularity change callback\n");
-#endif
-	controlPointMsg *msg = new(0) controlPointMsg;
-	granularityCallback.send(msg);
-      }
       
       
     }
@@ -449,8 +436,18 @@ controlPointManager::controlPointManager(){
 #endif
 
 
-    CkPrintf("\n");
-        
+
+    if(frameworkShouldAdvancePhase){
+      gotoNextPhase();	
+    }
+    
+    if(haveGranularityCallback){ 
+      controlPointMsg *msg = new(0) controlPointMsg;
+      granularityCallback.send(msg);
+    }
+    
+    
+    
   }
   
   /// Determine if any control point is known to affect an entry method
@@ -741,7 +738,7 @@ public:
 /// An interface callable by the application.
 void registerGranularityChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase){
   CkAssert(CkMyPe() == 0);
-  CkPrintf("registerGranularityChangeCallback\n");
+  CkPrintf("Application has registered a control point change callback\n");
   controlPointManagerProxy.ckLocalBranch()->setGranularityCallback(cb, frameworkShouldAdvancePhase);
 }
 
@@ -834,7 +831,8 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
   const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
   const int effective_phase = controlPointManagerProxy.ckLocalBranch()->allData.phases.size();
 
-  if( whichTuningScheme == RandomSelection ){
+
+  if( whichTuningScheme == RandomSelection){
 
     int result = lb + randInt(ub-lb+1, name, phase_id);
     CkPrintf("Control Point \"%s\" for phase %d chosen randomly to be: %d\n", name, phase_id, result); 
@@ -1051,6 +1049,56 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
 #define isInRange(v,a,b) ( ((v)<=(a)&&(v)>=(b)) || ((v)<=(b)&&(v)>=(a)) )
 
 
+/// Get control point value from range of integers [lb,ub]
+int controlPoint(const char *name, int lb, int ub){
+  instrumentedPhase &thisPhaseData = controlPointManagerProxy.ckLocalBranch()->thisPhaseData;
+  const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
+  std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;
+  int result;
+
+  // if we already have control point values for phase, return them
+  if( thisPhaseData.controlPoints.count(std::string(name))>0 ){
+    return thisPhaseData.controlPoints[std::string(name)];
+  }
+
+  if(controlPointSpace.count(std::string(name)) == 0){
+    // if this is the first time we've seen the range for the CP, then return the average
+    result = (lb + ub) / 2;
+  } else {
+    // otherwise, get new values from optimizer
+    result = valueProvidedByOptimizer(name, lb, ub);
+  }
+
+  CkAssert(isInRange(result,ub,lb));
+  thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 
+  controlPointSpace.insert(std::make_pair(std::string(name),std::make_pair(lb,ub))); 
+
+  return result;
+}
+
+
+/// Get control point value from set of provided integers
+#if 0
+int controlPoint(const char *name, std::vector<int>& values){
+  instrumentedPhase &thisPhaseData = controlPointManagerProxy.ckLocalBranch()->thisPhaseData;
+  const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
+
+  int result = valueProvidedByOptimizer(name, 0, values.size() );
+
+  bool found = false;
+  for(int i=0;i<values.size();i++){
+    if(values[i] == result)
+      found = true;
+  }
+  CkAssert(found);
+
+  thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 
+  return result;
+}
+#endif
+
+
+
 // Dynamic point varies throughout the life of program
 // The value it returns is based upon phase_id, a counter that changes for each phase of computation
 #if 0
@@ -1091,47 +1139,8 @@ int controlPoint2Pow(const char *name, int fine_granularity, int coarse_granular
 }
 #endif
 
-/// Get control point value from range of integers [lb,ub]
-int controlPoint(const char *name, int lb, int ub){
-  instrumentedPhase &thisPhaseData = controlPointManagerProxy.ckLocalBranch()->thisPhaseData;
-  const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
-  std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;
-
-  // if we already have control point values for phase, return them
-  if( thisPhaseData.controlPoints.count(std::string(name))>0 ){
-    return thisPhaseData.controlPoints[std::string(name)];
-  }
-
-  // otherwise, get new values from optimizer
-  int result = valueProvidedByOptimizer(name, lb, ub);
-
-  CkAssert(isInRange(result,ub,lb));
-  thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 
-  controlPointSpace.insert(std::make_pair(std::string(name),std::make_pair(lb,ub))); 
-
-  return result;
-}
 
 
-/// Get control point value from set of provided integers
-#if 0
-int controlPoint(const char *name, std::vector<int>& values){
-  instrumentedPhase &thisPhaseData = controlPointManagerProxy.ckLocalBranch()->thisPhaseData;
-  const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
-
-  int result = valueProvidedByOptimizer(name, 0, values.size() );
-
-  bool found = false;
-  for(int i=0;i<values.size();i++){
-    if(values[i] == result)
-      found = true;
-  }
-  CkAssert(found);
-
-  thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 
-  return result;
-}
-#endif
 
 
 
