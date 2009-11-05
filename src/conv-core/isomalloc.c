@@ -1887,7 +1887,8 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
   double shrink = 1.5;
   static int count = 0;
   size_t size=((size_t)(-1l)), good_size=0;
-  if (sizeof(size_t) > 8) size = size>>2;  /* 25% of machine address space! */
+  int retry = 0;
+  if (sizeof(size_t) >= 8) size = size>>2;  /* 25% of machine address space! */
   while (1) { /* test out an allocation of this size */
 	range=mmap(NULL,size,PROT_READ|PROT_WRITE,
  	             MAP_PRIVATE
@@ -1900,8 +1901,10 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
                      ,-1,0);
 	if (range==bad_alloc) { /* mmap failed */
 #if CMK_THREADS_DEBUG
-                /* CmiPrintf("[%d] test failed at size: %llu\n", CmiMyPe(), size); */
+                /* CmiPrintf("[%d] test failed at size: %llu error: %d\n", CmiMyPe(), size, errno);  */
 #endif
+                if (retry++ < 5) { usleep(rand()%10000); continue; }
+                else retry = 0;
 		size=(double)size/shrink; /* shrink request */
 		if (size<=0) return 0; /* mmap doesn't work */
 	}
@@ -2052,6 +2055,10 @@ static void init_ranges(char **argv)
               }
               read(fd, &ss, sizeof(CmiUInt8));
               read(fd, &ee, sizeof(CmiUInt8));
+#if CMK_THREADS_DEBUG
+              if (CmiMyPe() == 0) CmiPrintf("[%d] load node %d isomalloc region: %lx %lx. \n",
+                               CmiMyPe(), i, ss, ee);
+#endif
               close(fd);
               if (ss>s) s = ss;
               if (ee<e) e = ee;
@@ -2066,6 +2073,7 @@ static void init_ranges(char **argv)
 
               /* update */
             if (s > e)  {
+              if (CmiMyPe()==0) CmiPrintf("[%d] Invalid isomalloc region: %lx - %lx.\n", CmiMyPe(), s, e);
               CmiAbort("isomalloc> failed to find consolidated isomalloc region!");
             }
             freeRegion.start = (void *)s;
