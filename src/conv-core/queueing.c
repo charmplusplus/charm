@@ -37,7 +37,7 @@
     @{
 */
 
-#if CMK_USE_IBVERBS
+#if 1
 /* I don't see why we need CmiAlloc here, allocated from pinned memory
  * can be expensive */
 #define CmiAlloc   malloc
