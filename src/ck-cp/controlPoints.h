@@ -32,6 +32,8 @@
 #include "pathHistory.h" 
 
 
+#include <cp_effects.h>
+
 /**
  * \addtogroup ControlPointFramework
  *   @{
