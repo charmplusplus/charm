@@ -279,10 +279,10 @@ void TCHARM_Api_trace(const char *routineName, const char *libraryName);
 // - Traces library code entry/exit with appropriate build flags
 class TCharmAPIRoutine {
 	int state; //stores if the isomallocblockactivate and ctginstall need to be skipped during activation
-	CmiIsomallocBlockList *oldHeapBlock; 
 	CtgGlobals oldGlobals;	// this is actually a pointer
 	#ifdef CMK_BLUEGENE_CHARM
 	void *callEvent; // The BigSim-level event that called into the library
+        int pe;          // in case thread migrates
 	#endif
 
  public:
@@ -295,6 +295,7 @@ class TCharmAPIRoutine {
 		_TRACE_BG_TLINE_END(&callEvent);
 		_TRACE_BG_END_EXECUTE(0);
 		_TRACE_BG_BEGIN_EXECUTE_NOMSG(routineName, &callEvent, 0);
+		pe = CmiMyPe();
 		#endif
 
 		state = 0;
@@ -317,6 +318,7 @@ class TCharmAPIRoutine {
 
 	// Returning to user code from Charm++
 	~TCharmAPIRoutine() {
+		CmiIsomallocBlockList *oldHeapBlock; 
 		TCharm *tc=CtvAccess(_curTCharm);
 		if(tc != NULL){
 			if(state & 0x1){
@@ -345,7 +347,7 @@ class TCharmAPIRoutine {
 		_TRACE_BG_TLINE_END(&log);
 		_TRACE_BG_END_EXECUTE(0);
 		_TRACE_BG_BEGIN_EXECUTE_NOMSG("user_code", &log, 0);
-		_TRACE_BG_ADD_BACKWARD_DEP(callEvent);
+		if (CmiMyPe() == pe) _TRACE_BG_ADD_BACKWARD_DEP(callEvent);
 		#endif
 	}
 };
