@@ -6,6 +6,7 @@
 
 args=""
 pes=1
+ppn=1
 machinefile=""
 
 while [ $# -gt 0 ]
@@ -13,10 +14,12 @@ do
 	case $1 in
 	+ppn)
 		args=$args" +ppn "$2
+		ppn=$2
 		shift
 		;;
 	+ppn*)
 		args=$args" "$1
+		ppn=`echo $1 | awk '{print substr($1,5)}'`
 		;;
 	+p)
 		pes=$2
@@ -37,6 +40,15 @@ do
 	shift
 done
 
+rem=`expr $pes % $ppn`
+quot=`expr $pes / $ppn`
+if [ $rem -ne 0 ];
+then
+  printf "p = $pes should be a multiple of ppn = $ppn\n"
+  exit 1
+else
+  pes=$quot
+fi 
 
 printf "\nRunning on $pes processors: $args\n"
 
