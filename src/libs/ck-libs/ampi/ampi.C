@@ -1691,6 +1691,7 @@ MSG_ORDER_DEBUG(
 )
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_ADD_TAG("AMPI_generic");
+  msg->event = NULL;
 #endif
 
   int sync = UsrToEnv(msg)->getRef();
@@ -1745,6 +1746,7 @@ MSG_ORDER_DEBUG(
 #else
 #if CMK_BLUEGENE_CHARM
     _TRACE_BG_TLINE_END(&msg->event);    // store current log
+    msg->eventPe = CmiMyPe();
 #endif
     //in case ampi has not initialized and posted_ireqs are only inserted 
     //at AMPI_Irecv (MPI_Irecv)
@@ -1974,14 +1976,14 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 #if 1
   if (!dosuspend) {
     TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0, 1);
-    _TRACE_BG_ADD_BACKWARD_DEP(msg->event);
+    if (msg->eventPe == CmiMyPe()) _TRACE_BG_ADD_BACKWARD_DEP(msg->event);
   }
   else
 #endif
   TRACE_BG_ADD_TAG("RECV_RESUME_THREAD");
 #else
     TRACE_BG_AMPI_BREAK(thread->getThread(), "RECV_RESUME", NULL, 0, 0);
-    _TRACE_BG_ADD_BACKWARD_DEP(msg->event);
+    if (msg->eventPe == CmiMyPe()) _TRACE_BG_ADD_BACKWARD_DEP(msg->event);
 #endif
 #endif
 
@@ -2256,7 +2258,7 @@ inline void checkRequests(int n, MPI_Request* reqs){
 
 CDECL void AMPI_Migrate(void)
 {
-  AMPIAPI("AMPI_Migrate");
+//  AMPIAPI("AMPI_Migrate");
 #if 0
 #if CMK_BLUEGENE_CHARM
   TRACE_BG_AMPI_SUSPEND();

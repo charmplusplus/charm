@@ -856,6 +856,7 @@ class AmpiMsg : public CMessage_AmpiMsg {
   int length; //Number of bytes in this message 
 #if CMK_BLUEGENE_CHARM
   void *event;
+  int  eventPe;	 // the PE that the event is located
 #endif
   char *data;
 
