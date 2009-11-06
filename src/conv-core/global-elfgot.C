@@ -57,7 +57,7 @@ A more readable summary is at:
 #if CMK_HAS_ELF_H
 #include <elf.h>
 
-#define DEBUG_GOT_MANAGER 1
+#define DEBUG_GOT_MANAGER 0
 
 #if !CMK_SHARED_VARS_UNAVAILABLE
 #  error "Global-elfgot won't work properly under smp version: -swapglobals disabled"
