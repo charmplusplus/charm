@@ -1616,8 +1616,8 @@ unmap_slots(CmiInt8 slot, CmiInt8 nslots)
 static void map_failed(CmiInt8 s,CmiInt8 n)
 {
   void *addr=slot2addr(s);
-  CmiError("charm isomalloc.c> map failed to allocate %d bytes at %p.\n",
-      slotsize*n, addr);
+  CmiError("charm isomalloc.c> map failed to allocate %d bytes at %p, errno:%d.\n",
+      slotsize*n, addr, errno);
   CmiAbort("Exiting\n");
 }
 
