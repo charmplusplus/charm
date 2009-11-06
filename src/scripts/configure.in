@@ -1046,6 +1046,16 @@ EOT
 test_cxx "whether has sleep " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_SLEEP, $pass, [whether has sleep])
 
+#### test usleep ####
+cat > $t <<EOT
+#include <unistd.h>
+int main() {
+  usleep(100);
+  return 0;
+}
+EOT
+test_cxx "whether has usleep " "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_USLEEP, $pass, [whether has usleep])
 
 #### test personality() and ADDR_NO_RANDOMIZE ####
 # Only works on modern Linux systems

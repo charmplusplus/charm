@@ -168,6 +168,9 @@
 /* whether typeinfo/typeid works */
 #undef CMK_HAS_TYPEINFO
 
+/* whether has usleep */
+#undef CMK_HAS_USLEEP
+
 /* whether has values.h */
 #undef CMK_HAS_VALUES_H
 
@@ -212,9 +215,6 @@
 
 /* including STL <foo> does not works */
 #undef CMK_STL_USE_DOT_H
-
-/* whether templated member functions work */
-#undef CMK_TEMPLATE_MEMBERS_BROKEN
 
 /* Allows __thread. */
 #undef CMK_TLS_THREAD

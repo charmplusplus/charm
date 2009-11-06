@@ -2921,6 +2921,20 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test usleep ####
+cat > $t <<EOT
+#include <unistd.h>
+int main() {
+  usleep(100);
+  return 0;
+}
+EOT
+test_cxx "whether has usleep " "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_USLEEP $pass
+_ACEOF
+
 
 #### test personality() and ADDR_NO_RANDOMIZE ####
 # Only works on modern Linux systems
