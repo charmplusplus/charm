@@ -625,6 +625,15 @@ struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
 
 extern void* malloc_nomigrate(size_t size);
 
+/**
+   Allocate `size` bytes of memory usable as a message buffer.
+
+   Such memory may be in limited supply and expensive to obtain on
+   machine layers that use registered or pinned memory when
+   interacting with the communication hardware. Uses besides buffers
+   in which to construct messages should prefer the malloc()/free()
+   provided by libmemory-*.
+*/
 void    *CmiAlloc(int size);
 void     CmiReference(void *blk);
 int      CmiSize(void *blk);
