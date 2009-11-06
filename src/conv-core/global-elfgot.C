@@ -426,7 +426,7 @@ void CtgInit(void) {
 		CtgGlobalList *l=new CtgGlobalList;
 		CtgGlobalStruct *g=new CtgGlobalStruct;
 		if (CmiMyNode()==0) {
-			CmiPrintf("CHARM> -swapglobals enabled\n");
+			CmiPrintf("Charm++> -swapglobals enabled\n");
 		}
 		
 		g->allocate(l->getSize());
