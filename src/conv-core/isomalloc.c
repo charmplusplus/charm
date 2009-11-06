@@ -2204,7 +2204,7 @@ static void all_slotOP(const slotOP *op,CmiInt8 s,CmiInt8 n)
 /************** External interface ***************/
 void *CmiIsomalloc(int size)
 {
-	CmiInt8 s,n;
+	CmiInt8 s,n,i;
 	CmiIsomallocBlock *blk;
 	if (isomallocStart==NULL) return disabled_map(size);
 	n=length2slots(size);
@@ -2216,7 +2216,14 @@ void *CmiIsomalloc(int size)
 		CmiAbort("Out of virtual address space for isomalloc");
 	}
 	grab_slots(CpvAccess(myss),s,n);
-	blk=map_slots(s,n);
+        for (i=0; i<5; i++) {
+	  blk=map_slots(s,n);
+          if (blk!=NULL) break;
+#if CMK_HAS_USLEEP
+          if (errno == ENOMEM) { usleep(rand()%1000); continue; }
+          else break;
+#endif
+        }
 	if (!blk) map_failed(s,n);
 	blk->slot=s;
 	blk->length=size;
