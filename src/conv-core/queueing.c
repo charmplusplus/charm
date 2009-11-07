@@ -837,8 +837,8 @@ int CqsRemoveSpecificDeq(deq q, const void *msgPtr){
 
   while(head != tail){
     if(*head == msgPtr){
-      //    CmiPrintf("Replacing %p in deq with NULL\n", msgPtr);
-      //     *head = NULL;
+      /*    CmiPrintf("Replacing %p in deq with NULL\n", msgPtr); */
+      /*     *head = NULL;  */
       return 1;
     }
     head++;
@@ -869,7 +869,7 @@ int CqsRemoveSpecificPrioq(prioq q, const void *msgPtr){
     tail = pe->data.tail;
     while(head != tail){
       if(*head == msgPtr){
-	//	CmiPrintf("Replacing %p in prioq with NULL\n", msgPtr);
+	/*	CmiPrintf("Replacing %p in prioq with NULL\n", msgPtr); */
 	*head = NULL;
 	return 1;
       }     
