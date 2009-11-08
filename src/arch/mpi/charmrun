@@ -135,7 +135,7 @@ then
 		extra='-machinefile $PBS_NODEFILE'
 		;;
         kraken*)
-                ncores=`expr \( $pes + 7 \) / 8 \* 8`
+                ncores=`expr \( $pes + 11 \) / 12 \* 12`
 		ncpus="#PBS -l size=$ncores"
 		;;
 	*)
