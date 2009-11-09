@@ -194,18 +194,25 @@ a run of integers used to look up an object in a hash table.
 #define CK_ARRAYINDEX_MAXLEN 3 /*Max. # of integers in an array index*/
 #endif
 
+
 class CkArrayIndex
 {
 public:
         ///Length of index in *integers*
-	short int nInts;
-	///Number of dimensions in this index, not valid for user-defined indices
-	short int dimension; 
-	
-	//Index data immediately follows...
-	
-	int *data(void) {return (int*)((&nInts)+2);}
-	const int *data(void) const {return (int*)((&nInts)+2);}
+        short int nInts;
+        ///Number of dimensions in this index, not valid for user-defined indices
+        short int dimension; 
+        /// The actual index data
+        union {
+            int index[CK_ARRAYINDEX_MAXLEN];
+            short int indexShorts[2 * CK_ARRAYINDEX_MAXLEN];
+        };
+
+        /// Zero out the index bits upon construction
+        CkArrayIndex(): nInts(0), dimension(0) { bzero(index,CK_ARRAYINDEX_MAXLEN*sizeof(int)); }
+
+	int *data(void)             {return index; }
+	const int *data(void) const {return index; }
 
         int getCombinedCount(void) const {
           if (nInts == 1) return data()[0];
@@ -254,15 +261,11 @@ inline int CkArrayIndex::compare(const CkArrayIndex &i2) const
 
 //This class is as large as any CkArrayIndex
 class CkArrayIndexMax : public CkArrayIndex {
-	struct {
-		int data[CK_ARRAYINDEX_MAXLEN];
-	} index;
 	void copyFrom(const CkArrayIndex &that)
 	{
 		nInts=that.nInts;
 		dimension=that.dimension;
-		index=((const CkArrayIndexMax *)&that)->index;
-		//for (int i=0;i<nInts;i++) index.data[i]=that.data()[i];
+		for (int i=0;i<nInts;i++) index[i]=that.data()[i];
 	}
 public:
 	CkArrayIndexMax(void) { nInts=0; dimension=0; }
@@ -271,11 +274,11 @@ public:
 		{copyFrom(that);}
 	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
 		{copyFrom(that); return *this;}
-        void print() { CmiPrintf("%d: %d %d %d\n", nInts,index.data[0], index.data[1], index.data[2]); }
+        void print() { CmiPrintf("%d: %d %d %d\n", nInts,index[0], index[1], index[2]); }
 	void pup(PUP::er &p) {
 		p|nInts;
 		p|dimension;
-		for (int i=0;i<nInts;i++) p|index.data[i];
+		for (int i=0;i<nInts;i++) p|index[i];
 	}
 	/*
 	 * Code for the previous attempt to introduce CkArrayID into CmiObjId
@@ -327,7 +330,7 @@ public:
         CmiBool operator==(const CkArrayIndexMax& idx) const {
           if (nInts != idx.nInts) return CmiFalse;
           for (int i=0; i<nInts; i++)
-                if (index.data[i] != idx.index.data[i]) return CmiFalse;
+                if (index[i] != idx.index[i]) return CmiFalse;
           return CmiTrue;
         }
 };
