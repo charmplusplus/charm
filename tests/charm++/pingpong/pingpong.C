@@ -30,9 +30,14 @@ class Fancy
 };
 
 class CkArrayIndexFancy : public CkArrayIndex {
-  Fancy f;
+  Fancy *f;
   public:
-    CkArrayIndexFancy(char *str) : f(str) {nInts=3;}
+    CkArrayIndexFancy(char *str) 
+    {
+        /// Use placement new to ensure that the custom index object is placed in the memory reserved for it in the base class
+        f = new (index) Fancy(str);
+        nInts=3; 
+    }
 };
 
 #include "pingpong.decl.h"

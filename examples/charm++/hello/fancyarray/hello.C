@@ -24,11 +24,18 @@ public:
 // manager.  This class is only used by the translator--
 // you never need to refer to it again!
 class CkArrayIndexFancy : public CkArrayIndex {
-	Fancy idx;
+	Fancy *idx;
 public:
+    CkArrayIndexFancy() 
+    {
+        /// Use placement new to ensure that the custom index object is placed in the memory reserved for it in the base class
+        idx = new(index) Fancy(); 
+    }
+
 	CkArrayIndexFancy(const Fancy &f)
-		:idx(f) 
 	{
+        /// Use placement new to ensure that the custom index object is placed in the memory reserved for it in the base class
+        idx = new(index) Fancy(f);
 		nInts=2;
 	}
 };
