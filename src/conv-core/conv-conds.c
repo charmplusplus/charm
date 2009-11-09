@@ -10,18 +10,31 @@
 
 #include "converse.h"
 
+/**
+ * Structure to hold the requisites for a callback
+ */
 typedef struct _ccd_callback {
   CcdVoidFn fn;
   void *arg;
   int pe;			/* the pe that sets the callback */
 } ccd_callback;
 
+
+
+/**
+ * An element (a single callback) in a list of callbacks
+ */
 typedef struct _ccd_cblist_elem {
   ccd_callback cb;
   int next;
   int prev;
 } ccd_cblist_elem;
 
+
+
+/**
+ * A list of callbacks stored as an array and handled like a list
+ */
 typedef struct _ccd_cblist {
   unsigned int maxlen;
   unsigned int len;
@@ -31,8 +44,9 @@ typedef struct _ccd_cblist {
   int flag;
 } ccd_cblist;
 
-/* initializes a callback list to the maximum length of ml.
- */
+
+
+/** Initialize a list of callbacks. Alloc memory, set counters etc. */
 static void init_cblist(ccd_cblist *l, unsigned int ml)
 {
   int i;
@@ -50,8 +64,9 @@ static void init_cblist(ccd_cblist *l, unsigned int ml)
   l->flag = 0;
 }
 
-/* expand the callback list to a max length of ml
- */
+
+
+/** Expand the callback list to a max length of ml */
 static void expand_cblist(ccd_cblist *l, unsigned int ml)
 {
   ccd_cblist_elem *old_elems = l->elems;
@@ -71,8 +86,9 @@ static void expand_cblist(ccd_cblist *l, unsigned int ml)
   l->first_free = l->len;
 }
 
-/* remove element referred to by given list index idx.
- */
+
+
+/** Remove element referred to by given list index idx. */
 static void remove_elem(ccd_cblist *l, int idx)
 {
   ccd_cblist_elem *e = l->elems;
@@ -94,8 +110,9 @@ static void remove_elem(ccd_cblist *l, int idx)
   l->len--;
 }
 
-/* remove n elements from the beginning of the list.
- */
+
+
+/** Remove n elements from the beginning of the list. */
 static void remove_n_elems(ccd_cblist *l, int n)
 {
   int i;
@@ -106,8 +123,9 @@ static void remove_n_elems(ccd_cblist *l, int n)
   }
 }
 
-/* append callback to the given cblist, and return the index.
- */
+
+
+/** Append callback to the given cblist, and return the index. */
 static int append_elem(ccd_cblist *l, CcdVoidFn fn, void *arg, int pe)
 {
   register int idx;
@@ -131,10 +149,15 @@ static int append_elem(ccd_cblist *l, CcdVoidFn fn, void *arg, int pe)
   return idx;
 }
 
-/* call functions on the cblist. functions that are added after the call 
- * cblist is started (e.g. callbacks registered from other callbacks) are 
- * ignored. callbacks are kept in the list even after they are called.
- * Note: it is illegal to cancel callbacks from within ccd callbacks.
+
+
+/**
+ * Trigger the callbacks in the provided callback list and *retain* them
+ * after they are called. 
+ *
+ * Callbacks that are added after this function is started (e.g. callbacks 
+ * registered from other callbacks) are ignored. 
+ * @note: It is illegal to cancel callbacks from within ccd callbacks.
  */
 static void call_cblist_keep(ccd_cblist *l,double curWallTime)
 {
@@ -147,10 +170,15 @@ static void call_cblist_keep(ccd_cblist *l,double curWallTime)
   }
 }
 
-/* call functions on the cblist. functions that are added after the call 
- * cblist is started (e.g. callbacks registered from other callbacks) are 
- * ignored. callbacks are removed from the list after they are called.
- * Note: it is illegal to cancel callbacks from within ccd callbacks.
+
+
+/**
+ * Trigger the callbacks in the provided callback list and *remove* them
+ * from the list after they are called.
+ *
+ * Callbacks that are added after this function is started (e.g. callbacks 
+ * registered from other callbacks) are ignored. 
+ * @note: It is illegal to cancel callbacks from within ccd callbacks.
  */
 static void call_cblist_remove(ccd_cblist *l,double curWallTime)
 {
@@ -177,32 +205,49 @@ static void call_cblist_remove(ccd_cblist *l,double curWallTime)
   l->flag = 0;
 }
 
+
+
 #define CBLIST_INIT_LEN   8
 #define MAXNUMCONDS       512
 
+/**
+ * Lists of conditional callbacks that are maintained by the scheduler
+ */
 typedef struct {
   ccd_cblist condcb[MAXNUMCONDS];
   ccd_cblist condcb_keep[MAXNUMCONDS];
 } ccd_cond_callbacks;
 
+/***/
 CpvStaticDeclare(ccd_cond_callbacks, conds);   
+
+
 
 /*Make sure this matches the CcdPERIODIC_* list in converse.h*/
 #define CCD_PERIODIC_MAX 10
 const static double periodicCallInterval[CCD_PERIODIC_MAX]=
 {0.001, 0.010, 0.100, 1.0, 10.0, 60.0,10*60.0, 3600.0, 12*3600.0, 24*3600.0};
 
+/**
+ * List of periodic callbacks maintained by the scheduler
+ */
 typedef struct {
 	int nSkip;/*Number of opportunities to skip*/
 	double lastCheck;/*Time of last check*/
 	double nextCall[CCD_PERIODIC_MAX];
 } ccd_periodic_callbacks;
 
+/** */
 CpvStaticDeclare(ccd_periodic_callbacks, pcb);
 CpvDeclare(int, _ccd_numchecks);
 
+
+
 #define MAXTIMERHEAPENTRIES       256
 
+/**
+ * Structure used to manage callbacks in a heap
+ */
 typedef struct {
     double time;
     ccd_callback cb;
@@ -213,10 +258,16 @@ typedef struct {
  * ccd_heap[ccd_heaplen]
  */
 
+/** An array of time-scheduled callbacks managed as a heap */
 CpvStaticDeclare(ccd_heap_elem*, ccd_heap); 
+/** The length of the callback heap */
 CpvStaticDeclare(int, ccd_heaplen);
+/** The max allowed length of the callback heap */
 CpvStaticDeclare(int, ccd_heapmaxlen);
 
+
+
+/** Swap two elements on the heap */
 static void ccd_heap_swap(int index1, int index2)
 {
   ccd_heap_elem *h = CpvAccess(ccd_heap);
@@ -227,10 +278,15 @@ static void ccd_heap_swap(int index1, int index2)
   h[index2] = temp;
 }
 
-/*
- expand the ccd_heap, double the heap size and copy everything over.
- Initial 256 is reasonably big, so expanding won't happen often.
- Had a bug previously due to late expansion, should work now - Gengbin 12/4/03
+
+
+/**
+ * Expand the ccd_heap to make more room.
+ *
+ * Double the heap size and copy everything over. Initial 256 is reasonably 
+ * big, so expanding won't happen often.
+ *
+ * Had a bug previously due to late expansion, should work now - Gengbin 12/4/03
 */
 static void expand_ccd_heap()
 {
@@ -239,7 +295,7 @@ static void expand_ccd_heap()
   int newlen = oldlen*2;
   ccd_heap_elem *newheap;
 
-CmiPrintf("[%d] Warning: ccd_heap expand from %d to %d\n", CmiMyPe(),oldlen, newlen);
+  CmiPrintf("[%d] Warning: ccd_heap expand from %d to %d\n", CmiMyPe(),oldlen, newlen);
 
   newheap = (ccd_heap_elem*) malloc(sizeof(ccd_heap_elem)*2*(newlen+1));
   _MEMCHECK(newheap);
@@ -253,6 +309,11 @@ CmiPrintf("[%d] Warning: ccd_heap expand from %d to %d\n", CmiMyPe(),oldlen, new
   CpvAccess(ccd_heapmaxlen) = newlen;
 }
 
+
+
+/**
+ * Insert a new callback into the heap
+ */
 static void ccd_heap_insert(double t, CcdVoidFn fnp, void *arg, int pe)
 {
   int child, parent;
@@ -281,7 +342,10 @@ static void ccd_heap_insert(double t, CcdVoidFn fnp, void *arg, int pe)
   }
 }
 
-/* remove the top of the heap
+
+
+/**
+ * Remove the top of the heap
  */
 static void ccd_heap_remove(void)
 {
@@ -310,7 +374,11 @@ static void ccd_heap_remove(void)
   } 
 }
 
-/* If any of the CallFnAfter functions can now be called, call them 
+
+
+/**
+ * Identify any (over)due callbacks that were scheduled
+ * and trigger them. 
  */
 static void ccd_heap_update(double curWallTime)
 {
@@ -337,8 +405,13 @@ static void ccd_heap_update(double curWallTime)
   }
 }
 
+
+
 void CcdCallBacksReset(void *ignored,double curWallTime);
 
+/**
+ * Initialize the callback containers
+ */
 void CcdModuleInit(void)
 {
    int i;
@@ -371,39 +444,64 @@ void CcdModuleInit(void)
 
 
 
-/* Add a function that will be called when a particular condition is raised
+/**
+ * Register a callback function that will be triggered when the specified
+ * condition is raised the next time
  */
 int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void *arg)
 {
   return append_elem(&(CpvAccess(conds).condcb[condnum]), fnp, arg, CcdIGNOREPE);
 } 
 
+/** 
+ * Register a callback function that will be triggered on the specified PE
+ * when the specified condition is raised the next time 
+ */
 int CcdCallOnConditionOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe)
 {
   return append_elem(&(CpvAccess(conds).condcb[condnum]), fnp, arg, pe);
 } 
 
+/**
+ * Register a callback function that will be triggered *whenever* the specified
+ * condition is raised
+ */
 int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void *arg)
 {
   return append_elem(&(CpvAccess(conds).condcb_keep[condnum]), fnp, arg, CcdIGNOREPE);
 } 
 
+/**
+ * Register a callback function that will be triggered on the specified PE
+ * *whenever* the specified condition is raised
+ */
 int CcdCallOnConditionKeepOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe)
 {
   return append_elem(&(CpvAccess(conds).condcb_keep[condnum]), fnp, arg, pe);
 } 
 
+
+/**
+ * Cancel a previously registered conditional callback
+ */
 void CcdCancelCallOnCondition(int condnum, int idx)
 {
   remove_elem(&(CpvAccess(conds).condcb[condnum]), idx);
 }
 
+
+/**
+ * Cancel a previously registered conditional callback
+ */
 void CcdCancelCallOnConditionKeep(int condnum, int idx)
 {
   remove_elem(&(CpvAccess(conds).condcb_keep[condnum]), idx);
 }
 
-/* Call the function with the provided argument after a minimum delay of deltaT
+
+/**
+ * Register a callback function that will be triggered on the specified PE
+ * after a minimum delay of deltaT
  */
 void CcdCallFnAfterOnPE(CcdVoidFn fnp, void *arg, double deltaT, int pe)
 {
@@ -412,12 +510,20 @@ void CcdCallFnAfterOnPE(CcdVoidFn fnp, void *arg, double deltaT, int pe)
     ccd_heap_insert(tcall, fnp, arg, pe);
 } 
 
+
+/**
+ * Register a callback function that will be triggered after a minimum 
+ * delay of deltaT
+ */
 void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double deltaT)
 {
     CcdCallFnAfterOnPE(fnp, arg, deltaT, CcdIGNOREPE);
 } 
 
-/* Call all the functions that are waiting for this condition to be raised
+
+/**
+ * Raise a condition causing all registered callbacks corresponding to 
+ * that condition to be triggered
  */
 void CcdRaiseCondition(int condnum)
 {
@@ -426,7 +532,9 @@ void CcdRaiseCondition(int condnum)
   call_cblist_keep(&(CpvAccess(conds).condcb_keep[condnum]),curWallTime);
 }
 
-/* call functions to be called periodically, and also the time-indexed
+
+/* 
+ * Trigger callbacks periodically, and also the time-indexed
  * functions if their time has arrived
  */
 void CcdCallBacks(void)
@@ -469,8 +577,11 @@ void CcdCallBacks(void)
       break; /*<- because intervals are multiples of one another*/
 } 
 
-/*Called when something drastic changes-- restart ccd_num_checks
-*/
+
+
+/**
+ * Called when something drastic changes-- restart ccd_num_checks
+ */
 void CcdCallBacksReset(void *ignored,double curWallTime)
 {
   ccd_periodic_callbacks *o=&CpvAccess(pcb);
