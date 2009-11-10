@@ -78,13 +78,27 @@ class CkCoreState;
 
 /// Message watcher: for record/replay support
 class CkMessageWatcher {
+protected:
+  FILE *f;
+  CkMessageWatcher *next;
 public:
-	virtual ~CkMessageWatcher();
+    CkMessageWatcher() : next(NULL) { }
+    virtual ~CkMessageWatcher();
 	/**
 	 * This message is about to be processed by Charm.
 	 * If this function returns false, the message will not be processed.
+	 * The message is processed by the watcher starting from the innermost one
+	 * up to the outermost
 	 */
-	virtual CmiBool processMessage(envelope *env,CkCoreState *ck) =0;
+	inline CmiBool processMessage(envelope *env,CkCoreState *ck) {
+	  if (next != NULL) next->processMessage(env, ck);
+	  return process(env, ck);
+	}
+protected:
+    /** This is used internally by this class to call the correct subclass method */
+	virtual CmiBool process(envelope *env,CkCoreState *ck) =0;
+public:
+    inline void setNext(CkMessageWatcher *w) { next = w; }
 };
 
 /// All the state that's useful to have on the receive side in the Charm Core (ck.C)
@@ -93,6 +107,11 @@ class CkCoreState {
 	QdState *qd;
 public:
 	CkMessageWatcher *watcher;
+	/** Adds an extra watcher (which wrap the previously existing one) */
+	inline void addWatcher(CkMessageWatcher *w) {
+	  w->setNext(watcher);
+	  watcher = w;
+	}
 	
 	CkCoreState() 
 		:groupTable(CkpvAccess(_groupTable)),
