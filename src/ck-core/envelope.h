@@ -143,36 +143,36 @@ public:
    without wasting any storage.
  */
     union u_type {
-      struct s_chare { //NewChareMsg, NewVChareMsg, ForChareMsg, ForVidMsg, FillVidMsg
-      	void *ptr;       ///< object pointer
-      	UInt forAnyPe;   ///< Used only by newChare
+      struct s_chare {  // NewChareMsg, NewVChareMsg, ForChareMsg, ForVidMsg, FillVidMsg
+        void *ptr;      ///< object pointer
+        UInt forAnyPe;  ///< Used only by newChare
       } chare;
-      struct s_group {
-	CkGroupID g;           ///< GroupID
-	CkNodeGroupID rednMgr; ///< Reduction manager for this group (constructor only!)
-	int epoch;             ///< "epoch" this group was created during (0--mainchare, 1--later)
-	UShort arrayEp;        ///< Used only for array broadcasts
+      struct s_group {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg
+        CkGroupID g;           ///< GroupID
+        CkNodeGroupID rednMgr; ///< Reduction manager for this group (constructor only!)
+        int epoch;             ///< "epoch" this group was created during (0--mainchare, 1--later)
+        UShort arrayEp;        ///< Used only for array broadcasts
       } group;
-      struct s_array{               ///< For arrays only
-	CkArrayIndexStruct index;   ///< Array element index
-	int listenerData[CK_ARRAYLISTENER_MAXLEN]; ///< For creation
-	CkGroupID arr;              ///< Array manager GID
-	UChar hopCount;             ///< number of times message has been routed
-    	UChar ifNotThere;           ///< what to do if array element is missing
+      struct s_array{             ///< For arrays only (ArrayEltInitMsg, ForArrayEltMsg)
+        CkArrayIndexStruct index; ///< Array element index
+        int listenerData[CK_ARRAYLISTENER_MAXLEN]; ///< For creation
+        CkGroupID arr;            ///< Array manager GID
+        UChar hopCount;           ///< number of times message has been routed
+        UChar ifNotThere;         ///< what to do if array element is missing
       } array;
-      struct s_roData {        ///< RODataMsg for readonly data type
-      	UInt count;
+      struct s_roData {    ///< RODataMsg for readonly data type
+        UInt count;
       } roData;
-      struct s_roMsg {         ///< ROMsgMsg for readonlys defined in ci files
-      	UInt roIdx;
+      struct s_roMsg {     ///< ROMsgMsg for readonlys defined in ci files
+        UInt roIdx;
       } roMsg;
     };
-    struct s_attribs {        // Packed bitwise struct
-    	UChar msgIdx;         ///< Usertype of message (determines pack routine)
-	UChar mtype;          ///< e.g., ForBocMsg
-    	UChar queueing:4;     ///< Queueing strategy (FIFO, LIFO, PFIFO, ...)
-    	UChar isPacked:1;     ///< If true, message must be unpacked before use
-    	UChar isUsed:1;       ///< Marker bit to prevent message re-send.
+    struct s_attribs {  // Packed bitwise struct
+      UChar msgIdx;     ///< Usertype of message (determines pack routine)
+      UChar mtype;      ///< e.g., ForBocMsg
+      UChar queueing:4; ///< Queueing strategy (FIFO, LIFO, PFIFO, ...)
+      UChar isPacked:1; ///< If true, message must be unpacked before use
+      UChar isUsed:1;   ///< Marker bit to prevent message re-send.
     };
 #ifdef _FAULT_MLOG_
     CkObjID sender;
@@ -235,6 +235,9 @@ private:
             CkMsgAlignLength(size)+
 	    sizeof(int)*CkPriobitsToInts(prio);
       register envelope *env = (envelope *)CmiAlloc(tsize);
+#ifndef CMK_OPTIMIZE
+      memset(env, 0, sizeof(envelope));
+#endif
       env->setMsgtype(type);
       env->totalsize = tsize;
       env->priobits = prio;
