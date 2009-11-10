@@ -10,8 +10,14 @@
 
 #include <stdlib.h>
 #include <memory.h>
-#include "charm.h"
 
+#if CMK_HAS_STRINGS_H
+  #include <strings.h>            /* defines bzero */
+#else
+  #define bzero(s,n)   memset(s,0,n)
+#endif
+
+#include "charm.h"
 #include "middle.h"
 
 class CMessage_CkArgMsg {
