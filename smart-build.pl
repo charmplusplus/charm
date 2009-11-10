@@ -391,8 +391,8 @@ print << "EOF";
 Choose a set of compiler flags [1-5]
 	1) none
 	2) debug                      -g -O0
-	3) optimized + projections    -O2
-	4) optimized [default]        -O2 -DCMK_OPTIMIZE
+	3) optimized [default]        -O2
+	4) optimized no projections   -O2 -DCMK_OPTIMIZE
 	5) custom
 	
 EOF
@@ -406,10 +406,10 @@ while($line = <>){
 	} elsif($line eq "2"){
 		$compiler_flags = "-g -O0";
 		last;
-	} elsif($line eq "4" || $line eq ""){
+	} elsif($line eq "4" ){
  		$compiler_flags = "-O2 -DCMK_OPTIMIZE";
 		last;
-	} elsif($line eq "3"){ 
+	} elsif($line eq "3" || $line eq ""){ 
                 $compiler_flags = "-O2"; 
                 last; 
         }  elsif($line eq "5"){
