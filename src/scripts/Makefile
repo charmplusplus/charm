@@ -835,10 +835,11 @@ $(L)/libtrace-Tau.a: $(TAU_TRACE_OBJ) tau_selective.o
 
 
 # Note there is a BG/P specific addition to this target in Makefile.machine
+# Do not change this rule!
 LIBTRACE_CONTROLPOINTS=trace-controlPoints.o
 $(L)/libtrace-controlPoints.a: $(LIBTRACE_CONTROLPOINTS)
-	$(CHARMC) -o $@ $(LIBTRACE_CONTROLPOINTS)
-
+	$(CHARMC) -o $@ $^
+# Do not change this rule!
 
 LIBTRACE_RECREP=trace-recordreplay.o
 $(L)/libtrace-recordreplay.a: $(LIBTRACE_RECREP)
