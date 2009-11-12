@@ -3333,12 +3333,15 @@ public_mALLOc(size_t bytes)
     (void)mutex_unlock(&ar_ptr->mutex);
   assert(!victim || chunk_is_mmapped(mem2chunk(victim)) ||
 	 ar_ptr == arena_for_chunk(mem2chunk(victim)));
+
+  if (victim!=NULL) {
   memory_allocated += chunksize(mem2chunk(victim));
   
   if(memory_allocated > memory_allocated_max)
     memory_allocated_max=memory_allocated;
   if(memory_allocated < memory_allocated_min)
     memory_allocated_min=memory_allocated;
+  }
 
   return victim;
 }
