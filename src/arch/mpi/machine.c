@@ -1747,11 +1747,12 @@ static void KillOnAllSigs(int sigNo) {
   char *m;
   if (already_in_signal_handler) MPI_Abort(MPI_COMM_WORLD,1);
   already_in_signal_handler = 1;
+#if CMK_CCS_AVAILABLE
   if (CpvAccess(cmiArgDebugFlag)) {
     CpdNotify(CPD_SIGNAL, sigNo);
     CpdFreeze();
   }
-
+#endif
   CmiError("------------- Processor %d Exiting: Caught Signal ------------\n"
       "Signal: %d\n",CmiMyPe(),sigNo);
   CmiPrintStackTrace(1);
@@ -2048,11 +2049,12 @@ void CmiAbort(const char *message)
 {
   char *m;
   /* if CharmDebug is attached simply try to send a message to it */
+#if CMK_CCS_AVAILABLE
   if (CpvAccess(cmiArgDebugFlag)) {
     CpdNotify(CPD_ABORT, message);
     CpdFreeze();
   }
-  
+#endif  
   CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
         "Reason: %s\n",CmiMyPe(),message);
  /*  CmiError(message); */
