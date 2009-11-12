@@ -307,7 +307,7 @@ void OneTimeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPEs, c
 int getFirstPeOnPhysicalNodeFromList(int pe, const int totalDestPEs, const ComlibMulticastIndexCount* destPEs){
   int num;
   int *nodePeList;
-  CmiGetPesOnPhysicalNode(pe, &nodePeList, &num);
+  CmiGetPesOnPhysicalNode(CmiPhysicalNodeID(pe), &nodePeList, &num);
   
   for(int i=0;i<num;i++){
     // Scan destPEs for the pe
@@ -330,7 +330,7 @@ int getFirstPeOnPhysicalNodeFromList(int pe, const int totalDestPEs, const Comli
 int getNthPeOnPhysicalNodeFromList(int n, int pe, const int totalDestPEs, const ComlibMulticastIndexCount* destPEs){
   int num;
   int *nodePeList;
-  CmiGetPesOnPhysicalNode(pe, &nodePeList, &num);
+  CmiGetPesOnPhysicalNode(CmiPhysicalNodeID(pe), &nodePeList, &num);
   
   int count = 0;
   int lastFound = -1;
@@ -365,7 +365,7 @@ vector<int> getPesOnPhysicalNodeFromList(int pe, const int totalDestPEs, const C
  
   int num; 
   int *nodePeList; 
-  CmiGetPesOnPhysicalNode(pe, &nodePeList, &num); 
+  CmiGetPesOnPhysicalNode(CmiPhysicalNodeID(pe), &nodePeList, &num); 
   
   for(int i=0;i<num;i++){ 
     // Scan destPEs for the pe 
@@ -392,7 +392,7 @@ vector<int> getOtherPesOnPhysicalNodeFromList(int pe, const int totalDestPEs, co
 
   int num;
   int *nodePeList;
-  CmiGetPesOnPhysicalNode(pe, &nodePeList, &num);
+  CmiGetPesOnPhysicalNode(CmiPhysicalNodeID(pe), &nodePeList, &num);
   
   for(int i=0;i<num;i++){
     // Scan destPEs for the pe
