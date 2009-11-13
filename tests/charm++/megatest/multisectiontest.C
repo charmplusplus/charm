@@ -25,10 +25,10 @@ void multisectiontest_init()
 	  // array of group IDs
 
 	  CkGroupID gidArr[numgroups];
-	  CkArrayID aidArr[numarrays];
-	  CProxy_multisectiontest_grp Gproxy[numgroups];
-	  CProxy_multisectiontest_array1d Aproxy[numarrays];
+	  CkArrayID *aidArr= new CkArrayID[numarrays];
 
+	  CProxy_multisectiontest_grp *Gproxy= new CProxy_multisectiontest_grp[numgroups];
+	  CProxy_multisectiontest_array1d *Aproxy= new CProxy_multisectiontest_array1d[numarrays];
 	  for(int i=0;i<numgroups;i++)
 	    {
 	      //	      Gproxy[i]=
