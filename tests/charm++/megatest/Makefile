@@ -8,6 +8,8 @@ OBJS=megatest.o \
      varsizetest.o \
      varraystest.o \
      groupcast.o \
+     groupsectiontest.o \
+     multisectiontest.o \
      nodecast.o \
      synctest.o \
      fib.o \
@@ -26,7 +28,8 @@ OBJS=megatest.o \
      reduction.o \
      bitvector.o \
      immediatering.o \
-     callback.o
+     callback.o \
+
 
 #     priolongtest.o \
 
@@ -52,6 +55,8 @@ OBJS_REV=megatest.o \
      synctest.o \
      nodecast.o \
      groupcast.o \
+     groupsectiontest.o \
+     multisectiontest.o \
      varraystest.o \
      varsizetest.o \
      nodering.o \
@@ -66,7 +71,7 @@ CIFILES =  \
       fib.def.h        megatest.def.h       priotest.def.h   tempotest.def.h  \
       groupcast.def.h  migration.def.h      queens.def.h     varraystest.def.h\
       groupring.def.h  nodecast.def.h       reduction.def.h  varsizetest.def.h\
-#      priolongtest.def.h
+      groupsectiontest.def.h multisectiontest.def.h #priolongtest.def.h 
 
 .SUFFIXES:
 .SUFFIXES: .o .C .def.h .decl.h .ci .h

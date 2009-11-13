@@ -1,0 +1,11 @@
+module groupsectiontest {
+  message groupsectiontest_msg;
+  readonly CProxy_groupsectiontest gSectGproxy;  
+  group groupsectiontest {
+    entry groupsectiontest(void);
+    entry void recv(groupsectiontest_msg *);
+    entry void init();
+    entry void doneIteration(CkReductionMsg *);
+    entry void nextIteration(groupsectiontest_msg *);
+  };
+}

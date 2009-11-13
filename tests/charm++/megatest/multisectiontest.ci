@@ -1,0 +1,31 @@
+module multisectiontest {
+  message multisectiontest_msg;
+ message multisectionAID_msg
+	{
+	CkArrayID IDs[];
+	};
+  message multisectionGID_msg{
+	CkGroupID IDs[];
+	};
+ message multisection_proxymsg;
+  group multisectiontest_master {
+    entry multisectiontest_master(int groups);
+    entry void recvID(multisectionGID_msg *);
+    entry void doneIteration(CkReductionMsg *);
+    entry void doneSetup(CkReductionMsg *);
+  };
+  group multisectiontest_grp {
+    entry multisectiontest_grp(int, CkGroupID);
+    entry void recvID(multisectionAID_msg *msg);
+    entry void recvSProxy( multisection_proxymsg *m);
+    entry void recv(multisectiontest_msg *);
+    entry void nextIteration(multisectiontest_msg *);
+  };
+  array [1D] multisectiontest_array1d {
+    entry multisectiontest_array1d(CkGroupID);
+    entry void recvID(multisectionGID_msg *);
+    entry void recvSProxy( multisection_proxymsg *m);
+    entry void recv(multisectiontest_msg *);
+  };
+
+}
