@@ -3235,10 +3235,12 @@ void Entry::genGroupDefs(XStr& str)
     if ((isSync() || isLocal()) && !container->isForElement()) return; //No sync broadcast
 
     XStr retStr; retStr<<retType;
+    XStr msgTypeStr;
     if (isLocal())
-      str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1,0)<<")\n";
+      msgTypeStr<<paramType(0,1,0);
     else
-      str << makeDecl(retStr,1)<<"::"<<name<<"("<<paramType(0,1)<<")\n";
+      msgTypeStr<<paramType(0,1);
+    str << makeDecl(retStr,1)<<"::"<<name<<"("<<msgTypeStr<<")\n";
     str << "{\n  ckCheck();\n";
     if (!isLocal()) str <<marshallMsg();
 
@@ -3289,8 +3291,11 @@ void Entry::genGroupDefs(XStr& str)
         str << "     Ck"<<node<<"GroupMsgPrep("<<paramg<<");\n";
         str << "     ckDelegatedTo()->"<<node<<"GroupSectionSend(ckDelegatedPtr(),"<<params<<", ckGetNumSections(), ckGetSectionIDs());\n";
         str << "  } else {\n";
-        str << "    for (int i=0; i<ckGetNumSections(); ++i) ";
-        str << "CkSendMsg"<<node<<"BranchMulti("<<params<<", ckGetGroupIDn(i), ckGetNumElements(i), ckGetElements(i)"<<opts<<");\n";
+        str << "    void *impl_msg_tmp = (ckGetNumSections()>1) ? CkCopyMsg((void **) &impl_msg) : impl_msg;\n";
+        str << "    for (int i=0; i<ckGetNumSections(); ++i) {\n";
+        str << "       impl_msg_tmp= (i<ckGetNumSections()-1) ? CkCopyMsg((void **) &impl_msg):impl_msg;\n";
+        str << "       CkSendMsg"<<node<<"BranchMulti("<<epIdx()<<", impl_msg_tmp, ckGetGroupIDn(i), ckGetNumElements(i), ckGetElements(i)"<<opts<<");\n";
+        str << "    }\n";
         str << "  }\n";
       }
       else
