@@ -76,6 +76,8 @@ int CharmStrategy::deliverToIndices(void *msg, int numDestIdxs, const CkArrayInd
     }
     
   }
+  else
+    CkFreeMsg(msg);
 
   return count;
 }
