@@ -24,7 +24,7 @@ void multisectiontest_init()
 	  // make 3 arrays and 3 groups
 	  // array of group IDs
 
-	  CkGroupID gidArr[numgroups];
+	  CkGroupID *gidArr= new CkGroupID[numgroups];
 	  CkArrayID *aidArr= new CkArrayID[numarrays];
 
 	  CProxy_multisectiontest_grp *Gproxy= new CProxy_multisectiontest_grp[numgroups];
