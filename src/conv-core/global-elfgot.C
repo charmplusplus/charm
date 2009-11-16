@@ -277,8 +277,7 @@ CtgGlobalList::CtgGlobalList() {
 	}
     }
 
-    std::vector<global_rec> globals;
-    int padding_old = 0, padding_new = 0;
+    int padding = 0;
 
     // Figure out which relocation data entries refer to global data:
     for(count = 0; count < relt_size; count ++) {
@@ -316,9 +315,8 @@ CtgGlobalList::CtgGlobalList() {
 	// It's got the right name-- it's a user global
 	int size = symt[symindx].st_size;
 	int gSize = ALIGN8(size);
-	padding_old += gSize - size;
+	padding += gSize - size;
 	ELFXX_TYPE_Addr *gGot=(ELFXX_TYPE_Addr *)relt[count].r_offset;
-	globals.push_back(global_rec(gGot, size));
 
 #if DEBUG_GOT_MANAGER
 	printf("   -> %s is a user global, of size %d, at %p\n",
@@ -331,29 +329,12 @@ CtgGlobalList::CtgGlobalList() {
 	datalen+=gSize;
     }
 
-    // Lay out swapped globals as a structure in order of descending
-    // member size, to reduce padding.
-    // Potential optimization: pull small elements from the end to
-    // fill in `padding' space where possible.
-    size_t datalen2 = 0;
-    std::sort(globals.begin(), globals.end(), &compare_globals);
-    for (std::vector<global_rec>::iterator i = globals.begin(); i != globals.end(); ++i) {
-	short alignment = std::min(i->size, (size_t)16);
-	size_t padding = alignment>0?(datalen2 + alignment) % alignment:0;
-	size_t offset = datalen2 + padding;
-	padding_new += padding;
-	//rec.push_back(CtgRec(i->index, offset));
-	datalen2 = offset + i->size;
-    }
-
     nRec=rec.size();
 
 #if DEBUG_GOT_MANAGER   
     printf("relt has %d entries, %d of which are user globals\n\n", 
 	   relt_size, nRec);
-    printf("Traditional GOT layout takes %d (padding: %d), "
-	   "sorted takes %lu (padding: %d).\n", 
-	   datalen, padding_old, (unsigned long) datalen2, padding_new);
+    printf("Globals take %d bytes (padding bytes: %d)\n", datalen, padding);
 #endif
 }
 
