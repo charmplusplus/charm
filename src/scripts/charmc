@@ -108,7 +108,7 @@ printUsage() {
     echo "  flags:"
     echo "        -o <target> -g -O"
     echo "        -D<define> -I<include path> -L<lib path> -l<library> -s"
-    echo "        -machine <mach> -seq -host -langage <lang> "
+    echo "        -machine <mach> -seq -host -language <lang> "
     echo "        -balance <mode> -tracemode <mode> -memory <mode>"
     echo "        -modules <comma-separated list of C++ modules>"
     echo "        -verbose -save -purify -cp <dest> -gen-cpm <package>"
