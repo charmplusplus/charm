@@ -230,22 +230,10 @@ void CtgGlobalList::read(void *datav) const {
     }
 }
 
-struct global_rec
-{
-    ELFXX_TYPE_Addr * index;
-    size_t size;
-    global_rec(ELFXX_TYPE_Addr *index_, size_t size_)
-  : index(index_), size(size_) {}
-};
-static bool compare_globals(const global_rec &l, const global_rec &r)
-{
-    return l.size < r.size;
-}
-
 /**
    Analyze the current set of global variables, determine 
    which are user globals and which are system globals, 
-   and store the list of user globals. 
+   and store the list of user globals.
  */
 CtgGlobalList::CtgGlobalList() {
     datalen=0;
