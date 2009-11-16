@@ -6,4 +6,4 @@ include ../Makefile_common
 all: tv
 
 tv: testV.C
-	$(CHARMC) -o tv testV.C
+	$(CDIR)/bin/charmc -language c++ $(OPTS) -host -o tv testV.C
