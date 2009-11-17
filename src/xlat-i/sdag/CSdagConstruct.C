@@ -416,7 +416,7 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
                 sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, NULL, 0); 
               }
 	      else if (pl->isNamed()) {
-                sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, NULL, 0); 
+                sv = new CStateVar(0, (XStr)(*(pl->param->getType())), 0, pl->getGivenName(), 0, NULL, 0); 
 	      }
 	      else
 	         printf("PROBLEM - I DON'T KNOW THE TYPE\n");
