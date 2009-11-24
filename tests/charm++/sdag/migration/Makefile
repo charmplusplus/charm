@@ -1,7 +1,7 @@
 CHARMC=../../../../bin/charmc $(OPTS)
 DEFAULT=test1
 ALL=test1
-RUN=./charmrun 
+RUN=./charmrun  $(TESTOPTS)
 
 ifndef $(PROCS)
 	PROCS=2
