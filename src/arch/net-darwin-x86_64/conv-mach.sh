@@ -12,8 +12,8 @@ CMK_LIBS="-lckqt"
 CMK_RANLIB="ranlib"
 
 # Assumes GNU fortran compiler:
-CMK_CF77="g77"
-CMK_CF90="g90"
+CMK_CF77="g95 -arch x86_64 "
+CMK_CF90="g95 -arch x86_64 "
 
 # setting for shared lib
 # need -lstdc++ for c++ reference, and it needs to be put at very last 
