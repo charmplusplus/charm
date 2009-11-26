@@ -4,6 +4,12 @@
 #define TREE_STRATEGY_TOPO_UNAWARE
 namespace topo {
 
+/// Implementation artifacts shouldnt pollute topo::
+namespace impl {
+    template <typename Iterator>
+    SpanningTreeVertex* buildNextGen_topoUnaware(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches);
+}
+
 /** A concrete tree builder that is NOT topology aware. 
  *
  * Randomly selects child vertices and sub-trees etc. It should hence be, resource-wise, quite 
@@ -18,68 +24,64 @@ template <typename Iterator,typename ValueType = typename std::iterator_traits<I
 class SpanningTreeStrategy_topoUnaware: public SpanningTreeStrategy<Iterator>
 {
     public:
-        virtual SpanningTreeVertex* buildNextGen(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches=2)
-        {
-            // if (maxBranches < 1) throw;
-            CkAssert(maxBranches >= 1);
-            /// Create the output data structure
-            SpanningTreeVertex *parent = new SpanningTreeVertex(*firstVtx);
-            /// Check validity and ranges etc.
-            const int numDescendants = std::distance(firstVtx,beyondLastVtx) - 1;
-            // if (numDescendants < 0) throw;
-            CkAssert(numDescendants >= 0);
-            /// Compute the number of vertices in each branch
-            int numInSubTree = numDescendants / maxBranches; 
-            int remainder    = numDescendants % maxBranches; 
-            /// Push the appropriate indices into the container of child indices
-            for (int i=0, indx=1; (i<maxBranches && indx<=numDescendants); i++, indx += numInSubTree)
-            {
-                parent->childIndex.push_back(indx);
-                /// Distribute any remainder vertices as evenly as possible amongst all the branches 
-                if (remainder-- > 0) indx++;
-            }
-            /// Return the output structure
-            return parent;
-        }
+        inline virtual SpanningTreeVertex* buildNextGen(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches=2)
+        { return impl::buildNextGen_topoUnaware(firstVtx,beyondLastVtx,maxBranches); }
 };
 
 
 
-
-/** Partial specialization for the scenario of a container of SpanningTreeVertices. 
+/** Partial specialization when input is a container of SpanningTreeVertices. 
  *
- * Exactly the same as the default implementation, except that this stores the results in the parent vertex (in the container) too 
+ * Simply stores the results in the parent vertex (in the container) too 
  */
 template <typename Iterator>
 class SpanningTreeStrategy_topoUnaware<Iterator,SpanningTreeVertex>: public SpanningTreeStrategy<Iterator> 
 {
     public:
-        virtual SpanningTreeVertex* buildNextGen(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches=2)
+        inline virtual SpanningTreeVertex* buildNextGen(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches=2)
         {
-            // if (maxBranches < 1) throw;
-            CkAssert(maxBranches >= 1);
-            /// Check validity and ranges etc.
-            const int numDescendants = std::distance(firstVtx,beyondLastVtx) - 1;
-            // if (numDescendants < 0) throw;
-            CkAssert(numDescendants >= 0);
             /// Clear any existing list of children
             (*firstVtx).childIndex.clear();
-            /// Compute the number of vertices in each branch
-            int numInSubTree = numDescendants / maxBranches; 
-            int remainder    = numDescendants % maxBranches;
-            /// Push the appropriate indices into the container of child indices
-            for (int i=0, indx=1; (i<maxBranches && indx<=numDescendants); i++, indx += numInSubTree)
-            {
-                (*firstVtx).childIndex.push_back(indx); 
-                /// Distribute any remainder vertices as evenly as possible amongst all the branches 
-                if (remainder-- > 0) indx++;
-            }
-            /// Create the output data structure
-            SpanningTreeVertex *parent = new SpanningTreeVertex(*firstVtx);
-            /// Return the output structure
+            /// Build the next generation
+            SpanningTreeVertex *parent = impl::buildNextGen_topoUnaware(firstVtx,beyondLastVtx,maxBranches);
+            /// Copy the results into the parent vertex too
+            *firstVtx = *parent;
+            /// Return the results
             return parent;
         }
 };
+
+
+namespace impl {
+    template <typename Iterator>
+    SpanningTreeVertex* buildNextGen_topoUnaware(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches)
+    {
+        // if (maxBranches < 1) throw;
+        CkAssert(maxBranches >= 1);
+        /// Check validity and ranges etc.
+        const int numDescendants = std::distance(firstVtx,beyondLastVtx) - 1;
+        // if (numDescendants < 0) throw;
+        CkAssert(numDescendants >= 0);
+
+        /// Create the output data structure
+        SpanningTreeVertex *parent = new SpanningTreeVertex(*firstVtx);
+
+        /// Compute the number of vertices in each branch
+        int numInSubTree = numDescendants / maxBranches;
+        int remainder    = numDescendants % maxBranches;
+
+        /// Push the appropriate relative distances (from the tree root) into the container of child indices
+        for (int i=0, indx=1; (i<maxBranches && indx<=numDescendants); i++, indx += numInSubTree)
+        {
+            parent->childIndex.push_back(indx);
+            /// Distribute any remainder vertices as evenly as possible amongst all the branches 
+            if (remainder-- > 0) indx++;
+        }
+
+        /// Return the output structure
+        return parent;
+    }
+}
 
 } // end namespace topo
 #endif // TREE_STRATEGY_TOPO_UNAWARE
