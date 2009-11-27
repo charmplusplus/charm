@@ -144,7 +144,6 @@ bool test_general_fifo()
 {
   Queue q = CqsCreate();
   void *i = (char *)1, *j = (char *)2, *k = (char *)3;
-  void **e;
   CqsEnqueueGeneral(q, i, CQS_QUEUEING_FIFO, 1, 0);
   CqsEnqueueGeneral(q, j, CQS_QUEUEING_FIFO, 2, 0);
   CqsEnqueueGeneral(q, k, CQS_QUEUEING_FIFO, 42, 0);
@@ -153,7 +152,6 @@ bool test_general_fifo()
   CqsDequeue(q, &s);
   CqsDequeue(q, &t);
   bool result = (r == i) && (s == j) && (t == k);
-  cerr << "r s t" << r << s << t;
   CqsDelete(q);
   return result;
 }
@@ -162,7 +160,6 @@ bool test_general_ififo()
 {
   Queue q = CqsCreate();
   void *i = (char *)1, *j = (char *)2, *k = (char *)3;
-  void **e;
   unsigned int a = -1, b = 0, c = 1;
   CqsEnqueueGeneral(q, i, CQS_QUEUEING_IFIFO, 8*sizeof(int), &c);
   CqsEnqueueGeneral(q, j, CQS_QUEUEING_IFIFO, 8*sizeof(int), &b);
@@ -172,7 +169,6 @@ bool test_general_ififo()
   CqsDequeue(q, &s);
   CqsDequeue(q, &t);
   bool result = (r == k) && (s == j) && (t == i);
-  cerr << "r s t" << r << s << t;
   CqsDelete(q);
   return result;
 }
