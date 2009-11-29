@@ -52,7 +52,7 @@ public:
     p | val;
   }
 
-  Cell(CkMigrateMessage *m) {}
+  Cell(CkMigrateMessage *m) {__sdag_init();}
 };
 
 #include "test1.def.h"
