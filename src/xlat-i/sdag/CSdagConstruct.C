@@ -1364,7 +1364,7 @@ void SdagConstruct::generateSdagEntry(XStr& op)
   op << ");\n";
 #if CMK_BLUEGENE_CHARM
   generateTlineEndCall(op);
-  generateBeginExec(op, (char *)"spaceholder");
+  generateBeginExec(op, "spaceholder");
 #endif
   generateDummyBeginExecute(op);
   // end actual code
@@ -1600,7 +1600,7 @@ void SdagConstruct::generateTraceEndCall(XStr& op)          // for trace
   op << "    " << "_TRACE_END_EXECUTE(); \n";
 }
 
-void SdagConstruct::generateBeginExec(XStr& op, char *name){
+void SdagConstruct::generateBeginExec(XStr& op, const char *name){
   op << "     " << "_TRACE_BG_BEGIN_EXECUTE_NOMSG(\""<<name<<"\",&_bgParentLog,1);\n"; 
 }
 

@@ -1381,7 +1381,7 @@ public:
   void generateTraceEpDef(XStr& output);          
   static void generateTraceEndCall(XStr& op);            
   static void generateTlineEndCall(XStr& op);
-  static void generateBeginExec(XStr& op, char *name);
+  static void generateBeginExec(XStr& op, const char *name);
   static void generateEndExec(XStr& op);
   static void generateEndSeq(XStr& op);
   static void generateDummyBeginExecute(XStr& op);
