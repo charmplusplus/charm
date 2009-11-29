@@ -1,4 +1,4 @@
-DIRS=charm++ converse ampi fem armci bigsim ParFUM
+DIRS= simple2D
 
 
 all:
@@ -12,7 +12,7 @@ test:
 	done
 
 bgtest:
-	for d in charm++ ampi fem armci; do \
+	for d in $(DIRS); do \
 		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
