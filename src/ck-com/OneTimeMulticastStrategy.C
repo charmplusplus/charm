@@ -936,7 +936,7 @@ void OneTimeTopoTreeMulticastStrategy::determineNextHopPEs(const int totalDestPE
         tree.push_back( topo::SpanningTreeVertex(destPEs[i].pe) );
 
     /// Build the complete spanning tree
-    topo::buildSpanningTree(tree.begin(),tree.end(),degree,topo::getSpanningTreeStrategy<std::vector<topo::SpanningTreeVertex>::iterator>());
+    topo::buildSpanningTree(tree.begin(),tree.end(),degree);
 
     /// Identify this PE in the tree and find immediate children
     int peIdx = -1;

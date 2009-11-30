@@ -2072,8 +2072,11 @@ OneTimeMulticastStrategy.o: OneTimeMulticastStrategy.C \
   CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
   conv-trace.h trace-bluegene.h envelope.h convcomlibstrategy.h \
   ComlibLearner.h ComlibArrayListener.h ComlibStats.h comlib.decl.h \
-  ComlibSectionInfo.h TopoManager.h spanningTreeStrategy.h \
-  treeStrategy_topoUnaware.h treeStrategy_3dTorus.h
+  ComlibSectionInfo.h TopoManager.h \
+  spanningTreeStrategy.h spanningTreeVertex.h \
+  treeStrategy_3dTorus_minBytesHops.h treeStrategy_3dTorus_minHops.h \
+  treeStrategy_nodeAware_minBytes.h treeStrategy_nodeAware_minGens.h \
+  treeStrategy_topoUnaware.h
 	$(CHARMC) -c -I. OneTimeMulticastStrategy.C
 
 EachToManyMulticastStrategy.o: EachToManyMulticastStrategy.C \
