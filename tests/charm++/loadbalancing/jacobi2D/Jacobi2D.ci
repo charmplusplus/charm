@@ -13,5 +13,6 @@ mainmodule Jacobi2D {
   entry void refine();
   entry void AtSync();
   entry void stepping(CkReductionMsg *m);
+  entry void print(CkReductionMsg *m);
  }
 }
