@@ -22,3 +22,6 @@ clean:
 
 jacobi3d.o: jacobi3d.C jacobi3d.decl.h
 	$(CHARMC) -c jacobi3d.C -g
+
+run: jacobi3d
+	./charmrun +p2 ./jacobi3d 20 10 +balancer Refine 
