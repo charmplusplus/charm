@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /** \file jacobi3d.C
  *  Author: Abhinav S Bhatele
  *  Date Created: June 01st, 2009
@@ -63,12 +56,8 @@ int myrand(int numpes) {
 #define wrap_y(a)	(((a)+num_chare_y)%num_chare_y)
 #define wrap_z(a)	(((a)+num_chare_z)%num_chare_z)
 
-#define USE_3D_ARRAYS		0
-#if USE_3D_ARRAYS
-#define index(a, b, c)	a][b][c	
-#else
+//#define USE_3D_ARRAYS		0
 #define index(a, b, c)	( (a)*(blockDimY+2)*(blockDimZ+2) + (b)*(blockDimZ+2) + (c) )
-#endif
 
 #define MAX_ITER		26
 #define WARM_ITER		5
@@ -201,35 +190,18 @@ class Jacobi: public CBase_Jacobi {
     int iterations;
     int imsg;
 
-#if USE_3D_ARRAYS
-    double ***temperature;
-    double ***new_temperature;
-#else
     double *temperature;
     double *new_temperature;
-#endif
 
     // Constructor, initialize values
     Jacobi() {
       __sdag_init();
+      usesAtSync=CmiTrue;
 
       int i, j, k;
       // allocate a three dimensional array
-#if USE_3D_ARRAYS
-      temperature = new double**[blockDimX+2];
-      new_temperature = new double**[blockDimX+2];
-      for (i=0; i<blockDimX+2; i++) {
-	temperature[i] = new double*[blockDimY+2];
-	new_temperature[i] = new double*[blockDimY+2];
-	for(j=0; j<blockDimY+2; j++) {
-	  temperature[i][j] = new double[blockDimZ+2];
-	  new_temperature[i][j] = new double[blockDimZ+2];
-	}
-      }
-#else
       temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
       new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
-#endif
 
       for(i=0; i<blockDimX+2; ++i) {
 	for(j=0; j<blockDimY+2; ++j) {
@@ -244,28 +216,32 @@ class Jacobi: public CBase_Jacobi {
       constrainBC();
     }
 
-    Jacobi(CkMigrateMessage* m) {}
+  void pup(PUP::er &p)
+  {
+    CBase_Jacobi::pup(p);
+    __sdag_pup(p);
+    p|iterations;
+    p|imsg;
+
+    size_t size = (blockDimX+2) * (blockDimY+2) * (blockDimZ+2);
+    if (p.isUnpacking()) {
+	temperature = new double[size];
+	new_temperature = new double[size];
+      }
+    p(temperature, size);
+    p(new_temperature, size);
+  }
+
+  Jacobi(CkMigrateMessage* m) {__sdag_init();}
 
     ~Jacobi() { 
-#if USE_3D_ARRAYS
-      for (int i=0; i<blockDimX+2; i++) {
-        for(int j=0; j<blockDimY+2; j++) {
-          delete [] temperature[i][j];
-          delete [] new_temperature[i][j];
-	}
-        delete [] temperature[i];
-        delete [] new_temperature[i];
-      }
       delete [] temperature; 
       delete [] new_temperature; 
-#else
-      delete [] temperature; 
-      delete [] new_temperature; 
-#endif
     }
 
     // Send ghost faces to the six neighbors
     void begin_iteration(void) {
+      AtSync();
       if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
           CkPrintf("Start of iteration %d\n", iterations);
           //BgPrintf("BgPrint> Start of iteration at %f\n");
@@ -368,11 +344,7 @@ class Jacobi: public CBase_Jacobi {
       // calculate error
       // not being done right now since we are doing a fixed no. of iterations
 
-#if USE_3D_ARRAYS
-      double ***tmp;
-#else
       double *tmp;
-#endif
       tmp = temperature;
       temperature = new_temperature;
       new_temperature = tmp;
