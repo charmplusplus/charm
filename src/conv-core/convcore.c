@@ -307,6 +307,7 @@ void CmiArgGroup(const char *parentName,const char *groupName) {
 int CmiGetArgc(char **argv)
 {
 	int i=0,argc=0;
+	if (argv)
 	while (argv[i++]!=NULL)
 		argc++;
 	return argc;
