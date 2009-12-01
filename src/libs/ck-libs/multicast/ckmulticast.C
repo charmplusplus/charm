@@ -6,9 +6,8 @@
  *
  *  features:
  *     using a spanning tree (factor defined in ckmulticast.h)
- *     support pipelining via fragmentatio  (SPLIT_MULTICAST)
+ *     support pipelining via fragmentation  (SPLIT_MULTICAST)
  *     support *any-time* migration, spanning tree will be rebuilt automatically
- *     SMP node aware     (SMP_AWARE)
  * */
 
 #include "charm++.h"
@@ -16,6 +15,7 @@
 #include "register.h"
 
 #include "ckmulticast.h"
+#include "spanningTreeStrategy.h"
 
 #define DEBUGF(x)  // CkPrintf x;
 
@@ -26,8 +26,6 @@
 
 // maximum number of fragments into which a message can be broken
 #define MAXFRAGS 5
-
-#define SMP_AWARE                     1
 
 typedef CkQ<multicastGrpMsg *>   multicastGrpMsgBuf;
 typedef CkVec<CkArrayIndexMax>   arrayIndexList;
@@ -493,17 +491,19 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
           lists[lastKnown].push_back(IndexPos(msg->arrIdx[i], lastKnown));
     }
 
-    // Determine the number of children in the multicast tree
-    // (divide into MAXMCASTCHILDREN slots)
-    int numchild = 0;
-    int num = 0;
-    // Count the number of PEs with section members on them
+    CkVec<int> mySubTreePEs;
+    mySubTreePEs.reserve(numpes);
+    // The first PE in my subtree should be me, the tree root (as required by the spanning tree builder)
+    mySubTreePEs.push_back(CkMyPe());
+    // Identify the child PEs in the tree, ie the PEs with section members on them
     for (i=0; i<numpes; i++) 
     {
       if (i==CkMyPe()) continue;
-      if (lists[i].length()) num++;
+      if (lists[i].size()) 
+          mySubTreePEs.push_back(i);
     }
     // The number of multicast children can be limited by the spanning tree factor 
+    int num = mySubTreePEs.size() - 1, numchild = 0;
     if (factor <= 0) numchild = num;
     else numchild = num<factor?num:factor;
   
@@ -512,47 +512,33 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     // If there are any children, go about building a spanning tree
     if (numchild) 
     {
+        // Build the next generation of the spanning tree rooted at my PE
+        int *peListPtr = mySubTreePEs.getVec();
+        topo::SpanningTreeVertex *nextGenInfo;
+        nextGenInfo = topo::buildSpanningTreeGeneration(peListPtr,peListPtr + mySubTreePEs.size(),numchild);
+        CkAssert(nextGenInfo->childIndex.size() == numchild);
+
         // Distribute the section members across the number of direct children (branches)
         // Direct children are simply the first section member in each of the branch lists
-        //CkPrintf("[%d] numchild: %d\n", CkMyPe(), numchild);
         arrayIndexPosList *slots = new arrayIndexPosList[numchild];
-#if !SMP_AWARE
-        num = 0;
-        for (i=0; i<numpes; i++) 
+
+        // For each direct child, collate indices of all section members on the PEs in that branch
+        for (int i=0; i < numchild; i++)
         {
-            if (i==CkMyPe()) continue;
-            if (lists[i].length() == 0) continue;
-            for (j=0; j<lists[i].length(); j++)
-                slots[num].push_back(lists[i][j]);
-            num = (num+1) % numchild;
-        }
-#else
-        num = 0;
-        // SMP node aware, put SMP processors on the direct children
-        // first pass, find SMP processors
-        for (i=0; i<numpes; i++) 
-        {
-            if (i==CkMyPe()) continue;
-            if (lists[i].length() == 0) continue;
-            if (CmiPeOnSamePhysicalNode(i, CkMyPe())==1) {
-              // CkPrintf("[%d] child: %d\n", CkMyPe(), i);
-              for (j=0; j<lists[i].length(); j++)
-                slots[num].push_back(lists[i][j]);
-              lists[i].length() = 0;
-              num = (num+1) % numchild;
+            // Determine the indices of the first and last PEs in this branch of my sub-tree
+            int childStartIndex = nextGenInfo->childIndex[i], childEndIndex;
+            if (i < numchild-1)
+                childEndIndex = nextGenInfo->childIndex[i+1];
+            else
+                childEndIndex = mySubTreePEs.size();
+            // For each PE in this branch, add the section members on that PE to a list
+            for (int j = childStartIndex; j < childEndIndex; j++)
+            {
+                int pe = mySubTreePEs[j];
+                for (int k=0; k<lists[pe].size(); k++)
+                    slots[i].push_back(lists[pe][k]);
             }
         }
-        // second pass, fill the rest
-        for (i=0; i<numpes; i++) 
-        {
-            if (i==CkMyPe()) continue;
-            if (lists[i].length() == 0) continue;
-            // CkPrintf("[%d] child: %d\n", CkMyPe(), i);
-            for (j=0; j<lists[i].length(); j++)
-                slots[num].push_back(lists[i][j]);
-            num = (num+1) % numchild;
-        }
-#endif
 
         // Ask each of your direct children to setup their branches
         CProxy_CkMulticastMgr  mCastGrp(thisgroup);
@@ -576,6 +562,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
             mCastGrp[childroot].setup(m);
         }
         delete [] slots;
+        delete nextGenInfo;
     }
     // else, tell yourself that your children are ready
     else 

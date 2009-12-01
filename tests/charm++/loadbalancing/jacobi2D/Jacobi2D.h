@@ -8,7 +8,7 @@ using std::vector;
 #define  MIGRATE_STEPS              10
 
  class TheMain: public CBase_TheMain  {
-  public: enum {NUM_CHUNKS=20};
+  public: enum {NUM_CHUNKS=6};
   public: enum {CHUNK_SIZE=64};
   public: TheMain(CkArgMsg *);
   public: virtual void pup(PUP::er &p);
@@ -26,6 +26,7 @@ PUPbytes(arr_t)
   private: int numNeighbors;
   private: float maxDelta;
   private: double startTime;
+  private: double startT;
   public: JacobiChunk();
   public: void setStartTime(double t);
   public: void startNextIter();
@@ -37,6 +38,7 @@ PUPbytes(arr_t)
   public: void done(float delta);
   public: virtual void pup(PUP::er &p);
   public: void stepping(CkReductionMsg *m);
+  public: void print(CkReductionMsg *m);
   public: 
     virtual void ResumeFromSync();
     virtual void UserSetLBLoad();

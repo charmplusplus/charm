@@ -1,16 +1,12 @@
 
 #include "Jacobi2D.h"
 
-#define ITERATIONS 30
+#define ITERATIONS 10
 
   TheMain::TheMain(CkArgMsg *)
   {
    CkPrintf("ChareArray %d sq, data array %d sq, iterations %d\n", TheMain::NUM_CHUNKS, TheMain::CHUNK_SIZE, ITERATIONS);
-   int i;
-   int j;
-   CProxy_JacobiChunk jc = CProxy_JacobiChunk::ckNew();
-   for(i = 0;(i < TheMain::NUM_CHUNKS);(i++))   for(j = 0;(j < TheMain::NUM_CHUNKS);(j++))      jc(i,j).insert();
-   jc.doneInserting();
+   CProxy_JacobiChunk jc = CProxy_JacobiChunk::ckNew(TheMain::NUM_CHUNKS,TheMain::NUM_CHUNKS);
    jc(0,0).setStartTime(CmiWallTimer());
    jc.startNextIter();
   }
@@ -45,6 +41,7 @@
   void JacobiChunk::startNextIter()
   {
     int i;
+    startT = CmiWallTimer();
     if (thisIndex.x == 0 && thisIndex.y == 0) CmiPrintf("startNextIter: %d\n", numIters);
     if ((thisIndex.x > 0))
     thisProxy((thisIndex.x - 1),thisIndex.y).getBottom(data[1]);
@@ -118,6 +115,7 @@
    else
    if ((thisIndex.x == (TheMain::NUM_CHUNKS - 1)))
    for(i = 0;(i <= TheMain::CHUNK_SIZE);(i++))   data[(TheMain::CHUNK_SIZE + 1)][i] = data[TheMain::CHUNK_SIZE][i];
+   for (int k=0; k<(thisIndex.x*TheMain::NUM_CHUNKS + thisIndex.y)*100; k++)
    for(i = 1;(i <= TheMain::CHUNK_SIZE);(i++))   for(j = 1;(j <= TheMain::CHUNK_SIZE);(j++))   data[i][j] = (((((data[(i - 1)][j] + data[i][j]) + data[(i + 1)][j]) + data[i][(j - 1)]) + data[i][(j + 1)]) / 5.0);
 //     CkPrintf("Iteration time in microsecs = %d\n", (int )((CmiWallTimer() - t) * 1.0e6));
    if (false)
@@ -133,9 +131,13 @@
      }
    }
 
+   double t = CmiWallTimer() - startT;
+   CkCallback cb2(CkIndex_JacobiChunk::print(NULL), thisProxy(0,0));
+   contribute(sizeof(double), &t, CkReduction::max_double, cb2);
+
      // reduction
    CkCallback cb(CkIndex_JacobiChunk::stepping(NULL), thisProxy(0,0));
-   contribute(sizeof(float), &maxDelta, CkReduction::sum_float, cb);
+   contribute(sizeof(float), &maxDelta, CkReduction::max_float, cb);
   }
 
   void JacobiChunk::done(float delta)
@@ -167,12 +169,17 @@
     setObjTime(1.0);
   }
 
+  void JacobiChunk::print(CkReductionMsg *m) {   // on PE 0
+   double maxT = *(double*)m->getData();
+   CmiPrintf("Iter: %d takes %fs.\n", numIters, maxT);
+  }
+
   void JacobiChunk::stepping(CkReductionMsg *m) {   // on PE 0
    float max_delta = *(float*)m->getData();
    delete m;
    numIters --;
    if (numIters > 0) {
-     if (numIters % MIGRATE_STEPS == 3) {
+     if (numIters % MIGRATE_STEPS == 5) {
        thisProxy.AtSync();
      }
      else
