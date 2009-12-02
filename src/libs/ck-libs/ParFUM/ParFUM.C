@@ -525,7 +525,8 @@ PUPable_def(FEM_Sym_Linear)
 //Update fields after creation/migration
 void FEM_chunk::initFields(void)
 {
-  PUPable_reg(FEM_Sym_Linear);
+  if (CkMyRank() == 0) 
+    PUPable_reg(FEM_Sym_Linear);
 }
 
 FEM_chunk::~FEM_chunk()
