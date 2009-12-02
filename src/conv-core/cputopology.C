@@ -10,6 +10,10 @@
 #include "sockRoutines.h"
 #include "cklists.h"
 
+#if CMK_BLUEGENE_CHARM
+#include "middle-blue.h"
+using namespace BGConverse;
+#endif
 
 #define DEBUGP(x)  /** CmiPrintf x; */
 
@@ -346,22 +350,42 @@ extern "C" void CmiInitCPUTopology(char **argv)
 
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
 					   "obtain cpu topology info");
-#if !defined(__BLUEGENE__)
   obtain_flag = 1;
-#endif
   if (CmiGetArgFlagDesc(argv,"+skip_cpu_topology",
                                "skip the processof getting cpu topology info"))
     obtain_flag = 0;
 
+#if CMK_BLUEGENE_CHARM
+  if (BgNodeRank() == 0)
+#endif
+  {
   cpuTopoHandlerIdx =
      CmiRegisterHandler((CmiHandler)cpuTopoHandler);
   cpuTopoRecvHandlerIdx =
      CmiRegisterHandler((CmiHandler)cpuTopoRecvHandler);
+  }
 
   if (!obtain_flag) return;
   else if (CmiMyPe() == 0) {
      CmiPrintf("Charm++> cpu topology info is being gathered.\n");
   }
+
+#if CMK_BLUEGENE_CHARM
+  if (BgNodeRank() == 0)
+  {
+    //int numPes = BgNumNodes()*BgGetNumWorkThread();
+    int numPes = CkNumPes();
+    cpuTopo.nodeIDs = new int[numPes];
+    CpuTopology::supported = 1;
+    int wth = BgGetNumWorkThread();
+    for (int i=0; i<numPes; i++) {
+      int nid = i / wth;
+      cpuTopo.nodeIDs[i] = nid;
+    }
+    cpuTopo.sort();
+  }
+  return;
+#else
 
 #if CMK_USE_GM
   CmiBarrier();
@@ -466,6 +490,8 @@ extern "C" void CmiInitCPUTopology(char **argv)
   done++;
   CmiUnlock(topoLock);
 #endif
+
+#endif   /* __BLUEGENE__ */
 
   // now every one should have the node info
 }
