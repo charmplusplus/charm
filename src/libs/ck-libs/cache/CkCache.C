@@ -181,8 +181,10 @@
     finishedChunks = 0;
     if (syncdChares > 0) {
       _numChunks = numChunks;
+      //CkPrintf("Cache %d: sync following\n",thisgroup.idx);
     } else {
       syncdChares = 1;
+      //CkPrintf("Cache %d: sync\n",thisgroup.idx);
 
       localChares.reset();
       localCharesWB.reset();
@@ -260,6 +262,7 @@
   void CkCacheManager::finishedChunk(int chunk, CmiUInt8 weight) {
     CkAssert(chunkAck[chunk] > 0);
     chunkWeight[chunk] += weight;
+    //CkPrintf("Cache %d: finishedChunk %d\n",thisgroup.idx,chunkAck[chunk]);
     if (--chunkAck[chunk] == 0) {
       // we can safely delete the chunk from the cache
       
