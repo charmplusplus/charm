@@ -986,13 +986,13 @@ void _initCharm(int unused_argc, char **argv)
 		}*/
 	}	
 	
-#if ! CMK_BLUEGENE_CHARM
         if (faultFunc == NULL) {         // this is not restart
-            // blocking calls
+            // these two are blocking calls for non-bigsim
+#if ! CMK_BLUEGENE_CHARM
           CmiInitCPUAffinity(argv);
+#endif
           CmiInitCPUTopology(argv);
         }
-#endif
 
 	if (faultFunc) {
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
