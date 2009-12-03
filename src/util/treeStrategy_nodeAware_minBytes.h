@@ -62,6 +62,7 @@ namespace impl {
     SpanningTreeVertex* buildNextGen_nodeAware_minBytes(const vtxType parentPE, const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches)
     {
         /// ------------- Obtain a list of all PEs on this physical machine node -------------
+        CkAssert(parentPE < CkNumPes() );
         int numOnNode, *pesOnNode;
         CmiGetPesOnPhysicalNode(CmiPhysicalNodeID(parentPE),&pesOnNode,&numOnNode);
 

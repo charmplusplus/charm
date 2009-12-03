@@ -69,11 +69,12 @@ namespace impl {
         SpanningTreeVertex *parent = impl::buildNextGen_topoUnaware(firstVtx,beyondLastVtx,maxBranches);
 
         /// Obtain a list of all PEs on this physical machine node
+        CkAssert(parentPE < CkNumPes() );
         int numOnNode, *pesOnNode;
         CmiGetPesOnPhysicalNode(CmiPhysicalNodeID(parentPE),&pesOnNode,&numOnNode);
 
         /// Find any (upto maxBranches) tree members that are on the same node and make them the direct children
-        if (numOnNode > 0)
+        if (numOnNode > 0 && parent->childIndex.size() > 0)
         {
             Iterator itr = firstVtx;
             int brNum = 0, numBranches = parent->childIndex.size();
