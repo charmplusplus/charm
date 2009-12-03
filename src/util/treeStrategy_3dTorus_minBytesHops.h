@@ -91,7 +91,7 @@ SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningT
     TopoManager aTopoMgr;
     /// The number of vertices in the tree that require network traversal
     int numLocalDestinations = -1, numRemoteDestinations = 0;
-    Iterator firstDescendant = firstVtx, beyondLastLocal = firstVtx;
+    Iterator beyondLastLocal = firstVtx;
 
     /// Find the machine coordinates of each vertex and also collate the local destination vertices
     for (Iterator itr = firstVtx; itr != beyondLastVtx; itr++)
