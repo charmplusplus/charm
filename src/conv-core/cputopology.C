@@ -10,11 +10,6 @@
 #include "sockRoutines.h"
 #include "cklists.h"
 
-#if CMK_BLUEGENE_CHARM
-#include "middle-blue.h"
-using namespace BGConverse;
-#endif
-
 #define DEBUGP(x)  /** CmiPrintf x; */
 
 /** This scheme relies on using IP address to identify physical nodes 
@@ -51,6 +46,11 @@ extern "C" int getXTNodeID(int mype, int numpes);
 #if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
 #include <Carbon/Carbon.h>
 #include <Multiprocessing.h>
+#endif
+
+#if CMK_BLUEGENE_CHARM
+#include "middle-blue.h"
+using namespace BGConverse;
 #endif
 
 extern "C" int CmiNumCores(void) {
