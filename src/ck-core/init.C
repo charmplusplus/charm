@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 /**
 \addtogroup CkInit
 \brief Controls the Charm++ startup process.
@@ -49,6 +43,26 @@ which is probably overly complex.
 void CkRestartMain(const char* dirname);
 
 #define  DEBUGF(x)     //CmiPrintf x;
+
+#ifdef CALCULATE_HOPS
+/** Turn on manually if you want to calculate hops from within Charm++
+for some application **/
+
+#include "TopoManager.h"
+
+TopoManager *tmgr = NULL;
+double hops = 0;
+
+extern "C" void calculateTotalHops(int pe1, int pe2, int size) {
+  if(tmgr == NULL)
+    tmgr = new TopoManager();
+  hops += (tmgr->getHopsBetweenRanks(pe1, pe2) * size);
+}
+
+extern "C" void printTotalHops() {
+  CmiPrintf("TOTAL HOPS %lf\n", hops/(1024*1024) );
+}
+#endif
 
 UChar _defaultQueueing = CK_QUEUEING_FIFO;
 
