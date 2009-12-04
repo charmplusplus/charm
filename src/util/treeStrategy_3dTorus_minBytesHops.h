@@ -115,7 +115,12 @@ SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningT
     {
         numLocalBranches = (numRemoteDestinations >= maxBranches-1)? 1 : (maxBranches - numRemoteDestinations);
         /// Distribute the local destination vertices amongst numLocalBranches branches
-        impl::buildNextGen_topoUnaware(firstVtx,beyondLastLocal,numLocalBranches);
+        SpanningTreeVertex *localTree = impl::buildNextGen_topoUnaware(firstVtx,beyondLastLocal,numLocalBranches);
+        /// Append the local tree info to the child info
+        for (int i=0,n=localTree->childIndex.size(); i<n; i++)
+            firstVtx->childIndex.push_back( localTree->childIndex[i] );
+        /// Intermediate results no longer needed
+        delete localTree;
     }
 
     /// Partition the remote-vertex bounding box into the remaining number of branches
