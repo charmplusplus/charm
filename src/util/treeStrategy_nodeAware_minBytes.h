@@ -62,6 +62,7 @@ namespace impl {
     SpanningTreeVertex* buildNextGen_nodeAware_minBytes(const vtxType parentPE, const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches)
     {
         /// ------------- Obtain a list of all PEs on this physical machine node -------------
+        CkAssert(parentPE < CkNumPes() );
         int numOnNode, *pesOnNode;
         CmiGetPesOnPhysicalNode(CmiPhysicalNodeID(parentPE),&pesOnNode,&numOnNode);
 
@@ -71,7 +72,7 @@ namespace impl {
         /// The object that will hold the final results
         SpanningTreeVertex *parent = 0;
         /// 
-        Iterator itr = firstVtx, beyondLastLocal = firstVtx;
+        Iterator itr = firstVtx, lastLocal = firstVtx;
 
         /// Scan the tree members until we identify all possible same node PEs or run out of tree members
         while ( numLocalDestinations < numOnNode -1 && itr != beyondLastVtx)
@@ -82,8 +83,8 @@ namespace impl {
             if (itr != beyondLastVtx)
             {
                 numLocalDestinations++;
-                if (itr != ++beyondLastLocal)
-                    std::iter_swap(itr,beyondLastLocal);
+                if (itr != ++lastLocal)
+                    std::iter_swap(itr,lastLocal);
             }
         }
 
@@ -92,14 +93,15 @@ namespace impl {
         if (numLocalDestinations > 0)
         {
             /// Determine how many branches can be used to span the local destinations
-            int numRemoteDestinations = std::distance(firstVtx,beyondLastVtx) - numLocalDestinations; ///< @warning: This is O(treeSize) for Iterator != random iterator
+            int numRemoteDestinations = std::distance(firstVtx,beyondLastVtx) -1 - numLocalDestinations; ///< @warning: This is O(treeSize) for Iterator != random iterator
             numLocalBranches = (numRemoteDestinations >= maxBranches-1)? 1 : (maxBranches - numRemoteDestinations);
 
             /// Distribute the local destination vertices amongst numLocalBranches branches
+            Iterator beyondLastLocal = lastLocal;
             parent = buildNextGen_topoUnaware(firstVtx,++beyondLastLocal,numLocalBranches);
 
             /// Construct a topo-unaware tree for the rest (off-node PEs) of the vertices
-            SpanningTreeVertex *remoteSubTrees = buildNextGen_topoUnaware(beyondLastLocal,beyondLastVtx,maxBranches-numLocalBranches);
+            SpanningTreeVertex *remoteSubTrees = buildNextGen_topoUnaware(lastLocal,beyondLastVtx,maxBranches-numLocalBranches); ///< Abuse the interface by faking lastLocal as the tree root
 
             /// Append the remote sub-tree info to the result object
             for (int i=0, n=remoteSubTrees->childIndex.size(); i< n; i++)
