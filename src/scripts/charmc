@@ -173,7 +173,7 @@ Abort() {
 # Args: executed as given
 DoNoErrCheck() {
 	[ -n "$VERBOSE" ] && echo "charmc: Executing $@" 1>&2
-	"$@"
+	eval "$@"
 }
 
 Do() {
