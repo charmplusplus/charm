@@ -2231,7 +2231,17 @@ FEM_Mesh *FEM_readMesh(const char *prefix, int chunkNo, int nChunks)
         
         for(int i=0; i<numNeighborVPs; i++){
           IDXL_List list = shared.getLocalList(i);
-          CkPrintf("%d communicates with chunk %d through %d shared nodes\n", chunkNo, list.getDest(), list.size()); 
+
+	  double sumx, sumy;
+	  int nnodes = node.size();
+	  for(int n=0; n<nnodes; n++){
+	    double x,y;
+	    node.get_coord(n,x,y);
+	    sumx += x;
+	    sumy += y;
+	  }
+
+          CkPrintf("chunk %d at %f %f communicates with chunk %d through %d shared nodes\n", chunkNo, sumx/(double)nnodes, sumy/(double)nnodes, list.getDest(), list.size()); 
         }
 #endif
 
