@@ -663,7 +663,12 @@ do
 		;;
 
 	-D*|-I*)
-		OPTS_CPP="$OPTS_CPP $arg"
+		if echo "$arg" | grep ' '  > /dev/null 2>/dev/null 
+		then
+		  OPTS_CPP="$OPTS_CPP "\"$arg\"
+		else
+		  OPTS_CPP="$OPTS_CPP $arg"
+   		fi
 		;;
 
 	-LANG*)
@@ -749,7 +754,7 @@ done
 trap 'End 1' 2
 
 # Process original command-line arguments
-processArgs "$@"
+eval processArgs "$@"
 
 
 ##############################################################################
