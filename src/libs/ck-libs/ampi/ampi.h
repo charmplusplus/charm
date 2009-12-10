@@ -139,6 +139,8 @@ typedef int MPI_Fint;
 #define MPI_KEYVAL_INVALID (-1)
 #define MPI_INFO_NULL    (-1)
 
+#define MPI_IN_PLACE ((void *) -1L)
+
 #define MPI_BOTTOM	 0
 #define MPI_UNDEFINED    (-32766)
 

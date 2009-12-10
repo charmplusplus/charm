@@ -2739,6 +2739,10 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   }
 #endif
   
+  if (inbuf == MPI_IN_PLACE) inbuf = outbuf;
+  if (outbuf == MPI_IN_PLACE) outbuf = inbuf;
+  CmiAssert(inbuf != MPI_IN_PLACE && outbuf != MPI_IN_PLACE);
+
   ampi *ptr = getAmpiInstance(comm);
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
   if(op == MPI_OP_NULL) CkAbort("MPI_Reduce called with MPI_OP_NULL!!!");
@@ -2776,6 +2780,11 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
 {
   AMPIAPI("AMPI_Allreduce");
   ampi *ptr = getAmpiInstance(comm);
+ 
+  if (inbuf == MPI_IN_PLACE) inbuf = outbuf;
+  if (outbuf == MPI_IN_PLACE) outbuf = inbuf;
+  CmiAssert(inbuf != MPI_IN_PLACE && outbuf != MPI_IN_PLACE);
+  
   CkDDT_DataType *ddt_type = ptr->getDDT()->getType(type);
   TRACE_BG_AMPI_SET_SIZE(count * ddt_type->getSize());
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);

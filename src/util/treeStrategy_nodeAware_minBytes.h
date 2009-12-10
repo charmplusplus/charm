@@ -78,7 +78,11 @@ namespace impl {
         while ( numLocalDestinations < numOnNode -1 && itr != beyondLastVtx)
         {
             /// Try to find the next same-node PE
+            #if ! CMK_CC_PGCC
             itr = std::find_first_of(++itr,beyondLastVtx,pesOnNode,pesOnNode + numOnNode);
+            #else
+            itr = std::find_first_of(++itr,beyondLastVtx,pesOnNode,pesOnNode + numOnNode,vtxEqual());
+            #endif
             /// If such a PE was found...
             if (itr != beyondLastVtx)
             {
