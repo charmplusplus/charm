@@ -133,6 +133,19 @@ static int isLeakSlot(Slot *s) {
   return s->magic & LEAK_FLAG;
 }
 
+int Slot_ChareOwner(void *s) {
+  return ((Slot*)s)->chareID;
+}
+
+int Slot_AllocatedSize(void *s) {
+  return ((Slot*)s)->userSize;
+}
+
+int Slot_StackTrace(void *s, void ***stack) {
+  *stack = ((Slot*)s)->from;
+  return ((Slot*)s)->stackLen;
+}
+
 static void printSlot(Slot *s) {
   CmiPrintf("[%d] Leaked block of %d bytes at %p:\n",
 	    CmiMyPe(), s->userSize, SlotToUser(s));
@@ -1003,8 +1016,9 @@ static void CpdMMAPhandler(int sig, siginfo_t *si, void *unused){
     unProtectedPages = newUnProtectedPages;
   }
   unProtectedPages[unProtectedPagesSize++] = pageToUnprotect;
-  CmiPrintf("Got SIGSEGV at address: 0x%lx\n", (long) si->si_addr);
-  CmiPrintStackTrace(0);
+  CpdNotify(CPD_CROSSCORRUPTION, si->si_addr, memory_chare_id);
+  //CmiPrintf("Got SIGSEGV at address: 0x%lx\n", (long) si->si_addr);
+  //CmiPrintStackTrace(0);
 }
 
 static void protectMemory() {
@@ -1564,3 +1578,26 @@ void setMemoryOwnedBy(void *ptr, int chareID) {
   Slot *sl = UserToSlot(ptr);
   sl->chareID = chareID;
 }
+
+void * MemoryToSlot(void *ptr) {
+  Slot *sl;
+  int i;
+#if defined(CPD_USE_MMAP) && defined(CMK_SEPARATE_SLOT)
+  for (i=0; i<1000; ++i) {
+    sl = UserToSlot((void*)(((CmiUInt8)ptr)-i*meta_getpagesize() & ~(meta_getpagesize()-1)));
+    if (sl != NULL) return sl;
+  }
+#endif
+  return NULL;
+}
+
+/*void PrintDebugStackTrace(void *ptr) {
+  int i;
+  Slot *sl = UserToSlot((void*)(((CmiUInt8)ptr) & ~(meta_getpagesize()-1)));
+  if (sl != NULL) {
+    CmiPrintf("%d %d ",sl->chareID,sl->stackLen);
+    for (i=0; i<sl->stackLen; ++i) CmiPrintf("%p ",sl->from[i]);
+  } else {
+    CmiPrintf("%d 0 ",sl->chareID);
+  }
+}*/

@@ -730,6 +730,10 @@ void CpdResetMemory() { }
 void CpdCheckMemory() { }
 
 int get_memory_allocated_user_total() { return 0; }
+void * MemoryToSlot(void *ptr) { return NULL; }
+int Slot_ChareOwner(void *s) { return 0; }
+int Slot_AllocatedSize(void *s) { return 0; }
+int Slot_StackTrace(void *s, void ***stack) { return 0; }
 #ifdef setMemoryChareIDFromPtr
 #undef setMemoryChareIDFromPtr
 #endif
