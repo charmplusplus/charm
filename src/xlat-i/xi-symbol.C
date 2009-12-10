@@ -29,7 +29,7 @@ namespace xi {
 int fortranMode;
 int internalMode;
 const char *cur_file;
-char *python_doc;
+const char *python_doc;
 
 const char *Prefix::Proxy="CProxy_";
 const char *Prefix::ProxyElement="CProxyElement_";
@@ -2784,7 +2784,7 @@ void ParamList::checkParamList(){
   }
 }
 
-Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, char *e, int connect, ParamList *connectPList) :
+Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e, int connect, ParamList *connectPList) :
       attribs(a), retType(r), name((char *)n), param(p), stacksize(sz), sdagCon(sc), intExpr(e), isConnect(connect), connectParam(connectPList)
 {
   line=l; container=NULL;
