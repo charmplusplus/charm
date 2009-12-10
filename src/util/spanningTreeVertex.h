@@ -29,16 +29,16 @@ class SpanningTreeVertex
 
     /// Overload == and < to keep users happy. Note: not member functions
     ///@{
-    inline friend bool operator== (const SpanningTreeVertex &obj, const int vtxID)
+    inline friend bool operator== (const SpanningTreeVertex &obj, const vtxType vtxID)
     { return (obj.id == vtxID); }
 
-    inline friend bool operator== (const int vtxID, const SpanningTreeVertex &obj)
+    inline friend bool operator== (const vtxType vtxID, const SpanningTreeVertex &obj)
     { return (obj.id == vtxID); }
 
-    inline friend bool operator< (const SpanningTreeVertex &obj, const int vtxID)
+    inline friend bool operator< (const SpanningTreeVertex &obj, const vtxType vtxID)
     { return (obj.id < vtxID); }
 
-    inline friend bool operator< (const int vtxID, const SpanningTreeVertex &obj)
+    inline friend bool operator< (const vtxType vtxID, const SpanningTreeVertex &obj)
     { return (vtxID < obj.id); }
     ///@}
 

@@ -113,12 +113,6 @@ namespace topo {
 template <typename Iterator>
 SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minHops<Iterator,SpanningTreeVertex>::buildNextGen(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches)
 {
-    // if (maxBranches < 1) throw;
-    CkAssert(maxBranches >= 1);
-    /// Check validity and ranges etc.
-    const int numDescendants = std::distance(firstVtx,beyondLastVtx) - 1;
-    // if (numDescendants < 0) throw;
-    CkAssert(numDescendants >= 0);
     /// If the parent vertex already has a(n older) list of children, clear it
     (*firstVtx).childIndex.clear();
     (*firstVtx).childIndex.reserve(maxBranches);

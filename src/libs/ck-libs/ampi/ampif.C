@@ -325,6 +325,8 @@ void mpi_reduce(void *inbuf, void *outbuf, int *count, int *type,
    int *opc, int *root, int *comm, int *ierr)
 {
   MPI_Op op = GET_MPI_OP(*opc);
+  if (inbuf == NULL) inbuf = MPI_IN_PLACE;
+  if (outbuf == NULL) outbuf = MPI_IN_PLACE;
   *ierr = AMPI_Reduce(inbuf, outbuf, *count, *type, op, *root, *comm);
 }
 
@@ -332,6 +334,8 @@ void mpi_allreduce(void *inbuf,void *outbuf,int *count,int *type,
    int *opc, int *comm, int *ierr)
 {
   MPI_Op op = GET_MPI_OP(*opc);
+  if (inbuf == NULL) inbuf = MPI_IN_PLACE;
+  if (outbuf == NULL) outbuf = MPI_IN_PLACE;
   *ierr = AMPI_Allreduce(inbuf, outbuf, *count, *type, op, *comm);
 }
 

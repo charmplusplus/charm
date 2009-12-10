@@ -766,7 +766,9 @@ of each entry method.
 \label{array section}
 
 \charmpp{} supports array section which is a subset of array 
-elements in a chare array.
+elements in a chare array. \charmpp{} also supports array sections
+which are a subset of array elements in multiple chare arrays of the
+same type \ref{cross array section}.
 A special proxy for an array section can be created given a list of array
 indexes of elements.
 Multicast operations are directly supported in array section proxy with
@@ -998,5 +1000,76 @@ void Foo::pup(PUP::er & p) {
    }
 }
 \end{alltt}
+
+\paragraph{Cross Array Sections}
+
+
+\experimental{}
+\label{cross array section}
+
+Cross array sections contain elements from multiple arrays.
+Construction and use of cross array sections is similar to normal
+array sections with the following restrictions.  
+
+\begin{itemize}
+
+\item Arrays in a section my all be of the same type.
+
+\item Each array must be enumerated by array ID
+
+\item The elements within each array must be enumerated explicitly
+
+\item No existing modules currently support delegation of cross
+  section proxies.  Therefore reductions are not currently supported.
+
+\end{itemize}
+
+Note: cross section logic also works for groups with analogous characteristics.
+
+Given three arrays declared thusly:
+
+\begin{alltt}
+	  CkArrayID *aidArr= new CkArrayID[3];
+	  CProxy\_multisectiontest\_array1d *Aproxy= new CProxy\_multisectiontest\_array1d[3];
+	  for(int i=0;i<3;i++)
+	    \{
+	      Aproxy[i]=CProxy\_multisectiontest\_array1d::ckNew(masterproxy.ckGetGroupID(),ArraySize);	  
+	      aidArr[i]=Aproxy[i].ckGetArrayID();
+	    \}
+\end{alltt}
+
+One can make a section including the  lower half elements of all three
+arrays as follows:
+
+\begin{alltt}
+	  int aboundary=ArraySize/2;
+	  int afloor=aboundary;
+	  int aceiling=ArraySize-1;
+	  int asectionSize=aceiling-afloor+1;
+	  // cross section lower half of each array
+	  CkArrayIndexMax **aelems= new CkArrayIndexMax*[3];
+	  aelems[0]= new CkArrayIndexMax[asectionSize];
+	  aelems[1]= new CkArrayIndexMax[asectionSize];
+	  aelems[2]= new CkArrayIndexMax[asectionSize];
+	  int *naelems=new int[3];
+	  for(int k=0;k<3;k++)
+	    \{
+	      naelems[k]=asectionSize;
+	      for(int i=afloor,j=0;i<=aceiling;i++,j++)
+	        aelems[k][j]=CkArrayIndex1D(i);
+	    \}
+	  const CkArrayIndexMax *constaelems[3]={aelems[0], aelems[1], aelems[2]};
+	  CProxySection\_multisectiontest\_array1d arrayLowProxy(3,aidArr,constaelems,naelems);
+\end{alltt}
+
+
+
+The resulting cross section proxy, as in the example \uw{arrayLowProxy},
+can then be used for multicasts in the same way as a normal array
+section.
+
+Note: For simplicity the example has all arrays and sections of uniform
+size.  The size of each array and the number of elements in each array
+within a section can all be set independently.
 
 
