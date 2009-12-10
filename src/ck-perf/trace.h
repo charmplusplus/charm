@@ -140,6 +140,8 @@ class Trace {
     // begin/end of execution
     virtual void beginComputation(void) {}
     virtual void endComputation(void) {}
+    // demarkation of a phase boundary
+    virtual void endPhase() {}
     // clear all data collected for entry points
     virtual void traceClearEps() {}
     // enable CCS operations if supported on the trace module
@@ -267,6 +269,9 @@ public:
     inline void endFunc(char *name){ ALLDO(endFunc(name)); }
     inline void endFunc(int idx){ ALLDO(endFunc(idx)); }
 
+    /* Phase Demarkation */
+    inline void endPhase() { ALLDO(endPhase()); }
+
     /* Memory tracing */
     inline void malloc(void *where, int size, void **stack, int stackSize){ ALLDO(malloc(where,size,stack,stackSize)); }
     inline void free(void *where, int size){ ALLDO(free(where, size)); }
@@ -317,6 +322,8 @@ extern "C" {
 #define _TRACE_END_COMPUTATION() _TRACE_ALWAYS(CkpvAccess(_traces)->endComputation())
 #define _TRACE_ENQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->enqueue(env))
 #define _TRACE_DEQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->dequeue(env))
+
+#define _TRACE_END_PHASE() _TRACE_ONLY(CkpvAccess(_traces)->endPhase())
 
 /* Memory tracing */
 #define _TRACE_MALLOC(where, size, stack, stackSize) _TRACE_ONLY(CkpvAccess(_traces)->malloc(where,size,stack,stackSize))
