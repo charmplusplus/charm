@@ -1014,7 +1014,12 @@ static void protectMemory() {
   SLOT_ITERATE_START(cur)
     if (cur->chareID != memory_chare_id && cur->chareID > 0) {
       /*printf(" %p",cur->userData);*/
-      mprotect(cur->userData, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
+#ifdef CMK_SEPARATE_SLOT
+      char * data = cur->userData;
+#else
+      char * data = (char *)cur;
+#endif
+      mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
     } /*else printf(" (%p)",cur->userData);*/
   SLOT_ITERATE_END
   /*printf("\n");*/
@@ -1025,7 +1030,12 @@ static void unProtectMemory() {
 #ifdef CPD_USE_MMAP
   Slot *cur;
   SLOT_ITERATE_START(cur)
-    mprotect(cur->userData, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+#ifdef CMK_SEPARATE_SLOT
+      char * data = cur->userData;
+#else
+      char * data = (char *)cur;
+#endif
+    mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
   SLOT_ITERATE_END
   /*printf("unprotecting memory\n");*/
 #endif
