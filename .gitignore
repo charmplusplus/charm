@@ -16,6 +16,13 @@ lib
 lib_so
 tmp
 
+# Ignore directories created from compilation
+net-*
+mpi-*
+lapi*
+vmi-*
+multicore-*
+
 # Ignore cruft that would result from compiling charm example/test code
 # Note this is negated inside src/arch to permit addition of new charmrun files in there
 charmrun
