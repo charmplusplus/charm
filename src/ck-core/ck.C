@@ -1845,8 +1845,10 @@ public:
 private:
   virtual CmiBool process(envelope *env,CkCoreState *ck) {
     if (env->getEvent()) {
-      unsigned int crc = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
-      fprintf(f,"%d %d %d %d %x\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc);
+      //unsigned int crc = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
+      unsigned int crc1 = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
+      unsigned int crc2 = crc32(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
+      fprintf(f,"%d %d %d %hhd %x %x\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2);
     }
     return CmiTrue;
   }
@@ -1877,10 +1879,10 @@ private:
 
 class CkMessageReplay : public CkMessageWatcher {
 	int nextPE, nextSize, nextEvent, nexttype; //Properties of next message we need:
-	unsigned int crc;
+	unsigned int crc1, crc2;
 	/// Read the next message we need from the file:
 	void getNext(void) {
-		if (5!=fscanf(f,"%d%d%d%d%x", &nextPE,&nextSize,&nextEvent,&nexttype,&crc)) {
+		if (6!=fscanf(f,"%d%d%d%d%x%x", &nextPE,&nextSize,&nextEvent,&nexttype,&crc1,&crc2)) {
 			// CkAbort("CkMessageReplay> Syntax error reading replay file");
 			nextPE=nextSize=nextEvent=nexttype=-1; //No destructor->record file just ends in the middle!
 		}
@@ -1894,10 +1896,15 @@ class CkMessageReplay : public CkMessageWatcher {
 			CkPrintf("CkMessageReplay> Message size changed during replay org: [%d %d %d] got: [%d %d %d]\n", nextPE, nextEvent, nextSize, env->getSrcPe(), env->getEvent(), env->getTotalsize());
                         return CmiFalse;
                 }
-		unsigned int crcnew = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
-		if (crcnew != crc) {
-		  CkPrintf("CkMessageReplay> Message CRC changed during replay org: [0x%x] got: [0x%x]\n",crc,crcnew);
+		//unsigned int crcnew = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
+		unsigned int crcnew1 = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
+		unsigned int crcnew2 = crc32(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
+		if (crcnew1 != crc1) {
+		  CkPrintf("CkMessageReplay> Envelope CRC changed during replay org: [0x%x] got: [0x%x]\n",crc1,crcnew1);
 		}
+        if (crcnew2 != crc2) {
+          CkPrintf("CkMessageReplay> Message CRC changed during replay org: [0x%x] got: [0x%x]\n",crc2,crcnew2);
+        }
 		return CmiTrue;
 	}
 
