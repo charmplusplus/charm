@@ -248,14 +248,13 @@ basics: headers
 	touch basics
 
 # Headers is used only for the dependencies
-headers: dirs+sources
-	$(MAKE) headerlinks
+headers: headerlinks
 
 conv-autoconfig.h: configure
-	./configure
+	./configure $(QUIET)
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
-	@echo "Soft-linking headers..."
+	@[ "x$QUIET" = "x--quiet" ] || echo "Soft-linking headers..."
 	-@for hdr in $(ALLHEADERS) ; do test ! -f "../include/$$hdr" && ./system_ln "../tmp/$$hdr" ../include ; done
 	touch headerlinks
 
