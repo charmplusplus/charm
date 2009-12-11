@@ -38,6 +38,14 @@ inline int notequal(double v1, double v2)
     return (fabs(v1 - v2) > epsilon);
 }
 
+static void perfCheck(int expected, int actual)
+{
+  if (expected != actual)
+	ckout << "Arguments don't line up with compiled in defaults." << endl
+		  << expected << " != " << actual << endl
+		  << " Performance may suffer" << endl;
+}
+
 class t2d : public CBase_t2d
 {
 protected:
@@ -410,7 +418,7 @@ protected:
     // Assumes that the nepp equals the size of a row, i.e. NEPP == COLS1 == ROWS2
     void FindProductNoPrefetchStripMinedNMK(MSA2DRowMjrC::Write &wp)
     {
-        CkAssert(NEPP == cols1);
+	    perfCheck(NEPP, cols1);
         unsigned int rowStart, rowEnd;
         GetMyIndices(rows1, thisIndex, numWorkers, rowStart, rowEnd);
         CkPrintf("p%dw%d: FPNP2DSM A = %d %d %d %d\n", CkMyPe(), thisIndex, rowStart, rowEnd, 0, cols2-1);
@@ -441,8 +449,8 @@ protected:
     // Assumes CkAssert(NEPP_C == cols2);
     void FindProductNoPrefetchStripMinedMKN_ROWMJR(MSA2DRowMjrC::Write &wp)
     {
-        CkAssert(NEPP == cols1);
-        CkAssert(NEPP_C == cols2);
+	    perfCheck(NEPP, cols1);
+	    perfCheck(NEPP_C, cols2);
         CkAssert(arr2.getArrayLayout() == MSA_ROW_MAJOR);
         unsigned int rowStart, rowEnd;
         GetMyIndices(rows1, thisIndex, numWorkers, rowStart, rowEnd);
@@ -521,7 +529,7 @@ protected:
     // ============================= 2D ===================================
     void FindProductNoPrefetch2DStripMined(MSA2DRowMjrC::Write &wp)
     {
-        CkAssert(NEPP == cols1);
+        perfCheck(NEPP, cols1);
         unsigned int rowStart, rowEnd, colStart, colEnd;
         // fill in our portion of the C matrix
         GetMyIndices(rows1, toX(), numWorkers2D(), rowStart, rowEnd);
@@ -600,8 +608,8 @@ protected:
 
     void FindProductNoPrefetch3DStripMined(MSA2DRowMjrC::Accum &ap)
     {
-        CkAssert(NEPP == cols1);
-        unsigned int rowStart, rowEnd, colStart, colEnd, kStart, kEnd;
+        perfCheck(NEPP, cols1);
+		unsigned int rowStart, rowEnd, colStart, colEnd, kStart, kEnd;
         // fill in our portion of the C matrix
         GetMyIndices(rows1, toX3D(), numWorkers3D(), rowStart, rowEnd);
         GetMyIndices(cols2, toY3D(), numWorkers3D(), colStart, colEnd);
