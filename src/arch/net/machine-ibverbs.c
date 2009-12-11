@@ -345,10 +345,10 @@ typedef struct {
 #define INFIMULTIPOOL 0xDEAFB00D
 
 #if THREAD_MULTI_POOL
-infiCmiChunkPool **infiCmiChunkPools;
+static infiCmiChunkPool **infiCmiChunkPools;
 //TODO Find proper place to dispose the memory acquired by infiCmiChunkPool
 #else
-infiCmiChunkPool infiCmiChunkPools[INFINUMPOOLS];
+static infiCmiChunkPool infiCmiChunkPools[INFINUMPOOLS];
 #endif
 
 static void initInfiCmiChunkPools();
