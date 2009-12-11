@@ -48,26 +48,27 @@ typedef enum { MSA_COL_MAJOR=0, MSA_ROW_MAJOR=1 } MSA_Array_Layout_t;
 template <class T, bool PUP_EVERY_ELEMENT=false >
 class DefaultEntry {
 public:
-    inline void accumulate(T& a, const T& b) { a += b; }
+	template<typename U>
+    static inline void accumulate(T& a, const U& b) { a += b; }
     // identity for initializing at start of accumulate
-    inline T getIdentity() { return (T)0; }
-    inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
+    static inline T getIdentity() { return (T)0; }
+    static inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
 };
 
 template <class T, bool PUP_EVERY_ELEMENT=false >
 class ProductEntry {
 public:
-    inline void accumulate(T& a, const T& b) { a *= b; }
-    inline T getIdentity() { return (T)1; }
-    inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
+    static inline void accumulate(T& a, const T& b) { a *= b; }
+    static inline T getIdentity() { return (T)1; }
+    static inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
 };
 
 template <class T, T minVal, bool PUP_EVERY_ELEMENT=false >
 class MaxEntry {
 public:
-    inline void accumulate(T& a, const T& b) { a = (a<b)?b:a; }
-    inline T getIdentity() { return minVal; }
-    inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
+    static inline void accumulate(T& a, const T& b) { a = (a<b)?b:a; }
+    static inline T getIdentity() { return minVal; }
+    static inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
 };
 
 //================================================================
