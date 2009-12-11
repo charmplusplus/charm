@@ -2048,12 +2048,13 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
 #define MAX_SHARED_PER_NODE 20
 
 template <class T, bool PUP_EVERY_ELEMENT=true >
-  class DefaultListEntry {
+class DefaultListEntry {
     public:
-    inline void accumulate(T& a, const T& b) { a += b; }
+    template<typename U>
+    static inline void accumulate(T& a, const U& b) { a += b; }
     // identity for initializing at start of accumulate
-    inline T getIdentity() { return T(); }
-    inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
+    static inline T getIdentity() { return T(); }
+    static inline bool pupEveryElement(){ return PUP_EVERY_ELEMENT; }
   };
 
 extern double elemlistaccTime;
@@ -2266,6 +2267,31 @@ class MeshElem{
       m = new FEM_Mesh;
     }
     m->pup(p);
+  }
+
+  struct ElemInfo {
+      FEM_Mesh* m;
+      int index;
+      int elemType;
+      ElemInfo(FEM_Mesh* _m, int _index, int _elemType)
+          : m(_m), index(_index), elemType(_elemType) {}
+  };
+
+  MeshElem& operator+=(const ElemInfo& rhs) {
+     m->elem[rhs.elemType].copyShape(rhs.m->elem[rhs.elemType]);
+     m->elem[rhs.elemType].push_back(rhs.m->elem[rhs.elemType], rhs.index);
+  }
+
+  struct NodeInfo {
+      FEM_Mesh* m;
+      int index;
+      NodeInfo(FEM_Mesh* _m, int _index)
+          : m(_m), index(_index) {}
+  };
+
+  MeshElem& operator+=(const NodeInfo& rhs) {
+     m->node.copyShape(rhs.m->node);
+     m->node.push_back(rhs.m->node, rhs.index);
   }
 };
 
