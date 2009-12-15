@@ -2280,6 +2280,7 @@ class MeshElem{
   MeshElem& operator+=(const ElemInfo& rhs) {
      m->elem[rhs.elemType].copyShape(rhs.m->elem[rhs.elemType]);
      m->elem[rhs.elemType].push_back(rhs.m->elem[rhs.elemType], rhs.index);
+     return *this;
   }
 
   struct NodeInfo {
@@ -2292,6 +2293,7 @@ class MeshElem{
   MeshElem& operator+=(const NodeInfo& rhs) {
      m->node.copyShape(rhs.m->node);
      m->node.push_back(rhs.m->node, rhs.index);
+     return *this;
   }
 };
 
