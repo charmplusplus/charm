@@ -548,6 +548,9 @@ public:
   bool alreadyRequestedMemoryUsage;
   bool alreadyRequestedIdleTime;
 
+  bool exitWhenReady;
+
+
   controlPointManager();
      
   ~controlPointManager();
@@ -587,7 +590,11 @@ public:
   /// All processors reduce their memory usages in requestIdleTime() to this method
   void gatherIdleTime(CkReductionMsg *msg);
   
+  /// Call CkExit once all outstanding operations have completed (e.g. waiting for idle time & memory usage to be gathered)
+  void checkForShutdown();
 
+  /// Call CkExit once all outstanding operations have completed (e.g. waiting for idle time & memory usage to be gathered)
+  void exitIfReady();
 
   /// Entry method called on all PEs to request memory usage
   void requestMemoryUsage(CkCallback cb);
