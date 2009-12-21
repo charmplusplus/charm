@@ -248,19 +248,6 @@ controlPointManager::controlPointManager(){
 
     CkPrintf("[%d] processControlPoints() haveGranularityCallback=%d frameworkShouldAdvancePhase=%d\n", CkMyPe(), (int)haveGranularityCallback, (int)frameworkShouldAdvancePhase);
 
-    if(shouldGatherMemoryUsage && CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
-      alreadyRequestedMemoryUsage = true;
-      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
-      thisProxy.requestMemoryUsage(*cb);
-      delete cb;
-    }
-
-    if(shouldGatherUtilization && CkMyPe() == 0 && !alreadyRequestedIdleTime){
-      alreadyRequestedIdleTime = true;
-      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherIdleTime(NULL), 0, thisProxy);
-      thisProxy.requestIdleTime(*cb);
-      delete cb;
-    }
 
     //==========================================================================================
     // Print the data for each phase
@@ -485,6 +472,25 @@ controlPointManager::controlPointManager(){
   /// Called by either the application or the Control Point Framework to advance to the next phase  
   void controlPointManager::gotoNextPhase(){
 
+
+
+    if(shouldGatherMemoryUsage && CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
+      alreadyRequestedMemoryUsage = true;
+      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
+      thisProxy.requestMemoryUsage(*cb);
+      delete cb;
+    }
+
+    if(shouldGatherUtilization && CkMyPe() == 0 && !alreadyRequestedIdleTime){
+      alreadyRequestedIdleTime = true;
+      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherIdleTime(NULL), 0, thisProxy);
+      thisProxy.requestIdleTime(*cb);
+      delete cb;
+    }
+
+
+
+
     LBDatabase * myLBdatabase = LBDatabaseObj();
 
 #if CMK_LBDB_ON && 0
@@ -554,7 +560,9 @@ controlPointManager::controlPointManager(){
     idle[1] = i;
     idle[2] = i;
     
-    //    localControlPointTracingInstance()->resetTimings();
+    CkPrintf("[%d] idleRatio=%f\n", CkMyPe(), i);
+    
+    localControlPointTracingInstance()->resetTimings();
 
     contribute(3*sizeof(double),idle,idleTimeReductionType, cb);
   }

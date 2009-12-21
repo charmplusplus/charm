@@ -23,13 +23,14 @@
  *  Only the more common hooks are listened to in this module.
  */
 class TraceControlPoints : public Trace {
- public:
+ private:
 
   double lastBeginExecuteTime;
   int lastbeginMessageSize;
 
   /** The amount of time spent executing entry methods */
   double totalEntryMethodTime;
+
 
   /** The start of the idle region */
   double lastBeginIdle;
