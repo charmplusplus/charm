@@ -6,17 +6,10 @@
 cat > pup_f.f90 << END_OF_HEADER
       module pupmod
       implicit none
-      external fpup_int
-      external fpup_ints
       external fpup_char
       external fpup_chars
       external fpup_short
       external fpup_shorts
-      external fpup_real
-      external fpup_reals
-      external fpup_double
-      external fpup_doubles
-      external fpup_logical
       external fpup_logicals
       interface
         function fpup_issizing(p)
@@ -39,7 +32,43 @@ cat > pup_f.f90 << END_OF_HEADER
           INTEGER :: p
           logical fpup_isuserlevel
         end function
+
+        subroutine fpup_int(p, d)
+          INTEGER :: p
+          INTEGER (KIND=4) :: d
+       end subroutine
+       subroutine fpup_long(p, d)
+          INTEGER :: p
+          INTEGER (KIND=8) :: d
+       end subroutine
+       subroutine fpup_real(p, d)
+          INTEGER :: p
+          REAL (KIND=4)  :: d
+       end subroutine
+       subroutine fpup_double(p, d)
+          INTEGER :: p
+          REAL (KIND=8)  :: d
+       end subroutine
+       subroutine fpup_logical(p, d)
+          INTEGER :: p
+          LOGICAL :: d
+       end subroutine
       end interface
+
+END_OF_HEADER
+
+for t in ints longs reals doubles
+do
+  echo "      interface fpup_${t}" >> pup_f.f90
+  for i in  1 2 3 4 5 6 7
+  do
+  echo "       module procedure fpup_${t}_${i}" >> pup_f.f90
+  done
+  echo "      end interface fpup_${t}" >> pup_f.f90
+  echo >> pup_f.f90
+done
+
+cat >> pup_f.f90 << END_OF_HEADER
       interface pup
         module procedure pi,pia1d,pia2d,pia3d,pc,pca1d,pca2d,pca3d
         module procedure ps,psa1d,psa2d,psa3d,pr,pra1d,pra2d,pra3d
@@ -112,6 +141,79 @@ cat > pup_f.f90 << END_OF_HEADER
       end subroutine
 
 END_OF_HEADER
+
+
+for i in 1 2 3 4 5 6 7
+do
+  echo "       subroutine fpup_ints_${i}(p, d, c)" >> pup_f.f90
+  echo "        INTEGER :: p" >> pup_f.f90
+  echo -n "        INTEGER(kind=4), dimension(:" >> pup_f.f90
+  n=1
+  while [ $n -lt $i ]
+  do
+    echo -n ",:" >> pup_f.f90
+    n=`expr $n + 1`
+  done
+  echo ") :: d" >> pup_f.f90
+  echo "        INTEGER :: c" >> pup_f.f90
+  echo "        call fpup_intsg(p, d, c)"  >> pup_f.f90
+  echo "       end subroutine" >> pup_f.f90
+done
+echo >> pup_f.f90
+
+for i in 1 2 3 4 5 6 7
+do
+  echo "       subroutine fpup_longs_${i}(p, d, c)" >> pup_f.f90
+  echo "        INTEGER :: p" >> pup_f.f90
+  echo -n "        INTEGER(kind=8), dimension(:" >> pup_f.f90
+  n=1
+  while [ $n -lt $i ]
+  do
+    echo -n ",:" >> pup_f.f90
+    n=`expr $n + 1`
+  done
+  echo ") :: d" >> pup_f.f90
+  echo "        INTEGER :: c" >> pup_f.f90
+  echo "        call fpup_longsg(p, d, c)"  >> pup_f.f90
+  echo "       end subroutine" >> pup_f.f90
+done
+echo >> pup_f.f90
+
+for i in 1 2 3 4 5 6 7
+do
+  echo "       subroutine fpup_reals_${i}(p, d, c)" >> pup_f.f90
+  echo "        INTEGER :: p" >> pup_f.f90
+  echo -n "        REAL(kind=4), dimension(:" >> pup_f.f90
+  n=1
+  while [ $n -lt $i ]
+  do
+    echo -n ",:" >> pup_f.f90
+    n=`expr $n + 1`
+  done
+  echo ") :: d" >> pup_f.f90
+  echo "        INTEGER :: c" >> pup_f.f90
+  echo "        call fpup_realsg(p, d, c)"  >> pup_f.f90
+  echo "       end subroutine" >> pup_f.f90
+done
+echo >> pup_f.f90
+
+for i in 1 2 3 4 5 6 7
+do
+  echo "       subroutine fpup_doubles_${i}(p, d, c)" >> pup_f.f90
+  echo "        INTEGER :: p" >> pup_f.f90
+  echo -n "        REAL(kind=8), dimension(:" >> pup_f.f90
+  n=1
+  while [ $n -lt $i ]
+  do
+    echo -n ",:" >> pup_f.f90
+    n=`expr $n + 1`
+  done
+  echo ") :: d" >> pup_f.f90
+  echo "        INTEGER :: c" >> pup_f.f90
+  echo "        call fpup_doublesg(p, d, c)"  >> pup_f.f90
+  echo "       end subroutine" >> pup_f.f90
+done
+echo >> pup_f.f90
 
 #
 # Create pup routines for each data type:
