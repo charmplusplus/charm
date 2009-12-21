@@ -1,10 +1,5 @@
       module pupmod
       implicit none
-      external fpup_char
-      external fpup_chars
-      external fpup_short
-      external fpup_shorts
-      external fpup_logicals
       interface
         function fpup_issizing(p)
           INTEGER :: p
@@ -27,27 +22,46 @@
           logical fpup_isuserlevel
         end function
 
+        subroutine fpup_char(p, d)
+          INTEGER :: p
+          CHARACTER :: d
+        end subroutine
+        subroutine fpup_short(p, d)
+          INTEGER :: p
+          INTEGER (KIND=2) :: d
+        end subroutine
         subroutine fpup_int(p, d)
           INTEGER :: p
           INTEGER (KIND=4) :: d
-       end subroutine
-       subroutine fpup_long(p, d)
+        end subroutine
+        subroutine fpup_long(p, d)
           INTEGER :: p
           INTEGER (KIND=8) :: d
-       end subroutine
-       subroutine fpup_real(p, d)
+        end subroutine
+        subroutine fpup_real(p, d)
           INTEGER :: p
           REAL (KIND=4)  :: d
-       end subroutine
-       subroutine fpup_double(p, d)
+        end subroutine
+        subroutine fpup_double(p, d)
           INTEGER :: p
           REAL (KIND=8)  :: d
-       end subroutine
-       subroutine fpup_logical(p, d)
+        end subroutine
+        subroutine fpup_logical(p, d)
           INTEGER :: p
           LOGICAL :: d
-       end subroutine
+        end subroutine
       end interface
+
+      interface fpup_chars
+       module procedure fpup_chars_0
+       module procedure fpup_chars_1
+       module procedure fpup_chars_2
+       module procedure fpup_chars_3
+       module procedure fpup_chars_4
+       module procedure fpup_chars_5
+       module procedure fpup_chars_6
+       module procedure fpup_chars_7
+      end interface fpup_chars
 
       interface fpup_ints
        module procedure fpup_ints_1
@@ -88,6 +102,16 @@
        module procedure fpup_doubles_6
        module procedure fpup_doubles_7
       end interface fpup_doubles
+
+      interface fpup_logicals
+       module procedure fpup_logicals_1
+       module procedure fpup_logicals_2
+       module procedure fpup_logicals_3
+       module procedure fpup_logicals_4
+       module procedure fpup_logicals_5
+       module procedure fpup_logicals_6
+       module procedure fpup_logicals_7
+      end interface fpup_logicals
 
       interface pup
         module procedure pi,pia1d,pia2d,pia3d,pc,pca1d,pca2d,pca3d
@@ -160,176 +184,311 @@
         end do
       end subroutine
 
+      subroutine fpup_chars_0(p, d, c)
+        INTEGER :: p
+        CHARACTER(LEN=*)     d
+        INTEGER :: c
+        call fpup_charsg(p, d, c)
+      end subroutine
+       subroutine fpup_chars_1(p, d, c)
+        INTEGER :: p
+        character, intent(inout), dimension(:) :: d
+        INTEGER :: c
+        call fpup_charsg(p, d, c)
+       end subroutine
+       subroutine fpup_chars_2(p, d, c)
+        INTEGER :: p
+        character, intent(inout), dimension(:,:) :: d
+        INTEGER :: c
+        call fpup_charsg(p, d, c)
+       end subroutine
+       subroutine fpup_chars_3(p, d, c)
+        INTEGER :: p
+        character, intent(inout), dimension(:,:,:) :: d
+        INTEGER :: c
+        call fpup_charsg(p, d, c)
+       end subroutine
+       subroutine fpup_chars_4(p, d, c)
+        INTEGER :: p
+        character, intent(inout), dimension(:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_charsg(p, d, c)
+       end subroutine
+       subroutine fpup_chars_5(p, d, c)
+        INTEGER :: p
+        character, intent(inout), dimension(:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_charsg(p, d, c)
+       end subroutine
+       subroutine fpup_chars_6(p, d, c)
+        INTEGER :: p
+        character, intent(inout), dimension(:,:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_charsg(p, d, c)
+       end subroutine
+       subroutine fpup_chars_7(p, d, c)
+        INTEGER :: p
+        character, intent(inout), dimension(:,:,:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_charsg(p, d, c)
+       end subroutine
+
+       subroutine fpup_shorts_1(p, d, c)
+        INTEGER :: p
+        integer(kind=2), intent(inout), dimension(:) :: d
+        INTEGER :: c
+        call fpup_shortsg(p, d, c)
+       end subroutine
+       subroutine fpup_shorts_2(p, d, c)
+        INTEGER :: p
+        integer(kind=2), intent(inout), dimension(:,:) :: d
+        INTEGER :: c
+        call fpup_shortsg(p, d, c)
+       end subroutine
+       subroutine fpup_shorts_3(p, d, c)
+        INTEGER :: p
+        integer(kind=2), intent(inout), dimension(:,:,:) :: d
+        INTEGER :: c
+        call fpup_shortsg(p, d, c)
+       end subroutine
+       subroutine fpup_shorts_4(p, d, c)
+        INTEGER :: p
+        integer(kind=2), intent(inout), dimension(:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_shortsg(p, d, c)
+       end subroutine
+       subroutine fpup_shorts_5(p, d, c)
+        INTEGER :: p
+        integer(kind=2), intent(inout), dimension(:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_shortsg(p, d, c)
+       end subroutine
+       subroutine fpup_shorts_6(p, d, c)
+        INTEGER :: p
+        integer(kind=2), intent(inout), dimension(:,:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_shortsg(p, d, c)
+       end subroutine
+       subroutine fpup_shorts_7(p, d, c)
+        INTEGER :: p
+        integer(kind=2), intent(inout), dimension(:,:,:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_shortsg(p, d, c)
+       end subroutine
+
        subroutine fpup_ints_1(p, d, c)
         INTEGER :: p
-        INTEGER(kind=4), dimension(:) :: d
+        integer(kind=4), intent(inout), dimension(:) :: d
         INTEGER :: c
         call fpup_intsg(p, d, c)
        end subroutine
        subroutine fpup_ints_2(p, d, c)
         INTEGER :: p
-        INTEGER(kind=4), dimension(:,:) :: d
+        integer(kind=4), intent(inout), dimension(:,:) :: d
         INTEGER :: c
         call fpup_intsg(p, d, c)
        end subroutine
        subroutine fpup_ints_3(p, d, c)
         INTEGER :: p
-        INTEGER(kind=4), dimension(:,:,:) :: d
+        integer(kind=4), intent(inout), dimension(:,:,:) :: d
         INTEGER :: c
         call fpup_intsg(p, d, c)
        end subroutine
        subroutine fpup_ints_4(p, d, c)
         INTEGER :: p
-        INTEGER(kind=4), dimension(:,:,:,:) :: d
+        integer(kind=4), intent(inout), dimension(:,:,:,:) :: d
         INTEGER :: c
         call fpup_intsg(p, d, c)
        end subroutine
        subroutine fpup_ints_5(p, d, c)
         INTEGER :: p
-        INTEGER(kind=4), dimension(:,:,:,:,:) :: d
+        integer(kind=4), intent(inout), dimension(:,:,:,:,:) :: d
         INTEGER :: c
         call fpup_intsg(p, d, c)
        end subroutine
        subroutine fpup_ints_6(p, d, c)
         INTEGER :: p
-        INTEGER(kind=4), dimension(:,:,:,:,:,:) :: d
+        integer(kind=4), intent(inout), dimension(:,:,:,:,:,:) :: d
         INTEGER :: c
         call fpup_intsg(p, d, c)
        end subroutine
        subroutine fpup_ints_7(p, d, c)
         INTEGER :: p
-        INTEGER(kind=4), dimension(:,:,:,:,:,:,:) :: d
+        integer(kind=4), intent(inout), dimension(:,:,:,:,:,:,:) :: d
         INTEGER :: c
         call fpup_intsg(p, d, c)
        end subroutine
 
        subroutine fpup_longs_1(p, d, c)
         INTEGER :: p
-        INTEGER(kind=8), dimension(:) :: d
+        integer(kind=8), intent(inout), dimension(:) :: d
         INTEGER :: c
         call fpup_longsg(p, d, c)
        end subroutine
        subroutine fpup_longs_2(p, d, c)
         INTEGER :: p
-        INTEGER(kind=8), dimension(:,:) :: d
+        integer(kind=8), intent(inout), dimension(:,:) :: d
         INTEGER :: c
         call fpup_longsg(p, d, c)
        end subroutine
        subroutine fpup_longs_3(p, d, c)
         INTEGER :: p
-        INTEGER(kind=8), dimension(:,:,:) :: d
+        integer(kind=8), intent(inout), dimension(:,:,:) :: d
         INTEGER :: c
         call fpup_longsg(p, d, c)
        end subroutine
        subroutine fpup_longs_4(p, d, c)
         INTEGER :: p
-        INTEGER(kind=8), dimension(:,:,:,:) :: d
+        integer(kind=8), intent(inout), dimension(:,:,:,:) :: d
         INTEGER :: c
         call fpup_longsg(p, d, c)
        end subroutine
        subroutine fpup_longs_5(p, d, c)
         INTEGER :: p
-        INTEGER(kind=8), dimension(:,:,:,:,:) :: d
+        integer(kind=8), intent(inout), dimension(:,:,:,:,:) :: d
         INTEGER :: c
         call fpup_longsg(p, d, c)
        end subroutine
        subroutine fpup_longs_6(p, d, c)
         INTEGER :: p
-        INTEGER(kind=8), dimension(:,:,:,:,:,:) :: d
+        integer(kind=8), intent(inout), dimension(:,:,:,:,:,:) :: d
         INTEGER :: c
         call fpup_longsg(p, d, c)
        end subroutine
        subroutine fpup_longs_7(p, d, c)
         INTEGER :: p
-        INTEGER(kind=8), dimension(:,:,:,:,:,:,:) :: d
+        integer(kind=8), intent(inout), dimension(:,:,:,:,:,:,:) :: d
         INTEGER :: c
         call fpup_longsg(p, d, c)
        end subroutine
 
        subroutine fpup_reals_1(p, d, c)
         INTEGER :: p
-        REAL(kind=4), dimension(:) :: d
+        real(kind=4), intent(inout), dimension(:) :: d
         INTEGER :: c
         call fpup_realsg(p, d, c)
        end subroutine
        subroutine fpup_reals_2(p, d, c)
         INTEGER :: p
-        REAL(kind=4), dimension(:,:) :: d
+        real(kind=4), intent(inout), dimension(:,:) :: d
         INTEGER :: c
         call fpup_realsg(p, d, c)
        end subroutine
        subroutine fpup_reals_3(p, d, c)
         INTEGER :: p
-        REAL(kind=4), dimension(:,:,:) :: d
+        real(kind=4), intent(inout), dimension(:,:,:) :: d
         INTEGER :: c
         call fpup_realsg(p, d, c)
        end subroutine
        subroutine fpup_reals_4(p, d, c)
         INTEGER :: p
-        REAL(kind=4), dimension(:,:,:,:) :: d
+        real(kind=4), intent(inout), dimension(:,:,:,:) :: d
         INTEGER :: c
         call fpup_realsg(p, d, c)
        end subroutine
        subroutine fpup_reals_5(p, d, c)
         INTEGER :: p
-        REAL(kind=4), dimension(:,:,:,:,:) :: d
+        real(kind=4), intent(inout), dimension(:,:,:,:,:) :: d
         INTEGER :: c
         call fpup_realsg(p, d, c)
        end subroutine
        subroutine fpup_reals_6(p, d, c)
         INTEGER :: p
-        REAL(kind=4), dimension(:,:,:,:,:,:) :: d
+        real(kind=4), intent(inout), dimension(:,:,:,:,:,:) :: d
         INTEGER :: c
         call fpup_realsg(p, d, c)
        end subroutine
        subroutine fpup_reals_7(p, d, c)
         INTEGER :: p
-        REAL(kind=4), dimension(:,:,:,:,:,:,:) :: d
+        real(kind=4), intent(inout), dimension(:,:,:,:,:,:,:) :: d
         INTEGER :: c
         call fpup_realsg(p, d, c)
        end subroutine
 
        subroutine fpup_doubles_1(p, d, c)
         INTEGER :: p
-        REAL(kind=8), dimension(:) :: d
+        real(kind=8), intent(inout), dimension(:) :: d
         INTEGER :: c
         call fpup_doublesg(p, d, c)
        end subroutine
        subroutine fpup_doubles_2(p, d, c)
         INTEGER :: p
-        REAL(kind=8), dimension(:,:) :: d
+        real(kind=8), intent(inout), dimension(:,:) :: d
         INTEGER :: c
         call fpup_doublesg(p, d, c)
        end subroutine
        subroutine fpup_doubles_3(p, d, c)
         INTEGER :: p
-        REAL(kind=8), dimension(:,:,:) :: d
+        real(kind=8), intent(inout), dimension(:,:,:) :: d
         INTEGER :: c
         call fpup_doublesg(p, d, c)
        end subroutine
        subroutine fpup_doubles_4(p, d, c)
         INTEGER :: p
-        REAL(kind=8), dimension(:,:,:,:) :: d
+        real(kind=8), intent(inout), dimension(:,:,:,:) :: d
         INTEGER :: c
         call fpup_doublesg(p, d, c)
        end subroutine
        subroutine fpup_doubles_5(p, d, c)
         INTEGER :: p
-        REAL(kind=8), dimension(:,:,:,:,:) :: d
+        real(kind=8), intent(inout), dimension(:,:,:,:,:) :: d
         INTEGER :: c
         call fpup_doublesg(p, d, c)
        end subroutine
        subroutine fpup_doubles_6(p, d, c)
         INTEGER :: p
-        REAL(kind=8), dimension(:,:,:,:,:,:) :: d
+        real(kind=8), intent(inout), dimension(:,:,:,:,:,:) :: d
         INTEGER :: c
         call fpup_doublesg(p, d, c)
        end subroutine
        subroutine fpup_doubles_7(p, d, c)
         INTEGER :: p
-        REAL(kind=8), dimension(:,:,:,:,:,:,:) :: d
+        real(kind=8), intent(inout), dimension(:,:,:,:,:,:,:) :: d
         INTEGER :: c
         call fpup_doublesg(p, d, c)
+       end subroutine
+
+       subroutine fpup_logicals_1(p, d, c)
+        INTEGER :: p
+        logical, intent(inout), dimension(:) :: d
+        INTEGER :: c
+        call fpup_logicalsg(p, d, c)
+       end subroutine
+       subroutine fpup_logicals_2(p, d, c)
+        INTEGER :: p
+        logical, intent(inout), dimension(:,:) :: d
+        INTEGER :: c
+        call fpup_logicalsg(p, d, c)
+       end subroutine
+       subroutine fpup_logicals_3(p, d, c)
+        INTEGER :: p
+        logical, intent(inout), dimension(:,:,:) :: d
+        INTEGER :: c
+        call fpup_logicalsg(p, d, c)
+       end subroutine
+       subroutine fpup_logicals_4(p, d, c)
+        INTEGER :: p
+        logical, intent(inout), dimension(:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_logicalsg(p, d, c)
+       end subroutine
+       subroutine fpup_logicals_5(p, d, c)
+        INTEGER :: p
+        logical, intent(inout), dimension(:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_logicalsg(p, d, c)
+       end subroutine
+       subroutine fpup_logicals_6(p, d, c)
+        INTEGER :: p
+        logical, intent(inout), dimension(:,:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_logicalsg(p, d, c)
+       end subroutine
+       subroutine fpup_logicals_7(p, d, c)
+        INTEGER :: p
+        logical, intent(inout), dimension(:,:,:,:,:,:,:) :: d
+        INTEGER :: c
+        call fpup_logicalsg(p, d, c)
        end subroutine
 
 

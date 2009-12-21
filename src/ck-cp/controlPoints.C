@@ -109,6 +109,7 @@ unsigned int randInt(unsigned int num, const char* name, int seed=0){
 
 controlPointManager::controlPointManager(){
 
+    exitWhenReady = false;
     newControlPointsAvailable = false;
     alreadyRequestedMemoryUsage = false;   
     alreadyRequestedIdleTime = false;
@@ -518,6 +519,23 @@ controlPointManager::controlPointManager(){
     
 #endif    
     
+    if(shouldGatherMemoryUsage && CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
+      alreadyRequestedMemoryUsage = true;
+      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
+      thisProxy.requestMemoryUsage(*cb);
+      delete cb;
+    }
+
+    if(shouldGatherUtilization && CkMyPe() == 0 && !alreadyRequestedIdleTime){
+      alreadyRequestedIdleTime = true;
+      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherIdleTime(NULL), 0, thisProxy);
+      thisProxy.requestIdleTime(*cb);
+      delete cb;
+    }
+
+
+
+
     
     // increment phase id
     phase_id++;
@@ -586,10 +604,26 @@ controlPointManager::controlPointManager(){
     }
     
     alreadyRequestedIdleTime = false;
+    checkForShutdown();
     delete msg;
   }
-  
 
+
+  /// Call CkExit for this module once all outstanding operations have completed
+  void controlPointManager::checkForShutdown(){
+    if( exitWhenReady && !alreadyRequestedMemoryUsage && !alreadyRequestedIdleTime && CkMyPe()==0){
+      CkExit();
+    }
+  }
+
+
+  void controlPointManager::exitIfReady(){
+     if( !alreadyRequestedMemoryUsage && !alreadyRequestedIdleTime && CkMyPe()==0){
+      CkExit();
+     } else {
+       exitWhenReady = true;
+     }
+  }
 
   /// Entry method called on all PEs to request memory usage
   void controlPointManager::requestMemoryUsage(CkCallback cb){
@@ -615,6 +649,7 @@ controlPointManager::controlPointManager(){
     }
 
     alreadyRequestedMemoryUsage = false;
+    checkForShutdown();
     delete msg;
   }
 
@@ -790,7 +825,10 @@ extern "C" void controlPointShutdown(){
       CkPrintf("[%d] controlPointShutdown() at CkExit()\n", CkMyPe());
       controlPointManagerProxy.ckLocalBranch()->writeDataFile();
     }
-    CkExit();
+
+    // wait for gathering of idle time & memory usage to complete
+    controlPointManagerProxy.ckLocalBranch()->exitIfReady();
+
   }
 }
 
