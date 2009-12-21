@@ -6,11 +6,6 @@
 cat > pup_f.f90 << END_OF_HEADER
       module pupmod
       implicit none
-      external fpup_char
-      external fpup_chars
-      external fpup_short
-      external fpup_shorts
-      external fpup_logicals
       interface
         function fpup_issizing(p)
           INTEGER :: p
@@ -33,33 +28,45 @@ cat > pup_f.f90 << END_OF_HEADER
           logical fpup_isuserlevel
         end function
 
+        subroutine fpup_char(p, d)
+          INTEGER :: p
+          CHARACTER :: d
+        end subroutine
+        subroutine fpup_short(p, d)
+          INTEGER :: p
+          INTEGER (KIND=2) :: d
+        end subroutine
         subroutine fpup_int(p, d)
           INTEGER :: p
           INTEGER (KIND=4) :: d
-       end subroutine
-       subroutine fpup_long(p, d)
+        end subroutine
+        subroutine fpup_long(p, d)
           INTEGER :: p
           INTEGER (KIND=8) :: d
-       end subroutine
-       subroutine fpup_real(p, d)
+        end subroutine
+        subroutine fpup_real(p, d)
           INTEGER :: p
           REAL (KIND=4)  :: d
-       end subroutine
-       subroutine fpup_double(p, d)
+        end subroutine
+        subroutine fpup_double(p, d)
           INTEGER :: p
           REAL (KIND=8)  :: d
-       end subroutine
-       subroutine fpup_logical(p, d)
+        end subroutine
+        subroutine fpup_logical(p, d)
           INTEGER :: p
           LOGICAL :: d
-       end subroutine
+        end subroutine
       end interface
 
 END_OF_HEADER
 
-for t in ints longs reals doubles
+for t in chars ints longs reals doubles logicals
 do
   echo "      interface fpup_${t}" >> pup_f.f90
+  if test $t = "chars" 
+  then
+  echo "       module procedure fpup_${t}_0" >> pup_f.f90
+  fi
   for i in  1 2 3 4 5 6 7
   do
   echo "       module procedure fpup_${t}_${i}" >> pup_f.f90
@@ -140,14 +147,23 @@ cat >> pup_f.f90 << END_OF_HEADER
         end do
       end subroutine
 
+      subroutine fpup_chars_0(p, d, c)
+        INTEGER :: p
+        CHARACTER(LEN=*)     d
+        INTEGER :: c
+        call fpup_charsg(p, d, c)
+      end subroutine
 END_OF_HEADER
 
-
-for i in 1 2 3 4 5 6 7
+for data in "chars/character" "shorts/integer(kind=2)" "ints/integer(kind=4)" "longs/integer(kind=8)" "reals/real(kind=4)" "doubles/real(kind=8)"  "logicals/logical"
 do
-  echo "       subroutine fpup_ints_${i}(p, d, c)" >> pup_f.f90
+ pupname=`echo $data | awk -F/ '{print $1}'`
+ typename=`echo $data | awk -F/ '{print $2}'`
+ for i in 1 2 3 4 5 6 7
+ do
+  echo "       subroutine fpup_${pupname}_${i}(p, d, c)" >> pup_f.f90
   echo "        INTEGER :: p" >> pup_f.f90
-  echo -n "        INTEGER(kind=4), dimension(:" >> pup_f.f90
+  echo -n "        ${typename}, intent(inout), dimension(:" >> pup_f.f90
   n=1
   while [ $n -lt $i ]
   do
@@ -156,64 +172,11 @@ do
   done
   echo ") :: d" >> pup_f.f90
   echo "        INTEGER :: c" >> pup_f.f90
-  echo "        call fpup_intsg(p, d, c)"  >> pup_f.f90
+  echo "        call fpup_${pupname}g(p, d, c)"  >> pup_f.f90
   echo "       end subroutine" >> pup_f.f90
+ done
+ echo >> pup_f.f90
 done
-echo >> pup_f.f90
-
-for i in 1 2 3 4 5 6 7
-do
-  echo "       subroutine fpup_longs_${i}(p, d, c)" >> pup_f.f90
-  echo "        INTEGER :: p" >> pup_f.f90
-  echo -n "        INTEGER(kind=8), dimension(:" >> pup_f.f90
-  n=1
-  while [ $n -lt $i ]
-  do
-    echo -n ",:" >> pup_f.f90
-    n=`expr $n + 1`
-  done
-  echo ") :: d" >> pup_f.f90
-  echo "        INTEGER :: c" >> pup_f.f90
-  echo "        call fpup_longsg(p, d, c)"  >> pup_f.f90
-  echo "       end subroutine" >> pup_f.f90
-done
-echo >> pup_f.f90
-
-for i in 1 2 3 4 5 6 7
-do
-  echo "       subroutine fpup_reals_${i}(p, d, c)" >> pup_f.f90
-  echo "        INTEGER :: p" >> pup_f.f90
-  echo -n "        REAL(kind=4), dimension(:" >> pup_f.f90
-  n=1
-  while [ $n -lt $i ]
-  do
-    echo -n ",:" >> pup_f.f90
-    n=`expr $n + 1`
-  done
-  echo ") :: d" >> pup_f.f90
-  echo "        INTEGER :: c" >> pup_f.f90
-  echo "        call fpup_realsg(p, d, c)"  >> pup_f.f90
-  echo "       end subroutine" >> pup_f.f90
-done
-echo >> pup_f.f90
-
-for i in 1 2 3 4 5 6 7
-do
-  echo "       subroutine fpup_doubles_${i}(p, d, c)" >> pup_f.f90
-  echo "        INTEGER :: p" >> pup_f.f90
-  echo -n "        REAL(kind=8), dimension(:" >> pup_f.f90
-  n=1
-  while [ $n -lt $i ]
-  do
-    echo -n ",:" >> pup_f.f90
-    n=`expr $n + 1`
-  done
-  echo ") :: d" >> pup_f.f90
-  echo "        INTEGER :: c" >> pup_f.f90
-  echo "        call fpup_doublesg(p, d, c)"  >> pup_f.f90
-  echo "       end subroutine" >> pup_f.f90
-done
-echo >> pup_f.f90
 
 #
 # Create pup routines for each data type:
