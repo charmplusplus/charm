@@ -80,6 +80,27 @@ int distance(Iterator first, Iterator last)
  *
  *       Users can override this choice by specifying a strategy when calling one of the build routines. A list of
  *       strategies should be apparent from the headers included near the bottom of this file.
+ *
+ * Note to developers:
+ *       This code is probably more grandiose than it needs to be. Basically, there are a bunch of strategy classes
+ *       (that inherit from SpanningTreeStrategy) for constructing spanning trees. There is a factory method 
+ *       (getSpanningTreeStrategy) that returns the strategy that it thinks is the best choice given the machine, 
+ *       input etc. There are some template gimmicks just to allow users to pass input however they want (arrays /
+ *        vectors / CkVecs etc. of ints / SpanningTreeVertices)
+ *
+ *       Steps for adding new algorithms for constructing spanning trees should look something like this.
+ *       - Create a new template class (that inherits from the template base class SpanningTreeStrategy)
+ *       - Put it in a new file following appropriate naming conventions.
+ *       - Add an include statement near the bottom of this file along with the other existing includes
+ *       - Override the virtual method buildNextGen() in your new strategy class to implement your algorithm
+ *       - Existing strategies provide partial specializations based on the type of input passed in. Input 
+ *         is typically a container of int or SpanningTreeVertex. You may have to do something different for
+ *         each of these input types. (for eg, for SpanningTreeVertex store the results in the parent vertex too)
+ *       - Enclose any implementation details (functions, classes etc.) within another namespace (say, impl)
+ *         to avoid polluting this top-level namespace.
+ *       - Test your strategy by explicitly calling it from some test code to check its operation.
+ *       - Make appropriate changes to getSpanningTreeStrategy() to return your new strategy for appropriate
+ *         input on the appropriate machine(s)
  */
 
 
