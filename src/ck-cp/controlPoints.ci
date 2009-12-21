@@ -4,6 +4,8 @@ module ControlPoints {
   readonly int random_seed;
   readonly long controlPointSamplePeriod;
   readonly int whichTuningScheme;
+  readonly bool shouldGatherMemoryUsage;
+  readonly bool shouldGatherUtilization;
 
 
   initproc void registerIdleTimeReduction(void);	

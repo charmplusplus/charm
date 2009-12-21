@@ -36,6 +36,8 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ int whichTuningScheme;
 /* readonly */ bool writeDataFileAtShutdown;
 /* readonly */ bool loadDataFileAtStartup;
+/* readonly */ bool shouldGatherMemoryUsage;
+/* readonly */ bool shouldGatherUtilization;
 
 
 typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming}  tuningScheme;
@@ -246,22 +248,19 @@ controlPointManager::controlPointManager(){
 
     CkPrintf("[%d] processControlPoints() haveGranularityCallback=%d frameworkShouldAdvancePhase=%d\n", CkMyPe(), (int)haveGranularityCallback, (int)frameworkShouldAdvancePhase);
 
-#if 0       
-    if(CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
+    if(shouldGatherMemoryUsage && CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
       alreadyRequestedMemoryUsage = true;
       CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
-      // thisProxy.requestMemoryUsage(*cb);
+      thisProxy.requestMemoryUsage(*cb);
       delete cb;
     }
-    
-    if(CkMyPe() == 0 && !alreadyRequestedIdleTime){
+
+    if(shouldGatherUtilization && CkMyPe() == 0 && !alreadyRequestedIdleTime){
       alreadyRequestedIdleTime = true;
       CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherIdleTime(NULL), 0, thisProxy);
       thisProxy.requestIdleTime(*cb);
       delete cb;
     }
-#endif
-
 
     //==========================================================================================
     // Print the data for each phase
@@ -588,7 +587,7 @@ controlPointManager::controlPointManager(){
   void controlPointManager::requestMemoryUsage(CkCallback cb){
     int m = CmiMaxMemoryUsage() / 1024 / 1024;
     CmiResetMaxMemory();
-    CkPrintf("PE %d Memory Usage is %d MB\n",CkMyPe(), m);
+    //    CkPrintf("PE %d Memory Usage is %d MB\n",CkMyPe(), m);
     contribute(sizeof(int),&m,CkReduction::max_int, cb);
   }
 
@@ -719,6 +718,15 @@ public:
       whichTuningScheme = UseBestKnownTiming;
     } 
 
+    shouldGatherMemoryUsage = false;
+    if ( CmiGetArgFlagDesc(args->argv,"+CPGatherMemoryUsage","Gather memory usage after each phase") ){
+      shouldGatherMemoryUsage = true;
+    }
+
+    shouldGatherUtilization = false;
+    if ( CmiGetArgFlagDesc(args->argv,"+CPGatherUtilization","Gather utilization & Idle time after each phase") ){
+      shouldGatherUtilization = true;
+    }
 
     writeDataFileAtShutdown = false;   
     if( CmiGetArgFlagDesc(args->argv,"+CPSaveData","Save Control Point timings & configurations at completion") ){

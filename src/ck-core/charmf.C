@@ -167,3 +167,10 @@ FDECL void FTN_NAME(CMIENABLEISOMALLOC, cmienableisomalloc) ()
 {
   CmiEnableIsomalloc();
 }
+
+FDECL void FTN_NAME(CMIMEMORYCHECK, cmimemorycheck) ()
+{
+  CmiMemoryCheck();
+}
+
+

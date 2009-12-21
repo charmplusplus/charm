@@ -125,12 +125,15 @@ CDECL void pup_pointers(pup_er p,void **arr,int nItems) {mp(arr,nItems,(void*)NU
 #define PUP_BASIC_DATATYPEF(typeUP,typelo,type) \
  FDECL void FTN_NAME(FPUP_##typeUP,fpup_##typelo)(pup_er p,type *v) \
    {mp(*v);} \
+ FDECL void FTN_NAME(FPUP_##typeUP##SG,fpup_##typelo##sg)(pup_er p,type *arr,int *nItems) \
+   {mp(arr,*nItems);} \
  FDECL void FTN_NAME(FPUP_##typeUP##S,fpup_##typelo##s)(pup_er p,type *arr,int *nItems) \
    {mp(arr,*nItems);}
 
 PUP_BASIC_DATATYPEF(CHAR,char,char)
 PUP_BASIC_DATATYPEF(SHORT,short,short)
 PUP_BASIC_DATATYPEF(INT,int,int)
+PUP_BASIC_DATATYPEF(LONG,long,long)
 PUP_BASIC_DATATYPEF(REAL,real,float)
 PUP_BASIC_DATATYPEF(DOUBLE,double,double)
 PUP_BASIC_DATATYPEF(LOGICAL,logical,int)
