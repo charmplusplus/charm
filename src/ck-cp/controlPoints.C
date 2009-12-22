@@ -21,7 +21,6 @@ using namespace std;
 #define NUM_SAMPLES_BEFORE_TRANSISTION 5
 #define OPTIMIZER_TRANSITION 5
 
-#define WRITEDATAFILE 1
 
 //#undef DEBUGPRINT
 //#define DEBUGPRINT 4
@@ -196,6 +195,9 @@ controlPointManager::controlPointManager(){
       iss >> ips.memoryUsageMB;
       //     CkPrintf("Memory usage loaded from file: %d\n", ips.memoryUsageMB);
 
+      iss >> ips.idleTime.min;
+      iss >> ips.idleTime.avg;
+      iss >> ips.idleTime.max;
 
       // Read control point values
       for(int cp=0;cp<numControlPointNames;cp++){
@@ -224,16 +226,12 @@ controlPointManager::controlPointManager(){
 
   /// Add the current data to allData and output it to a file
   void controlPointManager::writeDataFile(){
-#if WRITEDATAFILE
     CkPrintf("============= writeDataFile() ============\n");
     ofstream outfile(dataFilename);
     allData.phases.push_back(thisPhaseData);
     allData.cleanupNames();
     outfile << allData.toString();
     outfile.close();
-#else
-    CkPrintf("NOT WRITING OUTPUT FILE\n");
-#endif
   }
 
   /// User can register a callback that is called when application should advance to next phase
@@ -462,8 +460,8 @@ controlPointManager::controlPointManager(){
   /// The data from the previous phase
   instrumentedPhase * controlPointManager::previousPhaseData(){
     int s = allData.phases.size();
-    if(s >= 1 && phase_id > 0) {
-      return &(allData.phases[s-1]);
+    if(s >= 2 && phase_id > 0) {
+      return &(allData.phases[s-2]);
     } else {
       return NULL;
     }
@@ -578,7 +576,7 @@ controlPointManager::controlPointManager(){
     idle[1] = i;
     idle[2] = i;
     
-    CkPrintf("[%d] idleRatio=%f\n", CkMyPe(), i);
+    //    CkPrintf("[%d] idleRatio=%f\n", CkMyPe(), i);
     
     localControlPointTracingInstance()->resetTimings();
 
@@ -609,21 +607,34 @@ controlPointManager::controlPointManager(){
   }
 
 
-  /// Call CkExit for this module once all outstanding operations have completed
+
   void controlPointManager::checkForShutdown(){
     if( exitWhenReady && !alreadyRequestedMemoryUsage && !alreadyRequestedIdleTime && CkMyPe()==0){
-      CkExit();
+      doExitNow();
     }
   }
 
 
   void controlPointManager::exitIfReady(){
      if( !alreadyRequestedMemoryUsage && !alreadyRequestedIdleTime && CkMyPe()==0){
-      CkExit();
+       CkPrintf("controlPointManager::exitIfReady exiting immediately\n");
+       doExitNow();
      } else {
+       CkPrintf("controlPointManager::exitIfReady Delaying exiting\n");
        exitWhenReady = true;
      }
   }
+
+
+
+  void controlPointManager::doExitNow(){
+    if(writeDataFileAtShutdown){
+      CkPrintf("[%d] controlPointShutdown() at CkExit()\n", CkMyPe());
+      controlPointManagerProxy.ckLocalBranch()->writeDataFile();
+    }
+    CkExit();
+  }
+
 
   /// Entry method called on all PEs to request memory usage
   void controlPointManager::requestMemoryUsage(CkCallback cb){
@@ -820,11 +831,6 @@ void controlPointTimingStamp() {
 /// Shutdown the control point framework, writing data to disk if necessary
 extern "C" void controlPointShutdown(){
   if(CkMyPe() == 0){
-
-    if(writeDataFileAtShutdown){
-      CkPrintf("[%d] controlPointShutdown() at CkExit()\n", CkMyPe());
-      controlPointManagerProxy.ckLocalBranch()->writeDataFile();
-    }
 
     // wait for gathering of idle time & memory usage to complete
     controlPointManagerProxy.ckLocalBranch()->exitIfReady();

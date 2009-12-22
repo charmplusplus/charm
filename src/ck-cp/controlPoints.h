@@ -188,14 +188,12 @@ public:
 
   // Determines if the control point values and other information exists
   bool hasValidControlPointValues(){
-#if 0
     std::map<std::string,int>::iterator iter;
     for(iter = controlPoints.begin();iter != controlPoints.end(); iter++){
       if(iter->second == -1){ 
         return false; 
       }  
     }
-#endif
     return true;
   }
 
@@ -338,7 +336,7 @@ public:
 
   /// Remove one phase with invalid control point values if found
   bool filterOutOnePhase(){
-#if 0
+#if 1
     // Note: calling erase on a vector will invalidate any iterators beyond the deletion point
     std::vector<instrumentedPhase>::iterator iter;
     for(iter = phases.begin(); iter != phases.end(); iter++) {
@@ -399,6 +397,8 @@ public:
 
 	// Print the memory usage
 	 s << runiter->memoryUsageMB << "    "; 
+
+	 s << runiter->idleTime.min << " " << runiter->idleTime.avg << " " << runiter->idleTime.max << "   ";
 
 	// Print the control point values
 	for(cpiter = runiter->controlPoints.begin(); cpiter != runiter->controlPoints.end(); cpiter++){ 
@@ -590,11 +590,14 @@ public:
   /// All processors reduce their memory usages in requestIdleTime() to this method
   void gatherIdleTime(CkReductionMsg *msg);
   
-  /// Call CkExit once all outstanding operations have completed (e.g. waiting for idle time & memory usage to be gathered)
+  /// Check to see if we are in the shutdown process, and handle it appropriately.
   void checkForShutdown();
 
-  /// Call CkExit once all outstanding operations have completed (e.g. waiting for idle time & memory usage to be gathered)
+  /// Start shutdown procedures for the controlPoints module(s). CkExit will be called once all outstanding operations have completed (e.g. waiting for idle time & memory usage to be gathered)
   void exitIfReady();
+
+  // All outstanding operations have completed, so do the shutdown now. First write files to output, and then call CkExit().
+  void doExitNow();
 
   /// Entry method called on all PEs to request memory usage
   void requestMemoryUsage(CkCallback cb);
