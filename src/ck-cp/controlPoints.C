@@ -951,8 +951,11 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
     static int count = 0;
     count++;
     instrumentedPhase *p = controlPointManagerProxy.ckLocalBranch()->previousPhaseData();
-    int result;
-
+    std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
+    int minValue =  controlPointSpace[std::string(name)].first;
+    int maxValue =  controlPointSpace[std::string(name)].second;
+    int result = minValue;
+ 
     if(count > 3){
       CkPrintf("Steering strategy\n");
       CkPrintf("Steering based on previous phase =:\n");
@@ -981,9 +984,7 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
 	  break;
 	}
 
-	std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
-	int minValue =  controlPointSpace[std::string(name)].first;
-	int maxValue =  controlPointSpace[std::string(name)].second;
+
 	result = p->controlPoints[std::string(name)] + 1; // increase it from previous phase
 
 	if(found && result <= maxValue){
