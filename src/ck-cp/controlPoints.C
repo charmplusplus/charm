@@ -898,7 +898,7 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
     CkPrintf("Control Point \"%s\" for phase %d chosen randomly to be: %d\n", name, phase_id, result); 
     return result;
 
-  } else if( whichTuningScheme == CriticalPathAutoPrioritization){
+  } else if( whichTuningScheme == CriticalPathAutoPrioritization) {
 
     // -----------------------------------------------------------
     //  USE CRITICAL PATH TO ADJUST PRIORITIES
@@ -910,7 +910,7 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
       int result = controlPointManagerProxy.ckLocalBranch()->newControlPoints[std::string(name)];
       CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d  from \"newControlPoints\" is: %d\n", name, phase_id, result);
       return result;
-    } 
+    }
   
     std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
 
@@ -938,6 +938,41 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
     instrumentedPhase &p = controlPointManagerProxy.ckLocalBranch()->best_phase;
     int result = p.controlPoints[std::string(name)];
     CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen out of best previous phase to be: %d\n", name, phase_id, result);
+    return result;
+    
+  } else if ( whichTuningScheme == 11 ) {
+    // -----------------------------------------------------------
+    //  STEERING BASED ON KNOWLEDGE
+  
+    // after 3 iterations, start steering performance
+
+    static int count = 0;
+    count++;
+    instrumentedPhase *p = controlPointManagerProxy.ckLocalBranch()->previousPhaseData();
+    
+    if(count > 3){
+      CkPrintf("Steering strategy\n");
+      CkPrintf("Steering based on previous phase =:\n");
+      p->print();
+      CkPrintf("\n");
+      fflush(stdout);
+      
+      // See if idle time is high:
+      double idleTime = p->idleTime.avg;
+      if(idleTime > 0.10){
+	CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
+	
+	// look for a possible control point knob to turn
+	
+	
+	
+	
+      }
+      
+    }
+  
+    int result = p->controlPoints[std::string(name)];
+    CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by Steering to be: %d\n", name, phase_id, result);
     return result;
     
   } else if( whichTuningScheme == SimulatedAnnealing ){
