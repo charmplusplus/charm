@@ -51,6 +51,11 @@ module comlib {
   PUPable OneTimeNodeTreeMulticastStrategy;
   PUPable OneTimeNodeTreeRingMulticastStrategy;
   PUPable OneTimeDimensionOrderedMulticastStrategy;
+  
+  PUPable ChunkMulticastStrategy;	
+  PUPable ChunkRingMulticastStrategy;	
+  PUPable ChunkTreeMulticastStrategy;	
+  PUPable ChunkPipeTreeMulticastStrategy;	
 
   //PUPable CharmStrategy;
   //PUPable MessageHolder;
