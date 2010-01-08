@@ -1845,10 +1845,13 @@ public:
 private:
   virtual CmiBool process(envelope *env,CkCoreState *ck) {
     if (env->getEvent()) {
+      bool wasPacked = env->isPacked();
+      if (!wasPacked) CkPackMessage(&env);
       //unsigned int crc = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
       unsigned int crc1 = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
       unsigned int crc2 = crc32(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
       fprintf(f,"%d %d %d %hhd %x %x\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2);
+      if (!wasPacked) CkUnpackMessage(&env);
     }
     return CmiTrue;
   }
@@ -1867,9 +1870,12 @@ public:
   ~CkMessageDetailRecorder() {fclose(f);}
 private:
   virtual CmiBool process(envelope *env, CkCoreState *ck) {
+    bool wasPacked = env->isPacked();
+    if (!wasPacked) CkPackMessage(&env);
     CmiUInt4 size = env->getTotalsize();
     fwrite(&size, 4, 1, f);
     fwrite(env, env->getTotalsize(), 1, f);
+    if (!wasPacked) CkUnpackMessage(&env);
     return CmiTrue;
   }
 };
@@ -1896,6 +1902,8 @@ class CkMessageReplay : public CkMessageWatcher {
 			CkPrintf("CkMessageReplay> Message size changed during replay org: [%d %d %d] got: [%d %d %d]\n", nextPE, nextEvent, nextSize, env->getSrcPe(), env->getEvent(), env->getTotalsize());
                         return CmiFalse;
                 }
+		bool wasPacked = env->isPacked();
+		if (!wasPacked) CkPackMessage(&env);
 		//unsigned int crcnew = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
 		unsigned int crcnew1 = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
 		unsigned int crcnew2 = crc32(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
@@ -1905,6 +1913,7 @@ class CkMessageReplay : public CkMessageWatcher {
         if (crcnew2 != crc2) {
           CkPrintf("CkMessageReplay> Message CRC changed during replay org: [0x%x] got: [0x%x]\n",crc2,crcnew2);
         }
+        if (!wasPacked) CkUnpackMessage(&env);
 		return CmiTrue;
 	}
 
