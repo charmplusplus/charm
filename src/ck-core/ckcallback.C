@@ -75,35 +75,53 @@ void *CkCallback::impl_thread_delay(void) const
 CkCallback::CkCallback(Chare *p, int ep, CmiBool doInline)
 		:type(doInline?isendChare:sendChare)
 {
+#ifndef CMK_OPTIMIZE
+      bzero(&d, sizeof(callbackData));
+#endif
 	d.chare.ep=ep; 
 	d.chare.id=p->ckGetChareID();
 }
 CkCallback::CkCallback(Group *p, int ep, CmiBool doInline)
 		:type(doInline?isendGroup:sendGroup)
 {
+#ifndef CMK_OPTIMIZE
+      bzero(&d, sizeof(callbackData));
+#endif
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyPe();
 }
 CkCallback::CkCallback(NodeGroup *p, int ep, CmiBool doInline)
 		:type(doInline?isendNodeGroup:sendNodeGroup)
 {
+#ifndef CMK_OPTIMIZE
+      bzero(&d, sizeof(callbackData));
+#endif
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyNode();
 }
 
 CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp)
 		:type(bcastNodeGroup) 
 {
+#ifndef CMK_OPTIMIZE
+      bzero(&d, sizeof(callbackData));
+#endif
 	d.group.ep=ep; d.group.id=ngp.ckGetGroupID();
 }
 
 CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,CmiBool doInline)
 	:type(doInline?isendNodeGroup:sendNodeGroup) 
 {
+#ifndef CMK_OPTIMIZE
+      bzero(&d, sizeof(callbackData));
+#endif
 	d.group.ep=ep; d.group.id=ngp.ckGetGroupID(); d.group.onPE=onPE;
 }
 
 CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,CmiBool doInline) 
 	:type(doInline?isendGroup:sendGroup) 
 {
+#ifndef CMK_OPTIMIZE
+      bzero(&d, sizeof(callbackData));
+#endif
 	d.group.ep=ep; 
 	d.group.id=grpElt.ckGetGroupID(); 
 	d.group.onPE=grpElt.ckGetGroupPe();
@@ -111,6 +129,9 @@ CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,CmiBool doInline
 CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline)
 	:type(doInline?isendArray:sendArray) 
 {
+#ifndef CMK_OPTIMIZE
+      bzero(&d, sizeof(callbackData));
+#endif
 	d.array.ep=ep; 
 	d.array.id=arrElt.ckGetArrayID(); 
 	d.array.idx.asMax()=arrElt.ckGetIndex();
@@ -119,7 +140,10 @@ CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doIn
 CkCallback::CkCallback(ArrayElement *p, int ep,CmiBool doInline)
 	:type(doInline?isendArray:sendArray) 
 {
-        d.array.ep=ep; 
+#ifndef CMK_OPTIMIZE
+      bzero(&d, sizeof(callbackData));
+#endif
+    d.array.ep=ep; 
 	d.array.id=p->ckGetArrayID(); 
 	d.array.idx.asMax()=p->ckGetArrayIndex();
 }
