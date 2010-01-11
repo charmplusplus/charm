@@ -578,6 +578,9 @@ public:
   /// The data from the previous phase
   instrumentedPhase *previousPhaseData();
 
+  /// The data from two phases back
+  instrumentedPhase *twoAgoPhaseData();
+
   /// Called by either the application or the Control Point Framework to advance to the next phase  
   void gotoNextPhase();
 

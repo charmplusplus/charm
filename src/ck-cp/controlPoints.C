@@ -466,6 +466,16 @@ controlPointManager::controlPointManager(){
       return NULL;
     }
   }
+ 
+  /// The data from two phases back
+  instrumentedPhase * controlPointManager::twoAgoPhaseData(){
+    int s = allData.phases.size();
+    if(s >= 3 && phase_id > 0) {
+      return &(allData.phases[s-3]);
+    } else {
+      return NULL;
+    }
+  }
   
 
   /// Called by either the application or the Control Point Framework to advance to the next phase  
@@ -884,8 +894,6 @@ bool valueShouldBeProvidedByOptimizer(){
 
 
 
-
-
 /// Determine a control point value using some optimization scheme (use max known, simmulated annealling, 
 /// user observed characteristic to adapt specific control point values.
 /// @note eventually there should be a plugin system where multiple schemes can be plugged in(similar to LB)
@@ -946,25 +954,29 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
     // -----------------------------------------------------------
     //  STEERING BASED ON KNOWLEDGE
   
-    // after 3 iterations, start steering performance
+    // after 3 iterations (and only on even steps), do steering performance. Otherwise, just use previous phase's configuration
 
-    static int count = 0;
-    count++;
-    instrumentedPhase *p = controlPointManagerProxy.ckLocalBranch()->previousPhaseData();
+    instrumentedPhase *p = controlPointManagerProxy.ckLocalBranch()->twoAgoPhaseData();
+    instrumentedPhase *prevPhase = controlPointManagerProxy.ckLocalBranch()->previousPhaseData();
     std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
     int minValue =  controlPointSpace[std::string(name)].first;
     int maxValue =  controlPointSpace[std::string(name)].second;
     int result = minValue;
  
-    if(count > 3){
+    if(phase_id > 3 && phase_id%2 == 0){
       CkPrintf("Steering strategy\n");
-      CkPrintf("Steering based on previous phase =:\n");
+      CkPrintf("Steering based on 2 phases ago(to ensure we have idle time measures) =:\n");
       p->print();
       CkPrintf("\n");
       fflush(stdout);
+
+      int lastValue =  p->controlPoints[std::string(name)];
+      result = lastValue;
       
       // See if idle time is high:
       double idleTime = p->idleTime.avg;
+      CkPrintf("Steering found idle time(%f)", idleTime);
+      fflush(stdout);
       if(idleTime > 0.10){
 	CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
 	
@@ -984,22 +996,24 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
 	  break;
 	}
 
-
-	result = p->controlPoints[std::string(name)] + 1; // increase it from previous phase
-
-	if(found && result <= maxValue){
-	  CkPrintf("valueProvidedByOptimizer(): Steering found a control point to adjust: %s\n", name);
-
-	} else {
-	  // Don't have any control points to turn :(
-	  CkPrintf("valueProvidedByOptimizer(): Steering didn't find any control points to adjust\n");
-	  result = p->controlPoints[std::string(name)];
+	
+	// This is a phase for steering, so adapt values from two phases back
+	if(found && std::string(name) == cpName && lastValue+1 <= maxValue){
+	  result = lastValue+1; // incrase from two phases back
 	}
-
+	
+      }
+      
+    }  else {
+      // This is not a phase to do steering, so stick with previously used values
+      result = prevPhase->controlPoints[std::string(name)];
+      if(result >= minValue && result <= maxValue){
+	CkPrintf("ERROR: result = %d\n", result);
+	CkAbort("ERROR");
       }
       
     }
-  
+    
     CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by Steering to be: %d\n", name, phase_id, result);
     return result;
     
@@ -1185,8 +1199,8 @@ int controlPoint(const char *name, int lb, int ub){
   }
 
   if(controlPointSpace.count(std::string(name)) == 0){
-    // if this is the first time we've seen the range for the CP, then return the average
-    result = (lb + ub) / 2;
+    // if this is the first time we've seen the range for the CP, then return the lower bound
+    result = lb;
   } else {
     // otherwise, get new values from optimizer
     result = valueProvidedByOptimizer(name, lb, ub);
