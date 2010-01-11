@@ -277,19 +277,19 @@ public:
     }
 
   }
-
-
-
-  void print() {
-    std::map<std::string,int>::iterator iter;
+  
+  
+  
+  void print() const {
+    std::map<std::string,int>::const_iterator iter;
 
     if(controlPoints.size() == 0){
       CkPrintf("no control point values found\n");
     }
     
     for(iter = controlPoints.begin(); iter != controlPoints.end(); iter++){
-      std::string name = iter->first;
-      int val = iter->second;
+      const std::string name = iter->first;
+      const int val = iter->second;
       CkPrintf("%s ---> %d\n",  name.c_str(),  val);
     } 
     
@@ -519,7 +519,6 @@ public:
   
   instrumentedData allData;
   instrumentedPhase thisPhaseData;
-  instrumentedPhase best_phase;
   
   /// The lower and upper bounds for each named control point
   std::map<std::string, std::pair<int,int> > controlPointSpace;
@@ -527,17 +526,17 @@ public:
   /// A set of named control points whose values cannot change within a single run of an application
   std::set<std::string> staticControlPoints;
 
-  /// Sets of entry point ids that are affected by some named control points
+  /// @deprecated Sets of entry point ids that are affected by some named control points
   std::map<std::string, std::set<int> > affectsPrioritiesEP;
-  /// Sets of entry array ids that are affected by some named control points
+  /// @deprecated Sets of entry array ids that are affected by some named control points
   std::map<std::string, std::set<int> > affectsPrioritiesArray;
 
   
   /// The control points to be used in the next phase. In gotoNextPhase(), these will be used
   std::map<std::string,int> newControlPoints;
-  /// Whether to use newControlPoints in gotoNextPhase()
-  bool newControlPointsAvailable;
-  
+  int generatedPlanForStep;
+
+
   /// A user supplied callback to call when control point values are to be changed
   CkCallback granularityCallback;
   bool haveGranularityCallback;
@@ -574,7 +573,10 @@ public:
   
   /// Determine if any control point is known to affect a chare array  
   bool controlPointAffectsThisArray(int array);
-  
+
+  /// Generate a plan (new control point values) once per phase
+  void generatePlan();
+
   /// The data from the previous phase
   instrumentedPhase *previousPhaseData();
 

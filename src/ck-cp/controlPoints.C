@@ -42,6 +42,36 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering}  tuningScheme;
 
 
+
+void printTuningScheme(){
+  switch(whichTuningScheme){
+  case RandomSelection:
+    CkPrintf("Tuning Scheme: RandomSelection\n");
+    break;
+  case SimulatedAnnealing:
+    CkPrintf("Tuning Scheme: SimulatedAnnealing\n");
+    break;
+  case ExhaustiveSearch:
+    CkPrintf("Tuning Scheme: ExhaustiveSearch\n");
+    break;
+  case CriticalPathAutoPrioritization:
+    CkPrintf("Tuning Scheme: CriticalPathAutoPrioritization\n");
+    break;
+  case UseBestKnownTiming:
+    CkPrintf("Tuning Scheme: UseBestKnownTiming\n");
+    break;
+  case UseSteering:
+    CkPrintf("Tuning Scheme: UseSteering\n");
+    break;
+  default:
+    CkPrintf("Unknown tuning scheme\n");
+    break;
+  }
+  fflush(stdout);
+}
+
+
+
 /// A reduction type that combines idle time statistics (min/max/avg etc.)
 CkReduction::reducerType idleTimeReductionType;
 /// A reducer that combines idle time statistics (min/max/avg etc.)
@@ -107,9 +137,9 @@ unsigned int randInt(unsigned int num, const char* name, int seed=0){
 
 
 controlPointManager::controlPointManager(){
+  generatedPlanForStep = -1;
 
     exitWhenReady = false;
-    newControlPointsAvailable = false;
     alreadyRequestedMemoryUsage = false;   
     alreadyRequestedIdleTime = false;
     
@@ -481,8 +511,6 @@ controlPointManager::controlPointManager(){
   /// Called by either the application or the Control Point Framework to advance to the next phase  
   void controlPointManager::gotoNextPhase(){
 
-
-
     if(shouldGatherMemoryUsage && CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
       alreadyRequestedMemoryUsage = true;
       CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
@@ -541,14 +569,10 @@ controlPointManager::controlPointManager(){
       delete cb;
     }
 
-
-
-
     
     // increment phase id
     phase_id++;
     
-    CkPrintf("Now in phase %d\n", phase_id);
     
     // save a copy of the timing information from this phase
     allData.phases.push_back(thisPhaseData);
@@ -556,6 +580,8 @@ controlPointManager::controlPointManager(){
     // clear the timing information that will be used for the next phase
     thisPhaseData.clear();
     
+    CkPrintf("Now in phase %d allData.phases.size()=%d\n", phase_id, allData.phases.size());
+
   }
 
   /// An application uses this to register an instrumented timing for this phase
@@ -868,68 +894,50 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime){
 
 
 
-/// Should an optimizer determine the control point values
-bool valueShouldBeProvidedByOptimizer(){
-#if 0  
-  const int effective_phase = controlPointManagerProxy.ckLocalBranch()->allData.phases.size();
-  const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id; 
-  
-  std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace; 
-  
-  double spaceSize = 1.0;
-  std::map<std::string, pair<int,int> >::iterator iter;
-  for(iter = controlPointSpace.begin(); iter != controlPointSpace.end(); iter++){
-    spaceSize *= iter->second.second - iter->second.first + 1;
-  }
-
-  //  CkPrintf("Control Point Space:\n\t\tnumber of control points = %d\n\t\tnumber of possible configurations = %.0lf\n", controlPointSpace.size(), spaceSize);
-
-  // return false;
-  //  return effective_phase > 1 && phase_id > 1;
-  //  return effective_phase >= OPTIMIZER_TRANSITION && phase_id > 3;
-#else
-  return true;
-#endif
-}
-
-
 
 /// Determine a control point value using some optimization scheme (use max known, simmulated annealling, 
 /// user observed characteristic to adapt specific control point values.
 /// @note eventually there should be a plugin system where multiple schemes can be plugged in(similar to LB)
-int valueProvidedByOptimizer(const char * name, int lb, int ub){
-  const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
-  const int effective_phase = controlPointManagerProxy.ckLocalBranch()->allData.phases.size();
+void controlPointManager::generatePlan() {
+  const int phase_id = this->phase_id;
+  const int effective_phase = allData.phases.size();
 
-
-  if( whichTuningScheme == RandomSelection){
-
-    int result = lb + randInt(ub-lb+1, name, phase_id);
-    CkPrintf("Control Point \"%s\" for phase %d chosen randomly to be: %d\n", name, phase_id, result); 
-    return result;
-
+  // Only generate a plan once per phase
+  if(generatedPlanForStep == phase_id) 
+    return;
+  generatedPlanForStep = phase_id;
+ 
+  CkPrintf("Generating Plan for phase %d\n", phase_id); 
+  printTuningScheme();
+  
+  if( whichTuningScheme == RandomSelection ){
+    std::map<std::string, std::pair<int,int> >::iterator cpsIter;
+    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+      const std::string &name = cpsIter->first;
+      const std::pair<int,int> &bounds = cpsIter->second;
+      const int lb = bounds.first;
+      const int ub = bounds.second;
+      newControlPoints[name] = lb + randInt(ub-lb+1, name.c_str(), phase_id);
+    }
   } else if( whichTuningScheme == CriticalPathAutoPrioritization) {
-
     // -----------------------------------------------------------
     //  USE CRITICAL PATH TO ADJUST PRIORITIES
     //   
     // This scheme will return the median value for the range 
     // early on, and then will transition over to the new control points
     // determined by the critical path adapting code
-    if(controlPointManagerProxy.ckLocalBranch()->newControlPointsAvailable){
-      int result = controlPointManagerProxy.ckLocalBranch()->newControlPoints[std::string(name)];
-      CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d  from \"newControlPoints\" is: %d\n", name, phase_id, result);
-      return result;
-    }
-  
-    std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
 
-    if(controlPointSpace.count(std::string(name))>0){
-      int minValue =  controlPointSpace[std::string(name)].first;
-      int maxValue =  controlPointSpace[std::string(name)].second;
-      return (minValue+maxValue)/2;
+    // ???? how does this work ???
+
+    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+      const std::string &name = cpsIter->first;
+      const std::pair<int,int> &bounds = cpsIter->second;
+      const int lb = bounds.first;
+      const int ub = bounds.second;
+      newControlPoints[name] =  (lb+ub)/2;
     }
-  
+
   } else if ( whichTuningScheme == UseBestKnownTiming ) {
 
     // -----------------------------------------------------------
@@ -937,56 +945,58 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
     static bool firstTime = true;
     if(firstTime){
       firstTime = false;
-      CkPrintf("Finding best phase\n");
-      instrumentedPhase p = controlPointManagerProxy.ckLocalBranch()->allData.findBest(); 
-      CkPrintf("p=:\n");
-      p.print();
+      instrumentedPhase best = controlPointManagerProxy.ckLocalBranch()->allData.findBest(); 
+      CkPrintf("Best known phase is:\n");
+      best.print();
       CkPrintf("\n");
-      controlPointManagerProxy.ckLocalBranch()->best_phase = p;
-    } 
-    
-    instrumentedPhase &p = controlPointManagerProxy.ckLocalBranch()->best_phase;
-    int result = p.controlPoints[std::string(name)];
-    CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen out of best previous phase to be: %d\n", name, phase_id, result);
-    return result;
-    
+      
+      std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+      for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter) {
+	const std::string &name = cpsIter->first;
+	newControlPoints[name] =  best.controlPoints[name];
+      }
+    }
+
   } else if ( whichTuningScheme == UseSteering ) {
     // -----------------------------------------------------------
     //  STEERING BASED ON KNOWLEDGE
   
-    // after 3 iterations (and only on even steps), do steering performance. Otherwise, just use previous phase's configuration
+    // after 3 phases (and only on even steps), do steering performance. Otherwise, just use previous phase's configuration
+    // plans are only generated after 3 phases
 
-    instrumentedPhase *p = controlPointManagerProxy.ckLocalBranch()->twoAgoPhaseData();
-    instrumentedPhase *prevPhase = controlPointManagerProxy.ckLocalBranch()->previousPhaseData();
-    std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
-    int minValue =  controlPointSpace[std::string(name)].first;
-    int maxValue =  controlPointSpace[std::string(name)].second;
-    int result = minValue;
+    instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
+    instrumentedPhase *prevPhase = previousPhaseData();
  
-    if(phase_id > 3 && phase_id%2 == 0){
-      CkPrintf("Steering strategy\n");
-      CkPrintf("Steering based on 2 phases ago(to ensure we have idle time measures) =:\n");
-      p->print();
+    if(phase_id%4 == 0){
+      CkPrintf("Steering based on 2 phases ago:\n");
+      twoAgoPhase->print();
       CkPrintf("\n");
       fflush(stdout);
-
-      int lastValue =  p->controlPoints[std::string(name)];
-      result = lastValue;
       
       // See if idle time is high:
-      double idleTime = p->idleTime.avg;
+      double idleTime = twoAgoPhase->idleTime.avg;
       CkPrintf("Steering encountered idle time (%f)\n", idleTime);
       fflush(stdout);
       if(idleTime > 0.10){
 	CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
-	
-	// look for a possible control point knob to turn
-       
-	std::map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["Concurrency"];
+	CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
 
+	// Initialize plan to be the values from two phases ago (later we'll adjust this)
+	std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+	for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	  const std::string &name = cpsIter->first;
+	  const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
+	  newControlPoints[name] = twoAgoValue;
+	}
+	CkPrintf("Steering initialized plan\n");
+	fflush(stdout);
+
+	// look for a possible control point knob to turn
+	std::map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["Concurrency"];
+	
 	// FIXME: assume for now that we just have one control point with the effect
 	bool found = false;
-	std::string cpName = "";
+	std::string cpName;
 	std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > *info;
 	std::map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > >::iterator iter;
 	for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
@@ -996,28 +1006,33 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
 	  break;
 	}
 
-	
-	// This is a phase for steering, so adapt values from two phases back
-	if(found && std::string(name) == cpName && lastValue+1 <= maxValue){
-	  result = lastValue+1; // incrase from two phases back
+	// Adapt the control point value
+	if(found){
+	  CkPrintf("Steering found knob to turn\n");
+	  fflush(stdout);
+	  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+	  const int maxValue = controlPointSpace[cpName].second;
+
+	  if(twoAgoValue+1 <= maxValue){
+	    newControlPoints[cpName] = twoAgoValue+1; // incrase from two phases back
+	  }
 	}
 	
       }
       
+      CkPrintf("Steering done for this phase\n");
+      fflush(stdout);
+
     }  else {
-      // This is not a phase to do steering, so stick with previously used values
-      result = prevPhase->controlPoints[std::string(name)];
-      if(result >= minValue && result <= maxValue){
-	CkPrintf("ERROR: result = %d\n", result);
-	CkAbort("ERROR");
-      }
-      
+      // This is not a phase to do steering, so stick with previously used values (one phase ago)
+      CkPrintf("not a phase to do steering, so stick with previously planned values (one phase ago)\n");
+      fflush(stdout);
     }
     
-    CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by Steering to be: %d\n", name, phase_id, result);
-    return result;
     
-  } else if( whichTuningScheme == SimulatedAnnealing ){
+    
+  } else if( whichTuningScheme == SimulatedAnnealing ) {
+#if FIX_THIS_GENERATE_SCHEME
     
     // -----------------------------------------------------------
     //  SIMULATED ANNEALING
@@ -1059,8 +1074,9 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
 
     CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by hill climbing to be: %d\n", name, phase_id, result); 
     return result; 
-
-  } else if( whichTuningScheme == ExhaustiveSearch ){
+#endif
+  } else if( whichTuningScheme == ExhaustiveSearch ) {
+#if FIX_THIS_GENERATE_SCHEME
 
     // -----------------------------------------------------------
     // EXHAUSTIVE SEARCH
@@ -1171,12 +1187,11 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
 
     CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by exhaustive search to be: %d\n", name, phase_id, result); 
     return result; 
-
+#endif
   } else {
     CkAbort("Some Control Point tuning strategy must be enabled.\n");
   }
 
-  return 0;  
 }
 
 
@@ -1198,12 +1213,22 @@ int controlPoint(const char *name, int lb, int ub){
     return thisPhaseData.controlPoints[std::string(name)];
   }
 
-  if(controlPointSpace.count(std::string(name)) == 0){
-    // if this is the first time we've seen the range for the CP, then return the lower bound
+
+  if( phase_id < 4 ){
+    // For the first few phases, just use the lower bound. 
+    // This ensures that the ranges for all the control points known before we do anything fancy
     result = lb;
-  } else {
-    // otherwise, get new values from optimizer
-    result = valueProvidedByOptimizer(name, lb, ub);
+  } else if(controlPointSpace.count(std::string(name)) == 0){
+    // if this is the first time we've seen the CP, then return the lower bound
+    result = lb;
+  }  else {
+    // Generate a plan one time for each phase
+    controlPointManagerProxy.ckLocalBranch()->generatePlan();
+    
+    // Return the planned value:
+    result = controlPointManagerProxy.ckLocalBranch()->newControlPoints[std::string(name)];
+    CkPrintf("Control Point \"%s\" for phase %d is: %d\n", name, phase_id, result);
+    
   }
 
   CkAssert(isInRange(result,ub,lb));
