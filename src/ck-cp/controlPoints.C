@@ -965,6 +965,7 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
       
       // See if idle time is high:
       double idleTime = p->idleTime.avg;
+      CkPrintf("Steering encountered idle time (%f)\n", idleTime);
       if(idleTime > 0.10){
 	CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
 	
