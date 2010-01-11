@@ -263,12 +263,19 @@ public:
 
 CkMemCheckPT::CkMemCheckPT(int w)
 {
-#if CK_NO_PROC_POOL
-  if (CkNumPes() <= 2) {
+  int numnodes = 0;
+#if NODE_CHECKPOINT
+  numnodes = CmiNumPhysicalNodes();
 #else
-  if (CkNumPes()  == 1) {
+  numnodes = CkNumPes();
 #endif
-    if (CkMyPe() == 0)  CkPrintf("Warning: CkMemCheckPT disabled!\n");
+#if CK_NO_PROC_POOL
+  if (numnodes <= 2)
+#else
+  if (numnodes  == 1)
+#endif
+  {
+    if (CkMyPe() == 0)  CkPrintf("Warning: CkMemCheckPT is disabled due to too few nodes.\n");
     _memChkptOn = 0;
   }
   inRestarting = 0;
@@ -769,7 +776,12 @@ void CkMemCheckPT::finishUp()
        CkStartQD(cpCallback);
   } 
 #if CK_NO_PROC_POOL
-  if (CkNumPes()-totalFailed() <=2) {
+#if NODE_CHECKPOINT
+  int numnodes = CmiNumPhysicalNodes();
+#else
+  int numnodes = CkNumPes();
+#endif
+  if (numnodes-totalFailed() <=2) {
     if (CkMyPe()==0) CkPrintf("Warning: CkMemCheckPT disabled!\n");
     _memChkptOn = 0;
   }
