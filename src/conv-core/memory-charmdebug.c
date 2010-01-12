@@ -1081,7 +1081,7 @@ void CpdCheckMemory(int report) {
   SLOT_ITERATE_END
 }
 
-static int cpdInSystem;
+int cpdInSystem;
 
 void CpdSystemEnter() {
 #ifdef CPD_USE_MMAP
