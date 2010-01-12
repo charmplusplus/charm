@@ -25,7 +25,7 @@ void automaticallySetMessagePriority(envelope *env); // in control point framewo
 #include "LBDatabase.h"
 #endif // CMK_LBDB_ON
 
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
 CpvDeclare(CkVec<void *>, chare_objs);
 CpvDeclare(CkVec<VidBlock *>, vidblocks);
 #endif
@@ -46,7 +46,7 @@ extern int _defaultObjectQ;
 Chare::Chare(void) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
      // for plain chare, objPtr is actually the index to chare table
   if (chareIdx >= 0) thishandle.objPtr=(void*)chareIdx;
 #endif
@@ -82,7 +82,7 @@ void Chare::pup(PUP::er &p)
 {
   p(thishandle.onPE);
   thishandle.objPtr=(void *)this;
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   p(chareIdx);
   if (chareIdx != -1) thishandle.objPtr=(void*)chareIdx;
 #endif
@@ -551,7 +551,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
     _MEMCHECK(pCid->objPtr);
     env->setMsgtype(NewVChareMsg);
     env->setVidPtr(pCid->objPtr);
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
     CpvAccess(vidblocks).push_back((VidBlock*)pCid->objPtr);
     int idx = CpvAccess(vidblocks).size()-1;
     pCid->objPtr = (void *)idx;
@@ -595,7 +595,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 
   CkpvAccess(_currentGroup) = groupID;
   CkpvAccess(_currentGroupRednMgr) = env->getRednMgr();
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   ((Chare *)obj)->chareIdx = -1;
 #endif
   _invokeEntryNoTrace(epIdx,env,obj); /* can't trace groups: would cause nested begin's */
@@ -618,7 +618,7 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 // User may call CkLocalNodeBranch() inside the nodegroup constructor
 //  store nodegroup into _currentNodeGroupObj
   CkpvAccess(_currentNodeGroupObj) = obj;
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   ((Chare *)obj)->chareIdx = -1;
 #endif
   _invokeEntryNoTrace(epIdx,env,obj);
@@ -774,7 +774,7 @@ static inline void *_allocNewChare(envelope *env, int &idx)
 {
   int chareIdx = _entryTable[env->getEpIdx()]->chareIdx;
   void *tmp=malloc(_chareTable[chareIdx]->size);
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   CpvAccess(chare_objs).push_back(tmp);
   idx = CpvAccess(chare_objs).size()-1;
 #endif
@@ -787,7 +787,7 @@ static void _processNewChareMsg(CkCoreState *ck,envelope *env)
 {
   int idx;
   register void *obj = _allocNewChare(env, idx);
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   ((Chare *)obj)->chareIdx = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
@@ -800,7 +800,7 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
   register CkChareID *pCid = (CkChareID *)
       _allocMsg(FillVidMsg, sizeof(CkChareID));
   pCid->onPE = CkMyPe();
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   pCid->objPtr = (void*)idx;
 #else
   pCid->objPtr = obj;
@@ -813,7 +813,7 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
   CmiSetHandler(ret, _charmHandlerIdx);
   CmiSyncSendAndFree(srcPe, ret->getTotalsize(), (char *)ret);
   CpvAccess(_qd)->create();
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   ((Chare *)obj)->chareIdx = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
@@ -831,7 +831,7 @@ static inline void _processForPlainChareMsg(CkCoreState *ck,envelope *env)
     obj = _mainTable[mainIdx]->getObj();
   }
   else {
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
     if (_chareTable[_entryTable[epIdx]->chareIdx]->chareType == TypeChare)
       obj = CpvAccess(chare_objs)[(CmiIntPtr)env->getObjPtr()];
     else
@@ -852,7 +852,7 @@ static inline void _processForChareMsg(CkCoreState *ck,envelope *env)
 
 static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
 {
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   register VidBlock *vptr = CpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
 #else
   register VidBlock *vptr = (VidBlock *) env->getVidPtr();
@@ -866,7 +866,7 @@ static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
 
 static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
 {
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   register VidBlock *vptr = CpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
 #else
   VidBlock *vptr = (VidBlock *) env->getVidPtr();
@@ -1340,7 +1340,7 @@ static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
   if (pCid->onPE < 0) { //Virtual chare ID (VID)
     register int pe = -(pCid->onPE+1);
     if(pe==CkMyPe()) {
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
       VidBlock *vblk = CpvAccess(vidblocks)[(CmiIntPtr)pCid->objPtr];
 #else
       VidBlock *vblk = (VidBlock *) pCid->objPtr;

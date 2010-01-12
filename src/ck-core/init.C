@@ -105,7 +105,7 @@ CkpvStaticDeclare(int,  _numInitsRecd); /* UInt changed to int */
 CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
 CpvExtern(CkVec<void *>, chare_objs);
 CpvExtern(CkVec<VidBlock *>, vidblocks);
 #endif
@@ -757,7 +757,7 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 	CpvInitialize(int,serializer);
 
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
           /* chare and vidblock table */
         CpvInitialize(CkVec<void *>, chare_objs);
         CpvInitialize(CkVec<VidBlock *>, vidblocks);
