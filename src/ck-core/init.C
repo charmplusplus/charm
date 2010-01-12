@@ -696,7 +696,7 @@ void InitCallTable::enumerateInitCalls()
   for (i=0; i<initProcCalls.length(); i++) initProcCalls[i]();
 }
 
-CpvCExtern(int, cmiArgDebugFlag);
+CpvCExtern(int, cpdSuspendStartup);
 extern "C" void CpdFreeze(void);
 
 extern int _dummy_dq;
@@ -1080,7 +1080,7 @@ void _initCharm(int unused_argc, char **argv)
         }
 
 #if CMK_CCS_AVAILABLE
-       if (CpvAccess(cmiArgDebugFlag))
+       if (CpvAccess(cpdSuspendStartup))
        { 
           //CmiPrintf("In Parallel Debugging mode .....\n");
           CpdFreeze();
