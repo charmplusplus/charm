@@ -192,7 +192,7 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 		bdcastRO();
 }
 
-#ifnedf CMK_CHARE_USE_PTR
+#ifndef CMK_CHARE_USE_PTR
 
 CpvExtern(CkVec<void *>, chare_objs);
 CpvExtern(CkVec<VidBlock *>, vidblocks);
