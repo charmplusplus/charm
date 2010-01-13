@@ -6,7 +6,7 @@ module ControlPoints {
   readonly int whichTuningScheme;
   readonly bool shouldGatherMemoryUsage;
   readonly bool shouldGatherUtilization;
-
+  readonly bool shouldGatherAll;
 
   initproc void registerCPReductions(void);	
 
@@ -36,6 +36,9 @@ module ControlPoints {
     entry void requestIdleTime(CkCallback cb);
     entry void gatherIdleTime(CkReductionMsg *msg);
 
+    entry void requestAll(CkCallback cb);
+    entry void gatherAll(CkReductionMsg *msg);
+  
  }   
 
 

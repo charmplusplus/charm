@@ -186,7 +186,7 @@ void TraceControlPoints::resetTimings(){
   lastResetTime = CmiWallTimer();
 }
 
-void TraceControlPoints::resetIdleOverheadMem(){
+void TraceControlPoints::resetAll(){
   totalIdleTime = 0.0;
   totalEntryMethodTime = 0.0;
   memUsage = 0;

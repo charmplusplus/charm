@@ -37,6 +37,7 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ bool loadDataFileAtStartup;
 /* readonly */ bool shouldGatherMemoryUsage;
 /* readonly */ bool shouldGatherUtilization;
+/* readonly */ bool shouldGatherAll;
 
 
 typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering}  tuningScheme;
@@ -97,9 +98,9 @@ CkReductionMsg *idleTimeReduction(int nMsg,CkReductionMsg **msgs){
 
 
 /// A reduction type that combines idle, overhead, and memory measurements
-CkReduction::reducerType idleOverMemReductionType;
+CkReduction::reducerType allMeasuresReductionType;
 /// A reducer that combines idle, overhead, and memory measurements
-CkReductionMsg *idleOverMemReduction(int nMsg,CkReductionMsg **msgs){
+CkReductionMsg *allMeasuresReduction(int nMsg,CkReductionMsg **msgs){
   double ret[7];
   if(nMsg > 0){
     CkAssert(msgs[0]->getSize()==7*sizeof(double));
@@ -126,14 +127,14 @@ CkReductionMsg *idleOverMemReduction(int nMsg,CkReductionMsg **msgs){
     // mem usage (max)
     ret[6]=max(ret[6],m[6]);
   }  
-  return CkReductionMsg::buildNew(3*sizeof(double),ret);   
+  return CkReductionMsg::buildNew(7*sizeof(double),ret);   
 }
 
 
 /// Registers the control point framework's reduction handlers at startup on each PE
 /*initproc*/ void registerCPReductions(void) {
   idleTimeReductionType=CkReduction::addReducer(idleTimeReduction);
-  idleOverMemReductionType=CkReduction::addReducer(idleOverMemReduction);
+  allMeasuresReductionType=CkReduction::addReducer(allMeasuresReduction);
 }
 
 
@@ -546,20 +547,34 @@ controlPointManager::controlPointManager(){
 
   /// Called by either the application or the Control Point Framework to advance to the next phase  
   void controlPointManager::gotoNextPhase(){
+    
+    CkPrintf("gotoNextPhase shouldGatherAll=%d\n", (int)shouldGatherAll);
+    fflush(stdout);
 
-    if(shouldGatherMemoryUsage && CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
-      alreadyRequestedMemoryUsage = true;
-      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
-      thisProxy.requestMemoryUsage(*cb);
+    if(shouldGatherAll && CkMyPe() == 0 && !alreadyRequestedAll){
+      alreadyRequestedAll = true;
+      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherAll(NULL), 0, thisProxy);
+      CkPrintf("Requesting all measurements\n");
+      thisProxy.requestAll(*cb);
       delete cb;
+    
+    } else {
+      
+      if(shouldGatherMemoryUsage && CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
+	alreadyRequestedMemoryUsage = true;
+	CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
+	thisProxy.requestMemoryUsage(*cb);
+	delete cb;
+      }
+      
+      if(shouldGatherUtilization && CkMyPe() == 0 && !alreadyRequestedIdleTime){
+	alreadyRequestedIdleTime = true;
+	CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherIdleTime(NULL), 0, thisProxy);
+	thisProxy.requestIdleTime(*cb);
+	delete cb;
+      }
     }
-
-    if(shouldGatherUtilization && CkMyPe() == 0 && !alreadyRequestedIdleTime){
-      alreadyRequestedIdleTime = true;
-      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherIdleTime(NULL), 0, thisProxy);
-      thisProxy.requestIdleTime(*cb);
-      delete cb;
-    }
+    
 
 
 
@@ -690,10 +705,10 @@ controlPointManager::controlPointManager(){
 
 
   /// Entry method called on all PEs to request CPU utilization statistics and memory usage
-  void controlPointManager::requestIdleOverMem(CkCallback cb){
+  void controlPointManager::requestAll(CkCallback cb){
     const double i = localControlPointTracingInstance()->idleRatio();
     const double o = localControlPointTracingInstance()->overheadRatio();
-    const double m = localControlPointTracingInstance()->memoryUsage();
+    const double m = localControlPointTracingInstance()->memoryUsageMB();
     
     double data[3+3+1];
 
@@ -711,13 +726,13 @@ controlPointManager::controlPointManager(){
 
     mem[0] = m;
     
-    localControlPointTracingInstance()->resetIdleOverheadMem();
+    localControlPointTracingInstance()->resetAll();
 
-    contribute(7*sizeof(double),idle,idleOverMemReductionType, cb);
+    contribute(7*sizeof(double),data,allMeasuresReductionType, cb);
   }
   
   /// All processors reduce their memory usages in requestIdleTime() to this method
-  void controlPointManager::gatherIdleOverMem(CkReductionMsg *msg){
+  void controlPointManager::gatherAll(CkReductionMsg *msg){
     int size=msg->getSize() / sizeof(double);
     CkAssert(size==7);
     double *data=(double *) msg->getData();
@@ -741,7 +756,7 @@ controlPointManager::controlPointManager(){
       CkPrintf("There is no previous phase to store measurements\n");
     }
     
-    alreadyRequestedIdleOverMem = false;
+    alreadyRequestedAll = false;
     checkForShutdown();
     delete msg;
   }
@@ -916,18 +931,24 @@ public:
       whichTuningScheme = UseBestKnownTiming;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPSteering","Use Steering to adjust Control Point Values") ){
       whichTuningScheme = UseSteering;
-    } 
+    }
 
+
+    shouldGatherAll = false;
     shouldGatherMemoryUsage = false;
-    if ( CmiGetArgFlagDesc(args->argv,"+CPGatherMemoryUsage","Gather memory usage after each phase") ){
-      shouldGatherMemoryUsage = true;
-    }
-
     shouldGatherUtilization = false;
-    if ( CmiGetArgFlagDesc(args->argv,"+CPGatherUtilization","Gather utilization & Idle time after each phase") ){
-      shouldGatherUtilization = true;
+    
+    if ( CmiGetArgFlagDesc(args->argv,"+CPGatherAll","Gather all types of measurements for each phase") ){
+      shouldGatherAll = true;
+    } else {
+      if ( CmiGetArgFlagDesc(args->argv,"+CPGatherMemoryUsage","Gather memory usage after each phase") ){
+	shouldGatherMemoryUsage = true;
+      }
+      if ( CmiGetArgFlagDesc(args->argv,"+CPGatherUtilization","Gather utilization & Idle time after each phase") ){
+	shouldGatherUtilization = true;
+      }
     }
-
+    
     writeDataFileAtShutdown = false;   
     if( CmiGetArgFlagDesc(args->argv,"+CPSaveData","Save Control Point timings & configurations at completion") ){
       writeDataFileAtShutdown = true;

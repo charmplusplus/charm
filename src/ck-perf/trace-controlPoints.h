@@ -99,21 +99,23 @@ class TraceControlPoints : public Trace {
   void resetTimings();
 
   /** Reset the idle, overhead, and memory measurements */
-  void resetIdleOverheadMem();
+  void resetAll();
 
   /** Fraction of the time spent idle */
   double idleRatio(){
-    return (totalIdleTime) / (CmiWallTimer() - lastResetTime);
+    double t = CmiWallTimer() - lastResetTime;
+    return (totalIdleTime) / t;
   }
 
   /** Fraction of time spent as overhead */
   double overheadRatio(){
-    return 0.0;
+    double t = CmiWallTimer() - lastResetTime;
+    return (t - totalIdleTime - totalEntryMethodTime) / t;
   }
 
-  /** Highest memory usage value we've seen since last time */
-  double memoryUsage(){
-    return 0.0;
+  /** Highest memory usage (in MB) value we've seen since last time */
+  double memoryUsageMB(){
+    return memUsage / 1024.0 / 1024.0;
   }
 
 

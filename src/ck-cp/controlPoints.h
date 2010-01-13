@@ -546,7 +546,7 @@ public:
 
   bool alreadyRequestedMemoryUsage;
   bool alreadyRequestedIdleTime;
-  bool alreadyRequestedIdleOverMem;
+  bool alreadyRequestedAll;
 
   bool exitWhenReady;
 
@@ -615,12 +615,10 @@ public:
   
 
   /// Entry method called on all PEs to request Idle, Overhead, and Memory measurements
-  void requestIdleOverMem(CkCallback cb);
+  void requestAll(CkCallback cb);
   /// All processors reduce their memory usages in requestIdleTime() to this method
-  void gatherIdleOverMem(CkReductionMsg *msg);
+  void gatherAll(CkReductionMsg *msg);
   
-
-
 
   /// Inform the control point framework that a named control point affects the priorities of some array  
   void associatePriorityArray(const char *name, int groupIdx);
