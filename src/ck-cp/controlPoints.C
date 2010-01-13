@@ -9,11 +9,11 @@
 #include "cp_effects.h"
 
 
-/**
- *  \addtogroup ControlPointFramework
- *   @{
- *
- */
+//  A framework for tuning "control points" exposed by an application. Tuning decisions are based upon observed performance measurements.
+ 
+
+/** @defgroup ControlPointFramework Automatic Performance Tuning and Steering Framework  */
+/**  @{ */
 
 using namespace std;
 
@@ -72,9 +72,9 @@ void printTuningScheme(){
 
 
 
-/// A reduction type that combines idle time statistics (min/max/avg etc.)
+/// A reduction type that combines idle time measurements (min/sum/max etc.)
 CkReduction::reducerType idleTimeReductionType;
-/// A reducer that combines idle time statistics (min/max/avg etc.)
+/// A reducer that combines idle time measurements (min/sum/max etc.)
 CkReductionMsg *idleTimeReduction(int nMsg,CkReductionMsg **msgs){
   double ret[3];
   if(nMsg > 0){
@@ -93,12 +93,48 @@ CkReductionMsg *idleTimeReduction(int nMsg,CkReductionMsg **msgs){
   }  
   return CkReductionMsg::buildNew(3*sizeof(double),ret);   
 }
-/// An initcall that registers the idle time reducer idleTimeReduction()
-/*initproc*/ void registerIdleTimeReduction(void) {
-  idleTimeReductionType=CkReduction::addReducer(idleTimeReduction);
+
+
+
+/// A reduction type that combines idle, overhead, and memory measurements
+CkReduction::reducerType idleOverMemReductionType;
+/// A reducer that combines idle, overhead, and memory measurements
+CkReductionMsg *idleOverMemReduction(int nMsg,CkReductionMsg **msgs){
+  double ret[7];
+  if(nMsg > 0){
+    CkAssert(msgs[0]->getSize()==7*sizeof(double));
+    double *m=(double *)msgs[0]->getData();
+    ret[0]=m[0];
+    ret[1]=m[1];
+    ret[2]=m[2];
+    ret[3]=m[3];
+    ret[4]=m[4];
+    ret[5]=m[5];
+    ret[6]=m[6];
+  }
+  for (int i=1;i<nMsg;i++) {
+    CkAssert(msgs[i]->getSize()==7*sizeof(double));
+    double *m=(double *)msgs[i]->getData();
+    // idle time (min/sum/max)
+    ret[0]=min(ret[0],m[0]);
+    ret[1]+=m[1];
+    ret[2]=max(ret[2],m[2]);
+    // overhead time (min/sum/max)
+    ret[3]=min(ret[3],m[3]);
+    ret[4]+=m[4];
+    ret[5]=max(ret[5],m[5]);
+    // mem usage (max)
+    ret[6]=max(ret[6],m[6]);
+  }  
+  return CkReductionMsg::buildNew(3*sizeof(double),ret);   
 }
 
 
+/// Registers the control point framework's reduction handlers at startup on each PE
+/*initproc*/ void registerCPReductions(void) {
+  idleTimeReductionType=CkReduction::addReducer(idleTimeReduction);
+  idleOverMemReductionType=CkReduction::addReducer(idleOverMemReduction);
+}
 
 
 
@@ -641,6 +677,78 @@ controlPointManager::controlPointManager(){
     checkForShutdown();
     delete msg;
   }
+
+
+
+
+
+
+
+
+
+
+
+
+  /// Entry method called on all PEs to request CPU utilization statistics and memory usage
+  void controlPointManager::requestIdleOverMem(CkCallback cb){
+    const double i = localControlPointTracingInstance()->idleRatio();
+    const double o = localControlPointTracingInstance()->overheadRatio();
+    const double m = localControlPointTracingInstance()->memoryUsage();
+    
+    double data[3+3+1];
+
+    double *idle = data;
+    double *over = data+3;
+    double *mem = data+6;
+
+    idle[0] = i;
+    idle[1] = i;
+    idle[2] = i;
+
+    over[0] = o;
+    over[1] = o;
+    over[2] = o;
+
+    mem[0] = m;
+    
+    localControlPointTracingInstance()->resetIdleOverheadMem();
+
+    contribute(7*sizeof(double),idle,idleOverMemReductionType, cb);
+  }
+  
+  /// All processors reduce their memory usages in requestIdleTime() to this method
+  void controlPointManager::gatherIdleOverMem(CkReductionMsg *msg){
+    int size=msg->getSize() / sizeof(double);
+    CkAssert(size==7);
+    double *data=(double *) msg->getData();
+        
+    double *idle = data;
+    double *over = data+3;
+    double *mem = data+6;
+
+    instrumentedPhase* prevPhase = previousPhaseData();
+    if(prevPhase != NULL){
+      CkPrintf("Storing idle time measurements\n");
+      prevPhase->idleTime.min = idle[0];
+      prevPhase->idleTime.avg = idle[1]/CkNumPes();
+      prevPhase->idleTime.max = idle[2];
+      
+      prevPhase->memoryUsageMB = mem[0];
+      
+      
+      CkPrintf("Stored idle time min=%lf in prevPhase=%p\n", prevPhase->idleTime.min, prevPhase);
+    } else {
+      CkPrintf("There is no previous phase to store measurements\n");
+    }
+    
+    alreadyRequestedIdleOverMem = false;
+    checkForShutdown();
+    delete msg;
+  }
+
+
+
+
 
 
 

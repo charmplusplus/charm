@@ -8,7 +8,7 @@ module ControlPoints {
   readonly bool shouldGatherUtilization;
 
 
-  initproc void registerIdleTimeReduction(void);	
+  initproc void registerCPReductions(void);	
 
 
  message controlPointMsg { 

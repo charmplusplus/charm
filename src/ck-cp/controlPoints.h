@@ -546,6 +546,7 @@ public:
 
   bool alreadyRequestedMemoryUsage;
   bool alreadyRequestedIdleTime;
+  bool alreadyRequestedIdleOverMem;
 
   bool exitWhenReady;
 
@@ -588,13 +589,7 @@ public:
 
   /// An application uses this to register an instrumented timing for this phase
   void setTiming(double time);
-  
-  /// Entry method called on all PEs to request memory usage
-  void requestIdleTime(CkCallback cb);
-  
-  /// All processors reduce their memory usages in requestIdleTime() to this method
-  void gatherIdleTime(CkReductionMsg *msg);
-  
+
   /// Check to see if we are in the shutdown process, and handle it appropriately.
   void checkForShutdown();
 
@@ -604,11 +599,27 @@ public:
   // All outstanding operations have completed, so do the shutdown now. First write files to output, and then call CkExit().
   void doExitNow();
 
+
+
+
   /// Entry method called on all PEs to request memory usage
   void requestMemoryUsage(CkCallback cb);
-
   /// All processors reduce their memory usages to this method
   void gatherMemoryUsage(CkReductionMsg *msg);
+
+
+  /// Entry method called on all PEs to request memory usage
+  void requestIdleTime(CkCallback cb);
+  /// All processors reduce their memory usages in requestIdleTime() to this method
+  void gatherIdleTime(CkReductionMsg *msg);
+  
+
+  /// Entry method called on all PEs to request Idle, Overhead, and Memory measurements
+  void requestIdleOverMem(CkCallback cb);
+  /// All processors reduce their memory usages in requestIdleTime() to this method
+  void gatherIdleOverMem(CkReductionMsg *msg);
+  
+
 
 
   /// Inform the control point framework that a named control point affects the priorities of some array  

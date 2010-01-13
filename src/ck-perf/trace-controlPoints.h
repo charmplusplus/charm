@@ -41,6 +41,11 @@ class TraceControlPoints : public Trace {
   /** The time we last rest the idle/entry totals */
   double lastResetTime;
 
+  /** The highest seen memory usage */
+  double memUsage;
+
+  
+
  public:
   TraceControlPoints(char **argv);
   
@@ -87,18 +92,31 @@ class TraceControlPoints : public Trace {
   void traceClose();
 
 
-
-
   // ==================================================================
   // The following methods are not required for a tracing module
 
   /** reset the idle time and entry method execution time accumulators */
   void resetTimings();
 
-  /** What fraction of the time is spent idle */
+  /** Reset the idle, overhead, and memory measurements */
+  void resetIdleOverheadMem();
+
+  /** Fraction of the time spent idle */
   double idleRatio(){
     return (totalIdleTime) / (CmiWallTimer() - lastResetTime);
   }
+
+  /** Fraction of time spent as overhead */
+  double overheadRatio(){
+    return 0.0;
+  }
+
+  /** Highest memory usage value we've seen since last time */
+  double memoryUsage(){
+    return 0.0;
+  }
+
+
 
 };
 

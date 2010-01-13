@@ -109,12 +109,22 @@ void TraceControlPoints::endExecute(void)
   double executionTime = CmiWallTimer() - lastBeginExecuteTime;
   totalEntryMethodTime += executionTime;
   
+  double m = (double)CmiMemoryUsage();
+  if(memUsage < m){
+    memUsage = m;
+  }
+
   //  CkPrintf("[%d] Previously executing Entry Method completes. lastbeginMessageSize=%d executionTime=%lf\n", CkMyPe(), lastbeginMessageSize, executionTime);
 }
 
 void TraceControlPoints::beginIdle(double curWallTime) {
   lastBeginIdle = CmiWallTimer();
   // CkPrintf("[%d] Scheduler has no useful user-work\n", CkMyPe());
+
+  double m = (double)CmiMemoryUsage();
+  if(memUsage < m){
+    memUsage = m;
+  }
 }
 
 void TraceControlPoints::endIdle(double curWallTime) {
@@ -138,6 +148,10 @@ void TraceControlPoints::endComputation(void)
 void TraceControlPoints::malloc(void *where, int size, void **stack, int stackSize)
 {
   // CkPrintf("[%d] Memory allocation of size %d occurred\n", CkMyPe(), size);
+  double m = (double)CmiMemoryUsage();
+  if(memUsage < m){
+    memUsage = m;
+  }
 }
 
 void TraceControlPoints::free(void *where, int size) {
@@ -171,6 +185,15 @@ void TraceControlPoints::resetTimings(){
   totalEntryMethodTime = 0.0;
   lastResetTime = CmiWallTimer();
 }
+
+void TraceControlPoints::resetIdleOverheadMem(){
+  totalIdleTime = 0.0;
+  totalEntryMethodTime = 0.0;
+  memUsage = 0;
+  lastResetTime = CmiWallTimer();
+}
+
+
 
 TraceControlPoints *localControlPointTracingInstance(){
   return CkpvAccess(_trace);
