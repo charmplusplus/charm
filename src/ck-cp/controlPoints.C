@@ -40,7 +40,7 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ bool shouldGatherAll;
 
 
-typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering}  tuningScheme;
+typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware}  tuningScheme;
 
 
 
@@ -63,6 +63,9 @@ void printTuningScheme(){
     break;
   case UseSteering:
     CkPrintf("Tuning Scheme: UseSteering\n");
+    break;
+  case MemoryAware:
+    CkPrintf("Tuning Scheme: MemoryAware\n");
     break;
   default:
     CkPrintf("Unknown tuning scheme\n");
@@ -934,6 +937,8 @@ public:
       whichTuningScheme = UseBestKnownTiming;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPSteering","Use Steering to adjust Control Point Values") ){
       whichTuningScheme = UseSteering;
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPMemoryAware", "Adjust control points to approach available memory") ){
+      whichTuningScheme = MemoryAware;
     }
 
 
@@ -1069,6 +1074,71 @@ void controlPointManager::generatePlan() {
       const int ub = bounds.second;
       newControlPoints[name] =  (lb+ub)/2;
     }
+
+  } else if ( whichTuningScheme == MemoryAware ) {
+
+    // -----------------------------------------------------------
+    //  STEERING BASED ON MEMORY USAGE
+
+    instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
+    instrumentedPhase *prevPhase = previousPhaseData();
+ 
+    if(phase_id%4 == 0){
+      CkPrintf("Steering (memory based) based on 2 phases ago:\n");
+      twoAgoPhase->print();
+      CkPrintf("\n");
+      fflush(stdout);
+      
+      // See if memory usage is low:
+      double memUsage = twoAgoPhase->memoryUsageMB;
+      CkPrintf("Steering (memory based) encountered memory usage of (%f MB)\n", memUsage);
+      fflush(stdout);
+      if(memUsage < 1100.0 && memUsage > 0.0){ // Kraken has about 16GB and 12 cores per node
+	CkPrintf("Steering (memory based) encountered low memory usage (%f) < 1200 \n", memUsage);
+	CkPrintf("Steering (memory based) controlPointSpace.size()=\n", controlPointSpace.size());
+	
+	// Initialize plan to be the values from two phases ago (later we'll adjust this)
+	std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+	for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	  const std::string &name = cpsIter->first;
+	  const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
+	  newControlPoints[name] = twoAgoValue;
+	}
+	CkPrintf("Steering (memory based) initialized plan\n");
+	fflush(stdout);
+
+	// look for a possible control point knob to turn
+	std::map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["MemoryConsumption"];
+	
+	// FIXME: assume for now that we just have one control point with the effect, and one direction to turn it
+	bool found = false;
+	std::string cpName;
+	std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > *info;
+	std::map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > >::iterator iter;
+	for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
+	  cpName = iter->first;
+	  info = &iter->second;
+	  found = true;
+	  break;
+	}
+
+	// Adapt the control point value
+	if(found){
+	  CkPrintf("Steering found knob to turn that should increase memory consumption\n");
+	  fflush(stdout);
+	  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+	  const int maxValue = controlPointSpace[cpName].second;
+	  
+	  if(twoAgoValue+1 <= maxValue){
+	    newControlPoints[cpName] = twoAgoValue+1; // increase from two phases back
+	  }
+	}
+	
+      }
+    }
+
+    CkPrintf("Steering (memory based) done for this phase\n");
+    fflush(stdout);
 
   } else if ( whichTuningScheme == UseBestKnownTiming ) {
 
