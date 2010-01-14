@@ -181,7 +181,7 @@ controlPointManager::controlPointManager(){
     alreadyRequestedIdleTime = false;
     alreadyRequestedAll = false;
     
-    instrumentedPhase newPhase;
+    instrumentedPhase * newPhase = new instrumentedPhase();
     allData.phases.push_back(newPhase);   
     
     dataFilename = (char*)malloc(128);
@@ -258,29 +258,29 @@ controlPointManager::controlPointManager(){
       while(line[0] == '#')
 	getline(infile,line); 
 
-      instrumentedPhase ips;
+      instrumentedPhase * ips = new instrumentedPhase();
 
       std::istringstream iss(line);
 
       // Read memory usage for phase
-      iss >> ips.memoryUsageMB;
+      iss >> ips->memoryUsageMB;
       //     CkPrintf("Memory usage loaded from file: %d\n", ips.memoryUsageMB);
 
-      iss >> ips.idleTime.min;
-      iss >> ips.idleTime.avg;
-      iss >> ips.idleTime.max;
+      iss >> ips->idleTime.min;
+      iss >> ips->idleTime.avg;
+      iss >> ips->idleTime.max;
 
       // Read control point values
       for(int cp=0;cp<numControlPointNames;cp++){
 	int cpvalue;
 	iss >> cpvalue;
-	ips.controlPoints.insert(make_pair(names[cp],cpvalue));
+	ips->controlPoints.insert(make_pair(names[cp],cpvalue));
       }
 
       double time;
 
       while(iss >> time){
-	ips.times.push_back(time);
+	ips->times.push_back(time);
 #if DEBUGPRINT > 5
 	CkPrintf("read time %lf from file\n", time);
 #endif
@@ -299,8 +299,10 @@ controlPointManager::controlPointManager(){
   void controlPointManager::writeDataFile(){
     CkPrintf("============= writeDataFile() ============\n");
     ofstream outfile(dataFilename);
-    //    allData.phases.push_back(thisPhaseData);
     allData.cleanupNames();
+
+    //  string s = allData.toString();
+    //  CkPrintf("At end: \n %s\n", s.c_str());
 
     allData.verify();
     allData.filterOutIncompletePhases();
@@ -537,7 +539,7 @@ controlPointManager::controlPointManager(){
   instrumentedPhase * controlPointManager::currentPhaseData(){
     int s = allData.phases.size();
     CkAssert(s>=1);
-    return &(allData.phases[s-1]);
+    return allData.phases[s-1];
   }
  
 
@@ -545,7 +547,7 @@ controlPointManager::controlPointManager(){
   instrumentedPhase * controlPointManager::previousPhaseData(){
     int s = allData.phases.size();
     if(s >= 2 && phase_id > 0) {
-      return &(allData.phases[s-2]);
+      return allData.phases[s-2];
     } else {
       return NULL;
     }
@@ -555,7 +557,7 @@ controlPointManager::controlPointManager(){
   instrumentedPhase * controlPointManager::twoAgoPhaseData(){
     int s = allData.phases.size();
     if(s >= 3 && phase_id > 0) {
-      return &(allData.phases[s-3]);
+      return allData.phases[s-3];
     } else {
       return NULL;
     }
@@ -630,7 +632,7 @@ controlPointManager::controlPointManager(){
     
 
     // Create new entry for the phase we are starting now
-    instrumentedPhase newPhase;
+    instrumentedPhase * newPhase = new instrumentedPhase();
     allData.phases.push_back(newPhase);
     
     CkPrintf("Now in phase %d allData.phases.size()=%d\n", phase_id, allData.phases.size());
@@ -737,7 +739,7 @@ controlPointManager::controlPointManager(){
     double *over = data+3;
     double *mem = data+6;
 
-    std::string b = allData.toString();
+    //    std::string b = allData.toString();
 
     instrumentedPhase* prevPhase = previousPhaseData();
     if(prevPhase != NULL){
@@ -746,18 +748,16 @@ controlPointManager::controlPointManager(){
       prevPhase->idleTime.max = idle[2];
       
       prevPhase->memoryUsageMB = mem[0];
-
       
-      CkPrintf("Stored idle time min=%lf mem=%lf in prevPhase=%p\n", (double)prevPhase->idleTime.min, (double)prevPhase->memoryUsageMB, prevPhase);
-      prevPhase->print();
-      CkPrintf("prevPhase=%p number of timings=%d\n", prevPhase, prevPhase->times.size() );
+      CkPrintf("Stored idle time min=%lf, mem=%lf in prevPhase=%p\n", (double)prevPhase->idleTime.min, (double)prevPhase->memoryUsageMB, prevPhase);
 
-      std::string a = allData.toString();
+      //      prevPhase->print();
+      // CkPrintf("prevPhase=%p number of timings=%d\n", prevPhase, prevPhase->times.size() );
 
-      CkPrintf("Before:\n%s\nAfter:\n%s\n\n", b.c_str(), a.c_str());
+      //      std::string a = allData.toString();
+
+      //CkPrintf("Before:\n%s\nAfter:\n%s\n\n", b.c_str(), a.c_str());
       
-
-
     } else {
       CkPrintf("There is no previous phase to store measurements\n");
     }
@@ -1077,15 +1077,15 @@ void controlPointManager::generatePlan() {
     static bool firstTime = true;
     if(firstTime){
       firstTime = false;
-      instrumentedPhase best = allData.findBest(); 
+      instrumentedPhase *best = allData.findBest(); 
       CkPrintf("Best known phase is:\n");
-      best.print();
+      best->print();
       CkPrintf("\n");
       
       std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
       for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter) {
 	const std::string &name = cpsIter->first;
-	newControlPoints[name] =  best.controlPoints[name];
+	newControlPoints[name] =  best->controlPoints[name];
       }
     }
 
@@ -1173,9 +1173,9 @@ void controlPointManager::generatePlan() {
     //  nearby it, with a radius decreasing as phases increase
 
     CkPrintf("Finding best phase\n");
-    instrumentedPhase bestPhase = allData.findBest();  
+    instrumentedPhase *bestPhase = allData.findBest();  
     CkPrintf("best found:\n"); 
-    bestPhase.print(); 
+    bestPhase->print(); 
     CkPrintf("\n"); 
     
 
@@ -1190,7 +1190,7 @@ void controlPointManager::generatePlan() {
       const int minValue = bounds.first;
       const int maxValue = bounds.second;
       
-      const int before = bestPhase.controlPoints[name];   
+      const int before = bestPhase->controlPoints[name];   
   
       const int range = (maxValue-minValue+1)*(1.0-progress);
 
@@ -1239,18 +1239,18 @@ void controlPointManager::generatePlan() {
   
     // Increment until finding an unused configuration
     allData.cleanupNames(); // put -1 values in for any control points missing
-    std::vector<instrumentedPhase> &phases = allData.phases;     
+    std::vector<instrumentedPhase*> &phases = allData.phases;     
 
     while(true){
     
-      std::vector<instrumentedPhase>::iterator piter; 
+      std::vector<instrumentedPhase*>::iterator piter; 
       bool testedConfiguration = false; 
       for(piter = phases.begin(); piter != phases.end(); piter++){ 
       
 	// Test if the configuration matches this phase
 	bool match = true;
 	for(int j=0;j<numDimensions;j++){
-	  match &= piter->controlPoints[names[j]] == config[j];
+	  match &= (*piter)->controlPoints[names[j]] == config[j];
 	}
       
 	if(match){
@@ -1284,12 +1284,12 @@ void controlPointManager::generatePlan() {
 	config[i]= (lowerBounds[i]+upperBounds[i]) / 2;
       }
     }
-  
 
     // results are now in config[i]
     
     for(int i=0; i<numDimensions; i++){
       newControlPoints[names[i]] = config[i];
+      CkPrintf("Exhaustive search chose:   %s   -> %d\n", names[i].c_str(), config[i]);
     }
 
 
@@ -1314,10 +1314,11 @@ int controlPoint(const char *name, int lb, int ub){
   int result;
 
   // if we already have control point values for phase, return them
-  if( thisPhaseData->controlPoints.count(std::string(name))>0 ){
+  if( thisPhaseData->controlPoints.count(std::string(name))>0 && thisPhaseData->controlPoints[std::string(name)]>=0 ){
+    CkPrintf("Already have control point values for phase. %s -> %d\n", name, (int)(thisPhaseData->controlPoints[std::string(name)]) );
     return thisPhaseData->controlPoints[std::string(name)];
   }
-
+  
 
   if( phase_id < 4 ){
     // For the first few phases, just use the lower bound. 
@@ -1326,20 +1327,24 @@ int controlPoint(const char *name, int lb, int ub){
   } else if(controlPointSpace.count(std::string(name)) == 0){
     // if this is the first time we've seen the CP, then return the lower bound
     result = lb;
+    
   }  else {
     // Generate a plan one time for each phase
     controlPointManagerProxy.ckLocalBranch()->generatePlan();
     
-    // Return the planned value:
+    // Use the planned value:
     result = controlPointManagerProxy.ckLocalBranch()->newControlPoints[std::string(name)];
-    CkPrintf("Control Point \"%s\" for phase %d is: %d\n", name, phase_id, result);
     
   }
 
   CkAssert(isInRange(result,ub,lb));
-  thisPhaseData->controlPoints.insert(std::make_pair(std::string(name),result)); 
+  thisPhaseData->controlPoints[std::string(name)] = result; // was insert() 
+
   controlPointSpace.insert(std::make_pair(std::string(name),std::make_pair(lb,ub))); 
 
+  CkPrintf("Control Point \"%s\" for phase %d is: %d\n", name, phase_id, result);
+  //  thisPhaseData->print();
+  
   return result;
 }
 

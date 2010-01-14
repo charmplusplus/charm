@@ -305,17 +305,17 @@ class instrumentedData {
 public:
 
   /// Stores all known instrumented phases(loaded from file, or from this run)
-  std::vector<instrumentedPhase> phases;
+  std::vector<instrumentedPhase*> phases;
 
   /// get control point names for all phases
   std::set<std::string> getNames(){
     std::set<std::string> names;
     
-    std::vector<instrumentedPhase>::iterator iter;
+    std::vector<instrumentedPhase*>::iterator iter;
     for(iter = phases.begin();iter!=phases.end();iter++) {
       
       std::map<std::string,int>::iterator iter2;
-      for(iter2 = iter->controlPoints.begin(); iter2 != iter->controlPoints.end(); iter2++){
+      for(iter2 = (*iter)->controlPoints.begin(); iter2 != (*iter)->controlPoints.end(); iter2++){
 	names.insert(iter2->first);
       }
       
@@ -328,9 +328,9 @@ public:
   void cleanupNames(){
     std::set<std::string> names = getNames();
     
-    std::vector<instrumentedPhase>::iterator iter;
+    std::vector<instrumentedPhase*>::iterator iter;
     for(iter = phases.begin();iter!=phases.end();iter++) {
-      iter->addAllNames(names);
+      (*iter)->addAllNames(names);
     }
   }
 
@@ -339,9 +339,9 @@ public:
   bool filterOutOnePhase(){
 #if 1
     // Note: calling erase on a vector will invalidate any iterators beyond the deletion point
-    std::vector<instrumentedPhase>::iterator iter;
+    std::vector<instrumentedPhase*>::iterator iter;
     for(iter = phases.begin(); iter != phases.end(); iter++) {
-      if(! iter->hasValidControlPointValues()  || iter->times.size()==0){
+      if(! (*iter)->hasValidControlPointValues()  || (*iter)->times.size()==0){
 	// CkPrintf("Filtered out a phase with incomplete control point values\n");
 	phases.erase(iter);
 	return true;
@@ -373,7 +373,7 @@ public:
     
     if(phases.size() > 0){
       
-      std::map<std::string,int> &ps = phases[0].controlPoints; 
+      std::map<std::string,int> &ps = phases[0]->controlPoints; 
       std::map<std::string,int>::iterator cpiter;
 
       // SCHEMA:
@@ -389,16 +389,16 @@ public:
       s << "# DATA:\n";
       s << "# first field is memory usage (MB). Then there are the " << ps.size()  << " control points values, followed by one or more timings" << "\n";
       s << "# number of control point sets: " << phases.size() << "\n";
-      std::vector<instrumentedPhase>::iterator runiter;
+      std::vector<instrumentedPhase*>::iterator runiter;
       for(runiter=phases.begin();runiter!=phases.end();runiter++){
 	
 	// Print the memory usage
-	 s << runiter->memoryUsageMB << "    "; 
+	s << (*runiter)->memoryUsageMB << "    "; 
 
-	 s << runiter->idleTime.min << " " << runiter->idleTime.avg << " " << runiter->idleTime.max << "   ";
+	s << (*runiter)->idleTime.min << " " << (*runiter)->idleTime.avg << " " << (*runiter)->idleTime.max << "   ";
 
 	// Print the control point values
-	for(cpiter = runiter->controlPoints.begin(); cpiter != runiter->controlPoints.end(); cpiter++){ 
+	for(cpiter = (*runiter)->controlPoints.begin(); cpiter != (*runiter)->controlPoints.end(); cpiter++){ 
 	  s << cpiter->second << " "; 
 	}
 
@@ -406,7 +406,7 @@ public:
 
 	// Print the times
 	std::vector<double>::iterator titer;
-	for(titer = runiter->times.begin(); titer != runiter->times.end(); titer++){
+	for(titer = (*runiter)->times.begin(); titer != (*runiter)->times.end(); titer++){
 	  s << *titer << " ";
 	}
 
@@ -424,23 +424,24 @@ public:
   /// Verify that all our phases of data have the same sets of control point names
   void verify(){
     if(phases.size() > 1){
-      instrumentedPhase & firstpoint = phases[0];
-      std::vector<instrumentedPhase>::iterator iter;
+      instrumentedPhase *firstpoint = phases[0];
+      std::vector<instrumentedPhase*>::iterator iter;
       for(iter = phases.begin();iter!=phases.end();iter++){
-	CkAssert( firstpoint.hasSameKeysAs(*iter));
+	CkAssert( firstpoint->hasSameKeysAs(*(*iter)));
       }  
     } 
   }
 
 
   // Find the fastest time from previous runs
-  instrumentedPhase findBest(){
+  instrumentedPhase* findBest(){
     CkAssert(phases.size()>1);
 
     double total_time = 0.0; // total for all times
     int total_count = 0;
 
-    instrumentedPhase best_phase;
+    instrumentedPhase * best_phase;
+
 #if OLDMAXDOUBLE
     double best_phase_avgtime = std::numeric_limits<double>::max();
 #else
@@ -449,9 +450,9 @@ public:
 
     int valid_phase_count = 0;
 
-    std::vector<instrumentedPhase>::iterator iter;
+    std::vector<instrumentedPhase*>::iterator iter;
     for(iter = phases.begin();iter!=phases.end();iter++){
-      if(iter->hasValidControlPointValues()){
+      if((*iter)->hasValidControlPointValues()){
 	valid_phase_count++;
 
 	double total_for_phase = 0.0;
@@ -459,7 +460,7 @@ public:
 
 	// iterate over all times for this control point configuration
 	std::vector<double>::iterator titer;
-	for(titer = iter->times.begin(); titer != iter->times.end(); titer++){
+	for(titer = (*iter)->times.begin(); titer != (*iter)->times.end(); titer++){
 	  total_count++;
 	  total_time += *titer;
 	  total_for_phase += *titer;
@@ -488,9 +489,9 @@ public:
     // Compute standard deviation
     double sumx=0.0;
     for(iter = phases.begin();iter!=phases.end();iter++){
-      if(iter->hasValidControlPointValues()){
+      if((*iter)->hasValidControlPointValues()){
 	std::vector<double>::iterator titer;
-	for(titer = iter->times.begin(); titer != iter->times.end(); titer++){
+	for(titer = (*iter)->times.begin(); titer != (*iter)->times.end(); titer++){
 	  sumx += (avg - *titer)*(avg - *titer);
 	} 
       }
