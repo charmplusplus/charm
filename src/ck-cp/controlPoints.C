@@ -179,6 +179,10 @@ controlPointManager::controlPointManager(){
     exitWhenReady = false;
     alreadyRequestedMemoryUsage = false;   
     alreadyRequestedIdleTime = false;
+    alreadyRequestedAll = false;
+    
+    instrumentedPhase newPhase;
+    allData.phases.push_back(newPhase);   
     
     dataFilename = (char*)malloc(128);
     sprintf(dataFilename, "controlPointData.txt");
@@ -295,8 +299,12 @@ controlPointManager::controlPointManager(){
   void controlPointManager::writeDataFile(){
     CkPrintf("============= writeDataFile() ============\n");
     ofstream outfile(dataFilename);
-    allData.phases.push_back(thisPhaseData);
+    //    allData.phases.push_back(thisPhaseData);
     allData.cleanupNames();
+
+    allData.verify();
+    allData.filterOutIncompletePhases();
+
     outfile << allData.toString();
     outfile.close();
   }
@@ -524,6 +532,15 @@ controlPointManager::controlPointManager(){
     return false;   
   }
   
+
+  /// The data from the current phase
+  instrumentedPhase * controlPointManager::currentPhaseData(){
+    int s = allData.phases.size();
+    CkAssert(s>=1);
+    return &(allData.phases[s-1]);
+  }
+ 
+
   /// The data from the previous phase
   instrumentedPhase * controlPointManager::previousPhaseData(){
     int s = allData.phases.size();
@@ -605,31 +622,16 @@ controlPointManager::controlPointManager(){
     myLBDB->ClearLoads(); // BUG: Probably very dangerous if we are actually using load balancing
     
 #endif    
-    
-    if(shouldGatherMemoryUsage && CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
-      alreadyRequestedMemoryUsage = true;
-      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
-      thisProxy.requestMemoryUsage(*cb);
-      delete cb;
-    }
 
-    if(shouldGatherUtilization && CkMyPe() == 0 && !alreadyRequestedIdleTime){
-      alreadyRequestedIdleTime = true;
-      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherIdleTime(NULL), 0, thisProxy);
-      thisProxy.requestIdleTime(*cb);
-      delete cb;
-    }
 
     
     // increment phase id
     phase_id++;
     
-    
-    // save a copy of the timing information from this phase
-    allData.phases.push_back(thisPhaseData);
-    
-    // clear the timing information that will be used for the next phase
-    thisPhaseData.clear();
+
+    // Create new entry for the phase we are starting now
+    instrumentedPhase newPhase;
+    allData.phases.push_back(newPhase);
     
     CkPrintf("Now in phase %d allData.phases.size()=%d\n", phase_id, allData.phases.size());
 
@@ -637,7 +639,8 @@ controlPointManager::controlPointManager(){
 
   /// An application uses this to register an instrumented timing for this phase
   void controlPointManager::setTiming(double time){
-    thisPhaseData.times.push_back(time);
+    currentPhaseData()->times.push_back(time);
+
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
        
     // First we should register this currently executing message as a path, because it is likely an important one to consider.
@@ -678,7 +681,6 @@ controlPointManager::controlPointManager(){
         
     instrumentedPhase* prevPhase = previousPhaseData();
     if(prevPhase != NULL){
-      CkPrintf("Storing idle time measurements\n");
       prevPhase->idleTime.min = r[0];
       prevPhase->idleTime.avg = r[1]/CkNumPes();
       prevPhase->idleTime.max = r[2];
@@ -692,12 +694,6 @@ controlPointManager::controlPointManager(){
     checkForShutdown();
     delete msg;
   }
-
-
-
-
-
-
 
 
 
@@ -741,17 +737,27 @@ controlPointManager::controlPointManager(){
     double *over = data+3;
     double *mem = data+6;
 
+    std::string b = allData.toString();
+
     instrumentedPhase* prevPhase = previousPhaseData();
     if(prevPhase != NULL){
-      CkPrintf("Storing idle time measurements\n");
       prevPhase->idleTime.min = idle[0];
       prevPhase->idleTime.avg = idle[1]/CkNumPes();
       prevPhase->idleTime.max = idle[2];
       
       prevPhase->memoryUsageMB = mem[0];
+
       
+      CkPrintf("Stored idle time min=%lf mem=%lf in prevPhase=%p\n", (double)prevPhase->idleTime.min, (double)prevPhase->memoryUsageMB, prevPhase);
+      prevPhase->print();
+      CkPrintf("prevPhase=%p number of timings=%d\n", prevPhase, prevPhase->times.size() );
+
+      std::string a = allData.toString();
+
+      CkPrintf("Before:\n%s\nAfter:\n%s\n\n", b.c_str(), a.c_str());
       
-      CkPrintf("Stored idle time min=%lf in prevPhase=%p\n", prevPhase->idleTime.min, prevPhase);
+
+
     } else {
       CkPrintf("There is no previous phase to store measurements\n");
     }
@@ -764,18 +770,15 @@ controlPointManager::controlPointManager(){
 
 
 
-
-
-
   void controlPointManager::checkForShutdown(){
-    if( exitWhenReady && !alreadyRequestedMemoryUsage && !alreadyRequestedIdleTime && CkMyPe()==0){
+    if( exitWhenReady && !alreadyRequestedAll && !alreadyRequestedMemoryUsage && !alreadyRequestedIdleTime && CkMyPe()==0){
       doExitNow();
     }
   }
 
 
   void controlPointManager::exitIfReady(){
-     if( !alreadyRequestedMemoryUsage && !alreadyRequestedIdleTime && CkMyPe()==0){
+     if( !alreadyRequestedMemoryUsage && !alreadyRequestedAll && !alreadyRequestedIdleTime && CkMyPe()==0){
        CkPrintf("controlPointManager::exitIfReady exiting immediately\n");
        doExitNow();
      } else {
@@ -1305,14 +1308,14 @@ void controlPointManager::generatePlan() {
 
 /// Get control point value from range of integers [lb,ub]
 int controlPoint(const char *name, int lb, int ub){
-  instrumentedPhase &thisPhaseData = controlPointManagerProxy.ckLocalBranch()->thisPhaseData;
+  instrumentedPhase *thisPhaseData = controlPointManagerProxy.ckLocalBranch()->currentPhaseData();
   const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
   std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;
   int result;
 
   // if we already have control point values for phase, return them
-  if( thisPhaseData.controlPoints.count(std::string(name))>0 ){
-    return thisPhaseData.controlPoints[std::string(name)];
+  if( thisPhaseData->controlPoints.count(std::string(name))>0 ){
+    return thisPhaseData->controlPoints[std::string(name)];
   }
 
 
@@ -1334,7 +1337,7 @@ int controlPoint(const char *name, int lb, int ub){
   }
 
   CkAssert(isInRange(result,ub,lb));
-  thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 
+  thisPhaseData->controlPoints.insert(std::make_pair(std::string(name),result)); 
   controlPointSpace.insert(std::make_pair(std::string(name),std::make_pair(lb,ub))); 
 
   return result;

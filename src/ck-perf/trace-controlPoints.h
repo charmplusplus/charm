@@ -115,7 +115,7 @@ class TraceControlPoints : public Trace {
 
   /** Highest memory usage (in MB) value we've seen since last time */
   double memoryUsageMB(){
-    return memUsage / 1024.0 / 1024.0;
+    return ((double)memUsage) / 1024.0 / 1024.0;
   }
 
 

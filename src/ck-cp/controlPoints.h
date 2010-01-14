@@ -145,17 +145,18 @@ public:
   std::vector<PathHistoryTableEntry> criticalPaths;
 #endif
   
-  int memoryUsageMB;
+  double memoryUsageMB;
 
   idleTimeContainer idleTime;
 
   instrumentedPhase(){
-    memoryUsageMB = -1;
+    memoryUsageMB = -1.0;
   }
   
   void clear(){
     controlPoints.clear();
     times.clear();
+    memoryUsageMB = -1.0;
     //    criticalPaths.clear();
   }
 
@@ -364,10 +365,6 @@ public:
   std::string toString(){
     std::ostringstream s;
 
-    verify();
-
-    filterOutIncompletePhases();
-
     // HEADER:
     s << "# HEADER:\n";
     s << "# Data for use with Isaac Dooley's Control Point Framework\n";
@@ -394,7 +391,7 @@ public:
       s << "# number of control point sets: " << phases.size() << "\n";
       std::vector<instrumentedPhase>::iterator runiter;
       for(runiter=phases.begin();runiter!=phases.end();runiter++){
-
+	
 	// Print the memory usage
 	 s << runiter->memoryUsageMB << "    "; 
 
@@ -518,7 +515,6 @@ public:
   char * dataFilename;
   
   instrumentedData allData;
-  instrumentedPhase thisPhaseData;
   
   /// The lower and upper bounds for each named control point
   std::map<std::string, std::pair<int,int> > controlPointSpace;
@@ -577,6 +573,9 @@ public:
 
   /// Generate a plan (new control point values) once per phase
   void generatePlan();
+
+  /// The data for the current phase
+  instrumentedPhase *currentPhaseData();
 
   /// The data from the previous phase
   instrumentedPhase *previousPhaseData();
