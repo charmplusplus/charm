@@ -67,7 +67,7 @@ unsigned int crctab[] = {
       0xbcb4666d,  0xb8757bda,  0xb5365d03,  0xb1f740b4
 };
 
-unsigned int crc32(unsigned char *data, int len)
+unsigned int crc32_initial(unsigned char *data, int len)
 {
     unsigned int        result = 0;
     int                 i;

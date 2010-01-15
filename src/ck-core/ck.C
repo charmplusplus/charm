@@ -1845,7 +1845,7 @@ public:
 private:
   virtual CmiBool process(envelope *env,CkCoreState *ck) {
     if (env->getEvent()) {
-      unsigned int crc = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
+      unsigned int crc = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
       fprintf(f,"%d %d %d %d %x\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc);
     }
     return CmiTrue;
@@ -1894,7 +1894,7 @@ class CkMessageReplay : public CkMessageWatcher {
 			CkPrintf("CkMessageReplay> Message size changed during replay org: [%d %d %d] got: [%d %d %d]\n", nextPE, nextEvent, nextSize, env->getSrcPe(), env->getEvent(), env->getTotalsize());
                         return CmiFalse;
                 }
-		unsigned int crcnew = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
+		unsigned int crcnew = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
 		if (crcnew != crc) {
 		  CkPrintf("CkMessageReplay> Message CRC changed during replay org: [0x%x] got: [0x%x]\n",crc,crcnew);
 		}

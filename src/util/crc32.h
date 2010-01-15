@@ -9,7 +9,7 @@ extern unsigned int crctab[];
 extern "C" {
 #endif
   
-unsigned int crc32(unsigned char *data, int len);
+unsigned int crc32_initial(unsigned char *data, int len);
 unsigned int crc32_update(unsigned char *data, int len, unsigned int previous);
 
 #ifdef __cplusplus
