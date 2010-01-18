@@ -95,6 +95,11 @@ typedef unsigned char  UChar;
 
 /**
 @addtogroup CkEnvelope
+*/
+
+CkpvExtern(int, envelopeEventID);
+
+/**
 @{
 The class envelope defines a Charm++ message's header. The first
 'CmiReservedHeaderSize' bytes of memory is exclusively reserved for Converse
@@ -244,7 +249,7 @@ private:
       env->setPacked(0);
       _SET_USED(env, 0);
       //for record-replay
-      env->setEvent(0);
+      env->setEvent(++CkpvAccess(envelopeEventID));
       env->setRef(0);
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY

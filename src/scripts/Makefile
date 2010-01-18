@@ -326,7 +326,7 @@ TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a   $(L)/libtrace-u
 	  $(L)/libtrace-simple.a $(L)/libtrace-controlPoints.a\
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a \
-          $(L)/libtrace-recordreplay.a  $(L)/libtracef_f.a $(L)/libtrace-memory.a
+          $(L)/libtracef_f.a $(L)/libtrace-memory.a
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
           $(L)/libmemory-gnuold.o $(L)/libmemory-verbose.o 	\
 	  $(L)/libmemory-paranoid.o \
@@ -841,10 +841,6 @@ $(L)/libtrace-controlPoints.a: $(LIBTRACE_CONTROLPOINTS)
 	$(CHARMC) -o $@ $^
 # Do not change this rule!
 
-LIBTRACE_RECREP=trace-recordreplay.o
-$(L)/libtrace-recordreplay.a: $(LIBTRACE_RECREP)
-	$(CHARMC) -o $@ $(LIBTRACE_RECREP)
-
 LIBTRACE_COUNT=trace-counter.o
 $(L)/libtrace-counter.a: $(LIBTRACE_COUNT)
 	$(CHARMC) -o $@ $(LIBTRACE_COUNT)
@@ -858,7 +854,7 @@ $(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)
 	$(CHARMC) -o $@ $(LIBTRACE_MEMORY)
 
 LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-simple.o \
-$(TAU_TRACE_OBJ) trace-recordreplay.o trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-controlPoints.o trace-utilization.o
+$(TAU_TRACE_OBJ) trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-controlPoints.o trace-utilization.o
 
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
@@ -882,7 +878,7 @@ tracef_f.o: tracef_f.f90
 TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
 	      trace-counter.o trace-controlPoints.o trace-utilization.o	\
 	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
-              trace-recordreplay.o trace-memory.o
+          trace-memory.o
 
 ######################################################################
 #

@@ -1841,6 +1841,9 @@ printf("[%d] DELETE!\n", CkMyPe());
 //------------------- Message Watcher (record/replay) ----------------
 
 #include "crc32.h"
+
+CkpvDeclare(int, envelopeEventID);
+
 CkMessageWatcher::~CkMessageWatcher() {}
 
 class CkMessageRecorder : public CkMessageWatcher {

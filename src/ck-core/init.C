@@ -837,6 +837,8 @@ void _initCharm(int unused_argc, char **argv)
         traceCharmInit(argv);
 #endif
  	
+    CkpvInitialize(int, envelopeEventID);
+    CkpvAccess(envelopeEventID) = 0;
 	CkMessageWatcherInit(argv,CkpvAccess(_coreState));
 	
 	/**
