@@ -1893,6 +1893,7 @@ private:
 #define REPLAYDEBUG(args) /* empty */
 
 class CkMessageReplay : public CkMessageWatcher {
+  int counter;
 	int nextPE, nextSize, nextEvent, nexttype; //Properties of next message we need:
 	unsigned int crc1, crc2;
 	/// Read the next message we need from the file:
@@ -1901,6 +1902,7 @@ class CkMessageReplay : public CkMessageWatcher {
 			// CkAbort("CkMessageReplay> Syntax error reading replay file");
 			nextPE=nextSize=nextEvent=nexttype=-1; //No destructor->record file just ends in the middle!
 		}
+		counter++;
 	}
 	/// If this is the next message we need, advance and return CmiTrue.
 	CmiBool isNext(envelope *env) {
@@ -1917,10 +1919,10 @@ class CkMessageReplay : public CkMessageWatcher {
 		unsigned int crcnew1 = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
 		unsigned int crcnew2 = crc32(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
 		if (crcnew1 != crc1) {
-		  CkPrintf("CkMessageReplay> Envelope CRC changed during replay org: [0x%x] got: [0x%x]\n",crc1,crcnew1);
+		  CkPrintf("CkMessageReplay %d> Envelope CRC changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc1,crcnew1);
 		}
         if (crcnew2 != crc2) {
-          CkPrintf("CkMessageReplay> Message CRC changed during replay org: [0x%x] got: [0x%x]\n",crc2,crcnew2);
+          CkPrintf("CkMessageReplay %d> Message CRC changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc2,crcnew2);
         }
         if (!wasPacked) CkUnpackMessage(&env);
 		return CmiTrue;
@@ -1950,6 +1952,7 @@ class CkMessageReplay : public CkMessageWatcher {
 
 public:
 	CkMessageReplay(FILE *f_) {
+	  counter=0;
 	  f=f_;
 	  getNext();
 	  REPLAYDEBUG("Constructing ckMessageReplay: "<< nextPE <<" "<< nextSize <<" "<<nextEvent);
