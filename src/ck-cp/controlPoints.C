@@ -315,7 +315,7 @@ controlPointManager::controlPointManager(){
   }
 
   /// User can register a callback that is called when application should advance to next phase
-  void controlPointManager::setGranularityCallback(CkCallback cb, bool _frameworkShouldAdvancePhase){
+  void controlPointManager::setCPCallback(CkCallback cb, bool _frameworkShouldAdvancePhase){
     frameworkShouldAdvancePhase = _frameworkShouldAdvancePhase;
     granularityCallback = cb;
     haveGranularityCallback = true;
@@ -973,10 +973,10 @@ public:
 };
 
 /// An interface callable by the application.
-void registerGranularityChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase){
+void registerCPChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase){
   CkAssert(CkMyPe() == 0);
   CkPrintf("Application has registered a control point change callback\n");
-  controlPointManagerProxy.ckLocalBranch()->setGranularityCallback(cb, frameworkShouldAdvancePhase);
+  controlPointManagerProxy.ckLocalBranch()->setCPCallback(cb, frameworkShouldAdvancePhase);
 }
 
 /// An interface callable by the application.

@@ -50,7 +50,7 @@
 
 
 
-void registerGranularityChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase);
+void registerCPChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase);
 
 
 void registerControlPointTiming(double time);
@@ -560,7 +560,7 @@ public:
   void writeDataFile();
 
   /// User can register a callback that is called when application should advance to next phase
-  void setGranularityCallback(CkCallback cb, bool _frameworkShouldAdvancePhase);
+  void setCPCallback(CkCallback cb, bool _frameworkShouldAdvancePhase);
 
   /// Called periodically by the runtime to handle the control points
   /// Currently called on each PE
