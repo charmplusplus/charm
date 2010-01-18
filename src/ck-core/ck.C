@@ -1395,15 +1395,19 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
 #endif
   register envelope *env = UsrToEnv(msg);
   int destPE=_prepareMsg(entryIdx,msg,pCid);
+  // Before it traced the creation only if destPE!=-1 (i.e it did not when the
+  // VidBlock was not yet filled). The problem is that the creation was never
+  // traced later when the VidBlock was filled. One solution is to trace the
+  // creation here, the other to trace it in VidBlock->msgDeliver().
+  _TRACE_CREATION_1(env);
   if (destPE!=-1) {
-    _TRACE_CREATION_1(env);
     CpvAccess(_qd)->create();
     if (opts & CK_MSG_SKIP_OR_IMM)
       _noCldEnqueue(destPE, env);
     else
       CldEnqueue(destPE, env, _infoIdx);
-    _TRACE_CREATION_DONE(1);
   }
+  _TRACE_CREATION_DONE(1);
 }
 
 extern "C"
