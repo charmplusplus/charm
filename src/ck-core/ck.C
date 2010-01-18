@@ -2012,16 +2012,20 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     if (CmiGetArgStringDesc(argv,"+record-detail",&procs,"Record full message content for the specified processors")) {
         CkListString list(procs);
         if (list.includes(CkMyPe())) {
+          CpdSetInitializeMemory(1);
           ck->addWatcher(new CkMessageDetailRecorder(openReplayFile("ckreplay_",".detail","w")));
         }
     }
 	if (CmiGetArgFlagDesc(argv,"+record","Record message processing order")) {
+	    CpdSetInitializeMemory(1);
 		ck->addWatcher(new CkMessageRecorder(openReplayFile("ckreplay_",".log","w")));
 	}
 	if (CmiGetArgFlagDesc(argv,"+replay","Re-play recorded message stream")) {
+	    CpdSetInitializeMemory(1);
 		ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
 	}
 	if (CmiGetArgStringDesc(argv,"+replay-detail",&procs,"Re-play the specified processors from recorded message content")) {
+	    CpdSetInitializeMemory(1);
 	  /*Nothing yet*/
 	}
 }

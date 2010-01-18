@@ -84,6 +84,7 @@ extern "C" {
 #endif
 
 /* Global variables used by charmdebug to maintain information */
+extern void CpdSetInitializeMemory(int v);
 #ifndef CMK_OPTIMIZE
 extern int memory_status_info;
 extern int memory_chare_id;

@@ -705,6 +705,7 @@ void CmiOutOfMemoryInit(void) {
 
 #ifndef CMK_MEMORY_BUILD_CHARMDEBUG
 /* declare the cpd_memory routines */
+void CpdSetInitializeMemory(int v) { }
 size_t  cpd_memory_length(void *lenParam) { return 0; }
 void cpd_memory_pup(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
 void cpd_memory_leak(void *itemParam,pup_er p,CpdListItemsRequest *req) { }

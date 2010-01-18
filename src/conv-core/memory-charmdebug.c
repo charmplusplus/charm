@@ -1314,12 +1314,15 @@ static void status(char *msg) {
 extern int getCharmEnvelopeSize();
 
 static int disableVerbosity = 1;
+int cpdInitializeMemory;
+void CpdSetInitializeMemory(int v) { cpdInitializeMemory = v; }
 
 static void meta_init(char **argv) {
   status("Converse -memory mode: charmdebug\n");
   char buf[100];
   sprintf(buf,"slot size %d\n",sizeof(Slot));
   status(buf);
+  cpdInitializeMemory = 0;
   charmEnvelopeSize = getCharmEnvelopeSize();
   CpdDebugGetAllocationTree = (void* (*)(int*))CreateAllocationTree;
   CpdDebug_pupAllocationPoint = pupAllocationPoint;
@@ -1384,6 +1387,9 @@ static void *meta_malloc(size_t size) {
     BEFORE_MALLOC_CALL;
     user = mm_malloc(size);
     AFTER_MALLOC_CALL;
+  }
+  if (cpdInitializeMemory) {
+    bzero(user, size); // for Record-Replay must initialize all memory otherwise paddings may differ (screwing up the CRC)
   }
   return user;
 }
