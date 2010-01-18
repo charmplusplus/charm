@@ -53,7 +53,7 @@ private:
 	union callbackData {
 	struct s_thread { //resumeThread
 		int onPE; //Thread is waiting on this PE
-		CkCallback *cb; //The suspending callback (NULL if already done)
+		int cb; //The suspending callback (0 if already done)
 		CthThread th; //Thread to resume (NULL if none waiting)
 		void *ret; //Place to put the returned message
 	} thread;
@@ -84,7 +84,7 @@ private:
 	} ccsReply;
 	};
 public:	
-	callbackType type; 
+	callbackType type;
 	callbackData d;
 	
 	void impl_thread_init(void);
@@ -172,6 +172,10 @@ public:
 	  d.ccsReply.reply=reply;
 	}
 
+	~CkCallback() {
+	  thread_destroy();
+	}
+	
 	int isInvalid(void) const {return type==invalid;}
 
 /**
@@ -186,6 +190,8 @@ public:
 		return NULL;
 	}
 
+	void thread_destroy() const;
+	
 /**
  * Send this message back to the caller.
  *
@@ -222,6 +228,7 @@ class CkCallbackResumeThread : public CkCallback {
 	    void * res = thread_delay(); //<- block thread here if it hasn't already
 	    if (result != NULL) *result = res;
 	    else CkFreeMsg(res);
+	    thread_destroy();
 	}
 };
 
