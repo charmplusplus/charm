@@ -46,13 +46,14 @@ public:
 void CkCallback::impl_thread_init(void)
 {
     int exist;
-	d.thread.onPE=CkMyPe();
+    CkCallback **cb;
+    d.thread.onPE=CkMyPe();
 	do {
 	  if (CpvAccess(nextThreadCB)==0) CpvAccess(nextThreadCB)=1;
 	  d.thread.cb=CpvAccess(nextThreadCB)++;
-	  CkCallback *&cb = CpvAccess(threadCBs).put(d.thread.cb, &exist);
+	  cb = &CpvAccess(threadCBs).put(d.thread.cb, &exist);
 	} while (exist==1);
-	cb = this; //<- so we can find this structure later
+	*cb = this; //<- so we can find this structure later
 	d.thread.th=NULL; //<- thread isn't suspended yet
 	d.thread.ret=NULL;//<- no data to return yet
 }
