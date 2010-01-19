@@ -733,6 +733,7 @@ void CmiOutOfMemoryInit(void) {
   }
 }
 
+int cpdInSystem=0;
 #ifndef CMK_MEMORY_BUILD_CHARMDEBUG
 /* declare the cpd_memory routines */
 void CpdSetInitializeMemory(int v) { }
