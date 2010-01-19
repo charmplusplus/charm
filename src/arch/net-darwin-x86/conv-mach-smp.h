@@ -9,8 +9,6 @@
 #define CMK_SHARED_VARS_UNAVAILABLE                        0
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  1
 
-#define CMK_MACOSX_PTHREAD_HACK                            1
-
 #if !CMK_GCC_X86_ASM || !CMK_GCC_X86_ASM_ATOMICINCREMENT
 #define CMK_PCQUEUE_LOCK                                   1
 #endif
