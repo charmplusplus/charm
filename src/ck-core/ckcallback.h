@@ -103,6 +103,7 @@ public:
 	  if (t==resumeThread) impl_thread_init();
 	}
 
+    // Call a C function on the current PE
 	CkCallback(Ck1CallbackFn fn) :type(call1Fn) {
 #ifndef CMK_OPTIMIZE
       bzero(&d, sizeof(callbackData));
@@ -110,6 +111,7 @@ public:
 	  d.c1fn.fn=fn;
 	}
 
+    // Call a C function on the current PE
 	CkCallback(CkCallbackFn fn,void *param) :type(callCFn) {
 #ifndef CMK_OPTIMIZE
       bzero(&d, sizeof(callbackData));
@@ -117,6 +119,7 @@ public:
 	  d.cfn.onPE=CkMyPe(); d.cfn.fn=fn; d.cfn.param=param;
 	}
 
+    // Call a chare entry method
 	CkCallback(int ep,const CkChareID &id,CmiBool doInline=CmiFalse) :type(doInline?isendChare:sendChare) {
 #ifndef CMK_OPTIMIZE
       bzero(&d, sizeof(callbackData));
@@ -124,8 +127,10 @@ public:
 	  d.chare.ep=ep; d.chare.id=id;
 	}
 
+    // Bcast to nodegroup
 	CkCallback(int ep,const CProxy_NodeGroup &ngp);
 
+    // Bcast to a group or nodegroup
 	CkCallback(int ep,const CkGroupID &id, int isNodeGroup=0) :type(isNodeGroup?bcastNodeGroup:bcastGroup) {
 #ifndef CMK_OPTIMIZE
       bzero(&d, sizeof(callbackData));
@@ -133,8 +138,10 @@ public:
 	  d.group.ep=ep; d.group.id=id;
 	}
 
+    // Send to nodegroup element
 	CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,CmiBool doInline=CmiFalse);
 
+    // Send to group/nodegroup element
 	CkCallback(int ep,int onPE,const CkGroupID &id,CmiBool doInline=CmiFalse, int isNodeGroup=0)
 		:type(doInline?(isNodeGroup?isendNodeGroup:isendGroup):(isNodeGroup?sendNodeGroup:sendGroup)) {
 #ifndef CMK_OPTIMIZE
@@ -143,14 +150,18 @@ public:
 	  d.group.ep=ep; d.group.id=id; d.group.onPE=onPE;
 	}
 
+    // Send to specified group element
 	CkCallback(int ep,const CProxyElement_Group &grpElt,CmiBool doInline=CmiFalse);
 	
+    // Bcast to array
 	CkCallback(int ep,const CkArrayID &id) :type(bcastArray) {
 #ifndef CMK_OPTIMIZE
       bzero(&d, sizeof(callbackData));
 #endif
 	  d.array.ep=ep; d.array.id=id;
 	}
+
+    // Send to array element
 	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,CmiBool doInline=CmiFalse)
 		:type(doInline?isendArray:sendArray) {
 #ifndef CMK_OPTIMIZE
@@ -158,11 +169,20 @@ public:
 #endif
 	  d.array.ep=ep; d.array.id=id; d.array.idx.asMax()=*(CkArrayIndexMax*)&idx;
 	}
+
+    // Bcast to array
 	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline=CmiFalse);
 
+    // Send to chare
 	CkCallback(Chare *p, int ep, CmiBool doInline=CmiFalse);
+
+    // Send to group element on current PE
 	CkCallback(Group *p, int ep, CmiBool doInline=CmiFalse);
+
+    // Send to nodegroup element on current node
 	CkCallback(NodeGroup *p, int ep, CmiBool doInline=CmiFalse);
+
+    // Send to specified array element 
  	CkCallback(ArrayElement *p, int ep,CmiBool doInline=CmiFalse);
 
 	CkCallback(const CcsDelayedReply &reply) :type(replyCCS) {

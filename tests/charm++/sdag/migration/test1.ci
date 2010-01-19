@@ -16,7 +16,6 @@ mainmodule test1 {
         CkPrintf("Migrating from PE %d\n", CkMyPe());
 	thisProxy.process2();
         this->migrateMe(0);
-//        CkPrintf("(%d, %d): running test with value %d\n", thisIndex.x, thisIndex.y, val);
       }
     };
     entry void process2(void) {

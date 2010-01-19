@@ -102,20 +102,26 @@ namespace ControlPoint {
   ControlPointAssociatedEntry assocWithEntry(const int entry);
   ControlPointAssociatedArray assocWithArray(const CProxy_ArrayBase &array);
 
+  typedef std::map<std::string,std:: map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > > > cp_effect_map;
+  typedef std::map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > > cp_name_map;
 
+
+namespace EffectIncrease {
+$funcdecls
+}
+
+namespace EffectDecrease {
+$funcdecls
+}
+
+
+} //namespace ControlPoint
+
+CkpvExtern(ControlPoint::cp_effect_map, cp_effects);
+CkpvExtern(ControlPoint::cp_name_map, cp_names);
+
+#endif
 EOF
-
-
-print OUT_H "namespace EffectIncrease {\n";
-print OUT_H $funcdecls;
-print OUT_H "}\n\n";
-
-print OUT_H "namespace EffectDecrease {\n";
-print OUT_H $funcdecls;
-print OUT_H "}\n\n\n";
-
-print OUT_H "} //namespace ControlPoint \n\n";
-print OUT_H "#endif\n";
 
 
 print OUT_CPP <<EOF;
@@ -130,16 +136,10 @@ print OUT_CPP <<EOF;
 using namespace ControlPoint;
 using namespace std;
 
-enum EFFECT {EFF_DEC, EFF_INC};
+enum DIRECTION {EFF_DEC, EFF_INC};
 
-EOF
-
-print OUT_CPP <<EOF;
-typedef map<std::string, map<std::string, vector<pair<int, ControlPoint::ControlPointAssociation> > > > cp_effect_map;
-typedef map<std::string, vector<pair<int, ControlPoint::ControlPointAssociation> > > cp_name_map;
-
-CkpvDeclare(cp_effect_map, cp_effects);
-CkpvDeclare(cp_name_map, cp_names);
+CkpvDeclare(ControlPoint::cp_effect_map, cp_effects);
+CkpvDeclare(ControlPoint::cp_name_map, cp_names);
 
 NoControlPointAssociation default_assoc;
 
@@ -154,23 +154,19 @@ ControlPoint::ControlPointAssociatedArray ControlPoint::assocWithArray(const CPr
 }
 
 void ControlPoint::initControlPointEffects() {
-\tCkpvInitialize(cp_effect_map, cp_effects);
-\tCkpvInitialize(cp_name_map, cp_names);
+    CkpvInitialize(cp_effect_map, cp_effects);
+    CkpvInitialize(cp_name_map, cp_names);
 }
 
 void testControlPointEffects() {
-
-EOF
-
-print OUT_CPP "$funccalls";
-
-print OUT_CPP <<EOF;
+$funccalls
 }
 
-void insert(const std::string control_type, const std::string name, const ControlPoint::ControlPointAssociation &a, const int effect) {
-\tCkpvAccess(cp_effects)[control_type][name].push_back(std::make_pair(effect, a));
-\tCkpvAccess(cp_names)[name].push_back(std::make_pair(effect, a));
+void insert(const std::string effect, const std::string name, const ControlPoint::ControlPointAssociation &assoc, const int direction) {
+    CkpvAccess(cp_effects)[effect][name].push_back(std::make_pair(direction, assoc));
+    CkpvAccess(cp_names)[name].push_back(std::make_pair(direction, assoc));
 }
-EOF
 
-print OUT_CPP "$funcdefs";
+$funcdefs
+
+EOF

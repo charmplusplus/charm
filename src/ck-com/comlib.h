@@ -12,6 +12,7 @@
 #include "BroadcastStrategy.h"
 #include "PipeBroadcastStrategy.h"
 #include "OneTimeMulticastStrategy.h"
+#include "ChunkMulticastStrategy.h"
 #include "EachToManyMulticastStrategy.h"
 #include "DirectMulticastStrategy.h"
 #include "RingMulticastStrategy.h"

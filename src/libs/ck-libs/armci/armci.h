@@ -6,13 +6,8 @@
  
  Original version by Chee Wai Lee, 2002
  Updated version by Chao Huang, 2005
+ Updated to ARMCI 1.4 by Chee Wai Lee, Dec 2009
 */
-
-/* 
- * missing interface for:
-  13. Collective Operations
-  14. System Configuration
- */
 
 #ifndef _ARMCI_H
 #define _ARMCI_H
@@ -45,6 +40,12 @@ int ARMCI_Main_cpp(int argc,char **argv); /* prototype for C++ main routine */
 #define ARMCI_FETCH_AND_ADD_LONG	2
 #define ARMCI_SWAP			3
 #define ARMCI_SWAP_LONG			4
+
+/* collective operations */
+#define ARMCI_INT      1
+#define ARMCI_LONG     2
+#define ARMCI_FLOAT    3
+#define ARMCI_DOUBLE   4
   
 /* redefine global variables used by armci */
 #define armci_me TCHARM_Element()
@@ -61,6 +62,9 @@ typedef struct {
 
 typedef int armci_hdl_t;
 typedef int armci_size_t;
+typedef int armci_domain_t;
+
+#define ARMCI_DOMAIN_SMP 0 /* SMP node domain for armci_domain_XXX calls */
 
 /* virtual processor Aggregate Remote Memory Copy Interface (ARMCI) */
 
@@ -295,6 +299,21 @@ void ARMCI_Migrate(void);
 void ARMCI_Async_Migrate(void);
 void ARMCI_Checkpoint(char* dirname);
 void ARMCI_MemCheckpoint(void);
+
+/* ******************************** */
+/* Collective Operations            */
+void armci_msg_brdcst(void *buffer, int len, int root);
+void armci_msg_gop2(void *x, int n, int type, char *op);
+void armci_msg_barrier(void);
+void armci_msg_reduce(void *x, int n, char *op, int type);
+
+/* ******************************** */
+/* System Configuration             */
+int armci_domain_nprocs(armci_domain_t domain, int id);
+int armci_domain_count(armci_domain_t domain);
+int armci_domain_id(armci_domain_t domain, int glob_proc_id);
+int armci_domain_glob_proc_id(armci_domain_t domain, int id, int loc_proc_id);
+int armci_domain_my_id(armci_domain_t domain);
 
 #ifdef __cplusplus
 }

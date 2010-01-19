@@ -1,8 +1,8 @@
 /*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
+ * $Source: /cvsroot/charm/src/ck-perf/trace-projections.h,v $
+ * $Author: gioachin $
+ * $Date: 2009-08-20 01:09:41 $
+ * $Revision: 2.78 $
  *****************************************************************************/
 
 /**
@@ -20,8 +20,6 @@
 #include "trace.h"
 #include "trace-common.h"
 #include "ckhashtable.h"
-
-
 
 #if CMK_HAS_COUNTER_PAPI
 #include <papi.h>
@@ -243,9 +241,13 @@ class TraceProjections;
 /// log pool in trace projection
 class LogPool {
   friend class TraceProjections;
+#ifdef PROJ_ANALYSIS
+  // The macro is here "just-in-case". Somehow, it seems it is not necessary
+  //   to declare friend classes ahead of time in C++.
   friend class TraceProjectionsBOC;
+  friend class KMeansBOC;
+#endif  //PROJ_ANALYSIS
   friend class controlPointManager;
-
   private:
     bool writeData;
     unsigned int poolSize;
@@ -272,6 +274,10 @@ class LogPool {
     double timeErr;
     double globalEndTime; // used at the end on Pe 0 only
 
+    int numPhases;
+    bool hasFlushed;
+    bool *keepPhase;  // one decision per phase
+
     int headerWritten;
     bool fileCreated;
     void writeHeader();
@@ -292,6 +298,19 @@ class LogPool {
     void writeSts(void);
     void writeSts(TraceProjections *traceProj);
     void writeRC(void);
+
+    void initializePhases() {
+      keepPhase = new bool[numPhases];
+      for (int i=0; i<numPhases; i++) {
+	keepPhase[i] = true;
+      }
+    }
+
+    void setAllPhases(bool val) {
+      for (int i=0; i<numPhases; i++) {
+	keepPhase[i] = val;
+      }
+    }
 
     void add(unsigned char type, unsigned short mIdx, unsigned short eIdx,
 	     double time, int event, int pe, int ml=0, CmiObjId* id=0, 
@@ -392,7 +411,12 @@ class NestedEvent {
   events descriptions will be written into .sts file.
 */
 class TraceProjections : public Trace {
+#ifdef PROJ_ANALYSIS
+  // The macro is here "just-in-case". Somehow, it seems it is not necessary
+  //   to declare friend classes ahead of time in C++.
   friend class TraceProjectionsBOC;
+  friend class KMeansBOC;
+#endif // PROJ_ANALYSIS
  private:
     LogPool* _logPool;        /**<  logpool for all events */
     int curevent;
@@ -405,9 +429,12 @@ class TraceProjections : public Trace {
     int funcCount;
     CkHashtableT<StrKey,int> funcHashtable;
 
-	int traceNestedEvents;
+    int traceNestedEvents;
     CkQ<NestedEvent> nestedEvents;
     
+    int currentPhaseID;
+    LogEntry* lastPhaseEvent;
+
     //as user now can specify the idx, it's possible that user may specify an existing idx
     //so that we need a data structure to track idx. --added by Chao Mei
     CkVec<int> idxVec;
@@ -417,7 +444,7 @@ class TraceProjections : public Trace {
     LONG_LONG_PAPI *papiValues;
 #endif
 
- public:
+  public:
     int converseExit; // used for exits that bypass CkExit.
     double endTime;
 
@@ -454,12 +481,12 @@ class TraceProjections : public Trace {
     void traceClearEps();
     void traceWriteSts();
     void traceClose();
-    void traceBegin();    
+    void traceBegin();
     void traceEnd();
- #if CMK_SMP_TRACE_COMMTHREAD		
+#if CMK_SMP_TRACE_COMMTHREAD
     void traceBeginOnCommThread();
     void traceEndOnCommThread();
-#endif 	
+#endif
     void traceFlushLog() { _logPool->flushLogBuffer(); }
 
     //functions that perform function tracing
@@ -470,6 +497,11 @@ class TraceProjections : public Trace {
     void beginFunc(int idx,char *file,int line);
     void endFunc(char *name);
     void endFunc(int num);
+
+    /* start recognizing phases in trace-projections */
+    /* _TRACE_END_PHASE must be called collectively on all processors */
+    /*   in order for phase numbers to match up. */
+    void endPhase();
 
     /* This is for moving projections to being a charm++ module */
     void closeTrace(void);
@@ -522,7 +554,6 @@ void enableTraceLogOutput();
 
 /// Force the log file to be flushed
 void flushTraceLog();
-
 
 #endif
 

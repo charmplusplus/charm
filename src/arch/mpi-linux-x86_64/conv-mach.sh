@@ -5,7 +5,7 @@ if test -x "$CHARMINC/MPIOPTS"
 then
   . $CHARMINC/MPIOPTS
 else
-  MPICXX_DEF=mpiCC
+  MPICXX_DEF=mpicxx
   MPICC_DEF=mpicc
 fi
 
@@ -22,7 +22,7 @@ fi
 CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
 case "$CMK_REAL_COMPILER" in
 g++) CMK_AMD64="-m64 -fPIC" ;;
-charmc)  echo "Error> charmc can not call AMPI's mpiCC wrapper! Please fix your PATH."; exit 1 ;;
+charmc)  echo "Error> charmc can not call AMPI's mpicxx/mpiCC wrapper! Please fix your PATH."; exit 1 ;;
 esac
 
 CMK_CPP_CHARM="/lib/cpp -P"

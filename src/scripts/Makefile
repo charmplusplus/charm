@@ -228,7 +228,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  TraceUtilization.decl.h BlueGene.decl.h \
 	  comlib.decl.h ComlibManager.h DummyStrategy.h	\
 	  MulticastStrategy.h DirectMulticastStrategy.h RingMulticastStrategy.h	\
-	  OneTimeMulticastStrategy.h MultiRingMulticast.h \
+	  ChunkMulticastStrategy.h OneTimeMulticastStrategy.h MultiRingMulticast.h \
 	  EachToManyMulticastStrategy.h MsgPacker.h StreamingStrategy.h \
 	  NodeMulticast.h PipeBroadcastStrategy.h MeshStreamingStrategy.h \
           PrioStreaming.h MPIStrategy.h MsgPacker.h StreamingStrategy.h \
@@ -252,10 +252,10 @@ headers: dirs+sources
 	$(MAKE) headerlinks
 
 conv-autoconfig.h: configure
-	./configure
+	./configure $(QUIET)
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
-	@echo "Soft-linking headers..."
+	@[ "x$QUIET" = "x--quiet" ] || echo "Soft-linking headers..."
 	-@for hdr in $(ALLHEADERS) ; do test ! -f "../include/$$hdr" && ./system_ln "../tmp/$$hdr" ../include ; done
 	touch headerlinks
 
@@ -932,7 +932,7 @@ loadbalancers: $(LOADBALANCERS) $(L)/libmoduleEveryLB.a
 ######################################################################
 
 STRATEGY_OBJS = MPIStrategy.o StreamingStrategy.o \
-                DummyStrategy.o NodeMulticast.o OneTimeMulticastStrategy.o \
+                DummyStrategy.o NodeMulticast.o ChunkMulticastStrategy.o OneTimeMulticastStrategy.o \
 		EachToManyMulticastStrategy.o ComlibSectionInfo.o \
                 AAPLearner.o ComlibStats.o AAMLearner.o \
                 MsgPacker.o MulticastStrategy.o DirectMulticastStrategy.o \

@@ -12,9 +12,9 @@ extern int in_bracket,in_braces,in_int_expr;
 extern TList<Entry *> *connectEntries;
 ModuleList *modlist;
 namespace xi {
-extern int macroDefined(char *str, int istrue);
-extern char *python_doc;
-void splitScopedName(char* name, char** scope, char** basename);
+extern int macroDefined(const char *str, int istrue);
+extern const char *python_doc;
+void splitScopedName(const char* name, const char** scope, const char** basename);
 }
 %}
 
@@ -48,7 +48,7 @@ void splitScopedName(char* name, char** scope, char** basename);
   MsgVarList *mvlist;
   PUPableClass *pupable;
   IncludeFile *includeFile;
-  char *strval;
+  const char *strval;
   int intval;
   Chare::attrib_t cattr;
   SdagConstruct *sc;
@@ -301,7 +301,7 @@ BuiltinType	: INT
 
 NamedType	: Name OptTParams { $$ = new NamedType($1,$2); };
 QualNamedType	: QualName OptTParams { 
-                    char* basename, *scope;
+                    const char* basename, *scope;
                     splitScopedName($1, &scope, &basename);
                     $$ = new NamedType(basename, $2, scope);
                 }
@@ -686,11 +686,11 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		| ENTRY '[' ACCEL ']' VOID Name EParameters AccelEParameters ParamBraceStart CCode ParamBraceEnd Name /* DMK : Accelerated Entry Method */
                 {
                   int attribs = SACCEL;
-                  char* name = $6;
+                  const char* name = $6;
                   ParamList* paramList = $7;
                   ParamList* accelParamList = $8;
 		  XStr* codeBody = new XStr($10);
-                  char* callbackName = $12;
+                  const char* callbackName = $12;
 
                   $$ = new Entry(lineno, attribs, new BuiltinType("void"), name, paramList,
                                  0, 0, 0, 0, 0
@@ -966,9 +966,19 @@ OptTraceName	: LITERAL
 		;
 
 SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPubList 
-		 { RemoveSdagComments($4);
-		   $$ = new SdagConstruct(SATOMIC, new XStr($4), $6, 0,0,0,0, 0 ); 
-		   if ($2) { $2[strlen($2)-1]=0; $$->traceName = new XStr($2+1); }
+                 {
+		   char *tmp = strdup($4);
+		   RemoveSdagComments(tmp);
+		   $$ = new SdagConstruct(SATOMIC, new XStr(tmp), $6, 0,0,0,0, 0 );
+		   free(tmp);
+
+		   if ($2)
+		   {
+		       tmp = strdup($2);
+		       tmp[strlen(tmp)-1]=0;
+		       $$->traceName = new XStr(tmp+1);
+		       free(tmp);
+		   }
 		 }
 		| CONNECT '(' IDENT EParameters ')' ParamBraceStart CCode '}'
 		{  
@@ -1015,8 +1025,11 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
 		| FORWARD ForwardList ';'
 		{ $$ = $2; }
 		| ParamBraceStart CCode ParamBraceEnd
-                 { RemoveSdagComments($2);
-                   $$ = new SdagConstruct(SATOMIC, new XStr($2), NULL, 0,0,0,0, 0 );
+                 {
+		     char *tmp = strdup($2);
+		     RemoveSdagComments(tmp);
+		     $$ = new SdagConstruct(SATOMIC, new XStr(tmp), NULL, 0,0,0,0, 0 );
+		     free(tmp);
                  }
 	 	;	
 

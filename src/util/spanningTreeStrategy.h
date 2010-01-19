@@ -80,6 +80,27 @@ int distance(Iterator first, Iterator last)
  *
  *       Users can override this choice by specifying a strategy when calling one of the build routines. A list of
  *       strategies should be apparent from the headers included near the bottom of this file.
+ *
+ * Note to developers:
+ *       This code is probably more grandiose than it needs to be. Basically, there are a bunch of strategy classes
+ *       (that inherit from SpanningTreeStrategy) for constructing spanning trees. There is a factory method 
+ *       (getSpanningTreeStrategy) that returns the strategy that it thinks is the best choice given the machine, 
+ *       input etc. There are some template gimmicks just to allow users to pass input however they want (arrays /
+ *        vectors / CkVecs etc. of ints / SpanningTreeVertices)
+ *
+ *       Steps for adding new algorithms for constructing spanning trees should look something like this.
+ *       - Create a new template class (that inherits from the template base class SpanningTreeStrategy)
+ *       - Put it in a new file following appropriate naming conventions.
+ *       - Add an include statement near the bottom of this file along with the other existing includes
+ *       - Override the virtual method buildNextGen() in your new strategy class to implement your algorithm
+ *       - Existing strategies provide partial specializations based on the type of input passed in. Input 
+ *         is typically a container of int or SpanningTreeVertex. You may have to do something different for
+ *         each of these input types. (for eg, for SpanningTreeVertex store the results in the parent vertex too)
+ *       - Enclose any implementation details (functions, classes etc.) within another namespace (say, impl)
+ *         to avoid polluting this top-level namespace.
+ *       - Test your strategy by explicitly calling it from some test code to check its operation.
+ *       - Make appropriate changes to getSpanningTreeStrategy() to return your new strategy for appropriate
+ *         input on the appropriate machine(s)
  */
 
 
@@ -160,8 +181,14 @@ inline SpanningTreeVertex* buildSpanningTreeGeneration(const Iterator firstVtx,
                                                        SpanningTreeStrategy<Iterator> *bldr
                                                       )
 {
+    /// Validate input. Invalid inputs are not exceptions. They are just no-ops
+    if (maxBranches < 1 || firstVtx == beyondLastVtx)
+        return (new SpanningTreeVertex() );
+
     /// If no strategy is passed in, instantiate one
-    if (bldr == 0) bldr = getSpanningTreeStrategy(firstVtx,beyondLastVtx,maxBranches);
+    if (bldr == 0)
+        bldr = getSpanningTreeStrategy(firstVtx,beyondLastVtx,maxBranches);
+
     return bldr->buildNextGen(firstVtx,beyondLastVtx,maxBranches);
 }
 
@@ -180,28 +207,28 @@ void buildSpanningTree(SpanningTreeVertex* dispatchTag,
                        SpanningTreeStrategy<Iterator> *bldr
                       )
 {
-    /// Build a tree only if there are any vertices in the input range
-    if (firstVtx < beyondLastVtx)
-    {
-        /// Build the next generation of the tree rooted at *firstVtx
-        SpanningTreeVertex *tmp = buildSpanningTreeGeneration(firstVtx,beyondLastVtx,maxBranches,bldr);
-        /// Delete the copy of firstVtx that gets returned from the call
-        delete tmp;
+    /// Validate input. Invalid inputs are not exceptions. They are just no-ops
+    if (maxBranches < 1 || firstVtx == beyondLastVtx)
+        return;
 
-        int numChildren = (*firstVtx).childIndex.size();
-        /// For each direct child...
-        for (int i=0; i< numChildren; i++)
-        {
-            /// Identify the range of vertices that are part of this subtree
-            Iterator start = firstVtx, end = firstVtx;
-            std::advance(start, (*firstVtx).childIndex[i] );
-            if (i < numChildren -1)
-                std::advance(end, (*firstVtx).childIndex[i+1] );
-            else
-                end = beyondLastVtx;
-            /// Build this subtree
-            buildSpanningTree(dispatchTag,start,end,maxBranches,bldr);
-        }
+    /// Build the next generation of the tree rooted at *firstVtx
+    SpanningTreeVertex *tmp = buildSpanningTreeGeneration(firstVtx,beyondLastVtx,maxBranches,bldr);
+    /// Delete the copy of firstVtx that gets returned from the call
+    delete tmp;
+
+    int numChildren = (*firstVtx).childIndex.size();
+    /// For each direct child...
+    for (int i=0; i< numChildren; i++)
+    {
+        /// Identify the range of vertices that are part of this subtree
+        Iterator start = firstVtx, end = firstVtx;
+        std::advance(start, (*firstVtx).childIndex[i] );
+        if (i < numChildren -1)
+            std::advance(end, (*firstVtx).childIndex[i+1] );
+        else
+            end = beyondLastVtx;
+        /// Build this subtree
+        buildSpanningTree(dispatchTag,start,end,maxBranches,bldr);
     }
 }
 

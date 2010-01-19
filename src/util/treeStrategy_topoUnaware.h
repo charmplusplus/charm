@@ -56,17 +56,14 @@ namespace impl {
     template <typename Iterator>
     SpanningTreeVertex* buildNextGen_topoUnaware(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches)
     {
-        // if (maxBranches < 1) throw;
-        CkAssert(maxBranches >= 1);
-        /// Check validity and ranges etc.
-        const int numDescendants = std::distance(firstVtx,beyondLastVtx) - 1;
-        // if (numDescendants < 0) throw;
-        CkAssert(numDescendants >= 0);
+        ///Invalid inputs are not exceptions. They are just no-ops
+        if (maxBranches < 1 || firstVtx == beyondLastVtx) return new SpanningTreeVertex();
 
-        /// Create the output data structure
+        /// Return data holds the parent vertex info [and child info, if there are any]
         SpanningTreeVertex *parent = new SpanningTreeVertex(*firstVtx);
 
         /// Compute the number of vertices in each branch
+        const int numDescendants = std::distance(firstVtx,beyondLastVtx) - 1;
         int numInSubTree = numDescendants / maxBranches;
         int remainder    = numDescendants % maxBranches;
 

@@ -44,12 +44,12 @@ public:
       val = (char*)"";
     }
   }
-  char *match(char *k) { if (!strcmp(k, key)) return val; return NULL; }
+  char *match(const char *k) { if (!strcmp(k, key)) return val; return NULL; }
 };
 
 static TList<MacroDefinition *> macros;
 
-int macroDefined(char *str, int istrue) 
+int macroDefined(const char *str, int istrue)
 {
   MacroDefinition *def;
   for (def = macros.begin(); !macros.end(); def=macros.next()) {
@@ -65,8 +65,8 @@ int macroDefined(char *str, int istrue)
 // input: name
 // output: basename (pointer somewhere inside name)
 //         scope (null if name is unscoped, newly allocated string otherwise)
-void splitScopedName(char* name, char** scope, char** basename) {
-    char* scopeEnd = strrchr(name, ':');
+void splitScopedName(const char* name, const char** scope, const char** basename) {
+    const char* scopeEnd = strrchr(name, ':');
     if (!scopeEnd) {
         *scope = NULL;
         *basename = name;
@@ -74,9 +74,10 @@ void splitScopedName(char* name, char** scope, char** basename) {
     }
     *basename = scopeEnd+1;
     int len = scopeEnd-name+1; /* valid characters to copy */
-    *scope = new char[len+1];
-    strncpy(*scope, name, len);
-    (*scope)[len]=0; /* gotta null-terminate C string */
+    char *tmp = new char[len+1];
+    strncpy(tmp, name, len);
+    tmp[len]=0; /* gotta null-terminate C string */
+    *scope = tmp;
 }
 
 FILE *openFile(char *interfacefile)

@@ -10,7 +10,6 @@
 #include "sockRoutines.h"
 #include "cklists.h"
 
-
 #define DEBUGP(x)  /** CmiPrintf x; */
 
 /** This scheme relies on using IP address to identify physical nodes 
@@ -47,6 +46,11 @@ extern "C" int getXTNodeID(int mype, int numpes);
 #if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
 #include <Carbon/Carbon.h>
 #include <Multiprocessing.h>
+#endif
+
+#if CMK_BLUEGENE_CHARM
+#include "middle-blue.h"
+using namespace BGConverse;
 #endif
 
 extern "C" int CmiNumCores(void) {
@@ -117,6 +121,7 @@ static CmmTable hostTable;
 class CpuTopology {
 public:
   static int *nodeIDs;
+  static int numPes;
   static int numNodes;
   static CkVec<int> *bynodes;
   static int supported;
@@ -135,12 +140,12 @@ public:
     if (numNodes > 0) return numNodes;     // already calculated
     CkVec<int> unodes;
     int i;
-    for (i=0; i<CmiNumPes(); i++)  unodes.push_back(nodeIDs[i]);
-    //unodes.bubbleSort(0, CmiNumPes()-1);
+    for (i=0; i<numPes; i++)  unodes.push_back(nodeIDs[i]);
+    //unodes.bubbleSort(0, numPes-1);
     unodes.quickSort();
     int last = -1;
     std::map<int, int> nodemap;  // nodeIDs can be out of range of [0,numNodes]
-    for (i=0; i<CmiNumPes(); i++)  { 
+    for (i=0; i<numPes; i++)  { 
         if (unodes[i] != last) {
           last=unodes[i];
 	  nodemap[unodes[i]] = numNodes;
@@ -151,7 +156,7 @@ public:
       numNodes = CmiNumNodes();
     else {
         // re-number nodeIDs, which may be necessary e.g. on BlueGene/P
-      for (i=0; i<CmiNumPes(); i++) nodeIDs[i] = nodemap[nodeIDs[i]];
+      for (i=0; i<numPes; i++) nodeIDs[i] = nodemap[nodeIDs[i]];
       CpuTopology::supported = 1;
     }
     return numNodes;
@@ -163,7 +168,7 @@ public:
     numUniqNodes();
     bynodes = new CkVec<int>[numNodes];
     if (supported) {
-      for (i=0; i<CmiNumPes(); i++){
+      for (i=0; i<numPes; i++){
         CmiAssert(nodeIDs[i] >=0 && nodeIDs[i] <= numNodes); // Sanity check for bug that occurs on mpi-crayxt
         bynodes[nodeIDs[i]].push_back(i);
       }
@@ -192,6 +197,7 @@ public:
 };
 
 int *CpuTopology::nodeIDs = NULL;
+int CpuTopology::numPes = 0;
 int CpuTopology::numNodes = 0;
 CkVec<int> *CpuTopology::bynodes = NULL;
 int CpuTopology::supported = 0;
@@ -346,22 +352,45 @@ extern "C" void CmiInitCPUTopology(char **argv)
 
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
 					   "obtain cpu topology info");
-#if !defined(__BLUEGENE__)
   obtain_flag = 1;
-#endif
   if (CmiGetArgFlagDesc(argv,"+skip_cpu_topology",
                                "skip the processof getting cpu topology info"))
     obtain_flag = 0;
 
+#if CMK_BLUEGENE_CHARM
+  if (BgNodeRank() == 0)
+#endif
+  {
   cpuTopoHandlerIdx =
      CmiRegisterHandler((CmiHandler)cpuTopoHandler);
   cpuTopoRecvHandlerIdx =
      CmiRegisterHandler((CmiHandler)cpuTopoRecvHandler);
+  }
 
   if (!obtain_flag) return;
   else if (CmiMyPe() == 0) {
+#if CMK_BLUEGENE_CHARM
+  if (BgNodeRank() == 0)
+#endif
      CmiPrintf("Charm++> cpu topology info is being gathered.\n");
   }
+
+#if CMK_BLUEGENE_CHARM
+  if (BgNodeRank() == 0)
+  {
+    //int numPes = BgNumNodes()*BgGetNumWorkThread();
+    int numPes = cpuTopo.numPes = CkNumPes();
+    cpuTopo.nodeIDs = new int[numPes];
+    CpuTopology::supported = 1;
+    int wth = BgGetNumWorkThread();
+    for (int i=0; i<numPes; i++) {
+      int nid = i / wth;
+      cpuTopo.nodeIDs[i] = nid;
+    }
+    cpuTopo.sort();
+  }
+  return;
+#else
 
 #if CMK_USE_GM
   CmiBarrier();
@@ -384,12 +413,12 @@ extern "C" void CmiInitCPUTopology(char **argv)
   if (CmiMyRank() == 0) {
     TopoManager tmgr;
 
-    int numNodes = CmiNumPes();
-    cpuTopo.nodeIDs = new int[numNodes];
+    int numPes = cpuTopo.numPes = CmiNumPes();
+    cpuTopo.nodeIDs = new int[numPes];
     CpuTopology::supported = 1;
 
     int x, y, z, t, nid;
-    for(int i=0; i<numNodes; i++) {
+    for(int i=0; i<numPes; i++) {
       tmgr.rankToCoordinates(i, x, y, z, t);
       nid = tmgr.coordinatesToRank(x, y, z, 0);
       cpuTopo.nodeIDs[i] = nid;
@@ -401,20 +430,20 @@ extern "C" void CmiInitCPUTopology(char **argv)
   return;
 #elif CMK_CRAYXT
   if(CmiMyRank() == 0) {
-    int numNodes = CmiNumPes();
-    cpuTopo.nodeIDs = new int[numNodes];
+    int numPes = cpuTopo.numPes = CmiNumPes();
+    cpuTopo.nodeIDs = new int[numPes];
     CpuTopology::supported = 1;
 
     int nid;
-    for(int i=0; i<numNodes; i++) {
-      nid = getXTNodeID(i, numNodes);
+    for(int i=0; i<numPes; i++) {
+      nid = getXTNodeID(i, numPes);
       cpuTopo.nodeIDs[i] = nid;
     }
     int prev = -1;
     nid = -1;
 
     // this assumes TXYZ mapping and changes nodeIDs
-    for(int i=0; i<numNodes; i++) {
+    for(int i=0; i<numPes; i++) {
       if(cpuTopo.nodeIDs[i] != prev) {
 	prev = cpuTopo.nodeIDs[i];
 	cpuTopo.nodeIDs[i] = ++nid;
@@ -441,6 +470,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
     _noip = 1; 
   #endif
   }
+  cpuTopo.numPes = CmiNumPes();
 
   CmiNodeAllBarrier();
   if (_noip) return; 
@@ -466,6 +496,8 @@ extern "C" void CmiInitCPUTopology(char **argv)
   done++;
   CmiUnlock(topoLock);
 #endif
+
+#endif   /* __BLUEGENE__ */
 
   // now every one should have the node info
 }

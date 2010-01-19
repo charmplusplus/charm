@@ -13,9 +13,12 @@ module msa
         entry void ReceivePageWithPUP(unsigned int page, MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> pageData, int size);
         entry void enroll(unsigned int numberOfWorkerThreads);
         entry void enrollAck(int originator);  // internal method
-        entry void enrollDone();  // internal mathod
+        entry void enrollDone();  // internal method
         entry void SyncAck();
-        entry void SyncDone();
+        entry void SyncDone(CkReductionMsg *);
+
+        // Push data to its home and wait for notice that everyone else has caught up
+		entry [threaded] void FinishSync();
 
         // for debugging purposes only
         entry void emitBufferValue(int ID, unsigned int pageNum, unsigned int offset);

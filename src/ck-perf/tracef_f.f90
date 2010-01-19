@@ -29,6 +29,8 @@
         subroutine ftraceEndFunc(idx)
           integer, intent(in) :: idx
         end subroutine
+        subroutine ftracePhaseEnd()
+        end subroutine
       end interface
       end module
 

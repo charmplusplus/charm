@@ -77,12 +77,6 @@ namespace topo {
 template <typename Iterator>
 SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningTreeVertex>::buildNextGen(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches)
 {
-    // if (maxBranches < 1) throw;
-    CkAssert(maxBranches >= 1);
-    /// Check validity and ranges etc.
-    const int numDescendants = std::distance(firstVtx,beyondLastVtx) - 1;
-    // if (numDescendants < 0) throw;
-    CkAssert(numDescendants >= 0);
     /// If the parent vertex already has a(n older) list of children, clear it
     (*firstVtx).childIndex.clear();
     (*firstVtx).childIndex.reserve(maxBranches);
@@ -91,7 +85,7 @@ SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningT
     TopoManager aTopoMgr;
     /// The number of vertices in the tree that require network traversal
     int numLocalDestinations = -1, numRemoteDestinations = 0;
-    Iterator firstDescendant = firstVtx, beyondLastLocal = firstVtx;
+    Iterator beyondLastLocal = firstVtx;
 
     /// Find the machine coordinates of each vertex and also collate the local destination vertices
     for (Iterator itr = firstVtx; itr != beyondLastVtx; itr++)
@@ -121,7 +115,12 @@ SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningT
     {
         numLocalBranches = (numRemoteDestinations >= maxBranches-1)? 1 : (maxBranches - numRemoteDestinations);
         /// Distribute the local destination vertices amongst numLocalBranches branches
-        impl::buildNextGen_topoUnaware(firstVtx,beyondLastLocal,numLocalBranches);
+        SpanningTreeVertex *localTree = impl::buildNextGen_topoUnaware(firstVtx,beyondLastLocal,numLocalBranches);
+        /// Append the local tree info to the child info
+        for (int i=0,n=localTree->childIndex.size(); i<n; i++)
+            firstVtx->childIndex.push_back( localTree->childIndex[i] );
+        /// Intermediate results no longer needed
+        delete localTree;
     }
 
     /// Partition the remote-vertex bounding box into the remaining number of branches

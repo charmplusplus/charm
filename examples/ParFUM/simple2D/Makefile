@@ -13,10 +13,10 @@ cst_nl.o: cst_nl.C
 
 
 test: pgm
-	./charmrun ./pgm +vp4 +p2
+	./charmrun ./pgm +vp4 +p2 $(TESTOPTS)
 
 bgtest: pgm
-	./charmrun ./pgm +vp4 +p2 +x2 +y2 +z1
+	./charmrun ./pgm +vp4 +p2 +x2 +y2 +z1 $(TESTOPTS)
 
 clean:
 	rm -f pgm fpgm *.o conv-host charmrun

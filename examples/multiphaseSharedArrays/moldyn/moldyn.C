@@ -20,7 +20,7 @@ PUPbytes(XYZ);
 class AtomInfo {
 public:
     double mass, charge;
-    AtomInfo() { mass = charge = 0.0; }
+  AtomInfo() : mass(0.0), charge(0.0) { }
     AtomInfo(const int rhs) { mass = charge = (double)rhs; } // identity value
     AtomInfo& operator+= (const AtomInfo& rhs) { } // we're not calling accumulate on this
 };
@@ -161,6 +161,7 @@ protected:
     XyzMSA coords;
     XyzMSA forces;
     AtomInfoMSA atominfo;
+	AtomInfoMSA::Read rAtominfo;
     NeighborMSA nbrList;
 
     unsigned int numAtoms, numWorkers;
@@ -171,14 +172,6 @@ protected:
         forces.enroll(numWorkers);
         atominfo.enroll(numWorkers);
         nbrList.enroll(numWorkers);
-    }
-
-    void SyncArrays()
-    {
-        coords.sync();
-        forces.sync();
-        atominfo.sync();
-        nbrList.sync();
     }
 
     void FillArrays()
@@ -217,73 +210,64 @@ protected:
         return 0;
     }
 
-    // ================================================================
-    // 2D calculations
+  double distance(const XYZ &a, const XYZ &b)
+  {
+	double dx = a.x - b.x,
+	  dy = a.y - b.y,
+	  dz = a.z - b.z;
+	return sqrt(dx*dx + dy*dy + dz*dz);
+  }
 
-    inline int numWorkers2D() {
-        static int n = 0;
+  void PlimptonMD(XyzMSA::Handle &hCoords, XyzMSA::Handle &hForces, 
+				  NeighborMSA::Handle &hNbr, AtomInfoMSA::Read &rAtominfo)
+  {
+	unsigned int i_start, i_end, j_start, j_end;
+	GetMyIndices(NUM_ATOMS-1, toX(), numWorkers2D(), i_start, i_end);
+	GetMyIndices(NUM_ATOMS-1, toY(), numWorkers2D(), j_start, j_end);
 
-        if (n==0) {
-            n = (int)(sqrt(numWorkers));
-            CkAssert(n*n == numWorkers);
-        }
+	XyzMSA::Read rCoords = coords.syncToRead(hCoords);
+	NeighborMSA::Read rNbr = nbrList.syncToRead(hNbr);
 
-        return n;
-    }
+	for (unsigned int timestep = 0; timestep < NUM_TIMESTEPS; timestep++) {
+	  // Force calculation for a section of the interaction matrix
+	  XyzMSA::Accum aForces = forces.syncToAccum(hForces);
+	  for (unsigned int i = i_start; i< i_end; i++)
+		for (unsigned int j = j_start; j< j_end; j++)
+		  if (rNbr(i,j)) {
+			XYZ force = calculateForce(rCoords(i),
+									   rAtominfo(i),
+									   rCoords(j),
+									   rAtominfo(j));
+			aForces(i) += force;
+			aForces(j) += force.negate();
+		  }
 
-    // Convert a 1D ChareArray index into a 2D x dimension index
-    inline unsigned int toX() {
-        return thisIndex/numWorkers2D();
-    }
-    // Convert a 1D ChareArray index into a 2D y dimension index
-    inline unsigned int toY() {
-        return thisIndex%numWorkers2D();
-    }
+	  // Movement Integration for our subset of atoms
+	  unsigned int myAtomsBegin, myAtomsEnd;
+	  XyzMSA::Read rForces = forces.syncToRead(aForces);
+	  XyzMSA::Write wCoords = coords.syncToWrite(rCoords);
+	  for (unsigned int k = myAtomsBegin; k<myAtomsEnd; k++)
+		wCoords(k) = integrate(rAtominfo(k), rForces(k));
 
-    // ================================================================
+	  // Neighbor list recalculation for our section of the interaction matrix
+	  rCoords = coords.syncToRead(wCoords);
+	  if  (timestep % 8 == 0) { // update neighbor list every 8 steps
+		NeighborMSA::Write wNbr = nbrList.syncToWrite(rNbr);
+		for (unsigned int i = i_start; i< i_end; i++)
+		  for (unsigned int j = j_start; j< j_end; j++)
+			if (distance(rCoords(i), rCoords(j)) < CUTOFF_DISTANCE) {
+			  wNbr.set(i,j) = true;
+			  wNbr.set(j,i) = true;
+			} else {
+			  wNbr.set(i,j) = false;
+			  wNbr.set(j,i) = false;
+			}
+		rNbr = nbrList.syncToRead(wNbr);
+	  }
 
-    void DoWork()
-    {
-        unsigned int i_start, i_end, j_start, j_end;
-        GetMyIndices(NUM_ATOMS-1, toX(), numWorkers2D(), i_start, i_end);
-        GetMyIndices(NUM_ATOMS-1, toY(), numWorkers2D(), j_start, j_end);
-
-        for (unsigned int timestep = 0; timestep < NUM_TIMESTEPS; timestep++) {
-            /**************** Phase I ****************/
-            // for a section of the interaction matrix
-            for (unsigned int i = i_start; i< i_end; i++)
-                for (unsigned int j = j_start; j< j_end; j++)
-                    if (nbrList.get(i,j)) { // nbrlist enters ReadOnly mode
-                        XYZ force = calculateForce(coords[i],
-                                                   atominfo[i],
-                                                   coords[j],
-                                                   atominfo[j]);
-                        forces.accumulate(i,  force); // Accumulate mode
-                        forces.accumulate(j, force.negate());
-                    }
-            forces.sync();
-
-            /**************** Phase II ****************/
-            unsigned int myAtomsBegin, myAtomsEnd;
-            for (unsigned int k = myAtomsBegin; k<myAtomsEnd; k++)
-                coords.set(k) = integrate(atominfo[k], forces[k]); // WriteOnly mode
-            coords.sync();
-
-            /**************** Phase III ****************/
-            if  (timestep %8 == 0) { // update neighbor list every 8 steps
-                for (unsigned int i = i_start; i< i_end; i++)
-                    for (unsigned int j = j_start; j< j_end; j++)
-                        if (distance(i, j) < CUTOFF_DISTANCE) {
-                            nbrList.set(i,j) = true;
-                            nbrList.set(j,i) = true;
-                        } else {
-                            nbrList.set(i,j) = false;
-                            nbrList.set(j,i) = false;
-                        }
-                nbrList.sync();
-            }
-        }
-    }
+	  hForces = rForces;
+	}
+  }
 
     void TestResults(bool prod_test=true)
     {
@@ -373,14 +357,15 @@ public:
         description.push_back("  fill");
 
         if(verbose) ckout << thisIndex << ": syncing" << endl;
-        SyncArrays();
+        //SyncArrays();
         times.push_back(CkWallTimer()); // 4
         description.push_back("    sync");
 
         if (do_test) TestResults(0);
 
         if(verbose) ckout << thisIndex << ": product" << endl;
-        DoWork();
+
+        PlimptonMD(coords.getInitialWrite(), forces.getInitialWrite(), nbrList.getInitialWrite(), rAtominfo);
         times.push_back(CkWallTimer()); // 5
         description.push_back("    work");
 

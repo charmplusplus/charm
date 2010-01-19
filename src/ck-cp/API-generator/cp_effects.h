@@ -53,6 +53,9 @@ namespace ControlPoint {
   ControlPointAssociatedEntry assocWithEntry(const int entry);
   ControlPointAssociatedArray assocWithArray(const CProxy_ArrayBase &array);
 
+  typedef std::map<std::string,std:: map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > > > cp_effect_map;
+  typedef std::map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > > cp_name_map;
+
 
 namespace EffectIncrease {
 	void Priority(std::string name, const ControlPoint::ControlPointAssociation &a);
@@ -83,6 +86,7 @@ namespace EffectIncrease {
 	void LoadBalancingPeriod(std::string name);
 	void GPUOffloadedWork(std::string name, const ControlPoint::ControlPointAssociation &a);
 	void GPUOffloadedWork(std::string name);
+
 }
 
 namespace EffectDecrease {
@@ -114,9 +118,13 @@ namespace EffectDecrease {
 	void LoadBalancingPeriod(std::string name);
 	void GPUOffloadedWork(std::string name, const ControlPoint::ControlPointAssociation &a);
 	void GPUOffloadedWork(std::string name);
+
 }
 
 
-} //namespace ControlPoint 
+} //namespace ControlPoint
+
+CkpvExtern(ControlPoint::cp_effect_map, cp_effects);
+CkpvExtern(ControlPoint::cp_name_map, cp_names);
 
 #endif

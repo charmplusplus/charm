@@ -4,9 +4,11 @@ module ControlPoints {
   readonly int random_seed;
   readonly long controlPointSamplePeriod;
   readonly int whichTuningScheme;
+  readonly bool shouldGatherMemoryUsage;
+  readonly bool shouldGatherUtilization;
+  readonly bool shouldGatherAll;
 
-
-  initproc void registerIdleTimeReduction(void);	
+  initproc void registerCPReductions(void);	
 
 
  message controlPointMsg { 
@@ -34,6 +36,9 @@ module ControlPoints {
     entry void requestIdleTime(CkCallback cb);
     entry void gatherIdleTime(CkReductionMsg *msg);
 
+    entry void requestAll(CkCallback cb);
+    entry void gatherAll(CkReductionMsg *msg);
+  
  }   
 
 

@@ -1,34 +1,66 @@
-
 module TraceProjections {
 
-  message OutlierStatsMessage {
+  message KMeansStatsMessage {
+    bool filter[];
+    double kSeedsPos[];
     double stats[];
   };
 
-  message OutlierWeightMessage;
+  message KSeedsMessage {
+    double kSeedsPos[];
+  };
 
-  message OutlierThresholdMessage;
+  message KSelectionMessage {
+    int minIDs[];
+    int maxIDs[];
+  };
 
   mainchare TraceProjectionsInit {
+    // This initialization happens at the start of the program and is
+    //   intended to allow commandline arguments to be passed into
+    //   trace-projections.
     entry TraceProjectionsInit(CkArgMsg *m);
   };
 
-  initnode void initTraceProjectionsBOC();
+  // initcalls are automatically executed by the runtime just before
+  //   computation begins. It is assumed this happens before mainchares are
+  //   initialized as it is intended for important runtime registrations.
+  // In this case, we have user-specific reductions and the registration of
+  //   an module exit function.
+  initproc void registerOutlierReduction(void);
+  initnode void initTraceProjectionsBOC(void);
   
   readonly CkGroupID traceProjectionsGID;
+  readonly CkGroupID kMeansGID;
+
+  // "shadow" BOC for TraceProjectionsBOC, specialized for KMeans computations
+  group [migratable] KMeansBOC {
+    entry KMeansBOC(bool, int, int, double, bool);
+    
+    entry void startKMeansAnalysis(void);
+    entry void flushCheck(CkReductionMsg *);
+    entry void flushCheckDone(void);
+    entry void getNextPhaseMetrics(void);
+    entry void globalMetricRefinement(CkReductionMsg *);
+    entry void findInitialClusters(KMeansStatsMessage *);
+    entry void updateKSeeds(CkReductionMsg *);
+    entry void updateSeedMembership(KSeedsMessage *);
+    entry void collectDistances(KSelectionMessage *);
+    entry void findNextMinMax(CkReductionMsg *);
+    entry void phaseDone(void);
+  };
 
   group [migratable] TraceProjectionsBOC {
-    entry TraceProjectionsBOC(void);
-    entry void startOutlierAnalysis();
-    entry void outlierAverageReduction(CkReductionMsg *);
-    entry void calculateWeights(OutlierStatsMessage *);
-    entry void determineOutliers(OutlierWeightMessage *);
-    entry void setOutliers(OutlierThresholdMessage *);
-    entry void startEndTimeAnalysis();
-    entry void endTimeReduction(CkReductionMsg *);
-    entry void finalReduction(CkReductionMsg *);
-    entry [notrace] void shutdownAnalysis(void);
-    entry void closeTrace(void);
+    entry TraceProjectionsBOC(bool);
+
+    entry void traceProjectionsParallelShutdown(void);
+    entry void startEndTimeAnalysis(void);
+    entry void endTimeDone(CkReductionMsg *);
+    entry void kMeansDone(void);
+    entry void kMeansDone(CkReductionMsg *);
+    entry void finalize(void);
+    entry void closingTraces(void);
+    entry void closeParallelShutdown(CkReductionMsg *);
   };
 
 };

@@ -146,8 +146,8 @@ class Type : public Printable {
     virtual int isCkMigMsg(void) const {return 0;}
     virtual int isReference(void) const {return 0;}
     virtual Type *deref(void) {return this;}
-    virtual char *getBaseName(void) const = 0;
-    virtual char *getScope(void) const = 0;
+    virtual const char *getBaseName(void) const = 0;
+    virtual const char *getScope(void) const = 0;
     virtual int getNumStars(void) const {return 0;}
     virtual void genProxyName(XStr &str,forWhom forElement);
     virtual void genIndexName(XStr &str);
@@ -173,25 +173,25 @@ class BuiltinType : public Type {
     void print(XStr& str) { str << name; }
     int isVoid(void) const { return !strcmp(name, "void"); }
     int isInt(void) const { return !strcmp(name, "int"); }
-    char *getBaseName(void) const { return name; }
-    char *getScope(void) const { return NULL; }
+    const char *getBaseName(void) const { return name; }
+    const char *getScope(void) const { return NULL; }
 };
 
 class NamedType : public Type {
   private:
-    char* name;
-    char* scope;
+    const char* name;
+    const char* scope;
     TParamList *tparams;
   public:
-    NamedType(const char* n, TParamList* t=0, char* scope_=NULL)
-       : name((char *)n), tparams(t), scope(scope_) {}
+    NamedType(const char* n, TParamList* t=0, const char* scope_=NULL)
+       : name(n), tparams(t), scope(scope_) {}
     int isTemplated(void) const { return (tparams!=0); }
     int isCkArgMsg(void) const {return 0==strcmp(name,"CkArgMsg");}
     int isCkMigMsg(void) const {return 0==strcmp(name,"CkMigrateMessage");}
     void print(XStr& str);
     int isNamed(void) const {return 1;}
-    virtual char *getBaseName(void) const { return name; }
-    virtual char *getScope(void) const { return scope; }
+    virtual const char *getBaseName(void) const { return name; }
+    virtual const char *getScope(void) const { return scope; }
     virtual void genProxyName(XStr& str,forWhom forElement);
     virtual void genIndexName(XStr& str);
     virtual void genMsgProxyName(XStr& str);
@@ -210,8 +210,8 @@ class PtrType : public Type {
     void indirect(void) { numstars++; }
     int getNumStars(void) const {return numstars; }
     void print(XStr& str);
-    char *getBaseName(void) const { return type->getBaseName(); }
-    char *getScope(void) const { return NULL; }
+    const char *getBaseName(void) const { return type->getBaseName(); }
+    const char *getScope(void) const { return NULL; }
     virtual void genMsgProxyName(XStr& str) { 
       if(numstars != 1) {
         die("too many stars-- entry parameter must have form 'MTYPE *msg'"); 
@@ -231,8 +231,8 @@ class ReferenceType : public Type {
     int isReference(void) const {return 1;}
     void print(XStr& str) {str<<referant<<" &";}
     virtual Type *deref(void) {return referant;}
-    char *getBaseName(void) const { return referant->getBaseName(); }
-    char *getScope(void) const { return NULL; }
+    const char *getBaseName(void) const { return referant->getBaseName(); }
+    const char *getScope(void) const { return NULL; }
 };
 /* I don't think these are useful any longer (OSL 11/30/2001)
 class ConstType : public Type {
@@ -370,7 +370,7 @@ class ParamList {
         return (next==NULL) && param->isCkMigMsgPtr();
     }
     int getNumStars(void) const {return param->type->getNumStars(); }
-    char *getBaseName(void) {
+    const char *getBaseName(void) {
     	return param->type->getBaseName();
     }
     void genMsgProxyName(XStr &str) {
@@ -407,10 +407,10 @@ class ParamList {
 class FuncType : public Type {
   private:
     Type *rtype;
-    char *name;
+    const char *name;
     ParamList *params;
   public:
-    FuncType(Type* r, char* n, ParamList* p) 
+    FuncType(Type* r, const char* n, ParamList* p)
     	:rtype(r),name(n),params(p) {}
     void print(XStr& str) { 
       rtype->print(str);
@@ -418,8 +418,8 @@ class FuncType : public Type {
       if(params)
         params->print(str);
     }
-    char *getBaseName(void) const { return name; }
-    char *getScope(void) const { return NULL; }
+    const char *getBaseName(void) const { return name; }
+    const char *getScope(void) const { return NULL; }
 };
 
 /****************** Template Support **************/
@@ -450,19 +450,19 @@ class TParamType : public TParam {
 
 /* A Value instantiation parameter */
 class TParamVal : public TParam {
-    char *val;
+    const char *val;
   public:
-    TParamVal(char *v) : val(v) {}
+    TParamVal(const char *v) : val(v) {}
     void print(XStr& str) { str << val; }
     void genSpec(XStr& str) { str << val; }
 };
 
 class Scope : public Construct {
   protected:
-    char* name_;
+    const char* name_;
     ConstructList* contents_;
   public:
-    Scope(char* name, ConstructList* contents) : contents_(contents), name_(name) {}
+    Scope(const char* name, ConstructList* contents) : contents_(contents), name_(name) {}
     virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {
         contents_->genPub(declstr, defstr, defconstr, connectPresent);
     }
@@ -512,10 +512,10 @@ class Scope : public Construct {
 
 class UsingScope : public Construct {
   protected:
-    char* name_;
+    const char* name_;
     bool symbol_;
   public:
-    UsingScope(char* name, bool symbol=false) : name_(name), symbol_(symbol) {}
+    UsingScope(const char* name, bool symbol=false) : name_(name), symbol_(symbol) {}
     virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
     virtual void genDecls(XStr& str) {
         str << "using ";
@@ -606,9 +606,9 @@ class TType : public TVar {
 /* a formal function argument */
 class TFunc : public TVar {
     FuncType *type;
-    char *init;
+    const char *init;
   public:
-    TFunc(FuncType *t, char *v=0) : type(t), init(v) {}
+    TFunc(FuncType *t, const char *v=0) : type(t), init(v) {}
     void print(XStr& str) { type->print(str); if(init) str << "=" << init; }
     void genLong(XStr& str){ type->print(str); if(init) str << "=" << init; }
     void genShort(XStr& str) {str << type->getBaseName(); }
@@ -617,10 +617,10 @@ class TFunc : public TVar {
 /* A formal variable argument */
 class TName : public TVar {
     Type *type;
-    char *name;
-    char *val;
+    const char *name;
+    const char *val;
   public:
-    TName(Type *t, char *n, char *v=0) : type(t), name(n), val(v) {}
+    TName(Type *t, const char *n, const char *v=0) : type(t), name(n), val(v) {}
     void print(XStr& str);
     void genLong(XStr& str);
     void genShort(XStr& str);
@@ -934,7 +934,7 @@ class Entry : public Member {
     int attribs;    
     Type *retType;
     Value *stacksize;
-    char *pythonDoc;
+    const char *pythonDoc;
     
     XStr proxyName(void) {return container->proxyName();}
     XStr indexName(void) {return container->indexName();}
@@ -997,7 +997,7 @@ class Entry : public Member {
     CEntry *entryPtr;
     XStr *label;
     char *name;
-    char *intExpr;
+    const char *intExpr;
     ParamList *param;
     ParamList *connectParam;
     int isConnect;
@@ -1019,7 +1019,7 @@ class Entry : public Member {
     int accel_dmaList_numWriteOnly;
     int accel_dmaList_scalarNeedsWrite;
 
-    Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, char *e=0, int connect=0, ParamList *connectPList =0);
+    Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz=0, SdagConstruct *sc =0, const char *e=0, int connect=0, ParamList *connectPList =0);
     void setChare(Chare *c);
     int isConnectEntry(void) { return isConnect; }
     int paramIsMarshalled(void) { return param->isMarshalled(); }
@@ -1103,7 +1103,7 @@ class AccelBlock : public Construct {
   void genDecls(XStr& str) { }
   void genDefs(XStr& str) { outputCode(str); }
   void genReg(XStr& str) { }
-  void preprocess(XStr& str) { }
+  void preprocess() { }
 
   /// Construct Accel Support Methods ///
   int genAccels_spe_c_funcBodies(XStr& str) { outputCode(str); return 0; }
@@ -1118,11 +1118,11 @@ class AccelBlock : public Construct {
 /****************** Modules, etc. ****************/
 class Module : public Construct {
     int _isMain;
-    char *name;
+    const char *name;
     
   public:
     ConstructList *clist;
-    Module(int l, char *n, ConstructList *c) : name(n), clist(c) { 
+    Module(int l, const char *n, ConstructList *c) : name(n), clist(c) {
 	    line = l;
 	    _isMain=0;
 	    if (clist!=NULL) clist->setModule(this);
@@ -1167,7 +1167,7 @@ class ModuleList : public Printable {
 class Readonly : public Member {
     int msg; // is it a readonly var(0) or msg(1) ?
     Type *type;
-    char *name;
+    const char *name;
     ValueList *dims;
     XStr qName(void) const { /*Return fully qualified name*/
       XStr ret;
@@ -1176,7 +1176,7 @@ class Readonly : public Member {
       return ret;
     }
   public:
-    Readonly(int l, Type *t, char *n, ValueList* d, int m=0) 
+    Readonly(int l, Type *t, const char *n, ValueList* d, int m=0)
 	    : msg(m), type(t), name(n)
             { line=l; dims=d; setChare(0); }
     void print(XStr& str);

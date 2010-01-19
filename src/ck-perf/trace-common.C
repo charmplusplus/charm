@@ -485,6 +485,11 @@ void traceMemoryUsage()
 #endif
 }
 
+extern "C"
+void tracePhaseEnd()
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->endPhase());
+}
 
 extern "C"
 void registerMachineUserEventsFunction(void (*eventRegistrationFunc)()) {

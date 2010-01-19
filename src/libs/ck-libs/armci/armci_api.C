@@ -143,8 +143,7 @@ CDECL int ARMCI_Acc(int datatype, void *scale, void* src, void* dst, int bytes, 
   return 0;
 }
 
-CDECL int ARMCI_NbAcc(int datatype, void *scale, void* src, void* dst, int bytes, int proc, 
-                  armci_hdl_t* ) {
+CDECL int ARMCI_NbAcc(int datatype, void *scale, void* src, void* dst, int bytes, int proc, armci_hdl_t* handle) {
   return 0;
 }
 
@@ -324,7 +323,7 @@ CDECL int ARMCI_AllFence(void) {
 
 // malloc is a collective operation. The user is expected to allocate
 // and manage ptr_arr.
-CDECL int ARMCI_Malloc(void *ptr_arr[], int bytes) {
+CDECL int ARMCI_Malloc(void *ptr_arr[], armci_size_t bytes) {
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
 //  pointer ptr = malloc(bytes);
   pointer ptr = vp->BlockMalloc(bytes);
@@ -343,7 +342,7 @@ CDECL int ARMCI_Free(void *address) {
   TCHARM_API_TRACE("ARMCI_Free", "armci");
   return 0;
 }
-CDECL void *ARMCI_Malloc_local(int bytes){
+CDECL void *ARMCI_Malloc_local(armci_size_t bytes){
   TCHARM_API_TRACE("ARMCI_Malloc_local", "armci");
   return malloc(bytes);
 }
@@ -385,6 +384,46 @@ CDECL int armci_notify_wait(int proc, int *pval){
   vp->notify_wait(proc);
   return 0;
 }
+
+/* ********************************* */
+/* Collective Operations             */
+CDECL void armci_msg_brdcst(void *buffer, int len, int root) {
+}
+
+CDECL void armci_msg_gop2(void *x, int n, int type, char *op) {
+}
+
+CDECL void armci_msg_barrier(void) {
+}
+
+CDECL void armci_msg_reduce(void *x, int n, char *op, int type) {
+}
+
+/* ******************************* */
+/* System Configuration            */
+CDECL int armci_domain_nprocs(armci_domain_t domain, int id) {
+  return -1;
+}
+
+CDECL int armci_domain_count(armci_domain_t domain) {
+  return -1;
+}
+
+CDECL int armci_domain_id(armci_domain_t domain, int glob_proc_id) {
+  return -1;
+}
+
+CDECL int armci_domain_glob_proc_id(armci_domain_t domain, int id, 
+				    int loc_proc_id) {
+  return -1;
+}
+
+CDECL int armci_domain_my_id(armci_domain_t domain) {
+  return -1;
+}
+
+/* ********************************** */
+/* Charm++ Runtime Support Extensions */
 
 CDECL void ARMCI_Migrate(void){
   TCHARM_API_TRACE("ARMCI_Migrate", "armci");

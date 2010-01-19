@@ -55,7 +55,9 @@
 /* Trace user supplied note (text string, with start, end times, and user event id)  */
 #define USER_SUPPLIED_BRACKETED_NOTE       29
 
-
+/* Support for Phases and time-partial logs */
+#define END_PHASE           30
+#define SURROGATE_BLOCK     31 /* inserted by cluster analysis only */
 
 #define  USER_EVENT_PAIR    100
 

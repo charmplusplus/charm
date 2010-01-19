@@ -507,7 +507,7 @@ void CmiBacktracePrint(void **retPtrs,int nLevels) {
           CmiPrintf("  [%d] Charm++ Runtime: %s (%s)\n",i,sys,print);
           break; /*Stop when we hit Charm++ runtime.*/
       } else {
-          CmiPrintf("  [%d] %s\n",i,print);
+          CmiPrintf("  [%d:%d] %s\n",CmiMyPe(),i,print);
       }
      }
     }

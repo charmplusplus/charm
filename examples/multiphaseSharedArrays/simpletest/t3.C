@@ -101,7 +101,7 @@ protected:
 
     unsigned int rows1, cols1, numWorkers;
 
-    void FillArray()
+    void FillArray(MSA2DRM::Write &w)
     {
         // fill in our portion of the array
         unsigned int rowStart, rowEnd;
@@ -110,15 +110,10 @@ protected:
         // fill them in with 1
         for(unsigned int r = rowStart; r < rowEnd; r++)
             for(unsigned int c = 0; c < cols1; c++)
-                arr1.set(r, c) = 1.0;
+                w.set(r, c) = 1.0;
     }
 
-    void SyncArrays()
-    {
-        arr1.sync();
-    }
-
-    void TestResults()
+    void TestResults(MSA2DRM::Read &rh)
     {
         int errors = 0;
 
@@ -128,9 +123,9 @@ protected:
             bool warnedRow=false;
             for(unsigned int c = 0; c < cols1; c++)
             {
-                if((!warnedRow) && notequal(arr1.get(r, c), 1.0))
+                if((!warnedRow) && notequal(rh.get(r, c), 1.0))
                 {
-                    ckout << "p" << CkMyPe() << "w" << thisIndex << " arr1 -- Illegal element at (" << r << "," << c << ") " << arr1.get(r,c) << endl;
+                    ckout << "p" << CkMyPe() << "w" << thisIndex << " arr1 -- Illegal element at (" << r << "," << c << ") " << rh.get(r,c) << endl;
                     errors++;
                     warnedRow=true;
                 }
@@ -162,15 +157,16 @@ public:
     void Start()
     {
         arr1.enroll(numWorkers); // barrier
-        FillArray();
-        SyncArrays();
-        TestResults();  // test before doing a reduction
+		MSA2DRM::Write &w = arr1.getInitialWrite();
+        FillArray(w);
+		MSA2DRM::Read &r = arr1.syncToRead(w);
+        TestResults(r);  // test before doing a reduction
         Contribute();
     }
 
     void Kontinue()
     {
-        TestResults();
+//        TestResults();
         Contribute();
     }
 };

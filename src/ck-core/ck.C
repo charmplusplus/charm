@@ -1859,9 +1859,9 @@ private:
     if (env->getEvent()) {
       bool wasPacked = env->isPacked();
       if (!wasPacked) CkPackMessage(&env);
-      //unsigned int crc = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
-      unsigned int crc1 = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
-      unsigned int crc2 = crc32(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
+      //unsigned int crc = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
+      unsigned int crc1 = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
+      unsigned int crc2 = crc32_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
       fprintf(f,"%d %d %d %hhd %x %x\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2);
       if (!wasPacked) CkUnpackMessage(&env);
     }
@@ -1918,9 +1918,9 @@ class CkMessageReplay : public CkMessageWatcher {
                 }
 		bool wasPacked = env->isPacked();
 		if (!wasPacked) CkPackMessage(&env);
-		//unsigned int crcnew = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
-		unsigned int crcnew1 = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
-		unsigned int crcnew2 = crc32(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
+		//unsigned int crcnew = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
+		unsigned int crcnew1 = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
+		unsigned int crcnew2 = crc32_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
 		if (crcnew1 != crc1) {
 		  CkPrintf("CkMessageReplay %d> Envelope CRC changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc1,crcnew1);
 		}
