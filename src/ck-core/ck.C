@@ -1895,6 +1895,10 @@ private:
 //#define REPLAYDEBUG(args) ckout<<"["<<CkMyPe()<<"] "<< args <<endl;
 #define REPLAYDEBUG(args) /* empty */
 
+extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
+  CkPrintf("[%d] Quiescence detected\n",CkMyPe());
+}
+
 class CkMessageReplay : public CkMessageWatcher {
   int counter;
 	int nextPE, nextSize, nextEvent, nexttype; //Properties of next message we need:
@@ -1959,6 +1963,7 @@ public:
 	  f=f_;
 	  getNext();
 	  REPLAYDEBUG("Constructing ckMessageReplay: "<< nextPE <<" "<< nextSize <<" "<<nextEvent);
+	  CQdRegisterCallback(CkMessageReplayQuiescence, this);
 	}
 	~CkMessageReplay() {fclose(f);}
 
