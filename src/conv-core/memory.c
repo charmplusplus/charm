@@ -57,6 +57,7 @@
 #include "converse.h"
 
 void * memory_stack_top; /*The higher end of the stack (approximation)*/
+int cpdInSystem=0;
 
 /*Choose the proper default configuration*/
 #if CMK_MEMORY_BUILD_DEFAULT
@@ -733,7 +734,6 @@ void CmiOutOfMemoryInit(void) {
   }
 }
 
-int cpdInSystem=0;
 #ifndef CMK_MEMORY_BUILD_CHARMDEBUG
 /* declare the cpd_memory routines */
 void CpdSetInitializeMemory(int v) { }
