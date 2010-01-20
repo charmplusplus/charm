@@ -812,6 +812,8 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeBocInitVec) = new PtrVec();
 	}
 
+	CkCallbackInit();
+	
 	CmiNodeAllBarrier();
 
 #if ! CMK_BLUEGENE_CHARM

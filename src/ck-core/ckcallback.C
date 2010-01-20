@@ -290,5 +290,11 @@ void CkDataMsg::check(void)
 		CkAbort("CkDataMsg corrupted-- bad tag.");
 }
 
+void CkCallbackInit() {
+  CpvInitialize(threadCB_t, threadCBs);
+  CpvInitialize(unsigned int, nextThreadCB);
+  CpvAccess(nextThreadCB)=1;
+}
+
 #include "CkCallback.def.h"
 
