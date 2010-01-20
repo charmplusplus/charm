@@ -16,6 +16,10 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 
 /*readonly*/ CProxy_ckcallback_group _ckcallbackgroup;
 
+typedef CkHashtableT<CkHashtableAdaptorT<unsigned int>, CkCallback*> threadCB_t;
+CpvStaticDeclare(threadCB_t, threadCBs);
+CpvStaticDeclare(unsigned int, nextThreadCB);
+
 //This main chare is only used to create the callback forwarding group
 class ckcallback_main : public CBase_ckcallback_main {
 public:
@@ -41,8 +45,15 @@ public:
 //Initialize the callback's thread fields before sending it off:
 void CkCallback::impl_thread_init(void)
 {
-	d.thread.onPE=CkMyPe();
-	d.thread.cb=this; //<- so we can find this structure later
+    int exist;
+    CkCallback **cb;
+    d.thread.onPE=CkMyPe();
+	do {
+	  if (CpvAccess(nextThreadCB)==0) CpvAccess(nextThreadCB)=1;
+	  d.thread.cb=CpvAccess(nextThreadCB)++;
+	  cb = &CpvAccess(threadCBs).put(d.thread.cb, &exist);
+	} while (exist==1);
+	*cb = this; //<- so we can find this structure later
 	d.thread.th=NULL; //<- thread isn't suspended yet
 	d.thread.ret=NULL;//<- no data to return yet
 }
@@ -57,12 +68,14 @@ void *CkCallback::impl_thread_delay(void) const
 	
 	//Find the original callback object:
 	CkCallback *dest=(CkCallback *)this;
-	if (d.thread.cb!=NULL) dest=d.thread.cb;
-	if (dest->d.thread.cb!=NULL) 
+	if (d.thread.cb!=0) dest=CpvAccess(threadCBs).get(d.thread.cb);
+	if (dest==0)
+	    CkAbort("Called thread_delay on an already deleted callback");
+	if (dest->d.thread.ret==NULL) 
 	{  //We need to sleep for the result:
 		dest->d.thread.th=CthSelf(); //<- so we know a thread is waiting
 		CthSuspend();
-		if (dest->d.thread.cb!=NULL) 
+		if (dest->d.thread.ret==NULL) 
 			CkAbort("thread resumed, but callback data is still empty");
 	}
 	return dest->d.thread.ret;
@@ -90,26 +103,26 @@ CkCallback::CkCallback(NodeGroup *p, int ep, CmiBool doInline)
 }
 
 CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp)
-		:type(bcastNodeGroup) 
+		:type(bcastNodeGroup)
 {
 	d.group.ep=ep; d.group.id=ngp.ckGetGroupID();
 }
 
 CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,CmiBool doInline)
-	:type(doInline?isendNodeGroup:sendNodeGroup) 
+	:type(doInline?isendNodeGroup:sendNodeGroup)
 {
 	d.group.ep=ep; d.group.id=ngp.ckGetGroupID(); d.group.onPE=onPE;
 }
 
 CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,CmiBool doInline) 
-	:type(doInline?isendGroup:sendGroup) 
+	:type(doInline?isendGroup:sendGroup)
 {
 	d.group.ep=ep; 
 	d.group.id=grpElt.ckGetGroupID(); 
 	d.group.onPE=grpElt.ckGetGroupPe();
 }
 CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline)
-	:type(doInline?isendArray:sendArray) 
+	:type(doInline?isendArray:sendArray)
 {
 	d.array.ep=ep; 
 	d.array.id=arrElt.ckGetArrayID(); 
@@ -117,7 +130,7 @@ CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doIn
 }
 
 CkCallback::CkCallback(ArrayElement *p, int ep,CmiBool doInline)
-	:type(doInline?isendArray:sendArray) 
+	:type(doInline?isendArray:sendArray)
 {
         d.array.ep=ep; 
 	d.array.id=p->ckGetArrayID(); 
@@ -145,11 +158,10 @@ void CkCallback::send(void *msg) const
 		break;
 	case resumeThread: //Resume a waiting thread
 		if (d.thread.onPE==CkMyPe()) {
-			CkCallback *dest=d.thread.cb;
-			if (dest==NULL)
+			CkCallback *dest=CpvAccess(threadCBs).get(d.thread.cb);
+			if (dest==0 || dest->d.thread.ret!=NULL)
 				CkAbort("Already sent a value to this callback!\n");
 			dest->d.thread.ret=msg; //<- return data
-			dest->d.thread.cb=NULL; //<- mark callback as finished
 			if (dest->d.thread.th!=NULL)
 				CthAwaken(dest->d.thread.th);
 		} 
@@ -228,6 +240,12 @@ void CkCallback::send(void *msg) const
 		CmiAbort("Called send on corrupted callback");
 		break;
 	};
+}
+
+void CkCallback::thread_destroy() const {
+  if (type==resumeThread && CpvAccess(threadCBs).get(d.thread.cb)==this) {
+    CpvAccess(threadCBs).remove(d.thread.cb);
+  }
 }
 
 

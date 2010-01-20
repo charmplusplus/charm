@@ -423,7 +423,7 @@ static inline void _handleProcData(PUP::er &p)
     // save mainchares into MainChares.dat
     if(CkMyPe()==0) CkPupMainChareData(p, (CkArgMsg*)NULL);
 	
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
     // save non-migratable chare
     CkPupChareData(p);
 #endif

@@ -319,7 +319,7 @@ private:
         void *log;
 #endif
 	CkReduction::reducerType reducer;
-	contributorInfo *ci;//Source contributor, or NULL if none
+	//contributorInfo *ci;//Source contributor, or NULL if none
 	int redNo;//The serial number of this reduction
 	int gcount;//Contribution to the global contributor count
         // for section multicast/reduction library

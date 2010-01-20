@@ -119,7 +119,7 @@ CkpvStaticDeclare(int,  _numInitsRecd); /* UInt changed to int */
 CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
 CpvExtern(CkVec<void *>, chare_objs);
 CpvExtern(CkVec<VidBlock *>, vidblocks);
 #endif
@@ -710,7 +710,7 @@ void InitCallTable::enumerateInitCalls()
   for (i=0; i<initProcCalls.length(); i++) initProcCalls[i]();
 }
 
-CpvCExtern(int, cmiArgDebugFlag);
+CpvCExtern(int, cpdSuspendStartup);
 extern "C" void CpdFreeze(void);
 
 extern int _dummy_dq;
@@ -771,7 +771,7 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 	CpvInitialize(int,serializer);
 
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
           /* chare and vidblock table */
         CpvInitialize(CkVec<void *>, chare_objs);
         CpvInitialize(CkVec<VidBlock *>, vidblocks);
@@ -851,6 +851,8 @@ void _initCharm(int unused_argc, char **argv)
         traceCharmInit(argv);
 #endif
  	
+    CkpvInitialize(int, envelopeEventID);
+    CkpvAccess(envelopeEventID) = 0;
 	CkMessageWatcherInit(argv,CkpvAccess(_coreState));
 	
 	/**
@@ -1094,7 +1096,7 @@ void _initCharm(int unused_argc, char **argv)
         }
 
 #if CMK_CCS_AVAILABLE
-       if (CpvAccess(cmiArgDebugFlag))
+       if (CpvAccess(cpdSuspendStartup))
        { 
           //CmiPrintf("In Parallel Debugging mode .....\n");
           CpdFreeze();

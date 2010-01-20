@@ -63,7 +63,7 @@ class VidBlock {
       return NULL;
     }
     void pup(PUP::er &p) {
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
       int s;
       if (!p.isUnpacking()) s = state-FILLED;
       p|s;

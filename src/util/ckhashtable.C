@@ -174,7 +174,7 @@ void CkHashtable::empty(void)
 //Add the given object to this table under the given key
 // Returns pointer to object storage.
 // Table will be resized if needed.
-void *CkHashtable::put(const void *key)
+void *CkHashtable::put(const void *key, int *existing)
 {
 	DEBUGF(("Putting key\n"))
 #if 0
@@ -192,6 +192,9 @@ void *CkHashtable::put(const void *key)
 		nObj++;
 		copyKey(layout.getKey(ent),key);
 		layout.fill(ent);
+		if (existing != NULL) *existing = 0;
+	} else {
+	  if (existing != NULL) *existing = 1;
 	}
 	return layout.getObject(ent);
 }
