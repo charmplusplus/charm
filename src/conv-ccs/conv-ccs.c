@@ -503,7 +503,7 @@ void CcsInit(char **argv)
   _ccsHandlerIdx = CmiRegisterHandler((CmiHandler)req_fw_handler);
   CpvInitialize(int, cmiArgDebugFlag);
   CpvInitialize(char *, displayArgument);
-  CpvInitialize(int, cpdSuspendStart);
+  CpvInitialize(int, cpdSuspendStartup);
   CpvAccess(cmiArgDebugFlag) = 0;
   CpvAccess(displayArgument) = NULL;
   CpvAccess(cpdSuspendStartup) = 0;
