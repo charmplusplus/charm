@@ -616,10 +616,6 @@ host_alias
 target_alias
 base_version
 SYNC
-WGET
-LYNX
-TELNET
-UUDECODE
 LIBOBJS
 LTLIBOBJS'
 ac_subst_files=''
@@ -3392,232 +3388,21 @@ echo "${ECHO_T}\"$ext\"" >&6; }
   /bin/rm -f conftest.f90
 fi
 
-### go get libpthread.a from charm website ###
+### Check that Linux's C library is recent enough to provide working pthreads
 if test "$base_version" = "net-linux" || test "$base_version" = "mpi-linux"
 then
-case $version in
-*linux*smp*|*linux*vmi*)
-  if test ! -r ../lib/libpthread.a
-  then
-    # Extract the first word of "wget", so it can be a program name with args.
-set dummy wget; ac_word=$2
-{ echo "$as_me:$LINENO: checking for $ac_word" >&5
-echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6; }
-if test "${ac_cv_prog_WGET+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  if test -n "$WGET"; then
-  ac_cv_prog_WGET="$WGET" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_WGET="wget "
-    echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-WGET=$ac_cv_prog_WGET
-if test -n "$WGET"; then
-  { echo "$as_me:$LINENO: result: $WGET" >&5
-echo "${ECHO_T}$WGET" >&6; }
-else
-  { echo "$as_me:$LINENO: result: no" >&5
-echo "${ECHO_T}no" >&6; }
-fi
-
-
-    # Extract the first word of "lynx", so it can be a program name with args.
-set dummy lynx; ac_word=$2
-{ echo "$as_me:$LINENO: checking for $ac_word" >&5
-echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6; }
-if test "${ac_cv_prog_LYNX+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  if test -n "$LYNX"; then
-  ac_cv_prog_LYNX="$LYNX" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_LYNX="lynx "
-    echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-LYNX=$ac_cv_prog_LYNX
-if test -n "$LYNX"; then
-  { echo "$as_me:$LINENO: result: $LYNX" >&5
-echo "${ECHO_T}$LYNX" >&6; }
-else
-  { echo "$as_me:$LINENO: result: no" >&5
-echo "${ECHO_T}no" >&6; }
-fi
-
-
-    # Extract the first word of "telnet", so it can be a program name with args.
-set dummy telnet; ac_word=$2
-{ echo "$as_me:$LINENO: checking for $ac_word" >&5
-echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6; }
-if test "${ac_cv_prog_TELNET+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  if test -n "$TELNET"; then
-  ac_cv_prog_TELNET="$TELNET" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_TELNET="telnet "
-    echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-TELNET=$ac_cv_prog_TELNET
-if test -n "$TELNET"; then
-  { echo "$as_me:$LINENO: result: $TELNET" >&5
-echo "${ECHO_T}$TELNET" >&6; }
-else
-  { echo "$as_me:$LINENO: result: no" >&5
-echo "${ECHO_T}no" >&6; }
-fi
-
-
-    # Extract the first word of "uudecode", so it can be a program name with args.
-set dummy uudecode; ac_word=$2
-{ echo "$as_me:$LINENO: checking for $ac_word" >&5
-echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6; }
-if test "${ac_cv_prog_UUDECODE+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  if test -n "$UUDECODE"; then
-  ac_cv_prog_UUDECODE="$UUDECODE" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_UUDECODE="uudecode "
-    echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-fi
-fi
-UUDECODE=$ac_cv_prog_UUDECODE
-if test -n "$UUDECODE"; then
-  { echo "$as_me:$LINENO: result: $UUDECODE" >&5
-echo "${ECHO_T}$UUDECODE" >&6; }
-else
-  { echo "$as_me:$LINENO: result: no" >&5
-echo "${ECHO_T}no" >&6; }
-fi
-
-
-
-    CHARMIP='128.174.241.81'
-#    CHARMIP='charm.cs.uiuc.edu'
-#    VERSION=`nm /lib/libc.so.6 | grep "A GLIBC_" | tail -1 | sed -e "s/00000000 A GLIBC_//g"`
+case $version in *linux*smp*|*linux*vmi*)
     { echo "$as_me:$LINENO: checking glibc version" >&5
 echo $ECHO_N "checking glibc version... $ECHO_C" >&6; }
     get_glibc_version
     { echo "$as_me:$LINENO: result: $GLIBCVERSION" >&5
 echo "${ECHO_T}$GLIBCVERSION" >&6; }
-    if test 1 = `expr $GLIBCVERSION \> 2.2.92`
+    if test 0 = `expr $GLIBCVERSION \> 2.2.92`
     then
-      cat >> ./conv-mach-opt.h << EOT
-#undef CMK_LINUX_PTHREAD_HACK
-EOT
-    else
-      L="libpthread-$GLIBCVERSION.a"
-      LSO="libpthread-$GLIBCVERSION.so"
-      URL="http://${CHARMIP}/distrib/$L"
-      URLSO="http://${CHARMIP}/distrib/$LSO"
-      finish=0
-      printf "getting $L from $URL ..."
-      if test -n "$WGET"
-      then
-        printf "(wget) ..."
-        $WGET $URL > /dev/null 2>&1  && mv $L ../lib && finish=1
-        $WGET $URLSO > /dev/null 2>&1  && mv $LSO ../lib_so
-      fi
-      if test $finish = 0 && test -n "$LYNX"
-      then
-        printf "(lynx) ..."
-        $LYNX -source $URL > $L 2>/dev/null
-        if file -L $L | grep 'archive' > /dev/null
-        then
-          mv $L ../lib && finish=1
-        fi
-        $LYNX -source $URLSO > $L 2>/dev/null
-      fi
-      if test $finish = 0 && test -n "$TELNET" && test -n "$UUDECODE"
-      then
-        printf "(telnet) ..."
-        cat > get_libpthread <<EOT
-#! /bin/sh
-echo "GET /distrib/libpthread-$GLIBCVERSION.uu 1.0"
-echo
-# exit normally when the telnet session closes.
-trap "exit 0" 13
-while : ; do
- echo
- sleep 1
-done
-EOT
-        /bin/sh ./get_libpthread | ($TELNET $CHARMIP 80 > .uulib 2>/dev/null); $UUDECODE .uulib 2>/dev/null && rm -f .uulib && mv $L ../lib && finish=1
-      fi
-      ln -s $L ../lib/libpthread.a
-      ln -s $LSO ../lib_so/libpthread.so
-      if test $finish = 0 || test ! -r ../lib/libpthread.a
-      then
-        /bin/rm -f ../lib/libpthread.a
-        echo "failed"
-        echo "#####################################################################"
-        echo "wget, lynx or telnet must be installed to get libpthread.a from charm website."
-        echo "Alternately, your version of GLIBC ($GLIBCVERSION) is not yet supported--"
-        echo " contact ppl@cs.uiuc.edu for assistance."
-        echo "#####################################################################"
-        exit 1
-      else
-        echo "done"
-      fi
+       echo "Your version of GLIBC is ancient, and does not have sufficient "
+       echo "support for pthreads."
+       exit 1
     fi
-  fi
-  ;;
 esac
 fi
 
@@ -4286,15 +4071,11 @@ host_alias!$host_alias$ac_delim
 target_alias!$target_alias$ac_delim
 base_version!$base_version$ac_delim
 SYNC!$SYNC$ac_delim
-WGET!$WGET$ac_delim
-LYNX!$LYNX$ac_delim
-TELNET!$TELNET$ac_delim
-UUDECODE!$UUDECODE$ac_delim
 LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 45; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 41; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5
