@@ -190,8 +190,10 @@ public:
  * Send this data, formatted as a CkDataMsg, back to the caller.
  */
 	void send(int length,const void *data) const;
+	
+	void pup(PUP::er &p);
 };
-PUPbytes(CkCallback) //FIXME: write a real pup routine
+//PUPbytes(CkCallback) //FIXME: write a real pup routine
 
 /**
  * Convenience class: a thread-suspending callback.  

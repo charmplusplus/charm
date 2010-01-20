@@ -242,6 +242,56 @@ void CkCallback::send(void *msg) const
 	};
 }
 
+void CkCallback::pup(PUP::er &p) {
+  //p((char*)this, sizeof(CkCallback));
+  int t = (int)type;
+  p|t;
+  type = (callbackType)t;
+  switch (type) {
+  case resumeThread:
+    p|d.thread.onPE;
+    p|d.thread.cb;
+    break;
+  case isendChare:
+  case sendChare:
+    p|d.chare.ep;
+    p|d.chare.id;
+    break;
+  case isendGroup:
+  case sendGroup:
+  case isendNodeGroup:
+  case sendNodeGroup:
+    p|d.group.onPE;
+  case bcastNodeGroup:
+  case bcastGroup:
+    p|d.group.ep;
+    p|d.group.id;
+    break;
+  case isendArray:
+  case sendArray:
+    p|d.array.idx;
+  case bcastArray:
+    p|d.array.ep;
+    p|d.array.id;
+    break;
+  case replyCCS:
+    p((char*)&d.ccsReply.reply, sizeof(d.ccsReply.reply));
+    break;
+  case call1Fn:
+    p((char*)&d.c1fn, sizeof(d.c1fn));
+    break;
+  case callCFn:
+    p((char*)&d.cfn, sizeof(d.cfn));
+    break;
+  case ignore:
+  case ckExit:
+  case invalid:
+    break;
+  default:
+    CkAbort("Inconsistent CkCallback type");
+  }
+}
+
 void CkCallback::thread_destroy() const {
   if (type==resumeThread && CpvAccess(threadCBs).get(d.thread.cb)==this) {
     CpvAccess(threadCBs).remove(d.thread.cb);
