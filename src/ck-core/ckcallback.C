@@ -85,54 +85,70 @@ void *CkCallback::impl_thread_delay(void) const
 /*These can't be defined in the .h file like the other constructors
  * because we need CkCallback before CProxyElement* are defined.
  */
-CkCallback::CkCallback(Chare *p, int ep, CmiBool doInline)
-		:type(doInline?isendChare:sendChare)
-{
+CkCallback::CkCallback(Chare *p, int ep, CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=doInline?isendChare:sendChare;
 	d.chare.ep=ep; 
 	d.chare.id=p->ckGetChareID();
 }
-CkCallback::CkCallback(Group *p, int ep, CmiBool doInline)
-		:type(doInline?isendGroup:sendGroup)
-{
+CkCallback::CkCallback(Group *p, int ep, CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=doInline?isendGroup:sendGroup;
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyPe();
 }
-CkCallback::CkCallback(NodeGroup *p, int ep, CmiBool doInline)
-		:type(doInline?isendNodeGroup:sendNodeGroup)
-{
+CkCallback::CkCallback(NodeGroup *p, int ep, CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=doInline?isendNodeGroup:sendNodeGroup;
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyNode();
 }
 
-CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp)
-		:type(bcastNodeGroup)
-{
+CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=bcastNodeGroup;
 	d.group.ep=ep; d.group.id=ngp.ckGetGroupID();
 }
 
-CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,CmiBool doInline)
-	:type(doInline?isendNodeGroup:sendNodeGroup)
-{
+CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=doInline?isendNodeGroup:sendNodeGroup;
 	d.group.ep=ep; d.group.id=ngp.ckGetGroupID(); d.group.onPE=onPE;
 }
 
-CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,CmiBool doInline) 
-	:type(doInline?isendGroup:sendGroup)
-{
+CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=doInline?isendGroup:sendGroup;
 	d.group.ep=ep; 
 	d.group.id=grpElt.ckGetGroupID(); 
 	d.group.onPE=grpElt.ckGetGroupPe();
 }
-CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline)
-	:type(doInline?isendArray:sendArray)
-{
+CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=doInline?isendArray:sendArray;
 	d.array.ep=ep; 
 	d.array.id=arrElt.ckGetArrayID(); 
 	d.array.idx.asMax()=arrElt.ckGetIndex();
 }
 
-CkCallback::CkCallback(ArrayElement *p, int ep,CmiBool doInline)
-	:type(doInline?isendArray:sendArray)
-{
-        d.array.ep=ep; 
+CkCallback::CkCallback(ArrayElement *p, int ep,CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=doInline?isendArray:sendArray;
+    d.array.ep=ep; 
 	d.array.id=p->ckGetArrayID(); 
 	d.array.idx.asMax()=p->ckGetArrayIndex();
 }
