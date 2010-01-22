@@ -358,6 +358,7 @@ void CpdNotify(int type, ...) {
   void *ptr; int integer, i;
   int levels=64;
   void *stackPtrs[64];
+  void *sl;
   va_list list;
   va_start(list, type);
   switch (type) {
@@ -377,7 +378,7 @@ void CpdNotify(int type, ...) {
     ptr = va_arg(list, void*);
     integer = va_arg(list, int);
     CmiPrintf("CPD: %d Cross %p %d ",CmiMyPe(), ptr, integer);
-    void *sl = MemoryToSlot(ptr);
+    sl = MemoryToSlot(ptr);
     if (sl != NULL) {
       int stackLen; void **stackTrace;
       stackLen = Slot_StackTrace(sl, &stackTrace);
