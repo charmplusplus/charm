@@ -55,7 +55,7 @@ void CkCallback::impl_thread_init(void)
 	} while (exist==1);
 	*cb = this; //<- so we can find this structure later
 	d.thread.th=NULL; //<- thread isn't suspended yet
-	d.thread.ret=NULL;//<- no data to return yet
+	d.thread.ret=(void*)-1;//<- no data to return yet
 }
 
 //Actually suspend this thread
@@ -71,11 +71,11 @@ void *CkCallback::impl_thread_delay(void) const
 	if (d.thread.cb!=0) dest=CpvAccess(threadCBs).get(d.thread.cb);
 	if (dest==0)
 	    CkAbort("Called thread_delay on an already deleted callback");
-	if (dest->d.thread.ret==NULL) 
+	if (dest->d.thread.ret==(void*)-1) 
 	{  //We need to sleep for the result:
 		dest->d.thread.th=CthSelf(); //<- so we know a thread is waiting
 		CthSuspend();
-		if (dest->d.thread.ret==NULL) 
+		if (dest->d.thread.ret==(void*)-1) 
 			CkAbort("thread resumed, but callback data is still empty");
 	}
 	return dest->d.thread.ret;
@@ -175,7 +175,7 @@ void CkCallback::send(void *msg) const
 	case resumeThread: //Resume a waiting thread
 		if (d.thread.onPE==CkMyPe()) {
 			CkCallback *dest=CpvAccess(threadCBs).get(d.thread.cb);
-			if (dest==0 || dest->d.thread.ret!=NULL)
+			if (dest==0 || dest->d.thread.ret!=(void*)-1)
 				CkAbort("Already sent a value to this callback!\n");
 			dest->d.thread.ret=msg; //<- return data
 			if (dest->d.thread.th!=NULL)
