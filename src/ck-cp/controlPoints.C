@@ -40,6 +40,13 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ bool shouldGatherAll;
 
 
+
+/// The control point values to be used for the first few phases if the strategy doesn't choose to do something else.
+/// These probably come from the command line arguments, so are available only on PE 0
+std::map<std::string, int> defaultControlPointValues;
+
+
+
 typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware}  tuningScheme;
 
 
@@ -909,8 +916,8 @@ public:
     int usec = (int)((time - (double)sec)*1000000.0);
     random_seed =  sec ^ usec;
 #endif
-
-
+    
+    
     double period;
     bool haveSamplePeriod = CmiGetArgDoubleDesc(args->argv,"+CPSamplePeriod", &period,"The time between Control Point Framework samples (in seconds)");
     if(haveSamplePeriod){
@@ -919,9 +926,9 @@ public:
     } else {
       controlPointSamplePeriod =  DEFAULT_CONTROL_POINT_SAMPLE_PERIOD;
     }
-
-
-
+    
+    
+    
     whichTuningScheme = RandomSelection;
 
 
@@ -941,6 +948,34 @@ public:
       whichTuningScheme = MemoryAware;
     }
 
+    char *defValStr = NULL;
+    if( CmiGetArgStringDesc(args->argv, "+CPDefaultValues", &defValStr, "Specify the default control point values used for the first couple phases") ){
+      CkPrintf("You specified default value string: %s\n", defValStr);
+      
+      // Parse the string, looking for commas
+     
+
+      char *tok = strtok(defValStr, ",");
+      while (tok) {
+	// split on the equal sign
+	int len = strlen(tok);
+	char *eqsign = strchr(tok, '=');
+	if(eqsign != NULL && eqsign != tok){
+	  *eqsign = '\0';
+	  char *cpname = tok;
+	  std::string cpName(tok);
+	  char *cpDefVal = eqsign+1;	  
+	  int v=-1;
+	  if(sscanf(cpDefVal, "%d", &v) == 1){
+	    CkPrintf("Command Line Argument Specifies that Control Point \"%s\" defaults to %d\n", cpname, v);
+	    CkAssert(CkMyPe() == 0); // can only access defaultControlPointValues on PE 0
+	    defaultControlPointValues[cpName] = v;
+	  }
+	}
+	tok = strtok(NULL, ",");
+      }
+
+    }
 
     shouldGatherAll = false;
     shouldGatherMemoryUsage = false;
@@ -966,6 +1001,7 @@ public:
     if( CmiGetArgFlagDesc(args->argv,"+CPLoadData","Load Control Point timings & configurations at startup") ){
       loadDataFileAtStartup = true;
     }
+
 
     controlPointManagerProxy = CProxy_controlPointManager::ckNew();
   }
@@ -1391,9 +1427,17 @@ int controlPoint(const char *name, int lb, int ub){
   
 
   if( phase_id < 4 ){
-    // For the first few phases, just use the lower bound. 
-    // This ensures that the ranges for all the control points known before we do anything fancy
+    // For the first few phases, just use the lower bound, or the default if one was provided 
+    // This ensures that the ranges for all the control points are known before we do anything fancy
     result = lb;
+
+
+    if(defaultControlPointValues.count(std::string(name)) > 0){
+      int v = defaultControlPointValues[std::string(name)];
+      CkPrintf("Startup phase using default value of %d for  \"%s\"\n", v, name);   
+      result = v;
+    }
+
   } else if(controlPointSpace.count(std::string(name)) == 0){
     // if this is the first time we've seen the CP, then return the lower bound
     result = lb;
