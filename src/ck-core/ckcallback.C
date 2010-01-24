@@ -314,6 +314,12 @@ void CkCallback::thread_destroy() const {
   }
 }
 
+CkCallbackResumeThread::~CkCallbackResumeThread() {
+  void * res = thread_delay(); //<- block thread here if it hasn't already
+  if (result != NULL) *result = res;
+  else CkFreeMsg(res);
+  thread_destroy();
+}
 
 /****** Callback-from-CCS ******/
 

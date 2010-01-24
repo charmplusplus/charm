@@ -254,12 +254,7 @@ class CkCallbackResumeThread : public CkCallback {
 		:CkCallback(resumeThread) { result = NULL; }
 	CkCallbackResumeThread(void * &ptr)
 	    :CkCallback(resumeThread) { result = &ptr; }
-	~CkCallbackResumeThread(void) {
-	    void * res = thread_delay(); //<- block thread here if it hasn't already
-	    if (result != NULL) *result = res;
-	    else CkFreeMsg(res);
-	    thread_destroy();
-	}
+        ~CkCallbackResumeThread(void);
 };
 
 void _registerCkCallback(void); //used by init
