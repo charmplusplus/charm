@@ -5,8 +5,6 @@
 */
 
 /** 
-    A system for exposing application and runtime "control points" 
-    to the dynamic optimization framework.
 
     @addtogroup CriticalPathFramework
     @{

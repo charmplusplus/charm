@@ -76,6 +76,12 @@ void enableTraceLogOutput()
   CkpvAccess(_trace)->setWriteData(true);
 }
 
+/// Force the log files to be flushed
+void flushTraceLog()
+{
+  CkpvAccess(_trace)->traceFlushLog();
+}
+
 #ifdef CMK_OPTIMIZE
 static int warned=0;
 #define OPTIMIZED_VERSION 	\
@@ -673,8 +679,25 @@ void LogPool::addUserSuppliedNote(char *note){
 void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et){
   //CkPrintf("LogPool::addUserSuppliedBracketedNote eventID=%d\n", eventID);
 #ifndef CMK_BLUEGENE_CHARM
+#if CMK_SMP_TRACE_COMMTHREAD && MPI_SMP_TRACE_COMMTHREAD_HACK
+  //This part of code is used  to combine the contiguous
+  //MPI_Test and MPI_Iprobe events to reduce the number of
+  //entries
+#define MPI_TEST_EVENT_ID 60
+#define MPI_IPROBE_EVENT_ID 70 
+  int lastEvent = pool[numEntries-1].event;
+  if((eventID==MPI_TEST_EVENT_ID || eventID==MPI_IPROBE_EVENT_ID) && (eventID==lastEvent)){
+    //just replace the endtime of last event
+    //CkPrintf("addUserSuppliedBracketNote: for event %d\n", lastEvent);
+    pool[numEntries].endTime = et;
+  }else{
+    new (&pool[numEntries++])
+      LogEntry(bt, et, USER_SUPPLIED_BRACKETED_NOTE, note, eventID);
+  }
+#else
   new (&pool[numEntries++])
-	LogEntry(bt, et, USER_SUPPLIED_BRACKETED_NOTE, note, eventID);
+    LogEntry(bt, et, USER_SUPPLIED_BRACKETED_NOTE, note, eventID);
+#endif
   if(poolSize == numEntries){
     flushLogBuffer();
   }
@@ -1098,6 +1121,19 @@ void TraceProjections::closeTrace() {
   }
   delete _logPool;	 // will write logs to file
 }
+
+#if CMK_SMP_TRACE_COMMTHREAD
+void TraceProjections::traceBeginOnCommThread()
+{
+  if (!computationStarted) return;
+  _logPool->add(BEGIN_TRACE, 0, 0, TraceTimer(), curevent++, CmiNumPes()+CmiMyNode());
+}
+
+void TraceProjections::traceEndOnCommThread()
+{
+  _logPool->add(END_TRACE, 0, 0, TraceTimer(), curevent++, CmiNumPes()+CmiMyNode());
+}
+#endif
 
 void TraceProjections::traceBegin(void)
 {

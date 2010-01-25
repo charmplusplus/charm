@@ -101,6 +101,17 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
  	}
 
 	char fileName[1024];
+
+#ifndef CMK_CHARE_USE_PTR
+	// save groups into Chares.dat
+	sprintf(fileName,"%s/Chares_%d.dat",dirname,CkMyPe());
+	FILE* fChares = fopen(fileName,"wb");
+	if(!fChares) CkAbort("Failed to create checkpoint file for chares!");
+	PUP::toDisk pChares(fChares);
+	CkPupChareData(pChares);
+	fclose(fChares);
+#endif
+
 	// save groups into Groups.dat
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
 	sprintf(fileName,"%s/Groups_%d.dat",dirname,CkMyPe());
@@ -192,7 +203,7 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 		bdcastRO();
 }
 
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
 
 CpvExtern(CkVec<void *>, chare_objs);
 CpvExtern(CkVec<VidBlock *>, vidblocks);
@@ -452,7 +463,7 @@ static void checkpointOne(const char* dirname, CkCallback& cb){
 	int _numPes = CkNumPes();
 	pRO|_numPes;
 	CkPupROData(pRO);
-	pRO((char *)&cb, sizeof(cb));
+	pRO|cb;
 	fclose(fRO);
 
 	// save mainchares into MainChares.dat
@@ -542,6 +553,19 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 		//bdcastRO(); // moved to CkPupMainChareData()
 	}
 	
+#ifndef CMK_CHARE_USE_PTR
+	// restore chares
+	if(CkNumPes() != _numPes)
+		CmiAbort("Can not restart from an application with plain Chares on a different number of processors!");
+	else
+		sprintf(filename,"%s/Chares_%d.dat",dirname,CkMyPe());
+	FILE* fChares = fopen(filename,"rb");
+	if(!fChares) CkAbort("Failed to open checkpoint file for chares!");
+	PUP::fromDisk pChares(fChares);
+	CkPupChareData(pChares);
+	fclose(fChares);
+#endif
+
 	// restore groups
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
 	// restore from PE0's copy if shrink/expand

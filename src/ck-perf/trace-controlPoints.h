@@ -23,13 +23,14 @@
  *  Only the more common hooks are listened to in this module.
  */
 class TraceControlPoints : public Trace {
- public:
+ private:
 
   double lastBeginExecuteTime;
   int lastbeginMessageSize;
 
   /** The amount of time spent executing entry methods */
   double totalEntryMethodTime;
+
 
   /** The start of the idle region */
   double lastBeginIdle;
@@ -39,6 +40,11 @@ class TraceControlPoints : public Trace {
   
   /** The time we last rest the idle/entry totals */
   double lastResetTime;
+
+  /** The highest seen memory usage */
+  double memUsage;
+
+  
 
  public:
   TraceControlPoints(char **argv);
@@ -86,18 +92,33 @@ class TraceControlPoints : public Trace {
   void traceClose();
 
 
-
-
   // ==================================================================
   // The following methods are not required for a tracing module
 
   /** reset the idle time and entry method execution time accumulators */
   void resetTimings();
 
-  /** What fraction of the time is spent idle */
+  /** Reset the idle, overhead, and memory measurements */
+  void resetAll();
+
+  /** Fraction of the time spent idle */
   double idleRatio(){
-    return (totalIdleTime) / (CmiWallTimer() - lastResetTime);
+    double t = CmiWallTimer() - lastResetTime;
+    return (totalIdleTime) / t;
   }
+
+  /** Fraction of time spent as overhead */
+  double overheadRatio(){
+    double t = CmiWallTimer() - lastResetTime;
+    return (t - totalIdleTime - totalEntryMethodTime) / t;
+  }
+
+  /** Highest memory usage (in MB) value we've seen since last time */
+  double memoryUsageMB(){
+    return ((double)memUsage) / 1024.0 / 1024.0;
+  }
+
+
 
 };
 

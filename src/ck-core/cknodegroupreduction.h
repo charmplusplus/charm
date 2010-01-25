@@ -134,7 +134,9 @@ public:
 	CProxy_CkNodeReductionMgr thisProxy;
 public:
 	CkNodeReductionMgr(void);
-	CkNodeReductionMgr(CkMigrateMessage *m) : IrrGroup(m) {}
+	CkNodeReductionMgr(CkMigrateMessage *m) : IrrGroup(m) {
+          storedCallback = NULL;
+        }
 
 	typedef CkReductionClientFn clientFn;
 

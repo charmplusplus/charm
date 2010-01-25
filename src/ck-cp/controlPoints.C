@@ -9,11 +9,11 @@
 #include "cp_effects.h"
 
 
-/**
- *  \addtogroup ControlPointFramework
- *   @{
- *
- */
+//  A framework for tuning "control points" exposed by an application. Tuning decisions are based upon observed performance measurements.
+ 
+
+/** @defgroup ControlPointFramework Automatic Performance Tuning and Steering Framework  */
+/**  @{ */
 
 using namespace std;
 
@@ -21,7 +21,6 @@ using namespace std;
 #define NUM_SAMPLES_BEFORE_TRANSISTION 5
 #define OPTIMIZER_TRANSITION 5
 
-#define WRITEDATAFILE 1
 
 //#undef DEBUGPRINT
 //#define DEBUGPRINT 4
@@ -36,14 +35,57 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ int whichTuningScheme;
 /* readonly */ bool writeDataFileAtShutdown;
 /* readonly */ bool loadDataFileAtStartup;
+/* readonly */ bool shouldGatherMemoryUsage;
+/* readonly */ bool shouldGatherUtilization;
+/* readonly */ bool shouldGatherAll;
 
 
-typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming}  tuningScheme;
+
+/// The control point values to be used for the first few phases if the strategy doesn't choose to do something else.
+/// These probably come from the command line arguments, so are available only on PE 0
+std::map<std::string, int> defaultControlPointValues;
 
 
-/// A reduction type that combines idle time statistics (min/max/avg etc.)
+
+typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware}  tuningScheme;
+
+
+
+void printTuningScheme(){
+  switch(whichTuningScheme){
+  case RandomSelection:
+    CkPrintf("Tuning Scheme: RandomSelection\n");
+    break;
+  case SimulatedAnnealing:
+    CkPrintf("Tuning Scheme: SimulatedAnnealing\n");
+    break;
+  case ExhaustiveSearch:
+    CkPrintf("Tuning Scheme: ExhaustiveSearch\n");
+    break;
+  case CriticalPathAutoPrioritization:
+    CkPrintf("Tuning Scheme: CriticalPathAutoPrioritization\n");
+    break;
+  case UseBestKnownTiming:
+    CkPrintf("Tuning Scheme: UseBestKnownTiming\n");
+    break;
+  case UseSteering:
+    CkPrintf("Tuning Scheme: UseSteering\n");
+    break;
+  case MemoryAware:
+    CkPrintf("Tuning Scheme: MemoryAware\n");
+    break;
+  default:
+    CkPrintf("Unknown tuning scheme\n");
+    break;
+  }
+  fflush(stdout);
+}
+
+
+
+/// A reduction type that combines idle time measurements (min/sum/max etc.)
 CkReduction::reducerType idleTimeReductionType;
-/// A reducer that combines idle time statistics (min/max/avg etc.)
+/// A reducer that combines idle time measurements (min/sum/max etc.)
 CkReductionMsg *idleTimeReduction(int nMsg,CkReductionMsg **msgs){
   double ret[3];
   if(nMsg > 0){
@@ -62,12 +104,48 @@ CkReductionMsg *idleTimeReduction(int nMsg,CkReductionMsg **msgs){
   }  
   return CkReductionMsg::buildNew(3*sizeof(double),ret);   
 }
-/// An initcall that registers the idle time reducer idleTimeReduction()
-/*initproc*/ void registerIdleTimeReduction(void) {
-  idleTimeReductionType=CkReduction::addReducer(idleTimeReduction);
+
+
+
+/// A reduction type that combines idle, overhead, and memory measurements
+CkReduction::reducerType allMeasuresReductionType;
+/// A reducer that combines idle, overhead, and memory measurements
+CkReductionMsg *allMeasuresReduction(int nMsg,CkReductionMsg **msgs){
+  double ret[7];
+  if(nMsg > 0){
+    CkAssert(msgs[0]->getSize()==7*sizeof(double));
+    double *m=(double *)msgs[0]->getData();
+    ret[0]=m[0];
+    ret[1]=m[1];
+    ret[2]=m[2];
+    ret[3]=m[3];
+    ret[4]=m[4];
+    ret[5]=m[5];
+    ret[6]=m[6];
+  }
+  for (int i=1;i<nMsg;i++) {
+    CkAssert(msgs[i]->getSize()==7*sizeof(double));
+    double *m=(double *)msgs[i]->getData();
+    // idle time (min/sum/max)
+    ret[0]=min(ret[0],m[0]);
+    ret[1]+=m[1];
+    ret[2]=max(ret[2],m[2]);
+    // overhead time (min/sum/max)
+    ret[3]=min(ret[3],m[3]);
+    ret[4]+=m[4];
+    ret[5]=max(ret[5],m[5]);
+    // mem usage (max)
+    ret[6]=max(ret[6],m[6]);
+  }  
+  return CkReductionMsg::buildNew(7*sizeof(double),ret);   
 }
 
 
+/// Registers the control point framework's reduction handlers at startup on each PE
+/*initproc*/ void registerCPReductions(void) {
+  idleTimeReductionType=CkReduction::addReducer(idleTimeReduction);
+  allMeasuresReductionType=CkReduction::addReducer(allMeasuresReduction);
+}
 
 
 
@@ -106,10 +184,15 @@ unsigned int randInt(unsigned int num, const char* name, int seed=0){
 
 
 controlPointManager::controlPointManager(){
+  generatedPlanForStep = -1;
 
-    newControlPointsAvailable = false;
+    exitWhenReady = false;
     alreadyRequestedMemoryUsage = false;   
     alreadyRequestedIdleTime = false;
+    alreadyRequestedAll = false;
+    
+    instrumentedPhase * newPhase = new instrumentedPhase();
+    allData.phases.push_back(newPhase);   
     
     dataFilename = (char*)malloc(128);
     sprintf(dataFilename, "controlPointData.txt");
@@ -185,26 +268,29 @@ controlPointManager::controlPointManager(){
       while(line[0] == '#')
 	getline(infile,line); 
 
-      instrumentedPhase ips;
+      instrumentedPhase * ips = new instrumentedPhase();
 
       std::istringstream iss(line);
 
       // Read memory usage for phase
-      iss >> ips.memoryUsageMB;
+      iss >> ips->memoryUsageMB;
       //     CkPrintf("Memory usage loaded from file: %d\n", ips.memoryUsageMB);
 
+      iss >> ips->idleTime.min;
+      iss >> ips->idleTime.avg;
+      iss >> ips->idleTime.max;
 
       // Read control point values
       for(int cp=0;cp<numControlPointNames;cp++){
 	int cpvalue;
 	iss >> cpvalue;
-	ips.controlPoints.insert(make_pair(names[cp],cpvalue));
+	ips->controlPoints.insert(make_pair(names[cp],cpvalue));
       }
 
       double time;
 
       while(iss >> time){
-	ips.times.push_back(time);
+	ips->times.push_back(time);
 #if DEBUGPRINT > 5
 	CkPrintf("read time %lf from file\n", time);
 #endif
@@ -221,20 +307,22 @@ controlPointManager::controlPointManager(){
 
   /// Add the current data to allData and output it to a file
   void controlPointManager::writeDataFile(){
-#if WRITEDATAFILE
     CkPrintf("============= writeDataFile() ============\n");
     ofstream outfile(dataFilename);
-    allData.phases.push_back(thisPhaseData);
     allData.cleanupNames();
+
+    //  string s = allData.toString();
+    //  CkPrintf("At end: \n %s\n", s.c_str());
+
+    allData.verify();
+    allData.filterOutIncompletePhases();
+
     outfile << allData.toString();
     outfile.close();
-#else
-    CkPrintf("NOT WRITING OUTPUT FILE\n");
-#endif
   }
 
   /// User can register a callback that is called when application should advance to next phase
-  void controlPointManager::setGranularityCallback(CkCallback cb, bool _frameworkShouldAdvancePhase){
+  void controlPointManager::setCPCallback(CkCallback cb, bool _frameworkShouldAdvancePhase){
     frameworkShouldAdvancePhase = _frameworkShouldAdvancePhase;
     granularityCallback = cb;
     haveGranularityCallback = true;
@@ -245,22 +333,6 @@ controlPointManager::controlPointManager(){
   void controlPointManager::processControlPoints(){
 
     CkPrintf("[%d] processControlPoints() haveGranularityCallback=%d frameworkShouldAdvancePhase=%d\n", CkMyPe(), (int)haveGranularityCallback, (int)frameworkShouldAdvancePhase);
-
-#if 0       
-    if(CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
-      alreadyRequestedMemoryUsage = true;
-      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
-      // thisProxy.requestMemoryUsage(*cb);
-      delete cb;
-    }
-    
-    if(CkMyPe() == 0 && !alreadyRequestedIdleTime){
-      alreadyRequestedIdleTime = true;
-      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherIdleTime(NULL), 0, thisProxy);
-      thisProxy.requestIdleTime(*cb);
-      delete cb;
-    }
-#endif
 
 
     //==========================================================================================
@@ -472,11 +544,30 @@ controlPointManager::controlPointManager(){
     return false;   
   }
   
+
+  /// The data from the current phase
+  instrumentedPhase * controlPointManager::currentPhaseData(){
+    int s = allData.phases.size();
+    CkAssert(s>=1);
+    return allData.phases[s-1];
+  }
+ 
+
   /// The data from the previous phase
   instrumentedPhase * controlPointManager::previousPhaseData(){
     int s = allData.phases.size();
-    if(s >= 1 && phase_id > 0) {
-      return &(allData.phases[s-1]);
+    if(s >= 2 && phase_id > 0) {
+      return allData.phases[s-2];
+    } else {
+      return NULL;
+    }
+  }
+ 
+  /// The data from two phases back
+  instrumentedPhase * controlPointManager::twoAgoPhaseData(){
+    int s = allData.phases.size();
+    if(s >= 3 && phase_id > 0) {
+      return allData.phases[s-3];
     } else {
       return NULL;
     }
@@ -485,6 +576,37 @@ controlPointManager::controlPointManager(){
 
   /// Called by either the application or the Control Point Framework to advance to the next phase  
   void controlPointManager::gotoNextPhase(){
+    
+    CkPrintf("gotoNextPhase shouldGatherAll=%d\n", (int)shouldGatherAll);
+    fflush(stdout);
+
+    if(shouldGatherAll && CkMyPe() == 0 && !alreadyRequestedAll){
+      alreadyRequestedAll = true;
+      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherAll(NULL), 0, thisProxy);
+      CkPrintf("Requesting all measurements\n");
+      thisProxy.requestAll(*cb);
+      delete cb;
+    
+    } else {
+      
+      if(shouldGatherMemoryUsage && CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
+	alreadyRequestedMemoryUsage = true;
+	CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
+	thisProxy.requestMemoryUsage(*cb);
+	delete cb;
+      }
+      
+      if(shouldGatherUtilization && CkMyPe() == 0 && !alreadyRequestedIdleTime){
+	alreadyRequestedIdleTime = true;
+	CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherIdleTime(NULL), 0, thisProxy);
+	thisProxy.requestIdleTime(*cb);
+	delete cb;
+      }
+    }
+    
+
+
+
 
     LBDatabase * myLBdatabase = LBDatabaseObj();
 
@@ -512,24 +634,25 @@ controlPointManager::controlPointManager(){
     myLBDB->ClearLoads(); // BUG: Probably very dangerous if we are actually using load balancing
     
 #endif    
-    
+
+
     
     // increment phase id
     phase_id++;
     
-    CkPrintf("Now in phase %d\n", phase_id);
+
+    // Create new entry for the phase we are starting now
+    instrumentedPhase * newPhase = new instrumentedPhase();
+    allData.phases.push_back(newPhase);
     
-    // save a copy of the timing information from this phase
-    allData.phases.push_back(thisPhaseData);
-    
-    // clear the timing information that will be used for the next phase
-    thisPhaseData.clear();
-    
+    CkPrintf("Now in phase %d allData.phases.size()=%d\n", phase_id, allData.phases.size());
+
   }
 
   /// An application uses this to register an instrumented timing for this phase
   void controlPointManager::setTiming(double time){
-    thisPhaseData.times.push_back(time);
+    currentPhaseData()->times.push_back(time);
+
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
        
     // First we should register this currently executing message as a path, because it is likely an important one to consider.
@@ -555,7 +678,9 @@ controlPointManager::controlPointManager(){
     idle[1] = i;
     idle[2] = i;
     
-    //    localControlPointTracingInstance()->resetTimings();
+    //    CkPrintf("[%d] idleRatio=%f\n", CkMyPe(), i);
+    
+    localControlPointTracingInstance()->resetTimings();
 
     contribute(3*sizeof(double),idle,idleTimeReductionType, cb);
   }
@@ -568,7 +693,6 @@ controlPointManager::controlPointManager(){
         
     instrumentedPhase* prevPhase = previousPhaseData();
     if(prevPhase != NULL){
-      CkPrintf("Storing idle time measurements\n");
       prevPhase->idleTime.min = r[0];
       prevPhase->idleTime.avg = r[1]/CkNumPes();
       prevPhase->idleTime.max = r[2];
@@ -579,16 +703,116 @@ controlPointManager::controlPointManager(){
     }
     
     alreadyRequestedIdleTime = false;
+    checkForShutdown();
     delete msg;
   }
+
+
+
+
+
+
+  /// Entry method called on all PEs to request CPU utilization statistics and memory usage
+  void controlPointManager::requestAll(CkCallback cb){
+    const double i = localControlPointTracingInstance()->idleRatio();
+    const double o = localControlPointTracingInstance()->overheadRatio();
+    const double m = localControlPointTracingInstance()->memoryUsageMB();
+    
+    double data[3+3+1];
+
+    double *idle = data;
+    double *over = data+3;
+    double *mem = data+6;
+
+    idle[0] = i;
+    idle[1] = i;
+    idle[2] = i;
+
+    over[0] = o;
+    over[1] = o;
+    over[2] = o;
+
+    mem[0] = m;
+    
+    localControlPointTracingInstance()->resetAll();
+
+    contribute(7*sizeof(double),data,allMeasuresReductionType, cb);
+  }
   
+  /// All processors reduce their memory usages in requestIdleTime() to this method
+  void controlPointManager::gatherAll(CkReductionMsg *msg){
+    int size=msg->getSize() / sizeof(double);
+    CkAssert(size==7);
+    double *data=(double *) msg->getData();
+        
+    double *idle = data;
+    double *over = data+3;
+    double *mem = data+6;
+
+    //    std::string b = allData.toString();
+
+    instrumentedPhase* prevPhase = previousPhaseData();
+    if(prevPhase != NULL){
+      prevPhase->idleTime.min = idle[0];
+      prevPhase->idleTime.avg = idle[1]/CkNumPes();
+      prevPhase->idleTime.max = idle[2];
+      
+      prevPhase->memoryUsageMB = mem[0];
+      
+      CkPrintf("Stored idle time min=%lf, mem=%lf in prevPhase=%p\n", (double)prevPhase->idleTime.min, (double)prevPhase->memoryUsageMB, prevPhase);
+
+      //      prevPhase->print();
+      // CkPrintf("prevPhase=%p number of timings=%d\n", prevPhase, prevPhase->times.size() );
+
+      //      std::string a = allData.toString();
+
+      //CkPrintf("Before:\n%s\nAfter:\n%s\n\n", b.c_str(), a.c_str());
+      
+    } else {
+      CkPrintf("There is no previous phase to store measurements\n");
+    }
+    
+    alreadyRequestedAll = false;
+    checkForShutdown();
+    delete msg;
+  }
+
+
+
+
+  void controlPointManager::checkForShutdown(){
+    if( exitWhenReady && !alreadyRequestedAll && !alreadyRequestedMemoryUsage && !alreadyRequestedIdleTime && CkMyPe()==0){
+      doExitNow();
+    }
+  }
+
+
+  void controlPointManager::exitIfReady(){
+     if( !alreadyRequestedMemoryUsage && !alreadyRequestedAll && !alreadyRequestedIdleTime && CkMyPe()==0){
+       CkPrintf("controlPointManager::exitIfReady exiting immediately\n");
+       doExitNow();
+     } else {
+       CkPrintf("controlPointManager::exitIfReady Delaying exiting\n");
+       exitWhenReady = true;
+     }
+  }
+
+
+
+  void controlPointManager::doExitNow(){
+    if(writeDataFileAtShutdown){
+      CkPrintf("[%d] controlPointShutdown() at CkExit()\n", CkMyPe());
+      controlPointManagerProxy.ckLocalBranch()->writeDataFile();
+    }
+    CkExit();
+  }
 
 
   /// Entry method called on all PEs to request memory usage
   void controlPointManager::requestMemoryUsage(CkCallback cb){
     int m = CmiMaxMemoryUsage() / 1024 / 1024;
     CmiResetMaxMemory();
-    CkPrintf("PE %d Memory Usage is %d MB\n",CkMyPe(), m);
+    //    CkPrintf("PE %d Memory Usage is %d MB\n",CkMyPe(), m);
     contribute(sizeof(int),&m,CkReduction::max_int, cb);
   }
 
@@ -608,6 +832,7 @@ controlPointManager::controlPointManager(){
     }
 
     alreadyRequestedMemoryUsage = false;
+    checkForShutdown();
     delete msg;
   }
 
@@ -691,8 +916,8 @@ public:
     int usec = (int)((time - (double)sec)*1000000.0);
     random_seed =  sec ^ usec;
 #endif
-
-
+    
+    
     double period;
     bool haveSamplePeriod = CmiGetArgDoubleDesc(args->argv,"+CPSamplePeriod", &period,"The time between Control Point Framework samples (in seconds)");
     if(haveSamplePeriod){
@@ -701,9 +926,9 @@ public:
     } else {
       controlPointSamplePeriod =  DEFAULT_CONTROL_POINT_SAMPLE_PERIOD;
     }
-
-
-
+    
+    
+    
     whichTuningScheme = RandomSelection;
 
 
@@ -717,9 +942,56 @@ public:
       whichTuningScheme = CriticalPathAutoPrioritization;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPBestKnown","Use BestKnown Timing for Control Point Values") ){
       whichTuningScheme = UseBestKnownTiming;
-    } 
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPSteering","Use Steering to adjust Control Point Values") ){
+      whichTuningScheme = UseSteering;
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPMemoryAware", "Adjust control points to approach available memory") ){
+      whichTuningScheme = MemoryAware;
+    }
 
+    char *defValStr = NULL;
+    if( CmiGetArgStringDesc(args->argv, "+CPDefaultValues", &defValStr, "Specify the default control point values used for the first couple phases") ){
+      CkPrintf("You specified default value string: %s\n", defValStr);
+      
+      // Parse the string, looking for commas
+     
 
+      char *tok = strtok(defValStr, ",");
+      while (tok) {
+	// split on the equal sign
+	int len = strlen(tok);
+	char *eqsign = strchr(tok, '=');
+	if(eqsign != NULL && eqsign != tok){
+	  *eqsign = '\0';
+	  char *cpname = tok;
+	  std::string cpName(tok);
+	  char *cpDefVal = eqsign+1;	  
+	  int v=-1;
+	  if(sscanf(cpDefVal, "%d", &v) == 1){
+	    CkPrintf("Command Line Argument Specifies that Control Point \"%s\" defaults to %d\n", cpname, v);
+	    CkAssert(CkMyPe() == 0); // can only access defaultControlPointValues on PE 0
+	    defaultControlPointValues[cpName] = v;
+	  }
+	}
+	tok = strtok(NULL, ",");
+      }
+
+    }
+
+    shouldGatherAll = false;
+    shouldGatherMemoryUsage = false;
+    shouldGatherUtilization = false;
+    
+    if ( CmiGetArgFlagDesc(args->argv,"+CPGatherAll","Gather all types of measurements for each phase") ){
+      shouldGatherAll = true;
+    } else {
+      if ( CmiGetArgFlagDesc(args->argv,"+CPGatherMemoryUsage","Gather memory usage after each phase") ){
+	shouldGatherMemoryUsage = true;
+      }
+      if ( CmiGetArgFlagDesc(args->argv,"+CPGatherUtilization","Gather utilization & Idle time after each phase") ){
+	shouldGatherUtilization = true;
+      }
+    }
+    
     writeDataFileAtShutdown = false;   
     if( CmiGetArgFlagDesc(args->argv,"+CPSaveData","Save Control Point timings & configurations at completion") ){
       writeDataFileAtShutdown = true;
@@ -730,16 +1002,17 @@ public:
       loadDataFileAtStartup = true;
     }
 
+
     controlPointManagerProxy = CProxy_controlPointManager::ckNew();
   }
   ~controlPointMain(){}
 };
 
 /// An interface callable by the application.
-void registerGranularityChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase){
+void registerCPChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase){
   CkAssert(CkMyPe() == 0);
   CkPrintf("Application has registered a control point change callback\n");
-  controlPointManagerProxy.ckLocalBranch()->setGranularityCallback(cb, frameworkShouldAdvancePhase);
+  controlPointManagerProxy.ckLocalBranch()->setCPCallback(cb, frameworkShouldAdvancePhase);
 }
 
 /// An interface callable by the application.
@@ -770,11 +1043,9 @@ void controlPointTimingStamp() {
 extern "C" void controlPointShutdown(){
   if(CkMyPe() == 0){
 
-    if(writeDataFileAtShutdown){
-      CkPrintf("[%d] controlPointShutdown() at CkExit()\n", CkMyPe());
-      controlPointManagerProxy.ckLocalBranch()->writeDataFile();
-    }
-    CkExit();
+    // wait for gathering of idle time & memory usage to complete
+    controlPointManagerProxy.ckLocalBranch()->exitIfReady();
+
   }
 }
 
@@ -796,70 +1067,115 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime){
 
 
 
-/// Should an optimizer determine the control point values
-bool valueShouldBeProvidedByOptimizer(){
-#if 0  
-  const int effective_phase = controlPointManagerProxy.ckLocalBranch()->allData.phases.size();
-  const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id; 
-  
-  std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace; 
-  
-  double spaceSize = 1.0;
-  std::map<std::string, pair<int,int> >::iterator iter;
-  for(iter = controlPointSpace.begin(); iter != controlPointSpace.end(); iter++){
-    spaceSize *= iter->second.second - iter->second.first + 1;
-  }
-
-  //  CkPrintf("Control Point Space:\n\t\tnumber of control points = %d\n\t\tnumber of possible configurations = %.0lf\n", controlPointSpace.size(), spaceSize);
-
-  // return false;
-  //  return effective_phase > 1 && phase_id > 1;
-  //  return effective_phase >= OPTIMIZER_TRANSITION && phase_id > 3;
-#else
-  return true;
-#endif
-}
-
-
-
-
 
 /// Determine a control point value using some optimization scheme (use max known, simmulated annealling, 
 /// user observed characteristic to adapt specific control point values.
 /// @note eventually there should be a plugin system where multiple schemes can be plugged in(similar to LB)
-int valueProvidedByOptimizer(const char * name, int lb, int ub){
-  const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
-  const int effective_phase = controlPointManagerProxy.ckLocalBranch()->allData.phases.size();
+void controlPointManager::generatePlan() {
+  const int phase_id = this->phase_id;
+  const int effective_phase = allData.phases.size();
 
-
-  if( whichTuningScheme == RandomSelection){
-
-    int result = lb + randInt(ub-lb+1, name, phase_id);
-    CkPrintf("Control Point \"%s\" for phase %d chosen randomly to be: %d\n", name, phase_id, result); 
-    return result;
-
-  } else if( whichTuningScheme == CriticalPathAutoPrioritization){
-
+  // Only generate a plan once per phase
+  if(generatedPlanForStep == phase_id) 
+    return;
+  generatedPlanForStep = phase_id;
+ 
+  CkPrintf("Generating Plan for phase %d\n", phase_id); 
+  printTuningScheme();
+  
+  if( whichTuningScheme == RandomSelection ){
+    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+      const std::string &name = cpsIter->first;
+      const std::pair<int,int> &bounds = cpsIter->second;
+      const int lb = bounds.first;
+      const int ub = bounds.second;
+      newControlPoints[name] = lb + randInt(ub-lb+1, name.c_str(), phase_id);
+    }
+  } else if( whichTuningScheme == CriticalPathAutoPrioritization) {
     // -----------------------------------------------------------
     //  USE CRITICAL PATH TO ADJUST PRIORITIES
     //   
     // This scheme will return the median value for the range 
     // early on, and then will transition over to the new control points
     // determined by the critical path adapting code
-    if(controlPointManagerProxy.ckLocalBranch()->newControlPointsAvailable){
-      int result = controlPointManagerProxy.ckLocalBranch()->newControlPoints[std::string(name)];
-      CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d  from \"newControlPoints\" is: %d\n", name, phase_id, result);
-      return result;
-    } 
-  
-    std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
 
-    if(controlPointSpace.count(std::string(name))>0){
-      int minValue =  controlPointSpace[std::string(name)].first;
-      int maxValue =  controlPointSpace[std::string(name)].second;
-      return (minValue+maxValue)/2;
+    // This won't work until the periodic function is fixed up a bit
+
+    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+      const std::string &name = cpsIter->first;
+      const std::pair<int,int> &bounds = cpsIter->second;
+      const int lb = bounds.first;
+      const int ub = bounds.second;
+      newControlPoints[name] =  (lb+ub)/2;
     }
-  
+
+  } else if ( whichTuningScheme == MemoryAware ) {
+
+    // -----------------------------------------------------------
+    //  STEERING BASED ON MEMORY USAGE
+
+    instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
+    instrumentedPhase *prevPhase = previousPhaseData();
+ 
+    if(phase_id%4 == 0){
+      CkPrintf("Steering (memory based) based on 2 phases ago:\n");
+      twoAgoPhase->print();
+      CkPrintf("\n");
+      fflush(stdout);
+      
+      // See if memory usage is low:
+      double memUsage = twoAgoPhase->memoryUsageMB;
+      CkPrintf("Steering (memory based) encountered memory usage of (%f MB)\n", memUsage);
+      fflush(stdout);
+      if(memUsage < 1100.0 && memUsage > 0.0){ // Kraken has about 16GB and 12 cores per node
+	CkPrintf("Steering (memory based) encountered low memory usage (%f) < 1200 \n", memUsage);
+	CkPrintf("Steering (memory based) controlPointSpace.size()=\n", controlPointSpace.size());
+	
+	// Initialize plan to be the values from two phases ago (later we'll adjust this)
+	std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+	for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	  const std::string &name = cpsIter->first;
+	  const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
+	  newControlPoints[name] = twoAgoValue;
+	}
+	CkPrintf("Steering (memory based) initialized plan\n");
+	fflush(stdout);
+
+	// look for a possible control point knob to turn
+	std::map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["MemoryConsumption"];
+	
+	// FIXME: assume for now that we just have one control point with the effect, and one direction to turn it
+	bool found = false;
+	std::string cpName;
+	std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > *info;
+	std::map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > >::iterator iter;
+	for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
+	  cpName = iter->first;
+	  info = &iter->second;
+	  found = true;
+	  break;
+	}
+
+	// Adapt the control point value
+	if(found){
+	  CkPrintf("Steering found knob to turn that should increase memory consumption\n");
+	  fflush(stdout);
+	  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+	  const int maxValue = controlPointSpace[cpName].second;
+	  
+	  if(twoAgoValue+1 <= maxValue){
+	    newControlPoints[cpName] = twoAgoValue+1; // increase from two phases back
+	  }
+	}
+	
+      }
+    }
+
+    CkPrintf("Steering (memory based) done for this phase\n");
+    fflush(stdout);
+
   } else if ( whichTuningScheme == UseBestKnownTiming ) {
 
     // -----------------------------------------------------------
@@ -867,20 +1183,93 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
     static bool firstTime = true;
     if(firstTime){
       firstTime = false;
-      CkPrintf("Finding best phase\n");
-      instrumentedPhase p = controlPointManagerProxy.ckLocalBranch()->allData.findBest(); 
-      CkPrintf("p=:\n");
-      p.print();
+      instrumentedPhase *best = allData.findBest(); 
+      CkPrintf("Best known phase is:\n");
+      best->print();
       CkPrintf("\n");
-      controlPointManagerProxy.ckLocalBranch()->best_phase = p;
-    } 
+      
+      std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+      for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter) {
+	const std::string &name = cpsIter->first;
+	newControlPoints[name] =  best->controlPoints[name];
+      }
+    }
+
+  } else if ( whichTuningScheme == UseSteering ) {
+    // -----------------------------------------------------------
+    //  STEERING BASED ON KNOWLEDGE
+  
+    // after 3 phases (and only on even steps), do steering performance. Otherwise, just use previous phase's configuration
+    // plans are only generated after 3 phases
+
+    instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
+    instrumentedPhase *prevPhase = previousPhaseData();
+ 
+    if(phase_id%4 == 0){
+      CkPrintf("Steering based on 2 phases ago:\n");
+      twoAgoPhase->print();
+      CkPrintf("\n");
+      fflush(stdout);
+      
+      // See if idle time is high:
+      double idleTime = twoAgoPhase->idleTime.avg;
+      CkPrintf("Steering encountered idle time (%f)\n", idleTime);
+      fflush(stdout);
+      if(idleTime > 0.10){
+	CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
+	CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
+
+	// Initialize plan to be the values from two phases ago (later we'll adjust this)
+	std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+	for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	  const std::string &name = cpsIter->first;
+	  const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
+	  newControlPoints[name] = twoAgoValue;
+	}
+	CkPrintf("Steering initialized plan\n");
+	fflush(stdout);
+
+	// look for a possible control point knob to turn
+	std::map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["Concurrency"];
+	
+	// FIXME: assume for now that we just have one control point with the effect
+	bool found = false;
+	std::string cpName;
+	std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > *info;
+	std::map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > >::iterator iter;
+	for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
+	  cpName = iter->first;
+	  info = &iter->second;
+	  found = true;
+	  break;
+	}
+
+	// Adapt the control point value
+	if(found){
+	  CkPrintf("Steering found knob to turn\n");
+	  fflush(stdout);
+	  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+	  const int maxValue = controlPointSpace[cpName].second;
+
+	  if(twoAgoValue+1 <= maxValue){
+	    newControlPoints[cpName] = twoAgoValue+1; // incrase from two phases back
+	  }
+	}
+	
+      }
+      
+      CkPrintf("Steering done for this phase\n");
+      fflush(stdout);
+
+    }  else {
+      // This is not a phase to do steering, so stick with previously used values (one phase ago)
+      CkPrintf("not a phase to do steering, so stick with previously planned values (one phase ago)\n");
+      fflush(stdout);
+    }
     
-    instrumentedPhase &p = controlPointManagerProxy.ckLocalBranch()->best_phase;
-    int result = p.controlPoints[std::string(name)];
-    CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen out of best previous phase to be: %d\n", name, phase_id, result);
-    return result;
     
-  } else if( whichTuningScheme == SimulatedAnnealing ){
+    
+  } else if( whichTuningScheme == SimulatedAnnealing ) {
     
     // -----------------------------------------------------------
     //  SIMULATED ANNEALING
@@ -888,48 +1277,43 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
     //
     //  Find the best search space configuration, and try something
     //  nearby it, with a radius decreasing as phases increase
-  
-    std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;  
-  
+
     CkPrintf("Finding best phase\n");
-    instrumentedPhase p = controlPointManagerProxy.ckLocalBranch()->allData.findBest();  
+    instrumentedPhase *bestPhase = allData.findBest();  
     CkPrintf("best found:\n"); 
-    p.print(); 
+    bestPhase->print(); 
     CkPrintf("\n"); 
-  
-    int before = p.controlPoints[std::string(name)];   
-  
-    int minValue =  controlPointSpace[std::string(name)].first;
-    int maxValue =  controlPointSpace[std::string(name)].second;
-  
-    int convergeByPhase = 100;
-  
+    
+
+    const int convergeByPhase = 100;
     // Determine from 0.0 to 1.0 how far along we are
-    double progress = (double) min(effective_phase, convergeByPhase) / (double)convergeByPhase;
+    const double progress = (double) min(effective_phase, convergeByPhase) / (double)convergeByPhase;
+
+    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+      const std::string &name = cpsIter->first;
+      const std::pair<int,int> &bounds = cpsIter->second;
+      const int minValue = bounds.first;
+      const int maxValue = bounds.second;
+      
+      const int before = bestPhase->controlPoints[name];   
   
-    int range = (maxValue-minValue+1)*(1.0-progress);
+      const int range = (maxValue-minValue+1)*(1.0-progress);
 
-    CkPrintf("========================== Hill climbing progress = %lf  range=%d\n", progress, range); 
+      int high = min(before+range, maxValue);
+      int low = max(before-range, minValue);
+      
+      newControlPoints[name] = low;
+      if(high-low > 0){
+	newControlPoints[name] += randInt(high-low, name.c_str(), phase_id); 
+      } 
+      
+    }
 
-    int high = min(before+range, maxValue);
-    int low = max(before-range, minValue);
-  
-    int result = low;
-
-    if(high-low > 0){
-      result += randInt(high-low, name, phase_id); 
-    } 
-
-    CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by hill climbing to be: %d\n", name, phase_id, result); 
-    return result; 
-
-  } else if( whichTuningScheme == ExhaustiveSearch ){
+  } else if( whichTuningScheme == ExhaustiveSearch ) {
 
     // -----------------------------------------------------------
     // EXHAUSTIVE SEARCH
-
-    std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;
-    std::set<std::string> &staticControlPoints = controlPointManagerProxy.ckLocalBranch()->staticControlPoints;  
    
     int numDimensions = controlPointSpace.size();
     CkAssert(numDimensions > 0);
@@ -941,27 +1325,16 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
     std::map<std::string, pair<int,int> >::iterator iter;
     for(iter = controlPointSpace.begin(); iter != controlPointSpace.end(); iter++){
       //    CkPrintf("Examining dimension %d\n", d);
-
-#if DEBUGPRINT
-      std::string name = iter->first;
-      if(staticControlPoints.count(name) >0 ){
-	cout << " control point " << name << " is static " << endl;
-      } else{
-	cout << " control point " << name << " is not static " << endl;
-      }
-#endif
-
       lowerBounds[d] = iter->second.first;
       upperBounds[d] = iter->second.second;
       d++;
     }
    
-
-    vector<std::string> s(numDimensions);
+    // get names for each dimension (control point)
+    vector<std::string> names(numDimensions);
     d=0;
     for(std::map<std::string, pair<int,int> >::iterator niter=controlPointSpace.begin(); niter!=controlPointSpace.end(); niter++){
-      s[d] = niter->first;
-      // cout << "s[" << d << "]=" << s[d] << endl;
+      names[d] = niter->first;
       d++;
     }
   
@@ -971,19 +1344,19 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
     config.push_back(0);
   
     // Increment until finding an unused configuration
-    controlPointManagerProxy.ckLocalBranch()->allData.cleanupNames(); // put -1 values in for any control points missing
-    std::vector<instrumentedPhase> &phases = controlPointManagerProxy.ckLocalBranch()->allData.phases;     
+    allData.cleanupNames(); // put -1 values in for any control points missing
+    std::vector<instrumentedPhase*> &phases = allData.phases;     
 
     while(true){
     
-      std::vector<instrumentedPhase>::iterator piter; 
+      std::vector<instrumentedPhase*>::iterator piter; 
       bool testedConfiguration = false; 
       for(piter = phases.begin(); piter != phases.end(); piter++){ 
       
 	// Test if the configuration matches this phase
 	bool match = true;
 	for(int j=0;j<numDimensions;j++){
-	  match &= piter->controlPoints[s[j]] == config[j];
+	  match &= (*piter)->controlPoints[names[j]] == config[j];
 	}
       
 	if(match){
@@ -1017,29 +1390,19 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
 	config[i]= (lowerBounds[i]+upperBounds[i]) / 2;
       }
     }
-  
-  
-    int result=-1;  
 
-    std::string name_s(name);
-    for(int i=0;i<numDimensions;i++){
-      //    cout << "Comparing " << name_s <<  " with s[" << i << "]=" << s[i] << endl;
-      if(name_s.compare(s[i]) == 0){
-	result = config[i];
-      }
+    // results are now in config[i]
+    
+    for(int i=0; i<numDimensions; i++){
+      newControlPoints[names[i]] = config[i];
+      CkPrintf("Exhaustive search chose:   %s   -> %d\n", names[i].c_str(), config[i]);
     }
 
-    CkAssert(result != -1);
-
-
-    CkPrintf("valueProvidedByOptimizer(): Control Point \"%s\" for phase %d chosen by exhaustive search to be: %d\n", name, phase_id, result); 
-    return result; 
 
   } else {
     CkAbort("Some Control Point tuning strategy must be enabled.\n");
   }
 
-  return 0;  
 }
 
 
@@ -1051,95 +1414,53 @@ int valueProvidedByOptimizer(const char * name, int lb, int ub){
 
 /// Get control point value from range of integers [lb,ub]
 int controlPoint(const char *name, int lb, int ub){
-  instrumentedPhase &thisPhaseData = controlPointManagerProxy.ckLocalBranch()->thisPhaseData;
+  instrumentedPhase *thisPhaseData = controlPointManagerProxy.ckLocalBranch()->currentPhaseData();
   const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
   std::map<std::string, pair<int,int> > &controlPointSpace = controlPointManagerProxy.ckLocalBranch()->controlPointSpace;
   int result;
 
   // if we already have control point values for phase, return them
-  if( thisPhaseData.controlPoints.count(std::string(name))>0 ){
-    return thisPhaseData.controlPoints[std::string(name)];
+  if( thisPhaseData->controlPoints.count(std::string(name))>0 && thisPhaseData->controlPoints[std::string(name)]>=0 ){
+    CkPrintf("Already have control point values for phase. %s -> %d\n", name, (int)(thisPhaseData->controlPoints[std::string(name)]) );
+    return thisPhaseData->controlPoints[std::string(name)];
   }
+  
 
-  if(controlPointSpace.count(std::string(name)) == 0){
-    // if this is the first time we've seen the range for the CP, then return the average
-    result = (lb + ub) / 2;
-  } else {
-    // otherwise, get new values from optimizer
-    result = valueProvidedByOptimizer(name, lb, ub);
+  if( phase_id < 4 ){
+    // For the first few phases, just use the lower bound, or the default if one was provided 
+    // This ensures that the ranges for all the control points are known before we do anything fancy
+    result = lb;
+
+
+    if(defaultControlPointValues.count(std::string(name)) > 0){
+      int v = defaultControlPointValues[std::string(name)];
+      CkPrintf("Startup phase using default value of %d for  \"%s\"\n", v, name);   
+      result = v;
+    }
+
+  } else if(controlPointSpace.count(std::string(name)) == 0){
+    // if this is the first time we've seen the CP, then return the lower bound
+    result = lb;
+    
+  }  else {
+    // Generate a plan one time for each phase
+    controlPointManagerProxy.ckLocalBranch()->generatePlan();
+    
+    // Use the planned value:
+    result = controlPointManagerProxy.ckLocalBranch()->newControlPoints[std::string(name)];
+    
   }
 
   CkAssert(isInRange(result,ub,lb));
-  thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 
+  thisPhaseData->controlPoints[std::string(name)] = result; // was insert() 
+
   controlPointSpace.insert(std::make_pair(std::string(name),std::make_pair(lb,ub))); 
 
-  return result;
-}
-
-
-/// Get control point value from set of provided integers
-#if 0
-int controlPoint(const char *name, std::vector<int>& values){
-  instrumentedPhase &thisPhaseData = controlPointManagerProxy.ckLocalBranch()->thisPhaseData;
-  const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
-
-  int result = valueProvidedByOptimizer(name, 0, values.size() );
-
-  bool found = false;
-  for(int i=0;i<values.size();i++){
-    if(values[i] == result)
-      found = true;
-  }
-  CkAssert(found);
-
-  thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result)); 
-  return result;
-}
-#endif
-
-
-
-// Dynamic point varies throughout the life of program
-// The value it returns is based upon phase_id, a counter that changes for each phase of computation
-#if 0
-int controlPoint2Pow(const char *name, int fine_granularity, int coarse_granularity){
- instrumentedPhase &thisPhaseData = controlPointManagerProxy.ckLocalBranch()->thisPhaseData;
-  const int phase_id = controlPointManagerProxy.ckLocalBranch()->phase_id;
-
-  int result;
-
-  // Use best configuration after a certain point
-  if(valueShouldBeProvidedByOptimizer()){
-    result = valueProvidedByOptimizer(name);
-  } 
-  else {
-
-    int l1 = (int)CmiLog2(fine_granularity);
-    int l2 = (int)CmiLog2(coarse_granularity);
+  CkPrintf("Control Point \"%s\" for phase %d is: %d\n", name, phase_id, result);
+  //  thisPhaseData->print();
   
-    if (l1 > l2){
-      int tmp;
-      tmp = l2;
-      l2 = l1; 
-      l1 = tmp;
-    }
-    CkAssert(l1 <= l2);
-    
-    int l = l1 + randInt(l2-l1+1,name, phase_id);
-
-    result = 1 << l;
-
-    CkAssert(isInRange(result,fine_granularity,coarse_granularity));
-    CkPrintf("Control Point \"%s\" for phase %d chosen randomly to be: %d\n", name, phase_id, result);
-  }
-
-  thisPhaseData.controlPoints.insert(std::make_pair(std::string(name),result));
-
   return result;
 }
-#endif
-
-
 
 
 

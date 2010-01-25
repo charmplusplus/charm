@@ -17,7 +17,7 @@ CpvExtern(Chare *,_currentObj);
 #define FORWARDED_TICKET 0x8000
 
 //TML: global variable for the size of the team
-#define TEAM_SIZE_MLOG 4
+#define TEAM_SIZE_MLOG 1
 #define MLOG_RESTARTED 0
 #define MLOG_CRASHED 1
 #define MEGABYTE 1048576
@@ -173,7 +173,8 @@ public:
 	int maxRestoredLocalTN;
 	int resendReplyRecvd;// variable that keeps a count of the processors that have replied to a requests to resend messages. 
 	int restartFlag; /*0 -> Normal state .. 1-> just after restart. tickets should not be handed out at this time */
-	CkHashtableT<CkHashtableAdaptorT<CkObjID>,RestoredLocalMap *> mapTable;	
+    int teamRecoveryFlag; // 0 -> normal state .. 1 -> recovery of a team member	
+	CkHashtableT<CkHashtableAdaptorT<CkObjID>,RestoredLocalMap *> mapTable;
 	//TML: teamTable, stores the SN to TN mapping for messages intra team
 	CkHashtableT<CkHashtableAdaptorT<CkObjID>,SNToTicket *> teamTable;
 
@@ -203,6 +204,7 @@ public:
 		ticketHoles = NULL;
 		currentHoles = 0;
 		restartFlag=0;
+		teamRecoveryFlag=0;
 		receivedTNs = NULL;
 		resendReplyRecvd=0;
 		maxRestoredLocalTN=0;
@@ -211,6 +213,7 @@ public:
 	};
 	inline MCount nextSN(const CkObjID &recver);
 	inline Ticket next_ticket(CkObjID &sender,MCount SN);
+	inline void verifyTicket(CkObjID &sender,MCount SN, MCount TN);
 	void addLogEntry(MlogEntry *entry);
 	virtual void pup(PUP::er &p);
 	CkQ<MlogEntry *> *getMlog(){ return &mlog;};
@@ -274,7 +277,9 @@ public:
 };
 
 /**
- *  @brief 
+ *  @brief Class for storing metadata of local messages.
+ *  It maps sequence numbers to ticket numbers.
+ *  It is used after a restart to maintain the same ticket numbers.
  */
 class RestoredLocalMap {
 public:
@@ -299,6 +304,7 @@ typedef struct {
 	CkObjID recver;
 	MlogEntry *logEntry;
 	MCount SN;
+	MCount TN;
 	int senderPE;
 } TicketRequest;
 CpvExtern(CkQ<TicketRequest *> *,_delayedTicketRequests);
@@ -480,7 +486,7 @@ void sendTicketGroupRequest(envelope *env,int destPE,int _infoIdx);
 void sendTicketArrayRequest(envelope *env,int destPE,int _infoIdx);
 void sendTicketNodeGroupRequest(envelope *env,int destNode,int _infoIdx);
 void generateCommonTicketRequest(CkObjID &recver,envelope *env,int destPE,int _infoIdx);
-void sendTicketRequest(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount SN,int resend);
+void sendTicketRequest(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount SN,MCount TN,int resend);
 void ticketLogLocalMessage(MlogEntry *entry);
 void sendLocalMessageCopy(MlogEntry *entry);
 void sendBufferedLocalMessageCopy();

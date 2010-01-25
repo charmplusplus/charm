@@ -483,6 +483,10 @@ class TraceProjections : public Trace {
     void traceClose();
     void traceBegin();
     void traceEnd();
+#if CMK_SMP_TRACE_COMMTHREAD
+    void traceBeginOnCommThread();
+    void traceEndOnCommThread();
+#endif
     void traceFlushLog() { _logPool->flushLogBuffer(); }
 
     //functions that perform function tracing
@@ -548,6 +552,8 @@ void disableTraceLogOutput();
 /// Enable the outputting of the trace logs
 void enableTraceLogOutput();
 
+/// Force the log file to be flushed
+void flushTraceLog();
 
 #endif
 

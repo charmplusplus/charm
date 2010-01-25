@@ -41,7 +41,8 @@ enum {
   CPD_SIGNAL = 1,
   CPD_ABORT = 2,
   CPD_FREEZE = 3,
-  CPD_BREAKPOINT = 4
+  CPD_BREAKPOINT = 4,
+  CPD_CROSSCORRUPTION = 5
 };
 extern void CpdNotify(int type, ...);
 

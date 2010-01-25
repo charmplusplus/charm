@@ -1395,86 +1395,19 @@ EOF
   /bin/rm -f conftest.f90
 fi
 
-### go get libpthread.a from charm website ###
+### Check that Linux's C library is recent enough to provide working pthreads
 if test "$base_version" = "net-linux" || test "$base_version" = "mpi-linux"
 then
-case $version in
-*linux*smp*|*linux*vmi*)
-  if test ! -r ../lib/libpthread.a
-  then
-    AC_CHECK_PROG(WGET, wget, wget )
-    AC_CHECK_PROG(LYNX, lynx, lynx )
-    AC_CHECK_PROG(TELNET, telnet, telnet )
-    AC_CHECK_PROG(UUDECODE, uudecode, uudecode )
-    
-    CHARMIP='128.174.241.81'
-#    CHARMIP='charm.cs.uiuc.edu'
-#    VERSION=`nm /lib/libc.so.6 | grep "A GLIBC_" | tail -1 | sed -e "s/00000000 A GLIBC_//g"`
+case $version in *linux*smp*|*linux*vmi*)
     AC_MSG_CHECKING(glibc version)
     get_glibc_version
     AC_MSG_RESULT($GLIBCVERSION)
-    if test 1 = `expr $GLIBCVERSION \> 2.2.92` 
+    if test 0 = `expr $GLIBCVERSION \> 2.2.92`
     then
-      cat >> ./conv-mach-opt.h << EOT
-#undef CMK_LINUX_PTHREAD_HACK
-EOT
-    else
-      L="libpthread-$GLIBCVERSION.a"
-      LSO="libpthread-$GLIBCVERSION.so"
-      URL="http://${CHARMIP}/distrib/$L"
-      URLSO="http://${CHARMIP}/distrib/$LSO"
-      finish=0
-      printf "getting $L from $URL ..."
-      if test -n "$WGET"
-      then
-        printf "(wget) ..."
-        $WGET $URL > /dev/null 2>&1  && mv $L ../lib && finish=1
-        $WGET $URLSO > /dev/null 2>&1  && mv $LSO ../lib_so
-      fi
-      if test $finish = 0 && test -n "$LYNX"
-      then
-        printf "(lynx) ..."
-        $LYNX -source $URL > $L 2>/dev/null 
-        if file -L $L | grep 'archive' > /dev/null
-        then
-          mv $L ../lib && finish=1
-        fi
-        $LYNX -source $URLSO > $L 2>/dev/null 
-      fi
-      if test $finish = 0 && test -n "$TELNET" && test -n "$UUDECODE"
-      then
-        printf "(telnet) ..."
-        cat > get_libpthread <<EOT
-#! /bin/sh
-echo "GET /distrib/libpthread-$GLIBCVERSION.uu 1.0"
-echo
-# exit normally when the telnet session closes.
-trap "exit 0" 13
-while : ; do
- echo
- sleep 1
-done
-EOT
-        /bin/sh ./get_libpthread | ($TELNET $CHARMIP 80 > .uulib 2>/dev/null); $UUDECODE .uulib 2>/dev/null && rm -f .uulib && mv $L ../lib && finish=1
-      fi
-      ln -s $L ../lib/libpthread.a
-      ln -s $LSO ../lib_so/libpthread.so
-      if test $finish = 0 || test ! -r ../lib/libpthread.a
-      then
-        /bin/rm -f ../lib/libpthread.a
-        echo "failed"
-        echo "#####################################################################"
-        echo "wget, lynx or telnet must be installed to get libpthread.a from charm website."
-        echo "Alternately, your version of GLIBC ($GLIBCVERSION) is not yet supported--"
-        echo " contact ppl@cs.uiuc.edu for assistance."
-        echo "#####################################################################"
-        exit 1
-      else
-        echo "done"
-      fi
+       echo "Your version of GLIBC is ancient, and does not have sufficient "
+       echo "support for pthreads."
+       exit 1
     fi
-  fi
-  ;;
 esac
 fi
 

@@ -72,8 +72,8 @@ static void setPad(char *pad) {
 }
 
 /*The given area is uninitialized-- fill it as such. */
-int memory_fill=-1; /*-1 (alternate), 0 (zeros), or 1 (DE)*/
-int memory_fillphase=0;
+static int memory_fill=-1; /*-1 (alternate), 0 (zeros), or 1 (DE)*/
+static int memory_fillphase=0;
 static void fill_uninit(char *loc,int len)
 {
 	int fill=memory_fill;
@@ -92,14 +92,14 @@ static char *Slot_toUser(Slot *s) {
 }
 
 /*Head of the circular slot list*/
-Slot slot_first={&slot_first,&slot_first};
+static Slot slot_first={&slot_first,&slot_first};
 
 
 /********* Heap Checking ***********/
 
-int memory_checkfreq=100; /*Check entire heap every this many malloc/frees*/
-int memory_checkphase=0; /*malloc/free counter*/
-int memory_verbose=0; /*Print out every time we check the heap*/
+static int memory_checkfreq=100; /*Check entire heap every this many malloc/frees*/
+static int memory_checkphase=0; /*malloc/free counter*/
+static int memory_verbose=0; /*Print out every time we check the heap*/
 
 static void slotAbort(const char *why,Slot *s) {
 	memory_checkfreq=100000;

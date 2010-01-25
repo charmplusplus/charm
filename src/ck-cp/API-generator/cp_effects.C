@@ -9,13 +9,10 @@
 using namespace ControlPoint;
 using namespace std;
 
-enum EFFECT {EFF_DEC, EFF_INC};
+enum DIRECTION {EFF_DEC, EFF_INC};
 
-typedef map<std::string, map<std::string, vector<pair<int, ControlPoint::ControlPointAssociation> > > > cp_effect_map;
-typedef map<std::string, vector<pair<int, ControlPoint::ControlPointAssociation> > > cp_name_map;
-
-CkpvDeclare(cp_effect_map, cp_effects);
-CkpvDeclare(cp_name_map, cp_names);
+CkpvDeclare(ControlPoint::cp_effect_map, cp_effects);
+CkpvDeclare(ControlPoint::cp_name_map, cp_names);
 
 NoControlPointAssociation default_assoc;
 
@@ -30,12 +27,11 @@ ControlPoint::ControlPointAssociatedArray ControlPoint::assocWithArray(const CPr
 }
 
 void ControlPoint::initControlPointEffects() {
-	CkpvInitialize(cp_effect_map, cp_effects);
-	CkpvInitialize(cp_name_map, cp_names);
+    CkpvInitialize(cp_effect_map, cp_effects);
+    CkpvInitialize(cp_name_map, cp_names);
 }
 
 void testControlPointEffects() {
-
 	ControlPoint::EffectIncrease::Priority("name");
 	ControlPoint::EffectDecrease::Priority("name");
 	ControlPoint::EffectIncrease::Priority("name", assocWithEntry(0));
@@ -92,12 +88,14 @@ void testControlPointEffects() {
 	ControlPoint::EffectDecrease::GPUOffloadedWork("name");
 	ControlPoint::EffectIncrease::GPUOffloadedWork("name", assocWithEntry(0));
 	ControlPoint::EffectDecrease::GPUOffloadedWork("name", assocWithEntry(0));
+
 }
 
-void insert(const std::string control_type, const std::string name, const ControlPoint::ControlPointAssociation &a, const int effect) {
-	CkpvAccess(cp_effects)[control_type][name].push_back(std::make_pair(effect, a));
-	CkpvAccess(cp_names)[name].push_back(std::make_pair(effect, a));
+void insert(const std::string effect, const std::string name, const ControlPoint::ControlPointAssociation &assoc, const int direction) {
+    CkpvAccess(cp_effects)[effect][name].push_back(std::make_pair(direction, assoc));
+    CkpvAccess(cp_names)[name].push_back(std::make_pair(direction, assoc));
 }
+
 void ControlPoint::EffectDecrease::Priority(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("Priority", s, a, EFF_DEC);
 }
@@ -266,3 +264,5 @@ void ControlPoint::EffectDecrease::GPUOffloadedWork(std::string s) {
 void ControlPoint::EffectIncrease::GPUOffloadedWork(std::string s) {
 	insert("GPUOffloadedWork", s, default_assoc, EFF_INC);
 }
+
+

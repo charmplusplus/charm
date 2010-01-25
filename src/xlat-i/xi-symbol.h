@@ -1103,7 +1103,7 @@ class AccelBlock : public Construct {
   void genDecls(XStr& str) { }
   void genDefs(XStr& str) { outputCode(str); }
   void genReg(XStr& str) { }
-  void preprocess(XStr& str) { }
+  void preprocess() { }
 
   /// Construct Accel Support Methods ///
   int genAccels_spe_c_funcBodies(XStr& str) { outputCode(str); return 0; }

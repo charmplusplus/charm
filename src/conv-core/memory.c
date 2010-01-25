@@ -5,21 +5,48 @@
  * $Revision$
  *****************************************************************************/
 
+
+
+/**  
+ @defgroup MemoryModule Memory Allocation and Monitoring
+
+ This module provides the functions malloc, free, calloc, cfree,
+ realloc, valloc, memalign, and other functions for determining
+ the current and past memory usage. 
+
+ There are several possible implementations provided here-- the user
+ can link in whichever is best using the -malloc option with charmc.
+
+ The major possibilities here are empty (use the system's malloc),
+ GNU (use malloc-gnu.c), and meta (use malloc-cache.c or malloc-paranoid.c).
+ On machines without sbrk(), only the system's malloc is available.
+
+ The CMK_MEMORY_BUILD_* symbols come in from the compiler command line.
+
+ To determine how much memory your Charm++ program is using on a 
+ processor, call CmiMemoryUsage(). This function will return the 
+ number of bytes allocated, usually representing the heap size. 
+ It is possible that this measurement will not exactly represent
+ the heap size, but rather will reflect the total amount of 
+ memory used by the program.
+
+*/
+
+
+/** 
+    @addtogroup MemoryModule
+    @{
+*/
+
+
 /******************************************************************************
  *
  * This module provides the functions malloc, free, calloc, cfree,
  * realloc, valloc, and memalign.
  *
- * There are several possible implementations provided here-- the user
- * can link in whichever is best using the -malloc option with charmc.
- *
- * The major possibilities here are empty (use the system's malloc),
- * GNU (use malloc-gnu.c), and meta (use malloc-cache.c or malloc-paranoid.c).
- * On machines without sbrk(), only the system's malloc is available.
- *
- * The CMK_MEMORY_BUILD_* symbols come in from the compiler command line.
  *
  *****************************************************************************/
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +57,7 @@
 #include "converse.h"
 
 void * memory_stack_top; /*The higher end of the stack (approximation)*/
+int cpdInSystem=0;
 
 /*Choose the proper default configuration*/
 #if CMK_MEMORY_BUILD_DEFAULT
@@ -620,16 +648,19 @@ void free_reentrant(void *mem)
   REENTRANT_MEM_LOCK_AROUND( meta_free(mem); )
 }
 
+/** Return number of bytes currently allocated, if possible. */
 CMK_TYPEDEF_UINT8 CmiMemoryUsage()
 {
   return memory_allocated;
 }
 
+/** Return number of maximum number of bytes allocated since the last call to CmiResetMaxMemory(), if possible. */
 CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage()
 {
   return memory_allocated_max;
 }
 
+/** Reset the mechanism that records the highest seen (high watermark) memory usage. */
 void CmiResetMaxMemory() {
   memory_allocated_max=memory_allocated;
 }
@@ -705,6 +736,7 @@ void CmiOutOfMemoryInit(void) {
 
 #ifndef CMK_MEMORY_BUILD_CHARMDEBUG
 /* declare the cpd_memory routines */
+void CpdSetInitializeMemory(int v) { }
 size_t  cpd_memory_length(void *lenParam) { return 0; }
 void cpd_memory_pup(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
 void cpd_memory_leak(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
@@ -730,6 +762,10 @@ void CpdResetMemory() { }
 void CpdCheckMemory() { }
 
 int get_memory_allocated_user_total() { return 0; }
+void * MemoryToSlot(void *ptr) { return NULL; }
+int Slot_ChareOwner(void *s) { return 0; }
+int Slot_AllocatedSize(void *s) { return 0; }
+int Slot_StackTrace(void *s, void ***stack) { return 0; }
 #ifdef setMemoryChareIDFromPtr
 #undef setMemoryChareIDFromPtr
 #endif
@@ -802,3 +838,7 @@ void CmiFreeAligned(void* ptr) {
   /* Free the memory */
   free ((void*)((char*)ptr - offset));
 }
+
+
+
+/** @} */

@@ -8,6 +8,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_NETPOLL         1
+
 #define CMK_AMD64					   1
 
 #define CMK_ASYNC_NOT_NEEDED                               0

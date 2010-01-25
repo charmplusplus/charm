@@ -381,16 +381,6 @@ CthCpvStatic(int, _defaultStackSize);
 static void CthThreadBaseInit(CthThreadBase *th)
 {
   static int serialno = 1;
-#if CMK_LINUX_PTHREAD_HACK
-  /*HACK for LinuxThreads: to support our user-level threads
-    library, we use a slightly modified version of libpthread.a
-    with user-level threads support enabled via these flags.
-  */
-  extern int __pthread_find_self_with_pid;
-  extern int __pthread_nonstandard_stacks;
-  __pthread_find_self_with_pid=1;
-  __pthread_nonstandard_stacks=1;
-#endif
   th->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
   th->token->thread = S(th);
   th->scheduled = 0;
