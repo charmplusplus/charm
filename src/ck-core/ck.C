@@ -684,7 +684,7 @@ void _createNodeGroup(CkGroupID groupID, envelope *env)
     CkPackMessage(&env);
     CmiSetHandler(env, _bocHandlerIdx);
     _numInitMsgs++;
-    CksvAccess(_numInitNodeMsgs)++;
+    if (CkpvAccess(_charmEpoch)==0) CksvAccess(_numInitNodeMsgs)++;
     CmiSyncNodeBroadcast(env->getTotalsize(), (char *)env);
     CpvAccess(_qd)->create(CkNumNodes()-1);
     CkUnpackMessage(&env);

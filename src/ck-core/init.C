@@ -555,7 +555,7 @@ static void _roRestartHandler(void *msg)
 {
   CkAssert(CkMyPe()!=0);
   register envelope *env = (envelope *) msg;
-  CkpvAccess(_numInitsRecd)+=2;  /*++;*/
+  CkpvAccess(_numInitsRecd)++;
   _numExpectInitMsgs = env->getCount();
   _processRODataMsg(env);
 }
@@ -592,7 +592,7 @@ static void _initHandler(void *msg)
       _processROMsgMsg(env);
       break;
     case RODataMsg:
-      CkpvAccess(_numInitsRecd)+=2;  /*++;*/
+      CkpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
       _numExpectInitMsgs = env->getCount();
       _processRODataMsg(env);
@@ -600,8 +600,8 @@ static void _initHandler(void *msg)
     default:
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
-	DEBUGF(("[%d,%.6lf] _numExpectInitMsgs %d CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs) %d\n",CmiMyPe(),CmiWallTimer(),_numExpectInitMsgs,CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs)));
-  if(_numExpectInitMsgs&&(CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs)>=_numExpectInitMsgs)) {
+	DEBUGF(("[%d,%.6lf] _numExpectInitMsgs %d CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs) %d+%d\n",CmiMyPe(),CmiWallTimer(),_numExpectInitMsgs,CkpvAccess(_numInitsRecd),CksvAccess(_numInitNodeMsgs)));
+  if(_numExpectInitMsgs&&(CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs)==_numExpectInitMsgs)) {
     _initDone();
   }
 }
@@ -822,7 +822,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	CkpvAccess(_coreState)=new CkCoreState();
 
-	CkpvAccess(_numInitsRecd) = -1;  /*0;*/
+	CkpvAccess(_numInitsRecd) = 0;
 
 	CkpvAccess(_ckout) = new _CkOutStream();
 	CkpvAccess(_ckerr) = new _CkErrStream();
