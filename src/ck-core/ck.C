@@ -1895,6 +1895,8 @@ private:
 //#define REPLAYDEBUG(args) ckout<<"["<<CkMyPe()<<"] "<< args <<endl;
 #define REPLAYDEBUG(args) /* empty */
 
+extern "C" void CkMessageReplayQuiescence(void *rep, double time);
+
 class CkMessageReplay : public CkMessageWatcher {
   int counter;
 	int nextPE, nextSize, nextEvent, nexttype; //Properties of next message we need:
@@ -1959,6 +1961,7 @@ public:
 	  f=f_;
 	  getNext();
 	  REPLAYDEBUG("Constructing ckMessageReplay: "<< nextPE <<" "<< nextSize <<" "<<nextEvent);
+	  CmiStartQD(CkMessageReplayQuiescence, this);
 	}
 	~CkMessageReplay() {fclose(f);}
 
@@ -1992,6 +1995,12 @@ private:
 		}
 	}
 };
+
+extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
+  CkPrintf("[%d] Quiescence detected\n",CkMyPe());
+  CkMessageReplay *replay = (CkMessageReplay*)rep;
+  
+}
 
 #include "trace-common.h" /* For traceRoot and traceRootBaseLength */
 

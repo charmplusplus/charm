@@ -452,7 +452,7 @@ static void checkpointOne(const char* dirname, CkCallback& cb){
 	int _numPes = CkNumPes();
 	pRO|_numPes;
 	CkPupROData(pRO);
-	pRO((char *)&cb, sizeof(cb));
+	pRO|cb;
 	fclose(fRO);
 
 	// save mainchares into MainChares.dat

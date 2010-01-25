@@ -55,7 +55,7 @@ void CkCallback::impl_thread_init(void)
 	} while (exist==1);
 	*cb = this; //<- so we can find this structure later
 	d.thread.th=NULL; //<- thread isn't suspended yet
-	d.thread.ret=NULL;//<- no data to return yet
+	d.thread.ret=(void*)-1;//<- no data to return yet
 }
 
 //Actually suspend this thread
@@ -71,11 +71,11 @@ void *CkCallback::impl_thread_delay(void) const
 	if (d.thread.cb!=0) dest=CpvAccess(threadCBs).get(d.thread.cb);
 	if (dest==0)
 	    CkAbort("Called thread_delay on an already deleted callback");
-	if (dest->d.thread.ret==NULL) 
+	if (dest->d.thread.ret==(void*)-1) 
 	{  //We need to sleep for the result:
 		dest->d.thread.th=CthSelf(); //<- so we know a thread is waiting
 		CthSuspend();
-		if (dest->d.thread.ret==NULL) 
+		if (dest->d.thread.ret==(void*)-1) 
 			CkAbort("thread resumed, but callback data is still empty");
 	}
 	return dest->d.thread.ret;
@@ -85,54 +85,70 @@ void *CkCallback::impl_thread_delay(void) const
 /*These can't be defined in the .h file like the other constructors
  * because we need CkCallback before CProxyElement* are defined.
  */
-CkCallback::CkCallback(Chare *p, int ep, CmiBool doInline)
-		:type(doInline?isendChare:sendChare)
-{
+CkCallback::CkCallback(Chare *p, int ep, CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=doInline?isendChare:sendChare;
 	d.chare.ep=ep; 
 	d.chare.id=p->ckGetChareID();
 }
-CkCallback::CkCallback(Group *p, int ep, CmiBool doInline)
-		:type(doInline?isendGroup:sendGroup)
-{
+CkCallback::CkCallback(Group *p, int ep, CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=doInline?isendGroup:sendGroup;
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyPe();
 }
-CkCallback::CkCallback(NodeGroup *p, int ep, CmiBool doInline)
-		:type(doInline?isendNodeGroup:sendNodeGroup)
-{
+CkCallback::CkCallback(NodeGroup *p, int ep, CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=doInline?isendNodeGroup:sendNodeGroup;
 	d.group.ep=ep; d.group.id=p->ckGetGroupID(); d.group.onPE=CkMyNode();
 }
 
-CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp)
-		:type(bcastNodeGroup)
-{
+CkCallback::CkCallback(int ep,const CProxy_NodeGroup &ngp) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=bcastNodeGroup;
 	d.group.ep=ep; d.group.id=ngp.ckGetGroupID();
 }
 
-CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,CmiBool doInline)
-	:type(doInline?isendNodeGroup:sendNodeGroup)
-{
+CkCallback::CkCallback(int ep,int onPE,const CProxy_NodeGroup &ngp,CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=doInline?isendNodeGroup:sendNodeGroup;
 	d.group.ep=ep; d.group.id=ngp.ckGetGroupID(); d.group.onPE=onPE;
 }
 
-CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,CmiBool doInline) 
-	:type(doInline?isendGroup:sendGroup)
-{
+CkCallback::CkCallback(int ep,const CProxyElement_Group &grpElt,CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=doInline?isendGroup:sendGroup;
 	d.group.ep=ep; 
 	d.group.id=grpElt.ckGetGroupID(); 
 	d.group.onPE=grpElt.ckGetGroupPe();
 }
-CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline)
-	:type(doInline?isendArray:sendArray)
-{
+CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=doInline?isendArray:sendArray;
 	d.array.ep=ep; 
 	d.array.id=arrElt.ckGetArrayID(); 
 	d.array.idx.asMax()=arrElt.ckGetIndex();
 }
 
-CkCallback::CkCallback(ArrayElement *p, int ep,CmiBool doInline)
-	:type(doInline?isendArray:sendArray)
-{
-        d.array.ep=ep; 
+CkCallback::CkCallback(ArrayElement *p, int ep,CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=doInline?isendArray:sendArray;
+    d.array.ep=ep; 
 	d.array.id=p->ckGetArrayID(); 
 	d.array.idx.asMax()=p->ckGetArrayIndex();
 }
@@ -159,7 +175,7 @@ void CkCallback::send(void *msg) const
 	case resumeThread: //Resume a waiting thread
 		if (d.thread.onPE==CkMyPe()) {
 			CkCallback *dest=CpvAccess(threadCBs).get(d.thread.cb);
-			if (dest==0 || dest->d.thread.ret!=NULL)
+			if (dest==0 || dest->d.thread.ret!=(void*)-1)
 				CkAbort("Already sent a value to this callback!\n");
 			dest->d.thread.ret=msg; //<- return data
 			if (dest->d.thread.th!=NULL)
@@ -242,12 +258,68 @@ void CkCallback::send(void *msg) const
 	};
 }
 
+void CkCallback::pup(PUP::er &p) {
+  //p((char*)this, sizeof(CkCallback));
+  int t = (int)type;
+  p|t;
+  type = (callbackType)t;
+  switch (type) {
+  case resumeThread:
+    p|d.thread.onPE;
+    p|d.thread.cb;
+    break;
+  case isendChare:
+  case sendChare:
+    p|d.chare.ep;
+    p|d.chare.id;
+    break;
+  case isendGroup:
+  case sendGroup:
+  case isendNodeGroup:
+  case sendNodeGroup:
+    p|d.group.onPE;
+  case bcastNodeGroup:
+  case bcastGroup:
+    p|d.group.ep;
+    p|d.group.id;
+    break;
+  case isendArray:
+  case sendArray:
+    p|d.array.idx;
+  case bcastArray:
+    p|d.array.ep;
+    p|d.array.id;
+    break;
+  case replyCCS:
+    p((char*)&d.ccsReply.reply, sizeof(d.ccsReply.reply));
+    break;
+  case call1Fn:
+    p((char*)&d.c1fn, sizeof(d.c1fn));
+    break;
+  case callCFn:
+    p((char*)&d.cfn, sizeof(d.cfn));
+    break;
+  case ignore:
+  case ckExit:
+  case invalid:
+    break;
+  default:
+    CkAbort("Inconsistent CkCallback type");
+  }
+}
+
 void CkCallback::thread_destroy() const {
   if (type==resumeThread && CpvAccess(threadCBs).get(d.thread.cb)==this) {
     CpvAccess(threadCBs).remove(d.thread.cb);
   }
 }
 
+CkCallbackResumeThread::~CkCallbackResumeThread() {
+  void * res = thread_delay(); //<- block thread here if it hasn't already
+  if (result != NULL) *result = res;
+  else CkFreeMsg(res);
+  thread_destroy();
+}
 
 /****** Callback-from-CCS ******/
 
