@@ -32,8 +32,34 @@ into _initHandler, it counts messages until it is fully
 initialized, then calls _initDone to clean out the queues 
 and resume normal operation.  
 
-Possible race conditions abound during this process,
-which is probably overly complex.
+Upon resume of normal operation, the user code is guaranteed that
+all readonlies (both data and messages) have been set consistently
+on all processors, and that the constructors for all nodegroups
+and groups allocated from a mainchare have been called.
+
+It is not guaranteed the order in which (node)groups allocated
+outside of a mainchare are constructed, nor that the construction
+will happen before other messages have been delivered by the scheduler.
+
+Even though not exposed to the final users, the creation order of
+groups and nodegroups allocated in mainchares is deterministic and
+respects the following points:
+<ul>
+<li>On all processors, there is no guarantee of the order of creation
+between (node)groups allocated from different mainchares;
+<li>On processor zero, within a mainchare, all (node)groups are created
+in the order specified by the source code (strictly), including array
+allocation of initial elements;
+<li>On processors other than zero, within a mainchare, the order
+specified by the source code is maintained between different nodegroups
+and between different groups;
+<li>On processors other than zero, the ordering between groups and
+nodegroups is NOT maintained, as all nodegroups are created before any
+group is created.
+</ul>
+
+This process should not have race conditions, but it can
+never be excluded...
 */
 /*@{*/
 
@@ -69,16 +95,31 @@ UChar _defaultQueueing = CK_QUEUEING_FIFO;
 UInt  _printCS = 0;
 UInt  _printSS = 0;
 
+/**
+ * This value has the number of total initialization message a processor awaits.
+ * It is received on nodes other than zero together with the ROData message.
+ * Even though it is shared by all processors it is ok: it doesn't matter when and
+ * by who it is set, provided that it becomes equal to the number of awaited messages
+ * (which is always at least one ---the readonly data message).
+ */
 UInt  _numExpectInitMsgs = 0;
+/**
+ * This number is used only by processor zero to count how many messages it will
+ * send out for the initialization process. After the readonly data message is sent
+ * (containing this counter), its value becomes irrelevant.
+ */
 UInt  _numInitMsgs = 0;
+/**
+ * Count the number of nodegroups that have been created in mainchares.
+ * Since the nodegroup creation is executed by a single processor in a
+ * given node, this value must be seen by all processors in a node.
+ */
 CksvDeclare(UInt,_numInitNodeMsgs);
 int   _infoIdx;
 int   _charmHandlerIdx;
 int   _initHandlerIdx;
-int   _roHandlerIdx;
 int   _roRestartHandlerIdx;
 int   _bocHandlerIdx;
-int   _nodeBocHandlerIdx;
 int   _qdHandlerIdx;
 int   _qdCommHandlerIdx;
 int   _triggerHandlerIdx;
@@ -115,7 +156,7 @@ CkpvDeclare(MsgPool*, _msgPool);
 CkpvDeclare(_CkOutStream*, _ckout);
 CkpvDeclare(_CkErrStream*, _ckerr);
 
-CkpvStaticDeclare(int,  _numInitsRecd); /* UInt changed to int */
+CkpvStaticDeclare(int,  _numInitsRecd);
 CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
@@ -362,7 +403,6 @@ static void _exitHandler(envelope *env)
       _exitStarted = 1;
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-      CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
@@ -386,7 +426,6 @@ static void _exitHandler(envelope *env)
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-      CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
 	/*FAULT_EVAC*/
       if(CmiNodeAlive(CkMyPe())){
          _sendStats();
@@ -434,6 +473,11 @@ static void _exitHandler(envelope *env)
   }
 }
 
+/**
+ * Create all groups in this processor (not called on processor zero).
+ * Notice that only groups created in mainchares are processed here;
+ * groups created later are processed as regular messages.
+ */
 static inline void _processBufferedBocInits(void)
 {
   CkCoreState *ck = CkpvAccess(_coreState);
@@ -441,9 +485,9 @@ static inline void _processBufferedBocInits(void)
   register int i = 0;
   PtrVec &inits=*CkpvAccess(_bocInitVec);
   register int len = inits.size();
-  for(i=0; i<len; i++) {
+  for(i=1; i<len; i++) {
     envelope *env = inits[i];
-    if(env==0) continue;
+    if(env==0) CkAbort("_processBufferedBocInits: empty message");
     if(env->isPacked())
       CkUnpackMessage(&env);
     _processBocInitMsg(ck,env);
@@ -451,16 +495,20 @@ static inline void _processBufferedBocInits(void)
   delete &inits;
 }
 
+/**
+ * Create all nodegroups in this node (called only by rank zero, and never on node zero).
+ * Notice that only nodegroups created in mainchares are processed here;
+ * nodegroups created later are processed as regular messages.
+ */
 static inline void _processBufferedNodeBocInits(void)
 {
   CkCoreState *ck = CkpvAccess(_coreState);
-  CkNumberHandlerEx(_nodeBocHandlerIdx,(CmiHandlerEx)_processHandler,ck);
   register int i = 0;
   PtrVec &inits=*CksvAccess(_nodeBocInitVec);
   register int len = inits.size();
-  for(i=0; i<len; i++) {
+  for(i=1; i<len; i++) {
     envelope *env = inits[i];
-    if(env==0) continue;
+    if(env==0) CkAbort("_processBufferedNodeBocInits: empty message");
     if(env->isPacked())
       CkUnpackMessage(&env);
     _processNodeBocInitMsg(ck,env);
@@ -490,6 +538,14 @@ static int _charmLoadEstimator(void)
   return CkpvAccess(_buffQ)->length();
 }
 
+/**
+ * This function is used to send other processors on the same node a signal so
+ * they can check if their _initDone can be called: the reason for this is that
+ * the check at the end of _initHandler can fail due to a missing message containing
+ * a Nodegroup creation. When that message arrives only one processor will receive
+ * it, and thus if no notification is sent to the other processors in the node, they
+ * will never proceed.
+ */
 static void _sendTriggers(void)
 {
   int i, num, first;
@@ -498,7 +554,7 @@ static void _sendTriggers(void)
   {
     _triggersSent++;
     num = CmiMyNodeSize();
-    register envelope *env = _allocEnv(RODataMsg);
+    register envelope *env = _allocEnv(RODataMsg); // Notice that the type here is irrelevant
     env->setSrcPe(CkMyPe());
     CmiSetHandler(env, _triggerHandlerIdx);
     first = CmiNodeFirst(CmiMyNode());
@@ -510,6 +566,15 @@ static void _sendTriggers(void)
   CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
 }
 
+/**
+ * This function (not a handler) is called once and only once per processor.
+ * It signals the processor that the initialization is done and regular messages
+ * can be processed.
+ *
+ * On processor zero it is called by _initCharm, on all other processors either
+ * by _initHandler or _triggerHandler (cannot be both).
+ * When fault-tolerance is active, it is called by the fault-tolerance scheme itself.
+ */
 void _initDone(void)
 {
   DEBUGF(("[%d] _initDone.\n", CkMyPe()));
@@ -528,6 +593,13 @@ void _initDone(void)
   CkpvAccess(_charmEpoch)=1;
 }
 
+/**
+ * Converse handler receiving a signal from another processors in the same node.
+ * (On _sendTrigger there is the explanation of why this is necessary)
+ * Simply check if with the NodeGroup processed by another processor we reached
+ * the expected count. Notice that it can only be called before _initDone: after
+ * _initDone, a message destined for this handler will go instead to the _discardHandler.
+ */
 static void _triggerHandler(envelope *env)
 {
   if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + CksvAccess(_numInitNodeMsgs) == _numExpectInitMsgs)
@@ -551,6 +623,12 @@ static inline void _processRODataMsg(envelope *env)
   CmiFree(env);
 }
 
+/**
+ * This is similar to the _initHandler, only that the Groups and Nodegroups are
+ * initialized from disk, so only one single message is expected.
+ *
+ * It is unclear how Readonly Messages are treated during restart... (if at all considered)
+ */
 static void _roRestartHandler(void *msg)
 {
   CkAssert(CkMyPe()!=0);
@@ -560,30 +638,37 @@ static void _roRestartHandler(void *msg)
   _processRODataMsg(env);
 }
 
-static void _roHandler(void *msg)
-{
-  CpvAccess(_qd)->process();
-  _roRestartHandler(msg);
-}
-
+/**
+ * This handler is used only during initialization. It receives messages from
+ * processor zero regarding Readonly Data (in one single message), Readonly Messages,
+ * Groups, and Nodegroups.
+ * The Readonly Data message also contains the total number of messages expected
+ * during the initialization phase.
+ * For Groups and Nodegroups, only messages with epoch=0 (meaning created from within
+ * a mainchare) are buffered for special creation, the other messages are buffered
+ * together with all the other regular messages by _bufferHandler (and will be flushed
+ * after all the initialization messages have been processed).
+ */
 static void _initHandler(void *msg)
 {
   CkAssert(CkMyPe()!=0);
   register envelope *env = (envelope *) msg;
   switch (env->getMsgtype()) {
     case BocInitMsg:
-      if (env->getGroupEpoch()==0)
+      if (env->getGroupEpoch()==0) {
         CkpvAccess(_numInitsRecd)++;
-      CpvAccess(_qd)->process();
-      CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, env);
+        CpvAccess(_qd)->process();
+        CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, env);
+      } else _bufferHandler(msg);
       break;
     case NodeBocInitMsg:
-      CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-      if (env->getGroupEpoch()==0)
+      if (env->getGroupEpoch()==0) {
+        CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
         CksvAccess(_numInitNodeMsgs)++;
-      CksvAccess(_nodeBocInitVec)->insert(env->getGroupNum().idx, env);
-      CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
-      CpvAccess(_qd)->process();
+        CksvAccess(_nodeBocInitVec)->insert(env->getGroupNum().idx, env);
+        CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
+        CpvAccess(_qd)->process();
+      } else _bufferHandler(msg);
       break;
     case ROMsgMsg:
       CkpvAccess(_numInitsRecd)++;
@@ -616,7 +701,6 @@ void _CkExit(void)
   //
   CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
   CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-  CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
   DEBUGF(("[%d] CkExit - _exitStarted:%d %d\n", CkMyPe(), _exitStarted, _exitHandlerIdx));
 
   if(CkMyPe()==0) {
@@ -829,11 +913,9 @@ void _initCharm(int unused_argc, char **argv)
 
 	_charmHandlerIdx = CkRegisterHandler((CmiHandler)_bufferHandler);
 	_initHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
-	_roHandlerIdx = CkRegisterHandler((CmiHandler)_roHandler);
 	_roRestartHandlerIdx = CkRegisterHandler((CmiHandler)_roRestartHandler);
 	_exitHandlerIdx = CkRegisterHandler((CmiHandler)_exitHandler);
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
-	_nodeBocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
 	_triggerHandlerIdx = CkRegisterHandler((CmiHandler)_triggerHandler);
 	_ckModuleInit();
