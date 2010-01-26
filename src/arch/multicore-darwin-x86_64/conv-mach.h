@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
@@ -76,8 +69,6 @@
 #define CMK_NO_ISO_MALLOC				   1
 */
 #define CMK_USE_KQUEUE                                     1
-
-#define CMK_MACOSX_PTHREAD_HACK                            1
 
 #if !CMK_GCC_X86_ASM || !CMK_GCC_X86_ASM_ATOMICINCREMENT
 #define CMK_PCQUEUE_LOCK                                   1

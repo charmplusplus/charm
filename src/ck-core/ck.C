@@ -25,7 +25,7 @@ void automaticallySetMessagePriority(envelope *env); // in control point framewo
 #include "LBDatabase.h"
 #endif // CMK_LBDB_ON
 
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
 CpvDeclare(CkVec<void *>, chare_objs);
 CpvDeclare(CkVec<VidBlock *>, vidblocks);
 #endif
@@ -46,7 +46,7 @@ extern int _defaultObjectQ;
 Chare::Chare(void) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
      // for plain chare, objPtr is actually the index to chare table
   if (chareIdx >= 0) thishandle.objPtr=(void*)chareIdx;
 #endif
@@ -82,7 +82,7 @@ void Chare::pup(PUP::er &p)
 {
   p(thishandle.onPE);
   thishandle.objPtr=(void *)this;
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   p(chareIdx);
   if (chareIdx != -1) thishandle.objPtr=(void*)chareIdx;
 #endif
@@ -551,7 +551,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
     _MEMCHECK(pCid->objPtr);
     env->setMsgtype(NewVChareMsg);
     env->setVidPtr(pCid->objPtr);
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
     CpvAccess(vidblocks).push_back((VidBlock*)pCid->objPtr);
     int idx = CpvAccess(vidblocks).size()-1;
     pCid->objPtr = (void *)idx;
@@ -595,7 +595,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 
   CkpvAccess(_currentGroup) = groupID;
   CkpvAccess(_currentGroupRednMgr) = env->getRednMgr();
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   ((Chare *)obj)->chareIdx = -1;
 #endif
   _invokeEntryNoTrace(epIdx,env,obj); /* can't trace groups: would cause nested begin's */
@@ -618,7 +618,7 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 // User may call CkLocalNodeBranch() inside the nodegroup constructor
 //  store nodegroup into _currentNodeGroupObj
   CkpvAccess(_currentNodeGroupObj) = obj;
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   ((Chare *)obj)->chareIdx = -1;
 #endif
   _invokeEntryNoTrace(epIdx,env,obj);
@@ -684,7 +684,7 @@ void _createNodeGroup(CkGroupID groupID, envelope *env)
     CkPackMessage(&env);
     CmiSetHandler(env, _bocHandlerIdx);
     _numInitMsgs++;
-    CksvAccess(_numInitNodeMsgs)++;
+    if (CkpvAccess(_charmEpoch)==0) CksvAccess(_numInitNodeMsgs)++;
     CmiSyncNodeBroadcast(env->getTotalsize(), (char *)env);
     CpvAccess(_qd)->create(CkNumNodes()-1);
     CkUnpackMessage(&env);
@@ -774,7 +774,7 @@ static inline void *_allocNewChare(envelope *env, int &idx)
 {
   int chareIdx = _entryTable[env->getEpIdx()]->chareIdx;
   void *tmp=malloc(_chareTable[chareIdx]->size);
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   CpvAccess(chare_objs).push_back(tmp);
   idx = CpvAccess(chare_objs).size()-1;
 #endif
@@ -787,7 +787,7 @@ static void _processNewChareMsg(CkCoreState *ck,envelope *env)
 {
   int idx;
   register void *obj = _allocNewChare(env, idx);
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   ((Chare *)obj)->chareIdx = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
@@ -800,7 +800,7 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
   register CkChareID *pCid = (CkChareID *)
       _allocMsg(FillVidMsg, sizeof(CkChareID));
   pCid->onPE = CkMyPe();
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   pCid->objPtr = (void*)idx;
 #else
   pCid->objPtr = obj;
@@ -813,7 +813,7 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
   CmiSetHandler(ret, _charmHandlerIdx);
   CmiSyncSendAndFree(srcPe, ret->getTotalsize(), (char *)ret);
   CpvAccess(_qd)->create();
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   ((Chare *)obj)->chareIdx = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
@@ -831,7 +831,7 @@ static inline void _processForPlainChareMsg(CkCoreState *ck,envelope *env)
     obj = _mainTable[mainIdx]->getObj();
   }
   else {
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
     if (_chareTable[_entryTable[epIdx]->chareIdx]->chareType == TypeChare)
       obj = CpvAccess(chare_objs)[(CmiIntPtr)env->getObjPtr()];
     else
@@ -852,7 +852,7 @@ static inline void _processForChareMsg(CkCoreState *ck,envelope *env)
 
 static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
 {
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   register VidBlock *vptr = CpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
 #else
   register VidBlock *vptr = (VidBlock *) env->getVidPtr();
@@ -866,7 +866,7 @@ static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
 
 static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
 {
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
   register VidBlock *vptr = CpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
 #else
   VidBlock *vptr = (VidBlock *) env->getVidPtr();
@@ -1340,7 +1340,7 @@ static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
   if (pCid->onPE < 0) { //Virtual chare ID (VID)
     register int pe = -(pCid->onPE+1);
     if(pe==CkMyPe()) {
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
       VidBlock *vblk = CpvAccess(vidblocks)[(CmiIntPtr)pCid->objPtr];
 #else
       VidBlock *vblk = (VidBlock *) pCid->objPtr;
@@ -1395,15 +1395,19 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
 #endif
   register envelope *env = UsrToEnv(msg);
   int destPE=_prepareMsg(entryIdx,msg,pCid);
+  // Before it traced the creation only if destPE!=-1 (i.e it did not when the
+  // VidBlock was not yet filled). The problem is that the creation was never
+  // traced later when the VidBlock was filled. One solution is to trace the
+  // creation here, the other to trace it in VidBlock->msgDeliver().
+  _TRACE_CREATION_1(env);
   if (destPE!=-1) {
-    _TRACE_CREATION_1(env);
     CpvAccess(_qd)->create();
     if (opts & CK_MSG_SKIP_OR_IMM)
       _noCldEnqueue(destPE, env);
     else
       CldEnqueue(destPE, env, _infoIdx);
-    _TRACE_CREATION_DONE(1);
   }
+  _TRACE_CREATION_DONE(1);
 }
 
 extern "C"
@@ -1433,12 +1437,17 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
 {
   register envelope *env = UsrToEnv(msg);
+  CkNodeGroupID nodeRedMgr;
   _CHECK_USED(env);
   _SET_USED(env, 1);
   env->setMsgtype(type);
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
+#ifndef CMK_OPTIMIZE
+  nodeRedMgr.setZero();
+  env->setRednMgr(nodeRedMgr);
+#endif
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   criticalPath_send(env);
   automaticallySetMessagePriority(env);
@@ -1832,6 +1841,9 @@ printf("[%d] DELETE!\n", CkMyPe());
 //------------------- Message Watcher (record/replay) ----------------
 
 #include "crc32.h"
+
+CkpvDeclare(int, envelopeEventID);
+
 CkMessageWatcher::~CkMessageWatcher() {}
 
 class CkMessageRecorder : public CkMessageWatcher {
@@ -1845,8 +1857,13 @@ public:
 private:
   virtual CmiBool process(envelope *env,CkCoreState *ck) {
     if (env->getEvent()) {
-      unsigned int crc = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
-      fprintf(f,"%d %d %d %d %x\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc);
+      bool wasPacked = env->isPacked();
+      if (!wasPacked) CkPackMessage(&env);
+      //unsigned int crc = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
+      unsigned int crc1 = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
+      unsigned int crc2 = crc32_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
+      fprintf(f,"%d %d %d %hhd %x %x\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2);
+      if (!wasPacked) CkUnpackMessage(&env);
     }
     return CmiTrue;
   }
@@ -1865,9 +1882,12 @@ public:
   ~CkMessageDetailRecorder() {fclose(f);}
 private:
   virtual CmiBool process(envelope *env, CkCoreState *ck) {
+    bool wasPacked = env->isPacked();
+    if (!wasPacked) CkPackMessage(&env);
     CmiUInt4 size = env->getTotalsize();
     fwrite(&size, 4, 1, f);
     fwrite(env, env->getTotalsize(), 1, f);
+    if (!wasPacked) CkUnpackMessage(&env);
     return CmiTrue;
   }
 };
@@ -1875,15 +1895,19 @@ private:
 //#define REPLAYDEBUG(args) ckout<<"["<<CkMyPe()<<"] "<< args <<endl;
 #define REPLAYDEBUG(args) /* empty */
 
+extern "C" void CkMessageReplayQuiescence(void *rep, double time);
+
 class CkMessageReplay : public CkMessageWatcher {
+  int counter;
 	int nextPE, nextSize, nextEvent, nexttype; //Properties of next message we need:
-	unsigned int crc;
+	unsigned int crc1, crc2;
 	/// Read the next message we need from the file:
 	void getNext(void) {
-		if (5!=fscanf(f,"%d%d%d%d%x", &nextPE,&nextSize,&nextEvent,&nexttype,&crc)) {
+		if (6!=fscanf(f,"%d%d%d%d%x%x", &nextPE,&nextSize,&nextEvent,&nexttype,&crc1,&crc2)) {
 			// CkAbort("CkMessageReplay> Syntax error reading replay file");
 			nextPE=nextSize=nextEvent=nexttype=-1; //No destructor->record file just ends in the middle!
 		}
+		counter++;
 	}
 	/// If this is the next message we need, advance and return CmiTrue.
 	CmiBool isNext(envelope *env) {
@@ -1894,10 +1918,18 @@ class CkMessageReplay : public CkMessageWatcher {
 			CkPrintf("CkMessageReplay> Message size changed during replay org: [%d %d %d] got: [%d %d %d]\n", nextPE, nextEvent, nextSize, env->getSrcPe(), env->getEvent(), env->getTotalsize());
                         return CmiFalse;
                 }
-		unsigned int crcnew = crc32(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
-		if (crcnew != crc) {
-		  CkPrintf("CkMessageReplay> Message CRC changed during replay org: [0x%x] got: [0x%x]\n",crc,crcnew);
+		bool wasPacked = env->isPacked();
+		if (!wasPacked) CkPackMessage(&env);
+		//unsigned int crcnew = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
+		unsigned int crcnew1 = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
+		unsigned int crcnew2 = crc32_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
+		if (crcnew1 != crc1) {
+		  CkPrintf("CkMessageReplay %d> Envelope CRC changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc1,crcnew1);
 		}
+        if (crcnew2 != crc2) {
+          CkPrintf("CkMessageReplay %d> Message CRC changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc2,crcnew2);
+        }
+        if (!wasPacked) CkUnpackMessage(&env);
 		return CmiTrue;
 	}
 
@@ -1925,9 +1957,11 @@ class CkMessageReplay : public CkMessageWatcher {
 
 public:
 	CkMessageReplay(FILE *f_) {
+	  counter=0;
 	  f=f_;
 	  getNext();
 	  REPLAYDEBUG("Constructing ckMessageReplay: "<< nextPE <<" "<< nextSize <<" "<<nextEvent);
+	  CmiStartQD(CkMessageReplayQuiescence, this);
 	}
 	~CkMessageReplay() {fclose(f);}
 
@@ -1962,6 +1996,12 @@ private:
 	}
 };
 
+extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
+  CkPrintf("[%d] Quiescence detected\n",CkMyPe());
+  CkMessageReplay *replay = (CkMessageReplay*)rep;
+  
+}
+
 #include "trace-common.h" /* For traceRoot and traceRootBaseLength */
 
 static FILE *openReplayFile(const char *prefix, const char *suffix, const char *permissions) {
@@ -1987,16 +2027,20 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     if (CmiGetArgStringDesc(argv,"+record-detail",&procs,"Record full message content for the specified processors")) {
         CkListString list(procs);
         if (list.includes(CkMyPe())) {
+          CpdSetInitializeMemory(1);
           ck->addWatcher(new CkMessageDetailRecorder(openReplayFile("ckreplay_",".detail","w")));
         }
     }
 	if (CmiGetArgFlagDesc(argv,"+record","Record message processing order")) {
+	    CpdSetInitializeMemory(1);
 		ck->addWatcher(new CkMessageRecorder(openReplayFile("ckreplay_",".log","w")));
 	}
 	if (CmiGetArgFlagDesc(argv,"+replay","Re-play recorded message stream")) {
+	    CpdSetInitializeMemory(1);
 		ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
 	}
 	if (CmiGetArgStringDesc(argv,"+replay-detail",&procs,"Re-play the specified processors from recorded message content")) {
+	    CpdSetInitializeMemory(1);
 	  /*Nothing yet*/
 	}
 }

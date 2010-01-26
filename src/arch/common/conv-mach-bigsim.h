@@ -14,3 +14,6 @@
 
 #define BIGSIM_OUT_OF_CORE                                 0
 #define BIGSIM_OOC_PREFETCH                                0
+
+
+#define CMK_CHARE_USE_PTR                                  1

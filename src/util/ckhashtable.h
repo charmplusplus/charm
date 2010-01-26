@@ -238,7 +238,7 @@ public:
 	//Add the given object to this table under the given key
 	// Returns pointer to object storage.
 	// Table will be resized if needed.
-	void *put(const void *key);
+	void *put(const void *key, int *existing=NULL);
 	
 	//Look up the given object in this table.  Return NULL if not found.
 	void *get(const void *key) const {
@@ -332,8 +332,8 @@ public:
 	 :CkHashtable(getLayout(),initLen,NloadFactor,Nhash,Ncompare)
 	 {}
 	
-	OBJ &put(const KEY &key) {
-		void *obj = CkHashtable::put((const void *)&key);
+	OBJ &put(const KEY &key, int *existing=NULL) {
+		void *obj = CkHashtable::put((const void *)&key, existing);
 		return *(OBJ *)obj;
 	}
 	OBJ get(const KEY &key) const {

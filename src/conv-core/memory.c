@@ -57,6 +57,7 @@
 #include "converse.h"
 
 void * memory_stack_top; /*The higher end of the stack (approximation)*/
+int cpdInSystem=0;
 
 /*Choose the proper default configuration*/
 #if CMK_MEMORY_BUILD_DEFAULT
@@ -735,6 +736,7 @@ void CmiOutOfMemoryInit(void) {
 
 #ifndef CMK_MEMORY_BUILD_CHARMDEBUG
 /* declare the cpd_memory routines */
+void CpdSetInitializeMemory(int v) { }
 size_t  cpd_memory_length(void *lenParam) { return 0; }
 void cpd_memory_pup(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
 void cpd_memory_leak(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
@@ -760,6 +762,10 @@ void CpdResetMemory() { }
 void CpdCheckMemory() { }
 
 int get_memory_allocated_user_total() { return 0; }
+void * MemoryToSlot(void *ptr) { return NULL; }
+int Slot_ChareOwner(void *s) { return 0; }
+int Slot_AllocatedSize(void *s) { return 0; }
+int Slot_StackTrace(void *s, void ***stack) { return 0; }
 #ifdef setMemoryChareIDFromPtr
 #undef setMemoryChareIDFromPtr
 #endif

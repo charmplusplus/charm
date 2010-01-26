@@ -492,6 +492,7 @@ void CcsBuiltinsInit(char **argv);
 
 CpvDeclare(int, cmiArgDebugFlag);
 CpvDeclare(char *, displayArgument);
+CpvDeclare(int, cpdSuspendStartup);
 
 void CcsInit(char **argv)
 {
@@ -502,9 +503,11 @@ void CcsInit(char **argv)
   _ccsHandlerIdx = CmiRegisterHandler((CmiHandler)req_fw_handler);
   CpvInitialize(int, cmiArgDebugFlag);
   CpvInitialize(char *, displayArgument);
+  CpvInitialize(int, cpdSuspendStartup);
   CpvAccess(cmiArgDebugFlag) = 0;
   CpvAccess(displayArgument) = NULL;
-
+  CpvAccess(cpdSuspendStartup) = 0;
+  
   CcsBuiltinsInit(argv);
 
   rep_fw_handler_idx = CmiRegisterHandler((CmiHandler)rep_fw_handler);
@@ -541,6 +544,9 @@ void CcsInit(char **argv)
             CmiPrintf("WARNING> x term for gdb needs to be specified as +DebugDisplay by debugger\n***\n");
      }
 
+     if (CmiGetArgFlagDesc(argv, "+DebugSuspend", "Suspend execution at beginning of program")) {
+       CpvAccess(cpdSuspendStartup) = 1;
+     }
   }
 }
 

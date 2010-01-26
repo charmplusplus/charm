@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #define CMK_SMP						   1
 
 #undef CMK_MALLOC_USE_GNU_MALLOC
@@ -22,8 +15,6 @@
 #undef CMK_SHARED_VARS_POSIX_THREADS_SMP
 #define CMK_SHARED_VARS_UNAVAILABLE                        0
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  1
-
-#define CMK_LINUX_PTHREAD_HACK                             1
 
 #undef CMK_SYNCHRONIZE_ON_TCP_CLOSE
 #define CMK_SYNCHRONIZE_ON_TCP_CLOSE                       1

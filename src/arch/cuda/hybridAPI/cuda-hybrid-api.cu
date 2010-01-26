@@ -194,10 +194,6 @@ void allocateBuffers(workRequest *wr) {
       int index = bufferInfo[i].bufferID; 
       int size = bufferInfo[i].size; 
 
-      if (bufferInfo[i].transferToDevice == 0) {
-	continue; 
-      }
-
       // if index value is invalid, use an available ID  
       if (index < 0 || index >= NUM_BUFFERS) {
 	int found = 0; 
