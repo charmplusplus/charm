@@ -9,10 +9,8 @@
 using namespace ControlPoint;
 using namespace std;
 
-enum DIRECTION {EFF_DEC, EFF_INC};
-
 CkpvDeclare(ControlPoint::cp_effect_map, cp_effects);
-CkpvDeclare(ControlPoint::cp_name_map, cp_names);
+//CkpvDeclare(ControlPoint::cp_name_map, cp_names);
 
 NoControlPointAssociation default_assoc;
 
@@ -28,7 +26,7 @@ ControlPoint::ControlPointAssociatedArray ControlPoint::assocWithArray(const CPr
 
 void ControlPoint::initControlPointEffects() {
     CkpvInitialize(cp_effect_map, cp_effects);
-    CkpvInitialize(cp_name_map, cp_names);
+//    CkpvInitialize(cp_name_map, cp_names);
 }
 
 void testControlPointEffects() {
@@ -40,10 +38,10 @@ void testControlPointEffects() {
 	ControlPoint::EffectDecrease::MemoryConsumption("name");
 	ControlPoint::EffectIncrease::MemoryConsumption("name", assocWithEntry(0));
 	ControlPoint::EffectDecrease::MemoryConsumption("name", assocWithEntry(0));
-	ControlPoint::EffectIncrease::Granularity("name");
-	ControlPoint::EffectDecrease::Granularity("name");
-	ControlPoint::EffectIncrease::Granularity("name", assocWithEntry(0));
-	ControlPoint::EffectDecrease::Granularity("name", assocWithEntry(0));
+	ControlPoint::EffectIncrease::GrainSize("name");
+	ControlPoint::EffectDecrease::GrainSize("name");
+	ControlPoint::EffectIncrease::GrainSize("name", assocWithEntry(0));
+	ControlPoint::EffectDecrease::GrainSize("name", assocWithEntry(0));
 	ControlPoint::EffectIncrease::ComputeDurations("name");
 	ControlPoint::EffectDecrease::ComputeDurations("name");
 	ControlPoint::EffectIncrease::ComputeDurations("name", assocWithEntry(0));
@@ -92,8 +90,10 @@ void testControlPointEffects() {
 }
 
 void insert(const std::string effect, const std::string name, const ControlPoint::ControlPointAssociation &assoc, const int direction) {
-    CkpvAccess(cp_effects)[effect][name].push_back(std::make_pair(direction, assoc));
-    CkpvAccess(cp_names)[name].push_back(std::make_pair(direction, assoc));
+   std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > &info = CkpvAccess(cp_effects)[effect][name];
+   info.first = direction;
+   info.second.push_back(assoc);
+  // CkpvAccess(cp_names)[name] = make_pair(push_back(std::make_pair(direction, assoc));
 }
 
 void ControlPoint::EffectDecrease::Priority(std::string s, const ControlPoint::ControlPointAssociation &a) {
@@ -120,17 +120,17 @@ void ControlPoint::EffectDecrease::MemoryConsumption(std::string s) {
 void ControlPoint::EffectIncrease::MemoryConsumption(std::string s) {
 	insert("MemoryConsumption", s, default_assoc, EFF_INC);
 }
-void ControlPoint::EffectDecrease::Granularity(std::string s, const ControlPoint::ControlPointAssociation &a) {
-	insert("Granularity", s, a, EFF_DEC);
+void ControlPoint::EffectDecrease::GrainSize(std::string s, const ControlPoint::ControlPointAssociation &a) {
+	insert("GrainSize", s, a, EFF_DEC);
 }
-void ControlPoint::EffectIncrease::Granularity(std::string s, const ControlPoint::ControlPointAssociation &a) {
-	insert("Granularity", s, a, EFF_INC);
+void ControlPoint::EffectIncrease::GrainSize(std::string s, const ControlPoint::ControlPointAssociation &a) {
+	insert("GrainSize", s, a, EFF_INC);
 }
-void ControlPoint::EffectDecrease::Granularity(std::string s) {
-	insert("Granularity", s, default_assoc, EFF_DEC);
+void ControlPoint::EffectDecrease::GrainSize(std::string s) {
+	insert("GrainSize", s, default_assoc, EFF_DEC);
 }
-void ControlPoint::EffectIncrease::Granularity(std::string s) {
-	insert("Granularity", s, default_assoc, EFF_INC);
+void ControlPoint::EffectIncrease::GrainSize(std::string s) {
+	insert("GrainSize", s, default_assoc, EFF_INC);
 }
 void ControlPoint::EffectDecrease::ComputeDurations(std::string s, const ControlPoint::ControlPointAssociation &a) {
 	insert("ComputeDurations", s, a, EFF_DEC);
