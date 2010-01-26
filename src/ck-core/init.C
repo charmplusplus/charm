@@ -75,10 +75,8 @@ CksvDeclare(UInt,_numInitNodeMsgs);
 int   _infoIdx;
 int   _charmHandlerIdx;
 int   _initHandlerIdx;
-int   _roHandlerIdx;
 int   _roRestartHandlerIdx;
 int   _bocHandlerIdx;
-int   _nodeBocHandlerIdx;
 int   _qdHandlerIdx;
 int   _qdCommHandlerIdx;
 int   _triggerHandlerIdx;
@@ -362,7 +360,6 @@ static void _exitHandler(envelope *env)
       _exitStarted = 1;
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-      CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
@@ -386,7 +383,6 @@ static void _exitHandler(envelope *env)
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-      CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
 	/*FAULT_EVAC*/
       if(CmiNodeAlive(CkMyPe())){
          _sendStats();
@@ -454,7 +450,6 @@ static inline void _processBufferedBocInits(void)
 static inline void _processBufferedNodeBocInits(void)
 {
   CkCoreState *ck = CkpvAccess(_coreState);
-  CkNumberHandlerEx(_nodeBocHandlerIdx,(CmiHandlerEx)_processHandler,ck);
   register int i = 0;
   PtrVec &inits=*CksvAccess(_nodeBocInitVec);
   register int len = inits.size();
@@ -560,12 +555,6 @@ static void _roRestartHandler(void *msg)
   _processRODataMsg(env);
 }
 
-static void _roHandler(void *msg)
-{
-  CpvAccess(_qd)->process();
-  _roRestartHandler(msg);
-}
-
 static void _initHandler(void *msg)
 {
   CkAssert(CkMyPe()!=0);
@@ -616,7 +605,6 @@ void _CkExit(void)
   //
   CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
   CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-  CkNumberHandler(_nodeBocHandlerIdx, (CmiHandler)_discardHandler);
   DEBUGF(("[%d] CkExit - _exitStarted:%d %d\n", CkMyPe(), _exitStarted, _exitHandlerIdx));
 
   if(CkMyPe()==0) {
@@ -829,11 +817,9 @@ void _initCharm(int unused_argc, char **argv)
 
 	_charmHandlerIdx = CkRegisterHandler((CmiHandler)_bufferHandler);
 	_initHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
-	_roHandlerIdx = CkRegisterHandler((CmiHandler)_roHandler);
 	_roRestartHandlerIdx = CkRegisterHandler((CmiHandler)_roRestartHandler);
 	_exitHandlerIdx = CkRegisterHandler((CmiHandler)_exitHandler);
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
-	_nodeBocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
 	_triggerHandlerIdx = CkRegisterHandler((CmiHandler)_triggerHandler);
 	_ckModuleInit();
