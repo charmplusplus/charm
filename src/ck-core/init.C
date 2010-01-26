@@ -437,9 +437,9 @@ static inline void _processBufferedBocInits(void)
   register int i = 0;
   PtrVec &inits=*CkpvAccess(_bocInitVec);
   register int len = inits.size();
-  for(i=0; i<len; i++) {
+  for(i=1; i<len; i++) {
     envelope *env = inits[i];
-    if(env==0) continue;
+    if(env==0) CkAbort("_processBufferedBocInits: empty message");
     if(env->isPacked())
       CkUnpackMessage(&env);
     _processBocInitMsg(ck,env);
@@ -447,15 +447,20 @@ static inline void _processBufferedBocInits(void)
   delete &inits;
 }
 
+/**
+ * Create all nodegroups in this node (called only by rank zero, and never on node zero).
+ * Notice that only nodegroups created in mainchares are processed here;
+ * nodegroups created later are processed as regular messages.
+ */
 static inline void _processBufferedNodeBocInits(void)
 {
   CkCoreState *ck = CkpvAccess(_coreState);
   register int i = 0;
   PtrVec &inits=*CksvAccess(_nodeBocInitVec);
   register int len = inits.size();
-  for(i=0; i<len; i++) {
+  for(i=1; i<len; i++) {
     envelope *env = inits[i];
-    if(env==0) continue;
+    if(env==0) CkAbort("_processBufferedNodeBocInits: empty message");
     if(env->isPacked())
       CkUnpackMessage(&env);
     _processNodeBocInitMsg(ck,env);
@@ -561,18 +566,20 @@ static void _initHandler(void *msg)
   register envelope *env = (envelope *) msg;
   switch (env->getMsgtype()) {
     case BocInitMsg:
-      if (env->getGroupEpoch()==0)
+      if (env->getGroupEpoch()==0) {
         CkpvAccess(_numInitsRecd)++;
-      CpvAccess(_qd)->process();
-      CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, env);
+        CpvAccess(_qd)->process();
+        CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, env);
+      } else _bufferHandler(msg);
       break;
     case NodeBocInitMsg:
-      CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-      if (env->getGroupEpoch()==0)
+      if (env->getGroupEpoch()==0) {
+        CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
         CksvAccess(_numInitNodeMsgs)++;
-      CksvAccess(_nodeBocInitVec)->insert(env->getGroupNum().idx, env);
-      CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
-      CpvAccess(_qd)->process();
+        CksvAccess(_nodeBocInitVec)->insert(env->getGroupNum().idx, env);
+        CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
+        CpvAccess(_qd)->process();
+      } else _bufferHandler(msg);
       break;
     case ROMsgMsg:
       CkpvAccess(_numInitsRecd)++;
