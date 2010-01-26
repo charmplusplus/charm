@@ -115,6 +115,7 @@ void ComlibManager::init(){
 	CkpvAccess(RecvmsgHandle) =CkRegisterHandler((CmiHandler)recv_array_msg);
 
 	bcast_pelist = new int [CkNumPes()];
+	_MEMCHECK(bcast_pelist);
 	for(int brcount = 0; brcount < CkNumPes(); brcount++)
 		bcast_pelist[brcount] = brcount;
 
