@@ -101,6 +101,17 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
  	}
 
 	char fileName[1024];
+
+#ifndef CMK_CHARE_USE_PTR
+	// save groups into Chares.dat
+	sprintf(fileName,"%s/Chares_%d.dat",dirname,CkMyPe());
+	FILE* fChares = fopen(fileName,"wb");
+	if(!fChares) CkAbort("Failed to create checkpoint file for chares!");
+	PUP::toDisk pChares(fChares);
+	CkPupChareData(pChares);
+	fclose(fChares);
+#endif
+
 	// save groups into Groups.dat
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
 	sprintf(fileName,"%s/Groups_%d.dat",dirname,CkMyPe());
@@ -542,6 +553,18 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 		//bdcastRO(); // moved to CkPupMainChareData()
 	}
 	
+#ifndef CMK_CHARE_USE_PTR
+	// restore chares only when number of pes is the same 
+	if(CkNumPes() == _numPes) {
+		sprintf(filename,"%s/Chares_%d.dat",dirname,CkMyPe());
+		FILE* fChares = fopen(filename,"rb");
+		if(!fChares) CkAbort("Failed to open checkpoint file for chares!");
+		PUP::fromDisk pChares(fChares);
+		CkPupChareData(pChares);
+		fclose(fChares);
+	}
+#endif
+
 	// restore groups
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
 	// restore from PE0's copy if shrink/expand

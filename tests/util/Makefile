@@ -10,6 +10,16 @@ check: check.o
 check.o: check.C
 	$(CHARMC) -c check.C
 
+headerpad: headerpad.o
+	$(CHARMC) -language charm++ -o headerpad headerpad.o -tracemode recordreplay
+
+headerpad.decl.h: headerpad.ci
+	$(CHARMC)  headerpad.ci
+
+headerpad.o: headerpad.C headerpad.decl.h headerpad.h
+	$(CHARMC) -c headerpad.C
+
+
 test: check
 	./charmrun +p1 ./check $(TESTOPTS)
 	@echo tests if MACHINE_DEBUG is enabled in machine.h and fails if it is set
