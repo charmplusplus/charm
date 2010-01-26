@@ -19,9 +19,15 @@ PUPbytes(pointer) //Pointers get sent as raw bytes
 #define ARMCI_GET 	0x1
 #define ARMCI_PUT 	0x2
 #define ARMCI_ACC 	0x3
+#define ARMCI_BGET      0x5
 #define ARMCI_BPUT	0x6
 #define ARMCI_BACC 	0x7
+
+#define ARMCI_IGET      0x9  // implicit get
+#define ARMCI_IPUT      0xa  // implicit put
+
 #define BLOCKING_MASK	0x4
+#define IMPLICIT_MASK   0x8  // anything that is implicit is non-blocking
 
 class Armci_Hdl {
 public:
@@ -29,18 +35,21 @@ public:
    int proc;
    int nbytes;
    int acked;
+   int wait;    // Is WaitProc or WaitAll waiting for me?
    pointer src;
    pointer dst;
    
-   Armci_Hdl() : op(ARMCI_INVALID), proc(-1), nbytes(0), acked(0), src(NULL), dst(NULL) 
+ Armci_Hdl() : op(ARMCI_INVALID), proc(-1), nbytes(0), acked(0), wait(0), src(NULL), dst(NULL) 
    	{ }
    Armci_Hdl(int o, int p, int n, pointer s, pointer d):
-   	op(o), proc(p), nbytes(n), acked(0), src(s), dst(d) { }
+   op(o), proc(p), nbytes(n), acked(0), wait(0), src(s), dst(d) { }
    void pup(PUP::er &p){
-     p|op; p|proc; p|nbytes; p|acked; p|src; p|dst;	
+     p|op; p|proc; p|nbytes; p|acked; p|wait; p|src; p|dst;	
    }
 };
 
+// Support for ARMCI notify feature designed for Co-Array Fortran. Should
+//   be orthogonal to wait/fence operations.
 class Armci_Note{
 public:
   int proc;
@@ -157,6 +166,7 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   void putData(ArmciMsg* msg);
   void putAck(int hdl);
   int nbput(pointer src, pointer dst, int bytes, int dst_proc);
+  void nbput_implicit(pointer src, pointer dst, int bytes, int dst_proc);
   void wait(int hdl);
   int test(int hdl);
   void waitmulti(vector<int> procs);
@@ -168,6 +178,7 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   
   void get(pointer src, pointer dst, int bytes, int src_proc);
   int nbget(pointer src, pointer dst, int bytes, int dst_proc);
+  void nbget_implicit(pointer src, pointer dst, int bytes, int dst_proc);
   void requestFromGet(pointer src, pointer dst, int nbytes, int dst_proc, int hdl);
   void putDataFromGet(pointer dst, int nbytes, char *data, int hdl);
   void putDataFromGet(ArmciMsg* msg);
@@ -178,6 +189,9 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   int nbputs(pointer src_ptr, int src_stride_ar[], 
 	   pointer dst_ptr, int dst_stride_ar[],
 	   int count[], int stride_levels, int dst_proc);
+  void nbputs_implicit(pointer src_ptr, int src_stride_ar[], 
+		       pointer dst_ptr, int dst_stride_ar[],
+		       int count[], int stride_levels, int dst_proc);
   void putsData(pointer dst_ptr, int dst_stride_ar[], 
   		int count[], int stride_levels,
 		int nbytes, char *data, int src_proc, int hdl);
@@ -189,6 +203,9 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   int nbgets(pointer src_ptr, int src_stride_ar[], 
 	   pointer dst_ptr, int dst_stride_ar[],
 	   int count[], int stride_levels, int src_proc);
+  void nbgets_implicit(pointer src_ptr, int src_stride_ar[], 
+		       pointer dst_ptr, int dst_stride_ar[],
+		       int count[], int stride_levels, int src_proc);
   void requestFromGets(pointer src_ptr, int src_stride_ar[], 
 	   pointer dst_ptr, int dst_stride_ar[],
 	   int count[], int stride_levels, int dst_proc, int hdl);

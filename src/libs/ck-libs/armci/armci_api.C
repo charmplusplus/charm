@@ -120,7 +120,11 @@ CDECL int ARMCI_Put(void *src, void *dst, int bytes, int proc) {
 CDECL int ARMCI_NbPut(void *src, void* dst, int bytes, int proc, armci_hdl_t *handle){
   TCHARM_API_TRACE("ARMCI_NbPut", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
-  *handle = vp->nbput(src, dst, bytes, proc);
+  if (handle != NULL) {
+    *handle = vp->nbput(src, dst, bytes, proc);
+  } else {
+    vp->nbput_implicit(src, dst, bytes, proc);
+  }
   return 0;
 }
 
@@ -135,7 +139,11 @@ CDECL int ARMCI_Get(void *src, void *dst, int bytes, int proc) {
 CDECL int ARMCI_NbGet(void *src, void* dst, int bytes, int proc, armci_hdl_t *handle){
   TCHARM_API_TRACE("ARMCI_NbGet", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
-  *handle = vp->nbget(src, dst, bytes, proc);
+  if (handle != NULL) {
+    *handle = vp->nbget(src, dst, bytes, proc);
+  } else {
+    vp->nbget_implicit(src, dst, bytes, proc);
+  }
   return 0;
 }
 
@@ -175,7 +183,13 @@ CDECL int ARMCI_NbPutS(
 		 ){
   TCHARM_API_TRACE("ARMCI_NbPutS", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
-  *handle = vp->nbputs(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar, count, stride_levels, proc);
+  if (handle != NULL) {
+    *handle = vp->nbputs(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar, 
+			 count, stride_levels, proc);
+  } else {
+    vp->nbputs_implicit(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar,
+			count, stride_levels, proc);
+  }
   return 0;
 }
 
@@ -213,7 +227,13 @@ CDECL int ARMCI_NbGetS(
 	        ){
   TCHARM_API_TRACE("ARMCI_NbGetS", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
-  *handle = vp->nbgets(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar, count, stride_levels, proc);
+  if (handle != NULL) {
+    *handle = vp->nbgets(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar, 
+			 count, stride_levels, proc);
+  } else {
+    vp->nbgets_implicit(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar,
+			count, stride_levels, proc);
+  }
   return 0;
 }
 
@@ -265,12 +285,20 @@ CDECL long ARMCI_GetValueLong(void *src, int proc) { return 0; }
 CDECL int ARMCI_GetValueInt(void *src, int proc) { return 0; }
 CDECL float ARMCI_GetValueFloat(void *src, int proc) { return 0.0; }
 CDECL double ARMCI_GetValueDouble(void *src, int proc) { return 0.0; }
+CDECL long ARMCI_NbGetValueLong(void *src, int proc, armci_hdl_t* handle) { return 0; }
+CDECL int ARMCI_NbGetValueInt(void *src, int proc, armci_hdl_t* handle) { return 0; }
+CDECL float ARMCI_NbGetValueFloat(void *src, int proc, armci_hdl_t* handle) { return 0.0; }
+CDECL double ARMCI_NbGetValueDouble(void *src, int proc, armci_hdl_t* handle) { return 0.0; }
 
 // global completion operations
 CDECL int ARMCI_Wait(armci_hdl_t *handle){
   TCHARM_API_TRACE("ARMCI_Wait", "armci");
   ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
-  vp->wait(*handle);
+  if (handle != NULL) {
+    vp->wait(*handle);
+  } else {
+    CmiAbort("ARMCI ERROR: Cannot pass NULL to ARMCI_Wait\n");
+  }
   return 0;
 }
 
@@ -390,7 +418,22 @@ CDECL int armci_notify_wait(int proc, int *pval){
 CDECL void armci_msg_brdcst(void *buffer, int len, int root) {
 }
 
+CDECL void armci_msg_bcast(void *buffer, int len, int root) {
+}
+
 CDECL void armci_msg_gop2(void *x, int n, int type, char *op) {
+}
+
+CDECL void armci_msg_igop(int *x, int n, char *op) {
+}
+
+CDECL void armci_msg_lgop(long *x, int n, char *op) {
+}
+
+CDECL void armci_msg_fgop(float *x, int n, char *op) {
+}
+
+CDECL void armci_msg_dgop(double *x, int n, char *op) {
 }
 
 CDECL void armci_msg_barrier(void) {

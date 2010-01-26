@@ -32,7 +32,8 @@ class VidBlock {
     PtrQ *msgQ;
     CkChareID actualID;
     void msgDeliver(envelope *env) {
-        env->setSrcPe(CkMyPe());
+        // This was causing sync entry methods not to return properly in some cases
+        //env->setSrcPe(CkMyPe());
         env->setMsgtype(ForChareMsg);
         env->setObjPtr(actualID.objPtr);
         CldEnqueue(actualID.onPE, env, _infoIdx);

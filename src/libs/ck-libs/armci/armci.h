@@ -240,6 +240,10 @@ long ARMCI_GetValueLong(void *src, int proc);
 int ARMCI_GetValueInt(void *src, int proc);
 float ARMCI_GetValueFloat(void *src, int proc);
 double ARMCI_GetValueDouble(void *src, int proc);
+long ARMCI_NbGetValueLong(void *src, int proc, armci_hdl_t* handle);
+int ARMCI_NbGetValueInt(void *src, int proc, armci_hdl_t* handle);
+float ARMCI_NbGetValueFloat(void *src, int proc, armci_hdl_t* handle);
+double ARMCI_NbGetValueDouble(void *src, int proc, armci_hdl_t* handle);
 
 /* ********************************** */
 /* Functions for Non-blocking support */
@@ -303,7 +307,12 @@ void ARMCI_MemCheckpoint(void);
 /* ******************************** */
 /* Collective Operations            */
 void armci_msg_brdcst(void *buffer, int len, int root);
+void armci_msg_bcast(void *buffer, int len, int root);
 void armci_msg_gop2(void *x, int n, int type, char *op);
+void armci_msg_igop(int *x, int n, char *op);
+void armci_msg_lgop(long *x, int n, char *op);
+void armci_msg_fgop(float *x, int n, char *op);
+void armci_msg_dgop(double *x, int n, char *op);
 void armci_msg_barrier(void);
 void armci_msg_reduce(void *x, int n, char *op, int type);
 
@@ -321,4 +330,4 @@ int armci_domain_my_id(armci_domain_t domain);
 
 #define ARMCI_INIT_HANDLE(hdl) 
 
-#endif
+#endif // _ARMCI_H

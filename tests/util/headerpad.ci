@@ -1,0 +1,9 @@
+mainmodule headerpad {
+  readonly CProxy_main mainProxy;
+  message testMsg;	   
+
+  mainchare main {
+    entry main(CkArgMsg *m);
+    entry void recv(testMsg *m);
+  };
+};
