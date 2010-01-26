@@ -1164,7 +1164,7 @@ void controlPointManager::generatePlan() {
     instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
     instrumentedPhase *prevPhase = previousPhaseData();
  
-    if(phase_id%4 == 0){
+    if(phase_id%2 == 0){
       CkPrintf("Steering (memory based) based on 2 phases ago:\n");
       twoAgoPhase->print();
       CkPrintf("\n");

@@ -26,6 +26,7 @@
 #include <vector>
 #include <utility>
 #include <limits>
+#include <algorithm>
 #include <float.h>
 
 #include "LBDatabase.h"
