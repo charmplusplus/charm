@@ -554,16 +554,15 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	}
 	
 #ifndef CMK_CHARE_USE_PTR
-	// restore chares
-	if(CkNumPes() != _numPes)
-		CmiAbort("Can not restart from an application with plain Chares on a different number of processors!");
-	else
+	// restore chares only when number of pes is the same 
+	if(CkNumPes() == _numPes) {
 		sprintf(filename,"%s/Chares_%d.dat",dirname,CkMyPe());
-	FILE* fChares = fopen(filename,"rb");
-	if(!fChares) CkAbort("Failed to open checkpoint file for chares!");
-	PUP::fromDisk pChares(fChares);
-	CkPupChareData(pChares);
-	fclose(fChares);
+		FILE* fChares = fopen(filename,"rb");
+		if(!fChares) CkAbort("Failed to open checkpoint file for chares!");
+		PUP::fromDisk pChares(fChares);
+		CkPupChareData(pChares);
+		fclose(fChares);
+	}
 #endif
 
 	// restore groups
