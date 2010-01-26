@@ -114,6 +114,7 @@ Tau:
 
 LIBS: CONVLIBS CHARMLIBS
 	cd libs; $(MAKE) otherlibs
+	echo "Built LIBS Successfully"
 
 bgtest: bigsim AMPI
 	cd ../tests ; $(MAKE) bgtest OPTS='$(OPTS)'
