@@ -110,21 +110,16 @@ CkReductionMsg *idleTimeReduction(int nMsg,CkReductionMsg **msgs){
 /// A reduction type that combines idle, overhead, and memory measurements
 CkReduction::reducerType allMeasuresReductionType;
 /// A reducer that combines idle, overhead, and memory measurements
+#define ALL_REDUCTION_SIZE 12
 CkReductionMsg *allMeasuresReduction(int nMsg,CkReductionMsg **msgs){
-  double ret[7];
+  double ret[ALL_REDUCTION_SIZE];
   if(nMsg > 0){
-    CkAssert(msgs[0]->getSize()==7*sizeof(double));
+    CkAssert(msgs[0]->getSize()==ALL_REDUCTION_SIZE*sizeof(double));
     double *m=(double *)msgs[0]->getData();
-    ret[0]=m[0];
-    ret[1]=m[1];
-    ret[2]=m[2];
-    ret[3]=m[3];
-    ret[4]=m[4];
-    ret[5]=m[5];
-    ret[6]=m[6];
+    memcpy(ret, m, ALL_REDUCTION_SIZE*sizeof(double) );
   }
   for (int i=1;i<nMsg;i++) {
-    CkAssert(msgs[i]->getSize()==7*sizeof(double));
+    CkAssert(msgs[i]->getSize()==ALL_REDUCTION_SIZE*sizeof(double));
     double *m=(double *)msgs[i]->getData();
     // idle time (min/sum/max)
     ret[0]=min(ret[0],m[0]);
@@ -136,8 +131,15 @@ CkReductionMsg *allMeasuresReduction(int nMsg,CkReductionMsg **msgs){
     ret[5]=max(ret[5],m[5]);
     // mem usage (max)
     ret[6]=max(ret[6],m[6]);
+    // bytes per invocation for two types of entry methods
+    ret[7]+=m[7];
+    ret[8]+=m[8];
+    ret[9]+=m[9];
+    ret[10]+=m[10];
+    // Grain size (avg)
+    ret[11]+=m[11];
   }  
-  return CkReductionMsg::buildNew(7*sizeof(double),ret);   
+  return CkReductionMsg::buildNew(ALL_REDUCTION_SIZE*sizeof(double),ret);   
 }
 
 
@@ -276,9 +278,16 @@ controlPointManager::controlPointManager(){
       iss >> ips->memoryUsageMB;
       //     CkPrintf("Memory usage loaded from file: %d\n", ips.memoryUsageMB);
 
+      // Read idle time
       iss >> ips->idleTime.min;
       iss >> ips->idleTime.avg;
       iss >> ips->idleTime.max;
+
+      // read bytePerInvoke
+      iss >> ips->bytesPerInvoke;
+
+      // read grain size
+      iss >> ips->grainSize;
 
       // Read control point values
       for(int cp=0;cp<numControlPointNames;cp++){
@@ -286,6 +295,12 @@ controlPointManager::controlPointManager(){
 	iss >> cpvalue;
 	ips->controlPoints.insert(make_pair(names[cp],cpvalue));
       }
+
+      // ignore median time
+      double mt;
+      iss >> mt;
+
+      // Read all times
 
       double time;
 
@@ -714,40 +729,53 @@ controlPointManager::controlPointManager(){
 
   /// Entry method called on all PEs to request CPU utilization statistics and memory usage
   void controlPointManager::requestAll(CkCallback cb){
-    const double i = localControlPointTracingInstance()->idleRatio();
-    const double o = localControlPointTracingInstance()->overheadRatio();
-    const double m = localControlPointTracingInstance()->memoryUsageMB();
-    
-    double data[3+3+1];
+    TraceControlPoints *t = localControlPointTracingInstance();
+
+    double data[ALL_REDUCTION_SIZE];
 
     double *idle = data;
     double *over = data+3;
     double *mem = data+6;
+    double *msgBytes = data+7;  
+    double *grainsize = data+11;  
 
+    const double i = t->idleRatio();
     idle[0] = i;
     idle[1] = i;
     idle[2] = i;
 
+    const double o = t->overheadRatio();
     over[0] = o;
     over[1] = o;
     over[2] = o;
 
+    const double m = t->memoryUsageMB();
     mem[0] = m;
+
+    msgBytes[0] = t->b2;
+    msgBytes[1] = t->b3;
+    msgBytes[2] = t->b2mlen;
+    msgBytes[3] = t->b3mlen;
+
+    grainsize[0] = t->grainSize();
     
     localControlPointTracingInstance()->resetAll();
 
-    contribute(7*sizeof(double),data,allMeasuresReductionType, cb);
+    contribute(ALL_REDUCTION_SIZE*sizeof(double),data,allMeasuresReductionType, cb);
   }
   
   /// All processors reduce their memory usages in requestIdleTime() to this method
   void controlPointManager::gatherAll(CkReductionMsg *msg){
+    CkAssert(msg->getSize()==ALL_REDUCTION_SIZE*sizeof(double));
     int size=msg->getSize() / sizeof(double);
-    CkAssert(size==7);
     double *data=(double *) msg->getData();
         
     double *idle = data;
     double *over = data+3;
     double *mem = data+6;
+    double *msgBytes = data+7;
+    double *granularity = data+11;
+
 
     //    std::string b = allData.toString();
 
@@ -760,6 +788,23 @@ controlPointManager::controlPointManager(){
       prevPhase->memoryUsageMB = mem[0];
       
       CkPrintf("Stored idle time min=%lf, mem=%lf in prevPhase=%p\n", (double)prevPhase->idleTime.min, (double)prevPhase->memoryUsageMB, prevPhase);
+
+      double bytesPerInvoke2 = msgBytes[2] / msgBytes[0];
+      double bytesPerInvoke3 = msgBytes[3] / msgBytes[1];
+
+      /** The average of the grain sizes on all PEs in us */
+      prevPhase->grainSize = (granularity[0] / (double)CkNumPes());
+
+      CkPrintf("Bytes Per Invokation 2 = %f\n", bytesPerInvoke2);
+      CkPrintf("Bytes Per Invokation 3 = %f\n", bytesPerInvoke3);
+
+      CkPrintf("Bytes Per us of work 2 = %f\n", bytesPerInvoke2/prevPhase->grainSize);
+      CkPrintf("Bytes Per us of work 3 = %f\n", bytesPerInvoke3/prevPhase->grainSize);
+
+      if(bytesPerInvoke2 > bytesPerInvoke3)
+	prevPhase->bytesPerInvoke = bytesPerInvoke2;
+      else
+	prevPhase->bytesPerInvoke = bytesPerInvoke3;
 
       //      prevPhase->print();
       // CkPrintf("prevPhase=%p number of timings=%d\n", prevPhase, prevPhase->times.size() );

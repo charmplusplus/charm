@@ -18,6 +18,7 @@
 #include <cmath>
 #include <math.h>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <string>
 #include <sstream>
@@ -149,14 +150,25 @@ public:
 
   idleTimeContainer idleTime;
 
+  /** Approximately records the average message size for an entry method. */
+  double bytesPerInvoke;
+
+  /** Records the average grain size (might be off a bit due to non application entry methods), in seconds */
+  double grainSize;
+
+
   instrumentedPhase(){
     memoryUsageMB = -1.0;
+    grainSize = -1.0;
+    bytesPerInvoke = -1.0;
   }
   
   void clear(){
     controlPoints.clear();
     times.clear();
     memoryUsageMB = -1.0;
+    grainSize = -1.0;
+    bytesPerInvoke = -1.0;
     //    criticalPaths.clear();
   }
 
@@ -295,7 +307,14 @@ public:
     } 
     
   }
-  
+
+  /** Determine the median time for this phase */
+  double medianTime(){
+    std::vector<double> sortedTimes = times;
+    std::sort(sortedTimes.begin(), sortedTimes.end());
+    return sortedTimes[sortedTimes.size() / 2];
+  }
+
   
 };
 
@@ -379,30 +398,43 @@ public:
       // SCHEMA:
       s << "# SCHEMA:\n";
       s << "# number of named control points:\n";
-      s << ps.size() << "\n";
-      
+      s << ps.size() << "\n";    
       for(cpiter = ps.begin(); cpiter != ps.end(); cpiter++){
 	s << cpiter->first << "\n";
       }
       
       // DATA:
       s << "# DATA:\n";
-      s << "# first field is memory usage (MB). Then there are the " << ps.size()  << " control points values, followed by one or more timings" << "\n";
-      s << "# number of control point sets: " << phases.size() << "\n";
+      s << "# There are " << ps.size()  << " control points\n";
+      s << "# number of recorded phases: " << phases.size() << "\n";
+      
+      s << "# Memory (MB)\tIdle Min\tIdle Avg\tIdle Max\tByte Per Invoke\tGrain Size\t";
+      for(cpiter = ps.begin(); cpiter != ps.end(); cpiter++){
+	s << cpiter->first << "\t";
+      }
+      s << "Median Timing\tTimings\n";
+      
+   
       std::vector<instrumentedPhase*>::iterator runiter;
       for(runiter=phases.begin();runiter!=phases.end();runiter++){
 	
 	// Print the memory usage
-	s << (*runiter)->memoryUsageMB << "    "; 
+	s << (*runiter)->memoryUsageMB << "\t"; 
 
-	s << (*runiter)->idleTime.min << " " << (*runiter)->idleTime.avg << " " << (*runiter)->idleTime.max << "   ";
+	s << (*runiter)->idleTime.min << "\t" << (*runiter)->idleTime.avg << "\t" << (*runiter)->idleTime.max << "\t";
+
+	s << (*runiter)->bytesPerInvoke << "\t";
+
+	s << (*runiter)->grainSize << "\t";
+
 
 	// Print the control point values
 	for(cpiter = (*runiter)->controlPoints.begin(); cpiter != (*runiter)->controlPoints.end(); cpiter++){ 
-	  s << cpiter->second << " "; 
+	  s << cpiter->second << "\t"; 
 	}
 
-	s << "     ";
+	// Print the median time
+	s << (*runiter)->medianTime() << "\t";
 
 	// Print the times
 	std::vector<double>::iterator titer;

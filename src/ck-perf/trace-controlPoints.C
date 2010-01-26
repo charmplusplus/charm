@@ -30,8 +30,11 @@ void _createTracecontrolPoints(char **argv)
 
 TraceControlPoints::TraceControlPoints(char **argv)
 {
-
   resetTimings();
+
+  b1=0;
+  b2=0;
+  b3=0;
 
   if (CkpvAccess(traceOnPe) == 0) return;
 
@@ -70,7 +73,7 @@ void TraceControlPoints::beginExecute(CmiObjId *tid)
   // CmiObjId is a 4-integer tuple uniquely identifying a migratable
   //   Charm++ object. Note that there are other non-migratable Charm++
   //   objects that CmiObjId will not identify.
-
+  b1++;
   lastBeginExecuteTime = CmiWallTimer();
   lastbeginMessageSize = -1;
 
@@ -81,7 +84,8 @@ void TraceControlPoints::beginExecute(envelope *e)
 {
   lastBeginExecuteTime = CmiWallTimer();
   lastbeginMessageSize = e->getTotalsize();
-
+  b2++;
+  b2mlen += lastbeginMessageSize;
   //  CkPrintf("[%d] WARNING ignoring TraceControlPoints::beginExecute(envelope *e)\n", CkMyPe());
 
   // no message means thread execution
@@ -93,10 +97,12 @@ void TraceControlPoints::beginExecute(envelope *e)
   //  CkPrintf("[%d] TraceControlPoints::beginExecute(envelope *e=%p)\n", CkMyPe(), e);
 
 }
-
+ 
 void TraceControlPoints::beginExecute(int event,int msgType,int ep,int srcPe, 
 			       int mlen, CmiObjId *idx)
 {
+  b3++;
+  b3mlen += mlen;
   lastBeginExecuteTime = CmiWallTimer();
   lastbeginMessageSize = mlen;
   //  CkPrintf("[%d] TraceControlPoints::beginExecute event=%d, msgType=%d, ep=%d, srcPe=%d, mlen=%d CmiObjId is also avaliable\n", CkMyPe(), event, msgType, ep, srcPe, mlen);
@@ -108,7 +114,8 @@ void TraceControlPoints::endExecute(void)
 {
   double executionTime = CmiWallTimer() - lastBeginExecuteTime;
   totalEntryMethodTime += executionTime;
-  
+  totalEntryMethodInvocations ++;
+
   double m = (double)CmiMemoryUsage();
   if(memUsage < m){
     memUsage = m;
@@ -183,6 +190,7 @@ void TraceControlPointsBOC::printBGP_UPC_CountersBOC(void) {
 void TraceControlPoints::resetTimings(){
   totalIdleTime = 0.0;
   totalEntryMethodTime = 0.0;
+  totalEntryMethodInvocations = 0;
   lastResetTime = CmiWallTimer();
 }
 
@@ -190,6 +198,11 @@ void TraceControlPoints::resetAll(){
   totalIdleTime = 0.0;
   totalEntryMethodTime = 0.0;
   memUsage = 0;
+  totalEntryMethodInvocations = 0;
+  b2mlen=0;
+  b3mlen=0;
+  b2=0;
+  b3=0;
   lastResetTime = CmiWallTimer();
 }
 
