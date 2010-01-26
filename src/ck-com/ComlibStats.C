@@ -9,6 +9,7 @@
 
 ComlibGlobalStats::ComlibGlobalStats() {
     statsArr = new ComlibLocalStats[CkNumPes()];
+    _MEMCHECK(statsArr);
 }
 
 void ComlibGlobalStats::updateStats(ComlibLocalStats &stats, int p) {
