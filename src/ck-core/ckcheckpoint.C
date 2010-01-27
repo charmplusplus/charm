@@ -422,33 +422,6 @@ int  CkCountArrayElements(){
 }
 #endif
 
-void CkPupProcessorData(PUP::er &p)
-{
-    // save readonlys, and callback BTW
-    if(CkMyRank()==0) {
-        CkPupROData(p);
-    }
-
-    // save mainchares into MainChares.dat
-    if(CkMyPe()==0) {
-      CkPupMainChareData(p, NULL);
-    }
-	
-    // save non-migratable chare
-    CkPupChareData(p);
-
-    // save groups 
-    CkPupGroupData(p);
-
-    // save nodegroups
-    if(CkMyRank()==0) {
-        CkPupNodeGroupData(p);
-    }
-
-    // pup array elements
-    CkPupArrayElementsData(p);
-}
-
 // called only on pe 0
 static void checkpointOne(const char* dirname, CkCallback& cb){
 	CmiAssert(CkMyPe()==0);
