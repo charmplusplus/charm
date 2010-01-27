@@ -962,6 +962,8 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
   }\
 }
 
+void CmiPushPE(int, void*);
+
 void          CmiSyncSendFn(int, int, char *);
 CmiCommHandle CmiAsyncSendFn(int, int, char *);
 void          CmiFreeSendFn(int, int, char *);
