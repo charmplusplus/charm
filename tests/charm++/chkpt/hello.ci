@@ -12,4 +12,9 @@ mainmodule hello {
     entry Hello(void);
     entry void SayHi();
   }; 
+ 
+  chare [migratable] CHello {
+    entry CHello(void);
+    entry void SayHi(int);
+  };
 };
