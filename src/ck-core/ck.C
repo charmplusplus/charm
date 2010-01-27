@@ -2017,7 +2017,7 @@ public:
     CmiPushPE(CkMyPe(), getNext());
   }
   virtual CmiBool process(envelope *env,CkCoreState *ck) {
-    CmiPushPe(CkMyPe(), getNext());
+    CmiPushPE(CkMyPe(), getNext());
   }
 };
 
