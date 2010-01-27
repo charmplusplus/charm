@@ -1172,7 +1172,7 @@ void CkUnpackMessage(envelope **pEnv)
 // the PE can never be CLD_ANYWHERE; wasting _infoFn calls.
 // Thus these accellerated versions of the Cld calls.
 
-int index_objectQHandler;
+static int index_objectQHandler;
 int index_tokenHandler;
 static int index_skipCldHandler;
 

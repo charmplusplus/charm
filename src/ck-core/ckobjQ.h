@@ -40,9 +40,6 @@ public:
 
 CkpvExtern(TokenPool*, _tokenPool);
 
-extern int index_objectQHandler;
-extern int index_tokenHandler;
-
 Chare * CkFindObjectPtr(envelope *);
 void _enqObjQueue(Chare *obj, envelope *env);
 void _ObjectQHandler(void *converseMsg);
