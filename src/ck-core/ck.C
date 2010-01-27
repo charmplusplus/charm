@@ -1996,6 +1996,24 @@ private:
 	}
 };
 
+class CkMessageDetailReplay : public CkMessageWatcher {
+  void *getNext() {
+    CmiUInt4 size;
+    fread(&size, 4, 1, f);
+    void *env = CmiAlloc(size);
+    fread(env, size, 1, f);
+    return env;
+  }
+public:
+  CkMessageDetailReplay(FILE *f_) {
+    f=f_;
+    getNext();
+  }
+  virtual CmiBool process(envelope *env,CkCoreState *ck) {
+    getNext();
+  }
+};
+
 extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
   CkMessageReplay *replay = (CkMessageReplay*)rep;
@@ -2035,13 +2053,19 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	    CpdSetInitializeMemory(1);
 		ck->addWatcher(new CkMessageRecorder(openReplayFile("ckreplay_",".log","w")));
 	}
-	if (CmiGetArgFlagDesc(argv,"+replay","Re-play recorded message stream")) {
+	if (CmiGetArgFlagDesc(argv,"+replay","Replay recorded message stream")) {
 	    CpdSetInitializeMemory(1);
 		ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
 	}
-	if (CmiGetArgStringDesc(argv,"+replay-detail",&procs,"Re-play the specified processors from recorded message content")) {
+	if (CmiGetArgStringDesc(argv,"+replay-detail",&procs,"Replay the specified processors from recorded message content")) {
 	    CpdSetInitializeMemory(1);
-	  /*Nothing yet*/
+	    // Set the parameters of the processor
+#if CMK_SHARED_VARS_UNAVAILABLE
+	    _Cmi_mype = atoi(procs);
+#else
+	    CkAbort("+replay-detail available only for non-SMP build");
+#endif
+	    ck->addWatcher(new CkMessageDetailReplay(openReplayFile("ckreplay_",".log","r")));
 	}
 }
 
