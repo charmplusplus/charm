@@ -2007,10 +2007,17 @@ class CkMessageDetailReplay : public CkMessageWatcher {
 public:
   CkMessageDetailReplay(FILE *f_) {
     f=f_;
-    getNext();
+    /* This must match what CkMessageDetailRecorder did */
+    CmiUInt2 little;
+    fread(&little, 2, 1, f);
+    if (little != sizeof(void*)) {
+      CkAbort("Replaying on a different architecture from which recording was done!");
+    }
+
+    CmiPushPE(CkMyPe(), getNext());
   }
   virtual CmiBool process(envelope *env,CkCoreState *ck) {
-    getNext();
+    CmiPushPe(CkMyPe(), getNext());
   }
 };
 
@@ -2065,7 +2072,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 #else
 	    CkAbort("+replay-detail available only for non-SMP build");
 #endif
-	    ck->addWatcher(new CkMessageDetailReplay(openReplayFile("ckreplay_",".log","r")));
+	    ck->addWatcher(new CkMessageDetailReplay(openReplayFile("ckreplay_",".detail","r")));
 	}
 }
 
