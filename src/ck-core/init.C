@@ -649,10 +649,15 @@ static void _roRestartHandler(void *msg)
  * together with all the other regular messages by _bufferHandler (and will be flushed
  * after all the initialization messages have been processed).
  */
-static void _initHandler(void *msg)
+static void _initHandler(void *msg, CkCoreState *ck)
 {
   CkAssert(CkMyPe()!=0);
   register envelope *env = (envelope *) msg;
+  
+  if (ck->watcher!=NULL) {
+    if (!ck->watcher->processMessage(env,ck)) return;
+  }
+  
   switch (env->getMsgtype()) {
     case BocInitMsg:
       if (env->getGroupEpoch()==0) {
@@ -913,9 +918,11 @@ void _initCharm(int unused_argc, char **argv)
 
 	_charmHandlerIdx = CkRegisterHandler((CmiHandler)_bufferHandler);
 	_initHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
+	CkNumberHandlerEx(_initHandlerIdx, (CmiHandlerEx)_initHandler, CkpvAccess(_coreState));
 	_roRestartHandlerIdx = CkRegisterHandler((CmiHandler)_roRestartHandler);
 	_exitHandlerIdx = CkRegisterHandler((CmiHandler)_exitHandler);
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
+	CkNumberHandlerEx(_bocHandlerIdx, (CmiHandlerEx)_initHandler, CkpvAccess(_coreState));
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
 	_triggerHandlerIdx = CkRegisterHandler((CmiHandler)_triggerHandler);
 	_ckModuleInit();
