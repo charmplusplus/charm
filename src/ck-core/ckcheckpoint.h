@@ -73,5 +73,9 @@ void CkRestartMain(const char* dirname, CkArgMsg *args);
 int  CkCountArrayElements();
 #endif
 
+// some useful flags (for disk checkpointing)
+extern int _inrestart;           // 1: if is during restart process
+extern int _restarted;           // 1: if this run is after restart
+extern int _oldNumPes;           // number of processors in the last run
 
 #endif //_CKCHECKPOINT_H

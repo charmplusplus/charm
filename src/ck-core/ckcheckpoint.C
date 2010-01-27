@@ -30,6 +30,8 @@ PUPbytes(GroupInfo)
 PUPmarshall(GroupInfo)
 
 int _inrestart = 0;
+int _restarted = 0;
+int _oldNumPes = 0;
 
 void CkCreateLocalChare(int epIdx, envelope *env);
 
@@ -533,6 +535,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	CkCallback cb;
 	
         _inrestart = 1;
+	_restarted = 1;
 
 	// restore readonlys
 	sprintf(filename,"%s/RO.dat",dirname);
@@ -545,6 +548,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	pRO|cb;
 	fclose(fRO);
 	DEBCHK("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
+        _oldNumPes = _numPes;
 
 	CmiNodeBarrier();
 
