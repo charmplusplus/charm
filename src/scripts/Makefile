@@ -67,10 +67,13 @@ f90charm: charm++ $(L)/libf90charm.a
 
 default_libs: multicast pythonCCS
 
-ChaNGa: charm++ cache
+ChaNGa: charm++ cache liveViz
 
 cache: charm++
 	cd libs/ck-libs/cache && $(MAKE)
+
+liveViz: charm++
+	cd libs/ck-libs/liveViz && $(MAKE)
 
 multicast: charmxi
 	cd libs/ck-libs/multicast && $(MAKE)
