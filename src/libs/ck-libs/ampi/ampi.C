@@ -5360,27 +5360,27 @@ int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source,
   int mype;
   AMPI_Comm_rank(comm, &mype);
 
+  // left
   AMPI_Cart_coords(comm, mype, ndims, coords);
   coords[direction] -= disp;
-  if (coords[direction] < 0)
-    if (periods[direction] == 1) {
+  if (periods[direction] == 1) {
       while (coords[direction]<0) coords[direction] += dims[direction];
-      AMPI_Cart_rank(comm, coords, rank_source);
-    }
-    else
-      *rank_source = MPI_PROC_NULL;
+      while (coords[direction]>= dims[direction]) coords[direction] -= dims[direction];
+  }
+  if (coords[direction]<0 || coords[direction]>= dims[direction])
+    *rank_source = MPI_PROC_NULL;
   else
     AMPI_Cart_rank(comm, coords, rank_source);
 
+  // right
   AMPI_Cart_coords(comm, mype, ndims, coords);
   coords[direction] += disp;
-  if (coords[direction] < 0)
-    if (periods[direction] == 1) {
+  if (periods[direction] == 1) {
       while (coords[direction]<0) coords[direction] += dims[direction];
-      AMPI_Cart_rank(comm, coords, rank_dest);
-    }
-    else
-      *rank_dest = MPI_PROC_NULL;
+      while (coords[direction]>= dims[direction]) coords[direction] -= dims[direction];
+  }
+  if (coords[direction]<0 || coords[direction]>= dims[direction])
+    *rank_dest = MPI_PROC_NULL;
   else
     AMPI_Cart_rank(comm, coords, rank_dest);
 
