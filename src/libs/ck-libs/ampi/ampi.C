@@ -5368,8 +5368,8 @@ static void cart_clamp_coord(MPI_Comm comm, const CkVec<int> &dims,
 }
 
 CDECL
-int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source, 
-		   int *rank_dest) {
+int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp,
+                    int *rank_source, int *rank_dest) {
   AMPIAPI("AMPI_Cart_shift");
   
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
