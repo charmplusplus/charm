@@ -5343,6 +5343,30 @@ int AMPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords) {
   return 0;
 }
 
+// Offset coords[direction] by displacement, and set the rank that
+// results
+static void cart_clamp_coord(MPI_Comm comm, const CkVec<int> &dims,
+			     const CkVec<int> &periodicity, int *coords,
+			     int direction, int displacement, int *rank_out)
+{
+  int base_coord = coords[direction];
+  coords[direction] += displacement;
+
+  if (periodicity[direction] == 1) {
+      while (coords[direction] < 0)
+	coords[direction] += dims[direction];
+      while (coords[direction] >= dims[direction])
+	coords[direction] -= dims[direction];
+  }
+
+  if (coords[direction]<0 || coords[direction]>= dims[direction])
+    *rank_out = MPI_PROC_NULL;
+  else
+    AMPI_Cart_rank(comm, coords, rank_out);
+
+  coords[direction] = base_coord;
+}
+
 CDECL
 int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source, 
 		   int *rank_dest) {
@@ -5359,30 +5383,10 @@ int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source,
 
   int mype;
   AMPI_Comm_rank(comm, &mype);
-
-  // left
   AMPI_Cart_coords(comm, mype, ndims, coords);
-  coords[direction] -= disp;
-  if (periods[direction] == 1) {
-      while (coords[direction]<0) coords[direction] += dims[direction];
-      while (coords[direction]>= dims[direction]) coords[direction] -= dims[direction];
-  }
-  if (coords[direction]<0 || coords[direction]>= dims[direction])
-    *rank_source = MPI_PROC_NULL;
-  else
-    AMPI_Cart_rank(comm, coords, rank_source);
 
-  // right
-  AMPI_Cart_coords(comm, mype, ndims, coords);
-  coords[direction] += disp;
-  if (periods[direction] == 1) {
-      while (coords[direction]<0) coords[direction] += dims[direction];
-      while (coords[direction]>= dims[direction]) coords[direction] -= dims[direction];
-  }
-  if (coords[direction]<0 || coords[direction]>= dims[direction])
-    *rank_dest = MPI_PROC_NULL;
-  else
-    AMPI_Cart_rank(comm, coords, rank_dest);
+  cart_clamp_coord(comm, dims, periods, coords, direction,  disp, rank_dest);
+  cart_clamp_coord(comm, dims, periods, coords, direction, -disp, rank_source);
 
   delete [] coords;
   return 0;
