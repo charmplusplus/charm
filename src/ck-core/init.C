@@ -162,7 +162,7 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
 #ifndef CMK_CHARE_USE_PTR
 CpvExtern(CkVec<void *>, chare_objs);
-CpvExtern(int, chare_types);
+CpvExtern(CkVec<int>, chare_types);
 CpvExtern(CkVec<VidBlock *>, vidblocks);
 #endif
 
