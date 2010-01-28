@@ -3142,7 +3142,7 @@ int IReq::wait(MPI_Status *sts){
 		ptr->block();
 			
 		//BIGSIM_OOC DEBUGGING
-		//CmiPrintf("After blocking: %dth time: %d: in Ireq::wait\n", ooccnt, ampiIndex);
+		//CmiPrintf("[%d] After blocking: in Ireq::wait\n", ptr->thisIndex);
 		//CmiPrintf("IReq's this pointer: %p\n", this);
 		//print();
 
@@ -3290,7 +3290,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 #endif
   for(i=0;i<reqvec->size();i++){
     for(j=0;j<((*reqvec)[i]).size();j++){
-      //CkPrintf("in loop [%d, %d]\n", i, j);
+      //CkPrintf("[%d] in loop [%d, %d]\n", pptr->thisIndex,i, j);
       if(request[((*reqvec)[i])[j]] == MPI_REQUEST_NULL){
         stsempty(sts[((*reqvec)[i])[j]]);
         continue;
@@ -5350,20 +5350,33 @@ int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source,
   
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
+  if ((direction < 0) || (direction >= ndims))
+    CkAbort("MPI_Cart_shift: direction not within dimensions range");
+
   const CkVec<int> &dims = c.getdims();
   const CkVec<int> &periods = c.getperiods();
   int *coords = new int[ndims];
 
-  AMPI_Comm_rank(comm, rank_source);
-  AMPI_Cart_coords(comm, *rank_source, ndims, coords);
+  int mype;
+  AMPI_Comm_rank(comm, &mype);
 
-  if ((direction < 0) || (direction >= ndims))
-    CkAbort("MPI_Cart_shift: direction not within dimensions range");
+  AMPI_Cart_coords(comm, mype, ndims, coords);
+  coords[direction] -= disp;
+  if (coords[direction] < 0)
+    if (periods[direction] == 1) {
+      while (coords[direction]<0) coords[direction] += dims[direction];
+      AMPI_Cart_rank(comm, coords, rank_source);
+    }
+    else
+      *rank_source = MPI_PROC_NULL;
+  else
+    AMPI_Cart_rank(comm, coords, rank_source);
 
+  AMPI_Cart_coords(comm, mype, ndims, coords);
   coords[direction] += disp;
   if (coords[direction] < 0)
     if (periods[direction] == 1) {
-      coords[direction] += dims[direction];
+      while (coords[direction]<0) coords[direction] += dims[direction];
       AMPI_Cart_rank(comm, coords, rank_dest);
     }
     else
