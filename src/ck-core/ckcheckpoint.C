@@ -32,6 +32,7 @@ PUPmarshall(GroupInfo)
 int _inrestart = 0;
 int _restarted = 0;
 int _oldNumPes = 0;
+int _chareRestored = 0;
 
 void CkCreateLocalChare(int epIdx, envelope *env);
 
@@ -572,6 +573,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 		PUP::fromDisk pChares(fChares);
 		CkPupChareData(pChares);
 		fclose(fChares);
+		_chareRestored = 1;
 	}
 #endif
 
