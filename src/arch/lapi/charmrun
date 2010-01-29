@@ -99,6 +99,8 @@ if [ -z "$llfile" ]
     then
     echo "No load leveler template specified. Either use the flag \"+ll <llfile>\" or create"
     echo "a file called \"charmrun.ll\" in the current directory on in your home directory."
+    echo "An example of the template can be found at src/arch/lapi/charmrun.ll, this may"
+    echo "require tuning for the specific machine (for example account_no or class)."
     echo
     exit
 fi
