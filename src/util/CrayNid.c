@@ -18,8 +18,6 @@
 
 #if CMK_CRAYXT
 
-#include <rca_lib.h>
-
 #if XT3_TOPOLOGY
 #include <catamount/cnos_mpi_os.h>
 #define MAXNID 2784
@@ -55,6 +53,8 @@ int getXTNodeID(int mype, int numpes) {
 #endif /* CMK_CRAYXT */
 
 #if XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY
+
+#include <rca_lib.h>
 
   #if XT4_TOPOLOGY
   #define MAXNID 14000
