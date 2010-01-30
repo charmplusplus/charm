@@ -793,7 +793,7 @@ int PumpMsgs(void)
   }
 
   
-  #if CMK_IMMEDIATE_MSG && !CMK_SMP
+#if CMK_IMMEDIATE_MSG && !CMK_SMP
   CmiHandleImmediate();
 #endif
   
@@ -997,6 +997,7 @@ char *CmiGetNonLocalNodeQ(void)
 {
   CmiState cs = CmiGetState();
   char *result = 0;
+  if (CmiNumPes() == 1) return NULL;
   CmiIdleLock_checkMessage(&cs->idle);
 /*  if(!PCQueueEmpty(CsvAccess(NodeState).NodeRecv)) {  */
     MACHSTATE1(3,"CmiGetNonLocalNodeQ begin %d {", CmiMyPe());
@@ -1014,6 +1015,9 @@ void *CmiGetNonLocal(void)
   static int count=0;
   CmiState cs = CmiGetState();
   void *msg;
+
+  if (CmiNumPes() == 1) return NULL;
+
   CmiIdleLock_checkMessage(&cs->idle);
   /* although it seems that lock is not needed, I found it crashes very often
      on mpi-smp without lock */
@@ -1908,6 +1912,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   }
 
   /* setup signal handlers */
+#if 0
   signal(SIGSEGV, KillOnAllSigs);
   signal(SIGFPE, KillOnAllSigs);
   signal(SIGILL, KillOnAllSigs);
@@ -1922,6 +1927,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   signal(SIGUSR2, HandleUserSignals);
 #     endif*/
 #   endif /*UNIX*/
+#endif
   
 #if CMK_NO_OUTSTANDING_SENDS
   no_outstanding_sends=1;
@@ -2059,10 +2065,12 @@ void CmiAbort(const char *message)
         "Reason: %s\n",CmiMyPe(),message);
  /*  CmiError(message); */
   CmiPrintStackTrace(0);
+/*
   m = CmiAlloc(CmiMsgHeaderSizeBytes);
   CmiSetHandler(m, machine_exit_idx);
   CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, m);
   machine_exit(m);
+*/
   /* Program never reaches here */
   MPI_Abort(MPI_COMM_WORLD, 1);
 }
