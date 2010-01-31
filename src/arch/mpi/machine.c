@@ -997,7 +997,6 @@ char *CmiGetNonLocalNodeQ(void)
 {
   CmiState cs = CmiGetState();
   char *result = 0;
-  if (CmiNumPes() == 1) return NULL;
   CmiIdleLock_checkMessage(&cs->idle);
 /*  if(!PCQueueEmpty(CsvAccess(NodeState).NodeRecv)) {  */
     MACHSTATE1(3,"CmiGetNonLocalNodeQ begin %d {", CmiMyPe());
