@@ -1015,7 +1015,9 @@ void *CmiGetNonLocal(void)
   CmiState cs = CmiGetState();
   void *msg;
 
+#if ! CMK_SMP
   if (CmiNumPes() == 1) return NULL;
+#endif
 
   CmiIdleLock_checkMessage(&cs->idle);
   /* although it seems that lock is not needed, I found it crashes very often

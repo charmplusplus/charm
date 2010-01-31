@@ -1,8 +1,4 @@
 COMMENT="Enable 32-bit mode (-q32)"
-if [ "$OBJECT_MODE" != "32" ]
-then
-        echo "WARNING: Charm built in 32-bit mode, but OBJECT_MODE=$OBJECT_MODE"
-fi
 
 CMK_CPP_CHARM='/usr/lib/cpp -P -D_NO_PROTO '
 CMK_CPP_C='/usr/lib/cpp -P -D_NO_PROTO '
