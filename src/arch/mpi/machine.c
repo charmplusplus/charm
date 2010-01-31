@@ -1912,7 +1912,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   }
 
   /* setup signal handlers */
-#if 0
   signal(SIGSEGV, KillOnAllSigs);
   signal(SIGFPE, KillOnAllSigs);
   signal(SIGILL, KillOnAllSigs);
@@ -1927,7 +1926,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   signal(SIGUSR2, HandleUserSignals);
 #     endif*/
 #   endif /*UNIX*/
-#endif
   
 #if CMK_NO_OUTSTANDING_SENDS
   no_outstanding_sends=1;
@@ -2065,12 +2063,10 @@ void CmiAbort(const char *message)
         "Reason: %s\n",CmiMyPe(),message);
  /*  CmiError(message); */
   CmiPrintStackTrace(0);
-/*
   m = CmiAlloc(CmiMsgHeaderSizeBytes);
   CmiSetHandler(m, machine_exit_idx);
   CmiSyncBroadcastAndFree(CmiMsgHeaderSizeBytes, m);
   machine_exit(m);
-*/
   /* Program never reaches here */
   MPI_Abort(MPI_COMM_WORLD, 1);
 }
