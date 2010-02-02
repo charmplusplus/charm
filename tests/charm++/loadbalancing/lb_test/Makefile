@@ -1,10 +1,10 @@
 # Makefile for load-banacing test program
 
-OPTS=
-LBLIB=-module EveryLB 
-CHARMC=../../../../bin/charmc $(OPTS)
+OPTS	=
+LBLIB	= -module EveryLB
+CHARMC	= ../../../../bin/charmc $(OPTS)
 
-OBJS = lb_test.o Topo.o
+OBJS	= lb_test.o Topo.o
 
 all:	lb_test
 
@@ -12,10 +12,10 @@ lb_test: $(OBJS)
 	$(CHARMC) -language charm++ -o lb_test $(OBJS) $(LBLIB) 
 
 lb_test.decl.h lb_test.def.h: lb_test.ci
-	$(CHARMC)  lb_test.ci 
+	$(CHARMC) lb_test.ci 
 
 Topo.decl.h Topo.def.h: Topo.ci
-	$(CHARMC)  Topo.ci 
+	$(CHARMC) Topo.ci 
 
 lb_test.o: lb_test.C lb_test.decl.h Topo.decl.h
 	$(CHARMC) -c lb_test.C

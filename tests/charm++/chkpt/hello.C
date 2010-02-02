@@ -48,7 +48,7 @@ public:
     step++;
 
       // if restarted from a different num of pes, we have to ignore the chare
-    if (!_restarted || _oldNumPes == CkNumPes()) chelloProxy.SayHi(step);
+    if (!_restarted || _chareRestored) chelloProxy.SayHi(step);
 
     int stepInc = *((int *)m->getData());
     CkAssert(step == stepInc);

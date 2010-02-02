@@ -77,5 +77,6 @@ int  CkCountArrayElements();
 extern int _inrestart;           // 1: if is during restart process
 extern int _restarted;           // 1: if this run is after restart
 extern int _oldNumPes;           // number of processors in the last run
+extern int _chareRestored;       // 1: if chare is restored at restart
 
 #endif //_CKCHECKPOINT_H
