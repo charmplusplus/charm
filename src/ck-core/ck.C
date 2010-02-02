@@ -27,6 +27,7 @@ void automaticallySetMessagePriority(envelope *env); // in control point framewo
 
 #ifndef CMK_CHARE_USE_PTR
 CpvDeclare(CkVec<void *>, chare_objs);
+CpvDeclare(CkVec<int>, chare_types);
 CpvDeclare(CkVec<VidBlock *>, vidblocks);
 #endif
 
@@ -47,7 +48,7 @@ Chare::Chare(void) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
 #ifndef CMK_CHARE_USE_PTR
-     // for plain chare, objPtr is actually the index to chare table
+     // for plain chare, objPtr is actually the index to chare obj table
   if (chareIdx >= 0) thishandle.objPtr=(void*)chareIdx;
 #endif
 #ifdef _FAULT_MLOG_
@@ -774,11 +775,12 @@ static inline void *_allocNewChare(envelope *env, int &idx)
 {
   int chareIdx = _entryTable[env->getEpIdx()]->chareIdx;
   void *tmp=malloc(_chareTable[chareIdx]->size);
+  _MEMCHECK(tmp);
 #ifndef CMK_CHARE_USE_PTR
   CpvAccess(chare_objs).push_back(tmp);
+  CpvAccess(chare_types).push_back(chareIdx);
   idx = CpvAccess(chare_objs).size()-1;
 #endif
-  _MEMCHECK(tmp);
   setMemoryTypeChare(tmp);
   return tmp;
 }
@@ -791,6 +793,12 @@ static void _processNewChareMsg(CkCoreState *ck,envelope *env)
   ((Chare *)obj)->chareIdx = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
+}
+
+void CkCreateLocalChare(int epIdx, envelope *env)
+{
+  env->setEpIdx(epIdx);
+  _processNewChareMsg(NULL, env);
 }
 
 static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
@@ -826,7 +834,7 @@ static inline void _processForPlainChareMsg(CkCoreState *ck,envelope *env)
   register int epIdx = env->getEpIdx();
   register int mainIdx = _chareTable[_entryTable[epIdx]->chareIdx]->mainChareType();
   register void *obj;
-  if (mainIdx != -1)  {
+  if (mainIdx != -1)  {           // mainchare
     CmiAssert(CkMyPe()==0);
     obj = _mainTable[mainIdx]->getObj();
   }

@@ -30,6 +30,11 @@ PUPbytes(GroupInfo)
 PUPmarshall(GroupInfo)
 
 int _inrestart = 0;
+int _restarted = 0;
+int _oldNumPes = 0;
+int _chareRestored = 0;
+
+void CkCreateLocalChare(int epIdx, envelope *env);
 
 // help class to find how many array elements
 class ElementCounter : public CkLocIterator {
@@ -206,6 +211,7 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 #ifndef CMK_CHARE_USE_PTR
 
 CpvExtern(CkVec<void *>, chare_objs);
+CpvExtern(CkVec<int>, chare_types);
 CpvExtern(CkVec<VidBlock *>, vidblocks);
 
 // handle plain non-migratable chare
@@ -215,21 +221,24 @@ void CkPupChareData(PUP::er &p)
   if (!p.isUnpacking()) n = CpvAccess(chare_objs).size();
   p|n;
   for (i=0; i<n; i++) {
-	Chare* obj;
-	int size;
+        int chare_type;
 	if (!p.isUnpacking()) {
-		PUP::sizer ps;
-	 	obj = (Chare*)CpvAccess(chare_objs)[i];
-		obj->pup(ps);
-		size = ps.size();
+		chare_type = CpvAccess(chare_types)[i];
 	}
-	p | size;
+	p | chare_type;
 	if (p.isUnpacking()) {
-		//DEBCHK("Chare PUP'ed: name = %s, idx = %d, size = %d\n", entry->name, i, size);
-		obj = (Chare*)malloc(size);
-		_MEMCHECK(obj);
-		CpvAccess(chare_objs).push_back(obj);
+		int migCtor = _chareTable[chare_type]->migCtor;
+		if(migCtor==-1) {
+			char buf[512];
+			sprintf(buf,"Chare %s needs a migration constructor and PUP'er routine for restart.\n", _chareTable[chare_type]->name);
+			CkAbort(buf);
+		}
+	        void *m = CkAllocSysMsg();
+	        envelope* env = UsrToEnv((CkMessage *)m);
+		CkCreateLocalChare(migCtor, env);
+		CkFreeSysMsg(m);
 	}
+	Chare *obj = (Chare*)CpvAccess(chare_objs)[i];
 	obj->pup(p);
   }
 
@@ -500,6 +509,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	CkCallback cb;
 	
         _inrestart = 1;
+	_restarted = 1;
 
 	// restore readonlys
 	sprintf(filename,"%s/RO.dat",dirname);
@@ -512,6 +522,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	pRO|cb;
 	fclose(fRO);
 	DEBCHK("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
+        _oldNumPes = _numPes;
 
 	CmiNodeBarrier();
 
@@ -535,6 +546,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 		PUP::fromDisk pChares(fChares);
 		CkPupChareData(pChares);
 		fclose(fChares);
+		_chareRestored = 1;
 	}
 #endif
 

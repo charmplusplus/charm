@@ -1,6 +1,6 @@
 Priority
 MemoryConsumption
-Granularity
+GrainSize
 ComputeDurations
 FlopRate
 NumComputeObjects

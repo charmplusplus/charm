@@ -162,6 +162,7 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
 #ifndef CMK_CHARE_USE_PTR
 CpvExtern(CkVec<void *>, chare_objs);
+CpvExtern(CkVec<int>, chare_types);
 CpvExtern(CkVec<VidBlock *>, vidblocks);
 #endif
 
@@ -863,6 +864,7 @@ void _initCharm(int unused_argc, char **argv)
 #ifndef CMK_CHARE_USE_PTR
           /* chare and vidblock table */
         CpvInitialize(CkVec<void *>, chare_objs);
+        CpvInitialize(CkVec<int>, chare_types);
         CpvInitialize(CkVec<VidBlock *>, vidblocks);
 #endif
 

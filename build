@@ -585,7 +585,7 @@ then
 	Echo "-------------------------------------------------"
 	Echo "$PROGRAM built successfully."
 	Echo "Next, try out a sample program like" \
-	     "tests/charm++/simplearrayhello"
+	     "$DESTINATION/tests/charm++/simplearrayhello"
 else
         printError
 fi

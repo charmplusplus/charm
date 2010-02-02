@@ -1684,6 +1684,8 @@ void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
 }
 #endif
 
+#include "ckarray.h"
+
 /*************************** LocMgr: CREATION *****************************/
 CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkArrayIndexMax& numInitial)
 	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),
@@ -1711,6 +1713,16 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkArrayIndexMax& numInitia
 	lbdbID = lbdbID_;
 	initLB(lbdbID_);
 	hashImmLock = CmiCreateImmediateLock();
+	
+	//Add the array managers that happen to have been created before this
+	for (int i=0; i<CkpvAccess(waitingArrayMgrs).size(); ++i) {
+	  CkArrayMgrWaiting &mgr = CkpvAccess(waitingArrayMgrs)[i];
+	  if (mgr.id==thisgroup) {
+	    mgr.array->notifyLocMgrCreated(this);
+	    CkpvAccess(waitingArrayMgrs).remove(i);
+	    --i;
+	  }
+	}
 }
 
 CkLocMgr::CkLocMgr(CkMigrateMessage* m)

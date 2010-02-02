@@ -5,7 +5,7 @@
 #   -Dname='"foo bar"'
 #   
 STOPFILE=${MPITEST_STOPTEST:-"$HOME/.stopmpichtests"}
-mpicc="/Users/abecker/code/charm.git/bin/mpiCC"
+mpicc="../../../../bin/ampiCC"
 mpiCC=""
 mpif77=":"
 mpif90="@MPIF90@"
