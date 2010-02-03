@@ -133,6 +133,32 @@ public:
 }; 
 
 
+/// A container that stores overhead statistics (min/max/avg etc.)
+class overheadContainer {
+public:
+  double min;
+  double avg;
+  double max;
+  
+  overheadContainer(){
+    min = -1.0;
+    max = -1.0;
+    avg = -1.0;
+  }
+  
+  bool isValid() const{
+    return (min >= 0.0 && avg >= min && max >= avg && max <= 1.0);
+  }
+  
+  void print() const{
+    if(isValid())
+      CkPrintf("[%d] Overhead Time is Min=%.2lf%% Avg=%.2lf%% Max=%.2lf%%\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);    
+    else
+      CkPrintf("[%d] Overhead Time is invalid\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);
+  }
+  
+}; 
+
 
 
 /// Stores data for a phase (a time range in which a single set of control point values is used).
@@ -150,6 +176,8 @@ public:
   double memoryUsageMB;
 
   idleTimeContainer idleTime;
+  overheadContainer overheadTime;
+
 
   /** Approximately records the average message size for an entry method. */
   double bytesPerInvoke;
@@ -409,7 +437,7 @@ public:
       s << "# There are " << ps.size()  << " control points\n";
       s << "# number of recorded phases: " << phases.size() << "\n";
       
-      s << "# Memory (MB)\tIdle Min\tIdle Avg\tIdle Max\tByte Per Invoke\tGrain Size\t";
+      s << "# Memory (MB)\tIdle Min\tIdle Avg\tIdle Max\tOverhead Min\tOverhead Avg\tOverhead Max\tByte Per Invoke\tGrain Size\t";
       for(cpiter = ps.begin(); cpiter != ps.end(); cpiter++){
 	s << cpiter->first << "\t";
       }
@@ -423,6 +451,8 @@ public:
 	s << (*runiter)->memoryUsageMB << "\t"; 
 
 	s << (*runiter)->idleTime.min << "\t" << (*runiter)->idleTime.avg << "\t" << (*runiter)->idleTime.max << "\t";
+	s << (*runiter)->overheadTime.min << "\t" << (*runiter)->overheadTime.avg << "\t" << (*runiter)->overheadTime.max << "\t";
+
 
 	s << (*runiter)->bytesPerInvoke << "\t";
 

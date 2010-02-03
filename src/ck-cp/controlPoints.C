@@ -283,6 +283,11 @@ controlPointManager::controlPointManager(){
       iss >> ips->idleTime.avg;
       iss >> ips->idleTime.max;
 
+      // Read overhead time
+      iss >> ips->overheadTime.min;
+      iss >> ips->overheadTime.avg;
+      iss >> ips->overheadTime.max;
+
       // read bytePerInvoke
       iss >> ips->bytesPerInvoke;
 
@@ -784,6 +789,10 @@ controlPointManager::controlPointManager(){
       prevPhase->idleTime.min = idle[0];
       prevPhase->idleTime.avg = idle[1]/CkNumPes();
       prevPhase->idleTime.max = idle[2];
+      
+      prevPhase->overheadTime.min = over[0];
+      prevPhase->overheadTime.avg = over[1]/CkNumPes();
+      prevPhase->overheadTime.max = over[2];
       
       prevPhase->memoryUsageMB = mem[0];
       
