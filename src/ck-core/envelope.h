@@ -392,7 +392,7 @@ private:
       return EnvToUsr(env);
     }
     static void _reset(void* m) {
-      register envelope *env = (envelope*)m;
+      register envelope *env = UsrToEnv(m);
       _resetEnv(env);
     }
 public:
