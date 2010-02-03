@@ -25,6 +25,9 @@
 #define _CHECK_VALID(p, msg) do { } while(0)
 #endif
 
+// Flag that tells the system if we are replaying using Record/Replay
+extern int replaySystem;
+
 /// A set of "Virtual ChareID"'s
 class VidBlock {
     enum VidState {FILLED, UNFILLED};

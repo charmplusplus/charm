@@ -1851,6 +1851,7 @@ printf("[%d] DELETE!\n", CkMyPe());
 #include "crc32.h"
 
 CkpvDeclare(int, envelopeEventID);
+int replaySystem;
 
 CkMessageWatcher::~CkMessageWatcher() {}
 
@@ -2032,7 +2033,7 @@ public:
 extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
   CkMessageReplay *replay = (CkMessageReplay*)rep;
-  
+  //CmiStartQD(CkMessageReplayQuiescence, replay);
 }
 
 #include "trace-common.h" /* For traceRoot and traceRootBaseLength */
@@ -2056,6 +2057,7 @@ static FILE *openReplayFile(const char *prefix, const char *suffix, const char *
 #include "ckliststring.h"
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     char *procs = NULL;
+    replaySystem = 0;
 	REPLAYDEBUG("CkMessageWaterInit ");
     if (CmiGetArgStringDesc(argv,"+record-detail",&procs,"Record full message content for the specified processors")) {
         CkListString list(procs);
@@ -2077,9 +2079,13 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	    // Set the parameters of the processor
 #if CMK_SHARED_VARS_UNAVAILABLE
 	    _Cmi_mype = atoi(procs);
+	    while (procs[0]!='/') procs++;
+	    procs++;
+	    _Cmi_numpes = atoi(procs);
 #else
 	    CkAbort("+replay-detail available only for non-SMP build");
 #endif
+	    replaySystem = 1;
 	    ck->addWatcher(new CkMessageDetailReplay(openReplayFile("ckreplay_",".detail","r")));
 	}
 }

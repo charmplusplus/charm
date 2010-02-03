@@ -1095,7 +1095,7 @@ void _initCharm(int unused_argc, char **argv)
 		}*/
 	}	
 	
-        if (faultFunc == NULL) {         // this is not restart
+        if (faultFunc == NULL && !replaySystem) {         // this is not restart
             // these two are blocking calls for non-bigsim
 #if ! CMK_BLUEGENE_CHARM
           CmiInitCPUAffinity(argv);
