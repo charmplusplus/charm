@@ -774,7 +774,7 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) cons
           }
 	  else {
 	    if (opts & CK_MSG_INLINE)
-	      localbranch->deliver(msg, CkDeliver_inline, opts&!CK_MSG_INLINE);
+	      localbranch->deliver(msg, CkDeliver_inline, opts & (~CK_MSG_INLINE));
 	    else
 	      localbranch->deliver(msg, CkDeliver_queue, opts);
 	  }

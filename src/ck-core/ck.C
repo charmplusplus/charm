@@ -1438,7 +1438,7 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
   }
   else {
     //No way to inline a cross-processor message:
-    CkSendMsg(entryIndex,msg,pCid,opts&!CK_MSG_INLINE);
+    CkSendMsg(entryIndex, msg, pCid, opts & (~CK_MSG_INLINE));
   }
 }
 
@@ -1551,7 +1551,7 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
     }
   }
   //Can't inline-- send the usual way, clear CK_MSG_INLINE
-  CkSendMsgBranch(eIdx,msg,destPE,gID,opts&!CK_MSG_INLINE);
+  CkSendMsgBranch(eIdx, msg, destPE, gID, opts & (~CK_MSG_INLINE));
 }
 
 extern "C"
@@ -1686,7 +1686,7 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
     }
   }
   //Can't inline-- send the usual way
-  CkSendMsgNodeBranch(eIdx,msg,node,gID,opts&!CK_MSG_INLINE);
+  CkSendMsgNodeBranch(eIdx, msg, node, gID, opts & ~(CK_MSG_INLINE));
 }
 
 extern "C"
