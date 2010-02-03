@@ -2066,7 +2066,7 @@ static FILE *openReplayFile(const char *prefix, const char *suffix, const char *
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     char *procs = NULL;
     replaySystem = 0;
-	REPLAYDEBUG("CkMessageWaterInit ");
+	REPLAYDEBUG("CkMessageWatcherInit ");
     if (CmiGetArgStringDesc(argv,"+record-detail",&procs,"Record full message content for the specified processors")) {
         CkListString list(procs);
         if (list.includes(CkMyPe())) {
@@ -2077,10 +2077,6 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	if (CmiGetArgFlagDesc(argv,"+record","Record message processing order")) {
 	    CpdSetInitializeMemory(1);
 		ck->addWatcher(new CkMessageRecorder(openReplayFile("ckreplay_",".log","w")));
-	}
-	if (CmiGetArgFlagDesc(argv,"+replay","Replay recorded message stream")) {
-	    CpdSetInitializeMemory(1);
-		ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
 	}
 	if (CmiGetArgStringDesc(argv,"+replay-detail",&procs,"Replay the specified processors from recorded message content")) {
 	    CpdSetInitializeMemory(1);
@@ -2096,6 +2092,10 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	    replaySystem = 1;
 	    ck->addWatcher(new CkMessageDetailReplay(openReplayFile("ckreplay_",".detail","r")));
 	}
+    if (CmiGetArgFlagDesc(argv,"+replay","Replay recorded message stream")) {
+        CpdSetInitializeMemory(1);
+        ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
+    }
 }
 
 extern "C"

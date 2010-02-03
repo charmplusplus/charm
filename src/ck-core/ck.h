@@ -95,8 +95,10 @@ public:
 	 * up to the outermost
 	 */
 	inline CmiBool processMessage(envelope *env,CkCoreState *ck) {
-	  if (next != NULL) next->processMessage(env, ck);
-	  return process(env, ck);
+	  CmiBool result = CmiTrue;
+	  if (next != NULL) result &= next->processMessage(env, ck);
+	  result &= process(env, ck);
+	  return result;
 	}
 protected:
     /** This is used internally by this class to call the correct subclass method */
