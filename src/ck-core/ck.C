@@ -2007,10 +2007,17 @@ private:
 
 class CkMessageDetailReplay : public CkMessageWatcher {
   void *getNext() {
-    CmiUInt4 size;
-    fread(&size, 4, 1, f);
+    CmiUInt4 size; size_t nread;
+    if ((nread=fread(&size, 4, 1, f)) < 1) {
+      if (feof(f)) return NULL;
+      CkPrintf("Broken record file (metadata) got %d\n",nread);
+      CkAbort("");
+    }
     void *env = CmiAlloc(size);
-    fread(env, size, 1, f);
+    if ((nread=fread(env, size, 1, f)) < 1) {
+      CkPrintf("Broken record file (data) expecting %d, got %d\n",size,nread);
+      CkAbort("");
+    }
     return env;
   }
 public:
@@ -2027,6 +2034,7 @@ public:
   }
   virtual CmiBool process(envelope *env,CkCoreState *ck) {
     CmiPushPE(CkMyPe(), getNext());
+    return CmiTrue;
   }
 };
 
