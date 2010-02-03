@@ -527,9 +527,9 @@ static inline void _processBufferedMsgs(void)
       if(env->isForAnyPE())
         CldEnqueue(CLD_ANYWHERE, env, _infoIdx);
       else
-        CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), (char *)env);
+        _processHandler((void *)env, CkpvAccess(_coreState));
     } else {
-      CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), (char *)env);
+      _processHandler((void *)env, CkpvAccess(_coreState));
     }
   }
 }
