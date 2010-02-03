@@ -796,10 +796,16 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) cons
 	  ckDelegatedTo()->ArraySend(ckDelegatedPtr(),ep,msg,_idx,ckGetArrayID());
 	else 
 	{ //Usual case: a direct send
-	  if (opts & CK_MSG_INLINE)
-	    ckLocalBranch()->deliver(msg, CkDeliver_inline, opts&!CK_MSG_INLINE);
-	  else
-	    ckLocalBranch()->deliver(msg, CkDeliver_queue, opts);
+	  CkArray *localbranch = ckLocalBranch();
+	  if (localbranch == NULL) {             // array not created yet
+	    CkArrayManagerDeliver(CkMyPe(), msg, 0);
+          }
+	  else {
+	    if (opts & CK_MSG_INLINE)
+	      localbranch->deliver(msg, CkDeliver_inline, opts&!CK_MSG_INLINE);
+	    else
+	      localbranch->deliver(msg, CkDeliver_queue, opts);
+	  }
 	}
 }
 
@@ -837,7 +843,10 @@ void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex
   m->array_index()=idx;
   msg_prepareSend(m,entryIndex,aID);
   CkArray *a=(CkArray *)_localBranch(aID);
-  a->deliver(m,CkDeliver_queue,opts);
+  if (a == NULL)
+    CkArrayManagerDeliver(CkMyPe(), msg, 0);
+  else
+    a->deliver(m,CkDeliver_queue,opts);
 }
 
 void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts)
