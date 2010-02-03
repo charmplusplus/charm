@@ -1851,7 +1851,6 @@ printf("[%d] DELETE!\n", CkMyPe());
 #include "crc32.h"
 
 CkpvDeclare(int, envelopeEventID);
-int replaySystem;
 
 CkMessageWatcher::~CkMessageWatcher() {}
 

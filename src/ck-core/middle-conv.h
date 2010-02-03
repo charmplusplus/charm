@@ -47,27 +47,27 @@ static inline int CkNumPes() { return CmiNumPes(); }
 
 static inline void CmiSyncSend(int x, int y, char *z) 
 {
-  CmiSyncSendFn(x, y, z);
+  if (ConverseDeliver()) CmiSyncSendFn(x, y, z);
 }
 static inline void CmiSyncSendAndFree(int x, int y, char *z)
 {
-  CmiFreeSendFn(x, y, z);
+  if (ConverseDeliver()) CmiFreeSendFn(x, y, z);
 }
 static inline void CmiSyncBroadcast(int x, char *y)
 {
-  CmiSyncBroadcastFn(x, y);
+  if (ConverseDeliver()) CmiSyncBroadcastFn(x, y);
 }
 static inline void CmiSyncBroadcastAndFree(int x, char *y)
 {
-  CmiFreeBroadcastFn(x, y);
+  if (ConverseDeliver()) CmiFreeBroadcastFn(x, y);
 }
 static inline void CmiSyncBroadcastAll(int x, char *y)
 {
-  CmiSyncBroadcastAllFn(x, y);
+  if (ConverseDeliver()) CmiSyncBroadcastAllFn(x, y);
 }
 static inline void CmiSyncBroadcastAllAndFree(int x, char *y)
 {
-  CmiFreeBroadcastAllFn(x, y);
+  if (ConverseDeliver()) CmiFreeBroadcastAllFn(x, y);
 }
 
 #if 0

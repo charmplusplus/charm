@@ -1051,25 +1051,31 @@ void	      CmiMultipleIsend(unsigned int, int, int *, char **);
 int           CmiAsyncMsgSent(CmiCommHandle);
 void          CmiReleaseCommHandle(CmiCommHandle);
 
-#define CmiSyncSend(p,s,m)              (CmiSyncSendFn((p),(s),(char *)(m)))
-#define CmiAsyncSend(p,s,m)             (CmiAsyncSendFn((p),(s),(char *)(m)))
-#define CmiSyncSendAndFree(p,s,m)       (CmiFreeSendFn((p),(s),(char *)(m)))
+#ifdef CMK_OPTIMIZE
+#define ConverseDeliver()   1
+#else
+int ConverseDeliver();
+#endif
 
-#define CmiSyncBroadcast(s,m)           (CmiSyncBroadcastFn((s),(char *)(m)))
-#define CmiAsyncBroadcast(s,m)          (CmiAsyncBroadcastFn((s),(char *)(m)))
-#define CmiSyncBroadcastAndFree(s,m)    (CmiFreeBroadcastFn((s),(char *)(m)))
+#define CmiSyncSend(p,s,m)              if (ConverseDeliver()) (CmiSyncSendFn((p),(s),(char *)(m)))
+#define CmiAsyncSend(p,s,m)             if (ConverseDeliver()) (CmiAsyncSendFn((p),(s),(char *)(m)))
+#define CmiSyncSendAndFree(p,s,m)       if (ConverseDeliver()) (CmiFreeSendFn((p),(s),(char *)(m)))
 
-#define CmiSyncBroadcastAll(s,m)        (CmiSyncBroadcastAllFn((s),(char *)(m)))
-#define CmiAsyncBroadcastAll(s,m)       (CmiAsyncBroadcastAllFn((s),(char *)(m)))
-#define CmiSyncBroadcastAllAndFree(s,m) (CmiFreeBroadcastAllFn((s),(char *)(m)))
+#define CmiSyncBroadcast(s,m)           if (ConverseDeliver()) (CmiSyncBroadcastFn((s),(char *)(m)))
+#define CmiAsyncBroadcast(s,m)          if (ConverseDeliver()) (CmiAsyncBroadcastFn((s),(char *)(m)))
+#define CmiSyncBroadcastAndFree(s,m)    if (ConverseDeliver()) (CmiFreeBroadcastFn((s),(char *)(m)))
 
-#define CmiSyncListSend(n,l,s,m)        (CmiSyncListSendFn((n),(l),(s),(char *)(m)))
-#define CmiAsyncListSend(n,l,s,m)       (CmiAsyncListSendFn((n),(l),(s),(char *)(m)))
-#define CmiSyncListSendAndFree(n,l,s,m) (CmiFreeListSendFn((n),(l),(s),(char *)(m)))
+#define CmiSyncBroadcastAll(s,m)        if (ConverseDeliver()) (CmiSyncBroadcastAllFn((s),(char *)(m)))
+#define CmiAsyncBroadcastAll(s,m)       if (ConverseDeliver()) (CmiAsyncBroadcastAllFn((s),(char *)(m)))
+#define CmiSyncBroadcastAllAndFree(s,m) if (ConverseDeliver()) (CmiFreeBroadcastAllFn((s),(char *)(m)))
 
-#define CmiSyncMulticast(g,s,m)         (CmiSyncMulticastFn((g),(s),(char*)(m)))
-#define CmiAsyncMulticast(g,s,m)        (CmiAsyncMulticastFn((g),(s),(char*)(m)))
-#define CmiSyncMulticastAndFree(g,s,m)  (CmiFreeMulticastFn((g),(s),(char*)(m)))
+#define CmiSyncListSend(n,l,s,m)        if (ConverseDeliver()) (CmiSyncListSendFn((n),(l),(s),(char *)(m)))
+#define CmiAsyncListSend(n,l,s,m)       if (ConverseDeliver()) (CmiAsyncListSendFn((n),(l),(s),(char *)(m)))
+#define CmiSyncListSendAndFree(n,l,s,m) if (ConverseDeliver()) (CmiFreeListSendFn((n),(l),(s),(char *)(m)))
+
+#define CmiSyncMulticast(g,s,m)         if (ConverseDeliver()) (CmiSyncMulticastFn((g),(s),(char*)(m)))
+#define CmiAsyncMulticast(g,s,m)        if (ConverseDeliver()) (CmiAsyncMulticastFn((g),(s),(char*)(m)))
+#define CmiSyncMulticastAndFree(g,s,m)  if (ConverseDeliver()) (CmiFreeMulticastFn((g),(s),(char*)(m)))
 
 #if CMK_NODE_QUEUE_AVAILABLE
 void          CmiSyncNodeSendFn(int, int, char *);
