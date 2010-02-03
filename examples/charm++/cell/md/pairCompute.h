@@ -19,15 +19,15 @@ class PairCompute : public CBase_PairCompute {
     int patchDataCount;
 
     /// Particle Buffers ///
-    float* particleX[2];
-    float* particleY[2];
-    float* particleZ[2];
-    float* particleQ[2];
+    MD_FLOAT* particleX[2];
+    MD_FLOAT* particleY[2];
+    MD_FLOAT* particleZ[2];
+    MD_FLOAT* particleQ[2];
 
     /// Force Buffers ///
-    float* forceX[2];
-    float* forceY[2];
-    float* forceZ[2];
+    MD_FLOAT* forceX[2];
+    MD_FLOAT* forceY[2];
+    MD_FLOAT* forceZ[2];
 
     #if USE_PROXY_PATCHES != 0
       CProxy_ProxyPatch proxyPatchProxy[2];
@@ -45,8 +45,8 @@ class PairCompute : public CBase_PairCompute {
 
     /// Entry Methods ///
     void init(int numParticlesPerPatch);
-    void patchData(int numParticles, float* particleX, float* particleY, float* particleZ, float* particleQ, int fromPatch, CProxy_ProxyPatch proxyPatchProxy);
-    void patchData(int numParticles, float* particleX, float* particleY, float* particleZ, float* particleQ, int fromPatch);
+    void patchData(int numParticles, MD_FLOAT* particleX, MD_FLOAT* particleY, MD_FLOAT* particleZ, MD_FLOAT* particleQ, int fromPatch, CProxy_ProxyPatch proxyPatchProxy);
+    void patchData(int numParticles, MD_FLOAT* particleX, MD_FLOAT* particleY, MD_FLOAT* particleZ, MD_FLOAT* particleQ, int fromPatch);
     void doCalc_callback();
 
 };

@@ -20,17 +20,17 @@ class Patch : public CBase_Patch {
     int remainingIterations;
 
     int numParticles;
-    float* particleX;  // x-coordinate
-    float* particleY;  // y-coordinate
-    float* particleZ;  // z-coordinate
-    float* particleQ;  // charge
-    float* particleM;  // mass
-    float* velocityX;  // velocity x-component
-    float* velocityY;  // velocity y-component
-    float* velocityZ;  // velocity z-component
-    float* forceSumX;  // Buffer to sum of force x components from computes
-    float* forceSumY;  // Buffer to sum of force y components from computes
-    float* forceSumZ;  // Buffer to sum of force z components from computes
+    MD_FLOAT* particleX;  // x-coordinate
+    MD_FLOAT* particleY;  // y-coordinate
+    MD_FLOAT* particleZ;  // z-coordinate
+    MD_FLOAT* particleQ;  // charge
+    MD_FLOAT* particleM;  // mass
+    MD_FLOAT* velocityX;  // velocity x-component
+    MD_FLOAT* velocityY;  // velocity y-component
+    MD_FLOAT* velocityZ;  // velocity z-component
+    MD_FLOAT* forceSumX;  // Buffer to sum of force x components from computes
+    MD_FLOAT* forceSumY;  // Buffer to sum of force y components from computes
+    MD_FLOAT* forceSumZ;  // Buffer to sum of force z components from computes
 
     #if USE_ARRAY_SECTIONS != 0
       CProxySection_PairCompute pairComputeArraySection_lower;
@@ -49,7 +49,7 @@ class Patch : public CBase_Patch {
 
     /// Member Functions ///
     void randomizeParticles();
-    float randf();
+    MD_FLOAT randf();
     void startIteration_common(int numIters);
 
   public:
@@ -65,8 +65,8 @@ class Patch : public CBase_Patch {
     void init_common(int numParticles);
     void startIteration();
     void startIterations(int numIters);
-    void forceCheckIn(int numParticles, float* forceX, float* forceY, float* forceZ);
-    void forceCheckIn(int numParticles, float* forceX, float* forceY, float* forceZ, int numForceCheckIns);
+    void forceCheckIn(int numParticles, MD_FLOAT* forceX, MD_FLOAT* forceY, MD_FLOAT* forceZ);
+    void forceCheckIn(int numParticles, MD_FLOAT* forceX, MD_FLOAT* forceY, MD_FLOAT* forceZ, int numForceCheckIns);
     void integrate_callback();
 
 };
@@ -82,13 +82,13 @@ class ProxyPatch : public CBase_ProxyPatch {
 
     /// Member Variables ///
     int numParticles;
-    float* particleX;
-    float* particleY;
-    float* particleZ;
-    float* particleQ;
-    float* forceSumX;
-    float* forceSumY;
-    float* forceSumZ;
+    MD_FLOAT* particleX;
+    MD_FLOAT* particleY;
+    MD_FLOAT* particleZ;
+    MD_FLOAT* particleQ;
+    MD_FLOAT* forceSumX;
+    MD_FLOAT* forceSumY;
+    MD_FLOAT* forceSumZ;
 
     int patchIndex;
 
@@ -104,8 +104,8 @@ class ProxyPatch : public CBase_ProxyPatch {
 
     /// Entry Methods ///
     void init(int numParticles);
-    void patchData(int numParticles, float* particleX, float* particleY, float* particleZ, float* particleQ);
-    void forceCheckIn(int numParticles, float* forceX, float* forceY, float* forceZ);
+    void patchData(int numParticles, MD_FLOAT* particleX, MD_FLOAT* particleY, MD_FLOAT* particleZ, MD_FLOAT* particleQ);
+    void forceCheckIn(int numParticles, MD_FLOAT* forceX, MD_FLOAT* forceY, MD_FLOAT* forceZ);
 
 };
 

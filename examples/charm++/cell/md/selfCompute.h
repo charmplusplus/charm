@@ -17,13 +17,13 @@ class SelfCompute : public CBase_SelfCompute {
 
     /// Member Variables ///
     int numParticles;
-    float* particleX;
-    float* particleY;
-    float* particleZ;
-    float* particleQ;
-    float* forceX;
-    float* forceY;
-    float* forceZ;
+    MD_FLOAT* particleX;
+    MD_FLOAT* particleY;
+    MD_FLOAT* particleZ;
+    MD_FLOAT* particleQ;
+    MD_FLOAT* forceX;
+    MD_FLOAT* forceY;
+    MD_FLOAT* forceZ;
 
     CProxy_ProxyPatch proxyPatchProxy;
 
@@ -41,8 +41,8 @@ class SelfCompute : public CBase_SelfCompute {
 
     /// Entry Methods ///
     void init(int numParticlesPerPatch);
-    void patchData(int numParticles, float* particleX, float* particleY, float* particleZ, float* particleQ, CProxy_ProxyPatch proxyPatchProxy);
-    void patchData(int numParticles, float* particleX, float* particleY, float* particleZ, float* particleQ);
+    void patchData(int numParticles, MD_FLOAT* particleX, MD_FLOAT* particleY, MD_FLOAT* particleZ, MD_FLOAT* particleQ, CProxy_ProxyPatch proxyPatchProxy);
+    void patchData(int numParticles, MD_FLOAT* particleX, MD_FLOAT* particleY, MD_FLOAT* particleZ, MD_FLOAT* particleQ);
     void doCalc_callback();
 
 };
