@@ -28,6 +28,34 @@
 // Flag that tells the system if we are replaying using Record/Replay
 extern int replaySystem;
 
+#ifndef CMK_OPTIMIZE
+inline void _CldEnqueue(int pe, void *msg, int infofn) {
+  if (replaySystem) {
+    CmiFree(msg);
+    return;
+  }
+  CldEnqueue(pe, msg, infofn);
+}
+inline void _CldEnqueueMulti(int npes, int *pes, void *msg, int infofn) {
+  if (replaySystem) {
+    CmiFree(msg);
+    return;
+  }
+  CldEnqueueMulti(npes, pes, msg, infofn);
+}
+inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
+  if (replaySystem) {
+    CmiFree(msg);
+    return;
+  }
+  CldNodeEnqueue(node, msg, infofn);
+}
+#else
+#define _CldEnqueue       CldEnqueue
+#define _CldEnqueueMulti  CldEnqueueMulti
+#define _CldNodeEnqueue   CldNodeEnqueue
+#endif
+
 /// A set of "Virtual ChareID"'s
 class VidBlock {
     enum VidState {FILLED, UNFILLED};
@@ -39,7 +67,7 @@ class VidBlock {
         //env->setSrcPe(CkMyPe());
         env->setMsgtype(ForChareMsg);
         env->setObjPtr(actualID.objPtr);
-        CldEnqueue(actualID.onPE, env, _infoIdx);
+        _CldEnqueue(actualID.onPE, env, _infoIdx);
         CpvAccess(_qd)->create();      
     }
   public:

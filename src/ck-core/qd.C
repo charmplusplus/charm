@@ -240,7 +240,7 @@ void CkStartQD(const CkCallback& cb)
 #if CMK_BLUEGENE_CHARM
   CmiFreeSendFn(0, env->getTotalsize(), (char *)env);
 #else
-  CldEnqueue(0, env, _infoIdx);
+  _CldEnqueue(0, env, _infoIdx);
 #endif
 }
 

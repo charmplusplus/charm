@@ -570,7 +570,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
     env->setForAnyPE(1);
   else
     env->setForAnyPE(0);
-  CldEnqueue(destPE, env, _infoIdx);
+  _CldEnqueue(destPE, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
 }
 
@@ -588,7 +588,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0)
-      CldEnqueue(CkMyPe(), pending, _infoIdx);
+      _CldEnqueue(CkMyPe(), pending, _infoIdx);
 //    delete ptrq;
       CkpvAccess(_groupTable)->find(groupID).clearPending();
   }
@@ -635,7 +635,7 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0)
-      CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
+      _CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
 //    delete ptrq;
       CksvAccess(_nodeGroupTable)->find(groupID).clearPending();
   }
@@ -1223,6 +1223,12 @@ static void _skipCldHandler(void *converseMsg)
 // Made non-static to be used by ckmessagelogging
 void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {
+#ifndef CMK_OPTIMIZE
+  if (replaySystem) {
+    CmiFree(env);
+    return;
+  }
+#endif
   if(pe == CkMyPe() ){
     if(!CmiNodeAlive(CkMyPe())){
 	printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
@@ -1278,12 +1284,18 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 }
 
 #if CMK_BLUEGENE_CHARM
-#   define  _skipCldEnqueue   CldEnqueue
+#   define  _skipCldEnqueue   _CldEnqueue
 #endif
 
 // by pass Charm++ priority queue, send as Converse message
 static void _noCldEnqueueMulti(int npes, int *pes, envelope *env)
 {
+#ifndef CMK_OPTIMIZE
+  if (replaySystem) {
+    CmiFree(env);
+    return;
+  }
+#endif
   CkPackMessage(&env);
   int len=env->getTotalsize();
   CmiSyncListSendAndFree(npes, pes, len, (char *)env);
@@ -1296,6 +1308,12 @@ static void _noCldEnqueue(int pe, envelope *env)
     CmiHandleMessage(env);
   } else
 */
+#ifndef CMK_OPTIMIZE
+  if (replaySystem) {
+    CmiFree(env);
+    return;
+  }
+#endif
   CkPackMessage(&env);
   int len=env->getTotalsize();
   if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
@@ -1312,6 +1330,12 @@ void _noCldNodeEnqueue(int node, envelope *env)
     CmiHandleMessage(env);
   } else {
 */
+#ifndef CMK_OPTIMIZE
+  if (replaySystem) {
+    CmiFree(env);
+    return;
+  }
+#endif
   CkPackMessage(&env);
   int len=env->getTotalsize();
   if (node==CLD_BROADCAST) { 
@@ -1426,7 +1450,7 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
     if (opts & CK_MSG_SKIP_OR_IMM)
       _noCldEnqueue(destPE, env);
     else
-      CldEnqueue(destPE, env, _infoIdx);
+      _CldEnqueue(destPE, env, _infoIdx);
   }
   _TRACE_CREATION_DONE(1);
 }
@@ -1514,7 +1538,7 @@ static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
 {
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
   _TRACE_CREATION_MULTICAST(env, npes, pes);
-  CldEnqueueMulti(npes, pes, env, _infoIdx);
+  _CldEnqueueMulti(npes, pes, env, _infoIdx);
   _TRACE_CREATION_DONE(1); 	// since it only creates one creation event.
 }
 
@@ -1637,7 +1661,7 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
     }
   }
   else
-    CldNodeEnqueue(node, env, _infoIdx);
+    _CldNodeEnqueue(node, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
 #endif
 }
@@ -1648,7 +1672,7 @@ static inline void _sendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID,
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
   _TRACE_CREATION_N(env, npes);
   for (int i=0; i<npes; i++) {
-    CldNodeEnqueue(nodes[i], env, _infoIdx);
+    _CldNodeEnqueue(nodes[i], env, _infoIdx);
   }
   _TRACE_CREATION_DONE(1);  // since it only creates one creation event.
 }
@@ -1795,7 +1819,7 @@ void CkArrayManagerInsert(int pe,void *msg,CkGroupID aID) {
   register envelope *env = UsrToEnv(msg);
   env->getsetArrayMgr()=aID;
   _prepareOutgoingArrayMsg(env,ArrayEltInitMsg);
-  CldEnqueue(pe, env, _infoIdx);
+  _CldEnqueue(pe, env, _infoIdx);
 }
 
 extern "C"

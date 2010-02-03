@@ -525,7 +525,7 @@ static inline void _processBufferedMsgs(void)
   while(NULL!=(env=(envelope*)CkpvAccess(_buffQ)->deq())) {
     if(env->getMsgtype()==NewChareMsg || env->getMsgtype()==NewVChareMsg) {
       if(env->isForAnyPE())
-        CldEnqueue(CLD_ANYWHERE, env, _infoIdx);
+        _CldEnqueue(CLD_ANYWHERE, env, _infoIdx);
       else
         _processHandler((void *)env, CkpvAccess(_coreState));
     } else {
