@@ -1951,7 +1951,8 @@ class CkMessageReplay : public CkMessageWatcher {
 			envelope *env=delayed.deq();
 			if (isNext(env)) { /* this is the next message: process it */
 				REPLAYDEBUG("Dequeueing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
-				CmiSyncSendAndFree(CkMyPe(),env->getTotalsize(),(char *)env);
+				//CmiSyncSendAndFree(CkMyPe(),env->getTotalsize(),(char *)env);
+				CsdEnqueueLifo((void*)env); // Make it at the beginning since this is the one we want next
 				return;
 			}
 			else /* Not ready yet-- put it back in the
