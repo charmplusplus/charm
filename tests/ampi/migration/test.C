@@ -1,6 +1,6 @@
 /**
- * AMPI Test program
- *  Orion Sky Lawlor, olawlor@acm.org, 2003/4/4
+ * AMPI Thread Migration Test
+ * Migrate the rank 1 AMPI process from node to node in order.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,7 +23,7 @@ int main(int argc,char **argv)
   if(p >= 1){
     CkPrintf("\nbegin migrating\n");
 
-    for (int step=0; step<5; ++step) {
+    for (int step=0; step<=CkNumPes(); ++step) {
       if (rank == 1) {
 	int destination_pe = (CkMyPe() + 1) % CkNumPes();
 	CkPrintf("Trying to migrate partition %d from pe %d to %d\n",
