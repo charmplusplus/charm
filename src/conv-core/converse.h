@@ -1189,6 +1189,7 @@ typedef struct {
   */
   char cmicore[CmiReservedHeaderSize];
   CthThread thread;
+  int serialNo;
 } CthThreadToken;
 
 CthThreadToken *CthGetToken(CthThread);
