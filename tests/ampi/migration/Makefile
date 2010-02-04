@@ -3,7 +3,7 @@ CHARMC=../../../bin/ampicxx $(OPTS)
 all: pgm
 
 pgm: test.o
-	$(CHARMC) -o pgm test.o -memory os-isomalloc
+	$(CHARMC) -o pgm test.o 
 
 test.o: test.C
 	$(CHARMC) -c test.C
