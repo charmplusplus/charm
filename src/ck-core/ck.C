@@ -980,6 +980,13 @@ void _processBocInitMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register int epIdx = env->getEpIdx();
+  if (!env->getGroupDep().isZero()) {      // dependence
+    CkGroupID dep = env->getGroupDep();
+    IrrGroup *obj = _lookupGroup(ck,env,dep);
+    if (obj == NULL) return;
+  }
+  else
+    ck->process();
   CkCreateLocalGroup(groupID, epIdx, env);
 }
 
@@ -1050,7 +1057,9 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 // Group support
     case BocInitMsg :
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: BocInitMsg\n", CkMyPe());)
-      ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
+      // QD processing moved inside _processBocInitMsg because it is conditional
+      //ck->process(); 
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processBocInitMsg(ck,env);
       break;
     case NodeBocInitMsg :

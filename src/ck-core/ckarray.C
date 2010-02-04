@@ -419,28 +419,31 @@ CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
 					  const CkArrayOptions &opts_)
 {
   CkArrayOptions opts(opts_);
-  if (opts.getLocationManager().isZero())
+  CkGroupID locMgr = opts.getLocationManager();
+  if (locMgr.isZero())
   { //Create a new location manager
 #if !CMK_LBDB_ON
     CkGroupID _lbdb;
 #endif
-    opts.setLocationManager(CProxy_CkLocMgr::ckNew(
-      opts.getMap(),_lbdb,opts.getNumInitial()
-      ));
+    locMgr = CProxy_CkLocMgr::ckNew(opts.getMap(),_lbdb,opts.getNumInitial());
+    opts.setLocationManager(locMgr);
   }
   //Create the array manager
   m->array_ep()=ctor;
   CkMarshalledMessage marsh(m);
+  CkEntryOptions  e_opts;
+  e_opts.setGroupDepID(locMgr);       // group creation dependence
 #if !GROUP_LEVEL_REDUCTION
   CProxy_CkArrayReductionMgr nodereductionProxy = CProxy_CkArrayReductionMgr::ckNew();
-  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy);
+  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy,&e_opts);
   nodereductionProxy.setAttachedGroup(ag);
 #else
   CkNodeGroupID dummyid;
-  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,dummyid);
+  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,dummyid,&e_opts);
 #endif
   return (CkArrayID)ag;
 }
+
 CkArrayID CProxy_ArrayBase::ckCreateEmptyArray(void)
 {
   return ckCreateArray((CkArrayMessage *)CkAllocSysMsg(),0,CkArrayOptions());
