@@ -737,46 +737,46 @@ int      CmiTimerIsSynchronized();
 
 #define CsdNodeEnqueueGeneral(x,s,i,p) do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
-          CqsEnqueueGeneral(CsvAccess(CsdNodeQueue),(x),(s),(i),(p)); \
+          CqsEnqueueGeneral((Queue)CsvAccess(CsdNodeQueue),(x),(s),(i),(p)); \
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         } while(0)
 #define CsdNodeEnqueueFifo(x)     do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
-          CqsEnqueueFifo(CsvAccess(CsdNodeQueue),(x)); \
+          CqsEnqueueFifo((Queue)CsvAccess(CsdNodeQueue),(x)); \
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         } while(0)
 #define CsdNodeEnqueueLifo(x)     do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
-          CqsEnqueueLifo(CsvAccess(CsdNodeQueue),(x))); \
+          CqsEnqueueLifo((Queue)CsvAccess(CsdNodeQueue),(x))); \
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         } while(0)
 #define CsdNodeEnqueue(x)     do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
-          CqsEnqueueFifo(CsvAccess(CsdNodeQueue),(x));\
+          CqsEnqueueFifo((Queue)CsvAccess(CsdNodeQueue),(x));\
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         } while(0)
 
-#define CsdNodeEmpty()            (CqsEmpty(CpvAccess(CsdNodeQueue)))
-#define CsdNodeLength()           (CqsLength(CpvAccess(CsdNodeQueue)))
+#define CsdNodeEmpty()            (CqsEmpty(C(Queue)pvAccess(CsdNodeQueue)))
+#define CsdNodeLength()           (CqsLength((Queue)CpvAccess(CsdNodeQueue)))
 
 #else
 
 #define CsdNodeEnqueueGeneral(x,s,i,p) (CsdEnqueueGeneral(x,s,i,p))
-#define CsdNodeEnqueueFifo(x) (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
-#define CsdNodeEnqueueLifo(x) (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),(x)))
+#define CsdNodeEnqueueFifo(x) (CqsEnqueueFifo((Queue)CpvAccess(CsdSchedQueue),(x)))
+#define CsdNodeEnqueueLifo(x) (CqsEnqueueLifo((Queue)CpvAccess(CsdSchedQueue),(x)))
 #define CsdNodeEnqueue(x)     (CsdEnqueue(x))
-#define CsdNodeEmpty()        (CqsEmpty(CpvAccess(CsdSchedQueue)))
-#define CsdNodeLength()       (CqsLength(CpvAccess(CsdSchedQueue)))
+#define CsdNodeEmpty()        (CqsEmpty((Queue)CpvAccess(CsdSchedQueue)))
+#define CsdNodeLength()       (CqsLength((Queue)CpvAccess(CsdSchedQueue)))
 
 #endif
 
 #define CsdEnqueueGeneral(x,s,i,p)\
-    (CqsEnqueueGeneral(CpvAccess(CsdSchedQueue),(x),(s),(i),(p)))
-#define CsdEnqueueFifo(x)     (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
-#define CsdEnqueueLifo(x)     (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),(x)))
-#define CsdEnqueue(x)         (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
-#define CsdEmpty()            (CqsEmpty(CpvAccess(CsdSchedQueue)))
-#define CsdLength()           (CqsLength(CpvAccess(CsdSchedQueue)))
+    (CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),(x),(s),(i),(p)))
+#define CsdEnqueueFifo(x)     (CqsEnqueueFifo((Queue)CpvAccess(CsdSchedQueue),(x)))
+#define CsdEnqueueLifo(x)     (CqsEnqueueLifo((Queue)CpvAccess(CsdSchedQueue),(x)))
+#define CsdEnqueue(x)         (CqsEnqueueFifo((Queue)CpvAccess(CsdSchedQueue),(x)))
+#define CsdEmpty()            (CqsEmpty((Queue)CpvAccess(CsdSchedQueue)))
+#define CsdLength()           (CqsLength((Queue)CpvAccess(CsdSchedQueue)))
 
 #if CMK_CMIPRINTF_IS_A_BUILTIN /* these are implemented in machine.c */
 void  CmiPrintf(const char *, ...);
