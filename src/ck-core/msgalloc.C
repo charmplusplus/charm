@@ -107,9 +107,11 @@ CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opt
 	//Copy the user's priority data into the message
 	envelope *env=UsrToEnv(m);
 	setMemoryTypeMessage(env);
+	if (opts->getPriorityPtr() != NULL)
 	CmiMemcpy(env->getPrioPtr(),opts->getPriorityPtr(),env->getPrioBytes());
 	//Set the message's queueing type
 	env->setQueueing((unsigned char)opts->getQueueing());
+	env->setGroupDep(opts->getGroupDepID());
 	return m;
 }
 
