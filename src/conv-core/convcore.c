@@ -1716,12 +1716,16 @@ void CthResumeNormalThread(CthThreadToken* token)
 	        resumeTraceCore();*/
 #endif
 #endif
-
+  
   /* BIGSIM_OOC DEBUGGING
   CmiPrintf("In CthResumeNormalThread:   ");
   CthPrintThdMagic(t);
   */
-  CthResume(t);
+
+  /* For Record/Replay debugging: need to notify the upper layer that we are resuming a thread */
+  if (CmiExecuteThreadResume(token)) {
+    CthResume(t);
+  }
 }
 
 void CthResumeSchedulingThread(CthThreadToken  *token)

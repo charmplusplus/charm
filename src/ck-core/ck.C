@@ -2044,6 +2044,14 @@ extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
   //CmiStartQD(CkMessageReplayQuiescence, replay);
 }
 
+extern "C" int CmiExecuteThreadResume(CthThreadToken *token) {
+  CkCoreState *ck = CkpvAccess(_coreState);
+  if (ck->watcher!=NULL) {
+    return ck->watcher->processThread(token,ck);
+  }
+  return 1;
+}
+
 #include "trace-common.h" /* For traceRoot and traceRootBaseLength */
 
 static FILE *openReplayFile(const char *prefix, const char *suffix, const char *permissions) {

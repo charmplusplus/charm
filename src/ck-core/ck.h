@@ -100,9 +100,16 @@ public:
 	  result &= process(env, ck);
 	  return result;
 	}
+	inline int processThread(CthThreadToken *token, CkCoreState *ck) {
+	   int result = 1;
+	   if (next != NULL) result &= next->processThread(token, ck);
+	   result &= process(token, ck);
+	   return result;
+	}
 protected:
-    /** This is used internally by this class to call the correct subclass method */
+    /** These are used internally by this class to call the correct subclass method */
 	virtual CmiBool process(envelope *env,CkCoreState *ck) =0;
+	virtual int process(CthThreadToken *token, CkCoreState *ck) {return 1;}
 public:
     inline void setNext(CkMessageWatcher *w) { next = w; }
 };
