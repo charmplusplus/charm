@@ -1858,7 +1858,7 @@ class CkMessageRecorder : public CkMessageWatcher {
 public:
   CkMessageRecorder(FILE *f_) { f=f_; }
   ~CkMessageRecorder() {
-    fprintf(f,"-1 -1 -1");
+    fprintf(f,"-1 -1 -1 ");
     fclose(f);
   }
 
@@ -1874,6 +1874,10 @@ private:
       if (!wasPacked) CkUnpackMessage(&env);
     }
     return CmiTrue;
+  }
+  virtual int process(CthThreadToken *token,CkCoreState *ck) {
+    fprintf(f, "%d %d %d\n",CkMyPe(), -2, token->serialNo);
+    return 1;
   }
 };
 
@@ -1911,10 +1915,25 @@ class CkMessageReplay : public CkMessageWatcher {
 	unsigned int crc1, crc2;
 	/// Read the next message we need from the file:
 	void getNext(void) {
+	  if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) CkAbort("CkMessageReplay> Syntax error reading replay file");
+	  if (nextSize > 0) {
+	    // We are reading a regular message
+	    if (3!=fscanf(f,"%d%x%x", &nexttype,&crc1,&crc2)) {
+	      CkAbort("CkMessageReplay> Syntax error reading replay file");
+	    }
+	  } else if (nextSize == -2) {
+	    // We are reading a special message (right now only thread awaken)
+	    getNext(); // For now simply skip that
+	  } else if (nextPE!=-1 || nextSize!=-1 || nextEvent!=-1) {
+	    CkPrintf("Read from file item %d %d %d\n",nextPE,nextSize,nextEvent);
+	    CkAbort("CkMessageReplay> Unrecognized input");
+	  }
+	    /*
 		if (6!=fscanf(f,"%d%d%d%d%x%x", &nextPE,&nextSize,&nextEvent,&nexttype,&crc1,&crc2)) {
-			// CkAbort("CkMessageReplay> Syntax error reading replay file");
+			CkAbort("CkMessageReplay> Syntax error reading replay file");
 			nextPE=nextSize=nextEvent=nexttype=-1; //No destructor->record file just ends in the middle!
 		}
+		*/
 		counter++;
 	}
 	/// If this is the next message we need, advance and return CmiTrue.
@@ -2002,6 +2021,9 @@ private:
                         flush();
 			return CmiFalse;
 		}
+	}
+	virtual int process(CthThreadToken *token, CkCoreState *ck) {
+	  return 1;
 	}
 };
 
