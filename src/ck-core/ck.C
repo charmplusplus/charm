@@ -887,11 +887,15 @@ static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
 /************** Receive: Groups ****************/
 
 /**
- This message is sent to this groupID--prepare to
- handle this message by looking up the group,
- and possibly stashing the message.
+ Return a pointer to the local BOC of "groupID".
+ The message "env" passed in has some known dependency on this groupID
+ (either it is to be delivered to this BOC, or it depends on this BOC being there).
+ Therefore, if the return value is NULL, this function buffers the massage so that
+ it will be re-sent (by CkCreateLocalBranch) when this groupID is eventually constructed.
+ The message passed in must have its handlers correctly set so that it can be
+ scheduled again.
 */
-IrrGroup *_lookupGroup(CkCoreState *ck,envelope *env,const CkGroupID &groupID)
+static inline IrrGroup *_lookupGroupAndBufferIfNotThere(CkCoreState *ck,envelope *env,const CkGroupID &groupID)
 {
 
 	CmiImmediateLock(CkpvAccess(_groupTableImmLock));
@@ -928,7 +932,7 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
 static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID =  env->getGroupNum();
-  register IrrGroup *obj = _lookupGroup(ck,env,env->getGroupNum());
+  register IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,env->getGroupNum());
   if(obj) {
     _deliverForBocMsg(ck,env->getEpIdx(),env,obj);
   }
@@ -980,6 +984,13 @@ void _processBocInitMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register int epIdx = env->getEpIdx();
+  if (!env->getGroupDep().isZero()) {      // dependence
+    CkGroupID dep = env->getGroupDep();
+    IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,dep);
+    if (obj == NULL) return;
+  }
+  else
+    ck->process();
   CkCreateLocalGroup(groupID, epIdx, env);
 }
 
@@ -993,14 +1004,14 @@ void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 /************** Receive: Arrays *************/
 
 static void _processArrayEltInitMsg(CkCoreState *ck,envelope *env) {
-  CkArray *mgr=(CkArray *)_lookupGroup(ck,env,env->getsetArrayMgr());
+  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getsetArrayMgr());
   if (mgr) {
     _SET_USED(env, 0);
     mgr->insertElement((CkMessage *)EnvToUsr(env));
   }
 }
 static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
-  CkArray *mgr=(CkArray *)_lookupGroup(ck,env,env->getsetArrayMgr());
+  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getsetArrayMgr());
   if (mgr) {
     _SET_USED(env, 0);
     mgr->getLocMgr()->deliverInline((CkMessage *)EnvToUsr(env));
@@ -1050,7 +1061,9 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 // Group support
     case BocInitMsg :
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: BocInitMsg\n", CkMyPe());)
-      ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
+      // QD processing moved inside _processBocInitMsg because it is conditional
+      //ck->process(); 
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processBocInitMsg(ck,env);
       break;
     case NodeBocInitMsg :
@@ -1438,7 +1451,7 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
   }
   else {
     //No way to inline a cross-processor message:
-    CkSendMsg(entryIndex,msg,pCid,opts&!CK_MSG_INLINE);
+    CkSendMsg(entryIndex, msg, pCid, opts & (~CK_MSG_INLINE));
   }
 }
 
@@ -1551,7 +1564,7 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
     }
   }
   //Can't inline-- send the usual way, clear CK_MSG_INLINE
-  CkSendMsgBranch(eIdx,msg,destPE,gID,opts&!CK_MSG_INLINE);
+  CkSendMsgBranch(eIdx, msg, destPE, gID, opts & (~CK_MSG_INLINE));
 }
 
 extern "C"
@@ -1686,7 +1699,7 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
     }
   }
   //Can't inline-- send the usual way
-  CkSendMsgNodeBranch(eIdx,msg,node,gID,opts&!CK_MSG_INLINE);
+  CkSendMsgNodeBranch(eIdx, msg, node, gID, opts & ~(CK_MSG_INLINE));
 }
 
 extern "C"

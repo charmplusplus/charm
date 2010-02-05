@@ -742,14 +742,12 @@ class CkArray : public CkReductionMgr, public CkArrMgr {
   CProxy_CkArray thisProxy;
   typedef CkMigratableListT<ArrayElement> ArrayElementList;
   ArrayElementList *elements;
-  CkVec<CkMessage*> msgsWaitingForLocMgr;
 
 public:
 //Array Creation:
   CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionProxy);
   CkArray(CkMigrateMessage *m);
   CkGroupID &getGroupID(void) {return thisgroup;}
-  void notifyLocMgrCreated(CkLocMgr *mgr);
 
 //Access & information routines
   inline CkLocMgr *getLocMgr(void) {return locMgr;}

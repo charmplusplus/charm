@@ -28,7 +28,7 @@ static CkDDT *getDDT(void) {
 //------------- startup -------------
 static mpi_comm_worlds mpi_worlds;
 
-int mpi_nworlds; /*Accessed by ampif*/
+int _mpi_nworlds; /*Accessed by ampif*/
 int MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS]; /*Accessed by user code*/
 
 /* ampiReducer: AMPI's generic reducer type 
@@ -451,7 +451,7 @@ static int AMPI_threadstart_idx = -1;
 
 static void ampiNodeInit(void)
 {
-  mpi_nworlds=0;
+  _mpi_nworlds=0;
   for(int i=0;i<MPI_MAX_COMM_WORLDS; i++)
   {
     MPI_COMM_UNIVERSE[i] = MPI_COMM_WORLD+1+i;
@@ -629,11 +629,11 @@ static ampi *ampiInit(char **argv)
 
 // FIXME: Need to serialize global communicator allocation in one place.
 	//Allocate the next communicator
-	if(mpi_nworlds == MPI_MAX_COMM_WORLDS)
+	if(_mpi_nworlds == MPI_MAX_COMM_WORLDS)
 	{
 		CkAbort("AMPI> Number of registered comm_worlds exceeded limit.\n");
 	}
-	int new_idx=mpi_nworlds;
+	int new_idx=_mpi_nworlds;
 	new_world=MPI_COMM_WORLD+new_idx; // Isaac guessed there shouldn't be a +1 here
 
         //Create and attach the ampiParent array
@@ -749,7 +749,7 @@ public:
     void add(const ampiCommStruct &nextWorld) {
       int new_idx=nextWorld.getComm()-(MPI_COMM_WORLD); // Isaac guessed there shouldn't be a +1 after the MPI_COMM_WORLD
         mpi_worlds[new_idx].comm=nextWorld;
-	if (mpi_nworlds<=new_idx) mpi_nworlds=new_idx+1;
+	if (_mpi_nworlds<=new_idx) _mpi_nworlds=new_idx+1;
 	STARTUP_DEBUG("ampiInit> listed MPI_COMM_UNIVERSE "<<new_idx)
     }
 };
@@ -1662,7 +1662,7 @@ const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo)
 {
   if (universeNo>MPI_COMM_WORLD) {
     int worldDex=universeNo-MPI_COMM_WORLD-1;
-    if (worldDex>=mpi_nworlds)
+    if (worldDex>=_mpi_nworlds)
       CkAbort("Bad world communicator passed to universeComm2CommStruct");
     return mpi_worlds[worldDex].comm;
   }

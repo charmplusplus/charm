@@ -52,6 +52,10 @@ class TraceControlPoints : public Trace {
   long b2mlen;
   long b3mlen;
 
+  // In some programs like Changa, entry methods may be nested, and hence we only want to consider the outermost one
+  int nesting_level;
+
+
  public:
   TraceControlPoints(char **argv);
   

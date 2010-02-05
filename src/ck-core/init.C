@@ -527,9 +527,9 @@ static inline void _processBufferedMsgs(void)
       if(env->isForAnyPE())
         CldEnqueue(CLD_ANYWHERE, env, _infoIdx);
       else
-        CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), (char *)env);
+        _processHandler((void *)env, CkpvAccess(_coreState));
     } else {
-      CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), (char *)env);
+      _processHandler((void *)env, CkpvAccess(_coreState));
     }
   }
 }
@@ -663,7 +663,8 @@ static void _initHandler(void *msg, CkCoreState *ck)
     case BocInitMsg:
       if (env->getGroupEpoch()==0) {
         CkpvAccess(_numInitsRecd)++;
-        CpvAccess(_qd)->process();
+	// _processBocInitMsg already handles QD
+        //CpvAccess(_qd)->process();
         CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, env);
       } else _bufferHandler(msg);
       break;

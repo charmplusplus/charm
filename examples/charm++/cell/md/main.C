@@ -76,7 +76,12 @@ Main::Main(CkArgMsg* msg) {
            numStepsRemaining,
            STEPS_PER_PRINT
 	  );
-
+  if(sizeof(MD_FLOAT)==4)
+    CkPrintf("Single Precision\n");
+  else  if(sizeof(MD_FLOAT)==8)
+    CkPrintf("Double Precision\n");
+  else 
+    CkPrintf("Precision %d bytes\n",sizeof(MD_FLOAT));
   // DMK - DEBUG
   #if ENABLE_USER_EVENTS != 0
     traceRegisterUserEvent("Patch::forceCheckIn_callback()", PROJ_USER_EVENT_PATCH_FORCECHECKIN_CALLBACK);
@@ -144,7 +149,7 @@ Main::Main(CkArgMsg* msg) {
     int numPairComputes = 0;
     for (int i = 0; i < numPEs; i++) { numPairComputes += peStats[i]; }
     for (int i = 0; i < numPEs; i++) {
-      CkPrintf("[STATS] :: peStats[%d] = %6d (%5.2f%%)\n", i, peStats[i], ((float)peStats[i]) / ((float)numPairComputes) * 100.0f);
+      CkPrintf("[STATS] :: peStats[%d] = %6d (%5.2f%%)\n", i, peStats[i], ((float)peStats[i]) / ((float)numPairComputes) * 10zero);
     }
   #endif
 

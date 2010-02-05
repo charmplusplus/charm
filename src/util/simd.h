@@ -152,7 +152,7 @@ inline __veclf __vmaddlf(const __veclf a, const __veclf b, const __veclf c) { __
 /***** Reciprocal *****/
 /* TODO | FIXME  - See if there is a better way to do this (few cycles and avoid the memory load) */
 inline  __vecf  __vrecipf(const  __vecf a) {  __vecf r; r.v0 = 1.0f / a.v0; r.v1 = 1.0f / a.v1; r.v2 = 1.0f / a.v2; r.v3 = 1.0f / a.v3; return r; }
-inline __veclf __vreciplf(const __veclf a) { __veclf r; r.v0 = 1.0 / a.v0; r.v1 = 1.0 / a.v1; return r; }
+inline __veclf __vreciplf(const __veclf a) { __veclf r; r.v0 = 1.0f / a.v0; r.v1 = 1.0f / a.v1; return r; }
 
 /***** Square Root *****/
 inline  __vecf  __vsqrtf(const  __vecf a) {  __vecf r; r.v0 = sqrtf(a.v0); r.v1 = sqrtf(a.v1); r.v2 = sqrtf(a.v2); r.v3 = sqrtf(a.v3); return r; }
@@ -360,6 +360,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   inline  float  vextractf( vecf v, const int i) { return (( float*)(&v))[i]; }
   inline double vextractlf(veclf v, const int i) { return ((double*)(&v))[i]; }
 
+
   /***** Set *****/
   #define  vseti(a)  (_mm_set1_epi32((int)(a)))
   #define  vsetf(a)  (_mm_set1_ps((float)(a)))
@@ -418,7 +419,12 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
 
   /***** Reciprocal *****/
   #define  vrecipf(a)  (_mm_rcp_ps(a))
-  #define vreciplf(a)  (_mm_rcp_pd(a))
+
+// why, oh why hath the SSE2 developers forsaken us?
+//  #define vreciplf(a)  (_mm_rcp_pd(a)) <-- no worky
+
+// vrecip goes to a not very vector implementation
+inline veclf vreciplf(const veclf a) { veclf r; double* a_ptr =  (double*)(&a); double* r_ptr = (double*)(&r); r_ptr[0] = 1.0f /  a_ptr[0]; r_ptr[1] = 1.0f / a_ptr[1]; return r; }
 
   /***** Square Root *****/
   #define  vsqrtf(a)  (_mm_sqrt_ps(a))
@@ -1110,6 +1116,10 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
 #define  vspreadi(a)  ( vseti(a))
 #define  vspreadf(a)  ( vsetf(a))
 #define vspreadlf(a)  (vsetlf(a))
+
+#define visfinitef(a) ( isfinite(vextractf((a),0)) && isfinite(vextractf((a),1)) && isfinite(vextractf((a),2)) && isfinite(vextractf((a),3)))
+#define visfinitelf(a) (isfinite(vextractlf((a),0)) && isfinite(vextractlf((a),1)))
+
 
 /***** Add to Scalar *****/
 #define   vaddis(a, b)  ( vaddi((a),  vseti(b)))
