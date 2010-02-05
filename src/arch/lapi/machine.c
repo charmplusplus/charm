@@ -4,6 +4,7 @@ Based on the template machine layer
 
 Developed by
 Filippo Gioachin   03/23/05
+Chao Mei 01/28/2010
 ************************************************************************/
 
 #include <lapi.h>
@@ -27,7 +28,7 @@ Filippo Gioachin   03/23/05
 /** 
  *  The converse qd is rarely used in current charm
  *  apps, so the counter for converse qd could be disabled
- *  max performance. --Chao Mei
+ *  for max performance. --Chao Mei
  */
 #define ENABLE_CONVERSE_QD 1
 
@@ -171,20 +172,16 @@ CpvDeclare(MsgOrderInfo, msgSeqInfo);
 
 CpvDeclare(unsigned , networkProgressCount);
 
-/* Does this to be Cpv in SMP -Chao Mei */
 int networkProgressPeriod;
 
-/* Does this to be Csv like lapiInterruptMode in SMP -Chao Mei */
 static int lapiDebugMode=0;
 
-/* Csv is node-private variable. Should it be Cpv?? -Chao Mei */
 CsvDeclare(int, lapiInterruptMode);
 
 
 static void ConverseRunPE(int everReturn);
 static void PerrorExit(const char *msg);
 
-/* Does this to be Csv in SMP -Chao Mei */
 static int Cmi_nodestart;   /* First processor in this node - stupid need due to machine-smp.h that uses it!!  */
 
 #include "machine-smp.c"
@@ -331,7 +328,6 @@ char *CopyMsg(char *msg, int len) {
 typedef struct ProcState {
     CmiNodeLock  recvLock;		    /* for cs->recv */
 } ProcState;
-/* Does it Cpv? --Chao Mei */
 static ProcState  *procState;
 #endif
  
