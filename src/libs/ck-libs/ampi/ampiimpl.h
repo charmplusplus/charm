@@ -515,7 +515,7 @@ inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec){
 #include "charm-api.h"
 #include <sys/stat.h> // for mkdir
 
-extern int mpi_nworlds;
+extern int _mpi_nworlds;
 
 #define MPI_BCAST_TAG   MPI_TAG_UB_VALUE+10
 #define MPI_BARR_TAG    MPI_TAG_UB_VALUE+11

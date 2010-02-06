@@ -358,6 +358,10 @@ TCharm::~TCharm()
 
 void TCharm::migrateTo(int destPE) {
 	if (destPE==CkMyPe()) return;
+	if (CthMigratable() == 0) {
+	    CkPrintf("Warning> thread migration is not supported!\n");
+            return;
+        }
 	// Make sure migrateMe gets called *after* we suspend:
 	thisProxy[thisIndex].migrateDelayed(destPE);
 //	resumeAfterMigration=true;

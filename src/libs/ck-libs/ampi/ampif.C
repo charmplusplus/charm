@@ -216,7 +216,7 @@ inline MPI_Op & GET_MPI_OP(int idx)      { MPI_Op *tab=CtvAccess(mpi_ops); retur
 void mpi_init_universe(int *unicomm)
 {
   AMPIAPI("mpi_init_universe");
-  for(int i=0;i<mpi_nworlds; i++)
+  for(int i=0;i<_mpi_nworlds; i++)
   {
     unicomm[i] = MPI_COMM_UNIVERSE[i];
   }

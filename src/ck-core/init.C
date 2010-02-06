@@ -658,7 +658,8 @@ static void _initHandler(void *msg)
     case BocInitMsg:
       if (env->getGroupEpoch()==0) {
         CkpvAccess(_numInitsRecd)++;
-        CpvAccess(_qd)->process();
+	// _processBocInitMsg already handles QD
+        //CpvAccess(_qd)->process();
         CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, env);
       } else _bufferHandler(msg);
       break;
