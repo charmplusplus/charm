@@ -26,9 +26,9 @@ Chao Mei 01/28/2010
 #include "pcqueue.h"
 
 /** 
- *  The converse qd is rarely used in current charm
- *  apps, so the counter for converse qd could be disabled
- *  for max performance. --Chao Mei
+ *  The converse qd is rarely used in current charm apps, so the
+ *  counter for converse qd could be disabled for max
+ *  performance. --Chao Mei
  */
 #define ENABLE_CONVERSE_QD 1
 
@@ -173,11 +173,8 @@ CpvDeclare(MsgOrderInfo, msgSeqInfo);
 CpvDeclare(unsigned , networkProgressCount);
 
 int networkProgressPeriod;
-
 static int lapiDebugMode=0;
-
 CsvDeclare(int, lapiInterruptMode);
-
 
 static void ConverseRunPE(int everReturn);
 static void PerrorExit(const char *msg);
@@ -1551,14 +1548,14 @@ void ConverseExit(void) {
     if(CmiMyRank()==0) {
         check_lapi(LAPI_Gfence, (lapiContext));
         check_lapi(LAPI_Term, (lapiContext));
-        exit(0);
+        exit(EXIT_SUCCESS);
     }else{
         pthread_exit(NULL);
     }
 #else
     check_lapi(LAPI_Gfence, (lapiContext));      
     check_lapi(LAPI_Term, (lapiContext));
-    exit(0);
+    exit(EXIT_SUCCESS);
 #endif
 }
 
@@ -1777,7 +1774,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
     memset(&info,0,sizeof(info));
 
-#if CMK_SMP
+
+/* instance_no has beed disabled, and no longer effective in LAPI --Chao Mei */
+#if 0 && CMK_SMP
 #if CMK_SMP_NO_COMMTHD    
     info.instance_no = CmiMyNodeSize();
 #else
@@ -1799,6 +1798,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
        because packets recv'd before a LAPI_Init are just dropped. */
     check_lapi(LAPI_Gfence,(lapiContext));
 
+    check_lapi(LAPI_Qenv,(lapiContext, TASK_ID, &CmiMyNode()));
+    check_lapi(LAPI_Qenv,(lapiContext, NUM_TASKS, &CmiNumNodes()));
+
 #if CMK_SMP
     CsvAccess(lapiInterruptMode) = 0;
     if(CmiGetArgFlag(argv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
@@ -1809,14 +1811,19 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     if(CmiGetArgFlag(argv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
     if(CmiGetArgFlag(argv,"+nopoll")) CsvAccess(lapiInterruptMode) = 1;  
 #endif
-/*
-    printf("Running lapi in interrupt mode: %d\n", CsvAccess(lapiInterruptMode));
-*/
+
+    if(CmiNumNodes()==1) {
+        /** 
+         *  There's a bug in LAPI with interrupt mode with only one
+         *  LAPI task, so turning off the interrupt mode. --Chao Mei
+         */
+        CsvAccess(lapiInterruptMode) = 0;
+    }
+
     check_lapi(LAPI_Senv,(lapiContext, ERROR_CHK, lapiDebugMode));
     check_lapi(LAPI_Senv,(lapiContext, INTERRUPT_SET, CsvAccess(lapiInterruptMode)));
 
-    check_lapi(LAPI_Qenv,(lapiContext, TASK_ID, &CmiMyNode()));
-    check_lapi(LAPI_Qenv,(lapiContext, NUM_TASKS, &CmiNumNodes()));
+    if(CmiMyNode()==0) printf("Running lapi in interrupt mode: %d\n", CsvAccess(lapiInterruptMode));
 
     /** 
      *  Associate PumpMsgsBegin with var "lapiHeaderHandler". Then inside Xfer calls,
