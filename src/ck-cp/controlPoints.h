@@ -616,6 +616,20 @@ public:
   ~controlPointManager();
 
 
+
+  virtual void pup(PUP::er &p)
+  {
+    CBase_controlPointManager::pup(p);
+    if(p.isUnpacking()){
+      CkAbort("Group controlPointManager is not yet capable of migration.\n");
+    }
+  }
+
+  controlPointManager(CkMigrateMessage* m) {
+    // TODO: Implement this
+  }
+
+
   /// Loads the previous run data file
   void loadDataFile();
 
