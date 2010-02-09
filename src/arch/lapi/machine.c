@@ -22,6 +22,17 @@ Chao Mei 01/28/2010
 
 #if CMK_SMP
 #define CMK_PCQUEUE_LOCK 1
+#else
+/** 
+ *  In non-smp case: the LAPI completion handler thread will
+ *  also access the proc's recv queue (a PCQueue), so the queue
+ *  needs to be protected. The number of producers equals the
+ *  #completion handler threads, while there's only one consumer
+ *  for the queue. Right now, the #completion handler threads is
+ *  set to 1, so the atomic operation for PCQueue should be
+ *  achieved via memory fence. --Chao Mei
+ */
+#define CMK_PCQUEUE_LOCK 1 
 #endif
 #include "pcqueue.h"
 
@@ -1792,8 +1803,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     /* Register error handler (redundant?) -- added by Chao Mei*/
     info.err_hndlr = (LAPI_err_hndlr *)lapi_err_hndlr;
 
-    check_lapi(LAPI_Init,(&lapiContext, &info));
+    /* Indicates the number of completion handler threads to create */
+    /* The number of completion hndlr thds will affect the atomic PCQueue operations!! */
+    info.num_compl_hndlr_thr = 1;
 
+    check_lapi(LAPI_Init,(&lapiContext, &info));
+    
     /* It's a good idea to start with a fence,
        because packets recv'd before a LAPI_Init are just dropped. */
     check_lapi(LAPI_Gfence,(lapiContext));
