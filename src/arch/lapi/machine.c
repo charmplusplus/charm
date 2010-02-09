@@ -348,6 +348,27 @@ CsvDeclare(CmiNodeState, NodeState);
 #include "immediate.c"
 #endif
 
+static void AdvanceCommunication(){
+    if(!CsvAccess(lapiInterruptMode)) check_lapi(LAPI_Probe,(lapiContext));
+#if CMK_SMP && CMK_IMMEDIATE_MSG
+    /** 
+     * Immediate msgs are handled in CmiPushNode and 
+     * CmiSendNodeSelf, CmiPushPe and CmiSendSelf in the non-SMP 
+     * case, but in SMP case, those four functions could be called 
+     * in the completition handler where "CmiMyPe(), CmiMyRank()" 
+     * will be wrong as the "CmiGetState()" will not return a right 
+     * proc-specific CmiState!! So immediate messages are handled 
+     * when proc is idle. This may cause a big delay for processing 
+     * immdiate messages in SMP mode if there's not a dedicated 
+     * communication thread. 
+     * --Chao Mei 
+     */
+    MACHSTATE1(2, "[%p] Handling Immediate Message begin{",CmiGetState());
+    CmiHandleImmediate();
+    MACHSTATE1(2, "[%p] Handling Immediate Message end}",CmiGetState());
+#endif
+}
+
 /* non-smp CmiStartThreads. -Chao Mei */
 #if CMK_SHARED_VARS_UNAVAILABLE
 /* To conform with the call made in SMP mode */
@@ -395,10 +416,13 @@ void CmiPushPE(int pe,void *msg) {
 
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
-        MACHSTATE1(3, "[%p] Handling Immediate Message",CmiGetState());
+        MACHSTATE1(3, "[%p] Push Immediate Message begin{",CmiGetState());
         CMI_DEST_RANK(msg) = pe;
         CmiPushImmediateMsg(msg);
-        CmiHandleImmediate();
+        MACHSTATE1(3, "[%p] Push Immediate Message end }",CmiGetState());
+        #if !CMK_SMP
+        CmiHandleImmediate();        
+        #endif
         return;
     }
 #endif
@@ -418,10 +442,13 @@ static void CmiPushNode(void *msg) {
 
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
-        MACHSTATE1(3, "[%p] Handling Immediate Message",CmiGetState());
+        MACHSTATE1(3, "[%p] Push Immediate Message begin {",CmiGetState());
         CMI_DEST_RANK(msg) = 0;
         CmiPushImmediateMsg(msg);
+        MACHSTATE1(3, "[%p] Push Immediate Message end }",CmiGetState());
+        #if !CMK_SMP
         CmiHandleImmediate();
+        #endif
         return;
     }
 #endif
@@ -865,10 +892,13 @@ static void CmiSendSelf(char *msg) {
 
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
-        MACHSTATE1(3, "[%p] Handling Immediate Message",CmiGetState());
-        /* CmiBecomeNonImmediate(msg); */
+        MACHSTATE1(3, "[%p] Push Immediate Message begin {",CmiGetState());        
         CmiPushImmediateMsg(msg);
+        MACHSTATE1(3, "[%p] Push Immediate Message end }",CmiGetState());        
+        #if !CMK_SMP
+        /* Immdiate msgs have to be handled differently in SMP. See more in AdvanceCommunication() */
         CmiHandleImmediate();
+        #endif
         return;
     }
 #endif
@@ -981,11 +1011,13 @@ static void CmiSendNodeSelf(char *msg) {
 
 #if CMK_IMMEDIATE_MSG
     if (CmiIsImmediate(msg)) {
-        MACHSTATE1(3, "[%p] Handling Immediate Message {",CmiGetState());
+        MACHSTATE1(3, "[%p] Push Immediate Message {",CmiGetState());
         CMI_DEST_RANK(msg) = 0;
         CmiPushImmediateMsg(msg);
+        MACHSTATE(3, "} Push Immediate Message end");
+        #if !CMK_SMP
         CmiHandleImmediate();
-        MACHSTATE(3, "} Handling Immediate Message end");
+        #endif     
         return;
     }
 #endif
@@ -1585,7 +1617,7 @@ static int        Cmi_usrsched;  /* Continue after start function finishes? */
  *  lapi_probe (network progress) is given by "sleepMs"
  */
 void CmiNotifyIdle(void) {    
-    if (!CsvAccess(lapiInterruptMode)) check_lapi(LAPI_Probe,(lapiContext));
+    AdvanceCommunication();
     CmiYield();
 }
 
@@ -1622,8 +1654,8 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
         CmiIdleLock_sleep(&s->cs->idle,s->sleepMs);
         MACHSTATE1(2,"} idle sleep (%d)",CmiMyPe());
     }
-    /* Changed by Chao Mei: to avoid lapi_probe when interrupt is on*/
-    if(!CsvAccess(lapiInterruptMode)) check_lapi(LAPI_Probe, (lapiContext));
+
+    AdvanceCommunication();
     
     MACHSTATE1(2,"still idle (%d) end }",CmiMyPe());
 }
@@ -1825,7 +1857,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     CsvAccess(lapiInterruptMode) = 1;    
     if(CmiGetArgFlag(argv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
     if(CmiGetArgFlag(argv,"+nopoll")) CsvAccess(lapiInterruptMode) = 1;  
-#endif
 
     if(CmiNumNodes()==1) {
         /** 
@@ -1834,6 +1865,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
          */
         CsvAccess(lapiInterruptMode) = 0;
     }
+#endif
 
     check_lapi(LAPI_Senv,(lapiContext, ERROR_CHK, lapiDebugMode));
     check_lapi(LAPI_Senv,(lapiContext, INTERRUPT_SET, CsvAccess(lapiInterruptMode)));
