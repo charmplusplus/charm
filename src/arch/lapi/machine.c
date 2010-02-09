@@ -1853,8 +1853,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     if(CmiGetArgFlag(argv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
     if(CmiGetArgFlag(argv,"+nopoll")) CsvAccess(lapiInterruptMode) = 1;    
 #else
-    /* To make the interrupt mode as default in the non-smp case */
-    CsvAccess(lapiInterruptMode) = 1;    
+    /* To make the interrupt mode as default in the non-smp case -THERE ARE PROBLEMS --Chao Mei */
+    CsvAccess(lapiInterruptMode) = 0;    
     if(CmiGetArgFlag(argv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
     if(CmiGetArgFlag(argv,"+nopoll")) CsvAccess(lapiInterruptMode) = 1;  
 
