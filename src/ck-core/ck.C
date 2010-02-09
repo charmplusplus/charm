@@ -2054,7 +2054,7 @@ public:
 
 private:
 	virtual CmiBool process(envelope *env,CkCoreState *ck) {
-	  CkAssert(*(int*)env == 0x34567890);
+	  //CkAssert(*(int*)env == 0x34567890);
 	  REPLAYDEBUG("ProcessMessage message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent() <<" " <<env->getMsgtype() <<" " <<env->getMsgIdx());
                 if (env->getEvent() == 0) return CmiTrue;
 		if (isNext(env)) { /* This is the message we were expecting */
@@ -2112,7 +2112,7 @@ class CkMessageDetailReplay : public CkMessageWatcher {
       CkPrintf("Broken record file (data) expecting %d, got %d (file position %lld)\n",size,nread,tell);
       CkAbort("");
     }
-    *(int*)env = 0x34567890; // set first integer as magic
+    //*(int*)env = 0x34567890; // set first integer as magic
     return env;
   }
 public:
