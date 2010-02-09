@@ -1936,7 +1936,7 @@ class CkMessageReplay : public CkMessageWatcher {
 	    }
 	  } else if (nextSize == -2) {
 	    // We are reading a special message (right now only thread awaken)
-	    getNext(); // For now simply skip that
+	    // Nothing to do since we have already read all info
 	  } else if (nextPE!=-1 || nextSize!=-1 || nextEvent!=-1) {
 	    CkPrintf("Read from file item %d %d %d\n",nextPE,nextSize,nextEvent);
 	    CkAbort("CkMessageReplay> Unrecognized input");
@@ -1953,6 +1953,7 @@ class CkMessageReplay : public CkMessageWatcher {
 	CmiBool isNext(envelope *env) {
 		if (nextPE!=env->getSrcPe()) return CmiFalse;
 		if (nextEvent!=env->getEvent()) return CmiFalse;
+		if (nextSize<0) return CmiFalse; // not waiting for a regular message
 		if (nextSize!=env->getTotalsize())
                 {
 			CkPrintf("CkMessageReplay> Message size changed during replay org: [%d %d %d] got: [%d %d %d]\n", nextPE, nextEvent, nextSize, env->getSrcPe(), env->getEvent(), env->getTotalsize());
@@ -1972,15 +1973,22 @@ class CkMessageReplay : public CkMessageWatcher {
         if (!wasPacked) CkUnpackMessage(&env);
 		return CmiTrue;
 	}
+	CmiBool isNext(CthThreadToken *token) {
+	  if (nextPE==CkMyPe() && nextSize==-2 && nextEvent==token->serialNo) return CmiTrue;
+	  return CmiFalse;
+	}
 
 	/// This is a (short) list of messages we aren't yet ready for:
-	CkQ<envelope *> delayed;
+	CkQ<envelope *> delayedMessages;
+	/// This is a (short) list of tokens (i.e messages that awake user-threads) we aren't yet ready for:
+	CkQ<CthThreadToken *> delayedTokens;
 
 	/// Try to flush out any delayed messages
 	void flush(void) {
-		int len=delayed.length();
+	  if (nextSize>0) {
+		int len=delayedMessages.length();
 		for (int i=0;i<len;i++) {
-			envelope *env=delayed.deq();
+			envelope *env=delayedMessages.deq();
 			if (isNext(env)) { /* this is the next message: process it */
 				REPLAYDEBUG("Dequeueing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
 				//CmiSyncSendAndFree(CkMyPe(),env->getTotalsize(),(char *)env);
@@ -1991,9 +1999,23 @@ class CkMessageReplay : public CkMessageWatcher {
 				queue */
 			  {
 				REPLAYDEBUG("requeueing delayed message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
-				delayed.enq(env);
+				delayedMessages.enq(env);
 			  }
 		}
+	  } else if (nextSize==-2) {
+	    int len=delayedTokens.length();
+	    for (int i=0;i<len;++i) {
+	      CthThreadToken *token=delayedTokens.deq();
+	      if (isNext(token)) {
+            REPLAYDEBUG("Dequeueing token: "<<token->serialNo)
+	        CsdEnqueueLifo((void*)token);
+	        return;
+	      } else {
+            REPLAYDEBUG("requeueing delayed token: "<<token->serialNo)
+	        delayedTokens.enq(token);
+	      }
+	    }
+	  }
 	}
 
 public:
@@ -2008,6 +2030,7 @@ public:
 
 private:
 	virtual CmiBool process(envelope *env,CkCoreState *ck) {
+	  CkAssert(*(int*)env == 0x34567890);
 	  REPLAYDEBUG("ProcessMessage message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent() <<" " <<env->getMsgtype() <<" " <<env->getMsgIdx());
                 if (env->getEvent() == 0) return CmiTrue;
 		if (isNext(env)) { /* This is the message we were expecting */
@@ -2030,13 +2053,24 @@ private:
 		else /*!isNext(env) */ {
 			REPLAYDEBUG("Queueing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent()
 				<<" because we wanted "<<nextPE<<" "<<nextSize<<" "<<nextEvent)
-			delayed.enq(env);
+			delayedMessages.enq(env);
                         flush();
 			return CmiFalse;
 		}
 	}
 	virtual int process(CthThreadToken *token, CkCoreState *ck) {
-	  return 1;
+      REPLAYDEBUG("ProcessToken token: "<<token->serialNo);
+	  if (isNext(token)) {
+        REPLAYDEBUG("Executing token: "<<token->serialNo)
+	    getNext();
+	    flush();
+	    return 1;
+	  } else {
+        REPLAYDEBUG("Queueing token: "<<token->serialNo
+            <<" because we wanted "<<nextPE<<" "<<nextSize<<" "<<nextEvent)
+	    delayedTokens.enq(token);
+	    return 0;
+	  }
 	}
 };
 
@@ -2049,10 +2083,12 @@ class CkMessageDetailReplay : public CkMessageWatcher {
       CkAbort("");
     }
     void *env = CmiAlloc(size);
+    long tell = ftell(f);
     if ((nread=fread(env, size, 1, f)) < 1) {
-      CkPrintf("Broken record file (data) expecting %d, got %d\n",size,nread);
+      CkPrintf("Broken record file (data) expecting %d, got %d (file position %lld)\n",size,nread,tell);
       CkAbort("");
     }
+    *(int*)env = 0x34567890; // set first integer as magic
     return env;
   }
 public:
@@ -2065,10 +2101,11 @@ public:
       CkAbort("Replaying on a different architecture from which recording was done!");
     }
 
-    CmiPushPE(CkMyPe(), getNext());
+    CsdEnqueue(getNext());
   }
   virtual CmiBool process(envelope *env,CkCoreState *ck) {
-    CmiPushPE(CkMyPe(), getNext());
+    void *msg = getNext();
+    if (msg != NULL) CsdEnqueue(msg);
     return CmiTrue;
   }
 };
@@ -2107,6 +2144,7 @@ static FILE *openReplayFile(const char *prefix, const char *suffix, const char *
 
 #include "ckliststring.h"
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
+    CmiBool forceReplay = CmiFalse;
     char *procs = NULL;
     replaySystem = 0;
 	REPLAYDEBUG("CkMessageWatcherInit ");
@@ -2122,6 +2160,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 		ck->addWatcher(new CkMessageRecorder(openReplayFile("ckreplay_",".log","w")));
 	}
 	if (CmiGetArgStringDesc(argv,"+replay-detail",&procs,"Replay the specified processors from recorded message content")) {
+	    forceReplay = CmiTrue;
 	    CpdSetInitializeMemory(1);
 	    // Set the parameters of the processor
 #if CMK_SHARED_VARS_UNAVAILABLE
@@ -2135,7 +2174,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	    replaySystem = 1;
 	    ck->addWatcher(new CkMessageDetailReplay(openReplayFile("ckreplay_",".detail","r")));
 	}
-    if (CmiGetArgFlagDesc(argv,"+replay","Replay recorded message stream")) {
+    if (CmiGetArgFlagDesc(argv,"+replay","Replay recorded message stream") || forceReplay) {
         CpdSetInitializeMemory(1);
         ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
     }
