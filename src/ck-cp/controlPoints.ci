@@ -27,7 +27,7 @@ module ControlPoints {
 
  initnode void controlPointInitNode();
 
- group controlPointManager {
+ group  [migratable]  controlPointManager {
     entry controlPointManager();
 
     entry void requestMemoryUsage(CkCallback cb);
