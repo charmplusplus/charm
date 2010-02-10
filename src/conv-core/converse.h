@@ -1053,12 +1053,6 @@ void	      CmiMultipleIsend(unsigned int, int, int *, char **);
 int           CmiAsyncMsgSent(CmiCommHandle);
 void          CmiReleaseCommHandle(CmiCommHandle);
 
-#ifdef CMK_OPTIMIZE
-#define ConverseDeliver()   1
-#else
-int ConverseDeliver();
-#endif
-
 #define CmiSyncSend(p,s,m)              (CmiSyncSendFn((p),(s),(char *)(m)))
 #define CmiAsyncSend(p,s,m)             (CmiAsyncSendFn((p),(s),(char *)(m)))
 #define CmiSyncSendAndFree(p,s,m)       (CmiFreeSendFn((p),(s),(char *)(m)))

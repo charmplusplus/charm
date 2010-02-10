@@ -32,6 +32,15 @@ void CpdFinishInitialization() {
 #endif
 }
 
+/** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
+int replaySystem = 0;
+
+#ifndef CMK_OPTIMIZE
+int ConverseDeliver() {
+  return !replaySystem;
+}
+#endif
+
 extern "C" void resetAllCRC();
 extern "C" void checkAllCRC(int report);
 

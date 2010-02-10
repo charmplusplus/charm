@@ -42,6 +42,12 @@
 #define CkVTimer(x)	      0
 #define CkElapse(x)   
 
+#ifdef CMK_OPTIMIZE
+#define ConverseDeliver()   1
+#else
+int ConverseDeliver();
+#endif
+
 #if ! CMK_NAMESPACES_BROKEN
 namespace Converse {
 #endif
