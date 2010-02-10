@@ -13,8 +13,8 @@ New Supported Platforms:
 --------------------------------------------------------------------------------
 Summary of New Features:
 --------------------------------------------------------------------------------
-1. TCharm: Automate tracing of API calls for simulation and analysis.
-Structured Dagger (SDAG): Support templated arguments properly
+1. Charm++
+ - Cross-array and cross-group sections
 
 2. Multiphase Shared Arrays (MSA)
   - Typed handles to enforce phases
@@ -23,7 +23,11 @@ Structured Dagger (SDAG): Support templated arguments properly
   - Major implementation cleanup
 
 3. Adaptive MPI (AMPI)
-  - Improved MPI standard conformance
+ - Improved MPI standard conformance, and documentation of non-conformance
+
+4. TCharm: Automate tracing of API calls for simulation and analysis.
+
+5. Structured Dagger (SDAG): Support templated arguments properly
 
 --------------------------------------------------------------------------------
 Architecture-specific changes:
@@ -33,6 +37,9 @@ MPI
 
 MPI-SMP
   - The +p option now has the same semantics as in other smp builds 
+
+Power 7
+  - Support for VSX in SIMD abstraction API
 
 Blue Gene/L
   - Compilers and options have been updated to the latest ones
