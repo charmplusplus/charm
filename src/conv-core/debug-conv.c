@@ -33,9 +33,11 @@ uint32_t ntohl(uint32_t netlong) {
 /** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
 int replaySystem = 0;
 
+#ifndef CMK_OPTIMIZE
 int ConverseDeliver() {
   return !replaySystem;
 }
+#endif
 
 /***************************************************
   The CCS interface to the debugger
