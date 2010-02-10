@@ -206,6 +206,7 @@ public:
   void Migrated(LDObjHandle h, int waitBarrier);
 
   void ObjMigrated(LDObjData data, LDCommData *cdata, int n, int level);
+  void ObjsMigrated(LDObjData *data, int m, LDCommData *cdata, int n, int level);
   void VectorDone(int atlevel);
   void MigrationDone(int balancing);  // Call when migration is complete
   void StatsDone(int level);  // Call when LDStats migration is complete
