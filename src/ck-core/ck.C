@@ -2148,12 +2148,36 @@ extern "C" void CkMessageDetailReplayDone(void *rep, double time) {
   ConverseExit();
 }
 
-extern "C" int CmiExecuteThreadResume(CthThreadToken *token) {
+static int CpdExecuteThreadResume(CthThreadToken *token) {
   CkCoreState *ck = CkpvAccess(_coreState);
   if (ck->watcher!=NULL) {
     return ck->watcher->processThread(token,ck);
   }
   return 1;
+}
+
+CpvCExtern(int, CthResumeNormalThreadIdx);
+extern "C" void CthResumeNormalThreadDebug(CthThreadToken* token)
+{
+  CthThread t = token->thread;
+
+  if(t == NULL){
+    free(token);
+    return;
+  }
+#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_IN_CHARM
+  if(CpvAccess(traceOn))
+    CthTraceResume(t);
+/*    if(CpvAccess(_traceCoreOn)) 
+            resumeTraceCore();*/
+#endif
+#endif
+  
+  /* For Record/Replay debugging: need to notify the upper layer that we are resuming a thread */
+  if (CpdExecuteThreadResume(token)) {
+    CthResume(t);
+  }
 }
 
 #include "trace-common.h" /* For traceRoot and traceRootBaseLength */
@@ -2189,6 +2213,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     }
 	if (CmiGetArgFlagDesc(argv,"+record","Record message processing order")) {
 	    CpdSetInitializeMemory(1);
+        CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
 		ck->addWatcher(new CkMessageRecorder(openReplayFile("ckreplay_",".log","w")));
 	}
 	if (CmiGetArgStringDesc(argv,"+replay-detail",&procs,"Replay the specified processors from recorded message content")) {
@@ -2208,6 +2233,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	}
     if (CmiGetArgFlagDesc(argv,"+replay","Replay recorded message stream") || forceReplay) {
         CpdSetInitializeMemory(1);
+        CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
         ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
     }
 }

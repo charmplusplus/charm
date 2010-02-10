@@ -1661,7 +1661,7 @@ int handler;
 CpvStaticDeclare(CthThread, CthMainThread);
 CpvStaticDeclare(CthThread, CthSchedulingThread);
 CpvStaticDeclare(CthThread, CthSleepingStandins);
-CpvStaticDeclare(int      , CthResumeNormalThreadIdx);
+CpvDeclare(int      , CthResumeNormalThreadIdx);
 CpvStaticDeclare(int      , CthResumeSchedulingThreadIdx);
 
 
@@ -1696,6 +1696,7 @@ CthThread CthSuspendSchedulingThread()
   return succ;
 }
 
+/* Notice: For changes to the following function, make sure the function CthResumeNormalThreadDebug is also kept updated. */
 void CthResumeNormalThread(CthThreadToken* token)
 {
   CthThread t = token->thread;
@@ -1722,10 +1723,7 @@ void CthResumeNormalThread(CthThreadToken* token)
   CthPrintThdMagic(t);
   */
 
-  /* For Record/Replay debugging: need to notify the upper layer that we are resuming a thread */
-  if (CmiExecuteThreadResume(token)) {
-    CthResume(t);
-  }
+  CthResume(t);
 }
 
 void CthResumeSchedulingThread(CthThreadToken  *token)
