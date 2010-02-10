@@ -31,7 +31,7 @@ uint32_t ntohl(uint32_t netlong) {
 #endif
 
 /** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
-int replaySystem;
+int replaySystem = 0;
 
 int ConverseDeliver() {
   return !replaySystem;

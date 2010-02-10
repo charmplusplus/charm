@@ -30,6 +30,10 @@
 #undef CmiSyncBroadcastAndFree
 #undef CmiSyncBroadcastAll
 #undef CmiSyncBroadcastAllAndFree
+#undef CmiSyncListSend
+#undef CmiSyncListSendAndFree
+#undef CmiSyncMulticast
+#undef CmiSyncMulticastAndFree
 
 #define CksdScheduler			CsdScheduler
 #define CksdExitScheduler		CsdExitScheduler
@@ -68,6 +72,22 @@ static inline void CmiSyncBroadcastAll(int x, char *y)
 static inline void CmiSyncBroadcastAllAndFree(int x, char *y)
 {
   if (ConverseDeliver()) CmiFreeBroadcastAllFn(x, y);
+}
+static inline void CmiSyncListSend(int x, int *y, int w, char *z)
+{
+  if (ConverseDeliver()) CmiSyncListSendFn(x, y, w, z);
+}
+static inline void CmiSyncListSendAndFree(int x, int *y, int w, char *z)
+{
+  if (ConverseDeliver()) CmiFreeListSendFn(x, y, w, z);
+}
+static inline void CmiSyncMulticast(CmiGroup x, int y, char *z)
+{
+  if (ConverseDeliver()) CmiSyncMulticastFn(x, y, z);
+}
+static inline void CmiSyncMulticastAndFree(CmiGroup x, int y, char *z)
+{
+  if (ConverseDeliver()) CmiFreeMulticastFn(x, y, z);
 }
 
 #if 0
