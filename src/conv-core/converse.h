@@ -733,6 +733,8 @@ double   CmiWallTimer(void);
 int      CmiTimerIsSynchronized();
 #endif
 
+#include "queueing.h" /* for "Queue" */
+
 #if CMK_NODE_QUEUE_AVAILABLE
 
 #define CsdNodeEnqueueGeneral(x,s,i,p) do { \
