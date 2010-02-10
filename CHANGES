@@ -5,8 +5,8 @@ git log on a clone of the charm repository.
 What's new in Charm++ 6.2.0 (since 6.1)
 =======================================
 
-TCharm: Automate tracing of API calls for simulation and analysis.
-Structured Dagger (SDAG): Support templated arguments properly
+Charm++
+ - Cross-array and cross-group sections
 
 Multiphase Shared Arrays (MSA)
  - Typed handles to enforce phases
@@ -15,12 +15,17 @@ Multiphase Shared Arrays (MSA)
  - Major implementation cleanup
 
 Adaptive MPI (AMPI)
- - Improved MPI standard conformance
+ - Improved MPI standard conformance, and documentation of non-conformance
+
+TCharm: Automate tracing of API calls for simulation and analysis.
+Structured Dagger (SDAG): Support templated arguments properly
 
 Architecture-specific changes:
 ------------------------------
 MPI
  - Default to using mpicxx instead of mpiCC
+Power 7
+ - Support for VSX in SIMD abstraction API
 
 
 Note that changes between 5.4 and 6.1 are not documented here. A
