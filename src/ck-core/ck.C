@@ -1945,6 +1945,7 @@ private:
 #define REPLAYDEBUG(args) /* empty */
 
 extern "C" void CkMessageReplayQuiescence(void *rep, double time);
+extern "C" void CkMessageDetailReplayDone(void *rep, double time);
 
 class CkMessageReplay : public CkMessageWatcher {
   int counter;
@@ -2126,6 +2127,8 @@ public:
     }
 
     CsdEnqueue(getNext());
+
+    CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)CkMessageDetailReplayDone, (void*)this);
   }
   virtual CmiBool process(envelope *env,CkCoreState *ck) {
     void *msg = getNext();
@@ -2138,6 +2141,11 @@ extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
   CkMessageReplay *replay = (CkMessageReplay*)rep;
   //CmiStartQD(CkMessageReplayQuiescence, replay);
+}
+
+extern "C" void CkMessageDetailReplayDone(void *rep, double time) {
+  CkPrintf("[%d] Detailed replay finished. Exiting.\n",CkMyPe());
+  ConverseExit();
 }
 
 extern "C" int CmiExecuteThreadResume(CthThreadToken *token) {
