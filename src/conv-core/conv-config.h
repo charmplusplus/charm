@@ -65,7 +65,7 @@
 #endif
 
 #ifndef CMK_OPTIMIZE
-#if CMK_CCS_AVAILABLE && !defined(_WIN32)
+#if !defined(_WIN32)
 #define CMK_REPLAYSYSTEM            1
 #endif
 #endif
