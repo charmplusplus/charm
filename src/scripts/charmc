@@ -777,6 +777,7 @@ Debug "Setting vars..."
 
 if [ "$USE_BUILD_OPTIONS" = "1" ]  
 then
+	[ -n "$VERBOSE" ] && echo "Charmc applying build time options: $BUILDOPTS"
 	OPTS="$OPTS $BUILDOPTS"
 fi
 
