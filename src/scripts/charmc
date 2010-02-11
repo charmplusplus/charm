@@ -79,6 +79,7 @@ USE_FASTEST_CC=""
 PROG_EXT=""
 
 COPY_CHARMRUN=true
+USE_BUILD_OPTIONS=0
 
 COPY_EXIT="true"
 CHARM_SHARED="0"
@@ -724,6 +725,9 @@ do
 	-no-charmrun)
 		COPY_CHARMRUN=false
 		;;
+	-use-build-options)
+		USE_BUILD_OPTIONS=1
+		;;
         -h|--help)
 	        printUsage
 		;;
@@ -770,6 +774,11 @@ Debug "Read config script, setting defaults..."
 . $CHARMINC/conv-config.sh $CHARMINC
 
 Debug "Setting vars..."
+
+if [ "$USE_BUILD_OPTIONS" = "1" ]  
+then
+	OPTS="$OPTS $BUILDOPTS"
+fi
 
 # If we are debugging, add "-g -O0" to the C/C++ flags
 if [ -n "$CHARMDEBUG" ]; then

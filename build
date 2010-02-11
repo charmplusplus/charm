@@ -571,6 +571,8 @@ printError()
 	exit $MAKEEXIT
 }
 
+echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
+
 Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET"' in $VERSION/tmp"
 cd $DESTINATION/tmp 
 $MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
