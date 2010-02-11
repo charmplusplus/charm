@@ -28,7 +28,7 @@
 // Flag that tells the system if we are replaying using Record/Replay
 extern int replaySystem;
 
-#ifndef CMK_OPTIMIZE
+#if CMK_REPLAYSYSTEM
 inline void _CldEnqueue(int pe, void *msg, int infofn) {
   if (replaySystem) {
     CmiFree(msg);

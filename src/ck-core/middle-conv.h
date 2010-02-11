@@ -42,10 +42,10 @@
 #define CkVTimer(x)	      0
 #define CkElapse(x)   
 
-#ifdef CMK_OPTIMIZE
-#define ConverseDeliver()   1
-#else
+#if CMK_REPLAYSYSTEM
 int ConverseDeliver();
+#else
+#define ConverseDeliver()   1
 #endif
 
 #if ! CMK_NAMESPACES_BROKEN

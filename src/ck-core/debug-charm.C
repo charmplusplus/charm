@@ -19,6 +19,17 @@
 //#include "queueing.h"
 #include <unistd.h>
 
+
+/** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
+int replaySystem = 0;
+
+#if CMK_REPLAYSYSTEM
+
+int ConverseDeliver() {
+  return !replaySystem;
+}
+#endif
+
 #if CMK_CCS_AVAILABLE && !defined(_WIN32)
 
 #include "ck.h"
@@ -31,15 +42,6 @@ void CpdFinishInitialization() {
   _debugEntryTable.resize(_entryTable.size());
 #endif
 }
-
-/** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
-int replaySystem = 0;
-
-#ifndef CMK_OPTIMIZE
-int ConverseDeliver() {
-  return !replaySystem;
-}
-#endif
 
 extern "C" void resetAllCRC();
 extern "C" void checkAllCRC(int report);
