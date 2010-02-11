@@ -10,6 +10,8 @@ New Supported Platforms:
 --------------------------------------------------------------------------------
 1. Charm++ ported to mips64 machines (such as SiCortex)
 
+2. Charm++ ported to Windows HPC cluster (mpi-win32)
+
 --------------------------------------------------------------------------------
 Summary of New Features:
 --------------------------------------------------------------------------------
@@ -29,11 +31,23 @@ Summary of New Features:
 
 5. Structured Dagger (SDAG): Support templated arguments properly
 
+6. Plain chares are not checkpointable (work with both disk-based and inmem checkpointing/restart
+
+7. support MPI_IN_PLACE in AMPI
+
+8. new CPU topology API
+
+9. a general implementation of CmiMemoryUsage()
+
+10. a new charmrun option ++no-va-randomization for net layers that disable stack randomization. useful for running AMPI with isomalloc
+
+11. A new interface for model-based load balancing
+
 --------------------------------------------------------------------------------
 Architecture-specific changes:
 --------------------------------------------------------------------------------
 MPI
-  - Default to using mpicxx instead of mpiCC
+  - Default to using ampicxx instead of mpiCC
 
 MPI-SMP
   - The +p option now has the same semantics as in other smp builds 
@@ -47,6 +61,17 @@ Blue Gene/L
 Cray XT
   - cputopology information is now available on XT3/4/5
 
+
+--------------------------------------------------------------------------------
+Bug Fixes
+--------------------------------------------------------------------------------
+1. MPI_Ssend bug fixed
+
+2. MPI_Cart_shift in AMPI
+
+3. Infiniband: memory leak bugs fixed in ibverbs
+
+4. fixed a bug in QD when immediate messages are used
 
 --------------------------------------------------------------------------------
 Note that changes between 5.4 and 6.1 are not documented here. A partial list
