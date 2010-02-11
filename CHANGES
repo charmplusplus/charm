@@ -1,5 +1,5 @@
 This file describes the most significant changes. For more detail, use
-git log on a clone of the charm repository.
+'git log' on a clone of the charm repository.
 
 ================================================================================
 What's new in Charm++ 6.2.0 (since 6.1)
@@ -8,73 +8,78 @@ What's new in Charm++ 6.2.0 (since 6.1)
 --------------------------------------------------------------------------------
 New Supported Platforms:
 --------------------------------------------------------------------------------
-1. Charm++ ported to mips64 machines (such as SiCortex)
 
-2. Charm++ ported to Windows HPC cluster (mpi-win32)
+64-bit MIPS, such as SiCortex, using mpi-linux-mips64
+
+Windows HPC cluster, using mpi-win32
 
 --------------------------------------------------------------------------------
-Summary of New Features:
+General Changes
 --------------------------------------------------------------------------------
-1. Charm++
+
+Runtime support
+ - A new interface for model-based load balancing
+ - new CPU topology API
+ - a general implementation of CmiMemoryUsage()
+ - Bug fix: Quiesence detection (QD) works with immediate messages
+
+Charm++
  - Cross-array and cross-group sections
+ - Structured Dagger (SDAG): Support templated arguments properly
+ - Plain chares support checkpoint/restart (both in-memory and disk-based)
 
-2. Multiphase Shared Arrays (MSA)
-  - Typed handles to enforce phases
-  - Split-phase synchronization to enable message-driven execution
-  - 3D arrays
-  - Major implementation cleanup
-
-3. Adaptive MPI (AMPI)
+Adaptive MPI (AMPI)
+ - Compilers renamed to avoid collision with host MPI (ampicc, ampiCC,
+   ampif77, ampif90)
  - Improved MPI standard conformance, and documentation of non-conformance
+   * Bug fixes in: MPI_Ssend, MPI_Cart_shift, MPI_Get_count
+   * Support MPI_IN_PLACE in MPI_(All)Reduce
+   * Define various missing constants
+ - Return the received message's tag in response to a non-blocking
+   wildcard receive, to support SuperLU
+ - Improved tracing for BigSim
 
-4. TCharm: Automate tracing of API calls for simulation and analysis.
+Multiphase Shared Arrays (MSA)
+ - Typed handles to enforce phases
+ - Split-phase synchronization to enable message-driven execution
+ - 3D arrays
 
-5. Structured Dagger (SDAG): Support templated arguments properly
-
-6. Plain chares are not checkpointable (work with both disk-based and inmem checkpointing/restart
-
-7. support MPI_IN_PLACE in AMPI
-
-8. new CPU topology API
-
-9. a general implementation of CmiMemoryUsage()
-
-10. a new charmrun option ++no-va-randomization for net layers that disable stack randomization. useful for running AMPI with isomalloc
-
-11. A new interface for model-based load balancing
+TCharm
+ - Automatic tracing of API calls for simulation and analysis.
 
 --------------------------------------------------------------------------------
-Architecture-specific changes:
+Architecture-specific changes
 --------------------------------------------------------------------------------
+
+Net-Linux
+ - New charmrun option ++no-va-randomization to disable address space
+   randomization (ASLR). This is most useful for running AMPI with
+   isomalloc
+
 MPI
-  - Default to using ampicxx instead of mpiCC
+ - Default to using ampicxx instead of mpiCC
 
 MPI-SMP
-  - The +p option now has the same semantics as in other smp builds 
+ - The +p option now has the same semantics as in other smp builds
 
 Power 7
-  - Support for VSX in SIMD abstraction API
+ - Support for VSX in SIMD abstraction API
 
 Blue Gene/L
-  - Compilers and options have been updated to the latest ones
+ - Compilers and options have been updated to the latest ones
 
 Cray XT
-  - cputopology information is now available on XT3/4/5
+ - cputopology information is now available on XT3/4/5
+
+Infiniband (ibverbs)
+ - Bug fix: plug memory leaks that caused failures in long runs
+
+LAPI
+ - ...
 
 
---------------------------------------------------------------------------------
-Bug Fixes
---------------------------------------------------------------------------------
-1. MPI_Ssend bug fixed
-
-2. MPI_Cart_shift in AMPI
-
-3. Infiniband: memory leak bugs fixed in ibverbs
-
-4. fixed a bug in QD when immediate messages are used
-
---------------------------------------------------------------------------------
-Note that changes between 5.4 and 6.1 are not documented here. A partial list
+================================================================================
+Note that changes from 5.9, 6.0, and 6.1 are not documented here. A partial list
 can be found on the charm download page, or by reading through version control
 logs.
 
