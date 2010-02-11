@@ -891,62 +891,62 @@ controlPointManager::controlPointManager(){
   }
 
 
-  /// Inform the control point framework that a named control point affects the priorities of some array  
-  void controlPointManager::associatePriorityArray(const char *name, int groupIdx){
-    CkPrintf("Associating control point \"%s\" affects priority of array id=%d\n", name, groupIdx );
+//   /// Inform the control point framework that a named control point affects the priorities of some array  
+//   void controlPointManager::associatePriorityArray(const char *name, int groupIdx){
+//     CkPrintf("Associating control point \"%s\" affects priority of array id=%d\n", name, groupIdx );
     
-    if(affectsPrioritiesArray.count(std::string(name)) > 0 ) {
-      affectsPrioritiesArray[std::string(name)].insert(groupIdx);
-    } else {
-      std::set<int> s;
-      s.insert(groupIdx);
-      affectsPrioritiesArray[std::string(name)] = s;
-    }
+//     if(affectsPrioritiesArray.count(std::string(name)) > 0 ) {
+//       affectsPrioritiesArray[std::string(name)].insert(groupIdx);
+//     } else {
+//       std::set<int> s;
+//       s.insert(groupIdx);
+//       affectsPrioritiesArray[std::string(name)] = s;
+//     }
     
-#if DEBUGPRINT   
-    std::map<std::string, std::set<int> >::iterator f;
-    for(f=affectsPrioritiesArray.begin(); f!=affectsPrioritiesArray.end();++f){
-      std::string name = f->first;
-      std::set<int> &vals = f->second;
-      cout << "Control point " << name << " affects arrays: ";
-      std::set<int>::iterator i;
-      for(i=vals.begin(); i!=vals.end();++i){
-	cout << *i << " ";
-      }
-      cout << endl;
-    }
-#endif
+// #if DEBUGPRINT   
+//     std::map<std::string, std::set<int> >::iterator f;
+//     for(f=affectsPrioritiesArray.begin(); f!=affectsPrioritiesArray.end();++f){
+//       std::string name = f->first;
+//       std::set<int> &vals = f->second;
+//       cout << "Control point " << name << " affects arrays: ";
+//       std::set<int>::iterator i;
+//       for(i=vals.begin(); i!=vals.end();++i){
+// 	cout << *i << " ";
+//       }
+//       cout << endl;
+//     }
+// #endif
     
-  }
+//   }
   
-  /// Inform the control point framework that a named control point affects the priority of some entry method
-  void controlPointManager::associatePriorityEntry(const char *name, int idx){
-    CkPrintf("Associating control point \"%s\" with EP id=%d\n", name, idx);
+//   /// Inform the control point framework that a named control point affects the priority of some entry method
+//   void controlPointManager::associatePriorityEntry(const char *name, int idx){
+//     CkPrintf("Associating control point \"%s\" with EP id=%d\n", name, idx);
 
-      if(affectsPrioritiesEP.count(std::string(name)) > 0 ) {
-      affectsPrioritiesEP[std::string(name)].insert(idx);
-    } else {
-      std::set<int> s;
-      s.insert(idx);
-      affectsPrioritiesEP[std::string(name)] = s;
-    }
+//       if(affectsPrioritiesEP.count(std::string(name)) > 0 ) {
+//       affectsPrioritiesEP[std::string(name)].insert(idx);
+//     } else {
+//       std::set<int> s;
+//       s.insert(idx);
+//       affectsPrioritiesEP[std::string(name)] = s;
+//     }
     
-#if DEBUGPRINT
-    std::map<std::string, std::set<int> >::iterator f;
-    for(f=affectsPrioritiesEP.begin(); f!=affectsPrioritiesEP.end();++f){
-      std::string name = f->first;
-      std::set<int> &vals = f->second;
-      cout << "Control point " << name << " affects EP: ";
-      std::set<int>::iterator i;
-      for(i=vals.begin(); i!=vals.end();++i){
-	cout << *i << " ";
-      }
-      cout << endl;
-    }
-#endif
+// #if DEBUGPRINT
+//     std::map<std::string, std::set<int> >::iterator f;
+//     for(f=affectsPrioritiesEP.begin(); f!=affectsPrioritiesEP.end();++f){
+//       std::string name = f->first;
+//       std::set<int> &vals = f->second;
+//       cout << "Control point " << name << " affects EP: ";
+//       std::set<int>::iterator i;
+//       for(i=vals.begin(); i!=vals.end();++i){
+// 	cout << *i << " ";
+//       }
+//       cout << endl;
+//     }
+// #endif
 
 
-  }
+//   }
   
 
 
@@ -1644,19 +1644,19 @@ int controlPoint(const char *name, int lb, int ub){
 
 
 /// Inform the control point framework that a named control point affects the priorities of some array  
-void controlPointPriorityArray(const char *name, CProxy_ArrayBase &arraybase){
-  CkGroupID aid = arraybase.ckGetArrayID();
-  int groupIdx = aid.idx;
-  controlPointManagerProxy.ckLocalBranch()->associatePriorityArray(name, groupIdx);
-  //  CkPrintf("Associating control point \"%s\" with array id=%d\n", name, groupIdx );
-}
+// void controlPointPriorityArray(const char *name, CProxy_ArrayBase &arraybase){
+//   CkGroupID aid = arraybase.ckGetArrayID();
+//   int groupIdx = aid.idx;
+//   controlPointManagerProxy.ckLocalBranch()->associatePriorityArray(name, groupIdx);
+//   //  CkPrintf("Associating control point \"%s\" with array id=%d\n", name, groupIdx );
+// }
 
 
-/// Inform the control point framework that a named control point affects the priorities of some entry method  
-void controlPointPriorityEntry(const char *name, int idx){
-  controlPointManagerProxy.ckLocalBranch()->associatePriorityEntry(name, idx);
-  //  CkPrintf("Associating control point \"%s\" with EP id=%d\n", name, idx);
-}
+// /// Inform the control point framework that a named control point affects the priorities of some entry method  
+// void controlPointPriorityEntry(const char *name, int idx){
+//   controlPointManagerProxy.ckLocalBranch()->associatePriorityEntry(name, idx);
+//   //  CkPrintf("Associating control point \"%s\" with EP id=%d\n", name, idx);
+// }
 
 
 

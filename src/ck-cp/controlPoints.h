@@ -79,12 +79,6 @@ int controlPoint(const char *name, int lb, int ub);
 /// The value returned will likely change between subsequent invocations
 int controlPoint(const char *name, std::vector<int>& values);
 
-/// Associate a control point as affecting priorities for an array
-void controlPointPriorityArray(const char *name, CProxy_ArrayBase &arraybase);
-
-/// Associate a control point with an entry method, whose priorities are affected by the control point
-void controlPointPriorityEntry(const char *name, int idx);
-
 
 
 
@@ -697,11 +691,11 @@ public:
   void gatherAll(CkReductionMsg *msg);
   
 
-  /// Inform the control point framework that a named control point affects the priorities of some array  
-  void associatePriorityArray(const char *name, int groupIdx);
+/*   /// Inform the control point framework that a named control point affects the priorities of some array   */
+/*   void associatePriorityArray(const char *name, int groupIdx); */
   
-  /// Inform the control point framework that a named control point affects the priority of some entry method
-  void associatePriorityEntry(const char *name, int idx);
+/*   /// Inform the control point framework that a named control point affects the priority of some entry method */
+/*   void associatePriorityEntry(const char *name, int idx); */
   
 
 
