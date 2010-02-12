@@ -89,6 +89,7 @@ syntax() {
   echo '  --basedir=DIR	     shortcut for the above two - DIR/include and DIR/lib'
   echo '  -j[N]              parallel make, N is the number of paralle make jobs'
   echo "  --with-romio       build AMPI with ROMIO library"
+  echo "  --with-production  build Charm++ with all optimizations for maximum performance"
   echo "  --destination=DIR  build Charm++ inside DIR, by default the destination is <version>"
   echo "  --suffix=DIR       append DIR to the destination directory of the Charm++ build"
   echo "  --tau-makefile=FILE Specify which TAU stub makefile to use"
@@ -207,6 +208,7 @@ INCDIR=
 ARCH=
 BUILD_SHARED=
 WITH_ROMIO=
+WITH_PRODUCTION=
 BUILD_EMULATOR=0
 DESTINATION=""
 DESTINATION_SUFFIX=""
@@ -293,6 +295,10 @@ do
 		;;
     --with-romio)
 		WITH_ROMIO="true"; shift
+		;;
+    --with-production)
+		WITH_PRODUCTION="true" 
+		shift
 		;;
     --build-shared|-bs)
 		# obsolete, do nothing
@@ -520,6 +526,11 @@ then
     echo "CMK_AMPI_WITH_ROMIO=\"true\"" >> $ConvSh
 fi
 
+if test -n "$WITH_PRODUCTION"
+then
+    echo '#define CMK_OPTIMIZE' >> $ConvHeader
+    echo '#define CMK_REPLAYSYSTEM  0' >> $ConvHeader
+fi
 
 # build with Tau
 WITH_TAU=0
@@ -570,6 +581,8 @@ printError()
 	Echo "for more information. Otherwise, email the developers at charm@cs.uiuc.edu"
 	exit $MAKEEXIT
 }
+
+echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
 
 Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET"' in $VERSION/tmp"
 cd $DESTINATION/tmp 

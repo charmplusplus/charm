@@ -32,7 +32,28 @@ Chao Mei 01/28/2010
  *  set to 1, so the atomic operation for PCQueue should be
  *  achieved via memory fence. --Chao Mei
  */
-#define CMK_PCQUEUE_LOCK 1 
+
+/* Redefine CmiNodeLocks only for PCQueue data structure */
+#define CmiNodeLock CmiNodeLock_nonsmp
+#undef CmiCreateLock()
+#undef CmiLock(lock)
+#undef CmiUnlock(lock)
+#undef CmiTryLock(lock)
+#undef CmiDestroyLock(lock)
+typedef pthread_mutex_t *CmiNodeLock_nonsmp;
+CmiNodeLock CmiCreateLock(){
+  CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(pthread_mutex_t));  
+  pthread_mutex_init(lk,(pthread_mutexattr_t *)0);
+  return lk;
+}
+#define CmiLock(lock) (pthread_mutex_lock(lock))
+#define CmiUnlock(lock) (pthread_mutex_unlock(lock))
+#define CmiTryLock(lock) (pthread_mutex_trylock(lock))
+void CmiDestroyLock(CmiNodeLock lock){
+    pthread_mutex_destroy(lock);
+    free(lock);
+}
+#define CMK_PCQUEUE_LOCK 1
 #endif
 #include "pcqueue.h"
 
@@ -628,6 +649,11 @@ static int CheckMsgInOrder(char *msg){
   * 6) SMP mode, with comm thread, with interrupt?? 
   *  
   * Currently, SMP mode without comm thread is undergoing implementation. 
+  *  
+  * This function is executed by LAPI internal threads. It seems that the number of internal 
+  * completion handler threads could vary during the program. LAPI adaptively creates more 
+  * threads if there are more outstanding messages!!!! This means pcqueue needs protection 
+  * even in the nonsmp case!!!!
   *  
   * --Chao Mei 
   */
@@ -1773,6 +1799,10 @@ static void ConverseRunPE(int everReturn) {
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)s);
 #else
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
+#if !CMK_SMP || CMK_SMP_NO_COMMTHD
+    /* If there's comm thread, then comm thd is responsible for advancing comm */
+    CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn)AdvanceCommunication, NULL);
+#endif
 #endif
 
 #if CMK_IMMEDIATE_MSG
@@ -1837,7 +1867,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
     /* Indicates the number of completion handler threads to create */
     /* The number of completion hndlr thds will affect the atomic PCQueue operations!! */
-    info.num_compl_hndlr_thr = 1;
+    /* info.num_compl_hndlr_thr = 1; */
 
     check_lapi(LAPI_Init,(&lapiContext, &info));
     
@@ -1853,7 +1883,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     if(CmiGetArgFlag(argv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
     if(CmiGetArgFlag(argv,"+nopoll")) CsvAccess(lapiInterruptMode) = 1;    
 #else
-    /* To make the interrupt mode as default in the non-smp case -THERE ARE PROBLEMS --Chao Mei */
+    /* To make the interrupt mode as default in the non-smp case -NOT QUITE STABLE YET!! */
     CsvAccess(lapiInterruptMode) = 0;    
     if(CmiGetArgFlag(argv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
     if(CmiGetArgFlag(argv,"+nopoll")) CsvAccess(lapiInterruptMode) = 1;  
@@ -1870,7 +1900,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     check_lapi(LAPI_Senv,(lapiContext, ERROR_CHK, lapiDebugMode));
     check_lapi(LAPI_Senv,(lapiContext, INTERRUPT_SET, CsvAccess(lapiInterruptMode)));
 
-    if(CmiMyNode()==0) printf("Running lapi in interrupt mode: %d\n", CsvAccess(lapiInterruptMode));
+    if(CmiMyNode()==0) {
+        printf("Running lapi in interrupt mode: %d\n", CsvAccess(lapiInterruptMode));
+        printf("Running lapi with %d completion handler threads.\n", info.num_compl_hndlr_thr);
+    }
 
     /** 
      *  Associate PumpMsgsBegin with var "lapiHeaderHandler". Then inside Xfer calls,
