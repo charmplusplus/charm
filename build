@@ -89,6 +89,7 @@ syntax() {
   echo '  --basedir=DIR	     shortcut for the above two - DIR/include and DIR/lib'
   echo '  -j[N]              parallel make, N is the number of paralle make jobs'
   echo "  --with-romio       build AMPI with ROMIO library"
+  echo "  --with-production  build Charm++ with CMK_OPTIMIZE"
   echo "  --destination=DIR  build Charm++ inside DIR, by default the destination is <version>"
   echo "  --suffix=DIR       append DIR to the destination directory of the Charm++ build"
   echo "  --tau-makefile=FILE Specify which TAU stub makefile to use"
