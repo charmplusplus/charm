@@ -11,22 +11,26 @@ New Supported Platforms:
 
 64-bit MIPS, such as SiCortex, using mpi-linux-mips64
 
-Windows HPC cluster, using mpi-win32
+Windows HPC cluster, using mpi-win32/mpi-win64
 
 --------------------------------------------------------------------------------
 General Changes
 --------------------------------------------------------------------------------
 
 Runtime support
+ - Smarter build/configure scripts
  - A new interface for model-based load balancing
  - new CPU topology API
  - a general implementation of CmiMemoryUsage()
- - Bug fix: Quiesence detection (QD) works with immediate messages
+ - Bug fix: Quiescence detection (QD) works with immediate messages
+ - New reduction functions implemented in Converse
+ - CCS (Converse Client-Server) can deliver message to more than one processor
 
 Charm++
  - Cross-array and cross-group sections
  - Structured Dagger (SDAG): Support templated arguments properly
  - Plain chares support checkpoint/restart (both in-memory and disk-based)
+ - Conditional packing of messages and parameters in SMP scenario
 
 Adaptive MPI (AMPI)
  - Compilers renamed to avoid collision with host MPI (ampicc, ampiCC,
@@ -46,6 +50,20 @@ Multiphase Shared Arrays (MSA)
 
 TCharm
  - Automatic tracing of API calls for simulation and analysis.
+
+Debugging
+ - Wider support for architectures other than net- (in particular MPI layers)
+ - Improved support for large scale debugging (better scalability)
+ - Enhanced record/replay stability to handle various events, and to signal unexpected messages
+ - New detailed record/replay: The full content of messages can be recorded, and a single processor can be re-executed outside of the parallel application
+
+Performance analysis
+ - Tracing of nested entry methods
+
+BigSim
+ - Out-of-core support, with prefetching capability
+ - Detailed tracing of MPI calls
+ - Detailed record/replay support at emulation time, capable of replaying any emulated processor after obtained recorded logs.
 
 --------------------------------------------------------------------------------
 Architecture-specific changes
@@ -75,7 +93,7 @@ Infiniband (ibverbs)
  - Bug fix: plug memory leaks that caused failures in long runs
 
 LAPI
- - ...
+ - Support for SMP
 
 
 ================================================================================
