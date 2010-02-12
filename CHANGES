@@ -11,7 +11,7 @@ New Supported Platforms:
 
 64-bit MIPS, such as SiCortex, using mpi-linux-mips64
 
-Windows HPC cluster, using mpi-win32
+Windows HPC cluster, using mpi-win32/mpi-win64
 
 Mac OSX 10.6, Snow Leopard (32-bit and 64-bit).
 
@@ -72,6 +72,12 @@ Automatic Performance Tuning
 
 Comlib
  - Improved OneTimeMulticastStrategy classes.
+
+BigSim
+ - Out-of-core support, with prefetching capability
+ - Detailed tracing of MPI calls
+ - Detailed record/replay support at emulation time, capable of
+   replaying any emulated processor after obtained recorded logs.
 
 --------------------------------------------------------------------------------
 Architecture-specific changes
