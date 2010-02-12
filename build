@@ -89,7 +89,7 @@ syntax() {
   echo '  --basedir=DIR	     shortcut for the above two - DIR/include and DIR/lib'
   echo '  -j[N]              parallel make, N is the number of paralle make jobs'
   echo "  --with-romio       build AMPI with ROMIO library"
-  echo "  --with-production  build Charm++ with CMK_OPTIMIZE"
+  echo "  --with-production  build Charm++ with all optimizations for maximum performance"
   echo "  --destination=DIR  build Charm++ inside DIR, by default the destination is <version>"
   echo "  --suffix=DIR       append DIR to the destination directory of the Charm++ build"
   echo "  --tau-makefile=FILE Specify which TAU stub makefile to use"
@@ -529,6 +529,7 @@ fi
 if test -n "$WITH_PRODUCTION"
 then
     echo '#define CMK_OPTIMIZE' >> $ConvHeader
+    echo '#define CMK_REPLAYSYSTEM  0' >> $ConvHeader
 fi
 
 # build with Tau
