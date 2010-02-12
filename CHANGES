@@ -54,8 +54,11 @@ TCharm
 Debugging
  - Wider support for architectures other than net- (in particular MPI layers)
  - Improved support for large scale debugging (better scalability)
- - Enhanced record/replay stability to handle various events, and to signal unexpected messages
- - New detailed record/replay: The full content of messages can be recorded, and a single processor can be re-executed outside of the parallel application
+ - Enhanced record/replay stability to handle various events, and to
+   signal unexpected messages
+ - New detailed record/replay: The full content of messages can be
+   recorded, and a single processor can be re-executed outside of the
+   parallel application
 
 Performance analysis
  - Tracing of nested entry methods
