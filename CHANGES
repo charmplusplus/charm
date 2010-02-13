@@ -13,6 +13,8 @@ New Supported Platforms:
 
 Windows HPC cluster, using mpi-win32
 
+Mac OSX 10.6, Snow Leopard (32-bit and 64-bit).
+
 --------------------------------------------------------------------------------
 General Changes
 --------------------------------------------------------------------------------
@@ -25,6 +27,8 @@ Runtime support
  - Bug fix: Quiescence detection (QD) works with immediate messages
  - New reduction functions implemented in Converse
  - CCS (Converse Client-Server) can deliver message to more than one processor
+ - Added a memory-aware adaptive scheduler, which can be optionally compiled in to charm.
+ - Added preliminary support for automatic message prioritization (disabled by default).
 
 Charm++
  - Cross-array and cross-group sections
@@ -63,6 +67,12 @@ Debugging
 Performance analysis
  - Tracing of nested entry methods
 
+Automatic Performance Tuning
+ - Created an automatic tuning framework [still for experimental use only].
+
+Comlib
+ - Improved OneTimeMulticastStrategy classes.
+
 --------------------------------------------------------------------------------
 Architecture-specific changes
 --------------------------------------------------------------------------------
@@ -83,6 +93,9 @@ Power 7
 
 Blue Gene/L
  - Compilers and options have been updated to the latest ones
+
+Blue Gene/P
+ - Added routines for measuring performance counters on BG/P.
 
 Cray XT
  - cputopology information is now available on XT3/4/5
