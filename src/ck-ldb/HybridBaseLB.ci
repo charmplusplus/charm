@@ -7,6 +7,8 @@ include "NeighborLBMsg.h";
 include "CentralLBMsg.h";
 include "HybridLBMsg.h";
 
+message DummyMsg;
+
 initnode void lbinit(void);
 
 group [migratable] HybridBaseLB: BaseLB {
@@ -22,7 +24,7 @@ group [migratable] HybridBaseLB: BaseLB {
   entry void ObjsMigrated(LDObjData data[m], int m, LDCommData cdata[n], int n, int level);
   entry void Loadbalancing(int level);	
   entry void NotifyObjectMigrationDone(int);	
-  entry void StartCollectInfo();
+  entry void StartCollectInfo(DummyMsg *);
   entry void CollectInfo(Location loc[n], int n, int fromlevel);	
   entry void PropagateInfo(Location loc[n], int n, int fromlevel);
   entry void reportLBQulity(double, double, double, int, double);
