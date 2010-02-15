@@ -879,6 +879,7 @@ void ComlibManager::printPeList(const char* note, int *count)
 	sprintf(buf+strlen(buf), ", all source objects discovered =  %d, all destination objects discovered = %d",  count[CkNumPes()] ,  count[CkNumPes()+1] );
 		
 	ComlibPrintf("%s\n", buf);
+	free(buf);
 }
 
 /***************************************************************************
