@@ -192,6 +192,9 @@ typedef struct _ckGroupID{
   inline int operator==(const struct _ckGroupID& gid) const {
     return (gid.idx==idx);
   }
+  inline int operator<(const struct _ckGroupID& gid) const {
+    return (gid.idx<idx);
+  }
 #endif
 } CkGroupID;
 

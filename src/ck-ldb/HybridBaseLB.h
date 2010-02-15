@@ -13,6 +13,8 @@
 #ifndef HYBRIDBASELB_H
 #define HYBRIDBASELB_H
 
+#include <map>
+
 #include "charm++.h"
 #include "BaseLB.h"
 #include "CentralLB.h"
@@ -54,11 +56,16 @@ private:
 public:
   ThreeLevelTree() {
     nLevels = 3;
-    span[0] = CkNumPes()/8;
+    span[0] = CkNumPes()/32;
+    if (span[0] < 2) span[0] = CkNumPes()/16;
+    if (span[0] < 2) span[0] = CkNumPes()/8;
     if (span[0] < 2) span[0] = CkNumPes()/4;
     CmiAssert(span[0]>1);
     span[1] = (CkNumPes()+span[0]-1)/span[0];
-    toproot = 1;
+    if (CmiNumPhysicalNodes() > 1)
+      toproot = CmiGetFirstPeOnPhysicalNode(1);
+    else
+      toproot = 1;
   }
   virtual ~ThreeLevelTree() {}
   virtual int numLevels() { return nLevels; }
@@ -212,7 +219,7 @@ public:
   void StatsDone(int level);  // Call when LDStats migration is complete
   void NotifyObjectMigrationDone(int level);	
   virtual void Loadbalancing(int level);	// start load balancing
-  void StartCollectInfo();
+  void StartCollectInfo(DummyMsg *m);
   void CollectInfo(Location *loc, int n, int fromlevel);
   void PropagateInfo(Location *loc, int n, int fromlevel);
 
@@ -261,7 +268,8 @@ protected:
     int vector_expected, vector_completed;
     int resumeAfterMigration;
     CkVec<MigrationRecord> outObjs;
-    CkVec<Location> unmatchedObjs;
+    //CkVec<Location> unmatchedObjs;
+    std::map< LDObjKey, int >  unmatchedObjs;
     CkVec<Location> matchedObjs;	 // don't need to be sent up
   public:
     LevelData(): parent(-1), children(NULL), nChildren(0), 
@@ -297,7 +305,7 @@ protected:
       if (statsData) statsData->clear();
       outObjs.free();
       matchedObjs.free();
-      unmatchedObjs.free();
+      unmatchedObjs.clear();
     }
     int useMem() {
       int memused = sizeof(LevelData);
