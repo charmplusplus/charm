@@ -1,4 +1,4 @@
-DIRS=charm++ converse ampi fem armci bigsim ParFUM
+DIRS=charm++ converse ampi fem ParFUM armci bigsim
 
 
 all:
