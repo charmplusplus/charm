@@ -83,8 +83,10 @@ void Chare::CkEnableObjQ()
 
 Chare::~Chare() {
 #ifndef CMK_CHARE_USE_PTR
-  if (chareIdx >= 0 && chareIdx < CpvAccess(chare_objs).size() &&
-     CpvAccess(chare_objs)[chareIdx] == this) 
+/*
+  if (chareIdx >= 0 && chareIdx < CpvAccess(chare_objs).size() && CpvAccess(chare_objs)[chareIdx] == this) 
+*/
+  if (chareIdx != -1)
   {
     CpvAccess(chare_objs)[chareIdx] = NULL;
     Vidblockmap::iterator iter = CpvAccess(vmap).find(chareIdx);
