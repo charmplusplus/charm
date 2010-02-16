@@ -192,6 +192,8 @@ CthThreadToken *CthGetToken(CthThread t){
 	return B(t)->token;
 }
 
+CpvStaticDeclare(int, Cth_serialNo);
+
 /*********************** Stack Aliasing *********************
   Stack aliasing: instead of consuming virtual address space
   with isomalloc, map all stacks to the same virtual addresses
@@ -381,18 +383,9 @@ CthCpvStatic(int, _defaultStackSize);
 static void CthThreadBaseInit(CthThreadBase *th)
 {
   static int serialno = 1;
-#if CMK_LINUX_PTHREAD_HACK
-  /*HACK for LinuxThreads: to support our user-level threads
-    library, we use a slightly modified version of libpthread.a
-    with user-level threads support enabled via these flags.
-  */
-  extern int __pthread_find_self_with_pid;
-  extern int __pthread_nonstandard_stacks;
-  __pthread_find_self_with_pid=1;
-  __pthread_nonstandard_stacks=1;
-#endif
   th->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
   th->token->thread = S(th);
+  th->token->serialNo = CpvAccess(Cth_serialNo)++;
   th->scheduled = 0;
 
   th->awakenfn = 0;
@@ -493,6 +486,9 @@ static void CthBaseInit(char **argv)
   
   CthCpvAccess(CthData)=0;
   CthCpvAccess(CthDatasize)=0;
+  
+  CpvInitialize(int, Cth_serialNo);
+  CpvAccess(Cth_serialNo) = 1;
 }
 
 int CthImplemented() { return 1; } 
@@ -525,6 +521,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 		if(BgOutOfCoreFlag==0){
 		    t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
 		    t->token->thread = S(t);
+		    t->token->serialNo = CpvAccess(Cth_serialNo)++;
 		    /*For normal runs where this pup is needed,
 		    set scheduled to 0 in the unpacking period since the thread has
 		    not been scheduled */
@@ -540,6 +537,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 			t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
 		    }
 		    t->token->thread = S(t);
+            t->token->serialNo = CpvAccess(Cth_serialNo)++;
 		}
 	}
 	

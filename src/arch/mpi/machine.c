@@ -793,7 +793,7 @@ int PumpMsgs(void)
   }
 
   
-  #if CMK_IMMEDIATE_MSG && !CMK_SMP
+#if CMK_IMMEDIATE_MSG && !CMK_SMP
   CmiHandleImmediate();
 #endif
   
@@ -1014,6 +1014,11 @@ void *CmiGetNonLocal(void)
   static int count=0;
   CmiState cs = CmiGetState();
   void *msg;
+
+#if ! CMK_SMP
+  if (CmiNumPes() == 1) return NULL;
+#endif
+
   CmiIdleLock_checkMessage(&cs->idle);
   /* although it seems that lock is not needed, I found it crashes very often
      on mpi-smp without lock */

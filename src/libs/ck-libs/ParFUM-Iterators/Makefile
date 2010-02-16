@@ -6,7 +6,7 @@ CUDAC = nvcc
 CUDAINC = -I$(CUDASDK)/common/inc -I$(CUDADIR)/include
 
 CHARMC=$(CDIR)/bin/charmc -cc $(CUDAC) -c++ $(CUDAC) $(OPTS) -nobs
-CCFLAGS = -DCUDA -DFP_TYPE_FLOAT  -O2 -DSHARED_NODES_ONLY_NEIGHBOR
+CCFLAGS = -DCUDA -DFP_TYPE_FLOAT  -g -DSHARED_NODES_ONLY_NEIGHBOR
 
 
 #Headers to be copied to include directory so application users can see them

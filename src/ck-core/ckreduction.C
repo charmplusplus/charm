@@ -391,7 +391,7 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
   _TRACE_BG_TLINE_END(&(m->log));
 #endif
   DEBR((AA"Contributor %p contributed for %d in grp %d ismigratable %d \n"AB,ci,ci->redNo,thisgroup.idx,m->isMigratableContributor()));
-  m->ci=ci;
+  //m->ci=ci;
   m->redNo=ci->redNo++;
   m->sourceFlag=-1;//A single contribution
   m->gcount=0;
@@ -1291,7 +1291,7 @@ CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
     memcpy(ret->data,srcData,NdataSize);
   ret->userFlag=-1;
   ret->reducer=reducer;
-  ret->ci=NULL;
+  //ret->ci=NULL;
   ret->sourceFlag=-1000;
   ret->gcount=0;
   ret->migratableContributor = true;
@@ -1731,7 +1731,7 @@ void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
     CpvAccess(_currentObj) = this;
 #endif
 
-  m->ci=ci;
+  //m->ci=ci;
   m->redNo=ci->redNo++;
   m->sourceFlag=-1;//A single contribution
   m->gcount=0;
@@ -1755,7 +1755,7 @@ void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMs
     Chare *oldObj =CpvAccess(_currentObj);
     CpvAccess(_currentObj) = this;
 #endif
-  m->ci=ci;
+  //m->ci=ci;
   m->redNo=ci->redNo++;
   m->gcount=count;
 #if DEBUGRED

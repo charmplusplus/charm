@@ -11,14 +11,14 @@
 #include <stdlib.h>
 #include <memory.h>
 
+#include "charm.h"
+#include "middle.h"
+
 #if CMK_HAS_STRINGS_H
   #include <strings.h>            /* defines bzero */
 #else
   #define bzero(s,n)   memset(s,0,n)
 #endif
-
-#include "charm.h"
-#include "middle.h"
 
 class CMessage_CkArgMsg {
 public: static int __idx;
@@ -101,9 +101,10 @@ class CkEntryOptions : public CkNoncopyable {
 	typedef unsigned int prio_t; //Datatype used to represent priorities
 	prio_t *prioPtr; //Points to message priority values
 	prio_t prioStore; //For short priorities, stores the priority value
+	CkGroupID  depGroupID;  // group dependence
 public:
 	CkEntryOptions(void): queueingtype(CK_QUEUEING_FIFO), prioBits(0), 
-                              prioPtr(NULL), prioStore(0) {}
+                              prioPtr(NULL), prioStore(0) { depGroupID.setZero(); }
 
 	~CkEntryOptions() {
 		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
@@ -152,11 +153,13 @@ public:
 	}
 	
 	inline void setQueueing(int queueingtype_) {queueingtype=queueingtype_;}
+	inline void setGroupDepID(CkGroupID &gid) { depGroupID = gid; }
 
 	///These are used by CkAllocateMarshallMsg, below:
 	inline int getQueueing(void) const {return queueingtype;}
 	inline int getPriorityBits(void) const {return prioBits;}
 	inline const prio_t *getPriorityPtr(void) const {return prioPtr;}
+	inline const CkGroupID getGroupDepID() const { return depGroupID; }
 };
 
 #include "CkMarshall.decl.h"
@@ -418,7 +421,7 @@ class Chare {
     CkObjectMsgQ objQ;                // object message queue
 #endif
   public:
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
     int chareIdx;                  // index in the chare obj table (chare_objs)
 #endif
 #ifdef _FAULT_MLOG_
@@ -726,7 +729,7 @@ class CProxy_Chare : public CProxy {
     }
 #ifndef CMK_OPTIMIZE
     inline void ckCheck(void) const  {   //Make sure this proxy has a value
-#if !CMK_FT_CHARE
+#ifdef CMK_CHARE_USE_PTR
 	if (_ck_cid.objPtr==0)
 		CkAbort("Error! This chare proxy has not been initialized!");
 #endif

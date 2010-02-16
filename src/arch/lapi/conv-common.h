@@ -3,7 +3,8 @@
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 
-#define CMK_MSG_HEADER_FIELDS CmiUInt2 rank,root,hdl,xhdl,info,stratid,size,redID;
+#define CMK_MSG_HEADER_FIELDS CmiUInt2 rank,hdl,xhdl,info,stratid,redID; int root, size, srcpe, seqno;
+
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_FIELDS }
 #define CMK_MSG_HEADER_BLUEGENE    { CMK_MSG_HEADER_FIELDS CMK_BLUEGENE_FIELDS }

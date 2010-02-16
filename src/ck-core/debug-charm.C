@@ -19,6 +19,17 @@
 //#include "queueing.h"
 #include <unistd.h>
 
+
+/** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
+int replaySystem = 0;
+
+#if CMK_REPLAYSYSTEM
+
+int ConverseDeliver() {
+  return !replaySystem;
+}
+#endif
+
 #if CMK_CCS_AVAILABLE && !defined(_WIN32)
 
 #include "ck.h"
@@ -47,6 +58,9 @@ CkQ<DebugRecursiveEntry> _debugData;
 
 void *CpdGetCurrentObject() { return _debugData.peek().obj; }
 void *CpdGetCurrentMsg() { return _debugData.peek().msg; }
+
+extern int cpdInSystem;
+extern "C" int CpdInUserCode() {return cpdInSystem==0 && _debugData.length()>0 && _debugData.peek().alreadyUserCode==1;}
 
 // Function called right before an entry method
 void CpdBeforeEp(int ep, void *obj, void *msg) {

@@ -185,3 +185,9 @@ callback.o: \
 	megatest.h \
 	callback.def.h
 	$(CHARMC) -o callback.o callback.C
+inlineem.o: \
+	inlineem.C \
+	inlineem.decl.h \
+	megatest.h \
+	inlineem.def.h
+	$(CHARMC) -o inlineem.o inlineem.C

@@ -95,6 +95,11 @@ typedef unsigned char  UChar;
 
 /**
 @addtogroup CkEnvelope
+*/
+
+CkpvExtern(int, envelopeEventID);
+
+/**
 @{
 The class envelope defines a Charm++ message's header. The first
 'CmiReservedHeaderSize' bytes of memory is exclusively reserved for Converse
@@ -150,6 +155,7 @@ public:
       struct s_group {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg
         CkGroupID g;           ///< GroupID
         CkNodeGroupID rednMgr; ///< Reduction manager for this group (constructor only!)
+        CkGroupID dep;         ///< create after dep is created (constructor only!)
         int epoch;             ///< "epoch" this group was created during (0--mainchare, 1--later)
         UShort arrayEp;        ///< Used only for array broadcasts
       } group;
@@ -242,9 +248,10 @@ private:
       env->totalsize = tsize;
       env->priobits = prio;
       env->setPacked(0);
+      env->type.group.dep.setZero();
       _SET_USED(env, 0);
       //for record-replay
-      env->setEvent(0);
+      env->setEvent(++CkpvAccess(envelopeEventID));
       env->setRef(0);
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
@@ -260,6 +267,9 @@ private:
 #endif
 
       return env;
+    }
+    void reset() {
+      setEvent(++CkpvAccess(envelopeEventID));
     }
     UShort getEpIdx(void) const { return epIdx; }
     void   setEpIdx(const UShort idx) { epIdx = idx; }
@@ -322,6 +332,8 @@ private:
     int getGroupEpoch(void) { return type.group.epoch; }
     void setRednMgr(CkNodeGroupID r){ type.group.rednMgr = r; }
     CkNodeGroupID getRednMgr(){ return type.group.rednMgr; }
+    CkGroupID getGroupDep(){ return type.group.dep; }
+    void setGroupDep(const CkGroupID &r){ type.group.dep = r; }
 
 // Array-specific fields
     CkGroupID &getsetArrayMgr(void) {return type.array.arr;}
@@ -363,6 +375,10 @@ inline void *_allocMsg(const int msgtype, const int size, const int prio=0) {
   return EnvToUsr(envelope::alloc(msgtype,size,prio));
 }
 
+inline void _resetEnv(envelope *env) {
+  env->reset();
+}
+
 /** @} */
 
 extern UChar   _defaultQueueing;
@@ -379,8 +395,12 @@ private:
       env->setMsgIdx(0);
       return EnvToUsr(env);
     }
+    static void _reset(void* m) {
+      register envelope *env = UsrToEnv(m);
+      _resetEnv(env);
+    }
 public:
-    MsgPool():SafePool<void*>(_alloc, CkFreeMsg) {}
+    MsgPool():SafePool<void*>(_alloc, CkFreeMsg, _reset) {}
 #ifdef _FAULT_MLOG_
         void *get(void){
             return allocfn();

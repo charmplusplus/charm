@@ -30,6 +30,11 @@ PUPbytes(GroupInfo)
 PUPmarshall(GroupInfo)
 
 int _inrestart = 0;
+int _restarted = 0;
+int _oldNumPes = 0;
+int _chareRestored = 0;
+
+void CkCreateLocalChare(int epIdx, envelope *env);
 
 // help class to find how many array elements
 class ElementCounter : public CkLocIterator {
@@ -101,6 +106,17 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
  	}
 
 	char fileName[1024];
+
+#ifndef CMK_CHARE_USE_PTR
+	// save groups into Chares.dat
+	sprintf(fileName,"%s/Chares_%d.dat",dirname,CkMyPe());
+	FILE* fChares = fopen(fileName,"wb");
+	if(!fChares) CkAbort("Failed to create checkpoint file for chares!");
+	PUP::toDisk pChares(fChares);
+	CkPupChareData(pChares);
+	fclose(fChares);
+#endif
+
 	// save groups into Groups.dat
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
 	sprintf(fileName,"%s/Groups_%d.dat",dirname,CkMyPe());
@@ -192,9 +208,10 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 		bdcastRO();
 }
 
-#if CMK_FT_CHARE
+#ifndef CMK_CHARE_USE_PTR
 
 CpvExtern(CkVec<void *>, chare_objs);
+CpvExtern(CkVec<int>, chare_types);
 CpvExtern(CkVec<VidBlock *>, vidblocks);
 
 // handle plain non-migratable chare
@@ -204,21 +221,24 @@ void CkPupChareData(PUP::er &p)
   if (!p.isUnpacking()) n = CpvAccess(chare_objs).size();
   p|n;
   for (i=0; i<n; i++) {
-	Chare* obj;
-	int size;
+        int chare_type;
 	if (!p.isUnpacking()) {
-		PUP::sizer ps;
-	 	obj = (Chare*)CpvAccess(chare_objs)[i];
-		obj->pup(ps);
-		size = ps.size();
+		chare_type = CpvAccess(chare_types)[i];
 	}
-	p | size;
+	p | chare_type;
 	if (p.isUnpacking()) {
-		//DEBCHK("Chare PUP'ed: name = %s, idx = %d, size = %d\n", entry->name, i, size);
-		obj = (Chare*)malloc(size);
-		_MEMCHECK(obj);
-		CpvAccess(chare_objs).push_back(obj);
+		int migCtor = _chareTable[chare_type]->migCtor;
+		if(migCtor==-1) {
+			char buf[512];
+			sprintf(buf,"Chare %s needs a migration constructor and PUP'er routine for restart.\n", _chareTable[chare_type]->name);
+			CkAbort(buf);
+		}
+	        void *m = CkAllocSysMsg();
+	        envelope* env = UsrToEnv((CkMessage *)m);
+		CkCreateLocalChare(migCtor, env);
+		CkFreeSysMsg(m);
 	}
+	Chare *obj = (Chare*)CpvAccess(chare_objs)[i];
 	obj->pup(p);
   }
 
@@ -411,33 +431,6 @@ int  CkCountArrayElements(){
 }
 #endif
 
-void CkPupProcessorData(PUP::er &p)
-{
-    // save readonlys, and callback BTW
-    if(CkMyRank()==0) {
-        CkPupROData(p);
-    }
-
-    // save mainchares into MainChares.dat
-    if(CkMyPe()==0) {
-      CkPupMainChareData(p, NULL);
-    }
-	
-    // save non-migratable chare
-    CkPupChareData(p);
-
-    // save groups 
-    CkPupGroupData(p);
-
-    // save nodegroups
-    if(CkMyRank()==0) {
-        CkPupNodeGroupData(p);
-    }
-
-    // pup array elements
-    CkPupArrayElementsData(p);
-}
-
 // called only on pe 0
 static void checkpointOne(const char* dirname, CkCallback& cb){
 	CmiAssert(CkMyPe()==0);
@@ -452,7 +445,7 @@ static void checkpointOne(const char* dirname, CkCallback& cb){
 	int _numPes = CkNumPes();
 	pRO|_numPes;
 	CkPupROData(pRO);
-	pRO((char *)&cb, sizeof(cb));
+	pRO|cb;
 	fclose(fRO);
 
 	// save mainchares into MainChares.dat
@@ -516,6 +509,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	CkCallback cb;
 	
         _inrestart = 1;
+	_restarted = 1;
 
 	// restore readonlys
 	sprintf(filename,"%s/RO.dat",dirname);
@@ -528,6 +522,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	pRO|cb;
 	fclose(fRO);
 	DEBCHK("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
+        _oldNumPes = _numPes;
 
 	CmiNodeBarrier();
 
@@ -542,6 +537,19 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 		//bdcastRO(); // moved to CkPupMainChareData()
 	}
 	
+#ifndef CMK_CHARE_USE_PTR
+	// restore chares only when number of pes is the same 
+	if(CkNumPes() == _numPes) {
+		sprintf(filename,"%s/Chares_%d.dat",dirname,CkMyPe());
+		FILE* fChares = fopen(filename,"rb");
+		if(!fChares) CkAbort("Failed to open checkpoint file for chares!");
+		PUP::fromDisk pChares(fChares);
+		CkPupChareData(pChares);
+		fclose(fChares);
+		_chareRestored = 1;
+	}
+#endif
+
 	// restore groups
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
 	// restore from PE0's copy if shrink/expand

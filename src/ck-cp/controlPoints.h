@@ -18,6 +18,7 @@
 #include <cmath>
 #include <math.h>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <string>
 #include <sstream>
@@ -25,6 +26,7 @@
 #include <vector>
 #include <utility>
 #include <limits>
+#include <algorithm>
 #include <float.h>
 
 #include "LBDatabase.h"
@@ -50,7 +52,7 @@
 
 
 
-void registerGranularityChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase);
+void registerCPChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase);
 
 
 void registerControlPointTiming(double time);
@@ -76,12 +78,6 @@ int controlPoint(const char *name, int lb, int ub);
 /// Return an integer from the provided vector of values
 /// The value returned will likely change between subsequent invocations
 int controlPoint(const char *name, std::vector<int>& values);
-
-/// Associate a control point as affecting priorities for an array
-void controlPointPriorityArray(const char *name, CProxy_ArrayBase &arraybase);
-
-/// Associate a control point with an entry method, whose priorities are affected by the control point
-void controlPointPriorityEntry(const char *name, int idx);
 
 
 
@@ -131,6 +127,32 @@ public:
 }; 
 
 
+/// A container that stores overhead statistics (min/max/avg etc.)
+class overheadContainer {
+public:
+  double min;
+  double avg;
+  double max;
+  
+  overheadContainer(){
+    min = -1.0;
+    max = -1.0;
+    avg = -1.0;
+  }
+  
+  bool isValid() const{
+    return (min >= 0.0 && avg >= min && max >= avg && max <= 1.0);
+  }
+  
+  void print() const{
+    if(isValid())
+      CkPrintf("[%d] Overhead Time is Min=%.2lf%% Avg=%.2lf%% Max=%.2lf%%\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);    
+    else
+      CkPrintf("[%d] Overhead Time is invalid\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);
+  }
+  
+}; 
+
 
 
 /// Stores data for a phase (a time range in which a single set of control point values is used).
@@ -148,15 +170,28 @@ public:
   double memoryUsageMB;
 
   idleTimeContainer idleTime;
+  overheadContainer overheadTime;
+
+
+  /** Approximately records the average message size for an entry method. */
+  double bytesPerInvoke;
+
+  /** Records the average grain size (might be off a bit due to non application entry methods), in seconds */
+  double grainSize;
+
 
   instrumentedPhase(){
     memoryUsageMB = -1.0;
+    grainSize = -1.0;
+    bytesPerInvoke = -1.0;
   }
   
   void clear(){
     controlPoints.clear();
     times.clear();
     memoryUsageMB = -1.0;
+    grainSize = -1.0;
+    bytesPerInvoke = -1.0;
     //    criticalPaths.clear();
   }
 
@@ -295,7 +330,14 @@ public:
     } 
     
   }
-  
+
+  /** Determine the median time for this phase */
+  double medianTime(){
+    std::vector<double> sortedTimes = times;
+    std::sort(sortedTimes.begin(), sortedTimes.end());
+    return sortedTimes[sortedTimes.size() / 2];
+  }
+
   
 };
 
@@ -379,30 +421,45 @@ public:
       // SCHEMA:
       s << "# SCHEMA:\n";
       s << "# number of named control points:\n";
-      s << ps.size() << "\n";
-      
+      s << ps.size() << "\n";    
       for(cpiter = ps.begin(); cpiter != ps.end(); cpiter++){
 	s << cpiter->first << "\n";
       }
       
       // DATA:
       s << "# DATA:\n";
-      s << "# first field is memory usage (MB). Then there are the " << ps.size()  << " control points values, followed by one or more timings" << "\n";
-      s << "# number of control point sets: " << phases.size() << "\n";
+      s << "# There are " << ps.size()  << " control points\n";
+      s << "# number of recorded phases: " << phases.size() << "\n";
+      
+      s << "# Memory (MB)\tIdle Min\tIdle Avg\tIdle Max\tOverhead Min\tOverhead Avg\tOverhead Max\tByte Per Invoke\tGrain Size\t";
+      for(cpiter = ps.begin(); cpiter != ps.end(); cpiter++){
+	s << cpiter->first << "\t";
+      }
+      s << "Median Timing\tTimings\n";
+      
+   
       std::vector<instrumentedPhase*>::iterator runiter;
       for(runiter=phases.begin();runiter!=phases.end();runiter++){
 	
 	// Print the memory usage
-	s << (*runiter)->memoryUsageMB << "    "; 
+	s << (*runiter)->memoryUsageMB << "\t"; 
 
-	s << (*runiter)->idleTime.min << " " << (*runiter)->idleTime.avg << " " << (*runiter)->idleTime.max << "   ";
+	s << (*runiter)->idleTime.min << "\t" << (*runiter)->idleTime.avg << "\t" << (*runiter)->idleTime.max << "\t";
+	s << (*runiter)->overheadTime.min << "\t" << (*runiter)->overheadTime.avg << "\t" << (*runiter)->overheadTime.max << "\t";
+
+
+	s << (*runiter)->bytesPerInvoke << "\t";
+
+	s << (*runiter)->grainSize << "\t";
+
 
 	// Print the control point values
 	for(cpiter = (*runiter)->controlPoints.begin(); cpiter != (*runiter)->controlPoints.end(); cpiter++){ 
-	  s << cpiter->second << " "; 
+	  s << cpiter->second << "\t"; 
 	}
 
-	s << "     ";
+	// Print the median time
+	s << (*runiter)->medianTime() << "\t";
 
 	// Print the times
 	std::vector<double>::iterator titer;
@@ -553,6 +610,20 @@ public:
   ~controlPointManager();
 
 
+
+  virtual void pup(PUP::er &p)
+  {
+    CBase_controlPointManager::pup(p);
+    if(p.isUnpacking()){
+      CkAbort("Group controlPointManager is not yet capable of migration.\n");
+    }
+  }
+
+  controlPointManager(CkMigrateMessage* m) {
+    // TODO: Implement this
+  }
+
+
   /// Loads the previous run data file
   void loadDataFile();
 
@@ -560,7 +631,7 @@ public:
   void writeDataFile();
 
   /// User can register a callback that is called when application should advance to next phase
-  void setGranularityCallback(CkCallback cb, bool _frameworkShouldAdvancePhase);
+  void setCPCallback(CkCallback cb, bool _frameworkShouldAdvancePhase);
 
   /// Called periodically by the runtime to handle the control points
   /// Currently called on each PE
@@ -620,11 +691,11 @@ public:
   void gatherAll(CkReductionMsg *msg);
   
 
-  /// Inform the control point framework that a named control point affects the priorities of some array  
-  void associatePriorityArray(const char *name, int groupIdx);
+/*   /// Inform the control point framework that a named control point affects the priorities of some array   */
+/*   void associatePriorityArray(const char *name, int groupIdx); */
   
-  /// Inform the control point framework that a named control point affects the priority of some entry method
-  void associatePriorityEntry(const char *name, int idx);
+/*   /// Inform the control point framework that a named control point affects the priority of some entry method */
+/*   void associatePriorityEntry(const char *name, int idx); */
   
 
 

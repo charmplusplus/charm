@@ -19,9 +19,13 @@
 #include "RefineCommLB.h"
 #include "RefineLB.h"
 
-#define  DEBUGF(x)     //  CmiPrintf x;
+#define  DEBUGF(x)     // CmiPrintf x;
 
 CreateLBFunc_Def(HybridBaseLB, "HybridBase load balancer")
+
+class DummyMsg: public CMessage_DummyMsg 
+{
+};
 
 void HybridBaseLB::staticMigrated(void* data, LDObjHandle h, int waitBarrier)
 {
@@ -313,7 +317,7 @@ void HybridBaseLB::buildStats(int atlevel)
      statsMsgsList[n]=0;
   }
   if (_lb_args.debug()>1) {
-      CmiPrintf("[%d] n_obj:%d migratable:%d ncom:%d\n", CkMyPe(), nobj, nmigobj, ncom);
+      CmiPrintf("[%d] n_obj:%d migratable:%d ncom:%d at level %d at %f.\n", CkMyPe(), nobj, nmigobj, ncom, atlevel, CkWallTimer());
   }
   CmiAssert(statsData->n_objs == nobj);
   CmiAssert(statsData->n_comm == ncom);
@@ -447,9 +451,9 @@ void HybridBaseLB::Loadbalancing(int atlevel)
     // CkPrintf("[%d] ReceiveMigration takes %f \n", CkMyPe(), CkWallTimer()-strat_end_time);
   }
 
-  if (atlevel == tree->numLevels()-1) {
-    if (_lb_args.debug()>0){
-        CkPrintf("[%d] Level %d Strat elapsed time %f\n", CkMyPe(), atlevel, strat_end_time-start_lb_time);
+  if (_lb_args.debug()>0){
+    CkPrintf("[%d] Loadbalancing Level %d started at %f, elapsed time %f\n", CkMyPe(), atlevel, start_lb_time, strat_end_time-start_lb_time);
+    if (atlevel == tree->numLevels()-1) {
     	CkPrintf("[%d] %s memUsage: %.2fKB\n", CkMyPe(), lbName(), (1.0*useMem())/1024);
     }
   }
@@ -592,6 +596,8 @@ void HybridBaseLB::ReceiveVectorMigration(LBVectorMigrateMsg *msg)
   lData->vector_expected  = 0;
   for (int i=0; i<msg->n_moves; i++)  {
     VectorMigrateInfo &move = msg->moves[i];
+    CkVec<LDObjData> objs;
+    CkVec<LDCommData> comms;
     if (move.from_pe == CkMyPe()) {
       int toPe = move.to_pe;
       double load = move.load;
@@ -600,11 +606,10 @@ void HybridBaseLB::ReceiveVectorMigration(LBVectorMigrateMsg *msg)
         LDObjData &objData = statsData->objData[obj];
         if (objData.wallTime <= load) {
           if (_lb_args.debug()>2)
-            CkPrintf("[%d] send obj: %d to %d.\n", CkMyPe(), obj, toPe);
+            CkPrintf("[%d] send obj: %d to PE %d.\n", CkMyPe(), obj, toPe);
+          objs.push_back(objData);
 	  // send comm data
-          CkVec<LDCommData> comms;
           collectCommData(obj, comms, atlevel);
-          thisProxy[toPe].ObjMigrated(objData, comms.getVec(), comms.size(), atlevel);
           lData->outObjs.push_back(MigrationRecord(objData.handle, lData->children[statsData->from_proc[obj]], -1));
           statsData->removeObject(obj);
           load -= objData.wallTime; 
@@ -613,7 +618,9 @@ void HybridBaseLB::ReceiveVectorMigration(LBVectorMigrateMsg *msg)
         }
       }
       if (_lb_args.debug()>1)
-        CkPrintf("[%d] sending %d objects to %d.\n", CkMyPe(), count, toPe);
+        CkPrintf("[%d] sending %d objects to %d at %f.\n", CkMyPe(), count, toPe, CkWallTimer());
+      if (objs.size() > 0)
+        thisProxy[toPe].ObjsMigrated(objs.getVec(), objs.size(), comms.getVec(), comms.size(), atlevel);
       thisProxy[toPe].TotalObjMigrated(count, atlevel);
     }
     else if (move.to_pe == CkMyPe()) {
@@ -634,9 +641,59 @@ void HybridBaseLB::ReceiveVectorMigration(LBVectorMigrateMsg *msg)
 #endif
 }
 
+// objects arrives with only objdata
+void HybridBaseLB::ObjsMigrated(LDObjData *datas, int m, LDCommData *cdata, int n, int atlevel)
+{
+  int i;
+  LevelData *lData = levelData[atlevel];
+  LDStats *statsData = lData->statsData;
+
+  if (statsData != NULL) {
+    CkVec<LDObjData> &oData = statsData->objData;
+
+    for (i=0; i<m; i++)
+    {
+      // copy into LDStats
+      LDObjData &data = datas[i];
+      oData.push_back(data);
+      statsData->n_objs++;
+      if (data.migratable) statsData->n_migrateobjs++;
+      // an incoming object to the root
+      // pretend this object belongs to it
+      statsData->from_proc.push_back(lData->nChildren);
+      statsData->to_proc.push_back(lData->nChildren);
+    }
+
+    // copy into comm data
+    if (n) {
+      CkVec<LDCommData> &cData = statsData->commData;
+      for (int i=0; i<n; i++)
+        cData.push_back(cdata[i]);
+      statsData->n_comm += n;
+      statsData->deleteCommHash();
+    }
+  }
+  else {        // leaf node, from which proc is unknown at this time
+    for (i=0; i<m; i++) {
+      LDObjData &data = datas[i];
+      LDObjKey key;
+      key.omID() = data.omID();
+      key.objID() = data.objID();
+      newObjs.push_back(Location(key, -1));
+    }
+  }
+
+  lData->obj_completed+=m;
+  if (lData->migrationDone()) {
+    StatsDone(atlevel);
+  }
+}
+
 void HybridBaseLB::VectorDone(int atlevel)
 {
   LevelData *lData = levelData[atlevel];
+  if (_lb_args.debug()>1)
+    CkPrintf("[%d] VectorDone %d at %f.\n", CkMyPe(), lData->vector_expected, CkWallTimer());
   lData->vector_expected = -1;
   lData->vector_completed = 0;
     // update the migration expected
@@ -651,7 +708,7 @@ void HybridBaseLB::TotalObjMigrated(int count, int atlevel)
   lData->vector_completed ++;
   vector_n_moves += count;
   if (_lb_args.debug()>1)
-    CkPrintf("[%d] TotalObjMigrated receive %d objects.\n", CkMyPe(), count);
+    CkPrintf("[%d] TotalObjMigrated receive %d objects at %f.\n", CkMyPe(), count, CkWallTimer());
   if (lData->vectorReceived()) {
     VectorDone(atlevel);
     if (lData->migrationDone())
@@ -748,6 +805,7 @@ void HybridBaseLB::StatsDone(int atlevel)
   thisProxy[lData->parent].NotifyObjectMigrationDone(atlevel);
 }
 
+// called one a parent node
 void HybridBaseLB::NotifyObjectMigrationDone(int fromlevel)
 {
   int i;
@@ -763,14 +821,23 @@ void HybridBaseLB::NotifyObjectMigrationDone(int fromlevel)
       thisProxy.Loadbalancing(atlevel-1, lData->nChildren, lData->children);
     }
     else {  // atlevel = 1
-      thisProxy.StartCollectInfo(lData->nChildren, lData->children);
+      if (_lb_args.debug() > 1)
+         CkPrintf("[%d] NotifyObjectMigrationDone at level %d started at %f\n",
+	        CkMyPe(), atlevel, CkWallTimer());
+      DummyMsg *m = new (8*sizeof(int)) DummyMsg;
+      *((int *)CkPriorityPtr(m)) = -100-atlevel;
+      CkSetQueueing(m, CK_QUEUEING_IFIFO);
+      thisProxy.StartCollectInfo(m, lData->nChildren, lData->children);
     }
   }
 }
 
-void HybridBaseLB::StartCollectInfo()
+// start from leaves of a domain, all processors in the domain start a 
+// tree reduction to fill pending from/to proc pairs.
+void HybridBaseLB::StartCollectInfo(DummyMsg *m)
 {
   int i;
+  delete m;
   LevelData *lData = levelData[0];
       // we are leaf, start a tree reduction to find from/to proc pairs
       // set this counter
@@ -807,9 +874,10 @@ void HybridBaseLB::CollectInfo(Location *loc, int n, int fromlevel)
    lData->info_recved++;
 
    CkVec<Location> &matchedObjs = lData->matchedObjs;
-   CkVec<Location> &unmatchedObjs = lData->unmatchedObjs;
+   std::map<LDObjKey, int> &unmatchedObjs = lData->unmatchedObjs;
 
-   // sort into mactched and unmatched list
+   // sort into matched and unmatched list
+#if 0
    for (int i=0; i<n; i++) {
      // search and see if we have answer, put to matched
      // store in unknown
@@ -827,14 +895,36 @@ void HybridBaseLB::CollectInfo(Location *loc, int n, int fromlevel)
      }
      if (!found) unmatchedObjs.push_back(loc[i]);
    }
+#else
+   for (int i=0; i<n; i++) {
+     std::map<LDObjKey, int>::iterator iter = unmatchedObjs.find(loc[i].key);
+     if (iter != unmatchedObjs.end()) {
+       CmiAssert(iter->second != -1 || loc[i].loc != -1);
+       if (loc[i].loc == -1) loc[i].loc = iter->second;
+       matchedObjs.push_back(loc[i]);
+       unmatchedObjs.erase(iter);
+     }
+     else
+       unmatchedObjs[loc[i].key] = loc[i].loc;
+   }
+#endif
 
   DEBUGF(("[%d] level %d has %d unmatched and %d matched. \n", CkMyPe(), atlevel, unmatchedObjs.size(), matchedObjs.size()));
 
    if (lData->info_recved == lData->nChildren) {
      lData->info_recved = 0;
+     if (_lb_args.debug() > 1)
+         CkPrintf("[%d] CollectInfo at level %d started at %f\n",
+	        CkMyPe(), atlevel, CkWallTimer());
      if (lData->parent != -1) {
        // send only unmatched ones up the tree
-       thisProxy[lData->parent].CollectInfo(unmatchedObjs.getVec(), unmatchedObjs.size(), atlevel);
+       CkVec<Location> unmatchedbuf;
+       for(std::map<LDObjKey, int>::const_iterator it = unmatchedObjs.begin(); it != unmatchedObjs.end(); ++it)
+       {
+         unmatchedbuf.push_back(Location(it->first, it->second));
+       }
+
+       thisProxy[lData->parent].CollectInfo(unmatchedbuf.getVec(), unmatchedbuf.size(), atlevel);
      }
      else { // root
        // we should have all answers now
@@ -853,16 +943,21 @@ void HybridBaseLB::PropagateInfo(Location *loc, int n, int fromlevel)
   int atlevel = fromlevel - 1;
   LevelData *lData = levelData[atlevel];
   CkVec<Location> &matchedObjs = lData->matchedObjs;
-  CkVec<Location> &unmatchedObjs = lData->unmatchedObjs;
+  //CkVec<Location> &unmatchedObjs = lData->unmatchedObjs;
+  std::map<LDObjKey, int> &unmatchedObjs = lData->unmatchedObjs;
 
   if (atlevel > 0) {
+    if (_lb_args.debug() > 1)
+      CkPrintf("[%d] PropagateInfo at level %d started at %f\n",
+	        CkMyPe(), atlevel, CkWallTimer());
     // search in unmatched
+#if 0
     for (i=0; i<n; i++) {
-     // search and see if we have answer, put to matched
-     // store in unknown
+       // search and see if we have answer, put to matched
+       // store in unknown
        for (obj=0; obj<unmatchedObjs.size(); obj++) {
          if (loc[i].key == unmatchedObjs[obj].key) {
-         // answer must exist now
+           // answer must exist now
            CmiAssert(unmatchedObjs[obj].loc != -1 || loc[i].loc != -1);
            if (unmatchedObjs[obj].loc == -1) unmatchedObjs[obj].loc = loc[i].loc;
            matchedObjs.push_back(unmatchedObjs[obj]);
@@ -871,6 +966,20 @@ void HybridBaseLB::PropagateInfo(Location *loc, int n, int fromlevel)
          }
        }
     }
+#else
+   for (int i=0; i<n; i++) {
+       // search and see if we have answer, put to matched
+     const LDObjKey key = loc[i].key;
+     std::map<LDObjKey, int>::iterator iter = unmatchedObjs.find(key);
+     if (iter != unmatchedObjs.end()) {
+       // answer must exist now
+       CmiAssert(iter->second != -1 || loc[i].loc != -1);
+       if (loc[i].loc == -1) loc[i].loc = iter->second;
+       matchedObjs.push_back(loc[i]);
+       unmatchedObjs.erase(iter);
+     }
+   }
+#endif
     CmiAssert(unmatchedObjs.size() == 0);
     DEBUGF(("[%d] level %d PropagateInfo had %d matchedObjs. \n", CkMyPe(), atlevel, matchedObjs.size()));
 
@@ -1046,7 +1155,9 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats,int count)
   // construct migration message
   int migrate_count=migrateInfo.length();
   DEBUGF(("[%d] level: %d has %d migrations. \n", CkMyPe(), currentLevel, migrate_count));
-  LBMigrateMsg * msg = new(migrate_count,count,count,0) LBMigrateMsg;
+  // ignore avail_vector, etc for now
+  //LBMigrateMsg * msg = new(migrate_count,count,count,0) LBMigrateMsg;
+  LBMigrateMsg * msg = new(migrate_count,0,0,0) LBMigrateMsg;
   msg->level = currentLevel;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {
@@ -1075,7 +1186,7 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats,int count)
       double mem = (1.0*useMem())/1024;
       thisProxy[0].reportLBMem(mem);
     }
-    CkPrintf("[%d] Print Summary takes %f seconds. \n", CkWallTimer()-stime);
+    CkPrintf("[%d] Print Summary takes %f seconds. \n", CkMyPe(), CkWallTimer()-stime);
   }   // end print summary
 
   // translate relative pe number to its real number

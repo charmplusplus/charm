@@ -93,31 +93,6 @@ if($cpu =~ m/i[0-9]86/){
 $converse_network_type = "net";
 
 
-print << "EOF";
-How do you want to handle SMP/Multicore: [1-4]
-         1) single-threaded [default]
-         2) multicore(single node only)
-         3) SMP
-         4) POSIX Shared Memory
-
-EOF
-
-while($line = <>){
-	chomp $line;
-	if($line eq "1" || $line eq ""){
-	    last;
-	} elsif($line eq "2"){
-	    $converse_network_type = "multicore";
-	    last;
-	} elsif($line eq "3"){
-	    $options = "$options smp ";
-	    last;
-	} elsif($line eq "4"){
-	    $options = "$options pxshm ";
-	    last;
-	}
-}
-
 # check for MPI
 
 $skip_choosing = "false";
@@ -249,6 +224,60 @@ if($arch eq "net-darwin"){
 
 
 
+#================ Choose SMP/PXSHM =================================
+
+# find what options are available
+$opts = `./build charm++ $arch help 2>&1 | grep "Supported options"`;
+$opts =~ m/Supported options: (.*)/;
+$opts = $1;
+
+
+#always provide multicore and single-threaded versions
+print << "EOF";
+How do you want to handle SMP/Multicore: [1-4]
+         1) single-threaded [default]
+         2) multicore(single node only)
+EOF
+
+# only add the smp or pxshm options if they are available
+$counter = 3; # the next index used in the list
+
+$smpIndex = -1;
+if($opts =~ m/smp/){
+  print "         $counter) SMP\n";
+  $smpIndex = $counter; 
+  $counter ++;
+}
+
+$pxshmIndex = -1;
+if($opts =~ m/pxshm/){
+  print "         $counter) POSIX Shared Memory\n";
+  $pxshmIndex = $counter; 
+  $counter ++;
+}
+
+while($line = <>){
+	chomp $line;
+	if($line eq "1" || $line eq ""){
+	    last;
+	} elsif($line eq "2"){
+	    $converse_network_type = "multicore";
+	    last;
+	} elsif($line eq $smpIndex){
+	    $options = "$options smp ";
+	    last;
+	} elsif($line eq $pxshmIndex){
+	    $options = "$options pxshm ";
+	    last;
+	}
+}
+
+
+
+
+
+
+
 #================ Choose Compiler =================================
 
 # Lookup list of compilers
@@ -286,6 +315,7 @@ if ($numc > 0) {
         }
     }
 }
+
 
 
 
@@ -382,6 +412,12 @@ $explanations{"mlogft"} = "Use message logging fault tolerance support";
           }
       }
   }
+
+
+
+
+
+
 
 
 

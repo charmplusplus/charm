@@ -108,6 +108,17 @@ int ArmciVirtualProcessor::nbput(pointer src, pointer dst,
   return hdl;
 }
 
+void ArmciVirtualProcessor::nbput_implicit(pointer src, pointer dst,
+					  int nbytes, int dst_proc) {
+  int hdl = hdlList.size();
+  Armci_Hdl* entry = new Armci_Hdl(ARMCI_IPUT, dst_proc, nbytes, src, dst);
+  hdlList.push_back(entry);
+
+  ArmciMsg *msg = new (nbytes, 0) ArmciMsg(dst,nbytes,thisIndex,hdl);
+  memcpy(msg->data, src, nbytes);
+  thisProxy[dst_proc].putData(msg);
+}
+
 void ArmciVirtualProcessor::putData(pointer dst, int nbytes, char *data,
 				    int src_proc, int hdl) {
   memcpy(dst, data, nbytes);
@@ -123,6 +134,10 @@ void ArmciVirtualProcessor::putData(ArmciMsg *m) {
 void ArmciVirtualProcessor::putAck(int hdl) {
   if(hdl != -1) { // non-blocking 
     hdlList[hdl]->acked = 1;  
+    if (hdlList[hdl]->wait == 1) {
+      hdlList[hdl]->wait = 0;
+      thread->resume();
+    }
   }
   thread->resume();
 }
@@ -144,6 +159,7 @@ int ArmciVirtualProcessor::nbget(pointer src, pointer dst,
     memcpy(dst,src,nbytes);
     return -1;
   }*/
+
   int hdl = hdlList.size();
   Armci_Hdl* entry = new Armci_Hdl(ARMCI_GET, src_proc, nbytes, src, dst);
   hdlList.push_back(entry);
@@ -151,6 +167,15 @@ int ArmciVirtualProcessor::nbget(pointer src, pointer dst,
   thisProxy[src_proc].requestFromGet(src, dst, nbytes, thisIndex, hdl);
 
   return hdl;
+}
+
+void ArmciVirtualProcessor::nbget_implicit(pointer src, pointer dst,
+					   int nbytes, int src_proc) {
+  int hdl = hdlList.size();
+  Armci_Hdl* entry = new Armci_Hdl(ARMCI_IGET, src_proc, nbytes, src, dst);
+  hdlList.push_back(entry);
+  
+  thisProxy[src_proc].requestFromGet(src, dst, nbytes, thisIndex, hdl);
 }
 
 void ArmciVirtualProcessor::wait(int hdl){
@@ -163,6 +188,13 @@ void ArmciVirtualProcessor::wait(int hdl){
   }
 }
 
+// CWL NOTE: This works only because in wait(), the while (1) loop
+//   insists on matching the first unackowledged non-blocking call 
+//   waitmulti is
+//   waiting on. Out-of-order acknowledgements will wake the thread
+//   but cause it to suspend itself again until the call is acknowledged.
+//   Subsequent calls to wait from waitmulti will then succeed because
+//   out-of-order acks would have set the acked flag.
 void ArmciVirtualProcessor::waitmulti(vector<int> procs){
   for(int i=0;i<procs.size();i++){
     wait(procs[i]);
@@ -172,8 +204,12 @@ void ArmciVirtualProcessor::waitmulti(vector<int> procs){
 void ArmciVirtualProcessor::waitproc(int proc){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
-    if(hdlList[i]->acked == 0 && hdlList[i]->proc == proc && hdlList[i]->op & BLOCKING_MASK == 0)
+    if((hdlList[i]->acked == 0) && 
+       (hdlList[i]->proc == proc) && 
+       ((hdlList[i]->op & IMPLICIT_MASK) != 0)) {
+      hdlList[i]->wait = 1;
       procs.push_back(i);
+    }
   }
   waitmulti(procs);
 }
@@ -181,8 +217,11 @@ void ArmciVirtualProcessor::waitproc(int proc){
 void ArmciVirtualProcessor::waitall(){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
-    if(hdlList[i]->acked == 0 && hdlList[i]->op & BLOCKING_MASK == 0)
+    if((hdlList[i]->acked == 0) && 
+       ((hdlList[i]->op & IMPLICIT_MASK) != 0)) {
+      hdlList[i]->wait = 1;
       procs.push_back(i);
+    }
   }
   waitmulti(procs);
 }
@@ -190,7 +229,9 @@ void ArmciVirtualProcessor::waitall(){
 void ArmciVirtualProcessor::fence(int proc){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
-    if(hdlList[i]->acked == 0 && (hdlList[i]->op & BLOCKING_MASK) && hdlList[i]->proc == proc)
+    if((hdlList[i]->acked == 0) && 
+       ((hdlList[i]->op & BLOCKING_MASK) != 0) && 
+       (hdlList[i]->proc == proc))
       procs.push_back(i);
   }
   waitmulti(procs);
@@ -198,7 +239,8 @@ void ArmciVirtualProcessor::fence(int proc){
 void ArmciVirtualProcessor::allfence(){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
-    if(hdlList[i]->acked == 0 && (hdlList[i]->op & BLOCKING_MASK))
+    if((hdlList[i]->acked == 0) && 
+       ((hdlList[i]->op & BLOCKING_MASK) != 0))
       procs.push_back(i);
   }
   waitmulti(procs);
@@ -233,6 +275,10 @@ void ArmciVirtualProcessor::putDataFromGet(pointer dst, int nbytes, char *data, 
   memcpy(dst, data, nbytes);
   if(hdl != -1) { // non-blocking 
     hdlList[hdl]->acked = 1;  
+    if (hdlList[hdl]->wait == 1) {
+      hdlList[hdl]->wait = 0;
+      thread->resume();
+    }
   }
   thread->resume();
 }
@@ -241,6 +287,10 @@ void ArmciVirtualProcessor::putDataFromGet(ArmciMsg *m) {
   memcpy(m->dst, m->data, m->nbytes);
   if(m->hdl != -1) { // non-blocking 
     hdlList[m->hdl]->acked = 1;  
+    if (hdlList[m->hdl]->wait == 1) {
+      hdlList[m->hdl]->wait = 0;
+      thread->resume();
+    }
   }
   delete m;
   thread->resume();
@@ -299,6 +349,28 @@ int ArmciVirtualProcessor::nbputs(pointer src_ptr, int src_stride_ar[],
   return hdl;
 }
 
+void ArmciVirtualProcessor::nbputs_implicit(pointer src_ptr, 
+					    int src_stride_ar[], 
+					    pointer dst_ptr, 
+					    int dst_stride_ar[],
+					    int count[], int stride_levels, 
+					    int dst_proc){
+  int nbytes = 1;
+  for(int i=0;i<stride_levels+1;i++) 
+    nbytes *= count[i];
+  int hdl = hdlList.size();
+  Armci_Hdl* entry = new Armci_Hdl(ARMCI_IPUT, dst_proc, nbytes, 
+				   src_ptr, dst_ptr);
+  hdlList.push_back(entry);
+ 
+  ArmciStridedMsg *m = new (stride_levels,stride_levels+1,nbytes, 0) ArmciStridedMsg(dst_ptr,stride_levels,nbytes,thisIndex,hdl);
+
+  memcpy(m->dst_stride_ar,dst_stride_ar,sizeof(int)*stride_levels);
+  memcpy(m->count,count,sizeof(int)*(stride_levels+1));
+  stridedCopy(src_ptr, m->data, src_stride_ar, count, stride_levels, 1);
+  thisProxy[dst_proc].putsData(m);
+}
+
 void ArmciVirtualProcessor::putsData(pointer dst_ptr, int dst_stride_ar[], 
   		int count[], int stride_levels,
 		int nbytes, char *data, int src_proc, int hdl){
@@ -331,6 +403,7 @@ void ArmciVirtualProcessor::gets(pointer src_ptr, int src_stride_ar[],
   // wait for reply
   thread->suspend();
 }
+
 int ArmciVirtualProcessor::nbgets(pointer src_ptr, int src_stride_ar[], 
 	   pointer dst_ptr, int dst_stride_ar[],
 	   int count[], int stride_levels, int src_proc){
@@ -355,6 +428,25 @@ int ArmciVirtualProcessor::nbgets(pointer src_ptr, int src_stride_ar[],
 
   return hdl;
 }
+
+void ArmciVirtualProcessor::nbgets_implicit(pointer src_ptr, 
+					    int src_stride_ar[], 
+					    pointer dst_ptr, 
+					    int dst_stride_ar[],
+					    int count[], int stride_levels, 
+					    int src_proc) {
+  int hdl = hdlList.size();
+  int nbytes = 1;
+  for(int i=0;i<stride_levels+1;i++) 
+    nbytes *= count[i];
+
+  Armci_Hdl* entry = new Armci_Hdl(ARMCI_IGET, src_proc, nbytes, src_ptr, dst_ptr);
+  hdlList.push_back(entry);
+
+  thisProxy[src_proc].requestFromGets(src_ptr, src_stride_ar, dst_ptr, dst_stride_ar, 
+  					count, stride_levels, thisIndex, hdl);
+}
+
 void ArmciVirtualProcessor::requestFromGets(pointer src_ptr, int src_stride_ar[], 
 	   pointer dst_ptr, int dst_stride_ar[], int count[], int stride_levels, int dst_proc, int hdl){
   int nbytes = 1;
@@ -373,6 +465,10 @@ void ArmciVirtualProcessor::putDataFromGets(pointer dst_ptr, int dst_stride_ar[]
   stridedCopy(dst_ptr, data, dst_stride_ar, count, stride_levels, 0);
   if(hdl != -1) { // non-blocking 
     hdlList[hdl]->acked = 1;  
+    if (hdlList[hdl]->wait == 1) {
+      hdlList[hdl]->wait = 0;
+      thread->resume();
+    }
   }
   thread->resume();
 }
@@ -381,6 +477,10 @@ void ArmciVirtualProcessor::putDataFromGets(ArmciStridedMsg *m){
   stridedCopy(m->dst, m->data, m->dst_stride_ar, m->count, m->stride_levels, 0);
   if(m->hdl != -1) { // non-blocking 
     hdlList[m->hdl]->acked = 1;  
+    if (hdlList[m->hdl]->wait == 1) {
+      hdlList[m->hdl]->wait = 0;
+      thread->resume();
+    }
   }
   delete m;
   thread->resume();

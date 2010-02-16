@@ -63,7 +63,6 @@ void CkPupChareData(PUP::er &p);
 void CkPupGroupData(PUP::er &p);
 void CkPupNodeGroupData(PUP::er &p);
 void CkPupArrayElementsData(PUP::er &p, int notifyListeners=1);
-void CkPupProcessorData(PUP::er &p);
 void CkRemoveArrayElements();
 //void CkTestArrayElements();
 
@@ -73,5 +72,10 @@ void CkRestartMain(const char* dirname, CkArgMsg *args);
 int  CkCountArrayElements();
 #endif
 
+// some useful flags (for disk checkpointing)
+extern int _inrestart;           // 1: if is during restart process
+extern int _restarted;           // 1: if this run is after restart
+extern int _oldNumPes;           // number of processors in the last run
+extern int _chareRestored;       // 1: if chare is restored at restart
 
 #endif //_CKCHECKPOINT_H

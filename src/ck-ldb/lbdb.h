@@ -49,6 +49,9 @@ typedef struct _LDOMid {
   CmiBool operator==(const struct _LDOMid& omId) const {
     return id == omId.id?CmiTrue:CmiFalse;
   }
+  CmiBool operator<(const struct _LDOMid& omId) const {
+    return id < omId.id?CmiTrue:CmiFalse;
+  }
   CmiBool operator!=(const struct _LDOMid& omId) const {
     return id == omId.id?CmiFalse:CmiTrue;
   }
@@ -69,6 +72,13 @@ typedef struct _LDObjid {
     for (int i=0; i<OBJ_ID_SZ; i++) if (id[i] != objid.id[i]) return CmiFalse;
     return CmiTrue;
   }
+  CmiBool operator<(const struct _LDObjid& objid) const {
+    for (int i=0; i<OBJ_ID_SZ; i++) {
+      if (id[i] < objid.id[i]) return CmiTrue;
+      else if (id[i] > objid.id[i]) return CmiFalse;
+    }
+    return CmiFalse;
+  }
   inline void pup(PUP::er &p);
 } LDObjid;
 
@@ -79,6 +89,11 @@ typedef struct _LDObjKey {
 public:
   CmiBool operator==(const _LDObjKey& obj) const {
     return (CmiBool)(omId == obj.omId && objId == obj.objId);
+  }
+  CmiBool operator<(const _LDObjKey& obj) const {
+    if (omId < obj.omId) return CmiTrue;
+    else if (omId == obj.omId) return objId < obj.objId;
+    else return CmiFalse;
   }
   inline LDOMid &omID() { return omId; }
   inline LDObjid &objID() { return objId; }

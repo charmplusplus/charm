@@ -28,7 +28,7 @@ static CkDDT *getDDT(void) {
 //------------- startup -------------
 static mpi_comm_worlds mpi_worlds;
 
-int mpi_nworlds; /*Accessed by ampif*/
+int _mpi_nworlds; /*Accessed by ampif*/
 int MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS]; /*Accessed by user code*/
 
 /* ampiReducer: AMPI's generic reducer type 
@@ -451,7 +451,7 @@ static int AMPI_threadstart_idx = -1;
 
 static void ampiNodeInit(void)
 {
-  mpi_nworlds=0;
+  _mpi_nworlds=0;
   for(int i=0;i<MPI_MAX_COMM_WORLDS; i++)
   {
     MPI_COMM_UNIVERSE[i] = MPI_COMM_WORLD+1+i;
@@ -629,11 +629,11 @@ static ampi *ampiInit(char **argv)
 
 // FIXME: Need to serialize global communicator allocation in one place.
 	//Allocate the next communicator
-	if(mpi_nworlds == MPI_MAX_COMM_WORLDS)
+	if(_mpi_nworlds == MPI_MAX_COMM_WORLDS)
 	{
 		CkAbort("AMPI> Number of registered comm_worlds exceeded limit.\n");
 	}
-	int new_idx=mpi_nworlds;
+	int new_idx=_mpi_nworlds;
 	new_world=MPI_COMM_WORLD+new_idx; // Isaac guessed there shouldn't be a +1 here
 
         //Create and attach the ampiParent array
@@ -749,7 +749,7 @@ public:
     void add(const ampiCommStruct &nextWorld) {
       int new_idx=nextWorld.getComm()-(MPI_COMM_WORLD); // Isaac guessed there shouldn't be a +1 after the MPI_COMM_WORLD
         mpi_worlds[new_idx].comm=nextWorld;
-	if (mpi_nworlds<=new_idx) mpi_nworlds=new_idx+1;
+	if (_mpi_nworlds<=new_idx) _mpi_nworlds=new_idx+1;
 	STARTUP_DEBUG("ampiInit> listed MPI_COMM_UNIVERSE "<<new_idx)
     }
 };
@@ -1662,7 +1662,7 @@ const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo)
 {
   if (universeNo>MPI_COMM_WORLD) {
     int worldDex=universeNo-MPI_COMM_WORLD-1;
-    if (worldDex>=mpi_nworlds)
+    if (worldDex>=_mpi_nworlds)
       CkAbort("Bad world communicator passed to universeComm2CommStruct");
     return mpi_worlds[worldDex].comm;
   }
@@ -3142,7 +3142,7 @@ int IReq::wait(MPI_Status *sts){
 		ptr->block();
 			
 		//BIGSIM_OOC DEBUGGING
-		//CmiPrintf("After blocking: %dth time: %d: in Ireq::wait\n", ooccnt, ampiIndex);
+		//CmiPrintf("[%d] After blocking: in Ireq::wait\n", ptr->thisIndex);
 		//CmiPrintf("IReq's this pointer: %p\n", this);
 		//print();
 
@@ -3290,7 +3290,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 #endif
   for(i=0;i<reqvec->size();i++){
     for(j=0;j<((*reqvec)[i]).size();j++){
-      //CkPrintf("in loop [%d, %d]\n", i, j);
+      //CkPrintf("[%d] in loop [%d, %d]\n", pptr->thisIndex,i, j);
       if(request[((*reqvec)[i])[j]] == MPI_REQUEST_NULL){
         stsempty(sts[((*reqvec)[i])[j]]);
         continue;
@@ -5343,33 +5343,50 @@ int AMPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords) {
   return 0;
 }
 
+// Offset coords[direction] by displacement, and set the rank that
+// results
+static void cart_clamp_coord(MPI_Comm comm, const CkVec<int> &dims,
+			     const CkVec<int> &periodicity, int *coords,
+			     int direction, int displacement, int *rank_out)
+{
+  int base_coord = coords[direction];
+  coords[direction] += displacement;
+
+  if (periodicity[direction] == 1) {
+      while (coords[direction] < 0)
+	coords[direction] += dims[direction];
+      while (coords[direction] >= dims[direction])
+	coords[direction] -= dims[direction];
+  }
+
+  if (coords[direction]<0 || coords[direction]>= dims[direction])
+    *rank_out = MPI_PROC_NULL;
+  else
+    AMPI_Cart_rank(comm, coords, rank_out);
+
+  coords[direction] = base_coord;
+}
+
 CDECL
-int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source, 
-		   int *rank_dest) {
+int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp,
+                    int *rank_source, int *rank_dest) {
   AMPIAPI("AMPI_Cart_shift");
   
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
+  if ((direction < 0) || (direction >= ndims))
+    CkAbort("MPI_Cart_shift: direction not within dimensions range");
+
   const CkVec<int> &dims = c.getdims();
   const CkVec<int> &periods = c.getperiods();
   int *coords = new int[ndims];
 
-  AMPI_Comm_rank(comm, rank_source);
-  AMPI_Cart_coords(comm, *rank_source, ndims, coords);
+  int mype;
+  AMPI_Comm_rank(comm, &mype);
+  AMPI_Cart_coords(comm, mype, ndims, coords);
 
-  if ((direction < 0) || (direction >= ndims))
-    CkAbort("MPI_Cart_shift: direction not within dimensions range");
-
-  coords[direction] += disp;
-  if (coords[direction] < 0)
-    if (periods[direction] == 1) {
-      coords[direction] += dims[direction];
-      AMPI_Cart_rank(comm, coords, rank_dest);
-    }
-    else
-      *rank_dest = MPI_PROC_NULL;
-  else
-    AMPI_Cart_rank(comm, coords, rank_dest);
+  cart_clamp_coord(comm, dims, periods, coords, direction,  disp, rank_dest);
+  cart_clamp_coord(comm, dims, periods, coords, direction, -disp, rank_source);
 
   delete [] coords;
   return 0;

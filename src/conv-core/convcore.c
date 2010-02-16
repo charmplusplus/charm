@@ -1661,7 +1661,7 @@ int handler;
 CpvStaticDeclare(CthThread, CthMainThread);
 CpvStaticDeclare(CthThread, CthSchedulingThread);
 CpvStaticDeclare(CthThread, CthSleepingStandins);
-CpvStaticDeclare(int      , CthResumeNormalThreadIdx);
+CpvDeclare(int      , CthResumeNormalThreadIdx);
 CpvStaticDeclare(int      , CthResumeSchedulingThreadIdx);
 
 
@@ -1696,6 +1696,7 @@ CthThread CthSuspendSchedulingThread()
   return succ;
 }
 
+/* Notice: For changes to the following function, make sure the function CthResumeNormalThreadDebug is also kept updated. */
 void CthResumeNormalThread(CthThreadToken* token)
 {
   CthThread t = token->thread;
@@ -1716,11 +1717,12 @@ void CthResumeNormalThread(CthThreadToken* token)
 	        resumeTraceCore();*/
 #endif
 #endif
-
+  
   /* BIGSIM_OOC DEBUGGING
   CmiPrintf("In CthResumeNormalThread:   ");
   CthPrintThdMagic(t);
   */
+
   CthResume(t);
 }
 

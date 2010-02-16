@@ -133,6 +133,19 @@ static int isLeakSlot(Slot *s) {
   return s->magic & LEAK_FLAG;
 }
 
+int Slot_ChareOwner(void *s) {
+  return ((Slot*)s)->chareID;
+}
+
+int Slot_AllocatedSize(void *s) {
+  return ((Slot*)s)->userSize;
+}
+
+int Slot_StackTrace(void *s, void ***stack) {
+  *stack = ((Slot*)s)->from;
+  return ((Slot*)s)->stackLen;
+}
+
 static void printSlot(Slot *s) {
   CmiPrintf("[%d] Leaked block of %d bytes at %p:\n",
 	    CmiMyPe(), s->userSize, SlotToUser(s));
@@ -1003,8 +1016,9 @@ static void CpdMMAPhandler(int sig, siginfo_t *si, void *unused){
     unProtectedPages = newUnProtectedPages;
   }
   unProtectedPages[unProtectedPagesSize++] = pageToUnprotect;
-  CmiPrintf("Got SIGSEGV at address: 0x%lx\n", (long) si->si_addr);
-  CmiPrintStackTrace(0);
+  CpdNotify(CPD_CROSSCORRUPTION, si->si_addr, memory_chare_id);
+  //CmiPrintf("Got SIGSEGV at address: 0x%lx\n", (long) si->si_addr);
+  //CmiPrintStackTrace(0);
 }
 
 static void protectMemory() {
@@ -1014,7 +1028,12 @@ static void protectMemory() {
   SLOT_ITERATE_START(cur)
     if (cur->chareID != memory_chare_id && cur->chareID > 0) {
       /*printf(" %p",cur->userData);*/
-      mprotect(cur->userData, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
+#ifdef CMK_SEPARATE_SLOT
+      char * data = cur->userData;
+#else
+      char * data = (char *)cur;
+#endif
+      mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
     } /*else printf(" (%p)",cur->userData);*/
   SLOT_ITERATE_END
   /*printf("\n");*/
@@ -1025,7 +1044,12 @@ static void unProtectMemory() {
 #ifdef CPD_USE_MMAP
   Slot *cur;
   SLOT_ITERATE_START(cur)
-    mprotect(cur->userData, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+#ifdef CMK_SEPARATE_SLOT
+      char * data = cur->userData;
+#else
+      char * data = (char *)cur;
+#endif
+    mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
   SLOT_ITERATE_END
   /*printf("unprotecting memory\n");*/
 #endif
@@ -1056,8 +1080,6 @@ void CpdCheckMemory(int report) {
 #endif
   SLOT_ITERATE_END
 }
-
-static int cpdInSystem;
 
 void CpdSystemEnter() {
 #ifdef CPD_USE_MMAP
@@ -1290,12 +1312,15 @@ static void status(char *msg) {
 extern int getCharmEnvelopeSize();
 
 static int disableVerbosity = 1;
+int cpdInitializeMemory;
+void CpdSetInitializeMemory(int v) { cpdInitializeMemory = v; }
 
 static void meta_init(char **argv) {
   status("Converse -memory mode: charmdebug\n");
   char buf[100];
   sprintf(buf,"slot size %d\n",sizeof(Slot));
   status(buf);
+  cpdInitializeMemory = 0;
   charmEnvelopeSize = getCharmEnvelopeSize();
   CpdDebugGetAllocationTree = (void* (*)(int*))CreateAllocationTree;
   CpdDebug_pupAllocationPoint = pupAllocationPoint;
@@ -1360,6 +1385,9 @@ static void *meta_malloc(size_t size) {
     BEFORE_MALLOC_CALL;
     user = mm_malloc(size);
     AFTER_MALLOC_CALL;
+  }
+  if (cpdInitializeMemory) {
+    bzero(user, size); // for Record-Replay must initialize all memory otherwise paddings may differ (screwing up the CRC)
   }
   return user;
 }
@@ -1554,3 +1582,26 @@ void setMemoryOwnedBy(void *ptr, int chareID) {
   Slot *sl = UserToSlot(ptr);
   sl->chareID = chareID;
 }
+
+void * MemoryToSlot(void *ptr) {
+  Slot *sl;
+  int i;
+#if defined(CPD_USE_MMAP) && defined(CMK_SEPARATE_SLOT)
+  for (i=0; i<1000; ++i) {
+    sl = UserToSlot((void*)(((CmiUInt8)ptr)-i*meta_getpagesize() & ~(meta_getpagesize()-1)));
+    if (sl != NULL) return sl;
+  }
+#endif
+  return NULL;
+}
+
+/*void PrintDebugStackTrace(void *ptr) {
+  int i;
+  Slot *sl = UserToSlot((void*)(((CmiUInt8)ptr) & ~(meta_getpagesize()-1)));
+  if (sl != NULL) {
+    CmiPrintf("%d %d ",sl->chareID,sl->stackLen);
+    for (i=0; i<sl->stackLen; ++i) CmiPrintf("%p ",sl->from[i]);
+  } else {
+    CmiPrintf("%d 0 ",sl->chareID);
+  }
+}*/

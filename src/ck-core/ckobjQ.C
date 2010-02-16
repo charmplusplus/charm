@@ -22,7 +22,6 @@
 CkpvDeclare(TokenPool*, _tokenPool);
 
 extern int index_tokenHandler;
-extern int index_skipCldHandler;
 
 extern CkMigratable * CkArrayMessageObjectPtr(envelope *env);
 

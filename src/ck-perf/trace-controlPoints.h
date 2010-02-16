@@ -28,23 +28,33 @@ class TraceControlPoints : public Trace {
   double lastBeginExecuteTime;
   int lastbeginMessageSize;
 
-  /** The amount of time spent executing entry methods */
-  double totalEntryMethodTime;
-
-
   /** The start of the idle region */
   double lastBeginIdle;
   
-  /** The amount of time spent idle */
-  double totalIdleTime;
-  
-  /** The time we last rest the idle/entry totals */
-  double lastResetTime;
+  /** The amount of time spent executing entry methods since we last reset the counters */
+  double totalEntryMethodTime;
 
-  /** The highest seen memory usage */
+  /** The amount of time spent idle since we last reset the counters */
+  double totalIdleTime;
+
+  /** The highest seen memory usage  since we last reset the counters */
   double memUsage;
 
-  
+  /** The number of entry method invocations since we last reset the counters */
+  long totalEntryMethodInvocations;
+
+    
+  /** The time we last rest the counters */
+  double lastResetTime;
+
+ public: 
+  int b1, b2, b3;
+  long b2mlen;
+  long b3mlen;
+
+  // In some programs like Changa, entry methods may be nested, and hence we only want to consider the outermost one
+  int nesting_level;
+
 
  public:
   TraceControlPoints(char **argv);
@@ -101,23 +111,31 @@ class TraceControlPoints : public Trace {
   /** Reset the idle, overhead, and memory measurements */
   void resetAll();
 
-  /** Fraction of the time spent idle */
+  /** Fraction of the time spent idle since resetting the counters */
   double idleRatio(){
     double t = CmiWallTimer() - lastResetTime;
     return (totalIdleTime) / t;
   }
 
-  /** Fraction of time spent as overhead */
+  /** Fraction of time spent as overhead since resetting the counters */
   double overheadRatio(){
     double t = CmiWallTimer() - lastResetTime;
     return (t - totalIdleTime - totalEntryMethodTime) / t;
   }
 
-  /** Highest memory usage (in MB) value we've seen since last time */
+  /** Highest memory usage (in MB) value we've seen since resetting the counters */
   double memoryUsageMB(){
     return ((double)memUsage) / 1024.0 / 1024.0;
   }
 
+  /** Determine the average grain size since last reset of counters */
+  double grainSize(){
+    return (double)totalEntryMethodTime / totalEntryMethodInvocations;
+  }
+
+  double bytesPerEntry() {
+    return (double)(b2mlen + b3mlen) / (double)(b2+b3);
+  }
 
 
 };

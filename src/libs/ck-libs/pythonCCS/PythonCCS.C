@@ -633,15 +633,24 @@ void PythonObject::executeThread(PythonExecute *pyMsg) {
       if (PyErr_Occurred() != 0) {
         //std::string str = getTraceback();
         //CkPrintf(str.c_str());
-        PyObject *exception, *v, *traceback;
+        PyObject *exception, *v, *traceback, *tmp;
         PyErr_Fetch(&exception, &v, &traceback);
         PyErr_NormalizeException(&exception, &v, &traceback);
-        CkPrintf("%s\n",PyString_AsString(PyObject_Repr(exception)));
-        CkPrintf("%s\n",PyString_AsString(PyObject_Repr(v)));
-        CkPrintf("%s\n",PyString_AsString(PyObject_Repr(traceback)));
-        CkPrintf("%s\n",PyString_AsString(PyObject_Str(exception)));
-        CkPrintf("%s\n",PyString_AsString(PyObject_Str(v)));
-        CkPrintf("%s\n",PyString_AsString(PyObject_Str(traceback)));
+        CkPrintf("%s\n",PyString_AsString(tmp=PyObject_Repr(exception)));
+        Py_DECREF(tmp);
+        CkPrintf("%s\n",PyString_AsString(tmp=PyObject_Repr(v)));
+        Py_DECREF(tmp);
+        CkPrintf("%s\n",PyString_AsString(tmp=PyObject_Repr(traceback)));
+        Py_DECREF(tmp);
+        CkPrintf("%s\n",PyString_AsString(tmp=PyObject_Str(exception)));
+        Py_DECREF(tmp);
+        CkPrintf("%s\n",PyString_AsString(tmp=PyObject_Str(v)));
+        Py_DECREF(tmp);
+        CkPrintf("%s\n",PyString_AsString(tmp=PyObject_Str(traceback)));
+        Py_DECREF(tmp);
+        if (exception!=NULL) Py_DECREF(exception);
+        if (v!=NULL) Py_DECREF(v);
+        if (traceback!=NULL) Py_DECREF(traceback);
       }
       if (!result) {
         CkPrintf("Python Call error\n");

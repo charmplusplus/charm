@@ -5,6 +5,45 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Default Simulation Parameters
 
+
+// convenience typedefs and consts to facilitate float vs double usage
+#define USE_DOUBLE 0
+#if USE_DOUBLE
+typedef double  MD_FLOAT;
+#define  MD_VEC veclf
+const double zero=0.0;
+const double one=1.0;
+const double two=2.0;
+#define myvec_numElems veclf_numElems;
+#define vextract_MDF vextractlf
+#define vsub_MDF vsublf
+#define vadd_MDF vaddlf
+#define vmadd_MDF vmaddlf
+#define vmul_MDF vmullf
+#define vspread_MDF vspreadlf
+#define vrecip_MDF vreciplf
+#define vsqrt_MDF vsqrtlf
+#define visfinite_MDF visfinitelf
+#else
+typedef float  MD_FLOAT;
+#define  MD_VEC vecf
+#define myvec_numElems vecf_numElems;
+const float zero=0.0f;
+const float one=1.0f;
+const float two=2.0f;
+
+#define vextract_MDF vextractf
+#define vsub_MDF vsubf
+#define vadd_MDF vaddf
+#define vmadd_MDF vmaddf
+#define vmul_MDF vmulf
+#define vspread_MDF vspreadf
+#define vrecip_MDF vrecipf
+#define vsqrt_MDF vsqrtf
+#define visfinite_MDF visfinitef
+#endif
+
+
 #define DEFAULT_NUM_PARTICLES_PER_PATCH  (128)
 
 #define DEFAULT_NUM_PATCHES_X              (2)
@@ -22,12 +61,19 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Physics Constants
 
+#if USE_DOUBLE
+#define TIME_PER_STEP       (1.0e-15)           // Unit: s
+#define SIM_BOX_SIDE_LEN    (1.0e-7)            // Unit: m (NOTE: 1 nm = 10A)
+#define COULOMBS_CONSTANT   (8.987551787e-9)    // Unit: N*(m^2)*(C^-2)
+#define ELECTRON_CHARGE     (-1.602176487e-19)  // Unit: C
+#define ELECTRON_MASS       (9.109382154e-31)   // Unit: kg
+#else
 #define TIME_PER_STEP       (1.0e-15f)           // Unit: s
 #define SIM_BOX_SIDE_LEN    (1.0e-7f)            // Unit: m (NOTE: 1 nm = 10A)
 #define COULOMBS_CONSTANT   (8.987551787e-9f)    // Unit: N*(m^2)*(C^-2)
 #define ELECTRON_CHARGE     (-1.602176487e-19f)  // Unit: C
 #define ELECTRON_MASS       (9.109382154e-31f)   // Unit: kg
-
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Misc. Helper Macros
@@ -49,6 +95,9 @@
 
 // DMK - DEBUG
 #define COUNT_FLOPS                      (0)
+
+// EJB - SANITY CHECK
+#define SANITY_CHECK                     (0)
 
 // DMK - DEBUG
 #define ENABLE_USER_EVENTS               (0)
