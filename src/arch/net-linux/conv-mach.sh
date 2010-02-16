@@ -14,6 +14,12 @@ CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_XIOPTS=""
 CMK_QT="i386-gcc"
 
+CMK_CF90=`which f95 2>/dev/null`
+if test -n "$CMK_CF90"
+then
+    . $CHARMINC/conv-mach-gfortran.sh
+else
+
 # fortran compiler f77 or gnu f95
 CMK_CF77=`which g77 2>/dev/null`
 if test -z "$CMK_CF77"
@@ -45,4 +51,6 @@ else
     CMK_F90_USE_MODDIR=1
     CMK_F90_MODINC="-I"
   fi
+fi
+
 fi

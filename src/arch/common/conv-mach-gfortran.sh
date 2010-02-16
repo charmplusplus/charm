@@ -6,16 +6,18 @@ CMK_CXX="$CMK_CXX -DCMK_GFORTRAN"
 if test -n "$CMK_MACOSX64"
 then
 CMK_F90FLAGS="$CMK_F90FLAGS -m64"
+CMK_F77FLAGS="$CMK_F90FLAGS -m64"
 fi
 
 if test -n "$CMK_MACOSX"
 then
 CMK_F90FLAGS="$CMK_F90FLAGS -fno-common"
+CMK_F77FLAGS="$CMK_F90FLAGS -fno-common"
 fi
 
-CMK_CF77="g77 "
-CMK_CF90=`which gfortran 2>/dev/null`
 CMK_FPP="/lib/cpp -P -CC"
+
+CMK_CF90=`which gfortran 2>/dev/null`
 CMK_CF90="$CMK_CF90 $CMK_F90FLAGS -fPIC -fno-second-underscore -fdollar-ok" 
 CMK_CF90_FIXED="$CMK_CF90 -ffixed-form "
 # find f90 library:
@@ -41,6 +43,9 @@ else
   #F90LIBDIR=`cd $F90DIR/../lib/gcc/ia64-unknown-linux-gnu/4.1.0; pwd`
 fi
 test -n "$F90LIBDIR" && CMK_F90LIBS="-L$F90LIBDIR -lgfortran -lgcc_eh"
+
+CMK_CF77=$CMK_CF90
+CMK_F77LIBS=$CMK_F90LIBS
 
 CMK_MOD_NAME_ALLCAPS=
 CMK_MOD_EXT="mod"
