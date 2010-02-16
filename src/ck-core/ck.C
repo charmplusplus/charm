@@ -26,9 +26,13 @@ void automaticallySetMessagePriority(envelope *env); // in control point framewo
 #endif // CMK_LBDB_ON
 
 #ifndef CMK_CHARE_USE_PTR
+#include <map>
 CpvDeclare(CkVec<void *>, chare_objs);
 CpvDeclare(CkVec<int>, chare_types);
 CpvDeclare(CkVec<VidBlock *>, vidblocks);
+
+typedef std::map<int, CkChareID>  Vidblockmap;
+CpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
 #endif
 
 #define CK_MSG_SKIP_OR_IMM    (CK_MSG_EXPEDITED | CK_MSG_IMMEDIATE)
@@ -77,7 +81,29 @@ void Chare::CkEnableObjQ()
 #endif
 }
 
-Chare::~Chare() {}
+Chare::~Chare() {
+#ifndef CMK_CHARE_USE_PTR
+  if (chareIdx >= 0 && chareIdx < CpvAccess(chare_objs).size() &&
+     CpvAccess(chare_objs)[chareIdx] == this) 
+  {
+    CpvAccess(chare_objs)[chareIdx] = NULL;
+    Vidblockmap::iterator iter = CpvAccess(vmap).find(chareIdx);
+    if (iter != CpvAccess(vmap).end()) {
+      register CkChareID *pCid = (CkChareID *)
+        _allocMsg(DeleteVidMsg, sizeof(CkChareID));
+      int srcPe = iter->second.onPE;
+      *pCid = iter->second;
+      register envelope *ret = UsrToEnv(pCid);
+      ret->setVidPtr(iter->second.objPtr);
+      ret->setSrcPe(CkMyPe());
+      CmiSetHandler(ret, _charmHandlerIdx);
+      CmiSyncSendAndFree(srcPe, ret->getTotalsize(), (char *)ret);
+      CpvAccess(_qd)->create();
+      CpvAccess(vmap).erase(iter);
+    }
+  }
+#endif
+}
 
 void Chare::pup(PUP::er &p)
 {
@@ -820,6 +846,13 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
   ret->setSrcPe(CkMyPe());
   CmiSetHandler(ret, _charmHandlerIdx);
   CmiSyncSendAndFree(srcPe, ret->getTotalsize(), (char *)ret);
+#ifndef CMK_CHARE_USE_PTR
+  // register the remote vidblock for deletion when chare is deleted
+  CkChareID vid;
+  vid.onPE = srcPe;
+  vid.objPtr = env->getVidPtr();
+  CpvAccess(vmap)[idx] = vid;    
+#endif
   CpvAccess(_qd)->create();
 #ifndef CMK_CHARE_USE_PTR
   ((Chare *)obj)->chareIdx = idx;
@@ -868,7 +901,7 @@ static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
 #endif
   register CkChareID *pcid = (CkChareID *) EnvToUsr(env);
   _CHECK_VALID(pcid, "FillVidMsg: Not a valid pCid\n");
-  vptr->fill(pcid->onPE, pcid->objPtr);
+  if (vptr) vptr->fill(pcid->onPE, pcid->objPtr);
   CmiFree(env);
 }
 
@@ -882,6 +915,16 @@ static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
 #endif
   _SET_USED(env, 1);
   vptr->send(env);
+}
+
+static inline void _processDeleteVidMsg(CkCoreState *ck,envelope *env)
+{
+#ifndef CMK_CHARE_USE_PTR
+  register VidBlock *vptr = CpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
+  delete vptr;
+  CpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()] = NULL;
+#endif
+  CmiFree(env);
 }
 
 /************** Receive: Groups ****************/
@@ -1126,6 +1169,11 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: FillVidMsg\n", CkMyPe());)
       ck->process();
       _processFillVidMsg(ck,env);
+      break;
+    case DeleteVidMsg  :
+      TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: DeleteVidMsg\n", CkMyPe());)
+      ck->process();
+      _processDeleteVidMsg(ck,env);
       break;
 
     default:

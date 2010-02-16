@@ -302,12 +302,12 @@ private:
     }
     void*  getVidPtr(void) const {
       CkAssert(getMsgtype()==NewVChareMsg || getMsgtype()==ForVidMsg
-          || getMsgtype()==FillVidMsg);
+          || getMsgtype()==FillVidMsg ||  getMsgtype()==DeleteVidMsg);
       return type.chare.ptr;
     }
     void   setVidPtr(void *p) {
       CkAssert(getMsgtype()==NewVChareMsg || getMsgtype()==ForVidMsg
-          || getMsgtype()==FillVidMsg);
+          || getMsgtype()==FillVidMsg ||  getMsgtype()==DeleteVidMsg);
       type.chare.ptr = p;
     }
     void*  getObjPtr(void) const { 
