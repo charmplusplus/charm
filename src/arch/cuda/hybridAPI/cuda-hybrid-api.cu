@@ -31,6 +31,7 @@ extern void CUDACallbackManager(void * fn);
  */ 
 #define NUM_BUFFERS 128
 #define MAX_PINNED_REQ 64  
+#define MAX_DELAYED_FREE_REQS 64  
 
 /* a flag which tells the system to record the time for invocation and
  *  completion of GPU events: memory allocation, transfer and
@@ -47,6 +48,9 @@ workRequestQueue *wrQueue = NULL;
 /* pending page-locked memory allocation requests */
 unsigned int pinnedMemQueueIndex = 0; 
 pinnedMemReq pinnedMemQueue[MAX_PINNED_REQ];
+
+unsigned int currentDfr = 0;
+DelayedFreeReq delayedFreeReqs[MAX_DELAYED_FREE_REQS];
 
 
 /* The runtime system keeps track of all allocated buffers on the GPU.
@@ -153,6 +157,36 @@ void pinnedMallocHost(pinnedMemReq *reqs) {
     */  
 }
 
+void delayedFree(void *ptr){
+  currentDfr++;
+  if(currentDfr == MAX_DELAYED_FREE_REQS){
+    currentDfr = 0;
+    if(!delayedFreeReqs[currentDfr].freed){
+      printf("Ran out of DFR queue space. Increase MAX_DELAYED_FREE_REQS\n");
+      exit(-1);
+    }
+    else{
+      delayedFreeReqs[currentDfr].ptr = ptr;
+      delayedFreeReqs[currentDfr].freed = false;
+    }
+  }
+}
+
+// there are smarter ways of doing this, surely.
+void flushDelayedFrees(){
+  for(int i = 0; i < MAX_DELAYED_FREE_REQS; i++){
+    if(!delayedFreeReqs[i].freed){
+      if(delayedFreeReqs[i].ptr == NULL){
+        printf("recorded NULL ptr in delayedFree()");
+        exit(-1);
+      }
+      cudaFreeHost(delayedFreeReqs[i].ptr);
+      delayedFreeReqs[i].freed = true;
+      delayedFreeReqs[i].ptr = NULL;
+    }
+  }
+}
+
 /* flushPinnedMemQueue
  *
  * executes pending pinned memory allocation requests
@@ -234,10 +268,10 @@ void allocateBuffers(workRequest *wr) {
       }      
       
       // allocate if the buffer for the corresponding index is NULL 
-      if (devBuffers[index] == NULL) {
+      if (devBuffers[index] == NULL && size > 0) {
 #ifdef GPU_PRINT_BUFFER_ALLOCATE
         double mil = 1e6;
-        printf("*** ALLOCATE buffer 0x%x size %f mb\n", devBuffers[index], 1.0*size/mil);
+        printf("*** ALLOCATE buffer 0x%x (%d) size %f mb\n", devBuffers[index], index, 1.0*size/mil);
 #endif
 
         CUDA_SAFE_CALL_NO_SYNC(cudaMalloc((void **) &devBuffers[index], size));
@@ -275,7 +309,7 @@ void setupData(workRequest *wr) {
       }
       */
       
-      if (bufferInfo[i].transferToDevice) {
+      if (bufferInfo[i].transferToDevice && size > 0) {
 	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpyAsync(devBuffers[index], 
           hostBuffers[index], size, cudaMemcpyHostToDevice, data_in_stream));
 #ifdef GPU_DEBUG
@@ -306,7 +340,7 @@ void copybackData(workRequest *wr) {
       int index = bufferInfo[i].bufferID; 
       int size = bufferInfo[i].size; 
       
-      if (bufferInfo[i].transferFromDevice) {
+      if (bufferInfo[i].transferFromDevice && size > 0) {
 #ifdef GPU_DEBUG
 	printf("transferFromDevice: %d at time %.2f size: %d "
 	       "error string: %s\n", index, cutGetTimerValue(timerHandle), 
@@ -337,7 +371,7 @@ void freeMemory(workRequest *wr) {
       int index = bufferInfo[i].bufferID; 
       if (bufferInfo[i].freeBuffer) {
 #ifdef GPU_PRINT_BUFFER_ALLOCATE
-        printf("*** FREE buffer 0x%x\n", devBuffers[index]);
+        printf("*** FREE buffer 0x%x (%d)\n", devBuffers[index], index);
 #endif
 
 #ifdef GPU_DEBUG
@@ -353,7 +387,7 @@ void freeMemory(workRequest *wr) {
   }
 }
 
-/* kernelSelect
+/* 
  * a switch statement defined by the user to allow the library to execute
  * the correct kernel 
  */ 
@@ -398,6 +432,12 @@ void initHybridAPI(int myPe) {
   traceRegisterUserEvent("GPU Kernel Execution", GPU_KERNEL_EXEC);
   traceRegisterUserEvent("GPU Memory Cleanup", GPU_MEM_CLEANUP);
 #endif
+
+  currentDfr = 0;
+  for(int i = 0; i < MAX_DELAYED_FREE_REQS; i++){
+    delayedFreeReqs[i].freed = true;
+    delayedFreeReqs[i].ptr = NULL;
+  }
 }
 
 /* gpuProgressFn
@@ -411,12 +451,14 @@ void gpuProgressFn() {
   }
   if (isEmpty(wrQueue)) {
     //    flushPinnedMemQueue();    
+    flushDelayedFrees();
     return;
   } 
   int returnVal; 
   workRequest *head = firstElement(wrQueue); 
   workRequest *second = secondElement(wrQueue);
   workRequest *third = thirdElement(wrQueue); 
+
   if (head->state == QUEUED) {
 #ifdef GPU_PROFILE
     gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
@@ -459,7 +501,9 @@ void gpuProgressFn() {
       timeIndex++; 
 #endif
       //flushPinnedMemQueue();
+      flushDelayedFrees();
       kernelSelect(head); 
+
       head->state = EXECUTING; 
       if (second != NULL) {
 #ifdef GPU_PROFILE
@@ -537,6 +581,7 @@ void gpuProgressFn() {
 	  timeIndex++; 
 #endif
 	  //	    flushPinnedMemQueue();	    
+          flushDelayedFrees();
 	  kernelSelect(second); 
 	  second->state = EXECUTING; 
 	  if (third != NULL) {
@@ -593,7 +638,6 @@ void gpuProgressFn() {
       CUDACallbackManager(head->callbackFn);
     }
   }
-  
 }
 
 /* exitHybridAPI

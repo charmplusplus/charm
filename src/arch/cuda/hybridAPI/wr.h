@@ -24,6 +24,13 @@ typedef struct pinnedMemReq {
   void *callbackFn; 
 } pinnedMemReq;
 
+typedef struct _delayedFreeReq {
+  void *ptr;
+  bool freed;
+} DelayedFreeReq;
+
+void delayedFree(void *ptr);
+
 /* pinnedMallocHost
  *
  * schedules a pinned memory allocation so that it does not impede
