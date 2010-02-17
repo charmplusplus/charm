@@ -26,11 +26,15 @@ void automaticallySetMessagePriority(envelope *env); // in control point framewo
 #endif // CMK_LBDB_ON
 
 #ifndef CMK_CHARE_USE_PTR
+#include <map>
 CpvDeclare(CkVec<void *>, chare_objs);
 CpvDeclare(CkVec<int>, chare_types);
 CpvDeclare(CkVec<VidBlock *>, vidblocks);
+
+typedef std::map<int, CkChareID>  Vidblockmap;
 CpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
 #endif
+
 
 #define CK_MSG_SKIP_OR_IMM    (CK_MSG_EXPEDITED | CK_MSG_IMMEDIATE)
 
@@ -43,6 +47,17 @@ int CkIndex_Group::__idx;
 int CkIndex_ArrayBase::__idx=-1;
 
 extern int _defaultObjectQ;
+
+void _initChareTables()
+{
+#ifndef CMK_CHARE_USE_PTR
+          /* chare and vidblock table */
+  CpvInitialize(CkVec<void *>, chare_objs);
+  CpvInitialize(CkVec<int>, chare_types);
+  CpvInitialize(CkVec<VidBlock *>, vidblocks);
+  CpvInitialize(Vidblockmap, vmap);
+#endif
+}
 
 //Charm++ virtual functions: declaring these here results in a smaller executable
 Chare::Chare(void) {
