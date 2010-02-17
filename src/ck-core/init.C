@@ -160,13 +160,6 @@ CkpvStaticDeclare(int,  _numInitsRecd);
 CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
-#ifndef CMK_CHARE_USE_PTR
-CpvExtern(CkVec<void *>, chare_objs);
-CpvExtern(CkVec<int>, chare_types);
-CpvExtern(CkVec<VidBlock *>, vidblocks);
-CpvExtern(Vidblockmap, vmap); 
-#endif
-
 /*
 	FAULT_EVAC
 */
@@ -776,6 +769,7 @@ extern void _registerPathHistory(void);
 extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
 extern void _loadbalancerInit();
+extern void _initChareTables();
 #if CMK_MEM_CHECKPOINT
 extern void init_memcheckpt(char **argv);
 #endif
@@ -866,13 +860,7 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 	CpvInitialize(int,serializer);
 
-#ifndef CMK_CHARE_USE_PTR
-          /* chare and vidblock table */
-        CpvInitialize(CkVec<void *>, chare_objs);
-        CpvInitialize(CkVec<int>, chare_types);
-        CpvInitialize(CkVec<VidBlock *>, vidblocks);
-        CpvInitialize(Vidblockmap, vmap);
-#endif
+	_initChareTables();            // for checkpointable plain chares
 
 	CksvInitialize(UInt, _numNodeGroups);
 	CksvInitialize(GroupTable*, _nodeGroupTable);

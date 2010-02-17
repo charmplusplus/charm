@@ -187,11 +187,6 @@ CkpvExtern(CkCoreState *, _coreState);
 
 void CkMessageWatcherInit(char **argv,CkCoreState *ck);
 
-#ifndef CMK_CHARE_USE_PTR
-#include <map>
-typedef std::map<int, CkChareID>  Vidblockmap;
-#endif
-
 extern void _processHandler(void *converseMsg,CkCoreState *ck);
 extern void _processBocInitMsg(CkCoreState *ck,envelope *msg);
 extern void _processNodeBocInitMsg(CkCoreState *ck,envelope *msg);
