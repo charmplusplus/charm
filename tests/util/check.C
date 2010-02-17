@@ -48,6 +48,16 @@ void check_test(int argc, char** argv) {
     CmiPrintf("Error: sizeof(CmiFloat8) is %d!\n",sizeof(float8));
     exit(1);
   }
+
+  CmiUInt8 mem_before = CmiMemoryUsage();
+  void *buf = CmiAlloc(1024);
+  CmiUInt8 mem_after = CmiMemoryUsage();
+  CmiFree(buf);
+  if (mem_after - mem_before < 1024) {
+    CmiPrintf("Error: CmiMemoryUsage() does not work!\n");
+    exit(1);
+  }
+
   CmiPrintf("All tests passed\n");
   CmiPrintf("Info: converse header: %d envelope: %d\n", CmiReservedHeaderSize, sizeof(envelope));
 }
