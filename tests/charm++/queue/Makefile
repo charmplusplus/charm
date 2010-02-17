@@ -11,4 +11,4 @@ main.decl.h: test.ci
 	$(CHARMC) $<
 
 clean:
-	rm -f pgm *.o *.decl.h *.def.h charmrun
+	rm -f pgm *.o *.decl.h *.def.h charmrun pgm.exe pgm.pdb pgm.ilk

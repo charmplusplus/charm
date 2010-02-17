@@ -33,5 +33,5 @@ bgdump:
 	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 dummy mesh2d +LBDebug 1 +LBSameCpus +LBNoBackground +bgconfig ./bg_config +LBDump 1 +LBDumpFile lb_test.dump
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o lb_test charmrun
+	rm -f *.decl.h *.def.h conv-host *.o lb_test charmrun lb_test.exe lb_test.pdb lb_test.ilk
 

@@ -9,7 +9,7 @@ test.o: test.c
 	$(CHARMC) -c test.c
 
 clean:
-	rm -f *.o *.mod pgm *~ conv-host charmrun
+	rm -f *.o *.mod pgm *~ conv-host charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
 
 test: pgm
 	./charmrun ./pgm +p2 +vp4 $(TESTOPTS)

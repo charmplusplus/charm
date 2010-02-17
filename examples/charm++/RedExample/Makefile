@@ -11,7 +11,7 @@ RedExample.decl.h: RedExample.ci
 	$(CHARMC)  RedExample.ci
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o RedExample charmrun *.log *.sum *.sts
+	rm -f *.decl.h *.def.h conv-host *.o RedExample charmrun *.log *.sum *.sts charmrun.exe RedExample.exe RedExample.pdb RedExample.ilk
 
 RedExample.o: RedExample.C RedExample.decl.h RedExample.h
 	$(CHARMC) -c RedExample.C

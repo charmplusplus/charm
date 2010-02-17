@@ -10,7 +10,7 @@ $(FNAME).o : $(FNAME).C $(FNAME).h $(FNAME).ci
 	$(CHARMC) -c $(FNAME).ci $(FNAME).C
 
 clean:
-	rm -f *.o conv-host pgm charmrun *.def.h *.decl.h
+	rm -f *.o conv-host pgm charmrun *.def.h *.decl.h pgm.exe pgm.pdb pgm.ilk
 
 test:  pgm
 	./charmrun +p4 ./pgm +balancer RandCentLB +LBDebug 1 $(TESTOPTS)

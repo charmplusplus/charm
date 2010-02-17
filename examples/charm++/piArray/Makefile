@@ -18,4 +18,4 @@ pgm.decl.h: pgm.ci
 	$(CHARMC) pgm.ci
 
 clean:
-	rm -f pgm *.o conv-host *.decl.h *.def.h *~ charmrun
+	rm -f pgm *.o conv-host *.decl.h *.def.h *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
