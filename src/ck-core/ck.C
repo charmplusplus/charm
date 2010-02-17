@@ -26,12 +26,9 @@ void automaticallySetMessagePriority(envelope *env); // in control point framewo
 #endif // CMK_LBDB_ON
 
 #ifndef CMK_CHARE_USE_PTR
-#include <map>
 CpvDeclare(CkVec<void *>, chare_objs);
 CpvDeclare(CkVec<int>, chare_types);
 CpvDeclare(CkVec<VidBlock *>, vidblocks);
-
-typedef std::map<int, CkChareID>  Vidblockmap;
 CpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
 #endif
 
@@ -88,6 +85,7 @@ Chare::~Chare() {
 */
   if (chareIdx != -1)
   {
+    CmiAssert(CpvAccess(chare_objs)[chareIdx] == this);
     CpvAccess(chare_objs)[chareIdx] = NULL;
     Vidblockmap::iterator iter = CpvAccess(vmap).find(chareIdx);
     if (iter != CpvAccess(vmap).end()) {

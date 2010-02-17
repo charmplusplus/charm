@@ -164,6 +164,7 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 CpvExtern(CkVec<void *>, chare_objs);
 CpvExtern(CkVec<int>, chare_types);
 CpvExtern(CkVec<VidBlock *>, vidblocks);
+CpvExtern(Vidblockmap, vmap); 
 #endif
 
 /*
@@ -867,6 +868,7 @@ void _initCharm(int unused_argc, char **argv)
         CpvInitialize(CkVec<void *>, chare_objs);
         CpvInitialize(CkVec<int>, chare_types);
         CpvInitialize(CkVec<VidBlock *>, vidblocks);
+        CpvInitialize(Vidblockmap, vmap);
 #endif
 
 	CksvInitialize(UInt, _numNodeGroups);
