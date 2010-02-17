@@ -22,7 +22,7 @@ queens_main::queens_main(queens_DMSG * dmsg)
 
   pMsg->nextRow = 0;
   pMsg->counterGroup = counterGroup;
-  CProxy_queens_queens::ckNew(pMsg);
+  CProxy_queens_queens::ckNew(pMsg, NULL, CK_PE_ANY);
 
   CkStartQD(CkIndex_queens_main::Quiescence1((CkQdMsg *)0), 
             &thishandle);
@@ -64,7 +64,7 @@ queens_queens::queens_queens(queens_PartialBoard *m)
 	for (i=0; i< NUMQUEENS; i++)
 	  newMsg->Queens[i] = m->Queens[i];
 	newMsg->Queens[row] = col;
-    	CProxy_queens_queens::ckNew(newMsg);  
+    	CProxy_queens_queens::ckNew(newMsg, NULL, CK_PE_ANY);
       }
   }
   delete m;
