@@ -94,7 +94,7 @@ DEPENDFILE = Make.depends
 include $(DEPENDFILE)
 
 clean:
-	rm -r -f conv-host pgm *.o *.decl.h *.def.h *.log *.sts *~ *.bak charmrun SunWS_cache
+	rm -r -f conv-host pgm pgm.exe pgm.pdb pgm.ilk *.o *.decl.h *.def.h *.log *.sts *~ *.bak charmrun SunWS_cache
 
 test: pgm
 	./charmrun ./pgm +p1 $(TESTOPTS)

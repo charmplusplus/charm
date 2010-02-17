@@ -11,7 +11,7 @@ hello.decl.h: hello.ci
 	$(CHARMC)  hello.ci
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o hello charmrun
+	rm -f *.decl.h *.def.h conv-host *.o hello charmrun charmrun.exe hello.exe hello.pdb hello.ilk
 
 hello.o: hello.C hello.decl.h
 	$(CHARMC) -c hello.C

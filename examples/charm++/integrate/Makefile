@@ -9,7 +9,7 @@ pgm.o : pgm.C pgm.h pgm.ci
 	$(CHARMC) -c pgm.ci pgm.C
 
 clean:
-	rm -f pgm *.o conv-host *.decl.h *.def.h *~ charmrun
+	rm -f pgm *.o conv-host *.decl.h *.def.h *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
 
 test: pgm
 	./charmrun ./pgm +p4 100 5 $(TESTOPTS)
