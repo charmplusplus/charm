@@ -4,7 +4,7 @@ CHARMINC=.
 SIMPLE_DIRS = cache sparseContiguousReducer tcharm ampi idxl \
               parmetis multiphaseSharedArrays fem ParFUM \
               ifem armci collide mblock barrier irecv netfem liveViz \
-              taskGraph search datatransfer 
+              taskGraph search datatransfer pose
 DIRS = $(SIMPLE_DIRS) pythonCCS
 
 .PHONY: $(DIRS)
