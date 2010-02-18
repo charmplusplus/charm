@@ -49,14 +49,16 @@ void check_test(int argc, char** argv) {
     exit(1);
   }
 
+  const int s = 1*1024*1024;
+  void *buf1 = CmiAlloc(s);
   CmiUInt8 mem_before = CmiMemoryUsage();
-  const int s = 1024*1024;
-  void *buf = CmiAlloc(s);
+  void *buf2 = CmiAlloc(s);
   CmiUInt8 mem_after = CmiMemoryUsage();
-  CmiFree(buf);
+  CmiFree(buf2);
+  CmiFree(buf1);
   CmiPrintf("CmiMemoryUsage() reported %fMB vs %fMB!\n", mem_before/1E6, mem_after/1E6);
   if (mem_after - mem_before < s) {
-    CmiPrintf("Error: CmiMemoryUsage() does not work!\n", mem_before, mem_after);
+    CmiPrintf("Error: CmiMemoryUsage() does not work %lld %lld!\n", mem_before, mem_after, mem_after - mem_before, s);
     exit(1);
   }
 
