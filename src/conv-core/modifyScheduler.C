@@ -14,8 +14,8 @@
 
 
 // Predeclarations:
-int CqsFindRemoveSpecificPrioq(prioq q, void *&msgPtr, const int *entryMethod, const int numEntryMethods );
-int CqsFindRemoveSpecificDeq(deq q, void *&msgPtr, const int *entryMethod, const int numEntryMethods );
+int CqsFindRemoveSpecificPrioq(_prioq q, void *&msgPtr, const int *entryMethod, const int numEntryMethods );
+int CqsFindRemoveSpecificDeq(_deq q, void *&msgPtr, const int *entryMethod, const int numEntryMethods );
 
 
 /** Search Queue for messages associated with a specified entry method */ 
@@ -81,7 +81,7 @@ void CqsIncreasePriorityForMemCriticalEntries(Queue q){
     @param [in] entryMethod An array of entry method ids that should be considered for removal
     @param [in] numEntryMethods The number of the values in the entryMethod array.
 */
-int CqsFindRemoveSpecificDeq(deq q, void *&msgPtr, const int *entryMethod, const int numEntryMethods ){
+int CqsFindRemoveSpecificDeq(_deq q, void *&msgPtr, const int *entryMethod, const int numEntryMethods ){
     void **iter = q->head; ///< An iterator used to iterate through the circular queue
 
     while(iter != q->tail){
@@ -124,12 +124,12 @@ int CqsFindRemoveSpecificDeq(deq q, void *&msgPtr, const int *entryMethod, const
     @param [in] entryMethod An array of entry method ids that should be considered for removal
     @param [in] numEntryMethods The number of the values in the entryMethod array.
 */
-int CqsFindRemoveSpecificPrioq(prioq q, void *&msgPtr, const int *entryMethod, const int numEntryMethods ){
+int CqsFindRemoveSpecificPrioq(_prioq q, void *&msgPtr, const int *entryMethod, const int numEntryMethods ){
 
     // A priority queue is a heap of circular queues
     for(int i = 1; i < q->heapnext; i++){
 	// For each of the circular queues:
-        prioqelt pe = (q->heap)[i];
+        _prioqelt pe = (q->heap)[i];
 	void **head; ///< An iterator used to iterate through a circular queue
 	void **tail; ///< The end of the circular queue
 	head = pe->data.head;
