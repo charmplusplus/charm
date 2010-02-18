@@ -48,6 +48,18 @@ void check_test(int argc, char** argv) {
     CmiPrintf("Error: sizeof(CmiFloat8) is %d!\n",sizeof(float8));
     exit(1);
   }
+
+  CmiUInt8 mem_before = CmiMemoryUsage();
+  const int s = 1024*1024;
+  void *buf = CmiAlloc(s);
+  CmiUInt8 mem_after = CmiMemoryUsage();
+  CmiFree(buf);
+  CmiPrintf("CmiMemoryUsage() reported %fMB vs %fMB!\n", mem_before/1E6, mem_after/1E6);
+  if (mem_after - mem_before < s) {
+    CmiPrintf("Error: CmiMemoryUsage() does not work!\n", mem_before, mem_after);
+    exit(1);
+  }
+
   CmiPrintf("All tests passed\n");
   CmiPrintf("Info: converse header: %d envelope: %d\n", CmiReservedHeaderSize, sizeof(envelope));
 }
