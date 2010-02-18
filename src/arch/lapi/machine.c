@@ -20,6 +20,61 @@ Chao Mei 01/28/2010
 
 #include "machine.h"
 
+/* Read the following carefully before building the machine layer on LAPI */
+/* =========BEGIN OF EXPLANATION OF MACRO USAGE=============*/
+/**
+ * 1. non-SMP mode: 
+ *   CMK_SMP = 0; 
+ *   CMK_PCQUEUE_LOCK = 1; (could be removed if memory fence and atomic ops are used) 
+ *  
+ *   (The following two could be disabled to reduce the overhead of machine layer) 
+ *     ENSURE_MSG_PAIRORDER = 0|1; 
+ *     ENABLE_CONVERSE_QD = 0|1; 
+ *  
+ *   (If ENSURE_MSG_PAIRORDER is 1, then setting DECOUPLE_BCAST_PROCESS to 1
+ *   will make the msg seqno increase at step of 1 w/o data race;
+ *     DECOUPLE_BCAST_PROCESS = 0|1;
+ * =========================================================== 
+ * 2. SMP mode without comm thd:
+ *    CMK_SMP = 1;
+ *    CMK_PCQUEUE_LOCK = 1;
+ *    CMK_SMP_NO_COMMTHD = 1;
+ *  
+ *    ENSURE_MSG_PAIRORDER and ENABLE_CONVERSE_QD have same options as in non-SMP mode;
+ *  
+ *    DECOUPLE_BCAST_PROCESS has same options as in non-SMP mode;
+ * =========================================================== 
+ *  3. SMP mode with comm thd:
+ *     CMK_SMP = 1;
+ *     CMK_PCQUEUE_LOCK = 1;
+ *     CMK_SMP_NO_COMMTHD = 0;
+ *  
+ *     ENSURE_MSG_PAIRORDER and ENABLE_CONVERSE_QD have same options as in non-SMP mode;
+ *  
+ *     (The following must be set with 1 as bcast msg is dealt with in comm thd!)
+ *     DECOUPLE_BCAST_PROCESS = 1;
+ *  ===========================================================
+ *  
+ *  Assumptions we made in different mode:
+ *  1. non-SMP:
+ *     a) imm msgs are processed when the proc is idle, and periodically. They should
+ *        never be processed in the LAPI thread;
+ *     b) forwarding msgs could be done on the proc or in the internal LAPI
+ *        completion handler threads;
+ *  2. SMP w/o comm thd:
+ *     a) same with non-SMP a)
+ *     b) forwarding bcast msgs could be done on proc whose rank=0;
+ *        (enable DECOUPLE_BCAST_PROCESS)  or in internal LAPI completion
+ *        handler threads;
+ *     c) the destination rank of proc-level bcast msg is always 0;
+ *  3. SMP w/ comm thd:
+ *     a) imm msgs are processed in comm thd;
+ *     b) forwarding bcast msgs is done in comm thd;
+ *     c) same with 2 c)
+ *  
+ */
+/* =========END OF EXPLANATION OF MACRO USAGE=============*/
+
 #if CMK_SMP
 #define CMK_PCQUEUE_LOCK 1
 #else
@@ -72,12 +127,23 @@ void CmiDestroyLock(CmiNodeLock lock){
  *  including "machine-smp.c".
  *  --Chao Mei
  */
-#define CMK_SMP_NO_COMMTHD 1
+#define CMK_SMP_NO_COMMTHD 0
 #if CMK_SMP_NO_COMMTHD
 int Cmi_commthread = 0;
+#else
+int Cmi_commthread = 1;
 #endif
 
 #endif
+
+/** 
+ *  Enable this macro will offload the broadcast relay from the
+ *  internal completion handler thread. This will make the msg
+ *  seqno free of data-race. In SMP mode with comm thread where
+ *  comm thread will forward bcast msgs, this macro should be
+ *  enabled.
+ */
+#define DECOUPLE_BCAST_PROCESS 1
 
 /** 
  * #####REGARDING IN-ORDER MESSAGE DELIVERY BETWEEN A PAIR OF 
@@ -101,65 +167,56 @@ int Cmi_commthread = 0;
  * --Chao Mei 
  */
 #define ENSURE_MSG_PAIRORDER 1
-#define MAX_MSG_SEQNO 65535
-#define MAX_WINDOW_SIZE 8
 
 #if ENSURE_MSG_PAIRORDER
-/* Variables used on recver side */
+
+#define MAX_MSG_SEQNO 65535
+/* MAX_WINDOW_SIZE should be smaller than MAX_MSG_SEQNO, and MAX(unsigned char) */
+#define MAX_WINDOW_SIZE 128
+int CUR_WINDOW_SIZE=8;
+
+/* The lock to ensure the completion handler (PumpMsgsComplete) is thread-safe */
+CmiNodeLock cmplHdlrThdLock = NULL;
+
 /** 
  *  expectedMsgSeqNo is an int array of size "#procs". It tracks
  *  the expected seqno recved from other procs to this proc.
- */
-CpvDeclare(int *, expectedMsgSeqNo);
-/** 
- * oosMsgBuffer is an array of sizeof(void **)*(#procs), each 
+ *  
+ *  nextMsgSeqNo is an int array of size "#procs". It tracks
+ *  the next seqno of the msg to be sent from this proc to other
+ *  procs.
+ *  
+ *  oooMsgBuffer is an array of sizeof(void **)*(#procs), each
  * element (created on demand) points to a window (array) size 
- * of MAX_WINDOW_SIZE which buffers the out-of-order incoming 
+ * of CUR_WINDOW_SIZE which buffers the out-of-order incoming 
  * messages (a (void *) array) 
- */   
-CpvDeclare(void ***, oooMsgBuffer);
-/** 
- * Indicates the maximum offset of the ooo msg ahead of the 
- * expected msg. The offset begins with 1, i.e., (offset-1) is 
- * the index of the ooo msg in the window (oooMsgBuffer)
- */
-CpvDeclare(unsigned char*, oooMaxOffset);
-
-
-/* Variables used on sender side */
-/** 
- *  nextMsgSeqNo is an int array of size "#procs". It tracks
- *  the next seqno of the msg to be sent from this proc to other
- *  procs.
- */
-CpvDeclare(int *, nextMsgSeqNo);
-
-
-/** 
- *  expectedMsgSeqNo is an int array of size "#procs". It tracks
- *  the expected seqno recved from other procs to this proc.
  *  
- *  nextMsgSeqNo is an int array of size "#procs". It tracks
- *  the next seqno of the msg to be sent from this proc to other
- *  procs.
+ * oooMaxOffset indicates the maximum offset of the ooo msg 
+ * ahead of the expected msg. The offset begins with 1, i.e., 
+ * (offset-1) is the index of the ooo msg in the window 
+ * (oooMsgBuffer) 
  *  
- *  Those two arrays also have corresponding locks to ensure the
- *  atomicity increase of seq no. As the seq no could possible
- *  be increased by multiple threads (the normal lapi execution
- *  thread, and the lapi thread that handles msg completion
- *  handler) --Chao Mei
+ *  --Chao Mei
  */
-/*
+
 typedef struct MsgOrderInfoStruct{
-    int *expectedMsgSeqNo;
-    CmiNodeLock *expectedLocks;
-
+    /* vars used on sender side */
     int *nextMsgSeqNo;
-    CmiNodeLock *nextLocks;
+
+    /* vars used on recv side */
+    int *expectedMsgSeqNo;        
+    void ***oooMsgBuffer;
+    unsigned char *oooMaxOffset;
 }MsgOrderInfo;
 
-CpvDeclare(MsgOrderInfo, msgSeqInfo);
-*/
+/** 
+ *  broadcast msgs and p2p msgs uses different tracks of seq no
+ *  as is the case with "net" layers.
+ */
+CpvDeclare(MsgOrderInfo, p2pMsgSeqInfo);
+CpvDeclare(MsgOrderInfo, bcastMsgSeqInfo);
+
+
 #endif
 
 /*
@@ -203,8 +260,8 @@ CpvDeclare(MsgOrderInfo, msgSeqInfo);
 #define CMI_MSG_SEQNO(msg)               ((CmiMsgHeaderBasic *)msg)->seqno
 
 CpvDeclare(unsigned , networkProgressCount);
+int networkProgressPeriod = 1000;
 
-int networkProgressPeriod;
 static int lapiDebugMode=0;
 CsvDeclare(int, lapiInterruptMode);
 
@@ -212,6 +269,8 @@ static void ConverseRunPE(int everReturn);
 static void PerrorExit(const char *msg);
 
 static int Cmi_nodestart;   /* First processor in this node - stupid need due to machine-smp.h that uses it!!  */
+
+static volatile int commThdExit = 0;
 
 #include "machine-smp.c"
 
@@ -268,6 +327,13 @@ int CmiRankOf(int pe)      {
 #endif
 
 CpvDeclare(void*, CmiLocalQueue);
+
+#if DECOUPLE_BCAST_PROCESS
+CpvDeclare(PCQueue, procBcastQ);
+#if CMK_NODE_QUEUE_AVAILABLE
+CsvDeclare(PCQueue, nodeBcastQ);
+#endif
+#endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
 #define DGRAM_NODEMESSAGE   (0x7EFB)
@@ -350,16 +416,6 @@ char *CopyMsg(char *msg, int len) {
     memcpy(copy, msg, len);
     return copy;
 }
-
-/* I don't think it is required here for guarding the recv queue on each proc -Chao Mei */
-#if 0
-/* If ProcState is that simple, then we don't need a struct for it --Chao Mei*/
-typedef struct ProcState {
-    CmiNodeLock  recvLock;		    /* for cs->recv */
-} ProcState;
-static ProcState  *procState;
-#endif
- 
  
 #if CMK_NODE_QUEUE_AVAILABLE
 CsvDeclare(CmiNodeState, NodeState);
@@ -369,9 +425,16 @@ CsvDeclare(CmiNodeState, NodeState);
 #include "immediate.c"
 #endif
 
+/** 
+ *  This function will be never called in the comm thd!
+ *  It is only used in the non-SMP mode, or in SMP mode w/o comm
+ *  thd! --Chao Mei
+ */
 static void AdvanceCommunication(){
+#if !CMK_SMP || CMK_SMP_NO_COMMTHD
+
     if(!CsvAccess(lapiInterruptMode)) check_lapi(LAPI_Probe,(lapiContext));
-#if CMK_SMP && CMK_IMMEDIATE_MSG
+#if CMK_IMMEDIATE_MSG
     /** 
      * Immediate msgs are handled in CmiPushNode and 
      * CmiSendNodeSelf, CmiPushPe and CmiSendSelf in the non-SMP 
@@ -382,11 +445,20 @@ static void AdvanceCommunication(){
      * when proc is idle. This may cause a big delay for processing 
      * immdiate messages in SMP mode if there's not a dedicated 
      * communication thread. 
-     * --Chao Mei 
+     *  
+     * Even in non-SMP, inside imm msg handlers, array proxy 
+     * messages could be sent. If handled in LAPI internal 
+     * completion thread, it will cause data-racing problems for 
+     * data structures that maintain charm array info. So it needs 
+     * to be handled in the context of a proc. 
+     *  
+     * -Chao Mei 
      */
     MACHSTATE1(2, "[%p] Handling Immediate Message begin{",CmiGetState());
     CmiHandleImmediate();
     MACHSTATE1(2, "[%p] Handling Immediate Message end}",CmiGetState());
+#endif
+
 #endif
 }
 
@@ -395,8 +467,6 @@ static void AdvanceCommunication(){
 /* To conform with the call made in SMP mode */
 static void CmiStartThreads(char **argv) {
     CmiStateInit(Cmi_nodestart, 0, &Cmi_state);
-    /* _Cmi_mype = Cmi_nodestart; // already set! */
-    _Cmi_myrank = 0;
 }
 #endif
 
@@ -412,14 +482,12 @@ static void CmiStartThreads(char **argv) {
  */
 static int getNextMsgSeqNo(int *seqNoArr, int destPe){
     int ret = seqNoArr[destPe];
-    if(ret == MAX_MSG_SEQNO) 
-        ret = 0;
-    else
-        ret++;
-
+    ret++;
     return ret;
 }
 static void setNextMsgSeqNo(int *seqNoArr, int destPe, int val){
+    /* the seq no. may fast-forward to a new round (i.e., starting from 1 again!) */
+    if(val>=MAX_MSG_SEQNO) val -= MAX_MSG_SEQNO;
     seqNoArr[destPe] = val;
 }
 
@@ -441,9 +509,6 @@ void CmiPushPE(int pe,void *msg) {
         CMI_DEST_RANK(msg) = pe;
         CmiPushImmediateMsg(msg);
         MACHSTATE1(3, "[%p] Push Immediate Message end }",CmiGetState());
-        #if !CMK_SMP
-        CmiHandleImmediate();        
-        #endif
         return;
     }
 #endif
@@ -467,9 +532,6 @@ static void CmiPushNode(void *msg) {
         CMI_DEST_RANK(msg) = 0;
         CmiPushImmediateMsg(msg);
         MACHSTATE1(3, "[%p] Push Immediate Message end }",CmiGetState());
-        #if !CMK_SMP
-        CmiHandleImmediate();
-        #endif
         return;
     }
 #endif
@@ -487,14 +549,14 @@ static void CmiPushNode(void *msg) {
 
 /* ======Beginning of helper functions for processing an incoming (network) message ======*/
 /* Process a proc-level broadcast message */
-static void ProcessBroadcastMsg(char *msg){
+static void ProcessProcBroadcastMsg(char *msg){
     int nbytes = CMI_MSG_SIZE(msg);    
 #if ENSURE_MSG_PAIRORDER
     MACHSTATE3(2,"[%p] the broadcast msg is from pe=%d with seq no=%d", CmiGetState(), CMI_MSG_SRCPE(msg), CMI_MSG_SEQNO(msg));
-    #if CMK_BROADCAST_SPANNING_TREE
-    SendSpanningChildren(nbytes, msg, CmiNodeFirst(CmiMyNode()), CpvAccessOther(nextMsgSeqNo, 0));
-    #elif CMK_BROADCAST_HYPERCUBE
-    SendHypercube(nbytes, msg, CmiNodeFirst(CmiMyNode()), CpvAccessOther(nextMsgSeqNo, 0));
+    #if CMK_BROADCAST_SPANNING_TREE    
+    SendSpanningChildren(nbytes, msg, CmiNodeFirst(CmiMyNode()), CpvAccessOther(bcastMsgSeqInfo, 0).nextMsgSeqNo);
+    #elif CMK_BROADCAST_HYPERCUBE    
+    SendHypercube(nbytes, msg, CmiNodeFirst(CmiMyNode()), CpvAccessOther(bcastMsgSeqInfo, 0).nextMsgSeqNo);
     #endif
 #else
     #if CMK_BROADCAST_SPANNING_TREE
@@ -512,15 +574,49 @@ static void ProcessBroadcastMsg(char *msg){
 #endif
 }
 
+#if CMK_NODE_QUEUE_AVAILABLE
+/* Process a node-level broadcast message */
+static void ProcessNodeBroadcastMsg(char *msg){
+    int nbytes = CMI_MSG_SIZE(msg);
+#if CMK_BROADCAST_SPANNING_TREE
+    SendSpanningChildrenNode(nbytes, msg);
+#elif CMK_BROADCAST_HYPERCUBE
+    SendHypercubeNode(nbytes, msg);
+#endif            
+    CmiPushNode(msg);
+}
+#endif
+
+/* Pull msgs from two queues, this function should not be called from cmpl_hdlr thread */
+static void ProcessBroadcastMsg(int pullRank){
+    char *msg;
+    do{
+        msg = PCQueuePop(CpvAccessOther(procBcastQ, pullRank));
+        if(msg) {
+            MACHSTATE2(4, "[%p]: process a proc-level bcast msg %p begin{", CmiGetState(), msg);
+            ProcessProcBroadcastMsg(msg);
+            MACHSTATE2(4, "[%p]: process a proc-level bcast msg %p end}", CmiGetState(), msg);
+        }else{ 
+            break;
+        }
+    }while (1);
+#if CMK_NODE_QUEUE_AVAILABLE
+    do{
+        msg = PCQueuePop(CsvAccess(nodeBcastQ));
+        if(msg) {
+            MACHSTATE2(4, "[%p]: process a node-level bcast msg %p begin{", CmiGetState(), msg);
+            ProcessNodeBroadcastMsg(msg);
+            MACHSTATE2(4, "[%p]: process a node-level bcast msg %p end}", CmiGetState(), msg);
+        }else{ 
+            break;
+        }
+    }while (1);    
+#endif
+}
+
+
 #if ENSURE_MSG_PAIRORDER
 /* return 1 if this msg is an out-of-order incoming message */
-
-/** 
- * !!!! 
- * TODO: data race for seqno is possible here if forwarding 
- * broadcast msgs is performed in completion handler  
- * --Chao Mei
- */
 
 /**
  * Returns 1 if this "msg" is an out-of-order message, or 
@@ -528,47 +624,42 @@ static void ProcessBroadcastMsg(char *msg){
  * of all buffered ooo msgs. 
  * --Chao Mei 
  */
-static int CheckMsgInOrder(char *msg){
+static int CheckMsgInOrder(char *msg, MsgOrderInfo *info){
     int srcpe, destrank; 
     int incomingSeqNo, expectedSeqNo;
     int curOffset, maxOffset;
     int i;
-    void **destMsgBuffer = NULL;    
+    void **destMsgBuffer = NULL;
 
-    /* Only checks the proc-level messages */
-    if(CMI_BROADCAST_ROOT(msg)<0) return 0;
-#if CMK_NODE_QUEUE_AVAILABLE
-    if(CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE) return 0;
-#endif
+    /* numMsg is the number of msgs to be processed in this buffer*/
+    /* Reason to have this extra copy of msgs to be processed: Reduce the atomic granularity */
+    void **toProcessMsgBuffer;
+    int numMsgs = 0;    
  
     srcpe = CMI_MSG_SRCPE(msg);
     destrank = CMI_DEST_RANK(msg);  
     incomingSeqNo = CMI_MSG_SEQNO(msg);
-    expectedSeqNo = getNextExpectedMsgSeqNo(CpvAccessOther(expectedMsgSeqNo, destrank), srcpe);
+    
+    CmiLock(cmplHdlrThdLock);
+
+    expectedSeqNo = getNextExpectedMsgSeqNo(info->expectedMsgSeqNo, srcpe);
     if(expectedSeqNo == incomingSeqNo){
         /* Two cases: has ooo msg buffered or not */
-        maxOffset = CpvAccessOther(oooMaxOffset, destrank)[srcpe];
+        maxOffset = (info->oooMaxOffset)[srcpe];
         if(maxOffset>0) {
             MACHSTATE1(4, "Processing all buffered ooo msgs (maxOffset=%d) including the just recved begin {", maxOffset);
+            toProcessMsgBuffer = malloc((CUR_WINDOW_SIZE+1)*sizeof(void *));
             /* process the msg just recved */
-            if(CMI_BROADCAST_ROOT(msg)>0) {
-                ProcessBroadcastMsg(msg);
-            }else{
-                CmiPushPE(CMI_DEST_RANK(msg), msg);
-            }
+            toProcessMsgBuffer[numMsgs++] = msg;            
             /* process the buffered ooo msg until the first empty slot in the window */
-            destMsgBuffer = CpvAccessOther(oooMsgBuffer, destrank)[srcpe];                       
+            destMsgBuffer = (info->oooMsgBuffer)[srcpe];                       
             for(curOffset=0; curOffset<maxOffset; curOffset++) {
                 char *curMsg = destMsgBuffer[curOffset];
                 if(curMsg == NULL){
-                    assert(curOffset!=(maxOffset-1));                                        
+                    CmiAssert(curOffset!=(maxOffset-1));                                        
                     break;
                 }
-                if(CMI_BROADCAST_ROOT(curMsg)>0) {
-                    ProcessBroadcastMsg(curMsg);
-                }else{
-                    CmiPushPE(CMI_DEST_RANK(curMsg), curMsg);
-                }
+                toProcessMsgBuffer[numMsgs++] = curMsg;
                 destMsgBuffer[curOffset] = NULL;
             }            
             /* Update expected seqno, maxOffset and slide the window */
@@ -592,13 +683,34 @@ static int CheckMsgInOrder(char *msg){
                 for(i=maxOffset-curOffset-1; i<maxOffset; i++) {
                     destMsgBuffer[i] = NULL;
                 }
-                CpvAccessOther(oooMaxOffset, destrank)[srcpe] = maxOffset-curOffset-1;
-                setNextExpectedMsgSeqNo(CpvAccessOther(expectedMsgSeqNo, destrank), srcpe, expectedSeqNo+curOffset);
+                (info->oooMaxOffset)[srcpe] = maxOffset-curOffset-1;
+                setNextExpectedMsgSeqNo(info->expectedMsgSeqNo, srcpe, expectedSeqNo+curOffset);
             }else{
                 /* there's no remaining buffered ooo msgs */
-                CpvAccessOther(oooMaxOffset, destrank)[srcpe] = 0;
-                setNextExpectedMsgSeqNo(CpvAccessOther(expectedMsgSeqNo, destrank), srcpe, expectedSeqNo+maxOffset);
+                (info->oooMaxOffset)[srcpe] = 0;
+                setNextExpectedMsgSeqNo(info->expectedMsgSeqNo, srcpe, expectedSeqNo+maxOffset);
             }
+
+            CmiUnlock(cmplHdlrThdLock);
+                        
+            /* Process the msgs */
+            for(i=0; i<numMsgs; i++){
+                char *curMsg = toProcessMsgBuffer[i];                
+                if(CMI_BROADCAST_ROOT(curMsg)>0) {
+                                        
+                #if DECOUPLE_BCAST_PROCESS
+                    PCQueuePush(CpvAccessOther(procBcastQ, 0), curMsg);
+                #else
+                    ProcessProcBroadcastMsg(curMsg);
+                #endif
+
+                }else{
+                    CmiPushPE(CMI_DEST_RANK(curMsg), curMsg);
+                }
+            }
+
+            free(toProcessMsgBuffer);
+
             MACHSTATE1(4, "Processing all buffered ooo msgs (actually processed %d) end }", curOffset);
             /** 
              * Since we have processed all buffered ooo msgs including 
@@ -608,25 +720,46 @@ static int CheckMsgInOrder(char *msg){
             return 1;
         }else{
             /* An expected msg recved without any ooo msg buffered */
-            setNextExpectedMsgSeqNo(CpvAccessOther(expectedMsgSeqNo, destrank), srcpe, expectedSeqNo);
+            MACHSTATE1(4, "Receiving an expected msg with seqno=%d\n", incomingSeqNo);
+            setNextExpectedMsgSeqNo(info->expectedMsgSeqNo, srcpe, expectedSeqNo);
+
+            CmiUnlock(cmplHdlrThdLock);
             return 0;
         }        
     }
 
     MACHSTATE2(4, "Receiving an out-of-order msg with seqno=%d, but expect seqno=%d\n", incomingSeqNo, expectedSeqNo);
-    if(CpvAccessOther(oooMsgBuffer, destrank)[srcpe]==NULL) {
-        CpvAccessOther(oooMsgBuffer, destrank)[srcpe] = malloc(MAX_WINDOW_SIZE*sizeof(void *));
-        memset(CpvAccessOther(oooMsgBuffer, destrank)[srcpe], 0, MAX_WINDOW_SIZE*sizeof(void *));
+    if((info->oooMsgBuffer)[srcpe]==NULL) {
+        (info->oooMsgBuffer)[srcpe] = malloc(CUR_WINDOW_SIZE*sizeof(void *));
+        memset((info->oooMsgBuffer)[srcpe], 0, CUR_WINDOW_SIZE*sizeof(void *));
     }
-    destMsgBuffer = CpvAccessOther(oooMsgBuffer, destrank)[srcpe];
+    destMsgBuffer = (info->oooMsgBuffer)[srcpe];
     curOffset = incomingSeqNo - expectedSeqNo;
-    maxOffset = CpvAccessOther(oooMaxOffset, destrank)[srcpe];
-    assert(curOffset>0 && curOffset<=MAX_WINDOW_SIZE);
-    assert(destMsgBuffer[curOffset-1] == NULL);
+    maxOffset = (info->oooMaxOffset)[srcpe];
+    if(curOffset<0) {
+        /* It's possible that the seqNo starts with another round (exceeding MAX_MSG_SEQNO) with 1 */
+        curOffset += MAX_MSG_SEQNO;
+    }
+    if(curOffset > CUR_WINDOW_SIZE) {
+        if(curOffset > MAX_WINDOW_SIZE) {
+            CmiAbort("Exceeding the MAX_WINDOW_SIZE!\n");
+        }
+        CmiPrintf("[%d]: WARNING: DOUBLING WINDOW SIZE TO %d\n", CmiMyPe(), CUR_WINDOW_SIZE*2);
+        (info->oooMsgBuffer)[srcpe] = malloc(CUR_WINDOW_SIZE*2*sizeof(void *));
+        memset((info->oooMsgBuffer)[srcpe], 0, CUR_WINDOW_SIZE*2*sizeof(void *));
+        memcpy((info->oooMsgBuffer)[srcpe], destMsgBuffer, CUR_WINDOW_SIZE*sizeof(void *));
+        CUR_WINDOW_SIZE *= 2;
+        free(destMsgBuffer);
+        destMsgBuffer = (info->oooMsgBuffer)[srcpe];
+    }    
+    CmiAssert(destMsgBuffer[curOffset-1] == NULL);
     destMsgBuffer[curOffset-1] = msg;
-    if(curOffset > maxOffset) CpvAccessOther(oooMaxOffset, destrank)[srcpe] = curOffset;
+    if(curOffset > maxOffset) (info->oooMaxOffset)[srcpe] = curOffset;
+
+    CmiUnlock(cmplHdlrThdLock);
     return 1;
 }
+
 #endif
 /* ======End of helper functions for processing an incoming (network) message ======*/
 
@@ -660,11 +793,12 @@ static int CheckMsgInOrder(char *msg){
 static void PumpMsgsComplete(lapi_handle_t *myLapiContext, void *am_info) {
     int i;
     char *msg = am_info;
+    int broot, destrank;
 
-    int nbytes = CMI_MSG_SIZE(msg);
-
-    MACHSTATE3(2,"[%p] PumpMsgsComplete with msg %p (isImm=%d) begin {",CmiGetState(), msg, CmiIsImmediate(msg));
-
+    MACHSTATE3(2,"[%p] PumpMsgsComplete with msg %p (isImm=%d) begin {",CmiGetState(), msg, CmiIsImmediate(msg));    
+#if ENSURE_MSG_PAIRORDER
+    MACHSTATE3(2,"msg %p info: srcpe=%d, seqno=%d", msg, CMI_MSG_SRCPE(msg), CMI_MSG_SEQNO(msg));
+#endif
     /**
      * First, we check if the msg is a broadcast msg via spanning 
      * tree. If it is, it needs to call SendSpanningChildren to 
@@ -686,15 +820,36 @@ static void PumpMsgsComplete(lapi_handle_t *myLapiContext, void *am_info) {
      *  
      * --Chao Mei 
      */
-#if ENSURE_MSG_PAIRORDER
-    /* Check whether the incoming message is in-order and buffer if necessary */
-    if(CheckMsgInOrder(msg)) return;    
+#if ENSURE_MSG_PAIRORDER 
+    broot = CMI_BROADCAST_ROOT(msg);
+    destrank = CMI_DEST_RANK(msg);
+    /* Only check proc-level msgs */
+    if (broot>=0 && destrank != DGRAM_NODEMESSAGE){
+        MsgOrderInfo *info;        
+        if(broot>0){
+            info = &CpvAccessOther(bcastMsgSeqInfo, destrank);
+            MACHSTATE1(2, "Check msg in-order for bcast msg %p", msg);
+        } else {
+            info = &CpvAccessOther(p2pMsgSeqInfo, destrank);
+            MACHSTATE1(2, "Check msg in-order for p2p msg %p", msg);
+        }
+        if(CheckMsgInOrder(msg,info)) {
+            MACHSTATE(2,"} PumpMsgsComplete end ");
+            return;
+        }
+    }
 #endif    
 
 #if CMK_BROADCAST_SPANNING_TREE || CMK_BROADCAST_HYPERCUBE
     if (CMI_BROADCAST_ROOT(msg)>0) {
-        MACHSTATE1(2,"[%p] Recved a proc-level broadcast msg",CmiGetState());     
-        ProcessBroadcastMsg(msg);
+        MACHSTATE2(2,"[%p] Recved a proc-level broadcast msg %p",CmiGetState(), msg);     
+                
+    #if DECOUPLE_BCAST_PROCESS
+        PCQueuePush(CpvAccessOther(procBcastQ, 0), msg);
+    #else
+        ProcessProcBroadcastMsg(msg);
+    #endif
+
         MACHSTATE(2,"} PumpMsgsComplete end ");
         return;
     }
@@ -702,12 +857,13 @@ static void PumpMsgsComplete(lapi_handle_t *myLapiContext, void *am_info) {
 #if CMK_NODE_QUEUE_AVAILABLE
     if(CMI_BROADCAST_ROOT(msg) < 0) {
         MACHSTATE1(2,"[%p] Recved a node-level broadcast msg",CmiGetState());  
-        #if CMK_BROADCAST_SPANNING_TREE
-        SendSpanningChildrenNode(nbytes, msg);
-        #elif CMK_BROADCAST_HYPERCUBE
-        SendHypercubeNode(nbytes, msg);
-        #endif            
-        CmiPushNode(msg);
+        
+    #if DECOUPLE_BCAST_PROCESS
+        PCQueuePush(CsvAccess(nodeBcastQ), msg);
+    #else
+        ProcessNodeBroadcastMsg(msg);
+    #endif
+
         MACHSTATE(2,"} PumpMsgsComplete end ");
         return;
     }
@@ -770,13 +926,6 @@ static void DeliveredMsg(lapi_handle_t *myLapiContext, void *msg, lapi_sh_info_t
 /* ======End of lapi callbacks such as the completion handler on the sender and recver side ======*/
 
 
-/**
- * TODO!!! CommunicationServer/CommunicationServerThread missing
- * for smp Should refer to the BG/P smp layer for 
- * commserver/commserverthd 
- * --Chao Mei
- */
-
 #if CMK_NODE_QUEUE_AVAILABLE
 char *CmiGetNonLocalNodeQ(void) {
     CmiState cs = CmiGetState();
@@ -796,7 +945,16 @@ char *CmiGetNonLocalNodeQ(void) {
 void *CmiGetNonLocal(void) {    
     CmiState cs = CmiGetState();
     MACHSTATE2(3, "[%p] CmiGetNonLocal begin %d{", cs, CmiMyPe());
-    CmiIdleLock_checkMessage(&cs->idle);    
+    CmiIdleLock_checkMessage(&cs->idle); 
+       
+#if DECOUPLE_BCAST_PROCESS
+#if !CMK_SMP
+    ProcessBroadcastMsg(0);
+#elif CMK_SMP_NO_COMMTHD
+    if(CmiMyRank()==0) ProcessBroadcastMsg(0);
+#endif
+#endif
+           
     void *msg = PCQueuePop(cs->recv);
     MACHSTATE3(3,"[%p] CmiGetNonLocal from queue %p with msg %p end }",CmiGetState(),(cs->recv), msg);    
     return msg;
@@ -812,24 +970,19 @@ void *CmiGetNonLocal(void) {
    messages (lapi does all the polling) every thread is authorized to process
    immediate messages. If we are not in lapiInterruptMode check for progress.
 */
-#if CMK_IMMEDIATE_MSG
-void CmiMachineProgressImpl() {
-    /**
-     * I don't understand why imm msgs need to be processed inside 
-     * machine progress implementation.?????? --Chao Mei 
-     */
-    MACHSTATE1(2,"[%p] Probing Immediate Messages",CmiGetState());
-    if (!CsvAccess(lapiInterruptMode)) check_lapi(LAPI_Probe,(lapiContext));
-
-    MACHSTATE1(2, "[%p] Handling Immediate Message begin{",CmiGetState());
-    CmiHandleImmediate();
-    MACHSTATE1(2, "[%p] Handling Immediate Message end }",CmiGetState());
-}
-#else
 void CmiMachineProgressImpl(){
     if (!CsvAccess(lapiInterruptMode)) check_lapi(LAPI_Probe,(lapiContext));
-}
+
+#if CMK_IMMEDIATE_MSG
+    MACHSTATE1(2, "[%p] Handling Immediate Message begin {",CmiGetState());
+    CmiHandleImmediate();
+    MACHSTATE1(2, "[%p] Handling Immediate Message end }",CmiGetState());
 #endif
+
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD && DECOUPLE_BCAST_PROCESS
+    if(CmiMyRank()==CmiMyNodeSize()) ProcessBroadcastMsg(0);
+#endif
+}
 
 /*TODO: does lapi provide any Barrrier related functions as DCMF provides??? --Chao Mei */
 /* Barrier needs to be implemented!!! -Chao Mei */
@@ -921,10 +1074,6 @@ static void CmiSendSelf(char *msg) {
         MACHSTATE1(3, "[%p] Push Immediate Message begin {",CmiGetState());        
         CmiPushImmediateMsg(msg);
         MACHSTATE1(3, "[%p] Push Immediate Message end }",CmiGetState());        
-        #if !CMK_SMP
-        /* Immdiate msgs have to be handled differently in SMP. See more in AdvanceCommunication() */
-        CmiHandleImmediate();
-        #endif
         return;
     }
 #endif
@@ -946,9 +1095,9 @@ void CmiSyncSendFn(int destPE, int size, char *msg) {
         CmiSendSelf(dupmsg);
     } else {
     #if ENSURE_MSG_PAIRORDER
-        CMI_MSG_SRCPE(dupmsg) = CmiMyPe();
-        CMI_MSG_SEQNO(dupmsg) = getNextMsgSeqNo(CpvAccess(nextMsgSeqNo), destPE);
-        setNextMsgSeqNo(CpvAccess(nextMsgSeqNo), destPE, CMI_MSG_SEQNO(dupmsg));
+        CMI_MSG_SRCPE(dupmsg) = CmiMyPe();        
+        CMI_MSG_SEQNO(dupmsg) = getNextMsgSeqNo(CpvAccess(p2pMsgSeqInfo).nextMsgSeqNo, destPE);
+        setNextMsgSeqNo(CpvAccess(p2pMsgSeqInfo).nextMsgSeqNo, destPE, CMI_MSG_SEQNO(dupmsg));
     #endif
 
     #if ENABLE_CONVERSE_QD
@@ -990,9 +1139,9 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg) {
     *((int *)handle) = 1;
 
 #if ENSURE_MSG_PAIRORDER
-    CMI_MSG_SRCPE(msg) = CmiMyPe();
-    CMI_MSG_SEQNO(msg) = getNextMsgSeqNo(CpvAccess(nextMsgSeqNo), destPE);
-    setNextMsgSeqNo(CpvAccess(nextMsgSeqNo), destPE, CMI_MSG_SEQNO(msg));
+    CMI_MSG_SRCPE(msg) = CmiMyPe();    
+    CMI_MSG_SEQNO(msg) = getNextMsgSeqNo(CpvAccess(p2pMsgSeqInfo).nextMsgSeqNo, destPE);
+    setNextMsgSeqNo(CpvAccess(p2pMsgSeqInfo).nextMsgSeqNo, destPE, CMI_MSG_SEQNO(msg));
 #endif
 
 #if ENABLE_CONVERSE_QD
@@ -1016,9 +1165,9 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         CmiSendSelf(msg);
     } else {
     #if ENSURE_MSG_PAIRORDER
-        CMI_MSG_SRCPE(msg) = CmiMyPe();
-        CMI_MSG_SEQNO(msg) = getNextMsgSeqNo(CpvAccess(nextMsgSeqNo), destPE);
-        setNextMsgSeqNo(CpvAccess(nextMsgSeqNo), destPE, CMI_MSG_SEQNO(msg));
+        CMI_MSG_SRCPE(msg) = CmiMyPe();        
+        CMI_MSG_SEQNO(msg) = getNextMsgSeqNo(CpvAccess(p2pMsgSeqInfo).nextMsgSeqNo, destPE);
+        setNextMsgSeqNo(CpvAccess(p2pMsgSeqInfo).nextMsgSeqNo, destPE, CMI_MSG_SEQNO(msg));
     #endif
     #if ENABLE_CONVERSE_QD
         CQdCreate(CpvAccess(cQdState), 1);
@@ -1041,9 +1190,6 @@ static void CmiSendNodeSelf(char *msg) {
         CMI_DEST_RANK(msg) = 0;
         CmiPushImmediateMsg(msg);
         MACHSTATE(3, "} Push Immediate Message end");
-        #if !CMK_SMP
-        CmiHandleImmediate();
-        #endif     
         return;
     }
 #endif
@@ -1168,7 +1314,7 @@ void SendSpanningChildren(int size, char *msg) {
     int i, rp;
     char *dupmsg;
 
-    assert(startnode>=0 && startnode<CmiNumNodes());
+    CmiAssert(startnode>=0 && startnode<CmiNumNodes());
     
     MACHSTATE3(3, "[%p] SendSpanningChildren on proc=%d with start proc %d begin {",CmiGetState(), CmiMyPe(), startproc);  
     /* rp is the relative node id from start node */  
@@ -1231,7 +1377,7 @@ void SendHypercube(int size, char *msg) {
         destnode += startnode;
         destnode = destnode % CmiNumNodes();
 
-        assert(destnode != CmiMyNode());
+        CmiAssert(destnode != CmiMyNode());
                
 #if CMK_BROADCAST_USE_CMIREFERENCE
         CmiReference(msg);
@@ -1273,8 +1419,8 @@ void CmiSyncBroadcastGeneralFn(int size, char *msg) {    /* ALL_EXCEPT_ME  */
     CMI_MSG_SIZE(msg) = size;
     /* node-aware spanning tree, so bcast msg is always delivered to the first core on each node */
     CMI_DEST_RANK(msg) = 0;
-#if ENSURE_MSG_PAIRORDER
-    SendSpanningChildren(size, msg, CmiMyPe(), CpvAccess(nextMsgSeqNo));
+#if ENSURE_MSG_PAIRORDER    
+    SendSpanningChildren(size, msg, CmiMyPe(), CpvAccess(bcastMsgSeqInfo).nextMsgSeqNo);
 #else
     SendSpanningChildren(size, msg);
 #endif
@@ -1290,8 +1436,8 @@ void CmiSyncBroadcastGeneralFn(int size, char *msg) {    /* ALL_EXCEPT_ME  */
     CMI_MSG_SIZE(msg) = size;
     CMI_DEST_RANK(msg) = 0;    
 
-#if ENSURE_MSG_PAIRORDER
-    SendHypercube(size, msg, CmiMyPe(), CpvAccess(nextMsgSeqNo));
+#if ENSURE_MSG_PAIRORDER    
+    SendHypercube(size, msg, CmiMyPe(), CpvAccess(bcastMsgSeqInfo).nextMsgSeqNo);
 #else
     SendHypercube(size, msg);
 #endif
@@ -1324,17 +1470,17 @@ void CmiSyncBroadcastGeneralFn(int size, char *msg) {    /* ALL_EXCEPT_ME  */
     for (i=cs->pe+1; i<CmiNumPes(); i++) {
         dupmsg = CopyMsg(msg, size);
         CMI_DEST_RANK(dupmsg) = CmiRankOf(i);
-    #if ENSURE_MSG_PAIRORDER
-        CMI_MSG_SEQNO(dupmsg) = getNextMsgSeqNo(CpvAccess(nextMsgSeqNo), i);
-        setNextMsgSeqNo(CpvAccess(nextMsgSeqNo), i, CMI_MSG_SEQNO(dupmsg));
+    #if ENSURE_MSG_PAIRORDER        
+        CMI_MSG_SEQNO(dupmsg) = getNextMsgSeqNo(CpvAccess(p2pMsgSeqInfo).nextMsgSeqNo, i);
+        setNextMsgSeqNo(CpvAccess(p2pMsgSeqInfo).nextMsgSeqNo, i, CMI_MSG_SEQNO(dupmsg));
     #endif
         lapiSendFn(i, size, dupmsg, ReleaseMsg, dupmsg, 1);        
     }
     for (i=0; i<cs->pe; i++) {
         dupmsg = CopyMsg(msg, size);
-    #if ENSURE_MSG_PAIRORDER
-        CMI_MSG_SEQNO(dupmsg) = getNextMsgSeqNo(CpvAccess(nextMsgSeqNo), i);
-        setNextMsgSeqNo(CpvAccess(nextMsgSeqNo), i, CMI_MSG_SEQNO(dupmsg));
+    #if ENSURE_MSG_PAIRORDER        
+        CMI_MSG_SEQNO(dupmsg) = getNextMsgSeqNo(CpvAccess(p2pMsgSeqInfo).nextMsgSeqNo, i);
+        setNextMsgSeqNo(CpvAccess(p2pMsgSeqInfo).nextMsgSeqNo, i, CMI_MSG_SEQNO(dupmsg));
     #endif
         CMI_DEST_RANK(dupmsg) = CmiRankOf(i);
         lapiSendFn(i, size, dupmsg, ReleaseMsg, dupmsg, 1);        
@@ -1349,7 +1495,7 @@ CmiCommHandle CmiAsyncBroadcastGeneralFn(int size, char *msg) {
 #if ENSURE_MSG_PAIRORDER
     /* Not sure how to add the msg seq no for async broadcast messages --Chao Mei */
     /* so abort here ! */
-    assert(0);
+    CmiAssert(0);
     return 0;
 #else
     CmiState cs = CmiGetState();
@@ -1414,7 +1560,7 @@ void SendSpanningChildrenNode(int size, char *msg){
     char *dupmsg;
 
     MACHSTATE3(2, "[%p] SendSpanningChildrenNode on node %d with startnode %d", CmiGetState(), CmiMyNode(), startnode);
-    assert(startnode>=0 && startnode<CmiNumNodes());
+    CmiAssert(startnode>=0 && startnode<CmiNumNodes());
         
     rp = CmiMyNode() - startnode;
     if (rp<0) rp+=CmiNumNodes();        
@@ -1455,7 +1601,7 @@ void SendHypercubeNode(int size, char *msg) {
         destnode += startnode;
         destnode = destnode % CmiNumNodes();        
                         
-        assert(destnode != CmiMyNode());
+        CmiAssert(destnode != CmiMyNode());
 
 #if CMK_BROADCAST_USE_CMIREFERENCE
         CmiReference(msg);
@@ -1602,13 +1748,18 @@ void ConverseExit(void) {
     /* A barrier excluding the comm thread if present */
     CmiNodeBarrier();
 
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+    /* Signal the comm thd to exit now! */
+    if(CmiMyRank()==0) {
+        commThdExit = 1;
+    }
+#endif
+
     ConverseCommonExit();
 
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
     if (CmiMyPe() == 0) CmiPrintf("End of program\n");
 #endif
-
-    /* TODO: signal the comm thread to exit now!! -Chao Mei */
 
     CmiNodeBarrier();
 
@@ -1690,6 +1841,54 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
 CpvDeclare(FILE *, debugLog);
 #endif
 
+
+#if ENSURE_MSG_PAIRORDER
+static void initMsgOrderInfo(MsgOrderInfo *info){
+    info->nextMsgSeqNo = malloc(CmiNumPes()*sizeof(int));
+    memset(info->nextMsgSeqNo, 0, CmiNumPes()*sizeof(int));
+    
+    info->expectedMsgSeqNo = malloc(CmiNumPes()*sizeof(int));
+    memset(info->expectedMsgSeqNo, 0, CmiNumPes()*sizeof(int));
+    
+    info->oooMsgBuffer = malloc(CmiNumPes()*sizeof(void **));
+    memset(info->oooMsgBuffer, 0, CmiNumPes()*sizeof(void **));
+    
+    info->oooMaxOffset = malloc(CmiNumPes()*sizeof(unsigned char));
+    memset(info->oooMaxOffset, 0, CmiNumPes()*sizeof(unsigned char));
+}
+#endif
+
+/* Only called from communication thread in SMP mode */
+static void CommunicationServer(int sleepTime) {
+#if CMK_SMP_NO_COMMTHD
+    sleep(sleepTime);
+#else
+    
+    if(commThdExit) {
+        MACHSTATE2(2, "[%d-%p] comm server exit begin {",CmiMyPe(),CmiGetState());
+        ConverseCommonExit();        
+        MACHSTATE2(2, "[%d-%p] comm server exit end }",CmiMyPe(),CmiGetState());
+        pthread_exit(NULL);
+    }
+
+    if(!CsvAccess(lapiInterruptMode)) check_lapi(LAPI_Probe,(lapiContext));
+
+#if CMK_IMMEDIATE_MSG
+    /*MACHSTATE1(2, "[%p] Handling Immediate Message begin{",CmiGetState());*/
+    CmiHandleImmediate();
+    /*MACHSTATE1(2, "[%p] Handling Immediate Message end}",CmiGetState());*/
+#endif
+
+#if DECOUPLE_BCAST_PROCESS
+    /*MACHSTATE1(2, "[%p] Enter ProcessBroadcastMsg begin{",CmiGetState());*/
+    ProcessBroadcastMsg(0);
+    /*MACHSTATE1(2, "[%p] Enter ProcessBroadcastMsg end}",CmiGetState());*/
+#endif
+
+    /* sleep(sleepTime) */
+#endif
+}
+
 static void ConverseRunPE(int everReturn) {
     CmiIdleState *s;
     char** CmiMyArgv;
@@ -1697,33 +1896,15 @@ static void ConverseRunPE(int everReturn) {
     CpvInitialize(void *,CmiLocalQueue);
     CpvInitialize(unsigned, networkProgressCount);
 
+    CpvInitialize(PCQueue, procBcastQ);
+    CpvAccess(procBcastQ) = PCQueueCreate();
+
 #if ENSURE_MSG_PAIRORDER
-    CpvInitialize(int *, nextMsgSeqNo);
-    CpvAccess(nextMsgSeqNo) = malloc(CmiNumPes()*sizeof(int));
-    memset(CpvAccess(nextMsgSeqNo), 0, CmiNumPes()*sizeof(int));
-    CpvInitialize(int *, expectedMsgSeqNo);
-    CpvAccess(expectedMsgSeqNo) = malloc(CmiNumPes()*sizeof(int));
-    memset(CpvAccess(expectedMsgSeqNo), 0, CmiNumPes()*sizeof(int));
+    CpvInitialize(MsgOrderInfo, p2pMsgSeqInfo);
+    initMsgOrderInfo(&CpvAccess(p2pMsgSeqInfo));
 
-    CpvInitialize(void ***, oooMsgBuffer);
-    CpvAccess(oooMsgBuffer) = malloc(CmiNumPes()*sizeof(void **));
-    memset(CpvAccess(oooMsgBuffer), 0, CmiNumPes()*sizeof(void **));
-
-    CpvInitialize(unsigned char *, oooMaxOffset);
-    CpvAccess(oooMaxOffset) = malloc(CmiNumPes()*sizeof(unsigned char));
-    memset(CpvAccess(oooMaxOffset), 0, CmiNumPes()*sizeof(unsigned char));
-
-/*
-    CpvInitialize(MsgOrderInfo, msgSeqInfo);
-    CpvAccess(msgSeqInfo).expectedMsgSeqNo = malloc(CmiNumPes()*sizeof(int));
-    memset(CpvAccess(msgSeqInfo).expectedMsgSeqNo, 0, CmiNumPes()*sizeof(int));
-    CpvAccess(msgSeqInfo).nextMsgSeqNo = malloc(CmiNumPes()*sizeof(int));
-    memset(CpvAccess(msgSeqInfo).nextMsgSeqNo, 0, CmiNumPes()*sizeof(int));
-    for(i=0; i<CmiNumPes(); i++) {
-        CpvAccess(msgSeqInfo).
-    }
-*/
-
+    CpvInitialize(MsgOrderInfo, bcastMsgSeqInfo); 
+    initMsgOrderInfo(&CpvAccess(bcastMsgSeqInfo));    
 #endif
 
 #if MACHINE_DEBUG_LOG
@@ -1801,7 +1982,9 @@ static void ConverseRunPE(int everReturn) {
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
 #if !CMK_SMP || CMK_SMP_NO_COMMTHD
     /* If there's comm thread, then comm thd is responsible for advancing comm */
-    CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn)AdvanceCommunication, NULL);
+    if(!CsvAccess(lapiInterruptMode)) {
+        CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn)AdvanceCommunication, NULL);
+    }
 #endif
 #endif
 
@@ -1814,8 +1997,8 @@ static void ConverseRunPE(int everReturn) {
     /* communication thread */
     if (CmiMyRank() == CmiMyNodeSize()) {
         Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-        MACHSTATE2(3, "[%p]: Comm thread on node %d is going to be a communication server", CmiGetState(), CmiMyNode());    
-        while (1) sleep(1); /*CommunicationServerThread(5);*/
+        MACHSTATE2(3, "[%p]: Comm thread on node %d is going to be a communication server", CmiGetState(), CmiMyNode());            
+        while(1) CommunicationServer(5);        
     } else { /* worker thread */
         if (!everReturn) {
             Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
@@ -1830,6 +2013,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     int n,i;
 
     lapi_info_t info;
+
+#if ENSURE_MSG_PAIRORDER
+   cmplHdlrThdLock = CmiCreateLock();
+#endif
 
     /* processor per node */
     /** 
@@ -1847,26 +2034,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
     memset(&info,0,sizeof(info));
 
-
-/* instance_no has beed disabled, and no longer effective in LAPI --Chao Mei */
-#if 0 && CMK_SMP
-#if CMK_SMP_NO_COMMTHD    
-    info.instance_no = CmiMyNodeSize();
-#else
-    /*create the additional lapi context instance for the comm thread in SMP mode -Chao Mei*/
-    info.instance_no = CmiMyNodeSize()+1;
-#endif
-    if(info.instance_no > 16) {
-        if(CmiMyPe()==0) CmiPrintf("WARNING: Only a maximum of 16 LAPI instances in a LAPI task could be created!\n");
-        info.instance_no = 16;
-    }
-#endif
-    
     /* Register error handler (redundant?) -- added by Chao Mei*/
     info.err_hndlr = (LAPI_err_hndlr *)lapi_err_hndlr;
 
     /* Indicates the number of completion handler threads to create */
     /* The number of completion hndlr thds will affect the atomic PCQueue operations!! */
+    /* NOTE: num_compl_hndlr_thr is obsolete now! --Chao Mei */
     /* info.num_compl_hndlr_thr = 1; */
 
     check_lapi(LAPI_Init,(&lapiContext, &info));
@@ -1883,8 +2056,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     if(CmiGetArgFlag(argv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
     if(CmiGetArgFlag(argv,"+nopoll")) CsvAccess(lapiInterruptMode) = 1;    
 #else
-    /* To make the interrupt mode as default in the non-smp case -NOT QUITE STABLE YET!! */
-    CsvAccess(lapiInterruptMode) = 0;    
+    /* To make the interrupt mode as default in the non-smp case */
+    CsvAccess(lapiInterruptMode) = 1;    
     if(CmiGetArgFlag(argv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
     if(CmiGetArgFlag(argv,"+nopoll")) CsvAccess(lapiInterruptMode) = 1;  
 
@@ -1930,13 +2103,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #if CMK_NODE_QUEUE_AVAILABLE
     CsvInitialize(CmiNodeState, NodeState);
     CmiNodeStateInit(&CsvAccess(NodeState));
-#endif
 
-#if 0
-    procState = (ProcState *)malloc((CmiMyNodeSize()) * sizeof(ProcState));
-    for (i=0; i<CmiMyNodeSize(); i++) {
-        procState[i].recvLock = CmiCreateLock();
-    }
+    CsvInitialize(PCQueue, nodeBcastQ);
+    CsvAccess(nodeBcastQ) = PCQueueCreate();
 #endif
 
     CmiStartThreads(argv);
