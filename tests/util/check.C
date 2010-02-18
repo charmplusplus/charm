@@ -56,14 +56,14 @@ void check_test(int argc, char** argv) {
   CmiUInt8 mem_after = CmiMemoryUsage();
   CmiFree(buf2);
   CmiFree(buf1);
-  CmiPrintf("CmiMemoryUsage() reported %fMB vs %fMB!\n", mem_before/1E6, mem_after/1E6);
+  CmiPrintf("CmiMemoryUsage() reported %fMB (before) vs %fMB (after)!\n", mem_before/1E6, mem_after/1E6);
   if (mem_after - mem_before < s) {
-    CmiPrintf("Error: CmiMemoryUsage() does not work %lld %lld!\n", mem_before, mem_after, mem_after - mem_before, s);
-    exit(1);
+    CmiPrintf("Error: CmiMemoryUsage() does not work %lld %lld!\n", mem_before, mem_after);
+    CmiAbort("CmiMemoryUsage failed");
   }
 
-  CmiPrintf("All tests passed\n");
   CmiPrintf("Info: converse header: %d envelope: %d\n", CmiReservedHeaderSize, sizeof(envelope));
+  CmiPrintf("All tests passed\n");
 }
 
 int main(int argc, char **argv)
