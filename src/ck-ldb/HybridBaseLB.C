@@ -466,7 +466,8 @@ void HybridBaseLB::Loadbalancing(int atlevel)
       thisProxy.ReceiveMigration(migrateMsg, nclients, lData->children);
     else {
         // send in multicast tree
-      CkSendMsgBranchGroup(CkIndex_HybridBaseLB::ReceiveMigration(NULL),  migrateMsg, thisgroup, group1);
+      thisProxy.ReceiveMigration(migrateMsg, group1);
+      //CkSendMsgBranchGroup(CkIndex_HybridBaseLB::ReceiveMigration(NULL),  migrateMsg, thisgroup, group1);
     }
     // CkPrintf("[%d] ReceiveMigration takes %f \n", CkMyPe(), CkWallTimer()-strat_end_time);
   }
