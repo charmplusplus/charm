@@ -1712,7 +1712,7 @@ void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, int opt
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
   CmiLookupGroup(grp, &npes, &pes);
   _TRACE_CREATION_MULTICAST(env, npes, pes);
-  CldEnqueueGroup(grp, env, _infoIdx);
+  _CldEnqueueGroup(grp, env, _infoIdx);
   _TRACE_CREATION_DONE(1); 	// since it only creates one creation event.
   _STATS_RECORD_SEND_BRANCH_N(npes);
   CpvAccess(_qd)->create(npes);
