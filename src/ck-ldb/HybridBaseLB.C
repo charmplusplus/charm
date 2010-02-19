@@ -78,6 +78,21 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): BaseLB(opt)
   maxMem = 0.0;
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
+
+  group1_created = 0;
+#if ! CMK_BLUEGENE_CHARM
+    // create a multicast group to optimize level 1 multicast
+  if (tree->isroot(CkMyPe(), 1)) {
+    int npes = tree->numChildren(CkMyPe(), 1);
+    if (npes >= 128) {                          // only when the group is big
+      int *pes = new int[npes];
+      tree->getChildren(CkMyPe(), 1, pes, npes);
+      group1 = CmiEstablishGroup(npes, pes);
+      group1_created = 1;
+      delete [] pes;
+    }
+  }
+#endif
 #endif
 }
 
@@ -447,7 +462,12 @@ void HybridBaseLB::Loadbalancing(int atlevel)
 
     // send to children 
     //CmiPrintf("[%d] level: %d nclients:%d children: %d %d\n", CkMyPe(), atlevel, nclients, lData->children[0], lData->children[1]);
-    thisProxy.ReceiveMigration(migrateMsg, nclients, lData->children);
+    if (!group1_created)
+      thisProxy.ReceiveMigration(migrateMsg, nclients, lData->children);
+    else {
+        // send in multicast tree
+      CkSendMsgBranchGroup(CkIndex_HybridBaseLB::ReceiveMigration(NULL),  migrateMsg, thisgroup, group1);
+    }
     // CkPrintf("[%d] ReceiveMigration takes %f \n", CkMyPe(), CkWallTimer()-strat_end_time);
   }
 
@@ -459,10 +479,10 @@ void HybridBaseLB::Loadbalancing(int atlevel)
   }
 
   // inform new objects that are from outside group
-  if (atlevel < tree->numLevels()-1) 
+  if (atlevel < tree->numLevels()-1) {
     for (i=0; i<statsData->n_objs; i++) {
       CmiAssert(statsData->from_proc[i] != -1);   // ???
-      if (statsData->from_proc[i] == nclients)  {
+      if (statsData->from_proc[i] == nclients)  {    // from outside
         CmiAssert(statsData->to_proc[i] < nclients);
         int tope = lData->children[statsData->to_proc[i]];
         // comm data
@@ -471,6 +491,7 @@ void HybridBaseLB::Loadbalancing(int atlevel)
         thisProxy[tope].ObjMigrated(statsData->objData[i], comms.getVec(), comms.size(), atlevel-1);
       }
     }
+  }
 }
 
 LBMigrateMsg* HybridBaseLB::Strategy(LDStats* stats,int count)
@@ -491,6 +512,7 @@ LBMigrateMsg* HybridBaseLB::Strategy(LDStats* stats,int count)
 }
 
 // migrate only object LDStat in group
+// leaf nodes actually migrate objects
 void HybridBaseLB::ReceiveMigration(LBMigrateMsg *msg)
 {
 #if CMK_LBDB_ON
