@@ -43,6 +43,13 @@ inline void _CldEnqueueMulti(int npes, int *pes, void *msg, int infofn) {
   }
   CldEnqueueMulti(npes, pes, msg, infofn);
 }
+inline void _CldEnqueueGroup(CmiGroup grp, void *msg, int infofn) {
+  if (replaySystem) {
+    CmiFree(msg);
+    return;
+  }
+  CldEnqueueGroup(grp, msg, infofn);
+}
 inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
   if (replaySystem) {
     CmiFree(msg);
@@ -53,6 +60,7 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
 #else
 #define _CldEnqueue       CldEnqueue
 #define _CldEnqueueMulti  CldEnqueueMulti
+#define _CldEnqueueGroup  CldEnqueueGroup
 #define _CldNodeEnqueue   CldNodeEnqueue
 #endif
 
