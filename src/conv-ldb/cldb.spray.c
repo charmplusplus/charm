@@ -145,6 +145,7 @@ void CldHopHandler(char *msg)
 
 void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
 {
+  int npes, *pes;
   int len, queueing, priobits,i; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   peinfo *pinf = &(CpvAccess(peinf));
@@ -157,8 +158,6 @@ void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
   CmiSetInfo(msg,infofn);
   CmiSetXHandler(msg, CmiGetHandler(msg));
   CmiSetHandler(msg, pinf->EnqueueHandler);
-  int npes;
-  int *pes;
   CmiLookupGroup(grp, &npes, &pes);
   for(i=0;i<npes;i++) {
     CmiSyncSend(pes[i], len, msg);
