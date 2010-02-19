@@ -48,7 +48,7 @@ TODO:
 #include <signal.h>
 
 // pick buddy processor from a different physical node
-#define NODE_CHECKPOINT                        1
+#define NODE_CHECKPOINT                        0
 
 // assume NO extra processors--1
 // assume extra processors--0
@@ -106,8 +106,8 @@ inline int CkMemCheckPT::BuddyPE(int pe)
   }
 #else
   budpe = pe;
-  while (budpe == pe || isFailed(budPe)) 
-          budPe = (budPe+1)%CkNumPes();
+  while (budpe == pe || isFailed(budpe)) 
+          budpe = (budpe+1)%CkNumPes();
 #endif
   return budpe;
 }
