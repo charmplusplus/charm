@@ -56,7 +56,9 @@ private:
 public:
   ThreeLevelTree() {
     nLevels = 3;
-    span[0] = CkNumPes()/32;
+    // span[0] = CkNumPes()/32;
+    int groupsize = 512;
+    span[0] = groupsize;
     if (span[0] < 2) span[0] = CkNumPes()/16;
     if (span[0] < 2) span[0] = CkNumPes()/8;
     if (span[0] < 2) span[0] = CkNumPes()/4;
@@ -238,6 +240,8 @@ public:
 private:
   CProxy_HybridBaseLB  thisProxy;
   int              foundNeighbors;
+  CmiGroup            group1;              // level 1 multicast group
+  int                 group1_created;
 
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
