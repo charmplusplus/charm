@@ -3210,6 +3210,7 @@ void Entry::genGroupDecl(XStr& str)
     // entry method on multiple PEs declaration
     if(!container->isForElement() && !container->isForSection() && !isSync() && !isLocal() && !container->isNodeGroup()) {
       str << "    "<<retType<<" "<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(1)<<");\n";
+      str << "    "<<retType<<" "<<name<<"("<<paramComma(1,0)<<"CmiGroup &grp"<<eo(1)<<");\n";
     }
   }
 }
@@ -3313,6 +3314,10 @@ void Entry::genGroupDefs(XStr& str)
       str << ""<<makeDecl(retStr,1)<<"::"<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(0)<<") {\n";
       str << marshallMsg();
       str << "  CkSendMsg"<<node<<"BranchMulti("<<paramg<<", npes, pes"<<opts<<");\n";
+      str << "}\n";
+      str << ""<<makeDecl(retStr,1)<<"::"<<name<<"("<<paramComma(1,0)<<"CmiGroup &grp"<<eo(0)<<") {\n";
+      str << marshallMsg();
+      str << "  CkSendMsg"<<node<<"BranchGroup("<<paramg<<", grp"<<opts<<");\n";
       str << "}\n";
     }
   }
