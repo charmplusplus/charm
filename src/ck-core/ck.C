@@ -1700,6 +1700,25 @@ void CkSendMsgBranchMulti(int eIdx,void *msg,CkGroupID gID,int npes,int *pes, in
 }
 
 extern "C"
+void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, int opts)
+{
+  int npes;
+  int *pes;
+  if (opts & CK_MSG_IMMEDIATE) {
+    CmiAbort("CkSendMsgBranchGroup: immediate messages not supported!");
+    return;
+  }
+    // normal mesg
+  register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  CmiLookupGroup(grp, &npes, &pes);
+  _TRACE_CREATION_MULTICAST(env, npes, pes);
+  CldEnqueueGroup(grp, env, _infoIdx);
+  _TRACE_CREATION_DONE(1); 	// since it only creates one creation event.
+  _STATS_RECORD_SEND_BRANCH_N(npes);
+  CpvAccess(_qd)->create(npes);
+}
+
+extern "C"
 void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID, int opts)
 {
   _sendMsgBranch(eIdx, msg, gID, CLD_BROADCAST_ALL, opts);

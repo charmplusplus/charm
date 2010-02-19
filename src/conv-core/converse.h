@@ -1395,6 +1395,7 @@ char *CldGetStrategy(void);
 
 void CldEnqueue(int pe, void *msg, int infofn);
 void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn);
+void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn);
 void CldNodeEnqueue(int node, void *msg, int infofn);
 
 /****** CMM: THE MESSAGE MANAGER ******/
