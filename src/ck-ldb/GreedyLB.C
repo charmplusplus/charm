@@ -187,7 +187,6 @@ GreedyLB::BuildCpuArray(BaseLB::LDStats* stats,
 void GreedyLB::work(BaseLB::LDStats* stats, int count)
 {
   int  obj, heapSize, objCount;
-  int *pemap = new int [count];
   HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
   HeapData *objData = BuildObjectArray(stats, count, &objCount);
   if (_lb_args.debug()>1) 
