@@ -26,8 +26,8 @@ void groupmulti_main::groupReady() {
   if (count < 3) {
     CProxy_groupmulti_group groupproxy(gid);
     groupmulti_BCMsg *g_bcm = new groupmulti_BCMsg;
-//    groupproxy.doBroadcast(g_bcm); 
-      CkSendMsgBranchGroup(CkIndex_groupmulti_group::doBroadcast(NULL), g_bcm, gid, cgrp, 0);
+//      CkSendMsgBranchGroup(CkIndex_groupmulti_group::doBroadcast(NULL), g_bcm, gid, cgrp, 0);
+      groupproxy.doBroadcast(g_bcm, cgrp);
   } else {
       delete this;
       megatest_finish();
