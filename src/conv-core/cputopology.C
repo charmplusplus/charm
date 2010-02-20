@@ -237,7 +237,8 @@ static void cpuTopoHandler(void *m)
     CmiFree(msg);
   }
   else {
-    msg->nodeID = nodecount++;
+//    msg->nodeID = nodecount++;
+    msg->nodeID = pe;           // we will compact the node ID later
     rec = msg;
     CmmPut(hostTable, 1, &tag, msg);
   }
@@ -277,7 +278,7 @@ static void cpuTopoRecvHandler(void *msg)
     CmiFree(m);
   CmiUnlock(topoLock);
 
-  // if (CmiMyPe() == 0) cpuTopo.print();
+//  if (CmiMyPe() == 0) cpuTopo.print();
 }
 
 /******************  API implementation **********************/
