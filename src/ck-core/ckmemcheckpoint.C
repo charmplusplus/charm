@@ -117,6 +117,9 @@ inline int CkMemCheckPT::BuddyPE(int pe)
 #if CMK_MEM_CHECKPOINT
 void ArrayElement::init_checkpt() {
 	if (_memChkptOn == 0) return;
+	if (CkInRestarting()) {
+	  CkPrintf("[%d] Warning: init_checkpt called during restart, possible bug in migration constructor!\n");
+	}
 	// only master init checkpoint
         if (thisArray->getLocMgr()->firstManager->mgr!=thisArray) return;
 
@@ -461,7 +464,7 @@ void CkMemCheckPT::recvProcData(CkProcCheckPTMessage *msg)
 {
   if (CpvAccess(procChkptBuf)) delete CpvAccess(procChkptBuf);
   CpvAccess(procChkptBuf) = msg;
-//CmiPrintf("[%d] CkMemCheckPT::recvProcData report to %d\n", CkMyPe(), msg->reportPe);
+  DEBUGF("[%d] CkMemCheckPT::recvProcData report to %d\n", CkMyPe(), msg->reportPe);
   thisProxy[msg->reportPe].cpFinish();
 }
 
@@ -755,7 +758,7 @@ void CkMemCheckPT::recoverArrayElements()
     inmem_restore(msg);
     count ++;
   }
-//CkPrintf("[%d] recoverArrayElements restore %d objects\n", CkMyPe(), count);
+  DEBUGF("[%d] recoverArrayElements restore %d objects\n", CkMyPe(), count);
 
   if (CkMyPe() == 0)
     CkStartQD(CkCallback(CkIndex_CkMemCheckPT::finishUp(), thisProxy));
