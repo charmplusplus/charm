@@ -31,6 +31,7 @@ typedef struct _delayedFreeReq {
 
 void delayedFree(void *ptr);
 
+
 /* pinnedMallocHost
  *
  * schedules a pinned memory allocation so that it does not impede
@@ -163,6 +164,10 @@ typedef struct {
  */
 void enqueue(workRequestQueue *q, workRequest *wr); 
 
+#ifdef GPU_MEMPOOL
+void hapi_poolFree(void *);
+void *hapi_poolMalloc(int size);
+#endif
 /* external declarations needed by the user */
 
 extern workRequestQueue *wrQueue; 

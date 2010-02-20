@@ -17,6 +17,10 @@
 #ifndef __CUDA_HYBRID_API_H__
 #define __CUDA_HYBRID_API_H__
 
+#ifdef GPU_MEMPOOL
+#include "cklists.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -35,6 +39,28 @@ void gpuProgressFn();
    cleans up and deletes memory allocated for the queue
 */
 void exitHybridAPI(); 
+
+
+#ifdef GPU_MEMPOOL
+// data and metadata reside in same chunk of memory
+typedef struct _header{
+  //void *buf;
+  struct _header *next;
+  int slot;
+}Header;
+
+typedef struct _bufferPool{
+  Header *head;
+  //bool expanded;
+  int size;
+}BufferPool;
+
+// pre-allocated buffers will be at least this big
+#define GPU_MEMPOOL_MIN_BUFFER_SIZE 1024
+
+void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools);
+
+#endif
 
 #ifdef __cplusplus
 }

@@ -23,13 +23,14 @@
  *  and executes the callback 
  */ 
 extern void CUDACallbackManager(void * fn); 
+extern int CmiMyPe();
 
 /* initial size of the user-addressed portion of host/device buffer
  * arrays; the system-addressed portion of host/device buffer arrays
  * (used when there is no need to share buffers between work requests)
  * will be equivalant in size.  
  */ 
-#define NUM_BUFFERS 128
+#define NUM_BUFFERS 256
 #define MAX_PINNED_REQ 64  
 #define MAX_DELAYED_FREE_REQS 64  
 
@@ -52,6 +53,13 @@ pinnedMemReq pinnedMemQueue[MAX_PINNED_REQ];
 unsigned int currentDfr = 0;
 DelayedFreeReq delayedFreeReqs[MAX_DELAYED_FREE_REQS];
 
+#ifdef GPU_MEMPOOL
+#define GPU_MEMPOOL_NUM_SLOTS 15
+
+CkVec<BufferPool> memPoolFreeBufs;
+CkVec<int> memPoolBoundaries;
+//int memPoolBoundaries[GPU_MEMPOOL_NUM_SLOTS];
+#endif
 
 /* The runtime system keeps track of all allocated buffers on the GPU.
  * The following arrays contain pointers to host (CPU) data and the
@@ -270,8 +278,9 @@ void allocateBuffers(workRequest *wr) {
       // allocate if the buffer for the corresponding index is NULL 
       if (devBuffers[index] == NULL && size > 0) {
 #ifdef GPU_PRINT_BUFFER_ALLOCATE
-        double mil = 1e6;
-        printf("*** ALLOCATE buffer 0x%x (%d) size %f mb\n", devBuffers[index], index, 1.0*size/mil);
+        double mil = 1e3;
+        printf("*** ALLOCATE buffer 0x%x (%d) size %f kb\n", devBuffers[index], index, 1.0*size/mil);
+
 #endif
 
         CUDA_SAFE_CALL_NO_SYNC(cudaMalloc((void **) &devBuffers[index], size));
@@ -431,6 +440,31 @@ void initHybridAPI(int myPe) {
   traceRegisterUserEvent("GPU Memory Setup", GPU_MEM_SETUP);
   traceRegisterUserEvent("GPU Kernel Execution", GPU_KERNEL_EXEC);
   traceRegisterUserEvent("GPU Memory Cleanup", GPU_MEM_CLEANUP);
+#endif
+
+#ifdef GPU_MEMPOOL
+  int nslots = GPU_MEMPOOL_NUM_SLOTS;
+  int *sizes;
+  sizes = (int *)malloc(sizeof(int)*nslots); 
+
+  memPoolBoundaries.reserve(GPU_MEMPOOL_NUM_SLOTS);
+  memPoolBoundaries.length() = GPU_MEMPOOL_NUM_SLOTS;
+
+  int bufSize = GPU_MEMPOOL_MIN_BUFFER_SIZE;
+  for(int i = 0; i < GPU_MEMPOOL_NUM_SLOTS; i++){
+    memPoolBoundaries[i] = bufSize;
+    bufSize = bufSize << 1;
+  }
+
+  sizes[0] = sizes[1] = sizes[2] = sizes[3] = 32; 
+  sizes[4] = sizes[5] = sizes[6] = sizes[7] = 16; 
+  sizes[8] = sizes[9] = sizes[10] = sizes[11] = 4; 
+  sizes[12] = sizes[13] = sizes[14] = 2; 
+
+  printf("creating buffer pool...");
+  createPool(sizes, nslots, memPoolFreeBufs);
+  printf("...done\n");
+
 #endif
 
   currentDfr = 0;
@@ -623,7 +657,7 @@ void gpuProgressFn() {
       */
   }
   if (head->state == TRANSFERRING_OUT) {
-    if (cudaStreamQuery(data_out_stream) == cudaSuccess) {
+    if (cudaStreamQuery(data_out_stream) == cudaSuccess && cudaStreamQuery(kernel_stream) == cudaSuccess){
       freeMemory(head); 
 #ifdef GPU_PROFILE
       gpuEvents[dataCleanupIndex].endTime = cutGetTimerValue(timerHandle);
@@ -640,6 +674,9 @@ void gpuProgressFn() {
   }
 }
 
+#ifdef GPU_MEMPOOL
+void releasePool(CkVec<BufferPool> &pools);
+#endif
 /* exitHybridAPI
  *  cleans up and deletes memory allocated for the queue and the CUDA streams
  */
@@ -671,4 +708,115 @@ void exitHybridAPI() {
   CUT_SAFE_CALL(cutDeleteTimer(timerHandle));  
 
 #endif
+
+#ifdef GPU_MEMPOOL
+  releasePool(memPoolFreeBufs);
+#endif
+
 }
+
+#ifdef GPU_MEMPOOL
+void releasePool(CkVec<BufferPool> &pools){
+  for(int i = 0; i < pools.length(); i++){
+    CUDA_SAFE_CALL_NO_SYNC(cudaFreeHost((void *)pools[i].head));
+  }
+  pools.free();
+}
+
+// Create a pool with nslots slots.
+// There are nbuffers[i] buffers for each buffer size corresponding to entry i
+// FIXME - list the alignment/fragmentation issues with either of two allocation schemes:
+// if a single, large buffer is allocated for each subpool
+// if multiple smaller buffers are allocated for each subpool
+void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools){
+  //pools  = (BufferPool *)malloc(nslots*sizeof(BufferPool));
+  pools.reserve(nslots);
+  pools.length() = nslots;
+
+  for(int i = 0; i < nslots; i++){
+    int bufSize = memPoolBoundaries[i];
+    int numBuffers = nbuffers[i];
+    pools[i].size = bufSize;
+    
+    CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **)(&pools[i].head), 
+                                          (sizeof(Header)+bufSize)*numBuffers));
+    if(pools[i].head == NULL){
+      abort();
+    }
+
+    Header *hd = pools[i].head;
+    Header *previous = NULL;
+    char *memory;
+
+    for(int j = 0; j < numBuffers; j++){
+      hd->slot = i;
+      hd->next = previous;
+      previous = hd;
+      hd++; // move ptr past header
+      memory = (char *)hd;
+      memory += bufSize;
+      hd = (Header *)memory;
+    }
+
+    pools[i].head = previous;
+  }
+}
+
+int findPool(int size){
+  int boundaryArrayLen = memPoolBoundaries.length();
+  if(size <= memPoolBoundaries[0]){
+    return (0);
+  }
+  else if(size > memPoolBoundaries[boundaryArrayLen-1]){
+    // create new slot
+    memPoolBoundaries.push_back(size);
+
+    BufferPool newpool;
+    CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **)&newpool.head, size+sizeof(Header)));
+    newpool.size = size;
+    memPoolFreeBufs.push_back(newpool);
+
+    Header *hd = newpool.head;
+    hd->next = NULL;
+    hd->slot = boundaryArrayLen;
+
+    return boundaryArrayLen;
+  }
+  for(int i = 0; i < GPU_MEMPOOL_NUM_SLOTS-1; i++){
+    if(memPoolBoundaries[i] < size && size <= memPoolBoundaries[i+1]){
+      return (i+1);
+    }
+  }
+  return -1;
+}
+
+void *getBufferFromPool(int pool, int size){
+  Header *ret;
+  if(pool < 0 || pool >= memPoolFreeBufs.length() || memPoolFreeBufs[pool].head == NULL){
+    printf("(%d) pool %d size: %d\n", CmiMyPe(), pool, size);
+    abort();
+  }
+  else{
+    ret = memPoolFreeBufs[pool].head;
+    memPoolFreeBufs[pool].head = ret->next;
+    return (void *)(ret+1);
+  }
+  return NULL;
+}
+
+void returnBufferToPool(int pool, Header *hd){
+  hd->next = memPoolFreeBufs[pool].head;
+  memPoolFreeBufs[pool].head = hd;
+}
+
+void *hapi_poolMalloc(int size){
+  return getBufferFromPool(findPool(size), size);
+}
+
+void hapi_poolFree(void *ptr){
+  Header *hd = ((Header *)ptr)-1;
+  returnBufferToPool(hd->slot, hd);
+}
+
+
+#endif
