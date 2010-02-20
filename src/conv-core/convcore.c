@@ -803,10 +803,12 @@ void CmiTimerInit()
   struct rusage ru;
   CpvInitialize(double, inittime_virtual);
 
+#if ! CMK_MEM_CHECKPOINT
   /* try to synchronize calling barrier */
   CmiBarrier();
   CmiBarrier();
   CmiBarrier();
+#endif
 
   gettimeofday(&tv,0);
   inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
@@ -815,8 +817,10 @@ void CmiTimerInit()
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
 
+#if ! CMK_MEM_CHECKPOINT
   CmiBarrier();
 /*  CmiBarrierZero(); */
+#endif
 }
 
 double CmiCpuTimer()
