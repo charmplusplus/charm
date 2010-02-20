@@ -19,6 +19,17 @@
 //#include "queueing.h"
 #include <unistd.h>
 
+
+/** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
+int replaySystem = 0;
+
+#if CMK_REPLAYSYSTEM
+
+int ConverseDeliver() {
+  return !replaySystem;
+}
+#endif
+
 #if CMK_CCS_AVAILABLE && !defined(_WIN32)
 
 #include "ck.h"

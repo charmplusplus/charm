@@ -34,7 +34,7 @@ public: static int __idx;
 
 PUPbytes(CkChareID)
 PUPbytes(CkGroupID)
-
+PUPbytes(CmiGroup)
   
 /**
  * CkMessage is the superclass of all Charm++ messages.

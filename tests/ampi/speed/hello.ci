@@ -5,6 +5,8 @@ mainmodule hello {
     char data[];
   };
 
+  initnode void nodeInit(void);
+
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void done(void);

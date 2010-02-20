@@ -268,6 +268,9 @@ private:
 
       return env;
     }
+    void reset() {
+      setEvent(++CkpvAccess(envelopeEventID));
+    }
     UShort getEpIdx(void) const { return epIdx; }
     void   setEpIdx(const UShort idx) { epIdx = idx; }
     UInt   getSrcPe(void) const { return pe; }
@@ -299,12 +302,12 @@ private:
     }
     void*  getVidPtr(void) const {
       CkAssert(getMsgtype()==NewVChareMsg || getMsgtype()==ForVidMsg
-          || getMsgtype()==FillVidMsg);
+          || getMsgtype()==FillVidMsg ||  getMsgtype()==DeleteVidMsg);
       return type.chare.ptr;
     }
     void   setVidPtr(void *p) {
       CkAssert(getMsgtype()==NewVChareMsg || getMsgtype()==ForVidMsg
-          || getMsgtype()==FillVidMsg);
+          || getMsgtype()==FillVidMsg ||  getMsgtype()==DeleteVidMsg);
       type.chare.ptr = p;
     }
     void*  getObjPtr(void) const { 
@@ -372,6 +375,10 @@ inline void *_allocMsg(const int msgtype, const int size, const int prio=0) {
   return EnvToUsr(envelope::alloc(msgtype,size,prio));
 }
 
+inline void _resetEnv(envelope *env) {
+  env->reset();
+}
+
 /** @} */
 
 extern UChar   _defaultQueueing;
@@ -388,8 +395,12 @@ private:
       env->setMsgIdx(0);
       return EnvToUsr(env);
     }
+    static void _reset(void* m) {
+      register envelope *env = UsrToEnv(m);
+      _resetEnv(env);
+    }
 public:
-    MsgPool():SafePool<void*>(_alloc, CkFreeMsg) {}
+    MsgPool():SafePool<void*>(_alloc, CkFreeMsg, _reset) {}
 #ifdef _FAULT_MLOG_
         void *get(void){
             return allocfn();

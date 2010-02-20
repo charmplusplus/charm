@@ -803,10 +803,12 @@ void CmiTimerInit()
   struct rusage ru;
   CpvInitialize(double, inittime_virtual);
 
+#if ! CMK_MEM_CHECKPOINT
   /* try to synchronize calling barrier */
   CmiBarrier();
   CmiBarrier();
   CmiBarrier();
+#endif
 
   gettimeofday(&tv,0);
   inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
@@ -815,8 +817,10 @@ void CmiTimerInit()
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
 
+#if ! CMK_MEM_CHECKPOINT
   CmiBarrier();
 /*  CmiBarrierZero(); */
+#endif
 }
 
 double CmiCpuTimer()
@@ -1661,7 +1665,7 @@ int handler;
 CpvStaticDeclare(CthThread, CthMainThread);
 CpvStaticDeclare(CthThread, CthSchedulingThread);
 CpvStaticDeclare(CthThread, CthSleepingStandins);
-CpvStaticDeclare(int      , CthResumeNormalThreadIdx);
+CpvDeclare(int      , CthResumeNormalThreadIdx);
 CpvStaticDeclare(int      , CthResumeSchedulingThreadIdx);
 
 
@@ -1696,6 +1700,7 @@ CthThread CthSuspendSchedulingThread()
   return succ;
 }
 
+/* Notice: For changes to the following function, make sure the function CthResumeNormalThreadDebug is also kept updated. */
 void CthResumeNormalThread(CthThreadToken* token)
 {
   CthThread t = token->thread;
@@ -1716,11 +1721,12 @@ void CthResumeNormalThread(CthThreadToken* token)
 	        resumeTraceCore();*/
 #endif
 #endif
-
+  
   /* BIGSIM_OOC DEBUGGING
   CmiPrintf("In CthResumeNormalThread:   ");
   CthPrintThdMagic(t);
   */
+
   CthResume(t);
 }
 

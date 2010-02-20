@@ -64,4 +64,15 @@
 #error "Compiler not generating 64 bit binary, please check compiler flags."
 #endif
 
+/* set up what production/non-production means */
+#ifndef CMK_OPTIMIZE
+
+#ifndef CMK_REPLAYSYSTEM
+#if !defined(_WIN32)
+#define CMK_REPLAYSYSTEM            1
+#endif
+#endif
+
+#endif
+
 #endif

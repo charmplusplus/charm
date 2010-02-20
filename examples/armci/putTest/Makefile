@@ -12,4 +12,4 @@ bgtest: put
 	./charmrun +p1 ./put +vp 2 +x2 +y1 +z1 $(TESTOPTS)
 
 clean:
-	rm -f put charmrun
+	rm -f put charmrun *.o charmrun.exe put.exe put.pdb put.ilk

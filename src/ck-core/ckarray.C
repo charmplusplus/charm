@@ -660,6 +660,9 @@ CmiBool CkArray::insertElement(CkMessage *me)
   int ctorIdx=m->array_ep();
   int chareType=_entryTable[ctorIdx]->chareIdx;
   ArrayElement *elt=allocate(chareType,idx,me,CmiFalse);
+#ifndef CMK_CHARE_USE_PTR
+  ((Chare *)elt)->chareIdx = -1;
+#endif
   if (!locMgr->addElement(thisgroup,idx,elt,ctorIdx,(void *)m)) return CmiFalse;
   CK_ARRAYLISTENER_LOOP(listeners,
       if (!l->ckElementCreated(elt)) return CmiFalse;);

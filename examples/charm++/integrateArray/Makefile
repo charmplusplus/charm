@@ -24,4 +24,4 @@ pgm.decl.h pgm.def.h: pgm.ci
 	$(CHARMC)  pgm.ci
 
 clean:
-	rm -f pgm pgm_prof *.o conv-host *.decl.h *.def.h *~ charmrun *.log *.sts core
+	rm -f pgm pgm_prof *.o conv-host *.decl.h *.def.h *~ charmrun *.log *.sts core charmrun.exe pgm.exe pgm.pdb pgm.ilk

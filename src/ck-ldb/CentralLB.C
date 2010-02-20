@@ -951,6 +951,11 @@ void CentralLB::CheckMigrationComplete()
 #if CMK_LBDB_ON
   lbdone ++;
   if (lbdone == 2) {
+    if (_lb_args.debug() && CkMyPe()==0) {
+      double end_lb_time = CkWallTimer();
+      CkPrintf("[%s] Load balancing step %d finished at %f duration %f\n",
+                lbName(), step()-1,end_lb_time,end_lb_time - start_lb_time);
+    }
     lbdone = 0;
     future_migrates_expected = -1;
     future_migrates_completed = 0;

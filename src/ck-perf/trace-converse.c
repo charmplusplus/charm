@@ -49,5 +49,5 @@ void traceEndFuncProj(char *name){}
 void traceUserSuppliedNote(char *note) {}
 
 /* This routine, included in Charm++ programs from init.C, needs to be present in converse as well.
-   Here is a place where it gets included only in converse, and not in Charm++ (thus not generating conflicts. */
+   Here is a place where it gets included only in converse, and not in Charm++ (thus not generating conflicts). */
 void EmergencyExit(void) {}

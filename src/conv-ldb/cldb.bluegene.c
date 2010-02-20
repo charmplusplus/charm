@@ -94,6 +94,11 @@ static int BgNumPes() { return BgNumNodes()*BgGetNumWorkThread(); }
                                     CmiGetHandler(msg), LARGE_WORK, len, msg);
 #endif
 
+void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
+{
+  CmiAbort("CldEnqueueGroup not supported!");
+}
+
 void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
 {
   int len, queueing, priobits,i; unsigned int *prioptr;

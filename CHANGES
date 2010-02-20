@@ -1,5 +1,109 @@
+This file describes the most significant changes. For more detail, use
+'git log' on a clone of the charm repository.
+
+================================================================================
+What's new in Charm++ 6.2.0 (since 6.1)
+================================================================================
+
+--------------------------------------------------------------------------------
+New Supported Platforms:
+--------------------------------------------------------------------------------
+
+64-bit MIPS, such as SiCortex, using mpi-linux-mips64
+
+Windows HPC cluster, using mpi-win32/mpi-win64
+
+--------------------------------------------------------------------------------
+General Changes
+--------------------------------------------------------------------------------
+
+Runtime support
+ - Smarter build/configure scripts
+ - A new interface for model-based load balancing
+ - new CPU topology API
+ - a general implementation of CmiMemoryUsage()
+ - Bug fix: Quiescence detection (QD) works with immediate messages
+ - New reduction functions implemented in Converse
+ - CCS (Converse Client-Server) can deliver message to more than one processor
+
+Charm++
+ - Cross-array and cross-group sections
+ - Structured Dagger (SDAG): Support templated arguments properly
+ - Plain chares support checkpoint/restart (both in-memory and disk-based)
+ - Conditional packing of messages and parameters in SMP scenario
+
+Adaptive MPI (AMPI)
+ - Compilers renamed to avoid collision with host MPI (ampicc, ampiCC,
+   ampif77, ampif90)
+ - Improved MPI standard conformance, and documentation of non-conformance
+   * Bug fixes in: MPI_Ssend, MPI_Cart_shift, MPI_Get_count
+   * Support MPI_IN_PLACE in MPI_(All)Reduce
+   * Define various missing constants
+ - Return the received message's tag in response to a non-blocking
+   wildcard receive, to support SuperLU
+ - Improved tracing for BigSim
+
+Multiphase Shared Arrays (MSA)
+ - Typed handles to enforce phases
+ - Split-phase synchronization to enable message-driven execution
+ - 3D arrays
+
+TCharm
+ - Automatic tracing of API calls for simulation and analysis.
+
+Debugging
+ - Wider support for architectures other than net- (in particular MPI layers)
+ - Improved support for large scale debugging (better scalability)
+ - Enhanced record/replay stability to handle various events, and to signal unexpected messages
+ - New detailed record/replay: The full content of messages can be recorded, and a single processor can be re-executed outside of the parallel application
+
+Performance analysis
+ - Tracing of nested entry methods
+
+BigSim
+ - Out-of-core support, with prefetching capability
+ - Detailed tracing of MPI calls
+ - Detailed record/replay support at emulation time, capable of replaying any emulated processor after obtained recorded logs.
+
+--------------------------------------------------------------------------------
+Architecture-specific changes
+--------------------------------------------------------------------------------
+
+Net-Linux
+ - New charmrun option ++no-va-randomization to disable address space
+   randomization (ASLR). This is most useful for running AMPI with
+   isomalloc
+
+MPI
+ - Default to using ampicxx instead of mpiCC
+
+MPI-SMP
+ - The +p option now has the same semantics as in other smp builds
+
+Power 7
+ - Support for VSX in SIMD abstraction API
+
+Blue Gene/L
+ - Compilers and options have been updated to the latest ones
+
+Cray XT
+ - cputopology information is now available on XT3/4/5
+
+Infiniband (ibverbs)
+ - Bug fix: plug memory leaks that caused failures in long runs
+
+LAPI
+ - Support for SMP
+
+
+================================================================================
+Note that changes from 5.9, 6.0, and 6.1 are not documented here. A partial list
+can be found on the charm download page, or by reading through version control
+logs.
+
+================================================================================
 What's New since Charm++ 5.4 release 1
-========================================
+================================================================================
 
 --------------------------------------------------------------------------------
 New Supported Platforms:
@@ -44,8 +148,9 @@ Summary of Changes:
                 *******   Old Change histories *******
 
 
+================================================================================
 What's New in Charm++ 5.4 release 1 since 5.0
-===============================================================
+================================================================================
 
 --------------------------------------------------------------------------------
 New Supported Platforms:
