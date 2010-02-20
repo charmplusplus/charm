@@ -535,7 +535,7 @@ void CkMemCheckPT::report()
     objsize += entry->getSize();
   }
   CmiAssert(CpvAccess(procChkptBuf));
-  CkPrintf("[%d] Checkpointed Object size: %d len: %d Processor data: %d\n", CkMyPe(), objsize, len, CpvAccess(procChkptBuf)->len);
+  CkPrintf("[%d] Checkpoint object size: %d len: %d Processor data: %d \n", CkMyPe(), objsize, len, CpvAccess(procChkptBuf)->len);
 }
 
 /*****************************************************************************
@@ -764,6 +764,8 @@ void CkMemCheckPT::recoverArrayElements()
     CkStartQD(CkCallback(CkIndex_CkMemCheckPT::finishUp(), thisProxy));
 }
 
+static double restartT;
+
 // on every processor
 // turn load balancer back on
 void CkMemCheckPT::finishUp()
@@ -775,9 +777,12 @@ void CkMemCheckPT::finishUp()
 
   if (CkMyPe() == 0)
   {
-       CkPrintf("[%d] CkMemCheckPT ----- %s in %f seconds\n",CkMyPe(), stage, CmiWallTimer()-startTime);
+       CkPrintf("[%d] CkMemCheckPT ----- %s in %f seconds, callback triggered\n",CkMyPe(), stage, CmiWallTimer()-startTime);
        CkStartQD(cpCallback);
   } 
+  if (CkMyPe() == thisFailedPe)
+       CkPrintf("[%d] Restart finished in %f seconds.\n", CkMyPe(), CkWallTimer()-restartT);
+
 #if CK_NO_PROC_POOL
 #if NODE_CHECKPOINT
   int numnodes = CmiNumPhysicalNodes();
@@ -952,6 +957,7 @@ static void askProcDataHandler(char *msg)
 void CkMemRestart(const char *dummy, CkArgMsg *args)
 {
 #if CMK_MEM_CHECKPOINT
+   restartT = CkWallTimer();
    _diePE = CkMyPe();
    CmiPrintf("[%d] I am restarting  cur_restart_phase:%d \n",CmiMyPe(), cur_restart_phase);
    CkMemCheckPT::startTime = CmiWallTimer();
