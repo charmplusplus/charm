@@ -456,14 +456,15 @@ void initHybridAPI(int myPe) {
     bufSize = bufSize << 1;
   }
 
-  sizes[0] = sizes[1] = sizes[2] = sizes[3] = 32; 
-  sizes[4] = sizes[5] = sizes[6] = sizes[7] = 16; 
-  sizes[8] = sizes[9] = sizes[10] = sizes[11] = 4; 
-  sizes[12] = sizes[13] = sizes[14] = 2; 
+  sizes[0] = 128;
+  sizes[1] = sizes[2] = sizes[3] = 32; 
+  sizes[4] = sizes[5] = sizes[6] = sizes[7] = 32; 
+  sizes[10] = 64;
+  sizes[8] = sizes[9] = sizes[11] = 16; 
+  sizes[12] = sizes[13] = sizes[14] = 8; 
 
-  printf("creating buffer pool...");
   createPool(sizes, nslots, memPoolFreeBufs);
-  printf("...done\n");
+  printf("[%d] done creating buffer pool\n", CmiMyPe());
 
 #endif
 
@@ -759,6 +760,9 @@ void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools){
     }
 
     pools[i].head = previous;
+#ifdef GPU_MEMPOOL_DEBUG
+    pools[i].num = numBuffers;
+#endif
   }
 }
 
@@ -774,6 +778,9 @@ int findPool(int size){
     BufferPool newpool;
     CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **)&newpool.head, size+sizeof(Header)));
     newpool.size = size;
+#ifdef GPU_MEMPOOL_DEBUG
+    newpool.num = 1;
+#endif
     memPoolFreeBufs.push_back(newpool);
 
     Header *hd = newpool.head;
@@ -793,12 +800,18 @@ int findPool(int size){
 void *getBufferFromPool(int pool, int size){
   Header *ret;
   if(pool < 0 || pool >= memPoolFreeBufs.length() || memPoolFreeBufs[pool].head == NULL){
-    printf("(%d) pool %d size: %d\n", CmiMyPe(), pool, size);
+#ifdef GPU_MEMPOOL_DEBUG
+    printf("(%d) pool %d size: %d, num: %d\n", CmiMyPe(), pool, size, memPoolFreeBufs[pool].num);
+#endif
     abort();
   }
   else{
     ret = memPoolFreeBufs[pool].head;
     memPoolFreeBufs[pool].head = ret->next;
+#ifdef GPU_MEMPOOL_DEBUG
+    ret->size = size;
+    memPoolFreeBufs[pool].num--;
+#endif
     return (void *)(ret+1);
   }
   return NULL;
@@ -807,15 +820,28 @@ void *getBufferFromPool(int pool, int size){
 void returnBufferToPool(int pool, Header *hd){
   hd->next = memPoolFreeBufs[pool].head;
   memPoolFreeBufs[pool].head = hd;
+#ifdef GPU_MEMPOOL_DEBUG
+  memPoolFreeBufs[pool].num++;
+#endif
 }
 
 void *hapi_poolMalloc(int size){
-  return getBufferFromPool(findPool(size), size);
+  int pool = findPool(size);
+  void *buf = getBufferFromPool(pool, size);
+#ifdef GPU_MEMPOOL_DEBUG
+  printf("(%d) hapi_malloc size %d pool %d left %d\n", CmiMyPe(), size, pool, memPoolFreeBufs[pool].num);
+#endif
+  return buf;
 }
 
 void hapi_poolFree(void *ptr){
   Header *hd = ((Header *)ptr)-1;
-  returnBufferToPool(hd->slot, hd);
+  int pool = hd->slot;
+  returnBufferToPool(pool, hd);
+#ifdef GPU_MEMPOOL_DEBUG
+  int size = hd->size;
+  printf("(%d) hapi_free size %d pool %d left %d\n", CmiMyPe(), size, pool, memPoolFreeBufs[pool].num);
+#endif
 }
 
 

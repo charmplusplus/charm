@@ -47,12 +47,18 @@ typedef struct _header{
   //void *buf;
   struct _header *next;
   int slot;
+#ifdef GPU_MEMPOOL_DEBUG
+  int size;
+#endif
 }Header;
 
 typedef struct _bufferPool{
   Header *head;
   //bool expanded;
   int size;
+#ifdef GPU_MEMPOOL_DEBUG
+  int num;
+#endif
 }BufferPool;
 
 // pre-allocated buffers will be at least this big
