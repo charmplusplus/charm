@@ -38,6 +38,7 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ bool shouldGatherMemoryUsage;
 /* readonly */ bool shouldGatherUtilization;
 /* readonly */ bool shouldGatherAll;
+/* readonly */ char CPDataFilename[512];
 
 
 
@@ -196,9 +197,6 @@ controlPointManager::controlPointManager(){
     instrumentedPhase * newPhase = new instrumentedPhase();
     allData.phases.push_back(newPhase);   
     
-    dataFilename = (char*)malloc(128);
-    sprintf(dataFilename, "controlPointData.txt");
-    
     frameworkShouldAdvancePhase = false;
     haveGranularityCallback = false;
 //    CkPrintf("[%d] controlPointManager() Constructor Initializing control points, and loading data file\n", CkMyPe());
@@ -238,7 +236,7 @@ controlPointManager::controlPointManager(){
 
   /// Loads the previous run data file
   void controlPointManager::loadDataFile(){
-    ifstream infile(dataFilename);
+    ifstream infile(CPDataFilename);
     vector<std::string> names;
     std::string line;
   
@@ -328,7 +326,7 @@ controlPointManager::controlPointManager(){
   /// Add the current data to allData and output it to a file
   void controlPointManager::writeDataFile(){
     CkPrintf("============= writeDataFile() ============\n");
-    ofstream outfile(dataFilename);
+    ofstream outfile(CPDataFilename);
     allData.cleanupNames();
 
     //  string s = allData.toString();
@@ -1054,6 +1052,13 @@ public:
    loadDataFileAtStartup = false;   
     if( CmiGetArgFlagDesc(args->argv,"+CPLoadData","Load Control Point timings & configurations at startup") ){
       loadDataFileAtStartup = true;
+    }
+
+    char *cpdatafile;
+    if( CmiGetArgStringDesc(args->argv, "+CPDataFilename", &cpdatafile, "Specify control point data file to save/load") ){
+      sprintf(CPDataFilename, "%s", cpdatafile);
+    } else {
+      sprintf(CPDataFilename, "controlPointData.txt");
     }
 
 
