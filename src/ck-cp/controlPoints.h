@@ -49,6 +49,7 @@
 /* readonly */ extern int whichTuningScheme;
 /* readonly */ extern bool writeDataFileAtShutdown;
 /* readonly */ extern bool loadDataFileAtStartup;
+/* readonly */ extern char CPDataFilename[512];
 
 
 
@@ -569,9 +570,7 @@ public:
 
 class controlPointManager : public CBase_controlPointManager {
 public:
-  
-  char * dataFilename;
-  
+    
   instrumentedData allData;
   
   /// The lower and upper bounds for each named control point
