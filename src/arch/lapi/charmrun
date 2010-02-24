@@ -138,6 +138,8 @@ if [ -n "$ppnused" ]
     if [ -n "$nodesize" ]
 	then
 	tasks_per_node=`expr $nodesize / $ppnused`
+    else
+	echo "WARNING: ns (node size) is missing, it should be used together with ppn!"
     fi
     if [ -n "$logical" -a -n "$nodesize" ]
 	then if [ $logical -ne $tasks_per_node ]
@@ -148,7 +150,18 @@ if [ -n "$ppnused" ]
 	    exit
 	fi
     fi
+    nodes=`expr $total_tasks / $tasks_per_node`
+    if [ `expr $nodes '*' $tasks_per_node` -ne $total_tasks ]
+      then
+      nodes=`expr $nodes + 1` 
+    fi 
+    if [ $tasks_per_node -gt $total_tasks ]
+      then
+      tasks_per_node=$total_tasks
+    fi
+    nodes="#@ node ="$nodes
     tasks_per_node="#@ tasks_per_node = "$tasks_per_node
+    total_tasks=""
 else
     total_tasks=$pes
     if test -z "$nodes"
@@ -163,15 +176,16 @@ else
       fi
     fi
     nodes="#@ node = "$nodes
+    total_tasks="#@ total_tasks = "$total_tasks 
 fi
 
 cat > $filename <<EOF
 # System settings
 #@ node_usage = $node_usage
 #@ network.LAPI = csss,,US
-#@ total_tasks = $total_tasks
+$total_tasks
 $nodes
-# $tasks_per_node
+$tasks_per_node
 
 # User settings
 EOF

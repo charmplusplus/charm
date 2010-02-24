@@ -15,11 +15,6 @@
 __global__ void
 matrixMul(float* C, float* A, float* B, int wA, int wB)
 {
-  for (int i=0; i<1000000; i++) {
-    C[blockIdx.x * BLOCK_SIZE + threadIdx.x] ++; 
-    C[blockIdx.x * BLOCK_SIZE + threadIdx.x] --; 
-  }
-  /*
     // Block index
     int bx = blockIdx.x;
     int by = blockIdx.y;
@@ -86,7 +81,6 @@ matrixMul(float* C, float* A, float* B, int wA, int wB)
     // each thread writes one element
     int c = wB * BLOCK_SIZE * by + BLOCK_SIZE * bx;
     C[c + wB * ty + tx] = Csub;
-  */
 }
 
 void hostMemorySetup(int matrixSize, ElementType **h_A_ptr, 
@@ -114,9 +108,16 @@ void hostMemorySetup(int matrixSize, ElementType **h_A_ptr,
 }
 
 void hostMemoryCleanup(ElementType *h_A, ElementType *h_B, ElementType *h_C) {
+
+  delayedFree(h_A); 
+  delayedFree(h_B); 
+  delayedFree(h_C);
+
+  /*
   cudaFreeHost(h_A); 
   cudaFreeHost(h_B); 
-  cudaFreeHost(h_C);
+  cudaFreeHost(h_C); 
+  */
 }
 
 void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B, 
