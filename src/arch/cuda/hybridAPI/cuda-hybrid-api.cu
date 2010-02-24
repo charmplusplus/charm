@@ -189,6 +189,7 @@ void flushDelayedFrees(){
     }
     cudaFreeHost(delayedFreeReqs[i]);
   }
+  currentDfr = 0; 
 }
 
 /* flushPinnedMemQueue
