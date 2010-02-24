@@ -103,10 +103,13 @@ unsigned int runningKernelIndex = 0;
 unsigned int dataSetupIndex = 0; 
 unsigned int dataCleanupIndex = 0; 
 
+#if defined GPU_TRACE || defined GPU_INSTRUMENT_WRS
+extern "C" double CmiWallTimer(); 
+#endif
+
 #ifdef GPU_TRACE
 extern "C" int traceRegisterUserEvent(const char*x, int e);
 extern "C" void traceUserBracketEvent(int e, double beginT, double endT);
-extern "C" double CmiWallTimer(); 
 
 #define GPU_MEM_SETUP 8800
 #define GPU_KERNEL_EXEC 8801
@@ -114,6 +117,12 @@ extern "C" double CmiWallTimer();
 
 #endif
 
+#endif
+
+#ifdef GPU_INSTRUMENT_WRS
+CkVec<CkVec<CkVec<RequestTimeInfo> > > avgTimes;
+bool initialized_instrument;
+bool initializedInstrument();
 #endif
 
 /* There are separate CUDA streams for kernel execution, data transfer
@@ -456,12 +465,36 @@ void initHybridAPI(int myPe) {
     bufSize = bufSize << 1;
   }
 
-  sizes[0] = 128;
-  sizes[1] = sizes[2] = sizes[3] = 32; 
-  sizes[4] = sizes[5] = sizes[6] = sizes[7] = 32; 
-  sizes[10] = 64;
-  sizes[8] = sizes[9] = sizes[11] = 16; 
-  sizes[12] = sizes[13] = sizes[14] = 8; 
+  //1K
+  sizes[0] = 512; 
+  //2K
+  sizes[1] = 512;
+  //4K
+  sizes[2] = 64;
+  //8K
+  sizes[3] = 64;
+  //16K
+  sizes[4] = 32;
+  //32K
+  sizes[5] = 32;
+  //64K
+  sizes[6] = 32;
+  //128K
+  sizes[7] = 32;
+  //256K
+  sizes[8] = 32;
+  //512K
+  sizes[9] = 32;
+  //1M
+  sizes[10] = 170;
+  //2M
+  sizes[11] = 16;
+  //4M
+  sizes[12] = 4;
+  //8M
+  sizes[13] = 2;
+  //16M
+  sizes[14] = 2; 
 
   createPool(sizes, nslots, memPoolFreeBufs);
   printf("[%d] done creating buffer pool\n", CmiMyPe());
@@ -473,6 +506,11 @@ void initHybridAPI(int myPe) {
     delayedFreeReqs[i].freed = true;
     delayedFreeReqs[i].ptr = NULL;
   }
+
+#ifdef GPU_INSTRUMENT_WRS
+  initialized_instrument = false;
+#endif
+
 }
 
 /* gpuProgressFn
@@ -506,6 +544,11 @@ void gpuProgressFn() {
 #endif
     timeIndex++; 
 #endif
+
+#ifdef GPU_INSTRUMENT_WRS
+    head->startTime = CmiWallTimer(); 
+#endif
+
     allocateBuffers(head); 
     setupData(head); 
     head->state = TRANSFERRING_IN; 
@@ -521,6 +564,24 @@ void gpuProgressFn() {
 			    gpuEvents[dataSetupIndex].cmiendTime); 
 #endif 
 #endif
+
+#ifdef GPU_INSTRUMENT_WRS
+      {
+        if(initializedInstrument()){
+          double tt = CmiWallTimer()-(head->startTime);
+          int index = head->chareIndex;
+          char type = head->compType;
+          char phase = head->compPhase;
+
+          CkVec<RequestTimeInfo> &vec = avgTimes[index][type];
+          if(vec.length() <= phase){
+            vec.growAtLeast(phase);
+          }
+          vec[phase].transferTime += tt;
+        }
+      }
+#endif
+
       if (second != NULL /*&& (second->state == QUEUED)*/) {
 	allocateBuffers(second); 
       }
@@ -535,6 +596,11 @@ void gpuProgressFn() {
 #endif
       timeIndex++; 
 #endif
+
+#ifdef GPU_INSTRUMENT_WRS
+      head->startTime = CmiWallTimer(); 
+#endif
+
       //flushPinnedMemQueue();
       flushDelayedFrees();
       kernelSelect(head); 
@@ -551,6 +617,10 @@ void gpuProgressFn() {
 	gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
 	timeIndex++; 
+#endif
+
+#ifdef GPU_INSTRUMENT_WRS
+        second->startTime = CmiWallTimer();
 #endif
 	setupData(second); 
 	second->state = TRANSFERRING_IN;
@@ -574,6 +644,23 @@ void gpuProgressFn() {
 			    gpuEvents[runningKernelIndex].cmiendTime); 
 #endif
 #endif
+#ifdef GPU_INSTRUMENT_WRS
+      {
+        if(initializedInstrument()){
+          double tt = CmiWallTimer()-(head->startTime);
+          int index = head->chareIndex;
+          char type = head->compType;
+          char phase = head->compPhase;
+
+          CkVec<RequestTimeInfo> &vec = avgTimes[index][type];
+          if(vec.length() <= phase){
+            vec.growAtLeast(phase);
+          }
+          vec[phase].kernelTime += tt;
+        }
+      }
+#endif
+
       if (second != NULL && second->state == QUEUED) {
 #ifdef GPU_PROFILE
 	gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
@@ -586,6 +673,11 @@ void gpuProgressFn() {
 #endif
 	timeIndex++; 
 #endif
+
+#ifdef GPU_INSTRUMENT_MS
+        second->startTime = CmiWallTimer();
+#endif
+        
 	allocateBuffers(second); 
 	setupData(second); 
 	second->state = TRANSFERRING_IN; 	
@@ -601,6 +693,23 @@ void gpuProgressFn() {
 				gpuEvents[dataSetupIndex].cmiendTime); 
 #endif
 #endif
+#ifdef GPU_INSTRUMENT_WRS
+          {
+            if(initializedInstrument()){
+              double tt = CmiWallTimer()-(head->startTime);
+              int index = second->chareIndex;
+              char type = second->compType;
+              char phase = second->compPhase;
+
+              CkVec<RequestTimeInfo> &vec = avgTimes[index][type];
+              if(vec.length() <= phase){
+                vec.growAtLeast(phase);
+              }
+              vec[phase].transferTime += tt;
+            }
+          }
+#endif
+
 	  if (third != NULL /*&& (third->state == QUEUED)*/) {
 	    allocateBuffers(third); 
 	  }
@@ -614,6 +723,10 @@ void gpuProgressFn() {
 	  gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
 	  timeIndex++; 
+#endif
+
+#ifdef GPU_INSTRUMENT_WRS
+          second->startTime = CmiWallTimer();
 #endif
 	  //	    flushPinnedMemQueue();	    
           flushDelayedFrees();
@@ -631,6 +744,10 @@ void gpuProgressFn() {
 #endif
 	    timeIndex++; 
 #endif
+
+#ifdef GPU_INSTRUMENT_WRS
+            third->startTime = CmiWallTimer();
+#endif
 	    setupData(third); 
 	    third->state = TRANSFERRING_IN; 	
 	  }
@@ -646,6 +763,9 @@ void gpuProgressFn() {
       gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
 #endif
       timeIndex++; 
+#endif
+#ifdef GPU_INSTRUMENT_WRS
+      head->startTime = CmiWallTimer(); 
 #endif
       copybackData(head);
       head->state = TRANSFERRING_OUT;
@@ -669,6 +789,24 @@ void gpuProgressFn() {
 			    gpuEvents[dataCleanupIndex].cmiendTime); 
 #endif
 #endif
+#ifdef GPU_INSTRUMENT_WRS
+      {
+        if(initializedInstrument()){
+          double tt = CmiWallTimer()-(head->startTime);
+          int index = head->chareIndex;
+          char type = head->compType;
+          char phase = head->compPhase;
+
+          CkVec<RequestTimeInfo> &vec = avgTimes[index][type];
+          if(vec.length() <= phase){
+            vec.growAtLeast(phase);
+          }
+          vec[phase].cleanupTime += tt;
+          vec[phase].n++;
+        }
+      }
+#endif
+
       dequeue(wrQueue);
       CUDACallbackManager(head->callbackFn);
     }
@@ -845,4 +983,41 @@ void hapi_poolFree(void *ptr){
 }
 
 
+#endif
+
+#ifdef GPU_INSTRUMENT_WRS
+void hapi_initInstrument(int numChares, char types){
+  avgTimes.reserve(numChares);
+  avgTimes.length() = numChares;
+  for(int i = 0; i < numChares; i++){
+    avgTimes[i].reserve(types);
+    avgTimes[i].length() = types;
+  }
+  initialized_instrument = true;
+}
+
+bool initializedInstrument(){
+  return initialized_instrument;
+}
+
+RequestTimeInfo &hapi_queryInstrument(int chare, char type, char phase){
+  return avgTimes[chare][type][phase];
+}
+
+void hapi_clearInstrument(){
+  for(int chare = 0; chare < avgTimes.length(); chare++){
+    for(int type = 0; type < avgTimes[chare].length(); type++){
+      for(int phase = 0; phase < avgTimes[chare][type].length(); phase++){
+        avgTimes[chare][type][phase].transferTime = 0.0;
+        avgTimes[chare][type][phase].kernelTime = 0.0;
+        avgTimes[chare][type][phase].cleanupTime = 0.0;
+        avgTimes[chare][type][phase].n = 0;
+      }
+      avgTimes[chare][type].length() = 0;
+    }
+    avgTimes[chare].length() = 0;
+  }
+  avgTimes.length() = 0;
+  initialized_instrument = false;
+}
 #endif

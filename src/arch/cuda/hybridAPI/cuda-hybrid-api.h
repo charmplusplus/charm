@@ -17,7 +17,7 @@
 #ifndef __CUDA_HYBRID_API_H__
 #define __CUDA_HYBRID_API_H__
 
-#ifdef GPU_MEMPOOL
+#if defined GPU_MEMPOOL || defined GPU_INSTRUMENT_WRS
 #include "cklists.h"
 #endif
 
@@ -72,4 +72,5 @@ void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools);
 }
 #endif
 
+ 
 #endif
