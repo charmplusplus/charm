@@ -576,6 +576,7 @@ void gpuProgressFn() {
           CkVec<RequestTimeInfo> &vec = avgTimes[index][type];
           if(vec.length() <= phase){
             vec.growAtLeast(phase);
+            vec.length() = phase+1;
           }
           vec[phase].transferTime += tt;
         }
@@ -655,6 +656,7 @@ void gpuProgressFn() {
           CkVec<RequestTimeInfo> &vec = avgTimes[index][type];
           if(vec.length() <= phase){
             vec.growAtLeast(phase);
+            vec.length() = phase+1;
           }
           vec[phase].kernelTime += tt;
         }
@@ -704,6 +706,7 @@ void gpuProgressFn() {
               CkVec<RequestTimeInfo> &vec = avgTimes[index][type];
               if(vec.length() <= phase){
                 vec.growAtLeast(phase);
+                vec.length() = phase+1;
               }
               vec[phase].transferTime += tt;
             }
@@ -800,6 +803,7 @@ void gpuProgressFn() {
           CkVec<RequestTimeInfo> &vec = avgTimes[index][type];
           if(vec.length() <= phase){
             vec.growAtLeast(phase);
+            vec.length() = phase+1;
           }
           vec[phase].cleanupTime += tt;
           vec[phase].n++;
@@ -1000,8 +1004,13 @@ bool initializedInstrument(){
   return initialized_instrument;
 }
 
-RequestTimeInfo &hapi_queryInstrument(int chare, char type, char phase){
-  return avgTimes[chare][type][phase];
+RequestTimeInfo *hapi_queryInstrument(int chare, char type, char phase){
+  if(phase < avgTimes[chare][type].length()){
+    return &avgTimes[chare][type][phase];
+  }
+  else{
+    return NULL;
+  }
 }
 
 void hapi_clearInstrument(){
@@ -1020,4 +1029,5 @@ void hapi_clearInstrument(){
   avgTimes.length() = 0;
   initialized_instrument = false;
 }
+
 #endif

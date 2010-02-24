@@ -198,7 +198,7 @@ struct RequestTimeInfo {
 };
 
 void hapi_initInstrument(int nchares, char ntypes);
-RequestTimeInfo &hapi_queryInstrument(int chare, char type, char phase);
+RequestTimeInfo *hapi_queryInstrument(int chare, char type, char phase);
 #endif
 
 #endif
