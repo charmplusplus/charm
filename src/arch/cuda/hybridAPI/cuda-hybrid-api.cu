@@ -51,7 +51,7 @@ unsigned int pinnedMemQueueIndex = 0;
 pinnedMemReq pinnedMemQueue[MAX_PINNED_REQ];
 
 unsigned int currentDfr = 0;
-DelayedFreeReq delayedFreeReqs[MAX_DELAYED_FREE_REQS];
+void *delayedFreeReqs[MAX_DELAYED_FREE_REQS];
 
 #ifdef GPU_MEMPOOL
 #define GPU_MEMPOOL_NUM_SLOTS 15
@@ -141,13 +141,13 @@ cudaStream_t data_out_stream;
  *
  */
 void pinnedMallocHost(pinnedMemReq *reqs) {
-  /*
+
   if ( (cudaStreamQuery(kernel_stream) == cudaSuccess) &&
        (cudaStreamQuery(data_in_stream) == cudaSuccess) &&
        (cudaStreamQuery(data_out_stream) == cudaSuccess) ) {    
-  */
 
-  /*
+
+
     for (int i=0; i<reqs->nBuffers; i++) {
       CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **) reqs->hostPtrs[i], 
 					    reqs->sizes[i])); 
@@ -158,9 +158,6 @@ void pinnedMallocHost(pinnedMemReq *reqs) {
 
     CUDACallbackManager(reqs->callbackFn);
 
-  */
-
-    /*
   }
   else {
     pinnedMemQueue[pinnedMemQueueIndex].hostPtrs = reqs->hostPtrs;
@@ -171,36 +168,26 @@ void pinnedMallocHost(pinnedMemReq *reqs) {
       printf("Error: pinned memory request buffer is overflowing\n"); 
     }
   }
-    */  
 }
 
 void delayedFree(void *ptr){
-  currentDfr++;
   if(currentDfr == MAX_DELAYED_FREE_REQS){
-    currentDfr = 0;
-    if(!delayedFreeReqs[currentDfr].freed){
-      printf("Ran out of DFR queue space. Increase MAX_DELAYED_FREE_REQS\n");
-      exit(-1);
-    }
-    else{
-      delayedFreeReqs[currentDfr].ptr = ptr;
-      delayedFreeReqs[currentDfr].freed = false;
-    }
+    printf("Ran out of DFR queue space. Increase MAX_DELAYED_FREE_REQS\n");
+    exit(-1);
   }
+  else{
+    delayedFreeReqs[currentDfr] = ptr;
+  }
+  currentDfr++;
 }
 
-// there are smarter ways of doing this, surely.
 void flushDelayedFrees(){
-  for(int i = 0; i < MAX_DELAYED_FREE_REQS; i++){
-    if(!delayedFreeReqs[i].freed){
-      if(delayedFreeReqs[i].ptr == NULL){
-        printf("recorded NULL ptr in delayedFree()");
-        exit(-1);
-      }
-      cudaFreeHost(delayedFreeReqs[i].ptr);
-      delayedFreeReqs[i].freed = true;
-      delayedFreeReqs[i].ptr = NULL;
+  for(int i = 0; i < currentDfr; i++){
+    if(delayedFreeReqs[i] == NULL){
+      printf("recorded NULL ptr in delayedFree()");
+      exit(-1);
     }
+    cudaFreeHost(delayedFreeReqs[i]);
   }
 }
 
@@ -210,7 +197,7 @@ void flushDelayedFrees(){
  *
  */
 void flushPinnedMemQueue() {
-  /*
+
   for (int i=0; i<pinnedMemQueueIndex; i++) {
     pinnedMemReq *req = &pinnedMemQueue[i]; 
     for (int j=0; j<req->nBuffers; j++) {
@@ -222,7 +209,7 @@ void flushPinnedMemQueue() {
     CUDACallbackManager(pinnedMemQueue[i].callbackFn);    
   }
   pinnedMemQueueIndex = 0; 
-  */
+
 }
 
 /* allocateBuffers
@@ -501,16 +488,9 @@ void initHybridAPI(int myPe) {
 
 #endif
 
-  currentDfr = 0;
-  for(int i = 0; i < MAX_DELAYED_FREE_REQS; i++){
-    delayedFreeReqs[i].freed = true;
-    delayedFreeReqs[i].ptr = NULL;
-  }
-
 #ifdef GPU_INSTRUMENT_WRS
   initialized_instrument = false;
 #endif
-
 }
 
 /* gpuProgressFn
@@ -523,7 +503,7 @@ void gpuProgressFn() {
     return; 
   }
   if (isEmpty(wrQueue)) {
-    //    flushPinnedMemQueue();    
+    flushPinnedMemQueue();    
     flushDelayedFrees();
     return;
   } 
@@ -596,7 +576,6 @@ void gpuProgressFn() {
 #endif
       timeIndex++; 
 #endif
-
 #ifdef GPU_INSTRUMENT_WRS
       head->startTime = CmiWallTimer(); 
 #endif
@@ -724,7 +703,6 @@ void gpuProgressFn() {
 #endif
 	  timeIndex++; 
 #endif
-
 #ifdef GPU_INSTRUMENT_WRS
           second->startTime = CmiWallTimer();
 #endif
