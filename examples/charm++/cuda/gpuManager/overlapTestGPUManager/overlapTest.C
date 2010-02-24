@@ -73,6 +73,15 @@ void Workers::complete() {
   int size = matrixSize * matrixSize * sizeof(ElementType); 
   memcpy(C, h_C, size); 
 
+  for (int i=0; i<matrixSize; i++) {
+    for (int j=0; j<matrixSize; j++) {
+      C[i*matrixSize + j] = 0; 
+      for (int k=0; k<matrixSize; k++) {
+	C[i*matrixSize + j] += A[i*matrixSize +k] * B[k * matrixSize + j];
+      }
+    }
+  }
+
 #ifdef DEBUG
   CkPrintf("[%d] A\n", thisIndex); 
   for (int i=0; i<matrixSize; i++) {
