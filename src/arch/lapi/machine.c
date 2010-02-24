@@ -2060,24 +2060,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     check_lapi(LAPI_Qenv,(lapiContext, TASK_ID, &CmiMyNode()));
     check_lapi(LAPI_Qenv,(lapiContext, NUM_TASKS, &CmiNumNodes()));
 
-#if CMK_SMP
+    /* Make polling as the default mode as real apps have better perf */
     CsvAccess(lapiInterruptMode) = 0;
     if(CmiGetArgFlag(argv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
     if(CmiGetArgFlag(argv,"+nopoll")) CsvAccess(lapiInterruptMode) = 1;    
-#else
-    /* To make the interrupt mode as default in the non-smp case */
-    CsvAccess(lapiInterruptMode) = 1;    
-    if(CmiGetArgFlag(argv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
-    if(CmiGetArgFlag(argv,"+nopoll")) CsvAccess(lapiInterruptMode) = 1;  
-
-    if(CmiNumNodes()==1) {
-        /** 
-         *  There's a bug in LAPI with interrupt mode with only one
-         *  LAPI task, so turning off the interrupt mode. --Chao Mei
-         */
-        CsvAccess(lapiInterruptMode) = 0;
-    }
-#endif
 
     check_lapi(LAPI_Senv,(lapiContext, ERROR_CHK, lapiDebugMode));
     check_lapi(LAPI_Senv,(lapiContext, INTERRUPT_SET, CsvAccess(lapiInterruptMode)));
