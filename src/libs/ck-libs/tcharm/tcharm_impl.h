@@ -16,7 +16,6 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #include "tcharmc.h"
 #include "cklists.h"
 #include "memory-isomalloc.h"
-#include <string>
 
 class TCharmTraceLibList;
 
@@ -285,17 +284,10 @@ class TCharmAPIRoutine {
 	void *callEvent; // The BigSim-level event that called into the library
         int pe;          // in case thread migrates
 	#endif
-	#ifndef CMK_OPTIMIZE
-	double startTime;
-	char *name;
-	#endif
 
  public:
 	// Entering Charm++ from user code
 	TCharmAPIRoutine(const char *routineName, const char *libraryName)
-	#ifndef CMK_OPTIMIZE
-	    : startTime(CmiWallTimer()), name(strdup(routineName))
-	#endif
 	{
 		#ifdef CMK_BLUEGENE_CHARM
 		// Start a new event, so we can distinguish between client 
@@ -356,11 +348,6 @@ class TCharmAPIRoutine {
 		_TRACE_BG_END_EXECUTE(0);
 		_TRACE_BG_BEGIN_EXECUTE_NOMSG("user_code", &log, 0);
 		if (CmiMyPe() == pe) _TRACE_BG_ADD_BACKWARD_DEP(callEvent);
-		#endif
-		#ifndef CMK_OPTIMIZE
-		traceUserSuppliedBracketedNote(name, 0, startTime,
-					       CmiWallTimer());
-		free(name);
 		#endif
 	}
 };
