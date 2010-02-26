@@ -584,13 +584,13 @@ printError()
 
 echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
 
-Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET"' in $VERSION/tmp"
+Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET"' in $DESTINATION/tmp"
 cd $DESTINATION/tmp 
 $MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
 MAKEEXIT=$?
 [ $MAKEEXIT -ne 0 ] && printError
 
-Echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS" QUIET="$QUIET"' in $VERSION/tmp"
+Echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS" QUIET="$QUIET"' in $DESTINATION/tmp"
 $MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
 MAKEEXIT=$?
 if [ $MAKEEXIT -eq 0 ]
