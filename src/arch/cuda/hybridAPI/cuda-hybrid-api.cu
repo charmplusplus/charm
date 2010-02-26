@@ -19,6 +19,10 @@
 #include "stdio.h"
 #include <cutil.h>
 
+#if defined GPU_MEMPOOL || defined GPU_INSTRUMENT_WRS
+#include "cklists.h"
+#endif
+
 /* A function in ck.C which casts the void * to a CkCallback object
  *  and executes the callback 
  */ 
@@ -398,6 +402,7 @@ void freeMemory(workRequest *wr) {
  * the correct kernel 
  */ 
 void kernelSelect(workRequest *wr);
+void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools);
 
 /* initHybridAPI
  *   initializes the work request queue, host/device buffer pointer

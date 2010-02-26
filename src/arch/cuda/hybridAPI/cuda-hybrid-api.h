@@ -17,9 +17,6 @@
 #ifndef __CUDA_HYBRID_API_H__
 #define __CUDA_HYBRID_API_H__
 
-#if defined GPU_MEMPOOL || defined GPU_INSTRUMENT_WRS
-#include "cklists.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,7 +61,6 @@ typedef struct _bufferPool{
 // pre-allocated buffers will be at least this big
 #define GPU_MEMPOOL_MIN_BUFFER_SIZE 1024
 
-void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools);
 
 #endif
 
