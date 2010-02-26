@@ -402,7 +402,9 @@ void freeMemory(workRequest *wr) {
  * the correct kernel 
  */ 
 void kernelSelect(workRequest *wr);
+#ifdef GPU_MEMPOOL
 void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools);
+#endif
 
 /* initHybridAPI
  *   initializes the work request queue, host/device buffer pointer
