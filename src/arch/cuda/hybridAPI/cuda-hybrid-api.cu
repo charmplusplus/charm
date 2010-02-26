@@ -678,7 +678,7 @@ void gpuProgressFn() {
 #ifdef GPU_INSTRUMENT_WRS
           {
             if(initializedInstrument()){
-              double tt = CmiWallTimer()-(head->startTime);
+              double tt = CmiWallTimer()-(second->startTime);
               int index = second->chareIndex;
               char type = second->compType;
               char phase = second->compPhase;
