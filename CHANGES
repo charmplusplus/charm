@@ -81,6 +81,11 @@ Performance analysis
 Automatic Performance Tuning
  - Created an automatic tuning framework [still for experimental use only].
 
+CkMulticast
+ - Network-topology / node aware spanning trees used internally for and
+   lower bytes on the network and improved performance in multicasts and
+   reductions delegated to this library
+
 Comlib
  - Improved OneTimeMulticastStrategy classes.
 
