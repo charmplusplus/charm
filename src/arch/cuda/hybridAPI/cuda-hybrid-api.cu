@@ -534,7 +534,7 @@ void gpuProgressFn() {
 #endif
 
 #ifdef GPU_INSTRUMENT_WRS
-    head->startTime = CmiWallTimer(); 
+    head->phaseStartTime = CmiWallTimer(); 
 #endif
 
     allocateBuffers(head); 
@@ -556,7 +556,7 @@ void gpuProgressFn() {
 #ifdef GPU_INSTRUMENT_WRS
       {
         if(initializedInstrument()){
-          double tt = CmiWallTimer()-(head->startTime);
+          double tt = CmiWallTimer()-(head->phaseStartTime);
           int index = head->chareIndex;
           char type = head->compType;
           char phase = head->compPhase;
@@ -586,7 +586,7 @@ void gpuProgressFn() {
       timeIndex++; 
 #endif
 #ifdef GPU_INSTRUMENT_WRS
-      head->startTime = CmiWallTimer(); 
+      head->phaseStartTime = CmiWallTimer(); 
 #endif
 
       //flushPinnedMemQueue();
@@ -608,7 +608,7 @@ void gpuProgressFn() {
 #endif
 
 #ifdef GPU_INSTRUMENT_WRS
-        second->startTime = CmiWallTimer();
+        second->phaseStartTime = CmiWallTimer();
 #endif
 	setupData(second); 
 	second->state = TRANSFERRING_IN;
@@ -635,7 +635,7 @@ void gpuProgressFn() {
 #ifdef GPU_INSTRUMENT_WRS
       {
         if(initializedInstrument()){
-          double tt = CmiWallTimer()-(head->startTime);
+          double tt = CmiWallTimer()-(head->phaseStartTime);
           int index = head->chareIndex;
           char type = head->compType;
           char phase = head->compPhase;
@@ -663,8 +663,8 @@ void gpuProgressFn() {
 	timeIndex++; 
 #endif
 
-#ifdef GPU_INSTRUMENT_MS
-        second->startTime = CmiWallTimer();
+#ifdef GPU_INSTRUMENT_WRS
+        second->phaseStartTime = CmiWallTimer();
 #endif
         
 	allocateBuffers(second); 
@@ -685,7 +685,7 @@ void gpuProgressFn() {
 #ifdef GPU_INSTRUMENT_WRS
           {
             if(initializedInstrument()){
-              double tt = CmiWallTimer()-(second->startTime);
+              double tt = CmiWallTimer()-(second->phaseStartTime);
               int index = second->chareIndex;
               char type = second->compType;
               char phase = second->compPhase;
@@ -715,7 +715,7 @@ void gpuProgressFn() {
 	  timeIndex++; 
 #endif
 #ifdef GPU_INSTRUMENT_WRS
-          second->startTime = CmiWallTimer();
+          second->phaseStartTime = CmiWallTimer();
 #endif
 	  //	    flushPinnedMemQueue();	    
           flushDelayedFrees();
@@ -735,7 +735,7 @@ void gpuProgressFn() {
 #endif
 
 #ifdef GPU_INSTRUMENT_WRS
-            third->startTime = CmiWallTimer();
+            third->phaseStartTime = CmiWallTimer();
 #endif
 	    setupData(third); 
 	    third->state = TRANSFERRING_IN; 	
@@ -754,7 +754,7 @@ void gpuProgressFn() {
       timeIndex++; 
 #endif
 #ifdef GPU_INSTRUMENT_WRS
-      head->startTime = CmiWallTimer(); 
+      head->phaseStartTime = CmiWallTimer(); 
 #endif
       copybackData(head);
       head->state = TRANSFERRING_OUT;
@@ -781,7 +781,7 @@ void gpuProgressFn() {
 #ifdef GPU_INSTRUMENT_WRS
       {
         if(initializedInstrument()){
-          double tt = CmiWallTimer()-(head->startTime);
+          double tt = CmiWallTimer()-(head->phaseStartTime);
           int index = head->chareIndex;
           char type = head->compType;
           char phase = head->compPhase;

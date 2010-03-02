@@ -114,10 +114,14 @@ typedef struct workRequest {
   void *userData; 
 
 #ifdef GPU_INSTRUMENT_WRS
-  double startTime;
+  double phaseStartTime;
   int chareIndex;
   char compType;
   char compPhase;
+
+  workRequest(){
+    chareIndex = -1;
+  }
 #endif
 
 } workRequest; 
