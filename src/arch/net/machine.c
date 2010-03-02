@@ -2655,6 +2655,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
       CmiGetArgFlagDesc(argv,"++debug",NULL /*meaning: don't show this*/)) Cmi_truecrash = 1;
     /* netpoll disable signal */
   if (CmiGetArgFlagDesc(argv,"+netpoll","Do not use SIGIO--poll instead")) Cmi_netpoll = 1;
+  if (CmiGetArgFlagDesc(argv,"+netint","Use SIGIO")) Cmi_netpoll = 0;
     /* idlepoll use poll instead if sleep when idle */
   if (CmiGetArgFlagDesc(argv,"+idlepoll","Do not sleep when idle")) Cmi_idlepoll = 1;
     /* idlesleep use sleep instead if busywait when idle */
