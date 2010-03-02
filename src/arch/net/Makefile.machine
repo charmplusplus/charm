@@ -1,1 +1,1 @@
-$(L)/libconv-cplus-n.a: machine.c machine-dgram.c machine-tcp.c machine-eth.c machine-mx.c machine-gm.c machine.h machine-smp.c machine-ammasso.h machine-ammasso.c machine-ibverbs.c machine-pxshm.c machine-sysvshm.c conv-onesided.c immediate.c $(CVHEADERS)
+$(L)/libconv-cplus-n.a: machine.c machine-dgram.c machine-tcp.c machine-eth.c machine-mx.c machine-gm.c machine.h machine-smp.c machine-ammasso.h machine-ammasso.c machine-ibverbs.c machine-pxshm.c machine-sysvshm.c conv-onesided.c immediate.c machine-recover.c $(CVHEADERS)
