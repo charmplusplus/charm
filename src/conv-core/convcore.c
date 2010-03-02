@@ -1500,12 +1500,12 @@ int CsdScheduler(int maxmsgs)
       int *CsdStopFlag_ptr = &CpvAccess(CsdStopFlag); \
       int cycle = CpvAccess(CsdStopFlag); \
       CsdSchedulerState_t state;\
-      CsdSchedulerState_new(&state);\
+      CsdSchedulerState_new(&state);
 
 /*A message is available-- process it*/
 #define SCHEDULE_MESSAGE \
       CmiHandleMessage(msg);\
-      if (*CsdStopFlag_ptr != cycle) break;\
+      if (*CsdStopFlag_ptr != cycle) break;
 
 /*No message available-- go (or remain) idle*/
 #define SCHEDULE_IDLE \
@@ -1514,7 +1514,7 @@ int CsdScheduler(int maxmsgs)
       if (*CsdStopFlag_ptr != cycle) {\
 	CsdEndIdle();\
 	break;\
-      }\
+      }
 
 /*
 	EVAC
