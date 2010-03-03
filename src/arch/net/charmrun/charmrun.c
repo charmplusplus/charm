@@ -3277,6 +3277,8 @@ void start_nodes_local(char ** env)
 
 #ifdef __FAULT__
 
+int cur_restart_phase = 1;
+
 void refill_nodetab_entry(int crashed_node);
 nodetab_host *replacement_host(int pe);
 
@@ -3287,6 +3289,7 @@ void restart_node(int crashed_node){
 	int restart_rsh_pid;
 	char **restart_argv;
 	int status=0;
+        char phase_str[10];
 	int i;
 	/** write the startScript file to be sent**/
   	sprintf(startScript,"/tmp/charmrun.%d.%d",getpid(),pe);
@@ -3299,14 +3302,16 @@ void restart_node(int crashed_node){
 	while(arg_argv[i]!= NULL){
 		i++;
 	}
-	restart_argv = (char **)malloc(sizeof(char *)*(i+2));
+	restart_argv = (char **)malloc(sizeof(char *)*(i+3));
 	i=0;
 	while(arg_argv[i]!= NULL){
 		restart_argv[i] = arg_argv[i];
 		i++;
 	}
 	restart_argv[i] = "+restartaftercrash";
-	restart_argv[i+1]=NULL;
+        sprintf(phase_str,"%d", ++cur_restart_phase);
+	restart_argv[i+1]=phase_str;
+	restart_argv[i+2]=NULL;
 
   	rsh_script(f,pe,crashed_node,restart_argv,1);
   	fclose(f);
