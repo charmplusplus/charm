@@ -11,8 +11,8 @@ CMK_LD="$CMK_CC $CMK_AMD64 "
 CMK_LDXX="$CMK_CXX $CMK_AMD64 "
 CMK_LD_SHARED="-shared"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
-CMK_LIBDIR="-L$CUDA_DIR/lib -L$NVIDIA_CUDA_SDK/lib"
-CMK_LIBS="-lckqt -lcuda -lcudart -lGL -lcutil -lcudahybridapi"
+CMK_LIBDIR="-L$CUDA_DIR/lib64 -L$NVIDIA_CUDA_SDK/lib"
+CMK_LIBS="-lckqt -lcuda -lcudart -lGL -lcutil_x86_64 -lcudahybridapi"
 CMK_RANLIB="ranlib"
 
 # native compiler for compiling charmxi, etc

@@ -166,6 +166,7 @@ void pinnedMallocHost(pinnedMemReq *reqs) {
   else {
     pinnedMemQueue[pinnedMemQueueIndex].hostPtrs = reqs->hostPtrs;
     pinnedMemQueue[pinnedMemQueueIndex].sizes = reqs->sizes; 
+    pinnedMemQueue[pinnedMemQueueIndex].nBuffers = reqs->nBuffers; 
     pinnedMemQueue[pinnedMemQueueIndex].callbackFn = reqs->callbackFn;     
     pinnedMemQueueIndex++;
     if (pinnedMemQueueIndex == MAX_PINNED_REQ) {
