@@ -141,7 +141,7 @@ static void setspeed_gigabit()
 static void extract_args(char **argv)
 {
   int ms;
-  setspeed_eth();
+  setspeed_gigabit();
   if (CmiGetArgFlagDesc(argv,"+atm","Tune for a low-latency ATM network"))
     setspeed_atm();
   if (CmiGetArgFlagDesc(argv,"+eth","Tune for an ethernet network"))
