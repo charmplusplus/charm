@@ -181,15 +181,28 @@ inline SpanningTreeVertex* buildSpanningTreeGeneration(const Iterator firstVtx,
                                                        SpanningTreeStrategy<Iterator> *bldr
                                                       )
 {
+    SpanningTreeVertex *result = 0;
+
     /// Validate input. Invalid inputs are not exceptions. They are just no-ops
     if (maxBranches < 1 || firstVtx == beyondLastVtx)
-        return (new SpanningTreeVertex() );
+        return (result = new SpanningTreeVertex() );
+
+    // Should the tree builder strategy object be deleted?
+    bool shouldDelete = false;
 
     /// If no strategy is passed in, instantiate one
     if (bldr == 0)
+    {
         bldr = getSpanningTreeStrategy(firstVtx,beyondLastVtx,maxBranches);
+        /// and remember to delete it after you're done
+        shouldDelete = true;
+    }
 
-    return bldr->buildNextGen(firstVtx,beyondLastVtx,maxBranches);
+    /// Delegate the actual work
+    result = bldr->buildNextGen(firstVtx,beyondLastVtx,maxBranches);
+
+    if (shouldDelete) delete bldr;
+    return result;
 }
 
 
@@ -249,12 +262,21 @@ inline void buildSpanningTree(const Iterator firstVtx,
                               SpanningTreeStrategy<Iterator> *bldr
                              )
 {
+    // Should the tree builder strategy object be deleted?
+    bool shouldDelete = false;
     /// If no strategy is passed in, instantiate one
-    if (bldr == 0) bldr = getSpanningTreeStrategy(firstVtx,beyondLastVtx,maxBranches);
+    if (bldr == 0)
+    {
+        bldr = getSpanningTreeStrategy(firstVtx,beyondLastVtx,maxBranches);
+        /// and remember to delete it after you're done
+        shouldDelete = true;
+    }
     /// Create a tag
     typename std::iterator_traits<Iterator>::value_type *tag = 0;
     /// Delegate the work
     impl::buildSpanningTree(tag,firstVtx,beyondLastVtx,maxBranches,bldr);
+    /// Delete the builder if it was not passed in
+    if (shouldDelete) delete bldr;
 }
 
 } // end namespace topo
