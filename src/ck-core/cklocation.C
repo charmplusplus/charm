@@ -307,7 +307,7 @@ public:
     } else if (i.nInts == 2) {
       flati = i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1];
     } else if (i.nInts == 3) {
-      flati = (i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1]) * arrs[arrayHdl]->_nelems.data()[2] + i.data()[2];
+      flati = (i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] * arrs[arrayHdl]->_nelems.data()[2] + i.data()[1]) * arrs[arrayHdl]->_nelems.data()[2] + i.data()[2];
     } else {
       CkAbort("CkArrayIndex has more than 3 integers!");
     }
@@ -1533,8 +1533,13 @@ private:
 public:
 	CkLocRec_buffering(CkLocMgr *Narr):CkLocRec_aging(Narr) {}
 	virtual ~CkLocRec_buffering() {
-		if (0!=buffer.length())
+		if (0!=buffer.length()) {
 			CkPrintf("[%d] Warning: Messages abandoned in array manager buffer!\n", CkMyPe());
+			CkArrayMessage *m;
+			while (NULL!=(m=buffer.deq()))  {
+				delete m;
+			}
+		}
 	}
   
 	virtual RecType type(void) {return buffering;}
@@ -1546,8 +1551,8 @@ public:
 			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
 		buffer.enq(msg);
 #ifdef _FAULT_MLOG_
-        envelope *env = UsrToEnv(msg);
-        env->sender = CpvAccess(_currentObj)->mlogData->objID;
+		envelope *env = UsrToEnv(msg);
+		env->sender = CpvAccess(_currentObj)->mlogData->objID;
 #endif
 		return CmiTrue;
 	}
@@ -1560,27 +1565,27 @@ public:
 		CkArrayMessage *m;
 		while (NULL!=(m=buffer.deq())) {
 #ifdef _FAULT_MLOG_         
-            DEBUG(CmiPrintf("[%d] buffered message being sent\n",CmiMyPe()));
-            envelope *env = UsrToEnv(m);
-            Chare *oldObj = CpvAccess(_currentObj);
-            CpvAccess(_currentObj) =(Chare *) env->sender.getObject();
-            env->sender.type = TypeInvalid;
+		DEBUG(CmiPrintf("[%d] buffered message being sent\n",CmiMyPe()));
+		envelope *env = UsrToEnv(m);
+		Chare *oldObj = CpvAccess(_currentObj);
+		CpvAccess(_currentObj) =(Chare *) env->sender.getObject();
+		env->sender.type = TypeInvalid;
 #endif
-			DEBS((AA"Sending buffered message to %s\n"AB,idx2str(m->array_index())));
-			myLocMgr->deliverViaQueue(m);
+		DEBS((AA"Sending buffered message to %s\n"AB,idx2str(m->array_index())));
+		myLocMgr->deliverViaQueue(m);
 #ifdef _FAULT_MLOG_         
-            CpvAccess(_currentObj) = oldObj;
+		CpvAccess(_currentObj) = oldObj;
 #endif
 		}
 	}
   
 	//Return if this element is now obsolete
 	virtual CmiBool isObsolete(int nSprings,const CkArrayIndex &idx) {
-		if (isStale()) {
+		if (isStale() && buffer.length()>0) {
 			/*This indicates something is seriously wrong--
 			  buffers should be short-lived.*/
-			CkPrintf("WARNING: %d stale array message(s) found!\n",buffer.length());
-			CkArrayMessage *msg=buffer.deq();
+			CkPrintf("[%d] WARNING: %d stale array message(s) found!\n",CkMyPe(),buffer.length());
+			CkArrayMessage *msg=buffer[0];
 			CkPrintf("Addressed to: ");
 			CkPrintEntryMethod(msg->array_ep());
 			CkPrintf(" index %s\n",idx2str(idx));
@@ -2003,6 +2008,9 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 	    #endif
 		int home=homePe(idx);
 		if (home!=CkMyPe())
+#if CMK_MEM_CHECKPOINT
+	        if (!CkInRestarting()) // all array elements are removed anyway
+#endif
 			thisProxy[home].reclaimRemote(idx,CkMyPe());
 	/*	//Install a zombie to keep the living from re-using this index.
 		insertRecN(new CkLocRec_dead(this),idx); */
@@ -2595,9 +2603,9 @@ void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p,int dummy)
     }
 }
 #else
-void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p)
+void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p, CmiBool notify)
 {
-	CkLocRec_local *rec=createLocal(idx,CmiFalse,CmiFalse,CmiTrue /* home doesn't know yet */ );
+	CkLocRec_local *rec=createLocal(idx,CmiFalse,CmiFalse,notify /* home doesn't know yet */ );
 
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec,CkElementCreation_resume);

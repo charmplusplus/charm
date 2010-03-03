@@ -624,7 +624,7 @@ public:
 #ifdef _FAULT_MLOG_
 	void resume(const CkArrayIndex &idx, PUP::er &p,int dummy=0);
 #else
-	void resume(const CkArrayIndex &idx, PUP::er &p);
+	void resume(const CkArrayIndex &idx, PUP::er &p, CmiBool notify=CmiTrue);
 #endif
 
 //Communication:
