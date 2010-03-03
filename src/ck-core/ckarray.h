@@ -539,7 +539,7 @@ public:
   ArrayElement(CkMigrateMessage *m);
   virtual ~ArrayElement();
 
-  int numElements; /// Initial number of array elements (DEPRICATED)
+  int _numElements; /// Initial number of array elements (DEPRICATED)
   // On the previous line, someone wrote "deprecated", but nevertheless it is still
   // used on TempoArray (tempo.C), ampi.C, irecv (receiver.h), as well as many tests and examples!
 
