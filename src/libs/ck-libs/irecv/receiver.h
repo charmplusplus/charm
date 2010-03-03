@@ -76,7 +76,7 @@ public:
   receiver(CkMigrateMessage *);
   ~receiver();
 
-  int getArraySize(void) const {return numElements;}
+  int getArraySize(void) const {return _numElements;}
 
   // interface
   void isend(void *buf, int count, int datatype, int dest, int tag, int refno);
