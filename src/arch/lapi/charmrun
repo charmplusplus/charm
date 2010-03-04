@@ -38,6 +38,10 @@ while [ $# -gt 0 ]
 	  llfile=$2
 	  shift
 	  ;;
+      +name)
+	  jobname=$2
+	  shift
+	  ;;
       *)
 	  args=$args"$1 "
 	  ;;
@@ -204,11 +208,16 @@ if [ $present -eq 0 ]
 EOF
 fi
 
+if [ -z "$jobname" ]
+    then
+    jobname=$executable
+fi
+
 present=`grep job_name $llfile|wc -l`
 if [ $present -eq 0 ]
     then
     cat >> $filename <<EOF
-#@ job_name = charmrun_$executable.$$
+#@ job_name = charmrun_$jobname.$$
 EOF
 fi
 
@@ -234,15 +243,15 @@ if [ $interactive -ne 0 ]
     if [ $present -eq 0 ]
 	then
 	cat >> $filename <<EOF
-#@ output = output_$executable.$$
+#@ output = output_$jobname.$$
 EOF
     fi
 
     present=`grep error $llfile|wc -l`
     if [ $present -eq 0 ]
-    then
-	cat >> $filename <<EOF
-#@ error = error_$executable.$$
+        then
+        cat >> $filename <<EOF
+#@ error = error_$jobname.$$
 EOF
     fi
 fi
