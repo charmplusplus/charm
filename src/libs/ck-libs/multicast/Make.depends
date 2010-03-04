@@ -3,8 +3,8 @@ ckmulticast.o: ckmulticast.C ../../../../tmp/charm++.h \
   ../../../../tmp/charm.h ../../../../tmp/converse.h \
   ../../../../tmp/conv-config.h ../../../../tmp/conv-autoconfig.h \
   ../../../../tmp/conv-common.h ../../../../tmp/conv-mach.h \
-  ../../../../tmp/conv-mach-opt.h ../../../../tmp/cc-xlc64.h \
-  ../../../../tmp/pup_c.h ../../../../tmp/conv-cpm.h \
+  ../../../../tmp/conv-mach-opt.h ../../../../tmp/pup_c.h \
+  ../../../../tmp/queueing.h ../../../../tmp/conv-cpm.h \
   ../../../../tmp/conv-cpath.h ../../../../tmp/conv-qd.h \
   ../../../../tmp/conv-random.h ../../../../tmp/conv-lists.h \
   ../../../../tmp/conv-trace.h ../../../../tmp/persistent.h \
@@ -39,5 +39,13 @@ ckmulticast.o: ckmulticast.C ../../../../tmp/charm++.h \
   ../../../../tmp/ckarrayreductionmgr.h ../../../../tmp/trace.h \
   ../../../../tmp/trace-bluegene.h ../../../../tmp/envelope.h \
   ../../../../tmp/envelope.h ../../../../tmp/register.h ckmulticast.h \
-  ../../../../tmp/pup.h CkMulticast.decl.h CkMulticast.def.h
+  ../../../../tmp/pup.h CkMulticast.decl.h \
+  ../../../../tmp/spanningTreeStrategy.h \
+  ../../../../tmp/spanningTreeVertex.h \
+  ../../../../tmp/treeStrategy_topoUnaware.h \
+  ../../../../tmp/treeStrategy_nodeAware_minGens.h \
+  ../../../../tmp/treeStrategy_nodeAware_minBytes.h \
+  ../../../../tmp/treeStrategy_3dTorus_minHops.h \
+  ../../../../tmp/TopoManager.h \
+  ../../../../tmp/treeStrategy_3dTorus_minBytesHops.h CkMulticast.def.h
 	$(CHARMC) -I../../../../tmp -o ckmulticast.o ckmulticast.C
