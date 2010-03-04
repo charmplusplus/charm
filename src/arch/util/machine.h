@@ -55,7 +55,7 @@ Displaying lower priority messages doesn't stop higher priority ones.
 
 extern FILE *debugLog;
 # define MACHSTATE_I(prio,args) if ((debugLog)&&(prio)>=MACHINE_DEBUG_PRIO) {\
-	fprintf args ; fflush(debugLog); }
+	CmiMemLock(); fprintf args ; fflush(debugLog); CmiMemUnlock(); }
 # define MACHSTATE(prio,str) \
 	MACHSTATE_I(prio,(debugLog,"[%d %.6f]> "str"\n",CmiMyRank(),CmiWallTimer()))
 # define MACHSTATE1(prio,str,a) \
