@@ -992,7 +992,7 @@ TraceProjections::TraceProjections(char **argv):
   _logPool->setBinary(binary);
 #if CMK_PROJECTIONS_USE_ZLIB
   _logPool->setCompressed(compressed);
-#endif CMK_PROJECTIONS_USE_ZLIB
+#endif
   if (CkMyPe() == 0) {
     _logPool->createSts();
     _logPool->createRC();
@@ -1020,7 +1020,7 @@ TraceProjections::TraceProjections(char **argv):
   }
   papiValues = new long_long[numPAPIEvents];
   memset(papiValues, 0, numPAPIEvents*sizeof(long_long));
-#endif CMK_HAS_COUNTER_PAPI
+#endif
 }
 
 int TraceProjections::traceRegisterUserEvent(const char* evt, int e)
