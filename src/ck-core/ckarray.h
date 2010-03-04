@@ -533,9 +533,7 @@ class ArrayElement : public CkMigratable
 {
   friend class CkArray;
   friend class CkArrayListener;
-  int _numElements; /// Initial number of array elements (DEPRICATED)
-  // On the previous line, someone wrote "deprecated", but nevertheless it is still
-  // used on TempoArray (tempo.C), ampi.C, irecv (receiver.h), as well as many tests and examples!
+  int numInitialElements; // Number of elements created by ckNew(numElements)
   void initBasics(void);
 public:
   ArrayElement(void);
@@ -563,7 +561,7 @@ public:
 
   inline const CkArrayID &ckGetArrayID(void) const {return thisArrayID;}
 
-  inline int ckGetArraySize(void) const { return _numElements; }
+  inline int ckGetArraySize(void) const { return numInitialElements; }
 protected:
   CkArray *thisArray;//My source array
   CkArrayID thisArrayID;//My source array's ID
