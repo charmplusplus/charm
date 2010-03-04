@@ -161,7 +161,7 @@ void pinnedMallocHost(pinnedMemReq *reqs) {
     free(reqs->sizes);
 
     CUDACallbackManager(reqs->callbackFn);
-
+    gpuProgressFn(); 
   }
   else {
     pinnedMemQueue[pinnedMemQueueIndex].hostPtrs = reqs->hostPtrs;
@@ -768,7 +768,9 @@ void gpuProgressFn() {
       */
   }
   if (head->state == TRANSFERRING_OUT) {
-    if (cudaStreamQuery(data_out_stream) == cudaSuccess && cudaStreamQuery(kernel_stream) == cudaSuccess){
+    if (cudaStreamQuery(data_in_stream) == cudaSuccess &&
+	cudaStreamQuery(data_out_stream) == cudaSuccess && 
+	cudaStreamQuery(kernel_stream) == cudaSuccess){
       freeMemory(head); 
 #ifdef GPU_PROFILE
       gpuEvents[dataCleanupIndex].endTime = cutGetTimerValue(timerHandle);
@@ -800,6 +802,7 @@ void gpuProgressFn() {
 
       dequeue(wrQueue);
       CUDACallbackManager(head->callbackFn);
+      gpuProgressFn(); 
     }
   }
 }
