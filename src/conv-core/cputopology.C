@@ -353,6 +353,9 @@ extern "C" void CmiInitCPUTopology(char **argv)
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
 					   "obtain cpu topology info");
   obtain_flag = 1;
+#if __FAULT__
+  obtain_flag = 0;
+#endif
   if (CmiGetArgFlagDesc(argv,"+skip_cpu_topology",
                                "skip the processof getting cpu topology info"))
     obtain_flag = 0;
@@ -367,7 +370,10 @@ extern "C" void CmiInitCPUTopology(char **argv)
      CmiRegisterHandler((CmiHandler)cpuTopoRecvHandler);
   }
 
-  if (!obtain_flag) return;
+  if (!obtain_flag) {
+    cpuTopo.sort();
+    return;
+  }
   else if (CmiMyPe() == 0) {
 #if CMK_BLUEGENE_CHARM
   if (BgNodeRank() == 0)
