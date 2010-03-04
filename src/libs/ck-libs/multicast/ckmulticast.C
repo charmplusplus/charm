@@ -570,6 +570,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         childrenReady(entry);
     }
     delete [] lists;
+    delete msg;
 }
 
 

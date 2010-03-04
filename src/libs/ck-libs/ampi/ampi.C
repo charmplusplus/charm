@@ -1122,7 +1122,7 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
 
   comlibProxy = thisProxy; // Will later be associated with comlib
   
-  seqEntries=parent->numElements;
+  seqEntries=parent->ckGetArraySize();
   oorder.init (seqEntries);
 #ifdef _FAULT_MLOG_
     if(thisIndex == 0){
@@ -1158,7 +1158,7 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s, ComlibInstanceHandle ciStr
   //  ComlibAssociateProxy(ciAlltoall, comlibProxy);
 #endif
 
-  seqEntries=parent->numElements;
+  seqEntries=parent->ckGetArraySize();
   oorder.init (seqEntries);
 }
 

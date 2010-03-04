@@ -173,7 +173,7 @@ int Cmi_commthread = 1;
 #define MAX_MSG_SEQNO 65535
 /* MAX_WINDOW_SIZE should be smaller than MAX_MSG_SEQNO, and MAX(unsigned char) */
 #define MAX_WINDOW_SIZE 128
-int CUR_WINDOW_SIZE=8;
+#define INIT_WINDOW_SIZE 8
 
 /* The lock to ensure the completion handler (PumpMsgsComplete) is thread-safe */
 CmiNodeLock cmplHdlrThdLock = NULL;
@@ -207,6 +207,7 @@ typedef struct MsgOrderInfoStruct{
     int *expectedMsgSeqNo;        
     void ***oooMsgBuffer;
     unsigned char *oooMaxOffset;
+    unsigned char *CUR_WINDOW_SIZE;
 }MsgOrderInfo;
 
 /** 
@@ -628,7 +629,7 @@ static int CheckMsgInOrder(char *msg, MsgOrderInfo *info){
     int srcpe, destrank; 
     int incomingSeqNo, expectedSeqNo;
     int curOffset, maxOffset;
-    int i;
+    int i, curWinSize;
     void **destMsgBuffer = NULL;
 
     /* numMsg is the number of msgs to be processed in this buffer*/
@@ -648,7 +649,8 @@ static int CheckMsgInOrder(char *msg, MsgOrderInfo *info){
         maxOffset = (info->oooMaxOffset)[srcpe];
         if(maxOffset>0) {
             MACHSTATE1(4, "Processing all buffered ooo msgs (maxOffset=%d) including the just recved begin {", maxOffset);
-            toProcessMsgBuffer = malloc((CUR_WINDOW_SIZE+1)*sizeof(void *));
+            curWinSize = info->CUR_WINDOW_SIZE[srcpe];
+            toProcessMsgBuffer = malloc((curWinSize+1)*sizeof(void *));
             /* process the msg just recved */
             toProcessMsgBuffer[numMsgs++] = msg;            
             /* process the buffered ooo msg until the first empty slot in the window */
@@ -728,10 +730,11 @@ static int CheckMsgInOrder(char *msg, MsgOrderInfo *info){
         }        
     }
 
-    MACHSTATE2(4, "Receiving an out-of-order msg with seqno=%d, but expect seqno=%d\n", incomingSeqNo, expectedSeqNo);
-    if((info->oooMsgBuffer)[srcpe]==NULL) {
-        (info->oooMsgBuffer)[srcpe] = malloc(CUR_WINDOW_SIZE*sizeof(void *));
-        memset((info->oooMsgBuffer)[srcpe], 0, CUR_WINDOW_SIZE*sizeof(void *));
+    MACHSTATE2(4, "Receiving an out-of-order msg with seqno=%d, but expect seqno=%d", incomingSeqNo, expectedSeqNo);
+    curWinSize = info->CUR_WINDOW_SIZE[srcpe];
+    if((info->oooMsgBuffer)[srcpe]==NULL) {        
+        (info->oooMsgBuffer)[srcpe] = malloc(curWinSize*sizeof(void *));
+        memset((info->oooMsgBuffer)[srcpe], 0, curWinSize*sizeof(void *));
     }
     destMsgBuffer = (info->oooMsgBuffer)[srcpe];
     curOffset = incomingSeqNo - expectedSeqNo;
@@ -740,15 +743,17 @@ static int CheckMsgInOrder(char *msg, MsgOrderInfo *info){
         /* It's possible that the seqNo starts with another round (exceeding MAX_MSG_SEQNO) with 1 */
         curOffset += MAX_MSG_SEQNO;
     }
-    if(curOffset > CUR_WINDOW_SIZE) {
+    if(curOffset > curWinSize) {
+        int newWinSize;
         if(curOffset > MAX_WINDOW_SIZE) {
             CmiAbort("Exceeding the MAX_WINDOW_SIZE!\n");
         }
-        CmiPrintf("[%d]: WARNING: DOUBLING WINDOW SIZE TO %d\n", CmiMyPe(), CUR_WINDOW_SIZE*2);
-        (info->oooMsgBuffer)[srcpe] = malloc(CUR_WINDOW_SIZE*2*sizeof(void *));
-        memset((info->oooMsgBuffer)[srcpe], 0, CUR_WINDOW_SIZE*2*sizeof(void *));
-        memcpy((info->oooMsgBuffer)[srcpe], destMsgBuffer, CUR_WINDOW_SIZE*sizeof(void *));
-        CUR_WINDOW_SIZE *= 2;
+        newWinSize = ((curOffset/curWinSize)+1)*curWinSize;
+        /*CmiPrintf("[%d]: WARNING: INCREASING WINDOW SIZE FROM %d TO %d\n", CmiMyPe(), curWinSize, newWinSize);*/
+        (info->oooMsgBuffer)[srcpe] = malloc(newWinSize*sizeof(void *));
+        memset((info->oooMsgBuffer)[srcpe], 0, newWinSize*sizeof(void *));
+        memcpy((info->oooMsgBuffer)[srcpe], destMsgBuffer, curWinSize*sizeof(void *));
+        info->CUR_WINDOW_SIZE[srcpe] = newWinSize;
         free(destMsgBuffer);
         destMsgBuffer = (info->oooMsgBuffer)[srcpe];
     }    
@@ -1844,6 +1849,7 @@ CpvDeclare(FILE *, debugLog);
 
 #if ENSURE_MSG_PAIRORDER
 static void initMsgOrderInfo(MsgOrderInfo *info){
+    int i;
     info->nextMsgSeqNo = malloc(CmiNumPes()*sizeof(int));
     memset(info->nextMsgSeqNo, 0, CmiNumPes()*sizeof(int));
     
@@ -1855,6 +1861,9 @@ static void initMsgOrderInfo(MsgOrderInfo *info){
     
     info->oooMaxOffset = malloc(CmiNumPes()*sizeof(unsigned char));
     memset(info->oooMaxOffset, 0, CmiNumPes()*sizeof(unsigned char));
+
+    info->CUR_WINDOW_SIZE = malloc(CmiNumPes()*sizeof(unsigned char));
+    for(i=0; i<CmiNumPes(); i++) info->CUR_WINDOW_SIZE[i] = INIT_WINDOW_SIZE;
 }
 #endif
 
@@ -2051,24 +2060,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     check_lapi(LAPI_Qenv,(lapiContext, TASK_ID, &CmiMyNode()));
     check_lapi(LAPI_Qenv,(lapiContext, NUM_TASKS, &CmiNumNodes()));
 
-#if CMK_SMP
+    /* Make polling as the default mode as real apps have better perf */
     CsvAccess(lapiInterruptMode) = 0;
     if(CmiGetArgFlag(argv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
     if(CmiGetArgFlag(argv,"+nopoll")) CsvAccess(lapiInterruptMode) = 1;    
-#else
-    /* To make the interrupt mode as default in the non-smp case */
-    CsvAccess(lapiInterruptMode) = 1;    
-    if(CmiGetArgFlag(argv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
-    if(CmiGetArgFlag(argv,"+nopoll")) CsvAccess(lapiInterruptMode) = 1;  
-
-    if(CmiNumNodes()==1) {
-        /** 
-         *  There's a bug in LAPI with interrupt mode with only one
-         *  LAPI task, so turning off the interrupt mode. --Chao Mei
-         */
-        CsvAccess(lapiInterruptMode) = 0;
-    }
-#endif
 
     check_lapi(LAPI_Senv,(lapiContext, ERROR_CHK, lapiDebugMode));
     check_lapi(LAPI_Senv,(lapiContext, INTERRUPT_SET, CsvAccess(lapiInterruptMode)));

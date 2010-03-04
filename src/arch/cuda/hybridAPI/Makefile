@@ -1,10 +1,9 @@
 CHARMDIR=../../
 CHARMC=$(CHARMDIR)/bin/charmc
 
-NVCC = /usr/local/cuda/bin/nvcc
-NVCC_FLAGS = -c -use_fast_math #-device-debug -deviceemu
-NVCC_INC = -I/usr/local/cuda/include -I$(HOME)/NVIDIA_CUDA_SDK/common/inc 
-
+NVCC = $(CUDA_DIR)/bin/nvcc
+NVCC_FLAGS = -c -use_fast_math #-DGPU_MEMPOOL -DGPU_MEMPOOL_DEBUG -DGPU_WRQ_VERBOSE #-device-debug -deviceemu
+NVCC_INC = -I$(CUDA_DIR)/include -I$(NVIDIA_CUDA_SDK)/common/inc -I.. 
 
 RM = rm -f
 

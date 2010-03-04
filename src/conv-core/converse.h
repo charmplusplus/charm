@@ -1471,10 +1471,11 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #define CcdPERIODIC_10seconds 20 /*every 10 seconds*/
 #define CcdPERIODIC_10s      20 /*every 10 seconds*/
 #define CcdPERIODIC_1minute  21 /*every minute*/
-#define CcdPERIODIC_10minute 22 /*every 10 minutes*/
-#define CcdPERIODIC_1hour    23 /*every hour*/
-#define CcdPERIODIC_12hour   24 /*every 12 hours*/
-#define CcdPERIODIC_1day     25 /*every day*/
+#define CcdPERIODIC_5minute  22 /*every 5 minute*/
+#define CcdPERIODIC_10minute 23 /*every 10 minutes*/
+#define CcdPERIODIC_1hour    24 /*every hour*/
+#define CcdPERIODIC_12hour   25 /*every 12 hours*/
+#define CcdPERIODIC_1day     26 /*every day*/
 
 /*Other conditions*/
 #define CcdQUIESCENCE 30

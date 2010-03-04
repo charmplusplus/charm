@@ -312,6 +312,7 @@ void CpdFreezeModeScheduler(void)
 #endif
 }
 
+void CpdMemoryMarkClean(char *msg);
 
 void CpdInit(void)
 {
@@ -338,6 +339,9 @@ void CpdInit(void)
   CpvInitialize(int, CpdSearchLeaksDone_Index);
   CpvAccess(CpdSearchLeaksDone_Index) = CmiRegisterHandler((CmiHandler)CpdSearchLeaksDone);
   
+  CcsRegisterHandler("converse_memory_mark",(CmiHandler)CpdMemoryMarkClean);
+  CcsSetMergeFn("converse_memory_mark", CcsMerge_concat);
+
   _debugHandlerIdx = CmiRegisterHandler((CmiHandler)handleDebugMessage);
 #if 0
   CpdInitializeObjectTable();

@@ -184,7 +184,7 @@ void ArrayElement::initBasics(void)
   ArrayElement_initInfo &info=CkpvAccess(initInfo);
   thisArray=info.thisArray;
   thisArrayID=info.thisArrayID;
-  numElements=info.numInitial.getCombinedCount();
+  numInitialElements=info.numInitial.getCombinedCount();
   if (info.listenerData) {
     memcpy(listenerData,info.listenerData,sizeof(listenerData));
   }

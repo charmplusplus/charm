@@ -533,15 +533,12 @@ class ArrayElement : public CkMigratable
 {
   friend class CkArray;
   friend class CkArrayListener;
+  int numInitialElements; // Number of elements created by ckNew(numElements)
   void initBasics(void);
 public:
   ArrayElement(void);
   ArrayElement(CkMigrateMessage *m);
   virtual ~ArrayElement();
-
-  int numElements; /// Initial number of array elements (DEPRICATED)
-  // On the previous line, someone wrote "deprecated", but nevertheless it is still
-  // used on TempoArray (tempo.C), ampi.C, irecv (receiver.h), as well as many tests and examples!
 
 /// Pack/unpack routine (called before and after migration)
   virtual void pup(PUP::er &p);
@@ -562,8 +559,9 @@ public:
 
   CK_REDUCTION_CONTRIBUTE_METHODS_DECL
 
-  const CkArrayID &ckGetArrayID(void) const {return thisArrayID;}
+  inline const CkArrayID &ckGetArrayID(void) const {return thisArrayID;}
 
+  inline int ckGetArraySize(void) const { return numInitialElements; }
 protected:
   CkArray *thisArray;//My source array
   CkArrayID thisArrayID;//My source array's ID
