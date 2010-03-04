@@ -62,20 +62,23 @@ public:
   void pup(PUP::er& p);
   inline int BuddyPE(int pe);
   void doItNow(int sp, CkCallback &);
-  void restart(int failedPe);
+  void restart(int diePe);
   void removeArrayElements();
   void createEntry(CkArrayID aid, CkGroupID loc, CkArrayIndexMax index, int buddy);
   void recvData(CkArrayCheckPTMessage *);
+  void gotData();
   void recvProcData(CkProcCheckPTMessage *);
   void cpFinish();
   void syncFiles(CkReductionMsg *);
   void report();
   void recoverBuddies();
+  void recoverEntry(CkArrayCheckPTMessage *msg);
   void recoverArrayElements();
   void quiescence(CkCallback &);
   void resetReductionMgr();
   void finishUp();
   void inmem_restore(CkArrayCheckPTMessage *m);
+  void updateLocations(int n, CkGroupID *g, CkArrayIndexMax *idx,int nowOnPe);
   void resetLB(int diepe);
 public:
   static CkCallback  cpCallback;
@@ -87,6 +90,7 @@ private:
   CkVec<CkCheckPTInfo *> ckTable;
 
   int recvCount, peCount;
+  int expectCount, ackCount;
     /// the processor who initiate the checkpointing
   int cpStarter;
   CkVec<int> failedPes;
@@ -112,6 +116,6 @@ void CkMemRestart(const char *, CkArgMsg *);
 void CkStartMemCheckpoint(CkCallback &cb);
 
 // true if inside a restarting phase
-int CkInRestarting(); 
+extern "C" int CkInRestarting(); 
 
 #endif

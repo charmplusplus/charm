@@ -1351,20 +1351,6 @@ void CsdEndIdle(void)
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
-#if CMK_MEM_CHECKPOINT
-#define MESSAGE_PHASE_CHECK	\
-	{	\
-          int phase = CmiGetRestartPhase(msg);	\
-	  if (phase < cur_restart_phase) {	\
-            /*CmiPrintf("[%d] discard message of phase %d cur_restart_phase:%d handler:%d. \n", CmiMyPe(), phase, cur_restart_phase, handler);*/	\
-            CmiFree(msg);	\
-	    return;	\
-          }	\
-	}
-#else
-#define MESSAGE_PHASE_CHECK
-#endif
-
 extern int _exitHandlerIdx;
 
 /** Takes a message and calls its corresponding handler. */
@@ -1387,7 +1373,7 @@ void CmiHandleMessage(void *msg)
 		return;
 	}*/
 	
-        MESSAGE_PHASE_CHECK
+        MESSAGE_PHASE_CHECK(msg)
 
 	h=&CmiGetHandlerInfo(msg);
 	(h->hdlr)(msg,h->userPtr);

@@ -1088,6 +1088,8 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 {
   register envelope *env = (envelope *) converseMsg;
 
+  MESSAGE_PHASE_CHECK(env);
+
 //#if CMK_RECORD_REPLAY
   if (ck->watcher!=NULL) {
     if (!ck->watcher->processMessage(env,ck)) return;
@@ -1258,9 +1260,9 @@ void CkUnpackMessage(envelope **pEnv)
 
 static int index_objectQHandler;
 int index_tokenHandler;
-static int index_skipCldHandler;
+int index_skipCldHandler;
 
-static void _skipCldHandler(void *converseMsg)
+void _skipCldHandler(void *converseMsg)
 {
   register envelope *env = (envelope *)(converseMsg);
   CmiSetHandler(converseMsg, CmiGetXHandler(converseMsg));
@@ -1584,7 +1586,7 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
   int numPes;
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
 #ifdef _FAULT_MLOG_
-        sendTicketGroupRequest(env,pe,_infoIdx);
+  sendTicketGroupRequest(env,pe,_infoIdx);
 #else
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
   _TRACE_CREATION_N(env, numPes);
@@ -1909,7 +1911,7 @@ void CkArrayManagerDeliver(int pe,void *msg, int opts) {
   register envelope *env = UsrToEnv(msg);
   _prepareOutgoingArrayMsg(env,ForArrayEltMsg);
 #ifdef _FAULT_MLOG_
-        sendTicketArrayRequest(env,pe,_infoIdx);
+   sendTicketArrayRequest(env,pe,_infoIdx);
 #else
   if (opts & CK_MSG_IMMEDIATE)
     CmiBecomeImmediate(env);

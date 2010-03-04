@@ -246,12 +246,12 @@ static inline void _parseCommandLineOpts(char **argv)
   if(CmiGetArgString(argv,"+restart",&_restartDir))
       faultFunc = CkRestartMain;
 #if __FAULT__
-  if (CmiGetArgFlagDesc(argv,"+restartaftercrash","restarting this processor after a crash")){	
+  if (CmiGetArgIntDesc(argv,"+restartaftercrash",&cur_restart_phase,"restarting this processor after a crash")){	
 # if CMK_MEM_CHECKPOINT
       faultFunc = CkMemRestart;
 # endif
 #ifdef _FAULT_MLOG_
-            faultFunc = CkMlogRestart;
+      faultFunc = CkMlogRestart;
 #endif
       CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
   }
@@ -316,7 +316,13 @@ static void _bufferHandler(void *msg)
 
 static void _discardHandler(envelope *env)
 {
+//  MESSAGE_PHASE_CHECK(env);
+
   DEBUGF(("[%d] _discardHandler called.\n", CkMyPe()));
+#if CMK_MEM_CHECKPOINT
+  CkPrintf("[%d] _discardHandler called!\n", CkMyPe());
+  if (CkInRestarting()) CpvAccess(_qd)->process();
+#endif
   CmiFree(env);
 }
 
@@ -383,6 +389,28 @@ static inline void _sendStats(void)
 
 #ifdef _FAULT_MLOG_
 extern void _messageLoggingExit();
+#endif
+
+#if __FAULT__
+//CpvExtern(int, CldHandlerIndex);
+//extern "C" void CldHandler(char *);
+extern int index_skipCldHandler;
+extern void _skipCldHandler(void *converseMsg);
+
+void _discard_charm_message()
+{
+  CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
+//  CkNumberHandler(CpvAccess(CldHandlerIndex), (CmiHandler)_discardHandler);
+  CkNumberHandler(index_skipCldHandler, (CmiHandler)_discardHandler);
+}
+
+void _resume_charm_message()
+{
+  CkNumberHandlerEx(_charmHandlerIdx,(CmiHandlerEx)_processHandler,
+  	CkpvAccess(_coreState));
+//  CkNumberHandler(CpvAccess(CldHandlerIndex), (CmiHandler)CldHandler);
+  CkNumberHandler(index_skipCldHandler, (CmiHandler)_skipCldHandler);
+}
 #endif
 
 static void _exitHandler(envelope *env)
@@ -1091,8 +1119,8 @@ void _initCharm(int unused_argc, char **argv)
 #if ! CMK_BLUEGENE_CHARM
           CmiInitCPUAffinity(argv);
 #endif
-          CmiInitCPUTopology(argv);
         }
+        CmiInitCPUTopology(argv);
 
 	if (faultFunc) {
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];

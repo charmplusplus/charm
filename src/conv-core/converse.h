@@ -598,6 +598,23 @@ extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 extern int cur_restart_phase;      /* number of restarts */
 #undef CmiSetHandler
 #define CmiSetHandler(m,v)  do {(((CmiMsgHeaderExt*)m)->hdl)=(v); (((CmiMsgHeaderExt*)m)->pn)=cur_restart_phase;} while(0)
+#define MESSAGE_PHASE_CHECK(msg)	\
+	{	\
+          int phase = CmiGetRestartPhase(msg);	\
+	  if (phase != 9999 && phase < cur_restart_phase) {	\
+            /* CmiPrintf("[%d] discard message of phase %d cur_restart_phase:%d. \n", CmiMyPe(), phase, cur_restart_phase); */	\
+            CmiFree(msg);	\
+	    return;	\
+          }	\
+          /* CmiAssert(phase == cur_restart_phase || phase == 9999); */ \
+          if (phase > cur_restart_phase && phase != 9999) {    \
+            /* CmiPrintf("[%d] enqueue message of phase %d cur_restart_phase:%d. \n", CmiMyPe(), phase, cur_restart_phase); */	\
+            CsdEnqueueFifo(msg);    \
+	    return;	\
+          }     \
+	}
+#else
+#define MESSAGE_PHASE_CHECK(msg)
 #endif
 
 /** This header goes before each chunk of memory allocated with CmiAlloc. 
