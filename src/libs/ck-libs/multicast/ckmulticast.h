@@ -70,9 +70,13 @@ class CkMulticastMgr: public CkDelegateMgr
     public:
         // ------------------------- Cons/Des-tructors ------------------------
         CkMulticastMgr()  { factor = MAXMCASTCHILDREN; }
-        CkMulticastMgr(CkMigrateMessage *m)  { delete m; }
+        CkMulticastMgr(CkMigrateMessage *m)  {}
         CkMulticastMgr(int f)  { factor = f; }
         int useDefCtor(void){ return 1; }
+        void pup(PUP::er &p){ 
+		CkDelegateMgr::pup(p);
+		p|factor;
+	}
 
         // ------------------------- Spanning Tree Setup ------------------------
         /// Stuff section member info into CkSectionInfo and call initCookie for the tree building
