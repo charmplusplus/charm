@@ -869,9 +869,27 @@ int CmiBarrier()
   int len, size, i;
   int status;
   int count = 0;
-  OtherNode node;
   int numnodes = CmiNumNodes();
+  ChMessage msg;
 
+  if (Cmi_charmrun_fd == -1) return 0;                // standalone
+  if (numnodes == 1) {
+    CmiNodeAllBarrier();
+    return 0;
+  }
+
+  if (CmiMyRank() == 0) {
+    CmiCommLock();
+    ctrl_sendone_nolock("barrier",NULL,0,NULL,0);
+
+    ChMessage_recv(Cmi_charmrun_fd,&msg);
+    while (strcmp(msg.header.type,"barrier")!=0)
+      ChMessage_recv(Cmi_charmrun_fd,&msg);
+    CmiCommUnlock();
+  }
+
+#if 0
+  /* unreliable */
 #if !CMK_SMP
   if (Cmi_netpoll == 0) return -1;
 #endif
@@ -909,6 +927,8 @@ int CmiBarrier()
       }
     }
   }
+#endif
+
   CmiNodeAllBarrier();
   /* printf("[%d] OUT of barrier \n", CmiMyPe()); */
   return 0;
@@ -918,7 +938,28 @@ int CmiBarrier()
 int CmiBarrierZero()
 {
   int i;
+  int numnodes = CmiNumNodes();
+  ChMessage msg;
 
+  if (Cmi_charmrun_fd == -1) return 0;                // standalone
+  if (numnodes == 1) {
+    CmiNodeAllBarrier();
+    return 0;
+  }
+
+  if (CmiMyRank() == 0) {
+    if (CmiMyNode() != 0)
+      ctrl_sendone_locking("barrier0",NULL,0,NULL,0);
+    else {
+      CmiCommLock();
+      ChMessage_recv(Cmi_charmrun_fd,&msg);
+      while (strcmp(msg.header.type,"barrier0")!=0)
+        ChMessage_recv(Cmi_charmrun_fd,&msg);
+      CmiCommUnlock();
+    }
+  }
+
+#if 0
 #if !CMK_SMP
   if (Cmi_netpoll == 0) return -1;
 #endif
@@ -934,6 +975,8 @@ int CmiBarrierZero()
       }
     }
   }
+#endif
+
   CmiNodeAllBarrier();
   return 0;
 }

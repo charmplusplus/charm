@@ -1626,6 +1626,31 @@ int req_handle_ending(ChMessage *msg,SOCKET fd)
   return REQ_OK;
 }
 
+int req_handle_barrier(ChMessage *msg,SOCKET fd)
+{
+  int i;
+  static int count = 0;
+  count ++;
+  if (count == nodetab_size) {
+    for (i=0;i<req_nClients;i++)
+      req_reply(req_clients[i], "barrier", "", 1);
+    count = 0;
+  }
+  return REQ_OK;
+}
+
+int req_handle_barrier0(ChMessage *msg,SOCKET fd)
+{
+  int i;
+  static int count = 0;
+  count ++;
+  if (count == nodetab_size-1) {
+    req_reply(req_clients[0], "barrier0", "", 1);
+    count = 0;
+  }
+  return REQ_OK;
+}
+
 
 int req_handle_abort(ChMessage *msg,SOCKET fd)
 {
@@ -1757,6 +1782,8 @@ int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
   else if (strcmp(cmd,"printsyn")==0)  return req_handle_printsyn(msg,replyFd);
   else if (strcmp(cmd,"printerrsyn")==0) return req_handle_printerrsyn(msg,replyFd);
   else if (strcmp(cmd,"scanf")==0)      return req_handle_scanf(msg,replyFd);
+  else if (strcmp(cmd,"barrier")==0)    return req_handle_barrier(msg,replyFd);
+  else if (strcmp(cmd,"barrier0")==0)   return req_handle_barrier0(msg,replyFd);
   else if (strcmp(cmd,"ending")==0)     return req_handle_ending(msg,replyFd);
   else if (strcmp(cmd,"abort")==0)      return req_handle_abort(msg,replyFd);
 #ifdef __FAULT__	
