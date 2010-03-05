@@ -165,7 +165,7 @@ static void CmiStartThreads(char **argv) {
 //int received_broadcast;
 
 /*Add a message to this processor's receive queue, pe is a rank */
-void CmiPushPE(int pe,void *msg) {
+static void CmiPushPE(int pe,void *msg) {
     CmiState cs = CmiGetStateN(pe);
     MACHSTATE2(3,"Pushing message into rank %d's queue %p{",pe, cs->recv);
 #if CMK_IMMEDIATE_MSG
@@ -791,6 +791,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     direct_config.protocol      = DCMF_DEFAULT_SEND_PROTOCOL;
     direct_config.cb_recv_short = direct_short_pkt_recv;
     direct_config.cb_recv       = direct_first_pkt_recv_done;
+#if (DCMF_VERSION_MAJOR >= 3)
+    direct_config.network  = DCMF_DEFAULT_NETWORK;
+#elif (DCMF_VERSION_MAJOR == 2)
+    direct_config.network  = DCMF_DefaultNetwork;
+#endif
     DCMF_Send_register (&cmi_dcmf_direct_registration,   &direct_config);
     directcb.function=direct_send_done_cb;
     directcb.clientdata=NULL;
@@ -2063,7 +2068,7 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle) {
         CmiPrintf("[%d] RDMA local put addr %p %d to recverNode %d receiver addr %p callback %p callbackdata %p\n",CmiMyPe(),userHandle->senderBuf,userHandle->recverBufSize, userHandle->recverNode,userHandle->recverBuf, userHandle->callbackFnPtr, userHandle->callbackData);
 #endif
 
-        memcpy(userHandle->recverBuf,userHandle->senderBuf,userHandle->recverBufSize);
+        CmiMemcpy(userHandle->recverBuf,userHandle->senderBuf,userHandle->recverBufSize);
         (*(userHandle->callbackFnPtr))(userHandle->callbackData);
     } else {
         dcmfDirectMsgHeader msgHead;
