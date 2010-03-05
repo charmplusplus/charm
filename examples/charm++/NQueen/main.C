@@ -49,7 +49,7 @@ void Main::Quiescence1(DUMMYMSG *msg)
 {
     int numSolutions = CProxy_counter(counterGroup).ckLocalBranch()->getTotalCount();
     double endtimer = CkTimer();
-    CkPrintf("There are %d Solutions to %d queens. Finish time=%f\n",
+    CkPrintf("There are %d Solutions to %d queens. Time=%f\n",
         numSolutions, numQueens, endtimer-starttimer);
     CkExit();
 }
