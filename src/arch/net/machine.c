@@ -1195,6 +1195,8 @@ CmiPrintStackTrace(0);
 
 static void node_addresses_store(ChMessage *msg);
 
+static int barrierReceived = 0;
+
 static void ctrl_getone(void)
 {
   ChMessage msg;
@@ -1236,10 +1238,17 @@ static void ctrl_getone(void)
 	// fprintf(stdout,"nodetable added %d\n",CmiMyPe());
   }
 #endif
+  else if(strcmp(msg.header.type,"barrier")==0) {
+        barrierReceived = 1;
+  }
+  else if(strcmp(msg.header.type,"barrier0")==0) {
+        barrierReceived = 2;
+  }
   else {
   /* We do not use KillEveryOne here because it calls CmiMyPe(),
    * which is not available to the communication thread on an SMP version.
    */
+    /* CmiPrintf("Unknown message: %s\n", msg.header.type); */
     charmrun_abort("ERROR> Unrecognized message from charmrun.\n");
     machine_exit(1);
   }
