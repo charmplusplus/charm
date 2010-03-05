@@ -135,6 +135,10 @@ static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
 
 CpvStaticDeclare(int, CmiMainHandlerIDP); /* Main handler for _CmiMultipleSend that is run on every node */
 
+#if CMK_MEM_CHECKPOINT
+void (*notify_crash_fn)(int) = NULL;
+#endif
+
 /*****************************************************************************
  *
  * Unix Stub Functions

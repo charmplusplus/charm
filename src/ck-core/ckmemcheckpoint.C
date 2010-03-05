@@ -1192,6 +1192,7 @@ void notify_crash(int node)
 #endif
 }
 
+extern "C" void (*notify_crash_fn)(int node);
 
 // initproc
 void CkRegisterRestartHandler( )
@@ -1206,6 +1207,7 @@ void CkRegisterRestartHandler( )
   CpvInitialize(CkProcCheckPTMessage *, procChkptBuf);
   CpvAccess(procChkptBuf) = NULL;
 
+  notify_crash_fn = notify_crash;
 #if 1
   // for debugging
   CkPrintf("[%d] PID %d \n", CkMyPe(), getpid());
