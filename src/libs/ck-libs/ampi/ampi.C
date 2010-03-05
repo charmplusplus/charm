@@ -1692,7 +1692,6 @@ void ampi::ssend_ack(int sreq_idx){
 	  SReq *sreq = (SReq *)(*reqs)[sreq_idx];
 	  sreq->statusIreq = true;
 	  if (resumeOnRecv) {
-	     resumeOnRecv = false;
 	     thread->resume();
 	  }
 	}
@@ -3255,6 +3254,8 @@ int SReq::wait(MPI_Status *sts){
 	while (statusIreq == false) {
           ptr->resumeOnRecv = true;
 	  ptr->block();
+	  ptr = getAmpiInstance(comm);
+	  ptr->resumeOnRecv = false;
 	}
 	return 0;
 }
