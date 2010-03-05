@@ -20,6 +20,7 @@ module ampi {
     entry void allInitDone(CkReductionMsg *m);
     entry void setInitDoneFlag();
     entry void unblock(void);
+    entry void ssend_ack(int);
     entry void generic(AmpiMsg *);
     entry void reduceResult(CkReductionMsg *m);
     entry void splitPhase1(CkReductionMsg *msg);
