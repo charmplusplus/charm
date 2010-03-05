@@ -949,9 +949,10 @@ int CmiBarrierZero()
   }
 
   if (CmiMyRank() == 0) {
-    if (CmiMyNode() != 0)
-      ctrl_sendone_locking("barrier0",NULL,0,NULL,0);
-    else {
+    char str[64];
+    sprintf(str, "%d", CmiMyNode());
+    ctrl_sendone_locking("barrier0",str,strlen(str)+1,NULL,0);
+    if (CmiMyNode() == 0) {
       while (barrierReceived != 2) {
         CmiCommLock();
         ctrl_getone();

@@ -1643,9 +1643,12 @@ int req_handle_barrier0(ChMessage *msg,SOCKET fd)
 {
   int i;
   static int count = 0;
+  static SOCKET fd0;
+  int pe = atoi(msg->data);
+  if (pe == 0) fd0 = fd;
   count ++;
-  if (count == nodetab_size-1) {
-    req_reply(req_clients[0], "barrier0", "", 1);
+  if (count == nodetab_size) {
+    req_reply(fd0, "barrier0", "", 1);     /* only send to node 0 */
     count = 0;
   }
   return REQ_OK;
