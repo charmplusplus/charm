@@ -879,13 +879,14 @@ int CmiBarrier()
   }
 
   if (CmiMyRank() == 0) {
-    CmiCommLock();
-    ctrl_sendone_nolock("barrier",NULL,0,NULL,0);
+    ctrl_sendone_locking("barrier",NULL,0,NULL,0);
 
-    ChMessage_recv(Cmi_charmrun_fd,&msg);
-    while (strcmp(msg.header.type,"barrier")!=0)
-      ChMessage_recv(Cmi_charmrun_fd,&msg);
-    CmiCommUnlock();
+    while (barrierReceived != 1) {
+      CmiCommLock();
+      ctrl_getone();
+      CmiCommUnlock();
+    }
+    barrierReceived = 0;
   }
 
 #if 0
@@ -951,11 +952,12 @@ int CmiBarrierZero()
     if (CmiMyNode() != 0)
       ctrl_sendone_locking("barrier0",NULL,0,NULL,0);
     else {
-      CmiCommLock();
-      ChMessage_recv(Cmi_charmrun_fd,&msg);
-      while (strcmp(msg.header.type,"barrier0")!=0)
-        ChMessage_recv(Cmi_charmrun_fd,&msg);
-      CmiCommUnlock();
+      while (barrierReceived != 2) {
+        CmiCommLock();
+        ctrl_getone();
+        CmiCommUnlock();
+      }
+      barrierReceived = 0;
     }
   }
 
