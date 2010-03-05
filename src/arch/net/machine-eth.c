@@ -872,6 +872,7 @@ int CmiBarrier()
   OtherNode node;
   int numnodes = CmiNumNodes();
 
+  return -1;
 #if !CMK_SMP
   if (Cmi_netpoll == 0) return -1;
 #endif
@@ -919,6 +920,7 @@ int CmiBarrierZero()
 {
   int i;
 
+  return -1;
 #if !CMK_SMP
   if (Cmi_netpoll == 0) return -1;
 #endif
