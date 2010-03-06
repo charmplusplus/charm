@@ -1113,14 +1113,16 @@ void _initCharm(int unused_argc, char **argv)
 			CcdCallFnAfter((CcdVoidFn)CkDecideEvacPe, 0, 10000);
 		}*/
 	}	
-	
-        if (faultFunc == NULL && !replaySystem) {         // this is not restart
+
+    if (!replaySystem) {
+        if (faultFunc == NULL) {         // this is not restart
             // these two are blocking calls for non-bigsim
 #if ! CMK_BLUEGENE_CHARM
           CmiInitCPUAffinity(argv);
 #endif
         }
         CmiInitCPUTopology(argv);
+    }
 
 	if (faultFunc) {
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
