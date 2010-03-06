@@ -292,7 +292,7 @@ static void cpuTopoRecvHandler(void *msg)
   done++;
   CmiUnlock(topoLock);
 
-  if (CmiMyPe() == 0) cpuTopo.print();
+  //if (CmiMyPe() == 0) cpuTopo.print();
 }
 
 // reduction function
