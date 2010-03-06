@@ -127,8 +127,13 @@ class rep
     prand_seed = rnum+INT_MAX; 
     return prand_seed;
   }
+#if !defined(_WIN32) || defined(__CYGWIN__) 
   inline long int POSE_Linear_rand() { return nrand48(prand48_seed); }
   inline double POSE_Uniform_rand() { return erand48(prand48_seed); }
+#else
+  inline long int POSE_Linear_rand() { return CrnRand(); }
+  inline double POSE_Uniform_rand() { return 1.0*CrnRand()/MAXINT; }
+#endif
 
 };
 

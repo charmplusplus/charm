@@ -281,7 +281,9 @@ int AMPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count);
 int AMPI_Isend(void *buf, int count, MPI_Datatype datatype, int dest,
               int tag, MPI_Comm comm, MPI_Request *request);
 #define MPI_Ibsend AMPI_Isend
-#define MPI_Issend AMPI_Isend	/* FIXME: see MPI_Ssend */
+#define MPI_Issend AMPI_Issend
+int AMPI_Issend(void *buf, int count, MPI_Datatype datatype, int dest,
+              int tag, MPI_Comm comm, MPI_Request *request);
 #define MPI_Irsend AMPI_Isend   /* FIXME: see MPI_Rsend */
 #define MPI_Irecv AMPI_Irecv
 int AMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int src,

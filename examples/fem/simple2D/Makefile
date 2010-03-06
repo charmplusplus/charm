@@ -19,4 +19,4 @@ bgtest: pgm
 	./charmrun ./pgm +vp4 +p2 +x2 +y2 +z1
 
 clean:
-	rm -f pgm fpgm *.o conv-host charmrun
+	rm -f pgm fpgm *.o conv-host charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk

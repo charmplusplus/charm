@@ -38,7 +38,7 @@ syntax() {
   then
   echo ''
   echo 'For platform specific options, use help option:'
-  echo '  help		  platform specific help, e.g. ./build charm++ net-linux help'
+  echo '  help		  platform specific help, e.g. ./build charm++ net-linux-x86_64 help'
   echo ''
   echo 'Choose a compiler (only one option is allowed from this section):'
   echo '  cc, cc64        For Sun WorkShop C++ 32/64 bit compilers'
@@ -66,7 +66,7 @@ syntax() {
   echo '  mpt             use SGI Message Passing Toolkit (only for mpi version)'
   echo '  gm              use Myrinet for communication'
   echo '  tcp             use TCP sockets for communication (only for net version)'
-  echo '  ibverbs         use the Infiniband OpenIB layer for communication (only for net-linux-amd64 currently)'
+  echo '  ibverbs         use the Infiniband OpenIB layer for communication (only for net-linux-x86_64 currently)'
   echo "  vmi             use NCSA's VMI for communication (only for mpi version)"
   echo '  scyld           compile for Scyld Beowulf cluster based on bproc'
   echo '  clustermatic    compile for Clustermatic (support version 3 and 4) '
@@ -89,6 +89,7 @@ syntax() {
   echo '  --basedir=DIR	     shortcut for the above two - DIR/include and DIR/lib'
   echo '  -j[N]              parallel make, N is the number of paralle make jobs'
   echo "  --with-romio       build AMPI with ROMIO library"
+  echo "  --with-production  build Charm++ with all optimizations for maximum performance"
   echo "  --destination=DIR  build Charm++ inside DIR, by default the destination is <version>"
   echo "  --suffix=DIR       append DIR to the destination directory of the Charm++ build"
   echo "  --tau-makefile=FILE Specify which TAU stub makefile to use"
@@ -99,11 +100,11 @@ syntax() {
   then
   echo ''
   echo 'Examples:'
-  echo "1. display all supported options for net-linux using 'help':"
-  echo '  ./build charm++ net-linux help'
+  echo "1. display all supported options for net-linux-x86_64 using 'help':"
+  echo '  ./build charm++ net-linux-x86_64 help'
   echo '2. compile Charm++ on Linux with optimizations:'
-  echo '  ./build charm++ net-linux -O -DCMK_OPTIMIZE'
-  echo '3. compile Charm++ for Linux clustermatic Beowulf cluster with Intel compiler:'
+  echo '  ./build charm++ net-linux-x86_64 -O -DCMK_OPTIMIZE'
+  echo '3. compile Charm++ for Linux (32bit) clustermatic Beowulf cluster with Intel compiler:'
   echo '  ./build charm++ net-linux clustermatic icc -O'
   echo '4. compile Charm++ for IA64 Linux cluster with MPICH-GM:'
   echo '  ./build charm++ mpi-linux-ia64 gm -O'
@@ -207,6 +208,7 @@ INCDIR=
 ARCH=
 BUILD_SHARED=
 WITH_ROMIO=
+WITH_PRODUCTION=
 BUILD_EMULATOR=0
 DESTINATION=""
 DESTINATION_SUFFIX=""
@@ -293,6 +295,10 @@ do
 		;;
     --with-romio)
 		WITH_ROMIO="true"; shift
+		;;
+    --with-production)
+		WITH_PRODUCTION="true" 
+		shift
 		;;
     --build-shared|-bs)
 		# obsolete, do nothing
@@ -520,6 +526,11 @@ then
     echo "CMK_AMPI_WITH_ROMIO=\"true\"" >> $ConvSh
 fi
 
+if test -n "$WITH_PRODUCTION"
+then
+    echo '#define CMK_OPTIMIZE' >> $ConvHeader
+    echo '#define CMK_REPLAYSYSTEM  0' >> $ConvHeader
+fi
 
 # build with Tau
 WITH_TAU=0
@@ -571,13 +582,15 @@ printError()
 	exit $MAKEEXIT
 }
 
-Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET"' in $VERSION/tmp"
+echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
+
+Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET"' in $DESTINATION/tmp"
 cd $DESTINATION/tmp 
 $MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
 MAKEEXIT=$?
 [ $MAKEEXIT -ne 0 ] && printError
 
-Echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS" QUIET="$QUIET"' in $VERSION/tmp"
+Echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS" QUIET="$QUIET"' in $DESTINATION/tmp"
 $MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
 MAKEEXIT=$?
 if [ $MAKEEXIT -eq 0 ]

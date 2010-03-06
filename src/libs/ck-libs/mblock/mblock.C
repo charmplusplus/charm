@@ -424,7 +424,7 @@ MBlockChunk::reduce(int fid, const void *inbuf, void *outbuf, int op)
 {
   const DType &dt = fields[fid]->dt;
   int len = dt.length();
-  if(numElements==1) {
+  if(ckGetArraySize()==1) {
     memcpy(outbuf,inbuf,len);
     return;
   }

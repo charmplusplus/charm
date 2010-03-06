@@ -270,7 +270,7 @@ static void CmiStartThreads(char **argv)
 }      
 
 /*Add a message to this processor's receive queue */
-static void CmiPushPE(int pe,void *msg)
+void CmiPushPE(int pe,void *msg)
 {
   CmiState cs=CmiGetStateN(pe);
   MACHSTATE1(2,"Pushing message into %d's queue",pe);

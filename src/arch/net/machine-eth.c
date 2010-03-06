@@ -869,9 +869,28 @@ int CmiBarrier()
   int len, size, i;
   int status;
   int count = 0;
-  OtherNode node;
   int numnodes = CmiNumNodes();
+  ChMessage msg;
 
+  if (Cmi_charmrun_fd == -1) return 0;                // standalone
+  if (numnodes == 1) {
+    CmiNodeAllBarrier();
+    return 0;
+  }
+
+  if (CmiMyRank() == 0) {
+    ctrl_sendone_locking("barrier",NULL,0,NULL,0);
+
+    while (barrierReceived != 1) {
+      CmiCommLock();
+      ctrl_getone();
+      CmiCommUnlock();
+    }
+    barrierReceived = 0;
+  }
+
+#if 0
+  /* unreliable */
 #if !CMK_SMP
   if (Cmi_netpoll == 0) return -1;
 #endif
@@ -909,6 +928,8 @@ int CmiBarrier()
       }
     }
   }
+#endif
+
   CmiNodeAllBarrier();
   /* printf("[%d] OUT of barrier \n", CmiMyPe()); */
   return 0;
@@ -918,7 +939,30 @@ int CmiBarrier()
 int CmiBarrierZero()
 {
   int i;
+  int numnodes = CmiNumNodes();
+  ChMessage msg;
 
+  if (Cmi_charmrun_fd == -1) return 0;                // standalone
+  if (numnodes == 1) {
+    CmiNodeAllBarrier();
+    return 0;
+  }
+
+  if (CmiMyRank() == 0) {
+    char str[64];
+    sprintf(str, "%d", CmiMyNode());
+    ctrl_sendone_locking("barrier0",str,strlen(str)+1,NULL,0);
+    if (CmiMyNode() == 0) {
+      while (barrierReceived != 2) {
+        CmiCommLock();
+        ctrl_getone();
+        CmiCommUnlock();
+      }
+      barrierReceived = 0;
+    }
+  }
+
+#if 0
 #if !CMK_SMP
   if (Cmi_netpoll == 0) return -1;
 #endif
@@ -934,6 +978,8 @@ int CmiBarrierZero()
       }
     }
   }
+#endif
+
   CmiNodeAllBarrier();
   return 0;
 }

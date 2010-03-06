@@ -31,7 +31,7 @@
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/charm/net-linux-amd64/tmp}&quot;"/>
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/charm/net-linux-amd64/tmp/libs/ck-libs/pythonCCS}&quot;"/>
 </option>
-<option id="gnu.cpp.compiler.option.preprocessor.def.1120432124" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
+<option id="gnu.cpp.compiler.option.preprocessor.def.1120432124" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
 <listOptionValue builtIn="false" value="CMK_SEPARATE_PATH=1"/>
 <listOptionValue builtIn="false" value="CMK_USE_BACKTRACE=1"/>
 <listOptionValue builtIn="false" value="CMK_CCS_AVAILABLE"/>
@@ -44,7 +44,7 @@
 <option id="gnu.c.compiler.option.include.paths.783568532" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
 <listOptionValue builtIn="false" value="&quot;${workspace_loc:/charm/net-linux-amd64/tmp}&quot;"/>
 </option>
-<option id="gnu.c.compiler.option.preprocessor.def.symbols.2106822378" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
+<option id="gnu.c.compiler.option.preprocessor.def.symbols.2106822378" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
 <listOptionValue builtIn="false" value="CMK_SEPARATE_PATH=1"/>
 <listOptionValue builtIn="false" value="CMK_USE_BACKTRACE=1"/>
 <listOptionValue builtIn="false" value="CMK_CCS_AVAILABLE"/>
@@ -64,6 +64,9 @@
 </tool>
 </toolChain>
 </folderInfo>
+<sourceEntries>
+<entry excluding="bin/|include/|lib/|lib_so/|tmp/|net-**" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name=""/>
+</sourceEntries>
 </configuration>
 </storageModule>
 <storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>

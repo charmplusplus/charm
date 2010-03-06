@@ -1195,6 +1195,8 @@ CmiPrintStackTrace(0);
 
 static void node_addresses_store(ChMessage *msg);
 
+static int barrierReceived = 0;
+
 static void ctrl_getone(void)
 {
   ChMessage msg;
@@ -1236,10 +1238,17 @@ static void ctrl_getone(void)
 	// fprintf(stdout,"nodetable added %d\n",CmiMyPe());
   }
 #endif
+  else if(strcmp(msg.header.type,"barrier")==0) {
+        barrierReceived = 1;
+  }
+  else if(strcmp(msg.header.type,"barrier0")==0) {
+        barrierReceived = 2;
+  }
   else {
   /* We do not use KillEveryOne here because it calls CmiMyPe(),
    * which is not available to the communication thread on an SMP version.
    */
+    /* CmiPrintf("Unknown message: %s\n", msg.header.type); */
     charmrun_abort("ERROR> Unrecognized message from charmrun.\n");
     machine_exit(1);
   }
@@ -2655,6 +2664,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
       CmiGetArgFlagDesc(argv,"++debug",NULL /*meaning: don't show this*/)) Cmi_truecrash = 1;
     /* netpoll disable signal */
   if (CmiGetArgFlagDesc(argv,"+netpoll","Do not use SIGIO--poll instead")) Cmi_netpoll = 1;
+  if (CmiGetArgFlagDesc(argv,"+netint","Use SIGIO")) Cmi_netpoll = 0;
     /* idlepoll use poll instead if sleep when idle */
   if (CmiGetArgFlagDesc(argv,"+idlepoll","Do not sleep when idle")) Cmi_idlepoll = 1;
     /* idlesleep use sleep instead if busywait when idle */

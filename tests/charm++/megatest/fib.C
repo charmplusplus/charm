@@ -17,7 +17,7 @@ fib_main::fib_main (void)
   pMsg = new fib_Range;
   pMsg->n = NUMCHARES;
   pMsg->parent = thishandle;
-  CProxy_fib_fibFunction::ckNew(pMsg);
+  CProxy_fib_fibFunction::ckNew(pMsg, NULL, CK_PE_ANY);
 }  
 
 void fib_main::results(fib_DataMsg *msg)
@@ -53,8 +53,8 @@ fib_fibFunction::fib_fibFunction(fib_Range *m)
     pMsg2->n = m->n - 2;
     pMsg2->parent = thishandle;
    
-    CProxy_fib_fibFunction::ckNew(pMsg1);
-    CProxy_fib_fibFunction::ckNew(pMsg2);
+    CProxy_fib_fibFunction::ckNew(pMsg1, NULL, CK_PE_ANY);
+    CProxy_fib_fibFunction::ckNew(pMsg2, NULL, CK_PE_ANY);
   }
   delete m;
 }

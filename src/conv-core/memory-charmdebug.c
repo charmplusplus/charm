@@ -50,9 +50,10 @@ struct _Slot {
   /*The number of bytes of user data*/
   int userSize;
 
-#define FLAGS_MASK        0x3F
-#define MODIFIED          0x20
-#define NEW_BLOCK         0x10
+#define FLAGS_MASK        0xFF
+#define MODIFIED          0x40
+#define NEW_BLOCK         0x20
+#define LEAK_CLEAN        0x10
 #define LEAK_FLAG         0x8
 #define UNKNOWN_TYPE      0x0
 #define SYSTEM_TYPE       0x1
@@ -62,8 +63,8 @@ struct _Slot {
   /* A magic number field, to verify this is an actual malloc'd buffer, and what
      type of allocation it is. The last 4 bits of the magic number are used to
      define a classification of mallocs. */
-#define SLOTMAGIC            0x8402a5c0
-#define SLOTMAGIC_VALLOC     0x7402a5c0
+#define SLOTMAGIC            0x8402a500
+#define SLOTMAGIC_VALLOC     0x7402a500
 #define SLOTMAGIC_FREED      0xDEADBEEF
   int magic;
 
@@ -479,6 +480,21 @@ void check_memory_leaks(LeakSearchInfo *info) {
   CkDeleteHashtable(table);
 
   memory_charmdebug_internal = 0;
+}
+
+void CpdMemoryMarkClean(char *msg) {
+  Slot *sl;
+  /* The first byte of the data packet indicates if we want o mark or unmark */
+  if ((msg+CmiMsgHeaderSizeBytes)[0]) {
+    SLOT_ITERATE_START(sl)
+      sl->magic |= LEAK_CLEAN;
+    SLOT_ITERATE_END
+  } else {
+    SLOT_ITERATE_START(sl)
+      sl->magic &= ~LEAK_CLEAN;
+    SLOT_ITERATE_END
+  }
+  CmiFree(msg);
 }
 
 /****************** memory allocation tree ******************/

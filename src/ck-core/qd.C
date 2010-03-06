@@ -146,7 +146,7 @@ static inline void _handlePhase2(QdState *state, QdMsg *msg)
         _bcastQD1(state, msg);   // dirty, restart again
       } else {             
           // quiescence detected, send callbacks
-        DEBUGP(("[%d] quiescence detected,\n", CmiMyPe()));
+        DEBUGP(("[%d] quiescence detected at %f.\n", CmiMyPe(), CmiWallTimer()));
         QdCallback* cb;
         while(NULL!=(cb=state->deq())) {
           cb->send();
@@ -237,10 +237,13 @@ void CkStartQD(const CkCallback& cb)
   msg->setCb(cb);
   register envelope *env = UsrToEnv((void *)msg);
   CmiSetHandler(env, _qdHandlerIdx);
+#if CMK_MEM_CHECKPOINT
+  CmiGetRestartPhase(env) = 9999;        // make sure it is always executed
+#endif
 #if CMK_BLUEGENE_CHARM
   CmiFreeSendFn(0, env->getTotalsize(), (char *)env);
 #else
-  CldEnqueue(0, env, _infoIdx);
+  _CldEnqueue(0, env, _infoIdx);
 #endif
 }
 

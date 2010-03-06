@@ -38,6 +38,7 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ bool shouldGatherMemoryUsage;
 /* readonly */ bool shouldGatherUtilization;
 /* readonly */ bool shouldGatherAll;
+/* readonly */ char CPDataFilename[512];
 
 
 
@@ -196,9 +197,6 @@ controlPointManager::controlPointManager(){
     instrumentedPhase * newPhase = new instrumentedPhase();
     allData.phases.push_back(newPhase);   
     
-    dataFilename = (char*)malloc(128);
-    sprintf(dataFilename, "controlPointData.txt");
-    
     frameworkShouldAdvancePhase = false;
     haveGranularityCallback = false;
 //    CkPrintf("[%d] controlPointManager() Constructor Initializing control points, and loading data file\n", CkMyPe());
@@ -238,7 +236,7 @@ controlPointManager::controlPointManager(){
 
   /// Loads the previous run data file
   void controlPointManager::loadDataFile(){
-    ifstream infile(dataFilename);
+    ifstream infile(CPDataFilename);
     vector<std::string> names;
     std::string line;
   
@@ -283,6 +281,11 @@ controlPointManager::controlPointManager(){
       iss >> ips->idleTime.avg;
       iss >> ips->idleTime.max;
 
+      // Read overhead time
+      iss >> ips->overheadTime.min;
+      iss >> ips->overheadTime.avg;
+      iss >> ips->overheadTime.max;
+
       // read bytePerInvoke
       iss >> ips->bytesPerInvoke;
 
@@ -323,7 +326,7 @@ controlPointManager::controlPointManager(){
   /// Add the current data to allData and output it to a file
   void controlPointManager::writeDataFile(){
     CkPrintf("============= writeDataFile() ============\n");
-    ofstream outfile(dataFilename);
+    ofstream outfile(CPDataFilename);
     allData.cleanupNames();
 
     //  string s = allData.toString();
@@ -785,6 +788,10 @@ controlPointManager::controlPointManager(){
       prevPhase->idleTime.avg = idle[1]/CkNumPes();
       prevPhase->idleTime.max = idle[2];
       
+      prevPhase->overheadTime.min = over[0];
+      prevPhase->overheadTime.avg = over[1]/CkNumPes();
+      prevPhase->overheadTime.max = over[2];
+      
       prevPhase->memoryUsageMB = mem[0];
       
       CkPrintf("Stored idle time min=%lf, mem=%lf in prevPhase=%p\n", (double)prevPhase->idleTime.min, (double)prevPhase->memoryUsageMB, prevPhase);
@@ -882,62 +889,62 @@ controlPointManager::controlPointManager(){
   }
 
 
-  /// Inform the control point framework that a named control point affects the priorities of some array  
-  void controlPointManager::associatePriorityArray(const char *name, int groupIdx){
-    CkPrintf("Associating control point \"%s\" affects priority of array id=%d\n", name, groupIdx );
+//   /// Inform the control point framework that a named control point affects the priorities of some array  
+//   void controlPointManager::associatePriorityArray(const char *name, int groupIdx){
+//     CkPrintf("Associating control point \"%s\" affects priority of array id=%d\n", name, groupIdx );
     
-    if(affectsPrioritiesArray.count(std::string(name)) > 0 ) {
-      affectsPrioritiesArray[std::string(name)].insert(groupIdx);
-    } else {
-      std::set<int> s;
-      s.insert(groupIdx);
-      affectsPrioritiesArray[std::string(name)] = s;
-    }
+//     if(affectsPrioritiesArray.count(std::string(name)) > 0 ) {
+//       affectsPrioritiesArray[std::string(name)].insert(groupIdx);
+//     } else {
+//       std::set<int> s;
+//       s.insert(groupIdx);
+//       affectsPrioritiesArray[std::string(name)] = s;
+//     }
     
-#if DEBUGPRINT   
-    std::map<std::string, std::set<int> >::iterator f;
-    for(f=affectsPrioritiesArray.begin(); f!=affectsPrioritiesArray.end();++f){
-      std::string name = f->first;
-      std::set<int> &vals = f->second;
-      cout << "Control point " << name << " affects arrays: ";
-      std::set<int>::iterator i;
-      for(i=vals.begin(); i!=vals.end();++i){
-	cout << *i << " ";
-      }
-      cout << endl;
-    }
-#endif
+// #if DEBUGPRINT   
+//     std::map<std::string, std::set<int> >::iterator f;
+//     for(f=affectsPrioritiesArray.begin(); f!=affectsPrioritiesArray.end();++f){
+//       std::string name = f->first;
+//       std::set<int> &vals = f->second;
+//       cout << "Control point " << name << " affects arrays: ";
+//       std::set<int>::iterator i;
+//       for(i=vals.begin(); i!=vals.end();++i){
+// 	cout << *i << " ";
+//       }
+//       cout << endl;
+//     }
+// #endif
     
-  }
+//   }
   
-  /// Inform the control point framework that a named control point affects the priority of some entry method
-  void controlPointManager::associatePriorityEntry(const char *name, int idx){
-    CkPrintf("Associating control point \"%s\" with EP id=%d\n", name, idx);
+//   /// Inform the control point framework that a named control point affects the priority of some entry method
+//   void controlPointManager::associatePriorityEntry(const char *name, int idx){
+//     CkPrintf("Associating control point \"%s\" with EP id=%d\n", name, idx);
 
-      if(affectsPrioritiesEP.count(std::string(name)) > 0 ) {
-      affectsPrioritiesEP[std::string(name)].insert(idx);
-    } else {
-      std::set<int> s;
-      s.insert(idx);
-      affectsPrioritiesEP[std::string(name)] = s;
-    }
+//       if(affectsPrioritiesEP.count(std::string(name)) > 0 ) {
+//       affectsPrioritiesEP[std::string(name)].insert(idx);
+//     } else {
+//       std::set<int> s;
+//       s.insert(idx);
+//       affectsPrioritiesEP[std::string(name)] = s;
+//     }
     
-#if DEBUGPRINT
-    std::map<std::string, std::set<int> >::iterator f;
-    for(f=affectsPrioritiesEP.begin(); f!=affectsPrioritiesEP.end();++f){
-      std::string name = f->first;
-      std::set<int> &vals = f->second;
-      cout << "Control point " << name << " affects EP: ";
-      std::set<int>::iterator i;
-      for(i=vals.begin(); i!=vals.end();++i){
-	cout << *i << " ";
-      }
-      cout << endl;
-    }
-#endif
+// #if DEBUGPRINT
+//     std::map<std::string, std::set<int> >::iterator f;
+//     for(f=affectsPrioritiesEP.begin(); f!=affectsPrioritiesEP.end();++f){
+//       std::string name = f->first;
+//       std::set<int> &vals = f->second;
+//       cout << "Control point " << name << " affects EP: ";
+//       std::set<int>::iterator i;
+//       for(i=vals.begin(); i!=vals.end();++i){
+// 	cout << *i << " ";
+//       }
+//       cout << endl;
+//     }
+// #endif
 
 
-  }
+//   }
   
 
 
@@ -1045,6 +1052,13 @@ public:
    loadDataFileAtStartup = false;   
     if( CmiGetArgFlagDesc(args->argv,"+CPLoadData","Load Control Point timings & configurations at startup") ){
       loadDataFileAtStartup = true;
+    }
+
+    char *cpdatafile;
+    if( CmiGetArgStringDesc(args->argv, "+CPDataFilename", &cpdatafile, "Specify control point data file to save/load") ){
+      sprintf(CPDataFilename, "%s", cpdatafile);
+    } else {
+      sprintf(CPDataFilename, "controlPointData.txt");
     }
 
 
@@ -1258,63 +1272,169 @@ void controlPointManager::generatePlan() {
       
       std::vector<std::map<std::string,int> > possibleNextStepPlans;
 
+
+      // ========================================= Concurrency =============================================
       // See if idle time is high:
-      double idleTime = twoAgoPhase->idleTime.avg;
-      CkPrintf("Steering encountered idle time (%f)\n", idleTime);
-      fflush(stdout);
-      if(idleTime > 0.10){
-	CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
-	CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
-
-
-	// Initialize the future plan to be the values from two phases ago (later we might adjust this)
-
-	CkPrintf("Steering initialized plan\n");
+      {
+	double idleTime = twoAgoPhase->idleTime.avg;
+	CkPrintf("Steering encountered idle time (%f)\n", idleTime);
 	fflush(stdout);
-
-	// look for a possible control point knob to turn
-	std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["Concurrency"];
+	if(idleTime > 0.10){
+	  CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
+	  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
 	
-	bool found = false;
-	std::string cpName;
-	std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
-	std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;
-	for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
-	  cpName = iter->first;
-	  info = &iter->second;
+	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["Concurrency"];
+	
+	  bool found = false;
+	  std::string cpName;
+	  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
+	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;
+	  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
+	    cpName = iter->first;
+	    info = &iter->second;
 	  
-	  // Initialize a new plan based on two phases ago
-	  std::map<std::string,int> aNewPlan;
+	    // Initialize a new plan based on two phases ago
+	    std::map<std::string,int> aNewPlan;
 	  
-	  std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-	  for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-	    const std::string &name = cpsIter->first;
-	    const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
-	    aNewPlan[name] = twoAgoValue;
-	  }
-	  
-	  CkPrintf("Steering found knob to turn\n");
-	  fflush(stdout);
-
-	  if(info->first == ControlPoint::EFF_INC){
-	    const int maxValue = controlPointSpace[cpName].second;
-	    const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-	    if(twoAgoValue+1 <= maxValue){
-	      aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
+	    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+	    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	      const std::string &name = cpsIter->first;
+	      const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
+	      aNewPlan[name] = twoAgoValue;
 	    }
-	  } else {
-	    const int minValue = controlPointSpace[cpName].second;
-	    const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-	    if(twoAgoValue-1 >= minValue){
-	      aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
-	    }
-	  }
-
-	  possibleNextStepPlans.push_back(aNewPlan);
 	  
+	    CkPrintf("Steering found knob to turn\n");
+	    fflush(stdout);
+
+	    if(info->first == ControlPoint::EFF_INC){
+	      const int maxValue = controlPointSpace[cpName].second;
+	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+	      if(twoAgoValue+1 <= maxValue){
+		aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
+	      }
+	    } else {
+	      const int minValue = controlPointSpace[cpName].second;
+	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+	      if(twoAgoValue-1 >= minValue){
+		aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
+	      }
+	    }
+
+	    possibleNextStepPlans.push_back(aNewPlan);
+	  
+	  }
 	}
+      }
+
+      // ========================================= Grain Size =============================================
+      // If the grain size is too small, there may be tons of messages and overhead time associated with scheduling
+      {
+	double overheadTime = twoAgoPhase->overheadTime.avg;
+	CkPrintf("Steering encountered overhead time (%f)\n", overheadTime);
+	fflush(stdout);
+	if(overheadTime > 0.10){
+	  CkPrintf("Steering encountered high overhead time(%f) > 10%%\n", overheadTime);
+	  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
+
+	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["GrainSize"];   
+	
+	  bool found = false;
+	  std::string cpName;
+	  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
+	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;     
+	  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
+	    cpName = iter->first;
+	    info = &iter->second;
+	  
+	    // Initialize a new plan based on two phases ago
+	    std::map<std::string,int> aNewPlan;
+	  
+	    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+	    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	      const std::string &name = cpsIter->first;
+	      const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
+	      aNewPlan[name] = twoAgoValue;
+	    }
+	  
+	    CkPrintf("Steering found knob to turn\n");
+	    fflush(stdout);
+
+	    if(info->first == ControlPoint::EFF_INC){
+	      const int maxValue = controlPointSpace[cpName].second;
+	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+	      if(twoAgoValue+1 <= maxValue){
+		aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
+	      }
+	    } else {
+	      const int minValue = controlPointSpace[cpName].second;
+	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+	      if(twoAgoValue-1 >= minValue){
+		aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
+	      }
+	    }
+
+	    possibleNextStepPlans.push_back(aNewPlan);
+	  
+	  }
 
       }
+      }
+      // ========================================= GPU Offload =============================================
+      // If the grain size is too small, there may be tons of messages and overhead time associated with scheduling
+      {
+	double idleTime = twoAgoPhase->idleTime.avg;
+	CkPrintf("Steering encountered idle time (%f)\n", idleTime);
+	fflush(stdout);
+	if(idleTime > 0.10){
+	  CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
+	  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
+	
+	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["GPUOffloadedWork"];   
+	
+	  bool found = false;
+	  std::string cpName;
+	  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
+	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;     
+	  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
+	    cpName = iter->first;
+	    info = &iter->second;
+	  
+	    // Initialize a new plan based on two phases ago
+	    std::map<std::string,int> aNewPlan;
+	  
+	    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+	    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	      const std::string &name = cpsIter->first;
+	      const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
+	      aNewPlan[name] = twoAgoValue;
+	    }
+	  
+	    CkPrintf("Steering found knob to turn\n");
+	    fflush(stdout);
+
+	    if(info->first == ControlPoint::EFF_DEC){
+	      const int maxValue = controlPointSpace[cpName].second;
+	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+	      if(twoAgoValue+1 <= maxValue){
+		aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
+	      }
+	    } else {
+	      const int minValue = controlPointSpace[cpName].second;
+	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+	      if(twoAgoValue-1 >= minValue){
+		aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
+	      }
+	    }
+
+	    possibleNextStepPlans.push_back(aNewPlan);
+	  
+	  }
+
+	}
+      }
+
+      // ========================================= Done =============================================
+
 
       if(possibleNextStepPlans.size() > 0){
 	newControlPoints = possibleNextStepPlans[0];
@@ -1529,19 +1649,19 @@ int controlPoint(const char *name, int lb, int ub){
 
 
 /// Inform the control point framework that a named control point affects the priorities of some array  
-void controlPointPriorityArray(const char *name, CProxy_ArrayBase &arraybase){
-  CkGroupID aid = arraybase.ckGetArrayID();
-  int groupIdx = aid.idx;
-  controlPointManagerProxy.ckLocalBranch()->associatePriorityArray(name, groupIdx);
-  //  CkPrintf("Associating control point \"%s\" with array id=%d\n", name, groupIdx );
-}
+// void controlPointPriorityArray(const char *name, CProxy_ArrayBase &arraybase){
+//   CkGroupID aid = arraybase.ckGetArrayID();
+//   int groupIdx = aid.idx;
+//   controlPointManagerProxy.ckLocalBranch()->associatePriorityArray(name, groupIdx);
+//   //  CkPrintf("Associating control point \"%s\" with array id=%d\n", name, groupIdx );
+// }
 
 
-/// Inform the control point framework that a named control point affects the priorities of some entry method  
-void controlPointPriorityEntry(const char *name, int idx){
-  controlPointManagerProxy.ckLocalBranch()->associatePriorityEntry(name, idx);
-  //  CkPrintf("Associating control point \"%s\" with EP id=%d\n", name, idx);
-}
+// /// Inform the control point framework that a named control point affects the priorities of some entry method  
+// void controlPointPriorityEntry(const char *name, int idx){
+//   controlPointManagerProxy.ckLocalBranch()->associatePriorityEntry(name, idx);
+//   //  CkPrintf("Associating control point \"%s\" with EP id=%d\n", name, idx);
+// }
 
 
 

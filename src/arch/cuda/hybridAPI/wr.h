@@ -24,6 +24,9 @@ typedef struct pinnedMemReq {
   void *callbackFn; 
 } pinnedMemReq;
 
+void delayedFree(void *ptr);
+
+
 /* pinnedMallocHost
  *
  * schedules a pinned memory allocation so that it does not impede
@@ -80,8 +83,9 @@ typedef struct dataInfo {
  * 3. define the data members for the work request
  * 4. enqueue the work request
  */
-typedef struct workRequest {
 
+
+typedef struct workRequest {
   /* The following parameters need to be set by the user */
 
   /* parameters for kernel execution */
@@ -108,6 +112,17 @@ typedef struct workRequest {
   int state; 
   /* user data, may be used to pass scalar values to kernel calls */
   void *userData; 
+
+#ifdef GPU_INSTRUMENT_WRS
+  double phaseStartTime;
+  int chareIndex;
+  char compType;
+  char compPhase;
+
+  workRequest(){
+    chareIndex = -1;
+  }
+#endif
 
 } workRequest; 
 
@@ -156,11 +171,34 @@ typedef struct {
  */
 void enqueue(workRequestQueue *q, workRequest *wr); 
 
+#ifdef GPU_MEMPOOL
+void hapi_poolFree(void *);
+void *hapi_poolMalloc(int size);
+#endif
 /* external declarations needed by the user */
 
 extern workRequestQueue *wrQueue; 
 extern void **devBuffers; 
 extern cudaStream_t kernel_stream; 
+
+#ifdef GPU_INSTRUMENT_WRS
+struct RequestTimeInfo {
+  double transferTime;
+  double kernelTime;
+  double cleanupTime;
+  int n;
+
+  RequestTimeInfo(){
+    transferTime = 0.0;
+    kernelTime = 0.0;
+    cleanupTime = 0.0;
+    n = 0;
+  }
+};
+
+void hapi_initInstrument(int nchares, char ntypes);
+RequestTimeInfo *hapi_queryInstrument(int chare, char type, char phase);
+#endif
 
 #endif
 

@@ -1626,6 +1626,34 @@ int req_handle_ending(ChMessage *msg,SOCKET fd)
   return REQ_OK;
 }
 
+int req_handle_barrier(ChMessage *msg,SOCKET fd)
+{
+  int i;
+  static int count = 0;
+  count ++;
+  if (count == nodetab_size) {
+    for (i=0;i<req_nClients;i++)
+      req_reply(req_clients[i], "barrier", "", 1);
+    count = 0;
+  }
+  return REQ_OK;
+}
+
+int req_handle_barrier0(ChMessage *msg,SOCKET fd)
+{
+  int i;
+  static int count = 0;
+  static SOCKET fd0;
+  int pe = atoi(msg->data);
+  if (pe == 0) fd0 = fd;
+  count ++;
+  if (count == nodetab_size) {
+    req_reply(fd0, "barrier0", "", 1);     /* only send to node 0 */
+    count = 0;
+  }
+  return REQ_OK;
+}
+
 
 int req_handle_abort(ChMessage *msg,SOCKET fd)
 {
@@ -1757,6 +1785,8 @@ int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
   else if (strcmp(cmd,"printsyn")==0)  return req_handle_printsyn(msg,replyFd);
   else if (strcmp(cmd,"printerrsyn")==0) return req_handle_printerrsyn(msg,replyFd);
   else if (strcmp(cmd,"scanf")==0)      return req_handle_scanf(msg,replyFd);
+  else if (strcmp(cmd,"barrier")==0)    return req_handle_barrier(msg,replyFd);
+  else if (strcmp(cmd,"barrier0")==0)   return req_handle_barrier0(msg,replyFd);
   else if (strcmp(cmd,"ending")==0)     return req_handle_ending(msg,replyFd);
   else if (strcmp(cmd,"abort")==0)      return req_handle_abort(msg,replyFd);
 #ifdef __FAULT__	
@@ -3277,6 +3307,8 @@ void start_nodes_local(char ** env)
 
 #ifdef __FAULT__
 
+int cur_restart_phase = 1;
+
 void refill_nodetab_entry(int crashed_node);
 nodetab_host *replacement_host(int pe);
 
@@ -3287,6 +3319,7 @@ void restart_node(int crashed_node){
 	int restart_rsh_pid;
 	char **restart_argv;
 	int status=0;
+        char phase_str[10];
 	int i;
 	/** write the startScript file to be sent**/
   	sprintf(startScript,"/tmp/charmrun.%d.%d",getpid(),pe);
@@ -3299,14 +3332,16 @@ void restart_node(int crashed_node){
 	while(arg_argv[i]!= NULL){
 		i++;
 	}
-	restart_argv = (char **)malloc(sizeof(char *)*(i+2));
+	restart_argv = (char **)malloc(sizeof(char *)*(i+3));
 	i=0;
 	while(arg_argv[i]!= NULL){
 		restart_argv[i] = arg_argv[i];
 		i++;
 	}
 	restart_argv[i] = "+restartaftercrash";
-	restart_argv[i+1]=NULL;
+        sprintf(phase_str,"%d", ++cur_restart_phase);
+	restart_argv[i+1]=phase_str;
+	restart_argv[i+2]=NULL;
 
   	rsh_script(f,pe,crashed_node,restart_argv,1);
   	fclose(f);

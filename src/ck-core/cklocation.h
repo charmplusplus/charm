@@ -624,7 +624,7 @@ public:
 #ifdef _FAULT_MLOG_
 	void resume(const CkArrayIndex &idx, PUP::er &p,int dummy=0);
 #else
-	void resume(const CkArrayIndex &idx, PUP::er &p);
+	void resume(const CkArrayIndex &idx, PUP::er &p, CmiBool notify=CmiTrue);
 #endif
 
 //Communication:
@@ -752,20 +752,7 @@ public:
 };
 
 
-class CkArrayMgrWaiting {
-public:
-  CkGroupID id;
-  CkArray *array;
-  CkArrayMgrWaiting(): array(NULL) { id.setZero(); }
-  CkArrayMgrWaiting(CkGroupID _id, CkArray *_array): id(_id), array(_array) { }
-};
-/**
- * A table to contain a list of array managers waiting on specific location
- * managers to be created (due to message races).
- * Efficiency should not be a problem, since this is a quite rare condition,
- * and there are not many array managers anyway in a program.
- */
-CkpvExtern(CkVec<CkArrayMgrWaiting>, waitingArrayMgrs);
+
 
 
 /// check the command line arguments to determine if we can use ConfigurableRRMap

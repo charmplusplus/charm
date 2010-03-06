@@ -38,6 +38,10 @@ while [ $# -gt 0 ]
 	  llfile=$2
 	  shift
 	  ;;
+      +name)
+	  jobname=$2
+	  shift
+	  ;;
       *)
 	  args=$args"$1 "
 	  ;;
@@ -138,6 +142,8 @@ if [ -n "$ppnused" ]
     if [ -n "$nodesize" ]
 	then
 	tasks_per_node=`expr $nodesize / $ppnused`
+    else
+	echo "WARNING: ns (node size) is missing, it should be used together with ppn!"
     fi
     if [ -n "$logical" -a -n "$nodesize" ]
 	then if [ $logical -ne $tasks_per_node ]
@@ -148,7 +154,18 @@ if [ -n "$ppnused" ]
 	    exit
 	fi
     fi
+    nodes=`expr $total_tasks / $tasks_per_node`
+    if [ `expr $nodes '*' $tasks_per_node` -ne $total_tasks ]
+      then
+      nodes=`expr $nodes + 1` 
+    fi 
+    if [ $tasks_per_node -gt $total_tasks ]
+      then
+      tasks_per_node=$total_tasks
+    fi
+    nodes="#@ node ="$nodes
     tasks_per_node="#@ tasks_per_node = "$tasks_per_node
+    total_tasks=""
 else
     total_tasks=$pes
     if test -z "$nodes"
@@ -163,15 +180,16 @@ else
       fi
     fi
     nodes="#@ node = "$nodes
+    total_tasks="#@ total_tasks = "$total_tasks 
 fi
 
 cat > $filename <<EOF
 # System settings
 #@ node_usage = $node_usage
 #@ network.LAPI = csss,,US
-#@ total_tasks = $total_tasks
+$total_tasks
 $nodes
-# $tasks_per_node
+$tasks_per_node
 
 # User settings
 EOF
@@ -190,11 +208,16 @@ if [ $present -eq 0 ]
 EOF
 fi
 
+if [ -z "$jobname" ]
+    then
+    jobname=$executable
+fi
+
 present=`grep job_name $llfile|wc -l`
 if [ $present -eq 0 ]
     then
     cat >> $filename <<EOF
-#@ job_name = charmrun_$executable.$$
+#@ job_name = charmrun_$jobname.$$
 EOF
 fi
 
@@ -220,15 +243,15 @@ if [ $interactive -ne 0 ]
     if [ $present -eq 0 ]
 	then
 	cat >> $filename <<EOF
-#@ output = output_$executable.$$
+#@ output = output_$jobname.$$
 EOF
     fi
 
     present=`grep error $llfile|wc -l`
     if [ $present -eq 0 ]
-    then
-	cat >> $filename <<EOF
-#@ error = error_$executable.$$
+        then
+        cat >> $filename <<EOF
+#@ error = error_$jobname.$$
 EOF
     fi
 fi

@@ -135,6 +135,10 @@ static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
 
 CpvStaticDeclare(int, CmiMainHandlerIDP); /* Main handler for _CmiMultipleSend that is run on every node */
 
+#if CMK_MEM_CHECKPOINT
+void (*notify_crash_fn)(int) = NULL;
+#endif
+
 /*****************************************************************************
  *
  * Unix Stub Functions
@@ -803,10 +807,12 @@ void CmiTimerInit()
   struct rusage ru;
   CpvInitialize(double, inittime_virtual);
 
+#if ! CMK_MEM_CHECKPOINT
   /* try to synchronize calling barrier */
   CmiBarrier();
   CmiBarrier();
   CmiBarrier();
+#endif
 
   gettimeofday(&tv,0);
   inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
@@ -815,8 +821,10 @@ void CmiTimerInit()
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
 
+#if ! CMK_MEM_CHECKPOINT
   CmiBarrier();
 /*  CmiBarrierZero(); */
+#endif
 }
 
 double CmiCpuTimer()
@@ -1347,20 +1355,6 @@ void CsdEndIdle(void)
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
-#if CMK_MEM_CHECKPOINT
-#define MESSAGE_PHASE_CHECK	\
-	{	\
-          int phase = CmiGetRestartPhase(msg);	\
-	  if (phase < cur_restart_phase) {	\
-            /*CmiPrintf("[%d] discard message of phase %d cur_restart_phase:%d handler:%d. \n", CmiMyPe(), phase, cur_restart_phase, handler);*/	\
-            CmiFree(msg);	\
-	    return;	\
-          }	\
-	}
-#else
-#define MESSAGE_PHASE_CHECK
-#endif
-
 extern int _exitHandlerIdx;
 
 /** Takes a message and calls its corresponding handler. */
@@ -1383,7 +1377,7 @@ void CmiHandleMessage(void *msg)
 		return;
 	}*/
 	
-        MESSAGE_PHASE_CHECK
+        MESSAGE_PHASE_CHECK(msg)
 
 	h=&CmiGetHandlerInfo(msg);
 	(h->hdlr)(msg,h->userPtr);
@@ -1496,12 +1490,12 @@ int CsdScheduler(int maxmsgs)
       int *CsdStopFlag_ptr = &CpvAccess(CsdStopFlag); \
       int cycle = CpvAccess(CsdStopFlag); \
       CsdSchedulerState_t state;\
-      CsdSchedulerState_new(&state);\
+      CsdSchedulerState_new(&state);
 
 /*A message is available-- process it*/
 #define SCHEDULE_MESSAGE \
       CmiHandleMessage(msg);\
-      if (*CsdStopFlag_ptr != cycle) break;\
+      if (*CsdStopFlag_ptr != cycle) break;
 
 /*No message available-- go (or remain) idle*/
 #define SCHEDULE_IDLE \
@@ -1510,7 +1504,8 @@ int CsdScheduler(int maxmsgs)
       if (*CsdStopFlag_ptr != cycle) {\
 	CsdEndIdle();\
 	break;\
-      }\
+      }
+
 /*
 	EVAC
 */
@@ -1661,7 +1656,7 @@ int handler;
 CpvStaticDeclare(CthThread, CthMainThread);
 CpvStaticDeclare(CthThread, CthSchedulingThread);
 CpvStaticDeclare(CthThread, CthSleepingStandins);
-CpvStaticDeclare(int      , CthResumeNormalThreadIdx);
+CpvDeclare(int      , CthResumeNormalThreadIdx);
 CpvStaticDeclare(int      , CthResumeSchedulingThreadIdx);
 
 
@@ -1696,6 +1691,7 @@ CthThread CthSuspendSchedulingThread()
   return succ;
 }
 
+/* Notice: For changes to the following function, make sure the function CthResumeNormalThreadDebug is also kept updated. */
 void CthResumeNormalThread(CthThreadToken* token)
 {
   CthThread t = token->thread;
@@ -1716,11 +1712,12 @@ void CthResumeNormalThread(CthThreadToken* token)
 	        resumeTraceCore();*/
 #endif
 #endif
-
+  
   /* BIGSIM_OOC DEBUGGING
   CmiPrintf("In CthResumeNormalThread:   ");
   CthPrintThdMagic(t);
   */
+
   CthResume(t);
 }
 

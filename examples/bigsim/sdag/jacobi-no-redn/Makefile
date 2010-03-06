@@ -48,4 +48,4 @@ bgtest: jacobi
 
 clean:
 	rm -f *.sts *.log C *.o *.def.h *.decl.h *~ jacobi bgTraceFile
-	rm -f charmrun conv-host core
+	rm -f charmrun conv-host core charmrun.exe jacobi.exe jacobi.pdb jacobi.ilk

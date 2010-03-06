@@ -12,7 +12,7 @@ endif
 all: $(ALL)
 
 clean:
-	-rm -rf *.o *~ core *.decl.h *.def.h *.txt charmrun $(ALL) 
+	-rm -rf *.o *~ core *.decl.h *.def.h *.txt charmrun $(ALL) test1.exe test1.pdb test1.ilk
 
 test1.decl.h: test1.ci
 	$(CHARMC) $(OPTS) test1.ci

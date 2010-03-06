@@ -138,7 +138,7 @@ void receiver::irecv(void *buf, int count, int datatype, int source, int tag, in
 int receiver::iAlltoAll(void *sendbuf, int sendcount, int sendtype, 
 	      void *recvbuf, int recvcount, int recvtype, int refno)
 {
-  int nPe = getArraySize();  // should be number of elements in array1D
+  int nPe = ckGetArraySize();  // should be number of elements in array1D
   int tag = 65535;	// special tag
   int i;
   for (i=0; i<nPe; i++) 
@@ -150,7 +150,7 @@ int receiver::iAlltoAll(void *sendbuf, int sendcount, int sendtype,
 
 int receiver::iAlltoAllv(void *sendbuf, int *sendcount, int *sdispls, int sendtype, void *recvbuf, int *recvcount, int *rdispls, int recvtype, int refno)
 {
-  int nPe = getArraySize();  // should be number of elements in array1D
+  int nPe = ckGetArraySize();  // should be number of elements in array1D
   int tag = 65535;	// special tag
   int i;
   for (i=0; i<nPe; i++) 

@@ -18,4 +18,4 @@ test: pgm
 #	-$(LINKLINE) -thread uJcontext && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
 
 clean:
-	rm -f conv-host *.o pgm *.bak pgm.*.log pgm.sts *~ charmrun
+	rm -f conv-host *.o pgm *.bak pgm.*.log pgm.sts *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk

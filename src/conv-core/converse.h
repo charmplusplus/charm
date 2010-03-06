@@ -598,6 +598,23 @@ extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 extern int cur_restart_phase;      /* number of restarts */
 #undef CmiSetHandler
 #define CmiSetHandler(m,v)  do {(((CmiMsgHeaderExt*)m)->hdl)=(v); (((CmiMsgHeaderExt*)m)->pn)=cur_restart_phase;} while(0)
+#define MESSAGE_PHASE_CHECK(msg)	\
+	{	\
+          int phase = CmiGetRestartPhase(msg);	\
+	  if (phase != 9999 && phase < cur_restart_phase) {	\
+            /* CmiPrintf("[%d] discard message of phase %d cur_restart_phase:%d. \n", CmiMyPe(), phase, cur_restart_phase); */	\
+            CmiFree(msg);	\
+	    return;	\
+          }	\
+          /* CmiAssert(phase == cur_restart_phase || phase == 9999); */ \
+          if (phase > cur_restart_phase && phase != 9999) {    \
+            /* CmiPrintf("[%d] enqueue message of phase %d cur_restart_phase:%d. \n", CmiMyPe(), phase, cur_restart_phase); */	\
+            CsdEnqueueFifo(msg);    \
+	    return;	\
+          }     \
+	}
+#else
+#define MESSAGE_PHASE_CHECK(msg)
 #endif
 
 /** This header goes before each chunk of memory allocated with CmiAlloc. 
@@ -733,50 +750,52 @@ double   CmiWallTimer(void);
 int      CmiTimerIsSynchronized();
 #endif
 
+#include "queueing.h" /* for "Queue" */
+
 #if CMK_NODE_QUEUE_AVAILABLE
 
 #define CsdNodeEnqueueGeneral(x,s,i,p) do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
-          CqsEnqueueGeneral(CsvAccess(CsdNodeQueue),(x),(s),(i),(p)); \
+          CqsEnqueueGeneral((Queue)CsvAccess(CsdNodeQueue),(x),(s),(i),(p)); \
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         } while(0)
 #define CsdNodeEnqueueFifo(x)     do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
-          CqsEnqueueFifo(CsvAccess(CsdNodeQueue),(x)); \
+          CqsEnqueueFifo((Queue)CsvAccess(CsdNodeQueue),(x)); \
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         } while(0)
 #define CsdNodeEnqueueLifo(x)     do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
-          CqsEnqueueLifo(CsvAccess(CsdNodeQueue),(x))); \
+          CqsEnqueueLifo((Queue)CsvAccess(CsdNodeQueue),(x))); \
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         } while(0)
 #define CsdNodeEnqueue(x)     do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
-          CqsEnqueueFifo(CsvAccess(CsdNodeQueue),(x));\
+          CqsEnqueueFifo((Queue)CsvAccess(CsdNodeQueue),(x));\
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         } while(0)
 
-#define CsdNodeEmpty()            (CqsEmpty(CpvAccess(CsdNodeQueue)))
-#define CsdNodeLength()           (CqsLength(CpvAccess(CsdNodeQueue)))
+#define CsdNodeEmpty()            (CqsEmpty(C(Queue)pvAccess(CsdNodeQueue)))
+#define CsdNodeLength()           (CqsLength((Queue)CpvAccess(CsdNodeQueue)))
 
 #else
 
 #define CsdNodeEnqueueGeneral(x,s,i,p) (CsdEnqueueGeneral(x,s,i,p))
-#define CsdNodeEnqueueFifo(x) (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
-#define CsdNodeEnqueueLifo(x) (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),(x)))
+#define CsdNodeEnqueueFifo(x) (CqsEnqueueFifo((Queue)CpvAccess(CsdSchedQueue),(x)))
+#define CsdNodeEnqueueLifo(x) (CqsEnqueueLifo((Queue)CpvAccess(CsdSchedQueue),(x)))
 #define CsdNodeEnqueue(x)     (CsdEnqueue(x))
-#define CsdNodeEmpty()        (CqsEmpty(CpvAccess(CsdSchedQueue)))
-#define CsdNodeLength()       (CqsLength(CpvAccess(CsdSchedQueue)))
+#define CsdNodeEmpty()        (CqsEmpty((Queue)CpvAccess(CsdSchedQueue)))
+#define CsdNodeLength()       (CqsLength((Queue)CpvAccess(CsdSchedQueue)))
 
 #endif
 
 #define CsdEnqueueGeneral(x,s,i,p)\
-    (CqsEnqueueGeneral(CpvAccess(CsdSchedQueue),(x),(s),(i),(p)))
-#define CsdEnqueueFifo(x)     (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
-#define CsdEnqueueLifo(x)     (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),(x)))
-#define CsdEnqueue(x)         (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
-#define CsdEmpty()            (CqsEmpty(CpvAccess(CsdSchedQueue)))
-#define CsdLength()           (CqsLength(CpvAccess(CsdSchedQueue)))
+    (CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),(x),(s),(i),(p)))
+#define CsdEnqueueFifo(x)     (CqsEnqueueFifo((Queue)CpvAccess(CsdSchedQueue),(x)))
+#define CsdEnqueueLifo(x)     (CqsEnqueueLifo((Queue)CpvAccess(CsdSchedQueue),(x)))
+#define CsdEnqueue(x)         (CqsEnqueueFifo((Queue)CpvAccess(CsdSchedQueue),(x)))
+#define CsdEmpty()            (CqsEmpty((Queue)CpvAccess(CsdSchedQueue)))
+#define CsdLength()           (CqsLength((Queue)CpvAccess(CsdSchedQueue)))
 
 #if CMK_CMIPRINTF_IS_A_BUILTIN /* these are implemented in machine.c */
 void  CmiPrintf(const char *, ...);
@@ -961,6 +980,8 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
     }\
   }\
 }
+
+void CmiPushPE(int, void*);
 
 void          CmiSyncSendFn(int, int, char *);
 CmiCommHandle CmiAsyncSendFn(int, int, char *);
@@ -1181,6 +1202,7 @@ typedef struct {
   */
   char cmicore[CmiReservedHeaderSize];
   CthThread thread;
+  int serialNo;
 } CthThreadToken;
 
 CthThreadToken *CthGetToken(CthThread);
@@ -1390,6 +1412,7 @@ char *CldGetStrategy(void);
 
 void CldEnqueue(int pe, void *msg, int infofn);
 void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn);
+void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn);
 void CldNodeEnqueue(int node, void *msg, int infofn);
 
 /****** CMM: THE MESSAGE MANAGER ******/
@@ -1448,10 +1471,11 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #define CcdPERIODIC_10seconds 20 /*every 10 seconds*/
 #define CcdPERIODIC_10s      20 /*every 10 seconds*/
 #define CcdPERIODIC_1minute  21 /*every minute*/
-#define CcdPERIODIC_10minute 22 /*every 10 minutes*/
-#define CcdPERIODIC_1hour    23 /*every hour*/
-#define CcdPERIODIC_12hour   24 /*every 12 hours*/
-#define CcdPERIODIC_1day     25 /*every day*/
+#define CcdPERIODIC_5minute  22 /*every 5 minute*/
+#define CcdPERIODIC_10minute 23 /*every 10 minutes*/
+#define CcdPERIODIC_1hour    24 /*every hour*/
+#define CcdPERIODIC_12hour   25 /*every 12 hours*/
+#define CcdPERIODIC_1day     26 /*every day*/
 
 /*Other conditions*/
 #define CcdQUIESCENCE 30

@@ -96,7 +96,7 @@ Various following command line arguments will affect the behavior of the program
 
 The scheme used for tuning can be selected at runtime by the use of one of the following options:
 \begin{alltt} 
-    +CPSchemeRandom            Randomly Select Control Point Values
+     +CPSchemeRandom            Randomly Select Control Point Values
  +CPExhaustiveSearch            Exhaustive Search of Control Point Values
       +CPSimulAnneal            Simulated Annealing Search of Control Point Values
  +CPCriticalPathPrio            Use Critical Path to adapt Control Point Values
@@ -107,9 +107,9 @@ The scheme used for tuning can be selected at runtime by the use of one of the f
 
 To intelligently tune or steer an application's performance, performance measurements ought to be used. Some of the schemes above require that memory footprint statistics and utilization statistics be gathered. The following flags enable the gathering of such measurements.
 \begin{alltt} 
-       +CPGatherAll            Gather all types of measurements for each phase
+        +CPGatherAll            Gather all types of measurements for each phase
 +CPGatherMemoryUsage            Gather memory usage after each phase
-+CPGatherUtilization            Gather utilization & Idle time after each phase
++CPGatherUtilization            Gather utilization \& Idle time after each phase
 \end{alltt} 
 
 
@@ -120,8 +120,9 @@ The control point framework will periodically adapt the control point values. Th
 
 The data from one run of the program can be saved and used in subsequent runs. The following command line arguments specify that a file named \texttt{controlPointData.txt} should be created or loaded. This file contains measurements for each phase as well as the control point values used in each phase. 
 \begin{alltt} 
-        +CPSaveData            Save Control Point timings & configurations at completion
-         +CPLoadData            Load Control Point timings & configurations at startup
+         +CPSaveData            Save Control Point timings \& configurations at completion
+         +CPLoadData            Load Control Point timings \& configurations at startup
+     +CPDataFilename            Specify the data filename 
 \end{alltt} 
 
 It might be useful for example, to run once with \texttt{+CPSimulAnneal +CPSaveData} to try to find a good configuration for the program, and then use  \texttt{+CPBestKnown +CPLoadData} for all subsequent production runs.

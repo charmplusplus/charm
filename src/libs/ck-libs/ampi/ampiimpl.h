@@ -515,7 +515,7 @@ inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec){
 #include "charm-api.h"
 #include <sys/stat.h> // for mkdir
 
-extern int mpi_nworlds;
+extern int _mpi_nworlds;
 
 #define MPI_BCAST_TAG   MPI_TAG_UB_VALUE+10
 #define MPI_BARR_TAG    MPI_TAG_UB_VALUE+11
@@ -722,6 +722,27 @@ public:
 		if(p.isDeleting()){
 			delete []myreqs;
 		}
+	}
+	//added due to BIGSIM_OOC DEBUGGING
+	virtual void print();
+};
+
+class SReq : public AmpiRequest {
+public:
+	bool statusIreq;
+	SReq(MPI_Comm comm_): statusIreq(false) {
+		comm = comm_; isvalid=true;
+	}
+	SReq(): statusIreq(false) {}
+	~SReq(){ }
+	CmiBool test(MPI_Status *sts);
+	void complete(MPI_Status *sts);
+	int wait(MPI_Status *sts);
+	void receive(ampi *ptr, AmpiMsg *msg) {}
+	inline int getType(void){ return 4; }
+	virtual void pup(PUP::er &p){
+		AmpiRequest::pup(p);
+		p|statusIreq;
 	}
 	//added due to BIGSIM_OOC DEBUGGING
 	virtual void print();
@@ -1208,8 +1229,8 @@ public:
       // empty
     }
 
-    void startCheckpoint(char* dname);
-    void Checkpoint(int len, char* dname);
+    void startCheckpoint(const char* dname);
+    void Checkpoint(int len, const char* dname);
     void ResumeThread(void);
     TCharm* getTCharmThread() {return thread;}
 
@@ -1377,6 +1398,7 @@ one MPI communicator.
 */
 class ampi : public CBase_ampi {
 friend class IReq;
+friend class SReq;
     CProxy_ampiParent parentProxy;
     void findParent(bool forMigration);
     ampiParent *parent;
@@ -1424,6 +1446,7 @@ friend class IReq;
     void unblock(void);
     void yield(void);
     void generic(AmpiMsg *);
+    void ssend_ack(int sreq);
     void reduceResult(CkReductionMsg *m);
     void splitPhase1(CkReductionMsg *msg);
     void commCreatePhase1(CkReductionMsg *msg);

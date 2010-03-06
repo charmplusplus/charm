@@ -27,7 +27,7 @@ void arrayRing_array::start(arrayMessage *msg)
     msg->iter++;
   if (msg->iter < maxRings) {
     CProxy_arrayRing_array hr(thisArrayID);
-    hr[(thisIndex+1) % numElements].start(msg);
+    hr[(thisIndex+1) % ckGetArraySize()].start(msg);
   } else {
     delete msg;
     megatest_finish();

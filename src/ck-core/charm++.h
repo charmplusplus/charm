@@ -34,7 +34,7 @@ public: static int __idx;
 
 PUPbytes(CkChareID)
 PUPbytes(CkGroupID)
-
+PUPbytes(CmiGroup)
   
 /**
  * CkMessage is the superclass of all Charm++ messages.
@@ -101,9 +101,10 @@ class CkEntryOptions : public CkNoncopyable {
 	typedef unsigned int prio_t; //Datatype used to represent priorities
 	prio_t *prioPtr; //Points to message priority values
 	prio_t prioStore; //For short priorities, stores the priority value
+	CkGroupID  depGroupID;  // group dependence
 public:
 	CkEntryOptions(void): queueingtype(CK_QUEUEING_FIFO), prioBits(0), 
-                              prioPtr(NULL), prioStore(0) {}
+                              prioPtr(NULL), prioStore(0) { depGroupID.setZero(); }
 
 	~CkEntryOptions() {
 		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
@@ -152,11 +153,13 @@ public:
 	}
 	
 	inline void setQueueing(int queueingtype_) {queueingtype=queueingtype_;}
+	inline void setGroupDepID(CkGroupID &gid) { depGroupID = gid; }
 
 	///These are used by CkAllocateMarshallMsg, below:
 	inline int getQueueing(void) const {return queueingtype;}
 	inline int getPriorityBits(void) const {return prioBits;}
 	inline const prio_t *getPriorityPtr(void) const {return prioPtr;}
+	inline const CkGroupID getGroupDepID() const { return depGroupID; }
 };
 
 #include "CkMarshall.decl.h"

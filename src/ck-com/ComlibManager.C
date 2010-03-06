@@ -862,16 +862,16 @@ void ComlibManager::printPeList(const char* note, int *count)
 	for(int i=0;i<CkNumPes();i++){
 		switch (count[i]){
 		case 0:
-			sprintf(buf+strlen(buf), " %d:no ", i, count[i]);
+			sprintf(buf+strlen(buf), " %d:no ", i);
 			break;
 		case 1:
-			sprintf(buf+strlen(buf), " %d:source ", i, count[i]);
+			sprintf(buf+strlen(buf), " %d:source ", i);
 			break;
 		case 2:
-			sprintf(buf+strlen(buf), " %d:dest ", i, count[i]);
+			sprintf(buf+strlen(buf), " %d:dest ", i);
 			break;
 		case 3:
-			sprintf(buf+strlen(buf), " %d:both ", i, count[i]);
+			sprintf(buf+strlen(buf), " %d:both ", i);
 			break;
 		}
 	}
@@ -879,6 +879,7 @@ void ComlibManager::printPeList(const char* note, int *count)
 	sprintf(buf+strlen(buf), ", all source objects discovered =  %d, all destination objects discovered = %d",  count[CkNumPes()] ,  count[CkNumPes()+1] );
 		
 	ComlibPrintf("%s\n", buf);
+	free(buf);
 }
 
 /***************************************************************************

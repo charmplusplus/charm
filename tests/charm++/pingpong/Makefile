@@ -13,7 +13,7 @@ cifiles: pingpong.ci
 	touch cifiles
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o pgm charmrun cifiles
+	rm -f *.decl.h *.def.h conv-host *.o pgm charmrun cifiles pgm.exe pgm.pdb pgm.ilk
 
 pingpong.o: pingpong.C cifiles
 	$(CHARMC) -I$(SRC)/conv-core pingpong.C

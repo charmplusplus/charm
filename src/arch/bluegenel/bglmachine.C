@@ -155,7 +155,7 @@ static void CmiStartThreads(char **argv)
 int received_immediate = 0;
 
 /*Add a message to this processor's receive queue, pe is a rank */
-static void CmiPushPE(int pe,void *msg)
+void CmiPushPE(int pe,void *msg)
 {
   CmiState cs = CmiGetStateN(pe);
   MACHSTATE2(3,"Pushing message into rank %d's queue %p{",pe, cs->recv);

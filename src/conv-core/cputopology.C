@@ -237,7 +237,8 @@ static void cpuTopoHandler(void *m)
     CmiFree(msg);
   }
   else {
-    msg->nodeID = nodecount++;
+//    msg->nodeID = nodecount++;
+    msg->nodeID = pe;           // we will compact the node ID later
     rec = msg;
     CmmPut(hostTable, 1, &tag, msg);
   }
@@ -277,7 +278,7 @@ static void cpuTopoRecvHandler(void *msg)
     CmiFree(m);
   CmiUnlock(topoLock);
 
-  // if (CmiMyPe() == 0) cpuTopo.print();
+//  if (CmiMyPe() == 0) cpuTopo.print();
 }
 
 /******************  API implementation **********************/
@@ -353,6 +354,9 @@ extern "C" void CmiInitCPUTopology(char **argv)
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
 					   "obtain cpu topology info");
   obtain_flag = 1;
+#if __FAULT__
+  obtain_flag = 0;
+#endif
   if (CmiGetArgFlagDesc(argv,"+skip_cpu_topology",
                                "skip the processof getting cpu topology info"))
     obtain_flag = 0;
@@ -367,7 +371,10 @@ extern "C" void CmiInitCPUTopology(char **argv)
      CmiRegisterHandler((CmiHandler)cpuTopoRecvHandler);
   }
 
-  if (!obtain_flag) return;
+  if (!obtain_flag) {
+    cpuTopo.sort();
+    return;
+  }
   else if (CmiMyPe() == 0) {
 #if CMK_BLUEGENE_CHARM
   if (BgNodeRank() == 0)

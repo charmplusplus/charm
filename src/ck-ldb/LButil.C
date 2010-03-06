@@ -86,7 +86,7 @@ LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count)
   }
 
   if (_lb_args.debug()>1) {
-    CkPrintf("After migration: (%d)", count);
+    CkPrintf("After migration: (%d) ", count);
     for (i=0; i<count; i++) CkPrintf("%f ", processors[i].load);
     CkPrintf("\n");
   }

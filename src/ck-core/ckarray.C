@@ -184,7 +184,7 @@ void ArrayElement::initBasics(void)
   ArrayElement_initInfo &info=CkpvAccess(initInfo);
   thisArray=info.thisArray;
   thisArrayID=info.thisArrayID;
-  numElements=info.numInitial.getCombinedCount();
+  numInitialElements=info.numInitial.getCombinedCount();
   if (info.listenerData) {
     memcpy(listenerData,info.listenerData,sizeof(listenerData));
   }
@@ -419,28 +419,31 @@ CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
 					  const CkArrayOptions &opts_)
 {
   CkArrayOptions opts(opts_);
-  if (opts.getLocationManager().isZero())
+  CkGroupID locMgr = opts.getLocationManager();
+  if (locMgr.isZero())
   { //Create a new location manager
 #if !CMK_LBDB_ON
     CkGroupID _lbdb;
 #endif
-    opts.setLocationManager(CProxy_CkLocMgr::ckNew(
-      opts.getMap(),_lbdb,opts.getNumInitial()
-      ));
+    locMgr = CProxy_CkLocMgr::ckNew(opts.getMap(),_lbdb,opts.getNumInitial());
+    opts.setLocationManager(locMgr);
   }
   //Create the array manager
   m->array_ep()=ctor;
   CkMarshalledMessage marsh(m);
+  CkEntryOptions  e_opts;
+  e_opts.setGroupDepID(locMgr);       // group creation dependence
 #if !GROUP_LEVEL_REDUCTION
   CProxy_CkArrayReductionMgr nodereductionProxy = CProxy_CkArrayReductionMgr::ckNew();
-  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy);
+  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy,&e_opts);
   nodereductionProxy.setAttachedGroup(ag);
 #else
   CkNodeGroupID dummyid;
-  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,dummyid);
+  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,dummyid,&e_opts);
 #endif
   return (CkArrayID)ag;
 }
+
 CkArrayID CProxy_ArrayBase::ckCreateEmptyArray(void)
 {
   return ckCreateArray((CkArrayMessage *)CkAllocSysMsg(),0,CkArrayOptions());
@@ -498,8 +501,6 @@ void CProxySection_ArrayBase::pup(PUP::er &p)
 }
 
 /*********************** CkArray Creation *************************/
-CkpvDeclare(CkVec<CkArrayMgrWaiting>, waitingArrayMgrs);
-
 void _ckArrayInit(void)
 {
   CkpvInitialize(ArrayElement_initInfo,initInfo);
@@ -508,7 +509,6 @@ void _ckArrayInit(void)
     // disable because broadcast listener may deliver broadcast message
   CkDisableTracing(CkIndex_CkLocMgr::immigrate(0));
   // by default anytime migration is allowed
-  CkpvInitialize(CkVec<CkArrayMgrWaiting>, waitingArrayMgrs);
 }
 
 CkArray::CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionID)
@@ -517,12 +517,7 @@ CkArray::CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID no
   thisProxy(thisgroup)
 {
   //Registration
-  if (locMgr != 0) {
-    elements=(ArrayElementList *)locMgr->addManager(thisgroup,this);
-  } else {
-    elements=NULL;
-    CkpvAccess(waitingArrayMgrs).insertAtEnd(CkArrayMgrWaiting(locMgrID, this));
-  }
+  elements=(ArrayElementList *)locMgr->addManager(thisgroup,this);
 //  moved to _ckArrayInit()
 //  CkpvInitialize(ArrayElement_initInfo,initInfo);
   CcdCallOnConditionKeep(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this);
@@ -548,11 +543,7 @@ CkArray::CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID no
   for (int l=0;l<listeners.size();l++) listeners[l]->ckBeginInserting();
 
   ///Set up initial elements (if any)
-  if (locMgr != 0) {
-    locMgr->populateInitial(numInitial,initMsg.getMessage(),this);
-  } else {
-    msgsWaitingForLocMgr.insertAtEnd(initMsg.getMessage());
-  }
+  locMgr->populateInitial(numInitial,initMsg.getMessage(),this);
 
   ///adding code for Reduction using nodegroups
 
@@ -596,22 +587,6 @@ void CkArray::pup(PUP::er &p){
 		broadcaster=(CkArrayBroadcaster *)(CkArrayListener *)(listeners[0]);
 		reducer=(CkArrayReducer *)(CkArrayListener *)(listeners[1]);
 	}
-}
-
-/**
- * In case there was a race condidion and the ArrayMgr was created before the LocMgr,
- * the initial creation message and the broadcasts are temporarily buffered.
- * All the messages are stored in "msgWaitingForLocMgr", the initial creation message
- * in position zero (avoiding an extra field in CkArray).
- */
-void CkArray::notifyLocMgrCreated(CkLocMgr *mgr) {
-  locMgr = mgr;
-  elements=(ArrayElementList *)locMgr->addManager(thisgroup,this);
-  locMgr->populateInitial(numInitial,msgsWaitingForLocMgr[0],this);
-  for (int i=1; i<msgsWaitingForLocMgr.size(); ++i) {
-    recvBroadcast(msgsWaitingForLocMgr[i]);
-  }
-  msgsWaitingForLocMgr.free();
 }
 
 #define CK_ARRAYLISTENER_STAMP_LOOP(listenerData) do {\
@@ -685,6 +660,9 @@ CmiBool CkArray::insertElement(CkMessage *me)
   int ctorIdx=m->array_ep();
   int chareType=_entryTable[ctorIdx]->chareIdx;
   ArrayElement *elt=allocate(chareType,idx,me,CmiFalse);
+#ifndef CMK_CHARE_USE_PTR
+  ((Chare *)elt)->chareIdx = -1;
+#endif
   if (!locMgr->addElement(thisgroup,idx,elt,ctorIdx,(void *)m)) return CmiFalse;
   CK_ARRAYLISTENER_LOOP(listeners,
       if (!l->ckElementCreated(elt)) return CmiFalse;);
@@ -796,10 +774,16 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) cons
 	  ckDelegatedTo()->ArraySend(ckDelegatedPtr(),ep,msg,_idx,ckGetArrayID());
 	else 
 	{ //Usual case: a direct send
-	  if (opts & CK_MSG_INLINE)
-	    ckLocalBranch()->deliver(msg, CkDeliver_inline, opts&!CK_MSG_INLINE);
-	  else
-	    ckLocalBranch()->deliver(msg, CkDeliver_queue, opts);
+	  CkArray *localbranch = ckLocalBranch();
+	  if (localbranch == NULL) {             // array not created yet
+	    CkArrayManagerDeliver(CkMyPe(), msg, 0);
+          }
+	  else {
+	    if (opts & CK_MSG_INLINE)
+	      localbranch->deliver(msg, CkDeliver_inline, opts & (~CK_MSG_INLINE));
+	    else
+	      localbranch->deliver(msg, CkDeliver_queue, opts);
+	  }
 	}
 }
 
@@ -837,7 +821,10 @@ void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex
   m->array_index()=idx;
   msg_prepareSend(m,entryIndex,aID);
   CkArray *a=(CkArray *)_localBranch(aID);
-  a->deliver(m,CkDeliver_queue,opts);
+  if (a == NULL)
+    CkArrayManagerDeliver(CkMyPe(), msg, 0);
+  else
+    a->deliver(m,CkDeliver_queue,opts);
 }
 
 void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts)
@@ -1066,15 +1053,11 @@ void CkArray::staticBroadcastHomeElements(CkArray *arr,void *data,CkLocRec *rec,
 }
 #endif
 
+
 /// Increment broadcast count; deliver to all local elements
 void CkArray::recvBroadcast(CkMessage *m)
 {
 	CK_MAGICNUMBER_CHECK
-    if (elements == NULL) {
-      // The location manager has been created yet. Delay the delivery...
-      msgsWaitingForLocMgr.insertAtEnd(m);
-      return;
-    }
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	broadcaster->incoming(msg);
 #ifdef _FAULT_MLOG_

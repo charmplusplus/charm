@@ -8,6 +8,7 @@ OBJS=megatest.o \
      varsizetest.o \
      varraystest.o \
      groupcast.o \
+     groupmulti.o \
      groupsectiontest.o \
      multisectiontest.o \
      nodecast.o \
@@ -29,6 +30,7 @@ OBJS=megatest.o \
      bitvector.o \
      immediatering.o \
      callback.o \
+     inlineem.o \
 
 
 #     priolongtest.o \
@@ -55,12 +57,14 @@ OBJS_REV=megatest.o \
      synctest.o \
      nodecast.o \
      groupcast.o \
+     groupmulti.o \
      groupsectiontest.o \
      multisectiontest.o \
      varraystest.o \
      varsizetest.o \
      nodering.o \
-     groupring.o
+     groupring.o \
+     inlineem.o
 
 #     priolongtest.o \
 
@@ -71,7 +75,8 @@ CIFILES =  \
       fib.def.h        megatest.def.h       priotest.def.h   tempotest.def.h  \
       groupcast.def.h  migration.def.h      queens.def.h     varraystest.def.h\
       groupring.def.h  nodecast.def.h       reduction.def.h  varsizetest.def.h\
-      groupsectiontest.def.h multisectiontest.def.h #priolongtest.def.h 
+      groupsectiontest.def.h multisectiontest.def.h inlineem.def.h \
+      groupmulti.def.h #priolongtest.def.h
 
 .SUFFIXES:
 .SUFFIXES: .o .C .def.h .decl.h .ci .h
@@ -92,7 +97,7 @@ DEPENDFILE = Make.depends
 include $(DEPENDFILE)
 
 clean:
-	rm -r -f conv-host pgm *.o *.decl.h *.def.h *.log *.sts *~ *.bak charmrun SunWS_cache
+	rm -r -f conv-host pgm pgm.exe pgm.pdb pgm.ilk *.o *.decl.h *.def.h *.log *.sts *~ *.bak charmrun SunWS_cache
 
 test: pgm
 	./charmrun ./pgm +p1 $(TESTOPTS)

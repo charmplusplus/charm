@@ -528,10 +528,12 @@ class SafePool {
     T msgs[MAXMSGS];
     typedef T (*allocFn)();
     typedef void (*freeFn)(T);
+    typedef void (*resetFn)(T);
     allocFn allocfn;
     freeFn  freefn;
+    resetFn resetfn;
   public:
-    SafePool(allocFn _afn, freeFn _ffn): allocfn(_afn), freefn(_ffn) {
+    SafePool(allocFn _afn, freeFn _ffn, resetFn _rfn=NULL): allocfn(_afn), freefn(_ffn), resetfn(_rfn) {
       for(int i=0;i<MAXMSGS;i++)
         msgs[i] = allocfn();
       num = MAXMSGS;
@@ -544,8 +546,10 @@ class SafePool {
     void put(T m) {
       if (num==MAXMSGS || CmiImmIsRunning())
         freefn(m);
-      else
+      else {
+        if (resetfn!=NULL) resetfn(m);
         msgs[num++] = m;
+      }
     }
 };
 

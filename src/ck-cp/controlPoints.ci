@@ -7,6 +7,9 @@ module ControlPoints {
   readonly bool shouldGatherMemoryUsage;
   readonly bool shouldGatherUtilization;
   readonly bool shouldGatherAll;
+  readonly char CPDataFilename[512];
+
+
 
   initproc void registerCPReductions(void);	
 
@@ -27,7 +30,7 @@ module ControlPoints {
 
  initnode void controlPointInitNode();
 
- group controlPointManager {
+ group  [migratable]  controlPointManager {
     entry controlPointManager();
 
     entry void requestMemoryUsage(CkCallback cb);

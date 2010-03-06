@@ -560,15 +560,18 @@ void LogPool::writeSts(TraceProjections *traceProj){
 
 void LogPool::writeRC(void)
 {
+    //CkPrintf("write RC is being executed\n");
 #ifdef PROJ_ANALYSIS  
-  //  CkAssert(CkMyPe() == 0);
-  //  fprintf(rcfp,"RC_GLOBAL_END_TIME %lld\n",
-  //	  (CMK_TYPEDEF_UINT8)(1.0e6*globalEndTime));
-  //  if (CkpvAccess(_trace)->isOutlierAutomatic()) {
-  //    fprintf(rcfp,"RC_OUTLIER_FILTERED true\n");
-  //  } else {
-  //    fprintf(rcfp,"RC_OUTLIER_FILTERED false\n");
-  //  }
+    CkAssert(CkMyPe() == 0);
+    fprintf(rcfp,"RC_GLOBAL_END_TIME %lld\n",
+  	  (CMK_TYPEDEF_UINT8)(1.0e6*globalEndTime));
+    /* //Yanhua comment it because isOutlierAutomatic is not a variable in trace
+    if (CkpvAccess(_trace)->isOutlierAutomatic()) {
+      fprintf(rcfp,"RC_OUTLIER_FILTERED true\n");
+    } else {
+      fprintf(rcfp,"RC_OUTLIER_FILTERED false\n");
+    }
+    */
 #endif //PROJ_ANALYSIS
   fclose(rcfp);
 }
@@ -992,7 +995,7 @@ TraceProjections::TraceProjections(char **argv):
   _logPool->setBinary(binary);
 #if CMK_PROJECTIONS_USE_ZLIB
   _logPool->setCompressed(compressed);
-#endif CMK_PROJECTIONS_USE_ZLIB
+#endif
   if (CkMyPe() == 0) {
     _logPool->createSts();
     _logPool->createRC();
@@ -1020,7 +1023,7 @@ TraceProjections::TraceProjections(char **argv):
   }
   papiValues = new long_long[numPAPIEvents];
   memset(papiValues, 0, numPAPIEvents*sizeof(long_long));
-#endif CMK_HAS_COUNTER_PAPI
+#endif
 }
 
 int TraceProjections::traceRegisterUserEvent(const char* evt, int e)
@@ -2578,7 +2581,7 @@ void KMeansBOC::phaseDone() {
 
 void TraceProjectionsBOC::startEndTimeAnalysis()
 {
- if(CkMyPe()==0)    CkPrintf("[%d] TraceProjectionsBOC::startEndTimeAnalysis time=\t%g\n", CkMyPe(), CkWallTimer() );
+ //if(CkMyPe()==0)    CkPrintf("[%d] TraceProjectionsBOC::startEndTimeAnalysis time=\t%g\n", CkMyPe(), CkWallTimer() );
 
   endTime = CkpvAccess(_trace)->endTime;
   // CkPrintf("[%d] End time is %lf us\n", CkMyPe(), endTime*1e06);
@@ -2590,7 +2593,7 @@ void TraceProjectionsBOC::startEndTimeAnalysis()
 
 void TraceProjectionsBOC::endTimeDone(CkReductionMsg *msg)
 {
- if(CkMyPe()==0)    CkPrintf("[%d] TraceProjectionsBOC::endTimeDone time=\t%g\n", CkMyPe(), CkWallTimer() );
+ //if(CkMyPe()==0)    CkPrintf("[%d] TraceProjectionsBOC::endTimeDone time=\t%g\n", CkMyPe(), CkWallTimer() );
 
   CkAssert(CkMyPe() == 0);
   parModulesRemaining--;
@@ -2637,8 +2640,8 @@ void TraceProjectionsBOC::kMeansDone() {
 void TraceProjectionsBOC::finalize()
 {
   CkAssert(CkMyPe() == 0);
-  CkPrintf("Total Analysis Time = %lf seconds\n", 
-	   CmiWallTimer()-analysisStartTime);
+  //CkPrintf("Total Analysis Time = %lf seconds\n", 
+  //	   CmiWallTimer()-analysisStartTime);
   thisProxy.closingTraces();
 }
 

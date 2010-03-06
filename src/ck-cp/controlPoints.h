@@ -49,6 +49,7 @@
 /* readonly */ extern int whichTuningScheme;
 /* readonly */ extern bool writeDataFileAtShutdown;
 /* readonly */ extern bool loadDataFileAtStartup;
+/* readonly */ extern char CPDataFilename[512];
 
 
 
@@ -78,12 +79,6 @@ int controlPoint(const char *name, int lb, int ub);
 /// Return an integer from the provided vector of values
 /// The value returned will likely change between subsequent invocations
 int controlPoint(const char *name, std::vector<int>& values);
-
-/// Associate a control point as affecting priorities for an array
-void controlPointPriorityArray(const char *name, CProxy_ArrayBase &arraybase);
-
-/// Associate a control point with an entry method, whose priorities are affected by the control point
-void controlPointPriorityEntry(const char *name, int idx);
 
 
 
@@ -133,6 +128,32 @@ public:
 }; 
 
 
+/// A container that stores overhead statistics (min/max/avg etc.)
+class overheadContainer {
+public:
+  double min;
+  double avg;
+  double max;
+  
+  overheadContainer(){
+    min = -1.0;
+    max = -1.0;
+    avg = -1.0;
+  }
+  
+  bool isValid() const{
+    return (min >= 0.0 && avg >= min && max >= avg && max <= 1.0);
+  }
+  
+  void print() const{
+    if(isValid())
+      CkPrintf("[%d] Overhead Time is Min=%.2lf%% Avg=%.2lf%% Max=%.2lf%%\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);    
+    else
+      CkPrintf("[%d] Overhead Time is invalid\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);
+  }
+  
+}; 
+
 
 
 /// Stores data for a phase (a time range in which a single set of control point values is used).
@@ -150,6 +171,8 @@ public:
   double memoryUsageMB;
 
   idleTimeContainer idleTime;
+  overheadContainer overheadTime;
+
 
   /** Approximately records the average message size for an entry method. */
   double bytesPerInvoke;
@@ -409,7 +432,7 @@ public:
       s << "# There are " << ps.size()  << " control points\n";
       s << "# number of recorded phases: " << phases.size() << "\n";
       
-      s << "# Memory (MB)\tIdle Min\tIdle Avg\tIdle Max\tByte Per Invoke\tGrain Size\t";
+      s << "# Memory (MB)\tIdle Min\tIdle Avg\tIdle Max\tOverhead Min\tOverhead Avg\tOverhead Max\tByte Per Invoke\tGrain Size\t";
       for(cpiter = ps.begin(); cpiter != ps.end(); cpiter++){
 	s << cpiter->first << "\t";
       }
@@ -423,6 +446,8 @@ public:
 	s << (*runiter)->memoryUsageMB << "\t"; 
 
 	s << (*runiter)->idleTime.min << "\t" << (*runiter)->idleTime.avg << "\t" << (*runiter)->idleTime.max << "\t";
+	s << (*runiter)->overheadTime.min << "\t" << (*runiter)->overheadTime.avg << "\t" << (*runiter)->overheadTime.max << "\t";
+
 
 	s << (*runiter)->bytesPerInvoke << "\t";
 
@@ -545,9 +570,7 @@ public:
 
 class controlPointManager : public CBase_controlPointManager {
 public:
-  
-  char * dataFilename;
-  
+    
   instrumentedData allData;
   
   /// The lower and upper bounds for each named control point
@@ -584,6 +607,20 @@ public:
   controlPointManager();
      
   ~controlPointManager();
+
+
+
+  virtual void pup(PUP::er &p)
+  {
+    CBase_controlPointManager::pup(p);
+    if(p.isUnpacking()){
+      CkAbort("Group controlPointManager is not yet capable of migration.\n");
+    }
+  }
+
+  controlPointManager(CkMigrateMessage* m) {
+    // TODO: Implement this
+  }
 
 
   /// Loads the previous run data file
@@ -653,11 +690,11 @@ public:
   void gatherAll(CkReductionMsg *msg);
   
 
-  /// Inform the control point framework that a named control point affects the priorities of some array  
-  void associatePriorityArray(const char *name, int groupIdx);
+/*   /// Inform the control point framework that a named control point affects the priorities of some array   */
+/*   void associatePriorityArray(const char *name, int groupIdx); */
   
-  /// Inform the control point framework that a named control point affects the priority of some entry method
-  void associatePriorityEntry(const char *name, int idx);
+/*   /// Inform the control point framework that a named control point affects the priority of some entry method */
+/*   void associatePriorityEntry(const char *name, int idx); */
   
 
 

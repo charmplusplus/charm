@@ -160,12 +160,6 @@ CkpvStaticDeclare(int,  _numInitsRecd);
 CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
-#ifndef CMK_CHARE_USE_PTR
-CpvExtern(CkVec<void *>, chare_objs);
-CpvExtern(CkVec<int>, chare_types);
-CpvExtern(CkVec<VidBlock *>, vidblocks);
-#endif
-
 /*
 	FAULT_EVAC
 */
@@ -252,12 +246,12 @@ static inline void _parseCommandLineOpts(char **argv)
   if(CmiGetArgString(argv,"+restart",&_restartDir))
       faultFunc = CkRestartMain;
 #if __FAULT__
-  if (CmiGetArgFlagDesc(argv,"+restartaftercrash","restarting this processor after a crash")){	
+  if (CmiGetArgIntDesc(argv,"+restartaftercrash",&cur_restart_phase,"restarting this processor after a crash")){	
 # if CMK_MEM_CHECKPOINT
       faultFunc = CkMemRestart;
 # endif
 #ifdef _FAULT_MLOG_
-            faultFunc = CkMlogRestart;
+      faultFunc = CkMlogRestart;
 #endif
       CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
   }
@@ -322,7 +316,13 @@ static void _bufferHandler(void *msg)
 
 static void _discardHandler(envelope *env)
 {
+//  MESSAGE_PHASE_CHECK(env);
+
   DEBUGF(("[%d] _discardHandler called.\n", CkMyPe()));
+#if CMK_MEM_CHECKPOINT
+  CkPrintf("[%d] _discardHandler called!\n", CkMyPe());
+  if (CkInRestarting()) CpvAccess(_qd)->process();
+#endif
   CmiFree(env);
 }
 
@@ -389,6 +389,28 @@ static inline void _sendStats(void)
 
 #ifdef _FAULT_MLOG_
 extern void _messageLoggingExit();
+#endif
+
+#if __FAULT__
+//CpvExtern(int, CldHandlerIndex);
+//extern "C" void CldHandler(char *);
+extern int index_skipCldHandler;
+extern void _skipCldHandler(void *converseMsg);
+
+void _discard_charm_message()
+{
+  CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
+//  CkNumberHandler(CpvAccess(CldHandlerIndex), (CmiHandler)_discardHandler);
+  CkNumberHandler(index_skipCldHandler, (CmiHandler)_discardHandler);
+}
+
+void _resume_charm_message()
+{
+  CkNumberHandlerEx(_charmHandlerIdx,(CmiHandlerEx)_processHandler,
+  	CkpvAccess(_coreState));
+//  CkNumberHandler(CpvAccess(CldHandlerIndex), (CmiHandler)CldHandler);
+  CkNumberHandler(index_skipCldHandler, (CmiHandler)_skipCldHandler);
+}
 #endif
 
 static void _exitHandler(envelope *env)
@@ -525,11 +547,11 @@ static inline void _processBufferedMsgs(void)
   while(NULL!=(env=(envelope*)CkpvAccess(_buffQ)->deq())) {
     if(env->getMsgtype()==NewChareMsg || env->getMsgtype()==NewVChareMsg) {
       if(env->isForAnyPE())
-        CldEnqueue(CLD_ANYWHERE, env, _infoIdx);
+        _CldEnqueue(CLD_ANYWHERE, env, _infoIdx);
       else
-        CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), (char *)env);
+        _processHandler((void *)env, CkpvAccess(_coreState));
     } else {
-      CmiSyncSendAndFree(CkMyPe(), env->getTotalsize(), (char *)env);
+      _processHandler((void *)env, CkpvAccess(_coreState));
     }
   }
 }
@@ -650,15 +672,21 @@ static void _roRestartHandler(void *msg)
  * together with all the other regular messages by _bufferHandler (and will be flushed
  * after all the initialization messages have been processed).
  */
-static void _initHandler(void *msg)
+static void _initHandler(void *msg, CkCoreState *ck)
 {
   CkAssert(CkMyPe()!=0);
   register envelope *env = (envelope *) msg;
+  
+  if (ck->watcher!=NULL) {
+    if (!ck->watcher->processMessage(env,ck)) return;
+  }
+  
   switch (env->getMsgtype()) {
     case BocInitMsg:
       if (env->getGroupEpoch()==0) {
         CkpvAccess(_numInitsRecd)++;
-        CpvAccess(_qd)->process();
+	// _processBocInitMsg already handles QD
+        //CpvAccess(_qd)->process();
         CkpvAccess(_bocInitVec)->insert(env->getGroupNum().idx, env);
       } else _bufferHandler(msg);
       break;
@@ -766,6 +794,7 @@ extern void _registerPathHistory(void);
 extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
 extern void _loadbalancerInit();
+extern void _initChareTables();
 #if CMK_MEM_CHECKPOINT
 extern void init_memcheckpt(char **argv);
 #endif
@@ -856,12 +885,7 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 	CpvInitialize(int,serializer);
 
-#ifndef CMK_CHARE_USE_PTR
-          /* chare and vidblock table */
-        CpvInitialize(CkVec<void *>, chare_objs);
-        CpvInitialize(CkVec<int>, chare_types);
-        CpvInitialize(CkVec<VidBlock *>, vidblocks);
-#endif
+	_initChareTables();            // for checkpointable plain chares
 
 	CksvInitialize(UInt, _numNodeGroups);
 	CksvInitialize(GroupTable*, _nodeGroupTable);
@@ -915,9 +939,11 @@ void _initCharm(int unused_argc, char **argv)
 
 	_charmHandlerIdx = CkRegisterHandler((CmiHandler)_bufferHandler);
 	_initHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
+	CkNumberHandlerEx(_initHandlerIdx, (CmiHandlerEx)_initHandler, CkpvAccess(_coreState));
 	_roRestartHandlerIdx = CkRegisterHandler((CmiHandler)_roRestartHandler);
 	_exitHandlerIdx = CkRegisterHandler((CmiHandler)_exitHandler);
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
+	CkNumberHandlerEx(_bocHandlerIdx, (CmiHandlerEx)_initHandler, CkpvAccess(_coreState));
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
 	_triggerHandlerIdx = CkRegisterHandler((CmiHandler)_triggerHandler);
 	_ckModuleInit();
@@ -1088,13 +1114,13 @@ void _initCharm(int unused_argc, char **argv)
 		}*/
 	}	
 	
-        if (faultFunc == NULL) {         // this is not restart
+        if (faultFunc == NULL && !replaySystem) {         // this is not restart
             // these two are blocking calls for non-bigsim
 #if ! CMK_BLUEGENE_CHARM
           CmiInitCPUAffinity(argv);
 #endif
-          CmiInitCPUTopology(argv);
         }
+        CmiInitCPUTopology(argv);
 
 	if (faultFunc) {
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
