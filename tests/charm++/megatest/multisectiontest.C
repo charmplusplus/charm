@@ -35,7 +35,6 @@ void multisectiontest_init()
 	      gidArr[i]=CProxy_multisectiontest_grp::ckNew(numgroups, masterproxy.ckGetGroupID());	  
 
 	    }
-	  const CkGroupID constgidArr[NUMGROUPS]={gidArr[0], gidArr[1], gidArr[2]};
 	  for(int i=0;i<numarrays;i++)
 	    {
 	      Aproxy[i]=CProxy_multisectiontest_array1d::ckNew(masterproxy.ckGetGroupID(),ArraySize);	  
@@ -66,10 +65,9 @@ void multisectiontest_init()
 	      for(int i=floor,j=0;i<=ceiling;i++,j++)
 		elems[k][j]=i;
 	    }
-	  const int *constelems[NUMGROUPS]={elems[0], elems[1], elems[2]};
 	  //	  CProxySection_multisectiontest_grp
 	  //	  groupLowProxy=CProxySection_multisectiontest_grp(numgroups,gidArr,elems,nelems);
-	  CProxySection_multisectiontest_grp groupLowProxy(numgroups, constgidArr,constelems,nelems);
+	  CProxySection_multisectiontest_grp groupLowProxy(numgroups, gidArr,elems,nelems);
 	  //  CkPrintf("[%d] section of groupid %d from %d to %d size
 	  //  %d\n",CkMyPe(), thisgroup,  floor, ceiling,
 	  //  sectionSize);
@@ -86,10 +84,11 @@ void multisectiontest_init()
 	    for(int i=afloor,j=0;i<=aceiling;i++,j++)
 	      aelems[k][j]=CkArrayIndex1D(i);
 	    }
-	  const CkArrayIndexMax *constaelems[NUMARRAYS]={aelems[0], aelems[1], aelems[2]};
 	  //	  CProxySection_multisectiontest_array1d
 	  //	  arrayLowProxy=CProxySection_multisectiontest_array1d(numarrays,aidArr,aelems,naelems);
-	  CProxySection_multisectiontest_array1d arrayLowProxy(numarrays,aidArr,constaelems,naelems);
+	  //	  CProxySection_multisectiontest_array1d
+	  //	  arrayLowProxy(numarrays,aidArr,constaelems,naelems);
+	  CProxySection_multisectiontest_array1d arrayLowProxy(numarrays,aidArr,aelems,naelems);
 	  // cross section other half of each group
 	  floor=0;
 	  ceiling=boundary-1;
@@ -111,8 +110,7 @@ void multisectiontest_init()
 	      for(int i=floor,j=0;i<=ceiling;i++,j++)
 		elemsH[k][j]=i;	  	  
 	    }
-	  const int *constelemsH[NUMGROUPS]={elemsH[0], elemsH[1], elemsH[2]};
-	  CProxySection_multisectiontest_grp groupHighProxy(numgroups,gidArr,constelemsH,nelems);
+	  CProxySection_multisectiontest_grp groupHighProxy(numgroups,gidArr,elemsH,nelems);
 
 	  // cross section upper half of each array
 	  // cross section lower half of each array
@@ -126,8 +124,7 @@ void multisectiontest_init()
 	      for(int i=afloor,j=0;i<=aceiling;i++,j++)
 		aelemsH[k][j]=CkArrayIndex1D(i);
 	    }
-	  const CkArrayIndexMax *constaelemsH[NUMARRAYS]={aelemsH[0], aelemsH[1], aelemsH[2]};
-	  CProxySection_multisectiontest_array1d arrayHighProxy(numarrays,aidArr,constaelemsH,naelems);
+	  CProxySection_multisectiontest_array1d arrayHighProxy(numarrays,aidArr, aelemsH, naelems);
 
 	  // send IDs to master
 	  multisectionGID_msg *mmsg= new (numgroups) multisectionGID_msg;
@@ -306,8 +303,7 @@ void multisectiontest_grp::recvID( multisectionAID_msg *m)
       for(int i=afloor,j=0;i<=aceiling;i++,j++)
 	aelems[k][j]=CkArrayIndex1D(i);
     }
-  const CkArrayIndexMax *constaelems[3]={aelems[0], aelems[1], aelems[2]};
-  multisectionProxy=CProxySection_multisectiontest_array1d(NUMARRAYS,m->IDs,constaelems,naelems);
+  multisectionProxy=CProxySection_multisectiontest_array1d(NUMARRAYS,m->IDs,aelems,naelems);
   delete m;  
   CkCallback cb(CkIndex_multisectiontest_master::doneSetup(NULL), 0,masterGroup);
   contribute(sizeof(int),&msgCount, CkReduction::sum_int,cb);
@@ -406,8 +402,7 @@ void multisectiontest_array1d::recvID(multisectionGID_msg *m)
       for(int i=floor,j=0;i<=ceiling;i++,j++)
 	elems[k][j]=i;
     }
-  const int *constelems[3]={elems[0], elems[1], elems[2]};
-  multisectionProxy=CProxySection_multisectiontest_grp(NUMGROUPS,m->IDs,constelems,nelems);
+  multisectionProxy=CProxySection_multisectiontest_grp(NUMGROUPS,m->IDs,elems,nelems);
   delete m;
   CkCallback cb(CkIndex_multisectiontest_master::doneSetup(NULL), 0,masterGroup);
   contribute(sizeof(int),&msgCount, CkReduction::sum_int,cb);  
