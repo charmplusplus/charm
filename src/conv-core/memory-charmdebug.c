@@ -106,7 +106,7 @@ void *lastMemoryAllocated = NULL;
 Slot **allocatedSince = NULL;
 int allocatedSinceSize = 0;
 int allocatedSinceMaxSize = 0;
-int saveAllocationHistory = 1;
+int saveAllocationHistory = 0;
 
 /* Convert a slot to a user address */
 static char *SlotToUser(Slot *s) {
