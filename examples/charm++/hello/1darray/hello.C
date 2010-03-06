@@ -10,24 +10,31 @@ class Main : public CBase_Main
 public:
   Main(CkArgMsg* m)
   {
+//		  CkExit();
+
     //Process command-line arguments
-    nElements=5;
-    if(m->argc >1 ) nElements=atoi(m->argv[1]);
-    delete m;
+   nElements=5;
+   if(m->argc >1 ) nElements=atoi(m->argv[1]);
+	   delete m;
 
     //Start the computation
-    CkPrintf("Running Hello on %d processors for %d elements\n",
-	     CkNumPes(),nElements);
-    mainProxy = thisProxy;
+    CkPrintf("Running Hello on %d processors for %d elements\n", CkNumPes(),nElements);
+//	int N1,N2;
+//	CkScanf("%d %d",&N1, &N2);
 
-    CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
+//    CkPrintf("Read Values %d and  %d \n", N1,N2);
+//	CkError("Testing Error");
+//CkAssert(0);
+   mainProxy = thisProxy;
 
-    arr[0].SayHi(17);
+  CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
+
+ arr[0].SayHi(17); 
   };
 
   void done(void)
   {
-    CkPrintf("All done\n");
+   CkPrintf("All done\n");
     CkExit();
   };
 };

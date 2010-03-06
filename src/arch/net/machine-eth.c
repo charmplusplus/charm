@@ -170,7 +170,7 @@ void TransmitAckDatagram(OtherNode node)
   
   seqno = node->recv_next;
   MACHSTATE2(3,"  TransmitAckDgram [seq %d to 'pe' %d]",seqno,node->nodestart)
-  DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, Cmi_charmrun_pid, seqno, 0);
+  DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, _Cmi_numnodes, seqno, 0);
   LOG(Cmi_clock, Cmi_nodestart, 'A', node->nodestart, seqno);
   for (i=0; i<Cmi_window_size; i++) {
     slot = seqno % Cmi_window_size;
@@ -214,7 +214,7 @@ void TransmitImplicitDgram(ImplicitDgram dg)
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
   temp = *head;
   dest = dg->dest;
-  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, dg->seqno, dg->broot);
+  DgramHeaderMake(head, dg->rank, dg->srcpe, _Cmi_numnodes, dg->seqno, dg->broot);
 #ifdef CMK_USE_CHECKSUM
   head->magic ^= computeCheckSum((unsigned char*)head, len + DGRAM_HEADER_SIZE);
 #endif
@@ -240,7 +240,7 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
   temp = *head;
   dest = dg->dest;
-  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_charmrun_pid, dg->seqno, dg->broot);
+  DgramHeaderMake(head, dg->rank, dg->srcpe, _Cmi_numnodes, dg->seqno, dg->broot);
 #ifdef CMK_USE_CHECKSUM
   head->magic ^= computeCheckSum((unsigned char *)head, len + DGRAM_HEADER_SIZE);
 #endif
@@ -728,7 +728,7 @@ void ReceiveDatagram()
 #ifdef CMK_USE_CHECKSUM
     if (computeCheckSum((unsigned char*)dg->data, dg->len) == 0)
 #else
-    if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK))
+    if (magic == (_Cmi_numnodes&DGRAM_MAGIC_MASK))
 #endif
     {
       if (dg->rank == DGRAM_ACKNOWLEDGE)
