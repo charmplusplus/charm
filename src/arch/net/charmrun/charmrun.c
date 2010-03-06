@@ -1631,7 +1631,7 @@ int req_handle_barrier(ChMessage *msg,SOCKET fd)
   int i;
   static int count = 0;
   count ++;
-  if (count == nodetab_size) {
+  if (count == req_nClients) {
     for (i=0;i<req_nClients;i++)
       req_reply(req_clients[i], "barrier", "", 1);
     count = 0;
@@ -1647,7 +1647,7 @@ int req_handle_barrier0(ChMessage *msg,SOCKET fd)
   int pe = atoi(msg->data);
   if (pe == 0) fd0 = fd;
   count ++;
-  if (count == nodetab_size) {
+  if (count == req_nClients) {
     req_reply(fd0, "barrier0", "", 1);     /* only send to node 0 */
     count = 0;
   }
