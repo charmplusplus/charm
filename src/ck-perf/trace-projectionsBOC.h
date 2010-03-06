@@ -3,7 +3,6 @@
 #include "trace-common.h"
 #include "ckcallback-ccs.h"
 
-
 #ifndef PROJ_ANALYSIS
 // NOTE: Needed to handle the automatically-generated method so 
 //   trace-projections would build correctly while ignoring any of the 
