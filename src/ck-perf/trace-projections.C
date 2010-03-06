@@ -1671,7 +1671,7 @@ extern "C" void TraceProjectionsExitHandler()
   bocProxy.traceProjectionsParallelShutdown();
 #else
   CkExit();
-#endif CMK_OPTIMIZE
+#endif
 }
 
 // This is called once on each processor but the idiom of use appears
@@ -1685,7 +1685,7 @@ void initTraceProjectionsBOC()
   if (BgNodeRank() == 0) {
 #else
     if (CkMyRank() == 0) {
-#endif __BLUEGENE__
+#endif
       registerExitFn(TraceProjectionsExitHandler);
     }
 #if 0
