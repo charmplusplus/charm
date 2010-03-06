@@ -2042,7 +2042,7 @@ void CmiSendReduce(CmiReduction *red) {
     }
     CmiSetHandler(msg, CpvAccess(CmiReductionMessageHandler));
     CmiSetRedID(msg, red->seqID);
-    /*CmiPrintf("CmiSendReduce(%d): sending %d bytes to %d\n",CmiMyPe(),msg_size,CpvAccess(_reduce_parent));*/
+    /*CmiPrintf("CmiSendReduce(%d): sending %d bytes to %d\n",CmiMyPe(),msg_size,red->parent);*/
     CmiSyncSendAndFree(red->parent, msg_size, msg);
   } else {
     (red->ops.destination)(msg);
