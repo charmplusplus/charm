@@ -2368,8 +2368,8 @@ void KMeansBOC::findRepresentatives() {
   int numCandidateOutliers = CkNumPes() - 
     exemplarsPerCluster*numNonEmptyClusters;
 
-  double remainders[numK];
-  int assigned[numK];
+  double *remainders = new double[numK];
+  int *assigned = new int[numK];
   exemplarChoicesLeft = new int[numK];
   outlierChoicesLeft = new int[numK];
 
@@ -2428,6 +2428,9 @@ void KMeansBOC::findRepresentatives() {
     DEBUGF("%d | Exemplar = %d | Outlier = %d\n", i, exemplarChoicesLeft[i],
 	   outlierChoicesLeft[i]);
   }
+
+  delete [] assigned;
+  delete [] remainders;
 
   // send out first broadcast
   KSelectionMessage *outmsg = NULL;
@@ -2740,7 +2743,7 @@ CkReductionMsg *minMaxReduction(int nMsgs,
   CkAssert(numBytes%sizeof(double) == 0);
   int numK = (numBytes/sizeof(double))/4;
 
-  double ret[numK*4];
+  double *ret = new double[numK*4];
   // fill with out-of-band values
   for (int i=0; i<numK; i++) {
     ret[i*4] = -1.0;
@@ -2787,7 +2790,9 @@ CkReductionMsg *minMaxReduction(int nMsgs,
       }
     }
   }
-  return CkReductionMsg::buildNew(numBytes, ret);
+  CkReductionMsg *redmsg = CkReductionMsg::buildNew(numBytes, ret);
+  delete [] ret;
+  return redmsg;
 }
 
 #include "TraceProjections.def.h"
