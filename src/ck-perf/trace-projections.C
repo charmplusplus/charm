@@ -1737,7 +1737,7 @@ TraceProjectionsInit::TraceProjectionsInit(CkArgMsg *msg) {
 					entryThreshold,
 					outlierUsePhases);
   }
-};
+}
 
 // Called on every processor.
 void TraceProjectionsBOC::traceProjectionsParallelShutdown() {
