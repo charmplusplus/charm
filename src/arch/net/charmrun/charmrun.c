@@ -1629,12 +1629,18 @@ int req_handle_ending(ChMessage *msg,SOCKET fd)
 int req_handle_barrier(ChMessage *msg,SOCKET fd)
 {
   int i;
-  static int count = 0;
-  count ++;
-  if (count == req_nClients) {
+  static int barrier_count = 0;
+  static int barrier_phase = 0;
+  barrier_count ++;
+  if (barrier_count == req_nClients) {
+    barrier_count = 0;
+    barrier_phase ++;
     for (i=0;i<req_nClients;i++)
-      req_reply(req_clients[i], "barrier", "", 1);
-    count = 0;
+      if (REQ_OK != req_reply(req_clients[i], "barrier", "", 1))
+      {
+        fprintf(stderr, "req_handle_barrier socket error: %d\n", i);
+	abort();
+      }
   }
   return REQ_OK;
 }
@@ -1983,9 +1989,10 @@ int errorcheck_one_client_connect(int client){
 		
 	req_clients[client]=skt_accept(server_fd,&clientIP,&clientPort);
 
-	
 	if (req_clients[client]==SOCKET_ERROR) 
 		client_connect_problem(client,"Failure in node accept");
+
+	skt_tcp_no_nagle(req_clients[client]);
 
 	return 1;
 };

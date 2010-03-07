@@ -868,9 +868,8 @@ int CmiBarrier()
 {
   int len, size, i;
   int status;
-  int count = 0;
   int numnodes = CmiNumNodes();
-  ChMessage msg;
+  static int barrier_phase = 0;
 
   if (Cmi_charmrun_fd == -1) return 0;                // standalone
   if (numnodes == 1) {
@@ -880,13 +879,13 @@ int CmiBarrier()
 
   if (CmiMyRank() == 0) {
     ctrl_sendone_locking("barrier",NULL,0,NULL,0);
-
     while (barrierReceived != 1) {
       CmiCommLock();
       ctrl_getone();
       CmiCommUnlock();
     }
     barrierReceived = 0;
+    barrier_phase ++;
   }
 
 #if 0
@@ -931,7 +930,7 @@ int CmiBarrier()
 #endif
 
   CmiNodeAllBarrier();
-  /* printf("[%d] OUT of barrier \n", CmiMyPe()); */
+  /* printf("[%d] OUT of barrier %d \n", CmiMyPe(), barrier_phase); */
   return 0;
 }
 
