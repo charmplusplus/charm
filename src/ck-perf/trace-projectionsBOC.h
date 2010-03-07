@@ -136,8 +136,8 @@ class TraceProjectionsBOC : public CBase_TraceProjectionsBOC {
   double endTime;
   double analysisStartTime;
  public:
- TraceProjectionsBOC(bool _findOutliers) : findOutliers(_findOutliers) {};
- TraceProjectionsBOC(CkMigrateMessage *m):CBase_TraceProjectionsBOC(m) {};
+ TraceProjectionsBOC(bool _findOutliers) : findOutliers(_findOutliers), parModulesRemaining(0) {};
+ TraceProjectionsBOC(CkMigrateMessage *m):CBase_TraceProjectionsBOC(m), parModulesRemaining(0) {};
 
   void traceProjectionsParallelShutdown();
   void startEndTimeAnalysis();
