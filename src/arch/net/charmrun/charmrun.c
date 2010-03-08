@@ -20,6 +20,9 @@
 #if CMK_BPROC
 #include <sys/bproc.h>
 #endif
+#if CMK_USE_POLL
+#include <poll.h>
+#endif
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 /*Win32 has screwy names for the standard UNIX calls:*/
@@ -1863,6 +1866,40 @@ int socket_error_in_poll(int code,const char *msg)
 	return -1;
 }
 
+#if CMK_USE_POLL /*poll() version*/
+# define CMK_PIPE_DECL(maxn,delayMs) \
+        static struct pollfd *fds = NULL; \
+        int nFds_sto=0; int *nFds=&nFds_sto; \
+        int pollDelayMs=delayMs; \
+        if (fds == NULL) fds = (struct pollfd *)malloc((maxn) * sizeof(struct pollfd));
+# define CMK_PIPE_SUB fds,nFds
+# define CMK_PIPE_CALL() poll(fds, *nFds, pollDelayMs); *nFds=0
+
+# define CMK_PIPE_PARAM struct pollfd *fds,int *nFds
+# define CMK_PIPE_ADDREAD(rd_fd) \
+        do {fds[*nFds].fd=rd_fd; fds[*nFds].events=POLLIN; (*nFds)++;} while(0)
+# define CMK_PIPE_ADDWRITE(wr_fd) \
+        do {fds[*nFds].fd=wr_fd; fds[*nFds].events=POLLOUT; (*nFds)++;} while(0)
+# define CMK_PIPE_CHECKREAD(rd_fd) fds[(*nFds)++].revents&POLLIN
+# define CMK_PIPE_CHECKWRITE(wr_fd) fds[(*nFds)++].revents&POLLOUT
+
+#else /*select() version*/
+
+# define CMK_PIPE_DECL(maxn, delayMs) \
+        fd_set rfds_sto,wfds_sto;\
+        int nFds=0;  \
+        fd_set *rfds=&rfds_sto,*wfds=&wfds_sto; struct timeval tmo; \
+        FD_ZERO(rfds); FD_ZERO(wfds);tmo.tv_sec=0; tmo.tv_usec=1000*delayMs;
+# define CMK_PIPE_SUB rfds,wfds
+# define CMK_PIPE_CALL() select(FD_SETSIZE, rfds, wfds, NULL, &tmo)
+
+# define CMK_PIPE_PARAM fd_set *rfds,fd_set *wfds
+# define CMK_PIPE_ADDREAD(rd_fd) { assert(nFds<FD_SETSIZE);FD_SET(rd_fd,rfds); nFds++; }
+# define CMK_PIPE_ADDWRITE(wr_fd) FD_SET(wr_fd,wfds)
+# define CMK_PIPE_CHECKREAD(rd_fd) FD_ISSET(rd_fd,rfds)
+# define CMK_PIPE_CHECKWRITE(wr_fd) FD_ISSET(wr_fd,wfds)
+#endif
+
 /*
 Wait for incoming requests on all client sockets,
 and the CCS socket (if present).
@@ -1870,25 +1907,22 @@ and the CCS socket (if present).
 void req_poll()
 {
   int status,i;
-  fd_set  rfds;
-  struct timeval tmo;
   int readcount;
+
+  CMK_PIPE_DECL(req_nClients+5, 1000);
+  for (i=0;i<req_nClients;i++)
+        CMK_PIPE_ADDREAD(req_clients[i]);
+  if (CcsServer_fd()!=INVALID_SOCKET) CMK_PIPE_ADDREAD(CcsServer_fd());
+  if (arg_charmdebug) {
+    CMK_PIPE_ADDREAD(0);
+    CMK_PIPE_ADDREAD(gdb_info_std[1]);
+    CMK_PIPE_ADDREAD(gdb_info_std[2]);
+  }
 
   skt_set_abort(socket_error_in_poll);
 
-  tmo.tv_sec = 1;
-  tmo.tv_usec = 0;
-  FD_ZERO(&rfds);
-  for (i=0;i<req_nClients;i++)
-	FD_SET(req_clients[i],&rfds);
-  if (CcsServer_fd()!=INVALID_SOCKET) FD_SET(CcsServer_fd(),&rfds);
-  if (arg_charmdebug) {
-    FD_SET(0, &rfds);
-    FD_SET(gdb_info_std[1], &rfds);
-    FD_SET(gdb_info_std[2], &rfds);
-  }
   DEBUGF(("Req_poll: Calling select...\n"));
-  status=select(FD_SETSIZE, &rfds, 0, 0, &tmo);
+  status=CMK_PIPE_CALL();
   DEBUGF(("Req_poll: Select returned %d...\n",status));
 
   if (status==0) return;/*Nothing to do-- timeout*/
@@ -1899,7 +1933,7 @@ void req_poll()
 		socket_error_in_poll(1359,"Node program terminated unexpectedly!\n");
 	}
   for (i=0;i<req_nClients;i++)
-	if (FD_ISSET(req_clients[i],&rfds))
+	if (CMK_PIPE_CHECKREAD(req_clients[i]))
 	  {
 	    readcount=10;   /*number of successive reads we serve per socket*/
 	    /*This client is ready to read*/
@@ -1908,14 +1942,14 @@ void req_poll()
 	  }
 
   if (CcsServer_fd()!=INVALID_SOCKET)
-	 if (FD_ISSET(CcsServer_fd(),&rfds)) {
+	 if (CMK_PIPE_CHECKREAD(CcsServer_fd())) {
 		  DEBUGF(("Activity on CCS server port...\n"));
 		  req_ccs_connect();
 	 }
 
   if (arg_charmdebug) {
     char buf[2048];
-    if (FD_ISSET(0, &rfds)) {
+    if (CMK_PIPE_CHECKREAD(0)) {
       int indata = read(0, buf, 5);
       buf[indata] = 0;
       if (indata < 5) fprintf(stderr,"Error reading command (%s)\n",buf);
@@ -1939,7 +1973,7 @@ void req_poll()
     /* NOTE: gdb_info_std[2] must be flushed before gdb_info_std[1] because the
        latter contains the string "(gdb) " ending the synchronization. Also the
        std[1] should be read with the else statement. It will not work without. */
-    if (FD_ISSET(gdb_info_std[2], &rfds)) {
+    if (CMK_PIPE_CHECKREAD(gdb_info_std[2])) {
       int indata = read(gdb_info_std[2], buf, 100);
       /*printf("read data from gdb info stderr %d\n",indata);*/
       if (indata > 0) {
@@ -1949,7 +1983,7 @@ void req_poll()
 	//fprintf(gdb_stream,"%s",buf);
 	fflush(gdb_stream);
       }
-    } else if (FD_ISSET(gdb_info_std[1], &rfds)) {
+    } else if (CMK_PIPE_CHECKREAD(gdb_info_std[1])) {
       int indata = read(gdb_info_std[1], buf, 100);
       /*printf("read data from gdb info stdout %d\n",indata);*/
       if (indata > 0) {
