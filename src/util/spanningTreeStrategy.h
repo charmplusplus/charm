@@ -119,6 +119,7 @@ class SpanningTreeVertex;
 template <typename Iterator,typename ValueType = typename std::iterator_traits<Iterator>::value_type>
 class SpanningTreeStrategy;
 
+//@{
 /// Builds one generation of the spanning tree given a container of vertices with the tree root as the first element in the container
 // Use a default strategy
 template <typename Iterator>
@@ -128,7 +129,9 @@ SpanningTreeVertex* buildSpanningTreeGeneration
 template <typename Iterator>
 SpanningTreeVertex* buildSpanningTreeGeneration
 (const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches, SpanningTreeStrategy<Iterator> *bldr);
+//@}
 
+//@{
 /// Builds the complete spanning tree given a container of vertices with the tree root as the first element in the container
 // Use a default strategy
 template <typename Iterator>
@@ -138,6 +141,7 @@ void buildSpanningTree
 template <typename Iterator>
 void buildSpanningTree
 (const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches, SpanningTreeStrategy<Iterator> *bldr);
+//@}
 
 /// Tiny factory method that returns a tree construction strategy that it thinks is best (based on inputs, the machine's network topology info etc)
 template <typename Iterator>
