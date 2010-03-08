@@ -391,7 +391,7 @@ fmain-ok: fmain.f90
 QUICK_THREADS: $(CVHEADERS)
 	-( cd QuickThreads && $(MAKE) clean )
 	( cd QuickThreads;./configure )
-	( cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS)' )
+	( cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS)' ) || ( echo "Did you try to build net-linux on a 64-bit system? Try net-linux-x86_64" && false )
 	cp -f QuickThreads/libqt.a ../lib/libckqt.a
 	-(CHARMINC=.; . ./conv-config.sh; \
 	  test -d ../lib_so && \
