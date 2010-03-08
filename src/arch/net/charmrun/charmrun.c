@@ -592,7 +592,7 @@ dupargv (argv)
   
   /* the vector */
   for (argc = 0; argv[argc] != NULL; argc++);
-  copy = (char **) malloc ((argc + 1) * sizeof (char *));
+  copy = (char **) malloc ((argc +2) * sizeof (char *));
   if (copy == NULL)
     return NULL;
   
@@ -600,7 +600,7 @@ dupargv (argv)
   for (argc = 0; argv[argc] != NULL; argc++)
     {
       int len = strlen (argv[argc]);
-      copy[argc] = malloc (sizeof (char *) * (len + 1));
+      copy[argc] = malloc (sizeof (char ) * (len + 1));
       strcpy (copy[argc], argv[argc]);
     }
   copy[argc] = NULL;
@@ -792,8 +792,11 @@ void arg_init(int argc, char **argv)
 	else{
 		//Removing charmrun from parameters	
 		arg_argv++;arg_argc--;
- 		arg_argv[arg_argc++]="++child-charmrun";
+		
+ 		arg_argv[arg_argc]=malloc(sizeof(char) * strlen("++child-charmrun"));
+		strcpy(arg_argv[arg_argc++],"++child-charmrun");
 		arg_argv[arg_argc] = NULL;
+		int al; for(al =0; al <arg_argc; al++) printf("%s \n", arg_argv[al]);
 	}
 
 					
@@ -884,7 +887,7 @@ void arg_init(int argc, char **argv)
     }
 	}
   if (arg_hierarchical_start) {
-    printf("Charmrun> hierarchial scalable start enabled. \n");
+    printf("Charmrun> hierarchical scalable start enabled. \n");
     if (arg_debug || arg_debug_no_pause) {
       fprintf(stderr, "Charmrun> Error: ++hierarchial-start does not support debugging mode. \n");
       exit(1);
@@ -2764,8 +2767,7 @@ void req_forward_client()
 		  }
 		  
 #if CMK_CCS_AVAILABLE
-		  printf("Available");
-		  if(arg_hierarchical_start && !arg_child_charmrun)
+		  if(!arg_hierarchical_start || (arg_hierarchical_start && !arg_child_charmrun))
 		  if(arg_server == 1) CcsServer_new(NULL,&arg_server_port,arg_server_auth);
 #endif
 		}
@@ -2929,6 +2931,8 @@ void req_forward_client()
 		double t1,t2,t3;
 		int main(int argc, char **argv, char **envp)
 		{
+// char hel[20];
+// scanf("%s",hel);
 		  srand(time(0));
 		  skt_init();
 		  skt_set_idle(fast_idleFn);
@@ -3556,7 +3560,6 @@ void req_forward_client()
 		  
 		  /* find the node-program */
 		  arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(nodeno), nodetab_ext(nodeno));
-		  
 		  /* find the current directory, relative version */
 		  arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(nodeno));
 
@@ -3826,9 +3829,12 @@ void req_forward_client()
 		{
 			
 		   static char buf[1024];
-			 sprintf(buf,"%s%s%s",arg_currdir_a,DIRSEP,"charmrun");
+		   char * nodeprog_name = strrchr(arg_nodeprog_a, '/');
+		   nodeprog_name[0] = 0;
+		   sprintf(buf,"%s%s%s",arg_nodeprog_a,DIRSEP,"charmrun");
 		   arg_nodeprog_a = strdup(buf);
-			 int client;
+		
+		   int client;
 			 int nextIndex =0;
 			 //rsh_pids=(int *)malloc(sizeof(int)*branchfactor);
 			 client=0;
