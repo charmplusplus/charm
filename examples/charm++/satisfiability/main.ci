@@ -1,0 +1,18 @@
+mainmodule main {
+
+
+    readonly CProxy_Main mainProxy;
+
+    mainchare Main{
+        entry Main(CkArgMsg* msg);
+    
+        entry void done();
+    };
+   
+    message SolverState;
+
+    chare Solver{
+        entry Solver(SolverState*);
+    };
+
+};
