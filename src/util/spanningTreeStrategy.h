@@ -62,7 +62,7 @@ int distance(Iterator first, Iterator last)
  * trees will be based on the best available information (node-awareness, network-topo awareness etc.).
  *
  * The focus remains on distributed logic that generates efficient (for practical purposes) spanning trees and not
- * theoretical MSTs (minimum spanning trees) etc. Hence the intented use is to supply a list of PEs as input and
+ * theoretical MSTs (minimum spanning trees) etc. Hence the intended use is to supply a list of PEs as input and
  * obtain info about the immediate next generation of vertices in the tree and the members of each of their
  * respective sub-trees. As an afterthought, the API includes calls that will generate a complete spanning tree
  * from the input too. However, no guarantees are currently made about the efficiency of this use.
@@ -225,7 +225,7 @@ inline SpanningTreeVertex* buildSpanningTreeGeneration(const Iterator firstVtx,
 /// Nested namespace to prevent the implementation muck from polluting topo::
 namespace impl {
 
-/// Tag dispatched function that does the actual work of building the spanning complete tree
+/// Tag dispatched function that does the actual work of building the complete spanning tree
 template <typename Iterator>
 void buildSpanningTree(SpanningTreeVertex* dispatchTag,
                        const Iterator firstVtx,
