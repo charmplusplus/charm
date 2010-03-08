@@ -81,6 +81,8 @@
 
 static double ftTimer;
 
+double start_timer;
+
 int *rsh_pids=NULL;
                                                                                 
 double GetClock(void)
@@ -2333,6 +2335,7 @@ int main(int argc, char **argv, char **envp)
   /* Compute the values of all constants */
   arg_init(argc, argv);
   if(arg_verbose) fprintf(stderr, "Charmrun> charmrun started...\n");
+  start_timer = GetClock();
 #if CMK_BPROC
   /* check scyld configuration */
   if (arg_nodelist)
@@ -2396,6 +2399,8 @@ int main(int argc, char **argv, char **envp)
   kill_nodes();
 #endif
   if(arg_verbose) fprintf(stderr, "Charmrun> node programs all connected\n");
+    /* report time */
+  fprintf(stderr, "Charmrun> started all node programs in %.3f seconds.\n", GetClock()-start_timer);
 
   /* enter request-service mode */
   while (1) req_poll();
