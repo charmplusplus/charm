@@ -16,6 +16,9 @@
 #include <signal.h>
 #include <time.h>
 #include <ctype.h>
+#if CMK_USE_POLL
+#include <poll.h>
+#endif
 
 #if CMK_BPROC
 #include <sys/bproc.h>
@@ -157,6 +160,37 @@ int skt_tcp_no_nagle(SOCKET fd)
   return ok;
 }
 
+#if CMK_USE_POLL
+int skt_select1(SOCKET fd,int msec)
+{
+  struct pollfd fds[1];
+  int begin, nreadable;
+  int sec=msec/1000;
+  int  secLeft=sec;
+
+  fds[0].fd=fd; 
+  fds[0].events=POLLIN;
+
+  if (msec>0) begin = time(0);
+  do
+  {
+    skt_ignore_SIGPIPE=1;
+    nreadable = poll(fds, 1, msec);
+    skt_ignore_SIGPIPE=0;
+    
+    if (nreadable < 0) {
+		if (skt_should_retry()) continue;
+		else skt_abort(93200,"Fatal error in poll");
+	}
+    if (nreadable >0) return 1; /*We gotta good socket*/
+  }
+  while(msec>0 && ((secLeft = sec - (time(0) - begin))>0));
+
+  return 0;/*Timed out*/
+}
+
+#else
+
 /*Sleep on given read socket until msec or readable*/
 int skt_select1(SOCKET fd,int msec)
 {
@@ -188,7 +222,7 @@ int skt_select1(SOCKET fd,int msec)
 
   return 0;/*Timed out*/
 }
-
+#endif
 
 /******* DNS *********/
 skt_ip_t _skt_invalid_ip={{0}};
