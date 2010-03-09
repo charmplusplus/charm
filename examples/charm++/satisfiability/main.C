@@ -74,7 +74,7 @@ int parseInt(StreamBuffer& in) {
     if      (*in == '-') neg = true, ++in;
     else if (*in == '+') ++in;
     if (*in < '0' || *in > '9')
-        error_exit("ParseInt error\n");
+        error_exit((char*)"ParseInt error\n");
 
     while (*in >= '0' && *in <= '9')
     {
@@ -110,7 +110,7 @@ static void parse_confFile(gzFile input_stream, SolverState& S) {
         if (*in == EOF)                                            
             break;                                                 
         else if (*in == 'p'){                                      
-            if (match(in, "p cnf")){                               
+            if (match(in, (char*)"p cnf")){                               
                 int vars    = parseInt(in);                        
                 int clauses = parseInt(in);                        
                 printf("|  Number of variables:  %-12d                                         |\n", vars);
@@ -122,7 +122,7 @@ static void parse_confFile(gzFile input_stream, SolverState& S) {
                     S.occurrence[__i] = 0;
             }else{
                 printf("PARSE ERROR! Unexpected char: %c\n", *in);
-                error_exit("Parse Error\n");
+                error_exit((char*)"Parse Error\n");
             }
         } else if (*in == 'c' || *in == 'p')
             skipLine(in);
@@ -145,7 +145,7 @@ Main::Main(CkArgMsg* msg)
     SolverState* solver_msg = new SolverState;
     if(msg->argc < 2)
     {
-        error_exit("Usage: 3sat filename\n");
+        error_exit((char*)"Usage: 3sat filename\n");
     }
 
     char filename[50];
@@ -159,7 +159,7 @@ Main::Main(CkArgMsg* msg)
 
     if(in == NULL)
     {
-        error_exit("Invalid input filename\n");
+        error_exit((char*)"Invalid input filename\n");
     }
 
     parse_confFile(in, *solver_msg);

@@ -100,9 +100,9 @@ Solver::Solver(SolverState* state_msg)
     CkVec<Clause> next_clauses;
     /* Which variable get assigned  */
     Lit assigned_var = state_msg->assigned_lit;
-#ifdef DEBUG    
+//#ifdef DEBUG    
     CkPrintf("\n\nNew chare: literal = %d, occurrence size=%d, level=%d \n", toInt(assigned_var), state_msg->occurrence.size(), state_msg->level);
-#endif    
+//#endif    
     SolverState *next_state = copy_solverstate(state_msg);
     
     //Unit clauses
@@ -257,7 +257,7 @@ Solver::Solver(SolverState* state_msg)
         bool satisfiable_0 = true;
         if(unit_clauses.empty()||unit_clauses[max_index+1]>0)        
         {
-            if(next_state->clauses.size() > 2)
+            if(next_state->clauses.size() > 30)
                 CProxy_Solver::ckNew(next_state);
             else //sequential
             {
@@ -274,7 +274,7 @@ Solver::Solver(SolverState* state_msg)
         new_msg2->occurrence[max_index] = -1;
         if(unit_clauses.empty()||unit_clauses[-max_index-1]>0)
         {
-            if(new_msg2->clauses.size() > 2)
+            if(new_msg2->clauses.size() > 30)
                 CProxy_Solver::ckNew(new_msg2);
             else
             {
@@ -309,9 +309,7 @@ bool Solver::seq_solve(SolverState* state_msg)
     CkVec<Clause> next_clauses;
     /* Which variable get assigned  */
     Lit assigned_var = state_msg->assigned_lit;
-#ifdef DEBUG    
     CkPrintf("\n\nSequential SAT New chare: literal = %d, occurrence size=%d, level=%d \n", toInt(assigned_var), state_msg->occurrence.size(), state_msg->level);
-#endif    
     SolverState *next_state = copy_solverstate(state_msg);
     
     //Unit clauses

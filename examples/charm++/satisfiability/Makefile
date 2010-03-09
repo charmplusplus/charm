@@ -2,10 +2,10 @@
 OPTS = -g
 CHARMC = charmc $(OPTS)  
 default: all
-all: 3sat
+all: sat
 
-3sat : main.o Solver.o 
-	$(CHARMC) -lz -language charm++  -o 3sat main.o Solver.o
+sat : main.o Solver.o 
+	$(CHARMC) -lz -language charm++  -o sat main.o Solver.o
 
 main.o : main.C main.decl.h main.def.h 
 	$(CHARMC) -o main.o main.C 
@@ -21,4 +21,4 @@ main.def.h main.decl.h : main.ci
 
 clean:
 	rm *.o *.def.h *.decl.h
-	rm  3sat
+	rm  sat
