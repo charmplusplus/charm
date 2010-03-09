@@ -594,8 +594,11 @@ extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 #define CmiGetHandlerInfo(env) (CmiHandlerToInfo(CmiGetHandler(env)))
 #define CmiGetHandlerFunction(env) (CmiHandlerToFunction(CmiGetHandler(env)))
 
-#if CMK_MEM_CHECKPOINT
+#if __FAULT__
 extern int cur_restart_phase;      /* number of restarts */
+#endif
+
+#if CMK_MEM_CHECKPOINT
 #undef CmiSetHandler
 #define CmiSetHandler(m,v)  do {(((CmiMsgHeaderExt*)m)->hdl)=(v); (((CmiMsgHeaderExt*)m)->pn)=cur_restart_phase;} while(0)
 #define MESSAGE_PHASE_CHECK(msg)	\
