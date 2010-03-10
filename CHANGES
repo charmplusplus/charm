@@ -126,7 +126,7 @@ Infiniband (ibverbs)
  - Bug fix: plug memory leaks that caused failures in long runs
 
 LAPI
- - Support for SMP
+ - Support for SMP (experimental)
 
 
 ================================================================================
