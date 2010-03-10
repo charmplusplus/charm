@@ -120,7 +120,7 @@ by, e.g., an alarm and should be retried.
 */
 static int skt_should_retry(void)
 {
-	int isinterrupt=0,istransient=0;
+	int isinterrupt=0,istransient=0,istimeout=0;
 #if defined(_WIN32) && !defined(__CYGWIN__) /*Windows systems-- check Windows Sockets Error*/
 	int err=WSAGetLastError();
 	if (err==WSAEINTR) isinterrupt=1;
@@ -129,6 +129,7 @@ static int skt_should_retry(void)
 #else /*UNIX systems-- check errno*/
 	int err=errno;
 	if (err==EINTR) isinterrupt=1;
+	if (err=ETIMEDOUT) istimeout=1;
 	if (err==EAGAIN||err==ECONNREFUSED
                ||err==EWOULDBLOCK||err==ENOBUFS
 #ifndef __CYGWIN__
@@ -146,6 +147,9 @@ static int skt_should_retry(void)
 		if (idleFunc!=NULL) idleFunc();
 		else sleep(1);
 	}
+	else if (istimeout) {
+                return 1;
+        }
 	else 
 		return 0; /*Some unrecognized problem-- abort!*/
 	return 1;/*Otherwise, we recognized it*/
