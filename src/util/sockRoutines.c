@@ -113,6 +113,8 @@ void skt_buffer_end(SOCKET sk) {}
 #endif
 
 
+static int ERRNO = -1;
+
 /*Called when a socket or select routine returns
 an error-- determines how to respond.
 Return 1 if the last call was interrupted
@@ -120,7 +122,7 @@ by, e.g., an alarm and should be retried.
 */
 static int skt_should_retry(void)
 {
-	int isinterrupt=0,istransient=0;
+	int isinterrupt=0,istransient=0,istimeout=0;
 #if defined(_WIN32) && !defined(__CYGWIN__) /*Windows systems-- check Windows Sockets Error*/
 	int err=WSAGetLastError();
 	if (err==WSAEINTR) isinterrupt=1;
@@ -129,6 +131,7 @@ static int skt_should_retry(void)
 #else /*UNIX systems-- check errno*/
 	int err=errno;
 	if (err==EINTR) isinterrupt=1;
+	if (err==ETIMEDOUT) istimeout=1;
 	if (err==EAGAIN||err==ECONNREFUSED
                ||err==EWOULDBLOCK||err==ENOBUFS
 #ifndef __CYGWIN__
@@ -137,6 +140,7 @@ static int skt_should_retry(void)
         )
 		istransient=1;
 #endif
+	ERRNO = err;
 	if (isinterrupt) {
 		/*We were interrupted by an alarm.  Schedule, then retry.*/
 		if (idleFunc!=NULL) idleFunc();
@@ -148,6 +152,8 @@ static int skt_should_retry(void)
 	}
 	else 
 		return 0; /*Some unrecognized problem-- abort!*/
+          /* timeout is used by send() for example to terminate node 
+             program normally, when charmrun dies  */
 	return 1;/*Otherwise, we recognized it*/
 }
 
@@ -437,7 +443,12 @@ SOCKET skt_connect(skt_ip_t ip, int port, int timeout)
 	else { /*Bad connect*/
 	  skt_close(ret);
 	  if (skt_should_retry()) continue;
-	  else return skt_abort(93515,"Error connecting to socket\n");
+	  else {
+#if ! defined(_WIN32) || defined(__CYGWIN__)
+            if (ERRNO == ETIMEDOUT) continue;      /* time out is fine */
+#endif
+            return skt_abort(93515,"Error connecting to socket\n");
+          }
     }
   }
   /*Timeout*/
