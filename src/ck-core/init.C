@@ -188,6 +188,7 @@ static CkFtFn  faultFunc = NULL;
 static char* _restartDir;
 
 #ifdef _FAULT_MLOG_
+int teamSize=1;
 int chkptPeriod=1000;
 bool parallelRestart=false;
 extern int BUFFER_TIME; //time spent waiting for buffered messages
@@ -284,6 +285,9 @@ static inline void _parseCommandLineOpts(char **argv)
 		_raiseEvac = 1;
 	}
 #ifdef _FAULT_MLOG_
+	if(!CmiGetArgIntDesc(argv,"+teamSize",&teamSize,"Set the team size for message logging")){
+        teamSize = 1;
+    }
     if(!CmiGetArgIntDesc(argv,"+chkptPeriod",&chkptPeriod,"Set the checkpoint period for the message logging fault tolerance algorithm in seconds")){
         chkptPeriod = 100;
     }

@@ -60,9 +60,15 @@ public:
 void CkPupROData(PUP::er &p);
 void CkPupMainChareData(PUP::er &p, CkArgMsg *args);
 void CkPupChareData(PUP::er &p);
+#ifdef _FAULT_MLOG_
+void CkPupGroupData(PUP::er &p,CmiBool create);
+void CkPupNodeGroupData(PUP::er &p,CmiBool create);
+#else
 void CkPupGroupData(PUP::er &p);
 void CkPupNodeGroupData(PUP::er &p);
+#endif
 void CkPupArrayElementsData(PUP::er &p, int notifyListeners=1);
+void CkPupProcessorData(PUP::er &p);
 void CkRemoveArrayElements();
 //void CkTestArrayElements();
 

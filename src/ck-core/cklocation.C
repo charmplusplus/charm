@@ -2294,7 +2294,7 @@ void CkLocMgr::iterate(CkLocIterator &dest) {
 /************************** LocMgr: MIGRATION *************************/
 #ifdef _FAULT_MLOG_
 void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
-        CkElementCreation_t type,int dummy)
+        CkElementCreation_t type, CmiBool create, int dummy)
 {
     p.comment("-------- Array Location --------");
     register ManagerRec *m;
@@ -2314,7 +2314,8 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
             CkMigratable *elt=m->mgr->allocateMigrated(elCType,rec->getIndex(),type);
             int migCtorIdx=_chareTable[elCType]->getMigCtor();
                 if(!dummy){
-                    if (!addElementToRec(rec,m,elt,migCtorIdx,NULL)) return;
+			if(create)
+                    		if (!addElementToRec(rec,m,elt,migCtorIdx,NULL)) return;
  				}else{
                     CkMigratable_initInfo &i=CkpvAccess(mig_initInfo);
                     i.locRec=rec;
@@ -2592,11 +2593,23 @@ void CkLocMgr::restore(const CkArrayIndex &idx, PUP::er &p)
 
 /// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
 #ifdef _FAULT_MLOG_
-void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p,int dummy)
+void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p, CmiBool create, int dummy)
 {
-    CkLocRec_local *rec=createLocal(idx,CmiFalse,CmiFalse,CmiTrue && !dummy /* home doesn't know yet */,dummy );
+	CkLocRec_local *rec;
+	CkLocRec *recGlobal;	
+
+	if(create){
+		rec = createLocal(idx,CmiFalse,CmiFalse,CmiTrue && !dummy /* home doesn't know yet */,dummy );
+	}else{
+		recGlobal = elementNrec(idx);
+		if(recGlobal == NULL) 
+			CmiAbort("Local object not found");
+		if(recGlobal->type() != CkLocRec::local)
+			CmiAbort("Local object not local, :P");
+		rec = (CkLocRec_local *)recGlobal;
+	}
         
-    pupElementsFor(p,rec,CkElementCreation_resume,dummy);
+    pupElementsFor(p,rec,CkElementCreation_resume,create,dummy);
 
     if(!dummy){
         callMethod(rec,&CkMigratable::ckJustMigrated);

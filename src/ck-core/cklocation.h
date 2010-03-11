@@ -622,7 +622,7 @@ public:
 	void restore(const CkArrayIndex &idx, PUP::er &p);
 	/// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
 #ifdef _FAULT_MLOG_
-	void resume(const CkArrayIndex &idx, PUP::er &p,int dummy=0);
+	void resume(const CkArrayIndex &idx, PUP::er &p, CmiBool create, int dummy=0);
 #else
 	void resume(const CkArrayIndex &idx, PUP::er &p, CmiBool notify=CmiTrue);
 #endif
@@ -659,8 +659,8 @@ private:
 	friend class CkLocation; //so it can call pupElementsFor
 	friend class ArrayElement;
 #ifdef _FAULT_MLOG_
- void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
-        CkElementCreation_t type,int dummy=0);
+	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
+        CkElementCreation_t type, CmiBool create=CmiTrue, int dummy=0);
 #else
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 		CkElementCreation_t type);
