@@ -93,7 +93,9 @@ static void readClause(StreamBuffer& in, SolverState& S, CkVec<Lit>& lits) {
         var = abs(parsed_lit)-1;
         
         S.occurrence[var]++;
-        while (var >= S.nVars()) S.newVar();
+        if(parsed_lit>0)
+            S.positive_occurrence[var]++;
+        //while (var >= S.nVars()) S.newVar();
         lits.push_back( Lit(parsed_lit));
     }
 }
@@ -118,8 +120,12 @@ static void parse_confFile(gzFile input_stream, SolverState& S) {
       
                 S.var_size = vars;
                 S.occurrence.resize(vars);
+                S.positive_occurrence.resize(vars);
                 for(int __i=0; __i<vars; __i++)
+                {
                     S.occurrence[__i] = 0;
+                    S.positive_occurrence[__i] = 0;
+                }
             }else{
                 printf("PARSE ERROR! Unexpected char: %c\n", *in);
                 error_exit((char*)"Parse Error\n");
@@ -142,11 +148,13 @@ static void parse_confFile(gzFile input_stream, SolverState& S) {
 Main::Main(CkArgMsg* msg)
 {
 
+    grainsize = 1;
     SolverState* solver_msg = new SolverState;
     if(msg->argc < 2)
     {
-        error_exit((char*)"Usage: 3sat filename\n");
-    }
+        error_exit((char*)"Usage: sat filename grainsize\n");
+    }else
+        grainsize = atoi(msg->argv[2]);
 
     char filename[50];
 
@@ -164,6 +172,8 @@ Main::Main(CkArgMsg* msg)
 
     parse_confFile(in, *solver_msg);
 
+    /*  unit propagation */ 
+    /* simplify() */
     readfiletimer = CmiWallTimer();
 
     /*fire the first chare */
@@ -171,19 +181,27 @@ Main::Main(CkArgMsg* msg)
 
     mainProxy = thisProxy;
     int max_index = get_max_element(solver_msg->occurrence);
-    
+   
     solver_msg->assigned_lit = Lit(max_index+1);
     solver_msg->level = 0;
     SolverState *not_msg = copy_solverstate(solver_msg);
     
     //CkPrintf(" main chare max index=%d, %d, assigned=%d\n", max_index+1, solver_msg->occurrence[max_index], toInt(solver_msg->assigned_lit));
     solver_msg->occurrence[max_index] = -2;
-    CProxy_Solver::ckNew(solver_msg);
-
     not_msg->assigned_lit = Lit(-max_index-1);
     not_msg->occurrence[max_index] = -1;
-    CProxy_Solver::ckNew(not_msg);
+    
+    int positive_max = solver_msg->positive_occurrence[max_index];
+    if(positive_max >= solver_msg->occurrence[max_index] - positive_max)
+    {
+        CProxy_Solver::ckNew(solver_msg);
+        CProxy_Solver::ckNew(not_msg);
+    }else
+    {
+        CProxy_Solver::ckNew(not_msg);
+        CProxy_Solver::ckNew(solver_msg);
 
+    }
 }
 
 Main::Main(CkMigrateMessage* msg) {}
