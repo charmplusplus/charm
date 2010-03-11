@@ -444,7 +444,9 @@ SOCKET skt_connect(skt_ip_t ip, int port, int timeout)
 	  skt_close(ret);
 	  if (skt_should_retry()) continue;
 	  else {
+#if ! defined(_WIN32) || defined(__CYGWIN__)
             if (ERRNO == ETIMEDOUT) continue;      /* time out is fine */
+#endif
             return skt_abort(93515,"Error connecting to socket\n");
           }
     }
