@@ -113,6 +113,8 @@ void skt_buffer_end(SOCKET sk) {}
 #endif
 
 
+static int ERRNO = -1;
+
 /*Called when a socket or select routine returns
 an error-- determines how to respond.
 Return 1 if the last call was interrupted
@@ -138,6 +140,7 @@ static int skt_should_retry(void)
         )
 		istransient=1;
 #endif
+	ERRNO = err;
 	if (isinterrupt) {
 		/*We were interrupted by an alarm.  Schedule, then retry.*/
 		if (idleFunc!=NULL) idleFunc();
@@ -147,11 +150,10 @@ static int skt_should_retry(void)
 		if (idleFunc!=NULL) idleFunc();
 		else sleep(1);
 	}
-	else if (istimeout) {
-                return 1;
-        }
 	else 
 		return 0; /*Some unrecognized problem-- abort!*/
+          /* timeout is used by send() for example to terminate node 
+             program normally, when charmrun dies  */
 	return 1;/*Otherwise, we recognized it*/
 }
 
@@ -441,7 +443,12 @@ SOCKET skt_connect(skt_ip_t ip, int port, int timeout)
 	else { /*Bad connect*/
 	  skt_close(ret);
 	  if (skt_should_retry()) continue;
-	  else return skt_abort(93515,"Error connecting to socket\n");
+	  else {
+#if ! defined(_WIN32) || defined(__CYGWIN__)
+            if (ERRNO == ETIMEDOUT) continue;      /* time out is fine */
+#endif
+            return skt_abort(93515,"Error connecting to socket\n");
+          }
     }
   }
   /*Timeout*/
