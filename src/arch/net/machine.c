@@ -1224,7 +1224,7 @@ static void ctrl_getone(void)
     int pe=0;/*<- node-local processor number. Any one will do.*/
     void *cmsg=(void *)CcsImpl_ccs2converse(hdr,msg.data+sizeof(CcsImplHeader),NULL);
     MACHSTATE(2,"Incoming CCS request");
-    CmiPushPE(pe,cmsg);
+    if (cmsg!=NULL) CmiPushPE(pe,cmsg);
   }
 #endif
 #ifdef __FAULT__	
