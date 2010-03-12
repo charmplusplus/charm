@@ -1,6 +1,6 @@
 COMMENT="Enable 64-bit mode (-q64)"
-CMK_CC='mpcc_r -q64 -qcpluscmt '
-CMK_CXX='mpCC_r -q64 -qstaticinline '
+CMK_CC='mpcc_r -q64 -qcpluscmt -qhalt=e '
+CMK_CXX='mpCC_r -q64 -qstaticinline -qhalt=e '
 CMK_LD="mpcc_r -q64 -brtl"
 CMK_LDXX="mpCC_r -q64 -brtl"
 CMK_SEQ_CC='xlc_r -q64'

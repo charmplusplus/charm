@@ -2,8 +2,8 @@ CMK_CPP_CHARM='/usr/lib/cpp -P -D_NO_PROTO '
 CMK_CPP_C='/usr/lib/cpp -P -D_NO_PROTO '
 CMK_LDRO='ld -r -o '
 CMK_LDRO_WORKS=0
-CMK_CC='mpcc_r -qcpluscmt '
-CMK_CXX='mpCC_r -qstaticinline '
+CMK_CC='mpcc_r -qcpluscmt -qhalt=e '
+CMK_CXX='mpCC_r -qstaticinline -qhalt=e '
 CMK_CXXPP='xlC -E '
 CMK_LD="mpcc_r -brtl "
 CMK_LDXX="mpCC_r -brtl "
