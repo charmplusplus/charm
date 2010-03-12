@@ -287,7 +287,7 @@ static void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 }
 
 /*Unpacks request message to call above routine*/
-int _ccsHandlerIdx;/*Converse handler index of below routine*/
+int _ccsHandlerIdx = 0;/*Converse handler index of below routine*/
 static void req_fw_handler(char *msg)
 {
   int offset = CmiMsgHeaderSizeBytes + sizeof(CcsImplHeader);
@@ -322,6 +322,15 @@ static void req_fw_handler(char *msg)
   CmiFree(msg);
 }
 
+#if ! NODE_0_IS_CONVHOST
+/* The followings are necessary to prevent CCS requests to be processed before
+ * CCS has been initialized. Really it matters only when NODE_0_IS_CONVHOST=0, but
+ * it doesn't hurt having it in the other case as well */
+static char **bufferedMessages = NULL;
+static int CcsNumBufferedMsgs = 0;
+#define CCS_MAX_NUM_BUFFERED_MSGS  100
+#endif
+
 /*Convert CCS header & message data into a converse message 
  addressed to handler*/
 char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_len)
@@ -335,9 +344,23 @@ char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_le
   msg=(char *)CmiAlloc(len);
   memcpy(msg+CmiMsgHeaderSizeBytes,hdr,sizeof(CcsImplHeader));
   memcpy(msg+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader),data,reqLen);
-  CmiSetHandler(msg, _ccsHandlerIdx);
   if (ret_len!=NULL) *ret_len=len;
-  return msg;
+  if (_ccsHandlerIdx != 0) {
+    CmiSetHandler(msg, _ccsHandlerIdx);
+    return msg;
+  } else {
+#if NODE_0_IS_CONVHOST
+    CmiAbort("Why do we need to buffer messages when node 0 is Convhost?");
+#else
+    //CmiPrintf("Buffering CCS message\n");
+    CmiAssert(CcsNumBufferedMsgs < CCS_MAX_NUM_BUFFERED_MSGS);
+    if (CcsNumBufferedMsgs < 0) CmiAbort("Why is a CCS message being buffered now???");
+    if (bufferedMessages == NULL) bufferedMessages = malloc(sizeof(char*)*CCS_MAX_NUM_BUFFERED_MSGS);
+    bufferedMessages[CcsNumBufferedMsgs] = msg;
+    CcsNumBufferedMsgs ++;
+    return NULL;
+#endif
+  }
 }
 
 /*Receives reply messages passed up from
@@ -548,6 +571,19 @@ void CcsInit(char **argv)
        CpvAccess(cpdSuspendStartup) = 1;
      }
   }
+
+#if ! NODE_0_IS_CONVHOST
+  if (CcsNumBufferedMsgs > 0) {
+    int i;
+    for (i=0; i<CcsNumBufferedMsgs; ++i) {
+      CmiSetHandler(bufferedMessages[i], _ccsHandlerIdx);
+      CmiPushPE(0, bufferedMessages[i]);
+    }
+    free(bufferedMessages);
+    bufferedMessages = NULL;
+    CcsNumBufferedMsgs = -1;
+  }
+#endif
 }
 
 #endif /*CMK_CCS_AVAILABLE*/

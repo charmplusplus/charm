@@ -17,7 +17,6 @@ CpvExtern(Chare *,_currentObj);
 #define FORWARDED_TICKET 0x8000
 
 //TML: global variable for the size of the team
-#define TEAM_SIZE_MLOG 1
 #define MLOG_RESTARTED 0
 #define MLOG_CRASHED 1
 #define MEGABYTE 1048576
@@ -536,7 +535,7 @@ CpvExtern(StoredCheckpoint *,_storedCheckpointData);
 //methods for checkpointing
 void checkpointAlarm(void *_dummy,double curWallTime);
 void startMlogCheckpoint(void *_dummy,double curWallTime);
-void pupArrayElementsSkip(PUP::er &p, MigrationRecord *listToSkip,int listSize=0);
+void pupArrayElementsSkip(PUP::er &p, CmiBool create, MigrationRecord *listToSkip,int listSize=0);
 
 //handler functions for checkpoint
 void _checkpointRequestHandler(CheckpointRequest *request);
