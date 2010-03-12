@@ -31,7 +31,10 @@ public:
     CkVec<int>      occurrence; 
     CkVec<int>      positive_occurrence; 
     int             level;
-    
+   
+    int             lower;
+    int             higher;
+
     //CkVec<Lit>      lit_state;
     //vector<Lit> assigns;
 
@@ -45,7 +48,7 @@ public:
 
     friend SolverState* copy_solverstate( const SolverState* org)
     {
-       SolverState *new_state = new SolverState;
+       SolverState *new_state = new (8*sizeof(int))SolverState;
         
        new_state->clauses.resize(org->clauses.size());
        for(int _i=0; _i<org->clauses.size(); _i++)

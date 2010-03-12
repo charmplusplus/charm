@@ -119,13 +119,13 @@ Solver::Solver(SolverState* state_msg)
         CkVec<Lit> new_clause;
         bool satisfied = false;
 #ifdef DEBUG    
-        CkPrintf("\n");
+//        CkPrintf("\n");
 #endif
         for(int j=0; j<cl.size();  j++)
         {
             Lit lit = cl[j];
 #ifdef DEBUG    
-            CkPrintf("%d   ", toInt(lit));
+        //    CkPrintf("%d   ", toInt(lit));
 #endif
             if(lit == assigned_var)
             {
@@ -189,7 +189,7 @@ Solver::Solver(SolverState* state_msg)
         /* one solution is found*/
         /* print the solution*/
         CkPrintf("one solutions found level=%d parallel\n", state_msg->level);
-        
+       /* 
         for(int _i=0; _i<state_msg->var_size; _i++)
         {
             if(state_msg->occurrence[_i] == -2)
@@ -198,9 +198,10 @@ Solver::Solver(SolverState* state_msg)
                 CkPrintf(" FALSE ");
             else
                 CkPrintf(" Anything ");
-        }
+        }*/
         CkPrintf("\n");
-        mainProxy.done();
+        mainProxy.done();//highest priority
+        //CkExit();
         return;
     }else
     {
@@ -217,11 +218,6 @@ Solver::Solver(SolverState* state_msg)
             {
                 Clause& cl = next_clauses[_i];
                
-                for(int j=0; j<cl.size(); j++)
-                {
-
-                    Lit lit = cl[j];
-                }
                 //reduce the clause
                 for(int j=0; j<cl.size(); j++)
                 {
@@ -249,6 +245,9 @@ Solver::Solver(SolverState* state_msg)
                 }else if(cl.size() == 1)// new unit clause
                 {
                     unit_clauses[toInt(cl[0])]++;
+                
+                    next_clauses.remove(_i);
+                    _i--;
                 }
             }
             /*remove this unit clause */
@@ -261,6 +260,7 @@ Solver::Solver(SolverState* state_msg)
     {
         CkPrintf(" one solutions found after propagation \n");
         mainProxy.done();
+        //CkExit();
         return;
     }
         int max_index = get_max_element(next_state->occurrence);
@@ -271,6 +271,7 @@ Solver::Solver(SolverState* state_msg)
         {
             CkPrintf("Unsatisfiable\n");
             mainProxy.done();
+            //CkExit();
             return;
         }
 
@@ -284,7 +285,15 @@ Solver::Solver(SolverState* state_msg)
         new_msg2->var_size = state_msg->var_size;
 
         next_state->level = state_msg->level+1;
+       
+
+        int nextlevel_priority;
         
+        int priority = =tate_msg->priority;
+
+        int lower = state_msg->lower;
+        int higher = state_msg->higher;
+        int middle = (lower+higher)/2;
         int positive_max = next_state->positive_occurrence[max_index];
         if(positive_max >= next_state->occurrence[max_index] - positive_max)
         {
@@ -300,7 +309,13 @@ Solver::Solver(SolverState* state_msg)
         bool satisfiable_0 = true;
 
         if(next_state->clauses.size() > grainsize)
+        {
+            next_state->lower = lower + 1;
+            next_state->higher = middle;
+            *((int *)CkPriorityPtr(next_state)) = lower+1;
+            CkSetQueueing(next_state, CK_QUEUEING_IFIFO);
             CProxy_Solver::ckNew(next_state);
+        }
         else //sequential
         {
             satisfiable_1 = seq_solve(next_state);
@@ -308,6 +323,7 @@ Solver::Solver(SolverState* state_msg)
             {
                 CkPrintf(" One solutions found by sequential algorithm\n");
                 mainProxy.done();
+                //CkExit();
                 return;
             }
         }
@@ -324,7 +340,14 @@ Solver::Solver(SolverState* state_msg)
             new_msg2->occurrence[max_index] = -2;
         }
         if(new_msg2->clauses.size() > grainsize)
+        {
+
+            new_msg2->lower = middle + 1;
+            new_msg2->higher = higher-1;
+            *((int *)CkPriorityPtr(new_msg2)) = middle+1;
+            CkSetQueueing(new_msg2, CK_QUEUEING_IFIFO);
             CProxy_Solver::ckNew(new_msg2);
+        }
         else
         {
             satisfiable_0 = seq_solve(new_msg2);
@@ -333,6 +356,7 @@ Solver::Solver(SolverState* state_msg)
             {
                 CkPrintf(" One solutions found by sequential algorithm\n");
                 mainProxy.done();
+                //CkExit();
                 return;
             }
 
@@ -342,20 +366,24 @@ Solver::Solver(SolverState* state_msg)
         {
             CkPrintf("Unsatisfiable through sequential\n");
             mainProxy.done();
+            //CkExit();
         }
 }
 
 /* Which literals are already assigned, which is assigned this interation, the unsolved clauses */
 /* should all these be passed as function parameters */
 /* solve the 3sat in sequence */
+
+long long int computes = 0;
 bool Solver::seq_solve(SolverState* state_msg)
 {
-        
+       
     CkVec<Clause> next_clauses;
     /* Which variable get assigned  */
     Lit assigned_var = state_msg->assigned_lit;
 #ifdef DEBUG
-    CkPrintf("\n\nSequential SAT New chare: literal = %d, occurrence size=%d, level=%d \n", toInt(assigned_var), state_msg->occurrence.size(), state_msg->level);
+    CkPrintf("\n\n Computes=%d Sequential SAT New chare: literal = %d,  level=%d, unsolved clauses=%d\n", computes++, toInt(assigned_var), state_msg->level, state_msg->clauses.size());
+    //CkPrintf("\n\n Computes=%d Sequential SAT New chare: literal = %d, occurrence size=%d, level=%d \n", computes++, toInt(assigned_var), state_msg->occurrence.size(), state_msg->level);
 #endif
     SolverState *next_state = copy_solverstate(state_msg);
     
@@ -371,13 +399,13 @@ bool Solver::seq_solve(SolverState* state_msg)
         CkVec<Lit> new_clause;
         bool satisfied = false;
 #ifdef DEBUG    
-        CkPrintf("\n");
+        //CkPrintf("\n");
 #endif
         for(int j=0; j<cl.size();  j++)
         {
             Lit lit = cl[j];
 #ifdef DEBUG    
-            CkPrintf("%d   ", toInt(lit));
+        //    CkPrintf("%d   ", toInt(lit));
 #endif
             if(lit == assigned_var)
             {
@@ -430,12 +458,14 @@ bool Solver::seq_solve(SolverState* state_msg)
         }
     } /* all clauses are checked*/
    
+    //CkPrintf(" After assignment, unit clauses = %d, unsolved clauses=%d\n", unit_clauses.size(), next_clauses.size());
+
     if(next_clauses.size() == 0)
     {
         /* one solution is found*/
         /* print the solution*/
-        CkPrintf("one solutions found level=%d by sequential SAT\n", state_msg->level);
-        
+        //CkPrintf("Inside sequential, done!! one solutions found level=%d by sequential SAT\n", state_msg->level);
+        /*
         for(int _i=0; _i<state_msg->var_size; _i++)
         {
             if(state_msg->occurrence[_i] == -2)
@@ -444,7 +474,7 @@ bool Solver::seq_solve(SolverState* state_msg)
                 CkPrintf(" FALSE ");
             else
                 CkPrintf(" Anything ");
-        }
+        }*/
         CkPrintf("\n");
         return true;
     }else
@@ -453,7 +483,7 @@ bool Solver::seq_solve(SolverState* state_msg)
         while(!unit_clauses.empty())
         {
 #ifdef DEBUG
-            CkPrintf("unit propagation\n");
+            CkPrintf("unit propagation, unit clauses=%d, unsolved clauses=%d\n", unit_clauses.size(), next_clauses.size());
 #endif
             int first_unit = (*(unit_clauses.begin())).first;
 
@@ -487,13 +517,15 @@ bool Solver::seq_solve(SolverState* state_msg)
                 }else if(cl.size() == 1)// new unit clause
                 {
                     unit_clauses[toInt(cl[0])]++;
-
+                    next_clauses.remove(_i);
+                    _i--;
                 }
             }
             /*remove this unit clause */
             unit_clauses.erase(unit_clauses.begin());
         }
 
+        //CkPrintf("After unit propagation, unit size = %d, unsolved = %d\n", unit_clauses.size(), next_clauses.size());
         if(next_clauses.size() == 0)
             return true;
         /* it would be better to insert the unit literal in order of their occurrence */
@@ -508,11 +540,11 @@ bool Solver::seq_solve(SolverState* state_msg)
 #endif
         if(next_state->occurrence[max_index] <=0)
         {
-            CkPrintf("Unsatisfiable in sequential SAT\n");
+            CkPrintf("****Unsatisfiable in sequential SAT\n");
             return false;
         }
 
-        
+
         next_state->assignclause(next_clauses);
         next_state->var_size = state_msg->var_size;
         next_state->level = state_msg->level+1;
@@ -528,20 +560,15 @@ bool Solver::seq_solve(SolverState* state_msg)
             next_state->occurrence[max_index] = -1;
             next_state->assigned_lit = Lit(-max_index-1);
         } 
-        bool satisfiable_1 = true;
 
-        if(unit_clauses[max_index+1]>0)        
+        bool   satisfiable_1 = seq_solve(next_state);
+        if(satisfiable_1)
         {
-            satisfiable_1 = seq_solve(next_state);
-            if(satisfiable_1)
-            {
-                return true;
-            }
+            return true;
         }
         
-        bool satisfiable_0 = true;
        
-         if(positive_max >= next_state->occurrence[max_index] - positive_max)
+        if(positive_max >= next_state->occurrence[max_index] - positive_max)
         {
             next_state->occurrence[max_index] = -1;
             next_state->assigned_lit = Lit(-max_index-1);
@@ -551,20 +578,15 @@ bool Solver::seq_solve(SolverState* state_msg)
             next_state->occurrence[max_index] = -2;
             next_state->assigned_lit = Lit(max_index+1);
         } 
-        if(unit_clauses.find(-max_index-1) != unit_clauses.end())
+            
+        bool satisfiable_0 = seq_solve(next_state);
+        if(satisfiable_0)
         {
-            satisfiable_0 = seq_solve(next_state);
-            if(satisfiable_0)
-            {
-                return true;
-            }
+            return true;
         }
 
-        if(!satisfiable_1 && !satisfiable_0)
-        {
-            CkPrintf("Unsatisfiable through sequential\n");
-            return false;
-        }
+        CkPrintf("Unsatisfiable through sequential\n");
+        return false;
     }
 
 }

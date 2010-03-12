@@ -6,7 +6,9 @@ mainmodule main {
     mainchare Main{
         entry Main(CkArgMsg* msg);
     
-        entry void done();
+        //entry void done();
+        //entry [expedited]void done();
+        entry [expedited]void done();
     };
    
     message SolverState;

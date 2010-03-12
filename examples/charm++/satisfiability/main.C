@@ -2,6 +2,7 @@
 #include <cstring>
 #include <stdint.h>
 #include <errno.h>
+#include <limits.h>
 
 #include <signal.h>
 #include <zlib.h>
@@ -12,11 +13,13 @@
 #include "SolverTypes.h"
 #include "Solver.h"
 
+
 //#include "util.h"
 
 CProxy_Main mainProxy;
 
 #define CHUNK_LIMIT 1048576
+
 
 class StreamBuffer {
     gzFile  in;
@@ -149,7 +152,7 @@ Main::Main(CkArgMsg* msg)
 {
 
     grainsize = 1;
-    SolverState* solver_msg = new SolverState;
+    SolverState* solver_msg = new (8 * sizeof(int))SolverState;
     if(msg->argc < 2)
     {
         error_exit((char*)"Usage: sat filename grainsize\n");
@@ -194,11 +197,31 @@ Main::Main(CkArgMsg* msg)
     int positive_max = solver_msg->positive_occurrence[max_index];
     if(positive_max >= solver_msg->occurrence[max_index] - positive_max)
     {
+
+        // assign true first and then false
+        *((int *)CkPriorityPtr(solver_msg)) = INT_MIN;
+        CkSetQueueing(solver_msg, CK_QUEUEING_IFIFO);
+        solver_msg->lower = INT_MIN;
+        solver_msg->higher = 0;
         CProxy_Solver::ckNew(solver_msg);
+        
+        *((int *)CkPriorityPtr(not_msg)) = 0;
+        CkSetQueueing(not_msg, CK_QUEUEING_IFIFO);
+        not_msg->lower = 0;
+        not_msg->higher = INT_MAX;
         CProxy_Solver::ckNew(not_msg);
     }else
     {
+        *((int *)CkPriorityPtr(not_msg)) = INT_MIN;
+        CkSetQueueing(not_msg, CK_QUEUEING_IFIFO);
+        not_msg->lower = INT_MIN;
+        not_msg->higher = 0;
         CProxy_Solver::ckNew(not_msg);
+        
+        *((int *)CkPriorityPtr(solver_msg)) = 0;
+        CkSetQueueing(solver_msg, CK_QUEUEING_IFIFO);
+        solver_msg->lower = 0;
+        solver_msg->higher = INT_MAX;
         CProxy_Solver::ckNew(solver_msg);
 
     }
