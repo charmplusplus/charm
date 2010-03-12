@@ -2232,11 +2232,10 @@ FEM_Mesh *FEM_readMesh(const char *prefix, int chunkNo, int nChunks)
         for(int i=0; i<numNeighborVPs; i++){
           IDXL_List list = shared.getLocalList(i);
 
-	  double sumx, sumy;
-	  int nnodes = node.size();
+	  double x, y, sumx = 0.0, sumy = 0.0;
+	  int nnodes = ret->node.size();
 	  for(int n=0; n<nnodes; n++){
-	    double x,y;
-	    node.get_coord(n,x,y);
+	    ret->node.get_coord(n, x, y);
 	    sumx += x;
 	    sumy += y;
 	  }
