@@ -1,6 +1,9 @@
 #ifndef _MAIN_H_
 #define _MAIN_H_
 
+/* readonly */ int grainsize;
+
+
 class Main : public CBase_Main{
 
 private:

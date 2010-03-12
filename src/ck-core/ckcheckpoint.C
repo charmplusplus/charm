@@ -123,7 +123,11 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	FILE* fGroups = fopen(fileName,"wb");
 	if(!fGroups) CkAbort("Failed to create checkpoint file for group table!");
 	PUP::toDisk pGroups(fGroups);
-	CkPupGroupData(pGroups);
+#ifdef _FAULT_MLOG_
+    CkPupGroupData(pGroups,CmiTrue);
+#else
+    CkPupGroupData(pGroups);
+#endif
 	fclose(fGroups);
 
 	// save nodegroups into NodeGroups.dat
@@ -134,7 +138,11 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	  if(!fNodeGroups) 
 	    CkAbort("Failed to create checkpoint file for nodegroup table!");
 	  PUP::toDisk pNodeGroups(fNodeGroups);
-	  CkPupNodeGroupData(pNodeGroups);
+#ifdef _FAULT_MLOG_
+      CkPupNodeGroupData(pNodeGroups,CmiTrue);
+#else
+      CkPupNodeGroupData(pNodeGroups);
+#endif
 	  fclose(fNodeGroups);
   	}
 
@@ -262,6 +270,120 @@ void CkPupChareData(PUP::er &p)
 }
 #endif
 
+#ifdef _FAULT_MLOG_
+// handle GroupTable and data
+void CkPupGroupData(PUP::er &p, CmiBool create)
+{
+	int numGroups, i;
+
+	if (!p.isUnpacking()) {
+	  numGroups = CkpvAccess(_groupIDTable)->size();
+	}
+	p|numGroups;
+	if (p.isUnpacking()) {
+	  if(CkMyPe()==0)  
+            CkpvAccess(_numGroups) = numGroups+1; 
+          else 
+	    CkpvAccess(_numGroups) = 1;
+	}
+	DEBCHK("[%d] CkPupGroupData %s: numGroups = %d\n", CkMyPe(),p.typeString(),numGroups);
+
+	GroupInfo *tmpInfo = new GroupInfo [numGroups];
+	if (!p.isUnpacking()) {
+	  for(i=0;i<numGroups;i++) {
+		tmpInfo[i].gID = (*CkpvAccess(_groupIDTable))[i];
+		TableEntry ent = CkpvAccess(_groupTable)->find(tmpInfo[i].gID);
+		tmpInfo[i].MigCtor = _chareTable[ent.getcIdx()]->migCtor;
+		tmpInfo[i].DefCtor = _chareTable[ent.getcIdx()]->defCtor;
+		strncpy(tmpInfo[i].name,_chareTable[ent.getcIdx()]->name,255);
+		//CkPrintf("[%d] CkPupGroupData: %s group %s \n", CkMyPe(), p.typeString(), tmpInfo[i].name);
+
+		if(tmpInfo[i].MigCtor==-1) {
+			char buf[512];
+			sprintf(buf,"Group %s needs a migration constructor and PUP'er routine for restart.\n", tmpInfo[i].name);
+			CkAbort(buf);
+		}
+	  }
+  	}
+	for (i=0; i<numGroups; i++) p|tmpInfo[i];
+
+	for(i=0;i<numGroups;i++) 
+	{
+	  CkGroupID gID = tmpInfo[i].gID;
+	  if (p.isUnpacking()) {
+	    //CkpvAccess(_groupIDTable)->push_back(gID);
+	    int eIdx = tmpInfo[i].MigCtor;
+	    // error checking
+	    if (eIdx == -1) {
+	      CkPrintf("[%d] ERROR> Group %s's migration constructor is not defined!\n", CkMyPe(), tmpInfo[i].name); CkAbort("Abort");
+	    }
+	    void *m = CkAllocSysMsg();
+	    envelope* env = UsrToEnv((CkMessage *)m);
+		if(create)
+		    CkCreateLocalGroup(gID, eIdx, env);
+	  }   // end of unPacking
+	  IrrGroup *gobj = CkpvAccess(_groupTable)->find(gID).getObj();
+	  // if using migration constructor, you'd better have a pup
+	  	if(!create)
+			gobj->mlogData->teamRecoveryFlag = 1;
+          gobj->pup(p);
+         // CkPrintf("Group PUP'ed: gid = %d, name = %s\n",gobj->ckGetGroupID().idx, tmpInfo[i].name);
+	}
+	delete [] tmpInfo;
+}
+
+// handle NodeGroupTable and data
+void CkPupNodeGroupData(PUP::er &p, CmiBool create)
+{
+	int numNodeGroups, i;
+	if (!p.isUnpacking()) {
+	  numNodeGroups = CksvAccess(_nodeGroupIDTable).size();
+	}
+	p|numNodeGroups;
+	if (p.isUnpacking()) {
+	  if(CkMyPe()==0){ CksvAccess(_numNodeGroups) = numNodeGroups+1; }
+	  else { CksvAccess(_numNodeGroups) = 1; }
+	}
+	if(CkMyPe() == 3)
+	CkPrintf("[%d] CkPupNodeGroupData %s: numNodeGroups = %d\n",CkMyPe(),p.typeString(),numNodeGroups);
+
+	GroupInfo *tmpInfo = new GroupInfo [numNodeGroups];
+	if (!p.isUnpacking()) {
+	  for(i=0;i<numNodeGroups;i++) {
+		tmpInfo[i].gID = CksvAccess(_nodeGroupIDTable)[i];
+		TableEntry ent2 = CksvAccess(_nodeGroupTable)->find(tmpInfo[i].gID);
+		tmpInfo[i].MigCtor = _chareTable[ent2.getcIdx()]->migCtor;
+		if(tmpInfo[i].MigCtor==-1) {
+			char buf[512];
+			sprintf(buf,"NodeGroup %s either need a migration constructor and\n\
+				     declared as [migratable] in .ci to be able to checkpoint.",\
+				     _chareTable[ent2.getcIdx()]->name);
+			CkAbort(buf);
+		}
+	  }
+	}
+	for (i=0; i<numNodeGroups; i++) p|tmpInfo[i];
+	for (i=0;i<numNodeGroups;i++) {
+		CkGroupID gID = tmpInfo[i].gID;
+		if (p.isUnpacking()) {
+			//CksvAccess(_nodeGroupIDTable).push_back(gID);
+			int eIdx = tmpInfo[i].MigCtor;
+			void *m = CkAllocSysMsg();
+			envelope* env = UsrToEnv((CkMessage *)m);
+			if(create){
+				CkCreateLocalNodeGroup(gID, eIdx, env);
+			}
+		}
+		TableEntry ent2 = CksvAccess(_nodeGroupTable)->find(gID);
+		IrrGroup *obj = ent2.getObj();
+		obj->pup(p);
+		if(CkMyPe() == 3) CkPrintf("Nodegroup PUP'ed: gid = %d, name = %s\n",
+			obj->ckGetGroupID().idx,
+			_chareTable[ent2.getcIdx()]->name);
+	}
+	delete [] tmpInfo;
+}
+#else
 // handle GroupTable and data
 void CkPupGroupData(PUP::er &p)
 {
@@ -370,7 +492,7 @@ void CkPupNodeGroupData(PUP::er &p)
 	}
 	delete [] tmpInfo;
 }
-
+#endif
 
 // handle chare array elements for this processor
 void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
@@ -405,7 +527,7 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
                 p|idx;
 		CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
 		if (notifyListeners){
-  		  mgr->resume(idx,p);
+  		  mgr->resume(idx,p,CmiTrue);
 		}
                 else{
   		  mgr->restore(idx,p);
@@ -430,6 +552,41 @@ int  CkCountArrayElements(){
     return numElements;
 }
 #endif
+
+void CkPupProcessorData(PUP::er &p)
+{
+    // save readonlys, and callback BTW
+    if(CkMyRank()==0) {
+        CkPupROData(p);
+    }
+
+    // save mainchares into MainChares.dat
+    if(CkMyPe()==0) {
+      CkPupMainChareData(p, NULL);
+    }
+	
+    // save non-migratable chare
+    CkPupChareData(p);
+
+    // save groups 
+#ifdef _FAULT_MLOG_
+    CkPupGroupData(p,CmiTrue);
+#else
+    CkPupGroupData(p);
+#endif
+
+    // save nodegroups
+    if(CkMyRank()==0) {
+#ifdef _FAULT_MLOG_
+        CkPupNodeGroupData(p,CmiTrue);	
+#else
+        CkPupNodeGroupData(p);
+#endif
+    }
+
+    // pup array elements
+    CkPupArrayElementsData(p);
+}
 
 // called only on pe 0
 static void checkpointOne(const char* dirname, CkCallback& cb){
@@ -560,7 +717,11 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	FILE* fGroups = fopen(filename,"rb");
 	if(!fGroups) CkAbort("Failed to open checkpoint file for group table!");
 	PUP::fromDisk pGroups(fGroups);
-	CkPupGroupData(pGroups);
+#ifdef _FAULT_MLOG_
+    CkPupGroupData(pGroups,CmiTrue);
+#else
+    CkPupGroupData(pGroups);
+#endif
 	fclose(fGroups);
 
 	// restore nodegroups
@@ -573,7 +734,11 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 		FILE* fNodeGroups = fopen(filename,"rb");
 		if(!fNodeGroups) CkAbort("Failed to open checkpoint file for nodegroup table!");
 		PUP::fromDisk pNodeGroups(fNodeGroups);
-		CkPupNodeGroupData(pNodeGroups);
+#ifdef _FAULT_MLOG_
+        CkPupNodeGroupData(pNodeGroups,CmiTrue);
+#else
+        CkPupNodeGroupData(pNodeGroups);
+#endif
 		fclose(fNodeGroups);
 	}
 

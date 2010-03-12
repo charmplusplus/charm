@@ -689,26 +689,25 @@ void createLocalQps(struct ibv_device *dev,int ibPort, int myNode,int numNodes,s
 		struct ibv_qp *qp = ibv_create_qp(context->pd,&initAttr);
 		MACHSTATE1(3,"TEST QP %p",qp);*/
 
-		for( i=0;i<numNodes;i++){
-			if(i == myNode){
+		for( i=1;i<numNodes;i++){
+                        int n = (myNode + i)%numNodes;
+			if(n == myNode){
 			}else{
-				localAddr[i].lid = myLid;
-				context->qp[i] = ibv_create_qp(context->pd,&initAttr);
+				localAddr[n].lid = myLid;
+				context->qp[n] = ibv_create_qp(context->pd,&initAttr);
 			
-				MACHSTATE2(3,"qp[%d] created %p",i,context->qp[i]);
+				MACHSTATE2(3,"qp[%d] created %p",n,context->qp[n]);
+				CmiAssert(context->qp[n] != NULL);
 			
-				CmiAssert(context->qp[i] != NULL);
-			
-			
-				ibv_modify_qp(context->qp[i], &attr,
+				ibv_modify_qp(context->qp[n], &attr,
 					  IBV_QP_STATE              |
 					  IBV_QP_PKEY_INDEX         |
 				  	IBV_QP_PORT               |
 				  	IBV_QP_ACCESS_FLAGS);		
 
-				localAddr[i].qpn = context->qp[i]->qp_num;
-				localAddr[i].psn = lrand48() & 0xffffff;
-				MACHSTATE4(3,"i %d lid Ox%x qpn 0x%x psn 0x%x",i,localAddr[i].lid,localAddr[i].qpn,localAddr[i].psn);
+				localAddr[n].qpn = context->qp[n]->qp_num;
+				localAddr[n].psn = lrand48() & 0xffffff;
+				MACHSTATE4(3,"i %d lid Ox%x qpn 0x%x psn 0x%x",n,localAddr[n].lid,localAddr[n].qpn,localAddr[n].psn);
 			}
 		}
 	}

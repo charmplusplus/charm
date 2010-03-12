@@ -2,26 +2,28 @@
 #include "SolverTypes.h"
 #include "Solver.h"
 #include <map>
-
+#include <vector>
 
 using namespace std;
 
 extern CProxy_Main mainProxy;
+extern int grainsize;
 
 SolverState::SolverState()
 {
 
+    var_frequency = 0;
 }
 
 inline int SolverState::nVars()
 {
-    return assigns.size(); 
+    return var_frequency; 
 }
 
 Var SolverState::newVar(bool sign, bool dvar)
 {
     int v = nVars();
-    assigns.push_back(toInt(l_Undef));
+    var_frequency++;
     return v;
 }
 
@@ -72,6 +74,8 @@ bool SolverState::addClause(CkVec<Lit>& ps)
                 for(int _i=0; _i<ps.size(); _i++)
                 {
                    occurrence[abs(toInt(ps[_i])-1)]--; 
+                   if(toInt(ps[_i]) > 0)
+                       positive_occurrence[abs(toInt(ps[_i])-1)]--; 
                 }
                 return true;
             }
@@ -100,17 +104,13 @@ Solver::Solver(SolverState* state_msg)
     CkVec<Clause> next_clauses;
     /* Which variable get assigned  */
     Lit assigned_var = state_msg->assigned_lit;
-//#ifdef DEBUG    
+#ifdef DEBUG    
     CkPrintf("\n\nNew chare: literal = %d, occurrence size=%d, level=%d \n", toInt(assigned_var), state_msg->occurrence.size(), state_msg->level);
-//#endif    
+#endif    
     SolverState *next_state = copy_solverstate(state_msg);
     
     //Unit clauses
-    map<int, int> unit_clauses;
-    //unit_clauses.erase(unit_clauses.begin(), unit_clauses.end());
-#ifdef DEBUG
-            CkPrintf("map size:%d", unit_clauses.size());
-#endif
+    map<int, int>  unit_clauses;
 
     /* use this value to propagate the clauses */
     for(int i=0; i<(state_msg->clauses).size(); i++)
@@ -119,7 +119,7 @@ Solver::Solver(SolverState* state_msg)
         CkVec<Lit> new_clause;
         bool satisfied = false;
 #ifdef DEBUG    
-        CkPrintf("##");
+        CkPrintf("\n");
 #endif
         for(int j=0; j<cl.size();  j++)
         {
@@ -145,36 +145,37 @@ Solver::Solver(SolverState* state_msg)
                 Lit lit = cl[j];
                 if(lit != assigned_var)
                 {
-                    (next_state->occurrence[abs(toInt(lit))-1])--;
+                    int int_lit = toInt(lit);
+                    (next_state->occurrence[abs(int_lit)-1])--;
+                    if(int_lit > 0)
+                        (next_state->positive_occurrence[abs(int_lit)-1])--;
                 }
             }
         } else if(new_clause.size() == 0 )
         {
         
             /* conflict */
-            //CkPrintf(" conflict\n");
-            //mainProxy.done();
             return;
         }else if(new_clause.size() == 1)
         {
             /*unit clause */
             Lit lit = new_clause[0];
-            if(unit_clauses[-toInt(lit)] > 0)
+            if(unit_clauses.find(-toInt(lit)) !=unit_clauses.end())
             {
 #ifdef DEBUG
-                CkPrintf("conflict detected by unit progation\n");
+                CkPrintf("conflict detected by unit progation, size=%d\n", unit_clauses.size());
 #endif
                 return;
                 /* conflict*/
             }else
             {
-                unit_clauses[toInt(lit)]++;
+                (unit_clauses[toInt(lit)])++;
+                int int_lit = toInt(lit);
+                int_lit>0?state_msg->occurrence[int_lit-1]=-2:state_msg->occurrence[-int_lit-1]=-1;
 #ifdef DEBUG
-                CkPrintf(" unit clause %d=%d\n", toInt(lit), unit_clauses[toInt(lit)]);
+                CkPrintf(" unit clause %d=%d, size=%D\n", toInt(lit), unit_clauses[toInt(lit)], unit_clauses.size());
 #endif
             }
-            Clause clsc(new_clause, false);
-            next_clauses.push_back(clsc);
         }
         else if(new_clause.size() > 1)
         {
@@ -183,7 +184,6 @@ Solver::Solver(SolverState* state_msg)
         }
     } /* all clauses are checked*/
    
-    //CkPrintf (" new clauses size=%d\n", next_clauses.size());
     if(next_clauses.size() == 0)
     {
         /* one solution is found*/
@@ -208,27 +208,62 @@ Solver::Solver(SolverState* state_msg)
         /* if there is unit clause, should choose these first??? TODO */
         /* TODO which variable to pick up */
         /*unit clause literal and also which occurrs most times */
-        int max_index =-1;//= get_max_element(next_state->occurrence);
-        if(!unit_clauses.empty())
+        while(!unit_clauses.empty())
         {
-       
-#ifdef DEBUG
-            CkPrintf("map size:%d", unit_clauses.size());
-#endif
-            int max_occur = -3;
-            for(int _i=0; _i<next_state->occurrence.size(); _i++)
+           //CkPrintf(" parallel propagation unit clauses size=%d, non unit size=%d, assigned var=%d\n", unit_clauses.size(), next_clauses.size(), toInt(assigned_var));
+            int first_unit = (*(unit_clauses.begin())).first;
+           //assign this variable
+            for(int _i=0; _i<next_clauses.size(); _i++)
             {
-#ifdef DEBUG
-                    CkPrintf(" unit detect index = %d, i=%d, occ=%d, unit_clause=%d\n", max_index, _i, next_state->occurrence[_i], unit_clauses[_i]);
-#endif
-                if(next_state->occurrence[_i]>max_occur&&(unit_clauses[_i+1]>0 || unit_clauses[-_i-1]>0))
+                Clause& cl = next_clauses[_i];
+               
+                for(int j=0; j<cl.size(); j++)
                 {
-                    max_index = _i;
-                    max_occur = next_state->occurrence[_i];
+
+                    Lit lit = cl[j];
+                }
+                //reduce the clause
+                for(int j=0; j<cl.size(); j++)
+                {
+                    Lit lit = cl[j];
+                    if(toInt(lit) == first_unit)//this clause goes away
+                    {
+                        for(int jj=0; jj<cl.size(); jj++)
+                        {
+                            Lit lit_2 = cl[jj];
+                            (next_state->occurrence[abs(toInt(lit_2))-1])--; 
+                            if(toInt(lit_2) > 0)
+                                (next_state->positive_occurrence[abs(toInt(lit_2))-1])--; 
+                        }
+                        next_clauses.remove(_i);
+                        _i--;
+                       break; 
+                    }else if (toInt(lit) == -first_unit)
+                    {
+                        cl.remove(j);
+                        j--;
+                    }
+                }
+                if(cl.size()==0){ // conflict
+                    return;
+                }else if(cl.size() == 1)// new unit clause
+                {
+                    unit_clauses[toInt(cl[0])]++;
                 }
             }
-        }else 
-            max_index = get_max_element(next_state->occurrence);
+            /*remove this unit clause */
+            unit_clauses.erase(unit_clauses.begin());
+        }
+
+        }
+
+    if(next_clauses.size() == 0)
+    {
+        CkPrintf(" one solutions found after propagation \n");
+        mainProxy.done();
+        return;
+    }
+        int max_index = get_max_element(next_state->occurrence);
 #ifdef DEBUG
         CkPrintf("max index = %d\n", max_index);
 #endif
@@ -242,52 +277,65 @@ Solver::Solver(SolverState* state_msg)
 
         //if() left literal unassigned is larger than a grain size, parallel 
         /* When we start sequential 3SAT Grainsize problem*/
-        next_state->assigned_lit = Lit(max_index+1);
         next_state->assignclause(next_clauses);
-        //CkPrintf (" assign clauses size=%d\n", next_state->clauses.size());
         next_state->var_size = state_msg->var_size;
 
         SolverState *new_msg2 = copy_solverstate(next_state);;
-        new_msg2->assigned_lit = Lit(-max_index-1);
         new_msg2->var_size = state_msg->var_size;
 
         next_state->level = state_msg->level+1;
-        next_state->occurrence[max_index] = -2;
+        
+        int positive_max = next_state->positive_occurrence[max_index];
+        if(positive_max >= next_state->occurrence[max_index] - positive_max)
+        {
+            next_state->assigned_lit = Lit(max_index+1);
+            next_state->occurrence[max_index] = -2;
+        }
+        else
+        {
+            next_state->assigned_lit = Lit(-max_index-1);
+            next_state->occurrence[max_index] = -1;
+        }
         bool satisfiable_1 = true;
         bool satisfiable_0 = true;
-        if(unit_clauses.empty()||unit_clauses[max_index+1]>0)        
+
+        if(next_state->clauses.size() > grainsize)
+            CProxy_Solver::ckNew(next_state);
+        else //sequential
         {
-            if(next_state->clauses.size() > 30)
-                CProxy_Solver::ckNew(next_state);
-            else //sequential
+            satisfiable_1 = seq_solve(next_state);
+            if(satisfiable_1)
             {
-                satisfiable_1 = seq_solve(next_state);
-                if(satisfiable_1)
-                {
-                    //CkPrintf(" One solutions found by sequential algorithm\n");
-                    mainProxy.done();
-                    return;
-                }
+                CkPrintf(" One solutions found by sequential algorithm\n");
+                mainProxy.done();
+                return;
             }
         }
+
         new_msg2->level = state_msg->level+1;
-        new_msg2->occurrence[max_index] = -1;
-        if(unit_clauses.empty()||unit_clauses[-max_index-1]>0)
+        if(positive_max >= new_msg2->occurrence[max_index] - positive_max)
         {
-            if(new_msg2->clauses.size() > 30)
-                CProxy_Solver::ckNew(new_msg2);
-            else
+            new_msg2->assigned_lit = Lit(-max_index-1);
+            new_msg2->occurrence[max_index] = -1;
+        }
+        else
+        {
+            new_msg2->assigned_lit = Lit(max_index+1);
+            new_msg2->occurrence[max_index] = -2;
+        }
+        if(new_msg2->clauses.size() > grainsize)
+            CProxy_Solver::ckNew(new_msg2);
+        else
+        {
+            satisfiable_0 = seq_solve(new_msg2);
+
+            if(satisfiable_0)
             {
-                satisfiable_0 = seq_solve(new_msg2);
-
-                if(satisfiable_0)
-                {
-                    //CkPrintf(" One solutions found by sequential algorithm\n");
-                    mainProxy.done();
-                    return;
-                }
-
+                CkPrintf(" One solutions found by sequential algorithm\n");
+                mainProxy.done();
+                return;
             }
+
         }
 
         if(!satisfiable_1 && !satisfiable_0)
@@ -295,9 +343,6 @@ Solver::Solver(SolverState* state_msg)
             CkPrintf("Unsatisfiable through sequential\n");
             mainProxy.done();
         }
-        // grain size is small now. use sequential to solve it    
-        // seq_solve()
-    }
 }
 
 /* Which literals are already assigned, which is assigned this interation, the unsolved clauses */
@@ -309,24 +354,24 @@ bool Solver::seq_solve(SolverState* state_msg)
     CkVec<Clause> next_clauses;
     /* Which variable get assigned  */
     Lit assigned_var = state_msg->assigned_lit;
+#ifdef DEBUG
     CkPrintf("\n\nSequential SAT New chare: literal = %d, occurrence size=%d, level=%d \n", toInt(assigned_var), state_msg->occurrence.size(), state_msg->level);
+#endif
     SolverState *next_state = copy_solverstate(state_msg);
     
     //Unit clauses
-    map<int, int> unit_clauses;
-    //unit_clauses.erase(unit_clauses.begin(), unit_clauses.end());
-#ifdef DEBUG
-            CkPrintf("map size:%d", unit_clauses.size());
-#endif
-
     /* use this value to propagate the clauses */
+    map<int, int> unit_clauses;
+#ifdef DEBUG
+    CkPrintf(" remainning clause size is %d\n", (state_msg->clauses).size());
+#endif
     for(int i=0; i<(state_msg->clauses).size(); i++)
     {
         Clause cl = ((state_msg->clauses)[i]);
         CkVec<Lit> new_clause;
         bool satisfied = false;
 #ifdef DEBUG    
-        CkPrintf("##");
+        CkPrintf("\n");
 #endif
         for(int j=0; j<cl.size();  j++)
         {
@@ -352,20 +397,22 @@ bool Solver::seq_solve(SolverState* state_msg)
                 Lit lit = cl[j];
                 if(lit != assigned_var)
                 {
-                    (next_state->occurrence[abs(toInt(lit))-1])--;
+                    int int_lit = toInt(lit);
+                    (next_state->occurrence[abs(int_lit)-1])--;
+                    if(int_lit > 0)
+                        (next_state->positive_occurrence[abs(int_lit)-1])--;
                 }
             }
         } else if(new_clause.size() == 0 ) //this clause is unsatisfiable
         {
         
             /* conflict */
-            //CkPrintf(" conflict\n");
             return false;
         }else if(new_clause.size() == 1) //unit clause
         {
             /*unit clause */
             Lit lit = new_clause[0];
-            if(unit_clauses[-toInt(lit)] > 0) // for a variable, x and ~x exist in unit clause at the same time
+            if(unit_clauses.find(-toInt(lit)) != unit_clauses.end()) // for a variable, x and ~x exist in unit clause at the same time
             {
                 CkPrintf("conflict detected by unit progation\n");
                 return false;
@@ -373,13 +420,8 @@ bool Solver::seq_solve(SolverState* state_msg)
             }else
             {
                 unit_clauses[toInt(lit)]++;
-#ifdef DEBUG
-                CkPrintf(" unit clause %d=%d\n", toInt(lit), unit_clauses[toInt(lit)]);
-#endif
             }
 
-            Clause clsc(new_clause, false);
-            next_clauses.push_back(clsc);
         }
         else if(new_clause.size() > 1)
         {
@@ -410,34 +452,38 @@ bool Solver::seq_solve(SolverState* state_msg)
         /*   assigned all unit clause literals first*/
         while(!unit_clauses.empty())
         {
-            int last_unit = (*(unit_clauses.begin())).first;
+#ifdef DEBUG
+            CkPrintf("unit propagation\n");
+#endif
+            int first_unit = (*(unit_clauses.begin())).first;
 
             //assign this variable
-            for(int _i=0; _i<next_state->clauses.size(); _i++)
+            for(int _i=0; _i<next_clauses.size(); _i++)
             {
-                Clause& cl = (next_state->clauses)[_i];
-               
+                Clause& cl = next_clauses[_i];
                 //reduce the clause
                 for(int j=0; j<cl.size(); j++)
                 {
                     Lit lit = cl[j];
-                    if(toInt(lit) == last_unit)//this clause goes away
+                    if(toInt(lit) == first_unit)//this clause goes away
                     {
                         for(int jj=0; jj<cl.size(); jj++)
                         {
                             Lit lit_2 = cl[jj];
                             (next_state->occurrence[abs(toInt(lit_2))-1])--; 
+                            if(toInt(lit_2) > 0)
+                                (next_state->positive_occurrence[abs(toInt(lit_2))-1])--; 
                         }
                        break; 
-                    }else if (toInt(lit) == -last_unit)
+                    }else if (toInt(lit) == -first_unit)
                     {
                         cl.remove(j);
                         j--;
                     }
                 }
-                if(cl.size()==0){
-                    next_state->clauses.remove(_i);
-                    _i--;
+                if(cl.size()==0){ // conflict
+                    return false;
+                    //_i--;
                 }else if(cl.size() == 1)// new unit clause
                 {
                     unit_clauses[toInt(cl[0])]++;
@@ -448,30 +494,15 @@ bool Solver::seq_solve(SolverState* state_msg)
             unit_clauses.erase(unit_clauses.begin());
         }
 
+        if(next_clauses.size() == 0)
+            return true;
         /* it would be better to insert the unit literal in order of their occurrence */
 
         /* make a decision and then fire new tasks */
         /* if there is unit clause, should choose these first??? TODO */
         /* TODO which variable to pick up */
         /*unit clause literal and also which occurrs most times */
-        int max_index =-1;//= get_max_element(next_state->occurrence);
-        if(!unit_clauses.empty())
-        {
-       
-#ifdef DEBUG
-            CkPrintf("map size:%d", unit_clauses.size());
-#endif
-            int max_occur = -3;
-            for(int _i=0; _i<next_state->occurrence.size(); _i++)
-            {
-                if(next_state->occurrence[_i]>max_occur&&(unit_clauses[_i+1]>0 || unit_clauses[-_i-1]>0))
-                {
-                    max_index = _i;
-                    max_occur = next_state->occurrence[_i];
-                }
-            }
-        }else 
-            max_index = get_max_element(next_state->occurrence);
+        int max_index =  get_max_element(next_state->occurrence);
 #ifdef DEBUG
         CkPrintf("max index = %d\n", max_index);
 #endif
@@ -482,15 +513,24 @@ bool Solver::seq_solve(SolverState* state_msg)
         }
 
         
-        next_state->assigned_lit = Lit(max_index+1);
         next_state->assignclause(next_clauses);
         next_state->var_size = state_msg->var_size;
         next_state->level = state_msg->level+1;
-        next_state->occurrence[max_index] = -2;
 
+        int positive_max = next_state->positive_occurrence[max_index];
+        if(positive_max >= next_state->occurrence[max_index] - positive_max)
+        {
+            next_state->occurrence[max_index] = -2;
+            next_state->assigned_lit = Lit(max_index+1);
+        }
+        else
+        {
+            next_state->occurrence[max_index] = -1;
+            next_state->assigned_lit = Lit(-max_index-1);
+        } 
         bool satisfiable_1 = true;
 
-        if(unit_clauses.empty()||unit_clauses[max_index+1]>0)        
+        if(unit_clauses[max_index+1]>0)        
         {
             satisfiable_1 = seq_solve(next_state);
             if(satisfiable_1)
@@ -500,9 +540,18 @@ bool Solver::seq_solve(SolverState* state_msg)
         }
         
         bool satisfiable_0 = true;
-        next_state->assigned_lit = Lit(-max_index-1);
-        next_state->occurrence[max_index] = -1;
-        if(unit_clauses.empty()||unit_clauses[-max_index-1]>0)
+       
+         if(positive_max >= next_state->occurrence[max_index] - positive_max)
+        {
+            next_state->occurrence[max_index] = -1;
+            next_state->assigned_lit = Lit(-max_index-1);
+        }
+        else
+        {
+            next_state->occurrence[max_index] = -2;
+            next_state->assigned_lit = Lit(max_index+1);
+        } 
+        if(unit_clauses.find(-max_index-1) != unit_clauses.end())
         {
             satisfiable_0 = seq_solve(next_state);
             if(satisfiable_0)

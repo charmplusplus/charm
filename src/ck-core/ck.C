@@ -81,6 +81,10 @@ Chare::Chare(CkMigrateMessage* m) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
 
+#ifdef _FAULT_MLOG_
+        mlogData = NULL;
+#endif
+
 #if CMK_OBJECT_QUEUE_AVAILABLE
   if (_defaultObjectQ)  CkEnableObjQ();
 #endif
@@ -129,10 +133,11 @@ void Chare::pup(PUP::er &p)
   if (chareIdx != -1) thishandle.objPtr=(void*)chareIdx;
 #endif
 #ifdef _FAULT_MLOG_
-  if(p.isUnpacking()){
-    mlogData = new ChareMlogData();
-  }
-  mlogData->pup(p);
+	if(p.isUnpacking()){
+		if(mlogData == NULL || !mlogData->teamRecoveryFlag)
+        	mlogData = new ChareMlogData();
+	}
+	mlogData->pup(p);
 #endif
 }
 
