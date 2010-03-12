@@ -118,6 +118,9 @@ Blue Gene/L
 
 Blue Gene/P
  - Added routines for measuring performance counters on BG/P.
+ - Updated to support latest DCMF driver version. On ANL's Intrepid, you may
+   need to set BGP_INSTALL=/bgsys/drivers/V1R4M1_460_2009-091110P/ppc in your
+   environment. This is the default on ANL's Surveyor.
 
 Cray XT
  - cputopology information is now available on XT3/4/5
