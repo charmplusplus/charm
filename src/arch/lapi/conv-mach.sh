@@ -13,8 +13,8 @@ esac
 
 CMK_CPP_CHARM='/usr/lib/cpp -P -D_NO_PROTO '
 CMK_CPP_C='/usr/lib/cpp -P -D_NO_PROTO '
-CMK_CC='mpcc_r -q32 -qcpluscmt '
-CMK_CXX='mpCC_r -q32 -qstaticinline '
+CMK_CC='mpcc_r -q32 -qcpluscmt -qhalt=e '
+CMK_CXX='mpCC_r -q32 -qstaticinline -qhalt=e '
 CMK_CXXPP='xlC -q32 -E '
 CMK_C_OPTIMIZE='-O3 -qstrict -Q  '
 CMK_CXX_OPTIMIZE='-O3 -qstrict -Q '
