@@ -52,7 +52,7 @@ CkReduction::reducerType minMaxReductionType;
 CkpvStaticDeclare(TraceProjections*, _trace);
 CtvStaticDeclare(int,curThreadEvent);
 
-CkpvDeclare(int, CtrLogBufSize);
+CkpvDeclare(CmiInt8, CtrLogBufSize);
 
 typedef CkVec<char *>  usrEventVec;
 CkpvStaticDeclare(usrEventVec, usrEventlist);
@@ -952,13 +952,13 @@ TraceProjections::TraceProjections(char **argv):
   if (CkpvAccess(traceOnPe) == 0) return;
 
   CtvInitialize(int,curThreadEvent);
-  CkpvInitialize(int, CtrLogBufSize);
+  CkpvInitialize(CmiInt8, CtrLogBufSize);
   CkpvAccess(CtrLogBufSize) = DefaultLogBufSize;
   CtvAccess(curThreadEvent)=0;
-  if (CmiGetArgIntDesc(argv,"+logsize",&CkpvAccess(CtrLogBufSize), 
+  if (CmiGetArgLongDesc(argv,"+logsize",&CkpvAccess(CtrLogBufSize), 
 		       "Log entries to buffer per I/O")) {
     if (CkMyPe() == 0) {
-      CmiPrintf("Trace: logsize: %d\n", CkpvAccess(CtrLogBufSize));
+      CmiPrintf("Trace: logsize: %ld\n", CkpvAccess(CtrLogBufSize));
     }
   }
   checknested = 
