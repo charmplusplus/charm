@@ -61,7 +61,7 @@
 
 #define  USER_EVENT_PAIR    100
 
-CkpvExtern(int, CtrLogBufSize);
+CkpvExtern(CmiInt8, CtrLogBufSize);
 CkpvExtern(char*, traceRoot);
 CkpvExtern(int, traceRootBaseLength);
 CkpvExtern(char*, selective);
