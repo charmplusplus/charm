@@ -1509,6 +1509,8 @@ void CcdRaiseCondition(int condnum);
 void CmiArgGroup(const char *parentName,const char *groupName);
 int CmiGetArgInt(char **argv,const char *arg,int *optDest);
 int CmiGetArgIntDesc(char **argv,const char *arg,int *optDest,const char *desc);
+int CmiGetArgLong(char **argv,const char *arg,CmiInt8 *optDest);
+int CmiGetArgLongDesc(char **argv,const char *arg,CmiInt8 *optDest,const char *desc);
 int CmiGetArgDouble(char **argv,const char *arg,double *optDest);
 int CmiGetArgDoubleDesc(char **argv,const char *arg,double *optDest,const char *desc);
 int CmiGetArgString(char **argv,const char *arg,char **optDest);
