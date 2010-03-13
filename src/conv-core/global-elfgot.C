@@ -324,7 +324,7 @@ CtgGlobalList::CtgGlobalList() {
 	static void *last = NULL;
         void *pg = (void*)(((size_t)gGot) & ~(CMK_MEMORY_PAGESIZE-1));
         if (pg != last) {
-            mprotect(pg, CMK_MEMORY_PAGESIZE, PROT_WRITE);
+            mprotect(pg, CMK_MEMORY_PAGESIZE, PROT_READ | PROT_WRITE);
             last = pg;
         }
 #endif
