@@ -1889,7 +1889,7 @@ int socket_error_in_poll(int code,const char *msg)
         fd_set rfds_sto,wfds_sto;\
         int nFds=0;  \
         fd_set *rfds=&rfds_sto,*wfds=&wfds_sto; struct timeval tmo; \
-        FD_ZERO(rfds); FD_ZERO(wfds);tmo.tv_sec=0; tmo.tv_usec=1000*delayMs;
+        FD_ZERO(rfds); FD_ZERO(wfds);tmo.tv_sec=delayMs/1000; tmo.tv_usec=1000*(delayMs%1000);
 # define CMK_PIPE_SUB rfds,wfds
 # define CMK_PIPE_CALL() select(FD_SETSIZE, rfds, wfds, NULL, &tmo)
 
