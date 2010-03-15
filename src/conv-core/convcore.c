@@ -425,6 +425,45 @@ int CmiGetArgInt(char **argv,const char *arg,int *optDest) {
 	return CmiGetArgIntDesc(argv,arg,optDest,"");
 }
 
+int CmiGetArgLongDesc(char **argv,const char *arg,CmiInt8 *optDest,const char *desc)
+{
+	int i;
+	int argLen=strlen(arg);
+	CmiAddCLA(arg,"integer",desc);
+	for (i=0;argv[i]!=NULL;i++)
+		if (0==strncmp(argv[i],arg,argLen))
+		{/*We *may* have found the argument*/
+			const char *opt=NULL;
+			int nDel=0;
+			switch(argv[i][argLen]) {
+			case 0: /* like "-p","27" */
+				opt=argv[i+1]; nDel=2; break;
+			case '=': /* like "-p=27" */
+				opt=&argv[i][argLen+1]; nDel=1; break;
+			case '-':case '+':
+			case '0':case '1':case '2':case '3':case '4':
+			case '5':case '6':case '7':case '8':case '9':
+				/* like "-p27" */
+				opt=&argv[i][argLen]; nDel=1; break;
+			default:
+				continue; /*False alarm-- skip it*/
+			}
+			if (opt==NULL) continue; /*False alarm*/
+			if (sscanf(opt,"%ld",optDest)<1) {
+			/*Bad command line argument-- die*/
+				fprintf(stderr,"Cannot parse %s option '%s' "
+					"as a long integer.\n",arg,opt);
+				CmiAbort("Bad command-line argument\n");
+			}
+			CmiDeleteArgs(&argv[i],nDel);
+			return 1;
+		}
+	return 0;/*Didn't find the argument-- dest is unchanged*/	
+}
+int CmiGetArgLong(char **argv,const char *arg,CmiInt8 *optDest) {
+	return CmiGetArgLongDesc(argv,arg,optDest,"");
+}
+
 /** Find the given argument in argv.  If present, delete
 it and return 1; if not present, return 0.
 e.g., arg=="-foo" matches argv=={...,"-foo",...} but not

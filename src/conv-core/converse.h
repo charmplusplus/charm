@@ -1118,9 +1118,11 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 #define CmiAsyncNodeBroadcastAll(s,m)       (CmiAsyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncNodeBroadcastAllAndFree(s,m) (CmiFreeNodeBroadcastAllFn((s),(char *)(m)))
 #else
+
 #define CmiSyncNodeSend(n,s,m)        CmiSyncSend(CmiNodeFirst(n),s,m)
 #define CmiAsyncNodeSend(n,s,m)       CmiAsyncSend(CmiNodeFirst(n),s,m)
 #define CmiSyncNodeSendAndFree(n,s,m) CmiSyncSendAndFree(CmiNodeFirst(n),s,m)
+#if CMK_UTH_VERSION || CMK_MULTICORE
 #define CmiSyncNodeBroadcast(s,m)           do { \
           int _i; \
           for(_i=0; _i<CmiNumNodes(); _i++) \
@@ -1142,6 +1144,14 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
           CmiSyncNodeBroadcastAll(s,m); \
           CmiFree(m); \
         } while(0)
+#else
+#define CmiSyncNodeBroadcast(s,m)           CmiSyncBroadcast(s,m)
+#define CmiAsyncNodeBroadcast(s,m)          CmiAsyncBroadcast(s,m)
+#define CmiSyncNodeBroadcastAndFree(s,m)    CmiSyncBroadcastAndFree(s,m)
+#define CmiSyncNodeBroadcastAll(s,m)        CmiSyncBroadcastAll(s,m)
+#define CmiAsyncNodeBroadcastAll(s,m)       CmiAsyncBroadcastAll(s,m)
+#define CmiSyncNodeBroadcastAllAndFree(s,m) CmiSyncBroadcastAllAndFree(s,m)
+#endif
 #endif
 
 /******** CMI MESSAGE RECEPTION ********/
@@ -1509,6 +1519,8 @@ void CcdRaiseCondition(int condnum);
 void CmiArgGroup(const char *parentName,const char *groupName);
 int CmiGetArgInt(char **argv,const char *arg,int *optDest);
 int CmiGetArgIntDesc(char **argv,const char *arg,int *optDest,const char *desc);
+int CmiGetArgLong(char **argv,const char *arg,CmiInt8 *optDest);
+int CmiGetArgLongDesc(char **argv,const char *arg,CmiInt8 *optDest,const char *desc);
 int CmiGetArgDouble(char **argv,const char *arg,double *optDest);
 int CmiGetArgDoubleDesc(char **argv,const char *arg,double *optDest,const char *desc);
 int CmiGetArgString(char **argv,const char *arg,char **optDest);

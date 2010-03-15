@@ -26,6 +26,8 @@ mainmodule lb_test {
     entry Lb_array();
     entry void Compute(HiMsg *);
     entry void ForwardMessages(void);
+    entry void pause();
+    entry void restart();
   };
 };
 
