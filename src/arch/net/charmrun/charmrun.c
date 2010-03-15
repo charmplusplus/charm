@@ -1889,13 +1889,14 @@ int socket_error_in_poll(int code,const char *msg)
 
 # define CMK_PIPE_DECL(maxn, delayMs) \
         fd_set rfds_sto,wfds_sto;\
+        int nFds=0;  \
         fd_set *rfds=&rfds_sto,*wfds=&wfds_sto; struct timeval tmo; \
         FD_ZERO(rfds); FD_ZERO(wfds);tmo.tv_sec=delayMs/1000; tmo.tv_usec=delayMs%1000;
 # define CMK_PIPE_SUB rfds,wfds
 # define CMK_PIPE_CALL() select(FD_SETSIZE, rfds, 0, 0, &tmo)
 
 # define CMK_PIPE_PARAM fd_set *rfds,fd_set *wfds
-# define CMK_PIPE_ADDREAD(rd_fd) { assert(rd_fd>=0&&rd_fd<FD_SETSIZE);FD_SET(rd_fd,rfds); }
+# define CMK_PIPE_ADDREAD(rd_fd) { assert(nFds<FD_SETSIZE);FD_SET(rd_fd,rfds); nFds++; }
 # define CMK_PIPE_ADDWRITE(wr_fd) FD_SET(wr_fd,wfds)
 # define CMK_PIPE_CHECKREAD(rd_fd) FD_ISSET(rd_fd,rfds)
 # define CMK_PIPE_CHECKWRITE(wr_fd) FD_ISSET(wr_fd,wfds)
