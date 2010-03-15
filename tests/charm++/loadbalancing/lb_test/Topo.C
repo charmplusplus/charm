@@ -8,6 +8,8 @@
 #include "Topo.h"
 #include "Topo.def.h"
 
+#define LINEARLY_GRADED                            0
+
 CkGroupID Topo::Create(const int _elem, const char* _topology, 
 		       const int min_us, const int max_us)
 {
@@ -91,6 +93,12 @@ void Topo::FindComputeTimes()
   for(i=0; i < elements; i++) {
     double work;
     do {  
+#if LINEARLY_GRADED
+      int mype = i/(elements/CkNumPes());
+      double max_on_pe = min_us + 1.0*(max_us - min_us)*(mype+1)/CkNumPes();
+      double min_on_pe = min_us + 1.0*(max_us - min_us)*(mype)/CkNumPes();
+      work = min_on_pe + (max_on_pe-min_on_pe)*pow((double)rand()/RAND_MAX,4.);
+#else
       // Gaussian doesn't give a bad enough distribution
       // work = gasdev() * devms + meanms;
       //work = (int)(((2.*devms*rand()) / RAND_MAX + meanms - devms) + 0.5);
@@ -99,6 +107,7 @@ void Topo::FindComputeTimes()
 //	work *= 4;
 //      work = meanms-devms + 2*devms*(exp((double)rand()/RAND_MAX)-1) / em1;
       work = min_us + (max_us-min_us)*pow((double)rand()/RAND_MAX,4.);
+#endif
     } while (work < 0);
     elemlist[i].work = work;
     // CkPrintf("%d work %f\n", i, work);

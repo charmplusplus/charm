@@ -73,11 +73,15 @@ public:
   main(CkArgMsg* m);
 
   void maindone(void) {
+#if 0
     nDone++;
     if (nDone==element_count) {
       CkPrintf("All done\n");
       CkExit();
     }
+#endif
+    CkPrintf("All done\n");
+    CkExit();
   };
 
 private:
@@ -376,8 +380,8 @@ public:
 	int loadbalancing = 0;
 	if (nTimes == step_count) {
 	  //We're done-- send a message to main telling it to die
-	  CProxy_main mproxy(mid);
-	  mproxy.maindone();
+          CkCallback cb(CkIndex_main::maindone(), mid);
+          contribute(0, NULL, CkReduction::sum_int, cb);
 	} else if (nTimes % n_loadbalance == 0) {
           if (specialTracing) {
             if (nTimes/n_loadbalance == 1) traceBegin();
@@ -386,7 +390,12 @@ public:
 	  //We're not done yet...
 	  //Either load balance, or send a message to the next guy
 	  DEBUGF(("Element %d AtSync on PE %d\n",thisIndex,CkMyPe()));
+#if 0
 	  AtSync();
+#else
+          CkCallback cb(CkIndex_Lb_array::pause(), thisProxy);
+          contribute(0, NULL, CkReduction::sum_int, cb);
+#endif
 	  loadbalancing = 1;
 	} else ForwardMessages();
       }
@@ -395,7 +404,23 @@ public:
   }
 
   void ResumeFromSync(void) { //Called by Load-balancing framework
+#if 0
     resumed = 1;
+    DEBUGF(("Element %d resumeFromSync on PE %d\n",thisIndex,CkMyPe()));
+    thisProxy[thisIndex].ForwardMessages();
+#else
+    CkCallback cb(CkIndex_Lb_array::restart(), thisProxy);
+    contribute(0, NULL, CkReduction::sum_int, cb);
+#endif
+  }
+
+  void pause() {
+    AtSync();
+  }
+
+  void restart() {
+    resumed = 1;
+    lastTime = CmiWallTimer();
     DEBUGF(("Element %d resumeFromSync on PE %d\n",thisIndex,CkMyPe()));
     thisProxy[thisIndex].ForwardMessages();
   }
@@ -456,17 +481,21 @@ private:
     // the number of iterations per second to make it closer
     // to the correct value
 
+#if 0
     CkPrintf("[%d] Iter  %.0f per second\n",CmiMyPe(), wps);
+#endif
     for(int i=0; i < 2; i++) {
       const double start_time = CmiWallTimer();
       work((int)wps,&result);
       const double end_time = CmiWallTimer();
       const double correction = calTime / (end_time-start_time);
       wps *= correction;
+#if 0
       CkPrintf("Iter %d -> %.0f per second\n",i,wps);
+#endif
     }
     calibrated = (int)(wps/calTime);
-    CkPrintf("calibrated iterations %d\n",calibrated);
+    if (CkMyPe() == 0) CkPrintf("calibrated iterations %d\n",calibrated);
     return calibrated;
   };
 
