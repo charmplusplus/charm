@@ -1118,18 +1118,40 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 #define CmiAsyncNodeBroadcastAll(s,m)       (CmiAsyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncNodeBroadcastAllAndFree(s,m) (CmiFreeNodeBroadcastAllFn((s),(char *)(m)))
 #else
-#if CMK_SMP
-#error "SMP should always has CMK_NODE_QUEUE_AVAILABLE defined"
-#endif
+
 #define CmiSyncNodeSend(n,s,m)        CmiSyncSend(CmiNodeFirst(n),s,m)
 #define CmiAsyncNodeSend(n,s,m)       CmiAsyncSend(CmiNodeFirst(n),s,m)
 #define CmiSyncNodeSendAndFree(n,s,m) CmiSyncSendAndFree(CmiNodeFirst(n),s,m)
-#define CmiSyncNodeBroadcast(s,m)     CmiSyncBroadcast(s,m)
+#if CMK_UTH_VERSION
+#define CmiSyncNodeBroadcast(s,m)           do { \
+          int _i; \
+          for(_i=0; _i<CmiNumNodes(); _i++) \
+            if(_i != CmiMyNode()) \
+              CmiSyncSend(CmiNodeFirst(_i),s,m); \
+        } while(0)
+#define CmiAsyncNodeBroadcast(s,m)          CmiSyncNodeBroadcast(s,m)
+#define CmiSyncNodeBroadcastAndFree(s,m)    do { \
+          CmiSyncNodeBroadcast(s,m); \
+          CmiFree(m); \
+        } while(0)
+#define CmiSyncNodeBroadcastAll(s,m)           do { \
+          int _i; \
+          for(_i=0; _i<CmiNumNodes(); _i++) \
+            CmiSyncSend(CmiNodeFirst(_i),s,m); \
+        } while(0)
+#define CmiAsyncNodeBroadcastAll(s,m)       CmiSyncNodeBroadcastAll(s,m)
+#define CmiSyncNodeBroadcastAllAndFree(s,m) do { \
+          CmiSyncNodeBroadcastAll(s,m); \
+          CmiFree(m); \
+        } while(0)
+#else
+#define CmiSyncNodeBroadcast(s,m)           CmiSyncBroadcast(s,m)
 #define CmiAsyncNodeBroadcast(s,m)          CmiAsyncBroadcast(s,m)
 #define CmiSyncNodeBroadcastAndFree(s,m)    CmiSyncBroadcastAndFree(s,m)
 #define CmiSyncNodeBroadcastAll(s,m)        CmiSyncBroadcastAll(s,m)
 #define CmiAsyncNodeBroadcastAll(s,m)       CmiAsyncBroadcastAll(s,m)
 #define CmiSyncNodeBroadcastAllAndFree(s,m) CmiSyncBroadcastAllAndFree(s,m)
+#endif
 #endif
 
 /******** CMI MESSAGE RECEPTION ********/
