@@ -34,6 +34,31 @@
 #include "pathHistory.h" 
 
 
+
+
+#define RESET		0
+#define BRIGHT 		1
+#define DIM		2
+#define UNDERLINE 	3
+#define BLINK		4
+#define REVERSE		7
+#define HIDDEN		8
+
+#define BLACK 		0
+#define RED		1
+#define GREEN		2
+#define YELLOW		3
+#define BLUE		4
+#define MAGENTA		5
+#define CYAN		6
+#define	WHITE		7
+
+
+
+
+
+
+
 #include <cp_effects.h>
 
 /**
@@ -336,7 +361,12 @@ public:
   double medianTime(){
     std::vector<double> sortedTimes = times;
     std::sort(sortedTimes.begin(), sortedTimes.end());
-    return sortedTimes[sortedTimes.size() / 2];
+    if(sortedTimes.size()>0){
+    	return sortedTimes[sortedTimes.size() / 2];
+    } else {
+    	CkAbort("Cannot compute medianTime for empty sortedTimes vector");
+    	return -1;
+    }
   }
 
   
@@ -460,7 +490,11 @@ public:
 	}
 
 	// Print the median time
-	s << (*runiter)->medianTime() << "\t";
+	if((*runiter)->times.size()>0){
+		s << (*runiter)->medianTime() << "\t";
+	} else {
+		s << "-1\t";
+	}
 
 	// Print the times
 	std::vector<double>::iterator titer;
@@ -568,6 +602,82 @@ public:
   
 };
 
+
+/** A class that implements the Nelder Mead Simplex Optimization Algorithm */
+class simplexScheme {
+private:
+	typedef enum simplexStateEnumT {beginning, reflecting, expanding, contracting, evaluatingOne, evaluatingMany}  simplexStateT;
+
+	/// The indices into the allData->phases that correspond to the current simplex used one of the tuning schemes.
+	std::set<int> simplexIndices;
+	simplexStateT simplexState;
+
+	double alpha;
+
+	/// Phase that was the worst point in the simplex, and has recently been replaced by a newer point.
+	int previousWorstPhase;
+
+	/// The first phase that was used by the this scheme. This helps us ignore a few startup phases that are out of our control.
+	int firstSimplexPhase;
+
+
+public:
+
+	simplexScheme() :
+		simplexState(beginning),
+		alpha(0.5),
+		firstSimplexPhase(-1)
+	{
+
+	}
+
+	void adapt(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+
+	void doReflection(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+
+	int worstPhaseInSimplex(instrumentedData &allData);
+
+	std::vector<double> centroidOfSimplex(instrumentedData &allData, int ignorePoint=-1);
+	std::vector<double> pointCoords(instrumentedData &allData, int i);
+
+	inline int keepInRange(int v, int lb, int ub){
+		if(v < lb)
+			return lb;
+		if(v > ub)
+			return ub;
+		return v;
+	}
+
+	void printSimplex(instrumentedData &allData){
+		char s[2048];
+		s[0] = '\0';
+		for(std::set<int>::iterator iter = simplexIndices.begin(); iter != simplexIndices.end(); ++iter){
+			sprintf(s+strlen(s), "%d: ", *iter);
+
+			for(std::map<std::string,int>::iterator citer = allData.phases[*iter]->controlPoints.begin(); citer != allData.phases[*iter]->controlPoints.end(); ++citer){
+				sprintf(s+strlen(s), " %d", citer->second);
+			}
+
+			sprintf(s+strlen(s), "\n");
+		}
+		CkPrintf("Current simplex is:\n%s\n", s);
+	}
+
+
+	/// A helper routine to color my terminal output
+	void textcolor(int attr, int fg, int bg)
+	{	char command[13];
+
+		/* Command is the control command to the terminal */
+		sprintf(command, "%c[%d;%d;%dm", 0x1B, attr, fg + 30, bg + 40);
+		CkPrintf("%s", command);
+	}
+
+
+};
+
+
+
 class controlPointManager : public CBase_controlPointManager {
 public:
     
@@ -589,7 +699,9 @@ public:
   std::map<std::string,int> newControlPoints;
   int generatedPlanForStep;
 
+  simplexScheme s;
 
+  
   /// A user supplied callback to call when control point values are to be changed
   CkCallback granularityCallback;
   bool haveGranularityCallback;
