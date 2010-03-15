@@ -34,31 +34,6 @@
 #include "pathHistory.h" 
 
 
-
-
-#define RESET		0
-#define BRIGHT 		1
-#define DIM		2
-#define UNDERLINE 	3
-#define BLINK		4
-#define REVERSE		7
-#define HIDDEN		8
-
-#define BLACK 		0
-#define RED		1
-#define GREEN		2
-#define YELLOW		3
-#define BLUE		4
-#define MAGENTA		5
-#define CYAN		6
-#define	WHITE		7
-
-
-
-
-
-
-
 #include <cp_effects.h>
 
 /**
@@ -647,6 +622,7 @@ private:
 	// A set of phases for which (P_i+P_l)/2 ought to be evaluated
 	std::set<int> stillMustContractList;
 
+	bool useBestKnown;
 
 	void computeCentroidBestWorst(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
 
@@ -680,23 +656,13 @@ private:
 			CkPrintf("Current simplex is:\n%s\n", s);
 		}
 
-
-		/// A helper routine to color my terminal output
-		void textcolor(int attr, int fg, int bg)
-		{	char command[13];
-
-			/* Command is the control command to the terminal */
-			sprintf(command, "%c[%d;%d;%dm", 0x1B, attr, fg + 30, bg + 40);
-			CkPrintf("%s", command);
-		}
-
-
 public:
 
 	simplexScheme() :
 		simplexState(beginning),
 		alpha(1.0), beta(0.5), gamma(2.0),
-		firstSimplexPhase(-1)
+		firstSimplexPhase(-1),
+		useBestKnown(false)
 	{
 		// Make sure the coefficients are reasonable
 		CkAssert(alpha >= 0);

@@ -1685,7 +1685,12 @@ int controlPoint(const char *name, int lb, int ub){
 
 
 void simplexScheme::adapt(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData){
-	textcolor(BRIGHT, RED, WHITE);
+
+	if(useBestKnown){
+		CkPrintf("Simplex Tuning: Simplex algorithm is done, using best known phase:\n");
+		return;
+	}
+
 
 	if(firstSimplexPhase< 0){
 		firstSimplexPhase = allData.phases.size()-1;
@@ -1854,10 +1859,6 @@ void simplexScheme::adapt(std::map<std::string, std::pair<int,int> > & controlPo
 		CkAbort("Unknown simplexState");
 	}
 
-
-	textcolor(RESET, BLACK, WHITE);
-
-
 }
 
 
@@ -1935,6 +1936,34 @@ void simplexScheme::doReflection(std::map<std::string, std::pair<int,int> > & co
 
 	computeCentroidBestWorst(controlPointSpace, newControlPoints, phase_id, allData);
 
+
+	// Quit if the diameter of our simplex is small
+	double maxr = 0.0;
+	for(int i=0; i<n+1; i++){
+		//		Compute r^2 of this simplex point from the centroid
+		double r2 = 0.0;
+		std::vector<double> p = pointCoords(allData, i);
+		for(int d=0; d<p.size(); d++){
+			double r1 = (p[d] * centroid[d]);
+			r2 += r1*r1;
+		}
+		if(r2 > maxr)
+			maxr = r2;
+	}
+
+	if(maxr < 20){
+		useBestKnown = true;
+		instrumentedPhase *best = allData.findBest();
+		CkPrintf("Simplex Tuning: Simplex diameter is small, so switching over to best known phase:\n");
+
+		std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+		for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter) {
+			const std::string &name = cpsIter->first;
+			newControlPoints[name] =  best->controlPoints[name];
+		}
+	}
+
+
 	// Compute new point P* =(1+alpha)*centroid - alpha(worstPoint)
 
 	pPhase = allData.phases.size()-1;
@@ -1944,7 +1973,7 @@ void simplexScheme::doReflection(std::map<std::string, std::pair<int,int> > & co
 	}
 
 	for(int i=0; i<P.size(); i++){
-		CkPrintf("P dimension %d is %f\n", i, P[i]);
+		CkPrintf("Simplex Tuning: P dimension %d is %f\n", i, P[i]);
 	}
 
 
