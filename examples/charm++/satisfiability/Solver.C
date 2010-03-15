@@ -287,10 +287,6 @@ Solver::Solver(SolverState* state_msg)
         next_state->level = state_msg->level+1;
        
 
-        int nextlevel_priority;
-        
-        int priority = =tate_msg->priority;
-
         int lower = state_msg->lower;
         int higher = state_msg->higher;
         int middle = (lower+higher)/2;
