@@ -42,10 +42,12 @@ int ARMCI_Main_cpp(int argc,char **argv); /* prototype for C++ main routine */
 #define ARMCI_SWAP_LONG			4
 
 /* collective operations */
-#define ARMCI_INT      1
-#define ARMCI_LONG     2
-#define ARMCI_FLOAT    3
-#define ARMCI_DOUBLE   4
+#define ARMCI_NUM_DATATYPES 5
+#define ARMCI_INT      0
+#define ARMCI_LONG     1
+#define ARMCI_FLOAT    2
+#define ARMCI_DOUBLE   3
+#define ARMCI_LONG_LONG 4
   
 /* redefine global variables used by armci */
 #define armci_me TCHARM_Element()
