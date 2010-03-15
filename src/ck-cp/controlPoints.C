@@ -1723,36 +1723,124 @@ void simplexScheme::adapt(std::map<std::string, std::pair<int,int> > & controlPo
 
 	} else if (simplexState == reflecting){
 		const double recentPhaseTime = allData.phases[allData.phases.size()-2]->medianTime();
-		const double previousWorstPhaseTime = allData.phases[previousWorstPhase]->medianTime();
+		const double previousWorstPhaseTime = allData.phases[worstPhase]->medianTime();
 
-		CkPrintf("After reflecting, the median time for the phase is %f, previous worst phase %d time was %f\n", recentPhaseTime, previousWorstPhase, previousWorstPhaseTime);
+		// Find the highest time from other points in the simplex
+		double highestTimeForOthersInSimplex = 0.0;
+		for(std::set<int>::iterator iter = simplexIndices.begin(); iter != simplexIndices.end(); ++iter){
+			double t = allData.phases[*iter]->medianTime();
+			if(*iter != worstPhase && t > highestTimeForOthersInSimplex) {
+				highestTimeForOthersInSimplex = t;
+			}
+		}
 
-		// if y* < yl,  transition to "expanding"
+		CkPrintf("After reflecting, the median time for the phase is %f, previous worst phase %d time was %f\n", recentPhaseTime, worstPhase, previousWorstPhaseTime);
 
-		// else if y* > yi replace ph with something and transition to "contracting"
+		if(recentPhaseTime < highestTimeForOthersInSimplex){
+			// if y* < yl,  transition to "expanding"
+			doExpansion(controlPointSpace, newControlPoints, phase_id, allData);
 
-		// else if y* > yi replace ph with p* and transition to "evaluatingOne"
+		} else if (recentPhaseTime <= highestTimeForOthersInSimplex){
+			// else if y* <= yi replace ph with p* and transition to "evaluatingOne"
+			simplexIndices.erase(worstPhase);
+			simplexIndices.insert(pPhase);
+			CkAssert(simplexIndices.size() == n+1);
 
-	} else if (simplexState == evaluatingOne){
-		CkAbort("Simplex Tuning state Not yet implemented");
-		// A new configuration has been evaluated, the simplex has been updated
+		} else {
+			// if y* > yh
+			if(recentPhaseTime <= worstTime){
+				// replace Ph with P*
+				simplexIndices.erase(worstPhase);
+				simplexIndices.insert(pPhase);
+			}
+
+			// Now, form P** and do contracting phase
+
+
+
+
+		}
+
+	} else if (simplexState == doneExpanding){
+		const double recentPhaseTime = allData.phases[allData.phases.size()-2]->medianTime();
+		const double previousWorstPhaseTime = allData.phases[worstPhase]->medianTime();
+		// A new configuration has been evaluated
+
+		// Check to see if y** < y1
+		if(recentPhaseTime < bestTime){
+			// replace Ph by P**
+			simplexIndices.erase(worstPhase);
+			simplexIndices.insert(p2Phase);
+			CkAssert(simplexIndices.size() == n+1);
+		} else {
+			// 	replace Ph by P*
+			simplexIndices.erase(worstPhase);
+			simplexIndices.insert(pPhase);
+			CkAssert(simplexIndices.size() == n+1);
+		}
 
 		// Transition to reflecting state
 		doReflection(controlPointSpace, newControlPoints, phase_id, allData);
 
-	} else if (simplexState == evaluatingMany){
-		CkAbort("Simplex Tuning state Not yet implemented");
+	}  else if (simplexState == contracting){
+		const double recentPhaseTime = allData.phases[allData.phases.size()-2]->medianTime();
+		const double previousWorstPhaseTime = allData.phases[worstPhase]->medianTime();
+		// A new configuration has been evaluated
 
-		// store next configuration in newControlPoints
+		// Check to see if y** < y1
+		if(recentPhaseTime > worstTime){
+			// replace Ph by P**
+			simplexIndices.erase(worstPhase);
+			simplexIndices.insert(p2Phase);
+			CkAssert(simplexIndices.size() == n+1);
+		} else {
+			// 	conceptually we will replace all Pi by (Pi+Pl)/2, but there is nothing to store this until after we have tried all of them
+			simplexState = stillContracting;
 
-		// if one more is left after this next one, then transition to "evaluatingOne"
+			// A set of phases for which (P_i+P_l)/2 ought to be evaluated
+			stillMustContractList = simplexIndices;
 
-	} else if (simplexState == contracting){
-		CkAbort("Simplex Tuning state Not yet implemented");
+			CkPrintf("Simplex Tuning: Switched to state: stillContracting\n");
+		}
 
-		// if y** > yh,   replace all points in simplex with (pi+pl)/2, List all new points in an array, put one into newControlPoints, transition to evaluating many(or evaluatingOne if n is small)
+		// Transition to reflecting state
+		doReflection(controlPointSpace, newControlPoints, phase_id, allData);
 
-		// else, replace ph with p**. Store P** configuration in newControlPoints. Transition to "evaluatingOne"
+	} else if (simplexState == stillContracting){
+		CkPrintf("Simplex Tuning: stillContracting found %d configurations left to try\n", stillMustContractList.size());
+
+		if(stillMustContractList.size()>0){
+			int c = *stillMustContractList.begin();
+			stillMustContractList.erase(c);
+			CkPrintf("Simplex Tuning: stillContracting evaluating configuration derived from phase %d\n", c);
+
+			std::vector<double> cPhaseConfig = pointCoords(allData, c);
+
+			// Evaluate point P by storing new configuration in newControlPoints, and by transitioning to "reflecting" state
+			int v = 0;
+			for(std::map<std::string, std::pair<int,int> >::iterator cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+				const std::string &name = cpsIter->first;
+				const std::pair<int,int> &bounds = cpsIter->second;
+				const int lb = bounds.first;
+				const int ub = bounds.second;
+
+				double val = (cPhaseConfig[v] + best[v])/2.0;
+
+				newControlPoints[name] = keepInRange(val,lb,ub);
+				CkPrintf("Simplex Tuning: v=%d Reflected worst %d %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
+				v++;
+			}
+		} else {
+			// We have tried all configurations. We should update the simplex to refer to all the newly tried configurations, and start over
+
+			for(int i=0; i<n+1; i++){
+				simplexIndices.insert(allData.phases.size()-2-i);
+			}
+
+			// Transition to reflecting state
+			doReflection(controlPointSpace, newControlPoints, phase_id, allData);
+
+		}
 
 
 	} else if (simplexState == expanding){
@@ -1762,6 +1850,8 @@ void simplexScheme::adapt(std::map<std::string, std::pair<int,int> > & controlPo
 
 		// else, replace ph with p*. Transition to "evaluatingOne"
 
+	} else {
+		CkAbort("Unknown simplexState");
 	}
 
 
@@ -1772,6 +1862,70 @@ void simplexScheme::adapt(std::map<std::string, std::pair<int,int> > & controlPo
 
 
 
+void simplexScheme::computeCentroidBestWorst(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData){
+	int n = controlPointSpace.size();
+
+	// Find worst performing point in the simplex
+	worstPhase = -1;
+	worstTime = -1.0;
+	bestPhase = 10000000;
+	bestTime = 10000000;
+	for(std::set<int>::iterator iter = simplexIndices.begin(); iter != simplexIndices.end(); ++iter){
+		double t = allData.phases[*iter]->medianTime();
+		if(t > worstTime){
+			worstTime = t;
+			worstPhase = *iter;
+		}
+		if(t < bestTime){
+			bestTime = t;
+			bestPhase = *iter;
+		}
+	}
+	CkAssert(worstTime != -1.0 && worstPhase != -1 && bestTime != 10000000 && bestPhase != 10000000);
+
+	worst = pointCoords(allData, worstPhase);
+	CkAssert(worst.size() == n);
+
+
+	// Calculate centroid of the remaining points in the simplex
+	centroid.resize(n);
+	for(int i=0; i<n; i++){
+		centroid[i] = 0.0;
+	}
+
+	int numPts = 0;
+
+	for(std::set<int>::iterator iter = simplexIndices.begin(); iter != simplexIndices.end(); ++iter){
+		if(*iter != worstPhase){
+			numPts ++;
+			// Accumulate into the result vector
+			int c = 0;
+			for(std::map<std::string,int>::iterator citer = allData.phases[*iter]->controlPoints.begin(); citer != allData.phases[*iter]->controlPoints.end(); ++citer){
+				centroid[c] += citer->second;
+				c++;
+			}
+
+		}
+	}
+
+	// Now divide the sums by the number of points.
+	for(int v = 0; v<centroid.size(); v++) {
+		centroid[v] /= (double)numPts;
+	}
+
+	CkAssert(centroid.size() == n);
+
+	for(int i=0; i<centroid.size(); i++){
+		CkPrintf("Centroid dimension %d is %f\n", i, centroid[i]);
+	}
+
+
+}
+
+
+
+
+
 /** Replace the worst point with its reflection across the centroid. */
 void simplexScheme::doReflection(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData){
 
@@ -1779,24 +1933,14 @@ void simplexScheme::doReflection(std::map<std::string, std::pair<int,int> > & co
 
 	printSimplex(allData);
 
-	// Find worst performing point in the simplex
-	int h = worstPhaseInSimplex(allData);
-	std::vector<double> worst = pointCoords(allData, h);
-	CkAssert(worst.size() == n);
+	computeCentroidBestWorst(controlPointSpace, newControlPoints, phase_id, allData);
 
-	// Calculate centroid of the remaining points in the simplex
-	std::vector<double> centroid = centroidOfSimplex(allData, h);
-	CkAssert(centroid.size() == n);
+	// Compute new point P* =(1+alpha)*centroid - alpha(worstPoint)
 
-	// Compute new point P=(1+alpha)*centroid - alpha(worstPoint)
-
-	for(int i=0; i<centroid.size(); i++){
-		CkPrintf("Centroid dimension %d is %f\n", i, centroid[i]);
-	}
-
-	std::vector<double> P;
+	pPhase = allData.phases.size()-1;
+	P.resize(n);
 	for(int i=0; i<n; i++){
-		P.push_back( (1.0+alpha) * centroid[i] - alpha * worst[i] );
+		P[i] = (1.0+alpha) * centroid[i] - alpha * worst[i] ;
 	}
 
 	for(int i=0; i<P.size(); i++){
@@ -1812,11 +1956,10 @@ void simplexScheme::doReflection(std::map<std::string, std::pair<int,int> > & co
 		const int lb = bounds.first;
 		const int ub = bounds.second;
 		newControlPoints[name] = keepInRange(P[v],lb,ub);
-		CkPrintf("Simplex Tuning: v=%d Reflected worst %d %s -> %f (ought to be %f )\n", (int)v, (int)h, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
+		CkPrintf("Simplex Tuning: v=%d Reflected worst %d %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
 		v++;
 	}
 
-	previousWorstPhase = h;
 
 	// Transition to "reflecting" state
 	simplexState = reflecting;
@@ -1825,53 +1968,88 @@ void simplexScheme::doReflection(std::map<std::string, std::pair<int,int> > & co
 }
 
 
-/** Linearly scan through points in simplex to find one with worst performance. Returns a phase index, not an index into the simplex. */
-int simplexScheme::worstPhaseInSimplex(instrumentedData &allData) {
-	double maxTimeSoFar = -1.0;
-	int maxSoFar = -1;
-	for(std::set<int>::iterator iter = simplexIndices.begin(); iter != simplexIndices.end(); ++iter){
 
-		CkPrintf("Simplex Tuning: allData.phases[%d]->times.size()=%d\n", *iter, allData.phases[*iter]->times.size());
 
-		fflush(0);
-		double t = allData.phases[*iter]->medianTime();
-		if(t > maxTimeSoFar){
-			maxTimeSoFar = t;
-			maxSoFar = *iter;
-		}
+/** Replace the newly tested reflection with a further expanded version of itself. */
+void simplexScheme::doExpansion(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData){
+	int n = controlPointSpace.size();
+	printSimplex(allData);
+
+	// Note that the original Nelder Mead paper has an error when it displays the equation for P** in figure 1.
+	// I believe the equation for P** in the text on page 308 is correct.
+
+	// Compute new point P2 = (1+gamma)*P - gamma(centroid)
+
+
+	p2Phase = allData.phases.size()-1;
+	P2.resize(n);
+	for(int i=0; i<n; i++){
+		P2[i] = ( (1.0+gamma) * P[i] - gamma * centroid[i] );
 	}
-	CkAssert(maxSoFar != -1);
-	return maxSoFar;
+
+	for(int i=0; i<P2.size(); i++){
+		CkPrintf("P2 aka P** dimension %d is %f\n", i, P2[i]);
+	}
+
+
+	// Evaluate point P** by storing new configuration in newControlPoints, and by transitioning to "reflecting" state
+	int v = 0;
+	for(std::map<std::string, std::pair<int,int> >::iterator cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+		const std::string &name = cpsIter->first;
+		const std::pair<int,int> &bounds = cpsIter->second;
+		const int lb = bounds.first;
+		const int ub = bounds.second;
+		newControlPoints[name] = keepInRange(P2[v],lb,ub);
+		CkPrintf("Simplex Tuning: v=%d Expanding %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
+		v++;
+	}
+
+
+	// Transition to "doneExpanding" state
+	simplexState = doneExpanding;
+	CkPrintf("Simplex Tuning: Switched to state: doneExpanding\n");
+
 }
 
-/** Compute the centroid of all points in the simplex, exclude the specified point if it is provided. */
-std::vector<double> simplexScheme::centroidOfSimplex(instrumentedData &allData, int ignorePoint){
-	std::vector<double> result;
-	int numPts = 0;
 
-	for(std::set<int>::iterator iter = simplexIndices.begin(); iter != simplexIndices.end(); ++iter){
-		if(*iter != ignorePoint){
-			// initialize result first time
-			while(result.size() < allData.phases[*iter]->controlPoints.size())
-				result.push_back(0.0);
 
-			numPts ++;
-			// Accumulate into the result vector
-			int c = 0;
-			for(std::map<std::string,int>::iterator citer = allData.phases[*iter]->controlPoints.begin(); citer != allData.phases[*iter]->controlPoints.end(); ++citer){
-				result[c] += citer->second;
-				c++;
-			}
 
-		}
+/** Replace the newly tested reflection with a further expanded version of itself. */
+void simplexScheme::doContraction(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData){
+	int n = controlPointSpace.size();
+	printSimplex(allData);
+
+	// Compute new point P2 = beta*Ph + (1-beta)*centroid
+
+
+	p2Phase = allData.phases.size()-1;
+	P2.resize(n);
+	for(int i=0; i<n; i++){
+		P2[i] = ( beta*worst[i] + (1.0-beta)*centroid[i] );
 	}
 
-	// Now divide the sums by the number of points.
-	for(int v = 0; v<result.size(); v++){
-		result[v] /= (double)numPts;
+	for(int i=0; i<P2.size(); i++){
+		CkPrintf("P2 aka P** dimension %d is %f\n", i, P2[i]);
 	}
 
-	return result;
+
+	// Evaluate point P** by storing new configuration in newControlPoints, and by transitioning to "reflecting" state
+	int v = 0;
+	for(std::map<std::string, std::pair<int,int> >::iterator cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+		const std::string &name = cpsIter->first;
+		const std::pair<int,int> &bounds = cpsIter->second;
+		const int lb = bounds.first;
+		const int ub = bounds.second;
+		newControlPoints[name] = keepInRange(P2[v],lb,ub);
+		CkPrintf("Simplex Tuning: v=%d Contracting %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
+		v++;
+	}
+
+
+	// Transition to "contracting" state
+	simplexState = contracting;
+	CkPrintf("Simplex Tuning: Switched to state: contracting\n");
+
 }
 
 

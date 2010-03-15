@@ -606,73 +606,105 @@ public:
 /** A class that implements the Nelder Mead Simplex Optimization Algorithm */
 class simplexScheme {
 private:
-	typedef enum simplexStateEnumT {beginning, reflecting, expanding, contracting, evaluatingOne, evaluatingMany}  simplexStateT;
+	typedef enum simplexStateEnumT {beginning, reflecting, expanding, contracting, doneExpanding, stillContracting}  simplexStateT;
 
 	/// The indices into the allData->phases that correspond to the current simplex used one of the tuning schemes.
 	std::set<int> simplexIndices;
 	simplexStateT simplexState;
 
+	 /// Reflection coefficient
 	double alpha;
+	// Contraction coefficient
+	double beta;
+	// Expansion coefficient
+	double gamma;
 
-	/// Phase that was the worst point in the simplex, and has recently been replaced by a newer point.
-	int previousWorstPhase;
 
 	/// The first phase that was used by the this scheme. This helps us ignore a few startup phases that are out of our control.
 	int firstSimplexPhase;
+
+	// Worst performing point in the simplex
+	int worstPhase;
+	double worstTime;
+	std::vector<double> worst; // p_h
+
+	// Centroid of remaining points in the simplex
+	std::vector<double> centroid;
+
+	// Best performing point in the simplex
+	int bestPhase;
+	double bestTime;
+	std::vector<double> best;
+
+	// P*
+	std::vector<double> P;
+	int pPhase;
+
+	// P**
+	std::vector<double> P2;
+	int p2Phase;
+
+	// A set of phases for which (P_i+P_l)/2 ought to be evaluated
+	std::set<int> stillMustContractList;
+
+
+	void computeCentroidBestWorst(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+
+	void doReflection(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+	void doExpansion(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+	void doContraction(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+
+
+	std::vector<double> pointCoords(instrumentedData &allData, int i);
+
+		inline int keepInRange(int v, int lb, int ub){
+			if(v < lb)
+				return lb;
+			if(v > ub)
+				return ub;
+			return v;
+		}
+
+		void printSimplex(instrumentedData &allData){
+			char s[2048];
+			s[0] = '\0';
+			for(std::set<int>::iterator iter = simplexIndices.begin(); iter != simplexIndices.end(); ++iter){
+				sprintf(s+strlen(s), "%d: ", *iter);
+
+				for(std::map<std::string,int>::iterator citer = allData.phases[*iter]->controlPoints.begin(); citer != allData.phases[*iter]->controlPoints.end(); ++citer){
+					sprintf(s+strlen(s), " %d", citer->second);
+				}
+
+				sprintf(s+strlen(s), "\n");
+			}
+			CkPrintf("Current simplex is:\n%s\n", s);
+		}
+
+
+		/// A helper routine to color my terminal output
+		void textcolor(int attr, int fg, int bg)
+		{	char command[13];
+
+			/* Command is the control command to the terminal */
+			sprintf(command, "%c[%d;%d;%dm", 0x1B, attr, fg + 30, bg + 40);
+			CkPrintf("%s", command);
+		}
 
 
 public:
 
 	simplexScheme() :
 		simplexState(beginning),
-		alpha(0.5),
+		alpha(1.0), beta(0.5), gamma(2.0),
 		firstSimplexPhase(-1)
 	{
-
+		// Make sure the coefficients are reasonable
+		CkAssert(alpha >= 0);
+		CkAssert(beta >= 0.0 && beta <= 1.0);
+		CkAssert(gamma >= 1.0);
 	}
 
 	void adapt(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
-
-	void doReflection(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
-
-	int worstPhaseInSimplex(instrumentedData &allData);
-
-	std::vector<double> centroidOfSimplex(instrumentedData &allData, int ignorePoint=-1);
-	std::vector<double> pointCoords(instrumentedData &allData, int i);
-
-	inline int keepInRange(int v, int lb, int ub){
-		if(v < lb)
-			return lb;
-		if(v > ub)
-			return ub;
-		return v;
-	}
-
-	void printSimplex(instrumentedData &allData){
-		char s[2048];
-		s[0] = '\0';
-		for(std::set<int>::iterator iter = simplexIndices.begin(); iter != simplexIndices.end(); ++iter){
-			sprintf(s+strlen(s), "%d: ", *iter);
-
-			for(std::map<std::string,int>::iterator citer = allData.phases[*iter]->controlPoints.begin(); citer != allData.phases[*iter]->controlPoints.end(); ++citer){
-				sprintf(s+strlen(s), " %d", citer->second);
-			}
-
-			sprintf(s+strlen(s), "\n");
-		}
-		CkPrintf("Current simplex is:\n%s\n", s);
-	}
-
-
-	/// A helper routine to color my terminal output
-	void textcolor(int attr, int fg, int bg)
-	{	char command[13];
-
-		/* Command is the control command to the terminal */
-		sprintf(command, "%c[%d;%d;%dm", 0x1B, attr, fg + 30, bg + 40);
-		CkPrintf("%s", command);
-	}
-
 
 };
 
