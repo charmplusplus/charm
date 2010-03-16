@@ -36,6 +36,8 @@ module armci {
 				int count[stride_levels+1], int stride_levels, int nbytes, char data[nbytes], int hdl);
 		entry void putDataFromGets(ArmciStridedMsg* msg);
 
+		entry void recvMsgBcast(int len, char buffer[len], int root);
+
 		entry void mallocClient(CkReductionMsg *msg);
 		entry void checkpoint(int len, char dname[len]);
     		entry void resumeThread();

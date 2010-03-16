@@ -12,6 +12,6 @@ otherlibs: charmlibs
 	cd other; $(MAKE) all OPTS='$(OPTS)'
 
 clean:
-	cd conv-libs; make clean
-	cd ck-libs; make clean
-	cd other; make clean
+	cd conv-libs; $(MAKE) clean
+	cd ck-libs; $(MAKE) clean
+	cd other; $(MAKE) clean

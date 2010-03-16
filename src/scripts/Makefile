@@ -1136,10 +1136,10 @@ clean:
 	rm -f core #*#
 	rm -f core *~
 	if [ -d charmrun ] ; then ( cd charmrun; make clean ) ; fi
-	-( cd doc && make clean )
-	( cd libs; make clean )
-	( cd ../examples && make clean )
-	( cd ../tests && make clean )
+	-( cd doc && $(MAKE) clean )
+	( cd libs; $(MAKE) clean )
+	( cd ../examples && $(MAKE) clean )
+	( cd ../tests && $(MAKE) clean )
 
 veryclean:
 	rm -rf ../bin
