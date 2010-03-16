@@ -100,7 +100,7 @@ Architecture-specific changes
 --------------------------------------------------------------------------------
 
 Net-*
- - Can run jobs with more than 1024 PEs when built with -DCMK_USE_POLL
+ - Can run jobs with more than 1024 PEs
 
 Net-Linux
  - New charmrun option ++no-va-randomization to disable address space
