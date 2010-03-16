@@ -21,12 +21,12 @@
 
 
 /** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
-int replaySystem = 0;
+int _replaySystem = 0;
 
 #if CMK_REPLAYSYSTEM
 
 int ConverseDeliver() {
-  return !replaySystem;
+  return !_replaySystem;
 }
 #endif
 

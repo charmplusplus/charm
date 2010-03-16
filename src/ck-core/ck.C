@@ -1294,7 +1294,7 @@ void _skipCldHandler(void *converseMsg)
 void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {
 #if CMK_REPLAYSYSTEM
-  if (replaySystem) {
+  if (_replaySystem) {
     CmiFree(env);
     return;
   }
@@ -1361,7 +1361,7 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 static void _noCldEnqueueMulti(int npes, int *pes, envelope *env)
 {
 #if CMK_REPLAYSYSTEM
-  if (replaySystem) {
+  if (_replaySystem) {
     CmiFree(env);
     return;
   }
@@ -1379,7 +1379,7 @@ static void _noCldEnqueue(int pe, envelope *env)
   } else
 */
 #if CMK_REPLAYSYSTEM
-  if (replaySystem) {
+  if (_replaySystem) {
     CmiFree(env);
     return;
   }
@@ -1401,7 +1401,7 @@ void _noCldNodeEnqueue(int node, envelope *env)
   } else {
 */
 #if CMK_REPLAYSYSTEM
-  if (replaySystem) {
+  if (_replaySystem) {
     CmiFree(env);
     return;
   }
@@ -2291,7 +2291,7 @@ static FILE *openReplayFile(const char *prefix, const char *suffix, const char *
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     CmiBool forceReplay = CmiFalse;
     char *procs = NULL;
-    replaySystem = 0;
+    _replaySystem = 0;
 	REPLAYDEBUG("CkMessageWatcherInit ");
     if (CmiGetArgStringDesc(argv,"+record-detail",&procs,"Record full message content for the specified processors")) {
         CkListString list(procs);
@@ -2317,7 +2317,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 #else
 	    CkAbort("+replay-detail available only for non-SMP build");
 #endif
-	    replaySystem = 1;
+	    _replaySystem = 1;
 	    ck->addWatcher(new CkMessageDetailReplay(openReplayFile("ckreplay_",".detail","r")));
 	}
     if (CmiGetArgFlagDesc(argv,"+replay","Replay recorded message stream") || forceReplay) {

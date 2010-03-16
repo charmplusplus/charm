@@ -26,32 +26,32 @@
 #endif
 
 // Flag that tells the system if we are replaying using Record/Replay
-extern int replaySystem;
+extern int _replaySystem;
 
 #if CMK_REPLAYSYSTEM
 inline void _CldEnqueue(int pe, void *msg, int infofn) {
-  if (replaySystem) {
+  if (_replaySystem) {
     CmiFree(msg);
     return;
   }
   CldEnqueue(pe, msg, infofn);
 }
 inline void _CldEnqueueMulti(int npes, int *pes, void *msg, int infofn) {
-  if (replaySystem) {
+  if (_replaySystem) {
     CmiFree(msg);
     return;
   }
   CldEnqueueMulti(npes, pes, msg, infofn);
 }
 inline void _CldEnqueueGroup(CmiGroup grp, void *msg, int infofn) {
-  if (replaySystem) {
+  if (_replaySystem) {
     CmiFree(msg);
     return;
   }
   CldEnqueueGroup(grp, msg, infofn);
 }
 inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
-  if (replaySystem) {
+  if (_replaySystem) {
     CmiFree(msg);
     return;
   }
