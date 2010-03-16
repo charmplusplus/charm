@@ -157,7 +157,7 @@ static void extract_args(char **argv)
   if (CmiGetArgIntDesc(argv,"+delay_retransmit",&ms, "Milliseconds to wait before retransmit"))
 	  Cmi_delay_retransmit=0.001*ms;
   if (CmiGetArgIntDesc(argv,"+ack_delay",&ms, "Milliseconds to wait before ack'ing"))
-	  Cmi_delay_retransmit=0.001*ms;
+	  Cmi_ack_delay=0.001*ms;
   extract_common_args(argv);
   Cmi_dgram_max_data = Cmi_max_dgram_size - DGRAM_HEADER_SIZE;
   Cmi_half_window = Cmi_window_size >> 1;
