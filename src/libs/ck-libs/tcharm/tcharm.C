@@ -231,7 +231,7 @@ void TCharm::pup(PUP::er &p) {
 #ifndef CMK_OPTIMIZE
   DBG("Packing thread");
   if (!isStopped && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
-    if(BgOutOfCoreFlag==0) //not doing out-of-core scheduling
+    if(_BgOutOfCoreFlag==0) //not doing out-of-core scheduling
 	CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
   }	
   if (tcharm_nomig) CkAbort("Cannot migrate with the +tcharm_nomig option!\n");
