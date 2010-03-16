@@ -28,7 +28,7 @@ typedef struct {
 	CkVec<int> funcList;
 } vprocData;
 
-CkVec<funcData *> funcTable; /*stores the name and index for the different functions (might add somethings later on)*/
+CkVec<funcData *> _funcTable; /*stores the name and index for the different functions (might add somethings later on)*/
 CkVec<vprocData *> vprocTable; /*stores the activation stack (only those functions that are being traced) for each virtual processor*/
 
 extern "C" void initAmpiProjections(){
@@ -87,15 +87,15 @@ extern "C" void ampi_msgSend(int tag,int dest,int count,int size){
 
 
 extern "C" int ampi_registerFunc(char *funcName){
-	for(int i=0;i<funcTable.size();i++){
-		if(strcmp(funcTable[i]->funcName,funcName)==0){
-			return funcTable[i]->funcNo;
+	for(int i=0;i<_funcTable.size();i++){
+		if(strcmp(_funcTable[i]->funcName,funcName)==0){
+			return _funcTable[i]->funcNo;
 		}
 	}
 	funcData *funcElem = new funcData;
-	funcElem->funcNo = funcTable.size();
+	funcElem->funcNo = _funcTable.size();
 	funcElem->funcName = funcName;
-	funcTable.push_back(funcElem);
+	_funcTable.push_back(funcElem);
 	return funcElem->funcNo;
 }
 
@@ -115,7 +115,7 @@ extern "C" void ampi_beginFunc(int funcNo,MPI_Comm comm){
 	int iData[2];
 	iData[0] = myindex;
 	iData[1] = funcNo;
-	LogEvent3(_AMPI_LANG_ID,_E_AMPI_BEGIN_FUNC,2,iData,strlen(funcTable[funcNo]->funcName)+1,funcTable[funcNo]->funcName);
+	LogEvent3(_AMPI_LANG_ID,_E_AMPI_BEGIN_FUNC,2,iData,strlen(_funcTable[funcNo]->funcName)+1,_funcTable[funcNo]->funcName);
 }
 
 
