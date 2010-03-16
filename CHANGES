@@ -99,6 +99,9 @@ BigSim
 Architecture-specific changes
 --------------------------------------------------------------------------------
 
+Net-*
+ - Can run jobs with more than 1024 PEs when built with -DCMK_USE_POLL
+
 Net-Linux
  - New charmrun option ++no-va-randomization to disable address space
    randomization (ASLR). This is most useful for running AMPI with
