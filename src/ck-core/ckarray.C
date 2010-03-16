@@ -60,7 +60,7 @@ Orion Sky Lawlor, olawlor@acm.org
 
 CpvDeclare(int ,serializer);
 
-CmiBool isAnytimeMigration;
+CmiBool _isAnytimeMigration;
 
 #define ARRAY_DEBUG_OUTPUT 0
 
@@ -883,7 +883,7 @@ CkArrayBroadcaster::~CkArrayBroadcaster()
 void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 {
   bcastNo++;
-  if (isAnytimeMigration) {
+  if (_isAnytimeMigration) {
     DEBB((AA"Received broadcast %d\n"AB,bcastNo));
     CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
     oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
@@ -911,7 +911,7 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
 /// Deliver all needed broadcasts to the given local element
 CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 {
-  if (! isAnytimeMigration) return CmiTrue;
+  if (! _isAnytimeMigration) return CmiTrue;
   int &elBcastNo=getData(el);
   if (elBcastNo<bcastNo)
   {//This element needs some broadcasts-- it must have
@@ -941,7 +941,7 @@ CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 
 void CkArrayBroadcaster::springCleaning(void)
 {
-  if (! isAnytimeMigration) return;
+  if (! _isAnytimeMigration) return;
   //Remove old broadcast messages
   int nDelete=oldBcasts.length()-(bcastNo-oldBcastNo);
   if (nDelete>0) {
@@ -1091,7 +1091,7 @@ void CkArray::recvBroadcast(CkMessage *m)
                 BgSplitEntry("end-broadcast", logs.getVec(), logs.size());
   		startVTimer();
 #endif
-	if (! isAnytimeMigration) {
+	if (! _isAnytimeMigration) {
 	  delete msg;
 	}
 }
