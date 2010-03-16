@@ -1807,8 +1807,8 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #endif
 
 /* The flag tells whether we are in the process of doing out-of-core emulation in BigSim */
-extern int BgOutOfCoreFlag;
-extern int BgInOutOfCoreMode;
+extern int _BgOutOfCoreFlag;
+extern int _BgInOutOfCoreMode;
 
 #ifdef ADAPT_SCHED_MEM
 extern int numMemCriticalEntries;

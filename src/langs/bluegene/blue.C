@@ -1520,7 +1520,7 @@ CmiStartFn bgMain(int argc, char **argv)
     }
   if (CmiGetArgDoubleDesc(argv, "+bgooc", &bgOOCMaxMemSize, "Simulate with out-of-core support and the threshhold of memory size")){
       bgUseOutOfCore = 1;
-      BgInOutOfCoreMode = 1; //the global (the whole converse layer) out-of-core flag
+      _BgInOutOfCoreMode = 1; //the global (the whole converse layer) out-of-core flag
 
       double curFreeMem = bgGetSysFreeMemSize();
       if(fabs(bgOOCMaxMemSize - 0.0)<=1e-6){

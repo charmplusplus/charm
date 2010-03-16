@@ -1660,7 +1660,7 @@ void CkLocMgr::flushAllRecs(void)
       //In the case of taking core out of memory (in BigSim's emulation)
       //the meta data in the location manager are not deleted so we need
       //this condition
-      if(BgOutOfCoreFlag!=1){
+      if(_BgOutOfCoreFlag!=1){
         hash.remove(*(CkArrayIndexMax *)&idx);
         delete rec;
         it->seek(-1);//retry this hash slot
@@ -2004,7 +2004,7 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 		//objects are not actually deleted but on disk. If deleted, msgs
 		//that seeking where is the object will be accumulated (a circular
 		//msg chain) and causes the program no progress
-		if(BgOutOfCoreFlag==1) return; 
+		if(_BgOutOfCoreFlag==1) return; 
 	    #endif
 		int home=homePe(idx);
 		if (home!=CkMyPe())
@@ -2576,7 +2576,7 @@ void CkLocMgr::restore(const CkArrayIndex &idx, PUP::er &p)
 	//informHome should not be called since such information is already
 	//immediately updated real migration
 #ifndef CMK_OPTIMIZE
-	if(BgOutOfCoreFlag!=2)
+	if(_BgOutOfCoreFlag!=2)
 	    CmiAbort("CkLocMgr::restore should only be used in out-of-core emulation for BigSim and be called when object is brought into memory!\n");
 #endif
 	CkLocRec_local *rec=createLocal(idx,CmiFalse,CmiFalse,CmiFalse);

@@ -3446,8 +3446,8 @@ unsigned char computeCheckSum(unsigned char *data, int len)
 }
 
 /* Flag for bigsim's out-of-core emulation */
-int BgOutOfCoreFlag=0; /*indicate the type of memory operation (in or out) */
-int BgInOutOfCoreMode=0; /*indicate whether the emulation is in the out-of-core emulation mode */
+int _BgOutOfCoreFlag=0; /*indicate the type of memory operation (in or out) */
+int _BgInOutOfCoreMode=0; /*indicate whether the emulation is in the out-of-core emulation mode */
 
 #if !CMK_HAS_LOG2
 unsigned int CmiLog2(unsigned int val) {
