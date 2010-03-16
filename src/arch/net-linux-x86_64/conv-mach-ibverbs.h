@@ -33,4 +33,4 @@
 
 
 #undef CMK_IBVERBS_FAST_START
-#define CMK_IBVERBS_FAST_START                         1
+#define CMK_IBVERBS_FAST_START                         0

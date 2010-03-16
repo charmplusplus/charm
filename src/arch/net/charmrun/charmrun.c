@@ -1240,7 +1240,7 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 	for (pe=0;pe<nodetab_cpus(nt);pe++){
 		nodetab_table[nt+pe]->ctrlfd=ctrlfd;
 	}
-	printf("Charmrun> client %d connected\n", nt);
+	/* printf("Charmrun> client %d connected\n", nt); */
 #else
 	dataport = ChMessageInt(i.dataport);
 	if (0==dataport)
@@ -2080,12 +2080,27 @@ void req_set_client_connect(int start,int end) {
 	for(i=0;i<(end-start);i++)
 		finished[i]=0;
 
+#if CMK_USE_IBVERBS && !CMK_IBVERBS_FAST_START
+    	for (i=start;i<end;i++) {
+		errorcheck_one_client_connect(curclientend++);
+	}	 
+	if (req_nClients > 1) {
+          	/*  a barrier to make sure infiniband device gets initialized */
+    		for (i=start;i<end;i++) 
+			ChMessage_recv(req_clients[i],&msg);
+    		for (i=start;i<end;i++)
+			req_reply(req_clients[i], "barrier", "", 1);
+	}
+#endif
+
 	done=0;
 	while(!done) {
 		/* check server socket for messages */
+#if ! CMK_USE_IBVERBS || CMK_IBVERBS_FAST_START
 		while(curclientstart==curclientend||skt_select1(server_fd,1)!=0) {
 			errorcheck_one_client_connect(curclientend++);
 		}
+#endif
 		/* check appropriate clients for messages */
 		for(client=curclientstart;client<curclientend;client++)
 			if(req_clients[client]>0) {
