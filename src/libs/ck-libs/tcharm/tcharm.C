@@ -580,13 +580,13 @@ CkArrayID TCHARM_Get_threads(void) {
 /************* Startup/Shutdown Coordination Support ************/
 
 // Useless values to reduce over:
-int vals[2]={0,1};
+int _vals[2]={0,1};
 
 //Called when we want to go to a barrier
 void TCharm::barrier(void) {
 	//Contribute to a synchronizing reduction
 	CkCallback cb(index_t::atBarrier(0), thisProxy[0]);
-	contribute(sizeof(vals),&vals,CkReduction::sum_int,cb);
+	contribute(sizeof(_vals),&_vals,CkReduction::sum_int,cb);
 #if CMK_BLUEGENE_CHARM
         void *curLog;		// store current log in timeline
         _TRACE_BG_TLINE_END(&curLog);
@@ -612,7 +612,7 @@ void TCharm::done(void) {
 	if (exitWhenDone) {
 		//Contribute to a synchronizing reduction
 		CkCallback cb(index_t::atExit(0), thisProxy[0]);
-		contribute(sizeof(vals),&vals,CkReduction::sum_int,cb);
+		contribute(sizeof(_vals),&_vals,CkReduction::sum_int,cb);
 	}
 	isSelfDone = true;
 	stop();
