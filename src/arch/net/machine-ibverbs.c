@@ -3210,6 +3210,10 @@ void processDirectWC(struct infiRdmaPacket *rdmaPacket){
 };
 */
 
+#if 0
+
+// use the common one
+
 static void sendBarrierMessage(int pe)
 {
   /* we will only need one packet */
@@ -3397,3 +3401,5 @@ int CmiBarrierZero()
   processAllBufferedMsgs();
 }
 
+
+#endif
