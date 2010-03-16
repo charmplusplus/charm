@@ -1284,7 +1284,7 @@ void ampi::pup(PUP::er &p)
 
 ampi::~ampi()
 {
-  if (CkInRestarting() || BgOutOfCoreFlag==1) {
+  if (CkInRestarting() || _BgOutOfCoreFlag==1) {
     // in restarting, we need to flush messages
     int tags[3], sts[3];
     tags[0] = tags[1] = tags[2] = CmmWildCard;
@@ -3150,7 +3150,7 @@ int IReq::wait(MPI_Status *sts){
 		//Because of the out-of-core emulation, this pointer is changed after in-out
 		//memory operation. So we need to return from this function and do the while loop
 		//in the outer function call.	
-		if(BgInOutOfCoreMode)
+		if(_BgInOutOfCoreMode)
 		    return -1;
 	    #endif	
 	}   // end of while
@@ -3224,7 +3224,7 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
   do{
     AmpiRequest *waitReq = (*reqs)[*request];
     waitResult = waitReq->wait(sts);
-    if(BgInOutOfCoreMode){
+    if(_BgInOutOfCoreMode){
 	reqs = getReqs();
     }
   }while(waitResult==-1);
@@ -3301,7 +3301,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
       do{	
 	AmpiRequest *waitReq = ((*reqs)[request[((*reqvec)[i])[j]]]);
 	waitResult = waitReq->wait(&sts[((*reqvec)[i])[j]]);
-	if(BgInOutOfCoreMode){
+	if(_BgInOutOfCoreMode){
 	    reqs = getReqs();
 	    reqvec = vecIndex(count, request);
 	}

@@ -234,7 +234,7 @@ CK_REDUCTION_CONTRIBUTE_METHODS_DEF(ArrayElement,thisArray,
 /// Remote method: calls destructor
 void ArrayElement::ckDestroy(void)
 {
-	if(BgOutOfCoreFlag!=1){ //in case of taking core out of memory
+	if(_BgOutOfCoreFlag!=1){ //in case of taking core out of memory
 	    CK_ARRAYLISTENER_LOOP(thisArray->listeners,
 			   l->ckElementDied(this));
 	}

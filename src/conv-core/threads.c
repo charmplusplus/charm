@@ -510,7 +510,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 	 * When unpacking, reset the thread pointer in token to this thread.
 	 */
 	  
-        if(BgOutOfCoreFlag!=0){
+        if(_BgOutOfCoreFlag!=0){
 	    pup_bytes(p, &t->token, sizeof(void *));
 	    if(!pup_isUnpacking(p)){
 		t->token->thread = NULL;
@@ -518,7 +518,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 	    pup_int(p, &t->scheduled);
 	}
 	if(pup_isUnpacking(p)){
-		if(BgOutOfCoreFlag==0){
+		if(_BgOutOfCoreFlag==0){
 		    t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
 		    t->token->thread = S(t);
 		    t->token->serialNo = CpvAccess(Cth_serialNo)++;
@@ -542,7 +542,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 	}
 	
 	/*BIGSIM_OOC DEBUGGING */
-	/*if(BgOutOfCoreFlag!=0){
+	/*if(_BgOutOfCoreFlag!=0){
 	   if(pup_isUnpacking(p)){
 		CmiPrintf("Unpacking: ");
 	    }else{
