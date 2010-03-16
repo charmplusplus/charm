@@ -185,7 +185,7 @@ CsvDeclare(CmiNodeLock, CsdNodeQueueLock);
 CpvDeclare(int,   CsdStopFlag);
 CpvDeclare(int,   CsdLocalCounter);
 
-CmiNodeLock smp_mutex;               /* for smp */
+CmiNodeLock _smp_mutex;               /* for smp */
 
 #if CONVERSE_VERSION_VMI
 void *CMI_VMI_CmiAlloc (int size);
@@ -911,7 +911,7 @@ static double readMHz(void)
   char str[1000];
   char buf[100];
   FILE *fp;
-  CmiLock(smp_mutex);
+  CmiLock(_smp_mutex);
   fp = fopen("/proc/cpuinfo", "r");
   if (fp != NULL)
   while(fgets(str, 1000, fp)!=0) {
@@ -920,11 +920,11 @@ static double readMHz(void)
       char *s = strchr(str, ':'); s=s+1;
       sscanf(s, "%lf", &x);
       fclose(fp);
-      CmiUnlock(smp_mutex);
+      CmiUnlock(_smp_mutex);
       return x;
     }
   }
-  CmiUnlock(smp_mutex);
+  CmiUnlock(_smp_mutex);
   CmiAbort("Cannot read CPU MHz from /proc/cpuinfo file.");
   return 0.0;
 }

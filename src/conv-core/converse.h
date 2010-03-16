@@ -481,7 +481,7 @@ for each processor in the node.
 #define CsvAccess(v) CMK_TAG(Csv_,v)
 #endif
 
-extern CmiNodeLock smp_mutex;
+extern CmiNodeLock _smp_mutex;
 
 extern int CmiBarrier(void);
 extern int CmiBarrierZero(void);

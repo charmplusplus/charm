@@ -57,7 +57,7 @@ static int read_randomflag(void)
 {
   FILE *fp;
   int random_flag;
-  CmiLock(smp_mutex);
+  CmiLock(_smp_mutex);
   fp = fopen("/proc/sys/kernel/randomize_va_space", "r");
   if (fp != NULL) {
     fscanf(fp, "%d", &random_flag);
@@ -74,7 +74,7 @@ static int read_randomflag(void)
   else {
     random_flag = -1;
   }
-  CmiUnlock(smp_mutex);
+  CmiUnlock(_smp_mutex);
   return random_flag;
 }
 

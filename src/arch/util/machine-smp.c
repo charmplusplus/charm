@@ -416,7 +416,7 @@ static void CmiStartThreads(char **argv)
 
   CmiMemLock_lock=CmiCreateLock();
   comm_mutex=CmiCreateLock();
-  smp_mutex = CmiCreateLock();
+  _smp_mutex = CmiCreateLock();
 #ifdef CMK_NO_ASM_AVAILABLE
   cmiMemoryLock = CmiCreateLock();
   if (CmiMyNode()==0) CmiPrintf("CmiMemory: fences and atomic operations not available in native assembly\n");
