@@ -308,10 +308,6 @@ dirs+sources:
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/
-	-ln -s ../../java/bin charmjavabin
-	-ln -s ../../java/bin ../bin/charmjavabin
-	-ln -s charmjavabin/* ../bin/
-	-ln -s ../java ..
 #	rm -f .gdir
 	rm -rf ../include ; mkdir ../include
 	-./system_ln  ../tmp/conv-*.*h ../include
