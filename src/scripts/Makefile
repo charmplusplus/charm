@@ -490,7 +490,7 @@ conv-lists.o: conv-lists.C $(UTILHEADERS) $(CVHEADERS)
 	$(CHARMC) -o conv-lists.o conv-lists.C
 	
 crc32.o: crc32.c crc32.h
-	$(CHARMC) -o crc32.o crc32.c
+	$(CHARMC) -optimize -o crc32.o crc32.c
 
 ## Converse load balancers (seed balancers, -balance)
 $(L)/libldb-none.o: cldb.none.c $(CVHEADERS)
