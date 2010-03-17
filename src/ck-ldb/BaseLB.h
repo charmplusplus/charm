@@ -154,7 +154,7 @@ public:
   double * expectedLoad;	// expected load for future
 
 public:
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	int step;
 	int lbDecisionCount;
 #endif

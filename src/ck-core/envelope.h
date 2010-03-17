@@ -89,7 +89,7 @@ typedef unsigned short UShort;
 typedef unsigned char  UChar;
 
 #include "charm.h" // for CkGroupID, and CkEnvelopeType
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 #include "ckobjid.h" //for the ckobjId
 #endif
 
@@ -180,7 +180,7 @@ public:
       UChar isPacked:1; ///< If true, message must be unpacked before use
       UChar isUsed:1;   ///< Marker bit to prevent message re-send.
     };
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CkObjID sender;
     CkObjID recver;
     MCount SN;
@@ -202,7 +202,7 @@ private:
     UInt   totalsize;  ///< Byte count from envelope start to end of priobits
     
   public:
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     UInt piggyBcastIdx;
 #endif
     void pup(PUP::er &p);
@@ -258,7 +258,7 @@ private:
       env->pathHistory.reset();
 #endif
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
       env->sender.type = TypeInvalid;
       env->recver.type = TypeInvalid;
       env->SN = 0;
@@ -401,7 +401,7 @@ private:
     }
 public:
     MsgPool():SafePool<void*>(_alloc, CkFreeMsg, _reset) {}
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         void *get(void){
             return allocfn();
         }

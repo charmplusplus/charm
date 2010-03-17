@@ -122,7 +122,7 @@ inline int CkHashCompare_int(const void *k1,const void *k2,size_t /*len*/)
 inline int CkHashCompare_pointer(const void *k1,const void *k2,size_t /*len*/)
 	{return *(char **)k1 == *(char **)k2;}
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 extern int countHashRefs;
 extern int countHashCollisions;
 #endif
@@ -382,7 +382,7 @@ public:
 		};
 	}
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	OBJ *getPointer(const KEY &key) {
         countHashRefs++;
         int i=key.hash()%this->len;

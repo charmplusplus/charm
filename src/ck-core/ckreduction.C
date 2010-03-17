@@ -196,7 +196,7 @@ CkReductionMgr::CkReductionMgr()//Constructor
   gcount=lcount=0;
   nContrib=nRemote=0;
   maxStartRequest=0;
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     if(CkMyPe() != 0){
         perProcessorCounts = NULL;
     }else{
@@ -396,7 +396,7 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
   m->sourceFlag=-1;//A single contribution
   m->gcount=0;
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     if(lcount == 0){
         m->sourceProcessorCount = 1;
     }else{
@@ -412,7 +412,7 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 #endif
 }
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkReductionMgr::contributeViaMessage(CkReductionMsg *m){
     CmiAssert(CmiMyPe() == 0);
     DEBR(("[%d] contributeViaMessage fromPE %d\n",CmiMyPe(),m->fromPE));
@@ -459,7 +459,7 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
  }
  DEBR((AA" Group ReductionStarting called for redNo %d\n"AB,m->num));
  int srcPE = (UsrToEnv(m))->getSrcPe();
-#ifndef _FAULT_MLOG_ 
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_)) 
   if (isPresent(m->num) && !inProgress)
   {
     DEBR((AA"Starting reduction #%d at parent's request\n"AB,m->num));
@@ -551,7 +551,7 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 	return;
   }
 
-#ifdef _FAULT_MLOG_ 
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
   if(CmiMyPe() == 0 && redNo == 0){
             for(int j=0;j<CkNumPes();j++){
                 if(j != CkMyPe() && j != srcPE){
@@ -611,7 +611,7 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 	  // kick-start your parent too ...
 			if(treeParent() != srcPE){
 				if(CmiNodeAlive(treeParent())||allowMessagesOnly !=-1){
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = oldObj;
 #endif
 		  		thisProxy[treeParent()].ReductionStarting(new CkReductionNumberMsg(i));
@@ -636,7 +636,7 @@ void CkReductionMgr::addContribution(CkReductionMsg *m)
 {
   if (isPast(m->redNo))
   {
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CmiAbort("this version should not have late migrations");
 #else
 	//We've moved on-- forward late contribution straight to root
@@ -671,7 +671,7 @@ void CkReductionMgr::finishReduction(void)
   	return;
   }
   //CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d at %.6f\n",CkMyPe(),redNo, nContrib,CmiWallTimer());
-#ifndef _FAULT_MLOG_   
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))   
 
   if (nContrib<(lcount+adj(redNo).lcount)){
          DEBR((AA"Need more local messages %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
@@ -708,7 +708,7 @@ void CkReductionMgr::finishReduction(void)
   DEBR((AA"Reducing data... %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
   CkReductionMsg *result=reduceMessages();
   result->redNo=redNo;
-#ifndef _FAULT_MLOG_
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
 
 #if GROUP_LEVEL_REDUCTION
   if (hasParent())
@@ -783,7 +783,7 @@ void CkReductionMgr::finishReduction(void)
   redNo++;
   //Shift the count adjustment vector down one slot (to match new redNo)
   int i;
-#ifndef _FAULT_MLOG_
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
 	if(CkMyPe()!=0){
 #else
     {
@@ -819,7 +819,7 @@ void CkReductionMgr::finishReduction(void)
   }
 #endif
 
-#ifndef _FAULT_MLOG_   
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))   
   if(maxStartRequest >= redNo){
 	  startReduction(redNo,CkMyPe());
 	  finishReduction();
@@ -1012,7 +1012,7 @@ void CkReductionMgr::pup(PUP::er &p)
   // we can not pup because inserting array elems will add the counters again
 //  p|lcount;
 //  p|gcount;
-#ifdef _FAULT_MLOG_ 
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
 //  p|lcount;
 //  //  p|gcount;
 //  //  printf("[%d] nodeProxy nodeGroup %d pupped in group %d \n",CkMyPe(),(nodeProxy.ckGetGroupID()).idx,thisgroup.idx);
@@ -1616,7 +1616,7 @@ CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
 /**nodegroup reduction manager . Most of it is similar to the guy above***/
 NodeGroup::NodeGroup(void) {
   __nodelock=CmiCreateLock();
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     mlogData->objID.type = TypeNodeGroup;
     mlogData->objID.data.group.onPE = CkMyNode();
 #endif
@@ -1726,7 +1726,7 @@ void CkNodeReductionMgr::ckSetReductionClient(CkCallback *cb)
 
 void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     Chare *oldObj =CpvAccess(_currentObj);
     CpvAccess(_currentObj) = this;
 #endif
@@ -1740,7 +1740,7 @@ void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 #endif
   addContribution(m);
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = oldObj;
 #endif
 }
@@ -1751,7 +1751,7 @@ void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMs
 #if CMK_BLUEGENE_CHARM
   _TRACE_BG_TLINE_END(&m->log);
 #endif
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     Chare *oldObj =CpvAccess(_currentObj);
     CpvAccess(_currentObj) = this;
 #endif
@@ -1766,7 +1766,7 @@ void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMs
   CkPrintf("[%d,%d] }}}contributewithCounter finished for %d at %0.6f\n",CkMyNode(),CkMyPe(),m->redNo,CmiWallTimer());
 #endif
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = oldObj;
 #endif
 }
@@ -2336,7 +2336,7 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   p | blocked;
   p | maxModificationRedNo;
 
-#ifndef _FAULT_MLOG_
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
   int isnull = (storedCallback == NULL);
   p | isnull;
   if (!isnull) {

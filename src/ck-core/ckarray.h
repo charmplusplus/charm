@@ -607,7 +607,7 @@ class ArrayElementT : public ArrayElement
 {
 public:
   ArrayElementT(void): thisIndex(*(const T *)thisIndexMax.data()) {
-#ifdef _FAULT_MLOG_     
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
         mlogData->objID.data.array.idx.asMax()=thisIndexMax;
 #endif
 }
@@ -842,7 +842,7 @@ private:
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 public:
   void flushStates() { CkReductionMgr::flushStates(); CK_ARRAYLISTENER_LOOP(listeners, l->flushState()); }
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	// the mlogft only support 1D arrays, then returning the number of elements in the first dimension
 	virtual int numberReductionMessages(){CkAssert(CkMyPe() == 0);return numInitial.data()[0];}
 	void broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index);

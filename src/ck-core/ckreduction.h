@@ -75,7 +75,7 @@ public:
   CkReductionNumberMsg(int n) {num=n;}
 };
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 #define MAX_INT 5000000
 #endif
 
@@ -231,7 +231,7 @@ private:
 
 //Checkpointing utilities
 public:
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     int *perProcessorCounts;
     int processorCount;
     int totalCount;
@@ -310,7 +310,7 @@ private:
   		>0 indicates this is a reduced contribution.
   	*/
   	int nSources(void) {return sourceFlag<0?-sourceFlag:sourceFlag;}
-#ifdef _FAULT_MLOG_ 
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     int sourceProcessorCount;
     int fromPE;
 #endif

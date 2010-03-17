@@ -187,7 +187,7 @@ typedef void (*CkFtFn)(const char *, CkArgMsg *);
 static CkFtFn  faultFunc = NULL;
 static char* _restartDir;
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 int teamSize=1;
 int chkptPeriod=1000;
 bool parallelRestart=false;
@@ -251,7 +251,7 @@ static inline void _parseCommandLineOpts(char **argv)
 # if CMK_MEM_CHECKPOINT
       faultFunc = CkMemRestart;
 # endif
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
       faultFunc = CkMlogRestart;
 #endif
       CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
@@ -284,7 +284,7 @@ static inline void _parseCommandLineOpts(char **argv)
 	if(CmiGetArgStringDesc(argv,"+raiseevac", &_raiseEvacFile,"Generates processor evacuation on random processors")){
 		_raiseEvac = 1;
 	}
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	if(!CmiGetArgIntDesc(argv,"+teamSize",&teamSize,"Set the team size for message logging")){
         teamSize = 1;
     }
@@ -391,7 +391,7 @@ static inline void _sendStats(void)
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 }
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 extern void _messageLoggingExit();
 #endif
 
@@ -447,7 +447,7 @@ static void _exitHandler(envelope *env)
       }	
       break;
     case ReqStatMsg:
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         _messageLoggingExit();
 #endif
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
@@ -1082,7 +1082,7 @@ void _initCharm(int unused_argc, char **argv)
     }
 #endif
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     _messageLoggingInit();
 #endif
 
@@ -1102,7 +1102,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	evacuate = 0;
 	CcdCallOnCondition(CcdSIGUSR1,(CcdVoidFn)CkDecideEvacPe,0);
-#ifdef _FAULT_MLOG_ 
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     CcdCallOnCondition(CcdSIGUSR2,(CcdVoidFn)CkMlogRestart,0);
 #endif
 
@@ -1152,7 +1152,7 @@ void _initCharm(int unused_argc, char **argv)
 			msg->argc = CmiGetArgc(argv);
 			msg->argv = argv;
 			_entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
             CpvAccess(_currentObj) = (Chare *)obj;
 #endif
 		}

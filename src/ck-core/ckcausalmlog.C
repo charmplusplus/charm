@@ -11,7 +11,7 @@
 #include <signal.h>
 #include "CentralLB.h"
 
-#ifdef _FAULT_MLOG_
+#ifdef _FAULT_CAUSAL_
 
 //#define DEBUG(x)  if(_restartFlag) {x;}
 #define DEBUG_MEM(x) //x

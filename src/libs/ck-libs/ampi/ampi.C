@@ -1125,7 +1125,7 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
   
   seqEntries=parent->ckGetArraySize();
   oorder.init (seqEntries);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     if(thisIndex == 0){
 /*      CkAssert(CkMyPe() == 0);
  *              CkGroupID _myManagerGID = thisProxy.ckGetArrayID();     
@@ -1828,7 +1828,7 @@ ampi::send(int t, int sRank, const void* buf, int count, int type,  int rank, MP
    TRACE_BG_AMPI_BREAK(thread->getThread(), "AMPI_SEND", NULL, 0, 1);
 #endif
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   MPI_Comm disComm = myComm.getComm();
   ampi *dis = getAmpiInstance(disComm);
   CpvAccess(_currentObj) = dis;
@@ -1947,7 +1947,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 
   resumeOnRecv=true;
   ampi *dis = getAmpiInstance(disComm);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 //  dis->yield();
 //  processRemoteMlogMessages();
 #endif
@@ -1963,7 +1963,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
     dis = getAmpiInstance(disComm);
   }
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CpvAccess(_currentObj) = dis;
         MSG_ORDER_DEBUG( printf("[%d] AMPI thread rescheduled  to Index %d buf %p src %d\n",CkMyPe(),dis->thisIndex,buf,s); )
 #endif
@@ -2070,7 +2070,7 @@ ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
     ciBcast.beginIteration();
     comlibProxy.generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
 #else
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	CpvAccess(_currentObj) = this;
 #endif
     thisProxy.generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
@@ -2286,7 +2286,7 @@ CDECL void AMPI_Migrate(void)
 #endif
   TCHARM_Migrate();
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     ampi *currentAmpi = getAmpiInstance(MPI_COMM_WORLD);
     CpvAccess(_currentObj) = currentAmpi;
 #endif
@@ -2525,7 +2525,7 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
 #if AMPI_COUNTER
   getAmpiParent()->counters.send++;
 #endif
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 //  ptr->yield();
 //  //  processRemoteMlogMessages();
 #endif
@@ -2727,7 +2727,7 @@ int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
     PUParray(*(pptr->toPUPer), (char *)buf, (pptr->pupBytes));
   }
 #endif
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 //  ptr->yield();
 //  //  processRemoteMlogMessages();
 #endif
@@ -3383,13 +3383,13 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 #endif
     
 #if 1
-#ifndef _FAULT_MLOG_
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
             //for fault evacuation
       if(oldPe != CkMyPe()){
 #endif
 			reqs = getReqs();
 			reqvec  = vecIndex(count,request);
-#ifndef _FAULT_MLOG_
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
             }
 #endif
 #endif

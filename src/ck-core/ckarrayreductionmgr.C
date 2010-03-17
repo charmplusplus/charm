@@ -187,7 +187,7 @@ void CkArrayReductionMgr::setAttachedGroup(CkGroupID groupID){
 
 
 void CkArrayReductionMgr::startNodeGroupReduction(int number,CkGroupID groupID){
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     Chare *oldObj =CpvAccess(_currentObj);
     CpvAccess(_currentObj) = this;
 #endif
@@ -199,7 +199,7 @@ void CkArrayReductionMgr::startNodeGroupReduction(int number,CkGroupID groupID){
 	CkReductionNumberMsg *msg = new CkReductionNumberMsg(number);
 	envelope::setSrcPe((char *)UsrToEnv(msg),CkMyNode());
 	((CkNodeReductionMgr *)this)->ReductionStarting(msg);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = oldObj;
 #endif
 }

@@ -76,7 +76,7 @@ public:
   CkMarshalledCLBStatsMessage bufMsg;
   SpanningTree st;
   CentralLB(const CkLBOptions & opt):BaseLB(opt) { initLB(opt); 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         lbDecisionCount= resumeCount=0;
 #endif
 } 
@@ -104,7 +104,7 @@ public:
 	                                        // to be resumed via message
   void ResumeClients(CkReductionMsg *);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	void ReceiveDummyMigration(int _step);
 #endif
   void MissMigrate(int waitForBarrier);
@@ -253,14 +253,14 @@ private:
 
 public:
   int useMem();
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     int savedBalancing;
     void endMigrationDone(int balancing);
     int lbDecisionCount ,resumeCount;
 #endif
 };
 
-#ifdef _FAULT_MLOG_ 
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     void resumeCentralLbAfterChkpt(void *lb);
 #endif
 
@@ -283,7 +283,7 @@ public:
 
   char * avail_vector;
   int next_lb;
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	int step;
 #endif
 

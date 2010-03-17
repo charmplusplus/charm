@@ -123,7 +123,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	FILE* fGroups = fopen(fileName,"wb");
 	if(!fGroups) CkAbort("Failed to create checkpoint file for group table!");
 	PUP::toDisk pGroups(fGroups);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CkPupGroupData(pGroups,CmiTrue);
 #else
     CkPupGroupData(pGroups);
@@ -138,7 +138,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 	  if(!fNodeGroups) 
 	    CkAbort("Failed to create checkpoint file for nodegroup table!");
 	  PUP::toDisk pNodeGroups(fNodeGroups);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
       CkPupNodeGroupData(pNodeGroups,CmiTrue);
 #else
       CkPupNodeGroupData(pNodeGroups);
@@ -270,7 +270,7 @@ void CkPupChareData(PUP::er &p)
 }
 #endif
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 // handle GroupTable and data
 void CkPupGroupData(PUP::er &p, CmiBool create)
 {
@@ -542,7 +542,7 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 	}
 }
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 int  CkCountArrayElements(){
     int numGroups = CkpvAccess(_groupIDTable)->size();
     int i;
@@ -569,7 +569,7 @@ void CkPupProcessorData(PUP::er &p)
     CkPupChareData(p);
 
     // save groups 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CkPupGroupData(p,CmiTrue);
 #else
     CkPupGroupData(p);
@@ -577,7 +577,7 @@ void CkPupProcessorData(PUP::er &p)
 
     // save nodegroups
     if(CkMyRank()==0) {
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CkPupNodeGroupData(p,CmiTrue);	
 #else
         CkPupNodeGroupData(p);
@@ -717,7 +717,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	FILE* fGroups = fopen(filename,"rb");
 	if(!fGroups) CkAbort("Failed to open checkpoint file for group table!");
 	PUP::fromDisk pGroups(fGroups);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CkPupGroupData(pGroups,CmiTrue);
 #else
     CkPupGroupData(pGroups);
@@ -734,7 +734,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 		FILE* fNodeGroups = fopen(filename,"rb");
 		if(!fNodeGroups) CkAbort("Failed to open checkpoint file for nodegroup table!");
 		PUP::fromDisk pNodeGroups(fNodeGroups);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CkPupNodeGroupData(pNodeGroups,CmiTrue);
 #else
         CkPupNodeGroupData(pNodeGroups);

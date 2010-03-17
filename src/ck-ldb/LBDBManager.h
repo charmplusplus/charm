@@ -277,7 +277,7 @@ private:
   int            startLBFn_count;
 public:
   int useMem();
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     int validObjHandle(LDObjHandle h ){
             if(objCount == 0)
                 return 0;
