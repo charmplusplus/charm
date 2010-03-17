@@ -1374,6 +1374,9 @@ static void meta_init(char **argv) {
   if (CmiGetArgFlagDesc(argv,"+memory_verbose", "Print all memory-related operations")) {
     disableVerbosity = 0;
   }
+  if (CmiGetArgFlagDesc(argv,"+memory_nostack", "Do not collect stack traces for memory allocations")) {
+    stackTraceDisabled = 1;
+  }
 }
 
 static void *meta_malloc(size_t size) {
