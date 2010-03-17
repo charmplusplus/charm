@@ -65,7 +65,7 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): BaseLB(opt)
   future_migrates_expected = -1;
 
   statsStrategy = FULL;
-  if (CkNumPes() >= 4096) statsStrategy = SHRINK;
+  if (CkNumPes() >= 512) statsStrategy = SHRINK;
   //statsStrategy = SHRINK;
 
   vector_n_moves = 0;
@@ -627,6 +627,7 @@ void HybridBaseLB::ReceiveVectorMigration(LBVectorMigrateMsg *msg)
       int count = 0;
       for (int obj=statsData->n_objs-1; obj>=0; obj--) {
         LDObjData &objData = statsData->objData[obj];
+	if (!objData.migratable) continue;
         if (objData.wallTime <= load) {
           if (_lb_args.debug()>2)
             CkPrintf("[%d] send obj: %d to PE %d.\n", CkMyPe(), obj, toPe);
