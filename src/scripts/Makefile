@@ -100,11 +100,11 @@ fftlib: charm++
 # parser files, etc.  All they need is the libjade + include files,
 # antlr.jar, jade.jar, and a few scripts which the jade target takes
 # care of.
-jadeall: jade
+#jadeall: jade
 #	make parser.g -> .java files
-	cd langs/jade && $(MAKE) p
+#	cd langs/jade && $(MAKE) p
 #	make the jade.jar file
-	cd ../java/charm/jade && $(MAKE)
+#	cd ../java/charm/jade && $(MAKE)
 
 #include TAU defs
 TAU_MAKEFILE=Make.tau
@@ -308,10 +308,10 @@ dirs+sources:
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/
-	-ln -s ../../java/bin charmjavabin
-	-ln -s ../../java/bin ../bin/charmjavabin
-	-ln -s charmjavabin/* ../bin/
-	-ln -s ../java ..
+#	-ln -s ../../java/bin charmjavabin
+#	-ln -s ../../java/bin ../bin/charmjavabin
+#	-ln -s charmjavabin/* ../bin/
+#	-ln -s ../java ..
 #	rm -f .gdir
 	rm -rf ../include ; mkdir ../include
 	-./system_ln  ../tmp/conv-*.*h ../include
