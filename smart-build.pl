@@ -338,6 +338,7 @@ $explanations{"ifc"} = "Use Intel's ifc compiler";
 $explanations{"ammasso"} = "Use native RDMA support on Ammasso interconnect";
 $explanations{"syncft"} = "Use initial fault tolerance support";
 $explanations{"mlogft"} = "Use message logging fault tolerance support";
+$explanations{"causalft"} = "Use causal message logging fault tolerance support";
 
 
 

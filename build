@@ -31,7 +31,7 @@ syntax() {
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 gcc4 mpcc pathscale'
-  echo 'help smp gm tcp vmi scyld clustermatic bigemulator ooc syncft mlogft papi'
+  echo 'help smp gm tcp vmi scyld clustermatic bigemulator ooc syncft mlogft causalft papi'
   echo 'pthreads lam'
   echo '--incdir --libdir --basedir --no-build-shared --destination --suffix -j'
   if test $more = 1
