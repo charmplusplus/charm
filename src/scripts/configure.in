@@ -696,6 +696,17 @@ EOT
 test_link "whether has sqrtf" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_SQRTF, $pass, [whether has sqrtf])
 
+#### test for fabsf ###
+cat > $t <<EOT
+#include <math.h>
+int main() {
+  float i = fabsf((float)10.0);
+  return 0;
+}
+EOT
+test_link "whether has fabsf" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_FABSF, $pass, [whether has fabsf])
+
 #### test for mkstemp ###
 cat > $t <<EOT
 #include <stdlib.h>

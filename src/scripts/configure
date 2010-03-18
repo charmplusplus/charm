@@ -2472,6 +2472,21 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test for fabsf ###
+cat > $t <<EOT
+#include <math.h>
+int main() {
+  float i = fabsf((float)10.0);
+  return 0;
+}
+EOT
+test_link "whether has fabsf" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_FABSF $pass
+_ACEOF
+
+
 #### test for mkstemp ###
 cat > $t <<EOT
 #include <stdlib.h>
