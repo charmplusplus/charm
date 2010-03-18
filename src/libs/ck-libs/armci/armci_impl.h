@@ -109,6 +109,10 @@ extern CkArrayID armciVPAid;
   _ARMCI_TEMPLATE_REDUCTION(opName##_float,float,reductionWork) \
   _ARMCI_TEMPLATE_REDUCTION(opName##_double,double,reductionWork)
 
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+#define llabs(x) abs(x)
+#endif
+
 /* 
    **CWL** The absolute function is inconveniently unpolymorphic in the
    standard C++ and math libraries.
