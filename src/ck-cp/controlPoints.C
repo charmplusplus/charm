@@ -18,8 +18,6 @@
 using namespace std;
 
 #define DEFAULT_CONTROL_POINT_SAMPLE_PERIOD  10000000
-#define NUM_SAMPLES_BEFORE_TRANSISTION 5
-#define OPTIMIZER_TRANSITION 5
 
 
 //#undef DEBUGPRINT
@@ -201,7 +199,7 @@ controlPointManager::controlPointManager() {
     allData.phases.push_back(newPhase);   
     
     frameworkShouldAdvancePhase = false;
-    haveGranularityCallback = false;
+    haveControlPointChangeCallback = false;
 //    CkPrintf("[%d] controlPointManager() Constructor Initializing control points, and loading data file\n", CkMyPe());
     
     ControlPoint::initControlPointEffects();
@@ -348,15 +346,15 @@ controlPointManager::controlPointManager() {
   /// User can register a callback that is called when application should advance to next phase
   void controlPointManager::setCPCallback(CkCallback cb, bool _frameworkShouldAdvancePhase){
     frameworkShouldAdvancePhase = _frameworkShouldAdvancePhase;
-    granularityCallback = cb;
-    haveGranularityCallback = true;
+    controlPointChangeCallback = cb;
+    haveControlPointChangeCallback = true;
   }
 
   /// Called periodically by the runtime to handle the control points
   /// Currently called on each PE
   void controlPointManager::processControlPoints(){
 
-    CkPrintf("[%d] processControlPoints() haveGranularityCallback=%d frameworkShouldAdvancePhase=%d\n", CkMyPe(), (int)haveGranularityCallback, (int)frameworkShouldAdvancePhase);
+    CkPrintf("[%d] processControlPoints() haveControlPointChangeCallback=%d frameworkShouldAdvancePhase=%d\n", CkMyPe(), (int)haveControlPointChangeCallback, (int)frameworkShouldAdvancePhase);
 
 
     //==========================================================================================
@@ -402,7 +400,6 @@ controlPointManager::controlPointManager() {
     //==========================================================================================
     // If this is a phase during which we try to adapt control point values based on critical path
 #if 0
-
     if( s%5 == 4) {
 
       // Find the most recent phase with valid critical path data and idle time measurements      
@@ -470,12 +467,16 @@ controlPointManager::controlPointManager() {
 	      gotoNextPhase();	
 	    }
 	    
-	    if(haveGranularityCallback){ 
+	    if(haveControlPointChangeCallback){ 
 #if DEBUGPRINT
-	      CkPrintf("Calling granularity change callback\n");
+	      CkPrintf("Calling control point change callback\n");
 #endif
-	      controlPointMsg *msg = new(0) controlPointMsg;
-	      granularityCallback.send(msg);
+	      // Create a high priority message and send it to the callback
+	      controlPointMsg *msg = new (8*sizeof(int)) controlPointMsg; 
+	      *((int*)CkPriorityPtr(msg)) = -INT_MAX;
+	      CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+	      controlPointChangeCallback.send(msg);
+	      
 	    }
 	    
 	    
@@ -527,8 +528,7 @@ controlPointManager::controlPointManager() {
       
       
     }
-    
-
+   
 #endif
 
 
@@ -537,12 +537,13 @@ controlPointManager::controlPointManager() {
       gotoNextPhase();	
     }
     
-    if(haveGranularityCallback){ 
-      controlPointMsg *msg = new(0) controlPointMsg;
-      granularityCallback.send(msg);
+    if(haveControlPointChangeCallback){ 
+      // Create a high priority message and send it to the callback
+      controlPointMsg *msg = new (8*sizeof(int)) controlPointMsg; 
+      *((int*)CkPriorityPtr(msg)) = -INT_MAX;
+      CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+      controlPointChangeCallback.send(msg);
     }
-    
-    
     
   }
   
@@ -979,7 +980,7 @@ public:
     double period;
     bool haveSamplePeriod = CmiGetArgDoubleDesc(args->argv,"+CPSamplePeriod", &period,"The time between Control Point Framework samples (in seconds)");
     if(haveSamplePeriod){
-      CkPrintf("LBPERIOD = %ld sec\n", period);
+      CkPrintf("controlPointSamplePeriod = %ld sec\n", period);
       controlPointSamplePeriod =  period * 1000; /**< A readonly */
     } else {
       controlPointSamplePeriod =  DEFAULT_CONTROL_POINT_SAMPLE_PERIOD;

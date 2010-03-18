@@ -704,8 +704,8 @@ public:
 
   
   /// A user supplied callback to call when control point values are to be changed
-  CkCallback granularityCallback;
-  bool haveGranularityCallback;
+  CkCallback controlPointChangeCallback;
+  bool haveControlPointChangeCallback;
   bool frameworkShouldAdvancePhase;
   
   int phase_id;
