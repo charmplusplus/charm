@@ -43,6 +43,12 @@ LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count)
     }
   }
 
+  if (_lb_args.debug()>1) {
+    CkPrintf("Before migration: (%d) ", count);
+    for (i=0; i<count; i++) CkPrintf("%f (%f)", processors[i].load, processors[i].backgroundLoad);
+    CkPrintf("\n");
+  }
+
   int done = 0;
   CkVec<VectorMigrateInfo *> miginfo;
   while (!done) {
