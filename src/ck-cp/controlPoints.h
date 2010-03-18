@@ -581,6 +581,9 @@ public:
 /** A class that implements the Nelder Mead Simplex Optimization Algorithm */
 class simplexScheme {
 private:
+        /** The states used by the Nelder Mead Simplex Algorithm. 
+	    The transitions between these states are displayed in the NelderMeadStateDiagram.pdf diagram.
+	*/
 	typedef enum simplexStateEnumT {beginning, reflecting, expanding, contracting, doneExpanding, stillContracting}  simplexStateT;
 
 	/// The indices into the allData->phases that correspond to the current simplex used one of the tuning schemes.
