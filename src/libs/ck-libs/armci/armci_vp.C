@@ -14,34 +14,17 @@ extern "C" void armciLibStart(void) {
   ARMCI_Main_cpp(argc, argv);
 }
 
-static int armciLibStart_idx = -1;
-
-void armciNodeInit(void) {
-  CmiAssert(armciLibStart_idx == -1);
-  armciLibStart_idx = TCHARM_Register_thread_function((TCHARM_Thread_data_start_fn)armciLibStart);
-}
-
-// Default startup routine (can be overridden by user's own)
-// This will be registered with TCharm's startup routine
-// in the Node initialization function.
-static void ArmciDefaultSetup(void) {
-  // Create the base threads on TCharm using user-defined start routine.
-  TCHARM_Create(TCHARM_Get_num_chunks(), armciLibStart_idx);
-}
-
-CtvDeclare(ArmciVirtualProcessor *, _armci_ptr);
-
 _ARMCI_GENERATE_POLYMORPHIC_REDUCTION(sum,ret[i]+=value[i];)
 _ARMCI_GENERATE_POLYMORPHIC_REDUCTION(product,ret[i]*=value[i];)
 _ARMCI_GENERATE_POLYMORPHIC_REDUCTION(max,if (ret[i]<value[i]) ret[i]=value[i];)
 _ARMCI_GENERATE_POLYMORPHIC_REDUCTION(min,if (ret[i]>value[i]) ret[i]=value[i];)
 _ARMCI_GENERATE_ABS_REDUCTION()
 
+static int armciLibStart_idx = -1;
 
-// Node initialization (made by initcall of the module armci)
-void armciProcInit(void) {
-  CtvInitialize(ArmciVirtualProcessor, _armci_ptr);
-  CtvAccess(_armci_ptr) = NULL;
+void armciNodeInit(void) {
+  CmiAssert(armciLibStart_idx == -1);
+  armciLibStart_idx = TCHARM_Register_thread_function((TCHARM_Thread_data_start_fn)armciLibStart);
 
   // initialize the reduction table
   _armciRednLookupTable = new int*[_ARMCI_NUM_REDN_OPS];
@@ -56,6 +39,22 @@ void armciProcInit(void) {
   _ARMCI_REGISTER_POLYMORPHIC_REDUCTION(min,_ARMCI_REDN_OP_MIN);
   _ARMCI_REGISTER_POLYMORPHIC_REDUCTION(absmax,_ARMCI_REDN_OP_ABSMAX);
   _ARMCI_REGISTER_POLYMORPHIC_REDUCTION(absmin,_ARMCI_REDN_OP_ABSMIN);
+}
+
+// Default startup routine (can be overridden by user's own)
+// This will be registered with TCharm's startup routine
+// in the Node initialization function.
+static void ArmciDefaultSetup(void) {
+  // Create the base threads on TCharm using user-defined start routine.
+  TCHARM_Create(TCHARM_Get_num_chunks(), armciLibStart_idx);
+}
+
+CtvDeclare(ArmciVirtualProcessor *, _armci_ptr);
+
+// Node initialization (made by initcall of the module armci)
+void armciProcInit(void) {
+  CtvInitialize(ArmciVirtualProcessor, _armci_ptr);
+  CtvAccess(_armci_ptr) = NULL;
 
   // Register the library's default startup routine to TCharm
   TCHARM_Set_fallback_setup(ArmciDefaultSetup);
