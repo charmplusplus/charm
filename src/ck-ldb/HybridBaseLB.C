@@ -52,9 +52,21 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): BaseLB(opt)
   notifier = theLbdb->getLBDB()->
     NotifyMigrated((LDMigratedFn)(staticMigrated), (void*)(this));
 
+  statsStrategy = FULL;
+
   // defines topology
-  tree = new ThreeLevelTree;
+  if (CkNumPes() <= 4)  {
+    tree = new TwoLevelTree;
+  }
+  else {
+    tree = new ThreeLevelTree;
+    if (CkNumPes() >= 4096) statsStrategy = SHRINK;
+    //statsStrategy = SHRINK;
+
+  }
   //tree = new FourLevelTree;
+  if (CkMyPe() == 0)
+    CkPrintf("%s: %s is created.\n", lbname, tree->name());
 
   // decide which load balancer to call
 //  greedy = (CentralLB *)AllocateGreedyLB();
@@ -63,10 +75,6 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): BaseLB(opt)
   currentLevel = 0;
   foundNeighbors = 0;
   future_migrates_expected = -1;
-
-  statsStrategy = FULL;
-  if (CkNumPes() >= 4096) statsStrategy = SHRINK;
-  //statsStrategy = SHRINK;
 
   vector_n_moves = 0;
 
