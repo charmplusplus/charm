@@ -78,6 +78,9 @@
 /* whether has elf.h */
 #undef CMK_HAS_ELF_H
 
+/* whether has fabsf */
+#undef CMK_HAS_FABSF
+
 /* whether gethostname() exists */
 #undef CMK_HAS_GETHOSTNAME
 

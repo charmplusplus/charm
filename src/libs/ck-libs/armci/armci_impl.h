@@ -113,6 +113,13 @@ extern CkArrayID armciVPAid;
 #define llabs(x) abs(x)
 #endif
 
+#if ! CMK_HAS_FABSF
+inline float fabsf(float x)
+{
+  return x>0.0?x:-x;
+}
+#endif
+
 /* 
    **CWL** The absolute function is inconveniently unpolymorphic in the
    standard C++ and math libraries.
