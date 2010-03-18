@@ -1684,6 +1684,20 @@ int controlPoint(const char *name, int lb, int ub){
 
 
 
+/** Determine the next configuration to try using the Nelder Mead Simplex Algorithm.
+
+    This function decomposes the algorithm into a state machine that allows it to
+    evaluate one or more configurations through subsequent clls to this function.
+    The state diagram is pictured in the NelderMeadStateDiagram.pdf diagram.
+
+    At one point in the algorithm, n+1 parameter configurations must be evaluated,
+    so a list of them will be created and they will be evaluated, one per call.
+
+    Currently there is no stopping criteria, but the simplex ought to contract down
+    to a few close configurations, and hence not much change will happen after this 
+    point.
+
+ */
 void simplexScheme::adapt(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData){
 
 	if(useBestKnown){
