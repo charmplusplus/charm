@@ -249,6 +249,9 @@ protected:
   virtual void work(LDStats* stats,int count);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
 
+    // helper function
+  LBMigrateMsg * createMigrateMsg(CkVec<MigrateInfo *> &migrateInfo,int count);
+
   virtual LBVectorMigrateMsg* VectorStrategy(LDStats* stats,int count);
 
   virtual int     useMem();
@@ -323,7 +326,7 @@ protected:
 
   int currentLevel;
 
-  enum StatsStrategy { FULL, SHRINK } ;
+  enum StatsStrategy { FULL, SHRINK, SHRINK_NULL} ;
   StatsStrategy statsStrategy;
 
 private:
