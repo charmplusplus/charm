@@ -56,12 +56,11 @@ private:
 public:
   ThreeLevelTree() {
     nLevels = 3;
-    // span[0] = CkNumPes()/32;
     int groupsize = 512;
+    while (CkNumPes() / groupsize < 2) {
+      groupsize /= 2;
+    }
     span[0] = groupsize;
-    if (span[0] < 2) span[0] = CkNumPes()/16;
-    if (span[0] < 2) span[0] = CkNumPes()/8;
-    if (span[0] < 2) span[0] = CkNumPes()/4;
     CmiAssert(span[0]>1);
     span[1] = (CkNumPes()+span[0]-1)/span[0];
     if (CmiNumPhysicalNodes() > 1)
