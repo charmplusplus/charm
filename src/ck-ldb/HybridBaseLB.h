@@ -31,15 +31,70 @@ inline int mymin(int x, int y) { return x<y?x:y; }
 
 // base class
 class MyHierarchyTree {
+protected:
+  int *span;
+  int nLevels;
+  const char *myname;
 public:
-  MyHierarchyTree() {}
+  MyHierarchyTree(): span(NULL), myname(NULL) {}
   virtual ~MyHierarchyTree() {}
-  virtual int numLevels() = 0;
+  const char* name() const { return myname; }
+  virtual const int numLevels() const { return nLevels; }
   virtual int parent(int mype, int level) = 0;
   virtual int isroot(int mype, int level) = 0;
   virtual int numChildren(int mype, int level) = 0;
   virtual void getChildren(int mype, int level, int *children, int &count) = 0;
-  virtual int numNodes(int level) = 0;
+  virtual int numNodes(int level) {
+    CmiAssert(level>=0 && level<nLevels);
+    int count=1;
+    for (int i=0; i<level; i++) count *= span[i];
+    CmiAssert(CkNumPes()%count ==0);
+    return CkNumPes()/count;
+  }
+};
+
+// a simple 2 layer tree, fat at level 1
+//        0
+//     ---+---
+//     0  1  2
+class TwoLevelTree: public MyHierarchyTree {
+private:
+  int toproot;
+public:
+  TwoLevelTree() {
+    myname = "TwoLevelTree";
+    span = new int[1];
+    nLevels = 2;
+    span[0] = CkNumPes();
+    toproot = 0;
+  }
+  virtual ~TwoLevelTree() { delete [] span; }
+  virtual int parent(int mype, int level) {
+    if (level == 0) return toproot;
+    if (level == 1) return -1;
+    CmiAssert(0);
+    return -1;
+  }
+  virtual int isroot(int mype, int level) {
+    if (level == 0) return 0;
+    if (level == 1 && mype == toproot) return 1;
+    return 0;
+  }
+  virtual int numChildren(int mype, int level) {
+    if (level == 0) return 0;
+    if (level == 1) return CkNumPes();
+    CmiAssert(0);
+    return 0;
+  }
+  virtual void getChildren(int mype, int level, int *children, int &count) {
+    CmiAssert(isroot(mype, level));
+    count = numChildren(mype, level);
+    if (count == 0) { return; }
+    if (level == 1) {
+      for (int i=0; i<count; i++) 
+        children[i] = i;
+    }
+  }
 };
 
 // a simple 3 layer tree, fat at level 1
@@ -50,14 +105,14 @@ public:
 //  0 1 2 3
 class ThreeLevelTree: public MyHierarchyTree {
 private:
-  int span[2];
   int toproot;
-  int nLevels;
 public:
   ThreeLevelTree() {
+    myname = "ThreeLevelTree";
+    span = new int[2];
     nLevels = 3;
     int groupsize = 512;
-    while (CkNumPes() / groupsize < 2) {
+    while (groupsize && CkNumPes() / groupsize < 2) {
       groupsize /= 2;
     }
     span[0] = groupsize;
@@ -68,8 +123,7 @@ public:
     else
       toproot = 1;
   }
-  virtual ~ThreeLevelTree() {}
-  virtual int numLevels() { return nLevels; }
+  virtual ~ThreeLevelTree() { delete [] span; }
   virtual int parent(int mype, int level) {
     if (level == 0) return mype/span[0]*span[0];
     if (level == 1) return toproot;
@@ -103,13 +157,6 @@ public:
         children[i] = i*span[0];
     }
   }
-  virtual int numNodes(int level) {
-    CmiAssert(level>=0 && level<nLevels);
-    int count=1;
-    for (int i=0; i<level; i++) count *= span[i];
-    CmiAssert(CkNumPes()%count ==0);
-    return CkNumPes()/count;
-  }
 };
 
 // a simple 4 layer tree, fat at level 1
@@ -122,11 +169,11 @@ public:
 // 0 1 2 3
 class FourLevelTree: public MyHierarchyTree {
 private:
-  int span[3];
   int toproot;
-  int nLevels;
 public:
   FourLevelTree() {
+    myname = "FourLevelTree";
+    span = new int[3];
     nLevels = 4;
 #if 1
     span[0] = 64;
@@ -140,8 +187,7 @@ public:
     CmiAssert(CkNumPes() == span[0]*span[1]*span[2]);
     toproot = 2;
   }
-  virtual ~FourLevelTree() {}
-  virtual int numLevels() { return nLevels; }
+  virtual ~FourLevelTree() { delete [] span; }
   virtual int parent(int mype, int level) {
     if (level == 0) return mype/span[0]*span[0];
     if (level == 1) return mype/span[0]/span[1]*span[0]*span[1]+1;
@@ -181,13 +227,6 @@ public:
       for (int i=0; i<count; i++) 
         children[i] = i*span[0]*span[1]+1;
     }
-  }
-  virtual int numNodes(int level) {
-    CmiAssert(level>=0 && level<nLevels);
-    int count=1;
-    for (int i=0; i<level; i++) count *= span[i];
-    CmiAssert(CkNumPes()%count ==0);
-    return CkNumPes()/count;
   }
 };
 
