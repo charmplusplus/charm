@@ -1994,7 +1994,7 @@ private:
       bool wasPacked = env->isPacked();
       if (!wasPacked) CkPackMessage(&env);
       //unsigned int crc = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
-      unsigned int crc1 = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
+      unsigned int crc1 = crc32_initial(((unsigned char*)env)+CmiReservedHeaderSize, sizeof(*env)-CmiReservedHeaderSize);
       unsigned int crc2 = crc32_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
       fprintf(f,"%d %d %d %hhd %x %x\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2);
       if (!wasPacked) CkUnpackMessage(&env);

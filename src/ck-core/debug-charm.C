@@ -640,7 +640,7 @@ void CpdSetBreakPoint (char *msg)
   char functionName[128];
   int tableSize, tableIdx = 0;
   int reply = 0;
-  sscanf(msg+CmiMsgHeaderSizeBytes, "%s", functionName);
+  sscanf(msg+CmiReservedHeaderSize, "%s", functionName);
   if (strlen(functionName) > 0)
   {
     tableSize = _entryTable.size();
@@ -687,7 +687,7 @@ void CpdRemoveBreakPoint (char *msg)
 {
   char functionName[128];
   int reply = 0;
-  sscanf(msg+CmiMsgHeaderSizeBytes, "%s", functionName);
+  sscanf(msg+CmiReservedHeaderSize, "%s", functionName);
   if (strlen(functionName) > 0) {
     int idx = atoi(functionName);
     if (idx >= 0 && idx < _entryTable.size()) {

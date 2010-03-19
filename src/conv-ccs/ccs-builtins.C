@@ -61,7 +61,7 @@ static killPortStruct *killList=NULL;
 static void ccs_killport(char *msg)
 {
   killPortStruct *oldList=killList;
-  int port=ChMessageInt(*(ChMessageInt_t *)(msg+CmiMsgHeaderSizeBytes));
+  int port=ChMessageInt(*(ChMessageInt_t *)(msg+CmiReservedHeaderSize));
   skt_ip_t ip;
   unsigned int connPort;
   CcsCallerId(&ip,&connPort);
@@ -175,7 +175,7 @@ static CpdListAccessor *CpdListLookup(const ChMessageInt_t *lenAndPath)
 //Get the length of the given list:
 static void CpdList_ccs_list_len(char *msg)
 {
-  const ChMessageInt_t *req=(const ChMessageInt_t *)(msg+CmiMsgHeaderSizeBytes);
+  const ChMessageInt_t *req=(const ChMessageInt_t *)(msg+CmiReservedHeaderSize);
   CpdListAccessor *acc=CpdListLookup(req);
   if (acc!=NULL) {
     ChMessageInt_t reply=ChMessageInt_new(acc->getLength());
@@ -194,9 +194,9 @@ static void CpdList_ccs_list_len(char *msg)
 static CpdListAccessor *CpdListHeader_ccs_list_items(char *msg,
 	     CpdListItemsRequest &h)
 {
-  int msgLen=CmiSize((void *)msg)-CmiMsgHeaderSizeBytes;
+  int msgLen=CmiSize((void *)msg)-CmiReservedHeaderSize;
   CpdListAccessor *ret=NULL;
-  const ChMessageInt_t *req=(const ChMessageInt_t *)(msg+CmiMsgHeaderSizeBytes);
+  const ChMessageInt_t *req=(const ChMessageInt_t *)(msg+CmiReservedHeaderSize);
   h.lo=ChMessageInt(req[0]); // first item to send
   h.hi=ChMessageInt(req[1]); // last item to send+1
   h.extraLen=ChMessageInt(req[2]); // extra data length
@@ -454,7 +454,7 @@ CCS Client->CWebHandler->...  (processor 0)
 #define MAXFNS 20 /*Largest number of performance functions to expect*/
 
 typedef struct {
-	char hdr[CmiMsgHeaderSizeBytes];
+	char hdr[CmiReservedHeaderSize];
 	int fromPE;/*Source processor*/
 	int perfData[MAXFNS];/*Performance numbers*/
 } CWeb_CollectedData;
@@ -582,9 +582,9 @@ static void CWebHandler(void){
       
       /*Start collecting data on each processor*/
       for(i = 0; i < CmiNumPes(); i++){
-        char *msg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
+        char *msg = (char *)CmiAlloc(CmiReservedHeaderSize);
         CmiSetHandler(msg, CWeb_CollectIndex);
-        CmiSyncSendAndFree(i, CmiMsgHeaderSizeBytes,msg);
+        CmiSyncSendAndFree(i, CmiReservedHeaderSize,msg);
       }
     }
   }

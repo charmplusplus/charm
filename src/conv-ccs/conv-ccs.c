@@ -55,8 +55,8 @@ static void callHandlerRec(CcsHandlerRec *c,int reqLen,const void *reqData) {
 	    Pack user data into a converse message (cripes! why bother?);
 	    user will delete the message. 
 	  */
-		char *cmsg = (char *) CmiAlloc(CmiMsgHeaderSizeBytes+reqLen);
-		memcpy(cmsg+CmiMsgHeaderSizeBytes, reqData, reqLen);
+		char *cmsg = (char *) CmiAlloc(CmiReservedHeaderSize+reqLen);
+		memcpy(cmsg+CmiReservedHeaderSize, reqData, reqLen);
 		(c->fnOld)(cmsg);
 	}
 	else { /* Pass read-only copy of data straight to user */
@@ -99,17 +99,17 @@ void * CcsMerge_concat(int *size,void *local,void **remote,int n) {
   char *ptr;
   int i;
   for (i=0; i<n; ++i) {
-    hdr = (CcsImplHeader*)(((char*)remote[i])+CmiMsgHeaderSizeBytes);
+    hdr = (CcsImplHeader*)(((char*)remote[i])+CmiReservedHeaderSize);
     total += ChMessageInt(hdr->len);
   }
   reply = CmiAlloc(total);
   memcpy(reply, local, *size);
-  ((CcsImplHeader*)(((char*)reply)+CmiMsgHeaderSizeBytes))->len = ChMessageInt_new(total-CmiMsgHeaderSizeBytes-sizeof(CcsImplHeader));
+  ((CcsImplHeader*)(((char*)reply)+CmiReservedHeaderSize))->len = ChMessageInt_new(total-CmiReservedHeaderSize-sizeof(CcsImplHeader));
   CmiFree(local);
   ptr = ((char*)reply)+*size;
   for (i=0; i<n; ++i) {
-    int len = ChMessageInt(((CcsImplHeader*)(((char*)remote[i])+CmiMsgHeaderSizeBytes))->len);
-    memcpy(ptr, ((char*)remote[i])+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader), len);
+    int len = ChMessageInt(((CcsImplHeader*)(((char*)remote[i])+CmiReservedHeaderSize))->len);
+    memcpy(ptr, ((char*)remote[i])+CmiReservedHeaderSize+sizeof(CcsImplHeader), len);
     ptr += len;
   }
   *size = total;
@@ -119,7 +119,7 @@ void * CcsMerge_concat(int *size,void *local,void **remote,int n) {
 #define SIMPLE_REDUCTION(name, dataType, loop) \
 void * CcsMerge_##name(int *size,void *local,void **remote,int n) { \
   int i, m; \
-  CcsImplHeader *hdrLocal = (CcsImplHeader*)(((char*)local)+CmiMsgHeaderSizeBytes); \
+  CcsImplHeader *hdrLocal = (CcsImplHeader*)(((char*)local)+CmiReservedHeaderSize); \
   int lenLocal = ChMessageInt(hdrLocal->len); \
   int nElem = lenLocal / sizeof(dataType); \
   dataType *ret = (dataType *) (hdrLocal+1); \
@@ -127,7 +127,7 @@ void * CcsMerge_##name(int *size,void *local,void **remote,int n) { \
   for (m=0; m<n; ++m) { \
     int len; \
     dataType *value; \
-    hdr = (CcsImplHeader*)(((char*)remote[m])+CmiMsgHeaderSizeBytes); \
+    hdr = (CcsImplHeader*)(((char*)remote[m])+CmiReservedHeaderSize); \
     len = ChMessageInt(hdr->len); \
     value = (dataType *)(hdr+1); \
     CmiAssert(lenLocal == len); \
@@ -182,9 +182,9 @@ int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
   if (repPE <= -1) {
     /* Reduce the message to get the final reply */
     CcsHandlerRec *fn;
-    int len=CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader)+repLen;
+    int len=CmiReservedHeaderSize+sizeof(CcsImplHeader)+repLen;
     char *msg=CmiAlloc(len);
-    char *r=msg+CmiMsgHeaderSizeBytes;
+    char *r=msg+CmiReservedHeaderSize;
     char *handlerStr;
     rep->len = ChMessageInt_new(repLen);
     *(CcsImplHeader *)r=*rep; r+=sizeof(CcsImplHeader);
@@ -290,19 +290,19 @@ static void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 int _ccsHandlerIdx = 0;/*Converse handler index of below routine*/
 static void req_fw_handler(char *msg)
 {
-  int offset = CmiMsgHeaderSizeBytes + sizeof(CcsImplHeader);
-  CcsImplHeader *hdr = (CcsImplHeader *)(msg+CmiMsgHeaderSizeBytes);
+  int offset = CmiReservedHeaderSize + sizeof(CcsImplHeader);
+  CcsImplHeader *hdr = (CcsImplHeader *)(msg+CmiReservedHeaderSize);
   int destPE = (int)ChMessageInt(hdr->pe);
   if (CmiMyPe() == 0 && destPE == -1) {
     /* Broadcast message to all other processors */
-    int len=CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader)+ChMessageInt(hdr->len);
+    int len=CmiReservedHeaderSize+sizeof(CcsImplHeader)+ChMessageInt(hdr->len);
     CmiSyncBroadcast(len, msg);
   }
   else if (destPE < -1) {
     /* Multicast the message to your children */
-    int len=CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader)+ChMessageInt(hdr->len)-destPE*sizeof(ChMessageInt_t);
+    int len=CmiReservedHeaderSize+sizeof(CcsImplHeader)+ChMessageInt(hdr->len)-destPE*sizeof(ChMessageInt_t);
     int index, child, i;
-    int *pes = (int*)(msg+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader));
+    int *pes = (int*)(msg+CmiReservedHeaderSize+sizeof(CcsImplHeader));
     ChMessageInt_t *pes_nbo = (ChMessageInt_t *)pes;
     offset -= destPE * sizeof(ChMessageInt_t);
     if (ChMessageInt(pes_nbo[0]) == CmiMyPe()) {
@@ -364,10 +364,10 @@ char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_le
   int len;
   char *msg;
   if (destPE < -1) reqLen -= destPE*sizeof(int);
-  len=CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader)+reqLen;
+  len=CmiReservedHeaderSize+sizeof(CcsImplHeader)+reqLen;
   msg=(char *)CmiAlloc(len);
-  memcpy(msg+CmiMsgHeaderSizeBytes,hdr,sizeof(CcsImplHeader));
-  memcpy(msg+CmiMsgHeaderSizeBytes+sizeof(CcsImplHeader),data,reqLen);
+  memcpy(msg+CmiReservedHeaderSize,hdr,sizeof(CcsImplHeader));
+  memcpy(msg+CmiReservedHeaderSize+sizeof(CcsImplHeader),data,reqLen);
   if (ret_len!=NULL) *ret_len=len;
   if (_ccsHandlerIdx != 0) {
     CmiSetHandler(msg, _ccsHandlerIdx);
@@ -387,7 +387,7 @@ converse to node 0.*/
 static void rep_fw_handler(char *msg)
 {
   int len;
-  char *r=msg+CmiMsgHeaderSizeBytes;
+  char *r=msg+CmiReservedHeaderSize;
   CcsImplHeader *hdr=(CcsImplHeader *)r; 
   r+=sizeof(CcsImplHeader);
   len=ChMessageInt(hdr->len);
@@ -444,10 +444,10 @@ void CcsImpl_reply(CcsImplHeader *rep,int repLen,const void *repData)
     CcsServer_sendReply(rep,repLen,repData);
   } else {
     /*Forward data & socket # to the replyPE*/
-    int len=CmiMsgHeaderSizeBytes+
+    int len=CmiReservedHeaderSize+
            sizeof(CcsImplHeader)+repLen;
     char *msg=CmiAlloc(len);
-    char *r=msg+CmiMsgHeaderSizeBytes;
+    char *r=msg+CmiReservedHeaderSize;
     *(CcsImplHeader *)r=*rep; r+=sizeof(CcsImplHeader);
     memcpy(r,repData,repLen);
     CmiSetHandler(msg,rep_fw_handler_idx);
