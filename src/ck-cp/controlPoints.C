@@ -76,6 +76,9 @@ void printTuningScheme(){
   case Simplex:
     CkPrintf("Tuning Scheme: Simplex Algorithm\n");
     break;
+  case DivideAndConquer:
+    CkPrintf("Tuning Scheme: Divide & Conquer Algorithm\n");
+    break;
   default:
     CkPrintf("Unknown tuning scheme\n");
     break;
@@ -1140,7 +1143,7 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime){
 
 /// Determine a control point value using some optimization scheme (use max known, simmulated annealling, 
 /// user observed characteristic to adapt specific control point values.
-/// @note eventually there should be a plugin system where multiple schemes can be plugged in(similar to LB)
+/// This function must return valid values for newControlPoints.
 void controlPointManager::generatePlan() {
   const int phase_id = this->phase_id;
   const int effective_phase = allData.phases.size();
@@ -1152,6 +1155,13 @@ void controlPointManager::generatePlan() {
  
   CkPrintf("Generating Plan for phase %d\n", phase_id); 
   printTuningScheme();
+
+  // By default lets put the previous phase data into newControlPoints
+  instrumentedPhase *prevPhase = previousPhaseData();
+  for(std::map<std::string, int >::const_iterator cpsIter=prevPhase->controlPoints.begin(); cpsIter != prevPhase->controlPoints.end(); ++cpsIter){
+	  newControlPoints[cpsIter->first] = cpsIter->second;
+  }
+
 
   if( whichTuningScheme == RandomSelection ){
     std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
@@ -1204,12 +1214,10 @@ void controlPointManager::generatePlan() {
 	CkPrintf("Steering (memory based) controlPointSpace.size()=\n", controlPointSpace.size());
 	
 	// Initialize plan to be the values from two phases ago (later we'll adjust this)
-	std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-	for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-	  const std::string &name = cpsIter->first;
-	  const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
-	  newControlPoints[name] = twoAgoValue;
+	for(std::map<std::string, int >::const_iterator cpsIter=twoAgoPhase->controlPoints.begin(); cpsIter != twoAgoPhase->controlPoints.end(); ++cpsIter){
+		newControlPoints[cpsIter->first] = cpsIter->second;
 	}
+
 	CkPrintf("Steering (memory based) initialized plan\n");
 	fflush(stdout);
 
@@ -1306,13 +1314,10 @@ void controlPointManager::generatePlan() {
 
 					  // Initialize a new plan based on two phases ago
 					  std::map<std::string,int> aNewPlan;
-
-					  std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-					  for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-						  const std::string &name = cpsIter->first;
-						  const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
-						  aNewPlan[name] = twoAgoValue;
+					  for(std::map<std::string, int >::const_iterator cpsIter=twoAgoPhase->controlPoints.begin(); cpsIter != twoAgoPhase->controlPoints.end(); ++cpsIter){
+						  aNewPlan[cpsIter->first] = cpsIter->second;
 					  }
+
 
 					  CkPrintf("Steering found knob to turn\n");
 					  fflush(stdout);
@@ -1359,13 +1364,10 @@ void controlPointManager::generatePlan() {
 
 					  // Initialize a new plan based on two phases ago
 					  std::map<std::string,int> aNewPlan;
-
-					  std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-					  for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-						  const std::string &name = cpsIter->first;
-						  const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
-						  aNewPlan[name] = twoAgoValue;
+					  for(std::map<std::string, int >::const_iterator cpsIter=twoAgoPhase->controlPoints.begin(); cpsIter != twoAgoPhase->controlPoints.end(); ++cpsIter){
+						  aNewPlan[cpsIter->first] = cpsIter->second;
 					  }
+
 
 					  CkPrintf("Steering found knob to turn\n");
 					  fflush(stdout);
@@ -1412,13 +1414,10 @@ void controlPointManager::generatePlan() {
 
 					  // Initialize a new plan based on two phases ago
 					  std::map<std::string,int> aNewPlan;
-
-					  std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-					  for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-						  const std::string &name = cpsIter->first;
-						  const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
-						  aNewPlan[name] = twoAgoValue;
+					  for(std::map<std::string, int >::const_iterator cpsIter=twoAgoPhase->controlPoints.begin(); cpsIter != twoAgoPhase->controlPoints.end(); ++cpsIter){
+						  aNewPlan[cpsIter->first] = cpsIter->second;
 					  }
+
 
 					  CkPrintf("Steering found knob to turn\n");
 					  fflush(stdout);
@@ -1558,13 +1557,10 @@ void controlPointManager::generatePlan() {
 
 					  // Initialize a new plan based on two phases ago
 					  std::map<std::string,int> aNewPlan;
-
-					  std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-					  for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-						  const std::string &name = cpsIter->first;
-						  const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
-						  aNewPlan[name] = twoAgoValue;
+					  for(std::map<std::string, int >::const_iterator cpsIter=twoAgoPhase->controlPoints.begin(); cpsIter != twoAgoPhase->controlPoints.end(); ++cpsIter){
+						  aNewPlan[cpsIter->first] = cpsIter->second;
 					  }
+
 
 					  CkPrintf("Steering found knob to turn\n");
 					  fflush(stdout);
