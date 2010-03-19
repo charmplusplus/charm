@@ -46,7 +46,7 @@ std::map<std::string, int> defaultControlPointValues;
 
 
 
-typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware, Simplex}  tuningScheme;
+typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware, Simplex, DivideAndConquer}  tuningScheme;
 
 
 
@@ -1007,7 +1007,9 @@ public:
       whichTuningScheme = MemoryAware;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPSimplex", "Nelder-Mead Simplex Algorithm") ){
       whichTuningScheme = Simplex;
- }
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPDivideConquer", "A divide and conquer program specific steering scheme") ){
+      whichTuningScheme = DivideAndConquer;
+    }
 
     char *defValStr = NULL;
     if( CmiGetArgStringDesc(args->argv, "+CPDefaultValues", &defValStr, "Specify the default control point values used for the first couple phases") ){
@@ -1264,205 +1266,205 @@ void controlPointManager::generatePlan() {
     }
 
   } else if ( whichTuningScheme == UseSteering ) {
-    // -----------------------------------------------------------
-    //  STEERING BASED ON KNOWLEDGE
-  
-    // after 3 phases (and only on even steps), do steering performance. Otherwise, just use previous phase's configuration
-    // plans are only generated after 3 phases
+	  // -----------------------------------------------------------
+	  //  STEERING BASED ON KNOWLEDGE
 
-    instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
-    instrumentedPhase *prevPhase = previousPhaseData();
+	  // after 3 phases (and only on even steps), do steering performance. Otherwise, just use previous phase's configuration
+	  // plans are only generated after 3 phases
 
-    if(phase_id%4 == 0){
-      CkPrintf("Steering based on 2 phases ago:\n");
-      twoAgoPhase->print();
-      CkPrintf("\n");
-      fflush(stdout);
-      
-      std::vector<std::map<std::string,int> > possibleNextStepPlans;
+	  instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
+	  instrumentedPhase *prevPhase = previousPhaseData();
+
+	  if(phase_id%4 == 0){
+		  CkPrintf("Steering based on 2 phases ago:\n");
+		  twoAgoPhase->print();
+		  CkPrintf("\n");
+		  fflush(stdout);
+
+		  std::vector<std::map<std::string,int> > possibleNextStepPlans;
 
 
-      // ========================================= Concurrency =============================================
-      // See if idle time is high:
-      {
-	double idleTime = twoAgoPhase->idleTime.avg;
-	CkPrintf("Steering encountered idle time (%f)\n", idleTime);
-	fflush(stdout);
-	if(idleTime > 0.10){
-	  CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
-	  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
-	
-	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["Concurrency"];
-	
-	  bool found = false;
-	  std::string cpName;
-	  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
-	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;
-	  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
-	    cpName = iter->first;
-	    info = &iter->second;
-	  
-	    // Initialize a new plan based on two phases ago
-	    std::map<std::string,int> aNewPlan;
-	  
-	    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-	    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-	      const std::string &name = cpsIter->first;
-	      const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
-	      aNewPlan[name] = twoAgoValue;
-	    }
-	  
-	    CkPrintf("Steering found knob to turn\n");
-	    fflush(stdout);
+		  // ========================================= Concurrency =============================================
+		  // See if idle time is high:
+		  {
+			  double idleTime = twoAgoPhase->idleTime.avg;
+			  CkPrintf("Steering encountered idle time (%f)\n", idleTime);
+			  fflush(stdout);
+			  if(idleTime > 0.10){
+				  CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
+				  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
 
-	    if(info->first == ControlPoint::EFF_INC){
-	      const int maxValue = controlPointSpace[cpName].second;
-	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-	      if(twoAgoValue+1 <= maxValue){
-		aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
-	      }
-	    } else {
-	      const int minValue = controlPointSpace[cpName].second;
-	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-	      if(twoAgoValue-1 >= minValue){
-		aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
-	      }
-	    }
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["Concurrency"];
 
-	    possibleNextStepPlans.push_back(aNewPlan);
-	  
+				  bool found = false;
+				  std::string cpName;
+				  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;
+				  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
+					  cpName = iter->first;
+					  info = &iter->second;
+
+					  // Initialize a new plan based on two phases ago
+					  std::map<std::string,int> aNewPlan;
+
+					  std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+					  for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+						  const std::string &name = cpsIter->first;
+						  const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
+						  aNewPlan[name] = twoAgoValue;
+					  }
+
+					  CkPrintf("Steering found knob to turn\n");
+					  fflush(stdout);
+
+					  if(info->first == ControlPoint::EFF_INC){
+						  const int maxValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  if(twoAgoValue+1 <= maxValue){
+							  aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
+						  }
+					  } else {
+						  const int minValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  if(twoAgoValue-1 >= minValue){
+							  aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
+						  }
+					  }
+
+					  possibleNextStepPlans.push_back(aNewPlan);
+
+				  }
+			  }
+		  }
+
+		  // ========================================= Grain Size =============================================
+		  // If the grain size is too small, there may be tons of messages and overhead time associated with scheduling
+		  {
+			  double overheadTime = twoAgoPhase->overheadTime.avg;
+			  CkPrintf("Steering encountered overhead time (%f)\n", overheadTime);
+			  fflush(stdout);
+			  if(overheadTime > 0.10){
+				  CkPrintf("Steering encountered high overhead time(%f) > 10%%\n", overheadTime);
+				  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
+
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["GrainSize"];
+
+				  bool found = false;
+				  std::string cpName;
+				  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;
+				  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
+					  cpName = iter->first;
+					  info = &iter->second;
+
+					  // Initialize a new plan based on two phases ago
+					  std::map<std::string,int> aNewPlan;
+
+					  std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+					  for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+						  const std::string &name = cpsIter->first;
+						  const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
+						  aNewPlan[name] = twoAgoValue;
+					  }
+
+					  CkPrintf("Steering found knob to turn\n");
+					  fflush(stdout);
+
+					  if(info->first == ControlPoint::EFF_INC){
+						  const int maxValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  if(twoAgoValue+1 <= maxValue){
+							  aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
+						  }
+					  } else {
+						  const int minValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  if(twoAgoValue-1 >= minValue){
+							  aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
+						  }
+					  }
+
+					  possibleNextStepPlans.push_back(aNewPlan);
+
+				  }
+
+			  }
+		  }
+		  // ========================================= GPU Offload =============================================
+		  // If the grain size is too small, there may be tons of messages and overhead time associated with scheduling
+		  {
+			  double idleTime = twoAgoPhase->idleTime.avg;
+			  CkPrintf("Steering encountered idle time (%f)\n", idleTime);
+			  fflush(stdout);
+			  if(idleTime > 0.10){
+				  CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
+				  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
+
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["GPUOffloadedWork"];
+
+				  bool found = false;
+				  std::string cpName;
+				  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;
+				  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
+					  cpName = iter->first;
+					  info = &iter->second;
+
+					  // Initialize a new plan based on two phases ago
+					  std::map<std::string,int> aNewPlan;
+
+					  std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+					  for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+						  const std::string &name = cpsIter->first;
+						  const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
+						  aNewPlan[name] = twoAgoValue;
+					  }
+
+					  CkPrintf("Steering found knob to turn\n");
+					  fflush(stdout);
+
+					  if(info->first == ControlPoint::EFF_DEC){
+						  const int maxValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  if(twoAgoValue+1 <= maxValue){
+							  aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
+						  }
+					  } else {
+						  const int minValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  if(twoAgoValue-1 >= minValue){
+							  aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
+						  }
+					  }
+
+					  possibleNextStepPlans.push_back(aNewPlan);
+
+				  }
+
+			  }
+		  }
+
+		  // ========================================= Done =============================================
+
+
+		  if(possibleNextStepPlans.size() > 0){
+			  newControlPoints = possibleNextStepPlans[0];
+		  }
+
+
+		  CkPrintf("Steering done for this phase\n");
+		  fflush(stdout);
+
+	  }  else {
+		  // This is not a phase to do steering, so stick with previously used values (one phase ago)
+		  CkPrintf("not a phase to do steering, so stick with previously planned values (one phase ago)\n");
+		  fflush(stdout);
 	  }
-	}
-      }
-
-      // ========================================= Grain Size =============================================
-      // If the grain size is too small, there may be tons of messages and overhead time associated with scheduling
-      {
-	double overheadTime = twoAgoPhase->overheadTime.avg;
-	CkPrintf("Steering encountered overhead time (%f)\n", overheadTime);
-	fflush(stdout);
-	if(overheadTime > 0.10){
-	  CkPrintf("Steering encountered high overhead time(%f) > 10%%\n", overheadTime);
-	  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
-
-	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["GrainSize"];   
-	
-	  bool found = false;
-	  std::string cpName;
-	  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
-	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;     
-	  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
-	    cpName = iter->first;
-	    info = &iter->second;
-	  
-	    // Initialize a new plan based on two phases ago
-	    std::map<std::string,int> aNewPlan;
-	  
-	    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-	    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-	      const std::string &name = cpsIter->first;
-	      const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
-	      aNewPlan[name] = twoAgoValue;
-	    }
-	  
-	    CkPrintf("Steering found knob to turn\n");
-	    fflush(stdout);
-
-	    if(info->first == ControlPoint::EFF_INC){
-	      const int maxValue = controlPointSpace[cpName].second;
-	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-	      if(twoAgoValue+1 <= maxValue){
-		aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
-	      }
-	    } else {
-	      const int minValue = controlPointSpace[cpName].second;
-	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-	      if(twoAgoValue-1 >= minValue){
-		aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
-	      }
-	    }
-
-	    possibleNextStepPlans.push_back(aNewPlan);
-	  
-	  }
-
-      }
-      }
-      // ========================================= GPU Offload =============================================
-      // If the grain size is too small, there may be tons of messages and overhead time associated with scheduling
-      {
-	double idleTime = twoAgoPhase->idleTime.avg;
-	CkPrintf("Steering encountered idle time (%f)\n", idleTime);
-	fflush(stdout);
-	if(idleTime > 0.10){
-	  CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
-	  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
-	
-	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["GPUOffloadedWork"];   
-	
-	  bool found = false;
-	  std::string cpName;
-	  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
-	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;     
-	  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
-	    cpName = iter->first;
-	    info = &iter->second;
-	  
-	    // Initialize a new plan based on two phases ago
-	    std::map<std::string,int> aNewPlan;
-	  
-	    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-	    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-	      const std::string &name = cpsIter->first;
-	      const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
-	      aNewPlan[name] = twoAgoValue;
-	    }
-	  
-	    CkPrintf("Steering found knob to turn\n");
-	    fflush(stdout);
-
-	    if(info->first == ControlPoint::EFF_DEC){
-	      const int maxValue = controlPointSpace[cpName].second;
-	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-	      if(twoAgoValue+1 <= maxValue){
-		aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
-	      }
-	    } else {
-	      const int minValue = controlPointSpace[cpName].second;
-	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-	      if(twoAgoValue-1 >= minValue){
-		aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
-	      }
-	    }
-
-	    possibleNextStepPlans.push_back(aNewPlan);
-	  
-	  }
-
-	}
-      }
-
-      // ========================================= Done =============================================
 
 
-      if(possibleNextStepPlans.size() > 0){
-	newControlPoints = possibleNextStepPlans[0];
-      } 
-          
-      
-      CkPrintf("Steering done for this phase\n");
-      fflush(stdout);
 
-    }  else {
-      // This is not a phase to do steering, so stick with previously used values (one phase ago)
-      CkPrintf("not a phase to do steering, so stick with previously planned values (one phase ago)\n");
-      fflush(stdout);
-    }
-    
-    
-    
   } else if( whichTuningScheme == SimulatedAnnealing ) {
-    
+
     // -----------------------------------------------------------
     //  SIMULATED ANNEALING
     //  Simulated Annealing style hill climbing method
@@ -1501,6 +1503,101 @@ void controlPointManager::generatePlan() {
       } 
       
     }
+
+  } else if ( whichTuningScheme == DivideAndConquer ) {
+
+	  // -----------------------------------------------------------
+	  //  STEERING FOR Divide & Conquer Programs
+	  //  This scheme uses no timing information. It just tries to converge to the point where idle time = overhead time.
+	  //  For a Fibonacci example, this appears to be a good heurstic for finding the best performing program.
+	  //  The scheme can be applied within a single program tree computation, if the tree is being traversed depth first.
+
+	  // after 3 phases (and only on even steps), do steering performance. Otherwise, just use previous phase's configuration
+	  // plans are only generated after 3 phases
+
+	  instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
+	  instrumentedPhase *prevPhase = previousPhaseData();
+
+	  if(phase_id%4 == 0){
+		  CkPrintf("Steering based on 2 phases ago:\n");
+		  twoAgoPhase->print();
+		  CkPrintf("\n");
+		  fflush(stdout);
+
+		  std::vector<std::map<std::string,int> > possibleNextStepPlans;
+
+
+		  // ========================================= Concurrency =============================================
+		  // See if idle time is high:
+		  {
+			  double idleTime = twoAgoPhase->idleTime.avg;
+			  double overheadTime = twoAgoPhase->overheadTime.avg;
+
+
+			  CkPrintf("Divide & Conquer Steering encountered overhead time (%f) idle time (%f)\n",overheadTime, idleTime);
+			  fflush(stdout);
+			  if(idleTime+overheadTime > 0.10){
+				  CkPrintf("Steering encountered high idle+overheadTime time(%f) > 10%%\n", idleTime+overheadTime);
+				  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
+
+				  int direction = -1;
+				  if (idleTime>overheadTime){
+					  // We need to decrease the grain size, or increase the available concurrency
+					  direction = 1;
+				  }
+
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["Concurrency"];
+
+				  bool found = false;
+				  std::string cpName;
+				  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;
+				  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
+					  cpName = iter->first;
+					  info = &iter->second;
+
+					  // Initialize a new plan based on two phases ago
+					  std::map<std::string,int> aNewPlan;
+
+					  std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+					  for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+						  const std::string &name = cpsIter->first;
+						  const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
+						  aNewPlan[name] = twoAgoValue;
+					  }
+
+					  CkPrintf("Steering found knob to turn\n");
+					  fflush(stdout);
+
+					  if(info->first == ControlPoint::EFF_INC){
+						  const int maxValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  if(twoAgoValue+1 <= maxValue){
+							  aNewPlan[cpName] = twoAgoValue+1*direction; // increase when idleTime > overheadTime
+						  }
+					  } else {
+						  const int minValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  if(twoAgoValue-1 >= minValue){
+							  aNewPlan[cpName] = twoAgoValue-1*direction;
+						  }
+					  }
+
+					  possibleNextStepPlans.push_back(aNewPlan);
+
+				  }
+			  }
+		  }
+
+		  if(possibleNextStepPlans.size() > 0){
+			  newControlPoints = possibleNextStepPlans[0];
+		  }
+
+
+		  CkPrintf("Tuning via Divide & Conquer Scheme done for this phase\n");
+		  fflush(stdout);
+	  }
+
   } else if( whichTuningScheme == Simplex ) {
 
 	  // -----------------------------------------------------------
