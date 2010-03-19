@@ -178,7 +178,7 @@ static inline void CkDeliverMsgs(int nmsg)	{ BgDeliverMsgs(nmsg); }
 #define CmiMultipleSend			BgMultipleSend
 
 #undef CsdEnqueueLifo
-#define CsdEnqueueLifo(m)  CmiSyncSendAndFree(CmiMyPe(),sizeof(m), (char*)(m));
+#define CsdEnqueueLifo(m)  CmiSyncSendAndFree(CkMyPe(),((envelope*)m)->getTotalsize(), (char*)(m));
 
 #undef CmiNodeAllBarrier
 #define CmiNodeAllBarrier()
