@@ -330,7 +330,7 @@ void workThreadInfo::scheduler(int count)
 
 static FILE *openBinaryReplayFile(int pe, const char* flags) {
         char fName[200];
-        sprintf(fName,"ckfullreplay_%06d.log",pe);
+        sprintf(fName,"bgfullreplay_%06d.log",pe);
         FILE *f;
         // CkPrintf("openBinaryReplayFile %s\n", fName);
         f = fopen(fName, flags);
