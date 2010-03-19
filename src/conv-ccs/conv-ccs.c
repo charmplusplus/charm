@@ -261,7 +261,7 @@ delivery.
   Deliver the given message data to the given
 CCS handler.
 */
-static void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
+void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 {
   char *cmsg;
   int reqLen=ChMessageInt(hdr->len);
@@ -288,40 +288,6 @@ static void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 
 /*Unpacks request message to call above routine*/
 int _ccsHandlerIdx = 0;/*Converse handler index of below routine*/
-static void req_fw_handler(char *msg)
-{
-  int offset = CmiReservedHeaderSize + sizeof(CcsImplHeader);
-  CcsImplHeader *hdr = (CcsImplHeader *)(msg+CmiReservedHeaderSize);
-  int destPE = (int)ChMessageInt(hdr->pe);
-  if (CmiMyPe() == 0 && destPE == -1) {
-    /* Broadcast message to all other processors */
-    int len=CmiReservedHeaderSize+sizeof(CcsImplHeader)+ChMessageInt(hdr->len);
-    CmiSyncBroadcast(len, msg);
-  }
-  else if (destPE < -1) {
-    /* Multicast the message to your children */
-    int len=CmiReservedHeaderSize+sizeof(CcsImplHeader)+ChMessageInt(hdr->len)-destPE*sizeof(ChMessageInt_t);
-    int index, child, i;
-    int *pes = (int*)(msg+CmiReservedHeaderSize+sizeof(CcsImplHeader));
-    ChMessageInt_t *pes_nbo = (ChMessageInt_t *)pes;
-    offset -= destPE * sizeof(ChMessageInt_t);
-    if (ChMessageInt(pes_nbo[0]) == CmiMyPe()) {
-      for (index=0; index<-destPE; ++index) pes[index] = ChMessageInt(pes_nbo[index]);
-    }
-    for (index=0; index<-destPE; ++index) {
-      if (pes[index] == CmiMyPe()) break;
-    }
-    child = (index << 2) + 1;
-    for (i=0; i<4; ++i) {
-      if (child+i < -destPE) {
-        CmiSyncSend(pes[child+i], len, msg);
-      }
-    }
-  }
-  CcsHandleRequest(hdr, msg+offset);
-  CmiFree(msg);
-}
-
 #if ! NODE_0_IS_CONVHOST
 /* The followings are necessary to prevent CCS requests to be processed before
  * CCS has been initialized. Really it matters only when NODE_0_IS_CONVHOST=0, but
@@ -340,6 +306,8 @@ void CcsBufferMessage(char *msg) {
   CcsNumBufferedMsgs ++;
 }
   
+extern void req_fw_handler(char *msg);
+
 void CcsReleaseMessages() {
 #if ! NODE_0_IS_CONVHOST
   if (CcsNumBufferedMsgs > 0) {
