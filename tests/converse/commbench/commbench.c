@@ -74,6 +74,9 @@ int commbench_skip(char *test)
   int i;
   int num_skip = CpvAccess(num_tests_to_skip);
   char **skip;
+  /* default mode where no tests are skipped */
+  if(num_skip==0) return 0;
+
   skip = CpvAccess(tests_to_skip);
   for (i=0; i<num_skip; i++) {
     if (strcmp(skip[i+2], test)==0)
@@ -135,10 +138,9 @@ void commbench_init(int argc, char **argv)
   for (i=1; i<argc; i++)
     if (strcmp(argv[i],"-only")==0)
       CpvAccess(test_negate_skip)=1;
-  CpvAccess(num_tests_to_skip) = argc;
+  CpvAccess(num_tests_to_skip) = 0;
   if(CpvAccess(test_negate_skip)) {
-    CpvAccess(num_tests_to_skip)--;
-    CpvAccess(num_tests_to_skip)--;
+    CpvAccess(num_tests_to_skip) = argc-2;
   }
   CpvAccess(tests_to_skip) = argv;
 
