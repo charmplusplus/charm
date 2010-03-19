@@ -517,6 +517,9 @@ void addBgNodeInbuffer(char *msgPtr, int lnodeID)
 	
   nInfo.addBgNodeInbuffer(msgPtr);
 }
+extern "C" void addBgNodeInbuffer_c(char *msgPtr, int lnodeID) {
+  addBgNodeInbuffer(msgPtr, lnodeID);
+}
 
 /** BG API Func 
  *  called by a comm thread
@@ -1185,7 +1188,8 @@ void BgProcessMessage(threadInfo *tinfo, char *msg)
 {
   DEBUGM(5, ("=====Begin of BgProcessing a msg on node[%d]=====\n", BgMyNode()));
   int handler = CmiBgMsgHandle(msg);
-  DEBUGF(("[%d] call handler %d\n", BgMyNode(), handler));
+  CmiPrintf("[%d] call handler %d\n", BgMyNode(), handler);
+  CmiAssert(handler < 1000);
 
   BgHandlerInfo *handInfo;
 #if  CMK_BLUEGENE_NODE
