@@ -2020,7 +2020,9 @@ static void writeToDisk()
 }
 
 
-// application Converse thread hook
+/*****************************************************************************
+             application Converse thread hook
+*****************************************************************************/
 
 CpvExtern(int      , CthResumeBigSimThreadIdx);
 
@@ -2087,3 +2089,7 @@ int BgIsReplay()
     return cva(bgMach).replay != -1;
 }
 
+int BgIsMainthread()
+{
+    return tMYNODE == NULL;
+}

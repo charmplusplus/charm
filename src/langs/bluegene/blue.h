@@ -226,6 +226,8 @@ double BgGetTime();
 char *BgGetNodeData();
 void BgSetNodeData(char *data);
 
+int BgIsMainthread();
+
 /************************ Timing utility functions ************************/
 
 #define BG_ELAPSE      1
