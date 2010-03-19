@@ -331,6 +331,30 @@ static int CcsNumBufferedMsgs = 0;
 #define CCS_MAX_NUM_BUFFERED_MSGS  100
 #endif
 
+void CcsBufferMessage(char *msg) {
+  //CmiPrintf("Buffering CCS message\n");
+  CmiAssert(CcsNumBufferedMsgs < CCS_MAX_NUM_BUFFERED_MSGS);
+  if (CcsNumBufferedMsgs < 0) CmiAbort("Why is a CCS message being buffered now???");
+  if (bufferedMessages == NULL) bufferedMessages = malloc(sizeof(char*)*CCS_MAX_NUM_BUFFERED_MSGS);
+  bufferedMessages[CcsNumBufferedMsgs] = msg;
+  CcsNumBufferedMsgs ++;
+}
+  
+void CcsReleaseMessages() {
+#if ! NODE_0_IS_CONVHOST
+  if (CcsNumBufferedMsgs > 0) {
+    int i;
+    for (i=0; i<CcsNumBufferedMsgs; ++i) {
+      CmiSetHandler(bufferedMessages[i], _ccsHandlerIdx);
+      CmiPushPE(0, bufferedMessages[i]);
+    }
+    free(bufferedMessages);
+    bufferedMessages = NULL;
+    CcsNumBufferedMsgs = -1;
+  }
+#endif
+}
+
 /*Convert CCS header & message data into a converse message 
  addressed to handler*/
 char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_len)
@@ -352,12 +376,7 @@ char *CcsImpl_ccs2converse(const CcsImplHeader *hdr,const void *data,int *ret_le
 #if NODE_0_IS_CONVHOST
     CmiAbort("Why do we need to buffer messages when node 0 is Convhost?");
 #else
-    //CmiPrintf("Buffering CCS message\n");
-    CmiAssert(CcsNumBufferedMsgs < CCS_MAX_NUM_BUFFERED_MSGS);
-    if (CcsNumBufferedMsgs < 0) CmiAbort("Why is a CCS message being buffered now???");
-    if (bufferedMessages == NULL) bufferedMessages = malloc(sizeof(char*)*CCS_MAX_NUM_BUFFERED_MSGS);
-    bufferedMessages[CcsNumBufferedMsgs] = msg;
-    CcsNumBufferedMsgs ++;
+    CcsBufferMessage(msg);
     return NULL;
 #endif
   }
@@ -572,18 +591,7 @@ void CcsInit(char **argv)
      }
   }
 
-#if ! NODE_0_IS_CONVHOST
-  if (CcsNumBufferedMsgs > 0) {
-    int i;
-    for (i=0; i<CcsNumBufferedMsgs; ++i) {
-      CmiSetHandler(bufferedMessages[i], _ccsHandlerIdx);
-      CmiPushPE(0, bufferedMessages[i]);
-    }
-    free(bufferedMessages);
-    bufferedMessages = NULL;
-    CcsNumBufferedMsgs = -1;
-  }
-#endif
+  CcsReleaseMessages();
 }
 
 #endif /*CMK_CCS_AVAILABLE*/
