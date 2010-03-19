@@ -286,8 +286,6 @@ void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
     CcsSendReply(0,NULL);/*Send an empty reply if not*/
 }
 
-/*Unpacks request message to call above routine*/
-int _ccsHandlerIdx = 0;/*Converse handler index of below routine*/
 #if ! NODE_0_IS_CONVHOST
 /* The followings are necessary to prevent CCS requests to be processed before
  * CCS has been initialized. Really it matters only when NODE_0_IS_CONVHOST=0, but
@@ -306,10 +304,44 @@ void CcsBufferMessage(char *msg) {
   CcsNumBufferedMsgs ++;
 }
   
+/*Unpacks request message to call above routine*/
+int _ccsHandlerIdx = 0;/*Converse handler index of routine req_fw_handler*/
+
+#if CMK_BLUEGENE_CHARM
+CpvDeclare(int, _bgCcsHandlerIdx);
+CpvDeclare(int, _bgCcsAck);
+/* This routine is needed when the application is built on top of the bigemulator
+ * layer of Charm. In this case, the real CCS handler must be called within a
+ * worker thread. The function of this function is to receive the CCS message in
+ * the bottom converse layer and forward it to the emulated layer. */
+static void bg_req_fw_handler(char *msg) {
+  if (CpvAccess(_bgCcsAck) < BgNodeSize()) {
+    CcsBufferMessage(msg);
+    return;
+  }
+  /* Get out of the message who is the destination pe */
+  int offset = CmiReservedHeaderSize + sizeof(CcsImplHeader);
+  CcsImplHeader *hdr = (CcsImplHeader *)(msg+CmiReservedHeaderSize);
+  int destPE = (int)ChMessageInt(hdr->pe);
+  CmiAssert(destPE >= 0); // FixME: should cover also broadcast and multicast -> create generic function to extract destpe
+  (((CmiBlueGeneMsgHeader*)msg)->tID) = 0;
+  (((CmiBlueGeneMsgHeader*)msg)->n) = 0;
+  (((CmiBlueGeneMsgHeader*)msg)->flag) = 0;
+  (((CmiBlueGeneMsgHeader*)msg)->t) = 0;
+  (((CmiBlueGeneMsgHeader*)msg)->hID) = CpvAccess(_bgCcsHandlerIdx);
+  /* Get the right thread to deliver to (for now assume it is using CyclicMapInfo) */
+  addBgNodeInbuffer_c(msg, destPE/CmiNumPes());
+  CmiPrintf("message CCS added %d to %d\n",((CmiBlueGeneMsgHeader*)msg)->hID, ((CmiBlueGeneMsgHeader*)msg)->tID);
+}
+#define req_fw_handler bg_req_fw_handler
+#endif
 extern void req_fw_handler(char *msg);
 
 void CcsReleaseMessages() {
 #if ! NODE_0_IS_CONVHOST
+#if CMK_BLUEGENE_CHARM
+  if (CpvAccess(_bgCcsAck) == 0 || CpvAccess(_bgCcsAck) < BgNodeSize()) return;
+#endif
   if (CcsNumBufferedMsgs > 0) {
     int i;
     for (i=0; i<CcsNumBufferedMsgs; ++i) {
@@ -511,6 +543,12 @@ void CcsInit(char **argv)
   CpvInitialize(CcsImplHeader *, ccsReq);
   CpvAccess(ccsReq) = NULL;
   _ccsHandlerIdx = CmiRegisterHandler((CmiHandler)req_fw_handler);
+#if CMK_BLUEGENE_CHARM
+  CpvInitialize(int, _bgCcsHandlerIdx);
+  CpvAccess(_bgCcsHandlerIdx) = 0;
+  CpvInitialize(int, _bgCcsAck);
+  CpvAccess(_bgCcsAck) = 0;
+#endif
   CpvInitialize(int, cmiArgDebugFlag);
   CpvInitialize(char *, displayArgument);
   CpvInitialize(int, cpdSuspendStartup);

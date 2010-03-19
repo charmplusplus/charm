@@ -850,6 +850,12 @@ extern "C" void initQd(char **argv)
         }
 }
 
+#if CMK_BLUEGENE_CHARM && CMK_CCS_AVAILABLE
+CpvExtern(int, _bgCcsHandlerIdx);
+CpvExtern(int, _bgCcsAck);
+extern "C" void req_fw_handler(char*);
+#endif
+
 /**
   This is the main charm setup routine.  It's called
   on all processors after Converse initialization.
@@ -1214,11 +1220,23 @@ void _initCharm(int unused_argc, char **argv)
         }
 
 #if CMK_CCS_AVAILABLE
+#if CMK_BLUEGENE_CHARM
+        // Register the BG handler for CCS. Notice that this is put into a variable shared by
+        // the whole real processor. This because converse needs to find it. We check that all
+        // virtual processors register the same index for this handler.
+        int bgCcsHandlerIdx = CkRegisterHandler((CmiHandler)req_fw_handler);
+        if (CpvAccess(_bgCcsHandlerIdx) == 0) CpvAccess(_bgCcsHandlerIdx) = bgCcsHandlerIdx;
+        CkAssert(CpvAccess(_bgCcsHandlerIdx)==bgCcsHandlerIdx);
+        CpvAccess(_bgCcsAck) ++;
+        CcsReleaseMessages();
+#else
+        // Should not use CpdFreeze inside a thread (since this processor is really a user-level thread)
        if (CpvAccess(cpdSuspendStartup))
        { 
           //CmiPrintf("In Parallel Debugging mode .....\n");
           CpdFreeze();
        }
+#endif
 #endif
 
 
