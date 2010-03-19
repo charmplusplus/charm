@@ -693,11 +693,11 @@ do
 		# used internally not to build Charm++ lib_so
 		BUILD_SHARE="0"
 		;;
-	"-O")
+	"-optimize")
 		OPTIMIZE_MODE=true
 		;;
 
-	"-NO")
+	"-no-optimize")
 		OPTIMIZE_MODE=false
 		;;
 	

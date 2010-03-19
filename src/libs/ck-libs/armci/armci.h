@@ -12,6 +12,7 @@
 #ifndef _ARMCI_H
 #define _ARMCI_H
 
+#include "conv-config.h"
 #include "tcharmc.h" /* for TCHARM_Element */
 
 #ifdef __cplusplus
@@ -312,7 +313,7 @@ void armci_msg_brdcst(void *buffer, int len, int root);
 void armci_msg_bcast(void *buffer, int len, int root);
 void armci_msg_gop2(void *x, int n, int type, char *op);
 void armci_msg_igop(int *x, int n, char *op);
-void armci_msg_lgop(long *x, int n, char *op);
+void armci_msg_lgop(CMK_TYPEDEF_INT8 *x, int n, char *op);
 void armci_msg_fgop(float *x, int n, char *op);
 void armci_msg_dgop(double *x, int n, char *op);
 void armci_msg_barrier(void);

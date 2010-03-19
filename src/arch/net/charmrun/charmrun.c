@@ -626,7 +626,7 @@ int   arg_help;		/* print help message */
 int   arg_ppn;		/* pes per node */
 int   arg_usehostname;
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 int     arg_read_pes=0;
 #endif
 
@@ -672,7 +672,7 @@ void arg_init(int argc, char **argv)
   pparam_flag(&arg_verbose,      0, "verbose",       "Print diagnostic messages");
   pparam_str(&arg_nodelist,      0, "nodelist",      "file containing list of nodes");
   pparam_str(&arg_nodegroup,"main", "nodegroup",     "which group of nodes to use");
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	pparam_int(&arg_read_pes, 0, "readpe",             "number of host names to read into the host table");
 #endif
 
@@ -932,7 +932,7 @@ int           nodetab_size;
 int          *nodetab_rank0_table;
 int           nodetab_rank0_size;
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 int                     loaded_max_pe;
 #endif
 
@@ -1038,7 +1038,7 @@ void nodetab_init_for_local()
   int tablesize, i, done=0;
   nodetab_host group;
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     if(arg_read_pes == 0){
         arg_read_pes = arg_requested_pes;
     }
@@ -1091,7 +1091,7 @@ void nodetab_init()
     exit(1);
   }
  
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	if(arg_read_pes == 0){
         arg_read_pes = arg_requested_pes;
     }
@@ -1111,7 +1111,7 @@ void nodetab_init()
   rightgroup = (strcmp(arg_nodegroup,"main")==0);
   
   while(fgets(input_line,sizeof(input_line)-1,f)!=0) {
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	if (nodetab_size == arg_read_pes) break;
 #else
     if (nodetab_size == arg_requested_pes) break;
@@ -1165,7 +1165,7 @@ fin:
       nodetab_table[i]->cpus = remain;
   }
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	loaded_max_pe = arg_requested_pes-1;
 #endif
 
@@ -1240,7 +1240,7 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 	for (pe=0;pe<nodetab_cpus(nt);pe++){
 		nodetab_table[nt+pe]->ctrlfd=ctrlfd;
 	}
-	printf("Charmrun> client %d connected\n", nt);
+	/* printf("Charmrun> client %d connected\n", nt); */
 #else
 	dataport = ChMessageInt(i.dataport);
 	if (0==dataport)
@@ -1617,7 +1617,7 @@ int req_handle_ending(ChMessage *msg,SOCKET fd)
   int i;
   req_ending++;
 
-#ifndef _FAULT_MLOG_    
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
 	if (req_ending == nodetab_size)
 #else
 	if(req_ending == arg_requested_pes)
@@ -1697,7 +1697,7 @@ void anounce_crash(int socket_index,int crashed_node);
 static int _last_crash = 0;			/* last crashed pe number */
 static int _crash_socket_index = 0;		/* last restart socket */
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 static int numCrashes=0;  /*number of crashes*/
 static SOCKET last_crashed_fd=-1;
 #endif
@@ -1713,7 +1713,7 @@ int req_handle_crashack(ChMessage *msg,SOCKET fd)
     req_handle_initnodetab(NULL,req_clients[_crash_socket_index]);
     _last_crash = 0;
     count = 0;
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	last_crashed_fd=-1;
 #endif
   }
@@ -1732,7 +1732,7 @@ void error_in_req_serve_client(SOCKET fd){
 		}
 	}
 	fflush(stdout);
-#ifndef _FAULT_MLOG_
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
 	skt_close(fd);
 #endif
 	crashed_pe = i;
@@ -1759,7 +1759,7 @@ void error_in_req_serve_client(SOCKET fd){
 	}	
 	socket_index = i;
 	reconnect_crashed_client(socket_index,crashed_node);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	skt_close(fd);
 #endif
 }
@@ -1777,7 +1777,7 @@ int req_handler_dispatch(ChMessage *msg,SOCKET replyFd)
   /* grab request data */
   recv_status = ChMessageData_recv(replyFd,msg);
 #ifdef __FAULT__
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
  if(recv_status < 0){
         if(replyFd == last_crashed_fd){
             return REQ_OK;
@@ -2080,12 +2080,27 @@ void req_set_client_connect(int start,int end) {
 	for(i=0;i<(end-start);i++)
 		finished[i]=0;
 
+#if CMK_USE_IBVERBS && !CMK_IBVERBS_FAST_START
+    	for (i=start;i<end;i++) {
+		errorcheck_one_client_connect(curclientend++);
+	}	 
+	if (req_nClients > 1) {
+          	/*  a barrier to make sure infiniband device gets initialized */
+    		for (i=start;i<end;i++) 
+			ChMessage_recv(req_clients[i],&msg);
+    		for (i=start;i<end;i++)
+			req_reply(req_clients[i], "barrier", "", 1);
+	}
+#endif
+
 	done=0;
 	while(!done) {
 		/* check server socket for messages */
+#if ! CMK_USE_IBVERBS || CMK_IBVERBS_FAST_START
 		while(curclientstart==curclientend||skt_select1(server_fd,1)!=0) {
 			errorcheck_one_client_connect(curclientend++);
 		}
+#endif
 		/* check appropriate clients for messages */
 		for(client=curclientstart;client<curclientend;client++)
 			if(req_clients[client]>0) {
@@ -3419,12 +3434,12 @@ void refill_nodetab_entry(int crashed_node){
 	int pe =  nodetab_rank0_table[crashed_node];
 	nodetab_host *h = nodetab_table[pe];
 	*h = *(replacement_host(pe));
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 fprintf(stderr,"Charmrun>>> New pe %d is on host %s \n",pe,nodetab_name(pe));
 #endif
 }
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 nodetab_host *replacement_host(int pe){
     int x=loaded_max_pe+1;
 

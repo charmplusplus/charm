@@ -1614,7 +1614,7 @@ CHARMINC="."
 test -r ./conv-config.sh && . ./conv-config.sh
 
 #keep it a decimal
-VERSION=60300
+VERSION=60301
 echo $VERSION > ../include/VERSION
 
 cat >>confdefs.h <<_ACEOF
@@ -2469,6 +2469,21 @@ test_link "whether has sqrtf" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_SQRTF $pass
+_ACEOF
+
+
+#### test for fabsf ###
+cat > $t <<EOT
+#include <math.h>
+int main() {
+  float i = fabsf((float)10.0);
+  return 0;
+}
+EOT
+test_link "whether has fabsf" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_FABSF $pass
 _ACEOF
 
 

@@ -1336,6 +1336,7 @@ static void meta_init(char **argv) {
   char buf[100];
   sprintf(buf,"slot size %d\n",sizeof(Slot));
   status(buf);
+  CmiMemoryIs_flag|=CMI_MEMORY_IS_CHARMDEBUG;
   cpdInitializeMemory = 0;
   charmEnvelopeSize = getCharmEnvelopeSize();
   CpdDebugGetAllocationTree = (void* (*)(int*))CreateAllocationTree;
@@ -1374,6 +1375,9 @@ static void meta_init(char **argv) {
   if (CmiGetArgFlagDesc(argv,"+memory_verbose", "Print all memory-related operations")) {
     disableVerbosity = 0;
   }
+  if (CmiGetArgFlagDesc(argv,"+memory_nostack", "Do not collect stack traces for memory allocations")) {
+    stackTraceDisabled = 1;
+  }
 }
 
 static void *meta_malloc(size_t size) {
@@ -1390,7 +1394,9 @@ static void *meta_malloc(size_t size) {
     if (s!=NULL) {
       user = (char*)setSlot(&s,size);
       memory_allocated_user_total += size;
+#if ! CMK_BLUEGENE_CHARM
       traceMalloc_c(user, size, s->from, s->stackLen);
+#endif
     }
     if (disableVerbosity == 0) {
       disableVerbosity = 1;
@@ -1441,7 +1447,9 @@ static void meta_free(void *mem) {
     int memSize = 0;
     if (mem!=NULL) memSize = s->userSize;
     memory_allocated_user_total -= memSize;
+#if ! CMK_BLUEGENE_CHARM
     traceFree_c(mem, memSize);
+#endif
 
     if (disableVerbosity == 0) {
       disableVerbosity = 1;
@@ -1532,7 +1540,9 @@ static void *meta_memalign(size_t align, size_t size) {
   s->extraStack->protectedMemory = NULL;
   s->extraStack->protectedMemoryLength = 0;
   memory_allocated_user_total += size;
+#if ! CMK_BLUEGENE_CHARM
   traceMalloc_c(user, size, s->from, s->stackLen);
+#endif
   return user;
 }
 

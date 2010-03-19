@@ -528,6 +528,12 @@ static void CmiMachineInit(char **argv){
 	context->tokensLeft=maxTokens;
 	//tokensPerProcessor=4;
 	if(_Cmi_numnodes > 1){
+#if !CMK_IBVERBS_FAST_START
+		/* a barrier to make sure all nodes initialized the device */
+  		ChMessage msg;
+    		ctrl_sendone_nolock("barrier",NULL,0,NULL,0);
+  		ChMessage_recv(Cmi_charmrun_fd,&msg);
+#endif
 		createLocalQps(dev,ibPort,_Cmi_mynode,_Cmi_numnodes,context->localAddr);
 	}
 	

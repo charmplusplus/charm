@@ -60,7 +60,7 @@ public:
 void CkPupROData(PUP::er &p);
 void CkPupMainChareData(PUP::er &p, CkArgMsg *args);
 void CkPupChareData(PUP::er &p);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkPupGroupData(PUP::er &p,CmiBool create=CmiTrue);
 void CkPupNodeGroupData(PUP::er &p,CmiBool create=CmiTrue);
 #else
@@ -74,7 +74,7 @@ void CkRemoveArrayElements();
 
 void CkStartCheckpoint(char* dirname,const CkCallback& cb);
 void CkRestartMain(const char* dirname, CkArgMsg *args);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 int  CkCountArrayElements();
 #endif
 

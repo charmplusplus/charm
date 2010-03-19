@@ -957,7 +957,7 @@ void CkMigratable::AtSync(int waitForMigration)
 {
 	if (!usesAtSync)
 		CkAbort("You must set usesAtSync=CmiTrue in your array element constructor to use AtSync!\n");
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     mlogData->toResumeOrNot=1;
 #endif
 	myRec->AsyncMigrate(!waitForMigration);
@@ -973,24 +973,24 @@ void CkMigratable::ReadyMigrate(CmiBool ready)
 	myRec->ReadyMigrate(ready);
 }
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     extern int globalResumeCount;
 #endif
 
 void CkMigratable::staticResumeFromSync(void* data)
 {
 	CkMigratable *el=(CkMigratable *)data;
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     if(el->mlogData->toResumeOrNot ==0 || el->mlogData->resumeCount >= globalResumeCount){
         return;
     }
 #endif
 	DEBL((AA"Element %s resuming from sync\n"AB,idx2str(el->thisIndexMax)));
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = el;
 #endif
 	el->ResumeFromSync();
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     el->mlogData->resumeCount++;
 #endif
 }
@@ -1401,7 +1401,7 @@ void CkLocRec_local::setMigratable(int migratable)
 	else
   	  the_lbdb->NonMigratable(ldHandle);
 }
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkLocRec_local::Migrated(){
     the_lbdb->Migrated(ldHandle, CmiTrue);
 }
@@ -1550,7 +1550,7 @@ public:
 		if (opts & CK_MSG_KEEP)
 			msg = (CkArrayMessage *)CkCopyMsg((void **)&msg);
 		buffer.enq(msg);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 		envelope *env = UsrToEnv(msg);
 		env->sender = CpvAccess(_currentObj)->mlogData->objID;
 #endif
@@ -1564,7 +1564,7 @@ public:
 		DEBS((AA" Delivering queued messages:\n"AB));
 		CkArrayMessage *m;
 		while (NULL!=(m=buffer.deq())) {
-#ifdef _FAULT_MLOG_         
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))         
 		DEBUG(CmiPrintf("[%d] buffered message being sent\n",CmiMyPe()));
 		envelope *env = UsrToEnv(m);
 		Chare *oldObj = CpvAccess(_currentObj);
@@ -1573,7 +1573,7 @@ public:
 #endif
 		DEBS((AA"Sending buffered message to %s\n"AB,idx2str(m->array_index())));
 		myLocMgr->deliverViaQueue(m);
-#ifdef _FAULT_MLOG_         
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))         
 		CpvAccess(_currentObj) = oldObj;
 #endif
 		}
@@ -1675,7 +1675,7 @@ void CkLocMgr::flushAllRecs(void)
   CmiImmediateUnlock(hashImmLock);
 }
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
     void *objp;
     void *keyp;
@@ -1749,7 +1749,7 @@ void CkLocMgr::pup(PUP::er &p){
 		// _lbdb is the fixed global groupID
 		initLB(lbdbID);
 
-#ifdef _FAULT_MLOG_     
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
         int count;
         p | count;
         DEBUG(CmiPrintf("[%d] Unpacking Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count));
@@ -1778,7 +1778,7 @@ void CkLocMgr::pup(PUP::er &p){
  * indexes of local elements dont need to be packed
  * since they will be recreated later anyway
  */
-#ifdef _FAULT_MLOG_     
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
         int count=0,count1=0;
         void *objp;
         void *keyp;
@@ -1876,7 +1876,7 @@ void CkLocMgr::inform(const CkArrayIndex &idx,int nowOnPe)
 		return; //Never insert a "remote" record pointing here
 	CkLocRec *rec=elementNrec(idx);
 	if (rec!=NULL && rec->type()==CkLocRec::local){
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CmiPrintf("[%d]WARNING!!! Element %d:%s is local but is being told it exists on %d\n",CkMyPe(),idx.dimension,idx2str(idx), nowOnPe);
 #endif
 		return; //Never replace a local element's record!
@@ -1891,7 +1891,7 @@ void CkLocMgr::informHome(const CkArrayIndex &idx,int nowOnPe)
 	if (home!=CkMyPe() && home!=nowOnPe) {
 		//Let this element's home Pe know it lives here now
 		DEBC((AA"  Telling %s's home %d that it lives on %d.\n"AB,idx2str(idx),home,nowOnPe));
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         informLocationHome(thisgroup,idx,home,CkMyPe());
 #else
 		thisProxy[home].updateLocation(idx,nowOnPe);
@@ -1899,7 +1899,7 @@ void CkLocMgr::informHome(const CkArrayIndex &idx,int nowOnPe)
 	}
 }
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 CkLocRec_local *CkLocMgr::createLocal(const CkArrayIndex &idx,
         CmiBool forMigration, CmiBool ignoreArrival,
         CmiBool notifyHome,int dummy)
@@ -2060,7 +2060,7 @@ int CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 	}else{
 		DEBS((AA"deliver %s rec is null\n"AB,idx2str(idx)));
 	}
-#ifndef _FAULT_MLOG_
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
 #if CMK_LBDB_ON
 	if (type==CkDeliver_queue) {
 		if (!(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats()) {
@@ -2292,7 +2292,7 @@ void CkLocMgr::iterate(CkLocIterator &dest) {
 
 
 /************************** LocMgr: MIGRATION *************************/
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
         CkElementCreation_t type, CmiBool create, int dummy)
 {
@@ -2452,7 +2452,7 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 		new (doubleSize, 0) CkArrayElementMigrateMessage;
 	msg->idx=idx;
 	msg->length=bufSize;
-#ifdef _FAULT_MLOG_ 
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     msg->gid = ckGetGroupID();
 #endif
 #if CMK_LBDB_ON
@@ -2477,7 +2477,7 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 
 	DEBM((AA"Migrated index size %s to %d \n"AB,idx2str(idx),toPe));	
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     sendMlogLocation(toPe,UsrToEnv(msg));
 #else
 	//Send off message and delete old copy
@@ -2491,7 +2491,7 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	duringMigration=CmiFalse;
 	//The element now lives on another processor-- tell ourselves and its home
 	inform(idx,toPe);
-#ifndef _FAULT_MLOG_    
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
 	informHome(idx,toPe);
 #endif
 	CK_MAGICNUMBER_CHECK
@@ -2518,7 +2518,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	}
 
 	//Create a record for this element
-#ifndef _FAULT_MLOG_    
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
 	CkLocRec_local *rec=createLocal(idx,CmiTrue,msg->ignoreArrival,CmiFalse /* home told on departure */ );
 #else
     CkLocRec_local *rec=createLocal(idx,CmiTrue,CmiTrue,CmiFalse /* home told on departure */ );
@@ -2592,7 +2592,7 @@ void CkLocMgr::restore(const CkArrayIndex &idx, PUP::er &p)
 
 
 /// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkLocMgr::resume(const CkArrayIndex &idx, PUP::er &p, CmiBool create, int dummy)
 {
 	CkLocRec_local *rec;
@@ -2686,7 +2686,7 @@ static const char *rec2str[]={
     "dead"//Deleted element (for debugging)
 };
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkLocMgr::setDuringMigration(CmiBool _duringMigration){
     duringMigration = _duringMigration;
 }

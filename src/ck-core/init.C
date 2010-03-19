@@ -124,7 +124,7 @@ int   _qdHandlerIdx;
 int   _qdCommHandlerIdx;
 int   _triggerHandlerIdx;
 int   _mainDone = 0;
-static int   _triggersSent = 0;
+CksvDeclare(int, _triggersSent);
 
 CkOutStream ckout;
 CkErrStream ckerr;
@@ -187,7 +187,7 @@ typedef void (*CkFtFn)(const char *, CkArgMsg *);
 static CkFtFn  faultFunc = NULL;
 static char* _restartDir;
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 int teamSize=1;
 int chkptPeriod=1000;
 bool parallelRestart=false;
@@ -251,7 +251,7 @@ static inline void _parseCommandLineOpts(char **argv)
 # if CMK_MEM_CHECKPOINT
       faultFunc = CkMemRestart;
 # endif
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
       faultFunc = CkMlogRestart;
 #endif
       CmiPrintf("[%d] Restarting after crash \n",CmiMyPe());
@@ -284,7 +284,7 @@ static inline void _parseCommandLineOpts(char **argv)
 	if(CmiGetArgStringDesc(argv,"+raiseevac", &_raiseEvacFile,"Generates processor evacuation on random processors")){
 		_raiseEvac = 1;
 	}
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	if(!CmiGetArgIntDesc(argv,"+teamSize",&teamSize,"Set the team size for message logging")){
         teamSize = 1;
     }
@@ -391,7 +391,7 @@ static inline void _sendStats(void)
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 }
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 extern void _messageLoggingExit();
 #endif
 
@@ -447,7 +447,7 @@ static void _exitHandler(envelope *env)
       }	
       break;
     case ReqStatMsg:
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         _messageLoggingExit();
 #endif
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
@@ -577,9 +577,9 @@ static void _sendTriggers(void)
 {
   int i, num, first;
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-  if (_triggersSent == 0)
+  if (CksvAccess(_triggersSent) == 0)
   {
-    _triggersSent++;
+    CksvAccess(_triggersSent)++;
     num = CmiMyNodeSize();
     register envelope *env = _allocEnv(RODataMsg); // Notice that the type here is irrelevant
     env->setSrcPe(CkMyPe());
@@ -605,7 +605,7 @@ static void _sendTriggers(void)
 void _initDone(void)
 {
   DEBUGF(("[%d] _initDone.\n", CkMyPe()));
-  if (!_triggersSent) _sendTriggers();
+  if (!CksvAccess(_triggersSent)) _sendTriggers();
   CkNumberHandler(_triggerHandlerIdx, (CmiHandler)_discardHandler);
   CmiNodeBarrier();
   if(CkMyRank() == 0) {
@@ -900,6 +900,8 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(UInt,_numInitNodeMsgs);
 	CkpvInitialize(int,_charmEpoch);
 	CkpvAccess(_charmEpoch)=0;
+	CksvInitialize(int, _triggersSent);
+	CksvAccess(_triggersSent) = 0;
 
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);
@@ -1082,7 +1084,7 @@ void _initCharm(int unused_argc, char **argv)
     }
 #endif
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     _messageLoggingInit();
 #endif
 
@@ -1102,7 +1104,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	evacuate = 0;
 	CcdCallOnCondition(CcdSIGUSR1,(CcdVoidFn)CkDecideEvacPe,0);
-#ifdef _FAULT_MLOG_ 
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     CcdCallOnCondition(CcdSIGUSR2,(CcdVoidFn)CkMlogRestart,0);
 #endif
 
@@ -1152,7 +1154,7 @@ void _initCharm(int unused_argc, char **argv)
 			msg->argc = CmiGetArgc(argv);
 			msg->argv = argv;
 			_entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
             CpvAccess(_currentObj) = (Chare *)obj;
 #endif
 		}

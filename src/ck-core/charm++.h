@@ -405,7 +405,7 @@ PUPmarshall(CkArrayID)
 #include "ckobjQ.h"
 
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 class ChareMlogData;
 #endif
 
@@ -424,7 +424,7 @@ class Chare {
 #ifndef CMK_CHARE_USE_PTR
     int chareIdx;                  // index in the chare obj table (chare_objs)
 #endif
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     ChareMlogData *mlogData;
 #endif
     Chare(CkMigrateMessage *m);
@@ -1116,7 +1116,7 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #endif
 
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 #include "ckmessagelogging.h"
 #endif
 #include "ckmemcheckpoint.h"

@@ -104,10 +104,21 @@ extern CkArrayID armciVPAid;
 
 #define _ARMCI_GENERATE_POLYMORPHIC_REDUCTION(opName,reductionWork) \
   _ARMCI_TEMPLATE_REDUCTION(opName##_int,int,reductionWork) \
-  _ARMCI_TEMPLATE_REDUCTION(opName##_long,long,reductionWork) \
-  _ARMCI_TEMPLATE_REDUCTION(opName##_longlong,long long,reductionWork) \
+  _ARMCI_TEMPLATE_REDUCTION(opName##_long,CmiInt8,reductionWork) \
+  _ARMCI_TEMPLATE_REDUCTION(opName##_longlong,CmiInt8,reductionWork) \
   _ARMCI_TEMPLATE_REDUCTION(opName##_float,float,reductionWork) \
   _ARMCI_TEMPLATE_REDUCTION(opName##_double,double,reductionWork)
+
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+#define llabs(x) abs(x)
+#endif
+
+#if ! CMK_HAS_FABSF
+inline float fabsf(float x)
+{
+  return x>0.0?x:-x;
+}
+#endif
 
 /* 
    **CWL** The absolute function is inconveniently unpolymorphic in the
@@ -115,13 +126,13 @@ extern CkArrayID armciVPAid;
 */
 #define _ARMCI_GENERATE_ABS_REDUCTION() \
   _ARMCI_TEMPLATE_REDUCTION(absmax_int,int,if (ret[i]<abs(value[i])) ret[i]=value[i];) \
-  _ARMCI_TEMPLATE_REDUCTION(absmax_long,long,if (ret[i]<labs(value[i])) ret[i]=value[i];) \
-  _ARMCI_TEMPLATE_REDUCTION(absmax_longlong,long long,if (ret[i]<llabs(value[i])) ret[i]=value[i];) \
+  _ARMCI_TEMPLATE_REDUCTION(absmax_long,CmiInt8,if (ret[i]<labs(value[i])) ret[i]=value[i];) \
+  _ARMCI_TEMPLATE_REDUCTION(absmax_longlong,CmiInt8,if (ret[i]<labs(value[i])) ret[i]=value[i];) \
   _ARMCI_TEMPLATE_REDUCTION(absmax_float,float,if (ret[i]<fabsf(value[i])) ret[i]=value[i];) \
   _ARMCI_TEMPLATE_REDUCTION(absmax_double,double,if (ret[i]<fabs(value[i])) ret[i]=value[i];) \
   _ARMCI_TEMPLATE_REDUCTION(absmin_int,int,if (ret[i]>abs(value[i])) ret[i]=value[i];) \
-  _ARMCI_TEMPLATE_REDUCTION(absmin_long,long,if (ret[i]>labs(value[i])) ret[i]=value[i];) \
-  _ARMCI_TEMPLATE_REDUCTION(absmin_longlong,long long,if (ret[i]>llabs(value[i])) ret[i]=value[i];) \
+  _ARMCI_TEMPLATE_REDUCTION(absmin_long,CmiInt8,if (ret[i]>labs(value[i])) ret[i]=value[i];) \
+  _ARMCI_TEMPLATE_REDUCTION(absmin_longlong,CmiInt8,if (ret[i]>labs(value[i])) ret[i]=value[i];) \
   _ARMCI_TEMPLATE_REDUCTION(absmin_float,float,if (ret[i]>fabsf(value[i])) ret[i]=value[i];) \
   _ARMCI_TEMPLATE_REDUCTION(absmin_double,double,if (ret[i]>fabs(value[i])) ret[i]=value[i];) 
 
