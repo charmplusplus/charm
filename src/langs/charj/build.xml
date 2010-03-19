@@ -3,9 +3,9 @@
         A translator and standard library for Charj, a language based on the
         Charm++ runtime system.
     </description>
-    
+
     <property name="project.name" value="Charj" />
-    
+
     <!-- set global properties for this build -->
     <property name="build" location="build"/>
     <property name="src" location="src"/>
@@ -16,7 +16,7 @@
     <property name="doc" location="docs"/>
 
     <property name="package" value="charj"/>
-    
+
     <!-- where to write/find token files -->
     <property name="token.lib" location="${buildsrc}/${package}" />
 
@@ -43,7 +43,6 @@
     <property name="profile" value="false" />
     <property name="report" value="false" />
     <property name="multithreaded" value="true" />
-    <property name="depend" value="true" />
 
     <target name="init">
         <tstamp />
@@ -62,31 +61,31 @@
         <attribute name="grammar.path"/>
         <sequential>
             <echo message="antlr @{grammar.name}" />
-            <antlr:antlr3 xmlns:antlr="antlib:org/apache/tools/ant/antlr" 
-                target="@{grammar.path}/@{grammar.name}" 
+            <antlr:antlr3 xmlns:antlr="antlib:org/apache/tools/ant/antlr"
+                target="@{grammar.path}/@{grammar.name}"
                 outputdirectory="@{grammar.path}"
                 libdirectory="@{grammar.path}"
                 multithreaded="${multithreaded}"
                 report="${report}"
-                depend="${depend}"
                 profile="${profile}">
+                <jvmarg value="-Xmx512M"/>
                 <classpath refid="${classpath}"/>
             </antlr:antlr3>
         </sequential>
     </macrodef>
-    
+
     <target name="Charj" depends="init">
-        <antlr3 grammar.name="Charj.g" 
+        <antlr3 grammar.name="Charj.g"
             grammar.path="${buildsrc}/charj/translator"/>
     </target>
 
     <target name="CharjSemantics" depends="Charj">
-        <antlr3 grammar.name="CharjSemantics.g" 
+        <antlr3 grammar.name="CharjSemantics.g"
             grammar.path="${buildsrc}/charj/translator"/>
     </target>
 
     <target name="CharjEmitter" depends="CharjSemantics">
-        <antlr3 grammar.name="CharjEmitter.g" 
+        <antlr3 grammar.name="CharjEmitter.g"
             grammar.path="${buildsrc}/charj/translator"/>
     </target>
 
@@ -103,9 +102,9 @@
         </manifest>
     </target>
 
-    <target name="dist" depends="compile, manifest" 
+    <target name="dist" depends="compile, manifest"
        description="create jarfiles">
-       <jar jarfile="${buildlib}/charj.jar" 
+       <jar jarfile="${buildlib}/charj.jar"
            basedir="${classes}"
            manifest="${classes}/META-INF/MANIFEST.MF">
             <fileset dir="${buildsrc}" includes="**/*.stg" />
@@ -133,8 +132,8 @@
             <fileset dir="${build}" />
         </delete>
     </target>
-    
-    <target name="all" depends="clean, dist, doc" 
+
+    <target name="all" depends="clean, dist, doc"
         description="do all"/>
-            
+
 </project>
