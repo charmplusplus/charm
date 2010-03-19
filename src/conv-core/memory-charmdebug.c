@@ -1336,6 +1336,7 @@ static void meta_init(char **argv) {
   char buf[100];
   sprintf(buf,"slot size %d\n",sizeof(Slot));
   status(buf);
+  CmiMemoryIs_flag|=CMI_MEMORY_IS_CHARMDEBUG;
   cpdInitializeMemory = 0;
   charmEnvelopeSize = getCharmEnvelopeSize();
   CpdDebugGetAllocationTree = (void* (*)(int*))CreateAllocationTree;
