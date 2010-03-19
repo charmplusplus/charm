@@ -124,7 +124,7 @@ int   _qdHandlerIdx;
 int   _qdCommHandlerIdx;
 int   _triggerHandlerIdx;
 int   _mainDone = 0;
-static int   _triggersSent = 0;
+CksvDeclare(int, _triggersSent);
 
 CkOutStream ckout;
 CkErrStream ckerr;
@@ -577,9 +577,9 @@ static void _sendTriggers(void)
 {
   int i, num, first;
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-  if (_triggersSent == 0)
+  if (CksvAccess(_triggersSent) == 0)
   {
-    _triggersSent++;
+    CksvAccess(_triggersSent)++;
     num = CmiMyNodeSize();
     register envelope *env = _allocEnv(RODataMsg); // Notice that the type here is irrelevant
     env->setSrcPe(CkMyPe());
@@ -605,7 +605,7 @@ static void _sendTriggers(void)
 void _initDone(void)
 {
   DEBUGF(("[%d] _initDone.\n", CkMyPe()));
-  if (!_triggersSent) _sendTriggers();
+  if (!CksvAccess(_triggersSent)) _sendTriggers();
   CkNumberHandler(_triggerHandlerIdx, (CmiHandler)_discardHandler);
   CmiNodeBarrier();
   if(CkMyRank() == 0) {
@@ -900,6 +900,8 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(UInt,_numInitNodeMsgs);
 	CkpvInitialize(int,_charmEpoch);
 	CkpvAccess(_charmEpoch)=0;
+	CksvInitialize(int, _triggersSent);
+	CksvAccess(_triggersSent) = 0;
 
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);
