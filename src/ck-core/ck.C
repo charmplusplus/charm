@@ -2300,10 +2300,15 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
           ck->addWatcher(new CkMessageDetailRecorder(openReplayFile("ckreplay_",".detail","w")));
         }
     }
-	if (CmiGetArgFlagDesc(argv,"+record","Record message processing order")) {
-	    CpdSetInitializeMemory(1);
-        CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
-		ck->addWatcher(new CkMessageRecorder(openReplayFile("ckreplay_",".log","w")));
+    if (CmiGetArgFlagDesc(argv,"+record","Record message processing order")) {
+	  if (CkMyPe() == 0) {
+	    CmiPrintf("Charm++> record mode.\n");
+	    if (!CmiMemoryIs(CMI_MEMORY_IS_CHARMDEBUG))
+	      CmiPrintf("Charm++> Warning: +record requires program linking with -memory charmdebug\n");
+	  }
+	  CpdSetInitializeMemory(1);
+          CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
+	  ck->addWatcher(new CkMessageRecorder(openReplayFile("ckreplay_",".log","w")));
 	}
 	if (CmiGetArgStringDesc(argv,"+replay-detail",&procs,"Replay the specified processors from recorded message content")) {
 	    forceReplay = CmiTrue;
@@ -2321,6 +2326,11 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	    ck->addWatcher(new CkMessageDetailReplay(openReplayFile("ckreplay_",".detail","r")));
 	}
     if (CmiGetArgFlagDesc(argv,"+replay","Replay recorded message stream") || forceReplay) {
+	if (CkMyPe() == 0)  {
+	  CmiPrintf("Charm++> replay mode.\n");
+	  if (!CmiMemoryIs(CMI_MEMORY_IS_CHARMDEBUG))
+	    CmiPrintf("Charm++> Warning: +replay requires program linking with -memory charmdebug\n");
+	}
         CpdSetInitializeMemory(1);
         CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
         ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
