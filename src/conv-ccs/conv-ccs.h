@@ -69,6 +69,7 @@ SIMPLE_POLYMORPH_REDUCTION(min);
 #undef SIMPLE_REDUCTION
 #undef SIMPLE_POLYMORPH_REDUCTION
 
+void CcsReleaseMessages();
 void CcsInit(char **argv);
 int CcsEnabled(void);
 int CcsIsRemoteRequest(void);
@@ -81,6 +82,7 @@ void CcsNoDelayedReply(CcsDelayedReply d);
 
 #else
 typedef void *CcsDelayedReply;
+#define CcsReleaseMessages() /*empty*/
 #define CcsInit(argv) /*empty*/
 #define CcsRegisterHandler(x,y) 0
 #define CcsRegisterHandlerFn(x,y,p) 0
