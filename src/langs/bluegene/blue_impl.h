@@ -41,7 +41,7 @@ public:
   ~BGMach() { if (network) delete network; }
   void nullify() { 
 	x=y=z=0; 
-	numCth=numWth=0; stacksize=0; 
+	numCth=numWth=1; stacksize=0; 
         record=replay=-1;
 	timingMethod = BG_WALLTIME; cpufactor=1.0; fpfactor=0.0;
 	traceroot=NULL; 
