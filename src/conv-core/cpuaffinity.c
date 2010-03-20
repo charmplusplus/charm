@@ -81,14 +81,6 @@ int set_cpu_affinity(unsigned int cpuid) {
    HANDLE hProcess;
  #endif
  
-  /* set the affinity mask if possible */
-  if ((cpuid / 8) > len) {
-    printf("Mask size too small to handle requested CPU ID\n");
-    return -1;
-  } else {
-    mask = 1 << cpuid;   /* set the affinity mask exclusively to one CPU */
-  }
-
 #ifdef _WIN32
   hProcess = GetCurrentProcess();
   if (SetProcessAffinityMask(hProcess, mask) == 0) {
@@ -98,6 +90,14 @@ int set_cpu_affinity(unsigned int cpuid) {
   pid = getpid();
   if (bindprocessor(BINDPROCESS, pid, cpuid) == -1) return -1;
 #else
+  /* set the affinity mask if possible */
+  if ((cpuid / 8) > len) {
+    printf("Mask size too small to handle requested CPU ID\n");
+    return -1;
+  } else {
+    mask = 1 << cpuid;   /* set the affinity mask exclusively to one CPU */
+  }
+
   /* PID 0 refers to the current process */
   if (sched_setaffinity(0, len, &mask) < 0) {
     perror("sched_setaffinity");
@@ -117,13 +117,15 @@ int set_thread_affinity(int cpuid) {
   HANDLE hThread;
 #endif	
   
+#if defined(_WIN32) || CMK_HAS_PTHREAD_SETAFFINITY
   /* set the affinity mask if possible */
   if ((cpuid / 8) > len) {
-    printf("Mask size too small to handle requested CPU ID\n");
+    printf("set_thread_affinity: Mask size too small to handle requested CPU ID\n");
     return -1;
   } else {
     mask = 1 << cpuid;   /* set the affinity mask exclusively to one CPU */
   }
+#endif
 
 #ifdef _WIN32
   hThread = GetCurrentThread();
