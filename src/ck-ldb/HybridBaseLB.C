@@ -355,6 +355,7 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
 #if CMK_LBDB_ON
   int i;
   double obj_walltime, obj_cputime;
+  double obj_nmwalltime, obj_nmcputime;
 
   LDStats *statsData = levelData[atlevel]->statsData;
   CmiAssert(statsData);
@@ -369,9 +370,16 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
   {
     shrink = 1;
     obj_walltime = obj_cputime = 0.0;
+    obj_nmwalltime = obj_nmcputime = 0.0;
     for (i=0; i<osz; i++)  {
-     obj_walltime += statsData->objData[i].wallTime;
-     obj_cputime += statsData->objData[i].cpuTime;
+      if (statsData->objData[i].migratable) {
+        obj_walltime += statsData->objData[i].wallTime;
+        obj_cputime += statsData->objData[i].cpuTime;
+      }
+      else {
+        obj_nmwalltime += statsData->objData[i].wallTime;
+        obj_nmcputime += statsData->objData[i].cpuTime;
+      }
     }
       // skip obj and comm data
     osz = csz = 0;
@@ -422,6 +430,8 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
   if (shrink) {
     cmsg->total_walltime = obj_walltime;
     cmsg->total_cputime = obj_cputime;
+    cmsg->bg_walltime += obj_nmwalltime;
+    cmsg->bg_cputime += obj_nmcputime;
   }
 
   return cmsg;
@@ -641,20 +651,21 @@ void HybridBaseLB::ReceiveVectorMigration(LBVectorMigrateMsg *msg)
       int toPe = move.to_pe;
       double load = move.load;
       int count = 0;
+      // TODO: sort max => low
       for (int obj=statsData->n_objs-1; obj>=0; obj--) {
         LDObjData &objData = statsData->objData[obj];
 	if (!objData.migratable) continue;
         if (objData.wallTime <= load) {
           if (_lb_args.debug()>2)
-            CkPrintf("[%d] send obj: %d to PE %d.\n", CkMyPe(), obj, toPe);
+            CkPrintf("[%d] send obj: %d to PE %d (load: %f).\n", CkMyPe(), obj, toPe, objData.wallTime);
           objs.push_back(objData);
 	  // send comm data
           collectCommData(obj, comms, atlevel);
           lData->outObjs.push_back(MigrationRecord(objData.handle, lData->children[statsData->from_proc[obj]], -1));
-          statsData->removeObject(obj);
           load -= objData.wallTime; 
+          statsData->removeObject(obj);
           count ++;
-          if (load == 0.0) break;
+          if (load <= 0.0) break;
         }
       }
       if (_lb_args.debug()>1)

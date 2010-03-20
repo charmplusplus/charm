@@ -314,6 +314,50 @@ static void cpuAffinityRecvHandler(void *msg)
   CmiFree(m);
 }
 
+static int search_pemap(char *pecoremap, int pe)
+{
+  char *mapstr = strdup(pecoremap);
+  int *map = (int *)malloc(CmiNumPes()*sizeof(int));
+  int i, count;
+
+  char *str = strtok(mapstr, ",");
+  count = 0;
+  while (str)
+  {
+      int hasdash=0, hascolon=0;
+      int start, end, stride=1;
+      for (i=0; i<strlen(str); i++) {
+          if (str[i] == '-') hasdash=1;
+          if (str[i] == ':') hascolon=1;
+      }
+      if (hasdash) {
+          if (hascolon) {
+            if (sscanf(str, "%d-%d:%d", &start, &end, &stride) != 3)
+                 printf("Warning: Check the format of \"%s\".\n", str);
+          }
+          else {
+            if (sscanf(str, "%d-%d", &start, &end) != 2)
+                 printf("Warning: Check the format of \"%s\".\n", str);
+          }
+      }
+      else {
+          sscanf(str, "%d", &start);
+          end = start;
+      }
+      for (i = start; i<=end; i+=stride) {
+        map[count++] = i;
+        if (count == CmiNumPes()) break;
+      }
+      if (count == CmiNumPes()) break;
+      str = strtok(NULL, ",");
+  }
+  i = map[pe % count];
+
+  free(map);
+  free(mapstr);
+  return i;
+}
+
 #if CMK_CRAYXT
 extern int getXTNodeID(int mype, int numpes);
 #endif
@@ -323,6 +367,8 @@ void CmiInitCPUAffinity(char **argv)
   static skt_ip_t myip;
   int ret, i, exclude;
   hostnameMsg  *msg;
+  char *pemap = NULL;
+  char *commap = NULL;
   char *coremap = NULL;
  
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
@@ -334,6 +380,11 @@ void CmiInitCPUAffinity(char **argv)
   CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping");
   if (coremap!=NULL && excludecount>0)
     CmiAbort("Charm++> +excludecore and +coremap can not be used togetehr!");
+
+  CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
+  if (pemap!=NULL && (coremap != NULL || excludecount>0))
+    CmiAbort("Charm++> +pemap can not be used with either +excludecore or +coremap.");
+  CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
 
   cpuAffinityHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityHandler);
@@ -353,15 +404,23 @@ void CmiInitCPUAffinity(char **argv)
        CmiPrintf(".\n");
      }
      if (coremap!=NULL)
-       CmiPrintf("Charm++> cpuaffinity map : %s\n", coremap);
+       CmiPrintf("Charm++> cpuaffinity core map : %s\n", coremap);
+     if (pemap!=NULL)
+       CmiPrintf("Charm++> cpuaffinity PE-core map : %s\n", pemap);
   }
 
-  if (CmiMyPe() >= CmiNumPes()) {         /* this is comm trhead */
+  if (CmiMyPe() >= CmiNumPes()) {         /* this is comm thread */
       /* comm thread either can float around, or pin down to the last rank.
          however it seems to be reportedly slower if it is floating */
     CmiNodeAllBarrier();
+    if (commap != NULL) {
+      int mycore = search_pemap(commap, CmiMyPe()-CmiNumPes());
+      printf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore); 
+    }
+    else {
     /* if (set_myaffinitity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
-    if (coremap == NULL) {
+    }
+    if (coremap == NULL && pemap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
     while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
 #else
@@ -372,6 +431,19 @@ void CmiInitCPUAffinity(char **argv)
     }
     CmiNodeAllBarrier();
     return;    /* comm thread return */
+  }
+
+  if (pemap != NULL) {
+    int mycore = search_pemap(pemap, CmiMyPe());
+    printf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore); 
+    if (mycore >= CmiNumCores()) {
+      CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", mycore, CmiNumCores(), CmiNumCores()-1);
+      CmiAbort("Invalid core number");
+    }
+    if (set_myaffinitity(mycore) == -1) CmiAbort("set_cpu_affinity abort!");
+    CmiNodeAllBarrier();
+    CmiNodeAllBarrier();
+    return;
   }
 
   if (coremap!= NULL) {
@@ -386,7 +458,7 @@ void CmiInitCPUAffinity(char **argv)
     i=0;
     while(ct>0) if (coremap[i++]==',') ct--;
     myrank = atoi(coremap+i);
-    printf("Charm++> set PE%d on node #%d core #%d\n", CmiMyPe(), CmiMyNode(), myrank); 
+    printf("Charm++> set PE%d on node #%d to core #%d\n", CmiMyPe(), CmiMyNode(), myrank); 
     if (myrank >= CmiNumCores()) {
       CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", myrank, CmiNumCores(), CmiNumCores()-1);
       CmiAbort("Invalid core number");

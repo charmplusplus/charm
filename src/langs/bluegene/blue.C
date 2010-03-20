@@ -1501,11 +1501,26 @@ CmiStartFn bgMain(int argc, char **argv)
   }
 
   // record/replay
-  if (CmiGetArgFlagDesc(argv,"+bgrecord","Record message processing order for BigSim"))
+  if (CmiGetArgFlagDesc(argv,"+bgrecord","Record message processing order for BigSim")) {
     cva(bgMach).record = 1;
+    if (CmiMyPe() == 0)
+      CmiPrintf("BG info> full record mode. \n");
+  }
   int replaype;
   if (CmiGetArgIntDesc(argv,"+bgreplay", &replaype, "Re-play message processing order for BigSim")) {
     cva(bgMach).replay = replaype;
+  }
+  else {
+    if (CmiGetArgFlagDesc(argv,"+bgreplay","Record message processing order for BigSim"))
+    cva(bgMach).replay = 0;    // default to 0
+  }
+  if (cva(bgMach).replay >= 0) {
+    if (CmiNumPes()>1)
+      CmiAbort("BG> bgreplay mode must run on one physical processor.");
+    if (cva(bgMach).x!=1 || cva(bgMach).y!=1 || cva(bgMach).z!=1 ||
+         cva(bgMach).numWth!=1 || cva(bgMach).numCth!=1)
+      CmiAbort("BG> bgreplay mode must run on one target processor.");
+    CmiPrintf("BG info> replay mode for target processor %d.\n", cva(bgMach).replay);
   }
   char *procs = NULL;
   if (CmiGetArgStringDesc(argv, "+bgrecordprocessors", &procs, "A list of processors to record, e.g. 0,10,20-30")) {

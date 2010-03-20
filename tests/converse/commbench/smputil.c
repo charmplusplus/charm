@@ -5,8 +5,12 @@
 #define NLOCKITER 1000000
 #define NBARRITER 10000
 
+#define NMALLOCITER 100000
+#define MALLOCSIZE 257
+
 CpvStaticDeclare(double, privateVar);
 CpvStaticDeclare(int, barrIdx);
+CpvStaticDeclare(int, memIdx);
 CsvStaticDeclare(double, sharedVar);
 
 static void barrierHandler(EmptyMsg *msg)
@@ -33,11 +37,53 @@ static void barrierHandler(EmptyMsg *msg)
   }
 }
 
+double memoryAllocTest(){
+  double starttime, endtime;  
+  double extraOverhead;
+  void **ptrs = NULL;
+  int i;	
+	/* Estimate the malloc overhead */
+  ptrs = (void **)malloc(NMALLOCITER*sizeof(void *));
+  /* Warm the cache first before estimating the overheads */
+  for(i=0; i<NMALLOCITER; i++) ptrs[i] = 0;
+  
+  starttime = CmiWallTimer();
+  for(i=0; i<NMALLOCITER; i++) ptrs[i] = (void *)0xabcd;
+  endtime = CmiWallTimer();
+  extraOverhead = endtime - starttime;
+  
+  starttime = CmiWallTimer();
+  for(i=0; i<NMALLOCITER; i++) ptrs[i] = malloc(MALLOCSIZE);
+  for(i=0; i<NMALLOCITER; i++) free(ptrs[i]);
+  endtime = CmiWallTimer();
+  free(ptrs);
+  
+  return (endtime-starttime-extraOverhead*2)/NMALLOCITER;  	
+}
+
+static void memAllocHandler(EmptyMsg *msg){
+	/* Make sure the memory contention on a node happens roughly at the same time */
+	CmiNodeBarrier();
+	double overhead = memoryAllocTest();	
+	CmiNodeBarrier();
+	
+	if(CmiMyPe()==0){
+	  CmiPrintf("[smputil] Estimated Malloc/Free Overhead (w contention): %le seconds\n",overhead);
+	  CmiSetHandler(msg, CpvAccess(barrIdx));
+	  CmiSyncBroadcastAll(sizeof(EmptyMsg), msg);
+	}
+	else {
+	  CmiFree(msg);
+	}
+}
+
 void smputil_init(void)
 {
   EmptyMsg msg;
   double starttime, endtime;
   double stackVar=0.0, loopOverhead;
+  double extraOverhead;
+  void **ptrs = NULL;
   int i;
   CmiNodeLock lock;
 
@@ -74,7 +120,11 @@ void smputil_init(void)
   endtime = CmiWallTimer();
   CmiPrintf("[smputil] LockUnlock Overhead: %le seconds\n",
              (endtime - starttime - loopOverhead)/NLOCKITER);
-  CmiSetHandler(&msg, CpvAccess(barrIdx));
+
+	endtime = memoryAllocTest();
+  CmiPrintf("[smputil] Estimated Malloc/Free Overhead (w/o contention): %le seconds\n",endtime);
+             
+  CmiSetHandler(&msg, CpvAccess(memIdx));
   CmiSyncBroadcastAll(sizeof(EmptyMsg), &msg);
 }
 
@@ -82,8 +132,10 @@ void smputil_moduleinit(void)
 {
   CpvInitialize(double, privateVar);
   CpvInitialize(int, barrIdx);
+  CpvInitialize(int, memIdx);
   CsvInitialize(double, sharedVar);
 
   CpvAccess(barrIdx) = CmiRegisterHandler((CmiHandler)barrierHandler);
+  CpvAccess(memIdx) = CmiRegisterHandler((CmiHandler)memAllocHandler);
 }
 
