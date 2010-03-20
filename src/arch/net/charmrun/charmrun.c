@@ -518,8 +518,11 @@ int pparam_parseopt()
     {
       char name[2];
       name[0]=opt[1];
+      if (strlen(opt)<=2 || !isalpha(opt[2]))
+      {
       name[1]=0;
       def = pparam_find(name);
+      }
     }
   if (def==NULL)
   {
