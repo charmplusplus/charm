@@ -323,11 +323,11 @@ static int search_pemap(char *pecoremap, int pe)
   while (str)
   {
       int hasdash=0, hascolon=0;
+      int start, end, stride=1;
       for (i=0; i<strlen(str); i++) {
           if (str[i] == '-') hasdash=1;
           if (str[i] == ':') hascolon=1;
       }
-      int start, end, stride=1;
       if (hasdash) {
           if (hascolon) {
             if (sscanf(str, "%d-%d:%d", &start, &end, &stride) != 3)
