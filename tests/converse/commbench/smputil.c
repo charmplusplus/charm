@@ -68,11 +68,12 @@ static void memAllocHandler(EmptyMsg *msg){
 	CmiNodeBarrier();
 	
 	if(CmiMyPe()==0){
-		CmiPrintf("[smputil] Estimated Malloc/Free Overhead (w contention): %le seconds\n",overhead);
-		CmiSetHandler(&msg, CpvAccess(barrIdx));
-	  CmiSyncBroadcastAll(sizeof(EmptyMsg), &msg);
-	}else{
-		CmiFree(msg);	
+	  CmiPrintf("[smputil] Estimated Malloc/Free Overhead (w contention): %le seconds\n",overhead);
+	  CmiSetHandler(msg, CpvAccess(barrIdx));
+	  CmiSyncBroadcastAll(sizeof(EmptyMsg), msg);
+	}
+	else {
+	  CmiFree(msg);
 	}
 }
 
