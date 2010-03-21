@@ -2046,6 +2046,7 @@ class CkMessageReplay : public CkMessageWatcher {
 	/// Read the next message we need from the file:
 	void getNext(void) {
 	  if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) CkAbort("CkMessageReplay> Syntax error reading replay file");
+          REPLAYDEBUG("getNext: "<<nextPE<<" " << nextSize << " " << nextEvent)
 	  if (nextSize > 0) {
 	    // We are reading a regular message
 	    if (3!=fscanf(f,"%d%x%x", &nexttype,&crc1,&crc2)) {
@@ -2054,6 +2055,9 @@ class CkMessageReplay : public CkMessageWatcher {
 	  } else if (nextSize == -2) {
 	    // We are reading a special message (right now only thread awaken)
 	    // Nothing to do since we have already read all info
+#if CMK_BLUEGENE_CHARM
+	    return getNext();          // ignoring thread event is ok
+#endif
 	  } else if (nextPE!=-1 || nextSize!=-1 || nextEvent!=-1) {
 	    CkPrintf("Read from file item %d %d %d\n",nextPE,nextSize,nextEvent);
 	    CkAbort("CkMessageReplay> Unrecognized input");
@@ -2071,6 +2075,7 @@ class CkMessageReplay : public CkMessageWatcher {
 		if (nextPE!=env->getSrcPe()) return CmiFalse;
 		if (nextEvent!=env->getEvent()) return CmiFalse;
 		if (nextSize<0) return CmiFalse; // not waiting for a regular message
+#if ! CMK_BLUEGENE_CHARM
 		if (nextSize!=env->getTotalsize())
                 {
 			CkPrintf("CkMessageReplay> Message size changed during replay org: [%d %d %d] got: [%d %d %d]\n", nextPE, nextEvent, nextSize, env->getSrcPe(), env->getEvent(), env->getTotalsize());
@@ -2090,6 +2095,7 @@ class CkMessageReplay : public CkMessageWatcher {
 		  }
 		  if (!wasPacked) CkUnpackMessage(&env);
 		}
+#endif
 		return CmiTrue;
 	}
 	CmiBool isNext(CthThreadToken *token) {
@@ -2232,7 +2238,9 @@ public:
 };
 
 extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
+#if ! CMK_BLUEGENE_CHARM
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
+#endif
   CkMessageReplay *replay = (CkMessageReplay*)rep;
   //CmiStartQD(CkMessageReplayQuiescence, replay);
 }
@@ -2339,7 +2347,9 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	    }
 	  }
 	  CpdSetInitializeMemory(1);
+#if ! CMK_BLUEGENE_CHARM
 	  CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
+#endif
 	  ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
 	}
 }
