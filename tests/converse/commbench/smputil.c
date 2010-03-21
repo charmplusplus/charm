@@ -62,9 +62,10 @@ double memoryAllocTest(){
 }
 
 static void memAllocHandler(EmptyMsg *msg){
+	double overhead;
 	/* Make sure the memory contention on a node happens roughly at the same time */
 	CmiNodeBarrier();
-	double overhead = memoryAllocTest();	
+	overhead = memoryAllocTest();	
 	CmiNodeBarrier();
 	
 	if(CmiMyPe()==0){
