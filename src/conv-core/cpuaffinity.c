@@ -68,6 +68,16 @@ static void add_exclude(int core)
 #include <sys/processor.h>
 #endif
 
+#define SET_MASK(cpuid)    \
+  /* set the affinity mask if possible */      \
+  if ((cpuid / 8) > len) {      \
+    printf("Mask size too small to handle requested CPU ID\n");   \
+    return -1;      \
+  } else {    \
+    mask = 1 << cpuid;   /* set the affinity mask exclusively to one CPU */ \
+  }
+
+
 /* This implementation assumes the default x86 CPU mask size used by Linux */
 /* For a large SMP machine, this code should be changed to use a variable sized   */
 /* CPU affinity mask buffer instead, as the present code will fail beyond 32 CPUs */
@@ -82,6 +92,7 @@ int set_cpu_affinity(unsigned int cpuid) {
  #endif
  
 #ifdef _WIN32
+  SET_MASK(cpuid)
   hProcess = GetCurrentProcess();
   if (SetProcessAffinityMask(hProcess, mask) == 0) {
     return -1;
@@ -90,13 +101,7 @@ int set_cpu_affinity(unsigned int cpuid) {
   pid = getpid();
   if (bindprocessor(BINDPROCESS, pid, cpuid) == -1) return -1;
 #else
-  /* set the affinity mask if possible */
-  if ((cpuid / 8) > len) {
-    printf("Mask size too small to handle requested CPU ID\n");
-    return -1;
-  } else {
-    mask = 1 << cpuid;   /* set the affinity mask exclusively to one CPU */
-  }
+  SET_MASK(cpuid)
 
   /* PID 0 refers to the current process */
   if (sched_setaffinity(0, len, &mask) < 0) {
@@ -117,22 +122,14 @@ int set_thread_affinity(int cpuid) {
   HANDLE hThread;
 #endif	
   
-#if defined(_WIN32) || CMK_HAS_PTHREAD_SETAFFINITY
-  /* set the affinity mask if possible */
-  if ((cpuid / 8) > len) {
-    printf("set_thread_affinity: Mask size too small to handle requested CPU ID\n");
-    return -1;
-  } else {
-    mask = 1 << cpuid;   /* set the affinity mask exclusively to one CPU */
-  }
-#endif
-
 #ifdef _WIN32
+  SET_MASK(cpuid)
   hThread = GetCurrentThread();
   if (SetThreadAffinityMask(hThread, mask) == 0) {
     return -1;
   }
 #elif  CMK_HAS_PTHREAD_SETAFFINITY
+  SET_MASK(cpuid)
   /* PID 0 refers to the current process */
   if (pthread_setaffinity_np(pthread_self(), len, &mask) < 0) {
     perror("pthread_setaffinity");
