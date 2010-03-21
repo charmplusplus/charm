@@ -1,11 +1,12 @@
 HPC_SDK="c:\Program Files\Microsoft HPC Pack 2008 SDK"
+HPC_SDK=`cygpath -d "$HPC_SDK"`
 
-CMK_CC="unix2nt_cc -D_CRT_SECURE_NO_DEPRECATE -I `cygpath -d "$HPC_SDK\Include"`"
+CMK_CC="unix2nt_cc -D_CRT_SECURE_NO_DEPRECATE -I `cygpath -u "$HPC_SDK\Include"`"
 CMK_CPP_C="$CMK_CC -E"
-CMK_CXX="unix2nt_cc -D_CRT_SECURE_NO_DEPRECATE  -I `cygpath -d "$HPC_SDK\Include"`"
+CMK_CXX="unix2nt_cc -D_CRT_SECURE_NO_DEPRECATE  -I `cygpath -u "$HPC_SDK\Include"`"
 CMK_CXXPP=$CMK_CC
-CMK_LD="$CMK_CC -L `cygpath -d "$HPC_SDK\Lib\amd64"` -lmsmpi"
-CMK_LDXX="$CMK_CXX -L `cygpath -d "$HPC_SDK\Lib\amd64"` -lmsmpi"
+CMK_LD="$CMK_CC -L `cygpath -u "$HPC_SDK\Lib\amd64"` -lmsmpi"
+CMK_LDXX="$CMK_CXX -L `cygpath -u "$HPC_SDK\Lib\amd64"` -lmsmpi"
 
 CMK_SEQ_CC="$CMK_CC"
 CMK_SEQ_CXX="$CMK_CXX"
