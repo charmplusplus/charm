@@ -307,7 +307,7 @@ public:
     } else if (i.nInts == 2) {
       flati = i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1];
     } else if (i.nInts == 3) {
-      flati = (i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] * arrs[arrayHdl]->_nelems.data()[2] + i.data()[1]) * arrs[arrayHdl]->_nelems.data()[2] + i.data()[2];
+      flati = (i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1]) * arrs[arrayHdl]->_nelems.data()[2] + i.data()[2];
     } else {
       CkAbort("CkArrayIndex has more than 3 integers!");
     }
