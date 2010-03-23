@@ -12,6 +12,8 @@ public:
 
     int nVars();
 
+    int clausesSize();
+    
     Var newVar (bool polarity = true, bool dvar = true);
     
     bool addClause(CkVec<Lit>& lits);
@@ -20,16 +22,22 @@ public:
 
     void assignclause(CkVec<Clause>& );
 
+    int  unsolvedClauses();
+    
+    void printSolution();
 
     CkVec<Clause>   clauses;
     Lit             assigned_lit;
     int             var_size;
+    int             unsolved_clauses;
 
     int             var_frequency; // 1, -1, 1 freq = 3
     CkVec<int>      unit_clause_index;
     // -2 means true, -1 means false, 0 means anything, > 0 means occurrence
     CkVec<int>      occurrence; 
     CkVec<int>      positive_occurrence; 
+    //2 * N (positive, negative)
+    CkVec< CkVec< int > >   whichClauses;
     int             level;
    
     int             lower;
@@ -64,7 +72,19 @@ public:
            new_state->occurrence[_i] = org->occurrence[_i];
            new_state->positive_occurrence[_i] = org->occurrence[_i];
        }
-        new_state->level = org->level;
+       new_state->level = org->level;
+       int _size = org->whichClauses.size();
+       new_state->whichClauses.resize(_size); 
+       for(int i=0; i<_size; i++)
+       {
+           int _sub_size = org->whichClauses[i].size();
+           new_state->whichClauses[i].resize(_sub_size);
+
+           for(int j=0; j<_sub_size; j++)
+           {
+               new_state->whichClauses[i][j] = org->whichClauses[i][j];
+           }
+       }
        return new_state;
     }
 

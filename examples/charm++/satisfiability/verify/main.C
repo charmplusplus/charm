@@ -205,23 +205,34 @@ static void simplify(SolverState& S)
 
 
 
-static void parse_confFile(gzFile input_stream, SolverState& S) {                  
-    StreamBuffer in(input_stream);    
-      CkVec<Lit> lits;                                                 
+static void parse_confFile(gzFile problem_stream, solution_stream) {                  
+   
+    vector<int> assignment;
+    StreamBuffer in_solution(solution_stream);    
+    
+   
+    for(;;)
+    {
+        if(*in == EOF)
+            break;
+        else
+    }
+
+    CkVec<Lit> lits;                                                 
     int i  = 0;
     
-    for (;;){                                                      
-        //printf(" + on %d\n", i++);
+    for (;;)
+    {                                                     
         skipWhitespace(in);                                        
         if (*in == EOF)                                            
             break;                                                 
         else if (*in == 'p'){                                      
-            if (match(in, (char*)"p cnf")){                               
+            if (match(in, (char*)"pcnf")){                               
                 int vars    = parseInt(in);                        
                 int clauses = parseInt(in);                        
                 printf("|  Number of variables:  %-12d                                         |\n", vars);
                 printf("|  Number of clauses:    %-12d                                         |\n", clauses);
-      
+
                 S.var_size = vars;
                 S.occurrence.resize(vars);
                 S.positive_occurrence.resize(vars);
@@ -254,22 +265,15 @@ static void parse_confFile(gzFile input_stream, SolverState& S) {
 Main::Main(CkArgMsg* msg)
 {
 
-    grainsize = 1;
-    SolverState* solver_msg = new (8 * sizeof(int))SolverState;
-    if(msg->argc < 2)
+    if(msg->argc < 3)
     {
-        error_exit((char*)"Usage: sat filename grainsize\n");
-    }else
-        grainsize = atoi(msg->argv[2]);
-
-    char filename[50];
-
+        error_exit((char*)"Usage: sat_verify problemfile solutionfile\n");
+    }
     /* read file */
 
-    starttimer = CmiWallTimer();
-
     /*read information from file */
-    gzFile in = gzopen(msg->argv[1], "rb");
+    gzFile in_problem = gzopen(msg->argv[1], "rb");
+    gzFile in_solution = gzopen(msg->argv[2], "rb");
 
     if(in == NULL)
     {
@@ -278,83 +282,6 @@ Main::Main(CkArgMsg* msg)
 
     parse_confFile(in, *solver_msg);
 
-
-    /*  unit propagation */ 
-    simplify(*solver_msg);
-
-#ifdef DEBUG
-    for(int __i = 0; __i<solver_msg->occurrence.size(); __i++)
-    {
-
-            if(solver_msg->occurrence[__i] == -2)
-                CkPrintf(" TRUE ");
-            else if(solver_msg->occurrence[__i] == -1)
-                CkPrintf(" FALSE ");
-            else
-                CkPrintf(" UNDECIDED ");
-    }
-
-
-    CkPrintf(" unsolved clauses %d\n", solver_msg->unsolvedClauses());
-#endif
-
-    solver_msg->unsolved_clauses = 0;
-   
-    int unsolved = solver_msg->unsolvedClauses();
-
-    if(unsolved == 0)
-    {
-        CkPrintf(" This problem is solved by pre-processing\n");
-        solver_msg->printSolution();
-        CkExit();
-    }
-    readfiletimer = CmiWallTimer();
-    /*fire the first chare */
-    /* 1)Which variable is assigned which value this time, (variable, 1), current clauses status vector(), literal array activities */
-
-    mainProxy = thisProxy;
-    int max_index = get_max_element(solver_msg->occurrence);
-    
-    solver_msg->assigned_lit = Lit(max_index+1);
-    solver_msg->level = 0;
-    SolverState *not_msg = copy_solverstate(solver_msg);
-    
-    //CkPrintf(" main chare max index=%d, %d, assigned=%d\n", max_index+1, solver_msg->occurrence[max_index], toInt(solver_msg->assigned_lit));
-    solver_msg->occurrence[max_index] = -2;
-    not_msg->assigned_lit = Lit(-max_index-1);
-    not_msg->occurrence[max_index] = -1;
-    
-    int positive_max = solver_msg->positive_occurrence[max_index];
-    if(positive_max >= solver_msg->occurrence[max_index] - positive_max)
-    {
-
-        // assign true first and then false
-        *((int *)CkPriorityPtr(solver_msg)) = INT_MIN;
-        CkSetQueueing(solver_msg, CK_QUEUEING_IFIFO);
-        solver_msg->lower = INT_MIN;
-        solver_msg->higher = 0;
-        CProxy_Solver::ckNew(solver_msg);
-        
-        *((int *)CkPriorityPtr(not_msg)) = 0;
-        CkSetQueueing(not_msg, CK_QUEUEING_IFIFO);
-        not_msg->lower = 0;
-        not_msg->higher = INT_MAX;
-        CProxy_Solver::ckNew(not_msg);
-    }else
-    {
-        *((int *)CkPriorityPtr(not_msg)) = INT_MIN;
-        CkSetQueueing(not_msg, CK_QUEUEING_IFIFO);
-        not_msg->lower = INT_MIN;
-        not_msg->higher = 0;
-        CProxy_Solver::ckNew(not_msg);
-        
-        *((int *)CkPriorityPtr(solver_msg)) = 0;
-        CkSetQueueing(solver_msg, CK_QUEUEING_IFIFO);
-        solver_msg->lower = 0;
-        solver_msg->higher = INT_MAX;
-        CProxy_Solver::ckNew(solver_msg);
-
-    }
 }
 
 Main::Main(CkMigrateMessage* msg) {}

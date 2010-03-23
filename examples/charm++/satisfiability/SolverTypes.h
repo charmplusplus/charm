@@ -28,9 +28,9 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 template<class V> 
 int get_max_element(const V& ps) {
 
-    int max_index = 0;
-    int max = ps[0];
-    for(int __i=1; __i<ps.size(); __i++)
+    int max_index = -1;
+    int max = -1;
+    for(int __i=0; __i<ps.size(); __i++)
     {
         if(ps[__i] > max)
         {
@@ -38,7 +38,6 @@ int get_max_element(const V& ps) {
             max_index = __i;
         }
     }
-
     return max_index;
 }
 
@@ -155,8 +154,15 @@ public:
         for (int i = 0; i < ps.size(); i++) data[i] = ps[i];
     }
 
-    void remove(int i){
-        data.remove(i); 
+    void remove(int v){
+        for(int i=0; i<data.size(); i++)
+        {
+            if(toInt(data[i]) == v)
+            {
+                data.remove(i);
+                return;
+            }
+        }
     }
     // -- use this function instead:
     int          size        ()      const   { return data.size(); }
@@ -180,6 +186,7 @@ public:
     void         strengthen  (Lit p);
 
 
+    void        resize  (int __size)  {data.resize(__size); }
     void pup(PUP::er &p) {
         for(int i=0; i<size(); i++)
             p|data[i];

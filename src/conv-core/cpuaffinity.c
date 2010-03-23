@@ -1,14 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
-#include "converse.h"
-#include "sockRoutines.h"
-
-#define DEBUGP(x)   /* CmiPrintf x;  */
 
 /*
  This scheme relies on using IP address to identify nodes and assigning 
@@ -16,7 +5,16 @@ cpu affinity.
 
  when CMK_NO_SOCKETS, which is typically on cray xt3 and bluegene/L.
  There is no hostname for the compute nodes.
+ *
+ * last updated 3/20/2010   Gengbin Zheng
+ * new options +pemap +commmap takes complex pattern of a list of cores
 */
+
+#include "converse.h"
+#include "sockRoutines.h"
+
+#define DEBUGP(x)   /* CmiPrintf x;  */
+
 #if CMK_HAS_SETAFFINITY || defined (_WIN32) || CMK_HAS_BINDPROCESSOR
 
 #include <stdlib.h>
@@ -45,7 +43,8 @@ long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr
 #include <sys/mpctl.h>
 #endif
 
-static int excludecore[8] = {-1};
+#define MAX_EXCLUDE      16
+static int excludecore[MAX_EXCLUDE] = {-1};
 static int excludecount = 0;
 
 static int affinity_doneflag = 0;
@@ -60,7 +59,7 @@ static int in_exclude(int core)
 static void add_exclude(int core)
 {
   if (in_exclude(core)) return;
-  CmiAssert(excludecount < 8);
+  CmiAssert(excludecount < MAX_EXCLUDE);
   excludecore[excludecount++] = core;
 }
 
@@ -311,13 +310,19 @@ static void cpuAffinityRecvHandler(void *msg)
   CmiFree(m);
 }
 
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+  /* strtok is thread safe in VC++ */
+#define strtok_r(x,y,z) strtok(x,y)
+#endif
+
 static int search_pemap(char *pecoremap, int pe)
 {
   char *mapstr = strdup(pecoremap);
   int *map = (int *)malloc(CmiNumPes()*sizeof(int));
+  char *ptr = NULL;
   int i, count;
 
-  char *str = strtok(mapstr, ",");
+  char *str = strtok_r(mapstr, ",", &ptr);
   count = 0;
   while (str)
   {
@@ -346,7 +351,7 @@ static int search_pemap(char *pecoremap, int pe)
         if (count == CmiNumPes()) break;
       }
       if (count == CmiNumPes()) break;
-      str = strtok(NULL, ",");
+      str = strtok_r(NULL, ",", &ptr);
   }
   i = map[pe % count];
 
@@ -374,6 +379,7 @@ void CmiInitCPUAffinity(char **argv)
   while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity")) 
     if (CmiMyRank() == 0) add_exclude(exclude);
   
+    /* obsolete */
   CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping");
   if (coremap!=NULL && excludecount>0)
     CmiAbort("Charm++> +excludecore and +coremap can not be used togetehr!");
@@ -518,10 +524,16 @@ void CmiInitCPUAffinity(char **argv)
 
 void CmiInitCPUAffinity(char **argv)
 {
+  char *pemap = NULL;
+  char *commap = NULL;
+  char *coremap = NULL;
   int excludecore = -1;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
   while (CmiGetArgIntDesc(argv,"+excludecore",&excludecore, "avoid core when setting cpuaffinity"));
+  CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping");
+  CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
+  CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
   if (affinity_flag && CmiMyPe()==0)
     CmiPrintf("sched_setaffinity() is not supported, +setcpuaffinity disabled.\n");
 }
