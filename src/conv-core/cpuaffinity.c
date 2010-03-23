@@ -310,6 +310,11 @@ static void cpuAffinityRecvHandler(void *msg)
   CmiFree(m);
 }
 
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+  /* strtok is thread safe in VC++ */
+#define strtok_r(x,y,z) strtok(x,y)
+#endif
+
 static int search_pemap(char *pecoremap, int pe)
 {
   char *mapstr = strdup(pecoremap);
