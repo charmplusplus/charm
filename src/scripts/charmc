@@ -700,7 +700,17 @@ do
 	"-no-optimize")
 		OPTIMIZE_MODE=false
 		;;
-	
+	-O)
+		Warning "Passing -O to charmc no longer uses charm's platform-specific"
+		Warning "optimization defaults. Use -optimize for that instead."
+		Warning "The -O flag is being passed to the underlying compiler."
+		OPTS="$OPTS $arg"
+		;;
+	-NO)
+		Warning "Passing -NO to charmc is deprecated."
+		Warning "Pass -no-optimize instead to turn off platform-specific"
+		Warning "optimization flags."
+		;;
 	"-pg"|"-g"|-W*|-O*)
 		OPTS="$OPTS $arg"
 		;;
