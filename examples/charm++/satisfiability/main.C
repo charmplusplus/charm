@@ -295,28 +295,26 @@ Main::Main(CkArgMsg* msg)
     }
 
 
-    CkPrintf(" unsolved clauses %d\n", solver_msg->unsolved_clauses);
+    CkPrintf(" unsolved clauses %d\n", solver_msg->unsolvedClauses());
 #endif
 
     solver_msg->unsolved_clauses = 0;
-    for(int __i=0; __i<solver_msg->clauses.size(); __i++)
+   
+    int unsolved = solver_msg->unsolvedClauses();
+
+    if(unsolved == 0)
     {
-        if(solver_msg->clauses[__i].size() > 0)
-            solver_msg->unsolved_clauses++;
+        CkPrintf(" This problem is solved by pre-processing\n");
+        solver_msg->printSolution();
+        CkExit();
     }
-    
     readfiletimer = CmiWallTimer();
     /*fire the first chare */
     /* 1)Which variable is assigned which value this time, (variable, 1), current clauses status vector(), literal array activities */
 
     mainProxy = thisProxy;
     int max_index = get_max_element(solver_msg->occurrence);
-  
-    if(max_index < 0)
-    {
-        CkPrintf(" This problem is solved by pre-processing\n");
-        CkExit();
-    }
+    
     solver_msg->assigned_lit = Lit(max_index+1);
     solver_msg->level = 0;
     SolverState *not_msg = copy_solverstate(solver_msg);
@@ -366,7 +364,7 @@ void Main::done()
 
     double endtimer = CmiWallTimer();
 
-    CkPrintf("File reading and processing time:         %f\n", readfiletimer-starttimer);
+    CkPrintf("\nFile reading and processing time:         %f\n", readfiletimer-starttimer);
     CkPrintf("Solving time:                             %f\n", endtimer - readfiletimer);
     CkExit();
 }

@@ -22,6 +22,9 @@ public:
 
     void assignclause(CkVec<Clause>& );
 
+    int  unsolvedClauses();
+    
+    void printSolution();
 
     CkVec<Clause>   clauses;
     Lit             assigned_lit;
