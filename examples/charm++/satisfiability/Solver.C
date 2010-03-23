@@ -229,7 +229,6 @@ unit_propagation:while(1){
              next_state->unit_clause_index.push_back(cl_index_);
          }else if (cl_neg.size() == 0)
          {
-                CkPrintf(" conflict found!\n");
                 return;
          }
     }
