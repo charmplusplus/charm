@@ -39,7 +39,7 @@ normal \charmpp{} using ``bgampi'' as the compilation target, like
 \end{verbatim}
 
 With Emulator libraries, one can write BigSim applications using its
-low level machine API.
+low level machine API (defined in ~\ref{bgemulator}).
 
 \subsubsection{Building Charm++ or AMPI on the BigSim Emulator}
 
@@ -58,6 +58,8 @@ which tells ``build'' to build Charm++ on top of the BigSim Emulator.
 The above ``build" command creates a directory named
 ``net-linux-x86\_64-bigemulator" under charm, which contains all the header
 files and libraries needed for compiling a user application.
+With this version of Charm++, one can run normal Charm++ and AMPI application
+on top of the emulator (in a virtualized environment).
 
 \subsection{Compiling BigSim Applications}
 
@@ -126,7 +128,8 @@ charmc -o hello hello.C -language ampi
 \end{verbatim}
 
 Sample applications in AMPI can be found in the directory charm/examples/ampi,
-specifically charm/examples/ampi/pingpong.
+specifically \\
+charm/examples/ampi/pingpong.
 
 \subsection{Running a BigSim Application}
 
@@ -148,17 +151,18 @@ machine (assuming a torus/mesh topology);
 \item {\tt +wth} and {\tt +cth}:  For one node, these two parameters define the
 number of worker processors~({\tt +wth}) and the number of communication
 processors~({\tt +cth}).
-\item {\tt +bglog}: used so that BigSim logfiles get created
-\item {\tt +bgcorrect}: starts the simulation mode for performance prediction.
-Otherwise the program runs without doing parallel event simulation for
-performance prediction of the application.
 \item {\tt +bgwalltime}: used only in simulation mode, when specified, use
 wallclock measurement of the time taken on the simulating machine to estimate
 the time it takes to run on the target machine.
 \item {\tt +bgcounter}:  used only in simulation mode, when specified, use the
 performance counter to estimate the time on target machine. This is currently
 only supported when perfex is installed, like Origin2000.
-\end{enumerate}
+\item {\tt +bglog}: generate BigSim trace log files, which can be used with BigNetSim. 
+\item {\tt +bgcorrect}: starts the simulation mode to predict performance.
+Without this option, a program simply runs on the emulator without doing any
+performance prediction.  Note: this option is obsolete, and no longer
+maintained, use +bglog to generate trace logs, and use BigNetSim for
+performance prediction.  \end{enumerate}
 
 For example, to simulate a parallel machine of size 64K as 40x40x40, with one
 worker processor and one communication processor on each node, and use 100 real
