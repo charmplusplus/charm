@@ -10,7 +10,7 @@ sat : main.o Solver.o
 main.o : main.C main.decl.h main.def.h 
 	$(CHARMC) -o main.o main.C 
 
-Solver.o : Solver.C SolverTypes.h
+Solver.o : Solver.C SolverTypes.h Solver.h
 	$(CHARMC) -o Solver.o Solver.C
 
 #util.o : util.C
