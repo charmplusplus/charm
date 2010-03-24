@@ -40,3 +40,26 @@ extern "C" void req_fw_handler(char *msg)
   CcsHandleRequest(hdr, msg+offset);
   CmiFree(msg);
 }
+
+extern "C" void CcsSendReply(int replyLen, const void *replyData);
+/**********************************************
+  "ccs_getinfo"-- takes no data
+    Return the number of parallel nodes, and
+      the number of processors per node as an array
+      of 4-byte big-endian ints.
+*/
+
+void ccs_getinfo(char *msg)
+{
+  int nNode=CmiNumNodes();
+  int len=(1+nNode)*sizeof(ChMessageInt_t);
+  ChMessageInt_t *table=(ChMessageInt_t *)malloc(len);
+  int n;
+  table[0]=ChMessageInt_new(nNode);
+  for (n=0;n<nNode;n++)
+    table[1+n]=ChMessageInt_new(CmiNodeSize(n));
+  CcsSendReply(len,(const char *)table);
+  free(table);
+  CmiFree(msg);
+}
+

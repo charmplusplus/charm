@@ -23,26 +23,7 @@
 
 #if CMK_CCS_AVAILABLE
 
-/**********************************************
-  "ccs_getinfo"-- takes no data
-    Return the number of parallel nodes, and
-      the number of processors per node as an array
-      of 4-byte big-endian ints.
-*/
-
-static void ccs_getinfo(char *msg)
-{
-  int nNode=CmiNumNodes();
-  int len=(1+nNode)*sizeof(ChMessageInt_t);
-  ChMessageInt_t *table=(ChMessageInt_t *)malloc(len);
-  int n;
-  table[0]=ChMessageInt_new(nNode);
-  for (n=0;n<nNode;n++)
-    table[1+n]=ChMessageInt_new(CmiNodeSize(n));
-  CcsSendReply(len,(const char *)table);
-  free(table);
-  CmiFree(msg);
-}
+void ccs_getinfo(char *msg);
 
 /**********************************************
   "ccs_killport"-- takes one 4-byte big-endian port number
