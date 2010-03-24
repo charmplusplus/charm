@@ -136,14 +136,12 @@ static void parse_confFile( char* solution_file, gzFile problem_stream) {
             for (;;){
                 parsed_lit = parseInt(in);
 
-                if(parsed_lit>0 && assignment[parsed_lit-1]==1)
+                if(parsed_lit>0 && (assignment[parsed_lit-1]==-2 || assignment[parsed_lit-1]==0))
                 {
-                    //printf("%d=%d ", parsed_lit, assignment[parsed_lit-1]);
                     satisfied = true;
                 }
-                if(parsed_lit<0 && assignment[-parsed_lit-1]==-1)
+                if(parsed_lit<0 && (assignment[-parsed_lit-1]==-1 || assignment[-parsed_lit-1]==0))
                 {
-                    //printf("%d=%d ", parsed_lit, assignment[-parsed_lit-1]);
                     satisfied = true;
                 }
 

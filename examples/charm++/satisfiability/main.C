@@ -263,6 +263,9 @@ Main::Main(CkArgMsg* msg)
     }else
         grainsize = atoi(msg->argv[2]);
 
+
+    CkPrintf("problem file:\t\t%s\ngrainsize:\t\t%d\nprocessor number:\t\t%d\n", msg->argv[1], grainsize, CkNumPes()); 
+
     char filename[50];
 
     /* read file */
@@ -288,13 +291,15 @@ Main::Main(CkArgMsg* msg)
 #ifdef DEBUG
     for(int __i = 0; __i<solver_msg->occurrence.size(); __i++)
     {
+        FILE *file;
+        char outputfile[50];
+        sprintf(outputfile, "%s.sat", inputfile);
+        file = fopen(outputfile, "w");
 
-            if(solver_msg->occurrence[__i] == -2)
-                CkPrintf(" TRUE ");
-            else if(solver_msg->occurrence[__i] == -1)
-                CkPrintf(" FALSE ");
-            else
-                CkPrintf(" UNDECIDED ");
+        for(int i=0; i<assignment.size(); i++)
+        {
+            fprintf(file, "%d\n", assignment[i]);
+        }
     }
 
 
@@ -308,7 +313,7 @@ Main::Main(CkArgMsg* msg)
     if(unsolved == 0)
     {
         CkPrintf(" This problem is solved by pre-processing\n");
-        solver_msg->printSolution();
+        //solver_msg->printSolution();
         CkExit();
     }
     readfiletimer = CmiWallTimer();
@@ -371,17 +376,13 @@ void Main::done(CkVec<int> assignment)
     CkPrintf("Solving time:                             %f\n", endtimer - readfiletimer);
   
     FILE *file;
-
     char outputfile[50];
     sprintf(outputfile, "%s.sat", inputfile);
-    file = fopen(outputfile, "a+");
+    file = fopen(outputfile, "w");
 
     for(int i=0; i<assignment.size(); i++)
     {
-        if(assignment[i] == -1)
-            fprintf(file, "%d\n", -1);
-        else
-            fprintf(file, "%d\n", 1);
+        fprintf(file, "%d\n", assignment[i]);
     }
     
     CkExit();
