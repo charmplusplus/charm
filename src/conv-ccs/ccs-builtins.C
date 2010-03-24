@@ -269,6 +269,10 @@ void CpdMachineArchitecture(char *msg) {
   char firstByte = *((char*)&value);
   if (firstByte == 1) reply[1] = 1;
   else reply[1] = 2;
+  // add the third bit if we are in bigsim
+#if CMK_BLUEGENE_CHARM
+  reply[1] |= 4;
+#endif
   // get the size of an "int"
   reply[2] = sizeof(int);
   // get the size of an "long"
