@@ -317,12 +317,15 @@ static void cpuAffinityRecvHandler(void *msg)
 
 static int search_pemap(char *pecoremap, int pe)
 {
-  char *mapstr = strdup(pecoremap);
   int *map = (int *)malloc(CmiNumPes()*sizeof(int));
   char *ptr = NULL;
   int i, count;
+  char *str;
 
-  char *str = strtok_r(mapstr, ",", &ptr);
+  char *mapstr = (char*)malloc(strlen(pecoremap)+1);
+  strcpy(mapstr, pecoremap);
+
+  str = strtok_r(mapstr, ",", &ptr);
   count = 0;
   while (str)
   {
