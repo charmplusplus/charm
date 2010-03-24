@@ -262,7 +262,7 @@ unit_propagation:while(1){
         next_state->printSolution();
 #endif
 
-        mainProxy.done();
+        mainProxy.done(next_state->occurrence);
         return;
     }
     int max_index = get_max_element(next_state->occurrence);
@@ -309,7 +309,7 @@ unit_propagation:while(1){
         if(satisfiable_1)
         {
             CkPrintf(" One solutions found by sequential algorithm\n");
-            mainProxy.done();
+            mainProxy.done(next_state->occurrence);
             return;
         }
     }
@@ -342,7 +342,7 @@ unit_propagation:while(1){
         if(satisfiable_0)
         {
             CkPrintf(" One solutions found by sequential algorithm\n");
-            mainProxy.done();
+            mainProxy.done(new_msg2->occurrence);
             return;
         }
 

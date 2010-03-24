@@ -8,7 +8,7 @@ mainmodule main {
     
         //entry void done();
         //entry [expedited]void done();
-        entry [expedited]void done();
+        entry [expedited]void done(CkVec<int>);
     };
    
     message SolverState;

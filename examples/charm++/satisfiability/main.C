@@ -20,6 +20,7 @@ CProxy_Main mainProxy;
 
 #define CHUNK_LIMIT 1048576
 
+char inputfile[50];
 
 class StreamBuffer {
     gzFile  in;
@@ -271,6 +272,8 @@ Main::Main(CkArgMsg* msg)
     /*read information from file */
     gzFile in = gzopen(msg->argv[1], "rb");
 
+    strcpy(inputfile, msg->argv[1]);
+
     if(in == NULL)
     {
         error_exit((char*)"Invalid input filename\n");
@@ -359,13 +362,28 @@ Main::Main(CkArgMsg* msg)
 
 Main::Main(CkMigrateMessage* msg) {}
 
-void Main::done()
+void Main::done(CkVec<int> assignment)
 {
 
     double endtimer = CmiWallTimer();
 
     CkPrintf("\nFile reading and processing time:         %f\n", readfiletimer-starttimer);
     CkPrintf("Solving time:                             %f\n", endtimer - readfiletimer);
+  
+    FILE *file;
+
+    char outputfile[50];
+    sprintf(outputfile, "%s.sat", inputfile);
+    file = fopen(outputfile, "a+");
+
+    for(int i=0; i<assignment.size(); i++)
+    {
+        if(assignment[i] == -1)
+            fprintf(file, "%d\n", -1);
+        else
+            fprintf(file, "%d\n", 1);
+    }
+    
     CkExit();
 }
 #include "main.def.h"
