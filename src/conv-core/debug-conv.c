@@ -192,7 +192,7 @@ static void CpdDebugCallMemStat(char *msg) {
 static void CpdDebugHandler(char *msg)
 {
     char name[128];
-    sscanf(msg+CmiMsgHeaderSizeBytes, "%s", name);
+    sscanf(msg+CmiReservedHeaderSize, "%s", name);
 
     if (strcmp(name, "freeze") == 0) {
       CpdFreeze();
