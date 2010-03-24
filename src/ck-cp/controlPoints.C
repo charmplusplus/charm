@@ -1508,7 +1508,7 @@ void controlPointManager::generatePlan() {
 	  instrumentedPhase *prevPhase = previousPhaseData();
 
 	  if(phase_id%4 == 0){
-		  CkPrintf("Steering based on 2 phases ago:\n");
+		  CkPrintf("Divide & Conquer Steering based on 2 phases ago:\n");
 		  twoAgoPhase->print();
 		  CkPrintf("\n");
 		  fflush(stdout);
@@ -1544,41 +1544,53 @@ void controlPointManager::generatePlan() {
 				  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
 					  cpName = iter->first;
 					  info = &iter->second;
-
+					  
 					  // Initialize a new plan based on two phases ago
 					  std::map<std::string,int> aNewPlan = twoAgoPhase->controlPoints;
+					  bool newPlanExists = false;
 
-
-					  CkPrintf("Steering found knob to turn\n");
+					  CkPrintf("Divide & Conquer Steering found knob to turn\n");
 					  fflush(stdout);
 
+
+
 					  if(info->first == ControlPoint::EFF_INC){
+						  const int minValue = controlPointSpace[cpName].first;
 						  const int maxValue = controlPointSpace[cpName].second;
 						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-						  if(twoAgoValue+1 <= maxValue){
-							  aNewPlan[cpName] = twoAgoValue+1*direction; // increase when idleTime > overheadTime
+						  const int newVal = twoAgoValue+1*direction;
+						  if(newVal <= maxValue && newVal >= minValue){
+						    aNewPlan[cpName] = newVal;
+						    newPlanExists = true;
+						  } else {
+						    CkPrintf("Divide & Conquer Steering found that turning the knob exceeds the control point's range (newVal=%d)\n", newVal);
 						  }
 					  } else {
-						  const int minValue = controlPointSpace[cpName].second;
+						  const int minValue = controlPointSpace[cpName].first;
+						  const int maxValue = controlPointSpace[cpName].second;
 						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-						  if(twoAgoValue-1 >= minValue){
-							  aNewPlan[cpName] = twoAgoValue-1*direction;
+						  const int newVal = twoAgoValue-1*direction;
+						  if(newVal <= maxValue && newVal >= minValue){
+							  aNewPlan[cpName] = newVal;
+							  newPlanExists = true;
+						  } else {
+						    CkPrintf("Divide & Conquer Steering found that turning the knob exceeds the control point's range (newVal=%d)\n", newVal);
 						  }
 					  }
 
-					  possibleNextStepPlans.push_back(aNewPlan);
-
+					  if(newPlanExists){
+					    possibleNextStepPlans.push_back(aNewPlan);
+					  }
 				  }
 			  }
 		  }
 
 		  if(possibleNextStepPlans.size() > 0){
-			  newControlPoints = possibleNextStepPlans[0];
+		    CkPrintf("Divide & Conquer Steering found %d possible next phases, using first one\n", possibleNextStepPlans.size());
+		    newControlPoints = possibleNextStepPlans[0];
+		  } else {
+		    CkPrintf("Divide & Conquer Steering found no possible next phases\n");
 		  }
-
-
-		  CkPrintf("Tuning via Divide & Conquer Scheme done for this phase\n");
-		  fflush(stdout);
 	  }
 
   } else if( whichTuningScheme == Simplex ) {
