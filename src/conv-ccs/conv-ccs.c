@@ -323,7 +323,12 @@ static void bg_req_fw_handler(char *msg) {
   int offset = CmiReservedHeaderSize + sizeof(CcsImplHeader);
   CcsImplHeader *hdr = (CcsImplHeader *)(msg+CmiReservedHeaderSize);
   int destPE = (int)ChMessageInt(hdr->pe);
-  CmiAssert(destPE >= 0); // FixME: should cover also broadcast and multicast -> create generic function to extract destpe
+  if (destPE == -1) destPE = 0;
+  if (destPE < -1) {
+    ChMessageInt_t *pes_nbo = (ChMessageInt_t *)(msg+CmiReservedHeaderSize+sizeof(CcsImplHeader));
+    destPE = ChMessageInt(pes_nbo[0]);
+  }
+  //CmiAssert(destPE >= 0); // FixME: should cover also broadcast and multicast -> create generic function to extract destpe
   (((CmiBlueGeneMsgHeader*)msg)->tID) = 0;
   (((CmiBlueGeneMsgHeader*)msg)->n) = 0;
   (((CmiBlueGeneMsgHeader*)msg)->flag) = 0;
