@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 
 #ifndef _CKSTREAM_H
 #define _CKSTREAM_H
@@ -17,8 +11,15 @@ class _CkOStream {
   private:
     int _isErr;
     size_t _buflen, _actlen;
-    char _obuf[BUF_MAXLEN];
-    char _tbuf[1024];
+    char _obuf[BUF_MAXLEN]; /* stores a line of text */
+    char _tbuf[1024]; /* used for formatting ints and things */
+    void output(const char *str) {
+      _actlen += strlen(str);
+      if(_actlen > _buflen)
+        CmiAbort("Print Buffer Overflow!!\n");
+      strcat(_obuf, str); 
+    }
+    
   public:
     _CkOStream(int isErr=0) { 
       _buflen=BUF_MAXLEN; 
@@ -43,10 +44,7 @@ class _CkOStream {
 #define _OPSHIFTLEFT(type, format) \
     _CkOStream& operator << (type x) { \
       sprintf(_tbuf, format, (type) x); \
-      _actlen += strlen(_tbuf); \
-      if(_actlen > _buflen) \
-        CmiAbort("Print Buffer Overflow!!\n"); \
-      strcat(_obuf, _tbuf); \
+      output(_tbuf); \
       return *this; \
     }
 
@@ -62,10 +60,15 @@ class _CkOStream {
 #endif
     _OPSHIFTLEFT(char, "%c");
     _OPSHIFTLEFT(unsigned char, "%u");
-    _OPSHIFTLEFT(float, "%g");
-    _OPSHIFTLEFT(double, "%g");  // Floats and doubles are identical for printf
-    _OPSHIFTLEFT(const char*, "%s");
+    _OPSHIFTLEFT(float, "%f");
+    _OPSHIFTLEFT(double, "%f");  // Floats and doubles are identical for printf
     _OPSHIFTLEFT(void*, "%p");
+
+    /* Avoid _tbuf overflow, by outputting strings directly... */
+    _CkOStream& operator << (const char *str) {
+      output(str);
+      return *this;
+    }
 };
 
 static inline _CkOStream& endl(_CkOStream& s)  { return s.endl(); }
