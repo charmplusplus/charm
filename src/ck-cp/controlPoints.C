@@ -1145,6 +1145,7 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime){
 /// user observed characteristic to adapt specific control point values.
 /// This function must return valid values for newControlPoints.
 void controlPointManager::generatePlan() {
+  const double startGenerateTime = CmiWallTimer();
   const int phase_id = this->phase_id;
   const int effective_phase = allData.phases.size();
 
@@ -1696,6 +1697,11 @@ void controlPointManager::generatePlan() {
     CkAbort("Some Control Point tuning strategy must be enabled.\n");
   }
 
+
+  const double endGenerateTime = CmiWallTimer();
+  
+  CkPrintf("Time to generate next control point configuration(s): %f sec\n", (endGenerateTime - startGenerateTime) );
+  
 }
 
 
