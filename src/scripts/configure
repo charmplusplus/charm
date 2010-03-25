@@ -2403,6 +2403,9 @@ _ACEOF
 
 
 #### test if we can build MPI ####
+if test "$CMK_BUILD_MPI" = 1
+then
+
 cat > $t <<EOT
 #include "mpi.h"
 int main(int argc, char **argv)
@@ -2418,6 +2421,12 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 BUILD_MPI=$strictpass
+
+if test $BUILD_MPI -eq 0
+then
+  echo "Error: Can not compile a MPI program"
+  exit 1
+fi
 
 if test $BUILD_MPI -eq 1
 then
@@ -2466,6 +2475,7 @@ _ACEOF
 fi
 mv -f ../include/mpi.h.bak ../include/mpi.h 2>/dev/null
 
+fi
 
 ################### Syscalls and Libraries ###################
 
