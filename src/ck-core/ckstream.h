@@ -6,13 +6,14 @@
 #include <stdio.h>
 
 #define BUF_MAXLEN  16384
+#define TBUF_MAXLEN   128
 
 class _CkOStream {
   private:
     int _isErr;
     size_t _buflen, _actlen;
-    char _obuf[BUF_MAXLEN]; /* stores a line of text */
-    char _tbuf[1024]; /* used for formatting ints and things */
+    char _obuf[BUF_MAXLEN];    /* stores a line of text */
+    char _tbuf[TBUF_MAXLEN];   /* used for formatting ints and things */
     void output(const char *str) {
       _actlen += strlen(str);
       if(_actlen > _buflen)
@@ -43,7 +44,8 @@ class _CkOStream {
     }
 #define _OPSHIFTLEFT(type, format) \
     _CkOStream& operator << (type x) { \
-      sprintf(_tbuf, format, (type) x); \
+      int ret = snprintf(_tbuf, TBUF_MAXLEN, format, (type) x); \
+      if (ret >= TBUF_MAXLEN) CmiPrintf("Warning: CkStream tbuf overflow!\n"); \
       output(_tbuf); \
       return *this; \
     }
