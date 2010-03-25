@@ -64,6 +64,10 @@
 #error "Compiler not generating 64 bit binary, please check compiler flags."
 #endif
 
+#if CMK_SIZET_64BIT && !CMK_64BIT
+#define CMK_64BIT                1
+#endif
+
 /* set up what production/non-production means */
 #ifndef CMK_OPTIMIZE
 
