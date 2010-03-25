@@ -4,7 +4,7 @@ CMK_CC='mpicc '
 CMK_CXX='mpicxx '
 CMK_CXXPP='mpicxx -E '
 CMK_RANLIB='ranlib'
-CMK_LIBS='-lckqt -lmpich '
+CMK_LIBS='-lckqt '
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 
 CMK_NATIVE_LIBS=''
