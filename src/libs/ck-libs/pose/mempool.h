@@ -27,11 +27,11 @@ public:
   /// Basic initialization
   MemoryPool() :memPools(NULL),lastLook(NULL){
 #ifdef VERBOSE_DEBUG
-  CkPrintf("[%d] constructing MemoryPool\n",CkMyPe());
+    CkPrintf("[%d] constructing MemoryPool\n",CkMyPe());
 #endif
-
- }
-  MemoryPool(CkMigrateMessage *) { };
+  }
+  MemoryPool(CkMigrateMessage *msg) : Group(msg) { }
+  void pup(PUP::er &p) { }
   /// returns number of blocks of size sz in pool
   int CheckPool(int sz); 
   /// returns a block from pool with size sz

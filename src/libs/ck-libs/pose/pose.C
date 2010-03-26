@@ -16,8 +16,13 @@ POSE_TimeType POSE_endtime;
 POSE_TimeType POSE_GlobalClock;
 POSE_TimeType POSE_GlobalTS;
 POSE_Config pose_config;
+#ifdef POSE_COMM_ON
 ComlibInstanceHandle POSE_commlib_insthndl;
+#endif
 int _POSE_SEQUENTIAL;
+int seqCheckpointInProgress;
+POSE_TimeType seqLastCheckpointGVT;
+CkQ<int> POSE_Skipped_Events;
 
 const eventID& GetEventID() {
   //CpvStaticDeclare(eventID, theEventID);  // initializes to [0.pe]
@@ -117,6 +122,8 @@ void POSE_init(int IDflag, int ET) // can specify both
   CkStartQD(fnIdx, &POSE_Coordinator_ID);
   POSE_GlobalClock = 0;
   POSE_GlobalTS = 0;
+  seqCheckpointInProgress = 0;
+  seqLastCheckpointGVT = 0;
 #else
   /*  CkPrintf("WARNING: Charm Quiescence termination enabled!\n");
   int fnIdx = CkIndex_pose::stop();
@@ -211,13 +218,18 @@ void pose::registerCallBack(callBack *cbm)
 void pose::stop(void) 
 { 
 #ifdef SEQUENTIAL_POSE
+  // don't stop if quiescence was reached for a checkpoint operation
+  if (seqCheckpointInProgress) {
+    POSE_Objects[0].SeqBeginCheckpoint();
+  } else {
 #if USE_LONG_TIMESTAMPS
-  CkPrintf("Sequential Endtime Approximation: %lld\n", POSE_GlobalClock);
+    CkPrintf("Sequential Endtime Approximation: %lld\n", POSE_GlobalClock);
 #else
-  CkPrintf("Sequential Endtime Approximation: %d\n", POSE_GlobalClock);
+    CkPrintf("Sequential Endtime Approximation: %d\n", POSE_GlobalClock);
 #endif
-  // Call sequential termination here, when done it calls prepExit
-  POSE_Objects.Terminate();
+    // Call sequential termination here, when done it calls prepExit
+    POSE_Objects.Terminate();
+  }
 #endif
   // prepExit();
 }
