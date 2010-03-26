@@ -46,7 +46,7 @@ std::map<std::string, int> defaultControlPointValues;
 
 
 
-typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware, Simplex, DivideAndConquer}  tuningScheme;
+typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware, Simplex, DivideAndConquer, AlwaysDefaults}  tuningScheme;
 
 
 
@@ -54,6 +54,9 @@ void printTuningScheme(){
   switch(whichTuningScheme){
   case RandomSelection:
     CkPrintf("Tuning Scheme: RandomSelection\n");
+    break;
+  case AlwaysDefaults:
+    CkPrintf("Tuning Scheme: AlwaysDefaults\n");
     break;
   case SimulatedAnnealing:
     CkPrintf("Tuning Scheme: SimulatedAnnealing\n");
@@ -998,6 +1001,8 @@ public:
       whichTuningScheme = RandomSelection;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPExhaustiveSearch","Exhaustive Search of Control Point Values") ){
       whichTuningScheme = ExhaustiveSearch;
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPAlwaysUseDefaults","Always Use The Provided Default Control Point Values") ){
+      whichTuningScheme = AlwaysDefaults;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPSimulAnneal","Simulated Annealing Search of Control Point Values") ){
       whichTuningScheme = SimulatedAnnealing;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPCriticalPathPrio","Use Critical Path to adapt Control Point Values") ){
@@ -1725,11 +1730,10 @@ int controlPoint(const char *name, int lb, int ub){
   }
   
 
-  if( phase_id < 4 ){
+  if( phase_id < 4 || whichTuningScheme == AlwaysDefaults){
     // For the first few phases, just use the lower bound, or the default if one was provided 
     // This ensures that the ranges for all the control points are known before we do anything fancy
     result = lb;
-
 
     if(defaultControlPointValues.count(std::string(name)) > 0){
       int v = defaultControlPointValues[std::string(name)];
