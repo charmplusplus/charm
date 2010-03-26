@@ -8,6 +8,10 @@
 #define BUF_MAXLEN  16384
 #define TBUF_MAXLEN   128
 
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+#define snprintf _snprintf
+#endif
+
 class _CkOStream {
   private:
     int _isErr;
