@@ -100,7 +100,7 @@ public:
     if (grt > maxGRT) maxGRT = grt;
   }
 };
-PUPbytes(localStat);
+PUPbytes(localStat)
 
 /// Entity to gather stats from each PE and prepare final report
 class globalStat : public Chare {
@@ -121,7 +121,7 @@ public:
   void localStatReport(localStatSummary *m); 
   void DOPcalc(int gvt, double grt);
 };
-PUPbytes(globalStat);
+PUPbytes(globalStat)
 
 
 // All timer functions are inlined below
