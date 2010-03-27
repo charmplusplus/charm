@@ -245,7 +245,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
-	graph.h bitvecset.h Set.h LBSimulation.h  \
+	graph.h bitvecset.h ckset.h LBSimulation.h  \
 	$(BLUE_HEADERS)
 
 basics: headers
@@ -643,7 +643,7 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o  \
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o WSLB.o \
            ObjGraph.o graph.o LButil.o Refiner.o RefinerApprox.o  \
-           RefinerComm.o bitvecset.o Set.o ckheap.o CommLBHeap.o \
+           RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) \
 	   charmProjections.o pathHistory.o
 
