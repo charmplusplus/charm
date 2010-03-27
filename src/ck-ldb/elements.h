@@ -22,7 +22,7 @@
 #include "converse.h"
 #include "lbdb.h"
 
-#include "Set.h"
+#include "ckset.h"
 #include "cklists.h"
 
 class minHeap;

@@ -65,7 +65,7 @@
 #endif
 
 #if CMK_SIZET_64BIT && !CMK_64BIT
-#error "Compiler is generating 64 bit binary, but charm is not configured for 64bit (CMK_64BIT)."
+#define CMK_64BIT                1
 #endif
 
 /* set up what production/non-production means */

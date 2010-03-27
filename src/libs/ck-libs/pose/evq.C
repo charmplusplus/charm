@@ -7,6 +7,10 @@ eventQueue::eventQueue()
   if(pose_config.dop){
     sprintf(filename, "dop%d.log", CkMyPe());
     fp = fopen(filename, "a");
+    if (fp == NULL) {
+      CkPrintf("ERROR: unable to open DOP file %s for append\n");
+      CkAbort("Error opening file");
+    }
     lastLoggedVT = 0;
   }
   Event *e;

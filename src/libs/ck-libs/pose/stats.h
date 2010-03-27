@@ -64,7 +64,8 @@ public:
     CkPrintf("[%d] constructing localStat\n",CkMyPe());
 #endif
   }
-  localStat(CkMigrateMessage *) { };
+  /// Migration constructor
+  localStat(CkMigrateMessage *msg) : Group(msg) { };
   /// Start the specified timer
   void TimerStart(int timer);  
   /// Stop the currently active timer
@@ -99,6 +100,7 @@ public:
     if (grt > maxGRT) maxGRT = grt;
   }
 };
+PUPbytes(localStat)
 
 /// Entity to gather stats from each PE and prepare final report
 class globalStat : public Chare {
@@ -113,11 +115,13 @@ private:
 public:
   /// Basic Constructor
   globalStat(void);
-  globalStat(CkMigrateMessage *) { };
+  /// Migration constructor
+  globalStat(CkMigrateMessage *msg) { };
   /// Receive, calculate and print statistics
   void localStatReport(localStatSummary *m); 
   void DOPcalc(int gvt, double grt);
 };
+PUPbytes(globalStat)
 
 
 // All timer functions are inlined below

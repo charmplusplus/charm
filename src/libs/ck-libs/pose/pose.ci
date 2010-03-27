@@ -3,11 +3,11 @@ module pose {
   readonly double busyWait;
   readonly double sim_timer;
   readonly int POSE_inactDetect;
-  readonly ComlibInstanceHandle POSE_commlib_insthndl;
+//  readonly ComlibInstanceHandle POSE_commlib_insthndl;
   readonly POSE_TimeType POSE_endtime;  
   readonly POSE_Config pose_config;
   message callBack;
-  chare pose {
+  chare [migratable] pose {
     entry pose();
     entry void registerCallBack(callBack *);
     entry void stop();
