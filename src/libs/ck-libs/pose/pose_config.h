@@ -37,9 +37,12 @@
 /// Uncomment to turn on POSE load balancer
 //#define LB_ON 1
 
+#ifdef POSE_COMM_ON
 #include <StreamingStrategy.h>
 #include <MeshStreamingStrategy.h>
 #include <PrioStreaming.h>
+#endif
+
 #define COMM_TIMEOUT 1
 #define COMM_MAXMSG 20
 
@@ -55,6 +58,10 @@
 #define LB_SKIP 51          // LB done 1/LB_SKIP times GVT iterations
 #define LB_THRESHOLD 4000   // 20 heavy objects
 #define LB_DIFF 2000       // min diff between min and max load PEs
+
+/// Checkpointing constants
+#define POSE_CHECKPOINT_INTERVAL 10000  // GVT ticks between checkpoints; 0 = no checkpointing
+#define POSE_CHECKPOINT_DIRECTORY "__pose_chkpt_files" // directory where checkpoint files are stored
 
 // MISC
 #define MAX_POOL_SIZE 40    // maximum size of a memory pool
