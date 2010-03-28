@@ -19,7 +19,7 @@ class minheap;
 class maxheap;
 
 #include "elements.h"
-#include "heap.h"
+#include "ckheap.h"
 
 class Refiner {
 public:

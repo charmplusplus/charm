@@ -16,7 +16,7 @@
 #include "CentralLB.h"
 
 #include "elements.h"
-#include "heap.h"
+#include "ckheap.h"
 #include "Refiner.h"
 
 class RefinerComm : public Refiner {

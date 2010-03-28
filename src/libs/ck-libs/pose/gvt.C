@@ -71,10 +71,38 @@ PVT::PVT()
     else reportsExpected = 1 + (P-2)/4 + (P-2)%2;
   }
   //  CkPrintf("PE %d reports to %d, receives %d reports, reduces and sends to %d, and reports directly to GVT if %d = 1!\n", CkMyPe(), reportTo, reportsExpected, reportReduceTo, reportEnd);
+  parCheckpointInProgress = 0;
+  parLastCheckpointGVT = 0LL;
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
+}
+
+/// PUP routine
+void PVT::pup(PUP::er &p) {
+  p|optPVT; p|conPVT; p|estGVT; p|repPVT;
+  p|simdone; p|iterMin; p|waitForFirst;
+  p|reportTo; p|reportsExpected; p|reportReduceTo; p|reportEnd;
+  p|gvtTurn; p|specEventCount; p|eventCount;
+  p|startPhaseActive; p|parCheckpointInProgress; p|parLastCheckpointGVT;
+  p|optGVT; p|conGVT; p|rdone;
+
+  if (p.isUnpacking()) {
+#ifndef CMK_OPTIMIZE
+    localStats = (localStat *)CkLocalBranch(theLocalStats);
+#endif
+#ifdef MEM_TEMPORAL
+    localTimePool = (TimePool *)CkLocalBranch(TempMemID);
+#endif
+    SendsAndRecvs = new SRtable();
+  }
+
+  SendsAndRecvs->pup(p);
+
+  if (SRs != NULL) {
+    CkAbort("ERROR: PVT member *SRs is unexpectedly not NULL\n");
+  }
 }
 
 void PVT::startPhaseExp(prioBcMsg *m) {
@@ -205,6 +233,58 @@ void PVT::setGVT(GVTMsg *m)
 #ifdef MEM_TEMPORAL
   localTimePool->set_min_time(estGVT);
 #endif
+
+  // Parallel checkpointing: setGVT was broken into two functions, and
+  // beginCheckpoint was added.  Only initiate the checkpointing
+  // procedure on PE 0, after commits have occurred.  This should
+  // minimize the amount of data written to disk.  In order to ensure
+  // a stable state, we wait for quiescence to be reached before
+  // beginning the checkpoint.  Inconsistent results were obtained
+  // (possibly from messages still in transit) without this step.
+  // Once quiescence is reached, PE 0 begins the checkpoint, and then
+  // resumes the simulation in resumeAfterCheckpoint.  This Callback
+  // function is also the first POSE function to be called when
+  // restarting from a checkpoint.
+
+  // Currently, checkpoints are initiated approximately every
+  // POSE_CHECKPOINT_INTERVAL GVT ticks (defined in pose_config.h).
+  // Support for a time-based interval could easily be added.
+
+  if ((CkMyPe() == 0) && (parCheckpointInProgress == 0) && 
+      (POSE_CHECKPOINT_INTERVAL > 0) && (estGVT >= (parLastCheckpointGVT + POSE_CHECKPOINT_INTERVAL))) {
+    // wait for quiescence to occur before checkpointing
+    eventMsg *dummyMsg = new eventMsg();
+    CkCallback cb(CkIndex_PVT::beginCheckpoint(dummyMsg), CkMyPe(), ThePVT);
+    CkStartQD(cb);
+  } else {
+    // skip checkpointing
+    eventMsg *dummyMsg = new eventMsg();
+    p[CkMyPe()].resumeAfterCheckpoint(dummyMsg);
+  }
+}
+
+/// ENTRY: begin checkpoint now that quiescence has been reached
+void PVT::beginCheckpoint(eventMsg *m) {
+  CkFreeMsg(m);
+  if (!parCheckpointInProgress) {  // ensure this only happens once
+    parCheckpointInProgress = 1;
+    CkPrintf("POSE: quiescence detected\n");
+    CkPrintf("POSE: beginning checkpoint on processor %d at GVT=%lld\n", CkMyPe(), estGVT);
+    eventMsg *dummyMsg = new eventMsg();
+    CkCallback cb(CkIndex_PVT::resumeAfterCheckpoint(dummyMsg), CkMyPe(), ThePVT);
+    CkStartCheckpoint(POSE_CHECKPOINT_DIRECTORY, cb);
+  }
+}
+
+/// ENTRY: resume after checkpointing, restarting, or if checkpointing doesn't occur
+void PVT::resumeAfterCheckpoint(eventMsg *m) {
+  if (parCheckpointInProgress) {
+    CkPrintf("POSE: checkpoint/restart complete on processor %d at GVT=%lld\n", CkMyPe(), estGVT);
+    parCheckpointInProgress = 0;
+    parLastCheckpointGVT = estGVT;
+  }
+  CkFreeMsg(m);
+  CProxy_PVT p(ThePVT);
   startPhaseActive = 0;
   prioBcMsg *startMsg = new (8*sizeof(int)) prioBcMsg;
   startMsg->bc = 1;

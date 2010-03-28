@@ -105,8 +105,18 @@ extern int POSE_inactDetect;
 extern POSE_TimeType POSE_GlobalClock;
 extern POSE_TimeType POSE_GlobalTS;
 
+/// Checkpointing (for sequential simulation)
+extern int seqCheckpointInProgress;
+extern POSE_TimeType seqLastCheckpointGVT;
+// Global queue for storing POSE object array indices that are
+// skipped during quiescence detection just before checkpointing
+// (used in sequential mode only)
+extern CkQ<int> POSE_Skipped_Events;
+
 /// For getting access to the commlib strategy
+#ifdef POSE_COMM_ON
 extern ComlibInstanceHandle POSE_commlib_insthndl;
+#endif
 
 extern POSE_Config pose_config;
 
@@ -149,7 +159,13 @@ class pose : public Chare {
 #endif
 
  }
+  /// Migration constructor
   pose(CkMigrateMessage *) { }
+  /// PUP routine
+  void pup(PUP::er &p) {
+    p|cb;
+    p|callBackSet;
+  }
   /// Register the callback with POSE
   void registerCallBack(callBack *);
   /// Stop the simulation

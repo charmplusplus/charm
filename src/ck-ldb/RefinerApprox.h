@@ -5,7 +5,7 @@
 
 #include "Refiner.h"
 #include "elements.h"
-#include "heap.h"
+#include "ckheap.h"
 
 #ifndef INFTY
 #define INFTY 999999

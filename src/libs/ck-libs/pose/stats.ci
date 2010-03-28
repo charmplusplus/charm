@@ -4,12 +4,12 @@ module stats {
   readonly CkChareID theGlobalStats;
   message localStatSummary; 
 
-  group localStat {
+  group [migratable] localStat {
     entry localStat(void);
     entry void SendStats(void);
   };
 
-  chare globalStat {
+  chare [migratable] globalStat {
     entry globalStat(void);
     entry void localStatReport(localStatSummary *);
   };

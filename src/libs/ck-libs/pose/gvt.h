@@ -95,9 +95,15 @@ class PVT : public Group {
   int specEventCount, eventCount;
   /// startPhase active flag
   int startPhaseActive;
+  /// indicates if checkpointing is in progress
+  int parCheckpointInProgress;
+  /// GVT at which the last checkpoint was performed
+  POSE_TimeType parLastCheckpointGVT;
   /* things which used to be member function statics */
+  /// optimistic and coservative GVTs
   POSE_TimeType optGVT, conGVT;
   int rdone;
+  /// used in PVT report reduction
   SRentry *SRs;
 #ifdef MEM_TEMPORAL
   TimePool *localTimePool;
@@ -106,7 +112,12 @@ class PVT : public Group {
  public:
   /// Basic Constructor
   PVT(void);
-  PVT(CkMigrateMessage *) { };
+  /// Migration Constructor
+  PVT(CkMigrateMessage *msg) : Group(msg) { };
+  /// PUP routine
+  void pup(PUP::er &p);
+  /// Destructor
+  ~PVT() { }
   /// ENTRY: runs the PVT calculation and reports to GVT
   void startPhase(prioBcMsg *m);             
   /// ENTRY: runs the expedited PVT calculation and reports to GVT
@@ -115,6 +126,10 @@ class PVT : public Group {
   /** Receives the new GVT estimate and termination flag; wakes up objects
       for fossil collection and forward execution with new GVT estimate. */
   void setGVT(GVTMsg *m);            
+  /// ENTRY: begin checkpoint now that quiescence has been reached
+  void beginCheckpoint(eventMsg *m);
+  /// ENTRY: resume after checkpointing, restarting, or if checkpointing doesn't occur
+  void resumeAfterCheckpoint(eventMsg *m);
   /// Returns GVT estimate
   POSE_TimeType getGVT() { return estGVT; }    
 
@@ -165,14 +180,33 @@ private:
   /// Number of PVT reports expected (1 or 2)
   int reportsExpected;
   /* things which used to be member function static */
-  POSE_TimeType optGVT,  conGVT;
+  /// optimistic and coservative GVTs
+  POSE_TimeType optGVT, conGVT;
   int done;
+  /// used to calculate GVT from PVT reports
   SRentry *SRs;
   int startOffset;
 public:
   /// Basic Constructor
   GVT(void);
-  GVT(CkMigrateMessage *) { };
+  /// Migration Constructor
+  GVT(CkMigrateMessage *msg) : Group(msg) { };
+  /// PUP routine
+  void pup(PUP::er &p) {
+    p|estGVT; p|inactive; p|inactiveTime; p|nextLBstart;
+    p|lastEarliest; p|lastSends; p|lastRecvs; p|reportsExpected;
+    p|optGVT; p|conGVT; p|done; p|startOffset;
+
+    if (p.isUnpacking()) {
+#ifndef CMK_OPTIMIZE
+      localStats = (localStat *)CkLocalBranch(theLocalStats);
+#endif
+    }
+
+    if (SRs != NULL) {
+      CkAbort("ERROR: GVT member *SRs is unexpectedly not NULL\n");
+    }
+  }
   //Use this for Ccd calls
   //static void _runGVT(UpdateMsg *);
   /// ENTRY: Run the GVT
