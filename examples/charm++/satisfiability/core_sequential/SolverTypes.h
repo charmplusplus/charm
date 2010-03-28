@@ -24,24 +24,6 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <cassert>
 #include <stdint.h>
 
-
-template<class V> 
-int get_max_element(const V& ps) {
-
-    int max_index = -1;
-    int max = -1;
-    for(int __i=0; __i<ps.size(); __i++)
-    {
-        if(ps[__i] > max)
-        {
-            max = ps[__i];
-            max_index = __i;
-        }
-    }
-    return max_index;
-}
-
-
 //=================================================================================================
 // Variables, literals, lifted booleans, clauses:
 
@@ -55,10 +37,9 @@ typedef int Var;
 
 class Lit {
     int     x;
-public:
-    Lit() : x(var_Undef)                                              { }   // (lit_Undef)
-    Lit(Var var) {x = var;};
-    Lit(Var var, bool sign)   {x=sign?var:-var; }
+ public:
+    Lit() : x(2*var_Undef)                                              { }   // (lit_Undef)
+    explicit Lit(Var var, bool sign = false) : x((var+var) + (int)sign) { }
 
     // Don't use these for constructing/deconstructing literals. Use the normal constructors instead.
     friend int  toInt       (Lit p);  // Guarantees small, positive integers suitable for array indexing.
@@ -72,17 +53,12 @@ public:
     bool operator == (Lit p) const { return x == p.x; }
     bool operator != (Lit p) const { return x != p.x; }
     bool operator <  (Lit p) const { return x < p.x;  } // '<' guarantees that p, ~p are adjacent in the ordering.
-
-
-    void pup(PUP::er &p) {
-        p|x;
-    }
 };
 
 inline  int  toInt       (Lit p)           { return p.x; }
 inline  Lit  toLit       (int i)           { Lit p; p.x = i; return p; }
-inline  Lit  operator   ~(Lit p)           { Lit q; q.x = -p.x; return q; }
-inline  bool sign        (Lit p)           { return p.x >1?true:false; }
+inline  Lit  operator   ~(Lit p)           { Lit q; q.x = p.x ^ 1; return q; }
+inline  bool sign        (Lit p)           { return p.x & 1; }
 inline  int  var         (Lit p)           { return p.x >> 1; }
 inline  Lit  unsign      (Lit p)           { Lit q; q.x = p.x & ~1; return q; }
 inline  Lit  id          (Lit p, bool sgn) { Lit q; q.x = p.x ^ (int)sgn; return q; }
@@ -123,74 +99,51 @@ const lbool l_Undef = toLbool( 0);
 
 
 class Clause {
-    CkVec<Lit>  data;
+    uint32_t size_etc;
+    union { float act; uint32_t abst; } extra;
+    Lit     data[0];
 
 public:
-   
-     Clause(){data.removeAll();}
-   
-     Clause(const Clause& corg)
-     {
-         data.resize(corg.size());
-        for(int _i=0; _i<data.size(); _i++)
-        {
-            data[_i] = corg[_i];
-        }
-     }
     void calcAbstraction() {
-    }
+        uint32_t abstraction = 0;
+        for (int i = 0; i < size(); i++)
+            abstraction |= 1 << (var(data[i]) & 31);
+        extra.abst = abstraction;  }
 
     // NOTE: This constructor cannot be used directly (doesn't allocate enough memory).
     template<class V>
     Clause(const V& ps, bool learnt) {
-        data.resize(ps.size());
+        size_etc = (ps.size() << 3) | (uint32_t)learnt;
         for (int i = 0; i < ps.size(); i++) data[i] = ps[i];
-    }
-    
-    template<class V>
-    void attachdata(const V& ps, bool learnt)
-    {
-        data.resize(ps.size());
-        for (int i = 0; i < ps.size(); i++) data[i] = ps[i];
-    }
+        if (learnt) extra.act = 0; else calcAbstraction(); }
 
-    void remove(int v){
-        for(int i=0; i<data.size(); i++)
-        {
-            if(toInt(data[i]) == v)
-            {
-                data.remove(i);
-                return;
-            }
-        }
-    }
     // -- use this function instead:
-    int          size        ()      const   { return data.size(); }
-    void         shrink      (int i)         { }
+    template<class V>
+    friend Clause* Clause_new(const V& ps, bool learnt = false) {
+        assert(sizeof(Lit)      == sizeof(uint32_t));
+        assert(sizeof(float)    == sizeof(uint32_t));
+        void* mem = malloc(sizeof(Clause) + sizeof(uint32_t)*(ps.size()));
+        return new (mem) Clause(ps, learnt); }
+
+    int          size        ()      const   { return size_etc >> 3; }
+    void         shrink      (int i)         { assert(i <= size()); size_etc = (((size_etc >> 3) - i) << 3) | (size_etc & 7); }
     void         pop         ()              { shrink(1); }
-    bool         learnt      ()      const   {  }
-    uint32_t     mark        ()      const   { return 1; }
-    void         mark        (uint32_t m)    {  }
+    bool         learnt      ()      const   { return size_etc & 1; }
+    uint32_t     mark        ()      const   { return (size_etc >> 1) & 3; }
+    void         mark        (uint32_t m)    { size_etc = (size_etc & ~6) | ((m & 3) << 1); }
     const Lit&   last        ()      const   { return data[size()-1]; }
 
     // NOTE: somewhat unsafe to change the clause in-place! Must manually call 'calcAbstraction' afterwards for
     //       subsumption operations to behave correctly.
     Lit&         operator [] (int i)         { return data[i]; }
     Lit          operator [] (int i) const   { return data[i]; }
-    //operator const Lit* (void) const         { return data; }
+    operator const Lit* (void) const         { return data; }
 
-    float       activity    ()              { return 1; }
-    uint32_t     abstraction () const { return 1; }
+    float&       activity    ()              { return extra.act; }
+    uint32_t     abstraction () const { return extra.abst; }
 
     Lit          subsumes    (const Clause& other) const;
     void         strengthen  (Lit p);
-
-
-    void        resize  (int __size)  {data.resize(__size); }
-    void pup(PUP::er &p) {
-        for(int i=0; i<size(); i++)
-            p|data[i];
-    }
 };
 
 
@@ -209,14 +162,36 @@ public:
 |________________________________________________________________________________________________@*/
 inline Lit Clause::subsumes(const Clause& other) const
 {
+    if (other.size() < size() || (extra.abst & ~other.extra.abst) != 0)
         return lit_Error;
+
+    Lit        ret = lit_Undef;
+    const Lit* c  = (const Lit*)(*this);
+    const Lit* d  = (const Lit*)other;
+
+    for (int i = 0; i < size(); i++) {
+        // search for c[i] or ~c[i]
+        for (int j = 0; j < other.size(); j++)
+            if (c[i] == d[j])
+                goto ok;
+            else if (ret == lit_Undef && c[i] == ~d[j]){
+                ret = c[i];
+                goto ok;
+            }
+
+        // did not find it
+        return lit_Error;
+    ok:;
+    }
+
+    return ret;
 }
 
 
 inline void Clause::strengthen(Lit p)
 {
-    //remove(*this, p);
-    //calcAbstraction();
+    remove(*this, p);
+    calcAbstraction();
 }
 
 #endif

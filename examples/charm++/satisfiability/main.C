@@ -10,8 +10,8 @@
 #include "main.decl.h"
 #include "main.h"
 
-#include "SolverTypes.h"
-#include "Solver.h"
+#include "par_SolverTypes.h"
+#include "par_Solver.h"
 
 
 //#include "util.h"
@@ -88,7 +88,7 @@ int parseInt(StreamBuffer& in) {
     return neg ? -val : val; 
 }
 
-static void readClause(StreamBuffer& in, SolverState& S, CkVec<Lit>& lits) {
+static void readClause(StreamBuffer& in, par_SolverState& S, CkVec<par_Lit>& lits) {
     int     parsed_lit, var;
     lits.removeAll();
     for (;;){
@@ -100,13 +100,13 @@ static void readClause(StreamBuffer& in, SolverState& S, CkVec<Lit>& lits) {
         if(parsed_lit>0)
             S.positive_occurrence[var]++;
         //while (var >= S.nVars()) S.newVar();
-        lits.push_back( Lit(parsed_lit));
+        lits.push_back( par_Lit(parsed_lit));
     }
 }
 
 /* unit propagation before real computing */
 
-static void simplify(SolverState& S)
+static void simplify(par_SolverState& S)
 {
     for(int i=0; i< S.unit_clause_index.size(); i++)
     {
@@ -114,9 +114,9 @@ static void simplify(SolverState& S)
         CkPrintf("Inside simplify before processing, unit clause number:%d, i=%d\n", S.unit_clause_index.size(), i);
 #endif
        
-        Clause cl = S.clauses[S.unit_clause_index[i]];
+        par_Clause cl = S.clauses[S.unit_clause_index[i]];
         //only one element in unit clause
-        Lit lit = cl[0];
+        par_Lit lit = cl[0];
         S.clauses[S.unit_clause_index[i]].resize(0);
         S.unsolved_clauses--;
 
@@ -145,11 +145,11 @@ static void simplify(SolverState& S)
 #ifdef DEBUG
            CkPrintf(" %d \n \t \t literals in this clauses: ", cl_index);
 #endif
-           Clause& cl_ = S.clauses[cl_index];
+           par_Clause& cl_ = S.clauses[cl_index];
            //for all the literals in this clauses, the occurrence decreases by 1
            for(int k=0; k< cl_.size(); k++)
            {
-               Lit lit_ = cl_[k];
+               par_Lit lit_ = cl_[k];
                if(toInt(lit_) == toInt(lit))
                    continue;
 #ifdef DEBUG
@@ -190,7 +190,7 @@ static void simplify(SolverState& S)
        for(int j=0; j<inClauses_opposite.size(); j++)
        {
            int cl_index_ = inClauses_opposite[j];
-           Clause& cl_neg = S.clauses[cl_index_];
+           par_Clause& cl_neg = S.clauses[cl_index_];
            cl_neg.remove(-toInt(lit));
            //becomes a unit clause
            if(cl_neg.size() == 1)
@@ -206,9 +206,9 @@ static void simplify(SolverState& S)
 
 
 
-static void parse_confFile(gzFile input_stream, SolverState& S) {                  
+static void parse_confFile(gzFile input_stream, par_SolverState& S) {                  
     StreamBuffer in(input_stream);    
-      CkVec<Lit> lits;                                                 
+      CkVec<par_Lit> lits;                                                 
     int i  = 0;
     
     for (;;){                                                      
@@ -256,7 +256,7 @@ Main::Main(CkArgMsg* msg)
 {
 
     grainsize = 1;
-    SolverState* solver_msg = new (8 * sizeof(int))SolverState;
+    par_SolverState* solver_msg = new (8 * sizeof(int))par_SolverState;
     if(msg->argc < 2)
     {
         error_exit((char*)"Usage: sat filename grainsize\n");
@@ -323,13 +323,13 @@ Main::Main(CkArgMsg* msg)
     mainProxy = thisProxy;
     int max_index = get_max_element(solver_msg->occurrence);
     
-    solver_msg->assigned_lit = Lit(max_index+1);
+    solver_msg->assigned_lit = par_Lit(max_index+1);
     solver_msg->level = 0;
-    SolverState *not_msg = copy_solverstate(solver_msg);
+    par_SolverState *not_msg = copy_solverstate(solver_msg);
     
     //CkPrintf(" main chare max index=%d, %d, assigned=%d\n", max_index+1, solver_msg->occurrence[max_index], toInt(solver_msg->assigned_lit));
     solver_msg->occurrence[max_index] = -2;
-    not_msg->assigned_lit = Lit(-max_index-1);
+    not_msg->assigned_lit = par_Lit(-max_index-1);
     not_msg->occurrence[max_index] = -1;
     
     int positive_max = solver_msg->positive_occurrence[max_index];
@@ -341,26 +341,26 @@ Main::Main(CkArgMsg* msg)
         CkSetQueueing(solver_msg, CK_QUEUEING_IFIFO);
         solver_msg->lower = INT_MIN;
         solver_msg->higher = 0;
-        CProxy_Solver::ckNew(solver_msg);
+        CProxy_mySolver::ckNew(solver_msg);
         
         *((int *)CkPriorityPtr(not_msg)) = 0;
         CkSetQueueing(not_msg, CK_QUEUEING_IFIFO);
         not_msg->lower = 0;
         not_msg->higher = INT_MAX;
-        CProxy_Solver::ckNew(not_msg);
+        CProxy_mySolver::ckNew(not_msg);
     }else
     {
         *((int *)CkPriorityPtr(not_msg)) = INT_MIN;
         CkSetQueueing(not_msg, CK_QUEUEING_IFIFO);
         not_msg->lower = INT_MIN;
         not_msg->higher = 0;
-        CProxy_Solver::ckNew(not_msg);
+        CProxy_mySolver::ckNew(not_msg);
         
         *((int *)CkPriorityPtr(solver_msg)) = 0;
         CkSetQueueing(solver_msg, CK_QUEUEING_IFIFO);
         solver_msg->lower = 0;
         solver_msg->higher = INT_MAX;
-        CProxy_Solver::ckNew(solver_msg);
+        CProxy_mySolver::ckNew(solver_msg);
 
     }
 }
