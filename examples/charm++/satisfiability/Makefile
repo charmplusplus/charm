@@ -42,5 +42,11 @@ par_Solver_tnm.o : par_Solver.C par_SolverTypes.h par_Solver.h  main.decl.h main
 $(TNM)/TNM.o: $(TNM)/TNM.C
 	$(CXX_COMPILE) $(CTNMFLAGS) -o $(TNM)/TNM.o -c $(TNM)/TNM.C
 
+#$(TNM)/adaptnoisebis1at5.o: $(TNM)/adaptnoisebis1at5.C
+#	$(CXX_COMPILE) $(CTNMFLAGS) -o $(TNM)/adaptnoisebis1at5.o -c $(TNM)/adaptnoisebis1at5.C
+
+#$(TNM)/inputbis.o : $(TNM)/inputbis.C
+#	$(CXX_COMPILE) $(CTNMFLAGS) -o $(TNM)/inputbis.o -c $(TNM)/inputbis.C
+
 clean:
 	@rm -f parsat_minisat *.def.h *.decl.h *.o $(MINISAT)/*.o $(TNM)/*.o charmrun
