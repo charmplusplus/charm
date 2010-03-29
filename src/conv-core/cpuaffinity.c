@@ -194,6 +194,15 @@ int print_thread_affinity() {
   return 0;
 }
 
+int CmiPrintCPUAffinity()
+{
+#if CMK_SMP
+  return print_thread_affinity();
+#else
+  return print_cpu_affinity();
+#endif
+}
+
 static int cpuAffinityHandlerIdx;
 static int cpuAffinityRecvHandlerIdx;
 
@@ -376,6 +385,7 @@ void CmiInitCPUAffinity(char **argv)
   char *commap = NULL;
   char *coremap = NULL;
  
+  int show_affinity_flag;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
 
@@ -391,6 +401,8 @@ void CmiInitCPUAffinity(char **argv)
   if (pemap!=NULL && (coremap != NULL || excludecount>0))
     CmiAbort("Charm++> +pemap can not be used with either +excludecore or +coremap.");
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
+  show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
+						"print cpu affinity");
 
   cpuAffinityHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityHandler);
@@ -401,7 +413,10 @@ void CmiInitCPUAffinity(char **argv)
      affLock = CmiCreateLock();
   }
 
-  if (!affinity_flag) return;
+  if (!affinity_flag) {
+    if (show_affinity_flag) CmiPrintCPUAffinity();
+    return;
+  }
   else if (CmiMyPe() == 0) {
      CmiPrintf("Charm++> cpu affinity enabled. \n");
      if (excludecount > 0) {
@@ -436,6 +451,7 @@ void CmiInitCPUAffinity(char **argv)
 #endif
     }
     CmiNodeAllBarrier();
+    if (show_affinity_flag) CmiPrintCPUAffinity();
     return;    /* comm thread return */
   }
 
@@ -449,6 +465,7 @@ void CmiInitCPUAffinity(char **argv)
     if (set_myaffinitity(mycore) == -1) CmiAbort("set_cpu_affinity abort!");
     CmiNodeAllBarrier();
     CmiNodeAllBarrier();
+    if (show_affinity_flag) CmiPrintCPUAffinity();
     return;
   }
 
@@ -520,10 +537,17 @@ void CmiInitCPUAffinity(char **argv)
   affinity_doneflag++;
   CmiUnlock(affLock);
   CmiNodeAllBarrier();
+
+  if (show_affinity_flag) CmiPrintCPUAffinity();
 }
 
 #else           /* not supporting affinity */
 
+
+int CmiPrintCPUAffinity()
+{
+  CmiPrintf("Warning: CmiPrintCPUAffinity not supported.\n");
+}
 
 void CmiInitCPUAffinity(char **argv)
 {
