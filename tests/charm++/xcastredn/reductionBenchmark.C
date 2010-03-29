@@ -99,7 +99,7 @@ Main::Main(CkArgMsg *m)
 
     /// Delegate the section collectives to the multicast manager
     arraySection.ckSectionDelegate(mgr);
-    /// Setup the client at the roots of the reductions
+    /// Setup the client at the root of the reductions
     CkCallback *cb = new CkCallback(CkIndex_Main::receiveReduction(0),thisProxy);
     chareArray.ckSetReductionClient(cb);
     mgr->setReductionClient(arraySection,cb);
