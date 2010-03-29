@@ -29,6 +29,7 @@ public:
     CkVec<par_Clause>   clauses;
     par_Lit             assigned_lit;
     int             var_size;
+    int             unsolved_vars;
     int             unsolved_clauses;
 
     int             var_frequency; // 1, -1, 1 freq = 3
@@ -65,7 +66,7 @@ public:
        }
 
        new_state->var_size = org->var_size;
-
+       new_state->unsolved_vars = org->unsolved_vars;
        new_state->occurrence.resize(org->occurrence.size());
        new_state->positive_occurrence.resize(org->occurrence.size());
        for(int _i=0; _i<org->occurrence.size(); _i++){

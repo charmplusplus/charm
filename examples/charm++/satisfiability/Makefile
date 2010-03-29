@@ -1,34 +1,46 @@
-MTL       = mtl
-EXEC      = par_sat
-SEQ		  = core_sequential
+MINISAT		  = minisat
+TNM			  = TNM
 #CHARMDIR = /Users/yanhuasun/PPL/charm/charm-6.1.2/multicore-darwin-x86_64
 OPTS = -g
 CXX = charmc   
 default: all
-all: $(EXEC)
+all: parsat_minisat parsat_tnm
 
-CFLAGS    = $(OPTS) -I$(MTL)  -I$(SEQ) -ffloat-store
+CFLAGS    = $(OPTS)  -ffloat-store
+CMINISATFLAGS = $(CFLAGS) -I$(MINISAT) -DMINISAT
+CTNMFLAGS 	 = $(CFLAGS) -I$(TNM) -DTNM
 LFLAGS    =  -lz -language charm++
 COPTIMIZE = -O3
 
-CXX_COMPILE = $(CXX) $(CFLAGS)
+CXX_COMPILE = $(CXX)
 
 CXX_LD = $(CXX) $(LFLAGS)
 
-$(EXEC): $(SEQ)/Solver.o par_Solver.o main.o
-	$(CXX_LD) $(LFLAGS) -o $(EXEC) $(SEQ)/Solver.o par_Solver.o main.o
+parsat_minisat: $(MINISAT)/Solver.o par_Solver_minisat.o main.o
+	$(CXX_LD) $(LFLAGS) -o parsat_minisat $(MINISAT)/Solver.o par_Solver_minisat.o main.o
+
 
 main.o : main.C main.decl.h main.def.h 
 	$(CXX_COMPILE) -o main.o -c main.C
 
-par_Solver.o : par_Solver.C par_SolverTypes.h par_Solver.h mtl/Vec.h mtl/minisatHeap.h  mtl/Alg.h $(SEQ)/SolverTypes.h mtl/Sort.h main.decl.h main.def.h 
-	$(CXX_COMPILE) -o par_Solver.o -c par_Solver.C
+par_Solver_minisat.o : par_Solver.C par_SolverTypes.h par_Solver.h $(MINISAT)/SolverTypes.h  main.decl.h main.def.h 
+	$(CXX_COMPILE) $(CMINISATFLAGS) -o par_Solver_minisat.o -c par_Solver.C
 
 main.def.h main.decl.h : main.ci
 	$(CXX) main.ci
 
-$(SEQ)/Solver.o: $(SEQ)/Solver.C $(SEQ)/Solver.h mtl/Vec.h mtl/minisatHeap.h  mtl/Alg.h $(SEQ)/SolverTypes.h mtl/Sort.h
-	$(CXX_COMPILE) -o $(SEQ)/Solver.o -c $(SEQ)/Solver.C 
+$(MINISAT)/Solver.o: $(MINISAT)/Solver.C $(MINISAT)/Solver.h  $(MINISAT)/SolverTypes.h 
+	$(CXX_COMPILE) $(CMINISATFLAGS) -o $(MINISAT)/Solver.o -c $(MINISAT)/Solver.C 
+
+
+parsat_tnm: $(TNM)/TNM.o par_Solver_tnm.o main.o
+	$(CXX) $(LFLAGS) -o parsat_tnm $(TNM)/TNM.o par_Solver_tnm.o main.o 
+
+par_Solver_tnm.o : par_Solver.C par_SolverTypes.h par_Solver.h  main.decl.h main.def.h 
+	$(CXX_COMPILE) $(CTNMFLAGS) -o par_Solver_tnm.o -c par_Solver.C 
+
+$(TNM)/TNM.o: $(TNM)/TNM.C
+	$(CXX_COMPILE) $(CTNMFLAGS) -o $(TNM)/TNM.o -c $(TNM)/TNM.C
 
 clean:
-	@rm -f $(EXEC) *.def.h *.decl.h *.o $(SEQ)/*.o charmrun
+	@rm -f parsat_minisat *.def.h *.decl.h *.o $(MINISAT)/*.o $(TNM)/*.o charmrun

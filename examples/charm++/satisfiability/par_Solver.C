@@ -1,9 +1,16 @@
 #include "main.decl.h"
 #include "par_SolverTypes.h"
 #include "par_Solver.h"
-#include "Solver.h"
 #include <map>
 #include <vector>
+
+#ifdef MINISAT
+#include "Solver.h"
+#endif
+
+#ifdef TNM
+#include "TNM.h"
+#endif
 
 using namespace std;
 
@@ -146,7 +153,8 @@ mySolver::mySolver(par_SolverState* state_msg)
     CkPrintf("\n\nNew chare: literal = %d, occurrence size=%d, level=%d \n", toInt(lit), state_msg->occurrence.size(), state_msg->level);
 #endif    
     par_SolverState *next_state = copy_solverstate(state_msg);
-    
+    //next_state->unsolved_vars = state_msg->unsolved_vars - 1;
+
     //Unit clauses
     /* use this value to propagate the clauses */
     // deal with the clauses where this literal is
@@ -241,6 +249,9 @@ mySolver::mySolver(par_SolverState* state_msg)
        if(_unit_ == next_state->unit_clause_index.size())
            break;
        lit = cl[0];
+
+
+       //next_state->unsolved_vars--;
     }
     /***************/
 
@@ -290,8 +301,6 @@ mySolver::mySolver(par_SolverState* state_msg)
     }
     else //sequential
     {
-        Solver      S;
-        S.verbosity = 1;
         /* This code is urgly. Need to revise it later. Convert par data structure to sequential 
          */
         vector< vector<int> > seq_clauses;
@@ -310,7 +319,7 @@ mySolver::mySolver(par_SolverState* state_msg)
                 seq_clauses.push_back(unsolvedclaus);
             }
         }
-        satisfiable_1 = S.seq_processing(seq_clauses);//seq_solve(next_state);
+        satisfiable_1 = seq_processing(next_state->unsolved_vars, seq_clauses);//seq_solve(next_state);
         if(satisfiable_1)
         {
             CkPrintf("One solution found by sequential processing \n");
@@ -341,8 +350,6 @@ mySolver::mySolver(par_SolverState* state_msg)
     }
     else
     {
-        Solver      S;
-        S.verbosity = 1;
        
         vector< vector<int> > seq_clauses;
         for(int _i_=0; _i_<new_msg2->clauses.size(); _i_++)
@@ -360,7 +367,7 @@ mySolver::mySolver(par_SolverState* state_msg)
             }
         }
 
-        bool ret = S.seq_processing(seq_clauses);//seq_solve(next_state);
+        bool ret = seq_processing(new_msg2->unsolved_vars,  seq_clauses);//seq_solve(next_state);
         //bool ret = Solver::seq_processing(new_msg2->clauses);//seq_solve(new_msg2);
         if(ret)
         {

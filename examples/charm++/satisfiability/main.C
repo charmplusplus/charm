@@ -222,8 +222,10 @@ static void parse_confFile(gzFile input_stream, par_SolverState& S) {
                 int clauses = parseInt(in);                        
                 printf("|  Number of variables:  %-12d                                         |\n", vars);
                 printf("|  Number of clauses:    %-12d                                         |\n", clauses);
-      
+                
+
                 S.var_size = vars;
+                S.unsolved_vars = vars;
                 S.occurrence.resize(vars);
                 S.positive_occurrence.resize(vars);
                 S.whichClauses.resize(2*vars);
