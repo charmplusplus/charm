@@ -159,7 +159,7 @@ int print_cpu_affinity() {
     return -1;
   }
   
-  printf("CPU affinity mask is: %08lx\n", pMask);
+ CmiPrintf("[%d] CPU affinity mask is: 0x%08lx\n", CmiMyPe(), pMask);
   
 #elif CMK_HAS_BINDPROCESSOR
   printf("[%d] CPU affinity mask is unknown for AIX. \n", CmiMyPe());
@@ -173,7 +173,7 @@ int print_cpu_affinity() {
     return -1;
   }
 
-  printf("[%d] CPU affinity mask is: %08lx\n", CmiMyPe(), mask);
+  CmiPrintf("[%d] CPU affinity mask is: 0x%08lx\n", CmiMyPe(), mask);
 #endif
   return 0;
 }
@@ -188,7 +188,7 @@ int print_thread_affinity() {
     perror("pthread_setaffinity");
     return -1;
   }
-  printf("[%d] pthread affinity mask is: %08lx\n", CmiMyPe(), mask);
+  CmiPrintf("[%d] %s affinity mask is: 0x%08lx\n", CmiMyPe(), CmiMyPe()>=CmiNumPes()?"communication pthread":"pthread", mask);
 #endif
 #endif
   return 0;
