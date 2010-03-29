@@ -497,6 +497,8 @@ extern void CmiGetPesOnPhysicalNode(int node, int **pelist, int *num);
 extern int CmiGetFirstPeOnPhysicalNode(int node);
 extern int CmiPhysicalRank(int pe);
 
+extern int CmiPrintCPUAffinity();
+
 /** Return 1 if our outgoing message queue 
    for this node is longer than this many bytes. */
 int CmiLongSendQueue(int forNode,int longerThanBytes);
