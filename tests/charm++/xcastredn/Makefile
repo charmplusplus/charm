@@ -11,9 +11,10 @@ ARGS      = 10 4 128 1 3 3 3 5 5 5
 
 # Specify the compilers, run script, flags etc.
 CXX       = charmc
-CXXFLAGS  = -language charm++ -O2
-CPPFLAGS  = -DCMK_OPTIMIZE
-LDFLAGS   = -module CkMulticast
+OPT       = -O2
+CXXFLAGS += -language charm++ $(OPT)
+CPPFLAGS += -DCMK_OPTIMIZE
+LDFLAGS  += -module CkMulticast
 EXEC      = charmrun
 EXECFLAGS = +p$(NP)
 ifdef $(NODELIST)
