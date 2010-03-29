@@ -1,3 +1,10 @@
+# Point this to your charm installation
+CHARMHOME = $(HOME)/charm
+
+# Charm directory structure
+CHARMBIN := $(CHARMHOME)/bin
+CHARMINC := $(CHARMHOME)/include
+
 # The relevant source files for this project
 HDR       = reductionBenchmark.h  
 SRC       = reductionBenchmark.C 
@@ -10,7 +17,7 @@ TARGET    = testReduction
 ARGS      = 10 4 128 1 3 3 3 5 5 5
 
 # Specify the compilers, run script, flags etc.
-CXX       = charmc
+CXX       = $(CHARMBIN)/charmc
 OPT       = -O2
 CXXFLAGS += -language charm++ $(OPT)
 CPPFLAGS += -DCMK_OPTIMIZE
@@ -43,13 +50,10 @@ test: all
 
 
 ####### Pattern rules
-CXXBIN := $(dir $(shell which $(CXX)))
-CXXINC := $(CXXBIN)../include
-
 # Rule to generate dependency information for C++ source files
 %.d: %.C
 	$(info Generating dependencies for $<)
-	@g++ -MM -MG $(CPPFLAGS) $(INCDIRS:%=-I%) -I$(CXXINC) $< | perl $(CXXBIN)/dep.pl $(CXXINC) > $@
+	@g++ -MM -MG $(CPPFLAGS) $(INCDIRS:%=-I%) -I$(CHARMINC) $< | perl $(CHARMBIN)/dep.pl $(CHARMINC) > $@
 #	@$(SHELL) -ec 'g++ -MM -MG $(CPPFLAGS) $(INCDIRS:%=-I%) $< \
 #	| sed '\''s/\($*\)\.o[ :]*/\1.o $@ : /g'\'' > $@; \
 #	[ -s $@ ] || rm -f $@'
