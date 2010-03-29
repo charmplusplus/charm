@@ -130,6 +130,7 @@ Cray XT
 
 Infiniband (ibverbs)
  - Bug fix: plug memory leaks that caused failures in long runs
+ - Optimized to reduce startup delays
 
 LAPI
  - Support for SMP (experimental)
