@@ -23,11 +23,13 @@ void seq::Step() {
     eq->CommitAll(parent);
 
     // checkpoint if appropriate
-    if ((userObj->myHandle == 0) && (seqCheckpointInProgress == 0) && (POSE_CHECKPOINT_INTERVAL > 0) && 
-	(POSE_GlobalClock >= (seqLastCheckpointGVT + POSE_CHECKPOINT_INTERVAL))) {
+    if ((userObj->myHandle == 0) && (seqCheckpointInProgress == 0) && 
+	(((pose_config.checkpoint_gvt_interval > 0) && (POSE_GlobalClock >= (seqLastCheckpointGVT + pose_config.checkpoint_gvt_interval))) || 
+	 ((pose_config.checkpoint_time_interval > 0) && (CmiWallTimer() >= (seqLastCheckpointTime + (double)pose_config.checkpoint_time_interval))))) {
       // start quiescence detection on the sim chare
       seqCheckpointInProgress = 1;
       seqLastCheckpointGVT = POSE_GlobalClock;
+      seqLastCheckpointTime = CmiWallTimer();
     }
 
   } else {

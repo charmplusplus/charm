@@ -95,10 +95,14 @@ class PVT : public Group {
   int specEventCount, eventCount;
   /// startPhase active flag
   int startPhaseActive;
+  /// starting time of the simulation
+  double parStartTime;
   /// indicates if checkpointing is in progress
   int parCheckpointInProgress;
   /// GVT at which the last checkpoint was performed
   POSE_TimeType parLastCheckpointGVT;
+  /// Time at which the last checkpoint was performed
+  double parLastCheckpointTime;
   /* things which used to be member function statics */
   /// optimistic and coservative GVTs
   POSE_TimeType optGVT, conGVT;

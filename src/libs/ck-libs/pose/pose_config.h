@@ -60,7 +60,6 @@
 #define LB_DIFF 2000       // min diff between min and max load PEs
 
 /// Checkpointing constants
-#define POSE_CHECKPOINT_INTERVAL 10000  // GVT ticks between checkpoints; 0 = no checkpointing
 #define POSE_CHECKPOINT_DIRECTORY "__pose_chkpt_files" // directory where checkpoint files are stored
 
 // MISC
@@ -124,6 +123,8 @@ class POSE_Config
   int max_leash;
   int leash_flex;
   bool deterministic;
+  int checkpoint_gvt_interval;
+  int checkpoint_time_interval;
   /* one very long initializer line */
   POSE_Config() :
 #ifdef POSE_STATS_ON                   //w
@@ -174,10 +175,12 @@ class POSE_Config
     max_leash(MAX_LEASH),         //w
     leash_flex(LEASH_FLEX),       //w
 #ifdef DETERMINISTIC_EVENTS        //w
-    deterministic(true)
+    deterministic(true),
 #else
-    deterministic(false)
+    deterministic(false),
 #endif
+    checkpoint_gvt_interval(0),
+    checkpoint_time_interval(0)
     {// all handled in initializer
     }
 };
