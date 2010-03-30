@@ -20,6 +20,7 @@ mainmodule reductionBenchmark {
     {
         entry Main(CkArgMsg *msg);
         entry void receiveReduction(CkReductionMsg *msg);
+        entry void startTest();
     };
 
 };

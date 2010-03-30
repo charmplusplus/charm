@@ -97,6 +97,8 @@ class Main: public CBase_Main
 {
     public:
         Main(CkArgMsg *m);
+        /// @entry Starts the timing tests
+        void startTest() { sendMulticast(curCommType, curMsgSize); }
         /// @entry Reduction client method. Receives the result of the reduction
         void receiveReduction(CkReductionMsg *msg);
 

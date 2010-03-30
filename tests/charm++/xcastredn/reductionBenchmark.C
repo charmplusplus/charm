@@ -120,8 +120,9 @@ Main::Main(CkArgMsg *m)
     for (int i=cfg.msgSizeMin; i<= cfg.msgSizeMax; i*=2)
         out<<std::setw(cfg.fieldWidth-3)<<i<<std::setw(3)<<" KB";
 
-    /// Send out the multicast
-    sendMulticast(curCommType,curMsgSize);
+    /// Wait for quiescence and then start the timing tests
+    CkCallback trigger(CkIndex_Main::startTest(), thisProxy);
+    CkStartQD(trigger);
 }
 
 
