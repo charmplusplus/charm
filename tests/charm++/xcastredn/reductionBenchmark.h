@@ -101,7 +101,7 @@ class Main: public CBase_Main
 
     private:
         /// Create an array section that I will multicast to
-        void createSection(const bool isSectionContiguous);
+        CProxySection_MyChareArray createSection(const bool isSectionContiguous);
         /// Sends out a multicast to the array section
         void sendMulticast(const CommMechanism commType, const int msgSize);
 

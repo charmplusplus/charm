@@ -95,7 +95,7 @@ Main::Main(CkArgMsg *m)
     /// Create the array
     chareArray            = CProxy_MyChareArray::ckNew(mcastGrpID,cfg.X,cfg.Y,cfg.Z); 
     /// Create the array section
-    createSection(cfg.useContiguousSection);
+    arraySection = createSection(cfg.useContiguousSection);
 
     /// Delegate the section collectives to the multicast manager
     arraySection.ckSectionDelegate(mgr);
@@ -120,7 +120,7 @@ Main::Main(CkArgMsg *m)
 
 
 
-void Main::createSection(const bool isSectionContiguous)
+CProxySection_MyChareArray Main::createSection(const bool isSectionContiguous)
 {
     /// Determing the lower starting index of the section along each dimension
     int Xl = 0, Yl = 0, Zl = 0;
@@ -141,7 +141,7 @@ void Main::createSection(const bool isSectionContiguous)
     CkAssert(cfg.X >= Xu && cfg.Y >= Yu && cfg.Z >= Zu);
 
     /// Create the section
-    arraySection = CProxySection_MyChareArray::ckNew(chareArray,Xl,Xu,dX,Yl,Yu,dY,Zl,Zu,dZ);
+    return CProxySection_MyChareArray::ckNew(chareArray,Xl,Xu,dX,Yl,Yu,dY,Zl,Zu,dZ);
 }
 
 
