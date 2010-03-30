@@ -14,6 +14,11 @@ then
 . $CHARMINC/conv-mach-pre.sh
 fi
 
+if [ -r $CHARMINC/conv-common.sh ]
+then
+. $CHARMINC/conv-common.sh
+fi
+
 if [ ! -r $CHARMINC/conv-mach.sh ]
 then
 	echo "Can't find conv-mach.sh in $CHARMINC directory."
