@@ -22,7 +22,7 @@ OPT       = -O2
 CXXFLAGS += -language charm++ $(OPT)
 CPPFLAGS += -DCMK_OPTIMIZE
 LDFLAGS  += -module CkMulticast
-EXEC      = charmrun
+EXEC      = ./charmrun
 EXECFLAGS = +p$(NP)
 ifdef $(NODELIST)
   EXECFLAGS += ++nodelist $(NODELIST)
