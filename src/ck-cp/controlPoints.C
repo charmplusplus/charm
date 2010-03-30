@@ -8,7 +8,7 @@
 #include <pathHistory.h>
 #include "cp_effects.h"
 
-
+#include <climits>
 //  A framework for tuning "control points" exposed by an application. Tuning decisions are based upon observed performance measurements.
  
 
