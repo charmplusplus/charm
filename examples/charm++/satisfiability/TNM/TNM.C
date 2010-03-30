@@ -52,8 +52,8 @@ typedef unsigned int my_unsigned_type;
    parameters tab_variable_size and tab_clause_size before compilation if 
    necessary */
 
-#define tab_variable_size  1000000
-#define tab_clause_size 5000000
+#define tab_variable_size  100000
+#define tab_clause_size 500000
 
 #define tab_unitclause_size \
  ((tab_clause_size/4<2000) ? 2000 : tab_clause_size/4)
@@ -95,20 +95,20 @@ int *neg_in[tab_variable_size];
 int *pos_in[tab_variable_size];
 int neg_nb[tab_variable_size];
 int pos_nb[tab_variable_size];
-my_type var_current_value[tab_variable_size];
-my_type var_rest_value[tab_variable_size];
-my_type var_state[tab_variable_size];
+my_type *var_current_value;//[tab_variable_size];
+my_type *var_rest_value;//[tab_variable_size];
+my_type *var_state;//[tab_variable_size];
 
 
-float reduce_if_negative_nb[tab_variable_size];
-float reduce_if_positive_nb[tab_variable_size];
+float *reduce_if_negative_nb;//[tab_variable_size];
+float *reduce_if_positive_nb;//[tab_variable_size];
 
 int *sat[tab_clause_size];
 int *var_sign[tab_clause_size];
-my_type clause_state[tab_clause_size];
-my_type clause_length[tab_clause_size];
-int most_recent[tab_clause_size];
-int most_recent_count[tab_clause_size];
+my_type *clause_state;//[tab_clause_size];
+my_type *clause_length;//[tab_clause_size];
+int *most_recent;//[tab_clause_size];
+int *most_recent_count;//[tab_clause_size];
 
 int VARIABLE_STACK_fill_pointer = 0;
 int CLAUSE_STACK_fill_pointer = 0;
@@ -116,10 +116,10 @@ int UNITCLAUSE_STACK_fill_pointer = 0;
 int MANAGEDCLAUSE_STACK_fill_pointer = 0;
 
 
-int VARIABLE_STACK[tab_variable_size];
-int CLAUSE_STACK[tab_clause_size];
-int UNITCLAUSE_STACK[tab_unitclause_size];
-int MANAGEDCLAUSE_STACK[tab_clause_size];
+int *VARIABLE_STACK;//[tab_variable_size];
+int *CLAUSE_STACK;//[tab_clause_size];
+int *UNITCLAUSE_STACK;//[tab_unitclause_size];
+int *MANAGEDCLAUSE_STACK;//[tab_clause_size];
 //int TESTED_VAR_STACK[tab_variable_size];
 //int TESTED_VAR_STACK_fill_pointer=0;
 
@@ -148,7 +148,7 @@ int NB_CLAUSE;
 int INIT_NB_CLAUSE;
 my_type R = 3;
 
-double counter[tab_variable_size];
+double *counter;//[tab_variable_size];
 double max_counter, min_counter, ave_counter, old_ave_counter;
 int global_j;
 
@@ -175,7 +175,7 @@ struct var_node *allocate_var_node1() {
   return &VAR_NODES1[VAR_NODES1_index++];
 }
 
-int test_flag[tab_variable_size];
+int *test_flag;//[tab_variable_size];
 
 int MAX_REDUCED;
 int T_SEUIL;
@@ -187,7 +187,7 @@ char *INPUT_FILE;
 
 unsigned long IMPLIED_LIT_FLAG=0;
 int IMPLIED_LIT_STACK_fill_pointer=0;
-int IMPLIED_LIT_STACK[tab_variable_size];
+int *IMPLIED_LIT_STACK;//[tab_variable_size];
 unsigned long LIT_IMPLIED[tab_variable_size]={0};
 
 long NB_SECOND_SEARCH=0;
@@ -304,32 +304,32 @@ my_type build(int build_flag, char* input_file) {
 #define INCREASING 2
 #define PLATEAU 0
 int var_count[tab_variable_size]={1};
-int neibor_stack[tab_variable_size];
+int *neibor_stack;//[tab_variable_size];
 int neibor_stack_fill_pointer=0;
 int **neibor_relations[tab_variable_size];
 int *neibor[tab_variable_size];
-int score[tab_variable_size];
-int make[tab_variable_size];
-int break_value[tab_variable_size];
-int tmp_score[tab_variable_size];
-int decreasing_vars_stack[tab_variable_size];
+int *score;//[tab_variable_size];
+int *make;//[tab_variable_size];
+int *break_value;//[tab_variable_size];
+int *tmp_score;//[tab_variable_size];
+int *decreasing_vars_stack;//[tab_variable_size];
 int decreasing_vars_stack_fill_pointer=0;
 int tabu[tab_variable_size]={FALSE};
-int tabu_stack[tab_variable_size];
+int *tabu_stack;//[tab_variable_size];
 int tabu_stack_fill_pointer=0;
-int tabu_list[tab_variable_size];
-int tendance[tab_variable_size];
+int *tabu_list;//[tab_variable_size];
+int *tendance;//[tab_variable_size];
 int MY_CLAUSE_STACK_fill_pointer=0;
-int MY_CLAUSE_STACK[tab_clause_size];
-int nb_lit_true[tab_clause_size];
-int clause_truth[tab_clause_size];
-int dommage_if_flip[tab_variable_size];
-int zerodommage[tab_variable_size];
-int zerodommage_vars_stack[tab_variable_size];
+int *MY_CLAUSE_STACK;//[tab_clause_size];
+int *nb_lit_true;//[tab_clause_size];
+int *clause_truth;//[tab_clause_size];
+int *dommage_if_flip;//[tab_variable_size];
+int *zerodommage;//[tab_variable_size];
+int *zerodommage_vars_stack;//[tab_variable_size];
 int zerodommage_vars_stack_fill_pointer=0;
-int flip_time[tab_variable_size];
-int enter_stack_time[tab_variable_size];
-int walk_time[tab_variable_size];
+int *flip_time;//[tab_variable_size];
+int *enter_stack_time;//[tab_variable_size];
+int *walk_time;//[tab_variable_size];
 int MAXTRIES=10000;
 int MAXSTEPS=2000000000;
 int NOISE=50;
@@ -1231,10 +1231,59 @@ bool search() {
 int HELP_FLAG=FALSE;
 
 
+void __initialize_vars()
+{
+    var_current_value = (my_type*) malloc(tab_variable_size * sizeof(my_type));
+    var_rest_value = (my_type*) malloc(tab_variable_size * sizeof(my_type));
+    var_state = (my_type*) malloc(tab_variable_size * sizeof(my_type));
+    clause_state = (my_type*)malloc(tab_clause_size * sizeof(my_type));
+    clause_length = (my_type*)malloc(tab_clause_size * sizeof(my_type));
+
+    test_flag = (int*) malloc(sizeof(int) * tab_variable_size);
+
+    IMPLIED_LIT_STACK = (int*) malloc(sizeof(int) *tab_variable_size);
+   neibor_stack = (int*) malloc(sizeof(int) * tab_variable_size);
+
+    counter = (double*) malloc(tab_variable_size * sizeof(double));
+    reduce_if_negative_nb = (float*) malloc(sizeof(float) * tab_variable_size);
+    reduce_if_positive_nb = (float*) malloc(sizeof(float) * tab_variable_size);
+    most_recent = (int*) malloc(sizeof(int) * tab_clause_size);
+    most_recent_count = (int*) malloc( sizeof(int) * tab_clause_size);
+
+    VARIABLE_STACK = (int*) malloc(tab_variable_size * sizeof(int));
+    CLAUSE_STACK = (int*) malloc(tab_clause_size * sizeof(int));
+    UNITCLAUSE_STACK = (int*) malloc(tab_unitclause_size * sizeof(int));
+
+    MANAGEDCLAUSE_STACK = (int*) malloc(tab_clause_size * sizeof(int));
+
+
+    score = (int*) malloc( sizeof(int) * tab_variable_size);
+    make = (int*) malloc(sizeof(int) * tab_variable_size);
+    break_value= (int*) malloc( sizeof(int) *tab_variable_size);
+    tmp_score = (int*) malloc(sizeof(int) * tab_variable_size);
+    decreasing_vars_stack =  (int*) malloc( sizeof(int) *tab_variable_size);
+   tabu_stack = (int*) malloc(sizeof(int) * tab_variable_size);
+  
+   tabu_list = (int*) malloc(sizeof(int) * tab_variable_size);
+   tendance = (int*) malloc( sizeof(int) * tab_variable_size);
+
+   MY_CLAUSE_STACK = (int*) malloc(sizeof(int) * tab_clause_size);
+   nb_lit_true = (int*) malloc( sizeof(int) * tab_clause_size);
+   clause_truth = (int*) malloc(sizeof(int) * tab_clause_size);
+   dommage_if_flip = (int*) malloc(sizeof(int) * tab_variable_size);
+   zerodommage = (int*) malloc(sizeof(int) *tab_variable_size);
+   zerodommage_vars_stack = (int*) malloc(sizeof(int) * tab_variable_size);
+   flip_time = (int*) malloc(sizeof(int) * tab_variable_size);
+   enter_stack_time = (int*) malloc(sizeof(int) * tab_variable_size);
+   walk_time = (int*) malloc(sizeof(int) *tab_variable_size);
+
+}
+
 bool seq_processing(int _var_size, const vector< vector<int> >& clauses)
 {
 
     int NB_VAR, NB_CLAUSE;
+    __initialize_vars();
     int ret = build_simple_sat_instance(_var_size, clauses);
 
     switch(ret)

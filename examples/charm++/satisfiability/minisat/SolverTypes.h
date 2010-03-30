@@ -113,9 +113,15 @@ public:
     // NOTE: This constructor cannot be used directly (doesn't allocate enough memory).
     template<class V>
     Clause(const V& ps, bool learnt) {
+        
+        //assert(sizeof(Lit)      == sizeof(uint32_t));
+        //assert(sizeof(float)    == sizeof(uint32_t));
         size_etc = (ps.size() << 3) | (uint32_t)learnt;
+        //&data = (Lit*) malloc(sizeof(uint32_t)*(ps.size()));
         for (int i = 0; i < ps.size(); i++) data[i] = ps[i];
-        if (learnt) extra.act = 0; else calcAbstraction(); }
+        if (learnt) extra.act = 0; else calcAbstraction(); 
+   
+    }
 
     // -- use this function instead:
     template<class V>
