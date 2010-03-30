@@ -94,15 +94,15 @@ Main::Main(CkArgMsg *m)
 
     /// Create the array
     chareArray            = CProxy_MyChareArray::ckNew(mcastGrpID,cfg.X,cfg.Y,cfg.Z); 
-    /// Create the array section
-    arraySection = createSection(cfg.useContiguousSection);
+    /// Create the array section to use with CkMulticast
+    arraySections.push_back( createSection(cfg.useContiguousSection) );
 
     /// Delegate the section collectives to the multicast manager
-    arraySection.ckSectionDelegate(mgr);
+    arraySections[0].ckSectionDelegate(mgr);
     /// Setup the client at the root of the reductions
     CkCallback *cb = new CkCallback(CkIndex_Main::receiveReduction(0),thisProxy);
     chareArray.ckSetReductionClient(cb);
-    mgr->setReductionClient(arraySection,cb);
+    mgr->setReductionClient(arraySections[0],cb);
 
     /// Start off with the first comm type and the smallest message size
     curCommType    = CharmBcast;
@@ -168,12 +168,12 @@ void Main::sendMulticast(const CommMechanism commType, const int msgSize)
 
         case CkMulticast:
             timeStart = CmiWallTimer();
-            arraySection.crunchData(msg);
+            arraySections[0].crunchData(msg);
             break;
 
         case Comlib:
             timeStart = CmiWallTimer();
-            arraySection.crunchData(msg);
+            arraySections[0].crunchData(msg);
             break;
 
         default:

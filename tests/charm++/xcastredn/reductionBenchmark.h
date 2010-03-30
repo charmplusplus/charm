@@ -108,7 +108,7 @@ class Main: public CBase_Main
         /// Chare array that is going to receive the multicasts
         CProxy_MyChareArray chareArray;
         /// Array section proxy
-        CProxySection_MyChareArray arraySection;
+        std::vector<CProxySection_MyChareArray> arraySections;
         /// Counter for tracking the comm mechanism that is currently being tested
         CommMechanism curCommType;
         /// Counters for tracking test progress
