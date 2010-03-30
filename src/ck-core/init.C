@@ -859,6 +859,7 @@ CkpvExtern(int, freezeModeFlag);
 #include "blue_impl.h"
 extern void BgProcessMessageFreezeMode(threadInfo *, char *);
 #endif
+void CpdBreakPointInit();
 
 /**
   This is the main charm setup routine.  It's called
@@ -1051,6 +1052,10 @@ void _initCharm(int unused_argc, char **argv)
 		*/
 		CkRegisterMainModule();
 		_registerDone();
+	}
+	/* The following will happen on every virtual processor in BigEmulator, not just on once per real processor */
+	if (CkMyRank() == 0) {
+	  CpdBreakPointInit();
 	}
 	CmiNodeAllBarrier();
 
