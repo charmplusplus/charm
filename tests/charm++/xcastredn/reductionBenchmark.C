@@ -85,7 +85,7 @@ Main::Main(CkArgMsg *m)
         CkPrintf("Wrong number of arguments. Try %s numRepeats msgSizeMin msgSizeMax isSectionContiguous sectionDimX sectionDimY sectionDimZ arrayDimX arrayDimY arrayDimZ",m->argv[0]);
 
     delete m;
-    CkPrintf("\nRunning timing tests for multicast/reductions using CkMulticast. Inputs are: \n\tArray size: (%d,%d,%d) \n\tSection size: (%d,%d,%d) \n\tMsg sizes (KB): %d to %d \n\tNum repeats: %d",
+    CkPrintf("\nMeasuring performance of chare array collectives using different communication libraries in charm++. Inputs are: \n\tArray size: (%d,%d,%d) \n\tSection size: (%d,%d,%d) \n\tMsg sizes (KB): %d to %d \n\tNum repeats: %d",
              cfg.X,cfg.Y,cfg.Z, cfg.section.X, cfg.section.Y, cfg.section.Z, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats);
 
     // Setup the multicast manager stuff
@@ -108,10 +108,17 @@ Main::Main(CkArgMsg *m)
     curCommType    = CharmBcast;
     curMsgSize     = cfg.msgSizeMin;
     curRepeatNum   = 0;
-    out<<std::fixed<<std::setprecision(6);
-    out<<"\n"<<std::setw(cfg.fieldWidth)<<"Msg size (KB)"<<std::setw(cfg.fieldWidth)<<"Avg time (ms)";
+
+    /// Prepare the output and logging buffers
+    log<<std::fixed<<std::setprecision(6);
+    log<<"\n"<<std::setw(cfg.fieldWidth)<<"Msg size (KB)"<<std::setw(cfg.fieldWidth)<<"Avg time (ms)";
     for (int i=1;i<=cfg.numRepeats;i++)
-        out<<std::setw(cfg.fieldWidth-3)<<"Trial "<<std::setw(3)<<i;
+        log<<std::setw(cfg.fieldWidth-3)<<"Trial "<<std::setw(3)<<i;
+
+    out<<std::fixed<<std::setprecision(6);
+    out<<"\n\nSummary: Avg time taken (ms) for different msg sizes by each comm mechanism\n"<<std::setw(commNameLen)<<"Mechanism";
+    for (int i=cfg.msgSizeMin; i<= cfg.msgSizeMax; i*=2)
+        out<<std::setw(cfg.fieldWidth-3)<<i<<std::setw(3)<<" KB";
 
     /// Send out the multicast
     sendMulticast(curCommType,curMsgSize);
@@ -197,9 +204,10 @@ void Main::receiveReduction(CkReductionMsg *msg)
     /// If this is the first ever multicast/reduction loop, dont time it as it includes tree setup times etc
     if (msg->getRedNo() == 0)
     {
-        CkPrintf("\nFirst mcast/red loop took: %.6f ms. This includes tree setup times etc",loopTimes[0]);
+        CkPrintf("\nFirst xcast/redn loop took: %.6f ms. Discarding this from collected measurements as it might include tree setup times etc",loopTimes[0]);
         loopTimes.pop_back();
         curRepeatNum--;
+        out<<"\n"<<std::setw(commNameLen)<<commName[curCommType];
     }
 
     /// If this ends the timings for a msg size
@@ -211,9 +219,11 @@ void Main::receiveReduction(CkReductionMsg *msg)
             avgTime += loopTimes[i];
         avgTime /= loopTimes.size();
         /// Collate the results
-        out<<"\n"<<std::setw(cfg.fieldWidth)<<curMsgSize<<std::setw(cfg.fieldWidth)<<avgTime;
+        log<<"\n"<<std::setw(cfg.fieldWidth)<<curMsgSize<<std::setw(cfg.fieldWidth)<<avgTime;
         for (int i=0; i< loopTimes.size(); i++)
-            out<<std::setw(cfg.fieldWidth)<<loopTimes[i];
+            log<<std::setw(cfg.fieldWidth)<<loopTimes[i];
+        out<<std::setw(cfg.fieldWidth)<<avgTime;
+
         /// Reset counters, timings and sizes
         curRepeatNum = 0;
         curMsgSize *= 2;
@@ -224,14 +234,18 @@ void Main::receiveReduction(CkReductionMsg *msg)
         {
             /// Print the results
             CkPrintf("\n----------------------------------------------------------------");
-            CkPrintf("\nFinished timing the collectives mechanism: %s. Results: \n%s\n",commName[curCommType],out.str().c_str());
+            CkPrintf("\nFinished timing the collectives mechanism: %s. Results: \n%s\n",commName[curCommType],log.str().c_str());
             /// Clear the output buffer
-            out.str("");
+            log.str("");
             /// Reset the counters
             curMsgSize = cfg.msgSizeMin;
             /// Exit if done
             if (++curCommType >= Comlib)
+            {
+                CkPrintf("\n----------------------------------------------------------------");
+                CkPrintf("%s\n",out.str().c_str());
                 CkExit();
+            }
         }
     }
 

@@ -17,7 +17,8 @@
 enum CommMechanism
 { CharmBcast, CkMulticast, Comlib };
 /// The names of the collective mechanisms
-char commName[][50] = {"Charm-Bcast/Redn","CkMulticast","Comlib"};
+const int commNameLen = 30;
+char commName[][commNameLen] = {"Charm-Bcast/Redn","CkMulticast","Comlib"};
 
 
 
@@ -114,7 +115,7 @@ class Main: public CBase_Main
         /// Counters for tracking test progress
         int curMsgSize,curRepeatNum;
         /// Stream holding all the results
-        std::stringstream out;
+        std::stringstream out, log;
         /// Start time for the multicast
         double timeStart;
         /// A vector (of size numRepeats) of times taken for a multicast/reduction loop
