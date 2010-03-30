@@ -555,7 +555,8 @@ void    resetVTime();
 char * getFullBuffer();
 void   addBgNodeMessage(char *msgPtr);
 void   addBgThreadMessage(char *msgPtr, int threadID);
-void   BgProcessMessage(threadInfo *t, char *msg);
+void   BgProcessMessageDefault(threadInfo *t, char *msg);
+extern void (*BgProcessMessage)(threadInfo *t, char *msg);
 
 
 /* blue gene debug */

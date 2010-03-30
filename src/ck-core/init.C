@@ -854,6 +854,10 @@ extern "C" void initQd(char **argv)
 CpvExtern(int, _bgCcsHandlerIdx);
 CpvExtern(int, _bgCcsAck);
 extern "C" void req_fw_handler(char*);
+CkpvExtern(void *, debugQueue);
+CkpvExtern(int, freezeModeFlag);
+#include "blue_impl.h"
+extern void BgProcessMessageFreezeMode(threadInfo *, char *);
 #endif
 
 /**
@@ -1229,14 +1233,21 @@ void _initCharm(int unused_argc, char **argv)
         CkAssert(CpvAccess(_bgCcsHandlerIdx)==bgCcsHandlerIdx);
         CpvAccess(_bgCcsAck) ++;
         CcsReleaseMessages();
-#else
+        
+        CkpvInitialize(int, freezeModeFlag);
+        CkpvAccess(freezeModeFlag) = 0;
+
+        CkpvInitialize(void *, debugQueue);
+        CkpvAccess(debugQueue) = CdsFifo_Create();
+        
+        BgProcessMessage = BgProcessMessageFreezeMode;
+#endif
         // Should not use CpdFreeze inside a thread (since this processor is really a user-level thread)
        if (CpvAccess(cpdSuspendStartup))
        { 
           //CmiPrintf("In Parallel Debugging mode .....\n");
           CpdFreeze();
        }
-#endif
 #endif
 
 

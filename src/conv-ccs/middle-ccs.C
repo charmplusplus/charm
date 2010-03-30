@@ -63,3 +63,54 @@ void ccs_getinfo(char *msg)
   CmiFree(msg);
 }
 
+//////////////////////////////////////////////////////////////////// middle-debug.C
+
+extern "C" {
+
+CpvDeclare(void *, debugQueue);
+CpvDeclare(int, freezeModeFlag);
+
+/*
+ Start the freeze-- call will not return until unfrozen
+ via a CCS request.
+ */
+void CpdFreeze(void)
+{
+  CpdNotify(CPD_FREEZE,getpid());
+  if (CpvAccess(freezeModeFlag)) return; /*Already frozen*/
+  CpvAccess(freezeModeFlag) = 1;
+#if ! CMK_BLUEGENE_CHARM
+  CpdFreezeModeScheduler();
+#endif
+}
+
+void CpdUnFreeze(void)
+{
+  CpvAccess(freezeModeFlag) = 0;
+}
+
+int CpdIsFrozen(void) {
+  return CpvAccess(freezeModeFlag);
+}
+
+}
+
+#include "blue_impl.h"
+void BgProcessMessageFreezeMode(threadInfo *t, char *msg) {
+  CmiPrintf("BgProcessMessageFreezeMode\n");
+#if CMK_CCS_AVAILABLE
+  void *debugQ=CpvAccess(debugQueue);
+  CmiAssert(msg!=NULL);
+  int processImmediately = CpdIsDebugMessage(msg);
+  if (processImmediately) BgProcessMessageDefault(t, msg);
+  while (!CpvAccess(freezeModeFlag) && !CdsFifo_Empty(debugQ)) {
+    BgProcessMessageDefault(t, (char*)CdsFifo_Dequeue(debugQ));
+  }
+  if (!processImmediately) {
+    if (!CpvAccess(freezeModeFlag)) BgProcessMessageDefault(t, msg); 
+    else CdsFifo_Enqueue(debugQ, msg);
+  }
+#else
+  BgProcessMessageDefault(t, msg);
+#endif
+}

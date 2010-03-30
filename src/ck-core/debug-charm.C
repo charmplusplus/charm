@@ -364,7 +364,7 @@ void hostInfo(void *itemIter, pup_er pp, CpdListItemsRequest *req) {
 }
 
 /************ Message CPD Lists ****************/
-CpvCExtern(void *,debugQueue);
+CkpvExtern(void *,debugQueue);
 CpvCExtern(int, skipBreakpoint);
 
 // Interpret data in a message in a user-friendly way.
@@ -440,15 +440,15 @@ public:
   CpdList_localQ() {}
   virtual const char * getPath(void) const {return "converse/localqueue";}
   virtual size_t getLength(void) const {
-    int x = CdsFifo_Length((CdsFifo)(CpvAccess(debugQueue)));
+    int x = CdsFifo_Length((CdsFifo)(CkpvAccess(debugQueue)));
     //CmiPrintf("*******Returning fifo length %d*********\n", x);
     //return CdsFifo_Length((CdsFifo)(CpvAccess(CmiLocalQueue)));
     if (CpvAccess(lastBreakPointMsg) != NULL) x++;
     return x;
   }
   virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
-    int length = CdsFifo_Length((CdsFifo)(CpvAccess(debugQueue)));
-    void ** messages = CdsFifo_Enumerate(CpvAccess(debugQueue));
+    int length = CdsFifo_Length((CdsFifo)(CkpvAccess(debugQueue)));
+    void ** messages = CdsFifo_Enumerate(CkpvAccess(debugQueue));
     int curObj=0;
 
     if (CpvAccess(lastBreakPointMsg) != NULL) {
@@ -473,8 +473,12 @@ public:
         const char *type="Converse";
         p.comment("name");
         char name[128];
+#if ! CMK_BLUEGENE_CHARM
         if (CmiGetHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Local Charm";}
         if (CmiGetXHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Network Charm";}
+#else
+        isCharm=1; type="BG";
+#endif
         sprintf(name,"%s %d: %s (%d)","Message",curObj,type,CmiGetHandler(msg));
         p(name, strlen(name));
 
@@ -606,9 +610,9 @@ void CpdDeliverSingleMessage () {
   }
   else {
     // we were not stopped at a breakpoint, then deliver the first message in the debug queue
-    if (!CdsFifo_Empty(CpvAccess(debugQueue))) {
+    if (!CdsFifo_Empty(CkpvAccess(debugQueue))) {
       CpvAccess(skipBreakpoint) = 1;
-      char *queuedMsg = (char *)CdsFifo_Dequeue(CpvAccess(debugQueue));
+      char *queuedMsg = (char *)CdsFifo_Dequeue(CkpvAccess(debugQueue));
       CmiHandleMessage(queuedMsg);
       CpvAccess(skipBreakpoint) = 0;
     }
@@ -740,7 +744,12 @@ extern "C" int CpdIsCharmDebugMessage(void *msg) {
          env->getMsgtype() == FillVidMsg || _entryTable[env->getEpIdx()]->inCharm;
 }
 
-
+CpvExtern(int, _bgCcsHandlerIdx);
+extern "C" int CpdIsBgCharmDebugMessage(void *msg) {
+  envelope *env = (envelope*)msg;
+  return (((CmiBlueGeneMsgHeader*)msg)->hID) == CpvAccess(_bgCcsHandlerIdx) || env->getMsgtype() == ForVidMsg ||
+         env->getMsgtype() == FillVidMsg || _entryTable[env->getEpIdx()]->inCharm;
+}
 
 CpvExtern(char *, displayArgument);
 
@@ -824,6 +833,9 @@ void CpdCharmInit()
   CpdListRegister(new CpdList_message());
   CpdListRegister(new CpdList_msgStack());
   CpdIsDebugMessage = CpdIsCharmDebugMessage;
+#if CMK_BLUEGENE_CHARM
+  CpdIsDebugMessage = CpdIsBgCharmDebugMessage;
+#endif
 }
 
 #else

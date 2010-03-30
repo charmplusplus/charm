@@ -12,10 +12,10 @@ Orion Sky Lawlor, olawlor@acm.org, 4/10/2001
 #include "conv-ccs.h"
 #include <errno.h>
 
-CpvStaticDeclare(int, freezeModeFlag);
+CpvExtern(int, freezeModeFlag);
 CpvStaticDeclare(int, continueFlag);
 CpvStaticDeclare(int, stepFlag);
-CpvDeclare(void *, debugQueue);
+CpvExtern(void *, debugQueue);
 int _debugHandlerIdx;
 CpvDeclare(int, skipBreakpoint); /* This is a counter of how many breakpoints we should skip */
 
@@ -225,27 +225,6 @@ static void CpdDebugHandler(char *msg)
 }
 
 
-/*
- Start the freeze-- call will not return until unfrozen
- via a CCS request.
- */
-void CpdFreeze(void)
-{
-  CpdNotify(CPD_FREEZE,getpid());
-  if (CpvAccess(freezeModeFlag)) return; /*Already frozen*/
-  CpvAccess(freezeModeFlag) = 1;
-  CpdFreezeModeScheduler();
-}
-
-void CpdUnFreeze(void)
-{
-  CpvAccess(freezeModeFlag) = 0;
-}
-
-int CpdIsFrozen(void) {
-  return CpvAccess(freezeModeFlag);
-}
-
 /* Deliver a single message in the queue while not unfreezing the program */
 void CpdNext(void) {
 
@@ -268,6 +247,9 @@ int (*CpdIsDebugMessage)(void *);
 
 void CpdFreezeModeScheduler(void)
 {
+#if CMK_BLUEGENE_CHARM
+    CmiAbort("Cannot run CpdFreezeModeScheduler inside BigSim emulated environment");
+#else
 #if CMK_CCS_AVAILABLE
     void *msg;
     void *debugQ=CpvAccess(debugQueue);
@@ -310,18 +292,21 @@ void CpdFreezeModeScheduler(void)
         CmiHandleMessage(queuedMsg);
     }
 #endif
+#endif
 }
 
 void CpdMemoryMarkClean(char *msg);
 
 void CpdInit(void)
 {
+#if ! CMK_BLUEGENE_CHARM
   CpvInitialize(int, freezeModeFlag);
   CpvAccess(freezeModeFlag) = 0;
 
   CpvInitialize(void *, debugQueue);
   CpvAccess(debugQueue) = CdsFifo_Create();
-
+#endif
+  
   CcsRegisterHandler("ccs_debug", (CmiHandler)CpdDebugHandler);
   CcsSetMergeFn("ccs_debug", CcsMerge_concat);
 
