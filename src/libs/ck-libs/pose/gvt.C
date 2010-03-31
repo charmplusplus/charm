@@ -314,7 +314,7 @@ void PVT::doneLB() {
     if (CkMyPe()==0) { 
       eventMsg *dummyMsg = new eventMsg();
       CProxy_PVT p(ThePVT);
-      p[0].resumeAfterCheckpoint(dummyMsg);
+      p[0].resumeAfterLB(dummyMsg);
     }
   }
 }
