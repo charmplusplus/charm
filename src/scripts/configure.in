@@ -691,7 +691,7 @@ then
   fi
 fi
 
-if test $BUILD_MPI -eq 1
+if test "$BUILD_MPI" -eq 1
 then
 cat > $t <<EOT
 #include "mpi.h"
