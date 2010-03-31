@@ -101,6 +101,10 @@ class PVT : public Group {
   int parCheckpointInProgress;
   /// GVT at which the last checkpoint was performed
   POSE_TimeType parLastCheckpointGVT;
+  /// indicates if load balancing is in progress
+  int parLBInProgress;
+  /// GVT at which the last load balancing was performed
+  POSE_TimeType parLastLBGVT;
   /// Time at which the last checkpoint was performed
   double parLastCheckpointTime;
   /* things which used to be member function statics */
@@ -135,6 +139,7 @@ class PVT : public Group {
   /// ENTRY: resume after checkpointing, restarting, or if checkpointing doesn't occur
   void resumeAfterCheckpoint(eventMsg *m);
   void beginLoadbalancing(eventMsg *m);
+  void resumeAfterLB(eventMsg *m);
   void callAtSync();
   void doneLB();
 

@@ -19,6 +19,7 @@ module gvt {
     entry void beginCheckpoint(eventMsg *);
     entry void resumeAfterCheckpoint(eventMsg *);
     entry void beginLoadbalancing(eventMsg *);
+    entry void resumeAfterLB(eventMsg *);
     entry void callAtSync();
     entry [expedited] void setGVT(GVTMsg *);
     entry [expedited] void reportReduce(UpdateMsg *);

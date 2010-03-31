@@ -75,6 +75,8 @@ PVT::PVT()
   parCheckpointInProgress = 0;
   parLastCheckpointGVT = 0;
   parLastCheckpointTime = parStartTime = CmiWallTimer();
+  parLBInProgress = 0;
+  parLastLBGVT = 0;
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
     localStats->TimerStop();
@@ -89,6 +91,7 @@ void PVT::pup(PUP::er &p) {
   p|gvtTurn; p|specEventCount; p|eventCount;
   p|startPhaseActive; p|parStartTime; p|parCheckpointInProgress;
   p|parLastCheckpointGVT; p|parLastCheckpointTime;
+  p|parLBInProgress; p|parLastLBGVT;
   p|optGVT; p|conGVT; p|rdone;
 
   if (p.isUnpacking()) {
@@ -264,6 +267,13 @@ void PVT::setGVT(GVTMsg *m)
     parCheckpointInProgress = 1;
     parLastCheckpointTime = CmiWallTimer();
     CkStartQD(cb);
+  } else if ((CkMyPe() == 0) && (parLBInProgress == 0) && 
+      (((pose_config.lb_gvt_interval > 0) && (estGVT >= (parLastLBGVT + pose_config.lb_gvt_interval))))) {
+    // wait for quiescence to occur before checkpointing
+    eventMsg *dummyMsg = new eventMsg();
+    CkCallback cb(CkIndex_PVT::beginLoadbalancing(dummyMsg), CkMyPe(), ThePVT);
+    parLBInProgress = 1;
+    CkStartQD(cb);
   } else {
     // skip checkpointing
     eventMsg *dummyMsg = new eventMsg();
@@ -285,7 +295,7 @@ void PVT::beginCheckpoint(eventMsg *m) {
 
 void PVT::beginLoadbalancing(eventMsg *m) {
   CkFreeMsg(m);
-  if (parCheckpointInProgress) {  // ensure this only happens once
+  if (parLBInProgress) {  // ensure this only happens once
     CProxy_PVT p(ThePVT);
     p.callAtSync();
   }
@@ -315,6 +325,26 @@ void PVT::resumeAfterCheckpoint(eventMsg *m) {
     CkPrintf("POSE: checkpoint/restart complete on processor %d at GVT=%lld time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() - parStartTime);
     parCheckpointInProgress = 0;
     parLastCheckpointGVT = estGVT;
+  }
+  CkFreeMsg(m);
+  CProxy_PVT p(ThePVT);
+  startPhaseActive = 0;
+  prioBcMsg *startMsg = new (8*sizeof(int)) prioBcMsg;
+  startMsg->bc = 1;
+  *((int *)CkPriorityPtr(startMsg)) = 0;
+  CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
+  p[CkMyPe()].startPhase(startMsg);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
+#endif
+}
+
+void PVT::resumeAfterLB(eventMsg *m) {
+  if (parLBInProgress) {
+    CkPrintf("POSE: load balancing complete on processor %d at GVT=%lld time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() - parStartTime);
+    parLBInProgress = 0;
+    parLastLBGVT = estGVT;
   }
   CkFreeMsg(m);
   CProxy_PVT p(ThePVT);

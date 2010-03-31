@@ -629,6 +629,7 @@ foreach my $incfile ($inC,@otherfiles)
 	#create the wrapper parent class constructor
 	$outChandle->print($returntype." ") if($returntype);
 	$outChandle->print(join('',$class,"::",$method,'(',$message,' *',$messagename,"){\n"));
+	$outChandle->print("  usesAtSync=true;\n");
 	$outChandle->print("#ifndef CMK_OPTIMIZE\n");
 	$outChandle->print("  if(pose_config.stats)\n");
 	$outChandle->print("    {localStats->TimerStart(SIM_TIMER);}\n");

@@ -125,6 +125,7 @@ class POSE_Config
   bool deterministic;
   int checkpoint_gvt_interval;
   int checkpoint_time_interval;
+  int lb_gvt_interval;
   /* one very long initializer line */
   POSE_Config() :
 #ifdef POSE_STATS_ON                   //w
@@ -180,7 +181,8 @@ class POSE_Config
     deterministic(false),
 #endif
     checkpoint_gvt_interval(0),
-    checkpoint_time_interval(0)
+    checkpoint_time_interval(0),
+    lb_gvt_interval(0)
     {// all handled in initializer
     }
 };

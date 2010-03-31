@@ -336,6 +336,12 @@ void POSEreadCmdLine()
     CmiPrintf("WARNING: checkpoint GVT and time values both set; ignoring time value\n");
     pose_config.checkpoint_time_interval = 0;
   }
+  /* load balancing */
+  CmiGetArgIntDesc(argv, "+lb_gvt_pose", &pose_config.lb_gvt_interval, 
+		   "Load balancing approximately every <gvt #> of GVT ticks; default = 0 = no lb");
+  if (pose_config.lb_gvt_interval < 0) {
+    CmiAbort("+lb_gvt_pose value must be >= 0; 0 = no load balancing\n");
+  }
   /* max_iteration seems to be defunct */
   //  CmiGetArgIntDesc(argv, "+FEmax_pose", &pose_config.max_iter , "Sets max events executed in single forward execution step.  Default to 100.");
   CmiGetArgIntDesc(argv, "+leash_specwindow_pose", &pose_config.spec_window , "Sets speculative window behavior.");
