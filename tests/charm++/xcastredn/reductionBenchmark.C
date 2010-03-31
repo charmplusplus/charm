@@ -105,7 +105,7 @@ Main::Main(CkArgMsg *m)
     mgr->setReductionClient(arraySections[0],cb);
 
     /// Start off with the first comm type and the smallest message size
-    curCommType    = CharmBcast;
+    curCommType    = CkMulticast;
     curMsgSize     = cfg.msgSizeMin;
     curRepeatNum   = 0;
 
@@ -230,7 +230,7 @@ void Main::receiveReduction(CkReductionMsg *msg)
         curMsgSize *= 2;
         loopTimes.clear();
 
-        /// If this ends the timings for all msg sizes, exit
+        /// If this ends the timings for all msg sizes, print results and proceed to the next phase
         if (curMsgSize > cfg.msgSizeMax)
         {
             /// Print the results
