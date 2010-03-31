@@ -92,6 +92,7 @@ class pvtObjects {
   }                           
   /// Wake up all posers in list
   void Wake();
+  void callAtSync();
   /// Call Commit on all posers
   void Commit();
   /// Insert poser in list

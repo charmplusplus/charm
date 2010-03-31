@@ -19,7 +19,7 @@ PVT::PVT()
   CpvInitialize(eventID, theEventID);
   CpvAccess(theEventID)=eventID();
   //  CpvAccess(theEventID).dump();
-  LBTurnInstrumentOff();
+  //LBTurnInstrumentOff();
   optGVT = POSE_UnsetTS; conGVT = POSE_UnsetTS;
   rdone=0;
   SRs=NULL;
@@ -280,6 +280,32 @@ void PVT::beginCheckpoint(eventMsg *m) {
     eventMsg *dummyMsg = new eventMsg();
     CkCallback cb(CkIndex_PVT::resumeAfterCheckpoint(dummyMsg), CkMyPe(), ThePVT);
     CkStartCheckpoint(POSE_CHECKPOINT_DIRECTORY, cb);
+  }
+}
+
+void PVT::beginLoadbalancing(eventMsg *m) {
+  CkFreeMsg(m);
+  if (parCheckpointInProgress) {  // ensure this only happens once
+    CProxy_PVT p(ThePVT);
+    p.callAtSync();
+  }
+}
+
+void PVT::callAtSync()
+{
+  objs.callAtSync();
+}
+
+void PVT::doneLB() {
+  static int count = 0;
+  count ++;
+  if (count == objs.getNumObjs()) {
+    count =0;
+    if (CkMyPe()==0) { 
+      eventMsg *dummyMsg = new eventMsg();
+      CProxy_PVT p(ThePVT);
+      p[0].resumeAfterCheckpoint(dummyMsg);
+    }
   }
 }
 

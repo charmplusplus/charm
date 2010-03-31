@@ -333,6 +333,12 @@ void sim::SeqResumeAfterCheckpoint() {
   CkStartQD(CkIndex_pose::stop(), &POSE_Coordinator_ID);
 }
 
+void sim::ResumeFromSync()
+{
+  PVT *localPVT = (PVT *)CkLocalBranch(ThePVT);
+  localPVT->doneLB();
+}
+
 /// Dump all data fields
 void sim::dump()
 {

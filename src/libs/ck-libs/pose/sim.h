@@ -297,6 +297,7 @@ class sim : public CBase_sim {
     va_end(ap);
     myStrat->currentEvent->commitErr = 1;
   }
+  void ResumeFromSync(void);
   /// Dump all data fields
   void dump();
  private:
