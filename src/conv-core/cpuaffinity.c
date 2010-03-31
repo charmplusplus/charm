@@ -197,9 +197,9 @@ int print_thread_affinity() {
 int CmiPrintCPUAffinity()
 {
 #if CMK_SMP
-  print_thread_affinity();
+  return print_thread_affinity();
 #else
-  print_cpu_affinity();
+  return print_cpu_affinity();
 #endif
 }
 
@@ -393,6 +393,7 @@ void CmiInitCPUAffinity(char **argv)
   char *commap = NULL;
   char *coremap = NULL;
  
+  int show_affinity_flag;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
 
@@ -408,7 +409,7 @@ void CmiInitCPUAffinity(char **argv)
   if (pemap!=NULL && (coremap != NULL || excludecount>0))
     CmiAbort("Charm++> +pemap can not be used with either +excludecore or +coremap.");
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
-  int show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
+  show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
 						"print cpu affinity");
 
   cpuAffinityHandlerIdx =
