@@ -13,6 +13,8 @@ New Supported Platforms:
 
 Windows HPC cluster, using mpi-win32/mpi-win64
 
+Mac OSX 10.6, Snow Leopard (32-bit and 64-bit).
+
 --------------------------------------------------------------------------------
 General Changes
 --------------------------------------------------------------------------------
@@ -25,12 +27,30 @@ Runtime support
  - Bug fix: Quiescence detection (QD) works with immediate messages
  - New reduction functions implemented in Converse
  - CCS (Converse Client-Server) can deliver message to more than one processor
+ - Added a memory-aware adaptive scheduler, which can be optionally
+   compiled in to charm
+ - Added preliminary support for automatic message prioritization
+   (disabled by default)
 
 Charm++
  - Cross-array and cross-group sections
  - Structured Dagger (SDAG): Support templated arguments properly
  - Plain chares support checkpoint/restart (both in-memory and disk-based)
  - Conditional packing of messages and parameters in SMP scenario
+ - Changes to the CkArrayIndex class hierarchy
+   -- sizeof() all CkArrayIndex* classes is now the same
+   -- Codes using custom array indices have to use placement-new to construct
+      their custom index. Refer example code: examples/charm++/hello/fancyarray/
+   -- *** Backward Incompatibility ***
+      CkArrayIndex[4D/5D/6D]::index are now of type int (instead of short)
+      However the data is stored as shorts. Access by casting
+      CkArrayIndexND::data() appropriately
+   -- *** Deprecated ***
+      The direct use of public data member
+      CkArrayIndexND::index (N=1..6) is deprecated. We reserve the right to
+      change/remove this variable in future releases of Charm++.
+      Instead, please access the indices via member function:
+      int CkArrayIndexND::data()
 
 Adaptive MPI (AMPI)
  - Compilers renamed to avoid collision with host MPI (ampicc, ampiCC,
@@ -49,25 +69,43 @@ Multiphase Shared Arrays (MSA)
  - 3D arrays
 
 TCharm
- - Automatic tracing of API calls for simulation and analysis.
+ - Automatic tracing of API calls for simulation and analysis
 
 Debugging
  - Wider support for architectures other than net- (in particular MPI layers)
  - Improved support for large scale debugging (better scalability)
- - Enhanced record/replay stability to handle various events, and to signal unexpected messages
- - New detailed record/replay: The full content of messages can be recorded, and a single processor can be re-executed outside of the parallel application
+ - Enhanced record/replay stability to handle various events, and to
+   signal unexpected messages
+ - New detailed record/replay: The full content of messages can be
+   recorded, and a single processor can be re-executed outside of the
+   parallel application
 
 Performance analysis
  - Tracing of nested entry methods
 
+Automatic Performance Tuning
+ - Created an automatic tuning framework [still for experimental use only]
+
+CkMulticast
+ - Network-topology / node aware spanning trees used internally for and
+   lower bytes on the network and improved performance in multicasts and
+   reductions delegated to this library
+
+Comlib
+ - Improved OneTimeMulticastStrategy classes
+
 BigSim
  - Out-of-core support, with prefetching capability
  - Detailed tracing of MPI calls
- - Detailed record/replay support at emulation time, capable of replaying any emulated processor after obtained recorded logs.
+ - Detailed record/replay support at emulation time, capable of
+   replaying any emulated processor after obtained recorded logs.
 
 --------------------------------------------------------------------------------
 Architecture-specific changes
 --------------------------------------------------------------------------------
+
+Net-*
+ - Can run jobs with more than 1024 PEs
 
 Net-Linux
  - New charmrun option ++no-va-randomization to disable address space
@@ -86,14 +124,21 @@ Power 7
 Blue Gene/L
  - Compilers and options have been updated to the latest ones
 
+Blue Gene/P
+ - Added routines for measuring performance counters on BG/P.
+ - Updated to support latest DCMF driver version. On ANL's Intrepid, you may
+   need to set BGP_INSTALL=/bgsys/drivers/V1R4M1_460_2009-091110P/ppc in your
+   environment. This is the default on ANL's Surveyor.
+
 Cray XT
  - cputopology information is now available on XT3/4/5
 
 Infiniband (ibverbs)
  - Bug fix: plug memory leaks that caused failures in long runs
+ - Optimized to reduce startup delays
 
 LAPI
- - Support for SMP
+ - Support for SMP (experimental)
 
 
 ================================================================================
