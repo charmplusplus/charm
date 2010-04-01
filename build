@@ -530,6 +530,8 @@ if test -n "$WITH_PRODUCTION"
 then
     echo '#define CMK_OPTIMIZE 1' >> $ConvHeader
     echo '#define CMK_REPLAYSYSTEM  0' >> $ConvHeader
+    # Prepend optimize so that an explicit -no-optimize still works
+    OPTS="-optimize $OPTS"
 fi
 
 # build with Tau
