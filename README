@@ -373,7 +373,7 @@ improvements, or bug reports is
 AUTHORS
 =======
 
-Charm++ was created and is maintained by the Parallel Programming Lab, 
+Charm++ was created and is maintained by the Parallel Programming Lab,
 in the Computer Science department at the University of Illinois at
 Urbana-Champaign.  Our managing professor is Dr. L.V. Kale; students
 have included (in rough time order) Wennie Shu, Kevin Nomura, Wayne
@@ -381,9 +381,12 @@ Fenton, Balkrishna Ramkumar, Vikram Saletore, Amitabh B. Sinha, Manish
 Gupta, Attila Gursoy, Balkrishna Ramkumar, Amitabh B. Sinha, Nimish
 Shah, Sanjeev Krishnan, Jayant DeSouza, Parthasarathy Ramachandran,
 Jeff Wright, Michael Lang, Jackie Wang, Fang Hu, Michael Denardo,
-Joshua Yelon, Narain Jagathesan, Zehra Sura, Krishnan Varadarajan, 
-Sameer Paranjpye, Milind Bhandarkar, Robert Brunner and Jayant Desouza. 
-Current developers include Terry Wilmarth, Gengbin Zheng, Orion Lawlor, 
-Karthik Mahesh, and Neelam Saboo.
+Joshua Yelon, Narain Jagathesan, Zehra Sura, Krishnan Varadarajan,
+Sameer Paranjpye, Milind Bhandarkar, Robert Brunner, Jayant Desouza,
+Terry Wilmarth, Orion Lawlor, Karthik Mahesh, Neelam Saboo, and Chee
+Wai Lee.  Current developers include Gengbin Zheng, Eric Bohm, Filippo
+Gioachin, Abhinav Bhatele, Isaac Dooley, Aaron Becker, Chao Mei, David
+Kunzman, Esteban Meneses, Lukasz Wesolowski, Pritish Jetley, Ramprasad
+Venkataraman, Ryan Mokos, Phil Miller, and Jonathan Lifflander.
 
 
