@@ -30,9 +30,9 @@ module CkArray {
     entry ArrayElement();
     //Calls destructor:
     entry void ckDestroy(void);
+    entry void recvBroadcast(CkMessage *);
     // CMK_MEM_CHECKPOINT
     entry void inmem_checkpoint(CkArrayCheckPTReqMessage *);
-	entry void recvBroadcast(CkMessage *);
   };
 
 
