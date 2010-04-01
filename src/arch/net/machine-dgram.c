@@ -508,8 +508,11 @@ static void node_addresses_store(ChMessage *msg)
   _Cmi_numnodes=ChMessageInt(n32[0]);
 
 #if CMK_USE_IBVERBS
-	ChInfiAddr *remoteInfiAddr = (ChInfiAddr *) (&msg->data[sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes]);
-  if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes +sizeof(ChInfiAddr)*_Cmi_numnodes )
+  ChInfiAddr *remoteInfiAddr = (ChInfiAddr *) (&msg->data[sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes]);
+  if (Cmi_charmrun_fd == -1) {
+    d = &((ChSingleNodeinfo*)n32)->info;
+  }
+  else if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes +sizeof(ChInfiAddr)*_Cmi_numnodes )
          !=(unsigned int)msg->len)
     {printf("Node table has inconsistent length!");machine_exit(1);}
 
