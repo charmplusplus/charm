@@ -292,6 +292,10 @@ while (@line=split(' ',($thisline=getcodeline($inhhandle)))) {
 	  {
 	    $outhhandle->print("#ifndef SEQUENTIAL_POSE\n");
 	    $outhhandle->print("$_"."\n");
+	    $outhhandle->print("#else"."\n");
+	    my $repversion=$_;
+	    $repversion =~ s/chpt<[^>]+>/rep/g;
+	    $outhhandle->print("$repversion"."\n");
 	    $outhhandle->print("#endif\n");
 	  }
 	else
@@ -315,6 +319,10 @@ while (@line=split(' ',($thisline=getcodeline($inhhandle)))) {
 	  {
 	    $outhhandle->print("#ifndef SEQUENTIAL_POSE\n");
 	    $outhhandle->print("$_"."\n");
+	    $outhhandle->print("#else"."\n");
+	    my $repversion=$_;
+	    $repversion =~ s/chpt<[^>]+>/rep/g;
+	    $outhhandle->print("$repversion"."\n");
 	    $outhhandle->print("#endif\n");
 	  }
 	else
@@ -735,6 +743,10 @@ foreach my $incfile ($inC,@otherfiles)
 	  {
 	    $outChandle->print("#ifndef SEQUENTIAL_POSE\n");
 	    $outChandle->print("$_"."\n");
+	    $outChandle->print("#else"."\n");
+	    my $repversion=$_;
+	    $repversion =~ s/chpt<[^>]+>/rep/g;
+	    $outChandle->print("$repversion"."\n");
 	    $outChandle->print("#endif\n");
 	  }
 	else
