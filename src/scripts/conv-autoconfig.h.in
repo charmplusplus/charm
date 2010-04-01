@@ -84,7 +84,10 @@
 /* whether gethostname() exists */
 #undef CMK_HAS_GETHOSTNAME
 
-/* whether getpid() exists */
+/* whether getpagesize exists */
+#undef CMK_HAS_GETPAGESIZE
+
+/* whether getpid exists */
 #undef CMK_HAS_GETPID
 
 /* whether get_myaddress() exists */
@@ -93,7 +96,7 @@
 /* whether iterator_traits works */
 #undef CMK_HAS_ITERATOR_TRAITS
 
-/* whether kill() exists */
+/* whether kill exists */
 #undef CMK_HAS_KILL
 
 /* whether has log2 */
@@ -141,7 +144,7 @@
 /* whether the sched_setaffinity() exists */
 #undef CMK_HAS_SETAFFINITY
 
-/* whether the setpriority() exists */
+/* whether the setpriority exists */
 #undef CMK_HAS_SETPRIORITY
 
 /* whether has sleep */
@@ -231,7 +234,7 @@
 /* whether has mkstemp */
 #undef CMK_USE_MKSTEMP
 
-/* whether the poll() syscall exists */
+/* whether the poll syscall exists */
 #undef CMK_USE_POLL
 
 /* whether the std:: names for STL work */
