@@ -89,7 +89,7 @@ Main::Main(CkArgMsg *m)
              CkNumPes(), cfg.X,cfg.Y,cfg.Z, cfg.section.X, cfg.section.Y, cfg.section.Z, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats);
 
     // Setup the multicast manager stuff
-    CkGroupID mcastGrpID  = CProxy_CkMulticastMgr::ckNew();
+    CkGroupID mcastGrpID  = CProxy_CkMulticastMgr::ckNew(4);
     CkMulticastMgr *mgr   = CProxy_CkMulticastMgr(mcastGrpID).ckLocalBranch();
 
     /// Create the array
