@@ -2614,6 +2614,21 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### check if getpagesize exists ####
+cat > $tc <<EOT
+#include <unistd.h>
+
+int main(int argc, char **argv) {
+    int s = getpagesize();
+}
+EOT
+test_linkc "whether has getpagesize" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_GETPAGESIZE $pass
+_ACEOF
+
+
 #### check if getpid exists ####
 cat > $tc <<EOT
 #include <sys/types.h>

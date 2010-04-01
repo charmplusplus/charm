@@ -81,6 +81,9 @@
 /* whether gethostname() exists */
 #undef CMK_HAS_GETHOSTNAME
 
+/* whether getpagesize exists */
+#undef CMK_HAS_GETPAGESIZE
+
 /* whether getpid() exists */
 #undef CMK_HAS_GETPID
 
