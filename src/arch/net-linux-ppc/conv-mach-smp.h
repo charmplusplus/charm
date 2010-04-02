@@ -14,6 +14,8 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
-#define CMK_MMAP_PROBE                                     1
+#define CMK_MMAP_PROBE                                     0
 
 #define CMK_NOT_USE_TLS_THREAD                             1
+/* #define CMK_PCQUEUE_LOCK                                   1  */
+
