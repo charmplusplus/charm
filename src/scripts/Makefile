@@ -253,6 +253,7 @@ basics: headers
 
 # Headers is used only for the dependencies
 headers: dirs+sources
+	$(MAKE) charmxi
 	$(MAKE) headerlinks
 
 conv-autoconfig.h: configure
