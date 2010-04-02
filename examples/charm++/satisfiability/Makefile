@@ -21,7 +21,7 @@ parsat_minisat: $(MINISAT)/Solver.o par_Solver_minisat.o main.o
 
 
 main.o : main.C main.decl.h main.def.h 
-	$(CXX_COMPILE) -o main.o -c main.C
+	$(CXX_COMPILE) $(CMINISATFLAGS) -o main.o -c main.C
 
 par_Solver_minisat.o : par_Solver.C par_SolverTypes.h par_Solver.h $(MINISAT)/SolverTypes.h  main.decl.h main.def.h 
 	$(CXX_COMPILE) $(CMINISATFLAGS) -o par_Solver_minisat.o -c par_Solver.C

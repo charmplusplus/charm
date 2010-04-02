@@ -7,12 +7,23 @@
 #include <signal.h>
 #include <zlib.h>
 
+#include <vector>
+
 #include "main.decl.h"
 #include "main.h"
 
 #include "par_SolverTypes.h"
 #include "par_Solver.h"
 
+#ifdef MINISAT
+#include "Solver.h"
+#endif
+
+#ifdef TNM
+#include "TNM.h"
+#endif
+
+using namespace std;
 
 //#include "util.h"
 
@@ -99,7 +110,6 @@ static void readClause(StreamBuffer& in, par_SolverState& S, CkVec<par_Lit>& lit
         S.occurrence[var]++;
         if(parsed_lit>0)
             S.positive_occurrence[var]++;
-        //while (var >= S.nVars()) S.newVar();
         lits.push_back( par_Lit(parsed_lit));
     }
 }
@@ -118,7 +128,6 @@ static void simplify(par_SolverState& S)
         //only one element in unit clause
         par_Lit lit = cl[0];
         S.clauses[S.unit_clause_index[i]].resize(0);
-        S.unsolved_clauses--;
 
         int pp_ = 1;
         int pp_i_ = 2;
@@ -134,10 +143,6 @@ static void simplify(par_SolverState& S)
        CkVec<int> &inClauses = S.whichClauses[pp_*2*toInt(lit)-pp_i_];
        CkVec<int> &inClauses_opposite = S.whichClauses[pp_*2*toInt(lit)-pp_j_];
        
-#ifdef DEBUG
-        CkPrintf("****\nUnit clause is %d, index=%d, occurrence=%d\n", toInt(lit), S.unit_clause_index[i], -pp_i_);
-           CkPrintf("\t same occur");
-#endif
        // literal with same sign
        for(int j=0; j<inClauses.size(); j++)
        {
@@ -161,7 +166,8 @@ static void simplify(par_SolverState& S)
                    S.positive_occurrence[toInt(lit_)-1]--;
                    //S.whichClauses[2*toInt(lit_)-2].remove(cl_index);
                 //remove the clause index for the literal
-               for(int _i = 0; _i<S.whichClauses[2*toInt(lit_)-2].size(); _i++)
+                    /* Low effieciency */
+                   for(int _i = 0; _i<S.whichClauses[2*toInt(lit_)-2].size(); _i++)
                    {
                        if(S.whichClauses[2*toInt(lit_)-2][_i] == cl_index)
                        {
@@ -183,7 +189,6 @@ static void simplify(par_SolverState& S)
                }
            }
            
-           S.unsolved_clauses--;
            S.clauses[cl_index].resize(0); //this clause goes away. In order to keep index unchanged, resize it as 0
        }
        
@@ -225,7 +230,6 @@ static void parse_confFile(gzFile input_stream, par_SolverState& S) {
                 
 
                 S.var_size = vars;
-                S.unsolved_vars = vars;
                 S.occurrence.resize(vars);
                 S.positive_occurrence.resize(vars);
                 S.whichClauses.resize(2*vars);
@@ -268,8 +272,6 @@ Main::Main(CkArgMsg* msg)
 
     CkPrintf("problem file:\t\t%s\ngrainsize:\t\t%d\nprocessor number:\t\t%d\n", msg->argv[1], grainsize, CkNumPes()); 
 
-    char filename[50];
-
     /* read file */
 
     starttimer = CmiWallTimer();
@@ -286,10 +288,8 @@ Main::Main(CkArgMsg* msg)
 
     parse_confFile(in, *solver_msg);
 
-
     /*  unit propagation */ 
     simplify(*solver_msg);
-
 #ifdef DEBUG
     for(int __i = 0; __i<solver_msg->occurrence.size(); __i++)
     {
@@ -297,31 +297,57 @@ Main::Main(CkArgMsg* msg)
         char outputfile[50];
         sprintf(outputfile, "%s.sat", inputfile);
         file = fopen(outputfile, "w");
-
         for(int i=0; i<assignment.size(); i++)
         {
             fprintf(file, "%d\n", assignment[i]);
         }
     }
 
-
-    CkPrintf(" unsolved clauses %d\n", solver_msg->unsolvedClauses());
 #endif
 
-    solver_msg->unsolved_clauses = 0;
-   
     int unsolved = solver_msg->unsolvedClauses();
 
     if(unsolved == 0)
     {
         CkPrintf(" This problem is solved by pre-processing\n");
-        //solver_msg->printSolution();
         CkExit();
     }
     readfiletimer = CmiWallTimer();
     /*fire the first chare */
     /* 1)Which variable is assigned which value this time, (variable, 1), current clauses status vector(), literal array activities */
 
+
+    /***  If grain size is larger than the clauses size, that means 'sequential' */
+    if(grainsize > solver_msg->clauses.size())
+    {
+        vector< vector<int> > seq_clauses;
+        for(int _i_=0; _i_<solver_msg->clauses.size(); _i_++)
+        {
+            if(solver_msg->clauses[_i_].size() > 0)
+            {
+                vector<int> unsolvedclaus;
+                par_Clause& cl = solver_msg->clauses[_i_];
+                unsolvedclaus.resize(cl.size());
+                for(int _j_=0; _j_<cl.size(); _j_++)
+                {
+                    unsolvedclaus[_j_] = toInt(cl[_j_]);
+                }
+                seq_clauses.push_back(unsolvedclaus);
+            }
+        }
+        bool satisfiable_1 = seq_processing(solver_msg->var_size, seq_clauses);//seq_solve(next_state);
+
+        if(satisfiable_1)
+        {
+            CkPrintf("One solution found without using any parallel\n");
+        }else
+        {
+       
+            CkPrintf(" Unsatisfiable\n");
+        }
+        done(solver_msg->occurrence);
+        return;
+    }
     mainProxy = thisProxy;
     int max_index = get_max_element(solver_msg->occurrence);
     
@@ -329,7 +355,6 @@ Main::Main(CkArgMsg* msg)
     solver_msg->level = 0;
     par_SolverState *not_msg = copy_solverstate(solver_msg);
     
-    //CkPrintf(" main chare max index=%d, %d, assigned=%d\n", max_index+1, solver_msg->occurrence[max_index], toInt(solver_msg->assigned_lit));
     solver_msg->occurrence[max_index] = -2;
     not_msg->assigned_lit = par_Lit(-max_index-1);
     not_msg->occurrence[max_index] = -1;
@@ -376,7 +401,8 @@ void Main::done(CkVec<int> assignment)
 
     CkPrintf("\nFile reading and processing time:         %f\n", readfiletimer-starttimer);
     CkPrintf("Solving time:                             %f\n", endtimer - readfiletimer);
-  
+ 
+    /*
     FILE *file;
     char outputfile[50];
     sprintf(outputfile, "%s.sat", inputfile);
@@ -386,7 +412,7 @@ void Main::done(CkVec<int> assignment)
     {
         fprintf(file, "%d\n", assignment[i]);
     }
-    
+    */
     CkExit();
 }
 #include "main.def.h"

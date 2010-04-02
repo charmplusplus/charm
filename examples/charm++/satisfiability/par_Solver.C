@@ -19,24 +19,13 @@ extern int grainsize;
 
 par_SolverState::par_SolverState()
 {
-    unsolved_clauses = 0; 
     var_frequency = 0;
 }
 
-inline int par_SolverState::nVars()
-{
-    return var_frequency; 
-}
 
 int par_SolverState::clausesSize()
 {
     return clauses.size();
-}
-int par_SolverState::newVar(bool sign, bool dvar)
-{
-    int v = nVars();
-    var_frequency++;
-    return v;
 }
 
 void par_SolverState::attachClause(par_Clause& c)
@@ -84,10 +73,6 @@ bool par_SolverState::addClause(CkVec<par_Lit>& ps)
                 CkPrintf("clause conflict between %d and %d\n", index, clauses.size());
                 return false;
             }
-            /*else if(unit_lit == ps[0])
-            {
-                return true;
-            }*/
         }
        /* all unit clauses are checked, no repeat, no conflict */
         unit_clause_index.push_back(clauses.size());
@@ -117,7 +102,6 @@ bool par_SolverState::addClause(CkVec<par_Lit>& ps)
     }
     clauses.push_back(par_Clause());
     clauses[clauses.size()-1].attachdata(ps, false);
-    unsolved_clauses++;
     // build the linklist for each literal pointing to the clause, where the literal occurs
     for(int i=0; i< ps.size(); i++)
     {
@@ -153,7 +137,6 @@ mySolver::mySolver(par_SolverState* state_msg)
     CkPrintf("\n\nNew chare: literal = %d, occurrence size=%d, level=%d \n", toInt(lit), state_msg->occurrence.size(), state_msg->level);
 #endif    
     par_SolverState *next_state = copy_solverstate(state_msg);
-    //next_state->unsolved_vars = state_msg->unsolved_vars - 1;
 
     //Unit clauses
     /* use this value to propagate the clauses */
@@ -251,7 +234,6 @@ mySolver::mySolver(par_SolverState* state_msg)
        lit = cl[0];
 
 
-       //next_state->unsolved_vars--;
     }
     /***************/
 
@@ -319,7 +301,7 @@ mySolver::mySolver(par_SolverState* state_msg)
                 seq_clauses.push_back(unsolvedclaus);
             }
         }
-        satisfiable_1 = seq_processing(next_state->unsolved_vars, seq_clauses);//seq_solve(next_state);
+        satisfiable_1 = seq_processing(next_state->var_size, seq_clauses);//seq_solve(next_state);
         if(satisfiable_1)
         {
             CkPrintf("One solution found by sequential processing \n");
@@ -367,7 +349,7 @@ mySolver::mySolver(par_SolverState* state_msg)
             }
         }
 
-        bool ret = seq_processing(new_msg2->unsolved_vars,  seq_clauses);//seq_solve(next_state);
+        bool ret = seq_processing(new_msg2->var_size,  seq_clauses);//seq_solve(next_state);
         //bool ret = Solver::seq_processing(new_msg2->clauses);//seq_solve(new_msg2);
         if(ret)
         {
