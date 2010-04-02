@@ -80,8 +80,8 @@ int controlPoint(const char *name, int lb, int ub);
 /// The value returned will likely change between subsequent invocations
 int controlPoint(const char *name, std::vector<int>& values);
 
-
-
+/// Write output data to disk. Callable from user program (for example, to periodically flush to disk if program might run out of time, or NAMD)
+void ControlPointWriteOutputToDisk();
 
 /// The application specifies that it is ready to proceed to a new set of control point values.
 /// This should be called after registerControlPointTiming()
@@ -779,10 +779,11 @@ public:
   /// Start shutdown procedures for the controlPoints module(s). CkExit will be called once all outstanding operations have completed (e.g. waiting for idle time & memory usage to be gathered)
   void exitIfReady();
 
-  // All outstanding operations have completed, so do the shutdown now. First write files to output, and then call CkExit().
+  /// All outstanding operations have completed, so do the shutdown now. First write files to disk, and then call CkExit().
   void doExitNow();
 
-
+  /// Write data to disk (when needed), likely at exit
+  void writeOutputToDisk();
 
 
   /// Entry method called on all PEs to request memory usage

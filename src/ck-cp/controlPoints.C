@@ -865,11 +865,15 @@ controlPointManager::controlPointManager() {
 
 
   void controlPointManager::doExitNow(){
-    if(writeDataFileAtShutdown){
-      CkPrintf("[%d] controlPointShutdown() at CkExit()\n", CkMyPe());
-      controlPointManagerProxy.ckLocalBranch()->writeDataFile();
-    }
-    CkExit();
+	  writeOutputToDisk();
+	  CkPrintf("[%d] Control point manager calling CkExit()\n", CkMyPe());
+	  CkExit();
+  }
+
+  void controlPointManager::writeOutputToDisk(){
+	  if(writeDataFileAtShutdown){
+		  controlPointManagerProxy.ckLocalBranch()->writeDataFile();
+	  }
   }
 
 
@@ -1712,7 +1716,6 @@ void controlPointManager::generatePlan() {
 
 
 
-
 #define isInRange(v,a,b) ( ((v)<=(a)&&(v)>=(b)) || ((v)<=(b)&&(v)>=(a)) )
 
 
@@ -2253,6 +2256,13 @@ std::vector<double> simplexScheme::pointCoords(instrumentedData &allData, int i)
 	return result;
 }
 
+
+
+
+void ControlPointWriteOutputToDisk(){
+	CkAssert(CkMyPe() == 0);
+	controlPointManagerProxy.ckLocalBranch()->writeOutputToDisk();
+}
 
 
 
