@@ -95,9 +95,10 @@ int CpdIsFrozen(void) {
 
 }
 
+#if CMK_BLUEGENE_CHARM
 #include "blue_impl.h"
 void BgProcessMessageFreezeMode(threadInfo *t, char *msg) {
-  CmiPrintf("BgProcessMessageFreezeMode\n");
+//  CmiPrintf("BgProcessMessageFreezeMode\n");
 #if CMK_CCS_AVAILABLE
   void *debugQ=CpvAccess(debugQueue);
   CmiAssert(msg!=NULL);
@@ -114,3 +115,4 @@ void BgProcessMessageFreezeMode(threadInfo *t, char *msg) {
   BgProcessMessageDefault(t, msg);
 #endif
 }
+#endif
