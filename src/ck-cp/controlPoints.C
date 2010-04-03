@@ -32,6 +32,7 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ long controlPointSamplePeriod;
 /* readonly */ int whichTuningScheme;
 /* readonly */ bool writeDataFileAtShutdown;
+/* readonly */ bool shouldFilterOutputData;
 /* readonly */ bool loadDataFileAtStartup;
 /* readonly */ bool shouldGatherMemoryUsage;
 /* readonly */ bool shouldGatherUtilization;
@@ -339,8 +340,10 @@ controlPointManager::controlPointManager() {
 //    string s = allData.toString();
 //    CkPrintf("At end: \n %s\n", s.c_str());
 
-    allData.verify();
-    allData.filterOutIncompletePhases();
+    if(shouldFilterOutputData){
+      allData.verify();
+      allData.filterOutIncompletePhases();
+    }
 
 //    string s2 = allData.toString();
 //    CkPrintf("After filtering: \n %s\n", s2.c_str());
@@ -1074,6 +1077,12 @@ public:
     if( CmiGetArgFlagDesc(args->argv,"+CPSaveData","Save Control Point timings & configurations at completion") ){
       writeDataFileAtShutdown = true;
     }
+
+    shouldFilterOutputData = true;
+    if( CmiGetArgFlagDesc(args->argv,"+CPNoFilterData","Don't filter phases from output data") ){
+      shouldFilterOutputData = false;
+    }
+
 
    loadDataFileAtStartup = false;   
     if( CmiGetArgFlagDesc(args->argv,"+CPLoadData","Load Control Point timings & configurations at startup") ){

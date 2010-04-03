@@ -9,7 +9,8 @@ module ControlPoints {
   readonly bool shouldGatherAll;
   readonly char CPDataFilename[512];
 
-
+  readonly bool shouldFilterOutputData;
+  readonly bool writeDataFileAtShutdown;
 
   initproc void registerCPReductions(void);	
 
