@@ -760,12 +760,17 @@ extern "C" int CpdIsCharmDebugMessage(void *msg) {
          env->getMsgtype() == FillVidMsg || _entryTable[env->getEpIdx()]->inCharm;
 }
 
+#if CMK_BLUEGENE_CHARM
 CpvExtern(int, _bgCcsHandlerIdx);
 extern "C" int CpdIsBgCharmDebugMessage(void *msg) {
   envelope *env = (envelope*)msg;
+  if (CmiBgMsgFlag(msg) == BG_CLONE) {
+    env=*(envelope**)(((char*)msg)+CmiBlueGeneMsgHeaderSizeBytes);
+  }
   return (((CmiBlueGeneMsgHeader*)msg)->hID) == CpvAccess(_bgCcsHandlerIdx) || env->getMsgtype() == ForVidMsg ||
          env->getMsgtype() == FillVidMsg || _entryTable[env->getEpIdx()]->inCharm;
 }
+#endif
 
 CpvExtern(char *, displayArgument);
 
