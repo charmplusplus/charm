@@ -332,7 +332,7 @@ controlPointManager::controlPointManager() {
 
   /// Add the current data to allData and output it to a file
   void controlPointManager::writeDataFile(){
-    CkPrintf("============= writeDataFile() ============\n");
+    CkPrintf("============= writeDataFile() to %s  ============\n", CPDataFilename);
     ofstream outfile(CPDataFilename);
     allData.cleanupNames();
 
@@ -344,8 +344,11 @@ controlPointManager::controlPointManager() {
 
 //    string s2 = allData.toString();
 //    CkPrintf("After filtering: \n %s\n", s2.c_str());
-
-    outfile << allData.toString();
+    if(allData.toString().length() > 10){
+      outfile << allData.toString();
+    } else {
+      outfile << " No data available to save to disk " << endl;
+    }
     outfile.close();
   }
 
