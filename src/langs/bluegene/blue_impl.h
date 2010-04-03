@@ -519,8 +519,10 @@ class workThreadInfo : public threadInfo {
 private:
   int CsdStopFlag;
 public:
+  void* reduceMsg;
+  
   workThreadInfo(int _id, nodeInfo *_node): 
-        threadInfo(_id, WORK_THREAD, _node) { 
+        threadInfo(_id, WORK_THREAD, _node), reduceMsg(NULL) { 
     CsdStopFlag=0; 
     watcher = NULL;
     if (_id != -1) {

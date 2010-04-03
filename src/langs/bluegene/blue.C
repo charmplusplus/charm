@@ -2092,3 +2092,30 @@ int BgIsReplay()
     return cva(bgMach).replay != -1;
 }
 
+extern "C" void CkReduce(void *msg, int size, CmiReduceMergeFn mergeFn) {
+  ((workThreadInfo*)cta(threadinfo))->reduceMsg = msg;
+  //CmiPrintf("Called CkReduce from %d %hd\n",CmiMyPe(),cta(threadinfo)->globalId);
+  int numLocal = 0, count = 0;
+  for (int j=0; j<cva(numNodes); j++){
+    for(int i=0;i<cva(bgMach).numWth;i++){
+      workThreadInfo *t = (workThreadInfo*)cva(nodeinfo)[j].threadinfo[i];
+      if (t->reduceMsg == NULL) return; /* we are not yet ready to reduce */
+      numLocal ++;
+    }
+  }
+  void **msgLocal = (void**)malloc(sizeof(void*)*(numLocal-1));
+  for (int j=0; j<cva(numNodes); j++){
+    for(int i=0;i<cva(bgMach).numWth;i++){
+      workThreadInfo *t = (workThreadInfo*)cva(nodeinfo)[j].threadinfo[i];
+      if (t == cta(threadinfo)) break;
+      msgLocal[count++] = t->reduceMsg;
+      t->reduceMsg = NULL;
+    }
+  }
+  CmiAssert(count==numLocal-1);
+  msg = mergeFn(&size, msg, msgLocal, numLocal-1);
+  CmiReduce(msg, size, mergeFn);
+  CmiPrintf("Called CmiReduce %d\n",CmiMyPe());
+  for (int i=0; i<numLocal-1; ++i) CmiFree(msgLocal[i]);
+  free(msgLocal);
+}

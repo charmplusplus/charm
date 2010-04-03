@@ -17,6 +17,8 @@
 #define CksvInitialize 	   CsvInitialize
 #define CksvAccess	   CsvAccess
 
+#define CkReduce    CmiReduce
+
 #undef CkMyPe
 #undef CkNumPes
 
