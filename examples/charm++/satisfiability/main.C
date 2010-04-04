@@ -275,6 +275,7 @@ Main::Main(CkArgMsg* msg)
 
     parse_confFile(in, *solver_msg);
 
+    solver_msg->printSolution();
     /*  unit propagation */ 
     simplify(*solver_msg);
 #ifdef DEBUG
