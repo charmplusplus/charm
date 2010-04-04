@@ -19,7 +19,7 @@
 #define USE_LONG_TIMESTAMPS 1
 
 /// Uncomment to force determinism in event ordering
-//#define DETERMINISTIC_EVENTS 1
+#define DETERMINISTIC_EVENTS 1
 
 /// Uncomment this to turn on coarse memory management
 #define MEM_COARSE

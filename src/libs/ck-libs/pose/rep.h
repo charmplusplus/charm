@@ -106,7 +106,7 @@ class rep
   /// Pack/unpack/sizing operator
   /** Derived classes must provide pup */
   virtual void pup(PUP::er &p) { 
-    p(ovt); p(ort); p(myHandle); p(anti_methods); p(prand48_seed,3);
+    p(ovt); p(ort); p(myHandle); p(anti_methods); p(prand_seed); p(prand48_seed,3);
   }
 #ifdef SEQUENTIAL_POSE
   void checkpoint(rep *) { }
