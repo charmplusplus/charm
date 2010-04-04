@@ -1,6 +1,13 @@
 #ifndef _PAR_SOLVER_H
 #define _PAR_SOLVER_H
 
+#include <map>
+
+using namespace std;
+
+
+typedef map<int, int> map_int_int;
+
 class par_SolverState : public CMessage_par_SolverState {
 
 private:
@@ -34,7 +41,7 @@ public:
     CkVec<int>      occurrence; 
     CkVec<int>      positive_occurrence; 
     //2 * N (positive, negative)
-    CkVec< CkVec< int > >   whichClauses;
+    CkVec< map_int_int >   whichClauses;
     int             level;
    
     int             lower;
@@ -73,12 +80,10 @@ public:
        new_state->whichClauses.resize(_size); 
        for(int i=0; i<_size; i++)
        {
-           int _sub_size = org->whichClauses[i].size();
-           new_state->whichClauses[i].resize(_sub_size);
-
-           for(int j=0; j<_sub_size; j++)
+           map<int, int> __cl_copy = org->whichClauses[i];
+           for(map_int_int::iterator iter=__cl_copy.begin(); iter!=__cl_copy.end(); iter++)
            {
-               new_state->whichClauses[i][j] = org->whichClauses[i][j];
+               (new_state->whichClauses[i]).insert( pair<int, int>((*iter).first, (*iter).second));
            }
        }
        return new_state;

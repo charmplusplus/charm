@@ -27,6 +27,8 @@ using namespace std;
 
 //#include "util.h"
 
+typedef map<int, int> map_int_int;
+
 CProxy_Main mainProxy;
 
 #define CHUNK_LIMIT 1048576
@@ -140,13 +142,13 @@ static void simplify(par_SolverState& S)
            pp_j_ = 2;
        }
        S.occurrence[pp_*toInt(lit)-1] = -pp_i_;
-       CkVec<int> &inClauses = S.whichClauses[pp_*2*toInt(lit)-pp_i_];
-       CkVec<int> &inClauses_opposite = S.whichClauses[pp_*2*toInt(lit)-pp_j_];
+       map_int_int &inClauses = S.whichClauses[pp_*2*toInt(lit)-pp_i_];
+       map_int_int &inClauses_opposite = S.whichClauses[pp_*2*toInt(lit)-pp_j_];
        
        // literal with same sign
-       for(int j=0; j<inClauses.size(); j++)
+       for( map_int_int::iterator iter = inClauses.begin(); iter!=inClauses.end(); iter++)
        {
-           int cl_index = inClauses[j];
+           int cl_index = (*iter).first;
 #ifdef DEBUG
            CkPrintf(" %d \n \t \t literals in this clauses: ", cl_index);
 #endif
@@ -164,37 +166,22 @@ static void simplify(par_SolverState& S)
                if(toInt(lit_) > 0)
                {
                    S.positive_occurrence[toInt(lit_)-1]--;
-                   //S.whichClauses[2*toInt(lit_)-2].remove(cl_index);
-                //remove the clause index for the literal
-                    /* Low effieciency */
-                   for(int _i = 0; _i<S.whichClauses[2*toInt(lit_)-2].size(); _i++)
-                   {
-                       if(S.whichClauses[2*toInt(lit_)-2][_i] == cl_index)
-                       {
-                           S.whichClauses[2*toInt(lit_)-2].remove(_i);
-                            break;
-                       }
-                   }
-
+                   map_int_int::iterator one_it = S.whichClauses[2*toInt(lit_)-2].find(cl_index);
+                   S.whichClauses[2*toInt(lit_)-2].erase(one_it);
                }else
                {
-                   for(int _i = 0; _i<S.whichClauses[-2*toInt(lit_)-1].size(); _i++)
-                   {
-                       if(S.whichClauses[-2*toInt(lit_)-1][_i] == cl_index)
-                       {
-                           S.whichClauses[-2*toInt(lit_)-1].remove(_i);
-                           break;
-                       }
-                   }
+                   map_int_int::iterator one_it = S.whichClauses[-2*toInt(lit_)-1].find(cl_index);
+                   S.whichClauses[-2*toInt(lit_)-1].erase(one_it);
                }
+
            }
            
            S.clauses[cl_index].resize(0); //this clause goes away. In order to keep index unchanged, resize it as 0
        }
        
-       for(int j=0; j<inClauses_opposite.size(); j++)
+       for(map_int_int::iterator iter= inClauses_opposite.begin(); iter!=inClauses_opposite.end(); iter++)
        {
-           int cl_index_ = inClauses_opposite[j];
+           int cl_index_ = (*iter).first;
            par_Clause& cl_neg = S.clauses[cl_index_];
            cl_neg.remove(-toInt(lit));
            //becomes a unit clause
@@ -402,7 +389,6 @@ void Main::done(CkVec<int> assignment)
     CkPrintf("\nFile reading and processing time:         %f\n", readfiletimer-starttimer);
     CkPrintf("Solving time:                             %f\n", endtimer - readfiletimer);
  
-    /*
     FILE *file;
     char outputfile[50];
     sprintf(outputfile, "%s.sat", inputfile);
@@ -412,7 +398,6 @@ void Main::done(CkVec<int> assignment)
     {
         fprintf(file, "%d\n", assignment[i]);
     }
-    */
     CkExit();
 }
 #include "main.def.h"

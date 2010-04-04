@@ -108,9 +108,9 @@ bool par_SolverState::addClause(CkVec<par_Lit>& ps)
         par_Lit lit = ps[i];
 
         if(toInt(lit) > 0)
-            whichClauses[2*toInt(lit)-2].push_back(clauses.size()-1);
+            whichClauses[2*toInt(lit)-2].insert(pair<int, int>(clauses.size()-1, 1));
         else
-            whichClauses[-2*toInt(lit)-1].push_back(clauses.size()-1);
+            whichClauses[-2*toInt(lit)-1].insert(pair<int, int> (clauses.size()-1, 1));
 
     }
 
@@ -156,15 +156,14 @@ mySolver::mySolver(par_SolverState* state_msg)
 
         next_state->occurrence[pp_*toInt(lit)-1] = -pp_i_;
     
-        //CkPrintf(" index=%d, total size=%d, original msg size=%d\n", pp_*2*toInt(lit)-pp_i_, next_state->whichClauses.size(), state_msg->whichClauses.size());
 
-        CkVec<int> &inClauses = next_state->whichClauses[pp_*2*toInt(lit)-pp_i_];
-        CkVec<int> &inClauses_opposite = next_state->whichClauses[pp_*2*toInt(lit)-pp_j_];
+        map_int_int &inClauses = next_state->whichClauses[pp_*2*toInt(lit)-pp_i_];
+        map_int_int  &inClauses_opposite = next_state->whichClauses[pp_*2*toInt(lit)-pp_j_];
 
     // literal with same sign, remove all these clauses
-       for(int j=0; j<inClauses.size(); j++)
+       for( map_int_int::iterator iter = inClauses.begin(); iter!=inClauses.end(); iter++)
        {
-           int cl_index = inClauses[j];
+           int cl_index = (*iter).first;
 
            par_Clause& cl_ = next_state->clauses[cl_index];
            //for all the literals in this clauses, the occurrence decreases by 1
@@ -177,33 +176,21 @@ mySolver::mySolver(par_SolverState* state_msg)
                if(toInt(lit_) > 0)
                {
                    next_state->positive_occurrence[toInt(lit_)-1]--;
-                   //remove the clause index for the literal
-                   for(int _i = 0; _i<next_state->whichClauses[2*toInt(lit_)-2].size(); _i++)
-                   {
-                       if(next_state->whichClauses[2*toInt(lit_)-2][_i] == cl_index)
-                       {
-                           next_state->whichClauses[2*toInt(lit_)-2].remove(_i);
-                           break;
-                       }
-                   }
+                   map_int_int::iterator one_it = next_state->whichClauses[2*toInt(lit_)-2].find(cl_index);
+                   next_state->whichClauses[2*toInt(lit_)-2].erase(one_it);
                }else
                {
-                   for(int _i = 0; _i<next_state->whichClauses[-2*toInt(lit_)-1].size(); _i++)
-                   {
-                       if(next_state->whichClauses[-2*toInt(lit_)-1][_i] == cl_index)
-                       {
-                           next_state->whichClauses[-2*toInt(lit_)-1].remove(_i);
-                           break;
-                       }
-                   }
+                   map_int_int::iterator one_it = next_state->whichClauses[-2*toInt(lit_)-1].find(cl_index);
+                   next_state->whichClauses[-2*toInt(lit_)-1].erase(one_it);
                }
+               
            } //finish dealing with all literal in the clause
            next_state->clauses[cl_index].resize(0);
        } //finish dealing with clauses where the literal occur the same
        /* opposite to the literal */
-       for(int j=0; j<inClauses_opposite.size(); j++)
+       for(map_int_int::iterator iter= inClauses_opposite.begin(); iter!=inClauses_opposite.end(); iter++)
        {
-           int cl_index_ = inClauses_opposite[j];
+           int cl_index_ = (*iter).first;
            par_Clause& cl_neg = next_state->clauses[cl_index_];
            cl_neg.remove(-toInt(lit));
 
@@ -398,14 +385,14 @@ bool mySolver::seq_solve(par_SolverState* state_msg)
 
     next_state->occurrence[pp_*toInt(lit)-1] = -pp_i_;
     
-    CkVec<int> &inClauses = next_state->whichClauses[pp_*2*toInt(lit)-pp_i_];
-    CkVec<int> &inClauses_opposite = next_state->whichClauses[pp_*2*toInt(lit)-pp_j_];
+    map_int_int &inClauses = next_state->whichClauses[pp_*2*toInt(lit)-pp_i_];
+    map_int_int &inClauses_opposite = next_state->whichClauses[pp_*2*toInt(lit)-pp_j_];
 
     // literal with same sign, remove all these clauses
-    for(int j=0; j<inClauses.size(); j++)
+    
+    for( map_int_int::iterator iter = inClauses.begin(); iter!=inClauses.end(); iter++)
     {
-        int cl_index = inClauses[j];
-
+        int cl_index = (*iter).first;
         par_Clause& cl_ = next_state->clauses[cl_index];
         //for all the literals in this clauses, the occurrence decreases by 1
         for(int k=0; k< cl_.size(); k++)
@@ -417,33 +404,21 @@ bool mySolver::seq_solve(par_SolverState* state_msg)
             if(toInt(lit_) > 0)
             {
                 next_state->positive_occurrence[toInt(lit_)-1]--;
-                //remove the clause index for the literal
-                for(int _i = 0; _i<next_state->whichClauses[2*toInt(lit_)-2].size(); _i++)
-                {
-                    if(next_state->whichClauses[2*toInt(lit_)-2][_i] == cl_index)
-                    {
-                        next_state->whichClauses[2*toInt(lit_)-2].remove(_i);
-                        break;
-                    }
-                }
+                map_int_int::iterator one_it = next_state->whichClauses[2*toInt(lit_)-2].find(cl_index);
+                next_state->whichClauses[2*toInt(lit_)-2].erase(one_it);
             }else
             {
-                for(int _i = 0; _i<next_state->whichClauses[-2*toInt(lit_)-1].size(); _i++)
-                {
-                    if(next_state->whichClauses[-2*toInt(lit_)-1][_i] == cl_index)
-                    {
-                        next_state->whichClauses[-2*toInt(lit_)-1].remove(_i);
-                        break;
-                    }
-                }
+                map_int_int::iterator one_it = next_state->whichClauses[-2*toInt(lit_)-1].find(cl_index);
+                next_state->whichClauses[-2*toInt(lit_)-1].erase(one_it);
             }
+
         }
-            next_state->clauses[cl_index].resize(0);
+        next_state->clauses[cl_index].resize(0);
     }
    
-    for(int j=0; j<inClauses_opposite.size(); j++)
+    for(map_int_int::iterator iter= inClauses_opposite.begin(); iter!=inClauses_opposite.end(); iter++)
     {
-        int cl_index_ = inClauses_opposite[j];
+        int cl_index_ = (*iter).first;
         par_Clause& cl_neg = next_state->clauses[cl_index_];
         cl_neg.remove(-toInt(lit));
             //becomes a unit clause
