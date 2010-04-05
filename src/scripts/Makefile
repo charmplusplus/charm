@@ -899,11 +899,21 @@ ControlPoints.def.h: ControlPoints.decl.h
 ControlPoints.decl.h : controlPoints.ci charmxi
 	$(CHARMXI) controlPoints.ci
 
-controlPoints_objs: $(L)/libmoduleControlPoints.a
+ControlPointsNoTrace.def.h: ControlPointsNoTrace.decl.h
+
+ControlPointsNoTrace.decl.h : ControlPointsNoTrace.ci charmxi
+	$(CHARMXI) ControlPointsNoTrace.ci
+
+controlPoints_objs: $(L)/libmoduleControlPoints.a $(L)/libmoduleControlPointsNoTrace.a
 
 $(L)/libmoduleControlPoints.a: $(CONTROLPOINTS_OBJS)
 	$(CHARMC) -o $(L)/libmoduleControlPoints.a $(CONTROLPOINTS_OBJS)
 
+$(L)/libmoduleControlPointsNoTrace.a: controlPointsNoTrace.o arrayRedistributor.o cp_effects.o
+	$(CHARMC) -o $(L)/libmoduleControlPointsNoTrace.a controlPointsNoTrace.o arrayRedistributor.o cp_effects.o
+
+controlPointsNoTrace.o: controlPoints.C controlPoints.h ControlPointsNoTrace.decl.h
+	$(CHARMC) -c controlPoints.C -o controlPointsNoTrace.o -DCP_DISABLE_TRACING $(OPTS)
 
 ######################################################################
 #

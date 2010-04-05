@@ -4,14 +4,21 @@
     to the dynamic optimization framework.
 
 */
+
+
 #ifndef __CONTROLPOINTS_H__
 #define __CONTROLPOINTS_H__
+
+
+#ifdef CP_DISABLE_TRACING
+#include "ControlPointsNoTrace.decl.h"
+#else
+#include "ControlPoints.decl.h"
+#endif
 
 #include <vector>
 #include <map>
 #include <cmath>
-#include "ControlPoints.decl.h"
-
 #include <pup_stl.h>
 #include <string>
 #include <set>

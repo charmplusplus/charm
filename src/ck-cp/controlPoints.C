@@ -1,4 +1,8 @@
 #include <charm++.h>
+
+// This file is compiled twice to make a version that is capable of not needing the tracing to be turned on. 
+// The Makefile will have -DCP_DISABLE_TRACING
+
 #include "controlPoints.h"
 #include "trace-controlPoints.h"
 #include "LBDatabase.h"
@@ -614,6 +618,7 @@ controlPointManager::controlPointManager() {
   /// Called by either the application or the Control Point Framework to advance to the next phase  
   void controlPointManager::gotoNextPhase(){
     
+#ifndef CP_DISABLE_TRACING
     CkPrintf("gotoNextPhase shouldGatherAll=%d\n", (int)shouldGatherAll);
     fflush(stdout);
 
@@ -642,12 +647,12 @@ controlPointManager::controlPointManager() {
     }
     
 
+#endif
 
 
-
-    LBDatabase * myLBdatabase = LBDatabaseObj();
 
 #if CMK_LBDB_ON && 0
+    LBDatabase * myLBdatabase = LBDatabaseObj();
     LBDB * myLBDB = myLBdatabase->getLBDB();       // LBDB is Defined in LBDBManager.h
     const CkVec<LBObj*> objs = myLBDB->getObjs();
     const int objCount = myLBDB->getObjCount();
@@ -709,6 +714,7 @@ controlPointManager::controlPointManager() {
   
   /// Entry method called on all PEs to request CPU utilization statistics
   void controlPointManager::requestIdleTime(CkCallback cb){
+#ifndef CP_DISABLE_TRACING
     double i = localControlPointTracingInstance()->idleRatio();
     double idle[3];
     idle[0] = i;
@@ -720,10 +726,14 @@ controlPointManager::controlPointManager() {
     localControlPointTracingInstance()->resetTimings();
 
     contribute(3*sizeof(double),idle,idleTimeReductionType, cb);
+#else
+    CkAbort("Should not get here\n");
+#endif
   }
   
   /// All processors reduce their memory usages in requestIdleTime() to this method
   void controlPointManager::gatherIdleTime(CkReductionMsg *msg){
+#ifndef CP_DISABLE_TRACING
     int size=msg->getSize() / sizeof(double);
     CkAssert(size==3);
     double *r=(double *) msg->getData();
@@ -742,6 +752,9 @@ controlPointManager::controlPointManager() {
     alreadyRequestedIdleTime = false;
     checkForShutdown();
     delete msg;
+#else
+    CkAbort("Should not get here\n");
+#endif
   }
 
 
@@ -751,6 +764,7 @@ controlPointManager::controlPointManager() {
 
   /// Entry method called on all PEs to request CPU utilization statistics and memory usage
   void controlPointManager::requestAll(CkCallback cb){
+#ifndef CP_DISABLE_TRACING
     TraceControlPoints *t = localControlPointTracingInstance();
 
     double data[ALL_REDUCTION_SIZE];
@@ -784,10 +798,14 @@ controlPointManager::controlPointManager() {
     localControlPointTracingInstance()->resetAll();
 
     contribute(ALL_REDUCTION_SIZE*sizeof(double),data,allMeasuresReductionType, cb);
+#else
+    CkAbort("Should not get here\n");
+#endif
   }
   
   /// All processors reduce their memory usages in requestIdleTime() to this method
   void controlPointManager::gatherAll(CkReductionMsg *msg){
+#ifndef CP_DISABLE_TRACING
     CkAssert(msg->getSize()==ALL_REDUCTION_SIZE*sizeof(double));
     int size=msg->getSize() / sizeof(double);
     double *data=(double *) msg->getData();
@@ -846,6 +864,9 @@ controlPointManager::controlPointManager() {
     alreadyRequestedAll = false;
     checkForShutdown();
     delete msg;
+#else
+    CkAbort("Should not get here\n");
+#endif
   }
 
 
@@ -2280,5 +2301,8 @@ void ControlPointWriteOutputToDisk(){
 
 /*! @} */
 
-
+#ifdef CP_DISABLE_TRACING
+#include "ControlPointsNoTrace.def.h"
+#else
 #include "ControlPoints.def.h"
+#endif
