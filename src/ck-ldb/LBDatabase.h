@@ -208,6 +208,10 @@ public:
     LDObjTime(h,walltime,cputime);
   };
 
+  inline void GetObjLoad(LDObjHandle &h, double &walltime, double &cputime) {
+    LDGetObjLoad(h,&walltime,&cputime);
+  };
+
   inline void QueryKnownObjLoad(LDObjHandle &h, double &walltime, double &cputime) {
     LDQueryKnownObjLoad(h,&walltime,&cputime);
   };

@@ -91,6 +91,11 @@ public:
         }
   }
 
+  inline void getTime(double *w, double *c) {
+    *w=data.wallTime; 
+    *c=data.cpuTime;
+  }
+
   inline void setTiming(double cputime)
   {
     data.wallTime = cputime;
