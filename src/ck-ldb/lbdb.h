@@ -287,6 +287,7 @@ void LDCollectStatsOn(LDHandle _lbdb);
 void LDCollectStatsOff(LDHandle _lbdb);
 int  CLDCollectingStats(LDHandle _lbdb);
 void LDQueryEstLoad(LDHandle bdb);
+void LDGetObjLoad(LDObjHandle &h, double *wallT, double *cpuT);
 void LDQueryKnownObjLoad(LDObjHandle &h, double *wallT, double *cpuT);
 
 int LDGetObjDataSz(LDHandle _lbdb);

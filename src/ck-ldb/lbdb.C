@@ -83,6 +83,13 @@ extern "C" void LDObjTime(LDObjHandle &_h,
   obj->IncrementTime(walltime,cputime);
 }
   
+extern "C" void LDGetObjLoad(LDObjHandle &_h, double *wallT, double *cpuT)
+{
+  LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
+  LBObj *const obj = db->LbObj(_h);
+  obj->getTime(wallT, cpuT);
+}
+
 extern "C" void LDQueryKnownObjLoad(LDObjHandle &_h, double *wallT, double *cpuT)
 {
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
