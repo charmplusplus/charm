@@ -102,7 +102,7 @@ public:
   inline void SetMigratable(CmiBool mig) { data.migratable = mig; }
   inline void UseAsyncMigrate(CmiBool async) { data.asyncArrival = async; }
   inline LDObjData &ObjData() { return data; };
-  inline void lastKnownLoad(double *c, double *w) {*c=lastCpuTime; *w=lastWallTime; }
+  inline void lastKnownLoad(double *w, double *c) {*c=lastCpuTime; *w=lastWallTime; }
   inline void *getUserData() { return  userData; }
 private:
 
