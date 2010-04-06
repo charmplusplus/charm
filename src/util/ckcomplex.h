@@ -1,7 +1,6 @@
 #ifndef __CKCOMPLEX_H__
 #define __CKCOMPLEX_H__
 
-#include "conv-mach.h"
 #include "pup.h"
 
 #if USE_FFTW_DECLS
