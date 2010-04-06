@@ -901,8 +901,8 @@ ControlPoints.decl.h : controlPoints.ci charmxi
 
 ControlPointsNoTrace.def.h: ControlPointsNoTrace.decl.h
 
-ControlPointsNoTrace.decl.h : ControlPointsNoTrace.ci charmxi
-	$(CHARMXI) ControlPointsNoTrace.ci
+ControlPointsNoTrace.decl.h : controlPointsNoTrace.ci charmxi
+	$(CHARMXI) controlPointsNoTrace.ci
 
 controlPoints_objs: $(L)/libmoduleControlPoints.a $(L)/libmoduleControlPointsNoTrace.a
 
