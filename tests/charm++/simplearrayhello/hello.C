@@ -45,7 +45,7 @@ public:
   
   void SayHi(int hiNo)
   {
-    CkPrintf("Hi[%d] from element %d %d\n",hiNo,thisIndex,nElements);
+    CkPrintf("Hi[%d] from element %d\n",hiNo,thisIndex);
     if (thisIndex < nElements-1)
       //Pass the hello on:
       thisProxy[thisIndex+1].SayHi(hiNo+1);
