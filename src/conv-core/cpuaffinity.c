@@ -159,7 +159,7 @@ int print_cpu_affinity() {
     return -1;
   }
   
- CmiPrintf("[%d] CPU affinity mask is: 0x%08lx\n", CmiMype(), pMask);
+ CmiPrintf("[%d] CPU affinity mask is: 0x%08lx\n", CmiMyPe(), pMask);
   
 #elif CMK_HAS_BINDPROCESSOR
   printf("[%d] CPU affinity mask is unknown for AIX. \n", CmiMyPe());
