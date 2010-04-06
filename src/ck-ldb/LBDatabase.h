@@ -208,6 +208,10 @@ public:
     LDObjTime(h,walltime,cputime);
   };
 
+  inline void QueryKnownObjLoad(LDObjHandle &h, double &walltime, double &cputime) {
+    LDQueryKnownObjLoad(h,&walltime,&cputime);
+  };
+
   inline int RunningObject(LDObjHandle* _o) const { 
 #if CMK_LBDB_ON
       LBDB *const db = (LBDB*)(myLDHandle.handle);
