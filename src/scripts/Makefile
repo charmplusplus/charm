@@ -913,7 +913,7 @@ $(L)/libmoduleControlPointsNoTrace.a: controlPointsNoTrace.o arrayRedistributor.
 	$(CHARMC) -o $(L)/libmoduleControlPointsNoTrace.a controlPointsNoTrace.o arrayRedistributor.o cp_effects.o
 
 controlPointsNoTrace.o: controlPoints.C controlPoints.h ControlPointsNoTrace.decl.h
-	$(CHARMC) -c controlPoints.C -o controlPointsNoTrace.o -DCP_DISABLE_TRACING $(OPTS)
+	$(CHARMC) -I. -c controlPoints.C -o controlPointsNoTrace.o -DCP_DISABLE_TRACING $(OPTS)
 
 ######################################################################
 #
