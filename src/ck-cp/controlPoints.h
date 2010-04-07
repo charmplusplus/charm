@@ -4,14 +4,21 @@
     to the dynamic optimization framework.
 
 */
+
+
 #ifndef __CONTROLPOINTS_H__
 #define __CONTROLPOINTS_H__
+
+
+#ifdef CP_DISABLE_TRACING
+#include "ControlPointsNoTrace.decl.h"
+#else
+#include "ControlPoints.decl.h"
+#endif
 
 #include <vector>
 #include <map>
 #include <cmath>
-#include "ControlPoints.decl.h"
-
 #include <pup_stl.h>
 #include <string>
 #include <set>
@@ -48,6 +55,7 @@
 /* readonly */ extern long controlPointSamplePeriod;
 /* readonly */ extern int whichTuningScheme;
 /* readonly */ extern bool writeDataFileAtShutdown;
+/* readonly */ extern bool shouldFilterOutputData;
 /* readonly */ extern bool loadDataFileAtStartup;
 /* readonly */ extern char CPDataFilename[512];
 
@@ -80,8 +88,8 @@ int controlPoint(const char *name, int lb, int ub);
 /// The value returned will likely change between subsequent invocations
 int controlPoint(const char *name, std::vector<int>& values);
 
-
-
+/// Write output data to disk. Callable from user program (for example, to periodically flush to disk if program might run out of time, or NAMD)
+void ControlPointWriteOutputToDisk();
 
 /// The application specifies that it is ready to proceed to a new set of control point values.
 /// This should be called after registerControlPointTiming()
@@ -779,10 +787,11 @@ public:
   /// Start shutdown procedures for the controlPoints module(s). CkExit will be called once all outstanding operations have completed (e.g. waiting for idle time & memory usage to be gathered)
   void exitIfReady();
 
-  // All outstanding operations have completed, so do the shutdown now. First write files to output, and then call CkExit().
+  /// All outstanding operations have completed, so do the shutdown now. First write files to disk, and then call CkExit().
   void doExitNow();
 
-
+  /// Write data to disk (when needed), likely at exit
+  void writeOutputToDisk();
 
 
   /// Entry method called on all PEs to request memory usage

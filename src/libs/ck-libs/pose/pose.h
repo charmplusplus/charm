@@ -108,6 +108,8 @@ extern POSE_TimeType POSE_GlobalTS;
 /// Checkpointing (for sequential simulation)
 extern int seqCheckpointInProgress;
 extern POSE_TimeType seqLastCheckpointGVT;
+extern double seqLastCheckpointTime;
+extern double seqStartTime;
 // Global queue for storing POSE object array indices that are
 // skipped during quiescence detection just before checkpointing
 // (used in sequential mode only)

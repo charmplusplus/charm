@@ -95,10 +95,18 @@ class PVT : public Group {
   int specEventCount, eventCount;
   /// startPhase active flag
   int startPhaseActive;
+  /// starting time of the simulation
+  double parStartTime;
   /// indicates if checkpointing is in progress
   int parCheckpointInProgress;
   /// GVT at which the last checkpoint was performed
   POSE_TimeType parLastCheckpointGVT;
+  /// indicates if load balancing is in progress
+  int parLBInProgress;
+  /// GVT at which the last load balancing was performed
+  POSE_TimeType parLastLBGVT;
+  /// Time at which the last checkpoint was performed
+  double parLastCheckpointTime;
   /* things which used to be member function statics */
   /// optimistic and coservative GVTs
   POSE_TimeType optGVT, conGVT;
@@ -130,6 +138,11 @@ class PVT : public Group {
   void beginCheckpoint(eventMsg *m);
   /// ENTRY: resume after checkpointing, restarting, or if checkpointing doesn't occur
   void resumeAfterCheckpoint(eventMsg *m);
+  void beginLoadbalancing(eventMsg *m);
+  void resumeAfterLB(eventMsg *m);
+  void callAtSync();
+  void doneLB();
+
   /// Returns GVT estimate
   POSE_TimeType getGVT() { return estGVT; }    
 

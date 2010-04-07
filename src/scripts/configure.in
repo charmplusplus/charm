@@ -691,7 +691,7 @@ then
   fi
 fi
 
-if test $BUILD_MPI -eq 1
+if test "$BUILD_MPI" = "1"
 then
 cat > $t <<EOT
 #include "mpi.h"
@@ -818,8 +818,19 @@ void foo(void) {
   poll(pos, 1, 1);
 }
 EOT
-test_cxx "whether poll() syscall exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass, [whether the poll() syscall exists])
+test_cxx "whether has poll" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass, [whether the poll syscall exists])
+
+#### check if getpagesize exists ####
+cat > $tc <<EOT
+#include <unistd.h>
+
+int main(int argc, char **argv) {
+    int s = getpagesize();
+}
+EOT
+test_linkc "whether has getpagesize" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_GETPAGESIZE, $pass, [whether getpagesize exists])
 
 #### check if getpid exists ####
 cat > $tc <<EOT
@@ -830,8 +841,8 @@ int main(int argc, char **argv) {
     pid_t pid = getpid();
 }
 EOT
-test_linkc "whether getpid() exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_GETPID, $pass, [whether getpid() exists])
+test_linkc "whether has getpid" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_GETPID, $pass, [whether getpid exists])
 
 #### check if kill exists ####
 cat > $tc <<EOT
@@ -845,8 +856,8 @@ int main(int argc, char**argv)
     kill(pid, 9);
 }
 EOT
-test_linkc "whether kill() exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_KILL, $pass, [whether kill() exists])
+test_linkc "whether has kill" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_KILL, $pass, [whether kill exists])
 
 #### test for setpriority ###
 cat > $t <<EOT
@@ -856,8 +867,8 @@ void foo(void) {
   setpriority(PRIO_PROCESS, 0, 0);
 }
 EOT
-test_cxx "whether setpriority() exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_SETPRIORITY, $pass, [whether the setpriority() exists])
+test_cxx "whether has setpriority" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_SETPRIORITY, $pass, [whether the setpriority exists])
 
 #### test for system ###
 cat > $t <<EOT
@@ -1261,7 +1272,7 @@ then
 	add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
 else
 	BUILD_SHARED=1
-        if test $BUILD_MPI -eq 1
+        if test "$BUILD_MPI" = "1"
 	then
 cat > $t <<EOT
 #include "stdlib.h"

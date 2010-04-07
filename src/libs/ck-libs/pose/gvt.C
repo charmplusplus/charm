@@ -19,7 +19,7 @@ PVT::PVT()
   CpvInitialize(eventID, theEventID);
   CpvAccess(theEventID)=eventID();
   //  CpvAccess(theEventID).dump();
-  LBTurnInstrumentOff();
+  //LBTurnInstrumentOff();
   optGVT = POSE_UnsetTS; conGVT = POSE_UnsetTS;
   rdone=0;
   SRs=NULL;
@@ -71,8 +71,12 @@ PVT::PVT()
     else reportsExpected = 1 + (P-2)/4 + (P-2)%2;
   }
   //  CkPrintf("PE %d reports to %d, receives %d reports, reduces and sends to %d, and reports directly to GVT if %d = 1!\n", CkMyPe(), reportTo, reportsExpected, reportReduceTo, reportEnd);
+
   parCheckpointInProgress = 0;
-  parLastCheckpointGVT = 0LL;
+  parLastCheckpointGVT = 0;
+  parLastCheckpointTime = parStartTime = CmiWallTimer();
+  parLBInProgress = 0;
+  parLastLBGVT = 0;
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
     localStats->TimerStop();
@@ -85,10 +89,13 @@ void PVT::pup(PUP::er &p) {
   p|simdone; p|iterMin; p|waitForFirst;
   p|reportTo; p|reportsExpected; p|reportReduceTo; p|reportEnd;
   p|gvtTurn; p|specEventCount; p|eventCount;
-  p|startPhaseActive; p|parCheckpointInProgress; p|parLastCheckpointGVT;
+  p|startPhaseActive; p|parStartTime; p|parCheckpointInProgress;
+  p|parLastCheckpointGVT; p|parLastCheckpointTime;
+  p|parLBInProgress; p|parLastLBGVT;
   p|optGVT; p|conGVT; p|rdone;
 
   if (p.isUnpacking()) {
+    parStartTime = CmiWallTimer() - (parLastCheckpointTime - parStartTime);
 #ifndef CMK_OPTIMIZE
     localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
@@ -246,15 +253,26 @@ void PVT::setGVT(GVTMsg *m)
   // function is also the first POSE function to be called when
   // restarting from a checkpoint.
 
-  // Currently, checkpoints are initiated approximately every
-  // POSE_CHECKPOINT_INTERVAL GVT ticks (defined in pose_config.h).
-  // Support for a time-based interval could easily be added.
+  // Checkpoints are initiated approximately every
+  // pose_config.checkpoint_gvt_interval GVT ticks or
+  // pose_config.checkpoint_time_interval seconds (both defined in
+  // pose_config.h).
 
   if ((CkMyPe() == 0) && (parCheckpointInProgress == 0) && 
-      (POSE_CHECKPOINT_INTERVAL > 0) && (estGVT >= (parLastCheckpointGVT + POSE_CHECKPOINT_INTERVAL))) {
+      (((pose_config.checkpoint_gvt_interval > 0) && (estGVT >= (parLastCheckpointGVT + pose_config.checkpoint_gvt_interval))) || 
+       ((pose_config.checkpoint_time_interval > 0) && (CmiWallTimer() >= (parLastCheckpointTime + (double)pose_config.checkpoint_time_interval))))) {
     // wait for quiescence to occur before checkpointing
     eventMsg *dummyMsg = new eventMsg();
     CkCallback cb(CkIndex_PVT::beginCheckpoint(dummyMsg), CkMyPe(), ThePVT);
+    parCheckpointInProgress = 1;
+    parLastCheckpointTime = CmiWallTimer();
+    CkStartQD(cb);
+  } else if ((CkMyPe() == 0) && (parLBInProgress == 0) && 
+      (((pose_config.lb_gvt_interval > 0) && (estGVT >= (parLastLBGVT + pose_config.lb_gvt_interval))))) {
+    // wait for quiescence to occur before checkpointing
+    eventMsg *dummyMsg = new eventMsg();
+    CkCallback cb(CkIndex_PVT::beginLoadbalancing(dummyMsg), CkMyPe(), ThePVT);
+    parLBInProgress = 1;
     CkStartQD(cb);
   } else {
     // skip checkpointing
@@ -266,22 +284,67 @@ void PVT::setGVT(GVTMsg *m)
 /// ENTRY: begin checkpoint now that quiescence has been reached
 void PVT::beginCheckpoint(eventMsg *m) {
   CkFreeMsg(m);
-  if (!parCheckpointInProgress) {  // ensure this only happens once
-    parCheckpointInProgress = 1;
+  if (parCheckpointInProgress) {  // ensure this only happens once
     CkPrintf("POSE: quiescence detected\n");
-    CkPrintf("POSE: beginning checkpoint on processor %d at GVT=%lld\n", CkMyPe(), estGVT);
+    CkPrintf("POSE: beginning checkpoint on processor %d at GVT=%lld time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() - parStartTime);
     eventMsg *dummyMsg = new eventMsg();
     CkCallback cb(CkIndex_PVT::resumeAfterCheckpoint(dummyMsg), CkMyPe(), ThePVT);
     CkStartCheckpoint(POSE_CHECKPOINT_DIRECTORY, cb);
   }
 }
 
+void PVT::beginLoadbalancing(eventMsg *m) {
+  CkFreeMsg(m);
+  if (parLBInProgress) {  // ensure this only happens once
+    CProxy_PVT p(ThePVT);
+    p.callAtSync();
+  }
+}
+
+void PVT::callAtSync()
+{
+  objs.callAtSync();
+}
+
+void PVT::doneLB() {
+  static int count = 0;
+  count ++;
+  if (count == objs.getNumObjs()) {
+    count =0;
+    if (CkMyPe()==0) { 
+      eventMsg *dummyMsg = new eventMsg();
+      CProxy_PVT p(ThePVT);
+      p[0].resumeAfterLB(dummyMsg);
+    }
+  }
+}
+
 /// ENTRY: resume after checkpointing, restarting, or if checkpointing doesn't occur
 void PVT::resumeAfterCheckpoint(eventMsg *m) {
   if (parCheckpointInProgress) {
-    CkPrintf("POSE: checkpoint/restart complete on processor %d at GVT=%lld\n", CkMyPe(), estGVT);
+    CkPrintf("POSE: checkpoint/restart complete on processor %d at GVT=%lld time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() - parStartTime);
     parCheckpointInProgress = 0;
     parLastCheckpointGVT = estGVT;
+  }
+  CkFreeMsg(m);
+  CProxy_PVT p(ThePVT);
+  startPhaseActive = 0;
+  prioBcMsg *startMsg = new (8*sizeof(int)) prioBcMsg;
+  startMsg->bc = 1;
+  *((int *)CkPriorityPtr(startMsg)) = 0;
+  CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
+  p[CkMyPe()].startPhase(startMsg);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
+#endif
+}
+
+void PVT::resumeAfterLB(eventMsg *m) {
+  if (parLBInProgress) {
+    CkPrintf("POSE: load balancing complete on processor %d at GVT=%lld time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() - parStartTime);
+    parLBInProgress = 0;
+    parLastLBGVT = estGVT;
   }
   CkFreeMsg(m);
   CProxy_PVT p(ThePVT);

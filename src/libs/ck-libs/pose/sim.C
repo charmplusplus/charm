@@ -83,7 +83,12 @@ void sim::pup(PUP::er &p) {
   if (thisIndex == 0) {
     p|seqCheckpointInProgress;
     p|seqLastCheckpointGVT;
+    p|seqLastCheckpointTime;
+    p|seqStartTime;
     p|POSE_Skipped_Events;
+    if (p.isUnpacking()) {
+      seqStartTime = CmiWallTimer() - (seqLastCheckpointTime - seqStartTime);
+    }
   }
 #endif
 }
@@ -284,9 +289,10 @@ void sim::Cancel(cancelMsg *m)
 // seq::Step()) is called on each poser listed in
 // POSE_Skipped_Events to execute the skipped events.
 
-// Currently, checkpoints are initiated approximately every
-// POSE_CHECKPOINT_INTERVAL GVT ticks (defined in pose_config.h).
-// Support for a time-based interval could easily be added.
+// Checkpoints are initiated approximately every
+// pose_config.checkpoint_gvt_interval GVT ticks or
+// pose_config.checkpoint_time_interval seconds (both defined in
+// pose_config.h).
 
 /// In sequential mode, begin checkpoint after reaching quiescence
 void sim::SeqBeginCheckpoint() {
@@ -295,7 +301,7 @@ void sim::SeqBeginCheckpoint() {
   // Ensure we're checkpointing
   CkAssert(seqCheckpointInProgress);
   CkPrintf("POSE: quiescence detected\n");
-  CkPrintf("POSE: beginning checkpoint on sim %d at GVT=%lld\n", thisIndex, seqLastCheckpointGVT);
+  CkPrintf("POSE: beginning checkpoint on sim %d at GVT=%lld time=%.1f sec\n", thisIndex, seqLastCheckpointGVT, CmiWallTimer() - seqStartTime);
   CkCallback cb(CkIndex_sim::SeqResumeAfterCheckpoint(), CkArrayIndex1D(thisIndex), thisProxy);
   CkStartCheckpoint(POSE_CHECKPOINT_DIRECTORY, cb);
 }
@@ -308,7 +314,7 @@ void sim::SeqResumeAfterCheckpoint() {
   CkAssert(seqCheckpointInProgress);
   seqCheckpointInProgress = 0;
   POSE_GlobalClock = seqLastCheckpointGVT;
-  CkPrintf("POSE: checkpoint/restart complete on sim %d at GVT=%lld\n", thisIndex, POSE_GlobalClock);
+  CkPrintf("POSE: checkpoint/restart complete on sim %d at GVT=%lld time=%.1f sec\n", thisIndex, POSE_GlobalClock, CmiWallTimer() - seqStartTime);
   // restart simulation
   while (POSE_Skipped_Events.length() > 0) {
     // These Step iterations MUST be executed now, before any messages
@@ -325,6 +331,12 @@ void sim::SeqResumeAfterCheckpoint() {
     }
   }
   CkStartQD(CkIndex_pose::stop(), &POSE_Coordinator_ID);
+}
+
+void sim::ResumeFromSync()
+{
+  PVT *localPVT = (PVT *)CkLocalBranch(ThePVT);
+  localPVT->doneLB();
 }
 
 /// Dump all data fields

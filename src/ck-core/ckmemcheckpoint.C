@@ -142,6 +142,8 @@ void ArrayElement::init_checkpt() {
 void ArrayElement::inmem_checkpoint(CkArrayCheckPTReqMessage *m) {
 #if CMK_MEM_CHECKPOINT
   //DEBUGF("[p%d] HERE checkpoint to %d %d \n", CkMyPe(), budPEs[0], budPEs[1]);
+//char index[128];   thisIndexMax.sprint(index);
+//printf("[%d] checkpointing %s\n", CkMyPe(), index);
   CkLocMgr *locMgr = thisArray->getLocMgr();
   CmiAssert(myRec!=NULL);
   int size;
@@ -428,7 +430,9 @@ void CkMemCheckPT::doItNow(int starter, CkCallback &cb)
   for (int i=0; i<len; i++) {
     CkCheckPTInfo *entry = ckTable[i];
       // always let the bigger number processor send request
-    if (CkMyPe() < entry->pNo) continue;
+    //if (CkMyPe() < entry->pNo) continue;
+      // always let the smaller number processor send request, may on same proc
+    if (!isMaster(entry->pNo)) continue;
       // call inmem_checkpoint to the array element, ask it to send
       // back checkpoint data via recvData().
     CkArrayCheckPTReqMessage *msg = new CkArrayCheckPTReqMessage;
@@ -447,7 +451,7 @@ static inline void _handleProcData(PUP::er &p)
     // save readonlys, and callback BTW
     CkPupROData(p);
 
-    // save mainchares into MainChares.dat
+    // save mainchares 
     if(CkMyPe()==0) CkPupMainChareData(p, (CkArgMsg*)NULL);
 	
 #ifndef CMK_CHARE_USE_PTR
@@ -583,6 +587,7 @@ inline int CkMemCheckPT::isMaster(int buddype)
   }
   return 0;
 #else
+    // smaller one
   int mype = CkMyPe();
 //CkPrintf("ismaster: %d %d\n", pe, mype);
   if (CkNumPes() - totalFailed() == 2) {

@@ -1,42 +1,39 @@
 #include "main.decl.h"
-#include "SolverTypes.h"
-#include "Solver.h"
+#include "par_SolverTypes.h"
+#include "par_Solver.h"
 #include <map>
 #include <vector>
+
+#ifdef MINISAT
+#include "Solver.h"
+#endif
+
+#ifdef TNM
+#include "TNM.h"
+#endif
 
 using namespace std;
 
 extern CProxy_Main mainProxy;
 extern int grainsize;
 
-SolverState::SolverState()
+par_SolverState::par_SolverState()
 {
-    unsolved_clauses = 0; 
     var_frequency = 0;
 }
 
-inline int SolverState::nVars()
-{
-    return var_frequency; 
-}
 
-int SolverState::clausesSize()
+int par_SolverState::clausesSize()
 {
     return clauses.size();
 }
-Var SolverState::newVar(bool sign, bool dvar)
-{
-    int v = nVars();
-    var_frequency++;
-    return v;
-}
 
-void SolverState::attachClause(Clause& c)
+void par_SolverState::attachClause(par_Clause& c)
 {
 
 }
 
-int SolverState::unsolvedClauses()
+int par_SolverState::unsolvedClauses()
 {
     int unsolved = 0;
     for(int i=0; i< clauses.size(); i++)
@@ -48,7 +45,7 @@ int SolverState::unsolvedClauses()
     return unsolved;
 }
 
-void SolverState::printSolution()
+void par_SolverState::printSolution()
 {
     for(int _i=0; _i<var_size; _i++)
     {
@@ -58,7 +55,7 @@ void SolverState::printSolution()
 }
 
 /* add clause, before adding, check unit conflict */
-bool SolverState::addClause(CkVec<Lit>& ps)
+bool par_SolverState::addClause(CkVec<par_Lit>& ps)
 {
     /*TODO precheck is needed here */
     if(ps.size() == 1)//unit clause
@@ -67,8 +64,8 @@ bool SolverState::addClause(CkVec<Lit>& ps)
         {
             int index = unit_clause_index[_i];
 
-            Clause unit = clauses[index];
-            Lit     unit_lit = unit[0];
+            par_Clause unit = clauses[index];
+            par_Lit     unit_lit = unit[0];
 
             if(unit_lit == ~ps[0])
             {
@@ -76,10 +73,6 @@ bool SolverState::addClause(CkVec<Lit>& ps)
                 CkPrintf("clause conflict between %d and %d\n", index, clauses.size());
                 return false;
             }
-            /*else if(unit_lit == ps[0])
-            {
-                return true;
-            }*/
         }
        /* all unit clauses are checked, no repeat, no conflict */
         unit_clause_index.push_back(clauses.size());
@@ -89,7 +82,7 @@ bool SolverState::addClause(CkVec<Lit>& ps)
    
     for(int i=0; i< ps.size(); i++)
     {
-        Lit lit = ps[i];
+        par_Lit lit = ps[i];
 
         for(int j=0; j<i; j++)
         {
@@ -107,25 +100,24 @@ bool SolverState::addClause(CkVec<Lit>& ps)
         }
     }
     }
-    clauses.push_back(Clause());
+    clauses.push_back(par_Clause());
     clauses[clauses.size()-1].attachdata(ps, false);
-    unsolved_clauses++;
     // build the linklist for each literal pointing to the clause, where the literal occurs
     for(int i=0; i< ps.size(); i++)
     {
-        Lit lit = ps[i];
+        par_Lit lit = ps[i];
 
         if(toInt(lit) > 0)
-            whichClauses[2*toInt(lit)-2].push_back(clauses.size()-1);
+            whichClauses[2*toInt(lit)-2].insert(pair<int, int>(clauses.size()-1, 1));
         else
-            whichClauses[-2*toInt(lit)-1].push_back(clauses.size()-1);
+            whichClauses[-2*toInt(lit)-1].insert(pair<int, int> (clauses.size()-1, 1));
 
     }
 
     return true;
 }
 
-void SolverState::assignclause(CkVec<Clause>& cls )
+void par_SolverState::assignclause(CkVec<par_Clause>& cls )
 {
     clauses.removeAll();
     for(int i=0; i<cls.size(); i++)
@@ -136,16 +128,16 @@ void SolverState::assignclause(CkVec<Clause>& cls )
 
 /* *********** Solver chare */
 
-Solver::Solver(SolverState* state_msg)
+mySolver::mySolver(par_SolverState* state_msg)
 {
 
     /* Which variable get assigned  */
-    Lit lit = state_msg->assigned_lit;
+    par_Lit lit = state_msg->assigned_lit;
 #ifdef DEBUG    
     CkPrintf("\n\nNew chare: literal = %d, occurrence size=%d, level=%d \n", toInt(lit), state_msg->occurrence.size(), state_msg->level);
 #endif    
-    SolverState *next_state = copy_solverstate(state_msg);
-    
+    par_SolverState *next_state = copy_solverstate(state_msg);
+
     //Unit clauses
     /* use this value to propagate the clauses */
     // deal with the clauses where this literal is
@@ -164,55 +156,42 @@ Solver::Solver(SolverState* state_msg)
 
         next_state->occurrence[pp_*toInt(lit)-1] = -pp_i_;
     
-        //CkPrintf(" index=%d, total size=%d, original msg size=%d\n", pp_*2*toInt(lit)-pp_i_, next_state->whichClauses.size(), state_msg->whichClauses.size());
 
-        CkVec<int> &inClauses = next_state->whichClauses[pp_*2*toInt(lit)-pp_i_];
-        CkVec<int> &inClauses_opposite = next_state->whichClauses[pp_*2*toInt(lit)-pp_j_];
+        map_int_int &inClauses = next_state->whichClauses[pp_*2*toInt(lit)-pp_i_];
+        map_int_int  &inClauses_opposite = next_state->whichClauses[pp_*2*toInt(lit)-pp_j_];
 
     // literal with same sign, remove all these clauses
-       for(int j=0; j<inClauses.size(); j++)
+       for( map_int_int::iterator iter = inClauses.begin(); iter!=inClauses.end(); iter++)
        {
-           int cl_index = inClauses[j];
+           int cl_index = (*iter).first;
 
-           Clause& cl_ = next_state->clauses[cl_index];
+           par_Clause& cl_ = next_state->clauses[cl_index];
            //for all the literals in this clauses, the occurrence decreases by 1
            for(int k=0; k< cl_.size(); k++)
            {
-               Lit lit_ = cl_[k];
+               par_Lit lit_ = cl_[k];
                if(toInt(lit_) == toInt(lit))
                    continue;
                next_state->occurrence[abs(toInt(lit_)) - 1]--;
                if(toInt(lit_) > 0)
                {
                    next_state->positive_occurrence[toInt(lit_)-1]--;
-                   //remove the clause index for the literal
-                   for(int _i = 0; _i<next_state->whichClauses[2*toInt(lit_)-2].size(); _i++)
-                   {
-                       if(next_state->whichClauses[2*toInt(lit_)-2][_i] == cl_index)
-                       {
-                           next_state->whichClauses[2*toInt(lit_)-2].remove(_i);
-                           break;
-                       }
-                   }
+                   map_int_int::iterator one_it = next_state->whichClauses[2*toInt(lit_)-2].find(cl_index);
+                   next_state->whichClauses[2*toInt(lit_)-2].erase(one_it);
                }else
                {
-                   for(int _i = 0; _i<next_state->whichClauses[-2*toInt(lit_)-1].size(); _i++)
-                   {
-                       if(next_state->whichClauses[-2*toInt(lit_)-1][_i] == cl_index)
-                       {
-                           next_state->whichClauses[-2*toInt(lit_)-1].remove(_i);
-                           break;
-                       }
-                   }
+                   map_int_int::iterator one_it = next_state->whichClauses[-2*toInt(lit_)-1].find(cl_index);
+                   next_state->whichClauses[-2*toInt(lit_)-1].erase(one_it);
                }
+               
            } //finish dealing with all literal in the clause
            next_state->clauses[cl_index].resize(0);
        } //finish dealing with clauses where the literal occur the same
        /* opposite to the literal */
-       for(int j=0; j<inClauses_opposite.size(); j++)
+       for(map_int_int::iterator iter= inClauses_opposite.begin(); iter!=inClauses_opposite.end(); iter++)
        {
-           int cl_index_ = inClauses_opposite[j];
-           Clause& cl_neg = next_state->clauses[cl_index_];
+           int cl_index_ = (*iter).first;
+           par_Clause& cl_neg = next_state->clauses[cl_index_];
            cl_neg.remove(-toInt(lit));
 
            /*becomes a unit clause */
@@ -228,7 +207,7 @@ Solver::Solver(SolverState* state_msg)
        _unit_++;
        if(_unit_ == next_state->unit_clause_index.size())
            break;
-       Clause cl = next_state->clauses[next_state->unit_clause_index[_unit_]];
+       par_Clause cl = next_state->clauses[next_state->unit_clause_index[_unit_]];
 
        while(cl.size() == 0){
            _unit_++;
@@ -240,6 +219,8 @@ Solver::Solver(SolverState* state_msg)
        if(_unit_ == next_state->unit_clause_index.size())
            break;
        lit = cl[0];
+
+
     }
     /***************/
 
@@ -259,7 +240,7 @@ Solver::Solver(SolverState* state_msg)
     ///* When we start sequential 3SAT Grainsize problem*/
    
     /* the other branch */
-    SolverState *new_msg2 = copy_solverstate(next_state);;
+    par_SolverState *new_msg2 = copy_solverstate(next_state);;
 
     next_state->level = state_msg->level+1;
 
@@ -269,12 +250,12 @@ Solver::Solver(SolverState* state_msg)
     int positive_max = next_state->positive_occurrence[max_index];
     if(positive_max >= next_state->occurrence[max_index] - positive_max)
     {
-        next_state->assigned_lit = Lit(max_index+1);
+        next_state->assigned_lit = par_Lit(max_index+1);
         next_state->occurrence[max_index] = -2;
     }
     else
     {
-        next_state->assigned_lit = Lit(-max_index-1);
+        next_state->assigned_lit = par_Lit(-max_index-1);
         next_state->occurrence[max_index] = -1;
     }
     bool satisfiable_1 = true;
@@ -285,13 +266,33 @@ Solver::Solver(SolverState* state_msg)
         next_state->higher = middle;
         *((int *)CkPriorityPtr(next_state)) = lower+1;
         CkSetQueueing(next_state, CK_QUEUEING_IFIFO);
-        CProxy_Solver::ckNew(next_state);
+        CProxy_mySolver::ckNew(next_state);
     }
     else //sequential
     {
-        satisfiable_1 = seq_solve(next_state);
+        /* This code is urgly. Need to revise it later. Convert par data structure to sequential 
+         */
+        vector< vector<int> > seq_clauses;
+        //seq_clauses.resize(next_state->clauses.size());
+        for(int _i_=0; _i_<next_state->clauses.size(); _i_++)
+        {
+            if(next_state->clauses[_i_].size() > 0)
+            {
+                vector<int> unsolvedclaus;
+                par_Clause& cl = next_state->clauses[_i_];
+                unsolvedclaus.resize(cl.size());
+                for(int _j_=0; _j_<cl.size(); _j_++)
+                {
+                    unsolvedclaus[_j_] = toInt(cl[_j_]);
+                }
+                seq_clauses.push_back(unsolvedclaus);
+            }
+        }
+        satisfiable_1 = seq_processing(next_state->var_size, seq_clauses);//seq_solve(next_state);
         if(satisfiable_1)
         {
+            CkPrintf("One solution found by sequential processing \n");
+            mainProxy.done(next_state->occurrence);
             return;
         }
     }
@@ -299,12 +300,12 @@ Solver::Solver(SolverState* state_msg)
     new_msg2->level = state_msg->level+1;
     if(positive_max >= new_msg2->occurrence[max_index] - positive_max)
     {
-        new_msg2->assigned_lit = Lit(-max_index-1);
+        new_msg2->assigned_lit = par_Lit(-max_index-1);
         new_msg2->occurrence[max_index] = -1;
     }
     else
     {
-        new_msg2->assigned_lit = Lit(max_index+1);
+        new_msg2->assigned_lit = par_Lit(max_index+1);
         new_msg2->occurrence[max_index] = -2;
     }
     unsolved = new_msg2->unsolvedClauses();
@@ -314,11 +315,35 @@ Solver::Solver(SolverState* state_msg)
         new_msg2->higher = higher-1;
         *((int *)CkPriorityPtr(new_msg2)) = middle+1;
         CkSetQueueing(new_msg2, CK_QUEUEING_IFIFO);
-        CProxy_Solver::ckNew(new_msg2);
+        CProxy_mySolver::ckNew(new_msg2);
     }
     else
     {
-        seq_solve(new_msg2);
+       
+        vector< vector<int> > seq_clauses;
+        for(int _i_=0; _i_<new_msg2->clauses.size(); _i_++)
+        {
+            par_Clause& cl = new_msg2->clauses[_i_];
+            if(cl.size() > 0)
+            {
+                vector<int> unsolvedclaus;
+                unsolvedclaus.resize(cl.size());
+                for(int _j_=0; _j_<cl.size(); _j_++)
+                {
+                    unsolvedclaus[_j_] = toInt(cl[_j_]);
+                }
+                seq_clauses.push_back(unsolvedclaus);
+            }
+        }
+
+        bool ret = seq_processing(new_msg2->var_size,  seq_clauses);//seq_solve(next_state);
+        //bool ret = Solver::seq_processing(new_msg2->clauses);//seq_solve(new_msg2);
+        if(ret)
+        {
+            CkPrintf("One solution found by sequential processing \n");
+            mainProxy.done(new_msg2->occurrence);
+        }
+        return;
     }
 
 }
@@ -328,16 +353,16 @@ Solver::Solver(SolverState* state_msg)
 /* solve the 3sat in sequence */
 
 long long int computes = 0;
-bool Solver::seq_solve(SolverState* state_msg)
+bool mySolver::seq_solve(par_SolverState* state_msg)
 {
     /* Which variable get assigned  */
-    Lit lit = state_msg->assigned_lit;
+    par_Lit lit = state_msg->assigned_lit;
        
 #ifdef DEBUG
     CkPrintf("\n\n Computes=%d Sequential SAT New chare: literal = %d,  level=%d, unsolved clauses=%d\n", computes++, toInt(assigned_var), state_msg->level, state_msg->clauses.size());
     //CkPrintf("\n\n Computes=%d Sequential SAT New chare: literal = %d, occurrence size=%d, level=%d \n", computes++, toInt(assigned_var), state_msg->occurrence.size(), state_msg->level);
 #endif
-    SolverState *next_state = copy_solverstate(state_msg);
+    par_SolverState *next_state = copy_solverstate(state_msg);
     
     //Unit clauses
     /* use this value to propagate the clauses */
@@ -360,53 +385,41 @@ bool Solver::seq_solve(SolverState* state_msg)
 
     next_state->occurrence[pp_*toInt(lit)-1] = -pp_i_;
     
-    CkVec<int> &inClauses = next_state->whichClauses[pp_*2*toInt(lit)-pp_i_];
-    CkVec<int> &inClauses_opposite = next_state->whichClauses[pp_*2*toInt(lit)-pp_j_];
+    map_int_int &inClauses = next_state->whichClauses[pp_*2*toInt(lit)-pp_i_];
+    map_int_int &inClauses_opposite = next_state->whichClauses[pp_*2*toInt(lit)-pp_j_];
 
     // literal with same sign, remove all these clauses
-    for(int j=0; j<inClauses.size(); j++)
+    
+    for( map_int_int::iterator iter = inClauses.begin(); iter!=inClauses.end(); iter++)
     {
-        int cl_index = inClauses[j];
-
-        Clause& cl_ = next_state->clauses[cl_index];
+        int cl_index = (*iter).first;
+        par_Clause& cl_ = next_state->clauses[cl_index];
         //for all the literals in this clauses, the occurrence decreases by 1
         for(int k=0; k< cl_.size(); k++)
         {
-            Lit lit_ = cl_[k];
+            par_Lit lit_ = cl_[k];
             if(toInt(lit_) == toInt(lit))
                 continue;
             next_state->occurrence[abs(toInt(lit_)) - 1]--;
             if(toInt(lit_) > 0)
             {
                 next_state->positive_occurrence[toInt(lit_)-1]--;
-                //remove the clause index for the literal
-                for(int _i = 0; _i<next_state->whichClauses[2*toInt(lit_)-2].size(); _i++)
-                {
-                    if(next_state->whichClauses[2*toInt(lit_)-2][_i] == cl_index)
-                    {
-                        next_state->whichClauses[2*toInt(lit_)-2].remove(_i);
-                        break;
-                    }
-                }
+                map_int_int::iterator one_it = next_state->whichClauses[2*toInt(lit_)-2].find(cl_index);
+                next_state->whichClauses[2*toInt(lit_)-2].erase(one_it);
             }else
             {
-                for(int _i = 0; _i<next_state->whichClauses[-2*toInt(lit_)-1].size(); _i++)
-                {
-                    if(next_state->whichClauses[-2*toInt(lit_)-1][_i] == cl_index)
-                    {
-                        next_state->whichClauses[-2*toInt(lit_)-1].remove(_i);
-                        break;
-                    }
-                }
+                map_int_int::iterator one_it = next_state->whichClauses[-2*toInt(lit_)-1].find(cl_index);
+                next_state->whichClauses[-2*toInt(lit_)-1].erase(one_it);
             }
+
         }
-            next_state->clauses[cl_index].resize(0);
+        next_state->clauses[cl_index].resize(0);
     }
    
-    for(int j=0; j<inClauses_opposite.size(); j++)
+    for(map_int_int::iterator iter= inClauses_opposite.begin(); iter!=inClauses_opposite.end(); iter++)
     {
-        int cl_index_ = inClauses_opposite[j];
-        Clause& cl_neg = next_state->clauses[cl_index_];
+        int cl_index_ = (*iter).first;
+        par_Clause& cl_neg = next_state->clauses[cl_index_];
         cl_neg.remove(-toInt(lit));
             //becomes a unit clause
          if(cl_neg.size() == 1)
@@ -421,7 +434,7 @@ bool Solver::seq_solve(SolverState* state_msg)
     _unit_++;
     if(_unit_ == next_state->unit_clause_index.size())
         break;
-    Clause cl = next_state->clauses[next_state->unit_clause_index[_unit_]];
+    par_Clause cl = next_state->clauses[next_state->unit_clause_index[_unit_]];
     
     while(cl.size() == 0){
         _unit_++;
@@ -458,18 +471,18 @@ bool Solver::seq_solve(SolverState* state_msg)
 #endif
         next_state->level = state_msg->level+1;
 
-        SolverState *new_msg2 = copy_solverstate(next_state);;
+        par_SolverState *new_msg2 = copy_solverstate(next_state);;
         
         int positive_max = next_state->positive_occurrence[max_index];
         if(positive_max >= next_state->occurrence[max_index] - positive_max)
         {
             next_state->occurrence[max_index] = -2;
-            next_state->assigned_lit = Lit(max_index+1);
+            next_state->assigned_lit = par_Lit(max_index+1);
         }
         else
         {
             next_state->occurrence[max_index] = -1;
-            next_state->assigned_lit = Lit(-max_index-1);
+            next_state->assigned_lit = par_Lit(-max_index-1);
         } 
 
         bool   satisfiable_1 = seq_solve(next_state);
@@ -483,12 +496,12 @@ bool Solver::seq_solve(SolverState* state_msg)
         if(positive_max >= next_state->occurrence[max_index] - positive_max)
         {
             new_msg2->occurrence[max_index] = -1;
-            new_msg2->assigned_lit = Lit(-max_index-1);
+            new_msg2->assigned_lit = par_Lit(-max_index-1);
         }
         else
         {
             new_msg2->occurrence[max_index] = -2;
-            new_msg2->assigned_lit = Lit(max_index+1);
+            new_msg2->assigned_lit = par_Lit(max_index+1);
         } 
             
         bool satisfiable_0 = seq_solve(new_msg2);

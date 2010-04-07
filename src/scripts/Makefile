@@ -253,6 +253,7 @@ basics: headers
 
 # Headers is used only for the dependencies
 headers: dirs+sources
+	$(MAKE) charmxi
 	$(MAKE) headerlinks
 
 conv-autoconfig.h: configure
@@ -898,11 +899,21 @@ ControlPoints.def.h: ControlPoints.decl.h
 ControlPoints.decl.h : controlPoints.ci charmxi
 	$(CHARMXI) controlPoints.ci
 
-controlPoints_objs: $(L)/libmoduleControlPoints.a
+ControlPointsNoTrace.def.h: ControlPointsNoTrace.decl.h
+
+ControlPointsNoTrace.decl.h : controlPointsNoTrace.ci charmxi
+	$(CHARMXI) controlPointsNoTrace.ci
+
+controlPoints_objs: $(L)/libmoduleControlPoints.a $(L)/libmoduleControlPointsNoTrace.a
 
 $(L)/libmoduleControlPoints.a: $(CONTROLPOINTS_OBJS)
 	$(CHARMC) -o $(L)/libmoduleControlPoints.a $(CONTROLPOINTS_OBJS)
 
+$(L)/libmoduleControlPointsNoTrace.a: controlPointsNoTrace.o arrayRedistributor.o cp_effects.o
+	$(CHARMC) -o $(L)/libmoduleControlPointsNoTrace.a controlPointsNoTrace.o arrayRedistributor.o cp_effects.o
+
+controlPointsNoTrace.o: controlPoints.C controlPoints.h ControlPointsNoTrace.decl.h
+	$(CHARMC) -I. -c controlPoints.C -o controlPointsNoTrace.o -DCP_DISABLE_TRACING $(OPTS)
 
 ######################################################################
 #

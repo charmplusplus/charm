@@ -961,7 +961,7 @@ then
 fi
 
 Debug "set 4"
-if [ -n "$OPTIMIZE_MODE" ]
+if [ "$OPTIMIZE_MODE" = "true" ]
 then
     OPTS_CC="$CMK_C_OPTIMIZE $OPTS_CC"
     OPTS_CXX="$CMK_CXX_OPTIMIZE $OPTS_CXX"

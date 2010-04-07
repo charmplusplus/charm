@@ -16,7 +16,7 @@ module CkMemCheckpoint {
         entry CkMemCheckPT(int w);
 	entry void createEntry(CkArrayID, CkGroupID, CkArrayIndexMax, int);
  	// checkpointing
-        entry void doItNow(int spe, CkCallback &);  //checkpointing
+        entry [expedited] void doItNow(int spe, CkCallback &);  //checkpointing
  	entry void recvData(CkArrayCheckPTMessage *);
  	entry void gotData();
 	entry void recvProcData(CkProcCheckPTMessage *);

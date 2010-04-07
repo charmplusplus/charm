@@ -139,6 +139,8 @@ CpvStaticDeclare(int, CmiMainHandlerIDP); /* Main handler for _CmiMultipleSend t
 void (*notify_crash_fn)(int) = NULL;
 #endif
 
+CpvDeclare(char *, _validProcessors);
+
 /*****************************************************************************
  *
  * Unix Stub Functions

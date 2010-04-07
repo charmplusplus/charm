@@ -159,7 +159,7 @@ int print_cpu_affinity() {
     return -1;
   }
   
-  printf("CPU affinity mask is: %08lx\n", pMask);
+ CmiPrintf("[%d] CPU affinity mask is: 0x%08lx\n", CmiMyPe(), pMask);
   
 #elif CMK_HAS_BINDPROCESSOR
   printf("[%d] CPU affinity mask is unknown for AIX. \n", CmiMyPe());
@@ -173,7 +173,7 @@ int print_cpu_affinity() {
     return -1;
   }
 
-  printf("[%d] CPU affinity mask is: %08lx\n", CmiMyPe(), mask);
+  CmiPrintf("[%d] CPU affinity mask is: 0x%08lx\n", CmiMyPe(), mask);
 #endif
   return 0;
 }
@@ -188,10 +188,19 @@ int print_thread_affinity() {
     perror("pthread_setaffinity");
     return -1;
   }
-  printf("[%d] pthread affinity mask is: %08lx\n", CmiMyPe(), mask);
+  CmiPrintf("[%d] %s affinity mask is: 0x%08lx\n", CmiMyPe(), CmiMyPe()>=CmiNumPes()?"communication pthread":"pthread", mask);
 #endif
 #endif
   return 0;
+}
+
+int CmiPrintCPUAffinity()
+{
+#if CMK_SMP
+  return print_thread_affinity();
+#else
+  return print_cpu_affinity();
+#endif
 }
 
 static int cpuAffinityHandlerIdx;
@@ -278,13 +287,21 @@ static void cpuAffinityHandler(void *m)
   }
 }
 
-static int set_myaffinitity(int myrank)
+static int set_myaffinitity(int mycore)
 {
+  int core = mycore;
+  if (core < 0) {
+    core = CmiNumCores() + core;
+  }
+  if (core < 0) {
+    CmiError("Error: Invalid cpu affinity core number: %d\n", mycore);
+    CmiAbort("set_myaffinitity failed");
+  }
   /* set cpu affinity */
 #if CMK_SMP
-  return set_thread_affinity(myrank);
+  return set_thread_affinity(core);
 #else
-  return set_cpu_affinity(myrank);
+  return set_cpu_affinity(core);
   /* print_cpu_affinity(); */
 #endif
 }
@@ -332,7 +349,7 @@ static int search_pemap(char *pecoremap, int pe)
       int hasdash=0, hascolon=0;
       int start, end, stride=1;
       for (i=0; i<strlen(str); i++) {
-          if (str[i] == '-') hasdash=1;
+          if (str[i] == '-' && i!=0) hasdash=1;
           if (str[i] == ':') hascolon=1;
       }
       if (hasdash) {
@@ -376,6 +393,7 @@ void CmiInitCPUAffinity(char **argv)
   char *commap = NULL;
   char *coremap = NULL;
  
+  int show_affinity_flag;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
 
@@ -391,6 +409,8 @@ void CmiInitCPUAffinity(char **argv)
   if (pemap!=NULL && (coremap != NULL || excludecount>0))
     CmiAbort("Charm++> +pemap can not be used with either +excludecore or +coremap.");
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
+  show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
+						"print cpu affinity");
 
   cpuAffinityHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityHandler);
@@ -401,7 +421,10 @@ void CmiInitCPUAffinity(char **argv)
      affLock = CmiCreateLock();
   }
 
-  if (!affinity_flag) return;
+  if (!affinity_flag) {
+    if (show_affinity_flag) CmiPrintCPUAffinity();
+    return;
+  }
   else if (CmiMyPe() == 0) {
      CmiPrintf("Charm++> cpu affinity enabled. \n");
      if (excludecount > 0) {
@@ -422,6 +445,8 @@ void CmiInitCPUAffinity(char **argv)
     if (commap != NULL) {
       int mycore = search_pemap(commap, CmiMyPe()-CmiNumPes());
       printf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore); 
+      if (-1 == set_myaffinitity(mycore))
+        CmiAbort("set_cpu_affinity abort!");
     }
     else {
     /* if (set_myaffinitity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
@@ -436,6 +461,7 @@ void CmiInitCPUAffinity(char **argv)
 #endif
     }
     CmiNodeAllBarrier();
+    if (show_affinity_flag) CmiPrintCPUAffinity();
     return;    /* comm thread return */
   }
 
@@ -449,6 +475,7 @@ void CmiInitCPUAffinity(char **argv)
     if (set_myaffinitity(mycore) == -1) CmiAbort("set_cpu_affinity abort!");
     CmiNodeAllBarrier();
     CmiNodeAllBarrier();
+    if (show_affinity_flag) CmiPrintCPUAffinity();
     return;
   }
 
@@ -520,10 +547,17 @@ void CmiInitCPUAffinity(char **argv)
   affinity_doneflag++;
   CmiUnlock(affLock);
   CmiNodeAllBarrier();
+
+  if (show_affinity_flag) CmiPrintCPUAffinity();
 }
 
 #else           /* not supporting affinity */
 
+
+int CmiPrintCPUAffinity()
+{
+  CmiPrintf("Warning: CmiPrintCPUAffinity not supported.\n");
+}
 
 void CmiInitCPUAffinity(char **argv)
 {

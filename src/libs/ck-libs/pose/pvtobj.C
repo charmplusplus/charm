@@ -61,6 +61,13 @@ int pvtObjects::Insert(int index, POSE_TimeType ovt, int sync, sim *myPtr)
   return idx;
 }
 
+void pvtObjects::callAtSync() {
+  register int i;
+  for (i=0; i<numSpaces; i++)
+    if (objs[i].isPresent()) {
+      (objs[i].localObjPtr)->AtSync();
+    }
+}
 /// Wake up all posers in list
 void pvtObjects::Wake() {
   register int i;

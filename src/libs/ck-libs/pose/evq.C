@@ -121,9 +121,7 @@ void eventQueue::InsertEventDeterministic(Event *e)
   // greater than last timestamp in queue, 
   // or currentPtr is at back (presumably because heap is empty)
   //CkPrintf("Received event "); e->evID.dump(); CkPrintf(" at %d...\n", e->timestamp);
-  if ((tmp->timestamp < e->timestamp) ||
-      ((tmp->timestamp == e->timestamp) && (tmp->evID < e->evID))
-      && (currentPtr != backPtr))
+  if ((tmp->timestamp < e->timestamp || (tmp->timestamp == e->timestamp && tmp->evID < e->evID)) && (currentPtr != backPtr))
     eqh->InsertEvent(e); // insert in heap
   else { // tmp->timestamp > e->timestamp; insert in linked list
     if ((currentPtr != backPtr) && (currentPtr->timestamp > e->timestamp))

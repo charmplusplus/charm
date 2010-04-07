@@ -2811,10 +2811,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   node_addresses_obtain(argv);
   MACHSTATE(5,"node_addresses_obtain done");
 
-#if CMK_USE_IBVERBS
-  if (Cmi_charmrun_fd==-1) CmiAbort("Fatal error: standalone mode is not supported in ibverbs. \n");
-#endif
-
   CmiCommunicationInit(argv);
 
 #if CMK_USE_SYSVSHM

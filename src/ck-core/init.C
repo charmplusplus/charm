@@ -163,7 +163,7 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 /*
 	FAULT_EVAC
 */
-CpvDeclare(char *, _validProcessors);
+CpvCExtern(char *, _validProcessors);
 CpvDeclare(char ,startedEvac);
 
 int    _exitHandlerIdx;
