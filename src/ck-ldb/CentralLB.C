@@ -97,9 +97,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   if (opt.getSeqNo() > 0) turnOff();
 
   stats_msg_count = 0;
-  statsMsgsList = new CLBStatsMsg*[CkNumPes()];
-  for(int i=0; i < CkNumPes(); i++)
-    statsMsgsList[i] = 0;
+  statsMsgsList = NULL;
 
   statsData = new LDStats;
 
@@ -435,6 +433,13 @@ void CentralLB::depositData(CLBStatsMsg *m)
 void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 {
 #if CMK_LBDB_ON
+  if (statsMsgsList == NULL) {
+    statsMsgsList = new CLBStatsMsg*[CkNumPes()];
+    CmiAssert(statsMsgsList != NULL);
+    for(int i=0; i < CkNumPes(); i++)
+      statsMsgsList[i] = 0;
+  }
+
     //  loop through all CLBStatsMsg in the incoming msg
   int count = msg.getCount();
   for (int num = 0; num < count; num++) 
