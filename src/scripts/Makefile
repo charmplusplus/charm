@@ -308,7 +308,6 @@ dirs+sources:
 	./gathertree ../../examples ../examples
 	./gathertree ../../tests ../tests
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
-	rm -f ../bin/gendeps4ci; cp gendeps4ci ../bin/
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/
 #	-ln -s ../../java/bin charmjavabin
