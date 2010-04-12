@@ -511,7 +511,7 @@ Array		: ARRAY ArrayAttribs ArrayIndexType NamedType OptBaseList MemberEList
 		;
 
 TChare		: CHARE CAttribs Name OptBaseList MemberEList
-		{ $$ = new Chare(lineno, $2, new NamedType($3), $4, $5);}
+		{ $$ = new Chare(lineno, $2|Chare::CCHARE, new NamedType($3), $4, $5);}
 		| MAINCHARE CAttribs Name OptBaseList MemberEList
 		{ $$ = new MainChare(lineno, $2, new NamedType($3), $4, $5); }
 		;
