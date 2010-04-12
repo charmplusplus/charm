@@ -449,7 +449,9 @@ extern "C" void CmiInitCPUTopology(char **argv)
   if (CmiMyPe() >= CmiNumPes()) {
     CmiNodeAllBarrier();         // comm thread waiting
 #if CMK_MACHINE_PROGRESS_DEFINED
+#if ! CMK_CRAYXT
     while (done < CmiMyNodeSize()) CmiNetworkProgress();
+#endif
 #endif
     return;    /* comm thread return */
   }
