@@ -24,7 +24,7 @@ int seqCheckpointInProgress;
 POSE_TimeType seqLastCheckpointGVT;
 double seqLastCheckpointTime;
 double seqStartTime;
-CkQ<int> POSE_Skipped_Events;
+CkQ<Skipped_Event> POSE_Skipped_Events;
 
 const eventID& GetEventID() {
   //CpvStaticDeclare(eventID, theEventID);  // initializes to [0.pe]
@@ -132,7 +132,7 @@ void POSE_init(int IDflag, int ET) // can specify both
   POSE_GlobalTS = 0;
   seqCheckpointInProgress = 0;
   seqLastCheckpointGVT = 0;
-  seqLastCheckpointTime = seqStartTime = CmiWallTimer();
+  seqLastCheckpointTime = seqStartTime = 0.0;
 #else
   /*  CkPrintf("WARNING: Charm Quiescence termination enabled!\n");
   int fnIdx = CkIndex_pose::stop();

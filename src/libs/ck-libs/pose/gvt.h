@@ -205,21 +205,7 @@ public:
   /// Migration Constructor
   GVT(CkMigrateMessage *msg) : Group(msg) { };
   /// PUP routine
-  void pup(PUP::er &p) {
-    p|estGVT; p|inactive; p|inactiveTime; p|nextLBstart;
-    p|lastEarliest; p|lastSends; p|lastRecvs; p|reportsExpected;
-    p|optGVT; p|conGVT; p|done; p|startOffset;
-
-    if (p.isUnpacking()) {
-#ifndef CMK_OPTIMIZE
-      localStats = (localStat *)CkLocalBranch(theLocalStats);
-#endif
-    }
-
-    if (SRs != NULL) {
-      CkAbort("ERROR: GVT member *SRs is unexpectedly not NULL\n");
-    }
-  }
+  void pup(PUP::er &p);
   //Use this for Ccd calls
   //static void _runGVT(UpdateMsg *);
   /// ENTRY: Run the GVT

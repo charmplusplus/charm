@@ -60,7 +60,7 @@ class SRentry {
     p|nullFlag;
     if (p.isUnpacking()) {
       if (nullFlag) {
-	next == NULL;
+	next = NULL;
       } else {
 	next = new SRentry();
 	next->pup(p);
