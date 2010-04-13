@@ -109,6 +109,20 @@ if [ -z "$llfile" ]
     exit
 fi
 
+if [ $ppnused -gt 0 ]
+    then
+#The MALLOCMULTIHEAP env var helps to improve the memory allocation performance
+#by splitting the heap into multiple parts where each thread has its
+#own access without locks. However, enabling this var will increase the memory
+#usage, so we only use it when it's a smp run.
+    heaps=$ppnused
+    if [ $ppnused -gt 32 ]
+        then
+        heaps=32
+    fi
+    export MALLOCMULTIHEAP=heaps:$heaps
+fi
+
 filename="charmrun_script.$$.ll"
 interactive=`grep queue $llfile|wc -l`
 
