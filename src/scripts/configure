@@ -1187,6 +1187,11 @@ if test -n "$ac_init_help"; then
 
   cat <<\_ACEOF
 
+Optional Features:
+  --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
+  --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-tracing        enable tracing modules
+
 _ACEOF
 ac_status=$?
 fi
@@ -1621,6 +1626,23 @@ cat >>confdefs.h <<_ACEOF
 #define CHARM_VERSION $VERSION
 _ACEOF
 
+
+# Check whether --enable-tracing was given.
+if test "${enable_tracing+set}" = set; then
+  enableval=$enable_tracing; enable_tracing=$enableval
+else
+  enable_tracing=yes
+fi
+
+
+if test "$enable_tracing" = "no"
+then
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_TRACE_DISABLED 1
+_ACEOF
+
+fi
 
 { echo "$as_me:$LINENO: checking machine name" >&5
 echo $ECHO_N "checking machine name... $ECHO_C" >&6; }

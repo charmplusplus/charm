@@ -532,6 +532,7 @@ then
     echo '#define CMK_REPLAYSYSTEM  0' >> $ConvHeader
     # Prepend optimize so that an explicit -no-optimize still works
     OPTS="-optimize $OPTS"
+    CONFIG_OPTS="$CONFIG_OPTS --disable-tracing"
 fi
 
 # build with Tau
@@ -586,9 +587,9 @@ printError()
 
 echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
 
-Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET"' in $DESTINATION/tmp"
+Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET" CONFIG_OPTS="$CONFIG_OPTS"' in $DESTINATION/tmp"
 cd $DESTINATION/tmp 
-$MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
+$MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET" CONFIG_OPTS="$CONFIG_OPTS"
 MAKEEXIT=$?
 [ $MAKEEXIT -ne 0 ] && printError
 

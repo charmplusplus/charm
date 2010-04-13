@@ -225,6 +225,9 @@
 /* Allows __thread. */
 #undef CMK_TLS_THREAD
 
+/* disable tracing */
+#undef CMK_TRACE_DISABLED
+
 /* whether glibc backtrace works */
 #undef CMK_USE_BACKTRACE
 
