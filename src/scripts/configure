@@ -1191,6 +1191,7 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-tracing        enable tracing modules
+  --enable-replay         enable record/replay
 
 _ACEOF
 ac_status=$?
@@ -1627,6 +1628,7 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+# check enable/disable
 # Check whether --enable-tracing was given.
 if test "${enable_tracing+set}" = set; then
   enableval=$enable_tracing; enable_tracing=$enableval
@@ -1644,6 +1646,24 @@ _ACEOF
 
 fi
 
+# Check whether --enable-replay was given.
+if test "${enable_replay+set}" = set; then
+  enableval=$enable_replay; enable_replay=$enableval
+else
+  enable_replay=yes
+fi
+
+
+if test "$enable_replay" = "no"
+then
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_REPLAYSYSTEM 0
+_ACEOF
+
+fi
+
+#
 { echo "$as_me:$LINENO: checking machine name" >&5
 echo $ECHO_N "checking machine name... $ECHO_C" >&6; }
 version=`pwd | awk -F/ '{print $(NF-1)}'`

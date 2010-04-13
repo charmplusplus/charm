@@ -207,6 +207,9 @@
 /* Python version */
 #undef CMK_PYTHON_VERSION
 
+/* disable replay */
+#undef CMK_REPLAYSYSTEM
+
 /* whether C++ signed char and char differ */
 #undef CMK_SIGNEDCHAR_DIFF_CHAR
 
