@@ -74,7 +74,7 @@ PVT::PVT()
 
   parCheckpointInProgress = 0;
   parLastCheckpointGVT = 0;
-  parLastCheckpointTime = parStartTime = CmiWallTimer();
+  parLastCheckpointTime = parStartTime = 0.0;
   parLBInProgress = 0;
   parLastLBGVT = 0;
 #ifndef CMK_OPTIMIZE
@@ -95,7 +95,7 @@ void PVT::pup(PUP::er &p) {
   p|optGVT; p|conGVT; p|rdone;
 
   if (p.isUnpacking()) {
-    parStartTime = CmiWallTimer() - (parLastCheckpointTime - parStartTime);
+    parStartTime = parLastCheckpointTime;
 #ifndef CMK_OPTIMIZE
     localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
@@ -107,8 +107,24 @@ void PVT::pup(PUP::er &p) {
 
   SendsAndRecvs->pup(p);
 
-  if (SRs != NULL) {
-    CkAbort("ERROR: PVT member *SRs is unexpectedly not NULL\n");
+  int nullFlag;
+  if (SRs == NULL) {
+    nullFlag = 1;
+  } else {
+    nullFlag = 0;
+  }
+  p|nullFlag;
+  if (p.isUnpacking()) {
+    if (nullFlag) {
+      SRs = NULL;
+    } else {
+      SRs = new SRentry();
+      SRs->pup(p);
+    }
+  } else {
+    if (!nullFlag) {
+      SRs->pup(p);
+    }
   }
 }
 
@@ -260,12 +276,13 @@ void PVT::setGVT(GVTMsg *m)
 
   if ((CkMyPe() == 0) && (parCheckpointInProgress == 0) && 
       (((pose_config.checkpoint_gvt_interval > 0) && (estGVT >= (parLastCheckpointGVT + pose_config.checkpoint_gvt_interval))) || 
-       ((pose_config.checkpoint_time_interval > 0) && (CmiWallTimer() >= (parLastCheckpointTime + (double)pose_config.checkpoint_time_interval))))) {
+       ((pose_config.checkpoint_time_interval > 0) && 
+	((CmiWallTimer() + parStartTime) >= (parLastCheckpointTime + (double)pose_config.checkpoint_time_interval))))) {
     // wait for quiescence to occur before checkpointing
     eventMsg *dummyMsg = new eventMsg();
     CkCallback cb(CkIndex_PVT::beginCheckpoint(dummyMsg), CkMyPe(), ThePVT);
     parCheckpointInProgress = 1;
-    parLastCheckpointTime = CmiWallTimer();
+    parLastCheckpointTime = CmiWallTimer() + parStartTime;
     CkStartQD(cb);
   } else if ((CkMyPe() == 0) && (parLBInProgress == 0) && 
       (((pose_config.lb_gvt_interval > 0) && (estGVT >= (parLastLBGVT + pose_config.lb_gvt_interval))))) {
@@ -286,7 +303,7 @@ void PVT::beginCheckpoint(eventMsg *m) {
   CkFreeMsg(m);
   if (parCheckpointInProgress) {  // ensure this only happens once
     CkPrintf("POSE: quiescence detected\n");
-    CkPrintf("POSE: beginning checkpoint on processor %d at GVT=%lld time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() - parStartTime);
+    CkPrintf("POSE: beginning checkpoint on processor %d at GVT=%lld sim time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() + parStartTime);
     eventMsg *dummyMsg = new eventMsg();
     CkCallback cb(CkIndex_PVT::resumeAfterCheckpoint(dummyMsg), CkMyPe(), ThePVT);
     CkStartCheckpoint(POSE_CHECKPOINT_DIRECTORY, cb);
@@ -322,7 +339,7 @@ void PVT::doneLB() {
 /// ENTRY: resume after checkpointing, restarting, or if checkpointing doesn't occur
 void PVT::resumeAfterCheckpoint(eventMsg *m) {
   if (parCheckpointInProgress) {
-    CkPrintf("POSE: checkpoint/restart complete on processor %d at GVT=%lld time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() - parStartTime);
+    CkPrintf("POSE: checkpoint/restart complete on processor %d at GVT=%lld sim time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() + parStartTime);
     parCheckpointInProgress = 0;
     parLastCheckpointGVT = estGVT;
   }
@@ -342,7 +359,7 @@ void PVT::resumeAfterCheckpoint(eventMsg *m) {
 
 void PVT::resumeAfterLB(eventMsg *m) {
   if (parLBInProgress) {
-    CkPrintf("POSE: load balancing complete on processor %d at GVT=%lld time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() - parStartTime);
+    CkPrintf("POSE: load balancing complete on processor %d at GVT=%lld sim time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() + parStartTime);
     parLBInProgress = 0;
     parLastLBGVT = estGVT;
   }
@@ -531,6 +548,39 @@ GVT::GVT()
     *((int *)CkPriorityPtr(startMsg)) = 0;
     CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
     p.startPhase(startMsg); // broadcast PVT calculation to all PVT branches
+  }
+}
+
+/// PUP routine
+void GVT::pup(PUP::er &p) {
+  p|estGVT; p|inactive; p|inactiveTime; p|nextLBstart;
+  p|lastEarliest; p|lastSends; p|lastRecvs; p|reportsExpected;
+  p|optGVT; p|conGVT; p|done; p|startOffset;
+
+  if (p.isUnpacking()) {
+#ifndef CMK_OPTIMIZE
+    localStats = (localStat *)CkLocalBranch(theLocalStats);
+#endif
+  }
+
+  int nullFlag;
+  if (SRs == NULL) {
+    nullFlag = 1;
+  } else {
+    nullFlag = 0;
+  }
+  p|nullFlag;
+  if (p.isUnpacking()) {
+    if (nullFlag) {
+      SRs = NULL;
+    } else {
+      SRs = new SRentry();
+      SRs->pup(p);
+    }
+  } else {
+    if (!nullFlag) {
+      SRs->pup(p);
+    }
   }
 }
 

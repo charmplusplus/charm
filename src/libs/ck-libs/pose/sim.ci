@@ -17,6 +17,7 @@ module sim {
     entry sim(void);
     entry void Step();
     entry void Step(prioMsg *m);
+    entry void CheckpointStep(eventMsg *);
     entry void Status(void);
     entry void Commit(void);	
     entry void ReportLBdata(void);	

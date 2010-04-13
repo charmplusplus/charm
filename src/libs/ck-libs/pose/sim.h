@@ -240,7 +240,9 @@ class sim : public CBase_sim {
   /// Start a forward execution step on myStrat
   void Step();                 
   /// Start a prioritized forward execution step on myStrat
-  void Step(prioMsg *m);       
+  void Step(prioMsg *m);    
+  /// Start a forward execution step on myStrat after a checkpoint (sequential mode only)
+  void CheckpointStep(eventMsg *m);
   /// Report safe time to PVT branch
   void Status() { 
     localPVT->objUpdateOVT(myPVTidx, myStrat->SafeTime(), objID->OVT()); 

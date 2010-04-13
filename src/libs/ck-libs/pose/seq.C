@@ -20,23 +20,29 @@ void seq::Step() {
       POSE_GlobalClock = userObj->OVT();
     ev->done = 1;
     eq->ShiftEvent();                       // move on to next event
-    eq->CommitAll(parent);
+    eq->CommitDoneEvents(parent);
 
     // checkpoint if appropriate
     if ((userObj->myHandle == 0) && (seqCheckpointInProgress == 0) && 
 	(((pose_config.checkpoint_gvt_interval > 0) && (POSE_GlobalClock >= (seqLastCheckpointGVT + pose_config.checkpoint_gvt_interval))) || 
-	 ((pose_config.checkpoint_time_interval > 0) && (CmiWallTimer() >= (seqLastCheckpointTime + (double)pose_config.checkpoint_time_interval))))) {
+	 ((pose_config.checkpoint_time_interval > 0) && 
+	  ((CmiWallTimer() + seqStartTime) >= (seqLastCheckpointTime + (double)pose_config.checkpoint_time_interval))))) {
       // start quiescence detection on the sim chare
       seqCheckpointInProgress = 1;
       seqLastCheckpointGVT = POSE_GlobalClock;
-      seqLastCheckpointTime = CmiWallTimer();
+      seqLastCheckpointTime = CmiWallTimer() + seqStartTime;
     }
 
   } else {
 
-    // if in the process of checkpointing, store sim handle so Step()
-    // can be called for this event on restart
-    POSE_Skipped_Events.enq(userObj->myHandle);
+    // if in the process of checkpointing, store info so Step() can be
+    // called for this event on restart/resume
+    Skipped_Event se;
+    se.simIndex = userObj->myHandle;
+    se.timestamp = eq->tsOfLastInserted;
+
+    // store skipped event
+    POSE_Skipped_Events.enq(se);
 
   }
 
