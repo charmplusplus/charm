@@ -77,6 +77,10 @@
 #endif
 #endif
 
+#endif    /* CMK_OPTIMIZE */
+
+#ifndef CMK_TRACE_DISABLED
+#define CMK_TRACE_DISABLED          0
 #endif
 
 #endif

@@ -18,7 +18,7 @@ int traceBluegeneLinked = 0;
 void traceInit(char **argv) {
   CpvInitialize(int, traceOn);
   CpvAccess(traceOn)=0;
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   CpvInitialize(int, _traceCoreOn); 
   CpvAccess(_traceCoreOn)=0; 
   /* initTraceCore(argv); */

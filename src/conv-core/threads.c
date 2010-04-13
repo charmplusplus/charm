@@ -673,7 +673,7 @@ void CthSuspend(void)
     CmiAbort("A thread's scheduler should not be less than 0!\n");
 #endif    
 
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
 #if !CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceSuspend();
@@ -692,7 +692,7 @@ void CthAwaken(CthThread th)
     return;
   } */
 
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceAwaken(th);
@@ -713,7 +713,7 @@ void CthYield()
 void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 {
   if (B(th)->awakenfn == 0) CthNoStrategy();
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceAwaken(th);
