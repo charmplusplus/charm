@@ -136,13 +136,18 @@ importDeclaration
     ;
     
 typeDeclaration
-    :   ^('class' IDENT (^('extends' su=type))? (^('implements' type+))? (csds+=classScopeDeclaration)*)
+    :   ^('template' '<' 'class' IDENT '>' td=typeDeclaration)
+        -> {emitH()}? templateDeclaration_h(
+            ident={$IDENT.text},
+            class1={$td.st})
+        ->
+    |   ^('class' i1=IDENT (^('extends' su=type))? (^('implements' type+))? (csds+=classScopeDeclaration)*)
         -> {emitCC()}? classDeclaration_cc(
-                ident={$IDENT.text}, 
+                ident={$i1.text}, 
                 ext={$su.st}, 
                 csds={$csds})
         -> {emitH()}? classDeclaration_h(
-                ident={$IDENT.text}, 
+                ident={$i1.text}, 
                 ext={$su.st}, 
                 csds={$csds})
         ->

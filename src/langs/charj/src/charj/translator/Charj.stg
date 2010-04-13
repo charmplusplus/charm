@@ -80,7 +80,6 @@ interfaceExtends(ts) ::=
 : public <ts; separator=", public ">
 >>
 
-
 classDeclaration_h(ident, ext, csds) ::=
 <<
 <if(debug)>/* \<typeDeclaration> */<endif>
@@ -92,6 +91,12 @@ class <ident>: public CBase_<ident> {
 };
 <if(debug)>/* \</typeDeclaration> */<endif>
 
+>>
+
+templateDeclaration_h(ident, class1) ::=
+<<
+template \<class <ident>\>
+<class1>
 >>
 
 classDeclaration_cc(ident, ext, csds) ::=
