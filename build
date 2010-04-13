@@ -335,6 +335,15 @@ do
 		QUIET="--quiet"
 		shift;
 		;;
+    --enable-tracing|--enable-tracing=*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		ENABLE_TRACING=yes
+		shift
+		;;
+    --enable-*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		shift
+		;;
     -j*)
                 PMAKENUM=`echo $1 | awk -Fj '{print $2}'`
 		MAKEOPTS="$MAKEOPTS -j $PMAKENUM"
@@ -368,6 +377,7 @@ do
           TestIfOption $1
           BOPTS="$BOPTS $1"
           [ $1 =  "bigemulator" ] && BUILD_EMULATOR=1
+          [ $1 =  "bigsim" ] && BUILD_EMULATOR=1
         fi
         shift
 	;;
@@ -375,6 +385,12 @@ do
 done
 
 [ "x$VERSION" = "x" ] && syntax && exit 1
+
+if test -n "$WITH_PRODUCTION" -a $BUILD_EMULATOR -eq 1 -a -z "$ENABLE_TRACING"
+then
+  echo "Error: bigemulator requires tracing modules, --with-production must be used with --enable-tracing"
+  exit 1
+fi
 
 if [ -z "$MAKE" ] 
 then
@@ -532,7 +548,7 @@ then
     echo '#define CMK_REPLAYSYSTEM  0' >> $ConvHeader
     # Prepend optimize so that an explicit -no-optimize still works
     OPTS="-optimize $OPTS"
-    CONFIG_OPTS="$CONFIG_OPTS --disable-tracing"
+    CONFIG_OPTS="--disable-tracing $CONFIG_OPTS"
 fi
 
 # build with Tau
