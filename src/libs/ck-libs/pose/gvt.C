@@ -274,7 +274,7 @@ void PVT::setGVT(GVTMsg *m)
   // pose_config.checkpoint_time_interval seconds (both defined in
   // pose_config.h).
 
-  if ((CkMyPe() == 0) && (parCheckpointInProgress == 0) && 
+  if ((CkMyPe() == 0) && (parCheckpointInProgress == 0) && (estGVT > 0) && 
       (((pose_config.checkpoint_gvt_interval > 0) && (estGVT >= (parLastCheckpointGVT + pose_config.checkpoint_gvt_interval))) || 
        ((pose_config.checkpoint_time_interval > 0) && 
 	((CmiWallTimer() + parStartTime) >= (parLastCheckpointTime + (double)pose_config.checkpoint_time_interval))))) {

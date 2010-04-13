@@ -23,7 +23,7 @@ void seq::Step() {
     eq->CommitDoneEvents(parent);
 
     // checkpoint if appropriate
-    if ((userObj->myHandle == 0) && (seqCheckpointInProgress == 0) && 
+    if ((userObj->myHandle == 0) && (seqCheckpointInProgress == 0) && (POSE_GlobalClock > 0) && 
 	(((pose_config.checkpoint_gvt_interval > 0) && (POSE_GlobalClock >= (seqLastCheckpointGVT + pose_config.checkpoint_gvt_interval))) || 
 	 ((pose_config.checkpoint_time_interval > 0) && 
 	  ((CmiWallTimer() + seqStartTime) >= (seqLastCheckpointTime + (double)pose_config.checkpoint_time_interval))))) {
