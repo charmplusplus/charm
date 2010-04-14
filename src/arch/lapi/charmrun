@@ -115,8 +115,8 @@ if [ $ppnused -gt 0 ]
 #by splitting the heap into multiple parts where each thread has its
 #own access without locks. However, enabling this var will increase the memory
 #usage, so we only use it when it's a smp run.
-    heaps=$ppnused
-    if [ $ppnused -gt 32 ]
+    heaps=`expr $ppnused + 1`
+    if [ $heaps -gt 32 ]
         then
         heaps=32
     fi
