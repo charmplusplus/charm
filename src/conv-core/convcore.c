@@ -3265,6 +3265,7 @@ void ConverseCommonExit(void)
   exitHybridAPI(); 
 #endif
 
+  EmergencyExit();
 }
 
 
