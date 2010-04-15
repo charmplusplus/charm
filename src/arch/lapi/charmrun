@@ -109,6 +109,8 @@ if [ -z "$llfile" ]
     exit
 fi
 
+if [ -n "$ppnused" ]
+then
 if [ $ppnused -gt 0 ]
     then
 #The MALLOCMULTIHEAP env var helps to improve the memory allocation performance
@@ -121,6 +123,7 @@ if [ $ppnused -gt 0 ]
         heaps=32
     fi
     export MALLOCMULTIHEAP=heaps:$heaps
+fi
 fi
 
 filename="charmrun_script.$$.ll"
