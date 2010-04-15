@@ -257,7 +257,8 @@ headers: dirs+sources
 	$(MAKE) headerlinks
 
 conv-autoconfig.h: configure
-	./configure $(QUIET) $(CONFIG_OPTS)
+	@. ./config_opts.sh; echo ./configure $(QUIET) $$CONFIG_OPTS;  \
+	./configure $(QUIET) $$CONFIG_OPTS
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
 	@[ "x$QUIET" = "x--quiet" ] || echo "Soft-linking headers..."

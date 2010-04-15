@@ -70,14 +70,17 @@
 
 /* set up what production/non-production means */
 #ifdef CMK_OPTIMIZE
+/*
 #undef CMK_REPLAYSYSTEM
 #define CMK_REPLAYSYSTEM            0
+*/
 #endif    /* CMK_OPTIMIZE */
 
 #ifndef CMK_REPLAYSYSTEM
 #define CMK_REPLAYSYSTEM            1
 #endif
 
+/* replay does not work on windows */
 #ifdef _WIN32
 #undef CMK_REPLAYSYSTEM
 #define CMK_REPLAYSYSTEM            0
