@@ -136,7 +136,7 @@ importDeclaration
     ;
     
 typeDeclaration
-    :   ^('template' '<' 'class' IDENT '>' td=typeDeclaration)
+    :   ^('template' 'class' IDENT td=typeDeclaration)
         -> {emitH()}? templateDeclaration_h(
             ident={$IDENT.text},
             class1={$td.st})

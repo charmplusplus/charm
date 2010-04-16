@@ -146,7 +146,7 @@ typeDeclaration
 
 templateDeclaration
     : 'template' '<' 'class' IDENT '>' classDefinition
-        -> ^('template' '<' 'class' IDENT '>' classDefinition)
+        -> ^('template' 'class' IDENT classDefinition)
     ;
 
 classDefinition
