@@ -380,12 +380,21 @@ void CthRegistered(int maxOffset) {
 /*********** Creation and Deletion **********/
 CthCpvStatic(int, _defaultStackSize);
 
+void CthSetSerialNo(CthThread t, int no)
+{
+  B(t)->token->serialNo = no;
+}
+
 static void CthThreadBaseInit(CthThreadBase *th)
 {
   static int serialno = 1;
   th->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
   th->token->thread = S(th);
+#if CMK_BLUEGENE_CHARM
+  th->token->serialNo = -1;
+#else
   th->token->serialNo = CpvAccess(Cth_serialNo)++;
+#endif
   th->scheduled = 0;
 
   th->awakenfn = 0;
