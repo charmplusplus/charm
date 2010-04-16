@@ -38,9 +38,9 @@
 
 CpvCExtern(int, _traceCoreOn);   // projector
 
-#ifdef CMK_OPTIMIZE
+#if CMK_TRACE_DISABLED
 static int warned = 0;
-#define OPTIMIZE_WARNING if (!warned) { warned=1;  CmiPrintf("\n\n!!!! Warning: tracing not available with CMK_OPTIMIZE!\n");  return;  }
+#define OPTIMIZE_WARNING if (!warned) { warned=1;  CmiPrintf("\n\n!!!! Warning: tracing not available with CMK_TRACE_DISABLED!\n");  return;  }
 #else
 #define OPTIMIZE_WARNING /*empty*/
 #endif
@@ -265,7 +265,7 @@ void TraceArray::traceEndOnCommThread() {
 
 /*Install the beginIdle/endIdle condition handlers.*/
 extern "C" void traceBegin(void) {
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   DEBUGF(("[%d] traceBegin called with %d at %f\n", CkMyPe(), CpvAccess(traceOn), TraceTimer()));
   
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -285,7 +285,7 @@ extern "C" void traceBegin(void) {
 
 /*Cancel the beginIdle/endIdle condition handlers.*/
 extern "C" void traceEnd(void) {
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   DEBUGF(("[%d] traceEnd called with %d at %f\n", CkMyPe(), CpvAccess(traceOn), TraceTimer()));
 
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -301,7 +301,7 @@ if(CmiMyRank()==0){
 	
   if (CpvAccess(traceOn)==0) return;
   if (CkpvAccess(_traces) == NULL) {
-    CmiPrintf("Warning: did you mix compilation with and without -DCMK_OPTIMIZE? \n");
+    CmiPrintf("Warning: did you mix compilation with and without -DCMK_TRACE_DISABLED? \n");
   }
   CkpvAccess(_traces)->traceEnd();
   CpvAccess(traceOn) = 0;
@@ -392,7 +392,7 @@ extern "C" void traceCharmInit(char **argv)
 #endif
 }
 
-// CMK_OPTIMIZE is already guarded in convcore.c
+// CMK_TRACE_DISABLED is already guarded in convcore.c
 extern "C"
 void traceMessageRecv(char *msg, int pe)
 {
@@ -401,7 +401,7 @@ void traceMessageRecv(char *msg, int pe)
 #endif
 }
 
-// CMK_OPTIMIZE is already guarded in convcore.c
+// CMK_TRACE_DISABLED is already guarded in convcore.c
 // converse thread tracing is not supported in blue gene simulator
 // in BigSim, threads need to be traced manually (because virtual processors
 // themselves are implemented as threads and we don't want them to be traced
@@ -429,7 +429,7 @@ void traceAwaken(CthThread t)
 extern "C"
 void traceUserEvent(int e)
 {
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   if (CpvAccess(traceOn))
     CkpvAccess(_traces)->userEvent(e);
 #endif
@@ -438,7 +438,7 @@ void traceUserEvent(int e)
 extern "C"
 void traceUserBracketEvent(int e, double beginT, double endT)
 {
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
     CkpvAccess(_traces)->userBracketEvent(e, beginT, endT);
 #endif
@@ -447,7 +447,7 @@ void traceUserBracketEvent(int e, double beginT, double endT)
 extern "C"
 void traceUserSuppliedData(int d)
 {
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
     CkpvAccess(_traces)->userSuppliedData(d);
 #endif
@@ -456,7 +456,7 @@ void traceUserSuppliedData(int d)
 extern "C"
 void traceUserSuppliedNote(char * note)
 {
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
     CkpvAccess(_traces)->userSuppliedNote(note);
 #endif
@@ -467,7 +467,7 @@ extern "C"
 void traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double et)
 {
   //CkPrintf("traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double et)\n");
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
     CkpvAccess(_traces)->userSuppliedBracketedNote(note, eventID, bt, et);
 #endif
@@ -477,7 +477,7 @@ void traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double e
 extern "C"
 void traceMemoryUsage()
 {
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   double d = CmiMemoryUsage()*1.0;
 
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
@@ -510,7 +510,7 @@ void (*registerMachineUserEvents())() {
 extern "C"
 int traceRegisterUserEvent(const char*x, int e)
 {
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   return CkpvAccess(_traces)->traceRegisterUserEvent(x, e);
 #else
   return 0;
@@ -594,7 +594,7 @@ int CkIsCharmMessage(char *msg)
 // return 1 if any one of tracing modules is linked.
 int  traceAvailable()
 {
-#ifdef CMK_OPTIMIZE
+#if CMK_TRACE_DISABLED
   return 0;
 #else
   return CkpvAccess(_traces)->length()>0;
@@ -628,7 +628,7 @@ void registerFunction(char *name){
 
 extern "C"
 int traceRegisterFunction(const char* name, int idx) {
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   if(idx==-999){
     CkpvAccess(_traces)->regFunc(name, idx);
   } else {

@@ -87,7 +87,7 @@ void sim::pup(PUP::er &p) {
     p|seqStartTime;
     p|POSE_Skipped_Events;
     if (p.isUnpacking()) {
-      seqStartTime = CmiWallTimer() - (seqLastCheckpointTime - seqStartTime);
+      seqStartTime = seqLastCheckpointTime;
     }
   }
 #endif
@@ -165,6 +165,33 @@ void sim::Step(prioMsg *m)
 	localStats->TimerStop();
       else localStats->SwitchTimer(tstat);
     }
+#endif
+}
+
+/// Start a forward execution step on myStrat after a checkpoint (sequential mode only)
+void sim::CheckpointStep(eventMsg *m) {
+  CkFreeMsg(m);
+  if (active < 0) return; // object is migrating; deactivate it 
+#ifndef CMK_OPTIMIZE
+  int tstat;
+  if (pose_config.stats) {
+    tstat = localStats->TimerRunning();
+    if (!tstat)
+      localStats->TimerStart(SIM_TIMER);
+    else localStats->SwitchTimer(SIM_TIMER);
+  }
+#endif
+
+  // ensure sequential mode
+  CkAssert(myStrat->STRAT_T == SEQ_T);
+  myStrat->Step(); // Call Step on strategy
+
+#ifndef CMK_OPTIMIZE
+  if (pose_config.stats) {
+    if (!tstat)
+      localStats->TimerStop();
+    else localStats->SwitchTimer(tstat);
+  }
 #endif
 }
 
@@ -301,7 +328,7 @@ void sim::SeqBeginCheckpoint() {
   // Ensure we're checkpointing
   CkAssert(seqCheckpointInProgress);
   CkPrintf("POSE: quiescence detected\n");
-  CkPrintf("POSE: beginning checkpoint on sim %d at GVT=%lld time=%.1f sec\n", thisIndex, seqLastCheckpointGVT, CmiWallTimer() - seqStartTime);
+  CkPrintf("POSE: beginning checkpoint on sim %d at GVT=%lld sim time=%.1f sec\n", thisIndex, seqLastCheckpointGVT, CmiWallTimer() + seqStartTime);
   CkCallback cb(CkIndex_sim::SeqResumeAfterCheckpoint(), CkArrayIndex1D(thisIndex), thisProxy);
   CkStartCheckpoint(POSE_CHECKPOINT_DIRECTORY, cb);
 }
@@ -314,22 +341,40 @@ void sim::SeqResumeAfterCheckpoint() {
   CkAssert(seqCheckpointInProgress);
   seqCheckpointInProgress = 0;
   POSE_GlobalClock = seqLastCheckpointGVT;
-  CkPrintf("POSE: checkpoint/restart complete on sim %d at GVT=%lld time=%.1f sec\n", thisIndex, POSE_GlobalClock, CmiWallTimer() - seqStartTime);
+  CkPrintf("POSE: checkpoint/restart complete on sim %d at GVT=%lld sim time=%.1f sec\n", thisIndex, POSE_GlobalClock, CmiWallTimer() + seqStartTime);
+
   // restart simulation
   while (POSE_Skipped_Events.length() > 0) {
-    // These Step iterations MUST be executed now, before any messages
-    // are delivered, or else the event queues will break.  To do this
-    // efficiently, since we're in sequential mode, call Step() as a
-    // local function.
-    int index = POSE_Skipped_Events.deq();
-    sim *localSim = POSE_Objects[index].ckLocal();
-    if (localSim == NULL) {
-      CkPrintf("ERROR: could not obtain pointer to local sim object %d after checkpoint/restart\n", index);
-      CkAbort("Pointer to local sim is NULL...this shouldn't happen in sequential mode\n");
-    } else {
-      localSim->Step();
+    // These Step iterations must all be enqueued now, before any messages
+    // are delivered, or else the event queues will break.  Because
+    // messages spawned by these events may need to be inserted, these
+    // events should be enqueued in the same manner as that used by
+    // the translated verion of POSE_invoke
+    eventMsg *evtMsg = new eventMsg;
+    Skipped_Event se = POSE_Skipped_Events.deq();
+    int _POSE_handle = se.simIndex;
+    POSE_TimeType _POSE_timeOffset = se.timestamp - objID->ovt;
+    objID->registerTimestamp(_POSE_handle, evtMsg, _POSE_timeOffset);
+    if (pose_config.dop) {
+      ct = CmiWallTimer();
+      evtMsg->rst = ct - st + eq->currentPtr->srt;
     }
+#ifndef CMK_OPTIMIZE
+    evtMsg->sanitize();
+#endif
+#ifndef CMK_OPTIMIZE
+    if(pose_config.stats)
+      localStats->SwitchTimer(COMM_TIMER);
+#endif
+    thisProxy[_POSE_handle].CheckpointStep(evtMsg);
+#ifndef CMK_OPTIMIZE
+    if (pose_config.stats)
+      localStats->SwitchTimer(DO_TIMER);
+#endif
   }
+
+  // restart quiescence detection, which is used for termination of
+  // sequential POSE
   CkStartQD(CkIndex_pose::stop(), &POSE_Coordinator_ID);
 }
 

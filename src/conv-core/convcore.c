@@ -1745,7 +1745,7 @@ void CthResumeNormalThread(CthThreadToken* token)
     free(token);
     return;
   }
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     CthTraceResume(t);
@@ -1773,7 +1773,7 @@ void CthResumeSchedulingThread(CthThreadToken  *token)
     CpvAccess(CthSleepingStandins) = me;
   }
   CpvAccess(CthSchedulingThread) = t;
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     CthTraceResume(t);
@@ -3231,7 +3231,7 @@ void ConverseCommonInit(char **argv)
    }
 #endif
 	
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   traceInit(argv);
 /*initTraceCore(argv);*/ /* projector */
 #endif
@@ -3280,7 +3280,7 @@ void ConverseCommonExit(void)
 {
   CcsImpl_kill();
 
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   traceClose();
 /*closeTraceCore();*/ /* projector */
 #endif
@@ -3297,6 +3297,7 @@ void ConverseCommonExit(void)
   exitHybridAPI(); 
 #endif
 
+  EmergencyExit();
 }
 
 

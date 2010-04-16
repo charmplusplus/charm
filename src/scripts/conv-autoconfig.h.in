@@ -207,6 +207,9 @@
 /* Python version */
 #undef CMK_PYTHON_VERSION
 
+/* disable replay */
+#undef CMK_REPLAYSYSTEM
+
 /* whether C++ signed char and char differ */
 #undef CMK_SIGNEDCHAR_DIFF_CHAR
 
@@ -224,6 +227,9 @@
 
 /* Allows __thread. */
 #undef CMK_TLS_THREAD
+
+/* disable tracing */
+#undef CMK_TRACE_DISABLED
 
 /* whether glibc backtrace works */
 #undef CMK_USE_BACKTRACE

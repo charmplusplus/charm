@@ -784,7 +784,10 @@ extern "C"
 void EmergencyExit(void) {
 #ifndef __BLUEGENE__
   /* Delete _coreState to force any CkMessageWatcher to close down. */
-  delete CkpvAccess(_coreState);
+  if (CkpvAccess(_coreState) != NULL) {
+    delete CkpvAccess(_coreState);
+    CkpvAccess(_coreState) = NULL;
+  }
 #endif
 }
 

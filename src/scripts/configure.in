@@ -11,6 +11,30 @@ VERSION=60301
 echo $VERSION > ../include/VERSION
 AC_DEFINE_UNQUOTED([CHARM_VERSION], $VERSION, [Charm++ version number])
 
+# check enable/disable
+AC_ARG_ENABLE([tracing],
+            [AS_HELP_STRING([--enable-tracing],
+              [enable tracing modules])],
+            [enable_tracing=$enableval],
+            [enable_tracing=yes])
+
+if test "$enable_tracing" = "no"
+then
+  AC_DEFINE_UNQUOTED(CMK_TRACE_DISABLED, 1, [disable tracing])
+fi
+
+AC_ARG_ENABLE([replay],
+            [AS_HELP_STRING([--enable-replay],
+              [enable record/replay])],
+            [enable_replay=$enableval],
+            [enable_replay=yes])
+
+if test "$enable_replay" = "no"
+then
+  AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
+fi
+
+#
 AC_MSG_CHECKING(machine name)
 version=`pwd | awk -F/ '{print $(NF-1)}'`
 base_version=`cat .vdir`

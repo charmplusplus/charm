@@ -105,6 +105,24 @@ extern int POSE_inactDetect;
 extern POSE_TimeType POSE_GlobalClock;
 extern POSE_TimeType POSE_GlobalTS;
 
+/// Class for storing data of events skipped while checkpointing (for sequential simulation)
+class Skipped_Event {
+ public:
+  int simIndex;
+  POSE_TimeType timestamp;
+
+  Skipped_Event() {}
+  Skipped_Event(int sIndex, POSE_TimeType ts) : simIndex(sIndex), timestamp(ts) {}
+  void pup(PUP::er &p) {
+    p|simIndex; p|timestamp;
+  }
+  inline Skipped_Event& operator=(const Skipped_Event &obj) {
+    simIndex = obj.simIndex;
+    timestamp = obj.timestamp;
+    return *this;
+  }
+};
+
 /// Checkpointing (for sequential simulation)
 extern int seqCheckpointInProgress;
 extern POSE_TimeType seqLastCheckpointGVT;
@@ -113,7 +131,7 @@ extern double seqStartTime;
 // Global queue for storing POSE object array indices that are
 // skipped during quiescence detection just before checkpointing
 // (used in sequential mode only)
-extern CkQ<int> POSE_Skipped_Events;
+extern CkQ<Skipped_Event> POSE_Skipped_Events;
 
 /// For getting access to the commlib strategy
 #ifdef POSE_COMM_ON

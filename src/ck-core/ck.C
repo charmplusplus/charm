@@ -1977,35 +1977,54 @@ printf("[%d] DELETE!\n", CkMyPe());
 #include "crc32.h"
 
 CkpvDeclare(int, envelopeEventID);
+int _recplay_crc = 0;
+int _recplay_checksum = 0;
+int _recplay_logsize = 1024*1024;
 
 CkMessageWatcher::~CkMessageWatcher() {}
 
 class CkMessageRecorder : public CkMessageWatcher {
+  char *buffer;
+  unsigned int curpos;
 public:
-  CkMessageRecorder(FILE *f_) { f=f_; }
+  CkMessageRecorder(FILE *f_): curpos(0) { f=f_; buffer=new char[_recplay_logsize]; }
   ~CkMessageRecorder() {
+    CkPrintf("closing log\n");
+    flushLog();
     fprintf(f,"-1 -1 -1 ");
     fclose(f);
+    delete[] buffer;
   }
 
 private:
+  void flushLog() {
+    CkPrintf("flushing log\n");
+    fprintf(f, "%s", buffer);
+    curpos=0;
+  }
   virtual CmiBool process(envelope *env,CkCoreState *ck) {
     if (env->getEvent()) {
+      char tmp[128];
       bool wasPacked = env->isPacked();
       if (!wasPacked) CkPackMessage(&env);
       unsigned int crc1=0, crc2=0;
-      if (CmiMemoryIs(CMI_MEMORY_IS_CHARMDEBUG)) {
+      if (_recplay_crc) {
         //unsigned int crc = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
         crc1 = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
         crc2 = crc32_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
+      } else if (_recplay_checksum) {
+        crc1 = checksum_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
+        crc2 = checksum_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
       }
-      fprintf(f,"%d %d %d %hhd %x %x\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2);
+      curpos+=sprintf(&buffer[curpos],"%d %d %d %hhd %x %x\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2);
+      if (curpos > _recplay_logsize-128) flushLog();
       if (!wasPacked) CkUnpackMessage(&env);
     }
     return CmiTrue;
   }
   virtual int process(CthThreadToken *token,CkCoreState *ck) {
-    fprintf(f, "%d %d %d\n",CkMyPe(), -2, token->serialNo);
+    curpos+=sprintf(&buffer[curpos], "%d %d %d\n",CkMyPe(), -2, token->serialNo);
+    if (curpos > _recplay_logsize-128) flushLog();
     return 1;
   }
 };
@@ -2081,17 +2100,28 @@ class CkMessageReplay : public CkMessageWatcher {
 			CkPrintf("CkMessageReplay> Message size changed during replay org: [%d %d %d] got: [%d %d %d]\n", nextPE, nextEvent, nextSize, env->getSrcPe(), env->getEvent(), env->getTotalsize());
                         return CmiFalse;
                 }
-		if (CmiMemoryIs(CMI_MEMORY_IS_CHARMDEBUG)) {
+		if (_recplay_crc || _recplay_checksum) {
 		  bool wasPacked = env->isPacked();
 		  if (!wasPacked) CkPackMessage(&env);
-		  //unsigned int crcnew = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
-		  unsigned int crcnew1 = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
-		  unsigned int crcnew2 = crc32_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
-		  if (crcnew1 != crc1) {
-		    CkPrintf("CkMessageReplay %d> Envelope CRC changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc1,crcnew1);
-		  }
-		  if (crcnew2 != crc2) {
-		    CkPrintf("CkMessageReplay %d> Message CRC changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc2,crcnew2);
+		  if (_recplay_crc) {
+		    //unsigned int crcnew = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
+		    unsigned int crcnew1 = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
+		    unsigned int crcnew2 = crc32_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
+		    if (crcnew1 != crc1) {
+		      CkPrintf("CkMessageReplay %d> Envelope CRC changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc1,crcnew1);
+		    }
+		    if (crcnew2 != crc2) {
+		      CkPrintf("CkMessageReplay %d> Message CRC changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc2,crcnew2);
+		    }
+		  } else if (_recplay_checksum) {
+            unsigned int crcnew1 = checksum_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
+            unsigned int crcnew2 = checksum_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
+            if (crcnew1 != crc1) {
+              CkPrintf("CkMessageReplay %d> Envelope Checksum changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc1,crcnew1);
+            }
+            if (crcnew2 != crc2) {
+              CkPrintf("CkMessageReplay %d> Message Checksum changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc2,crcnew2);
+            }		    
 		  }
 		  if (!wasPacked) CkUnpackMessage(&env);
 		}
@@ -2305,7 +2335,14 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     CmiBool forceReplay = CmiFalse;
     char *procs = NULL;
     _replaySystem = 0;
-	REPLAYDEBUG("CkMessageWatcherInit ");
+    if (CmiGetArgFlagDesc(argv,"+recplay-crc","Enable crc32 for message record-replay")) {
+      _recplay_crc = 1;
+    }
+    if (CmiGetArgFlagDesc(argv,"+recplay-checksum","Enable simple checksum for message record-replay")) {
+      _recplay_checksum = 1;
+    }
+    CmiGetArgIntDesc(argv,"+recplay-logsize",&_recplay_logsize,"Specify the size of the buffer used by the message recorder");
+    REPLAYDEBUG("CkMessageWatcherInit ");
     if (CmiGetArgStringDesc(argv,"+record-detail",&procs,"Record full message content for the specified processors")) {
         CkListString list(procs);
         if (list.includes(CkMyPe())) {
@@ -2318,6 +2355,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
         CmiPrintf("Charm++> record mode.\n");
         if (!CmiMemoryIs(CMI_MEMORY_IS_CHARMDEBUG)) {
           CmiPrintf("Charm++> Warning: disabling recording for message integrity detection (requires linking with -memory charmdebug)\n");
+          _recplay_crc = _recplay_checksum = 0;
         }
       }
       CpdSetInitializeMemory(1);
@@ -2344,6 +2382,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	    CmiPrintf("Charm++> replay mode.\n");
 	    if (!CmiMemoryIs(CMI_MEMORY_IS_CHARMDEBUG)) {
 	      CmiPrintf("Charm++> Warning: disabling message integrity detection during replay (requires linking with -memory charmdebug)\n");
+	      _recplay_crc = _recplay_checksum = 0;
 	    }
 	  }
 	  CpdSetInitializeMemory(1);
@@ -2351,6 +2390,9 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	  CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
 #endif
 	  ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
+	}
+	if (_recplay_crc && _recplay_checksum) {
+	  CmiAbort("Both +recplay-crc and +recplay-checksum options specified, only one allowed.");
 	}
 }
 
