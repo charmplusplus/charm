@@ -279,7 +279,7 @@ void BgUnsetStartOutOfCore();
 /*********************** Record / Replay *************************/
 int BgIsRecord();
 int BgIsReplay();
-void BgRewinRecord();
+void BgRewindRecord();
 
 #if defined(__cplusplus)
 }

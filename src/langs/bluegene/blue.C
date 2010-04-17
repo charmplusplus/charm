@@ -2122,7 +2122,7 @@ int BgIsReplay()
 }
 
 // for record/replay, to fseek back
-void BgRewinRecord()
+void BgRewindRecord()
 {
   threadInfo *tinfo = cta(threadinfo);
   if (tinfo->watcher) tinfo->watcher->rewind();
