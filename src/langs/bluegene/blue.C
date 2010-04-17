@@ -539,6 +539,18 @@ void addBgNodeMessage(char *msgPtr)
   tMYNODE->addBgNodeMessage(msgPtr);
 }
 
+void BgEnqueue(char *msg)
+{
+#if 0
+  ASSERT(tTHREADTYPE == WORK_THREAD);
+  workThreadInfo *tinfo = (workThreadInfo *)cta(threadinfo);
+  tinfo->addAffMessage(msg);
+#else
+  nodeInfo *myNode = cta(threadinfo)->myNode;
+  addBgNodeInbuffer(msg, myNode->id);
+#endif
+}
+
 /** BG API Func 
  *  check if inBuffer on this node has msg available
  */
@@ -2094,6 +2106,10 @@ void BgSetStrategyBigSimDefault(CthThread t)
   CthAddListener(t, a);
 }
 
+int BgIsMainthread()
+{
+    return tMYNODE == NULL;
+}
 
 int BgIsRecord()
 {
@@ -2105,7 +2121,10 @@ int BgIsReplay()
     return cva(bgMach).replay != -1;
 }
 
-int BgIsMainthread()
+// for record/replay, to fseek back
+void BgRewinRecord()
 {
-    return tMYNODE == NULL;
+  threadInfo *tinfo = cta(threadinfo);
+  if (tinfo->watcher) tinfo->watcher->rewind();
 }
+
