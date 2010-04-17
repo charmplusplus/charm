@@ -53,8 +53,8 @@ double memoryAllocTest(){
   extraOverhead = endtime - starttime;
   
   starttime = CmiWallTimer();
-  for(i=0; i<NMALLOCITER; i++) ptrs[i] = malloc(MALLOCSIZE);
-  for(i=0; i<NMALLOCITER; i++) free(ptrs[i]);
+  for(i=0; i<NMALLOCITER; i++) ptrs[i] = CmiAlloc(MALLOCSIZE);
+  for(i=0; i<NMALLOCITER; i++) CmiFree(ptrs[i]);
   endtime = CmiWallTimer();
   free(ptrs);
   
@@ -69,7 +69,7 @@ static void memAllocHandler(EmptyMsg *msg){
 	CmiNodeBarrier();
 	
 	if(CmiMyPe()==0){
-	  CmiPrintf("[smputil] Estimated Malloc/Free Overhead (w contention): %le seconds\n",overhead);
+	  CmiPrintf("[smputil] Estimated CmiAlloc/CmiFree Overhead (w contention): %le seconds\n",overhead);
 	  CmiSetHandler(msg, CpvAccess(barrIdx));
 	  CmiSyncBroadcastAll(sizeof(EmptyMsg), msg);
 	}
@@ -122,8 +122,8 @@ void smputil_init(void)
   CmiPrintf("[smputil] LockUnlock Overhead: %le seconds\n",
              (endtime - starttime - loopOverhead)/NLOCKITER);
 
-	endtime = memoryAllocTest();
-  CmiPrintf("[smputil] Estimated Malloc/Free Overhead (w/o contention): %le seconds\n",endtime);
+  endtime = memoryAllocTest();
+  CmiPrintf("[smputil] Estimated CmiAlloc/CmiFree Overhead (w/o contention): %le seconds\n",endtime);
              
   CmiSetHandler(&msg, CpvAccess(memIdx));
   CmiSyncBroadcastAll(sizeof(EmptyMsg), &msg);
