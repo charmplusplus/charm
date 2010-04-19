@@ -137,24 +137,14 @@ importDeclaration
 
 typeDeclaration
     :   classDefinition
-    |   templateDeclaration
     |   interfaceDefinition
     |   enumDefinition
     |   chareDefinition
     |   chareArrayDefinition
     ;
 
-templateList
-    : 'class'! IDENT (','! 'class'! IDENT)*
-    ;
-
-templateDeclaration
-    : 'template' '<' templateList '>' classDefinition
-        -> ^('template' templateList classDefinition)
-    ;
-
 classDefinition
-    : 'public'? 'class' IDENT ('extends' type)? ('implements' typeList)? '{'
+    :   'public'? 'class' IDENT ('extends' type)? ('implements' typeList)? '{'
             classScopeDeclaration*
         '}' ';'?
         -> ^('class' IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)

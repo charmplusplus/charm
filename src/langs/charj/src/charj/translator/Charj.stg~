@@ -82,28 +82,21 @@ interfaceExtends(ts) ::=
 
 classDeclaration_h(ident, ext, csds) ::=
 <<
+<if(debug)>/* \<typeDeclaration> */<endif>
+
+#include "<ident>.decl.h"
 /* superclass: <ext> */
 class <ident>: public CBase_<ident> {
     <csds; separator="\n">
 };
->>
-
-classWrapper_h(ident, ext, csds, class1) ::=
-<<
-<if(debug)>/* \<typeDeclaration> */<endif>
-
-#include "<ident>.decl.h"
-
-<classDeclaration_h(ident=ident, ext=ext, csds=csds)>
-
 <if(debug)>/* \</typeDeclaration> */<endif>
+
 >>
 
-templateDeclaration_h(tident, ident, ext, csds) ::=
+templateDeclaration_h(ident, class1) ::=
 <<
-#include "<ident>.decl.h"
-template \<class <tident; separator=", class ">\>
-<classDeclaration_h(ident=ident, ext=ext, csds=csds)>
+template \<class <ident>\>
+<class1>
 >>
 
 classDeclaration_cc(ident, ext, csds) ::=
