@@ -148,6 +148,14 @@ static int skt_should_retry(void)
 	return 1;/*Otherwise, we recognized it*/
 }
 
+int skt_tcp_no_nagle(SOCKET fd)
+{
+  int flag, ok;
+  flag = 1;
+  ok = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
+  return ok;
+}
+
 /*Sleep on given read socket until msec or readable*/
 int skt_select1(SOCKET fd,int msec)
 {

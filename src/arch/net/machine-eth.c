@@ -866,6 +866,7 @@ static void recvBarrierMessage()
 /* must be called on every PE including communication processors */
 int CmiBarrier()
 {
+return 0;
   int len, size, i;
   int status;
   int count = 0;

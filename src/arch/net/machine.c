@@ -2716,6 +2716,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 	MACHSTATE2(5,"skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
   	Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
 	MACHSTATE2(5,"Opened connection to charmrun at socket %d, dataport=%d", Cmi_charmrun_fd, dataport);
+	skt_tcp_no_nagle(Cmi_charmrun_fd);
+
 	CmiStdoutInit();
   } else {/*Standalone operation*/
   	printf("Charm++: standalone mode (not using charmrun)\n");

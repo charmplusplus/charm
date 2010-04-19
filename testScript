@@ -1,0 +1,7 @@
+cd  tmp/charmrun
+make clean
+make OPTS="-lm"
+cd  ../../net-linux-x86_64/examples/charm++/hello/1darray
+make clean
+make 
+cd  
