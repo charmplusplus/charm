@@ -3669,7 +3669,7 @@ int AMPI_Request_free(MPI_Request *request){
 
 CDECL
 int AMPI_Cancel(MPI_Request *request){
-  AMPIAPI("AMPI_Request_free");
+  AMPIAPI("AMPI_Cancel");
   return AMPI_Request_free(request);
 }
 
@@ -3706,7 +3706,7 @@ CDECL
 int AMPI_Ssend_init(void *buf, int count, int type, int dest, int tag,
                    MPI_Comm comm, MPI_Request *req)
 {
-  AMPIAPI("AMPI_Send_init");
+  AMPIAPI("AMPI_Ssend_init");
   AmpiRequestList* reqs = getReqs();
   PersReq *newreq = new PersReq(buf,count,type,dest,tag,comm,3);
   *req = reqs->insert(newreq);
