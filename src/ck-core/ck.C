@@ -2247,8 +2247,10 @@ class CkMessageDetailReplay : public CkMessageWatcher {
     return env;
   }
 public:
+  double starttime;
   CkMessageDetailReplay(FILE *f_) {
     f=f_;
+    starttime=CkWallTimer();
     /* This must match what CkMessageDetailRecorder did */
     CmiUInt2 little;
     fread(&little, 2, 1, f);
@@ -2276,7 +2278,8 @@ extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
 }
 
 extern "C" void CkMessageDetailReplayDone(void *rep, double time) {
-  CkPrintf("[%d] Detailed replay finished. Exiting.\n",CkMyPe());
+  CkMessageDetailReplay *replay = (CkMessageDetailReplay *)rep;
+  CkPrintf("[%d] Detailed replay finished after %f seconds. Exiting.\n",CkWallTimer()-replay->starttime,CkMyPe());
   ConverseExit();
 }
 
