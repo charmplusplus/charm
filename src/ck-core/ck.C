@@ -2279,7 +2279,7 @@ extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
 
 extern "C" void CkMessageDetailReplayDone(void *rep, double time) {
   CkMessageDetailReplay *replay = (CkMessageDetailReplay *)rep;
-  CkPrintf("[%d] Detailed replay finished after %f seconds. Exiting.\n",CkWallTimer()-replay->starttime,CkMyPe());
+  CkPrintf("[%d] Detailed replay finished after %f seconds. Exiting.\n",CkMyPe(),CkWallTimer()-replay->starttime);
   ConverseExit();
 }
 
