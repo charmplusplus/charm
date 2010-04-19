@@ -119,9 +119,13 @@ importDeclarations returns [List<CharjAST> packageNames]
 
 typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
 scope ScopeStack; // top-level type scope
-    :   ^('template' i1=IDENT* ^('class' i2=IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*))
+    :   ^('template'? i1=IDENT* ^('class' i2=IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*))
         {
-            // JL: Need to fill the templateArgs in ClassSymbol
+            // JL: Need to fill the templateArgs in ClassSymbol, and push this down
+            // to the class subtree
+        }
+    |   ^('class' i2=IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
+        {
             Scope outerScope = $ScopeStack[-1]::current;
             $sym = new ClassSymbol(symtab, $i2.text, null, outerScope);
             outerScope.define($sym.name, $sym);

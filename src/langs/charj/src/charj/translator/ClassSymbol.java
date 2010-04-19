@@ -7,6 +7,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
 
     public ClassSymbol superClass;
     public List<String> interfaceImpls;
+    public List<String> templateArgs;
 
     Map<String, PackageScope> imports = 
         new LinkedHashMap<String, PackageScope>();
