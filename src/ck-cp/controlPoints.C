@@ -1,4 +1,8 @@
 #include <charm++.h>
+
+// This file is compiled twice to make a version that is capable of not needing the tracing to be turned on. 
+// The Makefile will have -DCP_DISABLE_TRACING
+
 #include "controlPoints.h"
 #include "trace-controlPoints.h"
 #include "LBDatabase.h"
@@ -8,7 +12,7 @@
 #include <pathHistory.h>
 #include "cp_effects.h"
 
-
+#include <climits>
 //  A framework for tuning "control points" exposed by an application. Tuning decisions are based upon observed performance measurements.
  
 
@@ -18,8 +22,6 @@
 using namespace std;
 
 #define DEFAULT_CONTROL_POINT_SAMPLE_PERIOD  10000000
-#define NUM_SAMPLES_BEFORE_TRANSISTION 5
-#define OPTIMIZER_TRANSITION 5
 
 
 //#undef DEBUGPRINT
@@ -34,6 +36,7 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ long controlPointSamplePeriod;
 /* readonly */ int whichTuningScheme;
 /* readonly */ bool writeDataFileAtShutdown;
+/* readonly */ bool shouldFilterOutputData;
 /* readonly */ bool loadDataFileAtStartup;
 /* readonly */ bool shouldGatherMemoryUsage;
 /* readonly */ bool shouldGatherUtilization;
@@ -48,7 +51,7 @@ std::map<std::string, int> defaultControlPointValues;
 
 
 
-typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware, Simplex}  tuningScheme;
+typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware, Simplex, DivideAndConquer, AlwaysDefaults}  tuningScheme;
 
 
 
@@ -56,6 +59,9 @@ void printTuningScheme(){
   switch(whichTuningScheme){
   case RandomSelection:
     CkPrintf("Tuning Scheme: RandomSelection\n");
+    break;
+  case AlwaysDefaults:
+    CkPrintf("Tuning Scheme: AlwaysDefaults\n");
     break;
   case SimulatedAnnealing:
     CkPrintf("Tuning Scheme: SimulatedAnnealing\n");
@@ -77,6 +83,9 @@ void printTuningScheme(){
     break;
   case Simplex:
     CkPrintf("Tuning Scheme: Simplex Algorithm\n");
+    break;
+  case DivideAndConquer:
+    CkPrintf("Tuning Scheme: Divide & Conquer Algorithm\n");
     break;
   default:
     CkPrintf("Unknown tuning scheme\n");
@@ -201,7 +210,7 @@ controlPointManager::controlPointManager() {
     allData.phases.push_back(newPhase);   
     
     frameworkShouldAdvancePhase = false;
-    haveGranularityCallback = false;
+    haveControlPointChangeCallback = false;
 //    CkPrintf("[%d] controlPointManager() Constructor Initializing control points, and loading data file\n", CkMyPe());
     
     ControlPoint::initControlPointEffects();
@@ -328,35 +337,40 @@ controlPointManager::controlPointManager() {
 
   /// Add the current data to allData and output it to a file
   void controlPointManager::writeDataFile(){
-    CkPrintf("============= writeDataFile() ============\n");
+    CkPrintf("============= writeDataFile() to %s  ============\n", CPDataFilename);
     ofstream outfile(CPDataFilename);
     allData.cleanupNames();
 
 //    string s = allData.toString();
 //    CkPrintf("At end: \n %s\n", s.c_str());
 
-    allData.verify();
-    allData.filterOutIncompletePhases();
+    if(shouldFilterOutputData){
+      allData.verify();
+      allData.filterOutIncompletePhases();
+    }
 
 //    string s2 = allData.toString();
 //    CkPrintf("After filtering: \n %s\n", s2.c_str());
-
-    outfile << allData.toString();
+    if(allData.toString().length() > 10){
+      outfile << allData.toString();
+    } else {
+      outfile << " No data available to save to disk " << endl;
+    }
     outfile.close();
   }
 
   /// User can register a callback that is called when application should advance to next phase
   void controlPointManager::setCPCallback(CkCallback cb, bool _frameworkShouldAdvancePhase){
     frameworkShouldAdvancePhase = _frameworkShouldAdvancePhase;
-    granularityCallback = cb;
-    haveGranularityCallback = true;
+    controlPointChangeCallback = cb;
+    haveControlPointChangeCallback = true;
   }
 
   /// Called periodically by the runtime to handle the control points
   /// Currently called on each PE
   void controlPointManager::processControlPoints(){
 
-    CkPrintf("[%d] processControlPoints() haveGranularityCallback=%d frameworkShouldAdvancePhase=%d\n", CkMyPe(), (int)haveGranularityCallback, (int)frameworkShouldAdvancePhase);
+    CkPrintf("[%d] processControlPoints() haveControlPointChangeCallback=%d frameworkShouldAdvancePhase=%d\n", CkMyPe(), (int)haveControlPointChangeCallback, (int)frameworkShouldAdvancePhase);
 
 
     //==========================================================================================
@@ -402,7 +416,6 @@ controlPointManager::controlPointManager() {
     //==========================================================================================
     // If this is a phase during which we try to adapt control point values based on critical path
 #if 0
-
     if( s%5 == 4) {
 
       // Find the most recent phase with valid critical path data and idle time measurements      
@@ -470,12 +483,16 @@ controlPointManager::controlPointManager() {
 	      gotoNextPhase();	
 	    }
 	    
-	    if(haveGranularityCallback){ 
+	    if(haveControlPointChangeCallback){ 
 #if DEBUGPRINT
-	      CkPrintf("Calling granularity change callback\n");
+	      CkPrintf("Calling control point change callback\n");
 #endif
-	      controlPointMsg *msg = new(0) controlPointMsg;
-	      granularityCallback.send(msg);
+	      // Create a high priority message and send it to the callback
+	      controlPointMsg *msg = new (8*sizeof(int)) controlPointMsg; 
+	      *((int*)CkPriorityPtr(msg)) = -INT_MAX;
+	      CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+	      controlPointChangeCallback.send(msg);
+	      
 	    }
 	    
 	    
@@ -527,8 +544,7 @@ controlPointManager::controlPointManager() {
       
       
     }
-    
-
+   
 #endif
 
 
@@ -537,12 +553,13 @@ controlPointManager::controlPointManager() {
       gotoNextPhase();	
     }
     
-    if(haveGranularityCallback){ 
-      controlPointMsg *msg = new(0) controlPointMsg;
-      granularityCallback.send(msg);
+    if(haveControlPointChangeCallback){ 
+      // Create a high priority message and send it to the callback
+      controlPointMsg *msg = new (8*sizeof(int)) controlPointMsg; 
+      *((int*)CkPriorityPtr(msg)) = -INT_MAX;
+      CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+      controlPointChangeCallback.send(msg);
     }
-    
-    
     
   }
   
@@ -601,6 +618,7 @@ controlPointManager::controlPointManager() {
   /// Called by either the application or the Control Point Framework to advance to the next phase  
   void controlPointManager::gotoNextPhase(){
     
+#ifndef CP_DISABLE_TRACING
     CkPrintf("gotoNextPhase shouldGatherAll=%d\n", (int)shouldGatherAll);
     fflush(stdout);
 
@@ -629,12 +647,12 @@ controlPointManager::controlPointManager() {
     }
     
 
+#endif
 
 
-
-    LBDatabase * myLBdatabase = LBDatabaseObj();
 
 #if CMK_LBDB_ON && 0
+    LBDatabase * myLBdatabase = LBDatabaseObj();
     LBDB * myLBDB = myLBdatabase->getLBDB();       // LBDB is Defined in LBDBManager.h
     const CkVec<LBObj*> objs = myLBDB->getObjs();
     const int objCount = myLBDB->getObjCount();
@@ -696,6 +714,7 @@ controlPointManager::controlPointManager() {
   
   /// Entry method called on all PEs to request CPU utilization statistics
   void controlPointManager::requestIdleTime(CkCallback cb){
+#ifndef CP_DISABLE_TRACING
     double i = localControlPointTracingInstance()->idleRatio();
     double idle[3];
     idle[0] = i;
@@ -707,10 +726,14 @@ controlPointManager::controlPointManager() {
     localControlPointTracingInstance()->resetTimings();
 
     contribute(3*sizeof(double),idle,idleTimeReductionType, cb);
+#else
+    CkAbort("Should not get here\n");
+#endif
   }
   
   /// All processors reduce their memory usages in requestIdleTime() to this method
   void controlPointManager::gatherIdleTime(CkReductionMsg *msg){
+#ifndef CP_DISABLE_TRACING
     int size=msg->getSize() / sizeof(double);
     CkAssert(size==3);
     double *r=(double *) msg->getData();
@@ -729,6 +752,9 @@ controlPointManager::controlPointManager() {
     alreadyRequestedIdleTime = false;
     checkForShutdown();
     delete msg;
+#else
+    CkAbort("Should not get here\n");
+#endif
   }
 
 
@@ -738,6 +764,7 @@ controlPointManager::controlPointManager() {
 
   /// Entry method called on all PEs to request CPU utilization statistics and memory usage
   void controlPointManager::requestAll(CkCallback cb){
+#ifndef CP_DISABLE_TRACING
     TraceControlPoints *t = localControlPointTracingInstance();
 
     double data[ALL_REDUCTION_SIZE];
@@ -771,10 +798,14 @@ controlPointManager::controlPointManager() {
     localControlPointTracingInstance()->resetAll();
 
     contribute(ALL_REDUCTION_SIZE*sizeof(double),data,allMeasuresReductionType, cb);
+#else
+    CkAbort("Should not get here\n");
+#endif
   }
   
   /// All processors reduce their memory usages in requestIdleTime() to this method
   void controlPointManager::gatherAll(CkReductionMsg *msg){
+#ifndef CP_DISABLE_TRACING
     CkAssert(msg->getSize()==ALL_REDUCTION_SIZE*sizeof(double));
     int size=msg->getSize() / sizeof(double);
     double *data=(double *) msg->getData();
@@ -833,6 +864,9 @@ controlPointManager::controlPointManager() {
     alreadyRequestedAll = false;
     checkForShutdown();
     delete msg;
+#else
+    CkAbort("Should not get here\n");
+#endif
   }
 
 
@@ -858,11 +892,15 @@ controlPointManager::controlPointManager() {
 
 
   void controlPointManager::doExitNow(){
-    if(writeDataFileAtShutdown){
-      CkPrintf("[%d] controlPointShutdown() at CkExit()\n", CkMyPe());
-      controlPointManagerProxy.ckLocalBranch()->writeDataFile();
-    }
-    CkExit();
+	  writeOutputToDisk();
+	  CkPrintf("[%d] Control point manager calling CkExit()\n", CkMyPe());
+	  CkExit();
+  }
+
+  void controlPointManager::writeOutputToDisk(){
+	  if(writeDataFileAtShutdown){
+		  controlPointManagerProxy.ckLocalBranch()->writeDataFile();
+	  }
   }
 
 
@@ -979,7 +1017,7 @@ public:
     double period;
     bool haveSamplePeriod = CmiGetArgDoubleDesc(args->argv,"+CPSamplePeriod", &period,"The time between Control Point Framework samples (in seconds)");
     if(haveSamplePeriod){
-      CkPrintf("LBPERIOD = %ld sec\n", period);
+      CkPrintf("controlPointSamplePeriod = %ld sec\n", period);
       controlPointSamplePeriod =  period * 1000; /**< A readonly */
     } else {
       controlPointSamplePeriod =  DEFAULT_CONTROL_POINT_SAMPLE_PERIOD;
@@ -994,6 +1032,8 @@ public:
       whichTuningScheme = RandomSelection;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPExhaustiveSearch","Exhaustive Search of Control Point Values") ){
       whichTuningScheme = ExhaustiveSearch;
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPAlwaysUseDefaults","Always Use The Provided Default Control Point Values") ){
+      whichTuningScheme = AlwaysDefaults;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPSimulAnneal","Simulated Annealing Search of Control Point Values") ){
       whichTuningScheme = SimulatedAnnealing;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPCriticalPathPrio","Use Critical Path to adapt Control Point Values") ){
@@ -1006,7 +1046,9 @@ public:
       whichTuningScheme = MemoryAware;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPSimplex", "Nelder-Mead Simplex Algorithm") ){
       whichTuningScheme = Simplex;
- }
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPDivideConquer", "A divide and conquer program specific steering scheme") ){
+      whichTuningScheme = DivideAndConquer;
+    }
 
     char *defValStr = NULL;
     if( CmiGetArgStringDesc(args->argv, "+CPDefaultValues", &defValStr, "Specify the default control point values used for the first couple phases") ){
@@ -1056,6 +1098,12 @@ public:
     if( CmiGetArgFlagDesc(args->argv,"+CPSaveData","Save Control Point timings & configurations at completion") ){
       writeDataFileAtShutdown = true;
     }
+
+    shouldFilterOutputData = true;
+    if( CmiGetArgFlagDesc(args->argv,"+CPNoFilterData","Don't filter phases from output data") ){
+      shouldFilterOutputData = false;
+    }
+
 
    loadDataFileAtStartup = false;   
     if( CmiGetArgFlagDesc(args->argv,"+CPLoadData","Load Control Point timings & configurations at startup") ){
@@ -1137,8 +1185,9 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime){
 
 /// Determine a control point value using some optimization scheme (use max known, simmulated annealling, 
 /// user observed characteristic to adapt specific control point values.
-/// @note eventually there should be a plugin system where multiple schemes can be plugged in(similar to LB)
+/// This function must return valid values for newControlPoints.
 void controlPointManager::generatePlan() {
+  const double startGenerateTime = CmiWallTimer();
   const int phase_id = this->phase_id;
   const int effective_phase = allData.phases.size();
 
@@ -1149,6 +1198,13 @@ void controlPointManager::generatePlan() {
  
   CkPrintf("Generating Plan for phase %d\n", phase_id); 
   printTuningScheme();
+
+  // By default lets put the previous phase data into newControlPoints
+  instrumentedPhase *prevPhase = previousPhaseData();
+  for(std::map<std::string, int >::const_iterator cpsIter=prevPhase->controlPoints.begin(); cpsIter != prevPhase->controlPoints.end(); ++cpsIter){
+	  newControlPoints[cpsIter->first] = cpsIter->second;
+  }
+
 
   if( whichTuningScheme == RandomSelection ){
     std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
@@ -1201,12 +1257,9 @@ void controlPointManager::generatePlan() {
 	CkPrintf("Steering (memory based) controlPointSpace.size()=\n", controlPointSpace.size());
 	
 	// Initialize plan to be the values from two phases ago (later we'll adjust this)
-	std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-	for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-	  const std::string &name = cpsIter->first;
-	  const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
-	  newControlPoints[name] = twoAgoValue;
-	}
+	newControlPoints = twoAgoPhase->controlPoints;
+
+
 	CkPrintf("Steering (memory based) initialized plan\n");
 	fflush(stdout);
 
@@ -1263,205 +1316,187 @@ void controlPointManager::generatePlan() {
     }
 
   } else if ( whichTuningScheme == UseSteering ) {
-    // -----------------------------------------------------------
-    //  STEERING BASED ON KNOWLEDGE
-  
-    // after 3 phases (and only on even steps), do steering performance. Otherwise, just use previous phase's configuration
-    // plans are only generated after 3 phases
+	  // -----------------------------------------------------------
+	  //  STEERING BASED ON KNOWLEDGE
 
-    instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
-    instrumentedPhase *prevPhase = previousPhaseData();
+	  // after 3 phases (and only on even steps), do steering performance. Otherwise, just use previous phase's configuration
+	  // plans are only generated after 3 phases
 
-    if(phase_id%4 == 0){
-      CkPrintf("Steering based on 2 phases ago:\n");
-      twoAgoPhase->print();
-      CkPrintf("\n");
-      fflush(stdout);
-      
-      std::vector<std::map<std::string,int> > possibleNextStepPlans;
+	  instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
+	  instrumentedPhase *prevPhase = previousPhaseData();
+
+	  if(phase_id%4 == 0){
+		  CkPrintf("Steering based on 2 phases ago:\n");
+		  twoAgoPhase->print();
+		  CkPrintf("\n");
+		  fflush(stdout);
+
+		  std::vector<std::map<std::string,int> > possibleNextStepPlans;
 
 
-      // ========================================= Concurrency =============================================
-      // See if idle time is high:
-      {
-	double idleTime = twoAgoPhase->idleTime.avg;
-	CkPrintf("Steering encountered idle time (%f)\n", idleTime);
-	fflush(stdout);
-	if(idleTime > 0.10){
-	  CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
-	  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
-	
-	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["Concurrency"];
-	
-	  bool found = false;
-	  std::string cpName;
-	  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
-	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;
-	  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
-	    cpName = iter->first;
-	    info = &iter->second;
-	  
-	    // Initialize a new plan based on two phases ago
-	    std::map<std::string,int> aNewPlan;
-	  
-	    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-	    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-	      const std::string &name = cpsIter->first;
-	      const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
-	      aNewPlan[name] = twoAgoValue;
-	    }
-	  
-	    CkPrintf("Steering found knob to turn\n");
-	    fflush(stdout);
+		  // ========================================= Concurrency =============================================
+		  // See if idle time is high:
+		  {
+			  double idleTime = twoAgoPhase->idleTime.avg;
+			  CkPrintf("Steering encountered idle time (%f)\n", idleTime);
+			  fflush(stdout);
+			  if(idleTime > 0.10){
+				  CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
+				  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
 
-	    if(info->first == ControlPoint::EFF_INC){
-	      const int maxValue = controlPointSpace[cpName].second;
-	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-	      if(twoAgoValue+1 <= maxValue){
-		aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
-	      }
-	    } else {
-	      const int minValue = controlPointSpace[cpName].second;
-	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-	      if(twoAgoValue-1 >= minValue){
-		aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
-	      }
-	    }
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["Concurrency"];
 
-	    possibleNextStepPlans.push_back(aNewPlan);
-	  
+				  bool found = false;
+				  std::string cpName;
+				  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;
+				  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
+					  cpName = iter->first;
+					  info = &iter->second;
+
+					  // Initialize a new plan based on two phases ago
+					  std::map<std::string,int> aNewPlan = twoAgoPhase->controlPoints;
+
+					  CkPrintf("Steering found knob to turn\n");
+					  fflush(stdout);
+
+					  if(info->first == ControlPoint::EFF_INC){
+						  const int maxValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  if(twoAgoValue+1 <= maxValue){
+							  aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
+						  }
+					  } else {
+						  const int minValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  if(twoAgoValue-1 >= minValue){
+							  aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
+						  }
+					  }
+
+					  possibleNextStepPlans.push_back(aNewPlan);
+
+				  }
+			  }
+		  }
+
+		  // ========================================= Grain Size =============================================
+		  // If the grain size is too small, there may be tons of messages and overhead time associated with scheduling
+		  {
+			  double overheadTime = twoAgoPhase->overheadTime.avg;
+			  CkPrintf("Steering encountered overhead time (%f)\n", overheadTime);
+			  fflush(stdout);
+			  if(overheadTime > 0.10){
+				  CkPrintf("Steering encountered high overhead time(%f) > 10%%\n", overheadTime);
+				  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
+
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["GrainSize"];
+
+				  bool found = false;
+				  std::string cpName;
+				  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;
+				  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
+					  cpName = iter->first;
+					  info = &iter->second;
+
+					  // Initialize a new plan based on two phases ago
+					  std::map<std::string,int> aNewPlan = twoAgoPhase->controlPoints;
+
+
+
+					  CkPrintf("Steering found knob to turn\n");
+					  fflush(stdout);
+
+					  if(info->first == ControlPoint::EFF_INC){
+						  const int maxValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  if(twoAgoValue+1 <= maxValue){
+							  aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
+						  }
+					  } else {
+						  const int minValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  if(twoAgoValue-1 >= minValue){
+							  aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
+						  }
+					  }
+
+					  possibleNextStepPlans.push_back(aNewPlan);
+
+				  }
+
+			  }
+		  }
+		  // ========================================= GPU Offload =============================================
+		  // If the grain size is too small, there may be tons of messages and overhead time associated with scheduling
+		  {
+			  double idleTime = twoAgoPhase->idleTime.avg;
+			  CkPrintf("Steering encountered idle time (%f)\n", idleTime);
+			  fflush(stdout);
+			  if(idleTime > 0.10){
+				  CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
+				  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
+
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["GPUOffloadedWork"];
+
+				  bool found = false;
+				  std::string cpName;
+				  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;
+				  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
+					  cpName = iter->first;
+					  info = &iter->second;
+
+					  // Initialize a new plan based on two phases ago
+					  std::map<std::string,int> aNewPlan = twoAgoPhase->controlPoints;
+
+
+					  CkPrintf("Steering found knob to turn\n");
+					  fflush(stdout);
+
+					  if(info->first == ControlPoint::EFF_DEC){
+						  const int maxValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  if(twoAgoValue+1 <= maxValue){
+							  aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
+						  }
+					  } else {
+						  const int minValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  if(twoAgoValue-1 >= minValue){
+							  aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
+						  }
+					  }
+
+					  possibleNextStepPlans.push_back(aNewPlan);
+
+				  }
+
+			  }
+		  }
+
+		  // ========================================= Done =============================================
+
+
+		  if(possibleNextStepPlans.size() > 0){
+			  newControlPoints = possibleNextStepPlans[0];
+		  }
+
+
+		  CkPrintf("Steering done for this phase\n");
+		  fflush(stdout);
+
+	  }  else {
+		  // This is not a phase to do steering, so stick with previously used values (one phase ago)
+		  CkPrintf("not a phase to do steering, so stick with previously planned values (one phase ago)\n");
+		  fflush(stdout);
 	  }
-	}
-      }
-
-      // ========================================= Grain Size =============================================
-      // If the grain size is too small, there may be tons of messages and overhead time associated with scheduling
-      {
-	double overheadTime = twoAgoPhase->overheadTime.avg;
-	CkPrintf("Steering encountered overhead time (%f)\n", overheadTime);
-	fflush(stdout);
-	if(overheadTime > 0.10){
-	  CkPrintf("Steering encountered high overhead time(%f) > 10%%\n", overheadTime);
-	  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
-
-	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["GrainSize"];   
-	
-	  bool found = false;
-	  std::string cpName;
-	  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
-	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;     
-	  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
-	    cpName = iter->first;
-	    info = &iter->second;
-	  
-	    // Initialize a new plan based on two phases ago
-	    std::map<std::string,int> aNewPlan;
-	  
-	    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-	    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-	      const std::string &name = cpsIter->first;
-	      const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
-	      aNewPlan[name] = twoAgoValue;
-	    }
-	  
-	    CkPrintf("Steering found knob to turn\n");
-	    fflush(stdout);
-
-	    if(info->first == ControlPoint::EFF_INC){
-	      const int maxValue = controlPointSpace[cpName].second;
-	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-	      if(twoAgoValue+1 <= maxValue){
-		aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
-	      }
-	    } else {
-	      const int minValue = controlPointSpace[cpName].second;
-	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-	      if(twoAgoValue-1 >= minValue){
-		aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
-	      }
-	    }
-
-	    possibleNextStepPlans.push_back(aNewPlan);
-	  
-	  }
-
-      }
-      }
-      // ========================================= GPU Offload =============================================
-      // If the grain size is too small, there may be tons of messages and overhead time associated with scheduling
-      {
-	double idleTime = twoAgoPhase->idleTime.avg;
-	CkPrintf("Steering encountered idle time (%f)\n", idleTime);
-	fflush(stdout);
-	if(idleTime > 0.10){
-	  CkPrintf("Steering encountered high idle time(%f) > 10%%\n", idleTime);
-	  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
-	
-	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["GPUOffloadedWork"];   
-	
-	  bool found = false;
-	  std::string cpName;
-	  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
-	  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;     
-	  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
-	    cpName = iter->first;
-	    info = &iter->second;
-	  
-	    // Initialize a new plan based on two phases ago
-	    std::map<std::string,int> aNewPlan;
-	  
-	    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-	    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-	      const std::string &name = cpsIter->first;
-	      const int& twoAgoValue =  twoAgoPhase->controlPoints[name];
-	      aNewPlan[name] = twoAgoValue;
-	    }
-	  
-	    CkPrintf("Steering found knob to turn\n");
-	    fflush(stdout);
-
-	    if(info->first == ControlPoint::EFF_DEC){
-	      const int maxValue = controlPointSpace[cpName].second;
-	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-	      if(twoAgoValue+1 <= maxValue){
-		aNewPlan[cpName] = twoAgoValue+1; // increase from two phases back
-	      }
-	    } else {
-	      const int minValue = controlPointSpace[cpName].second;
-	      const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-	      if(twoAgoValue-1 >= minValue){
-		aNewPlan[cpName] = twoAgoValue-1; // decrease from two phases back
-	      }
-	    }
-
-	    possibleNextStepPlans.push_back(aNewPlan);
-	  
-	  }
-
-	}
-      }
-
-      // ========================================= Done =============================================
 
 
-      if(possibleNextStepPlans.size() > 0){
-	newControlPoints = possibleNextStepPlans[0];
-      } 
-          
-      
-      CkPrintf("Steering done for this phase\n");
-      fflush(stdout);
 
-    }  else {
-      // This is not a phase to do steering, so stick with previously used values (one phase ago)
-      CkPrintf("not a phase to do steering, so stick with previously planned values (one phase ago)\n");
-      fflush(stdout);
-    }
-    
-    
-    
   } else if( whichTuningScheme == SimulatedAnnealing ) {
-    
+
     // -----------------------------------------------------------
     //  SIMULATED ANNEALING
     //  Simulated Annealing style hill climbing method
@@ -1500,6 +1535,107 @@ void controlPointManager::generatePlan() {
       } 
       
     }
+
+  } else if ( whichTuningScheme == DivideAndConquer ) {
+
+	  // -----------------------------------------------------------
+	  //  STEERING FOR Divide & Conquer Programs
+	  //  This scheme uses no timing information. It just tries to converge to the point where idle time = overhead time.
+	  //  For a Fibonacci example, this appears to be a good heurstic for finding the best performing program.
+	  //  The scheme can be applied within a single program tree computation, if the tree is being traversed depth first.
+
+	  // after 3 phases (and only on even steps), do steering performance. Otherwise, just use previous phase's configuration
+	  // plans are only generated after 3 phases
+
+	  instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
+	  instrumentedPhase *prevPhase = previousPhaseData();
+
+	  if(phase_id%4 == 0){
+		  CkPrintf("Divide & Conquer Steering based on 2 phases ago:\n");
+		  twoAgoPhase->print();
+		  CkPrintf("\n");
+		  fflush(stdout);
+
+		  std::vector<std::map<std::string,int> > possibleNextStepPlans;
+
+
+		  // ========================================= Concurrency =============================================
+		  // See if idle time is high:
+		  {
+			  double idleTime = twoAgoPhase->idleTime.avg;
+			  double overheadTime = twoAgoPhase->overheadTime.avg;
+
+
+			  CkPrintf("Divide & Conquer Steering encountered overhead time (%f) idle time (%f)\n",overheadTime, idleTime);
+			  fflush(stdout);
+			  if(idleTime+overheadTime > 0.10){
+				  CkPrintf("Steering encountered high idle+overheadTime time(%f) > 10%%\n", idleTime+overheadTime);
+				  CkPrintf("Steering controlPointSpace.size()=\n", controlPointSpace.size());
+
+				  int direction = -1;
+				  if (idleTime>overheadTime){
+					  // We need to decrease the grain size, or increase the available concurrency
+					  direction = 1;
+				  }
+
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > &possibleCPsToTune = CkpvAccess(cp_effects)["Concurrency"];
+
+				  bool found = false;
+				  std::string cpName;
+				  std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > *info;
+				  std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > >::iterator iter;
+				  for(iter = possibleCPsToTune.begin(); iter != possibleCPsToTune.end(); iter++){
+					  cpName = iter->first;
+					  info = &iter->second;
+					  
+					  // Initialize a new plan based on two phases ago
+					  std::map<std::string,int> aNewPlan = twoAgoPhase->controlPoints;
+					  bool newPlanExists = false;
+
+					  CkPrintf("Divide & Conquer Steering found knob to turn\n");
+					  fflush(stdout);
+
+
+
+					  if(info->first == ControlPoint::EFF_INC){
+						  const int minValue = controlPointSpace[cpName].first;
+						  const int maxValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  const int newVal = twoAgoValue+1*direction;
+						  if(newVal <= maxValue && newVal >= minValue){
+						    aNewPlan[cpName] = newVal;
+						    newPlanExists = true;
+						  } else {
+						    CkPrintf("Divide & Conquer Steering found that turning the knob exceeds the control point's range (newVal=%d)\n", newVal);
+						  }
+					  } else {
+						  const int minValue = controlPointSpace[cpName].first;
+						  const int maxValue = controlPointSpace[cpName].second;
+						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+						  const int newVal = twoAgoValue-1*direction;
+						  if(newVal <= maxValue && newVal >= minValue){
+							  aNewPlan[cpName] = newVal;
+							  newPlanExists = true;
+						  } else {
+						    CkPrintf("Divide & Conquer Steering found that turning the knob exceeds the control point's range (newVal=%d)\n", newVal);
+						  }
+					  }
+
+					  if(newPlanExists){
+					    possibleNextStepPlans.push_back(aNewPlan);
+					  }
+				  }
+			  }
+		  }
+
+		  if(possibleNextStepPlans.size() > 0){
+		    CkPrintf("Divide & Conquer Steering found %d possible next phases, using first one\n", possibleNextStepPlans.size());
+		    newControlPoints = possibleNextStepPlans[0];
+		  } else {
+		    CkPrintf("Divide & Conquer Steering found no possible next phases\n");
+		  }
+	  }
+
   } else if( whichTuningScheme == Simplex ) {
 
 	  // -----------------------------------------------------------
@@ -1603,8 +1739,12 @@ void controlPointManager::generatePlan() {
     CkAbort("Some Control Point tuning strategy must be enabled.\n");
   }
 
-}
 
+  const double endGenerateTime = CmiWallTimer();
+  
+  CkPrintf("Time to generate next control point configuration(s): %f sec\n", (endGenerateTime - startGenerateTime) );
+  
+}
 
 
 
@@ -1626,11 +1766,10 @@ int controlPoint(const char *name, int lb, int ub){
   }
   
 
-  if( phase_id < 4 ){
+  if( phase_id < 4 || whichTuningScheme == AlwaysDefaults){
     // For the first few phases, just use the lower bound, or the default if one was provided 
     // This ensures that the ranges for all the control points are known before we do anything fancy
     result = lb;
-
 
     if(defaultControlPointValues.count(std::string(name)) > 0){
       int v = defaultControlPointValues[std::string(name)];
@@ -1684,6 +1823,20 @@ int controlPoint(const char *name, int lb, int ub){
 
 
 
+/** Determine the next configuration to try using the Nelder Mead Simplex Algorithm.
+
+    This function decomposes the algorithm into a state machine that allows it to
+    evaluate one or more configurations through subsequent clls to this function.
+    The state diagram is pictured in the NelderMeadStateDiagram.pdf diagram.
+
+    At one point in the algorithm, n+1 parameter configurations must be evaluated,
+    so a list of them will be created and they will be evaluated, one per call.
+
+    Currently there is no stopping criteria, but the simplex ought to contract down
+    to a few close configurations, and hence not much change will happen after this 
+    point.
+
+ */
 void simplexScheme::adapt(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData){
 
 	if(useBestKnown){
@@ -2139,7 +2292,17 @@ std::vector<double> simplexScheme::pointCoords(instrumentedData &allData, int i)
 
 
 
+void ControlPointWriteOutputToDisk(){
+	CkAssert(CkMyPe() == 0);
+	controlPointManagerProxy.ckLocalBranch()->writeOutputToDisk();
+}
+
+
+
 /*! @} */
 
-
+#ifdef CP_DISABLE_TRACING
+#include "ControlPointsNoTrace.def.h"
+#else
 #include "ControlPoints.def.h"
+#endif

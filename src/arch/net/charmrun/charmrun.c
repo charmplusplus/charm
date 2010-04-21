@@ -23,6 +23,8 @@
 #if CMK_USE_POLL
 #include <poll.h>
 #endif
+#include <sys/stat.h>
+
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 /*Win32 has screwy names for the standard UNIX calls:*/
@@ -518,8 +520,11 @@ int pparam_parseopt()
     {
       char name[2];
       name[0]=opt[1];
+      if (strlen(opt)<=2 || !isalpha(opt[2]))
+      {
       name[1]=0;
       def = pparam_find(name);
+      }
     }
   if (def==NULL)
   {
@@ -640,6 +645,7 @@ char *arg_display;
 int arg_ssh_display;
 char *arg_mylogin;
 #endif
+int   arg_mpiexec;
 int   arg_no_va_rand;
 
 char *arg_nodeprog_a;
@@ -686,6 +692,7 @@ void arg_init(int argc, char **argv)
   pparam_flag(&arg_scalable_start, 0, "scalable-start", "scalable start");
   pparam_flag(&arg_usehostname,  0, "usehostname", "Send nodes our symbolic hostname instead of IP address");
   pparam_str(&arg_charmrunip,    0, "useip",      "Use IP address provided for charmrun IP");
+  pparam_flag(&arg_mpiexec,          0, "mpiexec",   "use mpiexec to start jobs");
 #if CMK_USE_RSH
   pparam_flag(&arg_debug,         0, "debug",         "Run each node under gdb in an xterm window");
   pparam_flag(&arg_debug_no_pause,0, "debug-no-pause","Like debug, except doesn't pause at beginning");
@@ -773,7 +780,12 @@ void arg_init(int argc, char **argv)
 
 #if CMK_USE_RSH
   /* Find the current value of the CONV_RSH variable */
-  if(!arg_shell) arg_shell = getenv_rsh();
+  if(!arg_shell) {
+    if (arg_mpiexec)
+      arg_shell = "mpiexec";
+    else
+      arg_shell = getenv_rsh();
+  }
 
   /* Find the current value of the DISPLAY variable */
   if(!arg_display)
@@ -2333,6 +2345,7 @@ void req_start_server(void)
  ****************************************************************************/
 void start_nodes_daemon(void);
 void start_nodes_rsh(void);
+void start_nodes_mpiexec();
 #if CMK_BPROC
 void nodetab_init_for_scyld(void);
 void start_nodes_scyld(void);
@@ -2385,8 +2398,12 @@ int main(int argc, char **argv, char **envp)
 		printf("Charmrun> IBVERBS version of charmrun\n");
 #endif
     if (!arg_local) {
-      if (!arg_batch_spawn)
-        start_nodes_rsh();
+      if (!arg_batch_spawn) {
+        if (arg_mpiexec)
+          start_nodes_mpiexec();
+        else
+          start_nodes_rsh();
+      }
       else
         req_client_start_and_connect();
     }
@@ -2436,7 +2453,10 @@ char *create_netstart(int node)
 {
   static char dest[1024];
   int port=0;
-  sprintf(dest,"%d %s %d %d %d",node,server_addr,server_port,getpid()&0x7FFF, port);
+  if (arg_mpiexec)
+    sprintf(dest,"$OMPI_COMM_WORLD_RANK %s %d %d %d",server_addr,server_port,getpid()&0x7FFF, port);
+  else
+    sprintf(dest,"%d %s %d %d %d",node,server_addr,server_port,getpid()&0x7FFF, port);
   return dest;
 }
 
@@ -2523,8 +2543,9 @@ void start_nodes_rsh() {start_nodes_daemon();}
 void finish_nodes(void) {}
 void start_one_node_rsh(int rank0no) {}
 void finish_one_node(int rank0no) {}
+void start_nodes_mpiexec() {}
 
-int start_set_node_rsh(int client) {}
+int start_set_node_rsh(int client) { return 0; }
 void finish_set_nodes(int start, int stop) {}
 
 void envCat(char *dest,LPTSTR oldEnv)
@@ -2865,6 +2886,8 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
   char *host=nodetab_name(nodeno);
 #define CLOSE_ALL " < /dev/null 1> /dev/null 2> /dev/null &"
 
+  if (arg_mpiexec)
+        fprintf(f, "#!/bin/sh\n");
   fprintf(f, /*Echo: prints out status message*/
   	"Echo() {\n"
   	"  echo 'Charmrun remote shell(%s.%d)>' $*\n"
@@ -2906,14 +2929,20 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
   if (arg_display && !arg_ssh_display)
     fprintf(f,"DISPLAY='%s';export DISPLAY\n",arg_display);
   netstart = create_netstart(rank0no);
-  fprintf(f,"NETSTART='%s';export NETSTART\n",netstart);
-  fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",rank0no);
+  fprintf(f,"NETSTART=\"%s\";export NETSTART\n",netstart);
+  if (arg_mpiexec)
+    fprintf(f,"CmiMyNode=$OMPI_COMM_WORLD_RANK; export CmiMyNode\n");
+  else
+    fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",rank0no);
   fprintf(f,"CmiMyNodeSize='%d'; export CmiMyNodeSize\n",nodetab_getnodeinfo(rank0no)->cpus);
-  if (restart)    /* skip fork */
+  if (restart || arg_mpiexec)    /* skip fork */
     fprintf(f,"CmiMyForks='%d'; export CmiMyForks\n",0);
   else
     fprintf(f,"CmiMyForks='%d'; export CmiMyForks\n",nodetab_getnodeinfo(rank0no)->forks);
-  fprintf(f,"CmiNumNodes='%d'; export CmiNumNodes\n",nodetab_rank0_size);
+  if (arg_mpiexec)
+    fprintf(f,"CmiNumNodes=$OMPI_COMM_WORLD_SIZE; export CmiNumNodes\n");
+  else
+    fprintf(f,"CmiNumNodes='%d'; export CmiNumNodes\n",nodetab_rank0_size);
 #if CONVERSE_VERSION_VMI
   /* VMI environment variable */
   fprintf (f, "VMI_PROCS='%d'; export VMI_PROCS\n", arg_requested_pes);
@@ -3269,6 +3298,82 @@ void start_nodes_rsh()
 		clientgroup=start_set_node_rsh(client);
 		client+=clientgroup;
 	}
+}
+
+/* for mpiexec, for once calling mpiexec to start on all nodes  */
+int rsh_fork_one(const char *startScript)
+{
+  char **rshargv;
+  int pid;
+  int num=0;
+  char npes[128];
+  char *s, *e;
+
+  /* figure out size and dynamic allocate */
+  s=nodetab_shell(0); e=skipstuff(s);
+  while (*s) {
+    num++;
+    s = skipblanks(e); e = skipstuff(s);
+  }
+  rshargv = (char **)malloc(sizeof(char *)*(num+8));
+
+  num = 0;
+  s=nodetab_shell(0); e=skipstuff(s);
+  while (*s) {
+    rshargv[num++]=substr(s, e);
+    s = skipblanks(e); e = skipstuff(s);
+  }
+
+  rshargv[num++]="-np";
+  sprintf(npes, "%d", nodetab_rank0_size);
+  rshargv[num++]=npes;
+  rshargv[num++]=(char*)startScript;
+  rshargv[num++]=0;
+  if (arg_verbose) printf("Charmrun> Starting %s %s \n", nodetab_shell(0), startScript);
+  
+  pid = fork();
+  if (pid < 0) 
+  	{ perror("ERROR> starting mpiexec"); exit(1); }
+  if (pid == 0)
+  {/*Child process*/
+      int i;
+  /*  unlink(startScript); */
+      //removeEnv("DISPLAY="); /*No DISPLAY disables ssh's slow X11 forwarding*/
+      for(i=3; i<1024; i++) close(i);
+      execvp(rshargv[0], rshargv);
+      fprintf(stderr,"Charmrun> Couldn't find mpiexec program '%s'!\n",rshargv[0]);
+      exit(1);
+  }
+  free(rshargv);
+  if (arg_verbose)
+    fprintf(stderr,"Charmrun> mpiexec started\n");
+  return pid;
+}
+
+void start_nodes_mpiexec()
+{
+     int i;
+
+     FILE *f;
+     char startScript[200];
+     sprintf(startScript,"./charmrun.%d",getpid());
+     f=fopen(startScript,"w");
+     chmod(startScript, S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IROTH);
+     if (f==NULL) {
+       /* now try current directory */
+       sprintf(startScript,"./charmrun.%d",getpid());
+       f=fopen(startScript,"w");
+       if (f==NULL) {
+     	 fprintf(stderr,"Charmrun> Can not write file %s!\n", startScript);
+     	 exit(1);
+       }
+     }
+     rsh_script(f,0,0,arg_argv,0);
+     fclose(f);
+     rsh_pids=(int *)malloc(sizeof(int)*nodetab_rank0_size);
+     rsh_pids[0]=rsh_fork_one(startScript);
+     for (i=0; i<nodetab_rank0_size; i++)
+       rsh_pids[i] = 0;   /* skip finish_nodes */
 }
 
 void finish_set_nodes(int start, int stop) {

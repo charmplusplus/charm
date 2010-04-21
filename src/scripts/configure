@@ -1187,6 +1187,12 @@ if test -n "$ac_init_help"; then
 
   cat <<\_ACEOF
 
+Optional Features:
+  --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
+  --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-tracing        enable tracing modules
+  --enable-replay         enable record/replay
+
 _ACEOF
 ac_status=$?
 fi
@@ -1614,7 +1620,7 @@ CHARMINC="."
 test -r ./conv-config.sh && . ./conv-config.sh
 
 #keep it a decimal
-VERSION=60300
+VERSION=60301
 echo $VERSION > ../include/VERSION
 
 cat >>confdefs.h <<_ACEOF
@@ -1622,6 +1628,42 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+# check enable/disable
+# Check whether --enable-tracing was given.
+if test "${enable_tracing+set}" = set; then
+  enableval=$enable_tracing; enable_tracing=$enableval
+else
+  enable_tracing=yes
+fi
+
+
+if test "$enable_tracing" = "no"
+then
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_TRACE_DISABLED 1
+_ACEOF
+
+fi
+
+# Check whether --enable-replay was given.
+if test "${enable_replay+set}" = set; then
+  enableval=$enable_replay; enable_replay=$enableval
+else
+  enable_replay=yes
+fi
+
+
+if test "$enable_replay" = "no"
+then
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_REPLAYSYSTEM 0
+_ACEOF
+
+fi
+
+#
 { echo "$as_me:$LINENO: checking machine name" >&5
 echo $ECHO_N "checking machine name... $ECHO_C" >&6; }
 version=`pwd | awk -F/ '{print $(NF-1)}'`
@@ -2403,6 +2445,9 @@ _ACEOF
 
 
 #### test if we can build MPI ####
+if test "$CMK_BUILD_MPI" = 1
+then
+
 cat > $t <<EOT
 #include "mpi.h"
 int main(int argc, char **argv)
@@ -2419,7 +2464,40 @@ _ACEOF
 
 BUILD_MPI=$strictpass
 
-if test $strictpass -eq 1
+if test $BUILD_MPI -eq 0
+then
+  echo "Error: Can not compile a MPI program"
+  exit 1
+fi
+
+if test $BUILD_MPI -eq 1
+then
+  test_link "whether need to specify MPI library" "no" "yes" ""
+  if test $pass -ne 1
+  then
+    if test -z "$CMK_MPI_LIB"
+    then
+      test_link "whether -lmpich" "ok" "no" "-lmpich"
+      if test $pass -eq 1
+      then
+        add_flag CMK_SYSLIBS='"$CMK_SYSLIBS -lmpich"' "mpi lib"
+      else
+        test_link "whether -lmpi" "ok" "no" "-lmpi"
+        if test $pass -eq 1
+        then
+                add_flag CMK_SYSLIBS='"$CMK_SYSLIBS -lmpi"' "mpi lib"
+        else
+                echo "Error: can not find mpi library"
+                exit 1
+        fi
+      fi
+    else
+      add_flag CMK_SYSLIBS='"$CMK_SYSLIBS $CMK_MPI_LIB"' "mpi lib"
+    fi
+  fi
+fi
+
+if test "$BUILD_MPI" = "1"
 then
 cat > $t <<EOT
 #include "mpi.h"
@@ -2439,6 +2517,7 @@ _ACEOF
 fi
 mv -f ../include/mpi.h.bak ../include/mpi.h 2>/dev/null
 
+fi
 
 ################### Syscalls and Libraries ###################
 
@@ -2469,6 +2548,21 @@ test_link "whether has sqrtf" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_SQRTF $pass
+_ACEOF
+
+
+#### test for fabsf ###
+cat > $t <<EOT
+#include <math.h>
+int main() {
+  float i = fabsf((float)10.0);
+  return 0;
+}
+EOT
+test_link "whether has fabsf" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_FABSF $pass
 _ACEOF
 
 
@@ -2570,10 +2664,25 @@ void foo(void) {
   poll(pos, 1, 1);
 }
 EOT
-test_cxx "whether poll() syscall exists" "yes" "no" ""
+test_cxx "whether has poll" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_USE_POLL $pass
+_ACEOF
+
+
+#### check if getpagesize exists ####
+cat > $tc <<EOT
+#include <unistd.h>
+
+int main(int argc, char **argv) {
+    int s = getpagesize();
+}
+EOT
+test_linkc "whether has getpagesize" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_GETPAGESIZE $pass
 _ACEOF
 
 
@@ -2586,7 +2695,7 @@ int main(int argc, char **argv) {
     pid_t pid = getpid();
 }
 EOT
-test_linkc "whether getpid() exists" "yes" "no" ""
+test_linkc "whether has getpid" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_GETPID $pass
@@ -2605,7 +2714,7 @@ int main(int argc, char**argv)
     kill(pid, 9);
 }
 EOT
-test_linkc "whether kill() exists" "yes" "no" ""
+test_linkc "whether has kill" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_KILL $pass
@@ -2620,7 +2729,7 @@ void foo(void) {
   setpriority(PRIO_PROCESS, 0, 0);
 }
 EOT
-test_cxx "whether setpriority() exists" "yes" "no" ""
+test_cxx "whether has setpriority" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_SETPRIORITY $pass
@@ -3124,7 +3233,7 @@ then
 	add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
 else
 	BUILD_SHARED=1
-        if test $BUILD_MPI -eq 1
+        if test "$BUILD_MPI" = "1"
 	then
 cat > $t <<EOT
 #include "stdlib.h"

@@ -1,0 +1,121 @@
+#!/bin/sh
+# Script to generate dependency information that can be consumed by GNU make
+# Pass a ci file as input on command line and get result on stdout
+#
+# Ramprasad Venkataraman - Apr 2010
+
+
+
+# Spill the contents of the ci file into a pipe
+cat $1 | \
+#
+#
+# Massage the contents to make it more amenable to parsing for dependency extraction:
+#
+# - remove C style comments
+# - remove C++ style comments
+sed -e "/\/\*/,/\*\//d" -e "s|//.*||g" | \
+# - remove all user-inserted newlines
+# - insert newlines where user indicates end of a statement in ci file syntax, ie when script encounters ; } or {
+sed -nre ':extractCIstatement; s|\n| |g; /[\;\}\{]+/{s|[\;\}\{]+|\
+| ;P;D};N;b extractCIstatement' | \
+#
+#
+# Parse the processed ci syntax records and generate dependency information
+awk '
+# Before we commence parsing the ci file
+BEGIN {
+	# Set the field separator so that we dont have to worry about ; {  etc while parsing the ci file
+	# Ideally ; } and { should be record separators, but unfortunately regex-based RS is GNU awk-only
+    # The previous seds to process the input stream should remove all ; } and {. Still we keep them as
+    # field separators purely out of paranoia
+	FS    = "[\t ;}{\"]+";
+
+	# Initialize all counters
+	cnt   = 0;
+	nDeps = 0;
+}
+
+
+# Prints all the dependencies for a single module collated from parsing the ci file
+function printDependencies() {
+	# Print something only if there are any dependencies
+	if (nDeps > 0)
+	{
+		printf "\n%s.decl.h: ",modules[cnt-1];
+        for (i=0; i < nDeps; i++) printf "%s ",depList[i];
+		printf "\n\n";
+	}
+}
+
+
+# Returns the field number of the first match
+function getFieldNumOfMatch(str)
+{
+	for (i=1; i<=NF; i++)
+		if ($i == str) return i;
+	return -1;
+}
+
+
+# Reset counters and start dependency collation for a new module
+function startNewModule(str)
+{
+	# Print the dependencies for the previous module
+	printDependencies();
+	# Reset counters to start parsing this new module
+	nDeps = 0;
+	# Add the module name to the list of modules in this ci file
+	modules[cnt++] = str;
+}
+
+
+# If the ci file has an include statement, add it to the dependencies for the containing module
+/include/ {
+	# Find the field number of the include keyword
+	i = getFieldNumOfMatch("include")
+	# Add the included file to the list of dependencies for this module
+	depList[nDeps++] = $(i+1)
+}
+
+
+# Externed modules are additional dependencies for the current module
+/extern[ ]+module/ {
+	# Find the field number of the module keyword
+	fNum = getFieldNumOfMatch("module")
+	# Add the externed module to the list of dependencies for this module
+	depList[nDeps++] = $(fNum+1) ".decl.h"
+}
+
+
+# Parse mainmodule definitions
+/mainmodule/ {
+	# Find the field number of the module keyword
+	fNum = getFieldNumOfMatch("mainmodule")
+	# Mainmodules are also just another module in terms of dependencies
+	startNewModule( $(fNum+1) );
+}
+
+
+# Parse module definitions
+/^[ ]*module/ {
+	# Find the field number of the module keyword
+	fNum = getFieldNumOfMatch("module")
+	startNewModule( $(fNum+1) );
+}
+
+
+# After parsing the whole ci file, print the make rule to compile the ci file
+END {
+	# Print the dependencies for the last module parsed
+	printDependencies();
+	# Generate a compilation rule for all the decl files dependent on this ci file
+	for (i=0;i<cnt;i++)
+		printf "%s.decl.h %s.def.h ",modules[i],modules[i];
+}' && \
+#
+#
+# Add the input file as a dependency for the list of decl/def files that will be generated from it
+# This list of decl/def files is output at the end of the prev awk script
+printf ': %s' $1
+

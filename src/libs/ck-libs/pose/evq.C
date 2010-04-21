@@ -7,6 +7,10 @@ eventQueue::eventQueue()
   if(pose_config.dop){
     sprintf(filename, "dop%d.log", CkMyPe());
     fp = fopen(filename, "a");
+    if (fp == NULL) {
+      CkPrintf("ERROR: unable to open DOP file %s for append\n");
+      CkAbort("Error opening file");
+    }
     lastLoggedVT = 0;
   }
   Event *e;
@@ -14,6 +18,7 @@ eventQueue::eventQueue()
   largest = POSE_UnsetTS;
   mem_usage = 0;
   eventCount = 0;
+  tsOfLastInserted = 0;
   // create the front sentinel node
   e = new Event();
   e->timestamp = POSE_UnsetTS;
@@ -64,6 +69,7 @@ eventQueue::~eventQueue()
 /// Insert e in the queue in timestamp order
 void eventQueue::InsertEvent(Event *e)
 {
+  tsOfLastInserted = e->timestamp;
   if(pose_config.deterministic)
     {
       InsertEventDeterministic(e);
@@ -117,9 +123,7 @@ void eventQueue::InsertEventDeterministic(Event *e)
   // greater than last timestamp in queue, 
   // or currentPtr is at back (presumably because heap is empty)
   //CkPrintf("Received event "); e->evID.dump(); CkPrintf(" at %d...\n", e->timestamp);
-  if ((tmp->timestamp < e->timestamp) ||
-      ((tmp->timestamp == e->timestamp) && (tmp->evID < e->evID))
-      && (currentPtr != backPtr))
+  if ((tmp->timestamp < e->timestamp || (tmp->timestamp == e->timestamp && tmp->evID < e->evID)) && (currentPtr != backPtr))
     eqh->InsertEvent(e); // insert in heap
   else { // tmp->timestamp > e->timestamp; insert in linked list
     if ((currentPtr != backPtr) && (currentPtr->timestamp > e->timestamp))
@@ -263,6 +267,7 @@ void eventQueue::CommitAll(sim *obj)
 #endif
   Event *commitPtr = frontPtr->next;
   
+  // commit calls for done events
   while (commitPtr != backPtr) {
     if (commitPtr->done) {
       obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg);
@@ -274,21 +279,74 @@ void eventQueue::CommitAll(sim *obj)
     }
     commitPtr = commitPtr->next;
   }
-  // now free up the memory
+
+  // now free up the memory (frees ALL events in the queue, not just
+  // the ones that are done)
   Event *link = commitPtr;
   commitPtr = commitPtr->prev;
   while (commitPtr != frontPtr) {
 #ifdef MEM_TEMPORAL
     if (commitPtr->serialCPdata) {
       localTimePool->tmp_free(commitPtr->timestamp, commitPtr->serialCPdata);
+    }
 #else
     if (commitPtr->cpData) {
       delete commitPtr->cpData;
-#endif
     }
+#endif
     commitPtr = commitPtr->prev;
     mem_usage--;
     delete commitPtr->next;
+  }
+  frontPtr->next = link;
+  link->prev = frontPtr; 
+#ifdef EQ_SANITIZE
+  sanitize();
+#endif
+}
+
+/// Commit (delete) all events that are done (used in sequential mode)
+void eventQueue::CommitDoneEvents(sim *obj) {
+#ifdef EQ_SANITIZE
+  sanitize();
+#endif
+  Event *commitPtr = frontPtr->next;
+  
+  // commit calls for done events
+  while (commitPtr != backPtr) {
+    if (commitPtr->done) {
+      obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg);
+      CommitStatsHelper(commitPtr);
+      if (commitPtr->commitBfrLen > 0)  { // print buffered output
+	CkPrintf("%s", commitPtr->commitBfr);
+	if (commitPtr->commitErr) CmiAbort("Commit ERROR");
+      }
+    }
+    commitPtr = commitPtr->next;
+  }
+
+  // now free up the memory (only delete events that are done)
+  Event *link = commitPtr;
+  commitPtr = commitPtr->prev;
+  while (commitPtr != frontPtr) {
+    if (commitPtr->done == 1) {
+#ifdef MEM_TEMPORAL
+      if (commitPtr->serialCPdata) {
+	localTimePool->tmp_free(commitPtr->timestamp, commitPtr->serialCPdata);
+      }
+#else
+      if (commitPtr->cpData) {
+	delete commitPtr->cpData;
+      }
+#endif
+    }
+    commitPtr = commitPtr->prev;
+    if (commitPtr->next->done == 1) {
+      mem_usage--;
+      delete commitPtr->next;
+    } else {
+      link = commitPtr->next;
+    }
   }
   frontPtr->next = link;
   link->prev = frontPtr; 
@@ -373,6 +431,7 @@ void eventQueue::dump()
 /// Pack/unpack/sizing operator
 void eventQueue::pup(PUP::er &p) 
 {
+  p|tsOfLastInserted;
   Event *tmp;
   register int i;
   int countlist = 0;

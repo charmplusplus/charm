@@ -64,15 +64,30 @@
 #error "Compiler not generating 64 bit binary, please check compiler flags."
 #endif
 
+#if CMK_SIZET_64BIT && !CMK_64BIT
+#define CMK_64BIT                1
+#endif
+
 /* set up what production/non-production means */
-#ifndef CMK_OPTIMIZE
+#ifdef CMK_OPTIMIZE
+/*
+#undef CMK_REPLAYSYSTEM
+#define CMK_REPLAYSYSTEM            0
+*/
+#endif    /* CMK_OPTIMIZE */
 
 #ifndef CMK_REPLAYSYSTEM
-#if !defined(_WIN32)
 #define CMK_REPLAYSYSTEM            1
 #endif
+
+/* replay does not work on windows */
+#ifdef _WIN32
+#undef CMK_REPLAYSYSTEM
+#define CMK_REPLAYSYSTEM            0
 #endif
 
+#ifndef CMK_TRACE_DISABLED
+#define CMK_TRACE_DISABLED          0
 #endif
 
 #endif

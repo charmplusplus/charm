@@ -23,12 +23,10 @@
 /** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
 int _replaySystem = 0;
 
-#if CMK_REPLAYSYSTEM
-
+#undef ConverseDeliver
 int ConverseDeliver() {
   return !_replaySystem;
 }
-#endif
 
 #if CMK_CCS_AVAILABLE && !defined(_WIN32)
 

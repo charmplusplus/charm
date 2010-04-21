@@ -1,6 +1,6 @@
 
 #include "elements.h"
-#include "heap.h"
+#include "ckheap.h"
 
 #include "BaseLB.h"
 
@@ -13,7 +13,7 @@ LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count)
     processors[i].Id = i;
     processors[i].backgroundLoad = stats->procs[i].bg_cputime;
     processors[i].computeLoad = stats->procs[i].total_walltime;
-    processors[i].load = stats->procs[i].total_walltime;
+    processors[i].load = processors[i].computeLoad + processors[i].backgroundLoad;
     processors[i].pe_speed = stats->procs[i].pe_speed;
     processors[i].available = stats->procs[i].available;
   }
@@ -43,11 +43,18 @@ LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count)
     }
   }
 
+  if (_lb_args.debug()>1) {
+    CkPrintf("Before migration: (%d) ", count);
+    for (i=0; i<count; i++) CkPrintf("%f (%f %f) ", processors[i].load, processors[i].computeLoad, processors[i].backgroundLoad);
+    CkPrintf("\n");
+  }
+
   int done = 0;
   CkVec<VectorMigrateInfo *> miginfo;
   while (!done) {
     processorInfo *donor = (processorInfo *) heavyProcessors->deleteMax();
     if (!donor) break;
+    if (donor->computeLoad == 0.0) continue;    // nothing to move
     Iterator nextProcessor;
     processorInfo *p = (processorInfo *)
       lightProcessors->iterator((Iterator *) &nextProcessor);
@@ -57,8 +64,11 @@ LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count)
       double give;
       if (load > needed) give = needed;
       else give = load;
+      if (give > donor->computeLoad) give = donor->computeLoad;
       donor->load -= give;
+      donor->computeLoad -= give;
       p->load += give;
+      p->computeLoad += give;
       VectorMigrateInfo *move = new VectorMigrateInfo;
       move->from_pe = donor->Id;
       move->to_pe = p->Id;
@@ -87,7 +97,7 @@ LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count)
 
   if (_lb_args.debug()>1) {
     CkPrintf("After migration: (%d) ", count);
-    for (i=0; i<count; i++) CkPrintf("%f ", processors[i].load);
+    for (i=0; i<count; i++) CkPrintf("%f (%f %f) ", processors[i].load, processors[i].computeLoad, processors[i].backgroundLoad);
     CkPrintf("\n");
   }
 

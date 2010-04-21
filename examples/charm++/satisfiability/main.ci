@@ -8,13 +8,13 @@ mainmodule main {
     
         //entry void done();
         //entry [expedited]void done();
-        entry [expedited]void done();
+        entry [expedited]void done(CkVec<int>);
     };
    
-    message SolverState;
+    message par_SolverState;
 
-    chare Solver{
-        entry Solver(SolverState*);
+    chare mySolver{
+        entry mySolver(par_SolverState*);
     };
 
 };

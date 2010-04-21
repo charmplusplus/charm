@@ -13,6 +13,6 @@ public:
     Main(CkArgMsg* msg);
     Main(CkMigrateMessage* msg);
 
-    void done();
+    void done(CkVec<int>);
 };
 #endif

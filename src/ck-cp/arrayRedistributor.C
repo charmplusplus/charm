@@ -13,7 +13,7 @@
 //#include <sys/time.h>
 #include <float.h>
 
-#include "ControlPoints.decl.h"
+//#include "ControlPoints.decl.h"
 #include "trace-controlPoints.h"
 #include "LBDatabase.h"
 #include "controlPoints.h"

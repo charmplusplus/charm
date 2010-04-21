@@ -241,8 +241,10 @@ private:
             CkMsgAlignLength(size)+
 	    sizeof(int)*CkPriobitsToInts(prio);
       register envelope *env = (envelope *)CmiAlloc(tsize);
-#ifndef CMK_OPTIMIZE
+#if CMK_REPLAYSYSTEM
+      //for record-replay
       memset(env, 0, sizeof(envelope));
+      env->setEvent(++CkpvAccess(envelopeEventID));
 #endif
       env->setMsgtype(type);
       env->totalsize = tsize;
@@ -250,8 +252,6 @@ private:
       env->setPacked(0);
       env->type.group.dep.setZero();
       _SET_USED(env, 0);
-      //for record-replay
-      env->setEvent(++CkpvAccess(envelopeEventID));
       env->setRef(0);
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
@@ -377,6 +377,10 @@ inline void *_allocMsg(const int msgtype, const int size, const int prio=0) {
 
 inline void _resetEnv(envelope *env) {
   env->reset();
+}
+
+inline void setEventID(envelope *env){
+  env->setEvent(++CkpvAccess(envelopeEventID));
 }
 
 /** @} */

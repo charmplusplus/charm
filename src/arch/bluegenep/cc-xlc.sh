@@ -1,4 +1,4 @@
-XLC_PRE=/opt/ibmcmp
+XLC_PRE=/soft/apps/ibmcmp-jan2010
 XLC_POST=bin/bg
 XLC_F=$XLC_PRE/xlf/bg/11.1
 CMK_CC="$XLC_PRE/vac/bg/9.0/${XLC_POST}xlc -qcpluscmt -I$CHARMINC $BGP_INC"

@@ -85,7 +85,7 @@ extern "C" void RegisterLanguage(int lID, const char* ln)
 extern "C" void RegisterEvent(int lID, int eID)
 { LOGCONDITIONAL(CpvAccess(_traceCore)->RegisterEvent(lID, eID)); }
 
-/* These Log routines will segfault if called under CMK_OPTIMIZE;
+/* These Log routines will segfault if called under CMK_TRACE_DISABLED;
    the solution is to surround their callers with LOGCONDITIONAL. */
 extern "C" void LogEvent(int lID, int eID)
 { CpvAccess(_traceCore)->LogEvent(lID, eID); }

@@ -97,11 +97,8 @@ void CentralLB::initLB(const CkLBOptions &opt)
   if (opt.getSeqNo() > 0) turnOff();
 
   stats_msg_count = 0;
-  statsMsgsList = new CLBStatsMsg*[CkNumPes()];
-  for(int i=0; i < CkNumPes(); i++)
-    statsMsgsList[i] = 0;
-
-  statsData = new LDStats;
+  statsMsgsList = NULL;
+  statsData = NULL;
 
   // for future predictor
   if (_lb_predict) predicted_model = new FutureModel(_lb_predict_window);
@@ -224,6 +221,7 @@ void CentralLB::ProcessAtSync()
 void CentralLB::ReceiveCounts(CkReductionMsg  *msg)
 {
   CmiAssert(CkMyPe() == 0);
+  if (statsData == NULL) statsData = new LDStats;
 
   int *counts = (int *)msg->getData();
   int n_objs = counts[0];
@@ -435,6 +433,14 @@ void CentralLB::depositData(CLBStatsMsg *m)
 void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
 {
 #if CMK_LBDB_ON
+  if (statsMsgsList == NULL) {
+    statsMsgsList = new CLBStatsMsg*[CkNumPes()];
+    CmiAssert(statsMsgsList != NULL);
+    for(int i=0; i < CkNumPes(); i++)
+      statsMsgsList[i] = 0;
+  }
+  if (statsData == NULL) statsData = new LDStats;
+
     //  loop through all CLBStatsMsg in the incoming msg
   int count = msg.getCount();
   for (int num = 0; num < count; num++) 
@@ -1238,8 +1244,8 @@ void CentralLB::pup(PUP::er &p) {
     initLB(CkLBOptions(seqno)); 
   }
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	p | lbDecisionCount;
-    p | resumeCount;
+  p | lbDecisionCount;
+  p | resumeCount;
 #endif
 	
 }

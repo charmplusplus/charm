@@ -23,6 +23,8 @@ class eventQueue {
   POSE_TimeType largest;
   /// number of unexecuted events in the queue
   unsigned int eventCount;
+  /// Timestamp of the last event inserted in the queue
+  POSE_TimeType tsOfLastInserted;
   /// Output file name for stats for DOP calculation
   char filename[20];
   /// Output file pointer for stats for DOP calculation
@@ -76,11 +78,13 @@ class eventQueue {
 #ifdef EQ_SANITIZE
     sanitize();
 #endif
-  }               
+  }
   /// Commit (delete) events before target timestamp ts
   void CommitEvents(sim *obj, POSE_TimeType ts); 
   /// Commit (delete) all events
   void CommitAll(sim *obj); 
+  /// Commit (delete) all events that are done (used in sequential mode)
+  void CommitDoneEvents(sim *obj);
   /// Change currentPtr to point to event e
   /** Be very very careful with this -- avoid using if possible */
   void SetCurrentPtr(Event *e);

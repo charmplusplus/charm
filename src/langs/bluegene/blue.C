@@ -542,6 +542,18 @@ void addBgNodeMessage(char *msgPtr)
   tMYNODE->addBgNodeMessage(msgPtr);
 }
 
+void BgEnqueue(char *msg)
+{
+#if 0
+  ASSERT(tTHREADTYPE == WORK_THREAD);
+  workThreadInfo *tinfo = (workThreadInfo *)cta(threadinfo);
+  tinfo->addAffMessage(msg);
+#else
+  nodeInfo *myNode = cta(threadinfo)->myNode;
+  addBgNodeInbuffer(msg, myNode->id);
+#endif
+}
+
 /** BG API Func 
  *  check if inBuffer on this node has msg available
  */
@@ -1327,6 +1339,7 @@ static CmiHandler exitHandlerFunc(char *msg)
       traceCharmClose();
 //      CmiSwitchToPE(oldPe);
       delete cva(nodeinfo)[j].threadinfo[i]->watcher;   // force dump watcher
+      cva(nodeinfo)[j].threadinfo[i]->watcher = NULL;
     }
     if (origPe!=-2) CmiSwitchToPE(origPe);
   }
@@ -1506,11 +1519,26 @@ CmiStartFn bgMain(int argc, char **argv)
   }
 
   // record/replay
-  if (CmiGetArgFlagDesc(argv,"+bgrecord","Record message processing order for BigSim"))
+  if (CmiGetArgFlagDesc(argv,"+bgrecord","Record message processing order for BigSim")) {
     cva(bgMach).record = 1;
+    if (CmiMyPe() == 0)
+      CmiPrintf("BG info> full record mode. \n");
+  }
   int replaype;
   if (CmiGetArgIntDesc(argv,"+bgreplay", &replaype, "Re-play message processing order for BigSim")) {
     cva(bgMach).replay = replaype;
+  }
+  else {
+    if (CmiGetArgFlagDesc(argv,"+bgreplay","Record message processing order for BigSim"))
+    cva(bgMach).replay = 0;    // default to 0
+  }
+  if (cva(bgMach).replay >= 0) {
+    if (CmiNumPes()>1)
+      CmiAbort("BG> bgreplay mode must run on one physical processor.");
+    if (cva(bgMach).x!=1 || cva(bgMach).y!=1 || cva(bgMach).z!=1 ||
+         cva(bgMach).numWth!=1 || cva(bgMach).numCth!=1)
+      CmiAbort("BG> bgreplay mode must run on one target processor.");
+    CmiPrintf("BG info> replay mode for target processor %d.\n", cva(bgMach).replay);
   }
   char *procs = NULL;
   if (CmiGetArgStringDesc(argv, "+bgrecordprocessors", &procs, "A list of processors to record, e.g. 0,10,20-30")) {
@@ -2025,7 +2053,9 @@ static void writeToDisk()
 }
 
 
-// application Converse thread hook
+/*****************************************************************************
+             application Converse thread hook
+*****************************************************************************/
 
 CpvExtern(int      , CthResumeBigSimThreadIdx);
 
@@ -2081,6 +2111,10 @@ void BgSetStrategyBigSimDefault(CthThread t)
   CthAddListener(t, a);
 }
 
+int BgIsMainthread()
+{
+    return tMYNODE == NULL;
+}
 
 int BgIsRecord()
 {
@@ -2119,3 +2153,11 @@ extern "C" void CkReduce(void *msg, int size, CmiReduceMergeFn mergeFn) {
   for (int i=0; i<numLocal-1; ++i) CmiFree(msgLocal[i]);
   free(msgLocal);
 }
+
+// for record/replay, to fseek back
+void BgRewindRecord()
+{
+  threadInfo *tinfo = cta(threadinfo);
+  if (tinfo->watcher) tinfo->watcher->rewind();
+}
+

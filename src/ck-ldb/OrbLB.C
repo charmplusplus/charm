@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 
 /**
  * \addtogroup CkLdb
@@ -11,7 +5,10 @@
    objects and map to processors. In OrbLB, objects are treated to be enclosed 
    by a rectangular box using their LDObjid as coordinates.
 
+   Written by Gengbin Zheng
+
    ORB now takes background load into account
+   3/26/2010:        added support for avail_vector
 */
 /*@{*/
 
@@ -233,7 +230,11 @@ void OrbLB::mapPartitionsToNodes()
     for (i=0; i<npartition; i++) partitions[i].node = partitions[i].bkpes[0];
   }
   else {
-    for (i=0; i<P; i++) partitions[i].node = i;
+    int n = 0;
+    for (i=0; i<P; i++) { 
+      if (!statsData->procs[i].available) continue;
+      partitions[n++].node = i;
+    }
   }
 #else
   PatchMap *patchMap = PatchMap::Object();
@@ -355,7 +356,9 @@ void OrbLB::work(BaseLB::LDStats* stats, int count)
   CmiPrintf("qsort time: %f\n", CkWallTimer() - t);
 #endif
 
-  npartition = P;
+  npartition = 0;
+  for (i=0; i<P; i++)
+    if (stats->procs[i].available == CmiTrue) npartition++;
   partitions = new Partition[npartition];
 
   double totalLoad = 0.0;
@@ -389,11 +392,13 @@ void OrbLB::work(BaseLB::LDStats* stats, int count)
     top_partition.bkpes.resize(0);
     double total = totalLoad;
     for (i=0; i<P; i++) {
+      if (!stats->procs[i].available) continue;
       double bkload = stats->procs[i].bg_walltime;
       total += bkload;
     }
-    double averageLoad = total / P;
+    double averageLoad = total / npartition;
     for (i=0; i<P; i++) {
+      if (!stats->procs[i].available) continue;
       double bkload = stats->procs[i].bg_walltime;
       if (bkload < averageLoad) top_partition.bkpes.push_back(i);
       else CkPrintf("OrbLB Info> PE %d with %f background load will have 0 object.\n", i, bkload);

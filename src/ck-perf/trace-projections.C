@@ -82,14 +82,14 @@ void flushTraceLog()
   CkpvAccess(_trace)->traceFlushLog();
 }
 
-#ifdef CMK_OPTIMIZE
+#if CMK_TRACE_DISABLED
 static int warned=0;
 #define OPTIMIZED_VERSION 	\
 	if (!warned) { warned=1; 	\
 	CmiPrintf("\n\n!!!! Warning: traceUserEvent not available in optimized version!!!!\n\n\n"); }
 #else
 #define OPTIMIZED_VERSION /*empty*/
-#endif // CMK_OPTIMIZE
+#endif // CMK_TRACE_DISABLED
 
 /*
 On T3E, we need to have file number control by open/close files only when needed.
@@ -125,6 +125,7 @@ void _createTraceprojections(char **argv)
   CkpvInitialize(TraceProjections*, _trace);
   CkpvAccess(_trace) = new  TraceProjections(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
+  if (CkMyPe()==0) CkPrintf("Charm++: Tracemode Projections enabled.\n");
 }
  
 /* ****** CW TEMPORARY LOCATION ***** Support for thread listeners */
@@ -170,7 +171,7 @@ void traceThreadListener_free(struct CthThreadListener *l)
 
 void TraceProjections::traceAddThreadListeners(CthThread tid, envelope *e)
 {
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   /* strip essential information from the envelope */
   TraceThreadListener *a= new TraceThreadListener;
   
@@ -1666,7 +1667,7 @@ void registerOutlierReduction() {
 // FIXME: WHY extern "C"???
 extern "C" void TraceProjectionsExitHandler()
 {
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   // CkPrintf("[%d] TraceProjectionsExitHandler called!\n", CkMyPe());
   CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
   bocProxy.traceProjectionsParallelShutdown(CkMyPe());

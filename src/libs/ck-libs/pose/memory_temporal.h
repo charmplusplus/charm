@@ -231,8 +231,9 @@ class TimePool : public Group {
  public:
   TimePool() : min_time(POSE_UnsetTS), last_in_use(NULL), first_in_use(NULL), 
     not_in_use(NULL), not_in_use_sz(0) {}
-  TimePool(CkMigrateMessage *) {}
+  TimePool(CkMigrateMessage *msg) : Group(msg) {}
   ~TimePool();
+  void pup(PUP::er &p) {}
   // Return memory from a time range
   char *tmp_alloc(POSE_TimeType timestamp, int sz_in_bytes);
   // "Free" up memory from a time range

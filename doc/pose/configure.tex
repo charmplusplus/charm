@@ -75,6 +75,10 @@ defaults set in the {\tt pose\_config.h} file
 	$\circ$ Minimum threshold for load balancing, default is 4000
 \item {\tt {\bf +lb\_diff\_pose N}}\\
 	$\circ$ Once the load has been analyzed, we compute the difference between the max and min PE loads.  Only if this difference exceeds {\tt LB\_DIFF} do we bother migrating posers.\\
+\item {\tt {\bf +checkpoint\_gvt\_pose N}}\\
+	$\circ$ Checkpoint to disk approximately every N GVT ticks (N is an integer).  The default is 0, which indicates no checkpointing.
+\item {\tt {\bf +checkpoint\_time\_pose N}}\\
+	$\circ$ Checkpoint to disk every N seconds (N is an integer).  The default is 0, which indicates no checkpointing.  If both this parameter and +checkpoint\_gvt\_pose are greater than 0, a warning will be given, the value of this parameter will be set to 0, and POSE will checkpoint based on GVT ticks.
 \end{itemize}
 
 As a technical point, pose command line parsing is done inside the

@@ -180,7 +180,8 @@ void CkReduce(void *msg, int size, CmiReduceMergeFn mergeFn);
 #define CmiMultipleSend			BgMultipleSend
 
 #undef CsdEnqueueLifo
-#define CsdEnqueueLifo(m)  CmiSyncSendAndFree(CmiMyPe(),sizeof(m), (char*)(m));
+//#define CsdEnqueueLifo(m)  CmiSyncSendAndFree(CkMyPe(),((envelope*)m)->getTotalsize(), (char*)(m));
+#define CsdEnqueueLifo(m)    		BgEnqueue((char*)m)
 
 #undef CmiNodeAllBarrier
 #define CmiNodeAllBarrier()

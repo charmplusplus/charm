@@ -124,7 +124,7 @@ int   _qdHandlerIdx;
 int   _qdCommHandlerIdx;
 int   _triggerHandlerIdx;
 int   _mainDone = 0;
-static int   _triggersSent = 0;
+CksvDeclare(int, _triggersSent);
 
 CkOutStream ckout;
 CkErrStream ckerr;
@@ -163,7 +163,7 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 /*
 	FAULT_EVAC
 */
-CpvDeclare(char *, _validProcessors);
+CpvCExtern(char *, _validProcessors);
 CpvDeclare(char ,startedEvac);
 
 int    _exitHandlerIdx;
@@ -577,9 +577,9 @@ static void _sendTriggers(void)
 {
   int i, num, first;
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-  if (_triggersSent == 0)
+  if (CksvAccess(_triggersSent) == 0)
   {
-    _triggersSent++;
+    CksvAccess(_triggersSent)++;
     num = CmiMyNodeSize();
     register envelope *env = _allocEnv(RODataMsg); // Notice that the type here is irrelevant
     env->setSrcPe(CkMyPe());
@@ -605,7 +605,7 @@ static void _sendTriggers(void)
 void _initDone(void)
 {
   DEBUGF(("[%d] _initDone.\n", CkMyPe()));
-  if (!_triggersSent) _sendTriggers();
+  if (!CksvAccess(_triggersSent)) _sendTriggers();
   CkNumberHandler(_triggerHandlerIdx, (CmiHandler)_discardHandler);
   CmiNodeBarrier();
   if(CkMyRank() == 0) {
@@ -682,7 +682,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
   register envelope *env = (envelope *) msg;
   
   if (ck->watcher!=NULL) {
-    if (!ck->watcher->processMessage(env,ck)) return;
+    if (!ck->watcher->processMessage(&env,ck)) return;
   }
   
   switch (env->getMsgtype()) {
@@ -784,7 +784,10 @@ extern "C"
 void EmergencyExit(void) {
 #ifndef __BLUEGENE__
   /* Delete _coreState to force any CkMessageWatcher to close down. */
-  delete CkpvAccess(_coreState);
+  if (CkpvAccess(_coreState) != NULL) {
+    delete CkpvAccess(_coreState);
+    CkpvAccess(_coreState) = NULL;
+  }
 #endif
 }
 
@@ -911,6 +914,8 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(UInt,_numInitNodeMsgs);
 	CkpvInitialize(int,_charmEpoch);
 	CkpvAccess(_charmEpoch)=0;
+	CksvInitialize(int, _triggersSent);
+	CksvAccess(_triggersSent) = 0;
 
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);

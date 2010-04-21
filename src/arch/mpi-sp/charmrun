@@ -54,7 +54,7 @@ cu*|Cu*)
 esac
 
 # Prepend path to executable
-args=`pwd`/"$args"
+#args=`pwd`/"$args"
 
 echo "Running> poe $args $extra"
 poe $args $extra

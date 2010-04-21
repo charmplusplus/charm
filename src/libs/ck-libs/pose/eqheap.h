@@ -65,7 +65,9 @@ class EqHeap {
   /// Basic Constructor
   EqHeap() : heapSize(0),top(NULL){ }
   /// Destructor
-  ~EqHeap() { if (top) delete top; } 
+  ~EqHeap() { if (top) delete top; }
+  /// Heap size
+  inline int size() { return heapSize; }
   /// Insert event e in heap with low timestamps at top of heap
   void InsertEvent(Event *e);              
   /// Insert event e in heap deterministically with low timestamps at top

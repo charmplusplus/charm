@@ -497,6 +497,8 @@ extern void CmiGetPesOnPhysicalNode(int node, int **pelist, int *num);
 extern int CmiGetFirstPeOnPhysicalNode(int node);
 extern int CmiPhysicalRank(int pe);
 
+extern int CmiPrintCPUAffinity();
+
 /** Return 1 if our outgoing message queue 
    for this node is longer than this many bytes. */
 int CmiLongSendQueue(int forNode,int longerThanBytes);
@@ -685,11 +687,12 @@ void CmiResetMinMemory();
 void* CmiMallocAligned(const size_t size, const unsigned int alignment);
 void CmiFreeAligned(void* ptr);
 
-#define CMI_MEMORY_IS_ISOMALLOC (1<<1)
-#define CMI_MEMORY_IS_PARANOID  (1<<2)
-#define CMI_MEMORY_IS_GNU       (1<<3)
-#define CMI_MEMORY_IS_GNUOLD    (1<<4)
-#define CMI_MEMORY_IS_OS        (1<<5)
+#define CMI_MEMORY_IS_ISOMALLOC   (1<<1)
+#define CMI_MEMORY_IS_PARANOID    (1<<2)
+#define CMI_MEMORY_IS_GNU         (1<<3)
+#define CMI_MEMORY_IS_GNUOLD      (1<<4)
+#define CMI_MEMORY_IS_OS          (1<<5)
+#define CMI_MEMORY_IS_CHARMDEBUG  (1<<6)
 int CmiMemoryIs(int flag); /* return state of this flag */
 
 #define CMI_THREAD_IS_QT         (1<<1)
@@ -1225,6 +1228,7 @@ typedef void        (*CthAwkFn)(CthThreadToken *,int,
 				int prioBits,unsigned int *prioptr);
 typedef CthThread   (*CthThFn)();
 
+void       CthSetSerialNo(CthThread t, int no);
 int        CthImplemented(void);
 
 int        CthMigratable();

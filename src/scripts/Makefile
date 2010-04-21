@@ -203,7 +203,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ComlibLearner.h $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h lbdb++.h LBProfit.h \
           LBDBManager.h	LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
-	  Refiner.h RefinerApprox.h RefinerComm.h ObjGraph.h heap.h \
+	  Refiner.h RefinerApprox.h RefinerComm.h ObjGraph.h ckheap.h \
           elements.h CommLBHeap.h topology.h manager.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h RefineKLB.h RefineCommLB.h OrbLB.h \
@@ -245,7 +245,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
-	graph.h bitvecset.h Set.h LBSimulation.h  \
+	graph.h bitvecset.h ckset.h LBSimulation.h  \
 	$(BLUE_HEADERS)
 
 basics: headers
@@ -253,10 +253,12 @@ basics: headers
 
 # Headers is used only for the dependencies
 headers: dirs+sources
+	$(MAKE) charmxi
 	$(MAKE) headerlinks
 
 conv-autoconfig.h: configure
-	./configure $(QUIET)
+	@. ./config_opts.sh; echo ./configure $(QUIET) $$CONFIG_OPTS;  \
+	./configure $(QUIET) $$CONFIG_OPTS
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
 	@[ "x$QUIET" = "x--quiet" ] || echo "Soft-linking headers..."
@@ -306,6 +308,7 @@ dirs+sources:
 	./gathertree ../../examples ../examples
 	./gathertree ../../tests ../tests
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
+	rm -f ../bin/gendeps4ci; cp gendeps4ci ../bin/
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/
 #	-ln -s ../../java/bin charmjavabin
@@ -643,7 +646,7 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o  \
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o WSLB.o \
            ObjGraph.o graph.o LButil.o Refiner.o RefinerApprox.o  \
-           RefinerComm.o bitvecset.o Set.o heap.o CommLBHeap.o \
+           RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) \
 	   charmProjections.o pathHistory.o
 
@@ -898,11 +901,21 @@ ControlPoints.def.h: ControlPoints.decl.h
 ControlPoints.decl.h : controlPoints.ci charmxi
 	$(CHARMXI) controlPoints.ci
 
-controlPoints_objs: $(L)/libmoduleControlPoints.a
+ControlPointsNoTrace.def.h: ControlPointsNoTrace.decl.h
+
+ControlPointsNoTrace.decl.h : controlPointsNoTrace.ci charmxi
+	$(CHARMXI) controlPointsNoTrace.ci
+
+controlPoints_objs: $(L)/libmoduleControlPoints.a $(L)/libmoduleControlPointsNoTrace.a
 
 $(L)/libmoduleControlPoints.a: $(CONTROLPOINTS_OBJS)
 	$(CHARMC) -o $(L)/libmoduleControlPoints.a $(CONTROLPOINTS_OBJS)
 
+$(L)/libmoduleControlPointsNoTrace.a: controlPointsNoTrace.o arrayRedistributor.o cp_effects.o
+	$(CHARMC) -o $(L)/libmoduleControlPointsNoTrace.a controlPointsNoTrace.o arrayRedistributor.o cp_effects.o
+
+controlPointsNoTrace.o: controlPoints.C controlPoints.h ControlPointsNoTrace.decl.h
+	$(CHARMC) -I. -c controlPoints.C -o controlPointsNoTrace.o -DCP_DISABLE_TRACING $(OPTS)
 
 ######################################################################
 #

@@ -300,6 +300,7 @@ static void * combineMessage(int *size, void *data, void **remote, int count)
 {
   int i, j;
   int nprocs = ((hostnameMsg *)data)->n;
+  if (count == 0) return data;
   for (i=0; i<count; i++) nprocs += ((hostnameMsg *)remote[i])->n;
   *size = sizeof(hostnameMsg)+sizeof(_procInfo)*nprocs;
   hostnameMsg *msg = (hostnameMsg *)CmiAlloc(*size);
@@ -310,12 +311,12 @@ static void * combineMessage(int *size, void *data, void **remote, int count)
   int n=0;
   hostnameMsg *m = (hostnameMsg*)data;
   m->procs = (_procInfo*)((char*)m + sizeof(hostnameMsg));
-  for (int j=0; j<m->n; j++)
+  for (j=0; j<m->n; j++)
     msg->procs[n++] = m->procs[j];
   for (i=0; i<count; i++) {
-    hostnameMsg *m = (hostnameMsg*)remote[i];
+    m = (hostnameMsg*)remote[i];
     m->procs = (_procInfo*)((char*)m + sizeof(hostnameMsg));
-    for (int j=0; j<m->n; j++)
+    for (j=0; j<m->n; j++)
       msg->procs[n++] = m->procs[j];
   }
   return msg;
@@ -448,7 +449,9 @@ extern "C" void CmiInitCPUTopology(char **argv)
   if (CmiMyPe() >= CmiNumPes()) {
     CmiNodeAllBarrier();         // comm thread waiting
 #if CMK_MACHINE_PROGRESS_DEFINED
+#if ! CMK_CRAYXT
     while (done < CmiMyNodeSize()) CmiNetworkProgress();
+#endif
 #endif
     return;    /* comm thread return */
   }

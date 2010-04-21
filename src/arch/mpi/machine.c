@@ -153,6 +153,7 @@ static int checksum_flag = 0;
 #define MPI_POST_RECV_SIZE 200
 #endif
 /* #undef  MPI_POST_RECV_DEBUG  */
+#error "The following variables are never CpvInitialize'd. If you want to use POST_RECV, fix this first."
 CpvDeclare(unsigned long long, Cmi_posted_recv_total);
 CpvDeclare(unsigned long long, Cmi_unposted_recv_total);
 CpvDeclare(MPI_Request*, CmiPostedRecvRequests); /* An array of request handles for posted recvs */
@@ -179,6 +180,7 @@ static int mpi_tag = TAG;
 #define NEW_MPI_TAG	mpi_tag++; if (mpi_tag == MPI_TAG_UB) mpi_tag=TAG;
 */
 
+static int        _thread_provided = -1;
 int 		  _Cmi_numpes;
 int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_mynodesize;/* Number of processors in my address space */
@@ -286,8 +288,8 @@ void CmiTimerInit()
 {
   _is_global = CmiTimerIsSynchronized();
 
-  if (CmiMyRank() == 0) {
-    if (_is_global) {
+  if (_is_global) {
+    if (CmiMyRank() == 0) {
       double minTimer;
 #if CMK_TIMER_USE_XT3_DCLOCK
       starttimer = dclock();
@@ -299,19 +301,22 @@ void CmiTimerInit()
                                   MPI_COMM_WORLD );
       starttimer = minTimer;
     }
-    else {
-      /* we don't have a synchronous timer, set our own start time */
-      CmiBarrier();
-      CmiBarrier();
-      CmiBarrier();
-#if CMK_TIMER_USE_XT3_DCLOCK
-      starttimer = dclock();
-#else
-      starttimer = MPI_Wtime();
-#endif
-    }
-    /*  timerLock = CmiCreateLock();  */
   }
+  else {  /* we don't have a synchronous timer, set our own start time */
+    CmiBarrier();
+    CmiBarrier();
+    CmiBarrier();
+#if CMK_TIMER_USE_XT3_DCLOCK
+    starttimer = dclock();
+#else
+    starttimer = MPI_Wtime();
+#endif
+  }
+
+#if 0 && CMK_SMP && CMK_MPI_INIT_THREAD
+  if (CmiMyRank()==0 && _thread_provided == MPI_THREAD_SINGLE)
+    timerLock = CmiCreateLock();
+#endif
   CmiNodeAllBarrier();          /* for smp */
 }
 
@@ -1886,6 +1891,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   thread_level = MPI_THREAD_SINGLE;
 #endif
   MPI_Init_thread(&argc, &argv, thread_level, &provided);
+  _thread_provided = provided;
 #else
   MPI_Init(&argc, &argv);
   thread_level = 0;

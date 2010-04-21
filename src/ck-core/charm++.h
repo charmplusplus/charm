@@ -284,6 +284,7 @@ public:
 	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
 		{copyFrom(that); return *this;}
         void print() { CmiPrintf("%d: %d %d %d\n", nInts,index[0], index[1], index[2]); }
+        void sprint(char *str) { sprintf(str, "%d: %d %d %d", nInts,index[0], index[1], index[2]); }
 	void pup(PUP::er &p) {
 		p|nInts;
 		p|dimension;

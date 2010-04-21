@@ -1875,10 +1875,12 @@ ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank
 
   arrproxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm,sync));
 
-#ifndef CMK_OPTIMIZE
+#if 0
+#if ! CMK_TRACE_DISABLED
   int size=0;
   MPI_Type_size(type,&size);
   _LOG_E_AMPI_MSG_SEND(t,destIdx,count,size)
+#endif
 #endif
 }
 
