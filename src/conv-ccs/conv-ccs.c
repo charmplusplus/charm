@@ -24,19 +24,6 @@
  *
  *****************************************************************************/
  
-#include "ckhashtable.h"
-
-/* Includes all information stored about a single CCS handler. */
-typedef struct CcsHandlerRec {
-	const char *name; /*Name passed over socket*/
-	CmiHandler fnOld; /*Old converse-style handler, or NULL if new-style*/
-	CcsHandlerFn fn; /*New-style handler function, or NULL if old-style*/
-	void *userPtr;
-	CmiReduceMergeFn mergeFn; /*Merge function used for bcast requests*/
-	int nCalls; /* Number of times handler has been executed*/
-	CmiUInt2 redID; /*Reduction ID to be used with CmiListReduce*/
-} CcsHandlerRec;
-
 static void initHandlerRec(CcsHandlerRec *c,const char *name) {
   if (strlen(name)>=CCS_MAXHANDLER) 
   	CmiAbort("CCS handler names cannot exceed 32 characters");
@@ -65,8 +52,7 @@ static void callHandlerRec(CcsHandlerRec *c,int reqLen,const void *reqData) {
 }
 
 /*Table maps handler name to CcsHandler object*/
-typedef CkHashtable_c CcsHandlerTable;
-CpvStaticDeclare(CcsHandlerTable, ccsTab);
+CpvDeclare(CcsHandlerTable, ccsTab);
 
 CpvStaticDeclare(CcsImplHeader*,ccsReq);/*Identifies CCS requestor (client)*/
 
@@ -82,6 +68,9 @@ void CcsRegisterHandlerFn(const char *name, CcsHandlerFn fn, void *ptr) {
   cp.fn=fn;
   cp.userPtr=ptr;
   *(CcsHandlerRec *)CkHashtablePut(CpvAccess(ccsTab),(void *)&cp.name)=cp;
+}
+CcsHandlerRec *CcsGetHandler(const char *name) {
+  return CkHashtableGet(CpvAccess(ccsTab),(void *)&name);
 }
 void CcsSetMergeFn(const char *name, CmiReduceMergeFn newMerge) {
   CcsHandlerRec *rec=(CcsHandlerRec *)CkHashtableGet(CpvAccess(ccsTab),(void *)&name);
@@ -171,39 +160,7 @@ void CcsCallerId(skt_ip_t *pip, unsigned int *pport)
   *pport = ChMessageInt(CpvAccess(ccsReq)->attr.port);
 }
 
-static int rep_fw_handler_idx;
-
-/**
- * Decide if the reply is ready to be forwarded to the waiting client,
- * or if combination is required (for broadcast/multicast CCS requests.
- */
-int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
-  int repPE = (int)ChMessageInt(rep->pe);
-  if (repPE <= -1) {
-    /* Reduce the message to get the final reply */
-    CcsHandlerRec *fn;
-    int len=CmiReservedHeaderSize+sizeof(CcsImplHeader)+repLen;
-    char *msg=CmiAlloc(len);
-    char *r=msg+CmiReservedHeaderSize;
-    char *handlerStr;
-    rep->len = ChMessageInt_new(repLen);
-    *(CcsImplHeader *)r=*rep; r+=sizeof(CcsImplHeader);
-    memcpy(r,repData,repLen);
-    CmiSetHandler(msg,rep_fw_handler_idx);
-    handlerStr=rep->handler;
-    fn=(CcsHandlerRec *)CkHashtableGet(CpvAccess(ccsTab),(void *)&handlerStr);
-    if (fn->mergeFn == NULL) CmiAbort("Called CCS broadcast with NULL merge function!\n");
-    if (repPE == -1) {
-      /* CCS Broadcast */
-      CkReduce(msg, len, fn->mergeFn);
-    } else {
-      /* CCS Multicast */
-      CmiListReduce(-repPE, (int*)(rep+1), msg, len, fn->mergeFn, fn->redID);
-    }
-  } else {
-    CcsImpl_reply(rep, repLen, repData);
-  }
-}
+int rep_fw_handler_idx;
 
 CcsDelayedReply CcsDelayReply(void)
 {
@@ -286,14 +243,13 @@ void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
     CcsSendReply(0,NULL);/*Send an empty reply if not*/
 }
 
-#if ! NODE_0_IS_CONVHOST
+#if ! NODE_0_IS_CONVHOST || CMK_BLUEGENE_CHARM
 /* The followings are necessary to prevent CCS requests to be processed before
  * CCS has been initialized. Really it matters only when NODE_0_IS_CONVHOST=0, but
  * it doesn't hurt having it in the other case as well */
 static char **bufferedMessages = NULL;
 static int CcsNumBufferedMsgs = 0;
 #define CCS_MAX_NUM_BUFFERED_MSGS  100
-#endif
 
 void CcsBufferMessage(char *msg) {
   //CmiPrintf("Buffering CCS message\n");
@@ -303,6 +259,7 @@ void CcsBufferMessage(char *msg) {
   bufferedMessages[CcsNumBufferedMsgs] = msg;
   CcsNumBufferedMsgs ++;
 }
+#endif
   
 /*Unpacks request message to call above routine*/
 int _ccsHandlerIdx = 0;/*Converse handler index of routine req_fw_handler*/

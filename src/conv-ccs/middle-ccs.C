@@ -1,9 +1,10 @@
-#include "converse.h"
+#include "middle.h"
 
 #if CMK_BLUEGENE_CHARM
 #include "bgconverse.h"
 #endif
 #include "ccs-server.h"
+#include "conv-ccs.h"
 
 extern "C" void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData);
 
@@ -42,6 +43,39 @@ extern "C" void req_fw_handler(char *msg)
 }
 
 extern "C" void CcsSendReply(int replyLen, const void *replyData);
+extern int rep_fw_handler_idx;
+/**
+ * Decide if the reply is ready to be forwarded to the waiting client,
+ * or if combination is required (for broadcast/multicast CCS requests.
+ */
+extern "C" int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
+  int repPE = (int)ChMessageInt(rep->pe);
+  if (repPE <= -1) {
+    /* Reduce the message to get the final reply */
+    CcsHandlerRec *fn;
+    int len=CmiReservedHeaderSize+sizeof(CcsImplHeader)+repLen;
+    char *msg=(char*)CmiAlloc(len);
+    char *r=msg+CmiReservedHeaderSize;
+    char *handlerStr;
+    rep->len = ChMessageInt_new(repLen);
+    *(CcsImplHeader *)r=*rep; r+=sizeof(CcsImplHeader);
+    memcpy(r,repData,repLen);
+    CmiSetHandler(msg,rep_fw_handler_idx);
+    handlerStr=rep->handler;
+    fn=(CcsHandlerRec *)CcsGetHandler(handlerStr);
+    if (fn->mergeFn == NULL) CmiAbort("Called CCS broadcast with NULL merge function!\n");
+    if (repPE == -1) {
+      /* CCS Broadcast */
+      CkReduce(msg, len, fn->mergeFn);
+    } else {
+      /* CCS Multicast */
+      CmiListReduce(-repPE, (int*)(rep+1), msg, len, fn->mergeFn, fn->redID);
+    }
+  } else {
+    CcsImpl_reply(rep, repLen, repData);
+  }
+}
+
 /**********************************************
   "ccs_getinfo"-- takes no data
     Return the number of parallel nodes, and
