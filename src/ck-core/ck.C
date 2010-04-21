@@ -1995,7 +1995,7 @@ class CkMessageRecorder : public CkMessageWatcher {
 public:
   CkMessageRecorder(FILE *f_): curpos(0) { f=f_; buffer=new char[_recplay_logsize]; }
   ~CkMessageRecorder() {
-    flushLog();
+    flushLog(0);
     fprintf(f,"-1 -1 -1 ");
     fclose(f);
     delete[] buffer;
@@ -2009,8 +2009,8 @@ public:
   }
 
 private:
-  void flushLog() {
-    CkPrintf("[%d] flushing log\n", CkMyPe());
+  void flushLog(int verbose=1) {
+    if (verbose) CkPrintf("[%d] flushing log\n", CkMyPe());
     fprintf(f, "%s", buffer);
     curpos=0;
   }
