@@ -682,7 +682,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
   register envelope *env = (envelope *) msg;
   
   if (ck->watcher!=NULL) {
-    if (!ck->watcher->processMessage(env,ck)) return;
+    if (!ck->watcher->processMessage(&env,ck)) return;
   }
   
   switch (env->getMsgtype()) {
