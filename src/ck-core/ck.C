@@ -1981,7 +1981,7 @@ int _recplay_crc = 0;
 int _recplay_checksum = 0;
 int _recplay_logsize = 1024*1024;
 
-CkMessageWatcher::~CkMessageWatcher() {}
+CkMessageWatcher::~CkMessageWatcher() { if (next!=NULL) delete next;}
 
 class CkMessageRecorder : public CkMessageWatcher {
   char *buffer;
