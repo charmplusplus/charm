@@ -38,7 +38,7 @@ static void migrationDone(envelope *env, CkCoreState *ck)
   // Since migrationsDone will deal with Charm++ messages,
   // the LB must obey to the CkMessageWatcher orders.
   if (ck->watcher!=NULL) {
-    if (!ck->watcher->processMessage(env,ck)) return;
+    if (!ck->watcher->processMessage(&env,ck)) return;
   }
   
   NullLB *lb = (NullLB*)CkLocalBranch(_theNullLB);

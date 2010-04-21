@@ -1,5 +1,6 @@
 XLC_PRE=/soft/apps/ibmcmp-jan2010
 XLC_POST=bin/bg
+COMMENT="64-bit mode ignored! No VM on bluegene --> no 64 bit memory model."
 XLC_F=$XLC_PRE/xlf/bg/11.1
 CMK_CC="$XLC_PRE/vac/bg/9.0/${XLC_POST}xlc -qcpluscmt -I$CHARMINC $BGP_INC"
 CMK_CXX="$XLC_PRE/vacpp/bg/9.0/${XLC_POST}xlC -I$CHARMINC $BGP_INC"

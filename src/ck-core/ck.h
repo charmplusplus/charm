@@ -122,7 +122,7 @@ protected:
   FILE *f;
   CkMessageWatcher *next;
 public:
-    CkMessageWatcher() : next(NULL) { }
+    CkMessageWatcher() : f(NULL), next(NULL) { }
     virtual ~CkMessageWatcher();
 	/**
 	 * This message is about to be processed by Charm.
@@ -130,21 +130,27 @@ public:
 	 * The message is processed by the watcher starting from the innermost one
 	 * up to the outermost
 	 */
-	inline CmiBool processMessage(envelope *env,CkCoreState *ck) {
+	inline CmiBool processMessage(envelope **env,CkCoreState *ck) {
 	  CmiBool result = CmiTrue;
 	  if (next != NULL) result &= next->processMessage(env, ck);
 	  result &= process(env, ck);
+#if CMK_BLUEGENE_CHARM
+	  //if (!result) BgRewindRecord();
+#endif
 	  return result;
 	}
 	inline int processThread(CthThreadToken *token, CkCoreState *ck) {
 	   int result = 1;
 	   if (next != NULL) result &= next->processThread(token, ck);
 	   result &= process(token, ck);
+#if CMK_BLUEGENE_CHARM
+	   //if (!result) BgRewindRecord();
+#endif
 	   return result;
 	}
 protected:
     /** These are used internally by this class to call the correct subclass method */
-	virtual CmiBool process(envelope *env,CkCoreState *ck) =0;
+	virtual CmiBool process(envelope **env,CkCoreState *ck) =0;
 	virtual int process(CthThreadToken *token, CkCoreState *ck) {return 1;}
 public:
     inline void setNext(CkMessageWatcher *w) { next = w; }

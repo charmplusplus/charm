@@ -682,7 +682,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
   register envelope *env = (envelope *) msg;
   
   if (ck->watcher!=NULL) {
-    if (!ck->watcher->processMessage(env,ck)) return;
+    if (!ck->watcher->processMessage(&env,ck)) return;
   }
   
   switch (env->getMsgtype()) {
@@ -784,7 +784,10 @@ extern "C"
 void EmergencyExit(void) {
 #ifndef __BLUEGENE__
   /* Delete _coreState to force any CkMessageWatcher to close down. */
-  delete CkpvAccess(_coreState);
+  if (CkpvAccess(_coreState) != NULL) {
+    delete CkpvAccess(_coreState);
+    CkpvAccess(_coreState) = NULL;
+  }
 #endif
 }
 
