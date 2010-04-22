@@ -304,7 +304,7 @@ int main()
 #ifdef WRITE_OUTPUT_FILES
             // Write out the file
             cout << "writing " << rec_count << " simulated processors to this bgTrace file" << endl;
-            BgWriteTimelines(fileNum,tlinerecs,rec_count,numWth,OUTPUTDIR);
+            BgWriteTimelines(fileNum,tlinerecs,rec_count,OUTPUTDIR);
 #endif
         delete[] tlinerecs;
 
