@@ -17,7 +17,6 @@ CpvStaticDeclare(int, continueFlag);
 CpvStaticDeclare(int, stepFlag);
 CpvExtern(void *, debugQueue);
 int _debugHandlerIdx;
-CpvDeclare(int, skipBreakpoint); /* This is a counter of how many breakpoints we should skip */
 
 char ** memoryBackup;
 

@@ -1068,12 +1068,7 @@ void _initCharm(int unused_argc, char **argv)
 	_initCallTable.enumerateInitCalls();
 
 #ifndef CMK_OPTIMIZE
-#ifdef __BLUEGENE__
-        if(BgNodeRank()==0)
-#else
-        if(CkMyRank()==0)
-#endif
-          CpdFinishInitialization();
+	CpdFinishInitialization();
 #endif
 
 	//CmiNodeAllBarrier();
