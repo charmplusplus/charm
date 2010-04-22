@@ -45,7 +45,7 @@
 #define CkElapse(x)   
 
 #if CMK_REPLAYSYSTEM
-int ConverseDeliver();
+extern "C" int ConverseDeliver();
 #else
 #define ConverseDeliver()   1
 #endif

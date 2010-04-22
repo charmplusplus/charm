@@ -20,6 +20,14 @@ int _debugHandlerIdx;
 
 char ** memoryBackup;
 
+/** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
+int _replaySystem = 0;
+
+#undef ConverseDeliver
+int ConverseDeliver() {
+  return !_replaySystem;
+}
+
 #if ! CMK_HAS_NTOHL
 uint32_t ntohl(uint32_t netlong) {
   union { uint32_t i; unsigned char c[4]; } uaw;
