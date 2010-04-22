@@ -4456,7 +4456,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     
     free((char *)tmp_buf); 
     
-  }else if ( itemsize <= AMPI_ALLTOALL_MEDIUM_MSG ){
+  }else if ( itemsize <= AMPI_ALLTOALL_MEDIUM_MSG ) {
 #if AMPI_COMLIB
 	  if(comm == MPI_COMM_WORLD) {
 		  // commlib support
@@ -4469,13 +4469,13 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 		  ptr->getAlltoallStrategy()->doneInserting();
 	  } else
 #endif 
-      {
+    { // Note that this block hangs off the conditional above
 	for(i=0;i<size;i++) {
           int dst = (rank+i) % size;
           ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
                     sendtype, dst, comm);
 	}
-      }
+    }
     dttype = ptr->getDDT()->getType(recvtype) ;
     itemsize = dttype->getSize(recvcount) ;
     MPI_Status status;
