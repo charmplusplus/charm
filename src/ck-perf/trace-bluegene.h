@@ -15,8 +15,7 @@
 
 #include "trace.h"
 
-// TraceBluegene is subclass of Trace, 
-// it defines Blue Gene specific tracing subroutines.
+// Bigsim emulator specific tracing subroutines.
 class TraceBluegene : public Trace {
 
  private:

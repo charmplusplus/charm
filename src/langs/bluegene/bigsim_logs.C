@@ -9,6 +9,12 @@
      * add objId
  version 3
      * objId changed to 4 ints 
+
+ versions 4, 5
+ - ???
+
+ version 6
+ - MPI Record added
 */
 
 int bglog_version = BG_CURRENT_VERSION;
@@ -167,24 +173,6 @@ BgTimeLog::BgTimeLog(const BgMsgID &msgID)
   doCorrect = 1;
   flag = 0;
 }
-
-/*
-BgTimeLog::BgTimeLog(int _ep, int srcpe, int msgid, double _startTime, double _endTime, double _recvTime, char *str)
-{
-  if (str)
-    strcpy(name,str);
-  else
-    strcpy(name,"msgep");
-  startTime = _startTime;
-  endTime = _endTime;
-  execTime = endTime - startTime;
-  ep = _ep;
-  recvTime = _recvTime;
-  msgId = BgMsgID(srcpe, msgid);
-
-  recvTime = effRecvTime = startTime;
-}
-*/
 
 BgTimeLog::BgTimeLog(int epc, const char* namestr,double sTime)
 { 
