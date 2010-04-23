@@ -2677,22 +2677,14 @@ int AMPI_Barrier(MPI_Comm comm)
   AMPIAPI("AMPI_Barrier");
 
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Barrier not allowed for Inter-communicator!");
-#if CMK_BLUEGENE_CHARM
-  void *barrierLog;		// store current log in timeline
-  //TRACE_BG_AMPI_BARRIER_START(barrierLog);
-  TRACE_BG_AMPI_BREAK(NULL, "AMPI_Barrier", NULL, 0, 1);
-  _TRACE_BG_TLINE_END(&barrierLog); 
-#endif
+
+  TRACE_BG_AMPI_LOG(1, 0);
+
   //HACK: Use collective operation as a barrier.
   AMPI_Allreduce(NULL,NULL,0,MPI_INT,MPI_SUM,comm);
 
   //BIGSIM_OOC DEBUGGING
   //CkPrintf("%d: in AMPI_Barrier, after AMPI_Allreduce\n", getAmpiParent()->thisIndex);
-#if CMK_BLUEGENE_CHARM
-  //TRACE_BG_AMPI_BARRIER_END(barrierLog);
-  //_TRACE_BG_SET_INFO(NULL, "AMPI_Barrier_END",  &barrierLog, 1);
-  TRACE_BG_AMPI_BREAK(NULL, "AMPI_Barrier_END", &barrierLog, 1, 1);
-#endif
 #if AMPI_COUNTER
   getAmpiParent()->counters.barrier++;
 #endif
@@ -2843,7 +2835,9 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   CmiAssert(inbuf != MPI_IN_PLACE && outbuf != MPI_IN_PLACE);
   
   CkDDT_DataType *ddt_type = ptr->getDDT()->getType(type);
-  TRACE_BG_AMPI_SET_SIZE(count * ddt_type->getSize());
+
+  TRACE_BG_AMPI_LOG(2, count * ddt_type->getSize());
+
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
 
 #ifdef AMPIMSGLOG
