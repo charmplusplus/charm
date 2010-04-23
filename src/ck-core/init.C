@@ -853,6 +853,17 @@ extern "C" void initQd(char **argv)
         }
 }
 
+#if CMK_BLUEGENE_CHARM && CMK_CCS_AVAILABLE
+CpvExtern(int, _bgCcsHandlerIdx);
+CpvExtern(int, _bgCcsAck);
+extern "C" void req_fw_handler(char*);
+CkpvExtern(void *, debugQueue);
+CkpvExtern(int, freezeModeFlag);
+#include "blue_impl.h"
+extern void BgProcessMessageFreezeMode(threadInfo *, char *);
+#endif
+void CpdBreakPointInit();
+
 /**
   This is the main charm setup routine.  It's called
   on all processors after Converse initialization.
@@ -1047,18 +1058,17 @@ void _initCharm(int unused_argc, char **argv)
 		CkRegisterMainModule();
 		_registerDone();
 	}
+	/* The following will happen on every virtual processor in BigEmulator, not just on once per real processor */
+	if (CkMyRank() == 0) {
+	  CpdBreakPointInit();
+	}
 	CmiNodeAllBarrier();
 
     // Execute the initcalls registered in modules
 	_initCallTable.enumerateInitCalls();
 
 #ifndef CMK_OPTIMIZE
-#ifdef __BLUEGENE__
-        if(BgNodeRank()==0)
-#else
-        if(CkMyRank()==0)
-#endif
-          CpdFinishInitialization();
+	CpdFinishInitialization();
 #endif
 
 	//CmiNodeAllBarrier();
@@ -1132,6 +1142,25 @@ void _initCharm(int unused_argc, char **argv)
         }
         CmiInitCPUTopology(argv);
     }
+
+#if CMK_BLUEGENE_CHARM
+        // Register the BG handler for CCS. Notice that this is put into a variable shared by
+        // the whole real processor. This because converse needs to find it. We check that all
+        // virtual processors register the same index for this handler.
+        int bgCcsHandlerIdx = CkRegisterHandler((CmiHandler)req_fw_handler);
+        if (CpvAccess(_bgCcsHandlerIdx) == 0) CpvAccess(_bgCcsHandlerIdx) = bgCcsHandlerIdx;
+        CkAssert(CpvAccess(_bgCcsHandlerIdx)==bgCcsHandlerIdx);
+        CpvAccess(_bgCcsAck) ++;
+        CcsReleaseMessages();
+        
+        CkpvInitialize(int, freezeModeFlag);
+        CkpvAccess(freezeModeFlag) = 0;
+
+        CkpvInitialize(void *, debugQueue);
+        CkpvAccess(debugQueue) = CdsFifo_Create();
+        
+        BgProcessMessage = BgProcessMessageFreezeMode;
+#endif
 
 	if (faultFunc) {
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
@@ -1219,6 +1248,7 @@ void _initCharm(int unused_argc, char **argv)
         }
 
 #if CMK_CCS_AVAILABLE
+        // Should not use CpdFreeze inside a thread (since this processor is really a user-level thread)
        if (CpvAccess(cpdSuspendStartup))
        { 
           //CmiPrintf("In Parallel Debugging mode .....\n");

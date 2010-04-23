@@ -1181,6 +1181,8 @@ inline T *CkAllocateMarshallMsgT(int size,const CkEntryOptions *opts)
 
 /************************** Debugging Utilities **************/
 
+CkpvExtern(DebugEntryTable, _debugEntryTable);
+
 //For debugging: convert given index to a string (NOT threadsafe)
 static const char *idx2str(const CkArrayIndex &ind) {
   static char retBuf[80];

@@ -521,8 +521,10 @@ class workThreadInfo : public threadInfo {
 private:
   int CsdStopFlag;
 public:
+  void* reduceMsg;
+  
   workThreadInfo(int _id, nodeInfo *_node): 
-        threadInfo(_id, WORK_THREAD, _node) { 
+        threadInfo(_id, WORK_THREAD, _node), reduceMsg(NULL) { 
     CsdStopFlag=0; 
     watcher = NULL;
     if (_id != -1) {
@@ -557,7 +559,8 @@ void    resetVTime();
 char * getFullBuffer();
 void   addBgNodeMessage(char *msgPtr);
 void   addBgThreadMessage(char *msgPtr, int threadID);
-void   BgProcessMessage(threadInfo *t, char *msg);
+void   BgProcessMessageDefault(threadInfo *t, char *msg);
+extern void (*BgProcessMessage)(threadInfo *t, char *msg);
 
 
 /* blue gene debug */

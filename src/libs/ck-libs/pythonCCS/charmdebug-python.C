@@ -222,8 +222,8 @@ void CpdPythonGroup::registerPersistent(CkCcsRequestMsg *msg) {
   for (int i=0; i<n; ++i) {
     int ep = ntohl(((int*)iter)[i+2]);
     CkPrintf("registering method for EP %d\n",ep);
-    if (ep > 0) _debugEntryTable[ep].postProcess.push_back(dpc);
-    else _debugEntryTable[-ep].preProcess.push_back(dpc);
+    if (ep > 0) CkpvAccess(_debugEntryTable)[ep].postProcess.push_back(dpc);
+    else CkpvAccess(_debugEntryTable)[-ep].preProcess.push_back(dpc);
   }
   CkPrintf("[%d] Registering Persistent method (reference=%d)\n",CkMyPe(),pyReference);
 

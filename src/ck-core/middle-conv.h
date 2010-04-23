@@ -17,6 +17,8 @@
 #define CksvInitialize 	   CsvInitialize
 #define CksvAccess	   CsvAccess
 
+#define CkReduce    CmiReduce
+
 #undef CkMyPe
 #undef CkNumPes
 
@@ -43,7 +45,7 @@
 #define CkElapse(x)   
 
 #if CMK_REPLAYSYSTEM
-int ConverseDeliver();
+extern "C" int ConverseDeliver();
 #else
 #define ConverseDeliver()   1
 #endif
