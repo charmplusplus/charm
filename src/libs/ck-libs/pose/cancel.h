@@ -72,13 +72,13 @@ class CancelList {
   /// Remove a specific cancellation from the list
   void RemoveItem(CancelNode *item);      
   /// Test if cancellations is empty
-  int IsEmpty() { 
+  inline int IsEmpty() { 
     CmiAssert(((count == 0) && (cancellations == NULL)) ||
 	      ((count > 0) && (cancellations != NULL)));
     return (count == 0);
   }    
   /// Return earliest timestamp
-  POSE_TimeType getEarliest() { return earliest; }
+  inline POSE_TimeType getEarliest() { return earliest; }
   /// Dump all data fields
   void dump();               
   /// Pack/unpack/sizing operator

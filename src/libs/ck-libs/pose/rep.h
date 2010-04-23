@@ -62,17 +62,17 @@ class rep
   /// Initializer called from poser wrapper constructor
   void init(eventMsg *m);
   /// Return the OVT
-  POSE_TimeType OVT() { return ovt; }
+  inline POSE_TimeType OVT() { return ovt; }
   /// Set the OVT to t
-  void SetOVT(POSE_TimeType t) { ovt = t; }
+  inline void SetOVT(POSE_TimeType t) { ovt = t; }
   /// Make object use anti-methods rather than checkpointing
-  void useAntimethods() { anti_methods = 1; }
+  inline void useAntimethods() { anti_methods = 1; }
   /// Make object use checkpointing rather than anti-methods
-  void turnOffAntimethods() { anti_methods = 0; }
+  inline void turnOffAntimethods() { anti_methods = 0; }
   /// Check if this object uses anti-methods rather than checkpointing
-  int usesAntimethods() { return anti_methods; }
+  inline int usesAntimethods() { return anti_methods; }
   /// Elapse time by incrementing the OVT by dt
-  void elapse(POSE_TimeType dt) { ovt += dt; }
+  inline void elapse(POSE_TimeType dt) { ovt += dt; }
   /// Update the OVT and ORT at event start to auto-elapse to event timestamp
   /** If event has timestamp > OVT, OVT elapses to timestamp, otherwise
       there is no change to OVT. ORT updates similarly. */
@@ -85,7 +85,7 @@ class rep
   virtual void registerTimestamp(int idx, eventMsg *m, POSE_TimeType offset);
   /// Assignment operator
   /** Derived classes must provide assignment */
-  virtual rep& operator=(const rep& obj) { 
+  inline virtual rep& operator=(const rep& obj) { 
     ovt = obj.ovt; 
     ort = obj.ort;
     myHandle = obj.myHandle;
@@ -108,18 +108,18 @@ class rep
     p(ovt); p(ort); p(myHandle); p(anti_methods); p(prand_seed); p(prand48_seed,3);
   }
 #ifdef SEQUENTIAL_POSE
-  void checkpoint(rep *) { }
-  void restore(rep *) { }
+  inline void checkpoint(rep *) { }
+  inline void restore(rep *) { }
 #endif  
-  void POSE_srand(unsigned int pseed) { prand_seed = pseed; }
-  int POSE_rand() { 
+  inline void POSE_srand(unsigned int pseed) { prand_seed = pseed; }
+  inline int POSE_rand() { 
     int rnum; 
     srand(prand_seed); 
     rnum = rand(); 
     prand_seed = rnum+INT_MAX; 
     return rnum; 
   }
-  unsigned int POSE_urand() { 
+  inline unsigned int POSE_urand() { 
     int rnum; 
     srand(prand_seed); 
     rnum = rand(); 
