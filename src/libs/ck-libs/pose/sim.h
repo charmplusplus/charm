@@ -248,9 +248,11 @@ class sim : public CBase_sim {
     localPVT->objUpdateOVT(myPVTidx, myStrat->SafeTime(), objID->OVT()); 
   }
   /// Commit events based on new GVT estimate
-  void Commit();               
+  void Commit();
+  /// Commit all possible events before a checkpoint to disk
+  void CheckpointCommit();
   /// Add m to cancellation list
-  void Cancel(cancelMsg *m); 
+  void Cancel(cancelMsg *m);
   /// Report load information to local load balancer
   void ReportLBdata();
   /// Migrate this poser to processor indicated in m

@@ -95,6 +95,8 @@ class pvtObjects {
   void callAtSync();
   /// Call Commit on all posers
   void Commit();
+  /// Call CheckpointCommit on all posers
+  void CheckpointCommit();
   /// Insert poser in list
   /** Inserts an object in the list in the firstEmpty slot, expanding the list
       size if necessary */

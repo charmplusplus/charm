@@ -14,13 +14,12 @@ extern POSE_Config pose_config;
 /// Base representation class
 class rep 
 {
- protected:
-  /// Pointer to synchronization strategy
-  strat *myStrat;          
  public:
 #if POSE_COMM_ON
   CProxy_sim POSE_Objects;
 #endif
+  /// Pointer to synchronization strategy
+  strat *myStrat;          
   /// Pointer to poser wrapper
   sim *parent;             
   /// the object's unique handle
