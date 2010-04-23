@@ -463,7 +463,11 @@ static void CmiStartThreads(char **argv)
     pthread_attr_destroy(&attr);
   }
 #if ! (CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD)
+#if CMK_CONVERSE_MPI
+  pthread_setspecific(Cmi_state_key, Cmi_state_vector+_Cmi_mynodesize);
+#else
   pthread_setspecific(Cmi_state_key, Cmi_state_vector);
+#endif
 #endif
 
 }
