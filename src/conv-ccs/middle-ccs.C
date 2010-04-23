@@ -99,7 +99,11 @@ void ccs_getinfo(char *msg)
   CmiFree(msg);
 }
 
-//////////////////////////////////////////////////////////////////// middle-debug.C
+///////////////////////////////// middle-debug.C
+
+#if ! CMK_HAS_GETPID
+typedef int pid_t;
+#endif
 
 extern "C" {
 
