@@ -750,9 +750,9 @@ extern "C" int CpdIsBgCharmDebugMessage(void *msg) {
     // make sure it indeed is a charm message
   if ((CmiGetHandler(env) == _charmHandlerIdx) &&
          (CmiGetHandlerFunction(env) == (CmiHandlerEx)_processHandler) ||
-     (CmiGetXHandler(msg) == _charmHandlerIdx) )
+     (CmiGetXHandler(env) == _charmHandlerIdx) )
   {
-    return (((CmiBlueGeneMsgHeader*)msg)->hID) == CpvAccess(_bgCcsHandlerIdx) ||
+    return (((CmiBlueGeneMsgHeader*)env)->hID) == CpvAccess(_bgCcsHandlerIdx) ||
          env->getMsgtype() == ForVidMsg || env->getMsgtype() == FillVidMsg || 
          _entryTable[env->getEpIdx()]->inCharm;
   }
