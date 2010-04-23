@@ -1412,6 +1412,7 @@ CmiStartFn bgMain(int argc, char **argv)
   int i;
   char *configFile = NULL;
 
+  BgProcessMessage = BgProcessMessageDefault;
 #if CMK_CONDS_USE_SPECIAL_CODE
   // overwrite possible implementation in machine.c
   CmiSwitchToPE = CmiSwitchToPEFn;

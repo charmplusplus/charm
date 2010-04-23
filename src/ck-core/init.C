@@ -853,14 +853,8 @@ extern "C" void initQd(char **argv)
         }
 }
 
-#if CMK_BLUEGENE_CHARM && CMK_CCS_AVAILABLE
-CpvExtern(int, _bgCcsHandlerIdx);
-CpvExtern(int, _bgCcsAck);
-extern "C" void req_fw_handler(char*);
-CkpvExtern(void *, debugQueue);
-CkpvExtern(int, freezeModeFlag);
-#include "blue_impl.h"
-extern void BgProcessMessageFreezeMode(threadInfo *, char *);
+#if CMK_BLUEGENE_CHARM && CMK_CHARMDEBUG
+void CpdBlueGeneInit();
 #endif
 void CpdBreakPointInit();
 
@@ -1143,23 +1137,11 @@ void _initCharm(int unused_argc, char **argv)
         CmiInitCPUTopology(argv);
     }
 
-#if CMK_BLUEGENE_CHARM
-        // Register the BG handler for CCS. Notice that this is put into a variable shared by
-        // the whole real processor. This because converse needs to find it. We check that all
-        // virtual processors register the same index for this handler.
-        int bgCcsHandlerIdx = CkRegisterHandler((CmiHandler)req_fw_handler);
-        if (CpvAccess(_bgCcsHandlerIdx) == 0) CpvAccess(_bgCcsHandlerIdx) = bgCcsHandlerIdx;
-        CkAssert(CpvAccess(_bgCcsHandlerIdx)==bgCcsHandlerIdx);
-        CpvAccess(_bgCcsAck) ++;
-        CcsReleaseMessages();
-        
-        CkpvInitialize(int, freezeModeFlag);
-        CkpvAccess(freezeModeFlag) = 0;
-
-        CkpvInitialize(void *, debugQueue);
-        CkpvAccess(debugQueue) = CdsFifo_Create();
-        
-        BgProcessMessage = BgProcessMessageFreezeMode;
+#if CMK_BLUEGENE_CHARM && CMK_CHARMDEBUG
+      // Register the BG handler for CCS. Notice that this is put into a variable shared by
+      // the whole real processor. This because converse needs to find it. We check that all
+      // virtual processors register the same index for this handler.
+    CpdBlueGeneInit();
 #endif
 
 	if (faultFunc) {
@@ -1247,7 +1229,7 @@ void _initCharm(int unused_argc, char **argv)
                                         CkpvAccess(_coreState));
         }
 
-#if CMK_CCS_AVAILABLE
+#if CMK_CHARMDEBUG
         // Should not use CpdFreeze inside a thread (since this processor is really a user-level thread)
        if (CpvAccess(cpdSuspendStartup))
        { 

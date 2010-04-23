@@ -68,6 +68,7 @@
 #define CMK_64BIT                1
 #endif
 
+
 /* set up what production/non-production means */
 #ifdef CMK_OPTIMIZE
 /*
@@ -84,6 +85,10 @@
 #ifdef _WIN32
 #undef CMK_REPLAYSYSTEM
 #define CMK_REPLAYSYSTEM            0
+#endif
+
+#if ! CMK_CCS_AVAILABLE
+#define  CMK_CHARMDEBUG             0
 #endif
 
 #ifndef CMK_TRACE_DISABLED

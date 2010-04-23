@@ -203,6 +203,7 @@ extern void CpdCharmInit(void);
 
 void _registerDone(void)
 {
+#if CMK_CHARMDEBUG
   CpdListRegister(new CpdSimpleListAccessor("charm/entries",_entryTable.size(),pupEntry));
   CpdListRegister(new CpdSimpleListAccessor("charm/messages",_msgTable.size(),pupMsg));
   CpdListRegister(new CpdSimpleListAccessor("charm/chares",_chareTable.size(),pupChare));
@@ -210,7 +211,6 @@ void _registerDone(void)
   CpdListRegister(new CpdSimpleListAccessor("charm/readonly",_readonlyTable.size(),pupReadonly));
   CpdListRegister(new CpdSimpleListAccessor("charm/readonlyMsg",_readonlyMsgs.size(),pupReadonlyMsg));
 
-#if CMK_CCS_AVAILABLE
   CpdCharmInit();
 #endif
 }

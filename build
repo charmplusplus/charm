@@ -344,6 +344,10 @@ do
 		CONFIG_OPTS="$CONFIG_OPTS $1"
 		shift
 		;;
+    --disable-*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		shift
+		;;
     -j*)
                 PMAKENUM=`echo $1 | awk -Fj '{print $2}'`
 		MAKEOPTS="$MAKEOPTS -j $PMAKENUM"
@@ -547,7 +551,7 @@ then
     echo '#define CMK_OPTIMIZE 1' >> $ConvHeader
     # Prepend optimize so that an explicit -no-optimize still works
     OPTS="-optimize $OPTS"
-    CONFIG_OPTS="--disable-tracing --disable-replay $CONFIG_OPTS"
+    CONFIG_OPTS="--disable-tracing --disable-charmdebug --disable-replay $CONFIG_OPTS"
 fi
 
 # build with Tau
@@ -588,6 +592,7 @@ echo $VERSION | sed -e 's@-.*@@' > $DESTINATION/tmp/.gdir
 if test $BUILD_EMULATOR = 1
 then
   PROGRAM="$PROGRAM bigsim"
+#  CONFIG_OPTS="--disable-charmdebug $CONFIG_OPTS"
 fi
 
 printError()
