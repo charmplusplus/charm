@@ -26,7 +26,7 @@
 #endif
 
 // Flag that tells the system if we are replaying using Record/Replay
-extern int _replaySystem;
+extern "C" int _replaySystem;
 
 #if CMK_REPLAYSYSTEM
 inline void _CldEnqueue(int pe, void *msg, int infofn) {
