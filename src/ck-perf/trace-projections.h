@@ -261,6 +261,7 @@ class LogPool {
     char *dfname;
     char *pgmname;
     int binary;
+    int nSubdirs;
 #if CMK_PROJECTIONS_USE_ZLIB
     gzFile deltazfp;
     gzFile zfp;
@@ -285,6 +286,7 @@ class LogPool {
     LogPool(char *pgm);
     ~LogPool();
     void setBinary(int b) { binary = b; }
+    void setNumSubdirs(int n) { nSubdirs = n; }
 #if CMK_PROJECTIONS_USE_ZLIB
     void setCompressed(int c) { compressed = c; }
 #endif
