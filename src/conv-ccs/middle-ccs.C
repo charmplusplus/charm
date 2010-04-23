@@ -43,7 +43,7 @@ extern "C" void req_fw_handler(char *msg)
   CmiFree(msg);
 }
 
-extern int rep_fw_handler_idx;
+extern "C" int rep_fw_handler_idx;
 /**
  * Decide if the reply is ready to be forwarded to the waiting client,
  * or if combination is required (for broadcast/multicast CCS requests.
@@ -74,6 +74,7 @@ extern "C" int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
   } else {
     CcsImpl_reply(rep, repLen, repData);
   }
+  return 0;
 }
 #endif
 
@@ -111,11 +112,13 @@ CpvDeclare(int, freezeModeFlag);
  */
 void CpdFreeze(void)
 {
+#if CMK_HAS_GETPID
   CpdNotify(CPD_FREEZE,getpid());
   if (CpvAccess(freezeModeFlag)) return; /*Already frozen*/
   CpvAccess(freezeModeFlag) = 1;
 #if ! CMK_BLUEGENE_CHARM
   CpdFreezeModeScheduler();
+#endif
 #endif
 }
 
@@ -172,9 +175,11 @@ void CpdNotify(int type, ...) {
   case CPD_SIGNAL:
     CmiPrintf("CPD: %d Signal %d\n",CmiMyPe(), va_arg(list, int));
     break;
+#if CMK_HAS_GETPID
   case CPD_FREEZE:
     CmiPrintf("CPD: %d Freeze %d\n",CmiMyPe(),getpid());
     break;
+#endif
   case CPD_BREAKPOINT:
     CmiPrintf("CPD: %d BP %s\n",CmiMyPe(), va_arg(list, char*));
     break;
