@@ -747,13 +747,10 @@ extern "C" int CpdIsBgCharmDebugMessage(void *msg) {
   if (CmiBgMsgFlag(msg) == BG_CLONE) {
     env=*(envelope**)(((char*)msg)+CmiBlueGeneMsgHeaderSizeBytes);
   }
+  if  ((((CmiBlueGeneMsgHeader*)env)->hID) == CpvAccess(_bgCcsHandlerIdx)) return 1;
     // make sure it indeed is a charm message
-  if ((CmiGetHandler(env) == _charmHandlerIdx) &&
-         (CmiGetHandlerFunction(env) == (CmiHandlerEx)_processHandler) ||
-     (CmiGetXHandler(env) == _charmHandlerIdx) )
-  {
-    return (((CmiBlueGeneMsgHeader*)env)->hID) == CpvAccess(_bgCcsHandlerIdx) ||
-         env->getMsgtype() == ForVidMsg || env->getMsgtype() == FillVidMsg || 
+  if (CmiBgMsgHandle(env) == _charmHandlerIdx) {
+    return env->getMsgtype() == ForVidMsg || env->getMsgtype() == FillVidMsg ||
          _entryTable[env->getEpIdx()]->inCharm;
   }
   return 1;
