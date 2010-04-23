@@ -252,7 +252,7 @@ static int CcsNumBufferedMsgs = 0;
 #define CCS_MAX_NUM_BUFFERED_MSGS  100
 
 void CcsBufferMessage(char *msg) {
-  //CmiPrintf("Buffering CCS message\n");
+  CmiPrintf("Buffering CCS message\n");
   CmiAssert(CcsNumBufferedMsgs < CCS_MAX_NUM_BUFFERED_MSGS);
   if (CcsNumBufferedMsgs < 0) CmiAbort("Why is a CCS message being buffered now???");
   if (bufferedMessages == NULL) bufferedMessages = malloc(sizeof(char*)*CCS_MAX_NUM_BUFFERED_MSGS);
@@ -276,6 +276,7 @@ static void bg_req_fw_handler(char *msg) {
     CcsBufferMessage(msg);
     return;
   }
+  //CmiPrintf("CCS scheduling message\n");
   /* Get out of the message who is the destination pe */
   int offset = CmiReservedHeaderSize + sizeof(CcsImplHeader);
   CcsImplHeader *hdr = (CcsImplHeader *)(msg+CmiReservedHeaderSize);
@@ -300,15 +301,16 @@ static void bg_req_fw_handler(char *msg) {
 extern void req_fw_handler(char *msg);
 
 void CcsReleaseMessages() {
-#if ! NODE_0_IS_CONVHOST
+#if ! NODE_0_IS_CONVHOST || CMK_BLUEGENE_CHARM
 #if CMK_BLUEGENE_CHARM
   if (CpvAccess(_bgCcsAck) == 0 || CpvAccess(_bgCcsAck) < BgNodeSize()) return;
 #endif
   if (CcsNumBufferedMsgs > 0) {
     int i;
+    //CmiPrintf("CCS: %d messages released\n",CcsNumBufferedMsgs);
     for (i=0; i<CcsNumBufferedMsgs; ++i) {
       CmiSetHandler(bufferedMessages[i], _ccsHandlerIdx);
-      CmiPushPE(0, bufferedMessages[i]);
+      CsdEnqueue(bufferedMessages[i]);
     }
     free(bufferedMessages);
     bufferedMessages = NULL;
@@ -435,24 +437,31 @@ void CcsImpl_netRequest(CcsImplHeader *hdr,const void *reqData)
   char *msg;
   int len,repPE=ChMessageInt(hdr->pe);
   if (repPE<=-CmiNumPes() || repPE>=CmiNumPes()) {
+#if ! CMK_BLUEGENE_CHARM
     /*Treat out of bound values as errors. Helps detecting bugs*/
     if (repPE==-CmiNumPes()) CmiPrintf("Invalid processor index in CCS request: are you trying to do a broadcast instead?");
     else CmiPrintf("Invalid processor index in CCS request.");
     CpvAccess(ccsReq)=hdr;
     CcsSendReply(0,NULL); /*Send an empty reply to the possibly waiting client*/
     return;
+#endif
   }
 
   msg=CcsImpl_ccs2converse(hdr,reqData,&len);
   if (repPE >= 0) {
-    CmiSyncSendAndFree(repPE,len,msg);
+    /* The following %CmiNumPes() follows the assumption that in BigSim the mapping is round-robin */
+    //CmiPrintf("CCS message received for %d\n",repPE);
+    CmiSyncSendAndFree(repPE%CmiNumPes(),len,msg);
   } else if (repPE == -1) {
     /* Broadcast to all processors */
-    CmiPushPE(0, msg);
+    //CmiPrintf("CCS broadcast received\n");
+    CmiSyncSendAndFree(0,len,msg);
   } else {
     /* Multicast to -repPE processors, specified right at the beginning of reqData (as a list of pes) */
     int firstPE = ChMessageInt(*(ChMessageInt_t*)reqData);
-    CmiSyncSendAndFree(firstPE,len,msg);
+    /* The following %CmiNumPes() follows the assumption that in BigSim the mapping is round-robin */
+    //CmiPrintf("CCS multicast received\n");
+    CmiSyncSendAndFree(firstPE%CmiNumPes(),len,msg);
   }
 }
 
