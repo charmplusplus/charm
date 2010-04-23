@@ -112,13 +112,15 @@ CpvDeclare(int, freezeModeFlag);
  */
 void CpdFreeze(void)
 {
+  pid_t pid = 0;
 #if CMK_HAS_GETPID
-  CpdNotify(CPD_FREEZE,getpid());
+  pid = getpid();
+#endif
+  CpdNotify(CPD_FREEZE,pid);
   if (CpvAccess(freezeModeFlag)) return; /*Already frozen*/
   CpvAccess(freezeModeFlag) = 1;
 #if ! CMK_BLUEGENE_CHARM
   CpdFreezeModeScheduler();
-#endif
 #endif
 }
 
@@ -163,6 +165,7 @@ extern "C" int Slot_ChareOwner(void *s);
 #include <stdarg.h>
 void CpdNotify(int type, ...) {
   void *ptr; int integer, i;
+  pid_t pid=0;
   int levels=64;
   void *stackPtrs[64];
   void *sl;
@@ -175,11 +178,12 @@ void CpdNotify(int type, ...) {
   case CPD_SIGNAL:
     CmiPrintf("CPD: %d Signal %d\n",CmiMyPe(), va_arg(list, int));
     break;
-#if CMK_HAS_GETPID
   case CPD_FREEZE:
-    CmiPrintf("CPD: %d Freeze %d\n",CmiMyPe(),getpid());
-    break;
+#if CMK_HAS_GETPID
+    pid = getpid();
 #endif
+    CmiPrintf("CPD: %d Freeze %d\n",CmiMyPe(),pid);
+    break;
   case CPD_BREAKPOINT:
     CmiPrintf("CPD: %d BP %s\n",CmiMyPe(), va_arg(list, char*));
     break;
