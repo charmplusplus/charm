@@ -6,6 +6,7 @@
 #include "ccs-server.h"
 #include "conv-ccs.h"
 
+#if CMK_CCS_AVAILABLE
 extern "C" void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData);
 
 extern "C" void req_fw_handler(char *msg)
@@ -42,8 +43,7 @@ extern "C" void req_fw_handler(char *msg)
   CmiFree(msg);
 }
 
-extern "C" void CcsSendReply(int replyLen, const void *replyData);
-extern int rep_fw_handler_idx;
+extern "C" int rep_fw_handler_idx;
 /**
  * Decide if the reply is ready to be forwarded to the waiting client,
  * or if combination is required (for broadcast/multicast CCS requests.
@@ -74,7 +74,9 @@ extern "C" int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
   } else {
     CcsImpl_reply(rep, repLen, repData);
   }
+  return 0;
 }
+#endif
 
 /**********************************************
   "ccs_getinfo"-- takes no data
@@ -97,7 +99,11 @@ void ccs_getinfo(char *msg)
   CmiFree(msg);
 }
 
-//////////////////////////////////////////////////////////////////// middle-debug.C
+///////////////////////////////// middle-debug.C
+
+#if ! CMK_HAS_GETPID
+typedef int pid_t;
+#endif
 
 extern "C" {
 
@@ -110,7 +116,11 @@ CpvDeclare(int, freezeModeFlag);
  */
 void CpdFreeze(void)
 {
-  CpdNotify(CPD_FREEZE,getpid());
+  pid_t pid = 0;
+#if CMK_HAS_GETPID
+  pid = getpid();
+#endif
+  CpdNotify(CPD_FREEZE,pid);
   if (CpvAccess(freezeModeFlag)) return; /*Already frozen*/
   CpvAccess(freezeModeFlag) = 1;
 #if ! CMK_BLUEGENE_CHARM
@@ -159,6 +169,7 @@ extern "C" int Slot_ChareOwner(void *s);
 #include <stdarg.h>
 void CpdNotify(int type, ...) {
   void *ptr; int integer, i;
+  pid_t pid=0;
   int levels=64;
   void *stackPtrs[64];
   void *sl;
@@ -172,7 +183,10 @@ void CpdNotify(int type, ...) {
     CmiPrintf("CPD: %d Signal %d\n",CmiMyPe(), va_arg(list, int));
     break;
   case CPD_FREEZE:
-    CmiPrintf("CPD: %d Freeze %d\n",CmiMyPe(),getpid());
+#if CMK_HAS_GETPID
+    pid = getpid();
+#endif
+    CmiPrintf("CPD: %d Freeze %d\n",CmiMyPe(),pid);
     break;
   case CPD_BREAKPOINT:
     CmiPrintf("CPD: %d BP %s\n",CmiMyPe(), va_arg(list, char*));

@@ -80,6 +80,12 @@ void pvtObjects::Commit() {
   for (i=0; i<numSpaces; i++)
     if (objs[i].isPresent()) (objs[i].localObjPtr)->Commit();
 }
+/// Call CheckpointCommit on all posers
+void pvtObjects::CheckpointCommit() {
+  register int i;
+  for (i=0; i<numSpaces; i++)
+    if (objs[i].isPresent()) (objs[i].localObjPtr)->CheckpointCommit();
+}
 
 /// Dump data fields
 void pvtObjects::dump()

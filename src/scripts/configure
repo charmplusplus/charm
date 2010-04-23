@@ -1191,6 +1191,7 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-tracing        enable tracing modules
+  --enable-charmdebug     enable charmDebug
   --enable-replay         enable record/replay
 
 _ACEOF
@@ -1628,6 +1629,14 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+charmout="charmconfig.out"
+/bin/rm -rf $charmout
+
+Echo() {
+	echo $*
+	echo $* >> $charmout
+}
+
 # check enable/disable
 # Check whether --enable-tracing was given.
 if test "${enable_tracing+set}" = set; then
@@ -1639,9 +1648,34 @@ fi
 
 if test "$enable_tracing" = "no"
 then
+  Echo "Charm tracing is disabled"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_TRACE_DISABLED 1
+_ACEOF
+
+fi
+
+# Check whether --enable-charmdebug was given.
+if test "${enable_charmdebug+set}" = set; then
+  enableval=$enable_charmdebug; enable_charmdebug=$enableval
+else
+  enable_charmdebug=yes
+fi
+
+
+if test "$enable_charmdebug" = "no"
+then
+  Echo "CharmDebug is disabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_CHARMDEBUG 0
+_ACEOF
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_CHARMDEBUG 1
 _ACEOF
 
 fi
@@ -1656,6 +1690,7 @@ fi
 
 if test "$enable_replay" = "no"
 then
+  Echo "Charm record/replay is disabled"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_REPLAYSYSTEM 0
@@ -1679,9 +1714,6 @@ echo "${ECHO_T}$version" >&6; }
 
 t="test.cpp"
 tc="test.c"
-
-charmout="charmconfig.out"
-/bin/rm -rf $charmout
 
 # test result passed in $1
 # If the test suceeded, print $3 and set "pass"/clear "fail"

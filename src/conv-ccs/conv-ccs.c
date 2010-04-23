@@ -293,7 +293,7 @@ static void bg_req_fw_handler(char *msg) {
   (((CmiBlueGeneMsgHeader*)msg)->t) = 0;
   (((CmiBlueGeneMsgHeader*)msg)->hID) = CpvAccess(_bgCcsHandlerIdx);
   /* Get the right thread to deliver to (for now assume it is using CyclicMapInfo) */
-  addBgNodeInbuffer_c(msg, destPE/CmiNumPes());
+  addBgNodeInbuffer(msg, destPE/CmiNumPes());
   //CmiPrintf("message CCS added %d to %d\n",((CmiBlueGeneMsgHeader*)msg)->hID, ((CmiBlueGeneMsgHeader*)msg)->tID);
 }
 #define req_fw_handler bg_req_fw_handler

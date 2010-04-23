@@ -7,7 +7,7 @@ test -z "$ICC_ver" && echo "ICC compiler not found!" && exit 1
 
 #test intel x86, AMD or IA-64
 CPU_model=""
-model=`cat /proc/cpuinfo | grep 'model name'`
+model=`cat /proc/cpuinfo | grep 'model name' | tail -1`
 if echo $model | grep 'AMD' > /dev/null 2>/dev/null
 then
   CPU_model="AMD"

@@ -10,21 +10,6 @@
 */
 /*@{*/
 
-#include <stdlib.h>
-#if defined(_WIN32) && !defined(__CYGWIN__)
-#include <direct.h>
-#define CHDIR _chdir
-#define GETCWD _getcwd
-#define PATHSEP '\\'
-#define PATHSEPSTR "\\"
-#else
-#include <unistd.h>
-#define CHDIR chdir
-#define GETCWD getcwd
-#define PATHSEP '/'
-#define PATHSEPSTR "/"
-#endif
-
 // cannot include charm++.h because trace-common.o is part of libconv-core.a
 #include "charm.h"
 #include "middle.h"

@@ -20,7 +20,7 @@
 #include <unistd.h>
 
 
-#if CMK_CCS_AVAILABLE && !defined(_WIN32)
+#if CMK_CHARMDEBUG && CMK_CCS_AVAILABLE && !defined(_WIN32)
 
 #include "ck.h"
 
@@ -747,8 +747,16 @@ extern "C" int CpdIsBgCharmDebugMessage(void *msg) {
   if (CmiBgMsgFlag(msg) == BG_CLONE) {
     env=*(envelope**)(((char*)msg)+CmiBlueGeneMsgHeaderSizeBytes);
   }
-  return (((CmiBlueGeneMsgHeader*)msg)->hID) == CpvAccess(_bgCcsHandlerIdx) || env->getMsgtype() == ForVidMsg ||
-         env->getMsgtype() == FillVidMsg || _entryTable[env->getEpIdx()]->inCharm;
+    // make sure it indeed is a charm message
+  if ((CmiGetHandler(env) == _charmHandlerIdx) &&
+         (CmiGetHandlerFunction(env) == (CmiHandlerEx)_processHandler) ||
+     (CmiGetXHandler(msg) == _charmHandlerIdx) )
+  {
+    return (((CmiBlueGeneMsgHeader*)msg)->hID) == CpvAccess(_bgCcsHandlerIdx) ||
+         env->getMsgtype() == ForVidMsg || env->getMsgtype() == FillVidMsg || 
+         _entryTable[env->getEpIdx()]->inCharm;
+  }
+  return 0;
 }
 #endif
 
@@ -839,9 +847,43 @@ void CpdCharmInit()
 #endif
 }
 
+#if CMK_BLUEGENE_CHARM
+CpvExtern(int, _bgCcsHandlerIdx);
+CpvExtern(int, _bgCcsAck);
+extern "C" void req_fw_handler(char*);
+CkpvExtern(void *, debugQueue);
+CkpvExtern(int, freezeModeFlag);
+#include "blue_impl.h"
+extern void BgProcessMessageFreezeMode(threadInfo *, char *);
+
+void CpdBlueGeneInit()
+{
+        // Register the BG handler for CCS. Notice that this is put into a variable shared by
+        // the whole real processor. This because converse needs to find it. We check that all
+        // virtual processors register the same index for this handler.
+        int bgCcsHandlerIdx = CkRegisterHandler((CmiHandler)req_fw_handler);
+        if (CpvAccess(_bgCcsHandlerIdx) == 0) CpvAccess(_bgCcsHandlerIdx) = bgCcsHandlerIdx;
+        CkAssert(CpvAccess(_bgCcsHandlerIdx)==bgCcsHandlerIdx);
+        CpvAccess(_bgCcsAck) ++;
+        CcsReleaseMessages();
+        
+        CkpvInitialize(int, freezeModeFlag);
+        CkpvAccess(freezeModeFlag) = 0;
+
+        CkpvInitialize(void *, debugQueue);
+        CkpvAccess(debugQueue) = CdsFifo_Create();
+        
+        BgProcessMessage = BgProcessMessageFreezeMode;
+}
+#endif
+
 #else
 
+void CpdBreakPointInit() {}
 void CpdCharmInit() {}
+#if CMK_BLUEGENE_CHARM
+void CpdBlueGeneInit() {}
+#endif
 
 void CpdFinishInitialization() {}
 
