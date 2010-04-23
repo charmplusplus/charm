@@ -506,6 +506,7 @@ char * getFullBuffer()
  * called by a Converse handler or sendPacket()
  * add message msgPtr to a bluegene node's inbuffer queue 
  */
+extern "C"
 void addBgNodeInbuffer(char *msgPtr, int lnodeID)
 {
 #ifndef CMK_OPTIMIZE
@@ -516,9 +517,6 @@ void addBgNodeInbuffer(char *msgPtr, int lnodeID)
   //printf("Adding a msg %p to local node %d and its thread %d\n", msgPtr, lnodeID, CmiBgMsgThreadID(msgPtr));	
 	
   nInfo.addBgNodeInbuffer(msgPtr);
-}
-extern "C" void addBgNodeInbuffer_c(char *msgPtr, int lnodeID) {
-  addBgNodeInbuffer(msgPtr, lnodeID);
 }
 
 /** BG API Func 
