@@ -1629,6 +1629,14 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+charmout="charmconfig.out"
+/bin/rm -rf $charmout
+
+Echo() {
+	echo $*
+	echo $* >> $charmout
+}
+
 # check enable/disable
 # Check whether --enable-tracing was given.
 if test "${enable_tracing+set}" = set; then
@@ -1640,7 +1648,7 @@ fi
 
 if test "$enable_tracing" = "no"
 then
-  echo "Charm tracing is disabled"
+  Echo "Charm tracing is disabled"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_TRACE_DISABLED 1
@@ -1658,7 +1666,7 @@ fi
 
 if test "$enable_charmdebug" = "no"
 then
-  echo "CharmDebug is disabled"
+  Echo "CharmDebug is disabled"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_CHARMDEBUG 0
@@ -1680,14 +1688,9 @@ else
 fi
 
 
-if test "$enable_charmdebug" = "no"
-then
-  enable_replay=no
-fi
-
 if test "$enable_replay" = "no"
 then
-  echo "Charm record/replay is disabled"
+  Echo "Charm record/replay is disabled"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_REPLAYSYSTEM 0
@@ -1711,9 +1714,6 @@ echo "${ECHO_T}$version" >&6; }
 
 t="test.cpp"
 tc="test.c"
-
-charmout="charmconfig.out"
-/bin/rm -rf $charmout
 
 # test result passed in $1
 # If the test suceeded, print $3 and set "pass"/clear "fail"

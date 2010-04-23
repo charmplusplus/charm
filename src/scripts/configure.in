@@ -11,6 +11,14 @@ VERSION=60301
 echo $VERSION > ../include/VERSION
 AC_DEFINE_UNQUOTED([CHARM_VERSION], $VERSION, [Charm++ version number])
 
+charmout="charmconfig.out"
+/bin/rm -rf $charmout
+
+Echo() {
+	echo $* 
+	echo $* >> $charmout
+}
+
 # check enable/disable
 AC_ARG_ENABLE([tracing],
             [AS_HELP_STRING([--enable-tracing],
@@ -20,7 +28,7 @@ AC_ARG_ENABLE([tracing],
 
 if test "$enable_tracing" = "no"
 then
-  echo "Charm tracing is disabled"
+  Echo "Charm tracing is disabled"
   AC_DEFINE_UNQUOTED(CMK_TRACE_DISABLED, 1, [disable tracing])
 fi
 
@@ -32,7 +40,7 @@ AC_ARG_ENABLE([charmdebug],
 
 if test "$enable_charmdebug" = "no"
 then
-  echo "CharmDebug is disabled"
+  Echo "CharmDebug is disabled" 
   AC_DEFINE_UNQUOTED(CMK_CHARMDEBUG, 0, [disable charmdebug])
 else
   AC_DEFINE_UNQUOTED(CMK_CHARMDEBUG, 1, [enable charmdebug])
@@ -44,14 +52,9 @@ AC_ARG_ENABLE([replay],
             [enable_replay=$enableval],
             [enable_replay=yes])
 
-if test "$enable_charmdebug" = "no"
-then
-  enable_replay=no
-fi
-
 if test "$enable_replay" = "no"
 then
-  echo "Charm record/replay is disabled"
+  Echo "Charm record/replay is disabled"
   AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
 fi
 
@@ -65,9 +68,6 @@ AC_SUBST(base_version)
 
 t="test.cpp"
 tc="test.c"
-
-charmout="charmconfig.out"
-/bin/rm -rf $charmout
 
 # test result passed in $1
 # If the test suceeded, print $3 and set "pass"/clear "fail"
